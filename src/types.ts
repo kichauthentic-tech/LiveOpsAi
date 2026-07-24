@@ -1,0 +1,226 @@
+export type UserRole = "ceo" | "operations" | "brand" | "talent";
+
+export type PermissionKey =
+  | "view_financials"
+  | "view_executive_brief"
+  | "manage_sessions"
+  | "manage_calendar"
+  | "generate_scripts"
+  | "manage_talents"
+  | "manage_studios_gear"
+  | "manage_crm_projects"
+  | "manage_tiktok_api"
+  | "manage_finance_hr"
+  | "manage_ai_agents"
+  | "manage_users_permissions"
+  | "export_reports";
+
+export interface PermissionDefinition {
+  key: PermissionKey;
+  label: string;
+  category: "Tổng Quan & Báo Cáo" | "Vận Hành & Studio" | "Nội Dung & AI" | "Quản Trị System & Tài Chính";
+  description: string;
+}
+
+export type RolePermissionsMap = Record<UserRole, Record<PermissionKey, boolean>>;
+
+export interface SystemUser {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  customRoleTitle: string;
+  avatar: string;
+  status: "Active" | "Inactive";
+  assignedBrandId?: string;
+  assignedTalentId?: string;
+  lastLogin: string;
+  customPermissionOverrides?: Partial<Record<PermissionKey, boolean>>;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  timestamp: string;
+  performedBy: string;
+  action: string;
+  details: string;
+  category: "Permission Change" | "Role Update" | "User Status" | "Security Alert";
+}
+
+export interface Brand {
+  id: string;
+  name: string;
+  logo: string;
+  industry: string;
+  contactName: string;
+  phone: string;
+  email: string;
+  activeCampaigns: number;
+  totalGmv: number;
+  contractStatus: "Active" | "Pending" | "Completed";
+  owner: string;
+}
+
+export interface Talent {
+  id: string;
+  name: string;
+  avatar: string;
+  role: "Host" | "KOC" | "KOL" | "MC";
+  gender: string;
+  niches: string[];
+  followersTikTok: number;
+  avgGmvPerSession: number;
+  ctrAvg: number; // e.g. 8.5%
+  cvrAvg: number; // e.g. 4.2%
+  ratePerSession: number;
+  commissionRate: number; // e.g. 3%
+  overallScore: number; // 0-100
+  availabilityStatus: "Available" | "Busy" | "On Live";
+  brandsWorkedWith: string[];
+  phone: string;
+}
+
+export interface Studio {
+  id: string;
+  name: string;
+  roomNumber: string;
+  capacity: number;
+  theme: string;
+  status: "Live Now" | "Booked" | "Available" | "Maintenance";
+  currentSessionId?: string;
+  equipmentCount: number;
+}
+
+export interface Equipment {
+  id: string;
+  qrCode: string;
+  name: string;
+  category: "Camera" | "Lighting" | "Audio" | "PC/Switcher" | "Teleprompter";
+  model: string;
+  assignedStudioId?: string;
+  status: "In Use" | "In Stock" | "Maintenance" | "Damaged";
+  lastCheckDate: string;
+}
+
+export interface ProductSKU {
+  id: string;
+  code: string;
+  name: string;
+  category: string;
+  originalPrice: number;
+  livePrice: number;
+  commission: number;
+  stock: number;
+  soldInSession: number;
+  clickCount: number;
+  ctr: number;
+  cvr: number;
+}
+
+export interface MinuteMetric {
+  minute: number; // 0 to 60 or 120
+  timeString: string; // e.g. "08:15"
+  viewers: number;
+  peakViewers: number;
+  gmvCumulative: number;
+  gmvPerMinute: number;
+  ctr: number;
+  cvr: number;
+  productClicks: number;
+  comments: number;
+  eventTrigger?: string; // e.g. "Ghim Voucher 50k", "Host thử test son", "Flash Sale Combo"
+}
+
+export interface ChecklistItem {
+  id: string;
+  task: string;
+  category: "Tech" | "Studio" | "Product" | "Host & Script" | "TikTok App";
+  completed: boolean;
+  assignedTo: string;
+}
+
+export interface LiveSession {
+  id: string;
+  title: string;
+  brandId: string;
+  brandName: string;
+  shopTikTokHandle: string;
+  studioId: string;
+  studioName: string;
+  hostId: string;
+  hostName: string;
+  assistantName: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  status: "Live Now" | "Upcoming" | "Completed" | "Cancelled";
+  targetGmv: number;
+  actualGmv: number;
+  totalOrders: number;
+  avgWatchTimeSeconds: number;
+  peakViewers: number;
+  totalViews: number;
+  ctrAvg: number;
+  cvrAvg: number;
+  skus: ProductSKU[];
+  checklist: ChecklistItem[];
+  minuteMetrics: MinuteMetric[];
+  aiAnalysis?: {
+    overallRating: string;
+    gmvSummary: string;
+    keyHighlights: string[];
+    topMistakes: string[];
+    hostCoaching: {
+      closingSkillScore: number;
+      energyScore: number;
+      productKnowledgeScore: number;
+      speechRateScore: number;
+      feedback: string;
+    };
+    actionableRecommendations: string[];
+  };
+}
+
+export interface AgencyProject {
+  id: string;
+  name: string;
+  brandId: string;
+  brandName: string;
+  budget: number;
+  kpiGmv: number;
+  actualGmv: number;
+  startDate: string;
+  endDate: string;
+  status: "In Progress" | "Planning" | "Completed" | "Paused";
+  totalSessionsPlanned: number;
+  sessionsCompleted: number;
+  teamLead: string;
+}
+
+export interface WorkflowRule {
+  id: string;
+  name: string;
+  trigger: string;
+  action: string;
+  enabled: boolean;
+  lastRun?: string;
+  executionsCount: number;
+}
+
+export interface StrategicDirective {
+  id: string;
+  code: string;
+  title: string;
+  description: string;
+  department: "Operations" | "Content & AI" | "Talent Management" | "Brand Client" | "Finance & Admin";
+  assignedRole: UserRole | "all";
+  assigneeName: string;
+  priority: "Urgent" | "High" | "Medium";
+  targetKpi: string;
+  deadline: string;
+  status: "Pending" | "In Progress" | "Needs BOD Support" | "Completed";
+  progressPercent: number;
+  notesFromLead?: string;
+  createdAt: string;
+}
+
