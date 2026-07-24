@@ -1,6 +1,6 @@
 import React from "react";
 import { UserRole, SystemUser } from "../types";
-import { Radio, Sparkles, Activity, ShieldCheck, Bell, ChevronDown, User } from "lucide-react";
+import { Radio, Sparkles, Activity, ShieldCheck, Bell, Eye, EyeOff, RotateCcw } from "lucide-react";
 
 interface HeaderProps {
   currentRole: UserRole;
@@ -10,6 +10,9 @@ interface HeaderProps {
   users?: SystemUser[];
   activeUserId?: string;
   onUserSelect?: (userId: string) => void;
+  isMockDataHidden?: boolean;
+  onToggleMockData?: () => void;
+  onResetData?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -19,7 +22,10 @@ export const Header: React.FC<HeaderProps> = ({
   onTabChange,
   users = [],
   activeUserId,
-  onUserSelect
+  onUserSelect,
+  isMockDataHidden = false,
+  onToggleMockData,
+  onResetData
 }) => {
   const activeUser = users.find((u) => u.id === activeUserId) || users[0];
 
@@ -34,14 +40,45 @@ export const Header: React.FC<HeaderProps> = ({
 
         <div className="hidden sm:flex items-center gap-2 bg-slate-800/80 border border-slate-700/60 px-3 py-1 rounded-full">
           <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-          <span className="text-xs font-semibold text-slate-200">1 Concurrent Live Session</span>
+          <span className="text-xs font-semibold text-slate-200">
+            {isMockDataHidden ? "Clean Test Mode" : "1 Concurrent Live Session"}
+          </span>
           <span className="text-slate-500 text-xs">|</span>
-          <span className="text-xs font-mono text-emerald-400 font-bold">185.4M đ</span>
+          <span className="text-xs font-mono text-emerald-400 font-bold">
+            {isMockDataHidden ? "Test Real-time Data" : "185.4M đ"}
+          </span>
         </div>
       </div>
 
-      {/* Role Switcher, Settings & User Profile */}
+      {/* Role Switcher, Mock Data Control, Settings & User Profile */}
       <div className="flex items-center gap-3">
+        {/* Mock Data Toggle Button for Testing */}
+        {onToggleMockData && (
+          <button
+            onClick={onToggleMockData}
+            className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 ${
+              isMockDataHidden
+                ? "bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30 shadow-lg shadow-amber-500/10"
+                : "bg-slate-800/80 hover:bg-slate-700 text-slate-300 border-slate-700"
+            }`}
+            title={isMockDataHidden ? "Bấm để mở lại dữ liệu mẫu" : "Bấm để ẩn toàn bộ dữ liệu mẫu và test app sạch"}
+          >
+            {isMockDataHidden ? (
+              <>
+                <EyeOff className="w-4 h-4 text-amber-400" />
+                <span className="hidden sm:inline">Mock Data: </span>
+                <span className="text-amber-400 font-extrabold uppercase">ĐANG ẨN (TEST)</span>
+              </>
+            ) : (
+              <>
+                <Eye className="w-4 h-4 text-emerald-400" />
+                <span className="hidden sm:inline">Mock Data: </span>
+                <span className="text-emerald-400 font-extrabold uppercase">ĐANG HIỆN</span>
+              </>
+            )}
+          </button>
+        )}
+
         {/* Role Quick Selector */}
         <div className="flex items-center bg-slate-950/80 p-1 rounded-xl border border-slate-800/80">
           <span className="text-[11px] text-slate-400 px-2 font-medium hidden md:flex items-center gap-1">

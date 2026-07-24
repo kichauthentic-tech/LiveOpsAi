@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { LiveSession, Studio, Talent, Brand } from "../types";
 import {
   Calendar as CalendarIcon,
@@ -249,15 +249,12 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   brands,
   onAddSession
 }) => {
-  // Merge prop sessions with additional mock sessions for full month coverage
-  const [sessions, setSessions] = useState<LiveSession[]>(() => {
-    const ids = new Set(propSessions.map((s) => s.id));
-    const merged = [...propSessions];
-    ADDITIONAL_MOCK_SESSIONS.forEach((s) => {
-      if (!ids.has(s.id)) merged.push(s);
-    });
-    return merged;
-  });
+  // Sync sessions with propSessions so clean test mode is respected
+  const [sessions, setSessions] = useState<LiveSession[]>(propSessions);
+
+  useEffect(() => {
+    setSessions(propSessions);
+  }, [propSessions]);
 
   // View Mode: Month, Week, Day Matrix, Talent Workload, List
   const [viewMode, setViewMode] = useState<"month" | "week" | "day" | "talent_workload" | "list">("day");

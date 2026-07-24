@@ -223,7 +223,14 @@ export const PerformanceDeviationAlerts: React.FC<PerformanceDeviationAlertsProp
 
       {/* List of Deviating Sessions */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {filteredList.map((item) => {
+        {filteredList.length === 0 ? (
+          <div className="col-span-1 md:col-span-2 p-8 bg-slate-950/50 border border-slate-800 rounded-xl text-center text-xs text-slate-400 space-y-2">
+            <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto" />
+            <p className="font-bold text-slate-200">Không có cảnh báo lệch KPI nào</p>
+            <p className="text-slate-500">Tất cả phiên livestream hiện tại đang vận hành ổn định hoặc chưa phát sinh biến động doanh thu.</p>
+          </div>
+        ) : (
+          filteredList.map((item) => {
           const s = item.session;
           const isSurge = item.type === "surge";
           const isLive = s.status === "Live Now";

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry } from "./types";
+import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, StrategicDirective } from "./types";
 import {
   MOCK_SESSIONS,
   MOCK_BRANDS,
@@ -11,7 +11,8 @@ import {
   DEFAULT_ROLE_PERMISSIONS,
   ALL_PERMISSION_DEFINITIONS,
   MOCK_SYSTEM_USERS,
-  MOCK_AUDIT_LOGS
+  MOCK_AUDIT_LOGS,
+  MOCK_STRATEGIC_DIRECTIVES
 } from "./data/mockData";
 import {
   LayoutDashboard,
@@ -57,6 +58,8 @@ export default function App() {
   const [activeUserId, setActiveUserId] = useState<string>("usr-1");
 
   // State
+  const [isMockDataHidden, setIsMockDataHidden] = useState<boolean>(true);
+
   const [sessions, setSessions] = useState<LiveSession[]>(MOCK_SESSIONS);
   const [selectedSession, setSelectedSession] = useState<LiveSession>(MOCK_SESSIONS[0]);
   const [brands, setBrands] = useState(MOCK_BRANDS);
@@ -65,9 +68,25 @@ export default function App() {
   const [equipments, setEquipments] = useState(MOCK_EQUIPMENTS);
   const [projects, setProjects] = useState(MOCK_PROJECTS);
   const [workflowRules, setWorkflowRules] = useState(MOCK_WORKFLOW_RULES);
+  const [directives, setDirectives] = useState<StrategicDirective[]>(MOCK_STRATEGIC_DIRECTIVES);
+
+  // Active datasets filtered based on mock data visibility toggle
+  const activeSessions = isMockDataHidden ? sessions.filter((s) => s.isCustom) : sessions;
+  const activeBrands = isMockDataHidden ? brands.filter((b) => b.isCustom) : brands;
+  const activeTalents = isMockDataHidden ? talents.filter((t) => t.isCustom) : talents;
+  const activeStudios = isMockDataHidden ? studios.filter((s) => s.isCustom) : studios;
+  const activeEquipments = isMockDataHidden ? equipments.filter((e) => e.isCustom) : equipments;
+  const activeProjects = isMockDataHidden ? projects.filter((p) => p.isCustom) : projects;
+  const activeWorkflowRules = isMockDataHidden ? workflowRules.filter((w) => w.isCustom) : workflowRules;
+  const activeDirectives = isMockDataHidden ? directives.filter((d) => d.isCustom) : directives;
+  const activeAuditLogs = isMockDataHidden ? auditLogs.filter((a) => a.isCustom) : auditLogs;
+  const activeUsers = isMockDataHidden ? users.filter((u) => u.isCustom) : users;
+
+  // Active Selected Session (null/undefined when activeSessions is empty)
+  const activeSelectedSession = activeSessions.find((s) => s.id === selectedSession?.id) || activeSessions[0] || null;
 
   // Active User object
-  const activeUser = users.find((u) => u.id === activeUserId) || users[0];
+  const activeUser = users.find((u) => u.id === activeUserId) || users[0] || { id: "usr-1", name: "Ban Giám Đốc (CEO)", email: "ceo@agency.vn", role: "ceo" as const, status: "Active" as const, joinedDate: "2026-01-01" };
 
   // Helper to check permission for a specific key under current role/user
   const checkPermission = (permKey: PermissionKey): boolean => {
@@ -137,7 +156,7 @@ export default function App() {
 
   // Handlers for Talents
   const handleAddTalent = (newTalent: any) => {
-    setTalents(prev => [newTalent, ...prev]);
+    setTalents(prev => [{ ...newTalent, isCustom: true }, ...prev]);
   };
   const handleUpdateTalent = (updatedTalent: any) => {
     setTalents(prev => prev.map(t => t.id === updatedTalent.id ? updatedTalent : t));
@@ -148,7 +167,7 @@ export default function App() {
 
   // Handlers for Studios
   const handleAddStudio = (newStudio: any) => {
-    setStudios(prev => [newStudio, ...prev]);
+    setStudios(prev => [{ ...newStudio, isCustom: true }, ...prev]);
   };
   const handleUpdateStudio = (updatedStudio: any) => {
     setStudios(prev => prev.map(s => s.id === updatedStudio.id ? updatedStudio : s));
@@ -159,7 +178,7 @@ export default function App() {
 
   // Handlers for Equipments
   const handleAddEquipment = (newEquipment: any) => {
-    setEquipments(prev => [newEquipment, ...prev]);
+    setEquipments(prev => [{ ...newEquipment, isCustom: true }, ...prev]);
   };
   const handleUpdateEquipment = (updatedEquipment: any) => {
     setEquipments(prev => prev.map(e => e.id === updatedEquipment.id ? updatedEquipment : e));
@@ -170,7 +189,7 @@ export default function App() {
 
   // Handlers for Brands
   const handleAddBrand = (newBrand: any) => {
-    setBrands(prev => [newBrand, ...prev]);
+    setBrands(prev => [{ ...newBrand, isCustom: true }, ...prev]);
   };
   const handleUpdateBrand = (updatedBrand: any) => {
     setBrands(prev => prev.map(b => b.id === updatedBrand.id ? updatedBrand : b));
@@ -181,7 +200,7 @@ export default function App() {
 
   // Handlers for Projects
   const handleAddProject = (newProject: any) => {
-    setProjects(prev => [newProject, ...prev]);
+    setProjects(prev => [{ ...newProject, isCustom: true }, ...prev]);
   };
   const handleUpdateProject = (updatedProject: any) => {
     setProjects(prev => prev.map(p => p.id === updatedProject.id ? updatedProject : p));
@@ -192,19 +211,20 @@ export default function App() {
 
   // Handlers for Live Sessions
   const handleAddSession = (newSession: any) => {
-    setSessions(prev => [newSession, ...prev]);
-    setSelectedSession(newSession);
+    const item = { ...newSession, isCustom: true };
+    setSessions(prev => [item, ...prev]);
+    setSelectedSession(item);
   };
   const handleUpdateSession = (updatedSession: any) => {
     setSessions(prev => prev.map(s => s.id === updatedSession.id ? updatedSession : s));
-    if (selectedSession.id === updatedSession.id) {
+    if (selectedSession && selectedSession.id === updatedSession.id) {
       setSelectedSession(updatedSession);
     }
   };
   const handleDeleteSession = (id: string) => {
     setSessions(prev => {
       const next = prev.filter(s => s.id !== id);
-      if (selectedSession.id === id && next.length > 0) {
+      if (selectedSession && selectedSession.id === id && next.length > 0) {
         setSelectedSession(next[0]);
       }
       return next;
@@ -213,13 +233,54 @@ export default function App() {
 
   // Handlers for Workflow Rules
   const handleAddWorkflowRule = (newRule: any) => {
-    setWorkflowRules(prev => [newRule, ...prev]);
+    setWorkflowRules(prev => [{ ...newRule, isCustom: true }, ...prev]);
   };
   const handleUpdateWorkflowRule = (updatedRule: any) => {
     setWorkflowRules(prev => prev.map(r => r.id === updatedRule.id ? updatedRule : r));
   };
   const handleDeleteWorkflowRule = (id: string) => {
     setWorkflowRules(prev => prev.filter(r => r.id !== id));
+  };
+
+  // Handlers for Directives
+  const handleAddDirective = (newDir: any) => {
+    setDirectives(prev => [{ ...newDir, isCustom: true }, ...prev]);
+  };
+  const handleUpdateDirective = (updatedDir: any) => {
+    setDirectives(prev => prev.map(d => d.id === updatedDir.id ? updatedDir : d));
+  };
+  const handleDeleteDirective = (id: string) => {
+    setDirectives(prev => prev.filter(d => d.id !== id));
+  };
+
+  const handleClearAllCustomData = () => {
+    if (window.confirm("Bạn có chắc chắn muốn xóa sạch tất cả dữ liệu tự nhập không?")) {
+      setSessions(prev => prev.filter(s => !s.isCustom));
+      setBrands(prev => prev.filter(b => !b.isCustom));
+      setTalents(prev => prev.filter(t => !t.isCustom));
+      setStudios(prev => prev.filter(s => !s.isCustom));
+      setEquipments(prev => prev.filter(e => !e.isCustom));
+      setProjects(prev => prev.filter(p => !p.isCustom));
+      setWorkflowRules(prev => prev.filter(w => !w.isCustom));
+      setDirectives(prev => prev.filter(d => !d.isCustom));
+      setAuditLogs(prev => prev.filter(a => !a.isCustom));
+      setUsers(prev => prev.filter(u => !u.isCustom));
+    }
+  };
+
+  const handleClearEverything = () => {
+    if (window.confirm("Bạn có chắc chắn muốn XÓA SẠCH TẤT CẢ DỮ LIỆU (Cả Mock Data & Dữ liệu tự nhập) để kiểm tra ứng dụng ở trạng thái hoàn toàn trống không?")) {
+      setSessions([]);
+      setBrands([]);
+      setTalents([]);
+      setStudios([]);
+      setEquipments([]);
+      setProjects([]);
+      setWorkflowRules([]);
+      setDirectives([]);
+      setAuditLogs([]);
+      setIsMockDataHidden(true);
+    }
   };
 
   const handleSelectSessionFromDashboard = (session: LiveSession) => {
@@ -239,7 +300,7 @@ export default function App() {
     { id: "crm", label: "CRM & Projects", icon: Briefcase, perm: "manage_crm_projects" as PermissionKey },
     { id: "tiktok_api", label: "TikTok API", icon: Link2, perm: "manage_tiktok_api" as PermissionKey },
     { id: "finance", label: "Finance & P&L", icon: DollarSign, perm: "view_financials" as PermissionKey },
-    { id: "ai_agents", label: "AI Council", icon: Bot, perm: "manage_ai_agents" as PermissionKey },
+    { id: "ai_agents", label: "Hội Đồng AI & Simulator", icon: Bot, badge: "DEMO", perm: "manage_ai_agents" as PermissionKey },
     { id: "user_settings", label: "Phân Quyền & Role", icon: ShieldCheck, badge: "CUSTOM", perm: "manage_users_permissions" as PermissionKey },
   ];
 
@@ -354,9 +415,40 @@ export default function App() {
               users={users}
               activeUserId={activeUserId}
               onUserSelect={setActiveUserId}
+              isMockDataHidden={isMockDataHidden}
+              onToggleMockData={() => setIsMockDataHidden(!isMockDataHidden)}
+              onResetData={handleClearAllCustomData}
             />
           </div>
         </div>
+
+        {/* Clean Test Mode Alert Banner */}
+        {isMockDataHidden && (
+          <div className="bg-amber-950/80 border-b border-amber-500/30 px-6 py-2.5 text-xs text-amber-200 flex flex-wrap items-center justify-between gap-3 shadow-md backdrop-blur-md">
+            <div className="flex items-center gap-2">
+              <span className="p-1 bg-amber-500/20 rounded-lg text-amber-400">
+                <Sparkles className="w-4 h-4" />
+              </span>
+              <span>
+                <strong className="text-amber-300 font-extrabold uppercase">Chế Độ Test App (Clean State):</strong> Tất cả dữ liệu mẫu (Mock Data) đã được ẩn/xóa sạch. Tất cả các tab (Brief, Calendar, CRM, Talent, Studio, Settings...) đang trống để bạn tự do tạo dữ liệu mới để thử nghiệm.
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setIsMockDataHidden(false)}
+                className="px-3 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-[11px] transition-all shadow"
+              >
+                Mở Lại Mock Data Ban Đầu
+              </button>
+              <button
+                onClick={handleClearEverything}
+                className="px-3 py-1 bg-red-950/90 hover:bg-red-900 text-red-200 border border-red-500/40 font-bold rounded-lg text-[11px] transition-all"
+              >
+                Xóa Sạch Tự Nhập & Reset Về 0
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Dynamic View Content */}
         <main className="flex-1 overflow-y-auto p-6 scrollbar-thin">
@@ -405,23 +497,33 @@ export default function App() {
               </div>
             ) : (
               <>
-                {activeTab === "brief" && <ExecutiveBrief currentRole={currentRole} />}
+                {activeTab === "brief" && (
+                  <ExecutiveBrief
+                    currentRole={currentRole}
+                    sessions={activeSessions}
+                    directives={activeDirectives}
+                    onAddDirective={handleAddDirective}
+                    onUpdateDirective={handleUpdateDirective}
+                    onDeleteDirective={handleDeleteDirective}
+                    onNavigateTab={setActiveTab}
+                  />
+                )}
 
                 {activeTab === "dashboard" && (
                   <Dashboards
                     currentRole={currentRole}
-                    sessions={sessions}
-                    studios={studios}
-                    brands={brands}
-                    talents={talents}
+                    sessions={activeSessions}
+                    studios={activeStudios}
+                    brands={activeBrands}
+                    talents={activeTalents}
                     onSelectSession={handleSelectSessionFromDashboard}
                   />
                 )}
 
                 {activeTab === "sessions" && (
                   <LiveSessionHub
-                    sessions={sessions}
-                    selectedSession={selectedSession}
+                    sessions={activeSessions}
+                    selectedSession={activeSelectedSession}
                     onSelectSession={setSelectedSession}
                     onAddSession={handleAddSession}
                     onUpdateSession={handleUpdateSession}
@@ -431,10 +533,10 @@ export default function App() {
 
                 {activeTab === "calendar" && (
                   <LiveCalendar
-                    sessions={sessions}
-                    studios={studios}
-                    talents={talents}
-                    brands={brands}
+                    sessions={activeSessions}
+                    studios={activeStudios}
+                    talents={activeTalents}
+                    brands={activeBrands}
                   />
                 )}
 
@@ -442,8 +544,8 @@ export default function App() {
 
                 {activeTab === "talents" && (
                   <TalentMatcher
-                    talents={talents}
-                    brands={brands}
+                    talents={activeTalents}
+                    brands={activeBrands}
                     onAddTalent={handleAddTalent}
                     onUpdateTalent={handleUpdateTalent}
                     onDeleteTalent={handleDeleteTalent}
@@ -452,8 +554,8 @@ export default function App() {
 
                 {activeTab === "studios" && (
                   <StudioEquipment
-                    studios={studios}
-                    equipments={equipments}
+                    studios={activeStudios}
+                    equipments={activeEquipments}
                     onAddStudio={handleAddStudio}
                     onUpdateStudio={handleUpdateStudio}
                     onDeleteStudio={handleDeleteStudio}
@@ -465,8 +567,8 @@ export default function App() {
 
                 {activeTab === "crm" && (
                   <CrmProjects
-                    brands={brands}
-                    projects={projects}
+                    brands={activeBrands}
+                    projects={activeProjects}
                     onAddBrand={handleAddBrand}
                     onUpdateBrand={handleUpdateBrand}
                     onDeleteBrand={handleDeleteBrand}
@@ -478,30 +580,30 @@ export default function App() {
 
                 {activeTab === "tiktok_api" && (
                   <TikTokApiAutomation
-                    workflowRules={workflowRules}
+                    workflowRules={activeWorkflowRules}
                     onAddWorkflowRule={handleAddWorkflowRule}
                     onUpdateWorkflowRule={handleUpdateWorkflowRule}
                     onDeleteWorkflowRule={handleDeleteWorkflowRule}
                   />
                 )}
 
-                {activeTab === "finance" && <FinanceHr sessions={sessions} />}
+                {activeTab === "finance" && <FinanceHr sessions={activeSessions} />}
 
-                {activeTab === "ai_agents" && <AiMultiAgent />}
+                {activeTab === "ai_agents" && <AiMultiAgent onNavigateTab={setActiveTab} />}
 
                 {activeTab === "user_settings" && (
                   <UserRoleSettings
                     currentRole={currentRole}
                     rolePermissions={rolePermissions}
                     onUpdateRolePermissions={handleUpdateRolePermissions}
-                    users={users}
+                    users={activeUsers}
                     onAddUser={handleAddUser}
                     onUpdateUser={handleUpdateUser}
                     onDeleteUser={handleDeleteUser}
-                    auditLogs={auditLogs}
+                    auditLogs={activeAuditLogs}
                     permissionDefinitions={ALL_PERMISSION_DEFINITIONS}
-                    brands={brands}
-                    talents={talents}
+                    brands={activeBrands}
+                    talents={activeTalents}
                   />
                 )}
               </>

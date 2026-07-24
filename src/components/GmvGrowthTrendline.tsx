@@ -64,7 +64,9 @@ export const GmvGrowthTrendline: React.FC<GmvGrowthTrendlineProps> = ({ sessions
   // Generate 30-Day Forecast Data based on historical session metrics
   const chartData = useMemo(() => {
     const data = [];
-    const baseDailyGmv = Math.max(180, Math.round(historicalStats.avgGmvPerSession / 1000000)); // in Millions VNĐ
+    const baseDailyGmv = sessions.length > 0 && historicalStats.totalHistoricalGmv > 0
+      ? Math.max(10, Math.round(historicalStats.avgGmvPerSession / 1000000))
+      : 0; // in Millions VNĐ
 
     let cumulativeActual = 0;
     let cumulativeProjected = 0;
@@ -115,9 +117,11 @@ export const GmvGrowthTrendline: React.FC<GmvGrowthTrendlineProps> = ({ sessions
   // Key KPI Metrics Calculations
   const metrics = useMemo(() => {
     const actual15Days = chartData.filter((d) => d.dayNumber <= 15).reduce((acc, d) => acc + (d.actualGmv || 0), 0);
-    const projected30Days = chartData[chartData.length - 1].cumProjectedGmv;
-    const targetKpi = 7500; // Target KPI in Millions VNĐ (7.5 Tỷ)
-    const pacingPercent = Math.round((projected30Days / targetKpi) * 100);
+    const projected30Days = chartData[chartData.length - 1]?.cumProjectedGmv || 0;
+    const targetKpi = sessions.length > 0 
+      ? Math.max(1000, Math.round(sessions.reduce((acc, s) => acc + (s.targetGmv || 0), 0) / 1000000)) 
+      : 0; // Target KPI in Millions VNĐ
+    const pacingPercent = targetKpi > 0 ? Math.round((projected30Days / targetKpi) * 100) : 0;
     const estCommission = Math.round(projected30Days * 0.15); // 15% agency commission
 
     return {

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Sparkles,
   Layers,
@@ -22,18 +22,45 @@ import {
   X,
   Send,
   Building2,
-  Check
+  Check,
+  Play,
+  Radio,
+  Eye,
+  ShoppingBag,
+  DollarSign,
+  Activity,
+  ArrowUpRight
 } from "lucide-react";
-import { StrategicDirective, UserRole } from "../types";
-import { MOCK_STRATEGIC_DIRECTIVES } from "../data/mockData";
+import { LiveSession, StrategicDirective, UserRole } from "../types";
+import { MOCK_SESSIONS, MOCK_STRATEGIC_DIRECTIVES } from "../data/mockData";
+import { EndToEndFlowSimulator } from "./EndToEndFlowSimulator";
+import { PerformanceMetricsWidget } from "./PerformanceMetricsWidget";
 
 interface ExecutiveBriefProps {
   currentRole?: UserRole;
+  sessions?: LiveSession[];
+  directives?: StrategicDirective[];
+  onAddDirective?: (newDir: StrategicDirective) => void;
+  onUpdateDirective?: (dir: StrategicDirective) => void;
+  onDeleteDirective?: (id: string) => void;
+  onNavigateTab?: (tabId: string) => void;
 }
 
-export const ExecutiveBrief: React.FC<ExecutiveBriefProps> = ({ currentRole = "ceo" }) => {
-  const [activeTab, setActiveTab] = useState<"directives" | "blueprint">("directives");
-  const [directives, setDirectives] = useState<StrategicDirective[]>(MOCK_STRATEGIC_DIRECTIVES);
+export const ExecutiveBrief: React.FC<ExecutiveBriefProps> = ({
+  currentRole = "ceo",
+  sessions = [],
+  directives: propDirectives = [],
+  onAddDirective,
+  onUpdateDirective,
+  onDeleteDirective,
+  onNavigateTab
+}) => {
+  const [activeTab, setActiveTab] = useState<"directives" | "simulator" | "blueprint">("directives");
+  const [directives, setDirectives] = useState<StrategicDirective[]>(propDirectives);
+
+  useEffect(() => {
+    setDirectives(propDirectives);
+  }, [propDirectives]);
 
   // Filters
   const [searchQuery, setSearchQuery] = useState("");
@@ -186,6 +213,35 @@ export const ExecutiveBrief: React.FC<ExecutiveBriefProps> = ({ currentRole = "c
   const needsSupportCount = directives.filter((d) => d.status === "Needs BOD Support").length;
   const avgProgress = totalDirectives > 0 ? Math.round(directives.reduce((acc, d) => acc + d.progressPercent, 0) / totalDirectives) : 0;
 
+  // Real-Time Livestream Performance Calculations from `sessions` array
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(amount);
+  };
+
+  const liveNowSessions = sessions.filter((s) => s.status === "Live Now");
+  const upcomingSessions = sessions.filter((s) => s.status === "Upcoming");
+  const completedSessions = sessions.filter((s) => s.status === "Completed");
+
+  const totalSessionsCount = sessions.length;
+  const liveNowCount = liveNowSessions.length;
+
+  const totalTargetGmv = sessions.reduce((sum, s) => sum + (s.targetGmv || 0), 0);
+  const totalActualGmv = sessions.reduce((sum, s) => sum + (s.actualGmv || 0), 0);
+  const gmvTargetAchievement = totalTargetGmv > 0 ? Math.round((totalActualGmv / totalTargetGmv) * 100) : 0;
+
+  const totalOrders = sessions.reduce((sum, s) => sum + (s.totalOrders || 0), 0);
+  const totalViews = sessions.reduce((sum, s) => sum + (s.totalViews || 0), 0);
+  const currentPeakViewers = liveNowSessions.length > 0
+    ? liveNowSessions.reduce((sum, s) => sum + (s.peakViewers || 0), 0)
+    : sessions.reduce((sum, s) => sum + (s.peakViewers || 0), 0);
+
+  const avgCtr = sessions.length > 0
+    ? (sessions.reduce((sum, s) => sum + (s.ctrAvg || 0), 0) / sessions.length).toFixed(1)
+    : "0.0";
+  const avgCvr = sessions.length > 0
+    ? (sessions.reduce((sum, s) => sum + (s.cvrAvg || 0), 0) / sessions.length).toFixed(1)
+    : "0.0";
+
   return (
     <div className="max-w-7xl mx-auto space-y-8 pb-16">
       {/* Top Banner Header */}
@@ -203,7 +259,7 @@ export const ExecutiveBrief: React.FC<ExecutiveBriefProps> = ({ currentRole = "c
             </div>
 
             {/* Navigation Switcher Tabs */}
-            <div className="flex items-center bg-slate-900/90 p-1.5 rounded-2xl border border-purple-500/30">
+            <div className="flex items-center bg-slate-900/90 p-1.5 rounded-2xl border border-purple-500/30 gap-1">
               <button
                 onClick={() => setActiveTab("directives")}
                 className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 ${
@@ -217,6 +273,19 @@ export const ExecutiveBrief: React.FC<ExecutiveBriefProps> = ({ currentRole = "c
                 <span className="bg-purple-950 px-1.5 py-0.5 rounded-md text-[10px] text-purple-300 font-extrabold border border-purple-700">
                   {directives.length}
                 </span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab("simulator")}
+                className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 ${
+                  activeTab === "simulator"
+                    ? "bg-purple-600 text-white shadow-lg shadow-purple-600/30"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                <Play className="w-4 h-4 text-emerald-400" />
+                <span>End-To-End Simulator</span>
+                <span className="bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded text-[9px] font-black border border-emerald-500/30">HOT</span>
               </button>
 
               <button
@@ -273,6 +342,9 @@ export const ExecutiveBrief: React.FC<ExecutiveBriefProps> = ({ currentRole = "c
           </div>
         </div>
       </div>
+
+      {/* Performance Metrics Widget at the top */}
+      <PerformanceMetricsWidget sessions={sessions} onNavigateTab={onNavigateTab} />
 
       {/* TAB 1: BẢNG GIAO NHIỆM VỤ & CHỈ ĐẠO BAN GIÁM ĐỐC */}
       {activeTab === "directives" && (
@@ -573,7 +645,12 @@ export const ExecutiveBrief: React.FC<ExecutiveBriefProps> = ({ currentRole = "c
         </div>
       )}
 
-      {/* TAB 2: SYSTEM BLUEPRINT 16 MODULES */}
+      {/* TAB 2: END-TO-END FLOW SIMULATOR */}
+      {activeTab === "simulator" && (
+        <EndToEndFlowSimulator onNavigateTab={onNavigateTab} />
+      )}
+
+      {/* TAB 3: SYSTEM BLUEPRINT 16 MODULES */}
       {activeTab === "blueprint" && (
         <div className="space-y-8">
           {/* Section 1: Vision & The Problem */}

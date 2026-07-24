@@ -22,7 +22,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<"analytics" | "checklist" | "products" | "ai_coach">("analytics");
   const [analyzingAi, setAnalyzingAi] = useState(false);
-  const [aiAnalysisResult, setAiAnalysisResult] = useState<any>(selectedSession.aiAnalysis || null);
+  const [aiAnalysisResult, setAiAnalysisResult] = useState<any>(selectedSession?.aiAnalysis || null);
   const [viewMode, setViewMode] = useState<"single" | "multi_grid">("single");
 
   // Session Modal State
@@ -183,7 +183,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
             <div className="flex items-center gap-2">
               <span className="text-xs text-slate-400 font-medium">Chọn phiên live:</span>
               <select
-                value={selectedSession.id}
+                value={selectedSession?.id || ""}
                 onChange={(e) => {
                   const found = sessions.find((s) => s.id === e.target.value);
                   if (found) {
@@ -193,28 +193,36 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                 }}
                 className="bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-xl border border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500"
               >
-                {sessions.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    [{s.status}] {s.brandName} - {s.date} ({s.startTime})
-                  </option>
-                ))}
+                {sessions.length === 0 ? (
+                  <option value="">Chưa có phiên live nào (Clean State)</option>
+                ) : (
+                  sessions.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      [{s.status}] {s.brandName} - {s.date} ({s.startTime})
+                    </option>
+                  ))
+                )}
               </select>
 
-              <button
-                onClick={() => openEditSessionModal(selectedSession)}
-                className="bg-slate-800 hover:bg-slate-700 text-slate-200 p-2 rounded-xl border border-slate-700 transition-all"
-                title="Chỉnh sửa phiên live này"
-              >
-                <Edit3 className="w-3.5 h-3.5" />
-              </button>
+              {selectedSession && (
+                <>
+                  <button
+                    onClick={() => openEditSessionModal(selectedSession)}
+                    className="bg-slate-800 hover:bg-slate-700 text-slate-200 p-2 rounded-xl border border-slate-700 transition-all"
+                    title="Chỉnh sửa phiên live này"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                  </button>
 
-              <button
-                onClick={() => handleDeleteSession(selectedSession.id, selectedSession.brandName)}
-                className="bg-slate-800 hover:bg-red-900/50 text-red-400 p-2 rounded-xl border border-slate-700 hover:border-red-500 transition-all"
-                title="Xóa phiên live này"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
+                  <button
+                    onClick={() => handleDeleteSession(selectedSession.id, selectedSession.brandName)}
+                    className="bg-slate-800 hover:bg-red-900/50 text-red-400 p-2 rounded-xl border border-slate-700 hover:border-red-500 transition-all"
+                    title="Xóa phiên live này"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </>
+              )}
 
               <button
                 onClick={openAddSessionModal}
@@ -246,7 +254,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {liveSessions.map((s) => {
-                const isSelected = selectedSession.id === s.id;
+                const isSelected = selectedSession?.id === s.id;
                 return (
                   <div
                     key={s.id}
@@ -349,81 +357,102 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
           </div>
         )}
 
-        {/* Selected Session Info Banner */}
-        <div className="bg-slate-800/80 p-4 rounded-xl border border-slate-700/80 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 text-xs">
-          <div>
-            <span className="text-slate-400 block">Thương hiệu:</span>
-            <strong className="text-white text-sm font-bold">{selectedSession.brandName}</strong>
+        {/* Selected Session Details or Empty State */}
+        {!selectedSession ? (
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center space-y-4 my-4">
+            <div className="w-16 h-16 bg-purple-500/10 text-purple-400 rounded-full flex items-center justify-center mx-auto border border-purple-500/20">
+              <Radio className="w-8 h-8" />
+            </div>
+            <h3 className="text-xl font-black text-white">Chưa Có Phiên Live Nào Trong Hệ Thống</h3>
+            <p className="text-sm text-slate-400 max-w-md mx-auto">
+              Hệ thống hiện đang ở trạng thái trống (Clean State). Bạn hãy nhấp vào nút bên dưới để tạo phiên live đầu tiên hoặc mở lại Mock Data từ thanh thông báo.
+            </p>
+            <button
+              onClick={openAddSessionModal}
+              className="px-5 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl shadow-lg transition-all text-xs inline-flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" /> Tạo Phiên Live Mới Ngay
+            </button>
           </div>
-          <div>
-            <span className="text-slate-400 block">TikTok Handle:</span>
-            <strong className="text-purple-300 font-mono text-sm">{selectedSession.shopTikTokHandle}</strong>
-          </div>
-          <div>
-            <span className="text-slate-400 block">Host:</span>
-            <strong className="text-white font-bold">{selectedSession.hostName}</strong>
-          </div>
-          <div>
-            <span className="text-slate-400 block">Studio:</span>
-            <strong className="text-slate-200">{selectedSession.studioName}</strong>
-          </div>
-          <div>
-            <span className="text-slate-400 block">Thực Thu GMV:</span>
-            <strong className="text-emerald-400 text-sm font-black">{selectedSession.actualGmv.toLocaleString()} đ</strong>
-          </div>
-          <div>
-            <span className="text-slate-400 block">Peak Viewers:</span>
-            <strong className="text-indigo-300 text-sm font-bold">{selectedSession.peakViewers.toLocaleString()} người</strong>
-          </div>
-        </div>
+        ) : (
+          <>
+            {/* Selected Session Info Banner */}
+            <div className="bg-slate-800/80 p-4 rounded-xl border border-slate-700/80 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 text-xs">
+              <div>
+                <span className="text-slate-400 block">Thương hiệu:</span>
+                <strong className="text-white text-sm font-bold">{selectedSession.brandName}</strong>
+              </div>
+              <div>
+                <span className="text-slate-400 block">TikTok Handle:</span>
+                <strong className="text-purple-300 font-mono text-sm">{selectedSession.shopTikTokHandle}</strong>
+              </div>
+              <div>
+                <span className="text-slate-400 block">Host:</span>
+                <strong className="text-white font-bold">{selectedSession.hostName}</strong>
+              </div>
+              <div>
+                <span className="text-slate-400 block">Studio:</span>
+                <strong className="text-slate-200">{selectedSession.studioName}</strong>
+              </div>
+              <div>
+                <span className="text-slate-400 block">Thực Thu GMV:</span>
+                <strong className="text-emerald-400 text-sm font-black">{selectedSession.actualGmv ? selectedSession.actualGmv.toLocaleString() : 0} đ</strong>
+              </div>
+              <div>
+                <span className="text-slate-400 block">Peak Viewers:</span>
+                <strong className="text-indigo-300 text-sm font-bold">{selectedSession.peakViewers ? selectedSession.peakViewers.toLocaleString() : 0} người</strong>
+              </div>
+            </div>
 
-        {/* Tab Buttons */}
-        <div className="flex space-x-2 pt-2 border-t border-slate-800 text-xs font-semibold overflow-x-auto">
-          <button
-            onClick={() => setActiveTab("analytics")}
-            className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all ${
-              activeTab === "analytics"
-                ? "bg-purple-600 text-white shadow"
-                : "text-slate-400 hover:text-white hover:bg-slate-800"
-            }`}
-          >
-            📊 Biến Động Từng Phút (Minute Metrics)
-          </button>
-          <button
-            onClick={() => setActiveTab("checklist")}
-            className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all ${
-              activeTab === "checklist"
-                ? "bg-purple-600 text-white shadow"
-                : "text-slate-400 hover:text-white hover:bg-slate-800"
-            }`}
-          >
-            ✅ Pre-Live Checklist ({selectedSession.checklist.filter(c => c.completed).length}/{selectedSession.checklist.length})
-          </button>
-          <button
-            onClick={() => setActiveTab("products")}
-            className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all ${
-              activeTab === "products"
-                ? "bg-purple-600 text-white shadow"
-                : "text-slate-400 hover:text-white hover:bg-slate-800"
-            }`}
-          >
-            🛍️ SKUs & Conversion ({selectedSession.skus.length} sản phẩm)
-          </button>
-          <button
-            onClick={() => setActiveTab("ai_coach")}
-            className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all ${
-              activeTab === "ai_coach"
-                ? "bg-purple-600 text-white shadow"
-                : "text-slate-400 hover:text-white hover:bg-slate-800"
-            }`}
-          >
-            ✨ AI Session Analyst & Host Coach
-          </button>
-        </div>
+            {/* Tab Buttons */}
+            <div className="flex space-x-2 pt-2 border-t border-slate-800 text-xs font-semibold overflow-x-auto">
+              <button
+                onClick={() => setActiveTab("analytics")}
+                className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all ${
+                  activeTab === "analytics"
+                    ? "bg-purple-600 text-white shadow"
+                    : "text-slate-400 hover:text-white hover:bg-slate-800"
+                }`}
+              >
+                📊 Biến Động Từng Phút (Minute Metrics)
+              </button>
+              <button
+                onClick={() => setActiveTab("checklist")}
+                className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all ${
+                  activeTab === "checklist"
+                    ? "bg-purple-600 text-white shadow"
+                    : "text-slate-400 hover:text-white hover:bg-slate-800"
+                }`}
+              >
+                ✅ Pre-Live Checklist ({(selectedSession.checklist || []).filter(c => c.completed).length}/{(selectedSession.checklist || []).length})
+              </button>
+              <button
+                onClick={() => setActiveTab("products")}
+                className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all ${
+                  activeTab === "products"
+                    ? "bg-purple-600 text-white shadow"
+                    : "text-slate-400 hover:text-white hover:bg-slate-800"
+                }`}
+              >
+                🛍️ SKUs & Conversion ({(selectedSession.skus || []).length} sản phẩm)
+              </button>
+              <button
+                onClick={() => setActiveTab("ai_coach")}
+                className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all ${
+                  activeTab === "ai_coach"
+                    ? "bg-purple-600 text-white shadow"
+                    : "text-slate-400 hover:text-white hover:bg-slate-800"
+                }`}
+              >
+                ✨ AI Session Analyst & Host Coach
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Tab Content 1: Analytics & Minute Metrics Recharts */}
-      {activeTab === "analytics" && (
+      {selectedSession && activeTab === "analytics" && (
         <div className="space-y-6">
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
             <div className="flex justify-between items-center">
@@ -442,7 +471,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
 
             <div className="h-72 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={selectedSession.minuteMetrics}>
+                <LineChart data={selectedSession.minuteMetrics || []}>
                   <XAxis dataKey="timeString" stroke="#94a3b8" fontSize={12} />
                   <YAxis yAxisId="left" stroke="#8b5cf6" fontSize={12} />
                   <YAxis yAxisId="right" orientation="right" stroke="#10b981" fontSize={12} />
@@ -478,7 +507,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
             <h3 className="font-bold text-slate-900 text-base">Nhật Ký Sự Kiện Tác Động Doanh Thu Từng Phút</h3>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {selectedSession.minuteMetrics.map((m) => (
+              {(selectedSession.minuteMetrics || []).map((m) => (
                 <div key={m.minute} className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 space-y-2 hover:border-purple-300 transition-all">
                   <div className="flex justify-between items-center text-xs">
                     <span className="font-black text-purple-700 bg-purple-100 px-2 py-0.5 rounded">
@@ -500,7 +529,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
       )}
 
       {/* Tab Content 2: Pre-Live Checklist */}
-      {activeTab === "checklist" && (
+      {selectedSession && activeTab === "checklist" && (
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
           <div className="flex justify-between items-center">
             <div>
@@ -510,17 +539,17 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
               </p>
             </div>
             <span className="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-xs font-bold">
-              {selectedSession.checklist.filter(c => c.completed).length}/{selectedSession.checklist.length} Đã Hoàn Thành
+              {(selectedSession.checklist || []).filter(c => c.completed).length}/{(selectedSession.checklist || []).length} Đã Hoàn Thành
             </span>
           </div>
 
           <div className="space-y-2">
-            {selectedSession.checklist.map((item) => (
+            {(selectedSession.checklist || []).map((item) => (
               <div
                 key={item.id}
                 onClick={() => {
                   item.completed = !item.completed;
-                  onSelectSession({ ...selectedSession });
+                  if (selectedSession) onSelectSession({ ...selectedSession });
                 }}
                 className={`p-3.5 rounded-xl border flex items-center justify-between cursor-pointer transition-all hover:shadow-sm ${
                   item.completed ? "bg-emerald-50/60 border-emerald-200" : "bg-amber-50/60 border-amber-200"
@@ -549,7 +578,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
       )}
 
       {/* Tab Content 3: Product SKUs */}
-      {activeTab === "products" && (
+      {selectedSession && activeTab === "products" && (
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
           <h3 className="font-bold text-slate-900 text-base">Danh Sách SKUs & Hiệu Quả Chuyển Đổi Trong Phiên Live</h3>
           <div className="overflow-x-auto">
@@ -567,7 +596,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {selectedSession.skus.map((sku) => (
+                {(selectedSession.skus || []).map((sku) => (
                   <tr key={sku.id} className="hover:bg-slate-50">
                     <td className="p-3 font-mono font-bold text-purple-700">{sku.code}</td>
                     <td className="p-3 font-bold text-slate-900">{sku.name}</td>
@@ -586,7 +615,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
       )}
 
       {/* Tab Content 4: AI Analyst & Host Coach */}
-      {activeTab === "ai_coach" && (
+      {selectedSession && activeTab === "ai_coach" && (
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
           <div className="flex flex-wrap justify-between items-center gap-4 border-b border-slate-100 pb-4">
             <div>

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   TrendingUp,
   TrendingDown,
@@ -33,11 +33,12 @@ import {
   Legend,
   CartesianGrid
 } from "recharts";
-import { Brand, Studio } from "../types";
+import { Brand, Studio, LiveSession } from "../types";
 
 export interface KpiComparisonProps {
   brands?: Brand[];
   studios?: Studio[];
+  sessions?: LiveSession[];
 }
 
 type TimePeriodOption = "this_week_vs_last_week" | "this_month_vs_last_month" | "this_quarter_vs_last_quarter";
@@ -359,19 +360,172 @@ const STUDIO_COMPARISON_DATA = [
   { name: "Studio C (Tech/Home)", currentGMV: 1100, prevGMV: 910, currentSessions: 4, prevSessions: 4 }
 ];
 
-export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studios = [] }) => {
+export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studios = [], sessions }) => {
   const [timePeriod, setTimePeriod] = useState<TimePeriodOption>("this_week_vs_last_week");
   const [selectedCategory, setSelectedCategory] = useState<"all" | "revenue" | "livestream" | "roi">("all");
   const [selectedBrand, setSelectedBrand] = useState<string>("all");
   const [chartType, setChartType] = useState<"area" | "bar">("area");
   const [activeMetricTab, setActiveMetricTab] = useState<"gmv" | "orders">("gmv");
 
-  const currentMetrics = COMPARISON_METRICS[timePeriod];
+  const effectiveSessions = useMemo(() => {
+    if (!sessions) return [];
+    if (selectedBrand === "all") return sessions;
+    return sessions.filter((s) => s.brandId === selectedBrand || s.brandName === selectedBrand);
+  }, [sessions, selectedBrand]);
+
+  const rawMetrics = COMPARISON_METRICS[timePeriod];
+  const currentMetrics = useMemo(() => {
+    if (!effectiveSessions || effectiveSessions.length === 0) {
+      return rawMetrics.map((m) => ({
+        ...m,
+        currentValue: 0,
+        previousValue: 0,
+        target: 0
+      }));
+    }
+
+    const totalGmv = effectiveSessions.reduce((acc, s) => acc + (s.actualGmv || 0), 0);
+    const totalTargetGmv = effectiveSessions.reduce((acc, s) => acc + (s.targetGmv || 0), 0);
+    const totalOrders = effectiveSessions.reduce((acc, s) => acc + (s.totalOrders || 0), 0);
+    
+    const avgAov = totalOrders > 0 ? Math.round(totalGmv / totalOrders) : 0;
+    
+    const avgCvrRaw = effectiveSessions.reduce((acc, s) => acc + (s.cvrAvg || 0), 0) / effectiveSessions.length;
+    const avgCvr = Number(avgCvrRaw.toFixed(1));
+
+    const maxPeakCcu = Math.max(...effectiveSessions.map(s => s.peakViewers || 0), 0);
+
+    const avgWatchMinutesRaw = effectiveSessions.reduce((acc, s) => acc + ((s.avgWatchTimeSeconds || 0) / 60), 0) / effectiveSessions.length;
+    const avgWatchMinutes = Number(avgWatchMinutesRaw.toFixed(1));
+
+    const approxRoas = totalGmv > 0 ? Number((totalGmv / Math.max(1, effectiveSessions.length * 50000000)).toFixed(1)) : 0;
+
+    return rawMetrics.map((m) => {
+      if (m.id === "gmv") {
+        return {
+          ...m,
+          currentValue: totalGmv,
+          previousValue: Math.round(totalGmv * 0.8),
+          target: totalTargetGmv > 0 ? totalTargetGmv : Math.round(totalGmv * 1.1)
+        };
+      }
+      if (m.id === "orders") {
+        return {
+          ...m,
+          currentValue: totalOrders,
+          previousValue: Math.round(totalOrders * 0.8),
+          target: Math.round(totalOrders * 1.1)
+        };
+      }
+      if (m.id === "aov") {
+        return {
+          ...m,
+          currentValue: avgAov,
+          previousValue: Math.round(avgAov * 0.95),
+          target: Math.round(avgAov * 1.05)
+        };
+      }
+      if (m.id === "live_sessions") {
+        return {
+          ...m,
+          currentValue: effectiveSessions.length,
+          previousValue: Math.max(0, effectiveSessions.length - 2),
+          target: Math.round(effectiveSessions.length * 1.1)
+        };
+      }
+      if (m.id === "cvr") {
+        return {
+          ...m,
+          currentValue: avgCvr,
+          previousValue: Number((avgCvr * 0.85).toFixed(1)),
+          target: Number((avgCvr * 1.1).toFixed(1))
+        };
+      }
+      if (m.id === "peak_ccu") {
+        return {
+          ...m,
+          currentValue: maxPeakCcu,
+          previousValue: Math.round(maxPeakCcu * 0.8),
+          target: Math.round(maxPeakCcu * 1.1)
+        };
+      }
+      if (m.id === "avg_duration") {
+        return {
+          ...m,
+          currentValue: avgWatchMinutes,
+          previousValue: Number((avgWatchMinutes * 0.85).toFixed(1)),
+          target: Number((avgWatchMinutes * 1.1).toFixed(1))
+        };
+      }
+      if (m.id === "roas") {
+        return {
+          ...m,
+          currentValue: approxRoas,
+          previousValue: Number((approxRoas * 0.85).toFixed(1)),
+          target: Number((approxRoas * 1.1).toFixed(1))
+        };
+      }
+      return m;
+    });
+  }, [effectiveSessions, rawMetrics]);
+
   const filteredMetrics = currentMetrics.filter((m) =>
     selectedCategory === "all" ? true : m.category === selectedCategory
   );
 
-  const trajectoryData = DAILY_TRAJECTORY_DATA[timePeriod];
+  const trajectoryData = useMemo(() => {
+    const rawTrajectory = DAILY_TRAJECTORY_DATA[timePeriod];
+    if (!effectiveSessions || effectiveSessions.length === 0) {
+      return rawTrajectory.map((item) => ({
+        ...item,
+        current: 0,
+        previous: 0,
+        ordersCurrent: 0,
+        ordersPrev: 0
+      }));
+    }
+    const totalGmvMillions = Math.round(effectiveSessions.reduce((acc, s) => acc + (s.actualGmv || 0), 0) / 1000000);
+    const totalOrders = effectiveSessions.reduce((acc, s) => acc + (s.totalOrders || 0), 0);
+    const daysCount = rawTrajectory.length;
+    const gmvPerDay = Math.round(totalGmvMillions / daysCount);
+    const ordersPerDay = Math.round(totalOrders / daysCount);
+    return rawTrajectory.map((item, idx) => ({
+      ...item,
+      current: Math.max(0, Math.round(gmvPerDay * (0.8 + (idx % 3) * 0.2))),
+      previous: Math.max(0, Math.round(gmvPerDay * 0.7)),
+      ordersCurrent: Math.max(0, Math.round(ordersPerDay * (0.8 + (idx % 3) * 0.2))),
+      ordersPrev: Math.max(0, Math.round(ordersPerDay * 0.7))
+    }));
+  }, [timePeriod, effectiveSessions]);
+
+  const studioComparisonData = useMemo(() => {
+    if (!effectiveSessions || effectiveSessions.length === 0) {
+      if (studios && studios.length > 0) {
+        return studios.map((s) => ({
+          name: s.name,
+          currentGMV: 0,
+          prevGMV: 0,
+          currentSessions: 0,
+          prevSessions: 0
+        }));
+      }
+      return [];
+    }
+    if (studios && studios.length > 0) {
+      return studios.map((st) => {
+        const studioSessions = effectiveSessions.filter((s) => s.studioId === st.id || s.studioName === st.name);
+        const currentGMV = Math.round(studioSessions.reduce((acc, s) => acc + (s.actualGmv || 0), 0) / 1000000);
+        return {
+          name: st.name,
+          currentGMV,
+          prevGMV: Math.round(currentGMV * 0.8),
+          currentSessions: studioSessions.length,
+          prevSessions: Math.max(0, studioSessions.length - 1)
+        };
+      });
+    }
+    return [];
+  }, [effectiveSessions, studios]);
 
   // Helper formatting function
   const formatMetricValue = (value: number, format: MetricComparisonItem["format"], unit: string) => {
@@ -395,7 +549,7 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
 
   const getDeltaInfo = (item: MetricComparisonItem) => {
     const diff = item.currentValue - item.previousValue;
-    const percent = ((diff / item.previousValue) * 100).toFixed(1);
+    const percent = item.previousValue > 0 ? ((diff / item.previousValue) * 100).toFixed(1) : "0.0";
     const isPositive = diff >= 0;
     return { diff, percent: Number(percent), isPositive };
   };
@@ -415,6 +569,25 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
 
   // Growth driver highlights
   const getGrowthHighlights = () => {
+    if (!effectiveSessions || effectiveSessions.length === 0) {
+      return [
+        {
+          title: "Chưa Có Dữ Liệu Tăng Trưởng",
+          desc: "Hệ thống đang ở trạng thái trống (Clean State). Hãy tạo phiên live mới để AI bắt đầu phân tích.",
+          tag: "Clean State"
+        },
+        {
+          title: "Tối Ưu Công Suất Studio",
+          desc: "Sẵn sàng ghi nhận ca live khi bạn khởi tạo phiên đầu tiên.",
+          tag: "Studio Idle"
+        },
+        {
+          title: "Chỉ Số ROAS & Lợi Nhuận",
+          desc: "Hệ thống sẽ tự động tổng hợp chỉ số ngay khi phát sinh doanh thu thực tế.",
+          tag: "ROAS Ready"
+        }
+      ];
+    }
     if (timePeriod === "this_week_vs_last_week") {
       return [
         {
@@ -797,7 +970,7 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
 
             <div className="h-52 w-full pt-1">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={STUDIO_COMPARISON_DATA} layout="vertical">
+                <BarChart data={studioComparisonData} layout="vertical">
                   <XAxis type="number" stroke="#64748b" fontSize={11} />
                   <YAxis type="category" dataKey="name" stroke="#94a3b8" fontSize={10} width={90} />
                   <Tooltip
@@ -813,10 +986,12 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
 
           <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800/80 text-xs text-slate-300 space-y-1">
             <div className="font-bold text-indigo-300 flex items-center gap-1">
-              <Sparkles className="w-3.5 h-3.5" /> Studio A chiếm 45.6% tổng GMV
+              <Sparkles className="w-3.5 h-3.5" /> {sessions && sessions.length === 0 ? "Chưa phát sinh doanh thu" : "Studio A chiếm 45.6% tổng GMV"}
             </div>
             <p className="text-[11px] text-slate-400 leading-relaxed">
-              Studio A (Beauty) tiếp tục dẫn đầu với hiệu suất khai thác 8.5 giờ/ngày và CVR trung bình 5.8%.
+              {sessions && sessions.length === 0
+                ? "Tất cả studio phòng máy đang sẵn sàng nhận ca live mới."
+                : "Studio A (Beauty) tiếp tục dẫn đầu với hiệu suất khai thác 8.5 giờ/ngày và CVR trung bình 5.8%."}
             </p>
           </div>
         </div>
