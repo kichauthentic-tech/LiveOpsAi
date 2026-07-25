@@ -354,6 +354,7 @@ export default function App() {
               users={users}
               activeUserId={activeUserId}
               onUserSelect={setActiveUserId}
+              sessions={sessions}
             />
           </div>
         </div>

@@ -306,7 +306,7 @@ export const MOCK_SESSIONS: LiveSession[] = [
     studioId: "std-c",
     studioName: "Studio C - Home Appliance & Tech",
     hostId: "host-3",
-    hostName: "Linh Barbie (Linh Bếp Xinh)",
+    hostName: "Bích Ngọc (Ngọc Skincare)",
     assistantName: "Đỗ Khánh Vân (Key Account)",
     date: "2026-07-23",
     startTime: "08:30",
@@ -374,7 +374,7 @@ export const MOCK_SESSIONS: LiveSession[] = [
         energyScore: 90,
         productKnowledgeScore: 94,
         speechRateScore: 85,
-        feedback: "Linh Bếp Xinh giới thiệu tính năng sản phẩm vô cùng thuyết phục!"
+        feedback: "Bích Ngọc giới thiệu tính năng sản phẩm vô cùng thuyết phục!"
       },
       actionableRecommendations: [
         "Chuẩn bị quạt hút mùi/khói tại Studio C khi demo sản phẩm chiên nướng."

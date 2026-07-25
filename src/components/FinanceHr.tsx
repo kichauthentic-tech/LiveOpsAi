@@ -53,6 +53,23 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({ sessions }) => {
                 onChange={(e) => setCalcGmv(Number(e.target.value))}
                 className="w-full p-2.5 rounded-xl border border-slate-300 font-bold focus:ring-2 focus:ring-purple-500"
               />
+              {sessions.length > 0 && (
+                <select
+                  onChange={(e) => {
+                    const s = sessions.find((sess) => sess.id === e.target.value);
+                    if (s) setCalcGmv(s.actualGmv);
+                  }}
+                  defaultValue=""
+                  className="w-full mt-1.5 p-1.5 rounded-lg border border-slate-200 text-[11px] text-slate-500 bg-slate-50"
+                >
+                  <option value="" disabled>Hoặc nạp GMV từ phiên live thực tế...</option>
+                  {sessions.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.title} — {(s.actualGmv / 1000000).toFixed(1)}M đ
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-3">

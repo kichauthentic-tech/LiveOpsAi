@@ -56,6 +56,7 @@ export const Dashboards: React.FC<DashboardsProps> = ({
 }) => {
   const [dashboardSubTab, setDashboardSubTab] = useState<"overview" | "gmv_forecast" | "kpi_comparison" | "alerts">("overview");
   const liveSessions = sessions.filter((s) => s.status === "Live Now");
+  const upcomingSessions = sessions.filter((s) => s.status === "Upcoming");
   const liveSession = liveSessions[0] || sessions[0];
 
   // Calculate count of sessions with >20% deviation
@@ -221,8 +222,8 @@ export const Dashboards: React.FC<DashboardsProps> = ({
               <span>Số Lượng Phiên Live Hôm Nay</span>
               <Radio className="w-4 h-4 text-red-500" />
             </div>
-            <div className="text-2xl font-black text-slate-900">8 Phiên</div>
-            <div className="text-xs text-red-500 font-bold">1 Đang Live | 3 Sắp Live</div>
+            <div className="text-2xl font-black text-slate-900">{sessions.length} Phiên</div>
+            <div className="text-xs text-red-500 font-bold">{liveSessions.length} Đang Live | {upcomingSessions.length} Sắp Live</div>
           </div>
         </div>
 
