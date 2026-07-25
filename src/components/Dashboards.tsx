@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState } from "react";
 import { UserRole, LiveSession, Studio, Brand, Talent } from "../types";
 import {
   TrendingUp,
@@ -56,33 +56,7 @@ export const Dashboards: React.FC<DashboardsProps> = ({
 }) => {
   const [dashboardSubTab, setDashboardSubTab] = useState<"overview" | "gmv_forecast" | "kpi_comparison" | "alerts">("overview");
   const liveSessions = sessions.filter((s) => s.status === "Live Now");
-  const liveSession = liveSessions[0] || sessions[0] || null;
-  const totalActualGmv = sessions.reduce((sum, s) => sum + (s.actualGmv || 0), 0);
-  const totalCommission = Math.round(totalActualGmv * 0.15);
-  const totalSessionsCount = sessions.length;
-  const liveCount = sessions.filter((s) => s.status === "Live Now").length;
-  const upcomingCount = sessions.filter((s) => s.status === "Upcoming").length;
-  const occupancyHours = (sessions.length * 2.5).toFixed(1);
-  const occupancyRate = studios.length > 0 ? Math.min(100, Math.round((sessions.length * 2.5) / (studios.length * 10) * 100)) : 0;
-
-  const weeklyGmvData = useMemo(() => {
-    if (sessions.length === 0) {
-      return [
-        { day: "Thứ 2", gmv: 0 },
-        { day: "Thứ 3", gmv: 0 },
-        { day: "Thứ 4", gmv: 0 },
-        { day: "Thứ 5", gmv: 0 },
-        { day: "Thứ 6", gmv: 0 },
-        { day: "Thứ 7", gmv: 0 },
-        { day: "Chủ Nhật", gmv: 0 }
-      ];
-    }
-    const days = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ Nhật"];
-    return days.map((day, idx) => {
-      const dayGmv = sessions.filter((_, sIdx) => sIdx % 7 === idx).reduce((acc, s) => acc + (s.actualGmv || 0), 0);
-      return { day, gmv: Math.round(dayGmv / 1000000) };
-    });
-  }, [sessions]);
+  const liveSession = liveSessions[0] || sessions[0];
 
   // Calculate count of sessions with >20% deviation
   const deviatingSessionsCount = sessions.filter((s) => {
@@ -181,7 +155,7 @@ export const Dashboards: React.FC<DashboardsProps> = ({
     return (
       <div className="space-y-6">
         {subTabHeader}
-        <KpiComparison brands={brands} studios={studios} sessions={sessions} />
+        <KpiComparison brands={brands} studios={studios} />
       </div>
     );
   }
@@ -215,12 +189,12 @@ export const Dashboards: React.FC<DashboardsProps> = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-2">
             <div className="flex justify-between items-center text-slate-500 text-xs font-medium">
-              <span>Tổng GMV Hiện Tại</span>
+              <span>Tổng GMV Tháng Này</span>
               <TrendingUp className="w-4 h-4 text-emerald-600" />
             </div>
-            <div className="text-2xl font-black text-slate-900">{totalActualGmv.toLocaleString()} đ</div>
+            <div className="text-2xl font-black text-slate-900">7,720,000,000 đ</div>
             <div className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
-              <ArrowUpRight className="w-3.5 h-3.5" /> {sessions.length > 0 ? "Thống kê từ " + sessions.length + " phiên live" : "Chưa có dữ liệu phiên live"}
+              <ArrowUpRight className="w-3.5 h-3.5" /> +28.4% so với tháng trước
             </div>
           </div>
 
@@ -229,8 +203,8 @@ export const Dashboards: React.FC<DashboardsProps> = ({
               <span>Doanh Thu Agency (Commission)</span>
               <DollarSign className="w-4 h-4 text-purple-600" />
             </div>
-            <div className="text-2xl font-black text-slate-900">{totalCommission.toLocaleString()} đ</div>
-            <div className="text-xs text-slate-500 font-medium">Commission ước tính: 15%</div>
+            <div className="text-2xl font-black text-slate-900">1,158,000,000 đ</div>
+            <div className="text-xs text-slate-500 font-medium">Commission trung bình: 15%</div>
           </div>
 
           <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-2">
@@ -238,17 +212,17 @@ export const Dashboards: React.FC<DashboardsProps> = ({
               <span>Công Suất Studio (Occupancy)</span>
               <Building2 className="w-4 h-4 text-indigo-600" />
             </div>
-            <div className="text-2xl font-black text-slate-900">{occupancyRate}%</div>
-            <div className="text-xs text-indigo-600 font-medium">{occupancyHours}h / {studios.length * 10}h công suất khôi phục</div>
+            <div className="text-2xl font-black text-slate-900">71.6%</div>
+            <div className="text-xs text-indigo-600 font-medium">21.5h / 30h công suất hôm nay</div>
           </div>
 
           <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-2">
             <div className="flex justify-between items-center text-slate-500 text-xs font-medium">
-              <span>Tổng Số Phiên Livestream</span>
+              <span>Số Lượng Phiên Live Hôm Nay</span>
               <Radio className="w-4 h-4 text-red-500" />
             </div>
-            <div className="text-2xl font-black text-slate-900">{totalSessionsCount} Phiên</div>
-            <div className="text-xs text-red-500 font-bold">{liveCount} Đang Live | {upcomingCount} Sắp Live</div>
+            <div className="text-2xl font-black text-slate-900">8 Phiên</div>
+            <div className="text-xs text-red-500 font-bold">1 Đang Live | 3 Sắp Live</div>
           </div>
         </div>
 
@@ -264,11 +238,11 @@ export const Dashboards: React.FC<DashboardsProps> = ({
                 <h3 className="font-bold text-slate-900 text-base">Xu Hướng Doanh Thu GMV Theo Tuần (Triệu VNĐ)</h3>
                 <p className="text-xs text-slate-500">Bao gồm tất cả các phiên live của Brand đối tác</p>
               </div>
-              <span className="text-xs font-bold bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg">Tuần Hiện Tại / 2026</span>
+              <span className="text-xs font-bold bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg">Tuần 29 / 2026</span>
             </div>
             <div className="h-64 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={weeklyGmvData}>
+                <AreaChart data={WEEKLY_GMV_DATA}>
                   <defs>
                     <linearGradient id="gmvGrad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.4}/>
@@ -293,30 +267,24 @@ export const Dashboards: React.FC<DashboardsProps> = ({
               <span className="text-xs text-purple-600 font-semibold cursor-pointer hover:underline">Xem tất cả</span>
             </div>
             <div className="space-y-3">
-              {talents.length === 0 ? (
-                <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl text-center text-xs text-slate-500 italic">
-                  Chưa có thông tin Host. Thêm Host mới trong tab Talent Pool.
-                </div>
-              ) : (
-                talents.map((t, i) => (
-                  <div key={t.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
-                    <div className="flex items-center space-x-3">
-                      <span className="font-black text-xs text-slate-400 w-4">#{i+1}</span>
-                      <img src={t.avatar} alt={t.name} className="w-9 h-9 rounded-full object-cover border border-purple-300" />
-                      <div>
-                        <h4 className="font-bold text-slate-900 text-xs">{t.name}</h4>
-                        <p className="text-[10px] text-slate-500">
-                          {Array.isArray(t.niches) ? t.niches.join(", ") : String(t.niches || t.role || "Đa ngành")}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-extrabold text-xs text-emerald-600">{(t.avgGmvPerSession / 1000000).toFixed(0)}M đ/live</div>
-                      <div className="text-[10px] text-slate-400">CVR: {t.cvrAvg}%</div>
+              {talents.map((t, i) => (
+                <div key={t.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
+                  <div className="flex items-center space-x-3">
+                    <span className="font-black text-xs text-slate-400 w-4">#{i+1}</span>
+                    <img src={t.avatar} alt={t.name} className="w-9 h-9 rounded-full object-cover border border-purple-300" />
+                    <div>
+                      <h4 className="font-bold text-slate-900 text-xs">{t.name}</h4>
+                      <p className="text-[10px] text-slate-500">
+                        {Array.isArray(t.niches) ? t.niches.join(", ") : String(t.niches || t.role || "Đa ngành")}
+                      </p>
                     </div>
                   </div>
-                ))
-              )}
+                  <div className="text-right">
+                    <div className="font-extrabold text-xs text-emerald-600">{(t.avgGmvPerSession / 1000000).toFixed(0)}M đ/live</div>
+                    <div className="text-[10px] text-slate-400">CVR: {t.cvrAvg}%</div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -330,23 +298,16 @@ export const Dashboards: React.FC<DashboardsProps> = ({
                 Giám Sát {liveSessions.length} Phiên Live Đang Phát Sóng (Real-time Session Monitor)
               </h3>
             </div>
-            {liveSession && (
-              <button
-                onClick={() => onSelectSession(liveSession)}
-                className="bg-white text-slate-900 font-bold px-4 py-2 rounded-xl text-xs hover:bg-slate-100 transition-all shadow"
-              >
-                Mở Chi Tiết Operational Graph →
-              </button>
-            )}
+            <button
+              onClick={() => onSelectSession(liveSession)}
+              className="bg-white text-slate-900 font-bold px-4 py-2 rounded-xl text-xs hover:bg-slate-100 transition-all shadow"
+            >
+              Mở Chi Tiết Operational Graph →
+            </button>
           </div>
 
           <div className="grid md:grid-cols-2 gap-4 pt-2">
-            {liveSessions.length === 0 ? (
-              <div className="md:col-span-2 p-6 bg-white/5 border border-white/10 rounded-xl text-center text-xs text-purple-200">
-                Hiện chưa có phiên livestream nào đang phát sóng. Hãy tạo phiên live mới trong tab <strong className="text-white">Live Sessions</strong> để bắt đầu thử nghiệm.
-              </div>
-            ) : (
-              liveSessions.map((ls) => {
+            {liveSessions.map((ls) => {
               const devPct = ls.targetGmv > 0 ? ((ls.actualGmv - ls.targetGmv) / ls.targetGmv) * 100 : 0;
               const isDeviating = Math.abs(devPct) >= 20;
 
@@ -391,7 +352,7 @@ export const Dashboards: React.FC<DashboardsProps> = ({
                   </div>
                 </div>
               );
-            }))}
+            })}
           </div>
         </div>
 

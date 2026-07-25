@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { LiveSession, Studio, Talent, Brand } from "../types";
 import {
   Calendar as CalendarIcon,
@@ -249,12 +249,15 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   brands,
   onAddSession
 }) => {
-  // Sync sessions with propSessions so clean test mode is respected
-  const [sessions, setSessions] = useState<LiveSession[]>(propSessions);
-
-  useEffect(() => {
-    setSessions(propSessions);
-  }, [propSessions]);
+  // Merge prop sessions with additional mock sessions for full month coverage
+  const [sessions, setSessions] = useState<LiveSession[]>(() => {
+    const ids = new Set(propSessions.map((s) => s.id));
+    const merged = [...propSessions];
+    ADDITIONAL_MOCK_SESSIONS.forEach((s) => {
+      if (!ids.has(s.id)) merged.push(s);
+    });
+    return merged;
+  });
 
   // View Mode: Month, Week, Day Matrix, Talent Workload, List
   const [viewMode, setViewMode] = useState<"month" | "week" | "day" | "talent_workload" | "list">("day");
@@ -1385,9 +1388,9 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
             {talents.map((t) => {
               const hostSessions = sessions.filter((s) => s.hostId === t.id && s.date === selectedDate && s.status !== "Cancelled");
               const totalHoursToday = hostSessions.reduce((acc, curr) => {
-                const [h1] = curr.startTime.split(":").map(Number);
-                const [h2] = curr.endTime.split(":").map(Number);
-                return acc + (h2 - h1);
+                const [h1, m1] = curr.startTime.split(":").map(Number);
+                const [h2, m2] = curr.endTime.split(":").map(Number);
+                return acc + (h2 * 60 + m2 - (h1 * 60 + m1)) / 60;
               }, 0);
 
               const isOverloaded = totalHoursToday > 5;
@@ -1418,7 +1421,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   <div className="space-y-1 text-xs">
                     <div className="flex justify-between font-medium">
                       <span className="text-slate-400">Tổng giờ live ngày {selectedDate}:</span>
-                      <strong className={isOverloaded ? "text-rose-400" : "text-emerald-400"}>{totalHoursToday} Giờ Live</strong>
+                      <strong className={isOverloaded ? "text-rose-400" : "text-emerald-400"}>{Number(totalHoursToday.toFixed(1))} Giờ Live</strong>
                     </div>
                     <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
                       <div

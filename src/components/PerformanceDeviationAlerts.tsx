@@ -94,13 +94,13 @@ export const PerformanceDeviationAlerts: React.FC<PerformanceDeviationAlertsProp
   const surgeCount = deviationData.filter((d) => d.type === "surge").length;
   const lagCount = deviationData.filter((d) => d.type === "lag").length;
 
-  const handleSendTelegramAlert = (sessionTitle: string, devPct: number, type: "surge" | "lag") => {
-    const msg = type === "surge" 
+  const handleSendTelegramAlert = (sessionId: string, sessionTitle: string, devPct: number, type: "surge" | "lag") => {
+    const msg = type === "surge"
       ? `🚀 [SURGE ALERT] Phiên "${sessionTitle}" đang tăng trưởng +${devPct}% so với dự báo!`
       : `🚨 [LAG ALERT] Phiên "${sessionTitle}" đang sụt giảm ${devPct}% so với KPI target!`;
 
     setToastMessage(`Đã gửi cảnh bão khẩn cấp qua Telegram Operations Group: ${msg}`);
-    setNotifiedSessionIds((prev) => [...prev, sessionTitle]);
+    setNotifiedSessionIds((prev) => prev.includes(sessionId) ? prev : [...prev, sessionId]);
     setTimeout(() => setToastMessage(null), 4000);
   };
 
@@ -223,14 +223,7 @@ export const PerformanceDeviationAlerts: React.FC<PerformanceDeviationAlertsProp
 
       {/* List of Deviating Sessions */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {filteredList.length === 0 ? (
-          <div className="col-span-1 md:col-span-2 p-8 bg-slate-950/50 border border-slate-800 rounded-xl text-center text-xs text-slate-400 space-y-2">
-            <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto" />
-            <p className="font-bold text-slate-200">Không có cảnh báo lệch KPI nào</p>
-            <p className="text-slate-500">Tất cả phiên livestream hiện tại đang vận hành ổn định hoặc chưa phát sinh biến động doanh thu.</p>
-          </div>
-        ) : (
-          filteredList.map((item) => {
+        {filteredList.map((item) => {
           const s = item.session;
           const isSurge = item.type === "surge";
           const isLive = s.status === "Live Now";
@@ -312,9 +305,10 @@ export const PerformanceDeviationAlerts: React.FC<PerformanceDeviationAlertsProp
 
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => handleSendTelegramAlert(s.title, item.deviationPercent, item.type)}
-                    className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg transition-all text-xs flex items-center gap-1"
-                    title="Gửi Telegram Alert"
+                    onClick={() => handleSendTelegramAlert(s.id, s.title, item.deviationPercent, item.type)}
+                    disabled={notifiedSessionIds.includes(s.id)}
+                    className="p-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:hover:bg-slate-800 text-slate-300 hover:text-white rounded-lg transition-all text-xs flex items-center gap-1"
+                    title={notifiedSessionIds.includes(s.id) ? "Đã gửi cảnh báo" : "Gửi Telegram Alert"}
                   >
                     <Send className="w-3.5 h-3.5 text-blue-400" />
                     <span className="hidden sm:inline text-[10px]">Alert Ops</span>
