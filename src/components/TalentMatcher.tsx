@@ -20,6 +20,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
   const [selectedBrandId, setSelectedBrandId] = useState("brand-1");
   const [targetCategory, setTargetCategory] = useState("Mỹ phẩm Skincare");
   const [matchingResults, setMatchingResults] = useState<any[] | null>(null);
+  const [isMatching, setIsMatching] = useState(false);
 
   // Search & Filter
   const [searchTerm, setSearchTerm] = useState("");
@@ -124,23 +125,41 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
     }
   };
 
-  const handleRunMatching = () => {
+  const handleRunMatching = async () => {
     const activeBrand = brands.find((b) => b.id === selectedBrandId) || brands[0];
     const rawTalents = talents && talents.length > 0 ? talents : [];
-    const results = rawTalents.map((t, idx) => {
-      const matchScore = Math.max(70, 96 - idx * 5);
-      const nicheArr = t.niches || (t as any).niche || [];
-      const nicheStr = Array.isArray(nicheArr) ? nicheArr.join(", ") : String(nicheArr || "Đa ngành");
-      const followers = t.followersTikTok || (t as any).tiktokFollowers || 0;
-      return {
-        talentId: t.id,
-        name: t.name,
-        matchScore,
-        predictedGmv: `${((t.avgGmvPerSession || 100000000) / 1000000).toFixed(0)}M - ${(((t.avgGmvPerSession || 100000000) * 1.25) / 1000000).toFixed(0)}M đ`,
-        reasoning: `Thế mạnh ngành ${nicheStr}, CVR trung bình ${t.cvrAvg}% với ${followers.toLocaleString()} followers. Rất phù hợp với ${activeBrand?.name || "Brand"}.`
-      };
-    });
-    setMatchingResults(results);
+    setIsMatching(true);
+    try {
+      const res = await fetch("/api/gemini/match-talents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ brand: activeBrand, targetCategory, talents: rawTalents })
+      });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.results) && data.results.length > 0) {
+        setMatchingResults(data.results);
+        return;
+      }
+      throw new Error(data.error || "Empty AI matching result");
+    } catch (e) {
+      console.error("AI Talent Matching failed, dùng fallback công thức:", e);
+      const results = rawTalents.map((t, idx) => {
+        const matchScore = Math.max(70, 96 - idx * 5);
+        const nicheArr = t.niches || (t as any).niche || [];
+        const nicheStr = Array.isArray(nicheArr) ? nicheArr.join(", ") : String(nicheArr || "Đa ngành");
+        const followers = t.followersTikTok || (t as any).tiktokFollowers || 0;
+        return {
+          talentId: t.id,
+          name: t.name,
+          matchScore,
+          predictedGmv: `${((t.avgGmvPerSession || 100000000) / 1000000).toFixed(0)}M - ${(((t.avgGmvPerSession || 100000000) * 1.25) / 1000000).toFixed(0)}M đ`,
+          reasoning: `Thế mạnh ngành ${nicheStr}, CVR trung bình ${t.cvrAvg}% với ${followers.toLocaleString()} followers. Rất phù hợp với ${activeBrand?.name || "Brand"}.`
+        };
+      });
+      setMatchingResults(results);
+    } finally {
+      setIsMatching(false);
+    }
   };
 
   const filteredTalents = talents.filter((t) => {
@@ -194,9 +213,10 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
           <div className="flex items-end">
             <button
               onClick={handleRunMatching}
-              className="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold p-2.5 rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow"
+              disabled={isMatching}
+              className="w-full bg-purple-600 hover:bg-purple-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold p-2.5 rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow"
             >
-              <Sparkles className="w-4 h-4" /> AI Tìm Top Host Phù Hợp
+              <Sparkles className="w-4 h-4" /> {isMatching ? "Đang Phân Tích..." : "AI Tìm Top Host Phù Hợp"}
             </button>
           </div>
         </div>

@@ -1,14 +1,32 @@
 import express from "express";
 import path from "path";
+import crypto from "crypto";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
+import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
+import * as Sentry from "@sentry/node";
 
 dotenv.config();
 
+// Error tracking (Phase 11) — no-op until SENTRY_DSN is set, same gated pattern as
+// GEMINI_API_KEY/TIKTOK_APP_KEY: code runs identically either way, just silently
+// skips reporting when unconfigured.
+if (process.env.SENTRY_DSN) {
+  Sentry.init({ dsn: process.env.SENTRY_DSN, tracesSampleRate: 0.1 });
+}
+process.on("unhandledRejection", (reason) => {
+  if (process.env.SENTRY_DSN) Sentry.captureException(reason);
+  console.error("Unhandled Rejection:", reason);
+});
+process.on("uncaughtException", (error) => {
+  if (process.env.SENTRY_DSN) Sentry.captureException(error);
+  console.error("Uncaught Exception:", error);
+});
+
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   app.use(express.json());
 
@@ -20,6 +38,251 @@ async function startServer() {
     }
     return new GoogleGenAI({ apiKey });
   };
+
+  // Admin Supabase client — uses the service role key, which must only ever live
+  // server-side (never VITE_-prefixed, never shipped to the browser). Needed for
+  // account-level operations (invite/delete auth users) the anon key can't do.
+  const supabaseUrl = process.env.VITE_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseAdmin =
+    supabaseUrl && serviceRoleKey
+      ? createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
+      : null;
+
+  // Verifies the caller's bearer token belongs to a signed-in `ceo` profile.
+  // Returns the caller's user id on success, or null if unauthorized/misconfigured.
+  const requireCeoCaller = async (req: express.Request): Promise<string | null> => {
+    if (!supabaseAdmin) return null;
+    const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+    if (!token) return null;
+    const { data: userData, error: userErr } = await supabaseAdmin.auth.getUser(token);
+    if (userErr || !userData.user) return null;
+    const { data: profile, error: profileErr } = await supabaseAdmin
+      .from("profiles")
+      .select("role")
+      .eq("id", userData.user.id)
+      .single();
+    if (profileErr || !profile || profile.role !== "ceo") return null;
+    return userData.user.id;
+  };
+
+  // API Route: Invite a new user account (creates a real Supabase Auth user + triggers
+  // the `handle_new_user` trigger to create its `profiles` row).
+  app.post("/api/admin/users/invite", async (req, res) => {
+    if (!supabaseAdmin) {
+      return res.status(503).json({ error: "Server chưa cấu hình SUPABASE_SERVICE_ROLE_KEY." });
+    }
+    const callerId = await requireCeoCaller(req);
+    if (!callerId) {
+      return res.status(403).json({ error: "Chỉ tài khoản CEO mới được tạo tài khoản mới." });
+    }
+    const { name, email, role, customRoleTitle, assignedBrandId, assignedTalentId } = req.body || {};
+    if (!name || !email || !role) {
+      return res.status(400).json({ error: "Thiếu name/email/role." });
+    }
+    const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+      data: { name, role, custom_role_title: customRoleTitle || "" }
+    });
+    if (error) {
+      console.error("inviteUserByEmail error:", error);
+      return res.status(400).json({ error: error.message });
+    }
+    if (data.user && (assignedBrandId || assignedTalentId)) {
+      await supabaseAdmin
+        .from("profiles")
+        .update({
+          assigned_brand_id: assignedBrandId || null,
+          assigned_talent_id: assignedTalentId || null
+        })
+        .eq("id", data.user.id);
+    }
+    res.json({ success: true, id: data.user?.id });
+  });
+
+  // API Route: Permanently delete a user account (cascades to its `profiles` row).
+  app.delete("/api/admin/users/:id", async (req, res) => {
+    if (!supabaseAdmin) {
+      return res.status(503).json({ error: "Server chưa cấu hình SUPABASE_SERVICE_ROLE_KEY." });
+    }
+    const callerId = await requireCeoCaller(req);
+    if (!callerId) {
+      return res.status(403).json({ error: "Chỉ tài khoản CEO mới được xóa tài khoản." });
+    }
+    const { id } = req.params;
+    if (id === callerId) {
+      return res.status(400).json({ error: "Không thể tự xóa tài khoản của chính mình." });
+    }
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(id);
+    if (error) {
+      return res.status(400).json({ error: error.message });
+    }
+    res.json({ success: true });
+  });
+
+  // ============================================================
+  // Giai đoạn 9: TikTok Shop Partner API — OAuth + Webhook thật.
+  // Toàn bộ token (access/refresh) sống trong bảng `tiktok_shop_connections`, chỉ
+  // đọc/ghi được bằng admin client (service_role) — client không bao giờ query bảng
+  // này trực tiếp, luôn đi qua các endpoint dưới đây.
+  // ============================================================
+  const TIKTOK_APP_KEY = process.env.TIKTOK_APP_KEY || "";
+  const TIKTOK_APP_SECRET = process.env.TIKTOK_APP_SECRET || "";
+  const TIKTOK_WEBHOOK_SECRET = process.env.TIKTOK_WEBHOOK_SECRET || "";
+  // Nơi TikTok redirect lại sau khi seller cấp quyền — phải khớp 100% với URL đã khai báo
+  // trong TikTok Shop Partner Center khi tạo app.
+  const TIKTOK_REDIRECT_URI = process.env.TIKTOK_REDIRECT_URI || "";
+  const tiktokConfigured = () => Boolean(TIKTOK_APP_KEY && TIKTOK_APP_SECRET && TIKTOK_REDIRECT_URI);
+
+  // Verifies the caller's bearer token belongs to any signed-in profile (no role restriction) —
+  // used for read-only status/log endpoints that every logged-in user should be able to view.
+  const requireAnyCaller = async (req: express.Request): Promise<string | null> => {
+    if (!supabaseAdmin) return null;
+    const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+    if (!token) return null;
+    const { data, error } = await supabaseAdmin.auth.getUser(token);
+    if (error || !data.user) return null;
+    return data.user.id;
+  };
+
+  // API Route: returns a one-time-use TikTok authorization URL. The client redirects the
+  // browser to it (window.location = url); TikTok then redirects the seller back to
+  // TIKTOK_REDIRECT_URI with a `code` + `state` query param.
+  app.get("/api/tiktok/oauth/authorize", async (req, res) => {
+    if (!tiktokConfigured()) {
+      return res.status(503).json({ error: "Server chưa cấu hình TIKTOK_APP_KEY/TIKTOK_APP_SECRET/TIKTOK_REDIRECT_URI." });
+    }
+    const callerId = await requireCeoCaller(req);
+    if (!callerId) {
+      return res.status(403).json({ error: "Chỉ tài khoản CEO mới được kết nối TikTok Shop." });
+    }
+    const state = crypto.randomBytes(16).toString("hex");
+    // TikTok Shop Partner Center authorization entry point (Shop API for Partners, v2).
+    const url = `https://services.tiktokshop.com/open/authorize?service_id=${encodeURIComponent(TIKTOK_APP_KEY)}&state=${state}`;
+    res.json({ url, state });
+  });
+
+  // API Route: OAuth callback — TikTok redirects the seller's browser here after approval.
+  app.get("/api/tiktok/oauth/callback", async (req, res) => {
+    if (!supabaseAdmin || !tiktokConfigured()) {
+      return res.status(503).send("TikTok integration chưa được cấu hình đầy đủ trên server.");
+    }
+    const code = String(req.query.code || "");
+    if (!code) {
+      return res.status(400).send("Thiếu authorization code từ TikTok.");
+    }
+    try {
+      const tokenResp = await fetch(
+        `https://auth.tiktok-shops.com/api/v2/token/get?app_key=${encodeURIComponent(TIKTOK_APP_KEY)}&app_secret=${encodeURIComponent(TIKTOK_APP_SECRET)}&auth_code=${encodeURIComponent(code)}&grant_type=authorized_code`
+      );
+      const tokenJson: any = await tokenResp.json();
+      if (!tokenResp.ok || tokenJson.code) {
+        console.error("TikTok token exchange error:", tokenJson);
+        return res.status(400).send(`Lỗi trao đổi token với TikTok: ${tokenJson.message || tokenResp.statusText}`);
+      }
+      const data = tokenJson.data || tokenJson;
+      const shopId = String(data.seller_id || data.shop_id || data.open_id || "unknown");
+      const now = Date.now();
+      const row = {
+        shop_id: shopId,
+        shop_name: data.seller_name || "",
+        access_token: data.access_token,
+        access_token_expires_at: new Date(now + (data.access_token_expire_in || 0) * 1000).toISOString(),
+        refresh_token: data.refresh_token,
+        refresh_token_expires_at: new Date(now + (data.refresh_token_expire_in || 0) * 1000).toISOString(),
+        scope: Array.isArray(data.scope) ? data.scope.join(",") : String(data.scope || "")
+      };
+      const { error } = await supabaseAdmin.from("tiktok_shop_connections").upsert(row, { onConflict: "shop_id" });
+      if (error) {
+        console.error("Lưu TikTok connection thất bại:", error);
+        return res.status(500).send("Lưu kết nối TikTok thất bại.");
+      }
+      res.redirect("/?tiktok=connected");
+    } catch (err: any) {
+      console.error("TikTok OAuth callback error:", err);
+      res.status(500).send("Lỗi hệ thống khi xử lý callback TikTok.");
+    }
+  });
+
+  // API Route: connection status — safe subset only (no tokens ever leave the server).
+  app.get("/api/tiktok/status", async (req, res) => {
+    if (!supabaseAdmin) {
+      return res.json({ configured: false, connected: false });
+    }
+    const callerId = await requireAnyCaller(req);
+    if (!callerId) {
+      return res.status(403).json({ error: "Cần đăng nhập để xem trạng thái kết nối." });
+    }
+    const { data, error } = await supabaseAdmin
+      .from("tiktok_shop_connections")
+      .select("shop_id, shop_name, scope, access_token_expires_at, updated_at")
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) {
+      console.error("Đọc TikTok connection status thất bại:", error);
+      return res.status(500).json({ error: error.message });
+    }
+    res.json({
+      configured: tiktokConfigured(),
+      connected: Boolean(data),
+      shopId: data?.shop_id || null,
+      shopName: data?.shop_name || null,
+      scope: data?.scope || null,
+      accessTokenExpiresAt: data?.access_token_expires_at || null,
+      updatedAt: data?.updated_at || null
+    });
+  });
+
+  // API Route: disconnect — CEO-only, removes stored tokens.
+  app.post("/api/tiktok/disconnect", async (req, res) => {
+    if (!supabaseAdmin) {
+      return res.status(503).json({ error: "Server chưa cấu hình Supabase Admin." });
+    }
+    const callerId = await requireCeoCaller(req);
+    if (!callerId) {
+      return res.status(403).json({ error: "Chỉ tài khoản CEO mới được ngắt kết nối TikTok Shop." });
+    }
+    const { error } = await supabaseAdmin.from("tiktok_shop_connections").delete().neq("shop_id", "");
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+    res.json({ success: true });
+  });
+
+  // API Route: webhook receiver — TikTok Shop pushes live/order events here. Must respond
+  // fast (TikTok retries/kills the subscription on repeated timeouts), so we just verify +
+  // persist the raw event; any downstream processing (matching to a live_session, updating
+  // GMV) happens as a follow-up read of `tiktok_webhook_events`, not inline here.
+  app.post("/api/tiktok/webhook", async (req, res) => {
+    if (!supabaseAdmin) {
+      return res.status(503).json({ error: "Server chưa cấu hình Supabase Admin." });
+    }
+    // Signature verification: TikTok Shop signs webhook bodies with the app secret. Header name
+    // varies by webhook version configured in Partner Center — confirm exact header once the
+    // real app + webhook subscription exists, this checks the documented default.
+    if (TIKTOK_WEBHOOK_SECRET) {
+      const signature = String(req.headers["x-tts-signature"] || "");
+      const expected = crypto
+        .createHmac("sha256", TIKTOK_WEBHOOK_SECRET)
+        .update(JSON.stringify(req.body || {}))
+        .digest("hex");
+      if (!signature || signature !== expected) {
+        console.error("TikTok webhook signature mismatch — event rejected.");
+        return res.status(401).json({ error: "Invalid signature." });
+      }
+    }
+    const body = req.body || {};
+    const { error } = await supabaseAdmin.from("tiktok_webhook_events").insert({
+      event_type: String(body.type || body.event_type || "unknown"),
+      shop_id: String(body.shop_id || ""),
+      payload: body
+    });
+    if (error) {
+      console.error("Lưu TikTok webhook event thất bại:", error);
+      return res.status(500).json({ error: error.message });
+    }
+    res.json({ success: true });
+  });
 
   // API Routes
   app.get("/api/health", (req, res) => {
@@ -98,7 +361,7 @@ Hãy tạo 1 Kịch Bản Livestream TikTok chi tiết, cuốn hút, tối ưu C
 }`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-flash-latest",
         contents: prompt,
         config: { responseMimeType: "application/json" },
       });
@@ -169,7 +432,7 @@ ${JSON.stringify(sessionData)}
 }`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-flash-latest",
         contents: prompt,
         config: { responseMimeType: "application/json" },
       });
@@ -212,7 +475,7 @@ ${JSON.stringify(sessionData)}
       const prompt = `${systemPrompts[agentRole] || systemPrompts.ceo}\n\nNgười dùng hỏi: ${userMessage}`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-flash-latest",
         contents: prompt,
       });
 
@@ -222,6 +485,102 @@ ${JSON.stringify(sessionData)}
       res.status(500).json({ success: false, error: error.message });
     }
   });
+
+  // API Route: AI Talent Matching — replaces the old client-side `96 - idx*5` formula.
+  app.post("/api/gemini/match-talents", async (req, res) => {
+    try {
+      const { brand, targetCategory, talents } = req.body;
+      const ai = getGeminiClient();
+
+      if (!ai) {
+        // Fallback: same shape as before Phase 10 (formula-based), used only when no API key is set.
+        const results = (talents || []).map((t: any, idx: number) => ({
+          talentId: t.id,
+          name: t.name,
+          matchScore: Math.max(70, 96 - idx * 5),
+          predictedGmv: `${((t.avgGmvPerSession || 100000000) / 1000000).toFixed(0)}M - ${(((t.avgGmvPerSession || 100000000) * 1.25) / 1000000).toFixed(0)}M đ`,
+          reasoning: `Thế mạnh ngành ${(t.niches || []).join(", ") || "Đa ngành"}, CVR trung bình ${t.cvrAvg}% với ${(t.followersTikTok || 0).toLocaleString()} followers. Rất phù hợp với ${brand?.name || "Brand"}.`
+        }));
+        return res.json({ success: true, isMock: true, results });
+      }
+
+      const prompt = `Bạn là Talent Matcher AI cho Agency Livestream TikTok Shop, chuyên ghép Host/KOC phù hợp nhất cho từng Brand dựa trên dữ liệu thật.
+
+Thương hiệu cần ghép: ${brand?.name || "Brand"} (Ngành: ${brand?.industry || "N/A"})
+Danh mục sản phẩm SKU mục tiêu: ${targetCategory}
+
+Danh sách Talent hiện có (dữ liệu thật từ hệ thống):
+${JSON.stringify(talents)}
+
+Hãy chấm điểm mức độ phù hợp (matchScore, 0-100) cho MỖI talent trong danh sách trên dựa trên: mức độ khớp ngành hàng (niches) với ngành của Brand/SKU, CVR, số followers, GMV trung bình mỗi phiên. Đưa ra lý do (reasoning) ngắn gọn, cụ thể dựa trên số liệu thật đã cho — không bịa số liệu không có trong dữ liệu.
+
+Định dạng JSON trả về (mảng, giữ nguyên thứ tự talentId đầu vào):
+{
+  "results": [
+    { "talentId": "...", "name": "...", "matchScore": 92, "predictedGmv": "150M - 190M đ", "reasoning": "..." }
+  ]
+}`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-flash-latest",
+        contents: prompt,
+        config: { responseMimeType: "application/json" },
+      });
+
+      const data = JSON.parse(response.text || "{}");
+      return res.json({ success: true, isMock: false, results: data.results || [] });
+    } catch (error: any) {
+      console.error("Gemini Talent Matching Error:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // API Route: AI Brand Meeting Summarizer & Action Item Generator
+  app.post("/api/gemini/summarize-meeting", async (req, res) => {
+    try {
+      const { meetingNotes } = req.body;
+      const ai = getGeminiClient();
+
+      if (!ai) {
+        return res.json({
+          success: true,
+          isMock: true,
+          summary: "📌 AI Tóm Tắt & Hành Động Cần Làm:\n1. Tăng ngân sách Contract thêm +150.000.000đ cho Campaign Mega Live 8/8.\n2. Task KAM Lê Quốc Bảo: Khớp nối thêm 2 Host dự phòng (Ưu tiên Host Bích Ngọc) cho dải sản phẩm Haircare.\n3. Task Moderator Tuấn: Cấu hình bot tự động ghim Voucher 100k đúng khung giờ vàng 20:00 - 21:00."
+        });
+      }
+
+      const prompt = `Bạn là Trợ Lý AI cho Agency Livestream TikTok Shop, chuyên tóm tắt biên bản họp với Brand và tạo danh sách hành động cụ thể.
+
+Ghi chú cuộc họp thật (do người dùng nhập):
+"""
+${meetingNotes}
+"""
+
+Hãy đọc kỹ ghi chú trên (KHÔNG bịa thêm thông tin không có trong ghi chú) và trả về:
+1. Tóm tắt ngắn gọn các quyết định/thỏa thuận chính.
+2. Danh sách hành động cụ thể (action items), mỗi mục nêu rõ ai làm gì nếu ghi chú có nhắc tên người, hoặc mô tả việc cần làm nếu không có tên cụ thể.
+
+Trả về dạng text thuần (không JSON), định dạng:
+📌 AI Tóm Tắt & Hành Động Cần Làm:
+1. ...
+2. ...
+3. ...`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-flash-latest",
+        contents: prompt,
+      });
+
+      return res.json({ success: true, isMock: false, summary: response.text || "" });
+    } catch (error: any) {
+      console.error("Gemini Meeting Summary Error:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  if (process.env.SENTRY_DSN) {
+    Sentry.setupExpressErrorHandler(app);
+  }
 
   // Vite middleware for dev or static serving for prod
   if (process.env.NODE_ENV !== "production") {

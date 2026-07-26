@@ -1,27 +1,37 @@
 import React, { useState } from "react";
-import { WorkflowRule } from "../types";
-import { Server, Zap, RefreshCw, CheckCircle2, ShieldCheck, Code, Play, ArrowRight, Activity, FileSpreadsheet, Plus, Edit3, Trash2, X } from "lucide-react";
+import { TikTokConnectionStatus, TikTokWebhookEvent, WorkflowRule } from "../types";
+import { getTikTokAuthorizeUrl, disconnectTikTok } from "../lib/db/tiktokIntegration";
+import { Server, Zap, RefreshCw, ShieldCheck, ShieldAlert, ShieldX, Link2, Unlink, ArrowRight, Activity, FileSpreadsheet, Plus, Edit3, Trash2, X } from "lucide-react";
 
 interface TikTokApiAutomationProps {
   workflowRules: WorkflowRule[];
   onAddWorkflowRule?: (rule: WorkflowRule) => void;
   onUpdateWorkflowRule?: (rule: WorkflowRule) => void;
   onDeleteWorkflowRule?: (id: string) => void;
+  currentRole: string;
+  tiktokStatus: TikTokConnectionStatus | null;
+  tiktokStatusLoading: boolean;
+  tiktokStatusError: string | null;
+  webhookEvents: TikTokWebhookEvent[];
+  onRefreshTikTokStatus: () => void;
 }
 
 export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
   workflowRules,
   onAddWorkflowRule,
   onUpdateWorkflowRule,
-  onDeleteWorkflowRule
+  onDeleteWorkflowRule,
+  currentRole,
+  tiktokStatus,
+  tiktokStatusLoading,
+  tiktokStatusError,
+  webhookEvents,
+  onRefreshTikTokStatus
 }) => {
   const [activeTab, setActiveTab] = useState<"api_status" | "rules" | "csv_import">("api_status");
-  const [simulatingWebhook, setSimulatingWebhook] = useState(false);
-  const [webhookLogs, setWebhookLogs] = useState<string[]>([
-    "[2026-07-23 08:00:01] EVENT: tiktok.livestream.started | Session: session-live-01 | Studio A",
-    "[2026-07-23 08:15:22] EVENT: tiktok.orders.created | +32 Orders | SKU: COC-BHA-01",
-    "[2026-07-23 08:35:10] EVENT: tiktok.live.peak_viewers_reached | Peak: 3,420 Viewers"
-  ]);
+  const [connecting, setConnecting] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -31,15 +41,32 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
   const [ruleAction, setRuleAction] = useState("");
   const [ruleEnabled, setRuleEnabled] = useState(true);
 
-  const handleSimulateWebhook = () => {
-    setSimulatingWebhook(true);
-    setTimeout(() => {
-      setWebhookLogs((prev) => [
-        `[${new Date().toLocaleTimeString()}] WEBHOOK SYNC: tiktok.orders.payment_confirmed | +15 Orders | GMV +4,250,000đ`,
-        ...prev
-      ]);
-      setSimulatingWebhook(false);
-    }, 800);
+  const isCeo = currentRole === "ceo";
+
+  const handleConnect = async () => {
+    setActionError(null);
+    setConnecting(true);
+    try {
+      const url = await getTikTokAuthorizeUrl();
+      window.location.href = url;
+    } catch (err: any) {
+      setActionError(err.message || "Không thể kết nối TikTok Shop.");
+      setConnecting(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    if (!window.confirm("Ngắt kết nối TikTok Shop hiện tại? Mọi webhook sẽ ngừng nhận sự kiện.")) return;
+    setActionError(null);
+    setDisconnecting(true);
+    try {
+      await disconnectTikTok();
+      onRefreshTikTokStatus();
+    } catch (err: any) {
+      setActionError(err.message || "Không thể ngắt kết nối TikTok Shop.");
+    } finally {
+      setDisconnecting(false);
+    }
   };
 
   const handleToggleRule = (rule: WorkflowRule) => {
@@ -138,52 +165,111 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
       {/* API Status View */}
       {activeTab === "api_status" && (
         <div className="space-y-6">
+          {actionError && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-xs font-semibold p-3 rounded-xl">
+              {actionError}
+            </div>
+          )}
+          {tiktokStatusError && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-xs font-semibold p-3 rounded-xl">
+              {tiktokStatusError}
+            </div>
+          )}
+
           <div className="grid md:grid-cols-3 gap-4 text-xs">
             <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-1">
               <span className="text-slate-400 font-medium block">TikTok OAuth App Status</span>
-              <div className="text-sm font-bold text-emerald-600 flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4" /> AUTHORIZED (TikTok Partner v2.4)
-              </div>
-              <span className="text-[10px] text-slate-400">App ID: tt_partner_app_99218</span>
+              {tiktokStatusLoading ? (
+                <div className="text-sm font-bold text-slate-400 flex items-center gap-1.5">
+                  <RefreshCw className="w-4 h-4 animate-spin" /> Đang kiểm tra...
+                </div>
+              ) : !tiktokStatus?.configured ? (
+                <div className="text-sm font-bold text-slate-500 flex items-center gap-1.5">
+                  <ShieldX className="w-4 h-4" /> CHƯA CẤU HÌNH APP
+                </div>
+              ) : tiktokStatus.connected ? (
+                <div className="text-sm font-bold text-emerald-600 flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4" /> ĐÃ KẾT NỐI
+                </div>
+              ) : (
+                <div className="text-sm font-bold text-amber-600 flex items-center gap-1.5">
+                  <ShieldAlert className="w-4 h-4" /> CHƯA KẾT NỐI
+                </div>
+              )}
+              <span className="text-[10px] text-slate-400 block">
+                {tiktokStatus?.connected ? `Shop: ${tiktokStatus.shopName || tiktokStatus.shopId}` : "Không có shop nào đang kết nối"}
+              </span>
+              {isCeo && (
+                <div className="pt-2">
+                  {tiktokStatus?.connected ? (
+                    <button
+                      onClick={handleDisconnect}
+                      disabled={disconnecting}
+                      className="text-[11px] font-bold text-red-600 hover:text-red-700 flex items-center gap-1"
+                    >
+                      <Unlink className="w-3.5 h-3.5" /> {disconnecting ? "Đang ngắt..." : "Ngắt Kết Nối"}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleConnect}
+                      disabled={connecting || !tiktokStatus?.configured}
+                      className="text-[11px] font-bold text-purple-600 hover:text-purple-700 flex items-center gap-1 disabled:text-slate-300"
+                    >
+                      <Link2 className="w-3.5 h-3.5" /> {connecting ? "Đang chuyển hướng..." : "Kết Nối TikTok Shop"}
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-1">
-              <span className="text-slate-400 font-medium block">Webhook Endpoints</span>
+              <span className="text-slate-400 font-medium block">Webhook Endpoint</span>
               <div className="text-sm font-bold text-indigo-600 flex items-center gap-1.5">
-                <Activity className="w-4 h-4" /> ACTIVE (https://api.liveops.ai/webhook)
+                <Activity className="w-4 h-4" /> /api/tiktok/webhook
               </div>
-              <span className="text-[10px] text-slate-400">Rate Limit: 10,000 req/min</span>
+              <span className="text-[10px] text-slate-400">
+                Đăng ký URL này trong TikTok Shop Partner Center để nhận sự kiện live/order thật
+              </span>
             </div>
 
             <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-1">
-              <span className="text-slate-400 font-medium block">Độ Trễ Đồng Bộ (Latency)</span>
-              <div className="text-sm font-bold text-slate-900">120 ms (Real-time)</div>
-              <span className="text-[10px] text-emerald-600 font-medium">0 packet drop in last 24h</span>
+              <span className="text-slate-400 font-medium block">Access Token Hết Hạn</span>
+              <div className="text-sm font-bold text-slate-900">
+                {tiktokStatus?.accessTokenExpiresAt ? new Date(tiktokStatus.accessTokenExpiresAt).toLocaleString("vi-VN") : "—"}
+              </div>
+              <span className="text-[10px] text-slate-400">
+                {tiktokStatus?.scope ? `Scope: ${tiktokStatus.scope}` : "Chưa có phiên OAuth nào"}
+              </span>
             </div>
           </div>
 
-          {/* Webhook Stream Logs */}
+          {/* Webhook Event Log — dữ liệu thật từ bảng tiktok_webhook_events, không giả lập */}
           <div className="bg-slate-950 text-white p-6 rounded-2xl font-mono text-xs space-y-4 shadow-xl border border-slate-800">
             <div className="flex justify-between items-center border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
-                <span className="font-bold text-emerald-400">Real-time Webhook Event Stream Inspector</span>
+                <span className={`w-2.5 h-2.5 rounded-full ${tiktokStatus?.connected ? "bg-emerald-400 animate-ping" : "bg-slate-600"}`}></span>
+                <span className="font-bold text-emerald-400">Webhook Event Log (Thật)</span>
               </div>
               <button
-                onClick={handleSimulateWebhook}
-                disabled={simulatingWebhook}
-                className="bg-purple-600 hover:bg-purple-500 text-white font-sans text-xs px-3 py-1.5 rounded-lg font-bold flex items-center gap-1 transition-all"
+                onClick={onRefreshTikTokStatus}
+                className="bg-slate-800 hover:bg-slate-700 text-white font-sans text-xs px-3 py-1.5 rounded-lg font-bold flex items-center gap-1 transition-all"
               >
-                <Play className="w-3.5 h-3.5" /> Giả Lập Event Nhận Đơn
+                <RefreshCw className="w-3.5 h-3.5" /> Làm Mới
               </button>
             </div>
 
             <div className="space-y-2 max-h-56 overflow-y-auto">
-              {webhookLogs.map((log, i) => (
-                <p key={i} className="text-slate-300 hover:text-white transition-colors">
-                  {log}
+              {webhookEvents.length === 0 ? (
+                <p className="text-slate-500">
+                  Chưa nhận sự kiện webhook nào{tiktokStatus?.connected ? " — chờ TikTok Shop gửi event." : " — cần kết nối TikTok Shop trước."}
                 </p>
-              ))}
+              ) : (
+                webhookEvents.map((event) => (
+                  <p key={event.id} className="text-slate-300 hover:text-white transition-colors">
+                    [{new Date(event.receivedAt).toLocaleString("vi-VN")}] EVENT: {event.eventType} | Shop: {event.shopId || "—"}
+                  </p>
+                ))
+              )}
             </div>
           </div>
         </div>

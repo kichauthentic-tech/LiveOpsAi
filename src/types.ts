@@ -36,6 +36,7 @@ export interface SystemUser {
   assignedTalentId?: string;
   lastLogin: string;
   customPermissionOverrides?: Partial<Record<PermissionKey, boolean>>;
+  isCustom?: boolean;
 }
 
 export interface AuditLogEntry {
@@ -45,6 +46,7 @@ export interface AuditLogEntry {
   action: string;
   details: string;
   category: "Permission Change" | "Role Update" | "User Status" | "Security Alert";
+  isCustom?: boolean;
 }
 
 export interface Brand {
@@ -59,6 +61,8 @@ export interface Brand {
   totalGmv: number;
   contractStatus: "Active" | "Pending" | "Completed";
   owner: string;
+  ownerUserId?: string;
+  isCustom?: boolean;
 }
 
 export interface Talent {
@@ -78,6 +82,7 @@ export interface Talent {
   availabilityStatus: "Available" | "Busy" | "On Live";
   brandsWorkedWith: string[];
   phone: string;
+  isCustom?: boolean;
 }
 
 export interface Studio {
@@ -89,6 +94,7 @@ export interface Studio {
   status: "Live Now" | "Booked" | "Available" | "Maintenance";
   currentSessionId?: string;
   equipmentCount: number;
+  isCustom?: boolean;
 }
 
 export interface Equipment {
@@ -98,8 +104,10 @@ export interface Equipment {
   category: "Camera" | "Lighting" | "Audio" | "PC/Switcher" | "Teleprompter";
   model: string;
   assignedStudioId?: string;
+  assignedStudioName?: string;
   status: "In Use" | "In Stock" | "Maintenance" | "Damaged";
   lastCheckDate: string;
+  isCustom?: boolean;
 }
 
 export interface ProductSKU {
@@ -144,6 +152,7 @@ export interface LiveSession {
   title: string;
   brandId: string;
   brandName: string;
+  projectId?: string;
   shopTikTokHandle: string;
   studioId: string;
   studioName: string;
@@ -179,6 +188,7 @@ export interface LiveSession {
     };
     actionableRecommendations: string[];
   };
+  isCustom?: boolean;
 }
 
 export interface AgencyProject {
@@ -195,6 +205,40 @@ export interface AgencyProject {
   totalSessionsPlanned: number;
   sessionsCompleted: number;
   teamLead: string;
+  teamLeadUserId?: string;
+  isCustom?: boolean;
+}
+
+export interface SessionFinance {
+  sessionId: string;
+  agencyCommissionRate: number; // % GMV
+  studioCost: number;
+  adsCost: number;
+  hostFixRateOverride?: number;
+  hostCommissionRateOverride?: number; // % GMV
+  approvalStatus: "pending" | "approved" | "rejected";
+  approvedByUserId?: string;
+  approvedAt?: string;
+  notes: string;
+}
+
+export interface TikTokConnectionStatus {
+  configured: boolean;
+  connected: boolean;
+  shopId?: string | null;
+  shopName?: string | null;
+  scope?: string | null;
+  accessTokenExpiresAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface TikTokWebhookEvent {
+  id: string;
+  eventType: string;
+  shopId: string;
+  payload: Record<string, unknown>;
+  sessionId?: string | null;
+  receivedAt: string;
 }
 
 export interface WorkflowRule {
@@ -205,6 +249,7 @@ export interface WorkflowRule {
   enabled: boolean;
   lastRun?: string;
   executionsCount: number;
+  isCustom?: boolean;
 }
 
 export interface StrategicDirective {
@@ -222,5 +267,6 @@ export interface StrategicDirective {
   progressPercent: number;
   notesFromLead?: string;
   createdAt: string;
+  isCustom?: boolean;
 }
 

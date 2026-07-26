@@ -1,10 +1,11 @@
 import React, { useState } from "react";
-import { Brand, AgencyProject } from "../types";
+import { Brand, AgencyProject, SystemUser } from "../types";
 import { Building2, Layers, DollarSign, Sparkles, Plus, Edit3, Trash2, X, CheckCircle2, Clock, Phone, UserCheck } from "lucide-react";
 
 interface CrmProjectsProps {
   brands: Brand[];
   projects: AgencyProject[];
+  users?: SystemUser[];
   onAddBrand?: (brand: Brand) => void;
   onUpdateBrand?: (brand: Brand) => void;
   onDeleteBrand?: (id: string) => void;
@@ -16,6 +17,7 @@ interface CrmProjectsProps {
 export const CrmProjects: React.FC<CrmProjectsProps> = ({
   brands,
   projects,
+  users = [],
   onAddBrand,
   onUpdateBrand,
   onDeleteBrand,
@@ -23,10 +25,13 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
   onUpdateProject,
   onDeleteProject
 }) => {
+  // Internal agency staff eligible to be KAM / Team Lead owners
+  const staffUsers = users.filter((u) => u.role === "ceo" || u.role === "operations");
   const [meetingNotes, setMeetingNotes] = useState(
     "Cuộc họp trao đổi với Brand Cocoon ngày 22/07: Khách hàng đồng ý tăng ngân sách thêm 150 triệu cho đợt Mega Live 8/8 tới. Cần bổ sung 2 Host dự phòng cho ngành Haircare và ghim 10 Voucher 100k duy nhất từ 20h00 đến 21h00."
   );
   const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const [isSummarizing, setIsSummarizing] = useState(false);
 
   // Brand Modal State
   const [isBrandModalOpen, setIsBrandModalOpen] = useState(false);
@@ -38,6 +43,7 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
   const [brandPhone, setBrandPhone] = useState("");
   const [brandEmail, setBrandEmail] = useState("");
   const [brandOwner, setBrandOwner] = useState("Lê Quốc Bảo (KAM Lead)");
+  const [brandOwnerUserId, setBrandOwnerUserId] = useState<string>("");
   const [brandActiveCampaigns, setBrandActiveCampaigns] = useState(2);
   const [brandTotalGmv, setBrandTotalGmv] = useState(1200000000);
   const [brandContractStatus, setBrandContractStatus] = useState<"Active" | "Pending" | "Completed">("Active");
@@ -53,12 +59,30 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
   const [projPlannedSessions, setProjPlannedSessions] = useState(10);
   const [projCompletedSessions, setProjCompletedSessions] = useState(5);
   const [projTeamLead, setProjTeamLead] = useState("Trần Hoàng (Project Lead)");
+  const [projTeamLeadUserId, setProjTeamLeadUserId] = useState<string>("");
   const [projStatus, setProjStatus] = useState<"In Progress" | "Planning" | "Completed" | "Paused">("In Progress");
 
-  const handleSummarizeMeeting = () => {
-    setAiSummary(
-      "📌 AI Tóm Tắt & Hành Động Cần Làm:\n1. Tăng ngân sách Contract thêm +150.000.000đ cho Campaign Mega Live 8/8.\n2. Task KAM Lê Quốc Bảo: Khớp nối thêm 2 Host dự phòng (Ưu tiên Host Bích Ngọc) cho dải sản phẩm Haircare.\n3. Task Moderator Tuấn: Cấu hình bot tự động ghim Voucher 100k đúng khung giờ vàng 20:00 - 21:00."
-    );
+  const handleSummarizeMeeting = async () => {
+    if (!meetingNotes.trim()) return;
+    setIsSummarizing(true);
+    try {
+      const res = await fetch("/api/gemini/summarize-meeting", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ meetingNotes })
+      });
+      const data = await res.json();
+      if (data.success && data.summary) {
+        setAiSummary(data.summary);
+        return;
+      }
+      throw new Error(data.error || "Empty AI summary result");
+    } catch (e) {
+      console.error("AI Meeting Summary failed:", e);
+      setAiSummary("⚠️ Không thể tạo tóm tắt lúc này (lỗi kết nối AI). Vui lòng thử lại sau.");
+    } finally {
+      setIsSummarizing(false);
+    }
   };
 
   // Brand Handlers
@@ -71,6 +95,7 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
     setBrandPhone("0909 123 456");
     setBrandEmail("contact@brand.com");
     setBrandOwner("Lê Quốc Bảo (KAM Lead)");
+    setBrandOwnerUserId(staffUsers[0]?.id || "");
     setBrandActiveCampaigns(1);
     setBrandTotalGmv(500000000);
     setBrandContractStatus("Active");
@@ -86,10 +111,17 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
     setBrandPhone(b.phone);
     setBrandEmail(b.email || "contact@brand.com");
     setBrandOwner(b.owner);
+    setBrandOwnerUserId(b.ownerUserId || "");
     setBrandActiveCampaigns(b.activeCampaigns);
     setBrandTotalGmv(b.totalGmv);
     setBrandContractStatus(b.contractStatus);
     setIsBrandModalOpen(true);
+  };
+
+  const handleBrandOwnerSelect = (userId: string) => {
+    setBrandOwnerUserId(userId);
+    const staff = staffUsers.find((u) => u.id === userId);
+    if (staff) setBrandOwner(`${staff.name} (${staff.customRoleTitle})`);
   };
 
   const handleSaveBrand = (e: React.FormEvent) => {
@@ -107,7 +139,8 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
       activeCampaigns: Number(brandActiveCampaigns),
       totalGmv: Number(brandTotalGmv),
       contractStatus: brandContractStatus,
-      owner: brandOwner
+      owner: brandOwner,
+      ownerUserId: brandOwnerUserId || undefined
     };
 
     if (editingBrand) {
@@ -136,6 +169,7 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
     setProjPlannedSessions(8);
     setProjCompletedSessions(0);
     setProjTeamLead("Lê Quốc Bảo");
+    setProjTeamLeadUserId(staffUsers[0]?.id || "");
     setProjStatus("In Progress");
     setIsProjectModalOpen(true);
   };
@@ -150,8 +184,15 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
     setProjPlannedSessions(p.totalSessionsPlanned);
     setProjCompletedSessions(p.sessionsCompleted);
     setProjTeamLead(p.teamLead);
+    setProjTeamLeadUserId(p.teamLeadUserId || "");
     setProjStatus(p.status);
     setIsProjectModalOpen(true);
+  };
+
+  const handleTeamLeadSelect = (userId: string) => {
+    setProjTeamLeadUserId(userId);
+    const staff = staffUsers.find((u) => u.id === userId);
+    if (staff) setProjTeamLead(`${staff.name} (${staff.customRoleTitle})`);
   };
 
   const handleSaveProject = (e: React.FormEvent) => {
@@ -173,7 +214,8 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
       status: projStatus,
       totalSessionsPlanned: Number(projPlannedSessions),
       sessionsCompleted: Number(projCompletedSessions),
-      teamLead: projTeamLead
+      teamLead: projTeamLead,
+      teamLeadUserId: projTeamLeadUserId || undefined
     };
 
     if (editingProject) {
@@ -282,9 +324,10 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
           />
           <button
             onClick={handleSummarizeMeeting}
-            className="bg-purple-600 hover:bg-purple-500 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-2 transition-all shadow"
+            disabled={isSummarizing}
+            className="bg-purple-600 hover:bg-purple-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-2 transition-all shadow"
           >
-            <Sparkles className="w-4 h-4" /> Gemini AI Tóm Tắt & Giao Task Tự Động
+            <Sparkles className="w-4 h-4" /> {isSummarizing ? "Đang Tóm Tắt..." : "Gemini AI Tóm Tắt & Giao Task Tự Động"}
           </button>
           {aiSummary && (
             <div className="p-4 rounded-xl bg-slate-950 border border-purple-500/50 text-slate-200 whitespace-pre-line leading-relaxed font-mono">
@@ -455,13 +498,28 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">Nhân Viên Phụ Trách (KAM Lead)</label>
-                  <input
-                    type="text"
-                    value={brandOwner}
-                    onChange={(e) => setBrandOwner(e.target.value)}
-                    placeholder="VD: Lê Quốc Bảo"
-                    className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800"
-                  />
+                  {staffUsers.length > 0 ? (
+                    <select
+                      value={brandOwnerUserId}
+                      onChange={(e) => handleBrandOwnerSelect(e.target.value)}
+                      className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800 bg-white"
+                    >
+                      <option value="">-- Chọn nhân sự phụ trách --</option>
+                      {staffUsers.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name} ({u.customRoleTitle})
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      value={brandOwner}
+                      onChange={(e) => setBrandOwner(e.target.value)}
+                      placeholder="VD: Lê Quốc Bảo"
+                      className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800"
+                    />
+                  )}
                 </div>
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">Tổng Doanh Thu Tích Lũy (VNĐ)</label>
@@ -604,13 +662,28 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
 
               <div>
                 <label className="font-bold text-slate-700 block mb-1">Trưởng Nhóm Dự Án (Team Lead)</label>
-                <input
-                  type="text"
-                  value={projTeamLead}
-                  onChange={(e) => setProjTeamLead(e.target.value)}
-                  placeholder="VD: Trần Hoàng"
-                  className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800"
-                />
+                {staffUsers.length > 0 ? (
+                  <select
+                    value={projTeamLeadUserId}
+                    onChange={(e) => handleTeamLeadSelect(e.target.value)}
+                    className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800 bg-white"
+                  >
+                    <option value="">-- Chọn Team Lead --</option>
+                    {staffUsers.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name} ({u.customRoleTitle})
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    value={projTeamLead}
+                    onChange={(e) => setProjTeamLead(e.target.value)}
+                    placeholder="VD: Trần Hoàng"
+                    className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800"
+                  />
+                )}
               </div>
 
               <div className="pt-4 border-t border-slate-200 flex justify-end gap-3">
