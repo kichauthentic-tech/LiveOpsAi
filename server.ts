@@ -285,8 +285,34 @@ async function startServer() {
   });
 
   // API Routes
-  app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", timestamp: new Date().toISOString() });
+  // Monitoring (Phase 11) — actually checks DB reachability, not just "process is alive",
+  // so an uptime monitor gets a real 503 when Supabase is unreachable, not a false "ok".
+  app.get("/api/health", async (req, res) => {
+    let databaseOk = false;
+    let databaseError: string | null = null;
+    if (supabaseAdmin) {
+      try {
+        const { error } = await supabaseAdmin.from("profiles").select("id", { count: "exact", head: true }).limit(1);
+        if (error) throw error;
+        databaseOk = true;
+      } catch (err: any) {
+        databaseError = err.message;
+      }
+    } else {
+      databaseError = "SUPABASE_SERVICE_ROLE_KEY chưa cấu hình — không kiểm tra được kết nối DB";
+    }
+
+    res.status(databaseOk ? 200 : 503).json({
+      status: databaseOk ? "ok" : "degraded",
+      timestamp: new Date().toISOString(),
+      checks: {
+        database: databaseOk,
+        databaseError,
+        geminiConfigured: Boolean(process.env.GEMINI_API_KEY),
+        tiktokConfigured: Boolean(process.env.TIKTOK_APP_KEY && process.env.TIKTOK_APP_SECRET),
+        sentryConfigured: Boolean(process.env.SENTRY_DSN),
+      },
+    });
   });
 
   // API Route: AI Script Generator
