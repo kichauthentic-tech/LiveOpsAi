@@ -38,6 +38,7 @@ interface LiveCalendarProps {
   talents: Talent[];
   brands: Brand[];
   onAddSession?: (newSession: LiveSession) => void;
+  onUpdateSession?: (updatedSession: LiveSession) => void;
 }
 
 // Cố định 5 Ca Live Chuẩn
@@ -54,7 +55,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   studios,
   talents,
   brands,
-  onAddSession
+  onAddSession,
+  onUpdateSession
 }) => {
   // Sync sessions with propSessions so clean test mode is respected
   const [sessions, setSessions] = useState<LiveSession[]>(propSessions);
@@ -180,21 +182,17 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
     }
 
     // Update session
-    setSessions((prev) =>
-      prev.map((s) => {
-        if (s.id === sessionId) {
-          return {
-            ...s,
-            studioId: targetStudio.id,
-            studioName: targetStudio.name,
-            startTime: targetSlot.start,
-            endTime: targetSlot.end,
-            date: selectedDate
-          };
-        }
-        return s;
-      })
-    );
+    const updatedSession: LiveSession = {
+      ...session,
+      studioId: targetStudio.id,
+      studioName: targetStudio.name,
+      startTime: targetSlot.start,
+      endTime: targetSlot.end,
+      date: selectedDate
+    };
+
+    setSessions((prev) => prev.map((s) => (s.id === sessionId ? updatedSession : s)));
+    if (onUpdateSession) onUpdateSession(updatedSession);
 
     showToast(
       `✨ Đã chuyển phiên live "${session.brandName}" sang ${targetStudio.name} (${targetSlot.label})!`,
@@ -217,17 +215,9 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
       return;
     }
 
-    setSessions((prev) =>
-      prev.map((s) => {
-        if (s.id === sessionId) {
-          return {
-            ...s,
-            date: targetDateStr
-          };
-        }
-        return s;
-      })
-    );
+    const updatedSession: LiveSession = { ...session, date: targetDateStr };
+    setSessions((prev) => prev.map((s) => (s.id === sessionId ? updatedSession : s)));
+    if (onUpdateSession) onUpdateSession(updatedSession);
 
     showToast(
       `✨ Đã chuyển phiên live "${session.brandName}" sang ngày ${targetDateStr}!`,
@@ -250,17 +240,9 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
       return;
     }
 
-    setSessions((prev) =>
-      prev.map((s) => {
-        if (s.id === sessionId) {
-          return {
-            ...s,
-            date: targetDateStr
-          };
-        }
-        return s;
-      })
-    );
+    const updatedSession: LiveSession = { ...session, date: targetDateStr };
+    setSessions((prev) => prev.map((s) => (s.id === sessionId ? updatedSession : s)));
+    if (onUpdateSession) onUpdateSession(updatedSession);
 
     showToast(
       `✨ Đã chuyển phiên live "${session.brandName}" sang ngày ${targetDateStr}!`,

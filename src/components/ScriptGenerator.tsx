@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Sparkles, Copy, Check, Download, BookOpen, Clock, Tag, RefreshCw } from "lucide-react";
+import { authedFetch } from "../lib/authedFetch";
 
 export const ScriptGenerator: React.FC = () => {
   const [brandName, setBrandName] = useState("Cocoon Vietnam");
@@ -46,7 +47,7 @@ export const ScriptGenerator: React.FC = () => {
   const handleGenerateScript = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/gemini/generate-script", {
+      const res = await authedFetch("/api/gemini/generate-script", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

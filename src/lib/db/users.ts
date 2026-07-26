@@ -41,20 +41,22 @@ export async function fetchUsers(): Promise<SystemUser[]> {
 // server-side admin API (see inviteUser/deleteUserAccount below), since the anon key
 // cannot touch auth.users.
 export async function updateUserProfile(u: SystemUser): Promise<SystemUser> {
-  const { data, error } = await supabase
-    .from("profiles")
-    .update({
-      name: u.name,
-      role: u.role,
-      custom_role_title: u.customRoleTitle,
-      status: u.status,
-      assigned_brand_id: u.assignedBrandId || null,
-      assigned_talent_id: u.assignedTalentId || null,
-      custom_permission_overrides: u.customPermissionOverrides ?? {}
-    })
-    .eq("id", u.id)
-    .select()
-    .single();
+  const patch: Record<string, unknown> = {
+    name: u.name,
+    role: u.role,
+    custom_role_title: u.customRoleTitle,
+    status: u.status,
+    assigned_brand_id: u.assignedBrandId || null,
+    assigned_talent_id: u.assignedTalentId || null
+  };
+  // `customPermissionOverrides` is optional on SystemUser, so `undefined` is ambiguous — it could
+  // mean "no overrides" or just "this caller didn't build that field". Only touch the column when
+  // the caller explicitly set it (an empty object IS sent — that's a deliberate "clear all
+  // overrides" — but a plain `undefined` leaves the existing DB value alone instead of wiping it).
+  if (u.customPermissionOverrides !== undefined) {
+    patch.custom_permission_overrides = u.customPermissionOverrides;
+  }
+  const { data, error } = await supabase.from("profiles").update(patch).eq("id", u.id).select().single();
   if (error) throw error;
   return fromDb(data as DbProfile);
 }

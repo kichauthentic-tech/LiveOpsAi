@@ -860,6 +860,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                     Gán Khách Hàng Brand Quản Lý (*)
                   </label>
                   <select
+                    required
                     value={formData.assignedBrandId}
                     onChange={(e) => setFormData({ ...formData, assignedBrandId: e.target.value })}
                     className="w-full px-3 py-2 bg-slate-950 rounded-xl border border-slate-800 text-white focus:outline-none focus:border-emerald-500 font-bold"
@@ -881,6 +882,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                     Gán Profile Talent Host (*)
                   </label>
                   <select
+                    required
                     value={formData.assignedTalentId}
                     onChange={(e) => setFormData({ ...formData, assignedTalentId: e.target.value })}
                     className="w-full px-3 py-2 bg-slate-950 rounded-xl border border-slate-800 text-white focus:outline-none focus:border-amber-500 font-bold"

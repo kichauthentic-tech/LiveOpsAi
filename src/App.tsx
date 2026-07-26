@@ -129,6 +129,10 @@ export default function App() {
   const [phase3Loading, setPhase3Loading] = useState(true);
   const [phase3Error, setPhase3Error] = useState<string | null>(null);
 
+  // Previously these fetch errors were only stored in state and never rendered anywhere — a
+  // failed fetch left a tab silently empty forever with no indication anything went wrong.
+  const [dismissedDataErrorSignature, setDismissedDataErrorSignature] = useState<string | null>(null);
+
   useEffect(() => {
     if (!session) return;
     let cancelled = false;
@@ -151,7 +155,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [session]);
+  }, [session?.user?.id]);
 
   useEffect(() => {
     if (!session) return;
@@ -174,7 +178,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [session]);
+  }, [session?.user?.id]);
 
   useEffect(() => {
     if (!session) return;
@@ -197,7 +201,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [session]);
+  }, [session?.user?.id]);
 
   useEffect(() => {
     if (!session) return;
@@ -219,7 +223,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [session]);
+  }, [session?.user?.id]);
 
   useEffect(() => {
     if (!session) return;
@@ -243,7 +247,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [session]);
+  }, [session?.user?.id]);
 
   useEffect(() => {
     if (!session) return;
@@ -265,7 +269,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [session]);
+  }, [session?.user?.id]);
 
   useEffect(() => {
     if (!session) return;
@@ -287,7 +291,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [session]);
+  }, [session?.user?.id]);
 
   const refreshTikTokStatus = () => {
     if (!session) return;
@@ -308,25 +312,33 @@ export default function App() {
     if (!session) return;
     refreshTikTokStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session]);
+  }, [session?.user?.id]);
 
   async function handleUpdateSessionFinance(
     sessionId: string,
     patch: Partial<Pick<SessionFinance, "agencyCommissionRate" | "studioCost" | "adsCost" | "notes">>
   ) {
-    const updated = await upsertSessionFinance(sessionId, patch);
-    setFinanceRecords((prev) => {
-      const others = prev.filter((f) => f.sessionId !== sessionId);
-      return [...others, updated];
-    });
+    try {
+      const updated = await upsertSessionFinance(sessionId, patch);
+      setFinanceRecords((prev) => {
+        const others = prev.filter((f) => f.sessionId !== sessionId);
+        return [...others, updated];
+      });
+    } catch (e: any) {
+      window.alert(`Không thể cập nhật Finance & HR: ${e.message ?? e}`);
+    }
   }
 
   async function handleSetSessionFinanceApproval(sessionId: string, status: SessionFinance["approvalStatus"]) {
-    const updated = await setSessionFinanceApproval(sessionId, status, profile?.id);
-    setFinanceRecords((prev) => {
-      const others = prev.filter((f) => f.sessionId !== sessionId);
-      return [...others, updated];
-    });
+    try {
+      const updated = await setSessionFinanceApproval(sessionId, status);
+      setFinanceRecords((prev) => {
+        const others = prev.filter((f) => f.sessionId !== sessionId);
+        return [...others, updated];
+      });
+    } catch (e: any) {
+      window.alert(`Không thể cập nhật trạng thái duyệt: ${e.message ?? e}`);
+    }
   }
 
   // LocalStorage sync effects
@@ -406,6 +418,22 @@ export default function App() {
   const activeSessions = rawActiveSessions;
   const activeBrands = rawActiveBrands;
   const activeEquipments = rawActiveEquipments;
+
+  const dataLoadErrors = useMemo(
+    () =>
+      [
+        phase1Error && { key: "phase1", message: phase1Error },
+        sessionsError && { key: "sessions", message: sessionsError },
+        phase3Error && { key: "phase3", message: phase3Error },
+        phase4Error && { key: "phase4", message: phase4Error },
+        phase5Error && { key: "phase5", message: phase5Error },
+        phase6Error && { key: "phase6", message: phase6Error },
+        phase7Error && { key: "phase7", message: phase7Error }
+      ].filter((e): e is { key: string; message: string } => Boolean(e)),
+    [phase1Error, sessionsError, phase3Error, phase4Error, phase5Error, phase6Error, phase7Error]
+  );
+  const dataLoadErrorSignature = dataLoadErrors.map((e) => e.key + ":" + e.message).join("|");
+  const showDataLoadErrorBanner = dataLoadErrors.length > 0 && dismissedDataErrorSignature !== dataLoadErrorSignature;
 
   // Active Selected Session (null/undefined when activeSessions is empty)
   const activeSelectedSession = activeSessions.find((s) => s.id === selectedSession?.id) || activeSessions[0] || null;
@@ -656,25 +684,31 @@ export default function App() {
     }
   };
 
-  // Handlers for Live Sessions — persisted to Supabase
-  const handleAddSession = async (newSession: LiveSession) => {
+  // Handlers for Live Sessions — persisted to Supabase. Return a success boolean so callers that
+  // manage their own UI state (e.g. LiveSessionHub's modal) know whether to close/reset — only
+  // dismiss on caught errors below, not on an unconditional "we sent the request" assumption.
+  const handleAddSession = async (newSession: LiveSession): Promise<boolean> => {
     try {
       const created = await createSession(newSession);
       setSessions(prev => [created, ...prev]);
       setSelectedSession(created);
+      return true;
     } catch (e: any) {
       window.alert(`Không thể tạo Live Session: ${e.message ?? e}`);
+      return false;
     }
   };
-  const handleUpdateSession = async (updatedSession: LiveSession) => {
+  const handleUpdateSession = async (updatedSession: LiveSession): Promise<boolean> => {
     try {
       const saved = await updateSession(updatedSession);
       setSessions(prev => prev.map(s => s.id === saved.id ? saved : s));
       if (selectedSession && selectedSession.id === saved.id) {
         setSelectedSession(saved);
       }
+      return true;
     } catch (e: any) {
       window.alert(`Không thể cập nhật Live Session: ${e.message ?? e}`);
+      return false;
     }
   };
   const handleDeleteSession = async (id: string) => {
@@ -962,6 +996,34 @@ export default function App() {
           </div>
         )}
 
+        {/* Data Load Error Banner — surfaces fetch failures that used to be captured in state
+            and never shown anywhere, leaving affected tabs silently empty with no explanation. */}
+        {showDataLoadErrorBanner && (
+          <div className="bg-red-950/80 border-b border-red-500/30 px-6 py-2.5 text-xs text-red-200 flex flex-wrap items-start justify-between gap-3 shadow-md backdrop-blur-md">
+            <div className="flex items-start gap-2">
+              <span className="p-1 bg-red-500/20 rounded-lg text-red-400 mt-0.5">
+                <ShieldAlert className="w-4 h-4" />
+              </span>
+              <div>
+                <strong className="text-red-300 font-extrabold uppercase block mb-1">
+                  Lỗi Tải Dữ Liệu Từ Supabase:
+                </strong>
+                <ul className="list-disc list-inside space-y-0.5">
+                  {dataLoadErrors.map((e) => (
+                    <li key={e.key}>{e.message}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+            <button
+              onClick={() => setDismissedDataErrorSignature(dataLoadErrorSignature)}
+              className="px-3 py-1 bg-red-900/80 hover:bg-red-800 text-red-200 border border-red-500/40 font-bold rounded-lg text-[11px] transition-all shrink-0"
+            >
+              Đóng
+            </button>
+          </div>
+        )}
+
         {/* Dynamic View Content */}
         <main className="flex-1 overflow-y-auto p-6 scrollbar-thin">
           <div className="max-w-7xl mx-auto space-y-6">
@@ -1071,6 +1133,8 @@ export default function App() {
                     studios={activeStudios}
                     talents={activeTalents}
                     brands={activeBrands}
+                    onAddSession={handleAddSession}
+                    onUpdateSession={handleUpdateSession}
                   />
                 )}
 

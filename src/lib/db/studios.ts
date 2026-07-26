@@ -1,6 +1,10 @@
 import { supabase } from "../supabaseClient";
 import { Studio } from "../../types";
 
+// `??` only catches null/undefined, not "" — an empty string sent to this uuid FK
+// column fails with "invalid input syntax for type uuid" instead of clearing to NULL.
+const orNull = (v: string | undefined | null) => (v ? v : null);
+
 interface DbStudio {
   id: string;
   name: string;
@@ -31,7 +35,7 @@ function toDb(s: Studio) {
     capacity: s.capacity,
     theme: s.theme,
     status: s.status,
-    current_session_id: s.currentSessionId ?? null
+    current_session_id: orNull(s.currentSessionId)
   };
 }
 

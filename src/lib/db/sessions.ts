@@ -74,6 +74,13 @@ interface DbMinuteMetric {
   event_trigger: string | null;
 }
 
+// Postgres `time` columns come back from PostgREST as "HH:MM:SS" (e.g. "17:00:00"), but every
+// consumer in the app (FIXED_TIME_SLOTS, <input type="time">, conflict-checking string compares)
+// works in "HH:MM". Left un-normalized, a session's end_time "20:00:00" reads as lexicographically
+// GREATER than a slot boundary "20:00" (longer string beats its own prefix), so a session ending
+// exactly at a slot boundary was matching both that slot and the next one in the Day Matrix view.
+const toHhMm = (t: string) => t.slice(0, 5);
+
 function sessionFromDb(row: DbLiveSession): Omit<LiveSession, "skus" | "checklist" | "minuteMetrics"> {
   return {
     id: row.id,
@@ -88,8 +95,8 @@ function sessionFromDb(row: DbLiveSession): Omit<LiveSession, "skus" | "checklis
     hostName: row.host_name,
     assistantName: row.assistant_name,
     date: row.date,
-    startTime: row.start_time,
-    endTime: row.end_time,
+    startTime: toHhMm(row.start_time),
+    endTime: toHhMm(row.end_time),
     status: row.status,
     targetGmv: row.target_gmv,
     actualGmv: row.actual_gmv,
@@ -218,32 +225,20 @@ function minuteMetricToDb(sessionId: string, m: MinuteMetric) {
   };
 }
 
+// Delete-then-reinsert of the 3 child tables used to run as separate client
+// calls — if an insert failed partway through, the preceding delete had
+// already committed, permanently losing that session's child data. Now
+// delegated to a single Postgres function (see migration 0006) so the whole
+// delete+insert set runs in one implicit transaction and rolls back together
+// on any failure.
 async function replaceChildRows(sessionId: string, session: LiveSession) {
-  const [skusRes, checklistRes, metricsRes] = await Promise.all([
-    supabase.from("session_skus").delete().eq("session_id", sessionId),
-    supabase.from("session_checklist_items").delete().eq("session_id", sessionId),
-    supabase.from("session_minute_metrics").delete().eq("session_id", sessionId)
-  ]);
-  if (skusRes.error) throw skusRes.error;
-  if (checklistRes.error) throw checklistRes.error;
-  if (metricsRes.error) throw metricsRes.error;
-
-  if (session.skus?.length) {
-    const { error } = await supabase.from("session_skus").insert(session.skus.map((sku) => skuToDb(sessionId, sku)));
-    if (error) throw error;
-  }
-  if (session.checklist?.length) {
-    const { error } = await supabase
-      .from("session_checklist_items")
-      .insert(session.checklist.map((item) => checklistToDb(sessionId, item)));
-    if (error) throw error;
-  }
-  if (session.minuteMetrics?.length) {
-    const { error } = await supabase
-      .from("session_minute_metrics")
-      .insert(session.minuteMetrics.map((m) => minuteMetricToDb(sessionId, m)));
-    if (error) throw error;
-  }
+  const { error } = await supabase.rpc("replace_session_children", {
+    p_session_id: sessionId,
+    p_skus: (session.skus ?? []).map((sku) => skuToDb(sessionId, sku)),
+    p_checklist: (session.checklist ?? []).map((item) => checklistToDb(sessionId, item)),
+    p_metrics: (session.minuteMetrics ?? []).map((m) => minuteMetricToDb(sessionId, m))
+  });
+  if (error) throw error;
 }
 
 async function fetchChildRowsForSessions(sessionIds: string[]) {
@@ -296,10 +291,19 @@ export async function createSession(session: LiveSession): Promise<LiveSession> 
 }
 
 export async function updateSession(session: LiveSession): Promise<LiveSession> {
-  const { data, error } = await supabase.from("live_sessions").update(sessionToDb(session)).eq("id", session.id).select().single();
+  // Parent row update + child table replace used to be 2 separate calls — a
+  // failure in the child replace left the parent already committed with new
+  // values while children kept their old contents (see migration 0007).
+  // Now both run inside a single Postgres function call / transaction.
+  const { data, error } = await supabase.rpc("update_session_with_children", {
+    p_session_id: session.id,
+    p_session: sessionToDb(session),
+    p_skus: (session.skus ?? []).map((sku) => skuToDb(session.id, sku)),
+    p_checklist: (session.checklist ?? []).map((item) => checklistToDb(session.id, item)),
+    p_metrics: (session.minuteMetrics ?? []).map((m) => minuteMetricToDb(session.id, m))
+  });
   if (error) throw error;
   const row = data as DbLiveSession;
-  await replaceChildRows(row.id, session);
   const { skus, checklist, metrics } = await fetchChildRowsForSessions([row.id]);
   return assembleSessions([row], skus, checklist, metrics)[0];
 }

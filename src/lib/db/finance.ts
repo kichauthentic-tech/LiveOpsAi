@@ -58,10 +58,12 @@ export async function upsertSessionFinance(
   return fromDb(data as DbSessionFinance);
 }
 
+// `approved_by`/`approved_at` are no longer set from here — a DB trigger (migration 0008)
+// derives them from the caller's own auth.uid() whenever approval_status changes, so a client
+// can no longer attribute an approval to an arbitrary user id.
 export async function setSessionFinanceApproval(
   sessionId: string,
-  approvalStatus: SessionFinance["approvalStatus"],
-  approvedByUserId?: string
+  approvalStatus: SessionFinance["approvalStatus"]
 ): Promise<SessionFinance> {
   const { data, error } = await supabase
     .from("session_finance")
@@ -69,8 +71,6 @@ export async function setSessionFinanceApproval(
       {
         session_id: sessionId,
         approval_status: approvalStatus,
-        approved_by: approvalStatus === "pending" ? null : approvedByUserId ?? null,
-        approved_at: approvalStatus === "pending" ? null : new Date().toISOString(),
         updated_at: new Date().toISOString()
       },
       { onConflict: "session_id" }

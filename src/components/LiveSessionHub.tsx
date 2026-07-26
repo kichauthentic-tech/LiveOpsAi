@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { LiveSession, MinuteMetric, ProductSKU, Studio, Talent, Brand } from "../types";
 import { Radio, Play, CheckCircle2, Clock, Sparkles, TrendingUp, Users, ShoppingBag, AlertCircle, RefreshCw, Layers, Plus, Edit3, Trash2, X, Building2 } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
+import { authedFetch } from "../lib/authedFetch";
 
 interface LiveSessionHubProps {
   sessions: LiveSession[];
@@ -10,8 +11,8 @@ interface LiveSessionHubProps {
   talents: Talent[];
   brands: Brand[];
   onSelectSession: (session: LiveSession) => void;
-  onAddSession?: (session: LiveSession) => void;
-  onUpdateSession?: (session: LiveSession) => void;
+  onAddSession?: (session: LiveSession) => void | Promise<boolean>;
+  onUpdateSession?: (session: LiveSession) => void | Promise<boolean>;
   onDeleteSession?: (id: string) => void;
 }
 
@@ -81,7 +82,9 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
     setIsSessionModalOpen(true);
   };
 
-  const handleSaveSession = (e: React.FormEvent) => {
+  const [isSavingSession, setIsSavingSession] = useState(false);
+
+  const handleSaveSession = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const brandObj = brands.find((b) => b.id === sessBrandId);
@@ -116,13 +119,18 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
       minuteMetrics: editingSession?.minuteMetrics || []
     };
 
-    if (editingSession) {
-      if (onUpdateSession) onUpdateSession(sessionPayload);
-    } else {
-      if (onAddSession) onAddSession(sessionPayload);
+    setIsSavingSession(true);
+    try {
+      // App.tsx's handlers already alert the user and return `false` on failure — only close
+      // the modal (and lose the entered form data) once we know the save actually went through.
+      const result = editingSession
+        ? await onUpdateSession?.(sessionPayload)
+        : await onAddSession?.(sessionPayload);
+      if (result === false) return;
+      setIsSessionModalOpen(false);
+    } finally {
+      setIsSavingSession(false);
     }
-
-    setIsSessionModalOpen(false);
   };
 
   const handleDeleteSession = (id: string, brandName: string) => {
@@ -136,7 +144,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
   const handleRunAiAnalysis = async () => {
     setAnalyzingAi(true);
     try {
-      const res = await fetch("/api/gemini/analyze-session", {
+      const res = await authedFetch("/api/gemini/analyze-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sessionData: selectedSession })
@@ -855,8 +863,9 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
 
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Studio Phụ Trách</label>
+                  <label className="font-bold text-slate-700 block mb-1">Studio Phụ Trách *</label>
                   <select
+                    required
                     value={sessStudioId}
                     onChange={(e) => setSessStudioId(e.target.value)}
                     className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800 bg-white"
@@ -870,8 +879,9 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Host Chính</label>
+                  <label className="font-bold text-slate-700 block mb-1">Host Chính *</label>
                   <select
+                    required
                     value={sessHostId}
                     onChange={(e) => setSessHostId(e.target.value)}
                     className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800 bg-white"
@@ -927,9 +937,10 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl shadow transition-all"
+                  disabled={isSavingSession}
+                  className="px-5 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow transition-all"
                 >
-                  {editingSession ? "Cập Nhật Phiên Live" : "Lưu Phiên Live"}
+                  {isSavingSession ? "Đang Lưu..." : editingSession ? "Cập Nhật Phiên Live" : "Lưu Phiên Live"}
                 </button>
               </div>
             </form>

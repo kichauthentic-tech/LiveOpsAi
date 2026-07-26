@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Talent, Brand } from "../types";
 import { Users, Sparkles, Award, Search, Filter, Plus, Edit3, Trash2, X, Phone, CheckCircle2 } from "lucide-react";
+import { authedFetch } from "../lib/authedFetch";
 
 interface TalentMatcherProps {
   talents: Talent[];
@@ -130,7 +131,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
     const rawTalents = talents && talents.length > 0 ? talents : [];
     setIsMatching(true);
     try {
-      const res = await fetch("/api/gemini/match-talents", {
+      const res = await authedFetch("/api/gemini/match-talents", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ brand: activeBrand, targetCategory, talents: rawTalents })

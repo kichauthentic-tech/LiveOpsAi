@@ -28,7 +28,19 @@ async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
 
-  app.use(express.json());
+  // Capture the raw request body bytes alongside the parsed JSON. Needed for
+  // HMAC webhook signature verification (TikTok signs the raw bytes it sent,
+  // not a client-side re-serialization of the parsed object — key order/
+  // whitespace differences would otherwise make a genuine signature fail,
+  // or worse, make a forged one that happens to re-stringify identically
+  // pass).
+  app.use(
+    express.json({
+      verify: (req, _res, buf) => {
+        (req as any).rawBody = buf;
+      }
+    })
+  );
 
   // Lazy initialization helper for Gemini
   const getGeminiClient = () => {
@@ -257,19 +269,34 @@ async function startServer() {
     if (!supabaseAdmin) {
       return res.status(503).json({ error: "Server chưa cấu hình Supabase Admin." });
     }
-    // Signature verification: TikTok Shop signs webhook bodies with the app secret. Header name
-    // varies by webhook version configured in Partner Center — confirm exact header once the
-    // real app + webhook subscription exists, this checks the documented default.
-    if (TIKTOK_WEBHOOK_SECRET) {
-      const signature = String(req.headers["x-tts-signature"] || "");
-      const expected = crypto
-        .createHmac("sha256", TIKTOK_WEBHOOK_SECRET)
-        .update(JSON.stringify(req.body || {}))
-        .digest("hex");
-      if (!signature || signature !== expected) {
-        console.error("TikTok webhook signature mismatch — event rejected.");
-        return res.status(401).json({ error: "Invalid signature." });
-      }
+    // Fail closed: without a configured secret there is no way to verify the
+    // caller is really TikTok, so refuse the event instead of accepting an
+    // unauthenticated POST from anyone who finds this URL. (Previously this
+    // skipped verification entirely and accepted the event when the secret
+    // was unset — a silent fail-open.)
+    if (!TIKTOK_WEBHOOK_SECRET) {
+      console.error("TIKTOK_WEBHOOK_SECRET chưa cấu hình — từ chối webhook event.");
+      return res.status(503).json({ error: "Server chưa cấu hình TIKTOK_WEBHOOK_SECRET." });
+    }
+    // Signature verification: TikTok Shop signs the raw webhook body bytes with the app
+    // secret. Header name varies by webhook version configured in Partner Center — confirm
+    // exact header once the real app + webhook subscription exists, this checks the
+    // documented default. Signs `rawBody` (captured in the express.json() verify hook above),
+    // not a re-stringified req.body, since re-serialization can differ from what TikTok signed.
+    const signature = String(req.headers["x-tts-signature"] || "");
+    const rawBody: Buffer = (req as any).rawBody || Buffer.from(JSON.stringify(req.body || {}));
+    const expected = crypto.createHmac("sha256", TIKTOK_WEBHOOK_SECRET).update(rawBody).digest("hex");
+    const signatureBuf = Buffer.from(signature, "hex");
+    const expectedBuf = Buffer.from(expected, "hex");
+    // timingSafeEqual throws on mismatched lengths, so check that first — an invalid/absent
+    // signature just fails the check below rather than crashing the request.
+    const signatureValid =
+      signature.length > 0 &&
+      signatureBuf.length === expectedBuf.length &&
+      crypto.timingSafeEqual(signatureBuf, expectedBuf);
+    if (!signatureValid) {
+      console.error("TikTok webhook signature mismatch — event rejected.");
+      return res.status(401).json({ error: "Invalid signature." });
     }
     const body = req.body || {};
     const { error } = await supabaseAdmin.from("tiktok_webhook_events").insert({
@@ -315,9 +342,36 @@ async function startServer() {
     });
   });
 
+  // Gemini routes previously had no auth check at all — any unauthenticated caller could
+  // invoke them and drive up Gemini API usage/cost. Every /api/gemini/* route now requires
+  // a signed-in caller (any role — these AI features aren't role-restricted in the app),
+  // and rejects oversized payloads to bound per-request token cost.
+  const requireAuthedCallerOrReject = async (req: express.Request, res: express.Response): Promise<string | null> => {
+    if (!supabaseAdmin) {
+      res.status(503).json({ error: "Server chưa cấu hình Supabase Admin." });
+      return null;
+    }
+    const callerId = await requireAnyCaller(req);
+    if (!callerId) {
+      res.status(401).json({ error: "Cần đăng nhập để dùng tính năng AI." });
+      return null;
+    }
+    return callerId;
+  };
+  const MAX_AI_PAYLOAD_CHARS = 50_000;
+  const rejectIfPayloadTooLarge = (req: express.Request, res: express.Response): boolean => {
+    if (JSON.stringify(req.body || {}).length > MAX_AI_PAYLOAD_CHARS) {
+      res.status(413).json({ error: `Payload quá lớn cho AI request (giới hạn ${MAX_AI_PAYLOAD_CHARS.toLocaleString()} ký tự).` });
+      return true;
+    }
+    return false;
+  };
+
   // API Route: AI Script Generator
   app.post("/api/gemini/generate-script", async (req, res) => {
     try {
+      if (!(await requireAuthedCallerOrReject(req, res))) return;
+      if (rejectIfPayloadTooLarge(req, res)) return;
       const { brandName, productCategory, skus, targetAudience, tone, durationMinutes } = req.body;
       const ai = getGeminiClient();
 
@@ -403,6 +457,8 @@ Hãy tạo 1 Kịch Bản Livestream TikTok chi tiết, cuốn hút, tối ưu C
   // API Route: AI Live Session Analysis
   app.post("/api/gemini/analyze-session", async (req, res) => {
     try {
+      if (!(await requireAuthedCallerOrReject(req, res))) return;
+      if (rejectIfPayloadTooLarge(req, res)) return;
       const { sessionData } = req.body;
       const ai = getGeminiClient();
 
@@ -474,6 +530,8 @@ ${JSON.stringify(sessionData)}
   // API Route: Multi-Agent AI Assistant
   app.post("/api/gemini/agent-chat", async (req, res) => {
     try {
+      if (!(await requireAuthedCallerOrReject(req, res))) return;
+      if (rejectIfPayloadTooLarge(req, res)) return;
       const { agentRole, userMessage } = req.body;
       const ai = getGeminiClient();
 
@@ -515,6 +573,8 @@ ${JSON.stringify(sessionData)}
   // API Route: AI Talent Matching — replaces the old client-side `96 - idx*5` formula.
   app.post("/api/gemini/match-talents", async (req, res) => {
     try {
+      if (!(await requireAuthedCallerOrReject(req, res))) return;
+      if (rejectIfPayloadTooLarge(req, res)) return;
       const { brand, targetCategory, talents } = req.body;
       const ai = getGeminiClient();
 
@@ -564,6 +624,8 @@ Hãy chấm điểm mức độ phù hợp (matchScore, 0-100) cho MỖI talent 
   // API Route: AI Brand Meeting Summarizer & Action Item Generator
   app.post("/api/gemini/summarize-meeting", async (req, res) => {
     try {
+      if (!(await requireAuthedCallerOrReject(req, res))) return;
+      if (rejectIfPayloadTooLarge(req, res)) return;
       const { meetingNotes } = req.body;
       const ai = getGeminiClient();
 

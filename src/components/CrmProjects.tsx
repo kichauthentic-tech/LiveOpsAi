@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Brand, AgencyProject, SystemUser } from "../types";
 import { Building2, Layers, DollarSign, Sparkles, Plus, Edit3, Trash2, X, CheckCircle2, Clock, Phone, UserCheck } from "lucide-react";
+import { authedFetch } from "../lib/authedFetch";
 
 interface CrmProjectsProps {
   brands: Brand[];
@@ -66,7 +67,7 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
     if (!meetingNotes.trim()) return;
     setIsSummarizing(true);
     try {
-      const res = await fetch("/api/gemini/summarize-meeting", {
+      const res = await authedFetch("/api/gemini/summarize-meeting", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ meetingNotes })
@@ -354,7 +355,7 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
 
         <div className="space-y-3">
           {projects.map((p) => {
-            const percentGmv = Math.min(100, Math.round((p.actualGmv / p.kpiGmv) * 100));
+            const percentGmv = p.kpiGmv > 0 ? Math.min(100, Math.round((p.actualGmv / p.kpiGmv) * 100)) : 0;
             return (
               <div key={p.id} className="p-4 rounded-2xl border border-slate-200 bg-slate-50 space-y-3 hover:border-purple-300 transition-all relative group">
                 <div className="flex justify-between items-center text-xs">

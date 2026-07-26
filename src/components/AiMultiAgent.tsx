@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Sparkles, Send, Bot, User, RefreshCw, Cpu, Award, Zap, Play, MessageSquare } from "lucide-react";
 import { EndToEndFlowSimulator } from "./EndToEndFlowSimulator";
+import { authedFetch } from "../lib/authedFetch";
 
 type AgentRole = "ceo" | "host_coach" | "talent_matcher" | "data_analyst";
 
@@ -69,7 +70,7 @@ export const AiMultiAgent: React.FC<AiMultiAgentProps> = ({ onNavigateTab }) => 
     setLoading(true);
 
     try {
-      const res = await fetch("/api/gemini/agent-chat", {
+      const res = await authedFetch("/api/gemini/agent-chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
