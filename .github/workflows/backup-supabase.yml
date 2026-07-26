@@ -11,8 +11,14 @@ jobs:
     name: pg_dump → artifact
     runs-on: ubuntu-latest
     steps:
-      - name: Install postgresql-client
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Install postgresql-client 17 (matches Supabase's Postgres 17 server)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl ca-certificates gnupg
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /usr/share/keyrings/postgresql.gpg
+          echo "deb [signed-by=/usr/share/keyrings/postgresql.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
 
       - name: Dump database
         env:
@@ -24,7 +30,7 @@ jobs:
           fi
           mkdir -p backup
           STAMP=$(date -u +%Y%m%d-%H%M%S)
-          pg_dump "$SUPABASE_DB_URL" --no-owner --no-acl --format=custom --file="backup/liveopsai-${STAMP}.dump"
+          /usr/lib/postgresql/17/bin/pg_dump "$SUPABASE_DB_URL" --no-owner --no-acl --format=custom --file="backup/liveopsai-${STAMP}.dump"
           echo "STAMP=${STAMP}" >> "$GITHUB_ENV"
 
       - name: Upload backup as artifact
