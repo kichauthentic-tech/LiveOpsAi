@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { LiveSession, Studio, Talent, Brand } from "../types";
 import {
   Calendar as CalendarIcon,
@@ -49,199 +49,6 @@ const FIXED_TIME_SLOTS: TimeSlot[] = [
   { id: "slot5", label: "20:00 - 23:00", start: "20:00", end: "23:00", name: "Đêm Vàng (GOLDEN MEGA)" },
 ];
 
-// Rich Multi-Date Mock Data Seed for July 2026
-const ADDITIONAL_MOCK_SESSIONS: LiveSession[] = [
-  {
-    id: "session-m1",
-    title: "Chương Trình Đồ Bếp Gia Dụng Sunhouse - Deal Sốc Bữa Trưa 99K",
-    brandId: "brand-3",
-    brandName: "Sunhouse Official",
-    shopTikTokHandle: "@sunhouse_official",
-    studioId: "std-c",
-    studioName: "Studio C - Tech & Home Appliance",
-    hostId: "host-3",
-    hostName: "Bích Ngọc (Ngọc Skincare)",
-    assistantName: "Lê Minh Tuấn",
-    date: "2026-07-20",
-    startTime: "11:00",
-    endTime: "14:00",
-    status: "Completed",
-    targetGmv: 120000000,
-    actualGmv: 142000000,
-    totalOrders: 420,
-    avgWatchTimeSeconds: 150,
-    peakViewers: 1800,
-    totalViews: 28000,
-    ctrAvg: 7.2,
-    cvrAvg: 4.8,
-    skus: [],
-    checklist: [],
-    minuteMetrics: []
-  },
-  {
-    id: "session-m2",
-    title: "Mega Sale Trang Điểm Mùa Hè Maybelline New York",
-    brandId: "brand-4",
-    brandName: "Maybelline New York",
-    shopTikTokHandle: "@maybelline_vn",
-    studioId: "std-a",
-    studioName: "Studio A - Beauty & Skincare Master",
-    hostId: "host-1",
-    hostName: "Yến Nhi (Nhi Nham Nho)",
-    assistantName: "Trần Anh Quân",
-    date: "2026-07-21",
-    startTime: "20:00",
-    endTime: "23:00",
-    status: "Completed",
-    targetGmv: 350000000,
-    actualGmv: 410000000,
-    totalOrders: 1150,
-    avgWatchTimeSeconds: 210,
-    peakViewers: 5200,
-    totalViews: 78000,
-    ctrAvg: 9.5,
-    cvrAvg: 6.1,
-    skus: [],
-    checklist: [],
-    minuteMetrics: []
-  },
-  {
-    id: "session-m3",
-    title: "Coolmate Promax Activewear - Bộ Bút Đột Phá Thể Thao",
-    brandId: "brand-2",
-    brandName: "Coolmate Active",
-    shopTikTokHandle: "@coolmate.me",
-    studioId: "std-b",
-    studioName: "Studio B - Fashion & Lifestyle Studio",
-    hostId: "host-2",
-    hostName: "Hoàng Nam (Nam Style)",
-    assistantName: "Phạm Hải Đăng",
-    date: "2026-07-22",
-    startTime: "14:00",
-    endTime: "17:00",
-    status: "Completed",
-    targetGmv: 200000000,
-    actualGmv: 228000000,
-    totalOrders: 890,
-    avgWatchTimeSeconds: 165,
-    peakViewers: 2900,
-    totalViews: 41000,
-    ctrAvg: 8.1,
-    cvrAvg: 5.0,
-    skus: [],
-    checklist: [],
-    minuteMetrics: []
-  },
-  {
-    id: "session-m4",
-    title: "Tẩy Tế Bào Chết Cà Phê Cocoon - Chăm Sóc Da Thuần Chay",
-    brandId: "brand-1",
-    brandName: "Cocoon Vietnam",
-    shopTikTokHandle: "@cocoonvietnam_official",
-    studioId: "std-a",
-    studioName: "Studio A - Beauty & Skincare Master",
-    hostId: "host-1",
-    hostName: "Yến Nhi (Nhi Nham Nho)",
-    assistantName: "Lê Minh Tuấn",
-    date: "2026-07-24",
-    startTime: "17:00",
-    endTime: "20:00",
-    status: "Upcoming",
-    targetGmv: 180000000,
-    actualGmv: 0,
-    totalOrders: 0,
-    avgWatchTimeSeconds: 0,
-    peakViewers: 0,
-    totalViews: 0,
-    ctrAvg: 0,
-    cvrAvg: 0,
-    skus: [],
-    checklist: [],
-    minuteMetrics: []
-  },
-  {
-    id: "session-m5",
-    title: "Weekend Flash Sale Siêu Bão Coolmate Outfit Nam",
-    brandId: "brand-2",
-    brandName: "Coolmate Active",
-    shopTikTokHandle: "@coolmate.me",
-    studioId: "std-b",
-    studioName: "Studio B - Fashion & Lifestyle Studio",
-    hostId: "host-2",
-    hostName: "Hoàng Nam (Nam Style)",
-    assistantName: "Trần Anh Quân",
-    date: "2026-07-25",
-    startTime: "20:00",
-    endTime: "23:00",
-    status: "Upcoming",
-    targetGmv: 400000000,
-    actualGmv: 0,
-    totalOrders: 0,
-    avgWatchTimeSeconds: 0,
-    peakViewers: 0,
-    totalViews: 0,
-    ctrAvg: 0,
-    cvrAvg: 0,
-    skus: [],
-    checklist: [],
-    minuteMetrics: []
-  },
-  {
-    id: "session-m6",
-    title: "Gia Dụng Bếp Thông Minh Sunhouse Weekend",
-    brandId: "brand-3",
-    brandName: "Sunhouse Official",
-    shopTikTokHandle: "@sunhouse_official",
-    studioId: "std-c",
-    studioName: "Studio C - Tech & Home Appliance",
-    hostId: "host-3",
-    hostName: "Bích Ngọc (Ngọc Skincare)",
-    assistantName: "Lê Minh Tuấn",
-    date: "2026-07-26",
-    startTime: "11:00",
-    endTime: "14:00",
-    status: "Upcoming",
-    targetGmv: 150000000,
-    actualGmv: 0,
-    totalOrders: 0,
-    avgWatchTimeSeconds: 0,
-    peakViewers: 0,
-    totalViews: 0,
-    ctrAvg: 0,
-    cvrAvg: 0,
-    skus: [],
-    checklist: [],
-    minuteMetrics: []
-  },
-  {
-    id: "session-m7",
-    title: "Loreal & Maybelline Mega Brand Day TikTok Shop",
-    brandId: "brand-4",
-    brandName: "Maybelline New York",
-    shopTikTokHandle: "@maybelline_vn",
-    studioId: "std-a",
-    studioName: "Studio A - Beauty & Skincare Master",
-    hostId: "host-1",
-    hostName: "Yến Nhi (Nhi Nham Nho)",
-    assistantName: "Lê Minh Tuấn",
-    date: "2026-07-28",
-    startTime: "20:00",
-    endTime: "23:00",
-    status: "Upcoming",
-    targetGmv: 500000000,
-    actualGmv: 0,
-    totalOrders: 0,
-    avgWatchTimeSeconds: 0,
-    peakViewers: 0,
-    totalViews: 0,
-    ctrAvg: 0,
-    cvrAvg: 0,
-    skus: [],
-    checklist: [],
-    minuteMetrics: []
-  }
-];
-
 export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   sessions: propSessions,
   studios,
@@ -249,15 +56,12 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   brands,
   onAddSession
 }) => {
-  // Merge prop sessions with additional mock sessions for full month coverage
-  const [sessions, setSessions] = useState<LiveSession[]>(() => {
-    const ids = new Set(propSessions.map((s) => s.id));
-    const merged = [...propSessions];
-    ADDITIONAL_MOCK_SESSIONS.forEach((s) => {
-      if (!ids.has(s.id)) merged.push(s);
-    });
-    return merged;
-  });
+  // Sync sessions with propSessions so clean test mode is respected
+  const [sessions, setSessions] = useState<LiveSession[]>(propSessions);
+
+  useEffect(() => {
+    setSessions(propSessions);
+  }, [propSessions]);
 
   // View Mode: Month, Week, Day Matrix, Talent Workload, List
   const [viewMode, setViewMode] = useState<"month" | "week" | "day" | "talent_workload" | "list">("day");
@@ -1388,9 +1192,9 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
             {talents.map((t) => {
               const hostSessions = sessions.filter((s) => s.hostId === t.id && s.date === selectedDate && s.status !== "Cancelled");
               const totalHoursToday = hostSessions.reduce((acc, curr) => {
-                const [h1, m1] = curr.startTime.split(":").map(Number);
-                const [h2, m2] = curr.endTime.split(":").map(Number);
-                return acc + (h2 * 60 + m2 - (h1 * 60 + m1)) / 60;
+                const [h1] = curr.startTime.split(":").map(Number);
+                const [h2] = curr.endTime.split(":").map(Number);
+                return acc + (h2 - h1);
               }, 0);
 
               const isOverloaded = totalHoursToday > 5;
@@ -1421,7 +1225,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   <div className="space-y-1 text-xs">
                     <div className="flex justify-between font-medium">
                       <span className="text-slate-400">Tổng giờ live ngày {selectedDate}:</span>
-                      <strong className={isOverloaded ? "text-rose-400" : "text-emerald-400"}>{Number(totalHoursToday.toFixed(1))} Giờ Live</strong>
+                      <strong className={isOverloaded ? "text-rose-400" : "text-emerald-400"}>{totalHoursToday} Giờ Live</strong>
                     </div>
                     <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
                       <div

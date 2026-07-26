@@ -26,7 +26,8 @@ import {
   Lock,
   MessageSquare,
   Clock,
-  Briefcase
+  Briefcase,
+  ExternalLink
 } from "lucide-react";
 
 type ScenarioType = "standard_campaign" | "emergency_recovery" | "multi_role_audit";
@@ -41,6 +42,7 @@ interface FlowStep {
   description: string;
   badge: string;
   badgeColor: string;
+  targetTabId?: string;
   dataPayload: {
     label: string;
     value: string;
@@ -61,6 +63,7 @@ const SCENARIO_1_STEPS: FlowStep[] = [
     description: "Khởi tạo deal trên CRM với ngân sách 120M VNĐ, chỉ tiêu GMV tối thiểu 500M VNĐ cho 12 SKUs ngành Mỹ Phẩm.",
     badge: "CRM DEAL CREATED",
     badgeColor: "bg-blue-500/20 text-blue-300 border-blue-500/40",
+    targetTabId: "crm",
     dataPayload: [
       { label: "Khách hàng Brand", value: "Cocoon Vietnam Organic" },
       { label: "Mục tiêu GMV Target", value: "500,000,000 VNĐ", highlight: true },
@@ -83,6 +86,7 @@ const SCENARIO_1_STEPS: FlowStep[] = [
     description: "AI tính toán điểm số Match Score dựa trên lịch sử CVR Mỹ phẩm (5.2%), năng lượng nói liên tục 3h và phong cách nói về thuần chay.",
     badge: "AI HOST MATCHED",
     badgeColor: "bg-purple-500/20 text-purple-300 border-purple-500/40",
+    targetTabId: "talents",
     dataPayload: [
       { label: "Host Được Chọn", value: "Yến Nhi (Beauty Specialist)", highlight: true },
       { label: "AI Match Score", value: "98.5 / 100 Điểm" },
@@ -105,6 +109,7 @@ const SCENARIO_1_STEPS: FlowStep[] = [
     description: "Bộ phận kĩ thuật dùng Camera quét mã QR dán trên từng thiết bị: Máy quay Sony A7SIII, Mic Shure Wireless, Switcher Blackmagic & Đèn Softbox.",
     badge: "EQUIPMENT QR CHECKED",
     badgeColor: "bg-emerald-500/20 text-emerald-300 border-emerald-500/40",
+    targetTabId: "studios",
     dataPayload: [
       { label: "Phòng Studio", value: "Studio 01 (Beauty Specialist Theme)" },
       { label: "Trạng thái QR Code", value: "4/4 Thiết Bị Đã Quét Valid", highlight: true },
@@ -126,6 +131,7 @@ const SCENARIO_1_STEPS: FlowStep[] = [
     description: "Gemini AI đọc 12 SKUs Cocoon, tạo kịch bản 180 phút chia nhỏ thành từng khung 15 phút với deal shock mua 1 tặng 1.",
     badge: "AI SCRIPT READY",
     badgeColor: "bg-indigo-500/20 text-indigo-300 border-indigo-500/40",
+    targetTabId: "scripts",
     dataPayload: [
       { label: "Cấu trúc Hook 5s", value: "Tẩy xơ dừa chỉ 88K - Duy nhất 100 suất" },
       { label: "Số Lượng Trigger deal", value: "8 Khung Flash Sale Giờ Vàng", highlight: true },
@@ -148,6 +154,7 @@ const SCENARIO_1_STEPS: FlowStep[] = [
     description: "Phiên live bắt đầu lúc 19:00. Webhook TikTok API liên tục đẩy về chỉ số Mắt xem, Tỷ lệ click giỏ hàng (CTR) và GMV theo thời gian thực.",
     badge: "LIVE STREAMING ACTIVE",
     badgeColor: "bg-rose-500/20 text-rose-400 border-rose-500/40 animate-pulse",
+    targetTabId: "sessions",
     dataPayload: [
       { label: "Trạng thái Luồng OBS", value: "🔴 STREAMING LIVE (1080p 60fps)" },
       { label: "Mắt Xem Đỉnh (Peak)", value: "14,850 Viewers", highlight: true },
@@ -169,6 +176,7 @@ const SCENARIO_1_STEPS: FlowStep[] = [
     description: "Hệ thống AI tự động đối soát giữ chân người xem và đoạn Host chốt đơn bùng nổ nhất để rút kinh nghiệm cho ca live sau.",
     badge: "AI COACH EVALUATED",
     badgeColor: "bg-amber-500/20 text-amber-300 border-amber-500/40",
+    targetTabId: "ai_agents",
     dataPayload: [
       { label: "Chấm Điểm Host Yến Nhi", value: "94 / 100 Điểm (Xung Lực Cực Tốt)", highlight: true },
       { label: "Tỷ Lệ Giữ Chân (Retention)", value: "4.8 Phút / Người (Cao hơn 35% trung bình)" },
@@ -191,6 +199,7 @@ const SCENARIO_1_STEPS: FlowStep[] = [
     description: "Tự động khấu trừ Chi phí Studio, Lương Host, Mã giảm giá, Thuế để tính ra Net Profit Margin đạt 18.2%. Tự động ghi nhận Payout cho Host.",
     badge: "P&L FINANCIAL CLOSED",
     badgeColor: "bg-emerald-500/20 text-emerald-300 border-emerald-500/40",
+    targetTabId: "finance",
     dataPayload: [
       { label: "Tổng GMV Thực Thu", value: "542,600,000 VNĐ" },
       { label: "Chi Phí Vận Hành Studio", value: "12,500,000 VNĐ" },
@@ -212,6 +221,7 @@ const SCENARIO_1_STEPS: FlowStep[] = [
     description: "Brand Cocoon nhận được link Báo cáo Dashboard phân tích chuyên sâu ROI 4.5x, danh sách đơn hàng xuất file Excel và clip Replay.",
     badge: "FLOW COMPLETED",
     badgeColor: "bg-purple-500/20 text-purple-300 border-purple-500/40 font-bold",
+    targetTabId: "tiktok_api",
     dataPayload: [
       { label: "Chỉ Số ROI Brand", value: "4.5x Ngân Sách Booking", highlight: true },
       { label: "Thời Gian Đẩy Báo Cáo", value: "12 Giây Post-Live (Auto API)" },
@@ -237,6 +247,7 @@ const SCENARIO_2_STEPS: FlowStep[] = [
     description: "Webhook TikTok API liên tục cảnh báo lượt xem tụt từ 5,200 người xuống 1,100 người do Host chính gặp vấn đề khan tiếng.",
     badge: "ALERT DETECTED",
     badgeColor: "bg-red-500/20 text-red-400 border-red-500/40 animate-pulse",
+    targetTabId: "sessions",
     dataPayload: [
       { label: "Tăng Trưởng Viewers", value: "-78% trong 5 phút", highlight: true },
       { label: "Chỉ Số Tụt Hẫng", value: "Retention Rate < 1.2 Phút" },
@@ -257,9 +268,10 @@ const SCENARIO_2_STEPS: FlowStep[] = [
     description: "Trong vòng 15 giây, AI phân tích dữ liệu đề xuất điều Host dự phòng Nam Style ở Studio 02 sang tiếp quản luồng live.",
     badge: "AI AUTO-DIAGNOSED",
     badgeColor: "bg-amber-500/20 text-amber-300 border-amber-500/40",
+    targetTabId: "ai_agents",
     dataPayload: [
       { label: "Chẩn Đoán AI", value: "Host kiệt sức & thiếu nhịp đếm deal" },
-      { label: "Giải Pháp Đề Xuất", value: "Đổi Host Nam Style + Tung Flash Deal Áo Áo Polo 99K", highlight: true },
+      { label: "Giải Pháp Đề Xuất", value: "Đổi Host Nam Style + Tung Flash Deal Áo Polo 99K", highlight: true },
       { label: "Thời Gian Xử Lý AI", value: "0.8 Giây" }
     ],
     systemActions: [
@@ -272,11 +284,12 @@ const SCENARIO_2_STEPS: FlowStep[] = [
     moduleCode: "M06 & M13",
     moduleName: "Workflow Emergency Action",
     roleContext: "operations",
-    title: "3. Đổi Host Bán Hàng Real-Time & Phôi Phục Mắt Xem",
+    title: "3. Đổi Host Bán Hàng Real-Time & Phục Hồi Mắt Xem",
     subtitle: "Host Nam Style tiếp quản mic, tung Voucher độc quyền",
-    description: "Host Nam Style vào vị trí với năng lượng bùng nổ, ghim ghim deal Áo Polo 99K. Lượt xem nhanh chóng tăng vọt trở lại 6,500 mắt xem.",
+    description: "Host Nam Style vào vị trí với năng lượng bùng nổ, ghim deal Áo Polo 99K. Lượt xem nhanh chóng tăng vọt trở lại 6,500 mắt xem.",
     badge: "METRICS RECOVERED",
     badgeColor: "bg-emerald-500/20 text-emerald-300 border-emerald-500/40",
+    targetTabId: "tiktok_api",
     dataPayload: [
       { label: "Mắt Xem Phục Hồi", value: "6,520 Viewers (Tăng +490%)", highlight: true },
       { label: "Tốc Độ Đặt Hàng", value: "48 Đơn Hàng / Phút" },
@@ -300,6 +313,7 @@ const SCENARIO_3_STEPS: FlowStep[] = [
     description: "Giám Đốc Brand đăng nhập vào Portal riêng, xem chi tiết 12 SKUs đã bán, tỷ lệ đổi trả và chi phí Voucher tài trợ.",
     badge: "BRAND AUDITING",
     badgeColor: "bg-blue-500/20 text-blue-300 border-blue-500/40",
+    targetTabId: "crm",
     dataPayload: [
       { label: "Quyền Truy Cập Role", value: "Brand Client Manager Portal" },
       { label: "Dữ Liệu Hiển Thị", value: "GMV, SKU Units, Conversion, ROI" },
@@ -320,6 +334,7 @@ const SCENARIO_3_STEPS: FlowStep[] = [
     description: "Nếu tài khoản Brand cố tình truy cập vào Module Lương Host hoặc Chi Phí Vốn, Hệ Thống Custom Permission ngay lập tức chặn lại và hiển thị Access Restricted Guard.",
     badge: "ACCESS RESTRICTED GUARD",
     badgeColor: "bg-amber-500/20 text-amber-300 border-amber-500/40",
+    targetTabId: "user_settings",
     dataPayload: [
       { label: "Hành Vi Phát Hiện", value: "Cố truy cập Module 12 (HR Payroll)" },
       { label: "Xử Lý Hệ Thống", value: "DENIED - Yêu cầu Permission: manage_financials" },
@@ -332,7 +347,11 @@ const SCENARIO_3_STEPS: FlowStep[] = [
   }
 ];
 
-export const EndToEndFlowSimulator: React.FC = () => {
+interface EndToEndFlowSimulatorProps {
+  onNavigateTab?: (tabId: string) => void;
+}
+
+export const EndToEndFlowSimulator: React.FC<EndToEndFlowSimulatorProps> = ({ onNavigateTab }) => {
   const [activeScenario, setActiveScenario] = useState<ScenarioType>("standard_campaign");
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [isPlayingAuto, setIsPlayingAuto] = useState(false);

@@ -118,14 +118,23 @@ export const ScriptGenerator: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-slate-900 text-white p-6 rounded-2xl border border-slate-800 shadow-xl space-y-2">
-        <span className="text-purple-400 font-semibold text-xs uppercase tracking-wider block flex items-center gap-1.5">
-          <Sparkles className="w-4 h-4 text-purple-400" /> Module 09: AI Script Generator Engine
-        </span>
-        <h2 className="text-2xl font-black">Trình Sinh Kịch Bản Live TikTok Tự Động bằng AI</h2>
-        <p className="text-slate-400 text-xs">
-          Ứng dụng Gemini AI để biên soạn kịch bản giữ chân mắt xem, kích thích chốt đơn Flash Sale & xử lý từ chối
-        </p>
+      <div className="bg-slate-900 text-white p-6 rounded-2xl border border-slate-800 shadow-xl space-y-2 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <span className="text-purple-400 font-semibold text-xs uppercase tracking-wider block flex items-center gap-1.5">
+            <Sparkles className="w-4 h-4 text-purple-400" /> Module 09: AI Script Generator Engine
+          </span>
+          <h2 className="text-2xl font-black">Trình Sinh Kịch Bản Live TikTok Tự Động bằng AI</h2>
+          <p className="text-slate-400 text-xs">
+            Ứng dụng Gemini AI để biên soạn kịch bản giữ chân mắt xem, kích thích chốt đơn Flash Sale & xử lý từ chối
+          </p>
+        </div>
+        <div className="flex-shrink-0 bg-purple-950/80 border border-purple-500/40 rounded-xl px-3.5 py-2 text-right">
+          <div className="flex items-center gap-2 text-xs font-bold text-purple-300">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span>Gemini AI Engine Active</span>
+          </div>
+          <p className="text-[10px] text-purple-400">Server API Proxy Connected</p>
+        </div>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">

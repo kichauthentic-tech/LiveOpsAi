@@ -37,12 +37,12 @@ export const GmvGrowthTrendline: React.FC<GmvGrowthTrendlineProps> = ({ sessions
   const [viewType, setViewType] = useState<"daily" | "cumulative">("daily");
 
   // Calculate base daily average from historical sessions
-  const historicalStats = useMemo(() => {
-    let filteredSessions = sessions;
-    if (selectedBrandId !== "all") {
-      filteredSessions = sessions.filter((s) => s.brandId === selectedBrandId);
-    }
+  const filteredSessions = useMemo(() => {
+    if (selectedBrandId === "all") return sessions;
+    return sessions.filter((s) => s.brandId === selectedBrandId);
+  }, [sessions, selectedBrandId]);
 
+  const historicalStats = useMemo(() => {
     const totalHistoricalGmv = filteredSessions.reduce((acc, s) => acc + (s.actualGmv || 0), 0);
     const completedCount = filteredSessions.filter((s) => s.status === "Completed" || s.status === "Live Now").length || 1;
     const avgGmvPerSession = totalHistoricalGmv / completedCount;
@@ -52,7 +52,20 @@ export const GmvGrowthTrendline: React.FC<GmvGrowthTrendlineProps> = ({ sessions
       completedCount,
       avgGmvPerSession
     };
-  }, [sessions, selectedBrandId]);
+  }, [filteredSessions]);
+
+  /** Real GMV actually recorded per calendar date ("YYYY-MM-DD" -> total actualGmv). */
+  const gmvByDate = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const s of filteredSessions) {
+      if (!s.date) continue;
+      map.set(s.date, (map.get(s.date) || 0) + (s.actualGmv || 0));
+    }
+    return map;
+  }, [filteredSessions]);
+
+  const dateKeyFor = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
   // Scenario Multipliers
   const scenarioMultiplier = {
@@ -61,10 +74,15 @@ export const GmvGrowthTrendline: React.FC<GmvGrowthTrendlineProps> = ({ sessions
     aggressive: 1.32    // +32%
   }[scenario];
 
-  // Generate 30-Day Forecast Data based on historical session metrics
+  // Real actuals for the trailing 15 days + a mathematical projection model for the next 15 days.
+  // The model side is inherently an estimate — there is no "real data" for the future — so it is
+  // clearly labeled as a forecast in the UI (see CustomTooltip and the disclaimer below the chart).
   const chartData = useMemo(() => {
     const data = [];
-    const baseDailyGmv = Math.max(180, Math.round(historicalStats.avgGmvPerSession / 1000000)); // in Millions VNĐ
+    const today = new Date();
+    const baseDailyGmv = filteredSessions.length > 0 && historicalStats.totalHistoricalGmv > 0
+      ? Math.max(10, Math.round(historicalStats.avgGmvPerSession / 1000000))
+      : 0; // in Millions VNĐ
 
     let cumulativeActual = 0;
     let cumulativeProjected = 0;
@@ -75,20 +93,21 @@ export const GmvGrowthTrendline: React.FC<GmvGrowthTrendlineProps> = ({ sessions
       const isToday = day === 15;
       const dayLabel = day === 15 ? "D15 (Hôm nay)" : `Ngày ${day}`;
 
-      // Organic variation curve simulation based on day of week / live schedule
+      // Weekend/mid-month multipliers used only for the future projection model
       const weekendBoost = (day % 7 === 6 || day % 7 === 0) ? 1.35 : 0.95;
       const midMonthPeak = (day >= 12 && day <= 16) ? 1.25 : 1.0;
 
-      // Projected Daily GMV calculation
+      // Projected Daily GMV calculation (estimate, not historical fact)
       const projectedDaily = Math.round(baseDailyGmv * weekendBoost * midMonthPeak * scenarioMultiplier);
       const aggressiveDaily = Math.round(baseDailyGmv * weekendBoost * midMonthPeak * 1.35);
 
-      // Actual GMV for past 15 days (Day 1 to 15)
+      // Actual GMV for past 15 days (Day 1 = 14 days ago ... Day 15 = today), read from real sessions
       let actualDaily: number | null = null;
       if (day <= 15) {
-        // Historical variance simulating real session fluctuations
-        const variance = 1 + (Math.sin(day * 1.5) * 0.18);
-        actualDaily = Math.round(baseDailyGmv * weekendBoost * variance);
+        const calendarDate = new Date(today);
+        calendarDate.setDate(calendarDate.getDate() - (15 - day));
+        const realGmv = gmvByDate.get(dateKeyFor(calendarDate)) || 0;
+        actualDaily = Math.round(realGmv / 1000000);
         cumulativeActual += actualDaily;
       }
 
@@ -110,14 +129,16 @@ export const GmvGrowthTrendline: React.FC<GmvGrowthTrendlineProps> = ({ sessions
     }
 
     return data;
-  }, [historicalStats, scenarioMultiplier]);
+  }, [filteredSessions, historicalStats, gmvByDate, scenarioMultiplier]);
 
   // Key KPI Metrics Calculations
   const metrics = useMemo(() => {
     const actual15Days = chartData.filter((d) => d.dayNumber <= 15).reduce((acc, d) => acc + (d.actualGmv || 0), 0);
-    const projected30Days = chartData[chartData.length - 1].cumProjectedGmv;
-    const targetKpi = 7500; // Target KPI in Millions VNĐ (7.5 Tỷ)
-    const pacingPercent = Math.round((projected30Days / targetKpi) * 100);
+    const projected30Days = chartData[chartData.length - 1]?.cumProjectedGmv || 0;
+    const targetKpi = sessions.length > 0 
+      ? Math.max(1000, Math.round(sessions.reduce((acc, s) => acc + (s.targetGmv || 0), 0) / 1000000)) 
+      : 0; // Target KPI in Millions VNĐ
+    const pacingPercent = targetKpi > 0 ? Math.round((projected30Days / targetKpi) * 100) : 0;
     const estCommission = Math.round(projected30Days * 0.15); // 15% agency commission
 
     return {
@@ -386,18 +407,19 @@ export const GmvGrowthTrendline: React.FC<GmvGrowthTrendlineProps> = ({ sessions
         <Sparkles className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
         <div className="space-y-1">
           <div className="font-bold text-slate-200 flex items-center gap-2">
-            <span>AI Predictive Insight (Dự Báo Thuật Toán)</span>
+            <span>Dự Báo Theo Mô Hình Toán Học (Không Phải Số Liệu Đã Xảy Ra)</span>
             <span className="bg-purple-900/90 text-purple-300 text-[10px] px-2 py-0.5 rounded font-mono">
-              Accuracy Score 94.2%
+              Ước tính
             </span>
           </div>
           <p className="text-slate-300 leading-relaxed">
             Dựa trên <strong>{historicalStats.completedCount} phiên livestream lịch sử</strong> gần nhất, tốc độ GMV trung bình đạt{" "}
             <strong>{Math.round(historicalStats.avgGmvPerSession / 1000000)}M VNĐ/phiên</strong>. Nếu duy trì đúng kịch bản{" "}
-            <strong className="text-purple-300">{scenario.toUpperCase()}</strong> và bổ sung thêm 2 phiên Mega Live vào khung giờ vàng cuối tuần (Thứ 7 & CN), tổng GMV 30 ngày tới ước tính đạt{" "}
-            <strong className="text-emerald-400">{(metrics.projected30Days / 1000).toFixed(2)} Tỷ VNĐ</strong> ({metrics.pacingPercent >= 100
-              ? <>vượt KPI đề ra <strong>{(metrics.pacingPercent - 100).toFixed(1)}%</strong></>
-              : <>thấp hơn KPI đề ra <strong>{(100 - metrics.pacingPercent).toFixed(1)}%</strong></>}).
+            <strong className="text-purple-300">{scenario.toUpperCase()}</strong>, tổng GMV 30 ngày tới ước tính (mô hình toán, không phải số liệu thực) đạt{" "}
+            <strong className="text-emerald-400">{(metrics.projected30Days / 1000).toFixed(2)} Tỷ VNĐ</strong>{" "}
+            {metrics.pacingPercent > 100
+              ? `(vượt KPI đề ra ${metrics.pacingPercent - 100}%)`
+              : `(đạt ${metrics.pacingPercent}% KPI đề ra)`}.
           </p>
         </div>
       </div>

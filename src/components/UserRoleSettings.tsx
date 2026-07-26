@@ -27,14 +27,23 @@ import {
   FileText
 } from "lucide-react";
 
+export interface NewUserPayload {
+  name: string;
+  email: string;
+  role: UserRole;
+  customRoleTitle: string;
+  assignedBrandId?: string;
+  assignedTalentId?: string;
+}
+
 interface UserRoleSettingsProps {
   currentRole: UserRole;
   rolePermissions: RolePermissionsMap;
   onUpdateRolePermissions: (newMap: RolePermissionsMap) => void;
   users: SystemUser[];
-  onAddUser: (newUser: SystemUser) => void;
-  onUpdateUser: (updatedUser: SystemUser) => void;
-  onDeleteUser: (userId: string) => void;
+  onAddUser: (newUser: NewUserPayload) => Promise<void>;
+  onUpdateUser: (updatedUser: SystemUser) => Promise<void>;
+  onDeleteUser: (userId: string) => Promise<void>;
   auditLogs: AuditLogEntry[];
   permissionDefinitions: PermissionDefinition[];
   brands: Brand[];
@@ -62,6 +71,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
   // Modal State for New/Edit User
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<SystemUser | null>(null);
+  const [isSavingUser, setIsSavingUser] = useState(false);
   const [formData, setFormData] = useState<{
     name: string;
     email: string;
@@ -223,40 +233,41 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
   };
 
   // User creation/update handler
-  const handleSaveUser = (e: React.FormEvent) => {
+  const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim() || !formData.email.trim()) return;
 
-    if (editingUser) {
-      const updated: SystemUser = {
-        ...editingUser,
-        name: formData.name,
-        email: formData.email,
-        role: formData.role,
-        customRoleTitle: formData.customRoleTitle || getRoleDefaultTitle(formData.role),
-        status: formData.status,
-        assignedBrandId: formData.role === "brand" ? formData.assignedBrandId : undefined,
-        assignedTalentId: formData.role === "talent" ? formData.assignedTalentId : undefined
-      };
-      onUpdateUser(updated);
-    } else {
-      const newUser: SystemUser = {
-        id: `usr-${Date.now()}`,
-        name: formData.name,
-        email: formData.email,
-        role: formData.role,
-        customRoleTitle: formData.customRoleTitle || getRoleDefaultTitle(formData.role),
-        avatar: `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 900000)}?auto=format&fit=crop&w=150&q=80`,
-        status: formData.status,
-        assignedBrandId: formData.role === "brand" ? formData.assignedBrandId : undefined,
-        assignedTalentId: formData.role === "talent" ? formData.assignedTalentId : undefined,
-        lastLogin: "Mới tạo"
-      };
-      onAddUser(newUser);
-    }
+    setIsSavingUser(true);
+    try {
+      if (editingUser) {
+        const updated: SystemUser = {
+          ...editingUser,
+          name: formData.name,
+          role: formData.role,
+          customRoleTitle: formData.customRoleTitle || getRoleDefaultTitle(formData.role),
+          status: formData.status,
+          assignedBrandId: formData.role === "brand" ? formData.assignedBrandId : undefined,
+          assignedTalentId: formData.role === "talent" ? formData.assignedTalentId : undefined
+        };
+        await onUpdateUser(updated);
+      } else {
+        await onAddUser({
+          name: formData.name,
+          email: formData.email,
+          role: formData.role,
+          customRoleTitle: formData.customRoleTitle || getRoleDefaultTitle(formData.role),
+          assignedBrandId: formData.role === "brand" ? formData.assignedBrandId : undefined,
+          assignedTalentId: formData.role === "talent" ? formData.assignedTalentId : undefined
+        });
+      }
 
-    setIsUserModalOpen(false);
-    setEditingUser(null);
+      setIsUserModalOpen(false);
+      setEditingUser(null);
+    } catch {
+      // Error already surfaced to the user by the caller (App.tsx) — keep the modal open so they can retry.
+    } finally {
+      setIsSavingUser(false);
+    }
   };
 
   const openCreateModal = () => {
@@ -591,11 +602,17 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                       <tr key={u.id} className="hover:bg-slate-800/40 transition-colors">
                         <td className="p-4">
                           <div className="flex items-center gap-3">
-                            <img
-                              src={u.avatar}
-                              alt={u.name}
-                              className="w-9 h-9 rounded-full object-cover border border-slate-700"
-                            />
+                            {u.avatar ? (
+                              <img
+                                src={u.avatar}
+                                alt={u.name}
+                                className="w-9 h-9 rounded-full object-cover border border-slate-700"
+                              />
+                            ) : (
+                              <div className="w-9 h-9 rounded-full border border-slate-700 bg-slate-800 text-slate-300 flex items-center justify-center text-xs font-bold uppercase">
+                                {u.name.charAt(0) || "?"}
+                              </div>
+                            )}
                             <div>
                               <div className="font-bold text-white text-sm flex items-center gap-2">
                                 <span>{u.name}</span>
@@ -675,7 +692,11 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                             {/* Delete Button */}
                             {u.role !== "ceo" && (
                               <button
-                                onClick={() => onDeleteUser(u.id)}
+                                onClick={() => {
+                                  if (window.confirm(`Bạn có chắc chắn muốn xóa vĩnh viễn tài khoản "${u.name}" (${u.email})?`)) {
+                                    onDeleteUser(u.id);
+                                  }
+                                }}
                                 className="p-1.5 bg-slate-800 hover:bg-red-900/50 text-slate-500 hover:text-red-400 rounded-lg transition-all"
                                 title="Xóa tài khoản"
                               >
@@ -773,11 +794,22 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                 <input
                   type="email"
                   required
+                  disabled={!!editingUser}
                   placeholder="user@liveops.ai"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-950 rounded-xl border border-slate-800 text-white focus:outline-none focus:border-blue-500"
+                  className="w-full px-3 py-2 bg-slate-950 rounded-xl border border-slate-800 text-white focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 />
+                {editingUser && (
+                  <p className="text-[10px] text-slate-500">
+                    Không thể đổi email đăng nhập tại đây — email gắn với tài khoản Supabase Auth thật.
+                  </p>
+                )}
+                {!editingUser && (
+                  <p className="text-[10px] text-slate-500">
+                    Hệ thống sẽ gửi email mời tạo mật khẩu đến địa chỉ này.
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -866,16 +898,18 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
               <div className="pt-3 border-t border-slate-800 flex justify-end gap-2">
                 <button
                   type="button"
+                  disabled={isSavingUser}
                   onClick={() => setIsUserModalOpen(false)}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold"
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold disabled:opacity-50"
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-extrabold shadow-lg shadow-blue-600/30"
+                  disabled={isSavingUser}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-extrabold shadow-lg shadow-blue-600/30 disabled:opacity-60"
                 >
-                  {editingUser ? "Lưu Cập Nhật" : "Tạo Tài Khoản"}
+                  {isSavingUser ? "Đang xử lý..." : editingUser ? "Lưu Cập Nhật" : "Gửi Lời Mời"}
                 </button>
               </div>
             </form>
@@ -889,11 +923,17 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
           <div className="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-2xl p-6 text-white shadow-2xl space-y-5 max-h-[85vh] flex flex-col">
             <div className="flex justify-between items-center pb-3 border-b border-slate-800">
               <div className="flex items-center gap-3">
-                <img
-                  src={permissionOverrideUser.avatar}
-                  alt={permissionOverrideUser.name}
-                  className="w-10 h-10 rounded-full object-cover border border-slate-700"
-                />
+                {permissionOverrideUser.avatar ? (
+                  <img
+                    src={permissionOverrideUser.avatar}
+                    alt={permissionOverrideUser.name}
+                    className="w-10 h-10 rounded-full object-cover border border-slate-700"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-full border border-slate-700 bg-slate-800 text-slate-300 flex items-center justify-center text-sm font-bold uppercase">
+                    {permissionOverrideUser.name.charAt(0) || "?"}
+                  </div>
+                )}
                 <div>
                   <h3 className="font-black text-base text-white">
                     Custom Permission Extra: {permissionOverrideUser.name}

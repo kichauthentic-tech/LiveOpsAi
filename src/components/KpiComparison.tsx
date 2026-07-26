@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   TrendingUp,
   TrendingDown,
@@ -33,11 +33,12 @@ import {
   Legend,
   CartesianGrid
 } from "recharts";
-import { Brand, Studio } from "../types";
+import { Brand, Studio, LiveSession } from "../types";
 
 export interface KpiComparisonProps {
   brands?: Brand[];
   studios?: Studio[];
+  sessions?: LiveSession[];
 }
 
 type TimePeriodOption = "this_week_vs_last_week" | "this_month_vs_last_month" | "this_quarter_vs_last_quarter";
@@ -54,7 +55,8 @@ interface MetricComparisonItem {
   description: string;
 }
 
-// Mock dataset for comparison across timeframes
+// Static shell (labels, format, category) reused for both current and previous period —
+// numeric fields below are placeholders overwritten by real session data in `currentMetrics`.
 const COMPARISON_METRICS: Record<TimePeriodOption, MetricComparisonItem[]> = {
   this_week_vs_last_week: [
     {
@@ -328,50 +330,214 @@ const COMPARISON_METRICS: Record<TimePeriodOption, MetricComparisonItem[]> = {
   ]
 };
 
-// Daily comparison curve (Mon - Sun trajectory)
-const DAILY_TRAJECTORY_DATA = {
-  this_week_vs_last_week: [
-    { label: "Thứ 2", current: 480, previous: 380, ordersCurrent: 1650, ordersPrev: 1300 },
-    { label: "Thứ 3", current: 590, previous: 420, ordersCurrent: 2020, ordersPrev: 1450 },
-    { label: "Thứ 4", current: 520, previous: 490, ordersCurrent: 1780, ordersPrev: 1680 },
-    { label: "Thứ 5", current: 780, previous: 550, ordersCurrent: 2680, ordersPrev: 1890 },
-    { label: "Thứ 6", current: 1120, previous: 780, ordersCurrent: 3850, ordersPrev: 2650 },
-    { label: "Thứ 7", current: 1410, previous: 980, ordersCurrent: 4840, ordersPrev: 3350 },
-    { label: "Chủ Nhật", current: 1470, previous: 1010, ordersCurrent: 5030, ordersPrev: 3450 }
-  ],
-  this_month_vs_last_month: [
-    { label: "Tuần 1", current: 4200, previous: 3400, ordersCurrent: 14300, ordersPrev: 11600 },
-    { label: "Tuần 2", current: 5100, previous: 4100, ordersCurrent: 17300, ordersPrev: 14100 },
-    { label: "Tuần 3", current: 6300, previous: 4800, ordersCurrent: 21400, ordersPrev: 16500 },
-    { label: "Tuần 4", current: 6200, previous: 4900, ordersCurrent: 21200, ordersPrev: 16900 }
-  ],
-  this_quarter_vs_last_quarter: [
-    { label: "Tháng 1", current: 17800, previous: 14200, ordersCurrent: 60200, ordersPrev: 48500 },
-    { label: "Tháng 2", current: 18900, previous: 15100, ordersCurrent: 64100, ordersPrev: 51800 },
-    { label: "Tháng 3", current: 21800, previous: 16900, ordersCurrent: 73700, ordersPrev: 57700 }
-  ]
+// --- Real date-range helpers (replace the old hardcoded *0.8/*0.85 "previous period" trick) ---
+
+/** Parses a "YYYY-MM-DD" session date string as a local-midnight Date (avoids UTC-shift bugs). */
+const parseSessionDate = (dateStr: string): Date => {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
 };
 
-// Studio breakdown comparison data
-const STUDIO_COMPARISON_DATA = [
-  { name: "Studio A (Beauty)", currentGMV: 2450, prevGMV: 1850, currentSessions: 8, prevSessions: 6 },
-  { name: "Studio B (Fashion)", currentGMV: 1820, prevGMV: 1420, currentSessions: 6, prevSessions: 5 },
-  { name: "Studio C (Tech/Home)", currentGMV: 1100, prevGMV: 910, currentSessions: 4, prevSessions: 4 }
-];
+const addDays = (d: Date, n: number): Date => {
+  const r = new Date(d);
+  r.setDate(r.getDate() + n);
+  return r;
+};
 
-export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studios = [] }) => {
+const startOfCalendarWeek = (d: Date): Date => {
+  const r = new Date(d);
+  const day = r.getDay(); // 0 = Sun
+  const diff = day === 0 ? -6 : 1 - day; // shift back to Monday
+  r.setDate(r.getDate() + diff);
+  r.setHours(0, 0, 0, 0);
+  return r;
+};
+
+interface DateRange {
+  start: Date;
+  end: Date;
+}
+
+/** Real current/previous date windows for the selected period, anchored to "now". */
+const getPeriodRanges = (period: TimePeriodOption, now: Date): { current: DateRange; previous: DateRange } => {
+  if (period === "this_week_vs_last_week") {
+    const curStart = startOfCalendarWeek(now);
+    const curEnd = addDays(curStart, 6);
+    return {
+      current: { start: curStart, end: curEnd },
+      previous: { start: addDays(curStart, -7), end: addDays(curStart, -1) }
+    };
+  }
+  if (period === "this_month_vs_last_month") {
+    const curStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const curEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const prevStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const prevEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+    return { current: { start: curStart, end: curEnd }, previous: { start: prevStart, end: prevEnd } };
+  }
+  // this_quarter_vs_last_quarter
+  const q = Math.floor(now.getMonth() / 3);
+  const curStart = new Date(now.getFullYear(), q * 3, 1);
+  const curEnd = new Date(now.getFullYear(), q * 3 + 3, 0);
+  const prevStart = new Date(now.getFullYear(), q * 3 - 3, 1);
+  const prevEnd = new Date(now.getFullYear(), q * 3, 0);
+  return { current: { start: curStart, end: curEnd }, previous: { start: prevStart, end: prevEnd } };
+};
+
+const isSessionInRange = (session: LiveSession, range: DateRange): boolean => {
+  if (!session.date) return false;
+  const d = parseSessionDate(session.date);
+  return d >= range.start && d <= range.end;
+};
+
+interface PeriodBucket {
+  label: string;
+  range: DateRange;
+}
+
+/** Sub-buckets used for the trajectory chart, sized to the period type. */
+const buildBuckets = (period: TimePeriodOption, range: DateRange): PeriodBucket[] => {
+  if (period === "this_week_vs_last_week") {
+    const labels = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ Nhật"];
+    return labels.map((label, i) => {
+      const day = addDays(range.start, i);
+      return { label, range: { start: day, end: day } };
+    });
+  }
+  if (period === "this_month_vs_last_month") {
+    const totalDays = Math.round((range.end.getTime() - range.start.getTime()) / 86400000) + 1;
+    const chunk = Math.ceil(totalDays / 4);
+    const buckets: PeriodBucket[] = [];
+    for (let i = 0; i < 4; i++) {
+      const bStart = addDays(range.start, i * chunk);
+      if (bStart > range.end) break;
+      const bEnd = addDays(range.start, Math.min((i + 1) * chunk - 1, totalDays - 1));
+      buckets.push({ label: `Tuần ${i + 1}`, range: { start: bStart, end: bEnd } });
+    }
+    return buckets;
+  }
+  // this_quarter_vs_last_quarter
+  return [0, 1, 2].map((i) => {
+    const mStart = new Date(range.start.getFullYear(), range.start.getMonth() + i, 1);
+    const mEnd = new Date(range.start.getFullYear(), range.start.getMonth() + i + 1, 0);
+    return { label: `Tháng ${mStart.getMonth() + 1}`, range: { start: mStart, end: mEnd } };
+  });
+};
+
+export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studios = [], sessions }) => {
   const [timePeriod, setTimePeriod] = useState<TimePeriodOption>("this_week_vs_last_week");
   const [selectedCategory, setSelectedCategory] = useState<"all" | "revenue" | "livestream" | "roi">("all");
   const [selectedBrand, setSelectedBrand] = useState<string>("all");
   const [chartType, setChartType] = useState<"area" | "bar">("area");
   const [activeMetricTab, setActiveMetricTab] = useState<"gmv" | "orders">("gmv");
 
-  const currentMetrics = COMPARISON_METRICS[timePeriod];
+  const effectiveSessions = useMemo(() => {
+    if (!sessions) return [];
+    if (selectedBrand === "all") return sessions;
+    return sessions.filter((s) => s.brandId === selectedBrand || s.brandName === selectedBrand);
+  }, [sessions, selectedBrand]);
+
+  // Real current/previous date windows for the selected period (anchored to today).
+  const periodRanges = useMemo(() => getPeriodRanges(timePeriod, new Date()), [timePeriod]);
+
+  const currentPeriodSessions = useMemo(
+    () => effectiveSessions.filter((s) => isSessionInRange(s, periodRanges.current)),
+    [effectiveSessions, periodRanges]
+  );
+  const previousPeriodSessions = useMemo(
+    () => effectiveSessions.filter((s) => isSessionInRange(s, periodRanges.previous)),
+    [effectiveSessions, periodRanges]
+  );
+
+  /** Aggregates the metrics this component tracks from a real slice of sessions. */
+  const summarizeSessions = (list: LiveSession[]) => {
+    const totalGmv = list.reduce((acc, s) => acc + (s.actualGmv || 0), 0);
+    const totalTargetGmv = list.reduce((acc, s) => acc + (s.targetGmv || 0), 0);
+    const totalOrders = list.reduce((acc, s) => acc + (s.totalOrders || 0), 0);
+    const avgAov = totalOrders > 0 ? Math.round(totalGmv / totalOrders) : 0;
+    const avgCvr = list.length > 0 ? Number((list.reduce((acc, s) => acc + (s.cvrAvg || 0), 0) / list.length).toFixed(1)) : 0;
+    const maxPeakCcu = Math.max(0, ...list.map((s) => s.peakViewers || 0));
+    const avgWatchMinutes = list.length > 0
+      ? Number((list.reduce((acc, s) => acc + ((s.avgWatchTimeSeconds || 0) / 60), 0) / list.length).toFixed(1))
+      : 0;
+    const approxRoas = totalGmv > 0 ? Number((totalGmv / Math.max(1, list.length * 50000000)).toFixed(1)) : 0;
+    return { totalGmv, totalTargetGmv, totalOrders, avgAov, avgCvr, maxPeakCcu, avgWatchMinutes, approxRoas, count: list.length };
+  };
+
+  const rawMetrics = COMPARISON_METRICS[timePeriod];
+  const currentMetrics = useMemo(() => {
+    const cur = summarizeSessions(currentPeriodSessions);
+    const prev = summarizeSessions(previousPeriodSessions);
+
+    return rawMetrics.map((m) => {
+      if (m.id === "gmv") {
+        return {
+          ...m,
+          currentValue: cur.totalGmv,
+          previousValue: prev.totalGmv,
+          target: cur.totalTargetGmv > 0 ? cur.totalTargetGmv : Math.round(cur.totalGmv * 1.1)
+        };
+      }
+      if (m.id === "orders") {
+        return { ...m, currentValue: cur.totalOrders, previousValue: prev.totalOrders, target: Math.round(cur.totalOrders * 1.1) };
+      }
+      if (m.id === "aov") {
+        return { ...m, currentValue: cur.avgAov, previousValue: prev.avgAov, target: Math.round(cur.avgAov * 1.05) };
+      }
+      if (m.id === "live_sessions") {
+        return { ...m, currentValue: cur.count, previousValue: prev.count, target: Math.round(cur.count * 1.1) };
+      }
+      if (m.id === "cvr") {
+        return { ...m, currentValue: cur.avgCvr, previousValue: prev.avgCvr, target: Number((cur.avgCvr * 1.1).toFixed(1)) };
+      }
+      if (m.id === "peak_ccu") {
+        return { ...m, currentValue: cur.maxPeakCcu, previousValue: prev.maxPeakCcu, target: Math.round(cur.maxPeakCcu * 1.1) };
+      }
+      if (m.id === "avg_duration") {
+        return { ...m, currentValue: cur.avgWatchMinutes, previousValue: prev.avgWatchMinutes, target: Number((cur.avgWatchMinutes * 1.1).toFixed(1)) };
+      }
+      if (m.id === "roas") {
+        return { ...m, currentValue: cur.approxRoas, previousValue: prev.approxRoas, target: Number((cur.approxRoas * 1.1).toFixed(1)) };
+      }
+      return m;
+    });
+  }, [currentPeriodSessions, previousPeriodSessions, rawMetrics]);
+
   const filteredMetrics = currentMetrics.filter((m) =>
     selectedCategory === "all" ? true : m.category === selectedCategory
   );
 
-  const trajectoryData = DAILY_TRAJECTORY_DATA[timePeriod];
+  const trajectoryData = useMemo(() => {
+    const currentBuckets = buildBuckets(timePeriod, periodRanges.current);
+    const previousBuckets = buildBuckets(timePeriod, periodRanges.previous);
+    return currentBuckets.map((bucket, idx) => {
+      const prevBucket = previousBuckets[idx];
+      const curSessionsInBucket = effectiveSessions.filter((s) => isSessionInRange(s, bucket.range));
+      const prevSessionsInBucket = prevBucket ? effectiveSessions.filter((s) => isSessionInRange(s, prevBucket.range)) : [];
+      return {
+        label: bucket.label,
+        current: Math.round(curSessionsInBucket.reduce((acc, s) => acc + (s.actualGmv || 0), 0) / 1000000),
+        previous: Math.round(prevSessionsInBucket.reduce((acc, s) => acc + (s.actualGmv || 0), 0) / 1000000),
+        ordersCurrent: curSessionsInBucket.reduce((acc, s) => acc + (s.totalOrders || 0), 0),
+        ordersPrev: prevSessionsInBucket.reduce((acc, s) => acc + (s.totalOrders || 0), 0)
+      };
+    });
+  }, [timePeriod, periodRanges, effectiveSessions]);
+
+  const studioComparisonData = useMemo(() => {
+    if (!studios || studios.length === 0) return [];
+    return studios.map((st) => {
+      const curStudioSessions = currentPeriodSessions.filter((s) => s.studioId === st.id || s.studioName === st.name);
+      const prevStudioSessions = previousPeriodSessions.filter((s) => s.studioId === st.id || s.studioName === st.name);
+      return {
+        name: st.name,
+        currentGMV: Math.round(curStudioSessions.reduce((acc, s) => acc + (s.actualGmv || 0), 0) / 1000000),
+        prevGMV: Math.round(prevStudioSessions.reduce((acc, s) => acc + (s.actualGmv || 0), 0) / 1000000),
+        currentSessions: curStudioSessions.length,
+        prevSessions: prevStudioSessions.length
+      };
+    });
+  }, [currentPeriodSessions, previousPeriodSessions, studios]);
 
   // Helper formatting function
   const formatMetricValue = (value: number, format: MetricComparisonItem["format"], unit: string) => {
@@ -395,7 +561,7 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
 
   const getDeltaInfo = (item: MetricComparisonItem) => {
     const diff = item.currentValue - item.previousValue;
-    const percent = ((diff / item.previousValue) * 100).toFixed(1);
+    const percent = item.previousValue > 0 ? ((diff / item.previousValue) * 100).toFixed(1) : "0.0";
     const isPositive = diff >= 0;
     return { diff, percent: Number(percent), isPositive };
   };
@@ -413,42 +579,58 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
 
   const labels = getTimePeriodLabel(timePeriod);
 
-  // Growth driver highlights
+  const topStudioInsight = useMemo(() => {
+    const totalGmv = studioComparisonData.reduce((acc, s) => acc + s.currentGMV, 0);
+    if (totalGmv <= 0) return null;
+    const top = [...studioComparisonData].sort((a, b) => b.currentGMV - a.currentGMV)[0];
+    return { name: top.name, pct: ((top.currentGMV / totalGmv) * 100).toFixed(1) };
+  }, [studioComparisonData]);
+
+  // Growth driver highlights — derived from the real currentMetrics computed above, not hardcoded copy.
   const getGrowthHighlights = () => {
-    if (timePeriod === "this_week_vs_last_week") {
+    if (currentPeriodSessions.length === 0) {
       return [
         {
-          title: "Tăng Trưởng GMV +28.5%",
-          desc: "Tăng đột biến từ 2 phiên Mega Sale Cocoon & Anessa khung giờ vàng T6 & CN.",
-          tag: "GMV Surge"
+          title: "Chưa Có Dữ Liệu Tăng Trưởng",
+          desc: "Hệ thống đang ở trạng thái trống (Clean State). Hãy tạo phiên live mới để AI bắt đầu phân tích.",
+          tag: "Clean State"
         },
         {
-          title: "Tỉ Lệ CVR Tăng Đạt 5.4%",
-          desc: "AI Script đề xuất Deal Flash Sale giúp tăng 22% thời gian giữ chân khán giả.",
-          tag: "AI Script"
+          title: "Tối Ưu Công Suất Studio",
+          desc: "Sẵn sàng ghi nhận ca live khi bạn khởi tạo phiên đầu tiên.",
+          tag: "Studio Idle"
         },
         {
-          title: "Peak CCU Kỷ Lục 12.8k",
-          desc: "Phối hợp TikTok Voucher & kỹ năng chốt đơn dồn dập tại Studio A.",
-          tag: "Peak CCU"
+          title: "Chỉ Số ROAS & Lợi Nhuận",
+          desc: "Hệ thống sẽ tự động tổng hợp chỉ số ngay khi phát sinh doanh thu thực tế.",
+          tag: "ROAS Ready"
         }
       ];
     }
+
+    const gmvMetric = currentMetrics.find((m) => m.id === "gmv");
+    const cvrMetric = currentMetrics.find((m) => m.id === "cvr");
+    const peakMetric = currentMetrics.find((m) => m.id === "peak_ccu");
+    const roasMetric = currentMetrics.find((m) => m.id === "roas");
+    const gmvDelta = gmvMetric ? getDeltaInfo(gmvMetric) : null;
+
     return [
       {
-        title: "Tăng Trưởng Doanh Thu",
-        desc: "Mở rộng quy mô hợp tác cùng 4 nhãn hàng Mỹ phẩm & Gia dụng mới.",
-        tag: "Core Growth"
+        title: gmvDelta
+          ? `Tăng Trưởng GMV ${gmvDelta.isPositive ? "+" : ""}${gmvDelta.percent}%`
+          : "Tăng Trưởng GMV",
+        desc: `So với ${labels.previous.toLowerCase()}, GMV của ${currentPeriodSessions.length} phiên trong ${labels.current.toLowerCase()} ${gmvDelta && gmvDelta.isPositive ? "tăng" : "giảm"}.`,
+        tag: "GMV"
       },
       {
-        title: "Tối Ưu Công Suất Studio",
-        desc: "Studio A & B đạt 8.5h/ngày, giảm 15% thời gian trống ca.",
-        tag: "Efficiency"
+        title: `Tỉ Lệ CVR ${cvrMetric ? cvrMetric.currentValue : 0}%`,
+        desc: "Tỷ lệ chuyển đổi trung bình thực tế trên toàn bộ phiên trong kỳ.",
+        tag: "CVR"
       },
       {
-        title: "ROAS Agency Đạt 6.9x",
-        desc: "Tối ưu chi phí vận hành livestream và kịch bản chốt đơn chuyển đổi.",
-        tag: "High ROAS"
+        title: `Peak CCU ${peakMetric ? peakMetric.currentValue.toLocaleString() : 0}`,
+        desc: `ROAS Agency ước tính ${roasMetric ? roasMetric.currentValue : 0}x trong kỳ này.`,
+        tag: "Peak CCU"
       }
     ];
   };
@@ -797,7 +979,7 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
 
             <div className="h-52 w-full pt-1">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={STUDIO_COMPARISON_DATA} layout="vertical">
+                <BarChart data={studioComparisonData} layout="vertical">
                   <XAxis type="number" stroke="#64748b" fontSize={11} />
                   <YAxis type="category" dataKey="name" stroke="#94a3b8" fontSize={10} width={90} />
                   <Tooltip
@@ -813,10 +995,12 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
 
           <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800/80 text-xs text-slate-300 space-y-1">
             <div className="font-bold text-indigo-300 flex items-center gap-1">
-              <Sparkles className="w-3.5 h-3.5" /> Studio A chiếm 45.6% tổng GMV
+              <Sparkles className="w-3.5 h-3.5" /> {topStudioInsight ? `${topStudioInsight.name} chiếm ${topStudioInsight.pct}% tổng GMV` : "Chưa phát sinh doanh thu"}
             </div>
             <p className="text-[11px] text-slate-400 leading-relaxed">
-              Studio A (Beauty) tiếp tục dẫn đầu với hiệu suất khai thác 8.5 giờ/ngày và CVR trung bình 5.8%.
+              {topStudioInsight
+                ? `${topStudioInsight.name} dẫn đầu GMV trong ${labels.current.toLowerCase()} theo dữ liệu phiên live thực tế.`
+                : "Tất cả studio phòng máy đang sẵn sàng nhận ca live mới."}
             </p>
           </div>
         </div>

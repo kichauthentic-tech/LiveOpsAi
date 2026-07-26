@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { Sparkles, Send, Bot, User, RefreshCw, Cpu, Award, Zap } from "lucide-react";
+import { Sparkles, Send, Bot, User, RefreshCw, Cpu, Award, Zap, Play, MessageSquare } from "lucide-react";
+import { EndToEndFlowSimulator } from "./EndToEndFlowSimulator";
 
 type AgentRole = "ceo" | "host_coach" | "talent_matcher" | "data_analyst";
 
@@ -9,7 +10,12 @@ interface Message {
   time: string;
 }
 
-export const AiMultiAgent: React.FC = () => {
+interface AiMultiAgentProps {
+  onNavigateTab?: (tabId: string) => void;
+}
+
+export const AiMultiAgent: React.FC<AiMultiAgentProps> = ({ onNavigateTab }) => {
+  const [activeSubView, setActiveSubView] = useState<"chat" | "simulator">("chat");
   const [selectedAgent, setSelectedAgent] = useState<AgentRole>("ceo");
   const [inputMessage, setInputMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -117,17 +123,57 @@ export const AiMultiAgent: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="bg-slate-900 text-white p-6 rounded-2xl border border-slate-800 shadow-xl space-y-2">
-        <span className="text-purple-400 font-semibold text-xs uppercase tracking-wider block flex items-center gap-1.5">
-          <Bot className="w-4 h-4 text-purple-400" /> Module 16: Multi-Agent AI Council
-        </span>
-        <h2 className="text-2xl font-black">Hội Đồng Trợ Lý AI Chuyên Biệt Theo Vị Trí Vận Hành</h2>
-        <p className="text-slate-400 text-xs">
-          Tương tác trực tiếp với các Agent AI chuyên gia: CEO Advisor, Host Coach, Talent Matcher & Data Analyst
-        </p>
+      <div className="bg-gradient-to-br from-slate-900 via-purple-950 to-slate-900 text-white p-6 rounded-3xl border border-slate-800 shadow-xl space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <span className="text-purple-400 font-bold text-xs uppercase tracking-wider block flex items-center gap-1.5 bg-purple-950/80 px-3 py-1 rounded-full border border-purple-800">
+            <Bot className="w-4 h-4 text-purple-400" /> Module 16: Multi-Agent AI Council & Business Simulator
+          </span>
+
+          {/* Subview Toggle Buttons */}
+          <div className="flex items-center bg-slate-950 p-1 rounded-2xl border border-purple-500/30 gap-1">
+            <button
+              onClick={() => setActiveSubView("chat")}
+              className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 ${
+                activeSubView === "chat"
+                  ? "bg-purple-600 text-white shadow-lg shadow-purple-600/30"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <MessageSquare className="w-4 h-4" />
+              <span>Hội Đồng Trợ Lý AI</span>
+            </button>
+
+            <button
+              onClick={() => setActiveSubView("simulator")}
+              className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 ${
+                activeSubView === "simulator"
+                  ? "bg-purple-600 text-white shadow-lg shadow-purple-600/30"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <Play className="w-4 h-4 text-emerald-400" />
+              <span>End-To-End Simulator</span>
+              <span className="bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded text-[9px] font-black border border-emerald-500/30">HOT</span>
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <h2 className="text-2xl md:text-3xl font-black">
+            {activeSubView === "chat" ? "Hội Đồng Trợ Lý AI Chuyên Biệt Vận Hành" : "Khung Mô Phỏng Dòng Chảy Business End-To-End"}
+          </h2>
+          <p className="text-slate-300 text-xs md:text-sm mt-1">
+            {activeSubView === "chat"
+              ? "Tương tác trực tiếp với các Agent AI chuyên gia: CEO Advisor, Host Coach, Talent Matcher & Data Analyst"
+              : "Theo dõi dòng chảy dữ liệu liên module real-time từ Ký HĐ Brand → Booking Host → Setup Studio QR → TikTok API → P&L Tài Chính"}
+          </p>
+        </div>
       </div>
 
-      <div className="grid lg:grid-cols-4 gap-6">
+      {activeSubView === "simulator" ? (
+        <EndToEndFlowSimulator onNavigateTab={onNavigateTab} />
+      ) : (
+        <div className="grid lg:grid-cols-4 gap-6">
         {/* Agent Selector Sidebar */}
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-2 text-xs">
           <h3 className="font-bold text-slate-900 mb-2">Chọn Trợ Lý AI:</h3>
@@ -236,6 +282,7 @@ export const AiMultiAgent: React.FC = () => {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 };
