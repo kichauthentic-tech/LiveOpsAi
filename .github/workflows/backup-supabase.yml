@@ -37,11 +37,14 @@ jobs:
 # ---
 # Cách kích hoạt (cần user tự làm — DB password không được nhập hộ qua Claude Code):
 #
-# 1. Lấy connection string trực tiếp (KHÔNG dùng pooler) từ Supabase Dashboard:
-#    Project Settings > Database > Connection string > mục "URI", chọn chế độ
-#    "Direct connection" (không phải "Transaction pooler"/"Session pooler" —
-#    pg_dump cần kết nối trực tiếp cổng 5432, không qua PgBouncer).
-#    Dạng: postgresql://postgres:[YOUR-PASSWORD]@db.<project-ref>.supabase.co:5432/postgres
+# 1. Lấy connection string từ Supabase Dashboard: Project Settings > Database >
+#    Connection string > mục "URI", chọn chế độ "Session pooler" (KHÔNG dùng
+#    "Direct connection" — địa chỉ đó giờ chỉ có IPv6, mà GitHub Actions runner
+#    không có kết nối mạng ra ngoài qua IPv6 nên sẽ báo lỗi "Network is
+#    unreachable". Cũng KHÔNG dùng "Transaction pooler" (port 6543) — chế độ đó
+#    không tương thích với pg_dump. Chỉ "Session pooler" vừa có IPv4 vừa hoạt
+#    động đúng với pg_dump.)
+#    Dạng: postgresql://postgres.<project-ref>:[YOUR-PASSWORD]@aws-0-<region>.pooler.supabase.com:5432/postgres
 #
 # 2. Vào GitHub repo > Settings > Secrets and variables > Actions > New repository secret
 #    Tên: SUPABASE_DB_URL
