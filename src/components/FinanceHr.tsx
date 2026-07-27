@@ -136,25 +136,22 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
           <DollarSign className="w-4 h-4 text-purple-400" /> Modules 11 & 12: Finance, Unit Economics & HR
         </span>
         <h2 className="text-2xl font-black">Tài Chính P&L Trận Live & Quản Lý Nhân Sự Agency</h2>
-        <p className="text-slate-400 text-xs">
-          Báo cáo lợi nhuận thật theo từng phiên đã hoàn thành (GMV, hoa hồng Host, chi phí Studio/Ads) + trình mô phỏng what-if
-        </p>
       </div>
 
       {/* Real P&L report per completed session */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-        <div className="border-b border-slate-100 pb-3 flex items-center justify-between flex-wrap gap-2">
+      <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-sm space-y-4">
+        <div className="border-b border-slate-800 pb-3 flex items-center justify-between flex-wrap gap-2">
           <div>
-            <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-purple-600" /> Báo Cáo P&L Thật Theo Phiên Live
+            <h3 className="font-bold text-slate-100 text-base flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-purple-400" /> Báo Cáo P&L Thật Theo Phiên Live
             </h3>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-400">
               GMV & Host lấy từ dữ liệu phiên/talent thật trên Supabase. Commission Agency, chi phí Studio/Ads nhập & lưu thật, chỉ CEO mới duyệt được.
             </p>
           </div>
-          <div className="text-right text-xs bg-slate-50 border border-slate-200 rounded-xl px-4 py-2">
-            <div className="text-slate-500">Tổng {rows.length} phiên · Net Profit</div>
-            <div className={`text-lg font-black ${totals.netProfit >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+          <div className="text-right text-xs bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-2">
+            <div className="text-slate-400">Tổng {rows.length} phiên · Net Profit</div>
+            <div className={`text-lg font-black ${totals.netProfit >= 0 ? "text-emerald-400" : "text-red-400"}`}>
               {money(totals.netProfit)} đ <span className="text-xs font-bold text-slate-400">({totalMargin}%)</span>
             </div>
           </div>
@@ -166,7 +163,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="text-left text-slate-400 border-b border-slate-100">
+                <tr className="text-left text-slate-400 border-b border-slate-800">
                   <th className="py-2 pr-3">Phiên</th>
                   <th className="py-2 pr-3">GMV Thật</th>
                   <th className="py-2 pr-3">Comm Agency %</th>
@@ -179,19 +176,19 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
               </thead>
               <tbody>
                 {rows.map(({ session: s, finance, talent, grossAgencyRev, hostPayout, netProfit }) => (
-                  <tr key={s.id} className="border-b border-slate-50 align-middle">
+                  <tr key={s.id} className="border-b border-slate-800/60 align-middle">
                     <td className="py-2 pr-3">
-                      <div className="font-bold text-slate-800">{s.title}</div>
+                      <div className="font-bold text-slate-200">{s.title}</div>
                       <div className="text-slate-400">{s.brandName} · {s.date} · Host {talent?.name ?? s.hostName}</div>
                     </td>
-                    <td className="py-2 pr-3 font-bold text-slate-700">{money(s.actualGmv)} đ</td>
+                    <td className="py-2 pr-3 font-bold text-slate-300">{money(s.actualGmv)} đ</td>
                     <td className="py-2 pr-3">
                       <input
                         type="number"
                         defaultValue={finance.agencyCommissionRate}
                         disabled={savingId === s.id}
                         onBlur={(e) => handleFieldChange(s.id, "agencyCommissionRate", Number(e.target.value))}
-                        className="w-16 p-1.5 rounded-lg border border-slate-300 font-bold"
+                        className="w-16 p-1.5 rounded-lg border border-slate-700 bg-slate-950 text-slate-100 font-bold"
                       />
                     </td>
                     <td className="py-2 pr-3">
@@ -200,7 +197,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                         defaultValue={finance.studioCost}
                         disabled={savingId === s.id}
                         onBlur={(e) => handleFieldChange(s.id, "studioCost", Number(e.target.value))}
-                        className="w-24 p-1.5 rounded-lg border border-slate-300 font-bold"
+                        className="w-24 p-1.5 rounded-lg border border-slate-700 bg-slate-950 text-slate-100 font-bold"
                       />
                     </td>
                     <td className="py-2 pr-3">
@@ -209,11 +206,11 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                         defaultValue={finance.adsCost}
                         disabled={savingId === s.id}
                         onBlur={(e) => handleFieldChange(s.id, "adsCost", Number(e.target.value))}
-                        className="w-24 p-1.5 rounded-lg border border-slate-300 font-bold"
+                        className="w-24 p-1.5 rounded-lg border border-slate-700 bg-slate-950 text-slate-100 font-bold"
                       />
                     </td>
-                    <td className="py-2 pr-3 text-amber-600 font-bold">{money(hostPayout)} đ</td>
-                    <td className={`py-2 pr-3 font-black ${netProfit >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                    <td className="py-2 pr-3 text-amber-400 font-bold">{money(hostPayout)} đ</td>
+                    <td className={`py-2 pr-3 font-black ${netProfit >= 0 ? "text-emerald-400" : "text-red-400"}`}>
                       {money(netProfit)} đ
                     </td>
                     <td className="py-2 pr-3">
@@ -221,7 +218,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                         <button
                           onClick={() => handleApprove(s.id, "pending")}
                           disabled={savingId === s.id}
-                          className="flex items-center gap-1 text-emerald-600 font-bold hover:underline"
+                          className="flex items-center gap-1 text-emerald-400 font-bold hover:underline"
                           title={finance.approvedByUserId ? `Duyệt bởi ${userNameById[finance.approvedByUserId] ?? finance.approvedByUserId}` : undefined}
                         >
                           <CheckCircle2 className="w-3.5 h-3.5" /> Đã duyệt
@@ -230,7 +227,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                         <button
                           onClick={() => handleApprove(s.id, "pending")}
                           disabled={savingId === s.id}
-                          className="flex items-center gap-1 text-red-600 font-bold hover:underline"
+                          className="flex items-center gap-1 text-red-400 font-bold hover:underline"
                         >
                           <XCircle className="w-3.5 h-3.5" /> Từ chối
                         </button>
@@ -239,7 +236,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                           <button
                             onClick={() => handleApprove(s.id, "approved")}
                             disabled={savingId === s.id}
-                            className="text-emerald-600 hover:bg-emerald-50 p-1 rounded-lg"
+                            className="text-emerald-400 hover:bg-emerald-950/40 p-1 rounded-lg"
                             title="Duyệt bảng lương"
                           >
                             <CheckCircle2 className="w-4 h-4" />
@@ -247,7 +244,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                           <button
                             onClick={() => handleApprove(s.id, "rejected")}
                             disabled={savingId === s.id}
-                            className="text-red-600 hover:bg-red-50 p-1 rounded-lg"
+                            className="text-red-400 hover:bg-red-950/40 p-1 rounded-lg"
                             title="Từ chối"
                           >
                             <XCircle className="w-4 h-4" />
@@ -265,73 +262,73 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
       </div>
 
       {/* Session Unit Economics Simulator (what-if, not tied to a real session) */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
-        <div className="border-b border-slate-100 pb-3">
-          <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
-            <Calculator className="w-5 h-5 text-purple-600" /> Trình Mô Phỏng What-If (Unit Economics Calculator)
+      <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-sm space-y-6">
+        <div className="border-b border-slate-800 pb-3">
+          <h3 className="font-bold text-slate-100 text-base flex items-center gap-2">
+            <Calculator className="w-5 h-5 text-purple-400" /> Trình Mô Phỏng What-If (Unit Economics Calculator)
           </h3>
-          <p className="text-xs text-slate-500">Mô phỏng kịch bản giả định — không lưu vào Supabase, không gắn với phiên live thật nào</p>
+          <p className="text-xs text-slate-400">Mô phỏng kịch bản giả định — không lưu vào Supabase, không gắn với phiên live thật nào</p>
         </div>
 
         <div className="grid lg:grid-cols-2 gap-6">
           <div className="space-y-3 text-xs">
             <div>
-              <label className="font-bold text-slate-700 block mb-1">Dự Phóng GMV Phiên Live (VNĐ):</label>
+              <label className="font-bold text-slate-300 block mb-1">Dự Phóng GMV Phiên Live (VNĐ):</label>
               <input
                 type="number"
                 value={calcGmv}
                 onChange={(e) => setCalcGmv(Number(e.target.value))}
-                className="w-full p-2.5 rounded-xl border border-slate-300 font-bold focus:ring-2 focus:ring-purple-500"
+                className="w-full p-2.5 rounded-xl border border-slate-700 bg-slate-950 text-slate-100 font-bold focus:ring-2 focus:ring-purple-500"
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Commission Agency (% GMV):</label>
+                <label className="font-bold text-slate-300 block mb-1">Commission Agency (% GMV):</label>
                 <input
                   type="number"
                   value={agencyCommRate}
                   onChange={(e) => setAgencyCommRate(Number(e.target.value))}
-                  className="w-full p-2.5 rounded-xl border border-slate-300 font-bold focus:ring-2 focus:ring-purple-500"
+                  className="w-full p-2.5 rounded-xl border border-slate-700 bg-slate-950 text-slate-100 font-bold focus:ring-2 focus:ring-purple-500"
                 />
               </div>
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Lương Cứng Host (Fix Rate):</label>
+                <label className="font-bold text-slate-300 block mb-1">Lương Cứng Host (Fix Rate):</label>
                 <input
                   type="number"
                   value={hostFixRate}
                   onChange={(e) => setHostFixRate(Number(e.target.value))}
-                  className="w-full p-2.5 rounded-xl border border-slate-300 font-bold focus:ring-2 focus:ring-purple-500"
+                  className="w-full p-2.5 rounded-xl border border-slate-700 bg-slate-950 text-slate-100 font-bold focus:ring-2 focus:ring-purple-500"
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Host Comm (%):</label>
+                <label className="font-bold text-slate-300 block mb-1">Host Comm (%):</label>
                 <input
                   type="number"
                   value={hostCommRate}
                   onChange={(e) => setHostCommRate(Number(e.target.value))}
-                  className="w-full p-2.5 rounded-xl border border-slate-300 font-bold focus:ring-2 focus:ring-purple-500"
+                  className="w-full p-2.5 rounded-xl border border-slate-700 bg-slate-950 text-slate-100 font-bold focus:ring-2 focus:ring-purple-500"
                 />
               </div>
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Chi Phí Studio:</label>
+                <label className="font-bold text-slate-300 block mb-1">Chi Phí Studio:</label>
                 <input
                   type="number"
                   value={studioCost}
                   onChange={(e) => setStudioCost(Number(e.target.value))}
-                  className="w-full p-2.5 rounded-xl border border-slate-300 font-bold focus:ring-2 focus:ring-purple-500"
+                  className="w-full p-2.5 rounded-xl border border-slate-700 bg-slate-950 text-slate-100 font-bold focus:ring-2 focus:ring-purple-500"
                 />
               </div>
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Chi Phí Ads Live:</label>
+                <label className="font-bold text-slate-300 block mb-1">Chi Phí Ads Live:</label>
                 <input
                   type="number"
                   value={adsCost}
                   onChange={(e) => setAdsCost(Number(e.target.value))}
-                  className="w-full p-2.5 rounded-xl border border-slate-300 font-bold focus:ring-2 focus:ring-purple-500"
+                  className="w-full p-2.5 rounded-xl border border-slate-700 bg-slate-950 text-slate-100 font-bold focus:ring-2 focus:ring-purple-500"
                 />
               </div>
             </div>

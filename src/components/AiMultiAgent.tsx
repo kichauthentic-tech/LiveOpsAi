@@ -176,60 +176,60 @@ export const AiMultiAgent: React.FC<AiMultiAgentProps> = ({ onNavigateTab }) => 
       ) : (
         <div className="grid lg:grid-cols-4 gap-6">
         {/* Agent Selector Sidebar */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-2 text-xs">
-          <h3 className="font-bold text-slate-900 mb-2">Chọn Trợ Lý AI:</h3>
+        <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-sm space-y-2 text-xs">
+          <h3 className="font-bold text-slate-100 mb-2">Chọn Trợ Lý AI:</h3>
 
           <button
             onClick={() => setSelectedAgent("ceo")}
             className={`w-full p-3 rounded-xl text-left border transition-all space-y-1 ${
               selectedAgent === "ceo"
-                ? "bg-purple-50 border-purple-300 text-purple-950 font-bold"
-                : "bg-slate-50 border-slate-100 text-slate-700 hover:bg-slate-100"
+                ? "bg-purple-950/40 border-purple-700/60 text-purple-200 font-bold"
+                : "bg-slate-800/40 border-slate-800 text-slate-300 hover:bg-slate-800"
             }`}
           >
             <span className="font-bold block text-sm">👔 CEO Strategic Advisor</span>
-            <p className="text-[10px] text-slate-500">Tư vấn P&L, dòng tiền, tối ưu công suất Studio</p>
+            <p className="text-[10px] text-slate-400">Tư vấn P&L, dòng tiền, tối ưu công suất Studio</p>
           </button>
 
           <button
             onClick={() => setSelectedAgent("host_coach")}
             className={`w-full p-3 rounded-xl text-left border transition-all space-y-1 ${
               selectedAgent === "host_coach"
-                ? "bg-purple-50 border-purple-300 text-purple-950 font-bold"
-                : "bg-slate-50 border-slate-100 text-slate-700 hover:bg-slate-100"
+                ? "bg-purple-950/40 border-purple-700/60 text-purple-200 font-bold"
+                : "bg-slate-800/40 border-slate-800 text-slate-300 hover:bg-slate-800"
             }`}
           >
             <span className="font-bold block text-sm">🎙️ Host Coach AI</span>
-            <p className="text-[10px] text-slate-500">Tư vấn kỹ năng chốt đơn, giữ năng lượng & kịch bản</p>
+            <p className="text-[10px] text-slate-400">Tư vấn kỹ năng chốt đơn, giữ năng lượng & kịch bản</p>
           </button>
 
           <button
             onClick={() => setSelectedAgent("talent_matcher")}
             className={`w-full p-3 rounded-xl text-left border transition-all space-y-1 ${
               selectedAgent === "talent_matcher"
-                ? "bg-purple-50 border-purple-300 text-purple-950 font-bold"
-                : "bg-slate-50 border-slate-100 text-slate-700 hover:bg-slate-100"
+                ? "bg-purple-950/40 border-purple-700/60 text-purple-200 font-bold"
+                : "bg-slate-800/40 border-slate-800 text-slate-300 hover:bg-slate-800"
             }`}
           >
             <span className="font-bold block text-sm">👯 Talent Matcher AI</span>
-            <p className="text-[10px] text-slate-500">Khớp nối Host phù hợp với từng Brand & SKU</p>
+            <p className="text-[10px] text-slate-400">Khớp nối Host phù hợp với từng Brand & SKU</p>
           </button>
 
           <button
             onClick={() => setSelectedAgent("data_analyst")}
             className={`w-full p-3 rounded-xl text-left border transition-all space-y-1 ${
               selectedAgent === "data_analyst"
-                ? "bg-purple-50 border-purple-300 text-purple-950 font-bold"
-                : "bg-slate-50 border-slate-100 text-slate-700 hover:bg-slate-100"
+                ? "bg-purple-950/40 border-purple-700/60 text-purple-200 font-bold"
+                : "bg-slate-800/40 border-slate-800 text-slate-300 hover:bg-slate-800"
             }`}
           >
             <span className="font-bold block text-sm">📈 TikTok Data Analyst AI</span>
-            <p className="text-[10px] text-slate-500">Giải mã retention curve & thuật toán TikTok Live</p>
+            <p className="text-[10px] text-slate-400">Giải mã retention curve & thuật toán TikTok Live</p>
           </button>
         </div>
 
         {/* Active Chat Window */}
-        <div className="lg:col-span-3 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 flex flex-col justify-between min-h-[480px]">
+        <div className="lg:col-span-3 bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-sm space-y-4 flex flex-col justify-between min-h-[480px]">
           {/* Chat Messages Log */}
           <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
             {chatHistory[selectedAgent].map((msg, idx) => (
@@ -245,7 +245,7 @@ export const AiMultiAgent: React.FC<AiMultiAgentProps> = ({ onNavigateTab }) => 
                 <div className={`max-w-xl p-3.5 rounded-2xl text-xs space-y-1 leading-relaxed ${
                   msg.sender === "user"
                     ? "bg-purple-600 text-white rounded-tr-none"
-                    : "bg-slate-100 text-slate-900 rounded-tl-none border border-slate-200"
+                    : "bg-slate-800 text-slate-100 rounded-tl-none border border-slate-700"
                 }`}>
                   <p className="whitespace-pre-line">{msg.text}</p>
                   <span className={`text-[9px] block text-right font-mono ${
@@ -264,14 +264,14 @@ export const AiMultiAgent: React.FC<AiMultiAgentProps> = ({ onNavigateTab }) => 
           </div>
 
           {/* Input Box */}
-          <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+          <div className="flex items-center gap-2 pt-2 border-t border-slate-800">
             <input
               type="text"
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
               placeholder="Nhập câu hỏi hoặc câu lệnh cho Agent AI..."
-              className="grow bg-slate-50 text-slate-900 p-3 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500 font-medium"
+              className="grow bg-slate-950 text-slate-100 placeholder:text-slate-500 p-3 rounded-xl border border-slate-700 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500 font-medium"
             />
             <button
               onClick={handleSendMessage}

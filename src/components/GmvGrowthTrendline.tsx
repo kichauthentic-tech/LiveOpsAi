@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { LiveSession, Brand } from "../types";
+import { formatCurrencyAdaptive } from "../lib/formatCurrency";
 import {
   LineChart,
   Line,
@@ -188,21 +189,18 @@ export const GmvGrowthTrendline: React.FC<GmvGrowthTrendlineProps> = ({ sessions
   };
 
   return (
-    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+    <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-sm space-y-6">
       {/* Header & Controls */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 pb-4 border-b border-slate-100">
-        <div>
+      <div className="flex flex-col gap-4 pb-4 border-b border-slate-800">
+        <div className="shrink-0">
           <div className="flex items-center gap-2">
-            <span className="p-2 bg-purple-100 text-purple-700 rounded-xl">
+            <span className="p-2 bg-purple-900/40 text-purple-300 rounded-xl">
               <TrendingUp className="w-5 h-5" />
             </span>
             <div>
-              <h3 className="font-black text-slate-900 text-lg">
-                Dự Báo & So Sánh Tăng Trưởng GMV 30 Ngày (30-Day GMV Projection Trendline)
+              <h3 className="font-black text-slate-100 text-lg whitespace-nowrap">
+                Dự Báo Tăng Trưởng GMV 30 Ngày
               </h3>
-              <p className="text-xs text-slate-500">
-                Phân tích số liệu lịch sử phiên live thực tế + Mô hình dự báo tăng trưởng 30 ngày tiếp theo
-              </p>
             </div>
           </div>
         </div>
@@ -210,12 +208,12 @@ export const GmvGrowthTrendline: React.FC<GmvGrowthTrendlineProps> = ({ sessions
         {/* Filters & Scenario Selector */}
         <div className="flex flex-wrap items-center gap-2 text-xs">
           {/* Brand Filter */}
-          <div className="flex items-center gap-1.5 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
-            <Filter className="w-3.5 h-3.5 text-slate-500" />
+          <div className="flex items-center gap-1.5 bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700">
+            <Filter className="w-3.5 h-3.5 text-slate-400" />
             <select
               value={selectedBrandId}
               onChange={(e) => setSelectedBrandId(e.target.value)}
-              className="bg-transparent font-bold text-slate-800 outline-none cursor-pointer"
+              className="bg-transparent font-bold text-slate-200 outline-none cursor-pointer"
             >
               <option value="all">Tất cả Brands Đối Tác</option>
               {brands.map((b) => (
@@ -227,11 +225,11 @@ export const GmvGrowthTrendline: React.FC<GmvGrowthTrendlineProps> = ({ sessions
           </div>
 
           {/* Scenario Buttons */}
-          <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+          <div className="flex items-center bg-slate-800 p-1 rounded-xl border border-slate-700">
             <button
               onClick={() => setScenario("conservative")}
               className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
-                scenario === "conservative" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"
+                scenario === "conservative" ? "bg-slate-700 text-slate-100 shadow-sm" : "text-slate-400 hover:text-slate-100"
               }`}
             >
               🛡️ An Toàn (+8%)
@@ -239,7 +237,7 @@ export const GmvGrowthTrendline: React.FC<GmvGrowthTrendlineProps> = ({ sessions
             <button
               onClick={() => setScenario("target")}
               className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
-                scenario === "target" ? "bg-purple-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-900"
+                scenario === "target" ? "bg-purple-600 text-white shadow-sm" : "text-slate-400 hover:text-slate-100"
               }`}
             >
               🎯 Target Plan (+18%)
@@ -247,7 +245,7 @@ export const GmvGrowthTrendline: React.FC<GmvGrowthTrendlineProps> = ({ sessions
             <button
               onClick={() => setScenario("aggressive")}
               className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
-                scenario === "aggressive" ? "bg-amber-500 text-slate-950 shadow-sm font-black" : "text-slate-500 hover:text-slate-900"
+                scenario === "aggressive" ? "bg-amber-500 text-slate-950 shadow-sm font-black" : "text-slate-400 hover:text-slate-100"
               }`}
             >
               🚀 Bứt Phá (+32%)
@@ -255,11 +253,11 @@ export const GmvGrowthTrendline: React.FC<GmvGrowthTrendlineProps> = ({ sessions
           </div>
 
           {/* View Mode Toggle */}
-          <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+          <div className="flex items-center bg-slate-800 p-1 rounded-xl border border-slate-700">
             <button
               onClick={() => setViewType("daily")}
               className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
-                viewType === "daily" ? "bg-slate-900 text-white shadow-sm" : "text-slate-500 hover:text-slate-900"
+                viewType === "daily" ? "bg-slate-950 text-white shadow-sm" : "text-slate-400 hover:text-slate-100"
               }`}
             >
               Theo Ngày
@@ -267,7 +265,7 @@ export const GmvGrowthTrendline: React.FC<GmvGrowthTrendlineProps> = ({ sessions
             <button
               onClick={() => setViewType("cumulative")}
               className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
-                viewType === "cumulative" ? "bg-slate-900 text-white shadow-sm" : "text-slate-500 hover:text-slate-900"
+                viewType === "cumulative" ? "bg-slate-950 text-white shadow-sm" : "text-slate-400 hover:text-slate-100"
               }`}
             >
               Cộng Dồn 30 Ngày
@@ -278,47 +276,47 @@ export const GmvGrowthTrendline: React.FC<GmvGrowthTrendlineProps> = ({ sessions
 
       {/* Metric Cards Summary */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
-          <span className="text-slate-500 text-xs font-semibold block">GMV Thực Tế (15 Ngày Đầu)</span>
-          <div className="text-xl font-black text-emerald-600">
-            {(metrics.actual15Days / 1000).toFixed(2)} Tỷ VNĐ
+        <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700 space-y-1">
+          <span className="text-slate-400 text-xs font-semibold block">GMV Thực Tế (15 Ngày Đầu)</span>
+          <div className="text-xl font-black text-emerald-400">
+            {formatCurrencyAdaptive(metrics.actual15Days * 1_000_000, "VNĐ")}
           </div>
-          <span className="text-[10px] text-slate-500 font-medium">Lấy trực tiếp từ các phiên livestream đã hoàn thành</span>
+          <span className="text-[10px] text-slate-400 font-medium">Lấy trực tiếp từ các phiên livestream đã hoàn thành</span>
         </div>
 
-        <div className="p-4 rounded-xl bg-purple-50 border border-purple-200 space-y-1">
-          <span className="text-purple-700 text-xs font-semibold block">Dự Báo Tổng 30 Ngày</span>
-          <div className="text-xl font-black text-purple-900">
-            {(metrics.projected30Days / 1000).toFixed(2)} Tỷ VNĐ
+        <div className="p-4 rounded-xl bg-purple-950/30 border border-purple-800/50 space-y-1">
+          <span className="text-purple-300 text-xs font-semibold block">Dự Báo Tổng 30 Ngày</span>
+          <div className="text-xl font-black text-purple-200">
+            {formatCurrencyAdaptive(metrics.projected30Days * 1_000_000, "VNĐ")}
           </div>
-          <span className="text-[10px] text-purple-600 font-bold flex items-center gap-1">
+          <span className="text-[10px] text-purple-400 font-bold flex items-center gap-1">
             <ArrowUpRight className="w-3.5 h-3.5" /> Kịch bản {scenario.toUpperCase()} (+{scenario === "target" ? "18" : scenario === "aggressive" ? "32" : "8"}%)
           </span>
         </div>
 
-        <div className="p-4 rounded-xl bg-indigo-50 border border-indigo-200 space-y-1">
-          <span className="text-indigo-700 text-xs font-semibold block">Tỷ Lệ Đạt KPI (Pacing Rate)</span>
-          <div className="text-xl font-black text-indigo-900">
+        <div className="p-4 rounded-xl bg-indigo-950/30 border border-indigo-800/50 space-y-1">
+          <span className="text-indigo-300 text-xs font-semibold block">Tỷ Lệ Đạt KPI (Pacing Rate)</span>
+          <div className="text-xl font-black text-indigo-200">
             {metrics.pacingPercent}%
           </div>
-          <span className="text-[10px] text-indigo-600 font-medium">So với chỉ tiêu KPI 7.5 Tỷ VNĐ / Tháng</span>
+          <span className="text-[10px] text-indigo-400 font-medium">So với chỉ tiêu KPI 7.5 Tỷ VNĐ / Tháng</span>
         </div>
 
-        <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 space-y-1">
-          <span className="text-amber-800 text-xs font-semibold block">Hoa Hồng Agency Dự Kiến (15%)</span>
-          <div className="text-xl font-black text-amber-900">
-            {(metrics.estCommission / 1000).toFixed(2)} Tỷ VNĐ
+        <div className="p-4 rounded-xl bg-amber-950/30 border border-amber-800/50 space-y-1">
+          <span className="text-amber-300 text-xs font-semibold block">Hoa Hồng Agency Dự Kiến (15%)</span>
+          <div className="text-xl font-black text-amber-200">
+            {formatCurrencyAdaptive(metrics.estCommission * 1_000_000, "VNĐ")}
           </div>
-          <span className="text-[10px] text-amber-700 font-medium">Commission cơ sở ước tính</span>
+          <span className="text-[10px] text-amber-400 font-medium">Commission cơ sở ước tính</span>
         </div>
       </div>
 
       {/* Main Recharts Trendline Chart */}
       <div className="space-y-2">
-        <div className="flex justify-between items-center text-xs text-slate-500 font-medium px-1">
+        <div className="flex justify-between items-center text-xs text-slate-400 font-medium px-1">
           <span>Trục Y: Doanh Thu GMV (Triệu VNĐ)</span>
           <div className="flex items-center gap-4">
-            <span className="flex items-center gap-1.5 text-slate-700 font-bold">
+            <span className="flex items-center gap-1.5 text-slate-300 font-bold">
               <span className="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span> GMV Thực Tế (Historical Actual)
             </span>
             <span className="flex items-center gap-1.5 text-purple-600 font-bold">
@@ -416,7 +414,7 @@ export const GmvGrowthTrendline: React.FC<GmvGrowthTrendlineProps> = ({ sessions
             Dựa trên <strong>{historicalStats.completedCount} phiên livestream lịch sử</strong> gần nhất, tốc độ GMV trung bình đạt{" "}
             <strong>{Math.round(historicalStats.avgGmvPerSession / 1000000)}M VNĐ/phiên</strong>. Nếu duy trì đúng kịch bản{" "}
             <strong className="text-purple-300">{scenario.toUpperCase()}</strong>, tổng GMV 30 ngày tới ước tính (mô hình toán, không phải số liệu thực) đạt{" "}
-            <strong className="text-emerald-400">{(metrics.projected30Days / 1000).toFixed(2)} Tỷ VNĐ</strong>{" "}
+            <strong className="text-emerald-400">{formatCurrencyAdaptive(metrics.projected30Days * 1_000_000, "VNĐ")}</strong>{" "}
             {metrics.pacingPercent > 100
               ? `(vượt KPI đề ra ${metrics.pacingPercent - 100}%)`
               : `(đạt ${metrics.pacingPercent}% KPI đề ra)`}.

@@ -34,6 +34,7 @@ import {
   CartesianGrid
 } from "recharts";
 import { Brand, Studio, LiveSession } from "../types";
+import { formatCurrencyAdaptive } from "../lib/formatCurrency";
 
 export interface KpiComparisonProps {
   brands?: Brand[];
@@ -542,13 +543,7 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
   // Helper formatting function
   const formatMetricValue = (value: number, format: MetricComparisonItem["format"], unit: string) => {
     if (format === "currency") {
-      if (value >= 1000000000) {
-        return `${(value / 1000000000).toFixed(2)} Tỷ ${unit}`;
-      }
-      if (value >= 1000000) {
-        return `${(value / 1000000).toFixed(0)} Triệu ${unit}`;
-      }
-      return `${value.toLocaleString()} ${unit}`;
+      return formatCurrencyAdaptive(value, unit);
     }
     if (format === "percentage") {
       return `${value}%`;
@@ -645,11 +640,11 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
               <BarChart2 className="w-5 h-5" />
             </span>
             <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white">
-              So Sánh KPI Hiệu Suất Theo Kỳ (KPI Period Comparison)
+              So Sánh KPI Theo Kỳ
             </h2>
           </div>
           <p className="text-xs text-slate-400 max-w-2xl">
-            Phân tích sự tăng trưởng các chỉ số đo lường chính (GMV, Đơn hàng, CVR, ROI, CCU) giữa kỳ hiện tại và kỳ liền kề trước đó.
+            GMV, Đơn, CVR, ROI, CCU — kỳ hiện tại so với kỳ trước
           </p>
         </div>
 

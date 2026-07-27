@@ -17,6 +17,7 @@ interface DbLiveSession {
   studio_name: string;
   host_id: string | null;
   host_name: string;
+  assistant_id: string | null;
   assistant_name: string;
   date: string;
   start_time: string;
@@ -93,6 +94,7 @@ function sessionFromDb(row: DbLiveSession): Omit<LiveSession, "skus" | "checklis
     studioName: row.studio_name,
     hostId: row.host_id ?? "",
     hostName: row.host_name,
+    assistantId: row.assistant_id ?? undefined,
     assistantName: row.assistant_name,
     date: row.date,
     startTime: toHhMm(row.start_time),
@@ -121,6 +123,7 @@ function sessionToDb(s: LiveSession) {
     studio_name: s.studioName ?? "",
     host_id: orNull(s.hostId),
     host_name: s.hostName ?? "",
+    assistant_id: orNull(s.assistantId),
     assistant_name: s.assistantName ?? "",
     date: s.date,
     start_time: s.startTime,

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { UserRole, PermissionKey, PermissionDefinition, RolePermissionsMap, SystemUser, AuditLogEntry, Brand, Talent } from "../types";
+import { UserRole, PermissionKey, PermissionDefinition, RolePermissionsMap, SystemUser, AuditLogEntry, Brand, Talent, LiveSession } from "../types";
 import {
   ShieldCheck,
   ShieldAlert,
@@ -48,6 +48,7 @@ interface UserRoleSettingsProps {
   permissionDefinitions: PermissionDefinition[];
   brands: Brand[];
   talents: Talent[];
+  sessions: LiveSession[];
 }
 
 export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
@@ -61,7 +62,8 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
   auditLogs,
   permissionDefinitions,
   brands,
-  talents
+  talents,
+  sessions
 }) => {
   const [activeTab, setActiveTab] = useState<"roles" | "users" | "audit">("roles");
   const [selectedRole, setSelectedRole] = useState<UserRole>("operations");
@@ -160,7 +162,26 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
   // Reset Role Permissions to Default
   const handleResetRoleToDefault = (role: UserRole) => {
     let preset: Record<PermissionKey, boolean>;
-    if (role === "ceo") {
+    if (role === "admin") {
+      // Admin = CEO + quyền tối cao — mọi permission trong Ma Trận đều true, giống CEO.
+      // Quyền độc quyền thật sự của Admin (cấu hình AI Training) KHÔNG nằm trong Ma
+      // Trận này — xem RLS "admin only" của bảng ai_agent_prompts.
+      preset = {
+        view_financials: true,
+        view_executive_brief: true,
+        manage_sessions: true,
+        manage_calendar: true,
+        generate_scripts: true,
+        manage_talents: true,
+        manage_studios_gear: true,
+        manage_crm_projects: true,
+        manage_tiktok_api: true,
+        manage_finance_hr: true,
+        manage_ai_agents: true,
+        manage_users_permissions: true,
+        export_reports: true
+      };
+    } else if (role === "ceo") {
       preset = {
         view_financials: true,
         view_executive_brief: true,
@@ -208,13 +229,31 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
         manage_users_permissions: false,
         export_reports: true
       };
-    } else {
+    } else if (role === "talent") {
       preset = {
         view_financials: false,
         view_executive_brief: false,
         manage_sessions: false,
         manage_calendar: false,
         generate_scripts: true,
+        manage_talents: false,
+        manage_studios_gear: false,
+        manage_crm_projects: false,
+        manage_tiktok_api: false,
+        manage_finance_hr: false,
+        manage_ai_agents: false,
+        manage_users_permissions: false,
+        export_reports: false
+      };
+    } else {
+      // moderator — hẹp nhất: chỉ đọc dữ liệu (lịch/checklist) qua RLS "*_read_all"
+      // mặc định cho mọi authenticated user, không bật quyền quản lý/ghi nào.
+      preset = {
+        view_financials: false,
+        view_executive_brief: false,
+        manage_sessions: false,
+        manage_calendar: false,
+        generate_scripts: false,
         manage_talents: false,
         manage_studios_gear: false,
         manage_crm_projects: false,
@@ -300,6 +339,8 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
 
   const getRoleBadgeStyle = (role: UserRole) => {
     switch (role) {
+      case "admin":
+        return "bg-rose-500/20 text-rose-300 border-rose-500/40";
       case "ceo":
         return "bg-purple-500/20 text-purple-300 border-purple-500/40";
       case "operations":
@@ -308,11 +349,15 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
         return "bg-emerald-500/20 text-emerald-300 border-emerald-500/40";
       case "talent":
         return "bg-amber-500/20 text-amber-300 border-amber-500/40";
+      case "moderator":
+        return "bg-cyan-500/20 text-cyan-300 border-cyan-500/40";
     }
   };
 
   const getRoleDefaultTitle = (role: UserRole) => {
     switch (role) {
+      case "admin":
+        return "Quản Trị Viên Hệ Thống (Admin)";
       case "ceo":
         return "Executive Director / CEO";
       case "operations":
@@ -321,8 +366,14 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
         return "Brand Client Representative";
       case "talent":
         return "Livestream Host & Talent";
+      case "moderator":
+        return "Trợ Lý Vận Hành (Moderator)";
     }
   };
+
+  // Số ca live đã/đang phụ trách với vai trò Moderator — tra theo assistantId thật
+  // của session, không phải chuỗi assistantName gõ tay (xem migration 0010).
+  const countModeratorSessions = (userId: string) => sessions.filter((s) => s.assistantId === userId).length;
 
   return (
     <div className="space-y-6">
@@ -345,7 +396,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
               Phân Quyền Custom & Setting Người Dùng (Access Control Engine)
             </h2>
             <p className="text-xs text-slate-400 mt-1">
-              Cấu hình Ma trận phân quyền chi tiết cho 4 Role tiêu chuẩn, override quyền từng cá nhân & audit nhật ký an ninh.
+              Cấu hình Ma trận phân quyền chi tiết cho 6 Role tiêu chuẩn, override quyền từng cá nhân & audit nhật ký an ninh.
             </p>
           </div>
         </div>
@@ -394,8 +445,8 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
       {activeTab === "roles" && (
         <div className="space-y-6">
           {/* Role selector selector cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {(["ceo", "operations", "brand", "talent"] as UserRole[]).map((roleKey) => {
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+            {(["admin", "ceo", "operations", "brand", "talent", "moderator"] as UserRole[]).map((roleKey) => {
               const isSelected = selectedRole === roleKey;
               const permsMap = rolePermissions[roleKey];
               const enabledCount = Object.values(permsMap).filter(Boolean).length;
@@ -426,16 +477,20 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
 
                   <div>
                     <h3 className="font-extrabold text-white text-base">
+                      {roleKey === "admin" && "Quản Trị Viên Hệ Thống (Admin)"}
                       {roleKey === "ceo" && "Executive Admin (CEO)"}
                       {roleKey === "operations" && "Operations Manager"}
                       {roleKey === "brand" && "Brand Client Portal"}
                       {roleKey === "talent" && "Talent / Host Portal"}
+                      {roleKey === "moderator" && "Trợ Lý Vận Hành Portal"}
                     </h3>
                     <p className="text-[11px] text-slate-400 line-clamp-2 mt-1">
+                      {roleKey === "admin" && "Quyền tối cao — mọi thứ CEO làm được + độc quyền cấu hình AI Training Center (kể cả CEO không sửa được)."}
                       {roleKey === "ceo" && "Truy cập toàn quyền điều hành agency, P&L tài chính, CRM & phân quyền system."}
                       {roleKey === "operations" && "Điều phối phòng studio, xếp lịch ca live, kiểm kê gear QR & duyệt script."}
                       {roleKey === "brand" && "Cổng báo cáo dành cho Khách hàng: xem GMV thực thu, ROI, order analytics."}
                       {roleKey === "talent" && "Cổng dành cho Host/KOC: xem lịch livestream, commission dự kiến & AI coaching."}
+                      {roleKey === "moderator" && "Cổng dành cho Trợ Lý/Moderator: chỉ xem lịch ca được gán & checklist gear."}
                     </p>
                   </div>
 
@@ -562,10 +617,12 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                 className="px-3 py-2 bg-slate-950 text-xs text-slate-300 rounded-xl border border-slate-800 focus:outline-none focus:border-blue-500 font-bold"
               >
                 <option value="all">Tất cả Role</option>
+                <option value="admin">Admin</option>
                 <option value="ceo">CEO Admin</option>
                 <option value="operations">Operations</option>
                 <option value="brand">Brand Portal</option>
                 <option value="talent">Talent Host</option>
+                <option value="moderator">Trợ Lý Vận Hành</option>
               </select>
             </div>
 
@@ -648,6 +705,11 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                             <span className="bg-amber-950/60 text-amber-300 border border-amber-500/30 px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1.5 w-fit">
                               <Radio className="w-3.5 h-3.5 text-amber-400" />
                               <span>{assignedTalent.name}</span>
+                            </span>
+                          ) : u.role === "moderator" ? (
+                            <span className="bg-cyan-950/60 text-cyan-300 border border-cyan-500/30 px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1.5 w-fit">
+                              <Radio className="w-3.5 h-3.5 text-cyan-400" />
+                              <span>{countModeratorSessions(u.id)} ca đã phụ trách</span>
                             </span>
                           ) : (
                             <span className="text-slate-500 text-[11px]">Toàn Cơ Quan (Agency-wide)</span>
@@ -762,8 +824,8 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
       {/* MODAL: Create / Edit User */}
       {isUserModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl p-6 text-white shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex justify-between items-center pb-3 border-b border-slate-800">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl p-6 text-white shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
+            <div className="flex justify-between items-center pb-3 border-b border-slate-800 shrink-0">
               <h3 className="font-black text-lg text-white flex items-center gap-2">
                 <UserPlus className="w-5 h-5 text-blue-400" />
                 {editingUser ? "Chỉnh Sửa Tài Khoản Người Dùng" : "Tạo Tài Khoản Người Dùng Mới"}
@@ -776,7 +838,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSaveUser} className="space-y-4 text-xs">
+            <form onSubmit={handleSaveUser} className="space-y-4 text-xs overflow-y-auto">
               <div className="space-y-1">
                 <label className="text-slate-300 font-bold block">Họ và Tên (*)</label>
                 <input
@@ -812,7 +874,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-slate-300 font-bold block">Role Phân Quyền (*)</label>
                   <select
@@ -820,10 +882,12 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                     onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
                     className="w-full px-3 py-2 bg-slate-950 rounded-xl border border-slate-800 text-white focus:outline-none focus:border-blue-500 font-bold"
                   >
+                    <option value="admin">Admin (Quản Trị Viên Hệ Thống)</option>
                     <option value="ceo">CEO Admin</option>
                     <option value="operations">Operations Manager</option>
                     <option value="brand">Brand Client Portal</option>
                     <option value="talent">Talent Host Portal</option>
+                    <option value="moderator">Trợ Lý Vận Hành (Moderator)</option>
                   </select>
                 </div>
 

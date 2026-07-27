@@ -85,14 +85,14 @@ export const PerformanceMetricsWidget: React.FC<PerformanceMetricsWidgetProps> =
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-black text-white tracking-tight flex items-center gap-2">
                 <Radio className="w-5 h-5 text-red-500 animate-pulse" />
-                Performance Metrics Widget (Thống Kê Real-Time)
+                Performance Metrics Widget
               </h2>
               <span className="bg-red-500/20 text-red-400 border border-red-500/40 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
                 LIVE NOW ({liveNowCount})
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
-              Chỉ số hiệu suất thời gian thực tổng hợp từ danh sách {totalSessionsCount} phiên livestream
+              {totalSessionsCount} phiên livestream
             </p>
           </div>
         </div>

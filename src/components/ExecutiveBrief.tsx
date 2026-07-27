@@ -293,32 +293,29 @@ export const ExecutiveBrief: React.FC<ExecutiveBriefProps> = ({
           </div>
 
           <h1 className="text-2xl md:text-4xl font-black tracking-tight leading-tight text-white">
-            Định Hướng Chiến Lược & Bảng Phân Công Nhiệm Vụ Từ Ban Giám Đốc
+            Định Hướng Chiến Lược & Phân Công Nhiệm Vụ BOD
           </h1>
-          <p className="text-slate-300 text-xs md:text-sm max-w-4xl leading-relaxed">
-            Nơi Ban Giám Đốc (CEO & Board of Directors) ban hành chỉ đạo trực tiếp, phân bổ mục tiêu OKR / KPI xuống từng Trưởng Bộ Phận (Operations, Content AI, Talent Management, Brand Client Success, Finance) và theo dõi tiến độ thực thi real-time.
-          </p>
 
           {/* BOD Quick Key Metrics Bar */}
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-4 border-t border-purple-900/50 text-xs">
             <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800/80">
-              <span className="text-slate-400 block text-[11px]">Tổng Chỉ Đạo BOD:</span>
-              <strong className="text-white text-lg font-black">{totalDirectives} Nhiệm vụ</strong>
+              <span className="text-slate-400 block text-[11px]">Tổng Chỉ Đạo</span>
+              <strong className="text-white text-lg font-black">{totalDirectives}</strong>
             </div>
             <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800/80">
-              <span className="text-emerald-400 block text-[11px]">Đã Hoàn Thành:</span>
-              <strong className="text-emerald-400 text-lg font-black">{completedCount} Chỉ đạo</strong>
+              <span className="text-emerald-400 block text-[11px]">Hoàn Thành</span>
+              <strong className="text-emerald-400 text-lg font-black">{completedCount}</strong>
             </div>
             <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800/80">
-              <span className="text-blue-400 block text-[11px]">Đang Thực Hiện:</span>
-              <strong className="text-blue-400 text-lg font-black">{inProgressCount} Chỉ đạo</strong>
+              <span className="text-blue-400 block text-[11px]">Đang Thực Hiện</span>
+              <strong className="text-blue-400 text-lg font-black">{inProgressCount}</strong>
             </div>
             <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800/80">
-              <span className="text-amber-400 block text-[11px]">Cần CEO Hỗ Trợ:</span>
-              <strong className="text-amber-400 text-lg font-black">{needsSupportCount} Vấn đề</strong>
+              <span className="text-amber-400 block text-[11px]">Cần CEO Hỗ Trợ</span>
+              <strong className="text-amber-400 text-lg font-black">{needsSupportCount}</strong>
             </div>
             <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800/80 col-span-2 sm:col-span-1">
-              <span className="text-purple-300 block text-[11px]">Tiến Độ Tổng Thể:</span>
+              <span className="text-purple-300 block text-[11px]">Tiến Độ</span>
               <div className="flex items-center gap-2 mt-0.5">
                 <div className="grow bg-slate-800 h-2.5 rounded-full overflow-hidden">
                   <div
@@ -344,12 +341,12 @@ export const ExecutiveBrief: React.FC<ExecutiveBriefProps> = ({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-amber-400 font-bold text-sm">
                 <Target className="w-5 h-5" />
-                <span>THÔNG ĐIỆP CHỈ ĐẠO CHIẾN LƯỢC QUÝ 3 - TỪ BOARD OF DIRECTORS</span>
+                <span>CHỈ ĐẠO CHIẾN LƯỢC QUÝ 3</span>
               </div>
               <span className="text-[11px] text-slate-400 font-mono">Cập nhật: 2026-07-23 by CEO Jun Dang</span>
             </div>
             <p className="text-xs md:text-sm text-slate-300 leading-relaxed italic bg-slate-950/60 p-4 rounded-xl border border-slate-800">
-              &quot;Mục tiêu trọng tâm Q3/2026 của LiveOps AI Agency là chuẩn hóa 100% quy trình vận hành Livestream bằng trí tuệ nhân tạo Gemini AI, nâng định mức GMV toàn agency đạt <strong>15 Tỷ VNĐ</strong>. Toàn bộ Trưởng bộ phận có trách nhiệm thực hiện nghiêm túc các chỉ đạo bên dưới, báo cáo tiến độ trực tiếp lên hệ thống trước 17:00 hàng ngày.&quot;
+              &quot;Mục tiêu Q3/2026: GMV toàn agency đạt <strong>15 Tỷ VNĐ</strong>. Trưởng bộ phận báo cáo tiến độ trước 17:00 hàng ngày.&quot;
             </p>
           </div>
 
@@ -428,14 +425,14 @@ export const ExecutiveBrief: React.FC<ExecutiveBriefProps> = ({
               className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-purple-600/30 transition-all flex items-center gap-2 shrink-0"
             >
               <Plus className="w-4 h-4" />
-              <span>Giao Chỉ Đạo Mới (Ban Giám Đốc)</span>
+              <span>Giao Chỉ Đạo Mới</span>
             </button>
           </div>
 
           {/* Task Directives Cards Grid */}
           <div className="grid md:grid-cols-2 gap-6">
             {filteredDirectives.length === 0 ? (
-              <div className="col-span-2 p-12 text-center bg-slate-900/50 rounded-2xl border border-slate-800 space-y-3">
+              <div className="md:col-span-2 p-6 sm:p-12 text-center bg-slate-900/50 rounded-2xl border border-slate-800 space-y-3">
                 <ClipboardList className="w-12 h-12 text-slate-600 mx-auto" />
                 <p className="text-slate-400 text-sm font-medium">Không tìm thấy chỉ đạo chiến lược nào phù hợp bộ lọc.</p>
                 <button
@@ -686,21 +683,21 @@ export const ExecutiveBrief: React.FC<ExecutiveBriefProps> = ({
                     TỰ ĐỘNG API (Direct API)
                   </span>
                   <h4 className="font-bold text-sm text-emerald-400">TikTok Shop Open API Endpoints</h4>
-                  <p className="text-slate-300">Lấy dữ liệu Đơn hàng (Orders), Sản phẩm (SKUs), Doanh thu (GMV), Voucher usage, Flash sale status ngay khi session kết thúc qua webhook và GET endpoints.</p>
+                  <p className="text-slate-300">Đơn hàng, SKU, GMV, Voucher, Flash sale — lấy ngay khi session kết thúc.</p>
                 </div>
                 <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
                   <span className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded text-[10px] font-bold">
                     WEBHOOK / REAL-TIME
                   </span>
                   <h4 className="font-bold text-sm text-indigo-400">Live Stream Performance Webhooks</h4>
-                  <p className="text-slate-300">Cập nhật chỉ số Mắt xem (Peak Viewers), Lượt Thích, Comment, Share, Tỷ lệ giữ chân người xem (Retention Curve) theo thời điểm real-time.</p>
+                  <p className="text-slate-300">Mắt xem, Like, Comment, Share, Retention — cập nhật real-time.</p>
                 </div>
                 <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
                   <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded text-[10px] font-bold">
                     FALLBACK IMPORT
                   </span>
                   <h4 className="font-bold text-sm text-amber-400">CSV/Excel Smart Ingestion</h4>
-                  <p className="text-slate-300">Với các Shop đối tác chưa phân quyền OAuth API cấp cao, hệ thống cho phép kéo thả file Excel báo cáo Compass để AI tự động parse dữ liệu từng phút.</p>
+                  <p className="text-slate-300">Kéo thả file Compass để AI tự parse — dùng khi Shop chưa cấp OAuth API.</p>
                 </div>
               </div>
             </div>
@@ -797,7 +794,7 @@ export const ExecutiveBrief: React.FC<ExecutiveBriefProps> = ({
             </div>
 
             <form onSubmit={handleSaveDirective} className="space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-slate-400 font-semibold mb-1">Mã Chỉ Đạo (Directive Code):</label>
                   <input
@@ -847,7 +844,7 @@ export const ExecutiveBrief: React.FC<ExecutiveBriefProps> = ({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-slate-400 font-semibold mb-1">Bộ Phận Phụ Trách:</label>
                   <select
@@ -888,7 +885,7 @@ export const ExecutiveBrief: React.FC<ExecutiveBriefProps> = ({
                 />
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-slate-400 font-semibold mb-1">Hạn Hoàn Thành:</label>
                   <input

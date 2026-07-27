@@ -1,6 +1,7 @@
 import React from "react";
 import { UserRole, SystemUser, Brand, AgencyProject, LiveSession, Talent } from "../types";
 import { UserCheck, Building2, Layers, Radio, Calendar, DollarSign, Sparkles } from "lucide-react";
+import { formatCurrencyAdaptive } from "../lib/formatCurrency";
 
 interface MyWorkspaceProps {
   currentRole: UserRole;
@@ -13,44 +14,44 @@ interface MyWorkspaceProps {
   onSelectSession?: (session: LiveSession) => void;
 }
 
-const formatVnd = (n: number) => `${(n / 1000000).toLocaleString("vi-VN", { maximumFractionDigits: 1 })}M đ`;
+const formatVnd = (n: number) => formatCurrencyAdaptive(n);
 
 const statusBadge = (status: string) => {
   const map: Record<string, string> = {
     "Live Now": "bg-red-100 text-red-700",
     Upcoming: "bg-amber-100 text-amber-700",
     Completed: "bg-emerald-100 text-emerald-700",
-    Cancelled: "bg-slate-200 text-slate-600"
+    Cancelled: "bg-slate-700 text-slate-400"
   };
-  return map[status] || "bg-slate-200 text-slate-600";
+  return map[status] || "bg-slate-700 text-slate-400";
 };
 
 const EmptyState: React.FC<{ title: string; desc: string }> = ({ title, desc }) => (
-  <div className="bg-white border border-slate-200 rounded-2xl p-10 text-center space-y-2">
-    <div className="w-14 h-14 bg-purple-50 text-purple-500 rounded-full flex items-center justify-center mx-auto">
+  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-10 text-center space-y-2">
+    <div className="w-14 h-14 bg-purple-950/30 text-purple-400 rounded-full flex items-center justify-center mx-auto">
       <UserCheck className="w-6 h-6" />
     </div>
-    <h3 className="font-bold text-slate-900">{title}</h3>
-    <p className="text-sm text-slate-500 max-w-md mx-auto">{desc}</p>
+    <h3 className="font-bold text-slate-100">{title}</h3>
+    <p className="text-sm text-slate-400 max-w-md mx-auto">{desc}</p>
   </div>
 );
 
 const SessionRow: React.FC<{ s: LiveSession; onClick?: () => void }> = ({ s, onClick }) => (
   <div
     onClick={onClick}
-    className={`p-3.5 rounded-xl border border-slate-200 flex flex-wrap items-center justify-between gap-2 ${onClick ? "cursor-pointer hover:border-purple-300 hover:bg-purple-50/40" : ""} transition-all`}
+    className={`p-3.5 rounded-xl border border-slate-800 flex flex-wrap items-center justify-between gap-2 ${onClick ? "cursor-pointer hover:border-purple-700 hover:bg-purple-950/20" : ""} transition-all`}
   >
     <div>
       <div className="flex items-center gap-2">
         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${statusBadge(s.status)}`}>{s.status}</span>
-        <strong className="text-sm text-slate-900">{s.title || s.brandName}</strong>
+        <strong className="text-sm text-slate-100">{s.title || s.brandName}</strong>
       </div>
-      <p className="text-xs text-slate-500 mt-0.5">
+      <p className="text-xs text-slate-400 mt-0.5">
         {s.brandName} • {s.date} ({s.startTime}-{s.endTime}) • Studio: {s.studioName}
       </p>
     </div>
     <div className="text-right text-xs">
-      <div className="font-bold text-emerald-600">{formatVnd(s.actualGmv || 0)}</div>
+      <div className="font-bold text-emerald-400">{formatVnd(s.actualGmv || 0)}</div>
       <div className="text-slate-400">GMV thực tế</div>
     </div>
   </div>
@@ -131,25 +132,25 @@ export const MyWorkspace: React.FC<MyWorkspaceProps> = ({
         {header}
 
         {myProjects.length > 0 && (
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4">
-            <h3 className="font-bold text-slate-900 flex items-center gap-2">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+            <h3 className="font-bold text-slate-100 flex items-center gap-2">
               <Layers className="w-4 h-4 text-purple-500" /> Dự Án Tôi Làm Team Lead ({myProjects.length})
             </h3>
             {myProjects.map((p) => {
               const pct = p.kpiGmv > 0 ? Math.min(100, Math.round((p.actualGmv / p.kpiGmv) * 100)) : 0;
               return (
-                <div key={p.id} className="p-4 rounded-xl border border-slate-200 space-y-2">
+                <div key={p.id} className="p-4 rounded-xl border border-slate-800 space-y-2">
                   <div className="flex justify-between items-center">
-                    <strong className="text-sm text-slate-900">{p.name}</strong>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">{p.status}</span>
+                    <strong className="text-sm text-slate-100">{p.name}</strong>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-950/40 text-blue-300">{p.status}</span>
                   </div>
-                  <p className="text-xs text-slate-500">Brand: {p.brandName} • {p.sessionsCompleted}/{p.totalSessionsPlanned} phiên live</p>
-                  <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                  <p className="text-xs text-slate-400">Brand: {p.brandName} • {p.sessionsCompleted}/{p.totalSessionsPlanned} phiên live</p>
+                  <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
                     <div className="bg-purple-500 h-full rounded-full" style={{ width: `${pct}%` }} />
                   </div>
                   <div className="flex justify-between text-[11px] font-bold">
-                    <span className="text-slate-500">{formatVnd(p.actualGmv)} / {formatVnd(p.kpiGmv)}</span>
-                    <span className="text-purple-600">{pct}% KPI</span>
+                    <span className="text-slate-400">{formatVnd(p.actualGmv)} / {formatVnd(p.kpiGmv)}</span>
+                    <span className="text-purple-400">{pct}% KPI</span>
                   </div>
                 </div>
               );
@@ -158,17 +159,17 @@ export const MyWorkspace: React.FC<MyWorkspaceProps> = ({
         )}
 
         {myBrands.length > 0 && (
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-3">
-            <h3 className="font-bold text-slate-900 flex items-center gap-2">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-3">
+            <h3 className="font-bold text-slate-100 flex items-center gap-2">
               <Building2 className="w-4 h-4 text-purple-500" /> Brand Tôi Phụ Trách KAM ({myBrands.length})
             </h3>
             <div className="grid sm:grid-cols-2 gap-3">
               {myBrands.map((b) => (
-                <div key={b.id} className="p-3.5 rounded-xl border border-slate-200 flex items-center gap-3">
+                <div key={b.id} className="p-3.5 rounded-xl border border-slate-800 flex items-center gap-3">
                   <span className="text-2xl">{b.logo}</span>
                   <div>
-                    <strong className="text-sm text-slate-900 block">{b.name}</strong>
-                    <span className="text-xs text-slate-500">{b.industry}</span>
+                    <strong className="text-sm text-slate-100 block">{b.name}</strong>
+                    <span className="text-xs text-slate-400">{b.industry}</span>
                   </div>
                 </div>
               ))}
@@ -176,12 +177,12 @@ export const MyWorkspace: React.FC<MyWorkspaceProps> = ({
           </div>
         )}
 
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-3">
-          <h3 className="font-bold text-slate-900 flex items-center gap-2">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-3">
+          <h3 className="font-bold text-slate-100 flex items-center gap-2">
             <Radio className="w-4 h-4 text-purple-500" /> Phiên Live Liên Quan ({mySessions.length})
           </h3>
           {mySessions.length === 0 ? (
-            <p className="text-xs text-slate-500">Chưa có phiên live nào được tạo cho Brand/Project của bạn.</p>
+            <p className="text-xs text-slate-400">Chưa có phiên live nào được tạo cho Brand/Project của bạn.</p>
           ) : (
             <div className="space-y-2">
               {mySessions.map((s) => (
@@ -222,35 +223,35 @@ export const MyWorkspace: React.FC<MyWorkspaceProps> = ({
       <div className="space-y-6">
         {header}
 
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 flex items-center gap-4">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex items-center gap-4">
           <span className="text-3xl">{myBrand.logo}</span>
           <div>
-            <strong className="text-lg text-slate-900 block">{myBrand.name}</strong>
-            <span className="text-xs text-slate-500">{myBrand.industry} • Tổng GMV tích lũy: {formatVnd(myBrand.totalGmv)}</span>
+            <strong className="text-lg text-slate-100 block">{myBrand.name}</strong>
+            <span className="text-xs text-slate-400">{myBrand.industry} • Tổng GMV tích lũy: {formatVnd(myBrand.totalGmv)}</span>
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4">
-          <h3 className="font-bold text-slate-900 flex items-center gap-2">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+          <h3 className="font-bold text-slate-100 flex items-center gap-2">
             <Layers className="w-4 h-4 text-purple-500" /> Tiến Độ Chiến Dịch ({myProjects.length})
           </h3>
           {myProjects.length === 0 ? (
-            <p className="text-xs text-slate-500">Chưa có chiến dịch/dự án nào được khởi tạo cho brand của bạn.</p>
+            <p className="text-xs text-slate-400">Chưa có chiến dịch/dự án nào được khởi tạo cho brand của bạn.</p>
           ) : (
             myProjects.map((p) => {
               const pct = p.kpiGmv > 0 ? Math.min(100, Math.round((p.actualGmv / p.kpiGmv) * 100)) : 0;
               return (
-                <div key={p.id} className="p-4 rounded-xl border border-slate-200 space-y-2">
+                <div key={p.id} className="p-4 rounded-xl border border-slate-800 space-y-2">
                   <div className="flex justify-between items-center">
-                    <strong className="text-sm text-slate-900">{p.name}</strong>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">{p.status}</span>
+                    <strong className="text-sm text-slate-100">{p.name}</strong>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-950/40 text-blue-300">{p.status}</span>
                   </div>
-                  <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                  <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
                     <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${pct}%` }} />
                   </div>
                   <div className="flex justify-between text-[11px] font-bold">
-                    <span className="text-slate-500">{formatVnd(p.actualGmv)} / {formatVnd(p.kpiGmv)}</span>
-                    <span className="text-emerald-600">{pct}% KPI đạt được</span>
+                    <span className="text-slate-400">{formatVnd(p.actualGmv)} / {formatVnd(p.kpiGmv)}</span>
+                    <span className="text-emerald-400">{pct}% KPI đạt được</span>
                   </div>
                 </div>
               );
@@ -258,12 +259,12 @@ export const MyWorkspace: React.FC<MyWorkspaceProps> = ({
           )}
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-3">
-          <h3 className="font-bold text-slate-900 flex items-center gap-2">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-3">
+          <h3 className="font-bold text-slate-100 flex items-center gap-2">
             <Radio className="w-4 h-4 text-purple-500" /> Lịch Sử Phiên Live ({mySessions.length})
           </h3>
           {mySessions.length === 0 ? (
-            <p className="text-xs text-slate-500">Chưa có phiên live nào.</p>
+            <p className="text-xs text-slate-400">Chưa có phiên live nào.</p>
           ) : (
             <div className="space-y-2">
               {mySessions.map((s) => (
@@ -298,12 +299,12 @@ export const MyWorkspace: React.FC<MyWorkspaceProps> = ({
     <div className="space-y-6">
       {header}
 
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 flex flex-wrap items-center justify-between gap-4">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <img src={myTalent.avatar} alt={myTalent.name} className="w-12 h-12 rounded-full object-cover" />
           <div>
-            <strong className="text-slate-900 block">{myTalent.name}</strong>
-            <span className="text-xs text-slate-500">{myTalent.role} • CVR TB {myTalent.cvrAvg}% • Điểm tổng {myTalent.overallScore}/100</span>
+            <strong className="text-slate-100 block">{myTalent.name}</strong>
+            <span className="text-xs text-slate-400">{myTalent.role} • CVR TB {myTalent.cvrAvg}% • Điểm tổng {myTalent.overallScore}/100</span>
           </div>
         </div>
         <button
@@ -314,12 +315,12 @@ export const MyWorkspace: React.FC<MyWorkspaceProps> = ({
         </button>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-3">
-        <h3 className="font-bold text-slate-900 flex items-center gap-2">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-3">
+        <h3 className="font-bold text-slate-100 flex items-center gap-2">
           <Calendar className="w-4 h-4 text-purple-500" /> Lịch Live Sắp Tới Của Tôi ({upcoming.length})
         </h3>
         {upcoming.length === 0 ? (
-          <p className="text-xs text-slate-500">Bạn chưa được gán phiên live sắp tới nào.</p>
+          <p className="text-xs text-slate-400">Bạn chưa được gán phiên live sắp tới nào.</p>
         ) : (
           <div className="space-y-2">
             {upcoming.map((s) => (
@@ -340,12 +341,12 @@ export const MyWorkspace: React.FC<MyWorkspaceProps> = ({
         )}
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-3">
-        <h3 className="font-bold text-slate-900 flex items-center gap-2">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-3">
+        <h3 className="font-bold text-slate-100 flex items-center gap-2">
           <DollarSign className="w-4 h-4 text-purple-500" /> Phiên Đã Hoàn Thành ({completed.length})
         </h3>
         {completed.length === 0 ? (
-          <p className="text-xs text-slate-500">Chưa có phiên live nào hoàn thành.</p>
+          <p className="text-xs text-slate-400">Chưa có phiên live nào hoàn thành.</p>
         ) : (
           <div className="space-y-2">
             {completed.map((s) => (

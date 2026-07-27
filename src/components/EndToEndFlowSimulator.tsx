@@ -441,10 +441,10 @@ export const EndToEndFlowSimulator: React.FC<EndToEndFlowSimulatorProps> = ({ on
 
         <div>
           <h2 className="text-xl md:text-3xl font-black tracking-tight text-white">
-            Demo Luồng Vận Hành Khép Kín Đa Module (End-to-End Business Flow)
+            Demo Luồng Vận Hành Khép Kín Đa Module
           </h2>
           <p className="text-xs md:text-sm text-slate-300 mt-1 max-w-4xl">
-            Trải nghiệm thực tế cách 16 Module trong LiveOps AI OS phối hợp nhịp nhàng từ lúc tiếp nhận Hợp đồng Brand đến AI Booking Host, Setup Studio QR, Sinh Kịch bản, Livestream TikTok API, Phân tích AI Coach, Chốt Sổ Tài Chính & Payout Commission.
+            Mô phỏng luồng 16 Module: từ ký HĐ Brand đến Booking Host, Live TikTok, Chốt sổ & Payout.
           </p>
         </div>
 

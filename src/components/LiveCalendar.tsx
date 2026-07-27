@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { LiveSession, Studio, Talent, Brand } from "../types";
+import { LiveSession, Studio, Talent, Brand, SystemUser } from "../types";
 import {
   Calendar as CalendarIcon,
   Clock,
@@ -23,6 +23,7 @@ import {
   GripVertical,
   Move
 } from "lucide-react";
+import { authedFetch } from "../lib/authedFetch";
 
 export interface TimeSlot {
   id: string;
@@ -37,9 +38,19 @@ interface LiveCalendarProps {
   studios: Studio[];
   talents: Talent[];
   brands: Brand[];
-  onAddSession?: (newSession: LiveSession) => void;
-  onUpdateSession?: (updatedSession: LiveSession) => void;
+  users: SystemUser[];
+  onAddSession?: (newSession: LiveSession) => Promise<boolean>;
+  onUpdateSession?: (updatedSession: LiveSession) => Promise<boolean>;
 }
+
+// Ngày hôm nay theo giờ local, format YYYY-MM-DD
+const getTodayDateString = () => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = `${d.getMonth() + 1}`.padStart(2, "0");
+  const day = `${d.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
 // Cố định 5 Ca Live Chuẩn
 const FIXED_TIME_SLOTS: TimeSlot[] = [
@@ -55,9 +66,11 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   studios,
   talents,
   brands,
+  users,
   onAddSession,
   onUpdateSession
 }) => {
+  const moderators = users.filter((u) => u.role === "moderator");
   // Sync sessions with propSessions so clean test mode is respected
   const [sessions, setSessions] = useState<LiveSession[]>(propSessions);
 
@@ -68,12 +81,12 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   // View Mode: Month, Week, Day Matrix, Talent Workload, List
   const [viewMode, setViewMode] = useState<"month" | "week" | "day" | "talent_workload" | "list">("day");
 
-  // Selected Date string YYYY-MM-DD
-  const [selectedDate, setSelectedDate] = useState<string>("2026-07-23");
+  // Selected Date string YYYY-MM-DD (defaults to real today's date)
+  const [selectedDate, setSelectedDate] = useState<string>(() => getTodayDateString());
 
-  // Selected Month Year state for Month view navigation (default July 2026)
-  const [currentYear, setCurrentYear] = useState<number>(2026);
-  const [currentMonth, setCurrentMonth] = useState<number>(7); // 1-indexed (July = 7)
+  // Selected Month Year state for Month view navigation (defaults to current month/year)
+  const [currentYear, setCurrentYear] = useState<number>(() => new Date().getFullYear());
+  const [currentMonth, setCurrentMonth] = useState<number>(() => new Date().getMonth() + 1); // 1-indexed
 
   // Filters
   const [selectedStudioFilter, setSelectedStudioFilter] = useState<string>("ALL");
@@ -94,10 +107,11 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   const [newStartTime, setNewStartTime] = useState("14:00");
   const [newEndTime, setNewEndTime] = useState("17:00");
   const [newTargetGmv, setNewTargetGmv] = useState(200000000);
-  const [newAssistant, setNewAssistant] = useState("Lê Minh Tuấn (Moderator)");
+  const [newAssistantId, setNewAssistantId] = useState(moderators[0]?.id || "");
 
   // AI Recommendation State
   const [aiSuggestion, setAiSuggestion] = useState<string | null>(null);
+  const [isOptimizingSchedule, setIsOptimizingSchedule] = useState(false);
 
   // Drag and Drop State
   const [draggedSessionId, setDraggedSessionId] = useState<string | null>(null);
@@ -141,7 +155,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
     }
   };
 
-  const handleDropOnDayMatrix = (e: React.DragEvent, targetStudio: Studio, targetSlot: TimeSlot) => {
+  const handleDropOnDayMatrix = async (e: React.DragEvent, targetStudio: Studio, targetSlot: TimeSlot) => {
     e.preventDefault();
     setDragOverCellKey(null);
     const sessionId = e.dataTransfer.getData("text/plain") || draggedSessionId;
@@ -191,17 +205,21 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
       date: selectedDate
     };
 
-    setSessions((prev) => prev.map((s) => (s.id === sessionId ? updatedSession : s)));
-    if (onUpdateSession) onUpdateSession(updatedSession);
-
-    showToast(
-      `✨ Đã chuyển phiên live "${session.brandName}" sang ${targetStudio.name} (${targetSlot.label})!`,
-      "success"
-    );
+    // Don't optimistically mutate local `sessions` here — it's synced from propSessions
+    // (source of truth in App.tsx). Painting the move before the write is confirmed would
+    // leave a stale/incorrect position on screen if the Supabase update fails, since nothing
+    // would ever revert it back. Await the real result and only celebrate on success.
     setDraggedSessionId(null);
+    const ok = onUpdateSession ? await onUpdateSession(updatedSession) : true;
+    if (ok) {
+      showToast(
+        `✨ Đã chuyển phiên live "${session.brandName}" sang ${targetStudio.name} (${targetSlot.label})!`,
+        "success"
+      );
+    }
   };
 
-  const handleDropOnWeekDay = (e: React.DragEvent, targetDateStr: string) => {
+  const handleDropOnWeekDay = async (e: React.DragEvent, targetDateStr: string) => {
     e.preventDefault();
     setDragOverCellKey(null);
     const sessionId = e.dataTransfer.getData("text/plain") || draggedSessionId;
@@ -216,17 +234,17 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
     }
 
     const updatedSession: LiveSession = { ...session, date: targetDateStr };
-    setSessions((prev) => prev.map((s) => (s.id === sessionId ? updatedSession : s)));
-    if (onUpdateSession) onUpdateSession(updatedSession);
-
-    showToast(
-      `✨ Đã chuyển phiên live "${session.brandName}" sang ngày ${targetDateStr}!`,
-      "success"
-    );
     setDraggedSessionId(null);
+    const ok = onUpdateSession ? await onUpdateSession(updatedSession) : true;
+    if (ok) {
+      showToast(
+        `✨ Đã chuyển phiên live "${session.brandName}" sang ngày ${targetDateStr}!`,
+        "success"
+      );
+    }
   };
 
-  const handleDropOnMonthDay = (e: React.DragEvent, targetDateStr: string) => {
+  const handleDropOnMonthDay = async (e: React.DragEvent, targetDateStr: string) => {
     e.preventDefault();
     setDragOverCellKey(null);
     const sessionId = e.dataTransfer.getData("text/plain") || draggedSessionId;
@@ -241,14 +259,14 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
     }
 
     const updatedSession: LiveSession = { ...session, date: targetDateStr };
-    setSessions((prev) => prev.map((s) => (s.id === sessionId ? updatedSession : s)));
-    if (onUpdateSession) onUpdateSession(updatedSession);
-
-    showToast(
-      `✨ Đã chuyển phiên live "${session.brandName}" sang ngày ${targetDateStr}!`,
-      "success"
-    );
     setDraggedSessionId(null);
+    const ok = onUpdateSession ? await onUpdateSession(updatedSession) : true;
+    if (ok) {
+      showToast(
+        `✨ Đã chuyển phiên live "${session.brandName}" sang ngày ${targetDateStr}!`,
+        "success"
+      );
+    }
   };
 
   // Helper Date Parsing & Formatters
@@ -402,10 +420,11 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   };
 
   const handleGoToday = () => {
-    const today = "2026-07-23";
+    const today = getTodayDateString();
     setSelectedDate(today);
-    setCurrentYear(2026);
-    setCurrentMonth(7);
+    const parsed = parseDateString(today);
+    setCurrentYear(parsed.year);
+    setCurrentMonth(parsed.month);
   };
 
   // Conflict Checker
@@ -438,11 +457,13 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   const currentFormConflicts = checkConflicts(newStudioId, newHostId, newDate, newStartTime, newEndTime);
 
   // Save new session
-  const handleSaveBooking = (e: React.FormEvent) => {
+  const handleSaveBooking = async (e: React.FormEvent) => {
     e.preventDefault();
     const brandObj = brands.find((b) => b.id === newBrandId);
     const studioObj = studios.find((s) => s.id === newStudioId);
     const hostObj = talents.find((t) => t.id === newHostId);
+    const assistantObj = moderators.find((m) => m.id === newAssistantId);
+    const assistantName = assistantObj?.name || "Chưa gán Trợ Lý";
 
     const createdSession: LiveSession = {
       id: `session-${Date.now()}`,
@@ -454,7 +475,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
       studioName: studioObj?.name || "Studio Standard",
       hostId: newHostId,
       hostName: hostObj?.name || "Host Live",
-      assistantName: newAssistant,
+      assistantId: newAssistantId || undefined,
+      assistantName,
       date: newDate,
       startTime: newStartTime,
       endTime: newEndTime,
@@ -471,14 +493,17 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
       checklist: [
         { id: "c1", task: "Kiểm tra hệ thống mic & camera studio", category: "Tech", completed: false, assignedTo: "Kỹ thuật viên" },
         { id: "c2", task: "Setup ánh sáng & bối cảnh chụp mẫu sản phẩm", category: "Studio", completed: false, assignedTo: "Stylist" },
-        { id: "c3", task: "Duyệt danh sách SKU & Mã Giảm Giá TikTok Shop", category: "TikTok App", completed: false, assignedTo: newAssistant },
+        { id: "c3", task: "Duyệt danh sách SKU & Mã Giảm Giá TikTok Shop", category: "TikTok App", completed: false, assignedTo: assistantName },
         { id: "c4", task: "Duyệt Kịch bản chốt đơn & tung Deal Flash Sale", category: "Host & Script", completed: false, assignedTo: hostObj?.name || "Host" }
       ],
       minuteMetrics: []
     };
 
-    setSessions([createdSession, ...sessions]);
-    if (onAddSession) onAddSession(createdSession);
+    // Rely on propSessions (source of truth) updating after the write succeeds — the local
+    // `sessions` mirror re-syncs via the useEffect above — instead of optimistically inserting
+    // here and risking a phantom session staying visible if the create actually fails.
+    const ok = onAddSession ? await onAddSession(createdSession) : true;
+    if (!ok) return;
 
     setIsBookingModalOpen(false);
     setNewTitle("");
@@ -486,37 +511,77 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   };
 
   // AI Optimizer
-  const handleAiOptimizeSchedule = () => {
+  const runFallbackScheduleOptimizer = (brandName: string, industry: string) => {
+    let suggestedSlot = "20:00 - 23:00";
+    let suggestedHostName = "Yến Nhi";
+    let reason = "Ngành Beauty/Mỹ phẩm có CVR cao nhất vào khung giờ Tối Đêm Vàng.";
+
+    if (industry.includes("Thời trang") || industry.includes("Nam")) {
+      suggestedSlot = "14:00 - 17:00";
+      suggestedHostName = "Hoàng Nam";
+      reason = "Ngành Thời trang Nam đạt đòn bẩy đơn cao vào chiều trước giờ tan tầm.";
+    } else if (industry.includes("Gia dụng")) {
+      suggestedSlot = "11:00 - 14:00";
+      suggestedHostName = "Bích Ngọc";
+      reason = "Gia dụng bếp phù hợp nghỉ trưa dân văn phòng.";
+    }
+
+    const matchedHost = talents.find((t) => t.name.includes(suggestedHostName)) || talents[0];
+
+    return {
+      suggestedSlot,
+      suggestedHostId: matchedHost?.id || null,
+      suggestedHostName: matchedHost?.name || suggestedHostName,
+      reason,
+      predictedGmvLift: "+25%"
+    };
+  };
+
+  const applyScheduleSuggestion = (
+    brandName: string,
+    industry: string,
+    result: { suggestedSlot: string; suggestedHostId: string | null; suggestedHostName: string; reason: string; predictedGmvLift: string },
+    isMock: boolean
+  ) => {
+    const [slotStart, slotEnd] = result.suggestedSlot.split(" - ");
+    setNewStartTime(slotStart);
+    setNewEndTime(slotEnd);
+    const matchedHost = talents.find((t) => t.id === result.suggestedHostId) || talents.find((t) => t.name.includes(result.suggestedHostName));
+    if (matchedHost) setNewHostId(matchedHost.id);
+
+    setAiSuggestion(
+      `🤖 ${isMock ? "AI Recommendation (chưa cấu hình Gemini API key)" : "Gemini AI Recommendation"} cho ${brandName} (${industry}):\n` +
+      `• Khung giờ Vàng tối ưu: ${result.suggestedSlot}\n` +
+      `• Host đề xuất: ${result.suggestedHostName}\n` +
+      `• Lý do: ${result.reason}\n` +
+      `• Dự báo GMV tiềm năng: ${result.predictedGmvLift} so với phiên thường.`
+    );
+  };
+
+  const handleAiOptimizeSchedule = async () => {
     const brandObj = brands.find((b) => b.id === newBrandId);
     const brandName = brandObj?.name || "Thương hiệu";
     const industry = brandObj?.industry || "Thương mại điện tử";
 
-    let suggestedSlot = "20:00 - 23:00";
-    let suggestedHost = "Yến Nhi (Nhi Nham Nho)";
-    let reason = "Ngành Beauty/Mỹ phẩm có CVR cao nhất vào khung giờ Tối Đêm Vàng. Host Yến Nhi có CVR 5.4% cao nhất dàn KOC.";
-
-    if (industry.includes("Thời trang") || industry.includes("Nam")) {
-      suggestedSlot = "14:00 - 17:00";
-      suggestedHost = "Hoàng Nam (Nam Style)";
-      reason = "Ngành Thời trang Nam đạt đòn bẩy đơn cao vào chiều trước giờ tan tầm. Hoàng Nam từng mang lại 2.18 tỷ GMV.";
-    } else if (industry.includes("Gia dụng")) {
-      suggestedSlot = "11:00 - 14:00";
-      suggestedHost = "Bích Ngọc (Ngọc Skincare)";
-      reason = "Gia dụng bếp phù hợp nghỉ trưa dân văn phòng.";
+    setIsOptimizingSchedule(true);
+    try {
+      const res = await authedFetch("/api/gemini/optimize-schedule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ brand: brandObj, timeSlots: FIXED_TIME_SLOTS, talents })
+      });
+      const data = await res.json();
+      if (data.success && data.suggestedSlot) {
+        applyScheduleSuggestion(brandName, industry, data, !!data.isMock);
+        return;
+      }
+      throw new Error(data.error || "Empty AI schedule result");
+    } catch (e) {
+      console.error("AI Schedule Optimizer failed, dùng fallback công thức:", e);
+      applyScheduleSuggestion(brandName, industry, runFallbackScheduleOptimizer(brandName, industry), true);
+    } finally {
+      setIsOptimizingSchedule(false);
     }
-
-    setNewStartTime(suggestedSlot.split(" - ")[0]);
-    setNewEndTime(suggestedSlot.split(" - ")[1]);
-    const matchedHost = talents.find((t) => t.name.includes(suggestedHost.split(" ")[0])) || talents[0];
-    if (matchedHost) setNewHostId(matchedHost.id);
-
-    setAiSuggestion(
-      `🤖 Gemini AI Recommendation cho ${brandName} (${industry}):\n` +
-      `• Khung giờ Vàng tối ưu: ${suggestedSlot}\n` +
-      `• Host đề xuất: ${suggestedHost}\n` +
-      `• Lý do: ${reason}\n` +
-      `• Dự báo GMV tiềm năng: +25% so với phiên thường.`
-    );
   };
 
   // Filter sessions
@@ -555,11 +620,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
             <CalendarIcon className="w-4 h-4 text-blue-400 shrink-0" /> Operating Calendar & Multi-View Studio Allocator
           </span>
           <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-            Lịch Vận Hành Phiên Live (Xem Theo Ngày / Tuần / Tháng)
+            Lịch Vận Hành Phiên Live
           </h2>
-          <p className="text-slate-400 text-xs leading-relaxed">
-            Điều phối phòng Studio, phân bổ Host & KOC, tự động phát hiện xung đột lịch theo ca cố định
-          </p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -739,7 +801,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
         <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white px-4 py-3 rounded-2xl shadow-xl border border-blue-400/50 flex items-center justify-between animate-pulse">
           <div className="flex items-center gap-2.5 text-xs font-bold">
             <GripVertical className="w-5 h-5 text-amber-300 shrink-0" />
-            <span>ĐANG KÉO PHIÊN LIVE: Thả vào ô Studio / Ca Live (Lịch Ngày) hoặc Cột Ngày (Lịch Tuần/Tháng) để đổi lịch trực tiếp!</span>
+            <span>Đang kéo — thả để đổi lịch</span>
           </div>
           <span className="text-[10px] bg-black/40 px-2.5 py-1 rounded-lg font-mono font-bold shrink-0">
             Giữ &amp; Di Chuột Để Thả
@@ -786,7 +848,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
               <h3 className="font-bold text-white text-base flex items-center gap-2">
                 <CalendarIcon className="w-5 h-5 text-blue-400 shrink-0" /> Tổng Quan Lịch Tháng {currentMonth}/{currentYear}
               </h3>
-              <p className="text-xs text-slate-400">Kéo thả ca live vào ngày bất kỳ để thay đổi ngày diễn ra phiên live</p>
+              <p className="text-xs text-slate-400">Kéo thả để đổi lịch</p>
             </div>
             <div className="flex items-center gap-3 text-[11px] font-semibold">
               <span className="flex items-center gap-1 text-rose-400"><span className="w-2.5 h-2.5 rounded-full bg-rose-600"></span> Live Now</span>
@@ -798,8 +860,9 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
           <div className="grid grid-cols-7 gap-1 sm:gap-2">
             {/* Header days of week */}
             {["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ Nhật"].map((d, idx) => (
-              <div key={idx} className="p-2 text-center text-slate-400 font-bold text-xs uppercase bg-slate-950/80 rounded-lg">
-                {d}
+              <div key={idx} className="p-1 sm:p-2 text-center text-slate-400 font-bold text-xs uppercase bg-slate-950/80 rounded-lg">
+                <span className="hidden sm:inline">{d}</span>
+                <span className="sm:hidden">{d === "Chủ Nhật" ? "CN" : d.replace("Thứ ", "T")}</span>
               </div>
             ))}
 
@@ -807,7 +870,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
             {monthGridDays.map((cell, idx) => {
               const daySessions = filteredSessions.filter((s) => s.date === cell.dateStr && s.status !== "Cancelled");
               const isSelected = cell.dateStr === selectedDate;
-              const isToday = cell.dateStr === "2026-07-23";
+              const isToday = cell.dateStr === getTodayDateString();
               const totalGmvTarget = daySessions.reduce((acc, curr) => acc + curr.targetGmv, 0);
               const hasLiveNow = daySessions.some((s) => s.status === "Live Now");
 
@@ -824,7 +887,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                     setSelectedDate(cell.dateStr);
                     setViewMode("day");
                   }}
-                  className={`min-h-[90px] sm:min-h-[110px] p-2 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${
+                  className={`min-h-[64px] sm:min-h-[110px] p-1 sm:p-2 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${
                     isMonthHovered
                       ? "bg-blue-950/80 border-2 border-dashed border-blue-400 scale-[1.02] shadow-xl shadow-blue-500/20"
                       : !cell.isCurrentMonth
@@ -907,7 +970,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
               <h3 className="font-bold text-white text-base flex items-center gap-2">
                 <CalendarIcon className="w-5 h-5 text-blue-400" /> Lịch Vận Hành Tuần
               </h3>
-              <p className="text-xs text-slate-400">Kéo thả phiên live sang các cột ngày trong tuần để chuyển ngày làm việc</p>
+              <p className="text-xs text-slate-400">Kéo thả để đổi lịch</p>
             </div>
           </div>
 
@@ -915,7 +978,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
             {currentWeekDates.map((wDay) => {
               const daySessions = filteredSessions.filter((s) => s.date === wDay.dateStr && s.status !== "Cancelled");
               const isSelected = wDay.dateStr === selectedDate;
-              const isToday = wDay.dateStr === "2026-07-23";
+              const isToday = wDay.dateStr === getTodayDateString();
 
               const weekCellKey = `week_${wDay.dateStr}`;
               const isWeekHovered = dragOverCellKey === weekCellKey;
@@ -965,7 +1028,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                             ? "bg-rose-950/60 border-rose-500/60 text-white shadow animate-pulse"
                             : "bg-slate-900 border-slate-800 text-slate-200 hover:border-blue-500/50"
                         }`}
-                        title="Kéo thả sang cột ngày khác để đổi ngày phiên live"
+                        title="Kéo để đổi ngày"
                       >
                         <div className="flex justify-between items-center gap-1">
                           <span className="font-mono text-[10px] text-blue-400 font-bold flex items-center gap-1">
@@ -1096,7 +1159,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                                   ? "bg-rose-950/60 border-rose-500/60 text-white hover:border-rose-400 animate-pulse"
                                   : "bg-blue-950/40 border-blue-500/40 text-slate-200 hover:border-blue-400"
                               }`}
-                              title="Kéo thả sang ô Studio / Ca Live khác để chuyển đổi ca nhanh chóng"
+                              title="Kéo để đổi ca"
                             >
                               <div className="flex justify-between items-start gap-1">
                                 <span className="font-black text-xs text-white line-clamp-1 flex items-center gap-1">
@@ -1163,7 +1226,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
               <h3 className="font-bold text-white text-base flex items-center gap-2">
                 <User className="w-5 h-5 text-blue-400 shrink-0" /> Tải Làm Việc Host & KOC - Ngày {selectedDate}
               </h3>
-              <p className="text-xs text-slate-400">Kiểm tra tổng thời lượng live trong ngày để phân bổ đều năng lượng Host</p>
+              <p className="text-xs text-slate-400">Tổng thời lượng live trong ngày</p>
             </div>
             <span className="bg-blue-950 text-blue-300 border border-blue-800/80 text-xs font-bold px-3 py-1 rounded-full self-start sm:self-auto">
               Max Khuyên Dùng: 6 giờ / ngày
@@ -1317,9 +1380,10 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                 <button
                   type="button"
                   onClick={handleAiOptimizeSchedule}
-                  className="bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-3 py-1.5 rounded-lg flex items-center gap-1 shadow transition-all active:scale-95"
+                  disabled={isOptimizingSchedule}
+                  className="bg-blue-600 hover:bg-blue-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold text-xs px-3 py-1.5 rounded-lg flex items-center gap-1 shadow transition-all active:scale-95"
                 >
-                  <Zap className="w-3.5 h-3.5" /> Gợi Ý Khung Giờ Vàng AI
+                  <Zap className="w-3.5 h-3.5" /> {isOptimizingSchedule ? "Đang phân tích..." : "Gợi Ý Khung Giờ Vàng AI"}
                 </button>
               </div>
               {aiSuggestion && (
@@ -1431,12 +1495,23 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
 
                 <div>
                   <label className="font-bold text-slate-300 block mb-1">Trợ Lý Vận Hành (Moderator):</label>
-                  <input
-                    type="text"
-                    value={newAssistant}
-                    onChange={(e) => setNewAssistant(e.target.value)}
+                  <select
+                    value={newAssistantId}
+                    onChange={(e) => setNewAssistantId(e.target.value)}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500 font-medium"
-                  />
+                  >
+                    <option value="">-- Chưa gán Trợ Lý --</option>
+                    {moderators.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name} ({m.customRoleTitle || "Moderator"})
+                      </option>
+                    ))}
+                  </select>
+                  {moderators.length === 0 && (
+                    <p className="text-[10px] text-amber-400 mt-1">
+                      Chưa có tài khoản role Moderator nào — tạo ở tab Users & Permissions.
+                    </p>
+                  )}
                 </div>
               </div>
 

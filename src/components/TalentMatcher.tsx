@@ -177,9 +177,6 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
           <Users className="w-4 h-4 text-purple-400" /> Module 03: Talent Management & AI Matcher
         </span>
         <h2 className="text-2xl font-black">Hệ Thống Quản Lý Talent & Khớp Nối Host Thông Minh</h2>
-        <p className="text-slate-400 text-xs">
-          Thêm mới, chỉnh sửa thông tin Host/KOC, theo dõi chỉ số CVR, Rate Card & sử dụng AI để ghép cặp cho các chiến dịch.
-        </p>
       </div>
 
       {/* AI Matching Tool Banner */}
@@ -247,13 +244,13 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
       </div>
 
       {/* Talent Roster Database Header & Action Controls */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+      <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-sm space-y-4">
         <div className="flex flex-wrap justify-between items-center gap-4">
           <div>
-            <h3 className="font-bold text-slate-900 text-base">
+            <h3 className="font-bold text-slate-100 text-base">
               Danh Sách Đội Ngũ Talent & Host Agency ({filteredTalents.length}/{talents.length} Talent)
             </h3>
-            <p className="text-xs text-slate-500">Quản lý danh sách Host/KOC, theo dõi doanh thu TB và cập nhật thông tin</p>
+            <p className="text-xs text-slate-400">Quản lý danh sách Host/KOC, theo dõi doanh thu TB và cập nhật thông tin</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
@@ -265,7 +262,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                 placeholder="Tìm theo tên/SĐT..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 pr-3 py-1.5 text-xs bg-slate-100 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 font-medium"
+                className="pl-9 pr-3 py-1.5 text-xs bg-slate-800 text-slate-100 placeholder:text-slate-500 border border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 font-medium"
               />
             </div>
 
@@ -273,7 +270,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
             <select
               value={selectedRoleFilter}
               onChange={(e) => setSelectedRoleFilter(e.target.value)}
-              className="py-1.5 px-3 text-xs bg-slate-100 border border-slate-200 rounded-xl font-bold focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="py-1.5 px-3 text-xs bg-slate-800 text-slate-100 border border-slate-700 rounded-xl font-bold focus:outline-none focus:ring-2 focus:ring-purple-500"
             >
               <option value="All">Tất cả vai trò</option>
               <option value="Host">Host</option>
@@ -303,19 +300,19 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
             const rate = t.ratePerSession || (t as any).rateCardFee || 0;
 
             return (
-              <div key={t.id} className="p-4 rounded-2xl border border-slate-200 bg-slate-50 space-y-3 hover:border-purple-300 transition-all relative group">
+              <div key={t.id} className="p-4 rounded-2xl border border-slate-800 bg-slate-800/40 space-y-3 hover:border-purple-700 transition-all relative group">
                 <div className="flex justify-between items-start">
                   <div className="flex items-center space-x-3 min-w-0 flex-1">
                     <img src={avatar} alt={t.name} className="w-12 h-12 rounded-full object-cover border-2 border-purple-400 shadow-sm shrink-0" />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 whitespace-nowrap">
-                        <h4 className="font-bold text-slate-900 text-xs truncate">{t.name}</h4>
-                        <span className="bg-purple-100 text-purple-800 text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0">
+                        <h4 className="font-bold text-slate-100 text-xs truncate">{t.name}</h4>
+                        <span className="bg-purple-900/50 text-purple-300 text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0">
                           {t.role || "Host"}
                         </span>
                       </div>
-                      <p className="text-[10px] text-purple-700 font-medium truncate">{nicheStr}</p>
-                      <span className="text-[10px] text-slate-500 block truncate whitespace-nowrap">{followers.toLocaleString()} TikTok Followers</span>
+                      <p className="text-[10px] text-purple-300 font-medium truncate">{nicheStr}</p>
+                      <span className="text-[10px] text-slate-400 block truncate whitespace-nowrap">{followers.toLocaleString()} TikTok Followers</span>
                     </div>
                   </div>
 
@@ -323,14 +320,14 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => openEditModal(t)}
-                      className="p-1.5 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all"
+                      className="p-1.5 text-slate-400 hover:text-purple-300 hover:bg-purple-950/40 rounded-lg transition-all"
                       title="Chỉnh sửa Talent"
                     >
                       <Edit3 className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => handleDelete(t.id, t.name)}
-                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                      className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-950/40 rounded-lg transition-all"
                       title="Xóa Talent"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -338,20 +335,20 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 text-[10px] bg-white p-2.5 rounded-xl border border-slate-100 font-medium">
-                  <div>GMV TB: <strong className="text-emerald-600 block text-xs font-bold">{((t.avgGmvPerSession || 100000000) / 1000000).toFixed(0)}M đ</strong></div>
-                  <div>CVR TB: <strong className="text-purple-600 block text-xs font-bold">{t.cvrAvg || 4.5}%</strong></div>
-                  <div>Rate Card: <strong className="text-slate-800 block font-bold">{rate.toLocaleString()} đ</strong></div>
-                  <div>Hoa hồng: <strong className="text-indigo-600 block font-bold">{t.commissionRate || 3}%</strong></div>
+                <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-400 bg-slate-950/40 p-2.5 rounded-xl border border-slate-800 font-medium">
+                  <div>GMV TB: <strong className="text-emerald-400 block text-xs font-bold">{((t.avgGmvPerSession || 100000000) / 1000000).toFixed(0)}M đ</strong></div>
+                  <div>CVR TB: <strong className="text-purple-400 block text-xs font-bold">{t.cvrAvg || 4.5}%</strong></div>
+                  <div>Rate Card: <strong className="text-slate-200 block font-bold">{rate.toLocaleString()} đ</strong></div>
+                  <div>Hoa hồng: <strong className="text-indigo-400 block font-bold">{t.commissionRate || 3}%</strong></div>
                 </div>
 
                 <div className="flex justify-between items-center text-xs pt-1">
-                  <span className="text-[10px] font-bold text-slate-500 flex items-center gap-1">
+                  <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
                     <Phone className="w-3 h-3 text-slate-400" /> {t.phone || "N/A"}
                   </span>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                    t.availabilityStatus === "On Live" ? "bg-red-100 text-red-700 animate-pulse" :
-                    t.availabilityStatus === "Busy" ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"
+                    t.availabilityStatus === "On Live" ? "bg-red-900/40 text-red-300 animate-pulse" :
+                    t.availabilityStatus === "Busy" ? "bg-amber-900/40 text-amber-300" : "bg-emerald-900/40 text-emerald-300"
                   }`}>
                     {t.availabilityStatus || "Available"}
                   </span>
@@ -365,7 +362,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
       {/* Talent Form Modal (Add / Edit) */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden max-h-[90vh] flex flex-col">
+          <div className="bg-slate-900 w-full max-w-xl rounded-2xl shadow-2xl border border-slate-800 overflow-hidden max-h-[90vh] flex flex-col">
             <div className="bg-slate-900 text-white px-6 py-4 flex justify-between items-center">
               <h3 className="font-bold text-sm flex items-center gap-2">
                 <Users className="w-4 h-4 text-purple-400" />
@@ -377,37 +374,37 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
             </div>
 
             <form onSubmit={handleSaveTalent} className="p-6 space-y-4 text-xs overflow-y-auto">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Tên Talent / Host *</label>
+                  <label className="font-bold text-slate-300 block mb-1">Tên Talent / Host *</label>
                   <input
                     type="text"
                     required
                     value={formName}
                     onChange={(e) => setFormName(e.target.value)}
                     placeholder="VD: Nguyễn Văn A (A Live)"
-                    className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800 focus:ring-2 focus:ring-purple-500"
+                    className="w-full p-2.5 border border-slate-700 bg-slate-950 rounded-xl font-semibold text-slate-100 focus:ring-2 focus:ring-purple-500"
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Số Điện Thoại</label>
+                  <label className="font-bold text-slate-300 block mb-1">Số Điện Thoại</label>
                   <input
                     type="text"
                     value={formPhone}
                     onChange={(e) => setFormPhone(e.target.value)}
                     placeholder="VD: 0988 123 456"
-                    className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800 focus:ring-2 focus:ring-purple-500"
+                    className="w-full p-2.5 border border-slate-700 bg-slate-950 rounded-xl font-semibold text-slate-100 focus:ring-2 focus:ring-purple-500"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Vai Trò</label>
+                  <label className="font-bold text-slate-300 block mb-1">Vai Trò</label>
                   <select
                     value={formRole}
                     onChange={(e) => setFormRole(e.target.value as any)}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800"
+                    className="w-full p-2.5 border border-slate-700 bg-slate-950 rounded-xl font-semibold text-slate-100"
                   >
                     <option value="Host">Host</option>
                     <option value="KOC">KOC</option>
@@ -416,11 +413,11 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Giới Tính</label>
+                  <label className="font-bold text-slate-300 block mb-1">Giới Tính</label>
                   <select
                     value={formGender}
                     onChange={(e) => setFormGender(e.target.value)}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800"
+                    className="w-full p-2.5 border border-slate-700 bg-slate-950 rounded-xl font-semibold text-slate-100"
                   >
                     <option value="Nữ">Nữ</option>
                     <option value="Nam">Nam</option>
@@ -428,11 +425,11 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Trạng Thái</label>
+                  <label className="font-bold text-slate-300 block mb-1">Trạng Thái</label>
                   <select
                     value={formStatus}
                     onChange={(e) => setFormStatus(e.target.value as any)}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800"
+                    className="w-full p-2.5 border border-slate-700 bg-slate-950 rounded-xl font-semibold text-slate-100"
                   >
                     <option value="Available">Sẵn Sàng (Available)</option>
                     <option value="Busy">Đã Bận (Busy)</option>
@@ -442,85 +439,85 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Ngành Hàng Khớp Nối (Phân cách bằng dấu phẩy)</label>
+                <label className="font-bold text-slate-300 block mb-1">Ngành Hàng Khớp Nối (Phân cách bằng dấu phẩy)</label>
                 <input
                   type="text"
                   value={formNiches}
                   onChange={(e) => setFormNiches(e.target.value)}
                   placeholder="VD: Mỹ phẩm, Skincare, Thời trang"
-                  className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800"
+                  className="w-full p-2.5 border border-slate-700 bg-slate-950 rounded-xl font-semibold text-slate-100"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">TikTok Followers</label>
+                  <label className="font-bold text-slate-300 block mb-1">TikTok Followers</label>
                   <input
                     type="number"
                     value={formFollowers}
                     onChange={(e) => setFormFollowers(Number(e.target.value))}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800"
+                    className="w-full p-2.5 border border-slate-700 bg-slate-950 rounded-xl font-semibold text-slate-100"
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">GMV TB Mỗi Phiên (VND)</label>
+                  <label className="font-bold text-slate-300 block mb-1">GMV TB Mỗi Phiên (VND)</label>
                   <input
                     type="number"
                     value={formGmv}
                     onChange={(e) => setFormGmv(Number(e.target.value))}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800"
+                    className="w-full p-2.5 border border-slate-700 bg-slate-950 rounded-xl font-semibold text-slate-100"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">CVR Trung Bình (%)</label>
+                  <label className="font-bold text-slate-300 block mb-1">CVR Trung Bình (%)</label>
                   <input
                     type="number"
                     step="0.1"
                     value={formCvr}
                     onChange={(e) => setFormCvr(Number(e.target.value))}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800"
+                    className="w-full p-2.5 border border-slate-700 bg-slate-950 rounded-xl font-semibold text-slate-100"
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Rate Card (VND/Live)</label>
+                  <label className="font-bold text-slate-300 block mb-1">Rate Card (VND/Live)</label>
                   <input
                     type="number"
                     value={formRate}
                     onChange={(e) => setFormRate(Number(e.target.value))}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800"
+                    className="w-full p-2.5 border border-slate-700 bg-slate-950 rounded-xl font-semibold text-slate-100"
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Hoa Hồng % (Commission)</label>
+                  <label className="font-bold text-slate-300 block mb-1">Hoa Hồng % (Commission)</label>
                   <input
                     type="number"
                     step="0.1"
                     value={formCommission}
                     onChange={(e) => setFormCommission(Number(e.target.value))}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800"
+                    className="w-full p-2.5 border border-slate-700 bg-slate-950 rounded-xl font-semibold text-slate-100"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">URL Ảnh Đại Diện (Avatar URL)</label>
+                <label className="font-bold text-slate-300 block mb-1">URL Ảnh Đại Diện (Avatar URL)</label>
                 <input
                   type="text"
                   value={formAvatar}
                   onChange={(e) => setFormAvatar(e.target.value)}
                   placeholder="https://..."
-                  className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-mono"
+                  className="w-full p-2.5 border border-slate-700 bg-slate-950 text-slate-100 rounded-xl text-xs font-mono"
                 />
               </div>
 
-              <div className="pt-4 border-t border-slate-200 flex justify-end gap-3">
+              <div className="pt-4 border-t border-slate-800 flex justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-xl transition-all"
+                  className="px-4 py-2 text-slate-400 font-bold hover:bg-slate-800 rounded-xl transition-all"
                 >
                   Hủy Bỏ
                 </button>

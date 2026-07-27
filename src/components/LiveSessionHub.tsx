@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { LiveSession, MinuteMetric, ProductSKU, Studio, Talent, Brand } from "../types";
+import { LiveSession, MinuteMetric, ProductSKU, Studio, Talent, Brand, SystemUser } from "../types";
 import { Radio, Play, CheckCircle2, Clock, Sparkles, TrendingUp, Users, ShoppingBag, AlertCircle, RefreshCw, Layers, Plus, Edit3, Trash2, X, Building2 } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
 import { authedFetch } from "../lib/authedFetch";
@@ -10,6 +10,7 @@ interface LiveSessionHubProps {
   studios: Studio[];
   talents: Talent[];
   brands: Brand[];
+  users: SystemUser[];
   onSelectSession: (session: LiveSession) => void;
   onAddSession?: (session: LiveSession) => void | Promise<boolean>;
   onUpdateSession?: (session: LiveSession) => void | Promise<boolean>;
@@ -22,11 +23,13 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
   studios,
   talents,
   brands,
+  users,
   onSelectSession,
   onAddSession,
   onUpdateSession,
   onDeleteSession
 }) => {
+  const moderators = users.filter((u) => u.role === "moderator");
   const [activeTab, setActiveTab] = useState<"analytics" | "checklist" | "products" | "ai_coach">("analytics");
   const [analyzingAi, setAnalyzingAi] = useState(false);
   const [aiAnalysisResult, setAiAnalysisResult] = useState<any>(selectedSession?.aiAnalysis || null);
@@ -40,8 +43,8 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
   const [sessShopHandle, setSessShopHandle] = useState("@cocoon.vietnam.official");
   const [sessStudioId, setSessStudioId] = useState("");
   const [sessHostId, setSessHostId] = useState("");
-  const [sessAssistantName, setSessAssistantName] = useState("Nguyễn Tuấn");
-  const [sessDate, setSessDate] = useState("2026-07-23");
+  const [sessAssistantId, setSessAssistantId] = useState("");
+  const [sessDate, setSessDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [sessStartTime, setSessStartTime] = useState("19:00");
   const [sessEndTime, setSessEndTime] = useState("21:00");
   const [sessStatus, setSessStatus] = useState<"Live Now" | "Upcoming" | "Completed" | "Cancelled">("Upcoming");
@@ -55,7 +58,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
     setSessShopHandle("@cocoon.vietnam.official");
     setSessStudioId(studios[0]?.id || "");
     setSessHostId(talents[0]?.id || "");
-    setSessAssistantName("Nguyễn Tuấn");
+    setSessAssistantId(moderators[0]?.id || "");
     setSessDate("2026-07-24");
     setSessStartTime("20:00");
     setSessEndTime("22:00");
@@ -72,7 +75,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
     setSessShopHandle(s.shopTikTokHandle);
     setSessStudioId(s.studioId || studios[0]?.id || "");
     setSessHostId(s.hostId || talents[0]?.id || "");
-    setSessAssistantName(s.assistantName);
+    setSessAssistantId(s.assistantId || "");
     setSessDate(s.date);
     setSessStartTime(s.startTime);
     setSessEndTime(s.endTime);
@@ -90,6 +93,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
     const brandObj = brands.find((b) => b.id === sessBrandId);
     const studioObj = studios.find((s) => s.id === sessStudioId);
     const hostObj = talents.find((t) => t.id === sessHostId);
+    const assistantObj = moderators.find((m) => m.id === sessAssistantId);
 
     const sessionPayload: LiveSession = {
       id: editingSession ? editingSession.id : `session-${Date.now()}`,
@@ -101,7 +105,8 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
       studioName: studioObj?.name || "",
       hostId: sessHostId,
       hostName: hostObj?.name || "",
-      assistantName: sessAssistantName,
+      assistantId: sessAssistantId || undefined,
+      assistantName: assistantObj?.name || "Chưa gán Trợ Lý",
       date: sessDate,
       startTime: sessStartTime,
       endTime: sessEndTime,
@@ -170,9 +175,6 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
               <Radio className="w-4 h-4 text-red-500 animate-pulse" /> Operational Data Graph Nexus
             </span>
             <h2 className="text-2xl font-black">Livestream Session Hub</h2>
-            <p className="text-slate-400 text-xs mt-0.5">
-              Đơn vị quản lý trung tâm liên kết Brand, Campaign, Host, Studio, SKUs & AI Minute-by-Minute Analytics
-            </p>
           </div>
 
           <div className="flex items-center gap-3">
@@ -344,7 +346,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div className="grid grid-cols-1 min-[420px]:grid-cols-3 gap-2 text-xs">
                     <div className="bg-slate-950 p-2 rounded-lg">
                       <span className="text-slate-400 text-[10px] block">GMV Hiện Tại</span>
                       <strong className="text-emerald-400 font-bold">{s.actualGmv.toLocaleString()} đ</strong>
@@ -472,17 +474,17 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
       {/* Tab Content 1: Analytics & Minute Metrics Recharts */}
       {selectedSession && activeTab === "analytics" && (
         <div className="space-y-6">
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+          <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-sm space-y-4">
             <div className="flex justify-between items-center">
               <div>
-                <h3 className="font-bold text-slate-900 text-base">
+                <h3 className="font-bold text-slate-100 text-base">
                   Biểu Đồ GMV & Lượt Người Xem (Viewers) Từng Phút Trong Live
                 </h3>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-slate-400">
                   Dữ liệu được đồng bộ từ TikTok Live Performance API & Webhook
                 </p>
               </div>
-              <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-200">
+              <span className="text-xs font-bold text-indigo-400 bg-indigo-950/30 px-3 py-1 rounded-full border border-indigo-800/50">
                 Live Duration: 60 Minutes
               </span>
             </div>
@@ -522,19 +524,19 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
           </div>
 
           {/* Minute-by-Minute Key Events Timeline */}
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-            <h3 className="font-bold text-slate-900 text-base">Nhật Ký Sự Kiện Tác Động Doanh Thu Từng Phút</h3>
+          <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-sm space-y-4">
+            <h3 className="font-bold text-slate-100 text-base">Nhật Ký Sự Kiện Tác Động Doanh Thu Từng Phút</h3>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
               {(selectedSession.minuteMetrics || []).map((m) => (
-                <div key={m.minute} className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 space-y-2 hover:border-purple-300 transition-all">
+                <div key={m.minute} className="p-3.5 rounded-xl border border-slate-800 bg-slate-800/40 space-y-2 hover:border-purple-500/60 transition-all">
                   <div className="flex justify-between items-center text-xs">
-                    <span className="font-black text-purple-700 bg-purple-100 px-2 py-0.5 rounded">
+                    <span className="font-black text-purple-300 bg-purple-900/50 px-2 py-0.5 rounded">
                       {m.timeString} (Phút {m.minute})
                     </span>
-                    <span className="text-emerald-600 font-bold">{m.gmvCumulative.toLocaleString()} đ</span>
+                    <span className="text-emerald-400 font-bold">{m.gmvCumulative.toLocaleString()} đ</span>
                   </div>
-                  <div className="text-xs font-semibold text-slate-900">{m.eventTrigger || "Duy trì guồng nói kịch bản"}</div>
-                  <div className="flex justify-between items-center text-[10px] text-slate-500 pt-1 border-t border-slate-200">
+                  <div className="text-xs font-semibold text-slate-100">{m.eventTrigger || "Duy trì guồng nói kịch bản"}</div>
+                  <div className="flex justify-between items-center text-[10px] text-slate-400 pt-1 border-t border-slate-800">
                     <span>👁️ Viewers: {m.viewers}</span>
                     <span>CVR: {m.cvr}%</span>
                     <span>💬 Comment: {m.comments}</span>
@@ -548,15 +550,15 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
 
       {/* Tab Content 2: Pre-Live Checklist */}
       {selectedSession && activeTab === "checklist" && (
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+        <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-sm space-y-4">
           <div className="flex justify-between items-center">
             <div>
-              <h3 className="font-bold text-slate-900 text-base">Pre-Live Operational Checklist</h3>
-              <p className="text-xs text-slate-500">
+              <h3 className="font-bold text-slate-100 text-base">Pre-Live Operational Checklist</h3>
+              <p className="text-xs text-slate-400">
                 Nhấp vào từng công việc để đánh dấu hoàn thành. Đảm bảo chuẩn bị đủ kỹ thuật & kịch bản trước khi Go Live.
               </p>
             </div>
-            <span className="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-xs font-bold">
+            <span className="bg-emerald-900/50 text-emerald-300 px-3 py-1 rounded-full text-xs font-bold">
               {(selectedSession.checklist || []).filter(c => c.completed).length}/{(selectedSession.checklist || []).length} Đã Hoàn Thành
             </span>
           </div>
@@ -565,7 +567,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
             {(selectedSession.checklist || []).map((item) => (
               <div
                 key={item.id}
-                onClick={() => {
+                onClick={async () => {
                   if (!selectedSession) return;
                   const updatedSession = {
                     ...selectedSession,
@@ -573,11 +575,15 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                       c.id === item.id ? { ...c, completed: !c.completed } : c
                     ),
                   };
-                  onSelectSession(updatedSession);
-                  if (onUpdateSession) onUpdateSession(updatedSession);
+                  // Don't set `selectedSession` optimistically here — App.tsx's
+                  // handleUpdateSession already sets it (from the DB-confirmed row) on
+                  // success. Calling onSelectSession synchronously first meant a failed
+                  // Supabase write left the checklist toggle "stuck" showing the new state
+                  // forever, since `sessions` (source of truth) never actually changed.
+                  if (onUpdateSession) await onUpdateSession(updatedSession);
                 }}
                 className={`p-3.5 rounded-xl border flex items-center justify-between cursor-pointer transition-all hover:shadow-sm ${
-                  item.completed ? "bg-emerald-50/60 border-emerald-200" : "bg-amber-50/60 border-amber-200"
+                  item.completed ? "bg-emerald-950/30 border-emerald-800/50" : "bg-amber-950/30 border-amber-800/50"
                 }`}
               >
                 <div className="flex items-center space-x-3">
@@ -587,13 +593,13 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                     {item.completed ? "✓" : "!"}
                   </span>
                   <div>
-                    <h4 className={`font-bold text-xs ${item.completed ? "line-through text-slate-500" : "text-slate-900"}`}>
+                    <h4 className={`font-bold text-xs ${item.completed ? "line-through text-slate-500" : "text-slate-100"}`}>
                       {item.task}
                     </h4>
-                    <span className="text-[10px] text-slate-500">Hạng mục: {item.category}</span>
+                    <span className="text-[10px] text-slate-400">Hạng mục: {item.category}</span>
                   </div>
                 </div>
-                <span className="text-xs font-medium text-slate-600 bg-white px-2.5 py-1 rounded-lg border border-slate-200">
+                <span className="text-xs font-medium text-slate-300 bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-700">
                   Phụ trách: {item.assignedTo}
                 </span>
               </div>
@@ -604,12 +610,12 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
 
       {/* Tab Content 3: Product SKUs */}
       {selectedSession && activeTab === "products" && (
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-          <h3 className="font-bold text-slate-900 text-base">Danh Sách SKUs & Hiệu Quả Chuyển Đổi Trong Phiên Live</h3>
+        <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-sm space-y-4">
+          <h3 className="font-bold text-slate-100 text-base">Danh Sách SKUs & Hiệu Quả Chuyển Đổi Trong Phiên Live</h3>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-slate-600">
+                <tr className="border-b border-slate-800 bg-slate-800/40 text-slate-400">
                   <th className="p-3">Mã SKU</th>
                   <th className="p-3">Tên Sản Phẩm</th>
                   <th className="p-3">Giá Niêm Yết</th>
@@ -620,17 +626,17 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                   <th className="p-3">Tỷ Lệ CVR</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-800">
                 {(selectedSession.skus || []).map((sku) => (
-                  <tr key={sku.id} className="hover:bg-slate-50">
-                    <td className="p-3 font-mono font-bold text-purple-700">{sku.code}</td>
-                    <td className="p-3 font-bold text-slate-900">{sku.name}</td>
-                    <td className="p-3 text-slate-400 line-through">{sku.originalPrice.toLocaleString()} đ</td>
-                    <td className="p-3 text-emerald-600 font-bold">{sku.livePrice.toLocaleString()} đ</td>
-                    <td className="p-3 font-bold text-slate-900">{sku.soldInSession} món</td>
-                    <td className="p-3 text-slate-600">{sku.clickCount} clicks</td>
-                    <td className="p-3 text-indigo-600 font-bold">{sku.ctr}%</td>
-                    <td className="p-3 text-purple-600 font-bold">{sku.cvr}%</td>
+                  <tr key={sku.id} className="hover:bg-slate-800">
+                    <td className="p-3 font-mono font-bold text-purple-300">{sku.code}</td>
+                    <td className="p-3 font-bold text-slate-100">{sku.name}</td>
+                    <td className="p-3 text-slate-500 line-through">{sku.originalPrice.toLocaleString()} đ</td>
+                    <td className="p-3 text-emerald-400 font-bold">{sku.livePrice.toLocaleString()} đ</td>
+                    <td className="p-3 font-bold text-slate-100">{sku.soldInSession} món</td>
+                    <td className="p-3 text-slate-400">{sku.clickCount} clicks</td>
+                    <td className="p-3 text-indigo-400 font-bold">{sku.ctr}%</td>
+                    <td className="p-3 text-purple-400 font-bold">{sku.cvr}%</td>
                   </tr>
                 ))}
               </tbody>
@@ -641,13 +647,13 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
 
       {/* Tab Content 4: AI Analyst & Host Coach */}
       {selectedSession && activeTab === "ai_coach" && (
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
-          <div className="flex flex-wrap justify-between items-center gap-4 border-b border-slate-100 pb-4">
+        <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-sm space-y-6">
+          <div className="flex flex-wrap justify-between items-center gap-4 border-b border-slate-800 pb-4">
             <div>
-              <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-purple-600" /> AI Live Session Analyst & Host Coach
+              <h3 className="font-bold text-slate-100 text-base flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-purple-400" /> AI Live Session Analyst & Host Coach
               </h3>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-slate-400">
                 Hệ thống AI tự động đọc dữ liệu biến động từng phút để đưa ra bài học kinh nghiệm và chấm điểm Host
               </p>
             </div>
@@ -672,10 +678,10 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
             <div className="space-y-6">
               {/* Overall & GMV Summary */}
               <div className="grid md:grid-cols-2 gap-4">
-                <div className="p-4 rounded-xl bg-purple-50 border border-purple-200 space-y-1">
-                  <span className="text-xs text-purple-700 font-semibold uppercase">Đánh Giá Tổng Thể:</span>
-                  <div className="text-xl font-black text-purple-950">{aiAnalysisResult.overallRating}</div>
-                  <p className="text-xs text-purple-800">{aiAnalysisResult.gmvSummary}</p>
+                <div className="p-4 rounded-xl bg-purple-950/30 border border-purple-800/50 space-y-1">
+                  <span className="text-xs text-purple-400 font-semibold uppercase">Đánh Giá Tổng Thể:</span>
+                  <div className="text-xl font-black text-purple-100">{aiAnalysisResult.overallRating}</div>
+                  <p className="text-xs text-purple-300">{aiAnalysisResult.gmvSummary}</p>
                 </div>
                 <div className="p-4 rounded-xl bg-slate-900 text-white space-y-2">
                   <span className="text-xs text-slate-400 font-semibold uppercase">Host Performance Scorecard:</span>
@@ -691,16 +697,16 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
               {/* Highlights & Mistakes */}
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <h4 className="font-bold text-xs text-emerald-700 uppercase tracking-wider">🌟 Đột Biến Đáng Chú Ý (Highlights):</h4>
-                  <ul className="space-y-1.5 list-disc list-inside text-xs text-slate-700">
+                  <h4 className="font-bold text-xs text-emerald-400 uppercase tracking-wider">🌟 Đột Biến Đáng Chú Ý (Highlights):</h4>
+                  <ul className="space-y-1.5 list-disc list-inside text-xs text-slate-300">
                     {aiAnalysisResult.keyHighlights?.map((h: string, i: number) => (
                       <li key={i}>{h}</li>
                     ))}
                   </ul>
                 </div>
                 <div className="space-y-2">
-                  <h4 className="font-bold text-xs text-red-700 uppercase tracking-wider">⚠️ Sai Lầm & Điểm Thẽm Bị Drop (Top Mistakes):</h4>
-                  <ul className="space-y-1.5 list-disc list-inside text-xs text-slate-700">
+                  <h4 className="font-bold text-xs text-red-400 uppercase tracking-wider">⚠️ Sai Lầm & Điểm Thẽm Bị Drop (Top Mistakes):</h4>
+                  <ul className="space-y-1.5 list-disc list-inside text-xs text-slate-300">
                     {aiAnalysisResult.topMistakes?.map((m: string, i: number) => (
                       <li key={i}>{m}</li>
                     ))}
@@ -709,9 +715,9 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
               </div>
 
               {/* Recommendations */}
-              <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 space-y-2 text-xs">
-                <h4 className="font-bold text-emerald-900 uppercase">💡 Khuyến Nghị Hành Động Cho Live Kế Tiếp:</h4>
-                <ul className="space-y-1 list-disc list-inside text-emerald-950">
+              <div className="p-4 rounded-xl bg-emerald-950/30 border border-emerald-800/50 space-y-2 text-xs">
+                <h4 className="font-bold text-emerald-200 uppercase">💡 Khuyến Nghị Hành Động Cho Live Kế Tiếp:</h4>
+                <ul className="space-y-1 list-disc list-inside text-emerald-100">
                   {aiAnalysisResult.actionableRecommendations?.map((r: string, i: number) => (
                     <li key={i}>{r}</li>
                   ))}
@@ -724,8 +730,8 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
       {/* Session Modal */}
       {isSessionModalOpen && (
         <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white text-slate-900 w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
-            <div className="bg-slate-900 text-white px-6 py-4 flex justify-between items-center">
+          <div className="bg-slate-900 text-slate-100 w-full max-w-lg rounded-2xl shadow-2xl border border-slate-800 overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="bg-slate-900 text-white px-6 py-4 flex justify-between items-center shrink-0">
               <h3 className="font-bold text-sm flex items-center gap-2">
                 <Radio className="w-4 h-4 text-purple-400" />
                 {editingSession ? `Chỉnh Sửa Phiên Live: ${editingSession.brandName}` : "Tạo Phiên Livestream Mới"}
@@ -735,7 +741,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSaveSession} className="p-6 space-y-4 text-xs">
+            <form onSubmit={handleSaveSession} className="p-6 space-y-4 text-xs overflow-y-auto">
               {/* Conflict Detection Banner */}
               {(() => {
                 const studioConflictSession = sessions.find((s) => {
@@ -757,18 +763,18 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                 if (!studioConflictSession && !hostConflictSession) return null;
 
                 return (
-                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 space-y-1 text-xs animate-fade-in">
-                    <div className="flex items-center gap-1.5 font-bold text-amber-900">
-                      <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                  <div className="p-3 bg-amber-950/30 border border-amber-800/50 rounded-xl text-amber-200 space-y-1 text-xs animate-fade-in">
+                    <div className="flex items-center gap-1.5 font-bold text-amber-200">
+                      <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0" />
                       <span>Cảnh Báo Xung Đột Lịch Vận Hành:</span>
                     </div>
                     {studioConflictSession && (
-                      <p className="text-[11px] text-amber-800">
+                      <p className="text-[11px] text-amber-300">
                         • <strong>Studio &quot;{studios.find((s) => s.id === sessStudioId)?.name}&quot;</strong> đã trùng lịch với phiên &quot;{studioConflictSession.title}&quot; vào ngày {sessDate} ({studioConflictSession.startTime} - {studioConflictSession.endTime}).
                       </p>
                     )}
                     {hostConflictSession && (
-                      <p className="text-[11px] text-amber-800">
+                      <p className="text-[11px] text-amber-300">
                         • <strong>Host &quot;{talents.find((t) => t.id === sessHostId)?.name}&quot;</strong> đã trùng lịch với phiên &quot;{hostConflictSession.title}&quot; vào ngày {sessDate} ({hostConflictSession.startTime} - {hostConflictSession.endTime}).
                       </p>
                     )}
@@ -776,14 +782,14 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                 );
               })()}
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Thương Hiệu (Brand) *</label>
+                  <label className="font-bold text-slate-300 block mb-1">Thương Hiệu (Brand) *</label>
                   <select
                     required
                     value={sessBrandId}
                     onChange={(e) => setSessBrandId(e.target.value)}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800 bg-white"
+                    className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold text-slate-100 bg-slate-950"
                   >
                     <option value="">-- Chọn Brand --</option>
                     {brands.map((b) => (
@@ -794,35 +800,35 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">TikTok Handle</label>
+                  <label className="font-bold text-slate-300 block mb-1">TikTok Handle</label>
                   <input
                     type="text"
                     value={sessShopHandle}
                     onChange={(e) => setSessShopHandle(e.target.value)}
                     placeholder="@cocoon.vietnam"
-                    className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800"
+                    className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold text-slate-100 bg-slate-950 placeholder:text-slate-500"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Tiêu Đề / Nội Dung Phiên Live</label>
+                <label className="font-bold text-slate-300 block mb-1">Tiêu Đề / Nội Dung Phiên Live</label>
                 <input
                   type="text"
                   value={sessTitle}
                   onChange={(e) => setSessTitle(e.target.value)}
                   placeholder="VD: Mega Live 8/8 - Săn Deal Độc Quyền"
-                  className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800"
+                  className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold text-slate-100 bg-slate-950 placeholder:text-slate-500"
                 />
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Trạng Thái Live</label>
+                  <label className="font-bold text-slate-300 block mb-1">Trạng Thái Live</label>
                   <select
                     value={sessStatus}
                     onChange={(e) => setSessStatus(e.target.value as any)}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800"
+                    className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold text-slate-100 bg-slate-950 placeholder:text-slate-500"
                   >
                     <option value="Live Now">🔴 Live Now</option>
                     <option value="Upcoming">📅 Upcoming</option>
@@ -831,23 +837,23 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Ngày Diễn Ra</label>
+                  <label className="font-bold text-slate-300 block mb-1">Ngày Diễn Ra</label>
                   <input
                     type="date"
                     value={sessDate}
                     onChange={(e) => setSessDate(e.target.value)}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800"
+                    className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold text-slate-100 bg-slate-950 placeholder:text-slate-500"
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Khung Giờ</label>
+                  <label className="font-bold text-slate-300 block mb-1">Khung Giờ</label>
                   <div className="flex items-center gap-1">
                     <input
                       type="text"
                       value={sessStartTime}
                       onChange={(e) => setSessStartTime(e.target.value)}
                       placeholder="19:00"
-                      className="w-1/2 p-2 border border-slate-200 rounded-lg text-center font-semibold"
+                      className="w-1/2 p-2 border border-slate-700 rounded-lg text-center font-semibold text-slate-100 bg-slate-950 placeholder:text-slate-500"
                     />
                     <span>-</span>
                     <input
@@ -855,20 +861,20 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                       value={sessEndTime}
                       onChange={(e) => setSessEndTime(e.target.value)}
                       placeholder="21:00"
-                      className="w-1/2 p-2 border border-slate-200 rounded-lg text-center font-semibold"
+                      className="w-1/2 p-2 border border-slate-700 rounded-lg text-center font-semibold text-slate-100 bg-slate-950 placeholder:text-slate-500"
                     />
                   </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Studio Phụ Trách *</label>
+                  <label className="font-bold text-slate-300 block mb-1">Studio Phụ Trách *</label>
                   <select
                     required
                     value={sessStudioId}
                     onChange={(e) => setSessStudioId(e.target.value)}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800 bg-white"
+                    className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold text-slate-100 bg-slate-950"
                   >
                     <option value="">-- Chọn Studio --</option>
                     {studios.map((s) => (
@@ -879,12 +885,12 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Host Chính *</label>
+                  <label className="font-bold text-slate-300 block mb-1">Host Chính *</label>
                   <select
                     required
                     value={sessHostId}
                     onChange={(e) => setSessHostId(e.target.value)}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800 bg-white"
+                    className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold text-slate-100 bg-slate-950"
                   >
                     <option value="">-- Chọn Host --</option>
                     {talents.map((t) => (
@@ -895,43 +901,48 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Trợ Lý Moderator</label>
-                  <input
-                    type="text"
-                    value={sessAssistantName}
-                    onChange={(e) => setSessAssistantName(e.target.value)}
-                    placeholder="Tuấn Admin"
-                    className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800"
-                  />
+                  <label className="font-bold text-slate-300 block mb-1">Trợ Lý Moderator</label>
+                  <select
+                    value={sessAssistantId}
+                    onChange={(e) => setSessAssistantId(e.target.value)}
+                    className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold text-slate-100 bg-slate-950"
+                  >
+                    <option value="">-- Chưa gán Trợ Lý --</option>
+                    {moderators.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">KPI Target GMV (VNĐ)</label>
+                  <label className="font-bold text-slate-300 block mb-1">KPI Target GMV (VNĐ)</label>
                   <input
                     type="number"
                     value={sessTargetGmv}
                     onChange={(e) => setSessTargetGmv(Number(e.target.value))}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800"
+                    className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold text-slate-100 bg-slate-950 placeholder:text-slate-500"
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">GMV Thực Đạt (VNĐ)</label>
+                  <label className="font-bold text-slate-300 block mb-1">GMV Thực Đạt (VNĐ)</label>
                   <input
                     type="number"
                     value={sessActualGmv}
                     onChange={(e) => setSessActualGmv(Number(e.target.value))}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800"
+                    className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold text-slate-100 bg-slate-950 placeholder:text-slate-500"
                   />
                 </div>
               </div>
 
-              <div className="pt-4 border-t border-slate-200 flex justify-end gap-3">
+              <div className="pt-4 border-t border-slate-800 flex justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setIsSessionModalOpen(false)}
-                  className="px-4 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-xl transition-all"
+                  className="px-4 py-2 text-slate-400 font-bold hover:bg-slate-800 rounded-xl transition-all"
                 >
                   Hủy Bỏ
                 </button>

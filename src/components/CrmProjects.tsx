@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { Brand, AgencyProject, SystemUser } from "../types";
 import { Building2, Layers, DollarSign, Sparkles, Plus, Edit3, Trash2, X, CheckCircle2, Clock, Phone, UserCheck } from "lucide-react";
 import { authedFetch } from "../lib/authedFetch";
+import { formatCurrencyAdaptive } from "../lib/formatCurrency";
 
 interface CrmProjectsProps {
   brands: Brand[];
@@ -33,6 +34,12 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
   );
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [isSummarizing, setIsSummarizing] = useState(false);
+
+  // Guards against a rapid double-click firing two creates before React re-renders the
+  // disabled button — refs (not state) because the check must be synchronous on the very
+  // first line of the handler, before any state update has a chance to flush.
+  const isSavingBrandRef = useRef(false);
+  const isSavingProjectRef = useRef(false);
 
   // Brand Modal State
   const [isBrandModalOpen, setIsBrandModalOpen] = useState(false);
@@ -128,6 +135,8 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
   const handleSaveBrand = (e: React.FormEvent) => {
     e.preventDefault();
     if (!brandName.trim()) return;
+    if (isSavingBrandRef.current) return;
+    isSavingBrandRef.current = true;
 
     const brandPayload: Brand = {
       id: editingBrand ? editingBrand.id : `brand-${Date.now()}`,
@@ -151,6 +160,7 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
     }
 
     setIsBrandModalOpen(false);
+    isSavingBrandRef.current = false;
   };
 
   const handleDeleteBrand = (id: string, name: string) => {
@@ -199,6 +209,8 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
   const handleSaveProject = (e: React.FormEvent) => {
     e.preventDefault();
     if (!projName.trim()) return;
+    if (isSavingProjectRef.current) return;
+    isSavingProjectRef.current = true;
 
     const selectedBrand = brands.find((b) => b.id === projBrandId);
 
@@ -226,6 +238,7 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
     }
 
     setIsProjectModalOpen(false);
+    isSavingProjectRef.current = false;
   };
 
   const handleDeleteProject = (id: string, name: string) => {
@@ -241,17 +254,13 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
           <Building2 className="w-4 h-4 text-purple-400" /> Modules 01 & 02: CRM & Project Management
         </span>
         <h2 className="text-2xl font-black">Quản Lý Khách Hàng (Brand CRM) & Dự Án Agency</h2>
-        <p className="text-slate-400 text-xs">
-          Quản lý Hợp đồng, Tiến độ Campaign, AI Tóm tắt cuộc họp & Theo dõi tiến độ KPI GMV
-        </p>
       </div>
 
       {/* Brand CRM Section */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+      <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-sm space-y-4">
         <div className="flex justify-between items-center">
           <div>
-            <h3 className="font-bold text-slate-900 text-base">Danh Sách Thương Hiệu Đối Tác ({brands.length} Brands)</h3>
-            <p className="text-xs text-slate-500">Quản lý pipeline hợp đồng, KAM phụ trách & doanh thu tích lũy</p>
+            <h3 className="font-bold text-slate-100 text-base">Danh Sách Thương Hiệu Đối Tác ({brands.length} Brands)</h3>
           </div>
           <button
             onClick={openAddBrandModal}
@@ -263,33 +272,33 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
 
         <div className="grid md:grid-cols-2 gap-4">
           {brands.map((b) => (
-            <div key={b.id} className="p-4 rounded-2xl border border-slate-200 bg-slate-50 space-y-3 hover:border-purple-300 transition-all relative group">
+            <div key={b.id} className="p-4 rounded-2xl border border-slate-800 bg-slate-800/40 space-y-3 hover:border-purple-500/50 transition-all relative group">
               <div className="flex justify-between items-start">
                 <div className="flex items-center space-x-3">
-                  <span className="text-2xl p-2 bg-white rounded-xl border border-slate-200 shadow-sm">{b.logo}</span>
+                  <span className="text-2xl p-2 bg-slate-800 rounded-xl border border-slate-700 shadow-sm">{b.logo}</span>
                   <div>
-                    <h4 className="font-bold text-slate-900 text-sm">{b.name}</h4>
-                    <p className="text-xs text-purple-700 font-medium">{b.industry}</p>
+                    <h4 className="font-bold text-slate-100 text-sm">{b.name}</h4>
+                    <p className="text-xs text-purple-300 font-medium">{b.industry}</p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-1.5">
                   <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
-                    b.contractStatus === "Active" ? "bg-emerald-100 text-emerald-800" :
-                    b.contractStatus === "Pending" ? "bg-amber-100 text-amber-800" : "bg-slate-200 text-slate-700"
+                    b.contractStatus === "Active" ? "bg-emerald-900/50 text-emerald-300" :
+                    b.contractStatus === "Pending" ? "bg-amber-900/50 text-amber-300" : "bg-slate-700 text-slate-300"
                   }`}>
                     {b.contractStatus}
                   </span>
                   <button
                     onClick={() => openEditBrandModal(b)}
-                    className="p-1 text-slate-400 hover:text-purple-600 rounded transition-all"
+                    className="p-1 text-slate-400 hover:text-purple-400 rounded transition-all"
                     title="Chỉnh sửa Brand"
                   >
                     <Edit3 className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => handleDeleteBrand(b.id, b.name)}
-                    className="p-1 text-slate-400 hover:text-red-600 rounded transition-all"
+                    className="p-1 text-slate-400 hover:text-red-400 rounded transition-all"
                     title="Xóa Brand"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -297,14 +306,14 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 text-xs bg-white p-2.5 rounded-xl border border-slate-100">
-                <div>Đại diện Brand: <strong className="text-slate-900 block">{b.contactName} ({b.phone})</strong></div>
-                <div>Phụ trách KAM: <strong className="text-slate-900 block">{b.owner}</strong></div>
+              <div className="grid grid-cols-2 gap-2 text-xs bg-slate-800/60 p-2.5 rounded-xl border border-slate-800 text-slate-400">
+                <div>Đại diện Brand: <strong className="text-slate-100 block">{b.contactName} ({b.phone})</strong></div>
+                <div>Phụ trách KAM: <strong className="text-slate-100 block">{b.owner}</strong></div>
               </div>
 
-              <div className="flex justify-between items-center text-xs pt-1 border-t border-slate-200">
-                <span className="text-slate-500">Chiến dịch active: <strong>{b.activeCampaigns} campaigns</strong></span>
-                <span className="text-emerald-600 font-bold">Tổng GMV: {(b.totalGmv / 1000000000).toFixed(2)} Tỷ đ</span>
+              <div className="flex justify-between items-center text-xs pt-1 border-t border-slate-800">
+                <span className="text-slate-400">Chiến dịch active: <strong>{b.activeCampaigns} campaigns</strong></span>
+                <span className="text-emerald-400 font-bold">Tổng GMV: {formatCurrencyAdaptive(b.totalGmv)}</span>
               </div>
             </div>
           ))}
@@ -339,11 +348,10 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
       </div>
 
       {/* Projects Kanban / List */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+      <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-sm space-y-4">
         <div className="flex justify-between items-center">
           <div>
-            <h3 className="font-bold text-slate-900 text-base">Tiến Độ Các Dự Án Livestream ({projects.length} Dự Án)</h3>
-            <p className="text-xs text-slate-500">Theo dõi ngân sách, số phiên live & KPI GMV thực đạt</p>
+            <h3 className="font-bold text-slate-100 text-base">Tiến Độ Các Dự Án Livestream ({projects.length} Dự Án)</h3>
           </div>
           <button
             onClick={openAddProjectModal}
@@ -357,35 +365,35 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
           {projects.map((p) => {
             const percentGmv = p.kpiGmv > 0 ? Math.min(100, Math.round((p.actualGmv / p.kpiGmv) * 100)) : 0;
             return (
-              <div key={p.id} className="p-4 rounded-2xl border border-slate-200 bg-slate-50 space-y-3 hover:border-purple-300 transition-all relative group">
+              <div key={p.id} className="p-4 rounded-2xl border border-slate-800 bg-slate-800/40 space-y-3 hover:border-purple-500/50 transition-all relative group">
                 <div className="flex justify-between items-center text-xs">
                   <div>
-                    <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                    <h4 className="font-bold text-slate-100 text-sm flex items-center gap-2">
                       {p.name}
                       <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${
-                        p.status === "In Progress" ? "bg-purple-100 text-purple-800" :
-                        p.status === "Completed" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+                        p.status === "In Progress" ? "bg-purple-900/50 text-purple-300" :
+                        p.status === "Completed" ? "bg-emerald-900/50 text-emerald-300" : "bg-amber-900/50 text-amber-300"
                       }`}>
                         {p.status}
                       </span>
                     </h4>
-                    <span className="text-slate-500">Brand: {p.brandName} | Team Lead: {p.teamLead}</span>
+                    <span className="text-slate-400">Brand: {p.brandName} | Team Lead: {p.teamLead}</span>
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <span className="bg-purple-100 text-purple-800 font-bold px-3 py-1 rounded-full text-xs">
+                    <span className="bg-purple-900/50 text-purple-300 font-bold px-3 py-1 rounded-full text-xs">
                       {p.sessionsCompleted}/{p.totalSessionsPlanned} Phiên Live
                     </span>
                     <button
                       onClick={() => openEditProjectModal(p)}
-                      className="p-1 text-slate-400 hover:text-purple-600 rounded transition-all"
+                      className="p-1 text-slate-400 hover:text-purple-400 rounded transition-all"
                       title="Chỉnh sửa dự án"
                     >
                       <Edit3 className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => handleDeleteProject(p.id, p.name)}
-                      className="p-1 text-slate-400 hover:text-red-600 rounded transition-all"
+                      className="p-1 text-slate-400 hover:text-red-400 rounded transition-all"
                       title="Xóa dự án"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -396,10 +404,10 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
                 {/* Progress Bar */}
                 <div className="space-y-1">
                   <div className="flex justify-between text-[11px] font-bold">
-                    <span className="text-slate-600">Thực Thu GMV: {p.actualGmv.toLocaleString()} đ</span>
-                    <span className="text-emerald-600">KPI Target: {p.kpiGmv.toLocaleString()} đ ({percentGmv}%)</span>
+                    <span className="text-slate-400">Thực Thu GMV: {p.actualGmv.toLocaleString()} đ</span>
+                    <span className="text-emerald-400">KPI Target: {p.kpiGmv.toLocaleString()} đ ({percentGmv}%)</span>
                   </div>
-                  <div className="w-full h-3 bg-slate-200 rounded-full overflow-hidden">
+                  <div className="w-full h-3 bg-slate-700 rounded-full overflow-hidden">
                     <div className="h-full bg-gradient-to-r from-purple-600 to-emerald-500 rounded-full" style={{ width: `${percentGmv}%` }}></div>
                   </div>
                 </div>
@@ -412,8 +420,8 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
       {/* Brand Form Modal */}
       {isBrandModalOpen && (
         <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
-            <div className="bg-slate-900 text-white px-6 py-4 flex justify-between items-center">
+          <div className="bg-slate-900 w-full max-w-lg rounded-2xl shadow-2xl border border-slate-800 overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="bg-slate-900 text-white px-6 py-4 flex justify-between items-center shrink-0">
               <h3 className="font-bold text-sm flex items-center gap-2">
                 <Building2 className="w-4 h-4 text-purple-400" />
                 {editingBrand ? `Chỉnh Sửa Thương Hiệu: ${editingBrand.name}` : "Thêm Thương Hiệu Đối Tác Mới"}
@@ -423,48 +431,48 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSaveBrand} className="p-6 space-y-4 text-xs">
-              <div className="grid grid-cols-3 gap-3">
-                <div className="col-span-2">
-                  <label className="font-bold text-slate-700 block mb-1">Tên Thương Hiệu (Brand Name) *</label>
+            <form onSubmit={handleSaveBrand} className="p-6 space-y-4 text-xs overflow-y-auto">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="font-bold text-slate-300 block mb-1">Tên Thương Hiệu (Brand Name) *</label>
                   <input
                     type="text"
                     required
                     value={brandName}
                     onChange={(e) => setBrandName(e.target.value)}
                     placeholder="VD: Maybelline Official"
-                    className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800"
+                    className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold bg-slate-950 text-slate-100 placeholder:text-slate-500"
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Logo / Emoji</label>
+                  <label className="font-bold text-slate-300 block mb-1">Logo / Emoji</label>
                   <input
                     type="text"
                     value={brandLogo}
                     onChange={(e) => setBrandLogo(e.target.value)}
                     placeholder="🌿"
-                    className="w-full p-2.5 border border-slate-200 rounded-xl text-center font-bold text-lg"
+                    className="w-full p-2.5 border border-slate-700 rounded-xl text-center font-bold text-lg bg-slate-950 text-slate-100 placeholder:text-slate-500"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Ngành Hàng (Industry)</label>
+                  <label className="font-bold text-slate-300 block mb-1">Ngành Hàng (Industry)</label>
                   <input
                     type="text"
                     value={brandIndustry}
                     onChange={(e) => setBrandIndustry(e.target.value)}
                     placeholder="VD: Mỹ Phẩm Skincare"
-                    className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800"
+                    className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold bg-slate-950 text-slate-100 placeholder:text-slate-500"
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Trạng Thái Hợp Đồng</label>
+                  <label className="font-bold text-slate-300 block mb-1">Trạng Thái Hợp Đồng</label>
                   <select
                     value={brandContractStatus}
                     onChange={(e) => setBrandContractStatus(e.target.value as any)}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800"
+                    className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold bg-slate-950 text-slate-100"
                   >
                     <option value="Active">Active (Đang Chạy)</option>
                     <option value="Pending">Pending (Đang Đàm Đạo)</option>
@@ -473,37 +481,37 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Tên Người Đại Diện Brand</label>
+                  <label className="font-bold text-slate-300 block mb-1">Tên Người Đại Diện Brand</label>
                   <input
                     type="text"
                     value={brandContactName}
                     onChange={(e) => setBrandContactName(e.target.value)}
                     placeholder="VD: Nguyễn Thị Lan"
-                    className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800"
+                    className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold bg-slate-950 text-slate-100 placeholder:text-slate-500"
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Số Điện Thoại Đại Diện</label>
+                  <label className="font-bold text-slate-300 block mb-1">Số Điện Thoại Đại Diện</label>
                   <input
                     type="text"
                     value={brandPhone}
                     onChange={(e) => setBrandPhone(e.target.value)}
                     placeholder="VD: 0909 123 456"
-                    className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800"
+                    className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold bg-slate-950 text-slate-100 placeholder:text-slate-500"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Nhân Viên Phụ Trách (KAM Lead)</label>
+                  <label className="font-bold text-slate-300 block mb-1">Nhân Viên Phụ Trách (KAM Lead)</label>
                   {staffUsers.length > 0 ? (
                     <select
                       value={brandOwnerUserId}
                       onChange={(e) => handleBrandOwnerSelect(e.target.value)}
-                      className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800 bg-white"
+                      className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold bg-slate-950 text-slate-100"
                     >
                       <option value="">-- Chọn nhân sự phụ trách --</option>
                       {staffUsers.map((u) => (
@@ -518,26 +526,26 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
                       value={brandOwner}
                       onChange={(e) => setBrandOwner(e.target.value)}
                       placeholder="VD: Lê Quốc Bảo"
-                      className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800"
+                      className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold bg-slate-950 text-slate-100 placeholder:text-slate-500"
                     />
                   )}
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Tổng Doanh Thu Tích Lũy (VNĐ)</label>
+                  <label className="font-bold text-slate-300 block mb-1">Tổng Doanh Thu Tích Lũy (VNĐ)</label>
                   <input
                     type="number"
                     value={brandTotalGmv}
                     onChange={(e) => setBrandTotalGmv(Number(e.target.value))}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800"
+                    className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold bg-slate-950 text-slate-100 placeholder:text-slate-500"
                   />
                 </div>
               </div>
 
-              <div className="pt-4 border-t border-slate-200 flex justify-end gap-3">
+              <div className="pt-4 border-t border-slate-800 flex justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setIsBrandModalOpen(false)}
-                  className="px-4 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-xl transition-all"
+                  className="px-4 py-2 text-slate-400 font-bold hover:bg-slate-800 rounded-xl transition-all"
                 >
                   Hủy Bỏ
                 </button>
@@ -556,8 +564,8 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
       {/* Project Form Modal */}
       {isProjectModalOpen && (
         <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
-            <div className="bg-slate-900 text-white px-6 py-4 flex justify-between items-center">
+          <div className="bg-slate-900 w-full max-w-lg rounded-2xl shadow-2xl border border-slate-800 overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="bg-slate-900 text-white px-6 py-4 flex justify-between items-center shrink-0">
               <h3 className="font-bold text-sm flex items-center gap-2">
                 <Layers className="w-4 h-4 text-purple-400" />
                 {editingProject ? `Chỉnh Sửa Dự Án: ${editingProject.name}` : "Tạo Dự Án Livestream Mới"}
@@ -567,26 +575,26 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSaveProject} className="p-6 space-y-4 text-xs">
+            <form onSubmit={handleSaveProject} className="p-6 space-y-4 text-xs overflow-y-auto">
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Tên Dự Án / Campaign *</label>
+                <label className="font-bold text-slate-300 block mb-1">Tên Dự Án / Campaign *</label>
                 <input
                   type="text"
                   required
                   value={projName}
                   onChange={(e) => setProjName(e.target.value)}
                   placeholder="VD: Mega Live 8/8 Brand Cocoon"
-                  className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800"
+                  className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold bg-slate-950 text-slate-100 placeholder:text-slate-500"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Thương Hiệu (Brand)</label>
+                  <label className="font-bold text-slate-300 block mb-1">Thương Hiệu (Brand)</label>
                   <select
                     value={projBrandId}
                     onChange={(e) => setProjBrandId(e.target.value)}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800"
+                    className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold bg-slate-950 text-slate-100"
                   >
                     {brands.map((b) => (
                       <option key={b.id} value={b.id}>
@@ -596,11 +604,11 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Trạng Thái Dự Án</label>
+                  <label className="font-bold text-slate-300 block mb-1">Trạng Thái Dự Án</label>
                   <select
                     value={projStatus}
                     onChange={(e) => setProjStatus(e.target.value as any)}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800"
+                    className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold bg-slate-950 text-slate-100"
                   >
                     <option value="In Progress">In Progress (Đang Chạy)</option>
                     <option value="Planning">Planning (Lập Kế Hoạch)</option>
@@ -610,64 +618,64 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Ngân Sách Campaign (VNĐ)</label>
+                  <label className="font-bold text-slate-300 block mb-1">Ngân Sách Campaign (VNĐ)</label>
                   <input
                     type="number"
                     value={projBudget}
                     onChange={(e) => setProjBudget(Number(e.target.value))}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800"
+                    className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold bg-slate-950 text-slate-100 placeholder:text-slate-500"
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">KPI Target GMV (VNĐ)</label>
+                  <label className="font-bold text-slate-300 block mb-1">KPI Target GMV (VNĐ)</label>
                   <input
                     type="number"
                     value={projKpiGmv}
                     onChange={(e) => setProjKpiGmv(Number(e.target.value))}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800"
+                    className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold bg-slate-950 text-slate-100 placeholder:text-slate-500"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">GMV Thực Đạt (VNĐ)</label>
+                  <label className="font-bold text-slate-300 block mb-1">GMV Thực Đạt (VNĐ)</label>
                   <input
                     type="number"
                     value={projActualGmv}
                     onChange={(e) => setProjActualGmv(Number(e.target.value))}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800"
+                    className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold bg-slate-950 text-slate-100 placeholder:text-slate-500"
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Tổng Phiên Live Kế Hoạch</label>
+                  <label className="font-bold text-slate-300 block mb-1">Tổng Phiên Live Kế Hoạch</label>
                   <input
                     type="number"
                     value={projPlannedSessions}
                     onChange={(e) => setProjPlannedSessions(Number(e.target.value))}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800"
+                    className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold bg-slate-950 text-slate-100 placeholder:text-slate-500"
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Phiên Hoàn Thành</label>
+                  <label className="font-bold text-slate-300 block mb-1">Phiên Hoàn Thành</label>
                   <input
                     type="number"
                     value={projCompletedSessions}
                     onChange={(e) => setProjCompletedSessions(Number(e.target.value))}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800"
+                    className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold bg-slate-950 text-slate-100 placeholder:text-slate-500"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Trưởng Nhóm Dự Án (Team Lead)</label>
+                <label className="font-bold text-slate-300 block mb-1">Trưởng Nhóm Dự Án (Team Lead)</label>
                 {staffUsers.length > 0 ? (
                   <select
                     value={projTeamLeadUserId}
                     onChange={(e) => handleTeamLeadSelect(e.target.value)}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800 bg-white"
+                    className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold bg-slate-950 text-slate-100"
                   >
                     <option value="">-- Chọn Team Lead --</option>
                     {staffUsers.map((u) => (
@@ -682,16 +690,16 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
                     value={projTeamLead}
                     onChange={(e) => setProjTeamLead(e.target.value)}
                     placeholder="VD: Trần Hoàng"
-                    className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800"
+                    className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold bg-slate-950 text-slate-100 placeholder:text-slate-500"
                   />
                 )}
               </div>
 
-              <div className="pt-4 border-t border-slate-200 flex justify-end gap-3">
+              <div className="pt-4 border-t border-slate-800 flex justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setIsProjectModalOpen(false)}
-                  className="px-4 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-xl transition-all"
+                  className="px-4 py-2 text-slate-400 font-bold hover:bg-slate-800 rounded-xl transition-all"
                 >
                   Hủy Bỏ
                 </button>

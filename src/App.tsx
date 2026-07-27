@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, StrategicDirective, WorkflowRule, Talent, Studio, Equipment, Brand, AgencyProject, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent } from "./types";
+import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, StrategicDirective, WorkflowRule, Talent, Studio, Equipment, Brand, AgencyProject, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt } from "./types";
 import { ALL_PERMISSION_DEFINITIONS } from "./data/mockData";
 import { fetchTalents, createTalent, updateTalent, deleteTalent } from "./lib/db/talents";
 import { fetchStudios, createStudio, updateStudio, deleteStudio } from "./lib/db/studios";
@@ -14,6 +14,7 @@ import { fetchAuditLogs, createAuditLog } from "./lib/db/auditLogs";
 import { fetchRolePermissions, updateRolePermissions } from "./lib/db/rolePermissions";
 import { fetchSessionFinances, upsertSessionFinance, setSessionFinanceApproval } from "./lib/db/finance";
 import { fetchTikTokStatus, fetchTikTokWebhookEvents } from "./lib/db/tiktokIntegration";
+import { fetchAiAgentPrompts, updateAiAgentPrompt } from "./lib/db/aiAgentPrompts";
 import {
   LayoutDashboard,
   Radio,
@@ -33,7 +34,8 @@ import {
   ShieldAlert,
   Eye,
   EyeOff,
-  UserCheck
+  UserCheck,
+  BrainCircuit
 } from "lucide-react";
 import { Header } from "./components/Header";
 import { Login } from "./components/Login";
@@ -50,6 +52,7 @@ import { TikTokApiAutomation } from "./components/TikTokApiAutomation";
 import { FinanceHr } from "./components/FinanceHr";
 import { AiMultiAgent } from "./components/AiMultiAgent";
 import { UserRoleSettings } from "./components/UserRoleSettings";
+import { AiTrainingCenter } from "./components/AiTrainingCenter";
 import { MyWorkspace } from "./components/MyWorkspace";
 
 const STORAGE_PREFIX = "liveops_os_v2_";
@@ -95,6 +98,13 @@ export default function App() {
   const [tiktokStatusError, setTiktokStatusError] = useState<string | null>(null);
   const [tiktokWebhookEvents, setTiktokWebhookEvents] = useState<TikTokWebhookEvent[]>([]);
 
+  // AI Training Center prompts — real data from Supabase `ai_agent_prompts` (Giai đoạn 13),
+  // admin-only (RLS blocks read/write for every other role, incl. ceo). Only fetched for
+  // an admin session so non-admin users never see a 403 flash for a tab they can't reach.
+  const [aiAgentPrompts, setAiAgentPrompts] = useState<AiAgentPrompt[]>([]);
+  const [aiAgentPromptsLoading, setAiAgentPromptsLoading] = useState(true);
+  const [aiAgentPromptsError, setAiAgentPromptsError] = useState<string | null>(null);
+
   // Workflow Rules / Directives / Audit Logs — real data from Supabase (Phase 5), no mock fallback
   const [workflowRules, setWorkflowRules] = useState<WorkflowRule[]>([]);
   const [directives, setDirectives] = useState<StrategicDirective[]>([]);
@@ -106,9 +116,6 @@ export default function App() {
   const [users, setUsers] = useState<SystemUser[]>([]);
   const [phase4Loading, setPhase4Loading] = useState(true);
   const [phase4Error, setPhase4Error] = useState<string | null>(null);
-
-  // State
-  const [isMockDataHidden, setIsMockDataHidden] = useState<boolean>(() => loadStorage("isMockDataHidden", true));
 
   // Talents / Studios / Equipments — real data from Supabase (Phase 1), no mock fallback
   const [talents, setTalents] = useState<Talent[]>([]);
@@ -293,6 +300,36 @@ export default function App() {
     };
   }, [session?.user?.id]);
 
+  useEffect(() => {
+    if (!session || currentRole !== "admin") {
+      setAiAgentPromptsLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setAiAgentPromptsLoading(true);
+    fetchAiAgentPrompts()
+      .then((p) => {
+        if (cancelled) return;
+        setAiAgentPrompts(p);
+        setAiAgentPromptsError(null);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setAiAgentPromptsError(err.message ?? "Không tải được AI Training Center từ Supabase.");
+      })
+      .finally(() => {
+        if (!cancelled) setAiAgentPromptsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user?.id, currentRole]);
+
+  async function handleUpdateAiAgentPrompt(agentKey: string, systemPrompt: string) {
+    const updated = await updateAiAgentPrompt(agentKey, systemPrompt);
+    setAiAgentPrompts((prev) => prev.map((p) => (p.agentKey === agentKey ? updated : p)));
+  }
+
   const refreshTikTokStatus = () => {
     if (!session) return;
     setTiktokStatusLoading(true);
@@ -344,9 +381,7 @@ export default function App() {
   // LocalStorage sync effects
   useEffect(() => saveStorage("activeTab", activeTab), [activeTab]);
   useEffect(() => saveStorage("hideRestrictedMenu", hideRestrictedMenu), [hideRestrictedMenu]);
-  useEffect(() => saveStorage("isMockDataHidden", isMockDataHidden), [isMockDataHidden]);
 
-  // Active datasets filtered based on mock data visibility toggle
   // Live Sessions are real Supabase data now (Phase 2) — no mock filtering applies
   const rawActiveSessions = sessions;
   // Brands/Talents/Studios/Equipments/Projects are real Supabase data now — no mock filtering applies
@@ -778,16 +813,6 @@ export default function App() {
     }
   };
 
-  const handleClearAllCustomData = () => {
-    window.alert("Workflow Rules/Directives/Audit Logs giờ là dữ liệu thật trên Supabase — hãy xóa từng mục trong tab tương ứng.");
-  };
-
-  const handleClearEverything = () => {
-    if (window.confirm("Bạn có chắc chắn muốn XÓA SẠCH TẤT CẢ DỮ LIỆU (Cả Mock Data & Dữ liệu tự nhập) để kiểm tra ứng dụng ở trạng thái hoàn toàn trống không?")) {
-      setIsMockDataHidden(true);
-    }
-  };
-
   const handleSelectSessionFromDashboard = (session: LiveSession) => {
     setSelectedSession(session);
     setActiveTab("sessions");
@@ -808,6 +833,11 @@ export default function App() {
     { id: "finance", label: "Finance & P&L", icon: DollarSign, perm: "view_financials" as PermissionKey },
     { id: "ai_agents", label: "Hội Đồng AI & Simulator", icon: Bot, badge: "DEMO", perm: "manage_ai_agents" as PermissionKey },
     { id: "user_settings", label: "Phân Quyền & Role", icon: ShieldCheck, badge: "CUSTOM", perm: "manage_users_permissions" as PermissionKey },
+    // Độc quyền Admin — không dùng PermissionKey/Ma Trận Role để gate (không thể cấp
+    // qua Ma Trận cho role khác, kể cả ceo), chỉ hiện khi currentRole === "admin".
+    ...(currentRole === "admin"
+      ? [{ id: "ai_training", label: "AI Training Center", icon: BrainCircuit, badge: "ADMIN", perm: undefined }]
+      : []),
   ];
 
   // Helper to determine if current tab is allowed
@@ -838,7 +868,7 @@ export default function App() {
     <div className="flex h-screen w-full bg-slate-950 text-slate-200 overflow-hidden font-sans antialiased selection:bg-blue-600 selection:text-white">
       {/* Left Sidebar Navigation */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-900/90 backdrop-blur-md border-r border-slate-800 flex flex-col transition-transform duration-300 md:static md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-900/90 backdrop-blur-md border-r border-slate-800 flex flex-col transition-transform duration-300 md:translate-x-0 ${
           mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -884,7 +914,8 @@ export default function App() {
                   setActiveTab(item.id);
                   setMobileMenuOpen(false);
                 }}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-colors text-xs font-medium ${
+                title={item.label}
+                className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl transition-colors text-xs font-medium ${
                   isActive
                     ? "bg-blue-600/10 text-blue-400 border border-blue-600/20 font-bold"
                     : hasAccess
@@ -892,9 +923,9 @@ export default function App() {
                     : "text-slate-600 hover:bg-slate-900 hover:text-slate-500 opacity-70"
                 }`}
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 min-w-0">
                   <Icon
-                    className={`w-4 h-4 ${
+                    className={`w-4 h-4 shrink-0 ${
                       isActive
                         ? "text-blue-400"
                         : hasAccess
@@ -902,10 +933,10 @@ export default function App() {
                         : "text-slate-600"
                     }`}
                   />
-                  <span>{item.label}</span>
+                  <span className="truncate">{item.label}</span>
                 </div>
 
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 shrink-0">
                   {!hasAccess && <Lock className="w-3.5 h-3.5 text-amber-500/80" />}
                   {item.badge && hasAccess && (
                     <span className="bg-rose-600/20 text-rose-400 border border-rose-500/30 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase animate-pulse">
@@ -943,7 +974,7 @@ export default function App() {
       </aside>
 
       {/* Main Area */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden md:ml-64">
         {/* Top Header Bar */}
         <div className="flex items-center border-b border-slate-800 bg-slate-900/30 pr-4">
           <button
@@ -961,40 +992,9 @@ export default function App() {
               activeUserTitle={activeUser.customRoleTitle}
               onSignOut={signOut}
               sessions={activeSessions}
-              isMockDataHidden={isMockDataHidden}
-              onToggleMockData={() => setIsMockDataHidden(!isMockDataHidden)}
-              onResetData={handleClearAllCustomData}
             />
           </div>
         </div>
-
-        {/* Clean Test Mode Alert Banner */}
-        {isMockDataHidden && (
-          <div className="bg-amber-950/80 border-b border-amber-500/30 px-6 py-2.5 text-xs text-amber-200 flex flex-wrap items-center justify-between gap-3 shadow-md backdrop-blur-md">
-            <div className="flex items-center gap-2">
-              <span className="p-1 bg-amber-500/20 rounded-lg text-amber-400">
-                <Sparkles className="w-4 h-4" />
-              </span>
-              <span>
-                <strong className="text-amber-300 font-extrabold uppercase">Chế Độ Test App (Clean State):</strong> Tất cả dữ liệu mẫu (Mock Data) đã được ẩn/xóa sạch. Tất cả các tab (Brief, Calendar, CRM, Talent, Studio, Settings...) đang trống để bạn tự do tạo dữ liệu mới để thử nghiệm.
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setIsMockDataHidden(false)}
-                className="px-3 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-[11px] transition-all shadow"
-              >
-                Mở Lại Mock Data Ban Đầu
-              </button>
-              <button
-                onClick={handleClearEverything}
-                className="px-3 py-1 bg-red-950/90 hover:bg-red-900 text-red-200 border border-red-500/40 font-bold rounded-lg text-[11px] transition-all"
-              >
-                Xóa Sạch Tự Nhập & Reset Về 0
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* Data Load Error Banner — surfaces fetch failures that used to be captured in state
             and never shown anywhere, leaving affected tabs silently empty with no explanation. */}
@@ -1025,7 +1025,7 @@ export default function App() {
         )}
 
         {/* Dynamic View Content */}
-        <main className="flex-1 overflow-y-auto p-6 scrollbar-thin">
+        <main className="flex-1 overflow-y-auto p-3 sm:p-6 scrollbar-thin">
           <div className="max-w-7xl mx-auto space-y-6">
             {!isTabAllowed ? (
               /* Access Guard Fallback */
@@ -1110,6 +1110,7 @@ export default function App() {
                     brands={activeBrands}
                     talents={activeTalents}
                     onSelectSession={handleSelectSessionFromDashboard}
+                    onNavigateTab={setActiveTab}
                   />
                 )}
 
@@ -1120,6 +1121,7 @@ export default function App() {
                     studios={activeStudios}
                     talents={activeTalents}
                     brands={activeBrands}
+                    users={activeUsers}
                     onSelectSession={setSelectedSession}
                     onAddSession={handleAddSession}
                     onUpdateSession={handleUpdateSession}
@@ -1133,6 +1135,7 @@ export default function App() {
                     studios={activeStudios}
                     talents={activeTalents}
                     brands={activeBrands}
+                    users={activeUsers}
                     onAddSession={handleAddSession}
                     onUpdateSession={handleUpdateSession}
                   />
@@ -1154,6 +1157,7 @@ export default function App() {
                   <StudioEquipment
                     studios={activeStudios}
                     equipments={activeEquipments}
+                    sessions={activeSessions}
                     onAddStudio={handleAddStudio}
                     onUpdateStudio={handleUpdateStudio}
                     onDeleteStudio={handleDeleteStudio}
@@ -1206,6 +1210,15 @@ export default function App() {
 
                 {activeTab === "ai_agents" && <AiMultiAgent onNavigateTab={setActiveTab} />}
 
+                {activeTab === "ai_training" && currentRole === "admin" && (
+                  <AiTrainingCenter
+                    prompts={aiAgentPrompts}
+                    loading={aiAgentPromptsLoading}
+                    error={aiAgentPromptsError}
+                    onUpdate={handleUpdateAiAgentPrompt}
+                  />
+                )}
+
                 {activeTab === "user_settings" && (
                   <UserRoleSettings
                     currentRole={currentRole}
@@ -1219,6 +1232,7 @@ export default function App() {
                     permissionDefinitions={ALL_PERMISSION_DEFINITIONS}
                     brands={activeBrands}
                     talents={activeTalents}
+                    sessions={activeSessions}
                   />
                 )}
               </>
