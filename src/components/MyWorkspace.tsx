@@ -69,7 +69,7 @@ export const MyWorkspace: React.FC<MyWorkspaceProps> = ({
 }) => {
   // Only roles with real access to the Live Sessions module can click through to it;
   // Brand/Talent see the same info inline instead of hitting the Access Restricted guard.
-  const canOpenSessions = currentRole === "ceo" || currentRole === "operations";
+  const canOpenSessions = currentRole === "ceo" || currentRole === "admin" || currentRole === "operations";
 
   const header = (
     <div className="bg-slate-900 text-white p-6 rounded-2xl border border-slate-800 shadow-xl space-y-2">
@@ -83,13 +83,13 @@ export const MyWorkspace: React.FC<MyWorkspaceProps> = ({
     </div>
   );
 
-  if (currentRole === "ceo") {
+  if (currentRole === "ceo" || currentRole === "admin") {
     return (
       <div className="space-y-6">
         {header}
         <EmptyState
-          title="Bạn đang xem với vai trò CEO"
-          desc="CEO có toàn quyền theo dõi mọi Brand, Project và phiên live tại Command Brief & Dashboard. Trang này dành riêng cho từng cá nhân (Ops / Brand / Talent) xem đúng phần việc được giao."
+          title={`Bạn đang xem với vai trò ${currentRole === "admin" ? "Admin" : "CEO"}`}
+          desc="CEO/Admin có toàn quyền theo dõi mọi Brand, Project và phiên live tại Command Brief & Dashboard. Trang này dành riêng cho từng cá nhân (Ops / Brand / Talent) xem đúng phần việc được giao."
         />
         <div className="flex justify-center gap-3">
           <button

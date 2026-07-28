@@ -41,7 +41,7 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
   const [ruleAction, setRuleAction] = useState("");
   const [ruleEnabled, setRuleEnabled] = useState(true);
 
-  const isCeo = currentRole === "ceo";
+  const isCeo = currentRole === "ceo" || currentRole === "admin";
 
   const handleConnect = async () => {
     setActionError(null);

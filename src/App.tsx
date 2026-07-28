@@ -35,10 +35,13 @@ import {
   Eye,
   EyeOff,
   UserCheck,
-  BrainCircuit
+  BrainCircuit,
+  UserCog
 } from "lucide-react";
 import { Header } from "./components/Header";
 import { Login } from "./components/Login";
+import { ResetPasswordScreen } from "./components/ResetPasswordScreen";
+import { AccountSettings } from "./components/AccountSettings";
 import { useAuth } from "./hooks/useAuth";
 import { ExecutiveBrief } from "./components/ExecutiveBrief";
 import { Dashboards } from "./components/Dashboards";
@@ -75,7 +78,7 @@ function saveStorage<T>(key: string, value: T): void {
 }
 
 export default function App() {
-  const { session, profile, loading: authLoading, signOut } = useAuth();
+  const { session, profile, loading: authLoading, signOut, passwordRecovery } = useAuth();
 
   const currentRole: UserRole = profile?.role ?? "talent";
   const [activeTab, setActiveTab] = useState<string>(() => loadStorage("activeTab", "brief"));
@@ -833,6 +836,9 @@ export default function App() {
     { id: "finance", label: "Finance & P&L", icon: DollarSign, perm: "view_financials" as PermissionKey },
     { id: "ai_agents", label: "Hội Đồng AI & Simulator", icon: Bot, badge: "DEMO", perm: "manage_ai_agents" as PermissionKey },
     { id: "user_settings", label: "Phân Quyền & Role", icon: ShieldCheck, badge: "CUSTOM", perm: "manage_users_permissions" as PermissionKey },
+    // Tài khoản cá nhân — luôn hiện với mọi role, không gate theo PermissionKey (đổi tên/mật khẩu
+    // là việc của chính chủ tài khoản, không phải một quyền có thể cấp/thu hồi qua Ma Trận Role).
+    { id: "account_settings", label: "Tài Khoản Của Tôi", icon: UserCog, perm: undefined },
     // Độc quyền Admin — không dùng PermissionKey/Ma Trận Role để gate (không thể cấp
     // qua Ma Trận cho role khác, kể cả ceo), chỉ hiện khi currentRole === "admin".
     ...(currentRole === "admin"
@@ -850,6 +856,10 @@ export default function App() {
         Đang tải phiên đăng nhập...
       </div>
     );
+  }
+
+  if (passwordRecovery) {
+    return <ResetPasswordScreen />;
   }
 
   if (!session) {
@@ -1057,7 +1067,7 @@ export default function App() {
                     Về Dashboard Cho Role
                   </button>
 
-                  {currentRole === "ceo" ? (
+                  {currentRole === "ceo" || currentRole === "admin" ? (
                     <button
                       onClick={() => {
                         setActiveTab("user_settings");
@@ -1234,6 +1244,10 @@ export default function App() {
                     talents={activeTalents}
                     sessions={activeSessions}
                   />
+                )}
+
+                {activeTab === "account_settings" && (
+                  <AccountSettings activeUser={activeUser} onUpdateUser={handleUpdateUser} />
                 )}
               </>
             )}

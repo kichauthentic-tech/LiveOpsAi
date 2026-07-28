@@ -28,7 +28,7 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
   onDeleteProject
 }) => {
   // Internal agency staff eligible to be KAM / Team Lead owners
-  const staffUsers = users.filter((u) => u.role === "ceo" || u.role === "operations");
+  const staffUsers = users.filter((u) => u.role === "ceo" || u.role === "admin" || u.role === "operations");
   const [meetingNotes, setMeetingNotes] = useState(
     "Cuộc họp trao đổi với Brand Cocoon ngày 22/07: Khách hàng đồng ý tăng ngân sách thêm 150 triệu cho đợt Mega Live 8/8 tới. Cần bổ sung 2 Host dự phòng cho ngành Haircare và ghim 10 Voucher 100k duy nhất từ 20h00 đến 21h00."
   );

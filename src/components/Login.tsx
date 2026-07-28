@@ -3,8 +3,8 @@ import { useAuth } from "../hooks/useAuth";
 import { Lock, Mail, User, Loader2 } from "lucide-react";
 
 export const Login: React.FC = () => {
-  const { signIn, signUp } = useAuth();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const { signIn, signUp, sendPasswordResetEmail } = useAuth();
+  const [mode, setMode] = useState<"signin" | "signup" | "forgot">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -17,6 +17,18 @@ export const Login: React.FC = () => {
     setError(null);
     setInfo(null);
     setSubmitting(true);
+
+    if (mode === "forgot") {
+      const result = await sendPasswordResetEmail(email);
+      setSubmitting(false);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      setInfo("Đã gửi email đặt lại mật khẩu. Vui lòng kiểm tra hộp thư (kể cả mục Spam).");
+      return;
+    }
+
     const result =
       mode === "signin" ? await signIn(email, password) : await signUp(email, password, name);
     setSubmitting(false);
@@ -40,26 +52,45 @@ export const Login: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex bg-slate-950/80 border border-slate-800 rounded-xl p-1 mb-6">
-          <button
-            type="button"
-            onClick={() => setMode("signin")}
-            className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
-              mode === "signin" ? "bg-blue-600 text-white" : "text-slate-400"
-            }`}
-          >
-            Đăng nhập
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode("signup")}
-            className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
-              mode === "signup" ? "bg-blue-600 text-white" : "text-slate-400"
-            }`}
-          >
-            Tạo tài khoản
-          </button>
-        </div>
+        {mode !== "forgot" && (
+          <div className="flex bg-slate-950/80 border border-slate-800 rounded-xl p-1 mb-6">
+            <button
+              type="button"
+              onClick={() => {
+                setMode("signin");
+                setError(null);
+                setInfo(null);
+              }}
+              className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                mode === "signin" ? "bg-blue-600 text-white" : "text-slate-400"
+              }`}
+            >
+              Đăng nhập
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMode("signup");
+                setError(null);
+                setInfo(null);
+              }}
+              className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                mode === "signup" ? "bg-blue-600 text-white" : "text-slate-400"
+              }`}
+            >
+              Tạo tài khoản
+            </button>
+          </div>
+        )}
+
+        {mode === "forgot" && (
+          <div className="mb-6">
+            <h2 className="text-sm font-bold text-slate-200">Quên mật khẩu</h2>
+            <p className="text-xs text-slate-500 mt-1">
+              Nhập email đã đăng ký, hệ thống sẽ gửi liên kết đặt lại mật khẩu.
+            </p>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {mode === "signup" && (
@@ -86,18 +117,36 @@ export const Login: React.FC = () => {
               className="w-full pl-9 pr-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm outline-none focus:border-blue-500"
             />
           </div>
-          <div className="relative">
-            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-            <input
-              type="password"
-              required
-              minLength={6}
-              placeholder="Mật khẩu"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full pl-9 pr-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm outline-none focus:border-blue-500"
-            />
-          </div>
+          {mode !== "forgot" && (
+            <div className="relative">
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <input
+                type="password"
+                required
+                minLength={6}
+                placeholder="Mật khẩu"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full pl-9 pr-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm outline-none focus:border-blue-500"
+              />
+            </div>
+          )}
+
+          {mode === "signin" && (
+            <div className="text-right -mt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("forgot");
+                  setError(null);
+                  setInfo(null);
+                }}
+                className="text-[11px] text-slate-500 hover:text-blue-400 font-semibold transition-colors"
+              >
+                Quên mật khẩu?
+              </button>
+            </div>
+          )}
 
           {error && (
             <div className="text-xs text-red-300 bg-red-950/60 border border-red-500/30 rounded-lg px-3 py-2">
@@ -116,8 +165,22 @@ export const Login: React.FC = () => {
             className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-2"
           >
             {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-            {mode === "signin" ? "Đăng nhập" : "Tạo tài khoản"}
+            {mode === "signin" ? "Đăng nhập" : mode === "signup" ? "Tạo tài khoản" : "Gửi liên kết đặt lại"}
           </button>
+
+          {mode === "forgot" && (
+            <button
+              type="button"
+              onClick={() => {
+                setMode("signin");
+                setError(null);
+                setInfo(null);
+              }}
+              className="w-full text-center text-[11px] text-slate-500 hover:text-blue-400 font-semibold transition-colors"
+            >
+              ← Quay lại đăng nhập
+            </button>
+          )}
         </form>
       </div>
     </div>

@@ -188,8 +188,8 @@ export const Dashboards: React.FC<DashboardsProps> = ({
     );
   }
 
-  // Role: CEO / Director
-  if (currentRole === "ceo") {
+  // Role: CEO / Director (Admin = CEO superset, sees the same Executive Dashboard)
+  if (currentRole === "ceo" || currentRole === "admin") {
     return (
       <div className="space-y-6">
         {subTabHeader}

@@ -547,7 +547,8 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {defs.map((def) => {
                       const isAllowed = rolePermissions[selectedRole][def.key];
-                      const isCEO = selectedRole === "ceo" && def.key === "manage_users_permissions";
+                      const isCEO =
+                        (selectedRole === "ceo" || selectedRole === "admin") && def.key === "manage_users_permissions";
 
                       return (
                         <div
@@ -752,7 +753,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                             </button>
 
                             {/* Delete Button */}
-                            {u.role !== "ceo" && (
+                            {u.role !== "ceo" && u.role !== "admin" && (
                               <button
                                 onClick={() => {
                                   if (window.confirm(`Bạn có chắc chắn muốn xóa vĩnh viễn tài khoản "${u.name}" (${u.email})?`)) {
