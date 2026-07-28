@@ -1,4 +1,4 @@
-import { createApp } from "../src/server/createApp";
+import { createApp } from "../src/server/createApp.js";
 
 // Vercel serverless entrypoint. Every request under /api/* is routed here (see vercel.json),
 // and Vercel's Node runtime accepts an Express app directly as the default export since an

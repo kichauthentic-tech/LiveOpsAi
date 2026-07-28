@@ -64,8 +64,10 @@ create table if not exists ai_agent_prompts (
 
 alter table ai_agent_prompts enable row level security;
 
+drop policy if exists "ai_agent_prompts_read_admin" on ai_agent_prompts;
 create policy "ai_agent_prompts_read_admin" on ai_agent_prompts for select
   using (current_user_role() = 'admin');
+drop policy if exists "ai_agent_prompts_write_admin" on ai_agent_prompts;
 create policy "ai_agent_prompts_write_admin" on ai_agent_prompts for all
   using (current_user_role() = 'admin') with check (current_user_role() = 'admin');
 
