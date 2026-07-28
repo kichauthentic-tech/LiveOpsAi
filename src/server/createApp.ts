@@ -61,40 +61,48 @@ export function createApp() {
       ? createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
       : null;
 
+  type CallerResult = { userId: string; reason?: undefined } | { userId?: undefined; reason: string };
+
   // Verifies the caller's bearer token belongs to a signed-in `ceo` (or `admin` — Admin is
   // a superset of CEO, see Giai đoạn 13/PROJECT_STATUS.md) profile. Returns the caller's
-  // user id on success, or null if unauthorized/misconfigured.
-  const requireCeoCaller = async (req: express.Request): Promise<string | null> => {
-    if (!supabaseAdmin) return null;
+  // user id on success, or a `reason` string on failure — the reason is surfaced in the
+  // 403 response so misconfigurations (wrong Supabase project, expired session, role not
+  // actually set) are diagnosable from the client without server log access.
+  const requireCeoCaller = async (req: express.Request): Promise<CallerResult> => {
+    if (!supabaseAdmin) return { reason: "server_not_configured" };
     const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
-    if (!token) return null;
+    if (!token) return { reason: "no_token" };
     const { data: userData, error: userErr } = await supabaseAdmin.auth.getUser(token);
-    if (userErr || !userData.user) return null;
+    if (userErr || !userData.user) return { reason: `invalid_token: ${userErr?.message || "unknown"}` };
     const { data: profile, error: profileErr } = await supabaseAdmin
       .from("profiles")
       .select("role")
       .eq("id", userData.user.id)
       .single();
-    if (profileErr || !profile || (profile.role !== "ceo" && profile.role !== "admin")) return null;
-    return userData.user.id;
+    if (profileErr) return { reason: `profile_lookup_failed: ${profileErr.message}` };
+    if (!profile) return { reason: "profile_not_found" };
+    if (profile.role !== "ceo" && profile.role !== "admin") return { reason: `role_is_${profile.role}` };
+    return { userId: userData.user.id };
   };
 
   // Verifies the caller's bearer token belongs to a signed-in `admin` profile — used
   // exclusively for the AI Training Center (system prompt config), which is deliberately
   // NOT accessible to `ceo` (see ai_agent_prompts RLS in 0012_admin_ai_training_setup.sql).
-  const requireAdminCaller = async (req: express.Request): Promise<string | null> => {
-    if (!supabaseAdmin) return null;
+  const requireAdminCaller = async (req: express.Request): Promise<CallerResult> => {
+    if (!supabaseAdmin) return { reason: "server_not_configured" };
     const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
-    if (!token) return null;
+    if (!token) return { reason: "no_token" };
     const { data: userData, error: userErr } = await supabaseAdmin.auth.getUser(token);
-    if (userErr || !userData.user) return null;
+    if (userErr || !userData.user) return { reason: `invalid_token: ${userErr?.message || "unknown"}` };
     const { data: profile, error: profileErr } = await supabaseAdmin
       .from("profiles")
       .select("role")
       .eq("id", userData.user.id)
       .single();
-    if (profileErr || !profile || profile.role !== "admin") return null;
-    return userData.user.id;
+    if (profileErr) return { reason: `profile_lookup_failed: ${profileErr.message}` };
+    if (!profile) return { reason: "profile_not_found" };
+    if (profile.role !== "admin") return { reason: `role_is_${profile.role}` };
+    return { userId: userData.user.id };
   };
 
   // Returns the admin-configured system prompt for an AI agent (`ai_agent_prompts.system_prompt`),
@@ -123,10 +131,11 @@ export function createApp() {
       if (!supabaseAdmin) {
         return res.status(503).json({ error: "Server chưa cấu hình SUPABASE_SERVICE_ROLE_KEY." });
       }
-      const callerId = await requireCeoCaller(req);
-      if (!callerId) {
-        return res.status(403).json({ error: "Chỉ tài khoản CEO mới được tạo tài khoản mới." });
+      const caller = await requireCeoCaller(req);
+      if (!caller.userId) {
+        return res.status(403).json({ error: `Chỉ tài khoản CEO/Admin mới được tạo tài khoản mới. (${caller.reason})` });
       }
+      const callerId = caller.userId;
       const { name, email, role, customRoleTitle, assignedBrandId, assignedTalentId } = req.body || {};
       if (!name || !email || !role) {
         return res.status(400).json({ error: "Thiếu name/email/role." });
@@ -165,10 +174,11 @@ export function createApp() {
       if (!supabaseAdmin) {
         return res.status(503).json({ error: "Server chưa cấu hình SUPABASE_SERVICE_ROLE_KEY." });
       }
-      const callerId = await requireCeoCaller(req);
-      if (!callerId) {
-        return res.status(403).json({ error: "Chỉ tài khoản CEO mới được xóa tài khoản." });
+      const caller = await requireCeoCaller(req);
+      if (!caller.userId) {
+        return res.status(403).json({ error: `Chỉ tài khoản CEO/Admin mới được xóa tài khoản. (${caller.reason})` });
       }
+      const callerId = caller.userId;
       const { id } = req.params;
       if (id === callerId) {
         return res.status(400).json({ error: "Không thể tự xóa tài khoản của chính mình." });
@@ -194,9 +204,9 @@ export function createApp() {
       if (!supabaseAdmin) {
         return res.status(503).json({ error: "Server chưa cấu hình Supabase Admin." });
       }
-      const callerId = await requireAdminCaller(req);
-      if (!callerId) {
-        return res.status(403).json({ error: "Chỉ tài khoản Admin mới được xem AI Training Center." });
+      const caller = await requireAdminCaller(req);
+      if (!caller.userId) {
+        return res.status(403).json({ error: `Chỉ tài khoản Admin mới được xem AI Training Center. (${caller.reason})` });
       }
       const { data, error } = await supabaseAdmin.from("ai_agent_prompts").select("*").order("category").order("agent_key");
       if (error) {
@@ -214,10 +224,11 @@ export function createApp() {
       if (!supabaseAdmin) {
         return res.status(503).json({ error: "Server chưa cấu hình Supabase Admin." });
       }
-      const callerId = await requireAdminCaller(req);
-      if (!callerId) {
-        return res.status(403).json({ error: "Chỉ tài khoản Admin mới được sửa AI Training Center." });
+      const caller = await requireAdminCaller(req);
+      if (!caller.userId) {
+        return res.status(403).json({ error: `Chỉ tài khoản Admin mới được sửa AI Training Center. (${caller.reason})` });
       }
+      const callerId = caller.userId;
       const { agentKey } = req.params;
       const { systemPrompt } = req.body || {};
       if (typeof systemPrompt !== "string" || !systemPrompt.trim()) {
@@ -316,9 +327,9 @@ export function createApp() {
       if (!tiktokConfigured()) {
         return res.status(503).json({ error: "Server chưa cấu hình TIKTOK_APP_KEY/TIKTOK_APP_SECRET/TIKTOK_REDIRECT_URI." });
       }
-      const callerId = await requireCeoCaller(req);
-      if (!callerId) {
-        return res.status(403).json({ error: "Chỉ tài khoản CEO mới được kết nối TikTok Shop." });
+      const caller = await requireCeoCaller(req);
+      if (!caller.userId) {
+        return res.status(403).json({ error: `Chỉ tài khoản CEO/Admin mới được kết nối TikTok Shop. (${caller.reason})` });
       }
       pruneExpiredOAuthStates();
       const state = crypto.randomBytes(16).toString("hex");
@@ -417,9 +428,9 @@ export function createApp() {
       if (!supabaseAdmin) {
         return res.status(503).json({ error: "Server chưa cấu hình Supabase Admin." });
       }
-      const callerId = await requireCeoCaller(req);
-      if (!callerId) {
-        return res.status(403).json({ error: "Chỉ tài khoản CEO mới được ngắt kết nối TikTok Shop." });
+      const caller = await requireCeoCaller(req);
+      if (!caller.userId) {
+        return res.status(403).json({ error: `Chỉ tài khoản CEO/Admin mới được ngắt kết nối TikTok Shop. (${caller.reason})` });
       }
       const { error } = await supabaseAdmin.from("tiktok_shop_connections").delete().neq("shop_id", "");
       if (error) {
