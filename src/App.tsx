@@ -32,8 +32,6 @@ import {
   ShieldCheck,
   Lock,
   ShieldAlert,
-  Eye,
-  EyeOff,
   UserCheck,
   BrainCircuit,
   UserCog
@@ -83,7 +81,6 @@ export default function App() {
   const currentRole: UserRole = profile?.role ?? "talent";
   const [activeTab, setActiveTab] = useState<string>(() => loadStorage("activeTab", "brief"));
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [hideRestrictedMenu, setHideRestrictedMenu] = useState<boolean>(() => loadStorage("hideRestrictedMenu", false));
 
   // Role Permissions Matrix — real data from Supabase `role_permissions` (Phase 6), no mock/localStorage fallback
   const [rolePermissions, setRolePermissions] = useState<RolePermissionsMap>({} as RolePermissionsMap);
@@ -383,7 +380,6 @@ export default function App() {
 
   // LocalStorage sync effects
   useEffect(() => saveStorage("activeTab", activeTab), [activeTab]);
-  useEffect(() => saveStorage("hideRestrictedMenu", hideRestrictedMenu), [hideRestrictedMenu]);
 
   // Live Sessions are real Supabase data now (Phase 2) — no mock filtering applies
   const rawActiveSessions = sessions;
@@ -897,25 +893,13 @@ export default function App() {
           </button>
         </div>
 
-        <div className="px-4 py-2 border-b border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
-          <span className="font-semibold text-slate-500 uppercase tracking-wider text-[10px]">Danh Mục Tính Năng</span>
-          <button
-            onClick={() => setHideRestrictedMenu(!hideRestrictedMenu)}
-            className="flex items-center gap-1 hover:text-blue-400 transition-colors text-[10px] font-medium"
-            title="Ẩn hoặc hiện các mục không có quyền truy cập"
-          >
-            {hideRestrictedMenu ? <Eye className="w-3 h-3 text-blue-400" /> : <EyeOff className="w-3 h-3 text-slate-500" />}
-            <span>{hideRestrictedMenu ? "Hiện tất cả" : "Ẩn tab khóa"}</span>
-          </button>
-        </div>
-
         <nav className="flex-1 py-3 px-3 space-y-1 overflow-y-auto scrollbar-thin">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
             const hasAccess = !item.perm || checkPermission(item.perm);
 
-            if (hideRestrictedMenu && !hasAccess) return null;
+            if (!hasAccess) return null;
 
             return (
               <button
@@ -928,27 +912,18 @@ export default function App() {
                 className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl transition-colors text-xs font-medium ${
                   isActive
                     ? "bg-blue-600/10 text-blue-400 border border-blue-600/20 font-bold"
-                    : hasAccess
-                    ? "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
-                    : "text-slate-600 hover:bg-slate-900 hover:text-slate-500 opacity-70"
+                    : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
                 }`}
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <Icon
-                    className={`w-4 h-4 shrink-0 ${
-                      isActive
-                        ? "text-blue-400"
-                        : hasAccess
-                        ? "text-slate-400"
-                        : "text-slate-600"
-                    }`}
+                    className={`w-4 h-4 shrink-0 ${isActive ? "text-blue-400" : "text-slate-400"}`}
                   />
                   <span className="truncate">{item.label}</span>
                 </div>
 
                 <div className="flex items-center gap-1.5 shrink-0">
-                  {!hasAccess && <Lock className="w-3.5 h-3.5 text-amber-500/80" />}
-                  {item.badge && hasAccess && (
+                  {item.badge && (
                     <span className="bg-rose-600/20 text-rose-400 border border-rose-500/30 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase animate-pulse">
                       {item.badge}
                     </span>
