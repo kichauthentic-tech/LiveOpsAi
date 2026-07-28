@@ -22,6 +22,7 @@ interface AuthContextValue {
   profile: Profile | null;
   loading: boolean;
   passwordRecovery: boolean;
+  isInvite: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (email: string, password: string, name: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
@@ -39,6 +40,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
+  const [isInvite, setIsInvite] = useState(false);
 
   const loadProfile = async (userId: string) => {
     const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).single();
@@ -46,22 +48,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    // Fallback for the Supabase recovery-link hash (#access_token=...&type=recovery). The
-    // GoTrue client is supposed to auto-detect this and fire PASSWORD_RECOVERY via
+    // Fallback for the Supabase recovery/invite-link hash (#access_token=...&type=recovery|invite).
+    // The GoTrue client is supposed to auto-detect this and fire PASSWORD_RECOVERY via
     // onAuthStateChange, but that one-time parse races React StrictMode's double-invoked
     // effects (subscribe → unsubscribe → subscribe again) and the event can be dropped —
     // observed in practice as the app falling back to the Login screen with the hash still
-    // sitting unprocessed in the URL. Parse it ourselves so recovery works regardless of timing.
+    // sitting unprocessed in the URL. Parse it ourselves so recovery/invite works regardless of
+    // timing. Invite links are treated the same as recovery — the invited user has no password
+    // yet, so they must set one before they can use the app.
     const hashParams = new URLSearchParams(window.location.hash.slice(1));
-    const isRecoveryLink = hashParams.get("type") === "recovery";
+    const linkType = hashParams.get("type");
+    const isRecoveryLink = linkType === "recovery";
+    const isInviteLink = linkType === "invite";
     const recoveryAccessToken = hashParams.get("access_token");
     const recoveryRefreshToken = hashParams.get("refresh_token");
-    if (isRecoveryLink) {
+    if (isRecoveryLink || isInviteLink) {
       window.history.replaceState(null, "", window.location.pathname + window.location.search);
     }
 
-    if (isRecoveryLink && recoveryAccessToken && recoveryRefreshToken) {
+    if ((isRecoveryLink || isInviteLink) && recoveryAccessToken && recoveryRefreshToken) {
       setPasswordRecovery(true);
+      setIsInvite(isInviteLink);
       supabase.auth
         .setSession({ access_token: recoveryAccessToken, refresh_token: recoveryRefreshToken })
         .then(({ data }) => {
@@ -131,7 +138,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { error: error?.message ?? null };
   };
 
-  const clearPasswordRecovery = () => setPasswordRecovery(false);
+  const clearPasswordRecovery = () => {
+    setPasswordRecovery(false);
+    setIsInvite(false);
+  };
 
   return (
     <AuthContext.Provider
@@ -140,6 +150,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         profile,
         loading,
         passwordRecovery,
+        isInvite,
         signIn,
         signUp,
         signOut,

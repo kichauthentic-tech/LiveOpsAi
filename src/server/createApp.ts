@@ -140,8 +140,13 @@ export function createApp() {
       if (!name || !email || !role) {
         return res.status(400).json({ error: "Thiếu name/email/role." });
       }
+      // Supabase's invite email otherwise falls back to the dashboard's Site URL
+      // (commonly left at the localhost default), sending invitees to a dead link —
+      // derive the real origin from the request instead.
+      const requestOrigin = (req.headers.origin as string) || `${req.protocol}://${req.get("host")}`;
       const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-        data: { name, role, custom_role_title: customRoleTitle || "" }
+        data: { name, role, custom_role_title: customRoleTitle || "" },
+        redirectTo: requestOrigin
       });
       if (error) {
         console.error("inviteUserByEmail error:", error);

@@ -2,11 +2,11 @@ import React, { useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { Lock, Loader2, CheckCircle2 } from "lucide-react";
 
-// Shown instead of the normal app when Supabase fires a PASSWORD_RECOVERY auth event —
-// i.e. the user just landed here via the "reset password" link from their email and
-// already has a valid (recovery) session, so this only needs to collect the new password.
+// Shown instead of the normal app when Supabase fires a PASSWORD_RECOVERY auth event, or when
+// the user landed here via an invite link (which has no password yet and must set one) —
+// either way a valid session already exists, so this only needs to collect the new password.
 export const ResetPasswordScreen: React.FC = () => {
-  const { updatePassword, clearPasswordRecovery, signOut } = useAuth();
+  const { updatePassword, clearPasswordRecovery, signOut, isInvite } = useAuth();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -40,14 +40,16 @@ export const ResetPasswordScreen: React.FC = () => {
         <div className="mb-6 text-center">
           <h1 className="text-xl font-bold tracking-tighter text-blue-400">LIVEOPS AI</h1>
           <p className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">
-            Đặt lại mật khẩu
+            {isInvite ? "Đặt mật khẩu cho tài khoản" : "Đặt lại mật khẩu"}
           </p>
         </div>
 
         {done ? (
           <div className="text-center space-y-4">
             <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto" />
-            <p className="text-sm text-slate-300">Mật khẩu đã được cập nhật thành công.</p>
+            <p className="text-sm text-slate-300">
+              {isInvite ? "Mật khẩu đã được thiết lập thành công." : "Mật khẩu đã được cập nhật thành công."}
+            </p>
             <button
               onClick={async () => {
                 clearPasswordRecovery();
@@ -60,7 +62,9 @@ export const ResetPasswordScreen: React.FC = () => {
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
-            <p className="text-xs text-slate-500">Nhập mật khẩu mới cho tài khoản của bạn.</p>
+            <p className="text-xs text-slate-500">
+              {isInvite ? "Đặt mật khẩu để hoàn tất kích hoạt tài khoản." : "Nhập mật khẩu mới cho tài khoản của bạn."}
+            </p>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
               <input
