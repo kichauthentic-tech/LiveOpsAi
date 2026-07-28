@@ -46,11 +46,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      if (data.session) loadProfile(data.session.user.id);
-      setLoading(false);
-    });
+    // Fallback for the Supabase recovery-link hash (#access_token=...&type=recovery). The
+    // GoTrue client is supposed to auto-detect this and fire PASSWORD_RECOVERY via
+    // onAuthStateChange, but that one-time parse races React StrictMode's double-invoked
+    // effects (subscribe → unsubscribe → subscribe again) and the event can be dropped —
+    // observed in practice as the app falling back to the Login screen with the hash still
+    // sitting unprocessed in the URL. Parse it ourselves so recovery works regardless of timing.
+    const hashParams = new URLSearchParams(window.location.hash.slice(1));
+    const isRecoveryLink = hashParams.get("type") === "recovery";
+    const recoveryAccessToken = hashParams.get("access_token");
+    const recoveryRefreshToken = hashParams.get("refresh_token");
+    if (isRecoveryLink) {
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
+
+    if (isRecoveryLink && recoveryAccessToken && recoveryRefreshToken) {
+      setPasswordRecovery(true);
+      supabase.auth
+        .setSession({ access_token: recoveryAccessToken, refresh_token: recoveryRefreshToken })
+        .then(({ data }) => {
+          if (data.session) setSession(data.session);
+          setLoading(false);
+        });
+    } else {
+      supabase.auth.getSession().then(({ data }) => {
+        setSession(data.session);
+        if (data.session) loadProfile(data.session.user.id);
+        setLoading(false);
+      });
+    }
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, newSession) => {
       setSession(newSession);
