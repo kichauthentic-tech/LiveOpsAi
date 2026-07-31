@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, StrategicDirective, WorkflowRule, Talent, Studio, Equipment, Brand, AgencyProject, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt } from "./types";
+import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, StrategicDirective, WorkflowRule, Talent, Studio, Equipment, Brand, AgencyProject, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, ShiftSlot, ShiftRegistration, RecurringShiftTemplate } from "./types";
 import { ALL_PERMISSION_DEFINITIONS } from "./data/mockData";
 import { fetchTalents, createTalent, updateTalent, deleteTalent } from "./lib/db/talents";
 import { fetchStudios, createStudio, updateStudio, deleteStudio } from "./lib/db/studios";
@@ -15,6 +15,15 @@ import { fetchRolePermissions, updateRolePermissions } from "./lib/db/rolePermis
 import { fetchSessionFinances, upsertSessionFinance, setSessionFinanceApproval } from "./lib/db/finance";
 import { fetchTikTokStatus, fetchTikTokWebhookEvents } from "./lib/db/tiktokIntegration";
 import { fetchAiAgentPrompts, updateAiAgentPrompt } from "./lib/db/aiAgentPrompts";
+import { fetchBrandPlatformRates, upsertBrandPlatformRate } from "./lib/db/brandPlatformRates";
+import { fetchShiftSlots, createShiftSlot, createShiftSlots, updateShiftSlot, deleteShiftSlot } from "./lib/db/shiftSlots";
+import { fetchShiftRegistrations, registerForSlot, unregisterFromSlot } from "./lib/db/shiftRegistrations";
+import {
+  fetchRecurringShiftTemplates,
+  createRecurringShiftTemplate,
+  updateRecurringShiftTemplate,
+  deleteRecurringShiftTemplate
+} from "./lib/db/recurringShiftTemplates";
 import {
   LayoutDashboard,
   Radio,
@@ -34,7 +43,8 @@ import {
   ShieldAlert,
   UserCheck,
   BrainCircuit,
-  UserCog
+  UserCog,
+  CalendarClock
 } from "lucide-react";
 import { Header } from "./components/Header";
 import { Login } from "./components/Login";
@@ -55,6 +65,7 @@ import { AiMultiAgent } from "./components/AiMultiAgent";
 import { UserRoleSettings } from "./components/UserRoleSettings";
 import { AiTrainingCenter } from "./components/AiTrainingCenter";
 import { MyWorkspace } from "./components/MyWorkspace";
+import ShiftScheduling from "./components/ShiftScheduling";
 
 const STORAGE_PREFIX = "liveops_os_v2_";
 
@@ -135,6 +146,15 @@ export default function App() {
   const [projects, setProjects] = useState<AgencyProject[]>([]);
   const [phase3Loading, setPhase3Loading] = useState(true);
   const [phase3Error, setPhase3Error] = useState<string | null>(null);
+
+  // Đăng ký & Chốt Lịch Host — real data from Supabase `brand_platform_rates`/`shift_slots`/
+  // `session_availability` (Giai đoạn 14a), no mock fallback.
+  const [brandPlatformRates, setBrandPlatformRates] = useState<BrandPlatformRate[]>([]);
+  const [shiftSlots, setShiftSlots] = useState<ShiftSlot[]>([]);
+  const [shiftRegistrations, setShiftRegistrations] = useState<ShiftRegistration[]>([]);
+  const [recurringShiftTemplates, setRecurringShiftTemplates] = useState<RecurringShiftTemplate[]>([]);
+  const [phase14Loading, setPhase14Loading] = useState(true);
+  const [phase14Error, setPhase14Error] = useState<string | null>(null);
 
   // Previously these fetch errors were only stored in state and never rendered anywhere — a
   // failed fetch left a tab silently empty forever with no indication anything went wrong.
@@ -272,6 +292,31 @@ export default function App() {
       })
       .finally(() => {
         if (!cancelled) setPhase6Loading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user?.id]);
+
+  useEffect(() => {
+    if (!session) return;
+    let cancelled = false;
+    setPhase14Loading(true);
+    Promise.all([fetchBrandPlatformRates(), fetchShiftSlots(), fetchShiftRegistrations(), fetchRecurringShiftTemplates()])
+      .then(([rates, slots, regs, templates]) => {
+        if (cancelled) return;
+        setBrandPlatformRates(rates);
+        setShiftSlots(slots);
+        setShiftRegistrations(regs);
+        setRecurringShiftTemplates(templates);
+        setPhase14Error(null);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setPhase14Error(err.message ?? "Không tải được dữ liệu Đăng Ký & Chốt Lịch Host từ Supabase.");
+      })
+      .finally(() => {
+        if (!cancelled) setPhase14Loading(false);
       });
     return () => {
       cancelled = true;
@@ -462,9 +507,10 @@ export default function App() {
         phase4Error && { key: "phase4", message: phase4Error },
         phase5Error && { key: "phase5", message: phase5Error },
         phase6Error && { key: "phase6", message: phase6Error },
-        phase7Error && { key: "phase7", message: phase7Error }
+        phase7Error && { key: "phase7", message: phase7Error },
+        phase14Error && { key: "phase14", message: phase14Error }
       ].filter((e): e is { key: string; message: string } => Boolean(e)),
-    [phase1Error, sessionsError, phase3Error, phase4Error, phase5Error, phase6Error, phase7Error]
+    [phase1Error, sessionsError, phase3Error, phase4Error, phase5Error, phase6Error, phase7Error, phase14Error]
   );
   const dataLoadErrorSignature = dataLoadErrors.map((e) => e.key + ":" + e.message).join("|");
   const showDataLoadErrorBanner = dataLoadErrors.length > 0 && dismissedDataErrorSignature !== dataLoadErrorSignature;
@@ -760,6 +806,204 @@ export default function App() {
     }
   };
 
+  // Handlers for "Đăng Ký & Chốt Lịch Host" (Giai đoạn 14a)
+  const handleCreateShiftSlot = async (slot: ShiftSlot): Promise<boolean> => {
+    try {
+      const created = await createShiftSlot(slot);
+      setShiftSlots((prev) => [...prev, created]);
+      return true;
+    } catch (e: any) {
+      window.alert(`Không thể mở ca mới: ${e.message ?? e}`);
+      return false;
+    }
+  };
+
+  const handleDeleteShiftSlot = async (id: string) => {
+    try {
+      await deleteShiftSlot(id);
+      setShiftSlots((prev) => prev.filter((s) => s.id !== id));
+      setShiftRegistrations((prev) => prev.filter((r) => r.slotId !== id));
+    } catch (e: any) {
+      window.alert(`Không thể xoá ca: ${e.message ?? e}`);
+    }
+  };
+
+  const handleCreateRecurringTemplate = async (t: RecurringShiftTemplate): Promise<boolean> => {
+    try {
+      const created = await createRecurringShiftTemplate(t);
+      setRecurringShiftTemplates((prev) => [...prev, created]);
+      return true;
+    } catch (e: any) {
+      window.alert(`Không thể tạo quy tắc lặp: ${e.message ?? e}`);
+      return false;
+    }
+  };
+
+  const handleToggleRecurringTemplate = async (t: RecurringShiftTemplate): Promise<boolean> => {
+    try {
+      const updated = await updateRecurringShiftTemplate({ ...t, active: !t.active });
+      setRecurringShiftTemplates((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+      return true;
+    } catch (e: any) {
+      window.alert(`Không thể cập nhật quy tắc lặp: ${e.message ?? e}`);
+      return false;
+    }
+  };
+
+  const handleDeleteRecurringTemplate = async (id: string) => {
+    try {
+      await deleteRecurringShiftTemplate(id);
+      setRecurringShiftTemplates((prev) => prev.filter((t) => t.id !== id));
+    } catch (e: any) {
+      window.alert(`Không thể xoá quy tắc lặp: ${e.message ?? e}`);
+    }
+  };
+
+  // Sinh ca cho cả tháng từ các quy tắc lặp đang active — bỏ qua ngày đã có
+  // ca sinh từ đúng quy tắc đó rồi (tránh tạo trùng khi bấm lại nhiều lần).
+  const handleGenerateMonthSlots = async (month: string): Promise<number> => {
+    const [yearStr, monthStr] = month.split("-");
+    const year = Number(yearStr);
+    const monthIdx = Number(monthStr) - 1;
+    const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
+
+    const existingByTemplateAndDate = new Set(
+      shiftSlots.filter((s) => s.templateId).map((s) => `${s.templateId}:${s.date}`)
+    );
+
+    const toCreate: ShiftSlot[] = [];
+    for (const template of recurringShiftTemplates.filter((t) => t.active)) {
+      for (let day = 1; day <= daysInMonth; day++) {
+        const date = new Date(year, monthIdx, day);
+        if (date.getDay() !== template.weekday) continue;
+        const dateStr = `${year}-${monthStr.padStart(2, "0")}-${`${day}`.padStart(2, "0")}`;
+        if (existingByTemplateAndDate.has(`${template.id}:${dateStr}`)) continue;
+        toCreate.push({
+          id: `slot-${Date.now()}-${toCreate.length}`,
+          date: dateStr,
+          startTime: template.startTime,
+          endTime: template.endTime,
+          brandId: template.brandId,
+          brandName: template.brandName,
+          platform: template.platform,
+          studioId: template.studioId,
+          studioName: template.studioName,
+          notes: template.notes,
+          status: "open",
+          templateId: template.id
+        });
+      }
+    }
+
+    if (toCreate.length === 0) return 0;
+    try {
+      const created = await createShiftSlots(toCreate);
+      setShiftSlots((prev) => [...prev, ...created]);
+      return created.length;
+    } catch (e: any) {
+      window.alert(`Không thể sinh ca tự động: ${e.message ?? e}`);
+      return 0;
+    }
+  };
+
+  const handleRegisterSlot = async (slotId: string, talentId: string): Promise<boolean> => {
+    try {
+      const created = await registerForSlot(slotId, talentId);
+      setShiftRegistrations((prev) => [...prev, created]);
+      return true;
+    } catch (e: any) {
+      window.alert(`Không thể đăng ký ca: ${e.message ?? e}`);
+      return false;
+    }
+  };
+
+  const handleUnregisterSlot = async (slotId: string, talentId: string): Promise<boolean> => {
+    try {
+      await unregisterFromSlot(slotId, talentId);
+      setShiftRegistrations((prev) => prev.filter((r) => !(r.slotId === slotId && r.talentId === talentId)));
+      return true;
+    } catch (e: any) {
+      window.alert(`Không thể huỷ đăng ký: ${e.message ?? e}`);
+      return false;
+    }
+  };
+
+  const handleSaveBrandPlatformRate = async (
+    brandId: string,
+    platform: "TikTok" | "Shopee",
+    ratePerHour: number
+  ): Promise<boolean> => {
+    try {
+      const saved = await upsertBrandPlatformRate(brandId, platform, ratePerHour);
+      setBrandPlatformRates((prev) => {
+        const next = prev.filter((r) => !(r.brandId === brandId && r.platform === platform));
+        return [...next, saved];
+      });
+      return true;
+    } catch (e: any) {
+      window.alert(`Không thể lưu rate: ${e.message ?? e}`);
+      return false;
+    }
+  };
+
+  // Chốt lịch: sinh 1 live_session thật từ slot đã đăng ký, rồi đánh dấu slot "finalized"
+  // và lưu lại session_id để tra ngược — cả 2 bước cần thành công thì mới coi là xong.
+  const handleFinalizeShiftSlot = async (slot: ShiftSlot, hostId: string, coHostId: string | null): Promise<boolean> => {
+    const brand = brands.find((b) => b.id === slot.brandId);
+    const studio = studios.find((s) => s.id === slot.studioId);
+    const host = talents.find((t) => t.id === hostId);
+    const coHost = coHostId ? talents.find((t) => t.id === coHostId) : undefined;
+    const rate = brandPlatformRates.find((r) => r.brandId === slot.brandId && r.platform === slot.platform);
+
+    const [sh, sm] = slot.startTime.split(":").map(Number);
+    let [eh, em] = slot.endTime.split(":").map(Number);
+    let mins = eh * 60 + em - (sh * 60 + sm);
+    if (mins <= 0) mins += 24 * 60;
+    const hours = mins / 60;
+
+    const newSession: LiveSession = {
+      id: `session-${Date.now()}`,
+      title: `${brand?.name ?? slot.brandName} - ${slot.date} ${slot.startTime}`,
+      brandId: slot.brandId ?? "",
+      brandName: brand?.name ?? slot.brandName,
+      shopTikTokHandle: `@${(brand?.name ?? slot.brandName).toLowerCase().replace(/\s+/g, "") || "shop"}_official`,
+      studioId: slot.studioId ?? "",
+      studioName: studio?.name ?? slot.studioName,
+      hostId,
+      hostName: host?.name ?? "",
+      assistantName: "",
+      coHostId,
+      coHostName: coHost?.name ?? "",
+      platform: slot.platform,
+      date: slot.date,
+      startTime: slot.startTime,
+      endTime: slot.endTime,
+      status: "Upcoming",
+      targetGmv: (rate?.ratePerHour ?? 0) * hours,
+      actualGmv: 0,
+      totalOrders: 0,
+      avgWatchTimeSeconds: 0,
+      peakViewers: 0,
+      totalViews: 0,
+      ctrAvg: 0,
+      cvrAvg: 0,
+      skus: [],
+      checklist: [],
+      minuteMetrics: []
+    };
+
+    try {
+      const created = await createSession(newSession);
+      setSessions((prev) => [created, ...prev]);
+      const updatedSlot = await updateShiftSlot({ ...slot, status: "finalized", sessionId: created.id });
+      setShiftSlots((prev) => prev.map((s) => (s.id === updatedSlot.id ? updatedSlot : s)));
+      return true;
+    } catch (e: any) {
+      window.alert(`Không thể chốt lịch: ${e.message ?? e}`);
+      return false;
+    }
+  };
+
   // Handlers for Workflow Rules — persisted to Supabase
   const handleAddWorkflowRule = async (newRule: WorkflowRule) => {
     try {
@@ -824,6 +1068,10 @@ export default function App() {
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, perm: undefined },
     { id: "sessions", label: "Live Sessions", icon: Radio, badge: "LIVE", perm: "manage_sessions" as PermissionKey },
     { id: "calendar", label: "Lịch Vận Hành", icon: CalendarIcon, badge: "SMART", perm: "manage_calendar" as PermissionKey },
+    // Đăng ký & Chốt Lịch Host — luôn hiện với mọi role, không gate theo PermissionKey: role
+    // talent cần thấy tab này để tự đăng ký ca (Giai đoạn 14a); màn hình bên trong tự đổi giao
+    // diện theo currentRole (talent = đăng ký, ceo/operations/admin = mở ca + chốt lịch).
+    { id: "shift_scheduling", label: "Đăng Ký & Chốt Lịch", icon: CalendarClock, badge: "NEW", perm: undefined },
     { id: "scripts", label: "AI Script Gen", icon: Sparkles, perm: "generate_scripts" as PermissionKey },
     { id: "talents", label: "Talent Pool", icon: Users, perm: "manage_talents" as PermissionKey },
     { id: "studios", label: "Studios & Gear", icon: Building2, perm: "manage_studios_gear" as PermissionKey },
@@ -1123,6 +1371,31 @@ export default function App() {
                     users={activeUsers}
                     onAddSession={handleAddSession}
                     onUpdateSession={handleUpdateSession}
+                  />
+                )}
+
+                {activeTab === "shift_scheduling" && (
+                  <ShiftScheduling
+                    currentRole={currentRole}
+                    activeUser={activeUser}
+                    sessions={activeSessions}
+                    talents={activeTalents}
+                    brands={activeBrands}
+                    studios={activeStudios}
+                    shiftSlots={shiftSlots}
+                    shiftRegistrations={shiftRegistrations}
+                    brandPlatformRates={brandPlatformRates}
+                    recurringShiftTemplates={recurringShiftTemplates}
+                    onCreateSlot={handleCreateShiftSlot}
+                    onDeleteSlot={handleDeleteShiftSlot}
+                    onRegister={handleRegisterSlot}
+                    onUnregister={handleUnregisterSlot}
+                    onFinalizeSlot={handleFinalizeShiftSlot}
+                    onSaveRate={handleSaveBrandPlatformRate}
+                    onCreateTemplate={handleCreateRecurringTemplate}
+                    onToggleTemplate={handleToggleRecurringTemplate}
+                    onDeleteTemplate={handleDeleteRecurringTemplate}
+                    onGenerateMonthSlots={handleGenerateMonthSlots}
                   />
                 )}
 

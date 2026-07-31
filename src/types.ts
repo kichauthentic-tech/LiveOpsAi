@@ -160,6 +160,9 @@ export interface LiveSession {
   hostName: string;
   assistantId?: string;
   assistantName: string;
+  coHostId?: string;
+  coHostName: string;
+  platform: "TikTok" | "Shopee";
   date: string;
   startTime: string;
   endTime: string;
@@ -221,6 +224,54 @@ export interface SessionFinance {
   approvedByUserId?: string;
   approvedAt?: string;
   notes: string;
+}
+
+export interface BrandPlatformRate {
+  id: string;
+  brandId: string;
+  platform: "TikTok" | "Shopee";
+  ratePerHour: number;
+}
+
+export interface ShiftSlot {
+  id: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  brandId?: string;
+  brandName: string;
+  platform: "TikTok" | "Shopee";
+  studioId?: string;
+  studioName: string;
+  notes: string;
+  status: "open" | "finalized" | "cancelled";
+  sessionId?: string;
+  createdBy?: string;
+  templateId?: string;
+}
+
+// Quy tắc lặp theo thứ trong tuần — sinh hàng loạt ShiftSlot cho 1 tháng
+// thay vì ops tạo tay từng ca (xem migration 0015).
+export interface RecurringShiftTemplate {
+  id: string;
+  weekday: number; // 0=CN...6=Thứ 7, khớp Date.getDay()
+  brandId?: string;
+  brandName: string;
+  platform: "TikTok" | "Shopee";
+  startTime: string;
+  endTime: string;
+  studioId?: string;
+  studioName: string;
+  notes: string;
+  active: boolean;
+  createdBy?: string;
+}
+
+export interface ShiftRegistration {
+  id: string;
+  slotId: string;
+  talentId: string;
+  registeredAt: string;
 }
 
 export interface TikTokConnectionStatus {

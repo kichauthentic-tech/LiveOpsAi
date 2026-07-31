@@ -477,6 +477,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
       hostName: hostObj?.name || "Host Live",
       assistantId: newAssistantId || undefined,
       assistantName,
+      coHostName: "",
+      platform: "TikTok",
       date: newDate,
       startTime: newStartTime,
       endTime: newEndTime,

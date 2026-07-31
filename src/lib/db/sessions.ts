@@ -19,6 +19,9 @@ interface DbLiveSession {
   host_name: string;
   assistant_id: string | null;
   assistant_name: string;
+  co_host_id: string | null;
+  co_host_name: string;
+  platform: LiveSession["platform"];
   date: string;
   start_time: string;
   end_time: string;
@@ -96,6 +99,9 @@ function sessionFromDb(row: DbLiveSession): Omit<LiveSession, "skus" | "checklis
     hostName: row.host_name,
     assistantId: row.assistant_id ?? undefined,
     assistantName: row.assistant_name,
+    coHostId: row.co_host_id ?? undefined,
+    coHostName: row.co_host_name,
+    platform: row.platform,
     date: row.date,
     startTime: toHhMm(row.start_time),
     endTime: toHhMm(row.end_time),
@@ -125,6 +131,9 @@ function sessionToDb(s: LiveSession) {
     host_name: s.hostName ?? "",
     assistant_id: orNull(s.assistantId),
     assistant_name: s.assistantName ?? "",
+    co_host_id: orNull(s.coHostId),
+    co_host_name: s.coHostName ?? "",
+    platform: s.platform ?? "TikTok",
     date: s.date,
     start_time: s.startTime,
     end_time: s.endTime,
