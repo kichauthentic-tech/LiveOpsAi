@@ -291,6 +291,19 @@ export interface Campaign {
   // Host/Trợ live khi xem ca thuộc campaign này.
   hostBriefing: string;
   createdBy?: string;
+  // Luồng duyệt với Brand (Giai đoạn 16).
+  approvalStatus: "draft" | "sent_for_approval" | "revision_requested" | "approved";
+  sentAt?: string;
+  approvedAt?: string;
+}
+
+export interface CampaignRevisionNote {
+  id: string;
+  campaignId: string;
+  note: string;
+  requestedBy?: string;
+  requestedByName: string;
+  createdAt: string;
 }
 
 export interface ShiftRegistration {

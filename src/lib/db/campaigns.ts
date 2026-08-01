@@ -15,6 +15,9 @@ interface DbCampaign {
   status: Campaign["status"];
   host_briefing: string;
   created_by: string | null;
+  approval_status: Campaign["approvalStatus"];
+  sent_at: string | null;
+  approved_at: string | null;
 }
 
 function fromDb(row: DbCampaign): Campaign {
@@ -29,7 +32,10 @@ function fromDb(row: DbCampaign): Campaign {
     endDate: row.end_date,
     status: row.status,
     hostBriefing: row.host_briefing,
-    createdBy: row.created_by ?? undefined
+    createdBy: row.created_by ?? undefined,
+    approvalStatus: row.approval_status,
+    sentAt: row.sent_at ?? undefined,
+    approvedAt: row.approved_at ?? undefined
   };
 }
 
@@ -44,7 +50,10 @@ function toDb(c: Campaign) {
     end_date: c.endDate,
     status: c.status,
     host_briefing: c.hostBriefing,
-    created_by: orNull(c.createdBy)
+    created_by: orNull(c.createdBy),
+    approval_status: c.approvalStatus,
+    sent_at: orNull(c.sentAt),
+    approved_at: orNull(c.approvedAt)
   };
 }
 
@@ -69,4 +78,29 @@ export async function updateCampaign(c: Campaign): Promise<Campaign> {
 export async function deleteCampaign(id: string): Promise<void> {
   const { error } = await supabase.from("campaigns").delete().eq("id", id);
   if (error) throw error;
+}
+
+// Ops gửi campaign cho brand duyệt — partial update, không đụng field khác.
+export async function sendCampaignForApproval(id: string): Promise<Campaign> {
+  const { data, error } = await supabase
+    .from("campaigns")
+    .update({ approval_status: "sent_for_approval", sent_at: new Date().toISOString() })
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+  return fromDb(data as DbCampaign);
+}
+
+// Brand duyệt hoặc yêu cầu sửa — partial update, khớp đúng 2 hướng RLS
+// "campaigns_update_approval_brand" cho phép (xem migration 0017).
+export async function respondToCampaignApproval(
+  id: string,
+  decision: "approved" | "revision_requested"
+): Promise<Campaign> {
+  const patch: Record<string, unknown> = { approval_status: decision };
+  if (decision === "approved") patch.approved_at = new Date().toISOString();
+  const { data, error } = await supabase.from("campaigns").update(patch).eq("id", id).select().single();
+  if (error) throw error;
+  return fromDb(data as DbCampaign);
 }

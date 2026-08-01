@@ -1,6 +1,6 @@
-import React from "react";
-import { UserRole, SystemUser, Brand, AgencyProject, LiveSession, Talent } from "../types";
-import { UserCheck, Building2, Layers, Radio, Calendar, DollarSign, Sparkles } from "lucide-react";
+import React, { useState } from "react";
+import { UserRole, SystemUser, Brand, AgencyProject, LiveSession, Talent, Campaign, CampaignRevisionNote, ShiftSlot } from "../types";
+import { UserCheck, Building2, Layers, Radio, Calendar, DollarSign, Sparkles, Target, Send, MessageSquare, CheckCircle2 } from "lucide-react";
 import { formatCurrencyAdaptive } from "../lib/formatCurrency";
 
 interface MyWorkspaceProps {
@@ -10,9 +10,138 @@ interface MyWorkspaceProps {
   projects: AgencyProject[];
   sessions: LiveSession[];
   talents: Talent[];
+  campaigns: Campaign[];
+  campaignRevisionNotes: CampaignRevisionNote[];
+  shiftSlots: ShiftSlot[];
+  onRespondToCampaignApproval: (campaign: Campaign, decision: "approved" | "revision_requested", note?: string) => Promise<boolean>;
   onNavigateTab?: (tabId: string) => void;
   onSelectSession?: (session: LiveSession) => void;
 }
+
+const CAMPAIGN_TYPE_LABELS: Record<Campaign["type"], string> = {
+  daily: "Daily",
+  mega: "Mega D-Day",
+  mid_month: "Mid-month",
+  payday: "Payday",
+  other: "Khác"
+};
+
+const APPROVAL_STATUS_LABELS: Record<Campaign["approvalStatus"], string> = {
+  draft: "Chưa gửi duyệt",
+  sent_for_approval: "Đang chờ bạn duyệt",
+  revision_requested: "Bạn đã yêu cầu sửa",
+  approved: "Đã duyệt"
+};
+
+const APPROVAL_STATUS_STYLES: Record<Campaign["approvalStatus"], string> = {
+  draft: "bg-slate-800 text-slate-400",
+  sent_for_approval: "bg-blue-950 text-blue-300",
+  revision_requested: "bg-rose-950 text-rose-300",
+  approved: "bg-emerald-950 text-emerald-300"
+};
+
+const CampaignApprovalCard: React.FC<{
+  campaign: Campaign;
+  slots: ShiftSlot[];
+  notes: CampaignRevisionNote[];
+  onRespond: (campaign: Campaign, decision: "approved" | "revision_requested", note?: string) => Promise<boolean>;
+}> = ({ campaign, slots, notes, onRespond }) => {
+  const [noteText, setNoteText] = useState("");
+  const [submitting, setSubmitting] = useState<"approved" | "revision_requested" | null>(null);
+  const canRespond = campaign.approvalStatus === "sent_for_approval";
+
+  const handleApprove = async () => {
+    setSubmitting("approved");
+    await onRespond(campaign, "approved");
+    setSubmitting(null);
+  };
+
+  const handleRequestRevision = async () => {
+    if (!noteText.trim()) return;
+    setSubmitting("revision_requested");
+    const ok = await onRespond(campaign, "revision_requested", noteText);
+    setSubmitting(null);
+    if (ok) setNoteText("");
+  };
+
+  return (
+    <div className="p-4 rounded-xl border border-slate-800 space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <strong className="text-sm text-slate-100">{campaign.name}</strong>
+          <span className="text-[10px] font-bold ml-2 px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">{CAMPAIGN_TYPE_LABELS[campaign.type]}</span>
+        </div>
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${APPROVAL_STATUS_STYLES[campaign.approvalStatus]}`}>
+          {APPROVAL_STATUS_LABELS[campaign.approvalStatus]}
+        </span>
+      </div>
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-400">
+        <span>{campaign.startDate} → {campaign.endDate}</span>
+        <span className="font-bold text-emerald-400">KPI GMV: {formatVnd(campaign.targetGmv)}</span>
+        <span>{slots.length} ca đã phân bổ</span>
+      </div>
+
+      {campaign.hostBriefing && (
+        <p className="text-[11px] text-amber-300 bg-amber-950/20 border border-amber-900/40 rounded-lg p-2">{campaign.hostBriefing}</p>
+      )}
+
+      {slots.length > 0 && (
+        <div className="space-y-1 max-h-40 overflow-y-auto pr-1">
+          {slots
+            .slice()
+            .sort((a, b) => a.date.localeCompare(b.date))
+            .map((s) => (
+              <div key={s.id} className="flex items-center justify-between text-[11px] bg-slate-950/60 border border-slate-800 rounded-lg px-2.5 py-1.5">
+                <span className="text-slate-300 font-mono">{s.date} • {s.startTime}-{s.endTime}</span>
+                <span className="text-slate-500">{s.platform}{s.studioName ? ` • ${s.studioName}` : ""}</span>
+              </div>
+            ))}
+        </div>
+      )}
+
+      {notes.length > 0 && (
+        <div className="space-y-1 border-t border-slate-800 pt-2">
+          <span className="text-[11px] text-amber-400 font-bold flex items-center gap-1">
+            <MessageSquare className="w-3 h-3" /> Yêu cầu sửa đã gửi
+          </span>
+          {notes.slice(0, 3).map((n) => (
+            <p key={n.id} className="text-[11px] text-slate-400 pl-4">
+              {new Date(n.createdAt).toLocaleString("vi-VN")}: {n.note}
+            </p>
+          ))}
+        </div>
+      )}
+
+      {canRespond && (
+        <div className="border-t border-slate-800 pt-3 space-y-2">
+          <textarea
+            value={noteText}
+            onChange={(e) => setNoteText(e.target.value)}
+            placeholder="Ghi chú yêu cầu sửa (bắt buộc nếu chọn Yêu Cầu Sửa)..."
+            rows={2}
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-white text-xs focus:outline-none focus:border-blue-500"
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={handleApprove}
+              disabled={submitting !== null}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-colors"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" /> {submitting === "approved" ? "Đang duyệt..." : "Duyệt Lịch"}
+            </button>
+            <button
+              onClick={handleRequestRevision}
+              disabled={submitting !== null || !noteText.trim()}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-950 hover:bg-rose-900 disabled:opacity-50 text-rose-300 border border-rose-800 rounded-lg text-xs font-bold transition-colors"
+            >
+              <Send className="w-3.5 h-3.5" /> {submitting === "revision_requested" ? "Đang gửi..." : "Yêu Cầu Sửa"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const formatVnd = (n: number) => formatCurrencyAdaptive(n);
 
@@ -64,6 +193,10 @@ export const MyWorkspace: React.FC<MyWorkspaceProps> = ({
   projects,
   sessions,
   talents,
+  campaigns,
+  campaignRevisionNotes,
+  shiftSlots,
+  onRespondToCampaignApproval,
   onNavigateTab,
   onSelectSession
 }) => {
@@ -206,6 +339,10 @@ export const MyWorkspace: React.FC<MyWorkspaceProps> = ({
     const myBrand = brands.find((b) => b.id === activeUser.assignedBrandId);
     const myProjects = projects.filter((p) => p.brandId === activeUser.assignedBrandId);
     const mySessions = sessions.filter((s) => s.brandId === activeUser.assignedBrandId);
+    const myCampaigns = campaigns
+      .filter((c) => c.brandId === activeUser.assignedBrandId)
+      .slice()
+      .sort((a, b) => b.startDate.localeCompare(a.startDate));
 
     if (!myBrand) {
       return (
@@ -229,6 +366,27 @@ export const MyWorkspace: React.FC<MyWorkspaceProps> = ({
             <strong className="text-lg text-slate-100 block">{myBrand.name}</strong>
             <span className="text-xs text-slate-400">{myBrand.industry} • Tổng GMV tích lũy: {formatVnd(myBrand.totalGmv)}</span>
           </div>
+        </div>
+
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+          <h3 className="font-bold text-slate-100 flex items-center gap-2">
+            <Target className="w-4 h-4 text-purple-500" /> Campaign & Duyệt Lịch ({myCampaigns.length})
+          </h3>
+          {myCampaigns.length === 0 ? (
+            <p className="text-xs text-slate-400">Chưa có campaign nào được lên kế hoạch cho brand của bạn.</p>
+          ) : (
+            <div className="space-y-3">
+              {myCampaigns.map((c) => (
+                <CampaignApprovalCard
+                  key={c.id}
+                  campaign={c}
+                  slots={shiftSlots.filter((s) => s.campaignId === c.id)}
+                  notes={campaignRevisionNotes.filter((n) => n.campaignId === c.id)}
+                  onRespond={onRespondToCampaignApproval}
+                />
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">

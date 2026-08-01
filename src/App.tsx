@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, StrategicDirective, WorkflowRule, Talent, Studio, Equipment, Brand, AgencyProject, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, Campaign } from "./types";
+import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, StrategicDirective, WorkflowRule, Talent, Studio, Equipment, Brand, AgencyProject, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, Campaign, CampaignRevisionNote } from "./types";
 import { ALL_PERMISSION_DEFINITIONS } from "./data/mockData";
 import { fetchTalents, createTalent, updateTalent, deleteTalent } from "./lib/db/talents";
 import { fetchStudios, createStudio, updateStudio, deleteStudio } from "./lib/db/studios";
@@ -24,7 +24,15 @@ import {
   updateRecurringShiftTemplate,
   deleteRecurringShiftTemplate
 } from "./lib/db/recurringShiftTemplates";
-import { fetchCampaigns, createCampaign, updateCampaign, deleteCampaign } from "./lib/db/campaigns";
+import {
+  fetchCampaigns,
+  createCampaign,
+  updateCampaign,
+  deleteCampaign,
+  sendCampaignForApproval,
+  respondToCampaignApproval
+} from "./lib/db/campaigns";
+import { fetchCampaignRevisionNotes, createCampaignRevisionNote } from "./lib/db/campaignRevisionNotes";
 import {
   LayoutDashboard,
   Radio,
@@ -159,6 +167,7 @@ export default function App() {
 
   // Campaign — chu kỳ vận hành theo tháng của brand (Giai đoạn 15), real data from Supabase `campaigns`.
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [campaignRevisionNotes, setCampaignRevisionNotes] = useState<CampaignRevisionNote[]>([]);
   const [phase15Loading, setPhase15Loading] = useState(true);
   const [phase15Error, setPhase15Error] = useState<string | null>(null);
 
@@ -333,10 +342,11 @@ export default function App() {
     if (!session) return;
     let cancelled = false;
     setPhase15Loading(true);
-    fetchCampaigns()
-      .then((rows) => {
+    Promise.all([fetchCampaigns(), fetchCampaignRevisionNotes()])
+      .then(([rows, notes]) => {
         if (cancelled) return;
         setCampaigns(rows);
+        setCampaignRevisionNotes(notes);
         setPhase15Error(null);
       })
       .catch((err) => {
@@ -990,6 +1000,52 @@ export default function App() {
     }
   };
 
+  // Giai đoạn 16 — luồng duyệt Campaign với Brand.
+  const handleSendCampaignForApproval = async (campaign: Campaign): Promise<boolean> => {
+    try {
+      const updated = await sendCampaignForApproval(campaign.id);
+      setCampaigns((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+      await pushAuditLog({
+        action: "Gửi Campaign cho Brand duyệt",
+        details: `Campaign "${campaign.name}" (${campaign.brandName}) đã được gửi cho Brand duyệt lịch.`,
+        category: "Security Alert"
+      });
+      return true;
+    } catch (e: any) {
+      window.alert(`Không thể gửi campaign cho brand duyệt: ${e.message ?? e}`);
+      return false;
+    }
+  };
+
+  const handleRespondToCampaignApproval = async (
+    campaign: Campaign,
+    decision: "approved" | "revision_requested",
+    note?: string
+  ): Promise<boolean> => {
+    try {
+      const updated = await respondToCampaignApproval(campaign.id, decision);
+      setCampaigns((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+      if (decision === "revision_requested" && note && note.trim()) {
+        const created = await createCampaignRevisionNote({
+          campaignId: campaign.id,
+          note: note.trim(),
+          requestedBy: profile?.id,
+          requestedByName: activeUser.name
+        });
+        setCampaignRevisionNotes((prev) => [created, ...prev]);
+      }
+      await pushAuditLog({
+        action: decision === "approved" ? "Brand duyệt Campaign" : "Brand yêu cầu sửa Campaign",
+        details: `Campaign "${campaign.name}" (${campaign.brandName})${note ? ` — Ghi chú: ${note.trim()}` : ""}`,
+        category: "Security Alert"
+      });
+      return true;
+    } catch (e: any) {
+      window.alert(`Không thể ghi nhận phản hồi duyệt: ${e.message ?? e}`);
+      return false;
+    }
+  };
+
   const handleSaveBrandPlatformRate = async (
     brandId: string,
     platform: "TikTok" | "Shopee",
@@ -1380,6 +1436,10 @@ export default function App() {
                     projects={activeProjects}
                     sessions={activeSessions}
                     talents={activeTalents}
+                    campaigns={campaigns}
+                    campaignRevisionNotes={campaignRevisionNotes}
+                    shiftSlots={shiftSlots}
+                    onRespondToCampaignApproval={handleRespondToCampaignApproval}
                     onNavigateTab={setActiveTab}
                     onSelectSession={handleSelectSessionFromDashboard}
                   />
@@ -1462,6 +1522,8 @@ export default function App() {
                     onCreateCampaign={handleCreateCampaign}
                     onUpdateCampaign={handleUpdateCampaign}
                     onDeleteCampaign={handleDeleteCampaign}
+                    campaignRevisionNotes={campaignRevisionNotes}
+                    onSendCampaignForApproval={handleSendCampaignForApproval}
                     onUpdateSession={handleUpdateSession}
                     onLogAudit={pushAuditLog}
                   />

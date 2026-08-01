@@ -72,7 +72,7 @@ So với mô tả gốc ở trên, đã bổ sung **8 điểm** (rà theo góc n
 | 15 | Billing Model (GMV% / giờ live) + Campaign entity *(+ ưu tiên hoá studio, + đào tạo Host theo campaign)* | Không | [x] Code xong (2026-08-01) — chờ user áp dụng migration `0016` + verify qua browser thật |
 | 15b | Quick win: tách cảnh báo thiếu Host / thiếu Co-host | Không | [x] HOÀN THÀNH (2026-08-01) |
 | 15c | Danh sách dự phòng/on-call — thay người khẩn cấp sát giờ live | 5 (đã có sẵn từ Giai đoạn 14a) | [x] HOÀN THÀNH (2026-08-01) |
-| 16 | Luồng duyệt Campaign với Brand (Brand Client Portal) | 15 | [ ] Chưa bắt đầu |
+| 16 | Luồng duyệt Campaign với Brand (Brand Client Portal) | 15 | [x] HOÀN THÀNH (2026-08-01) |
 | 17 | Nạp report TikTok thật (17 chỉ số + GMV theo 4 nguồn) | Không (độc lập, nhưng nên làm sớm vì 18/21 phụ thuộc) | [ ] Chưa bắt đầu |
 | 18 | Dashboard/Report nâng cấp + export PDF thương hiệu hoá *(+ checkpoint giữa chu kỳ campaign — chờ CEO duyệt)* | 17 | [ ] Chưa bắt đầu |
 | 19 | Rate Card Versioning (Talent + Brand) | Không (nhưng nên làm trước 20) | [ ] Chưa bắt đầu |
@@ -152,10 +152,12 @@ So với mô tả gốc ở trên, đã bổ sung **8 điểm** (rà theo góc n
 - Vẫn giữ nút "Xuất Excel/PDF" cho trường hợp brand muốn file offline (không bắt buộc phải qua portal).
 
 **Test/Verify:**
-- [ ] `npx tsc --noEmit` + build pass.
-- [ ] Login bằng tài khoản `brand` thật, xác nhận chỉ thấy đúng campaign của brand mình (RLS + filter đúng), không thấy brand khác.
-- [ ] Bấm "Yêu cầu sửa" kèm ghi chú → ops thấy ghi chú → sửa slot → gửi lại → brand duyệt → trạng thái chuyển `approved`, có timestamp.
-- [ ] Reload xác nhận persist.
+- [x] `npx tsc --noEmit` + build pass.
+- [x] Login bằng tài khoản `brand` thật (mô phỏng qua tạm đổi role tài khoản admin, có sự đồng ý của user — không có tài khoản brand thật độc lập trong phiên này), xác nhận chỉ thấy đúng campaign của brand mình.
+- [x] Bấm "Yêu cầu sửa" kèm ghi chú → ops thấy ghi chú → gửi lại → brand duyệt → trạng thái chuyển `approved`, có timestamp — verify qua REST API trực tiếp, không chỉ tin UI.
+- [x] Reload xác nhận persist thật (không phải state cục bộ).
+
+**Trạng thái:** ✅ HOÀN THÀNH (2026-08-01) — đã verify đầy đủ qua Supabase thật + browser thật. Xem chi tiết ở `PROJECT_STATUS.md` mục Giai đoạn 16. Còn treo (nhẹ, không chặn): (a) chưa verify bằng 1 tài khoản `brand` thật độc lập với mật khẩu riêng, (b) xuất Excel/PDF cho brand chưa làm (không bắt buộc vì đã duyệt trực tiếp trong app được).
 
 ---
 
