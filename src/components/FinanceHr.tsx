@@ -1,6 +1,17 @@
 import React, { useMemo, useState } from "react";
-import { LiveSession, Talent, SessionFinance, SystemUser, Brand, BrandPlatformRate } from "../types";
-import { DollarSign, TrendingUp, Calculator, CheckCircle2, XCircle, Clock } from "lucide-react";
+import {
+  LiveSession,
+  Talent,
+  SessionFinance,
+  SystemUser,
+  Brand,
+  BrandPlatformRate,
+  TalentRateHistoryEntry,
+  BrandPlatformRateHistoryEntry,
+  MonthlyClose
+} from "../types";
+import { DollarSign, TrendingUp, Calculator, CheckCircle2, XCircle, Clock, Lock } from "lucide-react";
+import { DEFAULT_FINANCE, computeSessionPnl } from "../lib/pnl";
 
 interface FinanceHrProps {
   sessions: LiveSession[];
@@ -9,6 +20,9 @@ interface FinanceHrProps {
   users: SystemUser[];
   brands: Brand[];
   brandPlatformRates: BrandPlatformRate[];
+  talentRateHistory: TalentRateHistoryEntry[];
+  brandPlatformRateHistory: BrandPlatformRateHistoryEntry[];
+  monthlyCloses: MonthlyClose[];
   currentUserId?: string;
   onUpdateFinance: (
     sessionId: string,
@@ -16,24 +30,6 @@ interface FinanceHrProps {
   ) => Promise<void>;
   onSetFinanceApproval: (sessionId: string, status: SessionFinance["approvalStatus"]) => Promise<void>;
 }
-
-// Giờ live thật của 1 phiên — dùng cho billing_model="hourly" (Giai đoạn 15).
-// Giống hệt durationHours ở ShiftScheduling.tsx (ca qua đêm cộng thêm 24h).
-const sessionDurationHours = (start: string, end: string) => {
-  const [sh, sm] = start.split(":").map(Number);
-  const [eh, em] = end.split(":").map(Number);
-  let mins = eh * 60 + em - (sh * 60 + sm);
-  if (mins <= 0) mins += 24 * 60;
-  return mins / 60;
-};
-
-const DEFAULT_FINANCE: Omit<SessionFinance, "sessionId"> = {
-  agencyCommissionRate: 15,
-  studioCost: 0,
-  adsCost: 0,
-  approvalStatus: "pending",
-  notes: ""
-};
 
 const money = (n: number) => Math.round(n).toLocaleString("vi-VN");
 
@@ -44,11 +40,19 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
   users,
   brands,
   brandPlatformRates,
+  talentRateHistory,
+  brandPlatformRateHistory,
+  monthlyCloses,
   currentUserId,
   onUpdateFinance,
   onSetFinanceApproval
 }) => {
   const [savingId, setSavingId] = useState<string | null>(null);
+
+  const lockedMonths = useMemo(
+    () => new Set(monthlyCloses.filter((m) => m.status === "locked").map((m) => m.month)),
+    [monthlyCloses]
+  );
 
   const financeBySessionId = useMemo(() => {
     const map: Record<string, SessionFinance> = {};
@@ -81,25 +85,10 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
   );
 
   const rows = useMemo(() => {
-    return completedSessions.map((s) => {
-      const finance = financeBySessionId[s.id] ?? { sessionId: s.id, ...DEFAULT_FINANCE };
-      const talent = talentById[s.hostId];
-      const brand = brandById[s.brandId];
-      const hostFixRate = finance.hostFixRateOverride ?? talent?.ratePerSession ?? 0;
-      const hostCommRate = finance.hostCommissionRateOverride ?? talent?.commissionRate ?? 0;
-      // billing_model="hourly": doanh thu agency = giờ live thật × rate/giờ của brand
-      // (brand_platform_rates, Giai đoạn 14a) — không phải %GMV (Giai đoạn 15).
-      const isHourly = brand?.billingModel === "hourly";
-      const hourlyRate = brandPlatformRates.find((r) => r.brandId === s.brandId && r.platform === s.platform)?.ratePerHour ?? 0;
-      const grossAgencyRev = isHourly
-        ? sessionDurationHours(s.startTime, s.endTime) * hourlyRate
-        : (s.actualGmv * finance.agencyCommissionRate) / 100;
-      const hostPayout = hostFixRate + (s.actualGmv * hostCommRate) / 100;
-      const totalCost = hostPayout + finance.studioCost + finance.adsCost;
-      const netProfit = grossAgencyRev - totalCost;
-      return { session: s, finance, talent, isHourly, grossAgencyRev, hostPayout, netProfit };
-    });
-  }, [completedSessions, financeBySessionId, talentById, brandById, brandPlatformRates]);
+    return completedSessions.map((s) =>
+      computeSessionPnl(s, financeBySessionId, talentById, brandById, brandPlatformRates, talentRateHistory, brandPlatformRateHistory)
+    );
+  }, [completedSessions, financeBySessionId, talentById, brandById, brandPlatformRates, talentRateHistory, brandPlatformRateHistory]);
 
   const totals = useMemo(
     () =>
@@ -202,10 +191,22 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                 </tr>
               </thead>
               <tbody>
-                {rows.map(({ session: s, finance, talent, isHourly, grossAgencyRev, hostPayout, netProfit }) => (
+                {rows.map(({ session: s, finance, talent, isHourly, grossAgencyRev, hostPayout, netProfit }) => {
+                  const isLocked = lockedMonths.has(s.date.slice(0, 7));
+                  return (
                   <tr key={s.id} className="border-b border-slate-800/60 align-middle">
                     <td className="py-2 pr-3">
-                      <div className="font-bold text-slate-200">{s.title}</div>
+                      <div className="font-bold text-slate-200 flex items-center gap-1.5">
+                        {s.title}
+                        {isLocked && (
+                          <span
+                            title="Tháng này đã khoá sổ — CEO/Admin cần mở khoá ở tab Đóng Sổ Tháng trước khi sửa"
+                            className="flex items-center gap-0.5 text-[9px] font-bold bg-slate-800 text-slate-400 border border-slate-700 px-1.5 py-0.5 rounded-full"
+                          >
+                            <Lock className="w-2.5 h-2.5" /> Đã khoá sổ
+                          </span>
+                        )}
+                      </div>
                       <div className="text-slate-400">{s.brandName} · {s.date} · Host {talent?.name ?? s.hostName}</div>
                     </td>
                     <td className="py-2 pr-3 font-bold text-slate-300">{money(s.actualGmv)} đ</td>
@@ -222,9 +223,9 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                           <input
                             type="number"
                             defaultValue={finance.agencyCommissionRate}
-                            disabled={savingId === s.id}
+                            disabled={savingId === s.id || isLocked}
                             onBlur={(e) => handleFieldChange(s.id, "agencyCommissionRate", Number(e.target.value))}
-                            className="w-14 p-1.5 rounded-lg border border-slate-700 bg-slate-950 text-slate-100 font-bold"
+                            className="w-14 p-1.5 rounded-lg border border-slate-700 bg-slate-950 text-slate-100 font-bold disabled:opacity-40"
                           />
                           <span className="text-slate-500">% GMV</span>
                         </div>
@@ -234,18 +235,18 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                       <input
                         type="number"
                         defaultValue={finance.studioCost}
-                        disabled={savingId === s.id}
+                        disabled={savingId === s.id || isLocked}
                         onBlur={(e) => handleFieldChange(s.id, "studioCost", Number(e.target.value))}
-                        className="w-24 p-1.5 rounded-lg border border-slate-700 bg-slate-950 text-slate-100 font-bold"
+                        className="w-24 p-1.5 rounded-lg border border-slate-700 bg-slate-950 text-slate-100 font-bold disabled:opacity-40"
                       />
                     </td>
                     <td className="py-2 pr-3">
                       <input
                         type="number"
                         defaultValue={finance.adsCost}
-                        disabled={savingId === s.id}
+                        disabled={savingId === s.id || isLocked}
                         onBlur={(e) => handleFieldChange(s.id, "adsCost", Number(e.target.value))}
-                        className="w-24 p-1.5 rounded-lg border border-slate-700 bg-slate-950 text-slate-100 font-bold"
+                        className="w-24 p-1.5 rounded-lg border border-slate-700 bg-slate-950 text-slate-100 font-bold disabled:opacity-40"
                       />
                     </td>
                     <td className="py-2 pr-3 text-amber-400 font-bold">{money(hostPayout)} đ</td>
@@ -256,8 +257,8 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                       {finance.approvalStatus === "approved" ? (
                         <button
                           onClick={() => handleApprove(s.id, "pending")}
-                          disabled={savingId === s.id}
-                          className="flex items-center gap-1 text-emerald-400 font-bold hover:underline"
+                          disabled={savingId === s.id || isLocked}
+                          className="flex items-center gap-1 text-emerald-400 font-bold hover:underline disabled:opacity-40"
                           title={finance.approvedByUserId ? `Duyệt bởi ${userNameById[finance.approvedByUserId] ?? finance.approvedByUserId}` : undefined}
                         >
                           <CheckCircle2 className="w-3.5 h-3.5" /> Đã duyệt
@@ -265,8 +266,8 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                       ) : finance.approvalStatus === "rejected" ? (
                         <button
                           onClick={() => handleApprove(s.id, "pending")}
-                          disabled={savingId === s.id}
-                          className="flex items-center gap-1 text-red-400 font-bold hover:underline"
+                          disabled={savingId === s.id || isLocked}
+                          className="flex items-center gap-1 text-red-400 font-bold hover:underline disabled:opacity-40"
                         >
                           <XCircle className="w-3.5 h-3.5" /> Từ chối
                         </button>
@@ -274,16 +275,16 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => handleApprove(s.id, "approved")}
-                            disabled={savingId === s.id}
-                            className="text-emerald-400 hover:bg-emerald-950/40 p-1 rounded-lg"
+                            disabled={savingId === s.id || isLocked}
+                            className="text-emerald-400 hover:bg-emerald-950/40 p-1 rounded-lg disabled:opacity-40"
                             title="Duyệt bảng lương"
                           >
                             <CheckCircle2 className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleApprove(s.id, "rejected")}
-                            disabled={savingId === s.id}
-                            className="text-red-400 hover:bg-red-950/40 p-1 rounded-lg"
+                            disabled={savingId === s.id || isLocked}
+                            className="text-red-400 hover:bg-red-950/40 p-1 rounded-lg disabled:opacity-40"
                             title="Từ chối"
                           >
                             <XCircle className="w-4 h-4" />
@@ -293,7 +294,8 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                       )}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -236,6 +236,52 @@ export interface BrandPlatformRate {
   ratePerHour: number;
 }
 
+// Giai đoạn 19 — lịch sử rate theo thời gian, tự động ghi bởi DB trigger mỗi khi
+// talents.rate_per_session/commission_rate đổi. Dùng để tra đúng rate tại ngày của 1 session
+// cũ thay vì đọc giá trị hiện tại của Talent (xem finance.ts findTalentRateAsOf).
+export interface TalentRateHistoryEntry {
+  id: string;
+  talentId: string;
+  ratePerSession: number;
+  commissionRate: number;
+  effectiveFrom: string; // "YYYY-MM-DD"
+  effectiveTo?: string; // "YYYY-MM-DD", undefined = đang áp dụng
+}
+
+// Tương tự TalentRateHistoryEntry nhưng cho brand_platform_rates (khoá theo brand+platform).
+export interface BrandPlatformRateHistoryEntry {
+  id: string;
+  brandId: string;
+  platform: "TikTok" | "Shopee";
+  ratePerHour: number;
+  effectiveFrom: string;
+  effectiveTo?: string;
+}
+
+// Giai đoạn 20 — trạng thái khoá sổ theo tháng, chặn sửa SessionFinance sau khi đã "chốt sổ"
+// (xem trigger trg_session_finance_lock_check, migration 0019).
+export interface MonthlyClose {
+  month: string; // "YYYY-MM"
+  status: "open" | "locked";
+  lockedByUserId?: string;
+  lockedAt?: string;
+  notes: string;
+}
+
+// Giai đoạn 20 — theo dõi công nợ Brand: tính xong doanh thu không có nghĩa đã thu được tiền.
+export interface BrandInvoice {
+  id: string;
+  brandId: string;
+  month: string; // "YYYY-MM"
+  amount: number;
+  status: "unpaid" | "partial" | "paid";
+  dueDate?: string;
+  paidAmount: number;
+  paidAt?: string;
+  notes: string;
+  createdBy?: string;
+}
+
 export interface ShiftSlot {
   id: string;
   date: string;

@@ -76,7 +76,7 @@ So với mô tả gốc ở trên, đã bổ sung **8 điểm** (rà theo góc n
 | 17 | Nạp report TikTok thật (17 chỉ số + GMV theo 4 nguồn) | Không (độc lập, nhưng nên làm sớm vì 18/21 phụ thuộc) | [ ] Chưa bắt đầu |
 | 18 | Dashboard/Report nâng cấp + export PDF thương hiệu hoá *(+ checkpoint giữa chu kỳ campaign — chờ CEO duyệt)* | 17 | [ ] Chưa bắt đầu |
 | 19 | Rate Card Versioning (Talent + Brand) | Không (nhưng nên làm trước 20) | [ ] Chưa bắt đầu |
-| 20 | Đóng Sổ Tháng (Payroll + Revenue reconciliation) *(+ xuất hoá đơn & công nợ Brand — chờ CEO duyệt)* | 15, 19, (14a đã có workload) | [ ] Chưa bắt đầu |
+| 20 | Đóng Sổ Tháng (Payroll + Revenue reconciliation) *(+ xuất hoá đơn & công nợ Brand — chờ CEO duyệt)* | 15, 19, (14a đã có workload) | [x] HOÀN THÀNH (2026-08-01) |
 | 21 | AI Agent theo từng Brand (context + market research riêng) | 17 (cần dữ liệu thật để phân tích) | [ ] Chưa bắt đầu |
 | 22 | Notification/Alert Hub tổng hợp | 15b, 17 | [ ] Chưa bắt đầu |
 | 23 | Studio Utilization & Capacity Planning | Không | [ ] Chưa bắt đầu |
@@ -163,6 +163,8 @@ So với mô tả gốc ở trên, đã bổ sung **8 điểm** (rà theo góc n
 
 ## Giai đoạn 17 — Nạp report TikTok thật (17 chỉ số + GMV theo 4 nguồn)
 
+**Trạng thái:** ⏸️ TẠM HOÃN (2026-08-01) — cần user cung cấp 1 file export report TikTok Shop thật để thiết kế đúng mapping cột (xem cảnh báo bên dưới); chưa có tại thời điểm này. Giai đoạn 18 phụ thuộc trực tiếp giai đoạn này nên cũng hoãn theo. Đã nhảy sang Giai đoạn 19 (không phụ thuộc 17/18) — xem `PROJECT_STATUS.md` mục Giai đoạn 19.
+
 **Bối cảnh:** `LiveSession` ([src/types.ts:150](src/types.ts:150)) chỉ có 6 chỉ số thô (`actualGmv, totalOrders, avgWatchTimeSeconds, peakViewers, totalViews, ctrAvg, cvrAvg`), thiếu 11+ chỉ số user liệt kê (Item sold, UPT, Avg price, GPM, GMV/hour, View/hour, GMV/Product view, Product view, Product click, CTOR, Live impressions, Enter room live), và **không có GMV breakdown theo nguồn** (Total live / Aff / Product card / Video) — thứ bắt buộc để trả lời "vì sao GMV tăng/giảm". Đây là giai đoạn quan trọng nhất vì Giai đoạn 18/21 phụ thuộc dữ liệu này.
 
 **Phạm vi:**
@@ -181,6 +183,8 @@ So với mô tả gốc ở trên, đã bổ sung **8 điểm** (rà theo góc n
 
 ## Giai đoạn 18 — Dashboard/Report nâng cấp + export PDF thương hiệu hoá
 
+**Trạng thái:** ⏸️ TẠM HOÃN (2026-08-01) — phụ thuộc Giai đoạn 17, hoãn theo.
+
 **Phụ thuộc:** Giai đoạn 17 (cần bảng `session_report_metrics` có dữ liệu).
 
 **Phạm vi:**
@@ -197,6 +201,8 @@ So với mô tả gốc ở trên, đã bổ sung **8 điểm** (rà theo góc n
 
 ## Giai đoạn 19 — Rate Card Versioning (Talent + Brand)
 
+**Trạng thái:** ✅ HOÀN THÀNH (2026-08-01) — migration `0018` đã áp dụng, đã verify end-to-end qua Supabase thật + browser thật: đổi rate Talent A giữa 2 session (1 trước/1 sau ngày đổi), P&L khớp đúng 100% rate tại thời điểm từng session (8.5tr vs 10tr), trigger xử lý đúng nhiều lần sửa cùng ngày (không sinh version rác). Xem chi tiết đầy đủ ở `PROJECT_STATUS.md` mục Giai đoạn 19.
+
 **Bối cảnh:** `Talent.ratePerSession/commissionRate` ([src/types.ts:79-80](src/types.ts:79)) và `brand_platform_rates.rate_per_hour` là giá trị đơn, sửa là ghi đè — không có lịch sử theo thời gian. Đây là **rủi ro tài chính**: nếu đổi rate tháng 9, mọi tính toán lương/doanh thu tháng 7-8 (nếu tính lại) sẽ dùng nhầm rate mới.
 
 **Phạm vi:**
@@ -205,8 +211,8 @@ So với mô tả gốc ở trên, đã bổ sung **8 điểm** (rà theo góc n
 - Mọi chỗ tính P&L/lương (Finance module, Đóng sổ tháng) phải tra rate **theo đúng ngày của session**, không tra giá trị hiện tại — đây là thay đổi quan trọng nhất, cần rà lại toàn bộ chỗ đang đọc `talent.ratePerSession` trực tiếp.
 
 **Test/Verify:**
-- [ ] `npx tsc --noEmit` + build pass.
-- [ ] Đổi rate 1 talent → tạo session mới (dùng rate mới) và xác nhận session cũ (tháng trước) khi tính lại P&L vẫn dùng đúng rate cũ tại thời điểm đó.
+- [x] `npx tsc --noEmit` + build pass.
+- [x] Đổi rate 1 talent → tạo session mới (dùng rate mới) và xác nhận session cũ (tháng trước) khi tính lại P&L vẫn dùng đúng rate cũ tại thời điểm đó.
 
 ---
 
@@ -221,9 +227,9 @@ So với mô tả gốc ở trên, đã bổ sung **8 điểm** (rà theo góc n
 - **Khoá sổ (snapshot):** sau khi "Đóng Sổ" 1 tháng, số liệu tháng đó nên được đánh dấu `locked` (không cho sửa `session_report_metrics`/`session_finance` của session thuộc tháng đã khoá trừ khi mở khoá tay bởi CEO/Admin) — tránh số liệu "tự đổi" sau khi đã báo cáo brand/kế toán.
 
 **Test/Verify:**
-- [ ] `npx tsc --noEmit` + build pass.
-- [ ] Đối chiếu tay 1 tháng test: tổng lương = Σ(giờ × rate đúng thời điểm), tổng doanh thu = Σ(theo billing model từng brand) — khớp UI.
-- [ ] Khoá sổ xong, thử sửa session_finance của session thuộc tháng đã khoá → bị chặn đúng như kỳ vọng.
+- [x] `npx tsc --noEmit` + build pass (2026-08-01).
+- [x] Đối chiếu tay 1 tháng test: tổng lương = Σ(giờ × rate đúng thời điểm), tổng doanh thu = Σ(theo billing model từng brand) — khớp UI 100% (2026-08-01, xem chi tiết ở `PROJECT_STATUS.md`).
+- [x] Khoá sổ xong, thử sửa session_finance của session thuộc tháng đã khoá → bị chặn đúng bởi trigger DB (verify qua REST trực tiếp, không chỉ UI), mở khoá lại → sửa được bình thường (2026-08-01).
 
 ---
 
