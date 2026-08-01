@@ -18,6 +18,11 @@ interface DbCampaign {
   approval_status: Campaign["approvalStatus"];
   sent_at: string | null;
   approved_at: string | null;
+  outcome: Campaign["outcome"] | null;
+  renewal_decision: Campaign["renewalDecision"] | null;
+  review_notes: string;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
 }
 
 function fromDb(row: DbCampaign): Campaign {
@@ -35,7 +40,12 @@ function fromDb(row: DbCampaign): Campaign {
     createdBy: row.created_by ?? undefined,
     approvalStatus: row.approval_status,
     sentAt: row.sent_at ?? undefined,
-    approvedAt: row.approved_at ?? undefined
+    approvedAt: row.approved_at ?? undefined,
+    outcome: row.outcome ?? undefined,
+    renewalDecision: row.renewal_decision ?? undefined,
+    reviewNotes: row.review_notes ?? "",
+    reviewedBy: row.reviewed_by ?? undefined,
+    reviewedAt: row.reviewed_at ?? undefined
   };
 }
 
@@ -53,7 +63,12 @@ function toDb(c: Campaign) {
     created_by: orNull(c.createdBy),
     approval_status: c.approvalStatus,
     sent_at: orNull(c.sentAt),
-    approved_at: orNull(c.approvedAt)
+    approved_at: orNull(c.approvedAt),
+    outcome: c.outcome ?? null,
+    renewal_decision: c.renewalDecision ?? null,
+    review_notes: c.reviewNotes ?? "",
+    reviewed_by: orNull(c.reviewedBy),
+    reviewed_at: orNull(c.reviewedAt)
   };
 }
 
@@ -101,6 +116,28 @@ export async function respondToCampaignApproval(
   const patch: Record<string, unknown> = { approval_status: decision };
   if (decision === "approved") patch.approved_at = new Date().toISOString();
   const { data, error } = await supabase.from("campaigns").update(patch).eq("id", id).select().single();
+  if (error) throw error;
+  return fromDb(data as DbCampaign);
+}
+
+// Giai đoạn 25 — CEO/Ops đánh giá cuối campaign (KPI đạt/không, gia hạn hay
+// không) — partial update, không đụng field khác (name/dates/status...).
+export async function submitCampaignReview(
+  id: string,
+  review: { outcome: Campaign["outcome"]; renewalDecision: Campaign["renewalDecision"]; reviewNotes: string; reviewedBy?: string }
+): Promise<Campaign> {
+  const { data, error } = await supabase
+    .from("campaigns")
+    .update({
+      outcome: review.outcome,
+      renewal_decision: review.renewalDecision,
+      review_notes: review.reviewNotes,
+      reviewed_by: orNull(review.reviewedBy),
+      reviewed_at: new Date().toISOString()
+    })
+    .eq("id", id)
+    .select()
+    .single();
   if (error) throw error;
   return fromDb(data as DbCampaign);
 }

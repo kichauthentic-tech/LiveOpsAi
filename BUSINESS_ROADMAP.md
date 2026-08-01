@@ -79,7 +79,7 @@ So với mô tả gốc ở trên, đã bổ sung **8 điểm** (rà theo góc n
 | 20 | Đóng Sổ Tháng (Payroll + Revenue reconciliation) *(+ xuất hoá đơn & công nợ Brand — chờ CEO duyệt)* | 15, 19, (14a đã có workload) | [x] HOÀN THÀNH (2026-08-01) |
 | 21 | AI Agent theo từng Brand (context + market research riêng) | 17 (cần dữ liệu thật để phân tích) | [ ] Chưa bắt đầu |
 | 22 | Notification/Alert Hub tổng hợp | 15b, 17 | [ ] Chưa bắt đầu |
-| 23 | Studio Utilization & Capacity Planning | Không | [ ] Chưa bắt đầu |
+| 23 | Studio Utilization & Capacity Planning | Không | [x] HOÀN THÀNH (2026-08-01) |
 | 24 | Đánh giá & Độ tin cậy Talent (no-show/huỷ sát giờ *(+ đánh giá hiệu suất sau campaign — chờ CEO duyệt)*) | Không (nên có vài tháng dữ liệu thật trước) | [ ] Chưa bắt đầu |
 | 25 | Đánh giá cuối Campaign & Quyết định gia hạn Brand *(mới — chờ CEO duyệt)* | 15 | [ ] Chưa bắt đầu |
 
@@ -263,7 +263,15 @@ So với mô tả gốc ở trên, đã bổ sung **8 điểm** (rà theo góc n
 
 ## Giai đoạn 23 — Studio Utilization & Capacity Planning
 
-**Phạm vi:** dashboard tỷ lệ lấp đầy từng studio theo tuần/tháng (số giờ đã dùng / tổng giờ khả dụng), giúp quyết định đầu tư thêm studio hay không. Dữ liệu đã có sẵn ở `live_sessions`/`shift_slots`, chỉ cần tầng tổng hợp mới.
+**Trạng thái:** ✅ HOÀN THÀNH (2026-08-01) — migration `0020` đã áp dụng, đã verify end-to-end qua Supabase thật + browser thật (đổi giờ hoạt động 1 studio, tab Utilization tính lại đúng, reload xác nhận persist thật). Xem chi tiết ở `PROJECT_STATUS.md` mục Giai đoạn 23.
+
+**Phạm vi:** dashboard tỷ lệ lấp đầy từng studio theo tuần/tháng (số giờ đã dùng / tổng giờ khả dụng), giúp quyết định đầu tư thêm studio hay không. Dữ liệu lấy từ `live_sessions` (không phải `shift_slots`, vì sessions phản ánh giờ live thật đã diễn ra/đã lên lịch, khớp bản chất "utilization"); mẫu số lấy từ cột mới `studios.daily_available_hours` (migration `0020`, mặc định 16h/ngày, chỉnh được per-studio).
+
+**Test/Verify:**
+- [x] `npx tsc --noEmit` + `npm run build` pass.
+- [x] Đối chiếu tay 1 tháng test (16h/ngày × 31 ngày × 3 studio = 1488h khả dụng, 20h tổng đã dùng) — khớp UI 100%.
+- [x] Đổi `daily_available_hours` 1 studio (16→20) → tab Utilization tính lại đúng mẫu số mới, tổng công ty đổi theo đúng — reload xác nhận persist thật, không phải state cục bộ.
+- [x] Trước khi áp dụng migration: xác nhận lỗi Supabase thật khi sửa field mới (cột chưa tồn tại) — code gọi đúng chỗ, không phải giả lập.
 
 ---
 
@@ -277,16 +285,22 @@ So với mô tả gốc ở trên, đã bổ sung **8 điểm** (rà theo góc n
 
 ## Giai đoạn 25 — Đánh giá cuối Campaign & Quyết định gia hạn Brand
 
-> ✅ **CEO đã duyệt** (mục #4 trong bảng "Workflow doanh nghiệp 11 bước" ở đầu file, 2026-08-01) — phạm vi dự kiến bên dưới có thể code. Đây là Bước 11 (cuối) trong sơ đồ workflow 11 bước.
+**Trạng thái:** ✅ HOÀN THÀNH (2026-08-01) — migration `0021` đã áp dụng, đã verify end-to-end qua Supabase thật + browser thật. Xem chi tiết ở `PROJECT_STATUS.md` mục Giai đoạn 25.
+
+> ✅ **CEO đã duyệt** (mục #4 trong bảng "Workflow doanh nghiệp 11 bước" ở đầu file, 2026-08-01). Đây là Bước 11 (cuối) trong sơ đồ workflow 11 bước.
 
 **Bối cảnh:** Vòng lặp hiện tại (Giai đoạn 15 → ... → 20 → quay lại 15 cho tháng sau) mặc định hợp tác với Brand luôn tiếp tục. Thực tế cần 1 điểm quyết định rõ ràng cuối mỗi campaign/tháng: KPI có đạt không, có tiếp tục hợp tác/tái ký không, Brand có dấu hiệu rủi ro rời đi không (vd GMV lệch target nhiều tháng liên tiếp, phản hồi duyệt lịch ở Giai đoạn 16 ngày càng khó khăn).
 
-**Phạm vi (dự kiến, sẽ chốt lại sau khi CEO duyệt):**
-- `campaigns` (Giai đoạn 15) thêm bước đóng: `outcome` (`kpi_met | kpi_missed | partial`), `renewal_decision` (`renew | at_risk | churned`), `review_notes`.
-- UI: sau khi 1 campaign hoàn tất (đã qua Giai đoạn 10 - đóng sổ), hiện màn hình đánh giá — so KPI mục tiêu (Giai đoạn 1) vs GMV thật đạt được, CEO/Ops điền quyết định gia hạn.
-- Cân nhắc liên kết với Giai đoạn 21 (AI theo Brand): AI có thể gợi ý `renewal_decision` dựa trên xu hướng nhiều tháng, nhưng quyết định cuối vẫn do người — không tự động hoá bước này.
+**Phạm vi (đã code đúng như dự kiến):**
+- `campaigns` (Giai đoạn 15) thêm bước đóng: `outcome` (`kpi_met | kpi_missed | partial`), `renewal_decision` (`renew | at_risk | churned`), `review_notes`, `reviewed_by`, `reviewed_at`.
+- UI (`ShiftScheduling.tsx`, khối "Campaign Tháng"): khi campaign `status === "completed"`, hiện so sánh KPI mục tiêu vs GMV thật đạt được (tổng session Completed cùng brand trong khoảng ngày campaign) kèm %, form CEO/Ops điền outcome + quyết định gia hạn + ghi chú.
+- Chưa làm (để dành nếu cần sau): liên kết với Giai đoạn 21 (AI theo Brand) để AI gợi ý `renewal_decision` — hiện tại 100% người điền tay, đúng tinh thần "không tự động hoá bước quyết định".
 
-**Test/Verify:** (bổ sung khi bắt đầu code, sau khi CEO chốt phạm vi chính xác)
+**Test/Verify:**
+- [x] `npx tsc --noEmit` + `npm run build` pass.
+- [x] Tạo campaign test KPI 100tr, session Completed cùng brand/ngày actualGmv=80tr → card hiện đúng "Thật 80.000.000đ / KPI 100.000.000đ (80%)".
+- [x] Điền đánh giá (outcome=partial, renewal=at_risk, ghi chú) → lưu → F5 reload xác nhận persist thật, verify qua REST `reviewed_by`/`reviewed_at` đúng, `audit_logs` có dòng ghi đúng nội dung.
+- [x] Dọn sạch dữ liệu test, xác nhận về Clean State.
 
 ---
 

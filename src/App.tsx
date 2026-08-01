@@ -30,7 +30,8 @@ import {
   updateCampaign,
   deleteCampaign,
   sendCampaignForApproval,
-  respondToCampaignApproval
+  respondToCampaignApproval,
+  submitCampaignReview
 } from "./lib/db/campaigns";
 import { fetchCampaignRevisionNotes, createCampaignRevisionNote } from "./lib/db/campaignRevisionNotes";
 import { fetchTalentRateHistory } from "./lib/db/talentRateHistory";
@@ -58,7 +59,8 @@ import {
   BrainCircuit,
   UserCog,
   CalendarClock,
-  CalendarCheck
+  CalendarCheck,
+  Gauge
 } from "lucide-react";
 import { Header } from "./components/Header";
 import { Login } from "./components/Login";
@@ -76,6 +78,7 @@ import { CrmProjects } from "./components/CrmProjects";
 import { TikTokApiAutomation } from "./components/TikTokApiAutomation";
 import { FinanceHr } from "./components/FinanceHr";
 import { MonthlyClose as MonthlyCloseView } from "./components/MonthlyClose";
+import { StudioUtilization } from "./components/StudioUtilization";
 import { AiMultiAgent } from "./components/AiMultiAgent";
 import { UserRoleSettings } from "./components/UserRoleSettings";
 import { AiTrainingCenter } from "./components/AiTrainingCenter";
@@ -1164,6 +1167,29 @@ export default function App() {
     }
   };
 
+  // Giai đoạn 25 — đánh giá cuối campaign (Bước 11 workflow: KPI đạt không,
+  // quyết định gia hạn/cảnh báo rủi ro rời Brand).
+  const handleSubmitCampaignReview = async (
+    campaign: Campaign,
+    review: { outcome: NonNullable<Campaign["outcome"]>; renewalDecision: NonNullable<Campaign["renewalDecision"]>; reviewNotes: string }
+  ): Promise<boolean> => {
+    try {
+      const updated = await submitCampaignReview(campaign.id, { ...review, reviewedBy: profile?.id });
+      setCampaigns((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+      await pushAuditLog({
+        action: "Đánh giá cuối Campaign",
+        details: `Campaign "${campaign.name}" (${campaign.brandName}) — Kết quả: ${review.outcome}, Gia hạn: ${review.renewalDecision}${
+          review.reviewNotes ? ` — Ghi chú: ${review.reviewNotes}` : ""
+        }`,
+        category: "Security Alert"
+      });
+      return true;
+    } catch (e: any) {
+      window.alert(`Không thể lưu đánh giá campaign: ${e.message ?? e}`);
+      return false;
+    }
+  };
+
   const handleSaveBrandPlatformRate = async (
     brandId: string,
     platform: "TikTok" | "Shopee",
@@ -1311,6 +1337,7 @@ export default function App() {
     { id: "scripts", label: "AI Script Gen", icon: Sparkles, perm: "generate_scripts" as PermissionKey },
     { id: "talents", label: "Talent Pool", icon: Users, perm: "manage_talents" as PermissionKey },
     { id: "studios", label: "Studios & Gear", icon: Building2, perm: "manage_studios_gear" as PermissionKey },
+    { id: "studio_utilization", label: "Tỷ Lệ Lấp Đầy Studio", icon: Gauge, badge: "NEW", perm: "manage_studios_gear" as PermissionKey },
     { id: "crm", label: "CRM & Projects", icon: Briefcase, perm: "manage_crm_projects" as PermissionKey },
     { id: "tiktok_api", label: "TikTok API", icon: Link2, perm: "manage_tiktok_api" as PermissionKey },
     { id: "finance", label: "Finance & P&L", icon: DollarSign, perm: "view_financials" as PermissionKey },
@@ -1641,6 +1668,7 @@ export default function App() {
                     onCreateCampaign={handleCreateCampaign}
                     onUpdateCampaign={handleUpdateCampaign}
                     onDeleteCampaign={handleDeleteCampaign}
+                    onSubmitCampaignReview={handleSubmitCampaignReview}
                     campaignRevisionNotes={campaignRevisionNotes}
                     onSendCampaignForApproval={handleSendCampaignForApproval}
                     onUpdateSession={handleUpdateSession}
@@ -1672,6 +1700,10 @@ export default function App() {
                     onUpdateEquipment={handleUpdateEquipment}
                     onDeleteEquipment={handleDeleteEquipment}
                   />
+                )}
+
+                {activeTab === "studio_utilization" && (
+                  <StudioUtilization studios={activeStudios} sessions={activeSessions} />
                 )}
 
                 {activeTab === "crm" && (

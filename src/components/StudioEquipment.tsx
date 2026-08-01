@@ -56,6 +56,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
   const [studioTheme, setStudioTheme] = useState("Decor Hiện Đại, Ánh Sáng Ấm");
   const [studioStatus, setStudioStatus] = useState<"Live Now" | "Booked" | "Available" | "Maintenance">("Available");
   const [studioEquipmentCount, setStudioEquipmentCount] = useState(10);
+  const [studioDailyHours, setStudioDailyHours] = useState(16);
 
   // Equipment Modal State
   const [isEquipmentModalOpen, setIsEquipmentModalOpen] = useState(false);
@@ -86,6 +87,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
     setStudioTheme("Decor Hiện Đại, Ánh Sáng Tối Ưu Live Stream");
     setStudioStatus("Available");
     setStudioEquipmentCount(8);
+    setStudioDailyHours(16);
     setIsStudioModalOpen(true);
   };
 
@@ -97,6 +99,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
     setStudioTheme(s.theme);
     setStudioStatus(s.status);
     setStudioEquipmentCount(s.equipmentCount);
+    setStudioDailyHours(s.dailyAvailableHours ?? 16);
     setIsStudioModalOpen(true);
   };
 
@@ -111,7 +114,8 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
       capacity: Number(studioCapacity),
       theme: studioTheme,
       status: studioStatus,
-      equipmentCount: Number(studioEquipmentCount)
+      equipmentCount: Number(studioEquipmentCount),
+      dailyAvailableHours: Number(studioDailyHours)
     };
 
     if (editingStudio) {
@@ -283,6 +287,9 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
                   <div className="flex justify-between items-center text-xs text-slate-400 pt-2 border-t border-slate-800">
                     <span>Số thiết bị: <strong className="text-slate-100">{s.equipmentCount} món</strong></span>
                     <span>Sức chứa: <strong className="text-slate-100">{s.capacity} người</strong></span>
+                  </div>
+                  <div className="text-xs text-slate-400">
+                    <span>Giờ hoạt động: <strong className="text-slate-100">{s.dailyAvailableHours}h/ngày</strong></span>
                   </div>
                 </div>
               ))}
@@ -530,6 +537,19 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
                     className="w-full p-2.5 border border-slate-700 bg-slate-950 rounded-xl font-semibold text-slate-100"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-300 block mb-1">Số Giờ Hoạt Động / Ngày</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={24}
+                  value={studioDailyHours}
+                  onChange={(e) => setStudioDailyHours(Number(e.target.value))}
+                  className="w-full p-2.5 border border-slate-700 bg-slate-950 rounded-xl font-semibold text-slate-100"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">Dùng làm mẫu số tính tỷ lệ lấp đầy (Studio Utilization) — mặc định 16h/ngày (8:00-24:00)</p>
               </div>
 
               <div className="pt-4 border-t border-slate-800 flex justify-end gap-3">

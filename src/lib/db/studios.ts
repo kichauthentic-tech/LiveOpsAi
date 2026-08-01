@@ -13,6 +13,7 @@ interface DbStudio {
   theme: string;
   status: Studio["status"];
   current_session_id: string | null;
+  daily_available_hours: number;
 }
 
 function fromDb(row: DbStudio): Studio {
@@ -24,7 +25,9 @@ function fromDb(row: DbStudio): Studio {
     theme: row.theme,
     status: row.status,
     currentSessionId: row.current_session_id ?? undefined,
-    equipmentCount: 0 // computed client-side from the equipments list
+    equipmentCount: 0, // computed client-side from the equipments list
+    // Fallback nếu chưa áp dụng migration 0020 (cột chưa tồn tại, select("*") không lỗi mà chỉ thiếu field)
+    dailyAvailableHours: row.daily_available_hours ?? 16
   };
 }
 
@@ -35,7 +38,8 @@ function toDb(s: Studio) {
     capacity: s.capacity,
     theme: s.theme,
     status: s.status,
-    current_session_id: orNull(s.currentSessionId)
+    current_session_id: orNull(s.currentSessionId),
+    daily_available_hours: s.dailyAvailableHours
   };
 }
 

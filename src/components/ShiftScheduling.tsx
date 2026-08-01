@@ -64,6 +64,10 @@ interface ShiftSchedulingProps {
   onCreateCampaign: (campaign: Campaign) => Promise<boolean>;
   onUpdateCampaign: (campaign: Campaign) => Promise<boolean>;
   onDeleteCampaign: (id: string) => Promise<void>;
+  onSubmitCampaignReview: (
+    campaign: Campaign,
+    review: { outcome: NonNullable<Campaign["outcome"]>; renewalDecision: NonNullable<Campaign["renewalDecision"]>; reviewNotes: string }
+  ) => Promise<boolean>;
   onUpdateSession: (session: LiveSession) => Promise<boolean>;
   onLogAudit: (entry: { action: string; details: string; category: AuditLogEntry["category"] }) => Promise<void>;
 }
@@ -81,6 +85,30 @@ const APPROVAL_STATUS_LABELS: Record<Campaign["approvalStatus"], string> = {
   sent_for_approval: "Đang chờ Brand duyệt",
   revision_requested: "Brand yêu cầu sửa",
   approved: "Đã duyệt"
+};
+
+const OUTCOME_LABELS: Record<NonNullable<Campaign["outcome"]>, string> = {
+  kpi_met: "Đạt KPI",
+  kpi_missed: "Không đạt KPI",
+  partial: "Đạt một phần"
+};
+
+const OUTCOME_STYLES: Record<NonNullable<Campaign["outcome"]>, string> = {
+  kpi_met: "bg-emerald-950 text-emerald-300",
+  kpi_missed: "bg-rose-950 text-rose-300",
+  partial: "bg-amber-950 text-amber-300"
+};
+
+const RENEWAL_LABELS: Record<NonNullable<Campaign["renewalDecision"]>, string> = {
+  renew: "Gia hạn",
+  at_risk: "Có nguy cơ rời",
+  churned: "Đã rời (churned)"
+};
+
+const RENEWAL_STYLES: Record<NonNullable<Campaign["renewalDecision"]>, string> = {
+  renew: "bg-emerald-950 text-emerald-300",
+  at_risk: "bg-amber-950 text-amber-300",
+  churned: "bg-rose-950 text-rose-300"
 };
 
 const APPROVAL_STATUS_STYLES: Record<Campaign["approvalStatus"], string> = {
@@ -140,6 +168,7 @@ export default function ShiftScheduling({
   onCreateCampaign,
   onUpdateCampaign,
   onDeleteCampaign,
+  onSubmitCampaignReview,
   onUpdateSession,
   onLogAudit
 }: ShiftSchedulingProps) {
@@ -194,6 +223,13 @@ export default function ShiftScheduling({
   const [creatingCampaign, setCreatingCampaign] = useState(false);
   const [campaignFilter, setCampaignFilter] = useState("");
 
+  // Giai đoạn 25 — panel đánh giá cuối campaign, chỉ 1 campaign mở cùng lúc.
+  const [reviewingCampaignId, setReviewingCampaignId] = useState<string | null>(null);
+  const [reviewOutcome, setReviewOutcome] = useState<NonNullable<Campaign["outcome"]>>("kpi_met");
+  const [reviewRenewal, setReviewRenewal] = useState<NonNullable<Campaign["renewalDecision"]>>("renew");
+  const [reviewNotesDraft, setReviewNotesDraft] = useState("");
+  const [reviewBusy, setReviewBusy] = useState(false);
+
   const talentsById = useMemo(() => new Map(talents.map((t) => [t.id, t])), [talents]);
   const registrationsBySlot = useMemo(() => {
     const map = new Map<string, ShiftRegistration[]>();
@@ -221,6 +257,20 @@ export default function ShiftScheduling({
         .sort((a, b) => a.startDate.localeCompare(b.startDate)),
     [campaigns, selectedMonth]
   );
+
+  // Giai đoạn 25 — GMV thật đạt được của campaign = tổng actualGmv các session
+  // Completed cùng brand, rơi trong khoảng ngày campaign (giống cách MonthlyClose
+  // gộp theo tháng, chỉ đổi mẫu lọc từ "tháng" sang "khoảng ngày campaign").
+  const campaignActualGmv = useMemo(() => {
+    const map = new Map<string, number>();
+    campaigns.forEach((c) => {
+      const total = sessions
+        .filter((s) => s.brandId === c.brandId && s.status === "Completed" && s.date >= c.startDate && s.date <= c.endDate)
+        .reduce((acc, s) => acc + (s.actualGmv || 0), 0);
+      map.set(c.id, total);
+    });
+    return map;
+  }, [campaigns, sessions]);
 
   const monthSlotsUnfiltered = useMemo(
     () => shiftSlots.filter((s) => s.date.startsWith(selectedMonth)).sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime)),
@@ -381,7 +431,8 @@ export default function ShiftScheduling({
       endDate: campEndDate,
       status: "draft",
       hostBriefing: campHostBriefing,
-      approvalStatus: "draft"
+      approvalStatus: "draft",
+      reviewNotes: ""
     });
     setCreatingCampaign(false);
     if (ok) resetCampaignForm();
@@ -389,6 +440,24 @@ export default function ShiftScheduling({
 
   const handleCampaignStatusChange = async (campaign: Campaign, status: Campaign["status"]) => {
     await onUpdateCampaign({ ...campaign, status });
+  };
+
+  const openReviewPanel = (campaign: Campaign) => {
+    setReviewingCampaignId(campaign.id);
+    setReviewOutcome(campaign.outcome ?? "kpi_met");
+    setReviewRenewal(campaign.renewalDecision ?? "renew");
+    setReviewNotesDraft(campaign.reviewNotes ?? "");
+  };
+
+  const handleSubmitReview = async (campaign: Campaign) => {
+    setReviewBusy(true);
+    const ok = await onSubmitCampaignReview(campaign, {
+      outcome: reviewOutcome,
+      renewalDecision: reviewRenewal,
+      reviewNotes: reviewNotesDraft.trim()
+    });
+    setReviewBusy(false);
+    if (ok) setReviewingCampaignId(null);
   };
 
   const handleGenerate = async () => {
@@ -639,6 +708,89 @@ export default function ShiftScheduling({
                         ))}
                       </div>
                     )}
+
+                    {c.status === "completed" && (() => {
+                      const actualGmv = campaignActualGmv.get(c.id) ?? 0;
+                      const pct = c.targetGmv > 0 ? Math.round((actualGmv / c.targetGmv) * 100) : 0;
+                      const reviewing = reviewingCampaignId === c.id;
+                      return (
+                        <div className="space-y-2 border-t border-slate-800/80 pt-2">
+                          <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                            <span className="text-slate-500">Đánh giá cuối campaign:</span>
+                            <span className="text-slate-300">
+                              Thật {actualGmv.toLocaleString("vi-VN")}đ / KPI {c.targetGmv.toLocaleString("vi-VN")}đ ({pct}%)
+                            </span>
+                            {c.outcome && <span className={`px-2 py-0.5 rounded-full font-bold ${OUTCOME_STYLES[c.outcome]}`}>{OUTCOME_LABELS[c.outcome]}</span>}
+                            {c.renewalDecision && (
+                              <span className={`px-2 py-0.5 rounded-full font-bold ${RENEWAL_STYLES[c.renewalDecision]}`}>{RENEWAL_LABELS[c.renewalDecision]}</span>
+                            )}
+                            {!reviewing && (
+                              <button
+                                onClick={() => openReviewPanel(c)}
+                                className="ml-auto flex items-center gap-1 bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-800 px-2.5 py-1 rounded-lg font-bold transition-colors"
+                              >
+                                <Check className="w-3 h-3" /> {c.outcome ? "Sửa Đánh Giá" : "Đánh Giá"}
+                              </button>
+                            )}
+                          </div>
+                          {c.reviewNotes && !reviewing && <p className="text-[11px] text-slate-400 pl-1">{c.reviewNotes}</p>}
+                          {c.reviewedAt && !reviewing && (
+                            <span className="text-[11px] text-slate-600 pl-1">Đánh giá lúc {new Date(c.reviewedAt).toLocaleString("vi-VN")}</span>
+                          )}
+
+                          {reviewing && (
+                            <div className="bg-slate-950/80 border border-emerald-800/60 rounded-lg p-3 space-y-2">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <select
+                                  value={reviewOutcome}
+                                  onChange={(e) => setReviewOutcome(e.target.value as NonNullable<Campaign["outcome"]>)}
+                                  className="bg-slate-900 border border-slate-800 rounded-lg p-2 text-white text-xs focus:outline-none focus:border-emerald-500"
+                                >
+                                  {Object.entries(OUTCOME_LABELS).map(([value, label]) => (
+                                    <option key={value} value={value}>
+                                      {label}
+                                    </option>
+                                  ))}
+                                </select>
+                                <select
+                                  value={reviewRenewal}
+                                  onChange={(e) => setReviewRenewal(e.target.value as NonNullable<Campaign["renewalDecision"]>)}
+                                  className="bg-slate-900 border border-slate-800 rounded-lg p-2 text-white text-xs focus:outline-none focus:border-emerald-500"
+                                >
+                                  {Object.entries(RENEWAL_LABELS).map(([value, label]) => (
+                                    <option key={value} value={value}>
+                                      {label}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <textarea
+                                value={reviewNotesDraft}
+                                onChange={(e) => setReviewNotesDraft(e.target.value)}
+                                placeholder="Ghi chú đánh giá (lý do đạt/không đạt KPI, dấu hiệu rủi ro rời Brand...)"
+                                rows={2}
+                                className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-white text-xs focus:outline-none focus:border-emerald-500"
+                              />
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => handleSubmitReview(c)}
+                                  disabled={reviewBusy}
+                                  className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg font-bold text-xs transition-colors"
+                                >
+                                  {reviewBusy ? "Đang lưu..." : "Lưu Đánh Giá"}
+                                </button>
+                                <button
+                                  onClick={() => setReviewingCampaignId(null)}
+                                  className="text-slate-500 hover:text-slate-300 text-xs transition-colors"
+                                >
+                                  Huỷ
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })}

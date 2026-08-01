@@ -98,6 +98,7 @@ export interface Studio {
   currentSessionId?: string;
   equipmentCount: number;
   isCustom?: boolean;
+  dailyAvailableHours: number;
 }
 
 export interface Equipment {
@@ -341,6 +342,14 @@ export interface Campaign {
   approvalStatus: "draft" | "sent_for_approval" | "revision_requested" | "approved";
   sentAt?: string;
   approvedAt?: string;
+  // Đánh giá cuối Campaign & quyết định gia hạn Brand (Giai đoạn 25, Bước 11
+  // workflow) — điền sau khi campaign đã "completed", so KPI mục tiêu
+  // (targetGmv) với GMV thật đạt được.
+  outcome?: "kpi_met" | "kpi_missed" | "partial";
+  renewalDecision?: "renew" | "at_risk" | "churned";
+  reviewNotes: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
 }
 
 export interface CampaignRevisionNote {
