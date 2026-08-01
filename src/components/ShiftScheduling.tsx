@@ -1,7 +1,9 @@
 import React, { useMemo, useState } from "react";
 import {
+  AuditLogEntry,
   Brand,
   BrandPlatformRate,
+  Campaign,
   LiveSession,
   RecurringShiftTemplate,
   ShiftRegistration,
@@ -26,7 +28,10 @@ import {
   Sparkles,
   Zap,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Target,
+  Info,
+  Flame
 } from "lucide-react";
 
 interface ShiftSchedulingProps {
@@ -40,6 +45,7 @@ interface ShiftSchedulingProps {
   shiftRegistrations: ShiftRegistration[];
   brandPlatformRates: BrandPlatformRate[];
   recurringShiftTemplates: RecurringShiftTemplate[];
+  campaigns: Campaign[];
   onCreateSlot: (slot: ShiftSlot) => Promise<boolean>;
   onDeleteSlot: (id: string) => Promise<void>;
   onRegister: (slotId: string, talentId: string) => Promise<boolean>;
@@ -50,7 +56,20 @@ interface ShiftSchedulingProps {
   onToggleTemplate: (template: RecurringShiftTemplate) => Promise<boolean>;
   onDeleteTemplate: (id: string) => Promise<void>;
   onGenerateMonthSlots: (month: string) => Promise<number>;
+  onCreateCampaign: (campaign: Campaign) => Promise<boolean>;
+  onUpdateCampaign: (campaign: Campaign) => Promise<boolean>;
+  onDeleteCampaign: (id: string) => Promise<void>;
+  onUpdateSession: (session: LiveSession) => Promise<boolean>;
+  onLogAudit: (entry: { action: string; details: string; category: AuditLogEntry["category"] }) => Promise<void>;
 }
+
+const CAMPAIGN_TYPE_LABELS: Record<Campaign["type"], string> = {
+  daily: "Daily",
+  mega: "Mega D-Day",
+  mid_month: "Mid-month",
+  payday: "Payday",
+  other: "Khác"
+};
 
 const WEEKDAY_LABELS = ["CN", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"];
 
@@ -86,6 +105,7 @@ export default function ShiftScheduling({
   shiftRegistrations,
   brandPlatformRates,
   recurringShiftTemplates,
+  campaigns,
   onCreateSlot,
   onDeleteSlot,
   onRegister,
@@ -95,7 +115,12 @@ export default function ShiftScheduling({
   onCreateTemplate,
   onToggleTemplate,
   onDeleteTemplate,
-  onGenerateMonthSlots
+  onGenerateMonthSlots,
+  onCreateCampaign,
+  onUpdateCampaign,
+  onDeleteCampaign,
+  onUpdateSession,
+  onLogAudit
 }: ShiftSchedulingProps) {
   const admin = isAdminRole(currentRole);
   const myTalentId = activeUser.assignedTalentId;
@@ -110,11 +135,21 @@ export default function ShiftScheduling({
   const [newPlatform, setNewPlatform] = useState<"TikTok" | "Shopee">("TikTok");
   const [newStudioId, setNewStudioId] = useState("");
   const [newNotes, setNewNotes] = useState("");
+  const [newCampaignId, setNewCampaignId] = useState("");
   const [creating, setCreating] = useState(false);
 
   const [pickByLot, setPickByLot] = useState<Record<string, { hostId: string; coHostId: string }>>({});
   const [busySlotId, setBusySlotId] = useState<string | null>(null);
   const [rateDraft, setRateDraft] = useState<Record<string, string>>({});
+
+  // Giai đoạn 15c — thay người khẩn cấp trên 1 ca đã chốt (Host/Trợ live báo bận
+  // sát giờ live). Danh sách ứng viên thay thế lấy từ session_availability của
+  // chính slot đó (những người đã đăng ký rảnh nhưng không được chọn lúc chốt) —
+  // không cần bảng mới, đúng phạm vi đã CEO duyệt ở BUSINESS_ROADMAP.md.
+  const [emergencySwap, setEmergencySwap] = useState<{ slotId: string; role: "host" | "coHost" } | null>(null);
+  const [swapCandidateId, setSwapCandidateId] = useState("");
+  const [swapReason, setSwapReason] = useState("");
+  const [swapBusy, setSwapBusy] = useState(false);
 
   const [tplWeekday, setTplWeekday] = useState(1);
   const [tplStart, setTplStart] = useState("20:00");
@@ -122,9 +157,21 @@ export default function ShiftScheduling({
   const [tplBrandId, setTplBrandId] = useState(brands[0]?.id ?? "");
   const [tplPlatform, setTplPlatform] = useState<"TikTok" | "Shopee">("TikTok");
   const [tplStudioId, setTplStudioId] = useState("");
+  const [tplCampaignId, setTplCampaignId] = useState("");
   const [creatingTpl, setCreatingTpl] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [generateMsg, setGenerateMsg] = useState<string | null>(null);
+
+  // Campaign form (Giai đoạn 15)
+  const [campBrandId, setCampBrandId] = useState(brands[0]?.id ?? "");
+  const [campName, setCampName] = useState("");
+  const [campType, setCampType] = useState<Campaign["type"]>("daily");
+  const [campTargetGmv, setCampTargetGmv] = useState(0);
+  const [campStartDate, setCampStartDate] = useState(today);
+  const [campEndDate, setCampEndDate] = useState(today);
+  const [campHostBriefing, setCampHostBriefing] = useState("");
+  const [creatingCampaign, setCreatingCampaign] = useState(false);
+  const [campaignFilter, setCampaignFilter] = useState("");
 
   const talentsById = useMemo(() => new Map(talents.map((t) => [t.id, t])), [talents]);
   const registrationsBySlot = useMemo(() => {
@@ -137,21 +184,63 @@ export default function ShiftScheduling({
     return map;
   }, [shiftRegistrations]);
 
-  const monthSlots = useMemo(
+  const campaignsById = useMemo(() => new Map(campaigns.map((c) => [c.id, c])), [campaigns]);
+  const campaignsForNewBrand = useMemo(
+    () => campaigns.filter((c) => c.brandId === newBrandId && c.status !== "cancelled"),
+    [campaigns, newBrandId]
+  );
+  const campaignsForTplBrand = useMemo(
+    () => campaigns.filter((c) => c.brandId === tplBrandId && c.status !== "cancelled"),
+    [campaigns, tplBrandId]
+  );
+  const monthCampaigns = useMemo(
+    () =>
+      campaigns
+        .filter((c) => c.startDate <= `${selectedMonth}-31` && c.endDate >= `${selectedMonth}-01`)
+        .sort((a, b) => a.startDate.localeCompare(b.startDate)),
+    [campaigns, selectedMonth]
+  );
+
+  const monthSlotsUnfiltered = useMemo(
     () => shiftSlots.filter((s) => s.date.startsWith(selectedMonth)).sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime)),
     [shiftSlots, selectedMonth]
   );
+  const monthSlots = useMemo(
+    () => (campaignFilter ? monthSlotsUnfiltered.filter((s) => s.campaignId === campaignFilter) : monthSlotsUnfiltered),
+    [monthSlotsUnfiltered, campaignFilter]
+  );
 
   const slotsByDate = useMemo(() => {
+    const source = campaignFilter ? shiftSlots.filter((s) => s.campaignId === campaignFilter) : shiftSlots;
     const map = new Map<string, ShiftSlot[]>();
-    shiftSlots.forEach((s) => {
+    source.forEach((s) => {
       const list = map.get(s.date) ?? [];
       list.push(s);
       map.set(s.date, list);
     });
     map.forEach((list) => list.sort((a, b) => a.startTime.localeCompare(b.startTime)));
     return map;
-  }, [shiftSlots]);
+  }, [shiftSlots, campaignFilter]);
+
+  // Ưu tiên hoá studio (mục #5 CEO đã duyệt) — 2-3 brand cùng cần 1 studio/khung giờ
+  // vàng thì cảnh báo cho Ops quyết định thủ công, không tự động chọn ai được ưu tiên.
+  const timeOverlaps = (aStart: string, aEnd: string, bStart: string, bEnd: string) => aStart < bEnd && bStart < aEnd;
+  const findStudioConflicts = (date: string, start: string, end: string, studioId: string, brandId: string, excludeSlotId?: string) => {
+    if (!studioId) return [];
+    return shiftSlots.filter(
+      (s) =>
+        s.id !== excludeSlotId &&
+        s.status !== "cancelled" &&
+        s.date === date &&
+        s.studioId === studioId &&
+        s.brandId !== brandId &&
+        timeOverlaps(start, end, s.startTime, s.endTime)
+    );
+  };
+  const newSlotConflicts = useMemo(
+    () => findStudioConflicts(newDate, newStart, newEnd, newStudioId, newBrandId),
+    [shiftSlots, newDate, newStart, newEnd, newStudioId, newBrandId]
+  );
 
   // Lưới ngày đủ tuần (kể cả ngày lấp đầu/cuối từ tháng liền kề) để vẽ lịch ma trận.
   const monthGrid = useMemo(() => {
@@ -195,6 +284,10 @@ export default function ShiftScheduling({
 
   const handleCreateSlot = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (newSlotConflicts.length > 0) {
+      const names = newSlotConflicts.map((c) => `${c.brandName} (${c.startTime}-${c.endTime})`).join(", ");
+      if (!window.confirm(`Studio này đã có ca của brand khác cùng khung giờ: ${names}. Vẫn mở ca mới?`)) return;
+    }
     const brand = brands.find((b) => b.id === newBrandId);
     const studio = studios.find((s) => s.id === newStudioId);
     setCreating(true);
@@ -209,10 +302,14 @@ export default function ShiftScheduling({
       studioId: newStudioId || undefined,
       studioName: studio?.name ?? "",
       notes: newNotes,
-      status: "open"
+      status: "open",
+      campaignId: newCampaignId || undefined
     });
     setCreating(false);
-    if (ok) setNewNotes("");
+    if (ok) {
+      setNewNotes("");
+      setNewCampaignId("");
+    }
   };
 
   const handleCreateTemplate = async (e: React.FormEvent) => {
@@ -231,9 +328,45 @@ export default function ShiftScheduling({
       studioId: tplStudioId || undefined,
       studioName: studio?.name ?? "",
       notes: "",
-      active: true
+      active: true,
+      campaignId: tplCampaignId || undefined
     });
     setCreatingTpl(false);
+  };
+
+  const resetCampaignForm = () => {
+    setCampBrandId(brands[0]?.id ?? "");
+    setCampName("");
+    setCampType("daily");
+    setCampTargetGmv(0);
+    setCampStartDate(today);
+    setCampEndDate(today);
+    setCampHostBriefing("");
+  };
+
+  const handleCreateCampaignSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const brand = brands.find((b) => b.id === campBrandId);
+    if (!brand || !campName.trim()) return;
+    setCreatingCampaign(true);
+    const ok = await onCreateCampaign({
+      id: `campaign-${Date.now()}`,
+      brandId: campBrandId,
+      brandName: brand.name,
+      name: campName.trim(),
+      type: campType,
+      targetGmv: Number(campTargetGmv) || 0,
+      startDate: campStartDate,
+      endDate: campEndDate,
+      status: "draft",
+      hostBriefing: campHostBriefing
+    });
+    setCreatingCampaign(false);
+    if (ok) resetCampaignForm();
+  };
+
+  const handleCampaignStatusChange = async (campaign: Campaign, status: Campaign["status"]) => {
+    await onUpdateCampaign({ ...campaign, status });
   };
 
   const handleGenerate = async () => {
@@ -263,6 +396,31 @@ export default function ShiftScheduling({
     const ok = await onFinalizeSlot(slot, pick.hostId, pick.coHostId || null);
     setBusySlotId(null);
     if (ok) setPickByLot((prev) => ({ ...prev, [slot.id]: { hostId: "", coHostId: "" } }));
+  };
+
+  const handleEmergencySwap = async (slot: ShiftSlot, session: LiveSession, role: "host" | "coHost") => {
+    const candidate = talentsById.get(swapCandidateId);
+    if (!candidate) return;
+    setSwapBusy(true);
+    const oldName = role === "host" ? session.hostName : session.coHostName;
+    const updated: LiveSession =
+      role === "host"
+        ? { ...session, hostId: candidate.id, hostName: candidate.name }
+        : { ...session, coHostId: candidate.id, coHostName: candidate.name };
+    const ok = await onUpdateSession(updated);
+    if (ok) {
+      await onLogAudit({
+        action: `Thay người khẩn cấp — ${role === "host" ? "Host" : "Trợ live"}`,
+        details: `Ca ${slot.date} ${slot.startTime}-${slot.endTime} (${slot.brandName}): ${oldName || "—"} → ${candidate.name}. Lý do: ${
+          swapReason.trim() || "Không ghi lý do"
+        }.`,
+        category: "Security Alert"
+      });
+      setEmergencySwap(null);
+      setSwapCandidateId("");
+      setSwapReason("");
+    }
+    setSwapBusy(false);
   };
 
   const handleSaveRate = async (brandId: string) => {
@@ -295,12 +453,23 @@ export default function ShiftScheduling({
       .sort((a, b) => b.hours - a.hours);
   }, [sessions, selectedMonth]);
 
-  const understaffedSlots = useMemo(
-    () =>
-      monthSlots.filter(
-        (s) => s.status === "open" && s.date >= today && (registrationsBySlot.get(s.id) ?? []).length === 0
-      ),
-    [monthSlots, registrationsBySlot, today]
+  // Giai đoạn 15b — tách cảnh báo "thiếu người" theo số lượng đăng ký thay vì đếm
+  // chung: session_availability không phân biệt ai đăng ký với vai trò Host hay
+  // Trợ live (chỉ có 1 danh sách "đang rảnh"), nên suy ra 3 tình huống từ SỐ LƯỢNG
+  // đăng ký của slot — đúng với cách Ops chốt lịch thật (chọn Host trước, Co-host
+  // là người còn lại trong nhóm đã đăng ký): 0 đăng ký = thiếu cả Host lẫn Trợ live;
+  // đúng 1 đăng ký = đủ chọn Host nhưng chưa còn ai để chọn Trợ live; ≥2 = đủ cả hai.
+  const openFutureSlots = useMemo(
+    () => monthSlots.filter((s) => s.status === "open" && s.date >= today),
+    [monthSlots, today]
+  );
+  const slotsMissingBoth = useMemo(
+    () => openFutureSlots.filter((s) => (registrationsBySlot.get(s.id) ?? []).length === 0),
+    [openFutureSlots, registrationsBySlot]
+  );
+  const slotsMissingCoHost = useMemo(
+    () => openFutureSlots.filter((s) => (registrationsBySlot.get(s.id) ?? []).length === 1),
+    [openFutureSlots, registrationsBySlot]
   );
 
   return (
@@ -341,6 +510,21 @@ export default function ShiftScheduling({
           >
             <ChevronRight className="w-4 h-4" />
           </button>
+          {monthCampaigns.length > 0 && (
+            <select
+              value={campaignFilter}
+              onChange={(e) => setCampaignFilter(e.target.value)}
+              className="bg-slate-950 border border-slate-800 rounded-xl px-2 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+              title="Lọc theo Campaign"
+            >
+              <option value="">Tất cả Campaign</option>
+              {monthCampaigns.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.brandName} · {c.name}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
 
@@ -348,6 +532,134 @@ export default function ShiftScheduling({
         <div className="bg-amber-950/60 border border-amber-800 rounded-xl p-4 text-sm text-amber-200 flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 shrink-0" />
           Tài khoản của bạn chưa được gán hồ sơ Talent (assigned_talent_id) — liên hệ CEO/Operations để gán trước khi tự đăng ký ca được.
+        </div>
+      )}
+
+      {admin && (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl space-y-4">
+          <h3 className="font-bold text-white flex items-center gap-2">
+            <Target className="w-4 h-4 text-emerald-400" /> Campaign Tháng {selectedMonth}
+          </h3>
+          <p className="text-xs text-slate-500 -mt-2">
+            Kế hoạch theo tháng của brand (Daily/Mega D-Day/Mid-month/Payday...) với KPI GMV đã chốt — gán vào Ca/Quy Tắc Lặp bên dưới để phân bổ giờ live theo đúng campaign.
+          </p>
+
+          {monthCampaigns.length > 0 && (
+            <div className="space-y-1.5">
+              {monthCampaigns.map((c) => {
+                const slotCount = shiftSlots.filter((s) => s.campaignId === c.id).length;
+                return (
+                  <div key={c.id} className="flex flex-wrap items-center gap-2 text-xs bg-slate-950/80 border border-slate-800 rounded-lg px-3 py-2">
+                    <span className="font-bold text-white">{c.brandName}</span>
+                    <span className="text-slate-300">{c.name}</span>
+                    <span className="bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full font-bold">{CAMPAIGN_TYPE_LABELS[c.type]}</span>
+                    <span className="text-slate-500 font-mono">{c.startDate} → {c.endDate}</span>
+                    <span className="text-emerald-400 font-bold">KPI {c.targetGmv.toLocaleString("vi-VN")}đ</span>
+                    <span className="text-slate-500">{slotCount} ca đã gán</span>
+                    {c.hostBriefing && (
+                      <span className="flex items-center gap-1 text-amber-300" title={c.hostBriefing}>
+                        <Info className="w-3 h-3" /> Có brief Host
+                      </span>
+                    )}
+                    <div className="flex items-center gap-2 ml-auto">
+                      <select
+                        value={c.status}
+                        onChange={(e) => handleCampaignStatusChange(c, e.target.value as Campaign["status"])}
+                        className={`px-2 py-1 rounded-lg font-bold border ${
+                          c.status === "active"
+                            ? "bg-emerald-950 text-emerald-300 border-emerald-800"
+                            : c.status === "completed"
+                            ? "bg-blue-950 text-blue-300 border-blue-800"
+                            : c.status === "cancelled"
+                            ? "bg-slate-800 text-slate-500 border-slate-700"
+                            : "bg-amber-950 text-amber-300 border-amber-800"
+                        }`}
+                      >
+                        <option value="draft">Draft</option>
+                        <option value="active">Active</option>
+                        <option value="completed">Completed</option>
+                        <option value="cancelled">Cancelled</option>
+                      </select>
+                      <button onClick={() => onDeleteCampaign(c.id)} className="text-slate-500 hover:text-rose-400 transition-colors">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <form onSubmit={handleCreateCampaignSubmit} className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-6 gap-3 border-t border-slate-800 pt-3">
+            <select
+              value={campBrandId}
+              onChange={(e) => setCampBrandId(e.target.value)}
+              className="bg-slate-950 border border-slate-800 rounded-xl p-2 text-white text-sm focus:outline-none focus:border-blue-500"
+            >
+              <option value="">— Brand —</option>
+              {brands.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+            <input
+              placeholder="Tên campaign (VD: Mega 8/8)"
+              required
+              value={campName}
+              onChange={(e) => setCampName(e.target.value)}
+              className="bg-slate-950 border border-slate-800 rounded-xl p-2 text-white text-sm focus:outline-none focus:border-blue-500 sm:col-span-2"
+            />
+            <select
+              value={campType}
+              onChange={(e) => setCampType(e.target.value as Campaign["type"])}
+              className="bg-slate-950 border border-slate-800 rounded-xl p-2 text-white text-sm focus:outline-none focus:border-blue-500"
+            >
+              {Object.entries(CAMPAIGN_TYPE_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+            <input
+              type="number"
+              min={0}
+              placeholder="KPI GMV"
+              value={campTargetGmv}
+              onChange={(e) => setCampTargetGmv(Number(e.target.value))}
+              className="bg-slate-950 border border-slate-800 rounded-xl p-2 text-white text-sm focus:outline-none focus:border-blue-500"
+            />
+            <div className="flex gap-2 sm:col-span-3 lg:col-span-2">
+              <input
+                type="date"
+                required
+                value={campStartDate}
+                onChange={(e) => setCampStartDate(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-white text-sm focus:outline-none focus:border-blue-500"
+              />
+              <input
+                type="date"
+                required
+                value={campEndDate}
+                onChange={(e) => setCampEndDate(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-white text-sm focus:outline-none focus:border-blue-500"
+              />
+            </div>
+            <textarea
+              placeholder="Brief/đào tạo cho Host của campaign này (tuỳ chọn) — hiển thị cho Host khi xem ca thuộc campaign"
+              value={campHostBriefing}
+              onChange={(e) => setCampHostBriefing(e.target.value)}
+              rows={2}
+              className="bg-slate-950 border border-slate-800 rounded-xl p-2 text-white text-sm focus:outline-none focus:border-blue-500 sm:col-span-3 lg:col-span-5"
+            />
+            <button
+              type="submit"
+              disabled={creatingCampaign || !campBrandId}
+              className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold rounded-xl px-4 py-2 text-sm transition-colors sm:col-span-3 lg:col-span-1"
+            >
+              {creatingCampaign ? "Đang tạo..." : "+ Tạo Campaign"}
+            </button>
+          </form>
         </div>
       )}
 
@@ -374,6 +686,11 @@ export default function ShiftScheduling({
                   <span className="text-slate-400">{t.brandName || "—"}</span>
                   <span className="bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full font-bold">{t.platform}</span>
                   {t.studioName && <span className="text-slate-500">{t.studioName}</span>}
+                  {t.campaignId && campaignsById.get(t.campaignId) && (
+                    <span className="text-emerald-400 flex items-center gap-1">
+                      <Target className="w-3 h-3" /> {campaignsById.get(t.campaignId)?.name}
+                    </span>
+                  )}
                   <div className="flex items-center gap-2 ml-auto">
                     <button
                       onClick={() => onToggleTemplate(t)}
@@ -449,6 +766,18 @@ export default function ShiftScheduling({
               {studios.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
+                </option>
+              ))}
+            </select>
+            <select
+              value={tplCampaignId}
+              onChange={(e) => setTplCampaignId(e.target.value)}
+              className="bg-slate-950 border border-slate-800 rounded-xl p-2 text-white text-sm focus:outline-none focus:border-blue-500"
+            >
+              <option value="">— Campaign (tuỳ chọn) —</option>
+              {campaignsForTplBrand.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
                 </option>
               ))}
             </select>
@@ -534,6 +863,18 @@ export default function ShiftScheduling({
                 </option>
               ))}
             </select>
+            <select
+              value={newCampaignId}
+              onChange={(e) => setNewCampaignId(e.target.value)}
+              className="bg-slate-950 border border-slate-800 rounded-xl p-2 text-white text-sm focus:outline-none focus:border-blue-500"
+            >
+              <option value="">— Campaign (tuỳ chọn) —</option>
+              {campaignsForNewBrand.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
             <input
               placeholder="Ghi chú (tuỳ chọn)"
               value={newNotes}
@@ -548,6 +889,19 @@ export default function ShiftScheduling({
               {creating ? "Đang mở..." : "Mở Ca Đăng Ký"}
             </button>
           </form>
+
+          {newSlotConflicts.length > 0 && (
+            <div className="flex items-start gap-2 text-xs bg-rose-950/50 border border-rose-800 rounded-xl p-3 text-rose-200">
+              <Flame className="w-4 h-4 shrink-0 mt-0.5" />
+              <div>
+                <div className="font-bold">Ưu tiên hoá studio — studio này đã có ca khác cùng khung giờ:</div>
+                <div>
+                  {newSlotConflicts.map((c) => `${c.brandName} (${c.startTime}-${c.endTime})`).join(", ")}
+                </div>
+                <div className="text-rose-300/80 mt-0.5">Cân nhắc đổi studio/khung giờ, hoặc xác nhận khi mở ca nếu cố ý ưu tiên brand này.</div>
+              </div>
+            </div>
+          )}
 
           {newBrandId && (
             <div className="flex items-center gap-3 text-xs text-slate-400 border-t border-slate-800 pt-3">
@@ -576,17 +930,36 @@ export default function ShiftScheduling({
         </div>
       )}
 
-      {admin && understaffedSlots.length > 0 && (
+      {admin && slotsMissingBoth.length > 0 && (
         <div className="bg-rose-950/50 border border-rose-800 rounded-xl p-4 text-sm text-rose-200">
           <div className="font-bold flex items-center gap-2 mb-2">
-            <AlertTriangle className="w-4 h-4" /> {understaffedSlots.length} ca chưa có ai đăng ký
+            <AlertTriangle className="w-4 h-4" /> {slotsMissingBoth.length} ca chưa có ai đăng ký (thiếu cả Host &amp; Trợ live)
           </div>
           <div className="flex flex-wrap gap-2">
-            {understaffedSlots.map((s) => (
+            {slotsMissingBoth.map((s) => (
               <button
                 key={s.id}
                 onClick={() => setSelectedDate(s.date)}
                 className="bg-rose-900/60 border border-rose-800 rounded-lg px-2 py-1 font-mono text-xs hover:bg-rose-900 transition-colors"
+              >
+                {s.date} {s.startTime}-{s.endTime} · {s.brandName}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {admin && slotsMissingCoHost.length > 0 && (
+        <div className="bg-amber-950/50 border border-amber-800 rounded-xl p-4 text-sm text-amber-200">
+          <div className="font-bold flex items-center gap-2 mb-2">
+            <UserX className="w-4 h-4" /> {slotsMissingCoHost.length} ca đã có người đăng ký làm Host, còn thiếu Trợ live (Co-host)
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {slotsMissingCoHost.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => setSelectedDate(s.date)}
+                className="bg-amber-900/60 border border-amber-800 rounded-lg px-2 py-1 font-mono text-xs hover:bg-amber-900 transition-colors"
               >
                 {s.date} {s.startTime}-{s.endTime} · {s.brandName}
               </button>
@@ -619,9 +992,14 @@ export default function ShiftScheduling({
                 const dayNum = Number(cell.date.slice(8, 10));
                 const isToday = cell.date === today;
                 const isSelected = cell.date === selectedDate;
-                const hasUnderstaffed = daySlots.some(
+                const dayMissingBoth = daySlots.some(
                   (s) => s.status === "open" && cell.date >= today && (registrationsBySlot.get(s.id) ?? []).length === 0
                 );
+                const dayMissingCoHost = daySlots.some(
+                  (s) => s.status === "open" && cell.date >= today && (registrationsBySlot.get(s.id) ?? []).length === 1
+                );
+                const dayWarningColor = dayMissingBoth ? "bg-rose-500" : dayMissingCoHost ? "bg-amber-400" : null;
+                const dayWarningTitle = dayMissingBoth ? "Có ca chưa ai đăng ký" : dayMissingCoHost ? "Có ca thiếu Trợ live" : undefined;
                 const visibleChips = daySlots.slice(0, 3);
                 const extra = daySlots.length - visibleChips.length;
                 return (
@@ -638,7 +1016,7 @@ export default function ShiftScheduling({
                   >
                     <div className="flex items-center justify-between">
                       <span className={`text-xs font-mono font-bold ${isToday ? "text-purple-300" : "text-slate-300"}`}>{dayNum}</span>
-                      {hasUnderstaffed && <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" title="Có ca thiếu người" />}
+                      {dayWarningColor && <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dayWarningColor}`} title={dayWarningTitle} />}
                     </div>
                     <div className="flex flex-col gap-0.5">
                       {visibleChips.map((s) => {
@@ -687,6 +1065,12 @@ export default function ShiftScheduling({
           <span className="flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-slate-600" /> Đã huỷ
           </span>
+          <span className="flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-rose-500" /> Ngày có ca thiếu người
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" /> Ngày có ca thiếu Trợ live
+          </span>
           {selectedDate && (
             <button onClick={() => setSelectedDate(null)} className="ml-auto text-blue-400 hover:text-blue-300 font-bold">
               × Bỏ lọc ngày {selectedDate}
@@ -720,6 +1104,8 @@ export default function ShiftScheduling({
               const pick = pickByLot[slot.id] ?? { hostId: "", coHostId: "" };
               const conflict =
                 pick.hostId && checkConflicts(slot.date, slot.startTime, slot.endTime, slot.studioId ?? "", pick.hostId);
+              const slotCampaign = slot.campaignId ? campaignsById.get(slot.campaignId) : undefined;
+              const studioConflicts = findStudioConflicts(slot.date, slot.startTime, slot.endTime, slot.studioId ?? "", slot.brandId ?? "", slot.id);
               return (
                 <div key={slot.id} className="bg-slate-950/80 border border-slate-800 rounded-xl p-3 flex flex-col gap-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -748,6 +1134,33 @@ export default function ShiftScheduling({
                       >
                         {slot.status === "finalized" ? "ĐÃ CHỐT" : slot.status === "cancelled" ? "ĐÃ HUỶ" : `MỞ (${regs.length} đăng ký)`}
                       </span>
+                      {slot.status === "open" && slot.date >= today && (
+                        <span
+                          className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${
+                            regs.length === 0
+                              ? "bg-rose-950 text-rose-300 border-rose-800"
+                              : regs.length === 1
+                              ? "bg-amber-950 text-amber-300 border-amber-800"
+                              : "bg-emerald-950 text-emerald-300 border-emerald-800"
+                          }`}
+                        >
+                          {regs.length === 0 ? "Thiếu Host & Trợ live" : regs.length === 1 ? "Thiếu Trợ live" : "Đủ người đăng ký"}
+                        </span>
+                      )}
+                      {slotCampaign && (
+                        <span className="flex items-center gap-1 text-[10px] text-emerald-300" title={slotCampaign.hostBriefing || undefined}>
+                          <Target className="w-3 h-3" /> {slotCampaign.name}
+                          {slotCampaign.hostBriefing && <Info className="w-3 h-3 text-amber-300" />}
+                        </span>
+                      )}
+                      {studioConflicts.length > 0 && slot.status !== "cancelled" && (
+                        <span
+                          className="flex items-center gap-1 text-[10px] text-rose-300"
+                          title={`Ưu tiên hoá: ${studioConflicts.map((c) => `${c.brandName} (${c.startTime}-${c.endTime})`).join(", ")}`}
+                        >
+                          <Flame className="w-3 h-3" /> Trùng studio {studioConflicts.length} brand khác
+                        </span>
+                      )}
                     </div>
 
                     {admin && slot.status === "open" && (
@@ -760,6 +1173,13 @@ export default function ShiftScheduling({
                       </button>
                     )}
                   </div>
+
+                  {!admin && slotCampaign?.hostBriefing && (
+                    <div className="text-[11px] text-amber-200 bg-amber-950/40 border border-amber-900 rounded-lg px-2.5 py-1.5 flex items-start gap-1.5">
+                      <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                      <span>{slotCampaign.hostBriefing}</span>
+                    </div>
+                  )}
 
                   {!admin && slot.status === "open" && myTalentId && (
                     <button
@@ -828,11 +1248,111 @@ export default function ShiftScheduling({
                     </div>
                   )}
 
-                  {slot.status === "finalized" && (
-                    <div className="text-xs text-emerald-300 flex items-center gap-1.5 pt-1 border-t border-slate-800/80">
-                      <Check className="w-3.5 h-3.5" /> Đã chốt — xem chi tiết ở tab Live Sessions / Lịch Vận Hành.
-                    </div>
-                  )}
+                  {slot.status === "finalized" &&
+                    (() => {
+                      const session = slot.sessionId ? sessions.find((s) => s.id === slot.sessionId) : undefined;
+                      if (!session) {
+                        return (
+                          <div className="text-xs text-emerald-300 flex items-center gap-1.5 pt-1 border-t border-slate-800/80">
+                            <Check className="w-3.5 h-3.5" /> Đã chốt — xem chi tiết ở tab Live Sessions / Lịch Vận Hành.
+                          </div>
+                        );
+                      }
+                      const swapping = emergencySwap?.slotId === slot.id ? emergencySwap : null;
+                      const candidateRegs = regs.filter((r) => r.talentId !== session.hostId && r.talentId !== session.coHostId);
+                      return (
+                        <div className="pt-1 border-t border-slate-800/80 space-y-2">
+                          <div className="flex flex-wrap items-center gap-2 text-xs">
+                            <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                            <span className="text-emerald-300">Đã chốt</span>
+                            <span className="text-slate-400">
+                              Host: <span className="text-white font-medium">{session.hostName || "—"}</span>
+                            </span>
+                            {admin && (
+                              <button
+                                onClick={() => {
+                                  setEmergencySwap({ slotId: slot.id, role: "host" });
+                                  setSwapCandidateId("");
+                                  setSwapReason("");
+                                }}
+                                className="flex items-center gap-1 text-amber-400 hover:text-amber-300 font-bold"
+                              >
+                                <Repeat className="w-3 h-3" /> Báo bận / Tìm người thay
+                              </button>
+                            )}
+                            {session.coHostId && (
+                              <>
+                                <span className="text-slate-400">
+                                  · Trợ live: <span className="text-white font-medium">{session.coHostName}</span>
+                                </span>
+                                {admin && (
+                                  <button
+                                    onClick={() => {
+                                      setEmergencySwap({ slotId: slot.id, role: "coHost" });
+                                      setSwapCandidateId("");
+                                      setSwapReason("");
+                                    }}
+                                    className="flex items-center gap-1 text-amber-400 hover:text-amber-300 font-bold"
+                                  >
+                                    <Repeat className="w-3 h-3" /> Báo bận / Tìm người thay
+                                  </button>
+                                )}
+                              </>
+                            )}
+                          </div>
+                          {swapping && (
+                            <div className="bg-amber-950/40 border border-amber-800 rounded-lg p-2.5 space-y-2">
+                              <div className="text-[11px] text-amber-200 font-bold">
+                                Tìm người thay cho vai trò {swapping.role === "host" ? "Host" : "Trợ live"}
+                              </div>
+                              {candidateRegs.length === 0 ? (
+                                <div className="text-[11px] text-slate-500">
+                                  Không có ứng viên nào khác đã đăng ký rảnh ca này — cần báo tay/mở đăng ký lại.
+                                </div>
+                              ) : (
+                                <select
+                                  value={swapCandidateId}
+                                  onChange={(e) => setSwapCandidateId(e.target.value)}
+                                  className="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-amber-500"
+                                >
+                                  <option value="">— Chọn người thay —</option>
+                                  {candidateRegs.map((r) => (
+                                    <option key={r.talentId} value={r.talentId}>
+                                      {talentsById.get(r.talentId)?.name ?? r.talentId}
+                                    </option>
+                                  ))}
+                                </select>
+                              )}
+                              <input
+                                placeholder="Lý do đổi (vd: Host báo bận đột xuất)"
+                                value={swapReason}
+                                onChange={(e) => setSwapReason(e.target.value)}
+                                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-amber-500"
+                              />
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => handleEmergencySwap(slot, session, swapping.role)}
+                                  disabled={!swapCandidateId || swapBusy}
+                                  className="bg-amber-600 hover:bg-amber-500 disabled:opacity-40 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"
+                                >
+                                  {swapBusy ? "Đang xử lý..." : "Xác nhận thay người"}
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setEmergencySwap(null);
+                                    setSwapCandidateId("");
+                                    setSwapReason("");
+                                  }}
+                                  className="text-xs text-slate-400 hover:text-white"
+                                >
+                                  Huỷ
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                 </div>
               );
             })}

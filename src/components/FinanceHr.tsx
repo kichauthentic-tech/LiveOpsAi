@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { LiveSession, Talent, SessionFinance, SystemUser } from "../types";
+import { LiveSession, Talent, SessionFinance, SystemUser, Brand, BrandPlatformRate } from "../types";
 import { DollarSign, TrendingUp, Calculator, CheckCircle2, XCircle, Clock } from "lucide-react";
 
 interface FinanceHrProps {
@@ -7,6 +7,8 @@ interface FinanceHrProps {
   talents: Talent[];
   financeRecords: SessionFinance[];
   users: SystemUser[];
+  brands: Brand[];
+  brandPlatformRates: BrandPlatformRate[];
   currentUserId?: string;
   onUpdateFinance: (
     sessionId: string,
@@ -14,6 +16,16 @@ interface FinanceHrProps {
   ) => Promise<void>;
   onSetFinanceApproval: (sessionId: string, status: SessionFinance["approvalStatus"]) => Promise<void>;
 }
+
+// Giờ live thật của 1 phiên — dùng cho billing_model="hourly" (Giai đoạn 15).
+// Giống hệt durationHours ở ShiftScheduling.tsx (ca qua đêm cộng thêm 24h).
+const sessionDurationHours = (start: string, end: string) => {
+  const [sh, sm] = start.split(":").map(Number);
+  const [eh, em] = end.split(":").map(Number);
+  let mins = eh * 60 + em - (sh * 60 + sm);
+  if (mins <= 0) mins += 24 * 60;
+  return mins / 60;
+};
 
 const DEFAULT_FINANCE: Omit<SessionFinance, "sessionId"> = {
   agencyCommissionRate: 15,
@@ -30,6 +42,8 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
   talents,
   financeRecords,
   users,
+  brands,
+  brandPlatformRates,
   currentUserId,
   onUpdateFinance,
   onSetFinanceApproval
@@ -48,6 +62,12 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
     return map;
   }, [talents]);
 
+  const brandById = useMemo(() => {
+    const map: Record<string, Brand> = {};
+    for (const b of brands) map[b.id] = b;
+    return map;
+  }, [brands]);
+
   const userNameById = useMemo(() => {
     const map: Record<string, string> = {};
     for (const u of users) map[u.id] = u.name;
@@ -64,15 +84,22 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
     return completedSessions.map((s) => {
       const finance = financeBySessionId[s.id] ?? { sessionId: s.id, ...DEFAULT_FINANCE };
       const talent = talentById[s.hostId];
+      const brand = brandById[s.brandId];
       const hostFixRate = finance.hostFixRateOverride ?? talent?.ratePerSession ?? 0;
       const hostCommRate = finance.hostCommissionRateOverride ?? talent?.commissionRate ?? 0;
-      const grossAgencyRev = (s.actualGmv * finance.agencyCommissionRate) / 100;
+      // billing_model="hourly": doanh thu agency = giờ live thật × rate/giờ của brand
+      // (brand_platform_rates, Giai đoạn 14a) — không phải %GMV (Giai đoạn 15).
+      const isHourly = brand?.billingModel === "hourly";
+      const hourlyRate = brandPlatformRates.find((r) => r.brandId === s.brandId && r.platform === s.platform)?.ratePerHour ?? 0;
+      const grossAgencyRev = isHourly
+        ? sessionDurationHours(s.startTime, s.endTime) * hourlyRate
+        : (s.actualGmv * finance.agencyCommissionRate) / 100;
       const hostPayout = hostFixRate + (s.actualGmv * hostCommRate) / 100;
       const totalCost = hostPayout + finance.studioCost + finance.adsCost;
       const netProfit = grossAgencyRev - totalCost;
-      return { session: s, finance, talent, grossAgencyRev, hostPayout, netProfit };
+      return { session: s, finance, talent, isHourly, grossAgencyRev, hostPayout, netProfit };
     });
-  }, [completedSessions, financeBySessionId, talentById]);
+  }, [completedSessions, financeBySessionId, talentById, brandById, brandPlatformRates]);
 
   const totals = useMemo(
     () =>
@@ -166,7 +193,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                 <tr className="text-left text-slate-400 border-b border-slate-800">
                   <th className="py-2 pr-3">Phiên</th>
                   <th className="py-2 pr-3">GMV Thật</th>
-                  <th className="py-2 pr-3">Comm Agency %</th>
+                  <th className="py-2 pr-3">Doanh Thu Agency</th>
                   <th className="py-2 pr-3">Chi Phí Studio</th>
                   <th className="py-2 pr-3">Chi Phí Ads</th>
                   <th className="py-2 pr-3">Trả Host</th>
@@ -175,7 +202,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                 </tr>
               </thead>
               <tbody>
-                {rows.map(({ session: s, finance, talent, grossAgencyRev, hostPayout, netProfit }) => (
+                {rows.map(({ session: s, finance, talent, isHourly, grossAgencyRev, hostPayout, netProfit }) => (
                   <tr key={s.id} className="border-b border-slate-800/60 align-middle">
                     <td className="py-2 pr-3">
                       <div className="font-bold text-slate-200">{s.title}</div>
@@ -183,13 +210,25 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                     </td>
                     <td className="py-2 pr-3 font-bold text-slate-300">{money(s.actualGmv)} đ</td>
                     <td className="py-2 pr-3">
-                      <input
-                        type="number"
-                        defaultValue={finance.agencyCommissionRate}
-                        disabled={savingId === s.id}
-                        onBlur={(e) => handleFieldChange(s.id, "agencyCommissionRate", Number(e.target.value))}
-                        className="w-16 p-1.5 rounded-lg border border-slate-700 bg-slate-950 text-slate-100 font-bold"
-                      />
+                      {isHourly ? (
+                        <div>
+                          <span className="text-[9px] font-bold bg-blue-950 text-blue-300 border border-blue-800 px-1.5 py-0.5 rounded-full">
+                            Theo giờ live
+                          </span>
+                          <div className="font-bold text-slate-200 mt-0.5">{money(grossAgencyRev)} đ</div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            defaultValue={finance.agencyCommissionRate}
+                            disabled={savingId === s.id}
+                            onBlur={(e) => handleFieldChange(s.id, "agencyCommissionRate", Number(e.target.value))}
+                            className="w-14 p-1.5 rounded-lg border border-slate-700 bg-slate-950 text-slate-100 font-bold"
+                          />
+                          <span className="text-slate-500">% GMV</span>
+                        </div>
+                      )}
                     </td>
                     <td className="py-2 pr-3">
                       <input

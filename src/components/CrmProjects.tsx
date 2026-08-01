@@ -55,6 +55,7 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
   const [brandActiveCampaigns, setBrandActiveCampaigns] = useState(2);
   const [brandTotalGmv, setBrandTotalGmv] = useState(1200000000);
   const [brandContractStatus, setBrandContractStatus] = useState<"Active" | "Pending" | "Completed">("Active");
+  const [brandBillingModel, setBrandBillingModel] = useState<"gmv_commission" | "hourly">("gmv_commission");
 
   // Project Modal State
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
@@ -107,6 +108,7 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
     setBrandActiveCampaigns(1);
     setBrandTotalGmv(500000000);
     setBrandContractStatus("Active");
+    setBrandBillingModel("gmv_commission");
     setIsBrandModalOpen(true);
   };
 
@@ -123,6 +125,7 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
     setBrandActiveCampaigns(b.activeCampaigns);
     setBrandTotalGmv(b.totalGmv);
     setBrandContractStatus(b.contractStatus);
+    setBrandBillingModel(b.billingModel ?? "gmv_commission");
     setIsBrandModalOpen(true);
   };
 
@@ -150,7 +153,8 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
       totalGmv: Number(brandTotalGmv),
       contractStatus: brandContractStatus,
       owner: brandOwner,
-      ownerUserId: brandOwnerUserId || undefined
+      ownerUserId: brandOwnerUserId || undefined,
+      billingModel: brandBillingModel
     };
 
     if (editingBrand) {
@@ -314,6 +318,11 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
               <div className="flex justify-between items-center text-xs pt-1 border-t border-slate-800">
                 <span className="text-slate-400">Chiến dịch active: <strong>{b.activeCampaigns} campaigns</strong></span>
                 <span className="text-emerald-400 font-bold">Tổng GMV: {formatCurrencyAdaptive(b.totalGmv)}</span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                  {b.billingModel === "hourly" ? "💰 Thu Phí Theo Giờ Live" : "📊 Thu Phí Theo % GMV"}
+                </span>
               </div>
             </div>
           ))}
@@ -479,6 +488,21 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
                     <option value="Completed">Completed (Đã Hoàn Thành)</option>
                   </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-300 block mb-1">Hình Thức Thu Phí (Billing Model)</label>
+                <select
+                  value={brandBillingModel}
+                  onChange={(e) => setBrandBillingModel(e.target.value as "gmv_commission" | "hourly")}
+                  className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold bg-slate-950 text-slate-100"
+                >
+                  <option value="gmv_commission">Theo % GMV (Commission)</option>
+                  <option value="hourly">Theo Giờ Live (Rate/Giờ)</option>
+                </select>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Quyết định công thức tính Doanh Thu Agency ở tab Finance & HR. "Theo Giờ Live" dùng đơn giá cấu hình ở tab Đăng Ký &amp; Chốt Lịch Host.
+                </p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

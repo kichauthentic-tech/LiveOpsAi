@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, StrategicDirective, WorkflowRule, Talent, Studio, Equipment, Brand, AgencyProject, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, ShiftSlot, ShiftRegistration, RecurringShiftTemplate } from "./types";
+import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, StrategicDirective, WorkflowRule, Talent, Studio, Equipment, Brand, AgencyProject, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, Campaign } from "./types";
 import { ALL_PERMISSION_DEFINITIONS } from "./data/mockData";
 import { fetchTalents, createTalent, updateTalent, deleteTalent } from "./lib/db/talents";
 import { fetchStudios, createStudio, updateStudio, deleteStudio } from "./lib/db/studios";
@@ -24,6 +24,7 @@ import {
   updateRecurringShiftTemplate,
   deleteRecurringShiftTemplate
 } from "./lib/db/recurringShiftTemplates";
+import { fetchCampaigns, createCampaign, updateCampaign, deleteCampaign } from "./lib/db/campaigns";
 import {
   LayoutDashboard,
   Radio,
@@ -155,6 +156,11 @@ export default function App() {
   const [recurringShiftTemplates, setRecurringShiftTemplates] = useState<RecurringShiftTemplate[]>([]);
   const [phase14Loading, setPhase14Loading] = useState(true);
   const [phase14Error, setPhase14Error] = useState<string | null>(null);
+
+  // Campaign — chu kỳ vận hành theo tháng của brand (Giai đoạn 15), real data from Supabase `campaigns`.
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [phase15Loading, setPhase15Loading] = useState(true);
+  const [phase15Error, setPhase15Error] = useState<string | null>(null);
 
   // Previously these fetch errors were only stored in state and never rendered anywhere — a
   // failed fetch left a tab silently empty forever with no indication anything went wrong.
@@ -317,6 +323,28 @@ export default function App() {
       })
       .finally(() => {
         if (!cancelled) setPhase14Loading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user?.id]);
+
+  useEffect(() => {
+    if (!session) return;
+    let cancelled = false;
+    setPhase15Loading(true);
+    fetchCampaigns()
+      .then((rows) => {
+        if (cancelled) return;
+        setCampaigns(rows);
+        setPhase15Error(null);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setPhase15Error(err.message ?? "Không tải được dữ liệu Campaign từ Supabase.");
+      })
+      .finally(() => {
+        if (!cancelled) setPhase15Loading(false);
       });
     return () => {
       cancelled = true;
@@ -508,9 +536,10 @@ export default function App() {
         phase5Error && { key: "phase5", message: phase5Error },
         phase6Error && { key: "phase6", message: phase6Error },
         phase7Error && { key: "phase7", message: phase7Error },
-        phase14Error && { key: "phase14", message: phase14Error }
+        phase14Error && { key: "phase14", message: phase14Error },
+        phase15Error && { key: "phase15", message: phase15Error }
       ].filter((e): e is { key: string; message: string } => Boolean(e)),
-    [phase1Error, sessionsError, phase3Error, phase4Error, phase5Error, phase6Error, phase7Error, phase14Error]
+    [phase1Error, sessionsError, phase3Error, phase4Error, phase5Error, phase6Error, phase7Error, phase14Error, phase15Error]
   );
   const dataLoadErrorSignature = dataLoadErrors.map((e) => e.key + ":" + e.message).join("|");
   const showDataLoadErrorBanner = dataLoadErrors.length > 0 && dismissedDataErrorSignature !== dataLoadErrorSignature;
@@ -890,7 +919,8 @@ export default function App() {
           studioName: template.studioName,
           notes: template.notes,
           status: "open",
-          templateId: template.id
+          templateId: template.id,
+          campaignId: template.campaignId
         });
       }
     }
@@ -925,6 +955,38 @@ export default function App() {
     } catch (e: any) {
       window.alert(`Không thể huỷ đăng ký: ${e.message ?? e}`);
       return false;
+    }
+  };
+
+  // Handlers for Campaign (Giai đoạn 15)
+  const handleCreateCampaign = async (c: Campaign): Promise<boolean> => {
+    try {
+      const created = await createCampaign(c);
+      setCampaigns((prev) => [created, ...prev]);
+      return true;
+    } catch (e: any) {
+      window.alert(`Không thể tạo campaign: ${e.message ?? e}`);
+      return false;
+    }
+  };
+
+  const handleUpdateCampaign = async (c: Campaign): Promise<boolean> => {
+    try {
+      const updated = await updateCampaign(c);
+      setCampaigns((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+      return true;
+    } catch (e: any) {
+      window.alert(`Không thể cập nhật campaign: ${e.message ?? e}`);
+      return false;
+    }
+  };
+
+  const handleDeleteCampaign = async (id: string) => {
+    try {
+      await deleteCampaign(id);
+      setCampaigns((prev) => prev.filter((c) => c.id !== id));
+    } catch (e: any) {
+      window.alert(`Không thể xoá campaign: ${e.message ?? e}`);
     }
   };
 
@@ -1386,6 +1448,7 @@ export default function App() {
                     shiftRegistrations={shiftRegistrations}
                     brandPlatformRates={brandPlatformRates}
                     recurringShiftTemplates={recurringShiftTemplates}
+                    campaigns={campaigns}
                     onCreateSlot={handleCreateShiftSlot}
                     onDeleteSlot={handleDeleteShiftSlot}
                     onRegister={handleRegisterSlot}
@@ -1396,6 +1459,11 @@ export default function App() {
                     onToggleTemplate={handleToggleRecurringTemplate}
                     onDeleteTemplate={handleDeleteRecurringTemplate}
                     onGenerateMonthSlots={handleGenerateMonthSlots}
+                    onCreateCampaign={handleCreateCampaign}
+                    onUpdateCampaign={handleUpdateCampaign}
+                    onDeleteCampaign={handleDeleteCampaign}
+                    onUpdateSession={handleUpdateSession}
+                    onLogAudit={pushAuditLog}
                   />
                 )}
 
@@ -1460,6 +1528,8 @@ export default function App() {
                     talents={talents}
                     financeRecords={financeRecords}
                     users={users}
+                    brands={brands}
+                    brandPlatformRates={brandPlatformRates}
                     currentUserId={profile?.id}
                     onUpdateFinance={handleUpdateSessionFinance}
                     onSetFinanceApproval={handleSetSessionFinanceApproval}

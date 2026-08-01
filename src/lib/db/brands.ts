@@ -19,6 +19,7 @@ interface DbBrand {
   contract_status: Brand["contractStatus"];
   owner: string;
   owner_user_id: string | null;
+  billing_model: Brand["billingModel"];
 }
 
 function fromDb(row: DbBrand): Brand {
@@ -34,7 +35,8 @@ function fromDb(row: DbBrand): Brand {
     totalGmv: row.total_gmv,
     contractStatus: row.contract_status,
     owner: row.owner,
-    ownerUserId: row.owner_user_id ?? undefined
+    ownerUserId: row.owner_user_id ?? undefined,
+    billingModel: row.billing_model ?? "gmv_commission"
   };
 }
 
@@ -50,7 +52,8 @@ function toDb(b: Brand) {
     total_gmv: b.totalGmv,
     contract_status: b.contractStatus,
     owner: b.owner,
-    owner_user_id: orNull(b.ownerUserId)
+    owner_user_id: orNull(b.ownerUserId),
+    billing_model: b.billingModel
   };
 }
 

@@ -62,6 +62,9 @@ export interface Brand {
   contractStatus: "Active" | "Pending" | "Completed";
   owner: string;
   ownerUserId?: string;
+  // "gmv_commission" = doanh thu agency tính theo %GMV (session_finance.agencyCommissionRate,
+  // mặc định trước Giai đoạn 15). "hourly" = tính theo giờ live thật × BrandPlatformRate.ratePerHour.
+  billingModel: "gmv_commission" | "hourly";
   isCustom?: boolean;
 }
 
@@ -248,6 +251,7 @@ export interface ShiftSlot {
   sessionId?: string;
   createdBy?: string;
   templateId?: string;
+  campaignId?: string;
 }
 
 // Quy tắc lặp theo thứ trong tuần — sinh hàng loạt ShiftSlot cho 1 tháng
@@ -264,6 +268,28 @@ export interface RecurringShiftTemplate {
   studioName: string;
   notes: string;
   active: boolean;
+  createdBy?: string;
+  campaignId?: string;
+}
+
+// Chu kỳ vận hành theo tháng của 1 brand (Daily/Mega D-Day/Mid-month/Payday...)
+// với KPI GMV đã chốt trước — dùng làm căn cứ phân bổ giờ live (Giai đoạn 15).
+// Khác với AgencyProject (dự án hợp tác dài hạn, quản lý ở CrmProjects.tsx):
+// Campaign là chu kỳ ngắn hơn, gắn trực tiếp vào ShiftSlot/RecurringShiftTemplate
+// qua campaignId để lên lịch live.
+export interface Campaign {
+  id: string;
+  brandId: string;
+  brandName: string;
+  name: string;
+  type: "daily" | "mega" | "mid_month" | "payday" | "other";
+  targetGmv: number;
+  startDate: string;
+  endDate: string;
+  status: "draft" | "active" | "completed" | "cancelled";
+  // Đào tạo/brief Host theo campaign (mục #6 CEO đã duyệt) — hiển thị cho
+  // Host/Trợ live khi xem ca thuộc campaign này.
+  hostBriefing: string;
   createdBy?: string;
 }
 
