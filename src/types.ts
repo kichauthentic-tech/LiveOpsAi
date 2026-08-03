@@ -157,6 +157,7 @@ export interface LiveSession {
   brandId: string;
   brandName: string;
   projectId?: string;
+  campaignId?: string;
   shopTikTokHandle: string;
   studioId: string;
   studioName: string;

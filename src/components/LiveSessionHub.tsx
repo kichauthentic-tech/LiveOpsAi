@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { LiveSession, MinuteMetric, ProductSKU, Studio, Talent, Brand, SystemUser } from "../types";
+import { LiveSession, MinuteMetric, ProductSKU, Studio, Talent, Brand, SystemUser, Campaign } from "../types";
 import { Radio, Play, CheckCircle2, Clock, Sparkles, TrendingUp, Users, ShoppingBag, AlertCircle, RefreshCw, Layers, Plus, Edit3, Trash2, X, Building2 } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
 import { authedFetch } from "../lib/authedFetch";
@@ -11,6 +11,7 @@ interface LiveSessionHubProps {
   talents: Talent[];
   brands: Brand[];
   users: SystemUser[];
+  campaigns?: Campaign[];
   onSelectSession: (session: LiveSession) => void;
   onAddSession?: (session: LiveSession) => void | Promise<boolean>;
   onUpdateSession?: (session: LiveSession) => void | Promise<boolean>;
@@ -24,6 +25,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
   talents,
   brands,
   users,
+  campaigns = [],
   onSelectSession,
   onAddSession,
   onUpdateSession,
@@ -40,6 +42,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
   const [editingSession, setEditingSession] = useState<LiveSession | null>(null);
   const [sessTitle, setSessTitle] = useState("");
   const [sessBrandId, setSessBrandId] = useState("");
+  const [sessCampaignId, setSessCampaignId] = useState("");
   const [sessShopHandle, setSessShopHandle] = useState("@cocoon.vietnam.official");
   const [sessStudioId, setSessStudioId] = useState("");
   const [sessHostId, setSessHostId] = useState("");
@@ -55,6 +58,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
     setEditingSession(null);
     setSessTitle("Phiên Live Mỹ Phẩm Mùa Hè");
     setSessBrandId(brands[0]?.id || "");
+    setSessCampaignId("");
     setSessShopHandle("@cocoon.vietnam.official");
     setSessStudioId(studios[0]?.id || "");
     setSessHostId(talents[0]?.id || "");
@@ -72,6 +76,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
     setEditingSession(s);
     setSessTitle(s.title || "Phiên Livestream");
     setSessBrandId(s.brandId || brands[0]?.id || "");
+    setSessCampaignId(s.campaignId || "");
     setSessShopHandle(s.shopTikTokHandle);
     setSessStudioId(s.studioId || studios[0]?.id || "");
     setSessHostId(s.hostId || talents[0]?.id || "");
@@ -100,6 +105,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
       title: sessTitle || `Live ${brandObj?.name || "Brand"}`,
       brandId: sessBrandId,
       brandName: brandObj?.name || "",
+      campaignId: sessCampaignId || undefined,
       shopTikTokHandle: sessShopHandle,
       studioId: sessStudioId,
       studioName: studioObj?.name || "",
@@ -791,7 +797,10 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                   <select
                     required
                     value={sessBrandId}
-                    onChange={(e) => setSessBrandId(e.target.value)}
+                    onChange={(e) => {
+                      setSessBrandId(e.target.value);
+                      setSessCampaignId("");
+                    }}
                     className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold text-slate-100 bg-slate-950"
                   >
                     <option value="">-- Chọn Brand --</option>
@@ -802,6 +811,26 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                     ))}
                   </select>
                 </div>
+                <div>
+                  <label className="font-bold text-slate-300 block mb-1">Campaign (tùy chọn)</label>
+                  <select
+                    value={sessCampaignId}
+                    onChange={(e) => setSessCampaignId(e.target.value)}
+                    className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold text-slate-100 bg-slate-950"
+                  >
+                    <option value="">-- Không thuộc campaign nào --</option>
+                    {campaigns
+                      .filter((c) => c.brandId === sessBrandId && c.status !== "cancelled")
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} ({c.startDate} → {c.endDate})
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="font-bold text-slate-300 block mb-1">TikTok Handle</label>
                   <input

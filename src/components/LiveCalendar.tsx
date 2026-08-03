@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { LiveSession, Studio, Talent, Brand, SystemUser } from "../types";
+import { LiveSession, Studio, Talent, Brand, SystemUser, Campaign } from "../types";
 import {
   Calendar as CalendarIcon,
   Clock,
@@ -39,6 +39,7 @@ interface LiveCalendarProps {
   talents: Talent[];
   brands: Brand[];
   users: SystemUser[];
+  campaigns?: Campaign[];
   onAddSession?: (newSession: LiveSession) => Promise<boolean>;
   onUpdateSession?: (updatedSession: LiveSession) => Promise<boolean>;
 }
@@ -67,6 +68,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   talents,
   brands,
   users,
+  campaigns = [],
   onAddSession,
   onUpdateSession
 }) => {
@@ -101,6 +103,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   // New Booking Form State
   const [newTitle, setNewTitle] = useState("");
   const [newBrandId, setNewBrandId] = useState(brands[0]?.id || "");
+  const [newCampaignId, setNewCampaignId] = useState("");
   const [newStudioId, setNewStudioId] = useState(studios[0]?.id || "");
   const [newHostId, setNewHostId] = useState(talents[0]?.id || "");
   const [newDate, setNewDate] = useState(selectedDate);
@@ -470,6 +473,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
       title: newTitle || `Phiên Live ${brandObj?.name || 'Brand'} - ${newStartTime}`,
       brandId: newBrandId,
       brandName: brandObj?.name || "Brand Partner",
+      campaignId: newCampaignId || undefined,
       shopTikTokHandle: `@${brandObj?.name.toLowerCase().replace(/\s+/g, '') || 'shop'}_official`,
       studioId: newStudioId,
       studioName: studioObj?.name || "Studio Standard",
@@ -509,6 +513,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
 
     setIsBookingModalOpen(false);
     setNewTitle("");
+    setNewCampaignId("");
     setAiSuggestion(null);
   };
 
@@ -1452,7 +1457,10 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   <label className="font-bold text-slate-300 block mb-1">Thương Hiệu (Brand):</label>
                   <select
                     value={newBrandId}
-                    onChange={(e) => setNewBrandId(e.target.value)}
+                    onChange={(e) => {
+                      setNewBrandId(e.target.value);
+                      setNewCampaignId("");
+                    }}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500 font-medium"
                   >
                     {brands.map((b) => (
@@ -1460,6 +1468,24 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                         {b.name} ({b.industry})
                       </option>
                     ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-300 block mb-1">Campaign (tùy chọn):</label>
+                  <select
+                    value={newCampaignId}
+                    onChange={(e) => setNewCampaignId(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500 font-medium"
+                  >
+                    <option value="">-- Không thuộc campaign nào --</option>
+                    {campaigns
+                      .filter((c) => c.brandId === newBrandId && c.status !== "cancelled")
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} ({c.startDate} → {c.endDate})
+                        </option>
+                      ))}
                   </select>
                 </div>
 

@@ -585,9 +585,29 @@ Việc còn treo khác (không chặn Giai đoạn 9/10, có thể làm song son
   - Đã dọn sạch toàn bộ dữ liệu test (session, campaign, brand, dòng audit_log vừa tạo) → reload xác nhận về đúng Clean State.
 - **Giai đoạn 25: HOÀN THÀNH — đã verify đầy đủ qua Supabase thật + browser thật.**
 
+**Giai đoạn 26 — Campaign làm "xương sống" (spine model): thêm FK thật `live_sessions.campaign_id`:**
+- **Bối cảnh:** từ Giai đoạn 15, `campaigns` chỉ có FK thật tới `shift_slots`/`recurring_shift_templates` (migration `0016`) — bảng quan trọng nhất, `live_sessions`, chưa từng có cột `campaign_id`. Mọi nơi cần biết "session này thuộc campaign nào" phải tự suy luận qua `brand_id` + `date` nằm trong `[start_date, end_date]` của campaign (tự thừa nhận ở Giai đoạn 25: "không dùng `shift_slots.campaignId` vì đơn giản hơn"). User nhận thấy hệ thống "chấp vá" — nguyên nhân gốc chính là mẫu suy luận lặp lại này thay vì 1 nguồn sự thật FK duy nhất.
+- **Migration mới `supabase/migrations/0022_session_campaign_spine.sql`**: thêm cột `live_sessions.campaign_id` (uuid, FK `campaigns`, nullable — session phát sinh ngoài kế hoạch vẫn hợp lệ với giá trị `null`) + index. Backfill best-effort cho session cũ: gán theo đúng logic suy luận cũ (brand khớp + date trong khoảng ngày campaign), ưu tiên campaign có `start_date` gần nhất nếu khớp nhiều campaign chồng ngày; session không khớp giữ `null`. `update_session_with_children()` (hàm RPC dùng cho `updateSession`) được `create or replace` lại để map thêm `campaign_id` — đúng pattern bắt buộc mỗi khi thêm cột mới vào `live_sessions` (đã lặp lại ở migration `0010`/`0014`).
+  ⏳ **User cần tự áp dụng migration này lên Supabase thật (SQL Editor) TRƯỚC khi dùng lại tính năng tạo/sửa Live Session** — `sessionToDb()` giờ luôn gửi `campaign_id` trong payload insert/update, nếu cột chưa tồn tại trên DB thật thì **mọi thao tác tạo/sửa session sẽ lỗi**, không riêng gì tính năng campaign.
+- `src/types.ts`: `LiveSession` thêm `campaignId?: string`.
+- `src/lib/db/sessions.ts`: `DbLiveSession` thêm `campaign_id`; `sessionFromDb`/`sessionToDb` map 2 chiều (theo đúng pattern `orNull` có sẵn).
+- **3 điểm tạo session đều đã gán `campaignId`:**
+  - `App.tsx` `handleFinalizeShiftSlot` (chốt lịch từ `ShiftScheduling`) — lấy thẳng từ `slot.campaignId` đã có sẵn, không cần UI mới.
+  - `LiveCalendar.tsx` (đặt lịch nhanh) — thêm prop `campaigns`, state `newCampaignId`, dropdown "Campaign (tùy chọn)" lọc theo brand đang chọn (reset khi đổi brand).
+  - `LiveSessionHub.tsx` (tạo/sửa session nhanh) — thêm prop `campaigns`, state `sessCampaignId`, dropdown tương tự cạnh ô chọn Brand (reset khi đổi brand; nạp lại đúng giá trị khi mở modal Sửa).
+  - `App.tsx` truyền `campaigns={campaigns}` vào cả 2 component trên.
+- `src/components/ShiftScheduling.tsx` — `campaignActualGmv` (khối "Campaign Tháng", Giai đoạn 25) đổi ưu tiên lọc theo `session.campaignId === campaign.id` (FK thật) khi có; **fallback về đúng suy luận brand+khoảng ngày cũ** cho session tạo trước khi có cột (chưa được backfill hoặc backfill không khớp) — không làm mất GMV của dữ liệu lịch sử.
+- **Đã verify:** `npx tsc --noEmit` + `npm run build` pass sạch.
+- **Đã verify end-to-end qua Supabase thật + browser thật (phiên 2026-08-03, tài khoản admin thật `tuananh1902.skt@gmail.com`, sau khi user tự áp dụng migration `0022`)** — tạo `ZZZ Test Spine Campaign` (brand JOCKEY, KPI 1.000.000đ, 2026-08-03 → 2026-08-03), tạo 1 session qua form Live Session Hub chọn đúng campaign này ở dropdown "Campaign (tùy chọn)", `status=Completed`, `actualGmv=750.000đ`:
+  - **Verify qua REST API trực tiếp:** `live_sessions.campaign_id` = đúng UUID campaign vừa tạo (FK thật, không phải suy luận).
+  - Đổi campaign sang `status=completed` → card hiện đúng **"Thật 750.000đ / KPI 1.000.000đ (75%)"** — khớp chính xác `campaignActualGmv` tính qua `campaignId` thật.
+  - Dropdown Campaign ở cả Live Session Hub và Live Calendar lọc đúng theo brand đang chọn (reset khi đổi brand).
+  - Đã dọn sạch toàn bộ dữ liệu test (session, campaign vừa tạo) → xác nhận về đúng Clean State.
+- **Giai đoạn 26: HOÀN THÀNH — đã verify đầy đủ qua Supabase thật + browser thật.**
+
 ## Giai đoạn 16+ (còn lại) — xem file riêng `BUSINESS_ROADMAP.md`
 
-Giai đoạn 15, 15b, 15c, 16, 19, 20, 23, 25 đã HOÀN THÀNH — code xong + verify đầy đủ qua Supabase/browser thật. Giai đoạn 17/18 tạm hoãn (chờ file export TikTok thật), 21/22 phụ thuộc 17 nên cũng chờ theo. Giai đoạn 24 (Đánh giá & Độ tin cậy Talent) còn lại — xem `BUSINESS_ROADMAP.md`. Đọc file đó trước khi bắt đầu bất kỳ giai đoạn nào tiếp theo (giai đoạn kế tiếp do user chọn ở đầu phiên); sau khi hoàn thành + verify 1 giai đoạn, quay lại cập nhật `PROJECT_STATUS.md` này theo đúng quy ước, đồng thời đánh dấu trạng thái tương ứng trong `BUSINESS_ROADMAP.md`.
+Giai đoạn 15, 15b, 15c, 16, 19, 20, 23, 25, 26 đã HOÀN THÀNH — code xong + verify đầy đủ qua Supabase/browser thật. Giai đoạn 17/18 tạm hoãn (chờ file export TikTok thật), 21/22 phụ thuộc 17 nên cũng chờ theo. Giai đoạn 24 (Đánh giá & Độ tin cậy Talent) còn lại — xem `BUSINESS_ROADMAP.md`. Đọc file đó trước khi bắt đầu bất kỳ giai đoạn nào tiếp theo (giai đoạn kế tiếp do user chọn ở đầu phiên); sau khi hoàn thành + verify 1 giai đoạn, quay lại cập nhật `PROJECT_STATUS.md` này theo đúng quy ước, đồng thời đánh dấu trạng thái tương ứng trong `BUSINESS_ROADMAP.md`.
 
 **Lưu ý cho giai đoạn sau — tài khoản test:** user đã cung cấp tài khoản thật (`tuananh1902.skt@gmail.com`) để Claude tự đăng nhập verify — role thật trong DB hiện là `admin`, không phải `ceo`. Dùng tài khoản này để tự test qua browser mà không cần hỏi lại user mỗi giai đoạn, trừ khi cần test riêng hành vi theo role khác (Operations/Brand/Talent) hoặc user đổi mật khẩu. Mọi migration DDL mới vẫn cần user tự áp dụng qua SQL Editor (Claude chỉ có REST API qua service_role, không chạy được SQL thô) — nhắc rõ trong response khi có migration mới, và đợi user xác nhận đã áp dụng trước khi bắt đầu verify qua browser.
 

@@ -1228,6 +1228,7 @@ export default function App() {
       title: `${brand?.name ?? slot.brandName} - ${slot.date} ${slot.startTime}`,
       brandId: slot.brandId ?? "",
       brandName: brand?.name ?? slot.brandName,
+      campaignId: slot.campaignId,
       shopTikTokHandle: `@${(brand?.name ?? slot.brandName).toLowerCase().replace(/\s+/g, "") || "shop"}_official`,
       studioId: slot.studioId ?? "",
       studioName: studio?.name ?? slot.studioName,
@@ -1623,6 +1624,7 @@ export default function App() {
                     talents={activeTalents}
                     brands={activeBrands}
                     users={activeUsers}
+                    campaigns={campaigns}
                     onSelectSession={setSelectedSession}
                     onAddSession={handleAddSession}
                     onUpdateSession={handleUpdateSession}
@@ -1637,6 +1639,7 @@ export default function App() {
                     talents={activeTalents}
                     brands={activeBrands}
                     users={activeUsers}
+                    campaigns={campaigns}
                     onAddSession={handleAddSession}
                     onUpdateSession={handleUpdateSession}
                   />

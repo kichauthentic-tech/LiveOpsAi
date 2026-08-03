@@ -258,14 +258,17 @@ export default function ShiftScheduling({
     [campaigns, selectedMonth]
   );
 
-  // Giai đoạn 25 — GMV thật đạt được của campaign = tổng actualGmv các session
-  // Completed cùng brand, rơi trong khoảng ngày campaign (giống cách MonthlyClose
-  // gộp theo tháng, chỉ đổi mẫu lọc từ "tháng" sang "khoảng ngày campaign").
+  // Giai đoạn 26 — GMV thật đạt được của campaign = tổng actualGmv các session
+  // Completed có campaign_id trỏ thẳng vào campaign (FK thật từ migration 0022).
+  // Session cũ chưa được backfill (campaignId rỗng) vẫn fallback về suy luận
+  // brand+khoảng ngày như Giai đoạn 25, để không mất dữ liệu GMV của các
+  // session tạo trước khi có cột campaign_id.
   const campaignActualGmv = useMemo(() => {
     const map = new Map<string, number>();
     campaigns.forEach((c) => {
       const total = sessions
-        .filter((s) => s.brandId === c.brandId && s.status === "Completed" && s.date >= c.startDate && s.date <= c.endDate)
+        .filter((s) => s.status === "Completed")
+        .filter((s) => (s.campaignId ? s.campaignId === c.id : s.brandId === c.brandId && s.date >= c.startDate && s.date <= c.endDate))
         .reduce((acc, s) => acc + (s.actualGmv || 0), 0);
       map.set(c.id, total);
     });
