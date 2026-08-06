@@ -60,9 +60,21 @@ import {
   UserCog,
   CalendarClock,
   CalendarCheck,
-  Gauge
+  Gauge,
+  Store,
+  Tag,
+  Receipt,
+  ClipboardCheck,
+  Target
 } from "lucide-react";
-import { Header } from "./components/Header";
+import { Header, WorkspaceContext } from "./components/Header";
+import { BrandDashboard } from "./components/brand-workspace/BrandDashboard";
+import { BrandCalendar } from "./components/brand-workspace/BrandCalendar";
+import { BrandCampaigns } from "./components/brand-workspace/BrandCampaigns";
+import { BrandSessions } from "./components/brand-workspace/BrandSessions";
+import { BrandRateCard } from "./components/brand-workspace/BrandRateCard";
+import { BrandInvoices } from "./components/brand-workspace/BrandInvoices";
+import { BrandReviewHistory } from "./components/brand-workspace/BrandReviewHistory";
 import { Login } from "./components/Login";
 import { ResetPasswordScreen } from "./components/ResetPasswordScreen";
 import { AccountSettings } from "./components/AccountSettings";
@@ -110,6 +122,14 @@ export default function App() {
   const currentRole: UserRole = profile?.role ?? "talent";
   const [activeTab, setActiveTab] = useState<string>(() => loadStorage("activeTab", "brief"));
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Giai đoạn A — Workspace Agency ↔ Brand (xem WORKSPACE_DESIGN.md). Chỉ có ý nghĩa với
+  // ceo/admin/operations (những role được phép nhìn xuyên brand); role "brand" tự khoá vào
+  // đúng 1 brand của họ ở effectiveWorkspace bên dưới, không dùng state raw này.
+  const [workspace, setWorkspace] = useState<WorkspaceContext>(() =>
+    loadStorage<WorkspaceContext>("workspace", { type: "agency" })
+  );
+  useEffect(() => saveStorage("workspace", workspace), [workspace]);
 
   // Role Permissions Matrix — real data from Supabase `role_permissions` (Phase 6), no mock/localStorage fallback
   const [rolePermissions, setRolePermissions] = useState<RolePermissionsMap>({} as RolePermissionsMap);
@@ -703,6 +723,20 @@ export default function App() {
         status: "Active",
         lastLogin: ""
       };
+
+  // Workspace thật đang áp dụng — role "brand" bị ép cứng vào brand của chính họ (không cho
+  // chọn lại); ceo/admin/operations dùng state `workspace` từ switcher; các role khác
+  // (talent/moderator) luôn ở Agency Workspace vì chưa có nhu cầu nghiệp vụ nhìn theo brand.
+  const effectiveWorkspace: WorkspaceContext = useMemo(() => {
+    if (currentRole === "brand") {
+      return activeUser.assignedBrandId ? { type: "brand", brandId: activeUser.assignedBrandId } : { type: "agency" };
+    }
+    if (currentRole === "ceo" || currentRole === "admin" || currentRole === "operations") {
+      return workspace;
+    }
+    return { type: "agency" };
+  }, [currentRole, workspace, activeUser.assignedBrandId]);
+  const currentBrandId = effectiveWorkspace.type === "brand" ? effectiveWorkspace.brandId : undefined;
 
   // Helper to check permission for a specific key under current role/user
   const checkPermission = (permKey: PermissionKey): boolean => {
@@ -1324,36 +1358,100 @@ export default function App() {
     setActiveTab("sessions");
   };
 
-  // Navigation Items mapped to permission keys
-  const navItems = [
-    { id: "myworkspace", label: "Việc Của Tôi", icon: UserCheck, perm: undefined },
-    { id: "brief", label: "Command Brief", icon: FileText, perm: "view_executive_brief" as PermissionKey },
-    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, perm: undefined },
-    { id: "sessions", label: "Live Sessions", icon: Radio, badge: "LIVE", perm: "manage_sessions" as PermissionKey },
-    { id: "calendar", label: "Lịch Vận Hành", icon: CalendarIcon, badge: "SMART", perm: "manage_calendar" as PermissionKey },
-    // Đăng ký & Chốt Lịch Host — luôn hiện với mọi role, không gate theo PermissionKey: role
-    // talent cần thấy tab này để tự đăng ký ca (Giai đoạn 14a); màn hình bên trong tự đổi giao
-    // diện theo currentRole (talent = đăng ký, ceo/operations/admin = mở ca + chốt lịch).
-    { id: "shift_scheduling", label: "Đăng Ký & Chốt Lịch", icon: CalendarClock, badge: "NEW", perm: undefined },
-    { id: "scripts", label: "AI Script Gen", icon: Sparkles, perm: "generate_scripts" as PermissionKey },
-    { id: "talents", label: "Talent Pool", icon: Users, perm: "manage_talents" as PermissionKey },
-    { id: "studios", label: "Studios & Gear", icon: Building2, perm: "manage_studios_gear" as PermissionKey },
-    { id: "studio_utilization", label: "Tỷ Lệ Lấp Đầy Studio", icon: Gauge, badge: "NEW", perm: "manage_studios_gear" as PermissionKey },
-    { id: "crm", label: "CRM & Projects", icon: Briefcase, perm: "manage_crm_projects" as PermissionKey },
-    { id: "tiktok_api", label: "TikTok API", icon: Link2, perm: "manage_tiktok_api" as PermissionKey },
-    { id: "finance", label: "Finance & P&L", icon: DollarSign, perm: "view_financials" as PermissionKey },
-    { id: "monthly_close", label: "Đóng Sổ Tháng", icon: CalendarCheck, badge: "NEW", perm: "view_financials" as PermissionKey },
-    { id: "ai_agents", label: "Hội Đồng AI & Simulator", icon: Bot, badge: "DEMO", perm: "manage_ai_agents" as PermissionKey },
-    { id: "user_settings", label: "Phân Quyền & Role", icon: ShieldCheck, badge: "CUSTOM", perm: "manage_users_permissions" as PermissionKey },
-    // Tài khoản cá nhân — luôn hiện với mọi role, không gate theo PermissionKey (đổi tên/mật khẩu
-    // là việc của chính chủ tài khoản, không phải một quyền có thể cấp/thu hồi qua Ma Trận Role).
-    { id: "account_settings", label: "Tài Khoản Của Tôi", icon: UserCog, perm: undefined },
-    // Độc quyền Admin — không dùng PermissionKey/Ma Trận Role để gate (không thể cấp
-    // qua Ma Trận cho role khác, kể cả ceo), chỉ hiện khi currentRole === "admin".
-    ...(currentRole === "admin"
-      ? [{ id: "ai_training", label: "AI Training Center", icon: BrainCircuit, badge: "ADMIN", perm: undefined }]
-      : []),
+  // Navigation Items mapped to permission keys, grouped theo luồng công việc — đây là
+  // nhóm cho Agency Workspace (nhìn xuyên mọi Brand). Xem BRAND_NAV_GROUPS bên dưới cho
+  // Brand Workspace (Giai đoạn A, WORKSPACE_DESIGN.md).
+  const AGENCY_NAV_GROUPS = [
+    {
+      label: "Tổng Quan",
+      items: [
+        { id: "myworkspace", label: "Việc Của Tôi", icon: UserCheck, perm: undefined },
+        { id: "brief", label: "Command Brief", icon: FileText, perm: "view_executive_brief" as PermissionKey },
+        { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, perm: undefined },
+      ],
+    },
+    {
+      label: "Vận Hành Live",
+      items: [
+        { id: "sessions", label: "Live Sessions", icon: Radio, badge: "LIVE", perm: "manage_sessions" as PermissionKey },
+        { id: "calendar", label: "Lịch Vận Hành", icon: CalendarIcon, badge: "SMART", perm: "manage_calendar" as PermissionKey },
+        // Đăng ký & Chốt Lịch Host — luôn hiện với mọi role, không gate theo PermissionKey: role
+        // talent cần thấy tab này để tự đăng ký ca (Giai đoạn 14a); màn hình bên trong tự đổi giao
+        // diện theo currentRole (talent = đăng ký, ceo/operations/admin = mở ca + chốt lịch).
+        { id: "shift_scheduling", label: "Đăng Ký & Chốt Lịch", icon: CalendarClock, badge: "NEW", perm: undefined },
+      ],
+    },
+    {
+      label: "Tài Nguyên Chung",
+      items: [
+        { id: "scripts", label: "AI Script Gen", icon: Sparkles, perm: "generate_scripts" as PermissionKey },
+        { id: "talents", label: "Talent Pool", icon: Users, perm: "manage_talents" as PermissionKey },
+        { id: "studios", label: "Studios & Gear", icon: Building2, perm: "manage_studios_gear" as PermissionKey },
+        { id: "studio_utilization", label: "Tỷ Lệ Lấp Đầy Studio", icon: Gauge, badge: "NEW", perm: "manage_studios_gear" as PermissionKey },
+      ],
+    },
+    {
+      label: "Kinh Doanh",
+      items: [
+        { id: "crm", label: "CRM & Projects", icon: Briefcase, perm: "manage_crm_projects" as PermissionKey },
+        { id: "tiktok_api", label: "TikTok API", icon: Link2, perm: "manage_tiktok_api" as PermissionKey },
+      ],
+    },
+    {
+      label: "Tài Chính",
+      items: [
+        { id: "finance", label: "Finance & P&L", icon: DollarSign, perm: "view_financials" as PermissionKey },
+        { id: "monthly_close", label: "Đóng Sổ Tháng", icon: CalendarCheck, badge: "NEW", perm: "view_financials" as PermissionKey },
+      ],
+    },
+    {
+      label: "Hệ Thống",
+      items: [
+        { id: "ai_agents", label: "Hội Đồng AI & Simulator", icon: Bot, badge: "DEMO", perm: "manage_ai_agents" as PermissionKey },
+        { id: "user_settings", label: "Phân Quyền & Role", icon: ShieldCheck, badge: "CUSTOM", perm: "manage_users_permissions" as PermissionKey },
+        // Tài khoản cá nhân — luôn hiện với mọi role, không gate theo PermissionKey (đổi tên/mật khẩu
+        // là việc của chính chủ tài khoản, không phải một quyền có thể cấp/thu hồi qua Ma Trận Role).
+        { id: "account_settings", label: "Tài Khoản Của Tôi", icon: UserCog, perm: undefined },
+        // Độc quyền Admin — không dùng PermissionKey/Ma Trận Role để gate (không thể cấp
+        // qua Ma Trận cho role khác, kể cả ceo), chỉ hiện khi currentRole === "admin".
+        ...(currentRole === "admin"
+          ? [{ id: "ai_training", label: "AI Training Center", icon: BrainCircuit, badge: "ADMIN", perm: undefined }]
+          : []),
+      ],
+    },
   ];
+
+  // Brand Workspace (Giai đoạn A) — 1 nhóm duy nhất, luôn scope theo đúng 1 brand
+  // (currentBrandId). Không gate theo PermissionKey: role "brand" tự khoá vào workspace của
+  // chính họ và có quyền thấy đủ 7 module này bất kể Ma Trận Phân Quyền (role_permissions
+  // của "brand" mặc định false cho manage_calendar/view_financials — dùng lại các key đó ở
+  // đây sẽ khoá nhầm chính brand ra khỏi dữ liệu của họ); còn ceo/admin/operations vào xem hộ
+  // qua switcher vốn đã có toàn quyền agency-level rồi.
+  const BRAND_NAV_GROUPS = [
+    {
+      label: "Brand Workspace",
+      items: [
+        { id: "brand_dashboard", label: "Dashboard", icon: Store, perm: undefined },
+        { id: "brand_calendar", label: "Lịch Vận Hành", icon: CalendarIcon, perm: undefined },
+        { id: "brand_campaigns", label: "Campaign", icon: Target, badge: "CENTRAL", perm: undefined },
+        { id: "brand_sessions", label: "Sessions", icon: Radio, perm: undefined },
+        { id: "brand_rates", label: "Rate Card", icon: Tag, perm: undefined },
+        { id: "brand_invoices", label: "Hoá Đơn & Công Nợ", icon: Receipt, perm: undefined },
+        { id: "brand_reviews", label: "Báo Cáo Cuối Kỳ", icon: ClipboardCheck, perm: undefined },
+        { id: "account_settings", label: "Tài Khoản Của Tôi", icon: UserCog, perm: undefined },
+      ],
+    },
+  ];
+
+  const navGroups = effectiveWorkspace.type === "brand" ? BRAND_NAV_GROUPS : AGENCY_NAV_GROUPS;
+  const navItems = navGroups.flatMap((g) => g.items);
+
+  const handleWorkspaceChange = (next: WorkspaceContext) => {
+    setWorkspace(next);
+    const nextGroups = next.type === "brand" ? BRAND_NAV_GROUPS : AGENCY_NAV_GROUPS;
+    const firstTab = nextGroups.flatMap((g) => g.items)[0]?.id;
+    if (firstTab) setActiveTab(firstTab);
+  };
 
   // Helper to determine if current tab is allowed
   const currentTabNavItem = navItems.find((n) => n.id === activeTab);
@@ -1406,43 +1504,55 @@ export default function App() {
           </button>
         </div>
 
-        <nav className="flex-1 py-3 px-3 space-y-1 overflow-y-auto scrollbar-thin">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
-            const hasAccess = !item.perm || checkPermission(item.perm);
+        <nav className="flex-1 py-3 px-3 space-y-4 overflow-y-auto scrollbar-thin">
+          {navGroups.map((group) => {
+            const visibleItems = group.items.filter(
+              (item) => !item.perm || checkPermission(item.perm)
+            );
 
-            if (!hasAccess) return null;
+            if (visibleItems.length === 0) return null;
 
             return (
-              <button
-                key={item.id}
-                onClick={() => {
-                  setActiveTab(item.id);
-                  setMobileMenuOpen(false);
-                }}
-                title={item.label}
-                className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl transition-colors text-xs font-medium ${
-                  isActive
-                    ? "bg-blue-600/10 text-blue-400 border border-blue-600/20 font-bold"
-                    : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
-                }`}
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <Icon
-                    className={`w-4 h-4 shrink-0 ${isActive ? "text-blue-400" : "text-slate-400"}`}
-                  />
-                  <span className="truncate">{item.label}</span>
-                </div>
+              <div key={group.label} className="space-y-1">
+                <p className="px-3 text-[10px] font-bold uppercase tracking-widest text-slate-600">
+                  {group.label}
+                </p>
+                {visibleItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = activeTab === item.id;
 
-                <div className="flex items-center gap-1.5 shrink-0">
-                  {item.badge && (
-                    <span className="bg-rose-600/20 text-rose-400 border border-rose-500/30 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase animate-pulse">
-                      {item.badge}
-                    </span>
-                  )}
-                </div>
-              </button>
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        setActiveTab(item.id);
+                        setMobileMenuOpen(false);
+                      }}
+                      title={item.label}
+                      className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl transition-colors text-xs font-medium ${
+                        isActive
+                          ? "bg-blue-600/10 text-blue-400 border border-blue-600/20 font-bold"
+                          : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <Icon
+                          className={`w-4 h-4 shrink-0 ${isActive ? "text-blue-400" : "text-slate-400"}`}
+                        />
+                        <span className="truncate">{item.label}</span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {item.badge && (
+                          <span className="bg-rose-600/20 text-rose-400 border border-rose-500/30 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase animate-pulse">
+                            {item.badge}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             );
           })}
         </nav>
@@ -1490,6 +1600,18 @@ export default function App() {
               activeUserTitle={activeUser.customRoleTitle}
               onSignOut={signOut}
               sessions={activeSessions}
+              // Switcher chỉ hiện cho role được phép nhìn xuyên brand — role "brand" đã bị ép
+              // cứng vào effectiveWorkspace của họ (không truyền props này xuống thì Header
+              // tự ẩn switcher, xem Header.tsx).
+              workspace={
+                currentRole === "ceo" || currentRole === "admin" || currentRole === "operations" ? workspace : undefined
+              }
+              onWorkspaceChange={
+                currentRole === "ceo" || currentRole === "admin" || currentRole === "operations"
+                  ? handleWorkspaceChange
+                  : undefined
+              }
+              brands={activeBrands}
             />
           </div>
         </div>
@@ -1677,6 +1799,81 @@ export default function App() {
                     onUpdateSession={handleUpdateSession}
                     onLogAudit={pushAuditLog}
                   />
+                )}
+
+                {/* Brand Workspace (Giai đoạn A) — mọi tab dưới đây chỉ render khi effectiveWorkspace
+                    đang scope theo đúng 1 brand; component con nhận thẳng brandId + data đã lọc sẵn
+                    (giữ nguyên pattern fetch-1-lần-ở-App/filter-bằng-useMemo hiện có). */}
+                {activeTab === "brand_dashboard" && effectiveWorkspace.type === "brand" && (
+                  <BrandDashboard
+                    brandId={currentBrandId!}
+                    brand={activeBrands.find((b) => b.id === currentBrandId)}
+                    campaigns={campaigns}
+                    sessions={activeSessions}
+                    brandInvoices={brandInvoices}
+                  />
+                )}
+
+                {activeTab === "brand_calendar" && effectiveWorkspace.type === "brand" && (
+                  <BrandCalendar
+                    brandId={currentBrandId!}
+                    sessions={activeSessions}
+                    studios={activeStudios}
+                    talents={activeTalents}
+                    campaigns={campaigns}
+                  />
+                )}
+
+                {activeTab === "brand_campaigns" && effectiveWorkspace.type === "brand" && (
+                  <BrandCampaigns
+                    brandId={currentBrandId!}
+                    currentRole={currentRole}
+                    campaigns={campaigns}
+                    sessions={activeSessions}
+                    shiftSlots={shiftSlots}
+                    campaignRevisionNotes={campaignRevisionNotes}
+                    onSendCampaignForApproval={handleSendCampaignForApproval}
+                    onRespondToCampaignApproval={handleRespondToCampaignApproval}
+                    onSubmitCampaignReview={handleSubmitCampaignReview}
+                  />
+                )}
+
+                {activeTab === "brand_sessions" && effectiveWorkspace.type === "brand" && (
+                  <BrandSessions
+                    brandId={currentBrandId!}
+                    brand={activeBrands.find((b) => b.id === currentBrandId)}
+                    sessions={activeSessions}
+                    talents={talents}
+                    financeRecords={financeRecords}
+                    brandPlatformRates={brandPlatformRates}
+                    talentRateHistory={talentRateHistory}
+                    brandPlatformRateHistory={brandPlatformRateHistory}
+                  />
+                )}
+
+                {activeTab === "brand_rates" && effectiveWorkspace.type === "brand" && (
+                  <BrandRateCard
+                    brandId={currentBrandId!}
+                    currentRole={currentRole}
+                    brandPlatformRates={brandPlatformRates}
+                    brandPlatformRateHistory={brandPlatformRateHistory}
+                    onSaveRate={handleSaveBrandPlatformRate}
+                  />
+                )}
+
+                {activeTab === "brand_invoices" && effectiveWorkspace.type === "brand" && (
+                  <BrandInvoices
+                    brandId={currentBrandId!}
+                    currentRole={currentRole}
+                    brandInvoices={brandInvoices}
+                    onAddInvoice={handleAddBrandInvoice}
+                    onUpdateInvoice={handleUpdateBrandInvoice}
+                    onDeleteInvoice={handleDeleteBrandInvoice}
+                  />
+                )}
+
+                {activeTab === "brand_reviews" && effectiveWorkspace.type === "brand" && (
+                  <BrandReviewHistory brandId={currentBrandId!} campaigns={campaigns} sessions={activeSessions} />
                 )}
 
                 {activeTab === "scripts" && <ScriptGenerator />}
