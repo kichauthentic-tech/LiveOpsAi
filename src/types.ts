@@ -260,16 +260,6 @@ export interface BrandPlatformRateHistoryEntry {
   effectiveTo?: string;
 }
 
-// Giai đoạn 20 — trạng thái khoá sổ theo tháng, chặn sửa SessionFinance sau khi đã "chốt sổ"
-// (xem trigger trg_session_finance_lock_check, migration 0019).
-export interface MonthlyClose {
-  month: string; // "YYYY-MM"
-  status: "open" | "locked";
-  lockedByUserId?: string;
-  lockedAt?: string;
-  notes: string;
-}
-
 // Giai đoạn 20 — theo dõi công nợ Brand: tính xong doanh thu không có nghĩa đã thu được tiền.
 export interface BrandInvoice {
   id: string;
@@ -280,6 +270,24 @@ export interface BrandInvoice {
   dueDate?: string;
   paidAmount: number;
   paidAt?: string;
+  notes: string;
+  createdBy?: string;
+}
+
+// Giai đoạn B1 — SKU Showcase & Hero Product Catalog (Brand Workspace, xem
+// WORKSPACE_DESIGN.md#6). Danh sách SKU lên sóng của 1 brand, không dùng chung với module nào
+// khác.
+export interface BrandSku {
+  id: string;
+  brandId: string;
+  name: string;
+  skuCode: string;
+  flashPrice: number;
+  originalPrice: number;
+  isHero: boolean;
+  pinOrder: number;
+  clearanceRate: number; // % xả kho, 0-100
+  status: "active" | "inactive";
   notes: string;
   createdBy?: string;
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, StrategicDirective, WorkflowRule, Talent, Studio, Equipment, Brand, AgencyProject, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, Campaign, CampaignRevisionNote, TalentRateHistoryEntry, BrandPlatformRateHistoryEntry, MonthlyClose, BrandInvoice } from "./types";
+import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, StrategicDirective, WorkflowRule, Talent, Studio, Equipment, Brand, AgencyProject, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, Campaign, CampaignRevisionNote, TalentRateHistoryEntry, BrandPlatformRateHistoryEntry, BrandInvoice, BrandSku } from "./types";
 import { ALL_PERMISSION_DEFINITIONS } from "./data/mockData";
 import { fetchTalents, createTalent, updateTalent, deleteTalent } from "./lib/db/talents";
 import { fetchStudios, createStudio, updateStudio, deleteStudio } from "./lib/db/studios";
@@ -36,8 +36,8 @@ import {
 import { fetchCampaignRevisionNotes, createCampaignRevisionNote } from "./lib/db/campaignRevisionNotes";
 import { fetchTalentRateHistory } from "./lib/db/talentRateHistory";
 import { fetchBrandPlatformRateHistory } from "./lib/db/brandPlatformRateHistory";
-import { fetchMonthlyCloses, closeMonth, reopenMonth } from "./lib/db/monthlyClose";
 import { fetchBrandInvoices, createBrandInvoice, updateBrandInvoice, deleteBrandInvoice } from "./lib/db/brandInvoices";
+import { fetchBrandSkus, createBrandSku, updateBrandSku, deleteBrandSku } from "./lib/db/brandSkus";
 import {
   LayoutDashboard,
   Radio,
@@ -59,14 +59,12 @@ import {
   BrainCircuit,
   UserCog,
   CalendarClock,
-  CalendarCheck,
-  CalendarRange,
-  Gauge,
   Store,
   Tag,
   Receipt,
   ClipboardCheck,
-  Target
+  Target,
+  Package
 } from "lucide-react";
 import { Header, WorkspaceContext } from "./components/Header";
 import { BrandDashboard } from "./components/brand-workspace/BrandDashboard";
@@ -75,6 +73,7 @@ import { BrandCampaigns } from "./components/brand-workspace/BrandCampaigns";
 import { BrandSessions } from "./components/brand-workspace/BrandSessions";
 import { BrandRateCard } from "./components/brand-workspace/BrandRateCard";
 import { BrandInvoices } from "./components/brand-workspace/BrandInvoices";
+import { BrandSkuShowcase } from "./components/brand-workspace/BrandSkuShowcase";
 import { BrandReviewHistory } from "./components/brand-workspace/BrandReviewHistory";
 import { Login } from "./components/Login";
 import { ResetPasswordScreen } from "./components/ResetPasswordScreen";
@@ -90,14 +89,11 @@ import { StudioEquipment } from "./components/StudioEquipment";
 import { CrmProjects } from "./components/CrmProjects";
 import { TikTokApiAutomation } from "./components/TikTokApiAutomation";
 import { FinanceHr } from "./components/FinanceHr";
-import { MonthlyClose as MonthlyCloseView } from "./components/MonthlyClose";
-import { StudioUtilization } from "./components/StudioUtilization";
 import { AiMultiAgent } from "./components/AiMultiAgent";
 import { UserRoleSettings } from "./components/UserRoleSettings";
 import { AiTrainingCenter } from "./components/AiTrainingCenter";
 import { MyWorkspace } from "./components/MyWorkspace";
 import ShiftScheduling from "./components/ShiftScheduling";
-import CampaignTimeline from "./components/CampaignTimeline";
 
 const STORAGE_PREFIX = "liveops_os_v2_";
 
@@ -123,14 +119,6 @@ export default function App() {
 
   const currentRole: UserRole = profile?.role ?? "talent";
   const [activeTab, setActiveTab] = useState<string>(() => loadStorage("activeTab", "brief"));
-  // Giai đoạn 27 — "Xem trong Lịch" ở Campaign Timeline nhảy sang tab shift_scheduling
-  // kèm đúng tháng + campaign đang lọc; nonce đổi mỗi lần bấm để effect bên
-  // ShiftScheduling áp dụng lại kể cả bấm cùng 1 campaign 2 lần liên tiếp.
-  const [scheduleJumpTarget, setScheduleJumpTarget] = useState<{ campaignId: string; month: string; nonce: number } | null>(null);
-  const handleJumpToSchedule = (campaignId: string, month: string) => {
-    setScheduleJumpTarget({ campaignId, month, nonce: Date.now() });
-    setActiveTab("shift_scheduling");
-  };
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Giai đoạn A — Workspace Agency ↔ Brand (xem WORKSPACE_DESIGN.md). Chỉ có ý nghĩa với
@@ -218,11 +206,17 @@ export default function App() {
   const [phase19Loading, setPhase19Loading] = useState(true);
   const [phase19Error, setPhase19Error] = useState<string | null>(null);
 
-  // Giai đoạn 20 — Đóng Sổ Tháng (khoá sổ) + Hoá đơn/công nợ Brand.
-  const [monthlyCloses, setMonthlyCloses] = useState<MonthlyClose[]>([]);
+  // Giai đoạn 20 — Hoá đơn/công nợ Brand.
   const [brandInvoices, setBrandInvoices] = useState<BrandInvoice[]>([]);
   const [phase20Loading, setPhase20Loading] = useState(true);
   const [phase20Error, setPhase20Error] = useState<string | null>(null);
+
+  // Giai đoạn B1 — SKU Showcase & Hero Product Catalog (Brand Workspace, xem
+  // WORKSPACE_DESIGN.md#6). Fetch 1 lần ở agency-level giống brandInvoices, mỗi Brand Workspace
+  // tự filter theo brandId.
+  const [brandSkus, setBrandSkus] = useState<BrandSku[]>([]);
+  const [phaseB1Loading, setPhaseB1Loading] = useState(true);
+  const [phaseB1Error, setPhaseB1Error] = useState<string | null>(null);
 
   // Previously these fetch errors were only stored in state and never rendered anywhere — a
   // failed fetch left a tab silently empty forever with no indication anything went wrong.
@@ -463,19 +457,40 @@ export default function App() {
     if (!session) return;
     let cancelled = false;
     setPhase20Loading(true);
-    Promise.all([fetchMonthlyCloses(), fetchBrandInvoices()])
-      .then(([closes, invoices]) => {
+    fetchBrandInvoices()
+      .then((invoices) => {
         if (cancelled) return;
-        setMonthlyCloses(closes);
         setBrandInvoices(invoices);
         setPhase20Error(null);
       })
       .catch((err) => {
         if (cancelled) return;
-        setPhase20Error(err.message ?? "Không tải được dữ liệu Đóng Sổ Tháng từ Supabase.");
+        setPhase20Error(err.message ?? "Không tải được dữ liệu Hoá Đơn Brand từ Supabase.");
       })
       .finally(() => {
         if (!cancelled) setPhase20Loading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user?.id]);
+
+  useEffect(() => {
+    if (!session) return;
+    let cancelled = false;
+    setPhaseB1Loading(true);
+    fetchBrandSkus()
+      .then((skus) => {
+        if (cancelled) return;
+        setBrandSkus(skus);
+        setPhaseB1Error(null);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setPhaseB1Error(err.message ?? "Không tải được SKU Showcase từ Supabase.");
+      })
+      .finally(() => {
+        if (!cancelled) setPhaseB1Loading(false);
       });
     return () => {
       cancelled = true;
@@ -560,26 +575,6 @@ export default function App() {
     }
   }
 
-  async function handleCloseMonth(month: string, notes: string) {
-    const updated = await closeMonth(month, notes, profile?.id);
-    setMonthlyCloses((prev) => [...prev.filter((m) => m.month !== month), updated]);
-    await pushAuditLog({
-      category: "Security Alert",
-      action: `Khoá sổ tháng ${month}`,
-      details: notes ? `Ghi chú: ${notes}` : "Không có ghi chú."
-    });
-  }
-
-  async function handleReopenMonth(month: string) {
-    const updated = await reopenMonth(month);
-    setMonthlyCloses((prev) => [...prev.filter((m) => m.month !== month), updated]);
-    await pushAuditLog({
-      category: "Security Alert",
-      action: `Mở khoá sổ tháng ${month}`,
-      details: "Cho phép sửa lại Finance của các phiên thuộc tháng này."
-    });
-  }
-
   async function handleAddBrandInvoice(invoice: { brandId: string; month: string; amount: number; dueDate?: string; notes: string }) {
     const created = await createBrandInvoice({ ...invoice, status: "unpaid", createdBy: profile?.id });
     setBrandInvoices((prev) => [...prev, created]);
@@ -596,6 +591,26 @@ export default function App() {
   async function handleDeleteBrandInvoice(id: string) {
     await deleteBrandInvoice(id);
     setBrandInvoices((prev) => prev.filter((inv) => inv.id !== id));
+  }
+
+  async function handleAddBrandSku(sku: { brandId: string; name: string; skuCode: string; flashPrice: number; originalPrice: number }) {
+    const created = await createBrandSku({ ...sku, createdBy: profile?.id });
+    setBrandSkus((prev) => [...prev, created]);
+  }
+
+  async function handleUpdateBrandSku(
+    id: string,
+    patch: Partial<
+      Pick<BrandSku, "name" | "skuCode" | "flashPrice" | "originalPrice" | "isHero" | "pinOrder" | "clearanceRate" | "status" | "notes">
+    >
+  ) {
+    const updated = await updateBrandSku(id, patch);
+    setBrandSkus((prev) => prev.map((s) => (s.id === id ? updated : s)));
+  }
+
+  async function handleDeleteBrandSku(id: string) {
+    await deleteBrandSku(id);
+    setBrandSkus((prev) => prev.filter((s) => s.id !== id));
   }
 
   // LocalStorage sync effects
@@ -686,7 +701,8 @@ export default function App() {
         phase14Error && { key: "phase14", message: phase14Error },
         phase15Error && { key: "phase15", message: phase15Error },
         phase19Error && { key: "phase19", message: phase19Error },
-        phase20Error && { key: "phase20", message: phase20Error }
+        phase20Error && { key: "phase20", message: phase20Error },
+        phaseB1Error && { key: "phaseB1", message: phaseB1Error }
       ].filter((e): e is { key: string; message: string } => Boolean(e)),
     [
       phase1Error,
@@ -699,7 +715,8 @@ export default function App() {
       phase14Error,
       phase15Error,
       phase19Error,
-      phase20Error
+      phase20Error,
+      phaseB1Error
     ]
   );
   const dataLoadErrorSignature = dataLoadErrors.map((e) => e.key + ":" + e.message).join("|");
@@ -1389,9 +1406,6 @@ export default function App() {
         // talent cần thấy tab này để tự đăng ký ca (Giai đoạn 14a); màn hình bên trong tự đổi giao
         // diện theo currentRole (talent = đăng ký, ceo/operations/admin = mở ca + chốt lịch).
         { id: "shift_scheduling", label: "Đăng Ký & Chốt Lịch", icon: CalendarClock, badge: "NEW", perm: undefined },
-        // Giai đoạn 27 — view tổng hợp đọc dữ liệu campaigns/live_sessions/shift_slots đã có,
-        // không phải bảng/data mới. Gate theo cùng quyền với Lịch Vận Hành (manage_calendar).
-        { id: "campaign_timeline", label: "Campaign Timeline", icon: CalendarRange, badge: "NEW", perm: "manage_calendar" as PermissionKey },
       ],
     },
     {
@@ -1400,7 +1414,6 @@ export default function App() {
         { id: "scripts", label: "AI Script Gen", icon: Sparkles, perm: "generate_scripts" as PermissionKey },
         { id: "talents", label: "Talent Pool", icon: Users, perm: "manage_talents" as PermissionKey },
         { id: "studios", label: "Studios & Gear", icon: Building2, perm: "manage_studios_gear" as PermissionKey },
-        { id: "studio_utilization", label: "Tỷ Lệ Lấp Đầy Studio", icon: Gauge, badge: "NEW", perm: "manage_studios_gear" as PermissionKey },
       ],
     },
     {
@@ -1414,7 +1427,6 @@ export default function App() {
       label: "Tài Chính",
       items: [
         { id: "finance", label: "Finance & P&L", icon: DollarSign, perm: "view_financials" as PermissionKey },
-        { id: "monthly_close", label: "Đóng Sổ Tháng", icon: CalendarCheck, badge: "NEW", perm: "view_financials" as PermissionKey },
       ],
     },
     {
@@ -1449,6 +1461,7 @@ export default function App() {
         { id: "brand_campaigns", label: "Campaign", icon: Target, badge: "CENTRAL", perm: undefined },
         { id: "brand_sessions", label: "Sessions", icon: Radio, perm: undefined },
         { id: "brand_rates", label: "Rate Card", icon: Tag, perm: undefined },
+        { id: "brand_skus", label: "SKU Showcase", icon: Package, badge: "NEW", perm: undefined },
         { id: "brand_invoices", label: "Hoá Đơn & Công Nợ", icon: Receipt, perm: undefined },
         { id: "brand_reviews", label: "Báo Cáo Cuối Kỳ", icon: ClipboardCheck, perm: undefined },
         { id: "account_settings", label: "Tài Khoản Của Tôi", icon: UserCog, perm: undefined },
@@ -1811,17 +1824,6 @@ export default function App() {
                     onSendCampaignForApproval={handleSendCampaignForApproval}
                     onUpdateSession={handleUpdateSession}
                     onLogAudit={pushAuditLog}
-                    jumpTarget={scheduleJumpTarget}
-                  />
-                )}
-
-                {activeTab === "campaign_timeline" && (
-                  <CampaignTimeline
-                    campaigns={campaigns}
-                    brands={activeBrands}
-                    sessions={activeSessions}
-                    shiftSlots={shiftSlots}
-                    onJumpToSchedule={handleJumpToSchedule}
                   />
                 )}
 
@@ -1885,6 +1887,17 @@ export default function App() {
                   />
                 )}
 
+                {activeTab === "brand_skus" && effectiveWorkspace.type === "brand" && (
+                  <BrandSkuShowcase
+                    brandId={currentBrandId!}
+                    currentRole={currentRole}
+                    brandSkus={brandSkus}
+                    onAddSku={handleAddBrandSku}
+                    onUpdateSku={handleUpdateBrandSku}
+                    onDeleteSku={handleDeleteBrandSku}
+                  />
+                )}
+
                 {activeTab === "brand_invoices" && effectiveWorkspace.type === "brand" && (
                   <BrandInvoices
                     brandId={currentBrandId!}
@@ -1926,10 +1939,6 @@ export default function App() {
                   />
                 )}
 
-                {activeTab === "studio_utilization" && (
-                  <StudioUtilization studios={activeStudios} sessions={activeSessions} />
-                )}
-
                 {activeTab === "crm" && (
                   <CrmProjects
                     brands={activeBrands}
@@ -1969,30 +1978,8 @@ export default function App() {
                     brandPlatformRates={brandPlatformRates}
                     talentRateHistory={talentRateHistory}
                     brandPlatformRateHistory={brandPlatformRateHistory}
-                    monthlyCloses={monthlyCloses}
-                    currentUserId={profile?.id}
                     onUpdateFinance={handleUpdateSessionFinance}
                     onSetFinanceApproval={handleSetSessionFinanceApproval}
-                  />
-                )}
-
-                {activeTab === "monthly_close" && (
-                  <MonthlyCloseView
-                    sessions={activeSessions}
-                    talents={talents}
-                    brands={brands}
-                    financeRecords={financeRecords}
-                    brandPlatformRates={brandPlatformRates}
-                    talentRateHistory={talentRateHistory}
-                    brandPlatformRateHistory={brandPlatformRateHistory}
-                    monthlyCloses={monthlyCloses}
-                    brandInvoices={brandInvoices}
-                    currentRole={currentRole}
-                    onCloseMonth={handleCloseMonth}
-                    onReopenMonth={handleReopenMonth}
-                    onAddInvoice={handleAddBrandInvoice}
-                    onUpdateInvoice={handleUpdateBrandInvoice}
-                    onDeleteInvoice={handleDeleteBrandInvoice}
                   />
                 )}
 

@@ -1,8 +1,7 @@
 import { Campaign, LiveSession } from "../types";
 
-// Nguồn tính GMV thật của 1 campaign — dùng chung cho ShiftScheduling.tsx
-// (khối "Campaign Tháng"/đánh giá cuối) và CampaignTimeline.tsx, tránh lặp
-// lại 2 bản logic khác nhau (chính là nguyên nhân "chấp vá" trước Giai đoạn 26).
+// Nguồn tính GMV thật của 1 campaign — dùng chung cho các màn hình cần đọc
+// GMV campaign, tránh lặp lại 2 bản logic khác nhau.
 // Ưu tiên session.campaignId (FK thật, migration 0022); fallback về suy luận
 // brand+khoảng ngày cho session cũ chưa được backfill.
 export function computeCampaignActualGmv(campaigns: Campaign[], sessions: LiveSession[]): Map<string, number> {

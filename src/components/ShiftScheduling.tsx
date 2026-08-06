@@ -272,8 +272,7 @@ export default function ShiftScheduling({
     [campaigns, selectedMonth]
   );
 
-  // Giai đoạn 26 — GMV thật của campaign, dùng chung công thức với CampaignTimeline
-  // (xem src/lib/campaignMetrics.ts) để không lặp lại 2 bản logic khác nhau.
+  // Giai đoạn 26 — GMV thật của campaign (xem src/lib/campaignMetrics.ts).
   const campaignActualGmv = useMemo(() => computeCampaignActualGmv(campaigns, sessions), [campaigns, sessions]);
 
   const monthSlotsUnfiltered = useMemo(

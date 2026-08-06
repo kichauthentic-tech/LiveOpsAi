@@ -7,10 +7,9 @@ import {
   Brand,
   BrandPlatformRate,
   TalentRateHistoryEntry,
-  BrandPlatformRateHistoryEntry,
-  MonthlyClose
+  BrandPlatformRateHistoryEntry
 } from "../types";
-import { DollarSign, TrendingUp, Calculator, CheckCircle2, XCircle, Clock, Lock } from "lucide-react";
+import { DollarSign, TrendingUp, Calculator, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { DEFAULT_FINANCE, computeSessionPnl } from "../lib/pnl";
 
 interface FinanceHrProps {
@@ -22,8 +21,6 @@ interface FinanceHrProps {
   brandPlatformRates: BrandPlatformRate[];
   talentRateHistory: TalentRateHistoryEntry[];
   brandPlatformRateHistory: BrandPlatformRateHistoryEntry[];
-  monthlyCloses: MonthlyClose[];
-  currentUserId?: string;
   onUpdateFinance: (
     sessionId: string,
     patch: Partial<Pick<SessionFinance, "agencyCommissionRate" | "studioCost" | "adsCost" | "notes">>
@@ -42,17 +39,10 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
   brandPlatformRates,
   talentRateHistory,
   brandPlatformRateHistory,
-  monthlyCloses,
-  currentUserId,
   onUpdateFinance,
   onSetFinanceApproval
 }) => {
   const [savingId, setSavingId] = useState<string | null>(null);
-
-  const lockedMonths = useMemo(
-    () => new Set(monthlyCloses.filter((m) => m.status === "locked").map((m) => m.month)),
-    [monthlyCloses]
-  );
 
   const financeBySessionId = useMemo(() => {
     const map: Record<string, SessionFinance> = {};
@@ -192,20 +182,11 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
               </thead>
               <tbody>
                 {rows.map(({ session: s, finance, talent, isHourly, grossAgencyRev, hostPayout, netProfit }) => {
-                  const isLocked = lockedMonths.has(s.date.slice(0, 7));
                   return (
                   <tr key={s.id} className="border-b border-slate-800/60 align-middle">
                     <td className="py-2 pr-3">
                       <div className="font-bold text-slate-200 flex items-center gap-1.5">
                         {s.title}
-                        {isLocked && (
-                          <span
-                            title="Tháng này đã khoá sổ — CEO/Admin cần mở khoá ở tab Đóng Sổ Tháng trước khi sửa"
-                            className="flex items-center gap-0.5 text-[9px] font-bold bg-slate-800 text-slate-400 border border-slate-700 px-1.5 py-0.5 rounded-full"
-                          >
-                            <Lock className="w-2.5 h-2.5" /> Đã khoá sổ
-                          </span>
-                        )}
                       </div>
                       <div className="text-slate-400">{s.brandName} · {s.date} · Host {talent?.name ?? s.hostName}</div>
                     </td>
@@ -223,7 +204,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                           <input
                             type="number"
                             defaultValue={finance.agencyCommissionRate}
-                            disabled={savingId === s.id || isLocked}
+                            disabled={savingId === s.id}
                             onBlur={(e) => handleFieldChange(s.id, "agencyCommissionRate", Number(e.target.value))}
                             className="w-14 p-1.5 rounded-lg border border-slate-700 bg-slate-950 text-slate-100 font-bold disabled:opacity-40"
                           />
@@ -235,7 +216,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                       <input
                         type="number"
                         defaultValue={finance.studioCost}
-                        disabled={savingId === s.id || isLocked}
+                        disabled={savingId === s.id}
                         onBlur={(e) => handleFieldChange(s.id, "studioCost", Number(e.target.value))}
                         className="w-24 p-1.5 rounded-lg border border-slate-700 bg-slate-950 text-slate-100 font-bold disabled:opacity-40"
                       />
@@ -244,7 +225,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                       <input
                         type="number"
                         defaultValue={finance.adsCost}
-                        disabled={savingId === s.id || isLocked}
+                        disabled={savingId === s.id}
                         onBlur={(e) => handleFieldChange(s.id, "adsCost", Number(e.target.value))}
                         className="w-24 p-1.5 rounded-lg border border-slate-700 bg-slate-950 text-slate-100 font-bold disabled:opacity-40"
                       />
@@ -257,7 +238,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                       {finance.approvalStatus === "approved" ? (
                         <button
                           onClick={() => handleApprove(s.id, "pending")}
-                          disabled={savingId === s.id || isLocked}
+                          disabled={savingId === s.id}
                           className="flex items-center gap-1 text-emerald-400 font-bold hover:underline disabled:opacity-40"
                           title={finance.approvedByUserId ? `Duyệt bởi ${userNameById[finance.approvedByUserId] ?? finance.approvedByUserId}` : undefined}
                         >
@@ -266,7 +247,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                       ) : finance.approvalStatus === "rejected" ? (
                         <button
                           onClick={() => handleApprove(s.id, "pending")}
-                          disabled={savingId === s.id || isLocked}
+                          disabled={savingId === s.id}
                           className="flex items-center gap-1 text-red-400 font-bold hover:underline disabled:opacity-40"
                         >
                           <XCircle className="w-3.5 h-3.5" /> Từ chối
@@ -275,7 +256,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => handleApprove(s.id, "approved")}
-                            disabled={savingId === s.id || isLocked}
+                            disabled={savingId === s.id}
                             className="text-emerald-400 hover:bg-emerald-950/40 p-1 rounded-lg disabled:opacity-40"
                             title="Duyệt bảng lương"
                           >
@@ -283,7 +264,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                           </button>
                           <button
                             onClick={() => handleApprove(s.id, "rejected")}
-                            disabled={savingId === s.id || isLocked}
+                            disabled={savingId === s.id}
                             className="text-red-400 hover:bg-red-950/40 p-1 rounded-lg disabled:opacity-40"
                             title="Từ chối"
                           >

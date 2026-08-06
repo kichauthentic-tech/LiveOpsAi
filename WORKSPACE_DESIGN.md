@@ -1,7 +1,7 @@
 # LiveOps AI — Thiết kế Workspace Model (Agency ↔ Brand)
 
-> **Trạng thái: GIAI ĐOẠN A (khung workspace) ĐÃ CODE + VERIFY XONG.** Xem mục "Đã hoàn thành" bên dưới.
-> Còn lại: 6 module mới ở mục 6/Giai đoạn B+, chưa bắt đầu.
+> **Trạng thái: GIAI ĐOẠN A (khung workspace) + GIAI ĐOẠN B1 (SKU Showcase) ĐÃ CODE + VERIFY XONG.** Xem mục "Đã hoàn thành" bên dưới.
+> Còn lại: 5 module mới ở mục 6/Giai đoạn B+ (SKU Showcase đã xong) — Product Sample Inventory, Live Stream Incident Log, Co-Funded Voucher Request Center, Live Audience & Conversion Analytics, chưa bắt đầu.
 > Không phụ thuộc `PROJECT_STATUS.md`/`BUSINESS_ROADMAP.md` (đã bị xóa có chủ đích, không khôi phục).
 > Đọc `CLAUDE.md` để biết quy ước cập nhật tài liệu — file này thay thế vai trò "trạng thái sống" của module workspace cho tới khi implement xong; sau khi code+verify xong, sáp nhập nội dung "Đã hoàn thành" vào bất kỳ file trạng thái nào user dùng lại sau này.
 
@@ -11,6 +11,13 @@
 - **`AGENCY_NAV_GROUPS` / `BRAND_NAV_GROUPS`** — tách trong `App.tsx`, đổi label nhóm Agency sang tiếng Việt (Tổng Quan/Vận Hành Live/Tài Nguyên Chung/Kinh Doanh/Tài Chính/Hệ Thống), không đổi component nào. `BRAND_NAV_GROUPS` — 7 tab mới + `account_settings` (thêm ngoài spec gốc để role brand vẫn đổi được mật khẩu/tên), **không gate theo `PermissionKey`** (role `brand` mặc định `manage_calendar`/`view_financials` = false trong `role_permissions` — gate sẽ khoá nhầm chính brand khỏi dữ liệu của họ; cô lập quyền dựa vào việc chỉ ceo/admin/operations/brand mới vào được brand workspace, không dựa vào Ma Trận Phân Quyền).
 - **7 component `src/components/brand-workspace/`** — `BrandDashboard`, `BrandCalendar`, `BrandCampaigns` (màn trung tâm, gộp luồng duyệt lịch từ `MyWorkspace.tsx` CampaignApprovalCard + đánh giá cuối kỳ từ `ShiftScheduling.tsx`), `BrandSessions` (dùng lại `computeSessionPnl` từ `lib/pnl.ts`), `BrandRateCard`, `BrandInvoices`, `BrandReviewHistory`. Mỗi component nhận `brandId` + data đã fetch sẵn ở `App.tsx`, tự filter bằng `useMemo`, không fetch riêng.
 - **Verify** — đăng nhập thật qua Supabase (role admin), chuyển Agency ↔ JOCKEY ↔ VERA qua switcher, click qua đủ 7 tab brand + account settings, không có lỗi console. Campaign rỗng ở JOCKEY/VERA là đúng dữ liệu thật (Campaign Timeline agency-level cũng rỗng cùng khung tháng — không phải bug filter).
+
+## Đã hoàn thành — Giai đoạn B1 (SKU Showcase & Hero Product Catalog)
+
+- **Bảng `brand_skus`** — [supabase/migrations/0024_brand_skus.sql](supabase/migrations/0024_brand_skus.sql). Cột: `brand_id` (FK cascade), `name`, `sku_code`, `flash_price`/`original_price`, `is_hero`, `pin_order` (thứ tự ghim), `clearance_rate` (0-100, tỷ lệ xả kho), `status` (`active`/`inactive`). RLS: đọc mọi authenticated, ghi `ceo`/`operations`/`admin` — cùng pattern `brand_platform_rates` (migration 0014), role `brand` không tự ghi trực tiếp DB, cô lập qua workspace access như đã chốt ở mục 2.
+- **`src/lib/db/brandSkus.ts`** — `fetchBrandSkus`/`createBrandSku`/`updateBrandSku`/`deleteBrandSku`, cùng pattern `fromDb`/snake↔camel như `brandInvoices.ts`.
+- **`src/components/brand-workspace/BrandSkuShowcase.tsx`** — tab mới `brand_skus` trong `BRAND_NAV_GROUPS` (App.tsx), bảng inline-edit (giống `BrandInvoices.tsx`): giá flash-deal/gốc, % xả kho, toggle Hero (star), trạng thái, xoá. `canEdit` gate theo `currentRole` (ceo/admin/operations), role `brand` chỉ xem.
+- **Verify** — chạy migration thật trên Supabase, tạo/sửa/xoá 1 SKU qua UI (Franklin brand workspace), reload xác nhận Hero toggle + % xả kho persist đúng, xoá xong quay về empty state, không lỗi console.
 
 ## Quy ước kỹ thuật phát sinh
 
@@ -46,11 +53,13 @@ Giữ nguyên tinh thần các nhóm nav hiện tại, đổi tên nhóm đầu 
 | Nhóm | Module | Component hiện tại | Ghi chú |
 |---|---|---|---|
 | Overview | Việc Của Tôi, Command Brief, Dashboard tổng | `MyWorkspace`, `ExecutiveBrief`, `Dashboards` | giữ nguyên |
-| Live Ops | Live Sessions (toàn agency), Lịch Vận Hành (toàn agency), Đăng Ký & Chốt Lịch, Campaign Timeline (toàn agency) | `LiveSessionHub`, `LiveCalendar`, `ShiftScheduling`, `CampaignTimeline` | giữ nguyên — đây chính là nơi Ops cần nhìn **xuyên brand** để tránh đụng lịch studio/talent |
-| Resources (dùng chung, KHÔNG thuộc brand nào) | Talent Pool, Studios & Gear, Tỷ Lệ Lấp Đầy Studio, AI Script Gen | `TalentMatcher`, `StudioEquipment`, `StudioUtilization`, `ScriptGenerator` | tài nguyên agency sở hữu, brand không có bản riêng |
+| Live Ops | Live Sessions (toàn agency), Lịch Vận Hành (toàn agency), Đăng Ký & Chốt Lịch | `LiveSessionHub`, `LiveCalendar`, `ShiftScheduling` | giữ nguyên — đây chính là nơi Ops cần nhìn **xuyên brand** để tránh đụng lịch studio/talent |
+| Resources (dùng chung, KHÔNG thuộc brand nào) | Talent Pool, Studios & Gear, AI Script Gen | `TalentMatcher`, `StudioEquipment`, `ScriptGenerator` | tài nguyên agency sở hữu, brand không có bản riêng |
 | Business | CRM & Projects, TikTok API | `CrmProjects`, `TikTokApiAutomation` | giữ nguyên, agency-level |
-| Finance | Finance & P&L tổng, Đóng Sổ Tháng | `FinanceHr`, `MonthlyClose` | giữ nguyên — đóng sổ là hành động toàn agency theo tháng, không tách theo brand |
+| Finance | Finance & P&L tổng | `FinanceHr` | giữ nguyên |
 | System | Hội Đồng AI, Phân Quyền & Role, Tài Khoản, AI Training Center | không đổi | giữ nguyên |
+
+> **Đã gỡ bỏ (không còn trong roadmap):** `CampaignTimeline` (trùng lặp với Brand Campaigns/`ShiftScheduling` — GMV campaign đã dùng chung `lib/campaignMetrics.ts`), `StudioUtilization` (chưa có nhu cầu nghiệp vụ rõ ràng), `MonthlyClose` (trùng chức năng với Finance & P&L theo-session + Brand Invoices — xem migration `0023_drop_monthly_close.sql`, đã apply). Component + `monthly_closes` table + trigger khoá sổ đã xoá khỏi codebase/Supabase.
 
 **Không đổi gì về code cho các module này ở giai đoạn 1** — chỉ đổi label nhóm và (tuỳ chọn) thêm khối "Tổng quan Brand" trên Dashboard tổng (card GMV theo từng brand, click vào card = nhảy sang Brand Workspace tương ứng — dùng lại data `brands`/`campaigns` đã fetch sẵn, không cần API mới).
 

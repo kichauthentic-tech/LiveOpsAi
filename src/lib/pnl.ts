@@ -1,6 +1,4 @@
-// P&L thật của 1 session — logic dùng chung giữa FinanceHr.tsx (báo cáo theo phiên, Giai đoạn
-// 7/19) và MonthlyClose.tsx (gộp theo tháng, Giai đoạn 20). Tách ra 1 nơi duy nhất để 2 màn hình
-// không bao giờ tính lệch nhau.
+// P&L thật của 1 session — logic dùng chung cho báo cáo Finance & P&L.
 import {
   LiveSession,
   Talent,
