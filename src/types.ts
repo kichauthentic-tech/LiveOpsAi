@@ -337,6 +337,26 @@ export interface LibraryScript {
   createdBy?: string;
 }
 
+// Giai đoạn B5 — Co-Funded Voucher Request Center (Brand Workspace). Luồng
+// duyệt 2 chiều giống Campaign (approvalStatus/sentAt/approvedAt) nhưng
+// brand "duyệt" ở đây tương đương "cấp quyền áp trực tiếp" voucher này.
+export interface CoFundedVoucher {
+  id: string;
+  sessionId: string;
+  brandId: string;
+  voucherCode: string;
+  description: string;
+  totalValue: number;
+  brandContributionPct: number;
+  agencyContributionPct: number;
+  platformContributionPct: number;
+  approvalStatus: "draft" | "sent_for_approval" | "revision_requested" | "approved";
+  sentAt?: string;
+  approvedAt?: string;
+  revisionNote: string;
+  createdBy?: string;
+}
+
 export interface ShiftSlot {
   id: string;
   date: string;

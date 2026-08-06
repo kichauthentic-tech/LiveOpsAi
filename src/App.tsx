@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, StrategicDirective, WorkflowRule, Talent, Studio, Equipment, Brand, AgencyProject, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, Campaign, CampaignRevisionNote, TalentRateHistoryEntry, BrandPlatformRateHistoryEntry, BrandInvoice, BrandSku, ProductSample, LiveStreamIncident, LibraryScript } from "./types";
+import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, StrategicDirective, WorkflowRule, Talent, Studio, Equipment, Brand, AgencyProject, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, Campaign, CampaignRevisionNote, TalentRateHistoryEntry, BrandPlatformRateHistoryEntry, BrandInvoice, BrandSku, ProductSample, LiveStreamIncident, LibraryScript, CoFundedVoucher } from "./types";
 import { ALL_PERMISSION_DEFINITIONS } from "./data/mockData";
 import { fetchTalents, createTalent, updateTalent, deleteTalent } from "./lib/db/talents";
 import { fetchStudios, createStudio, updateStudio, deleteStudio } from "./lib/db/studios";
@@ -47,6 +47,13 @@ import {
 } from "./lib/db/liveStreamIncidents";
 import { fetchScriptLibrary, createLibraryScript, updateLibraryScript, deleteLibraryScript } from "./lib/db/scriptLibrary";
 import {
+  fetchCoFundedVouchers,
+  createCoFundedVoucher,
+  deleteCoFundedVoucher,
+  sendVoucherForApproval,
+  respondToVoucherApproval
+} from "./lib/db/coFundedVouchers";
+import {
   LayoutDashboard,
   Radio,
   FileText,
@@ -75,7 +82,8 @@ import {
   Package,
   Boxes,
   AlertTriangle,
-  BookOpen
+  BookOpen,
+  Ticket
 } from "lucide-react";
 import { Header, WorkspaceContext } from "./components/Header";
 import { BrandDashboard } from "./components/brand-workspace/BrandDashboard";
@@ -85,6 +93,7 @@ import { BrandSessions } from "./components/brand-workspace/BrandSessions";
 import { BrandRateCard } from "./components/brand-workspace/BrandRateCard";
 import { BrandInvoices } from "./components/brand-workspace/BrandInvoices";
 import { BrandSkuShowcase } from "./components/brand-workspace/BrandSkuShowcase";
+import { BrandVoucherRequests } from "./components/brand-workspace/BrandVoucherRequests";
 import { ProductSampleInventory } from "./components/ProductSampleInventory";
 import { LiveStreamIncidentLog } from "./components/LiveStreamIncidentLog";
 import { ScriptLibrary } from "./components/ScriptLibrary";
@@ -240,6 +249,9 @@ export default function App() {
   const [scriptLibrary, setScriptLibrary] = useState<LibraryScript[]>([]);
   const [phaseB4Loading, setPhaseB4Loading] = useState(true);
   const [phaseB4Error, setPhaseB4Error] = useState<string | null>(null);
+  const [coFundedVouchers, setCoFundedVouchers] = useState<CoFundedVoucher[]>([]);
+  const [phaseB5Loading, setPhaseB5Loading] = useState(true);
+  const [phaseB5Error, setPhaseB5Error] = useState<string | null>(null);
 
   // Previously these fetch errors were only stored in state and never rendered anywhere — a
   // failed fetch left a tab silently empty forever with no indication anything went wrong.
@@ -587,6 +599,28 @@ export default function App() {
   }, [session?.user?.id]);
 
   useEffect(() => {
+    if (!session) return;
+    let cancelled = false;
+    setPhaseB5Loading(true);
+    fetchCoFundedVouchers()
+      .then((vouchers) => {
+        if (cancelled) return;
+        setCoFundedVouchers(vouchers);
+        setPhaseB5Error(null);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setPhaseB5Error(err.message ?? "Không tải được Co-Funded Voucher Request Center từ Supabase.");
+      })
+      .finally(() => {
+        if (!cancelled) setPhaseB5Loading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user?.id]);
+
+  useEffect(() => {
     if (!session || currentRole !== "admin") {
       setAiAgentPromptsLoading(false);
       return;
@@ -761,6 +795,66 @@ export default function App() {
     setScriptLibrary((prev) => prev.filter((s) => s.id !== id));
   }
 
+  // Giai đoạn B5 — Co-Funded Voucher Request Center (Brand Workspace).
+  async function handleAddCoFundedVoucher(v: {
+    sessionId: string;
+    voucherCode: string;
+    description: string;
+    totalValue: number;
+    brandContributionPct: number;
+    agencyContributionPct: number;
+    platformContributionPct: number;
+  }) {
+    const session = sessions.find((s) => s.id === v.sessionId);
+    if (!session?.brandId) {
+      window.alert("Phiên live này chưa gán Brand, không thể tạo voucher.");
+      return;
+    }
+    const created = await createCoFundedVoucher({ ...v, brandId: session.brandId, createdBy: profile?.id });
+    setCoFundedVouchers((prev) => [created, ...prev]);
+  }
+
+  async function handleDeleteCoFundedVoucher(id: string) {
+    await deleteCoFundedVoucher(id);
+    setCoFundedVouchers((prev) => prev.filter((v) => v.id !== id));
+  }
+
+  const handleSendVoucherForApproval = async (voucher: CoFundedVoucher): Promise<boolean> => {
+    try {
+      const updated = await sendVoucherForApproval(voucher.id);
+      setCoFundedVouchers((prev) => prev.map((v) => (v.id === updated.id ? updated : v)));
+      await pushAuditLog({
+        action: "Gửi Voucher Đồng Tài Trợ cho Brand duyệt",
+        details: `Voucher "${voucher.voucherCode || voucher.id}" đã được gửi cho Brand duyệt.`,
+        category: "Security Alert"
+      });
+      return true;
+    } catch (e: any) {
+      window.alert(`Không thể gửi voucher cho brand duyệt: ${e.message ?? e}`);
+      return false;
+    }
+  };
+
+  const handleRespondToVoucherApproval = async (
+    voucher: CoFundedVoucher,
+    decision: "approved" | "revision_requested",
+    note?: string
+  ): Promise<boolean> => {
+    try {
+      const updated = await respondToVoucherApproval(voucher.id, decision, note);
+      setCoFundedVouchers((prev) => prev.map((v) => (v.id === updated.id ? updated : v)));
+      await pushAuditLog({
+        action: decision === "approved" ? "Brand duyệt Voucher Đồng Tài Trợ" : "Brand yêu cầu sửa Voucher",
+        details: `Voucher "${voucher.voucherCode || voucher.id}"${note ? ` — Ghi chú: ${note.trim()}` : ""}`,
+        category: "Security Alert"
+      });
+      return true;
+    } catch (e: any) {
+      window.alert(`Không thể ghi nhận phản hồi duyệt voucher: ${e.message ?? e}`);
+      return false;
+    }
+  };
+
   // LocalStorage sync effects
   useEffect(() => saveStorage("activeTab", activeTab), [activeTab]);
 
@@ -853,7 +947,8 @@ export default function App() {
         phaseB1Error && { key: "phaseB1", message: phaseB1Error },
         phaseB2Error && { key: "phaseB2", message: phaseB2Error },
         phaseB3Error && { key: "phaseB3", message: phaseB3Error },
-        phaseB4Error && { key: "phaseB4", message: phaseB4Error }
+        phaseB4Error && { key: "phaseB4", message: phaseB4Error },
+        phaseB5Error && { key: "phaseB5", message: phaseB5Error }
       ].filter((e): e is { key: string; message: string } => Boolean(e)),
     [
       phase1Error,
@@ -870,7 +965,8 @@ export default function App() {
       phaseB1Error,
       phaseB2Error,
       phaseB3Error,
-      phaseB4Error
+      phaseB4Error,
+      phaseB5Error
     ]
   );
   const dataLoadErrorSignature = dataLoadErrors.map((e) => e.key + ":" + e.message).join("|");
@@ -1629,6 +1725,7 @@ export default function App() {
         { id: "brand_sessions", label: "Sessions", icon: Radio, perm: undefined },
         { id: "brand_rates", label: "Rate Card", icon: Tag, perm: undefined },
         { id: "brand_skus", label: "SKU Showcase", icon: Package, badge: "NEW", perm: undefined },
+        { id: "brand_vouchers", label: "Voucher Đồng Tài Trợ", icon: Ticket, badge: "NEW", perm: undefined },
         { id: "brand_invoices", label: "Hoá Đơn & Công Nợ", icon: Receipt, perm: undefined },
         { id: "brand_reviews", label: "Báo Cáo Cuối Kỳ", icon: ClipboardCheck, perm: undefined },
         { id: "account_settings", label: "Tài Khoản Của Tôi", icon: UserCog, perm: undefined },
@@ -2062,6 +2159,19 @@ export default function App() {
                     onAddSku={handleAddBrandSku}
                     onUpdateSku={handleUpdateBrandSku}
                     onDeleteSku={handleDeleteBrandSku}
+                  />
+                )}
+
+                {activeTab === "brand_vouchers" && effectiveWorkspace.type === "brand" && (
+                  <BrandVoucherRequests
+                    brandId={currentBrandId!}
+                    currentRole={currentRole}
+                    vouchers={coFundedVouchers}
+                    sessions={activeSessions}
+                    onAddVoucher={handleAddCoFundedVoucher}
+                    onDeleteVoucher={handleDeleteCoFundedVoucher}
+                    onSendVoucherForApproval={handleSendVoucherForApproval}
+                    onRespondToVoucherApproval={handleRespondToVoucherApproval}
                   />
                 )}
 
