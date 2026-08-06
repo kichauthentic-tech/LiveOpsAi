@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, StrategicDirective, WorkflowRule, Talent, Studio, Equipment, Brand, AgencyProject, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, Campaign, CampaignRevisionNote, TalentRateHistoryEntry, BrandPlatformRateHistoryEntry, BrandInvoice, BrandSku, ProductSample, LiveStreamIncident } from "./types";
+import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, StrategicDirective, WorkflowRule, Talent, Studio, Equipment, Brand, AgencyProject, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, Campaign, CampaignRevisionNote, TalentRateHistoryEntry, BrandPlatformRateHistoryEntry, BrandInvoice, BrandSku, ProductSample, LiveStreamIncident, LibraryScript } from "./types";
 import { ALL_PERMISSION_DEFINITIONS } from "./data/mockData";
 import { fetchTalents, createTalent, updateTalent, deleteTalent } from "./lib/db/talents";
 import { fetchStudios, createStudio, updateStudio, deleteStudio } from "./lib/db/studios";
@@ -45,6 +45,7 @@ import {
   updateLiveStreamIncident,
   deleteLiveStreamIncident
 } from "./lib/db/liveStreamIncidents";
+import { fetchScriptLibrary, createLibraryScript, updateLibraryScript, deleteLibraryScript } from "./lib/db/scriptLibrary";
 import {
   LayoutDashboard,
   Radio,
@@ -73,7 +74,8 @@ import {
   Target,
   Package,
   Boxes,
-  AlertTriangle
+  AlertTriangle,
+  BookOpen
 } from "lucide-react";
 import { Header, WorkspaceContext } from "./components/Header";
 import { BrandDashboard } from "./components/brand-workspace/BrandDashboard";
@@ -85,6 +87,7 @@ import { BrandInvoices } from "./components/brand-workspace/BrandInvoices";
 import { BrandSkuShowcase } from "./components/brand-workspace/BrandSkuShowcase";
 import { ProductSampleInventory } from "./components/ProductSampleInventory";
 import { LiveStreamIncidentLog } from "./components/LiveStreamIncidentLog";
+import { ScriptLibrary } from "./components/ScriptLibrary";
 import { BrandReviewHistory } from "./components/brand-workspace/BrandReviewHistory";
 import { Login } from "./components/Login";
 import { ResetPasswordScreen } from "./components/ResetPasswordScreen";
@@ -234,6 +237,9 @@ export default function App() {
   const [liveStreamIncidents, setLiveStreamIncidents] = useState<LiveStreamIncident[]>([]);
   const [phaseB3Loading, setPhaseB3Loading] = useState(true);
   const [phaseB3Error, setPhaseB3Error] = useState<string | null>(null);
+  const [scriptLibrary, setScriptLibrary] = useState<LibraryScript[]>([]);
+  const [phaseB4Loading, setPhaseB4Loading] = useState(true);
+  const [phaseB4Error, setPhaseB4Error] = useState<string | null>(null);
 
   // Previously these fetch errors were only stored in state and never rendered anywhere — a
   // failed fetch left a tab silently empty forever with no indication anything went wrong.
@@ -559,6 +565,28 @@ export default function App() {
   }, [session?.user?.id]);
 
   useEffect(() => {
+    if (!session) return;
+    let cancelled = false;
+    setPhaseB4Loading(true);
+    fetchScriptLibrary()
+      .then((scripts) => {
+        if (cancelled) return;
+        setScriptLibrary(scripts);
+        setPhaseB4Error(null);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setPhaseB4Error(err.message ?? "Không tải được Script Library từ Supabase.");
+      })
+      .finally(() => {
+        if (!cancelled) setPhaseB4Loading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user?.id]);
+
+  useEffect(() => {
     if (!session || currentRole !== "admin") {
       setAiAgentPromptsLoading(false);
       return;
@@ -715,6 +743,24 @@ export default function App() {
     setLiveStreamIncidents((prev) => prev.filter((i) => i.id !== id));
   }
 
+  async function handleAddLibraryScript(script: { brandId?: string; title: string; hook: string; content: string; platform: LibraryScript["platform"] }) {
+    const created = await createLibraryScript({ ...script, createdBy: profile?.id });
+    setScriptLibrary((prev) => [created, ...prev]);
+  }
+
+  async function handleUpdateLibraryScript(
+    id: string,
+    patch: Partial<Pick<LibraryScript, "title" | "hook" | "content" | "platform" | "pinnedSkuOrder" | "tags">> & { brandId?: string | null }
+  ) {
+    const updated = await updateLibraryScript(id, patch);
+    setScriptLibrary((prev) => prev.map((s) => (s.id === id ? updated : s)));
+  }
+
+  async function handleDeleteLibraryScript(id: string) {
+    await deleteLibraryScript(id);
+    setScriptLibrary((prev) => prev.filter((s) => s.id !== id));
+  }
+
   // LocalStorage sync effects
   useEffect(() => saveStorage("activeTab", activeTab), [activeTab]);
 
@@ -806,7 +852,8 @@ export default function App() {
         phase20Error && { key: "phase20", message: phase20Error },
         phaseB1Error && { key: "phaseB1", message: phaseB1Error },
         phaseB2Error && { key: "phaseB2", message: phaseB2Error },
-        phaseB3Error && { key: "phaseB3", message: phaseB3Error }
+        phaseB3Error && { key: "phaseB3", message: phaseB3Error },
+        phaseB4Error && { key: "phaseB4", message: phaseB4Error }
       ].filter((e): e is { key: string; message: string } => Boolean(e)),
     [
       phase1Error,
@@ -822,7 +869,8 @@ export default function App() {
       phase20Error,
       phaseB1Error,
       phaseB2Error,
-      phaseB3Error
+      phaseB3Error,
+      phaseB4Error
     ]
   );
   const dataLoadErrorSignature = dataLoadErrors.map((e) => e.key + ":" + e.message).join("|");
@@ -1530,6 +1578,9 @@ export default function App() {
         { id: "product_samples", label: "Hàng Mẫu (Product Sample)", icon: Boxes, badge: "NEW", perm: "manage_studios_gear" as PermissionKey },
         // Dùng lại perm "manage_sessions" — Incident Log liên kết chặt tới Live Session.
         { id: "live_incidents", label: "Nhật Ký Sự Cố Live", icon: AlertTriangle, badge: "NEW", perm: "manage_sessions" as PermissionKey },
+        // Dùng lại perm "generate_scripts" — cùng nhóm quyền với AI Script Gen, và role talent
+        // (default generate_scripts=true) cần thấy tab này để đọc teleprompter khi live.
+        { id: "script_library", label: "Thư Viện Kịch Bản", icon: BookOpen, badge: "NEW", perm: "generate_scripts" as PermissionKey },
       ],
     },
     {
@@ -2075,6 +2126,17 @@ export default function App() {
                     onAddIncident={handleAddLiveStreamIncident}
                     onUpdateIncident={handleUpdateLiveStreamIncident}
                     onDeleteIncident={handleDeleteLiveStreamIncident}
+                  />
+                )}
+
+                {activeTab === "script_library" && (
+                  <ScriptLibrary
+                    currentRole={currentRole}
+                    brands={activeBrands}
+                    scripts={scriptLibrary}
+                    onAddScript={handleAddLibraryScript}
+                    onUpdateScript={handleUpdateLibraryScript}
+                    onDeleteScript={handleDeleteLibraryScript}
                   />
                 )}
 

@@ -321,6 +321,22 @@ export interface LiveStreamIncident {
   reportedBy?: string;
 }
 
+// Giai đoạn B4 — Script & Teleprompter Library (Agency Workspace, nhóm "Content & Quality", xem
+// WORKSPACE_DESIGN.md#6). Kho kịch bản đã lưu để tái sử dụng + đọc qua teleprompter khi live —
+// khác ScriptGenerator (sinh kịch bản mới bằng AI, không lưu trữ). Nội dung dạng text/markdown
+// đơn giản, không phải cấu trúc JSON nhiều Part.
+export interface LibraryScript {
+  id: string;
+  brandId?: string;
+  title: string;
+  hook: string;
+  content: string;
+  platform: "TikTok" | "Shopee";
+  pinnedSkuOrder: string;
+  tags: string;
+  createdBy?: string;
+}
+
 export interface ShiftSlot {
   id: string;
   date: string;

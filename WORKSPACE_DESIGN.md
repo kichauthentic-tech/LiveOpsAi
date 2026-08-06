@@ -1,7 +1,7 @@
 # LiveOps AI — Thiết kế Workspace Model (Agency ↔ Brand)
 
-> **Trạng thái: GIAI ĐOẠN A (khung workspace) + GIAI ĐOẠN B1 (SKU Showcase) + GIAI ĐOẠN B2 (Product Sample Inventory) + GIAI ĐOẠN B3 (Live Stream Incident Log) ĐÃ CODE + VERIFY XONG.** Xem mục "Đã hoàn thành" bên dưới.
-> Còn lại ở mục 6/Giai đoạn B+: Script & Teleprompter Library, Co-Funded Voucher Request Center, Live Audience & Conversion Analytics — chưa bắt đầu.
+> **Trạng thái: GIAI ĐOẠN A (khung workspace) + GIAI ĐOẠN B1 (SKU Showcase) + GIAI ĐOẠN B2 (Product Sample Inventory) + GIAI ĐOẠN B3 (Live Stream Incident Log) + GIAI ĐOẠN B4 (Script & Teleprompter Library) ĐÃ CODE + VERIFY XONG.** Xem mục "Đã hoàn thành" bên dưới.
+> Còn lại ở mục 6/Giai đoạn B+: Co-Funded Voucher Request Center, Live Audience & Conversion Analytics — chưa bắt đầu.
 > Không phụ thuộc `PROJECT_STATUS.md`/`BUSINESS_ROADMAP.md` (đã bị xóa có chủ đích, không khôi phục).
 > Đọc `CLAUDE.md` để biết quy ước cập nhật tài liệu — file này thay thế vai trò "trạng thái sống" của module workspace cho tới khi implement xong; sau khi code+verify xong, sáp nhập nội dung "Đã hoàn thành" vào bất kỳ file trạng thái nào user dùng lại sau này.
 
@@ -32,6 +32,15 @@
 - **`src/lib/db/liveStreamIncidents.ts`** — `fetchLiveStreamIncidents`/`createLiveStreamIncident`/`updateLiveStreamIncident`/`deleteLiveStreamIncident`, cùng pattern `fromDb` như các module trước.
 - **`src/components/LiveStreamIncidentLog.tsx`** — **Agency Workspace**, thêm vào nhóm nav `Content & Quality` (cùng nhóm với Product Sample Inventory) trong `AGENCY_NAV_GROUPS`, tab `live_incidents`. Filter theo trạng thái ở đầu trang, đếm nhanh "N sự cố đang mở", tạo mới qua form chọn Live Session + loại sự cố + mức độ + mô tả, bảng cho sửa inline category/severity/resolution/status. `canEdit` gate theo `currentRole` (ceo/admin/operations), dùng lại `PermissionKey` **`manage_sessions`** (liên kết chặt tới Live Session, không tạo permission key mới).
 - **Verify** — chạy migration thật trên Supabase, tạo 1 sự cố test (CROCS session, Khoá giỏ hàng, mức Cao), sửa ghi chú xử lý + đổi trạng thái sang "Đã xử lý" inline, reload xác nhận persist đúng + counter "sự cố đang mở" cập nhật đúng, xoá xong quay về empty state, không lỗi console.
+
+## Đã hoàn thành — Giai đoạn B4 (Script & Teleprompter Library)
+
+- **Phạm vi đã chốt với user trước khi code** (roadmap gốc flag đây là điểm mơ hồ cần làm rõ): (1) làm cả thư viện lưu trữ CRUD **và** chế độ đọc teleprompter fullscreen trong cùng 1 phiên; (2) nội dung kịch bản lưu dạng **text/markdown đơn giản** + metadata (hook, thứ tự ghim SKU), **không** parse lại cấu trúc JSON nhiều Part như `ScriptGenerator.tsx`.
+- **Ranh giới với `ScriptGenerator.tsx` (AI Script Gen)** — `ScriptGenerator` là công cụ SINH kịch bản mới bằng Gemini AI, không lưu trữ (kết quả chỉ tồn tại trong state, mất khi rời trang). `ScriptLibrary` là nơi LƯU LẠI kịch bản đã có để tái sử dụng + đọc qua teleprompter. Không có luồng tự động nối 2 module (chưa có nút "Lưu vào Library" ngay trong ScriptGenerator) — nếu cần, đó là việc của phiên sau.
+- **Bảng `script_library`** — [supabase/migrations/0027_script_library.sql](supabase/migrations/0027_script_library.sql). Cột: `brand_id` (FK, **nullable** — kịch bản có thể dùng chung mọi Brand), `title`, `hook`, `content` (text/markdown), `platform` (`TikTok`/`Shopee`, cùng giá trị với `LiveSession.platform`), `pinned_sku_order` (text tự do), `tags`. RLS: đọc mọi authenticated, ghi `ceo`/`operations`/`admin`.
+- **`src/lib/db/scriptLibrary.ts`** — `fetchScriptLibrary`/`createLibraryScript`/`updateLibraryScript`/`deleteLibraryScript`, cùng pattern `fromDb` như các module trước.
+- **`src/components/ScriptLibrary.tsx`** — **Agency Workspace**, nhóm nav `Content & Quality`, tab `script_library`. Hai chế độ hiển thị trong 1 component: (1) danh sách thẻ kịch bản (tạo mới, sửa inline mở rộng ngay dưới thẻ, xoá), (2) **Teleprompter fullscreen** (`position: fixed inset-0`) khi bấm nút "Teleprompter" trên 1 thẻ — chữ lớn, có nút phóng to/thu nhỏ cỡ chữ (`fontScale` state), nút đóng quay lại danh sách. `canEdit` gate theo `currentRole` (ceo/admin/operations); dùng lại `PermissionKey` **`generate_scripts`** (cùng nhóm quyền AI Script Gen, role `talent` mặc định có quyền này nên thấy được tab để đọc teleprompter khi live).
+- **Verify** — chạy migration thật trên Supabase, tạo 1 kịch bản test (JOCKEY, TikTok, có hook + nội dung nhiều dòng), mở Teleprompter fullscreen + test nút phóng to chữ, đóng lại, sửa inline thêm "Thứ tự ghim SKU", reload xác nhận persist đúng, xoá xong quay về empty state, không lỗi console.
 
 ## Quy ước kỹ thuật phát sinh
 
