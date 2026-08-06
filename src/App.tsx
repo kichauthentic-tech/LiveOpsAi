@@ -83,7 +83,8 @@ import {
   Boxes,
   AlertTriangle,
   BookOpen,
-  Ticket
+  Ticket,
+  BarChart3
 } from "lucide-react";
 import { Header, WorkspaceContext } from "./components/Header";
 import { BrandDashboard } from "./components/brand-workspace/BrandDashboard";
@@ -94,6 +95,7 @@ import { BrandRateCard } from "./components/brand-workspace/BrandRateCard";
 import { BrandInvoices } from "./components/brand-workspace/BrandInvoices";
 import { BrandSkuShowcase } from "./components/brand-workspace/BrandSkuShowcase";
 import { BrandVoucherRequests } from "./components/brand-workspace/BrandVoucherRequests";
+import { BrandAudienceAnalytics } from "./components/brand-workspace/BrandAudienceAnalytics";
 import { ProductSampleInventory } from "./components/ProductSampleInventory";
 import { LiveStreamIncidentLog } from "./components/LiveStreamIncidentLog";
 import { ScriptLibrary } from "./components/ScriptLibrary";
@@ -1726,6 +1728,7 @@ export default function App() {
         { id: "brand_rates", label: "Rate Card", icon: Tag, perm: undefined },
         { id: "brand_skus", label: "SKU Showcase", icon: Package, badge: "NEW", perm: undefined },
         { id: "brand_vouchers", label: "Voucher Đồng Tài Trợ", icon: Ticket, badge: "NEW", perm: undefined },
+        { id: "brand_audience_analytics", label: "Hiệu Suất Xem & Chuyển Đổi", icon: BarChart3, badge: "NEW", perm: undefined },
         { id: "brand_invoices", label: "Hoá Đơn & Công Nợ", icon: Receipt, perm: undefined },
         { id: "brand_reviews", label: "Báo Cáo Cuối Kỳ", icon: ClipboardCheck, perm: undefined },
         { id: "account_settings", label: "Tài Khoản Của Tôi", icon: UserCog, perm: undefined },
@@ -2173,6 +2176,10 @@ export default function App() {
                     onSendVoucherForApproval={handleSendVoucherForApproval}
                     onRespondToVoucherApproval={handleRespondToVoucherApproval}
                   />
+                )}
+
+                {activeTab === "brand_audience_analytics" && effectiveWorkspace.type === "brand" && (
+                  <BrandAudienceAnalytics brandId={currentBrandId!} sessions={activeSessions} />
                 )}
 
                 {activeTab === "brand_invoices" && effectiveWorkspace.type === "brand" && (

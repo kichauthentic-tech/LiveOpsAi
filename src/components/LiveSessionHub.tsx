@@ -53,6 +53,12 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
   const [sessStatus, setSessStatus] = useState<"Live Now" | "Upcoming" | "Completed" | "Cancelled">("Upcoming");
   const [sessTargetGmv, setSessTargetGmv] = useState(250000000);
   const [sessActualGmv, setSessActualGmv] = useState(0);
+  // Giai đoạn B6 — trước đây các số này bị set cứng (1500/25000/8.5/4.2) mỗi khi lưu session
+  // thay vì để trống chờ nhập tay thật, vi phạm nguyên tắc "không giả lập số liệu" của dự án.
+  const [sessPeakViewers, setSessPeakViewers] = useState(0);
+  const [sessTotalViews, setSessTotalViews] = useState(0);
+  const [sessCtrAvg, setSessCtrAvg] = useState(0);
+  const [sessCvrAvg, setSessCvrAvg] = useState(0);
 
   const openAddSessionModal = () => {
     setEditingSession(null);
@@ -69,6 +75,10 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
     setSessStatus("Upcoming");
     setSessTargetGmv(250000000);
     setSessActualGmv(0);
+    setSessPeakViewers(0);
+    setSessTotalViews(0);
+    setSessCtrAvg(0);
+    setSessCvrAvg(0);
     setIsSessionModalOpen(true);
   };
 
@@ -87,6 +97,10 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
     setSessStatus(s.status);
     setSessTargetGmv(s.targetGmv);
     setSessActualGmv(s.actualGmv);
+    setSessPeakViewers(s.peakViewers || 0);
+    setSessTotalViews(s.totalViews || 0);
+    setSessCtrAvg(s.ctrAvg || 0);
+    setSessCvrAvg(s.cvrAvg || 0);
     setIsSessionModalOpen(true);
   };
 
@@ -124,10 +138,10 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
       actualGmv: Number(sessActualGmv),
       totalOrders: editingSession?.totalOrders || 0,
       avgWatchTimeSeconds: editingSession?.avgWatchTimeSeconds || 120,
-      peakViewers: editingSession?.peakViewers || 1500,
-      totalViews: editingSession?.totalViews || 25000,
-      ctrAvg: editingSession?.ctrAvg || 8.5,
-      cvrAvg: editingSession?.cvrAvg || 4.2,
+      peakViewers: Number(sessPeakViewers),
+      totalViews: Number(sessTotalViews),
+      ctrAvg: Number(sessCtrAvg),
+      cvrAvg: Number(sessCvrAvg),
       skus: editingSession?.skus || [],
       checklist: editingSession?.checklist || [],
       minuteMetrics: editingSession?.minuteMetrics || []
@@ -965,6 +979,49 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                     type="number"
                     value={sessActualGmv}
                     onChange={(e) => setSessActualGmv(Number(e.target.value))}
+                    className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold text-slate-100 bg-slate-950 placeholder:text-slate-500"
+                  />
+                </div>
+              </div>
+
+              {/* Giai đoạn B6 — nhập tay thật (không giả lập), nguồn cho Brand Analytics.
+                  Để trống/0 tới khi có số thật thay vì mặc định số đẹp như trước. */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div>
+                  <label className="font-bold text-slate-300 block mb-1">PCU (Peak Viewers)</label>
+                  <input
+                    type="number"
+                    value={sessPeakViewers}
+                    onChange={(e) => setSessPeakViewers(Number(e.target.value))}
+                    className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold text-slate-100 bg-slate-950 placeholder:text-slate-500"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-300 block mb-1">Tổng Lượt Xem</label>
+                  <input
+                    type="number"
+                    value={sessTotalViews}
+                    onChange={(e) => setSessTotalViews(Number(e.target.value))}
+                    className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold text-slate-100 bg-slate-950 placeholder:text-slate-500"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-300 block mb-1">CTR TB (%)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={sessCtrAvg}
+                    onChange={(e) => setSessCtrAvg(Number(e.target.value))}
+                    className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold text-slate-100 bg-slate-950 placeholder:text-slate-500"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-300 block mb-1">CVR TB (%)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={sessCvrAvg}
+                    onChange={(e) => setSessCvrAvg(Number(e.target.value))}
                     className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold text-slate-100 bg-slate-950 placeholder:text-slate-500"
                   />
                 </div>
