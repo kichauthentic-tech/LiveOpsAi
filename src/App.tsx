@@ -60,6 +60,7 @@ import {
   UserCog,
   CalendarClock,
   CalendarCheck,
+  CalendarRange,
   Gauge,
   Store,
   Tag,
@@ -96,6 +97,7 @@ import { UserRoleSettings } from "./components/UserRoleSettings";
 import { AiTrainingCenter } from "./components/AiTrainingCenter";
 import { MyWorkspace } from "./components/MyWorkspace";
 import ShiftScheduling from "./components/ShiftScheduling";
+import CampaignTimeline from "./components/CampaignTimeline";
 
 const STORAGE_PREFIX = "liveops_os_v2_";
 
@@ -121,6 +123,14 @@ export default function App() {
 
   const currentRole: UserRole = profile?.role ?? "talent";
   const [activeTab, setActiveTab] = useState<string>(() => loadStorage("activeTab", "brief"));
+  // Giai đoạn 27 — "Xem trong Lịch" ở Campaign Timeline nhảy sang tab shift_scheduling
+  // kèm đúng tháng + campaign đang lọc; nonce đổi mỗi lần bấm để effect bên
+  // ShiftScheduling áp dụng lại kể cả bấm cùng 1 campaign 2 lần liên tiếp.
+  const [scheduleJumpTarget, setScheduleJumpTarget] = useState<{ campaignId: string; month: string; nonce: number } | null>(null);
+  const handleJumpToSchedule = (campaignId: string, month: string) => {
+    setScheduleJumpTarget({ campaignId, month, nonce: Date.now() });
+    setActiveTab("shift_scheduling");
+  };
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Giai đoạn A — Workspace Agency ↔ Brand (xem WORKSPACE_DESIGN.md). Chỉ có ý nghĩa với
@@ -1379,6 +1389,9 @@ export default function App() {
         // talent cần thấy tab này để tự đăng ký ca (Giai đoạn 14a); màn hình bên trong tự đổi giao
         // diện theo currentRole (talent = đăng ký, ceo/operations/admin = mở ca + chốt lịch).
         { id: "shift_scheduling", label: "Đăng Ký & Chốt Lịch", icon: CalendarClock, badge: "NEW", perm: undefined },
+        // Giai đoạn 27 — view tổng hợp đọc dữ liệu campaigns/live_sessions/shift_slots đã có,
+        // không phải bảng/data mới. Gate theo cùng quyền với Lịch Vận Hành (manage_calendar).
+        { id: "campaign_timeline", label: "Campaign Timeline", icon: CalendarRange, badge: "NEW", perm: "manage_calendar" as PermissionKey },
       ],
     },
     {
@@ -1798,6 +1811,17 @@ export default function App() {
                     onSendCampaignForApproval={handleSendCampaignForApproval}
                     onUpdateSession={handleUpdateSession}
                     onLogAudit={pushAuditLog}
+                    jumpTarget={scheduleJumpTarget}
+                  />
+                )}
+
+                {activeTab === "campaign_timeline" && (
+                  <CampaignTimeline
+                    campaigns={campaigns}
+                    brands={activeBrands}
+                    sessions={activeSessions}
+                    shiftSlots={shiftSlots}
+                    onJumpToSchedule={handleJumpToSchedule}
                   />
                 )}
 

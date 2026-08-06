@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   AuditLogEntry,
   Brand,
@@ -14,6 +14,7 @@ import {
   Talent,
   UserRole
 } from "../types";
+import { computeCampaignActualGmv } from "../lib/campaignMetrics";
 import {
   Calendar as CalendarIcon,
   Plus,
@@ -70,6 +71,10 @@ interface ShiftSchedulingProps {
   ) => Promise<boolean>;
   onUpdateSession: (session: LiveSession) => Promise<boolean>;
   onLogAudit: (entry: { action: string; details: string; category: AuditLogEntry["category"] }) => Promise<void>;
+  // Từ Campaign Timeline, bấm "Xem trong Lịch" nhảy thẳng tới đúng tháng + lọc theo
+  // campaign đó — nonce đổi mỗi lần bấm để useEffect áp dụng lại kể cả khi bấm cùng 1
+  // campaign 2 lần liên tiếp (giá trị month/campaignId không đổi thì effect không chạy lại).
+  jumpTarget?: { campaignId: string; month: string; nonce: number } | null;
 }
 
 const CAMPAIGN_TYPE_LABELS: Record<Campaign["type"], string> = {
@@ -170,7 +175,8 @@ export default function ShiftScheduling({
   onDeleteCampaign,
   onSubmitCampaignReview,
   onUpdateSession,
-  onLogAudit
+  onLogAudit,
+  jumpTarget
 }: ShiftSchedulingProps) {
   const admin = isAdminRole(currentRole);
   const myTalentId = activeUser.assignedTalentId;
@@ -223,6 +229,14 @@ export default function ShiftScheduling({
   const [creatingCampaign, setCreatingCampaign] = useState(false);
   const [campaignFilter, setCampaignFilter] = useState("");
 
+  useEffect(() => {
+    if (!jumpTarget) return;
+    setSelectedMonth(jumpTarget.month);
+    setCampaignFilter(jumpTarget.campaignId);
+    setSelectedDate(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jumpTarget?.nonce]);
+
   // Giai đoạn 25 — panel đánh giá cuối campaign, chỉ 1 campaign mở cùng lúc.
   const [reviewingCampaignId, setReviewingCampaignId] = useState<string | null>(null);
   const [reviewOutcome, setReviewOutcome] = useState<NonNullable<Campaign["outcome"]>>("kpi_met");
@@ -258,22 +272,9 @@ export default function ShiftScheduling({
     [campaigns, selectedMonth]
   );
 
-  // Giai đoạn 26 — GMV thật đạt được của campaign = tổng actualGmv các session
-  // Completed có campaign_id trỏ thẳng vào campaign (FK thật từ migration 0022).
-  // Session cũ chưa được backfill (campaignId rỗng) vẫn fallback về suy luận
-  // brand+khoảng ngày như Giai đoạn 25, để không mất dữ liệu GMV của các
-  // session tạo trước khi có cột campaign_id.
-  const campaignActualGmv = useMemo(() => {
-    const map = new Map<string, number>();
-    campaigns.forEach((c) => {
-      const total = sessions
-        .filter((s) => s.status === "Completed")
-        .filter((s) => (s.campaignId ? s.campaignId === c.id : s.brandId === c.brandId && s.date >= c.startDate && s.date <= c.endDate))
-        .reduce((acc, s) => acc + (s.actualGmv || 0), 0);
-      map.set(c.id, total);
-    });
-    return map;
-  }, [campaigns, sessions]);
+  // Giai đoạn 26 — GMV thật của campaign, dùng chung công thức với CampaignTimeline
+  // (xem src/lib/campaignMetrics.ts) để không lặp lại 2 bản logic khác nhau.
+  const campaignActualGmv = useMemo(() => computeCampaignActualGmv(campaigns, sessions), [campaigns, sessions]);
 
   const monthSlotsUnfiltered = useMemo(
     () => shiftSlots.filter((s) => s.date.startsWith(selectedMonth)).sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime)),
