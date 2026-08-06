@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, StrategicDirective, WorkflowRule, Talent, Studio, Equipment, Brand, AgencyProject, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, Campaign, CampaignRevisionNote, TalentRateHistoryEntry, BrandPlatformRateHistoryEntry, BrandInvoice, BrandSku } from "./types";
+import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, StrategicDirective, WorkflowRule, Talent, Studio, Equipment, Brand, AgencyProject, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, Campaign, CampaignRevisionNote, TalentRateHistoryEntry, BrandPlatformRateHistoryEntry, BrandInvoice, BrandSku, ProductSample } from "./types";
 import { ALL_PERMISSION_DEFINITIONS } from "./data/mockData";
 import { fetchTalents, createTalent, updateTalent, deleteTalent } from "./lib/db/talents";
 import { fetchStudios, createStudio, updateStudio, deleteStudio } from "./lib/db/studios";
@@ -38,6 +38,7 @@ import { fetchTalentRateHistory } from "./lib/db/talentRateHistory";
 import { fetchBrandPlatformRateHistory } from "./lib/db/brandPlatformRateHistory";
 import { fetchBrandInvoices, createBrandInvoice, updateBrandInvoice, deleteBrandInvoice } from "./lib/db/brandInvoices";
 import { fetchBrandSkus, createBrandSku, updateBrandSku, deleteBrandSku } from "./lib/db/brandSkus";
+import { fetchProductSamples, createProductSample, updateProductSample, deleteProductSample } from "./lib/db/productSamples";
 import {
   LayoutDashboard,
   Radio,
@@ -64,7 +65,8 @@ import {
   Receipt,
   ClipboardCheck,
   Target,
-  Package
+  Package,
+  Boxes
 } from "lucide-react";
 import { Header, WorkspaceContext } from "./components/Header";
 import { BrandDashboard } from "./components/brand-workspace/BrandDashboard";
@@ -74,6 +76,7 @@ import { BrandSessions } from "./components/brand-workspace/BrandSessions";
 import { BrandRateCard } from "./components/brand-workspace/BrandRateCard";
 import { BrandInvoices } from "./components/brand-workspace/BrandInvoices";
 import { BrandSkuShowcase } from "./components/brand-workspace/BrandSkuShowcase";
+import { ProductSampleInventory } from "./components/ProductSampleInventory";
 import { BrandReviewHistory } from "./components/brand-workspace/BrandReviewHistory";
 import { Login } from "./components/Login";
 import { ResetPasswordScreen } from "./components/ResetPasswordScreen";
@@ -217,6 +220,9 @@ export default function App() {
   const [brandSkus, setBrandSkus] = useState<BrandSku[]>([]);
   const [phaseB1Loading, setPhaseB1Loading] = useState(true);
   const [phaseB1Error, setPhaseB1Error] = useState<string | null>(null);
+  const [productSamples, setProductSamples] = useState<ProductSample[]>([]);
+  const [phaseB2Loading, setPhaseB2Loading] = useState(true);
+  const [phaseB2Error, setPhaseB2Error] = useState<string | null>(null);
 
   // Previously these fetch errors were only stored in state and never rendered anywhere — a
   // failed fetch left a tab silently empty forever with no indication anything went wrong.
@@ -498,6 +504,28 @@ export default function App() {
   }, [session?.user?.id]);
 
   useEffect(() => {
+    if (!session) return;
+    let cancelled = false;
+    setPhaseB2Loading(true);
+    fetchProductSamples()
+      .then((samples) => {
+        if (cancelled) return;
+        setProductSamples(samples);
+        setPhaseB2Error(null);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setPhaseB2Error(err.message ?? "Không tải được Product Sample Inventory từ Supabase.");
+      })
+      .finally(() => {
+        if (!cancelled) setPhaseB2Loading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user?.id]);
+
+  useEffect(() => {
     if (!session || currentRole !== "admin") {
       setAiAgentPromptsLoading(false);
       return;
@@ -613,6 +641,24 @@ export default function App() {
     setBrandSkus((prev) => prev.filter((s) => s.id !== id));
   }
 
+  async function handleAddProductSample(sample: { brandId: string; studioId?: string; productName: string; sampleCode: string; quantity: number }) {
+    const created = await createProductSample({ ...sample, createdBy: profile?.id });
+    setProductSamples((prev) => [created, ...prev]);
+  }
+
+  async function handleUpdateProductSample(
+    id: string,
+    patch: Partial<Pick<ProductSample, "studioId" | "productName" | "sampleCode" | "quantity" | "status" | "locationNote" | "notes">>
+  ) {
+    const updated = await updateProductSample(id, patch);
+    setProductSamples((prev) => prev.map((s) => (s.id === id ? updated : s)));
+  }
+
+  async function handleDeleteProductSample(id: string) {
+    await deleteProductSample(id);
+    setProductSamples((prev) => prev.filter((s) => s.id !== id));
+  }
+
   // LocalStorage sync effects
   useEffect(() => saveStorage("activeTab", activeTab), [activeTab]);
 
@@ -702,7 +748,8 @@ export default function App() {
         phase15Error && { key: "phase15", message: phase15Error },
         phase19Error && { key: "phase19", message: phase19Error },
         phase20Error && { key: "phase20", message: phase20Error },
-        phaseB1Error && { key: "phaseB1", message: phaseB1Error }
+        phaseB1Error && { key: "phaseB1", message: phaseB1Error },
+        phaseB2Error && { key: "phaseB2", message: phaseB2Error }
       ].filter((e): e is { key: string; message: string } => Boolean(e)),
     [
       phase1Error,
@@ -716,7 +763,8 @@ export default function App() {
       phase15Error,
       phase19Error,
       phase20Error,
-      phaseB1Error
+      phaseB1Error,
+      phaseB2Error
     ]
   );
   const dataLoadErrorSignature = dataLoadErrors.map((e) => e.key + ":" + e.message).join("|");
@@ -1417,6 +1465,14 @@ export default function App() {
       ],
     },
     {
+      label: "Content & Quality",
+      items: [
+        // Dùng lại perm "manage_studios_gear" — Product Sample Inventory liên kết chặt tới
+        // Studio (đúng nguyên tắc đã chốt ở WORKSPACE_DESIGN.md#5, tránh phình PermissionKey).
+        { id: "product_samples", label: "Hàng Mẫu (Product Sample)", icon: Boxes, badge: "NEW", perm: "manage_studios_gear" as PermissionKey },
+      ],
+    },
+    {
       label: "Kinh Doanh",
       items: [
         { id: "crm", label: "CRM & Projects", icon: Briefcase, perm: "manage_crm_projects" as PermissionKey },
@@ -1936,6 +1992,18 @@ export default function App() {
                     onAddEquipment={handleAddEquipment}
                     onUpdateEquipment={handleUpdateEquipment}
                     onDeleteEquipment={handleDeleteEquipment}
+                  />
+                )}
+
+                {activeTab === "product_samples" && (
+                  <ProductSampleInventory
+                    currentRole={currentRole}
+                    brands={activeBrands}
+                    studios={activeStudios}
+                    productSamples={productSamples}
+                    onAddSample={handleAddProductSample}
+                    onUpdateSample={handleUpdateProductSample}
+                    onDeleteSample={handleDeleteProductSample}
                   />
                 )}
 

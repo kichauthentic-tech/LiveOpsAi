@@ -292,6 +292,22 @@ export interface BrandSku {
   createdBy?: string;
 }
 
+// Giai đoạn B2 — Product Sample Inventory (Agency Workspace, nhóm "Content & Quality", xem
+// WORKSPACE_DESIGN.md#6). Tracking hàng mẫu vật lý brand gửi tới Studio, agency-wide (không thuộc
+// Brand Workspace) — studioId có thể rỗng khi hàng mẫu đang "in_transit", chưa gán tới Studio nào.
+export interface ProductSample {
+  id: string;
+  brandId: string;
+  studioId?: string;
+  productName: string;
+  sampleCode: string;
+  quantity: number;
+  status: "in_transit" | "at_studio" | "returned" | "damaged" | "lost";
+  locationNote: string;
+  notes: string;
+  createdBy?: string;
+}
+
 export interface ShiftSlot {
   id: string;
   date: string;

@@ -1,7 +1,7 @@
 # LiveOps AI — Thiết kế Workspace Model (Agency ↔ Brand)
 
-> **Trạng thái: GIAI ĐOẠN A (khung workspace) + GIAI ĐOẠN B1 (SKU Showcase) ĐÃ CODE + VERIFY XONG.** Xem mục "Đã hoàn thành" bên dưới.
-> Còn lại: 5 module mới ở mục 6/Giai đoạn B+ (SKU Showcase đã xong) — Product Sample Inventory, Live Stream Incident Log, Co-Funded Voucher Request Center, Live Audience & Conversion Analytics, chưa bắt đầu.
+> **Trạng thái: GIAI ĐOẠN A (khung workspace) + GIAI ĐOẠN B1 (SKU Showcase) + GIAI ĐOẠN B2 (Product Sample Inventory) ĐÃ CODE + VERIFY XONG.** Xem mục "Đã hoàn thành" bên dưới.
+> Còn lại ở mục 6/Giai đoạn B+: Script & Teleprompter Library, Live Stream Incident Log, Co-Funded Voucher Request Center, Live Audience & Conversion Analytics — chưa bắt đầu.
 > Không phụ thuộc `PROJECT_STATUS.md`/`BUSINESS_ROADMAP.md` (đã bị xóa có chủ đích, không khôi phục).
 > Đọc `CLAUDE.md` để biết quy ước cập nhật tài liệu — file này thay thế vai trò "trạng thái sống" của module workspace cho tới khi implement xong; sau khi code+verify xong, sáp nhập nội dung "Đã hoàn thành" vào bất kỳ file trạng thái nào user dùng lại sau này.
 
@@ -19,10 +19,18 @@
 - **`src/components/brand-workspace/BrandSkuShowcase.tsx`** — tab mới `brand_skus` trong `BRAND_NAV_GROUPS` (App.tsx), bảng inline-edit (giống `BrandInvoices.tsx`): giá flash-deal/gốc, % xả kho, toggle Hero (star), trạng thái, xoá. `canEdit` gate theo `currentRole` (ceo/admin/operations), role `brand` chỉ xem.
 - **Verify** — chạy migration thật trên Supabase, tạo/sửa/xoá 1 SKU qua UI (Franklin brand workspace), reload xác nhận Hero toggle + % xả kho persist đúng, xoá xong quay về empty state, không lỗi console.
 
+## Đã hoàn thành — Giai đoạn B2 (Product Sample Inventory)
+
+- **Bảng `product_samples`** — [supabase/migrations/0025_product_samples.sql](supabase/migrations/0025_product_samples.sql). Cột: `brand_id` (FK cascade), `studio_id` (FK, **nullable** — hàng mẫu có thể "in_transit" chưa gán Studio nào), `product_name`, `sample_code`, `quantity`, `status` (`in_transit`/`at_studio`/`returned`/`damaged`/`lost`), `location_note` (vị trí cụ thể trong Studio, vd "Kệ A3"). RLS: đọc mọi authenticated, ghi `ceo`/`operations`/`admin` — cùng pattern `brand_skus`/`brand_platform_rates`.
+- **`src/lib/db/productSamples.ts`** — `fetchProductSamples`/`createProductSample`/`updateProductSample`/`deleteProductSample`, cùng pattern `fromDb`/snake↔camel như `brandSkus.ts`.
+- **`src/components/ProductSampleInventory.tsx`** — **Agency Workspace** (không thuộc Brand Workspace), nhóm nav mới `Content & Quality` trong `AGENCY_NAV_GROUPS` (App.tsx), tab `product_samples`. Agency-wide: Ops cần nhìn xuyên mọi Brand/Studio để biết hàng mẫu đang nằm đâu — filter theo Studio ở đầu trang, bảng hiện cột Brand + Studio (đổi được inline) + SL/Vị trí/Trạng thái, tạo mới qua form chọn Brand+Studio. `canEdit` gate theo `currentRole` (ceo/admin/operations), dùng lại `PermissionKey` **`manage_studios_gear`** (không tạo permission key mới, đúng đề xuất ở mục 5 — module liên kết chặt tới Studio).
+- **Verify** — chạy migration thật trên Supabase, tạo 1 hàng mẫu test (JOCKEY, Studio 1 - Fashion, SL 3), sửa vị trí ("Kệ B2") + trạng thái ("Có mặt tại Studio") inline, reload xác nhận persist đúng, xoá xong quay về empty state, không lỗi console.
+
 ## Quy ước kỹ thuật phát sinh
 
 - Brand workspace nav items để `perm: undefined` toàn bộ — không dùng lại `PermissionKey` hiện có cho tab brand-scoped, vì các key đó được thiết kế cho ngữ cảnh agency-wide và role `brand` không có chúng theo default.
 - `effectiveWorkspace` (không phải `workspace` raw state) là nguồn sự thật duy nhất cho brandId hiện tại — luôn dùng nó khi cần biết "đang ở brand nào", không đọc thẳng `workspace` vì role `brand` không dùng state đó.
+- Module mới ở **Agency Workspace** (nhóm `Content & Quality` trở đi) thì ngược lại — **dùng lại `PermissionKey` agency-wide sẵn có** (vd `manage_studios_gear` cho Product Sample Inventory) thay vì tạo key mới, để tránh phình `RolePermissionsMap`/`ALL_PERMISSION_DEFINITIONS`/`UserRoleSettings.tsx`. Chỉ tạo `PermissionKey` mới nếu module không liên quan rõ ràng tới permission nào đã có.
 >
 > **Quyết định chiến lược (đã chốt sau khi cân nhắc "xây lại từ đầu" vs "nâng cấp"):** KHÔNG rebuild hệ thống từ đầu. Giữ nguyên toàn bộ Supabase schema + business logic đã verify qua 27 giai đoạn (công thức P&L, rate history, trigger khoá sổ tháng, RLS 4 role, luồng duyệt Campaign...) — rebuild lại đống này tốn effort hơn viết mới, không phải ít hơn, và rủi ro sai số tiền/lương thật. Chỉ **viết lại lớp UI/`App.tsx`** theo kiến trúc workspace ở dưới — đây vốn dĩ đã là "viết lại giao diện gần như hoàn toàn" (đổi cách tổ chức nav/layout), nên giải quyết đúng nỗi đau "flat tab khó mở rộng" mà không cần đánh đổi phần backend đã chạy thật.
 
