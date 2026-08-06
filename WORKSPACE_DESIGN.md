@@ -1,7 +1,7 @@
 # LiveOps AI — Thiết kế Workspace Model (Agency ↔ Brand)
 
-> **Trạng thái: GIAI ĐOẠN A (khung workspace) + GIAI ĐOẠN B1 (SKU Showcase) + GIAI ĐOẠN B2 (Product Sample Inventory) ĐÃ CODE + VERIFY XONG.** Xem mục "Đã hoàn thành" bên dưới.
-> Còn lại ở mục 6/Giai đoạn B+: Script & Teleprompter Library, Live Stream Incident Log, Co-Funded Voucher Request Center, Live Audience & Conversion Analytics — chưa bắt đầu.
+> **Trạng thái: GIAI ĐOẠN A (khung workspace) + GIAI ĐOẠN B1 (SKU Showcase) + GIAI ĐOẠN B2 (Product Sample Inventory) + GIAI ĐOẠN B3 (Live Stream Incident Log) ĐÃ CODE + VERIFY XONG.** Xem mục "Đã hoàn thành" bên dưới.
+> Còn lại ở mục 6/Giai đoạn B+: Script & Teleprompter Library, Co-Funded Voucher Request Center, Live Audience & Conversion Analytics — chưa bắt đầu.
 > Không phụ thuộc `PROJECT_STATUS.md`/`BUSINESS_ROADMAP.md` (đã bị xóa có chủ đích, không khôi phục).
 > Đọc `CLAUDE.md` để biết quy ước cập nhật tài liệu — file này thay thế vai trò "trạng thái sống" của module workspace cho tới khi implement xong; sau khi code+verify xong, sáp nhập nội dung "Đã hoàn thành" vào bất kỳ file trạng thái nào user dùng lại sau này.
 
@@ -25,6 +25,13 @@
 - **`src/lib/db/productSamples.ts`** — `fetchProductSamples`/`createProductSample`/`updateProductSample`/`deleteProductSample`, cùng pattern `fromDb`/snake↔camel như `brandSkus.ts`.
 - **`src/components/ProductSampleInventory.tsx`** — **Agency Workspace** (không thuộc Brand Workspace), nhóm nav mới `Content & Quality` trong `AGENCY_NAV_GROUPS` (App.tsx), tab `product_samples`. Agency-wide: Ops cần nhìn xuyên mọi Brand/Studio để biết hàng mẫu đang nằm đâu — filter theo Studio ở đầu trang, bảng hiện cột Brand + Studio (đổi được inline) + SL/Vị trí/Trạng thái, tạo mới qua form chọn Brand+Studio. `canEdit` gate theo `currentRole` (ceo/admin/operations), dùng lại `PermissionKey` **`manage_studios_gear`** (không tạo permission key mới, đúng đề xuất ở mục 5 — module liên kết chặt tới Studio).
 - **Verify** — chạy migration thật trên Supabase, tạo 1 hàng mẫu test (JOCKEY, Studio 1 - Fashion, SL 3), sửa vị trí ("Kệ B2") + trạng thái ("Có mặt tại Studio") inline, reload xác nhận persist đúng, xoá xong quay về empty state, không lỗi console.
+
+## Đã hoàn thành — Giai đoạn B3 (Live Stream Incident Log)
+
+- **Bảng `live_stream_incidents`** — [supabase/migrations/0026_live_stream_incidents.sql](supabase/migrations/0026_live_stream_incidents.sql). Cột: `session_id` (FK `live_sessions`, cascade), `category` (`network_drop`/`cart_locked`/`host_late`/`voucher_exhausted`/`other`), `severity` (`low`/`medium`/`high`/`critical`), `description`, `resolution`, `status` (`open`/`resolved`). RLS: đọc mọi authenticated, ghi `ceo`/`operations`/`admin`. **Lệch nhẹ so với gợi ý "append-only như audit_logs" ở mục 6** — incident cần sửa `resolution`/`status` sau khi Ops xử lý xong, nên dùng full CRUD như `product_samples`/`brand_skus` thay vì append-only thuần (xem comment trong migration).
+- **`src/lib/db/liveStreamIncidents.ts`** — `fetchLiveStreamIncidents`/`createLiveStreamIncident`/`updateLiveStreamIncident`/`deleteLiveStreamIncident`, cùng pattern `fromDb` như các module trước.
+- **`src/components/LiveStreamIncidentLog.tsx`** — **Agency Workspace**, thêm vào nhóm nav `Content & Quality` (cùng nhóm với Product Sample Inventory) trong `AGENCY_NAV_GROUPS`, tab `live_incidents`. Filter theo trạng thái ở đầu trang, đếm nhanh "N sự cố đang mở", tạo mới qua form chọn Live Session + loại sự cố + mức độ + mô tả, bảng cho sửa inline category/severity/resolution/status. `canEdit` gate theo `currentRole` (ceo/admin/operations), dùng lại `PermissionKey` **`manage_sessions`** (liên kết chặt tới Live Session, không tạo permission key mới).
+- **Verify** — chạy migration thật trên Supabase, tạo 1 sự cố test (CROCS session, Khoá giỏ hàng, mức Cao), sửa ghi chú xử lý + đổi trạng thái sang "Đã xử lý" inline, reload xác nhận persist đúng + counter "sự cố đang mở" cập nhật đúng, xoá xong quay về empty state, không lỗi console.
 
 ## Quy ước kỹ thuật phát sinh
 

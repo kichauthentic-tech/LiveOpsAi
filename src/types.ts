@@ -308,6 +308,19 @@ export interface ProductSample {
   createdBy?: string;
 }
 
+// Giai đoạn B3 — Live Stream Incident Log (Agency Workspace, nhóm "Content & Quality", xem
+// WORKSPACE_DESIGN.md#6). Nhật ký sự cố khi live, liên kết session_id.
+export interface LiveStreamIncident {
+  id: string;
+  sessionId: string;
+  category: "network_drop" | "cart_locked" | "host_late" | "voucher_exhausted" | "other";
+  severity: "low" | "medium" | "high" | "critical";
+  description: string;
+  resolution: string;
+  status: "open" | "resolved";
+  reportedBy?: string;
+}
+
 export interface ShiftSlot {
   id: string;
   date: string;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, StrategicDirective, WorkflowRule, Talent, Studio, Equipment, Brand, AgencyProject, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, Campaign, CampaignRevisionNote, TalentRateHistoryEntry, BrandPlatformRateHistoryEntry, BrandInvoice, BrandSku, ProductSample } from "./types";
+import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, StrategicDirective, WorkflowRule, Talent, Studio, Equipment, Brand, AgencyProject, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, Campaign, CampaignRevisionNote, TalentRateHistoryEntry, BrandPlatformRateHistoryEntry, BrandInvoice, BrandSku, ProductSample, LiveStreamIncident } from "./types";
 import { ALL_PERMISSION_DEFINITIONS } from "./data/mockData";
 import { fetchTalents, createTalent, updateTalent, deleteTalent } from "./lib/db/talents";
 import { fetchStudios, createStudio, updateStudio, deleteStudio } from "./lib/db/studios";
@@ -40,6 +40,12 @@ import { fetchBrandInvoices, createBrandInvoice, updateBrandInvoice, deleteBrand
 import { fetchBrandSkus, createBrandSku, updateBrandSku, deleteBrandSku } from "./lib/db/brandSkus";
 import { fetchProductSamples, createProductSample, updateProductSample, deleteProductSample } from "./lib/db/productSamples";
 import {
+  fetchLiveStreamIncidents,
+  createLiveStreamIncident,
+  updateLiveStreamIncident,
+  deleteLiveStreamIncident
+} from "./lib/db/liveStreamIncidents";
+import {
   LayoutDashboard,
   Radio,
   FileText,
@@ -66,7 +72,8 @@ import {
   ClipboardCheck,
   Target,
   Package,
-  Boxes
+  Boxes,
+  AlertTriangle
 } from "lucide-react";
 import { Header, WorkspaceContext } from "./components/Header";
 import { BrandDashboard } from "./components/brand-workspace/BrandDashboard";
@@ -77,6 +84,7 @@ import { BrandRateCard } from "./components/brand-workspace/BrandRateCard";
 import { BrandInvoices } from "./components/brand-workspace/BrandInvoices";
 import { BrandSkuShowcase } from "./components/brand-workspace/BrandSkuShowcase";
 import { ProductSampleInventory } from "./components/ProductSampleInventory";
+import { LiveStreamIncidentLog } from "./components/LiveStreamIncidentLog";
 import { BrandReviewHistory } from "./components/brand-workspace/BrandReviewHistory";
 import { Login } from "./components/Login";
 import { ResetPasswordScreen } from "./components/ResetPasswordScreen";
@@ -223,6 +231,9 @@ export default function App() {
   const [productSamples, setProductSamples] = useState<ProductSample[]>([]);
   const [phaseB2Loading, setPhaseB2Loading] = useState(true);
   const [phaseB2Error, setPhaseB2Error] = useState<string | null>(null);
+  const [liveStreamIncidents, setLiveStreamIncidents] = useState<LiveStreamIncident[]>([]);
+  const [phaseB3Loading, setPhaseB3Loading] = useState(true);
+  const [phaseB3Error, setPhaseB3Error] = useState<string | null>(null);
 
   // Previously these fetch errors were only stored in state and never rendered anywhere — a
   // failed fetch left a tab silently empty forever with no indication anything went wrong.
@@ -526,6 +537,28 @@ export default function App() {
   }, [session?.user?.id]);
 
   useEffect(() => {
+    if (!session) return;
+    let cancelled = false;
+    setPhaseB3Loading(true);
+    fetchLiveStreamIncidents()
+      .then((incidents) => {
+        if (cancelled) return;
+        setLiveStreamIncidents(incidents);
+        setPhaseB3Error(null);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setPhaseB3Error(err.message ?? "Không tải được Live Stream Incident Log từ Supabase.");
+      })
+      .finally(() => {
+        if (!cancelled) setPhaseB3Loading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user?.id]);
+
+  useEffect(() => {
     if (!session || currentRole !== "admin") {
       setAiAgentPromptsLoading(false);
       return;
@@ -659,6 +692,29 @@ export default function App() {
     setProductSamples((prev) => prev.filter((s) => s.id !== id));
   }
 
+  async function handleAddLiveStreamIncident(incident: {
+    sessionId: string;
+    category: LiveStreamIncident["category"];
+    severity: LiveStreamIncident["severity"];
+    description: string;
+  }) {
+    const created = await createLiveStreamIncident({ ...incident, reportedBy: profile?.id });
+    setLiveStreamIncidents((prev) => [created, ...prev]);
+  }
+
+  async function handleUpdateLiveStreamIncident(
+    id: string,
+    patch: Partial<Pick<LiveStreamIncident, "category" | "severity" | "description" | "resolution" | "status">>
+  ) {
+    const updated = await updateLiveStreamIncident(id, patch);
+    setLiveStreamIncidents((prev) => prev.map((i) => (i.id === id ? updated : i)));
+  }
+
+  async function handleDeleteLiveStreamIncident(id: string) {
+    await deleteLiveStreamIncident(id);
+    setLiveStreamIncidents((prev) => prev.filter((i) => i.id !== id));
+  }
+
   // LocalStorage sync effects
   useEffect(() => saveStorage("activeTab", activeTab), [activeTab]);
 
@@ -749,7 +805,8 @@ export default function App() {
         phase19Error && { key: "phase19", message: phase19Error },
         phase20Error && { key: "phase20", message: phase20Error },
         phaseB1Error && { key: "phaseB1", message: phaseB1Error },
-        phaseB2Error && { key: "phaseB2", message: phaseB2Error }
+        phaseB2Error && { key: "phaseB2", message: phaseB2Error },
+        phaseB3Error && { key: "phaseB3", message: phaseB3Error }
       ].filter((e): e is { key: string; message: string } => Boolean(e)),
     [
       phase1Error,
@@ -764,7 +821,8 @@ export default function App() {
       phase19Error,
       phase20Error,
       phaseB1Error,
-      phaseB2Error
+      phaseB2Error,
+      phaseB3Error
     ]
   );
   const dataLoadErrorSignature = dataLoadErrors.map((e) => e.key + ":" + e.message).join("|");
@@ -1470,6 +1528,8 @@ export default function App() {
         // Dùng lại perm "manage_studios_gear" — Product Sample Inventory liên kết chặt tới
         // Studio (đúng nguyên tắc đã chốt ở WORKSPACE_DESIGN.md#5, tránh phình PermissionKey).
         { id: "product_samples", label: "Hàng Mẫu (Product Sample)", icon: Boxes, badge: "NEW", perm: "manage_studios_gear" as PermissionKey },
+        // Dùng lại perm "manage_sessions" — Incident Log liên kết chặt tới Live Session.
+        { id: "live_incidents", label: "Nhật Ký Sự Cố Live", icon: AlertTriangle, badge: "NEW", perm: "manage_sessions" as PermissionKey },
       ],
     },
     {
@@ -2004,6 +2064,17 @@ export default function App() {
                     onAddSample={handleAddProductSample}
                     onUpdateSample={handleUpdateProductSample}
                     onDeleteSample={handleDeleteProductSample}
+                  />
+                )}
+
+                {activeTab === "live_incidents" && (
+                  <LiveStreamIncidentLog
+                    currentRole={currentRole}
+                    sessions={activeSessions}
+                    incidents={liveStreamIncidents}
+                    onAddIncident={handleAddLiveStreamIncident}
+                    onUpdateIncident={handleUpdateLiveStreamIncident}
+                    onDeleteIncident={handleDeleteLiveStreamIncident}
                   />
                 )}
 
