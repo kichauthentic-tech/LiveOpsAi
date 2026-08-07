@@ -3,6 +3,7 @@ import { Brand, Campaign, LiveSession, BrandInvoice } from "../../types";
 import { Store, Target, Receipt, TrendingUp } from "lucide-react";
 import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
 import { computeCampaignActualGmv } from "../../lib/campaignMetrics";
+import { GmvCalendar } from "../GmvCalendar";
 
 interface BrandDashboardProps {
   brandId: string;
@@ -119,6 +120,12 @@ export const BrandDashboard: React.FC<BrandDashboardProps> = ({ brandId, brand, 
         </span>
         <p className="text-2xl font-black text-white mt-1">{formatCurrencyAdaptive(brand.totalGmv)}</p>
       </div>
+
+      <GmvCalendar
+        sessions={brandSessions}
+        title="Lịch GMV: Target vs Actual"
+        subtitle={`Theo dõi target/actual GMV từng ngày của ${brand.name} và tiến độ dự phóng cuối tháng.`}
+      />
     </div>
   );
 };

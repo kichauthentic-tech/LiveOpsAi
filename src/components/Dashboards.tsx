@@ -20,6 +20,7 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, 
 import { KpiComparison } from "./KpiComparison";
 import { GmvGrowthTrendline } from "./GmvGrowthTrendline";
 import { PerformanceDeviationAlerts } from "./PerformanceDeviationAlerts";
+import { GmvCalendar } from "./GmvCalendar";
 
 interface DashboardsProps {
   currentRole: UserRole;
@@ -56,7 +57,9 @@ export const Dashboards: React.FC<DashboardsProps> = ({
   onSelectSession,
   onNavigateTab
 }) => {
-  const [dashboardSubTab, setDashboardSubTab] = useState<"overview" | "gmv_forecast" | "kpi_comparison" | "alerts">("overview");
+  const [dashboardSubTab, setDashboardSubTab] = useState<"overview" | "gmv_forecast" | "gmv_calendar" | "kpi_comparison" | "alerts">(
+    "overview"
+  );
   const liveSessions = sessions.filter((s) => s.status === "Live Now");
   const liveSession = liveSessions[0] || sessions[0] || null;
   const totalActualGmv = sessions.reduce((sum, s) => sum + (s.actualGmv || 0), 0);
@@ -143,6 +146,18 @@ export const Dashboards: React.FC<DashboardsProps> = ({
         </button>
 
         <button
+          onClick={() => setDashboardSubTab("gmv_calendar")}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+            dashboardSubTab === "gmv_calendar"
+              ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30"
+              : "text-slate-400 hover:text-white hover:bg-slate-800"
+          }`}
+        >
+          <Calendar className="w-4 h-4 text-blue-400" />
+          <span>Lịch GMV Target/Actual</span>
+        </button>
+
+        <button
           onClick={() => setDashboardSubTab("kpi_comparison")}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
             dashboardSubTab === "kpi_comparison"
@@ -175,6 +190,19 @@ export const Dashboards: React.FC<DashboardsProps> = ({
       <div className="space-y-6">
         {subTabHeader}
         <GmvGrowthTrendline sessions={sessions} brands={brands} />
+      </div>
+    );
+  }
+
+  if (dashboardSubTab === "gmv_calendar") {
+    return (
+      <div className="space-y-6">
+        {subTabHeader}
+        <GmvCalendar
+          sessions={sessions}
+          title="Lịch GMV Toàn Agency: Target vs Actual"
+          subtitle="Tổng hợp mọi brand — theo dõi target/actual GMV từng ngày và tiến độ dự phóng cuối tháng."
+        />
       </div>
     );
   }
