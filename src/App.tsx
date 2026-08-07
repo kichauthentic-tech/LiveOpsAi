@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, StrategicDirective, WorkflowRule, Talent, Studio, Equipment, Brand, AgencyProject, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, Campaign, CampaignRevisionNote, TalentRateHistoryEntry, BrandPlatformRateHistoryEntry, BrandInvoice, BrandSku, ProductSample, LiveStreamIncident, LibraryScript, CoFundedVoucher, OnboardingChecklistTemplateItem, BrandOnboardingChecklistItem, PromoScheme } from "./types";
+import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, StrategicDirective, WorkflowRule, Talent, Studio, Equipment, Brand, AgencyProject, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, Campaign, CampaignRevisionNote, TalentRateHistoryEntry, BrandPlatformRateHistoryEntry, BrandInvoice, BrandSku, ProductSample, LiveStreamIncident, LibraryScript, CoFundedVoucher, OnboardingChecklistTemplateItem, BrandOnboardingChecklistItem, PromoScheme, SkuPlatformPrice } from "./types";
 import { ALL_PERMISSION_DEFINITIONS } from "./data/mockData";
 import { fetchTalents, createTalent, updateTalent, deleteTalent } from "./lib/db/talents";
 import { fetchStudios, createStudio, updateStudio, deleteStudio } from "./lib/db/studios";
@@ -65,6 +65,7 @@ import {
   deleteBrandOnboardingChecklistItem
 } from "./lib/db/onboardingChecklist";
 import { fetchPromoSchemes, createPromoScheme, updatePromoScheme, deletePromoScheme } from "./lib/db/promoSchemes";
+import { fetchSkuPlatformPrices, importSkuPlatformPrices, deleteSkuPlatformPrice } from "./lib/db/skuPlatformPrices";
 import {
   LayoutDashboard,
   Radio,
@@ -96,7 +97,8 @@ import {
   AlertTriangle,
   BookOpen,
   Ticket,
-  BarChart3
+  BarChart3,
+  FileSpreadsheet
 } from "lucide-react";
 import { Header, WorkspaceContext } from "./components/Header";
 import { BrandDashboard } from "./components/brand-workspace/BrandDashboard";
@@ -106,6 +108,7 @@ import { BrandSessions } from "./components/brand-workspace/BrandSessions";
 import { BrandRateCard } from "./components/brand-workspace/BrandRateCard";
 import { BrandInvoices } from "./components/brand-workspace/BrandInvoices";
 import { BrandSkuShowcase } from "./components/brand-workspace/BrandSkuShowcase";
+import { PriceListImport } from "./components/brand-workspace/PriceListImport";
 import { BrandVoucherRequests } from "./components/brand-workspace/BrandVoucherRequests";
 import { BrandAudienceAnalytics } from "./components/brand-workspace/BrandAudienceAnalytics";
 import { ProductSampleInventory } from "./components/ProductSampleInventory";
@@ -279,6 +282,11 @@ export default function App() {
   const [promoSchemes, setPromoSchemes] = useState<PromoScheme[]>([]);
   const [phaseC3Loading, setPhaseC3Loading] = useState(true);
   const [phaseC3Error, setPhaseC3Error] = useState<string | null>(null);
+
+  // Giai đoạn C4 — Price List Import (SKU pricing theo platform, Brand Workspace).
+  const [skuPlatformPrices, setSkuPlatformPrices] = useState<SkuPlatformPrice[]>([]);
+  const [phaseC4Loading, setPhaseC4Loading] = useState(true);
+  const [phaseC4Error, setPhaseC4Error] = useState<string | null>(null);
 
   // Previously these fetch errors were only stored in state and never rendered anywhere — a
   // failed fetch left a tab silently empty forever with no indication anything went wrong.
@@ -693,6 +701,28 @@ export default function App() {
   }, [session?.user?.id]);
 
   useEffect(() => {
+    if (!session) return;
+    let cancelled = false;
+    setPhaseC4Loading(true);
+    fetchSkuPlatformPrices()
+      .then((prices) => {
+        if (cancelled) return;
+        setSkuPlatformPrices(prices);
+        setPhaseC4Error(null);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setPhaseC4Error(err.message ?? "Không tải được Price List từ Supabase.");
+      })
+      .finally(() => {
+        if (!cancelled) setPhaseC4Loading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user?.id]);
+
+  useEffect(() => {
     if (!session || currentRole !== "admin") {
       setAiAgentPromptsLoading(false);
       return;
@@ -991,6 +1021,19 @@ export default function App() {
     setPromoSchemes((prev) => prev.filter((s) => s.id !== id));
   }
 
+  async function handleImportSkuPlatformPrices(
+    brandId: string,
+    rows: Array<Pick<SkuPlatformPrice, "skuCode" | "skuName" | "platform" | "rrp" | "markdownPrice" | "isEol">>
+  ) {
+    const imported = await importSkuPlatformPrices(brandId, rows, profile?.id);
+    setSkuPlatformPrices((prev) => [...prev.filter((p) => p.brandId !== brandId), ...imported]);
+  }
+
+  async function handleDeleteSkuPlatformPrice(id: string) {
+    await deleteSkuPlatformPrice(id);
+    setSkuPlatformPrices((prev) => prev.filter((p) => p.id !== id));
+  }
+
   // LocalStorage sync effects
   useEffect(() => saveStorage("activeTab", activeTab), [activeTab]);
 
@@ -1086,7 +1129,8 @@ export default function App() {
         phaseB4Error && { key: "phaseB4", message: phaseB4Error },
         phaseB5Error && { key: "phaseB5", message: phaseB5Error },
         phaseC1Error && { key: "phaseC1", message: phaseC1Error },
-        phaseC3Error && { key: "phaseC3", message: phaseC3Error }
+        phaseC3Error && { key: "phaseC3", message: phaseC3Error },
+        phaseC4Error && { key: "phaseC4", message: phaseC4Error }
       ].filter((e): e is { key: string; message: string } => Boolean(e)),
     [
       phase1Error,
@@ -1106,7 +1150,8 @@ export default function App() {
       phaseB4Error,
       phaseB5Error,
       phaseC1Error,
-      phaseC3Error
+      phaseC3Error,
+      phaseC4Error
     ]
   );
   const dataLoadErrorSignature = dataLoadErrors.map((e) => e.key + ":" + e.message).join("|");
@@ -1868,6 +1913,7 @@ export default function App() {
         { id: "brand_sessions", label: "Sessions", icon: Radio, perm: undefined },
         { id: "brand_rates", label: "Rate Card", icon: Tag, perm: undefined },
         { id: "brand_skus", label: "SKU Showcase", icon: Package, badge: "NEW", perm: undefined },
+        { id: "brand_price_list", label: "Price List Import", icon: FileSpreadsheet, badge: "NEW", perm: undefined },
         { id: "brand_vouchers", label: "Voucher Đồng Tài Trợ", icon: Ticket, badge: "NEW", perm: undefined },
         { id: "brand_audience_analytics", label: "Hiệu Suất Xem & Chuyển Đổi", icon: BarChart3, badge: "NEW", perm: undefined },
         { id: "brand_invoices", label: "Hoá Đơn & Công Nợ", icon: Receipt, perm: undefined },
@@ -2309,6 +2355,16 @@ export default function App() {
                     onAddSku={handleAddBrandSku}
                     onUpdateSku={handleUpdateBrandSku}
                     onDeleteSku={handleDeleteBrandSku}
+                  />
+                )}
+
+                {activeTab === "brand_price_list" && effectiveWorkspace.type === "brand" && (
+                  <PriceListImport
+                    brandId={currentBrandId!}
+                    currentRole={currentRole}
+                    prices={skuPlatformPrices}
+                    onImport={(rows) => handleImportSkuPlatformPrices(currentBrandId!, rows)}
+                    onDeleteRow={handleDeleteSkuPlatformPrice}
                   />
                 )}
 
