@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, StrategicDirective, WorkflowRule, Talent, Studio, Equipment, Brand, AgencyProject, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, Campaign, CampaignRevisionNote, TalentRateHistoryEntry, BrandPlatformRateHistoryEntry, BrandInvoice, BrandSku, ProductSample, LiveStreamIncident, LibraryScript, CoFundedVoucher, OnboardingChecklistTemplateItem, BrandOnboardingChecklistItem } from "./types";
+import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, StrategicDirective, WorkflowRule, Talent, Studio, Equipment, Brand, AgencyProject, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, Campaign, CampaignRevisionNote, TalentRateHistoryEntry, BrandPlatformRateHistoryEntry, BrandInvoice, BrandSku, ProductSample, LiveStreamIncident, LibraryScript, CoFundedVoucher, OnboardingChecklistTemplateItem, BrandOnboardingChecklistItem, PromoScheme } from "./types";
 import { ALL_PERMISSION_DEFINITIONS } from "./data/mockData";
 import { fetchTalents, createTalent, updateTalent, deleteTalent } from "./lib/db/talents";
 import { fetchStudios, createStudio, updateStudio, deleteStudio } from "./lib/db/studios";
@@ -64,6 +64,7 @@ import {
   updateBrandOnboardingChecklistItem,
   deleteBrandOnboardingChecklistItem
 } from "./lib/db/onboardingChecklist";
+import { fetchPromoSchemes, createPromoScheme, updatePromoScheme, deletePromoScheme } from "./lib/db/promoSchemes";
 import {
   LayoutDashboard,
   Radio,
@@ -273,6 +274,11 @@ export default function App() {
   const [brandOnboardingChecklists, setBrandOnboardingChecklists] = useState<BrandOnboardingChecklistItem[]>([]);
   const [phaseC1Loading, setPhaseC1Loading] = useState(true);
   const [phaseC1Error, setPhaseC1Error] = useState<string | null>(null);
+
+  // Giai đoạn C3 — Scheme khuyến mãi tích hợp Calendar. Áp dụng theo khoảng ngày, agency-wide.
+  const [promoSchemes, setPromoSchemes] = useState<PromoScheme[]>([]);
+  const [phaseC3Loading, setPhaseC3Loading] = useState(true);
+  const [phaseC3Error, setPhaseC3Error] = useState<string | null>(null);
 
   // Previously these fetch errors were only stored in state and never rendered anywhere — a
   // failed fetch left a tab silently empty forever with no indication anything went wrong.
@@ -665,6 +671,28 @@ export default function App() {
   }, [session?.user?.id]);
 
   useEffect(() => {
+    if (!session) return;
+    let cancelled = false;
+    setPhaseC3Loading(true);
+    fetchPromoSchemes()
+      .then((schemes) => {
+        if (cancelled) return;
+        setPromoSchemes(schemes);
+        setPhaseC3Error(null);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setPhaseC3Error(err.message ?? "Không tải được Scheme khuyến mãi từ Supabase.");
+      })
+      .finally(() => {
+        if (!cancelled) setPhaseC3Loading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user?.id]);
+
+  useEffect(() => {
     if (!session || currentRole !== "admin") {
       setAiAgentPromptsLoading(false);
       return;
@@ -945,6 +973,24 @@ export default function App() {
     setBrandOnboardingChecklists((prev) => prev.filter((c) => c.id !== id));
   }
 
+  async function handleAddPromoScheme(scheme: { title: string; description: string; startDate: string; endDate: string }) {
+    const created = await createPromoScheme({ ...scheme, createdBy: profile?.id });
+    setPromoSchemes((prev) => [...prev, created]);
+  }
+
+  async function handleUpdatePromoScheme(
+    id: string,
+    patch: Partial<Pick<PromoScheme, "title" | "description" | "startDate" | "endDate">>
+  ) {
+    const updated = await updatePromoScheme(id, patch);
+    setPromoSchemes((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+  }
+
+  async function handleDeletePromoScheme(id: string) {
+    await deletePromoScheme(id);
+    setPromoSchemes((prev) => prev.filter((s) => s.id !== id));
+  }
+
   // LocalStorage sync effects
   useEffect(() => saveStorage("activeTab", activeTab), [activeTab]);
 
@@ -1039,7 +1085,8 @@ export default function App() {
         phaseB3Error && { key: "phaseB3", message: phaseB3Error },
         phaseB4Error && { key: "phaseB4", message: phaseB4Error },
         phaseB5Error && { key: "phaseB5", message: phaseB5Error },
-        phaseC1Error && { key: "phaseC1", message: phaseC1Error }
+        phaseC1Error && { key: "phaseC1", message: phaseC1Error },
+        phaseC3Error && { key: "phaseC3", message: phaseC3Error }
       ].filter((e): e is { key: string; message: string } => Boolean(e)),
     [
       phase1Error,
@@ -1058,7 +1105,8 @@ export default function App() {
       phaseB3Error,
       phaseB4Error,
       phaseB5Error,
-      phaseC1Error
+      phaseC1Error,
+      phaseC3Error
     ]
   );
   const dataLoadErrorSignature = dataLoadErrors.map((e) => e.key + ":" + e.message).join("|");
@@ -2150,6 +2198,11 @@ export default function App() {
                     campaigns={campaigns}
                     onAddSession={handleAddSession}
                     onUpdateSession={handleUpdateSession}
+                    currentRole={currentRole}
+                    schemes={promoSchemes}
+                    onAddScheme={handleAddPromoScheme}
+                    onUpdateScheme={handleUpdatePromoScheme}
+                    onDeleteScheme={handleDeletePromoScheme}
                   />
                 )}
 
@@ -2207,6 +2260,7 @@ export default function App() {
                     studios={activeStudios}
                     talents={activeTalents}
                     campaigns={campaigns}
+                    schemes={promoSchemes}
                   />
                 )}
 

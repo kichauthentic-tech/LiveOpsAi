@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { LiveSession, Studio, Talent, Brand, SystemUser, Campaign } from "../types";
+import { LiveSession, Studio, Talent, Brand, SystemUser, Campaign, PromoScheme, UserRole } from "../types";
+import { schemesForDate } from "../lib/schemeUtils";
+import { SchemeManager } from "./SchemeManager";
 import {
   Calendar as CalendarIcon,
   Clock,
@@ -42,6 +44,11 @@ interface LiveCalendarProps {
   campaigns?: Campaign[];
   onAddSession?: (newSession: LiveSession) => Promise<boolean>;
   onUpdateSession?: (updatedSession: LiveSession) => Promise<boolean>;
+  currentRole?: UserRole;
+  schemes?: PromoScheme[];
+  onAddScheme?: (scheme: { title: string; description: string; startDate: string; endDate: string }) => Promise<void>;
+  onUpdateScheme?: (id: string, patch: Partial<Pick<PromoScheme, "title" | "description" | "startDate" | "endDate">>) => Promise<void>;
+  onDeleteScheme?: (id: string) => Promise<void>;
 }
 
 // Ngày hôm nay theo giờ local, format YYYY-MM-DD
@@ -70,8 +77,15 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   users,
   campaigns = [],
   onAddSession,
-  onUpdateSession
+  onUpdateSession,
+  currentRole,
+  schemes = [],
+  onAddScheme,
+  onUpdateScheme,
+  onDeleteScheme
 }) => {
+  const canEditSchemes = currentRole === "ceo" || currentRole === "admin" || currentRole === "operations";
+  const [showSchemeManager, setShowSchemeManager] = useState(false);
   const moderators = users.filter((u) => u.role === "moderator");
   // Sync sessions with propSessions so clean test mode is respected
   const [sessions, setSessions] = useState<LiveSession[]>(propSessions);
@@ -803,6 +817,32 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
         </select>
       </div>
 
+      {/* SCHEME KHUYẾN MÃI (Giai đoạn C3) */}
+      {canEditSchemes && (
+        <div className="flex items-center justify-end">
+          <button
+            onClick={() => setShowSchemeManager((v) => !v)}
+            className="text-xs font-bold text-amber-400 hover:text-amber-300 transition-colors flex items-center gap-1"
+          >
+            <Tag className="w-3.5 h-3.5" /> {showSchemeManager ? "Ẩn Scheme khuyến mãi" : `Quản lý Scheme khuyến mãi (${schemes.length})`}
+          </button>
+        </div>
+      )}
+      {canEditSchemes && showSchemeManager && (
+        <SchemeManager
+          schemes={schemes}
+          onAdd={async (s) => {
+            if (onAddScheme) await onAddScheme(s);
+          }}
+          onUpdate={async (id, patch) => {
+            if (onUpdateScheme) await onUpdateScheme(id, patch);
+          }}
+          onDelete={async (id) => {
+            if (onDeleteScheme) await onDeleteScheme(id);
+          }}
+        />
+      )}
+
       {/* DRAG & DROP HELPER BANNER */}
       {draggedSessionId ? (
         <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white px-4 py-3 rounded-2xl shadow-xl border border-blue-400/50 flex items-center justify-between animate-pulse">
@@ -883,6 +923,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
 
               const monthCellKey = `month_${cell.dateStr}`;
               const isMonthHovered = dragOverCellKey === monthCellKey;
+              const daySchemes = schemesForDate(schemes, cell.dateStr);
 
               return (
                 <div
@@ -916,11 +957,21 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                     >
                       {cell.dayNum}
                     </span>
-                    {daySessions.length > 0 && (
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${hasLiveNow ? "bg-rose-600 text-white animate-pulse" : "bg-blue-600/20 text-blue-400 border border-blue-500/30"}`}>
-                        {daySessions.length} phiên
-                      </span>
-                    )}
+                    <div className="flex items-center gap-1">
+                      {daySchemes.length > 0 && (
+                        <span
+                          title={daySchemes.map((s) => `${s.title}${s.description ? ` — ${s.description}` : ""}`).join("\n")}
+                          className="text-[10px] leading-none"
+                        >
+                          🏷️
+                        </span>
+                      )}
+                      {daySessions.length > 0 && (
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${hasLiveNow ? "bg-rose-600 text-white animate-pulse" : "bg-blue-600/20 text-blue-400 border border-blue-500/30"}`}>
+                          {daySessions.length} phiên
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Session badges in cell */}
@@ -989,6 +1040,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
 
               const weekCellKey = `week_${wDay.dateStr}`;
               const isWeekHovered = dragOverCellKey === weekCellKey;
+              const daySchemes = schemesForDate(schemes, wDay.dateStr);
 
               return (
                 <div
@@ -1009,7 +1061,14 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                     className="flex justify-between items-center border-b border-slate-800/80 pb-2 cursor-pointer"
                   >
                     <div>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase block">{wDay.dayName}</span>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1">
+                        {wDay.dayName}
+                        {daySchemes.length > 0 && (
+                          <span title={daySchemes.map((s) => `${s.title}${s.description ? ` — ${s.description}` : ""}`).join("\n")}>
+                            🏷️
+                          </span>
+                        )}
+                      </span>
                       <strong className={`text-sm font-mono font-bold ${isToday ? "text-blue-400" : "text-white"}`}>
                         {wDay.dayNum}/{parseDateString(wDay.dateStr).month}
                       </strong>

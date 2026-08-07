@@ -573,3 +573,14 @@ export interface BrandOnboardingChecklistItem {
   createdAt?: string;
 }
 
+// Giai đoạn C3 — Scheme (khuyến mãi/khung giờ vàng) tích hợp vào Lịch Vận Hành. Áp dụng
+// theo khoảng ngày, không gắn session/brand cụ thể — hiển thị badge trên ô ngày Calendar.
+export interface PromoScheme {
+  id: string;
+  title: string;
+  description: string;
+  startDate: string;
+  endDate: string;
+  createdAt?: string;
+}
+

@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from "react";
-import { Campaign, LiveSession, Studio, Talent } from "../../types";
+import { Campaign, LiveSession, PromoScheme, Studio, Talent } from "../../types";
 import { CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
+import { schemesForDate } from "../../lib/schemeUtils";
 
 interface BrandCalendarProps {
   brandId: string;
@@ -9,6 +10,7 @@ interface BrandCalendarProps {
   studios: Studio[];
   talents: Talent[];
   campaigns: Campaign[];
+  schemes?: PromoScheme[];
 }
 
 const WEEKDAY_LABELS = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
@@ -26,7 +28,7 @@ const shiftMonth = (month: string, delta: number) => {
   return `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, "0")}`;
 };
 
-export const BrandCalendar: React.FC<BrandCalendarProps> = ({ brandId, sessions, studios, talents, campaigns }) => {
+export const BrandCalendar: React.FC<BrandCalendarProps> = ({ brandId, sessions, studios, talents, campaigns, schemes = [] }) => {
   const today = new Date();
   const [month, setMonth] = useState(`${today.getFullYear()}-${`${today.getMonth() + 1}`.padStart(2, "0")}`);
 
@@ -111,9 +113,20 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({ brandId, sessions,
             if (day === null) return <div key={`b-${idx}`} className="min-h-[84px]" />;
             const dateStr = `${month}-${`${day}`.padStart(2, "0")}`;
             const daySessions = sessionsByDate.get(dateStr) ?? [];
+            const daySchemes = schemesForDate(schemes, dateStr);
             return (
               <div key={dateStr} className="min-h-[84px] bg-slate-950/80 border border-slate-800 rounded-lg p-1.5 space-y-1">
-                <span className="text-[10px] text-slate-500 font-mono">{day}</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] text-slate-500 font-mono">{day}</span>
+                  {daySchemes.length > 0 && (
+                    <span
+                      title={daySchemes.map((s) => `${s.title}${s.description ? ` — ${s.description}` : ""}`).join("\n")}
+                      className="text-[9px] leading-none"
+                    >
+                      🏷️
+                    </span>
+                  )}
+                </div>
                 {daySessions.slice(0, 3).map((s) => (
                   <div
                     key={s.id}
