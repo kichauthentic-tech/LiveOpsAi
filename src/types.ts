@@ -549,3 +549,27 @@ export interface StrategicDirective {
   isCustom?: boolean;
 }
 
+// Giai đoạn C1 — Onboarding Checklist theo Brand. Template dùng chung (agency-wide,
+// sửa hiếm khi) copy ra instance riêng cho từng brand lúc onboard.
+export interface OnboardingChecklistTemplateItem {
+  id: string;
+  title: string;
+  description: string;
+  orderIndex: number;
+  isActive: boolean;
+  createdAt?: string;
+}
+
+export interface BrandOnboardingChecklistItem {
+  id: string;
+  brandId: string;
+  title: string;
+  description: string;
+  assignee: string;
+  deadline?: string;
+  status: "pending" | "in_progress" | "completed";
+  orderIndex: number;
+  sourceTemplateItemId?: string;
+  createdAt?: string;
+}
+
