@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, WorkflowRule, Talent, Studio, Equipment, Brand, AgencyProject, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, Campaign, CampaignRevisionNote, TalentRateHistoryEntry, BrandPlatformRateHistoryEntry, BrandInvoice, BrandSku, CoFundedVoucher, OnboardingChecklistTemplateItem, BrandOnboardingChecklistItem, PromoScheme, SkuPlatformPrice } from "./types";
+import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, WorkflowRule, Talent, Studio, Equipment, Brand, AgencyProject, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, Campaign, CampaignRevisionNote, TalentRateHistoryEntry, BrandPlatformRateHistoryEntry, BrandInvoice, BrandSku, CoFundedVoucher, PromoScheme, SkuPlatformPrice } from "./types";
 import { ALL_PERMISSION_DEFINITIONS } from "./data/mockData";
 import { fetchTalents, createTalent, updateTalent, deleteTalent } from "./lib/db/talents";
 import { fetchStudios, createStudio, updateStudio, deleteStudio } from "./lib/db/studios";
@@ -44,17 +44,6 @@ import {
   sendVoucherForApproval,
   respondToVoucherApproval
 } from "./lib/db/coFundedVouchers";
-import {
-  fetchOnboardingChecklistTemplates,
-  createOnboardingChecklistTemplateItem,
-  updateOnboardingChecklistTemplateItem,
-  deleteOnboardingChecklistTemplateItem,
-  fetchBrandOnboardingChecklists,
-  createBrandOnboardingChecklistItem,
-  instantiateBrandOnboardingChecklist,
-  updateBrandOnboardingChecklistItem,
-  deleteBrandOnboardingChecklistItem
-} from "./lib/db/onboardingChecklist";
 import { fetchPromoSchemes, createPromoScheme, updatePromoScheme, deletePromoScheme } from "./lib/db/promoSchemes";
 import { fetchSkuPlatformPrices, importSkuPlatformPrices, deleteSkuPlatformPrice } from "./lib/db/skuPlatformPrices";
 import {
@@ -99,7 +88,6 @@ import { BrandSkuShowcase } from "./components/brand-workspace/BrandSkuShowcase"
 import { PriceListImport } from "./components/brand-workspace/PriceListImport";
 import { BrandVoucherRequests } from "./components/brand-workspace/BrandVoucherRequests";
 import { BrandAudienceAnalytics } from "./components/brand-workspace/BrandAudienceAnalytics";
-import { OnboardingChecklist } from "./components/OnboardingChecklist";
 import { BrandReviewHistory } from "./components/brand-workspace/BrandReviewHistory";
 import { Login } from "./components/Login";
 import { ResetPasswordScreen } from "./components/ResetPasswordScreen";
@@ -243,13 +231,6 @@ export default function App() {
   const [coFundedVouchers, setCoFundedVouchers] = useState<CoFundedVoucher[]>([]);
   const [phaseB5Loading, setPhaseB5Loading] = useState(true);
   const [phaseB5Error, setPhaseB5Error] = useState<string | null>(null);
-
-  // Giai đoạn C1 — Onboarding Checklist theo Brand. Template dùng chung (agency-wide) +
-  // instance riêng theo brand, cùng pattern fetch 1 lần ở agency-level như các module B+.
-  const [onboardingChecklistTemplates, setOnboardingChecklistTemplates] = useState<OnboardingChecklistTemplateItem[]>([]);
-  const [brandOnboardingChecklists, setBrandOnboardingChecklists] = useState<BrandOnboardingChecklistItem[]>([]);
-  const [phaseC1Loading, setPhaseC1Loading] = useState(true);
-  const [phaseC1Error, setPhaseC1Error] = useState<string | null>(null);
 
   // Giai đoạn C3 — Scheme khuyến mãi tích hợp Calendar. Áp dụng theo khoảng ngày, agency-wide.
   const [promoSchemes, setPromoSchemes] = useState<PromoScheme[]>([]);
@@ -564,29 +545,6 @@ export default function App() {
   useEffect(() => {
     if (!session) return;
     let cancelled = false;
-    setPhaseC1Loading(true);
-    Promise.all([fetchOnboardingChecklistTemplates(), fetchBrandOnboardingChecklists()])
-      .then(([templates, checklists]) => {
-        if (cancelled) return;
-        setOnboardingChecklistTemplates(templates);
-        setBrandOnboardingChecklists(checklists);
-        setPhaseC1Error(null);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setPhaseC1Error(err.message ?? "Không tải được Onboarding Checklist từ Supabase.");
-      })
-      .finally(() => {
-        if (!cancelled) setPhaseC1Loading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [session?.user?.id]);
-
-  useEffect(() => {
-    if (!session) return;
-    let cancelled = false;
     setPhaseC3Loading(true);
     fetchPromoSchemes()
       .then((schemes) => {
@@ -804,52 +762,6 @@ export default function App() {
     }
   };
 
-  async function handleAddOnboardingTemplateItem(item: { title: string; description: string }) {
-    const created = await createOnboardingChecklistTemplateItem({
-      ...item,
-      orderIndex: onboardingChecklistTemplates.length,
-      createdBy: profile?.id
-    });
-    setOnboardingChecklistTemplates((prev) => [...prev, created]);
-  }
-
-  async function handleUpdateOnboardingTemplateItem(
-    id: string,
-    patch: Partial<Pick<OnboardingChecklistTemplateItem, "title" | "description" | "isActive">>
-  ) {
-    const updated = await updateOnboardingChecklistTemplateItem(id, patch);
-    setOnboardingChecklistTemplates((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
-  }
-
-  async function handleDeleteOnboardingTemplateItem(id: string) {
-    await deleteOnboardingChecklistTemplateItem(id);
-    setOnboardingChecklistTemplates((prev) => prev.filter((t) => t.id !== id));
-  }
-
-  async function handleInstantiateBrandChecklist(brandId: string) {
-    const created = await instantiateBrandOnboardingChecklist(brandId, onboardingChecklistTemplates, profile?.id);
-    setBrandOnboardingChecklists((prev) => [...prev, ...created]);
-  }
-
-  async function handleAddBrandChecklistItem(item: { brandId: string; title: string; description: string }) {
-    const orderIndex = brandOnboardingChecklists.filter((c) => c.brandId === item.brandId).length;
-    const created = await createBrandOnboardingChecklistItem({ ...item, orderIndex, createdBy: profile?.id });
-    setBrandOnboardingChecklists((prev) => [...prev, created]);
-  }
-
-  async function handleUpdateBrandChecklistItem(
-    id: string,
-    patch: Partial<Pick<BrandOnboardingChecklistItem, "title" | "description" | "assignee" | "deadline" | "status">>
-  ) {
-    const updated = await updateBrandOnboardingChecklistItem(id, patch);
-    setBrandOnboardingChecklists((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
-  }
-
-  async function handleDeleteBrandChecklistItem(id: string) {
-    await deleteBrandOnboardingChecklistItem(id);
-    setBrandOnboardingChecklists((prev) => prev.filter((c) => c.id !== id));
-  }
-
   async function handleAddPromoScheme(scheme: { title: string; description: string; startDate: string; endDate: string }) {
     const created = await createPromoScheme({ ...scheme, createdBy: profile?.id });
     setPromoSchemes((prev) => [...prev, created]);
@@ -971,7 +883,6 @@ export default function App() {
         phase20Error && { key: "phase20", message: phase20Error },
         phaseB1Error && { key: "phaseB1", message: phaseB1Error },
         phaseB5Error && { key: "phaseB5", message: phaseB5Error },
-        phaseC1Error && { key: "phaseC1", message: phaseC1Error },
         phaseC3Error && { key: "phaseC3", message: phaseC3Error },
         phaseC4Error && { key: "phaseC4", message: phaseC4Error }
       ].filter((e): e is { key: string; message: string } => Boolean(e)),
@@ -989,7 +900,6 @@ export default function App() {
       phase20Error,
       phaseB1Error,
       phaseB5Error,
-      phaseC1Error,
       phaseC3Error,
       phaseC4Error
     ]
@@ -1667,9 +1577,6 @@ export default function App() {
       label: "Kinh Doanh",
       items: [
         { id: "crm", label: "CRM & Projects", icon: Briefcase, perm: "manage_crm_projects" as PermissionKey },
-        // Dùng lại perm "manage_crm_projects" — Onboarding Checklist gắn liền với quan hệ
-        // Brand mới (CRM & Projects), không tạo PermissionKey riêng (đúng nguyên tắc mục 5).
-        { id: "onboarding_checklist", label: "Onboarding Checklist", icon: ClipboardCheck, badge: "NEW", perm: "manage_crm_projects" as PermissionKey },
         { id: "tiktok_api", label: "TikTok API", icon: Link2, perm: "manage_tiktok_api" as PermissionKey },
       ],
     },
@@ -2207,22 +2114,6 @@ export default function App() {
                     onAddProject={handleAddProject}
                     onUpdateProject={handleUpdateProject}
                     onDeleteProject={handleDeleteProject}
-                  />
-                )}
-
-                {activeTab === "onboarding_checklist" && (
-                  <OnboardingChecklist
-                    currentRole={currentRole}
-                    brands={activeBrands}
-                    templateItems={onboardingChecklistTemplates}
-                    brandChecklists={brandOnboardingChecklists}
-                    onAddTemplateItem={handleAddOnboardingTemplateItem}
-                    onUpdateTemplateItem={handleUpdateOnboardingTemplateItem}
-                    onDeleteTemplateItem={handleDeleteOnboardingTemplateItem}
-                    onInstantiateChecklist={handleInstantiateBrandChecklist}
-                    onAddChecklistItem={handleAddBrandChecklistItem}
-                    onUpdateChecklistItem={handleUpdateBrandChecklistItem}
-                    onDeleteChecklistItem={handleDeleteBrandChecklistItem}
                   />
                 )}
 
