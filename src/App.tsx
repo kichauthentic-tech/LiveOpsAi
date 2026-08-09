@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, WorkflowRule, Talent, Studio, Equipment, Brand, AgencyProject, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, Campaign, CampaignRevisionNote, TalentRateHistoryEntry, BrandPlatformRateHistoryEntry, BrandInvoice, BrandSku, ProductSample, LiveStreamIncident, LibraryScript, CoFundedVoucher, OnboardingChecklistTemplateItem, BrandOnboardingChecklistItem, PromoScheme, SkuPlatformPrice } from "./types";
+import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, WorkflowRule, Talent, Studio, Equipment, Brand, AgencyProject, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, Campaign, CampaignRevisionNote, TalentRateHistoryEntry, BrandPlatformRateHistoryEntry, BrandInvoice, BrandSku, CoFundedVoucher, OnboardingChecklistTemplateItem, BrandOnboardingChecklistItem, PromoScheme, SkuPlatformPrice } from "./types";
 import { ALL_PERMISSION_DEFINITIONS } from "./data/mockData";
 import { fetchTalents, createTalent, updateTalent, deleteTalent } from "./lib/db/talents";
 import { fetchStudios, createStudio, updateStudio, deleteStudio } from "./lib/db/studios";
@@ -37,14 +37,6 @@ import { fetchTalentRateHistory } from "./lib/db/talentRateHistory";
 import { fetchBrandPlatformRateHistory } from "./lib/db/brandPlatformRateHistory";
 import { fetchBrandInvoices, createBrandInvoice, updateBrandInvoice, deleteBrandInvoice } from "./lib/db/brandInvoices";
 import { fetchBrandSkus, createBrandSku, updateBrandSku, deleteBrandSku } from "./lib/db/brandSkus";
-import { fetchProductSamples, createProductSample, updateProductSample, deleteProductSample } from "./lib/db/productSamples";
-import {
-  fetchLiveStreamIncidents,
-  createLiveStreamIncident,
-  updateLiveStreamIncident,
-  deleteLiveStreamIncident
-} from "./lib/db/liveStreamIncidents";
-import { fetchScriptLibrary, createLibraryScript, updateLibraryScript, deleteLibraryScript } from "./lib/db/scriptLibrary";
 import {
   fetchCoFundedVouchers,
   createCoFundedVoucher,
@@ -92,9 +84,6 @@ import {
   ClipboardCheck,
   Target,
   Package,
-  Boxes,
-  AlertTriangle,
-  BookOpen,
   Ticket,
   BarChart3,
   FileSpreadsheet
@@ -110,9 +99,6 @@ import { BrandSkuShowcase } from "./components/brand-workspace/BrandSkuShowcase"
 import { PriceListImport } from "./components/brand-workspace/PriceListImport";
 import { BrandVoucherRequests } from "./components/brand-workspace/BrandVoucherRequests";
 import { BrandAudienceAnalytics } from "./components/brand-workspace/BrandAudienceAnalytics";
-import { ProductSampleInventory } from "./components/ProductSampleInventory";
-import { LiveStreamIncidentLog } from "./components/LiveStreamIncidentLog";
-import { ScriptLibrary } from "./components/ScriptLibrary";
 import { OnboardingChecklist } from "./components/OnboardingChecklist";
 import { BrandReviewHistory } from "./components/brand-workspace/BrandReviewHistory";
 import { Login } from "./components/Login";
@@ -254,15 +240,6 @@ export default function App() {
   const [brandSkus, setBrandSkus] = useState<BrandSku[]>([]);
   const [phaseB1Loading, setPhaseB1Loading] = useState(true);
   const [phaseB1Error, setPhaseB1Error] = useState<string | null>(null);
-  const [productSamples, setProductSamples] = useState<ProductSample[]>([]);
-  const [phaseB2Loading, setPhaseB2Loading] = useState(true);
-  const [phaseB2Error, setPhaseB2Error] = useState<string | null>(null);
-  const [liveStreamIncidents, setLiveStreamIncidents] = useState<LiveStreamIncident[]>([]);
-  const [phaseB3Loading, setPhaseB3Loading] = useState(true);
-  const [phaseB3Error, setPhaseB3Error] = useState<string | null>(null);
-  const [scriptLibrary, setScriptLibrary] = useState<LibraryScript[]>([]);
-  const [phaseB4Loading, setPhaseB4Loading] = useState(true);
-  const [phaseB4Error, setPhaseB4Error] = useState<string | null>(null);
   const [coFundedVouchers, setCoFundedVouchers] = useState<CoFundedVoucher[]>([]);
   const [phaseB5Loading, setPhaseB5Loading] = useState(true);
   const [phaseB5Error, setPhaseB5Error] = useState<string | null>(null);
@@ -565,72 +542,6 @@ export default function App() {
   useEffect(() => {
     if (!session) return;
     let cancelled = false;
-    setPhaseB2Loading(true);
-    fetchProductSamples()
-      .then((samples) => {
-        if (cancelled) return;
-        setProductSamples(samples);
-        setPhaseB2Error(null);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setPhaseB2Error(err.message ?? "Không tải được Product Sample Inventory từ Supabase.");
-      })
-      .finally(() => {
-        if (!cancelled) setPhaseB2Loading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [session?.user?.id]);
-
-  useEffect(() => {
-    if (!session) return;
-    let cancelled = false;
-    setPhaseB3Loading(true);
-    fetchLiveStreamIncidents()
-      .then((incidents) => {
-        if (cancelled) return;
-        setLiveStreamIncidents(incidents);
-        setPhaseB3Error(null);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setPhaseB3Error(err.message ?? "Không tải được Live Stream Incident Log từ Supabase.");
-      })
-      .finally(() => {
-        if (!cancelled) setPhaseB3Loading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [session?.user?.id]);
-
-  useEffect(() => {
-    if (!session) return;
-    let cancelled = false;
-    setPhaseB4Loading(true);
-    fetchScriptLibrary()
-      .then((scripts) => {
-        if (cancelled) return;
-        setScriptLibrary(scripts);
-        setPhaseB4Error(null);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setPhaseB4Error(err.message ?? "Không tải được Script Library từ Supabase.");
-      })
-      .finally(() => {
-        if (!cancelled) setPhaseB4Loading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [session?.user?.id]);
-
-  useEffect(() => {
-    if (!session) return;
-    let cancelled = false;
     setPhaseB5Loading(true);
     fetchCoFundedVouchers()
       .then((vouchers) => {
@@ -831,65 +742,6 @@ export default function App() {
   async function handleDeleteBrandSku(id: string) {
     await deleteBrandSku(id);
     setBrandSkus((prev) => prev.filter((s) => s.id !== id));
-  }
-
-  async function handleAddProductSample(sample: { brandId: string; studioId?: string; productName: string; sampleCode: string; quantity: number }) {
-    const created = await createProductSample({ ...sample, createdBy: profile?.id });
-    setProductSamples((prev) => [created, ...prev]);
-  }
-
-  async function handleUpdateProductSample(
-    id: string,
-    patch: Partial<Pick<ProductSample, "studioId" | "productName" | "sampleCode" | "quantity" | "status" | "locationNote" | "notes">>
-  ) {
-    const updated = await updateProductSample(id, patch);
-    setProductSamples((prev) => prev.map((s) => (s.id === id ? updated : s)));
-  }
-
-  async function handleDeleteProductSample(id: string) {
-    await deleteProductSample(id);
-    setProductSamples((prev) => prev.filter((s) => s.id !== id));
-  }
-
-  async function handleAddLiveStreamIncident(incident: {
-    sessionId: string;
-    category: LiveStreamIncident["category"];
-    severity: LiveStreamIncident["severity"];
-    description: string;
-  }) {
-    const created = await createLiveStreamIncident({ ...incident, reportedBy: profile?.id });
-    setLiveStreamIncidents((prev) => [created, ...prev]);
-  }
-
-  async function handleUpdateLiveStreamIncident(
-    id: string,
-    patch: Partial<Pick<LiveStreamIncident, "category" | "severity" | "description" | "resolution" | "status">>
-  ) {
-    const updated = await updateLiveStreamIncident(id, patch);
-    setLiveStreamIncidents((prev) => prev.map((i) => (i.id === id ? updated : i)));
-  }
-
-  async function handleDeleteLiveStreamIncident(id: string) {
-    await deleteLiveStreamIncident(id);
-    setLiveStreamIncidents((prev) => prev.filter((i) => i.id !== id));
-  }
-
-  async function handleAddLibraryScript(script: { brandId?: string; title: string; hook: string; content: string; platform: LibraryScript["platform"] }) {
-    const created = await createLibraryScript({ ...script, createdBy: profile?.id });
-    setScriptLibrary((prev) => [created, ...prev]);
-  }
-
-  async function handleUpdateLibraryScript(
-    id: string,
-    patch: Partial<Pick<LibraryScript, "title" | "hook" | "content" | "platform" | "pinnedSkuOrder" | "tags">> & { brandId?: string | null }
-  ) {
-    const updated = await updateLibraryScript(id, patch);
-    setScriptLibrary((prev) => prev.map((s) => (s.id === id ? updated : s)));
-  }
-
-  async function handleDeleteLibraryScript(id: string) {
-    await deleteLibraryScript(id);
-    setScriptLibrary((prev) => prev.filter((s) => s.id !== id));
   }
 
   // Giai đoạn B5 — Co-Funded Voucher Request Center (Brand Workspace).
@@ -1118,9 +970,6 @@ export default function App() {
         phase19Error && { key: "phase19", message: phase19Error },
         phase20Error && { key: "phase20", message: phase20Error },
         phaseB1Error && { key: "phaseB1", message: phaseB1Error },
-        phaseB2Error && { key: "phaseB2", message: phaseB2Error },
-        phaseB3Error && { key: "phaseB3", message: phaseB3Error },
-        phaseB4Error && { key: "phaseB4", message: phaseB4Error },
         phaseB5Error && { key: "phaseB5", message: phaseB5Error },
         phaseC1Error && { key: "phaseC1", message: phaseC1Error },
         phaseC3Error && { key: "phaseC3", message: phaseC3Error },
@@ -1139,9 +988,6 @@ export default function App() {
       phase19Error,
       phase20Error,
       phaseB1Error,
-      phaseB2Error,
-      phaseB3Error,
-      phaseB4Error,
       phaseB5Error,
       phaseC1Error,
       phaseC3Error,
@@ -1818,19 +1664,6 @@ export default function App() {
       ],
     },
     {
-      label: "Content & Quality",
-      items: [
-        // Dùng lại perm "manage_studios_gear" — Product Sample Inventory liên kết chặt tới
-        // Studio (đúng nguyên tắc đã chốt ở WORKSPACE_DESIGN.md#5, tránh phình PermissionKey).
-        { id: "product_samples", label: "Hàng Mẫu (Product Sample)", icon: Boxes, badge: "NEW", perm: "manage_studios_gear" as PermissionKey },
-        // Dùng lại perm "manage_sessions" — Incident Log liên kết chặt tới Live Session.
-        { id: "live_incidents", label: "Nhật Ký Sự Cố Live", icon: AlertTriangle, badge: "NEW", perm: "manage_sessions" as PermissionKey },
-        // Dùng lại perm "generate_scripts" — cùng nhóm quyền với AI Script Gen, và role talent
-        // (default generate_scripts=true) cần thấy tab này để đọc teleprompter khi live.
-        { id: "script_library", label: "Thư Viện Kịch Bản", icon: BookOpen, badge: "NEW", perm: "generate_scripts" as PermissionKey },
-      ],
-    },
-    {
       label: "Kinh Doanh",
       items: [
         { id: "crm", label: "CRM & Projects", icon: Briefcase, perm: "manage_crm_projects" as PermissionKey },
@@ -2360,40 +2193,6 @@ export default function App() {
                     onAddEquipment={handleAddEquipment}
                     onUpdateEquipment={handleUpdateEquipment}
                     onDeleteEquipment={handleDeleteEquipment}
-                  />
-                )}
-
-                {activeTab === "product_samples" && (
-                  <ProductSampleInventory
-                    currentRole={currentRole}
-                    brands={activeBrands}
-                    studios={activeStudios}
-                    productSamples={productSamples}
-                    onAddSample={handleAddProductSample}
-                    onUpdateSample={handleUpdateProductSample}
-                    onDeleteSample={handleDeleteProductSample}
-                  />
-                )}
-
-                {activeTab === "live_incidents" && (
-                  <LiveStreamIncidentLog
-                    currentRole={currentRole}
-                    sessions={activeSessions}
-                    incidents={liveStreamIncidents}
-                    onAddIncident={handleAddLiveStreamIncident}
-                    onUpdateIncident={handleUpdateLiveStreamIncident}
-                    onDeleteIncident={handleDeleteLiveStreamIncident}
-                  />
-                )}
-
-                {activeTab === "script_library" && (
-                  <ScriptLibrary
-                    currentRole={currentRole}
-                    brands={activeBrands}
-                    scripts={scriptLibrary}
-                    onAddScript={handleAddLibraryScript}
-                    onUpdateScript={handleUpdateLibraryScript}
-                    onDeleteScript={handleDeleteLibraryScript}
                   />
                 )}
 

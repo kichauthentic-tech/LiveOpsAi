@@ -291,51 +291,6 @@ export interface BrandSku {
   createdBy?: string;
 }
 
-// Giai đoạn B2 — Product Sample Inventory (Agency Workspace, nhóm "Content & Quality", xem
-// WORKSPACE_DESIGN.md#6). Tracking hàng mẫu vật lý brand gửi tới Studio, agency-wide (không thuộc
-// Brand Workspace) — studioId có thể rỗng khi hàng mẫu đang "in_transit", chưa gán tới Studio nào.
-export interface ProductSample {
-  id: string;
-  brandId: string;
-  studioId?: string;
-  productName: string;
-  sampleCode: string;
-  quantity: number;
-  status: "in_transit" | "at_studio" | "returned" | "damaged" | "lost";
-  locationNote: string;
-  notes: string;
-  createdBy?: string;
-}
-
-// Giai đoạn B3 — Live Stream Incident Log (Agency Workspace, nhóm "Content & Quality", xem
-// WORKSPACE_DESIGN.md#6). Nhật ký sự cố khi live, liên kết session_id.
-export interface LiveStreamIncident {
-  id: string;
-  sessionId: string;
-  category: "network_drop" | "cart_locked" | "host_late" | "voucher_exhausted" | "other";
-  severity: "low" | "medium" | "high" | "critical";
-  description: string;
-  resolution: string;
-  status: "open" | "resolved";
-  reportedBy?: string;
-}
-
-// Giai đoạn B4 — Script & Teleprompter Library (Agency Workspace, nhóm "Content & Quality", xem
-// WORKSPACE_DESIGN.md#6). Kho kịch bản đã lưu để tái sử dụng + đọc qua teleprompter khi live —
-// khác ScriptGenerator (sinh kịch bản mới bằng AI, không lưu trữ). Nội dung dạng text/markdown
-// đơn giản, không phải cấu trúc JSON nhiều Part.
-export interface LibraryScript {
-  id: string;
-  brandId?: string;
-  title: string;
-  hook: string;
-  content: string;
-  platform: "TikTok" | "Shopee";
-  pinnedSkuOrder: string;
-  tags: string;
-  createdBy?: string;
-}
-
 // Giai đoạn B5 — Co-Funded Voucher Request Center (Brand Workspace). Luồng
 // duyệt 2 chiều giống Campaign (approvalStatus/sentAt/approvedAt) nhưng
 // brand "duyệt" ở đây tương đương "cấp quyền áp trực tiếp" voucher này.
