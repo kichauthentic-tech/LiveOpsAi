@@ -128,7 +128,7 @@ Giữ nguyên tinh thần các nhóm nav hiện tại, đổi tên nhóm đầu 
 
 | Nhóm | Module | Component hiện tại | Ghi chú |
 |---|---|---|---|
-| Overview | Việc Của Tôi, Command Brief, Dashboard tổng | `MyWorkspace`, `ExecutiveBrief`, `Dashboards` | giữ nguyên |
+| Overview | Dashboard tổng | `Dashboards` | `MyWorkspace`/`ExecutiveBrief` (Việc Của Tôi, Command Brief) đã gỡ bỏ khỏi codebase theo yêu cầu — không còn trong roadmap |
 | Live Ops | Live Sessions (toàn agency), Lịch Vận Hành (toàn agency), Đăng Ký & Chốt Lịch | `LiveSessionHub`, `LiveCalendar`, `ShiftScheduling` | giữ nguyên — đây chính là nơi Ops cần nhìn **xuyên brand** để tránh đụng lịch studio/talent |
 | Resources (dùng chung, KHÔNG thuộc brand nào) | Talent Pool, Studios & Gear, AI Script Gen | `TalentMatcher`, `StudioEquipment`, `ScriptGenerator` | tài nguyên agency sở hữu, brand không có bản riêng |
 | Business | CRM & Projects, TikTok API | `CrmProjects`, `TikTokApiAutomation` | giữ nguyên, agency-level |

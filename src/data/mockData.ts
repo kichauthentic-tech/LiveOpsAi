@@ -8,12 +8,6 @@ export const ALL_PERMISSION_DEFINITIONS: PermissionDefinition[] = [
     description: "Cho phép truy cập số liệu doanh thu agency, lợi nhuận ròng, commission và dòng tiền P&L."
   },
   {
-    key: "view_executive_brief",
-    label: "Xem Command Brief & Chỉ Đạo Ban Giám Đốc",
-    category: "Tổng Quan & Báo Cáo",
-    description: "Quyền xem Dashboard định hướng chiến lược và thông điệp điều hành từ CEO."
-  },
-  {
     key: "manage_sessions",
     label: "Quản Lý Phiên Livestream",
     category: "Vận Hành & Studio",

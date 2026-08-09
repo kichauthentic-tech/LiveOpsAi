@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, StrategicDirective, WorkflowRule, Talent, Studio, Equipment, Brand, AgencyProject, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, Campaign, CampaignRevisionNote, TalentRateHistoryEntry, BrandPlatformRateHistoryEntry, BrandInvoice, BrandSku, ProductSample, LiveStreamIncident, LibraryScript, CoFundedVoucher, OnboardingChecklistTemplateItem, BrandOnboardingChecklistItem, PromoScheme, SkuPlatformPrice } from "./types";
+import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, WorkflowRule, Talent, Studio, Equipment, Brand, AgencyProject, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, Campaign, CampaignRevisionNote, TalentRateHistoryEntry, BrandPlatformRateHistoryEntry, BrandInvoice, BrandSku, ProductSample, LiveStreamIncident, LibraryScript, CoFundedVoucher, OnboardingChecklistTemplateItem, BrandOnboardingChecklistItem, PromoScheme, SkuPlatformPrice } from "./types";
 import { ALL_PERMISSION_DEFINITIONS } from "./data/mockData";
 import { fetchTalents, createTalent, updateTalent, deleteTalent } from "./lib/db/talents";
 import { fetchStudios, createStudio, updateStudio, deleteStudio } from "./lib/db/studios";
@@ -9,7 +9,6 @@ import { fetchBrands, createBrand, updateBrand, deleteBrand } from "./lib/db/bra
 import { fetchProjects, createProject, updateProject, deleteProject } from "./lib/db/projects";
 import { fetchUsers, updateUserProfile, inviteUser, deleteUserAccount, InviteUserPayload } from "./lib/db/users";
 import { fetchWorkflowRules, createWorkflowRule, updateWorkflowRule, deleteWorkflowRule } from "./lib/db/workflowRules";
-import { fetchDirectives, createDirective, updateDirective, deleteDirective } from "./lib/db/directives";
 import { fetchAuditLogs, createAuditLog } from "./lib/db/auditLogs";
 import { fetchRolePermissions, updateRolePermissions } from "./lib/db/rolePermissions";
 import { fetchSessionFinances, upsertSessionFinance, setSessionFinanceApproval } from "./lib/db/finance";
@@ -120,7 +119,6 @@ import { Login } from "./components/Login";
 import { ResetPasswordScreen } from "./components/ResetPasswordScreen";
 import { AccountSettings } from "./components/AccountSettings";
 import { useAuth } from "./hooks/useAuth";
-import { ExecutiveBrief } from "./components/ExecutiveBrief";
 import { Dashboards } from "./components/Dashboards";
 import { LiveSessionHub } from "./components/LiveSessionHub";
 import { LiveCalendar } from "./components/LiveCalendar";
@@ -133,7 +131,6 @@ import { FinanceHr } from "./components/FinanceHr";
 import { AiMultiAgent } from "./components/AiMultiAgent";
 import { UserRoleSettings } from "./components/UserRoleSettings";
 import { AiTrainingCenter } from "./components/AiTrainingCenter";
-import { MyWorkspace } from "./components/MyWorkspace";
 import ShiftScheduling from "./components/ShiftScheduling";
 
 const STORAGE_PREFIX = "liveops_os_v2_";
@@ -159,7 +156,7 @@ export default function App() {
   const { session, profile, loading: authLoading, signOut, passwordRecovery } = useAuth();
 
   const currentRole: UserRole = profile?.role ?? "talent";
-  const [activeTab, setActiveTab] = useState<string>(() => loadStorage("activeTab", "brief"));
+  const [activeTab, setActiveTab] = useState<string>(() => loadStorage("activeTab", "dashboard"));
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Giai đoạn A — Workspace Agency ↔ Brand (xem WORKSPACE_DESIGN.md). Chỉ có ý nghĩa với
@@ -193,9 +190,8 @@ export default function App() {
   const [aiAgentPromptsLoading, setAiAgentPromptsLoading] = useState(true);
   const [aiAgentPromptsError, setAiAgentPromptsError] = useState<string | null>(null);
 
-  // Workflow Rules / Directives / Audit Logs — real data from Supabase (Phase 5), no mock fallback
+  // Workflow Rules / Audit Logs — real data from Supabase (Phase 5), no mock fallback
   const [workflowRules, setWorkflowRules] = useState<WorkflowRule[]>([]);
-  const [directives, setDirectives] = useState<StrategicDirective[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [phase5Loading, setPhase5Loading] = useState(true);
   const [phase5Error, setPhase5Error] = useState<string | null>(null);
@@ -388,17 +384,16 @@ export default function App() {
     if (!session) return;
     let cancelled = false;
     setPhase5Loading(true);
-    Promise.all([fetchWorkflowRules(), fetchDirectives(), fetchAuditLogs()])
-      .then(([w, d, a]) => {
+    Promise.all([fetchWorkflowRules(), fetchAuditLogs()])
+      .then(([w, a]) => {
         if (cancelled) return;
         setWorkflowRules(w);
-        setDirectives(d);
         setAuditLogs(a);
         setPhase5Error(null);
       })
       .catch((err) => {
         if (cancelled) return;
-        setPhase5Error(err.message ?? "Không tải được Workflow Rules/Directives/Audit Logs từ Supabase.");
+        setPhase5Error(err.message ?? "Không tải được Workflow Rules/Audit Logs từ Supabase.");
       })
       .finally(() => {
         if (!cancelled) setPhase5Loading(false);
@@ -1045,9 +1040,8 @@ export default function App() {
   const rawActiveStudios = studios;
   const rawActiveEquipments = equipments;
   const rawActiveProjects = projects;
-  // Workflow Rules/Directives/Audit Logs are real Supabase data now (Phase 5) — no mock filtering applies
+  // Workflow Rules/Audit Logs are real Supabase data now (Phase 5) — no mock filtering applies
   const activeWorkflowRules = workflowRules;
-  const activeDirectives = directives;
   const activeAuditLogs = auditLogs;
   // Users are real Supabase data now (Phase 4) — no mock filtering applies
   const activeUsers = users;
@@ -1789,32 +1783,6 @@ export default function App() {
     }
   };
 
-  // Handlers for Directives — persisted to Supabase
-  const handleAddDirective = async (newDir: StrategicDirective) => {
-    try {
-      const created = await createDirective(newDir);
-      setDirectives(prev => [created, ...prev]);
-    } catch (e: any) {
-      window.alert(`Không thể tạo Chỉ Đạo: ${e.message ?? e}`);
-    }
-  };
-  const handleUpdateDirective = async (updatedDir: StrategicDirective) => {
-    try {
-      const saved = await updateDirective(updatedDir);
-      setDirectives(prev => prev.map(d => d.id === saved.id ? saved : d));
-    } catch (e: any) {
-      window.alert(`Không thể cập nhật Chỉ Đạo: ${e.message ?? e}`);
-    }
-  };
-  const handleDeleteDirective = async (id: string) => {
-    try {
-      await deleteDirective(id);
-      setDirectives(prev => prev.filter(d => d.id !== id));
-    } catch (e: any) {
-      window.alert(`Không thể xóa Chỉ Đạo: ${e.message ?? e}`);
-    }
-  };
-
   const handleSelectSessionFromDashboard = (session: LiveSession) => {
     setSelectedSession(session);
     setActiveTab("sessions");
@@ -1827,8 +1795,6 @@ export default function App() {
     {
       label: "Tổng Quan",
       items: [
-        { id: "myworkspace", label: "Việc Của Tôi", icon: UserCheck, perm: undefined },
-        { id: "brief", label: "Command Brief", icon: FileText, perm: "view_executive_brief" as PermissionKey },
         { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, perm: undefined },
       ],
     },
@@ -2177,35 +2143,6 @@ export default function App() {
               </div>
             ) : (
               <>
-                {activeTab === "myworkspace" && (
-                  <MyWorkspace
-                    currentRole={currentRole}
-                    activeUser={activeUser}
-                    brands={activeBrands}
-                    projects={activeProjects}
-                    sessions={activeSessions}
-                    talents={activeTalents}
-                    campaigns={campaigns}
-                    campaignRevisionNotes={campaignRevisionNotes}
-                    shiftSlots={shiftSlots}
-                    onRespondToCampaignApproval={handleRespondToCampaignApproval}
-                    onNavigateTab={setActiveTab}
-                    onSelectSession={handleSelectSessionFromDashboard}
-                  />
-                )}
-
-                {activeTab === "brief" && (
-                  <ExecutiveBrief
-                    currentRole={currentRole}
-                    sessions={activeSessions}
-                    directives={activeDirectives}
-                    onAddDirective={handleAddDirective}
-                    onUpdateDirective={handleUpdateDirective}
-                    onDeleteDirective={handleDeleteDirective}
-                    onNavigateTab={setActiveTab}
-                  />
-                )}
-
                 {activeTab === "dashboard" && (
                   <Dashboards
                     currentRole={currentRole}

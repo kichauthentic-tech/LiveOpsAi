@@ -168,7 +168,6 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
       // Trận này — xem RLS "admin only" của bảng ai_agent_prompts.
       preset = {
         view_financials: true,
-        view_executive_brief: true,
         manage_sessions: true,
         manage_calendar: true,
         generate_scripts: true,
@@ -184,7 +183,6 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
     } else if (role === "ceo") {
       preset = {
         view_financials: true,
-        view_executive_brief: true,
         manage_sessions: true,
         manage_calendar: true,
         generate_scripts: true,
@@ -200,7 +198,6 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
     } else if (role === "operations") {
       preset = {
         view_financials: false,
-        view_executive_brief: true,
         manage_sessions: true,
         manage_calendar: true,
         generate_scripts: true,
@@ -216,7 +213,6 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
     } else if (role === "brand") {
       preset = {
         view_financials: false,
-        view_executive_brief: false,
         manage_sessions: false,
         manage_calendar: false,
         generate_scripts: true,
@@ -232,7 +228,6 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
     } else if (role === "talent") {
       preset = {
         view_financials: false,
-        view_executive_brief: false,
         manage_sessions: false,
         manage_calendar: false,
         generate_scripts: true,
@@ -250,7 +245,6 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
       // mặc định cho mọi authenticated user, không bật quyền quản lý/ghi nào.
       preset = {
         view_financials: false,
-        view_executive_brief: false,
         manage_sessions: false,
         manage_calendar: false,
         generate_scripts: false,

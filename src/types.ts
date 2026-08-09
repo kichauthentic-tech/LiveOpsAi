@@ -2,7 +2,6 @@ export type UserRole = "ceo" | "operations" | "brand" | "talent" | "moderator" |
 
 export type PermissionKey =
   | "view_financials"
-  | "view_executive_brief"
   | "manage_sessions"
   | "manage_calendar"
   | "generate_scripts"
@@ -529,24 +528,6 @@ export interface GeneratedScript {
   opening: { time: string; hook: string; action: string; dialogue: ScriptDialogueLine[] };
   parts: ScriptPart[];
   closing: { time: string; strategy: string; callToAction: string; dialogue: ScriptDialogueLine[] };
-}
-
-export interface StrategicDirective {
-  id: string;
-  code: string;
-  title: string;
-  description: string;
-  department: "Operations" | "Content & AI" | "Talent Management" | "Brand Client" | "Finance & Admin";
-  assignedRole: UserRole | "all";
-  assigneeName: string;
-  priority: "Urgent" | "High" | "Medium";
-  targetKpi: string;
-  deadline: string;
-  status: "Pending" | "In Progress" | "Needs BOD Support" | "Completed";
-  progressPercent: number;
-  notesFromLead?: string;
-  createdAt: string;
-  isCustom?: boolean;
 }
 
 // Giai đoạn C1 — Onboarding Checklist theo Brand. Template dùng chung (agency-wide,
