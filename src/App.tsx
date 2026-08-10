@@ -1788,18 +1788,10 @@ export default function App() {
                     studios={activeStudios}
                     shiftSlots={shiftSlots}
                     shiftRegistrations={shiftRegistrations}
-                    brandPlatformRates={brandPlatformRates}
-                    recurringShiftTemplates={recurringShiftTemplates}
-                    onCreateSlot={handleCreateShiftSlot}
                     onDeleteSlot={handleDeleteShiftSlot}
                     onRegister={handleRegisterSlot}
                     onUnregister={handleUnregisterSlot}
                     onFinalizeSlot={handleFinalizeShiftSlot}
-                    onSaveRate={handleSaveBrandPlatformRate}
-                    onCreateTemplate={handleCreateRecurringTemplate}
-                    onToggleTemplate={handleToggleRecurringTemplate}
-                    onDeleteTemplate={handleDeleteRecurringTemplate}
-                    onGenerateMonthSlots={handleGenerateMonthSlots}
                     onUpdateSession={handleUpdateSession}
                     onLogAudit={pushAuditLog}
                   />

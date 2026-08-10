@@ -2,9 +2,7 @@ import React, { useMemo, useState } from "react";
 import {
   AuditLogEntry,
   Brand,
-  BrandPlatformRate,
   LiveSession,
-  RecurringShiftTemplate,
   ShiftRegistration,
   ShiftSlot,
   Studio,
@@ -14,17 +12,14 @@ import {
 } from "../types";
 import {
   Calendar as CalendarIcon,
-  Plus,
   Trash2,
   UserCheck,
   UserX,
   AlertTriangle,
   Users,
   Radio,
-  DollarSign,
   Check,
   Repeat,
-  Sparkles,
   Zap,
   ChevronLeft,
   ChevronRight,
@@ -40,18 +35,10 @@ interface ShiftSchedulingProps {
   studios: Studio[];
   shiftSlots: ShiftSlot[];
   shiftRegistrations: ShiftRegistration[];
-  brandPlatformRates: BrandPlatformRate[];
-  recurringShiftTemplates: RecurringShiftTemplate[];
-  onCreateSlot: (slot: ShiftSlot) => Promise<boolean>;
   onDeleteSlot: (id: string) => Promise<void>;
   onRegister: (slotId: string, talentId: string) => Promise<boolean>;
   onUnregister: (slotId: string, talentId: string) => Promise<boolean>;
   onFinalizeSlot: (slot: ShiftSlot, hostId: string, coHostId: string | null) => Promise<boolean>;
-  onSaveRate: (brandId: string, platform: "TikTok" | "Shopee", ratePerHour: number) => Promise<boolean>;
-  onCreateTemplate: (template: RecurringShiftTemplate) => Promise<boolean>;
-  onToggleTemplate: (template: RecurringShiftTemplate) => Promise<boolean>;
-  onDeleteTemplate: (id: string) => Promise<void>;
-  onGenerateMonthSlots: (month: string) => Promise<number>;
   onUpdateSession: (session: LiveSession) => Promise<boolean>;
   onLogAudit: (entry: { action: string; details: string; category: AuditLogEntry["category"] }) => Promise<void>;
 }
@@ -88,18 +75,10 @@ export default function ShiftScheduling({
   studios,
   shiftSlots,
   shiftRegistrations,
-  brandPlatformRates,
-  recurringShiftTemplates,
-  onCreateSlot,
   onDeleteSlot,
   onRegister,
   onUnregister,
   onFinalizeSlot,
-  onSaveRate,
-  onCreateTemplate,
-  onToggleTemplate,
-  onDeleteTemplate,
-  onGenerateMonthSlots,
   onUpdateSession,
   onLogAudit
 }: ShiftSchedulingProps) {
@@ -109,18 +88,8 @@ export default function ShiftScheduling({
   const [selectedMonth, setSelectedMonth] = useState(today.slice(0, 7)); // "YYYY-MM"
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
-  const [newDate, setNewDate] = useState(today);
-  const [newStart, setNewStart] = useState("20:00");
-  const [newEnd, setNewEnd] = useState("23:00");
-  const [newBrandId, setNewBrandId] = useState(brands[0]?.id ?? "");
-  const [newPlatform, setNewPlatform] = useState<"TikTok" | "Shopee">("TikTok");
-  const [newStudioId, setNewStudioId] = useState("");
-  const [newNotes, setNewNotes] = useState("");
-  const [creating, setCreating] = useState(false);
-
   const [pickByLot, setPickByLot] = useState<Record<string, { hostId: string; coHostId: string }>>({});
   const [busySlotId, setBusySlotId] = useState<string | null>(null);
-  const [rateDraft, setRateDraft] = useState<Record<string, string>>({});
 
   // Giai đoạn 15c — thay người khẩn cấp trên 1 ca đã chốt (Host/Trợ live báo bận
   // sát giờ live). Danh sách ứng viên thay thế lấy từ session_availability của
@@ -130,16 +99,6 @@ export default function ShiftScheduling({
   const [swapCandidateId, setSwapCandidateId] = useState("");
   const [swapReason, setSwapReason] = useState("");
   const [swapBusy, setSwapBusy] = useState(false);
-
-  const [tplWeekday, setTplWeekday] = useState(1);
-  const [tplStart, setTplStart] = useState("20:00");
-  const [tplEnd, setTplEnd] = useState("23:00");
-  const [tplBrandId, setTplBrandId] = useState(brands[0]?.id ?? "");
-  const [tplPlatform, setTplPlatform] = useState<"TikTok" | "Shopee">("TikTok");
-  const [tplStudioId, setTplStudioId] = useState("");
-  const [creatingTpl, setCreatingTpl] = useState(false);
-  const [generating, setGenerating] = useState(false);
-  const [generateMsg, setGenerateMsg] = useState<string | null>(null);
 
   const talentsById = useMemo(() => new Map(talents.map((t) => [t.id, t])), [talents]);
   const registrationsBySlot = useMemo(() => {
@@ -183,11 +142,6 @@ export default function ShiftScheduling({
         timeOverlaps(start, end, s.startTime, s.endTime)
     );
   };
-  const newSlotConflicts = useMemo(
-    () => findStudioConflicts(newDate, newStart, newEnd, newStudioId, newBrandId),
-    [shiftSlots, newDate, newStart, newEnd, newStudioId, newBrandId]
-  );
-
   // Lưới ngày đủ tuần (kể cả ngày lấp đầu/cuối từ tháng liền kề) để vẽ lịch ma trận.
   const monthGrid = useMemo(() => {
     const [yearStr, monthStr] = selectedMonth.split("-");
@@ -214,9 +168,6 @@ export default function ShiftScheduling({
     setSelectedDate(null);
   };
 
-  const rateFor = (brandId: string, platform: "TikTok" | "Shopee") =>
-    brandPlatformRates.find((r) => r.brandId === brandId && r.platform === platform);
-
   const checkConflicts = (date: string, start: string, end: string, studioId: string, talentId: string) => {
     return sessions.some(
       (s) =>
@@ -226,63 +177,6 @@ export default function ShiftScheduling({
         s.endTime > start &&
         ((studioId && s.studioId === studioId) || s.hostId === talentId || s.coHostId === talentId)
     );
-  };
-
-  const handleCreateSlot = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newSlotConflicts.length > 0) {
-      const names = newSlotConflicts.map((c) => `${c.brandName} (${c.startTime}-${c.endTime})`).join(", ");
-      if (!window.confirm(`Studio này đã có ca của brand khác cùng khung giờ: ${names}. Vẫn mở ca mới?`)) return;
-    }
-    const brand = brands.find((b) => b.id === newBrandId);
-    const studio = studios.find((s) => s.id === newStudioId);
-    setCreating(true);
-    const ok = await onCreateSlot({
-      id: `slot-${Date.now()}`,
-      date: newDate,
-      startTime: newStart,
-      endTime: newEnd,
-      brandId: newBrandId || undefined,
-      brandName: brand?.name ?? "",
-      platform: newPlatform,
-      studioId: newStudioId || undefined,
-      studioName: studio?.name ?? "",
-      notes: newNotes,
-      status: "open"
-    });
-    setCreating(false);
-    if (ok) {
-      setNewNotes("");
-    }
-  };
-
-  const handleCreateTemplate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const brand = brands.find((b) => b.id === tplBrandId);
-    const studio = studios.find((s) => s.id === tplStudioId);
-    setCreatingTpl(true);
-    await onCreateTemplate({
-      id: `tpl-${Date.now()}`,
-      weekday: tplWeekday,
-      brandId: tplBrandId || undefined,
-      brandName: brand?.name ?? "",
-      platform: tplPlatform,
-      startTime: tplStart,
-      endTime: tplEnd,
-      studioId: tplStudioId || undefined,
-      studioName: studio?.name ?? "",
-      notes: "",
-      active: true
-    });
-    setCreatingTpl(false);
-  };
-
-  const handleGenerate = async () => {
-    setGenerating(true);
-    setGenerateMsg(null);
-    const count = await onGenerateMonthSlots(selectedMonth);
-    setGenerating(false);
-    setGenerateMsg(count > 0 ? `Đã sinh ${count} ca mới cho tháng ${selectedMonth}.` : "Không có ca mới nào để sinh (đã sinh đủ hoặc chưa có quy tắc lặp nào).");
   };
 
   const handleToggleRegister = async (slot: ShiftSlot) => {
@@ -329,13 +223,6 @@ export default function ShiftScheduling({
       setSwapReason("");
     }
     setSwapBusy(false);
-  };
-
-  const handleSaveRate = async (brandId: string) => {
-    const key = `${brandId}:${newPlatform}`;
-    const raw = rateDraft[key];
-    if (raw === undefined) return;
-    await onSaveRate(brandId, newPlatform, Number(raw) || 0);
   };
 
   // Tải theo host trong tháng đang xem — gộp cả vai trò Host lẫn Co-host.
@@ -425,244 +312,6 @@ export default function ShiftScheduling({
         <div className="bg-amber-950/60 border border-amber-800 rounded-xl p-4 text-sm text-amber-200 flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 shrink-0" />
           Tài khoản của bạn chưa được gán hồ sơ Talent (assigned_talent_id) — liên hệ CEO/Operations để gán trước khi tự đăng ký ca được.
-        </div>
-      )}
-
-      {admin && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl space-y-4">
-          <h3 className="font-bold text-white flex items-center gap-2">
-            <Repeat className="w-4 h-4 text-purple-400" /> Quy Tắc Lặp (Ca Cố Định Theo Tuần)
-          </h3>
-          <p className="text-xs text-slate-500 -mt-2">
-            Khai báo 1 lần, hệ thống tự sinh ca cho cả tháng — thay vì mở tay từng ca lặp lại mỗi tuần.
-          </p>
-
-          {recurringShiftTemplates.length > 0 && (
-            <div className="space-y-1.5">
-              {recurringShiftTemplates.map((t) => (
-                <div
-                  key={t.id}
-                  className={`flex flex-wrap items-center gap-2 text-xs bg-slate-950/80 border border-slate-800 rounded-lg px-3 py-2 ${
-                    !t.active ? "opacity-50" : ""
-                  }`}
-                >
-                  <span className="font-mono font-bold text-white w-14">{WEEKDAY_LABELS[t.weekday]}</span>
-                  <span className="font-mono text-slate-300">{t.startTime}-{t.endTime}</span>
-                  <span className="text-slate-400">{t.brandName || "—"}</span>
-                  <span className="bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full font-bold">{t.platform}</span>
-                  {t.studioName && <span className="text-slate-500">{t.studioName}</span>}
-                  <div className="flex items-center gap-2 ml-auto">
-                    <button
-                      onClick={() => onToggleTemplate(t)}
-                      className={`px-2 py-1 rounded-lg font-bold ${
-                        t.active
-                          ? "bg-emerald-950 text-emerald-300 border border-emerald-800"
-                          : "bg-slate-800 text-slate-400 border border-slate-700"
-                      }`}
-                    >
-                      {t.active ? "Đang bật" : "Đã tắt"}
-                    </button>
-                    <button onClick={() => onDeleteTemplate(t.id)} className="text-slate-500 hover:text-rose-400 transition-colors">
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <form onSubmit={handleCreateTemplate} className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-6 gap-3 border-t border-slate-800 pt-3">
-            <select
-              value={tplWeekday}
-              onChange={(e) => setTplWeekday(Number(e.target.value))}
-              className="bg-slate-950 border border-slate-800 rounded-xl p-2 text-white text-sm focus:outline-none focus:border-blue-500"
-            >
-              {WEEKDAY_LABELS.map((label, idx) => (
-                <option key={idx} value={idx}>
-                  {label}
-                </option>
-              ))}
-            </select>
-            <input
-              type="time"
-              required
-              value={tplStart}
-              onChange={(e) => setTplStart(e.target.value)}
-              className="bg-slate-950 border border-slate-800 rounded-xl p-2 text-white text-sm focus:outline-none focus:border-blue-500"
-            />
-            <input
-              type="time"
-              required
-              value={tplEnd}
-              onChange={(e) => setTplEnd(e.target.value)}
-              className="bg-slate-950 border border-slate-800 rounded-xl p-2 text-white text-sm focus:outline-none focus:border-blue-500"
-            />
-            <select
-              value={tplBrandId}
-              onChange={(e) => setTplBrandId(e.target.value)}
-              className="bg-slate-950 border border-slate-800 rounded-xl p-2 text-white text-sm focus:outline-none focus:border-blue-500"
-            >
-              <option value="">— Brand —</option>
-              {brands.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
-            <select
-              value={tplPlatform}
-              onChange={(e) => setTplPlatform(e.target.value as "TikTok" | "Shopee")}
-              className="bg-slate-950 border border-slate-800 rounded-xl p-2 text-white text-sm focus:outline-none focus:border-blue-500"
-            >
-              <option value="TikTok">TikTok</option>
-              <option value="Shopee">Shopee</option>
-            </select>
-            <select
-              value={tplStudioId}
-              onChange={(e) => setTplStudioId(e.target.value)}
-              className="bg-slate-950 border border-slate-800 rounded-xl p-2 text-white text-sm focus:outline-none focus:border-blue-500"
-            >
-              <option value="">— Studio (tuỳ chọn) —</option>
-              {studios.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-            <button
-              type="submit"
-              disabled={creatingTpl || !tplBrandId}
-              className="bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-bold rounded-xl px-4 py-2 text-sm transition-colors sm:col-span-3 lg:col-span-6"
-            >
-              {creatingTpl ? "Đang thêm..." : "+ Thêm Quy Tắc Lặp"}
-            </button>
-          </form>
-
-          <div className="flex flex-wrap items-center gap-3 border-t border-slate-800 pt-3">
-            <button
-              onClick={handleGenerate}
-              disabled={generating || recurringShiftTemplates.every((t) => !t.active)}
-              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-bold rounded-xl px-4 py-2 text-sm transition-colors"
-            >
-              <Sparkles className="w-4 h-4" />
-              {generating ? "Đang sinh ca..." : `Sinh Ca Cho Tháng ${selectedMonth}`}
-            </button>
-            {generateMsg && <span className="text-xs text-slate-400">{generateMsg}</span>}
-          </div>
-        </div>
-      )}
-
-      {admin && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl space-y-4">
-          <h3 className="font-bold text-white flex items-center gap-2">
-            <Plus className="w-4 h-4 text-emerald-400" /> Mở Ca Mới (Phát Sinh)
-          </h3>
-          <form onSubmit={handleCreateSlot} className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <input
-              type="date"
-              required
-              value={newDate}
-              onChange={(e) => setNewDate(e.target.value)}
-              className="bg-slate-950 border border-slate-800 rounded-xl p-2 text-white text-sm focus:outline-none focus:border-blue-500"
-            />
-            <input
-              type="time"
-              required
-              value={newStart}
-              onChange={(e) => setNewStart(e.target.value)}
-              className="bg-slate-950 border border-slate-800 rounded-xl p-2 text-white text-sm focus:outline-none focus:border-blue-500"
-            />
-            <input
-              type="time"
-              required
-              value={newEnd}
-              onChange={(e) => setNewEnd(e.target.value)}
-              className="bg-slate-950 border border-slate-800 rounded-xl p-2 text-white text-sm focus:outline-none focus:border-blue-500"
-            />
-            <select
-              value={newBrandId}
-              onChange={(e) => setNewBrandId(e.target.value)}
-              className="bg-slate-950 border border-slate-800 rounded-xl p-2 text-white text-sm focus:outline-none focus:border-blue-500"
-            >
-              <option value="">— Brand —</option>
-              {brands.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
-            <select
-              value={newPlatform}
-              onChange={(e) => setNewPlatform(e.target.value as "TikTok" | "Shopee")}
-              className="bg-slate-950 border border-slate-800 rounded-xl p-2 text-white text-sm focus:outline-none focus:border-blue-500"
-            >
-              <option value="TikTok">TikTok</option>
-              <option value="Shopee">Shopee</option>
-            </select>
-            <select
-              value={newStudioId}
-              onChange={(e) => setNewStudioId(e.target.value)}
-              className="bg-slate-950 border border-slate-800 rounded-xl p-2 text-white text-sm focus:outline-none focus:border-blue-500"
-            >
-              <option value="">— Studio (tuỳ chọn) —</option>
-              {studios.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-            <input
-              placeholder="Ghi chú (tuỳ chọn)"
-              value={newNotes}
-              onChange={(e) => setNewNotes(e.target.value)}
-              className="bg-slate-950 border border-slate-800 rounded-xl p-2 text-white text-sm focus:outline-none focus:border-blue-500 sm:col-span-2 lg:col-span-3"
-            />
-            <button
-              type="submit"
-              disabled={creating || !newBrandId}
-              className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold rounded-xl px-4 py-2 text-sm transition-colors sm:col-span-1 lg:col-span-3"
-            >
-              {creating ? "Đang mở..." : "Mở Ca Đăng Ký"}
-            </button>
-          </form>
-
-          {newSlotConflicts.length > 0 && (
-            <div className="flex items-start gap-2 text-xs bg-rose-950/50 border border-rose-800 rounded-xl p-3 text-rose-200">
-              <Flame className="w-4 h-4 shrink-0 mt-0.5" />
-              <div>
-                <div className="font-bold">Ưu tiên hoá studio — studio này đã có ca khác cùng khung giờ:</div>
-                <div>
-                  {newSlotConflicts.map((c) => `${c.brandName} (${c.startTime}-${c.endTime})`).join(", ")}
-                </div>
-                <div className="text-rose-300/80 mt-0.5">Cân nhắc đổi studio/khung giờ, hoặc xác nhận khi mở ca nếu cố ý ưu tiên brand này.</div>
-              </div>
-            </div>
-          )}
-
-          {newBrandId && (
-            <div className="flex items-center gap-3 text-xs text-slate-400 border-t border-slate-800 pt-3">
-              <DollarSign className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>Rate/giờ ({newPlatform}, {brands.find((b) => b.id === newBrandId)?.name}):</span>
-              <input
-                type="number"
-                min={0}
-                placeholder={String(rateFor(newBrandId, newPlatform)?.ratePerHour ?? 0)}
-                value={rateDraft[`${newBrandId}:${newPlatform}`] ?? ""}
-                onChange={(e) => setRateDraft((prev) => ({ ...prev, [`${newBrandId}:${newPlatform}`]: e.target.value }))}
-                className="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-white w-32 font-mono focus:outline-none focus:border-blue-500"
-              />
-              <button
-                onClick={() => handleSaveRate(newBrandId)}
-                className="text-blue-400 hover:text-blue-300 font-bold"
-              >
-                Lưu Rate
-              </button>
-              <span className="text-slate-500">
-                → Target GMV/ca ({durationHours(newStart, newEnd).toFixed(1)}h) ={" "}
-                {((rateFor(newBrandId, newPlatform)?.ratePerHour ?? 0) * durationHours(newStart, newEnd)).toLocaleString("vi-VN")}đ
-              </span>
-            </div>
-          )}
         </div>
       )}
 
