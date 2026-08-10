@@ -25,6 +25,7 @@ import {
   ChevronRight,
   Flame
 } from "lucide-react";
+import { CAMPAIGN_DAY_STYLES, getCampaignDayInfo } from "../lib/campaignDays";
 
 interface ShiftSchedulingProps {
   currentRole: UserRole;
@@ -387,21 +388,32 @@ export default function ShiftScheduling({
                 const dayWarningTitle = dayMissingBoth ? "Có ca chưa ai đăng ký" : dayMissingCoHost ? "Có ca thiếu Trợ live" : undefined;
                 const visibleChips = daySlots.slice(0, 3);
                 const extra = daySlots.length - visibleChips.length;
+                const campaignDay = getCampaignDayInfo(cell.date);
                 return (
                   <button
                     key={cell.date}
                     onClick={() => setSelectedDate(cell.date === selectedDate ? null : cell.date)}
+                    title={campaignDay?.label}
                     className={`text-left min-h-[92px] sm:min-h-[108px] rounded-lg p-1.5 flex flex-col gap-1 border transition-colors ${
                       isSelected
                         ? "border-blue-500 bg-blue-950/30"
                         : isToday
                         ? "border-purple-600 bg-slate-950/80"
                         : "border-slate-800 bg-slate-950/50 hover:border-slate-700"
-                    } ${!cell.inMonth ? "opacity-35" : ""}`}
+                    } ${!cell.inMonth ? "opacity-35" : ""} ${campaignDay ? CAMPAIGN_DAY_STYLES[campaignDay.type].ring : ""}`}
                   >
                     <div className="flex items-center justify-between">
                       <span className={`text-xs font-mono font-bold ${isToday ? "text-purple-300" : "text-slate-300"}`}>{dayNum}</span>
-                      {dayWarningColor && <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dayWarningColor}`} title={dayWarningTitle} />}
+                      <div className="flex items-center gap-1">
+                        {campaignDay && (
+                          <span
+                            className={`text-[8px] font-bold px-1 rounded leading-tight ${CAMPAIGN_DAY_STYLES[campaignDay.type].badge}`}
+                          >
+                            {campaignDay.shortLabel}
+                          </span>
+                        )}
+                        {dayWarningColor && <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dayWarningColor}`} title={dayWarningTitle} />}
+                      </div>
                     </div>
                     <div className="flex flex-col gap-0.5">
                       {visibleChips.map((s) => {

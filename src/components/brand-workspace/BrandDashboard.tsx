@@ -51,26 +51,28 @@ export const BrandDashboard: React.FC<BrandDashboardProps> = ({ brandId, brand, 
         </div>
       </div>
 
-      <div className="bg-gradient-to-br from-blue-950/60 to-slate-900 border border-blue-900/40 rounded-2xl p-6 shadow-xl">
-        <span className="text-blue-400 font-semibold text-xs uppercase tracking-wider flex items-center gap-1.5">
-          <TrendingUp className="w-4 h-4" /> GMV tháng {thisMonth}
-        </span>
-        <p className="text-3xl font-black text-white mt-1">{formatCurrencyAdaptive(monthGmv)}</p>
-      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-gradient-to-br from-blue-950/60 to-slate-900 border border-blue-900/40 rounded-2xl p-5 shadow-xl">
+          <span className="text-blue-400 font-semibold text-xs uppercase tracking-wider flex items-center gap-1.5">
+            <TrendingUp className="w-4 h-4" /> GMV tháng {thisMonth}
+          </span>
+          <p className="text-2xl font-black text-white mt-1">{formatCurrencyAdaptive(monthGmv)}</p>
+        </div>
 
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-1">
-        <span className="text-amber-400 font-semibold text-xs uppercase tracking-wider flex items-center gap-1.5">
-          <Receipt className="w-4 h-4" /> Công nợ hiện tại
-        </span>
-        <p className="text-base font-bold text-white">{formatCurrencyAdaptive(debt.outstanding)}</p>
-        <p className="text-xs text-slate-400">{debt.invoiceCount} hoá đơn đã lập</p>
-      </div>
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-1">
+          <span className="text-amber-400 font-semibold text-xs uppercase tracking-wider flex items-center gap-1.5">
+            <Receipt className="w-4 h-4" /> Công nợ hiện tại
+          </span>
+          <p className="text-2xl font-black text-white mt-1">{formatCurrencyAdaptive(debt.outstanding)}</p>
+          <p className="text-xs text-slate-400">{debt.invoiceCount} hoá đơn đã lập</p>
+        </div>
 
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
-        <span className="text-slate-400 font-semibold text-xs uppercase tracking-wider flex items-center gap-1.5">
-          <Store className="w-4 h-4" /> Tổng GMV tích luỹ
-        </span>
-        <p className="text-2xl font-black text-white mt-1">{formatCurrencyAdaptive(brand.totalGmv)}</p>
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+          <span className="text-slate-400 font-semibold text-xs uppercase tracking-wider flex items-center gap-1.5">
+            <Store className="w-4 h-4" /> Tổng GMV tích luỹ
+          </span>
+          <p className="text-2xl font-black text-white mt-1">{formatCurrencyAdaptive(brand.totalGmv)}</p>
+        </div>
       </div>
 
       <GmvCalendar

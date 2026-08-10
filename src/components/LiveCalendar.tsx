@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { LiveSession, Studio, Talent, Brand, SystemUser, PromoScheme, UserRole } from "../types";
 import { schemesForDate } from "../lib/schemeUtils";
+import { CAMPAIGN_DAY_STYLES, getCampaignDayInfo } from "../lib/campaignDays";
 import { SchemeManager } from "./SchemeManager";
 import {
   Calendar as CalendarIcon,
@@ -919,6 +920,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
               const monthCellKey = `month_${cell.dateStr}`;
               const isMonthHovered = dragOverCellKey === monthCellKey;
               const daySchemes = schemesForDate(schemes, cell.dateStr);
+              const campaignDay = getCampaignDayInfo(cell.dateStr);
 
               return (
                 <div
@@ -930,6 +932,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                     setSelectedDate(cell.dateStr);
                     setViewMode("day");
                   }}
+                  title={campaignDay?.label}
                   className={`min-h-[64px] sm:min-h-[110px] p-1 sm:p-2 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${
                     isMonthHovered
                       ? "bg-blue-950/80 border-2 border-dashed border-blue-400 scale-[1.02] shadow-xl shadow-blue-500/20"
@@ -938,7 +941,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                       : isSelected
                       ? "bg-blue-950/50 border-blue-500 shadow-md shadow-blue-600/10"
                       : "bg-slate-950/80 border-slate-800/80 hover:border-slate-700 hover:bg-slate-900"
-                  }`}
+                  } ${campaignDay && !isMonthHovered ? CAMPAIGN_DAY_STYLES[campaignDay.type].ring : ""}`}
                 >
                   <div className="flex justify-between items-start">
                     <span
@@ -953,6 +956,13 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                       {cell.dayNum}
                     </span>
                     <div className="flex items-center gap-1">
+                      {campaignDay && (
+                        <span
+                          className={`text-[8px] font-bold px-1 rounded leading-tight ${CAMPAIGN_DAY_STYLES[campaignDay.type].badge}`}
+                        >
+                          {campaignDay.shortLabel}
+                        </span>
+                      )}
                       {daySchemes.length > 0 && (
                         <span
                           title={daySchemes.map((s) => `${s.title}${s.description ? ` — ${s.description}` : ""}`).join("\n")}
@@ -1036,6 +1046,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
               const weekCellKey = `week_${wDay.dateStr}`;
               const isWeekHovered = dragOverCellKey === weekCellKey;
               const daySchemes = schemesForDate(schemes, wDay.dateStr);
+              const campaignDay = getCampaignDayInfo(wDay.dateStr);
 
               return (
                 <div
@@ -1043,13 +1054,14 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   onDragOver={(e) => handleDragOver(e, weekCellKey)}
                   onDragLeave={(e) => handleDragLeave(e, weekCellKey)}
                   onDrop={(e) => handleDropOnWeekDay(e, wDay.dateStr)}
+                  title={campaignDay?.label}
                   className={`bg-slate-950 rounded-2xl p-3 border space-y-3 transition-all ${
                     isWeekHovered
                       ? "border-2 border-dashed border-blue-400 bg-blue-950/40 shadow-xl shadow-blue-500/20 scale-[1.01]"
                       : isSelected
                       ? "border-blue-500/80 bg-blue-950/20"
                       : "border-slate-800"
-                  }`}
+                  } ${campaignDay && !isWeekHovered ? CAMPAIGN_DAY_STYLES[campaignDay.type].ring : ""}`}
                 >
                   <div
                     onClick={() => setSelectedDate(wDay.dateStr)}
@@ -1068,9 +1080,18 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                         {wDay.dayNum}/{parseDateString(wDay.dateStr).month}
                       </strong>
                     </div>
-                    <span className="text-[10px] bg-slate-900 text-slate-400 font-bold px-2 py-0.5 rounded-full">
-                      {daySessions.length}
-                    </span>
+                    <div className="flex items-center gap-1">
+                      {campaignDay && (
+                        <span
+                          className={`text-[8px] font-bold px-1 rounded leading-tight ${CAMPAIGN_DAY_STYLES[campaignDay.type].badge}`}
+                        >
+                          {campaignDay.shortLabel}
+                        </span>
+                      )}
+                      <span className="text-[10px] bg-slate-900 text-slate-400 font-bold px-2 py-0.5 rounded-full">
+                        {daySessions.length}
+                      </span>
+                    </div>
                   </div>
 
                   {/* Session cards under this day */}
@@ -1145,6 +1166,17 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
             <div>
               <h3 className="font-bold text-white text-base flex items-center gap-2">
                 <Building2 className="w-5 h-5 text-blue-400 shrink-0" /> Ma Trận Phân Bổ Phòng Studio - Ngày {selectedDate} ({getDayOfWeekName(selectedDate)})
+                {(() => {
+                  const campaignDay = getCampaignDayInfo(selectedDate);
+                  return campaignDay ? (
+                    <span
+                      title={campaignDay.label}
+                      className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${CAMPAIGN_DAY_STYLES[campaignDay.type].badge}`}
+                    >
+                      {campaignDay.shortLabel}
+                    </span>
+                  ) : null;
+                })()}
               </h3>
               <p className="text-xs text-slate-400">Kéo thả ca live vào bất kỳ ô Studio/Ca Live để đổi phòng hoặc ca làm việc linh hoạt</p>
             </div>

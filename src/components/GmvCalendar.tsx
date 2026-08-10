@@ -3,11 +3,14 @@ import { LiveSession } from "../types";
 import { CalendarDays, ChevronLeft, ChevronRight, TrendingUp } from "lucide-react";
 import { formatCurrencyAdaptive } from "../lib/formatCurrency";
 import { computeGmvByDate, DailyGmv } from "../lib/gmvMetrics";
+import { CAMPAIGN_DAY_STYLES, getCampaignDayInfo } from "../lib/campaignDays";
 
 interface GmvCalendarProps {
   sessions: LiveSession[];
   title?: string;
   subtitle?: string;
+  month?: string;
+  onMonthChange?: (month: string) => void;
 }
 
 const WEEKDAY_LABELS = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
@@ -34,9 +37,17 @@ const cellTone = (day: DailyGmv | undefined, dateStr: string, todayDate: string)
 export const GmvCalendar: React.FC<GmvCalendarProps> = ({
   sessions,
   title = "Lịch GMV: Target vs Actual",
-  subtitle = "Theo dõi target/actual GMV từng ngày và tiến độ dự phóng cuối tháng."
+  subtitle = "Theo dõi target/actual GMV từng ngày và tiến độ dự phóng cuối tháng.",
+  month: controlledMonth,
+  onMonthChange
 }) => {
-  const [month, setMonth] = useState(getTodayMonth());
+  const [internalMonth, setInternalMonth] = useState(getTodayMonth());
+  const month = controlledMonth ?? internalMonth;
+  const setMonth = (updater: (mo: string) => string) => {
+    const next = updater(month);
+    if (onMonthChange) onMonthChange(next);
+    else setInternalMonth(next);
+  };
   const todayDate = getTodayDate();
   const todayMonth = getTodayMonth();
 
@@ -99,7 +110,7 @@ export const GmvCalendar: React.FC<GmvCalendarProps> = ({
           <input
             type="month"
             value={month}
-            onChange={(e) => setMonth(e.target.value)}
+            onChange={(e) => setMonth(() => e.target.value)}
             className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono text-sm focus:outline-none focus:border-blue-500"
           />
           <button
@@ -155,14 +166,25 @@ export const GmvCalendar: React.FC<GmvCalendarProps> = ({
             const daily = gmvByDate.get(dateStr);
             const pct = daily && daily.target > 0 ? Math.round((daily.actual / daily.target) * 100) : null;
             const isToday = dateStr === todayDate;
+            const campaignDay = getCampaignDayInfo(dateStr);
             return (
               <div
                 key={dateStr}
+                title={campaignDay?.label}
                 className={`min-h-[76px] border rounded-lg p-1.5 space-y-0.5 ${cellTone(daily, dateStr, todayDate)} ${
-                  isToday ? "ring-1 ring-blue-500" : ""
+                  isToday ? "ring-1 ring-blue-500" : campaignDay ? CAMPAIGN_DAY_STYLES[campaignDay.type].ring : ""
                 }`}
               >
-                <span className="text-[10px] text-slate-500 font-mono">{day}</span>
+                <div className="flex items-center justify-between gap-1">
+                  <span className="text-[10px] text-slate-500 font-mono">{day}</span>
+                  {campaignDay && (
+                    <span
+                      className={`text-[8px] font-bold px-1 rounded leading-tight ${CAMPAIGN_DAY_STYLES[campaignDay.type].badge}`}
+                    >
+                      {campaignDay.shortLabel}
+                    </span>
+                  )}
+                </div>
                 {daily && daily.sessionCount > 0 ? (
                   <div className="space-y-0.5">
                     <p className="text-[9px] text-slate-400 leading-tight">Target: {formatCurrencyAdaptive(daily.target)}</p>

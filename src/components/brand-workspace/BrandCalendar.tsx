@@ -3,6 +3,7 @@ import { LiveSession, PromoScheme, Studio, Talent } from "../../types";
 import { CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
 import { schemesForDate } from "../../lib/schemeUtils";
+import { CAMPAIGN_DAY_STYLES, getCampaignDayInfo } from "../../lib/campaignDays";
 
 interface BrandCalendarProps {
   brandId: string;
@@ -107,16 +108,32 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({ brandId, sessions,
             const dateStr = `${month}-${`${day}`.padStart(2, "0")}`;
             const daySessions = sessionsByDate.get(dateStr) ?? [];
             const daySchemes = schemesForDate(schemes, dateStr);
+            const campaignDay = getCampaignDayInfo(dateStr);
             return (
-              <div key={dateStr} className="min-h-[84px] bg-slate-950/80 border border-slate-800 rounded-lg p-1.5 space-y-1">
-                <div className="flex items-center gap-1">
-                  <span className="text-[10px] text-slate-500 font-mono">{day}</span>
-                  {daySchemes.length > 0 && (
+              <div
+                key={dateStr}
+                title={campaignDay?.label}
+                className={`min-h-[84px] bg-slate-950/80 border border-slate-800 rounded-lg p-1.5 space-y-1 ${
+                  campaignDay ? CAMPAIGN_DAY_STYLES[campaignDay.type].ring : ""
+                }`}
+              >
+                <div className="flex items-center justify-between gap-1">
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-slate-500 font-mono">{day}</span>
+                    {daySchemes.length > 0 && (
+                      <span
+                        title={daySchemes.map((s) => `${s.title}${s.description ? ` — ${s.description}` : ""}`).join("\n")}
+                        className="text-[9px] leading-none"
+                      >
+                        🏷️
+                      </span>
+                    )}
+                  </div>
+                  {campaignDay && (
                     <span
-                      title={daySchemes.map((s) => `${s.title}${s.description ? ` — ${s.description}` : ""}`).join("\n")}
-                      className="text-[9px] leading-none"
+                      className={`text-[8px] font-bold px-1 rounded leading-tight ${CAMPAIGN_DAY_STYLES[campaignDay.type].badge}`}
                     >
-                      🏷️
+                      {campaignDay.shortLabel}
                     </span>
                   )}
                 </div>
