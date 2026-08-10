@@ -23,6 +23,7 @@ interface DbCampaign {
   review_notes: string;
   reviewed_by: string | null;
   reviewed_at: string | null;
+  template_id: string | null;
 }
 
 function fromDb(row: DbCampaign): Campaign {
@@ -45,7 +46,8 @@ function fromDb(row: DbCampaign): Campaign {
     renewalDecision: row.renewal_decision ?? undefined,
     reviewNotes: row.review_notes ?? "",
     reviewedBy: row.reviewed_by ?? undefined,
-    reviewedAt: row.reviewed_at ?? undefined
+    reviewedAt: row.reviewed_at ?? undefined,
+    templateId: row.template_id ?? undefined
   };
 }
 
@@ -68,7 +70,8 @@ function toDb(c: Campaign) {
     renewal_decision: c.renewalDecision ?? null,
     review_notes: c.reviewNotes ?? "",
     reviewed_by: orNull(c.reviewedBy),
-    reviewed_at: orNull(c.reviewedAt)
+    reviewed_at: orNull(c.reviewedAt),
+    template_id: orNull(c.templateId)
   };
 }
 
@@ -82,6 +85,15 @@ export async function createCampaign(c: Campaign): Promise<Campaign> {
   const { data, error } = await supabase.from("campaigns").insert(toDb(c)).select().single();
   if (error) throw error;
   return fromDb(data as DbCampaign);
+}
+
+// Sinh hàng loạt Campaign từ CampaignTemplate cho 1 tháng — cùng pattern
+// createShiftSlots (lib/db/shiftSlots.ts) đã dùng cho generate ca theo tuần.
+export async function createCampaigns(cs: Campaign[]): Promise<Campaign[]> {
+  if (cs.length === 0) return [];
+  const { data, error } = await supabase.from("campaigns").insert(cs.map(toDb)).select();
+  if (error) throw error;
+  return (data as DbCampaign[]).map(fromDb);
 }
 
 export async function updateCampaign(c: Campaign): Promise<Campaign> {

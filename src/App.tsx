@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, WorkflowRule, Talent, Studio, Equipment, Brand, AgencyProject, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, Campaign, CampaignRevisionNote, TalentRateHistoryEntry, BrandPlatformRateHistoryEntry, BrandInvoice, BrandSku, CoFundedVoucher, PromoScheme, SkuPlatformPrice } from "./types";
+import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, WorkflowRule, Talent, Studio, Equipment, Brand, AgencyProject, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, Campaign, CampaignTemplate, CampaignRevisionNote, TalentRateHistoryEntry, BrandPlatformRateHistoryEntry, BrandInvoice, BrandSku, CoFundedVoucher, PromoScheme, SkuPlatformPrice } from "./types";
 import { ALL_PERMISSION_DEFINITIONS } from "./data/mockData";
 import { fetchTalents, createTalent, updateTalent, deleteTalent } from "./lib/db/talents";
 import { fetchStudios, createStudio, updateStudio, deleteStudio } from "./lib/db/studios";
@@ -26,13 +26,19 @@ import {
 import {
   fetchCampaigns,
   createCampaign,
-  updateCampaign,
+  createCampaigns,
   deleteCampaign,
   sendCampaignForApproval,
   respondToCampaignApproval,
   submitCampaignReview
 } from "./lib/db/campaigns";
 import { fetchCampaignRevisionNotes, createCampaignRevisionNote } from "./lib/db/campaignRevisionNotes";
+import {
+  fetchCampaignTemplates,
+  createCampaignTemplate,
+  updateCampaignTemplate,
+  deleteCampaignTemplate
+} from "./lib/db/campaignTemplates";
 import { fetchTalentRateHistory } from "./lib/db/talentRateHistory";
 import { fetchBrandPlatformRateHistory } from "./lib/db/brandPlatformRateHistory";
 import { fetchBrandInvoices, createBrandInvoice, updateBrandInvoice, deleteBrandInvoice } from "./lib/db/brandInvoices";
@@ -206,6 +212,8 @@ export default function App() {
   // Campaign — chu kỳ vận hành theo tháng của brand (Giai đoạn 15), real data from Supabase `campaigns`.
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [campaignRevisionNotes, setCampaignRevisionNotes] = useState<CampaignRevisionNote[]>([]);
+  // Template hoá Campaign (mục "template hoá Campaign") — mẫu sinh Campaign lặp lại theo tháng.
+  const [campaignTemplates, setCampaignTemplates] = useState<CampaignTemplate[]>([]);
   const [phase15Loading, setPhase15Loading] = useState(true);
   const [phase15Error, setPhase15Error] = useState<string | null>(null);
 
@@ -412,11 +420,12 @@ export default function App() {
     if (!session) return;
     let cancelled = false;
     setPhase15Loading(true);
-    Promise.all([fetchCampaigns(), fetchCampaignRevisionNotes()])
-      .then(([rows, notes]) => {
+    Promise.all([fetchCampaigns(), fetchCampaignRevisionNotes(), fetchCampaignTemplates()])
+      .then(([rows, notes, templates]) => {
         if (cancelled) return;
         setCampaigns(rows);
         setCampaignRevisionNotes(notes);
+        setCampaignTemplates(templates);
         setPhase15Error(null);
       })
       .catch((err) => {
@@ -1347,23 +1356,96 @@ export default function App() {
     }
   };
 
-  const handleUpdateCampaign = async (c: Campaign): Promise<boolean> => {
-    try {
-      const updated = await updateCampaign(c);
-      setCampaigns((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
-      return true;
-    } catch (e: any) {
-      window.alert(`Không thể cập nhật campaign: ${e.message ?? e}`);
-      return false;
-    }
-  };
-
   const handleDeleteCampaign = async (id: string) => {
     try {
       await deleteCampaign(id);
       setCampaigns((prev) => prev.filter((c) => c.id !== id));
     } catch (e: any) {
       window.alert(`Không thể xoá campaign: ${e.message ?? e}`);
+    }
+  };
+
+  // Template hoá Campaign — cùng tinh thần handleCreateRecurringTemplate/handleGenerateMonthSlots
+  // ở trên nhưng cho Campaign thay vì Ca.
+  const handleCreateCampaignTemplate = async (t: CampaignTemplate): Promise<boolean> => {
+    try {
+      const created = await createCampaignTemplate(t);
+      setCampaignTemplates((prev) => [...prev, created]);
+      return true;
+    } catch (e: any) {
+      window.alert(`Không thể tạo mẫu Campaign: ${e.message ?? e}`);
+      return false;
+    }
+  };
+
+  const handleToggleCampaignTemplate = async (t: CampaignTemplate): Promise<boolean> => {
+    try {
+      const updated = await updateCampaignTemplate({ ...t, active: !t.active });
+      setCampaignTemplates((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+      return true;
+    } catch (e: any) {
+      window.alert(`Không thể cập nhật mẫu Campaign: ${e.message ?? e}`);
+      return false;
+    }
+  };
+
+  const handleDeleteCampaignTemplate = async (id: string) => {
+    try {
+      await deleteCampaignTemplate(id);
+      setCampaignTemplates((prev) => prev.filter((t) => t.id !== id));
+    } catch (e: any) {
+      window.alert(`Không thể xoá mẫu Campaign: ${e.message ?? e}`);
+    }
+  };
+
+  // Sinh Campaign cho cả tháng từ các mẫu đang active — bỏ qua mẫu đã sinh
+  // rồi cho đúng tháng đó (tránh tạo trùng khi bấm lại nhiều lần), cùng logic
+  // dedup với handleGenerateMonthSlots ở trên.
+  const handleGenerateMonthCampaigns = async (month: string): Promise<number> => {
+    const [yearStr, monthStr] = month.split("-");
+    const year = Number(yearStr);
+    const monthIdx = Number(monthStr) - 1;
+    const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
+    const pad = (n: number) => `${n}`.padStart(2, "0");
+
+    const existingByTemplateAndStart = new Set(
+      campaigns.filter((c) => c.templateId).map((c) => `${c.templateId}:${c.startDate}`)
+    );
+
+    const toCreate: Campaign[] = [];
+    campaignTemplates
+      .filter((t) => t.active && t.brandId)
+      .forEach((template, idx) => {
+        const startDay = Math.min(template.startDay, daysInMonth);
+        const endDay = Math.min(Math.max(template.endDay, startDay), daysInMonth);
+        const startDate = `${year}-${monthStr.padStart(2, "0")}-${pad(startDay)}`;
+        const endDate = `${year}-${monthStr.padStart(2, "0")}-${pad(endDay)}`;
+        if (existingByTemplateAndStart.has(`${template.id}:${startDate}`)) return;
+        toCreate.push({
+          id: `campaign-${Date.now()}-${idx}`,
+          brandId: template.brandId!,
+          brandName: template.brandName,
+          name: template.name,
+          type: template.type,
+          targetGmv: template.targetGmv,
+          startDate,
+          endDate,
+          status: "draft",
+          hostBriefing: template.hostBriefing,
+          approvalStatus: "draft",
+          reviewNotes: "",
+          templateId: template.id
+        });
+      });
+
+    if (toCreate.length === 0) return 0;
+    try {
+      const created = await createCampaigns(toCreate);
+      setCampaigns((prev) => [...created, ...prev]);
+      return created.length;
+    } catch (e: any) {
+      window.alert(`Không thể sinh Campaign tự động: ${e.message ?? e}`);
+      return 0;
     }
   };
 
@@ -1953,13 +2035,14 @@ export default function App() {
                     onDeleteTemplate={handleDeleteRecurringTemplate}
                     onGenerateMonthSlots={handleGenerateMonthSlots}
                     onCreateCampaign={handleCreateCampaign}
-                    onUpdateCampaign={handleUpdateCampaign}
                     onDeleteCampaign={handleDeleteCampaign}
-                    onSubmitCampaignReview={handleSubmitCampaignReview}
-                    campaignRevisionNotes={campaignRevisionNotes}
-                    onSendCampaignForApproval={handleSendCampaignForApproval}
                     onUpdateSession={handleUpdateSession}
                     onLogAudit={pushAuditLog}
+                    campaignTemplates={campaignTemplates}
+                    onCreateCampaignTemplate={handleCreateCampaignTemplate}
+                    onToggleCampaignTemplate={handleToggleCampaignTemplate}
+                    onDeleteCampaignTemplate={handleDeleteCampaignTemplate}
+                    onGenerateMonthCampaigns={handleGenerateMonthCampaigns}
                   />
                 )}
 

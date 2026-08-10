@@ -378,6 +378,27 @@ export interface Campaign {
   reviewNotes: string;
   reviewedBy?: string;
   reviewedAt?: string;
+  // Đánh dấu Campaign do CampaignTemplate sinh ra tự động cho 1 tháng.
+  templateId?: string;
+}
+
+// Template hoá Campaign — nhiều brand tháng nào cũng chắc chắn lặp lại cùng
+// bộ Campaign (Daily/Mega D-Day/Mid-month/Payday...), khai báo 1 lần rồi
+// "Sinh Campaign Cho Tháng" thay vì gõ tay form Campaign mỗi tháng (cùng tinh
+// thần RecurringShiftTemplate đã giải quyết cho Ca — xem migration 0033).
+export interface CampaignTemplate {
+  id: string;
+  brandId?: string;
+  brandName: string;
+  name: string;
+  type: Campaign["type"];
+  targetGmv: number;
+  // Ngày-trong-tháng (1-31), clamp vào số ngày thực khi sinh cho 1 tháng cụ thể.
+  startDay: number;
+  endDay: number;
+  hostBriefing: string;
+  active: boolean;
+  createdBy?: string;
 }
 
 export interface CampaignRevisionNote {

@@ -4,7 +4,7 @@ import {
   Brand,
   BrandPlatformRate,
   Campaign,
-  CampaignRevisionNote,
+  CampaignTemplate,
   LiveSession,
   RecurringShiftTemplate,
   ShiftRegistration,
@@ -14,7 +14,6 @@ import {
   Talent,
   UserRole
 } from "../types";
-import { computeCampaignActualGmv } from "../lib/campaignMetrics";
 import {
   Calendar as CalendarIcon,
   Plus,
@@ -31,11 +30,11 @@ import {
   Zap,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Target,
   Info,
-  Flame,
-  Send,
-  MessageSquare
+  Flame
 } from "lucide-react";
 
 interface ShiftSchedulingProps {
@@ -50,8 +49,6 @@ interface ShiftSchedulingProps {
   brandPlatformRates: BrandPlatformRate[];
   recurringShiftTemplates: RecurringShiftTemplate[];
   campaigns: Campaign[];
-  campaignRevisionNotes: CampaignRevisionNote[];
-  onSendCampaignForApproval: (campaign: Campaign) => Promise<boolean>;
   onCreateSlot: (slot: ShiftSlot) => Promise<boolean>;
   onDeleteSlot: (id: string) => Promise<void>;
   onRegister: (slotId: string, talentId: string) => Promise<boolean>;
@@ -63,14 +60,14 @@ interface ShiftSchedulingProps {
   onDeleteTemplate: (id: string) => Promise<void>;
   onGenerateMonthSlots: (month: string) => Promise<number>;
   onCreateCampaign: (campaign: Campaign) => Promise<boolean>;
-  onUpdateCampaign: (campaign: Campaign) => Promise<boolean>;
   onDeleteCampaign: (id: string) => Promise<void>;
-  onSubmitCampaignReview: (
-    campaign: Campaign,
-    review: { outcome: NonNullable<Campaign["outcome"]>; renewalDecision: NonNullable<Campaign["renewalDecision"]>; reviewNotes: string }
-  ) => Promise<boolean>;
   onUpdateSession: (session: LiveSession) => Promise<boolean>;
   onLogAudit: (entry: { action: string; details: string; category: AuditLogEntry["category"] }) => Promise<void>;
+  campaignTemplates: CampaignTemplate[];
+  onCreateCampaignTemplate: (template: CampaignTemplate) => Promise<boolean>;
+  onToggleCampaignTemplate: (template: CampaignTemplate) => Promise<boolean>;
+  onDeleteCampaignTemplate: (id: string) => Promise<void>;
+  onGenerateMonthCampaigns: (month: string) => Promise<number>;
   // Từ Campaign Timeline, bấm "Xem trong Lịch" nhảy thẳng tới đúng tháng + lọc theo
   // campaign đó — nonce đổi mỗi lần bấm để useEffect áp dụng lại kể cả khi bấm cùng 1
   // campaign 2 lần liên tiếp (giá trị month/campaignId không đổi thì effect không chạy lại).
@@ -158,8 +155,6 @@ export default function ShiftScheduling({
   brandPlatformRates,
   recurringShiftTemplates,
   campaigns,
-  campaignRevisionNotes,
-  onSendCampaignForApproval,
   onCreateSlot,
   onDeleteSlot,
   onRegister,
@@ -171,12 +166,15 @@ export default function ShiftScheduling({
   onDeleteTemplate,
   onGenerateMonthSlots,
   onCreateCampaign,
-  onUpdateCampaign,
   onDeleteCampaign,
-  onSubmitCampaignReview,
   onUpdateSession,
   onLogAudit,
-  jumpTarget
+  jumpTarget,
+  campaignTemplates,
+  onCreateCampaignTemplate,
+  onToggleCampaignTemplate,
+  onDeleteCampaignTemplate,
+  onGenerateMonthCampaigns
 }: ShiftSchedulingProps) {
   const admin = isAdminRole(currentRole);
   const myTalentId = activeUser.assignedTalentId;
@@ -229,6 +227,20 @@ export default function ShiftScheduling({
   const [creatingCampaign, setCreatingCampaign] = useState(false);
   const [campaignFilter, setCampaignFilter] = useState("");
 
+  // Mẫu Campaign lặp hàng tháng (template hoá Campaign) — khai báo 1 lần,
+  // "Sinh Campaign Cho Tháng" tự tạo thay vì gõ tay form Campaign mỗi tháng.
+  const [campTplBrandId, setCampTplBrandId] = useState(brands[0]?.id ?? "");
+  const [campTplName, setCampTplName] = useState("");
+  const [campTplType, setCampTplType] = useState<Campaign["type"]>("daily");
+  const [campTplTargetGmv, setCampTplTargetGmv] = useState(0);
+  const [campTplStartDay, setCampTplStartDay] = useState(1);
+  const [campTplEndDay, setCampTplEndDay] = useState(1);
+  const [campTplHostBriefing, setCampTplHostBriefing] = useState("");
+  const [creatingCampTpl, setCreatingCampTpl] = useState(false);
+  const [generatingCampaigns, setGeneratingCampaigns] = useState(false);
+  const [generateCampaignsMsg, setGenerateCampaignsMsg] = useState<string | null>(null);
+  const [showCampTemplates, setShowCampTemplates] = useState(false);
+
   useEffect(() => {
     if (!jumpTarget) return;
     setSelectedMonth(jumpTarget.month);
@@ -236,13 +248,6 @@ export default function ShiftScheduling({
     setSelectedDate(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jumpTarget?.nonce]);
-
-  // Giai đoạn 25 — panel đánh giá cuối campaign, chỉ 1 campaign mở cùng lúc.
-  const [reviewingCampaignId, setReviewingCampaignId] = useState<string | null>(null);
-  const [reviewOutcome, setReviewOutcome] = useState<NonNullable<Campaign["outcome"]>>("kpi_met");
-  const [reviewRenewal, setReviewRenewal] = useState<NonNullable<Campaign["renewalDecision"]>>("renew");
-  const [reviewNotesDraft, setReviewNotesDraft] = useState("");
-  const [reviewBusy, setReviewBusy] = useState(false);
 
   const talentsById = useMemo(() => new Map(talents.map((t) => [t.id, t])), [talents]);
   const registrationsBySlot = useMemo(() => {
@@ -271,9 +276,6 @@ export default function ShiftScheduling({
         .sort((a, b) => a.startDate.localeCompare(b.startDate)),
     [campaigns, selectedMonth]
   );
-
-  // Giai đoạn 26 — GMV thật của campaign (xem src/lib/campaignMetrics.ts).
-  const campaignActualGmv = useMemo(() => computeCampaignActualGmv(campaigns, sessions), [campaigns, sessions]);
 
   const monthSlotsUnfiltered = useMemo(
     () => shiftSlots.filter((s) => s.date.startsWith(selectedMonth)).sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime)),
@@ -441,26 +443,45 @@ export default function ShiftScheduling({
     if (ok) resetCampaignForm();
   };
 
-  const handleCampaignStatusChange = async (campaign: Campaign, status: Campaign["status"]) => {
-    await onUpdateCampaign({ ...campaign, status });
+  const resetCampTplForm = () => {
+    setCampTplBrandId(brands[0]?.id ?? "");
+    setCampTplName("");
+    setCampTplType("daily");
+    setCampTplTargetGmv(0);
+    setCampTplStartDay(1);
+    setCampTplEndDay(1);
+    setCampTplHostBriefing("");
   };
 
-  const openReviewPanel = (campaign: Campaign) => {
-    setReviewingCampaignId(campaign.id);
-    setReviewOutcome(campaign.outcome ?? "kpi_met");
-    setReviewRenewal(campaign.renewalDecision ?? "renew");
-    setReviewNotesDraft(campaign.reviewNotes ?? "");
-  };
-
-  const handleSubmitReview = async (campaign: Campaign) => {
-    setReviewBusy(true);
-    const ok = await onSubmitCampaignReview(campaign, {
-      outcome: reviewOutcome,
-      renewalDecision: reviewRenewal,
-      reviewNotes: reviewNotesDraft.trim()
+  const handleCreateCampaignTemplateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const brand = brands.find((b) => b.id === campTplBrandId);
+    if (!brand || !campTplName.trim()) return;
+    setCreatingCampTpl(true);
+    const ok = await onCreateCampaignTemplate({
+      id: `camptpl-${Date.now()}`,
+      brandId: campTplBrandId,
+      brandName: brand.name,
+      name: campTplName.trim(),
+      type: campTplType,
+      targetGmv: Number(campTplTargetGmv) || 0,
+      startDay: campTplStartDay,
+      endDay: Math.max(campTplEndDay, campTplStartDay),
+      hostBriefing: campTplHostBriefing,
+      active: true
     });
-    setReviewBusy(false);
-    if (ok) setReviewingCampaignId(null);
+    setCreatingCampTpl(false);
+    if (ok) resetCampTplForm();
+  };
+
+  const handleGenerateCampaigns = async () => {
+    setGeneratingCampaigns(true);
+    setGenerateCampaignsMsg(null);
+    const count = await onGenerateMonthCampaigns(selectedMonth);
+    setGeneratingCampaigns(false);
+    setGenerateCampaignsMsg(
+      count > 0 ? `Đã sinh ${count} Campaign mới cho tháng ${selectedMonth}.` : "Không có Campaign mới nào để sinh (đã sinh đủ hoặc chưa có mẫu nào)."
+    );
   };
 
   const handleGenerate = async () => {
@@ -642,161 +663,46 @@ export default function ShiftScheduling({
             <div className="space-y-1.5">
               {monthCampaigns.map((c) => {
                 const slotCount = shiftSlots.filter((s) => s.campaignId === c.id).length;
-                const notes = campaignRevisionNotes.filter((n) => n.campaignId === c.id);
                 return (
-                  <div key={c.id} className="bg-slate-950/80 border border-slate-800 rounded-lg px-3 py-2 space-y-2">
-                    <div className="flex flex-wrap items-center gap-2 text-xs">
-                      <span className="font-bold text-white">{c.brandName}</span>
-                      <span className="text-slate-300">{c.name}</span>
-                      <span className="bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full font-bold">{CAMPAIGN_TYPE_LABELS[c.type]}</span>
-                      <span className="text-slate-500 font-mono">{c.startDate} → {c.endDate}</span>
-                      <span className="text-emerald-400 font-bold">KPI {c.targetGmv.toLocaleString("vi-VN")}đ</span>
-                      <span className="text-slate-500">{slotCount} ca đã gán</span>
-                      {c.hostBriefing && (
-                        <span className="flex items-center gap-1 text-amber-300" title={c.hostBriefing}>
-                          <Info className="w-3 h-3" /> Có brief Host
-                        </span>
-                      )}
-                      <div className="flex items-center gap-2 ml-auto">
-                        <select
-                          value={c.status}
-                          onChange={(e) => handleCampaignStatusChange(c, e.target.value as Campaign["status"])}
-                          className={`px-2 py-1 rounded-lg font-bold border ${
-                            c.status === "active"
-                              ? "bg-emerald-950 text-emerald-300 border-emerald-800"
-                              : c.status === "completed"
-                              ? "bg-blue-950 text-blue-300 border-blue-800"
-                              : c.status === "cancelled"
-                              ? "bg-slate-800 text-slate-500 border-slate-700"
-                              : "bg-amber-950 text-amber-300 border-amber-800"
-                          }`}
-                        >
-                          <option value="draft">Draft</option>
-                          <option value="active">Active</option>
-                          <option value="completed">Completed</option>
-                          <option value="cancelled">Cancelled</option>
-                        </select>
-                        <button onClick={() => onDeleteCampaign(c.id)} className="text-slate-500 hover:text-rose-400 transition-colors">
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2 text-[11px] border-t border-slate-800/80 pt-2">
-                      <span className="text-slate-500">Duyệt với Brand:</span>
-                      <span className={`px-2 py-0.5 rounded-full font-bold ${APPROVAL_STATUS_STYLES[c.approvalStatus]}`}>
-                        {APPROVAL_STATUS_LABELS[c.approvalStatus]}
+                  <div key={c.id} className="flex flex-wrap items-center gap-2 text-xs bg-slate-950/80 border border-slate-800 rounded-lg px-3 py-2">
+                    <span className="font-bold text-white">{c.brandName}</span>
+                    <span className="text-slate-300">{c.name}</span>
+                    <span className="bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full font-bold">{CAMPAIGN_TYPE_LABELS[c.type]}</span>
+                    <span className="text-slate-500 font-mono">{c.startDate} → {c.endDate}</span>
+                    <span className="text-emerald-400 font-bold">KPI {c.targetGmv.toLocaleString("vi-VN")}đ</span>
+                    <span className="text-slate-500">{slotCount} ca đã gán</span>
+                    {c.hostBriefing && (
+                      <span className="flex items-center gap-1 text-amber-300" title={c.hostBriefing}>
+                        <Info className="w-3 h-3" /> Brief
                       </span>
-                      {c.sentAt && <span className="text-slate-500">Gửi lúc {new Date(c.sentAt).toLocaleString("vi-VN")}</span>}
-                      {c.approvedAt && <span className="text-emerald-400">Duyệt lúc {new Date(c.approvedAt).toLocaleString("vi-VN")}</span>}
-                      {(c.approvalStatus === "draft" || c.approvalStatus === "revision_requested") && (
-                        <button
-                          onClick={() => onSendCampaignForApproval(c)}
-                          className="ml-auto flex items-center gap-1 bg-blue-950 hover:bg-blue-900 text-blue-300 border border-blue-800 px-2.5 py-1 rounded-lg font-bold transition-colors"
-                        >
-                          <Send className="w-3 h-3" /> Gửi Brand Duyệt
-                        </button>
-                      )}
-                    </div>
-
-                    {notes.length > 0 && (
-                      <div className="space-y-1 border-t border-slate-800/80 pt-2">
-                        <span className="text-[11px] text-amber-400 font-bold flex items-center gap-1">
-                          <MessageSquare className="w-3 h-3" /> Yêu cầu sửa từ Brand ({notes.length})
-                        </span>
-                        {notes.slice(0, 3).map((n) => (
-                          <p key={n.id} className="text-[11px] text-slate-400 pl-4">
-                            <span className="text-slate-300 font-bold">{n.requestedByName}</span> ({new Date(n.createdAt).toLocaleString("vi-VN")}): {n.note}
-                          </p>
-                        ))}
-                      </div>
                     )}
-
-                    {c.status === "completed" && (() => {
-                      const actualGmv = campaignActualGmv.get(c.id) ?? 0;
-                      const pct = c.targetGmv > 0 ? Math.round((actualGmv / c.targetGmv) * 100) : 0;
-                      const reviewing = reviewingCampaignId === c.id;
-                      return (
-                        <div className="space-y-2 border-t border-slate-800/80 pt-2">
-                          <div className="flex flex-wrap items-center gap-2 text-[11px]">
-                            <span className="text-slate-500">Đánh giá cuối campaign:</span>
-                            <span className="text-slate-300">
-                              Thật {actualGmv.toLocaleString("vi-VN")}đ / KPI {c.targetGmv.toLocaleString("vi-VN")}đ ({pct}%)
-                            </span>
-                            {c.outcome && <span className={`px-2 py-0.5 rounded-full font-bold ${OUTCOME_STYLES[c.outcome]}`}>{OUTCOME_LABELS[c.outcome]}</span>}
-                            {c.renewalDecision && (
-                              <span className={`px-2 py-0.5 rounded-full font-bold ${RENEWAL_STYLES[c.renewalDecision]}`}>{RENEWAL_LABELS[c.renewalDecision]}</span>
-                            )}
-                            {!reviewing && (
-                              <button
-                                onClick={() => openReviewPanel(c)}
-                                className="ml-auto flex items-center gap-1 bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-800 px-2.5 py-1 rounded-lg font-bold transition-colors"
-                              >
-                                <Check className="w-3 h-3" /> {c.outcome ? "Sửa Đánh Giá" : "Đánh Giá"}
-                              </button>
-                            )}
-                          </div>
-                          {c.reviewNotes && !reviewing && <p className="text-[11px] text-slate-400 pl-1">{c.reviewNotes}</p>}
-                          {c.reviewedAt && !reviewing && (
-                            <span className="text-[11px] text-slate-600 pl-1">Đánh giá lúc {new Date(c.reviewedAt).toLocaleString("vi-VN")}</span>
-                          )}
-
-                          {reviewing && (
-                            <div className="bg-slate-950/80 border border-emerald-800/60 rounded-lg p-3 space-y-2">
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                <select
-                                  value={reviewOutcome}
-                                  onChange={(e) => setReviewOutcome(e.target.value as NonNullable<Campaign["outcome"]>)}
-                                  className="bg-slate-900 border border-slate-800 rounded-lg p-2 text-white text-xs focus:outline-none focus:border-emerald-500"
-                                >
-                                  {Object.entries(OUTCOME_LABELS).map(([value, label]) => (
-                                    <option key={value} value={value}>
-                                      {label}
-                                    </option>
-                                  ))}
-                                </select>
-                                <select
-                                  value={reviewRenewal}
-                                  onChange={(e) => setReviewRenewal(e.target.value as NonNullable<Campaign["renewalDecision"]>)}
-                                  className="bg-slate-900 border border-slate-800 rounded-lg p-2 text-white text-xs focus:outline-none focus:border-emerald-500"
-                                >
-                                  {Object.entries(RENEWAL_LABELS).map(([value, label]) => (
-                                    <option key={value} value={value}>
-                                      {label}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                              <textarea
-                                value={reviewNotesDraft}
-                                onChange={(e) => setReviewNotesDraft(e.target.value)}
-                                placeholder="Ghi chú đánh giá (lý do đạt/không đạt KPI, dấu hiệu rủi ro rời Brand...)"
-                                rows={2}
-                                className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-white text-xs focus:outline-none focus:border-emerald-500"
-                              />
-                              <div className="flex items-center gap-2">
-                                <button
-                                  onClick={() => handleSubmitReview(c)}
-                                  disabled={reviewBusy}
-                                  className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg font-bold text-xs transition-colors"
-                                >
-                                  {reviewBusy ? "Đang lưu..." : "Lưu Đánh Giá"}
-                                </button>
-                                <button
-                                  onClick={() => setReviewingCampaignId(null)}
-                                  className="text-slate-500 hover:text-slate-300 text-xs transition-colors"
-                                >
-                                  Huỷ
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
+                    <span
+                      className={`px-2 py-0.5 rounded-full font-bold ${
+                        c.status === "active"
+                          ? "bg-emerald-950 text-emerald-300"
+                          : c.status === "completed"
+                          ? "bg-blue-950 text-blue-300"
+                          : c.status === "cancelled"
+                          ? "bg-slate-800 text-slate-500"
+                          : "bg-amber-950 text-amber-300"
+                      }`}
+                    >
+                      {c.status}
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-full font-bold ${APPROVAL_STATUS_STYLES[c.approvalStatus]}`} title="Quản lý duyệt/sửa ở Brand Workspace → Campaign">
+                      {APPROVAL_STATUS_LABELS[c.approvalStatus]}
+                    </span>
+                    {c.outcome && <span className={`px-2 py-0.5 rounded-full font-bold ${OUTCOME_STYLES[c.outcome]}`}>{OUTCOME_LABELS[c.outcome]}</span>}
+                    {c.renewalDecision && (
+                      <span className={`px-2 py-0.5 rounded-full font-bold ${RENEWAL_STYLES[c.renewalDecision]}`}>{RENEWAL_LABELS[c.renewalDecision]}</span>
+                    )}
+                    <button onClick={() => onDeleteCampaign(c.id)} className="ml-auto text-slate-500 hover:text-rose-400 transition-colors">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 );
               })}
+              <p className="text-[11px] text-slate-600">Gửi duyệt, xem yêu cầu sửa và đánh giá cuối kỳ — quản lý đầy đủ ở Brand Workspace → Campaign.</p>
             </div>
           )}
 
@@ -870,6 +776,145 @@ export default function ShiftScheduling({
               {creatingCampaign ? "Đang tạo..." : "+ Tạo Campaign"}
             </button>
           </form>
+
+          <div className="border-t border-slate-800 pt-3">
+            <button
+              onClick={() => setShowCampTemplates((v) => !v)}
+              className="flex items-center gap-1.5 text-xs font-bold text-purple-300 hover:text-purple-200 transition-colors"
+            >
+              {showCampTemplates ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              <Repeat className="w-3.5 h-3.5" /> Mẫu Campaign Lặp Hàng Tháng ({campaignTemplates.length})
+            </button>
+            <p className="text-[11px] text-slate-500 mt-1">
+              Khai báo brand nào tháng nào cũng có campaign cố định (Daily/Mega/Payday...) 1 lần — bấm "Sinh Campaign Cho Tháng" thay vì gõ tay mỗi tháng.
+            </p>
+
+            {showCampTemplates && (
+              <div className="space-y-3 mt-3">
+                {campaignTemplates.length > 0 && (
+                  <div className="space-y-1.5">
+                    {campaignTemplates.map((t) => (
+                      <div
+                        key={t.id}
+                        className={`flex flex-wrap items-center gap-2 text-xs bg-slate-950/80 border border-slate-800 rounded-lg px-3 py-2 ${
+                          !t.active ? "opacity-50" : ""
+                        }`}
+                      >
+                        <span className="font-bold text-white">{t.brandName || "—"}</span>
+                        <span className="text-slate-300">{t.name}</span>
+                        <span className="bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full font-bold">{CAMPAIGN_TYPE_LABELS[t.type]}</span>
+                        <span className="text-slate-500 font-mono">Ngày {t.startDay} → {t.endDay}</span>
+                        <span className="text-emerald-400 font-bold">KPI {t.targetGmv.toLocaleString("vi-VN")}đ</span>
+                        <div className="flex items-center gap-2 ml-auto">
+                          <button
+                            onClick={() => onToggleCampaignTemplate(t)}
+                            className={`px-2 py-1 rounded-lg font-bold ${
+                              t.active
+                                ? "bg-emerald-950 text-emerald-300 border border-emerald-800"
+                                : "bg-slate-800 text-slate-400 border border-slate-700"
+                            }`}
+                          >
+                            {t.active ? "Đang bật" : "Đã tắt"}
+                          </button>
+                          <button onClick={() => onDeleteCampaignTemplate(t.id)} className="text-slate-500 hover:text-rose-400 transition-colors">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <form onSubmit={handleCreateCampaignTemplateSubmit} className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                  <select
+                    value={campTplBrandId}
+                    onChange={(e) => setCampTplBrandId(e.target.value)}
+                    className="bg-slate-950 border border-slate-800 rounded-xl p-2 text-white text-sm focus:outline-none focus:border-purple-500"
+                  >
+                    <option value="">— Brand —</option>
+                    {brands.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    placeholder="Tên mẫu (VD: Mid-month)"
+                    required
+                    value={campTplName}
+                    onChange={(e) => setCampTplName(e.target.value)}
+                    className="bg-slate-950 border border-slate-800 rounded-xl p-2 text-white text-sm focus:outline-none focus:border-purple-500 sm:col-span-2"
+                  />
+                  <select
+                    value={campTplType}
+                    onChange={(e) => setCampTplType(e.target.value as Campaign["type"])}
+                    className="bg-slate-950 border border-slate-800 rounded-xl p-2 text-white text-sm focus:outline-none focus:border-purple-500"
+                  >
+                    {Object.entries(CAMPAIGN_TYPE_LABELS).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="number"
+                    min={0}
+                    placeholder="KPI GMV mặc định"
+                    value={campTplTargetGmv}
+                    onChange={(e) => setCampTplTargetGmv(Number(e.target.value))}
+                    className="bg-slate-950 border border-slate-800 rounded-xl p-2 text-white text-sm focus:outline-none focus:border-purple-500"
+                  />
+                  <div className="flex items-center gap-2 sm:col-span-3 lg:col-span-2">
+                    <input
+                      type="number"
+                      min={1}
+                      max={31}
+                      title="Ngày bắt đầu trong tháng"
+                      value={campTplStartDay}
+                      onChange={(e) => setCampTplStartDay(Number(e.target.value))}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-white text-sm focus:outline-none focus:border-purple-500"
+                    />
+                    <span className="text-slate-500 text-xs shrink-0">→</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={31}
+                      title="Ngày kết thúc trong tháng"
+                      value={campTplEndDay}
+                      onChange={(e) => setCampTplEndDay(Number(e.target.value))}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-white text-sm focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+                  <textarea
+                    placeholder="Brief/đào tạo Host mặc định (tuỳ chọn)"
+                    value={campTplHostBriefing}
+                    onChange={(e) => setCampTplHostBriefing(e.target.value)}
+                    rows={2}
+                    className="bg-slate-950 border border-slate-800 rounded-xl p-2 text-white text-sm focus:outline-none focus:border-purple-500 sm:col-span-3 lg:col-span-5"
+                  />
+                  <button
+                    type="submit"
+                    disabled={creatingCampTpl || !campTplBrandId}
+                    className="bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-bold rounded-xl px-4 py-2 text-sm transition-colors sm:col-span-3 lg:col-span-1"
+                  >
+                    {creatingCampTpl ? "Đang thêm..." : "+ Thêm Mẫu"}
+                  </button>
+                </form>
+
+                <div className="flex flex-wrap items-center gap-3 border-t border-slate-800 pt-3">
+                  <button
+                    onClick={handleGenerateCampaigns}
+                    disabled={generatingCampaigns || campaignTemplates.every((t) => !t.active)}
+                    className="flex items-center gap-1.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white font-bold rounded-xl px-4 py-2 text-sm transition-colors"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    {generatingCampaigns ? "Đang sinh..." : `Sinh Campaign Cho Tháng ${selectedMonth}`}
+                  </button>
+                  {generateCampaignsMsg && <span className="text-xs text-slate-400">{generateCampaignsMsg}</span>}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
