@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import { LiveSession } from "../types";
 import { CalendarDays, ChevronLeft, ChevronRight, TrendingUp } from "lucide-react";
 import { formatCurrencyAdaptive } from "../lib/formatCurrency";
-import { computeGmvByDate, DailyGmv } from "../lib/campaignMetrics";
+import { computeGmvByDate, DailyGmv } from "../lib/gmvMetrics";
 
 interface GmvCalendarProps {
   sessions: LiveSession[];

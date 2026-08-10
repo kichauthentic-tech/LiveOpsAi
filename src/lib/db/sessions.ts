@@ -12,7 +12,6 @@ interface DbLiveSession {
   brand_id: string | null;
   brand_name: string;
   project_id: string | null;
-  campaign_id: string | null;
   shop_tiktok_handle: string;
   studio_id: string | null;
   studio_name: string;
@@ -93,7 +92,6 @@ function sessionFromDb(row: DbLiveSession): Omit<LiveSession, "skus" | "checklis
     brandId: row.brand_id ?? "",
     brandName: row.brand_name,
     projectId: row.project_id ?? undefined,
-    campaignId: row.campaign_id ?? undefined,
     shopTikTokHandle: row.shop_tiktok_handle,
     studioId: row.studio_id ?? "",
     studioName: row.studio_name,
@@ -126,7 +124,6 @@ function sessionToDb(s: LiveSession) {
     brand_id: orNull(s.brandId),
     brand_name: s.brandName ?? "",
     project_id: orNull(s.projectId),
-    campaign_id: orNull(s.campaignId),
     shop_tiktok_handle: s.shopTikTokHandle ?? "",
     studio_id: orNull(s.studioId),
     studio_name: s.studioName ?? "",

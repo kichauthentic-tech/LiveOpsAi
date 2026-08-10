@@ -156,7 +156,6 @@ export interface LiveSession {
   brandId: string;
   brandName: string;
   projectId?: string;
-  campaignId?: string;
   shopTikTokHandle: string;
   studioId: string;
   studioName: string;
@@ -326,7 +325,6 @@ export interface ShiftSlot {
   sessionId?: string;
   createdBy?: string;
   templateId?: string;
-  campaignId?: string;
 }
 
 // Quy tắc lặp theo thứ trong tuần — sinh hàng loạt ShiftSlot cho 1 tháng
@@ -344,70 +342,6 @@ export interface RecurringShiftTemplate {
   notes: string;
   active: boolean;
   createdBy?: string;
-  campaignId?: string;
-}
-
-// Chu kỳ vận hành theo tháng của 1 brand (Daily/Mega D-Day/Mid-month/Payday...)
-// với KPI GMV đã chốt trước — dùng làm căn cứ phân bổ giờ live (Giai đoạn 15).
-// Khác với AgencyProject (dự án hợp tác dài hạn, quản lý ở CrmProjects.tsx):
-// Campaign là chu kỳ ngắn hơn, gắn trực tiếp vào ShiftSlot/RecurringShiftTemplate
-// qua campaignId để lên lịch live.
-export interface Campaign {
-  id: string;
-  brandId: string;
-  brandName: string;
-  name: string;
-  type: "daily" | "mega" | "mid_month" | "payday" | "other";
-  targetGmv: number;
-  startDate: string;
-  endDate: string;
-  status: "draft" | "active" | "completed" | "cancelled";
-  // Đào tạo/brief Host theo campaign (mục #6 CEO đã duyệt) — hiển thị cho
-  // Host/Trợ live khi xem ca thuộc campaign này.
-  hostBriefing: string;
-  createdBy?: string;
-  // Luồng duyệt với Brand (Giai đoạn 16).
-  approvalStatus: "draft" | "sent_for_approval" | "revision_requested" | "approved";
-  sentAt?: string;
-  approvedAt?: string;
-  // Đánh giá cuối Campaign & quyết định gia hạn Brand (Giai đoạn 25, Bước 11
-  // workflow) — điền sau khi campaign đã "completed", so KPI mục tiêu
-  // (targetGmv) với GMV thật đạt được.
-  outcome?: "kpi_met" | "kpi_missed" | "partial";
-  renewalDecision?: "renew" | "at_risk" | "churned";
-  reviewNotes: string;
-  reviewedBy?: string;
-  reviewedAt?: string;
-  // Đánh dấu Campaign do CampaignTemplate sinh ra tự động cho 1 tháng.
-  templateId?: string;
-}
-
-// Template hoá Campaign — nhiều brand tháng nào cũng chắc chắn lặp lại cùng
-// bộ Campaign (Daily/Mega D-Day/Mid-month/Payday...), khai báo 1 lần rồi
-// "Sinh Campaign Cho Tháng" thay vì gõ tay form Campaign mỗi tháng (cùng tinh
-// thần RecurringShiftTemplate đã giải quyết cho Ca — xem migration 0033).
-export interface CampaignTemplate {
-  id: string;
-  brandId?: string;
-  brandName: string;
-  name: string;
-  type: Campaign["type"];
-  targetGmv: number;
-  // Ngày-trong-tháng (1-31), clamp vào số ngày thực khi sinh cho 1 tháng cụ thể.
-  startDay: number;
-  endDay: number;
-  hostBriefing: string;
-  active: boolean;
-  createdBy?: string;
-}
-
-export interface CampaignRevisionNote {
-  id: string;
-  campaignId: string;
-  note: string;
-  requestedBy?: string;
-  requestedByName: string;
-  createdAt: string;
 }
 
 export interface ShiftRegistration {

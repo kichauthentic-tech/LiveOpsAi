@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, WorkflowRule, Talent, Studio, Equipment, Brand, AgencyProject, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, Campaign, CampaignTemplate, CampaignRevisionNote, TalentRateHistoryEntry, BrandPlatformRateHistoryEntry, BrandInvoice, BrandSku, CoFundedVoucher, PromoScheme, SkuPlatformPrice } from "./types";
+import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, WorkflowRule, Talent, Studio, Equipment, Brand, AgencyProject, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, TalentRateHistoryEntry, BrandPlatformRateHistoryEntry, BrandInvoice, BrandSku, CoFundedVoucher, PromoScheme, SkuPlatformPrice } from "./types";
 import { ALL_PERMISSION_DEFINITIONS } from "./data/mockData";
 import { fetchTalents, createTalent, updateTalent, deleteTalent } from "./lib/db/talents";
 import { fetchStudios, createStudio, updateStudio, deleteStudio } from "./lib/db/studios";
@@ -23,22 +23,6 @@ import {
   updateRecurringShiftTemplate,
   deleteRecurringShiftTemplate
 } from "./lib/db/recurringShiftTemplates";
-import {
-  fetchCampaigns,
-  createCampaign,
-  createCampaigns,
-  deleteCampaign,
-  sendCampaignForApproval,
-  respondToCampaignApproval,
-  submitCampaignReview
-} from "./lib/db/campaigns";
-import { fetchCampaignRevisionNotes, createCampaignRevisionNote } from "./lib/db/campaignRevisionNotes";
-import {
-  fetchCampaignTemplates,
-  createCampaignTemplate,
-  updateCampaignTemplate,
-  deleteCampaignTemplate
-} from "./lib/db/campaignTemplates";
 import { fetchTalentRateHistory } from "./lib/db/talentRateHistory";
 import { fetchBrandPlatformRateHistory } from "./lib/db/brandPlatformRateHistory";
 import { fetchBrandInvoices, createBrandInvoice, updateBrandInvoice, deleteBrandInvoice } from "./lib/db/brandInvoices";
@@ -76,8 +60,6 @@ import {
   Store,
   Tag,
   Receipt,
-  ClipboardCheck,
-  Target,
   Package,
   Ticket,
   BarChart3,
@@ -86,7 +68,6 @@ import {
 import { Header, WorkspaceContext } from "./components/Header";
 import { BrandDashboard } from "./components/brand-workspace/BrandDashboard";
 import { BrandCalendar } from "./components/brand-workspace/BrandCalendar";
-import { BrandCampaigns } from "./components/brand-workspace/BrandCampaigns";
 import { BrandSessions } from "./components/brand-workspace/BrandSessions";
 import { BrandRateCard } from "./components/brand-workspace/BrandRateCard";
 import { BrandInvoices } from "./components/brand-workspace/BrandInvoices";
@@ -94,7 +75,6 @@ import { BrandSkuShowcase } from "./components/brand-workspace/BrandSkuShowcase"
 import { PriceListImport } from "./components/brand-workspace/PriceListImport";
 import { BrandVoucherRequests } from "./components/brand-workspace/BrandVoucherRequests";
 import { BrandAudienceAnalytics } from "./components/brand-workspace/BrandAudienceAnalytics";
-import { BrandReviewHistory } from "./components/brand-workspace/BrandReviewHistory";
 import { Login } from "./components/Login";
 import { ResetPasswordScreen } from "./components/ResetPasswordScreen";
 import { AccountSettings } from "./components/AccountSettings";
@@ -209,13 +189,6 @@ export default function App() {
   const [phase14Loading, setPhase14Loading] = useState(true);
   const [phase14Error, setPhase14Error] = useState<string | null>(null);
 
-  // Campaign — chu kỳ vận hành theo tháng của brand (Giai đoạn 15), real data from Supabase `campaigns`.
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [campaignRevisionNotes, setCampaignRevisionNotes] = useState<CampaignRevisionNote[]>([]);
-  // Template hoá Campaign (mục "template hoá Campaign") — mẫu sinh Campaign lặp lại theo tháng.
-  const [campaignTemplates, setCampaignTemplates] = useState<CampaignTemplate[]>([]);
-  const [phase15Loading, setPhase15Loading] = useState(true);
-  const [phase15Error, setPhase15Error] = useState<string | null>(null);
 
   // Rate Card Versioning (Giai đoạn 19) — lịch sử rate theo thời gian, ghi tự động bởi DB
   // trigger (migration 0018). Chỉ đọc, dùng để tra rate đúng tại ngày của session cũ ở
@@ -410,30 +383,6 @@ export default function App() {
       })
       .finally(() => {
         if (!cancelled) setPhase14Loading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [session?.user?.id]);
-
-  useEffect(() => {
-    if (!session) return;
-    let cancelled = false;
-    setPhase15Loading(true);
-    Promise.all([fetchCampaigns(), fetchCampaignRevisionNotes(), fetchCampaignTemplates()])
-      .then(([rows, notes, templates]) => {
-        if (cancelled) return;
-        setCampaigns(rows);
-        setCampaignRevisionNotes(notes);
-        setCampaignTemplates(templates);
-        setPhase15Error(null);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setPhase15Error(err.message ?? "Không tải được dữ liệu Campaign từ Supabase.");
-      })
-      .finally(() => {
-        if (!cancelled) setPhase15Loading(false);
       });
     return () => {
       cancelled = true;
@@ -887,7 +836,6 @@ export default function App() {
         phase6Error && { key: "phase6", message: phase6Error },
         phase7Error && { key: "phase7", message: phase7Error },
         phase14Error && { key: "phase14", message: phase14Error },
-        phase15Error && { key: "phase15", message: phase15Error },
         phase19Error && { key: "phase19", message: phase19Error },
         phase20Error && { key: "phase20", message: phase20Error },
         phaseB1Error && { key: "phaseB1", message: phaseB1Error },
@@ -904,7 +852,6 @@ export default function App() {
       phase6Error,
       phase7Error,
       phase14Error,
-      phase15Error,
       phase19Error,
       phase20Error,
       phaseB1Error,
@@ -1305,8 +1252,7 @@ export default function App() {
           studioName: template.studioName,
           notes: template.notes,
           status: "open",
-          templateId: template.id,
-          campaignId: template.campaignId
+          templateId: template.id
         });
       }
     }
@@ -1340,180 +1286,6 @@ export default function App() {
       return true;
     } catch (e: any) {
       window.alert(`Không thể huỷ đăng ký: ${e.message ?? e}`);
-      return false;
-    }
-  };
-
-  // Handlers for Campaign (Giai đoạn 15)
-  const handleCreateCampaign = async (c: Campaign): Promise<boolean> => {
-    try {
-      const created = await createCampaign(c);
-      setCampaigns((prev) => [created, ...prev]);
-      return true;
-    } catch (e: any) {
-      window.alert(`Không thể tạo campaign: ${e.message ?? e}`);
-      return false;
-    }
-  };
-
-  const handleDeleteCampaign = async (id: string) => {
-    try {
-      await deleteCampaign(id);
-      setCampaigns((prev) => prev.filter((c) => c.id !== id));
-    } catch (e: any) {
-      window.alert(`Không thể xoá campaign: ${e.message ?? e}`);
-    }
-  };
-
-  // Template hoá Campaign — cùng tinh thần handleCreateRecurringTemplate/handleGenerateMonthSlots
-  // ở trên nhưng cho Campaign thay vì Ca.
-  const handleCreateCampaignTemplate = async (t: CampaignTemplate): Promise<boolean> => {
-    try {
-      const created = await createCampaignTemplate(t);
-      setCampaignTemplates((prev) => [...prev, created]);
-      return true;
-    } catch (e: any) {
-      window.alert(`Không thể tạo mẫu Campaign: ${e.message ?? e}`);
-      return false;
-    }
-  };
-
-  const handleToggleCampaignTemplate = async (t: CampaignTemplate): Promise<boolean> => {
-    try {
-      const updated = await updateCampaignTemplate({ ...t, active: !t.active });
-      setCampaignTemplates((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
-      return true;
-    } catch (e: any) {
-      window.alert(`Không thể cập nhật mẫu Campaign: ${e.message ?? e}`);
-      return false;
-    }
-  };
-
-  const handleDeleteCampaignTemplate = async (id: string) => {
-    try {
-      await deleteCampaignTemplate(id);
-      setCampaignTemplates((prev) => prev.filter((t) => t.id !== id));
-    } catch (e: any) {
-      window.alert(`Không thể xoá mẫu Campaign: ${e.message ?? e}`);
-    }
-  };
-
-  // Sinh Campaign cho cả tháng từ các mẫu đang active — bỏ qua mẫu đã sinh
-  // rồi cho đúng tháng đó (tránh tạo trùng khi bấm lại nhiều lần), cùng logic
-  // dedup với handleGenerateMonthSlots ở trên.
-  const handleGenerateMonthCampaigns = async (month: string): Promise<number> => {
-    const [yearStr, monthStr] = month.split("-");
-    const year = Number(yearStr);
-    const monthIdx = Number(monthStr) - 1;
-    const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
-    const pad = (n: number) => `${n}`.padStart(2, "0");
-
-    const existingByTemplateAndStart = new Set(
-      campaigns.filter((c) => c.templateId).map((c) => `${c.templateId}:${c.startDate}`)
-    );
-
-    const toCreate: Campaign[] = [];
-    campaignTemplates
-      .filter((t) => t.active && t.brandId)
-      .forEach((template, idx) => {
-        const startDay = Math.min(template.startDay, daysInMonth);
-        const endDay = Math.min(Math.max(template.endDay, startDay), daysInMonth);
-        const startDate = `${year}-${monthStr.padStart(2, "0")}-${pad(startDay)}`;
-        const endDate = `${year}-${monthStr.padStart(2, "0")}-${pad(endDay)}`;
-        if (existingByTemplateAndStart.has(`${template.id}:${startDate}`)) return;
-        toCreate.push({
-          id: `campaign-${Date.now()}-${idx}`,
-          brandId: template.brandId!,
-          brandName: template.brandName,
-          name: template.name,
-          type: template.type,
-          targetGmv: template.targetGmv,
-          startDate,
-          endDate,
-          status: "draft",
-          hostBriefing: template.hostBriefing,
-          approvalStatus: "draft",
-          reviewNotes: "",
-          templateId: template.id
-        });
-      });
-
-    if (toCreate.length === 0) return 0;
-    try {
-      const created = await createCampaigns(toCreate);
-      setCampaigns((prev) => [...created, ...prev]);
-      return created.length;
-    } catch (e: any) {
-      window.alert(`Không thể sinh Campaign tự động: ${e.message ?? e}`);
-      return 0;
-    }
-  };
-
-  // Giai đoạn 16 — luồng duyệt Campaign với Brand.
-  const handleSendCampaignForApproval = async (campaign: Campaign): Promise<boolean> => {
-    try {
-      const updated = await sendCampaignForApproval(campaign.id);
-      setCampaigns((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
-      await pushAuditLog({
-        action: "Gửi Campaign cho Brand duyệt",
-        details: `Campaign "${campaign.name}" (${campaign.brandName}) đã được gửi cho Brand duyệt lịch.`,
-        category: "Security Alert"
-      });
-      return true;
-    } catch (e: any) {
-      window.alert(`Không thể gửi campaign cho brand duyệt: ${e.message ?? e}`);
-      return false;
-    }
-  };
-
-  const handleRespondToCampaignApproval = async (
-    campaign: Campaign,
-    decision: "approved" | "revision_requested",
-    note?: string
-  ): Promise<boolean> => {
-    try {
-      const updated = await respondToCampaignApproval(campaign.id, decision);
-      setCampaigns((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
-      if (decision === "revision_requested" && note && note.trim()) {
-        const created = await createCampaignRevisionNote({
-          campaignId: campaign.id,
-          note: note.trim(),
-          requestedBy: profile?.id,
-          requestedByName: activeUser.name
-        });
-        setCampaignRevisionNotes((prev) => [created, ...prev]);
-      }
-      await pushAuditLog({
-        action: decision === "approved" ? "Brand duyệt Campaign" : "Brand yêu cầu sửa Campaign",
-        details: `Campaign "${campaign.name}" (${campaign.brandName})${note ? ` — Ghi chú: ${note.trim()}` : ""}`,
-        category: "Security Alert"
-      });
-      return true;
-    } catch (e: any) {
-      window.alert(`Không thể ghi nhận phản hồi duyệt: ${e.message ?? e}`);
-      return false;
-    }
-  };
-
-  // Giai đoạn 25 — đánh giá cuối campaign (Bước 11 workflow: KPI đạt không,
-  // quyết định gia hạn/cảnh báo rủi ro rời Brand).
-  const handleSubmitCampaignReview = async (
-    campaign: Campaign,
-    review: { outcome: NonNullable<Campaign["outcome"]>; renewalDecision: NonNullable<Campaign["renewalDecision"]>; reviewNotes: string }
-  ): Promise<boolean> => {
-    try {
-      const updated = await submitCampaignReview(campaign.id, { ...review, reviewedBy: profile?.id });
-      setCampaigns((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
-      await pushAuditLog({
-        action: "Đánh giá cuối Campaign",
-        details: `Campaign "${campaign.name}" (${campaign.brandName}) — Kết quả: ${review.outcome}, Gia hạn: ${review.renewalDecision}${
-          review.reviewNotes ? ` — Ghi chú: ${review.reviewNotes}` : ""
-        }`,
-        category: "Security Alert"
-      });
-      return true;
-    } catch (e: any) {
-      window.alert(`Không thể lưu đánh giá campaign: ${e.message ?? e}`);
       return false;
     }
   };
@@ -1556,7 +1328,6 @@ export default function App() {
       title: `${brand?.name ?? slot.brandName} - ${slot.date} ${slot.startTime}`,
       brandId: slot.brandId ?? "",
       brandName: brand?.name ?? slot.brandName,
-      campaignId: slot.campaignId,
       shopTikTokHandle: `@${(brand?.name ?? slot.brandName).toLowerCase().replace(/\s+/g, "") || "shop"}_official`,
       studioId: slot.studioId ?? "",
       studioName: studio?.name ?? slot.studioName,
@@ -1697,7 +1468,6 @@ export default function App() {
       items: [
         { id: "brand_dashboard", label: "Dashboard", icon: Store, perm: undefined },
         { id: "brand_calendar", label: "Lịch Vận Hành", icon: CalendarIcon, perm: undefined },
-        { id: "brand_campaigns", label: "Campaign", icon: Target, badge: "CENTRAL", perm: undefined },
         { id: "brand_sessions", label: "Sessions", icon: Radio, perm: undefined },
         { id: "brand_rates", label: "Rate Card", icon: Tag, perm: undefined },
         { id: "brand_skus", label: "SKU Showcase", icon: Package, badge: "NEW", perm: undefined },
@@ -1705,7 +1475,6 @@ export default function App() {
         { id: "brand_vouchers", label: "Voucher Đồng Tài Trợ", icon: Ticket, badge: "NEW", perm: undefined },
         { id: "brand_audience_analytics", label: "Hiệu Suất Xem & Chuyển Đổi", icon: BarChart3, badge: "NEW", perm: undefined },
         { id: "brand_invoices", label: "Hoá Đơn & Công Nợ", icon: Receipt, perm: undefined },
-        { id: "brand_reviews", label: "Báo Cáo Cuối Kỳ", icon: ClipboardCheck, perm: undefined },
         { id: "account_settings", label: "Tài Khoản Của Tôi", icon: UserCog, perm: undefined },
       ],
     },
@@ -1985,7 +1754,6 @@ export default function App() {
                     talents={activeTalents}
                     brands={activeBrands}
                     users={activeUsers}
-                    campaigns={campaigns}
                     onSelectSession={setSelectedSession}
                     onAddSession={handleAddSession}
                     onUpdateSession={handleUpdateSession}
@@ -2000,7 +1768,6 @@ export default function App() {
                     talents={activeTalents}
                     brands={activeBrands}
                     users={activeUsers}
-                    campaigns={campaigns}
                     onAddSession={handleAddSession}
                     onUpdateSession={handleUpdateSession}
                     currentRole={currentRole}
@@ -2023,7 +1790,6 @@ export default function App() {
                     shiftRegistrations={shiftRegistrations}
                     brandPlatformRates={brandPlatformRates}
                     recurringShiftTemplates={recurringShiftTemplates}
-                    campaigns={campaigns}
                     onCreateSlot={handleCreateShiftSlot}
                     onDeleteSlot={handleDeleteShiftSlot}
                     onRegister={handleRegisterSlot}
@@ -2034,15 +1800,8 @@ export default function App() {
                     onToggleTemplate={handleToggleRecurringTemplate}
                     onDeleteTemplate={handleDeleteRecurringTemplate}
                     onGenerateMonthSlots={handleGenerateMonthSlots}
-                    onCreateCampaign={handleCreateCampaign}
-                    onDeleteCampaign={handleDeleteCampaign}
                     onUpdateSession={handleUpdateSession}
                     onLogAudit={pushAuditLog}
-                    campaignTemplates={campaignTemplates}
-                    onCreateCampaignTemplate={handleCreateCampaignTemplate}
-                    onToggleCampaignTemplate={handleToggleCampaignTemplate}
-                    onDeleteCampaignTemplate={handleDeleteCampaignTemplate}
-                    onGenerateMonthCampaigns={handleGenerateMonthCampaigns}
                   />
                 )}
 
@@ -2053,7 +1812,6 @@ export default function App() {
                   <BrandDashboard
                     brandId={currentBrandId!}
                     brand={activeBrands.find((b) => b.id === currentBrandId)}
-                    campaigns={campaigns}
                     sessions={activeSessions}
                     brandInvoices={brandInvoices}
                   />
@@ -2065,22 +1823,7 @@ export default function App() {
                     sessions={activeSessions}
                     studios={activeStudios}
                     talents={activeTalents}
-                    campaigns={campaigns}
                     schemes={promoSchemes}
-                  />
-                )}
-
-                {activeTab === "brand_campaigns" && effectiveWorkspace.type === "brand" && (
-                  <BrandCampaigns
-                    brandId={currentBrandId!}
-                    currentRole={currentRole}
-                    campaigns={campaigns}
-                    sessions={activeSessions}
-                    shiftSlots={shiftSlots}
-                    campaignRevisionNotes={campaignRevisionNotes}
-                    onSendCampaignForApproval={handleSendCampaignForApproval}
-                    onRespondToCampaignApproval={handleRespondToCampaignApproval}
-                    onSubmitCampaignReview={handleSubmitCampaignReview}
                   />
                 )}
 
@@ -2154,10 +1897,6 @@ export default function App() {
                     onUpdateInvoice={handleUpdateBrandInvoice}
                     onDeleteInvoice={handleDeleteBrandInvoice}
                   />
-                )}
-
-                {activeTab === "brand_reviews" && effectiveWorkspace.type === "brand" && (
-                  <BrandReviewHistory brandId={currentBrandId!} campaigns={campaigns} sessions={activeSessions} />
                 )}
 
                 {activeTab === "scripts" && <ScriptGenerator />}

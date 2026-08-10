@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { Campaign, LiveSession, PromoScheme, Studio, Talent } from "../../types";
+import { LiveSession, PromoScheme, Studio, Talent } from "../../types";
 import { CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
 import { schemesForDate } from "../../lib/schemeUtils";
@@ -9,7 +9,6 @@ interface BrandCalendarProps {
   sessions: LiveSession[];
   studios: Studio[];
   talents: Talent[];
-  campaigns: Campaign[];
   schemes?: PromoScheme[];
 }
 
@@ -28,7 +27,7 @@ const shiftMonth = (month: string, delta: number) => {
   return `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, "0")}`;
 };
 
-export const BrandCalendar: React.FC<BrandCalendarProps> = ({ brandId, sessions, studios, talents, campaigns, schemes = [] }) => {
+export const BrandCalendar: React.FC<BrandCalendarProps> = ({ brandId, sessions, studios, talents, schemes = [] }) => {
   const today = new Date();
   const [month, setMonth] = useState(`${today.getFullYear()}-${`${today.getMonth() + 1}`.padStart(2, "0")}`);
 
@@ -44,12 +43,6 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({ brandId, sessions,
     for (const t of talents) map[t.id] = t;
     return map;
   }, [talents]);
-  const campaignById = useMemo(() => {
-    const map: Record<string, Campaign> = {};
-    for (const c of campaigns) map[c.id] = c;
-    return map;
-  }, [campaigns]);
-
   const [y, m] = month.split("-").map(Number);
   const firstDay = new Date(y, m - 1, 1);
   const daysInMonth = new Date(y, m, 0).getDate();
@@ -132,7 +125,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({ brandId, sessions,
                     key={s.id}
                     title={`${s.startTime}-${s.endTime} • ${studioById[s.studioId]?.name ?? s.studioName} • Host ${
                       talentById[s.hostId]?.name ?? s.hostName
-                    }${s.campaignId ? ` • ${campaignById[s.campaignId]?.name ?? ""}` : ""}`}
+                    }`}
                     className={`text-[9px] font-bold px-1 py-0.5 rounded truncate ${STATUS_STYLES[s.status]}`}
                   >
                     {s.startTime} {s.hostName}

@@ -18,7 +18,6 @@ interface DbShiftSlot {
   session_id: string | null;
   created_by: string | null;
   template_id: string | null;
-  campaign_id: string | null;
 }
 
 const toHhMm = (t: string) => t.slice(0, 5);
@@ -38,8 +37,7 @@ function fromDb(row: DbShiftSlot): ShiftSlot {
     status: row.status,
     sessionId: row.session_id ?? undefined,
     createdBy: row.created_by ?? undefined,
-    templateId: row.template_id ?? undefined,
-    campaignId: row.campaign_id ?? undefined
+    templateId: row.template_id ?? undefined
   };
 }
 
@@ -57,8 +55,7 @@ function toDb(s: ShiftSlot) {
     status: s.status,
     session_id: orNull(s.sessionId),
     created_by: orNull(s.createdBy),
-    template_id: orNull(s.templateId),
-    campaign_id: orNull(s.campaignId)
+    template_id: orNull(s.templateId)
   };
 }
 

@@ -16,7 +16,6 @@ interface DbRecurringShiftTemplate {
   notes: string;
   active: boolean;
   created_by: string | null;
-  campaign_id: string | null;
 }
 
 const toHhMm = (t: string) => t.slice(0, 5);
@@ -34,8 +33,7 @@ function fromDb(row: DbRecurringShiftTemplate): RecurringShiftTemplate {
     studioName: row.studio_name,
     notes: row.notes,
     active: row.active,
-    createdBy: row.created_by ?? undefined,
-    campaignId: row.campaign_id ?? undefined
+    createdBy: row.created_by ?? undefined
   };
 }
 
@@ -51,8 +49,7 @@ function toDb(t: RecurringShiftTemplate) {
     studio_name: t.studioName ?? "",
     notes: t.notes ?? "",
     active: t.active,
-    created_by: orNull(t.createdBy),
-    campaign_id: orNull(t.campaignId)
+    created_by: orNull(t.createdBy)
   };
 }
 
