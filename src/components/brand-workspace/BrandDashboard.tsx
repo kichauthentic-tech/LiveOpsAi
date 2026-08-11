@@ -18,6 +18,7 @@ import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContai
 import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
 import { computeGmvByDate } from "../../lib/gmvMetrics";
 import { GmvCalendar } from "../GmvCalendar";
+import { BrandLogo } from "../ui/BrandLogo";
 
 interface BrandDashboardProps {
   brandId: string;
@@ -131,7 +132,7 @@ export const BrandDashboard: React.FC<BrandDashboardProps> = ({ brandId, brand, 
   return (
     <div className="space-y-5">
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex items-center gap-4 shadow-xl">
-        <span className="text-4xl">{brand.logo || "🏷️"}</span>
+        <BrandLogo brand={brand} size="lg" />
         <div>
           <h2 className="text-xl font-black text-white">{brand.name}</h2>
           <p className="text-xs text-slate-400">

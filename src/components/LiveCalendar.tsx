@@ -1,7 +1,17 @@
 import React, { useState, useEffect } from "react";
 import { LiveSession, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, Studio, Talent, Brand, SystemUser, PromoScheme, UserRole } from "../types";
 import { schemesForDate } from "../lib/schemeUtils";
-import { CAMPAIGN_DAY_STYLES, getCampaignDayInfo } from "../lib/campaignDays";
+import { getCampaignDayInfo } from "../lib/campaignDays";
+import { BrandLogo } from "./ui/BrandLogo";
+import { getBrandTheme } from "../lib/brandTheme";
+import { EventPill } from "./ui/EventPill";
+import {
+  SessionEventCard,
+  SESSION_TONE,
+  SESSION_STATUS_LABEL,
+  buildSessionMeta,
+  buildSlotMeta
+} from "./ui/SessionEventCard";
 import { SchemeManager } from "./SchemeManager";
 import { RecurringTemplateManager } from "./scheduling/RecurringTemplateManager";
 import { SlotDetailModal } from "./scheduling/SlotDetailModal";
@@ -66,6 +76,11 @@ interface LiveCalendarProps {
   onUpdateScheme?: (id: string, patch: Partial<Pick<PromoScheme, "title" | "description" | "startDate" | "endDate">>) => Promise<void>;
   onDeleteScheme?: (id: string) => Promise<void>;
 }
+
+// Số card tối đa trong 1 ô lịch tháng — card session giờ cao hơn pill 1 dòng cũ nên phải giới hạn,
+// phần dư gộp thành dòng "+N phiên nữa" (bấm vào ô để sang Ma Trận Ngày xem đủ).
+const MONTH_CELL_MAX_SESSIONS = 2;
+const MONTH_CELL_MAX_SLOTS = 2;
 
 // Ngày hôm nay theo giờ local, format YYYY-MM-DD
 const getTodayDateString = () => {
@@ -714,6 +729,10 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
     }
   };
 
+  const brandById = new Map<string, Brand>(brands.map((b) => [b.id, b]));
+  // Session/ShiftSlot lưu sẵn `brandName`; tra theo tên để lấy logo cho các chỗ chỉ có tên (chú giải).
+  const brandByName = new Map<string, Brand>(brands.map((b) => [b.name, b]));
+
   // Filter sessions
   const filteredSessions = sessions.filter((s) => {
     if (selectedStudioFilter !== "ALL" && s.studioId !== selectedStudioFilter) return false;
@@ -757,6 +776,18 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
 
   // Month Grid Days for Month View
   const monthGridDays = getMonthGridDays(currentYear, currentMonth);
+
+  // Chú giải màu brand cho Lịch Tháng — chỉ liệt kê brand thật sự có phiên/ca trong tháng đang xem,
+  // để bảng chú giải không dài bằng cả danh sách brand của agency.
+  const monthPrefix = `${currentYear}-${`${currentMonth}`.padStart(2, "0")}`;
+  const monthBrandNames = Array.from(
+    new Set(
+      [
+        ...filteredSessions.filter((s) => s.date.startsWith(monthPrefix) && s.status !== "Cancelled").map((s) => s.brandName),
+        ...openSlots.filter((sl) => sl.date.startsWith(monthPrefix)).map((sl) => sl.brandName)
+      ].filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b, "vi"));
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -1031,25 +1062,48 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
 
       {/* VIEW 1: MONTH VIEW (Lịch Tháng - Bảng Lịch 30/31 Ngày) */}
       {viewMode === "month" && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl space-y-4">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-800 pb-3 gap-2">
+        <div className="bg-[#f8f9fa] dark:bg-slate-900 border border-pink-200 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl space-y-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-200 dark:border-slate-800 pb-3 gap-2">
             <div>
-              <h3 className="font-bold text-white text-base flex items-center gap-2">
-                <CalendarIcon className="w-5 h-5 text-blue-400 shrink-0" /> Tổng Quan Lịch Tháng {currentMonth}/{currentYear}
+              <h3 className="font-black text-slate-900 dark:text-white text-base flex items-center gap-2">
+                <CalendarIcon className="w-5 h-5 text-blue-500 dark:text-blue-400 shrink-0" /> Tổng Quan Lịch Tháng {currentMonth}/{currentYear}
               </h3>
-              <p className="text-xs text-slate-400">Kéo thả để đổi lịch</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Kéo thả để đổi lịch · Màu badge = màu nhận diện của brand</p>
             </div>
-            <div className="flex items-center gap-3 text-[11px] font-semibold">
-              <span className="flex items-center gap-1 text-rose-400"><span className="w-2.5 h-2.5 rounded-full bg-rose-600"></span> Live Now</span>
-              <span className="flex items-center gap-1 text-blue-400"><span className="w-2.5 h-2.5 rounded-full bg-blue-600"></span> Có phiên live</span>
+            <div className="flex items-center gap-1.5 flex-wrap text-[11px] font-semibold">
+              {monthBrandNames.map((name) => {
+                const theme = getBrandTheme(name);
+                return (
+                  <span
+                    key={name}
+                    style={{ background: theme.primary, color: theme.onPrimary, borderColor: theme.secondary }}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-full border text-[10px] font-black uppercase tracking-tight shadow-sm"
+                  >
+                    <BrandLogo brand={brandByName.get(name)} size="xs" className="rounded bg-white" />
+                    {name}
+                  </span>
+                );
+              })}
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full border-2 border-dashed border-slate-400 dark:border-slate-600 text-slate-500 dark:text-slate-400 text-[10px] font-black uppercase">
+                Viền đứt = ca chờ ĐK
+              </span>
             </div>
           </div>
 
-          {/* Month Calendar Grid */}
-          <div className="grid grid-cols-7 gap-1 sm:gap-2">
+          {/* Month Calendar Grid — dưới xl, 7 cột chia nhau <100px/ô thì card session không còn đọc
+              được, nên cho cuộn ngang với bề rộng tối thiểu thay vì bóp card thành sọc vô nghĩa. */}
+          <div className="overflow-x-auto -mx-1 px-1 pb-1">
+          <div className="grid grid-cols-7 gap-1 sm:gap-2 min-w-[1080px] xl:min-w-0">
             {/* Header days of week */}
             {["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ Nhật"].map((d, idx) => (
-              <div key={idx} className="p-1 sm:p-2 text-center text-slate-400 font-bold text-xs uppercase bg-slate-950/80 rounded-lg">
+              <div
+                key={idx}
+                className={`p-1 sm:p-2 text-center font-black text-xs uppercase rounded-xl ${
+                  idx >= 5
+                    ? "bg-rose-100 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400"
+                    : "bg-slate-100 dark:bg-slate-900/60 text-slate-500 dark:text-slate-400"
+                }`}
+              >
                 <span className="hidden sm:inline">{d}</span>
                 <span className="sm:hidden">{d === "Chủ Nhật" ? "CN" : d.replace("Thứ ", "T")}</span>
               </div>
@@ -1080,36 +1134,37 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                     setViewMode("day");
                   }}
                   title={campaignDay?.label}
-                  className={`min-h-[64px] sm:min-h-[110px] p-1 sm:p-2 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${
+                  className={`min-h-[110px] sm:min-h-[215px] p-1 sm:p-2.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between relative overflow-visible ${
                     isMonthHovered
-                      ? "bg-blue-950/80 border-2 border-dashed border-blue-400 scale-[1.02] shadow-xl shadow-blue-500/20"
+                      ? "bg-blue-100 dark:bg-blue-950/80 border-2 border-dashed border-blue-400 scale-[1.02] shadow-xl shadow-blue-500/20"
                       : !cell.isCurrentMonth
-                      ? "bg-slate-950/30 border-slate-800/40 opacity-40 hover:opacity-80"
+                      ? "bg-slate-100/60 dark:bg-slate-950/30 border-slate-200 dark:border-slate-800/40 opacity-40 hover:opacity-80"
+                      : isToday
+                      ? "bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-700/60 ring-2 ring-amber-400 shadow-md"
                       : isSelected
-                      ? "bg-blue-950/50 border-blue-500 shadow-md shadow-blue-600/10"
-                      : "bg-slate-950/80 border-slate-800/80 hover:border-slate-700 hover:bg-slate-900"
-                  } ${campaignDay && !isMonthHovered ? CAMPAIGN_DAY_STYLES[campaignDay.type].ring : ""}`}
+                      ? "bg-blue-50 dark:bg-blue-950/50 border-blue-500 shadow-md shadow-blue-600/10"
+                      : "bg-white dark:bg-slate-950/80 border-slate-200 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-900"
+                  }`}
                 >
-                  <div className="flex justify-between items-start">
+                  {isToday && (
+                    <span className="absolute -top-2 right-1.5 shrink-0 text-[8px] sm:text-[9px] font-black px-2 py-0.5 rounded-full bg-orange-500 text-white leading-none shadow-md z-10 tracking-wide">
+                      HÔM NAY
+                    </span>
+                  )}
+                  <div className="flex justify-between items-start flex-wrap gap-1">
                     <span
-                      className={`text-xs font-mono font-bold w-6 h-6 rounded-full flex items-center justify-center ${
+                      className={`shrink-0 text-sm sm:text-base font-black ${
                         isToday
-                          ? "bg-blue-600 text-white"
+                          ? "text-orange-600 dark:text-orange-400"
                           : isSelected
-                          ? "bg-blue-950 text-blue-400 border border-blue-500"
-                          : "text-slate-300"
+                          ? "text-blue-600 dark:text-blue-400"
+                          : "text-slate-700 dark:text-slate-300"
                       }`}
                     >
                       {cell.dayNum}
                     </span>
-                    <div className="flex items-center gap-1">
-                      {campaignDay && (
-                        <span
-                          className={`text-[8px] font-bold px-1 rounded leading-tight ${CAMPAIGN_DAY_STYLES[campaignDay.type].badge}`}
-                        >
-                          {campaignDay.shortLabel}
-                        </span>
-                      )}
+                    <div className="flex items-center gap-1 flex-wrap shrink-0">
+                      {campaignDay && <EventPill tier="black_bold" label={campaignDay.shortLabel} />}
                       {daySchemes.length > 0 && (
                         <span
                           title={daySchemes.map((s) => `${s.title}${s.description ? ` — ${s.description}` : ""}`).join("\n")}
@@ -1118,25 +1173,33 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                           🏷️
                         </span>
                       )}
-                      {daySessions.length > 0 && (
-                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${hasLiveNow ? "bg-rose-600 text-white animate-pulse" : "bg-blue-600/20 text-blue-400 border border-blue-500/30"}`}>
-                          {daySessions.length} phiên
-                        </span>
-                      )}
-                      {daySlots.length > 0 && (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-950/60 text-amber-400 border border-amber-700/50">
-                          {daySlots.length} chờ ĐK
+                      {hasLiveNow && (
+                        <span className="text-[8px] sm:text-[9px] font-black px-1.5 py-0.5 rounded-full bg-rose-600 text-white animate-pulse tracking-wide">
+                          LIVE
                         </span>
                       )}
                     </div>
                   </div>
 
-                  {/* Session badges in cell */}
-                  <div className="space-y-1 my-1">
-                    {daySessions.slice(0, 2).map((ds) => (
-                      <div
+                  {/* Session badges in cell — card to theo màu brand (lib/brandTheme.ts) */}
+                  <div className="space-y-1.5 my-1 flex-1">
+                    {daySessions.slice(0, MONTH_CELL_MAX_SESSIONS).map((ds) => (
+                      <SessionEventCard
                         key={ds.id}
+                        theme={getBrandTheme(ds.brandName)}
+                        brand={brandById.get(ds.brandId)}
+                        brandName={ds.brandName}
+                        startTime={ds.startTime}
+                        endTime={ds.endTime}
+                        meta={buildSessionMeta(ds)}
+                        metaLimit={3}
+                        tone={SESSION_TONE[ds.status]}
+                        statusLabel={SESSION_STATUS_LABEL[ds.status]}
+                        dragging={draggedSessionId === ds.id}
                         draggable
+                        tooltip={`${ds.title} · ${ds.studioName} · Host ${ds.hostName}${
+                          ds.coHostName ? ` · Co-Host ${ds.coHostName}` : ""
+                        } — kéo thả sang ngày khác để chuyển lịch`}
                         onDragStart={(e) => {
                           e.stopPropagation();
                           handleDragStart(e, ds);
@@ -1146,62 +1209,65 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                           e.stopPropagation();
                           setSelectedSessionDetail(ds);
                         }}
-                        className={`text-[9px] p-1 rounded font-medium truncate flex items-center gap-1 cursor-grab active:cursor-grabbing hover:opacity-90 ${
-                          draggedSessionId === ds.id ? "opacity-30 border-dashed border-amber-400" : ""
-                        } ${
-                          ds.status === "Live Now" ? "bg-rose-950 text-rose-300 border border-rose-800" : "bg-slate-900 text-slate-300 border border-slate-800"
-                        }`}
-                        title="Kéo thả sang ngày khác để chuyển lịch"
-                      >
-                        <GripVertical className="w-2.5 h-2.5 text-slate-400 shrink-0" />
-                        <strong className="text-white">{ds.startTime}</strong> {ds.brandName}
-                      </div>
+                      />
                     ))}
-                    {daySessions.length > 2 && (
-                      <span className="text-[9px] text-slate-500 font-bold block">+ {daySessions.length - 2} phiên nữa...</span>
+                    {daySessions.length > MONTH_CELL_MAX_SESSIONS && (
+                      <span className="text-[9px] text-slate-500 font-bold block">
+                        + {daySessions.length - MONTH_CELL_MAX_SESSIONS} phiên nữa...
+                      </span>
                     )}
-                    {daySlots.slice(0, 2).map((sl) => (
-                      <div
+                    {daySlots.slice(0, MONTH_CELL_MAX_SLOTS).map((sl) => (
+                      <SessionEventCard
                         key={sl.id}
+                        theme={getBrandTheme(sl.brandName)}
+                        brand={brandById.get(sl.brandId ?? "")}
+                        brandName={sl.brandName}
+                        startTime={sl.startTime}
+                        endTime={sl.endTime}
+                        meta={buildSlotMeta(sl)}
+                        metaLimit={2}
+                        tone="pending"
+                        statusLabel="CHỜ ĐK"
+                        pending
+                        tooltip={`Ca chờ đăng ký · ${sl.startTime}-${sl.endTime} · ${sl.studioName}`}
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedSlotDetail(sl);
                         }}
-                        title={`Ca chờ đăng ký · ${sl.startTime}-${sl.endTime} · ${sl.studioName}`}
-                        className="text-[9px] p-1 rounded font-medium truncate flex items-center gap-1 bg-amber-950/40 text-amber-300 border border-dashed border-amber-700/60 hover:opacity-80 cursor-pointer"
-                      >
-                        <strong className="text-amber-200">{sl.startTime}</strong> {sl.brandName} · Chờ ĐK
-                      </div>
+                      />
                     ))}
-                    {daySlots.length > 2 && (
-                      <span className="text-[9px] text-amber-500 font-bold block">+ {daySlots.length - 2} ca chờ ĐK nữa...</span>
+                    {daySlots.length > MONTH_CELL_MAX_SLOTS && (
+                      <span className="text-[9px] text-amber-600 dark:text-amber-500 font-bold block">
+                        + {daySlots.length - MONTH_CELL_MAX_SLOTS} ca chờ ĐK nữa...
+                      </span>
                     )}
                   </div>
 
                   {/* Day total GMV */}
                   {totalGmvTarget > 0 ? (
-                    <div className="text-[9px] font-mono font-bold text-emerald-400 pt-1 border-t border-slate-800/60 truncate">
+                    <div className="text-[9px] font-mono font-bold text-emerald-600 dark:text-emerald-400 pt-1 border-t border-slate-200 dark:border-slate-800/60 truncate">
                       Target: {(totalGmvTarget / 1000000).toFixed(0)}M
                     </div>
                   ) : (
-                    <div className="text-[9px] text-slate-600 italic">Trống lịch</div>
+                    <div className="text-[9px] text-slate-400 dark:text-slate-600 italic">Trống lịch</div>
                   )}
                 </div>
               );
             })}
+          </div>
           </div>
         </div>
       )}
 
       {/* VIEW 2: WEEK VIEW (Lịch Tuần - 7 Ngày Từ T2 Đến CN) */}
       {viewMode === "week" && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl space-y-4">
-          <div className="border-b border-slate-800 pb-3 flex justify-between items-center">
+        <div className="bg-[#f8f9fa] dark:bg-slate-900 border border-pink-200 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl space-y-4">
+          <div className="border-b border-slate-200 dark:border-slate-800 pb-3 flex justify-between items-center">
             <div>
-              <h3 className="font-bold text-white text-base flex items-center gap-2">
-                <CalendarIcon className="w-5 h-5 text-blue-400" /> Lịch Vận Hành Tuần
+              <h3 className="font-black text-slate-900 dark:text-white text-base flex items-center gap-2">
+                <CalendarIcon className="w-5 h-5 text-blue-500 dark:text-blue-400" /> Lịch Vận Hành Tuần
               </h3>
-              <p className="text-xs text-slate-400">Kéo thả để đổi lịch</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Kéo thả để đổi lịch</p>
             </div>
           </div>
 
@@ -1224,20 +1290,20 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   onDragLeave={(e) => handleDragLeave(e, weekCellKey)}
                   onDrop={(e) => handleDropOnWeekDay(e, wDay.dateStr)}
                   title={campaignDay?.label}
-                  className={`bg-slate-950 rounded-2xl p-3 border space-y-3 transition-all ${
+                  className={`bg-white dark:bg-slate-950 rounded-2xl p-3 border space-y-3 transition-all ${
                     isWeekHovered
-                      ? "border-2 border-dashed border-blue-400 bg-blue-950/40 shadow-xl shadow-blue-500/20 scale-[1.01]"
+                      ? "border-2 border-dashed border-blue-400 bg-blue-50 dark:bg-blue-950/40 shadow-xl shadow-blue-500/20 scale-[1.01]"
                       : isSelected
-                      ? "border-blue-500/80 bg-blue-950/20"
-                      : "border-slate-800"
-                  } ${campaignDay && !isWeekHovered ? CAMPAIGN_DAY_STYLES[campaignDay.type].ring : ""}`}
+                      ? "border-blue-500/80 bg-blue-50/60 dark:bg-blue-950/20"
+                      : "border-slate-200 dark:border-slate-800"
+                  }`}
                 >
                   <div
                     onClick={() => setSelectedDate(wDay.dateStr)}
-                    className="flex justify-between items-center border-b border-slate-800/80 pb-2 cursor-pointer"
+                    className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800/80 pb-2 cursor-pointer"
                   >
                     <div>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1">
+                      <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase flex items-center gap-1">
                         {wDay.dayName}
                         {daySchemes.length > 0 && (
                           <span title={daySchemes.map((s) => `${s.title}${s.description ? ` — ${s.description}` : ""}`).join("\n")}>
@@ -1245,23 +1311,17 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                           </span>
                         )}
                       </span>
-                      <strong className={`text-sm font-mono font-bold ${isToday ? "text-blue-400" : "text-white"}`}>
+                      <strong className={`text-sm font-mono font-bold ${isToday ? "text-blue-600 dark:text-blue-400" : "text-slate-900 dark:text-white"}`}>
                         {wDay.dayNum}/{parseDateString(wDay.dateStr).month}
                       </strong>
                     </div>
                     <div className="flex items-center gap-1">
-                      {campaignDay && (
-                        <span
-                          className={`text-[8px] font-bold px-1 rounded leading-tight ${CAMPAIGN_DAY_STYLES[campaignDay.type].badge}`}
-                        >
-                          {campaignDay.shortLabel}
-                        </span>
-                      )}
-                      <span className="text-[10px] bg-slate-900 text-slate-400 font-bold px-2 py-0.5 rounded-full">
+                      {campaignDay && <EventPill tier="black_bold" label={campaignDay.shortLabel} />}
+                      <span className="text-[10px] bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 font-bold px-2 py-0.5 rounded-full">
                         {daySessions.length}
                       </span>
                       {daySlots.length > 0 && (
-                        <span className="text-[10px] bg-amber-950/60 text-amber-400 border border-amber-700/50 font-bold px-2 py-0.5 rounded-full">
+                        <span className="text-[10px] bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700/50 font-bold px-2 py-0.5 rounded-full">
                           {daySlots.length} chờ ĐK
                         </span>
                       )}
@@ -1271,58 +1331,42 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   {/* Session cards under this day */}
                   <div className="space-y-2 min-h-[160px]">
                     {daySlots.map((sl) => (
-                      <div
+                      <SessionEventCard
                         key={sl.id}
+                        theme={getBrandTheme(sl.brandName)}
+                        brand={brandById.get(sl.brandId ?? "")}
+                        brandName={sl.brandName}
+                        startTime={sl.startTime}
+                        endTime={sl.endTime}
+                        meta={buildSlotMeta(sl)}
+                        size="md"
+                        tone="pending"
+                        statusLabel="CHỜ ĐK"
+                        pending
+                        tooltip="Ca chờ đăng ký — bấm để xem/đăng ký/chốt lịch"
                         onClick={() => setSelectedSlotDetail(sl)}
-                        title="Ca chờ đăng ký — bấm để xem/đăng ký/chốt lịch"
-                        className="p-2.5 rounded-xl border border-dashed border-amber-700/60 bg-amber-950/30 text-xs space-y-1 cursor-pointer hover:border-amber-500/80"
-                      >
-                        <div className="flex justify-between items-center gap-1">
-                          <span className="font-mono text-[10px] text-amber-300 font-bold">
-                            {sl.startTime}-{sl.endTime}
-                          </span>
-                          <span className="text-[9px] bg-amber-900/60 text-amber-300 font-bold px-1.5 py-0.5 rounded">
-                            Chờ ĐK
-                          </span>
-                        </div>
-                        <p className="font-bold text-amber-100 line-clamp-1 text-[11px]">{sl.brandName}</p>
-                        <p className="text-[10px] text-amber-300/70 line-clamp-1">{sl.studioName}</p>
-                      </div>
+                      />
                     ))}
                     {daySessions.map((ds) => (
-                      <div
+                      <SessionEventCard
                         key={ds.id}
+                        theme={getBrandTheme(ds.brandName)}
+                        brand={brandById.get(ds.brandId)}
+                        brandName={ds.brandName}
+                        startTime={ds.startTime}
+                        endTime={ds.endTime}
+                        title={ds.title}
+                        meta={buildSessionMeta(ds)}
+                        size="md"
+                        tone={SESSION_TONE[ds.status]}
+                        statusLabel={SESSION_STATUS_LABEL[ds.status]}
+                        dragging={draggedSessionId === ds.id}
                         draggable
+                        tooltip="Kéo để đổi ngày"
                         onDragStart={(e) => handleDragStart(e, ds)}
                         onDragEnd={handleDragEnd}
                         onClick={() => setSelectedSessionDetail(ds)}
-                        className={`p-2.5 rounded-xl border text-xs space-y-1 cursor-grab active:cursor-grabbing transition-all hover:scale-[1.02] ${
-                          draggedSessionId === ds.id ? "opacity-30 border-dashed border-amber-400" : ""
-                        } ${
-                          ds.status === "Live Now"
-                            ? "bg-rose-950/60 border-rose-500/60 text-white shadow animate-pulse"
-                            : "bg-slate-900 border-slate-800 text-slate-200 hover:border-blue-500/50"
-                        }`}
-                        title="Kéo để đổi ngày"
-                      >
-                        <div className="flex justify-between items-center gap-1">
-                          <span className="font-mono text-[10px] text-blue-400 font-bold flex items-center gap-1">
-                            <GripVertical className="w-3 h-3 text-slate-400 shrink-0 cursor-grab" />
-                            {ds.startTime}-{ds.endTime}
-                          </span>
-                          <span className="text-[9px] bg-slate-800 text-slate-300 font-semibold px-1 rounded truncate">
-                            {ds.studioName.split(" - ")[0]}
-                          </span>
-                        </div>
-
-                        <p className="font-bold text-white line-clamp-1 text-[11px]">{ds.brandName}</p>
-                        <p className="text-[10px] text-slate-400 line-clamp-1">{ds.title}</p>
-
-                        <div className="flex justify-between items-center pt-1 text-[10px] border-t border-slate-800/80">
-                          <span className="text-slate-400 truncate">{ds.hostName.split(" ")[0]}</span>
-                          <span className="font-mono font-bold text-emerald-400">{(ds.targetGmv/1000000).toFixed(0)}M</span>
-                        </div>
-                      </div>
+                      />
                     ))}
 
                     {daySessions.length === 0 && daySlots.length === 0 && (
@@ -1334,8 +1378,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                         }}
                         className={`h-24 rounded-xl border border-dashed transition-all cursor-pointer flex flex-col items-center justify-center space-y-1 ${
                           isWeekHovered
-                            ? "border-blue-400 bg-blue-950/40 text-blue-300 font-bold"
-                            : "border-slate-800/80 hover:border-blue-500/50 text-slate-600 hover:text-blue-400"
+                            ? "border-blue-400 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-300 font-bold"
+                            : "border-slate-300 dark:border-slate-800/80 hover:border-blue-400 dark:hover:border-blue-500/50 text-slate-400 dark:text-slate-600 hover:text-blue-500 dark:hover:text-blue-400"
                         }`}
                       >
                         <Plus className="w-4 h-4" />
@@ -1361,14 +1405,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                 <Building2 className="w-5 h-5 text-blue-400 shrink-0" /> Ma Trận Phân Bổ Phòng Studio - Ngày {selectedDate} ({getDayOfWeekName(selectedDate)})
                 {(() => {
                   const campaignDay = getCampaignDayInfo(selectedDate);
-                  return campaignDay ? (
-                    <span
-                      title={campaignDay.label}
-                      className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${CAMPAIGN_DAY_STYLES[campaignDay.type].badge}`}
-                    >
-                      {campaignDay.shortLabel}
-                    </span>
-                  ) : null;
+                  return campaignDay ? <EventPill tier="black_bold" label={campaignDay.shortLabel} title={campaignDay.label} /> : null;
                 })()}
               </h3>
               <p className="text-xs text-slate-400">Kéo thả ca live vào bất kỳ ô Studio/Ca Live để đổi phòng hoặc ca làm việc linh hoạt</p>
@@ -1443,57 +1480,39 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                           }`}
                         >
                           {matchedSession ? (
-                            <div
+                            <SessionEventCard
+                              theme={getBrandTheme(matchedSession.brandName)}
+                              brand={brandById.get(matchedSession.brandId)}
+                              brandName={matchedSession.brandName}
+                              startTime={matchedSession.startTime}
+                        endTime={matchedSession.endTime}
+                              title={matchedSession.title}
+                              meta={buildSessionMeta(matchedSession)}
+                              size="md"
+                              tone={SESSION_TONE[matchedSession.status]}
+                              statusLabel={SESSION_STATUS_LABEL[matchedSession.status]}
+                              dragging={draggedSessionId === matchedSession.id}
                               draggable
+                              tooltip="Kéo để đổi ca"
                               onDragStart={(e) => handleDragStart(e, matchedSession)}
                               onDragEnd={handleDragEnd}
                               onClick={() => setSelectedSessionDetail(matchedSession)}
-                              className={`p-2.5 rounded-xl border transition-all cursor-grab active:cursor-grabbing hover:scale-[1.02] space-y-1.5 shadow ${
-                                draggedSessionId === matchedSession.id ? "opacity-30 border-dashed border-amber-400" : ""
-                              } ${
-                                matchedSession.status === "Live Now"
-                                  ? "bg-rose-950/60 border-rose-500/60 text-white hover:border-rose-400 animate-pulse"
-                                  : "bg-blue-950/40 border-blue-500/40 text-slate-200 hover:border-blue-400"
-                              }`}
-                              title="Kéo để đổi ca"
-                            >
-                              <div className="flex justify-between items-start gap-1">
-                                <span className="font-black text-xs text-white line-clamp-1 flex items-center gap-1">
-                                  <GripVertical className="w-3.5 h-3.5 text-slate-400 shrink-0 cursor-grab hover:text-blue-400" />
-                                  {matchedSession.brandName}
-                                </span>
-                                {matchedSession.status === "Live Now" ? (
-                                  <span className="bg-rose-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded uppercase shrink-0">LIVE</span>
-                                ) : (
-                                  <span className="bg-blue-600/30 text-blue-300 text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0">
-                                    {matchedSession.startTime}-{matchedSession.endTime}
-                                  </span>
-                                )}
-                              </div>
-
-                              <p className="text-[11px] text-slate-300 line-clamp-1 font-medium">{matchedSession.title}</p>
-
-                              <div className="flex items-center justify-between text-[10px] pt-1 border-t border-slate-800/60">
-                                <span className="text-slate-400 font-semibold flex items-center gap-1 truncate">
-                                  <User className="w-3 h-3 text-blue-400 shrink-0" /> {matchedSession.hostName.split(" ")[0]}
-                                </span>
-                                <span className="font-mono font-bold text-emerald-400 shrink-0">
-                                  {(matchedSession.targetGmv / 1000000).toFixed(0)}M Target
-                                </span>
-                              </div>
-                            </div>
+                            />
                           ) : matchedSlot ? (
-                            <div
+                            <SessionEventCard
+                              theme={getBrandTheme(matchedSlot.brandName)}
+                              brand={brandById.get(matchedSlot.brandId ?? "")}
+                              brandName={matchedSlot.brandName}
+                              startTime={matchedSlot.startTime}
+                        endTime={matchedSlot.endTime}
+                              meta={buildSlotMeta(matchedSlot)}
+                              size="md"
+                              tone="pending"
+                              statusLabel="CHỜ ĐK"
+                              pending
+                              tooltip={`Ca chờ đăng ký · ${matchedSlot.startTime}-${matchedSlot.endTime} · Bấm để xem/đăng ký/chốt lịch`}
                               onClick={() => setSelectedSlotDetail(matchedSlot)}
-                              title={`Ca chờ đăng ký · ${matchedSlot.startTime}-${matchedSlot.endTime} · Bấm để xem/đăng ký/chốt lịch`}
-                              className="h-20 rounded-xl border border-dashed border-amber-700/60 bg-amber-950/30 p-2 flex flex-col justify-center gap-0.5 cursor-pointer hover:border-amber-500/80"
-                            >
-                              <span className="text-[9px] bg-amber-900/60 text-amber-300 font-bold px-1.5 py-0.5 rounded self-start">
-                                Chờ ĐK
-                              </span>
-                              <p className="text-[11px] font-bold text-amber-100 line-clamp-1">{matchedSlot.brandName}</p>
-                              <p className="text-[9px] text-amber-300/70 font-mono">{matchedSlot.startTime}-{matchedSlot.endTime}</p>
-                            </div>
+                            />
                           ) : (
                             <div
                               onClick={() => {
@@ -1633,7 +1652,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   >
                     <td className="p-3 font-bold text-white">
                       <div>{s.title}</div>
-                      <span className="text-[10px] text-blue-400 font-semibold">{s.brandName}</span>
+                      <span className="text-[10px] text-blue-400 font-semibold inline-flex items-center gap-1"><BrandLogo brand={brandById.get(s.brandId)} size="xs" /> {s.brandName}</span>
                     </td>
                     <td className="p-3 font-mono text-slate-300">
                       {s.date} <strong className="text-white block">{s.startTime} - {s.endTime}</strong>
@@ -1660,7 +1679,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   <tr key={sl.id} onClick={() => setSelectedSlotDetail(sl)} className="hover:bg-amber-950/20 transition-colors cursor-pointer">
                     <td className="p-3 font-bold text-amber-100">
                       <div>{sl.notes || "Ca chờ đăng ký"}</div>
-                      <span className="text-[10px] text-amber-400 font-semibold">{sl.brandName}</span>
+                      <span className="text-[10px] text-amber-400 font-semibold inline-flex items-center gap-1"><BrandLogo brand={brandById.get(sl.brandId)} size="xs" /> {sl.brandName}</span>
                     </td>
                     <td className="p-3 font-mono text-slate-300">
                       {sl.date} <strong className="text-white block">{sl.startTime} - {sl.endTime}</strong>
@@ -1955,7 +1974,9 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
           <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-xl w-full p-4 sm:p-6 space-y-4 shadow-2xl">
             <div className="flex justify-between items-start border-b border-slate-800 pb-3">
               <div>
-                <span className="text-[10px] font-bold text-blue-400 uppercase font-mono">{selectedSessionDetail.brandName}</span>
+                <span className="text-[10px] font-bold text-blue-400 uppercase font-mono inline-flex items-center gap-1">
+                  <BrandLogo brand={brandById.get(selectedSessionDetail.brandId)} size="xs" /> {selectedSessionDetail.brandName}
+                </span>
                 <h3 className="font-bold text-white text-base sm:text-lg">{selectedSessionDetail.title}</h3>
               </div>
               <div className="flex items-center gap-2 shrink-0">

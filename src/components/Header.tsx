@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { UserRole, LiveSession, Brand } from "../types";
-import { ShieldCheck, LogOut, Building2, ChevronDown, Check } from "lucide-react";
+import { ShieldCheck, LogOut, Building2, ChevronDown, Check, Sun, Moon } from "lucide-react";
+import { useTheme } from "../hooks/useTheme";
+import { BrandLogo } from "./ui/BrandLogo";
 
 // Giai đoạn A (Workspace Agency ↔ Brand) — xem WORKSPACE_DESIGN.md.
 export type WorkspaceContext = { type: "agency" } | { type: "brand"; brandId: string };
@@ -38,7 +40,7 @@ const WorkspaceSwitcher: React.FC<{
         {workspace.type === "agency" ? (
           <Building2 className="w-3.5 h-3.5 text-blue-400" />
         ) : (
-          <span className="text-sm leading-none">{currentBrand?.logo ?? "🏷️"}</span>
+          <BrandLogo brand={currentBrand} size="xs" />
         )}
         <span className="text-xs font-bold text-slate-200">{label}</span>
         <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
@@ -71,7 +73,7 @@ const WorkspaceSwitcher: React.FC<{
                 }}
                 className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-800/80 transition-colors"
               >
-                <span className="text-sm leading-none shrink-0">{b.logo || "🏷️"}</span>
+                <BrandLogo brand={b} size="sm" />
                 <span className="flex-1 text-left truncate">{b.name}</span>
                 {workspace.type === "brand" && workspace.brandId === b.id && <Check className="w-3.5 h-3.5 text-blue-400" />}
               </button>
@@ -97,6 +99,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const liveSessions = sessions.filter((s) => s.status === "Live Now");
   const liveGmvTotal = liveSessions.reduce((sum, s) => sum + (s.actualGmv || 0), 0);
+  const { theme, toggleTheme } = useTheme();
 
   return (
     <header className="h-16 border-b border-slate-800/80 px-6 flex items-center justify-between bg-slate-900/40 backdrop-blur-md sticky top-0 z-40 text-white gap-4">
@@ -132,6 +135,14 @@ export const Header: React.FC<HeaderProps> = ({
             {currentRole} {activeUserTitle ? `• ${activeUserTitle}` : ""}
           </span>
         </div>
+
+        <button
+          onClick={toggleTheme}
+          className="p-2 rounded-xl border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-all"
+          title={theme === "dark" ? "Chuyển sang giao diện sáng" : "Chuyển sang giao diện tối"}
+        >
+          {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+        </button>
 
         {onSignOut && (
           <button

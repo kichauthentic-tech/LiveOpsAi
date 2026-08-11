@@ -3,6 +3,7 @@ import { Brand, AgencyProject, SystemUser } from "../types";
 import { Building2, Layers, DollarSign, Sparkles, Plus, Edit3, Trash2, X, CheckCircle2, Clock, Phone, UserCheck } from "lucide-react";
 import { authedFetch } from "../lib/authedFetch";
 import { formatCurrencyAdaptive } from "../lib/formatCurrency";
+import { BrandLogo } from "./ui/BrandLogo";
 
 interface CrmProjectsProps {
   brands: Brand[];
@@ -279,7 +280,7 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
             <div key={b.id} className="p-4 rounded-2xl border border-slate-800 bg-slate-800/40 space-y-3 hover:border-purple-500/50 transition-all relative group">
               <div className="flex justify-between items-start">
                 <div className="flex items-center space-x-3">
-                  <span className="text-2xl p-2 bg-slate-800 rounded-xl border border-slate-700 shadow-sm">{b.logo}</span>
+                  <BrandLogo brand={b} size="md" className="bg-slate-800 border border-slate-700 shadow-sm" />
                   <div>
                     <h4 className="font-bold text-slate-100 text-sm">{b.name}</h4>
                     <p className="text-xs text-purple-300 font-medium">{b.industry}</p>
