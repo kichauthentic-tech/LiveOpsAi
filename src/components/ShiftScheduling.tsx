@@ -26,6 +26,7 @@ import {
   Flame
 } from "lucide-react";
 import { CAMPAIGN_DAY_STYLES, getCampaignDayInfo } from "../lib/campaignDays";
+import { CampaignDayRibbon } from "./ui/CampaignDayRibbon";
 
 interface ShiftSchedulingProps {
   currentRole: UserRole;
@@ -316,41 +317,22 @@ export default function ShiftScheduling({
         </div>
       )}
 
-      {admin && slotsMissingBoth.length > 0 && (
-        <div className="bg-rose-950/50 border border-rose-800 rounded-xl p-4 text-sm text-rose-200">
-          <div className="font-bold flex items-center gap-2 mb-2">
-            <AlertTriangle className="w-4 h-4" /> {slotsMissingBoth.length} ca chưa có ai đăng ký (thiếu cả Host &amp; Trợ live)
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {slotsMissingBoth.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => setSelectedDate(s.date)}
-                className="bg-rose-900/60 border border-rose-800 rounded-lg px-2 py-1 font-mono text-xs hover:bg-rose-900 transition-colors"
-              >
-                {s.date} {s.startTime}-{s.endTime} · {s.brandName}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {admin && slotsMissingCoHost.length > 0 && (
-        <div className="bg-amber-950/50 border border-amber-800 rounded-xl p-4 text-sm text-amber-200">
-          <div className="font-bold flex items-center gap-2 mb-2">
-            <UserX className="w-4 h-4" /> {slotsMissingCoHost.length} ca đã có người đăng ký làm Host, còn thiếu Trợ live (Co-host)
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {slotsMissingCoHost.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => setSelectedDate(s.date)}
-                className="bg-amber-900/60 border border-amber-800 rounded-lg px-2 py-1 font-mono text-xs hover:bg-amber-900 transition-colors"
-              >
-                {s.date} {s.startTime}-{s.endTime} · {s.brandName}
-              </button>
-            ))}
-          </div>
+      {/* Cảnh báo gói gọn 1 dòng — chi tiết từng ca xem trên lịch ma trận / danh sách ca theo ngày */}
+      {admin && (slotsMissingBoth.length > 0 || slotsMissingCoHost.length > 0) && (
+        <div className="bg-rose-950/40 border border-rose-900 rounded-xl px-4 py-2.5 text-sm text-rose-200 flex flex-wrap items-center gap-x-3 gap-y-1">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          {slotsMissingBoth.length > 0 && (
+            <span>
+              <span className="font-bold">{slotsMissingBoth.length}</span> ca chưa có ai đăng ký
+            </span>
+          )}
+          {slotsMissingBoth.length > 0 && slotsMissingCoHost.length > 0 && <span className="text-rose-700">·</span>}
+          {slotsMissingCoHost.length > 0 && (
+            <span className="text-amber-200">
+              <span className="font-bold">{slotsMissingCoHost.length}</span> ca thiếu Trợ live
+            </span>
+          )}
+          <span className="text-rose-400/70 text-xs">— chọn ngày đỏ/vàng trên lịch để xử lý</span>
         </div>
       )}
 
@@ -373,7 +355,7 @@ export default function ShiftScheduling({
               ))}
             </div>
             <div className="grid grid-cols-7 gap-1.5">
-              {monthGrid.map((cell) => {
+              {monthGrid.map((cell, cellIdx) => {
                 const daySlots = slotsByDate.get(cell.date) ?? [];
                 const dayNum = Number(cell.date.slice(8, 10));
                 const isToday = cell.date === today;
@@ -402,16 +384,19 @@ export default function ShiftScheduling({
                         : "border-slate-800 bg-slate-950/50 hover:border-slate-700"
                     } ${!cell.inMonth ? "opacity-35" : ""} ${campaignDay ? CAMPAIGN_DAY_STYLES[campaignDay.type].ring : ""}`}
                   >
+                    {/* Gọi ở MỌI ô: ô ngày thường chừa dải trống cùng chiều cao nên số ngày cả
+                        hàng vẫn thẳng, dải camp không "chèn" đẩy riêng 3 ô camp xuống. */}
+                    <CampaignDayRibbon
+                      info={campaignDay}
+                      columnIndex={cellIdx % 7}
+                      isGridStart={cellIdx === 0}
+                      cellsRemainingInGrid={monthGrid.length - cellIdx}
+                      variant="compact"
+                    />
+
                     <div className="flex items-center justify-between">
                       <span className={`text-xs font-mono font-bold ${isToday ? "text-purple-300" : "text-slate-300"}`}>{dayNum}</span>
                       <div className="flex items-center gap-1">
-                        {campaignDay && (
-                          <span
-                            className={`text-[8px] font-bold px-1 rounded leading-tight ${CAMPAIGN_DAY_STYLES[campaignDay.type].badge}`}
-                          >
-                            {campaignDay.shortLabel}
-                          </span>
-                        )}
                         {dayWarningColor && <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dayWarningColor}`} title={dayWarningTitle} />}
                       </div>
                     </div>
@@ -476,24 +461,22 @@ export default function ShiftScheduling({
         </div>
       </div>
 
+      {/* Chỉ hiện danh sách ca của ngày đang chọn — bỏ danh sách dàn trải cả tháng */}
+      {selectedDate && (
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl">
         <div className="flex items-center justify-between gap-2 flex-wrap mb-4">
           <h3 className="font-bold text-white flex items-center gap-2">
             <Radio className="w-4 h-4 text-blue-400" />
-            {selectedDate ? `Ca Ngày ${dayLabel(selectedDate)} ${selectedDate}` : `Danh Sách Ca Tháng ${selectedMonth}`}
+            {`Ca Ngày ${dayLabel(selectedDate)} ${selectedDate}`}
           </h3>
-          {selectedDate && (
-            <button onClick={() => setSelectedDate(null)} className="text-xs text-blue-400 hover:text-blue-300 font-bold">
-              Xem cả tháng
-            </button>
-          )}
+          <button onClick={() => setSelectedDate(null)} className="text-xs text-blue-400 hover:text-blue-300 font-bold">
+            × Đóng
+          </button>
         </div>
         <div className="overflow-x-auto -mx-2">
           <div className="min-w-[720px] px-2 space-y-2">
             {visibleSlots.length === 0 && (
-              <p className="text-sm text-slate-500 py-6 text-center">
-                {selectedDate ? "Chưa có ca nào trong ngày này." : "Chưa có ca nào mở trong tháng này."}
-              </p>
+              <p className="text-sm text-slate-500 py-6 text-center">Chưa có ca nào trong ngày này.</p>
             )}
             {visibleSlots.map((slot) => {
               const regs = registrationsBySlot.get(slot.id) ?? [];
@@ -742,6 +725,7 @@ export default function ShiftScheduling({
           </div>
         </div>
       </div>
+      )}
 
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl">
         <h3 className="font-bold text-white flex items-center gap-2 mb-4">
