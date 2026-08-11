@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { LiveSession, Studio, Talent, Brand, SystemUser, PromoScheme, UserRole } from "../types";
+import { LiveSession, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, Studio, Talent, Brand, SystemUser, PromoScheme, UserRole } from "../types";
 import { schemesForDate } from "../lib/schemeUtils";
 import { CAMPAIGN_DAY_STYLES, getCampaignDayInfo } from "../lib/campaignDays";
 import { SchemeManager } from "./SchemeManager";
+import { RecurringTemplateManager } from "./scheduling/RecurringTemplateManager";
+import { SlotDetailModal } from "./scheduling/SlotDetailModal";
 import {
   Calendar as CalendarIcon,
   Clock,
@@ -38,13 +40,27 @@ export interface TimeSlot {
 
 interface LiveCalendarProps {
   sessions: LiveSession[];
+  shiftSlots?: ShiftSlot[];
+  shiftRegistrations?: ShiftRegistration[];
   studios: Studio[];
   talents: Talent[];
   brands: Brand[];
   users: SystemUser[];
   onAddSession?: (newSession: LiveSession) => Promise<boolean>;
   onUpdateSession?: (updatedSession: LiveSession) => Promise<boolean>;
+  onCreateSlot?: (slot: ShiftSlot) => Promise<boolean>;
+  onDeleteSlot?: (id: string) => Promise<void>;
+  onRegisterSlot?: (slotId: string, talentId: string) => Promise<boolean>;
+  onUnregisterSlot?: (slotId: string, talentId: string) => Promise<boolean>;
+  onFinalizeSlot?: (slot: ShiftSlot, hostId: string, coHostId: string | null) => Promise<boolean>;
+  myTalentId?: string;
+  currentUserId?: string;
   currentRole?: UserRole;
+  recurringShiftTemplates?: RecurringShiftTemplate[];
+  onCreateTemplate?: (t: RecurringShiftTemplate) => Promise<boolean>;
+  onToggleTemplate?: (t: RecurringShiftTemplate) => Promise<boolean>;
+  onDeleteTemplate?: (id: string) => Promise<void>;
+  onGenerateMonthSlots?: (month: string) => Promise<number>;
   schemes?: PromoScheme[];
   onAddScheme?: (scheme: { title: string; description: string; startDate: string; endDate: string }) => Promise<void>;
   onUpdateScheme?: (id: string, patch: Partial<Pick<PromoScheme, "title" | "description" | "startDate" | "endDate">>) => Promise<void>;
@@ -71,19 +87,34 @@ const FIXED_TIME_SLOTS: TimeSlot[] = [
 
 export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   sessions: propSessions,
+  shiftSlots = [],
+  shiftRegistrations = [],
   studios,
   talents,
   brands,
   users,
   onAddSession,
   onUpdateSession,
+  onCreateSlot,
+  onDeleteSlot,
+  onRegisterSlot,
+  onUnregisterSlot,
+  onFinalizeSlot,
+  myTalentId,
+  currentUserId,
   currentRole,
+  recurringShiftTemplates = [],
+  onCreateTemplate,
+  onToggleTemplate,
+  onDeleteTemplate,
+  onGenerateMonthSlots,
   schemes = [],
   onAddScheme,
   onUpdateScheme,
   onDeleteScheme
 }) => {
   const canEditSchemes = currentRole === "ceo" || currentRole === "admin" || currentRole === "operations";
+  const canManageTemplates = canEditSchemes && !!onCreateTemplate && !!onGenerateMonthSlots;
   const [showSchemeManager, setShowSchemeManager] = useState(false);
   const moderators = users.filter((u) => u.role === "moderator");
   // Sync sessions with propSessions so clean test mode is respected
@@ -112,17 +143,31 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   // Modal State
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [selectedSessionDetail, setSelectedSessionDetail] = useState<LiveSession | null>(null);
+  const [selectedSlotDetail, setSelectedSlotDetail] = useState<ShiftSlot | null>(null);
+  const canManageSlots = currentRole === "ceo" || currentRole === "admin" || currentRole === "operations";
 
   // New Booking Form State
+  const [bookingMode, setBookingMode] = useState<"session" | "slot">("session");
   const [newTitle, setNewTitle] = useState("");
   const [newBrandId, setNewBrandId] = useState(brands[0]?.id || "");
   const [newStudioId, setNewStudioId] = useState(studios[0]?.id || "");
   const [newHostId, setNewHostId] = useState(talents[0]?.id || "");
+  const [newCoHostId, setNewCoHostId] = useState("");
   const [newDate, setNewDate] = useState(selectedDate);
   const [newStartTime, setNewStartTime] = useState("14:00");
   const [newEndTime, setNewEndTime] = useState("17:00");
   const [newTargetGmv, setNewTargetGmv] = useState(200000000);
   const [newAssistantId, setNewAssistantId] = useState(moderators[0]?.id || "");
+
+  // Edit state cho session đã có (mở từ panel chi tiết)
+  const [isEditingDetail, setIsEditingDetail] = useState(false);
+  const [editDate, setEditDate] = useState("");
+  const [editStartTime, setEditStartTime] = useState("");
+  const [editEndTime, setEditEndTime] = useState("");
+  const [editStudioId, setEditStudioId] = useState("");
+  const [editHostId, setEditHostId] = useState("");
+  const [editCoHostId, setEditCoHostId] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
 
   // AI Recommendation State
   const [aiSuggestion, setAiSuggestion] = useState<string | null>(null);
@@ -443,7 +488,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   };
 
   // Conflict Checker
-  const checkConflicts = (studioId: string, hostId: string, date: string, start: string, end: string) => {
+  const checkConflicts = (studioId: string, hostId: string, date: string, start: string, end: string, excludeSessionId?: string) => {
     const conflicts = {
       studioConflict: false,
       hostConflict: false,
@@ -452,6 +497,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
     };
 
     sessions.forEach((s) => {
+      if (s.id === excludeSessionId) return;
       if (s.date === date && s.status !== "Cancelled") {
         if (s.startTime < end && s.endTime > start) {
           if (s.studioId === studioId) {
@@ -470,13 +516,41 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   };
 
   const currentFormConflicts = checkConflicts(newStudioId, newHostId, newDate, newStartTime, newEndTime);
+  const currentEditConflicts = selectedSessionDetail
+    ? checkConflicts(editStudioId, editHostId, editDate, editStartTime, editEndTime, selectedSessionDetail.id)
+    : { studioConflict: false, hostConflict: false, studioConflictWith: "", hostConflictWith: "" };
 
-  // Save new session
+  // Save new session hoặc mở ca chờ đăng ký (tuỳ bookingMode)
   const handleSaveBooking = async (e: React.FormEvent) => {
     e.preventDefault();
     const brandObj = brands.find((b) => b.id === newBrandId);
     const studioObj = studios.find((s) => s.id === newStudioId);
+
+    if (bookingMode === "slot") {
+      const newSlot: ShiftSlot = {
+        id: `slot-${Date.now()}`,
+        date: newDate,
+        startTime: newStartTime,
+        endTime: newEndTime,
+        brandId: newBrandId || undefined,
+        brandName: brandObj?.name || "Brand Partner",
+        platform: "TikTok",
+        studioId: newStudioId || undefined,
+        studioName: studioObj?.name || "Studio Standard",
+        notes: newTitle,
+        status: "open",
+        createdBy: currentUserId
+      };
+      const ok = onCreateSlot ? await onCreateSlot(newSlot) : true;
+      if (!ok) return;
+      setIsBookingModalOpen(false);
+      setNewTitle("");
+      setAiSuggestion(null);
+      return;
+    }
+
     const hostObj = talents.find((t) => t.id === newHostId);
+    const coHostObj = talents.find((t) => t.id === newCoHostId);
     const assistantObj = moderators.find((m) => m.id === newAssistantId);
     const assistantName = assistantObj?.name || "Chưa gán Trợ Lý";
 
@@ -492,7 +566,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
       hostName: hostObj?.name || "Host Live",
       assistantId: newAssistantId || undefined,
       assistantName,
-      coHostName: "",
+      coHostId: newCoHostId || undefined,
+      coHostName: coHostObj?.name || "",
       platform: "TikTok",
       date: newDate,
       startTime: newStartTime,
@@ -524,7 +599,45 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
 
     setIsBookingModalOpen(false);
     setNewTitle("");
+    setNewCoHostId("");
     setAiSuggestion(null);
+  };
+
+  const openEditDetail = (session: LiveSession) => {
+    setEditDate(session.date);
+    setEditStartTime(session.startTime);
+    setEditEndTime(session.endTime);
+    setEditStudioId(session.studioId);
+    setEditHostId(session.hostId);
+    setEditCoHostId(session.coHostId || "");
+    setIsEditingDetail(true);
+  };
+
+  const handleSaveDetailEdit = async () => {
+    if (!selectedSessionDetail) return;
+    const studioObj = studios.find((s) => s.id === editStudioId);
+    const hostObj = talents.find((t) => t.id === editHostId);
+    const coHostObj = talents.find((t) => t.id === editCoHostId);
+
+    const updated: LiveSession = {
+      ...selectedSessionDetail,
+      date: editDate,
+      startTime: editStartTime,
+      endTime: editEndTime,
+      studioId: editStudioId,
+      studioName: studioObj?.name || selectedSessionDetail.studioName,
+      hostId: editHostId,
+      hostName: hostObj?.name || selectedSessionDetail.hostName,
+      coHostId: editCoHostId || undefined,
+      coHostName: coHostObj?.name || ""
+    };
+
+    setSavingEdit(true);
+    const ok = onUpdateSession ? await onUpdateSession(updated) : true;
+    setSavingEdit(false);
+    if (!ok) return;
+    setSelectedSessionDetail(updated);
+    setIsEditingDetail(false);
   };
 
   // AI Optimizer
@@ -613,6 +726,23 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
       const matchHost = s.hostName.toLowerCase().includes(q);
       const matchStudio = s.studioName.toLowerCase().includes(q);
       if (!matchTitle && !matchBrand && !matchHost && !matchStudio) return false;
+    }
+    return true;
+  });
+
+  // Ca đang mở chờ đăng ký (chưa có host) — vẽ song song với session đã chốt
+  // trên mọi view, cùng bộ filter studio/brand (host filter không áp dụng vì
+  // slot chưa có host).
+  const openSlots = shiftSlots.filter((sl) => {
+    if (sl.status !== "open") return false;
+    if (selectedStudioFilter !== "ALL" && sl.studioId !== selectedStudioFilter) return false;
+    if (selectedBrandFilter !== "ALL" && sl.brandId !== selectedBrandFilter) return false;
+    if (searchQuery.trim() !== "") {
+      const q = searchQuery.toLowerCase();
+      const matchBrand = sl.brandName.toLowerCase().includes(q);
+      const matchStudio = sl.studioName.toLowerCase().includes(q);
+      const matchNotes = sl.notes.toLowerCase().includes(q);
+      if (!matchBrand && !matchStudio && !matchNotes) return false;
     }
     return true;
   });
@@ -707,7 +837,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   : "text-slate-400 hover:text-white"
               }`}
             >
-              <Layers className="w-3.5 h-3.5" /> Tất Cả ({filteredSessions.length})
+              <Layers className="w-3.5 h-3.5" /> Tất Cả ({filteredSessions.length}{openSlots.length > 0 ? ` +${openSlots.length} chờ ĐK` : ""})
             </button>
           </div>
         </div>
@@ -839,6 +969,22 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
         />
       )}
 
+      {canManageTemplates && (
+        <RecurringTemplateManager
+          templates={recurringShiftTemplates}
+          brands={brands}
+          studios={studios}
+          currentMonth={currentMonth}
+          currentYear={currentYear}
+          currentUserId={currentUserId}
+          onCreateTemplate={onCreateTemplate!}
+          onToggleTemplate={onToggleTemplate!}
+          onDeleteTemplate={onDeleteTemplate!}
+          onGenerateMonthSlots={onGenerateMonthSlots!}
+        />
+      )}
+
+
       {/* DRAG & DROP HELPER BANNER */}
       {draggedSessionId ? (
         <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white px-4 py-3 rounded-2xl shadow-xl border border-blue-400/50 flex items-center justify-between animate-pulse">
@@ -912,6 +1058,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
             {/* Grid Days */}
             {monthGridDays.map((cell, idx) => {
               const daySessions = filteredSessions.filter((s) => s.date === cell.dateStr && s.status !== "Cancelled");
+              const daySlots = openSlots.filter((sl) => sl.date === cell.dateStr);
               const isSelected = cell.dateStr === selectedDate;
               const isToday = cell.dateStr === getTodayDateString();
               const totalGmvTarget = daySessions.reduce((acc, curr) => acc + curr.targetGmv, 0);
@@ -976,6 +1123,11 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                           {daySessions.length} phiên
                         </span>
                       )}
+                      {daySlots.length > 0 && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-950/60 text-amber-400 border border-amber-700/50">
+                          {daySlots.length} chờ ĐK
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -1007,6 +1159,22 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                     ))}
                     {daySessions.length > 2 && (
                       <span className="text-[9px] text-slate-500 font-bold block">+ {daySessions.length - 2} phiên nữa...</span>
+                    )}
+                    {daySlots.slice(0, 2).map((sl) => (
+                      <div
+                        key={sl.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedSlotDetail(sl);
+                        }}
+                        title={`Ca chờ đăng ký · ${sl.startTime}-${sl.endTime} · ${sl.studioName}`}
+                        className="text-[9px] p-1 rounded font-medium truncate flex items-center gap-1 bg-amber-950/40 text-amber-300 border border-dashed border-amber-700/60 hover:opacity-80 cursor-pointer"
+                      >
+                        <strong className="text-amber-200">{sl.startTime}</strong> {sl.brandName} · Chờ ĐK
+                      </div>
+                    ))}
+                    {daySlots.length > 2 && (
+                      <span className="text-[9px] text-amber-500 font-bold block">+ {daySlots.length - 2} ca chờ ĐK nữa...</span>
                     )}
                   </div>
 
@@ -1040,6 +1208,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
             {currentWeekDates.map((wDay) => {
               const daySessions = filteredSessions.filter((s) => s.date === wDay.dateStr && s.status !== "Cancelled");
+              const daySlots = openSlots.filter((sl) => sl.date === wDay.dateStr);
               const isSelected = wDay.dateStr === selectedDate;
               const isToday = wDay.dateStr === getTodayDateString();
 
@@ -1091,11 +1260,35 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                       <span className="text-[10px] bg-slate-900 text-slate-400 font-bold px-2 py-0.5 rounded-full">
                         {daySessions.length}
                       </span>
+                      {daySlots.length > 0 && (
+                        <span className="text-[10px] bg-amber-950/60 text-amber-400 border border-amber-700/50 font-bold px-2 py-0.5 rounded-full">
+                          {daySlots.length} chờ ĐK
+                        </span>
+                      )}
                     </div>
                   </div>
 
                   {/* Session cards under this day */}
                   <div className="space-y-2 min-h-[160px]">
+                    {daySlots.map((sl) => (
+                      <div
+                        key={sl.id}
+                        onClick={() => setSelectedSlotDetail(sl)}
+                        title="Ca chờ đăng ký — bấm để xem/đăng ký/chốt lịch"
+                        className="p-2.5 rounded-xl border border-dashed border-amber-700/60 bg-amber-950/30 text-xs space-y-1 cursor-pointer hover:border-amber-500/80"
+                      >
+                        <div className="flex justify-between items-center gap-1">
+                          <span className="font-mono text-[10px] text-amber-300 font-bold">
+                            {sl.startTime}-{sl.endTime}
+                          </span>
+                          <span className="text-[9px] bg-amber-900/60 text-amber-300 font-bold px-1.5 py-0.5 rounded">
+                            Chờ ĐK
+                          </span>
+                        </div>
+                        <p className="font-bold text-amber-100 line-clamp-1 text-[11px]">{sl.brandName}</p>
+                        <p className="text-[10px] text-amber-300/70 line-clamp-1">{sl.studioName}</p>
+                      </div>
+                    ))}
                     {daySessions.map((ds) => (
                       <div
                         key={ds.id}
@@ -1132,7 +1325,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                       </div>
                     ))}
 
-                    {daySessions.length === 0 && (
+                    {daySessions.length === 0 && daySlots.length === 0 && (
                       <div
                         onClick={() => {
                           setSelectedDate(wDay.dateStr);
@@ -1183,6 +1376,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
             <div className="flex flex-wrap items-center gap-3 text-[11px] font-semibold">
               <span className="flex items-center gap-1 text-rose-400"><span className="w-2.5 h-2.5 rounded-full bg-rose-600"></span> Live</span>
               <span className="flex items-center gap-1 text-blue-400"><span className="w-2.5 h-2.5 rounded-full bg-blue-600"></span> Đã Đặt</span>
+              <span className="flex items-center gap-1 text-amber-400"><span className="w-2.5 h-2.5 rounded-full bg-amber-600"></span> Chờ Đăng Ký</span>
               <span className="flex items-center gap-1 text-emerald-400"><span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span> Trống</span>
             </div>
           </div>
@@ -1225,6 +1419,15 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                           s.endTime > slot.start &&
                           s.status !== "Cancelled"
                       );
+                      const matchedSlot = !matchedSession
+                        ? openSlots.find(
+                            (sl) =>
+                              sl.date === selectedDate &&
+                              sl.studioId === std.id &&
+                              sl.startTime < slot.end &&
+                              sl.endTime > slot.start
+                          )
+                        : undefined;
 
                       const matrixCellKey = `matrix_${std.id}_${slot.id}`;
                       const isMatrixHovered = dragOverCellKey === matrixCellKey;
@@ -1278,6 +1481,18 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                                   {(matchedSession.targetGmv / 1000000).toFixed(0)}M Target
                                 </span>
                               </div>
+                            </div>
+                          ) : matchedSlot ? (
+                            <div
+                              onClick={() => setSelectedSlotDetail(matchedSlot)}
+                              title={`Ca chờ đăng ký · ${matchedSlot.startTime}-${matchedSlot.endTime} · Bấm để xem/đăng ký/chốt lịch`}
+                              className="h-20 rounded-xl border border-dashed border-amber-700/60 bg-amber-950/30 p-2 flex flex-col justify-center gap-0.5 cursor-pointer hover:border-amber-500/80"
+                            >
+                              <span className="text-[9px] bg-amber-900/60 text-amber-300 font-bold px-1.5 py-0.5 rounded self-start">
+                                Chờ ĐK
+                              </span>
+                              <p className="text-[11px] font-bold text-amber-100 line-clamp-1">{matchedSlot.brandName}</p>
+                              <p className="text-[9px] text-amber-300/70 font-mono">{matchedSlot.startTime}-{matchedSlot.endTime}</p>
                             </div>
                           ) : (
                             <div
@@ -1396,7 +1611,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
       {/* VIEW 5: LIST VIEW */}
       {viewMode === "list" && (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl space-y-4">
-          <h3 className="font-bold text-white text-base">Danh Sách Tất Cả Các Phiên Live</h3>
+          <h3 className="font-bold text-white text-base">Danh Sách Tất Cả Các Phiên Live &amp; Ca Chờ Đăng Ký</h3>
           <div className="overflow-x-auto scrollbar-thin">
             <table className="w-full text-left text-xs border-collapse min-w-[650px]">
               <thead>
@@ -1441,6 +1656,25 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                     </td>
                   </tr>
                 ))}
+                {openSlots.map((sl) => (
+                  <tr key={sl.id} onClick={() => setSelectedSlotDetail(sl)} className="hover:bg-amber-950/20 transition-colors cursor-pointer">
+                    <td className="p-3 font-bold text-amber-100">
+                      <div>{sl.notes || "Ca chờ đăng ký"}</div>
+                      <span className="text-[10px] text-amber-400 font-semibold">{sl.brandName}</span>
+                    </td>
+                    <td className="p-3 font-mono text-slate-300">
+                      {sl.date} <strong className="text-white block">{sl.startTime} - {sl.endTime}</strong>
+                    </td>
+                    <td className="p-3 text-slate-300">{sl.studioName}</td>
+                    <td className="p-3 font-medium text-amber-300/80 italic">Chưa có Host</td>
+                    <td className="p-3 font-mono font-bold text-slate-500">—</td>
+                    <td className="p-3 text-right">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-950/60 text-amber-400 border border-amber-700/50">
+                        Chờ ĐK
+                      </span>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -1464,8 +1698,35 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
               </button>
             </div>
 
+            {/* Chế độ tạo: Session đã có host hay Ca mở chờ đăng ký */}
+            <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => setBookingMode("session")}
+                className={`flex-1 px-3 py-2 rounded-lg transition-all ${
+                  bookingMode === "session" ? "bg-blue-600 text-white shadow-sm" : "text-slate-400 hover:text-white"
+                }`}
+              >
+                Tạo Session Trực Tiếp (đã có Host)
+              </button>
+              <button
+                type="button"
+                onClick={() => setBookingMode("slot")}
+                className={`flex-1 px-3 py-2 rounded-lg transition-all ${
+                  bookingMode === "slot" ? "bg-blue-600 text-white shadow-sm" : "text-slate-400 hover:text-white"
+                }`}
+              >
+                Mở Ca Chờ Đăng Ký
+              </button>
+            </div>
+            {bookingMode === "slot" && (
+              <p className="text-[11px] text-slate-400 bg-slate-950/60 border border-slate-800 rounded-xl p-2.5">
+                Ca sẽ hiện ở "Đăng Ký &amp; Chốt Lịch" để host tự đăng ký — Ops chốt Host chính thức sau, chưa cần chọn Host ở đây.
+              </p>
+            )}
+
             {/* AI Optimizer Trigger Button */}
-            <div className="bg-gradient-to-r from-blue-950 to-indigo-950 border border-blue-800/80 p-3.5 rounded-xl space-y-2">
+            <div className={`bg-gradient-to-r from-blue-950 to-indigo-950 border border-blue-800/80 p-3.5 rounded-xl space-y-2 ${bookingMode === "slot" ? "opacity-40 pointer-events-none" : ""}`}>
               <div className="flex justify-between items-center flex-wrap gap-2">
                 <span className="text-xs font-bold text-blue-300 flex items-center gap-1.5">
                   <Sparkles className="w-4 h-4 text-blue-400 shrink-0" /> Gemini AI Schedule Matching
@@ -1570,7 +1831,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {bookingMode === "session" && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="font-bold text-slate-300 block mb-1">Host Chính (Main Host):</label>
                   <select
@@ -1581,6 +1843,22 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                     {talents.map((t) => (
                       <option key={t.id} value={t.id}>
                         {t.name} ({t.role} • CVR: {t.cvrAvg}%)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-300 block mb-1">Co-Host (tuỳ chọn):</label>
+                  <select
+                    value={newCoHostId}
+                    onChange={(e) => setNewCoHostId(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500 font-medium"
+                  >
+                    <option value="">-- Không có Co-Host --</option>
+                    {talents.filter((t) => t.id !== newHostId).map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name} ({t.role})
                       </option>
                     ))}
                   </select>
@@ -1602,11 +1880,12 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   </select>
                   {moderators.length === 0 && (
                     <p className="text-[10px] text-amber-400 mt-1">
-                      Chưa có tài khoản role Moderator nào — tạo ở tab Users & Permissions.
+                      Chưa có tài khoản role Moderator nào — tạo ở tab Users &amp; Permissions.
                     </p>
                   )}
                 </div>
               </div>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
@@ -1638,6 +1917,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                 </div>
               </div>
 
+              {bookingMode === "session" && (
               <div>
                 <label className="font-bold text-slate-300 block mb-1">KPI Target GMV Cam Kết (VNĐ):</label>
                 <input
@@ -1647,6 +1927,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500 font-mono font-bold"
                 />
               </div>
+              )}
 
               <div className="pt-3 border-t border-slate-800 flex justify-end gap-3">
                 <button
@@ -1677,22 +1958,105 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                 <span className="text-[10px] font-bold text-blue-400 uppercase font-mono">{selectedSessionDetail.brandName}</span>
                 <h3 className="font-bold text-white text-base sm:text-lg">{selectedSessionDetail.title}</h3>
               </div>
-              <button
-                onClick={() => setSelectedSessionDetail(null)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                {onUpdateSession && !isEditingDetail && (
+                  <button
+                    onClick={() => openEditDetail(selectedSessionDetail)}
+                    className="text-[11px] font-bold text-blue-400 hover:text-blue-300 px-2.5 py-1.5 rounded-lg border border-blue-800/60 bg-blue-950/40"
+                  >
+                    Sửa
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    setSelectedSessionDetail(null);
+                    setIsEditingDetail(false);
+                  }}
+                  className="text-slate-400 hover:text-white p-1 rounded-lg"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
+            {isEditingDetail ? (
+              <div className="space-y-3 text-xs bg-slate-950 p-3 rounded-xl border border-slate-800">
+                {(currentEditConflicts.studioConflict || currentEditConflicts.hostConflict) && (
+                  <div className="p-2.5 bg-rose-950/80 border border-rose-700/80 rounded-xl text-[11px] space-y-1 text-rose-200 font-medium">
+                    {currentEditConflicts.studioConflict && <p>• Trùng Studio: "{currentEditConflicts.studioConflictWith}"!</p>}
+                    {currentEditConflicts.hostConflict && <p>• Trùng Host: "{currentEditConflicts.hostConflictWith}"!</p>}
+                  </div>
+                )}
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="font-bold text-slate-400 block mb-1">Ngày:</label>
+                    <input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-white font-mono" />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-400 block mb-1">Giờ bắt đầu:</label>
+                    <input type="time" value={editStartTime} onChange={(e) => setEditStartTime(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-white font-mono" />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-400 block mb-1">Giờ kết thúc:</label>
+                    <input type="time" value={editEndTime} onChange={(e) => setEditEndTime(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-white font-mono" />
+                  </div>
+                </div>
+                <div>
+                  <label className="font-bold text-slate-400 block mb-1">Phòng Studio:</label>
+                  <select value={editStudioId} onChange={(e) => setEditStudioId(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-white">
+                    {studios.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="font-bold text-slate-400 block mb-1">Host chính:</label>
+                    <select value={editHostId} onChange={(e) => setEditHostId(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-white">
+                      {talents.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-400 block mb-1">Co-Host:</label>
+                    <select value={editCoHostId} onChange={(e) => setEditCoHostId(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-white">
+                      <option value="">-- Không có --</option>
+                      {talents.filter((t) => t.id !== editHostId).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 pt-1">
+                  <button
+                    onClick={() => setIsEditingDetail(false)}
+                    className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 font-bold text-[11px]"
+                  >
+                    Huỷ
+                  </button>
+                  <button
+                    onClick={handleSaveDetailEdit}
+                    disabled={savingEdit}
+                    className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white font-bold text-[11px]"
+                  >
+                    {savingEdit ? "Đang lưu..." : "Lưu Thay Đổi"}
+                  </button>
+                </div>
+              </div>
+            ) : (
             <div className="grid grid-cols-2 gap-3 text-xs bg-slate-950 p-3 rounded-xl border border-slate-800">
               <div>Ngày Live: <strong className="text-white block font-mono">{selectedSessionDetail.date}</strong></div>
               <div>Khung giờ: <strong className="text-white block font-mono">{selectedSessionDetail.startTime} - {selectedSessionDetail.endTime}</strong></div>
               <div>Phòng Studio: <strong className="text-white block">{selectedSessionDetail.studioName}</strong></div>
               <div>Host chính: <strong className="text-white block">{selectedSessionDetail.hostName}</strong></div>
+              {selectedSessionDetail.coHostName && (
+                <div>Co-Host: <strong className="text-white block">{selectedSessionDetail.coHostName}</strong></div>
+              )}
               <div>Trợ lý / Moderator: <strong className="text-white block">{selectedSessionDetail.assistantName}</strong></div>
               <div>Target GMV: <strong className="text-emerald-400 block font-mono font-bold">{selectedSessionDetail.targetGmv.toLocaleString()} VNĐ</strong></div>
             </div>
+            )}
 
             <div className="space-y-2 text-xs">
               <h4 className="font-bold text-slate-300">Checklist Chuẩn Bị ({selectedSessionDetail.checklist.filter(c => c.completed).length}/{selectedSessionDetail.checklist.length}):</h4>
@@ -1718,6 +2082,23 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {selectedSlotDetail && (
+        <SlotDetailModal
+          slot={selectedSlotDetail}
+          onClose={() => setSelectedSlotDetail(null)}
+          talents={talents}
+          registrations={shiftRegistrations}
+          sessions={sessions}
+          shiftSlots={shiftSlots}
+          canManage={canManageSlots}
+          myTalentId={myTalentId}
+          onRegister={onRegisterSlot}
+          onUnregister={onUnregisterSlot}
+          onFinalizeSlot={onFinalizeSlot}
+          onDeleteSlot={onDeleteSlot}
+        />
       )}
     </div>
   );

@@ -1237,7 +1237,7 @@ export default function App() {
     for (const template of recurringShiftTemplates.filter((t) => t.active)) {
       for (let day = 1; day <= daysInMonth; day++) {
         const date = new Date(year, monthIdx, day);
-        if (date.getDay() !== template.weekday) continue;
+        if (!template.isDaily && date.getDay() !== template.weekday) continue;
         const dateStr = `${year}-${monthStr.padStart(2, "0")}-${`${day}`.padStart(2, "0")}`;
         if (existingByTemplateAndDate.has(`${template.id}:${dateStr}`)) continue;
         toCreate.push({
@@ -1764,17 +1764,31 @@ export default function App() {
                 {activeTab === "calendar" && (
                   <LiveCalendar
                     sessions={activeSessions}
+                    shiftSlots={shiftSlots}
+                    shiftRegistrations={shiftRegistrations}
                     studios={activeStudios}
                     talents={activeTalents}
                     brands={activeBrands}
                     users={activeUsers}
                     onAddSession={handleAddSession}
                     onUpdateSession={handleUpdateSession}
+                    onCreateSlot={handleCreateShiftSlot}
+                    onDeleteSlot={handleDeleteShiftSlot}
+                    onRegisterSlot={handleRegisterSlot}
+                    onUnregisterSlot={handleUnregisterSlot}
+                    onFinalizeSlot={handleFinalizeShiftSlot}
+                    myTalentId={activeUser.assignedTalentId}
+                    currentUserId={activeUser.id}
                     currentRole={currentRole}
                     schemes={promoSchemes}
                     onAddScheme={handleAddPromoScheme}
                     onUpdateScheme={handleUpdatePromoScheme}
                     onDeleteScheme={handleDeletePromoScheme}
+                    recurringShiftTemplates={recurringShiftTemplates}
+                    onCreateTemplate={handleCreateRecurringTemplate}
+                    onToggleTemplate={handleToggleRecurringTemplate}
+                    onDeleteTemplate={handleDeleteRecurringTemplate}
+                    onGenerateMonthSlots={handleGenerateMonthSlots}
                   />
                 )}
 
@@ -1805,17 +1819,34 @@ export default function App() {
                     brandId={currentBrandId!}
                     brand={activeBrands.find((b) => b.id === currentBrandId)}
                     sessions={activeSessions}
-                    brandInvoices={brandInvoices}
                   />
                 )}
 
                 {activeTab === "brand_calendar" && effectiveWorkspace.type === "brand" && (
                   <BrandCalendar
                     brandId={currentBrandId!}
+                    brandName={activeBrands.find((b) => b.id === currentBrandId)?.name || "Brand"}
                     sessions={activeSessions}
+                    shiftSlots={shiftSlots}
+                    shiftRegistrations={shiftRegistrations}
                     studios={activeStudios}
                     talents={activeTalents}
+                    users={activeUsers}
                     schemes={promoSchemes}
+                    currentUserId={activeUser.id}
+                    myTalentId={activeUser.assignedTalentId}
+                    onAddSession={handleAddSession}
+                    onUpdateSession={handleUpdateSession}
+                    onCreateSlot={handleCreateShiftSlot}
+                    onDeleteSlot={handleDeleteShiftSlot}
+                    onRegisterSlot={handleRegisterSlot}
+                    onUnregisterSlot={handleUnregisterSlot}
+                    onFinalizeSlot={handleFinalizeShiftSlot}
+                    recurringShiftTemplates={recurringShiftTemplates}
+                    onCreateTemplate={handleCreateRecurringTemplate}
+                    onToggleTemplate={handleToggleRecurringTemplate}
+                    onDeleteTemplate={handleDeleteRecurringTemplate}
+                    onGenerateMonthSlots={handleGenerateMonthSlots}
                   />
                 )}
 

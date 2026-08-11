@@ -331,7 +331,8 @@ export interface ShiftSlot {
 // thay vì ops tạo tay từng ca (xem migration 0015).
 export interface RecurringShiftTemplate {
   id: string;
-  weekday: number; // 0=CN...6=Thứ 7, khớp Date.getDay()
+  weekday: number; // 0=CN...6=Thứ 7, khớp Date.getDay() — bỏ qua khi isDaily=true
+  isDaily?: boolean; // true = áp dụng mọi ngày trong tháng, không chỉ 1 thứ cố định
   brandId?: string;
   brandName: string;
   platform: "TikTok" | "Shopee";

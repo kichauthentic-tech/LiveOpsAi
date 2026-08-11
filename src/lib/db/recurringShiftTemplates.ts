@@ -6,6 +6,7 @@ const orNull = (v: string | undefined | null) => (v ? v : null);
 interface DbRecurringShiftTemplate {
   id: string;
   weekday: number;
+  is_daily: boolean;
   brand_id: string | null;
   brand_name: string;
   platform: RecurringShiftTemplate["platform"];
@@ -24,6 +25,7 @@ function fromDb(row: DbRecurringShiftTemplate): RecurringShiftTemplate {
   return {
     id: row.id,
     weekday: row.weekday,
+    isDaily: row.is_daily,
     brandId: row.brand_id ?? undefined,
     brandName: row.brand_name,
     platform: row.platform,
@@ -40,6 +42,7 @@ function fromDb(row: DbRecurringShiftTemplate): RecurringShiftTemplate {
 function toDb(t: RecurringShiftTemplate) {
   return {
     weekday: t.weekday,
+    is_daily: !!t.isDaily,
     brand_id: orNull(t.brandId),
     brand_name: t.brandName ?? "",
     platform: t.platform,
