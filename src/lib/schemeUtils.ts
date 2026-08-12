@@ -18,3 +18,13 @@ export function schemesByDate(schemes: PromoScheme[], month: string): Map<string
   }
   return map;
 }
+
+/** Danh sách category (thứ tự xuất hiện đầu tiên) trong 1 tập scheme — dùng làm hàng của
+ * bảng SchemeWeekStrip. Không sort alphabet để giữ đúng thứ tự người dùng nhập trước sau. */
+export function schemeCategoriesInOrder(schemes: PromoScheme[]): string[] {
+  const seen: string[] = [];
+  for (const s of schemes) {
+    if (!seen.includes(s.category)) seen.push(s.category);
+  }
+  return seen;
+}

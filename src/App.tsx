@@ -773,14 +773,21 @@ export default function App() {
     }
   };
 
-  async function handleAddPromoScheme(scheme: { title: string; description: string; startDate: string; endDate: string }) {
+  async function handleAddPromoScheme(scheme: {
+    title: string;
+    description: string;
+    startDate: string;
+    endDate: string;
+    brandId?: string;
+    category?: string;
+  }) {
     const created = await createPromoScheme({ ...scheme, createdBy: profile?.id });
     setPromoSchemes((prev) => [...prev, created]);
   }
 
   async function handleUpdatePromoScheme(
     id: string,
-    patch: Partial<Pick<PromoScheme, "title" | "description" | "startDate" | "endDate">>
+    patch: Partial<Pick<PromoScheme, "title" | "description" | "startDate" | "endDate" | "category">>
   ) {
     const updated = await updatePromoScheme(id, patch);
     setPromoSchemes((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
@@ -1946,6 +1953,9 @@ export default function App() {
                     talents={activeTalents}
                     users={activeUsers}
                     schemes={promoSchemes}
+                    onAddScheme={handleAddPromoScheme}
+                    onUpdateScheme={handleUpdatePromoScheme}
+                    onDeleteScheme={handleDeletePromoScheme}
                     currentUserId={activeUser.id}
                     myTalentId={activeUser.assignedTalentId}
                     onAddSession={handleAddSession}
