@@ -18,7 +18,7 @@ const CAMPAIGN_DAY_ICONS: Record<CampaignDayType, typeof Flame> = {
 };
 
 /** Preset theo từng lưới lịch: bù đúng padding ngang của ô + khe lưới (`--camp-gap`). */
-export type CampaignRibbonVariant = "poster" | "liveMonth" | "compact";
+export type CampaignRibbonVariant = "poster" | "liveMonth";
 
 const RIBBON_PRESETS: Record<
   CampaignRibbonVariant,
@@ -47,16 +47,6 @@ const RIBBON_PRESETS: Record<
     iconSize: "w-3 h-3",
     capStart: "rounded-tl-2xl",
     capEnd: "rounded-tr-2xl"
-  },
-  // ShiftScheduling month cell: p-1.5, lưới gap-1.5, bo góc ô `rounded-lg`.
-  compact: {
-    wrapper: "-mx-1.5 -mt-1.5 [--camp-gap:6px]",
-    height: "h-[16px]",
-    ribbonHeight: "h-[22px]",
-    text: "text-[8px]",
-    iconSize: "w-2.5 h-2.5",
-    capStart: "rounded-tl-lg",
-    capEnd: "rounded-tr-lg"
   }
 };
 

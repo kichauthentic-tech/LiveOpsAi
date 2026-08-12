@@ -114,7 +114,9 @@ export const PosterDayCell: React.FC<PosterDayCellProps> = ({
       } ${onClick ? "cursor-pointer hover:border-blue-400/60 dark:hover:border-blue-500/50 transition-colors" : ""}`}
     >
       {isToday && (
-        <span className="absolute -top-2 right-1.5 shrink-0 text-[8px] sm:text-[9px] font-black px-2 py-0.5 rounded-full bg-orange-500 text-white leading-none shadow-md z-10 tracking-wide">
+        // z-30 > z-20 của CampaignDayRibbon — ngày "hôm nay" rơi vào dải camp (D-Day/Mid-Month/
+        // Pay-Day) vẫn phải đọc được chữ "HÔM NAY", không bị dải banner đè lên.
+        <span className="absolute -top-2 right-1.5 shrink-0 text-[8px] sm:text-[9px] font-black px-2 py-0.5 rounded-full bg-orange-500 text-white leading-none shadow-md z-30 tracking-wide">
           HÔM NAY
         </span>
       )}
