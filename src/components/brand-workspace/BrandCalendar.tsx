@@ -3,12 +3,13 @@ import { LiveSession, PromoScheme, ShiftSlot, ShiftRegistration, RecurringShiftT
 import { CalendarIcon, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
 import { schemesForDate } from "../../lib/schemeUtils";
-import { getCampaignDayInfo } from "../../lib/campaignDays";
+import { CAMPAIGN_DAY_STYLES, getCampaignDayInfo } from "../../lib/campaignDays";
 import { BrandSessionModal } from "./BrandSessionModal";
 import { RecurringTemplateManager } from "../scheduling/RecurringTemplateManager";
 import { SlotDetailModal } from "../scheduling/SlotDetailModal";
 import { PosterCalendarHeader, PosterCalendarGrid, PosterDayCell } from "../ui/PosterCalendarGrid";
 import { EventPill, EventPillTier } from "../ui/EventPill";
+import { CampaignDayRibbon } from "../ui/CampaignDayRibbon";
 import {
   SessionEventCard,
   SESSION_TONE,
@@ -235,7 +236,16 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
               title={campaignDay?.label}
               onClick={canManage ? () => setModalState({ open: true, session: null, initialDate: dateStr }) : undefined}
               minHeight="min-h-[140px] sm:min-h-[215px]"
-              badge={campaignDay && <EventPill tier="black_bold" label={campaignDay.shortLabel} />}
+              toneClassName={campaignDay ? CAMPAIGN_DAY_STYLES[campaignDay.type].cell : undefined}
+              ribbon={
+                <CampaignDayRibbon
+                  info={campaignDay}
+                  columnIndex={idx % 7}
+                  isGridStart={day === 1}
+                  cellsRemainingInGrid={daysInMonth - day + 1}
+                  variant="poster"
+                />
+              }
               footer={eventCount > 0 ? `${eventCount} sự kiện` : undefined}
             >
               {daySchemes.slice(0, 1).map((s) => (
@@ -284,7 +294,6 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
                   meta={buildSlotMeta(sl)}
                   metaLimit={2}
                   tone="pending"
-                  statusLabel="CHỜ ĐK"
                   pending
                   tooltip={`Ca chờ đăng ký · ${sl.startTime}-${sl.endTime} · ${sl.studioName}`}
                   onClick={(e) => {

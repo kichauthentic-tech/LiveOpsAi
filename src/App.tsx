@@ -63,7 +63,9 @@ import {
   Package,
   Ticket,
   BarChart3,
-  FileSpreadsheet
+  FileSpreadsheet,
+  PanelLeftClose,
+  PanelLeftOpen
 } from "lucide-react";
 import { Header, WorkspaceContext } from "./components/Header";
 import { BrandDashboard } from "./components/brand-workspace/BrandDashboard";
@@ -95,6 +97,12 @@ import ShiftScheduling from "./components/ShiftScheduling";
 
 const STORAGE_PREFIX = "liveops_os_v2_";
 
+// Các tab mà nội dung chính là lưới lịch — vào là tự thu gọn sidebar để lấy chiều ngang
+// (lưới 7 cột / ma trận 5 khung giờ cần ~150px mỗi ô, xem WORKSPACE_DESIGN.md).
+// 2 dashboard cũng có lịch GMV nhưng nằm trong sub-tab, nên xử lý riêng qua
+// `onCalendarViewChange` chứ không liệt kê ở đây.
+const CALENDAR_TABS = new Set(["calendar", "brand_calendar", "shift_scheduling"]);
+
 function loadStorage<T>(key: string, fallback: T): T {
   try {
     const item = localStorage.getItem(STORAGE_PREFIX + key);
@@ -118,6 +126,51 @@ export default function App() {
   const currentRole: UserRole = profile?.role ?? "talent";
   const [activeTab, setActiveTab] = useState<string>(() => loadStorage("activeTab", "dashboard"));
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  // Thu gọn sidebar thành thanh icon (w-16) để nhường không gian ngang cho calendar.
+  // Chỉ áp dụng từ breakpoint md trở lên — dưới md sidebar vẫn là drawer trượt như cũ.
+  //
+  // 3 mảnh state:
+  //  - `sidebarPref`: lựa chọn tay của user cho các module KHÔNG có lịch (persist).
+  //  - `dashboardCalendarView`: 2 dashboard báo lên khi sub-tab đang mở là lịch GMV.
+  //  - `sidebarCollapsed`: trạng thái thật đang render = tự thu gọn trong module có lịch,
+  //    ngoài ra trả về đúng `sidebarPref`.
+  const [sidebarPref, setSidebarPref] = useState<boolean>(() => loadStorage("sidebarCollapsed", false));
+  useEffect(() => saveStorage("sidebarCollapsed", sidebarPref), [sidebarPref]);
+
+  const [dashboardCalendarView, setDashboardCalendarView] = useState(false);
+  const isCalendarModule =
+    CALENDAR_TABS.has(activeTab) ||
+    ((activeTab === "dashboard" || activeTab === "brand_dashboard") && dashboardCalendarView);
+
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(sidebarPref);
+  // Vào module có lịch → tự thu gọn; rời đi → trả lại đúng lựa chọn tay của user.
+  // Nếu user tự mở lại sidebar khi đang ở trong module lịch thì effect này không chạy
+  // (deps không đổi) nên tôn trọng thao tác đó cho tới lần chuyển module kế tiếp.
+  useEffect(() => {
+    setSidebarCollapsed(isCalendarModule ? true : sidebarPref);
+  }, [isCalendarModule, sidebarPref]);
+
+  const toggleSidebar = React.useCallback(() => {
+    setSidebarCollapsed((v) => {
+      const next = !v;
+      // Chỉ ghi đè lựa chọn mặc định khi đang ở module không có lịch — thao tác tay
+      // trong module lịch chỉ có tác dụng tạm thời, không đổi mặc định của user.
+      if (!isCalendarModule) setSidebarPref(next);
+      return next;
+    });
+  }, [isCalendarModule]);
+
+  // Phím tắt Cmd/Ctrl + B — chuẩn quen thuộc của các app có sidebar (VSCode, Notion...).
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "b") {
+        e.preventDefault();
+        toggleSidebar();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [toggleSidebar]);
 
   // Giai đoạn A — Workspace Agency ↔ Brand (xem WORKSPACE_DESIGN.md). Chỉ có ý nghĩa với
   // ceo/admin/operations (những role được phép nhìn xuyên brand); role "brand" tự khoá vào
@@ -1522,17 +1575,29 @@ export default function App() {
     <div className="flex h-screen w-full bg-slate-950 text-slate-200 overflow-hidden font-sans antialiased selection:bg-blue-600 selection:text-white">
       {/* Left Sidebar Navigation */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-900/90 backdrop-blur-md border-r border-slate-800 flex flex-col transition-transform duration-300 md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-900/90 backdrop-blur-md border-r border-slate-800 flex flex-col transition-all duration-300 md:translate-x-0 ${
           mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        } ${sidebarCollapsed ? "md:w-16" : "md:w-64"}`}
       >
-        <div className="p-6 border-b border-slate-800 flex items-center justify-between">
-          <div>
+        <div
+          className={`border-b border-slate-800 flex items-center justify-between ${
+            sidebarCollapsed ? "p-6 md:px-0 md:py-4 md:justify-center" : "p-6"
+          }`}
+        >
+          <div className={sidebarCollapsed ? "md:hidden" : ""}>
             <h1 className="text-xl font-bold tracking-tighter text-blue-400">LIVEOPS AI</h1>
             <p className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">
               Agency Operating System
             </p>
           </div>
+          {sidebarCollapsed && (
+            <span
+              className="hidden md:flex w-9 h-9 rounded-xl bg-blue-600/10 border border-blue-600/20 text-blue-400 items-center justify-center text-sm font-black tracking-tighter"
+              title="LIVEOPS AI"
+            >
+              LO
+            </span>
+          )}
           <button
             onClick={() => setMobileMenuOpen(false)}
             className="md:hidden text-slate-400 hover:text-white"
@@ -1541,7 +1606,11 @@ export default function App() {
           </button>
         </div>
 
-        <nav className="flex-1 py-3 px-3 space-y-4 overflow-y-auto scrollbar-thin">
+        <nav
+          className={`flex-1 py-3 space-y-4 overflow-y-auto scrollbar-thin ${
+            sidebarCollapsed ? "px-3 md:px-2" : "px-3"
+          }`}
+        >
           {navGroups.map((group) => {
             const visibleItems = group.items.filter(
               (item) => !item.perm || checkPermission(item.perm)
@@ -1551,9 +1620,15 @@ export default function App() {
 
             return (
               <div key={group.label} className="space-y-1">
-                <p className="px-3 text-[10px] font-bold uppercase tracking-widest text-slate-600">
+                <p
+                  className={`px-3 text-[10px] font-bold uppercase tracking-widest text-slate-600 ${
+                    sidebarCollapsed ? "md:hidden" : ""
+                  }`}
+                >
                   {group.label}
                 </p>
+                {/* Ở chế độ thu gọn, nhóm nav chỉ còn được phân tách bằng 1 gạch mảnh. */}
+                {sidebarCollapsed && <div className="hidden md:block mx-2 border-t border-slate-800" />}
                 {visibleItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = activeTab === item.id;
@@ -1566,20 +1641,28 @@ export default function App() {
                         setMobileMenuOpen(false);
                       }}
                       title={item.label}
-                      className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl transition-colors text-xs font-medium ${
+                      className={`w-full flex items-center justify-between gap-2 py-2.5 rounded-xl transition-colors text-xs font-medium ${
+                        sidebarCollapsed ? "px-3 md:px-0 md:justify-center" : "px-3"
+                      } ${
                         isActive
                           ? "bg-blue-600/10 text-blue-400 border border-blue-600/20 font-bold"
                           : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
                       }`}
                     >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <Icon
-                          className={`w-4 h-4 shrink-0 ${isActive ? "text-blue-400" : "text-slate-400"}`}
-                        />
-                        <span className="truncate">{item.label}</span>
+                      <div className={`flex items-center gap-3 min-w-0 ${sidebarCollapsed ? "md:gap-0" : ""}`}>
+                        <div className="relative shrink-0">
+                          <Icon
+                            className={`w-4 h-4 shrink-0 ${isActive ? "text-blue-400" : "text-slate-400"}`}
+                          />
+                          {/* Thu gọn: badge NEW co lại thành chấm nhỏ trên icon cho khỏi mất tín hiệu. */}
+                          {sidebarCollapsed && item.badge && (
+                            <span className="hidden md:block absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-rose-500" />
+                          )}
+                        </div>
+                        <span className={`truncate ${sidebarCollapsed ? "md:hidden" : ""}`}>{item.label}</span>
                       </div>
 
-                      <div className="flex items-center gap-1.5 shrink-0">
+                      <div className={`flex items-center gap-1.5 shrink-0 ${sidebarCollapsed ? "md:hidden" : ""}`}>
                         {item.badge && (
                           <span className="bg-rose-600/20 text-rose-400 border border-rose-500/30 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase animate-pulse">
                             {item.badge}
@@ -1595,8 +1678,13 @@ export default function App() {
         </nav>
 
         {/* User Card */}
-        <div className="p-4 mt-auto border-t border-slate-800">
-          <div className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-xl border border-slate-700/50">
+        <div className={`mt-auto border-t border-slate-800 ${sidebarCollapsed ? "p-4 md:p-2" : "p-4"}`}>
+          <div
+            className={`flex items-center gap-3 bg-slate-800/50 rounded-xl border border-slate-700/50 ${
+              sidebarCollapsed ? "p-3 md:p-2 md:justify-center" : "p-3"
+            }`}
+            title={sidebarCollapsed ? `${activeUser.name} • ${currentRole}` : undefined}
+          >
             {activeUser.avatar ? (
               <img
                 src={activeUser.avatar}
@@ -1608,7 +1696,7 @@ export default function App() {
                 {activeUser.name.charAt(0) || "?"}
               </div>
             )}
-            <div className="text-xs min-w-0">
+            <div className={`text-xs min-w-0 ${sidebarCollapsed ? "md:hidden" : ""}`}>
               <p className="font-bold text-slate-200 truncate">{activeUser.name}</p>
               <p className="text-blue-400 text-[10px] uppercase font-extrabold truncate">
                 {currentRole} • {activeUser.customRoleTitle}
@@ -1619,7 +1707,11 @@ export default function App() {
       </aside>
 
       {/* Main Area */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden md:ml-64">
+      <div
+        className={`flex-1 flex flex-col min-w-0 overflow-hidden transition-all duration-300 ${
+          sidebarCollapsed ? "md:ml-16" : "md:ml-64"
+        }`}
+      >
         {/* Top Header Bar */}
         <div className="flex items-center border-b border-slate-800 bg-slate-900/30 pr-4">
           <button
@@ -1627,6 +1719,25 @@ export default function App() {
             className="p-4 md:hidden text-slate-400 hover:text-white"
           >
             <Menu className="w-5 h-5" />
+          </button>
+          <button
+            onClick={toggleSidebar}
+            className="hidden md:flex p-2 ml-3 rounded-xl border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-all"
+            title={
+              sidebarCollapsed
+                ? isCalendarModule
+                  ? "Mở rộng menu (Ctrl/Cmd + B) — menu tự thu gọn ở module có lịch"
+                  : "Mở rộng menu (Ctrl/Cmd + B)"
+                : "Thu gọn menu để rộng chỗ cho lịch (Ctrl/Cmd + B)"
+            }
+            aria-label={sidebarCollapsed ? "Mở rộng menu" : "Thu gọn menu"}
+            aria-expanded={!sidebarCollapsed}
+          >
+            {sidebarCollapsed ? (
+              <PanelLeftOpen className="w-4 h-4" />
+            ) : (
+              <PanelLeftClose className="w-4 h-4" />
+            )}
           </button>
           <div className="flex-1">
             <Header
@@ -1743,6 +1854,7 @@ export default function App() {
                     talents={activeTalents}
                     onSelectSession={handleSelectSessionFromDashboard}
                     onNavigateTab={setActiveTab}
+                    onCalendarViewChange={setDashboardCalendarView}
                   />
                 )}
 
@@ -1819,6 +1931,7 @@ export default function App() {
                     brandId={currentBrandId!}
                     brand={activeBrands.find((b) => b.id === currentBrandId)}
                     sessions={activeSessions}
+                    onCalendarViewChange={setDashboardCalendarView}
                   />
                 )}
 

@@ -5,7 +5,7 @@ import { formatCurrencyAdaptive } from "../lib/formatCurrency";
 import { computeGmvByDate, DailyGmv } from "../lib/gmvMetrics";
 import { getCampaignDayInfo } from "../lib/campaignDays";
 import { PosterCalendarHeader, PosterCalendarGrid, PosterDayCell } from "./ui/PosterCalendarGrid";
-import { EventPill } from "./ui/EventPill";
+import { CampaignDayRibbon } from "./ui/CampaignDayRibbon";
 
 interface GmvCalendarProps {
   sessions: LiveSession[];
@@ -168,7 +168,15 @@ export const GmvCalendar: React.FC<GmvCalendarProps> = ({
               isWeekend={idx % 7 === 0 || idx % 7 === 6}
               title={campaignDay?.label}
               toneClassName={cellTone(daily, dateStr, todayDate)}
-              badge={campaignDay && <EventPill tier="black_bold" label={campaignDay.shortLabel} />}
+              ribbon={
+                <CampaignDayRibbon
+                  info={campaignDay}
+                  columnIndex={idx % 7}
+                  isGridStart={day === 1}
+                  cellsRemainingInGrid={daysInMonth - day + 1}
+                  variant="poster"
+                />
+              }
               footer={daily && daily.sessionCount > 0 ? `${daily.sessionCount} phiên` : undefined}
             >
               {daily && daily.sessionCount > 0 ? (

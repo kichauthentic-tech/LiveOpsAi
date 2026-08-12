@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { LiveSession, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, Studio, Talent, Brand, SystemUser, PromoScheme, UserRole } from "../types";
 import { schemesForDate } from "../lib/schemeUtils";
-import { getCampaignDayInfo } from "../lib/campaignDays";
+import { CAMPAIGN_DAY_STYLES, getCampaignDayInfo } from "../lib/campaignDays";
 import { BrandLogo } from "./ui/BrandLogo";
 import { getBrandTheme } from "../lib/brandTheme";
 import { EventPill } from "./ui/EventPill";
+import { CampaignDayRibbon, CampaignDayBanner } from "./ui/CampaignDayRibbon";
 import {
   SessionEventCard,
   SESSION_TONE,
@@ -1143,6 +1144,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                       ? "bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-700/60 ring-2 ring-amber-400 shadow-md"
                       : isSelected
                       ? "bg-blue-50 dark:bg-blue-950/50 border-blue-500 shadow-md shadow-blue-600/10"
+                      : campaignDay
+                      ? CAMPAIGN_DAY_STYLES[campaignDay.type].cell
                       : "bg-white dark:bg-slate-950/80 border-slate-200 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-900"
                   }`}
                 >
@@ -1151,6 +1154,16 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                       HÔM NAY
                     </span>
                   )}
+                  {/* Gọi ở MỌI ô (kể cả ngày thường) — ô thường chừa dải trống cùng chiều cao nên
+                      số ngày của 3 ngày camp không bị đẩy tụt so với cả hàng. */}
+                  <CampaignDayRibbon
+                    info={campaignDay}
+                    columnIndex={idx % 7}
+                    isGridStart={idx === 0}
+                    cellsRemainingInGrid={monthGridDays.length - idx}
+                    variant="liveMonth"
+                  />
+
                   <div className="flex justify-between items-start flex-wrap gap-1">
                     <span
                       className={`shrink-0 text-sm sm:text-base font-black ${
@@ -1164,7 +1177,6 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                       {cell.dayNum}
                     </span>
                     <div className="flex items-center gap-1 flex-wrap shrink-0">
-                      {campaignDay && <EventPill tier="black_bold" label={campaignDay.shortLabel} />}
                       {daySchemes.length > 0 && (
                         <span
                           title={daySchemes.map((s) => `${s.title}${s.description ? ` — ${s.description}` : ""}`).join("\n")}
@@ -1227,7 +1239,6 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                         meta={buildSlotMeta(sl)}
                         metaLimit={2}
                         tone="pending"
-                        statusLabel="CHỜ ĐK"
                         pending
                         tooltip={`Ca chờ đăng ký · ${sl.startTime}-${sl.endTime} · ${sl.studioName}`}
                         onClick={(e) => {
@@ -1298,6 +1309,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                       : "border-slate-200 dark:border-slate-800"
                   }`}
                 >
+                  {campaignDay && <CampaignDayBanner info={campaignDay} className="-mt-0.5" />}
                   <div
                     onClick={() => setSelectedDate(wDay.dateStr)}
                     className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800/80 pb-2 cursor-pointer"
@@ -1316,7 +1328,6 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                       </strong>
                     </div>
                     <div className="flex items-center gap-1">
-                      {campaignDay && <EventPill tier="black_bold" label={campaignDay.shortLabel} />}
                       <span className="text-[10px] bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 font-bold px-2 py-0.5 rounded-full">
                         {daySessions.length}
                       </span>
@@ -1341,7 +1352,6 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                         meta={buildSlotMeta(sl)}
                         size="md"
                         tone="pending"
-                        statusLabel="CHỜ ĐK"
                         pending
                         tooltip="Ca chờ đăng ký — bấm để xem/đăng ký/chốt lịch"
                         onClick={() => setSelectedSlotDetail(sl)}
@@ -1405,7 +1415,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                 <Building2 className="w-5 h-5 text-blue-400 shrink-0" /> Ma Trận Phân Bổ Phòng Studio - Ngày {selectedDate} ({getDayOfWeekName(selectedDate)})
                 {(() => {
                   const campaignDay = getCampaignDayInfo(selectedDate);
-                  return campaignDay ? <EventPill tier="black_bold" label={campaignDay.shortLabel} title={campaignDay.label} /> : null;
+                  return campaignDay ? <CampaignDayBanner info={campaignDay} /> : null;
                 })()}
               </h3>
               <p className="text-xs text-slate-400">Kéo thả ca live vào bất kỳ ô Studio/Ca Live để đổi phòng hoặc ca làm việc linh hoạt</p>
@@ -1508,7 +1518,6 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                               meta={buildSlotMeta(matchedSlot)}
                               size="md"
                               tone="pending"
-                              statusLabel="CHỜ ĐK"
                               pending
                               tooltip={`Ca chờ đăng ký · ${matchedSlot.startTime}-${matchedSlot.endTime} · Bấm để xem/đăng ký/chốt lịch`}
                               onClick={() => setSelectedSlotDetail(matchedSlot)}

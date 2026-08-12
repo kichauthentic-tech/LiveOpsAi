@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { Brand, LiveSession } from "../../types";
 import {
   Store,
@@ -24,6 +24,8 @@ interface BrandDashboardProps {
   brandId: string;
   brand?: Brand;
   sessions: LiveSession[];
+  /** Báo lên App khi tab đang mở có lịch GMV — App dùng để tự thu gọn sidebar. */
+  onCalendarViewChange?: (isCalendarView: boolean) => void;
 }
 
 const getTodayMonth = () => new Date().toISOString().slice(0, 7);
@@ -47,8 +49,20 @@ const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
   { key: "performance", label: "Báo Cáo Hiệu Suất", icon: BarChart3 }
 ];
 
-export const BrandDashboard: React.FC<BrandDashboardProps> = ({ brandId, brand, sessions }) => {
+export const BrandDashboard: React.FC<BrandDashboardProps> = ({
+  brandId,
+  brand,
+  sessions,
+  onCalendarViewChange
+}) => {
   const [tab, setTab] = useState<TabKey>("overview");
+
+  // Tab "Báo Cáo Hiệu Suất" chứa lịch GMV 7 cột → báo lên App để sidebar tự thu gọn.
+  useEffect(() => {
+    onCalendarViewChange?.(tab === "performance");
+    return () => onCalendarViewChange?.(false);
+  }, [tab, onCalendarViewChange]);
+
   const [month, setMonth] = useState(getTodayMonth());
   const thisMonth = getTodayMonth();
   const todayDate = getTodayDate();

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { UserRole, LiveSession, Studio, Brand, Talent } from "../types";
 import {
   TrendingUp,
@@ -30,6 +30,8 @@ interface DashboardsProps {
   talents: Talent[];
   onSelectSession: (session: LiveSession) => void;
   onNavigateTab?: (tab: string) => void;
+  /** Báo lên App khi sub-tab đang mở là lịch GMV — App dùng để tự thu gọn sidebar. */
+  onCalendarViewChange?: (isCalendarView: boolean) => void;
 }
 
 const WEEKLY_GMV_DATA = [
@@ -55,11 +57,18 @@ export const Dashboards: React.FC<DashboardsProps> = ({
   brands,
   talents,
   onSelectSession,
-  onNavigateTab
+  onNavigateTab,
+  onCalendarViewChange
 }) => {
   const [dashboardSubTab, setDashboardSubTab] = useState<"overview" | "gmv_forecast" | "gmv_calendar" | "kpi_comparison" | "alerts">(
     "overview"
   );
+
+  // Sub-tab "Lịch GMV" cũng là 1 lưới lịch 7 cột → báo lên App để sidebar tự thu gọn.
+  useEffect(() => {
+    onCalendarViewChange?.(dashboardSubTab === "gmv_calendar");
+    return () => onCalendarViewChange?.(false);
+  }, [dashboardSubTab, onCalendarViewChange]);
   const liveSessions = sessions.filter((s) => s.status === "Live Now");
   const liveSession = liveSessions[0] || sessions[0] || null;
   const totalActualGmv = sessions.reduce((sum, s) => sum + (s.actualGmv || 0), 0);

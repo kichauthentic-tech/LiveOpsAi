@@ -1,8 +1,7 @@
 import React from "react";
-import { Building2, GripVertical, LucideIcon, Mic, Target, Users } from "lucide-react";
+import { Building2, GripVertical, LucideIcon, Mic, ShoppingBag, Users } from "lucide-react";
 import { Brand, LiveSession, ShiftSlot } from "../../types";
 import { BrandTheme, brandGradient } from "../../lib/brandTheme";
-import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
 import { BrandLogo } from "./BrandLogo";
 
 // Badge session/ca trên các view lịch — bản "to, rõ" thay cho pill 1 dòng cũ.
@@ -36,7 +35,8 @@ interface SessionEventCardProps {
   title?: string;
   meta?: SessionCardMeta[];
   tone?: SessionCardTone;
-  /** Nhãn trạng thái góc phải (LIVE, XONG, CHỜ ĐK...). Không truyền = không hiện. */
+  /** Nhãn trạng thái góc phải (LIVE, XONG...). Không truyền = không hiện — ca chờ đăng ký cố ý
+   * không có nhãn, đã nhận ra qua viền đứt, để nhường chỗ cho chip thông tin. */
   statusLabel?: string;
   size?: "sm" | "md";
   /** Số chip meta tối đa hiện ra ở size "sm" (mặc định 2) — phần dư gộp thành "+N". */
@@ -194,20 +194,22 @@ export const SESSION_STATUS_LABEL: Record<LiveSession["status"], string | undefi
 // Rút tên còn "họ cuối + tên" cho vừa chip mà vẫn nhận ra người (Nguyễn Thị Mai Anh → Mai Anh).
 const shortName = (full: string): string => full.trim().split(/\s+/).slice(-2).join(" ");
 
-/** Thứ tự chip = thứ tự ưu tiên khi ô lịch hẹp (size "sm" chỉ hiện `metaLimit` chip đầu). */
+/** Thứ tự chip = thứ tự ưu tiên khi ô lịch hẹp (size "sm" chỉ hiện `metaLimit` chip đầu).
+ * Cố ý KHÔNG có Target GMV: con số GMV thuộc về lịch báo cáo hiệu suất, lịch vận hành chỉ
+ * trả lời "ai live, ở đâu, trên nền tảng nào". */
 export const buildSessionMeta = (s: LiveSession): SessionCardMeta[] => {
   const meta: SessionCardMeta[] = [];
   if (s.hostName) meta.push({ icon: Mic, label: shortName(s.hostName), title: `Host: ${s.hostName}` });
-  if (s.targetGmv > 0)
-    meta.push({ icon: Target, label: formatCurrencyAdaptive(s.targetGmv, ""), title: `Target GMV: ${s.targetGmv.toLocaleString("vi-VN")}đ` });
+  if (s.platform) meta.push({ icon: ShoppingBag, label: s.platform, title: `Nền tảng: ${s.platform}` });
   if (s.coHostName) meta.push({ icon: Users, label: shortName(s.coHostName), title: `Co-Host: ${s.coHostName}` });
   if (s.studioName) meta.push({ icon: Building2, label: s.studioName.split(" - ")[0], title: `Studio: ${s.studioName}` });
   return meta;
 };
 
-/** Ca chờ đăng ký chưa có host/GMV — chỉ còn studio + ghi chú để phân biệt các ca cùng brand. */
+/** Ca chờ đăng ký chưa có host — nền tảng đứng đầu vì đó là thứ host cần biết trước khi nhận ca. */
 export const buildSlotMeta = (sl: ShiftSlot): SessionCardMeta[] => {
   const meta: SessionCardMeta[] = [];
+  if (sl.platform) meta.push({ icon: ShoppingBag, label: sl.platform, title: `Nền tảng: ${sl.platform}` });
   if (sl.studioName) meta.push({ icon: Building2, label: sl.studioName.split(" - ")[0], title: `Studio: ${sl.studioName}` });
   if (sl.notes) meta.push({ label: sl.notes, title: sl.notes });
   return meta;

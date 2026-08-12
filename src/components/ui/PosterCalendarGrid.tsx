@@ -76,6 +76,8 @@ interface PosterDayCellProps {
   isToday?: boolean;
   isWeekend?: boolean;
   badge?: React.ReactNode;
+  /** Dải banner bao trùm nhiều ngày (ui/CampaignDayRibbon) — nằm sát mép trên ô, tràn qua khe lưới. */
+  ribbon?: React.ReactNode;
   onClick?: () => void;
   title?: string;
   minHeight?: string;
@@ -91,6 +93,7 @@ export const PosterDayCell: React.FC<PosterDayCellProps> = ({
   isToday,
   isWeekend,
   badge,
+  ribbon,
   onClick,
   title,
   minHeight = "min-h-[120px] sm:min-h-[155px]",
@@ -115,6 +118,7 @@ export const PosterDayCell: React.FC<PosterDayCellProps> = ({
           HÔM NAY
         </span>
       )}
+      {ribbon}
       <div className="flex items-start justify-between gap-1 flex-wrap pr-1">
         <span className={`shrink-0 text-sm sm:text-base font-black ${isToday ? "text-orange-600 dark:text-orange-400" : "text-slate-700 dark:text-slate-300"}`}>
           {day}
