@@ -1794,7 +1794,7 @@ export default function App() {
 
         {/* Dynamic View Content */}
         <main className="flex-1 overflow-y-auto p-3 sm:p-6 scrollbar-thin">
-          <div className="max-w-7xl mx-auto space-y-6">
+          <div className={`mx-auto space-y-6 ${isCalendarModule ? "max-w-none" : "max-w-7xl"}`}>
             {!isTabAllowed ? (
               /* Access Guard Fallback */
               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center max-w-2xl mx-auto my-12 space-y-5 text-white shadow-2xl">
