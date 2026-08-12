@@ -4,6 +4,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, TrendingUp } from "lucide-reac
 import { formatCurrencyAdaptive } from "../lib/formatCurrency";
 import { computeGmvByDate, DailyGmv } from "../lib/gmvMetrics";
 import { getCampaignDayInfo } from "../lib/campaignDays";
+import { getTodayDate, getTodayMonth } from "../lib/dateUtils";
 import { PosterCalendarHeader, PosterCalendarGrid, PosterDayCell } from "./ui/PosterCalendarGrid";
 import { CampaignDayRibbon } from "./ui/CampaignDayRibbon";
 
@@ -22,9 +23,6 @@ const shiftMonth = (month: string, delta: number) => {
   const d = new Date(y, m - 1 + delta, 1);
   return `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, "0")}`;
 };
-
-const getTodayMonth = () => new Date().toISOString().slice(0, 7);
-const getTodayDate = () => new Date().toISOString().slice(0, 10);
 
 const cellTone = (day: DailyGmv | undefined, dateStr: string, todayDate: string) => {
   if (!day || day.sessionCount === 0) return "bg-slate-50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800/70";

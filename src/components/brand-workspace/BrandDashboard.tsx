@@ -17,6 +17,7 @@ import {
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
 import { computeGmvByDate } from "../../lib/gmvMetrics";
+import { getTodayDate, getTodayMonth } from "../../lib/dateUtils";
 import { GmvCalendar } from "../GmvCalendar";
 import { BrandLogo } from "../ui/BrandLogo";
 
@@ -27,9 +28,6 @@ interface BrandDashboardProps {
   /** Báo lên App khi tab đang mở có lịch GMV — App dùng để tự thu gọn sidebar. */
   onCalendarViewChange?: (isCalendarView: boolean) => void;
 }
-
-const getTodayMonth = () => new Date().toISOString().slice(0, 7);
-const getTodayDate = () => new Date().toISOString().slice(0, 10);
 
 const shiftMonth = (month: string, delta: number) => {
   const [y, m] = month.split("-").map(Number);
