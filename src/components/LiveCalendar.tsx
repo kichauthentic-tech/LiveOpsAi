@@ -1285,7 +1285,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
-            {currentWeekDates.map((wDay) => {
+            {currentWeekDates.map((wDay, wIdx) => {
               const daySessions = filteredSessions.filter((s) => s.date === wDay.dateStr && s.status !== "Cancelled");
               const daySlots = openSlots.filter((sl) => sl.date === wDay.dateStr);
               const isSelected = wDay.dateStr === selectedDate;
@@ -1303,15 +1303,29 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   onDragLeave={(e) => handleDragLeave(e, weekCellKey)}
                   onDrop={(e) => handleDropOnWeekDay(e, wDay.dateStr)}
                   title={campaignDay?.label}
-                  className={`bg-white dark:bg-slate-950 rounded-2xl p-3 border space-y-3 transition-all ${
+                  className={`bg-white dark:bg-slate-950 rounded-2xl p-3 border space-y-3 transition-all overflow-visible ${
                     isWeekHovered
                       ? "border-2 border-dashed border-blue-400 bg-blue-50 dark:bg-blue-950/40 shadow-xl shadow-blue-500/20 scale-[1.01]"
                       : isSelected
                       ? "border-blue-500/80 bg-blue-50/60 dark:bg-blue-950/20"
+                      : campaignDay
+                      ? CAMPAIGN_DAY_STYLES[campaignDay.type].cell
                       : "border-slate-200 dark:border-slate-800"
                   }`}
                 >
-                  {campaignDay && <CampaignDayBanner info={campaignDay} className="-mt-0.5" />}
+                  {/* Desktop (md:grid-cols-7, hàng ngang thật): dải banner nối liền qua 3 ngày của
+                      đợt camp, đồng bộ kỹ thuật với Poster Calendar/lịch tháng. Mobile xếp dọc
+                      1 cột nên "nối ngang" vô nghĩa — vẫn dùng badge rời như cũ. */}
+                  <div className="hidden md:block">
+                    <CampaignDayRibbon
+                      info={campaignDay}
+                      columnIndex={wIdx}
+                      isGridStart={wIdx === 0}
+                      cellsRemainingInGrid={currentWeekDates.length - wIdx}
+                      variant="liveWeek"
+                    />
+                  </div>
+                  {campaignDay && <CampaignDayBanner info={campaignDay} className="-mt-0.5 md:hidden" />}
                   <div
                     onClick={() => setSelectedDate(wDay.dateStr)}
                     className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800/80 pb-2 cursor-pointer"
@@ -1411,22 +1425,41 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
       {/* VIEW 3: DAY MATRIX VIEW (Ma Trận Phòng Studio Với 5 Ca Cố Định) */}
       {viewMode === "day" && (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl space-y-4">
+          {(() => {
+            const campaignDay = getCampaignDayInfo(selectedDate);
+            return campaignDay ? <CampaignDayBanner info={campaignDay} className="w-full !rounded-xl justify-center py-1.5" /> : null;
+          })()}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-800 pb-3 gap-2">
             <div>
               <h3 className="font-bold text-white text-base flex items-center gap-2">
                 <Building2 className="w-5 h-5 text-blue-400 shrink-0" /> Ma Trận Phân Bổ Phòng Studio - Ngày {selectedDate} ({getDayOfWeekName(selectedDate)})
-                {(() => {
-                  const campaignDay = getCampaignDayInfo(selectedDate);
-                  return campaignDay ? <CampaignDayBanner info={campaignDay} /> : null;
-                })()}
               </h3>
               <p className="text-xs text-slate-400">Kéo thả ca live vào bất kỳ ô Studio/Ca Live để đổi phòng hoặc ca làm việc linh hoạt</p>
             </div>
-            <div className="flex flex-wrap items-center gap-3 text-[11px] font-semibold">
-              <span className="flex items-center gap-1 text-rose-400"><span className="w-2.5 h-2.5 rounded-full bg-rose-600"></span> Live</span>
-              <span className="flex items-center gap-1 text-blue-400"><span className="w-2.5 h-2.5 rounded-full bg-blue-600"></span> Đã Đặt</span>
-              <span className="flex items-center gap-1 text-amber-400"><span className="w-2.5 h-2.5 rounded-full bg-amber-600"></span> Chờ Đăng Ký</span>
-              <span className="flex items-center gap-1 text-emerald-400"><span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span> Trống</span>
+            {/* Chú giải phải khớp đúng cách card thật vẽ trạng thái (SessionEventCard dùng màu
+                brand cho nền, KHÔNG dùng rose/blue/amber cố định) — nếu không chú giải nói dối
+                người dùng về ý nghĩa màu sắc trên ô lịch. Trạng thái phân biệt bằng viền/hiệu ứng:
+                Live = viền đỏ nhấp nháy, Đã Đặt = viền liền, Chờ Đăng Ký = viền đứt mờ hơn,
+                Trống = ô đứt nét xám có dấu "+". */}
+            <div className="flex flex-wrap items-center gap-3 text-[11px] font-semibold text-slate-400">
+              <span className="flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-md bg-rose-500 ring-2 ring-rose-400 ring-offset-1 ring-offset-slate-900 animate-pulse" />
+                Live
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-md bg-slate-700 border-2 border-solid border-slate-500" />
+                Đã Đặt
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-md bg-slate-800/60 border-2 border-dashed border-slate-400" />
+                Chờ Đăng Ký
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-md border border-dashed border-slate-700 flex items-center justify-center">
+                  <Plus className="w-2 h-2 text-slate-600" />
+                </span>
+                Trống
+              </span>
             </div>
           </div>
 

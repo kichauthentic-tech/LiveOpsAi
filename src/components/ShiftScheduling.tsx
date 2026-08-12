@@ -458,18 +458,24 @@ export default function ShiftScheduling({
           </div>
         </div>
 
+        {/* Chú giải phải khớp đúng cách SessionEventCard vẽ trạng thái thật: nền card lấy màu
+            brand (không có màu cố định theo trạng thái), trạng thái phân biệt bằng KIỂU VIỀN —
+            viền đứt = ca mở (chưa/đã có người đăng ký đều cùng 1 kiểu viền, card không có chip
+            đếm số người đăng ký nên 2 trạng thái này không phân biệt được bằng mắt), viền liền =
+            đã chốt, viền liền mờ = đã huỷ. 2 mục cảnh báo theo NGÀY bên dưới vẫn là chấm màu cố
+            định (bg-rose-500/bg-amber-400) vì đó là badge riêng, không phải card. */}
         <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-500 dark:text-slate-400 mt-3 pt-3 border-t border-slate-200 dark:border-slate-800">
-          <span className="flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-rose-400" /> Mở, chưa ai đăng ký
+          <span className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded-md bg-slate-300 dark:bg-slate-700 border-2 border-dashed border-slate-500 dark:border-slate-400" />
+            Ca mở, chờ đăng ký
           </span>
-          <span className="flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-400" /> Mở, đã có người đăng ký
+          <span className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded-md bg-slate-300 dark:bg-slate-700 border-2 border-solid border-slate-500 dark:border-slate-400" />
+            Đã chốt
           </span>
-          <span className="flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> Đã chốt
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-slate-600" /> Đã huỷ
+          <span className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded-md bg-slate-300 dark:bg-slate-700 border-2 border-solid border-slate-500 dark:border-slate-400 opacity-60 saturate-50" />
+            Đã huỷ
           </span>
           <span className="flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-rose-500" /> Ngày có ca thiếu người
