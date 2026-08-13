@@ -25,7 +25,6 @@ import {
   AlertTriangle,
   CheckCircle2,
   Sparkles,
-  Layers,
   Search,
   X,
   Zap,
@@ -78,10 +77,9 @@ interface LiveCalendarProps {
   onDeleteScheme?: (id: string) => Promise<void>;
 }
 
-// Số card tối đa trong 1 ô lịch tháng — card session giờ cao hơn pill 1 dòng cũ nên phải giới hạn,
-// phần dư gộp thành dòng "+N phiên nữa" (bấm vào ô để sang Ma Trận Ngày xem đủ).
-const MONTH_CELL_MAX_SESSIONS = 2;
-const MONTH_CELL_MAX_SLOTS = 2;
+// Chiều cao vùng card trong 1 ô lịch tháng — đủ cho ~2 card, ô nào nhiều hơn thì cuộn dọc
+// bên trong chính ô đó thay vì đẩy vỡ layout lưới hoặc cắt gộp thành "+N phiên nữa".
+const MONTH_CELL_LIST_MAX_H = "max-h-[76px] sm:max-h-[168px]";
 
 // Ngày hôm nay theo giờ local, format YYYY-MM-DD
 const getTodayDateString = () => {
@@ -141,7 +139,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   }, [propSessions]);
 
   // View Mode: Month, Week, Day Matrix, Talent Workload, List
-  const [viewMode, setViewMode] = useState<"month" | "week" | "day" | "talent_workload" | "list">("day");
+  const [viewMode, setViewMode] = useState<"month" | "week" | "day" | "talent_workload">("day");
 
   // Selected Date string YYYY-MM-DD (defaults to real today's date)
   const [selectedDate, setSelectedDate] = useState<string>(() => getTodayDateString());
@@ -861,16 +859,6 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
             >
               <User className="w-3.5 h-3.5" /> Tải Lịch Host
             </button>
-            <button
-              onClick={() => setViewMode("list")}
-              className={`px-3 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
-                viewMode === "list"
-                  ? "bg-blue-600 text-white shadow-sm font-black"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              <Layers className="w-3.5 h-3.5" /> Tất Cả ({filteredSessions.length}{openSlots.length > 0 ? ` +${openSlots.length} chờ ĐK` : ""})
-            </button>
           </div>
         </div>
 
@@ -895,7 +883,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
             <span className="font-mono font-bold text-white px-2.5 text-xs text-center min-w-[140px]">
               {viewMode === "month" && `Tháng ${currentMonth < 10 ? '0' + currentMonth : currentMonth} / ${currentYear}`}
               {viewMode === "week" && `Tuần (${currentWeekDates[0]?.dayNum}/${parseDateString(currentWeekDates[0]?.dateStr || '').month} - ${currentWeekDates[6]?.dayNum}/${parseDateString(currentWeekDates[6]?.dateStr || '').month})`}
-              {(viewMode === "day" || viewMode === "talent_workload" || viewMode === "list") && `${getDayOfWeekName(selectedDate)}, ${selectedDate}`}
+              {(viewMode === "day" || viewMode === "talent_workload") && `${getDayOfWeekName(selectedDate)}, ${selectedDate}`}
             </span>
 
             <button
@@ -926,53 +914,6 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
             />
           </div>
         </div>
-      </div>
-
-      {/* Filter Dropdowns & Search */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs">
-        <div className="relative">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-          <input
-            type="text"
-            placeholder="Tìm theo tên phiên, Host, Brand..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-white focus:outline-none focus:border-blue-500 font-medium"
-          />
-        </div>
-
-        <select
-          value={selectedStudioFilter}
-          onChange={(e) => setSelectedStudioFilter(e.target.value)}
-          className="bg-slate-900 border border-slate-800 rounded-xl p-2 text-white focus:outline-none focus:border-blue-500 font-medium"
-        >
-          <option value="ALL">🏢 Tất cả phòng Studio ({studios.length})</option>
-          {studios.map((s) => (
-            <option key={s.id} value={s.id}>{s.name}</option>
-          ))}
-        </select>
-
-        <select
-          value={selectedHostFilter}
-          onChange={(e) => setSelectedHostFilter(e.target.value)}
-          className="bg-slate-900 border border-slate-800 rounded-xl p-2 text-white focus:outline-none focus:border-blue-500 font-medium"
-        >
-          <option value="ALL">🎙️ Tất cả Host / KOC ({talents.length})</option>
-          {talents.map((t) => (
-            <option key={t.id} value={t.id}>{t.name} ({t.role})</option>
-          ))}
-        </select>
-
-        <select
-          value={selectedBrandFilter}
-          onChange={(e) => setSelectedBrandFilter(e.target.value)}
-          className="bg-slate-900 border border-slate-800 rounded-xl p-2 text-white focus:outline-none focus:border-blue-500 font-medium"
-        >
-          <option value="ALL">🌿 Tất cả Brand Khách Hàng ({brands.length})</option>
-          {brands.map((b) => (
-            <option key={b.id} value={b.id}>{b.name}</option>
-          ))}
-        </select>
       </div>
 
       {/* SCHEME KHUYẾN MÃI (Giai đoạn C3) */}
@@ -1060,6 +1001,53 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
           </button>
         </div>
       )}
+
+      {/* Filter Dropdowns & Search — đặt ngay trên lịch để lọc áp dụng tức thì cho view đang xem */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs">
+        <div className="relative">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+          <input
+            type="text"
+            placeholder="Tìm theo tên phiên, Host, Brand..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-white focus:outline-none focus:border-blue-500 font-medium"
+          />
+        </div>
+
+        <select
+          value={selectedStudioFilter}
+          onChange={(e) => setSelectedStudioFilter(e.target.value)}
+          className="bg-slate-900 border border-slate-800 rounded-xl p-2 text-white focus:outline-none focus:border-blue-500 font-medium"
+        >
+          <option value="ALL">🏢 Tất cả phòng Studio ({studios.length})</option>
+          {studios.map((s) => (
+            <option key={s.id} value={s.id}>{s.name}</option>
+          ))}
+        </select>
+
+        <select
+          value={selectedHostFilter}
+          onChange={(e) => setSelectedHostFilter(e.target.value)}
+          className="bg-slate-900 border border-slate-800 rounded-xl p-2 text-white focus:outline-none focus:border-blue-500 font-medium"
+        >
+          <option value="ALL">🎙️ Tất cả Host / KOC ({talents.length})</option>
+          {talents.map((t) => (
+            <option key={t.id} value={t.id}>{t.name} ({t.role})</option>
+          ))}
+        </select>
+
+        <select
+          value={selectedBrandFilter}
+          onChange={(e) => setSelectedBrandFilter(e.target.value)}
+          className="bg-slate-900 border border-slate-800 rounded-xl p-2 text-white focus:outline-none focus:border-blue-500 font-medium"
+        >
+          <option value="ALL">🌿 Tất cả Brand Khách Hàng ({brands.length})</option>
+          {brands.map((b) => (
+            <option key={b.id} value={b.id}>{b.name}</option>
+          ))}
+        </select>
+      </div>
 
       {/* VIEW 1: MONTH VIEW (Lịch Tháng - Bảng Lịch 30/31 Ngày) */}
       {viewMode === "month" && (
@@ -1195,9 +1183,13 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                     </div>
                   </div>
 
-                  {/* Session badges in cell — card to theo màu brand (lib/brandTheme.ts) */}
-                  <div className="space-y-1.5 my-1 flex-1">
-                    {daySessions.slice(0, MONTH_CELL_MAX_SESSIONS).map((ds) => (
+                  {/* Session badges in cell — card to theo màu brand (lib/brandTheme.ts).
+                      Ngày nào nhiều session/ca hơn chỗ chứa thì cuộn dọc trong chính ô đó,
+                      không cắt gộp thành "+N nữa" nữa — click vào card vẫn xem chi tiết được. */}
+                  <div
+                    className={`space-y-1.5 my-1 flex-1 overflow-y-auto overscroll-contain pr-0.5 scrollbar-thin ${MONTH_CELL_LIST_MAX_H}`}
+                  >
+                    {daySessions.map((ds) => (
                       <SessionEventCard
                         key={ds.id}
                         theme={getBrandTheme(ds.brandName)}
@@ -1225,12 +1217,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                         }}
                       />
                     ))}
-                    {daySessions.length > MONTH_CELL_MAX_SESSIONS && (
-                      <span className="text-[9px] text-slate-500 font-bold block">
-                        + {daySessions.length - MONTH_CELL_MAX_SESSIONS} phiên nữa...
-                      </span>
-                    )}
-                    {daySlots.slice(0, MONTH_CELL_MAX_SLOTS).map((sl) => (
+                    {daySlots.map((sl) => (
                       <SessionEventCard
                         key={sl.id}
                         theme={getBrandTheme(sl.brandName)}
@@ -1249,11 +1236,6 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                         }}
                       />
                     ))}
-                    {daySlots.length > MONTH_CELL_MAX_SLOTS && (
-                      <span className="text-[9px] text-amber-600 dark:text-amber-500 font-bold block">
-                        + {daySlots.length - MONTH_CELL_MAX_SLOTS} ca chờ ĐK nữa...
-                      </span>
-                    )}
                   </div>
 
                   {/* Day total GMV */}
@@ -1667,79 +1649,6 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                 </div>
               );
             })}
-          </div>
-        </div>
-      )}
-
-      {/* VIEW 5: LIST VIEW */}
-      {viewMode === "list" && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl space-y-4">
-          <h3 className="font-bold text-white text-base">Danh Sách Tất Cả Các Phiên Live &amp; Ca Chờ Đăng Ký</h3>
-          <div className="overflow-x-auto scrollbar-thin">
-            <table className="w-full text-left text-xs border-collapse min-w-[650px]">
-              <thead>
-                <tr className="border-b border-slate-800 text-slate-400 bg-slate-950">
-                  <th className="p-3">Tên Phiên Live & Brand</th>
-                  <th className="p-3">Ngày & Khung Giờ</th>
-                  <th className="p-3">Phòng Studio</th>
-                  <th className="p-3">Host & KOC</th>
-                  <th className="p-3">Mục Tiêu GMV</th>
-                  <th className="p-3 text-right">Trạng Thái</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60">
-                {filteredSessions.map((s) => (
-                  <tr
-                    key={s.id}
-                    onClick={() => setSelectedSessionDetail(s)}
-                    className="hover:bg-slate-800/40 transition-colors cursor-pointer"
-                  >
-                    <td className="p-3 font-bold text-white">
-                      <div>{s.title}</div>
-                      <span className="text-[10px] text-blue-400 font-semibold inline-flex items-center gap-1"><BrandLogo brand={brandById.get(s.brandId)} size="xs" /> {s.brandName}</span>
-                    </td>
-                    <td className="p-3 font-mono text-slate-300">
-                      {s.date} <strong className="text-white block">{s.startTime} - {s.endTime}</strong>
-                    </td>
-                    <td className="p-3 text-slate-300">{s.studioName}</td>
-                    <td className="p-3 font-medium text-slate-200">{s.hostName}</td>
-                    <td className="p-3 font-mono font-bold text-emerald-400">{s.targetGmv.toLocaleString()} đ</td>
-                    <td className="p-3 text-right">
-                      <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                          s.status === "Live Now"
-                            ? "bg-rose-600 text-white animate-pulse"
-                            : s.status === "Completed"
-                            ? "bg-slate-800 text-slate-300"
-                            : "bg-blue-600/20 text-blue-400"
-                        }`}
-                      >
-                        {s.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-                {openSlots.map((sl) => (
-                  <tr key={sl.id} onClick={() => setSelectedSlotDetail(sl)} className="hover:bg-amber-950/20 transition-colors cursor-pointer">
-                    <td className="p-3 font-bold text-amber-100">
-                      <div>{sl.notes || "Ca chờ đăng ký"}</div>
-                      <span className="text-[10px] text-amber-400 font-semibold inline-flex items-center gap-1"><BrandLogo brand={brandById.get(sl.brandId)} size="xs" /> {sl.brandName}</span>
-                    </td>
-                    <td className="p-3 font-mono text-slate-300">
-                      {sl.date} <strong className="text-white block">{sl.startTime} - {sl.endTime}</strong>
-                    </td>
-                    <td className="p-3 text-slate-300">{sl.studioName}</td>
-                    <td className="p-3 font-medium text-amber-300/80 italic">Chưa có Host</td>
-                    <td className="p-3 font-mono font-bold text-slate-500">—</td>
-                    <td className="p-3 text-right">
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-950/60 text-amber-400 border border-amber-700/50">
-                        Chờ ĐK
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
         </div>
       )}
