@@ -27,6 +27,9 @@ import {
 } from "lucide-react";
 import { CAMPAIGN_DAY_STYLES, getCampaignDayInfo } from "../lib/campaignDays";
 import { CampaignDayRibbon } from "./ui/CampaignDayRibbon";
+import { PosterDayCell } from "./ui/PosterCalendarGrid";
+import { getBrandTheme } from "../lib/brandTheme";
+import { SessionEventCard, SessionCardTone, buildSlotMeta } from "./ui/SessionEventCard";
 
 interface ShiftSchedulingProps {
   currentRole: UserRole;
@@ -46,6 +49,19 @@ interface ShiftSchedulingProps {
 }
 
 const WEEKDAY_LABELS = ["CN", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"];
+
+// Tone card cho ca trên lịch ma trận — "open" luôn viền đứt (pending) bất kể đã có
+// người đăng ký hay chưa, vì ca CHỈ thật sự chốt khi Ops finalize (đổi status).
+const SLOT_TONE: Record<ShiftSlot["status"], SessionCardTone> = {
+  open: "pending",
+  finalized: "upcoming",
+  cancelled: "cancelled"
+};
+const SLOT_STATUS_LABEL: Record<ShiftSlot["status"], string | undefined> = {
+  open: undefined,
+  finalized: undefined,
+  cancelled: "HUỶ"
+};
 
 const getTodayDateString = () => {
   const d = new Date();
@@ -103,6 +119,7 @@ export default function ShiftScheduling({
   const [swapBusy, setSwapBusy] = useState(false);
 
   const talentsById = useMemo(() => new Map(talents.map((t) => [t.id, t])), [talents]);
+  const brandById = useMemo(() => new Map(brands.map((b) => [b.id, b])), [brands]);
   const registrationsBySlot = useMemo(() => {
     const map = new Map<string, ShiftRegistration[]>();
     shiftRegistrations.forEach((r) => {
@@ -336,25 +353,27 @@ export default function ShiftScheduling({
         </div>
       )}
 
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl">
-        <h3 className="font-bold text-white flex items-center gap-2 mb-4">
-          <CalendarIcon className="w-4 h-4 text-blue-400" /> Lịch Ma Trận Tháng {selectedMonth}
+      <div className="bg-[#f8f9fa] dark:bg-slate-900 border border-pink-200 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl">
+        <h3 className="font-black text-slate-900 dark:text-white flex items-center gap-2 mb-4">
+          <CalendarIcon className="w-4 h-4 text-blue-500 dark:text-blue-400" /> Lịch Ma Trận Tháng {selectedMonth}
         </h3>
-        <div className="overflow-x-auto -mx-2">
-          <div className="min-w-[760px] px-2">
-            <div className="grid grid-cols-7 gap-1.5 mb-1.5">
+        <div className="overflow-x-auto -mx-1 px-1 pb-1">
+          <div className="min-w-[760px] xl:min-w-0">
+            <div className="grid grid-cols-7 gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-black uppercase tracking-wide mb-2">
               {WEEKDAY_LABELS.map((label, idx) => (
                 <div
                   key={label}
-                  className={`text-center text-[11px] font-bold uppercase tracking-wide py-1 ${
-                    idx === 0 || idx === 6 ? "text-amber-400" : "text-slate-500"
+                  className={`text-center py-2 rounded-xl ${
+                    idx === 0 || idx === 6
+                      ? "bg-rose-100 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400"
+                      : "bg-slate-100 dark:bg-slate-900/60 text-slate-500 dark:text-slate-400"
                   }`}
                 >
                   {label}
                 </div>
               ))}
             </div>
-            <div className="grid grid-cols-7 gap-1.5">
+            <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
               {monthGrid.map((cell, cellIdx) => {
                 const daySlots = slotsByDate.get(cell.date) ?? [];
                 const dayNum = Number(cell.date.slice(8, 10));
@@ -368,84 +387,95 @@ export default function ShiftScheduling({
                 );
                 const dayWarningColor = dayMissingBoth ? "bg-rose-500" : dayMissingCoHost ? "bg-amber-400" : null;
                 const dayWarningTitle = dayMissingBoth ? "Có ca chưa ai đăng ký" : dayMissingCoHost ? "Có ca thiếu Trợ live" : undefined;
-                const visibleChips = daySlots.slice(0, 3);
+                const visibleChips = daySlots.slice(0, 2);
                 const extra = daySlots.length - visibleChips.length;
                 const campaignDay = getCampaignDayInfo(cell.date);
+                const toneClassName = isSelected
+                  ? "bg-blue-50 dark:bg-blue-950/50 border-blue-500 shadow-md shadow-blue-600/10"
+                  : !cell.inMonth
+                  ? "bg-slate-100/60 dark:bg-slate-950/30 border-slate-200 dark:border-slate-800/40 opacity-40 hover:opacity-80"
+                  : campaignDay
+                  ? CAMPAIGN_DAY_STYLES[campaignDay.type].cell
+                  : undefined;
                 return (
-                  <button
+                  <PosterDayCell
                     key={cell.date}
-                    onClick={() => setSelectedDate(cell.date === selectedDate ? null : cell.date)}
+                    day={dayNum}
+                    isToday={isToday}
+                    isWeekend={cellIdx % 7 === 0 || cellIdx % 7 === 6}
                     title={campaignDay?.label}
-                    className={`text-left min-h-[92px] sm:min-h-[108px] rounded-lg p-1.5 flex flex-col gap-1 border transition-colors ${
-                      isSelected
-                        ? "border-blue-500 bg-blue-950/30"
-                        : isToday
-                        ? "border-purple-600 bg-slate-950/80"
-                        : "border-slate-800 bg-slate-950/50 hover:border-slate-700"
-                    } ${!cell.inMonth ? "opacity-35" : ""} ${campaignDay ? CAMPAIGN_DAY_STYLES[campaignDay.type].ring : ""}`}
+                    toneClassName={toneClassName}
+                    onClick={() => setSelectedDate(cell.date === selectedDate ? null : cell.date)}
+                    badge={
+                      dayWarningColor ? (
+                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dayWarningColor}`} title={dayWarningTitle} />
+                      ) : undefined
+                    }
+                    ribbon={
+                      // Gọi ở MỌI ô: ô ngày thường chừa dải trống cùng chiều cao nên số ngày cả
+                      // hàng vẫn thẳng, dải camp không "chèn" đẩy riêng 3 ô camp xuống.
+                      <CampaignDayRibbon
+                        info={campaignDay}
+                        columnIndex={cellIdx % 7}
+                        isGridStart={cellIdx === 0}
+                        cellsRemainingInGrid={monthGrid.length - cellIdx}
+                        variant="poster"
+                      />
+                    }
                   >
-                    {/* Gọi ở MỌI ô: ô ngày thường chừa dải trống cùng chiều cao nên số ngày cả
-                        hàng vẫn thẳng, dải camp không "chèn" đẩy riêng 3 ô camp xuống. */}
-                    <CampaignDayRibbon
-                      info={campaignDay}
-                      columnIndex={cellIdx % 7}
-                      isGridStart={cellIdx === 0}
-                      cellsRemainingInGrid={monthGrid.length - cellIdx}
-                      variant="compact"
-                    />
-
-                    <div className="flex items-center justify-between">
-                      <span className={`text-xs font-mono font-bold ${isToday ? "text-purple-300" : "text-slate-300"}`}>{dayNum}</span>
-                      <div className="flex items-center gap-1">
-                        {dayWarningColor && <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dayWarningColor}`} title={dayWarningTitle} />}
-                      </div>
+                    <div className="space-y-1">
+                      {visibleChips.map((s) => (
+                        <SessionEventCard
+                          key={s.id}
+                          theme={getBrandTheme(s.brandName)}
+                          brand={brandById.get(s.brandId ?? "")}
+                          brandName={s.brandName}
+                          startTime={s.startTime}
+                          endTime={s.endTime}
+                          meta={buildSlotMeta(s)}
+                          tone={SLOT_TONE[s.status]}
+                          statusLabel={SLOT_STATUS_LABEL[s.status]}
+                          pending={s.status === "open"}
+                          tooltip={`${s.startTime}-${s.endTime} · ${s.studioName} · ${
+                            s.status === "open"
+                              ? `${(registrationsBySlot.get(s.id) ?? []).length} người đăng ký`
+                              : s.status === "finalized"
+                              ? "Đã chốt"
+                              : "Đã huỷ"
+                          }`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedDate(cell.date === selectedDate ? null : cell.date);
+                          }}
+                        />
+                      ))}
+                      {extra > 0 && <span className="text-[9px] text-slate-500 dark:text-slate-400 font-bold block">+{extra} ca khác</span>}
                     </div>
-                    <div className="flex flex-col gap-0.5">
-                      {visibleChips.map((s) => {
-                        const regsCount = (registrationsBySlot.get(s.id) ?? []).length;
-                        const dotColor =
-                          s.status === "finalized"
-                            ? "bg-emerald-400"
-                            : s.status === "cancelled"
-                            ? "bg-slate-600"
-                            : regsCount === 0
-                            ? "bg-rose-400"
-                            : "bg-blue-400";
-                        const shortBrand = s.brandName ? (s.brandName.length > 9 ? `${s.brandName.slice(0, 8)}…` : s.brandName) : "—";
-                        return (
-                          <span
-                            key={s.id}
-                            className={`flex items-center gap-1 text-[10px] leading-tight px-1 py-0.5 rounded bg-slate-900/80 ${
-                              s.status === "cancelled" ? "text-slate-600 line-through" : "text-slate-300"
-                            }`}
-                          >
-                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotColor}`} />
-                            <span className="font-mono shrink-0">{s.startTime}</span>
-                            <span className="truncate">{shortBrand}</span>
-                          </span>
-                        );
-                      })}
-                      {extra > 0 && <span className="text-[10px] text-slate-500 px-1">+{extra} khác</span>}
-                    </div>
-                  </button>
+                  </PosterDayCell>
                 );
               })}
             </div>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-500 mt-3 pt-3 border-t border-slate-800">
-          <span className="flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-rose-400" /> Mở, chưa ai đăng ký
+        {/* Chú giải phải khớp đúng cách SessionEventCard vẽ trạng thái thật: nền card lấy màu
+            brand (không có màu cố định theo trạng thái), trạng thái phân biệt bằng KIỂU VIỀN —
+            viền đứt = ca mở (chưa/đã có người đăng ký đều cùng 1 kiểu viền, card không có chip
+            đếm số người đăng ký nên 2 trạng thái này không phân biệt được bằng mắt), viền liền =
+            đã chốt, viền liền mờ = đã huỷ. 2 mục cảnh báo theo NGÀY bên dưới vẫn là chấm màu cố
+            định (bg-rose-500/bg-amber-400) vì đó là badge riêng, không phải card. */}
+        <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-500 dark:text-slate-400 mt-3 pt-3 border-t border-slate-200 dark:border-slate-800">
+          <span className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded-md bg-slate-300 dark:bg-slate-700 border-2 border-dashed border-slate-500 dark:border-slate-400" />
+            Ca mở, chờ đăng ký
           </span>
-          <span className="flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-400" /> Mở, đã có người đăng ký
+          <span className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded-md bg-slate-300 dark:bg-slate-700 border-2 border-solid border-slate-500 dark:border-slate-400" />
+            Đã chốt
           </span>
-          <span className="flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> Đã chốt
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-slate-600" /> Đã huỷ
+          <span className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded-md bg-slate-300 dark:bg-slate-700 border-2 border-solid border-slate-500 dark:border-slate-400 opacity-60 saturate-50" />
+            Đã huỷ
           </span>
           <span className="flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-rose-500" /> Ngày có ca thiếu người

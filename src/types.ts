@@ -442,13 +442,19 @@ export interface GeneratedScript {
 }
 
 // Giai đoạn C3 — Scheme (khuyến mãi/khung giờ vàng) tích hợp vào Lịch Vận Hành. Áp dụng
-// theo khoảng ngày, không gắn session/brand cụ thể — hiển thị badge trên ô ngày Calendar.
+// theo khoảng ngày — hiển thị badge trên ô ngày Calendar. `brandId` = null/undefined: scheme
+// áp dụng toàn agency (dùng ở LiveCalendar); có giá trị: scheme riêng của 1 brand, quản lý
+// trực tiếp trong Brand Workspace Calendar (bảng scheme theo hạng mục × ngày trong tuần).
+// `category` tự do (vd "Voucher scheme", "Combo Deal", "Free Gift") — không enum vì hạng mục
+// vận hành thay đổi liên tục, không cố định theo code.
 export interface PromoScheme {
   id: string;
   title: string;
   description: string;
   startDate: string;
   endDate: string;
+  brandId?: string | null;
+  category: string;
   createdAt?: string;
 }
 

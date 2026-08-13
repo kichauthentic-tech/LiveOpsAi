@@ -78,8 +78,9 @@ export const CAMPAIGN_DAY_STYLES: Record<
     badge: "bg-rose-600 text-white",
     ring: "ring-1 ring-inset ring-rose-500/70",
     // `cell` = nền phủ CẢ ô ngày thuộc dải camp (không phải badge nhỏ trong ô) — cùng với `ring`
-    // làm 3 ngày của đợt camp đọc ra như một khối liền dưới dải banner.
-    cell: "bg-rose-50 dark:bg-rose-950/25 border-rose-300 dark:border-rose-800/70",
+    // làm 3 ngày của đợt camp đọc ra như một khối liền dưới dải banner. Dark mode cần opacity/màu
+    // đậm hơn light mode nhiều vì nền cell tối (slate-900) đã gần trùng amber/rose-950 mờ.
+    cell: "bg-rose-50 dark:bg-rose-950/50 border-rose-300 dark:border-rose-700/80",
     dot: "bg-rose-500",
     text: "text-rose-400",
     banner: "bg-gradient-to-r from-rose-600 via-red-500 to-orange-500",
@@ -88,7 +89,7 @@ export const CAMPAIGN_DAY_STYLES: Record<
   midmonth: {
     badge: "bg-amber-600 text-white",
     ring: "ring-1 ring-inset ring-amber-500/70",
-    cell: "bg-amber-50 dark:bg-amber-950/25 border-amber-300 dark:border-amber-800/70",
+    cell: "bg-amber-50 dark:bg-amber-950/50 border-amber-300 dark:border-amber-700/80",
     dot: "bg-amber-500",
     text: "text-amber-400",
     banner: "bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600",
@@ -97,7 +98,7 @@ export const CAMPAIGN_DAY_STYLES: Record<
   payday: {
     badge: "bg-violet-600 text-white",
     ring: "ring-1 ring-inset ring-violet-500/70",
-    cell: "bg-violet-50 dark:bg-violet-950/25 border-violet-300 dark:border-violet-800/70",
+    cell: "bg-violet-50 dark:bg-violet-950/50 border-violet-300 dark:border-violet-700/80",
     dot: "bg-violet-500",
     text: "text-violet-400",
     banner: "bg-gradient-to-r from-violet-600 via-fuchsia-600 to-purple-600",

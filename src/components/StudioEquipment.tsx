@@ -16,6 +16,7 @@ import {
   Search,
   Filter
 } from "lucide-react";
+import { getTodayDate } from "../lib/dateUtils";
 
 interface StudioEquipmentProps {
   studios: Studio[];
@@ -73,7 +74,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
     setSimulatedQrScan(code);
   };
 
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = getTodayDate();
   const todaysBookings = sessions
     .filter((s) => s.date === todayStr && s.status !== "Cancelled")
     .sort((a, b) => a.startTime.localeCompare(b.startTime));

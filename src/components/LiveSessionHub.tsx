@@ -3,6 +3,7 @@ import { LiveSession, MinuteMetric, ProductSKU, Studio, Talent, Brand, SystemUse
 import { Radio, Play, CheckCircle2, Clock, Sparkles, TrendingUp, Users, ShoppingBag, AlertCircle, RefreshCw, Layers, Plus, Edit3, Trash2, X, Building2 } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
 import { authedFetch } from "../lib/authedFetch";
+import { getTodayDate } from "../lib/dateUtils";
 
 interface LiveSessionHubProps {
   sessions: LiveSession[];
@@ -44,7 +45,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
   const [sessStudioId, setSessStudioId] = useState("");
   const [sessHostId, setSessHostId] = useState("");
   const [sessAssistantId, setSessAssistantId] = useState("");
-  const [sessDate, setSessDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [sessDate, setSessDate] = useState(() => getTodayDate());
   const [sessStartTime, setSessStartTime] = useState("19:00");
   const [sessEndTime, setSessEndTime] = useState("21:00");
   const [sessStatus, setSessStatus] = useState<"Live Now" | "Upcoming" | "Completed" | "Cancelled">("Upcoming");

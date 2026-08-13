@@ -7,6 +7,8 @@ interface DbPromoScheme {
   description: string;
   start_date: string;
   end_date: string;
+  brand_id: string | null;
+  category: string;
   created_at: string;
 }
 
@@ -17,6 +19,8 @@ function fromDb(row: DbPromoScheme): PromoScheme {
     description: row.description,
     startDate: row.start_date,
     endDate: row.end_date,
+    brandId: row.brand_id,
+    category: row.category,
     createdAt: row.created_at
   };
 }
@@ -28,7 +32,8 @@ export async function fetchPromoSchemes(): Promise<PromoScheme[]> {
 }
 
 export async function createPromoScheme(
-  scheme: Pick<PromoScheme, "title" | "description" | "startDate" | "endDate"> & { createdBy?: string }
+  scheme: Pick<PromoScheme, "title" | "description" | "startDate" | "endDate"> &
+    Partial<Pick<PromoScheme, "brandId" | "category">> & { createdBy?: string }
 ): Promise<PromoScheme> {
   const { data, error } = await supabase
     .from("promo_schemes")
@@ -37,6 +42,8 @@ export async function createPromoScheme(
       description: scheme.description,
       start_date: scheme.startDate,
       end_date: scheme.endDate,
+      brand_id: scheme.brandId ?? null,
+      category: scheme.category ?? "Chung",
       created_by: scheme.createdBy ?? null
     })
     .select()
@@ -47,13 +54,14 @@ export async function createPromoScheme(
 
 export async function updatePromoScheme(
   id: string,
-  patch: Partial<Pick<PromoScheme, "title" | "description" | "startDate" | "endDate">>
+  patch: Partial<Pick<PromoScheme, "title" | "description" | "startDate" | "endDate" | "category">>
 ): Promise<PromoScheme> {
   const row: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (patch.title !== undefined) row.title = patch.title;
   if (patch.description !== undefined) row.description = patch.description;
   if (patch.startDate !== undefined) row.start_date = patch.startDate;
   if (patch.endDate !== undefined) row.end_date = patch.endDate;
+  if (patch.category !== undefined) row.category = patch.category;
 
   const { data, error } = await supabase.from("promo_schemes").update(row).eq("id", id).select().single();
   if (error) throw error;

@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { BrandInvoice, UserRole } from "../../types";
 import { Receipt, Plus, Trash2 } from "lucide-react";
+import { getTodayMonth } from "../../lib/dateUtils";
 
 interface BrandInvoicesProps {
   brandId: string;
@@ -19,8 +20,6 @@ const INVOICE_STATUS_LABEL: Record<BrandInvoice["status"], string> = {
   partial: "Thu một phần",
   paid: "Đã thu đủ"
 };
-
-const getTodayMonth = () => new Date().toISOString().slice(0, 7);
 
 export const BrandInvoices: React.FC<BrandInvoicesProps> = ({ brandId, currentRole, brandInvoices, onAddInvoice, onUpdateInvoice, onDeleteInvoice }) => {
   const canEdit = currentRole === "ceo" || currentRole === "admin" || currentRole === "operations";

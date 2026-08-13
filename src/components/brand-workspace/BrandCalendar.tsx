@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { LiveSession, PromoScheme, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, Studio, SystemUser, Talent } from "../../types";
-import { CalendarIcon, ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { CalendarIcon, ChevronLeft, ChevronRight, Plus, Tag } from "lucide-react";
 import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
 import { schemesForDate } from "../../lib/schemeUtils";
 import { CAMPAIGN_DAY_STYLES, getCampaignDayInfo } from "../../lib/campaignDays";
@@ -10,6 +10,7 @@ import { SlotDetailModal } from "../scheduling/SlotDetailModal";
 import { PosterCalendarHeader, PosterCalendarGrid, PosterDayCell } from "../ui/PosterCalendarGrid";
 import { EventPill, EventPillTier } from "../ui/EventPill";
 import { CampaignDayRibbon } from "../ui/CampaignDayRibbon";
+import { SchemeWeekStrip } from "./SchemeWeekStrip";
 import {
   SessionEventCard,
   SESSION_TONE,
@@ -29,6 +30,9 @@ interface BrandCalendarProps {
   talents: Talent[];
   users?: SystemUser[];
   schemes?: PromoScheme[];
+  onAddScheme?: (scheme: { title: string; description: string; startDate: string; endDate: string; brandId: string; category: string }) => Promise<void>;
+  onUpdateScheme?: (id: string, patch: Partial<Pick<PromoScheme, "title" | "description" | "startDate" | "endDate" | "category">>) => Promise<void>;
+  onDeleteScheme?: (id: string) => Promise<void>;
   currentUserId?: string;
   myTalentId?: string;
   canEdit?: boolean;
@@ -84,6 +88,9 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
   talents,
   users = [],
   schemes = [],
+  onAddScheme,
+  onUpdateScheme,
+  onDeleteScheme,
   currentUserId,
   myTalentId,
   canEdit = true,
@@ -115,6 +122,8 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
   const brandTemplates = useMemo(() => recurringShiftTemplates.filter((t) => t.brandId === brandId), [recurringShiftTemplates, brandId]);
 
   const brandSessions = useMemo(() => sessions.filter((s) => s.brandId === brandId), [sessions, brandId]);
+  const brandSchemes = useMemo(() => schemes.filter((s) => s.brandId === brandId), [schemes, brandId]);
+  const canManageSchemes = canManage && !!onAddScheme && !!onUpdateScheme && !!onDeleteScheme;
   const brandOpenSlots = useMemo(
     () => shiftSlots.filter((sl) => sl.brandId === brandId && sl.status === "open"),
     [shiftSlots, brandId]
@@ -220,16 +229,41 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
 
       <PosterCalendarGrid weekdayLabels={WEEKDAY_LABELS} minWidthClassName="min-w-[1080px] xl:min-w-0">
         {cells.map((day, idx) => {
-          if (day === null) return <PosterDayCell key={`b-${idx}`} day={null} />;
+          const rowStart = idx - (idx % 7);
+          const isRowEnd = idx % 7 === 6 || idx === cells.length - 1;
+          const weekStrip = isRowEnd && (
+            <SchemeWeekStrip
+              key={`scheme-week-${rowStart}`}
+              brandId={brandId}
+              weekDates={Array.from({ length: 7 }, (_, ci) => {
+                const cellDay = cells[rowStart + ci];
+                return cellDay ? `${month}-${`${cellDay}`.padStart(2, "0")}` : null;
+              })}
+              schemes={brandSchemes}
+              canManage={canManageSchemes}
+              onAdd={onAddScheme}
+              onUpdate={onUpdateScheme}
+              onDelete={onDeleteScheme}
+            />
+          );
+
+          if (day === null) {
+            return (
+              <React.Fragment key={`b-${idx}`}>
+                <PosterDayCell day={null} />
+                {weekStrip}
+              </React.Fragment>
+            );
+          }
           const dateStr = `${month}-${`${day}`.padStart(2, "0")}`;
           const daySessions = sessionsByDate.get(dateStr) ?? [];
           const daySlots = slotsByDate.get(dateStr) ?? [];
-          const daySchemes = schemesForDate(schemes, dateStr);
+          const daySchemes = schemesForDate(brandSchemes, dateStr);
           const campaignDay = getCampaignDayInfo(dateStr);
           const eventCount = daySessions.length + daySlots.length + daySchemes.length;
           return (
+            <React.Fragment key={dateStr}>
             <PosterDayCell
-              key={dateStr}
               day={day}
               isToday={dateStr === getTodayDateString()}
               isWeekend={idx % 7 === 0 || idx % 7 === 6}
@@ -247,16 +281,17 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
                 />
               }
               footer={eventCount > 0 ? `${eventCount} sự kiện` : undefined}
+              badge={
+                daySchemes.length > 0 ? (
+                  <span
+                    title={`${daySchemes.length} scheme khuyến mãi — xem chi tiết ở bảng dưới hàng tuần`}
+                    className="flex items-center justify-center w-4 h-4 rounded-full bg-amber-400 text-amber-950"
+                  >
+                    <Tag className="w-2.5 h-2.5" />
+                  </span>
+                ) : undefined
+              }
             >
-              {daySchemes.slice(0, 1).map((s) => (
-                <EventPill
-                  key={s.id}
-                  tier="gold_gradient"
-                  label={s.title}
-                  title={`${s.title}${s.description ? ` — ${s.description}` : ""}`}
-                />
-              ))}
-              {daySchemes.length > 1 && <span className="text-[9px] text-slate-500">+{daySchemes.length - 1} scheme khác</span>}
               {daySessions.slice(0, CELL_MAX_SESSIONS).map((s) => (
                 <SessionEventCard
                   key={s.id}
@@ -306,6 +341,8 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
                 <span className="text-[9px] text-amber-600 dark:text-amber-500">+{daySlots.length - CELL_MAX_SLOTS} ca chờ ĐK</span>
               )}
             </PosterDayCell>
+            {weekStrip}
+            </React.Fragment>
           );
         })}
       </PosterCalendarGrid>
@@ -338,31 +375,6 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
             </div>
           ))}
       </div>
-
-      {brandOpenSlots.filter((sl) => sl.date.startsWith(month)).length > 0 && (
-        <div className="space-y-2">
-          <p className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wide">Ca Chờ Đăng Ký</p>
-          {Array.from(slotsByDate.entries())
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([date, list]) => (
-              <div key={date} className="bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-900/40 rounded-xl px-4 py-3 space-y-1.5 shadow-sm">
-                <p className="text-xs font-bold text-slate-700 dark:text-slate-300 font-mono">{date}</p>
-                {list.map((sl) => (
-                  <div
-                    key={sl.id}
-                    onClick={() => setSelectedSlotDetail(sl)}
-                    className="flex flex-wrap items-center gap-2 text-[11px] text-amber-700 dark:text-amber-300/90 cursor-pointer hover:text-amber-900 dark:hover:text-amber-200"
-                  >
-                    <EventPill tier="pastel_festival" label="Chờ ĐK" />
-                    <span>{sl.startTime}-{sl.endTime}</span>
-                    <span>Studio: {sl.studioName}</span>
-                    {sl.notes && <span className="text-slate-500">· {sl.notes}</span>}
-                  </div>
-                ))}
-              </div>
-            ))}
-        </div>
-      )}
 
       {modalState.open && canManage && (
         <BrandSessionModal
