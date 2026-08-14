@@ -30,6 +30,8 @@ import { CampaignDayRibbon } from "./ui/CampaignDayRibbon";
 import { PosterDayCell } from "./ui/PosterCalendarGrid";
 import { getBrandTheme } from "../lib/brandTheme";
 import { SessionEventCard, SessionCardTone, buildSlotMeta } from "./ui/SessionEventCard";
+import { SessionReportForm } from "./SessionReportForm";
+import { SessionReportInput } from "../lib/db/sessionReports";
 
 interface ShiftSchedulingProps {
   currentRole: UserRole;
@@ -46,6 +48,7 @@ interface ShiftSchedulingProps {
   onFinalizeSlot: (slot: ShiftSlot, hostId: string, coHostId: string | null) => Promise<boolean>;
   onUpdateSession: (session: LiveSession) => Promise<boolean>;
   onLogAudit: (entry: { action: string; details: string; category: AuditLogEntry["category"] }) => Promise<void>;
+  onSubmitSessionReport: (sessionId: string, input: SessionReportInput) => Promise<boolean>;
 }
 
 const WEEKDAY_LABELS = ["CN", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"];
@@ -98,7 +101,8 @@ export default function ShiftScheduling({
   onUnregister,
   onFinalizeSlot,
   onUpdateSession,
-  onLogAudit
+  onLogAudit,
+  onSubmitSessionReport
 }: ShiftSchedulingProps) {
   const admin = isAdminRole(currentRole);
   const myTalentId = activeUser.assignedTalentId;
@@ -108,6 +112,9 @@ export default function ShiftScheduling({
 
   const [pickByLot, setPickByLot] = useState<Record<string, { hostId: string; coHostId: string }>>({});
   const [busySlotId, setBusySlotId] = useState<string | null>(null);
+
+  // Talent tự nhập report cho đúng ca của mình (chỉ 1 form mở tại 1 thời điểm).
+  const [openReportSessionId, setOpenReportSessionId] = useState<string | null>(null);
 
   // Giai đoạn 15c — thay người khẩn cấp trên 1 ca đã chốt (Host/Trợ live báo bận
   // sát giờ live). Danh sách ứng viên thay thế lấy từ session_availability của
@@ -744,6 +751,30 @@ export default function ShiftScheduling({
                                   Huỷ
                                 </button>
                               </div>
+                            </div>
+                          )}
+                          {!admin && (myTalentId === session.hostId || myTalentId === session.coHostId) && (
+                            <div className="pt-2 border-t border-slate-800/80">
+                              {openReportSessionId === session.id ? (
+                                <SessionReportForm
+                                  session={session}
+                                  onSubmit={(input) => onSubmitSessionReport(session.id, input)}
+                                  onCancel={() => setOpenReportSessionId(null)}
+                                />
+                              ) : (
+                                <button
+                                  onClick={() => setOpenReportSessionId(session.id)}
+                                  className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-emerald-950 text-emerald-300 border border-emerald-800 hover:bg-emerald-900 transition-colors"
+                                >
+                                  <Radio className="w-3.5 h-3.5" />
+                                  {session.report ? "Sửa Report Ca Này" : "Nhập Report Ca Này"}
+                                </button>
+                              )}
+                              {session.report?.submittedAt && openReportSessionId !== session.id && (
+                                <p className="text-[11px] text-slate-500 mt-1">
+                                  Đã nhập lúc {new Date(session.report.submittedAt).toLocaleString("vi-VN")}
+                                </p>
+                              )}
                             </div>
                           )}
                         </div>

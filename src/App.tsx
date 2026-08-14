@@ -5,6 +5,7 @@ import { fetchTalents, createTalent, updateTalent, deleteTalent } from "./lib/db
 import { fetchStudios, createStudio, updateStudio, deleteStudio } from "./lib/db/studios";
 import { fetchEquipments, createEquipment, updateEquipment, deleteEquipment } from "./lib/db/equipments";
 import { fetchSessions, createSession, updateSession, deleteSession } from "./lib/db/sessions";
+import { submitSessionReport, SessionReportInput } from "./lib/db/sessionReports";
 import { fetchBrands, createBrand, updateBrand, deleteBrand } from "./lib/db/brands";
 import { fetchUsers, updateUserProfile, inviteUser, deleteUserAccount, InviteUserPayload } from "./lib/db/users";
 import { fetchWorkflowRules, createWorkflowRule, updateWorkflowRule, deleteWorkflowRule } from "./lib/db/workflowRules";
@@ -971,6 +972,19 @@ export default function App() {
       return false;
     }
   };
+  const handleSubmitSessionReport = async (sessionId: string, input: SessionReportInput): Promise<boolean> => {
+    try {
+      const saved = await submitSessionReport(sessionId, input);
+      setSessions((prev) => prev.map((s) => (s.id === saved.id ? saved : s)));
+      if (selectedSession && selectedSession.id === saved.id) {
+        setSelectedSession(saved);
+      }
+      return true;
+    } catch (e: any) {
+      window.alert(`Không thể lưu report ca live: ${e.message ?? e}`);
+      return false;
+    }
+  };
   const handleDeleteSession = async (id: string) => {
     try {
       await deleteSession(id);
@@ -1675,6 +1689,7 @@ export default function App() {
                     onRegisterSlot={handleRegisterSlot}
                     onUnregisterSlot={handleUnregisterSlot}
                     onFinalizeSlot={handleFinalizeShiftSlot}
+                    onSubmitSessionReport={handleSubmitSessionReport}
                     myTalentId={activeUser.assignedTalentId}
                     currentUserId={activeUser.id}
                     currentRole={currentRole}
@@ -1704,6 +1719,7 @@ export default function App() {
                     onRegister={handleRegisterSlot}
                     onUnregister={handleUnregisterSlot}
                     onFinalizeSlot={handleFinalizeShiftSlot}
+                    onSubmitSessionReport={handleSubmitSessionReport}
                     onUpdateSession={handleUpdateSession}
                     onLogAudit={pushAuditLog}
                   />
@@ -1744,6 +1760,7 @@ export default function App() {
                     onRegisterSlot={handleRegisterSlot}
                     onUnregisterSlot={handleUnregisterSlot}
                     onFinalizeSlot={handleFinalizeShiftSlot}
+                    onSubmitSessionReport={handleSubmitSessionReport}
                     recurringShiftTemplates={recurringShiftTemplates}
                     onCreateTemplate={handleCreateRecurringTemplate}
                     onToggleTemplate={handleToggleRecurringTemplate}
@@ -1753,7 +1770,12 @@ export default function App() {
                 )}
 
                 {activeTab === "brand_sessions" && effectiveWorkspace.type === "brand" && (
-                  <BrandSessions brandId={currentBrandId!} sessions={activeSessions} />
+                  <BrandSessions
+                    brandId={currentBrandId!}
+                    sessions={activeSessions}
+                    currentRole={currentRole}
+                    onSubmitSessionReport={handleSubmitSessionReport}
+                  />
                 )}
 
                 {activeTab === "brand_skus" && effectiveWorkspace.type === "brand" && (

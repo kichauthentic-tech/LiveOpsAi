@@ -1,6 +1,6 @@
 # LiveOps AI — Thiết kế Workspace Model (Agency ↔ Brand)
 
-> **Trạng thái: GIAI ĐOẠN A + B1-B6 + C1-C4 ĐÃ CODE + VERIFY XONG. Module Campaign đã bị xóa hoàn toàn (2026-08-10). Module Lịch Vận Hành hợp nhất (tạo/sửa Session + Ca) đã code + verify xong (2026-08-11). Poster Calendar Design System + hạ tầng theme toggle app-wide đã code + verify xong (2026-08-11) — xem "Đã hoàn thành — Poster Calendar Design System". Session Card theo màu logo brand (thay pill 1 dòng cũ) đã code + verify xong (2026-08-12) — xem "Đã hoàn thành — Session Card theo màu brand".** Roadmap "6 module mới" gốc ở mục 6 đã hoàn thành. Giai đoạn C (4 module mới, mục 6.1) đã xong toàn bộ: **C1 — Onboarding Checklist theo Brand** (đã xóa 2026-08-09, xem "Đã xóa — Giai đoạn C1"), **C2 — GMV Target vs Actual theo Calendar**, **C3 — Scheme khuyến mãi tích hợp Calendar**, **C4 — Price List Import**. Toàn bộ roadmap workspace model (mục 6 + 6.1) đã hoàn thành. Sau đó rà soát UI Campaign (template hoá, rồi rút gọn) cho tới khi kết luận module này chỉ còn là tag tùy chọn không ảnh hưởng P&L/GMV → **xóa hoàn toàn** (component `BrandCampaigns`/`BrandReviewHistory`, 3 bảng DB, mọi field `campaignId` — xem "Đã xóa — Module Campaign"). Migration [0034_drop_campaigns.sql](supabase/migrations/0034_drop_campaigns.sql) đã chạy xong trên Supabase thật (2026-08-10), verify lại qua browser thật sau migration — không lỗi console. Ngay sau đó, user thấy trang "Đăng Ký & Chốt Lịch" (`ShiftScheduling.tsx`) vẫn còn rối vì 2 khối form "Quy Tắc Lặp"/"Mở Ca Mới" — đã xóa UI 2 khối này (2026-08-10). Thay vì xây lại UI lịch kiểu ClickUp/Notion từ đầu, user quyết định (2026-08-11) hợp nhất khả năng tạo/sửa Session/Ca (giờ, ngày, host, co-host) trực tiếp vào `LiveCalendar.tsx` (Agency, vốn đã có modal đặt lịch + drag-drop) và mở rộng thêm sang `BrandCalendar.tsx` (Brand Workspace, trước đây read-only) — xem "Đã hoàn thành — Module Lịch Vận Hành hợp nhất". Sau đó đã thêm logic cố định highlight ngày camp D-Day/Mid-Month/Pay-Day trên mọi calendar trong hệ thống (xem "Đã hoàn thành — Highlight ngày camp cố định"). Gần nhất trước đó (2026-08-15), sửa rò rỉ dữ liệu nội bộ ở `BrandSessions.tsx` — bảng Sessions phía Brand Workspace từng hiện `grossAgencyRev`/`hostPayout`/`netProfit` (margin nội bộ agency) cho chính brand xem, đã bỏ 3 cột này và thay bằng thông tin vận hành phiên live (Nền tảng, Target GMV, Peak Viewers, CTR/CVR) — xem "Đã sửa — Bỏ lộ P&L nội bộ khỏi Brand Sessions". Ngay sau đó (2026-08-15), mở rộng Rate Card: thêm tỷ lệ hoàn hủy theo brand+platform để ước tính NMV, và tách quyền xem tab Rate Card khỏi luồng chung của Brand Workspace bằng `PermissionKey` mới `view_rate_card` — xem "Đã hoàn thành — Rate Card: Tỷ Lệ Hoàn Hủy + NMV Ước Tính + Permission Riêng". Ngay sau đó (2026-08-15), **gỡ bỏ hoàn toàn module C4 — Price List Import** theo yêu cầu user (chỉ giữ SKU Showcase) — xem "Đã gỡ bỏ — Giai đoạn C4 (Price List Import)". Ngay sau đó (2026-08-15), **gỡ bỏ hoàn toàn module Giai đoạn 20 — Hoá Đơn & Công Nợ Brand** (công nợ là nghiệp vụ kế toán riêng, ngoài phạm vi app) và thay vào đó **sửa `lib/pnl.ts`** để P&L GMV-commission tính trên NMV ước tính (`actualGmv × (1 − returnRate/100)`) thay vì GMV thô — xem "Đã gỡ bỏ — Module Hoá Đơn & Công Nợ Brand, chuyển sang doanh thu ước tính ở P&L". Quyết định này **đảo ngược** quyết định "không đổi `lib/pnl.ts`" ở giai đoạn Rate Card returnRate ngay trước đó — lúc đó chưa rõ ý định dùng returnRate cho P&L thật. Ngay sau đó (2026-08-15), **gỡ bỏ hoàn toàn module AI Script Gen** (tab sinh kịch bản livestream bằng Gemini AI) theo yêu cầu user — xem "Đã gỡ bỏ — Module AI Script Gen". Ngay sau đó (2026-08-15), **gỡ bỏ End-To-End Simulator + 2 persona chat Host Coach AI/Talent Matcher AI khỏi Hội Đồng AI** (Module 16), dọn theo agent prompt mồ côi tương ứng trong AI Training Center — xem "Đã gỡ bỏ — End-To-End Simulator & Host Coach/Talent Matcher trong Hội Đồng AI". Phiên sau cần user chỉ hướng đi tiếp theo (module mới khác, hoặc rà soát/refactor phần đã có).
+> **Trạng thái: GIAI ĐOẠN A + B1-B6 + C1-C4 ĐÃ CODE + VERIFY XONG. Module Campaign đã bị xóa hoàn toàn (2026-08-10). Module Lịch Vận Hành hợp nhất (tạo/sửa Session + Ca) đã code + verify xong (2026-08-11). Poster Calendar Design System + hạ tầng theme toggle app-wide đã code + verify xong (2026-08-11) — xem "Đã hoàn thành — Poster Calendar Design System". Session Card theo màu logo brand (thay pill 1 dòng cũ) đã code + verify xong (2026-08-12) — xem "Đã hoàn thành — Session Card theo màu brand".** Roadmap "6 module mới" gốc ở mục 6 đã hoàn thành. Giai đoạn C (4 module mới, mục 6.1) đã xong toàn bộ: **C1 — Onboarding Checklist theo Brand** (đã xóa 2026-08-09, xem "Đã xóa — Giai đoạn C1"), **C2 — GMV Target vs Actual theo Calendar**, **C3 — Scheme khuyến mãi tích hợp Calendar**, **C4 — Price List Import**. Toàn bộ roadmap workspace model (mục 6 + 6.1) đã hoàn thành. Sau đó rà soát UI Campaign (template hoá, rồi rút gọn) cho tới khi kết luận module này chỉ còn là tag tùy chọn không ảnh hưởng P&L/GMV → **xóa hoàn toàn** (component `BrandCampaigns`/`BrandReviewHistory`, 3 bảng DB, mọi field `campaignId` — xem "Đã xóa — Module Campaign"). Migration [0034_drop_campaigns.sql](supabase/migrations/0034_drop_campaigns.sql) đã chạy xong trên Supabase thật (2026-08-10), verify lại qua browser thật sau migration — không lỗi console. Ngay sau đó, user thấy trang "Đăng Ký & Chốt Lịch" (`ShiftScheduling.tsx`) vẫn còn rối vì 2 khối form "Quy Tắc Lặp"/"Mở Ca Mới" — đã xóa UI 2 khối này (2026-08-10). Thay vì xây lại UI lịch kiểu ClickUp/Notion từ đầu, user quyết định (2026-08-11) hợp nhất khả năng tạo/sửa Session/Ca (giờ, ngày, host, co-host) trực tiếp vào `LiveCalendar.tsx` (Agency, vốn đã có modal đặt lịch + drag-drop) và mở rộng thêm sang `BrandCalendar.tsx` (Brand Workspace, trước đây read-only) — xem "Đã hoàn thành — Module Lịch Vận Hành hợp nhất". Sau đó đã thêm logic cố định highlight ngày camp D-Day/Mid-Month/Pay-Day trên mọi calendar trong hệ thống (xem "Đã hoàn thành — Highlight ngày camp cố định"). Gần nhất trước đó (2026-08-15), sửa rò rỉ dữ liệu nội bộ ở `BrandSessions.tsx` — bảng Sessions phía Brand Workspace từng hiện `grossAgencyRev`/`hostPayout`/`netProfit` (margin nội bộ agency) cho chính brand xem, đã bỏ 3 cột này và thay bằng thông tin vận hành phiên live (Nền tảng, Target GMV, Peak Viewers, CTR/CVR) — xem "Đã sửa — Bỏ lộ P&L nội bộ khỏi Brand Sessions". Ngay sau đó (2026-08-15), mở rộng Rate Card: thêm tỷ lệ hoàn hủy theo brand+platform để ước tính NMV, và tách quyền xem tab Rate Card khỏi luồng chung của Brand Workspace bằng `PermissionKey` mới `view_rate_card` — xem "Đã hoàn thành — Rate Card: Tỷ Lệ Hoàn Hủy + NMV Ước Tính + Permission Riêng". Ngay sau đó (2026-08-15), **gỡ bỏ hoàn toàn module C4 — Price List Import** theo yêu cầu user (chỉ giữ SKU Showcase) — xem "Đã gỡ bỏ — Giai đoạn C4 (Price List Import)". Ngay sau đó (2026-08-15), **gỡ bỏ hoàn toàn module Giai đoạn 20 — Hoá Đơn & Công Nợ Brand** (công nợ là nghiệp vụ kế toán riêng, ngoài phạm vi app) và thay vào đó **sửa `lib/pnl.ts`** để P&L GMV-commission tính trên NMV ước tính (`actualGmv × (1 − returnRate/100)`) thay vì GMV thô — xem "Đã gỡ bỏ — Module Hoá Đơn & Công Nợ Brand, chuyển sang doanh thu ước tính ở P&L". Quyết định này **đảo ngược** quyết định "không đổi `lib/pnl.ts`" ở giai đoạn Rate Card returnRate ngay trước đó — lúc đó chưa rõ ý định dùng returnRate cho P&L thật. Ngay sau đó (2026-08-15), **gỡ bỏ hoàn toàn module AI Script Gen** (tab sinh kịch bản livestream bằng Gemini AI) theo yêu cầu user — xem "Đã gỡ bỏ — Module AI Script Gen". Ngay sau đó (2026-08-15), **gỡ bỏ End-To-End Simulator + 2 persona chat Host Coach AI/Talent Matcher AI khỏi Hội Đồng AI** (Module 16), dọn theo agent prompt mồ côi tương ứng trong AI Training Center — xem "Đã gỡ bỏ — End-To-End Simulator & Host Coach/Talent Matcher trong Hội Đồng AI". Ngay sau đó (2026-08-15), trên branch riêng `feature/session-live-report`, đã code+verify xong **Module Report Số Liệu Live Theo Ca** (đối chiếu file Excel thật `YFB Working File 2026`): Talent tự nhập report ca của mình qua `ShiftScheduling.tsx`, Ops/CEO/Admin nhập/sửa hộ qua `BrandSessions.tsx`, bảng sidecar `live_session_reports` + RPC riêng `submit_live_session_report` (migration 0046, đã chạy trên Supabase thật) — xem "Đã hoàn thành — Module Report Số Liệu Live Theo Ca". Nhánh Talent tự nhập mới verify bằng đọc code (chưa có tài khoản test role `talent` thật để bấm-thử qua browser). Phiên sau cần user chỉ hướng đi tiếp theo (merge branch này vào main sau khi user duyệt, module mới khác, hoặc rà soát/refactor phần đã có).
 > Không phụ thuộc `PROJECT_STATUS.md`/`BUSINESS_ROADMAP.md` (đã bị xóa có chủ đích, không khôi phục).
 > Đọc `CLAUDE.md` để biết quy ước cập nhật tài liệu — file này thay thế vai trò "trạng thái sống" của module workspace cho tới khi implement xong; sau khi code+verify xong, sáp nhập nội dung "Đã hoàn thành" vào bất kỳ file trạng thái nào user dùng lại sau này.
 
@@ -430,6 +430,71 @@ Ngay sau đó, user chỉ ra thêm 1 agent prompt mồ côi khác trong AI Train
 - **`src/server/createApp.ts`** — xoá route `POST /api/gemini/summarize-meeting`.
 - **Agent prompt DB** — [supabase/migrations/0044_drop_meeting_summarizer_agent.sql](supabase/migrations/0044_drop_meeting_summarizer_agent.sql) xoá row `agent_key = 'meeting_summarizer'` khỏi `ai_agent_prompts` — user cần tự chạy trên Supabase SQL Editor (chưa apply lên DB thật tại thời điểm code).
 - **Verify** — `npx tsc --noEmit` sạch. Qua browser thật (role admin): tab CRM & Projects hiện đúng, không còn khối AI Meeting Summarizer giữa danh sách Brand và danh sách Dự Án, không lỗi console.
+
+## Đã hoàn thành — Module Report Số Liệu Live Theo Ca (branch `feature/session-live-report`, 2026-08-15)
+
+Đội vận hành hiện nhập số liệu từng ca live (GMV, view, CTR, ADS cost...) tay trên Google Sheet
+(đối chiếu file mẫu `YFB _ Working File 2026 - NEW.xlsx` user cung cấp — mỗi brand+platform 1
+sheet, mỗi dòng = 1 ca, field khác nhau giữa TikTok/Shopee). Module này đưa việc nhập tay đó vào
+app, với 2 điểm nhập: Talent tự nhập ca của chính mình, và Ops/CEO/Admin nhập/sửa hộ theo brand.
+
+- **Quyết định đã chốt với user trước khi code**: (1) không tự động trừ delta khi ca nối tiếp
+  không tắt — trợ live tự trừ số tay trước khi nhập (đơn giản, đúng thói quen hiện tại); (2) bao
+  phủ đầy đủ field như Excel, tách theo platform; (3) 2 điểm nhập — `ShiftScheduling.tsx` (Talent)
+  và `BrandSessions.tsx` (Ops/CEO/Admin, role `brand` chỉ xem).
+- **Migration [0046_live_session_reports.sql](supabase/migrations/0046_live_session_reports.sql)**
+  — bảng sidecar `live_session_reports` (1-1 với `live_sessions`, cùng pattern `session_finance`)
+  chứa field TikTok riêng (`impression_count`/`ads_cost`/`enter_room_rate`/`ctor`/`avg_order_value`),
+  field Shopee riêng (`atc_count`/`gpm`/`checkout_count`/`coin_spent`), field chung
+  (`restart_count`/`cross_live`/`host_late`/`status_note`/`gmv_total`/2 link dashboard đối soát) +
+  audit (`submitted_by_talent_id`/`submitted_by_role`/`submitted_at`). **Không** map lại
+  `actualGmv`/`totalViews`/`ctrAvg`/`avgWatchTimeSeconds` — 4 field này đã có sẵn trên
+  `live_sessions` từ Giai đoạn B6, RPC ghi thẳng vào đó. `peakViewers`/`cvrAvg` (B6) **ngoài phạm
+  vi** module này (Excel không có khái niệm PCU/CVR) — vẫn nhập qua `LiveSessionHub` như cũ.
+- **RPC riêng `submit_live_session_report`** (KHÔNG tái dùng `update_session_with_children`) —
+  lý do: hàm đó ghi toàn bộ field session kể cả brand/host/date; nếu mở RLS UPDATE `live_sessions`
+  cho talent theo row sở hữu thì Postgres RLS chỉ chặn được theo row chứ không theo cột, talent sẽ
+  vô tình sửa được cả host/brand/ngày của chính session mình. RPC mới `security definer` có chủ
+  đích, tự kiểm tra quyền bên trong: role `talent` chỉ được gọi khi `host_id`/`co_host_id` khớp
+  `current_user_talent_id()`; role `ceo`/`operations`/`admin` luôn được phép; role khác (kể cả
+  `brand`) bị chặn. Đây là **quy ước mới** cho các RPC cần phân quyền hẹp hơn khả năng của RLS
+  theo row/role thông thường — tham khảo nếu module sau cũng cần "user chỉ sửa đúng bản ghi của
+  mình, không phải cả field".
+- **`src/types.ts`** — `LiveSessionReport` (camelCase, đủ field sidecar) + `LiveSession.report?`.
+- **`src/lib/db/sessions.ts`** — `fetchChildRowsForSessions`/`assembleSessions` join thêm
+  `live_session_reports` (cùng pattern `session_skus`/`session_checklist_items`), gắn vào
+  `.report`. Thêm `fetchSessionById(id)` (dùng sau khi gọi RPC report để lấy lại session đã
+  assemble đầy đủ).
+- **`src/lib/db/sessionReports.ts`** (mới) — `submitSessionReport(sessionId, input)` gọi RPC rồi
+  `fetchSessionById` để trả về `LiveSession` đầy đủ (kèm `.report` mới).
+- **`src/components/SessionReportForm.tsx`** (mới) — form dùng chung cho cả 2 điểm nhập, field
+  hiện theo `session.platform` (TikTok vs Shopee), pre-fill từ `session.report` nếu đã có (cho
+  sửa lại), style input copy từ khối B6 trong `LiveSessionHub.tsx`.
+- **Điểm nhập 1 — `ShiftScheduling.tsx`**: trong block `slot.status === "finalized"`, nếu không
+  phải admin và `myTalentId` khớp `session.hostId`/`coHostId` → hiện nút "Nhập/Sửa Report Ca Này"
+  mở `SessionReportForm` inline, kèm dòng "Đã nhập lúc...". Prop mới `onSubmitSessionReport`.
+- **Điểm nhập 2 — `brand-workspace/BrandSessions.tsx`**: thêm prop `currentRole`/
+  `onSubmitSessionReport`, cột "Report" + nút "Nhập/Sửa" chỉ hiện khi `currentRole` là
+  `ceo`/`operations`/`admin` (role `brand` không thấy nút, đúng "brand chỉ xem"), mở
+  `SessionReportForm` trong modal overlay.
+- **`App.tsx`** — handler `handleSubmitSessionReport` (pattern alert-on-failure/return boolean
+  giống `handleUpdateSession`), truyền vào cả 3 lần render `<ShiftScheduling>` và vào
+  `<BrandSessions>` (kèm `currentRole`).
+- **Verify** — `npx tsc --noEmit` sạch, `npm run build` qua. User đã tự chạy migration 0046 trên
+  Supabase SQL Editor. Qua browser thật (role admin): tạo 1 session test qua `LiveCalendar`
+  ("ZZZ Test Report Ca", Franklin/TikTok/Talent D), sang Brand Workspace Franklin → Sessions →
+  bấm "Nhập" → điền GMV Live/View/CTR/RESTART/Status note → "Chốt Report Ca Này" → bảng cập nhật
+  đúng ngay (GMV thực tế 12,3 triệu, CTR 3.5%, nút đổi thành "Sửa"). Reload lại trang (full
+  navigate) → dữ liệu vẫn đúng, mở lại form "Sửa" thấy pre-fill đúng toàn bộ field + dòng "Lần
+  nhập gần nhất". Kiểm tra chéo Agency Dashboard → Tổng GMV Hiện Tại 12.345.000đ, Doanh Thu
+  Agency (Commission) 1.851.750đ (15%) — xác nhận field mirror `actual_gmv` lan đúng tới P&L/
+  Dashboard. Không lỗi console (chỉ WebSocket HMR không liên quan). Xoá session test sau khi
+  verify, xác nhận quay lại Clean State ("Chưa Có Phiên Live Nào Trong Hệ Thống").
+- **Giới hạn đã biết — chưa verify được nhánh Talent tự nhập (Điểm nhập 1)**: tài khoản test hiện
+  có (`tuananh1902.skt@gmail.com`) chỉ có role `admin`, không có tài khoản role `talent` thật gắn
+  với 1 `Talent` record để tự bấm-thử qua browser. Đã verify nhánh này bằng đọc code + logic
+  RLS/RPC kỹ (ownership check trong `submit_live_session_report`), nhưng **chưa test thật 100%**.
+  Nếu cần verify thật, cần user cấp 1 tài khoản role `talent`.
 
 ## Đã gỡ bỏ — Module "Dự Án Agency" (AgencyProject) + field "Chiến dịch active" trên Brand (2026-08-15)
 

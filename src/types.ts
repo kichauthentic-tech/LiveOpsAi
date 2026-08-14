@@ -194,6 +194,35 @@ export interface LiveSession {
     actionableRecommendations: string[];
   };
   isCustom?: boolean;
+  report?: LiveSessionReport;
+}
+
+// Report số liệu vận hành theo ca — đối chiếu file Excel thật (YFB Working File 2026), sidecar
+// 1-1 với LiveSession (migration 0046). Field chung mọi platform luôn có; field theo platform
+// (tiktok*/shopee*) chỉ điền đúng platform tương ứng của session, còn lại để trống.
+export interface LiveSessionReport {
+  sessionId: string;
+  restartCount: number;
+  crossLive: boolean;
+  hostLate: boolean;
+  statusNote: string;
+  gmvTotal?: number; // cột "GMV" riêng trong Excel, khác actualGmv ("GMV Live")
+  dashboardLink1?: string;
+  dashboardLink2?: string;
+  // TikTok
+  impressionCount?: number;
+  adsCost?: number;
+  enterRoomRate?: number; // ERR (%)
+  ctor?: number; // CTOR (%)
+  avgOrderValue?: number; // AVG.price
+  // Shopee
+  atcCount?: number;
+  gpm?: number;
+  checkoutCount?: number; // "CO"
+  coinSpent?: number; // Xu đã tung
+  submittedByTalentId?: string;
+  submittedByRole?: UserRole;
+  submittedAt?: string;
 }
 
 export interface SessionFinance {

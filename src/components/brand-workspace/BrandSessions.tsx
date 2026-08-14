@@ -1,12 +1,18 @@
 import React, { useMemo, useState } from "react";
-import { LiveSession } from "../../types";
-import { Radio } from "lucide-react";
+import { LiveSession, UserRole } from "../../types";
+import { Radio, X } from "lucide-react";
 import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
+import { SessionReportForm } from "../SessionReportForm";
+import { SessionReportInput } from "../../lib/db/sessionReports";
 
 interface BrandSessionsProps {
   brandId: string;
   sessions: LiveSession[];
+  currentRole: UserRole;
+  onSubmitSessionReport: (sessionId: string, input: SessionReportInput) => Promise<boolean>;
 }
+
+const CAN_EDIT_REPORT_ROLES: UserRole[] = ["ceo", "operations", "admin"];
 
 const STATUS_STYLES: Record<LiveSession["status"], string> = {
   "Live Now": "bg-red-950 text-red-300 border-red-800",
@@ -17,8 +23,10 @@ const STATUS_STYLES: Record<LiveSession["status"], string> = {
 
 const STATUS_FILTERS: (LiveSession["status"] | "ALL")[] = ["ALL", "Live Now", "Upcoming", "Completed", "Cancelled"];
 
-export const BrandSessions: React.FC<BrandSessionsProps> = ({ brandId, sessions }) => {
+export const BrandSessions: React.FC<BrandSessionsProps> = ({ brandId, sessions, currentRole, onSubmitSessionReport }) => {
   const [statusFilter, setStatusFilter] = useState<LiveSession["status"] | "ALL">("ALL");
+  const [reportSessionId, setReportSessionId] = useState<string | null>(null);
+  const canEditReport = CAN_EDIT_REPORT_ROLES.includes(currentRole);
 
   const rows = useMemo(
     () =>
@@ -64,6 +72,7 @@ export const BrandSessions: React.FC<BrandSessionsProps> = ({ brandId, sessions 
                 <th className="py-2.5 px-2 text-right">GMV thực tế</th>
                 <th className="py-2.5 px-2 text-right">Peak Viewers</th>
                 <th className="py-2.5 px-4 text-right">CTR / CVR</th>
+                {canEditReport && <th className="py-2.5 px-4 text-right">Report</th>}
               </tr>
             </thead>
             <tbody>
@@ -85,11 +94,21 @@ export const BrandSessions: React.FC<BrandSessionsProps> = ({ brandId, sessions 
                   <td className="py-2.5 px-4 text-right text-slate-300">
                     {(s.ctrAvg || 0)}% / {(s.cvrAvg || 0)}%
                   </td>
+                  {canEditReport && (
+                    <td className="py-2.5 px-4 text-right">
+                      <button
+                        onClick={() => setReportSessionId(s.id)}
+                        className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-emerald-950 text-emerald-300 border border-emerald-800 hover:bg-emerald-900 transition-colors"
+                      >
+                        {s.report ? "Sửa" : "Nhập"}
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-slate-500 italic">
+                  <td colSpan={canEditReport ? 9 : 8} className="py-8 text-center text-slate-500 italic">
                     Không có phiên live nào khớp bộ lọc.
                   </td>
                 </tr>
@@ -98,6 +117,31 @@ export const BrandSessions: React.FC<BrandSessionsProps> = ({ brandId, sessions 
           </table>
         </div>
       </div>
+
+      {reportSessionId &&
+        (() => {
+          const session = rows.find((s) => s.id === reportSessionId);
+          if (!session) return null;
+          return (
+            <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-base font-bold text-white">
+                    Report Ca — {session.date} {session.startTime}-{session.endTime} ({session.hostName || "—"})
+                  </h3>
+                  <button onClick={() => setReportSessionId(null)} className="text-slate-500 hover:text-white">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <SessionReportForm
+                  session={session}
+                  onSubmit={(input) => onSubmitSessionReport(session.id, input)}
+                  onCancel={() => setReportSessionId(null)}
+                />
+              </div>
+            </div>
+          );
+        })()}
     </div>
   );
 };

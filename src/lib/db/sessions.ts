@@ -1,5 +1,5 @@
 import { supabase } from "../supabaseClient";
-import { LiveSession, ProductSKU, ChecklistItem, MinuteMetric } from "../../types";
+import { LiveSession, ProductSKU, ChecklistItem, MinuteMetric, LiveSessionReport, UserRole } from "../../types";
 
 // brands/studios/talents are all real Supabase tables now (Phases 1/3) and every
 // UI form selects these IDs from the real lists — no more free-text fallback, so
@@ -61,6 +61,29 @@ interface DbChecklistItem {
   assigned_to: string;
 }
 
+interface DbSessionReport {
+  session_id: string;
+  restart_count: number;
+  cross_live: boolean;
+  host_late: boolean;
+  status_note: string;
+  gmv_total: number | null;
+  dashboard_link_1: string | null;
+  dashboard_link_2: string | null;
+  impression_count: number | null;
+  ads_cost: number | null;
+  enter_room_rate: number | null;
+  ctor: number | null;
+  avg_order_value: number | null;
+  atc_count: number | null;
+  gpm: number | null;
+  checkout_count: number | null;
+  coin_spent: number | null;
+  submitted_by_talent_id: string | null;
+  submitted_by_role: UserRole | null;
+  submitted_at: string | null;
+}
+
 interface DbMinuteMetric {
   id: string;
   session_id: string;
@@ -84,7 +107,32 @@ interface DbMinuteMetric {
 // exactly at a slot boundary was matching both that slot and the next one in the Day Matrix view.
 const toHhMm = (t: string) => t.slice(0, 5);
 
-function sessionFromDb(row: DbLiveSession): Omit<LiveSession, "skus" | "checklist" | "minuteMetrics"> {
+function reportFromDb(row: DbSessionReport): LiveSessionReport {
+  return {
+    sessionId: row.session_id,
+    restartCount: row.restart_count,
+    crossLive: row.cross_live,
+    hostLate: row.host_late,
+    statusNote: row.status_note,
+    gmvTotal: row.gmv_total ?? undefined,
+    dashboardLink1: row.dashboard_link_1 ?? undefined,
+    dashboardLink2: row.dashboard_link_2 ?? undefined,
+    impressionCount: row.impression_count ?? undefined,
+    adsCost: row.ads_cost ?? undefined,
+    enterRoomRate: row.enter_room_rate ?? undefined,
+    ctor: row.ctor ?? undefined,
+    avgOrderValue: row.avg_order_value ?? undefined,
+    atcCount: row.atc_count ?? undefined,
+    gpm: row.gpm ?? undefined,
+    checkoutCount: row.checkout_count ?? undefined,
+    coinSpent: row.coin_spent ?? undefined,
+    submittedByTalentId: row.submitted_by_talent_id ?? undefined,
+    submittedByRole: row.submitted_by_role ?? undefined,
+    submittedAt: row.submitted_at ?? undefined
+  };
+}
+
+function sessionFromDb(row: DbLiveSession): Omit<LiveSession, "skus" | "checklist" | "minuteMetrics" | "report"> {
   return {
     id: row.id,
     title: row.title,
@@ -252,29 +300,44 @@ async function replaceChildRows(sessionId: string, session: LiveSession) {
 
 async function fetchChildRowsForSessions(sessionIds: string[]) {
   if (sessionIds.length === 0) {
-    return { skus: [] as DbSessionSku[], checklist: [] as DbChecklistItem[], metrics: [] as DbMinuteMetric[] };
+    return {
+      skus: [] as DbSessionSku[],
+      checklist: [] as DbChecklistItem[],
+      metrics: [] as DbMinuteMetric[],
+      reports: [] as DbSessionReport[]
+    };
   }
-  const [skusRes, checklistRes, metricsRes] = await Promise.all([
+  const [skusRes, checklistRes, metricsRes, reportsRes] = await Promise.all([
     supabase.from("session_skus").select("*").in("session_id", sessionIds),
     supabase.from("session_checklist_items").select("*").in("session_id", sessionIds),
-    supabase.from("session_minute_metrics").select("*").in("session_id", sessionIds).order("minute", { ascending: true })
+    supabase.from("session_minute_metrics").select("*").in("session_id", sessionIds).order("minute", { ascending: true }),
+    supabase.from("live_session_reports").select("*").in("session_id", sessionIds)
   ]);
   if (skusRes.error) throw skusRes.error;
   if (checklistRes.error) throw checklistRes.error;
   if (metricsRes.error) throw metricsRes.error;
+  if (reportsRes.error) throw reportsRes.error;
   return {
     skus: (skusRes.data as DbSessionSku[]) ?? [],
     checklist: (checklistRes.data as DbChecklistItem[]) ?? [],
-    metrics: (metricsRes.data as DbMinuteMetric[]) ?? []
+    metrics: (metricsRes.data as DbMinuteMetric[]) ?? [],
+    reports: (reportsRes.data as DbSessionReport[]) ?? []
   };
 }
 
-function assembleSessions(rows: DbLiveSession[], skus: DbSessionSku[], checklist: DbChecklistItem[], metrics: DbMinuteMetric[]): LiveSession[] {
+function assembleSessions(
+  rows: DbLiveSession[],
+  skus: DbSessionSku[],
+  checklist: DbChecklistItem[],
+  metrics: DbMinuteMetric[],
+  reports: DbSessionReport[]
+): LiveSession[] {
   return rows.map((row) => ({
     ...sessionFromDb(row),
     skus: skus.filter((r) => r.session_id === row.id).map(skuFromDb),
     checklist: checklist.filter((r) => r.session_id === row.id).map(checklistFromDb),
-    minuteMetrics: metrics.filter((r) => r.session_id === row.id).map(minuteMetricFromDb)
+    minuteMetrics: metrics.filter((r) => r.session_id === row.id).map(minuteMetricFromDb),
+    report: reports.find((r) => r.session_id === row.id) ? reportFromDb(reports.find((r) => r.session_id === row.id)!) : undefined
   }));
 }
 
@@ -282,8 +345,8 @@ export async function fetchSessions(): Promise<LiveSession[]> {
   const { data, error } = await supabase.from("live_sessions").select("*").order("date", { ascending: false }).order("start_time", { ascending: false });
   if (error) throw error;
   const rows = (data as DbLiveSession[]) ?? [];
-  const { skus, checklist, metrics } = await fetchChildRowsForSessions(rows.map((r) => r.id));
-  return assembleSessions(rows, skus, checklist, metrics);
+  const { skus, checklist, metrics, reports } = await fetchChildRowsForSessions(rows.map((r) => r.id));
+  return assembleSessions(rows, skus, checklist, metrics, reports);
 }
 
 export async function createSession(session: LiveSession): Promise<LiveSession> {
@@ -295,7 +358,8 @@ export async function createSession(session: LiveSession): Promise<LiveSession> 
     ...sessionFromDb(row),
     skus: session.skus ?? [],
     checklist: session.checklist ?? [],
-    minuteMetrics: session.minuteMetrics ?? []
+    minuteMetrics: session.minuteMetrics ?? [],
+    report: undefined
   };
 }
 
@@ -313,8 +377,18 @@ export async function updateSession(session: LiveSession): Promise<LiveSession> 
   });
   if (error) throw error;
   const row = data as DbLiveSession;
-  const { skus, checklist, metrics } = await fetchChildRowsForSessions([row.id]);
-  return assembleSessions([row], skus, checklist, metrics)[0];
+  const { skus, checklist, metrics, reports } = await fetchChildRowsForSessions([row.id]);
+  return assembleSessions([row], skus, checklist, metrics, reports)[0];
+}
+
+// Dùng sau khi gọi RPC submit_live_session_report (src/lib/db/sessionReports.ts) — RPC đó chỉ
+// trả về row live_sessions thô, cần assemble lại đầy đủ (kèm .report) trước khi cập nhật state.
+export async function fetchSessionById(id: string): Promise<LiveSession> {
+  const { data, error } = await supabase.from("live_sessions").select("*").eq("id", id).single();
+  if (error) throw error;
+  const row = data as DbLiveSession;
+  const { skus, checklist, metrics, reports } = await fetchChildRowsForSessions([row.id]);
+  return assembleSessions([row], skus, checklist, metrics, reports)[0];
 }
 
 export async function deleteSession(id: string): Promise<void> {
