@@ -1974,16 +1974,7 @@ export default function App() {
                 )}
 
                 {activeTab === "brand_sessions" && effectiveWorkspace.type === "brand" && (
-                  <BrandSessions
-                    brandId={currentBrandId!}
-                    brand={activeBrands.find((b) => b.id === currentBrandId)}
-                    sessions={activeSessions}
-                    talents={talents}
-                    financeRecords={financeRecords}
-                    brandPlatformRates={brandPlatformRates}
-                    talentRateHistory={talentRateHistory}
-                    brandPlatformRateHistory={brandPlatformRateHistory}
-                  />
+                  <BrandSessions brandId={currentBrandId!} sessions={activeSessions} />
                 )}
 
                 {activeTab === "brand_rates" && effectiveWorkspace.type === "brand" && (

@@ -1,26 +1,11 @@
 import React, { useMemo, useState } from "react";
-import {
-  Brand,
-  BrandPlatformRate,
-  BrandPlatformRateHistoryEntry,
-  LiveSession,
-  SessionFinance,
-  Talent,
-  TalentRateHistoryEntry
-} from "../../types";
+import { LiveSession } from "../../types";
 import { Radio } from "lucide-react";
-import { computeSessionPnl } from "../../lib/pnl";
 import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
 
 interface BrandSessionsProps {
   brandId: string;
-  brand?: Brand;
   sessions: LiveSession[];
-  talents: Talent[];
-  financeRecords: SessionFinance[];
-  brandPlatformRates: BrandPlatformRate[];
-  talentRateHistory: TalentRateHistoryEntry[];
-  brandPlatformRateHistory: BrandPlatformRateHistoryEntry[];
 }
 
 const STATUS_STYLES: Record<LiveSession["status"], string> = {
@@ -32,19 +17,10 @@ const STATUS_STYLES: Record<LiveSession["status"], string> = {
 
 const STATUS_FILTERS: (LiveSession["status"] | "ALL")[] = ["ALL", "Live Now", "Upcoming", "Completed", "Cancelled"];
 
-export const BrandSessions: React.FC<BrandSessionsProps> = ({
-  brandId,
-  brand,
-  sessions,
-  talents,
-  financeRecords,
-  brandPlatformRates,
-  talentRateHistory,
-  brandPlatformRateHistory
-}) => {
+export const BrandSessions: React.FC<BrandSessionsProps> = ({ brandId, sessions }) => {
   const [statusFilter, setStatusFilter] = useState<LiveSession["status"] | "ALL">("ALL");
 
-  const brandSessions = useMemo(
+  const rows = useMemo(
     () =>
       sessions
         .filter((s) => s.brandId === brandId)
@@ -52,26 +28,6 @@ export const BrandSessions: React.FC<BrandSessionsProps> = ({
         .slice()
         .sort((a, b) => b.date.localeCompare(a.date)),
     [sessions, brandId, statusFilter]
-  );
-
-  const talentById = useMemo(() => {
-    const map: Record<string, Talent> = {};
-    for (const t of talents) map[t.id] = t;
-    return map;
-  }, [talents]);
-  const financeBySessionId = useMemo(() => {
-    const map: Record<string, SessionFinance> = {};
-    for (const f of financeRecords) map[f.sessionId] = f;
-    return map;
-  }, [financeRecords]);
-  const brandById = useMemo(() => (brand ? { [brand.id]: brand } : {}), [brand]);
-
-  const rows = useMemo(
-    () =>
-      brandSessions.map((s) =>
-        computeSessionPnl(s, financeBySessionId, talentById, brandById, brandPlatformRates, talentRateHistory, brandPlatformRateHistory)
-      ),
-    [brandSessions, financeBySessionId, talentById, brandById, brandPlatformRates, talentRateHistory, brandPlatformRateHistory]
   );
 
   return (
@@ -102,36 +58,38 @@ export const BrandSessions: React.FC<BrandSessionsProps> = ({
               <tr className="text-left text-slate-500 border-b border-slate-800">
                 <th className="py-2.5 px-4">Ngày</th>
                 <th className="py-2.5 px-2">Trạng thái</th>
+                <th className="py-2.5 px-2">Nền tảng</th>
                 <th className="py-2.5 px-2">Host</th>
+                <th className="py-2.5 px-2 text-right">Target GMV</th>
                 <th className="py-2.5 px-2 text-right">GMV thực tế</th>
-                <th className="py-2.5 px-2 text-right">Doanh thu Agency</th>
-                <th className="py-2.5 px-2 text-right">Trả Host</th>
-                <th className="py-2.5 px-4 text-right">Lợi nhuận</th>
+                <th className="py-2.5 px-2 text-right">Peak Viewers</th>
+                <th className="py-2.5 px-4 text-right">CTR / CVR</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
-                <tr key={r.session.id} className="border-b border-slate-800/60">
+              {rows.map((s) => (
+                <tr key={s.id} className="border-b border-slate-800/60">
                   <td className="py-2.5 px-4 text-slate-300 font-mono">
-                    {r.session.date} {r.session.startTime}-{r.session.endTime}
+                    {s.date} {s.startTime}-{s.endTime}
                   </td>
                   <td className="py-2.5 px-2">
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${STATUS_STYLES[r.session.status]}`}>
-                      {r.session.status}
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${STATUS_STYLES[s.status]}`}>
+                      {s.status}
                     </span>
                   </td>
-                  <td className="py-2.5 px-2 text-slate-300">{r.session.hostName}</td>
-                  <td className="py-2.5 px-2 text-right text-slate-200 font-bold">{formatCurrencyAdaptive(r.session.actualGmv || 0)}</td>
-                  <td className="py-2.5 px-2 text-right text-blue-400">{formatCurrencyAdaptive(r.grossAgencyRev)}</td>
-                  <td className="py-2.5 px-2 text-right text-amber-400">{formatCurrencyAdaptive(r.hostPayout)}</td>
-                  <td className={`py-2.5 px-4 text-right font-bold ${r.netProfit >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                    {formatCurrencyAdaptive(r.netProfit)}
+                  <td className="py-2.5 px-2 text-slate-300">{s.platform}</td>
+                  <td className="py-2.5 px-2 text-slate-300">{s.hostName}</td>
+                  <td className="py-2.5 px-2 text-right text-slate-400">{formatCurrencyAdaptive(s.targetGmv || 0)}</td>
+                  <td className="py-2.5 px-2 text-right text-emerald-400 font-bold">{formatCurrencyAdaptive(s.actualGmv || 0)}</td>
+                  <td className="py-2.5 px-2 text-right text-indigo-300">{(s.peakViewers || 0).toLocaleString()}</td>
+                  <td className="py-2.5 px-4 text-right text-slate-300">
+                    {(s.ctrAvg || 0)}% / {(s.cvrAvg || 0)}%
                   </td>
                 </tr>
               ))}
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-slate-500 italic">
+                  <td colSpan={8} className="py-8 text-center text-slate-500 italic">
                     Không có phiên live nào khớp bộ lọc.
                   </td>
                 </tr>
