@@ -1638,12 +1638,9 @@ export default function App() {
           <div className="flex-1">
             <Header
               currentRole={currentRole}
-              activeTab={activeTab}
-              onTabChange={setActiveTab}
               activeUserName={activeUser.name}
               activeUserTitle={activeUser.customRoleTitle}
               onSignOut={signOut}
-              sessions={activeSessions}
               // Switcher chỉ hiện cho role được phép nhìn xuyên brand — role "brand" đã bị ép
               // cứng vào effectiveWorkspace của họ (không truyền props này xuống thì Header
               // tự ẩn switcher, xem Header.tsx).

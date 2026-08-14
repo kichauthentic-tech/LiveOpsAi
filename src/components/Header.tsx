@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { UserRole, LiveSession, Brand } from "../types";
-import { ShieldCheck, LogOut, Building2, ChevronDown, Check, Sun, Moon } from "lucide-react";
+import { UserRole, Brand } from "../types";
+import { LogOut, Building2, ChevronDown, Check, Sun, Moon } from "lucide-react";
 import { useTheme } from "../hooks/useTheme";
 import { BrandLogo } from "./ui/BrandLogo";
 
@@ -9,12 +9,9 @@ export type WorkspaceContext = { type: "agency" } | { type: "brand"; brandId: st
 
 interface HeaderProps {
   currentRole: UserRole;
-  activeTab: string;
-  onTabChange: (tab: string) => void;
   activeUserName?: string;
   activeUserTitle?: string;
   onSignOut?: () => void;
-  sessions?: LiveSession[];
   // Switcher chỉ hiện cho role có quyền nhìn xuyên brand (ceo/admin/operations) —
   // role "brand" tự khoá vào workspace của họ ở App.tsx, không truyền props này xuống.
   workspace?: WorkspaceContext;
@@ -87,18 +84,13 @@ const WorkspaceSwitcher: React.FC<{
 
 export const Header: React.FC<HeaderProps> = ({
   currentRole,
-  activeTab,
-  onTabChange,
   activeUserName,
   activeUserTitle,
   onSignOut,
-  sessions = [],
   workspace,
   onWorkspaceChange,
   brands = []
 }) => {
-  const liveSessions = sessions.filter((s) => s.status === "Live Now");
-  const liveGmvTotal = liveSessions.reduce((sum, s) => sum + (s.actualGmv || 0), 0);
   const { theme, toggleTheme } = useTheme();
 
   return (
@@ -108,22 +100,6 @@ export const Header: React.FC<HeaderProps> = ({
         {workspace && onWorkspaceChange && (
           <WorkspaceSwitcher workspace={workspace} brands={brands} onChange={onWorkspaceChange} />
         )}
-
-        <div className="hidden lg:flex flex-col">
-          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Active Region</span>
-          <span className="text-xs font-bold text-slate-200">Vietnam (HCMC/HN)</span>
-        </div>
-
-        <div className="hidden sm:flex items-center gap-2 bg-slate-800/80 border border-slate-700/60 px-3 py-1 rounded-full">
-          <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-          <span className="text-xs font-semibold text-slate-200">
-            {liveSessions.length} Concurrent Live Session{liveSessions.length !== 1 ? "s" : ""}
-          </span>
-          <span className="text-slate-500 text-xs">|</span>
-          <span className="text-xs font-mono text-emerald-400 font-bold">
-            {(liveGmvTotal / 1000000).toFixed(1)}M đ
-          </span>
-        </div>
       </div>
 
       {/* Role Switcher, Settings & User Profile */}
@@ -153,19 +129,6 @@ export const Header: React.FC<HeaderProps> = ({
             <LogOut className="w-4 h-4" />
           </button>
         )}
-
-        {/* User Settings Shortcut Button */}
-        <button
-          onClick={() => onTabChange("user_settings")}
-          className={`p-2 rounded-xl border transition-all flex items-center gap-1.5 text-xs font-bold ${
-            activeTab === "user_settings"
-              ? "bg-purple-600 text-white border-purple-500 shadow-lg shadow-purple-600/30"
-              : "bg-slate-800/80 hover:bg-slate-700 text-slate-300 border-slate-700"
-          }`}
-        >
-          <ShieldCheck className="w-4 h-4 text-purple-400" />
-          <span className="hidden xl:inline">Phân Quyền Custom</span>
-        </button>
       </div>
     </header>
   );
