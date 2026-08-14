@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, WorkflowRule, Talent, Studio, Equipment, Brand, AgencyProject, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, TalentRateHistoryEntry, BrandPlatformRateHistoryEntry, BrandInvoice, BrandSku, CoFundedVoucher, PromoScheme, SkuPlatformPrice } from "./types";
+import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, WorkflowRule, Talent, Studio, Equipment, Brand, AgencyProject, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, TalentRateHistoryEntry, BrandPlatformRateHistoryEntry, BrandInvoice, BrandSku, PromoScheme } from "./types";
 import { ALL_PERMISSION_DEFINITIONS } from "./data/mockData";
 import { fetchTalents, createTalent, updateTalent, deleteTalent } from "./lib/db/talents";
 import { fetchStudios, createStudio, updateStudio, deleteStudio } from "./lib/db/studios";
@@ -27,15 +27,7 @@ import { fetchTalentRateHistory } from "./lib/db/talentRateHistory";
 import { fetchBrandPlatformRateHistory } from "./lib/db/brandPlatformRateHistory";
 import { fetchBrandInvoices, createBrandInvoice, updateBrandInvoice, deleteBrandInvoice } from "./lib/db/brandInvoices";
 import { fetchBrandSkus, createBrandSku, updateBrandSku, deleteBrandSku } from "./lib/db/brandSkus";
-import {
-  fetchCoFundedVouchers,
-  createCoFundedVoucher,
-  deleteCoFundedVoucher,
-  sendVoucherForApproval,
-  respondToVoucherApproval
-} from "./lib/db/coFundedVouchers";
 import { fetchPromoSchemes, createPromoScheme, updatePromoScheme, deletePromoScheme } from "./lib/db/promoSchemes";
-import { fetchSkuPlatformPrices, importSkuPlatformPrices, deleteSkuPlatformPrice } from "./lib/db/skuPlatformPrices";
 import {
   LayoutDashboard,
   Radio,
@@ -61,9 +53,7 @@ import {
   Tag,
   Receipt,
   Package,
-  Ticket,
   BarChart3,
-  FileSpreadsheet,
   PanelLeftClose,
   PanelLeftOpen
 } from "lucide-react";
@@ -74,8 +64,6 @@ import { BrandSessions } from "./components/brand-workspace/BrandSessions";
 import { BrandRateCard } from "./components/brand-workspace/BrandRateCard";
 import { BrandInvoices } from "./components/brand-workspace/BrandInvoices";
 import { BrandSkuShowcase } from "./components/brand-workspace/BrandSkuShowcase";
-import { PriceListImport } from "./components/brand-workspace/PriceListImport";
-import { BrandVoucherRequests } from "./components/brand-workspace/BrandVoucherRequests";
 import { BrandAudienceAnalytics } from "./components/brand-workspace/BrandAudienceAnalytics";
 import { Login } from "./components/Login";
 import { ResetPasswordScreen } from "./components/ResetPasswordScreen";
@@ -262,19 +250,12 @@ export default function App() {
   const [brandSkus, setBrandSkus] = useState<BrandSku[]>([]);
   const [phaseB1Loading, setPhaseB1Loading] = useState(true);
   const [phaseB1Error, setPhaseB1Error] = useState<string | null>(null);
-  const [coFundedVouchers, setCoFundedVouchers] = useState<CoFundedVoucher[]>([]);
-  const [phaseB5Loading, setPhaseB5Loading] = useState(true);
-  const [phaseB5Error, setPhaseB5Error] = useState<string | null>(null);
-
   // Giai đoạn C3 — Scheme khuyến mãi tích hợp Calendar. Áp dụng theo khoảng ngày, agency-wide.
   const [promoSchemes, setPromoSchemes] = useState<PromoScheme[]>([]);
   const [phaseC3Loading, setPhaseC3Loading] = useState(true);
   const [phaseC3Error, setPhaseC3Error] = useState<string | null>(null);
 
   // Giai đoạn C4 — Price List Import (SKU pricing theo platform, Brand Workspace).
-  const [skuPlatformPrices, setSkuPlatformPrices] = useState<SkuPlatformPrice[]>([]);
-  const [phaseC4Loading, setPhaseC4Loading] = useState(true);
-  const [phaseC4Error, setPhaseC4Error] = useState<string | null>(null);
 
   // Previously these fetch errors were only stored in state and never rendered anywhere — a
   // failed fetch left a tab silently empty forever with no indication anything went wrong.
@@ -534,28 +515,6 @@ export default function App() {
   useEffect(() => {
     if (!session) return;
     let cancelled = false;
-    setPhaseB5Loading(true);
-    fetchCoFundedVouchers()
-      .then((vouchers) => {
-        if (cancelled) return;
-        setCoFundedVouchers(vouchers);
-        setPhaseB5Error(null);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setPhaseB5Error(err.message ?? "Không tải được Co-Funded Voucher Request Center từ Supabase.");
-      })
-      .finally(() => {
-        if (!cancelled) setPhaseB5Loading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [session?.user?.id]);
-
-  useEffect(() => {
-    if (!session) return;
-    let cancelled = false;
     setPhaseC3Loading(true);
     fetchPromoSchemes()
       .then((schemes) => {
@@ -569,28 +528,6 @@ export default function App() {
       })
       .finally(() => {
         if (!cancelled) setPhaseC3Loading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [session?.user?.id]);
-
-  useEffect(() => {
-    if (!session) return;
-    let cancelled = false;
-    setPhaseC4Loading(true);
-    fetchSkuPlatformPrices()
-      .then((prices) => {
-        if (cancelled) return;
-        setSkuPlatformPrices(prices);
-        setPhaseC4Error(null);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setPhaseC4Error(err.message ?? "Không tải được Price List từ Supabase.");
-      })
-      .finally(() => {
-        if (!cancelled) setPhaseC4Loading(false);
       });
     return () => {
       cancelled = true;
@@ -713,66 +650,6 @@ export default function App() {
     setBrandSkus((prev) => prev.filter((s) => s.id !== id));
   }
 
-  // Giai đoạn B5 — Co-Funded Voucher Request Center (Brand Workspace).
-  async function handleAddCoFundedVoucher(v: {
-    sessionId: string;
-    voucherCode: string;
-    description: string;
-    totalValue: number;
-    brandContributionPct: number;
-    agencyContributionPct: number;
-    platformContributionPct: number;
-  }) {
-    const session = sessions.find((s) => s.id === v.sessionId);
-    if (!session?.brandId) {
-      window.alert("Phiên live này chưa gán Brand, không thể tạo voucher.");
-      return;
-    }
-    const created = await createCoFundedVoucher({ ...v, brandId: session.brandId, createdBy: profile?.id });
-    setCoFundedVouchers((prev) => [created, ...prev]);
-  }
-
-  async function handleDeleteCoFundedVoucher(id: string) {
-    await deleteCoFundedVoucher(id);
-    setCoFundedVouchers((prev) => prev.filter((v) => v.id !== id));
-  }
-
-  const handleSendVoucherForApproval = async (voucher: CoFundedVoucher): Promise<boolean> => {
-    try {
-      const updated = await sendVoucherForApproval(voucher.id);
-      setCoFundedVouchers((prev) => prev.map((v) => (v.id === updated.id ? updated : v)));
-      await pushAuditLog({
-        action: "Gửi Voucher Đồng Tài Trợ cho Brand duyệt",
-        details: `Voucher "${voucher.voucherCode || voucher.id}" đã được gửi cho Brand duyệt.`,
-        category: "Security Alert"
-      });
-      return true;
-    } catch (e: any) {
-      window.alert(`Không thể gửi voucher cho brand duyệt: ${e.message ?? e}`);
-      return false;
-    }
-  };
-
-  const handleRespondToVoucherApproval = async (
-    voucher: CoFundedVoucher,
-    decision: "approved" | "revision_requested",
-    note?: string
-  ): Promise<boolean> => {
-    try {
-      const updated = await respondToVoucherApproval(voucher.id, decision, note);
-      setCoFundedVouchers((prev) => prev.map((v) => (v.id === updated.id ? updated : v)));
-      await pushAuditLog({
-        action: decision === "approved" ? "Brand duyệt Voucher Đồng Tài Trợ" : "Brand yêu cầu sửa Voucher",
-        details: `Voucher "${voucher.voucherCode || voucher.id}"${note ? ` — Ghi chú: ${note.trim()}` : ""}`,
-        category: "Security Alert"
-      });
-      return true;
-    } catch (e: any) {
-      window.alert(`Không thể ghi nhận phản hồi duyệt voucher: ${e.message ?? e}`);
-      return false;
-    }
-  };
-
   async function handleAddPromoScheme(scheme: {
     title: string;
     description: string;
@@ -796,19 +673,6 @@ export default function App() {
   async function handleDeletePromoScheme(id: string) {
     await deletePromoScheme(id);
     setPromoSchemes((prev) => prev.filter((s) => s.id !== id));
-  }
-
-  async function handleImportSkuPlatformPrices(
-    brandId: string,
-    rows: Array<Pick<SkuPlatformPrice, "skuCode" | "skuName" | "platform" | "rrp" | "markdownPrice" | "isEol">>
-  ) {
-    const imported = await importSkuPlatformPrices(brandId, rows, profile?.id);
-    setSkuPlatformPrices((prev) => [...prev.filter((p) => p.brandId !== brandId), ...imported]);
-  }
-
-  async function handleDeleteSkuPlatformPrice(id: string) {
-    await deleteSkuPlatformPrice(id);
-    setSkuPlatformPrices((prev) => prev.filter((p) => p.id !== id));
   }
 
   // LocalStorage sync effects
@@ -899,9 +763,7 @@ export default function App() {
         phase19Error && { key: "phase19", message: phase19Error },
         phase20Error && { key: "phase20", message: phase20Error },
         phaseB1Error && { key: "phaseB1", message: phaseB1Error },
-        phaseB5Error && { key: "phaseB5", message: phaseB5Error },
-        phaseC3Error && { key: "phaseC3", message: phaseC3Error },
-        phaseC4Error && { key: "phaseC4", message: phaseC4Error }
+        phaseC3Error && { key: "phaseC3", message: phaseC3Error }
       ].filter((e): e is { key: string; message: string } => Boolean(e)),
     [
       phase1Error,
@@ -915,9 +777,7 @@ export default function App() {
       phase19Error,
       phase20Error,
       phaseB1Error,
-      phaseB5Error,
-      phaseC3Error,
-      phaseC4Error
+      phaseC3Error
     ]
   );
   const dataLoadErrorSignature = dataLoadErrors.map((e) => e.key + ":" + e.message).join("|");
@@ -1522,9 +1382,8 @@ export default function App() {
       items: [
         { id: "ai_agents", label: "Hội Đồng AI & Simulator", icon: Bot, badge: "DEMO", perm: "manage_ai_agents" as PermissionKey },
         { id: "user_settings", label: "Phân Quyền & Role", icon: ShieldCheck, badge: "CUSTOM", perm: "manage_users_permissions" as PermissionKey },
-        // Tài khoản cá nhân — luôn hiện với mọi role, không gate theo PermissionKey (đổi tên/mật khẩu
-        // là việc của chính chủ tài khoản, không phải một quyền có thể cấp/thu hồi qua Ma Trận Role).
-        { id: "account_settings", label: "Tài Khoản Của Tôi", icon: UserCog, perm: undefined },
+        // Tài khoản cá nhân đã dời vào User Card cuối sidebar (bấm vào card để mở), không
+        // còn là 1 mục nav riêng — tránh trùng lặp lối vào.
         // Độc quyền Admin — không dùng PermissionKey/Ma Trận Role để gate (không thể cấp
         // qua Ma Trận cho role khác, kể cả ceo), chỉ hiện khi currentRole === "admin".
         ...(currentRole === "admin"
@@ -1554,11 +1413,8 @@ export default function App() {
         { id: "brand_sessions", label: "Sessions", icon: Radio, perm: undefined },
         { id: "brand_rates", label: "Rate Card", icon: Tag, perm: "view_rate_card" as PermissionKey },
         { id: "brand_skus", label: "SKU Showcase", icon: Package, badge: "NEW", perm: undefined },
-        { id: "brand_price_list", label: "Price List Import", icon: FileSpreadsheet, badge: "NEW", perm: undefined },
-        { id: "brand_vouchers", label: "Voucher Đồng Tài Trợ", icon: Ticket, badge: "NEW", perm: undefined },
         { id: "brand_audience_analytics", label: "Hiệu Suất Xem & Chuyển Đổi", icon: BarChart3, badge: "NEW", perm: undefined },
         { id: "brand_invoices", label: "Hoá Đơn & Công Nợ", icon: Receipt, perm: undefined },
-        { id: "account_settings", label: "Tài Khoản Của Tôi", icon: UserCog, perm: undefined },
       ],
     },
   ];
@@ -1707,32 +1563,42 @@ export default function App() {
           })}
         </nav>
 
-        {/* User Card */}
+        {/* User Card — bấm để mở Tài Khoản Của Tôi (thay cho mục nav riêng đã bỏ) */}
         <div className={`mt-auto border-t border-slate-800 ${sidebarCollapsed ? "p-4 md:p-2" : "p-4"}`}>
-          <div
-            className={`flex items-center gap-3 bg-slate-800/50 rounded-xl border border-slate-700/50 ${
-              sidebarCollapsed ? "p-3 md:p-2 md:justify-center" : "p-3"
-            }`}
-            title={sidebarCollapsed ? `${activeUser.name} • ${currentRole}` : undefined}
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab("account_settings");
+              setMobileMenuOpen(false);
+            }}
+            title={`${activeUser.name} • ${currentRole} — Tài Khoản Của Tôi`}
+            className={`w-full flex items-center gap-3 rounded-xl border transition-colors text-left ${
+              activeTab === "account_settings"
+                ? "bg-blue-600/10 border-blue-600/20"
+                : "bg-slate-800/50 border-slate-700/50 hover:bg-slate-800 hover:border-slate-600"
+            } ${sidebarCollapsed ? "p-3 md:p-2 md:justify-center" : "p-3"}`}
           >
             {activeUser.avatar ? (
               <img
                 src={activeUser.avatar}
                 alt={activeUser.name}
-                className="w-9 h-9 rounded-full object-cover border border-slate-600"
+                className="w-9 h-9 rounded-full object-cover border border-slate-600 shrink-0"
               />
             ) : (
               <div className="w-9 h-9 rounded-full border border-slate-600 bg-slate-800 text-slate-300 flex items-center justify-center text-xs font-bold uppercase shrink-0">
                 {activeUser.name.charAt(0) || "?"}
               </div>
             )}
-            <div className={`text-xs min-w-0 ${sidebarCollapsed ? "md:hidden" : ""}`}>
+            <div className={`text-xs min-w-0 flex-1 ${sidebarCollapsed ? "md:hidden" : ""}`}>
               <p className="font-bold text-slate-200 truncate">{activeUser.name}</p>
               <p className="text-blue-400 text-[10px] uppercase font-extrabold truncate">
                 {currentRole} • {activeUser.customRoleTitle}
               </p>
             </div>
-          </div>
+            <UserCog
+              className={`w-4 h-4 text-slate-500 shrink-0 ${sidebarCollapsed ? "md:hidden" : ""}`}
+            />
+          </button>
         </div>
       </aside>
 
@@ -2020,29 +1886,6 @@ export default function App() {
                     onAddSku={handleAddBrandSku}
                     onUpdateSku={handleUpdateBrandSku}
                     onDeleteSku={handleDeleteBrandSku}
-                  />
-                )}
-
-                {activeTab === "brand_price_list" && effectiveWorkspace.type === "brand" && (
-                  <PriceListImport
-                    brandId={currentBrandId!}
-                    currentRole={currentRole}
-                    prices={skuPlatformPrices}
-                    onImport={(rows) => handleImportSkuPlatformPrices(currentBrandId!, rows)}
-                    onDeleteRow={handleDeleteSkuPlatformPrice}
-                  />
-                )}
-
-                {activeTab === "brand_vouchers" && effectiveWorkspace.type === "brand" && (
-                  <BrandVoucherRequests
-                    brandId={currentBrandId!}
-                    currentRole={currentRole}
-                    vouchers={coFundedVouchers}
-                    sessions={activeSessions}
-                    onAddVoucher={handleAddCoFundedVoucher}
-                    onDeleteVoucher={handleDeleteCoFundedVoucher}
-                    onSendVoucherForApproval={handleSendVoucherForApproval}
-                    onRespondToVoucherApproval={handleRespondToVoucherApproval}
                   />
                 )}
 

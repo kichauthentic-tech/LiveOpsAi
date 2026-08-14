@@ -295,26 +295,6 @@ export interface BrandSku {
   createdBy?: string;
 }
 
-// Giai đoạn B5 — Co-Funded Voucher Request Center (Brand Workspace). Luồng
-// duyệt 2 chiều giống Campaign (approvalStatus/sentAt/approvedAt) nhưng
-// brand "duyệt" ở đây tương đương "cấp quyền áp trực tiếp" voucher này.
-export interface CoFundedVoucher {
-  id: string;
-  sessionId: string;
-  brandId: string;
-  voucherCode: string;
-  description: string;
-  totalValue: number;
-  brandContributionPct: number;
-  agencyContributionPct: number;
-  platformContributionPct: number;
-  approvalStatus: "draft" | "sent_for_approval" | "revision_requested" | "approved";
-  sentAt?: string;
-  approvedAt?: string;
-  revisionNote: string;
-  createdBy?: string;
-}
-
 export interface ShiftSlot {
   id: string;
   date: string;
@@ -461,22 +441,5 @@ export interface PromoScheme {
   brandId?: string | null;
   category: string;
   createdAt?: string;
-}
-
-// Giai đoạn C4 — Price List Import (SKU pricing theo platform, Brand Workspace). Giá bán niêm
-// yết (RRP) + giá sau markdown import từ file Excel vận hành thật, không có form CRUD chi tiết
-// từng field. Khác BrandPlatformRate (đó là % hoa hồng agency ăn theo platform) — đây là giá
-// bán SKU thực tế trên sàn. Mỗi lần import thay thế toàn bộ danh sách giá hiện tại của brand đó.
-export interface SkuPlatformPrice {
-  id: string;
-  brandId: string;
-  skuCode: string;
-  skuName: string;
-  platform: "TikTok" | "Shopee";
-  rrp: number;
-  markdownPrice: number;
-  isEol: boolean;
-  importedAt: string;
-  createdBy?: string;
 }
 
