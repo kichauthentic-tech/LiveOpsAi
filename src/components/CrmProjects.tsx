@@ -1,46 +1,46 @@
 import React, { useRef, useState } from "react";
-import { Brand, AgencyProject, SystemUser } from "../types";
-import { Building2, Layers, DollarSign, Sparkles, Plus, Edit3, Trash2, X, CheckCircle2, Clock, Phone, UserCheck } from "lucide-react";
-import { authedFetch } from "../lib/authedFetch";
-import { formatCurrencyAdaptive } from "../lib/formatCurrency";
+import { Brand, BrandPlatformRate, BrandPlatformRateHistoryEntry, LiveSession, SystemUser, UserRole } from "../types";
+import { Building2, Plus, Edit3, Trash2, X, Tag } from "lucide-react";
 import { BrandLogo } from "./ui/BrandLogo";
+import { BrandRateCard } from "./BrandRateCard";
 
 interface CrmProjectsProps {
   brands: Brand[];
-  projects: AgencyProject[];
   users?: SystemUser[];
   onAddBrand?: (brand: Brand) => void;
   onUpdateBrand?: (brand: Brand) => void;
   onDeleteBrand?: (id: string) => void;
-  onAddProject?: (project: AgencyProject) => void;
-  onUpdateProject?: (project: AgencyProject) => void;
-  onDeleteProject?: (id: string) => void;
+  currentRole: UserRole;
+  brandPlatformRates: BrandPlatformRate[];
+  brandPlatformRateHistory: BrandPlatformRateHistoryEntry[];
+  sessions: LiveSession[];
+  onSaveRate: (brandId: string, platform: "TikTok" | "Shopee", ratePerHour: number) => Promise<boolean>;
+  onSaveReturnRate: (brandId: string, platform: "TikTok" | "Shopee", returnRate: number) => Promise<boolean>;
 }
 
 export const CrmProjects: React.FC<CrmProjectsProps> = ({
   brands,
-  projects,
   users = [],
   onAddBrand,
   onUpdateBrand,
   onDeleteBrand,
-  onAddProject,
-  onUpdateProject,
-  onDeleteProject
+  currentRole,
+  brandPlatformRates,
+  brandPlatformRateHistory,
+  sessions,
+  onSaveRate,
+  onSaveReturnRate
 }) => {
-  // Internal agency staff eligible to be KAM / Team Lead owners
+  // Internal agency staff eligible to be KAM owners
   const staffUsers = users.filter((u) => u.role === "ceo" || u.role === "admin" || u.role === "operations");
-  const [meetingNotes, setMeetingNotes] = useState(
-    "Cuộc họp trao đổi với Brand Cocoon ngày 22/07: Khách hàng đồng ý tăng ngân sách thêm 150 triệu cho đợt Mega Live 8/8 tới. Cần bổ sung 2 Host dự phòng cho ngành Haircare và ghim 10 Voucher 100k duy nhất từ 20h00 đến 21h00."
-  );
-  const [aiSummary, setAiSummary] = useState<string | null>(null);
-  const [isSummarizing, setIsSummarizing] = useState(false);
+  // Rate Card set tập trung ở đây (CRM) thay vì phải vào từng Brand Workspace — chỉ mở 1
+  // brand tại 1 thời điểm, đóng lại khi chọn brand khác hoặc bấm đóng.
+  const [expandedRateCardBrandId, setExpandedRateCardBrandId] = useState<string | null>(null);
 
   // Guards against a rapid double-click firing two creates before React re-renders the
-  // disabled button — refs (not state) because the check must be synchronous on the very
+  // disabled button — a ref (not state) because the check must be synchronous on the very
   // first line of the handler, before any state update has a chance to flush.
   const isSavingBrandRef = useRef(false);
-  const isSavingProjectRef = useRef(false);
 
   // Brand Modal State
   const [isBrandModalOpen, setIsBrandModalOpen] = useState(false);
@@ -53,47 +53,9 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
   const [brandEmail, setBrandEmail] = useState("");
   const [brandOwner, setBrandOwner] = useState("Lê Quốc Bảo (KAM Lead)");
   const [brandOwnerUserId, setBrandOwnerUserId] = useState<string>("");
-  const [brandActiveCampaigns, setBrandActiveCampaigns] = useState(2);
   const [brandTotalGmv, setBrandTotalGmv] = useState(1200000000);
   const [brandContractStatus, setBrandContractStatus] = useState<"Active" | "Pending" | "Completed">("Active");
   const [brandBillingModel, setBrandBillingModel] = useState<"gmv_commission" | "hourly">("gmv_commission");
-
-  // Project Modal State
-  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
-  const [editingProject, setEditingProject] = useState<AgencyProject | null>(null);
-  const [projName, setProjName] = useState("");
-  const [projBrandId, setProjBrandId] = useState(brands[0]?.id || "brand-1");
-  const [projBudget, setProjBudget] = useState(150000000);
-  const [projKpiGmv, setProjKpiGmv] = useState(800000000);
-  const [projActualGmv, setProjActualGmv] = useState(450000000);
-  const [projPlannedSessions, setProjPlannedSessions] = useState(10);
-  const [projCompletedSessions, setProjCompletedSessions] = useState(5);
-  const [projTeamLead, setProjTeamLead] = useState("Trần Hoàng (Project Lead)");
-  const [projTeamLeadUserId, setProjTeamLeadUserId] = useState<string>("");
-  const [projStatus, setProjStatus] = useState<"In Progress" | "Planning" | "Completed" | "Paused">("In Progress");
-
-  const handleSummarizeMeeting = async () => {
-    if (!meetingNotes.trim()) return;
-    setIsSummarizing(true);
-    try {
-      const res = await authedFetch("/api/gemini/summarize-meeting", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ meetingNotes })
-      });
-      const data = await res.json();
-      if (data.success && data.summary) {
-        setAiSummary(data.summary);
-        return;
-      }
-      throw new Error(data.error || "Empty AI summary result");
-    } catch (e) {
-      console.error("AI Meeting Summary failed:", e);
-      setAiSummary("⚠️ Không thể tạo tóm tắt lúc này (lỗi kết nối AI). Vui lòng thử lại sau.");
-    } finally {
-      setIsSummarizing(false);
-    }
-  };
 
   // Brand Handlers
   const openAddBrandModal = () => {
@@ -106,7 +68,6 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
     setBrandEmail("contact@brand.com");
     setBrandOwner("Lê Quốc Bảo (KAM Lead)");
     setBrandOwnerUserId(staffUsers[0]?.id || "");
-    setBrandActiveCampaigns(1);
     setBrandTotalGmv(500000000);
     setBrandContractStatus("Active");
     setBrandBillingModel("gmv_commission");
@@ -123,7 +84,6 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
     setBrandEmail(b.email || "contact@brand.com");
     setBrandOwner(b.owner);
     setBrandOwnerUserId(b.ownerUserId || "");
-    setBrandActiveCampaigns(b.activeCampaigns);
     setBrandTotalGmv(b.totalGmv);
     setBrandContractStatus(b.contractStatus);
     setBrandBillingModel(b.billingModel ?? "gmv_commission");
@@ -150,7 +110,6 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
       contactName: brandContactName || "Nguyễn Văn A",
       phone: brandPhone || "0909 123 456",
       email: brandEmail || "info@brand.com",
-      activeCampaigns: Number(brandActiveCampaigns),
       totalGmv: Number(brandTotalGmv),
       contractStatus: brandContractStatus,
       owner: brandOwner,
@@ -174,91 +133,13 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
     }
   };
 
-  // Project Handlers
-  const openAddProjectModal = () => {
-    setEditingProject(null);
-    setProjName("");
-    setProjBrandId(brands[0]?.id || "brand-1");
-    setProjBudget(150000000);
-    setProjKpiGmv(800000000);
-    setProjActualGmv(0);
-    setProjPlannedSessions(8);
-    setProjCompletedSessions(0);
-    setProjTeamLead("Lê Quốc Bảo");
-    setProjTeamLeadUserId(staffUsers[0]?.id || "");
-    setProjStatus("In Progress");
-    setIsProjectModalOpen(true);
-  };
-
-  const openEditProjectModal = (p: AgencyProject) => {
-    setEditingProject(p);
-    setProjName(p.name);
-    setProjBrandId(p.brandId);
-    setProjBudget(p.budget);
-    setProjKpiGmv(p.kpiGmv);
-    setProjActualGmv(p.actualGmv);
-    setProjPlannedSessions(p.totalSessionsPlanned);
-    setProjCompletedSessions(p.sessionsCompleted);
-    setProjTeamLead(p.teamLead);
-    setProjTeamLeadUserId(p.teamLeadUserId || "");
-    setProjStatus(p.status);
-    setIsProjectModalOpen(true);
-  };
-
-  const handleTeamLeadSelect = (userId: string) => {
-    setProjTeamLeadUserId(userId);
-    const staff = staffUsers.find((u) => u.id === userId);
-    if (staff) setProjTeamLead(`${staff.name} (${staff.customRoleTitle})`);
-  };
-
-  const handleSaveProject = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!projName.trim()) return;
-    if (isSavingProjectRef.current) return;
-    isSavingProjectRef.current = true;
-
-    const selectedBrand = brands.find((b) => b.id === projBrandId);
-
-    const projectPayload: AgencyProject = {
-      id: editingProject ? editingProject.id : `proj-${Date.now()}`,
-      name: projName,
-      brandId: projBrandId,
-      brandName: selectedBrand ? selectedBrand.name : "Thương Hiệu",
-      budget: Number(projBudget),
-      kpiGmv: Number(projKpiGmv),
-      actualGmv: Number(projActualGmv),
-      startDate: editingProject?.startDate || new Date().toISOString().split("T")[0],
-      endDate: editingProject?.endDate || "2026-08-31",
-      status: projStatus,
-      totalSessionsPlanned: Number(projPlannedSessions),
-      sessionsCompleted: Number(projCompletedSessions),
-      teamLead: projTeamLead,
-      teamLeadUserId: projTeamLeadUserId || undefined
-    };
-
-    if (editingProject) {
-      if (onUpdateProject) onUpdateProject(projectPayload);
-    } else {
-      if (onAddProject) onAddProject(projectPayload);
-    }
-
-    setIsProjectModalOpen(false);
-    isSavingProjectRef.current = false;
-  };
-
-  const handleDeleteProject = (id: string, name: string) => {
-    if (window.confirm(`Bạn có chắc chắn muốn xóa dự án "${name}"?`)) {
-      if (onDeleteProject) onDeleteProject(id);
-    }
-  };
-
   return (
     <div className="space-y-6">
       <div className="bg-slate-900 text-white p-6 rounded-2xl border border-slate-800 shadow-xl space-y-2">
         <span className="text-purple-400 font-semibold text-xs uppercase tracking-wider block flex items-center gap-1.5">
-          <Building2 className="w-4 h-4 text-purple-400" /> Modules 01 & 02: CRM & Project Management
+          <Building2 className="w-4 h-4 text-purple-400" /> Module 01: CRM
         </span>
-        <h2 className="text-2xl font-black">Quản Lý Khách Hàng (Brand CRM) & Dự Án Agency</h2>
+        <h2 className="text-2xl font-black">Quản Lý Khách Hàng (Brand CRM)</h2>
       </div>
 
       {/* Brand CRM Section */}
@@ -295,6 +176,13 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
                     {b.contractStatus}
                   </span>
                   <button
+                    onClick={() => setExpandedRateCardBrandId((cur) => (cur === b.id ? null : b.id))}
+                    className={`p-1 rounded transition-all ${expandedRateCardBrandId === b.id ? "text-blue-400" : "text-slate-400 hover:text-blue-400"}`}
+                    title="Rate Card"
+                  >
+                    <Tag className="w-3.5 h-3.5" />
+                  </button>
+                  <button
                     onClick={() => openEditBrandModal(b)}
                     className="p-1 text-slate-400 hover:text-purple-400 rounded transition-all"
                     title="Chỉnh sửa Brand"
@@ -316,10 +204,6 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
                 <div>Phụ trách KAM: <strong className="text-slate-100 block">{b.owner}</strong></div>
               </div>
 
-              <div className="flex justify-between items-center text-xs pt-1 border-t border-slate-800">
-                <span className="text-slate-400">Chiến dịch active: <strong>{b.activeCampaigns} campaigns</strong></span>
-                <span className="text-emerald-400 font-bold">Tổng GMV: {formatCurrencyAdaptive(b.totalGmv)}</span>
-              </div>
               <div>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
                   {b.billingModel === "hourly" ? "💰 Thu Phí Theo Giờ Live" : "📊 Thu Phí Theo % GMV"}
@@ -330,102 +214,33 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
         </div>
       </div>
 
-      {/* AI Meeting Summarizer */}
-      <div className="bg-gradient-to-r from-purple-900 to-indigo-900 text-white p-6 rounded-2xl border border-purple-700/50 shadow-lg space-y-4">
-        <div className="flex items-center gap-2 text-purple-300 font-bold text-sm">
-          <Sparkles className="w-5 h-5 text-purple-400" /> AI Brand Meeting Summarizer & Action Item Generator
-        </div>
-        <div className="space-y-3 text-xs">
-          <textarea
-            value={meetingNotes}
-            onChange={(e) => setMeetingNotes(e.target.value)}
-            rows={3}
-            className="w-full bg-slate-800 text-white p-3 rounded-xl border border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500"
-          />
-          <button
-            onClick={handleSummarizeMeeting}
-            disabled={isSummarizing}
-            className="bg-purple-600 hover:bg-purple-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-2 transition-all shadow"
-          >
-            <Sparkles className="w-4 h-4" /> {isSummarizing ? "Đang Tóm Tắt..." : "Gemini AI Tóm Tắt & Giao Task Tự Động"}
-          </button>
-          {aiSummary && (
-            <div className="p-4 rounded-xl bg-slate-950 border border-purple-500/50 text-slate-200 whitespace-pre-line leading-relaxed font-mono">
-              {aiSummary}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Projects Kanban / List */}
-      <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-sm space-y-4">
-        <div className="flex justify-between items-center">
-          <div>
-            <h3 className="font-bold text-slate-100 text-base">Tiến Độ Các Dự Án Livestream ({projects.length} Dự Án)</h3>
+      {/* Rate Card — set tập trung tại đây cho mọi Brand, không cần vào từng Brand Workspace */}
+      {expandedRateCardBrandId && (
+        <div className="bg-slate-900 p-6 rounded-2xl border border-blue-500/40 shadow-sm space-y-4">
+          <div className="flex justify-between items-center">
+            <h3 className="font-bold text-slate-100 text-base flex items-center gap-2">
+              <Tag className="w-4 h-4 text-blue-400" />
+              Rate Card — {brands.find((b) => b.id === expandedRateCardBrandId)?.name}
+            </h3>
+            <button
+              onClick={() => setExpandedRateCardBrandId(null)}
+              className="p-1 text-slate-400 hover:text-white rounded transition-all"
+              title="Đóng"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
-          <button
-            onClick={openAddProjectModal}
-            className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow transition-all"
-          >
-            <Plus className="w-4 h-4" /> Tạo Dự Án Mới
-          </button>
+          <BrandRateCard
+            brandId={expandedRateCardBrandId}
+            currentRole={currentRole}
+            brandPlatformRates={brandPlatformRates}
+            brandPlatformRateHistory={brandPlatformRateHistory}
+            sessions={sessions}
+            onSaveRate={onSaveRate}
+            onSaveReturnRate={onSaveReturnRate}
+          />
         </div>
-
-        <div className="space-y-3">
-          {projects.map((p) => {
-            const percentGmv = p.kpiGmv > 0 ? Math.min(100, Math.round((p.actualGmv / p.kpiGmv) * 100)) : 0;
-            return (
-              <div key={p.id} className="p-4 rounded-2xl border border-slate-800 bg-slate-800/40 space-y-3 hover:border-purple-500/50 transition-all relative group">
-                <div className="flex justify-between items-center text-xs">
-                  <div>
-                    <h4 className="font-bold text-slate-100 text-sm flex items-center gap-2">
-                      {p.name}
-                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${
-                        p.status === "In Progress" ? "bg-purple-900/50 text-purple-300" :
-                        p.status === "Completed" ? "bg-emerald-900/50 text-emerald-300" : "bg-amber-900/50 text-amber-300"
-                      }`}>
-                        {p.status}
-                      </span>
-                    </h4>
-                    <span className="text-slate-400">Brand: {p.brandName} | Team Lead: {p.teamLead}</span>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <span className="bg-purple-900/50 text-purple-300 font-bold px-3 py-1 rounded-full text-xs">
-                      {p.sessionsCompleted}/{p.totalSessionsPlanned} Phiên Live
-                    </span>
-                    <button
-                      onClick={() => openEditProjectModal(p)}
-                      className="p-1 text-slate-400 hover:text-purple-400 rounded transition-all"
-                      title="Chỉnh sửa dự án"
-                    >
-                      <Edit3 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteProject(p.id, p.name)}
-                      className="p-1 text-slate-400 hover:text-red-400 rounded transition-all"
-                      title="Xóa dự án"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Progress Bar */}
-                <div className="space-y-1">
-                  <div className="flex justify-between text-[11px] font-bold">
-                    <span className="text-slate-400">Thực Thu GMV: {p.actualGmv.toLocaleString()} đ</span>
-                    <span className="text-emerald-400">KPI Target: {p.kpiGmv.toLocaleString()} đ ({percentGmv}%)</span>
-                  </div>
-                  <div className="w-full h-3 bg-slate-700 rounded-full overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-purple-600 to-emerald-500 rounded-full" style={{ width: `${percentGmv}%` }}></div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      )}
 
       {/* Brand Form Modal */}
       {isBrandModalOpen && (
@@ -579,160 +394,6 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
                   className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl shadow transition-all"
                 >
                   {editingBrand ? "Cập Nhật Brand" : "Lưu Brand Mới"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Project Form Modal */}
-      {isProjectModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 w-full max-w-lg rounded-2xl shadow-2xl border border-slate-800 overflow-hidden max-h-[90vh] flex flex-col">
-            <div className="bg-slate-900 text-white px-6 py-4 flex justify-between items-center shrink-0">
-              <h3 className="font-bold text-sm flex items-center gap-2">
-                <Layers className="w-4 h-4 text-purple-400" />
-                {editingProject ? `Chỉnh Sửa Dự Án: ${editingProject.name}` : "Tạo Dự Án Livestream Mới"}
-              </h3>
-              <button onClick={() => setIsProjectModalOpen(false)} className="text-slate-400 hover:text-white">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveProject} className="p-6 space-y-4 text-xs overflow-y-auto">
-              <div>
-                <label className="font-bold text-slate-300 block mb-1">Tên Dự Án / Campaign *</label>
-                <input
-                  type="text"
-                  required
-                  value={projName}
-                  onChange={(e) => setProjName(e.target.value)}
-                  placeholder="VD: Mega Live 8/8 Brand Cocoon"
-                  className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold bg-slate-950 text-slate-100 placeholder:text-slate-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="font-bold text-slate-300 block mb-1">Thương Hiệu (Brand)</label>
-                  <select
-                    value={projBrandId}
-                    onChange={(e) => setProjBrandId(e.target.value)}
-                    className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold bg-slate-950 text-slate-100"
-                  >
-                    {brands.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.logo} {b.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="font-bold text-slate-300 block mb-1">Trạng Thái Dự Án</label>
-                  <select
-                    value={projStatus}
-                    onChange={(e) => setProjStatus(e.target.value as any)}
-                    className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold bg-slate-950 text-slate-100"
-                  >
-                    <option value="In Progress">In Progress (Đang Chạy)</option>
-                    <option value="Planning">Planning (Lập Kế Hoạch)</option>
-                    <option value="Completed">Completed (Hoàn Thành)</option>
-                    <option value="Paused">Paused (Tạm Dừng)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="font-bold text-slate-300 block mb-1">Ngân Sách Campaign (VNĐ)</label>
-                  <input
-                    type="number"
-                    value={projBudget}
-                    onChange={(e) => setProjBudget(Number(e.target.value))}
-                    className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold bg-slate-950 text-slate-100 placeholder:text-slate-500"
-                  />
-                </div>
-                <div>
-                  <label className="font-bold text-slate-300 block mb-1">KPI Target GMV (VNĐ)</label>
-                  <input
-                    type="number"
-                    value={projKpiGmv}
-                    onChange={(e) => setProjKpiGmv(Number(e.target.value))}
-                    className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold bg-slate-950 text-slate-100 placeholder:text-slate-500"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="font-bold text-slate-300 block mb-1">GMV Thực Đạt (VNĐ)</label>
-                  <input
-                    type="number"
-                    value={projActualGmv}
-                    onChange={(e) => setProjActualGmv(Number(e.target.value))}
-                    className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold bg-slate-950 text-slate-100 placeholder:text-slate-500"
-                  />
-                </div>
-                <div>
-                  <label className="font-bold text-slate-300 block mb-1">Tổng Phiên Live Kế Hoạch</label>
-                  <input
-                    type="number"
-                    value={projPlannedSessions}
-                    onChange={(e) => setProjPlannedSessions(Number(e.target.value))}
-                    className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold bg-slate-950 text-slate-100 placeholder:text-slate-500"
-                  />
-                </div>
-                <div>
-                  <label className="font-bold text-slate-300 block mb-1">Phiên Hoàn Thành</label>
-                  <input
-                    type="number"
-                    value={projCompletedSessions}
-                    onChange={(e) => setProjCompletedSessions(Number(e.target.value))}
-                    className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold bg-slate-950 text-slate-100 placeholder:text-slate-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="font-bold text-slate-300 block mb-1">Trưởng Nhóm Dự Án (Team Lead)</label>
-                {staffUsers.length > 0 ? (
-                  <select
-                    value={projTeamLeadUserId}
-                    onChange={(e) => handleTeamLeadSelect(e.target.value)}
-                    className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold bg-slate-950 text-slate-100"
-                  >
-                    <option value="">-- Chọn Team Lead --</option>
-                    {staffUsers.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name} ({u.customRoleTitle})
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    type="text"
-                    value={projTeamLead}
-                    onChange={(e) => setProjTeamLead(e.target.value)}
-                    placeholder="VD: Trần Hoàng"
-                    className="w-full p-2.5 border border-slate-700 rounded-xl font-semibold bg-slate-950 text-slate-100 placeholder:text-slate-500"
-                  />
-                )}
-              </div>
-
-              <div className="pt-4 border-t border-slate-800 flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsProjectModalOpen(false)}
-                  className="px-4 py-2 text-slate-400 font-bold hover:bg-slate-800 rounded-xl transition-all"
-                >
-                  Hủy Bỏ
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl shadow transition-all"
-                >
-                  {editingProject ? "Cập Nhật Dự Án" : "Lưu Dự Án Mới"}
                 </button>
               </div>
             </form>

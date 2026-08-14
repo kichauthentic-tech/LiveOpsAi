@@ -1,9 +1,8 @@
 import React, { useState } from "react";
-import { Sparkles, Send, Bot, User, RefreshCw, Cpu, Award, Zap, Play, MessageSquare } from "lucide-react";
-import { EndToEndFlowSimulator } from "./EndToEndFlowSimulator";
+import { Sparkles, Send, Bot, User, RefreshCw, Cpu, Award, Zap } from "lucide-react";
 import { authedFetch } from "../lib/authedFetch";
 
-type AgentRole = "ceo" | "host_coach" | "talent_matcher" | "data_analyst";
+type AgentRole = "ceo" | "data_analyst";
 
 interface Message {
   sender: "user" | "agent";
@@ -11,12 +10,7 @@ interface Message {
   time: string;
 }
 
-interface AiMultiAgentProps {
-  onNavigateTab?: (tabId: string) => void;
-}
-
-export const AiMultiAgent: React.FC<AiMultiAgentProps> = ({ onNavigateTab }) => {
-  const [activeSubView, setActiveSubView] = useState<"chat" | "simulator">("chat");
+export const AiMultiAgent: React.FC = () => {
   const [selectedAgent, setSelectedAgent] = useState<AgentRole>("ceo");
   const [inputMessage, setInputMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -25,20 +19,6 @@ export const AiMultiAgent: React.FC<AiMultiAgentProps> = ({ onNavigateTab }) => 
       {
         sender: "agent",
         text: "Xin chào! Tôi là CEO AI Advisor. Tôi có thể hỗ trợ bạn phân tích P&L, tối ưu dòng tiền, công suất Studio & chiến lược tăng trưởng Agency. Bạn cần tôi trợ giúp gì?",
-        time: "08:30"
-      }
-    ],
-    host_coach: [
-      {
-        sender: "agent",
-        text: "Chào bạn! Tôi là Host Coach AI. Hãy gửi kịch bản hoặc hỏi về kỹ thuật giữ mắt xem, tung deal Flash Sale và xử lý khi Host đứt nhịp trên sóng live!",
-        time: "08:30"
-      }
-    ],
-    talent_matcher: [
-      {
-        sender: "agent",
-        text: "Tôi là Talent Matcher AI. Bạn đang muốn tìm Host cho Brand nào? Tôi sẽ xem chỉ số CVR, CTR & lịch làm việc để đề xuất ngay!",
         time: "08:30"
       }
     ],
@@ -100,10 +80,6 @@ export const AiMultiAgent: React.FC<AiMultiAgentProps> = ({ onNavigateTab }) => 
     let reply = "";
     if (selectedAgent === "ceo") {
       reply = `[CEO Advisor Response]: Dựa trên dữ liệu tài chính & công suất Agency:\n- Về vấn đề "${currentText}": Tôi khuyến nghị ưu tiên tối ưu tỷ lệ Net Margin từng phiên live (giữ mức 18-25%).\n- Với các Brand lớn như Cocoon hay Coolmate, hãy gộp kịch bản Flash Sale khung giờ vàng để nâng GMV trung bình trên mỗi phiên.`;
-    } else if (selectedAgent === "host_coach") {
-      reply = `[Host Coach Response]: Dành cho vấn đề "${currentText}":\n1. Kỹ thuật Giữ Mắt Xem: Sau 3 phút tung deal, Host phải lập tức thực hiện Demo sản phẩm dạng Close-up.\n2. Lối xưng hô: Dùng ngôn ngữ sôi động, gọi tên người xem để tạo cảm giác cá nhân hóa.\n3. Xử lý nghi ngờ: Show tem vỡ/mã QR chống giả để kích thích nút 'Mua Ngay'.`;
-    } else if (selectedAgent === "talent_matcher") {
-      reply = `[Talent Matcher Response]: Phân tích nhu cầu "${currentText}":\n- Top 1 Host đề xuất: Yến Nhi (CVR 5.4%, thế mạnh Mỹ phẩm & Skincare).\n- Top 2 Host đề xuất: Hoàng Nam (CVR 6.1%, thế mạnh Thời trang & Tech).\nCả 2 Host đều đạt tỉ lệ khớp nối trên 90% cho chiến dịch sắp tới.`;
     } else {
       reply = `[TikTok Data Analyst Response]: Giải mã dữ liệu luồng live đối với "${currentText}":\n- Tỷ lệ đứt nhịp (Drop View) thường xảy ra ở phút thứ 12-15 nếu không đổi sản phẩm.\n- Khuyến nghị: Cứ mỗi 10 phút, kích hoạt 1 đợt đẩy Voucher TikTok Shop 30k để đẩy lượt comment & kéo retention curve vọt lên lại.`;
     }
@@ -127,54 +103,19 @@ export const AiMultiAgent: React.FC<AiMultiAgentProps> = ({ onNavigateTab }) => 
       <div className="bg-gradient-to-br from-slate-900 via-purple-950 to-slate-900 text-white p-6 rounded-3xl border border-slate-800 shadow-xl space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <span className="text-purple-400 font-bold text-xs uppercase tracking-wider block flex items-center gap-1.5 bg-purple-950/80 px-3 py-1 rounded-full border border-purple-800">
-            <Bot className="w-4 h-4 text-purple-400" /> Module 16: Multi-Agent AI Council & Business Simulator
+            <Bot className="w-4 h-4 text-purple-400" /> Module 16: Multi-Agent AI Council
           </span>
-
-          {/* Subview Toggle Buttons */}
-          <div className="flex items-center bg-slate-950 p-1 rounded-2xl border border-purple-500/30 gap-1">
-            <button
-              onClick={() => setActiveSubView("chat")}
-              className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 ${
-                activeSubView === "chat"
-                  ? "bg-purple-600 text-white shadow-lg shadow-purple-600/30"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              <MessageSquare className="w-4 h-4" />
-              <span>Hội Đồng Trợ Lý AI</span>
-            </button>
-
-            <button
-              onClick={() => setActiveSubView("simulator")}
-              className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 ${
-                activeSubView === "simulator"
-                  ? "bg-purple-600 text-white shadow-lg shadow-purple-600/30"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              <Play className="w-4 h-4 text-emerald-400" />
-              <span>End-To-End Simulator</span>
-              <span className="bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded text-[9px] font-black border border-emerald-500/30">HOT</span>
-            </button>
-          </div>
         </div>
 
         <div>
-          <h2 className="text-2xl md:text-3xl font-black">
-            {activeSubView === "chat" ? "Hội Đồng Trợ Lý AI Chuyên Biệt Vận Hành" : "Khung Mô Phỏng Dòng Chảy Business End-To-End"}
-          </h2>
+          <h2 className="text-2xl md:text-3xl font-black">Hội Đồng Trợ Lý AI Chuyên Biệt Vận Hành</h2>
           <p className="text-slate-300 text-xs md:text-sm mt-1">
-            {activeSubView === "chat"
-              ? "Tương tác trực tiếp với các Agent AI chuyên gia: CEO Advisor, Host Coach, Talent Matcher & Data Analyst"
-              : "Theo dõi dòng chảy dữ liệu liên module real-time từ Ký HĐ Brand → Booking Host → Setup Studio QR → TikTok API → P&L Tài Chính"}
+            Tương tác trực tiếp với các Agent AI chuyên gia: CEO Advisor & Data Analyst
           </p>
         </div>
       </div>
 
-      {activeSubView === "simulator" ? (
-        <EndToEndFlowSimulator onNavigateTab={onNavigateTab} />
-      ) : (
-        <div className="grid lg:grid-cols-4 gap-6">
+      <div className="grid lg:grid-cols-4 gap-6">
         {/* Agent Selector Sidebar */}
         <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-sm space-y-2 text-xs">
           <h3 className="font-bold text-slate-100 mb-2">Chọn Trợ Lý AI:</h3>
@@ -189,30 +130,6 @@ export const AiMultiAgent: React.FC<AiMultiAgentProps> = ({ onNavigateTab }) => 
           >
             <span className="font-bold block text-sm">👔 CEO Strategic Advisor</span>
             <p className="text-[10px] text-slate-400">Tư vấn P&L, dòng tiền, tối ưu công suất Studio</p>
-          </button>
-
-          <button
-            onClick={() => setSelectedAgent("host_coach")}
-            className={`w-full p-3 rounded-xl text-left border transition-all space-y-1 ${
-              selectedAgent === "host_coach"
-                ? "bg-purple-950/40 border-purple-700/60 text-purple-200 font-bold"
-                : "bg-slate-800/40 border-slate-800 text-slate-300 hover:bg-slate-800"
-            }`}
-          >
-            <span className="font-bold block text-sm">🎙️ Host Coach AI</span>
-            <p className="text-[10px] text-slate-400">Tư vấn kỹ năng chốt đơn, giữ năng lượng & kịch bản</p>
-          </button>
-
-          <button
-            onClick={() => setSelectedAgent("talent_matcher")}
-            className={`w-full p-3 rounded-xl text-left border transition-all space-y-1 ${
-              selectedAgent === "talent_matcher"
-                ? "bg-purple-950/40 border-purple-700/60 text-purple-200 font-bold"
-                : "bg-slate-800/40 border-slate-800 text-slate-300 hover:bg-slate-800"
-            }`}
-          >
-            <span className="font-bold block text-sm">👯 Talent Matcher AI</span>
-            <p className="text-[10px] text-slate-400">Khớp nối Host phù hợp với từng Brand & SKU</p>
           </button>
 
           <button
@@ -283,7 +200,6 @@ export const AiMultiAgent: React.FC<AiMultiAgentProps> = ({ onNavigateTab }) => 
           </div>
         </div>
       </div>
-      )}
     </div>
   );
 };

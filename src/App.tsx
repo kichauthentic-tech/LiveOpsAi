@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, WorkflowRule, Talent, Studio, Equipment, Brand, AgencyProject, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, TalentRateHistoryEntry, BrandPlatformRateHistoryEntry, BrandInvoice, BrandSku, PromoScheme } from "./types";
+import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, WorkflowRule, Talent, Studio, Equipment, Brand, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, TalentRateHistoryEntry, BrandPlatformRateHistoryEntry, BrandSku, PromoScheme } from "./types";
 import { ALL_PERMISSION_DEFINITIONS } from "./data/mockData";
 import { fetchTalents, createTalent, updateTalent, deleteTalent } from "./lib/db/talents";
 import { fetchStudios, createStudio, updateStudio, deleteStudio } from "./lib/db/studios";
 import { fetchEquipments, createEquipment, updateEquipment, deleteEquipment } from "./lib/db/equipments";
 import { fetchSessions, createSession, updateSession, deleteSession } from "./lib/db/sessions";
 import { fetchBrands, createBrand, updateBrand, deleteBrand } from "./lib/db/brands";
-import { fetchProjects, createProject, updateProject, deleteProject } from "./lib/db/projects";
 import { fetchUsers, updateUserProfile, inviteUser, deleteUserAccount, InviteUserPayload } from "./lib/db/users";
 import { fetchWorkflowRules, createWorkflowRule, updateWorkflowRule, deleteWorkflowRule } from "./lib/db/workflowRules";
 import { fetchAuditLogs, createAuditLog } from "./lib/db/auditLogs";
@@ -25,14 +24,12 @@ import {
 } from "./lib/db/recurringShiftTemplates";
 import { fetchTalentRateHistory } from "./lib/db/talentRateHistory";
 import { fetchBrandPlatformRateHistory } from "./lib/db/brandPlatformRateHistory";
-import { fetchBrandInvoices, createBrandInvoice, updateBrandInvoice, deleteBrandInvoice } from "./lib/db/brandInvoices";
 import { fetchBrandSkus, createBrandSku, updateBrandSku, deleteBrandSku } from "./lib/db/brandSkus";
 import { fetchPromoSchemes, createPromoScheme, updatePromoScheme, deletePromoScheme } from "./lib/db/promoSchemes";
 import {
   LayoutDashboard,
   Radio,
   FileText,
-  Sparkles,
   Users,
   Building2,
   Briefcase,
@@ -50,8 +47,6 @@ import {
   UserCog,
   CalendarClock,
   Store,
-  Tag,
-  Receipt,
   Package,
   BarChart3,
   PanelLeftClose,
@@ -61,8 +56,6 @@ import { Header, WorkspaceContext } from "./components/Header";
 import { BrandDashboard } from "./components/brand-workspace/BrandDashboard";
 import { BrandCalendar } from "./components/brand-workspace/BrandCalendar";
 import { BrandSessions } from "./components/brand-workspace/BrandSessions";
-import { BrandRateCard } from "./components/brand-workspace/BrandRateCard";
-import { BrandInvoices } from "./components/brand-workspace/BrandInvoices";
 import { BrandSkuShowcase } from "./components/brand-workspace/BrandSkuShowcase";
 import { BrandAudienceAnalytics } from "./components/brand-workspace/BrandAudienceAnalytics";
 import { Login } from "./components/Login";
@@ -72,7 +65,6 @@ import { useAuth } from "./hooks/useAuth";
 import { Dashboards } from "./components/Dashboards";
 import { LiveSessionHub } from "./components/LiveSessionHub";
 import { LiveCalendar } from "./components/LiveCalendar";
-import { ScriptGenerator } from "./components/ScriptGenerator";
 import { TalentMatcher } from "./components/TalentMatcher";
 import { StudioEquipment } from "./components/StudioEquipment";
 import { CrmProjects } from "./components/CrmProjects";
@@ -215,9 +207,8 @@ export default function App() {
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [sessionsError, setSessionsError] = useState<string | null>(null);
 
-  // Brands / Projects — real data from Supabase (Phase 3), no mock fallback
+  // Brands — real data from Supabase (Phase 3), no mock fallback
   const [brands, setBrands] = useState<Brand[]>([]);
-  const [projects, setProjects] = useState<AgencyProject[]>([]);
   const [phase3Loading, setPhase3Loading] = useState(true);
   const [phase3Error, setPhase3Error] = useState<string | null>(null);
 
@@ -239,13 +230,8 @@ export default function App() {
   const [phase19Loading, setPhase19Loading] = useState(true);
   const [phase19Error, setPhase19Error] = useState<string | null>(null);
 
-  // Giai đoạn 20 — Hoá đơn/công nợ Brand.
-  const [brandInvoices, setBrandInvoices] = useState<BrandInvoice[]>([]);
-  const [phase20Loading, setPhase20Loading] = useState(true);
-  const [phase20Error, setPhase20Error] = useState<string | null>(null);
-
   // Giai đoạn B1 — SKU Showcase & Hero Product Catalog (Brand Workspace, xem
-  // WORKSPACE_DESIGN.md#6). Fetch 1 lần ở agency-level giống brandInvoices, mỗi Brand Workspace
+  // WORKSPACE_DESIGN.md#6). Fetch 1 lần ở agency-level, mỗi Brand Workspace
   // tự filter theo brandId.
   const [brandSkus, setBrandSkus] = useState<BrandSku[]>([]);
   const [phaseB1Loading, setPhaseB1Loading] = useState(true);
@@ -312,16 +298,15 @@ export default function App() {
     if (!session) return;
     let cancelled = false;
     setPhase3Loading(true);
-    Promise.all([fetchBrands(), fetchProjects()])
-      .then(([b, p]) => {
+    fetchBrands()
+      .then((b) => {
         if (cancelled) return;
         setBrands(b);
-        setProjects(p);
         setPhase3Error(null);
       })
       .catch((err) => {
         if (cancelled) return;
-        setPhase3Error(err.message ?? "Không tải được dữ liệu Brand/Project từ Supabase.");
+        setPhase3Error(err.message ?? "Không tải được dữ liệu Brand từ Supabase.");
       })
       .finally(() => {
         if (!cancelled) setPhase3Loading(false);
@@ -471,28 +456,6 @@ export default function App() {
   useEffect(() => {
     if (!session) return;
     let cancelled = false;
-    setPhase20Loading(true);
-    fetchBrandInvoices()
-      .then((invoices) => {
-        if (cancelled) return;
-        setBrandInvoices(invoices);
-        setPhase20Error(null);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setPhase20Error(err.message ?? "Không tải được dữ liệu Hoá Đơn Brand từ Supabase.");
-      })
-      .finally(() => {
-        if (!cancelled) setPhase20Loading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [session?.user?.id]);
-
-  useEffect(() => {
-    if (!session) return;
-    let cancelled = false;
     setPhaseB1Loading(true);
     fetchBrandSkus()
       .then((skus) => {
@@ -612,24 +575,6 @@ export default function App() {
     }
   }
 
-  async function handleAddBrandInvoice(invoice: { brandId: string; month: string; amount: number; dueDate?: string; notes: string }) {
-    const created = await createBrandInvoice({ ...invoice, status: "unpaid", createdBy: profile?.id });
-    setBrandInvoices((prev) => [...prev, created]);
-  }
-
-  async function handleUpdateBrandInvoice(
-    id: string,
-    patch: Partial<Pick<BrandInvoice, "amount" | "status" | "dueDate" | "paidAmount" | "notes">>
-  ) {
-    const updated = await updateBrandInvoice(id, patch);
-    setBrandInvoices((prev) => prev.map((inv) => (inv.id === id ? updated : inv)));
-  }
-
-  async function handleDeleteBrandInvoice(id: string) {
-    await deleteBrandInvoice(id);
-    setBrandInvoices((prev) => prev.filter((inv) => inv.id !== id));
-  }
-
   async function handleAddBrandSku(sku: { brandId: string; name: string; skuCode: string; flashPrice: number; originalPrice: number }) {
     const created = await createBrandSku({ ...sku, createdBy: profile?.id });
     setBrandSkus((prev) => [...prev, created]);
@@ -680,35 +625,16 @@ export default function App() {
 
   // Live Sessions are real Supabase data now (Phase 2) — no mock filtering applies
   const rawActiveSessions = sessions;
-  // Brands/Talents/Studios/Equipments/Projects are real Supabase data now — no mock filtering applies
+  // Brands/Talents/Studios/Equipments are real Supabase data now — no mock filtering applies
   const rawActiveBrands = brands;
   const rawActiveTalents = talents;
   const rawActiveStudios = studios;
   const rawActiveEquipments = equipments;
-  const rawActiveProjects = projects;
   // Workflow Rules/Audit Logs are real Supabase data now (Phase 5) — no mock filtering applies
   const activeWorkflowRules = workflowRules;
   const activeAuditLogs = auditLogs;
   // Users are real Supabase data now (Phase 4) — no mock filtering applies
   const activeUsers = users;
-
-  // 1. DERIVED DATA: Projects GMV automatically computed from child sessions to ensure consistency
-  const activeProjects = useMemo(() => {
-    return rawActiveProjects.map((p) => {
-      const childSessions = rawActiveSessions.filter(
-        (s) => s.projectId === p.id || s.brandName?.toLowerCase() === p.brandName?.toLowerCase() || s.brandId === p.brandId
-      );
-      const computedActualGmv = childSessions.reduce((acc, s) => acc + (s.actualGmv || 0), 0);
-      const computedTargetGmv = p.kpiGmv || childSessions.reduce((acc, s) => acc + (s.targetGmv || 0), 0);
-      const computedSessionsCompleted = childSessions.filter((s) => s.status === "Completed").length;
-      return {
-        ...p,
-        actualGmv: childSessions.length > 0 ? computedActualGmv : (p.actualGmv || 0),
-        kpiGmv: computedTargetGmv > 0 ? computedTargetGmv : (p.kpiGmv || 0),
-        sessionsCompleted: childSessions.length > 0 ? computedSessionsCompleted : (p.sessionsCompleted || 0)
-      };
-    });
-  }, [rawActiveProjects, rawActiveSessions]);
 
   // 2. DERIVED DATA: Studio equipment count calculated directly from equipment list assignments
   const activeStudios = useMemo(() => {
@@ -761,7 +687,6 @@ export default function App() {
         phase7Error && { key: "phase7", message: phase7Error },
         phase14Error && { key: "phase14", message: phase14Error },
         phase19Error && { key: "phase19", message: phase19Error },
-        phase20Error && { key: "phase20", message: phase20Error },
         phaseB1Error && { key: "phaseB1", message: phaseB1Error },
         phaseC3Error && { key: "phaseC3", message: phaseC3Error }
       ].filter((e): e is { key: string; message: string } => Boolean(e)),
@@ -775,7 +700,6 @@ export default function App() {
       phase7Error,
       phase14Error,
       phase19Error,
-      phase20Error,
       phaseB1Error,
       phaseC3Error
     ]
@@ -1017,32 +941,6 @@ export default function App() {
       setBrands(prev => prev.filter(b => b.id !== id));
     } catch (e: any) {
       window.alert(`Không thể xóa Brand: ${e.message ?? e}`);
-    }
-  };
-
-  // Handlers for Projects — persisted to Supabase
-  const handleAddProject = async (newProject: AgencyProject) => {
-    try {
-      const created = await createProject(newProject);
-      setProjects(prev => [created, ...prev]);
-    } catch (e: any) {
-      window.alert(`Không thể tạo Dự Án: ${e.message ?? e}`);
-    }
-  };
-  const handleUpdateProject = async (updatedProject: AgencyProject) => {
-    try {
-      const saved = await updateProject(updatedProject);
-      setProjects(prev => prev.map(p => p.id === saved.id ? saved : p));
-    } catch (e: any) {
-      window.alert(`Không thể cập nhật Dự Án: ${e.message ?? e}`);
-    }
-  };
-  const handleDeleteProject = async (id: string) => {
-    try {
-      await deleteProject(id);
-      setProjects(prev => prev.filter(p => p.id !== id));
-    } catch (e: any) {
-      window.alert(`Không thể xóa Dự Án: ${e.message ?? e}`);
     }
   };
 
@@ -1359,7 +1257,6 @@ export default function App() {
     {
       label: "Tài Nguyên Chung",
       items: [
-        { id: "scripts", label: "AI Script Gen", icon: Sparkles, perm: "generate_scripts" as PermissionKey },
         { id: "talents", label: "Talent Pool", icon: Users, perm: "manage_talents" as PermissionKey },
         { id: "studios", label: "Studios & Gear", icon: Building2, perm: "manage_studios_gear" as PermissionKey },
       ],
@@ -1367,7 +1264,7 @@ export default function App() {
     {
       label: "Kinh Doanh",
       items: [
-        { id: "crm", label: "CRM & Projects", icon: Briefcase, perm: "manage_crm_projects" as PermissionKey },
+        { id: "crm", label: "CRM", icon: Briefcase, perm: "manage_crm_projects" as PermissionKey },
         { id: "tiktok_api", label: "TikTok API", icon: Link2, perm: "manage_tiktok_api" as PermissionKey },
       ],
     },
@@ -1394,16 +1291,14 @@ export default function App() {
   ];
 
   // Brand Workspace (Giai đoạn A) — 1 nhóm duy nhất, luôn scope theo đúng 1 brand
-  // (currentBrandId). Phần lớn tab không gate theo PermissionKey: role "brand" tự khoá vào
+  // (currentBrandId). Không tab nào gate theo PermissionKey: role "brand" tự khoá vào
   // workspace của chính họ và có quyền thấy các module này bất kể Ma Trận Phân Quyền
   // (role_permissions của "brand" mặc định false cho manage_calendar/view_financials — dùng
   // lại các key đó ở đây sẽ khoá nhầm chính brand ra khỏi dữ liệu của họ); còn ceo/admin/
   // operations vào xem hộ qua switcher vốn đã có toàn quyền agency-level rồi.
-  // Ngoại lệ: `brand_rates` (Rate Card) gate bằng PermissionKey mới `view_rate_card` (Giai
-  // đoạn 27) — khác các tab còn lại, vì đây là dữ liệu thương mại (rate/hoa hồng/tỷ lệ hoàn
-  // hủy) nhạy cảm hơn Calendar/Sessions, và CEO cần kiểm soát theo role được — kể cả role
-  // "brand" cũng phải được cấp `view_rate_card` mới thấy (migration 0039 mặc định bật true
-  // cho ceo/admin/operations/brand để không khoá nhầm ai đang dùng, false cho talent/moderator).
+  // Rate Card không còn ở đây — đã chuyển hẳn sang CRM (Agency-side, gate `view_rate_card`)
+  // để ceo/admin/operations set giá 1 lần cho mọi brand, không cần vào từng brand workspace
+  // (xem "Đã chuyển — Rate Card vào CRM" trong WORKSPACE_DESIGN.md).
   const BRAND_NAV_GROUPS = [
     {
       label: "Brand Workspace",
@@ -1411,10 +1306,8 @@ export default function App() {
         { id: "brand_dashboard", label: "Dashboard", icon: Store, perm: undefined },
         { id: "brand_calendar", label: "Lịch Vận Hành", icon: CalendarIcon, perm: undefined },
         { id: "brand_sessions", label: "Sessions", icon: Radio, perm: undefined },
-        { id: "brand_rates", label: "Rate Card", icon: Tag, perm: "view_rate_card" as PermissionKey },
         { id: "brand_skus", label: "SKU Showcase", icon: Package, badge: "NEW", perm: undefined },
         { id: "brand_audience_analytics", label: "Hiệu Suất Xem & Chuyển Đổi", icon: BarChart3, badge: "NEW", perm: undefined },
-        { id: "brand_invoices", label: "Hoá Đơn & Công Nợ", icon: Receipt, perm: undefined },
       ],
     },
   ];
@@ -1863,18 +1756,6 @@ export default function App() {
                   <BrandSessions brandId={currentBrandId!} sessions={activeSessions} />
                 )}
 
-                {activeTab === "brand_rates" && effectiveWorkspace.type === "brand" && (
-                  <BrandRateCard
-                    brandId={currentBrandId!}
-                    currentRole={currentRole}
-                    brandPlatformRates={brandPlatformRates}
-                    brandPlatformRateHistory={brandPlatformRateHistory}
-                    sessions={activeSessions}
-                    onSaveRate={handleSaveBrandPlatformRate}
-                    onSaveReturnRate={handleSaveBrandPlatformReturnRate}
-                  />
-                )}
-
                 {activeTab === "brand_skus" && effectiveWorkspace.type === "brand" && (
                   <BrandSkuShowcase
                     brandId={currentBrandId!}
@@ -1889,19 +1770,6 @@ export default function App() {
                 {activeTab === "brand_audience_analytics" && effectiveWorkspace.type === "brand" && (
                   <BrandAudienceAnalytics brandId={currentBrandId!} sessions={activeSessions} />
                 )}
-
-                {activeTab === "brand_invoices" && effectiveWorkspace.type === "brand" && (
-                  <BrandInvoices
-                    brandId={currentBrandId!}
-                    currentRole={currentRole}
-                    brandInvoices={brandInvoices}
-                    onAddInvoice={handleAddBrandInvoice}
-                    onUpdateInvoice={handleUpdateBrandInvoice}
-                    onDeleteInvoice={handleDeleteBrandInvoice}
-                  />
-                )}
-
-                {activeTab === "scripts" && <ScriptGenerator />}
 
                 {activeTab === "talents" && (
                   <TalentMatcher
@@ -1930,14 +1798,16 @@ export default function App() {
                 {activeTab === "crm" && (
                   <CrmProjects
                     brands={activeBrands}
-                    projects={activeProjects}
                     users={users}
                     onAddBrand={handleAddBrand}
                     onUpdateBrand={handleUpdateBrand}
                     onDeleteBrand={handleDeleteBrand}
-                    onAddProject={handleAddProject}
-                    onUpdateProject={handleUpdateProject}
-                    onDeleteProject={handleDeleteProject}
+                    currentRole={currentRole}
+                    brandPlatformRates={brandPlatformRates}
+                    brandPlatformRateHistory={brandPlatformRateHistory}
+                    sessions={activeSessions}
+                    onSaveRate={handleSaveBrandPlatformRate}
+                    onSaveReturnRate={handleSaveBrandPlatformReturnRate}
                   />
                 )}
 
@@ -1971,7 +1841,7 @@ export default function App() {
                   />
                 )}
 
-                {activeTab === "ai_agents" && <AiMultiAgent onNavigateTab={setActiveTab} />}
+                {activeTab === "ai_agents" && <AiMultiAgent />}
 
                 {activeTab === "ai_training" && currentRole === "admin" && (
                   <AiTrainingCenter

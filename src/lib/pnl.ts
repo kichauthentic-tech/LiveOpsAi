@@ -81,9 +81,14 @@ export function computeSessionPnl(
     brandRateAtDate?.ratePerHour ??
     brandPlatformRates.find((r) => r.brandId === session.brandId && r.platform === session.platform)?.ratePerHour ??
     0;
+  const returnRate =
+    brandRateAtDate?.returnRate ??
+    brandPlatformRates.find((r) => r.brandId === session.brandId && r.platform === session.platform)?.returnRate ??
+    0;
+  const estimatedNmv = session.actualGmv * (1 - returnRate / 100);
   const grossAgencyRev = isHourly
     ? sessionDurationHours(session.startTime, session.endTime) * hourlyRate
-    : (session.actualGmv * finance.agencyCommissionRate) / 100;
+    : (estimatedNmv * finance.agencyCommissionRate) / 100;
   const hostPayout = hostFixRate + (session.actualGmv * hostCommRate) / 100;
   const totalCost = hostPayout + finance.studioCost + finance.adsCost;
   const netProfit = grossAgencyRev - totalCost;

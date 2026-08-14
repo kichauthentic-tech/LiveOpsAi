@@ -20,12 +20,6 @@ export const ALL_PERMISSION_DEFINITIONS: PermissionDefinition[] = [
     description: "Xếp lịch sử dụng Studio, gán Host & Assistant, duyệt khung giờ trùng."
   },
   {
-    key: "generate_scripts",
-    label: "Sử Dụng AI Script Generator",
-    category: "Nội Dung & AI",
-    description: "Truy cập công cụ sinh kịch bản livestream tự động bằng Gemini AI cho các ngành hàng."
-  },
-  {
     key: "manage_talents",
     label: "Quản Lý Talent Pool & Matcher",
     category: "Nội Dung & AI",

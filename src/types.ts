@@ -4,7 +4,6 @@ export type PermissionKey =
   | "view_financials"
   | "manage_sessions"
   | "manage_calendar"
-  | "generate_scripts"
   | "manage_talents"
   | "manage_studios_gear"
   | "manage_crm_projects"
@@ -57,7 +56,6 @@ export interface Brand {
   contactName: string;
   phone: string;
   email: string;
-  activeCampaigns: number;
   totalGmv: number;
   contractStatus: "Active" | "Pending" | "Completed";
   owner: string;
@@ -156,7 +154,6 @@ export interface LiveSession {
   title: string;
   brandId: string;
   brandName: string;
-  projectId?: string;
   shopTikTokHandle: string;
   studioId: string;
   studioName: string;
@@ -196,24 +193,6 @@ export interface LiveSession {
     };
     actionableRecommendations: string[];
   };
-  isCustom?: boolean;
-}
-
-export interface AgencyProject {
-  id: string;
-  name: string;
-  brandId: string;
-  brandName: string;
-  budget: number;
-  kpiGmv: number;
-  actualGmv: number;
-  startDate: string;
-  endDate: string;
-  status: "In Progress" | "Planning" | "Completed" | "Paused";
-  totalSessionsPlanned: number;
-  sessionsCompleted: number;
-  teamLead: string;
-  teamLeadUserId?: string;
   isCustom?: boolean;
 }
 
@@ -261,20 +240,6 @@ export interface BrandPlatformRateHistoryEntry {
   returnRate: number;
   effectiveFrom: string;
   effectiveTo?: string;
-}
-
-// Giai đoạn 20 — theo dõi công nợ Brand: tính xong doanh thu không có nghĩa đã thu được tiền.
-export interface BrandInvoice {
-  id: string;
-  brandId: string;
-  month: string; // "YYYY-MM"
-  amount: number;
-  status: "unpaid" | "partial" | "paid";
-  dueDate?: string;
-  paidAmount: number;
-  paidAt?: string;
-  notes: string;
-  createdBy?: string;
 }
 
 // Giai đoạn B1 — SKU Showcase & Hero Product Catalog (Brand Workspace, xem

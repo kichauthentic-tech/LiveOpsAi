@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { BrandPlatformRate, BrandPlatformRateHistoryEntry, LiveSession, UserRole } from "../../types";
+import { BrandPlatformRate, BrandPlatformRateHistoryEntry, LiveSession, UserRole } from "../types";
 import { Tag, History } from "lucide-react";
 
 interface BrandRateCardProps {

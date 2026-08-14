@@ -14,7 +14,6 @@ interface DbBrand {
   contact_name: string;
   phone: string;
   email: string;
-  active_campaigns: number;
   total_gmv: number;
   contract_status: Brand["contractStatus"];
   owner: string;
@@ -31,7 +30,6 @@ function fromDb(row: DbBrand): Brand {
     contactName: row.contact_name,
     phone: row.phone,
     email: row.email,
-    activeCampaigns: row.active_campaigns,
     totalGmv: row.total_gmv,
     contractStatus: row.contract_status,
     owner: row.owner,
@@ -48,7 +46,6 @@ function toDb(b: Brand) {
     contact_name: b.contactName,
     phone: b.phone,
     email: b.email,
-    active_campaigns: b.activeCampaigns,
     total_gmv: b.totalGmv,
     contract_status: b.contractStatus,
     owner: b.owner,
