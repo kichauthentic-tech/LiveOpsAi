@@ -178,7 +178,8 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
         manage_finance_hr: true,
         manage_ai_agents: true,
         manage_users_permissions: true,
-        export_reports: true
+        export_reports: true,
+        view_rate_card: true
       };
     } else if (role === "ceo") {
       preset = {
@@ -193,7 +194,8 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
         manage_finance_hr: true,
         manage_ai_agents: true,
         manage_users_permissions: true,
-        export_reports: true
+        export_reports: true,
+        view_rate_card: true
       };
     } else if (role === "operations") {
       preset = {
@@ -208,7 +210,8 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
         manage_finance_hr: false,
         manage_ai_agents: true,
         manage_users_permissions: false,
-        export_reports: true
+        export_reports: true,
+        view_rate_card: true
       };
     } else if (role === "brand") {
       preset = {
@@ -223,7 +226,8 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
         manage_finance_hr: false,
         manage_ai_agents: false,
         manage_users_permissions: false,
-        export_reports: true
+        export_reports: true,
+        view_rate_card: true
       };
     } else if (role === "talent") {
       preset = {
@@ -238,7 +242,8 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
         manage_finance_hr: false,
         manage_ai_agents: false,
         manage_users_permissions: false,
-        export_reports: false
+        export_reports: false,
+        view_rate_card: false
       };
     } else {
       // moderator — hẹp nhất: chỉ đọc dữ liệu (lịch/checklist) qua RLS "*_read_all"
@@ -255,7 +260,8 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
         manage_finance_hr: false,
         manage_ai_agents: false,
         manage_users_permissions: false,
-        export_reports: false
+        export_reports: false,
+        view_rate_card: false
       };
     }
 

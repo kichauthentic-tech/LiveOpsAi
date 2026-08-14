@@ -72,6 +72,12 @@ export const ALL_PERMISSION_DEFINITIONS: PermissionDefinition[] = [
     label: "Xuất Báo Cáo Chi Tiết (Export)",
     category: "Tổng Quan & Báo Cáo",
     description: "Tải file dữ liệu Excel, PDF báo cáo hiệu suất chiến dịch cho Brand & Ban giám đốc."
+  },
+  {
+    key: "view_rate_card",
+    label: "Xem Rate Card & Tỷ Lệ Hoàn Hủy Brand",
+    category: "Quản Trị System & Tài Chính",
+    description: "Xem/sửa rate đ/giờ live, tỷ lệ hoàn hủy và NMV ước tính theo từng brand & nền tảng — áp dụng cho mọi role kể cả Brand (khác các tab khác trong Brand Workspace vốn không cần permission riêng)."
   }
 ];
 

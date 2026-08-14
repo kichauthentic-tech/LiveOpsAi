@@ -12,7 +12,8 @@ export type PermissionKey =
   | "manage_finance_hr"
   | "manage_ai_agents"
   | "manage_users_permissions"
-  | "export_reports";
+  | "export_reports"
+  | "view_rate_card";
 
 export interface PermissionDefinition {
   key: PermissionKey;
@@ -234,6 +235,9 @@ export interface BrandPlatformRate {
   brandId: string;
   platform: "TikTok" | "Shopee";
   ratePerHour: number;
+  // Tỷ lệ hoàn hủy (0-100), dùng để ước tính NMV = GMV × (1 - returnRate/100) cho brand
+  // charge theo NMV thay vì GMV thô. Riêng theo platform (TikTok/Shopee có policy đổi trả khác nhau).
+  returnRate: number;
 }
 
 // Giai đoạn 19 — lịch sử rate theo thời gian, tự động ghi bởi DB trigger mỗi khi
@@ -254,6 +258,7 @@ export interface BrandPlatformRateHistoryEntry {
   brandId: string;
   platform: "TikTok" | "Shopee";
   ratePerHour: number;
+  returnRate: number;
   effectiveFrom: string;
   effectiveTo?: string;
 }

@@ -6,6 +6,7 @@ interface DbBrandPlatformRate {
   brand_id: string;
   platform: BrandPlatformRate["platform"];
   rate_per_hour: number;
+  return_rate: number;
 }
 
 function fromDb(row: DbBrandPlatformRate): BrandPlatformRate {
@@ -13,7 +14,8 @@ function fromDb(row: DbBrandPlatformRate): BrandPlatformRate {
     id: row.id,
     brandId: row.brand_id,
     platform: row.platform,
-    ratePerHour: row.rate_per_hour
+    ratePerHour: row.rate_per_hour,
+    returnRate: row.return_rate
   };
 }
 
@@ -33,6 +35,22 @@ export async function upsertBrandPlatformRate(
   const { data, error } = await supabase
     .from("brand_platform_rates")
     .upsert({ brand_id: brandId, platform, rate_per_hour: ratePerHour }, { onConflict: "brand_id,platform" })
+    .select()
+    .single();
+  if (error) throw error;
+  return fromDb(data as DbBrandPlatformRate);
+}
+
+// Tách riêng khỏi upsertBrandPlatformRate (không phải cùng 1 form field) — chỉ set
+// return_rate trong payload, on-conflict-update không đụng tới rate_per_hour đang có.
+export async function upsertBrandPlatformReturnRate(
+  brandId: string,
+  platform: BrandPlatformRate["platform"],
+  returnRate: number
+): Promise<BrandPlatformRate> {
+  const { data, error } = await supabase
+    .from("brand_platform_rates")
+    .upsert({ brand_id: brandId, platform, return_rate: returnRate }, { onConflict: "brand_id,platform" })
     .select()
     .single();
   if (error) throw error;

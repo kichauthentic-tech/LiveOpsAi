@@ -6,6 +6,7 @@ interface DbBrandPlatformRateHistoryEntry {
   brand_id: string;
   platform: BrandPlatformRateHistoryEntry["platform"];
   rate_per_hour: number;
+  return_rate: number;
   effective_from: string;
   effective_to: string | null;
 }
@@ -16,6 +17,7 @@ function fromDb(row: DbBrandPlatformRateHistoryEntry): BrandPlatformRateHistoryE
     brandId: row.brand_id,
     platform: row.platform,
     ratePerHour: row.rate_per_hour,
+    returnRate: row.return_rate,
     effectiveFrom: row.effective_from,
     effectiveTo: row.effective_to ?? undefined
   };

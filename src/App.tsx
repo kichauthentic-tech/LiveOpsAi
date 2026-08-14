@@ -14,7 +14,7 @@ import { fetchRolePermissions, updateRolePermissions } from "./lib/db/rolePermis
 import { fetchSessionFinances, upsertSessionFinance, setSessionFinanceApproval } from "./lib/db/finance";
 import { fetchTikTokStatus, fetchTikTokWebhookEvents } from "./lib/db/tiktokIntegration";
 import { fetchAiAgentPrompts, updateAiAgentPrompt } from "./lib/db/aiAgentPrompts";
-import { fetchBrandPlatformRates, upsertBrandPlatformRate } from "./lib/db/brandPlatformRates";
+import { fetchBrandPlatformRates, upsertBrandPlatformRate, upsertBrandPlatformReturnRate } from "./lib/db/brandPlatformRates";
 import { fetchShiftSlots, createShiftSlot, createShiftSlots, updateShiftSlot, deleteShiftSlot } from "./lib/db/shiftSlots";
 import { fetchShiftRegistrations, registerForSlot, unregisterFromSlot } from "./lib/db/shiftRegistrations";
 import {
@@ -1368,6 +1368,24 @@ export default function App() {
     }
   };
 
+  const handleSaveBrandPlatformReturnRate = async (
+    brandId: string,
+    platform: "TikTok" | "Shopee",
+    returnRate: number
+  ): Promise<boolean> => {
+    try {
+      const saved = await upsertBrandPlatformReturnRate(brandId, platform, returnRate);
+      setBrandPlatformRates((prev) => {
+        const next = prev.filter((r) => !(r.brandId === brandId && r.platform === platform));
+        return [...next, saved];
+      });
+      return true;
+    } catch (e: any) {
+      window.alert(`Không thể lưu tỷ lệ hoàn hủy: ${e.message ?? e}`);
+      return false;
+    }
+  };
+
   // Chốt lịch: sinh 1 live_session thật từ slot đã đăng ký, rồi đánh dấu slot "finalized"
   // và lưu lại session_id để tra ngược — cả 2 bước cần thành công thì mới coi là xong.
   const handleFinalizeShiftSlot = async (slot: ShiftSlot, hostId: string, coHostId: string | null): Promise<boolean> => {
@@ -1517,11 +1535,16 @@ export default function App() {
   ];
 
   // Brand Workspace (Giai đoạn A) — 1 nhóm duy nhất, luôn scope theo đúng 1 brand
-  // (currentBrandId). Không gate theo PermissionKey: role "brand" tự khoá vào workspace của
-  // chính họ và có quyền thấy đủ 7 module này bất kể Ma Trận Phân Quyền (role_permissions
-  // của "brand" mặc định false cho manage_calendar/view_financials — dùng lại các key đó ở
-  // đây sẽ khoá nhầm chính brand ra khỏi dữ liệu của họ); còn ceo/admin/operations vào xem hộ
-  // qua switcher vốn đã có toàn quyền agency-level rồi.
+  // (currentBrandId). Phần lớn tab không gate theo PermissionKey: role "brand" tự khoá vào
+  // workspace của chính họ và có quyền thấy các module này bất kể Ma Trận Phân Quyền
+  // (role_permissions của "brand" mặc định false cho manage_calendar/view_financials — dùng
+  // lại các key đó ở đây sẽ khoá nhầm chính brand ra khỏi dữ liệu của họ); còn ceo/admin/
+  // operations vào xem hộ qua switcher vốn đã có toàn quyền agency-level rồi.
+  // Ngoại lệ: `brand_rates` (Rate Card) gate bằng PermissionKey mới `view_rate_card` (Giai
+  // đoạn 27) — khác các tab còn lại, vì đây là dữ liệu thương mại (rate/hoa hồng/tỷ lệ hoàn
+  // hủy) nhạy cảm hơn Calendar/Sessions, và CEO cần kiểm soát theo role được — kể cả role
+  // "brand" cũng phải được cấp `view_rate_card` mới thấy (migration 0039 mặc định bật true
+  // cho ceo/admin/operations/brand để không khoá nhầm ai đang dùng, false cho talent/moderator).
   const BRAND_NAV_GROUPS = [
     {
       label: "Brand Workspace",
@@ -1529,7 +1552,7 @@ export default function App() {
         { id: "brand_dashboard", label: "Dashboard", icon: Store, perm: undefined },
         { id: "brand_calendar", label: "Lịch Vận Hành", icon: CalendarIcon, perm: undefined },
         { id: "brand_sessions", label: "Sessions", icon: Radio, perm: undefined },
-        { id: "brand_rates", label: "Rate Card", icon: Tag, perm: undefined },
+        { id: "brand_rates", label: "Rate Card", icon: Tag, perm: "view_rate_card" as PermissionKey },
         { id: "brand_skus", label: "SKU Showcase", icon: Package, badge: "NEW", perm: undefined },
         { id: "brand_price_list", label: "Price List Import", icon: FileSpreadsheet, badge: "NEW", perm: undefined },
         { id: "brand_vouchers", label: "Voucher Đồng Tài Trợ", icon: Ticket, badge: "NEW", perm: undefined },
@@ -1983,7 +2006,9 @@ export default function App() {
                     currentRole={currentRole}
                     brandPlatformRates={brandPlatformRates}
                     brandPlatformRateHistory={brandPlatformRateHistory}
+                    sessions={activeSessions}
                     onSaveRate={handleSaveBrandPlatformRate}
+                    onSaveReturnRate={handleSaveBrandPlatformReturnRate}
                   />
                 )}
 
