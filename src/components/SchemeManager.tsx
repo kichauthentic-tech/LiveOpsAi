@@ -68,7 +68,7 @@ export const SchemeManager: React.FC<SchemeManagerProps> = ({ schemes, onAdd, on
               onBlur={(e) => onUpdate(s.id, { endDate: e.target.value })}
               className="bg-[var(--surface)] border border-[var(--border)] rounded px-1.5 py-1 text-[var(--text)] text-[11px]"
             />
-            <button onClick={() => onDelete(s.id)} className="text-red-400 hover:bg-red-950/40 p-1 rounded-lg">
+            <button onClick={() => onDelete(s.id)} className="text-red-400 hover:bg-red-950/80 p-1 rounded-lg">
               <Trash2 className="w-3.5 h-3.5" />
             </button>
           </div>

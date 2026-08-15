@@ -335,7 +335,7 @@ export default function ShiftScheduling({
       </div>
 
       {!admin && !myTalentId && (
-        <div className="bg-amber-950/60 border border-amber-800 rounded-xl p-4 text-sm text-amber-200 flex items-center gap-2">
+        <div className="bg-amber-950/85 border border-amber-800 rounded-xl p-4 text-sm text-amber-200 flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 shrink-0" />
           Tài khoản của bạn chưa được gán hồ sơ Talent (assigned_talent_id) — liên hệ CEO/Operations để gán trước khi tự đăng ký ca được.
         </div>
@@ -343,7 +343,7 @@ export default function ShiftScheduling({
 
       {/* Cảnh báo gói gọn 1 dòng — chi tiết từng ca xem trên lịch ma trận / danh sách ca theo ngày */}
       {admin && (slotsMissingBoth.length > 0 || slotsMissingCoHost.length > 0) && (
-        <div className="bg-rose-950/40 border border-rose-900 rounded-xl px-4 py-2.5 text-sm text-rose-200 flex flex-wrap items-center gap-x-3 gap-y-1">
+        <div className="bg-rose-950/90 border border-rose-900 rounded-xl px-4 py-2.5 text-sm text-rose-200 flex flex-wrap items-center gap-x-3 gap-y-1">
           <AlertTriangle className="w-4 h-4 shrink-0" />
           {slotsMissingBoth.length > 0 && (
             <span>
@@ -356,7 +356,7 @@ export default function ShiftScheduling({
               <span className="font-bold">{slotsMissingCoHost.length}</span> ca thiếu Trợ live
             </span>
           )}
-          <span className="text-rose-400/70 text-xs">— chọn ngày đỏ/vàng trên lịch để xử lý</span>
+          <span className="text-rose-300 text-xs">— chọn ngày đỏ/vàng trên lịch để xử lý</span>
         </div>
       )}
 
@@ -533,7 +533,7 @@ export default function ShiftScheduling({
                       <span className="text-[10px] bg-[var(--surface-elevated)] text-[var(--text-muted)] px-2 py-0.5 rounded-full font-bold">{slot.platform}</span>
                       {slot.studioName && <span className="text-[var(--text-faint)] text-xs">{slot.studioName}</span>}
                       {slot.templateId ? (
-                        <span className="flex items-center gap-1 text-[10px] text-purple-300" title="Tự động sinh từ quy tắc lặp">
+                        <span className="flex items-center gap-1 text-[10px] text-[var(--accent-text)]" title="Tự động sinh từ quy tắc lặp">
                           <Zap className="w-3 h-3" /> Tự động
                         </span>
                       ) : (
@@ -704,7 +704,7 @@ export default function ShiftScheduling({
                             )}
                           </div>
                           {swapping && (
-                            <div className="bg-amber-950/40 border border-amber-800 rounded-lg p-2.5 space-y-2">
+                            <div className="bg-amber-950/80 border border-amber-800 rounded-lg p-2.5 space-y-2">
                               <div className="text-[11px] text-amber-200 font-bold">
                                 Tìm người thay cho vai trò {swapping.role === "host" ? "Host" : "Trợ live"}
                               </div>
@@ -790,7 +790,7 @@ export default function ShiftScheduling({
 
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-6 shadow-xl">
         <h3 className="font-bold text-[var(--text)] flex items-center gap-2 mb-4">
-          <Users className="w-4 h-4 text-purple-400" /> Tải Theo Host — Tháng {selectedMonth}
+          <Users className="w-4 h-4 text-[var(--accent-text)]" /> Tải Theo Host — Tháng {selectedMonth}
         </h3>
         {loadByTalent.length === 0 ? (
           <p className="text-sm text-[var(--text-faint)]">Chưa có ca nào đã chốt trong tháng này.</p>

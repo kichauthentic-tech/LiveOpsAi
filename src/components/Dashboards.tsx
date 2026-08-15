@@ -309,14 +309,14 @@ export const Dashboards: React.FC<DashboardsProps> = ({
                 <AreaChart data={weeklyGmvData}>
                   <defs>
                     <linearGradient id="gmvGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.4}/>
-                      <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
+                      <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.4}/>
+                      <stop offset="95%" stopColor="var(--accent)" stopOpacity={0}/>
                     </linearGradient>
                   </defs>
                   <XAxis dataKey="day" stroke="var(--text-muted)" fontSize={12} />
                   <YAxis stroke="var(--text-muted)" fontSize={12} />
                   <Tooltip formatter={(value: any) => [`${value} Triệu đ`, "GMV"]} />
-                  <Area type="monotone" dataKey="gmv" stroke="#8b5cf6" strokeWidth={3} fillOpacity={1} fill="url(#gmvGrad)" />
+                  <Area type="monotone" dataKey="gmv" stroke="var(--accent)" strokeWidth={3} fillOpacity={1} fill="url(#gmvGrad)" />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -367,7 +367,7 @@ export const Dashboards: React.FC<DashboardsProps> = ({
         </div>
 
         {/* Active Session Quick Monitor */}
-        <div className="bg-gradient-to-r from-[var(--accent)]/25 to-[var(--surface)] text-white p-6 rounded-2xl border border-[var(--accent)]/50 shadow-xl space-y-4">
+        <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-[var(--surface)] text-white p-6 rounded-2xl border border-purple-700/50 shadow-xl space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-red-500 animate-ping"></span>
@@ -387,7 +387,7 @@ export const Dashboards: React.FC<DashboardsProps> = ({
 
           <div className="grid md:grid-cols-2 gap-4 pt-2">
             {liveSessions.length === 0 ? (
-              <div className="md:col-span-2 p-6 bg-white/5 border border-white/10 rounded-xl text-center text-xs text-[var(--accent-text)]">
+              <div className="md:col-span-2 p-6 bg-white/5 border border-white/10 rounded-xl text-center text-xs text-purple-200">
                 Hiện chưa có phiên livestream nào đang phát sóng. Hãy tạo phiên live mới trong tab <strong className="text-white">Live Sessions</strong> để bắt đầu thử nghiệm.
               </div>
             ) : (
@@ -399,11 +399,11 @@ export const Dashboards: React.FC<DashboardsProps> = ({
                 <div
                   key={ls.id}
                   onClick={() => onSelectSession(ls)}
-                  className="bg-white/10 hover:bg-white/15 border border-white/10 hover:border-[var(--accent)] p-4 rounded-xl cursor-pointer transition-all space-y-3"
+                  className="bg-white/10 hover:bg-white/15 border border-white/10 hover:border-purple-400 p-4 rounded-xl cursor-pointer transition-all space-y-3"
                 >
                   <div className="flex justify-between items-start">
                     <div>
-                      <span className="text-[var(--accent-text)] font-bold text-[11px] block">{ls.studioName}</span>
+                      <span className="text-purple-300 font-bold text-[11px] block">{ls.studioName}</span>
                       <h4 className="font-black text-white text-base mt-0.5">{ls.brandName}</h4>
                     </div>
                     <div className="flex items-center gap-1.5">
@@ -422,12 +422,12 @@ export const Dashboards: React.FC<DashboardsProps> = ({
 
                   <div className="grid grid-cols-1 min-[420px]:grid-cols-3 gap-2 text-xs">
                     <div className="bg-black/20 p-2 rounded-lg">
-                      <span className="text-[var(--accent-text)] text-[10px] block">Host:</span>
+                      <span className="text-purple-200 text-[10px] block">Host:</span>
                       <strong className="text-white truncate block">{ls.hostName}</strong>
                     </div>
                     <div className="bg-black/20 p-2 rounded-lg">
-                      <span className="text-[var(--accent-text)] text-[10px] block">Peak CCU:</span>
-                      <strong className="text-[var(--accent-text)] block">{ls.peakViewers.toLocaleString()}</strong>
+                      <span className="text-purple-200 text-[10px] block">Peak CCU:</span>
+                      <strong className="text-indigo-300 block">{ls.peakViewers.toLocaleString()}</strong>
                     </div>
                     <div className="bg-emerald-500/20 border border-emerald-400/40 p-2 rounded-lg">
                       <span className="text-emerald-200 text-[10px] block">GMV Thực Thu:</span>
@@ -453,11 +453,11 @@ export const Dashboards: React.FC<DashboardsProps> = ({
         {subTabHeader}
         <div className="bg-[var(--surface)] text-[var(--text)] p-6 rounded-2xl border border-[var(--border)] shadow-lg flex flex-wrap justify-between items-center gap-4">
           <div>
-            <span className="text-indigo-400 font-semibold text-xs uppercase tracking-wider block">Operations Center</span>
+            <span className="text-[var(--accent-text)] font-semibold text-xs uppercase tracking-wider block">Operations Center</span>
             <h2 className="text-2xl font-black">Trung Tâm Vận Hành Studio & Equipment</h2>
             <p className="text-[var(--text-muted)] text-xs mt-1">3 Studio · 52 thiết bị</p>
           </div>
-          <span className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-3 py-1.5 rounded-xl text-xs font-semibold">
+          <span className="bg-[var(--accent)]/20 text-[var(--accent-text)] border border-[var(--accent)]/30 px-3 py-1.5 rounded-xl text-xs font-semibold">
             Status: ALL SYSTEMS NOMINAL
           </span>
         </div>
@@ -496,7 +496,7 @@ export const Dashboards: React.FC<DashboardsProps> = ({
                 <XAxis dataKey="studio" stroke="var(--text-muted)" fontSize={12} />
                 <YAxis stroke="var(--text-muted)" fontSize={12} />
                 <Tooltip formatter={(val: any) => [`${val} Giờ`, "Thời gian sử dụng"]} />
-                <Bar dataKey="hours" fill="#6366f1" radius={[8, 8, 0, 0]} />
+                <Bar dataKey="hours" fill="var(--accent)" radius={[8, 8, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

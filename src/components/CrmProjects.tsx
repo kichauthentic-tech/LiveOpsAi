@@ -170,8 +170,8 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
 
                 <div className="flex items-center gap-1.5">
                   <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
-                    b.contractStatus === "Active" ? "bg-emerald-900/50 text-emerald-300" :
-                    b.contractStatus === "Pending" ? "bg-amber-900/50 text-amber-300" : "bg-[var(--surface-hover)] text-[var(--text-muted)]"
+                    b.contractStatus === "Active" ? "bg-emerald-900/85 text-emerald-300" :
+                    b.contractStatus === "Pending" ? "bg-amber-900/85 text-amber-300" : "bg-[var(--surface-hover)] text-[var(--text-muted)]"
                   }`}>
                     {b.contractStatus}
                   </span>

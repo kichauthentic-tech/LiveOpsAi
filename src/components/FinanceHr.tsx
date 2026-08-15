@@ -124,8 +124,8 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
   return (
     <div className="space-y-6">
       <div className="bg-[var(--surface)] text-[var(--text)] p-6 rounded-2xl border border-[var(--border)] shadow-xl space-y-2">
-        <span className="text-purple-400 font-semibold text-xs uppercase tracking-wider block flex items-center gap-1.5">
-          <DollarSign className="w-4 h-4 text-purple-400" /> Modules 11 & 12: Finance, Unit Economics & HR
+        <span className="text-[var(--accent-text)] font-semibold text-xs uppercase tracking-wider block flex items-center gap-1.5">
+          <DollarSign className="w-4 h-4 text-[var(--accent-text)]" /> Modules 11 & 12: Finance, Unit Economics & HR
         </span>
         <h2 className="text-2xl font-black">Tài Chính P&L Trận Live & Quản Lý Nhân Sự Agency</h2>
       </div>
@@ -135,7 +135,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
         <div className="border-b border-[var(--border)] pb-3 flex items-center justify-between flex-wrap gap-2">
           <div>
             <h3 className="font-bold text-[var(--text)] text-base flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-purple-400" /> Báo Cáo P&L Thật Theo Phiên Live
+              <TrendingUp className="w-5 h-5 text-[var(--accent-text)]" /> Báo Cáo P&L Thật Theo Phiên Live
             </h3>
             <p className="text-xs text-[var(--text-muted)]">
               GMV & Host lấy từ dữ liệu phiên/talent thật trên Supabase. Commission Agency, chi phí Studio/Ads nhập & lưu thật, chỉ CEO mới duyệt được.
@@ -243,7 +243,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                           <button
                             onClick={() => handleApprove(s.id, "approved")}
                             disabled={savingId === s.id}
-                            className="text-emerald-400 hover:bg-emerald-950/40 p-1 rounded-lg disabled:opacity-40"
+                            className="text-emerald-400 hover:bg-emerald-950/80 p-1 rounded-lg disabled:opacity-40"
                             title="Duyệt bảng lương"
                           >
                             <CheckCircle2 className="w-4 h-4" />
@@ -251,7 +251,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                           <button
                             onClick={() => handleApprove(s.id, "rejected")}
                             disabled={savingId === s.id}
-                            className="text-red-400 hover:bg-red-950/40 p-1 rounded-lg disabled:opacity-40"
+                            className="text-red-400 hover:bg-red-950/80 p-1 rounded-lg disabled:opacity-40"
                             title="Từ chối"
                           >
                             <XCircle className="w-4 h-4" />

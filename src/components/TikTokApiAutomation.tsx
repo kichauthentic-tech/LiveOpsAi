@@ -163,12 +163,12 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
       {activeTab === "api_status" && (
         <div className="space-y-6">
           {actionError && (
-            <div className="bg-red-950/30 border border-red-800/50 text-red-400 text-xs font-semibold p-3 rounded-xl">
+            <div className="bg-red-950/80 border border-red-800/50 text-red-400 text-xs font-semibold p-3 rounded-xl">
               {actionError}
             </div>
           )}
           {tiktokStatusError && (
-            <div className="bg-red-950/30 border border-red-800/50 text-red-400 text-xs font-semibold p-3 rounded-xl">
+            <div className="bg-red-950/80 border border-red-800/50 text-red-400 text-xs font-semibold p-3 rounded-xl">
               {tiktokStatusError}
             </div>
           )}
@@ -342,7 +342,7 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
         <div className="bg-[var(--surface)] p-6 rounded-2xl border border-[var(--border)] shadow-sm space-y-4">
           <h3 className="font-bold text-[var(--text)] text-base flex items-center gap-2">
             <FileSpreadsheet className="w-5 h-5 text-emerald-600" /> Nhập Báo Cáo TikTok Compass Bằng File Excel / CSV
-            <span className="bg-amber-950/30 text-amber-400 border border-amber-800/50 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
+            <span className="bg-amber-950/80 text-amber-400 border border-amber-800/50 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
               Sắp Ra Mắt
             </span>
           </h3>

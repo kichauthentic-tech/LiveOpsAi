@@ -35,8 +35,8 @@ export const BrandAudienceAnalytics: React.FC<BrandAudienceAnalyticsProps> = ({ 
   return (
     <div className="space-y-5">
       <div className="bg-[var(--surface)] text-[var(--text)] p-6 rounded-2xl border border-[var(--border)] shadow-xl space-y-2">
-        <span className="text-purple-400 font-semibold text-xs uppercase tracking-wider block flex items-center gap-1.5">
-          <BarChart3 className="w-4 h-4 text-purple-400" /> Live Audience & Conversion Analytics
+        <span className="text-[var(--accent-text)] font-semibold text-xs uppercase tracking-wider block flex items-center gap-1.5">
+          <BarChart3 className="w-4 h-4 text-[var(--accent-text)]" /> Live Audience & Conversion Analytics
         </span>
         <h2 className="text-2xl font-black">Hiệu Suất Xem & Chuyển Đổi</h2>
         <p className="text-[var(--text-muted)] text-xs">

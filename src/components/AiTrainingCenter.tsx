@@ -66,7 +66,7 @@ export const AiTrainingCenter: React.FC<AiTrainingCenterProps> = ({ prompts, loa
             Cấu hình system prompt riêng cho từng AI Agent thật đang chạy trong hệ thống. Chỉ tài khoản Admin thấy và sửa được tab này.
           </p>
         </div>
-        <div className="flex-shrink-0 bg-rose-950/60 border border-rose-500/40 rounded-xl px-3.5 py-2 text-right">
+        <div className="flex-shrink-0 bg-rose-950/85 border border-rose-500/40 rounded-xl px-3.5 py-2 text-right">
           <div className="flex items-center gap-2 text-xs font-bold text-rose-300">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
             <span>{prompts.length} Agent</span>
@@ -82,7 +82,7 @@ export const AiTrainingCenter: React.FC<AiTrainingCenterProps> = ({ prompts, loa
       )}
 
       {!loading && error && (
-        <div className="bg-red-950/30 border border-red-800/50 text-red-300 p-6 rounded-2xl text-sm flex items-start gap-3">
+        <div className="bg-red-950/80 border border-red-800/50 text-red-300 p-6 rounded-2xl text-sm flex items-start gap-3">
           <ShieldAlert className="w-5 h-5 shrink-0 mt-0.5" />
           <div>
             <p className="font-bold">Không tải được AI Training Center.</p>

@@ -106,7 +106,7 @@ export const PerformanceDeviationAlerts: React.FC<PerformanceDeviationAlertsProp
 
   if (deviationData.length === 0) {
     return (
-      <div className="bg-emerald-950/20 border border-emerald-500/30 p-4 rounded-2xl flex items-center justify-between text-xs text-emerald-300">
+      <div className="bg-emerald-950/80 border border-emerald-500/30 p-4 rounded-2xl flex items-center justify-between text-xs text-emerald-300">
         <div className="flex items-center gap-2">
           <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
           <span>
@@ -122,7 +122,7 @@ export const PerformanceDeviationAlerts: React.FC<PerformanceDeviationAlertsProp
 
   if (isCompact) {
     return (
-      <div className="bg-amber-950/40 border border-amber-500/50 p-3.5 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-xs">
+      <div className="bg-amber-950/80 border border-amber-500/50 p-3.5 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-2.5">
           <span className="relative flex h-3 w-3">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
@@ -190,7 +190,7 @@ export const PerformanceDeviationAlerts: React.FC<PerformanceDeviationAlertsProp
           <button
             onClick={() => setFilterType("all")}
             className={`px-3 py-1 rounded-lg font-bold transition-all ${
-              filterType === "all" ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)] hover:text-white"
+              filterType === "all" ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)] hover:text-[var(--text)]"
             }`}
           >
             Tất Cả ({deviationData.length})
@@ -198,7 +198,7 @@ export const PerformanceDeviationAlerts: React.FC<PerformanceDeviationAlertsProp
           <button
             onClick={() => setFilterType("surge")}
             className={`px-3 py-1 rounded-lg font-bold transition-all flex items-center gap-1 ${
-              filterType === "surge" ? "bg-emerald-600 text-white" : "text-[var(--text-muted)] hover:text-white"
+              filterType === "surge" ? "bg-emerald-600 text-white" : "text-[var(--text-muted)] hover:text-[var(--text)]"
             }`}
           >
             ⚡ Vượt Chỉ Tiêu (+{surgeCount})
@@ -206,7 +206,7 @@ export const PerformanceDeviationAlerts: React.FC<PerformanceDeviationAlertsProp
           <button
             onClick={() => setFilterType("lag")}
             className={`px-3 py-1 rounded-lg font-bold transition-all flex items-center gap-1 ${
-              filterType === "lag" ? "bg-red-600 text-white" : "text-[var(--text-muted)] hover:text-white"
+              filterType === "lag" ? "bg-red-600 text-white" : "text-[var(--text-muted)] hover:text-[var(--text)]"
             }`}
           >
             🚨 Sụt Giảm (-{lagCount})
@@ -232,8 +232,8 @@ export const PerformanceDeviationAlerts: React.FC<PerformanceDeviationAlertsProp
               key={s.id}
               className={`p-4 rounded-xl border transition-all space-y-3 relative overflow-hidden ${
                 isSurge
-                  ? "bg-emerald-950/30 border-emerald-500/40 hover:border-emerald-400"
-                  : "bg-red-950/30 border-red-500/40 hover:border-red-400"
+                  ? "bg-emerald-950/80 border-emerald-500/40 hover:border-emerald-400"
+                  : "bg-red-950/80 border-red-500/40 hover:border-red-400"
               }`}
             >
               {/* Top Row: Session Title & Deviation Badge */}

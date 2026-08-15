@@ -967,7 +967,7 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
         <div className="bg-[var(--surface-base)]/90 border border-[var(--border)] rounded-2xl p-5 space-y-4 flex flex-col justify-between">
           <div className="space-y-3">
             <h3 className="font-bold text-[var(--text)] text-base flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-indigo-400" />
+              <Building2 className="w-5 h-5 text-[var(--accent-text)]" />
               So Sánh Doanh Thu Theo Studio (Triệu VNĐ)
             </h3>
             <p className="text-xs text-[var(--text-muted)]">Đóng góp của 3 Studio phòng máy trong kỳ hiện tại vs kỳ trước</p>
@@ -981,7 +981,7 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
                     contentStyle={{ backgroundColor: "var(--surface)", borderColor: "var(--border)", borderRadius: "12px" }}
                     formatter={(val: any) => [`${val} Triệu VNĐ`, "GMV"]}
                   />
-                  <Bar dataKey="currentGMV" name="Kỳ Này" fill="#818cf8" radius={[0, 6, 6, 0]} />
+                  <Bar dataKey="currentGMV" name="Kỳ Này" fill="var(--accent)" radius={[0, 6, 6, 0]} />
                   <Bar dataKey="prevGMV" name="Kỳ Trước" fill="var(--border)" radius={[0, 6, 6, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -989,7 +989,7 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
           </div>
 
           <div className="bg-[var(--surface)]/80 p-3 rounded-xl border border-[var(--border)]/80 text-xs text-[var(--text-muted)] space-y-1">
-            <div className="font-bold text-indigo-300 flex items-center gap-1">
+            <div className="font-bold text-[var(--accent-text)] flex items-center gap-1">
               <Sparkles className="w-3.5 h-3.5" /> {topStudioInsight ? `${topStudioInsight.name} chiếm ${topStudioInsight.pct}% tổng GMV` : "Chưa phát sinh doanh thu"}
             </div>
             <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">

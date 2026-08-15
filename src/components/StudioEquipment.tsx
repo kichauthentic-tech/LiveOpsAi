@@ -301,7 +301,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
           <div className="bg-[var(--surface)] p-6 rounded-2xl border border-[var(--border)] shadow-sm space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="font-bold text-[var(--text)] text-base">Lịch Đặt Phòng Studio Hôm Nay</h3>
-              <span className="text-xs font-semibold text-emerald-400 bg-emerald-950/30 px-3 py-1 rounded-full border border-emerald-800/50">
+              <span className="text-xs font-semibold text-emerald-400 bg-emerald-950/80 px-3 py-1 rounded-full border border-emerald-800/50">
                 {todaysBookings.length} Phiên hôm nay
               </span>
             </div>

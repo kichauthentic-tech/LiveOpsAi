@@ -302,7 +302,7 @@ export const GmvGrowthTrendline: React.FC<GmvGrowthTrendlineProps> = ({ sessions
           <span className="text-[10px] text-sky-400 font-medium">So với chỉ tiêu KPI 7.5 Tỷ VNĐ / Tháng</span>
         </div>
 
-        <div className="p-4 rounded-xl bg-amber-950/30 border border-amber-800/50 space-y-1">
+        <div className="p-4 rounded-xl bg-amber-950/80 border border-amber-800/50 space-y-1">
           <span className="text-amber-300 text-xs font-semibold block">Hoa Hồng Agency Dự Kiến (15%)</span>
           <div className="text-xl font-black text-amber-200">
             {formatCurrencyAdaptive(metrics.estCommission * 1_000_000, "VNĐ")}
@@ -337,8 +337,8 @@ export const GmvGrowthTrendline: React.FC<GmvGrowthTrendlineProps> = ({ sessions
                   <stop offset="95%" stopColor="var(--success)" stopOpacity={0}/>
                 </linearGradient>
                 <linearGradient id="projectedGmvGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
+                  <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.3}/>
+                  <stop offset="95%" stopColor="var(--accent)" stopOpacity={0}/>
                 </linearGradient>
               </defs>
 
@@ -378,7 +378,7 @@ export const GmvGrowthTrendline: React.FC<GmvGrowthTrendlineProps> = ({ sessions
               <Line
                 type="monotone"
                 dataKey={viewType === "daily" ? "projectedGmv" : "cumProjectedGmv"}
-                stroke="#8b5cf6"
+                stroke="var(--accent)"
                 strokeWidth={2.5}
                 strokeDasharray="5 5"
                 dot={{ r: 3, fill: "#8b5cf6" }}

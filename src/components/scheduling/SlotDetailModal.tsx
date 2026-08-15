@@ -122,7 +122,7 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
         </div>
 
         {studioConflicts.length > 0 && (
-          <div className="p-2.5 bg-rose-950/60 border border-rose-800/60 rounded-xl text-[11px] text-rose-300 flex items-center gap-1.5">
+          <div className="p-2.5 bg-rose-950/85 border border-rose-800/60 rounded-xl text-[11px] text-rose-300 flex items-center gap-1.5">
             <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> Trùng Studio với {studioConflicts.length} ca brand khác cùng khung giờ.
           </div>
         )}

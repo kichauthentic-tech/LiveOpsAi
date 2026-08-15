@@ -92,7 +92,7 @@ export const BrandSessions: React.FC<BrandSessionsProps> = ({ brandId, sessions,
                   <td className="py-2.5 px-2 text-[var(--text-muted)]">{s.hostName}</td>
                   <td className="py-2.5 px-2 text-right text-[var(--text-muted)]">{formatCurrencyAdaptive(s.targetGmv || 0)}</td>
                   <td className="py-2.5 px-2 text-right text-[var(--success)] font-bold">{formatCurrencyAdaptive(s.actualGmv || 0)}</td>
-                  <td className="py-2.5 px-2 text-right text-indigo-300">{(s.peakViewers || 0).toLocaleString()}</td>
+                  <td className="py-2.5 px-2 text-right text-[var(--text-muted)]">{(s.peakViewers || 0).toLocaleString()}</td>
                   <td className="py-2.5 px-4 text-right text-[var(--text-muted)]">
                     {(s.ctrAvg || 0)}% / {(s.cvrAvg || 0)}%
                   </td>

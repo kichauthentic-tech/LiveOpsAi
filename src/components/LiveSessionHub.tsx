@@ -511,7 +511,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={selectedSession.minuteMetrics || []}>
                   <XAxis dataKey="timeString" stroke="var(--text-muted)" fontSize={12} />
-                  <YAxis yAxisId="left" stroke="#8b5cf6" fontSize={12} />
+                  <YAxis yAxisId="left" stroke="var(--accent)" fontSize={12} />
                   <YAxis yAxisId="right" orientation="right" stroke="var(--success)" fontSize={12} />
                   <Tooltip
                     content={({ active, payload }) => {
@@ -534,7 +534,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                       return null;
                     }}
                   />
-                  <Line yAxisId="left" type="monotone" dataKey="viewers" stroke="#8b5cf6" strokeWidth={3} name="Mắt xem (Viewers)" />
+                  <Line yAxisId="left" type="monotone" dataKey="viewers" stroke="var(--accent)" strokeWidth={3} name="Mắt xem (Viewers)" />
                   <Line yAxisId="right" type="monotone" dataKey="gmvCumulative" stroke="var(--success)" strokeWidth={3} name="GMV Tích Lũy" />
                 </LineChart>
               </ResponsiveContainer>
@@ -576,7 +576,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                 Nhấp vào từng công việc để đánh dấu hoàn thành. Đảm bảo chuẩn bị đủ kỹ thuật & kịch bản trước khi Go Live.
               </p>
             </div>
-            <span className="bg-emerald-900/50 text-emerald-300 px-3 py-1 rounded-full text-xs font-bold">
+            <span className="bg-emerald-900/85 text-emerald-300 px-3 py-1 rounded-full text-xs font-bold">
               {(selectedSession.checklist || []).filter(c => c.completed).length}/{(selectedSession.checklist || []).length} Đã Hoàn Thành
             </span>
           </div>
@@ -601,7 +601,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                   if (onUpdateSession) await onUpdateSession(updatedSession);
                 }}
                 className={`p-3.5 rounded-xl border flex items-center justify-between cursor-pointer transition-all hover:shadow-sm ${
-                  item.completed ? "bg-emerald-950/30 border-emerald-800/50" : "bg-amber-950/30 border-amber-800/50"
+                  item.completed ? "bg-emerald-950/80 border-emerald-800/50" : "bg-amber-950/80 border-amber-800/50"
                 }`}
               >
                 <div className="flex items-center space-x-3">
@@ -733,7 +733,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
               </div>
 
               {/* Recommendations */}
-              <div className="p-4 rounded-xl bg-emerald-950/30 border border-emerald-800/50 space-y-2 text-xs">
+              <div className="p-4 rounded-xl bg-emerald-950/80 border border-emerald-800/50 space-y-2 text-xs">
                 <h4 className="font-bold text-emerald-200 uppercase">💡 Khuyến Nghị Hành Động Cho Live Kế Tiếp:</h4>
                 <ul className="space-y-1 list-disc list-inside text-emerald-100">
                   {aiAnalysisResult.actionableRecommendations?.map((r: string, i: number) => (
@@ -781,7 +781,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                 if (!studioConflictSession && !hostConflictSession) return null;
 
                 return (
-                  <div className="p-3 bg-amber-950/30 border border-amber-800/50 rounded-xl text-amber-200 space-y-1 text-xs animate-fade-in">
+                  <div className="p-3 bg-amber-950/80 border border-amber-800/50 rounded-xl text-amber-200 space-y-1 text-xs animate-fade-in">
                     <div className="flex items-center gap-1.5 font-bold text-amber-200">
                       <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0" />
                       <span>Cảnh Báo Xung Đột Lịch Vận Hành:</span>

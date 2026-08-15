@@ -130,8 +130,8 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ activeUser, on
             <div
               className={`text-xs rounded-lg px-3 py-2 border ${
                 nameMessage.type === "ok"
-                  ? "text-emerald-300 bg-emerald-950/60 border-emerald-500/30"
-                  : "text-red-300 bg-red-950/60 border-red-500/30"
+                  ? "text-emerald-300 bg-emerald-950/85 border-emerald-500/30"
+                  : "text-red-300 bg-red-950/85 border-red-500/30"
               }`}
             >
               {nameMessage.text}
@@ -202,8 +202,8 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ activeUser, on
             <div
               className={`text-xs rounded-lg px-3 py-2 border ${
                 passwordMessage.type === "ok"
-                  ? "text-emerald-300 bg-emerald-950/60 border-emerald-500/30"
-                  : "text-red-300 bg-red-950/60 border-red-500/30"
+                  ? "text-emerald-300 bg-emerald-950/85 border-emerald-500/30"
+                  : "text-red-300 bg-red-950/85 border-red-500/30"
               }`}
             >
               {passwordMessage.text}

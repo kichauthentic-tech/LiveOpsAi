@@ -100,7 +100,7 @@ export const AiMultiAgent: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="bg-gradient-to-br from-[var(--surface)] via-[var(--accent)]/15 to-[var(--surface)] text-white p-6 rounded-3xl border border-[var(--border)] shadow-xl space-y-4">
+      <div className="bg-gradient-to-br from-[var(--surface)] via-[var(--accent)]/15 to-[var(--surface)] text-[var(--text)] p-6 rounded-3xl border border-[var(--border)] shadow-xl space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <span className="text-[var(--accent-text)] font-bold text-xs uppercase tracking-wider block flex items-center gap-1.5 bg-[var(--accent)]/15 px-3 py-1 rounded-full border border-[var(--accent)]/40">
             <Bot className="w-4 h-4 text-[var(--accent-text)]" /> Module 16: Multi-Agent AI Council
@@ -108,7 +108,7 @@ export const AiMultiAgent: React.FC = () => {
         </div>
 
         <div>
-          <h2 className="text-2xl md:text-3xl font-black">Hội Đồng Trợ Lý AI Chuyên Biệt Vận Hành</h2>
+          <h2 className="text-2xl md:text-3xl font-black text-[var(--text)]">Hội Đồng Trợ Lý AI Chuyên Biệt Vận Hành</h2>
           <p className="text-[var(--text-muted)] text-xs md:text-sm mt-1">
             Tương tác trực tiếp với các Agent AI chuyên gia: CEO Advisor & Data Analyst
           </p>

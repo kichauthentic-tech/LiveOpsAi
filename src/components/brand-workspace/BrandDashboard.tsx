@@ -264,7 +264,7 @@ export const BrandDashboard: React.FC<BrandDashboardProps> = ({
               <p className="text-xl font-black text-[var(--text)] mt-1">{performanceSummary.completedCount}</p>
             </div>
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
-              <span className="text-purple-400 font-semibold text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+              <span className="text-[var(--accent-text)] font-semibold text-[11px] uppercase tracking-wider flex items-center gap-1.5">
                 <Eye className="w-3.5 h-3.5" /> PCU trung bình
               </span>
               <p className="text-xl font-black text-[var(--text)] mt-1">{performanceSummary.avgPeak.toLocaleString("vi-VN")}</p>

@@ -86,7 +86,7 @@ export const RecurringTemplateManager: React.FC<RecurringTemplateManagerProps> =
       <div className="flex items-center justify-end">
         <button
           onClick={() => setExpanded((v) => !v)}
-          className="text-xs font-bold text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-1"
+          className="text-xs font-bold text-[var(--accent-text)] hover:opacity-80 transition-colors flex items-center gap-1"
         >
           <Repeat className="w-3.5 h-3.5" /> {expanded ? "Ẩn Quy Tắc Lặp" : `Quy Tắc Lặp (${templates.length})`}
         </button>
@@ -95,7 +95,7 @@ export const RecurringTemplateManager: React.FC<RecurringTemplateManagerProps> =
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5 space-y-4">
           <div>
             <h3 className="font-bold text-[var(--text)] text-sm flex items-center gap-2">
-              <Repeat className="w-4 h-4 text-indigo-400" /> Quy Tắc Lặp (Ca Cố Định Theo Tuần)
+              <Repeat className="w-4 h-4 text-[var(--accent-text)]" /> Quy Tắc Lặp (Ca Cố Định Theo Tuần)
             </h3>
             <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
               Mẫu lặp dùng để sinh hàng loạt Ca chờ đăng ký cho cả tháng — không cần tạo tay từng ca.
@@ -167,7 +167,7 @@ export const RecurringTemplateManager: React.FC<RecurringTemplateManagerProps> =
               <input type="text" value={tplNotes} onChange={(e) => setTplNotes(e.target.value)} placeholder="Tuỳ chọn" className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)]" />
             </div>
             <div className="col-span-2 flex justify-end">
-              <button type="submit" disabled={creatingTpl} className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white font-bold text-[11px]">
+              <button type="submit" disabled={creatingTpl} className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-60 text-white font-bold text-[11px]">
                 {creatingTpl ? "Đang tạo..." : "+ Thêm Mẫu"}
               </button>
             </div>
@@ -181,7 +181,7 @@ export const RecurringTemplateManager: React.FC<RecurringTemplateManagerProps> =
               type="button"
               onClick={handleGenerateSlotsForMonth}
               disabled={generatingSlots}
-              className="shrink-0 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white font-bold text-[11px] flex items-center gap-1.5"
+              className="shrink-0 px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-60 text-white font-bold text-[11px] flex items-center gap-1.5"
             >
               <Repeat className="w-3.5 h-3.5" /> {generatingSlots ? "Đang sinh..." : `Sinh Ca Cho Tháng ${currentMonth}/${currentYear}`}
             </button>

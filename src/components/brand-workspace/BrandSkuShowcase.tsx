@@ -228,7 +228,7 @@ export const BrandSkuShowcase: React.FC<BrandSkuShowcaseProps> = ({ brandId, cur
                   </td>
                   {canEdit && (
                     <td className="py-2.5 px-4">
-                      <button onClick={() => onDeleteSku(s.id)} className="text-[var(--danger)] hover:bg-red-950/40 p-1 rounded-lg" title="Xoá SKU">
+                      <button onClick={() => onDeleteSku(s.id)} className="text-[var(--danger)] hover:bg-red-950/80 p-1 rounded-lg" title="Xoá SKU">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </td>
