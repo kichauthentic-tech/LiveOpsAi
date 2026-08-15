@@ -160,7 +160,7 @@ export const SchemeDayPanel: React.FC<SchemeDayPanelProps> = ({ brandId, date, s
                     <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${color.dot}`} />
                     {scheme.category}
                   </p>
-                  <p className={`mt-0.5 font-semibold leading-snug ${color.text}`}>{scheme.description}</p>
+                  <p className={`mt-0.5 font-semibold leading-snug whitespace-pre-wrap ${color.text}`}>{scheme.description}</p>
                 </>
               )}
             </div>

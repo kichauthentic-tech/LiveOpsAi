@@ -220,7 +220,7 @@ export const SchemeWeekStrip: React.FC<SchemeWeekStripProps> = ({ brandId, weekD
                           <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${color.dot}`} />
                           {category}
                         </p>
-                        <p className={`mt-0.5 font-semibold leading-snug ${color.text}`}>{seg.scheme.description}</p>
+                        <p className={`mt-0.5 font-semibold leading-snug whitespace-pre-wrap ${color.text}`}>{seg.scheme.description}</p>
                       </>
                     )}
                   </div>
