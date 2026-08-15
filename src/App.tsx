@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, WorkflowRule, Talent, Studio, Equipment, Brand, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, TalentRateHistoryEntry, BrandPlatformRateHistoryEntry, BrandSku, PromoScheme } from "./types";
 import { ALL_PERMISSION_DEFINITIONS } from "./data/mockData";
-import { fetchTalents, createTalent, updateTalent, deleteTalent } from "./lib/db/talents";
+import { fetchTalents, updateTalent, deleteTalent } from "./lib/db/talents";
 import { fetchStudios, createStudio, updateStudio, deleteStudio } from "./lib/db/studios";
 import { fetchEquipments, createEquipment, updateEquipment, deleteEquipment } from "./lib/db/equipments";
 import { fetchSessions, createSession, updateSession, deleteSession } from "./lib/db/sessions";
@@ -67,7 +67,7 @@ import { useAuth } from "./hooks/useAuth";
 import { Dashboards } from "./components/Dashboards";
 import { LiveSessionHub } from "./components/LiveSessionHub";
 import { LiveCalendar } from "./components/LiveCalendar";
-import { TalentMatcher } from "./components/TalentMatcher";
+import { TalentMatcher, NewTalentAccountPayload } from "./components/TalentMatcher";
 import { StudioEquipment } from "./components/StudioEquipment";
 import { CrmProjects } from "./components/CrmProjects";
 import { TikTokApiAutomation } from "./components/TikTokApiAutomation";
@@ -843,13 +843,37 @@ export default function App() {
   };
 
   // Handlers for Talents — persisted to Supabase
-  const handleAddTalent = async (newTalent: Talent) => {
-    try {
-      const created = await createTalent(newTalent);
-      setTalents(prev => [created, ...prev]);
-    } catch (e: any) {
-      window.alert(`Không thể tạo Talent: ${e.message ?? e}`);
-    }
+  // Tạo talent mới giờ luôn kèm tạo account đăng nhập thật (mật khẩu mặc định 000000, xem
+  // TalentMatcher.tsx "Thêm Talent Mới") — đi qua endpoint invite thay vì insert `talents`
+  // trực tiếp, nên phải refetch cả talents lẫn users sau khi xong. Không catch+alert ở đây —
+  // để lỗi propagate lên cho TalentMatcher hiện inline trong modal (tránh double dialog).
+  const handleCreateTalentAccount = async (payload: NewTalentAccountPayload) => {
+    await inviteUser({
+      name: payload.name,
+      email: payload.email,
+      role: "talent",
+      customRoleTitle: "Talent Host",
+      defaultPassword: "000000",
+      newTalentProfile: {
+        name: payload.name,
+        phone: payload.phone,
+        role: payload.role,
+        gender: payload.gender,
+        niches: payload.niches,
+        avatar: payload.avatar,
+        followersTikTok: payload.followersTikTok,
+        avgGmvPerSession: payload.avgGmvPerSession,
+        ctrAvg: payload.ctrAvg,
+        cvrAvg: payload.cvrAvg,
+        overallScore: payload.overallScore,
+        ratePerSession: payload.ratePerSession,
+        commissionRate: payload.commissionRate,
+        availabilityStatus: payload.availabilityStatus
+      }
+    });
+    const [refreshedTalents, refreshedUsers] = await Promise.all([fetchTalents(), fetchUsers()]);
+    setTalents(refreshedTalents);
+    setUsers(refreshedUsers);
   };
   const handleUpdateTalent = async (id: string, patch: Partial<Talent>) => {
     try {
@@ -1809,7 +1833,7 @@ export default function App() {
                     currentRole={currentRole}
                     talents={activeTalents}
                     brands={activeBrands}
-                    onAddTalent={handleAddTalent}
+                    onCreateTalentAccount={handleCreateTalentAccount}
                     onUpdateTalent={handleUpdateTalent}
                     onDeleteTalent={handleDeleteTalent}
                   />

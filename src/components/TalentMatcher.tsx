@@ -1,13 +1,31 @@
 import React, { useState } from "react";
 import { Talent, Brand, UserRole } from "../types";
-import { Users, Sparkles, Award, Search, Filter, Plus, Edit3, Trash2, X, Phone, CheckCircle2 } from "lucide-react";
+import { Users, Sparkles, Award, Search, Filter, Plus, Edit3, Trash2, X, Phone, CheckCircle2, Loader2 } from "lucide-react";
 import { authedFetch } from "../lib/authedFetch";
+
+export interface NewTalentAccountPayload {
+  name: string;
+  email: string;
+  phone: string;
+  role: "Host" | "KOC" | "KOL" | "MC";
+  gender: string;
+  niches: string[];
+  avatar: string;
+  followersTikTok: number;
+  avgGmvPerSession: number;
+  ctrAvg: number;
+  cvrAvg: number;
+  overallScore: number;
+  ratePerSession: number;
+  commissionRate: number;
+  availabilityStatus: "Available" | "Busy" | "On Live";
+}
 
 interface TalentMatcherProps {
   currentRole: UserRole;
   talents: Talent[];
   brands: Brand[];
-  onAddTalent?: (talent: Talent) => void;
+  onCreateTalentAccount?: (payload: NewTalentAccountPayload) => Promise<void>;
   onUpdateTalent?: (id: string, patch: Partial<Talent>) => void;
   onDeleteTalent?: (id: string) => void;
 }
@@ -16,12 +34,14 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
   currentRole,
   talents,
   brands,
-  onAddTalent,
+  onCreateTalentAccount,
   onUpdateTalent,
   onDeleteTalent
 }) => {
   // Rate Card/Hoa hồng — chỉ ceo/admin xem được (đúng dữ liệu trả về từ view `talents_secure`,
   // vốn đã mask thành 0 cho role khác — ẩn luôn UI cho nhất quán thay vì hiện "0đ" gây hiểu lầm).
+  // Tạo talent mới giờ luôn kèm tạo account thật (Supabase Admin API) nên cũng chỉ ceo/admin
+  // làm được — dùng chung điều kiện này cho cả 2 mục đích.
   const canSeeRate = currentRole === "ceo" || currentRole === "admin";
   const [selectedBrandId, setSelectedBrandId] = useState("brand-1");
   const [targetCategory, setTargetCategory] = useState("Mỹ phẩm Skincare");
@@ -42,6 +62,9 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
 
   // Form State
   const [formName, setFormName] = useState("");
+  const [formEmail, setFormEmail] = useState("");
+  const [isCreatingAccount, setIsCreatingAccount] = useState(false);
+  const [createAccountError, setCreateAccountError] = useState<string | null>(null);
   const [formRole, setFormRole] = useState<"Host" | "KOC" | "KOL" | "MC">("Host");
   const [formGender, setFormGender] = useState("Nữ");
   const [formNiches, setFormNiches] = useState("Mỹ phẩm, Skincare");
@@ -58,7 +81,9 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
 
   const openAddModal = () => {
     setEditingTalent(null);
+    setCreateAccountError(null);
     setFormName("");
+    setFormEmail("");
     setFormRole("Host");
     setFormGender("Nữ");
     setFormNiches("Mỹ phẩm, Skincare");
@@ -95,7 +120,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
     setIsModalOpen(true);
   };
 
-  const handleSaveTalent = (e: React.FormEvent) => {
+  const handleSaveTalent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formName.trim()) return;
 
@@ -127,17 +152,30 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
         patch.commissionRate = Number(formCommission);
       }
       if (onUpdateTalent) onUpdateTalent(editingTalent.id, patch);
-    } else {
-      const talentPayload: Talent = {
-        id: `talent-${Date.now()}`,
-        ...basePayload,
-        ratePerSession: canSeeRate ? Number(formRate) : 0,
-        commissionRate: canSeeRate ? Number(formCommission) : 0
-      };
-      if (onAddTalent) onAddTalent(talentPayload);
+      setIsModalOpen(false);
+      return;
     }
 
-    setIsModalOpen(false);
+    // Tạo mới — luôn kèm tạo account thật (mật khẩu mặc định 000000), không còn tạo hồ sơ
+    // Talent Pool đứng một mình nữa. Gọi server thật nên cần chờ + hiện lỗi nếu email trùng...
+    if (!formEmail.trim()) return;
+    setCreateAccountError(null);
+    setIsCreatingAccount(true);
+    try {
+      if (onCreateTalentAccount) {
+        await onCreateTalentAccount({
+          ...basePayload,
+          email: formEmail.trim(),
+          ratePerSession: Number(formRate),
+          commissionRate: Number(formCommission)
+        });
+      }
+      setIsModalOpen(false);
+    } catch (err: any) {
+      setCreateAccountError(err?.message ?? "Không thể tạo tài khoản Talent mới.");
+    } finally {
+      setIsCreatingAccount(false);
+    }
   };
 
   const handleDelete = (id: string, name: string) => {
@@ -299,13 +337,15 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
               <option value="MC">MC</option>
             </select>
 
-            {/* Add New Talent Button */}
-            <button
-              onClick={openAddModal}
-              className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow transition-all"
-            >
-              <Plus className="w-4 h-4" /> Thêm Talent Mới
-            </button>
+            {/* Add New Talent Button — tạo mới giờ kèm tạo account thật nên chỉ ceo/admin */}
+            {canSeeRate && (
+              <button
+                onClick={openAddModal}
+                className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow transition-all"
+              >
+                <Plus className="w-4 h-4" /> Thêm Talent Mới
+              </button>
+            )}
           </div>
         </div>
 
@@ -433,6 +473,26 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                 </div>
               </div>
 
+              {/* Chỉ hiện khi tạo mới — tạo mới giờ luôn kèm tạo account đăng nhập thật, mật khẩu
+                  mặc định 000000, không gửi email mời (khác luồng "Tạo Tài Khoản Mới" ở Phân
+                  Quyền & Role). Sửa hồ sơ đã có account rồi thì không cần nhập lại email. */}
+              {!editingTalent && (
+                <div>
+                  <label className="font-bold text-[var(--text-muted)] block mb-1">Email Đăng Nhập *</label>
+                  <input
+                    type="email"
+                    required
+                    value={formEmail}
+                    onChange={(e) => setFormEmail(e.target.value)}
+                    placeholder="host@liveops.ai"
+                    className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)] focus:ring-2 focus:ring-[var(--accent)]"
+                  />
+                  <p className="text-[10px] text-[var(--text-faint)] mt-1">
+                    Hệ thống tạo tài khoản đăng nhập với mật khẩu mặc định <strong>000000</strong> — báo talent đổi mật khẩu sau khi đăng nhập lần đầu.
+                  </p>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="font-bold text-[var(--text-muted)] block mb-1">Vai Trò</label>
@@ -553,6 +613,12 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                 />
               </div>
 
+              {createAccountError && (
+                <div className="text-xs rounded-lg px-3 py-2 border text-red-300 bg-red-950/60 border-red-500/30">
+                  {createAccountError}
+                </div>
+              )}
+
               <div className="pt-4 border-t border-[var(--border)] flex justify-end gap-3">
                 <button
                   type="button"
@@ -563,9 +629,11 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold rounded-xl shadow transition-all"
+                  disabled={isCreatingAccount}
+                  className="px-5 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white font-bold rounded-xl shadow transition-all flex items-center gap-2"
                 >
-                  {editingTalent ? "Cập Nhật Talent" : "Lưu Talent Mới"}
+                  {isCreatingAccount && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  {editingTalent ? "Cập Nhật Talent" : "Tạo Talent + Tài Khoản"}
                 </button>
               </div>
             </form>

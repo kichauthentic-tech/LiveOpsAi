@@ -136,20 +136,39 @@ export function createApp() {
         return res.status(403).json({ error: `Chỉ tài khoản CEO/Admin mới được tạo tài khoản mới. (${caller.reason})` });
       }
       const callerId = caller.userId;
-      const { name, email, role, customRoleTitle, assignedBrandId, assignedTalentId, newTalentProfile } = req.body || {};
+      const { name, email, role, customRoleTitle, assignedBrandId, assignedTalentId, newTalentProfile, defaultPassword } = req.body || {};
       if (!name || !email || !role) {
         return res.status(400).json({ error: "Thiếu name/email/role." });
       }
-      // Supabase's invite email otherwise falls back to the dashboard's Site URL
-      // (commonly left at the localhost default), sending invitees to a dead link —
-      // derive the real origin from the request instead.
-      const requestOrigin = (req.headers.origin as string) || `${req.protocol}://${req.get("host")}`;
-      const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-        data: { name, role, custom_role_title: customRoleTitle || "" },
-        redirectTo: requestOrigin
-      });
+      // Mặc định: gửi email mời, người dùng tự đặt mật khẩu qua link (luồng "Tạo Tài Khoản
+      // Mới" ở Phân Quyền & Role). Khi có `defaultPassword` — dùng cho quick-add "Thêm Talent
+      // Mới" ở Talent Pool (ceo/admin) — tạo tài khoản với mật khẩu biết trước luôn, không gửi
+      // email mời, để ceo/admin có thể giao mật khẩu trực tiếp cho talent.
+      let data: { user: { id: string } | null };
+      let error: { message: string } | null;
+      if (defaultPassword) {
+        const result = await supabaseAdmin.auth.admin.createUser({
+          email,
+          password: defaultPassword,
+          email_confirm: true,
+          user_metadata: { name, role, custom_role_title: customRoleTitle || "" }
+        });
+        data = result.data;
+        error = result.error;
+      } else {
+        // Supabase's invite email otherwise falls back to the dashboard's Site URL
+        // (commonly left at the localhost default), sending invitees to a dead link —
+        // derive the real origin from the request instead.
+        const requestOrigin = (req.headers.origin as string) || `${req.protocol}://${req.get("host")}`;
+        const result = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+          data: { name, role, custom_role_title: customRoleTitle || "" },
+          redirectTo: requestOrigin
+        });
+        data = result.data;
+        error = result.error;
+      }
       if (error) {
-        console.error("inviteUserByEmail error:", error);
+        console.error("Tạo auth user error:", error);
         return res.status(400).json({ error: error.message });
       }
       let assignmentWarning: string | null = null;
@@ -167,8 +186,17 @@ export function createApp() {
             role: newTalentProfile.role || "Host",
             gender: newTalentProfile.gender || "",
             niches: Array.isArray(newTalentProfile.niches) ? newTalentProfile.niches : [],
-            avatar: "",
-            availability_status: "Available",
+            avatar: newTalentProfile.avatar || "",
+            // Hiệu suất (followers/GMV/CTR/CVR/điểm) mặc định 0 nếu không truyền — sẽ tự tính từ
+            // báo cáo phiên live thật sau này, không nhập tay khi tạo mới (xem WORKSPACE_DESIGN.md).
+            followers_tiktok: newTalentProfile.followersTikTok || 0,
+            avg_gmv_per_session: newTalentProfile.avgGmvPerSession || 0,
+            ctr_avg: newTalentProfile.ctrAvg || 0,
+            cvr_avg: newTalentProfile.cvrAvg || 0,
+            overall_score: newTalentProfile.overallScore || 0,
+            rate_per_session: newTalentProfile.ratePerSession || 0,
+            commission_rate: newTalentProfile.commissionRate || 0,
+            availability_status: newTalentProfile.availabilityStatus || "Available",
             profile_id: data.user.id
           })
           .select("id")

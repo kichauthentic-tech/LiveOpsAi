@@ -87,12 +87,6 @@ async function fetchOneSecure(id: string): Promise<Talent> {
   return fromDb(data as DbTalent);
 }
 
-export async function createTalent(t: Talent): Promise<Talent> {
-  const { data, error } = await supabase.from("talents").insert(toDb(t)).select("id").single();
-  if (error) throw error;
-  return fetchOneSecure((data as { id: string }).id);
-}
-
 // Partial update — chỉ gửi field thực sự có trong `patch`. Bắt buộc phải partial (không
 // phải full-row) vì người sửa không phải ceo/admin/chính chủ đọc rate/commission từ
 // `talents_secure` sẽ luôn thấy 2 field này = null; nếu gửi full object sẽ vô tình ghi đè

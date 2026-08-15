@@ -99,10 +99,10 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
     assignedTalentId: ""
   });
 
-  // Đảo chiều luồng tạo talent (chỉ áp dụng khi tạo mới, không phải sửa): "existing" = link
-  // vào 1 hồ sơ Talent Pool có sẵn (dropdown, luồng cũ, dùng để dọn dữ liệu cũ chưa có account);
-  // "new" = nhập nhanh thông tin cơ bản, server tự tạo hồ sơ Talent Pool + link 2 chiều luôn.
-  const [talentLinkMode, setTalentLinkMode] = useState<"existing" | "new">("new");
+  // Đảo chiều luồng tạo talent (chỉ áp dụng khi tạo mới, không phải sửa): mọi talent mới đều
+  // nhập nhanh thông tin cơ bản ở đây, server tự tạo hồ sơ Talent Pool + link 2 chiều luôn —
+  // không còn chọn "link vào hồ sơ có sẵn" (dữ liệu hiện tại chỉ là demo, sẽ clear/tạo lại
+  // bằng dữ liệu talent thật nên không cần giữ đường link hồ sơ cũ).
   const [newTalentForm, setNewTalentForm] = useState<{
     phone: string;
     role: "Host" | "KOC" | "KOL" | "MC";
@@ -306,15 +306,14 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
         };
         await onUpdateUser(updated);
       } else {
-        const isNewTalentLink = formData.role === "talent" && talentLinkMode === "new";
+        const isNewTalent = formData.role === "talent";
         await onAddUser({
           name: formData.name,
           email: formData.email,
           role: formData.role,
           customRoleTitle: formData.customRoleTitle || getRoleDefaultTitle(formData.role),
           assignedBrandId: formData.role === "brand" ? formData.assignedBrandId : undefined,
-          assignedTalentId: formData.role === "talent" && talentLinkMode === "existing" ? formData.assignedTalentId : undefined,
-          newTalentProfile: isNewTalentLink
+          newTalentProfile: isNewTalent
             ? {
                 name: formData.name,
                 phone: newTalentForm.phone,
@@ -346,7 +345,6 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
       assignedBrandId: "",
       assignedTalentId: ""
     });
-    setTalentLinkMode("new");
     setNewTalentForm({ phone: "", role: "Host", gender: "Nữ", niches: "" });
     setIsUserModalOpen(true);
   };
@@ -971,34 +969,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
               {/* Conditional Talent selection if role is talent */}
               {formData.role === "talent" && (
                 <div className="space-y-2 p-3 bg-amber-950/80 border border-amber-500/30 rounded-xl">
-                  {!editingUser && (
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setTalentLinkMode("new")}
-                        className={`flex-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition-all ${
-                          talentLinkMode === "new"
-                            ? "bg-amber-500 text-black border-amber-400"
-                            : "bg-[var(--surface-base)] text-amber-300 border-amber-500/30"
-                        }`}
-                      >
-                        Tạo Hồ Sơ Talent Mới
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setTalentLinkMode("existing")}
-                        className={`flex-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition-all ${
-                          talentLinkMode === "existing"
-                            ? "bg-amber-500 text-black border-amber-400"
-                            : "bg-[var(--surface-base)] text-amber-300 border-amber-500/30"
-                        }`}
-                      >
-                        Link Hồ Sơ Có Sẵn
-                      </button>
-                    </div>
-                  )}
-
-                  {(editingUser || talentLinkMode === "existing") ? (
+                  {editingUser ? (
                     <div>
                       <label className="text-amber-300 font-bold block mb-1">Gán Profile Talent Host (*)</label>
                       <select

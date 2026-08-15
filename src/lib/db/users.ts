@@ -67,6 +67,15 @@ export interface NewTalentProfilePayload {
   role: "Host" | "KOC" | "KOL" | "MC";
   gender: string;
   niches: string[];
+  avatar?: string;
+  followersTikTok?: number;
+  avgGmvPerSession?: number;
+  ctrAvg?: number;
+  cvrAvg?: number;
+  overallScore?: number;
+  ratePerSession?: number;
+  commissionRate?: number;
+  availabilityStatus?: "Available" | "Busy" | "On Live";
 }
 
 export interface InviteUserPayload {
@@ -76,9 +85,13 @@ export interface InviteUserPayload {
   customRoleTitle: string;
   assignedBrandId?: string;
   assignedTalentId?: string;
-  // Đảo chiều luồng tạo talent: khi role="talent" và không chọn assignedTalentId có sẵn,
-  // gửi thông tin cơ bản này để server tự tạo hồ sơ Talent Pool + link 2 chiều luôn.
+  // Tạo talent: gửi thông tin hồ sơ để server tự tạo Talent Pool row + link 2 chiều luôn
+  // (không còn chọn link hồ sơ có sẵn — mọi talent mới đều đi qua đường này).
   newTalentProfile?: NewTalentProfilePayload;
+  // Có giá trị = quick-add "Thêm Talent Mới" ở Talent Pool (ceo/admin): tạo account với mật
+  // khẩu biết trước ngay, không gửi email mời. Không có = luồng "Tạo Tài Khoản Mới" thường
+  // (Phân Quyền & Role), gửi email mời như cũ.
+  defaultPassword?: string;
 }
 
 async function authedFetch(path: string, init: RequestInit): Promise<Response> {
