@@ -46,7 +46,7 @@ export const Login: React.FC = () => {
     <div className="min-h-screen w-full flex items-center justify-center bg-[var(--surface-base)] text-[var(--text)] px-4">
       <div className="w-full max-w-sm bg-[var(--surface)]/80 border border-[var(--border)] rounded-2xl p-8 shadow-2xl">
         <div className="mb-6 text-center">
-          <h1 className="text-xl font-bold tracking-tighter text-blue-400">LIVEOPS AI</h1>
+          <h1 className="text-xl font-bold tracking-tighter text-[var(--accent-text)]">LIVEOPS AI</h1>
           <p className="text-[10px] uppercase tracking-widest text-[var(--text-faint)] font-semibold">
             Agency Operating System
           </p>
@@ -62,7 +62,7 @@ export const Login: React.FC = () => {
                 setInfo(null);
               }}
               className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                mode === "signin" ? "bg-blue-600 text-white" : "text-[var(--text-muted)]"
+                mode === "signin" ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)]"
               }`}
             >
               Đăng nhập
@@ -75,7 +75,7 @@ export const Login: React.FC = () => {
                 setInfo(null);
               }}
               className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                mode === "signup" ? "bg-blue-600 text-white" : "text-[var(--text-muted)]"
+                mode === "signup" ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)]"
               }`}
             >
               Tạo tài khoản
@@ -102,7 +102,7 @@ export const Login: React.FC = () => {
                 placeholder="Họ tên"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full pl-9 pr-3 py-2.5 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl text-sm outline-none focus:border-blue-500"
+                className="w-full pl-9 pr-3 py-2.5 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl text-sm outline-none focus:border-[var(--accent)]"
               />
             </div>
           )}
@@ -114,7 +114,7 @@ export const Login: React.FC = () => {
               placeholder="Email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full pl-9 pr-3 py-2.5 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl text-sm outline-none focus:border-blue-500"
+              className="w-full pl-9 pr-3 py-2.5 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl text-sm outline-none focus:border-[var(--accent)]"
             />
           </div>
           {mode !== "forgot" && (
@@ -127,7 +127,7 @@ export const Login: React.FC = () => {
                 placeholder="Mật khẩu"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-9 pr-3 py-2.5 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl text-sm outline-none focus:border-blue-500"
+                className="w-full pl-9 pr-3 py-2.5 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl text-sm outline-none focus:border-[var(--accent)]"
               />
             </div>
           )}
@@ -141,7 +141,7 @@ export const Login: React.FC = () => {
                   setError(null);
                   setInfo(null);
                 }}
-                className="text-[11px] text-[var(--text-faint)] hover:text-blue-400 font-semibold transition-colors"
+                className="text-[11px] text-[var(--text-faint)] hover:text-[var(--accent-text)] font-semibold transition-colors"
               >
                 Quên mật khẩu?
               </button>
@@ -162,7 +162,7 @@ export const Login: React.FC = () => {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-2"
+            className="w-full py-2.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-60 text-white font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-2"
           >
             {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
             {mode === "signin" ? "Đăng nhập" : mode === "signup" ? "Tạo tài khoản" : "Gửi liên kết đặt lại"}
@@ -176,7 +176,7 @@ export const Login: React.FC = () => {
                 setError(null);
                 setInfo(null);
               }}
-              className="w-full text-center text-[11px] text-[var(--text-faint)] hover:text-blue-400 font-semibold transition-colors"
+              className="w-full text-center text-[11px] text-[var(--text-faint)] hover:text-[var(--accent-text)] font-semibold transition-colors"
             >
               ← Quay lại đăng nhập
             </button>

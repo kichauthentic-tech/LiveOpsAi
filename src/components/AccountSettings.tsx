@@ -104,7 +104,7 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ activeUser, on
       {/* Thông tin cơ bản */}
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-6 space-y-4">
         <div className="flex items-center gap-2 text-sm font-bold text-[var(--text)]">
-          <User className="w-4 h-4 text-blue-400" />
+          <User className="w-4 h-4 text-[var(--accent-text)]" />
           Thông Tin Hiển Thị
         </div>
 
@@ -122,7 +122,7 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ activeUser, on
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="mt-1 w-full px-3 py-2.5 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl text-sm outline-none focus:border-blue-500 text-[var(--text)]"
+              className="mt-1 w-full px-3 py-2.5 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl text-sm outline-none focus:border-[var(--accent)] text-[var(--text)]"
             />
           </div>
 
@@ -141,7 +141,7 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ activeUser, on
           <button
             type="submit"
             disabled={savingName || name.trim() === activeUser.name}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl text-xs transition-all flex items-center gap-2"
+            className="px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl text-xs transition-all flex items-center gap-2"
           >
             {savingName && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
             Lưu Tên Hiển Thị
@@ -152,7 +152,7 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ activeUser, on
       {/* Đổi mật khẩu */}
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-6 space-y-4">
         <div className="flex items-center gap-2 text-sm font-bold text-[var(--text)]">
-          <Lock className="w-4 h-4 text-blue-400" />
+          <Lock className="w-4 h-4 text-[var(--accent-text)]" />
           Đổi Mật Khẩu
         </div>
 
@@ -166,7 +166,7 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ activeUser, on
               required
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
-              className="mt-1 w-full px-3 py-2.5 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl text-sm outline-none focus:border-blue-500 text-[var(--text)]"
+              className="mt-1 w-full px-3 py-2.5 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl text-sm outline-none focus:border-[var(--accent)] text-[var(--text)]"
             />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -180,7 +180,7 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ activeUser, on
                 minLength={6}
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                className="mt-1 w-full px-3 py-2.5 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl text-sm outline-none focus:border-blue-500 text-[var(--text)]"
+                className="mt-1 w-full px-3 py-2.5 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl text-sm outline-none focus:border-[var(--accent)] text-[var(--text)]"
               />
             </div>
             <div>
@@ -193,7 +193,7 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ activeUser, on
                 minLength={6}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="mt-1 w-full px-3 py-2.5 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl text-sm outline-none focus:border-blue-500 text-[var(--text)]"
+                className="mt-1 w-full px-3 py-2.5 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl text-sm outline-none focus:border-[var(--accent)] text-[var(--text)]"
               />
             </div>
           </div>
@@ -213,7 +213,7 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ activeUser, on
           <button
             type="submit"
             disabled={savingPassword}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold rounded-xl text-xs transition-all flex items-center gap-2"
+            className="px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white font-bold rounded-xl text-xs transition-all flex items-center gap-2"
           >
             {savingPassword && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
             Đổi Mật Khẩu
@@ -224,7 +224,7 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ activeUser, on
       {/* Quên mật khẩu hiện tại */}
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-6 space-y-3">
         <div className="flex items-center gap-2 text-sm font-bold text-[var(--text)]">
-          <KeyRound className="w-4 h-4 text-blue-400" />
+          <KeyRound className="w-4 h-4 text-[var(--accent-text)]" />
           Quên Mật Khẩu Hiện Tại?
         </div>
         <p className="text-xs text-[var(--text-faint)]">

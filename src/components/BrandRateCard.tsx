@@ -82,7 +82,7 @@ export const BrandRateCard: React.FC<BrandRateCardProps> = ({
   return (
     <div className="space-y-5">
       <h2 className="text-lg font-bold text-[var(--text)] flex items-center gap-2">
-        <Tag className="w-5 h-5 text-blue-400" /> Rate Card
+        <Tag className="w-5 h-5 text-[var(--accent-text)]" /> Rate Card
       </h2>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -109,12 +109,12 @@ export const BrandRateCard: React.FC<BrandRateCardProps> = ({
                     placeholder="Rate mới"
                     value={draft ?? ""}
                     onChange={(e) => setDrafts((d) => ({ ...d, [platform]: e.target.value }))}
-                    className="flex-1 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] text-xs focus:outline-none focus:border-blue-500"
+                    className="flex-1 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] text-xs focus:outline-none focus:border-[var(--accent)]"
                   />
                   <button
                     onClick={() => handleSave(platform)}
                     disabled={busy !== null || draft === undefined || draft === ""}
-                    className="px-3 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-colors"
+                    className="px-3 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-colors"
                   >
                     {busy === platform ? "..." : "Lưu"}
                   </button>
@@ -135,12 +135,12 @@ export const BrandRateCard: React.FC<BrandRateCardProps> = ({
                       placeholder="% mới"
                       value={returnDraft ?? ""}
                       onChange={(e) => setReturnDrafts((d) => ({ ...d, [platform]: e.target.value }))}
-                      className="flex-1 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] text-xs focus:outline-none focus:border-blue-500"
+                      className="flex-1 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] text-xs focus:outline-none focus:border-[var(--accent)]"
                     />
                     <button
                       onClick={() => handleSaveReturnRate(platform)}
                       disabled={returnBusy !== null || returnDraft === undefined || returnDraft === ""}
-                      className="px-3 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-colors"
+                      className="px-3 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-colors"
                     >
                       {returnBusy === platform ? "..." : "Lưu"}
                     </button>

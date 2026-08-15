@@ -1365,7 +1365,7 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen w-full bg-[var(--surface-base)] text-[var(--text)] overflow-hidden font-sans antialiased selection:bg-blue-600 selection:text-white">
+    <div className="flex h-screen w-full bg-[var(--surface-base)] text-[var(--text)] overflow-hidden font-sans antialiased selection:bg-[var(--accent)] selection:text-white">
       {/* Left Sidebar Navigation */}
       <aside
         className={`fixed inset-y-0 left-0 z-50 w-64 bg-[var(--surface)]/90 backdrop-blur-md border-r border-[var(--border)] flex flex-col transition-all duration-300 md:translate-x-0 ${
@@ -1378,14 +1378,14 @@ export default function App() {
           }`}
         >
           <div className={sidebarCollapsed ? "md:hidden" : ""}>
-            <h1 className="text-xl font-bold tracking-tighter text-blue-400">LIVEOPS AI</h1>
+            <h1 className="text-xl font-bold tracking-tighter text-[var(--accent-text)]">LIVEOPS AI</h1>
             <p className="text-[10px] uppercase tracking-widest text-[var(--text-faint)] font-semibold">
               Agency Operating System
             </p>
           </div>
           {sidebarCollapsed && (
             <span
-              className="hidden md:flex w-9 h-9 rounded-xl bg-blue-600/10 border border-blue-600/20 text-blue-400 items-center justify-center text-sm font-black tracking-tighter"
+              className="hidden md:flex w-9 h-9 rounded-xl bg-[var(--accent)]/10 border border-[var(--accent)]/20 text-[var(--accent-text)] items-center justify-center text-sm font-black tracking-tighter"
               title="LIVEOPS AI"
             >
               LO
@@ -1438,14 +1438,14 @@ export default function App() {
                         sidebarCollapsed ? "px-3 md:px-0 md:justify-center" : "px-3"
                       } ${
                         isActive
-                          ? "bg-blue-600/10 text-blue-400 border border-blue-600/20 font-bold"
+                          ? "bg-[var(--accent)]/10 text-[var(--accent-text)] border border-[var(--accent)]/20 font-bold"
                           : "text-[var(--text-muted)] hover:bg-[var(--surface-elevated)]/80 hover:text-[var(--text)]"
                       }`}
                     >
                       <div className={`flex items-center gap-3 min-w-0 ${sidebarCollapsed ? "md:gap-0" : ""}`}>
                         <div className="relative shrink-0">
                           <Icon
-                            className={`w-4 h-4 shrink-0 ${isActive ? "text-blue-400" : "text-[var(--text-muted)]"}`}
+                            className={`w-4 h-4 shrink-0 ${isActive ? "text-[var(--accent-text)]" : "text-[var(--text-muted)]"}`}
                           />
                           {/* Thu gọn: badge NEW co lại thành chấm nhỏ trên icon cho khỏi mất tín hiệu. */}
                           {sidebarCollapsed && item.badge && (
@@ -1481,7 +1481,7 @@ export default function App() {
             title={`${activeUser.name} • ${currentRole} — Tài Khoản Của Tôi`}
             className={`w-full flex items-center gap-3 rounded-xl border transition-colors text-left ${
               activeTab === "account_settings"
-                ? "bg-blue-600/10 border-blue-600/20"
+                ? "bg-[var(--accent)]/10 border-[var(--accent)]/20"
                 : "bg-[var(--surface-elevated)]/50 border-[var(--border)]/50 hover:bg-[var(--surface-elevated)] hover:border-[var(--text-faint)]"
             } ${sidebarCollapsed ? "p-3 md:p-2 md:justify-center" : "p-3"}`}
           >

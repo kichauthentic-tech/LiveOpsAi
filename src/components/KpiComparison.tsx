@@ -636,7 +636,7 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
       <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-[var(--border)]">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <span className="p-2 bg-blue-600/20 text-blue-400 rounded-xl border border-blue-500/30">
+            <span className="p-2 bg-[var(--accent)]/20 text-[var(--accent-text)] rounded-xl border border-[var(--accent)]/30">
               <BarChart2 className="w-5 h-5" />
             </span>
             <h2 className="text-xl sm:text-2xl font-black tracking-tight text-[var(--text)]">
@@ -654,7 +654,7 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
             onClick={() => setTimePeriod("this_week_vs_last_week")}
             className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
               timePeriod === "this_week_vs_last_week"
-                ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30"
+                ? "bg-[var(--accent)] text-white shadow-lg shadow-[var(--accent)]/30"
                 : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface)]"
             }`}
           >
@@ -666,7 +666,7 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
             onClick={() => setTimePeriod("this_month_vs_last_month")}
             className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
               timePeriod === "this_month_vs_last_month"
-                ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30"
+                ? "bg-[var(--accent)] text-white shadow-lg shadow-[var(--accent)]/30"
                 : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface)]"
             }`}
           >
@@ -678,7 +678,7 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
             onClick={() => setTimePeriod("this_quarter_vs_last_quarter")}
             className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
               timePeriod === "this_quarter_vs_last_quarter"
-                ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30"
+                ? "bg-[var(--accent)] text-white shadow-lg shadow-[var(--accent)]/30"
                 : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface)]"
             }`}
           >
@@ -819,7 +819,7 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
                 </div>
                 <div className="h-1.5 w-full bg-[var(--surface-elevated)] rounded-full overflow-hidden flex">
                   <div
-                    className="h-full bg-blue-500 transition-all duration-500 rounded-full"
+                    className="h-full bg-[var(--accent)] transition-all duration-500 rounded-full"
                     style={{
                       width: `${Math.min(100, (item.currentValue / Math.max(item.currentValue, item.target)) * 100)}%`
                     }}
@@ -838,7 +838,7 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h3 className="font-bold text-[var(--text)] text-base flex items-center gap-2">
-                <LineChart className="w-5 h-5 text-blue-400" />
+                <LineChart className="w-5 h-5 text-[var(--accent-text)]" />
                 Quỹ Đạo Tăng Trưởng Theo Thời Gian ({labels.current} vs {labels.previous})
               </h3>
               <p className="text-xs text-[var(--text-muted)]">So sánh nhịp độ phát sinh doanh thu và đơn hàng qua từng ngày/tuần</p>
@@ -849,7 +849,7 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
                 <button
                   onClick={() => setActiveMetricTab("gmv")}
                   className={`px-3 py-1 rounded-lg font-bold transition-all ${
-                    activeMetricTab === "gmv" ? "bg-blue-600 text-white" : "text-[var(--text-muted)] hover:text-white"
+                    activeMetricTab === "gmv" ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)] hover:text-[var(--text)]"
                   }`}
                 >
                   Doanh Thu GMV (Triệu đ)
@@ -857,7 +857,7 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
                 <button
                   onClick={() => setActiveMetricTab("orders")}
                   className={`px-3 py-1 rounded-lg font-bold transition-all ${
-                    activeMetricTab === "orders" ? "bg-blue-600 text-white" : "text-[var(--text-muted)] hover:text-white"
+                    activeMetricTab === "orders" ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)] hover:text-[var(--text)]"
                   }`}
                 >
                   Đơn Hàng
@@ -868,7 +868,7 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
                 <button
                   onClick={() => setChartType("area")}
                   className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
-                    chartType === "area" ? "bg-[var(--surface-elevated)] text-blue-400" : "text-[var(--text-faint)] hover:text-[var(--text-muted)]"
+                    chartType === "area" ? "bg-[var(--surface-elevated)] text-[var(--accent-text)]" : "text-[var(--text-faint)] hover:text-[var(--text-muted)]"
                   }`}
                   title="Biểu đồ Miền (Area Chart)"
                 >
@@ -877,7 +877,7 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
                 <button
                   onClick={() => setChartType("bar")}
                   className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
-                    chartType === "bar" ? "bg-[var(--surface-elevated)] text-blue-400" : "text-[var(--text-faint)] hover:text-[var(--text-muted)]"
+                    chartType === "bar" ? "bg-[var(--surface-elevated)] text-[var(--accent-text)]" : "text-[var(--text-faint)] hover:text-[var(--text-muted)]"
                   }`}
                   title="Biểu đồ Cột So Sánh (Grouped Bar)"
                 >

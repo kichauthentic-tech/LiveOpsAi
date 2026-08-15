@@ -793,8 +793,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
       {/* Top Banner */}
       <div className="bg-[var(--surface)] border border-[var(--border)] p-4 sm:p-6 rounded-2xl shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="space-y-1">
-          <span className="text-blue-400 font-semibold text-[11px] sm:text-xs uppercase tracking-wider flex items-center gap-1.5">
-            <CalendarIcon className="w-4 h-4 text-blue-400 shrink-0" /> Operating Calendar & Multi-View Studio Allocator
+          <span className="text-[var(--accent-text)] font-semibold text-[11px] sm:text-xs uppercase tracking-wider flex items-center gap-1.5">
+            <CalendarIcon className="w-4 h-4 text-[var(--accent-text)] shrink-0" /> Operating Calendar & Multi-View Studio Allocator
           </span>
           <h2 className="text-xl sm:text-2xl font-black text-[var(--text)] tracking-tight">
             Lịch Vận Hành Phiên Live
@@ -807,7 +807,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
               setNewDate(selectedDate);
               setIsBookingModalOpen(true);
             }}
-            className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 transition-all active:scale-95"
+            className="w-full sm:w-auto bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-[var(--accent)]/20 transition-all active:scale-95"
           >
             <Plus className="w-4 h-4" /> Đặt Lịch Phiên Live Mới
           </button>
@@ -823,7 +823,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
               onClick={() => setViewMode("month")}
               className={`px-3 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
                 viewMode === "month"
-                  ? "bg-blue-600 text-white shadow-sm font-black"
+                  ? "bg-[var(--accent)] text-white shadow-sm font-black"
                   : "text-[var(--text-muted)] hover:text-[var(--text)]"
               }`}
             >
@@ -833,7 +833,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
               onClick={() => setViewMode("week")}
               className={`px-3 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
                 viewMode === "week"
-                  ? "bg-blue-600 text-white shadow-sm font-black"
+                  ? "bg-[var(--accent)] text-white shadow-sm font-black"
                   : "text-[var(--text-muted)] hover:text-[var(--text)]"
               }`}
             >
@@ -843,7 +843,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
               onClick={() => setViewMode("day")}
               className={`px-3 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
                 viewMode === "day"
-                  ? "bg-blue-600 text-white shadow-sm font-black"
+                  ? "bg-[var(--accent)] text-white shadow-sm font-black"
                   : "text-[var(--text-muted)] hover:text-[var(--text)]"
               }`}
             >
@@ -853,7 +853,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
               onClick={() => setViewMode("talent_workload")}
               className={`px-3 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
                 viewMode === "talent_workload"
-                  ? "bg-blue-600 text-white shadow-sm font-black"
+                  ? "bg-[var(--accent)] text-white shadow-sm font-black"
                   : "text-[var(--text-muted)] hover:text-[var(--text)]"
               }`}
             >
@@ -875,7 +875,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
 
             <button
               onClick={handleGoToday}
-              className="px-2.5 py-1 text-[11px] font-bold bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-blue-400 rounded-lg transition-colors"
+              className="px-2.5 py-1 text-[11px] font-bold bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--accent-text)] rounded-lg transition-colors"
             >
               Hôm Nay
             </button>
@@ -897,7 +897,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
 
           {/* Quick Date Picker */}
           <div className="flex items-center gap-2 bg-[var(--surface-base)] px-3 py-1.5 rounded-xl border border-[var(--border)]">
-            <CalendarIcon className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+            <CalendarIcon className="w-3.5 h-3.5 text-[var(--accent-text)] shrink-0" />
             <input
               type="date"
               value={selectedDate}
@@ -1011,14 +1011,14 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
             placeholder="Tìm theo tên phiên, Host, Brand..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-xl pl-9 pr-3 py-2 text-[var(--text)] focus:outline-none focus:border-blue-500 font-medium"
+            className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-xl pl-9 pr-3 py-2 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
           />
         </div>
 
         <select
           value={selectedStudioFilter}
           onChange={(e) => setSelectedStudioFilter(e.target.value)}
-          className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-2 text-[var(--text)] focus:outline-none focus:border-blue-500 font-medium"
+          className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-2 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
         >
           <option value="ALL">🏢 Tất cả phòng Studio ({studios.length})</option>
           {studios.map((s) => (
@@ -1029,7 +1029,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
         <select
           value={selectedHostFilter}
           onChange={(e) => setSelectedHostFilter(e.target.value)}
-          className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-2 text-[var(--text)] focus:outline-none focus:border-blue-500 font-medium"
+          className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-2 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
         >
           <option value="ALL">🎙️ Tất cả Host / KOC ({talents.length})</option>
           {talents.map((t) => (
@@ -1040,7 +1040,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
         <select
           value={selectedBrandFilter}
           onChange={(e) => setSelectedBrandFilter(e.target.value)}
-          className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-2 text-[var(--text)] focus:outline-none focus:border-blue-500 font-medium"
+          className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-2 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
         >
           <option value="ALL">🌿 Tất cả Brand Khách Hàng ({brands.length})</option>
           {brands.map((b) => (
@@ -1414,7 +1414,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-[var(--border)] pb-3 gap-2">
             <div>
               <h3 className="font-bold text-[var(--text)] text-base flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-blue-400 shrink-0" /> Ma Trận Phân Bổ Phòng Studio - Ngày {selectedDate} ({getDayOfWeekName(selectedDate)})
+                <Building2 className="w-5 h-5 text-[var(--accent-text)] shrink-0" /> Ma Trận Phân Bổ Phòng Studio - Ngày {selectedDate} ({getDayOfWeekName(selectedDate)})
               </h3>
               <p className="text-xs text-[var(--text-muted)]">Kéo thả ca live vào bất kỳ ô Studio/Ca Live để đổi phòng hoặc ca làm việc linh hoạt</p>
             </div>
@@ -1466,7 +1466,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   <tr key={std.id} className="hover:bg-[var(--surface-elevated)]/20 transition-colors">
                     <td className="p-3 font-bold text-[var(--text)] sticky left-0 bg-[var(--surface)] z-10 border-r border-[var(--border)] shadow-md">
                       <div className="flex items-center gap-2">
-                        <span className="p-1.5 rounded-lg bg-[var(--surface-elevated)] border border-[var(--border)] text-blue-400 shrink-0">🏢</span>
+                        <span className="p-1.5 rounded-lg bg-[var(--surface-elevated)] border border-[var(--border)] text-[var(--accent-text)] shrink-0">🏢</span>
                         <div>
                           <p className="text-xs sm:text-sm font-bold text-[var(--text)] line-clamp-1">{std.name}</p>
                           <p className="text-[10px] text-[var(--text-muted)] font-mono">{std.roomNumber}</p>
@@ -1503,7 +1503,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                           onDragLeave={(e) => handleDragLeave(e, matrixCellKey)}
                           onDrop={(e) => handleDropOnDayMatrix(e, std, slot)}
                           className={`p-2 border-r border-[var(--border)]/60 align-top transition-all ${
-                            isMatrixHovered ? "bg-blue-950/80 border-2 border-dashed border-blue-400 scale-[1.01]" : ""
+                            isMatrixHovered ? "bg-[var(--accent)]/20 border-2 border-dashed border-[var(--accent)] scale-[1.01]" : ""
                           }`}
                         >
                           {matchedSession ? (
@@ -1551,7 +1551,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                               className={`h-20 rounded-xl border border-dashed transition-all cursor-pointer flex flex-col items-center justify-center space-y-1 ${
                                 isMatrixHovered
                                   ? "border-emerald-400 bg-emerald-950/50 text-emerald-300 font-bold scale-105"
-                                  : "border-[var(--border)]/80 hover:border-blue-500/50 hover:bg-blue-950/20 text-[var(--text-faint)] hover:text-blue-400"
+                                  : "border-[var(--border)]/80 hover:border-[var(--accent)]/50 hover:bg-[var(--accent)]/10 text-[var(--text-faint)] hover:text-[var(--accent-text)]"
                               }`}
                             >
                               <Plus className="w-4 h-4" />
@@ -1577,7 +1577,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
           <div className="border-b border-[var(--border)] pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
               <h3 className="font-bold text-[var(--text)] text-base flex items-center gap-2">
-                <User className="w-5 h-5 text-blue-400 shrink-0" /> Tải Làm Việc Host & KOC - Ngày {selectedDate}
+                <User className="w-5 h-5 text-[var(--accent-text)] shrink-0" /> Tải Làm Việc Host & KOC - Ngày {selectedDate}
               </h3>
               <p className="text-xs text-[var(--text-muted)]">Tổng thời lượng live trong ngày</p>
             </div>
@@ -1604,7 +1604,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                       <img src={t.avatar} alt={t.name} className="w-10 h-10 rounded-full object-cover border border-[var(--border)] shrink-0" />
                       <div>
                         <h4 className="font-bold text-[var(--text)] text-sm line-clamp-1">{t.name}</h4>
-                        <span className="text-xs text-blue-400 font-medium">{t.role} • Score: {t.overallScore}</span>
+                        <span className="text-xs text-[var(--accent-text)] font-medium">{t.role} • Score: {t.overallScore}</span>
                       </div>
                     </div>
                     <span
@@ -1627,7 +1627,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                     </div>
                     <div className="w-full h-2 bg-[var(--surface-elevated)] rounded-full overflow-hidden">
                       <div
-                        className={`h-full rounded-full ${isOverloaded ? "bg-rose-500" : "bg-blue-500"}`}
+                        className={`h-full rounded-full ${isOverloaded ? "bg-rose-500" : "bg-[var(--accent)]"}`}
                         style={{ width: `${Math.min(100, (totalHoursToday / 6) * 100)}%` }}
                       ></div>
                     </div>
@@ -1639,7 +1639,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                       hostSessions.map((hs) => (
                         <div key={hs.id} className="p-2 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-xs flex justify-between items-center gap-2">
                           <span className="font-bold text-[var(--text)] truncate">{hs.title}</span>
-                          <span className="font-mono text-[10px] text-blue-400 shrink-0">{hs.startTime}-{hs.endTime}</span>
+                          <span className="font-mono text-[10px] text-[var(--accent-text)] shrink-0">{hs.startTime}-{hs.endTime}</span>
                         </div>
                       ))
                     ) : (
@@ -1659,7 +1659,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl max-w-2xl w-full p-4 sm:p-6 space-y-4 sm:space-y-5 shadow-2xl overflow-y-auto max-h-[92vh]">
             <div className="flex justify-between items-center border-b border-[var(--border)] pb-3">
               <div className="flex items-center gap-2">
-                <CalendarIcon className="w-5 h-5 text-blue-400" />
+                <CalendarIcon className="w-5 h-5 text-[var(--accent-text)]" />
                 <h3 className="font-bold text-[var(--text)] text-base sm:text-lg">Đặt Lịch Phiên Live Mới</h3>
               </div>
               <button
@@ -1676,7 +1676,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                 type="button"
                 onClick={() => setBookingMode("session")}
                 className={`flex-1 px-3 py-2 rounded-lg transition-all ${
-                  bookingMode === "session" ? "bg-blue-600 text-white shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text)]"
+                  bookingMode === "session" ? "bg-[var(--accent)] text-white shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text)]"
                 }`}
               >
                 Tạo Session Trực Tiếp (đã có Host)
@@ -1685,7 +1685,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                 type="button"
                 onClick={() => setBookingMode("slot")}
                 className={`flex-1 px-3 py-2 rounded-lg transition-all ${
-                  bookingMode === "slot" ? "bg-blue-600 text-white shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text)]"
+                  bookingMode === "slot" ? "bg-[var(--accent)] text-white shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text)]"
                 }`}
               >
                 Mở Ca Chờ Đăng Ký
@@ -1733,7 +1733,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                     }}
                     className={`px-2.5 py-1.5 rounded-lg border font-mono font-bold text-[11px] transition-all ${
                       newStartTime === st.start && newEndTime === st.end
-                        ? "bg-blue-600 text-white border-blue-500 shadow-sm"
+                        ? "bg-[var(--accent)] text-white border-[var(--accent)] shadow-sm"
                         : "bg-[var(--surface-base)] text-[var(--text-muted)] border-[var(--border)] hover:border-[var(--border)]"
                     }`}
                   >
@@ -1767,7 +1767,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   placeholder="Ví dụ: Mega Live 8/8 Flash Sale Mỹ Phẩm Cocoon"
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
-                  className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3 text-[var(--text)] focus:outline-none focus:border-blue-500 font-medium"
+                  className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
                 />
               </div>
 
@@ -1777,7 +1777,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   <select
                     value={newBrandId}
                     onChange={(e) => setNewBrandId(e.target.value)}
-                    className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3 text-[var(--text)] focus:outline-none focus:border-blue-500 font-medium"
+                    className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
                   >
                     {brands.map((b) => (
                       <option key={b.id} value={b.id}>
@@ -1792,7 +1792,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   <select
                     value={newStudioId}
                     onChange={(e) => setNewStudioId(e.target.value)}
-                    className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3 text-[var(--text)] focus:outline-none focus:border-blue-500 font-medium"
+                    className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
                   >
                     {studios.map((s) => (
                       <option key={s.id} value={s.id}>
@@ -1810,7 +1810,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   <select
                     value={newHostId}
                     onChange={(e) => setNewHostId(e.target.value)}
-                    className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3 text-[var(--text)] focus:outline-none focus:border-blue-500 font-medium"
+                    className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
                   >
                     {talents.map((t) => (
                       <option key={t.id} value={t.id}>
@@ -1825,7 +1825,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   <select
                     value={newCoHostId}
                     onChange={(e) => setNewCoHostId(e.target.value)}
-                    className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3 text-[var(--text)] focus:outline-none focus:border-blue-500 font-medium"
+                    className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
                   >
                     <option value="">-- Không có Co-Host --</option>
                     {talents.filter((t) => t.id !== newHostId).map((t) => (
@@ -1841,7 +1841,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   <select
                     value={newAssistantId}
                     onChange={(e) => setNewAssistantId(e.target.value)}
-                    className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3 text-[var(--text)] focus:outline-none focus:border-blue-500 font-medium"
+                    className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
                   >
                     <option value="">-- Chưa gán Trợ Lý --</option>
                     {moderators.map((m) => (
@@ -1866,7 +1866,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                     type="date"
                     value={newDate}
                     onChange={(e) => setNewDate(e.target.value)}
-                    className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3 text-[var(--text)] focus:outline-none focus:border-blue-500 font-mono"
+                    className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-mono"
                   />
                 </div>
                 <div>
@@ -1875,7 +1875,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                     type="time"
                     value={newStartTime}
                     onChange={(e) => setNewStartTime(e.target.value)}
-                    className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3 text-[var(--text)] focus:outline-none focus:border-blue-500 font-mono"
+                    className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-mono"
                   />
                 </div>
                 <div>
@@ -1884,7 +1884,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                     type="time"
                     value={newEndTime}
                     onChange={(e) => setNewEndTime(e.target.value)}
-                    className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3 text-[var(--text)] focus:outline-none focus:border-blue-500 font-mono"
+                    className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-mono"
                   />
                 </div>
               </div>
@@ -1896,7 +1896,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   type="number"
                   value={newTargetGmv}
                   onChange={(e) => setNewTargetGmv(Number(e.target.value))}
-                  className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3 text-[var(--text)] focus:outline-none focus:border-blue-500 font-mono font-bold"
+                  className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-mono font-bold"
                 />
               </div>
               )}
@@ -1911,7 +1911,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-lg shadow-blue-600/30"
+                  className="px-5 py-2.5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold shadow-lg shadow-[var(--accent)]/30"
                 >
                   Xác Nhận Đặt Lịch
                 </button>
@@ -1927,7 +1927,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl max-w-xl w-full p-4 sm:p-6 space-y-4 shadow-2xl">
             <div className="flex justify-between items-start border-b border-[var(--border)] pb-3">
               <div>
-                <span className="text-[10px] font-bold text-blue-400 uppercase font-mono inline-flex items-center gap-1">
+                <span className="text-[10px] font-bold text-[var(--accent-text)] uppercase font-mono inline-flex items-center gap-1">
                   <BrandLogo brand={brandById.get(selectedSessionDetail.brandId)} size="xs" /> {selectedSessionDetail.brandName}
                 </span>
                 <h3 className="font-bold text-[var(--text)] text-base sm:text-lg">{selectedSessionDetail.title}</h3>
@@ -1936,7 +1936,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                 {onUpdateSession && !isEditingDetail && (
                   <button
                     onClick={() => openEditDetail(selectedSessionDetail)}
-                    className="text-[11px] font-bold text-blue-400 hover:text-blue-300 px-2.5 py-1.5 rounded-lg border border-blue-800/60 bg-blue-950/40"
+                    className="text-[11px] font-bold text-[var(--accent-text)] hover:opacity-80 px-2.5 py-1.5 rounded-lg border border-[var(--accent)]/40 bg-[var(--accent)]/10"
                   >
                     Sửa
                   </button>
@@ -2012,7 +2012,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   <button
                     onClick={handleSaveDetailEdit}
                     disabled={savingEdit}
-                    className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white font-bold text-[11px]"
+                    className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-60 text-white font-bold text-[11px]"
                   >
                     {savingEdit ? "Đang lưu..." : "Lưu Thay Đổi"}
                   </button>
@@ -2049,7 +2049,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
             <div className="pt-2 border-t border-[var(--border)] flex justify-end">
               <button
                 onClick={() => setSelectedSessionDetail(null)}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs"
+                className="px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold rounded-xl text-xs"
               >
                 Đóng
               </button>
