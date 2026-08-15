@@ -1,24 +1,28 @@
 import React, { useState } from "react";
 import { ChevronDown, Plus, Tag, Trash2 } from "lucide-react";
 import { PromoScheme } from "../../types";
-import { schemeCategoriesInOrder, schemeCategoryColor, schemesForDate } from "../../lib/schemeUtils";
+import { schemeCategoryColor } from "../../lib/schemeUtils";
 
 // Bảng Scheme khuyến mãi theo tuần, nhúng thẳng dưới mỗi hàng 7 ô ngày của BrandCalendar —
 // tương đương file Excel vận hành thật (hàng = hạng mục khuyến mãi như "Voucher scheme",
-// "Combo Deal", "Free Gift"; cột = ngày trong tuần; ô nào thuộc cùng 1 scheme đa-ngày (vd
-// đợt camp D-Day/Mid-Month) tự động gộp thành 1 khối màu trải dài qua các cột đó). Đóng/mở
-// độc lập theo từng tuần (mặc định đóng) — cùng kiểu tương tác ẩn/hiện với sidebar
-// (`sidebarCollapsed` trong App.tsx), không cần persist localStorage vì đây chỉ là toggle
-// phụ trong 1 phiên xem.
+// "Combo Deal", "Free Gift"; cột = ngày trong tuần; scheme đa-ngày (vd đợt camp D-Day/Mid-Month)
+// tự động gộp thành 1 khối màu trải dài qua các cột đó). Đóng/mở độc lập theo từng tuần (mặc
+// định đóng) — cùng kiểu tương tác ẩn/hiện với sidebar (`sidebarCollapsed` trong App.tsx),
+// không cần persist localStorage vì đây chỉ là toggle phụ trong 1 phiên xem.
 //
 // Dùng CSS grid `grid-cols-7` (không phải <table>) để khớp pixel-perfect với lưới ngày của
-// `PosterCalendarGrid` phía trên — mỗi khối scheme chiếm `gridColumn: span N`, tên hạng mục
-// in ngay trong khối màu thay vì tách cột riêng (cột riêng khiến bảng "xấu"/lệch với lưới
-// ngày — tên hạng mục thường dài, ép cột label rộng cố định trong khi khối màu bị bóp hẹp).
+// `PosterCalendarGrid` phía trên — tên hạng mục in ngay trong khối màu thay vì tách cột riêng
+// (cột riêng khiến bảng "xấu"/lệch với lưới ngày — tên hạng mục thường dài, ép cột label rộng
+// cố định trong khi khối màu bị bóp hẹp).
+//
+// **Xếp khối (packing)** — KHÔNG cố định 1 hàng/category (sẽ để trống rất nhiều ô khi 1 category
+// chỉ có scheme ngắn ngày). Thay vào đó xếp từng scheme độc lập vào hàng đầu tiên còn chỗ trống ở
+// đúng dải cột ngày của nó (thuật toán "first-fit" quen thuộc khi vẽ lịch kiểu Google Calendar) —
+// 2 scheme khác category vẫn có thể nằm chung 1 hàng nếu không chồng ngày, tiết kiệm chiều cao.
 //
 // `category` không phải 1 entity riêng trong DB — chỉ là field text trên từng `PromoScheme`,
-// nên "hàng" ở đây được suy ra (group by) từ dữ liệu hiện có, không có thao tác "đổi tên hạng
-// mục" riêng: muốn đổi tên, xoá rồi tạo lại các scheme dưới hạng mục mới.
+// nên không có thao tác "đổi tên hạng mục" riêng: muốn đổi tên, sửa trực tiếp field này trên
+// từng scheme (không đồng loạt đổi tên cả nhóm).
 
 interface SchemeWeekStripProps {
   brandId: string;
@@ -30,29 +34,48 @@ interface SchemeWeekStripProps {
   onDelete?: (id: string) => Promise<void>;
 }
 
-interface Segment {
-  span: number;
-  date: string | null;
-  scheme: PromoScheme | null;
+interface PackedSegment {
+  scheme: PromoScheme;
+  colStart: number; // 0-6, cột ngày bắt đầu trong tuần đang xem
+  colEnd: number; // 0-6, cột ngày kết thúc (inclusive)
+  row: number; // hàng được xếp vào (0-based, tính từ thuật toán first-fit)
 }
 
-function buildRowSegments(categorySchemes: PromoScheme[], weekDates: (string | null)[]): Segment[] {
-  const schemeAt = (date: string | null) => (date ? schemesForDate(categorySchemes, date)[0] ?? null : null);
-  const segments: Segment[] = [];
-  let i = 0;
-  while (i < weekDates.length) {
-    const date = weekDates[i];
-    const scheme = schemeAt(date);
-    let span = 1;
-    while (i + span < weekDates.length) {
-      const nextScheme = schemeAt(weekDates[i + span]);
-      if (scheme && nextScheme && scheme.id === nextScheme.id) span++;
-      else break;
+// Mỗi scheme có 1 khoảng ngày liên tục (startDate→endDate) nên giao của nó với 7 ngày trong
+// tuần cũng luôn liên tục — không cần gộp nhiều mảnh như trước, chỉ cần tìm cột đầu/cuối còn
+// active. Sau đó xếp (first-fit) vào hàng đầu tiên không có khối nào khác chồng cột với nó.
+function buildPackedSegments(weekSchemes: PromoScheme[], weekDates: (string | null)[]): PackedSegment[] {
+  const raw = weekSchemes
+    .map((scheme) => {
+      let colStart = -1;
+      let colEnd = -1;
+      weekDates.forEach((d, idx) => {
+        if (d && d >= scheme.startDate && d <= scheme.endDate) {
+          if (colStart === -1) colStart = idx;
+          colEnd = idx;
+        }
+      });
+      return { scheme, colStart, colEnd };
+    })
+    .filter((seg) => seg.colStart !== -1)
+    // Cột bắt đầu sớm hơn xếp trước; cùng cột bắt đầu thì khối rộng hơn xếp trước (dễ đóng gói
+    // gọn hơn là để khối hẹp chiếm chỗ trước rồi khối rộng phải rớt xuống hàng mới).
+    .sort((a, b) => a.colStart - b.colStart || b.colEnd - b.colStart - (a.colEnd - a.colStart));
+
+  const rowOccupancy: { colStart: number; colEnd: number }[][] = [];
+  const packed: PackedSegment[] = [];
+  for (const seg of raw) {
+    let rowIndex = rowOccupancy.findIndex((occupied) =>
+      occupied.every((iv) => seg.colEnd < iv.colStart || seg.colStart > iv.colEnd)
+    );
+    if (rowIndex === -1) {
+      rowIndex = rowOccupancy.length;
+      rowOccupancy.push([]);
     }
-    segments.push({ span, date, scheme });
-    i += span;
+    rowOccupancy[rowIndex].push({ colStart: seg.colStart, colEnd: seg.colEnd });
+    packed.push({ scheme: seg.scheme, colStart: seg.colStart, colEnd: seg.colEnd, row: rowIndex });
   }
-  return segments;
+  return packed;
 }
 
 const EMPTY_DRAFT = { category: "", content: "", startDate: "", endDate: "" };
@@ -71,11 +94,12 @@ export const SchemeWeekStrip: React.FC<SchemeWeekStripProps> = ({ brandId, weekD
   const [busy, setBusy] = useState(false);
 
   const weekSchemes = schemes.filter((s) => weekDates.some((d) => d && d >= s.startDate && d <= s.endDate));
-  const categories = schemeCategoriesInOrder(weekSchemes);
+  const packedSegments = buildPackedSegments(weekSchemes, weekDates);
+  const rowCount = Math.max(1, ...packedSegments.map((seg) => seg.row + 1));
   const firstDate = weekDates.find((d) => d) ?? "";
   const lastDate = [...weekDates].reverse().find((d) => d) ?? "";
 
-  if (categories.length === 0 && !canManage) return null;
+  if (weekSchemes.length === 0 && !canManage) return null;
 
   // Nhãn khoảng ngày của tuần này (vd "02/08 – 08/08") — in ngay trên nút toggle để không bị
   // nhầm strip này thuộc tuần nào khi nhiều tuần liền kề đều đóng, nhìn giống 1 dải liên tục.
@@ -134,7 +158,7 @@ export const SchemeWeekStrip: React.FC<SchemeWeekStripProps> = ({ brandId, weekD
       >
         <Tag className="w-3.5 h-3.5 shrink-0" />
         <span>
-          {categories.length > 0 ? `Scheme khuyến mãi (${categories.length})` : "Chưa có scheme — bấm để thêm"}
+          {weekSchemes.length > 0 ? `Scheme khuyến mãi (${weekSchemes.length})` : "Chưa có scheme — bấm để thêm"}
           {weekLabel && <span className="font-mono font-normal opacity-70 ml-1">· Tuần {weekLabel}</span>}
         </span>
         <ChevronDown className={`w-3.5 h-3.5 ml-auto shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
@@ -147,85 +171,80 @@ export const SchemeWeekStrip: React.FC<SchemeWeekStripProps> = ({ brandId, weekD
               <option key={c} value={c} />
             ))}
           </datalist>
-          <div className="grid grid-cols-7 gap-1.5">
-            {categories.map((category) => {
-              const categorySchemes = weekSchemes.filter((s) => s.category === category);
-              const segments = buildRowSegments(categorySchemes, weekDates);
-              const color = schemeCategoryColor(category);
-              return segments.map((seg, si) => {
-                const key = `${category}-${si}`;
-                if (!seg.date || !seg.scheme) {
-                  return <div key={key} style={{ gridColumn: `span ${seg.span}` }} className="min-h-[2.25rem]" />;
-                }
-                const isEditing = editingId === seg.scheme.id;
-                return (
-                  <div
-                    key={key}
-                    style={{ gridColumn: `span ${seg.span}` }}
-                    onClick={() => canManage && !isEditing && startEdit(seg.scheme!)}
-                    className={`rounded-lg border px-2 py-1.5 text-[11px] ${color.bg} ${color.border} ${
-                      canManage ? "cursor-pointer hover:brightness-95 dark:hover:brightness-125 transition-[filter]" : ""
-                    }`}
-                  >
-                    {isEditing ? (
-                      <div className="space-y-1" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="grid grid-cols-7 gap-1.5"
+            style={{ gridTemplateRows: `repeat(${rowCount}, minmax(2.25rem, auto))` }}
+          >
+            {packedSegments.map((seg) => {
+              const color = schemeCategoryColor(seg.scheme.category);
+              const isEditing = editingId === seg.scheme.id;
+              return (
+                <div
+                  key={seg.scheme.id}
+                  style={{ gridColumn: `${seg.colStart + 1} / ${seg.colEnd + 2}`, gridRow: seg.row + 1 }}
+                  onClick={() => canManage && !isEditing && startEdit(seg.scheme)}
+                  className={`rounded-lg border px-2 py-1.5 text-[11px] ${color.bg} ${color.border} ${
+                    canManage ? "cursor-pointer hover:brightness-95 dark:hover:brightness-125 transition-[filter]" : ""
+                  }`}
+                >
+                  {isEditing ? (
+                    <div className="space-y-1" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="text"
+                        value={draft.category}
+                        onChange={(e) => setDraft((d) => ({ ...d, category: e.target.value }))}
+                        list="scheme-categories"
+                        placeholder="Hạng mục"
+                        className={`w-full bg-white/70 dark:bg-slate-900/60 rounded px-1 py-0.5 text-[9px] font-black uppercase tracking-wide ${color.text} focus:outline-none focus:ring-1 focus:ring-amber-500`}
+                      />
+                      <textarea
+                        autoFocus
+                        value={draft.text}
+                        onChange={(e) => setDraft((d) => ({ ...d, text: e.target.value }))}
+                        rows={2}
+                        className="w-full min-w-[140px] bg-white/70 dark:bg-slate-900/60 rounded p-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-amber-500"
+                      />
+                      <div className="flex flex-wrap items-center gap-1">
                         <input
-                          type="text"
-                          value={draft.category}
-                          onChange={(e) => setDraft((d) => ({ ...d, category: e.target.value }))}
-                          list="scheme-categories"
-                          placeholder="Hạng mục"
-                          className={`w-full bg-white/70 dark:bg-slate-900/60 rounded px-1 py-0.5 text-[9px] font-black uppercase tracking-wide ${color.text} focus:outline-none focus:ring-1 focus:ring-amber-500`}
+                          type="date"
+                          value={draft.startDate}
+                          onChange={(e) => setDraft((d) => ({ ...d, startDate: e.target.value }))}
+                          className="bg-white/70 dark:bg-slate-900/60 rounded px-1 py-0.5 text-[10px]"
                         />
-                        <textarea
-                          autoFocus
-                          value={draft.text}
-                          onChange={(e) => setDraft((d) => ({ ...d, text: e.target.value }))}
-                          rows={2}
-                          className="w-full min-w-[140px] bg-white/70 dark:bg-slate-900/60 rounded p-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-amber-500"
+                        <span className="text-slate-400">→</span>
+                        <input
+                          type="date"
+                          value={draft.endDate}
+                          onChange={(e) => setDraft((d) => ({ ...d, endDate: e.target.value }))}
+                          className="bg-white/70 dark:bg-slate-900/60 rounded px-1 py-0.5 text-[10px]"
                         />
-                        <div className="flex flex-wrap items-center gap-1">
-                          <input
-                            type="date"
-                            value={draft.startDate}
-                            onChange={(e) => setDraft((d) => ({ ...d, startDate: e.target.value }))}
-                            className="bg-white/70 dark:bg-slate-900/60 rounded px-1 py-0.5 text-[10px]"
-                          />
-                          <span className="text-slate-400">→</span>
-                          <input
-                            type="date"
-                            value={draft.endDate}
-                            onChange={(e) => setDraft((d) => ({ ...d, endDate: e.target.value }))}
-                            className="bg-white/70 dark:bg-slate-900/60 rounded px-1 py-0.5 text-[10px]"
-                          />
-                          <button
-                            disabled={busy}
-                            onClick={saveEdit}
-                            className="ml-auto px-1.5 py-0.5 rounded bg-amber-600 text-white text-[10px] font-bold disabled:opacity-50"
-                          >
-                            Lưu
-                          </button>
-                          <button
-                            disabled={busy}
-                            onClick={() => onDelete && seg.scheme && (onDelete(seg.scheme.id), setEditingId(null))}
-                            className="p-0.5 rounded text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </div>
+                        <button
+                          disabled={busy}
+                          onClick={saveEdit}
+                          className="ml-auto px-1.5 py-0.5 rounded bg-amber-600 text-white text-[10px] font-bold disabled:opacity-50"
+                        >
+                          Lưu
+                        </button>
+                        <button
+                          disabled={busy}
+                          onClick={() => onDelete && (onDelete(seg.scheme.id), setEditingId(null))}
+                          className="p-0.5 rounded text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
                       </div>
-                    ) : (
-                      <>
-                        <p className={`flex items-center gap-1 text-[9px] font-black uppercase tracking-wide ${color.text} opacity-80`}>
-                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${color.dot}`} />
-                          {category}
-                        </p>
-                        <p className={`mt-0.5 font-semibold leading-snug whitespace-pre-wrap ${color.text}`}>{seg.scheme.description}</p>
-                      </>
-                    )}
-                  </div>
-                );
-              });
+                    </div>
+                  ) : (
+                    <>
+                      <p className={`flex items-center gap-1 text-[9px] font-black uppercase tracking-wide ${color.text} opacity-80`}>
+                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${color.dot}`} />
+                        {seg.scheme.category}
+                      </p>
+                      <p className={`mt-0.5 font-semibold leading-snug whitespace-pre-wrap ${color.text}`}>{seg.scheme.description}</p>
+                    </>
+                  )}
+                </div>
+              );
             })}
           </div>
 
