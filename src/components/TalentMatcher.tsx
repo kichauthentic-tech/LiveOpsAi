@@ -172,7 +172,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
   return (
     <div className="space-y-6">
       {/* Top Banner */}
-      <div className="bg-slate-900 text-white p-6 rounded-2xl border border-slate-800 shadow-xl space-y-2">
+      <div className="bg-[var(--surface)] text-[var(--text)] p-6 rounded-2xl border border-[var(--border)] shadow-xl space-y-2">
         <span className="text-purple-400 font-semibold text-xs uppercase tracking-wider block flex items-center gap-1.5">
           <Users className="w-4 h-4 text-purple-400" /> Module 03: Talent Management & AI Matcher
         </span>
@@ -180,17 +180,17 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
       </div>
 
       {/* AI Matching Tool Banner */}
-      <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 text-white p-6 rounded-2xl border border-purple-700/50 shadow-lg space-y-4">
+      <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-[var(--surface)] text-white p-6 rounded-2xl border border-purple-700/50 shadow-lg space-y-4">
         <div className="flex items-center gap-2 text-purple-300 font-bold text-sm">
           <Sparkles className="w-5 h-5 text-purple-400" /> Trình AI Khớp Nối Host Cho Chiến Dịch
         </div>
         <div className="grid md:grid-cols-3 gap-4 text-xs">
           <div>
-            <label className="text-slate-300 block mb-1 font-semibold">Chọn Thương Hiệu (Brand):</label>
+            <label className="text-[var(--text-muted)] block mb-1 font-semibold">Chọn Thương Hiệu (Brand):</label>
             <select
               value={selectedBrandId}
               onChange={(e) => setSelectedBrandId(e.target.value)}
-              className="w-full bg-slate-800 text-white p-2.5 rounded-xl border border-slate-700 font-bold focus:ring-2 focus:ring-purple-500"
+              className="w-full bg-[var(--surface-elevated)] text-[var(--text)] p-2.5 rounded-xl border border-[var(--border)] font-bold focus:ring-2 focus:ring-purple-500"
             >
               {brands.map((b) => (
                 <option key={b.id} value={b.id}>
@@ -200,12 +200,12 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
             </select>
           </div>
           <div>
-            <label className="text-slate-300 block mb-1 font-semibold">Danh Mục Sản Phẩm SKU:</label>
+            <label className="text-[var(--text-muted)] block mb-1 font-semibold">Danh Mục Sản Phẩm SKU:</label>
             <input
               type="text"
               value={targetCategory}
               onChange={(e) => setTargetCategory(e.target.value)}
-              className="w-full bg-slate-800 text-white p-2.5 rounded-xl border border-slate-700 font-bold focus:ring-2 focus:ring-purple-500"
+              className="w-full bg-[var(--surface-elevated)] text-[var(--text)] p-2.5 rounded-xl border border-[var(--border)] font-bold focus:ring-2 focus:ring-purple-500"
             />
           </div>
           <div className="flex items-end">
@@ -221,18 +221,18 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
 
         {/* AI Matching Output Results */}
         {matchingResults && (
-          <div className="bg-slate-950/80 p-4 rounded-xl border border-purple-800/80 space-y-3 pt-4 text-xs">
+          <div className="bg-[var(--surface-base)]/80 p-4 rounded-xl border border-purple-800/80 space-y-3 pt-4 text-xs">
             <h4 className="font-bold text-purple-300 text-sm">Gợi Ý Top Host Phù Hợp Nhất Cho Brand:</h4>
             <div className="grid md:grid-cols-2 gap-4">
               {matchingResults.map((r, i) => (
-                <div key={i} className="p-3.5 rounded-xl bg-slate-900 border border-purple-500/40 space-y-2">
+                <div key={i} className="p-3.5 rounded-xl bg-[var(--surface)] border border-purple-500/40 space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="font-black text-sm text-white">{r.name}</span>
+                    <span className="font-black text-sm text-[var(--text)]">{r.name}</span>
                     <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded font-bold">
                       Match Score: {r.matchScore}%
                     </span>
                   </div>
-                  <p className="text-slate-300 text-[11px] leading-relaxed">{r.reasoning}</p>
+                  <p className="text-[var(--text-muted)] text-[11px] leading-relaxed">{r.reasoning}</p>
                   <div className="text-right text-[10px] text-emerald-400 font-mono font-bold">
                     Dự đoán GMV: {r.predictedGmv}
                   </div>
@@ -244,25 +244,25 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
       </div>
 
       {/* Talent Roster Database Header & Action Controls */}
-      <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-sm space-y-4">
+      <div className="bg-[var(--surface)] p-6 rounded-2xl border border-[var(--border)] shadow-sm space-y-4">
         <div className="flex flex-wrap justify-between items-center gap-4">
           <div>
-            <h3 className="font-bold text-slate-100 text-base">
+            <h3 className="font-bold text-[var(--text)] text-base">
               Danh Sách Đội Ngũ Talent & Host Agency ({filteredTalents.length}/{talents.length} Talent)
             </h3>
-            <p className="text-xs text-slate-400">Quản lý danh sách Host/KOC, theo dõi doanh thu TB và cập nhật thông tin</p>
+            <p className="text-xs text-[var(--text-muted)]">Quản lý danh sách Host/KOC, theo dõi doanh thu TB và cập nhật thông tin</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             {/* Search Input */}
             <div className="relative">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+              <Search className="w-4 h-4 text-[var(--text-muted)] absolute left-3 top-2.5" />
               <input
                 type="text"
                 placeholder="Tìm theo tên/SĐT..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 pr-3 py-1.5 text-xs bg-slate-800 text-slate-100 placeholder:text-slate-500 border border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 font-medium"
+                className="pl-9 pr-3 py-1.5 text-xs bg-[var(--surface-elevated)] text-[var(--text)] placeholder:text-[var(--text-faint)] border border-[var(--border)] rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 font-medium"
               />
             </div>
 
@@ -270,7 +270,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
             <select
               value={selectedRoleFilter}
               onChange={(e) => setSelectedRoleFilter(e.target.value)}
-              className="py-1.5 px-3 text-xs bg-slate-800 text-slate-100 border border-slate-700 rounded-xl font-bold focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="py-1.5 px-3 text-xs bg-[var(--surface-elevated)] text-[var(--text)] border border-[var(--border)] rounded-xl font-bold focus:outline-none focus:ring-2 focus:ring-purple-500"
             >
               <option value="All">Tất cả vai trò</option>
               <option value="Host">Host</option>
@@ -300,19 +300,19 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
             const rate = t.ratePerSession || (t as any).rateCardFee || 0;
 
             return (
-              <div key={t.id} className="p-4 rounded-2xl border border-slate-800 bg-slate-800/40 space-y-3 hover:border-purple-700 transition-all relative group">
+              <div key={t.id} className="p-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-elevated)]/40 space-y-3 hover:border-purple-700 transition-all relative group">
                 <div className="flex justify-between items-start">
                   <div className="flex items-center space-x-3 min-w-0 flex-1">
                     <img src={avatar} alt={t.name} className="w-12 h-12 rounded-full object-cover border-2 border-purple-400 shadow-sm shrink-0" />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 whitespace-nowrap">
-                        <h4 className="font-bold text-slate-100 text-xs truncate">{t.name}</h4>
+                        <h4 className="font-bold text-[var(--text)] text-xs truncate">{t.name}</h4>
                         <span className="bg-purple-900/50 text-purple-300 text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0">
                           {t.role || "Host"}
                         </span>
                       </div>
                       <p className="text-[10px] text-purple-300 font-medium truncate">{nicheStr}</p>
-                      <span className="text-[10px] text-slate-400 block truncate whitespace-nowrap">{followers.toLocaleString()} TikTok Followers</span>
+                      <span className="text-[10px] text-[var(--text-muted)] block truncate whitespace-nowrap">{followers.toLocaleString()} TikTok Followers</span>
                     </div>
                   </div>
 
@@ -320,14 +320,14 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => openEditModal(t)}
-                      className="p-1.5 text-slate-400 hover:text-purple-300 hover:bg-purple-950/40 rounded-lg transition-all"
+                      className="p-1.5 text-[var(--text-muted)] hover:text-purple-300 hover:bg-purple-950/40 rounded-lg transition-all"
                       title="Chỉnh sửa Talent"
                     >
                       <Edit3 className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => handleDelete(t.id, t.name)}
-                      className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-950/40 rounded-lg transition-all"
+                      className="p-1.5 text-[var(--text-muted)] hover:text-red-400 hover:bg-red-950/40 rounded-lg transition-all"
                       title="Xóa Talent"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -335,16 +335,16 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-400 bg-slate-950/40 p-2.5 rounded-xl border border-slate-800 font-medium">
+                <div className="grid grid-cols-2 gap-2 text-[10px] text-[var(--text-muted)] bg-[var(--surface-base)]/40 p-2.5 rounded-xl border border-[var(--border)] font-medium">
                   <div>GMV TB: <strong className="text-emerald-400 block text-xs font-bold">{((t.avgGmvPerSession || 100000000) / 1000000).toFixed(0)}M đ</strong></div>
                   <div>CVR TB: <strong className="text-purple-400 block text-xs font-bold">{t.cvrAvg || 4.5}%</strong></div>
-                  <div>Rate Card: <strong className="text-slate-200 block font-bold">{rate.toLocaleString()} đ</strong></div>
+                  <div>Rate Card: <strong className="text-[var(--text)] block font-bold">{rate.toLocaleString()} đ</strong></div>
                   <div>Hoa hồng: <strong className="text-indigo-400 block font-bold">{t.commissionRate || 3}%</strong></div>
                 </div>
 
                 <div className="flex justify-between items-center text-xs pt-1">
-                  <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
-                    <Phone className="w-3 h-3 text-slate-400" /> {t.phone || "N/A"}
+                  <span className="text-[10px] font-bold text-[var(--text-muted)] flex items-center gap-1">
+                    <Phone className="w-3 h-3 text-[var(--text-muted)]" /> {t.phone || "N/A"}
                   </span>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
                     t.availabilityStatus === "On Live" ? "bg-red-900/40 text-red-300 animate-pulse" :
@@ -361,14 +361,14 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
 
       {/* Talent Form Modal (Add / Edit) */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 w-full max-w-xl rounded-2xl shadow-2xl border border-slate-800 overflow-hidden max-h-[90vh] flex flex-col">
-            <div className="bg-slate-900 text-white px-6 py-4 flex justify-between items-center">
+        <div className="fixed inset-0 bg-[var(--surface)]/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[var(--surface)] w-full max-w-xl rounded-2xl shadow-2xl border border-[var(--border)] overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="bg-[var(--surface)] text-[var(--text)] px-6 py-4 flex justify-between items-center">
               <h3 className="font-bold text-sm flex items-center gap-2">
                 <Users className="w-4 h-4 text-purple-400" />
                 {editingTalent ? `Chỉnh Sửa Talent: ${editingTalent.name}` : "Thêm Talent Mới Vào Hệ Thống"}
               </h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-white">
+              <button onClick={() => setIsModalOpen(false)} className="text-[var(--text-muted)] hover:text-[var(--text)]">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -376,35 +376,35 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
             <form onSubmit={handleSaveTalent} className="p-6 space-y-4 text-xs overflow-y-auto">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="font-bold text-slate-300 block mb-1">Tên Talent / Host *</label>
+                  <label className="font-bold text-[var(--text-muted)] block mb-1">Tên Talent / Host *</label>
                   <input
                     type="text"
                     required
                     value={formName}
                     onChange={(e) => setFormName(e.target.value)}
                     placeholder="VD: Nguyễn Văn A (A Live)"
-                    className="w-full p-2.5 border border-slate-700 bg-slate-950 rounded-xl font-semibold text-slate-100 focus:ring-2 focus:ring-purple-500"
+                    className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)] focus:ring-2 focus:ring-purple-500"
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-300 block mb-1">Số Điện Thoại</label>
+                  <label className="font-bold text-[var(--text-muted)] block mb-1">Số Điện Thoại</label>
                   <input
                     type="text"
                     value={formPhone}
                     onChange={(e) => setFormPhone(e.target.value)}
                     placeholder="VD: 0988 123 456"
-                    className="w-full p-2.5 border border-slate-700 bg-slate-950 rounded-xl font-semibold text-slate-100 focus:ring-2 focus:ring-purple-500"
+                    className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)] focus:ring-2 focus:ring-purple-500"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="font-bold text-slate-300 block mb-1">Vai Trò</label>
+                  <label className="font-bold text-[var(--text-muted)] block mb-1">Vai Trò</label>
                   <select
                     value={formRole}
                     onChange={(e) => setFormRole(e.target.value as any)}
-                    className="w-full p-2.5 border border-slate-700 bg-slate-950 rounded-xl font-semibold text-slate-100"
+                    className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
                   >
                     <option value="Host">Host</option>
                     <option value="KOC">KOC</option>
@@ -413,11 +413,11 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className="font-bold text-slate-300 block mb-1">Giới Tính</label>
+                  <label className="font-bold text-[var(--text-muted)] block mb-1">Giới Tính</label>
                   <select
                     value={formGender}
                     onChange={(e) => setFormGender(e.target.value)}
-                    className="w-full p-2.5 border border-slate-700 bg-slate-950 rounded-xl font-semibold text-slate-100"
+                    className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
                   >
                     <option value="Nữ">Nữ</option>
                     <option value="Nam">Nam</option>
@@ -425,11 +425,11 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className="font-bold text-slate-300 block mb-1">Trạng Thái</label>
+                  <label className="font-bold text-[var(--text-muted)] block mb-1">Trạng Thái</label>
                   <select
                     value={formStatus}
                     onChange={(e) => setFormStatus(e.target.value as any)}
-                    className="w-full p-2.5 border border-slate-700 bg-slate-950 rounded-xl font-semibold text-slate-100"
+                    className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
                   >
                     <option value="Available">Sẵn Sàng (Available)</option>
                     <option value="Busy">Đã Bận (Busy)</option>
@@ -439,85 +439,85 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
               </div>
 
               <div>
-                <label className="font-bold text-slate-300 block mb-1">Ngành Hàng Khớp Nối (Phân cách bằng dấu phẩy)</label>
+                <label className="font-bold text-[var(--text-muted)] block mb-1">Ngành Hàng Khớp Nối (Phân cách bằng dấu phẩy)</label>
                 <input
                   type="text"
                   value={formNiches}
                   onChange={(e) => setFormNiches(e.target.value)}
                   placeholder="VD: Mỹ phẩm, Skincare, Thời trang"
-                  className="w-full p-2.5 border border-slate-700 bg-slate-950 rounded-xl font-semibold text-slate-100"
+                  className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="font-bold text-slate-300 block mb-1">TikTok Followers</label>
+                  <label className="font-bold text-[var(--text-muted)] block mb-1">TikTok Followers</label>
                   <input
                     type="number"
                     value={formFollowers}
                     onChange={(e) => setFormFollowers(Number(e.target.value))}
-                    className="w-full p-2.5 border border-slate-700 bg-slate-950 rounded-xl font-semibold text-slate-100"
+                    className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-300 block mb-1">GMV TB Mỗi Phiên (VND)</label>
+                  <label className="font-bold text-[var(--text-muted)] block mb-1">GMV TB Mỗi Phiên (VND)</label>
                   <input
                     type="number"
                     value={formGmv}
                     onChange={(e) => setFormGmv(Number(e.target.value))}
-                    className="w-full p-2.5 border border-slate-700 bg-slate-950 rounded-xl font-semibold text-slate-100"
+                    className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="font-bold text-slate-300 block mb-1">CVR Trung Bình (%)</label>
+                  <label className="font-bold text-[var(--text-muted)] block mb-1">CVR Trung Bình (%)</label>
                   <input
                     type="number"
                     step="0.1"
                     value={formCvr}
                     onChange={(e) => setFormCvr(Number(e.target.value))}
-                    className="w-full p-2.5 border border-slate-700 bg-slate-950 rounded-xl font-semibold text-slate-100"
+                    className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-300 block mb-1">Rate Card (VND/Live)</label>
+                  <label className="font-bold text-[var(--text-muted)] block mb-1">Rate Card (VND/Live)</label>
                   <input
                     type="number"
                     value={formRate}
                     onChange={(e) => setFormRate(Number(e.target.value))}
-                    className="w-full p-2.5 border border-slate-700 bg-slate-950 rounded-xl font-semibold text-slate-100"
+                    className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-300 block mb-1">Hoa Hồng % (Commission)</label>
+                  <label className="font-bold text-[var(--text-muted)] block mb-1">Hoa Hồng % (Commission)</label>
                   <input
                     type="number"
                     step="0.1"
                     value={formCommission}
                     onChange={(e) => setFormCommission(Number(e.target.value))}
-                    className="w-full p-2.5 border border-slate-700 bg-slate-950 rounded-xl font-semibold text-slate-100"
+                    className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="font-bold text-slate-300 block mb-1">URL Ảnh Đại Diện (Avatar URL)</label>
+                <label className="font-bold text-[var(--text-muted)] block mb-1">URL Ảnh Đại Diện (Avatar URL)</label>
                 <input
                   type="text"
                   value={formAvatar}
                   onChange={(e) => setFormAvatar(e.target.value)}
                   placeholder="https://..."
-                  className="w-full p-2.5 border border-slate-700 bg-slate-950 text-slate-100 rounded-xl text-xs font-mono"
+                  className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] text-[var(--text)] rounded-xl text-xs font-mono"
                 />
               </div>
 
-              <div className="pt-4 border-t border-slate-800 flex justify-end gap-3">
+              <div className="pt-4 border-t border-[var(--border)] flex justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 text-slate-400 font-bold hover:bg-slate-800 rounded-xl transition-all"
+                  className="px-4 py-2 text-[var(--text-muted)] font-bold hover:bg-[var(--surface-elevated)] rounded-xl transition-all"
                 >
                   Hủy Bỏ
                 </button>

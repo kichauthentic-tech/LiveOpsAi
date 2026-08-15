@@ -18,7 +18,7 @@ const STATUS_STYLES: Record<LiveSession["status"], string> = {
   "Live Now": "bg-red-950 text-red-300 border-red-800",
   Upcoming: "bg-amber-950 text-amber-300 border-amber-800",
   Completed: "bg-emerald-950 text-emerald-300 border-emerald-800",
-  Cancelled: "bg-slate-800 text-slate-500 border-slate-700"
+  Cancelled: "bg-[var(--surface-elevated)] text-[var(--text-faint)] border-[var(--border)]"
 };
 
 const STATUS_FILTERS: (LiveSession["status"] | "ALL")[] = ["ALL", "Live Now", "Upcoming", "Completed", "Cancelled"];
@@ -41,8 +41,8 @@ export const BrandSessions: React.FC<BrandSessionsProps> = ({ brandId, sessions,
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-bold text-white flex items-center gap-2">
-          <Radio className="w-5 h-5 text-blue-400" /> Sessions
+        <h2 className="text-lg font-bold text-[var(--text)] flex items-center gap-2">
+          <Radio className="w-5 h-5 text-[var(--accent-text)]" /> Sessions
         </h2>
         <div className="flex items-center gap-1.5">
           {STATUS_FILTERS.map((s) => (
@@ -50,7 +50,9 @@ export const BrandSessions: React.FC<BrandSessionsProps> = ({ brandId, sessions,
               key={s}
               onClick={() => setStatusFilter(s)}
               className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${
-                statusFilter === s ? "bg-blue-600 text-white" : "bg-slate-950 border border-slate-800 text-slate-400 hover:text-white"
+                statusFilter === s
+                  ? "bg-[var(--accent)] text-white"
+                  : "bg-[var(--surface-base)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]"
               }`}
             >
               {s === "ALL" ? "Tất cả" : s}
@@ -59,11 +61,11 @@ export const BrandSessions: React.FC<BrandSessionsProps> = ({ brandId, sessions,
         </div>
       </div>
 
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-xl">
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-left text-slate-500 border-b border-slate-800">
+              <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)]">
                 <th className="py-2.5 px-4">Ngày</th>
                 <th className="py-2.5 px-2">Trạng thái</th>
                 <th className="py-2.5 px-2">Nền tảng</th>
@@ -77,8 +79,8 @@ export const BrandSessions: React.FC<BrandSessionsProps> = ({ brandId, sessions,
             </thead>
             <tbody>
               {rows.map((s) => (
-                <tr key={s.id} className="border-b border-slate-800/60">
-                  <td className="py-2.5 px-4 text-slate-300 font-mono">
+                <tr key={s.id} className="border-b border-[var(--border-muted)]">
+                  <td className="py-2.5 px-4 text-[var(--text-muted)] font-mono">
                     {s.date} {s.startTime}-{s.endTime}
                   </td>
                   <td className="py-2.5 px-2">
@@ -86,12 +88,12 @@ export const BrandSessions: React.FC<BrandSessionsProps> = ({ brandId, sessions,
                       {s.status}
                     </span>
                   </td>
-                  <td className="py-2.5 px-2 text-slate-300">{s.platform}</td>
-                  <td className="py-2.5 px-2 text-slate-300">{s.hostName}</td>
-                  <td className="py-2.5 px-2 text-right text-slate-400">{formatCurrencyAdaptive(s.targetGmv || 0)}</td>
-                  <td className="py-2.5 px-2 text-right text-emerald-400 font-bold">{formatCurrencyAdaptive(s.actualGmv || 0)}</td>
+                  <td className="py-2.5 px-2 text-[var(--text-muted)]">{s.platform}</td>
+                  <td className="py-2.5 px-2 text-[var(--text-muted)]">{s.hostName}</td>
+                  <td className="py-2.5 px-2 text-right text-[var(--text-muted)]">{formatCurrencyAdaptive(s.targetGmv || 0)}</td>
+                  <td className="py-2.5 px-2 text-right text-[var(--success)] font-bold">{formatCurrencyAdaptive(s.actualGmv || 0)}</td>
                   <td className="py-2.5 px-2 text-right text-indigo-300">{(s.peakViewers || 0).toLocaleString()}</td>
-                  <td className="py-2.5 px-4 text-right text-slate-300">
+                  <td className="py-2.5 px-4 text-right text-[var(--text-muted)]">
                     {(s.ctrAvg || 0)}% / {(s.cvrAvg || 0)}%
                   </td>
                   {canEditReport && (
@@ -108,7 +110,7 @@ export const BrandSessions: React.FC<BrandSessionsProps> = ({ brandId, sessions,
               ))}
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={canEditReport ? 9 : 8} className="py-8 text-center text-slate-500 italic">
+                  <td colSpan={canEditReport ? 9 : 8} className="py-8 text-center text-[var(--text-faint)] italic">
                     Không có phiên live nào khớp bộ lọc.
                   </td>
                 </tr>
@@ -123,13 +125,13 @@ export const BrandSessions: React.FC<BrandSessionsProps> = ({ brandId, sessions,
           const session = rows.find((s) => s.id === reportSessionId);
           if (!session) return null;
           return (
-            <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-base font-bold text-white">
+                  <h3 className="text-base font-bold text-[var(--text)]">
                     Report Ca — {session.date} {session.startTime}-{session.endTime} ({session.hostName || "—"})
                   </h3>
-                  <button onClick={() => setReportSessionId(null)} className="text-slate-500 hover:text-white">
+                  <button onClick={() => setReportSessionId(null)} className="text-[var(--text-faint)] hover:text-[var(--text)]">
                     <X className="w-5 h-5" />
                   </button>
                 </div>

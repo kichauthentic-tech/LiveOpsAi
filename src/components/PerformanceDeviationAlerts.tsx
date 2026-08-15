@@ -156,41 +156,41 @@ export const PerformanceDeviationAlerts: React.FC<PerformanceDeviationAlertsProp
   }
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 text-white shadow-xl space-y-4">
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 text-[var(--text)] shadow-xl space-y-4">
       {/* Toast Notification Popup */}
       {toastMessage && (
         <div className="bg-emerald-600 text-white px-4 py-3 rounded-xl text-xs font-bold shadow-lg flex justify-between items-center animate-bounce">
           <span className="flex items-center gap-2">
             <Send className="w-4 h-4" /> {toastMessage}
           </span>
-          <button onClick={() => setToastMessage(null)} className="text-white hover:text-slate-200">
+          <button onClick={() => setToastMessage(null)} className="text-[var(--text)] hover:text-[var(--text)]">
             <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
       {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-3 border-b border-slate-800">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-3 border-b border-[var(--border)]">
         <div className="flex items-center gap-2.5">
           <div className="p-2 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-xl relative">
             <Bell className="w-5 h-5 animate-bounce" />
-            <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center border border-slate-900">
+            <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center border border-[var(--border)]">
               {deviationData.length}
             </span>
           </div>
           <div>
-            <h3 className="font-extrabold text-base text-white flex items-center gap-2">
+            <h3 className="font-extrabold text-base text-[var(--text)] flex items-center gap-2">
               Cảnh Báo Lệch KPI GMV (&gt;20%)
             </h3>
           </div>
         </div>
 
         {/* Filter Buttons */}
-        <div className="flex items-center gap-1.5 bg-slate-800/80 p-1 rounded-xl text-xs border border-slate-700">
+        <div className="flex items-center gap-1.5 bg-[var(--surface-elevated)]/80 p-1 rounded-xl text-xs border border-[var(--border)]">
           <button
             onClick={() => setFilterType("all")}
             className={`px-3 py-1 rounded-lg font-bold transition-all ${
-              filterType === "all" ? "bg-purple-600 text-white" : "text-slate-400 hover:text-white"
+              filterType === "all" ? "bg-purple-600 text-white" : "text-[var(--text-muted)] hover:text-white"
             }`}
           >
             Tất Cả ({deviationData.length})
@@ -198,7 +198,7 @@ export const PerformanceDeviationAlerts: React.FC<PerformanceDeviationAlertsProp
           <button
             onClick={() => setFilterType("surge")}
             className={`px-3 py-1 rounded-lg font-bold transition-all flex items-center gap-1 ${
-              filterType === "surge" ? "bg-emerald-600 text-white" : "text-slate-400 hover:text-white"
+              filterType === "surge" ? "bg-emerald-600 text-white" : "text-[var(--text-muted)] hover:text-white"
             }`}
           >
             ⚡ Vượt Chỉ Tiêu (+{surgeCount})
@@ -206,7 +206,7 @@ export const PerformanceDeviationAlerts: React.FC<PerformanceDeviationAlertsProp
           <button
             onClick={() => setFilterType("lag")}
             className={`px-3 py-1 rounded-lg font-bold transition-all flex items-center gap-1 ${
-              filterType === "lag" ? "bg-red-600 text-white" : "text-slate-400 hover:text-white"
+              filterType === "lag" ? "bg-red-600 text-white" : "text-[var(--text-muted)] hover:text-white"
             }`}
           >
             🚨 Sụt Giảm (-{lagCount})
@@ -217,9 +217,9 @@ export const PerformanceDeviationAlerts: React.FC<PerformanceDeviationAlertsProp
       {/* List of Deviating Sessions */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {filteredList.length === 0 ? (
-          <div className="col-span-1 md:col-span-2 p-8 bg-slate-950/50 border border-slate-800 rounded-xl text-center text-xs text-slate-400 space-y-2">
+          <div className="col-span-1 md:col-span-2 p-8 bg-[var(--surface-base)]/50 border border-[var(--border)] rounded-xl text-center text-xs text-[var(--text-muted)] space-y-2">
             <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto" />
-            <p className="font-bold text-slate-200">Không có cảnh báo lệch KPI nào</p>
+            <p className="font-bold text-[var(--text)]">Không có cảnh báo lệch KPI nào</p>
           </div>
         ) : (
           filteredList.map((item) => {
@@ -240,14 +240,14 @@ export const PerformanceDeviationAlerts: React.FC<PerformanceDeviationAlertsProp
               <div className="flex justify-between items-start gap-2">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-extrabold text-slate-300">{s.brandName}</span>
+                    <span className="text-xs font-extrabold text-[var(--text-muted)]">{s.brandName}</span>
                     {isLive && (
                       <span className="bg-red-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded flex items-center gap-1 animate-pulse">
                         <Radio className="w-2.5 h-2.5" /> LIVE NOW
                       </span>
                     )}
                   </div>
-                  <h4 className="font-bold text-sm text-white line-clamp-1 mt-0.5">{s.title}</h4>
+                  <h4 className="font-bold text-sm text-[var(--text)] line-clamp-1 mt-0.5">{s.title}</h4>
                 </div>
 
                 {/* Badge */}
@@ -264,13 +264,13 @@ export const PerformanceDeviationAlerts: React.FC<PerformanceDeviationAlertsProp
               </div>
 
               {/* GMV Target vs Actual Comparison */}
-              <div className="grid grid-cols-2 gap-2 text-xs bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
+              <div className="grid grid-cols-2 gap-2 text-xs bg-[var(--surface)]/80 p-2.5 rounded-lg border border-[var(--border)]">
                 <div>
-                  <span className="text-slate-400 text-[10px] block">Mục tiêu Target:</span>
-                  <span className="font-bold text-slate-200">{(s.targetGmv / 1000000).toFixed(0)}M VNĐ</span>
+                  <span className="text-[var(--text-muted)] text-[10px] block">Mục tiêu Target:</span>
+                  <span className="font-bold text-[var(--text)]">{(s.targetGmv / 1000000).toFixed(0)}M VNĐ</span>
                 </div>
                 <div>
-                  <span className="text-slate-400 text-[10px] block">Thực Thu GMV:</span>
+                  <span className="text-[var(--text-muted)] text-[10px] block">Thực Thu GMV:</span>
                   <span className={`font-black ${isSurge ? "text-emerald-400" : "text-red-400"}`}>
                     {(s.actualGmv / 1000000).toFixed(1)}M VNĐ ({isSurge ? "Thặng dư" : "Thiếu"}{" "}
                     {(item.diffAmount / 1000000).toFixed(1)}M)
@@ -280,10 +280,10 @@ export const PerformanceDeviationAlerts: React.FC<PerformanceDeviationAlertsProp
 
               {/* Recommended Action Levers */}
               <div className="space-y-1.5 text-xs">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block flex items-center gap-1">
+                <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider block flex items-center gap-1">
                   <Sparkles className="w-3 h-3 text-amber-400" /> Đề Xuất Xử Lý Thuật Toán:
                 </span>
-                <ul className="space-y-1 text-slate-300 text-[11px]">
+                <ul className="space-y-1 text-[var(--text-muted)] text-[11px]">
                   {item.recommendations.map((rec, idx) => (
                     <li key={idx} className="flex items-start gap-1.5">
                       <span className="text-purple-400 font-bold">•</span>
@@ -294,7 +294,7 @@ export const PerformanceDeviationAlerts: React.FC<PerformanceDeviationAlertsProp
               </div>
 
               {/* Action Buttons */}
-              <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2">
+              <div className="pt-2 border-t border-[var(--border)]/80 flex items-center justify-between gap-2">
                 <button
                   onClick={() => onSelectSession(s)}
                   className="text-xs font-bold text-purple-400 hover:text-purple-300 flex items-center gap-1"
@@ -306,7 +306,7 @@ export const PerformanceDeviationAlerts: React.FC<PerformanceDeviationAlertsProp
                   <button
                     onClick={() => handleAcknowledgeAlert(s.id, s.title)}
                     disabled={notifiedSessionIds.includes(s.id)}
-                    className="p-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:hover:bg-slate-800 text-slate-300 hover:text-white rounded-lg transition-all text-xs flex items-center gap-1"
+                    className="p-1.5 bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] disabled:opacity-50 disabled:hover:bg-[var(--surface-elevated)] text-[var(--text-muted)] hover:text-[var(--text)] rounded-lg transition-all text-xs flex items-center gap-1"
                     title={notifiedSessionIds.includes(s.id) ? "Đã báo Ops" : "Đánh dấu đã báo Ops"}
                   >
                     {notifiedSessionIds.includes(s.id) ? (
@@ -321,7 +321,7 @@ export const PerformanceDeviationAlerts: React.FC<PerformanceDeviationAlertsProp
 
                   <button
                     onClick={() => handleDismissAlert(s.id)}
-                    className="p-1.5 text-slate-500 hover:text-slate-300 rounded-lg transition-all"
+                    className="p-1.5 text-[var(--text-faint)] hover:text-[var(--text-muted)] rounded-lg transition-all"
                     title="Bỏ qua cảnh báo này"
                   >
                     <X className="w-4 h-4" />

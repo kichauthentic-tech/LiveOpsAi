@@ -94,31 +94,31 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-4 sm:p-6 space-y-4 shadow-2xl">
-        <div className="flex justify-between items-start border-b border-slate-800 pb-3">
+    <div className="fixed inset-0 z-50 bg-[var(--surface-base)]/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl max-w-lg w-full p-4 sm:p-6 space-y-4 shadow-2xl">
+        <div className="flex justify-between items-start border-b border-[var(--border)] pb-3">
           <div>
             <span className="text-[10px] font-bold text-amber-400 uppercase font-mono">{slot.brandName}</span>
-            <h3 className="font-bold text-white text-base sm:text-lg">Ca Chờ Đăng Ký</h3>
+            <h3 className="font-bold text-[var(--text)] text-base sm:text-lg">Ca Chờ Đăng Ký</h3>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {canManage && onDeleteSlot && (
-              <button onClick={handleDelete} disabled={busy} className="text-slate-500 hover:text-rose-400 p-1 rounded-lg" title="Xoá ca">
+              <button onClick={handleDelete} disabled={busy} className="text-[var(--text-faint)] hover:text-rose-400 p-1 rounded-lg" title="Xoá ca">
                 <Trash2 className="w-4 h-4" />
               </button>
             )}
-            <button onClick={onClose} className="text-slate-400 hover:text-white p-1 rounded-lg">
+            <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text)] p-1 rounded-lg">
               <X className="w-5 h-5" />
             </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 text-xs bg-slate-950 p-3 rounded-xl border border-slate-800">
-          <div>Ngày: <strong className="text-white block font-mono">{slot.date}</strong></div>
-          <div>Khung giờ: <strong className="text-white block font-mono">{slot.startTime} - {slot.endTime}</strong></div>
-          <div>Phòng Studio: <strong className="text-white block">{slot.studioName || "—"}</strong></div>
-          <div>Nền tảng: <strong className="text-white block">{slot.platform}</strong></div>
-          {slot.notes && <div className="col-span-2">Ghi chú: <strong className="text-white block">{slot.notes}</strong></div>}
+        <div className="grid grid-cols-2 gap-3 text-xs bg-[var(--surface-base)] p-3 rounded-xl border border-[var(--border)]">
+          <div>Ngày: <strong className="text-[var(--text)] block font-mono">{slot.date}</strong></div>
+          <div>Khung giờ: <strong className="text-[var(--text)] block font-mono">{slot.startTime} - {slot.endTime}</strong></div>
+          <div>Phòng Studio: <strong className="text-[var(--text)] block">{slot.studioName || "—"}</strong></div>
+          <div>Nền tảng: <strong className="text-[var(--text)] block">{slot.platform}</strong></div>
+          {slot.notes && <div className="col-span-2">Ghi chú: <strong className="text-[var(--text)] block">{slot.notes}</strong></div>}
         </div>
 
         {studioConflicts.length > 0 && (
@@ -144,15 +144,15 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
 
         {canManage && (
           <div className="space-y-2.5">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-300">
-              <Users className="w-3.5 h-3.5 text-slate-500" /> Đã đăng ký ({regs.length})
+            <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--text-muted)]">
+              <Users className="w-3.5 h-3.5 text-[var(--text-faint)]" /> Đã đăng ký ({regs.length})
             </div>
             {regs.length === 0 ? (
-              <p className="text-xs text-slate-600">Chưa có ai đăng ký ca này.</p>
+              <p className="text-xs text-[var(--text-faint)]">Chưa có ai đăng ký ca này.</p>
             ) : (
               <div className="flex flex-wrap gap-1.5">
                 {regs.map((r) => (
-                  <span key={r.id} className="text-[11px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full">
+                  <span key={r.id} className="text-[11px] bg-[var(--surface-elevated)] text-[var(--text-muted)] px-2 py-0.5 rounded-full">
                     {talentsById.get(r.talentId)?.name ?? r.talentId}
                   </span>
                 ))}
@@ -164,7 +164,7 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
                 <select
                   value={hostId}
                   onChange={(e) => setHostId(e.target.value)}
-                  className="bg-slate-950 border border-slate-800 rounded-lg px-2 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                  className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-2 text-xs text-[var(--text)] focus:outline-none focus:border-blue-500"
                 >
                   <option value="">Host…</option>
                   {regs.map((r) => (
@@ -174,7 +174,7 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
                 <select
                   value={coHostId}
                   onChange={(e) => setCoHostId(e.target.value)}
-                  className="bg-slate-950 border border-slate-800 rounded-lg px-2 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                  className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-2 text-xs text-[var(--text)] focus:outline-none focus:border-blue-500"
                 >
                   <option value="">Trợ live (tuỳ chọn)…</option>
                   {regs.filter((r) => r.talentId !== hostId).map((r) => (
@@ -203,11 +203,11 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
         )}
 
         {!myTalentId && !canManage && (
-          <p className="text-xs text-slate-500 text-center py-2">Xem chi tiết đăng ký ở "Đăng Ký &amp; Chốt Lịch".</p>
+          <p className="text-xs text-[var(--text-faint)] text-center py-2">Xem chi tiết đăng ký ở "Đăng Ký &amp; Chốt Lịch".</p>
         )}
 
-        <div className="pt-2 border-t border-slate-800 flex justify-end">
-          <button onClick={onClose} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs">
+        <div className="pt-2 border-t border-[var(--border)] flex justify-end">
+          <button onClick={onClose} className="px-4 py-2 bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--text-muted)] font-bold rounded-xl text-xs">
             Đóng
           </button>
         </div>

@@ -372,7 +372,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
   return (
     <div className="space-y-6">
       {/* Top Banner */}
-      <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 text-white">
+      <div className="bg-[var(--surface)] border border-[var(--border)] p-6 rounded-2xl shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 text-[var(--text)]">
         <div className="flex items-center gap-3">
           <div className="p-3 bg-blue-600/20 text-blue-400 border border-blue-500/30 rounded-2xl">
             <ShieldCheck className="w-7 h-7 animate-pulse" />
@@ -386,23 +386,23 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                 Module 14
               </span>
             </div>
-            <h2 className="text-2xl font-black text-white mt-0.5">
+            <h2 className="text-2xl font-black text-[var(--text)] mt-0.5">
               Phân Quyền Custom & Setting Người Dùng (Access Control Engine)
             </h2>
-            <p className="text-xs text-slate-400 mt-1">
+            <p className="text-xs text-[var(--text-muted)] mt-1">
               Cấu hình Ma trận phân quyền chi tiết cho 6 Role tiêu chuẩn, override quyền từng cá nhân & audit nhật ký an ninh.
             </p>
           </div>
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex items-center bg-slate-950 p-1.5 rounded-xl border border-slate-800 text-xs font-bold gap-1">
+        <div className="flex items-center bg-[var(--surface-base)] p-1.5 rounded-xl border border-[var(--border)] text-xs font-bold gap-1">
           <button
             onClick={() => setActiveTab("roles")}
             className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 ${
               activeTab === "roles"
                 ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30 font-black"
-                : "text-slate-400 hover:text-white"
+                : "text-[var(--text-muted)] hover:text-[var(--text)]"
             }`}
           >
             <Key className="w-4 h-4" />
@@ -414,7 +414,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
             className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 ${
               activeTab === "users"
                 ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30 font-black"
-                : "text-slate-400 hover:text-white"
+                : "text-[var(--text-muted)] hover:text-[var(--text)]"
             }`}
           >
             <Users className="w-4 h-4" />
@@ -426,7 +426,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
             className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 ${
               activeTab === "audit"
                 ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30 font-black"
-                : "text-slate-400 hover:text-white"
+                : "text-[var(--text-muted)] hover:text-[var(--text)]"
             }`}
           >
             <History className="w-4 h-4" />
@@ -452,8 +452,8 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                   onClick={() => setSelectedRole(roleKey)}
                   className={`p-4 rounded-2xl border text-left transition-all relative overflow-hidden space-y-3 ${
                     isSelected
-                      ? "bg-slate-900 border-blue-500 ring-2 ring-blue-500/20 shadow-xl"
-                      : "bg-slate-900/50 border-slate-800 hover:border-slate-700 hover:bg-slate-900/80"
+                      ? "bg-[var(--surface)] border-blue-500 ring-2 ring-blue-500/20 shadow-xl"
+                      : "bg-[var(--surface)]/50 border-[var(--border)] hover:border-[var(--border)] hover:bg-[var(--surface)]/80"
                   }`}
                 >
                   <div className="flex justify-between items-start">
@@ -464,13 +464,13 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                     >
                       {roleKey.toUpperCase()}
                     </span>
-                    <span className="text-xs font-mono font-bold text-slate-400">
+                    <span className="text-xs font-mono font-bold text-[var(--text-muted)]">
                       {enabledCount}/{totalCount} Permissions
                     </span>
                   </div>
 
                   <div>
-                    <h3 className="font-extrabold text-white text-base">
+                    <h3 className="font-extrabold text-[var(--text)] text-base">
                       {roleKey === "admin" && "Quản Trị Viên Hệ Thống (Admin)"}
                       {roleKey === "ceo" && "Executive Admin (CEO)"}
                       {roleKey === "operations" && "Operations Manager"}
@@ -478,7 +478,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                       {roleKey === "talent" && "Talent / Host Portal"}
                       {roleKey === "moderator" && "Trợ Lý Vận Hành Portal"}
                     </h3>
-                    <p className="text-[11px] text-slate-400 line-clamp-2 mt-1">
+                    <p className="text-[11px] text-[var(--text-muted)] line-clamp-2 mt-1">
                       {roleKey === "admin" && "Quyền tối cao — mọi thứ CEO làm được + độc quyền cấu hình AI Training Center (kể cả CEO không sửa được)."}
                       {roleKey === "ceo" && "Truy cập toàn quyền điều hành agency, P&L tài chính, CRM & phân quyền system."}
                       {roleKey === "operations" && "Điều phối phòng studio, xếp lịch ca live, kiểm kê gear QR & duyệt script."}
@@ -490,7 +490,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
 
                   {/* Progress bar */}
                   <div className="space-y-1">
-                    <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                    <div className="w-full bg-[var(--surface-elevated)] h-1.5 rounded-full overflow-hidden">
                       <div
                         className="bg-blue-500 h-full rounded-full transition-all duration-300"
                         style={{ width: `${(enabledCount / totalCount) * 100}%` }}
@@ -503,17 +503,17 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
           </div>
 
           {/* Permission Category Groups for Selected Role */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-white space-y-6 shadow-xl">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-slate-800">
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-6 text-[var(--text)] space-y-6 shadow-xl">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-[var(--border)]">
               <div>
                 <div className="flex items-center gap-2">
                   <Key className="w-5 h-5 text-blue-400" />
-                  <h3 className="font-black text-lg text-white">
+                  <h3 className="font-black text-lg text-[var(--text)]">
                     Tùy Chỉnh Phân Quyền Chi Tiết Cho Role:{" "}
                     <span className="text-blue-400 uppercase">{selectedRole}</span>
                   </h3>
                 </div>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <p className="text-xs text-[var(--text-muted)] mt-0.5">
                   Bật/tắt từng tính năng cụ thể. Các thay đổi sẽ được áp dụng ngay lập tức cho toàn bộ người dùng thuộc role này.
                 </p>
               </div>
@@ -521,7 +521,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => handleResetRoleToDefault(selectedRole)}
-                  className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold border border-slate-700 transition-all flex items-center gap-1.5"
+                  className="px-3.5 py-1.5 bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--text-muted)] rounded-xl text-xs font-bold border border-[var(--border)] transition-all flex items-center gap-1.5"
                 >
                   <Sliders className="w-3.5 h-3.5 text-purple-400" />
                   <span>Khôi Phục Mặc Định</span>
@@ -533,7 +533,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
             <div className="space-y-6">
               {(Object.entries(groupedPermissions) as [string, PermissionDefinition[]][]).map(([category, defs]) => (
                 <div key={category} className="space-y-3">
-                  <div className="flex items-center gap-2 text-xs font-black text-slate-300 uppercase tracking-wider bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+                  <div className="flex items-center gap-2 text-xs font-black text-[var(--text-muted)] uppercase tracking-wider bg-[var(--surface-base)]/60 p-2.5 rounded-xl border border-[var(--border)]/80">
                     <Sparkles className="w-3.5 h-3.5 text-blue-400" />
                     <span>{category}</span>
                   </div>
@@ -551,7 +551,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                           className={`p-3.5 rounded-xl border transition-all cursor-pointer select-none flex items-start justify-between gap-3 ${
                             isAllowed
                               ? "bg-blue-950/30 border-blue-500/40 hover:border-blue-400"
-                              : "bg-slate-950/40 border-slate-800 hover:border-slate-700 opacity-60 hover:opacity-100"
+                              : "bg-[var(--surface-base)]/40 border-[var(--border)] hover:border-[var(--border)] opacity-60 hover:opacity-100"
                           }`}
                         >
                           <div className="space-y-1">
@@ -559,11 +559,11 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                               {isAllowed ? (
                                 <Lock className="w-3.5 h-3.5 text-emerald-400" />
                               ) : (
-                                <Unlock className="w-3.5 h-3.5 text-slate-500" />
+                                <Unlock className="w-3.5 h-3.5 text-[var(--text-faint)]" />
                               )}
-                              <span className="font-bold text-xs text-white">{def.label}</span>
+                              <span className="font-bold text-xs text-[var(--text)]">{def.label}</span>
                             </div>
-                            <p className="text-[10px] text-slate-400 line-clamp-2 leading-relaxed">
+                            <p className="text-[10px] text-[var(--text-muted)] line-clamp-2 leading-relaxed">
                               {def.description}
                             </p>
                           </div>
@@ -571,7 +571,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                           {/* Toggle Button */}
                           <div
                             className={`w-11 h-6 flex items-center rounded-full p-1 transition-all shrink-0 ${
-                              isAllowed ? "bg-blue-600 justify-end" : "bg-slate-800 justify-start"
+                              isAllowed ? "bg-blue-600 justify-end" : "bg-[var(--surface-elevated)] justify-start"
                             }`}
                           >
                             <div className="bg-white w-4 h-4 rounded-full shadow-md"></div>
@@ -591,17 +591,17 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
       {activeTab === "users" && (
         <div className="space-y-6">
           {/* Controls Bar */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-md">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[var(--surface)] p-4 rounded-2xl border border-[var(--border)] shadow-md">
             <div className="flex items-center gap-3 w-full sm:w-auto">
               {/* Search input */}
               <div className="relative flex-1 sm:w-64">
-                <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+                <Search className="w-4 h-4 text-[var(--text-faint)] absolute left-3 top-2.5" />
                 <input
                   type="text"
                   placeholder="Tìm tên, email hoặc vai trò..."
                   value={userSearch}
                   onChange={(e) => setUserSearch(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 bg-slate-950 text-xs text-white rounded-xl border border-slate-800 focus:outline-none focus:border-blue-500"
+                  className="w-full pl-9 pr-3 py-2 bg-[var(--surface-base)] text-xs text-[var(--text)] rounded-xl border border-[var(--border)] focus:outline-none focus:border-blue-500"
                 />
               </div>
 
@@ -609,7 +609,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
               <select
                 value={userRoleFilter}
                 onChange={(e) => setUserRoleFilter(e.target.value)}
-                className="px-3 py-2 bg-slate-950 text-xs text-slate-300 rounded-xl border border-slate-800 focus:outline-none focus:border-blue-500 font-bold"
+                className="px-3 py-2 bg-[var(--surface-base)] text-xs text-[var(--text-muted)] rounded-xl border border-[var(--border)] focus:outline-none focus:border-blue-500 font-bold"
               >
                 <option value="all">Tất cả Role</option>
                 <option value="admin">Admin</option>
@@ -631,10 +631,10 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
           </div>
 
           {/* User List Table / Cards */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl text-white">
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-xl text-[var(--text)]">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-950/80 text-slate-400 font-extrabold uppercase border-b border-slate-800 text-[10px]">
+                <thead className="bg-[var(--surface-base)]/80 text-[var(--text-muted)] font-extrabold uppercase border-b border-[var(--border)] text-[10px]">
                   <tr>
                     <th className="p-4">Người Dùng System</th>
                     <th className="p-4">Role Phân Quyền</th>
@@ -644,29 +644,29 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                     <th className="p-4 text-right">Thao Tác</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/80">
+                <tbody className="divide-y divide-[var(--border)]/80">
                   {filteredUsers.map((u) => {
                     const assignedBrand = brands.find((b) => b.id === u.assignedBrandId);
                     const assignedTalent = talents.find((t) => t.id === u.assignedTalentId);
                     const customOverridesCount = Object.keys(u.customPermissionOverrides || {}).length;
 
                     return (
-                      <tr key={u.id} className="hover:bg-slate-800/40 transition-colors">
+                      <tr key={u.id} className="hover:bg-[var(--surface-elevated)]/40 transition-colors">
                         <td className="p-4">
                           <div className="flex items-center gap-3">
                             {u.avatar ? (
                               <img
                                 src={u.avatar}
                                 alt={u.name}
-                                className="w-9 h-9 rounded-full object-cover border border-slate-700"
+                                className="w-9 h-9 rounded-full object-cover border border-[var(--border)]"
                               />
                             ) : (
-                              <div className="w-9 h-9 rounded-full border border-slate-700 bg-slate-800 text-slate-300 flex items-center justify-center text-xs font-bold uppercase">
+                              <div className="w-9 h-9 rounded-full border border-[var(--border)] bg-[var(--surface-elevated)] text-[var(--text-muted)] flex items-center justify-center text-xs font-bold uppercase">
                                 {u.name.charAt(0) || "?"}
                               </div>
                             )}
                             <div>
-                              <div className="font-bold text-white text-sm flex items-center gap-2">
+                              <div className="font-bold text-[var(--text)] text-sm flex items-center gap-2">
                                 <span>{u.name}</span>
                                 {customOverridesCount > 0 && (
                                   <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[9px] font-black px-1.5 py-0.5 rounded">
@@ -674,7 +674,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                                   </span>
                                 )}
                               </div>
-                              <span className="text-slate-400 text-[11px] block">{u.email}</span>
+                              <span className="text-[var(--text-muted)] text-[11px] block">{u.email}</span>
                             </div>
                           </div>
                         </td>
@@ -687,7 +687,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                           >
                             {u.role.toUpperCase()}
                           </span>
-                          <span className="text-slate-400 text-[11px] block mt-1">{u.customRoleTitle}</span>
+                          <span className="text-[var(--text-muted)] text-[11px] block mt-1">{u.customRoleTitle}</span>
                         </td>
 
                         <td className="p-4">
@@ -707,7 +707,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                               <span>{countModeratorSessions(u.id)} ca đã phụ trách</span>
                             </span>
                           ) : (
-                            <span className="text-slate-500 text-[11px]">Toàn Cơ Quan (Agency-wide)</span>
+                            <span className="text-[var(--text-faint)] text-[11px]">Toàn Cơ Quan (Agency-wide)</span>
                           )}
                         </td>
 
@@ -723,14 +723,14 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                           </span>
                         </td>
 
-                        <td className="p-4 text-slate-400 text-[11px]">{u.lastLogin}</td>
+                        <td className="p-4 text-[var(--text-muted)] text-[11px]">{u.lastLogin}</td>
 
                         <td className="p-4 text-right">
                           <div className="flex items-center justify-end gap-2">
                             {/* Custom Permission Overrides Button */}
                             <button
                               onClick={() => setPermissionOverrideUser(u)}
-                              className="p-1.5 bg-slate-800 hover:bg-slate-700 text-purple-400 rounded-lg transition-all text-xs flex items-center gap-1"
+                              className="p-1.5 bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-purple-400 rounded-lg transition-all text-xs flex items-center gap-1"
                               title="Override quyền riêng cho người dùng này"
                             >
                               <Key className="w-3.5 h-3.5" />
@@ -740,7 +740,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                             {/* Edit Button */}
                             <button
                               onClick={() => openEditModal(u)}
-                              className="p-1.5 bg-slate-800 hover:bg-slate-700 text-blue-400 rounded-lg transition-all"
+                              className="p-1.5 bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-blue-400 rounded-lg transition-all"
                               title="Chỉnh sửa tài khoản"
                             >
                               <Edit2 className="w-3.5 h-3.5" />
@@ -754,7 +754,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                                     onDeleteUser(u.id);
                                   }
                                 }}
-                                className="p-1.5 bg-slate-800 hover:bg-red-900/50 text-slate-500 hover:text-red-400 rounded-lg transition-all"
+                                className="p-1.5 bg-[var(--surface-elevated)] hover:bg-red-900/50 text-[var(--text-faint)] hover:text-red-400 rounded-lg transition-all"
                                 title="Xóa tài khoản"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -774,26 +774,26 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
 
       {/* TAB 3: AUDIT LOGS */}
       {activeTab === "audit" && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-white space-y-4 shadow-xl">
-          <div className="flex justify-between items-center pb-3 border-b border-slate-800">
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-6 text-[var(--text)] space-y-4 shadow-xl">
+          <div className="flex justify-between items-center pb-3 border-b border-[var(--border)]">
             <div className="flex items-center gap-2">
               <History className="w-5 h-5 text-blue-400" />
-              <h3 className="font-extrabold text-base text-white">
+              <h3 className="font-extrabold text-base text-[var(--text)]">
                 Nhật Ký An Ninh & Thay Đổi Phân Quyền (Audit Trails)
               </h3>
             </div>
-            <span className="text-xs text-slate-400 font-mono">Real-time Encrypted Log</span>
+            <span className="text-xs text-[var(--text-muted)] font-mono">Real-time Encrypted Log</span>
           </div>
 
           <div className="space-y-3">
             {auditLogs.map((log) => (
               <div
                 key={log.id}
-                className="bg-slate-950 p-4 rounded-xl border border-slate-800/80 flex items-start justify-between gap-4 text-xs"
+                className="bg-[var(--surface-base)] p-4 rounded-xl border border-[var(--border)]/80 flex items-start justify-between gap-4 text-xs"
               >
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-white">{log.action}</span>
+                    <span className="font-bold text-[var(--text)]">{log.action}</span>
                     <span
                       className={`px-2 py-0.5 rounded text-[9px] font-black ${
                         log.category === "Permission Change"
@@ -806,10 +806,10 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                       {log.category}
                     </span>
                   </div>
-                  <p className="text-slate-300 text-[11px]">{log.details}</p>
-                  <p className="text-slate-500 text-[10px]">Thực hiện bởi: {log.performedBy}</p>
+                  <p className="text-[var(--text-muted)] text-[11px]">{log.details}</p>
+                  <p className="text-[var(--text-faint)] text-[10px]">Thực hiện bởi: {log.performedBy}</p>
                 </div>
-                <span className="text-slate-500 text-[11px] font-mono shrink-0">{log.timestamp}</span>
+                <span className="text-[var(--text-faint)] text-[11px] font-mono shrink-0">{log.timestamp}</span>
               </div>
             ))}
           </div>
@@ -819,15 +819,15 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
       {/* MODAL: Create / Edit User */}
       {isUserModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl p-6 text-white shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
-            <div className="flex justify-between items-center pb-3 border-b border-slate-800 shrink-0">
-              <h3 className="font-black text-lg text-white flex items-center gap-2">
+          <div className="bg-[var(--surface)] border border-[var(--border)] w-full max-w-lg rounded-2xl p-6 text-[var(--text)] shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
+            <div className="flex justify-between items-center pb-3 border-b border-[var(--border)] shrink-0">
+              <h3 className="font-black text-lg text-[var(--text)] flex items-center gap-2">
                 <UserPlus className="w-5 h-5 text-blue-400" />
                 {editingUser ? "Chỉnh Sửa Tài Khoản Người Dùng" : "Tạo Tài Khoản Người Dùng Mới"}
               </h3>
               <button
                 onClick={() => setIsUserModalOpen(false)}
-                className="text-slate-400 hover:text-white"
+                className="text-[var(--text-muted)] hover:text-[var(--text)]"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -835,19 +835,19 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
 
             <form onSubmit={handleSaveUser} className="space-y-4 text-xs overflow-y-auto">
               <div className="space-y-1">
-                <label className="text-slate-300 font-bold block">Họ và Tên (*)</label>
+                <label className="text-[var(--text-muted)] font-bold block">Họ và Tên (*)</label>
                 <input
                   type="text"
                   required
                   placeholder="Ví dụ: Nguyễn Văn A"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-950 rounded-xl border border-slate-800 text-white focus:outline-none focus:border-blue-500"
+                  className="w-full px-3 py-2 bg-[var(--surface-base)] rounded-xl border border-[var(--border)] text-[var(--text)] focus:outline-none focus:border-blue-500"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-slate-300 font-bold block">Email Đăng Nhập (*)</label>
+                <label className="text-[var(--text-muted)] font-bold block">Email Đăng Nhập (*)</label>
                 <input
                   type="email"
                   required
@@ -855,15 +855,15 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                   placeholder="user@liveops.ai"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-950 rounded-xl border border-slate-800 text-white focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 bg-[var(--surface-base)] rounded-xl border border-[var(--border)] text-[var(--text)] focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 />
                 {editingUser && (
-                  <p className="text-[10px] text-slate-500">
+                  <p className="text-[10px] text-[var(--text-faint)]">
                     Không thể đổi email đăng nhập tại đây — email gắn với tài khoản Supabase Auth thật.
                   </p>
                 )}
                 {!editingUser && (
-                  <p className="text-[10px] text-slate-500">
+                  <p className="text-[10px] text-[var(--text-faint)]">
                     Hệ thống sẽ gửi email mời tạo mật khẩu đến địa chỉ này.
                   </p>
                 )}
@@ -871,11 +871,11 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-slate-300 font-bold block">Role Phân Quyền (*)</label>
+                  <label className="text-[var(--text-muted)] font-bold block">Role Phân Quyền (*)</label>
                   <select
                     value={formData.role}
                     onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
-                    className="w-full px-3 py-2 bg-slate-950 rounded-xl border border-slate-800 text-white focus:outline-none focus:border-blue-500 font-bold"
+                    className="w-full px-3 py-2 bg-[var(--surface-base)] rounded-xl border border-[var(--border)] text-[var(--text)] focus:outline-none focus:border-blue-500 font-bold"
                   >
                     <option value="admin">Admin (Quản Trị Viên Hệ Thống)</option>
                     <option value="ceo">CEO Admin</option>
@@ -887,13 +887,13 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-slate-300 font-bold block">Trạng Thái (*)</label>
+                  <label className="text-[var(--text-muted)] font-bold block">Trạng Thái (*)</label>
                   <select
                     value={formData.status}
                     onChange={(e) =>
                       setFormData({ ...formData, status: e.target.value as "Active" | "Inactive" })
                     }
-                    className="w-full px-3 py-2 bg-slate-950 rounded-xl border border-slate-800 text-white focus:outline-none focus:border-blue-500 font-bold"
+                    className="w-full px-3 py-2 bg-[var(--surface-base)] rounded-xl border border-[var(--border)] text-[var(--text)] focus:outline-none focus:border-blue-500 font-bold"
                   >
                     <option value="Active">Active (Hoạt động)</option>
                     <option value="Inactive">Inactive (Tạm khóa)</option>
@@ -902,13 +902,13 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
               </div>
 
               <div className="space-y-1">
-                <label className="text-slate-300 font-bold block">Chức Danh Custom (Job Title)</label>
+                <label className="text-[var(--text-muted)] font-bold block">Chức Danh Custom (Job Title)</label>
                 <input
                   type="text"
                   placeholder="Ví dụ: Key Account Manager (Brand Lead)"
                   value={formData.customRoleTitle}
                   onChange={(e) => setFormData({ ...formData, customRoleTitle: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-950 rounded-xl border border-slate-800 text-white focus:outline-none focus:border-blue-500"
+                  className="w-full px-3 py-2 bg-[var(--surface-base)] rounded-xl border border-[var(--border)] text-[var(--text)] focus:outline-none focus:border-blue-500"
                 />
               </div>
 
@@ -922,7 +922,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                     required
                     value={formData.assignedBrandId}
                     onChange={(e) => setFormData({ ...formData, assignedBrandId: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-950 rounded-xl border border-slate-800 text-white focus:outline-none focus:border-emerald-500 font-bold"
+                    className="w-full px-3 py-2 bg-[var(--surface-base)] rounded-xl border border-[var(--border)] text-[var(--text)] focus:outline-none focus:border-emerald-500 font-bold"
                   >
                     <option value="">-- Chọn Nhãn Hàng --</option>
                     {brands.map((b) => (
@@ -944,7 +944,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                     required
                     value={formData.assignedTalentId}
                     onChange={(e) => setFormData({ ...formData, assignedTalentId: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-950 rounded-xl border border-slate-800 text-white focus:outline-none focus:border-amber-500 font-bold"
+                    className="w-full px-3 py-2 bg-[var(--surface-base)] rounded-xl border border-[var(--border)] text-[var(--text)] focus:outline-none focus:border-amber-500 font-bold"
                   >
                     <option value="">-- Chọn Host Livestream --</option>
                     {talents.map((t) => (
@@ -956,12 +956,12 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                 </div>
               )}
 
-              <div className="pt-3 border-t border-slate-800 flex justify-end gap-2">
+              <div className="pt-3 border-t border-[var(--border)] flex justify-end gap-2">
                 <button
                   type="button"
                   disabled={isSavingUser}
                   onClick={() => setIsUserModalOpen(false)}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold disabled:opacity-50"
+                  className="px-4 py-2 bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--text-muted)] rounded-xl font-bold disabled:opacity-50"
                 >
                   Hủy
                 </button>
@@ -981,25 +981,25 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
       {/* MODAL: Custom Permission Override per User */}
       {permissionOverrideUser && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-2xl p-6 text-white shadow-2xl space-y-5 max-h-[85vh] flex flex-col">
-            <div className="flex justify-between items-center pb-3 border-b border-slate-800">
+          <div className="bg-[var(--surface)] border border-[var(--border)] w-full max-w-2xl rounded-2xl p-6 text-[var(--text)] shadow-2xl space-y-5 max-h-[85vh] flex flex-col">
+            <div className="flex justify-between items-center pb-3 border-b border-[var(--border)]">
               <div className="flex items-center gap-3">
                 {permissionOverrideUser.avatar ? (
                   <img
                     src={permissionOverrideUser.avatar}
                     alt={permissionOverrideUser.name}
-                    className="w-10 h-10 rounded-full object-cover border border-slate-700"
+                    className="w-10 h-10 rounded-full object-cover border border-[var(--border)]"
                   />
                 ) : (
-                  <div className="w-10 h-10 rounded-full border border-slate-700 bg-slate-800 text-slate-300 flex items-center justify-center text-sm font-bold uppercase">
+                  <div className="w-10 h-10 rounded-full border border-[var(--border)] bg-[var(--surface-elevated)] text-[var(--text-muted)] flex items-center justify-center text-sm font-bold uppercase">
                     {permissionOverrideUser.name.charAt(0) || "?"}
                   </div>
                 )}
                 <div>
-                  <h3 className="font-black text-base text-white">
+                  <h3 className="font-black text-base text-[var(--text)]">
                     Custom Permission Extra: {permissionOverrideUser.name}
                   </h3>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-[var(--text-muted)]">
                     Ghi đè quyền đặc biệt cho tài khoản này (Role gốc:{" "}
                     <span className="text-blue-400 font-bold uppercase">
                       {permissionOverrideUser.role}
@@ -1010,7 +1010,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
               </div>
               <button
                 onClick={() => setPermissionOverrideUser(null)}
-                className="text-slate-400 hover:text-white"
+                className="text-[var(--text-muted)] hover:text-[var(--text)]"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1029,20 +1029,20 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                     className={`p-3 rounded-xl border flex items-center justify-between gap-3 ${
                       isOverridden
                         ? "bg-amber-950/30 border-amber-500/50"
-                        : "bg-slate-950 border-slate-800"
+                        : "bg-[var(--surface-base)] border-[var(--border)]"
                     }`}
                   >
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-white text-xs">{def.label}</span>
+                        <span className="font-bold text-[var(--text)] text-xs">{def.label}</span>
                         {isOverridden && (
                           <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[9px] font-black px-1.5 py-0.5 rounded">
                             OVERRIDDEN
                           </span>
                         )}
                       </div>
-                      <p className="text-[10px] text-slate-400">{def.description}</p>
-                      <span className="text-[10px] text-slate-500 font-mono">
+                      <p className="text-[10px] text-[var(--text-muted)]">{def.description}</p>
+                      <span className="text-[10px] text-[var(--text-faint)] font-mono">
                         Quyền mặc định của Role: {roleDefault ? "ALLOWED" : "DENIED"}
                       </span>
                     </div>
@@ -1054,7 +1054,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                       className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
                         activeVal
                           ? "bg-emerald-600 text-white border-emerald-500"
-                          : "bg-slate-800 text-slate-400 border-slate-700"
+                          : "bg-[var(--surface-elevated)] text-[var(--text-muted)] border-[var(--border)]"
                       }`}
                     >
                       {activeVal ? "✓ ALLOWED" : "✕ DENIED"}
@@ -1064,7 +1064,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
               })}
             </div>
 
-            <div className="pt-3 border-t border-slate-800 flex justify-end">
+            <div className="pt-3 border-t border-[var(--border)] flex justify-end">
               <button
                 onClick={() => setPermissionOverrideUser(null)}
                 className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold shadow-lg"

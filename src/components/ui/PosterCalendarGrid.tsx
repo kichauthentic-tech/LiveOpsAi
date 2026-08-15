@@ -19,8 +19,8 @@ export const PosterCalendarHeader: React.FC<PosterCalendarHeaderProps> = ({ icon
     <div className="flex items-center gap-2.5">
       {Icon && <Icon className="w-5 h-5 text-blue-400 shrink-0" />}
       <div>
-        <h2 className="text-lg font-black text-white tracking-tight">{title}</h2>
-        {subtitle && <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>}
+        <h2 className="text-lg font-black text-[var(--text)] tracking-tight">{title}</h2>
+        {subtitle && <p className="text-xs text-[var(--text-muted)] mt-0.5">{subtitle}</p>}
       </div>
     </div>
     <div className="flex items-center gap-1.5 flex-wrap">

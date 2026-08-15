@@ -1342,7 +1342,7 @@ export default function App() {
 
   if (authLoading) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-slate-950 text-slate-400 text-sm">
+      <div className="flex h-screen w-full items-center justify-center bg-[var(--surface-base)] text-[var(--text-muted)] text-sm">
         Đang tải phiên đăng nhập...
       </div>
     );
@@ -1358,28 +1358,28 @@ export default function App() {
 
   if (!profile) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-slate-950 text-slate-400 text-sm">
+      <div className="flex h-screen w-full items-center justify-center bg-[var(--surface-base)] text-[var(--text-muted)] text-sm">
         Đang tải hồ sơ người dùng...
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen w-full bg-slate-950 text-slate-200 overflow-hidden font-sans antialiased selection:bg-blue-600 selection:text-white">
+    <div className="flex h-screen w-full bg-[var(--surface-base)] text-[var(--text)] overflow-hidden font-sans antialiased selection:bg-blue-600 selection:text-white">
       {/* Left Sidebar Navigation */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-900/90 backdrop-blur-md border-r border-slate-800 flex flex-col transition-all duration-300 md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-[var(--surface)]/90 backdrop-blur-md border-r border-[var(--border)] flex flex-col transition-all duration-300 md:translate-x-0 ${
           mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         } ${sidebarCollapsed ? "md:w-16" : "md:w-64"}`}
       >
         <div
-          className={`border-b border-slate-800 flex items-center justify-between ${
+          className={`border-b border-[var(--border)] flex items-center justify-between ${
             sidebarCollapsed ? "p-6 md:px-0 md:py-4 md:justify-center" : "p-6"
           }`}
         >
           <div className={sidebarCollapsed ? "md:hidden" : ""}>
             <h1 className="text-xl font-bold tracking-tighter text-blue-400">LIVEOPS AI</h1>
-            <p className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">
+            <p className="text-[10px] uppercase tracking-widest text-[var(--text-faint)] font-semibold">
               Agency Operating System
             </p>
           </div>
@@ -1393,7 +1393,7 @@ export default function App() {
           )}
           <button
             onClick={() => setMobileMenuOpen(false)}
-            className="md:hidden text-slate-400 hover:text-white"
+            className="md:hidden text-[var(--text-muted)] hover:text-[var(--text)]"
           >
             <X className="w-5 h-5" />
           </button>
@@ -1414,14 +1414,14 @@ export default function App() {
             return (
               <div key={group.label} className="space-y-1">
                 <p
-                  className={`px-3 text-[10px] font-bold uppercase tracking-widest text-slate-600 ${
+                  className={`px-3 text-[10px] font-bold uppercase tracking-widest text-[var(--text-faint)] ${
                     sidebarCollapsed ? "md:hidden" : ""
                   }`}
                 >
                   {group.label}
                 </p>
                 {/* Ở chế độ thu gọn, nhóm nav chỉ còn được phân tách bằng 1 gạch mảnh. */}
-                {sidebarCollapsed && <div className="hidden md:block mx-2 border-t border-slate-800" />}
+                {sidebarCollapsed && <div className="hidden md:block mx-2 border-t border-[var(--border)]" />}
                 {visibleItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = activeTab === item.id;
@@ -1439,13 +1439,13 @@ export default function App() {
                       } ${
                         isActive
                           ? "bg-blue-600/10 text-blue-400 border border-blue-600/20 font-bold"
-                          : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
+                          : "text-[var(--text-muted)] hover:bg-[var(--surface-elevated)]/80 hover:text-[var(--text)]"
                       }`}
                     >
                       <div className={`flex items-center gap-3 min-w-0 ${sidebarCollapsed ? "md:gap-0" : ""}`}>
                         <div className="relative shrink-0">
                           <Icon
-                            className={`w-4 h-4 shrink-0 ${isActive ? "text-blue-400" : "text-slate-400"}`}
+                            className={`w-4 h-4 shrink-0 ${isActive ? "text-blue-400" : "text-[var(--text-muted)]"}`}
                           />
                           {/* Thu gọn: badge NEW co lại thành chấm nhỏ trên icon cho khỏi mất tín hiệu. */}
                           {sidebarCollapsed && item.badge && (
@@ -1471,7 +1471,7 @@ export default function App() {
         </nav>
 
         {/* User Card — bấm để mở Tài Khoản Của Tôi (thay cho mục nav riêng đã bỏ) */}
-        <div className={`mt-auto border-t border-slate-800 ${sidebarCollapsed ? "p-4 md:p-2" : "p-4"}`}>
+        <div className={`mt-auto border-t border-[var(--border)] ${sidebarCollapsed ? "p-4 md:p-2" : "p-4"}`}>
           <button
             type="button"
             onClick={() => {
@@ -1482,28 +1482,28 @@ export default function App() {
             className={`w-full flex items-center gap-3 rounded-xl border transition-colors text-left ${
               activeTab === "account_settings"
                 ? "bg-blue-600/10 border-blue-600/20"
-                : "bg-slate-800/50 border-slate-700/50 hover:bg-slate-800 hover:border-slate-600"
+                : "bg-[var(--surface-elevated)]/50 border-[var(--border)]/50 hover:bg-[var(--surface-elevated)] hover:border-[var(--text-faint)]"
             } ${sidebarCollapsed ? "p-3 md:p-2 md:justify-center" : "p-3"}`}
           >
             {activeUser.avatar ? (
               <img
                 src={activeUser.avatar}
                 alt={activeUser.name}
-                className="w-9 h-9 rounded-full object-cover border border-slate-600 shrink-0"
+                className="w-9 h-9 rounded-full object-cover border border-[var(--border)] shrink-0"
               />
             ) : (
-              <div className="w-9 h-9 rounded-full border border-slate-600 bg-slate-800 text-slate-300 flex items-center justify-center text-xs font-bold uppercase shrink-0">
+              <div className="w-9 h-9 rounded-full border border-[var(--border)] bg-[var(--surface-elevated)] text-[var(--text-muted)] flex items-center justify-center text-xs font-bold uppercase shrink-0">
                 {activeUser.name.charAt(0) || "?"}
               </div>
             )}
             <div className={`text-xs min-w-0 flex-1 ${sidebarCollapsed ? "md:hidden" : ""}`}>
-              <p className="font-bold text-slate-200 truncate">{activeUser.name}</p>
+              <p className="font-bold text-[var(--text)] truncate">{activeUser.name}</p>
               <p className="text-blue-400 text-[10px] uppercase font-extrabold truncate">
                 {currentRole} • {activeUser.customRoleTitle}
               </p>
             </div>
             <UserCog
-              className={`w-4 h-4 text-slate-500 shrink-0 ${sidebarCollapsed ? "md:hidden" : ""}`}
+              className={`w-4 h-4 text-[var(--text-faint)] shrink-0 ${sidebarCollapsed ? "md:hidden" : ""}`}
             />
           </button>
         </div>
@@ -1516,16 +1516,16 @@ export default function App() {
         }`}
       >
         {/* Top Header Bar */}
-        <div className="flex items-center border-b border-slate-800 bg-slate-900/30 pr-4">
+        <div className="flex items-center border-b border-[var(--border)] bg-[var(--surface)]/30 pr-4">
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-4 md:hidden text-slate-400 hover:text-white"
+            className="p-4 md:hidden text-[var(--text-muted)] hover:text-[var(--text)]"
           >
             <Menu className="w-5 h-5" />
           </button>
           <button
             onClick={toggleSidebar}
-            className="hidden md:flex p-2 ml-3 rounded-xl border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-all"
+            className="hidden md:flex p-2 ml-3 rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)]/80 hover:bg-[var(--surface-hover)] text-[var(--text-muted)] hover:text-[var(--text)] transition-all"
             title={
               sidebarCollapsed
                 ? isCalendarModule
@@ -1597,21 +1597,21 @@ export default function App() {
           <div className={`mx-auto space-y-6 ${isCalendarModule ? "max-w-none" : "max-w-7xl"}`}>
             {!isTabAllowed ? (
               /* Access Guard Fallback */
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center max-w-2xl mx-auto my-12 space-y-5 text-white shadow-2xl">
+              <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-8 text-center max-w-2xl mx-auto my-12 space-y-5 text-[var(--text)] shadow-2xl">
                 <div className="w-16 h-16 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-2xl flex items-center justify-center mx-auto">
                   <ShieldAlert className="w-8 h-8 animate-bounce" />
                 </div>
 
                 <div className="space-y-2">
-                  <h2 className="text-xl font-black text-white">Quyền Truy Cập Bị Hạn Chế (Access Restricted)</h2>
-                  <p className="text-xs text-slate-400 max-w-md mx-auto">
+                  <h2 className="text-xl font-black text-[var(--text)]">Quyền Truy Cập Bị Hạn Chế (Access Restricted)</h2>
+                  <p className="text-xs text-[var(--text-muted)] max-w-md mx-auto">
                     Role hiện tại của bạn (<span className="text-amber-400 font-bold uppercase">{currentRole}</span>) chưa được cấp quyền truy cập tính năng{" "}
-                    <strong className="text-white">&quot;{currentTabNavItem?.label}&quot;</strong>.
+                    <strong className="text-[var(--text)]">&quot;{currentTabNavItem?.label}&quot;</strong>.
                   </p>
                 </div>
 
-                <div className="p-4 bg-slate-950 border border-slate-800 rounded-xl text-left text-xs font-mono space-y-1 text-slate-300">
-                  <div className="text-slate-500 font-sans text-[10px] uppercase font-bold">Chi tiết yêu cầu an ninh:</div>
+                <div className="p-4 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl text-left text-xs font-mono space-y-1 text-[var(--text-muted)]">
+                  <div className="text-[var(--text-faint)] font-sans text-[10px] uppercase font-bold">Chi tiết yêu cầu an ninh:</div>
                   <div>• Permission Required: <span className="text-blue-400">{currentTabNavItem?.perm}</span></div>
                   <div>• Current Role: <span className="text-amber-400">{currentRole}</span></div>
                   <div>• Status: <span className="text-red-400">DENIED</span></div>
@@ -1620,7 +1620,7 @@ export default function App() {
                 <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
                   <button
                     onClick={() => setActiveTab("dashboard")}
-                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition-all"
+                    className="px-4 py-2 bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--text)] rounded-xl text-xs font-bold transition-all"
                   >
                     Về Dashboard Cho Role
                   </button>

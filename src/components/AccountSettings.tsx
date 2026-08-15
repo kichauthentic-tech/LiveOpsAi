@@ -97,32 +97,32 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ activeUser, on
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
-        <h1 className="text-xl font-black text-white">Tài Khoản Của Tôi</h1>
-        <p className="text-xs text-slate-500 mt-1">Quản lý tên hiển thị và mật khẩu đăng nhập của bạn.</p>
+        <h1 className="text-xl font-black text-[var(--text)]">Tài Khoản Của Tôi</h1>
+        <p className="text-xs text-[var(--text-faint)] mt-1">Quản lý tên hiển thị và mật khẩu đăng nhập của bạn.</p>
       </div>
 
       {/* Thông tin cơ bản */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
-        <div className="flex items-center gap-2 text-sm font-bold text-slate-200">
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-6 space-y-4">
+        <div className="flex items-center gap-2 text-sm font-bold text-[var(--text)]">
           <User className="w-4 h-4 text-blue-400" />
           Thông Tin Hiển Thị
         </div>
 
-        <div className="flex items-center gap-2 text-xs text-slate-500">
+        <div className="flex items-center gap-2 text-xs text-[var(--text-faint)]">
           <Mail className="w-3.5 h-3.5" />
           <span>{activeUser.email}</span>
-          <span className="text-slate-600">(email đăng nhập, không thể tự đổi ở đây)</span>
+          <span className="text-[var(--text-faint)]">(email đăng nhập, không thể tự đổi ở đây)</span>
         </div>
 
         <form onSubmit={handleSaveName} className="space-y-3">
           <div>
-            <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Tên hiển thị</label>
+            <label className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">Tên hiển thị</label>
             <input
               type="text"
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="mt-1 w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm outline-none focus:border-blue-500 text-slate-200"
+              className="mt-1 w-full px-3 py-2.5 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl text-sm outline-none focus:border-blue-500 text-[var(--text)]"
             />
           </div>
 
@@ -150,15 +150,15 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ activeUser, on
       </div>
 
       {/* Đổi mật khẩu */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
-        <div className="flex items-center gap-2 text-sm font-bold text-slate-200">
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-6 space-y-4">
+        <div className="flex items-center gap-2 text-sm font-bold text-[var(--text)]">
           <Lock className="w-4 h-4 text-blue-400" />
           Đổi Mật Khẩu
         </div>
 
         <form onSubmit={handleChangePassword} className="space-y-3">
           <div>
-            <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">
+            <label className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">
               Mật khẩu hiện tại
             </label>
             <input
@@ -166,12 +166,12 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ activeUser, on
               required
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
-              className="mt-1 w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm outline-none focus:border-blue-500 text-slate-200"
+              className="mt-1 w-full px-3 py-2.5 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl text-sm outline-none focus:border-blue-500 text-[var(--text)]"
             />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">
+              <label className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">
                 Mật khẩu mới
               </label>
               <input
@@ -180,11 +180,11 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ activeUser, on
                 minLength={6}
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                className="mt-1 w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm outline-none focus:border-blue-500 text-slate-200"
+                className="mt-1 w-full px-3 py-2.5 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl text-sm outline-none focus:border-blue-500 text-[var(--text)]"
               />
             </div>
             <div>
-              <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">
+              <label className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">
                 Nhập lại mật khẩu mới
               </label>
               <input
@@ -193,7 +193,7 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ activeUser, on
                 minLength={6}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="mt-1 w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm outline-none focus:border-blue-500 text-slate-200"
+                className="mt-1 w-full px-3 py-2.5 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl text-sm outline-none focus:border-blue-500 text-[var(--text)]"
               />
             </div>
           </div>
@@ -222,18 +222,18 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ activeUser, on
       </div>
 
       {/* Quên mật khẩu hiện tại */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-3">
-        <div className="flex items-center gap-2 text-sm font-bold text-slate-200">
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-6 space-y-3">
+        <div className="flex items-center gap-2 text-sm font-bold text-[var(--text)]">
           <KeyRound className="w-4 h-4 text-blue-400" />
           Quên Mật Khẩu Hiện Tại?
         </div>
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-[var(--text-faint)]">
           Không nhớ mật khẩu hiện tại để đổi ở trên? Gửi một email đặt lại mật khẩu tới{" "}
-          <span className="text-slate-300 font-semibold">{activeUser.email}</span>.
+          <span className="text-[var(--text-muted)] font-semibold">{activeUser.email}</span>.
         </p>
 
         {resetMessage && (
-          <div className="text-xs text-slate-300 bg-slate-950/60 border border-slate-700/60 rounded-lg px-3 py-2 flex items-center gap-2">
+          <div className="text-xs text-[var(--text-muted)] bg-[var(--surface-base)]/60 border border-[var(--border)]/60 rounded-lg px-3 py-2 flex items-center gap-2">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
             {resetMessage}
           </div>
@@ -243,7 +243,7 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ activeUser, on
           type="button"
           onClick={handleSendResetEmail}
           disabled={sendingReset}
-          className="px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 border border-slate-700 font-bold rounded-xl text-xs transition-all flex items-center gap-2"
+          className="px-4 py-2 bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] disabled:opacity-50 text-[var(--text)] border border-[var(--border)] font-bold rounded-xl text-xs transition-all flex items-center gap-2"
         >
           {sendingReset && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
           Gửi Email Đặt Lại Mật Khẩu

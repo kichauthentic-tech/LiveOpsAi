@@ -92,12 +92,12 @@ export const RecurringTemplateManager: React.FC<RecurringTemplateManagerProps> =
         </button>
       </div>
       {expanded && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-4">
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5 space-y-4">
           <div>
-            <h3 className="font-bold text-white text-sm flex items-center gap-2">
+            <h3 className="font-bold text-[var(--text)] text-sm flex items-center gap-2">
               <Repeat className="w-4 h-4 text-indigo-400" /> Quy Tắc Lặp (Ca Cố Định Theo Tuần)
             </h3>
-            <p className="text-[11px] text-slate-400 mt-0.5">
+            <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
               Mẫu lặp dùng để sinh hàng loạt Ca chờ đăng ký cho cả tháng — không cần tạo tay từng ca.
             </p>
           </div>
@@ -105,13 +105,13 @@ export const RecurringTemplateManager: React.FC<RecurringTemplateManagerProps> =
           {templates.length > 0 && (
             <div className="space-y-1.5">
               {templates.map((t) => (
-                <div key={t.id} className="flex items-center justify-between gap-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs">
+                <div key={t.id} className="flex items-center justify-between gap-2 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl px-3 py-2 text-xs">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold text-white">{t.isDaily ? "Hàng Ngày" : WEEKDAY_NAMES[t.weekday]}</span>
-                    <span className="text-slate-400 font-mono">{t.startTime}-{t.endTime}</span>
-                    {!lockedBrandId && <span className="text-slate-400">{t.brandName || "— Không brand —"}</span>}
-                    <span className="text-slate-500">{t.studioName}</span>
-                    <span className={`px-1.5 py-0.5 rounded font-bold ${t.active ? "bg-emerald-950 text-emerald-400" : "bg-slate-800 text-slate-500"}`}>
+                    <span className="font-bold text-[var(--text)]">{t.isDaily ? "Hàng Ngày" : WEEKDAY_NAMES[t.weekday]}</span>
+                    <span className="text-[var(--text-muted)] font-mono">{t.startTime}-{t.endTime}</span>
+                    {!lockedBrandId && <span className="text-[var(--text-muted)]">{t.brandName || "— Không brand —"}</span>}
+                    <span className="text-[var(--text-faint)]">{t.studioName}</span>
+                    <span className={`px-1.5 py-0.5 rounded font-bold ${t.active ? "bg-emerald-950 text-emerald-400" : "bg-[var(--surface-elevated)] text-[var(--text-faint)]"}`}>
                       {t.active ? "Active" : "Tắt"}
                     </span>
                   </div>
@@ -132,39 +132,39 @@ export const RecurringTemplateManager: React.FC<RecurringTemplateManagerProps> =
             </div>
           )}
 
-          <form onSubmit={handleCreateTemplateSubmit} className={`grid grid-cols-2 ${lockedBrandId ? "sm:grid-cols-2" : "sm:grid-cols-3"} gap-2 text-xs bg-slate-950/60 border border-slate-800 rounded-xl p-3`}>
+          <form onSubmit={handleCreateTemplateSubmit} className={`grid grid-cols-2 ${lockedBrandId ? "sm:grid-cols-2" : "sm:grid-cols-3"} gap-2 text-xs bg-[var(--surface-base)]/60 border border-[var(--border)] rounded-xl p-3`}>
             <div>
-              <label className="font-bold text-slate-400 block mb-1">Thứ trong tuần:</label>
-              <select value={tplWeekday} onChange={(e) => setTplWeekday(Number(e.target.value))} className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-white">
+              <label className="font-bold text-[var(--text-muted)] block mb-1">Thứ trong tuần:</label>
+              <select value={tplWeekday} onChange={(e) => setTplWeekday(Number(e.target.value))} className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)]">
                 <option value={-1}>Hàng Ngày (mọi ngày trong tháng)</option>
                 {WEEKDAY_NAMES.map((name, idx) => <option key={idx} value={idx}>{name}</option>)}
               </select>
             </div>
             {!lockedBrandId && (
               <div>
-                <label className="font-bold text-slate-400 block mb-1">Brand:</label>
-                <select value={tplBrandId} onChange={(e) => setTplBrandId(e.target.value)} className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-white">
+                <label className="font-bold text-[var(--text-muted)] block mb-1">Brand:</label>
+                <select value={tplBrandId} onChange={(e) => setTplBrandId(e.target.value)} className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)]">
                   {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
                 </select>
               </div>
             )}
             <div>
-              <label className="font-bold text-slate-400 block mb-1">Studio:</label>
-              <select value={tplStudioId} onChange={(e) => setTplStudioId(e.target.value)} className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-white">
+              <label className="font-bold text-[var(--text-muted)] block mb-1">Studio:</label>
+              <select value={tplStudioId} onChange={(e) => setTplStudioId(e.target.value)} className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)]">
                 {studios.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </div>
             <div>
-              <label className="font-bold text-slate-400 block mb-1">Giờ bắt đầu:</label>
-              <input type="time" value={tplStartTime} onChange={(e) => setTplStartTime(e.target.value)} className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-white font-mono" />
+              <label className="font-bold text-[var(--text-muted)] block mb-1">Giờ bắt đầu:</label>
+              <input type="time" value={tplStartTime} onChange={(e) => setTplStartTime(e.target.value)} className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] font-mono" />
             </div>
             <div>
-              <label className="font-bold text-slate-400 block mb-1">Giờ kết thúc:</label>
-              <input type="time" value={tplEndTime} onChange={(e) => setTplEndTime(e.target.value)} className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-white font-mono" />
+              <label className="font-bold text-[var(--text-muted)] block mb-1">Giờ kết thúc:</label>
+              <input type="time" value={tplEndTime} onChange={(e) => setTplEndTime(e.target.value)} className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] font-mono" />
             </div>
             <div>
-              <label className="font-bold text-slate-400 block mb-1">Ghi chú:</label>
-              <input type="text" value={tplNotes} onChange={(e) => setTplNotes(e.target.value)} placeholder="Tuỳ chọn" className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-white" />
+              <label className="font-bold text-[var(--text-muted)] block mb-1">Ghi chú:</label>
+              <input type="text" value={tplNotes} onChange={(e) => setTplNotes(e.target.value)} placeholder="Tuỳ chọn" className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)]" />
             </div>
             <div className="col-span-2 flex justify-end">
               <button type="submit" disabled={creatingTpl} className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white font-bold text-[11px]">
@@ -173,8 +173,8 @@ export const RecurringTemplateManager: React.FC<RecurringTemplateManagerProps> =
             </div>
           </form>
 
-          <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-800">
-            <p className="text-[11px] text-slate-400">
+          <div className="flex items-center justify-between gap-2 pt-2 border-t border-[var(--border)]">
+            <p className="text-[11px] text-[var(--text-muted)]">
               {generateMsg || `Sinh Ca chờ đăng ký cho tháng ${currentMonth}/${currentYear} từ mọi mẫu đang Active — bỏ qua ngày đã sinh trước đó.`}
             </p>
             <button

@@ -35,11 +35,11 @@ export const ResetPasswordScreen: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-slate-950 text-slate-200 px-4">
-      <div className="w-full max-w-sm bg-slate-900/80 border border-slate-800 rounded-2xl p-8 shadow-2xl">
+    <div className="min-h-screen w-full flex items-center justify-center bg-[var(--surface-base)] text-[var(--text)] px-4">
+      <div className="w-full max-w-sm bg-[var(--surface)]/80 border border-[var(--border)] rounded-2xl p-8 shadow-2xl">
         <div className="mb-6 text-center">
           <h1 className="text-xl font-bold tracking-tighter text-blue-400">LIVEOPS AI</h1>
-          <p className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">
+          <p className="text-[10px] uppercase tracking-widest text-[var(--text-faint)] font-semibold">
             {isInvite ? "Đặt mật khẩu cho tài khoản" : "Đặt lại mật khẩu"}
           </p>
         </div>
@@ -47,7 +47,7 @@ export const ResetPasswordScreen: React.FC = () => {
         {done ? (
           <div className="text-center space-y-4">
             <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto" />
-            <p className="text-sm text-slate-300">
+            <p className="text-sm text-[var(--text-muted)]">
               {isInvite ? "Mật khẩu đã được thiết lập thành công." : "Mật khẩu đã được cập nhật thành công."}
             </p>
             <button
@@ -62,11 +62,11 @@ export const ResetPasswordScreen: React.FC = () => {
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-[var(--text-faint)]">
               {isInvite ? "Đặt mật khẩu để hoàn tất kích hoạt tài khoản." : "Nhập mật khẩu mới cho tài khoản của bạn."}
             </p>
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-faint)]" />
               <input
                 type="password"
                 required
@@ -74,11 +74,11 @@ export const ResetPasswordScreen: React.FC = () => {
                 placeholder="Mật khẩu mới"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-9 pr-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm outline-none focus:border-blue-500"
+                className="w-full pl-9 pr-3 py-2.5 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl text-sm outline-none focus:border-blue-500"
               />
             </div>
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-faint)]" />
               <input
                 type="password"
                 required
@@ -86,7 +86,7 @@ export const ResetPasswordScreen: React.FC = () => {
                 placeholder="Nhập lại mật khẩu mới"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full pl-9 pr-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm outline-none focus:border-blue-500"
+                className="w-full pl-9 pr-3 py-2.5 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl text-sm outline-none focus:border-blue-500"
               />
             </div>
 

@@ -158,38 +158,38 @@ export const BrandSessionModal: React.FC<BrandSessionModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-4 sm:p-6 space-y-4 shadow-2xl overflow-y-auto max-h-[92vh]">
-        <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl max-w-lg w-full p-4 sm:p-6 space-y-4 shadow-2xl overflow-y-auto max-h-[92vh]">
+        <div className="flex justify-between items-center border-b border-[var(--border)] pb-3">
           <div className="flex items-center gap-2">
-            <CalendarIcon className="w-5 h-5 text-blue-400" />
-            <h3 className="font-bold text-white text-base">{isEdit ? "Sửa Phiên Live" : "Đặt Lịch Phiên Live Mới"}</h3>
+            <CalendarIcon className="w-5 h-5 text-[var(--accent-text)]" />
+            <h3 className="font-bold text-[var(--text)] text-base">{isEdit ? "Sửa Phiên Live" : "Đặt Lịch Phiên Live Mới"}</h3>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white p-1 rounded-lg">
+          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text)] p-1 rounded-lg">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {!isEdit && (
-          <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs font-bold">
+          <div className="flex items-center bg-[var(--surface-base)] p-1 rounded-xl border border-[var(--border)] text-xs font-bold">
             <button
               type="button"
               onClick={() => setMode("session")}
-              className={`flex-1 px-3 py-2 rounded-lg transition-all ${mode === "session" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-white"}`}
+              className={`flex-1 px-3 py-2 rounded-lg transition-all ${mode === "session" ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)] hover:text-[var(--text)]"}`}
             >
               Tạo Trực Tiếp (đã có Host)
             </button>
             <button
               type="button"
               onClick={() => setMode("slot")}
-              className={`flex-1 px-3 py-2 rounded-lg transition-all ${mode === "slot" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-white"}`}
+              className={`flex-1 px-3 py-2 rounded-lg transition-all ${mode === "slot" ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)] hover:text-[var(--text)]"}`}
             >
               Mở Ca Chờ Đăng Ký
             </button>
           </div>
         )}
         {!isEdit && mode === "slot" && (
-          <p className="text-[11px] text-slate-400 bg-slate-950/60 border border-slate-800 rounded-xl p-2.5">
+          <p className="text-[11px] text-[var(--text-muted)] bg-[var(--surface-base)]/60 border border-[var(--border)] rounded-xl p-2.5">
             Ca sẽ hiện ở "Đăng Ký & Chốt Lịch" bên Agency để host tự đăng ký, Ops chốt Host chính thức sau.
           </p>
         )}
@@ -206,23 +206,23 @@ export const BrandSessionModal: React.FC<BrandSessionModalProps> = ({
 
         <form onSubmit={handleSubmit} className="space-y-3 text-xs">
           <div>
-            <label className="font-bold text-slate-300 block mb-1">Tiêu Đề Phiên Live:</label>
+            <label className="font-bold text-[var(--text-muted)] block mb-1">Tiêu Đề Phiên Live:</label>
             <input
               type="text"
               required
               placeholder={`Ví dụ: Live ${brandName} Flash Sale`}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white focus:outline-none focus:border-blue-500 font-medium"
+              className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-2.5 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
             />
           </div>
 
           <div>
-            <label className="font-bold text-slate-300 block mb-1">Phòng Studio:</label>
+            <label className="font-bold text-[var(--text-muted)] block mb-1">Phòng Studio:</label>
             <select
               value={studioId}
               onChange={(e) => setStudioId(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white focus:outline-none focus:border-blue-500 font-medium"
+              className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-2.5 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
             >
               {studios.map((s) => (
                 <option key={s.id} value={s.id}>{s.name}</option>
@@ -233,11 +233,11 @@ export const BrandSessionModal: React.FC<BrandSessionModalProps> = ({
           {(isEdit || mode === "session") && (
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="font-bold text-slate-300 block mb-1">Host Chính:</label>
+                <label className="font-bold text-[var(--text-muted)] block mb-1">Host Chính:</label>
                 <select
                   value={hostId}
                   onChange={(e) => setHostId(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white focus:outline-none focus:border-blue-500 font-medium"
+                  className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-2.5 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
                 >
                   {talents.map((t) => (
                     <option key={t.id} value={t.id}>{t.name}</option>
@@ -245,11 +245,11 @@ export const BrandSessionModal: React.FC<BrandSessionModalProps> = ({
                 </select>
               </div>
               <div>
-                <label className="font-bold text-slate-300 block mb-1">Co-Host (tuỳ chọn):</label>
+                <label className="font-bold text-[var(--text-muted)] block mb-1">Co-Host (tuỳ chọn):</label>
                 <select
                   value={coHostId}
                   onChange={(e) => setCoHostId(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white focus:outline-none focus:border-blue-500 font-medium"
+                  className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-2.5 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
                 >
                   <option value="">-- Không có --</option>
                   {talents.filter((t) => t.id !== hostId).map((t) => (
@@ -262,39 +262,39 @@ export const BrandSessionModal: React.FC<BrandSessionModalProps> = ({
 
           <div className="grid grid-cols-3 gap-2">
             <div>
-              <label className="font-bold text-slate-300 block mb-1">Ngày:</label>
+              <label className="font-bold text-[var(--text-muted)] block mb-1">Ngày:</label>
               <input type="date" required value={date} onChange={(e) => setDate(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono focus:outline-none focus:border-blue-500" />
+                className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-2.5 text-[var(--text)] font-mono focus:outline-none focus:border-[var(--accent)]" />
             </div>
             <div>
-              <label className="font-bold text-slate-300 block mb-1">Giờ bắt đầu:</label>
+              <label className="font-bold text-[var(--text-muted)] block mb-1">Giờ bắt đầu:</label>
               <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono focus:outline-none focus:border-blue-500" />
+                className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-2.5 text-[var(--text)] font-mono focus:outline-none focus:border-[var(--accent)]" />
             </div>
             <div>
-              <label className="font-bold text-slate-300 block mb-1">Giờ kết thúc:</label>
+              <label className="font-bold text-[var(--text-muted)] block mb-1">Giờ kết thúc:</label>
               <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono focus:outline-none focus:border-blue-500" />
+                className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-2.5 text-[var(--text)] font-mono focus:outline-none focus:border-[var(--accent)]" />
             </div>
           </div>
 
           {(isEdit || mode === "session") && (
             <div>
-              <label className="font-bold text-slate-300 block mb-1">KPI Target GMV (VNĐ):</label>
+              <label className="font-bold text-[var(--text-muted)] block mb-1">KPI Target GMV (VNĐ):</label>
               <input
                 type="number"
                 value={targetGmv}
                 onChange={(e) => setTargetGmv(Number(e.target.value))}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono font-bold focus:outline-none focus:border-blue-500"
+                className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-2.5 text-[var(--text)] font-mono font-bold focus:outline-none focus:border-[var(--accent)]"
               />
             </div>
           )}
 
-          <div className="pt-3 border-t border-slate-800 flex justify-end gap-3">
-            <button type="button" onClick={onClose} className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 font-bold">
+          <div className="pt-3 border-t border-[var(--border)] flex justify-end gap-3">
+            <button type="button" onClick={onClose} className="px-4 py-2 rounded-xl bg-[var(--surface-elevated)] text-[var(--text-muted)] hover:opacity-80 font-bold">
               Hủy Bỏ
             </button>
-            <button type="submit" disabled={saving} className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white font-bold shadow-lg shadow-blue-600/30">
+            <button type="submit" disabled={saving} className="px-5 py-2 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-60 text-white font-bold shadow-lg">
               {saving ? "Đang lưu..." : isEdit ? "Lưu Thay Đổi" : "Xác Nhận"}
             </button>
           </div>

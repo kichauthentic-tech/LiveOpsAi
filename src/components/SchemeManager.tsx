@@ -35,72 +35,72 @@ export const SchemeManager: React.FC<SchemeManagerProps> = ({ schemes, onAdd, on
   const sorted = [...schemes].sort((a, b) => a.startDate.localeCompare(b.startDate));
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
-      <div className="text-xs font-bold text-slate-400 flex items-center gap-1.5">
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 space-y-3">
+      <div className="text-xs font-bold text-[var(--text-muted)] flex items-center gap-1.5">
         <Tag className="w-3.5 h-3.5 text-amber-400" /> Scheme khuyến mãi (hiện badge 🏷️ trên ô ngày trong khoảng áp dụng)
       </div>
       <div className="space-y-2">
         {sorted.map((s) => (
-          <div key={s.id} className="flex flex-wrap items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg p-2">
+          <div key={s.id} className="flex flex-wrap items-center gap-2 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2">
             <input
               type="text"
               defaultValue={s.title}
               onBlur={(e) => onUpdate(s.id, { title: e.target.value })}
-              className="flex-1 min-w-[120px] bg-transparent text-white text-xs font-bold focus:outline-none"
+              className="flex-1 min-w-[120px] bg-transparent text-[var(--text)] text-xs font-bold focus:outline-none"
             />
             <input
               type="text"
               defaultValue={s.description}
               placeholder="Mô tả (mã voucher nếu có)"
               onBlur={(e) => onUpdate(s.id, { description: e.target.value })}
-              className="flex-1 min-w-[160px] bg-transparent text-slate-300 text-xs focus:outline-none"
+              className="flex-1 min-w-[160px] bg-transparent text-[var(--text-muted)] text-xs focus:outline-none"
             />
             <input
               type="date"
               defaultValue={s.startDate}
               onBlur={(e) => onUpdate(s.id, { startDate: e.target.value })}
-              className="bg-slate-900 border border-slate-800 rounded px-1.5 py-1 text-slate-200 text-[11px]"
+              className="bg-[var(--surface)] border border-[var(--border)] rounded px-1.5 py-1 text-[var(--text)] text-[11px]"
             />
-            <span className="text-slate-600 text-xs">→</span>
+            <span className="text-[var(--text-faint)] text-xs">→</span>
             <input
               type="date"
               defaultValue={s.endDate}
               onBlur={(e) => onUpdate(s.id, { endDate: e.target.value })}
-              className="bg-slate-900 border border-slate-800 rounded px-1.5 py-1 text-slate-200 text-[11px]"
+              className="bg-[var(--surface)] border border-[var(--border)] rounded px-1.5 py-1 text-[var(--text)] text-[11px]"
             />
             <button onClick={() => onDelete(s.id)} className="text-red-400 hover:bg-red-950/40 p-1 rounded-lg">
               <Trash2 className="w-3.5 h-3.5" />
             </button>
           </div>
         ))}
-        {sorted.length === 0 && <div className="text-xs text-slate-500 italic py-2">Chưa có scheme khuyến mãi nào.</div>}
+        {sorted.length === 0 && <div className="text-xs text-[var(--text-faint)] italic py-2">Chưa có scheme khuyến mãi nào.</div>}
       </div>
-      <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-800">
+      <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[var(--border)]">
         <input
           type="text"
           placeholder="Tên scheme (vd Flash Sale 8.8)"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          className="flex-1 min-w-[140px] bg-slate-950 border border-slate-800 rounded-lg p-2 text-white text-xs focus:outline-none focus:border-blue-500"
+          className="flex-1 min-w-[140px] bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] text-xs focus:outline-none focus:border-blue-500"
         />
         <input
           type="text"
           placeholder="Mô tả (mã voucher nếu có)"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          className="flex-1 min-w-[160px] bg-slate-950 border border-slate-800 rounded-lg p-2 text-white text-xs focus:outline-none focus:border-blue-500"
+          className="flex-1 min-w-[160px] bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] text-xs focus:outline-none focus:border-blue-500"
         />
         <input
           type="date"
           value={startDate}
           onChange={(e) => setStartDate(e.target.value)}
-          className="bg-slate-950 border border-slate-800 rounded-lg p-2 text-white text-xs focus:outline-none focus:border-blue-500"
+          className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] text-xs focus:outline-none focus:border-blue-500"
         />
         <input
           type="date"
           value={endDate}
           onChange={(e) => setEndDate(e.target.value)}
-          className="bg-slate-950 border border-slate-800 rounded-lg p-2 text-white text-xs focus:outline-none focus:border-blue-500"
+          className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] text-xs focus:outline-none focus:border-blue-500"
         />
         <button
           onClick={handleAdd}

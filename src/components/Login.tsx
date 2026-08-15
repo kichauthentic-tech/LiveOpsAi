@@ -43,17 +43,17 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-slate-950 text-slate-200 px-4">
-      <div className="w-full max-w-sm bg-slate-900/80 border border-slate-800 rounded-2xl p-8 shadow-2xl">
+    <div className="min-h-screen w-full flex items-center justify-center bg-[var(--surface-base)] text-[var(--text)] px-4">
+      <div className="w-full max-w-sm bg-[var(--surface)]/80 border border-[var(--border)] rounded-2xl p-8 shadow-2xl">
         <div className="mb-6 text-center">
           <h1 className="text-xl font-bold tracking-tighter text-blue-400">LIVEOPS AI</h1>
-          <p className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">
+          <p className="text-[10px] uppercase tracking-widest text-[var(--text-faint)] font-semibold">
             Agency Operating System
           </p>
         </div>
 
         {mode !== "forgot" && (
-          <div className="flex bg-slate-950/80 border border-slate-800 rounded-xl p-1 mb-6">
+          <div className="flex bg-[var(--surface-base)]/80 border border-[var(--border)] rounded-xl p-1 mb-6">
             <button
               type="button"
               onClick={() => {
@@ -62,7 +62,7 @@ export const Login: React.FC = () => {
                 setInfo(null);
               }}
               className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                mode === "signin" ? "bg-blue-600 text-white" : "text-slate-400"
+                mode === "signin" ? "bg-blue-600 text-white" : "text-[var(--text-muted)]"
               }`}
             >
               Đăng nhập
@@ -75,7 +75,7 @@ export const Login: React.FC = () => {
                 setInfo(null);
               }}
               className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                mode === "signup" ? "bg-blue-600 text-white" : "text-slate-400"
+                mode === "signup" ? "bg-blue-600 text-white" : "text-[var(--text-muted)]"
               }`}
             >
               Tạo tài khoản
@@ -85,8 +85,8 @@ export const Login: React.FC = () => {
 
         {mode === "forgot" && (
           <div className="mb-6">
-            <h2 className="text-sm font-bold text-slate-200">Quên mật khẩu</h2>
-            <p className="text-xs text-slate-500 mt-1">
+            <h2 className="text-sm font-bold text-[var(--text)]">Quên mật khẩu</h2>
+            <p className="text-xs text-[var(--text-faint)] mt-1">
               Nhập email đã đăng ký, hệ thống sẽ gửi liên kết đặt lại mật khẩu.
             </p>
           </div>
@@ -95,31 +95,31 @@ export const Login: React.FC = () => {
         <form onSubmit={handleSubmit} className="space-y-4">
           {mode === "signup" && (
             <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-faint)]" />
               <input
                 type="text"
                 required
                 placeholder="Họ tên"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full pl-9 pr-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm outline-none focus:border-blue-500"
+                className="w-full pl-9 pr-3 py-2.5 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl text-sm outline-none focus:border-blue-500"
               />
             </div>
           )}
           <div className="relative">
-            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-faint)]" />
             <input
               type="email"
               required
               placeholder="Email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full pl-9 pr-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm outline-none focus:border-blue-500"
+              className="w-full pl-9 pr-3 py-2.5 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl text-sm outline-none focus:border-blue-500"
             />
           </div>
           {mode !== "forgot" && (
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-faint)]" />
               <input
                 type="password"
                 required
@@ -127,7 +127,7 @@ export const Login: React.FC = () => {
                 placeholder="Mật khẩu"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-9 pr-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm outline-none focus:border-blue-500"
+                className="w-full pl-9 pr-3 py-2.5 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl text-sm outline-none focus:border-blue-500"
               />
             </div>
           )}
@@ -141,7 +141,7 @@ export const Login: React.FC = () => {
                   setError(null);
                   setInfo(null);
                 }}
-                className="text-[11px] text-slate-500 hover:text-blue-400 font-semibold transition-colors"
+                className="text-[11px] text-[var(--text-faint)] hover:text-blue-400 font-semibold transition-colors"
               >
                 Quên mật khẩu?
               </button>
@@ -176,7 +176,7 @@ export const Login: React.FC = () => {
                 setError(null);
                 setInfo(null);
               }}
-              className="w-full text-center text-[11px] text-slate-500 hover:text-blue-400 font-semibold transition-colors"
+              className="w-full text-center text-[11px] text-[var(--text-faint)] hover:text-blue-400 font-semibold transition-colors"
             >
               ← Quay lại đăng nhập
             </button>

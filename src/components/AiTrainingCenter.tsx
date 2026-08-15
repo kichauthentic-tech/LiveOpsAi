@@ -56,13 +56,13 @@ export const AiTrainingCenter: React.FC<AiTrainingCenterProps> = ({ prompts, loa
 
   return (
     <div className="space-y-6">
-      <div className="bg-slate-900 text-white p-6 rounded-2xl border border-slate-800 shadow-xl space-y-2 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-[var(--surface)] text-[var(--text)] p-6 rounded-2xl border border-[var(--border)] shadow-xl space-y-2 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <span className="text-rose-400 font-semibold text-xs uppercase tracking-wider block flex items-center gap-1.5">
             <BrainCircuit className="w-4 h-4 text-rose-400" /> Độc Quyền Admin
           </span>
           <h2 className="text-2xl font-black">AI Training Center</h2>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-[var(--text-muted)] mt-1">
             Cấu hình system prompt riêng cho từng AI Agent thật đang chạy trong hệ thống. Chỉ tài khoản Admin thấy và sửa được tab này.
           </p>
         </div>
@@ -76,7 +76,7 @@ export const AiTrainingCenter: React.FC<AiTrainingCenterProps> = ({ prompts, loa
       </div>
 
       {loading && (
-        <div className="bg-slate-900 p-8 rounded-2xl border border-slate-800 text-center text-slate-400 text-sm flex items-center justify-center gap-2">
+        <div className="bg-[var(--surface)] p-8 rounded-2xl border border-[var(--border)] text-center text-[var(--text-muted)] text-sm flex items-center justify-center gap-2">
           <RefreshCw className="w-4 h-4 animate-spin" /> Đang tải danh sách AI Agent...
         </div>
       )}
@@ -95,7 +95,7 @@ export const AiTrainingCenter: React.FC<AiTrainingCenterProps> = ({ prompts, loa
       )}
 
       {!loading && !error && prompts.length === 0 && (
-        <div className="bg-slate-900 p-8 rounded-2xl border border-slate-800 text-center text-slate-400 text-sm">
+        <div className="bg-[var(--surface)] p-8 rounded-2xl border border-[var(--border)] text-center text-[var(--text-muted)] text-sm">
           Chưa có Agent nào được seed trong <code>ai_agent_prompts</code>.
         </div>
       )}
@@ -104,7 +104,7 @@ export const AiTrainingCenter: React.FC<AiTrainingCenterProps> = ({ prompts, loa
         !error &&
         Object.entries(groupedByCategory).map(([category, agents]: [string, AiAgentPrompt[]]) => (
           <div key={category} className="space-y-3">
-            <h3 className="font-bold text-slate-100 text-sm uppercase tracking-wider border-b border-slate-800 pb-2">
+            <h3 className="font-bold text-[var(--text)] text-sm uppercase tracking-wider border-b border-[var(--border)] pb-2">
               {category}
             </h3>
             <div className="grid lg:grid-cols-2 gap-4">
@@ -113,29 +113,29 @@ export const AiTrainingCenter: React.FC<AiTrainingCenterProps> = ({ prompts, loa
                 const isDirty = draft !== p.systemPrompt;
                 const isDefault = draft === p.defaultPrompt;
                 return (
-                  <div key={p.agentKey} className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-sm space-y-3">
+                  <div key={p.agentKey} className="bg-[var(--surface)] p-5 rounded-2xl border border-[var(--border)] shadow-sm space-y-3">
                     <div>
-                      <h4 className="font-black text-slate-100 text-sm">{p.name}</h4>
-                      <p className="text-[11px] text-slate-400 mt-0.5">{p.description}</p>
+                      <h4 className="font-black text-[var(--text)] text-sm">{p.name}</h4>
+                      <p className="text-[11px] text-[var(--text-muted)] mt-0.5">{p.description}</p>
                     </div>
                     <textarea
                       value={draft}
                       onChange={(e) => setDrafts((prev) => ({ ...prev, [p.agentKey]: e.target.value }))}
                       rows={6}
-                      className="w-full p-3 rounded-xl border border-slate-700 bg-slate-950 text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-rose-500 font-medium text-xs leading-relaxed"
+                      className="w-full p-3 rounded-xl border border-[var(--border)] bg-[var(--surface-base)] text-[var(--text)] placeholder:text-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-rose-500 font-medium text-xs leading-relaxed"
                     />
                     <div className="flex items-center justify-between gap-2">
                       <button
                         onClick={() => handleResetDraft(p)}
                         disabled={isDefault}
-                        className="text-[11px] font-bold text-slate-400 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
+                        className="text-[11px] font-bold text-[var(--text-muted)] hover:text-[var(--text)] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
                       >
                         <RotateCcw className="w-3.5 h-3.5" /> Khôi Phục Mặc Định
                       </button>
                       <button
                         onClick={() => handleSave(p.agentKey)}
                         disabled={!isDirty || savingKey === p.agentKey}
-                        className="bg-rose-600 hover:bg-rose-500 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold px-3.5 py-1.5 rounded-xl text-[11px] flex items-center gap-1.5 transition-all"
+                        className="bg-rose-600 hover:bg-rose-500 disabled:bg-[var(--text-muted)] disabled:cursor-not-allowed text-white font-bold px-3.5 py-1.5 rounded-xl text-[11px] flex items-center gap-1.5 transition-all"
                       >
                         {savingKey === p.agentKey ? (
                           <>
@@ -153,7 +153,7 @@ export const AiTrainingCenter: React.FC<AiTrainingCenterProps> = ({ prompts, loa
                       </button>
                     </div>
                     {p.updatedAt && (
-                      <p className="text-[10px] text-slate-400">Sửa lần cuối: {new Date(p.updatedAt).toLocaleString("vi-VN")}</p>
+                      <p className="text-[10px] text-[var(--text-muted)]">Sửa lần cuối: {new Date(p.updatedAt).toLocaleString("vi-VN")}</p>
                     )}
                   </div>
                 );

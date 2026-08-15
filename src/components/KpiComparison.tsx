@@ -631,31 +631,31 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
   };
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-7 text-slate-100 shadow-2xl space-y-6">
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-3xl p-5 sm:p-7 text-[var(--text)] shadow-2xl space-y-6">
       {/* HEADER BAR */}
-      <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-800">
+      <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-[var(--border)]">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <span className="p-2 bg-blue-600/20 text-blue-400 rounded-xl border border-blue-500/30">
               <BarChart2 className="w-5 h-5" />
             </span>
-            <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white">
+            <h2 className="text-xl sm:text-2xl font-black tracking-tight text-[var(--text)]">
               So Sánh KPI Theo Kỳ
             </h2>
           </div>
-          <p className="text-xs text-slate-400 max-w-2xl">
+          <p className="text-xs text-[var(--text-muted)] max-w-2xl">
             GMV, Đơn, CVR, ROI, CCU — kỳ hiện tại so với kỳ trước
           </p>
         </div>
 
         {/* TIMEFRAME TOGGLE BUTTONS */}
-        <div className="flex items-center gap-1.5 bg-slate-950 p-1.5 rounded-2xl border border-slate-800">
+        <div className="flex items-center gap-1.5 bg-[var(--surface-base)] p-1.5 rounded-2xl border border-[var(--border)]">
           <button
             onClick={() => setTimePeriod("this_week_vs_last_week")}
             className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
               timePeriod === "this_week_vs_last_week"
                 ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30"
-                : "text-slate-400 hover:text-white hover:bg-slate-900"
+                : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface)]"
             }`}
           >
             <Calendar className="w-3.5 h-3.5" />
@@ -667,7 +667,7 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
             className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
               timePeriod === "this_month_vs_last_month"
                 ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30"
-                : "text-slate-400 hover:text-white hover:bg-slate-900"
+                : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface)]"
             }`}
           >
             <Calendar className="w-3.5 h-3.5" />
@@ -679,7 +679,7 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
             className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
               timePeriod === "this_quarter_vs_last_quarter"
                 ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30"
-                : "text-slate-400 hover:text-white hover:bg-slate-900"
+                : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface)]"
             }`}
           >
             <Layers className="w-3.5 h-3.5" />
@@ -689,17 +689,17 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
       </div>
 
       {/* FILTER CONTROLS BAR */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-950/80 p-3 rounded-2xl border border-slate-800/80 text-xs">
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-[var(--surface-base)]/80 p-3 rounded-2xl border border-[var(--border)]/80 text-xs">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-slate-400 font-semibold flex items-center gap-1">
+          <span className="text-[var(--text-muted)] font-semibold flex items-center gap-1">
             <Filter className="w-3.5 h-3.5 text-blue-400" /> Nhóm Chỉ Số:
           </span>
           <button
             onClick={() => setSelectedCategory("all")}
             className={`px-2.5 py-1 rounded-lg font-medium transition-all ${
               selectedCategory === "all"
-                ? "bg-slate-800 text-blue-400 border border-blue-500/40"
-                : "text-slate-400 hover:text-white"
+                ? "bg-[var(--surface-elevated)] text-blue-400 border border-blue-500/40"
+                : "text-[var(--text-muted)] hover:text-[var(--text)]"
             }`}
           >
             Tất cả
@@ -709,7 +709,7 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
             className={`px-2.5 py-1 rounded-lg font-medium transition-all ${
               selectedCategory === "revenue"
                 ? "bg-emerald-950 text-emerald-300 border border-emerald-500/40"
-                : "text-slate-400 hover:text-white"
+                : "text-[var(--text-muted)] hover:text-[var(--text)]"
             }`}
           >
             Doanh Thu & Đơn Hàng
@@ -719,7 +719,7 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
             className={`px-2.5 py-1 rounded-lg font-medium transition-all ${
               selectedCategory === "livestream"
                 ? "bg-purple-950 text-purple-300 border border-purple-500/40"
-                : "text-slate-400 hover:text-white"
+                : "text-[var(--text-muted)] hover:text-[var(--text)]"
             }`}
           >
             Livestream & Viewer
@@ -729,7 +729,7 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
             className={`px-2.5 py-1 rounded-lg font-medium transition-all ${
               selectedCategory === "roi"
                 ? "bg-amber-950 text-amber-300 border border-amber-500/40"
-                : "text-slate-400 hover:text-white"
+                : "text-[var(--text-muted)] hover:text-[var(--text)]"
             }`}
           >
             Lợi Nhuận & ROAS
@@ -738,11 +738,11 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
 
         {/* Brand Selector Filter */}
         <div className="flex items-center gap-2">
-          <span className="text-slate-400 font-semibold">Thương hiệu:</span>
+          <span className="text-[var(--text-muted)] font-semibold">Thương hiệu:</span>
           <select
             value={selectedBrand}
             onChange={(e) => setSelectedBrand(e.target.value)}
-            className="bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-xl px-2.5 py-1.5 outline-none focus:border-blue-500"
+            className="bg-[var(--surface)] border border-[var(--border)] text-[var(--text)] text-xs rounded-xl px-2.5 py-1.5 outline-none focus:border-blue-500"
           >
             <option value="all">Tất cả Nhãn Hàng (Agency General)</option>
             {brands.map((b) => (
@@ -765,11 +765,11 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
           return (
             <div
               key={item.id}
-              className="bg-slate-950/90 border border-slate-800 hover:border-slate-700 rounded-2xl p-4 flex flex-col justify-between space-y-3 transition-all hover:shadow-xl relative overflow-hidden group h-full"
+              className="bg-[var(--surface-base)]/90 border border-[var(--border)] hover:border-[var(--border)] rounded-2xl p-4 flex flex-col justify-between space-y-3 transition-all hover:shadow-xl relative overflow-hidden group h-full"
             >
               <div className="space-y-1.5">
                 <div className="flex items-start justify-between gap-2 min-h-[2.25rem]">
-                  <span className="text-[11px] font-semibold text-slate-400 leading-snug line-clamp-2 flex-1">
+                  <span className="text-[11px] font-semibold text-[var(--text-muted)] leading-snug line-clamp-2 flex-1">
                     {item.name}
                   </span>
 
@@ -790,17 +790,17 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
                   </div>
                 </div>
 
-                <div className="text-xl sm:text-2xl font-black text-white tracking-tight">{currentFormatted}</div>
+                <div className="text-xl sm:text-2xl font-black text-[var(--text)] tracking-tight">{currentFormatted}</div>
               </div>
 
               {/* Comparison vs Previous Period */}
-              <div className="bg-slate-900/80 rounded-xl p-2.5 border border-slate-800/80 text-[11px] space-y-1">
-                <div className="flex justify-between items-center text-slate-400">
+              <div className="bg-[var(--surface)]/80 rounded-xl p-2.5 border border-[var(--border)]/80 text-[11px] space-y-1">
+                <div className="flex justify-between items-center text-[var(--text-muted)]">
                   <span className="truncate">{labels.previous}:</span>
-                  <strong className="text-slate-200 shrink-0 ml-2 font-mono">{previousFormatted}</strong>
+                  <strong className="text-[var(--text)] shrink-0 ml-2 font-mono">{previousFormatted}</strong>
                 </div>
 
-                <div className="flex justify-between items-center text-slate-400">
+                <div className="flex justify-between items-center text-[var(--text-muted)]">
                   <span>Delta:</span>
                   <strong className={`shrink-0 ml-2 font-mono ${delta.isPositive ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}`}>
                     {delta.isPositive ? "+" : ""}
@@ -811,13 +811,13 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
 
               {/* Visual Mini Comparison Bar */}
               <div className="space-y-1">
-                <div className="flex justify-between items-center text-[10px] text-slate-400">
+                <div className="flex justify-between items-center text-[10px] text-[var(--text-muted)]">
                   <span className="truncate">Target: {formatMetricValue(item.target, item.format, item.unit)}</span>
                   <span className={isTargetAchieved ? "text-emerald-400 font-bold shrink-0 ml-1" : "text-amber-400 font-bold shrink-0 ml-1"}>
                     {isTargetAchieved ? "✓ Đạt" : "▲ Chưa Đạt"}
                   </span>
                 </div>
-                <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden flex">
+                <div className="h-1.5 w-full bg-[var(--surface-elevated)] rounded-full overflow-hidden flex">
                   <div
                     className="h-full bg-blue-500 transition-all duration-500 rounded-full"
                     style={{
@@ -834,22 +834,22 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
       {/* DUAL COMPARISON CHART SECTION */}
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Main Chart Card (Trajectory comparison) */}
-        <div className="lg:col-span-2 bg-slate-950/90 border border-slate-800 rounded-2xl p-5 space-y-4">
+        <div className="lg:col-span-2 bg-[var(--surface-base)]/90 border border-[var(--border)] rounded-2xl p-5 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="font-bold text-white text-base flex items-center gap-2">
+              <h3 className="font-bold text-[var(--text)] text-base flex items-center gap-2">
                 <LineChart className="w-5 h-5 text-blue-400" />
                 Quỹ Đạo Tăng Trưởng Theo Thời Gian ({labels.current} vs {labels.previous})
               </h3>
-              <p className="text-xs text-slate-400">So sánh nhịp độ phát sinh doanh thu và đơn hàng qua từng ngày/tuần</p>
+              <p className="text-xs text-[var(--text-muted)]">So sánh nhịp độ phát sinh doanh thu và đơn hàng qua từng ngày/tuần</p>
             </div>
 
             <div className="flex items-center gap-2">
-              <div className="bg-slate-900 p-1 rounded-xl border border-slate-800 flex items-center text-xs">
+              <div className="bg-[var(--surface)] p-1 rounded-xl border border-[var(--border)] flex items-center text-xs">
                 <button
                   onClick={() => setActiveMetricTab("gmv")}
                   className={`px-3 py-1 rounded-lg font-bold transition-all ${
-                    activeMetricTab === "gmv" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-white"
+                    activeMetricTab === "gmv" ? "bg-blue-600 text-white" : "text-[var(--text-muted)] hover:text-white"
                   }`}
                 >
                   Doanh Thu GMV (Triệu đ)
@@ -857,18 +857,18 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
                 <button
                   onClick={() => setActiveMetricTab("orders")}
                   className={`px-3 py-1 rounded-lg font-bold transition-all ${
-                    activeMetricTab === "orders" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-white"
+                    activeMetricTab === "orders" ? "bg-blue-600 text-white" : "text-[var(--text-muted)] hover:text-white"
                   }`}
                 >
                   Đơn Hàng
                 </button>
               </div>
 
-              <div className="bg-slate-900 p-1 rounded-xl border border-slate-800 flex items-center text-xs">
+              <div className="bg-[var(--surface)] p-1 rounded-xl border border-[var(--border)] flex items-center text-xs">
                 <button
                   onClick={() => setChartType("area")}
                   className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
-                    chartType === "area" ? "bg-slate-800 text-blue-400" : "text-slate-500 hover:text-slate-300"
+                    chartType === "area" ? "bg-[var(--surface-elevated)] text-blue-400" : "text-[var(--text-faint)] hover:text-[var(--text-muted)]"
                   }`}
                   title="Biểu đồ Miền (Area Chart)"
                 >
@@ -877,7 +877,7 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
                 <button
                   onClick={() => setChartType("bar")}
                   className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
-                    chartType === "bar" ? "bg-slate-800 text-blue-400" : "text-slate-500 hover:text-slate-300"
+                    chartType === "bar" ? "bg-[var(--surface-elevated)] text-blue-400" : "text-[var(--text-faint)] hover:text-[var(--text-muted)]"
                   }`}
                   title="Biểu đồ Cột So Sánh (Grouped Bar)"
                 >
@@ -893,19 +893,19 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
                 <AreaChart data={trajectoryData}>
                   <defs>
                     <linearGradient id="currentGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.5} />
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                      <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.5} />
+                      <stop offset="95%" stopColor="var(--accent)" stopOpacity={0} />
                     </linearGradient>
                     <linearGradient id="prevGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#64748b" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#64748b" stopOpacity={0} />
+                      <stop offset="5%" stopColor="var(--text-faint)" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="var(--text-faint)" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                  <XAxis dataKey="label" stroke="#64748b" fontSize={12} />
-                  <YAxis stroke="#64748b" fontSize={12} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis dataKey="label" stroke="var(--text-faint)" fontSize={12} />
+                  <YAxis stroke="var(--text-faint)" fontSize={12} />
                   <Tooltip
-                    contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155", borderRadius: "12px" }}
+                    contentStyle={{ backgroundColor: "var(--surface)", borderColor: "var(--border)", borderRadius: "12px" }}
                     formatter={(val: any, name: any) => [
                       activeMetricTab === "gmv" ? `${val} Triệu VNĐ` : `${val} đơn`,
                       name === "current" ? labels.current : labels.previous
@@ -916,7 +916,7 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
                     type="monotone"
                     dataKey={activeMetricTab === "gmv" ? "current" : "ordersCurrent"}
                     name="current"
-                    stroke="#3b82f6"
+                    stroke="var(--accent)"
                     strokeWidth={3}
                     fillOpacity={1}
                     fill="url(#currentGrad)"
@@ -925,7 +925,7 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
                     type="monotone"
                     dataKey={activeMetricTab === "gmv" ? "previous" : "ordersPrev"}
                     name="previous"
-                    stroke="#64748b"
+                    stroke="var(--text-faint)"
                     strokeWidth={2}
                     strokeDasharray="4 4"
                     fillOpacity={1}
@@ -934,11 +934,11 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
                 </AreaChart>
               ) : (
                 <BarChart data={trajectoryData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                  <XAxis dataKey="label" stroke="#64748b" fontSize={12} />
-                  <YAxis stroke="#64748b" fontSize={12} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis dataKey="label" stroke="var(--text-faint)" fontSize={12} />
+                  <YAxis stroke="var(--text-faint)" fontSize={12} />
                   <Tooltip
-                    contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155", borderRadius: "12px" }}
+                    contentStyle={{ backgroundColor: "var(--surface)", borderColor: "var(--border)", borderRadius: "12px" }}
                     formatter={(val: any, name: any) => [
                       activeMetricTab === "gmv" ? `${val} Triệu VNĐ` : `${val} đơn`,
                       name === "current" ? labels.current : labels.previous
@@ -948,13 +948,13 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
                   <Bar
                     dataKey={activeMetricTab === "gmv" ? "current" : "ordersCurrent"}
                     name="current"
-                    fill="#3b82f6"
+                    fill="var(--accent)"
                     radius={[6, 6, 0, 0]}
                   />
                   <Bar
                     dataKey={activeMetricTab === "gmv" ? "previous" : "ordersPrev"}
                     name="previous"
-                    fill="#475569"
+                    fill="var(--text-faint)"
                     radius={[6, 6, 0, 0]}
                   />
                 </BarChart>
@@ -964,35 +964,35 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
         </div>
 
         {/* Studio Level Performance Comparison */}
-        <div className="bg-slate-950/90 border border-slate-800 rounded-2xl p-5 space-y-4 flex flex-col justify-between">
+        <div className="bg-[var(--surface-base)]/90 border border-[var(--border)] rounded-2xl p-5 space-y-4 flex flex-col justify-between">
           <div className="space-y-3">
-            <h3 className="font-bold text-white text-base flex items-center gap-2">
+            <h3 className="font-bold text-[var(--text)] text-base flex items-center gap-2">
               <Building2 className="w-5 h-5 text-indigo-400" />
               So Sánh Doanh Thu Theo Studio (Triệu VNĐ)
             </h3>
-            <p className="text-xs text-slate-400">Đóng góp của 3 Studio phòng máy trong kỳ hiện tại vs kỳ trước</p>
+            <p className="text-xs text-[var(--text-muted)]">Đóng góp của 3 Studio phòng máy trong kỳ hiện tại vs kỳ trước</p>
 
             <div className="h-52 w-full pt-1">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={studioComparisonData} layout="vertical">
-                  <XAxis type="number" stroke="#64748b" fontSize={11} />
-                  <YAxis type="category" dataKey="name" stroke="#94a3b8" fontSize={10} width={90} />
+                  <XAxis type="number" stroke="var(--text-faint)" fontSize={11} />
+                  <YAxis type="category" dataKey="name" stroke="var(--text-muted)" fontSize={10} width={90} />
                   <Tooltip
-                    contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155", borderRadius: "12px" }}
+                    contentStyle={{ backgroundColor: "var(--surface)", borderColor: "var(--border)", borderRadius: "12px" }}
                     formatter={(val: any) => [`${val} Triệu VNĐ`, "GMV"]}
                   />
                   <Bar dataKey="currentGMV" name="Kỳ Này" fill="#818cf8" radius={[0, 6, 6, 0]} />
-                  <Bar dataKey="prevGMV" name="Kỳ Trước" fill="#334155" radius={[0, 6, 6, 0]} />
+                  <Bar dataKey="prevGMV" name="Kỳ Trước" fill="var(--border)" radius={[0, 6, 6, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </div>
 
-          <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800/80 text-xs text-slate-300 space-y-1">
+          <div className="bg-[var(--surface)]/80 p-3 rounded-xl border border-[var(--border)]/80 text-xs text-[var(--text-muted)] space-y-1">
             <div className="font-bold text-indigo-300 flex items-center gap-1">
               <Sparkles className="w-3.5 h-3.5" /> {topStudioInsight ? `${topStudioInsight.name} chiếm ${topStudioInsight.pct}% tổng GMV` : "Chưa phát sinh doanh thu"}
             </div>
-            <p className="text-[11px] text-slate-400 leading-relaxed">
+            <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
               {topStudioInsight
                 ? `${topStudioInsight.name} dẫn đầu GMV trong ${labels.current.toLowerCase()} theo dữ liệu phiên live thực tế.`
                 : "Tất cả studio phòng máy đang sẵn sàng nhận ca live mới."}
@@ -1002,11 +1002,11 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
       </div>
 
       {/* AI GROWTH DRIVERS BREAKDOWN */}
-      <div className="bg-gradient-to-r from-blue-950/80 via-slate-900 to-indigo-950/80 border border-blue-900/50 rounded-2xl p-5 sm:p-6 space-y-4 shadow-xl">
+      <div className="bg-gradient-to-r from-blue-950/80 via-[var(--surface)] to-indigo-950/80 border border-blue-900/50 rounded-2xl p-5 sm:p-6 space-y-4 shadow-xl">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-amber-400 animate-spin-slow shrink-0" />
-            <h3 className="font-bold text-white text-base">Phân Tích Yếu Tố Tăng Trưởng (AI Growth Breakdown)</h3>
+            <h3 className="font-bold text-[var(--text)] text-base">Phân Tích Yếu Tố Tăng Trưởng (AI Growth Breakdown)</h3>
           </div>
           <span className="text-xs bg-blue-600/30 text-blue-300 border border-blue-500/40 px-2.5 py-1 rounded-xl font-mono font-bold shrink-0">
             LiveOps AI Insights
@@ -1017,15 +1017,15 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
           {getGrowthHighlights().map((h, i) => (
             <div
               key={i}
-              className="bg-slate-900/90 border border-slate-800/90 p-4 rounded-xl flex flex-col justify-between space-y-2 hover:border-blue-500/40 transition-all h-full"
+              className="bg-[var(--surface)]/90 border border-[var(--border)]/90 p-4 rounded-xl flex flex-col justify-between space-y-2 hover:border-blue-500/40 transition-all h-full"
             >
               <div className="flex justify-between items-start gap-2 h-7">
                 <h4 className="font-bold text-xs text-blue-300 leading-snug line-clamp-1">{h.title}</h4>
-                <span className="text-[10px] bg-slate-800 text-slate-300 font-semibold px-2 py-0.5 rounded-md shrink-0">
+                <span className="text-[10px] bg-[var(--surface-elevated)] text-[var(--text-muted)] font-semibold px-2 py-0.5 rounded-md shrink-0">
                   {h.tag}
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 leading-relaxed min-h-[2.5rem] flex-1">{h.desc}</p>
+              <p className="text-[11px] text-[var(--text-muted)] leading-relaxed min-h-[2.5rem] flex-1">{h.desc}</p>
             </div>
           ))}
         </div>

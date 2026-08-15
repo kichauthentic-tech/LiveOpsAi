@@ -101,7 +101,7 @@ export const GmvCalendar: React.FC<GmvCalendarProps> = ({
           <>
             <button
               onClick={() => setMonth((mo) => shiftMonth(mo, -1))}
-              className="p-2 rounded-xl bg-slate-950/60 border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition-colors"
+              className="p-2 rounded-xl bg-[var(--surface-base)]/60 border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] hover:border-[var(--text-faint)] transition-colors"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
@@ -109,11 +109,11 @@ export const GmvCalendar: React.FC<GmvCalendarProps> = ({
               type="month"
               value={month}
               onChange={(e) => setMonth(() => e.target.value)}
-              className="bg-slate-950/60 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono text-sm focus:outline-none focus:border-blue-500"
+              className="bg-[var(--surface-base)]/60 border border-[var(--border)] rounded-xl px-3 py-2 text-[var(--text)] font-mono text-sm focus:outline-none focus:border-blue-500"
             />
             <button
               onClick={() => setMonth((mo) => shiftMonth(mo, 1))}
-              className="p-2 rounded-xl bg-slate-950/60 border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition-colors"
+              className="p-2 rounded-xl bg-[var(--surface-base)]/60 border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] hover:border-[var(--text-faint)] transition-colors"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -129,7 +129,7 @@ export const GmvCalendar: React.FC<GmvCalendarProps> = ({
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-1 shadow-sm">
           <span className="text-emerald-600 dark:text-emerald-400 font-semibold text-xs uppercase tracking-wider">Actual tháng</span>
           <p className="text-2xl font-black text-slate-900 dark:text-white">{formatCurrencyAdaptive(monthSummary.actual)}</p>
-          <p className="text-xs text-slate-500">{monthSummary.achievedPct.toFixed(0)}% target</p>
+          <p className="text-xs text-[var(--text-faint)]">{monthSummary.achievedPct.toFixed(0)}% target</p>
         </div>
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-1 shadow-sm">
           <span className="text-purple-600 dark:text-purple-400 font-semibold text-xs uppercase tracking-wider flex items-center gap-1.5">
@@ -138,12 +138,12 @@ export const GmvCalendar: React.FC<GmvCalendarProps> = ({
           {monthSummary.projectedEom !== null ? (
             <>
               <p className="text-2xl font-black text-slate-900 dark:text-white">{formatCurrencyAdaptive(monthSummary.projectedEom)}</p>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-[var(--text-faint)]">
                 {monthSummary.projectedPct !== null ? `${monthSummary.projectedPct.toFixed(0)}% target` : "—"} • run-rate {monthSummary.daysElapsed} ngày đã qua
               </p>
             </>
           ) : (
-            <p className="text-xs text-slate-500 pt-1">
+            <p className="text-xs text-[var(--text-faint)] pt-1">
               {month === todayMonth ? "Chưa đủ dữ liệu ngày đã qua." : "Chỉ tính dự phóng cho tháng hiện tại."}
             </p>
           )}

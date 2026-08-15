@@ -135,7 +135,7 @@ export const BrandDashboard: React.FC<BrandDashboardProps> = ({
 
   if (!brand) {
     return (
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-10 text-center text-sm text-slate-400">
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-10 text-center text-sm text-[var(--text-muted)]">
         Không tìm thấy dữ liệu Brand này.
       </div>
     );
@@ -143,12 +143,12 @@ export const BrandDashboard: React.FC<BrandDashboardProps> = ({
 
   return (
     <div className="space-y-5">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex items-center gap-4 shadow-xl">
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-6 flex items-center gap-4 shadow-xl">
         <BrandLogo brand={brand} size="lg" />
         <div>
-          <h2 className="text-xl font-black text-white">{brand.name}</h2>
-          <p className="text-xs text-slate-400">
-            {brand.industry} • {brand.contactName} • Hợp đồng: <span className="text-emerald-400 font-bold">{brand.contractStatus}</span>
+          <h2 className="text-xl font-black text-[var(--text)]">{brand.name}</h2>
+          <p className="text-xs text-[var(--text-muted)]">
+            {brand.industry} • {brand.contactName} • Hợp đồng: <span className="text-[var(--success)] font-bold">{brand.contractStatus}</span>
           </p>
         </div>
       </div>
@@ -160,8 +160,8 @@ export const BrandDashboard: React.FC<BrandDashboardProps> = ({
             onClick={() => setTab(key)}
             className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-bold transition-colors ${
               tab === key
-                ? "bg-blue-600 text-white shadow-lg"
-                : "bg-slate-950 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700"
+                ? "bg-[var(--accent)] text-white shadow-lg"
+                : "bg-[var(--surface-base)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] hover:border-[var(--text-faint)]"
             }`}
           >
             <Icon className="w-4 h-4" /> {label}
@@ -172,15 +172,15 @@ export const BrandDashboard: React.FC<BrandDashboardProps> = ({
       {tab === "overview" && (
         <div className="space-y-5">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="bg-gradient-to-br from-blue-950/60 to-slate-900 border border-blue-900/40 rounded-2xl p-5 shadow-xl">
-              <span className="text-blue-400 font-semibold text-xs uppercase tracking-wider flex items-center gap-1.5">
+            <div className="bg-gradient-to-br from-[var(--accent)]/10 to-[var(--surface)] border border-[var(--accent)]/30 rounded-2xl p-5 shadow-xl">
+              <span className="text-[var(--accent-text)] font-semibold text-xs uppercase tracking-wider flex items-center gap-1.5">
                 <TrendingUp className="w-4 h-4" /> GMV tháng {thisMonth}
               </span>
-              <p className="text-2xl font-black text-white mt-1">{formatCurrencyAdaptive(monthGmv)}</p>
+              <p className="text-2xl font-black text-[var(--text)] mt-1">{formatCurrencyAdaptive(monthGmv)}</p>
               {momGrowthPct !== null && (
                 <p
                   className={`text-xs font-bold mt-1 flex items-center gap-1 ${
-                    momGrowthPct >= 0 ? "text-emerald-400" : "text-red-400"
+                    momGrowthPct >= 0 ? "text-[var(--success)]" : "text-[var(--danger)]"
                   }`}
                 >
                   {momGrowthPct >= 0 ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
@@ -190,65 +190,65 @@ export const BrandDashboard: React.FC<BrandDashboardProps> = ({
               )}
             </div>
 
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
-              <span className="text-amber-400 font-semibold text-xs uppercase tracking-wider flex items-center gap-1.5">
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5">
+              <span className="text-[var(--warning)] font-semibold text-xs uppercase tracking-wider flex items-center gap-1.5">
                 <ShoppingBag className="w-4 h-4" /> AOV trung bình tháng này
               </span>
-              <p className="text-2xl font-black text-white mt-1">{formatCurrencyAdaptive(monthAov)}</p>
+              <p className="text-2xl font-black text-[var(--text)] mt-1">{formatCurrencyAdaptive(monthAov)}</p>
             </div>
 
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
-              <span className="text-slate-400 font-semibold text-xs uppercase tracking-wider flex items-center gap-1.5">
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5">
+              <span className="text-[var(--text-muted)] font-semibold text-xs uppercase tracking-wider flex items-center gap-1.5">
                 <Store className="w-4 h-4" /> Tổng GMV tích luỹ
               </span>
-              <p className="text-2xl font-black text-white mt-1">{formatCurrencyAdaptive(brand.totalGmv)}</p>
+              <p className="text-2xl font-black text-[var(--text)] mt-1">{formatCurrencyAdaptive(brand.totalGmv)}</p>
             </div>
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl space-y-3">
-            <h3 className="text-sm font-bold text-white">Xu Hướng GMV 6 Tháng Gần Nhất</h3>
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 sm:p-6 shadow-xl space-y-3">
+            <h3 className="text-sm font-bold text-[var(--text)]">Xu Hướng GMV 6 Tháng Gần Nhất</h3>
             <div className="h-40 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={growthTrendData}>
                   <defs>
                     <linearGradient id="brandGmvGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4} />
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                      <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="var(--accent)" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <XAxis dataKey="month" stroke="#94a3b8" fontSize={11} />
-                  <YAxis stroke="#94a3b8" fontSize={10} tickFormatter={(v) => formatCurrencyAdaptive(v)} width={56} />
+                  <XAxis dataKey="month" stroke="var(--text-faint)" fontSize={11} />
+                  <YAxis stroke="var(--text-faint)" fontSize={10} tickFormatter={(v) => formatCurrencyAdaptive(v)} width={56} />
                   <Tooltip
                     formatter={(value: any) => [formatCurrencyAdaptive(Number(value)), "GMV"]}
-                    contentStyle={{ background: "#0f172a", border: "1px solid #1e293b", borderRadius: 8 }}
+                    contentStyle={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8 }}
                   />
-                  <Area type="monotone" dataKey="gmv" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#brandGmvGrad)" />
+                  <Area type="monotone" dataKey="gmv" stroke="var(--accent)" strokeWidth={3} fillOpacity={1} fill="url(#brandGmvGrad)" />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
-            <span className="text-slate-400 font-semibold text-xs uppercase tracking-wider flex items-center gap-1.5 mb-3">
-              {nextSession?.status === "Live Now" ? <Wifi className="w-4 h-4 text-red-400" /> : <CalendarClock className="w-4 h-4" />}
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 shadow-xl">
+            <span className="text-[var(--text-muted)] font-semibold text-xs uppercase tracking-wider flex items-center gap-1.5 mb-3">
+              {nextSession?.status === "Live Now" ? <Wifi className="w-4 h-4 text-[var(--danger)]" /> : <CalendarClock className="w-4 h-4" />}
               Đang Vận Hành Cho Bạn
             </span>
             {nextSession ? (
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-white font-bold flex items-center gap-2">
+                  <p className="text-[var(--text)] font-bold flex items-center gap-2">
                     {nextSession.status === "Live Now" && (
-                      <span className="text-[10px] bg-red-600 text-white px-1.5 py-0.5 rounded font-black animate-pulse">LIVE</span>
+                      <span className="text-[10px] bg-[var(--danger)] text-white px-1.5 py-0.5 rounded font-black animate-pulse">LIVE</span>
                     )}
                     {nextSession.title}
                   </p>
-                  <p className="text-xs text-slate-400 mt-0.5">
+                  <p className="text-xs text-[var(--text-muted)] mt-0.5">
                     {nextSession.date} • {nextSession.startTime}-{nextSession.endTime} • Host: {nextSession.hostName} • {nextSession.platform}
                   </p>
                 </div>
               </div>
             ) : (
-              <p className="text-sm text-slate-500">Chưa có phiên live nào sắp tới được lên lịch.</p>
+              <p className="text-sm text-[var(--text-faint)]">Chưa có phiên live nào sắp tới được lên lịch.</p>
             )}
           </div>
         </div>
@@ -257,58 +257,58 @@ export const BrandDashboard: React.FC<BrandDashboardProps> = ({
       {tab === "performance" && (
         <div className="space-y-5">
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
               <span className="text-red-400 font-semibold text-[11px] uppercase tracking-wider flex items-center gap-1.5">
                 <Radio className="w-3.5 h-3.5" /> Số phiên live
               </span>
-              <p className="text-xl font-black text-white mt-1">{performanceSummary.completedCount}</p>
+              <p className="text-xl font-black text-[var(--text)] mt-1">{performanceSummary.completedCount}</p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
               <span className="text-purple-400 font-semibold text-[11px] uppercase tracking-wider flex items-center gap-1.5">
                 <Eye className="w-3.5 h-3.5" /> PCU trung bình
               </span>
-              <p className="text-xl font-black text-white mt-1">{performanceSummary.avgPeak.toLocaleString("vi-VN")}</p>
+              <p className="text-xl font-black text-[var(--text)] mt-1">{performanceSummary.avgPeak.toLocaleString("vi-VN")}</p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
               <span className="text-sky-400 font-semibold text-[11px] uppercase tracking-wider flex items-center gap-1.5">
                 <MousePointerClick className="w-3.5 h-3.5" /> CTR trung bình
               </span>
-              <p className="text-xl font-black text-white mt-1">{performanceSummary.avgCtr.toFixed(1)}%</p>
+              <p className="text-xl font-black text-[var(--text)] mt-1">{performanceSummary.avgCtr.toFixed(1)}%</p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
               <span className="text-emerald-400 font-semibold text-[11px] uppercase tracking-wider flex items-center gap-1.5">
                 <Target className="w-3.5 h-3.5" /> CVR trung bình
               </span>
-              <p className="text-xl font-black text-white mt-1">{performanceSummary.avgCvr.toFixed(1)}%</p>
+              <p className="text-xl font-black text-[var(--text)] mt-1">{performanceSummary.avgCvr.toFixed(1)}%</p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
               <span className="text-amber-400 font-semibold text-[11px] uppercase tracking-wider flex items-center gap-1.5">
                 <ShoppingBag className="w-3.5 h-3.5" /> AOV trung bình
               </span>
-              <p className="text-xl font-black text-white mt-1">{formatCurrencyAdaptive(performanceSummary.avgAov)}</p>
+              <p className="text-xl font-black text-[var(--text)] mt-1">{formatCurrencyAdaptive(performanceSummary.avgAov)}</p>
             </div>
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl space-y-4">
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 sm:p-6 shadow-xl space-y-4">
             <div>
-              <h3 className="text-sm font-bold text-white">Xu Hướng GMV Theo Ngày — Target vs Actual</h3>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <h3 className="text-sm font-bold text-[var(--text)]">Xu Hướng GMV Theo Ngày — Target vs Actual</h3>
+              <p className="text-xs text-[var(--text-faint)] mt-0.5">
                 Đọc nhanh xu hướng theo tuần/tháng của {brand.name} trong {month}. Dùng cùng bộ lọc tháng với lịch bên dưới.
               </p>
             </div>
             <div className="h-64 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={dailyTrendData}>
-                  <XAxis dataKey="day" stroke="#94a3b8" fontSize={10} interval={1} />
-                  <YAxis stroke="#94a3b8" fontSize={10} tickFormatter={(v) => formatCurrencyAdaptive(v)} width={56} />
+                  <XAxis dataKey="day" stroke="var(--text-faint)" fontSize={10} interval={1} />
+                  <YAxis stroke="var(--text-faint)" fontSize={10} tickFormatter={(v) => formatCurrencyAdaptive(v)} width={56} />
                   <Tooltip
                     formatter={(value: any, name: string) => [formatCurrencyAdaptive(Number(value)), name === "target" ? "Target" : "Actual"]}
                     labelFormatter={(d) => `Ngày ${d}`}
-                    contentStyle={{ background: "#0f172a", border: "1px solid #1e293b", borderRadius: 8 }}
+                    contentStyle={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8 }}
                   />
                   <Legend formatter={(v) => (v === "target" ? "Target" : "Actual")} wrapperStyle={{ fontSize: 11 }} />
-                  <Bar dataKey="target" fill="#334155" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="actual" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="target" fill="var(--border)" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="actual" fill="var(--accent)" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

@@ -9,8 +9,8 @@ interface SessionReportFormProps {
 }
 
 const inputClass =
-  "w-full p-2.5 border border-slate-700 rounded-xl font-semibold text-slate-100 bg-slate-950 placeholder:text-slate-500";
-const labelClass = "font-bold text-slate-300 block mb-1 text-xs";
+  "w-full p-2.5 border border-[var(--border)] rounded-xl font-semibold text-[var(--text)] bg-[var(--surface-base)] placeholder:text-[var(--text-faint)]";
+const labelClass = "font-bold text-[var(--text-muted)] block mb-1 text-xs";
 
 // Field theo đúng cấu trúc file Excel thật (YFB Working File 2026) — common mọi platform +
 // nhóm riêng TikTok/Shopee. actualGmv/totalViews/ctrAvg/avgWatchTimeSeconds ghi thẳng vào
@@ -152,11 +152,11 @@ export function SessionReportForm({ session, onSubmit, onCancel }: SessionReport
           <label className={labelClass}>RESTART (số lần)</label>
           <input type="number" value={restartCount} onChange={(e) => setRestartCount(Number(e.target.value))} className={inputClass} />
         </div>
-        <label className="flex items-center gap-2 text-sm text-slate-300 font-semibold pb-2.5">
+        <label className="flex items-center gap-2 text-sm text-[var(--text-muted)] font-semibold pb-2.5">
           <input type="checkbox" checked={hostLate} onChange={(e) => setHostLate(e.target.checked)} className="w-4 h-4" />
           Host đến trễ
         </label>
-        <label className="flex items-center gap-2 text-sm text-slate-300 font-semibold pb-2.5">
+        <label className="flex items-center gap-2 text-sm text-[var(--text-muted)] font-semibold pb-2.5">
           <input type="checkbox" checked={crossLive} onChange={(e) => setCrossLive(e.target.checked)} className="w-4 h-4" />
           Cross Live
         </label>
@@ -178,13 +178,13 @@ export function SessionReportForm({ session, onSubmit, onCancel }: SessionReport
       </div>
 
       {r?.submittedAt && (
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-[var(--text-faint)]">
           Lần nhập gần nhất: {new Date(r.submittedAt).toLocaleString("vi-VN")}
         </p>
       )}
 
       <div className="flex justify-end gap-3 pt-2">
-        <button type="button" onClick={onCancel} className="px-4 py-2 text-slate-400 font-bold hover:bg-slate-800 rounded-xl transition-all">
+        <button type="button" onClick={onCancel} className="px-4 py-2 text-[var(--text-muted)] font-bold hover:bg-[var(--surface-elevated)] rounded-xl transition-all">
           Hủy Bỏ
         </button>
         <button

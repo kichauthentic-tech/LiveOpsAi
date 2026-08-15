@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { UserRole, Brand } from "../types";
-import { LogOut, Building2, ChevronDown, Check, Sun, Moon } from "lucide-react";
-import { useTheme } from "../hooks/useTheme";
+import { LogOut, Building2, ChevronDown, Check, Palette } from "lucide-react";
+import { useTheme, THEME_OPTIONS } from "../hooks/useTheme";
 import { BrandLogo } from "./ui/BrandLogo";
 
 // Giai đoạn A (Workspace Agency ↔ Brand) — xem WORKSPACE_DESIGN.md.
@@ -32,35 +32,35 @@ const WorkspaceSwitcher: React.FC<{
     <div className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 border border-slate-700/60 px-3 py-1.5 rounded-full transition-colors"
+        className="flex items-center gap-2 bg-[var(--surface-elevated)]/80 hover:bg-[var(--surface-hover)] border border-[var(--border)]/60 px-3 py-1.5 rounded-full transition-colors"
       >
         {workspace.type === "agency" ? (
           <Building2 className="w-3.5 h-3.5 text-blue-400" />
         ) : (
           <BrandLogo brand={currentBrand} size="xs" />
         )}
-        <span className="text-xs font-bold text-slate-200">{label}</span>
-        <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+        <span className="text-xs font-bold text-[var(--text)]">{label}</span>
+        <ChevronDown className="w-3.5 h-3.5 text-[var(--text-muted)]" />
       </button>
 
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-full mt-2 w-64 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl z-50 py-1.5 max-h-96 overflow-y-auto">
+          <div className="absolute left-0 top-full mt-2 w-64 bg-[var(--surface)] border border-[var(--border)] rounded-xl shadow-2xl z-50 py-1.5 max-h-96 overflow-y-auto">
             <button
               onClick={() => {
                 onChange({ type: "agency" });
                 setOpen(false);
               }}
-              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-800/80 transition-colors"
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-[var(--text)] hover:bg-[var(--surface-elevated)]/80 transition-colors"
             >
               <Building2 className="w-4 h-4 text-blue-400 shrink-0" />
               <span className="flex-1 text-left">Agency (Toàn cảnh)</span>
               {workspace.type === "agency" && <Check className="w-3.5 h-3.5 text-blue-400" />}
             </button>
-            <div className="border-t border-slate-800 my-1.5" />
-            <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-widest text-slate-600">Brand</p>
-            {brands.length === 0 && <p className="px-3 py-2 text-[11px] text-slate-500">Chưa có Brand nào.</p>}
+            <div className="border-t border-[var(--border)] my-1.5" />
+            <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-widest text-[var(--text-faint)]">Brand</p>
+            {brands.length === 0 && <p className="px-3 py-2 text-[11px] text-[var(--text-faint)]">Chưa có Brand nào.</p>}
             {brands.map((b) => (
               <button
                 key={b.id}
@@ -68,11 +68,50 @@ const WorkspaceSwitcher: React.FC<{
                   onChange({ type: "brand", brandId: b.id });
                   setOpen(false);
                 }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-800/80 transition-colors"
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-[var(--text)] hover:bg-[var(--surface-elevated)]/80 transition-colors"
               >
                 <BrandLogo brand={b} size="sm" />
                 <span className="flex-1 text-left truncate">{b.name}</span>
                 {workspace.type === "brand" && workspace.brandId === b.id && <Check className="w-3.5 h-3.5 text-blue-400" />}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+const ThemeSwitcher: React.FC = () => {
+  const { theme, setTheme } = useTheme();
+  const [open, setOpen] = useState(false);
+  const current = THEME_OPTIONS.find((t) => t.id === theme);
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="p-2 rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)]/80 hover:bg-[var(--surface-hover)] text-[var(--text-muted)] hover:text-[var(--text)] transition-all"
+        title={`Giao diện: ${current?.label ?? theme}`}
+      >
+        <Palette className="w-4 h-4" />
+      </button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full mt-2 w-44 bg-[var(--surface)] border border-[var(--border)] rounded-xl shadow-2xl z-50 py-1.5">
+            {THEME_OPTIONS.map((opt) => (
+              <button
+                key={opt.id}
+                onClick={() => {
+                  setTheme(opt.id);
+                  setOpen(false);
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-[var(--text)] hover:bg-[var(--surface-elevated)]/80 transition-colors"
+              >
+                <span className="flex-1 text-left">{opt.label}</span>
+                {theme === opt.id && <Check className="w-3.5 h-3.5 text-blue-400" />}
               </button>
             ))}
           </div>
@@ -91,10 +130,8 @@ export const Header: React.FC<HeaderProps> = ({
   onWorkspaceChange,
   brands = []
 }) => {
-  const { theme, toggleTheme } = useTheme();
-
   return (
-    <header className="h-16 border-b border-slate-800/80 px-6 flex items-center justify-between bg-slate-900/40 backdrop-blur-md sticky top-0 z-40 text-white gap-4">
+    <header className="h-16 border-b border-[var(--border)]/80 px-6 flex items-center justify-between bg-[var(--surface)]/40 backdrop-blur-md sticky top-0 z-40 text-[var(--text)] gap-4">
       {/* Active Region & Live Status */}
       <div className="flex items-center gap-6">
         {workspace && onWorkspaceChange && (
@@ -106,24 +143,18 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="flex items-center gap-3">
         {/* Logged-in user identity (real auth — role comes from the account, not a switcher) */}
         <div className="hidden md:flex flex-col items-end leading-tight px-2">
-          <span className="text-xs font-bold text-slate-200">{activeUserName}</span>
+          <span className="text-xs font-bold text-[var(--text)]">{activeUserName}</span>
           <span className="text-[10px] text-blue-400 font-semibold uppercase">
             {currentRole} {activeUserTitle ? `• ${activeUserTitle}` : ""}
           </span>
         </div>
 
-        <button
-          onClick={toggleTheme}
-          className="p-2 rounded-xl border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-all"
-          title={theme === "dark" ? "Chuyển sang giao diện sáng" : "Chuyển sang giao diện tối"}
-        >
-          {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-        </button>
+        <ThemeSwitcher />
 
         {onSignOut && (
           <button
             onClick={onSignOut}
-            className="p-2 rounded-xl border border-slate-700 bg-slate-800/80 hover:bg-red-950/60 hover:border-red-500/50 text-slate-300 hover:text-red-300 transition-all"
+            className="p-2 rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)]/80 hover:bg-red-950/60 hover:border-red-500/50 text-[var(--text-muted)] hover:text-red-300 transition-all"
             title="Đăng xuất"
           >
             <LogOut className="w-4 h-4" />
