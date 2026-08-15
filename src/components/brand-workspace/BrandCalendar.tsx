@@ -248,6 +248,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
             startTime={s.startTime}
             endTime={s.endTime}
             meta={buildSessionMeta({ ...s, hostName: talentById[s.hostId]?.name ?? s.hostName, studioName: studioById[s.studioId]?.name ?? s.studioName })}
+            targetGmv={s.targetGmv}
             metaLimit={4}
             tone={SESSION_TONE[s.status]}
             statusLabel={SESSION_STATUS_LABEL[s.status]}
@@ -555,6 +556,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
                           hostName: talentById[s.hostId]?.name ?? s.hostName,
                           studioName: studioById[s.studioId]?.name ?? s.studioName
                         })}
+                        targetGmv={s.targetGmv}
                         size="md"
                         tone={SESSION_TONE[s.status]}
                         statusLabel={SESSION_STATUS_LABEL[s.status]}

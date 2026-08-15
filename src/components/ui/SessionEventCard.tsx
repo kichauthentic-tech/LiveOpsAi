@@ -1,5 +1,5 @@
 import React from "react";
-import { Building2, GripVertical, LucideIcon, Mic, ShoppingBag, Target, Users } from "lucide-react";
+import { Building2, GripVertical, LucideIcon, Mic, ShoppingBag, Users } from "lucide-react";
 import { Brand, LiveSession, ShiftSlot } from "../../types";
 import { BrandTheme, brandGradient } from "../../lib/brandTheme";
 import { BrandLogo } from "./BrandLogo";
@@ -10,9 +10,10 @@ import { BrandLogo } from "./BrandLogo";
 // style, vì Tailwind không sinh được class từ hex động. Component này CHỈ trình bày: mọi dữ liệu
 // (giờ, host, GMV...) do call-site tính rồi truyền vào.
 //
-// **Mở rộng thông tin sau này** (co-host, target GMV, PCU, studio...) → thêm phần tử vào mảng
-// `meta`, KHÔNG sửa layout ở đây. Mỗi meta là 1 chip tự xuống dòng, nên thêm bao nhiêu cũng
-// không vỡ ô ngày; ở size "sm" (ô lịch tháng) chỉ hiện `metaLimit` chip đầu để giữ chiều cao ô.
+// **Mở rộng thông tin sau này** (co-host, PCU, studio...) → thêm phần tử vào mảng `meta`, KHÔNG
+// sửa layout ở đây. Mỗi meta là 1 chip tự xuống dòng, nên thêm bao nhiêu cũng không vỡ ô ngày; ở
+// size "sm" (ô lịch tháng) chỉ hiện `metaLimit` chip đầu để giữ chiều cao ô. Riêng Target GMV có
+// prop `targetGmv` và ô hiển thị badge màu riêng của nó — không đi qua `meta`.
 export interface SessionCardMeta {
   icon?: LucideIcon;
   label: string;
@@ -34,6 +35,10 @@ interface SessionEventCardProps {
   /** Tên phiên / mô tả ngắn — ẩn ở size "sm" nếu không có chỗ. */
   title?: string;
   meta?: SessionCardMeta[];
+  /** Target GMV — tách riêng khỏi `meta` vì đây là con số quan trọng nhất sau giờ live, cần
+   * nổi bật thành badge màu riêng ở góc phải hàng brand thay vì lẫn vào chip xám như các thông
+   * tin phụ khác. Không truyền = không hiện badge (ca chờ đăng ký chưa có target). */
+  targetGmv?: number;
   tone?: SessionCardTone;
   /** Nhãn trạng thái góc phải (LIVE, XONG...). Không truyền = không hiện — ca chờ đăng ký cố ý
    * không có nhãn, đã nhận ra qua viền đứt, để nhường chỗ cho chip thông tin. */
@@ -53,6 +58,16 @@ interface SessionEventCardProps {
   className?: string;
 }
 
+// Target GMV rút gọn cho vừa 1 badge nhỏ (50.000.000đ → 50M, 1.200.000.000đ → 1.2B) — ký hiệu quốc
+// tế M/B thay vì "tr"/"tỷ" cho ngắn gọn, bản đầy đủ vào `title` để hover xem chính xác.
+const compactGmv = (amount: number): string => {
+  const abs = Math.abs(amount);
+  if (abs >= 1_000_000_000) return `${(amount / 1_000_000_000).toLocaleString("vi-VN", { maximumFractionDigits: 1 })}B`;
+  if (abs >= 1_000_000) return `${(amount / 1_000_000).toLocaleString("vi-VN", { maximumFractionDigits: 1 })}M`;
+  if (abs >= 1_000) return `${(amount / 1_000).toLocaleString("vi-VN", { maximumFractionDigits: 0 })}K`;
+  return `${amount}`;
+};
+
 const TONE_RING: Record<SessionCardTone, string> = {
   live: "ring-2 ring-rose-400 ring-offset-1 ring-offset-white dark:ring-offset-slate-950",
   upcoming: "",
@@ -69,6 +84,7 @@ export const SessionEventCard: React.FC<SessionEventCardProps> = ({
   endTime,
   title,
   meta = [],
+  targetGmv,
   tone = "upcoming",
   statusLabel,
   size = "sm",
@@ -109,7 +125,8 @@ export const SessionEventCard: React.FC<SessionEventCardProps> = ({
         onClick || draggable ? "cursor-pointer hover:shadow-lg hover:-translate-y-px transition-all active:scale-[0.99]" : ""
       } ${draggable ? "cursor-grab active:cursor-grabbing" : ""} ${className}`}
     >
-      {/* Hàng 1: nhận diện brand + trạng thái */}
+      {/* Hàng 1: nhận diện brand (trái) + Target GMV (phải) — GMV là con số quan trọng nhất sau
+          giờ live nên tách khỏi chip xám, đặt ngay góc phải hàng đầu để đập vào mắt trước tiên. */}
       <div className="flex items-center gap-1 xl:gap-1.5 min-w-0">
         {/* Tay cầm kéo-thả chiếm chỗ quý ở ô hẹp — chỉ hiện từ xl (cả card vẫn kéo được ở mọi khổ). */}
         {draggable && <GripVertical className={`w-3 h-3 shrink-0 opacity-60 ${compact ? "hidden xl:block" : ""}`} />}
@@ -117,6 +134,14 @@ export const SessionEventCard: React.FC<SessionEventCardProps> = ({
         <span className={`font-black uppercase tracking-tight truncate min-w-0 ${compact ? "text-[9px] xl:text-[10px]" : "text-[11px]"}`}>
           {brandName}
         </span>
+        {!!targetGmv && (
+          <span
+            title={`Target GMV: ${targetGmv.toLocaleString("vi-VN")}đ`}
+            className="ml-auto shrink-0 text-emerald-400 font-mono font-bold leading-none text-[9px] xl:text-[10px]"
+          >
+            {compactGmv(targetGmv)}
+          </span>
+        )}
       </div>
 
       {/* Hàng 2: giờ (thông tin quan trọng nhất, để to nhất) + nhãn trạng thái. Nhãn nằm ở đây chứ
@@ -196,26 +221,15 @@ export const SESSION_STATUS_LABEL: Record<LiveSession["status"], string | undefi
 // Rút tên còn "họ cuối + tên" cho vừa chip mà vẫn nhận ra người (Nguyễn Thị Mai Anh → Mai Anh).
 const shortName = (full: string): string => full.trim().split(/\s+/).slice(-2).join(" ");
 
-// Target GMV rút gọn cho vừa 1 chip hẹp (50.000.000đ → 50tr, 1.200.000.000đ → 1.2tỷ) — bản đầy đủ
-// vào `title` để hover xem chính xác.
-const compactGmv = (amount: number): string => {
-  const abs = Math.abs(amount);
-  if (abs >= 1_000_000_000) return `${(amount / 1_000_000_000).toLocaleString("vi-VN", { maximumFractionDigits: 1 })}tỷ`;
-  if (abs >= 1_000_000) return `${(amount / 1_000_000).toLocaleString("vi-VN", { maximumFractionDigits: 1 })}tr`;
-  if (abs >= 1_000) return `${(amount / 1_000).toLocaleString("vi-VN", { maximumFractionDigits: 0 })}k`;
-  return `${amount}`;
-};
-
 /** Thứ tự chip = thứ tự ưu tiên khi ô lịch hẹp (size "sm" chỉ hiện `metaLimit` chip đầu).
- * Bộ 4 thông tin vận hành bắt buộc theo mọi khung lịch: nền tảng, Target GMV, host, trợ (co-host).
- * Actual GMV (kết quả) không thuộc đây — đó là số của lịch báo cáo hiệu suất, không phải lịch vận hành. */
+ * Target GMV KHÔNG nằm trong danh sách này — nó có badge riêng ở góc phải hàng brand (xem prop
+ * `targetGmv` của SessionEventCard, đổ trực tiếp từ `s.targetGmv` ở call-site).
+ * Actual GMV (kết quả) cũng không thuộc đây — đó là số của lịch báo cáo hiệu suất, không phải lịch vận hành. */
 export const buildSessionMeta = (s: LiveSession): SessionCardMeta[] => {
   const meta: SessionCardMeta[] = [];
   if (s.platform) meta.push({ icon: ShoppingBag, label: s.platform, title: `Nền tảng: ${s.platform}` });
-  if (s.targetGmv) meta.push({ icon: Target, label: compactGmv(s.targetGmv), title: `Target GMV: ${s.targetGmv.toLocaleString("vi-VN")}đ` });
   if (s.hostName) meta.push({ icon: Mic, label: shortName(s.hostName), title: `Host: ${s.hostName}` });
   if (s.coHostName) meta.push({ icon: Users, label: shortName(s.coHostName), title: `Trợ (Co-Host): ${s.coHostName}` });
-  if (s.studioName) meta.push({ icon: Building2, label: s.studioName.split(" - ")[0], title: `Studio: ${s.studioName}` });
   return meta;
 };
 
