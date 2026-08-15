@@ -136,7 +136,7 @@ export function createApp() {
         return res.status(403).json({ error: `Chỉ tài khoản CEO/Admin mới được tạo tài khoản mới. (${caller.reason})` });
       }
       const callerId = caller.userId;
-      const { name, email, role, customRoleTitle, assignedBrandId, assignedTalentId } = req.body || {};
+      const { name, email, role, customRoleTitle, assignedBrandId, assignedTalentId, newTalentProfile } = req.body || {};
       if (!name || !email || !role) {
         return res.status(400).json({ error: "Thiếu name/email/role." });
       }
@@ -153,12 +153,39 @@ export function createApp() {
         return res.status(400).json({ error: error.message });
       }
       let assignmentWarning: string | null = null;
-      if (data.user && (assignedBrandId || assignedTalentId)) {
+      // Đảo chiều: role=talent không chọn hồ sơ có sẵn (assignedTalentId) nhưng có
+      // newTalentProfile → tự tạo row `talents` rồi link 2 chiều, thay vì bắt phải tạo
+      // Talent Pool trước ở màn hình khác. Best-effort, không transaction (cùng pattern
+      // gán assignedBrandId/assignedTalentId phía dưới) — tài khoản đã tạo xong dù bước này lỗi.
+      let effectiveTalentId: string | null = assignedTalentId || null;
+      if (data.user && role === "talent" && !assignedTalentId && newTalentProfile?.name) {
+        const { data: newTalent, error: talentInsertError } = await supabaseAdmin
+          .from("talents")
+          .insert({
+            name: newTalentProfile.name,
+            phone: newTalentProfile.phone || "",
+            role: newTalentProfile.role || "Host",
+            gender: newTalentProfile.gender || "",
+            niches: Array.isArray(newTalentProfile.niches) ? newTalentProfile.niches : [],
+            avatar: "",
+            availability_status: "Available",
+            profile_id: data.user.id
+          })
+          .select("id")
+          .single();
+        if (talentInsertError || !newTalent) {
+          console.error("Tự tạo hồ sơ Talent Pool thất bại sau khi invite:", talentInsertError);
+          assignmentWarning = "Tài khoản đã được tạo nhưng tự tạo hồ sơ Talent Pool thất bại — vui lòng tạo/gán thủ công.";
+        } else {
+          effectiveTalentId = newTalent.id;
+        }
+      }
+      if (data.user && (assignedBrandId || effectiveTalentId)) {
         const { error: assignError } = await supabaseAdmin
           .from("profiles")
           .update({
             assigned_brand_id: assignedBrandId || null,
-            assigned_talent_id: assignedTalentId || null
+            assigned_talent_id: effectiveTalentId
           })
           .eq("id", data.user.id);
         if (assignError) {

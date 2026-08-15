@@ -1,23 +1,28 @@
 import React, { useState } from "react";
-import { Talent, Brand } from "../types";
+import { Talent, Brand, UserRole } from "../types";
 import { Users, Sparkles, Award, Search, Filter, Plus, Edit3, Trash2, X, Phone, CheckCircle2 } from "lucide-react";
 import { authedFetch } from "../lib/authedFetch";
 
 interface TalentMatcherProps {
+  currentRole: UserRole;
   talents: Talent[];
   brands: Brand[];
   onAddTalent?: (talent: Talent) => void;
-  onUpdateTalent?: (talent: Talent) => void;
+  onUpdateTalent?: (id: string, patch: Partial<Talent>) => void;
   onDeleteTalent?: (id: string) => void;
 }
 
 export const TalentMatcher: React.FC<TalentMatcherProps> = ({
+  currentRole,
   talents,
   brands,
   onAddTalent,
   onUpdateTalent,
   onDeleteTalent
 }) => {
+  // Rate Card/Hoa hồng — chỉ ceo/admin xem được (đúng dữ liệu trả về từ view `talents_secure`,
+  // vốn đã mask thành 0 cho role khác — ẩn luôn UI cho nhất quán thay vì hiện "0đ" gây hiểu lầm).
+  const canSeeRate = currentRole === "ceo" || currentRole === "admin";
   const [selectedBrandId, setSelectedBrandId] = useState("brand-1");
   const [targetCategory, setTargetCategory] = useState("Mỹ phẩm Skincare");
   const [matchingResults, setMatchingResults] = useState<any[] | null>(null);
@@ -30,6 +35,10 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTalent, setEditingTalent] = useState<Talent | null>(null);
+
+  // Detail/performance view (read-only) — click vào thân card mở modal này thay vì đi thẳng
+  // vào modal sửa; icon bút chì vẫn mở modal sửa như cũ.
+  const [detailTalent, setDetailTalent] = useState<Talent | null>(null);
 
   // Form State
   const [formName, setFormName] = useState("");
@@ -92,8 +101,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
 
     const nichesParsed = formNiches.split(",").map((s) => s.trim()).filter(Boolean);
 
-    const talentPayload: Talent = {
-      id: editingTalent ? editingTalent.id : `talent-${Date.now()}`,
+    const basePayload: Omit<Talent, "id" | "ratePerSession" | "commissionRate"> = {
       name: formName,
       avatar: formAvatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250",
       role: formRole,
@@ -103,8 +111,6 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
       avgGmvPerSession: Number(formGmv),
       ctrAvg: Number(formCtr),
       cvrAvg: Number(formCvr),
-      ratePerSession: Number(formRate),
-      commissionRate: Number(formCommission),
       overallScore: Number(formScore),
       availabilityStatus: formStatus,
       brandsWorkedWith: editingTalent?.brandsWorkedWith || ["Agency Network"],
@@ -112,8 +118,22 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
     };
 
     if (editingTalent) {
-      if (onUpdateTalent) onUpdateTalent(talentPayload);
+      // Partial update — chỉ gửi rate/commissionRate nếu currentRole thấy được field này (form
+      // không hiện input cho non-ceo/admin nên formRate/formCommission vẫn giữ giá trị cũ = 0 từ
+      // view mask — gửi lên sẽ vô tình ghi đè rate thật thành 0 nếu không loại trừ ở đây).
+      const patch: Partial<Talent> = { ...basePayload };
+      if (canSeeRate) {
+        patch.ratePerSession = Number(formRate);
+        patch.commissionRate = Number(formCommission);
+      }
+      if (onUpdateTalent) onUpdateTalent(editingTalent.id, patch);
     } else {
+      const talentPayload: Talent = {
+        id: `talent-${Date.now()}`,
+        ...basePayload,
+        ratePerSession: canSeeRate ? Number(formRate) : 0,
+        commissionRate: canSeeRate ? Number(formCommission) : 0
+      };
       if (onAddTalent) onAddTalent(talentPayload);
     }
 
@@ -180,7 +200,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
       </div>
 
       {/* AI Matching Tool Banner */}
-      <div className="bg-gradient-to-r from-[var(--accent)]/25 to-[var(--surface)] text-white p-6 rounded-2xl border border-[var(--accent)]/50 shadow-lg space-y-4">
+      <div className="bg-gradient-to-r from-[var(--accent)]/25 to-[var(--surface)] text-[var(--text)] p-6 rounded-2xl border border-[var(--accent)]/50 shadow-lg space-y-4">
         <div className="flex items-center gap-2 text-[var(--accent-text)] font-bold text-sm">
           <Sparkles className="w-5 h-5 text-[var(--accent-text)]" /> Trình AI Khớp Nối Host Cho Chiến Dịch
         </div>
@@ -300,7 +320,12 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
             const rate = t.ratePerSession || (t as any).rateCardFee || 0;
 
             return (
-              <div key={t.id} className="p-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-elevated)]/40 space-y-3 hover:border-[var(--accent)] transition-all relative group">
+              <div
+                key={t.id}
+                onClick={() => setDetailTalent(t)}
+                className="p-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-elevated)]/40 space-y-3 hover:border-[var(--accent)] transition-all relative group cursor-pointer"
+                title="Xem chi tiết & hiệu suất"
+              >
                 <div className="flex justify-between items-start">
                   <div className="flex items-center space-x-3 min-w-0 flex-1">
                     <img src={avatar} alt={t.name} className="w-12 h-12 rounded-full object-cover border-2 border-[var(--accent)] shadow-sm shrink-0" />
@@ -319,15 +344,21 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                   {/* Edit & Delete Action Buttons */}
                   <div className="flex items-center gap-1">
                     <button
-                      onClick={() => openEditModal(t)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openEditModal(t);
+                      }}
                       className="p-1.5 text-[var(--text-muted)] hover:text-[var(--accent-text)] hover:bg-[var(--accent-hover)]/40 rounded-lg transition-all"
                       title="Chỉnh sửa Talent"
                     >
                       <Edit3 className="w-3.5 h-3.5" />
                     </button>
                     <button
-                      onClick={() => handleDelete(t.id, t.name)}
-                      className="p-1.5 text-[var(--text-muted)] hover:text-red-400 hover:bg-red-950/40 rounded-lg transition-all"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(t.id, t.name);
+                      }}
+                      className="p-1.5 text-[var(--text-muted)] hover:text-red-400 hover:bg-red-950/80 rounded-lg transition-all"
                       title="Xóa Talent"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -338,8 +369,12 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                 <div className="grid grid-cols-2 gap-2 text-[10px] text-[var(--text-muted)] bg-[var(--surface-base)]/40 p-2.5 rounded-xl border border-[var(--border)] font-medium">
                   <div>GMV TB: <strong className="text-emerald-400 block text-xs font-bold">{((t.avgGmvPerSession || 100000000) / 1000000).toFixed(0)}M đ</strong></div>
                   <div>CVR TB: <strong className="text-[var(--accent-text)] block text-xs font-bold">{t.cvrAvg || 4.5}%</strong></div>
-                  <div>Rate Card: <strong className="text-[var(--text)] block font-bold">{rate.toLocaleString()} đ</strong></div>
-                  <div>Hoa hồng: <strong className="text-[var(--accent-text)] block font-bold">{t.commissionRate || 3}%</strong></div>
+                  {canSeeRate && (
+                    <>
+                      <div>Rate Card: <strong className="text-[var(--text)] block font-bold">{rate.toLocaleString()} đ</strong></div>
+                      <div>Hoa hồng: <strong className="text-[var(--accent-text)] block font-bold">{t.commissionRate || 0}%</strong></div>
+                    </>
+                  )}
                 </div>
 
                 <div className="flex justify-between items-center text-xs pt-1">
@@ -347,8 +382,8 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                     <Phone className="w-3 h-3 text-[var(--text-muted)]" /> {t.phone || "N/A"}
                   </span>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                    t.availabilityStatus === "On Live" ? "bg-red-900/40 text-red-300 animate-pulse" :
-                    t.availabilityStatus === "Busy" ? "bg-amber-900/40 text-amber-300" : "bg-emerald-900/40 text-emerald-300"
+                    t.availabilityStatus === "On Live" ? "bg-red-900/80 text-red-300 animate-pulse" :
+                    t.availabilityStatus === "Busy" ? "bg-amber-900/80 text-amber-300" : "bg-emerald-900/80 text-emerald-300"
                   }`}>
                     {t.availabilityStatus || "Available"}
                   </span>
@@ -470,7 +505,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className={`grid grid-cols-1 gap-3 ${canSeeRate ? "sm:grid-cols-3" : "sm:grid-cols-1"}`}>
                 <div>
                   <label className="font-bold text-[var(--text-muted)] block mb-1">CVR Trung Bình (%)</label>
                   <input
@@ -481,25 +516,30 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                     className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
                   />
                 </div>
-                <div>
-                  <label className="font-bold text-[var(--text-muted)] block mb-1">Rate Card (VND/Live)</label>
-                  <input
-                    type="number"
-                    value={formRate}
-                    onChange={(e) => setFormRate(Number(e.target.value))}
-                    className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
-                  />
-                </div>
-                <div>
-                  <label className="font-bold text-[var(--text-muted)] block mb-1">Hoa Hồng % (Commission)</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={formCommission}
-                    onChange={(e) => setFormCommission(Number(e.target.value))}
-                    className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
-                  />
-                </div>
+                {/* Rate Card/Hoa hồng — trường bảo mật, chỉ ceo/admin sửa được (xem talents_secure). */}
+                {canSeeRate && (
+                  <>
+                    <div>
+                      <label className="font-bold text-[var(--text-muted)] block mb-1">Rate Card (VND/Live)</label>
+                      <input
+                        type="number"
+                        value={formRate}
+                        onChange={(e) => setFormRate(Number(e.target.value))}
+                        className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-bold text-[var(--text-muted)] block mb-1">Hoa Hồng % (Commission)</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={formCommission}
+                        onChange={(e) => setFormCommission(Number(e.target.value))}
+                        className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
+                      />
+                    </div>
+                  </>
+                )}
               </div>
 
               <div>
@@ -529,6 +569,61 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Detail/Performance Modal (read-only) — mở khi click thân card */}
+      {detailTalent && (
+        <div className="fixed inset-0 bg-[var(--surface)]/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[var(--surface)] w-full max-w-lg rounded-2xl shadow-2xl border border-[var(--border)] overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="bg-[var(--surface)] text-[var(--text)] px-6 py-4 flex justify-between items-center border-b border-[var(--border)]">
+              <h3 className="font-bold text-sm flex items-center gap-2">
+                <Award className="w-4 h-4 text-[var(--accent-text)]" />
+                Chi Tiết & Hiệu Suất: {detailTalent.name}
+              </h3>
+              <button onClick={() => setDetailTalent(null)} className="text-[var(--text-muted)] hover:text-[var(--text)]">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 text-xs overflow-y-auto">
+              <div className="flex items-center gap-3">
+                <img
+                  src={detailTalent.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250"}
+                  alt={detailTalent.name}
+                  className="w-14 h-14 rounded-full object-cover border-2 border-[var(--accent)] shadow-sm shrink-0"
+                />
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <h4 className="font-bold text-[var(--text)] text-sm truncate">{detailTalent.name}</h4>
+                    <span className="bg-[var(--accent)]/50 text-[var(--accent-text)] text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0">
+                      {detailTalent.role || "Host"}
+                    </span>
+                  </div>
+                  <p className="text-[var(--text-muted)]">{detailTalent.gender} • {(detailTalent.niches || []).join(", ") || "Đa ngành"}</p>
+                  <p className="text-[var(--text-muted)] flex items-center gap-1 mt-0.5">
+                    <Phone className="w-3 h-3" /> {detailTalent.phone || "N/A"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 bg-[var(--surface-base)]/40 p-3 rounded-xl border border-[var(--border)]">
+                <div>TikTok Followers: <strong className="text-[var(--text)] block text-sm font-bold">{(detailTalent.followersTikTok || 0).toLocaleString()}</strong></div>
+                <div>Điểm Tổng Hợp: <strong className="text-[var(--text)] block text-sm font-bold">{detailTalent.overallScore || 0}</strong></div>
+                <div>GMV TB / Phiên: <strong className="text-emerald-400 block text-sm font-bold">{((detailTalent.avgGmvPerSession || 0) / 1000000).toFixed(0)}M đ</strong></div>
+                <div>CVR TB: <strong className="text-[var(--accent-text)] block text-sm font-bold">{detailTalent.cvrAvg || 0}%</strong></div>
+                <div>CTR TB: <strong className="text-[var(--accent-text)] block text-sm font-bold">{detailTalent.ctrAvg || 0}%</strong></div>
+                <div>Trạng Thái: <strong className="text-[var(--text)] block text-sm font-bold">{detailTalent.availabilityStatus || "Available"}</strong></div>
+              </div>
+
+              {canSeeRate && (
+                <div className="grid grid-cols-2 gap-2 bg-amber-950/30 p-3 rounded-xl border border-amber-500/30">
+                  <div>Rate Card: <strong className="text-[var(--text)] block text-sm font-bold">{(detailTalent.ratePerSession || 0).toLocaleString()} đ</strong></div>
+                  <div>Hoa Hồng: <strong className="text-[var(--accent-text)] block text-sm font-bold">{detailTalent.commissionRate || 0}%</strong></div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

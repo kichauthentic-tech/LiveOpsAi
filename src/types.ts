@@ -83,6 +83,8 @@ export interface Talent {
   availabilityStatus: "Available" | "Busy" | "On Live";
   brandsWorkedWith: string[];
   phone: string;
+  dateOfBirth?: string; // "YYYY-MM-DD"
+  profileId?: string; // liên kết tới profiles.id (tài khoản đăng nhập của chính talent này)
   isCustom?: boolean;
 }
 

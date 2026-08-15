@@ -30,6 +30,7 @@ interface AuthContextValue {
   sendPasswordResetEmail: (email: string) => Promise<{ error: string | null }>;
   reauthenticate: (password: string) => Promise<{ error: string | null }>;
   updatePassword: (newPassword: string) => Promise<{ error: string | null }>;
+  updateEmail: (newEmail: string) => Promise<{ error: string | null }>;
   clearPasswordRecovery: () => void;
 }
 
@@ -138,6 +139,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { error: error?.message ?? null };
   };
 
+  // Supabase gửi email xác nhận tới địa chỉ mới (và thường cả địa chỉ cũ) trước khi thực sự đổi —
+  // profiles.email chỉ đồng bộ sau khi xác nhận xong, qua trigger on_auth_user_email_updated
+  // (0047_talent_rate_and_finance_security.sql), không phải ngay khi gọi hàm này.
+  const updateEmail: AuthContextValue["updateEmail"] = async (newEmail) => {
+    const { error } = await supabase.auth.updateUser({ email: newEmail });
+    return { error: error?.message ?? null };
+  };
+
   const clearPasswordRecovery = () => {
     setPasswordRecovery(false);
     setIsInvite(false);
@@ -158,6 +167,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         sendPasswordResetEmail,
         reauthenticate,
         updatePassword,
+        updateEmail,
         clearPasswordRecovery
       }}
     >

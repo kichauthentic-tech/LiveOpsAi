@@ -62,6 +62,7 @@ import { BrandAudienceAnalytics } from "./components/brand-workspace/BrandAudien
 import { Login } from "./components/Login";
 import { ResetPasswordScreen } from "./components/ResetPasswordScreen";
 import { AccountSettings } from "./components/AccountSettings";
+import { MyTalentProfile } from "./components/MyTalentProfile";
 import { useAuth } from "./hooks/useAuth";
 import { Dashboards } from "./components/Dashboards";
 import { LiveSessionHub } from "./components/LiveSessionHub";
@@ -850,9 +851,9 @@ export default function App() {
       window.alert(`Không thể tạo Talent: ${e.message ?? e}`);
     }
   };
-  const handleUpdateTalent = async (updatedTalent: Talent) => {
+  const handleUpdateTalent = async (id: string, patch: Partial<Talent>) => {
     try {
-      const saved = await updateTalent(updatedTalent);
+      const saved = await updateTalent(id, patch);
       setTalents(prev => prev.map(t => t.id === saved.id ? saved : t));
     } catch (e: any) {
       window.alert(`Không thể cập nhật Talent: ${e.message ?? e}`);
@@ -1266,6 +1267,11 @@ export default function App() {
         // talent cần thấy tab này để tự đăng ký ca (Giai đoạn 14a); màn hình bên trong tự đổi giao
         // diện theo currentRole (talent = đăng ký, ceo/operations/admin = mở ca + chốt lịch).
         { id: "shift_scheduling", label: "Đăng Ký & Chốt Lịch", icon: CalendarClock, badge: "NEW", perm: undefined },
+        // Hồ Sơ Của Tôi — chỉ role talent, cùng pattern hardcode-theo-role như ai_training bên
+        // dưới (không qua Ma Trận Phân Quyền, vì đây là trang tự quản lý của chính talent đó).
+        ...(currentRole === "talent"
+          ? [{ id: "my_talent_profile", label: "Hồ Sơ Của Tôi", icon: Users, perm: undefined }]
+          : []),
       ],
     },
     {
@@ -1285,7 +1291,12 @@ export default function App() {
     {
       label: "Tài Chính",
       items: [
-        { id: "finance", label: "Finance & P&L", icon: DollarSign, perm: "view_financials" as PermissionKey },
+        // Khoá cứng ceo/admin — không qua Ma Trận Phân Quyền (trước đây gate bằng permission
+        // `view_financials` togglable, ceo có thể lỡ bật cho operations qua Ma Trận). Toàn bộ
+        // dữ liệu Finance & HR (lương/hoa hồng/chi phí) giờ chỉ ceo/admin biết được.
+        ...(currentRole === "ceo" || currentRole === "admin"
+          ? [{ id: "finance", label: "Finance & P&L", icon: DollarSign, perm: undefined }]
+          : []),
       ],
     },
     {
@@ -1795,11 +1806,20 @@ export default function App() {
 
                 {activeTab === "talents" && (
                   <TalentMatcher
+                    currentRole={currentRole}
                     talents={activeTalents}
                     brands={activeBrands}
                     onAddTalent={handleAddTalent}
                     onUpdateTalent={handleUpdateTalent}
                     onDeleteTalent={handleDeleteTalent}
+                  />
+                )}
+
+                {activeTab === "my_talent_profile" && currentRole === "talent" && (
+                  <MyTalentProfile
+                    activeUser={activeUser}
+                    talents={talents}
+                    onUpdateTalent={handleUpdateTalent}
                   />
                 )}
 

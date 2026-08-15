@@ -34,6 +34,13 @@ export interface NewUserPayload {
   customRoleTitle: string;
   assignedBrandId?: string;
   assignedTalentId?: string;
+  newTalentProfile?: {
+    name: string;
+    phone: string;
+    role: "Host" | "KOC" | "KOL" | "MC";
+    gender: string;
+    niches: string[];
+  };
 }
 
 interface UserRoleSettingsProps {
@@ -92,6 +99,17 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
     assignedTalentId: ""
   });
 
+  // Đảo chiều luồng tạo talent (chỉ áp dụng khi tạo mới, không phải sửa): "existing" = link
+  // vào 1 hồ sơ Talent Pool có sẵn (dropdown, luồng cũ, dùng để dọn dữ liệu cũ chưa có account);
+  // "new" = nhập nhanh thông tin cơ bản, server tự tạo hồ sơ Talent Pool + link 2 chiều luôn.
+  const [talentLinkMode, setTalentLinkMode] = useState<"existing" | "new">("new");
+  const [newTalentForm, setNewTalentForm] = useState<{
+    phone: string;
+    role: "Host" | "KOC" | "KOL" | "MC";
+    gender: string;
+    niches: string;
+  }>({ phone: "", role: "Host", gender: "Nữ", niches: "" });
+
   // Modal state for Custom User Permissions Overrides
   const [permissionOverrideUser, setPermissionOverrideUser] = useState<SystemUser | null>(null);
 
@@ -107,15 +125,19 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
     });
   }, [users, userSearch, userRoleFilter]);
 
-  // Group permissions by category
+  // Group permissions by category — bỏ view_financials/manage_finance_hr khỏi Ma Trận: Finance &
+  // HR giờ khoá cứng ceo/admin ở App.tsx, không còn togglable qua đây (tránh hiểu lầm là bật
+  // được cho role khác — xem "Khoá cứng Finance & HR" trong WORKSPACE_DESIGN.md).
   const groupedPermissions = useMemo(() => {
     const groups: Record<string, PermissionDefinition[]> = {};
-    permissionDefinitions.forEach((def) => {
-      if (!groups[def.category]) {
-        groups[def.category] = [];
-      }
-      groups[def.category].push(def);
-    });
+    permissionDefinitions
+      .filter((def) => def.key !== "view_financials" && def.key !== "manage_finance_hr")
+      .forEach((def) => {
+        if (!groups[def.category]) {
+          groups[def.category] = [];
+        }
+        groups[def.category].push(def);
+      });
     return groups;
   }, [permissionDefinitions]);
 
@@ -284,13 +306,23 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
         };
         await onUpdateUser(updated);
       } else {
+        const isNewTalentLink = formData.role === "talent" && talentLinkMode === "new";
         await onAddUser({
           name: formData.name,
           email: formData.email,
           role: formData.role,
           customRoleTitle: formData.customRoleTitle || getRoleDefaultTitle(formData.role),
           assignedBrandId: formData.role === "brand" ? formData.assignedBrandId : undefined,
-          assignedTalentId: formData.role === "talent" ? formData.assignedTalentId : undefined
+          assignedTalentId: formData.role === "talent" && talentLinkMode === "existing" ? formData.assignedTalentId : undefined,
+          newTalentProfile: isNewTalentLink
+            ? {
+                name: formData.name,
+                phone: newTalentForm.phone,
+                role: newTalentForm.role,
+                gender: newTalentForm.gender,
+                niches: newTalentForm.niches.split(",").map((s) => s.trim()).filter(Boolean)
+              }
+            : undefined
         });
       }
 
@@ -314,6 +346,8 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
       assignedBrandId: "",
       assignedTalentId: ""
     });
+    setTalentLinkMode("new");
+    setNewTalentForm({ phone: "", role: "Host", gender: "Nữ", niches: "" });
     setIsUserModalOpen(true);
   };
 
@@ -692,17 +726,17 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
 
                         <td className="p-4">
                           {u.role === "brand" && assignedBrand ? (
-                            <span className="bg-emerald-950/60 text-emerald-300 border border-emerald-500/30 px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1.5 w-fit">
+                            <span className="bg-emerald-950/85 text-emerald-300 border border-emerald-500/30 px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1.5 w-fit">
                               <Building2 className="w-3.5 h-3.5 text-emerald-400" />
                               <span>{assignedBrand.name}</span>
                             </span>
                           ) : u.role === "talent" && assignedTalent ? (
-                            <span className="bg-amber-950/60 text-amber-300 border border-amber-500/30 px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1.5 w-fit">
+                            <span className="bg-amber-950/85 text-amber-300 border border-amber-500/30 px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1.5 w-fit">
                               <Radio className="w-3.5 h-3.5 text-amber-400" />
                               <span>{assignedTalent.name}</span>
                             </span>
                           ) : u.role === "moderator" ? (
-                            <span className="bg-cyan-950/60 text-cyan-300 border border-cyan-500/30 px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1.5 w-fit">
+                            <span className="bg-cyan-950/85 text-cyan-300 border border-cyan-500/30 px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1.5 w-fit">
                               <Radio className="w-3.5 h-3.5 text-cyan-400" />
                               <span>{countModeratorSessions(u.id)} ca đã phụ trách</span>
                             </span>
@@ -914,7 +948,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
 
               {/* Conditional Brand selection if role is brand */}
               {formData.role === "brand" && (
-                <div className="space-y-1 p-3 bg-emerald-950/40 border border-emerald-500/30 rounded-xl">
+                <div className="space-y-1 p-3 bg-emerald-950/80 border border-emerald-500/30 rounded-xl">
                   <label className="text-emerald-300 font-bold block">
                     Gán Khách Hàng Brand Quản Lý (*)
                   </label>
@@ -936,23 +970,93 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
 
               {/* Conditional Talent selection if role is talent */}
               {formData.role === "talent" && (
-                <div className="space-y-1 p-3 bg-amber-950/40 border border-amber-500/30 rounded-xl">
-                  <label className="text-amber-300 font-bold block">
-                    Gán Profile Talent Host (*)
-                  </label>
-                  <select
-                    required
-                    value={formData.assignedTalentId}
-                    onChange={(e) => setFormData({ ...formData, assignedTalentId: e.target.value })}
-                    className="w-full px-3 py-2 bg-[var(--surface-base)] rounded-xl border border-[var(--border)] text-[var(--text)] focus:outline-none focus:border-amber-500 font-bold"
-                  >
-                    <option value="">-- Chọn Host Livestream --</option>
-                    {talents.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name} ({t.role})
-                      </option>
-                    ))}
-                  </select>
+                <div className="space-y-2 p-3 bg-amber-950/80 border border-amber-500/30 rounded-xl">
+                  {!editingUser && (
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setTalentLinkMode("new")}
+                        className={`flex-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition-all ${
+                          talentLinkMode === "new"
+                            ? "bg-amber-500 text-black border-amber-400"
+                            : "bg-[var(--surface-base)] text-amber-300 border-amber-500/30"
+                        }`}
+                      >
+                        Tạo Hồ Sơ Talent Mới
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTalentLinkMode("existing")}
+                        className={`flex-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition-all ${
+                          talentLinkMode === "existing"
+                            ? "bg-amber-500 text-black border-amber-400"
+                            : "bg-[var(--surface-base)] text-amber-300 border-amber-500/30"
+                        }`}
+                      >
+                        Link Hồ Sơ Có Sẵn
+                      </button>
+                    </div>
+                  )}
+
+                  {(editingUser || talentLinkMode === "existing") ? (
+                    <div>
+                      <label className="text-amber-300 font-bold block mb-1">Gán Profile Talent Host (*)</label>
+                      <select
+                        required
+                        value={formData.assignedTalentId}
+                        onChange={(e) => setFormData({ ...formData, assignedTalentId: e.target.value })}
+                        className="w-full px-3 py-2 bg-[var(--surface-base)] rounded-xl border border-[var(--border)] text-[var(--text)] focus:outline-none focus:border-amber-500 font-bold"
+                      >
+                        <option value="">-- Chọn Host Livestream --</option>
+                        {talents.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.name} ({t.role})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-[10px] text-amber-300/80">
+                        Tên hồ sơ Talent Pool = Tên hiển thị ở trên ({formData.name || "chưa nhập"}). Hệ thống tự tạo + link tài khoản này ngay sau khi tạo.
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          placeholder="Số điện thoại"
+                          value={newTalentForm.phone}
+                          onChange={(e) => setNewTalentForm({ ...newTalentForm, phone: e.target.value })}
+                          className="px-3 py-2 bg-[var(--surface-base)] rounded-xl border border-[var(--border)] text-[var(--text)] focus:outline-none focus:border-amber-500"
+                        />
+                        <select
+                          value={newTalentForm.role}
+                          onChange={(e) => setNewTalentForm({ ...newTalentForm, role: e.target.value as any })}
+                          className="px-3 py-2 bg-[var(--surface-base)] rounded-xl border border-[var(--border)] text-[var(--text)] focus:outline-none focus:border-amber-500"
+                        >
+                          <option value="Host">Host</option>
+                          <option value="KOC">KOC</option>
+                          <option value="KOL">KOL</option>
+                          <option value="MC">MC</option>
+                        </select>
+                        <select
+                          value={newTalentForm.gender}
+                          onChange={(e) => setNewTalentForm({ ...newTalentForm, gender: e.target.value })}
+                          className="px-3 py-2 bg-[var(--surface-base)] rounded-xl border border-[var(--border)] text-[var(--text)] focus:outline-none focus:border-amber-500"
+                        >
+                          <option value="Nữ">Nữ</option>
+                          <option value="Nam">Nam</option>
+                          <option value="Khác">Khác</option>
+                        </select>
+                        <input
+                          type="text"
+                          placeholder="Ngành hàng (phân cách bằng dấu phẩy)"
+                          value={newTalentForm.niches}
+                          onChange={(e) => setNewTalentForm({ ...newTalentForm, niches: e.target.value })}
+                          className="px-3 py-2 bg-[var(--surface-base)] rounded-xl border border-[var(--border)] text-[var(--text)] focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1028,7 +1132,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                     key={def.key}
                     className={`p-3 rounded-xl border flex items-center justify-between gap-3 ${
                       isOverridden
-                        ? "bg-amber-950/30 border-amber-500/50"
+                        ? "bg-amber-950/80 border-amber-500/50"
                         : "bg-[var(--surface-base)] border-[var(--border)]"
                     }`}
                   >

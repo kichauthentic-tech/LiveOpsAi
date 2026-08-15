@@ -61,6 +61,14 @@ export async function updateUserProfile(u: SystemUser): Promise<SystemUser> {
   return fromDb(data as DbProfile);
 }
 
+export interface NewTalentProfilePayload {
+  name: string;
+  phone: string;
+  role: "Host" | "KOC" | "KOL" | "MC";
+  gender: string;
+  niches: string[];
+}
+
 export interface InviteUserPayload {
   name: string;
   email: string;
@@ -68,6 +76,9 @@ export interface InviteUserPayload {
   customRoleTitle: string;
   assignedBrandId?: string;
   assignedTalentId?: string;
+  // Đảo chiều luồng tạo talent: khi role="talent" và không chọn assignedTalentId có sẵn,
+  // gửi thông tin cơ bản này để server tự tạo hồ sơ Talent Pool + link 2 chiều luôn.
+  newTalentProfile?: NewTalentProfilePayload;
 }
 
 async function authedFetch(path: string, init: RequestInit): Promise<Response> {
