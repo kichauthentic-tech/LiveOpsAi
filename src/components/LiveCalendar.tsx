@@ -1198,7 +1198,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                         startTime={ds.startTime}
                         endTime={ds.endTime}
                         meta={buildSessionMeta(ds)}
-                        metaLimit={3}
+                        metaLimit={4}
                         tone={SESSION_TONE[ds.status]}
                         statusLabel={SESSION_STATUS_LABEL[ds.status]}
                         dragging={draggedSessionId === ds.id}

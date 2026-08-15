@@ -1,5 +1,5 @@
 import React from "react";
-import { Building2, GripVertical, LucideIcon, Mic, ShoppingBag, Users } from "lucide-react";
+import { Building2, GripVertical, LucideIcon, Mic, ShoppingBag, Target, Users } from "lucide-react";
 import { Brand, LiveSession, ShiftSlot } from "../../types";
 import { BrandTheme, brandGradient } from "../../lib/brandTheme";
 import { BrandLogo } from "./BrandLogo";
@@ -145,10 +145,12 @@ export const SessionEventCard: React.FC<SessionEventCardProps> = ({
         <div className={`truncate opacity-90 font-semibold ${compact ? "text-[9px]" : "text-[10px] mt-0.5"}`}>{title}</div>
       )}
 
-      {/* Hàng 3: chip thông tin mở rộng — thêm host/co-host/GMV/... qua prop `meta`.
-          Ẩn dưới xl ở size "sm": ô lịch tháng lúc đó hẹp hơn 1 chip, hiện ra chỉ còn icon vô nghĩa. */}
+      {/* Hàng 3: chip thông tin mở rộng — brand/giờ đã ở hàng 1-2, chip này luôn hiện (mọi khổ
+          màn hình, mọi khung lịch tuần/tháng) để đủ bộ thông tin vận hành: nền tảng, Target GMV,
+          host + trợ. Grid tháng có min-width cưỡng bức (xem PosterCalendarGrid) nên luôn đủ chỗ
+          ngang cho vài chip hẹp; chip tự xuống dòng (flex-wrap) khi cần. */}
       {shown.length > 0 && (
-        <div className={`flex-wrap items-center gap-1 mt-1 ${compact ? "hidden xl:flex" : "flex"}`}>
+        <div className="flex flex-wrap items-center gap-1 mt-1">
           {shown.map((m, i) => (
             <span
               key={i}
@@ -194,14 +196,25 @@ export const SESSION_STATUS_LABEL: Record<LiveSession["status"], string | undefi
 // Rút tên còn "họ cuối + tên" cho vừa chip mà vẫn nhận ra người (Nguyễn Thị Mai Anh → Mai Anh).
 const shortName = (full: string): string => full.trim().split(/\s+/).slice(-2).join(" ");
 
+// Target GMV rút gọn cho vừa 1 chip hẹp (50.000.000đ → 50tr, 1.200.000.000đ → 1.2tỷ) — bản đầy đủ
+// vào `title` để hover xem chính xác.
+const compactGmv = (amount: number): string => {
+  const abs = Math.abs(amount);
+  if (abs >= 1_000_000_000) return `${(amount / 1_000_000_000).toLocaleString("vi-VN", { maximumFractionDigits: 1 })}tỷ`;
+  if (abs >= 1_000_000) return `${(amount / 1_000_000).toLocaleString("vi-VN", { maximumFractionDigits: 1 })}tr`;
+  if (abs >= 1_000) return `${(amount / 1_000).toLocaleString("vi-VN", { maximumFractionDigits: 0 })}k`;
+  return `${amount}`;
+};
+
 /** Thứ tự chip = thứ tự ưu tiên khi ô lịch hẹp (size "sm" chỉ hiện `metaLimit` chip đầu).
- * Cố ý KHÔNG có Target GMV: con số GMV thuộc về lịch báo cáo hiệu suất, lịch vận hành chỉ
- * trả lời "ai live, ở đâu, trên nền tảng nào". */
+ * Bộ 4 thông tin vận hành bắt buộc theo mọi khung lịch: nền tảng, Target GMV, host, trợ (co-host).
+ * Actual GMV (kết quả) không thuộc đây — đó là số của lịch báo cáo hiệu suất, không phải lịch vận hành. */
 export const buildSessionMeta = (s: LiveSession): SessionCardMeta[] => {
   const meta: SessionCardMeta[] = [];
-  if (s.hostName) meta.push({ icon: Mic, label: shortName(s.hostName), title: `Host: ${s.hostName}` });
   if (s.platform) meta.push({ icon: ShoppingBag, label: s.platform, title: `Nền tảng: ${s.platform}` });
-  if (s.coHostName) meta.push({ icon: Users, label: shortName(s.coHostName), title: `Co-Host: ${s.coHostName}` });
+  if (s.targetGmv) meta.push({ icon: Target, label: compactGmv(s.targetGmv), title: `Target GMV: ${s.targetGmv.toLocaleString("vi-VN")}đ` });
+  if (s.hostName) meta.push({ icon: Mic, label: shortName(s.hostName), title: `Host: ${s.hostName}` });
+  if (s.coHostName) meta.push({ icon: Users, label: shortName(s.coHostName), title: `Trợ (Co-Host): ${s.coHostName}` });
   if (s.studioName) meta.push({ icon: Building2, label: s.studioName.split(" - ")[0], title: `Studio: ${s.studioName}` });
   return meta;
 };
