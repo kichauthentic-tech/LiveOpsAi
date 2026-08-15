@@ -123,39 +123,39 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
 
   return (
     <div className="space-y-6">
-      <div className="bg-slate-900 text-white p-6 rounded-2xl border border-slate-800 shadow-xl space-y-2">
-        <span className="text-purple-400 font-semibold text-xs uppercase tracking-wider block flex items-center gap-1.5">
-          <DollarSign className="w-4 h-4 text-purple-400" /> Modules 11 & 12: Finance, Unit Economics & HR
+      <div className="bg-[var(--surface)] text-[var(--text)] p-6 rounded-2xl border border-[var(--border)] shadow-xl space-y-2">
+        <span className="text-[var(--accent-text)] font-semibold text-xs uppercase tracking-wider block flex items-center gap-1.5">
+          <DollarSign className="w-4 h-4 text-[var(--accent-text)]" /> Modules 11 & 12: Finance, Unit Economics & HR
         </span>
         <h2 className="text-2xl font-black">Tài Chính P&L Trận Live & Quản Lý Nhân Sự Agency</h2>
       </div>
 
       {/* Real P&L report per completed session */}
-      <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-sm space-y-4">
-        <div className="border-b border-slate-800 pb-3 flex items-center justify-between flex-wrap gap-2">
+      <div className="bg-[var(--surface)] p-6 rounded-2xl border border-[var(--border)] shadow-sm space-y-4">
+        <div className="border-b border-[var(--border)] pb-3 flex items-center justify-between flex-wrap gap-2">
           <div>
-            <h3 className="font-bold text-slate-100 text-base flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-purple-400" /> Báo Cáo P&L Thật Theo Phiên Live
+            <h3 className="font-bold text-[var(--text)] text-base flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-[var(--accent-text)]" /> Báo Cáo P&L Thật Theo Phiên Live
             </h3>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-[var(--text-muted)]">
               GMV & Host lấy từ dữ liệu phiên/talent thật trên Supabase. Commission Agency, chi phí Studio/Ads nhập & lưu thật, chỉ CEO mới duyệt được.
             </p>
           </div>
-          <div className="text-right text-xs bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-2">
-            <div className="text-slate-400">Tổng {rows.length} phiên · Net Profit</div>
+          <div className="text-right text-xs bg-[var(--surface-elevated)]/50 border border-[var(--border)] rounded-xl px-4 py-2">
+            <div className="text-[var(--text-muted)]">Tổng {rows.length} phiên · Net Profit</div>
             <div className={`text-lg font-black ${totals.netProfit >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-              {money(totals.netProfit)} đ <span className="text-xs font-bold text-slate-400">({totalMargin}%)</span>
+              {money(totals.netProfit)} đ <span className="text-xs font-bold text-[var(--text-muted)]">({totalMargin}%)</span>
             </div>
           </div>
         </div>
 
         {rows.length === 0 ? (
-          <p className="text-xs text-slate-400 italic py-6 text-center">Chưa có phiên live nào ở trạng thái "Completed" để tính P&L thật.</p>
+          <p className="text-xs text-[var(--text-muted)] italic py-6 text-center">Chưa có phiên live nào ở trạng thái "Completed" để tính P&L thật.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="text-left text-slate-400 border-b border-slate-800">
+                <tr className="text-left text-[var(--text-muted)] border-b border-[var(--border)]">
                   <th className="py-2 pr-3">Phiên</th>
                   <th className="py-2 pr-3">GMV Thật</th>
                   <th className="py-2 pr-3">Doanh Thu Agency</th>
@@ -169,21 +169,21 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
               <tbody>
                 {rows.map(({ session: s, finance, talent, isHourly, grossAgencyRev, hostPayout, netProfit }) => {
                   return (
-                  <tr key={s.id} className="border-b border-slate-800/60 align-middle">
+                  <tr key={s.id} className="border-b border-[var(--border)]/60 align-middle">
                     <td className="py-2 pr-3">
-                      <div className="font-bold text-slate-200 flex items-center gap-1.5">
+                      <div className="font-bold text-[var(--text)] flex items-center gap-1.5">
                         {s.title}
                       </div>
-                      <div className="text-slate-400">{s.brandName} · {s.date} · Host {talent?.name ?? s.hostName}</div>
+                      <div className="text-[var(--text-muted)]">{s.brandName} · {s.date} · Host {talent?.name ?? s.hostName}</div>
                     </td>
-                    <td className="py-2 pr-3 font-bold text-slate-300">{money(s.actualGmv)} đ</td>
+                    <td className="py-2 pr-3 font-bold text-[var(--text-muted)]">{money(s.actualGmv)} đ</td>
                     <td className="py-2 pr-3">
                       {isHourly ? (
                         <div>
                           <span className="text-[9px] font-bold bg-blue-950 text-blue-300 border border-blue-800 px-1.5 py-0.5 rounded-full">
                             Theo giờ live
                           </span>
-                          <div className="font-bold text-slate-200 mt-0.5">{money(grossAgencyRev)} đ</div>
+                          <div className="font-bold text-[var(--text)] mt-0.5">{money(grossAgencyRev)} đ</div>
                         </div>
                       ) : (
                         <div className="flex items-center gap-1">
@@ -192,9 +192,9 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                             defaultValue={finance.agencyCommissionRate}
                             disabled={savingId === s.id}
                             onBlur={(e) => handleFieldChange(s.id, "agencyCommissionRate", Number(e.target.value))}
-                            className="w-14 p-1.5 rounded-lg border border-slate-700 bg-slate-950 text-slate-100 font-bold disabled:opacity-40"
+                            className="w-14 p-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface-base)] text-[var(--text)] font-bold disabled:opacity-40"
                           />
-                          <span className="text-slate-500">% GMV</span>
+                          <span className="text-[var(--text-faint)]">% GMV</span>
                         </div>
                       )}
                     </td>
@@ -204,7 +204,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                         defaultValue={finance.studioCost}
                         disabled={savingId === s.id}
                         onBlur={(e) => handleFieldChange(s.id, "studioCost", Number(e.target.value))}
-                        className="w-24 p-1.5 rounded-lg border border-slate-700 bg-slate-950 text-slate-100 font-bold disabled:opacity-40"
+                        className="w-24 p-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface-base)] text-[var(--text)] font-bold disabled:opacity-40"
                       />
                     </td>
                     <td className="py-2 pr-3">
@@ -213,7 +213,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                         defaultValue={finance.adsCost}
                         disabled={savingId === s.id}
                         onBlur={(e) => handleFieldChange(s.id, "adsCost", Number(e.target.value))}
-                        className="w-24 p-1.5 rounded-lg border border-slate-700 bg-slate-950 text-slate-100 font-bold disabled:opacity-40"
+                        className="w-24 p-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface-base)] text-[var(--text)] font-bold disabled:opacity-40"
                       />
                     </td>
                     <td className="py-2 pr-3 text-amber-400 font-bold">{money(hostPayout)} đ</td>
@@ -243,7 +243,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                           <button
                             onClick={() => handleApprove(s.id, "approved")}
                             disabled={savingId === s.id}
-                            className="text-emerald-400 hover:bg-emerald-950/40 p-1 rounded-lg disabled:opacity-40"
+                            className="text-emerald-400 hover:bg-emerald-950/80 p-1 rounded-lg disabled:opacity-40"
                             title="Duyệt bảng lương"
                           >
                             <CheckCircle2 className="w-4 h-4" />
@@ -251,12 +251,12 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                           <button
                             onClick={() => handleApprove(s.id, "rejected")}
                             disabled={savingId === s.id}
-                            className="text-red-400 hover:bg-red-950/40 p-1 rounded-lg disabled:opacity-40"
+                            className="text-red-400 hover:bg-red-950/80 p-1 rounded-lg disabled:opacity-40"
                             title="Từ chối"
                           >
                             <XCircle className="w-4 h-4" />
                           </button>
-                          <span className="flex items-center gap-1 text-slate-400"><Clock className="w-3 h-3" /> Chờ duyệt</span>
+                          <span className="flex items-center gap-1 text-[var(--text-muted)]"><Clock className="w-3 h-3" /> Chờ duyệt</span>
                         </div>
                       )}
                     </td>

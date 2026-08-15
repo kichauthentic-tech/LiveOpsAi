@@ -791,12 +791,12 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Top Banner */}
-      <div className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-2xl shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <div className="bg-[var(--surface)] border border-[var(--border)] p-4 sm:p-6 rounded-2xl shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="space-y-1">
-          <span className="text-blue-400 font-semibold text-[11px] sm:text-xs uppercase tracking-wider flex items-center gap-1.5">
-            <CalendarIcon className="w-4 h-4 text-blue-400 shrink-0" /> Operating Calendar & Multi-View Studio Allocator
+          <span className="text-[var(--accent-text)] font-semibold text-[11px] sm:text-xs uppercase tracking-wider flex items-center gap-1.5">
+            <CalendarIcon className="w-4 h-4 text-[var(--accent-text)] shrink-0" /> Operating Calendar & Multi-View Studio Allocator
           </span>
-          <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+          <h2 className="text-xl sm:text-2xl font-black text-[var(--text)] tracking-tight">
             Lịch Vận Hành Phiên Live
           </h2>
         </div>
@@ -807,7 +807,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
               setNewDate(selectedDate);
               setIsBookingModalOpen(true);
             }}
-            className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 transition-all active:scale-95"
+            className="w-full sm:w-auto bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-[var(--accent)]/20 transition-all active:scale-95"
           >
             <Plus className="w-4 h-4" /> Đặt Lịch Phiên Live Mới
           </button>
@@ -815,16 +815,16 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
       </div>
 
       {/* Primary Navigation & Date View Control Bar */}
-      <div className="bg-slate-900/90 border border-slate-800 p-3 sm:p-4 rounded-2xl flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+      <div className="bg-[var(--surface)]/90 border border-[var(--border)] p-3 sm:p-4 rounded-2xl flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
         {/* View Mode Switcher */}
         <div className="overflow-x-auto no-scrollbar pb-1 lg:pb-0">
-          <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs font-bold whitespace-nowrap min-w-max">
+          <div className="flex items-center bg-[var(--surface-base)] p-1 rounded-xl border border-[var(--border)] text-xs font-bold whitespace-nowrap min-w-max">
             <button
               onClick={() => setViewMode("month")}
               className={`px-3 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
                 viewMode === "month"
-                  ? "bg-blue-600 text-white shadow-sm font-black"
-                  : "text-slate-400 hover:text-white"
+                  ? "bg-[var(--accent)] text-white shadow-sm font-black"
+                  : "text-[var(--text-muted)] hover:text-[var(--text)]"
               }`}
             >
               <CalendarIcon className="w-3.5 h-3.5" /> Lịch Tháng
@@ -833,8 +833,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
               onClick={() => setViewMode("week")}
               className={`px-3 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
                 viewMode === "week"
-                  ? "bg-blue-600 text-white shadow-sm font-black"
-                  : "text-slate-400 hover:text-white"
+                  ? "bg-[var(--accent)] text-white shadow-sm font-black"
+                  : "text-[var(--text-muted)] hover:text-[var(--text)]"
               }`}
             >
               <CalendarIcon className="w-3.5 h-3.5" /> Lịch Tuần
@@ -843,8 +843,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
               onClick={() => setViewMode("day")}
               className={`px-3 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
                 viewMode === "day"
-                  ? "bg-blue-600 text-white shadow-sm font-black"
-                  : "text-slate-400 hover:text-white"
+                  ? "bg-[var(--accent)] text-white shadow-sm font-black"
+                  : "text-[var(--text-muted)] hover:text-[var(--text)]"
               }`}
             >
               <Building2 className="w-3.5 h-3.5" /> Ma Trận Ngày (Studio)
@@ -853,8 +853,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
               onClick={() => setViewMode("talent_workload")}
               className={`px-3 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
                 viewMode === "talent_workload"
-                  ? "bg-blue-600 text-white shadow-sm font-black"
-                  : "text-slate-400 hover:text-white"
+                  ? "bg-[var(--accent)] text-white shadow-sm font-black"
+                  : "text-[var(--text-muted)] hover:text-[var(--text)]"
               }`}
             >
               <User className="w-3.5 h-3.5" /> Tải Lịch Host
@@ -864,10 +864,10 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
 
         {/* Date / Month / Week Step Navigation */}
         <div className="flex flex-wrap items-center justify-between lg:justify-end gap-2 text-xs">
-          <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+          <div className="flex items-center gap-1 bg-[var(--surface-base)] p-1 rounded-xl border border-[var(--border)]">
             <button
               onClick={handlePrevPeriod}
-              className="p-1.5 hover:bg-slate-800 text-slate-300 rounded-lg transition-colors"
+              className="p-1.5 hover:bg-[var(--surface-elevated)] text-[var(--text-muted)] rounded-lg transition-colors"
               title="Thời gian trước"
             >
               <ChevronLeft className="w-4 h-4" />
@@ -875,12 +875,12 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
 
             <button
               onClick={handleGoToday}
-              className="px-2.5 py-1 text-[11px] font-bold bg-slate-800 hover:bg-slate-700 text-blue-400 rounded-lg transition-colors"
+              className="px-2.5 py-1 text-[11px] font-bold bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--accent-text)] rounded-lg transition-colors"
             >
               Hôm Nay
             </button>
 
-            <span className="font-mono font-bold text-white px-2.5 text-xs text-center min-w-[140px]">
+            <span className="font-mono font-bold text-[var(--text)] px-2.5 text-xs text-center min-w-[140px]">
               {viewMode === "month" && `Tháng ${currentMonth < 10 ? '0' + currentMonth : currentMonth} / ${currentYear}`}
               {viewMode === "week" && `Tuần (${currentWeekDates[0]?.dayNum}/${parseDateString(currentWeekDates[0]?.dateStr || '').month} - ${currentWeekDates[6]?.dayNum}/${parseDateString(currentWeekDates[6]?.dateStr || '').month})`}
               {(viewMode === "day" || viewMode === "talent_workload") && `${getDayOfWeekName(selectedDate)}, ${selectedDate}`}
@@ -888,7 +888,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
 
             <button
               onClick={handleNextPeriod}
-              className="p-1.5 hover:bg-slate-800 text-slate-300 rounded-lg transition-colors"
+              className="p-1.5 hover:bg-[var(--surface-elevated)] text-[var(--text-muted)] rounded-lg transition-colors"
               title="Thời gian tiếp"
             >
               <ChevronRight className="w-4 h-4" />
@@ -896,8 +896,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
           </div>
 
           {/* Quick Date Picker */}
-          <div className="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800">
-            <CalendarIcon className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+          <div className="flex items-center gap-2 bg-[var(--surface-base)] px-3 py-1.5 rounded-xl border border-[var(--border)]">
+            <CalendarIcon className="w-3.5 h-3.5 text-[var(--accent-text)] shrink-0" />
             <input
               type="date"
               value={selectedDate}
@@ -910,7 +910,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   setCurrentMonth(parsed.month);
                 }
               }}
-              className="bg-transparent text-white focus:outline-none cursor-pointer font-mono text-xs"
+              className="bg-transparent text-[var(--text)] focus:outline-none cursor-pointer font-mono text-xs"
             />
           </div>
         </div>
@@ -970,7 +970,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
           </span>
         </div>
       ) : (
-        <div className="bg-slate-900/60 border border-slate-800/80 px-4 py-2.5 rounded-xl text-xs text-slate-400 flex items-center gap-2">
+        <div className="bg-[var(--surface)]/60 border border-[var(--border)]/80 px-4 py-2.5 rounded-xl text-xs text-[var(--text-muted)] flex items-center gap-2">
           <GripVertical className="w-4 h-4 text-blue-400 shrink-0" />
           <span>
             <strong className="text-blue-300 font-semibold">Tính năng Kéo-Thả (Drag &amp; Drop):</strong> Kéo trực tiếp thẻ ca live sang ô Studio/Khung giờ mới hoặc Ngày khác để đổi thời gian lịch live nhanh chóng không cần mở form.
@@ -995,7 +995,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
           <span className="flex-1 leading-relaxed">{toastNotification.text}</span>
           <button
             onClick={() => setToastNotification(null)}
-            className="text-slate-400 hover:text-white p-1 rounded-lg"
+            className="text-[var(--text-muted)] hover:text-[var(--text)] p-1 rounded-lg"
           >
             <X className="w-4 h-4" />
           </button>
@@ -1005,20 +1005,20 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
       {/* Filter Dropdowns & Search — đặt ngay trên lịch để lọc áp dụng tức thì cho view đang xem */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs">
         <div className="relative">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+          <Search className="w-4 h-4 text-[var(--text-muted)] absolute left-3 top-3" />
           <input
             type="text"
             placeholder="Tìm theo tên phiên, Host, Brand..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-white focus:outline-none focus:border-blue-500 font-medium"
+            className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-xl pl-9 pr-3 py-2 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
           />
         </div>
 
         <select
           value={selectedStudioFilter}
           onChange={(e) => setSelectedStudioFilter(e.target.value)}
-          className="bg-slate-900 border border-slate-800 rounded-xl p-2 text-white focus:outline-none focus:border-blue-500 font-medium"
+          className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-2 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
         >
           <option value="ALL">🏢 Tất cả phòng Studio ({studios.length})</option>
           {studios.map((s) => (
@@ -1029,7 +1029,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
         <select
           value={selectedHostFilter}
           onChange={(e) => setSelectedHostFilter(e.target.value)}
-          className="bg-slate-900 border border-slate-800 rounded-xl p-2 text-white focus:outline-none focus:border-blue-500 font-medium"
+          className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-2 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
         >
           <option value="ALL">🎙️ Tất cả Host / KOC ({talents.length})</option>
           {talents.map((t) => (
@@ -1040,7 +1040,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
         <select
           value={selectedBrandFilter}
           onChange={(e) => setSelectedBrandFilter(e.target.value)}
-          className="bg-slate-900 border border-slate-800 rounded-xl p-2 text-white focus:outline-none focus:border-blue-500 font-medium"
+          className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-2 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
         >
           <option value="ALL">🌿 Tất cả Brand Khách Hàng ({brands.length})</option>
           {brands.map((b) => (
@@ -1406,39 +1406,39 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
 
       {/* VIEW 3: DAY MATRIX VIEW (Ma Trận Phòng Studio Với 5 Ca Cố Định) */}
       {viewMode === "day" && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl space-y-4">
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-6 shadow-xl space-y-4">
           {(() => {
             const campaignDay = getCampaignDayInfo(selectedDate);
             return campaignDay ? <CampaignDayBanner info={campaignDay} className="w-full !rounded-xl justify-center py-1.5" /> : null;
           })()}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-800 pb-3 gap-2">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-[var(--border)] pb-3 gap-2">
             <div>
-              <h3 className="font-bold text-white text-base flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-blue-400 shrink-0" /> Ma Trận Phân Bổ Phòng Studio - Ngày {selectedDate} ({getDayOfWeekName(selectedDate)})
+              <h3 className="font-bold text-[var(--text)] text-base flex items-center gap-2">
+                <Building2 className="w-5 h-5 text-[var(--accent-text)] shrink-0" /> Ma Trận Phân Bổ Phòng Studio - Ngày {selectedDate} ({getDayOfWeekName(selectedDate)})
               </h3>
-              <p className="text-xs text-slate-400">Kéo thả ca live vào bất kỳ ô Studio/Ca Live để đổi phòng hoặc ca làm việc linh hoạt</p>
+              <p className="text-xs text-[var(--text-muted)]">Kéo thả ca live vào bất kỳ ô Studio/Ca Live để đổi phòng hoặc ca làm việc linh hoạt</p>
             </div>
             {/* Chú giải phải khớp đúng cách card thật vẽ trạng thái (SessionEventCard dùng màu
                 brand cho nền, KHÔNG dùng rose/blue/amber cố định) — nếu không chú giải nói dối
                 người dùng về ý nghĩa màu sắc trên ô lịch. Trạng thái phân biệt bằng viền/hiệu ứng:
                 Live = viền đỏ nhấp nháy, Đã Đặt = viền liền, Chờ Đăng Ký = viền đứt mờ hơn,
                 Trống = ô đứt nét xám có dấu "+". */}
-            <div className="flex flex-wrap items-center gap-3 text-[11px] font-semibold text-slate-400">
+            <div className="flex flex-wrap items-center gap-3 text-[11px] font-semibold text-[var(--text-muted)]">
               <span className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-md bg-rose-500 ring-2 ring-rose-400 ring-offset-1 ring-offset-slate-900 animate-pulse" />
+                <span className="w-3 h-3 rounded-md bg-rose-500 ring-2 ring-rose-400 ring-offset-1 ring-offset-[var(--surface)] animate-pulse" />
                 Live
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-md bg-slate-700 border-2 border-solid border-slate-500" />
+                <span className="w-3 h-3 rounded-md bg-[var(--surface-hover)] border-2 border-solid border-[var(--border)]" />
                 Đã Đặt
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-md bg-slate-800/60 border-2 border-dashed border-slate-400" />
+                <span className="w-3 h-3 rounded-md bg-[var(--surface-elevated)]/60 border-2 border-dashed border-[var(--border)]" />
                 Chờ Đăng Ký
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-md border border-dashed border-slate-700 flex items-center justify-center">
-                  <Plus className="w-2 h-2 text-slate-600" />
+                <span className="w-3 h-3 rounded-md border border-dashed border-[var(--border)] flex items-center justify-center">
+                  <Plus className="w-2 h-2 text-[var(--text-faint)]" />
                 </span>
                 Trống
               </span>
@@ -1446,30 +1446,30 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
           </div>
 
           {/* Table Container with Sticky Room Name Column */}
-          <div className="overflow-x-auto relative rounded-xl border border-slate-800/80 scrollbar-thin">
+          <div className="overflow-x-auto relative rounded-xl border border-[var(--border)]/80 scrollbar-thin">
             <table className="w-full text-left border-collapse min-w-[780px]">
               <thead>
-                <tr className="border-b border-slate-800 text-xs font-bold text-slate-400 bg-slate-950">
-                  <th className="p-3 w-48 uppercase tracking-wider sticky left-0 bg-slate-950 z-20 border-r border-slate-800 shadow-md">
+                <tr className="border-b border-[var(--border)] text-xs font-bold text-[var(--text-muted)] bg-[var(--surface-base)]">
+                  <th className="p-3 w-48 uppercase tracking-wider sticky left-0 bg-[var(--surface-base)] z-20 border-r border-[var(--border)] shadow-md">
                     Phòng Studio
                   </th>
                   {FIXED_TIME_SLOTS.map((slot) => (
-                    <th key={slot.id} className="p-3 text-center border-r border-slate-800/80 min-w-[170px] bg-slate-950">
-                      <div className="font-mono text-white text-xs">{slot.label}</div>
-                      <span className="text-[10px] text-slate-400 font-medium line-clamp-1">{slot.name}</span>
+                    <th key={slot.id} className="p-3 text-center border-r border-[var(--border)]/80 min-w-[170px] bg-[var(--surface-base)]">
+                      <div className="font-mono text-[var(--text)] text-xs">{slot.label}</div>
+                      <span className="text-[10px] text-[var(--text-muted)] font-medium line-clamp-1">{slot.name}</span>
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60 text-xs">
+              <tbody className="divide-y divide-[var(--border)]/60 text-xs">
                 {studios.map((std) => (
-                  <tr key={std.id} className="hover:bg-slate-800/20 transition-colors">
-                    <td className="p-3 font-bold text-white sticky left-0 bg-slate-900 z-10 border-r border-slate-800 shadow-md">
+                  <tr key={std.id} className="hover:bg-[var(--surface-elevated)]/20 transition-colors">
+                    <td className="p-3 font-bold text-[var(--text)] sticky left-0 bg-[var(--surface)] z-10 border-r border-[var(--border)] shadow-md">
                       <div className="flex items-center gap-2">
-                        <span className="p-1.5 rounded-lg bg-slate-800 border border-slate-700 text-blue-400 shrink-0">🏢</span>
+                        <span className="p-1.5 rounded-lg bg-[var(--surface-elevated)] border border-[var(--border)] text-[var(--accent-text)] shrink-0">🏢</span>
                         <div>
-                          <p className="text-xs sm:text-sm font-bold text-white line-clamp-1">{std.name}</p>
-                          <p className="text-[10px] text-slate-400 font-mono">{std.roomNumber}</p>
+                          <p className="text-xs sm:text-sm font-bold text-[var(--text)] line-clamp-1">{std.name}</p>
+                          <p className="text-[10px] text-[var(--text-muted)] font-mono">{std.roomNumber}</p>
                         </div>
                       </div>
                     </td>
@@ -1502,8 +1502,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                           onDragOver={(e) => handleDragOver(e, matrixCellKey)}
                           onDragLeave={(e) => handleDragLeave(e, matrixCellKey)}
                           onDrop={(e) => handleDropOnDayMatrix(e, std, slot)}
-                          className={`p-2 border-r border-slate-800/60 align-top transition-all ${
-                            isMatrixHovered ? "bg-blue-950/80 border-2 border-dashed border-blue-400 scale-[1.01]" : ""
+                          className={`p-2 border-r border-[var(--border)]/60 align-top transition-all ${
+                            isMatrixHovered ? "bg-[var(--accent)]/20 border-2 border-dashed border-[var(--accent)] scale-[1.01]" : ""
                           }`}
                         >
                           {matchedSession ? (
@@ -1551,7 +1551,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                               className={`h-20 rounded-xl border border-dashed transition-all cursor-pointer flex flex-col items-center justify-center space-y-1 ${
                                 isMatrixHovered
                                   ? "border-emerald-400 bg-emerald-950/50 text-emerald-300 font-bold scale-105"
-                                  : "border-slate-800/80 hover:border-blue-500/50 hover:bg-blue-950/20 text-slate-600 hover:text-blue-400"
+                                  : "border-[var(--border)]/80 hover:border-[var(--accent)]/50 hover:bg-[var(--accent)]/10 text-[var(--text-faint)] hover:text-[var(--accent-text)]"
                               }`}
                             >
                               <Plus className="w-4 h-4" />
@@ -1573,13 +1573,13 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
 
       {/* VIEW 4: TALENT WORKLOAD */}
       {viewMode === "talent_workload" && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl space-y-4">
-          <div className="border-b border-slate-800 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-6 shadow-xl space-y-4">
+          <div className="border-b border-[var(--border)] pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
-              <h3 className="font-bold text-white text-base flex items-center gap-2">
-                <User className="w-5 h-5 text-blue-400 shrink-0" /> Tải Làm Việc Host & KOC - Ngày {selectedDate}
+              <h3 className="font-bold text-[var(--text)] text-base flex items-center gap-2">
+                <User className="w-5 h-5 text-[var(--accent-text)] shrink-0" /> Tải Làm Việc Host & KOC - Ngày {selectedDate}
               </h3>
-              <p className="text-xs text-slate-400">Tổng thời lượng live trong ngày</p>
+              <p className="text-xs text-[var(--text-muted)]">Tổng thời lượng live trong ngày</p>
             </div>
             <span className="bg-blue-950 text-blue-300 border border-blue-800/80 text-xs font-bold px-3 py-1 rounded-full self-start sm:self-auto">
               Max Khuyên Dùng: 6 giờ / ngày
@@ -1598,13 +1598,13 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
               const isOverloaded = totalHoursToday > 5;
 
               return (
-                <div key={t.id} className="bg-slate-950 border border-slate-800 p-4 rounded-2xl space-y-3">
+                <div key={t.id} className="bg-[var(--surface-base)] border border-[var(--border)] p-4 rounded-2xl space-y-3">
                   <div className="flex justify-between items-center gap-2">
                     <div className="flex items-center space-x-3">
-                      <img src={t.avatar} alt={t.name} className="w-10 h-10 rounded-full object-cover border border-slate-700 shrink-0" />
+                      <img src={t.avatar} alt={t.name} className="w-10 h-10 rounded-full object-cover border border-[var(--border)] shrink-0" />
                       <div>
-                        <h4 className="font-bold text-white text-sm line-clamp-1">{t.name}</h4>
-                        <span className="text-xs text-blue-400 font-medium">{t.role} • Score: {t.overallScore}</span>
+                        <h4 className="font-bold text-[var(--text)] text-sm line-clamp-1">{t.name}</h4>
+                        <span className="text-xs text-[var(--accent-text)] font-medium">{t.role} • Score: {t.overallScore}</span>
                       </div>
                     </div>
                     <span
@@ -1613,7 +1613,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                           ? "bg-rose-950 text-rose-300 border border-rose-800"
                           : totalHoursToday > 0
                           ? "bg-emerald-950 text-emerald-300 border border-emerald-800"
-                          : "bg-slate-800 text-slate-400"
+                          : "bg-[var(--surface-elevated)] text-[var(--text-muted)]"
                       }`}
                     >
                       {isOverloaded ? "⚠️ Cảnh Báo Quá Tải" : totalHoursToday > 0 ? "Bận Phiên Live" : "Rảnh"}
@@ -1622,28 +1622,28 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
 
                   <div className="space-y-1 text-xs">
                     <div className="flex justify-between font-medium">
-                      <span className="text-slate-400">Tổng giờ live ngày {selectedDate}:</span>
+                      <span className="text-[var(--text-muted)]">Tổng giờ live ngày {selectedDate}:</span>
                       <strong className={isOverloaded ? "text-rose-400" : "text-emerald-400"}>{totalHoursToday} Giờ Live</strong>
                     </div>
-                    <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                    <div className="w-full h-2 bg-[var(--surface-elevated)] rounded-full overflow-hidden">
                       <div
-                        className={`h-full rounded-full ${isOverloaded ? "bg-rose-500" : "bg-blue-500"}`}
+                        className={`h-full rounded-full ${isOverloaded ? "bg-rose-500" : "bg-[var(--accent)]"}`}
                         style={{ width: `${Math.min(100, (totalHoursToday / 6) * 100)}%` }}
                       ></div>
                     </div>
                   </div>
 
-                  <div className="space-y-1.5 pt-2 border-t border-slate-800">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase block">Phiên Được Phân Bổ:</span>
+                  <div className="space-y-1.5 pt-2 border-t border-[var(--border)]">
+                    <span className="text-[10px] font-bold text-[var(--text-faint)] uppercase block">Phiên Được Phân Bổ:</span>
                     {hostSessions.length > 0 ? (
                       hostSessions.map((hs) => (
-                        <div key={hs.id} className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-xs flex justify-between items-center gap-2">
-                          <span className="font-bold text-slate-200 truncate">{hs.title}</span>
-                          <span className="font-mono text-[10px] text-blue-400 shrink-0">{hs.startTime}-{hs.endTime}</span>
+                        <div key={hs.id} className="p-2 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-xs flex justify-between items-center gap-2">
+                          <span className="font-bold text-[var(--text)] truncate">{hs.title}</span>
+                          <span className="font-mono text-[10px] text-[var(--accent-text)] shrink-0">{hs.startTime}-{hs.endTime}</span>
                         </div>
                       ))
                     ) : (
-                      <p className="text-[11px] text-slate-500 italic">Chưa có lịch phiên live trong ngày này.</p>
+                      <p className="text-[11px] text-[var(--text-faint)] italic">Chưa có lịch phiên live trong ngày này.</p>
                     )}
                   </div>
                 </div>
@@ -1655,28 +1655,28 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
 
       {/* QUICK BOOKING MODAL */}
       {isBookingModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-4 sm:p-6 space-y-4 sm:space-y-5 shadow-2xl overflow-y-auto max-h-[92vh]">
-            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+        <div className="fixed inset-0 z-50 bg-[var(--surface-base)]/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl max-w-2xl w-full p-4 sm:p-6 space-y-4 sm:space-y-5 shadow-2xl overflow-y-auto max-h-[92vh]">
+            <div className="flex justify-between items-center border-b border-[var(--border)] pb-3">
               <div className="flex items-center gap-2">
-                <CalendarIcon className="w-5 h-5 text-blue-400" />
-                <h3 className="font-bold text-white text-base sm:text-lg">Đặt Lịch Phiên Live Mới</h3>
+                <CalendarIcon className="w-5 h-5 text-[var(--accent-text)]" />
+                <h3 className="font-bold text-[var(--text)] text-base sm:text-lg">Đặt Lịch Phiên Live Mới</h3>
               </div>
               <button
                 onClick={() => setIsBookingModalOpen(false)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg"
+                className="text-[var(--text-muted)] hover:text-[var(--text)] p-1 rounded-lg"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Chế độ tạo: Session đã có host hay Ca mở chờ đăng ký */}
-            <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs font-bold">
+            <div className="flex items-center bg-[var(--surface-base)] p-1 rounded-xl border border-[var(--border)] text-xs font-bold">
               <button
                 type="button"
                 onClick={() => setBookingMode("session")}
                 className={`flex-1 px-3 py-2 rounded-lg transition-all ${
-                  bookingMode === "session" ? "bg-blue-600 text-white shadow-sm" : "text-slate-400 hover:text-white"
+                  bookingMode === "session" ? "bg-[var(--accent)] text-white shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text)]"
                 }`}
               >
                 Tạo Session Trực Tiếp (đã có Host)
@@ -1685,14 +1685,14 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                 type="button"
                 onClick={() => setBookingMode("slot")}
                 className={`flex-1 px-3 py-2 rounded-lg transition-all ${
-                  bookingMode === "slot" ? "bg-blue-600 text-white shadow-sm" : "text-slate-400 hover:text-white"
+                  bookingMode === "slot" ? "bg-[var(--accent)] text-white shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text)]"
                 }`}
               >
                 Mở Ca Chờ Đăng Ký
               </button>
             </div>
             {bookingMode === "slot" && (
-              <p className="text-[11px] text-slate-400 bg-slate-950/60 border border-slate-800 rounded-xl p-2.5">
+              <p className="text-[11px] text-[var(--text-muted)] bg-[var(--surface-base)]/60 border border-[var(--border)] rounded-xl p-2.5">
                 Ca sẽ hiện ở "Đăng Ký &amp; Chốt Lịch" để host tự đăng ký — Ops chốt Host chính thức sau, chưa cần chọn Host ở đây.
               </p>
             )}
@@ -1713,7 +1713,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                 </button>
               </div>
               {aiSuggestion && (
-                <div className="text-xs text-slate-200 font-mono whitespace-pre-line bg-slate-950/80 p-3 rounded-lg border border-blue-500/30">
+                <div className="text-xs text-[var(--text)] font-mono whitespace-pre-line bg-[var(--surface-base)]/80 p-3 rounded-lg border border-blue-500/30">
                   {aiSuggestion}
                 </div>
               )}
@@ -1721,7 +1721,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
 
             {/* Quick Shift Slot Presets */}
             <div className="space-y-1 text-xs">
-              <label className="font-bold text-slate-300 block">Chọn Nhanh Ca Live Cố Định:</label>
+              <label className="font-bold text-[var(--text-muted)] block">Chọn Nhanh Ca Live Cố Định:</label>
               <div className="flex flex-wrap gap-1.5">
                 {FIXED_TIME_SLOTS.map((st) => (
                   <button
@@ -1733,8 +1733,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                     }}
                     className={`px-2.5 py-1.5 rounded-lg border font-mono font-bold text-[11px] transition-all ${
                       newStartTime === st.start && newEndTime === st.end
-                        ? "bg-blue-600 text-white border-blue-500 shadow-sm"
-                        : "bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700"
+                        ? "bg-[var(--accent)] text-white border-[var(--accent)] shadow-sm"
+                        : "bg-[var(--surface-base)] text-[var(--text-muted)] border-[var(--border)] hover:border-[var(--border)]"
                     }`}
                   >
                     {st.label} ({st.name.split(" ")[0]})
@@ -1760,24 +1760,24 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
 
             <form onSubmit={handleSaveBooking} className="space-y-4 text-xs">
               <div>
-                <label className="font-bold text-slate-300 block mb-1">Tiêu Đề Chiến Dịch / Phiên Live:</label>
+                <label className="font-bold text-[var(--text-muted)] block mb-1">Tiêu Đề Chiến Dịch / Phiên Live:</label>
                 <input
                   type="text"
                   required
                   placeholder="Ví dụ: Mega Live 8/8 Flash Sale Mỹ Phẩm Cocoon"
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500 font-medium"
+                  className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="font-bold text-slate-300 block mb-1">Thương Hiệu (Brand):</label>
+                  <label className="font-bold text-[var(--text-muted)] block mb-1">Thương Hiệu (Brand):</label>
                   <select
                     value={newBrandId}
                     onChange={(e) => setNewBrandId(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500 font-medium"
+                    className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
                   >
                     {brands.map((b) => (
                       <option key={b.id} value={b.id}>
@@ -1788,11 +1788,11 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-300 block mb-1">Phòng Studio:</label>
+                  <label className="font-bold text-[var(--text-muted)] block mb-1">Phòng Studio:</label>
                   <select
                     value={newStudioId}
                     onChange={(e) => setNewStudioId(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500 font-medium"
+                    className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
                   >
                     {studios.map((s) => (
                       <option key={s.id} value={s.id}>
@@ -1806,11 +1806,11 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
               {bookingMode === "session" && (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="font-bold text-slate-300 block mb-1">Host Chính (Main Host):</label>
+                  <label className="font-bold text-[var(--text-muted)] block mb-1">Host Chính (Main Host):</label>
                   <select
                     value={newHostId}
                     onChange={(e) => setNewHostId(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500 font-medium"
+                    className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
                   >
                     {talents.map((t) => (
                       <option key={t.id} value={t.id}>
@@ -1821,11 +1821,11 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-300 block mb-1">Co-Host (tuỳ chọn):</label>
+                  <label className="font-bold text-[var(--text-muted)] block mb-1">Co-Host (tuỳ chọn):</label>
                   <select
                     value={newCoHostId}
                     onChange={(e) => setNewCoHostId(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500 font-medium"
+                    className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
                   >
                     <option value="">-- Không có Co-Host --</option>
                     {talents.filter((t) => t.id !== newHostId).map((t) => (
@@ -1837,11 +1837,11 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-300 block mb-1">Trợ Lý Vận Hành (Moderator):</label>
+                  <label className="font-bold text-[var(--text-muted)] block mb-1">Trợ Lý Vận Hành (Moderator):</label>
                   <select
                     value={newAssistantId}
                     onChange={(e) => setNewAssistantId(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500 font-medium"
+                    className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
                   >
                     <option value="">-- Chưa gán Trợ Lý --</option>
                     {moderators.map((m) => (
@@ -1861,57 +1861,57 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="font-bold text-slate-300 block mb-1">Ngày Live:</label>
+                  <label className="font-bold text-[var(--text-muted)] block mb-1">Ngày Live:</label>
                   <input
                     type="date"
                     value={newDate}
                     onChange={(e) => setNewDate(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500 font-mono"
+                    className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-mono"
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-300 block mb-1">Giờ Bắt Đầu:</label>
+                  <label className="font-bold text-[var(--text-muted)] block mb-1">Giờ Bắt Đầu:</label>
                   <input
                     type="time"
                     value={newStartTime}
                     onChange={(e) => setNewStartTime(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500 font-mono"
+                    className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-mono"
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-300 block mb-1">Giờ Kết Thúc:</label>
+                  <label className="font-bold text-[var(--text-muted)] block mb-1">Giờ Kết Thúc:</label>
                   <input
                     type="time"
                     value={newEndTime}
                     onChange={(e) => setNewEndTime(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500 font-mono"
+                    className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-mono"
                   />
                 </div>
               </div>
 
               {bookingMode === "session" && (
               <div>
-                <label className="font-bold text-slate-300 block mb-1">KPI Target GMV Cam Kết (VNĐ):</label>
+                <label className="font-bold text-[var(--text-muted)] block mb-1">KPI Target GMV Cam Kết (VNĐ):</label>
                 <input
                   type="number"
                   value={newTargetGmv}
                   onChange={(e) => setNewTargetGmv(Number(e.target.value))}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500 font-mono font-bold"
+                  className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-mono font-bold"
                 />
               </div>
               )}
 
-              <div className="pt-3 border-t border-slate-800 flex justify-end gap-3">
+              <div className="pt-3 border-t border-[var(--border)] flex justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setIsBookingModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 font-bold"
+                  className="px-4 py-2.5 rounded-xl bg-[var(--surface-elevated)] text-[var(--text-muted)] hover:bg-[var(--surface-hover)] font-bold"
                 >
                   Hủy Bỏ
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-lg shadow-blue-600/30"
+                  className="px-5 py-2.5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold shadow-lg shadow-[var(--accent)]/30"
                 >
                   Xác Nhận Đặt Lịch
                 </button>
@@ -1923,20 +1923,20 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
 
       {/* SESSION DETAIL MODAL */}
       {selectedSessionDetail && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-xl w-full p-4 sm:p-6 space-y-4 shadow-2xl">
-            <div className="flex justify-between items-start border-b border-slate-800 pb-3">
+        <div className="fixed inset-0 z-50 bg-[var(--surface-base)]/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl max-w-xl w-full p-4 sm:p-6 space-y-4 shadow-2xl">
+            <div className="flex justify-between items-start border-b border-[var(--border)] pb-3">
               <div>
-                <span className="text-[10px] font-bold text-blue-400 uppercase font-mono inline-flex items-center gap-1">
+                <span className="text-[10px] font-bold text-[var(--accent-text)] uppercase font-mono inline-flex items-center gap-1">
                   <BrandLogo brand={brandById.get(selectedSessionDetail.brandId)} size="xs" /> {selectedSessionDetail.brandName}
                 </span>
-                <h3 className="font-bold text-white text-base sm:text-lg">{selectedSessionDetail.title}</h3>
+                <h3 className="font-bold text-[var(--text)] text-base sm:text-lg">{selectedSessionDetail.title}</h3>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 {onUpdateSession && !isEditingDetail && (
                   <button
                     onClick={() => openEditDetail(selectedSessionDetail)}
-                    className="text-[11px] font-bold text-blue-400 hover:text-blue-300 px-2.5 py-1.5 rounded-lg border border-blue-800/60 bg-blue-950/40"
+                    className="text-[11px] font-bold text-[var(--accent-text)] hover:opacity-80 px-2.5 py-1.5 rounded-lg border border-[var(--accent)]/40 bg-[var(--accent)]/10"
                   >
                     Sửa
                   </button>
@@ -1946,7 +1946,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                     setSelectedSessionDetail(null);
                     setIsEditingDetail(false);
                   }}
-                  className="text-slate-400 hover:text-white p-1 rounded-lg"
+                  className="text-[var(--text-muted)] hover:text-[var(--text)] p-1 rounded-lg"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -1954,7 +1954,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
             </div>
 
             {isEditingDetail ? (
-              <div className="space-y-3 text-xs bg-slate-950 p-3 rounded-xl border border-slate-800">
+              <div className="space-y-3 text-xs bg-[var(--surface-base)] p-3 rounded-xl border border-[var(--border)]">
                 {(currentEditConflicts.studioConflict || currentEditConflicts.hostConflict) && (
                   <div className="p-2.5 bg-rose-950/80 border border-rose-700/80 rounded-xl text-[11px] space-y-1 text-rose-200 font-medium">
                     {currentEditConflicts.studioConflict && <p>• Trùng Studio: "{currentEditConflicts.studioConflictWith}"!</p>}
@@ -1963,40 +1963,40 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                 )}
                 <div className="grid grid-cols-3 gap-2">
                   <div>
-                    <label className="font-bold text-slate-400 block mb-1">Ngày:</label>
+                    <label className="font-bold text-[var(--text-muted)] block mb-1">Ngày:</label>
                     <input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-white font-mono" />
+                      className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] font-mono" />
                   </div>
                   <div>
-                    <label className="font-bold text-slate-400 block mb-1">Giờ bắt đầu:</label>
+                    <label className="font-bold text-[var(--text-muted)] block mb-1">Giờ bắt đầu:</label>
                     <input type="time" value={editStartTime} onChange={(e) => setEditStartTime(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-white font-mono" />
+                      className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] font-mono" />
                   </div>
                   <div>
-                    <label className="font-bold text-slate-400 block mb-1">Giờ kết thúc:</label>
+                    <label className="font-bold text-[var(--text-muted)] block mb-1">Giờ kết thúc:</label>
                     <input type="time" value={editEndTime} onChange={(e) => setEditEndTime(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-white font-mono" />
+                      className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] font-mono" />
                   </div>
                 </div>
                 <div>
-                  <label className="font-bold text-slate-400 block mb-1">Phòng Studio:</label>
+                  <label className="font-bold text-[var(--text-muted)] block mb-1">Phòng Studio:</label>
                   <select value={editStudioId} onChange={(e) => setEditStudioId(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-white">
+                    className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)]">
                     {studios.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="font-bold text-slate-400 block mb-1">Host chính:</label>
+                    <label className="font-bold text-[var(--text-muted)] block mb-1">Host chính:</label>
                     <select value={editHostId} onChange={(e) => setEditHostId(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-white">
+                      className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)]">
                       {talents.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className="font-bold text-slate-400 block mb-1">Co-Host:</label>
+                    <label className="font-bold text-[var(--text-muted)] block mb-1">Co-Host:</label>
                     <select value={editCoHostId} onChange={(e) => setEditCoHostId(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-white">
+                      className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)]">
                       <option value="">-- Không có --</option>
                       {talents.filter((t) => t.id !== editHostId).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                     </select>
@@ -2005,39 +2005,39 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                 <div className="flex justify-end gap-2 pt-1">
                   <button
                     onClick={() => setIsEditingDetail(false)}
-                    className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 font-bold text-[11px]"
+                    className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] text-[var(--text-muted)] hover:bg-[var(--surface-hover)] font-bold text-[11px]"
                   >
                     Huỷ
                   </button>
                   <button
                     onClick={handleSaveDetailEdit}
                     disabled={savingEdit}
-                    className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white font-bold text-[11px]"
+                    className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-60 text-white font-bold text-[11px]"
                   >
                     {savingEdit ? "Đang lưu..." : "Lưu Thay Đổi"}
                   </button>
                 </div>
               </div>
             ) : (
-            <div className="grid grid-cols-2 gap-3 text-xs bg-slate-950 p-3 rounded-xl border border-slate-800">
-              <div>Ngày Live: <strong className="text-white block font-mono">{selectedSessionDetail.date}</strong></div>
-              <div>Khung giờ: <strong className="text-white block font-mono">{selectedSessionDetail.startTime} - {selectedSessionDetail.endTime}</strong></div>
-              <div>Phòng Studio: <strong className="text-white block">{selectedSessionDetail.studioName}</strong></div>
-              <div>Host chính: <strong className="text-white block">{selectedSessionDetail.hostName}</strong></div>
+            <div className="grid grid-cols-2 gap-3 text-xs bg-[var(--surface-base)] p-3 rounded-xl border border-[var(--border)]">
+              <div>Ngày Live: <strong className="text-[var(--text)] block font-mono">{selectedSessionDetail.date}</strong></div>
+              <div>Khung giờ: <strong className="text-[var(--text)] block font-mono">{selectedSessionDetail.startTime} - {selectedSessionDetail.endTime}</strong></div>
+              <div>Phòng Studio: <strong className="text-[var(--text)] block">{selectedSessionDetail.studioName}</strong></div>
+              <div>Host chính: <strong className="text-[var(--text)] block">{selectedSessionDetail.hostName}</strong></div>
               {selectedSessionDetail.coHostName && (
-                <div>Co-Host: <strong className="text-white block">{selectedSessionDetail.coHostName}</strong></div>
+                <div>Co-Host: <strong className="text-[var(--text)] block">{selectedSessionDetail.coHostName}</strong></div>
               )}
-              <div>Trợ lý / Moderator: <strong className="text-white block">{selectedSessionDetail.assistantName}</strong></div>
+              <div>Trợ lý / Moderator: <strong className="text-[var(--text)] block">{selectedSessionDetail.assistantName}</strong></div>
               <div>Target GMV: <strong className="text-emerald-400 block font-mono font-bold">{selectedSessionDetail.targetGmv.toLocaleString()} VNĐ</strong></div>
             </div>
             )}
 
             <div className="space-y-2 text-xs">
-              <h4 className="font-bold text-slate-300">Checklist Chuẩn Bị ({selectedSessionDetail.checklist.filter(c => c.completed).length}/{selectedSessionDetail.checklist.length}):</h4>
+              <h4 className="font-bold text-[var(--text-muted)]">Checklist Chuẩn Bị ({selectedSessionDetail.checklist.filter(c => c.completed).length}/{selectedSessionDetail.checklist.length}):</h4>
               <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
                 {selectedSessionDetail.checklist.map((ck) => (
-                  <div key={ck.id} className="p-2 bg-slate-950 rounded-lg border border-slate-800/80 flex items-center justify-between">
-                    <span className={`text-slate-300 ${ck.completed ? "line-through opacity-60" : ""}`}>{ck.task}</span>
+                  <div key={ck.id} className="p-2 bg-[var(--surface-base)] rounded-lg border border-[var(--border)]/80 flex items-center justify-between">
+                    <span className={`text-[var(--text-muted)] ${ck.completed ? "line-through opacity-60" : ""}`}>{ck.task}</span>
                     <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${ck.completed ? "bg-emerald-950 text-emerald-400" : "bg-amber-950 text-amber-400"}`}>
                       {ck.completed ? "Đã xong" : "Chưa làm"}
                     </span>
@@ -2046,10 +2046,10 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
               </div>
             </div>
 
-            <div className="pt-2 border-t border-slate-800 flex justify-end">
+            <div className="pt-2 border-t border-[var(--border)] flex justify-end">
               <button
                 onClick={() => setSelectedSessionDetail(null)}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs"
+                className="px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold rounded-xl text-xs"
               >
                 Đóng
               </button>

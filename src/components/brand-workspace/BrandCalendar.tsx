@@ -180,7 +180,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
           canManage && (
             <button
               onClick={() => setModalState({ open: true, session: null, initialDate: undefined })}
-              className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-lg shadow-blue-600/20 transition-all active:scale-95"
+              className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-lg transition-all active:scale-95"
             >
               <Plus className="w-4 h-4" /> Đặt Lịch Mới
             </button>
@@ -190,7 +190,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
           <>
             <button
               onClick={() => setMonth((mo) => shiftMonth(mo, -1))}
-              className="p-2 rounded-xl bg-slate-950/60 border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition-colors"
+              className="p-2 rounded-xl bg-[var(--surface-base)]/60 border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] hover:border-[var(--text-faint)] transition-colors"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
@@ -198,11 +198,11 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
               type="month"
               value={month}
               onChange={(e) => setMonth(e.target.value)}
-              className="bg-slate-950/60 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono text-sm focus:outline-none focus:border-blue-500"
+              className="bg-[var(--surface-base)]/60 border border-[var(--border)] rounded-xl px-3 py-2 text-[var(--text)] font-mono text-sm focus:outline-none focus:border-[var(--accent)]"
             />
             <button
               onClick={() => setMonth((mo) => shiftMonth(mo, 1))}
-              className="p-2 rounded-xl bg-slate-950/60 border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition-colors"
+              className="p-2 rounded-xl bg-[var(--surface-base)]/60 border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] hover:border-[var(--text-faint)] transition-colors"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -285,7 +285,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
                 daySchemes.length > 0 ? (
                   <span
                     title={`${daySchemes.length} scheme khuyến mãi — xem chi tiết ở bảng dưới hàng tuần`}
-                    className="flex items-center justify-center w-4 h-4 rounded-full bg-amber-400 text-amber-950"
+                    className="flex items-center justify-center w-4 h-4 rounded-full bg-[var(--warning)] text-white"
                   >
                     <Tag className="w-2.5 h-2.5" />
                   </span>
@@ -317,7 +317,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
                 />
               ))}
               {daySessions.length > CELL_MAX_SESSIONS && (
-                <span className="text-[9px] text-slate-500">+{daySessions.length - CELL_MAX_SESSIONS} khác</span>
+                <span className="text-[9px] text-[var(--text-faint)]">+{daySessions.length - CELL_MAX_SESSIONS} khác</span>
               )}
               {daySlots.slice(0, CELL_MAX_SLOTS).map((sl) => (
                 <SessionEventCard
@@ -338,7 +338,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
                 />
               ))}
               {daySlots.length > CELL_MAX_SLOTS && (
-                <span className="text-[9px] text-amber-600 dark:text-amber-500">+{daySlots.length - CELL_MAX_SLOTS} ca chờ ĐK</span>
+                <span className="text-[9px] text-[var(--warning)]">+{daySlots.length - CELL_MAX_SLOTS} ca chờ ĐK</span>
               )}
             </PosterDayCell>
             {weekStrip}
@@ -349,18 +349,18 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
 
       <div className="space-y-2">
         {(sessionsByDate.size === 0 || Array.from(sessionsByDate.values()).flat().length === 0) && (
-          <p className="text-sm text-slate-500 text-center py-6">Không có phiên live nào trong tháng {month}.</p>
+          <p className="text-sm text-[var(--text-faint)] text-center py-6">Không có phiên live nào trong tháng {month}.</p>
         )}
         {Array.from(sessionsByDate.entries())
           .sort(([a], [b]) => a.localeCompare(b))
           .map(([date, list]) => (
-            <div key={date} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 space-y-1.5 shadow-sm">
-              <p className="text-xs font-bold text-slate-700 dark:text-slate-300 font-mono">{date}</p>
+            <div key={date} className="bg-[var(--surface)] border border-[var(--border)] rounded-xl px-4 py-3 space-y-1.5 shadow-sm">
+              <p className="text-xs font-bold text-[var(--text-muted)] font-mono">{date}</p>
               {list.map((s) => (
                 <div
                   key={s.id}
                   onClick={() => canManage && setModalState({ open: true, session: s })}
-                  className={`flex flex-wrap items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400 ${canManage ? "cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" : ""}`}
+                  className={`flex flex-wrap items-center gap-2 text-[11px] text-[var(--text-faint)] ${canManage ? "cursor-pointer hover:text-[var(--text)]" : ""}`}
                 >
                   <EventPill tier={STATUS_TIER[s.status]} label={s.status} />
                   <span>
@@ -369,7 +369,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
                   <span>Host: {s.hostName}</span>
                   {s.coHostName && <span>Co-Host: {s.coHostName}</span>}
                   <span>Studio: {s.studioName}</span>
-                  <span className="ml-auto font-bold text-emerald-600 dark:text-emerald-400">{formatCurrencyAdaptive(s.actualGmv || 0)}</span>
+                  <span className="ml-auto font-bold text-[var(--success)]">{formatCurrencyAdaptive(s.actualGmv || 0)}</span>
                 </div>
               ))}
             </div>

@@ -81,8 +81,8 @@ export const BrandRateCard: React.FC<BrandRateCardProps> = ({
 
   return (
     <div className="space-y-5">
-      <h2 className="text-lg font-bold text-white flex items-center gap-2">
-        <Tag className="w-5 h-5 text-blue-400" /> Rate Card
+      <h2 className="text-lg font-bold text-[var(--text)] flex items-center gap-2">
+        <Tag className="w-5 h-5 text-[var(--accent-text)]" /> Rate Card
       </h2>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -94,10 +94,10 @@ export const BrandRateCard: React.FC<BrandRateCardProps> = ({
           const gmv = gmvByPlatform[platform];
           const estimatedNmv = gmv * (1 - returnRate / 100);
           return (
-            <div key={platform} className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3 shadow-xl">
+            <div key={platform} className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 space-y-3 shadow-xl">
               <div className="flex items-center justify-between">
-                <span className="font-bold text-white">{platform}</span>
-                <span className="text-[10px] text-slate-500 uppercase font-bold">đ / giờ live</span>
+                <span className="font-bold text-[var(--text)]">{platform}</span>
+                <span className="text-[10px] text-[var(--text-faint)] uppercase font-bold">đ / giờ live</span>
               </div>
               <p className="text-2xl font-black text-emerald-400">
                 {current ? current.ratePerHour.toLocaleString("vi-VN") : "—"}đ
@@ -109,21 +109,21 @@ export const BrandRateCard: React.FC<BrandRateCardProps> = ({
                     placeholder="Rate mới"
                     value={draft ?? ""}
                     onChange={(e) => setDrafts((d) => ({ ...d, [platform]: e.target.value }))}
-                    className="flex-1 bg-slate-950 border border-slate-800 rounded-lg p-2 text-white text-xs focus:outline-none focus:border-blue-500"
+                    className="flex-1 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] text-xs focus:outline-none focus:border-[var(--accent)]"
                   />
                   <button
                     onClick={() => handleSave(platform)}
                     disabled={busy !== null || draft === undefined || draft === ""}
-                    className="px-3 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-colors"
+                    className="px-3 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-colors"
                   >
                     {busy === platform ? "..." : "Lưu"}
                   </button>
                 </div>
               )}
 
-              <div className="pt-3 border-t border-slate-800 space-y-2">
+              <div className="pt-3 border-t border-[var(--border)] space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-slate-500 uppercase font-bold">Tỷ lệ hoàn hủy</span>
+                  <span className="text-[10px] text-[var(--text-faint)] uppercase font-bold">Tỷ lệ hoàn hủy</span>
                   <span className="text-sm font-bold text-amber-400">{returnRate}%</span>
                 </div>
                 {canEdit && (
@@ -135,22 +135,22 @@ export const BrandRateCard: React.FC<BrandRateCardProps> = ({
                       placeholder="% mới"
                       value={returnDraft ?? ""}
                       onChange={(e) => setReturnDrafts((d) => ({ ...d, [platform]: e.target.value }))}
-                      className="flex-1 bg-slate-950 border border-slate-800 rounded-lg p-2 text-white text-xs focus:outline-none focus:border-blue-500"
+                      className="flex-1 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] text-xs focus:outline-none focus:border-[var(--accent)]"
                     />
                     <button
                       onClick={() => handleSaveReturnRate(platform)}
                       disabled={returnBusy !== null || returnDraft === undefined || returnDraft === ""}
-                      className="px-3 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-colors"
+                      className="px-3 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-colors"
                     >
                       {returnBusy === platform ? "..." : "Lưu"}
                     </button>
                   </div>
                 )}
                 <div className="flex items-center justify-between text-[11px] pt-1">
-                  <span className="text-slate-500">
+                  <span className="text-[var(--text-faint)]">
                     NMV ước tính (GMV {gmv.toLocaleString("vi-VN")}đ × {(100 - returnRate)}%)
                   </span>
-                  <span className="font-bold text-slate-200">{Math.round(estimatedNmv).toLocaleString("vi-VN")}đ</span>
+                  <span className="font-bold text-[var(--text)]">{Math.round(estimatedNmv).toLocaleString("vi-VN")}đ</span>
                 </div>
               </div>
             </div>
@@ -158,23 +158,23 @@ export const BrandRateCard: React.FC<BrandRateCardProps> = ({
         })}
       </div>
 
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 shadow-xl">
-        <h3 className="font-bold text-slate-100 flex items-center gap-2">
-          <History className="w-4 h-4 text-slate-500" /> Lịch Sử Rate
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 space-y-4 shadow-xl">
+        <h3 className="font-bold text-[var(--text)] flex items-center gap-2">
+          <History className="w-4 h-4 text-[var(--text-faint)]" /> Lịch Sử Rate
         </h3>
         {PLATFORMS.map((platform) => (
           <div key={platform} className="space-y-1.5">
-            <p className="text-xs font-bold text-slate-400">{platform}</p>
+            <p className="text-xs font-bold text-[var(--text-muted)]">{platform}</p>
             {historyByPlatform[platform].length === 0 ? (
-              <p className="text-[11px] text-slate-600 pl-2">Chưa có lịch sử.</p>
+              <p className="text-[11px] text-[var(--text-faint)] pl-2">Chưa có lịch sử.</p>
             ) : (
               <div className="space-y-1">
                 {historyByPlatform[platform].map((h) => (
-                  <div key={h.id} className="flex items-center justify-between text-[11px] bg-slate-950/60 border border-slate-800 rounded-lg px-3 py-1.5">
-                    <span className="text-slate-400 font-mono">
+                  <div key={h.id} className="flex items-center justify-between text-[11px] bg-[var(--surface-base)]/60 border border-[var(--border)] rounded-lg px-3 py-1.5">
+                    <span className="text-[var(--text-muted)] font-mono">
                       {h.effectiveFrom} → {h.effectiveTo ?? "hiện tại"}
                     </span>
-                    <span className="text-slate-200 font-bold">
+                    <span className="text-[var(--text)] font-bold">
                       {h.ratePerHour.toLocaleString("vi-VN")}đ
                       <span className="text-amber-400 font-normal ml-2">· hoàn hủy {h.returnRate}%</span>
                     </span>

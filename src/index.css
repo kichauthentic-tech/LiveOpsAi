@@ -1,2 +1,66 @@
 @import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
+
+/*
+  Design tokens cho 3 theme preset — dropdown đổi qua src/hooks/useTheme.tsx.
+  "midnight"/"ocean" là theme tối (kèm class .dark để mọi utility dark: hiện có vẫn hoạt động),
+  "sand" là theme sáng. Component mới nên ưu tiên dùng token (var(--surface) qua class bg-[var(--surface)]
+  hoặc utility tương ứng) thay vì hardcode bg-slate-900 để tự động đổi theo cả 3 theme.
+*/
+:root,
+.theme-midnight {
+  --surface-base: #020617;
+  --surface: #0f172a;
+  --surface-elevated: #1e293b;
+  --surface-hover: #334155;
+  --surface-muted: rgba(30, 41, 59, 0.6);
+  --text: #f1f5f9;
+  --text-muted: #cbd5e1;
+  --text-faint: #64748b;
+  --border: #334155;
+  --border-muted: rgba(51, 65, 85, 0.6);
+  --accent: #3b82f6;
+  --accent-hover: #60a5fa;
+  --accent-text: #93c5fd;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+}
+
+.theme-ocean {
+  --surface-base: #041014;
+  --surface: #0b1f26;
+  --surface-elevated: #123039;
+  --surface-hover: #1c4550;
+  --surface-muted: rgba(18, 48, 57, 0.6);
+  --text: #ecfeff;
+  --text-muted: #a5f3fc;
+  --text-faint: #5f9ea8;
+  --border: #1c4550;
+  --border-muted: rgba(28, 69, 80, 0.6);
+  --accent: #06b6d4;
+  --accent-hover: #22d3ee;
+  --accent-text: #67e8f9;
+  --success: #14b8a6;
+  --warning: #f59e0b;
+  --danger: #f43f5e;
+}
+
+.theme-sand {
+  --surface-base: #faf6f0;
+  --surface: #ffffff;
+  --surface-elevated: #f5efe6;
+  --surface-hover: #ebe2d3;
+  --surface-muted: rgba(245, 239, 230, 0.8);
+  --text: #292524;
+  --text-muted: #57534e;
+  --text-faint: #a8a29e;
+  --border: #e7e0d6;
+  --border-muted: rgba(231, 224, 214, 0.7);
+  --accent: #d97706;
+  --accent-hover: #b45309;
+  --accent-text: #b45309;
+  --success: #059669;
+  --warning: #d97706;
+  --danger: #dc2626;
+}
