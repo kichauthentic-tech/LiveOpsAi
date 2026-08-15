@@ -160,7 +160,7 @@ export const GmvGrowthTrendline: React.FC<GmvGrowthTrendlineProps> = ({ sessions
           <div className="font-bold border-b border-[var(--border)] pb-1.5 flex justify-between items-center text-[var(--text-muted)]">
             <span>{label}</span>
             {dataPoint.isFuture ? (
-              <span className="bg-purple-900/80 text-purple-300 text-[10px] px-2 py-0.5 rounded font-semibold">Dự báo 30 ngày</span>
+              <span className="bg-[var(--accent)]/80 text-[var(--accent-text)] text-[10px] px-2 py-0.5 rounded font-semibold">Dự báo 30 ngày</span>
             ) : (
               <span className="bg-emerald-900/80 text-emerald-300 text-[10px] px-2 py-0.5 rounded font-semibold">Thực tế đã diễn ra</span>
             )}
@@ -173,7 +173,7 @@ export const GmvGrowthTrendline: React.FC<GmvGrowthTrendlineProps> = ({ sessions
                 <span>{(viewType === "daily" ? dataPoint.actualGmv : dataPoint.cumActualGmv)?.toLocaleString()}M đ</span>
               </div>
             )}
-            <div className="flex justify-between items-center text-purple-300 font-semibold">
+            <div className="flex justify-between items-center text-[var(--accent-text)] font-semibold">
               <span>Dự báo Target ({viewType === "daily" ? "Ngày" : "Cộng dồn"}):</span>
               <span>{(viewType === "daily" ? dataPoint.projectedGmv : dataPoint.cumProjectedGmv)?.toLocaleString()}M đ</span>
             </div>
@@ -194,7 +194,7 @@ export const GmvGrowthTrendline: React.FC<GmvGrowthTrendlineProps> = ({ sessions
       <div className="flex flex-col gap-4 pb-4 border-b border-[var(--border)]">
         <div className="shrink-0">
           <div className="flex items-center gap-2">
-            <span className="p-2 bg-purple-900/40 text-purple-300 rounded-xl">
+            <span className="p-2 bg-[var(--accent)]/40 text-[var(--accent-text)] rounded-xl">
               <TrendingUp className="w-5 h-5" />
             </span>
             <div>
@@ -237,7 +237,7 @@ export const GmvGrowthTrendline: React.FC<GmvGrowthTrendlineProps> = ({ sessions
             <button
               onClick={() => setScenario("target")}
               className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
-                scenario === "target" ? "bg-purple-600 text-white shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text)]"
+                scenario === "target" ? "bg-[var(--accent)] text-white shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text)]"
               }`}
             >
               🎯 Target Plan (+18%)
@@ -284,22 +284,22 @@ export const GmvGrowthTrendline: React.FC<GmvGrowthTrendlineProps> = ({ sessions
           <span className="text-[10px] text-[var(--text-muted)] font-medium">Lấy trực tiếp từ các phiên livestream đã hoàn thành</span>
         </div>
 
-        <div className="p-4 rounded-xl bg-purple-950/30 border border-purple-800/50 space-y-1">
-          <span className="text-purple-300 text-xs font-semibold block">Dự Báo Tổng 30 Ngày</span>
-          <div className="text-xl font-black text-purple-200">
+        <div className="p-4 rounded-xl bg-[var(--accent)]/30 border border-[var(--accent)]/50 space-y-1">
+          <span className="text-[var(--accent-text)] text-xs font-semibold block">Dự Báo Tổng 30 Ngày</span>
+          <div className="text-xl font-black text-[var(--accent-text)]">
             {formatCurrencyAdaptive(metrics.projected30Days * 1_000_000, "VNĐ")}
           </div>
-          <span className="text-[10px] text-purple-400 font-bold flex items-center gap-1">
+          <span className="text-[10px] text-[var(--accent-text)] font-bold flex items-center gap-1">
             <ArrowUpRight className="w-3.5 h-3.5" /> Kịch bản {scenario.toUpperCase()} (+{scenario === "target" ? "18" : scenario === "aggressive" ? "32" : "8"}%)
           </span>
         </div>
 
-        <div className="p-4 rounded-xl bg-indigo-950/30 border border-indigo-800/50 space-y-1">
-          <span className="text-indigo-300 text-xs font-semibold block">Tỷ Lệ Đạt KPI (Pacing Rate)</span>
-          <div className="text-xl font-black text-indigo-200">
+        <div className="p-4 rounded-xl bg-sky-950/30 border border-sky-800/50 space-y-1">
+          <span className="text-sky-300 text-xs font-semibold block">Tỷ Lệ Đạt KPI (Pacing Rate)</span>
+          <div className="text-xl font-black text-sky-200">
             {metrics.pacingPercent}%
           </div>
-          <span className="text-[10px] text-indigo-400 font-medium">So với chỉ tiêu KPI 7.5 Tỷ VNĐ / Tháng</span>
+          <span className="text-[10px] text-sky-400 font-medium">So với chỉ tiêu KPI 7.5 Tỷ VNĐ / Tháng</span>
         </div>
 
         <div className="p-4 rounded-xl bg-amber-950/30 border border-amber-800/50 space-y-1">
@@ -319,8 +319,8 @@ export const GmvGrowthTrendline: React.FC<GmvGrowthTrendlineProps> = ({ sessions
             <span className="flex items-center gap-1.5 text-[var(--text-muted)] font-bold">
               <span className="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span> GMV Thực Tế (Historical Actual)
             </span>
-            <span className="flex items-center gap-1.5 text-purple-600 font-bold">
-              <span className="w-3 h-1 border-b-2 border-dashed border-purple-600 inline-block"></span> GMV Dự Báo (30-Day Forecast)
+            <span className="flex items-center gap-1.5 text-[var(--accent-text)] font-bold">
+              <span className="w-3 h-1 border-b-2 border-dashed border-[var(--accent)] inline-block"></span> GMV Dự Báo (30-Day Forecast)
             </span>
             <span className="flex items-center gap-1.5 text-amber-600 font-bold">
               <span className="w-3 h-1 border-b-2 border-dotted border-amber-500 inline-block"></span> Mục Tiêu Bứt Phá
@@ -406,14 +406,14 @@ export const GmvGrowthTrendline: React.FC<GmvGrowthTrendlineProps> = ({ sessions
         <div className="space-y-1">
           <div className="font-bold text-[var(--text)] flex items-center gap-2">
             <span>Dự Báo Theo Mô Hình Toán Học (Không Phải Số Liệu Đã Xảy Ra)</span>
-            <span className="bg-purple-900/90 text-purple-300 text-[10px] px-2 py-0.5 rounded font-mono">
+            <span className="bg-[var(--accent)]/90 text-[var(--accent-text)] text-[10px] px-2 py-0.5 rounded font-mono">
               Ước tính
             </span>
           </div>
           <p className="text-[var(--text-muted)] leading-relaxed">
             Dựa trên <strong>{historicalStats.completedCount} phiên livestream lịch sử</strong> gần nhất, tốc độ GMV trung bình đạt{" "}
             <strong>{Math.round(historicalStats.avgGmvPerSession / 1000000)}M VNĐ/phiên</strong>. Nếu duy trì đúng kịch bản{" "}
-            <strong className="text-purple-300">{scenario.toUpperCase()}</strong>, tổng GMV 30 ngày tới ước tính (mô hình toán, không phải số liệu thực) đạt{" "}
+            <strong className="text-[var(--accent-text)]">{scenario.toUpperCase()}</strong>, tổng GMV 30 ngày tới ước tính (mô hình toán, không phải số liệu thực) đạt{" "}
             <strong className="text-emerald-400">{formatCurrencyAdaptive(metrics.projected30Days * 1_000_000, "VNĐ")}</strong>{" "}
             {metrics.pacingPercent > 100
               ? `(vượt KPI đề ra ${metrics.pacingPercent - 100}%)`

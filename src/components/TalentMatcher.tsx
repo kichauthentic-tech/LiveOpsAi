@@ -173,16 +173,16 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
     <div className="space-y-6">
       {/* Top Banner */}
       <div className="bg-[var(--surface)] text-[var(--text)] p-6 rounded-2xl border border-[var(--border)] shadow-xl space-y-2">
-        <span className="text-purple-400 font-semibold text-xs uppercase tracking-wider block flex items-center gap-1.5">
-          <Users className="w-4 h-4 text-purple-400" /> Module 03: Talent Management & AI Matcher
+        <span className="text-[var(--accent-text)] font-semibold text-xs uppercase tracking-wider block flex items-center gap-1.5">
+          <Users className="w-4 h-4 text-[var(--accent-text)]" /> Module 03: Talent Management & AI Matcher
         </span>
         <h2 className="text-2xl font-black">Hệ Thống Quản Lý Talent & Khớp Nối Host Thông Minh</h2>
       </div>
 
       {/* AI Matching Tool Banner */}
-      <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-[var(--surface)] text-white p-6 rounded-2xl border border-purple-700/50 shadow-lg space-y-4">
-        <div className="flex items-center gap-2 text-purple-300 font-bold text-sm">
-          <Sparkles className="w-5 h-5 text-purple-400" /> Trình AI Khớp Nối Host Cho Chiến Dịch
+      <div className="bg-gradient-to-r from-[var(--accent)]/25 to-[var(--surface)] text-white p-6 rounded-2xl border border-[var(--accent)]/50 shadow-lg space-y-4">
+        <div className="flex items-center gap-2 text-[var(--accent-text)] font-bold text-sm">
+          <Sparkles className="w-5 h-5 text-[var(--accent-text)]" /> Trình AI Khớp Nối Host Cho Chiến Dịch
         </div>
         <div className="grid md:grid-cols-3 gap-4 text-xs">
           <div>
@@ -190,7 +190,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
             <select
               value={selectedBrandId}
               onChange={(e) => setSelectedBrandId(e.target.value)}
-              className="w-full bg-[var(--surface-elevated)] text-[var(--text)] p-2.5 rounded-xl border border-[var(--border)] font-bold focus:ring-2 focus:ring-purple-500"
+              className="w-full bg-[var(--surface-elevated)] text-[var(--text)] p-2.5 rounded-xl border border-[var(--border)] font-bold focus:ring-2 focus:ring-[var(--accent)]"
             >
               {brands.map((b) => (
                 <option key={b.id} value={b.id}>
@@ -205,14 +205,14 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
               type="text"
               value={targetCategory}
               onChange={(e) => setTargetCategory(e.target.value)}
-              className="w-full bg-[var(--surface-elevated)] text-[var(--text)] p-2.5 rounded-xl border border-[var(--border)] font-bold focus:ring-2 focus:ring-purple-500"
+              className="w-full bg-[var(--surface-elevated)] text-[var(--text)] p-2.5 rounded-xl border border-[var(--border)] font-bold focus:ring-2 focus:ring-[var(--accent)]"
             />
           </div>
           <div className="flex items-end">
             <button
               onClick={handleRunMatching}
               disabled={isMatching}
-              className="w-full bg-purple-600 hover:bg-purple-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold p-2.5 rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow"
+              className="w-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold p-2.5 rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow"
             >
               <Sparkles className="w-4 h-4" /> {isMatching ? "Đang Phân Tích..." : "AI Tìm Top Host Phù Hợp"}
             </button>
@@ -221,11 +221,11 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
 
         {/* AI Matching Output Results */}
         {matchingResults && (
-          <div className="bg-[var(--surface-base)]/80 p-4 rounded-xl border border-purple-800/80 space-y-3 pt-4 text-xs">
-            <h4 className="font-bold text-purple-300 text-sm">Gợi Ý Top Host Phù Hợp Nhất Cho Brand:</h4>
+          <div className="bg-[var(--surface-base)]/80 p-4 rounded-xl border border-[var(--accent)]/80 space-y-3 pt-4 text-xs">
+            <h4 className="font-bold text-[var(--accent-text)] text-sm">Gợi Ý Top Host Phù Hợp Nhất Cho Brand:</h4>
             <div className="grid md:grid-cols-2 gap-4">
               {matchingResults.map((r, i) => (
-                <div key={i} className="p-3.5 rounded-xl bg-[var(--surface)] border border-purple-500/40 space-y-2">
+                <div key={i} className="p-3.5 rounded-xl bg-[var(--surface)] border border-[var(--accent)]/40 space-y-2">
                   <div className="flex justify-between items-center">
                     <span className="font-black text-sm text-[var(--text)]">{r.name}</span>
                     <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded font-bold">
@@ -262,7 +262,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                 placeholder="Tìm theo tên/SĐT..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 pr-3 py-1.5 text-xs bg-[var(--surface-elevated)] text-[var(--text)] placeholder:text-[var(--text-faint)] border border-[var(--border)] rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 font-medium"
+                className="pl-9 pr-3 py-1.5 text-xs bg-[var(--surface-elevated)] text-[var(--text)] placeholder:text-[var(--text-faint)] border border-[var(--border)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--accent)] font-medium"
               />
             </div>
 
@@ -270,7 +270,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
             <select
               value={selectedRoleFilter}
               onChange={(e) => setSelectedRoleFilter(e.target.value)}
-              className="py-1.5 px-3 text-xs bg-[var(--surface-elevated)] text-[var(--text)] border border-[var(--border)] rounded-xl font-bold focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="py-1.5 px-3 text-xs bg-[var(--surface-elevated)] text-[var(--text)] border border-[var(--border)] rounded-xl font-bold focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
             >
               <option value="All">Tất cả vai trò</option>
               <option value="Host">Host</option>
@@ -282,7 +282,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
             {/* Add New Talent Button */}
             <button
               onClick={openAddModal}
-              className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow transition-all"
+              className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow transition-all"
             >
               <Plus className="w-4 h-4" /> Thêm Talent Mới
             </button>
@@ -300,18 +300,18 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
             const rate = t.ratePerSession || (t as any).rateCardFee || 0;
 
             return (
-              <div key={t.id} className="p-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-elevated)]/40 space-y-3 hover:border-purple-700 transition-all relative group">
+              <div key={t.id} className="p-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-elevated)]/40 space-y-3 hover:border-[var(--accent)] transition-all relative group">
                 <div className="flex justify-between items-start">
                   <div className="flex items-center space-x-3 min-w-0 flex-1">
-                    <img src={avatar} alt={t.name} className="w-12 h-12 rounded-full object-cover border-2 border-purple-400 shadow-sm shrink-0" />
+                    <img src={avatar} alt={t.name} className="w-12 h-12 rounded-full object-cover border-2 border-[var(--accent)] shadow-sm shrink-0" />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 whitespace-nowrap">
                         <h4 className="font-bold text-[var(--text)] text-xs truncate">{t.name}</h4>
-                        <span className="bg-purple-900/50 text-purple-300 text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0">
+                        <span className="bg-[var(--accent)]/50 text-[var(--accent-text)] text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0">
                           {t.role || "Host"}
                         </span>
                       </div>
-                      <p className="text-[10px] text-purple-300 font-medium truncate">{nicheStr}</p>
+                      <p className="text-[10px] text-[var(--accent-text)] font-medium truncate">{nicheStr}</p>
                       <span className="text-[10px] text-[var(--text-muted)] block truncate whitespace-nowrap">{followers.toLocaleString()} TikTok Followers</span>
                     </div>
                   </div>
@@ -320,7 +320,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => openEditModal(t)}
-                      className="p-1.5 text-[var(--text-muted)] hover:text-purple-300 hover:bg-purple-950/40 rounded-lg transition-all"
+                      className="p-1.5 text-[var(--text-muted)] hover:text-[var(--accent-text)] hover:bg-[var(--accent-hover)]/40 rounded-lg transition-all"
                       title="Chỉnh sửa Talent"
                     >
                       <Edit3 className="w-3.5 h-3.5" />
@@ -337,9 +337,9 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
 
                 <div className="grid grid-cols-2 gap-2 text-[10px] text-[var(--text-muted)] bg-[var(--surface-base)]/40 p-2.5 rounded-xl border border-[var(--border)] font-medium">
                   <div>GMV TB: <strong className="text-emerald-400 block text-xs font-bold">{((t.avgGmvPerSession || 100000000) / 1000000).toFixed(0)}M đ</strong></div>
-                  <div>CVR TB: <strong className="text-purple-400 block text-xs font-bold">{t.cvrAvg || 4.5}%</strong></div>
+                  <div>CVR TB: <strong className="text-[var(--accent-text)] block text-xs font-bold">{t.cvrAvg || 4.5}%</strong></div>
                   <div>Rate Card: <strong className="text-[var(--text)] block font-bold">{rate.toLocaleString()} đ</strong></div>
-                  <div>Hoa hồng: <strong className="text-indigo-400 block font-bold">{t.commissionRate || 3}%</strong></div>
+                  <div>Hoa hồng: <strong className="text-[var(--accent-text)] block font-bold">{t.commissionRate || 3}%</strong></div>
                 </div>
 
                 <div className="flex justify-between items-center text-xs pt-1">
@@ -365,7 +365,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
           <div className="bg-[var(--surface)] w-full max-w-xl rounded-2xl shadow-2xl border border-[var(--border)] overflow-hidden max-h-[90vh] flex flex-col">
             <div className="bg-[var(--surface)] text-[var(--text)] px-6 py-4 flex justify-between items-center">
               <h3 className="font-bold text-sm flex items-center gap-2">
-                <Users className="w-4 h-4 text-purple-400" />
+                <Users className="w-4 h-4 text-[var(--accent-text)]" />
                 {editingTalent ? `Chỉnh Sửa Talent: ${editingTalent.name}` : "Thêm Talent Mới Vào Hệ Thống"}
               </h3>
               <button onClick={() => setIsModalOpen(false)} className="text-[var(--text-muted)] hover:text-[var(--text)]">
@@ -383,7 +383,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                     value={formName}
                     onChange={(e) => setFormName(e.target.value)}
                     placeholder="VD: Nguyễn Văn A (A Live)"
-                    className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)] focus:ring-2 focus:ring-purple-500"
+                    className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)] focus:ring-2 focus:ring-[var(--accent)]"
                   />
                 </div>
                 <div>
@@ -393,7 +393,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                     value={formPhone}
                     onChange={(e) => setFormPhone(e.target.value)}
                     placeholder="VD: 0988 123 456"
-                    className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)] focus:ring-2 focus:ring-purple-500"
+                    className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)] focus:ring-2 focus:ring-[var(--accent)]"
                   />
                 </div>
               </div>
@@ -523,7 +523,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl shadow transition-all"
+                  className="px-5 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold rounded-xl shadow transition-all"
                 >
                   {editingTalent ? "Cập Nhật Talent" : "Lưu Talent Mới"}
                 </button>

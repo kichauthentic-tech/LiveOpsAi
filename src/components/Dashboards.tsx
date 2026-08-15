@@ -234,7 +234,7 @@ export const Dashboards: React.FC<DashboardsProps> = ({
         {/* CEO Top Banner */}
         <div className="flex flex-wrap items-center justify-between bg-[var(--surface)] text-[var(--text)] p-6 rounded-2xl border border-[var(--border)] shadow-lg gap-4">
           <div>
-            <span className="text-purple-400 font-semibold text-xs uppercase tracking-wider block">Executive Dashboard</span>
+            <span className="text-[var(--accent-text)] font-semibold text-xs uppercase tracking-wider block">Executive Dashboard</span>
             <h2 className="text-2xl font-black">Báo Cáo Tổng Quan Giám Đốc (CEO Dashboard)</h2>
             <p className="text-[var(--text-muted)] text-xs mt-1">
               3 Studio hoạt động · Net Margin 24.5%
@@ -331,7 +331,7 @@ export const Dashboards: React.FC<DashboardsProps> = ({
               {onNavigateTab && (
                 <button
                   onClick={() => onNavigateTab("talents")}
-                  className="text-xs text-purple-600 font-semibold hover:underline"
+                  className="text-xs text-[var(--accent-text)] font-semibold hover:underline"
                 >
                   Xem tất cả
                 </button>
@@ -347,7 +347,7 @@ export const Dashboards: React.FC<DashboardsProps> = ({
                   <div key={t.id} className="flex items-center justify-between p-3 rounded-xl bg-[var(--surface-elevated)]/40 border border-[var(--border)]">
                     <div className="flex items-center space-x-3">
                       <span className="font-black text-xs text-[var(--text-muted)] w-4">#{i+1}</span>
-                      <img src={t.avatar} alt={t.name} className="w-9 h-9 rounded-full object-cover border border-purple-300" />
+                      <img src={t.avatar} alt={t.name} className="w-9 h-9 rounded-full object-cover border border-[var(--accent)]/40" />
                       <div>
                         <h4 className="font-bold text-[var(--text)] text-xs">{t.name}</h4>
                         <p className="text-[10px] text-[var(--text-muted)]">
@@ -367,7 +367,7 @@ export const Dashboards: React.FC<DashboardsProps> = ({
         </div>
 
         {/* Active Session Quick Monitor */}
-        <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-[var(--surface)] text-white p-6 rounded-2xl border border-purple-700/50 shadow-xl space-y-4">
+        <div className="bg-gradient-to-r from-[var(--accent)]/25 to-[var(--surface)] text-white p-6 rounded-2xl border border-[var(--accent)]/50 shadow-xl space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-red-500 animate-ping"></span>
@@ -387,7 +387,7 @@ export const Dashboards: React.FC<DashboardsProps> = ({
 
           <div className="grid md:grid-cols-2 gap-4 pt-2">
             {liveSessions.length === 0 ? (
-              <div className="md:col-span-2 p-6 bg-white/5 border border-white/10 rounded-xl text-center text-xs text-purple-200">
+              <div className="md:col-span-2 p-6 bg-white/5 border border-white/10 rounded-xl text-center text-xs text-[var(--accent-text)]">
                 Hiện chưa có phiên livestream nào đang phát sóng. Hãy tạo phiên live mới trong tab <strong className="text-white">Live Sessions</strong> để bắt đầu thử nghiệm.
               </div>
             ) : (
@@ -399,11 +399,11 @@ export const Dashboards: React.FC<DashboardsProps> = ({
                 <div
                   key={ls.id}
                   onClick={() => onSelectSession(ls)}
-                  className="bg-white/10 hover:bg-white/15 border border-white/10 hover:border-purple-400 p-4 rounded-xl cursor-pointer transition-all space-y-3"
+                  className="bg-white/10 hover:bg-white/15 border border-white/10 hover:border-[var(--accent)] p-4 rounded-xl cursor-pointer transition-all space-y-3"
                 >
                   <div className="flex justify-between items-start">
                     <div>
-                      <span className="text-purple-300 font-bold text-[11px] block">{ls.studioName}</span>
+                      <span className="text-[var(--accent-text)] font-bold text-[11px] block">{ls.studioName}</span>
                       <h4 className="font-black text-white text-base mt-0.5">{ls.brandName}</h4>
                     </div>
                     <div className="flex items-center gap-1.5">
@@ -422,12 +422,12 @@ export const Dashboards: React.FC<DashboardsProps> = ({
 
                   <div className="grid grid-cols-1 min-[420px]:grid-cols-3 gap-2 text-xs">
                     <div className="bg-black/20 p-2 rounded-lg">
-                      <span className="text-purple-200 text-[10px] block">Host:</span>
+                      <span className="text-[var(--accent-text)] text-[10px] block">Host:</span>
                       <strong className="text-white truncate block">{ls.hostName}</strong>
                     </div>
                     <div className="bg-black/20 p-2 rounded-lg">
-                      <span className="text-purple-200 text-[10px] block">Peak CCU:</span>
-                      <strong className="text-indigo-300 block">{ls.peakViewers.toLocaleString()}</strong>
+                      <span className="text-[var(--accent-text)] text-[10px] block">Peak CCU:</span>
+                      <strong className="text-[var(--accent-text)] block">{ls.peakViewers.toLocaleString()}</strong>
                     </div>
                     <div className="bg-emerald-500/20 border border-emerald-400/40 p-2 rounded-lg">
                       <span className="text-emerald-200 text-[10px] block">GMV Thực Thu:</span>
@@ -556,7 +556,7 @@ export const Dashboards: React.FC<DashboardsProps> = ({
                 </div>
                 <div className="text-right space-y-1">
                   <div className="font-black text-emerald-600 text-sm">{s.actualGmv.toLocaleString()} VNĐ</div>
-                  <button onClick={() => onSelectSession(s)} className="text-xs font-bold text-purple-600 hover:underline">
+                  <button onClick={() => onSelectSession(s)} className="text-xs font-bold text-[var(--accent-text)] hover:underline">
                     Xem Báo Cáo Phút-Theo-Phút →
                   </button>
                 </div>
@@ -603,15 +603,15 @@ export const Dashboards: React.FC<DashboardsProps> = ({
 
       <div className="bg-[var(--surface)] p-6 rounded-2xl border border-[var(--border)] shadow-sm space-y-4">
         <h3 className="font-bold text-[var(--text)] text-base">AI Host Coaching & Feedback Mới Nhất</h3>
-        <div className="p-4 rounded-xl bg-purple-950/30 border border-purple-800/50 space-y-3 text-xs text-purple-200">
+        <div className="p-4 rounded-xl bg-[var(--accent)]/10 border border-[var(--accent)]/40 space-y-3 text-xs text-[var(--accent-text)]">
           <p className="leading-relaxed font-medium">
             &quot;Host Yến Nhi biểu cảm rất cuốn hút, phản xạ đọc comment mượt mà. Tuy nhiên ở phút 20-25 cần lưu ý tránh giải thích thuật ngữ chuyên ngành Skincare quá lâu. Tăng thời lượng swatch son/test sản phẩm lên da trực tiếp trước ống kính!&quot;
           </p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-purple-800/50 font-bold">
-            <div>Chốt Đơn: <span className="text-purple-300">92/100</span></div>
-            <div>Năng Lượng: <span className="text-purple-300">96/100</span></div>
-            <div>Kiến Thức Sản Phẩm: <span className="text-purple-300">90/100</span></div>
-            <div>Tốc Độ Nói: <span className="text-purple-300">82/100</span></div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-[var(--accent)]/40 font-bold">
+            <div>Chốt Đơn: <span className="text-[var(--accent-text)]">92/100</span></div>
+            <div>Năng Lượng: <span className="text-[var(--accent-text)]">96/100</span></div>
+            <div>Kiến Thức Sản Phẩm: <span className="text-[var(--accent-text)]">90/100</span></div>
+            <div>Tốc Độ Nói: <span className="text-[var(--accent-text)]">82/100</span></div>
           </div>
         </div>
       </div>

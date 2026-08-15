@@ -136,8 +136,8 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
   return (
     <div className="space-y-6">
       <div className="bg-[var(--surface)] text-[var(--text)] p-6 rounded-2xl border border-[var(--border)] shadow-xl space-y-2">
-        <span className="text-purple-400 font-semibold text-xs uppercase tracking-wider block flex items-center gap-1.5">
-          <Building2 className="w-4 h-4 text-purple-400" /> Module 01: CRM
+        <span className="text-[var(--accent-text)] font-semibold text-xs uppercase tracking-wider block flex items-center gap-1.5">
+          <Building2 className="w-4 h-4 text-[var(--accent-text)]" /> Module 01: CRM
         </span>
         <h2 className="text-2xl font-black">Quản Lý Khách Hàng (Brand CRM)</h2>
       </div>
@@ -150,7 +150,7 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
           </div>
           <button
             onClick={openAddBrandModal}
-            className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow transition-all"
+            className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow transition-all"
           >
             <Plus className="w-4 h-4" /> Thêm Thương Hiệu
           </button>
@@ -158,13 +158,13 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
 
         <div className="grid md:grid-cols-2 gap-4">
           {brands.map((b) => (
-            <div key={b.id} className="p-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-elevated)]/40 space-y-3 hover:border-purple-500/50 transition-all relative group">
+            <div key={b.id} className="p-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-elevated)]/40 space-y-3 hover:border-[var(--accent)]/50 transition-all relative group">
               <div className="flex justify-between items-start">
                 <div className="flex items-center space-x-3">
                   <BrandLogo brand={b} size="md" className="bg-[var(--surface-elevated)] border border-[var(--border)] shadow-sm" />
                   <div>
                     <h4 className="font-bold text-[var(--text)] text-sm">{b.name}</h4>
-                    <p className="text-xs text-purple-300 font-medium">{b.industry}</p>
+                    <p className="text-xs text-[var(--accent-text)] font-medium">{b.industry}</p>
                   </div>
                 </div>
 
@@ -184,7 +184,7 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
                   </button>
                   <button
                     onClick={() => openEditBrandModal(b)}
-                    className="p-1 text-[var(--text-muted)] hover:text-purple-400 rounded transition-all"
+                    className="p-1 text-[var(--text-muted)] hover:text-[var(--accent-text)] rounded transition-all"
                     title="Chỉnh sửa Brand"
                   >
                     <Edit3 className="w-3.5 h-3.5" />
@@ -248,7 +248,7 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
           <div className="bg-[var(--surface)] w-full max-w-lg rounded-2xl shadow-2xl border border-[var(--border)] overflow-hidden max-h-[90vh] flex flex-col">
             <div className="bg-[var(--surface)] text-[var(--text)] px-6 py-4 flex justify-between items-center shrink-0">
               <h3 className="font-bold text-sm flex items-center gap-2">
-                <Building2 className="w-4 h-4 text-purple-400" />
+                <Building2 className="w-4 h-4 text-[var(--accent-text)]" />
                 {editingBrand ? `Chỉnh Sửa Thương Hiệu: ${editingBrand.name}` : "Thêm Thương Hiệu Đối Tác Mới"}
               </h3>
               <button onClick={() => setIsBrandModalOpen(false)} className="text-[var(--text-muted)] hover:text-[var(--text)]">
@@ -391,7 +391,7 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl shadow transition-all"
+                  className="px-5 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold rounded-xl shadow transition-all"
                 >
                   {editingBrand ? "Cập Nhật Brand" : "Lưu Brand Mới"}
                 </button>

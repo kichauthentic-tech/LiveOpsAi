@@ -69,10 +69,10 @@ export const PerformanceMetricsWidget: React.FC<PerformanceMetricsWidgetProps> =
       : "0.0";
 
   return (
-    <div className="bg-[var(--surface)]/95 border border-purple-500/30 rounded-3xl p-6 shadow-2xl space-y-5 relative overflow-hidden backdrop-blur-md">
+    <div className="bg-[var(--surface)]/95 border border-[var(--accent)]/30 rounded-3xl p-6 shadow-2xl space-y-5 relative overflow-hidden backdrop-blur-md">
       {/* Background glow effects */}
       <div className="absolute top-0 right-0 w-80 h-80 bg-red-500/5 rounded-full blur-3xl pointer-events-none"></div>
-      <div className="absolute bottom-0 left-0 w-80 h-80 bg-purple-500/5 rounded-full blur-3xl pointer-events-none"></div>
+      <div className="absolute bottom-0 left-0 w-80 h-80 bg-[var(--accent)]/5 rounded-full blur-3xl pointer-events-none"></div>
 
       {/* Widget Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--border)]/80 pb-4">
@@ -101,11 +101,11 @@ export const PerformanceMetricsWidget: React.FC<PerformanceMetricsWidgetProps> =
           <div className="flex items-center gap-2">
             <button
               onClick={() => onNavigateTab("dashboard")}
-              className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-purple-600/20 transition-all flex items-center gap-1.5"
+              className="px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-xl text-xs font-bold shadow-lg shadow-[var(--accent)]/20 transition-all flex items-center gap-1.5"
             >
               <Activity className="w-4 h-4 text-emerald-300" />
               <span>Xem Chi Tiết Studio LiveOps</span>
-              <ArrowUpRight className="w-3.5 h-3.5 text-purple-200" />
+              <ArrowUpRight className="w-3.5 h-3.5 text-[var(--accent-text)]" />
             </button>
           </div>
         )}
@@ -171,23 +171,23 @@ export const PerformanceMetricsWidget: React.FC<PerformanceMetricsWidgetProps> =
         </div>
 
         {/* Metric 3: Average Viewer Count (Lượt Mắt Xem Trung Bình) */}
-        <div className="bg-[var(--surface-base)]/80 p-4 rounded-2xl border border-purple-500/30 hover:border-purple-500/60 transition-all group relative overflow-hidden">
+        <div className="bg-[var(--surface-base)]/80 p-4 rounded-2xl border border-[var(--accent)]/30 hover:border-[var(--accent)]/60 transition-all group relative overflow-hidden">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-bold text-purple-400 uppercase tracking-wider">
+            <span className="text-[11px] font-bold text-[var(--accent-text)] uppercase tracking-wider">
               3. Avg Viewer Count
             </span>
-            <div className="p-2 bg-purple-500/10 rounded-xl border border-purple-500/20 group-hover:scale-110 transition-transform">
-              <Users className="w-4 h-4 text-purple-400" />
+            <div className="p-2 bg-[var(--accent)]/10 rounded-xl border border-[var(--accent)]/20 group-hover:scale-110 transition-transform">
+              <Users className="w-4 h-4 text-[var(--accent-text)]" />
             </div>
           </div>
-          <div className="text-2xl font-black text-purple-300">
+          <div className="text-2xl font-black text-[var(--accent-text)]">
             {avgPeakViewerCount.toLocaleString("vi-VN")}{" "}
             <span className="text-xs font-normal text-[var(--text-muted)]">người</span>
           </div>
           <div className="mt-2 text-[10px] text-[var(--text-muted)] space-y-1 border-t border-[var(--border)] pt-1.5">
             <div className="flex justify-between">
               <span>Mắt xem đang phát:</span>
-              <strong className="text-purple-300">{currentLivePeakViewers.toLocaleString("vi-VN")}</strong>
+              <strong className="text-[var(--accent-text)]">{currentLivePeakViewers.toLocaleString("vi-VN")}</strong>
             </div>
             <div className="flex justify-between">
               <span>Tổng lượt xem (Views):</span>
@@ -266,14 +266,14 @@ export const PerformanceMetricsWidget: React.FC<PerformanceMetricsWidgetProps> =
 
           <div className="flex flex-wrap items-center gap-4 text-[var(--text-muted)] text-[11px]">
             <div>
-              Brand: <strong className="text-purple-300">{liveNowSessions[0].brandName}</strong>
+              Brand: <strong className="text-[var(--accent-text)]">{liveNowSessions[0].brandName}</strong>
             </div>
             <div>
               Host: <strong className="text-amber-300">{liveNowSessions[0].hostName}</strong>
             </div>
             <div>
               Mắt xem:{" "}
-              <strong className="text-purple-300">
+              <strong className="text-[var(--accent-text)]">
                 {liveNowSessions[0].peakViewers.toLocaleString("vi-VN")}
               </strong>
             </div>
@@ -288,7 +288,7 @@ export const PerformanceMetricsWidget: React.FC<PerformanceMetricsWidgetProps> =
           {onNavigateTab && (
             <button
               onClick={() => onNavigateTab("dashboard")}
-              className="text-purple-300 hover:text-white font-bold text-xs flex items-center gap-1 bg-purple-950/60 hover:bg-purple-900/60 px-3 py-1.5 rounded-xl border border-purple-800/40 transition-all"
+              className="text-[var(--accent-text)] hover:text-white font-bold text-xs flex items-center gap-1 bg-[var(--accent)]/60 hover:bg-[var(--accent-hover)]/60 px-3 py-1.5 rounded-xl border border-[var(--accent)]/40 transition-all"
             >
               <span>Xem LiveOps</span>
               <ArrowUpRight className="w-3.5 h-3.5" />

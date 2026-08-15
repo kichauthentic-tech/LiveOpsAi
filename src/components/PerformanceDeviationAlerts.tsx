@@ -190,7 +190,7 @@ export const PerformanceDeviationAlerts: React.FC<PerformanceDeviationAlertsProp
           <button
             onClick={() => setFilterType("all")}
             className={`px-3 py-1 rounded-lg font-bold transition-all ${
-              filterType === "all" ? "bg-purple-600 text-white" : "text-[var(--text-muted)] hover:text-white"
+              filterType === "all" ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)] hover:text-white"
             }`}
           >
             Tất Cả ({deviationData.length})
@@ -286,7 +286,7 @@ export const PerformanceDeviationAlerts: React.FC<PerformanceDeviationAlertsProp
                 <ul className="space-y-1 text-[var(--text-muted)] text-[11px]">
                   {item.recommendations.map((rec, idx) => (
                     <li key={idx} className="flex items-start gap-1.5">
-                      <span className="text-purple-400 font-bold">•</span>
+                      <span className="text-[var(--accent-text)] font-bold">•</span>
                       <span>{rec}</span>
                     </li>
                   ))}
@@ -297,7 +297,7 @@ export const PerformanceDeviationAlerts: React.FC<PerformanceDeviationAlertsProp
               <div className="pt-2 border-t border-[var(--border)]/80 flex items-center justify-between gap-2">
                 <button
                   onClick={() => onSelectSession(s)}
-                  className="text-xs font-bold text-purple-400 hover:text-purple-300 flex items-center gap-1"
+                  className="text-xs font-bold text-[var(--accent-text)] hover:opacity-80 flex items-center gap-1"
                 >
                   Mở Live Hub Control →
                 </button>

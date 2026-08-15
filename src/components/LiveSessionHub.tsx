@@ -189,7 +189,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
       <div className="bg-[var(--surface)] text-[var(--text)] p-6 rounded-2xl border border-[var(--border)] shadow-xl space-y-5">
         <div className="flex flex-wrap justify-between items-center gap-4">
           <div>
-            <span className="text-purple-400 font-semibold text-xs uppercase tracking-wider block flex items-center gap-1.5">
+            <span className="text-[var(--accent-text)] font-semibold text-xs uppercase tracking-wider block flex items-center gap-1.5">
               <Radio className="w-4 h-4 text-red-500 animate-pulse" /> Operational Data Graph Nexus
             </span>
             <h2 className="text-2xl font-black">Livestream Session Hub</h2>
@@ -202,7 +202,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                 <button
                   onClick={() => setViewMode("single")}
                   className={`px-3 py-1 rounded-lg font-bold transition-all ${
-                    viewMode === "single" ? "bg-purple-600 text-white" : "text-[var(--text-muted)] hover:text-[var(--text)]"
+                    viewMode === "single" ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)] hover:text-[var(--text)]"
                   }`}
                 >
                   Giao Diện Đơn
@@ -210,7 +210,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                 <button
                   onClick={() => setViewMode("multi_grid")}
                   className={`px-3 py-1 rounded-lg font-bold transition-all flex items-center gap-1 ${
-                    viewMode === "multi_grid" ? "bg-purple-600 text-white" : "text-[var(--text-muted)] hover:text-[var(--text)]"
+                    viewMode === "multi_grid" ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)] hover:text-[var(--text)]"
                   }`}
                 >
                   <Layers className="w-3.5 h-3.5" /> So Sánh Multi-Live ({liveSessions.length})
@@ -229,7 +229,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                     setAiAnalysisResult(found.aiAnalysis || null);
                   }
                 }}
-                className="bg-[var(--surface-elevated)] text-[var(--text)] text-xs font-bold px-3 py-2 rounded-xl border border-[var(--border)] focus:outline-none focus:ring-2 focus:ring-purple-500"
+                className="bg-[var(--surface-elevated)] text-[var(--text)] text-xs font-bold px-3 py-2 rounded-xl border border-[var(--border)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
               >
                 {sessions.length === 0 ? (
                   <option value="">Chưa có phiên live nào (Clean State)</option>
@@ -264,7 +264,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
 
               <button
                 onClick={openAddSessionModal}
-                className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow transition-all ml-1"
+                className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow transition-all ml-1"
               >
                 <Plus className="w-3.5 h-3.5" /> Thêm Phiên Live
               </button>
@@ -302,7 +302,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                     }}
                     className={`p-3.5 rounded-xl border cursor-pointer transition-all space-y-2 ${
                       isSelected
-                        ? "bg-gradient-to-r from-purple-950/90 to-[var(--surface)] border-purple-500 shadow-lg shadow-purple-900/30 ring-2 ring-purple-500/50"
+                        ? "bg-gradient-to-r from-[var(--accent)]/90 to-[var(--surface)] border-[var(--accent)] shadow-lg shadow-[var(--accent)]/30 ring-2 ring-[var(--accent)]/50"
                         : "bg-[var(--surface)]/80 border-[var(--border)] hover:border-[var(--border)] hover:bg-[var(--surface)]"
                     }`}
                   >
@@ -325,7 +325,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                       </div>
                       <div>
                         <span className="text-[var(--text-muted)] block">Peak Viewers:</span>
-                        <strong className="text-indigo-300 font-bold">{s.peakViewers.toLocaleString()} người</strong>
+                        <strong className="text-[var(--accent-text)] font-bold">{s.peakViewers.toLocaleString()} người</strong>
                       </div>
                     </div>
                   </div>
@@ -337,10 +337,10 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
 
         {/* MULTI-GRID COMPARISON VIEW IF TOGGLED */}
         {viewMode === "multi_grid" && liveSessions.length > 1 && (
-          <div className="bg-[var(--surface-base)] p-4 rounded-2xl border border-purple-500/40 space-y-4">
+          <div className="bg-[var(--surface-base)] p-4 rounded-2xl border border-[var(--accent)]/40 space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="font-bold text-[var(--text)] text-sm flex items-center gap-2">
-                <Layers className="w-4 h-4 text-purple-400" /> Bảng So Sánh Các Phiên Live Đang Phát Sóng
+                <Layers className="w-4 h-4 text-[var(--accent-text)]" /> Bảng So Sánh Các Phiên Live Đang Phát Sóng
               </h3>
               <span className="text-xs text-[var(--text-muted)]">Song song {liveSessions.length} Studio</span>
             </div>
@@ -350,7 +350,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                 <div key={s.id} className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4 space-y-3">
                   <div className="flex justify-between items-center border-b border-[var(--border)] pb-2">
                     <div>
-                      <span className="text-xs font-bold text-purple-400">{s.studioName}</span>
+                      <span className="text-xs font-bold text-[var(--accent-text)]">{s.studioName}</span>
                       <h4 className="font-black text-[var(--text)] text-base">{s.brandName}</h4>
                     </div>
                     <button
@@ -358,7 +358,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                         onSelectSession(s);
                         setViewMode("single");
                       }}
-                      className="text-xs bg-purple-600/30 text-purple-300 hover:bg-purple-600 hover:text-white px-2.5 py-1 rounded-lg border border-purple-500/40 transition-all"
+                      className="text-xs bg-[var(--accent)]/30 text-[var(--accent-text)] hover:bg-[var(--accent-hover)] hover:text-white px-2.5 py-1 rounded-lg border border-[var(--accent)]/40 transition-all"
                     >
                       Xem Chi Tiết →
                     </button>
@@ -371,7 +371,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                     </div>
                     <div className="bg-[var(--surface-base)] p-2 rounded-lg">
                       <span className="text-[var(--text-muted)] text-[10px] block">Mắt Xem Peak</span>
-                      <strong className="text-indigo-300 font-bold">{s.peakViewers.toLocaleString()}</strong>
+                      <strong className="text-[var(--accent-text)] font-bold">{s.peakViewers.toLocaleString()}</strong>
                     </div>
                     <div className="bg-[var(--surface-base)] p-2 rounded-lg">
                       <span className="text-[var(--text-muted)] text-[10px] block">Host phụ trách</span>
@@ -398,7 +398,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
         {/* Selected Session Details or Empty State */}
         {!selectedSession ? (
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-12 text-center space-y-4 my-4">
-            <div className="w-16 h-16 bg-purple-500/10 text-purple-400 rounded-full flex items-center justify-center mx-auto border border-purple-500/20">
+            <div className="w-16 h-16 bg-[var(--accent)]/10 text-[var(--accent-text)] rounded-full flex items-center justify-center mx-auto border border-[var(--accent)]/20">
               <Radio className="w-8 h-8" />
             </div>
             <h3 className="text-xl font-black text-[var(--text)]">Chưa Có Phiên Live Nào Trong Hệ Thống</h3>
@@ -407,7 +407,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
             </p>
             <button
               onClick={openAddSessionModal}
-              className="px-5 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl shadow-lg transition-all text-xs inline-flex items-center gap-2"
+              className="px-5 py-2.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold rounded-xl shadow-lg transition-all text-xs inline-flex items-center gap-2"
             >
               <Plus className="w-4 h-4" /> Tạo Phiên Live Mới Ngay
             </button>
@@ -422,7 +422,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
               </div>
               <div>
                 <span className="text-[var(--text-muted)] block">TikTok Handle:</span>
-                <strong className="text-purple-300 font-mono text-sm">{selectedSession.shopTikTokHandle}</strong>
+                <strong className="text-[var(--accent-text)] font-mono text-sm">{selectedSession.shopTikTokHandle}</strong>
               </div>
               <div>
                 <span className="text-[var(--text-muted)] block">Host:</span>
@@ -438,7 +438,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
               </div>
               <div>
                 <span className="text-[var(--text-muted)] block">Peak Viewers:</span>
-                <strong className="text-indigo-300 text-sm font-bold">{selectedSession.peakViewers ? selectedSession.peakViewers.toLocaleString() : 0} người</strong>
+                <strong className="text-[var(--accent-text)] text-sm font-bold">{selectedSession.peakViewers ? selectedSession.peakViewers.toLocaleString() : 0} người</strong>
               </div>
             </div>
 
@@ -448,7 +448,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                 onClick={() => setActiveTab("analytics")}
                 className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all ${
                   activeTab === "analytics"
-                    ? "bg-purple-600 text-white shadow"
+                    ? "bg-[var(--accent)] text-white shadow"
                     : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]"
                 }`}
               >
@@ -458,7 +458,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                 onClick={() => setActiveTab("checklist")}
                 className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all ${
                   activeTab === "checklist"
-                    ? "bg-purple-600 text-white shadow"
+                    ? "bg-[var(--accent)] text-white shadow"
                     : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]"
                 }`}
               >
@@ -468,7 +468,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                 onClick={() => setActiveTab("products")}
                 className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all ${
                   activeTab === "products"
-                    ? "bg-purple-600 text-white shadow"
+                    ? "bg-[var(--accent)] text-white shadow"
                     : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]"
                 }`}
               >
@@ -478,7 +478,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                 onClick={() => setActiveTab("ai_coach")}
                 className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all ${
                   activeTab === "ai_coach"
-                    ? "bg-purple-600 text-white shadow"
+                    ? "bg-[var(--accent)] text-white shadow"
                     : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]"
                 }`}
               >
@@ -502,7 +502,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                   Dữ liệu được đồng bộ từ TikTok Live Performance API & Webhook
                 </p>
               </div>
-              <span className="text-xs font-bold text-indigo-400 bg-indigo-950/30 px-3 py-1 rounded-full border border-indigo-800/50">
+              <span className="text-xs font-bold text-[var(--accent-text)] bg-[var(--accent)]/30 px-3 py-1 rounded-full border border-[var(--accent)]/50">
                 Live Duration: 60 Minutes
               </span>
             </div>
@@ -519,10 +519,10 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                         const data = payload[0].payload as MinuteMetric;
                         return (
                           <div className="bg-[var(--surface)] text-[var(--text)] p-3 rounded-xl text-xs space-y-1 shadow-xl border border-[var(--border)]">
-                            <p className="font-bold text-purple-300">{data.timeString} - Phút {data.minute}</p>
+                            <p className="font-bold text-[var(--accent-text)]">{data.timeString} - Phút {data.minute}</p>
                             <p>👁️ Mắt xem: <strong className="text-[var(--text)]">{data.viewers.toLocaleString()}</strong></p>
                             <p>💰 GMV Tích lũy: <strong className="text-emerald-400">{data.gmvCumulative.toLocaleString()} đ</strong></p>
-                            <p>🎯 CVR: <strong className="text-indigo-300">{data.cvr}%</strong> | CTR: <strong className="text-indigo-300">{data.ctr}%</strong></p>
+                            <p>🎯 CVR: <strong className="text-[var(--accent-text)]">{data.cvr}%</strong> | CTR: <strong className="text-[var(--accent-text)]">{data.ctr}%</strong></p>
                             {data.eventTrigger && (
                               <p className="text-amber-300 border-t border-[var(--border)] pt-1 mt-1 font-semibold">
                                 📌 {data.eventTrigger}
@@ -546,9 +546,9 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
             <h3 className="font-bold text-[var(--text)] text-base">Nhật Ký Sự Kiện Tác Động Doanh Thu Từng Phút</h3>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
               {(selectedSession.minuteMetrics || []).map((m) => (
-                <div key={m.minute} className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)]/40 space-y-2 hover:border-purple-500/60 transition-all">
+                <div key={m.minute} className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)]/40 space-y-2 hover:border-[var(--accent)]/60 transition-all">
                   <div className="flex justify-between items-center text-xs">
-                    <span className="font-black text-purple-300 bg-purple-900/50 px-2 py-0.5 rounded">
+                    <span className="font-black text-[var(--accent-text)] bg-[var(--accent)]/50 px-2 py-0.5 rounded">
                       {m.timeString} (Phút {m.minute})
                     </span>
                     <span className="text-emerald-400 font-bold">{m.gmvCumulative.toLocaleString()} đ</span>
@@ -647,14 +647,14 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
               <tbody className="divide-y divide-[var(--border)]">
                 {(selectedSession.skus || []).map((sku) => (
                   <tr key={sku.id} className="hover:bg-[var(--surface-elevated)]">
-                    <td className="p-3 font-mono font-bold text-purple-300">{sku.code}</td>
+                    <td className="p-3 font-mono font-bold text-[var(--accent-text)]">{sku.code}</td>
                     <td className="p-3 font-bold text-[var(--text)]">{sku.name}</td>
                     <td className="p-3 text-[var(--text-faint)] line-through">{sku.originalPrice.toLocaleString()} đ</td>
                     <td className="p-3 text-emerald-400 font-bold">{sku.livePrice.toLocaleString()} đ</td>
                     <td className="p-3 font-bold text-[var(--text)]">{sku.soldInSession} món</td>
                     <td className="p-3 text-[var(--text-muted)]">{sku.clickCount} clicks</td>
-                    <td className="p-3 text-indigo-400 font-bold">{sku.ctr}%</td>
-                    <td className="p-3 text-purple-400 font-bold">{sku.cvr}%</td>
+                    <td className="p-3 text-[var(--accent-text)] font-bold">{sku.ctr}%</td>
+                    <td className="p-3 text-[var(--accent-text)] font-bold">{sku.cvr}%</td>
                   </tr>
                 ))}
               </tbody>
@@ -669,7 +669,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
           <div className="flex flex-wrap justify-between items-center gap-4 border-b border-[var(--border)] pb-4">
             <div>
               <h3 className="font-bold text-[var(--text)] text-base flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-purple-400" /> AI Live Session Analyst & Host Coach
+                <Sparkles className="w-5 h-5 text-[var(--accent-text)]" /> AI Live Session Analyst & Host Coach
               </h3>
               <p className="text-xs text-[var(--text-muted)]">
                 Hệ thống AI tự động đọc dữ liệu biến động từng phút để đưa ra bài học kinh nghiệm và chấm điểm Host
@@ -678,7 +678,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
             <button
               onClick={handleRunAiAnalysis}
               disabled={analyzingAi}
-              className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-2 transition-all shadow"
+              className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-2 transition-all shadow"
             >
               {analyzingAi ? (
                 <>
@@ -696,10 +696,10 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
             <div className="space-y-6">
               {/* Overall & GMV Summary */}
               <div className="grid md:grid-cols-2 gap-4">
-                <div className="p-4 rounded-xl bg-purple-950/30 border border-purple-800/50 space-y-1">
-                  <span className="text-xs text-purple-400 font-semibold uppercase">Đánh Giá Tổng Thể:</span>
-                  <div className="text-xl font-black text-purple-100">{aiAnalysisResult.overallRating}</div>
-                  <p className="text-xs text-purple-300">{aiAnalysisResult.gmvSummary}</p>
+                <div className="p-4 rounded-xl bg-[var(--accent)]/30 border border-[var(--accent)]/50 space-y-1">
+                  <span className="text-xs text-[var(--accent-text)] font-semibold uppercase">Đánh Giá Tổng Thể:</span>
+                  <div className="text-xl font-black text-[var(--accent-text)]">{aiAnalysisResult.overallRating}</div>
+                  <p className="text-xs text-[var(--accent-text)]">{aiAnalysisResult.gmvSummary}</p>
                 </div>
                 <div className="p-4 rounded-xl bg-[var(--surface)] text-[var(--text)] space-y-2">
                   <span className="text-xs text-[var(--text-muted)] font-semibold uppercase">Host Performance Scorecard:</span>
@@ -751,7 +751,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
           <div className="bg-[var(--surface)] text-[var(--text)] w-full max-w-lg rounded-2xl shadow-2xl border border-[var(--border)] overflow-hidden max-h-[90vh] flex flex-col">
             <div className="bg-[var(--surface)] text-[var(--text)] px-6 py-4 flex justify-between items-center shrink-0">
               <h3 className="font-bold text-sm flex items-center gap-2">
-                <Radio className="w-4 h-4 text-purple-400" />
+                <Radio className="w-4 h-4 text-[var(--accent-text)]" />
                 {editingSession ? `Chỉnh Sửa Phiên Live: ${editingSession.brandName}` : "Tạo Phiên Livestream Mới"}
               </h3>
               <button onClick={() => setIsSessionModalOpen(false)} className="text-[var(--text-muted)] hover:text-[var(--text)]">
@@ -1011,7 +1011,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                 <button
                   type="submit"
                   disabled={isSavingSession}
-                  className="px-5 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow transition-all"
+                  className="px-5 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow transition-all"
                 >
                   {isSavingSession ? "Đang Lưu..." : editingSession ? "Cập Nhật Phiên Live" : "Lưu Phiên Live"}
                 </button>

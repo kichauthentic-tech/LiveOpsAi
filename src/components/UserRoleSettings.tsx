@@ -382,7 +382,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
               <span className="text-xs font-bold text-[var(--accent-text)] uppercase tracking-widest">
                 System Administration
               </span>
-              <span className="bg-purple-600/30 text-purple-300 border border-purple-500/40 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">
+              <span className="bg-[var(--accent)]/30 text-[var(--accent-text)] border border-[var(--accent)]/40 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">
                 Module 14
               </span>
             </div>
@@ -523,7 +523,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                   onClick={() => handleResetRoleToDefault(selectedRole)}
                   className="px-3.5 py-1.5 bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--text-muted)] rounded-xl text-xs font-bold border border-[var(--border)] transition-all flex items-center gap-1.5"
                 >
-                  <Sliders className="w-3.5 h-3.5 text-purple-400" />
+                  <Sliders className="w-3.5 h-3.5 text-[var(--accent-text)]" />
                   <span>Khôi Phục Mặc Định</span>
                 </button>
               </div>
@@ -730,7 +730,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                             {/* Custom Permission Overrides Button */}
                             <button
                               onClick={() => setPermissionOverrideUser(u)}
-                              className="p-1.5 bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-purple-400 rounded-lg transition-all text-xs flex items-center gap-1"
+                              className="p-1.5 bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--accent-text)] rounded-lg transition-all text-xs flex items-center gap-1"
                               title="Override quyền riêng cho người dùng này"
                             >
                               <Key className="w-3.5 h-3.5" />

@@ -1630,7 +1630,7 @@ export default function App() {
                       onClick={() => {
                         setActiveTab("user_settings");
                       }}
-                      className="px-5 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-black shadow-lg shadow-purple-600/30 transition-all flex items-center gap-2"
+                      className="px-5 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-xl text-xs font-black shadow-lg shadow-[var(--accent)]/30 transition-all flex items-center gap-2"
                     >
                       <ShieldCheck className="w-4 h-4" />
                       <span>Quản Lý Phân Quyền Hợp Lệ (Role Settings)</span>

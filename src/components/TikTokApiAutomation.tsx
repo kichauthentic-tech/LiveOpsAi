@@ -125,8 +125,8 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
   return (
     <div className="space-y-6">
       <div className="bg-[var(--surface)] text-[var(--text)] p-6 rounded-2xl border border-[var(--border)] shadow-xl space-y-2">
-        <span className="text-purple-400 font-semibold text-xs uppercase tracking-wider block flex items-center gap-1.5">
-          <Server className="w-4 h-4 text-purple-400" /> Modules 07 & 13: TikTok Open API & Automation Engine
+        <span className="text-[var(--accent-text)] font-semibold text-xs uppercase tracking-wider block flex items-center gap-1.5">
+          <Server className="w-4 h-4 text-[var(--accent-text)]" /> Modules 07 & 13: TikTok Open API & Automation Engine
         </span>
         <h2 className="text-2xl font-black">TikTok Open API & Tự Động Hóa Workflow Agency</h2>
       </div>
@@ -136,7 +136,7 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
         <button
           onClick={() => setActiveTab("api_status")}
           className={`px-4 py-2 rounded-xl transition-all ${
-            activeTab === "api_status" ? "bg-purple-600 text-white shadow" : "bg-[var(--surface-elevated)] text-[var(--text-muted)] hover:bg-[var(--surface-hover)]"
+            activeTab === "api_status" ? "bg-[var(--accent)] text-white shadow" : "bg-[var(--surface-elevated)] text-[var(--text-muted)] hover:bg-[var(--surface-hover)]"
           }`}
         >
           🔗 TikTok Shop Partner API Status & Webhooks
@@ -144,7 +144,7 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
         <button
           onClick={() => setActiveTab("rules")}
           className={`px-4 py-2 rounded-xl transition-all ${
-            activeTab === "rules" ? "bg-purple-600 text-white shadow" : "bg-[var(--surface-elevated)] text-[var(--text-muted)] hover:bg-[var(--surface-hover)]"
+            activeTab === "rules" ? "bg-[var(--accent)] text-white shadow" : "bg-[var(--surface-elevated)] text-[var(--text-muted)] hover:bg-[var(--surface-hover)]"
           }`}
         >
           ⚡ Visual Workflow Automation Rules ({workflowRules.filter(r => r.enabled).length} Enabled)
@@ -152,7 +152,7 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
         <button
           onClick={() => setActiveTab("csv_import")}
           className={`px-4 py-2 rounded-xl transition-all ${
-            activeTab === "csv_import" ? "bg-purple-600 text-white shadow" : "bg-[var(--surface-elevated)] text-[var(--text-muted)] hover:bg-[var(--surface-hover)]"
+            activeTab === "csv_import" ? "bg-[var(--accent)] text-white shadow" : "bg-[var(--surface-elevated)] text-[var(--text-muted)] hover:bg-[var(--surface-hover)]"
           }`}
         >
           📄 Smart Compass Excel / CSV Fallback Parser
@@ -210,7 +210,7 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
                     <button
                       onClick={handleConnect}
                       disabled={connecting || !tiktokStatus?.configured}
-                      className="text-[11px] font-bold text-purple-600 hover:text-purple-700 flex items-center gap-1 disabled:text-[var(--text-muted)]"
+                      className="text-[11px] font-bold text-[var(--accent-text)] hover:opacity-80 flex items-center gap-1 disabled:text-[var(--text-muted)]"
                     >
                       <Link2 className="w-3.5 h-3.5" /> {connecting ? "Đang chuyển hướng..." : "Kết Nối TikTok Shop"}
                     </button>
@@ -221,7 +221,7 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
 
             <div className="bg-[var(--surface)] p-4 rounded-2xl border border-[var(--border)] shadow-sm space-y-1">
               <span className="text-[var(--text-muted)] font-medium block">Webhook Endpoint</span>
-              <div className="text-sm font-bold text-indigo-600 flex items-center gap-1.5">
+              <div className="text-sm font-bold text-[var(--accent-text)] flex items-center gap-1.5">
                 <Activity className="w-4 h-4" /> /api/tiktok/webhook
               </div>
               <span className="text-[10px] text-[var(--text-muted)]">
@@ -281,7 +281,7 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
             </div>
             <button
               onClick={openAddModal}
-              className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow transition-all"
+              className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow transition-all"
             >
               <Plus className="w-4 h-4" /> Thêm Quy Tắc Mới
             </button>
@@ -289,7 +289,7 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
 
           <div className="space-y-3">
             {workflowRules.map((rule) => (
-              <div key={rule.id} className="p-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-elevated)]/40 flex flex-wrap justify-between items-center gap-4 hover:border-purple-300 transition-all">
+              <div key={rule.id} className="p-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-elevated)]/40 flex flex-wrap justify-between items-center gap-4 hover:border-[var(--accent)] transition-all">
                 <div className="space-y-1 max-w-2xl">
                   <h4 className="font-bold text-[var(--text)] text-sm flex items-center gap-2">
                     {rule.name}
@@ -300,7 +300,7 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
                     )}
                   </h4>
                   <div className="text-xs text-[var(--text-muted)] flex flex-wrap items-center gap-2 font-mono">
-                    <span className="bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded font-bold">TRIGGER: {rule.trigger}</span>
+                    <span className="bg-[var(--accent)]/20 text-[var(--accent-text)] px-2 py-0.5 rounded font-bold">TRIGGER: {rule.trigger}</span>
                     <ArrowRight className="w-3.5 h-3.5 text-[var(--text-muted)]" />
                     <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold">ACTION: {rule.action}</span>
                   </div>
@@ -318,7 +318,7 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
                   </button>
                   <button
                     onClick={() => openEditModal(rule)}
-                    className="p-1.5 text-[var(--text-muted)] hover:text-purple-600 rounded transition-all"
+                    className="p-1.5 text-[var(--text-muted)] hover:text-[var(--accent-text)] rounded transition-all"
                     title="Chỉnh sửa quy tắc"
                   >
                     <Edit3 className="w-4 h-4" />
@@ -368,7 +368,7 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
           <div className="bg-[var(--surface)] text-[var(--text)] w-full max-w-lg rounded-2xl shadow-2xl border border-[var(--border)] overflow-hidden max-h-[90vh] flex flex-col">
             <div className="bg-[var(--surface)] text-[var(--text)] px-6 py-4 flex justify-between items-center shrink-0">
               <h3 className="font-bold text-sm flex items-center gap-2">
-                <Zap className="w-4 h-4 text-purple-400" />
+                <Zap className="w-4 h-4 text-[var(--accent-text)]" />
                 {editingRule ? `Chỉnh Sửa Quy Tắc: ${editingRule.name}` : "Thêm Quy Tắc Tự Động Hóa Mới"}
               </h3>
               <button onClick={() => setIsModalOpen(false)} className="text-[var(--text-muted)] hover:text-[var(--text)]">
@@ -419,7 +419,7 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
                   id="ruleEnabledCheckbox"
                   checked={ruleEnabled}
                   onChange={(e) => setRuleEnabled(e.target.checked)}
-                  className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+                  className="w-4 h-4 text-[var(--accent)] rounded focus:ring-[var(--accent)]"
                 />
                 <label htmlFor="ruleEnabledCheckbox" className="font-bold text-[var(--text-muted)] cursor-pointer">
                   Kích Hoạt Quy Tắc Này (Enabled)
@@ -436,7 +436,7 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl shadow transition-all"
+                  className="px-5 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold rounded-xl shadow transition-all"
                 >
                   {editingRule ? "Cập Nhật Quy Tắc" : "Lưu Quy Tắc"}
                 </button>

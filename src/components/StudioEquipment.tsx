@@ -202,8 +202,8 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
     <div className="space-y-6">
       {/* Top Banner */}
       <div className="bg-[var(--surface)] text-[var(--text)] p-6 rounded-2xl border border-[var(--border)] shadow-xl space-y-2">
-        <span className="text-purple-400 font-semibold text-xs uppercase tracking-wider block flex items-center gap-1.5">
-          <Building2 className="w-4 h-4 text-purple-400" /> Modules 04 & 05: Studio & QR Equipment Management
+        <span className="text-[var(--accent-text)] font-semibold text-xs uppercase tracking-wider block flex items-center gap-1.5">
+          <Building2 className="w-4 h-4 text-[var(--accent-text)]" /> Modules 04 & 05: Studio & QR Equipment Management
         </span>
         <h2 className="text-2xl font-black">Quản Lý Hệ Thống Studio & Thiết Bị Livestream</h2>
       </div>
@@ -213,7 +213,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
         <button
           onClick={() => setActiveSubTab("studios")}
           className={`px-4 py-2 rounded-xl transition-all ${
-            activeSubTab === "studios" ? "bg-purple-600 text-white shadow" : "bg-[var(--surface-elevated)] text-[var(--text-muted)] hover:bg-[var(--surface-hover)]"
+            activeSubTab === "studios" ? "bg-[var(--accent)] text-white shadow" : "bg-[var(--surface-elevated)] text-[var(--text-muted)] hover:bg-[var(--surface-hover)]"
           }`}
         >
           🏢 Danh Sách Studio ({studios.length} Phòng)
@@ -221,7 +221,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
         <button
           onClick={() => setActiveSubTab("equipment")}
           className={`px-4 py-2 rounded-xl transition-all ${
-            activeSubTab === "equipment" ? "bg-purple-600 text-white shadow" : "bg-[var(--surface-elevated)] text-[var(--text-muted)] hover:bg-[var(--surface-hover)]"
+            activeSubTab === "equipment" ? "bg-[var(--accent)] text-white shadow" : "bg-[var(--surface-elevated)] text-[var(--text-muted)] hover:bg-[var(--surface-hover)]"
           }`}
         >
           📷 Kho Thiết Bị & Quét Mã QR Code ({equipments.length} Thiết bị)
@@ -239,7 +239,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
               </div>
               <button
                 onClick={openAddStudioModal}
-                className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow transition-all"
+                className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow transition-all"
               >
                 <Plus className="w-4 h-4" /> Thêm Studio Mới
               </button>
@@ -247,10 +247,10 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
 
             <div className="grid md:grid-cols-3 gap-6">
               {studios.map((s) => (
-                <div key={s.id} className="bg-[var(--surface-elevated)]/40 p-5 rounded-2xl border border-[var(--border)] shadow-sm space-y-4 relative group hover:border-purple-300 transition-all">
+                <div key={s.id} className="bg-[var(--surface-elevated)]/40 p-5 rounded-2xl border border-[var(--border)] shadow-sm space-y-4 relative group hover:border-[var(--accent)] transition-all">
                   <div className="flex justify-between items-start">
                     <div>
-                      <span className="text-xs text-purple-300 font-bold bg-purple-950/30 px-2 py-0.5 rounded">{s.roomNumber}</span>
+                      <span className="text-xs text-[var(--accent-text)] font-bold bg-[var(--accent)]/30 px-2 py-0.5 rounded">{s.roomNumber}</span>
                       <h3 className="font-bold text-[var(--text)] text-base mt-1">{s.name}</h3>
                     </div>
 
@@ -265,7 +265,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
 
                       <button
                         onClick={() => openEditStudioModal(s)}
-                        className="p-1 text-[var(--text-muted)] hover:text-purple-300 hover:bg-[var(--surface-hover)] rounded transition-all"
+                        className="p-1 text-[var(--text-muted)] hover:text-[var(--accent-text)] hover:bg-[var(--surface-hover)] rounded transition-all"
                         title="Chỉnh sửa Studio"
                       >
                         <Edit3 className="w-3.5 h-3.5" />
@@ -313,11 +313,11 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
                   <div
                     key={s.id}
                     className={`p-3 rounded-xl border flex justify-between items-center ${
-                      s.status === "Live Now" ? "bg-purple-950/30 border-purple-800/50" : "bg-indigo-950/30 border-indigo-800/50"
+                      s.status === "Live Now" ? "bg-rose-500/10 border-rose-500/40" : "bg-[var(--accent)]/10 border-[var(--accent)]/30"
                     }`}
                   >
                     <div>
-                      <span className={`font-bold ${s.status === "Live Now" ? "text-purple-200" : "text-indigo-200"}`}>
+                      <span className={`font-bold ${s.status === "Live Now" ? "text-rose-400" : "text-[var(--accent-text)]"}`}>
                         {s.startTime} - {s.endTime} [{s.studioName}]
                       </span>
                       <p className="text-[var(--text-muted)]">{s.brandName} (Host {s.hostName})</p>
@@ -346,7 +346,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
             <div className="flex flex-wrap justify-between items-center gap-4">
               <div>
                 <h3 className="font-bold text-[var(--text)] text-base flex items-center gap-2">
-                  <QrCode className="w-5 h-5 text-purple-400" /> Quản Lý Thiết Bị Bằng Mã QR Code ({filteredEquipments.length} Thiết bị)
+                  <QrCode className="w-5 h-5 text-[var(--accent-text)]" /> Quản Lý Thiết Bị Bằng Mã QR Code ({filteredEquipments.length} Thiết bị)
                 </h3>
                 <p className="text-xs text-[var(--text-muted)]">Quét QR Code trên thân máy để check-in, check-out hoặc gửi báo hỏng</p>
               </div>
@@ -360,7 +360,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
                     placeholder="Tìm tên/mã QR/model..."
                     value={equipmentSearch}
                     onChange={(e) => setEquipmentSearch(e.target.value)}
-                    className="pl-9 pr-3 py-1.5 text-xs bg-[var(--surface-base)] text-[var(--text)] placeholder:text-[var(--text-faint)] border border-[var(--border)] rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 font-medium"
+                    className="pl-9 pr-3 py-1.5 text-xs bg-[var(--surface-base)] text-[var(--text)] placeholder:text-[var(--text-faint)] border border-[var(--border)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--accent)] font-medium"
                   />
                 </div>
 
@@ -368,7 +368,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
                 <select
                   value={selectedCategoryFilter}
                   onChange={(e) => setSelectedCategoryFilter(e.target.value)}
-                  className="py-1.5 px-3 text-xs bg-[var(--surface-base)] text-[var(--text)] border border-[var(--border)] rounded-xl font-bold focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="py-1.5 px-3 text-xs bg-[var(--surface-base)] text-[var(--text)] border border-[var(--border)] rounded-xl font-bold focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
                 >
                   <option value="All">Tất cả hạng mục</option>
                   <option value="Camera">Camera</option>
@@ -380,7 +380,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
 
                 <button
                   onClick={openAddEquipmentModal}
-                  className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow transition-all"
+                  className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow transition-all"
                 >
                   <Plus className="w-4 h-4" /> Thêm Thiết Bị
                 </button>
@@ -388,13 +388,13 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
             </div>
 
             {simulatedQrScan && (
-              <div className="bg-purple-950/30 p-3 rounded-xl border border-purple-800/50 flex justify-between items-center text-xs">
-                <span className="text-purple-200 font-medium">
-                  🔍 Đã quét mã QR: <strong className="font-mono text-purple-400">{simulatedQrScan}</strong>
+              <div className="bg-[var(--accent)]/30 p-3 rounded-xl border border-[var(--accent)]/50 flex justify-between items-center text-xs">
+                <span className="text-[var(--accent-text)] font-medium">
+                  🔍 Đã quét mã QR: <strong className="font-mono text-[var(--accent-text)]">{simulatedQrScan}</strong>
                 </span>
                 <button
                   onClick={() => setSimulatedQrScan(null)}
-                  className="text-purple-400 hover:underline font-bold"
+                  className="text-[var(--accent-text)] hover:underline font-bold"
                 >
                   Xóa kết quả
                 </button>
@@ -403,14 +403,14 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
 
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
               {filteredEquipments.map((eq) => (
-                <div key={eq.id} className="p-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-elevated)]/40 space-y-3 hover:border-purple-300 transition-all relative group">
+                <div key={eq.id} className="p-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-elevated)]/40 space-y-3 hover:border-[var(--accent)] transition-all relative group">
                   <div className="flex justify-between items-start">
-                    <span className="bg-purple-950/30 text-purple-300 font-mono text-[10px] font-bold px-2 py-0.5 rounded">
+                    <span className="bg-[var(--accent)]/30 text-[var(--accent-text)] font-mono text-[10px] font-bold px-2 py-0.5 rounded">
                       {eq.qrCode}
                     </span>
                     <div className="flex items-center gap-1">
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        eq.status === "In Use" ? "bg-indigo-500/20 text-indigo-300" :
+                        eq.status === "In Use" ? "bg-[var(--accent)]/20 text-[var(--accent-text)]" :
                         eq.status === "Maintenance" ? "bg-amber-500/20 text-amber-300" :
                         eq.status === "Damaged" ? "bg-red-500/20 text-red-300" : "bg-emerald-500/20 text-emerald-300"
                       }`}>
@@ -418,7 +418,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
                       </span>
                       <button
                         onClick={() => openEditEquipmentModal(eq)}
-                        className="p-1 text-[var(--text-muted)] hover:text-purple-300 rounded transition-all"
+                        className="p-1 text-[var(--text-muted)] hover:text-[var(--accent-text)] rounded transition-all"
                         title="Chỉnh sửa thiết bị"
                       >
                         <Edit3 className="w-3.5 h-3.5" />
@@ -435,7 +435,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
                   <div>
                     <h4 className="font-bold text-[var(--text)] text-xs">{eq.name}</h4>
                     <p className="text-[10px] text-[var(--text-muted)] mt-0.5">{eq.model}</p>
-                    <span className="text-[9px] text-purple-300 font-semibold bg-purple-950/30 px-1.5 py-0.5 rounded mt-1 inline-block">
+                    <span className="text-[9px] text-[var(--accent-text)] font-semibold bg-[var(--accent)]/30 px-1.5 py-0.5 rounded mt-1 inline-block">
                       {eq.category}
                     </span>
                   </div>
@@ -443,7 +443,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
                     <span>Kiểm tra: {eq.lastCheckDate}</span>
                     <button
                       onClick={() => handleScanQr(eq.qrCode)}
-                      className="text-purple-400 font-bold hover:underline"
+                      className="text-[var(--accent-text)] font-bold hover:underline"
                     >
                       Giả lập Quét QR
                     </button>
@@ -461,7 +461,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
           <div className="bg-[var(--surface)] w-full max-w-lg rounded-2xl shadow-2xl border border-[var(--border)] overflow-hidden max-h-[90vh] flex flex-col">
             <div className="bg-[var(--surface)] text-[var(--text)] px-6 py-4 flex justify-between items-center shrink-0">
               <h3 className="font-bold text-sm flex items-center gap-2">
-                <Building2 className="w-4 h-4 text-purple-400" />
+                <Building2 className="w-4 h-4 text-[var(--accent-text)]" />
                 {editingStudio ? `Chỉnh Sửa Studio: ${editingStudio.name}` : "Thêm Studio Livestream Mới"}
               </h3>
               <button onClick={() => setIsStudioModalOpen(false)} className="text-[var(--text-muted)] hover:text-[var(--text)]">
@@ -563,7 +563,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl shadow transition-all"
+                  className="px-5 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold rounded-xl shadow transition-all"
                 >
                   {editingStudio ? "Cập Nhật Studio" : "Lưu Studio Mới"}
                 </button>
@@ -579,7 +579,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
           <div className="bg-[var(--surface)] w-full max-w-lg rounded-2xl shadow-2xl border border-[var(--border)] overflow-hidden max-h-[90vh] flex flex-col">
             <div className="bg-[var(--surface)] text-[var(--text)] px-6 py-4 flex justify-between items-center shrink-0">
               <h3 className="font-bold text-sm flex items-center gap-2">
-                <Camera className="w-4 h-4 text-purple-400" />
+                <Camera className="w-4 h-4 text-[var(--accent-text)]" />
                 {editingEquipment ? `Chỉnh Sửa Thiết Bị: ${editingEquipment.name}` : "Thêm Thiết Bị Mới Vào Kho"}
               </h3>
               <button onClick={() => setIsEquipmentModalOpen(false)} className="text-[var(--text-muted)] hover:text-[var(--text)]">
@@ -690,7 +690,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl shadow transition-all"
+                  className="px-5 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold rounded-xl shadow transition-all"
                 >
                   {editingEquipment ? "Cập Nhật Thiết Bị" : "Lưu Thiết Bị Mới"}
                 </button>
