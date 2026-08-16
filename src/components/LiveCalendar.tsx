@@ -13,8 +13,6 @@ import {
   buildSessionMeta,
   buildSlotMeta
 } from "./ui/SessionEventCard";
-import { SchemeManager } from "./SchemeManager";
-import { RecurringTemplateManager } from "./scheduling/RecurringTemplateManager";
 import { SlotDetailModal } from "./scheduling/SlotDetailModal";
 import {
   Calendar as CalendarIcon,
@@ -127,9 +125,6 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   onUpdateScheme,
   onDeleteScheme
 }) => {
-  const canEditSchemes = currentRole === "ceo" || currentRole === "admin" || currentRole === "operations";
-  const canManageTemplates = canEditSchemes && !!onCreateTemplate && !!onGenerateMonthSlots;
-  const [showSchemeManager, setShowSchemeManager] = useState(false);
   const moderators = users.filter((u) => u.role === "moderator");
   // Sync sessions with propSessions so clean test mode is respected
   const [sessions, setSessions] = useState<LiveSession[]>(propSessions);
@@ -915,48 +910,6 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
           </div>
         </div>
       </div>
-
-      {/* SCHEME KHUYẾN MÃI (Giai đoạn C3) */}
-      {canEditSchemes && (
-        <div className="flex items-center justify-end">
-          <button
-            onClick={() => setShowSchemeManager((v) => !v)}
-            className="text-xs font-bold text-amber-400 hover:text-amber-300 transition-colors flex items-center gap-1"
-          >
-            <Tag className="w-3.5 h-3.5" /> {showSchemeManager ? "Ẩn Scheme khuyến mãi" : `Quản lý Scheme khuyến mãi (${schemes.length})`}
-          </button>
-        </div>
-      )}
-      {canEditSchemes && showSchemeManager && (
-        <SchemeManager
-          schemes={schemes}
-          onAdd={async (s) => {
-            if (onAddScheme) await onAddScheme(s);
-          }}
-          onUpdate={async (id, patch) => {
-            if (onUpdateScheme) await onUpdateScheme(id, patch);
-          }}
-          onDelete={async (id) => {
-            if (onDeleteScheme) await onDeleteScheme(id);
-          }}
-        />
-      )}
-
-      {canManageTemplates && (
-        <RecurringTemplateManager
-          templates={recurringShiftTemplates}
-          brands={brands}
-          studios={studios}
-          currentMonth={currentMonth}
-          currentYear={currentYear}
-          currentUserId={currentUserId}
-          onCreateTemplate={onCreateTemplate!}
-          onToggleTemplate={onToggleTemplate!}
-          onDeleteTemplate={onDeleteTemplate!}
-          onGenerateMonthSlots={onGenerateMonthSlots!}
-        />
-      )}
-
 
       {/* DRAG & DROP HELPER BANNER */}
       {draggedSessionId ? (
