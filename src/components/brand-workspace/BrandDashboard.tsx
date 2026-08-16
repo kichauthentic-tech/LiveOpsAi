@@ -1,30 +1,40 @@
 import React, { useMemo, useState, useEffect } from "react";
-import { Brand, LiveSession } from "../../types";
+import { Brand, LiveSession, Talent } from "../../types";
 import {
   Store,
   TrendingUp,
   TrendingDown,
   LayoutDashboard,
   BarChart3,
+  BarChart2,
   Eye,
   MousePointerClick,
   Target,
   Radio,
   ShoppingBag,
   Wifi,
-  CalendarClock
+  CalendarClock,
+  Calendar,
+  AlertTriangle,
+  Award
 } from "lucide-react";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
 import { computeGmvByDate } from "../../lib/gmvMetrics";
 import { getTodayDate, getTodayMonth } from "../../lib/dateUtils";
 import { GmvCalendar } from "../GmvCalendar";
+import { GmvGrowthTrendline } from "../GmvGrowthTrendline";
+import { PerformanceDeviationAlerts } from "../PerformanceDeviationAlerts";
+import { KpiComparison } from "../KpiComparison";
 import { BrandLogo } from "../ui/BrandLogo";
 
 interface BrandDashboardProps {
   brandId: string;
   brand?: Brand;
   sessions: LiveSession[];
+  /** Chỉ dùng avatar/tên/niches để hiển thị leaderboard Top Host — không đọc rate/commission (field nhạy cảm, xem talents_secure). */
+  talents?: Talent[];
+  onSelectSession?: (session: LiveSession) => void;
   /** Báo lên App khi tab đang mở có lịch GMV — App dùng để tự thu gọn sidebar. */
   onCalendarViewChange?: (isCalendarView: boolean) => void;
 }
@@ -40,24 +50,21 @@ const monthLabel = (month: string) => {
   return `Th${m}/${y}`;
 };
 
-type TabKey = "overview" | "performance";
-
-const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
-  { key: "overview", label: "Tổng Quan", icon: LayoutDashboard },
-  { key: "performance", label: "Báo Cáo Hiệu Suất", icon: BarChart3 }
-];
+type TabKey = "overview" | "performance" | "gmv_forecast" | "alerts" | "gmv_calendar" | "kpi_comparison";
 
 export const BrandDashboard: React.FC<BrandDashboardProps> = ({
   brandId,
   brand,
   sessions,
+  talents = [],
+  onSelectSession,
   onCalendarViewChange
 }) => {
   const [tab, setTab] = useState<TabKey>("overview");
 
-  // Tab "Báo Cáo Hiệu Suất" chứa lịch GMV 7 cột → báo lên App để sidebar tự thu gọn.
+  // Tab "Lịch GMV" là lưới lịch 7 cột → báo lên App để sidebar tự thu gọn (đồng bộ hành vi với Agency Dashboard).
   useEffect(() => {
-    onCalendarViewChange?.(tab === "performance");
+    onCalendarViewChange?.(tab === "gmv_calendar");
     return () => onCalendarViewChange?.(false);
   }, [tab, onCalendarViewChange]);
 
@@ -97,6 +104,30 @@ export const BrandDashboard: React.FC<BrandDashboardProps> = ({
     });
   }, [brandSessions, thisMonth]);
 
+  // Top Host cho riêng brand này — đồng bộ panel "Top Host Xuất Sắc" của Agency Dashboard (Dashboards.tsx),
+  // nhưng xếp hạng theo GMV trung bình/phiên mà host đó tạo ra thật cho chính brand này, không phải avgGmvPerSession toàn agency.
+  const topHostsForBrand = useMemo(() => {
+    const byHost = new Map<string, { hostId: string; hostName: string; totalGmv: number; sessionCount: number; cvrSum: number }>();
+    brandSessions
+      .filter((s) => s.status === "Completed" && s.actualGmv > 0)
+      .forEach((s) => {
+        const entry = byHost.get(s.hostId) || { hostId: s.hostId, hostName: s.hostName, totalGmv: 0, sessionCount: 0, cvrSum: 0 };
+        entry.totalGmv += s.actualGmv || 0;
+        entry.sessionCount += 1;
+        entry.cvrSum += s.cvrAvg || 0;
+        byHost.set(s.hostId, entry);
+      });
+    return Array.from(byHost.values())
+      .map((h) => ({
+        ...h,
+        avgGmv: h.totalGmv / h.sessionCount,
+        avgCvr: h.cvrSum / h.sessionCount,
+        talent: talents.find((t) => t.id === h.hostId)
+      }))
+      .sort((a, b) => b.avgGmv - a.avgGmv)
+      .slice(0, 5);
+  }, [brandSessions, talents]);
+
   const nextSession = useMemo(() => {
     const live = brandSessions.find((s) => s.status === "Live Now");
     if (live) return live;
@@ -133,6 +164,21 @@ export const BrandDashboard: React.FC<BrandDashboardProps> = ({
     });
   }, [selectedMonthSessions, month]);
 
+  // Cùng ngưỡng lệch KPI với Agency Dashboard (Dashboards.tsx) để badge cảnh báo nhất quán.
+  const deviatingSessionsCount = useMemo(
+    () =>
+      brandSessions.filter((s) => {
+        if (s.targetGmv > 0 && (s.actualGmv > 0 || s.status === "Live Now")) {
+          const devPct = Math.abs((s.actualGmv - s.targetGmv) / s.targetGmv);
+          return devPct >= 0.2;
+        }
+        return false;
+      }).length,
+    [brandSessions]
+  );
+
+  const brandOnly = useMemo(() => (brand ? [brand] : []), [brand]);
+
   if (!brand) {
     return (
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-10 text-center text-sm text-[var(--text-muted)]">
@@ -153,20 +199,87 @@ export const BrandDashboard: React.FC<BrandDashboardProps> = ({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-1.5">
-        {TABS.map(({ key, label, icon: Icon }) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-bold transition-colors ${
-              tab === key
-                ? "bg-[var(--accent)] text-white shadow-lg"
-                : "bg-[var(--surface-base)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] hover:border-[var(--text-faint)]"
-            }`}
-          >
-            <Icon className="w-4 h-4" /> {label}
-          </button>
-        ))}
+      {/* Thanh sub-tab đồng bộ pattern với Agency Dashboard (Dashboards.tsx `subTabHeader`) — mỗi tab giữ 1 màu nhận diện riêng. */}
+      <div className="flex flex-wrap items-center gap-2 bg-[var(--surface)]/90 p-2 rounded-2xl border border-[var(--border)] shadow-md">
+        <button
+          onClick={() => setTab("overview")}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+            tab === "overview"
+              ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30"
+              : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]"
+          }`}
+        >
+          <LayoutDashboard className="w-4 h-4" />
+          <span>Tổng Quan</span>
+        </button>
+
+        <button
+          onClick={() => setTab("performance")}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+            tab === "performance"
+              ? "bg-emerald-600 text-white shadow-lg shadow-emerald-600/30"
+              : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]"
+          }`}
+        >
+          <BarChart3 className="w-4 h-4" />
+          <span>Báo Cáo Hiệu Suất</span>
+        </button>
+
+        <button
+          onClick={() => setTab("gmv_forecast")}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+            tab === "gmv_forecast"
+              ? "bg-purple-600 text-white shadow-lg shadow-purple-600/30"
+              : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]"
+          }`}
+        >
+          <TrendingUp className="w-4 h-4 text-purple-400" />
+          <span>Dự Báo GMV 30 Ngày</span>
+          <span className="bg-purple-500 text-white font-black text-[9px] px-1.5 py-0.5 rounded-md uppercase">
+            30D Trend
+          </span>
+        </button>
+
+        <button
+          onClick={() => setTab("alerts")}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 relative ${
+            tab === "alerts"
+              ? "bg-amber-600 text-white shadow-lg shadow-amber-600/30 font-black"
+              : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]"
+          }`}
+        >
+          <AlertTriangle className="w-4 h-4 text-amber-400 animate-pulse" />
+          <span>Cảnh Báo Lệch KPI</span>
+          {deviatingSessionsCount > 0 && (
+            <span className="bg-red-500 text-white font-black text-[10px] px-2 py-0.5 rounded-full animate-bounce">
+              {deviatingSessionsCount} Alerts (&gt;20%)
+            </span>
+          )}
+        </button>
+
+        <button
+          onClick={() => setTab("gmv_calendar")}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+            tab === "gmv_calendar"
+              ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30"
+              : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]"
+          }`}
+        >
+          <Calendar className="w-4 h-4 text-blue-400" />
+          <span>Lịch GMV Target/Actual</span>
+        </button>
+
+        <button
+          onClick={() => setTab("kpi_comparison")}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+            tab === "kpi_comparison"
+              ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30"
+              : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]"
+          }`}
+        >
+          <BarChart2 className="w-4 h-4 text-emerald-400" />
+          <span>So Sánh KPI Theo Kỳ</span>
+        </button>
       </div>
 
       {tab === "overview" && (
@@ -226,6 +339,45 @@ export const BrandDashboard: React.FC<BrandDashboardProps> = ({
                 </AreaChart>
               </ResponsiveContainer>
             </div>
+          </div>
+
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 shadow-xl space-y-3">
+            <h3 className="font-bold text-[var(--text)] text-sm flex items-center gap-1.5">
+              <Award className="w-4 h-4 text-amber-500" /> Top Host Xuất Sắc Cho {brand.name}
+            </h3>
+            {topHostsForBrand.length === 0 ? (
+              <div className="p-4 bg-[var(--surface-elevated)]/40 border border-[var(--border)] rounded-xl text-center text-xs text-[var(--text-muted)] italic">
+                Chưa có phiên live hoàn thành để xếp hạng host.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {topHostsForBrand.map((h, i) => (
+                  <div
+                    key={h.hostId}
+                    className="flex items-center justify-between p-3 rounded-xl bg-[var(--surface-elevated)]/40 border border-[var(--border)]"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <span className="font-black text-xs text-[var(--text-muted)] w-4">#{i + 1}</span>
+                      {h.talent?.avatar ? (
+                        <img src={h.talent.avatar} alt={h.hostName} className="w-9 h-9 rounded-full object-cover border border-[var(--accent)]/40" />
+                      ) : (
+                        <div className="w-9 h-9 rounded-full bg-[var(--surface-base)] border border-[var(--accent)]/40 flex items-center justify-center text-xs font-bold text-[var(--text-muted)]">
+                          {h.hostName.charAt(0)}
+                        </div>
+                      )}
+                      <div>
+                        <h4 className="font-bold text-[var(--text)] text-xs">{h.hostName}</h4>
+                        <p className="text-[10px] text-[var(--text-muted)]">{h.sessionCount} phiên live cho {brand.name}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-extrabold text-xs text-emerald-600">{formatCurrencyAdaptive(h.avgGmv)}/live</div>
+                      <div className="text-[10px] text-[var(--text-muted)]">CVR: {h.avgCvr.toFixed(1)}%</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 shadow-xl">
@@ -293,7 +445,7 @@ export const BrandDashboard: React.FC<BrandDashboardProps> = ({
             <div>
               <h3 className="text-sm font-bold text-[var(--text)]">Xu Hướng GMV Theo Ngày — Target vs Actual</h3>
               <p className="text-xs text-[var(--text-faint)] mt-0.5">
-                Đọc nhanh xu hướng theo tuần/tháng của {brand.name} trong {month}. Dùng cùng bộ lọc tháng với lịch bên dưới.
+                Đọc nhanh xu hướng theo tuần/tháng của {brand.name} trong {month}. Xem dạng lịch đầy đủ ở tab "Lịch GMV Target/Actual".
               </p>
             </div>
             <div className="h-64 w-full">
@@ -313,16 +465,31 @@ export const BrandDashboard: React.FC<BrandDashboardProps> = ({
               </ResponsiveContainer>
             </div>
           </div>
-
-          <GmvCalendar
-            sessions={brandSessions}
-            title="Lịch GMV: Target vs Actual"
-            subtitle={`Theo dõi target/actual GMV từng ngày của ${brand.name} và tiến độ dự phóng cuối tháng.`}
-            month={month}
-            onMonthChange={setMonth}
-          />
         </div>
       )}
+
+      {tab === "gmv_forecast" && (
+        <GmvGrowthTrendline sessions={brandSessions} brands={brandOnly} hideCommission hideBrandFilter />
+      )}
+
+      {tab === "alerts" && (
+        <PerformanceDeviationAlerts
+          sessions={brandSessions}
+          onSelectSession={onSelectSession ?? (() => {})}
+        />
+      )}
+
+      {tab === "gmv_calendar" && (
+        <GmvCalendar
+          sessions={brandSessions}
+          title="Lịch GMV: Target vs Actual"
+          subtitle={`Theo dõi target/actual GMV từng ngày của ${brand.name} và tiến độ dự phóng cuối tháng.`}
+          month={month}
+          onMonthChange={setMonth}
+        />
+      )}
+
+      {tab === "kpi_comparison" && <KpiComparison brands={brandOnly} sessions={brandSessions} />}
     </div>
   );
 };

@@ -1272,6 +1272,11 @@ export default function App() {
     setActiveTab("sessions");
   };
 
+  const handleSelectSessionFromBrandDashboard = (session: LiveSession) => {
+    setSelectedSession(session);
+    setActiveTab("brand_sessions");
+  };
+
   // Navigation Items mapped to permission keys, grouped theo luồng công việc — đây là
   // nhóm cho Agency Workspace (nhìn xuyên mọi Brand). Xem BRAND_NAV_GROUPS bên dưới cho
   // Brand Workspace (Giai đoạn A, WORKSPACE_DESIGN.md).
@@ -1768,6 +1773,8 @@ export default function App() {
                     brandId={currentBrandId!}
                     brand={activeBrands.find((b) => b.id === currentBrandId)}
                     sessions={activeSessions}
+                    talents={activeTalents}
+                    onSelectSession={handleSelectSessionFromBrandDashboard}
                     onCalendarViewChange={setDashboardCalendarView}
                   />
                 )}

@@ -24,15 +24,27 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   HelpCircle,
-  BarChart3
+  BarChart3,
+  Shield,
+  Rocket,
+  MapPin
 } from "lucide-react";
 
 interface GmvGrowthTrendlineProps {
   sessions: LiveSession[];
   brands: Brand[];
+  /** Ẩn thẻ hoa hồng agency — dùng khi component hiển thị trong Brand Workspace, không lộ margin nội bộ cho brand. */
+  hideCommission?: boolean;
+  /** Ẩn bộ lọc "Tất cả Brands Đối Tác" — dùng khi component đã hiển thị trong ngữ cảnh 1 brand duy nhất (Brand Workspace), lọc lại theo brand là thừa. */
+  hideBrandFilter?: boolean;
 }
 
-export const GmvGrowthTrendline: React.FC<GmvGrowthTrendlineProps> = ({ sessions, brands }) => {
+export const GmvGrowthTrendline: React.FC<GmvGrowthTrendlineProps> = ({
+  sessions,
+  brands,
+  hideCommission = false,
+  hideBrandFilter = false
+}) => {
   const [selectedBrandId, setSelectedBrandId] = useState<string>("all");
   const [scenario, setScenario] = useState<"target" | "aggressive" | "conservative">("target");
   const [viewType, setViewType] = useState<"daily" | "cumulative">("daily");
@@ -207,48 +219,50 @@ export const GmvGrowthTrendline: React.FC<GmvGrowthTrendlineProps> = ({ sessions
 
         {/* Filters & Scenario Selector */}
         <div className="flex flex-wrap items-center gap-2 text-xs">
-          {/* Brand Filter */}
-          <div className="flex items-center gap-1.5 bg-[var(--surface-elevated)] px-3 py-1.5 rounded-xl border border-[var(--border)]">
-            <Filter className="w-3.5 h-3.5 text-[var(--text-muted)]" />
-            <select
-              value={selectedBrandId}
-              onChange={(e) => setSelectedBrandId(e.target.value)}
-              className="bg-transparent font-bold text-[var(--text)] outline-none cursor-pointer"
-            >
-              <option value="all">Tất cả Brands Đối Tác</option>
-              {brands.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.logo} {b.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Brand Filter — ẩn khi component đã ở trong ngữ cảnh 1 brand duy nhất (Brand Workspace) */}
+          {!hideBrandFilter && (
+            <div className="flex items-center gap-1.5 bg-[var(--surface-elevated)] px-3 py-1.5 rounded-xl border border-[var(--border)]">
+              <Filter className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+              <select
+                value={selectedBrandId}
+                onChange={(e) => setSelectedBrandId(e.target.value)}
+                className="bg-transparent font-bold text-[var(--text)] outline-none cursor-pointer"
+              >
+                <option value="all">Tất cả Brands Đối Tác</option>
+                {brands.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.logo} {b.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Scenario Buttons */}
           <div className="flex items-center bg-[var(--surface-elevated)] p-1 rounded-xl border border-[var(--border)]">
             <button
               onClick={() => setScenario("conservative")}
-              className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+              className={`px-2.5 py-1 rounded-lg font-bold transition-all flex items-center gap-1 ${
                 scenario === "conservative" ? "bg-[var(--surface-hover)] text-[var(--text)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text)]"
               }`}
             >
-              🛡️ An Toàn (+8%)
+              <Shield className="w-3.5 h-3.5" /> An Toàn (+8%)
             </button>
             <button
               onClick={() => setScenario("target")}
-              className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+              className={`px-2.5 py-1 rounded-lg font-bold transition-all flex items-center gap-1 ${
                 scenario === "target" ? "bg-[var(--accent)] text-white shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text)]"
               }`}
             >
-              🎯 Target Plan (+18%)
+              <Target className="w-3.5 h-3.5" /> Target Plan (+18%)
             </button>
             <button
               onClick={() => setScenario("aggressive")}
-              className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+              className={`px-2.5 py-1 rounded-lg font-bold transition-all flex items-center gap-1 ${
                 scenario === "aggressive" ? "bg-amber-500 text-slate-950 shadow-sm font-black" : "text-[var(--text-muted)] hover:text-[var(--text)]"
               }`}
             >
-              🚀 Bứt Phá (+32%)
+              <Rocket className="w-3.5 h-3.5" /> Bứt Phá (+32%)
             </button>
           </div>
 
@@ -275,7 +289,7 @@ export const GmvGrowthTrendline: React.FC<GmvGrowthTrendlineProps> = ({ sessions
       </div>
 
       {/* Metric Cards Summary */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 ${hideCommission ? "lg:grid-cols-3" : "lg:grid-cols-4"}`}>
         <div className="p-4 rounded-xl bg-[var(--surface-elevated)]/50 border border-[var(--border)] space-y-1">
           <span className="text-[var(--text-muted)] text-xs font-semibold block">GMV Thực Tế (15 Ngày Đầu)</span>
           <div className="text-xl font-black text-emerald-400">
@@ -302,13 +316,15 @@ export const GmvGrowthTrendline: React.FC<GmvGrowthTrendlineProps> = ({ sessions
           <span className="text-[10px] text-sky-400 font-medium">So với chỉ tiêu KPI 7.5 Tỷ VNĐ / Tháng</span>
         </div>
 
-        <div className="p-4 rounded-xl bg-amber-950/80 border border-amber-800/50 space-y-1">
-          <span className="text-amber-300 text-xs font-semibold block">Hoa Hồng Agency Dự Kiến (15%)</span>
-          <div className="text-xl font-black text-amber-200">
-            {formatCurrencyAdaptive(metrics.estCommission * 1_000_000, "VNĐ")}
+        {!hideCommission && (
+          <div className="p-4 rounded-xl bg-amber-950/80 border border-amber-800/50 space-y-1">
+            <span className="text-amber-300 text-xs font-semibold block">Hoa Hồng Agency Dự Kiến (15%)</span>
+            <div className="text-xl font-black text-amber-200">
+              {formatCurrencyAdaptive(metrics.estCommission * 1_000_000, "VNĐ")}
+            </div>
+            <span className="text-[10px] text-amber-400 font-medium">Commission cơ sở ước tính</span>
           </div>
-          <span className="text-[10px] text-amber-400 font-medium">Commission cơ sở ước tính</span>
-        </div>
+        )}
       </div>
 
       {/* Main Recharts Trendline Chart */}
@@ -354,7 +370,7 @@ export const GmvGrowthTrendline: React.FC<GmvGrowthTrendlineProps> = ({ sessions
                 strokeDasharray="4 4"
                 strokeWidth={2}
                 label={{
-                  value: "📍 HÔM NAY",
+                  value: "HÔM NAY",
                   fill: "var(--danger)",
                   fontSize: 10,
                   fontWeight: "bold",
