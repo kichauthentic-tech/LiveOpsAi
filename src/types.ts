@@ -73,8 +73,8 @@ export interface Talent {
   role: "Host" | "KOC" | "KOL" | "MC";
   gender: string;
   niches: string[];
-  followersTikTok: number;
   avgGmvPerSession: number;
+  totalGmv: number; // GMV tích lũy toàn thời gian
   ctrAvg: number; // e.g. 8.5%
   cvrAvg: number; // e.g. 4.2%
   ratePerSession: number;

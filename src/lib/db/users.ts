@@ -68,8 +68,8 @@ export interface NewTalentProfilePayload {
   gender: string;
   niches: string[];
   avatar?: string;
-  followersTikTok?: number;
   avgGmvPerSession?: number;
+  totalGmv?: number;
   ctrAvg?: number;
   cvrAvg?: number;
   overallScore?: number;

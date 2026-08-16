@@ -187,10 +187,10 @@ export function createApp() {
             gender: newTalentProfile.gender || "",
             niches: Array.isArray(newTalentProfile.niches) ? newTalentProfile.niches : [],
             avatar: newTalentProfile.avatar || "",
-            // Hiệu suất (followers/GMV/CTR/CVR/điểm) mặc định 0 nếu không truyền — sẽ tự tính từ
+            // Hiệu suất (GMV/CTR/CVR/điểm) mặc định 0 nếu không truyền — sẽ tự tính từ
             // báo cáo phiên live thật sau này, không nhập tay khi tạo mới (xem WORKSPACE_DESIGN.md).
-            followers_tiktok: newTalentProfile.followersTikTok || 0,
             avg_gmv_per_session: newTalentProfile.avgGmvPerSession || 0,
+            total_gmv: newTalentProfile.totalGmv || 0,
             ctr_avg: newTalentProfile.ctrAvg || 0,
             cvr_avg: newTalentProfile.cvrAvg || 0,
             overall_score: newTalentProfile.overallScore || 0,
@@ -744,7 +744,7 @@ ${JSON.stringify(sessionData)}
           name: t.name,
           matchScore: Math.max(70, 96 - idx * 5),
           predictedGmv: `${((t.avgGmvPerSession || 100000000) / 1000000).toFixed(0)}M - ${(((t.avgGmvPerSession || 100000000) * 1.25) / 1000000).toFixed(0)}M đ`,
-          reasoning: `Thế mạnh ngành ${(t.niches || []).join(", ") || "Đa ngành"}, CVR trung bình ${t.cvrAvg}% với ${(t.followersTikTok || 0).toLocaleString()} followers. Rất phù hợp với ${brand?.name || "Brand"}.`
+          reasoning: `Thế mạnh ngành ${(t.niches || []).join(", ") || "Đa ngành"}, CVR trung bình ${t.cvrAvg}%, GMV tích lũy ${((t.totalGmv || 0) / 1000000).toFixed(0)}M đ. Rất phù hợp với ${brand?.name || "Brand"}.`
         }));
         return res.json({ success: true, isMock: true, results });
       }
@@ -761,7 +761,7 @@ Danh mục sản phẩm SKU mục tiêu: ${targetCategory}
 Danh sách Talent hiện có (dữ liệu thật từ hệ thống):
 ${JSON.stringify(talents)}
 
-Hãy chấm điểm mức độ phù hợp (matchScore, 0-100) cho MỖI talent trong danh sách trên dựa trên: mức độ khớp ngành hàng (niches) với ngành của Brand/SKU, CVR, số followers, GMV trung bình mỗi phiên. Đưa ra lý do (reasoning) ngắn gọn, cụ thể dựa trên số liệu thật đã cho — không bịa số liệu không có trong dữ liệu.
+Hãy chấm điểm mức độ phù hợp (matchScore, 0-100) cho MỖI talent trong danh sách trên dựa trên: mức độ khớp ngành hàng (niches) với ngành của Brand/SKU, CVR, GMV trung bình mỗi phiên, GMV tích lũy. Đưa ra lý do (reasoning) ngắn gọn, cụ thể dựa trên số liệu thật đã cho — không bịa số liệu không có trong dữ liệu.
 
 Định dạng JSON trả về (mảng, giữ nguyên thứ tự talentId đầu vào):
 {

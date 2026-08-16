@@ -231,8 +231,8 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({ activeUser, ta
             <div className="font-bold text-[var(--text)] mt-0.5">{myTalent.availabilityStatus}</div>
           </div>
           <div className="bg-[var(--surface-base)]/40 border border-[var(--border)] rounded-xl p-3">
-            <div className="text-[var(--text-muted)]">TikTok Followers</div>
-            <div className="font-bold text-[var(--text)] mt-0.5">{(myTalent.followersTikTok || 0).toLocaleString()}</div>
+            <div className="text-[var(--text-muted)]">GMV Tích Lũy</div>
+            <div className="font-bold text-emerald-400 mt-0.5">{((myTalent.totalGmv || 0) / 1000000).toFixed(0)}M đ</div>
           </div>
           <div className="bg-[var(--surface-base)]/40 border border-[var(--border)] rounded-xl p-3">
             <div className="text-[var(--text-muted)]">GMV TB / Phiên</div>

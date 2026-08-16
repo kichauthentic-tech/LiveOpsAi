@@ -8,8 +8,8 @@ interface DbTalent {
   role: Talent["role"];
   gender: string;
   niches: string[];
-  followers_tiktok: number;
   avg_gmv_per_session: number;
+  total_gmv: number;
   ctr_avg: number;
   cvr_avg: number;
   // Mask thành null bởi view `talents_secure` nếu người đọc không phải ceo/admin/chính
@@ -32,8 +32,8 @@ function fromDb(row: DbTalent): Talent {
     role: row.role,
     gender: row.gender,
     niches: row.niches ?? [],
-    followersTikTok: row.followers_tiktok,
     avgGmvPerSession: row.avg_gmv_per_session,
+    totalGmv: row.total_gmv,
     ctrAvg: row.ctr_avg,
     cvrAvg: row.cvr_avg,
     ratePerSession: row.rate_per_session ?? 0,
@@ -54,8 +54,8 @@ function toDb(t: Partial<Talent>) {
   if (t.role !== undefined) patch.role = t.role;
   if (t.gender !== undefined) patch.gender = t.gender;
   if (t.niches !== undefined) patch.niches = t.niches ?? [];
-  if (t.followersTikTok !== undefined) patch.followers_tiktok = t.followersTikTok;
   if (t.avgGmvPerSession !== undefined) patch.avg_gmv_per_session = t.avgGmvPerSession;
+  if (t.totalGmv !== undefined) patch.total_gmv = t.totalGmv;
   if (t.ctrAvg !== undefined) patch.ctr_avg = t.ctrAvg;
   if (t.cvrAvg !== undefined) patch.cvr_avg = t.cvrAvg;
   if (t.ratePerSession !== undefined) patch.rate_per_session = t.ratePerSession;

@@ -11,8 +11,8 @@ export interface NewTalentAccountPayload {
   gender: string;
   niches: string[];
   avatar: string;
-  followersTikTok: number;
   avgGmvPerSession: number;
+  totalGmv: number;
   ctrAvg: number;
   cvrAvg: number;
   overallScore: number;
@@ -68,8 +68,8 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
   const [formRole, setFormRole] = useState<"Host" | "KOC" | "KOL" | "MC">("Host");
   const [formGender, setFormGender] = useState("Nữ");
   const [formNiches, setFormNiches] = useState("Mỹ phẩm, Skincare");
-  const [formFollowers, setFormFollowers] = useState(500000);
   const [formGmv, setFormGmv] = useState(150000000);
+  const [formTotalGmv, setFormTotalGmv] = useState(0);
   const [formCvr, setFormCvr] = useState(5.0);
   const [formCtr, setFormCtr] = useState(8.0);
   const [formRate, setFormRate] = useState(5000000);
@@ -87,8 +87,8 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
     setFormRole("Host");
     setFormGender("Nữ");
     setFormNiches("Mỹ phẩm, Skincare");
-    setFormFollowers(500000);
     setFormGmv(150000000);
+    setFormTotalGmv(0);
     setFormCvr(5.0);
     setFormCtr(8.0);
     setFormRate(5000000);
@@ -107,8 +107,8 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
     setFormGender(t.gender || "Nữ");
     const nicheArr = t.niches || (t as any).niche || [];
     setFormNiches(Array.isArray(nicheArr) ? nicheArr.join(", ") : String(nicheArr));
-    setFormFollowers(t.followersTikTok || (t as any).tiktokFollowers || 500000);
     setFormGmv(t.avgGmvPerSession || 150000000);
+    setFormTotalGmv(t.totalGmv || 0);
     setFormCvr(t.cvrAvg || 5.0);
     setFormCtr(t.ctrAvg || 8.0);
     setFormRate(t.ratePerSession || (t as any).rateCardFee || 5000000);
@@ -132,8 +132,8 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
       role: formRole,
       gender: formGender,
       niches: nichesParsed,
-      followersTikTok: Number(formFollowers),
       avgGmvPerSession: Number(formGmv),
+      totalGmv: Number(formTotalGmv),
       ctrAvg: Number(formCtr),
       cvrAvg: Number(formCvr),
       overallScore: Number(formScore),
@@ -206,13 +206,12 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
         const matchScore = Math.max(70, 96 - idx * 5);
         const nicheArr = t.niches || (t as any).niche || [];
         const nicheStr = Array.isArray(nicheArr) ? nicheArr.join(", ") : String(nicheArr || "Đa ngành");
-        const followers = t.followersTikTok || (t as any).tiktokFollowers || 0;
         return {
           talentId: t.id,
           name: t.name,
           matchScore,
           predictedGmv: `${((t.avgGmvPerSession || 100000000) / 1000000).toFixed(0)}M - ${(((t.avgGmvPerSession || 100000000) * 1.25) / 1000000).toFixed(0)}M đ`,
-          reasoning: `Thế mạnh ngành ${nicheStr}, CVR trung bình ${t.cvrAvg}% với ${followers.toLocaleString()} followers. Rất phù hợp với ${activeBrand?.name || "Brand"}.`
+          reasoning: `Thế mạnh ngành ${nicheStr}, CVR trung bình ${t.cvrAvg}%, GMV tích lũy ${((t.totalGmv || 0) / 1000000).toFixed(0)}M đ. Rất phù hợp với ${activeBrand?.name || "Brand"}.`
         };
       });
       setMatchingResults(results);
@@ -355,7 +354,6 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
             const nicheArr = t.niches || (t as any).niche || [];
             const nicheStr = Array.isArray(nicheArr) ? nicheArr.join(", ") : String(nicheArr || "Đa ngành");
             const avatar = t.avatar || (t as any).avatarUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250";
-            const followers = t.followersTikTok || (t as any).tiktokFollowers || 0;
             const score = t.overallScore || (t as any).aiMatchScore || 90;
             const rate = t.ratePerSession || (t as any).rateCardFee || 0;
 
@@ -377,7 +375,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                         </span>
                       </div>
                       <p className="text-[10px] text-[var(--accent-text)] font-medium truncate">{nicheStr}</p>
-                      <span className="text-[10px] text-[var(--text-muted)] block truncate whitespace-nowrap">{followers.toLocaleString()} TikTok Followers</span>
+                      <span className="text-[10px] text-[var(--text-muted)] block truncate whitespace-nowrap">GMV tích lũy {((t.totalGmv || 0) / 1000000).toFixed(0)}M đ</span>
                     </div>
                   </div>
 
@@ -546,20 +544,20 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="font-bold text-[var(--text-muted)] block mb-1">TikTok Followers</label>
-                  <input
-                    type="number"
-                    value={formFollowers}
-                    onChange={(e) => setFormFollowers(Number(e.target.value))}
-                    className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
-                  />
-                </div>
-                <div>
                   <label className="font-bold text-[var(--text-muted)] block mb-1">GMV TB Mỗi Phiên (VND)</label>
                   <input
                     type="number"
                     value={formGmv}
                     onChange={(e) => setFormGmv(Number(e.target.value))}
+                    className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-[var(--text-muted)] block mb-1">GMV Tích Lũy (VND)</label>
+                  <input
+                    type="number"
+                    value={formTotalGmv}
+                    onChange={(e) => setFormTotalGmv(Number(e.target.value))}
                     className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
                   />
                 </div>
@@ -677,7 +675,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
               </div>
 
               <div className="grid grid-cols-2 gap-2 bg-[var(--surface-base)]/40 p-3 rounded-xl border border-[var(--border)]">
-                <div>TikTok Followers: <strong className="text-[var(--text)] block text-sm font-bold">{(detailTalent.followersTikTok || 0).toLocaleString()}</strong></div>
+                <div>GMV Tích Lũy: <strong className="text-[var(--text)] block text-sm font-bold">{((detailTalent.totalGmv || 0) / 1000000).toFixed(0)}M đ</strong></div>
                 <div>Điểm Tổng Hợp: <strong className="text-[var(--text)] block text-sm font-bold">{detailTalent.overallScore || 0}</strong></div>
                 <div>GMV TB / Phiên: <strong className="text-emerald-400 block text-sm font-bold">{((detailTalent.avgGmvPerSession || 0) / 1000000).toFixed(0)}M đ</strong></div>
                 <div>CVR TB: <strong className="text-[var(--accent-text)] block text-sm font-bold">{detailTalent.cvrAvg || 0}%</strong></div>
