@@ -1338,8 +1338,9 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                     </div>
                   </div>
 
-                  {/* Session cards under this day */}
-                  <div className="space-y-2 min-h-[160px]">
+                  {/* Session cards under this day — cuộn dọc khi nhiều hơn 2 card, đồng bộ với
+                      ô lịch tháng (MONTH_CELL_LIST_MAX_H) thay vì đẩy cả hàng tuần cao dần. */}
+                  <div className="space-y-2 min-h-[160px] max-h-[230px] overflow-y-auto overscroll-contain pr-0.5 scrollbar-thin">
                     {daySlots.map((sl) => (
                       <SessionEventCard
                         key={sl.id}

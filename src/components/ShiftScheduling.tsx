@@ -394,8 +394,6 @@ export default function ShiftScheduling({
                 );
                 const dayWarningColor = dayMissingBoth ? "bg-rose-500" : dayMissingCoHost ? "bg-amber-400" : null;
                 const dayWarningTitle = dayMissingBoth ? "Có ca chưa ai đăng ký" : dayMissingCoHost ? "Có ca thiếu Trợ live" : undefined;
-                const visibleChips = daySlots.slice(0, 2);
-                const extra = daySlots.length - visibleChips.length;
                 const campaignDay = getCampaignDayInfo(cell.date);
                 const toneClassName = isSelected
                   ? "bg-blue-50 dark:bg-blue-950/50 border-blue-500 shadow-md shadow-blue-600/10"
@@ -431,7 +429,7 @@ export default function ShiftScheduling({
                     }
                   >
                     <div className="space-y-1">
-                      {visibleChips.map((s) => (
+                      {daySlots.map((s) => (
                         <SessionEventCard
                           key={s.id}
                           theme={getBrandTheme(s.brandName)}
@@ -456,7 +454,6 @@ export default function ShiftScheduling({
                           }}
                         />
                       ))}
-                      {extra > 0 && <span className="text-[9px] text-slate-500 dark:text-slate-400 font-bold block">+{extra} ca khác</span>}
                     </div>
                   </PosterDayCell>
                 );

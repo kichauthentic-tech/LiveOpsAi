@@ -128,7 +128,11 @@ export const PosterDayCell: React.FC<PosterDayCellProps> = ({
         {badge && <span className="shrink-0">{badge}</span>}
       </div>
       <div className="border-t border-slate-100 dark:border-slate-800/80" />
-      <div className="flex-1 flex flex-col gap-1 overflow-hidden">{children}</div>
+      {/* Cuộn dọc trong chính ô khi nhiều hơn 2 card lịch live, đồng bộ với ô lịch tháng của
+          LiveCalendar — không cắt gộp thành "+N khác" nữa, click card vẫn xem chi tiết được. */}
+      <div className="flex-1 flex flex-col gap-1 overflow-y-auto overscroll-contain pr-0.5 scrollbar-thin max-h-[76px] sm:max-h-[168px]">
+        {children}
+      </div>
       {footer && (
         <div className="text-right text-[9px] font-semibold text-slate-400 dark:text-slate-500 pt-0.5">{footer}</div>
       )}

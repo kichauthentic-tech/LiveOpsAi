@@ -69,10 +69,6 @@ const STATUS_TIER: Record<LiveSession["status"], EventPillTier> = {
   Cancelled: "white_box"
 };
 
-// Card session cao hơn pill 1 dòng cũ nên phải giới hạn số card/ô, phần dư gộp thành "+N".
-const CELL_MAX_SESSIONS = 2;
-const CELL_MAX_SLOTS = 2;
-
 const shiftMonth = (month: string, delta: number) => {
   const [y, m] = month.split("-").map(Number);
   const d = new Date(y, m - 1 + delta, 1);
@@ -240,7 +236,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
           ) : undefined
         }
       >
-        {daySessions.slice(0, CELL_MAX_SESSIONS).map((s) => (
+        {daySessions.map((s) => (
           <SessionEventCard
             key={s.id}
             theme={brandTheme}
@@ -265,10 +261,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
             }
           />
         ))}
-        {daySessions.length > CELL_MAX_SESSIONS && (
-          <span className="text-[9px] text-[var(--text-faint)]">+{daySessions.length - CELL_MAX_SESSIONS} khác</span>
-        )}
-        {daySlots.slice(0, CELL_MAX_SLOTS).map((sl) => (
+        {daySlots.map((sl) => (
           <SessionEventCard
             key={sl.id}
             theme={brandTheme}
@@ -286,9 +279,6 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
             }}
           />
         ))}
-        {daySlots.length > CELL_MAX_SLOTS && (
-          <span className="text-[9px] text-[var(--warning)]">+{daySlots.length - CELL_MAX_SLOTS} ca chờ ĐK</span>
-        )}
       </PosterDayCell>
     );
   };
