@@ -14,7 +14,8 @@ import {
   ArrowUpRight,
   Clock,
   BarChart2,
-  LayoutDashboard
+  LayoutDashboard,
+  Zap
 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
 import { KpiComparison } from "./KpiComparison";
@@ -411,7 +412,11 @@ export const Dashboards: React.FC<DashboardsProps> = ({
                         <span className={`text-[10px] font-black px-2 py-0.5 rounded-md flex items-center gap-1 ${
                           devPct >= 20 ? "bg-emerald-500/30 text-emerald-300 border border-emerald-400/50" : "bg-red-500/30 text-red-300 border border-red-400/50 animate-pulse"
                         }`}>
-                          {devPct >= 20 ? `⚡ +${devPct.toFixed(0)}%` : `🚨 ${devPct.toFixed(0)}%`}
+                          {devPct >= 20 ? (
+                            <><Zap className="w-3 h-3" /> +{devPct.toFixed(0)}%</>
+                          ) : (
+                            <><AlertTriangle className="w-3 h-3" /> {devPct.toFixed(0)}%</>
+                          )}
                         </span>
                       )}
                       <span className="bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded-md flex items-center gap-1">

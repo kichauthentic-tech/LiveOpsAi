@@ -24,7 +24,8 @@ import {
   Radio,
   Building2,
   Briefcase,
-  FileText
+  FileText,
+  Zap
 } from "lucide-react";
 
 export interface NewUserPayload {
@@ -701,8 +702,8 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                               <div className="font-bold text-[var(--text)] text-sm flex items-center gap-2">
                                 <span>{u.name}</span>
                                 {customOverridesCount > 0 && (
-                                  <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[9px] font-black px-1.5 py-0.5 rounded">
-                                    ⚡ {customOverridesCount} Override
+                                  <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[9px] font-black px-1.5 py-0.5 rounded inline-flex items-center gap-0.5">
+                                    <Zap className="w-2.5 h-2.5" /> {customOverridesCount} Override
                                   </span>
                                 )}
                               </div>
@@ -1126,13 +1127,17 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                       onClick={() =>
                         handleToggleUserPermissionOverride(permissionOverrideUser.id, def.key)
                       }
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-1 ${
                         activeVal
                           ? "bg-emerald-600 text-white border-emerald-500"
                           : "bg-[var(--surface-elevated)] text-[var(--text-muted)] border-[var(--border)]"
                       }`}
                     >
-                      {activeVal ? "✓ ALLOWED" : "✕ DENIED"}
+                      {activeVal ? (
+                        <><Check className="w-3.5 h-3.5" /> ALLOWED</>
+                      ) : (
+                        <><X className="w-3.5 h-3.5" /> DENIED</>
+                      )}
                     </button>
                   </div>
                 );

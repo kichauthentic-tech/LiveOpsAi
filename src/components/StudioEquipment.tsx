@@ -216,7 +216,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
             activeSubTab === "studios" ? "bg-[var(--accent)] text-white shadow" : "bg-[var(--surface-elevated)] text-[var(--text-muted)] hover:bg-[var(--surface-hover)]"
           }`}
         >
-          🏢 Danh Sách Studio ({studios.length} Phòng)
+          <span className="inline-flex items-center gap-1.5"><Building2 className="w-3.5 h-3.5" /> Danh Sách Studio ({studios.length} Phòng)</span>
         </button>
         <button
           onClick={() => setActiveSubTab("equipment")}
@@ -224,7 +224,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
             activeSubTab === "equipment" ? "bg-[var(--accent)] text-white shadow" : "bg-[var(--surface-elevated)] text-[var(--text-muted)] hover:bg-[var(--surface-hover)]"
           }`}
         >
-          📷 Kho Thiết Bị & Quét Mã QR Code ({equipments.length} Thiết bị)
+          <span className="inline-flex items-center gap-1.5"><Camera className="w-3.5 h-3.5" /> Kho Thiết Bị & Quét Mã QR Code ({equipments.length} Thiết bị)</span>
         </button>
       </div>
 
@@ -390,7 +390,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
             {simulatedQrScan && (
               <div className="bg-[var(--accent)]/30 p-3 rounded-xl border border-[var(--accent)]/50 flex justify-between items-center text-xs">
                 <span className="text-[var(--accent-text)] font-medium">
-                  🔍 Đã quét mã QR: <strong className="font-mono text-[var(--accent-text)]">{simulatedQrScan}</strong>
+                  <span className="inline-flex items-center gap-1"><Search className="w-3 h-3" /> Đã quét mã QR:</span> <strong className="font-mono text-[var(--accent-text)]">{simulatedQrScan}</strong>
                 </span>
                 <button
                   onClick={() => setSimulatedQrScan(null)}

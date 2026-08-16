@@ -37,7 +37,7 @@ export const SchemeManager: React.FC<SchemeManagerProps> = ({ schemes, onAdd, on
   return (
     <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 space-y-3">
       <div className="text-xs font-bold text-[var(--text-muted)] flex items-center gap-1.5">
-        <Tag className="w-3.5 h-3.5 text-amber-400" /> Scheme khuyến mãi (hiện badge 🏷️ trên ô ngày trong khoảng áp dụng)
+        <Tag className="w-3.5 h-3.5 text-amber-400" /> Scheme khuyến mãi (hiện badge nhãn <Tag className="w-3 h-3 inline" /> trên ô ngày trong khoảng áp dụng)
       </div>
       <div className="space-y-2">
         {sorted.map((s) => (

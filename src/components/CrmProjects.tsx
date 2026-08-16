@@ -1,6 +1,6 @@
 import React, { useRef, useState } from "react";
 import { Brand, BrandPlatformRate, BrandPlatformRateHistoryEntry, LiveSession, SystemUser, UserRole } from "../types";
-import { Building2, Plus, Edit3, Trash2, X, Tag } from "lucide-react";
+import { Building2, Plus, Edit3, Trash2, X, Tag, DollarSign, Percent } from "lucide-react";
 import { BrandLogo } from "./ui/BrandLogo";
 import { BrandRateCard } from "./BrandRateCard";
 
@@ -205,8 +205,16 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
               </div>
 
               <div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[var(--surface-elevated)] text-[var(--text-muted)] border border-[var(--border)]">
-                  {b.billingModel === "hourly" ? "💰 Thu Phí Theo Giờ Live" : "📊 Thu Phí Theo % GMV"}
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[var(--surface-elevated)] text-[var(--text-muted)] border border-[var(--border)] inline-flex items-center gap-1">
+                  {b.billingModel === "hourly" ? (
+                    <>
+                      <DollarSign className="w-3 h-3" /> Thu Phí Theo Giờ Live
+                    </>
+                  ) : (
+                    <>
+                      <Percent className="w-3 h-3" /> Thu Phí Theo % GMV
+                    </>
+                  )}
                 </span>
               </div>
             </div>

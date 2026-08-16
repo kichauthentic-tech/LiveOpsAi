@@ -139,7 +139,7 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
             activeTab === "api_status" ? "bg-[var(--accent)] text-white shadow" : "bg-[var(--surface-elevated)] text-[var(--text-muted)] hover:bg-[var(--surface-hover)]"
           }`}
         >
-          🔗 TikTok Shop Partner API Status & Webhooks
+          <span className="inline-flex items-center gap-1.5"><Link2 className="w-3.5 h-3.5" /> TikTok Shop Partner API Status & Webhooks</span>
         </button>
         <button
           onClick={() => setActiveTab("rules")}
@@ -147,7 +147,7 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
             activeTab === "rules" ? "bg-[var(--accent)] text-white shadow" : "bg-[var(--surface-elevated)] text-[var(--text-muted)] hover:bg-[var(--surface-hover)]"
           }`}
         >
-          ⚡ Visual Workflow Automation Rules ({workflowRules.filter(r => r.enabled).length} Enabled)
+          <span className="inline-flex items-center gap-1.5"><Zap className="w-3.5 h-3.5" /> Visual Workflow Automation Rules ({workflowRules.filter(r => r.enabled).length} Enabled)</span>
         </button>
         <button
           onClick={() => setActiveTab("csv_import")}
@@ -155,7 +155,7 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
             activeTab === "csv_import" ? "bg-[var(--accent)] text-white shadow" : "bg-[var(--surface-elevated)] text-[var(--text-muted)] hover:bg-[var(--surface-hover)]"
           }`}
         >
-          📄 Smart Compass Excel / CSV Fallback Parser
+          <span className="inline-flex items-center gap-1.5"><FileSpreadsheet className="w-3.5 h-3.5" /> Smart Compass Excel / CSV Fallback Parser</span>
         </button>
       </div>
 

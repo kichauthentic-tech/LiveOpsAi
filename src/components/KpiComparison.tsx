@@ -813,8 +813,12 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
               <div className="space-y-1">
                 <div className="flex justify-between items-center text-[10px] text-[var(--text-muted)]">
                   <span className="truncate">Target: {formatMetricValue(item.target, item.format, item.unit)}</span>
-                  <span className={isTargetAchieved ? "text-emerald-400 font-bold shrink-0 ml-1" : "text-amber-400 font-bold shrink-0 ml-1"}>
-                    {isTargetAchieved ? "✓ Đạt" : "▲ Chưa Đạt"}
+                  <span className={`flex items-center gap-0.5 shrink-0 ml-1 ${isTargetAchieved ? "text-emerald-400 font-bold" : "text-amber-400 font-bold"}`}>
+                    {isTargetAchieved ? (
+                      <><CheckCircle2 className="w-3 h-3" /> Đạt</>
+                    ) : (
+                      <><TrendingUp className="w-3 h-3" /> Chưa Đạt</>
+                    )}
                   </span>
                 </div>
                 <div className="h-1.5 w-full bg-[var(--surface-elevated)] rounded-full overflow-hidden flex">

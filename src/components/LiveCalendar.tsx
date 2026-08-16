@@ -262,7 +262,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
 
     if (conflict) {
       showToast(
-        `⚠️ Không thể chuyển! Phòng ${targetStudio.name} đã có phiên live "${conflict.brandName}" ở ca ${targetSlot.label}!`,
+        `Không thể chuyển! Phòng ${targetStudio.name} đã có phiên live "${conflict.brandName}" ở ca ${targetSlot.label}!`,
         "warning"
       );
       setDraggedSessionId(null);
@@ -287,7 +287,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
     const ok = onUpdateSession ? await onUpdateSession(updatedSession) : true;
     if (ok) {
       showToast(
-        `✨ Đã chuyển phiên live "${session.brandName}" sang ${targetStudio.name} (${targetSlot.label})!`,
+        `Đã chuyển phiên live "${session.brandName}" sang ${targetStudio.name} (${targetSlot.label})!`,
         "success"
       );
     }
@@ -312,7 +312,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
     const ok = onUpdateSession ? await onUpdateSession(updatedSession) : true;
     if (ok) {
       showToast(
-        `✨ Đã chuyển phiên live "${session.brandName}" sang ngày ${targetDateStr}!`,
+        `Đã chuyển phiên live "${session.brandName}" sang ngày ${targetDateStr}!`,
         "success"
       );
     }
@@ -337,7 +337,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
     const ok = onUpdateSession ? await onUpdateSession(updatedSession) : true;
     if (ok) {
       showToast(
-        `✨ Đã chuyển phiên live "${session.brandName}" sang ngày ${targetDateStr}!`,
+        `Đã chuyển phiên live "${session.brandName}" sang ngày ${targetDateStr}!`,
         "success"
       );
     }
@@ -694,7 +694,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
     if (matchedHost) setNewHostId(matchedHost.id);
 
     setAiSuggestion(
-      `🤖 ${isMock ? "AI Recommendation (chưa cấu hình Gemini API key)" : "Gemini AI Recommendation"} cho ${brandName} (${industry}):\n` +
+      `${isMock ? "AI Recommendation (chưa cấu hình Gemini API key)" : "Gemini AI Recommendation"} cho ${brandName} (${industry}):\n` +
       `• Khung giờ Vàng tối ưu: ${result.suggestedSlot}\n` +
       `• Host đề xuất: ${result.suggestedHostName}\n` +
       `• Lý do: ${result.reason}\n` +
@@ -1020,7 +1020,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
           onChange={(e) => setSelectedStudioFilter(e.target.value)}
           className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-2 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
         >
-          <option value="ALL">🏢 Tất cả phòng Studio ({studios.length})</option>
+          <option value="ALL">Tất cả phòng Studio ({studios.length})</option>
           {studios.map((s) => (
             <option key={s.id} value={s.id}>{s.name}</option>
           ))}
@@ -1031,7 +1031,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
           onChange={(e) => setSelectedHostFilter(e.target.value)}
           className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-2 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
         >
-          <option value="ALL">🎙️ Tất cả Host / KOC ({talents.length})</option>
+          <option value="ALL">Tất cả Host / KOC ({talents.length})</option>
           {talents.map((t) => (
             <option key={t.id} value={t.id}>{t.name} ({t.role})</option>
           ))}
@@ -1042,7 +1042,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
           onChange={(e) => setSelectedBrandFilter(e.target.value)}
           className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-2 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
         >
-          <option value="ALL">🌿 Tất cả Brand Khách Hàng ({brands.length})</option>
+          <option value="ALL">Tất cả Brand Khách Hàng ({brands.length})</option>
           {brands.map((b) => (
             <option key={b.id} value={b.id}>{b.name}</option>
           ))}
@@ -1172,7 +1172,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                           title={daySchemes.map((s) => `${s.title}${s.description ? ` — ${s.description}` : ""}`).join("\n")}
                           className="text-[10px] leading-none"
                         >
-                          🏷️
+                          <Tag className="w-2.5 h-2.5" />
                         </span>
                       )}
                       {hasLiveNow && (
@@ -1318,7 +1318,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                         {wDay.dayName}
                         {daySchemes.length > 0 && (
                           <span title={daySchemes.map((s) => `${s.title}${s.description ? ` — ${s.description}` : ""}`).join("\n")}>
-                            🏷️
+                            <Tag className="w-2.5 h-2.5" />
                           </span>
                         )}
                       </span>
@@ -1468,7 +1468,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   <tr key={std.id} className="hover:bg-[var(--surface-elevated)]/20 transition-colors">
                     <td className="p-3 font-bold text-[var(--text)] sticky left-0 bg-[var(--surface)] z-10 border-r border-[var(--border)] shadow-md">
                       <div className="flex items-center gap-2">
-                        <span className="p-1.5 rounded-lg bg-[var(--surface-elevated)] border border-[var(--border)] text-[var(--accent-text)] shrink-0">🏢</span>
+                        <span className="p-1.5 rounded-lg bg-[var(--surface-elevated)] border border-[var(--border)] text-[var(--accent-text)] shrink-0"><Building2 className="w-3.5 h-3.5" /></span>
                         <div>
                           <p className="text-xs sm:text-sm font-bold text-[var(--text)] line-clamp-1">{std.name}</p>
                           <p className="text-[10px] text-[var(--text-muted)] font-mono">{std.roomNumber}</p>
@@ -1619,7 +1619,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                           : "bg-[var(--surface-elevated)] text-[var(--text-muted)]"
                       }`}
                     >
-                      {isOverloaded ? "⚠️ Cảnh Báo Quá Tải" : totalHoursToday > 0 ? "Bận Phiên Live" : "Rảnh"}
+                      {isOverloaded ? (<span className="inline-flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Cảnh Báo Quá Tải</span>) : totalHoursToday > 0 ? "Bận Phiên Live" : "Rảnh"}
                     </span>
                   </div>
 

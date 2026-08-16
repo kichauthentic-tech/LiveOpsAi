@@ -133,13 +133,13 @@ export const PerformanceDeviationAlerts: React.FC<PerformanceDeviationAlertsProp
           </span>
           <div className="flex items-center gap-1.5 font-extrabold text-[11px]">
             {surgeCount > 0 && (
-              <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-md">
-                ⚡ {surgeCount} Vượt (+20%)
+              <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-md inline-flex items-center gap-1">
+                <Zap className="w-3 h-3" /> {surgeCount} Vượt (+20%)
               </span>
             )}
             {lagCount > 0 && (
-              <span className="bg-red-500/20 text-red-300 border border-red-500/30 px-2 py-0.5 rounded-md">
-                🚨 {lagCount} Cảnh báo sụt (-20%)
+              <span className="bg-red-500/20 text-red-300 border border-red-500/30 px-2 py-0.5 rounded-md inline-flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3" /> {lagCount} Cảnh báo sụt (-20%)
               </span>
             )}
           </div>
@@ -201,7 +201,7 @@ export const PerformanceDeviationAlerts: React.FC<PerformanceDeviationAlertsProp
               filterType === "surge" ? "bg-emerald-600 text-white" : "text-[var(--text-muted)] hover:text-[var(--text)]"
             }`}
           >
-            ⚡ Vượt Chỉ Tiêu (+{surgeCount})
+            <Zap className="w-3 h-3" /> Vượt Chỉ Tiêu (+{surgeCount})
           </button>
           <button
             onClick={() => setFilterType("lag")}
@@ -209,7 +209,7 @@ export const PerformanceDeviationAlerts: React.FC<PerformanceDeviationAlertsProp
               filterType === "lag" ? "bg-red-600 text-white" : "text-[var(--text-muted)] hover:text-[var(--text)]"
             }`}
           >
-            🚨 Sụt Giảm (-{lagCount})
+            <AlertTriangle className="w-3 h-3" /> Sụt Giảm (-{lagCount})
           </button>
         </div>
       </div>

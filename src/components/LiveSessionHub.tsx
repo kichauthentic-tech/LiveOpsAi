@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { LiveSession, MinuteMetric, ProductSKU, Studio, Talent, Brand, SystemUser } from "../types";
-import { Radio, Play, CheckCircle2, Clock, Sparkles, TrendingUp, Users, ShoppingBag, AlertCircle, RefreshCw, Layers, Plus, Edit3, Trash2, X, Building2 } from "lucide-react";
+import { Radio, Play, CheckCircle2, Clock, Sparkles, TrendingUp, Users, ShoppingBag, AlertCircle, AlertTriangle, RefreshCw, Layers, Plus, Edit3, Trash2, X, Building2, BarChart3, Eye, DollarSign, Target, Pin, MessageCircle, Star, Lightbulb } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
 import { authedFetch } from "../lib/authedFetch";
 import { getTodayDate } from "../lib/dateUtils";
@@ -452,7 +452,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                     : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]"
                 }`}
               >
-                📊 Biến Động Từng Phút (Minute Metrics)
+                <BarChart3 className="w-3.5 h-3.5" /> Biến Động Từng Phút (Minute Metrics)
               </button>
               <button
                 onClick={() => setActiveTab("checklist")}
@@ -462,7 +462,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                     : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]"
                 }`}
               >
-                ✅ Pre-Live Checklist ({(selectedSession.checklist || []).filter(c => c.completed).length}/{(selectedSession.checklist || []).length})
+                <CheckCircle2 className="w-3.5 h-3.5" /> Pre-Live Checklist ({(selectedSession.checklist || []).filter(c => c.completed).length}/{(selectedSession.checklist || []).length})
               </button>
               <button
                 onClick={() => setActiveTab("products")}
@@ -472,7 +472,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                     : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]"
                 }`}
               >
-                🛍️ SKUs & Conversion ({(selectedSession.skus || []).length} sản phẩm)
+                <ShoppingBag className="w-3.5 h-3.5" /> SKUs & Conversion ({(selectedSession.skus || []).length} sản phẩm)
               </button>
               <button
                 onClick={() => setActiveTab("ai_coach")}
@@ -482,7 +482,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                     : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]"
                 }`}
               >
-                ✨ AI Session Analyst & Host Coach
+                <Sparkles className="w-3.5 h-3.5" /> AI Session Analyst & Host Coach
               </button>
             </div>
           </>
@@ -520,12 +520,12 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                         return (
                           <div className="bg-[var(--surface)] text-[var(--text)] p-3 rounded-xl text-xs space-y-1 shadow-xl border border-[var(--border)]">
                             <p className="font-bold text-[var(--accent-text)]">{data.timeString} - Phút {data.minute}</p>
-                            <p>👁️ Mắt xem: <strong className="text-[var(--text)]">{data.viewers.toLocaleString()}</strong></p>
-                            <p>💰 GMV Tích lũy: <strong className="text-emerald-400">{data.gmvCumulative.toLocaleString()} đ</strong></p>
-                            <p>🎯 CVR: <strong className="text-[var(--accent-text)]">{data.cvr}%</strong> | CTR: <strong className="text-[var(--accent-text)]">{data.ctr}%</strong></p>
+                            <p className="flex items-center gap-1"><Eye className="w-3 h-3" /> Mắt xem: <strong className="text-[var(--text)]">{data.viewers.toLocaleString()}</strong></p>
+                            <p className="flex items-center gap-1"><DollarSign className="w-3 h-3" /> GMV Tích lũy: <strong className="text-emerald-400">{data.gmvCumulative.toLocaleString()} đ</strong></p>
+                            <p className="flex items-center gap-1"><Target className="w-3 h-3" /> CVR: <strong className="text-[var(--accent-text)]">{data.cvr}%</strong> | CTR: <strong className="text-[var(--accent-text)]">{data.ctr}%</strong></p>
                             {data.eventTrigger && (
-                              <p className="text-amber-300 border-t border-[var(--border)] pt-1 mt-1 font-semibold">
-                                📌 {data.eventTrigger}
+                              <p className="text-amber-300 border-t border-[var(--border)] pt-1 mt-1 font-semibold flex items-center gap-1">
+                                <Pin className="w-3 h-3" /> {data.eventTrigger}
                               </p>
                             )}
                           </div>
@@ -555,9 +555,9 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                   </div>
                   <div className="text-xs font-semibold text-[var(--text)]">{m.eventTrigger || "Duy trì guồng nói kịch bản"}</div>
                   <div className="flex justify-between items-center text-[10px] text-[var(--text-muted)] pt-1 border-t border-[var(--border)]">
-                    <span>👁️ Viewers: {m.viewers}</span>
+                    <span className="flex items-center gap-1"><Eye className="w-3 h-3" /> Viewers: {m.viewers}</span>
                     <span>CVR: {m.cvr}%</span>
-                    <span>💬 Comment: {m.comments}</span>
+                    <span className="flex items-center gap-1"><MessageCircle className="w-3 h-3" /> Comment: {m.comments}</span>
                   </div>
                 </div>
               ))}
@@ -608,7 +608,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                   <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
                     item.completed ? "bg-emerald-600 text-white" : "bg-amber-500 text-white"
                   }`}>
-                    {item.completed ? "✓" : "!"}
+                    {item.completed ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
                   </span>
                   <div>
                     <h4 className={`font-bold text-xs ${item.completed ? "line-through text-[var(--text-faint)]" : "text-[var(--text)]"}`}>
@@ -715,7 +715,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
               {/* Highlights & Mistakes */}
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <h4 className="font-bold text-xs text-emerald-400 uppercase tracking-wider">🌟 Đột Biến Đáng Chú Ý (Highlights):</h4>
+                  <h4 className="font-bold text-xs text-emerald-400 uppercase tracking-wider flex items-center gap-1.5"><Star className="w-3.5 h-3.5" /> Đột Biến Đáng Chú Ý (Highlights):</h4>
                   <ul className="space-y-1.5 list-disc list-inside text-xs text-[var(--text-muted)]">
                     {aiAnalysisResult.keyHighlights?.map((h: string, i: number) => (
                       <li key={i}>{h}</li>
@@ -723,7 +723,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                   </ul>
                 </div>
                 <div className="space-y-2">
-                  <h4 className="font-bold text-xs text-red-400 uppercase tracking-wider">⚠️ Sai Lầm & Điểm Thẽm Bị Drop (Top Mistakes):</h4>
+                  <h4 className="font-bold text-xs text-red-400 uppercase tracking-wider flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5" /> Sai Lầm & Điểm Thẽm Bị Drop (Top Mistakes):</h4>
                   <ul className="space-y-1.5 list-disc list-inside text-xs text-[var(--text-muted)]">
                     {aiAnalysisResult.topMistakes?.map((m: string, i: number) => (
                       <li key={i}>{m}</li>
@@ -734,7 +734,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
 
               {/* Recommendations */}
               <div className="p-4 rounded-xl bg-emerald-950/80 border border-emerald-800/50 space-y-2 text-xs">
-                <h4 className="font-bold text-emerald-200 uppercase">💡 Khuyến Nghị Hành Động Cho Live Kế Tiếp:</h4>
+                <h4 className="font-bold text-emerald-200 uppercase flex items-center gap-1.5"><Lightbulb className="w-3.5 h-3.5" /> Khuyến Nghị Hành Động Cho Live Kế Tiếp:</h4>
                 <ul className="space-y-1 list-disc list-inside text-emerald-100">
                   {aiAnalysisResult.actionableRecommendations?.map((r: string, i: number) => (
                     <li key={i}>{r}</li>
@@ -849,10 +849,10 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
                     onChange={(e) => setSessStatus(e.target.value as any)}
                     className="w-full p-2.5 border border-[var(--border)] rounded-xl font-semibold text-[var(--text)] bg-[var(--surface-base)] placeholder:text-[var(--text-faint)]"
                   >
-                    <option value="Live Now">🔴 Live Now</option>
-                    <option value="Upcoming">📅 Upcoming</option>
-                    <option value="Completed">✅ Completed</option>
-                    <option value="Cancelled">❌ Cancelled</option>
+                    <option value="Live Now">Live Now</option>
+                    <option value="Upcoming">Upcoming</option>
+                    <option value="Completed">Completed</option>
+                    <option value="Cancelled">Cancelled</option>
                   </select>
                 </div>
                 <div>

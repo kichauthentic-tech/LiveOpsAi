@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Sparkles, Send, Bot, User, RefreshCw, Cpu, Award, Zap } from "lucide-react";
+import { Sparkles, Send, Bot, User, RefreshCw, Cpu, Award, Zap, Briefcase, LineChart } from "lucide-react";
 import { authedFetch } from "../lib/authedFetch";
 
 type AgentRole = "ceo" | "data_analyst";
@@ -128,7 +128,9 @@ export const AiMultiAgent: React.FC = () => {
                 : "bg-[var(--surface-elevated)]/40 border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-elevated)]"
             }`}
           >
-            <span className="font-bold block text-sm">👔 CEO Strategic Advisor</span>
+            <span className="font-bold flex items-center gap-1.5 text-sm">
+              <Briefcase className="w-4 h-4" /> CEO Strategic Advisor
+            </span>
             <p className="text-[10px] text-[var(--text-muted)]">Tư vấn P&L, dòng tiền, tối ưu công suất Studio</p>
           </button>
 
@@ -140,7 +142,9 @@ export const AiMultiAgent: React.FC = () => {
                 : "bg-[var(--surface-elevated)]/40 border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-elevated)]"
             }`}
           >
-            <span className="font-bold block text-sm">📈 TikTok Data Analyst AI</span>
+            <span className="font-bold flex items-center gap-1.5 text-sm">
+              <LineChart className="w-4 h-4" /> TikTok Data Analyst AI
+            </span>
             <p className="text-[10px] text-[var(--text-muted)]">Giải mã retention curve & thuật toán TikTok Live</p>
           </button>
         </div>
