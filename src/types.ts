@@ -178,6 +178,11 @@ export interface LiveSession {
   totalViews: number;
   ctrAvg: number;
   cvrAvg: number;
+  // Đối soát TikTok (migration 0050) — "manual" = talent tự nhập, chưa chính xác vì TikTok
+  // chưa chốt hoàn/hủy; "tiktok_reconciled" = đã ghi đè bằng số chính thức từ TikTok cuối tháng.
+  dataSource?: "manual" | "tiktok_reconciled";
+  reconciledAt?: string;
+  tiktokRoomId?: string;
   skus: ProductSKU[];
   checklist: ChecklistItem[];
   minuteMetrics: MinuteMetric[];
@@ -225,6 +230,60 @@ export interface LiveSessionReport {
   submittedByTalentId?: string;
   submittedByRole?: UserRole;
   submittedAt?: string;
+}
+
+// Đối soát TikTok (migration 0050) — xem lib/db/tiktokReconciliation.ts. 1 import = 1 lần
+// upload file "Live Analysis" TikTok cho 1 khoảng ngày; mỗi dòng trong file là 1
+// TikTokLiveImportRow, sau khi match với đúng LiveSession thì apply để ghi đè.
+export interface TikTokLiveImport {
+  id: string;
+  periodStart: string;
+  periodEnd: string;
+  source: "csv_export" | "api";
+  status: "staged" | "matched" | "applied";
+  importedAt: string;
+}
+
+export interface TikTokLiveImportRow {
+  id: string;
+  importId: string;
+  tiktokRoomId?: string;
+  creatorName?: string;
+  startTime: string;
+  endTime?: string;
+  gmv?: number;
+  itemsSold?: number;
+  orders?: number;
+  customers?: number;
+  avgPrice?: number;
+  ctor?: number;
+  ctr?: number;
+  viewers?: number;
+  views?: number;
+  avgWatchTimeSeconds?: number;
+  newFollowers?: number;
+  productImpressions?: number;
+  productClicks?: number;
+  matchedSessionId?: string;
+  matchConfidence?: "room_id" | "time_overlap" | "manual" | "unmatched";
+}
+
+// Audit trail 1 lần đối soát — lưu cặp giá trị manual (trước khi ghi đè) vs tiktok (sau khi ghi
+// đè) để phát hiện lệch số lớn (flagged), chỉ ceo/admin/operations xem được.
+export interface LiveSessionReconciliation {
+  id: string;
+  sessionId: string;
+  importRowId?: string;
+  manualActualGmv?: number;
+  tiktokActualGmv?: number;
+  gmvDeltaPct?: number;
+  manualTotalViews?: number;
+  tiktokTotalViews?: number;
+  manualCtrAvg?: number;
+  tiktokCtrAvg?: number;
+  flagged: boolean;
+  note?: string;
+  reconciledAt: string;
 }
 
 export interface SessionFinance {

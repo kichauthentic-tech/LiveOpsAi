@@ -4,6 +4,7 @@ import { Radio, Play, CheckCircle2, Clock, Sparkles, TrendingUp, Users, Shopping
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
 import { authedFetch } from "../lib/authedFetch";
 import { getTodayDate } from "../lib/dateUtils";
+import { DataSourceBadge } from "./common/DataSourceBadge";
 
 interface LiveSessionHubProps {
   sessions: LiveSession[];
@@ -439,6 +440,10 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
               <div>
                 <span className="text-[var(--text-muted)] block">Peak Viewers:</span>
                 <strong className="text-[var(--accent-text)] text-sm font-bold">{selectedSession.peakViewers ? selectedSession.peakViewers.toLocaleString() : 0} người</strong>
+              </div>
+              <div>
+                <span className="text-[var(--text-muted)] block">Nguồn Số Liệu:</span>
+                <DataSourceBadge dataSource={selectedSession.dataSource} className="mt-0.5" />
               </div>
             </div>
 

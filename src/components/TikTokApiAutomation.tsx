@@ -1,7 +1,8 @@
 import React, { useState } from "react";
-import { TikTokConnectionStatus, TikTokWebhookEvent, WorkflowRule } from "../types";
+import { TikTokConnectionStatus, TikTokWebhookEvent, WorkflowRule, LiveSession } from "../types";
 import { getTikTokAuthorizeUrl, disconnectTikTok } from "../lib/db/tiktokIntegration";
 import { Server, Zap, RefreshCw, ShieldCheck, ShieldAlert, ShieldX, Link2, Unlink, ArrowRight, Activity, FileSpreadsheet, Plus, Edit3, Trash2, X } from "lucide-react";
+import { TikTokLiveReconciliation } from "./TikTokLiveReconciliation";
 
 interface TikTokApiAutomationProps {
   workflowRules: WorkflowRule[];
@@ -14,6 +15,8 @@ interface TikTokApiAutomationProps {
   tiktokStatusError: string | null;
   webhookEvents: TikTokWebhookEvent[];
   onRefreshTikTokStatus: () => void;
+  sessions: LiveSession[];
+  onSessionUpdated: (session: LiveSession) => void;
 }
 
 export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
@@ -26,7 +29,9 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
   tiktokStatusLoading,
   tiktokStatusError,
   webhookEvents,
-  onRefreshTikTokStatus
+  onRefreshTikTokStatus,
+  sessions,
+  onSessionUpdated
 }) => {
   const [activeTab, setActiveTab] = useState<"api_status" | "rules" | "csv_import">("api_status");
   const [connecting, setConnecting] = useState(false);
@@ -42,6 +47,7 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
   const [ruleEnabled, setRuleEnabled] = useState(true);
 
   const isCeo = currentRole === "ceo" || currentRole === "admin";
+  const canReconcile = currentRole === "ceo" || currentRole === "admin" || currentRole === "operations";
 
   const handleConnect = async () => {
     setActionError(null);
@@ -155,7 +161,7 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
             activeTab === "csv_import" ? "bg-[var(--accent)] text-white shadow" : "bg-[var(--surface-elevated)] text-[var(--text-muted)] hover:bg-[var(--surface-hover)]"
           }`}
         >
-          <span className="inline-flex items-center gap-1.5"><FileSpreadsheet className="w-3.5 h-3.5" /> Smart Compass Excel / CSV Fallback Parser</span>
+          <span className="inline-flex items-center gap-1.5"><FileSpreadsheet className="w-3.5 h-3.5" /> Đối Soát Số Liệu TikTok</span>
         </button>
       </div>
 
@@ -337,29 +343,16 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
         </div>
       )}
 
-      {/* CSV / Excel Fallback Parser */}
+      {/* Đối soát số liệu TikTok (migration 0050) — thay placeholder cũ, chỉ ceo/admin/operations
+          dùng được (RLS trên tiktok_live_imports/tiktok_live_import_rows đã khoá cùng mức). */}
       {activeTab === "csv_import" && (
-        <div className="bg-[var(--surface)] p-6 rounded-2xl border border-[var(--border)] shadow-sm space-y-4">
-          <h3 className="font-bold text-[var(--text)] text-base flex items-center gap-2">
-            <FileSpreadsheet className="w-5 h-5 text-emerald-600" /> Nhập Báo Cáo TikTok Compass Bằng File Excel / CSV
-            <span className="bg-amber-950/80 text-amber-400 border border-amber-800/50 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
-              Sắp Ra Mắt
-            </span>
-          </h3>
-          <p className="text-xs text-[var(--text-muted)]">
-            Dành cho Shop chưa mở quyền OAuth API. Tính năng đang được phát triển.
-          </p>
-
-          <div className="border-2 border-dashed border-[var(--border)] bg-[var(--surface-elevated)]/40 p-8 rounded-2xl text-center space-y-3 opacity-60 cursor-not-allowed">
-            <FileSpreadsheet className="w-10 h-10 text-[var(--text-muted)] mx-auto" />
-            <div>
-              <p className="font-bold text-[var(--text-muted)] text-sm">Kéo & Thả File Excel/CSV Compass vào đây</p>
-            </div>
-            <button disabled className="bg-[var(--surface-hover)] text-[var(--text-muted)] font-bold px-4 py-2 rounded-xl text-xs cursor-not-allowed">
-              Chọn File Từ Máy Tính
-            </button>
+        canReconcile ? (
+          <TikTokLiveReconciliation sessions={sessions} onSessionUpdated={onSessionUpdated} />
+        ) : (
+          <div className="bg-[var(--surface)] p-6 rounded-2xl border border-[var(--border)] shadow-sm text-xs text-[var(--text-muted)]">
+            Chỉ CEO/Admin/Operations mới được đối soát số liệu TikTok.
           </div>
-        </div>
+        )
       )}
 
       {/* Rule Form Modal */}

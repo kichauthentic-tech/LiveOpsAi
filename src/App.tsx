@@ -1010,6 +1010,14 @@ export default function App() {
       return false;
     }
   };
+  // TikTokLiveReconciliation đã tự gọi RPC apply_tiktok_reconciliation và có sẵn LiveSession
+  // đầy đủ (fetchSessionById) — chỉ cần cập nhật lại state, không network round-trip thêm.
+  const handleSessionReconciled = (updated: LiveSession) => {
+    setSessions((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+    if (selectedSession && selectedSession.id === updated.id) {
+      setSelectedSession(updated);
+    }
+  };
   const handleDeleteSession = async (id: string) => {
     try {
       await deleteSession(id);
@@ -1896,6 +1904,8 @@ export default function App() {
                     tiktokStatusError={tiktokStatusError}
                     webhookEvents={tiktokWebhookEvents}
                     onRefreshTikTokStatus={refreshTikTokStatus}
+                    sessions={sessions}
+                    onSessionUpdated={handleSessionReconciled}
                   />
                 )}
 

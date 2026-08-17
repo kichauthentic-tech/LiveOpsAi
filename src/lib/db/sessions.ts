@@ -34,6 +34,9 @@ interface DbLiveSession {
   ctr_avg: number;
   cvr_avg: number;
   ai_analysis: LiveSession["aiAnalysis"] | null;
+  data_source: LiveSession["dataSource"] | null;
+  reconciled_at: string | null;
+  tiktok_room_id: string | null;
 }
 
 interface DbSessionSku {
@@ -160,7 +163,10 @@ function sessionFromDb(row: DbLiveSession): Omit<LiveSession, "skus" | "checklis
     totalViews: row.total_views,
     ctrAvg: row.ctr_avg,
     cvrAvg: row.cvr_avg,
-    aiAnalysis: row.ai_analysis ?? undefined
+    aiAnalysis: row.ai_analysis ?? undefined,
+    dataSource: row.data_source ?? "manual",
+    reconciledAt: row.reconciled_at ?? undefined,
+    tiktokRoomId: row.tiktok_room_id ?? undefined
   };
 }
 

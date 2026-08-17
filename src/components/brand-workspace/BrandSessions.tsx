@@ -4,6 +4,7 @@ import { Radio, X } from "lucide-react";
 import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
 import { SessionReportForm } from "../SessionReportForm";
 import { SessionReportInput } from "../../lib/db/sessionReports";
+import { DataSourceBadge } from "../common/DataSourceBadge";
 
 interface BrandSessionsProps {
   brandId: string;
@@ -72,6 +73,7 @@ export const BrandSessions: React.FC<BrandSessionsProps> = ({ brandId, sessions,
                 <th className="py-2.5 px-2">Host</th>
                 <th className="py-2.5 px-2 text-right">Target GMV</th>
                 <th className="py-2.5 px-2 text-right">GMV thực tế</th>
+                <th className="py-2.5 px-2">Nguồn Số Liệu</th>
                 <th className="py-2.5 px-2 text-right">Peak Viewers</th>
                 <th className="py-2.5 px-4 text-right">CTR / CVR</th>
                 {canEditReport && <th className="py-2.5 px-4 text-right">Report</th>}
@@ -92,6 +94,9 @@ export const BrandSessions: React.FC<BrandSessionsProps> = ({ brandId, sessions,
                   <td className="py-2.5 px-2 text-[var(--text-muted)]">{s.hostName}</td>
                   <td className="py-2.5 px-2 text-right text-[var(--text-muted)]">{formatCurrencyAdaptive(s.targetGmv || 0)}</td>
                   <td className="py-2.5 px-2 text-right text-[var(--success)] font-bold">{formatCurrencyAdaptive(s.actualGmv || 0)}</td>
+                  <td className="py-2.5 px-2">
+                    <DataSourceBadge dataSource={s.dataSource} />
+                  </td>
                   <td className="py-2.5 px-2 text-right text-[var(--text-muted)]">{(s.peakViewers || 0).toLocaleString()}</td>
                   <td className="py-2.5 px-4 text-right text-[var(--text-muted)]">
                     {(s.ctrAvg || 0)}% / {(s.cvrAvg || 0)}%
@@ -110,7 +115,7 @@ export const BrandSessions: React.FC<BrandSessionsProps> = ({ brandId, sessions,
               ))}
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={canEditReport ? 9 : 8} className="py-8 text-center text-[var(--text-faint)] italic">
+                  <td colSpan={canEditReport ? 10 : 9} className="py-8 text-center text-[var(--text-faint)] italic">
                     Không có phiên live nào khớp bộ lọc.
                   </td>
                 </tr>

@@ -22,6 +22,7 @@ import { KpiComparison } from "./KpiComparison";
 import { GmvGrowthTrendline } from "./GmvGrowthTrendline";
 import { PerformanceDeviationAlerts } from "./PerformanceDeviationAlerts";
 import { GmvCalendar } from "./GmvCalendar";
+import { DataSourceBadge } from "./common/DataSourceBadge";
 
 interface DashboardsProps {
   currentRole: UserRole;
@@ -556,6 +557,7 @@ export const Dashboards: React.FC<DashboardsProps> = ({
                     }`}>
                       {s.status}
                     </span>
+                    <DataSourceBadge dataSource={s.dataSource} />
                   </div>
                   <p className="text-xs text-[var(--text-muted)] mt-1">{s.hostName} · {s.studioName} · {s.date}</p>
                 </div>
