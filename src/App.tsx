@@ -59,6 +59,7 @@ import { BrandCalendar } from "./components/brand-workspace/BrandCalendar";
 import { BrandSessions } from "./components/brand-workspace/BrandSessions";
 import { BrandSkuShowcase } from "./components/brand-workspace/BrandSkuShowcase";
 import { BrandAudienceAnalytics } from "./components/brand-workspace/BrandAudienceAnalytics";
+import { BrandMonthlyReport } from "./components/brand-workspace/BrandMonthlyReport";
 import { Login } from "./components/Login";
 import { ResetPasswordScreen } from "./components/ResetPasswordScreen";
 import { AccountSettings } from "./components/AccountSettings";
@@ -1370,6 +1371,7 @@ export default function App() {
         { id: "brand_sessions", label: "Sessions", icon: Radio, perm: undefined },
         { id: "brand_skus", label: "SKU Showcase", icon: Package, badge: "NEW", perm: undefined },
         { id: "brand_audience_analytics", label: "Hiệu Suất Xem & Chuyển Đổi", icon: BarChart3, badge: "NEW", perm: undefined },
+        { id: "brand_monthly_report", label: "Report Tháng", icon: FileText, badge: "NEW", perm: undefined },
       ],
     },
   ];
@@ -1841,6 +1843,15 @@ export default function App() {
 
                 {activeTab === "brand_audience_analytics" && effectiveWorkspace.type === "brand" && (
                   <BrandAudienceAnalytics brandId={currentBrandId!} sessions={activeSessions} />
+                )}
+
+                {activeTab === "brand_monthly_report" && effectiveWorkspace.type === "brand" && (
+                  <BrandMonthlyReport
+                    brandId={currentBrandId!}
+                    brandName={activeBrands.find((b) => b.id === currentBrandId)?.name || "Brand"}
+                    sessions={activeSessions}
+                    currentRole={currentRole}
+                  />
                 )}
 
                 {activeTab === "talents" && (

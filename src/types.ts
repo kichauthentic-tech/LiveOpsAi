@@ -286,6 +286,24 @@ export interface LiveSessionReconciliation {
   reconciledAt: string;
 }
 
+// Report tháng Brand Workspace (migration 0051) — phần số liệu vận hành (GMV/Host/SKU) luôn
+// tính live từ LiveSession[], object này chỉ giữ phần nhập tay bắt buộc + trạng thái phát hành.
+export interface BrandMonthlyReport {
+  id: string;
+  brandId: string;
+  periodMonth: string; // "YYYY-MM-01"
+  status: "draft" | "published";
+  adsSpend?: number;
+  roas?: number;
+  promotionNotes?: string;
+  customerInsightNotes?: string;
+  accountHealthNotes?: string;
+  publishedAt?: string;
+  publishedBy?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface SessionFinance {
   sessionId: string;
   agencyCommissionRate: number; // % GMV
