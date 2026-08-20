@@ -90,6 +90,10 @@ const STORAGE_PREFIX = "liveops_os_v2_";
 // `onCalendarViewChange` chứ không liệt kê ở đây.
 const CALENDAR_TABS = new Set(["calendar", "brand_calendar", "shift_scheduling"]);
 
+// Tab render được nhưng cố ý KHÔNG nằm trong sidebar (vào từ menu user ở Header). Phải khai
+// báo ở đây vì isTabAllowed coi "không có nav item" là không được phép.
+const TABS_WITHOUT_NAV_ITEM = new Set(["account_settings"]);
+
 function loadStorage<T>(key: string, fallback: T): T {
   try {
     const item = localStorage.getItem(STORAGE_PREFIX + key);
@@ -629,6 +633,18 @@ export default function App() {
 
   // LocalStorage sync effects
   useEffect(() => saveStorage("activeTab", activeTab), [activeTab]);
+
+  // activeTab và workspace được lưu localStorage nhưng KHÔNG tách theo user, nên trên máy dùng
+  // chung chúng đi thẳng từ phiên đăng nhập này sang phiên khác. Cả hai đều mang ý nghĩa phân
+  // quyền (tab nào được mở, đang đứng ở brand nào), nên phải reset khi chủ sở hữu đổi.
+  // sidebarCollapsed thì không đụng — thuần thẩm mỹ, dùng chung vô hại.
+  useEffect(() => {
+    if (!profile?.id) return;
+    if (loadStorage<string | null>("uiStateOwner", null) === profile.id) return;
+    saveStorage("uiStateOwner", profile.id);
+    setActiveTab("dashboard");
+    setWorkspace({ type: "agency" });
+  }, [profile?.id]);
 
   // Live Sessions are real Supabase data now (Phase 2) — no mock filtering applies
   const rawActiveSessions = sessions;
@@ -1406,9 +1422,22 @@ export default function App() {
     if (firstTab) setActiveTab(firstTab);
   };
 
-  // Helper to determine if current tab is allowed
+  // Helper to determine if current tab is allowed.
+  //
+  // Trước đây là `!currentTabNavItem?.perm || checkPermission(...)` — tab KHÔNG có trong navItems
+  // sẽ cho `currentTabNavItem === undefined`, `!undefined` là true, nên MỌI tab lạ đều được coi
+  // là hợp lệ. Ba nav item được tạo có điều kiện theo role (my_talent_profile / finance /
+  // ai_training) nên với role không đủ quyền chúng biến mất khỏi navItems, rơi đúng vào lỗ này.
+  // Chỉ `finance` là còn render thật (2 tab kia có guard `&& currentRole === ...` riêng), và
+  // activeTab thì được lưu localStorage KHÔNG tách theo user — nên máy dùng chung: ceo mở tab
+  // Finance rồi đăng xuất, người sau đăng nhập là vào thẳng Finance & P&L.
+  //
+  // Nay đảo lại mặc định: không tìm thấy nav item = không được phép. Cách này bảo vệ luôn mọi
+  // nav item tạo-có-điều-kiện thêm về sau, không phải nhớ thêm guard ở chỗ render.
   const currentTabNavItem = navItems.find((n) => n.id === activeTab);
-  const isTabAllowed = !currentTabNavItem?.perm || checkPermission(currentTabNavItem.perm);
+  const isTabAllowed =
+    TABS_WITHOUT_NAV_ITEM.has(activeTab) ||
+    (!!currentTabNavItem && (!currentTabNavItem.perm || checkPermission(currentTabNavItem.perm)));
 
   if (authLoading) {
     return (
@@ -1676,13 +1705,15 @@ export default function App() {
                   <h2 className="text-xl font-black text-[var(--text)]">Quyền Truy Cập Bị Hạn Chế (Access Restricted)</h2>
                   <p className="text-xs text-[var(--text-muted)] max-w-md mx-auto">
                     Role hiện tại của bạn (<span className="text-amber-400 font-bold uppercase">{currentRole}</span>) chưa được cấp quyền truy cập tính năng{" "}
-                    <strong className="text-[var(--text)]">&quot;{currentTabNavItem?.label}&quot;</strong>.
+                    <strong className="text-[var(--text)]">&quot;{currentTabNavItem?.label ?? activeTab}&quot;</strong>.
                   </p>
                 </div>
 
                 <div className="p-4 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl text-left text-xs font-mono space-y-1 text-[var(--text-muted)]">
                   <div className="text-[var(--text-faint)] font-sans text-[10px] uppercase font-bold">Chi tiết yêu cầu an ninh:</div>
-                  <div>• Permission Required: <span className="text-blue-400">{currentTabNavItem?.perm}</span></div>
+                  {/* Tab không có nav item cho role này thì không có perm key nào để in — nói thẳng là do role,
+                      thay vì in "undefined". */}
+                  <div>• Permission Required: <span className="text-blue-400">{currentTabNavItem?.perm ?? "không khả dụng cho role này"}</span></div>
                   <div>• Current Role: <span className="text-amber-400">{currentRole}</span></div>
                   <div>• Status: <span className="text-red-400">DENIED</span></div>
                 </div>
@@ -1957,7 +1988,9 @@ export default function App() {
                   />
                 )}
 
-                {activeTab === "finance" && (
+                {/* Guard trùng với điều kiện tạo nav item ở nhóm "Tài Chính" — cố ý lặp lại
+                    thay vì chỉ dựa vào isTabAllowed, cùng khuôn với ai_training bên dưới. */}
+                {activeTab === "finance" && (currentRole === "ceo" || currentRole === "admin") && (
                   <FinanceHr
                     sessions={activeSessions}
                     talents={talents}
