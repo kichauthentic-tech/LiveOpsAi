@@ -95,9 +95,35 @@ async function fetchOneSecure(id: string): Promise<Talent> {
 // `talents_secure` sẽ luôn thấy 2 field này = null; nếu gửi full object sẽ vô tình ghi đè
 // rate/commission thật thành null.
 export async function updateTalent(id: string, patch: Partial<Talent>): Promise<Talent> {
-  const { error } = await supabase.from("talents").update(toDb(patch)).eq("id", id);
+  // .select("id") là bắt buộc, không phải trang trí: PostgREST update mà RLS lọc còn 0 dòng thì
+  // trả 204 KHÔNG kèm error, nên nếu không đếm lại số dòng thì mọi lần ghi bị RLS chặn đều lặng
+  // lẽ báo thành công (đúng bug C3 — talent lưu hồ sơ, app báo "Đã cập nhật" mà DB không đổi).
+  // Phải là select("id") chứ không phải select("*"): 0047 đã `revoke select on talents from
+  // authenticated` (đọc đi qua view talents_secure), 0048 chỉ cấp lại đúng `grant select (id)`.
+  // select("*") ở đây sẽ fail 42501 permission denied chứ không phải trả về dữ liệu.
+  const { data, error } = await supabase.from("talents").update(toDb(patch)).eq("id", id).select("id");
   if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error("Không có quyền sửa hồ sơ Talent này, hoặc hồ sơ không còn tồn tại.");
+  }
   return fetchOneSecure(id);
+}
+
+// Talent tự sửa thông tin liên hệ của chính mình — đi qua RPC security definer (migration 0058)
+// chứ không update thẳng bảng: RLS chặn theo dòng chứ không theo cột, mở policy cho talent ghi
+// vào talents là mở luôn đường tự sửa rate/commission. RPC whitelist cứng đúng 3 field dưới đây.
+export async function updateMyTalentProfile(patch: {
+  phone: string;
+  avatar: string;
+  dateOfBirth?: string;
+}): Promise<Talent> {
+  const { data, error } = await supabase.rpc("update_my_talent_profile", {
+    p_phone: patch.phone,
+    p_avatar: patch.avatar,
+    p_date_of_birth: patch.dateOfBirth || null
+  });
+  if (error) throw error;
+  return fromDb(data as DbTalent);
 }
 
 export async function deleteTalent(id: string): Promise<void> {

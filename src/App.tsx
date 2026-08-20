@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, WorkflowRule, Talent, Studio, Equipment, Brand, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, TalentRateHistoryEntry, BrandPlatformRateHistoryEntry, BrandSku, PromoScheme } from "./types";
 import { ALL_PERMISSION_DEFINITIONS } from "./data/mockData";
-import { fetchTalents, updateTalent, deleteTalent } from "./lib/db/talents";
+import { fetchTalents, updateTalent, updateMyTalentProfile, deleteTalent } from "./lib/db/talents";
 import { fetchStudios, createStudio, updateStudio, deleteStudio } from "./lib/db/studios";
 import { fetchEquipments, createEquipment, updateEquipment, deleteEquipment } from "./lib/db/equipments";
 import { fetchSessions, createSession, updateSession, deleteSession } from "./lib/db/sessions";
@@ -895,6 +895,12 @@ export default function App() {
     } catch (e: any) {
       window.alert(`Không thể cập nhật Talent: ${e.message ?? e}`);
     }
+  };
+  // Talent tự sửa hồ sơ của mình — cố ý KHÔNG bọc try/catch như handleUpdateTalent: lỗi phải
+  // nổi lên tới form để hiện đúng thông báo đỏ tại chỗ, thay vì nuốt rồi báo thành công (bug C3).
+  const handleSaveMyTalentProfile = async (patch: { phone: string; avatar: string; dateOfBirth?: string }) => {
+    const saved = await updateMyTalentProfile(patch);
+    setTalents(prev => prev.map(t => t.id === saved.id ? saved : t));
   };
   const handleDeleteTalent = async (id: string) => {
     try {
@@ -1900,7 +1906,7 @@ export default function App() {
                   <MyTalentProfile
                     activeUser={activeUser}
                     talents={talents}
-                    onUpdateTalent={handleUpdateTalent}
+                    onSaveMyProfile={handleSaveMyTalentProfile}
                   />
                 )}
 

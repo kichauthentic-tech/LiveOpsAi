@@ -6,10 +6,13 @@ import { User, Phone, Cake, Mail, Loader2, Lock, ShieldAlert, Award } from "luci
 interface MyTalentProfileProps {
   activeUser: SystemUser;
   talents: Talent[];
-  onUpdateTalent: (id: string, patch: Partial<Talent>) => void;
+  // KHÔNG dùng chung handleUpdateTalent của App: handler đó tự nuốt lỗi bằng window.alert rồi
+  // trả void, nên try/catch dưới đây thành code chết và form luôn báo "Đã cập nhật" kể cả khi DB
+  // không ghi được gì (bug C3). Handler riêng này bắt buộc phải để lỗi nổi lên.
+  onSaveMyProfile: (patch: { phone: string; avatar: string; dateOfBirth?: string }) => Promise<void>;
 }
 
-export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({ activeUser, talents, onUpdateTalent }) => {
+export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({ activeUser, talents, onSaveMyProfile }) => {
   const { reauthenticate, updateEmail } = useAuth();
   const myTalent = talents.find((t) => t.id === activeUser.assignedTalentId);
 
@@ -40,7 +43,7 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({ activeUser, ta
     setProfileMessage(null);
     setSavingProfile(true);
     try {
-      await onUpdateTalent(myTalent.id, { phone, avatar, dateOfBirth: dateOfBirth || undefined });
+      await onSaveMyProfile({ phone, avatar, dateOfBirth: dateOfBirth || undefined });
       setProfileMessage({ type: "ok", text: "Đã cập nhật hồ sơ." });
     } catch (e: any) {
       setProfileMessage({ type: "err", text: e.message ?? "Không thể cập nhật hồ sơ." });
