@@ -1237,18 +1237,19 @@ export default function App() {
 
   // Chốt lịch: sinh 1 live_session thật từ slot đã đăng ký, rồi đánh dấu slot "finalized"
   // và lưu lại session_id để tra ngược — cả 2 bước cần thành công thì mới coi là xong.
+  //
+  // FIX M5 (audit 2026-08-21): 2 bước ghi vào 2 bảng khác nhau (live_sessions rồi shift_slots)
+  // không có transaction chung — nếu bước update slot lỗi sau khi session đã tạo xong, session
+  // đó mồ côi (không slot nào trỏ tới) và bấm chốt lại sẽ tạo thêm 1 session trùng. Sửa bằng
+  // compensating action: nếu update slot lỗi, xoá luôn session vừa tạo trước khi báo lỗi, để
+  // trạng thái DB quay lại y như trước khi bấm chốt — bấm lại sau đó không sinh trùng. Không dùng
+  // 1 RPC chung như update_session_with_children (0007) vì insert session cần replicate toàn bộ
+  // cột + child rows (skus/checklist/metrics) sang SQL, rủi ro lệch cao hơn lợi ích ở đây.
   const handleFinalizeShiftSlot = async (slot: ShiftSlot, hostId: string, coHostId: string | null): Promise<boolean> => {
     const brand = brands.find((b) => b.id === slot.brandId);
     const studio = studios.find((s) => s.id === slot.studioId);
     const host = talents.find((t) => t.id === hostId);
     const coHost = coHostId ? talents.find((t) => t.id === coHostId) : undefined;
-    const rate = brandPlatformRates.find((r) => r.brandId === slot.brandId && r.platform === slot.platform);
-
-    const [sh, sm] = slot.startTime.split(":").map(Number);
-    let [eh, em] = slot.endTime.split(":").map(Number);
-    let mins = eh * 60 + em - (sh * 60 + sm);
-    if (mins <= 0) mins += 24 * 60;
-    const hours = mins / 60;
 
     const newSession: LiveSession = {
       id: `session-${Date.now()}`,
@@ -1268,7 +1269,13 @@ export default function App() {
       startTime: slot.startTime,
       endTime: slot.endTime,
       status: "Upcoming",
-      targetGmv: (rate?.ratePerHour ?? 0) * hours,
+      // rate.ratePerHour ở đây là đơn giá AGENCY THU CỦA BRAND theo giờ (brand_platform_rates,
+      // dùng cho billingModel="hourly") — không phải mục tiêu doanh số GMV của phiên live, nên
+      // dùng nó làm target sai đơn vị: brand tính %GMV thì ratePerHour = 0 nên target luôn 0,
+      // brand tính theo giờ thì hiện ra đúng doanh thu agency chứ không phải GMV. Dùng
+      // avgGmvPerSession của host (GMV trung bình/phiên đã ghi nhận, cùng field TalentMatcher
+      // dùng để dự đoán doanh số) làm target hợp lý hơn — đúng ý nghĩa "kỳ vọng GMV phiên này".
+      targetGmv: host?.avgGmvPerSession ?? 0,
       actualGmv: 0,
       totalOrders: 0,
       avgWatchTimeSeconds: 0,
@@ -1281,13 +1288,21 @@ export default function App() {
       minuteMetrics: []
     };
 
+    let created: LiveSession | undefined;
     try {
-      const created = await createSession(newSession);
-      setSessions((prev) => [created, ...prev]);
+      created = await createSession(newSession);
       const updatedSlot = await updateShiftSlot({ ...slot, status: "finalized", sessionId: created.id });
+      setSessions((prev) => [created!, ...prev]);
       setShiftSlots((prev) => prev.map((s) => (s.id === updatedSlot.id ? updatedSlot : s)));
       return true;
     } catch (e: any) {
+      if (created) {
+        try {
+          await deleteSession(created.id);
+        } catch {
+          // Rollback thất bại — session mồ côi vẫn còn trong DB, nhưng không nuốt lỗi gốc bên dưới.
+        }
+      }
       window.alert(`Không thể chốt lịch: ${e.message ?? e}`);
       return false;
     }
