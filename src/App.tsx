@@ -1201,6 +1201,11 @@ export default function App() {
         const next = prev.filter((r) => !(r.brandId === brandId && r.platform === platform));
         return [...next, saved];
       });
+      // Cùng lỗi đã sửa ở handleUpdateTalent (H2): đổi rate mở version mới trong
+      // brand_platform_rate_history (trigger 0018-style), nhưng state history chỉ nạp 1 lần lúc
+      // mở app. Không nạp lại thì pnl.ts:106 (findBrandRateAsOf) vẫn trả rate cũ cho session mới
+      // tới khi F5 (audit H1).
+      setBrandPlatformRateHistory(await fetchBrandPlatformRateHistory());
       return true;
     } catch (e: any) {
       window.alert(`Không thể lưu rate: ${e.message ?? e}`);
@@ -1219,6 +1224,8 @@ export default function App() {
         const next = prev.filter((r) => !(r.brandId === brandId && r.platform === platform));
         return [...next, saved];
       });
+      // Cùng lý do với handleSaveBrandPlatformRate ở trên (audit H1).
+      setBrandPlatformRateHistory(await fetchBrandPlatformRateHistory());
       return true;
     } catch (e: any) {
       window.alert(`Không thể lưu tỷ lệ hoàn hủy: ${e.message ?? e}`);
