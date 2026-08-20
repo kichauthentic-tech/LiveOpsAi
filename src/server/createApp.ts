@@ -493,7 +493,15 @@ export function createApp() {
       if (!caller.userId) {
         return res.status(403).json({ error: `Chỉ tài khoản CEO/Admin mới được ngắt kết nối TikTok Shop. (${caller.reason})` });
       }
-      const { error } = await supabaseAdmin.from("tiktok_shop_connections").delete().neq("shop_id", "");
+      // FIX L10 (audit 2026-08-21): .neq("shop_id", "") xoá MỌI hàng (mọi shop_id khác chuỗi rỗng
+      // đều khớp) thay vì đúng shop đang được ngắt — nếu có nhiều shop kết nối cùng lúc, ngắt 1
+      // shop sẽ vô tình xoá sạch token của các shop khác. Bắt buộc client gửi đúng shop_id cần
+      // ngắt (lấy từ /api/tiktok/status), chỉ xoá đúng hàng đó.
+      const shopId = String(req.body?.shop_id || "").trim();
+      if (!shopId) {
+        return res.status(400).json({ error: "Thiếu shop_id cần ngắt kết nối." });
+      }
+      const { error } = await supabaseAdmin.from("tiktok_shop_connections").delete().eq("shop_id", shopId);
       if (error) {
         return res.status(500).json({ error: error.message });
       }
@@ -613,6 +621,23 @@ export function createApp() {
     }
     return false;
   };
+
+  // FIX L10 (audit 2026-08-21): /api/gemini/match-talents và /api/gemini/optimize-schedule trước
+  // đây JSON.stringify nguyên mảng talents từ req.body thẳng vào prompt gửi Google — bao gồm
+  // ratePerSession/ratePerHour/commissionRate (rate nội bộ, đã che khỏi mọi role trừ ceo/admin/
+  // chính talent đó ở tầng UI/RLS — xem "Bảo Mật Rate/Finance") và phone (PII), dù AI chỉ cần
+  // niches/CVR/GMV để chấm điểm phù hợp. Lọc chỉ giữ field thật sự cần trước khi gửi ra ngoài.
+  const sanitizeTalentsForAi = (talents: unknown): any[] =>
+    (Array.isArray(talents) ? talents : []).map((t: any) => ({
+      id: t?.id,
+      name: t?.name,
+      niches: t?.niches,
+      avgGmvPerSession: t?.avgGmvPerSession,
+      totalGmv: t?.totalGmv,
+      cvrAvg: t?.cvrAvg,
+      ctrAvg: t?.ctrAvg,
+      overallScore: t?.overallScore
+    }));
 
   // API Route: AI Live Session Analysis
   app.post("/api/gemini/analyze-session", async (req, res) => {
@@ -760,7 +785,7 @@ Thương hiệu cần ghép: ${brand?.name || "Brand"} (Ngành: ${brand?.industr
 Danh mục sản phẩm SKU mục tiêu: ${targetCategory}
 
 Danh sách Talent hiện có (dữ liệu thật từ hệ thống):
-${JSON.stringify(talents)}
+${JSON.stringify(sanitizeTalentsForAi(talents))}
 
 Hãy chấm điểm mức độ phù hợp (matchScore, 0-100) cho MỖI talent trong danh sách trên dựa trên: mức độ khớp ngành hàng (niches) với ngành của Brand/SKU, CVR, GMV trung bình mỗi phiên, GMV tích lũy. Đưa ra lý do (reasoning) ngắn gọn, cụ thể dựa trên số liệu thật đã cho — không bịa số liệu không có trong dữ liệu.
 
@@ -833,7 +858,7 @@ Các khung giờ live cố định có thể chọn:
 ${JSON.stringify(timeSlots)}
 
 Danh sách Talent hiện có (dữ liệu thật từ hệ thống):
-${JSON.stringify(talents)}
+${JSON.stringify(sanitizeTalentsForAi(talents))}
 
 Hãy chọn MỘT khung giờ phù hợp nhất trong danh sách trên và MỘT Host phù hợp nhất trong danh sách Talent, dựa trên ngành hàng của Brand, CVR, GMV trung bình mỗi phiên của Talent, và đặc điểm khung giờ. Đưa ra lý do (reason) ngắn gọn dựa trên số liệu thật đã cho — không bịa số liệu không có trong dữ liệu. Ước tính mức tăng GMV tiềm năng (predictedGmvLift) dạng phần trăm.
 

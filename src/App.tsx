@@ -1060,16 +1060,18 @@ export default function App() {
       setSelectedSession(updated);
     }
   };
+  // FIX L10 (audit 2026-08-21): gọi setSelectedSession bên trong updater của setSessions là side
+  // effect trong hàm lẽ ra phải thuần (pure) — ở React StrictMode dev, updater chạy 2 lần nên side
+  // effect này cũng chạy 2 lần. Tính "next" từ state `sessions` đọc trực tiếp (đã có sẵn qua
+  // closure, cùng cách handleSessionReconciled ở trên đang làm) thay vì qua callback của setSessions.
   const handleDeleteSession = async (id: string) => {
     try {
       await deleteSession(id);
-      setSessions(prev => {
-        const next = prev.filter(s => s.id !== id);
-        if (selectedSession && selectedSession.id === id) {
-          setSelectedSession(next[0] ?? null);
-        }
-        return next;
-      });
+      const next = sessions.filter((s) => s.id !== id);
+      setSessions(next);
+      if (selectedSession && selectedSession.id === id) {
+        setSelectedSession(next[0] ?? null);
+      }
     } catch (e: any) {
       window.alert(`Không thể xóa Live Session: ${e.message ?? e}`);
     }

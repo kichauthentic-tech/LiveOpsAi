@@ -36,8 +36,12 @@ export async function getTikTokAuthorizeUrl(): Promise<string> {
   return body.url as string;
 }
 
-export async function disconnectTikTok(): Promise<void> {
-  const res = await authedFetch("/api/tiktok/disconnect", { method: "POST" });
+export async function disconnectTikTok(shopId: string): Promise<void> {
+  const res = await authedFetch("/api/tiktok/disconnect", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ shop_id: shopId })
+  });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error || "Không thể ngắt kết nối TikTok.");

@@ -62,11 +62,12 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
   };
 
   const handleDisconnect = async () => {
+    if (!tiktokStatus?.shopId) return;
     if (!window.confirm("Ngắt kết nối TikTok Shop hiện tại? Mọi webhook sẽ ngừng nhận sự kiện.")) return;
     setActionError(null);
     setDisconnecting(true);
     try {
-      await disconnectTikTok();
+      await disconnectTikTok(tiktokStatus.shopId);
       onRefreshTikTokStatus();
     } catch (err: any) {
       setActionError(err.message || "Không thể ngắt kết nối TikTok Shop.");
