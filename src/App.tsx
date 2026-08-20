@@ -2091,6 +2091,7 @@ export default function App() {
                 {activeTab === "user_settings" && (
                   <UserRoleSettings
                     currentRole={currentRole}
+                    currentUserId={activeUser.id}
                     rolePermissions={rolePermissions}
                     onUpdateRolePermissions={handleUpdateRolePermissions}
                     users={activeUsers}

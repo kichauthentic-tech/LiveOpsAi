@@ -46,6 +46,7 @@ export interface NewUserPayload {
 
 interface UserRoleSettingsProps {
   currentRole: UserRole;
+  currentUserId: string;
   rolePermissions: RolePermissionsMap;
   onUpdateRolePermissions: (newMap: RolePermissionsMap) => void;
   users: SystemUser[];
@@ -61,6 +62,7 @@ interface UserRoleSettingsProps {
 
 export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
   currentRole,
+  currentUserId,
   rolePermissions,
   onUpdateRolePermissions,
   users,
@@ -164,6 +166,16 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
 
     // Calculate new override
     const newOverrides = { ...(targetUser.customPermissionOverrides || {}) };
+    const newEffectiveValue = currentOverride === undefined ? !currentRoleDefault : currentRoleDefault;
+
+    // FIX L6 (audit 2026-08-21): Ma Trận Phân Quyền đã chặn tắt manage_users_permissions cho
+    // role ceo/admin, nhưng override riêng-từng-user (đè lên role default, xem App.tsx hasPermission)
+    // không có chặn tương tự — chính người đang đăng nhập có thể tự tắt quyền này cho tài khoản
+    // mình, biến mất khỏi menu Phân Quyền, không còn cách nào tự khôi phục qua UI nếu không còn
+    // ceo/admin nào khác. Chặn đúng như đã làm ở cấp role.
+    if (userId === currentUserId && permKey === "manage_users_permissions" && !newEffectiveValue) {
+      return;
+    }
 
     if (currentOverride === undefined) {
       // Toggle away from role default
@@ -1098,6 +1110,8 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                 const userOverride = permissionOverrideUser.customPermissionOverrides?.[def.key];
                 const activeVal = userOverride !== undefined ? userOverride : roleDefault;
                 const isOverridden = userOverride !== undefined;
+                const isSelfManagePermLock =
+                  permissionOverrideUser.id === currentUserId && def.key === "manage_users_permissions" && activeVal;
 
                 return (
                   <div
@@ -1125,10 +1139,14 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
 
                     <button
                       onClick={() =>
-                        handleToggleUserPermissionOverride(permissionOverrideUser.id, def.key)
+                        !isSelfManagePermLock && handleToggleUserPermissionOverride(permissionOverrideUser.id, def.key)
                       }
+                      disabled={isSelfManagePermLock}
+                      title={isSelfManagePermLock ? "Không thể tự tắt quyền Phân Quyền của chính tài khoản đang đăng nhập" : undefined}
                       className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-1 ${
-                        activeVal
+                        isSelfManagePermLock
+                          ? "bg-emerald-600/50 text-white/70 border-emerald-500/50 cursor-not-allowed"
+                          : activeVal
                           ? "bg-emerald-600 text-white border-emerald-500"
                           : "bg-[var(--surface-elevated)] text-[var(--text-muted)] border-[var(--border)]"
                       }`}
