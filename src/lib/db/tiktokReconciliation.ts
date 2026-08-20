@@ -41,17 +41,23 @@ function toNum(v: unknown): number | undefined {
   return Number.isNaN(n) ? undefined : n;
 }
 
+// FIX L7 (audit 2026-08-21): trước đây MỌI giá trị < 1 (bất kể string hay number) đều bị nhân
+// 100 với giả định luôn là dạng phân số — CTR thật "0.8" (đã là điểm %, ví dụ 0.8%) bị đọc nhầm
+// thành 80%. Excel chỉ cho ra number dạng phân số (0.008 nghĩa là 0.8%) khi cell được ĐỊNH DẠNG
+// Percent (đọc bằng XLSX {raw:true}) — cell dạng text không có ngữ cảnh định dạng đó nên không
+// thể là phân số ẩn, phải hiểu đúng nghĩa đen theo giá trị đã ghi.
 function toPercent(v: unknown): number | undefined {
   if (v === null || v === undefined || v === "") return undefined;
-  if (typeof v === "string" && v.includes("%")) {
-    const n = parseFloat(v.replace("%", "").trim());
-    return Number.isNaN(n) ? undefined : n;
+  if (typeof v === "string") {
+    const trimmed = v.trim();
+    if (trimmed.includes("%")) {
+      const n = parseFloat(trimmed.replace("%", ""));
+      return Number.isNaN(n) ? undefined : n;
+    }
+    return toNum(trimmed);
   }
-  const n = toNum(v);
-  if (n === undefined) return undefined;
-  // TikTok đôi khi trả tỉ lệ dạng phân số (0.0097) thay vì phần trăm (0.97) tuỳ export —
-  // giá trị < 1 gần chắc là phân số, nhân 100 cho đồng nhất với các % khác trong cùng file.
-  return n < 1 ? n * 100 : n;
+  if (typeof v !== "number") return undefined;
+  return v < 1 ? v * 100 : v;
 }
 
 // TikTok Seller Center export giờ theo múi giờ của shop (VN, UTC+7) dưới dạng wall-clock, KHÔNG
@@ -437,17 +443,24 @@ export function matchImportRows(rows: TikTokLiveImportRow[], sessions: LiveSessi
   for (const row of rows) {
     if (row.matchedSessionId) continue;
     const rowVn = vnParts(row.startTime);
-    const rowMinutes = toMinutes(rowVn.time);
     const normalizedCreator = normalizeName(row.creatorName);
 
-    const candidates = tiktokSessions.filter((s) => s.date === rowVn.date);
+    // FIX L7 (audit 2026-08-21): trước đây chỉ xét session CÙNG NGÀY với dòng TikTok, trong khi
+    // compareSessionTimes (dùng cho cảnh báo lệch giờ) đã quy đổi lệch ngày ra phút — phiên bắt
+    // đầu 23:50 hôm trước, TikTok ghi 00:10 hôm sau, không bao giờ lọt qua filter cùng ngày này
+    // nên không bao giờ tự khớp được dù giờ chỉ lệch 20 phút. Nới sang ±1 ngày rồi dùng chung
+    // compareSessionTimes để tính lệch phút (đã xử lý đúng lệch ngày) thay vì so giờ-trong-ngày.
+    const candidates = tiktokSessions.filter((s) => {
+      const dayOffset = Math.round((Date.parse(`${rowVn.date}T00:00:00Z`) - Date.parse(`${s.date}T00:00:00Z`)) / 86400000);
+      return Math.abs(dayOffset) <= 1;
+    });
     const byName = normalizedCreator
       ? candidates.filter((s) => normalizeName(s.hostName).includes(normalizedCreator) || normalizedCreator.includes(normalizeName(s.hostName)))
       : [];
     const pool = byName.length > 0 ? byName : candidates;
 
     for (const s of pool) {
-      const diff = Math.abs(toMinutes(s.startTime) - rowMinutes);
+      const diff = Math.abs(compareSessionTimes(row, s).startDeltaMinutes);
       if (diff <= MAX_AUTO_MATCH_MINUTES) pairs.push({ rowId: row.id, sessionId: s.id, diff });
     }
   }

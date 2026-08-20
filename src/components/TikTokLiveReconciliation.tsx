@@ -106,7 +106,12 @@ export const TikTokLiveReconciliation: React.FC<TikTokLiveReconciliationProps> =
   };
 
   const handleOverrideMatch = async (rowId: string, sessionId: string) => {
-    const confidence = sessionId ? "manual" : undefined;
+    // FIX L7 (audit 2026-08-21): trước đây bỏ khớp gửi confidence = undefined — Supabase client
+    // JSON.stringify payload trước khi gửi, key có giá trị undefined bị loại bỏ hoàn toàn khỏi
+    // request, nên match_confidence trong DB giữ nguyên giá trị cũ và badge "Đã Khớp" vẫn hiện
+    // sau khi tải lại dù matchedSessionId đã null. Dùng "unmatched" (giá trị thật, luôn có trong
+    // payload) — cùng literal matchImportRows đã dùng cho dòng chưa khớp.
+    const confidence = sessionId ? "manual" : "unmatched";
     setRows((prev) => prev.map((r) => (r.id === rowId ? { ...r, matchedSessionId: sessionId || undefined, matchConfidence: confidence } : r)));
     try {
       await updateRowMatch(rowId, sessionId || null, confidence);
