@@ -48,7 +48,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
   const [editingSession, setEditingSession] = useState<LiveSession | null>(null);
   const [sessTitle, setSessTitle] = useState("");
   const [sessBrandId, setSessBrandId] = useState("");
-  const [sessShopHandle, setSessShopHandle] = useState("@cocoon.vietnam.official");
+  const [sessShopHandle, setSessShopHandle] = useState("");
   const [sessStudioId, setSessStudioId] = useState("");
   const [sessHostId, setSessHostId] = useState("");
   const [sessAssistantId, setSessAssistantId] = useState("");
@@ -65,15 +65,18 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
   const [sessCtrAvg, setSessCtrAvg] = useState(0);
   const [sessCvrAvg, setSessCvrAvg] = useState(0);
 
+  // FIX L5 (audit 2026-08-21): trước đây tiêu đề/handle/ngày mặc định là dữ liệu demo cụ thể
+  // ("Phiên Live Mỹ Phẩm Mùa Hè", "@cocoon.vietnam.official", ngày quá khứ cố định "2026-07-24")
+  // — dễ lưu nhầm vào DB nếu ops không để ý sửa. Để trống/ngày hôm nay, input đã có placeholder ví dụ.
   const openAddSessionModal = () => {
     setEditingSession(null);
-    setSessTitle("Phiên Live Mỹ Phẩm Mùa Hè");
+    setSessTitle("");
     setSessBrandId(brands[0]?.id || "");
-    setSessShopHandle("@cocoon.vietnam.official");
+    setSessShopHandle("");
     setSessStudioId(studios[0]?.id || "");
     setSessHostId(talents[0]?.id || "");
     setSessAssistantId(moderators[0]?.id || "");
-    setSessDate("2026-07-24");
+    setSessDate(getTodayDate());
     setSessStartTime("20:00");
     setSessEndTime("22:00");
     setSessStatus("Upcoming");
@@ -414,7 +417,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
             </div>
             <h3 className="text-xl font-black text-[var(--text)]">Chưa Có Phiên Live Nào Trong Hệ Thống</h3>
             <p className="text-sm text-[var(--text-muted)] max-w-md mx-auto">
-              Hệ thống hiện đang ở trạng thái trống (Clean State). Bạn hãy nhấp vào nút bên dưới để tạo phiên live đầu tiên hoặc mở lại Mock Data từ thanh thông báo.
+              Hệ thống hiện đang ở trạng thái trống (Clean State). Bạn hãy nhấp vào nút bên dưới để tạo phiên live đầu tiên.
             </p>
             <button
               onClick={openAddSessionModal}

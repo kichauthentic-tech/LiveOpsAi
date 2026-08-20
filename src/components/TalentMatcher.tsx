@@ -81,8 +81,11 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
   const [formRateHour, setFormRateHour] = useState(0);
   const [formCommission, setFormCommission] = useState(3.5);
   const [formScore, setFormScore] = useState(90);
-  const [formPhone, setFormPhone] = useState("0988 123 456");
-  const [formAvatar, setFormAvatar] = useState("https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250");
+  // FIX L5 (audit 2026-08-21): trước đây mặc định số điện thoại/avatar demo cố định (nhìn như đã
+  // nhập thật) và brandsWorkedWith luôn gán "Agency Network" (không phải brand nào trong hệ thống)
+  // — dễ lưu nhầm vào DB nếu ops không để ý sửa. Để trống, input avatar đã có placeholder ví dụ.
+  const [formPhone, setFormPhone] = useState("");
+  const [formAvatar, setFormAvatar] = useState("");
   const [formStatus, setFormStatus] = useState<"Available" | "Busy" | "On Live">("Available");
 
   const openAddModal = () => {
@@ -100,8 +103,8 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
     setFormRate(5000000);
     setFormCommission(3.5);
     setFormScore(90);
-    setFormPhone("0988 123 456");
-    setFormAvatar("https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250");
+    setFormPhone("");
+    setFormAvatar("");
     setFormStatus("Available");
     setIsModalOpen(true);
   };
@@ -121,8 +124,8 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
     setFormRateHour(t.ratePerHour || 0);
     setFormCommission(t.commissionRate || 3.5);
     setFormScore(t.overallScore || (t as any).aiMatchScore || 90);
-    setFormPhone(t.phone || "0988 123 456");
-    setFormAvatar(t.avatar || (t as any).avatarUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250");
+    setFormPhone(t.phone || "");
+    setFormAvatar(t.avatar || (t as any).avatarUrl || "");
     setFormStatus(t.availabilityStatus || "Available");
     setIsModalOpen(true);
   };
@@ -135,7 +138,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
 
     const basePayload: Omit<Talent, "id" | "ratePerSession" | "ratePerHour" | "commissionRate"> = {
       name: formName,
-      avatar: formAvatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250",
+      avatar: formAvatar,
       role: formRole,
       gender: formGender,
       niches: nichesParsed,
@@ -145,7 +148,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
       cvrAvg: Number(formCvr),
       overallScore: Number(formScore),
       availabilityStatus: formStatus,
-      brandsWorkedWith: editingTalent?.brandsWorkedWith || ["Agency Network"],
+      brandsWorkedWith: editingTalent?.brandsWorkedWith || [],
       phone: formPhone
     };
 
