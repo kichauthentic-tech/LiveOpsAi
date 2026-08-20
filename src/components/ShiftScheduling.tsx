@@ -78,11 +78,13 @@ const dayLabel = (dateStr: string) => {
   return names[d.getDay()];
 };
 
+// FIX L8 (audit 2026-08-21): mins === 0 (gõ nhầm giờ kết thúc = giờ bắt đầu) trước đây cũng cộng
+// +1440 như ca qua đêm thật, ra 24 giờ công — chỉ ca qua đêm thật (mins < 0) mới cộng thêm 24h.
 const durationHours = (start: string, end: string) => {
   const [sh, sm] = start.split(":").map(Number);
   let [eh, em] = end.split(":").map(Number);
   let mins = eh * 60 + em - (sh * 60 + sm);
-  if (mins <= 0) mins += 24 * 60; // ca qua đêm, vd 22:00 -> 00:30
+  if (mins < 0) mins += 24 * 60; // ca qua đêm, vd 22:00 -> 00:30
   return mins / 60;
 }
 

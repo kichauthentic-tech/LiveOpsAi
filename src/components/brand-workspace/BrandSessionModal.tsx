@@ -69,6 +69,14 @@ export const BrandSessionModal: React.FC<BrandSessionModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // FIX L8 (audit 2026-08-21): gõ nhầm giờ kết thúc trùng giờ bắt đầu trước đây bị tính thành
+    // ca qua đêm 24 giờ công (sessionDurationHours ở lib/pnl.ts) — chặn ngay ở form.
+    if (startTime === endTime) {
+      window.alert("Giờ bắt đầu và giờ kết thúc không được trùng nhau.");
+      return;
+    }
+
     const studioObj = studios.find((s) => s.id === studioId);
 
     if (!isEdit && mode === "slot") {

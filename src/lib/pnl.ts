@@ -19,11 +19,15 @@ export const DEFAULT_FINANCE: Omit<SessionFinance, "sessionId"> = {
 
 // Giờ live thật của 1 phiên (ca qua đêm cộng thêm 24h) — giống hệt durationHours ở
 // ShiftScheduling.tsx.
+// FIX L8 (audit 2026-08-21): điều kiện cũ `mins <= 0` gộp chung 2 trường hợp khác nhau — ca qua
+// đêm thật (end < start, vd 22:00 -> 00:30, mins âm) và gõ nhầm giờ kết thúc = giờ bắt đầu (mins
+// đúng bằng 0). Cả 2 đều bị +1440 nên start===end ra 24 giờ công, không có kiểm tra nào chặn lại.
+// Chỉ ca qua đêm thật (mins < 0) mới cộng thêm 24h; start===end phải ra 0 giờ.
 export function sessionDurationHours(start: string, end: string): number {
   const [sh, sm] = start.split(":").map(Number);
   const [eh, em] = end.split(":").map(Number);
   let mins = eh * 60 + em - (sh * 60 + sm);
-  if (mins <= 0) mins += 24 * 60;
+  if (mins < 0) mins += 24 * 60;
   return mins / 60;
 }
 

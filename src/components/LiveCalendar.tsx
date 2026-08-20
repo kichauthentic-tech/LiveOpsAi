@@ -532,6 +532,14 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   // Save new session hoặc mở ca chờ đăng ký (tuỳ bookingMode)
   const handleSaveBooking = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // FIX L8 (audit 2026-08-21): gõ nhầm giờ kết thúc trùng giờ bắt đầu trước đây bị tính thành
+    // ca qua đêm 24 giờ công (sessionDurationHours ở lib/pnl.ts) — chặn ngay ở form.
+    if (newStartTime === newEndTime) {
+      window.alert("Giờ bắt đầu và giờ kết thúc không được trùng nhau.");
+      return;
+    }
+
     const brandObj = brands.find((b) => b.id === newBrandId);
     const studioObj = studios.find((s) => s.id === newStudioId);
 
@@ -624,6 +632,14 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
 
   const handleSaveDetailEdit = async () => {
     if (!selectedSessionDetail) return;
+
+    // FIX L8 (audit 2026-08-21): gõ nhầm giờ kết thúc trùng giờ bắt đầu trước đây bị tính thành
+    // ca qua đêm 24 giờ công (sessionDurationHours ở lib/pnl.ts) — chặn ngay ở form.
+    if (editStartTime === editEndTime) {
+      window.alert("Giờ bắt đầu và giờ kết thúc không được trùng nhau.");
+      return;
+    }
+
     const studioObj = studios.find((s) => s.id === editStudioId);
     const hostObj = talents.find((t) => t.id === editHostId);
     const coHostObj = talents.find((t) => t.id === editCoHostId);

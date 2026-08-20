@@ -115,6 +115,14 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
   const handleSaveSession = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // FIX L8 (audit 2026-08-21): gõ nhầm giờ kết thúc trùng giờ bắt đầu trước đây bị tính thành
+    // ca qua đêm 24 giờ công (sessionDurationHours ở lib/pnl.ts) — chặn ngay ở form, không có
+    // cách nào diễn giải hợp lý cho giờ bắt đầu/kết thúc trùng nhau.
+    if (sessStartTime === sessEndTime) {
+      window.alert("Giờ bắt đầu và giờ kết thúc không được trùng nhau.");
+      return;
+    }
+
     const brandObj = brands.find((b) => b.id === sessBrandId);
     const studioObj = studios.find((s) => s.id === sessStudioId);
     const hostObj = talents.find((t) => t.id === sessHostId);
