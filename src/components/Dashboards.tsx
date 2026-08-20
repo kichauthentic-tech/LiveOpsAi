@@ -1,5 +1,15 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { UserRole, LiveSession, Studio, Brand, Talent } from "../types";
+import {
+  UserRole,
+  LiveSession,
+  Studio,
+  Brand,
+  Talent,
+  SessionFinance,
+  BrandPlatformRate,
+  TalentRateHistoryEntry,
+  BrandPlatformRateHistoryEntry
+} from "../types";
 import {
   TrendingUp,
   DollarSign,
@@ -23,6 +33,8 @@ import { GmvGrowthTrendline } from "./GmvGrowthTrendline";
 import { PerformanceDeviationAlerts } from "./PerformanceDeviationAlerts";
 import { GmvCalendar } from "./GmvCalendar";
 import { DataSourceBadge } from "./common/DataSourceBadge";
+import { computeSessionPnl, sessionDurationHours } from "../lib/pnl";
+import { getTodayDate } from "../lib/dateUtils";
 
 interface DashboardsProps {
   currentRole: UserRole;
@@ -30,27 +42,15 @@ interface DashboardsProps {
   studios: Studio[];
   brands: Brand[];
   talents: Talent[];
+  financeRecords: SessionFinance[];
+  brandPlatformRates: BrandPlatformRate[];
+  talentRateHistory: TalentRateHistoryEntry[];
+  brandPlatformRateHistory: BrandPlatformRateHistoryEntry[];
   onSelectSession: (session: LiveSession) => void;
   onNavigateTab?: (tab: string) => void;
   /** Báo lên App khi sub-tab đang mở là lịch GMV — App dùng để tự thu gọn sidebar. */
   onCalendarViewChange?: (isCalendarView: boolean) => void;
 }
-
-const WEEKLY_GMV_DATA = [
-  { day: "Thứ 2", gmv: 320 },
-  { day: "Thứ 3", gmv: 450 },
-  { day: "Thứ 4", gmv: 390 },
-  { day: "Thứ 5", gmv: 610 },
-  { day: "Thứ 6", gmv: 890 },
-  { day: "Thứ 7", gmv: 1250 },
-  { day: "Chủ Nhật", gmv: 1420 }
-];
-
-const STUDIO_OCCUPANCY_DATA = [
-  { studio: "Studio A (Beauty)", hours: 8.5, capacity: 10 },
-  { studio: "Studio B (Fashion)", hours: 6.0, capacity: 10 },
-  { studio: "Studio C (Tech/Home)", hours: 7.0, capacity: 10 }
-];
 
 export const Dashboards: React.FC<DashboardsProps> = ({
   currentRole,
@@ -58,6 +58,10 @@ export const Dashboards: React.FC<DashboardsProps> = ({
   studios,
   brands,
   talents,
+  financeRecords,
+  brandPlatformRates,
+  talentRateHistory,
+  brandPlatformRateHistory,
   onSelectSession,
   onNavigateTab,
   onCalendarViewChange
@@ -74,12 +78,69 @@ export const Dashboards: React.FC<DashboardsProps> = ({
   const liveSessions = sessions.filter((s) => s.status === "Live Now");
   const liveSession = liveSessions[0] || sessions[0] || null;
   const totalActualGmv = sessions.reduce((sum, s) => sum + (s.actualGmv || 0), 0);
-  const totalCommission = Math.round(totalActualGmv * 0.15);
   const totalSessionsCount = sessions.length;
   const liveCount = sessions.filter((s) => s.status === "Live Now").length;
   const upcomingCount = sessions.filter((s) => s.status === "Upcoming").length;
-  const occupancyHours = (sessions.length * 2.5).toFixed(1);
-  const occupancyRate = studios.length > 0 ? Math.min(100, Math.round((sessions.length * 2.5) / (studios.length * 10) * 100)) : 0;
+
+  // FIX L1 (audit 2026-08-21): "Doanh Thu Agency" cũ = GMV × 0.15 cứng cho mọi phiên, bỏ qua
+  // agencyCommissionRate thật từng phiên, mô hình billingModel="hourly", và tỷ lệ hoàn hủy. Dùng
+  // đúng công thức P&L thật (computeSessionPnl, cùng hàm Finance & P&L dùng) trên các phiên đã
+  // Completed — số chưa chốt (Upcoming/Live Now) chưa có GMV/finance thật để tính.
+  const financeBySessionId = useMemo(() => {
+    const map: Record<string, SessionFinance> = {};
+    for (const f of financeRecords) map[f.sessionId] = f;
+    return map;
+  }, [financeRecords]);
+  const talentById = useMemo(() => {
+    const map: Record<string, Talent> = {};
+    for (const t of talents) map[t.id] = t;
+    return map;
+  }, [talents]);
+  const brandById = useMemo(() => {
+    const map: Record<string, Brand> = {};
+    for (const b of brands) map[b.id] = b;
+    return map;
+  }, [brands]);
+  const totalCommission = useMemo(() => {
+    return sessions
+      .filter((s) => s.status === "Completed")
+      .reduce(
+        (sum, s) =>
+          sum + computeSessionPnl(s, financeBySessionId, talentById, brandById, brandPlatformRates, talentRateHistory, brandPlatformRateHistory).grossAgencyRev,
+        0
+      );
+  }, [sessions, financeBySessionId, talentById, brandById, brandPlatformRates, talentRateHistory, brandPlatformRateHistory]);
+
+  // Chi phí thật/session (host + studio + ads) để KpiComparison tính ROAS thật thay vì công thức
+  // "mỗi phiên tốn đúng 50 triệu" bịa (audit L1) — netProfit = grossAgencyRev - totalCost.
+  const costBySessionId = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const s of sessions) {
+      if (s.status !== "Completed") continue;
+      const pnl = computeSessionPnl(s, financeBySessionId, talentById, brandById, brandPlatformRates, talentRateHistory, brandPlatformRateHistory);
+      map[s.id] = pnl.grossAgencyRev - pnl.netProfit;
+    }
+    return map;
+  }, [sessions, financeBySessionId, talentById, brandById, brandPlatformRates, talentRateHistory, brandPlatformRateHistory]);
+
+  // FIX L1: "Công Suất Studio" cũ = số phiên TOÀN THỜI GIAN × 2.5h bịa, chia cho số studio × 10h
+  // bịa — không có khung thời gian rõ ràng nên càng nhiều lịch sử càng vượt 100% vô nghĩa. Đổi
+  // sang đúng phạm vi "hôm nay" (khớp tên chart "...Hôm Nay" bên dưới), giờ live thật từng phiên
+  // (sessionDurationHours, cùng hàm P&L dùng) và công suất khả dụng thật của từng studio
+  // (Studio.dailyAvailableHours) thay vì hằng số 10h bịa.
+  const todayStr = getTodayDate();
+  const todayStudioStats = useMemo(() => {
+    return studios.map((s) => {
+      const hours = sessions
+        .filter((sess) => sess.date === todayStr && sess.status !== "Cancelled" && sess.studioId === s.id)
+        .reduce((sum, sess) => sum + sessionDurationHours(sess.startTime, sess.endTime), 0);
+      return { studio: s.name, hours: Number(hours.toFixed(1)), capacity: s.dailyAvailableHours || 0 };
+    });
+  }, [sessions, studios, todayStr]);
+  const totalOccupiedHoursToday = todayStudioStats.reduce((sum, s) => sum + s.hours, 0);
+  const totalCapacityHoursToday = todayStudioStats.reduce((sum, s) => sum + s.capacity, 0);
+  const occupancyRate =
+    totalCapacityHoursToday > 0 ? Math.min(100, Math.round((totalOccupiedHoursToday / totalCapacityHoursToday) * 100)) : 0;
 
   const weeklyGmvData = useMemo(() => {
     if (sessions.length === 0) {
@@ -226,7 +287,7 @@ export const Dashboards: React.FC<DashboardsProps> = ({
     return (
       <div className="space-y-6">
         {subTabHeader}
-        <KpiComparison brands={brands} studios={studios} sessions={sessions} />
+        <KpiComparison brands={brands} studios={studios} sessions={sessions} costBySessionId={costBySessionId} />
       </div>
     );
   }
@@ -274,17 +335,17 @@ export const Dashboards: React.FC<DashboardsProps> = ({
               <span>Doanh Thu Agency (Commission)</span>
               <DollarSign className="w-4 h-4 text-purple-600" />
             </div>
-            <div className="text-2xl font-black text-[var(--text)]">{totalCommission.toLocaleString()} đ</div>
-            <div className="text-xs text-[var(--text-muted)] font-medium">Commission ước tính: 15%</div>
+            <div className="text-2xl font-black text-[var(--text)]">{Math.round(totalCommission).toLocaleString()} đ</div>
+            <div className="text-xs text-[var(--text-muted)] font-medium">P&L thật từ các phiên đã hoàn thành</div>
           </div>
 
           <div className="bg-[var(--surface)] p-5 rounded-2xl border border-[var(--border)] shadow-sm space-y-2">
             <div className="flex justify-between items-center text-[var(--text-muted)] text-xs font-medium">
-              <span>Công Suất Studio (Occupancy)</span>
+              <span>Công Suất Studio Hôm Nay (Occupancy)</span>
               <Building2 className="w-4 h-4 text-indigo-600" />
             </div>
             <div className="text-2xl font-black text-[var(--text)]">{occupancyRate}%</div>
-            <div className="text-xs text-indigo-600 font-medium">{occupancyHours}h / {studios.length * 10}h công suất khôi phục</div>
+            <div className="text-xs text-indigo-600 font-medium">{totalOccupiedHoursToday.toFixed(1)}h / {totalCapacityHoursToday}h công suất khả dụng</div>
           </div>
 
           <div className="bg-[var(--surface)] p-5 rounded-2xl border border-[var(--border)] shadow-sm space-y-2">
@@ -451,7 +512,9 @@ export const Dashboards: React.FC<DashboardsProps> = ({
         </div>
 
         {/* Embedded Period KPI Comparison Component */}
-        <KpiComparison brands={brands} studios={studios} />
+        {/* FIX (phát hiện trong lúc sửa L1): thiếu prop sessions — component luôn nhận [] nên mọi
+            metric hiện 0 bất kể dữ liệu thật, làm hỏng hẳn mục đích của khối "Embedded" này. */}
+        <KpiComparison brands={brands} studios={studios} sessions={sessions} costBySessionId={costBySessionId} />
       </div>
     );
   }
@@ -502,7 +565,7 @@ export const Dashboards: React.FC<DashboardsProps> = ({
           <h3 className="font-bold text-[var(--text)] text-base">Thời Gian Vận Hành Lịch Live Studio Hôm Nay (Giờ)</h3>
           <div className="h-48 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={STUDIO_OCCUPANCY_DATA}>
+              <BarChart data={todayStudioStats}>
                 <XAxis dataKey="studio" stroke="var(--text-muted)" fontSize={12} />
                 <YAxis stroke="var(--text-muted)" fontSize={12} />
                 <Tooltip formatter={(val: any) => [`${val} Giờ`, "Thời gian sử dụng"]} />

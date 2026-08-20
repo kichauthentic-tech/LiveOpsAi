@@ -35,6 +35,12 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
   const [activeTab, setActiveTab] = useState<"analytics" | "checklist" | "products" | "ai_coach">("analytics");
   const [analyzingAi, setAnalyzingAi] = useState(false);
   const [aiAnalysisResult, setAiAnalysisResult] = useState<any>(selectedSession?.aiAnalysis || null);
+  // FIX L1 (audit 2026-08-21): server trả isMock khi chưa cấu hình GEMINI_API_KEY (bản phân tích
+  // viết sẵn kèm số cụ thể như "185.400.000đ", "phút 18:00 Flash Sale Combo Serum" — createApp.ts
+  // /api/gemini/analyze-session) nhưng UI trước đây bỏ qua cờ này, hiện y hệt phân tích thật của
+  // đúng phiên đang mở. Theo dõi cờ để hiện rõ banner cảnh báo (cùng cách LiveCalendar đã làm đúng
+  // cho AI Schedule Optimizer).
+  const [aiAnalysisIsMock, setAiAnalysisIsMock] = useState(false);
   const [viewMode, setViewMode] = useState<"single" | "multi_grid">("single");
 
   // Session Modal State
@@ -133,7 +139,10 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
       targetGmv: Number(sessTargetGmv),
       actualGmv: Number(sessActualGmv),
       totalOrders: editingSession?.totalOrders || 0,
-      avgWatchTimeSeconds: editingSession?.avgWatchTimeSeconds || 120,
+      // FIX L1 (audit 2026-08-21): "|| 120" chèn 2 phút giả cho phiên chưa có số thật, vi phạm
+      // đúng nguyên tắc "không giả lập số liệu" ghi ngay phía trên (dòng 55-56) — sửa cùng cách
+      // các field peakViewers/totalViews/ctrAvg/cvrAvg bên dưới đã làm đúng: giữ 0 thật, không bịa.
+      avgWatchTimeSeconds: editingSession?.avgWatchTimeSeconds ?? 0,
       peakViewers: Number(sessPeakViewers),
       totalViews: Number(sessTotalViews),
       ctrAvg: Number(sessCtrAvg),
@@ -176,6 +185,7 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
       const data = await res.json();
       if (data.success) {
         setAiAnalysisResult(data.insights);
+        setAiAnalysisIsMock(!!data.isMock);
       }
     } catch (e) {
       console.error(e);
@@ -699,6 +709,12 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
 
           {aiAnalysisResult && (
             <div className="space-y-6">
+              {aiAnalysisIsMock && (
+                <div className="flex items-center gap-2 text-xs text-amber-400 bg-amber-950/40 border border-amber-500/40 rounded-xl px-3 py-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  Chưa cấu hình Gemini API key — đây là bản phân tích mẫu cố định, không phải phân tích thật của phiên này.
+                </div>
+              )}
               {/* Overall & GMV Summary */}
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="p-4 rounded-xl bg-[var(--accent)]/30 border border-[var(--accent)]/50 space-y-1">

@@ -8,6 +8,10 @@ interface Message {
   sender: "user" | "agent";
   text: string;
   time: string;
+  // FIX L1 (audit 2026-08-21): true khi câu trả lời là bản viết sẵn (server chưa cấu hình
+  // GEMINI_API_KEY, hoặc client fallback lúc API lỗi) — trước đây UI không phân biệt, hiện y hệt
+  // phản hồi Gemini thật. Cùng nguyên tắc isMock LiveCalendar đã làm đúng cho AI Schedule Optimizer.
+  isMock?: boolean;
 }
 
 export const AiMultiAgent: React.FC = () => {
@@ -63,7 +67,8 @@ export const AiMultiAgent: React.FC = () => {
         const agentMsg: Message = {
           sender: "agent",
           text: data.reply,
-          time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+          time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          isMock: !!data.isMock
         };
         setChatHistory((prev) => ({
           ...prev,
@@ -88,7 +93,8 @@ export const AiMultiAgent: React.FC = () => {
       const agentMsg: Message = {
         sender: "agent",
         text: reply,
-        time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+        time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        isMock: true
       };
       setChatHistory((prev) => ({
         ...prev,
@@ -168,6 +174,11 @@ export const AiMultiAgent: React.FC = () => {
                     ? "bg-[var(--accent)] text-white rounded-tr-none"
                     : "bg-[var(--surface-elevated)] text-[var(--text)] rounded-tl-none border border-[var(--border)]"
                 }`}>
+                  {msg.isMock && (
+                    <span className="inline-block text-[9px] font-bold uppercase tracking-wide text-amber-400 bg-amber-950/40 border border-amber-500/40 rounded px-1.5 py-0.5">
+                      Chưa cấu hình Gemini API key — câu trả lời mẫu
+                    </span>
+                  )}
                   <p className="whitespace-pre-line">{msg.text}</p>
                   <span className={`text-[9px] block text-right font-mono ${
                     msg.sender === "user" ? "text-[var(--accent-text)]" : "text-[var(--text-muted)]"

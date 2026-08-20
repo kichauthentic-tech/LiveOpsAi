@@ -93,8 +93,12 @@ export const GmvGrowthTrendline: React.FC<GmvGrowthTrendlineProps> = ({
   const chartData = useMemo(() => {
     const data = [];
     const today = new Date();
+    // FIX L1 (audit 2026-08-21): sàn Math.max(10, ...) từng bịa ra baseline dự báo cho brand chưa
+    // có phiên nào (avgGmvPerSession = 0) — brand mới tinh vẫn thấy một đường dự báo tăng trưởng
+    // như đang có traffic thật. Bỏ sàn: không có lịch sử thật thì baseline = 0, đường dự báo cũng
+    // phẳng ở 0 (đúng thực tế "chưa có dữ liệu" thay vì bịa số).
     const baseDailyGmv = filteredSessions.length > 0 && historicalStats.totalHistoricalGmv > 0
-      ? Math.max(10, Math.round(historicalStats.avgGmvPerSession / 1000000))
+      ? Math.round(historicalStats.avgGmvPerSession / 1000000)
       : 0; // in Millions VNĐ
 
     let cumulativeActual = 0;
@@ -106,8 +110,15 @@ export const GmvGrowthTrendline: React.FC<GmvGrowthTrendlineProps> = ({
       const isToday = day === 15;
       const dayLabel = day === 15 ? "D15 (Hôm nay)" : `Ngày ${day}`;
 
-      // Weekend/mid-month multipliers used only for the future projection model
-      const weekendBoost = (day % 7 === 6 || day % 7 === 0) ? 1.35 : 0.95;
+      // D15 = hôm nay, nên ngày dương lịch thật của "day" là today + (day - 15).
+      const calendarDate = new Date(today);
+      calendarDate.setDate(calendarDate.getDate() + (day - 15));
+
+      // FIX L1: weekendBoost cũ dùng day % 7 (day chạy 1→30, không neo vào thứ thật trong tuần)
+      // — trùng đúng lỗi đã sửa ở Dashboards.tsx "GMV theo thứ". Đổi sang getDay() của ngày dương
+      // lịch thật vừa tính ở trên (0=CN, 6=Thứ 7).
+      const weekday = calendarDate.getDay();
+      const weekendBoost = weekday === 0 || weekday === 6 ? 1.35 : 0.95;
       const midMonthPeak = (day >= 12 && day <= 16) ? 1.25 : 1.0;
 
       // Projected Daily GMV calculation (estimate, not historical fact)
@@ -117,8 +128,6 @@ export const GmvGrowthTrendline: React.FC<GmvGrowthTrendlineProps> = ({
       // Actual GMV for past 15 days (Day 1 = 14 days ago ... Day 15 = today), read from real sessions
       let actualDaily: number | null = null;
       if (day <= 15) {
-        const calendarDate = new Date(today);
-        calendarDate.setDate(calendarDate.getDate() - (15 - day));
         const realGmv = gmvByDate.get(dateKeyFor(calendarDate)) || 0;
         actualDaily = Math.round(realGmv / 1000000);
         cumulativeActual += actualDaily;
@@ -148,8 +157,12 @@ export const GmvGrowthTrendline: React.FC<GmvGrowthTrendlineProps> = ({
   const metrics = useMemo(() => {
     const actual15Days = chartData.filter((d) => d.dayNumber <= 15).reduce((acc, d) => acc + (d.actualGmv || 0), 0);
     const projected30Days = chartData[chartData.length - 1]?.cumProjectedGmv || 0;
-    const targetKpi = sessions.length > 0 
-      ? Math.max(1000, Math.round(sessions.reduce((acc, s) => acc + (s.targetGmv || 0), 0) / 1000000)) 
+    // FIX L1: sàn Math.max(1000, ...) từng bịa mục tiêu 1 tỷ khi tổng targetGmv thật = 0 (chưa có
+    // phiên nào được chốt lịch kèm host — targetGmv chỉ có giá trị sau khi chốt, xem M5) — khiến
+    // pacingPercent (dưới) so với 1 con số ảo. Không sàn: chưa có target thật thì targetKpi = 0,
+    // pacingPercent cũng về 0 thay vì báo tiến độ dựa trên mục tiêu bịa.
+    const targetKpi = sessions.length > 0
+      ? Math.round(sessions.reduce((acc, s) => acc + (s.targetGmv || 0), 0) / 1000000)
       : 0; // Target KPI in Millions VNĐ
     const pacingPercent = targetKpi > 0 ? Math.round((projected30Days / targetKpi) * 100) : 0;
     const estCommission = Math.round(projected30Days * 0.15); // 15% agency commission

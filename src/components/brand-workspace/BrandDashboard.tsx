@@ -489,7 +489,7 @@ export const BrandDashboard: React.FC<BrandDashboardProps> = ({
         />
       )}
 
-      {tab === "kpi_comparison" && <KpiComparison brands={brandOnly} sessions={brandSessions} />}
+      {tab === "kpi_comparison" && <KpiComparison brands={brandOnly} sessions={brandSessions} hideCommission />}
     </div>
   );
 };

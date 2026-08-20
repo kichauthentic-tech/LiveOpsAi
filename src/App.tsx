@@ -1809,6 +1809,10 @@ export default function App() {
                     studios={activeStudios}
                     brands={activeBrands}
                     talents={activeTalents}
+                    financeRecords={financeRecords}
+                    brandPlatformRates={brandPlatformRates}
+                    talentRateHistory={talentRateHistory}
+                    brandPlatformRateHistory={brandPlatformRateHistory}
                     onSelectSession={handleSelectSessionFromDashboard}
                     onNavigateTab={setActiveTab}
                     onCalendarViewChange={setDashboardCalendarView}

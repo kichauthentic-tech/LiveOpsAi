@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Talent, Brand, UserRole } from "../types";
-import { Users, Sparkles, Award, Search, Filter, Plus, Edit3, Trash2, X, Phone, CheckCircle2, Loader2 } from "lucide-react";
+import { Users, Sparkles, Award, Search, Filter, Plus, Edit3, Trash2, X, Phone, CheckCircle2, Loader2, AlertTriangle } from "lucide-react";
 import { authedFetch } from "../lib/authedFetch";
 
 export interface NewTalentAccountPayload {
@@ -48,6 +48,10 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
   const [targetCategory, setTargetCategory] = useState("Mỹ phẩm Skincare");
   const [matchingResults, setMatchingResults] = useState<any[] | null>(null);
   const [isMatching, setIsMatching] = useState(false);
+  // FIX L1 (audit 2026-08-21): server trả isMock khi chưa cấu hình GEMINI_API_KEY, nhưng nhánh
+  // thành công trước đây bỏ qua cờ này — hiện y hệt kết quả AI thật. Theo dõi riêng để hiện banner
+  // (cùng true khi rơi vào nhánh catch fallback công thức bên dưới).
+  const [matchingIsMock, setMatchingIsMock] = useState(false);
 
   // Search & Filter
   const [searchTerm, setSearchTerm] = useState("");
@@ -202,13 +206,20 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
       const data = await res.json();
       if (data.success && Array.isArray(data.results) && data.results.length > 0) {
         setMatchingResults(data.results);
+        setMatchingIsMock(!!data.isMock);
         return;
       }
       throw new Error(data.error || "Empty AI matching result");
     } catch (e) {
       console.error("AI Talent Matching failed, dùng fallback công thức:", e);
-      const results = rawTalents.map((t, idx) => {
-        const matchScore = Math.max(70, 96 - idx * 5);
+      setMatchingIsMock(true);
+      const results = rawTalents.map((t) => {
+        // FIX L1 (audit 2026-08-21): fallback cũ = 96 − index×5 — xếp hạng theo VỊ TRÍ TRONG MẢNG,
+        // không phản ánh gì về talent, nhưng hiển thị y hệt điểm phù hợp AI thật khi API lỗi/không
+        // có key. Dùng overallScore (điểm đánh giá thật đã lưu ở Talent Pool, 0-100) — vẫn không
+        // phải điểm "phù hợp với brand này" như AI thật tính, nhưng ít nhất là tín hiệu thật của
+        // đúng talent đó, không phải thứ tự ngẫu nhiên từ API trả về.
+        const matchScore = t.overallScore || 0;
         const nicheArr = t.niches || (t as any).niche || [];
         const nicheStr = Array.isArray(nicheArr) ? nicheArr.join(", ") : String(nicheArr || "Đa ngành");
         return {
@@ -285,6 +296,12 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
         {matchingResults && (
           <div className="bg-[var(--surface-base)]/80 p-4 rounded-xl border border-[var(--accent)]/80 space-y-3 pt-4 text-xs">
             <h4 className="font-bold text-[var(--accent-text)] text-sm">Gợi Ý Top Host Phù Hợp Nhất Cho Brand:</h4>
+            {matchingIsMock && (
+              <div className="flex items-center gap-2 text-[11px] text-amber-400 bg-amber-950/40 border border-amber-500/40 rounded-xl px-3 py-2">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                Chưa cấu hình Gemini API key (hoặc AI đang lỗi) — điểm phù hợp bên dưới tính bằng công thức đơn giản, không phải phân tích AI thật.
+              </div>
+            )}
             <div className="grid md:grid-cols-2 gap-4">
               {matchingResults.map((r, i) => (
                 <div key={i} className="p-3.5 rounded-xl bg-[var(--surface)] border border-[var(--accent)]/40 space-y-2">

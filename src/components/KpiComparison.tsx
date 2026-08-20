@@ -40,6 +40,13 @@ export interface KpiComparisonProps {
   brands?: Brand[];
   studios?: Studio[];
   sessions?: LiveSession[];
+  /** Chi phí thật của từng session (hostPayout + studioCost + adsCost, xem lib/pnl.ts) — chỉ có ở
+   * ngữ cảnh Agency (Dashboards.tsx tự tính bằng computeSessionPnl). Không truyền = không có cách
+   * nào tính ROAS thật, thẻ "Lợi Nhuận & ROAS" tự ẩn thay vì bịa số (audit L1). */
+  costBySessionId?: Record<string, number>;
+  /** Ẩn nhóm chỉ số "Lợi Nhuận & ROAS" (margin nội bộ agency) — dùng khi hiển thị trong Brand
+   * Workspace, cùng ý nghĩa với hideCommission ở GmvGrowthTrendline. */
+  hideCommission?: boolean;
 }
 
 type TimePeriodOption = "this_week_vs_last_week" | "this_month_vs_last_month" | "this_quarter_vs_last_quarter";
@@ -52,7 +59,9 @@ interface MetricComparisonItem {
   previousValue: number;
   unit: string;
   format: "currency" | "number" | "percentage" | "duration";
-  target: number;
+  // FIX L1: optional — chỉ gmv (khi có targetGmv thật trong kỳ) mới có target thật, còn lại
+  // undefined thay vì bịa currentValue×1.1 (xem currentMetrics).
+  target?: number;
   description: string;
 }
 
@@ -425,7 +434,13 @@ const buildBuckets = (period: TimePeriodOption, range: DateRange): PeriodBucket[
   });
 };
 
-export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studios = [], sessions }) => {
+export const KpiComparison: React.FC<KpiComparisonProps> = ({
+  brands = [],
+  studios = [],
+  sessions,
+  costBySessionId,
+  hideCommission = false
+}) => {
   const [timePeriod, setTimePeriod] = useState<TimePeriodOption>("this_week_vs_last_week");
   const [selectedCategory, setSelectedCategory] = useState<"all" | "revenue" | "livestream" | "roi">("all");
   const [selectedBrand, setSelectedBrand] = useState<string>("all");
@@ -461,7 +476,14 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
     const avgWatchMinutes = list.length > 0
       ? Number((list.reduce((acc, s) => acc + ((s.avgWatchTimeSeconds || 0) / 60), 0) / list.length).toFixed(1))
       : 0;
-    const approxRoas = totalGmv > 0 ? Number((totalGmv / Math.max(1, list.length * 50000000)).toFixed(1)) : 0;
+    // FIX L1 (audit 2026-08-21): công thức cũ giả định MỌI session tốn đúng 50.000.000đ — con số
+    // bịa, không liên quan gì tới chi phí thật (studio/ads/lương host) của agency. Dùng chi phí
+    // thật (costBySessionId, do Dashboards.tsx tính bằng computeSessionPnl) khi có; không có thì
+    // approxRoas = 0 thay vì bịa một hệ số — hideCommission ở trên đã ẩn hẳn thẻ này khi dùng
+    // trong Brand Workspace (không có costBySessionId), nên 0 chỉ thật sự hiển thị khi đang ở
+    // Agency mà chưa có session Completed nào trong kỳ, đúng nghĩa "chưa có dữ liệu".
+    const totalRealCost = costBySessionId ? list.reduce((acc, s) => acc + (costBySessionId[s.id] || 0), 0) : 0;
+    const approxRoas = totalRealCost > 0 ? Number((totalGmv / totalRealCost).toFixed(1)) : 0;
     return { totalGmv, totalTargetGmv, totalOrders, avgAov, avgCvr, maxPeakCcu, avgWatchMinutes, approxRoas, count: list.length };
   };
 
@@ -470,43 +492,50 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
     const cur = summarizeSessions(currentPeriodSessions);
     const prev = summarizeSessions(previousPeriodSessions);
 
+    // FIX L1 (audit 2026-08-21): trước đây MỌI metric (trừ gmv khi có targetGmv thật) đặt
+    // target = currentValue × 1.1/1.05 — một "mục tiêu" tự tham chiếu chính số hiện tại, nên
+    // thanh tiến độ luôn hiện ~91-95% bất kể thực tế tốt/xấu ra sao. Không có nguồn target thật
+    // nào cho orders/aov/cvr/peak_ccu/avg_duration/roas trong data model (chỉ session.targetGmv
+    // là target thật, dùng riêng cho gmv) — để target = undefined thay vì bịa, UI dưới tự ẩn khối
+    // Target/thanh tiến độ khi không có target thật, chỉ còn so sánh current vs kỳ trước (thật).
     return rawMetrics.map((m) => {
       if (m.id === "gmv") {
         return {
           ...m,
           currentValue: cur.totalGmv,
           previousValue: prev.totalGmv,
-          target: cur.totalTargetGmv > 0 ? cur.totalTargetGmv : Math.round(cur.totalGmv * 1.1)
+          target: cur.totalTargetGmv > 0 ? cur.totalTargetGmv : undefined
         };
       }
       if (m.id === "orders") {
-        return { ...m, currentValue: cur.totalOrders, previousValue: prev.totalOrders, target: Math.round(cur.totalOrders * 1.1) };
+        return { ...m, currentValue: cur.totalOrders, previousValue: prev.totalOrders, target: undefined };
       }
       if (m.id === "aov") {
-        return { ...m, currentValue: cur.avgAov, previousValue: prev.avgAov, target: Math.round(cur.avgAov * 1.05) };
+        return { ...m, currentValue: cur.avgAov, previousValue: prev.avgAov, target: undefined };
       }
       if (m.id === "live_sessions") {
-        return { ...m, currentValue: cur.count, previousValue: prev.count, target: Math.round(cur.count * 1.1) };
+        return { ...m, currentValue: cur.count, previousValue: prev.count, target: undefined };
       }
       if (m.id === "cvr") {
-        return { ...m, currentValue: cur.avgCvr, previousValue: prev.avgCvr, target: Number((cur.avgCvr * 1.1).toFixed(1)) };
+        return { ...m, currentValue: cur.avgCvr, previousValue: prev.avgCvr, target: undefined };
       }
       if (m.id === "peak_ccu") {
-        return { ...m, currentValue: cur.maxPeakCcu, previousValue: prev.maxPeakCcu, target: Math.round(cur.maxPeakCcu * 1.1) };
+        return { ...m, currentValue: cur.maxPeakCcu, previousValue: prev.maxPeakCcu, target: undefined };
       }
       if (m.id === "avg_duration") {
-        return { ...m, currentValue: cur.avgWatchMinutes, previousValue: prev.avgWatchMinutes, target: Number((cur.avgWatchMinutes * 1.1).toFixed(1)) };
+        return { ...m, currentValue: cur.avgWatchMinutes, previousValue: prev.avgWatchMinutes, target: undefined };
       }
       if (m.id === "roas") {
-        return { ...m, currentValue: cur.approxRoas, previousValue: prev.approxRoas, target: Number((cur.approxRoas * 1.1).toFixed(1)) };
+        return { ...m, currentValue: cur.approxRoas, previousValue: prev.approxRoas, target: undefined };
       }
       return m;
     });
   }, [currentPeriodSessions, previousPeriodSessions, rawMetrics]);
 
-  const filteredMetrics = currentMetrics.filter((m) =>
-    selectedCategory === "all" ? true : m.category === selectedCategory
-  );
+  const filteredMetrics = currentMetrics.filter((m) => {
+    if (hideCommission && m.category === "roi") return false;
+    return selectedCategory === "all" ? true : m.category === selectedCategory;
+  });
 
   const trajectoryData = useMemo(() => {
     const currentBuckets = buildBuckets(timePeriod, periodRanges.current);
@@ -724,16 +753,18 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
           >
             Livestream & Viewer
           </button>
-          <button
-            onClick={() => setSelectedCategory("roi")}
-            className={`px-2.5 py-1 rounded-lg font-medium transition-all ${
-              selectedCategory === "roi"
-                ? "bg-amber-950 text-amber-300 border border-amber-500/40"
-                : "text-[var(--text-muted)] hover:text-[var(--text)]"
-            }`}
-          >
-            Lợi Nhuận & ROAS
-          </button>
+          {!hideCommission && (
+            <button
+              onClick={() => setSelectedCategory("roi")}
+              className={`px-2.5 py-1 rounded-lg font-medium transition-all ${
+                selectedCategory === "roi"
+                  ? "bg-amber-950 text-amber-300 border border-amber-500/40"
+                  : "text-[var(--text-muted)] hover:text-[var(--text)]"
+              }`}
+            >
+              Lợi Nhuận & ROAS
+            </button>
+          )}
         </div>
 
         {/* Brand Selector Filter */}
@@ -760,7 +791,8 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
           const delta = getDeltaInfo(item);
           const currentFormatted = formatMetricValue(item.currentValue, item.format, item.unit);
           const previousFormatted = formatMetricValue(item.previousValue, item.format, item.unit);
-          const isTargetAchieved = item.currentValue >= item.target;
+          const hasRealTarget = item.target !== undefined;
+          const isTargetAchieved = hasRealTarget && item.currentValue >= item.target!;
 
           return (
             <div
@@ -809,27 +841,31 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({ brands = [], studi
                 </div>
               </div>
 
-              {/* Visual Mini Comparison Bar */}
-              <div className="space-y-1">
-                <div className="flex justify-between items-center text-[10px] text-[var(--text-muted)]">
-                  <span className="truncate">Target: {formatMetricValue(item.target, item.format, item.unit)}</span>
-                  <span className={`flex items-center gap-0.5 shrink-0 ml-1 ${isTargetAchieved ? "text-emerald-400 font-bold" : "text-amber-400 font-bold"}`}>
-                    {isTargetAchieved ? (
-                      <><CheckCircle2 className="w-3 h-3" /> Đạt</>
-                    ) : (
-                      <><TrendingUp className="w-3 h-3" /> Chưa Đạt</>
-                    )}
-                  </span>
+              {/* Visual Mini Comparison Bar — chỉ hiện khi có target THẬT (session.targetGmv cho
+                  gmv). Các metric khác không có nguồn target thật trong data model nên không hiện
+                  khối này thay vì bịa target = currentValue×1.1 (audit L1). */}
+              {hasRealTarget && (
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center text-[10px] text-[var(--text-muted)]">
+                    <span className="truncate">Target: {formatMetricValue(item.target!, item.format, item.unit)}</span>
+                    <span className={`flex items-center gap-0.5 shrink-0 ml-1 ${isTargetAchieved ? "text-emerald-400 font-bold" : "text-amber-400 font-bold"}`}>
+                      {isTargetAchieved ? (
+                        <><CheckCircle2 className="w-3 h-3" /> Đạt</>
+                      ) : (
+                        <><TrendingUp className="w-3 h-3" /> Chưa Đạt</>
+                      )}
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full bg-[var(--surface-elevated)] rounded-full overflow-hidden flex">
+                    <div
+                      className="h-full bg-[var(--accent)] transition-all duration-500 rounded-full"
+                      style={{
+                        width: `${Math.min(100, (item.currentValue / Math.max(item.currentValue, item.target!)) * 100)}%`
+                      }}
+                    />
+                  </div>
                 </div>
-                <div className="h-1.5 w-full bg-[var(--surface-elevated)] rounded-full overflow-hidden flex">
-                  <div
-                    className="h-full bg-[var(--accent)] transition-all duration-500 rounded-full"
-                    style={{
-                      width: `${Math.min(100, (item.currentValue / Math.max(item.currentValue, item.target)) * 100)}%`
-                    }}
-                  />
-                </div>
-              </div>
+              )}
             </div>
           );
         })}
