@@ -400,6 +400,25 @@ const isSessionInRange = (session: LiveSession, range: DateRange): boolean => {
   return d >= range.start && d <= range.end;
 };
 
+/** Số ngày đã trôi qua của kỳ hiện tại tính tới "now" (chặn ở range.end nếu kỳ đã kết thúc). */
+const getElapsedDays = (range: DateRange, now: Date): number => {
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const clampedEnd = today < range.end ? today : range.end;
+  if (clampedEnd < range.start) return 0;
+  return Math.round((clampedEnd.getTime() - range.start.getTime()) / 86400000) + 1;
+};
+
+// FIX L2 (audit 2026-08-21): "kỳ này" (tuần/tháng/quý hiện tại) luôn là một kỳ DỞ DANG — curEnd là
+// ngày cuối kỳ trên lịch, phần lớn còn ở tương lai — trong khi "kỳ trước" luôn ĐẦY ĐỦ (đã kết
+// thúc). So tổng dở dang với tổng đầy đủ thì mọi chỉ số luôn thấp hơn giả tạo, tăng trưởng luôn
+// âm cho tới hết kỳ. Cắt "kỳ trước" xuống đúng số ngày đã trôi qua của "kỳ này" để so sánh công bằng
+// (kiểu "cùng kỳ tháng trước"/"tháng-tới-nay" thay vì "tháng dở dang" vs "tháng trọn vẹn").
+const getComparablePreviousRange = (previous: DateRange, elapsedDays: number): DateRange => {
+  const fullLength = Math.round((previous.end.getTime() - previous.start.getTime()) / 86400000) + 1;
+  const cappedDays = Math.max(0, Math.min(elapsedDays, fullLength));
+  return { start: previous.start, end: addDays(previous.start, Math.max(0, cappedDays - 1)) };
+};
+
 interface PeriodBucket {
   label: string;
   range: DateRange;
@@ -456,13 +475,21 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({
   // Real current/previous date windows for the selected period (anchored to today).
   const periodRanges = useMemo(() => getPeriodRanges(timePeriod, new Date()), [timePeriod]);
 
+  // FIX L2: kỳ trước dùng để SO SÁNH (thẻ KPI, delta%, so sánh Studio) bị cắt xuống cùng số ngày đã
+  // trôi qua của kỳ này — tránh so "tháng dở dang" với "tháng trọn vẹn". periodRanges.previous (đầy
+  // đủ) vẫn giữ nguyên cho biểu đồ quỹ đạo (trajectoryData) vì đó là biểu đồ xu hướng, không phải %.
+  const comparablePreviousRange = useMemo(() => {
+    const elapsedDays = getElapsedDays(periodRanges.current, new Date());
+    return getComparablePreviousRange(periodRanges.previous, elapsedDays);
+  }, [periodRanges]);
+
   const currentPeriodSessions = useMemo(
     () => effectiveSessions.filter((s) => isSessionInRange(s, periodRanges.current)),
     [effectiveSessions, periodRanges]
   );
   const previousPeriodSessions = useMemo(
-    () => effectiveSessions.filter((s) => isSessionInRange(s, periodRanges.previous)),
-    [effectiveSessions, periodRanges]
+    () => effectiveSessions.filter((s) => isSessionInRange(s, comparablePreviousRange)),
+    [effectiveSessions, comparablePreviousRange]
   );
 
   /** Aggregates the metrics this component tracks from a real slice of sessions. */
@@ -484,7 +511,11 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({
     // Agency mà chưa có session Completed nào trong kỳ, đúng nghĩa "chưa có dữ liệu".
     const totalRealCost = costBySessionId ? list.reduce((acc, s) => acc + (costBySessionId[s.id] || 0), 0) : 0;
     const approxRoas = totalRealCost > 0 ? Number((totalGmv / totalRealCost).toFixed(1)) : 0;
-    return { totalGmv, totalTargetGmv, totalOrders, avgAov, avgCvr, maxPeakCcu, avgWatchMinutes, approxRoas, count: list.length };
+    // FIX L2: "Số Phiên Livestream" chỉ tính phiên đã/đang thực sự diễn ra (Completed/Live Now) —
+    // trước đây đếm luôn cả Cancelled và Upcoming (lịch tương lai chưa chắc diễn ra), phóng đại
+    // hoạt động thật trong kỳ.
+    const heldSessionsCount = list.filter((s) => s.status === "Completed" || s.status === "Live Now").length;
+    return { totalGmv, totalTargetGmv, totalOrders, avgAov, avgCvr, maxPeakCcu, avgWatchMinutes, approxRoas, count: list.length, heldSessionsCount };
   };
 
   const rawMetrics = COMPARISON_METRICS[timePeriod];
@@ -514,7 +545,7 @@ export const KpiComparison: React.FC<KpiComparisonProps> = ({
         return { ...m, currentValue: cur.avgAov, previousValue: prev.avgAov, target: undefined };
       }
       if (m.id === "live_sessions") {
-        return { ...m, currentValue: cur.count, previousValue: prev.count, target: undefined };
+        return { ...m, currentValue: cur.heldSessionsCount, previousValue: prev.heldSessionsCount, target: undefined };
       }
       if (m.id === "cvr") {
         return { ...m, currentValue: cur.avgCvr, previousValue: prev.avgCvr, target: undefined };

@@ -85,14 +85,23 @@ export const BrandDashboard: React.FC<BrandDashboardProps> = ({
     return orders > 0 ? monthGmv / orders : 0;
   }, [completedThisMonth, monthGmv]);
 
+  // FIX L2 (audit 2026-08-21): monthGmv chỉ tính tới ngày hôm nay (tháng hiện tại luôn dở dang),
+  // trong khi prevGmv trước đây lấy nguyên cả tháng trước (đã trọn). Ngày 10 mà so với cả tháng
+  // trước thì GMV nào cũng thấp hơn giả tạo → tăng trưởng luôn âm tới hết tháng. Cắt prevGmv xuống
+  // đúng "ngày 1 tới ngày N" của tháng trước (N = ngày hôm nay) để so sánh cùng số ngày đã trôi qua.
   const momGrowthPct = useMemo(() => {
     const prevMonth = shiftMonth(thisMonth, -1);
+    const todayDay = Number(todayDate.split("-")[2]);
     const prevGmv = brandSessions
-      .filter((s) => s.status === "Completed" && s.date.startsWith(prevMonth))
+      .filter((s) => {
+        if (s.status !== "Completed" || !s.date.startsWith(prevMonth)) return false;
+        const day = Number(s.date.split("-")[2]);
+        return day <= todayDay;
+      })
       .reduce((acc, s) => acc + (s.actualGmv || 0), 0);
     if (prevGmv <= 0) return null;
     return ((monthGmv - prevGmv) / prevGmv) * 100;
-  }, [brandSessions, thisMonth, monthGmv]);
+  }, [brandSessions, thisMonth, monthGmv, todayDate]);
 
   const growthTrendData = useMemo(() => {
     return Array.from({ length: 6 }, (_, i) => {
@@ -298,7 +307,7 @@ export const BrandDashboard: React.FC<BrandDashboardProps> = ({
                 >
                   {momGrowthPct >= 0 ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
                   {momGrowthPct >= 0 ? "+" : ""}
-                  {momGrowthPct.toFixed(1)}% so tháng trước
+                  {momGrowthPct.toFixed(1)}% so cùng kỳ tháng trước
                 </p>
               )}
             </div>
