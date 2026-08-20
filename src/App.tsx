@@ -112,7 +112,7 @@ function saveStorage<T>(key: string, value: T): void {
 }
 
 export default function App() {
-  const { session, profile, loading: authLoading, signOut, passwordRecovery } = useAuth();
+  const { session, profile, profileError, loading: authLoading, signOut, passwordRecovery, refreshProfile } = useAuth();
 
   const currentRole: UserRole = profile?.role ?? "talent";
   const [activeTab, setActiveTab] = useState<string>(() => loadStorage("activeTab", "dashboard"));
@@ -1487,9 +1487,34 @@ export default function App() {
   }
 
   if (!profile) {
+    // FIX M8 (audit 2026-08-21): trước đây màn này không có nhánh lỗi — session hợp lệ nhưng
+    // fetch profiles lỗi mạng/RLS thì kẹt mãi ở đây, không lối thoát. profileError (useAuth.tsx)
+    // phân biệt "đang tải" (chưa có lỗi) với "đã thử và lỗi" — có lỗi thì cho thử lại hoặc đăng
+    // xuất thay vì màn hình chết.
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-[var(--surface-base)] text-[var(--text-muted)] text-sm">
-        Đang tải hồ sơ người dùng...
+      <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-[var(--surface-base)] text-[var(--text-muted)] text-sm px-6 text-center">
+        {profileError ? (
+          <>
+            <div className="text-[var(--text)] font-semibold">Không tải được hồ sơ người dùng</div>
+            <div className="max-w-md text-xs text-[var(--text-muted)]">{profileError}</div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => refreshProfile()}
+                className="px-4 py-2 rounded-lg bg-[var(--accent)] text-white font-bold text-xs"
+              >
+                Thử lại
+              </button>
+              <button
+                onClick={() => signOut()}
+                className="px-4 py-2 rounded-lg border border-[var(--border)] text-[var(--text)] font-bold text-xs"
+              >
+                Đăng xuất
+              </button>
+            </div>
+          </>
+        ) : (
+          "Đang tải hồ sơ người dùng..."
+        )}
       </div>
     );
   }

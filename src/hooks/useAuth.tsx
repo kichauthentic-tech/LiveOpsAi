@@ -20,6 +20,7 @@ export interface Profile {
 interface AuthContextValue {
   session: Session | null;
   profile: Profile | null;
+  profileError: string | null;
   loading: boolean;
   passwordRecovery: boolean;
   isInvite: boolean;
@@ -39,13 +40,24 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
   const [isInvite, setIsInvite] = useState(false);
 
+  // FIX M8 (audit 2026-08-21): trước đây if (!error && data) setProfile(data) nuốt luôn lỗi —
+  // không có state báo lỗi, không retry. Lỗi mạng hoặc bị RLS chặn khi fetch profiles thì App
+  // (profile === null nhưng session vẫn có) kẹt vĩnh viễn ở màn "Đang tải hồ sơ người dùng...",
+  // không thông báo, không nút thử lại, không cả nút đăng xuất để thoát. Ghi lại lỗi vào
+  // profileError để App.tsx hiện được UI thoát hiểm (Thử lại / Đăng xuất) thay vì màn hình chết.
   const loadProfile = async (userId: string) => {
+    setProfileError(null);
     const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).single();
-    if (!error && data) setProfile(data as Profile);
+    if (error) {
+      setProfileError(error.message);
+    } else if (data) {
+      setProfile(data as Profile);
+    }
   };
 
   useEffect(() => {
@@ -91,6 +103,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loadProfile(newSession.user.id);
       } else {
         setProfile(null);
+        setProfileError(null);
       }
     });
 
@@ -157,6 +170,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         session,
         profile,
+        profileError,
         loading,
         passwordRecovery,
         isInvite,
