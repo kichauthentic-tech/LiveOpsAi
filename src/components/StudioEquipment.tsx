@@ -30,6 +30,20 @@ interface StudioEquipmentProps {
   onDeleteEquipment?: (id: string) => void;
 }
 
+// FIX M7 (audit 2026-08-21): QR-EQ-${100-999} chỉ có 900 giá trị khả dĩ trong khi qr_code là
+// UNIQUE (0001_init.sql) — theo nghịch lý ngày sinh, ~35 thiết bị đã có 50% khả năng trùng, và
+// insert lúc đó ném thẳng lỗi Postgres thô cho người dùng (không kiểm tra trùng trước khi gợi ý).
+// Nới không gian lên 9000 giá trị + generate-rồi-đối-chiếu với danh sách thiết bị đang có, thử lại
+// tới khi ra mã chưa dùng.
+const generateUniqueQrCode = (existingCodes: Set<string>): string => {
+  let code = "";
+  for (let attempt = 0; attempt < 50; attempt++) {
+    code = `QR-EQ-${Math.floor(1000 + Math.random() * 9000)}`;
+    if (!existingCodes.has(code)) return code;
+  }
+  return code;
+};
+
 export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
   studios,
   equipments,
@@ -140,7 +154,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
     setEqName("");
     setEqCategory("Camera");
     setEqModel("Sony A7IV / Lens 24-70mm f2.8");
-    setEqQrCode(`QR-EQ-${Math.floor(100 + Math.random() * 900)}`);
+    setEqQrCode(generateUniqueQrCode(new Set(equipments.map((eq) => eq.qrCode))));
     setEqAssignedStudioId(studios[0]?.id || "std-a");
     setEqStatus("In Stock");
     setEqLastCheckDate(getTodayDate());
@@ -162,6 +176,18 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
   const handleSaveEquipment = (e: React.FormEvent) => {
     e.preventDefault();
     if (!eqName.trim()) return;
+
+    // Mã QR gợi ý ban đầu đã tránh trùng (generateUniqueQrCode), nhưng field này cho sửa tay
+    // (placeholder "VD: QR-CAM-005") — chặn trùng ở đây để báo lỗi tiếng Việt rõ ràng thay vì để
+    // insert ném lỗi unique_violation thô của Postgres (audit M7).
+    const trimmedQrCode = eqQrCode.trim();
+    const isDuplicateQrCode = equipments.some(
+      (eq) => eq.qrCode.toLowerCase() === trimmedQrCode.toLowerCase() && eq.id !== editingEquipment?.id
+    );
+    if (isDuplicateQrCode) {
+      window.alert(`Mã QR "${trimmedQrCode}" đã được dùng cho thiết bị khác — vui lòng đổi mã khác.`);
+      return;
+    }
 
     const equipmentPayload: Equipment = {
       id: editingEquipment ? editingEquipment.id : `eq-${Date.now()}`,

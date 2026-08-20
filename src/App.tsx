@@ -959,7 +959,14 @@ export default function App() {
       const created = await createEquipment(newEquipment);
       setEquipments(prev => [created, ...prev]);
     } catch (e: any) {
-      window.alert(`Không thể tạo thiết bị: ${e.message ?? e}`);
+      // Race hiếm: 2 người cùng thêm thiết bị trùng mã QR giữa lúc StudioEquipment đã kiểm tra
+      // trùng ở state cục bộ và lúc insert thật chạy tới DB — DB vẫn là nguồn chặn trùng cuối
+      // cùng (qr_code unique, 0001_init.sql). Dịch lỗi Postgres thô thành thông báo dễ hiểu (M7).
+      if (e?.code === "23505") {
+        window.alert(`Mã QR "${newEquipment.qrCode}" vừa bị thiết bị khác dùng mất — vui lòng đổi mã khác rồi thử lại.`);
+      } else {
+        window.alert(`Không thể tạo thiết bị: ${e.message ?? e}`);
+      }
     }
   };
   const handleUpdateEquipment = async (updatedEquipment: Equipment) => {
