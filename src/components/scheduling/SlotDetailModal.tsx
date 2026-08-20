@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { LiveSession, ShiftSlot, ShiftRegistration, Talent } from "../../types";
 import { X, Users, UserCheck, UserX, Check, AlertTriangle, Trash2 } from "lucide-react";
+import { timeRangesOverlap } from "../../lib/dateUtils";
 
 interface SlotDetailModalProps {
   slot: ShiftSlot;
@@ -42,15 +43,13 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
   const regs = registrations.filter((r) => r.slotId === slot.id);
   const iAmRegistered = myTalentId ? regs.some((r) => r.talentId === myTalentId) : false;
 
-  const timeOverlaps = (aStart: string, aEnd: string, bStart: string, bEnd: string) => aStart < bEnd && bStart < aEnd;
-
   const hostConflict =
     !!hostId &&
     sessions.some(
       (s) =>
         s.date === slot.date &&
         s.status !== "Cancelled" &&
-        timeOverlaps(s.startTime, s.endTime, slot.startTime, slot.endTime) &&
+        timeRangesOverlap(s.startTime, s.endTime, slot.startTime, slot.endTime) &&
         (s.hostId === hostId || s.coHostId === hostId)
     );
 
@@ -62,7 +61,7 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
           s.date === slot.date &&
           s.studioId === slot.studioId &&
           s.brandId !== slot.brandId &&
-          timeOverlaps(slot.startTime, slot.endTime, s.startTime, s.endTime)
+          timeRangesOverlap(slot.startTime, slot.endTime, s.startTime, s.endTime)
       )
     : [];
 

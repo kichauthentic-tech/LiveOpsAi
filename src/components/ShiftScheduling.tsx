@@ -26,6 +26,7 @@ import {
   Flame
 } from "lucide-react";
 import { CAMPAIGN_DAY_STYLES, getCampaignDayInfo } from "../lib/campaignDays";
+import { timeRangesOverlap } from "../lib/dateUtils";
 import { CampaignDayRibbon } from "./ui/CampaignDayRibbon";
 import { PosterDayCell } from "./ui/PosterCalendarGrid";
 import { getBrandTheme } from "../lib/brandTheme";
@@ -155,7 +156,6 @@ export default function ShiftScheduling({
 
   // Ưu tiên hoá studio (mục #5 CEO đã duyệt) — 2-3 brand cùng cần 1 studio/khung giờ
   // vàng thì cảnh báo cho Ops quyết định thủ công, không tự động chọn ai được ưu tiên.
-  const timeOverlaps = (aStart: string, aEnd: string, bStart: string, bEnd: string) => aStart < bEnd && bStart < aEnd;
   const findStudioConflicts = (date: string, start: string, end: string, studioId: string, brandId: string, excludeSlotId?: string) => {
     if (!studioId) return [];
     return shiftSlots.filter(
@@ -165,7 +165,7 @@ export default function ShiftScheduling({
         s.date === date &&
         s.studioId === studioId &&
         s.brandId !== brandId &&
-        timeOverlaps(start, end, s.startTime, s.endTime)
+        timeRangesOverlap(start, end, s.startTime, s.endTime)
     );
   };
   // Lưới ngày đủ tuần (kể cả ngày lấp đầu/cuối từ tháng liền kề) để vẽ lịch ma trận.
@@ -199,8 +199,7 @@ export default function ShiftScheduling({
       (s) =>
         s.date === date &&
         s.status !== "Cancelled" &&
-        s.startTime < end &&
-        s.endTime > start &&
+        timeRangesOverlap(s.startTime, s.endTime, start, end) &&
         ((studioId && s.studioId === studioId) || s.hostId === talentId || s.coHostId === talentId)
     );
   };

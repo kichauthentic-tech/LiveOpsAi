@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { LiveSession, ShiftSlot, Studio, Talent, SystemUser } from "../../types";
 import { CalendarIcon, X, AlertTriangle } from "lucide-react";
+import { timeRangesOverlap } from "../../lib/dateUtils";
 
 interface BrandSessionModalProps {
   brandId: string;
@@ -58,7 +59,7 @@ export const BrandSessionModal: React.FC<BrandSessionModalProps> = ({
     sessions.forEach((s) => {
       if (existingSession && s.id === existingSession.id) return;
       if (s.date !== date || s.status === "Cancelled") return;
-      if (s.startTime < endTime && s.endTime > startTime) {
+      if (timeRangesOverlap(s.startTime, s.endTime, startTime, endTime)) {
         if (s.studioId === studioId) result.studio = `${s.title} (${s.brandName})`;
         if (s.hostId === hostId) result.host = `${s.hostName} — ${s.title} (${s.brandName})`;
       }

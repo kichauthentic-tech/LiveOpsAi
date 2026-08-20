@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { LiveSession, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, Studio, Talent, Brand, SystemUser, PromoScheme, UserRole } from "../types";
 import { schemesForDate } from "../lib/schemeUtils";
+import { timeRangesOverlap } from "../lib/dateUtils";
 import { CAMPAIGN_DAY_STYLES, getCampaignDayInfo } from "../lib/campaignDays";
 import { BrandLogo } from "./ui/BrandLogo";
 import { getBrandTheme } from "../lib/brandTheme";
@@ -250,8 +251,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
         s.id !== sessionId &&
         s.date === selectedDate &&
         s.studioId === targetStudio.id &&
-        s.startTime < targetSlot.end &&
-        s.endTime > targetSlot.start &&
+        timeRangesOverlap(s.startTime, s.endTime, targetSlot.start, targetSlot.end) &&
         s.status !== "Cancelled"
     );
 
@@ -508,7 +508,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
     sessions.forEach((s) => {
       if (s.id === excludeSessionId) return;
       if (s.date === date && s.status !== "Cancelled") {
-        if (s.startTime < end && s.endTime > start) {
+        if (timeRangesOverlap(s.startTime, s.endTime, start, end)) {
           if (s.studioId === studioId) {
             conflicts.studioConflict = true;
             conflicts.studioConflictWith = s.title;
@@ -1435,8 +1435,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                         (s) =>
                           s.date === selectedDate &&
                           s.studioId === std.id &&
-                          s.startTime < slot.end &&
-                          s.endTime > slot.start &&
+                          timeRangesOverlap(s.startTime, s.endTime, slot.start, slot.end) &&
                           s.status !== "Cancelled"
                       );
                       const matchedSlot = !matchedSession
@@ -1444,8 +1443,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                             (sl) =>
                               sl.date === selectedDate &&
                               sl.studioId === std.id &&
-                              sl.startTime < slot.end &&
-                              sl.endTime > slot.start
+                              timeRangesOverlap(sl.startTime, sl.endTime, slot.start, slot.end)
                           )
                         : undefined;
 
