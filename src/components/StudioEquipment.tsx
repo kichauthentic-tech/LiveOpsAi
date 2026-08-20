@@ -143,7 +143,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
     setEqQrCode(`QR-EQ-${Math.floor(100 + Math.random() * 900)}`);
     setEqAssignedStudioId(studios[0]?.id || "std-a");
     setEqStatus("In Stock");
-    setEqLastCheckDate(new Date().toISOString().split("T")[0]);
+    setEqLastCheckDate(getTodayDate());
     setIsEquipmentModalOpen(true);
   };
 

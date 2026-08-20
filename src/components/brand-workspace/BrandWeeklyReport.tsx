@@ -10,6 +10,7 @@ import {
   eachDay,
   DataRawWeekSlice
 } from "../../lib/dataraw/weeklySlice";
+import { getTodayDate } from "../../lib/dateUtils";
 
 interface BrandWeeklyReportProps {
   brandId: string;
@@ -30,7 +31,7 @@ const fmtInt = (n: number) => n.toLocaleString("vi-VN");
 //   - Dataraw (lọc từ batch tháng): số CHÍNH THỨC từ TikTok cho đúng các ngày trong tuần.
 // Đặt cạnh nhau để ops thấy ngay tuần này hệ thống ghi nhận lệch gì so với TikTok.
 export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, brandName, sessions, currentRole }) => {
-  const [weekStart, setWeekStart] = useState(() => isoWeekStart(new Date().toISOString().slice(0, 10)));
+  const [weekStart, setWeekStart] = useState(() => isoWeekStart(getTodayDate()));
   const [slice, setSlice] = useState<DataRawWeekSlice | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
