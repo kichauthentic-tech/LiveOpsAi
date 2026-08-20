@@ -94,8 +94,12 @@ export const Dashboards: React.FC<DashboardsProps> = ({
       ];
     }
     const days = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ Nhật"];
+    // getDay(): 0=CN...6=Thứ 7 — mảng weekdayOrder khớp thứ tự hiển thị của `days` ở trên
+    const weekdayOrder = [1, 2, 3, 4, 5, 6, 0];
     return days.map((day, idx) => {
-      const dayGmv = sessions.filter((_, sIdx) => sIdx % 7 === idx).reduce((acc, s) => acc + (s.actualGmv || 0), 0);
+      const dayGmv = sessions
+        .filter((s) => new Date(s.date).getDay() === weekdayOrder[idx])
+        .reduce((acc, s) => acc + (s.actualGmv || 0), 0);
       return { day, gmv: Math.round(dayGmv / 1000000) };
     });
   }, [sessions]);

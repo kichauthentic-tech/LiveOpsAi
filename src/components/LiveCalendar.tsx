@@ -1546,11 +1546,14 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {talents.map((t) => {
               const hostSessions = sessions.filter((s) => s.hostId === t.id && s.date === selectedDate && s.status !== "Cancelled");
-              const totalHoursToday = hostSessions.reduce((acc, curr) => {
-                const [h1] = curr.startTime.split(":").map(Number);
-                const [h2] = curr.endTime.split(":").map(Number);
-                return acc + (h2 - h1);
+              const totalMinutesToday = hostSessions.reduce((acc, curr) => {
+                const [h1, m1] = curr.startTime.split(":").map(Number);
+                const [h2, m2] = curr.endTime.split(":").map(Number);
+                let minutes = (h2 * 60 + m2) - (h1 * 60 + m1);
+                if (minutes < 0) minutes += 24 * 60; // ca qua đêm, vd 22:00 -> 05:00
+                return acc + minutes;
               }, 0);
+              const totalHoursToday = Math.round((totalMinutesToday / 60) * 10) / 10;
 
               const isOverloaded = totalHoursToday > 5;
 
