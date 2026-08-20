@@ -244,10 +244,16 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({ activeUser, ta
           </div>
         </div>
 
-        <div className="bg-amber-950/30 border border-amber-500/30 rounded-xl p-3 grid grid-cols-2 gap-3 text-xs">
+        <div className="bg-amber-950/30 border border-amber-500/30 rounded-xl p-3 grid grid-cols-3 gap-3 text-xs">
           <div>
             <div className="text-amber-300/80">Rate Card</div>
-            <div className="font-bold text-[var(--text)] mt-0.5">{(myTalent.ratePerSession || 0).toLocaleString()} đ</div>
+            {/* Talent đặt rate/giờ > 0 thì lương ca tính theo giờ công thực tế (giờ ca + OT −
+                off sớm) — hiện đúng loại rate đang áp dụng thay vì luôn hiện rate/live. */}
+            {(myTalent.ratePerHour || 0) > 0 ? (
+              <div className="font-bold text-[var(--text)] mt-0.5">{(myTalent.ratePerHour || 0).toLocaleString()} đ<span className="text-amber-300/80 font-semibold">/giờ</span></div>
+            ) : (
+              <div className="font-bold text-[var(--text)] mt-0.5">{(myTalent.ratePerSession || 0).toLocaleString()} đ<span className="text-amber-300/80 font-semibold">/live</span></div>
+            )}
           </div>
           <div>
             <div className="text-amber-300/80">Hoa Hồng</div>

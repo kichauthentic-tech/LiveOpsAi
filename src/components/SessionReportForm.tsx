@@ -1,6 +1,7 @@
 import { useState, FormEvent } from "react";
 import { LiveSession } from "../types";
 import { SessionReportInput } from "../lib/db/sessionReports";
+import { sessionDurationHours } from "../lib/pnl";
 
 interface SessionReportFormProps {
   session: LiveSession;
@@ -11,6 +12,10 @@ interface SessionReportFormProps {
 const inputClass =
   "w-full p-2.5 border border-[var(--border)] rounded-xl font-semibold text-[var(--text)] bg-[var(--surface-base)] placeholder:text-[var(--text-faint)]";
 const labelClass = "font-bold text-[var(--text-muted)] block mb-1 text-xs";
+
+// Mốc OT/off sớm hay gặp nhất theo mô tả vận hành của user — vẫn cho gõ tay số bất kỳ cho các
+// trường hợp lệch mốc.
+const MINUTE_PRESETS = [15, 30, 45, 60];
 
 // Field theo đúng cấu trúc file Excel thật (YFB Working File 2026) — common mọi platform +
 // nhóm riêng TikTok/Shopee. actualGmv/totalViews/ctrAvg/avgWatchTimeSeconds ghi thẳng vào
@@ -26,6 +31,8 @@ export function SessionReportForm({ session, onSubmit, onCancel }: SessionReport
   const [restartCount, setRestartCount] = useState(r?.restartCount || 0);
   const [crossLive, setCrossLive] = useState(r?.crossLive || false);
   const [hostLate, setHostLate] = useState(r?.hostLate || false);
+  const [otMinutes, setOtMinutes] = useState(r?.otMinutes ?? 0);
+  const [earlyLeaveMinutes, setEarlyLeaveMinutes] = useState(r?.earlyLeaveMinutes ?? 0);
   const [statusNote, setStatusNote] = useState(r?.statusNote || "");
   const [gmvTotal, setGmvTotal] = useState(r?.gmvTotal ?? 0);
   const [dashboardLink1, setDashboardLink1] = useState(r?.dashboardLink1 || "");
@@ -46,6 +53,12 @@ export function SessionReportForm({ session, onSubmit, onCancel }: SessionReport
 
   const isTikTok = session.platform === "TikTok";
 
+  // Giờ tính lương hiện ngay tại form để host/ops thấy hệ quả của con số vừa khai (cùng công
+  // thức billableSessionHours ở pnl.ts, nhưng tính từ state đang gõ chứ không từ report đã lưu).
+  const scheduledHours = sessionDurationHours(session.startTime, session.endTime);
+  const billableHours = Math.max(0, scheduledHours + (otMinutes - earlyLeaveMinutes) / 60);
+  const fmtHours = (h: number) => `${Math.floor(h)}h${String(Math.round((h % 1) * 60)).padStart(2, "0")}`;
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -57,6 +70,8 @@ export function SessionReportForm({ session, onSubmit, onCancel }: SessionReport
       restartCount,
       crossLive,
       hostLate,
+      otMinutes,
+      earlyLeaveMinutes,
       statusNote,
       gmvTotal,
       dashboardLink1: dashboardLink1 || undefined,
@@ -163,6 +178,74 @@ export function SessionReportForm({ session, onSubmit, onCancel }: SessionReport
         <div>
           <label className={labelClass}>Status Live</label>
           <input type="text" value={statusNote} onChange={(e) => setStatusNote(e.target.value)} className={inputClass} placeholder="Ghi chú tình trạng ca" />
+        </div>
+      </div>
+
+
+      {/* OT / Off sớm — cơ sở tính giờ công cho talent ăn lương theo giờ (Giai đoạn 3). Số liệu
+          đối soát TikTok KHÔNG tự điền vào đây: đối soát chỉ cảnh báo lệch, giờ công vẫn theo
+          khai báo + ops duyệt. */}
+      <div className="border border-[var(--border)] rounded-xl p-3 space-y-3">
+        <div className="flex items-baseline justify-between gap-2 flex-wrap">
+          <p className="font-bold text-[var(--text)] text-xs">Giờ Công Thực Tế</p>
+          <p className="text-[11px] text-[var(--text-muted)]">
+            Ca theo lịch <b>{fmtHours(scheduledHours)}</b> ({session.startTime}–{session.endTime})
+            {" → "}tính lương <b className={billableHours !== scheduledHours ? "text-amber-500" : "text-[var(--text)]"}>{fmtHours(billableHours)}</b>
+          </p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className={labelClass}>OT — live thêm (phút)</label>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {MINUTE_PRESETS.map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setOtMinutes(otMinutes === m ? 0 : m)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border ${
+                    otMinutes === m
+                      ? "bg-emerald-600 text-white border-emerald-600"
+                      : "bg-[var(--surface-elevated)] text-[var(--text-muted)] border-[var(--border)] hover:bg-[var(--surface-hover)]"
+                  }`}
+                >
+                  +{m}p
+                </button>
+              ))}
+              <input
+                type="number"
+                min={0}
+                value={otMinutes}
+                onChange={(e) => setOtMinutes(Math.max(0, Number(e.target.value)))}
+                className="w-20 p-1.5 border border-[var(--border)] rounded-lg font-semibold text-[var(--text)] bg-[var(--surface-base)] text-[11px]"
+              />
+            </div>
+          </div>
+          <div>
+            <label className={labelClass}>Off sớm — nghỉ trước giờ (phút)</label>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {MINUTE_PRESETS.map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setEarlyLeaveMinutes(earlyLeaveMinutes === m ? 0 : m)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border ${
+                    earlyLeaveMinutes === m
+                      ? "bg-amber-600 text-white border-amber-600"
+                      : "bg-[var(--surface-elevated)] text-[var(--text-muted)] border-[var(--border)] hover:bg-[var(--surface-hover)]"
+                  }`}
+                >
+                  −{m}p
+                </button>
+              ))}
+              <input
+                type="number"
+                min={0}
+                value={earlyLeaveMinutes}
+                onChange={(e) => setEarlyLeaveMinutes(Math.max(0, Number(e.target.value)))}
+                className="w-20 p-1.5 border border-[var(--border)] rounded-lg font-semibold text-[var(--text)] bg-[var(--surface-base)] text-[11px]"
+              />
+            </div>
+          </div>
         </div>
       </div>
 

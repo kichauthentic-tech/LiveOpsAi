@@ -40,6 +40,7 @@ import {
   Menu,
   X,
   Calendar as CalendarIcon,
+  CalendarRange,
   ShieldCheck,
   Lock,
   ShieldAlert,
@@ -51,7 +52,8 @@ import {
   Package,
   BarChart3,
   PanelLeftClose,
-  PanelLeftOpen
+  PanelLeftOpen,
+  Database
 } from "lucide-react";
 import { Header, WorkspaceContext } from "./components/Header";
 import { BrandDashboard } from "./components/brand-workspace/BrandDashboard";
@@ -60,6 +62,8 @@ import { BrandSessions } from "./components/brand-workspace/BrandSessions";
 import { BrandSkuShowcase } from "./components/brand-workspace/BrandSkuShowcase";
 import { BrandAudienceAnalytics } from "./components/brand-workspace/BrandAudienceAnalytics";
 import { BrandMonthlyReport } from "./components/brand-workspace/BrandMonthlyReport";
+import { BrandWeeklyReport } from "./components/brand-workspace/BrandWeeklyReport";
+import { BrandDataRaw } from "./components/brand-workspace/BrandDataRaw";
 import { Login } from "./components/Login";
 import { ResetPasswordScreen } from "./components/ResetPasswordScreen";
 import { AccountSettings } from "./components/AccountSettings";
@@ -868,6 +872,7 @@ export default function App() {
         cvrAvg: payload.cvrAvg,
         overallScore: payload.overallScore,
         ratePerSession: payload.ratePerSession,
+        ratePerHour: payload.ratePerHour,
         commissionRate: payload.commissionRate,
         availabilityStatus: payload.availabilityStatus
       }
@@ -880,6 +885,13 @@ export default function App() {
     try {
       const saved = await updateTalent(id, patch);
       setTalents(prev => prev.map(t => t.id === saved.id ? saved : t));
+      // Đổi rate sẽ khiến DB trigger (migration 0018/0055) mở version mới trong
+      // talent_rate_history. State history chỉ nạp 1 lần lúc mở app, nên không nạp lại thì P&L
+      // (lib/pnl.ts tra rate theo NGÀY session qua history) vẫn tính bằng rate cũ cho tới khi
+      // user F5 — đúng lỗi đã gặp khi verify Giai đoạn 3.
+      if (patch.ratePerSession !== undefined || patch.ratePerHour !== undefined || patch.commissionRate !== undefined) {
+        setTalentRateHistory(await fetchTalentRateHistory());
+      }
     } catch (e: any) {
       window.alert(`Không thể cập nhật Talent: ${e.message ?? e}`);
     }
@@ -1371,7 +1383,9 @@ export default function App() {
         { id: "brand_sessions", label: "Sessions", icon: Radio, perm: undefined },
         { id: "brand_skus", label: "SKU Showcase", icon: Package, badge: "NEW", perm: undefined },
         { id: "brand_audience_analytics", label: "Hiệu Suất Xem & Chuyển Đổi", icon: BarChart3, badge: "NEW", perm: undefined },
+        { id: "brand_weekly_report", label: "Report Tuần", icon: CalendarRange, badge: "NEW", perm: undefined },
         { id: "brand_monthly_report", label: "Report Tháng", icon: FileText, badge: "NEW", perm: undefined },
+        { id: "brand_dataraw", label: "Dữ Liệu Gốc", icon: Database, badge: "NEW", perm: undefined },
       ],
     },
   ];
@@ -1845,11 +1859,28 @@ export default function App() {
                   <BrandAudienceAnalytics brandId={currentBrandId!} sessions={activeSessions} />
                 )}
 
+                {activeTab === "brand_weekly_report" && effectiveWorkspace.type === "brand" && (
+                  <BrandWeeklyReport
+                    brandId={currentBrandId!}
+                    brandName={activeBrands.find((b) => b.id === currentBrandId)?.name || "Brand"}
+                    sessions={activeSessions}
+                    currentRole={currentRole}
+                  />
+                )}
+
                 {activeTab === "brand_monthly_report" && effectiveWorkspace.type === "brand" && (
                   <BrandMonthlyReport
                     brandId={currentBrandId!}
                     brandName={activeBrands.find((b) => b.id === currentBrandId)?.name || "Brand"}
                     sessions={activeSessions}
+                    currentRole={currentRole}
+                  />
+                )}
+
+                {activeTab === "brand_dataraw" && effectiveWorkspace.type === "brand" && (
+                  <BrandDataRaw
+                    brandId={currentBrandId!}
+                    brandName={activeBrands.find((b) => b.id === currentBrandId)?.name || "Brand"}
                     currentRole={currentRole}
                   />
                 )}

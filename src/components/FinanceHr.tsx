@@ -167,7 +167,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                 </tr>
               </thead>
               <tbody>
-                {rows.map(({ session: s, finance, talent, isHourly, grossAgencyRev, hostPayout, netProfit }) => {
+                {rows.map(({ session: s, finance, talent, isHourly, grossAgencyRev, hostPayout, netProfit, hostPaidHourly, billableHours, otMinutes, earlyLeaveMinutes }) => {
                   return (
                   <tr key={s.id} className="border-b border-[var(--border)]/60 align-middle">
                     <td className="py-2 pr-3">
@@ -216,7 +216,18 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                         className="w-24 p-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface-base)] text-[var(--text)] font-bold disabled:opacity-40"
                       />
                     </td>
-                    <td className="py-2 pr-3 text-amber-400 font-bold">{money(hostPayout)} đ</td>
+                    {/* Giai đoạn 3 — nói rõ con số ra từ đâu: talent ăn theo giờ thì hiện giờ
+                        công thực tế + phần OT/off sớm host đã khai, để ops đối chiếu khi duyệt. */}
+                    <td className="py-2 pr-3">
+                      <div className="text-amber-400 font-bold">{money(hostPayout)} đ</div>
+                      {hostPaidHourly && (
+                        <div className="text-[9px] text-[var(--text-muted)] mt-0.5">
+                          {billableHours.toFixed(2)}h × rate/giờ
+                          {otMinutes > 0 && <span className="text-emerald-400 font-bold"> · OT +{otMinutes}p</span>}
+                          {earlyLeaveMinutes > 0 && <span className="text-amber-400 font-bold"> · off sớm −{earlyLeaveMinutes}p</span>}
+                        </div>
+                      )}
+                    </td>
                     <td className={`py-2 pr-3 font-black ${netProfit >= 0 ? "text-emerald-400" : "text-red-400"}`}>
                       {money(netProfit)} đ
                     </td>

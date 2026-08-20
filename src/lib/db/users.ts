@@ -74,6 +74,7 @@ export interface NewTalentProfilePayload {
   cvrAvg?: number;
   overallScore?: number;
   ratePerSession?: number;
+  ratePerHour?: number;
   commissionRate?: number;
   availabilityStatus?: "Available" | "Busy" | "On Live";
 }

@@ -15,6 +15,7 @@ interface DbTalent {
   // Mask thành null bởi view `talents_secure` nếu người đọc không phải ceo/admin/chính
   // talent đó — xem 0047_talent_rate_and_finance_security.sql.
   rate_per_session: number | null;
+  rate_per_hour: number | null;
   commission_rate: number | null;
   overall_score: number;
   availability_status: Talent["availabilityStatus"];
@@ -37,6 +38,7 @@ function fromDb(row: DbTalent): Talent {
     ctrAvg: row.ctr_avg,
     cvrAvg: row.cvr_avg,
     ratePerSession: row.rate_per_session ?? 0,
+    ratePerHour: row.rate_per_hour ?? 0,
     commissionRate: row.commission_rate ?? 0,
     overallScore: row.overall_score,
     availabilityStatus: row.availability_status,
@@ -59,6 +61,7 @@ function toDb(t: Partial<Talent>) {
   if (t.ctrAvg !== undefined) patch.ctr_avg = t.ctrAvg;
   if (t.cvrAvg !== undefined) patch.cvr_avg = t.cvrAvg;
   if (t.ratePerSession !== undefined) patch.rate_per_session = t.ratePerSession;
+  if (t.ratePerHour !== undefined) patch.rate_per_hour = t.ratePerHour;
   if (t.commissionRate !== undefined) patch.commission_rate = t.commissionRate;
   if (t.overallScore !== undefined) patch.overall_score = t.overallScore;
   if (t.availabilityStatus !== undefined) patch.availability_status = t.availabilityStatus;

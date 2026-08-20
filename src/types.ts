@@ -78,6 +78,9 @@ export interface Talent {
   ctrAvg: number; // e.g. 8.5%
   cvrAvg: number; // e.g. 4.2%
   ratePerSession: number;
+  // Rate theo GIỜ (Giai đoạn 3, migration 0055) — song song với ratePerSession (tiền/phiên cố
+  // định, data cũ giữ nguyên). > 0 = talent này tính lương theo giờ; 0 = giữ công thức flat cũ.
+  ratePerHour: number;
   commissionRate: number; // e.g. 3%
   overallScore: number; // 0-100
   availabilityStatus: "Available" | "Busy" | "On Live";
@@ -212,6 +215,11 @@ export interface LiveSessionReport {
   restartCount: number;
   crossLive: boolean;
   hostLate: boolean;
+  // OT / off sớm host tự khai (Giai đoạn 3, migration 0055) — cộng/trừ vào giờ tính lương.
+  // Chỉ lấy từ khai báo + ops duyệt, KHÔNG suy ra từ số liệu đối soát TikTok (Giai đoạn 2 chỉ
+  // cảnh báo lệch giờ, không ghi đè).
+  otMinutes: number;
+  earlyLeaveMinutes: number;
   statusNote: string;
   gmvTotal?: number; // cột "GMV" riêng trong Excel, khác actualGmv ("GMV Live")
   dashboardLink1?: string;
@@ -239,8 +247,13 @@ export interface TikTokLiveImport {
   id: string;
   periodStart: string;
   periodEnd: string;
-  source: "csv_export" | "api";
+  // "dataraw" = sinh ra từ 1 batch Live Analysis trong kho Dataraw của brand (migration 0053,
+  // luồng duy nhất hiện tại); "csv_export" là các batch cũ upload trực tiếp trước đó.
+  source: "csv_export" | "api" | "dataraw";
   status: "staged" | "matched" | "applied";
+  brandId?: string;
+  brandName?: string;
+  datarawImportId?: string;
   importedAt: string;
 }
 
@@ -281,10 +294,20 @@ export interface LiveSessionReconciliation {
   tiktokTotalViews?: number;
   manualCtrAvg?: number;
   tiktokCtrAvg?: number;
+  // Đối soát giờ live (migration 0054) — chỉ để cảnh báo, KHÔNG ghi đè giờ công tính lương.
+  manualStartTime?: string;
+  tiktokStartTime?: string;
+  manualDurationMinutes?: number;
+  tiktokDurationMinutes?: number;
+  startDeltaMinutes?: number;
+  durationDeltaMinutes?: number;
+  flagReasons: ReconciliationFlagReason[];
   flagged: boolean;
   note?: string;
   reconciledAt: string;
 }
+
+export type ReconciliationFlagReason = "gmv" | "start_time" | "duration";
 
 // Report tháng Brand Workspace (migration 0051) — phần số liệu vận hành (GMV/Host/SKU) luôn
 // tính live từ LiveSession[], object này chỉ giữ phần nhập tay bắt buộc + trạng thái phát hành.
@@ -302,6 +325,38 @@ export interface BrandMonthlyReport {
   publishedBy?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+// Module Dataraw Brand Workspace (migration 0052) — kho lưu nguyên trạng 4 report Excel tải tay
+// từ TikTok Shop mỗi tuần/tháng, làm cơ sở dựng report + đối soát + tra cứu sau này. Không map
+// cứng cột vào schema (product_list có tới 176 cột) — "columns" giữ thứ tự+tên cột gốc, mỗi dòng
+// "raw" lưu đúng theo key đó.
+export type DataRawReportType = "shop_promotion" | "product_list" | "live_analysis" | "shop_analytics";
+
+export interface DataRawColumn {
+  key: string;
+  label: string;
+}
+
+export interface BrandDataRawImport {
+  id: string;
+  brandId: string;
+  reportType: DataRawReportType;
+  periodLabel?: string;
+  periodStart?: string;
+  periodEnd?: string;
+  fileName?: string;
+  columns: DataRawColumn[];
+  summary?: Record<string, unknown>;
+  rowCount: number;
+  importedAt: string;
+}
+
+export interface BrandDataRawRow {
+  id: string;
+  importId: string;
+  rowIndex: number;
+  raw: Record<string, unknown>;
 }
 
 export interface SessionFinance {
@@ -334,6 +389,7 @@ export interface TalentRateHistoryEntry {
   id: string;
   talentId: string;
   ratePerSession: number;
+  ratePerHour: number;
   commissionRate: number;
   effectiveFrom: string; // "YYYY-MM-DD"
   effectiveTo?: string; // "YYYY-MM-DD", undefined = đang áp dụng

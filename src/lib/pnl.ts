@@ -54,10 +54,27 @@ export interface SessionPnl {
   session: LiveSession;
   finance: SessionFinance;
   talent?: Talent;
+  // LƯU Ý dễ nhầm: isHourly là mô hình tính DOANH THU AGENCY của BRAND (grossAgencyRev), hoàn
+  // toàn tách biệt với việc talent hưởng lương theo giờ hay theo phiên (hostPaidHourly bên dưới).
   isHourly: boolean;
   grossAgencyRev: number;
   hostPayout: number;
   netProfit: number;
+  // Giai đoạn 3 — chi tiết cách ra hostPayout, để UI Finance giải thích được con số.
+  hostPaidHourly: boolean;
+  billableHours: number;
+  otMinutes: number;
+  earlyLeaveMinutes: number;
+}
+
+// Giờ tính lương của 1 phiên = giờ ca theo lịch + OT − off sớm (host tự khai trong report sau
+// phiên, ops duyệt). KHÔNG dùng thời lượng live thật từ TikTok: đối soát Giai đoạn 2 chỉ cảnh
+// báo lệch giờ chứ không ghi đè, theo đúng quyết định đã chốt với user.
+export function billableSessionHours(session: LiveSession): number {
+  const scheduled = sessionDurationHours(session.startTime, session.endTime);
+  const otMinutes = session.report?.otMinutes ?? 0;
+  const earlyLeaveMinutes = session.report?.earlyLeaveMinutes ?? 0;
+  return Math.max(0, scheduled + (otMinutes - earlyLeaveMinutes) / 60);
 }
 
 export function computeSessionPnl(
@@ -73,8 +90,18 @@ export function computeSessionPnl(
   const talent = talentById[session.hostId];
   const brand = brandById[session.brandId];
   const talentRateAtDate = talent ? findTalentRateAsOf(talentRateHistory, talent.id, session.date) : undefined;
-  const hostFixRate = finance.hostFixRateOverride ?? talentRateAtDate?.ratePerSession ?? talent?.ratePerSession ?? 0;
   const hostCommRate = finance.hostCommissionRateOverride ?? talentRateAtDate?.commissionRate ?? talent?.commissionRate ?? 0;
+
+  // Rate theo giờ (Giai đoạn 3) chỉ áp dụng khi talent thực sự có đặt > 0 — talent chưa chuyển
+  // sang mô hình giờ vẫn ăn công thức flat cũ, nên P&L các session cũ không đổi sau migration.
+  const talentHourRate = talentRateAtDate?.ratePerHour ?? talent?.ratePerHour ?? 0;
+  // Override tay ở Finance vẫn thắng tất cả (ops chốt số cuối), và luôn hiểu là số tiền cố định
+  // cho cả phiên — không nhân với giờ, giống hành vi trước Giai đoạn 3.
+  const hostPaidHourly = finance.hostFixRateOverride === undefined && talentHourRate > 0;
+  const billableHours = billableSessionHours(session);
+  const hostFixRate = hostPaidHourly
+    ? talentHourRate * billableHours
+    : finance.hostFixRateOverride ?? talentRateAtDate?.ratePerSession ?? talent?.ratePerSession ?? 0;
   const isHourly = brand?.billingModel === "hourly";
   const brandRateAtDate = findBrandRateAsOf(brandPlatformRateHistory, session.brandId, session.platform, session.date);
   const hourlyRate =
@@ -92,5 +119,11 @@ export function computeSessionPnl(
   const hostPayout = hostFixRate + (session.actualGmv * hostCommRate) / 100;
   const totalCost = hostPayout + finance.studioCost + finance.adsCost;
   const netProfit = grossAgencyRev - totalCost;
-  return { session, finance, talent, isHourly, grossAgencyRev, hostPayout, netProfit };
+  return {
+    session, finance, talent, isHourly, grossAgencyRev, hostPayout, netProfit,
+    hostPaidHourly,
+    billableHours,
+    otMinutes: session.report?.otMinutes ?? 0,
+    earlyLeaveMinutes: session.report?.earlyLeaveMinutes ?? 0
+  };
 }

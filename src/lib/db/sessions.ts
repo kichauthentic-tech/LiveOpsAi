@@ -69,6 +69,8 @@ interface DbSessionReport {
   restart_count: number;
   cross_live: boolean;
   host_late: boolean;
+  ot_minutes: number;
+  early_leave_minutes: number;
   status_note: string;
   gmv_total: number | null;
   dashboard_link_1: string | null;
@@ -116,6 +118,8 @@ function reportFromDb(row: DbSessionReport): LiveSessionReport {
     restartCount: row.restart_count,
     crossLive: row.cross_live,
     hostLate: row.host_late,
+    otMinutes: row.ot_minutes ?? 0,
+    earlyLeaveMinutes: row.early_leave_minutes ?? 0,
     statusNote: row.status_note,
     gmvTotal: row.gmv_total ?? undefined,
     dashboardLink1: row.dashboard_link_1 ?? undefined,

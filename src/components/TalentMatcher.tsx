@@ -17,6 +17,7 @@ export interface NewTalentAccountPayload {
   cvrAvg: number;
   overallScore: number;
   ratePerSession: number;
+  ratePerHour: number;
   commissionRate: number;
   availabilityStatus: "Available" | "Busy" | "On Live";
 }
@@ -73,6 +74,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
   const [formCvr, setFormCvr] = useState(5.0);
   const [formCtr, setFormCtr] = useState(8.0);
   const [formRate, setFormRate] = useState(5000000);
+  const [formRateHour, setFormRateHour] = useState(0);
   const [formCommission, setFormCommission] = useState(3.5);
   const [formScore, setFormScore] = useState(90);
   const [formPhone, setFormPhone] = useState("0988 123 456");
@@ -112,6 +114,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
     setFormCvr(t.cvrAvg || 5.0);
     setFormCtr(t.ctrAvg || 8.0);
     setFormRate(t.ratePerSession || (t as any).rateCardFee || 5000000);
+    setFormRateHour(t.ratePerHour || 0);
     setFormCommission(t.commissionRate || 3.5);
     setFormScore(t.overallScore || (t as any).aiMatchScore || 90);
     setFormPhone(t.phone || "0988 123 456");
@@ -126,7 +129,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
 
     const nichesParsed = formNiches.split(",").map((s) => s.trim()).filter(Boolean);
 
-    const basePayload: Omit<Talent, "id" | "ratePerSession" | "commissionRate"> = {
+    const basePayload: Omit<Talent, "id" | "ratePerSession" | "ratePerHour" | "commissionRate"> = {
       name: formName,
       avatar: formAvatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250",
       role: formRole,
@@ -149,6 +152,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
       const patch: Partial<Talent> = { ...basePayload };
       if (canSeeRate) {
         patch.ratePerSession = Number(formRate);
+        patch.ratePerHour = Number(formRateHour);
         patch.commissionRate = Number(formCommission);
       }
       if (onUpdateTalent) onUpdateTalent(editingTalent.id, patch);
@@ -167,6 +171,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
           ...basePayload,
           email: formEmail.trim(),
           ratePerSession: Number(formRate),
+          ratePerHour: Number(formRateHour),
           commissionRate: Number(formCommission)
         });
       }
@@ -563,7 +568,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                 </div>
               </div>
 
-              <div className={`grid grid-cols-1 gap-3 ${canSeeRate ? "sm:grid-cols-3" : "sm:grid-cols-1"}`}>
+              <div className={`grid grid-cols-1 gap-3 ${canSeeRate ? "sm:grid-cols-4" : "sm:grid-cols-1"}`}>
                 <div>
                   <label className="font-bold text-[var(--text-muted)] block mb-1">CVR Trung Bình (%)</label>
                   <input
@@ -585,6 +590,21 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                         onChange={(e) => setFormRate(Number(e.target.value))}
                         className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
                       />
+                    </div>
+                    <div>
+                      {/* Giai đoạn 3 — rate theo GIỜ, song song rate/phiên ở trên. Đặt > 0 thì
+                          lương ca tính theo giờ công thực tế (giờ ca + OT − off sớm, xem
+                          billableSessionHours ở lib/pnl.ts); để 0 thì giữ nguyên rate/phiên. */}
+                      <label className="font-bold text-[var(--text-muted)] block mb-1">Rate Card (VND/Giờ)</label>
+                      <input
+                        type="number"
+                        value={formRateHour}
+                        onChange={(e) => setFormRateHour(Number(e.target.value))}
+                        className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
+                      />
+                      <p className="text-[10px] text-[var(--text-faint)] mt-1">
+                        {Number(formRateHour) > 0 ? "Đang tính lương theo giờ — bỏ qua rate/live." : "Để 0 = tính theo rate/live."}
+                      </p>
                     </div>
                     <div>
                       <label className="font-bold text-[var(--text-muted)] block mb-1">Hoa Hồng % (Commission)</label>
