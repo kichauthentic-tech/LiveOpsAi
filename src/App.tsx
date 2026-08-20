@@ -1123,7 +1123,9 @@ export default function App() {
 
   // Sinh ca cho cả tháng từ các quy tắc lặp đang active — bỏ qua ngày đã có
   // ca sinh từ đúng quy tắc đó rồi (tránh tạo trùng khi bấm lại nhiều lần).
-  const handleGenerateMonthSlots = async (month: string): Promise<number> => {
+  // brandId có giá trị khi gọi từ Brand Workspace (BrandCalendar) — chỉ sinh ca cho quy tắc
+  // của đúng brand đó, không phải toàn bộ agency (audit M4).
+  const handleGenerateMonthSlots = async (month: string, brandId?: string): Promise<number> => {
     const [yearStr, monthStr] = month.split("-");
     const year = Number(yearStr);
     const monthIdx = Number(monthStr) - 1;
@@ -1134,7 +1136,7 @@ export default function App() {
     );
 
     const toCreate: ShiftSlot[] = [];
-    for (const template of recurringShiftTemplates.filter((t) => t.active)) {
+    for (const template of recurringShiftTemplates.filter((t) => t.active && (!brandId || t.brandId === brandId))) {
       for (let day = 1; day <= daysInMonth; day++) {
         const date = new Date(year, monthIdx, day);
         if (!template.isDaily && date.getDay() !== template.weekday) continue;
@@ -1875,7 +1877,7 @@ export default function App() {
                     onCreateTemplate={handleCreateRecurringTemplate}
                     onToggleTemplate={handleToggleRecurringTemplate}
                     onDeleteTemplate={handleDeleteRecurringTemplate}
-                    onGenerateMonthSlots={handleGenerateMonthSlots}
+                    onGenerateMonthSlots={(month) => handleGenerateMonthSlots(month, currentBrandId!)}
                   />
                 )}
 
