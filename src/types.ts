@@ -290,6 +290,8 @@ export interface LiveSessionReconciliation {
   manualActualGmv?: number;
   tiktokActualGmv?: number;
   gmvDeltaPct?: number;
+  manualTotalOrders?: number;
+  tiktokTotalOrders?: number;
   manualTotalViews?: number;
   tiktokTotalViews?: number;
   manualCtrAvg?: number;

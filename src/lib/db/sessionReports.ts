@@ -8,6 +8,9 @@ import { fetchSessionById } from "./sessions";
 // update_session_with_children.
 export interface SessionReportInput {
   actualGmv: number;
+  // C2 (migration 0057) — số đơn host tự khai sau ca. Lớp "tạm tính", sẽ bị đối soát TikTok
+  // ghi đè bằng cột "Đơn hàng đã thanh toán" cuối tháng, giống hệt cách actualGmv chạy.
+  totalOrders: number;
   totalViews: number;
   ctrAvg: number;
   avgWatchTimeSeconds: number;
@@ -36,6 +39,7 @@ export async function submitSessionReport(sessionId: string, input: SessionRepor
   const { error } = await supabase.rpc("submit_live_session_report", {
     p_session_id: sessionId,
     p_actual_gmv: input.actualGmv,
+    p_total_orders: input.totalOrders,
     p_total_views: input.totalViews,
     p_ctr_avg: input.ctrAvg,
     p_avg_watch_time_seconds: input.avgWatchTimeSeconds,

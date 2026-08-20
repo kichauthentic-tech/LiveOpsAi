@@ -487,6 +487,7 @@ export async function applyReconciliation(importRowId: string, sessionId: string
 interface DbReconciliation {
   id: string; session_id: string; import_row_id: string | null;
   manual_actual_gmv: number | null; tiktok_actual_gmv: number | null; gmv_delta_pct: number | null;
+  manual_total_orders: number | null; tiktok_total_orders: number | null;
   manual_total_views: number | null; tiktok_total_views: number | null;
   manual_ctr_avg: number | null; tiktok_ctr_avg: number | null;
   manual_start_time: string | null; tiktok_start_time: string | null;
@@ -503,6 +504,8 @@ function reconciliationFromDb(row: DbReconciliation): LiveSessionReconciliation 
     manualActualGmv: row.manual_actual_gmv ?? undefined,
     tiktokActualGmv: row.tiktok_actual_gmv ?? undefined,
     gmvDeltaPct: row.gmv_delta_pct ?? undefined,
+    manualTotalOrders: row.manual_total_orders ?? undefined,
+    tiktokTotalOrders: row.tiktok_total_orders ?? undefined,
     manualTotalViews: row.manual_total_views ?? undefined,
     tiktokTotalViews: row.tiktok_total_views ?? undefined,
     manualCtrAvg: row.manual_ctr_avg ?? undefined,

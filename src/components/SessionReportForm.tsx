@@ -24,6 +24,7 @@ const MINUTE_PRESETS = [15, 30, 45, 60];
 export function SessionReportForm({ session, onSubmit, onCancel }: SessionReportFormProps) {
   const r = session.report;
   const [actualGmv, setActualGmv] = useState(session.actualGmv || 0);
+  const [totalOrders, setTotalOrders] = useState(session.totalOrders || 0);
   const [totalViews, setTotalViews] = useState(session.totalViews || 0);
   const [ctrAvg, setCtrAvg] = useState(session.ctrAvg || 0);
   const [avgWatchTimeSeconds, setAvgWatchTimeSeconds] = useState(session.avgWatchTimeSeconds || 0);
@@ -64,6 +65,7 @@ export function SessionReportForm({ session, onSubmit, onCancel }: SessionReport
     setSaving(true);
     const ok = await onSubmit({
       actualGmv,
+      totalOrders,
       totalViews,
       ctrAvg,
       avgWatchTimeSeconds,
@@ -86,10 +88,14 @@ export function SessionReportForm({ session, onSubmit, onCancel }: SessionReport
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <div>
           <label className={labelClass}>GMV Live (VNĐ)</label>
           <input type="number" value={actualGmv} onChange={(e) => setActualGmv(Number(e.target.value))} className={inputClass} />
+        </div>
+        <div>
+          <label className={labelClass}>Đơn Hàng</label>
+          <input type="number" min={0} value={totalOrders} onChange={(e) => setTotalOrders(Math.max(0, Number(e.target.value)))} className={inputClass} />
         </div>
         <div>
           <label className={labelClass}>GMV Tổng (VNĐ)</label>
