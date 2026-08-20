@@ -230,7 +230,10 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
         <div className="p-3 bg-red-950/80 border border-red-800/50 rounded-xl text-red-300 text-xs font-semibold">{errorMsg}</div>
       )}
 
-      {unreconciledSessions.length > 0 && (
+      {/* FIX L4 (audit 2026-08-21): banner này là cảnh báo cho Ops tự đối soát trước khi phát hành,
+          không phải nội dung cho brand — trước đây hiện cho mọi role kể cả brand, khiến brand đọc
+          nhầm câu "đối soát trước khi phát hành report cho khách" như đang nói với chính họ. */}
+      {canManage && unreconciledSessions.length > 0 && (
         <div className="p-4 bg-amber-950/80 border border-amber-800/50 rounded-xl space-y-2">
           <div className="flex items-center gap-2 text-amber-200 font-bold text-sm">
             <AlertTriangle className="w-4 h-4 text-amber-400" />
@@ -259,6 +262,12 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
         </div>
       ) : (
         <>
+          {/* FIX L4 (audit 2026-08-21): GMV/Host Performance/Top SKU tính live từ session, không theo
+              trạng thái report — trước đây brand mở tab là thấy số liệu vận hành ngay cả khi report
+              còn là bản nháp chưa phát hành. Ops/CEO/Admin vẫn cần xem live để soát trước khi phát hành,
+              chỉ chặn với brand cho tới khi report được phát hành chính thức. */}
+          {canManage || isPublished ? (
+            <>
           {/* Overview */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
@@ -352,6 +361,12 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
               </table>
             </div>
           </div>
+            </>
+          ) : (
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-8 text-center text-[var(--text-faint)] text-sm">
+              Report tháng {month} chưa được phát hành. Số liệu vận hành sẽ hiển thị khi Ops/CEO/Admin phát hành report.
+            </div>
+          )}
 
           {/* Manual entry sections */}
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 space-y-4">
