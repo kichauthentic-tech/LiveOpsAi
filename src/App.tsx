@@ -1427,6 +1427,14 @@ export default function App() {
   // Rate Card không còn ở đây — đã chuyển hẳn sang CRM (Agency-side, gate `view_rate_card`)
   // để ceo/admin/operations set giá 1 lần cho mọi brand, không cần vào từng brand workspace
   // (xem "Đã chuyển — Rate Card vào CRM" trong WORKSPACE_DESIGN.md).
+  // FIX L3 (audit 2026-08-21): "Report Tuần" (CAN_VIEW_ROLES trong BrandWeeklyReport.tsx) và "Dữ
+  // Liệu Gốc" (RLS ceo/admin/operations trong 0052_brand_dataraw.sql) là công cụ VẬN HÀNH NỘI BỘ —
+  // đúng như thiết kế ban đầu ("report tháng brand chỉ xuất ra ngoài app, brand không tự vào xem
+  // raw data qua hệ thống", comment trong chính migration 0052). Trước đây 2 tab này vẫn hiện
+  // trong menu ngay cả khi đăng nhập bằng role "brand" thật — bấm vào chỉ thấy màn chặn quyền
+  // (Report Tuần) hoặc trang trống hoàn toàn do RLS lọc sạch dòng, không rõ là do quyền (Dữ Liệu
+  // Gốc). Bỏ 2 tab này khỏi menu khi currentRole === "brand"; ceo/operations/admin xem hộ qua
+  // switcher vẫn thấy đủ như cũ.
   const BRAND_NAV_GROUPS = [
     {
       label: "Brand Workspace",
@@ -1436,9 +1444,13 @@ export default function App() {
         { id: "brand_sessions", label: "Sessions", icon: Radio, perm: undefined },
         { id: "brand_skus", label: "SKU Showcase", icon: Package, badge: "NEW", perm: undefined },
         { id: "brand_audience_analytics", label: "Hiệu Suất Xem & Chuyển Đổi", icon: BarChart3, badge: "NEW", perm: undefined },
-        { id: "brand_weekly_report", label: "Report Tuần", icon: CalendarRange, badge: "NEW", perm: undefined },
+        ...(currentRole === "brand"
+          ? []
+          : [{ id: "brand_weekly_report", label: "Report Tuần", icon: CalendarRange, badge: "NEW", perm: undefined }]),
         { id: "brand_monthly_report", label: "Report Tháng", icon: FileText, badge: "NEW", perm: undefined },
-        { id: "brand_dataraw", label: "Dữ Liệu Gốc", icon: Database, badge: "NEW", perm: undefined },
+        ...(currentRole === "brand"
+          ? []
+          : [{ id: "brand_dataraw", label: "Dữ Liệu Gốc", icon: Database, badge: "NEW", perm: undefined }]),
       ],
     },
   ];
