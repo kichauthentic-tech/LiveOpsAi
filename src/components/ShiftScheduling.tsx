@@ -196,14 +196,21 @@ export default function ShiftScheduling({
     setSelectedDate(null);
   };
 
+  // FIX L9 (audit 2026-08-21): trước đây gộp trùng studio VÀ trùng host vào chung 1 boolean, nhưng
+  // thông báo hiển thị luôn cố định là "Host đã chọn trùng lịch" — khi thực tế chỉ trùng phòng
+  // studio (host rảnh), ops đọc sai nguyên nhân và đi đổi host thay vì đổi phòng. Trả về riêng
+  // từng loại để UI hiện đúng câu, cùng pattern {studioConflict, hostConflict} đã dùng ở
+  // LiveCalendar.tsx.
   const checkConflicts = (date: string, start: string, end: string, studioId: string, talentId: string) => {
-    return sessions.some(
-      (s) =>
-        s.date === date &&
-        s.status !== "Cancelled" &&
-        timeRangesOverlap(s.startTime, s.endTime, start, end) &&
-        ((studioId && s.studioId === studioId) || s.hostId === talentId || s.coHostId === talentId)
-    );
+    let studioConflict = false;
+    let hostConflict = false;
+    for (const s of sessions) {
+      if (s.date !== date || s.status === "Cancelled") continue;
+      if (!timeRangesOverlap(s.startTime, s.endTime, start, end)) continue;
+      if (studioId && s.studioId === studioId) studioConflict = true;
+      if (s.hostId === talentId || s.coHostId === talentId) hostConflict = true;
+    }
+    return { studioConflict, hostConflict };
   };
 
   const handleToggleRegister = async (slot: ShiftSlot) => {
@@ -517,8 +524,9 @@ export default function ShiftScheduling({
               const regs = registrationsBySlot.get(slot.id) ?? [];
               const iAmRegistered = myTalentId ? regs.some((r) => r.talentId === myTalentId) : false;
               const pick = pickByLot[slot.id] ?? { hostId: "", coHostId: "" };
-              const conflict =
-                pick.hostId && checkConflicts(slot.date, slot.startTime, slot.endTime, slot.studioId ?? "", pick.hostId);
+              const conflict = pick.hostId
+                ? checkConflicts(slot.date, slot.startTime, slot.endTime, slot.studioId ?? "", pick.hostId)
+                : { studioConflict: false, hostConflict: false };
               const studioConflicts = findStudioConflicts(slot.date, slot.startTime, slot.endTime, slot.studioId ?? "", slot.brandId ?? "", slot.id);
               return (
                 <div key={slot.id} className="bg-[var(--surface-base)]/80 border border-[var(--border)] rounded-xl p-3 flex flex-col gap-2">
@@ -641,9 +649,14 @@ export default function ShiftScheduling({
                           </button>
                         </div>
                       )}
-                      {conflict && (
+                      {(conflict.studioConflict || conflict.hostConflict) && (
                         <span className="w-full text-[11px] text-rose-400 flex items-center gap-1">
-                          <AlertTriangle className="w-3 h-3" /> Host đã chọn trùng lịch với 1 ca khác cùng ngày.
+                          <AlertTriangle className="w-3 h-3" />
+                          {conflict.hostConflict && conflict.studioConflict
+                            ? "Trùng lịch cả Host lẫn Studio với 1 ca khác cùng ngày."
+                            : conflict.hostConflict
+                            ? "Host đã chọn trùng lịch với 1 ca khác cùng ngày."
+                            : "Studio của ca này trùng lịch với 1 ca khác cùng ngày."}
                         </span>
                       )}
                     </div>
