@@ -165,7 +165,7 @@ export const SchemeWeekStrip: React.FC<SchemeWeekStripProps> = ({ brandId, weekD
       </button>
 
       {open && (
-        <div className="mt-1.5 rounded-xl border border-amber-200 dark:border-amber-900/50 bg-white dark:bg-slate-900/80 p-2">
+        <div className="mt-1.5 rounded-xl border border-amber-200 dark:border-amber-900/50 bg-[var(--surface)] p-2">
           <datalist id="scheme-categories">
             {Array.from(new Set(schemes.map((s) => s.category))).map((c) => (
               <option key={c} value={c} />
@@ -195,28 +195,28 @@ export const SchemeWeekStrip: React.FC<SchemeWeekStripProps> = ({ brandId, weekD
                         onChange={(e) => setDraft((d) => ({ ...d, category: e.target.value }))}
                         list="scheme-categories"
                         placeholder="Hạng mục"
-                        className={`w-full bg-white/70 dark:bg-slate-900/60 rounded px-1 py-0.5 text-[9px] font-black uppercase tracking-wide ${color.text} focus:outline-none focus:ring-1 focus:ring-amber-500`}
+                        className={`w-full bg-[var(--surface-elevated)] rounded px-1 py-0.5 text-[9px] font-black uppercase tracking-wide ${color.text} focus:outline-none focus:ring-1 focus:ring-amber-500`}
                       />
                       <textarea
                         autoFocus
                         value={draft.text}
                         onChange={(e) => setDraft((d) => ({ ...d, text: e.target.value }))}
                         rows={2}
-                        className="w-full min-w-[140px] bg-white/70 dark:bg-slate-900/60 rounded p-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-amber-500"
+                        className="w-full min-w-[140px] bg-[var(--surface-elevated)] rounded p-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-amber-500"
                       />
                       <div className="flex flex-wrap items-center gap-1">
                         <input
                           type="date"
                           value={draft.startDate}
                           onChange={(e) => setDraft((d) => ({ ...d, startDate: e.target.value }))}
-                          className="bg-white/70 dark:bg-slate-900/60 rounded px-1 py-0.5 text-[10px]"
+                          className="bg-[var(--surface-elevated)] rounded px-1 py-0.5 text-[10px]"
                         />
-                        <span className="text-slate-400">→</span>
+                        <span className="text-[var(--text-faint)]">→</span>
                         <input
                           type="date"
                           value={draft.endDate}
                           onChange={(e) => setDraft((d) => ({ ...d, endDate: e.target.value }))}
-                          className="bg-white/70 dark:bg-slate-900/60 rounded px-1 py-0.5 text-[10px]"
+                          className="bg-[var(--surface-elevated)] rounded px-1 py-0.5 text-[10px]"
                         />
                         <button
                           disabled={busy}
@@ -268,27 +268,27 @@ export const SchemeWeekStrip: React.FC<SchemeWeekStripProps> = ({ brandId, weekD
                     value={newRow.category}
                     onChange={(e) => setNewRow((d) => ({ ...d, category: e.target.value }))}
                     list="scheme-categories"
-                    className="min-w-[130px] bg-slate-100 dark:bg-slate-800 rounded px-1.5 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-amber-500"
+                    className="min-w-[130px] bg-[var(--surface-elevated)] rounded px-1.5 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-amber-500"
                   />
                   <input
                     type="text"
                     placeholder="Nội dung"
                     value={newRow.content}
                     onChange={(e) => setNewRow((d) => ({ ...d, content: e.target.value }))}
-                    className="flex-1 min-w-[160px] bg-slate-100 dark:bg-slate-800 rounded px-1.5 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-amber-500"
+                    className="flex-1 min-w-[160px] bg-[var(--surface-elevated)] rounded px-1.5 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-amber-500"
                   />
                   <input
                     type="date"
                     value={newRow.startDate}
                     onChange={(e) => setNewRow((d) => ({ ...d, startDate: e.target.value }))}
-                    className="bg-slate-100 dark:bg-slate-800 rounded px-1.5 py-1 text-[10px]"
+                    className="bg-[var(--surface-elevated)] rounded px-1.5 py-1 text-[10px]"
                   />
-                  <span className="text-slate-400">→</span>
+                  <span className="text-[var(--text-faint)]">→</span>
                   <input
                     type="date"
                     value={newRow.endDate}
                     onChange={(e) => setNewRow((d) => ({ ...d, endDate: e.target.value }))}
-                    className="bg-slate-100 dark:bg-slate-800 rounded px-1.5 py-1 text-[10px]"
+                    className="bg-[var(--surface-elevated)] rounded px-1.5 py-1 text-[10px]"
                   />
                   <button
                     disabled={busy || !newRow.category.trim() || !newRow.content.trim()}
@@ -297,7 +297,7 @@ export const SchemeWeekStrip: React.FC<SchemeWeekStripProps> = ({ brandId, weekD
                   >
                     Thêm
                   </button>
-                  <button onClick={() => setAddingCategory(null)} className="px-2 py-1 rounded text-slate-400 text-[11px]">
+                  <button onClick={() => setAddingCategory(null)} className="px-2 py-1 rounded text-[var(--text-faint)] text-[11px]">
                     Huỷ
                   </button>
                 </div>

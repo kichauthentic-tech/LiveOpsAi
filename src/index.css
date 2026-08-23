@@ -46,6 +46,26 @@
   --danger: #f43f5e;
 }
 
+/* YFB — theo đúng bộ nhận diện đen–vàng report Crocs x YFB Vietnam gốc. */
+.theme-yfb {
+  --surface-base: #0b0b0d;
+  --surface: #17171b;
+  --surface-elevated: #1d1d22;
+  --surface-hover: #26262c;
+  --surface-muted: rgba(29, 29, 34, 0.6);
+  --text: #f4f1e8;
+  --text-muted: #93939c;
+  --text-faint: #5f5f66;
+  --border: #2a2a30;
+  --border-muted: rgba(42, 42, 48, 0.6);
+  --accent: #f2c94c;
+  --accent-hover: #f7d873;
+  --accent-text: #a9873a;
+  --success: #6fcf97;
+  --warning: #f2c94c;
+  --danger: #eb6b6b;
+}
+
 .theme-sand {
   --surface-base: #faf6f0;
   --surface: #ffffff;

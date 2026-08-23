@@ -13,8 +13,20 @@ interface BrandDataRawProps {
 const REPORT_TABS: { id: DataRawReportType; label: string; hint: string }[] = [
   { id: "shop_promotion", label: "Khuyến Mãi", hint: 'Export "Shop Promotion List" từ TikTok Shop Seller Center.' },
   { id: "product_list", label: "Sản Phẩm", hint: 'Export "Product List" từ TikTok Shop Seller Center.' },
-  { id: "live_analysis", label: "Live Analysis", hint: 'Export "Live Analysis" từ TikTok Shop Seller Center.' },
-  { id: "shop_analytics", label: "Shop Analytics", hint: 'Export "Shop Analytics — Key metrics" từ TikTok Shop Seller Center.' }
+  {
+    id: "creator_live_performance",
+    label: "Creator Live Performance",
+    hint: 'Export "Creator-Live-Performance" từ TikTok Creator Center — nguồn chính cho GMV/CTR/CTOR Livestream trong Report Tháng (thay thế Live Analysis).'
+  },
+  { id: "live_analysis", label: "Live Analysis (Cũ)", hint: 'Export "Live Analysis" từ TikTok Shop Seller Center — KHÔNG còn dùng cho Report Tháng, chỉ giữ lại để tra cứu batch cũ đã import trước đây.' },
+  { id: "shop_analytics", label: "Shop Analytics", hint: 'Export "Shop Analytics — Key metrics" từ TikTok Shop Seller Center.' },
+  { id: "live_performance_core_stats", label: "Live Performance", hint: 'Export "Live Performance Core Stats" từ TikTok Shop Seller Center — GMV LIVE theo ngày, dùng cho biểu đồ xu hướng ngày trong Report Tháng.' },
+  { id: "product_card_traffic_stats", label: "Product Card Traffic", hint: 'Export "Product Card Traffic Stats" từ TikTok Shop Seller Center — traffic thẻ sản phẩm theo ngày.' },
+  {
+    id: "transaction_analysis_creator_list",
+    label: "Affiliate — Creator List",
+    hint: 'Export "Transaction Analysis - Creator List" từ TikTok Shop Partner Center (tên file dạng "..._YYYYMMDD-YYYYMMDD.xlsx") — GMV/đơn/hoa hồng theo từng creator affiliate trong kỳ. Hiện chỉ lưu để tra cứu, chưa nối vào Report Tháng Tab 04.'
+  }
 ];
 
 function fmtCell(v: unknown): string {

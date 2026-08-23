@@ -214,7 +214,7 @@ export const BrandDashboard: React.FC<BrandDashboardProps> = ({
           onClick={() => setTab("overview")}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
             tab === "overview"
-              ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30"
+              ? "bg-[var(--accent)] text-[var(--surface-base)] shadow-lg shadow-[var(--accent)]/30"
               : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]"
           }`}
         >
@@ -226,7 +226,7 @@ export const BrandDashboard: React.FC<BrandDashboardProps> = ({
           onClick={() => setTab("performance")}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
             tab === "performance"
-              ? "bg-emerald-600 text-white shadow-lg shadow-emerald-600/30"
+              ? "bg-[var(--accent)] text-[var(--surface-base)] shadow-lg shadow-[var(--accent)]/30"
               : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]"
           }`}
         >
@@ -238,7 +238,7 @@ export const BrandDashboard: React.FC<BrandDashboardProps> = ({
           onClick={() => setTab("gmv_forecast")}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
             tab === "gmv_forecast"
-              ? "bg-purple-600 text-white shadow-lg shadow-purple-600/30"
+              ? "bg-[var(--accent)] text-[var(--surface-base)] shadow-lg shadow-[var(--accent)]/30"
               : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]"
           }`}
         >
@@ -253,7 +253,7 @@ export const BrandDashboard: React.FC<BrandDashboardProps> = ({
           onClick={() => setTab("alerts")}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 relative ${
             tab === "alerts"
-              ? "bg-amber-600 text-white shadow-lg shadow-amber-600/30 font-black"
+              ? "bg-[var(--accent)] text-[var(--surface-base)] shadow-lg shadow-[var(--accent)]/30 font-black"
               : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]"
           }`}
         >
@@ -270,7 +270,7 @@ export const BrandDashboard: React.FC<BrandDashboardProps> = ({
           onClick={() => setTab("gmv_calendar")}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
             tab === "gmv_calendar"
-              ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30"
+              ? "bg-[var(--accent)] text-[var(--surface-base)] shadow-lg shadow-[var(--accent)]/30"
               : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]"
           }`}
         >
@@ -282,7 +282,7 @@ export const BrandDashboard: React.FC<BrandDashboardProps> = ({
           onClick={() => setTab("kpi_comparison")}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
             tab === "kpi_comparison"
-              ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30"
+              ? "bg-[var(--accent)] text-[var(--surface-base)] shadow-lg shadow-[var(--accent)]/30"
               : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]"
           }`}
         >

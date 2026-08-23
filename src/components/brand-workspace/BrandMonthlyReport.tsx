@@ -1,17 +1,16 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { LiveSession, UserRole, BrandMonthlyReport as BrandMonthlyReportType } from "../../types";
+import { LiveSession, UserRole, BrandMonthlyReport as BrandMonthlyReportType, BrandPlatformRate } from "../../types";
 import {
   FileText,
   TrendingUp,
-  Users,
-  ShoppingBag,
   AlertTriangle,
   CheckCircle2,
   Send,
   RotateCcw,
   Loader2,
   Clock,
-  Target
+  Target,
+  CalendarRange
 } from "lucide-react";
 import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
 import { getTodayMonth } from "../../lib/dateUtils";
@@ -23,12 +22,21 @@ import {
   unpublishMonthlyReport,
   MonthlyReportManualInput
 } from "../../lib/db/monthlyReports";
+import { MonthlyReportTabs } from "./MonthlyReportTabs";
+import { BrandWeeklyReport } from "./BrandWeeklyReport";
+
+// Report Tuần không còn là tab riêng ở menu (2026-08-23) — gộp làm chế độ xem "Tuần" ngay trong
+// Report Tháng qua toggle bên dưới, tái dùng nguyên BrandWeeklyReport.tsx (đã tự chặn quyền qua
+// CAN_VIEW_ROLES của chính nó). Chỉ hiện toggle cho role thấy được Report Tuần, để brand không bấm
+// vào rồi gặp màn chặn quyền.
+const CAN_VIEW_WEEKLY_ROLES: UserRole[] = ["ceo", "operations", "admin"];
 
 interface BrandMonthlyReportProps {
   brandId: string;
   brandName: string;
   sessions: LiveSession[];
   currentRole: UserRole;
+  brandPlatformRates: BrandPlatformRate[];
 }
 
 const CAN_MANAGE_ROLES: UserRole[] = ["ceo", "operations", "admin"];
@@ -103,8 +111,10 @@ const MomChip: React.FC<{ current: number | null; previous: number | null }> = (
   );
 };
 
-export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId, brandName, sessions, currentRole }) => {
+export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId, brandName, sessions, currentRole, brandPlatformRates }) => {
   const canManage = CAN_MANAGE_ROLES.includes(currentRole);
+  const canViewWeekly = CAN_VIEW_WEEKLY_ROLES.includes(currentRole);
+  const [viewMode, setViewMode] = useState<"month" | "week">("month");
   const [month, setMonth] = useState(getTodayMonth());
   const [report, setReport] = useState<BrandMonthlyReportType | null>(null);
   const [loading, setLoading] = useState(true);
@@ -145,46 +155,6 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
     [completedSessions]
   );
 
-  const overview = useMemo(() => {
-    const targetGmv = completedSessions.reduce((sum, s) => sum + (s.targetGmv || 0), 0);
-    const actualGmv = completedSessions.reduce((sum, s) => sum + (s.actualGmv || 0), 0);
-    const totalOrders = completedSessions.reduce((sum, s) => sum + (s.totalOrders || 0), 0);
-    const withViewData = completedSessions.filter((s) => s.peakViewers > 0);
-    const avgPeak = withViewData.length ? Math.round(withViewData.reduce((sum, s) => sum + s.peakViewers, 0) / withViewData.length) : 0;
-    const withRateData = completedSessions.filter((s) => s.ctrAvg > 0 || s.cvrAvg > 0);
-    const avgCtr = withRateData.length ? withRateData.reduce((sum, s) => sum + (s.ctrAvg || 0), 0) / withRateData.length : 0;
-    const avgCvr = withRateData.length ? withRateData.reduce((sum, s) => sum + (s.cvrAvg || 0), 0) / withRateData.length : 0;
-    return { targetGmv, actualGmv, totalOrders, avgPeak, avgCtr, avgCvr, sessionCount: completedSessions.length };
-  }, [completedSessions]);
-
-  const hostPerformance = useMemo(() => {
-    const map = new Map<string, { hostName: string; sessionCount: number; gmv: number }>();
-    for (const s of completedSessions) {
-      const key = s.hostName || "Chưa gán";
-      const entry = map.get(key) || { hostName: key, sessionCount: 0, gmv: 0 };
-      entry.sessionCount += 1;
-      entry.gmv += s.actualGmv || 0;
-      map.set(key, entry);
-    }
-    return Array.from(map.values()).sort((a, b) => b.gmv - a.gmv);
-  }, [completedSessions]);
-
-  const topSkus = useMemo(() => {
-    const map = new Map<string, { code: string; name: string; sold: number; revenue: number }>();
-    for (const s of completedSessions) {
-      for (const sku of s.skus || []) {
-        const key = sku.code || sku.name;
-        const entry = map.get(key) || { code: sku.code, name: sku.name, sold: 0, revenue: 0 };
-        entry.sold += sku.soldInSession || 0;
-        entry.revenue += (sku.soldInSession || 0) * (sku.livePrice || 0);
-        map.set(key, entry);
-      }
-    }
-    return Array.from(map.values())
-      .sort((a, b) => b.sold - a.sold)
-      .slice(0, 10);
-  }, [completedSessions]);
-
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -211,12 +181,21 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
     setSaving(true);
     setErrorMsg(null);
     try {
+      // Form này không có input cho các field kế hoạch tháng sau (sống ở Tab 05 trong
+      // MonthlyReportTabs, fetch/lưu độc lập cùng 1 row brand_monthly_reports) — pass-through
+      // nguyên giá trị đã tải để không bị ghi đè về null khi lưu form Ads/Notes.
       const input: MonthlyReportManualInput = {
         adsSpend: adsSpend ? Number(adsSpend) : undefined,
         roas: roas ? Number(roas) : undefined,
         promotionNotes: promotionNotes || undefined,
         customerInsightNotes: customerInsightNotes || undefined,
-        accountHealthNotes: accountHealthNotes || undefined
+        accountHealthNotes: accountHealthNotes || undefined,
+        planTargetGmv: report?.planTargetGmv,
+        planTargetHours: report?.planTargetHours,
+        planPctDaily: report?.planPctDaily,
+        planPctDday: report?.planPctDday,
+        planPctMidmonth: report?.planPctMidmonth,
+        planPctPayday: report?.planPctPayday
       };
       const saved = await upsertMonthlyReport(brandId, `${month}-01`, input);
       setReport(saved);
@@ -267,6 +246,31 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
 
   return (
     <div className="space-y-5">
+      {canViewWeekly && (
+        <div className="inline-flex items-center gap-1 bg-[var(--surface)] border border-[var(--border)] rounded-xl p-1">
+          <button
+            onClick={() => setViewMode("month")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+              viewMode === "month" ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)] hover:bg-[var(--surface-elevated)]"
+            }`}
+          >
+            <FileText className="w-3.5 h-3.5" /> Tháng
+          </button>
+          <button
+            onClick={() => setViewMode("week")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+              viewMode === "week" ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)] hover:bg-[var(--surface-elevated)]"
+            }`}
+          >
+            <CalendarRange className="w-3.5 h-3.5" /> Tuần
+          </button>
+        </div>
+      )}
+
+      {viewMode === "week" ? (
+        <BrandWeeklyReport brandId={brandId} brandName={brandName} sessions={sessions} currentRole={currentRole} />
+      ) : (
+        <>
       <div className="bg-[var(--surface)] text-[var(--text)] p-6 rounded-2xl border border-[var(--border)] shadow-xl space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -344,99 +348,10 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
               chỉ chặn với brand cho tới khi report được phát hành chính thức. */}
           {canManage || isPublished ? (
             <>
-          {/* Overview */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
-              <div className="text-[11px] text-[var(--text-faint)]">Target vs Thực Đạt GMV</div>
-              <div className="text-lg font-black text-[var(--text)]">{formatCurrencyAdaptive(overview.actualGmv)}</div>
-              <div className="text-[10px] text-[var(--text-muted)]">/ {formatCurrencyAdaptive(overview.targetGmv)} target</div>
-            </div>
-            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
-              <div className="text-[11px] text-[var(--text-faint)]">Tổng Đơn Hàng</div>
-              <div className="text-lg font-black text-[var(--text)]">{overview.totalOrders.toLocaleString("vi-VN")}</div>
-              <div className="text-[10px] text-[var(--text-muted)]">{overview.sessionCount} phiên live</div>
-            </div>
-            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
-              <div className="text-[11px] text-[var(--text-faint)]">PCU Trung Bình</div>
-              <div className="text-lg font-black text-[var(--text)]">{overview.avgPeak.toLocaleString("vi-VN")}</div>
-            </div>
-            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
-              <div className="text-[11px] text-[var(--text-faint)]">CTR / CVR TB</div>
-              <div className="text-lg font-black text-[var(--text)]">
-                {overview.avgCtr.toFixed(1)}% / {overview.avgCvr.toFixed(1)}%
-              </div>
-            </div>
-          </div>
-
-          {/* Host Performance */}
-          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 space-y-3">
-            <h3 className="font-bold text-[var(--text)] text-sm flex items-center gap-2">
-              <Users className="w-4 h-4 text-[var(--accent-text)]" /> Host Performance
-            </h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)]">
-                    <th className="py-2 px-2">Host</th>
-                    <th className="py-2 px-2 text-right">Số Phiên</th>
-                    <th className="py-2 px-2 text-right">GMV</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {hostPerformance.map((h) => (
-                    <tr key={h.hostName} className="border-b border-[var(--border-muted)]">
-                      <td className="py-2 px-2 text-[var(--text)] font-semibold">{h.hostName}</td>
-                      <td className="py-2 px-2 text-right text-[var(--text-muted)]">{h.sessionCount}</td>
-                      <td className="py-2 px-2 text-right text-emerald-400 font-bold">{formatCurrencyAdaptive(h.gmv)}</td>
-                    </tr>
-                  ))}
-                  {hostPerformance.length === 0 && (
-                    <tr>
-                      <td colSpan={3} className="py-6 text-center text-[var(--text-faint)] italic">
-                        Chưa có phiên Completed trong tháng.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Assortment / SKU */}
-          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 space-y-3">
-            <h3 className="font-bold text-[var(--text)] text-sm flex items-center gap-2">
-              <ShoppingBag className="w-4 h-4 text-[var(--accent-text)]" /> Assortment / Top SKU
-            </h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)]">
-                    <th className="py-2 px-2">Mã SKU</th>
-                    <th className="py-2 px-2">Tên Sản Phẩm</th>
-                    <th className="py-2 px-2 text-right">Đã Bán</th>
-                    <th className="py-2 px-2 text-right">Doanh Thu</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {topSkus.map((sku) => (
-                    <tr key={sku.code || sku.name} className="border-b border-[var(--border-muted)]">
-                      <td className="py-2 px-2 font-mono text-[var(--accent-text)]">{sku.code || "—"}</td>
-                      <td className="py-2 px-2 text-[var(--text)] font-semibold">{sku.name}</td>
-                      <td className="py-2 px-2 text-right text-[var(--text-muted)]">{sku.sold.toLocaleString("vi-VN")}</td>
-                      <td className="py-2 px-2 text-right text-emerald-400 font-bold">{formatCurrencyAdaptive(sku.revenue)}</td>
-                    </tr>
-                  ))}
-                  {topSkus.length === 0 && (
-                    <tr>
-                      <td colSpan={4} className="py-6 text-center text-[var(--text-faint)] italic">
-                        Chưa có dữ liệu SKU trong tháng.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          {/* Report Tháng redesign (2026-08-22) — tabbed, skin đen-vàng cố định cho tài liệu gửi
+              brand, thay toàn bộ khối Overview/Host Performance/Top SKU/Deep Dive cũ. Xem note thiết
+              kế trong MonthlyReportTabs.tsx (nguồn dữ liệu từng tab, giới hạn phạm vi). */}
+          <MonthlyReportTabs brandId={brandId} month={month} sessions={sessions} canManage={canManage} brandPlatformRates={brandPlatformRates} />
 
           {/* Ads Report chi tiết — tính từ ads_cost thật trong Report Ca (live_session_reports),
               chỉ có cho TikTok (Shopee không có field ads_cost trong Excel gốc, xem migration 0046). */}
@@ -629,6 +544,8 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
             )}
           </div>
 
+        </>
+      )}
         </>
       )}
     </div>

@@ -25,10 +25,10 @@ const shiftMonth = (month: string, delta: number) => {
 };
 
 const cellTone = (day: DailyGmv | undefined, dateStr: string, todayDate: string) => {
-  if (!day || day.sessionCount === 0) return "bg-slate-50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800/70";
-  if (day.target === 0) return "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800";
+  if (!day || day.sessionCount === 0) return "bg-[var(--surface-muted)] border-[var(--border-muted)]";
+  if (day.target === 0) return "bg-[var(--surface)] border-[var(--border)]";
   const pct = day.actual / day.target;
-  if (dateStr > todayDate) return "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"; // tương lai, chưa live
+  if (dateStr > todayDate) return "bg-[var(--surface)] border-[var(--border)]"; // tương lai, chưa live
   if (pct >= 1) return "bg-emerald-50 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-800/60";
   if (pct >= 0.7) return "bg-amber-50 dark:bg-amber-950/50 border-amber-300 dark:border-amber-800/50";
   return "bg-red-50 dark:bg-red-950/50 border-red-300 dark:border-red-900/50";
@@ -122,22 +122,22 @@ export const GmvCalendar: React.FC<GmvCalendarProps> = ({
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-1 shadow-sm">
-          <span className="text-blue-600 dark:text-blue-400 font-semibold text-xs uppercase tracking-wider">Target tháng</span>
-          <p className="text-2xl font-black text-slate-900 dark:text-white">{formatCurrencyAdaptive(monthSummary.target)}</p>
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 space-y-1 shadow-sm">
+          <span className="text-[var(--accent-text)] font-semibold text-xs uppercase tracking-wider">Target tháng</span>
+          <p className="text-2xl font-black text-[var(--text)]">{formatCurrencyAdaptive(monthSummary.target)}</p>
         </div>
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-1 shadow-sm">
-          <span className="text-emerald-600 dark:text-emerald-400 font-semibold text-xs uppercase tracking-wider">Actual tháng</span>
-          <p className="text-2xl font-black text-slate-900 dark:text-white">{formatCurrencyAdaptive(monthSummary.actual)}</p>
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 space-y-1 shadow-sm">
+          <span className="text-[var(--success)] font-semibold text-xs uppercase tracking-wider">Actual tháng</span>
+          <p className="text-2xl font-black text-[var(--text)]">{formatCurrencyAdaptive(monthSummary.actual)}</p>
           <p className="text-xs text-[var(--text-faint)]">{monthSummary.achievedPct.toFixed(0)}% target</p>
         </div>
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-1 shadow-sm">
-          <span className="text-purple-600 dark:text-purple-400 font-semibold text-xs uppercase tracking-wider flex items-center gap-1.5">
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 space-y-1 shadow-sm">
+          <span className="text-[var(--accent-text)] font-semibold text-xs uppercase tracking-wider flex items-center gap-1.5">
             <TrendingUp className="w-3.5 h-3.5" /> Dự phóng cuối tháng
           </span>
           {monthSummary.projectedEom !== null ? (
             <>
-              <p className="text-2xl font-black text-slate-900 dark:text-white">{formatCurrencyAdaptive(monthSummary.projectedEom)}</p>
+              <p className="text-2xl font-black text-[var(--text)]">{formatCurrencyAdaptive(monthSummary.projectedEom)}</p>
               <p className="text-xs text-[var(--text-faint)]">
                 {monthSummary.projectedPct !== null ? `${monthSummary.projectedPct.toFixed(0)}% target` : "—"} • run-rate {monthSummary.daysElapsed} ngày đã qua
               </p>

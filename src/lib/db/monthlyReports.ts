@@ -15,6 +15,22 @@ interface DbMonthlyReport {
   promotion_notes: string | null;
   customer_insight_notes: string | null;
   account_health_notes: string | null;
+  plan_target_gmv: number | null;
+  plan_target_nmv: number | null;
+  plan_target_hours: number | null;
+  plan_pct_daily: number | null;
+  plan_pct_dday: number | null;
+  plan_pct_midmonth: number | null;
+  plan_pct_payday: number | null;
+  camp_dday_start: string | null;
+  camp_dday_end: string | null;
+  camp_dday_target_gmv: number | null;
+  camp_midmonth_start: string | null;
+  camp_midmonth_end: string | null;
+  camp_midmonth_target_gmv: number | null;
+  camp_payday_start: string | null;
+  camp_payday_end: string | null;
+  camp_payday_target_gmv: number | null;
   published_at: string | null;
   published_by: string | null;
   created_at: string;
@@ -32,6 +48,22 @@ function reportFromDb(row: DbMonthlyReport): BrandMonthlyReport {
     promotionNotes: row.promotion_notes ?? undefined,
     customerInsightNotes: row.customer_insight_notes ?? undefined,
     accountHealthNotes: row.account_health_notes ?? undefined,
+    planTargetGmv: row.plan_target_gmv ?? undefined,
+    planTargetNmv: row.plan_target_nmv ?? undefined,
+    planTargetHours: row.plan_target_hours ?? undefined,
+    planPctDaily: row.plan_pct_daily ?? undefined,
+    planPctDday: row.plan_pct_dday ?? undefined,
+    planPctMidmonth: row.plan_pct_midmonth ?? undefined,
+    planPctPayday: row.plan_pct_payday ?? undefined,
+    campDdayStart: row.camp_dday_start ?? undefined,
+    campDdayEnd: row.camp_dday_end ?? undefined,
+    campDdayTargetGmv: row.camp_dday_target_gmv ?? undefined,
+    campMidmonthStart: row.camp_midmonth_start ?? undefined,
+    campMidmonthEnd: row.camp_midmonth_end ?? undefined,
+    campMidmonthTargetGmv: row.camp_midmonth_target_gmv ?? undefined,
+    campPaydayStart: row.camp_payday_start ?? undefined,
+    campPaydayEnd: row.camp_payday_end ?? undefined,
+    campPaydayTargetGmv: row.camp_payday_target_gmv ?? undefined,
     publishedAt: row.published_at ?? undefined,
     publishedBy: row.published_by ?? undefined,
     createdAt: row.created_at,
@@ -45,6 +77,22 @@ export interface MonthlyReportManualInput {
   promotionNotes?: string;
   customerInsightNotes?: string;
   accountHealthNotes?: string;
+  planTargetGmv?: number;
+  planTargetNmv?: number;
+  planTargetHours?: number;
+  planPctDaily?: number;
+  planPctDday?: number;
+  planPctMidmonth?: number;
+  planPctPayday?: number;
+  campDdayStart?: string;
+  campDdayEnd?: string;
+  campDdayTargetGmv?: number;
+  campMidmonthStart?: string;
+  campMidmonthEnd?: string;
+  campMidmonthTargetGmv?: number;
+  campPaydayStart?: string;
+  campPaydayEnd?: string;
+  campPaydayTargetGmv?: number;
 }
 
 // periodMonth: "YYYY-MM-01". Lấy report hiện có nếu đã tạo, không tự tạo mới — UI gọi
@@ -82,7 +130,26 @@ export async function upsertMonthlyReport(brandId: string, periodMonth: string, 
         roas: input.roas ?? null,
         promotion_notes: input.promotionNotes ?? null,
         customer_insight_notes: input.customerInsightNotes ?? null,
-        account_health_notes: input.accountHealthNotes ?? null
+        account_health_notes: input.accountHealthNotes ?? null,
+        // Đã sửa: các field kế hoạch dưới đây từng bị THIẾU khỏi payload upsert dù có trong
+        // MonthlyReportManualInput — Tab 05 "Kế hoạch tháng sau" tưởng đã lưu nhưng chưa từng ghi
+        // xuống DB (mọi field plan_* luôn bị null hoá lại mỗi lần upsert vì không có mặt trong object).
+        plan_target_gmv: input.planTargetGmv ?? null,
+        plan_target_nmv: input.planTargetNmv ?? null,
+        plan_target_hours: input.planTargetHours ?? null,
+        plan_pct_daily: input.planPctDaily ?? null,
+        plan_pct_dday: input.planPctDday ?? null,
+        plan_pct_midmonth: input.planPctMidmonth ?? null,
+        plan_pct_payday: input.planPctPayday ?? null,
+        camp_dday_start: input.campDdayStart ?? null,
+        camp_dday_end: input.campDdayEnd ?? null,
+        camp_dday_target_gmv: input.campDdayTargetGmv ?? null,
+        camp_midmonth_start: input.campMidmonthStart ?? null,
+        camp_midmonth_end: input.campMidmonthEnd ?? null,
+        camp_midmonth_target_gmv: input.campMidmonthTargetGmv ?? null,
+        camp_payday_start: input.campPaydayStart ?? null,
+        camp_payday_end: input.campPaydayEnd ?? null,
+        camp_payday_target_gmv: input.campPaydayTargetGmv ?? null
       },
       { onConflict: "brand_id,period_month" }
     )

@@ -115,28 +115,28 @@ export const SchemeDayPanel: React.FC<SchemeDayPanelProps> = ({ brandId, date, s
                     onChange={(e) => setDraft((d) => ({ ...d, category: e.target.value }))}
                     list="scheme-categories-day"
                     placeholder="Hạng mục"
-                    className={`w-full bg-white/70 dark:bg-slate-900/60 rounded px-1.5 py-1 text-[10px] font-black uppercase tracking-wide ${color.text} focus:outline-none focus:ring-1 focus:ring-amber-500`}
+                    className={`w-full bg-[var(--surface-elevated)] rounded px-1.5 py-1 text-[10px] font-black uppercase tracking-wide ${color.text} focus:outline-none focus:ring-1 focus:ring-amber-500`}
                   />
                   <textarea
                     autoFocus
                     value={draft.text}
                     onChange={(e) => setDraft((d) => ({ ...d, text: e.target.value }))}
                     rows={2}
-                    className="w-full bg-white/70 dark:bg-slate-900/60 rounded p-1.5 text-[12px] focus:outline-none focus:ring-1 focus:ring-amber-500"
+                    className="w-full bg-[var(--surface-elevated)] rounded p-1.5 text-[12px] focus:outline-none focus:ring-1 focus:ring-amber-500"
                   />
                   <div className="flex flex-wrap items-center gap-1">
                     <input
                       type="date"
                       value={draft.startDate}
                       onChange={(e) => setDraft((d) => ({ ...d, startDate: e.target.value }))}
-                      className="bg-white/70 dark:bg-slate-900/60 rounded px-1 py-0.5 text-[10px]"
+                      className="bg-[var(--surface-elevated)] rounded px-1 py-0.5 text-[10px]"
                     />
-                    <span className="text-slate-400">→</span>
+                    <span className="text-[var(--text-faint)]">→</span>
                     <input
                       type="date"
                       value={draft.endDate}
                       onChange={(e) => setDraft((d) => ({ ...d, endDate: e.target.value }))}
-                      className="bg-white/70 dark:bg-slate-900/60 rounded px-1 py-0.5 text-[10px]"
+                      className="bg-[var(--surface-elevated)] rounded px-1 py-0.5 text-[10px]"
                     />
                     <button
                       disabled={busy}

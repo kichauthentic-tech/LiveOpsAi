@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 
-export type Theme = "midnight" | "ocean" | "sand";
+export type Theme = "midnight" | "ocean" | "sand" | "yfb";
 
 export const THEME_OPTIONS: Array<{ id: Theme; label: string; dark: boolean }> = [
   { id: "midnight", label: "Midnight", dark: true },
   { id: "ocean", label: "Ocean", dark: true },
-  { id: "sand", label: "Sand", dark: false }
+  { id: "sand", label: "Sand", dark: false },
+  { id: "yfb", label: "YFB", dark: true }
 ];
 
 interface ThemeContextValue {
@@ -21,7 +22,7 @@ const STORAGE_KEY = "liveops-theme";
 // không mất lựa chọn user đã lưu trước đó.
 const getInitialTheme = (): Theme => {
   const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored === "midnight" || stored === "ocean" || stored === "sand") return stored;
+  if (stored === "midnight" || stored === "ocean" || stored === "sand" || stored === "yfb") return stored;
   if (stored === "light") return "sand";
   return "midnight";
 };

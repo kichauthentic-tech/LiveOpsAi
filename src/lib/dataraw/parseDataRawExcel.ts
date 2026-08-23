@@ -163,6 +163,87 @@ function parseShopAnalytics(rows: unknown[][]): ParsedDataRawImport {
   };
 }
 
+// Live Performance Core Stats + Product Card Traffic Stats — cả 2 đều là bảng phẳng theo NGÀY,
+// header anchored ở cột "Thời gian" (khác "Ngày" của Shop Analytics), không có khối tổng quan
+// riêng như Shop Analytics. Meta dòng đầu khác định dạng nhẹ giữa 2 loại (có/không ngoặc vuông)
+// nên vẫn tách 2 hàm riêng thay vì dùng chung 1 regex, để lỗi định dạng báo đúng loại report.
+function parseDailyByThoiGianHeader(rows: unknown[][], metaRegex: RegExp, metaPrefix: RegExp, reportLabel: string): ParsedDataRawImport {
+  const metaLine = String(rows[0]?.[0] ?? "");
+  const metaMatch = metaLine.match(metaRegex);
+  const headerIdx = rows.findIndex((r) => r && String(r[0] ?? "").trim() === "Thời gian");
+  if (headerIdx === -1) {
+    throw new Error(`Không tìm thấy dòng tiêu đề (cột "Thời gian") — file có đúng định dạng "${reportLabel}" từ TikTok Shop không?`);
+  }
+  const header = trimTrailingEmpty(rows[headerIdx]);
+  const columns = dedupeHeaders(header);
+  return {
+    periodLabel: metaLine.replace(metaPrefix, "").trim() || undefined,
+    periodStart: metaMatch?.[1],
+    periodEnd: metaMatch?.[2],
+    columns,
+    rows: buildRows(rows, headerIdx + 1, columns)
+  };
+}
+
+function parseLivePerformanceCoreStats(rows: unknown[][]): ParsedDataRawImport {
+  return parseDailyByThoiGianHeader(rows, /Phạm vi ngày:\s*([\d\-]+)\s*~\s*([\d\-]+)/, /^Phạm vi ngày:\s*/, "Live Performance Core Stats");
+}
+
+function parseProductCardTrafficStats(rows: unknown[][]): ParsedDataRawImport {
+  return parseDailyByThoiGianHeader(rows, /\[Phạm vi ngày\]:\s*([\d\-]+)\s*~\s*([\d\-]+)/, /^\[Phạm vi ngày\]:\s*/, "Product Card Traffic Stats");
+}
+
+// Creator-Live-Performance (migration 0066) — xuất từ TikTok Creator Center, tiếng Anh, 1
+// dòng/phiên live theo Room ID (khác live_analysis theo Seller Center). Meta dòng đầu chỉ là
+// "yyyy-mm-dd ~ yyyy-mm-dd" trần, không có prefix chữ nào cả — khác mọi report khác.
+function parseCreatorLivePerformance(rows: unknown[][]): ParsedDataRawImport {
+  const metaLine = String(rows[0]?.[0] ?? "");
+  const metaMatch = metaLine.match(/^(\d{4}-\d{2}-\d{2})\s*~\s*(\d{4}-\d{2}-\d{2})/);
+  const headerIdx = rows.findIndex((r) => r && String(r[0] ?? "").trim() === "Room ID");
+  if (headerIdx === -1) {
+    throw new Error('Không tìm thấy dòng tiêu đề (cột "Room ID") — file có đúng định dạng "Creator-Live-Performance" từ TikTok không?');
+  }
+  const header = trimTrailingEmpty(rows[headerIdx]);
+  const columns = dedupeHeaders(header);
+  return {
+    periodLabel: metaLine.trim() || undefined,
+    periodStart: metaMatch?.[1],
+    periodEnd: metaMatch?.[2],
+    columns,
+    rows: buildRows(rows, headerIdx + 1, columns)
+  };
+}
+
+// "..._20260701-20260731.xlsx" -> {start: "2026-07-01", end: "2026-07-31"}
+function periodFromFileName(fileName: string): { start?: string; end?: string } {
+  const m = fileName.match(/(\d{4})(\d{2})(\d{2})-(\d{4})(\d{2})(\d{2})/);
+  if (!m) return {};
+  const [, y1, m1, d1, y2, m2, d2] = m;
+  return { start: `${y1}-${m1}-${d1}`, end: `${y2}-${m2}-${d2}` };
+}
+
+// Transaction Analysis — Creator List (migration 0074) — export tiếng Anh từ TikTok Shop Partner
+// Center, 1 dòng/creator affiliate. Khác mọi report khác ở chỗ hàng 0 LÀ header luôn (không có
+// dòng meta phạm vi ngày riêng), hàng 1 là mô tả cột (bỏ qua) rồi mới tới data — nên kỳ báo cáo
+// phải lấy từ chính tên file (dạng "..._YYYYMMDD-YYYYMMDD.xlsx").
+function parseTransactionAnalysisCreatorList(rows: unknown[][], fileName: string): ParsedDataRawImport {
+  const headerIdx = rows.findIndex((r) => r && String(r[0] ?? "").trim() === "Creator name");
+  if (headerIdx === -1) {
+    throw new Error('Không tìm thấy dòng tiêu đề (cột "Creator name") — file có đúng định dạng "Transaction Analysis - Creator List" từ TikTok Shop Partner Center không?');
+  }
+  const header = trimTrailingEmpty(rows[headerIdx]);
+  const columns = dedupeHeaders(header);
+  const period = periodFromFileName(fileName);
+  return {
+    periodLabel: period.start && period.end ? `${period.start} ~ ${period.end}` : undefined,
+    periodStart: period.start,
+    periodEnd: period.end,
+    columns,
+    // headerIdx + 2: hàng headerIdx + 1 là dòng mô tả cột (text dài, không phải data), bỏ qua.
+    rows: buildRows(rows, headerIdx + 2, columns)
+  };
+}
+
 export async function parseDataRawExcel(file: File, reportType: DataRawReportType): Promise<ParsedDataRawImport> {
   const buf = await file.arrayBuffer();
   const rows = readSheetRows(buf);
@@ -171,5 +252,9 @@ export async function parseDataRawExcel(file: File, reportType: DataRawReportTyp
     case "product_list": return parseProductList(rows);
     case "live_analysis": return parseLiveAnalysis(rows);
     case "shop_analytics": return parseShopAnalytics(rows);
+    case "live_performance_core_stats": return parseLivePerformanceCoreStats(rows);
+    case "product_card_traffic_stats": return parseProductCardTrafficStats(rows);
+    case "creator_live_performance": return parseCreatorLivePerformance(rows);
+    case "transaction_analysis_creator_list": return parseTransactionAnalysisCreatorList(rows, file.name);
   }
 }

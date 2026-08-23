@@ -1020,13 +1020,13 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
 
       {/* VIEW 1: MONTH VIEW (Lịch Tháng - Bảng Lịch 30/31 Ngày) */}
       {viewMode === "month" && (
-        <div className="bg-[#f8f9fa] dark:bg-slate-900 border border-pink-200 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl space-y-4">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-200 dark:border-slate-800 pb-3 gap-2">
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-6 shadow-xl space-y-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-[var(--border)] pb-3 gap-2">
             <div>
-              <h3 className="font-black text-slate-900 dark:text-white text-base flex items-center gap-2">
-                <CalendarIcon className="w-5 h-5 text-blue-500 dark:text-blue-400 shrink-0" /> Tổng Quan Lịch Tháng {currentMonth}/{currentYear}
+              <h3 className="font-black text-[var(--text)] text-base flex items-center gap-2">
+                <CalendarIcon className="w-5 h-5 text-[var(--accent-text)] shrink-0" /> Tổng Quan Lịch Tháng {currentMonth}/{currentYear}
               </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Kéo thả để đổi lịch · Màu badge = màu nhận diện của brand</p>
+              <p className="text-xs text-[var(--text-muted)]">Kéo thả để đổi lịch · Màu badge = màu nhận diện của brand</p>
             </div>
             <div className="flex items-center gap-1.5 flex-wrap text-[11px] font-semibold">
               {monthBrandNames.map((name) => {
@@ -1042,7 +1042,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   </span>
                 );
               })}
-              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full border-2 border-dashed border-slate-400 dark:border-slate-600 text-slate-500 dark:text-slate-400 text-[10px] font-black uppercase">
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full border-2 border-dashed border-[var(--border)] text-[var(--text-muted)] text-[10px] font-black uppercase">
                 Viền đứt = ca chờ ĐK
               </span>
             </div>
@@ -1059,7 +1059,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                 className={`p-1 sm:p-2 text-center font-black text-xs uppercase rounded-xl ${
                   idx >= 5
                     ? "bg-rose-100 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400"
-                    : "bg-slate-100 dark:bg-slate-900/60 text-slate-500 dark:text-slate-400"
+                    : "bg-[var(--surface-elevated)] text-[var(--text-muted)]"
                 }`}
               >
                 <span className="hidden sm:inline">{d}</span>
@@ -1094,16 +1094,16 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   title={campaignDay?.label}
                   className={`min-h-[110px] sm:min-h-[215px] p-1 sm:p-2.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between relative overflow-visible ${
                     isMonthHovered
-                      ? "bg-blue-100 dark:bg-blue-950/80 border-2 border-dashed border-blue-400 scale-[1.02] shadow-xl shadow-blue-500/20"
+                      ? "bg-[var(--accent)]/15 border-2 border-dashed border-[var(--accent)] scale-[1.02] shadow-xl shadow-[var(--accent)]/20"
                       : !cell.isCurrentMonth
-                      ? "bg-slate-100/60 dark:bg-slate-950/30 border-slate-200 dark:border-slate-800/40 opacity-40 hover:opacity-80"
+                      ? "bg-[var(--surface-muted)] border-[var(--border-muted)] opacity-40 hover:opacity-80"
                       : isToday
                       ? "bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-700/60 ring-2 ring-amber-400 shadow-md"
                       : isSelected
-                      ? "bg-blue-50 dark:bg-blue-950/50 border-blue-500 shadow-md shadow-blue-600/10"
+                      ? "bg-[var(--accent)]/10 border-[var(--accent)] shadow-md shadow-[var(--accent)]/10"
                       : campaignDay
                       ? CAMPAIGN_DAY_STYLES[campaignDay.type].cell
-                      : "bg-white dark:bg-slate-950/80 border-slate-200 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-900"
+                      : "bg-[var(--surface)] border-[var(--border)] hover:border-[var(--text-faint)] hover:bg-[var(--surface-hover)]"
                   }`}
                 >
                   {isToday && (
@@ -1129,8 +1129,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                         isToday
                           ? "text-orange-600 dark:text-orange-400"
                           : isSelected
-                          ? "text-blue-600 dark:text-blue-400"
-                          : "text-slate-700 dark:text-slate-300"
+                          ? "text-[var(--accent-text)]"
+                          : "text-[var(--text)]"
                       }`}
                     >
                       {cell.dayNum}
@@ -1210,11 +1210,11 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
 
                   {/* Day total GMV */}
                   {totalGmvTarget > 0 ? (
-                    <div className="text-[9px] font-mono font-bold text-emerald-600 dark:text-emerald-400 pt-1 border-t border-slate-200 dark:border-slate-800/60 truncate">
+                    <div className="text-[9px] font-mono font-bold text-[var(--success)] pt-1 border-t border-[var(--border-muted)] truncate">
                       Target: {(totalGmvTarget / 1000000).toFixed(0)}M
                     </div>
                   ) : (
-                    <div className="text-[9px] text-slate-400 dark:text-slate-600 italic">Trống lịch</div>
+                    <div className="text-[9px] text-[var(--text-faint)] italic">Trống lịch</div>
                   )}
                 </div>
               );
@@ -1226,13 +1226,13 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
 
       {/* VIEW 2: WEEK VIEW (Lịch Tuần - 7 Ngày Từ T2 Đến CN) */}
       {viewMode === "week" && (
-        <div className="bg-[#f8f9fa] dark:bg-slate-900 border border-pink-200 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl space-y-4">
-          <div className="border-b border-slate-200 dark:border-slate-800 pb-3 flex justify-between items-center">
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-6 shadow-xl space-y-4">
+          <div className="border-b border-[var(--border)] pb-3 flex justify-between items-center">
             <div>
-              <h3 className="font-black text-slate-900 dark:text-white text-base flex items-center gap-2">
-                <CalendarIcon className="w-5 h-5 text-blue-500 dark:text-blue-400" /> Lịch Vận Hành Tuần
+              <h3 className="font-black text-[var(--text)] text-base flex items-center gap-2">
+                <CalendarIcon className="w-5 h-5 text-[var(--accent-text)]" /> Lịch Vận Hành Tuần
               </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Kéo thả để đổi lịch</p>
+              <p className="text-xs text-[var(--text-muted)]">Kéo thả để đổi lịch</p>
             </div>
           </div>
 
@@ -1255,14 +1255,14 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   onDragLeave={(e) => handleDragLeave(e, weekCellKey)}
                   onDrop={(e) => handleDropOnWeekDay(e, wDay.dateStr)}
                   title={campaignDay?.label}
-                  className={`bg-white dark:bg-slate-950 rounded-2xl p-3 border space-y-3 transition-all overflow-visible ${
+                  className={`bg-[var(--surface)] rounded-2xl p-3 border space-y-3 transition-all overflow-visible ${
                     isWeekHovered
-                      ? "border-2 border-dashed border-blue-400 bg-blue-50 dark:bg-blue-950/40 shadow-xl shadow-blue-500/20 scale-[1.01]"
+                      ? "border-2 border-dashed border-[var(--accent)] bg-[var(--accent)]/10 shadow-xl shadow-[var(--accent)]/20 scale-[1.01]"
                       : isSelected
-                      ? "border-blue-500/80 bg-blue-50/60 dark:bg-blue-950/20"
+                      ? "border-[var(--accent)]/80 bg-[var(--accent)]/5"
                       : campaignDay
                       ? CAMPAIGN_DAY_STYLES[campaignDay.type].cell
-                      : "border-slate-200 dark:border-slate-800"
+                      : "border-[var(--border)]"
                   }`}
                 >
                   {/* Desktop (md:grid-cols-7, hàng ngang thật): dải banner nối liền qua 3 ngày của
@@ -1280,10 +1280,10 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   {campaignDay && <CampaignDayBanner info={campaignDay} className="-mt-0.5 md:hidden" />}
                   <div
                     onClick={() => setSelectedDate(wDay.dateStr)}
-                    className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800/80 pb-2 cursor-pointer"
+                    className="flex justify-between items-center border-b border-[var(--border-muted)] pb-2 cursor-pointer"
                   >
                     <div>
-                      <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase flex items-center gap-1">
+                      <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase flex items-center gap-1">
                         {wDay.dayName}
                         {daySchemes.length > 0 && (
                           <span title={daySchemes.map((s) => `${s.title}${s.description ? ` — ${s.description}` : ""}`).join("\n")}>
@@ -1291,12 +1291,12 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                           </span>
                         )}
                       </span>
-                      <strong className={`text-sm font-mono font-bold ${isToday ? "text-blue-600 dark:text-blue-400" : "text-slate-900 dark:text-white"}`}>
+                      <strong className={`text-sm font-mono font-bold ${isToday ? "text-[var(--accent-text)]" : "text-[var(--text)]"}`}>
                         {wDay.dayNum}/{parseDateString(wDay.dateStr).month}
                       </strong>
                     </div>
                     <div className="flex items-center gap-1">
-                      <span className="text-[10px] bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 font-bold px-2 py-0.5 rounded-full">
+                      <span className="text-[10px] bg-[var(--surface-elevated)] text-[var(--text-muted)] font-bold px-2 py-0.5 rounded-full">
                         {daySessions.length}
                       </span>
                       {daySlots.length > 0 && (
@@ -1358,8 +1358,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                         }}
                         className={`h-24 rounded-xl border border-dashed transition-all cursor-pointer flex flex-col items-center justify-center space-y-1 ${
                           isWeekHovered
-                            ? "border-blue-400 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-300 font-bold"
-                            : "border-slate-300 dark:border-slate-800/80 hover:border-blue-400 dark:hover:border-blue-500/50 text-slate-400 dark:text-slate-600 hover:text-blue-500 dark:hover:text-blue-400"
+                            ? "border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent-text)] font-bold"
+                            : "border-[var(--border)] hover:border-[var(--accent)]/60 text-[var(--text-faint)] hover:text-[var(--accent-text)]"
                         }`}
                       >
                         <Plus className="w-4 h-4" />
@@ -1681,7 +1681,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   type="button"
                   onClick={handleAiOptimizeSchedule}
                   disabled={isOptimizingSchedule}
-                  className="bg-blue-600 hover:bg-blue-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold text-xs px-3 py-1.5 rounded-lg flex items-center gap-1 shadow transition-all active:scale-95"
+                  className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-60 disabled:cursor-not-allowed text-[var(--surface-base)] font-bold text-xs px-3 py-1.5 rounded-lg flex items-center gap-1 shadow transition-all active:scale-95"
                 >
                   <Zap className="w-3.5 h-3.5" /> {isOptimizingSchedule ? "Đang phân tích..." : "Gợi Ý Khung Giờ Vàng AI"}
                 </button>

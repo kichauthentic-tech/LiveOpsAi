@@ -13,9 +13,10 @@ import {
   RECONCILE_THRESHOLDS,
   updateRowMatch,
   applyReconciliation,
+  applyReconciliationChain,
   DataRawLiveAnalysisOption
 } from "../lib/db/tiktokReconciliation";
-import { FileSpreadsheet, CheckCircle2, AlertTriangle, RefreshCw, Database, Download, Clock } from "lucide-react";
+import { FileSpreadsheet, CheckCircle2, AlertTriangle, RefreshCw, Database, Download, Clock, Link2, Link2Off } from "lucide-react";
 
 interface TikTokLiveReconciliationProps {
   sessions: LiveSession[];
@@ -42,7 +43,7 @@ const FLAG_LABELS: Record<ReconciliationFlagReason, string> = {
 };
 
 function confidenceBadge(c: TikTokLiveImportRow["matchConfidence"]) {
-  if (c === "time_overlap" || c === "manual" || c === "room_id") {
+  if (c === "time_overlap" || c === "manual" || c === "room_id" || c === "chain") {
     return <span className="bg-emerald-950/60 text-emerald-400 border border-emerald-800/50 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">Đã Khớp</span>;
   }
   return <span className="bg-amber-950/60 text-amber-400 border border-amber-800/50 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">Chưa Khớp</span>;
@@ -125,8 +126,13 @@ export const TikTokLiveReconciliation: React.FC<TikTokLiveReconciliationProps> =
     setApplyingId(row.id);
     setError(null);
     try {
-      const updated = await applyReconciliation(row.id, row.matchedSessionId);
-      onSessionUpdated(updated);
+      if (row.matchedSessionIds && row.matchedSessionIds.length > 1) {
+        const updated = await applyReconciliationChain(row.id, row.matchedSessionIds);
+        updated.forEach(onSessionUpdated);
+      } else {
+        const updated = await applyReconciliation(row.id, row.matchedSessionId);
+        onSessionUpdated(updated);
+      }
       await refreshReconciliations(rows);
     } catch (e: any) {
       setError(e.message || "Không áp dụng được đối soát cho dòng này.");
@@ -135,11 +141,33 @@ export const TikTokLiveReconciliation: React.FC<TikTokLiveReconciliationProps> =
     }
   };
 
+  // Bỏ chuỗi tự phát hiện — ops muốn tự chọn tay từng session thay vì để hệ thống gộp ca nối
+  // (VD phát hiện sai, hoặc 1 trong các ca thực ra không cùng phiên LIVE liên tục).
+  const handleUnlinkChain = async (rowId: string) => {
+    setRows((prev) => prev.map((r) => (r.id === rowId ? { ...r, matchedSessionId: undefined, matchedSessionIds: undefined, matchConfidence: "unmatched" } : r)));
+    try {
+      await updateRowMatch(rowId, null, "unmatched");
+    } catch (e: any) {
+      setError(e.message);
+    }
+  };
+
   // Áp dụng hàng loạt cho các dòng đã khớp & chưa đối soát. Chạy tuần tự (không Promise.all) vì
   // mỗi lần apply là 1 RPC ghi đè live_sessions — chạy song song dễ vượt rate limit và khó báo
   // đúng dòng nào lỗi; số dòng 1 tháng chỉ vài chục nên tuần tự vẫn nhanh.
+  // "Đã đối soát" cho dòng ca nối = MỌI session trong chuỗi đều đã tiktok_reconciled (không chỉ
+  // session đầu) — nếu không, bulk-apply sẽ ghi đè lại (chia lại GMV) những chuỗi đã xong.
+  const isRowReconciled = React.useCallback(
+    (row: TikTokLiveImportRow) => {
+      const ids = row.matchedSessionIds && row.matchedSessionIds.length > 1 ? row.matchedSessionIds : row.matchedSessionId ? [row.matchedSessionId] : [];
+      if (ids.length === 0) return false;
+      return ids.every((id) => sessions.find((s) => s.id === id)?.dataSource === "tiktok_reconciled");
+    },
+    [sessions]
+  );
+
   const handleBulkApply = async () => {
-    const pending = rows.filter((r) => r.matchedSessionId && sessions.find((s) => s.id === r.matchedSessionId)?.dataSource !== "tiktok_reconciled");
+    const pending = rows.filter((r) => r.matchedSessionId && !isRowReconciled(r));
     if (pending.length === 0) return;
     setError(null);
     let done = 0;
@@ -147,8 +175,13 @@ export const TikTokLiveReconciliation: React.FC<TikTokLiveReconciliationProps> =
     for (const row of pending) {
       setBulkProgress(`Đang áp dụng ${done + 1}/${pending.length}...`);
       try {
-        const updated = await applyReconciliation(row.id, row.matchedSessionId!);
-        onSessionUpdated(updated);
+        if (row.matchedSessionIds && row.matchedSessionIds.length > 1) {
+          const updated = await applyReconciliationChain(row.id, row.matchedSessionIds);
+          updated.forEach(onSessionUpdated);
+        } else {
+          const updated = await applyReconciliation(row.id, row.matchedSessionId!);
+          onSessionUpdated(updated);
+        }
         done++;
       } catch (e: any) {
         failed.push(`${row.creatorName || "?"} ${vnParts(row.startTime).label}: ${e.message ?? e}`);
@@ -160,9 +193,7 @@ export const TikTokLiveReconciliation: React.FC<TikTokLiveReconciliationProps> =
   };
 
   const matchedCount = rows.filter((r) => r.matchedSessionId).length;
-  const pendingApplyCount = rows.filter(
-    (r) => r.matchedSessionId && sessions.find((s) => s.id === r.matchedSessionId)?.dataSource !== "tiktok_reconciled"
-  ).length;
+  const pendingApplyCount = rows.filter((r) => r.matchedSessionId && !isRowReconciled(r)).length;
 
   const sessionOptionsByDate = useMemo(() => {
     const map: Record<string, LiveSession[]> = {};
@@ -196,15 +227,17 @@ export const TikTokLiveReconciliation: React.FC<TikTokLiveReconciliationProps> =
           <FileSpreadsheet className="w-5 h-5 text-emerald-600" /> Đối Soát Số Liệu TikTok
         </h3>
         <p className="text-xs text-[var(--text-muted)]">
-          Dữ liệu lấy từ report <b>Live Analysis</b> đã lưu trong module <b>Dữ Liệu Gốc</b> của từng brand — không upload file ở đây nữa.
-          Chọn batch cần đối soát bên dưới, hệ thống tự khớp theo ngày + tên host + giờ bắt đầu gần nhất trong phạm vi brand đó,
-          sau đó ghi đè số liệu tạm tính bằng số chính thức từ TikTok.
+          Dữ liệu lấy từ report <b>Creator-Live-Performance</b> (hoặc <b>Live Analysis</b> cho batch cũ trước 2026-08-22) đã lưu trong
+          module <b>Dữ Liệu Gốc</b> của từng brand — không upload file ở đây nữa. Chọn batch cần đối soát bên dưới, hệ thống tự khớp
+          theo ngày + giờ bắt đầu gần nhất trong phạm vi brand đó (kèm tên host nếu batch có, Creator-Live-Performance không có tên
+          host nên chỉ khớp theo ngày+giờ), sau đó ghi đè số liệu tạm tính bằng số chính thức từ TikTok.
         </p>
 
         {datarawOptions.length === 0 ? (
           <div className="text-xs text-[var(--text-muted)] bg-[var(--surface-elevated)]/40 border border-dashed border-[var(--border)] rounded-xl p-4 flex items-center gap-2">
             <Database className="w-4 h-4 shrink-0" />
-            Chưa có brand nào upload report "Live Analysis" vào Dữ Liệu Gốc. Vào Brand Workspace → Dữ Liệu Gốc → tab Live Analysis để upload trước.
+            Chưa có brand nào upload report "Creator-Live-Performance"/"Live Analysis" vào Dữ Liệu Gốc. Vào Brand Workspace → Dữ Liệu
+            Gốc để upload trước.
           </div>
         ) : (
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -216,7 +249,10 @@ export const TikTokLiveReconciliation: React.FC<TikTokLiveReconciliationProps> =
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="font-bold text-[var(--text)] text-xs truncate">{opt.brandName}</p>
-                      <p className="text-[11px] text-[var(--text-muted)]">{fmtPeriod(opt.periodStart, opt.periodEnd)} · {opt.rowCount} phiên</p>
+                      <p className="text-[11px] text-[var(--text-muted)]">
+                        {fmtPeriod(opt.periodStart, opt.periodEnd)} · {opt.rowCount} phiên ·{" "}
+                        {opt.reportType === "creator_live_performance" ? "Creator Live Performance" : "Live Analysis (cũ)"}
+                      </p>
                     </div>
                     {full ? (
                       <span className="bg-emerald-950/60 text-emerald-400 border border-emerald-800/50 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase shrink-0">Đủ Cả Tháng</span>
@@ -297,9 +333,51 @@ export const TikTokLiveReconciliation: React.FC<TikTokLiveReconciliationProps> =
                 {rows.map((row) => {
                   const rowVn = vnParts(row.startTime);
                   const candidates = sessionOptionsByDate[rowVn.date] || [];
+                  const isChain = !!(row.matchedSessionIds && row.matchedSessionIds.length > 1);
+                  const chainSessions = isChain ? row.matchedSessionIds!.map((id) => sessions.find((s) => s.id === id)).filter(Boolean) as LiveSession[] : [];
                   const matchedSession = sessions.find((s) => s.id === row.matchedSessionId);
-                  const alreadyReconciled = matchedSession?.dataSource === "tiktok_reconciled";
-                  const delta = matchedSession ? compareSessionTimes(row, matchedSession) : undefined;
+                  const alreadyReconciled = isRowReconciled(row);
+                  const delta = !isChain && matchedSession ? compareSessionTimes(row, matchedSession) : undefined;
+                  const chainManualSum = chainSessions.reduce((sum, s) => sum + (s.actualGmv || 0), 0);
+
+                  if (isChain) {
+                    return (
+                      <tr key={row.id} className="border-t border-[var(--border-muted)] bg-[var(--surface-elevated)]/30">
+                        <td className="p-2 font-semibold text-[var(--text)]">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <Link2 className="w-3.5 h-3.5 text-[var(--accent-text)] shrink-0" />
+                            {chainSessions.map((s) => s.hostName).join(" + ")}
+                          </div>
+                          <button onClick={() => handleUnlinkChain(row.id)} className="mt-1 flex items-center gap-1 text-[10px] text-[var(--text-faint)] hover:text-[var(--text-muted)]">
+                            <Link2Off className="w-3 h-3" /> Bỏ chuỗi, tự chọn tay
+                          </button>
+                        </td>
+                        <td className="p-2 text-[var(--text-muted)]">{rowVn.label}</td>
+                        <td className="p-2 font-semibold text-[var(--text)]">{fmtMoney(row.gmv)}</td>
+                        <td className="p-2 text-[var(--text-muted)]">
+                          <span className="text-[10px] font-bold bg-[var(--accent)]/20 text-[var(--accent-text)] px-2 py-0.5 rounded-full uppercase">Ca Nối · {chainSessions.length} host</span>
+                        </td>
+                        <td className="p-2 text-[var(--text-muted)]">
+                          {fmtMoney(chainManualSum)}
+                          <span className="text-[10px] block text-[var(--text-faint)]">
+                            Chênh {fmtMoney((row.gmv ?? 0) - chainManualSum)} chia đều {chainSessions.length} host
+                          </span>
+                        </td>
+                        <td className="p-2 text-[var(--text-faint)]">— (ca nối không so lệch giờ từng host)</td>
+                        <td className="p-2">{alreadyReconciled ? <span className="inline-flex items-center gap-1 text-emerald-500 font-bold text-[10px]"><CheckCircle2 className="w-3.5 h-3.5" /> Đã Đối Soát</span> : confidenceBadge(row.matchConfidence)}</td>
+                        <td className="p-2">
+                          <button
+                            onClick={() => handleApply(row)}
+                            disabled={applyingId === row.id || alreadyReconciled}
+                            className="bg-[var(--accent)] text-[var(--accent-text)] font-bold px-3 py-1 rounded-lg text-[11px] disabled:opacity-40 disabled:cursor-not-allowed"
+                          >
+                            {applyingId === row.id ? "..." : alreadyReconciled ? "Xong" : "Áp Dụng Chuỗi"}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  }
+
                   return (
                     <tr key={row.id} className="border-t border-[var(--border-muted)]">
                       <td className="p-2 font-semibold text-[var(--text)]">{row.creatorName || "—"}</td>

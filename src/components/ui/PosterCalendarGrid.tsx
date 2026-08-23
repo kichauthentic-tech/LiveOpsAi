@@ -15,9 +15,9 @@ interface PosterCalendarHeaderProps {
 }
 
 export const PosterCalendarHeader: React.FC<PosterCalendarHeaderProps> = ({ icon: Icon, title, subtitle, nav, actions }) => (
-  <div className="rounded-2xl bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 border border-slate-700/60 dark:border-slate-800 px-5 py-4 flex flex-wrap items-center justify-between gap-3 shadow-lg">
+  <div className="rounded-2xl bg-gradient-to-r from-[var(--surface-elevated)] via-[var(--surface)] to-[var(--surface-elevated)] border border-[var(--border)] px-5 py-4 flex flex-wrap items-center justify-between gap-3 shadow-lg">
     <div className="flex items-center gap-2.5">
-      {Icon && <Icon className="w-5 h-5 text-blue-400 shrink-0" />}
+      {Icon && <Icon className="w-5 h-5 text-[var(--accent-text)] shrink-0" />}
       <div>
         <h2 className="text-lg font-black text-[var(--text)] tracking-tight">{title}</h2>
         {subtitle && <p className="text-xs text-[var(--text-muted)] mt-0.5">{subtitle}</p>}
@@ -30,7 +30,7 @@ export const PosterCalendarHeader: React.FC<PosterCalendarHeaderProps> = ({ icon
   </div>
 );
 
-const WEEKEND_TINT = "bg-pink-50/80 dark:bg-slate-900/40";
+const WEEKEND_TINT = "bg-rose-50/80 dark:bg-rose-950/20";
 
 interface PosterCalendarGridProps {
   weekdayLabels: string[];
@@ -48,7 +48,7 @@ export const PosterCalendarGrid: React.FC<PosterCalendarGridProps> = ({
   minWidthClassName = "",
   children
 }) => (
-  <div className="bg-[#f8f9fa] dark:bg-slate-950 border border-pink-200 dark:border-slate-800 rounded-2xl p-3 sm:p-5 shadow-xl">
+  <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 sm:p-5 shadow-xl">
     <div className="overflow-x-auto -mx-1 px-1 pb-1">
       <div className={minWidthClassName}>
         <div className="grid grid-cols-7 gap-2 text-[10px] sm:text-xs font-black uppercase tracking-wide mb-3">
@@ -58,7 +58,7 @@ export const PosterCalendarGrid: React.FC<PosterCalendarGridProps> = ({
               className={`text-center py-2 rounded-xl ${
                 weekendIndices.includes(i)
                   ? "bg-rose-100 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400"
-                  : "bg-slate-100 dark:bg-slate-900/60 text-slate-500 dark:text-slate-400"
+                  : "bg-[var(--surface-elevated)] text-[var(--text-muted)]"
               }`}
             >
               {w}
@@ -110,8 +110,8 @@ export const PosterDayCell: React.FC<PosterDayCellProps> = ({
       className={`${minHeight} relative rounded-2xl p-1.5 sm:p-2.5 flex flex-col gap-1 border overflow-visible ${
         isToday
           ? "bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-700/60 ring-2 ring-amber-400 shadow-md"
-          : toneClassName ?? `bg-white dark:bg-slate-900/80 border-slate-200 dark:border-slate-800 ${isWeekend ? WEEKEND_TINT : ""}`
-      } ${onClick ? "cursor-pointer hover:border-blue-400/60 dark:hover:border-blue-500/50 transition-colors" : ""}`}
+          : toneClassName ?? `bg-[var(--surface)] border-[var(--border)] ${isWeekend ? WEEKEND_TINT : ""}`
+      } ${onClick ? "cursor-pointer hover:border-[var(--accent)]/60 transition-colors" : ""}`}
     >
       {isToday && (
         // z-30 > z-20 của CampaignDayRibbon — ngày "hôm nay" rơi vào dải camp (D-Day/Mid-Month/
@@ -122,19 +122,19 @@ export const PosterDayCell: React.FC<PosterDayCellProps> = ({
       )}
       {ribbon}
       <div className="flex items-start justify-between gap-1 flex-wrap pr-1">
-        <span className={`shrink-0 text-sm sm:text-base font-black ${isToday ? "text-orange-600 dark:text-orange-400" : "text-slate-700 dark:text-slate-300"}`}>
+        <span className={`shrink-0 text-sm sm:text-base font-black ${isToday ? "text-orange-600 dark:text-orange-400" : "text-[var(--text)]"}`}>
           {day}
         </span>
         {badge && <span className="shrink-0">{badge}</span>}
       </div>
-      <div className="border-t border-slate-100 dark:border-slate-800/80" />
+      <div className="border-t border-[var(--border-muted)]" />
       {/* Cuộn dọc trong chính ô khi nhiều hơn 2 card lịch live, đồng bộ với ô lịch tháng của
           LiveCalendar — không cắt gộp thành "+N khác" nữa, click card vẫn xem chi tiết được. */}
       <div className="flex-1 flex flex-col gap-1 overflow-y-auto overscroll-contain pr-0.5 scrollbar-thin max-h-[76px] sm:max-h-[168px]">
         {children}
       </div>
       {footer && (
-        <div className="text-right text-[9px] font-semibold text-slate-400 dark:text-slate-500 pt-0.5">{footer}</div>
+        <div className="text-right text-[9px] font-semibold text-[var(--text-faint)] pt-0.5">{footer}</div>
       )}
     </div>
   );

@@ -10,7 +10,12 @@ import { fetchDataRawRows } from "./brandDataRaw";
 // gian bắt đầu gần nhất, KHÔNG dựa vào tiktokRoomId (để dành khi có pipeline API tự động sau
 // này, lúc đó TikTok trả room_id thật, match sẽ chính xác tuyệt đối).
 
-// ---- Đọc bảng "Live Analysis" từ Dataraw ----
+// ---- Đọc bảng "Live Analysis" (cũ) hoặc "Creator-Live-Performance" (mới, từ 2026-08-22) từ Dataraw ----
+
+// Live Analysis không có Room ID nên khớp session dựa vào ngày + tên host + thời gian bắt đầu gần
+// nhất. Creator-Live-Performance CÓ Room ID nhưng KHÔNG có tên host — creatorName để trống,
+// matchImportRows() tự động rơi về khớp theo ngày+giờ (xem comment ở matchImportRows bên dưới),
+// không cần sửa gì logic match cả.
 
 // Cột trong file export thật (xem sample đã xem qua trong phiên trước) — tên cột tiếng Việt do
 // TikTok đặt, có thể đổi nhẹ theo version export nên match theo substring thay vì exact string.
@@ -96,6 +101,83 @@ function parseDurationMinutes(v: unknown): number {
   return (h ? parseInt(h[1], 10) * 60 : 0) + (m ? parseInt(m[1], 10) : 0);
 }
 
+// Creator-Live-Performance (TikTok Creator Center, tiếng Anh, theo Room ID) — cột khác hẳn Live
+// Analysis: có Room ID, KHÔNG có tên host, "Start Time"/"End Time" đủ cả 2 mốc (không cần suy ra
+// từ duration như Live Analysis).
+const COLUMN_PATTERNS_CLP: Record<string, RegExp> = {
+  tiktokRoomId: /^Room ID$/i,
+  startTime: /^Start Time$/i,
+  endTime: /^End Time$/i,
+  gmv: /^Attributed GMV$/i,
+  itemsSold: /^Attributed items sold$/i,
+  orders: /^Attributed orders$/i,
+  customers: /^Customers$/i,
+  avgPrice: /^AOV$/i,
+  views: /^Views$/i,
+  avgWatchTime: /^Avg\. viewing duration$/i,
+  newFollowers: /^New followers$/i,
+  productImpressions: /^Product Impressions$/i,
+  productClicks: /^Product clicks$/i,
+  ctr: /^CTR$/i,
+  ctor: /^CTOR$/i
+};
+
+// "2026-07-01 10:59:09" (giờ VN, khác định dạng "yyyy/mm/dd/ hh:mm" của Live Analysis) -> Date
+// đúng instant, cùng convention VN_OFFSET_MS.
+function parseStartTimeClp(v: unknown): Date | undefined {
+  if (!v) return undefined;
+  const s = String(v).trim();
+  const m = s.match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
+  if (!m) return undefined;
+  const [, y, mo, d, h, mi, se] = m;
+  return new Date(Date.UTC(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi), Number(se)) - VN_OFFSET_MS);
+}
+
+function mapCreatorLivePerformanceToImportRows(columns: DataRawColumn[], rawRows: Record<string, unknown>[]): ParsedImportRow[] {
+  const colKey: Record<string, string> = {};
+  for (const [key, pattern] of Object.entries(COLUMN_PATTERNS_CLP)) {
+    const col = columns.find((c) => pattern.test(c.label.trim()));
+    if (col) colKey[key] = col.key;
+  }
+  if (!colKey.startTime) {
+    throw new Error('Batch Dữ Liệu Gốc này không có cột "Start Time" — chọn đúng report Creator-Live-Performance.');
+  }
+  const get = (raw: Record<string, unknown>, key: string): unknown => (colKey[key] ? raw[colKey[key]] : undefined);
+
+  const out: ParsedImportRow[] = [];
+  for (const raw of rawRows) {
+    const start = parseStartTimeClp(get(raw, "startTime"));
+    if (!start) continue;
+    const end = parseStartTimeClp(get(raw, "endTime"));
+
+    out.push({
+      tiktokRoomId: colKey.tiktokRoomId ? String(get(raw, "tiktokRoomId") ?? "").trim() : undefined,
+      // File này không có cột tên host — để trống, matchImportRows() tự rơi về khớp theo
+      // ngày+giờ (đã hỗ trợ sẵn, không cần sửa logic match).
+      creatorName: undefined,
+      startTime: start.toISOString(),
+      endTime: end?.toISOString(),
+      gmv: toNum(get(raw, "gmv")),
+      itemsSold: toNum(get(raw, "itemsSold")),
+      orders: toNum(get(raw, "orders")),
+      customers: toNum(get(raw, "customers")),
+      avgPrice: toNum(get(raw, "avgPrice")),
+      ctor: toPercent(get(raw, "ctor")),
+      ctr: toPercent(get(raw, "ctr")),
+      // Không có field "viewer duy nhất" riêng như Live Analysis (Người xem) — chỉ có "Views",
+      // để viewers trống thay vì gán bừa = views (2 khái niệm khác nhau).
+      viewers: undefined,
+      views: toNum(get(raw, "views")),
+      avgWatchTimeSeconds: toNum(get(raw, "avgWatchTime")),
+      newFollowers: toNum(get(raw, "newFollowers")),
+      productImpressions: toNum(get(raw, "productImpressions")),
+      productClicks: toNum(get(raw, "productClicks")),
+      raw
+    });
+  }
+  return out;
+}
+
 export interface ParsedImportRow {
   tiktokRoomId?: string;
   creatorName?: string;
@@ -120,7 +202,16 @@ export interface ParsedImportRow {
 // Dataraw lưu nguyên trạng: columns = [{key,label}] theo đúng thứ tự cột file gốc, mỗi dòng là
 // raw jsonb keyed theo columns[].key. Ở đây map ngược về ParsedImportRow có kiểu để match session:
 // dò key của từng cột cần dùng bằng COLUMN_PATTERNS trên label (label = tên cột gốc TikTok).
-export function mapDataRawToImportRows(columns: DataRawColumn[], rawRows: Record<string, unknown>[]): ParsedImportRow[] {
+// reportType mặc định "live_analysis" (nguồn cũ) — truyền "creator_live_performance" khi batch
+// đang nạp là nguồn mới (từ 2026-08-22, xem COLUMN_PATTERNS_CLP).
+export function mapDataRawToImportRows(
+  columns: DataRawColumn[],
+  rawRows: Record<string, unknown>[],
+  reportType: "live_analysis" | "creator_live_performance" = "live_analysis"
+): ParsedImportRow[] {
+  if (reportType === "creator_live_performance") {
+    return mapCreatorLivePerformanceToImportRows(columns, rawRows);
+  }
   const colKey: Record<string, string> = {};
   for (const [key, pattern] of Object.entries(COLUMN_PATTERNS)) {
     const col = columns.find((c) => pattern.test(c.label.trim()));
@@ -187,7 +278,7 @@ interface DbImportRow {
   orders: number | null; customers: number | null; avg_price: number | null; ctor: number | null;
   ctr: number | null; viewers: number | null; views: number | null; avg_watch_time_seconds: number | null;
   new_followers: number | null; product_impressions: number | null; product_clicks: number | null;
-  matched_session_id: string | null; match_confidence: string | null;
+  matched_session_id: string | null; matched_session_ids: string[] | null; match_confidence: string | null;
 }
 function importRowFromDb(row: DbImportRow): TikTokLiveImportRow {
   return {
@@ -211,6 +302,7 @@ function importRowFromDb(row: DbImportRow): TikTokLiveImportRow {
     productImpressions: row.product_impressions ?? undefined,
     productClicks: row.product_clicks ?? undefined,
     matchedSessionId: row.matched_session_id ?? undefined,
+    matchedSessionIds: row.matched_session_ids ?? undefined,
     matchConfidence: (row.match_confidence as TikTokLiveImportRow["matchConfidence"]) ?? undefined
   };
 }
@@ -224,13 +316,16 @@ export async function fetchImports(): Promise<TikTokLiveImport[]> {
   return ((data as DbImport[]) ?? []).map(importFromDb);
 }
 
-// Danh sách batch "Live Analysis" trong kho Dataraw của TẤT CẢ brand — nguồn để ops chọn nạp
-// vào đối soát. Dataraw gộp 1 batch/tháng/brand (xem brandDataRaw.ts) nên danh sách này đúng
-// bằng số tháng đã upload, không phình theo số lần upload trong tháng.
+// Danh sách batch "Live Analysis" (cũ) HOẶC "Creator-Live-Performance" (mới) trong kho Dataraw
+// của TẤT CẢ brand — nguồn để ops chọn nạp vào đối soát. Giữ cả 2 loại: brand nào còn batch Live
+// Analysis cũ (trước 2026-08-22) vẫn đối soát được, brand nào đã chuyển hẳn sang nguồn mới thì chỉ
+// còn thấy Creator-Live-Performance. Dataraw gộp 1 batch/tháng/brand/loại report (xem
+// brandDataRaw.ts) nên danh sách này đúng bằng số tháng đã upload, không phình theo số lần upload.
 export interface DataRawLiveAnalysisOption {
   id: string;
   brandId: string;
   brandName: string;
+  reportType: "live_analysis" | "creator_live_performance";
   periodStart?: string;
   periodEnd?: string;
   periodLabel?: string;
@@ -242,14 +337,15 @@ export interface DataRawLiveAnalysisOption {
 export async function fetchDataRawLiveAnalysisBatches(): Promise<DataRawLiveAnalysisOption[]> {
   const { data, error } = await supabase
     .from("brand_dataraw_imports")
-    .select("id, brand_id, period_start, period_end, period_label, row_count, columns, imported_at, brands(name)")
-    .eq("report_type", "live_analysis")
+    .select("id, brand_id, report_type, period_start, period_end, period_label, row_count, columns, imported_at, brands(name)")
+    .in("report_type", ["live_analysis", "creator_live_performance"])
     .order("period_start", { ascending: false, nullsFirst: false });
   if (error) throw error;
   return ((data as any[]) ?? []).map((r) => ({
     id: r.id,
     brandId: r.brand_id,
     brandName: r.brands?.name ?? "—",
+    reportType: r.report_type,
     periodStart: r.period_start ?? undefined,
     periodEnd: r.period_end ?? undefined,
     periodLabel: r.period_label ?? undefined,
@@ -284,7 +380,7 @@ export async function fetchImportRows(importId: string): Promise<TikTokLiveImpor
 // live_session_reconciliations giữ nguyên, import_row_id chỉ bị set null).
 export async function createImportFromDataRaw(option: DataRawLiveAnalysisOption): Promise<{ batch: TikTokLiveImport; rows: TikTokLiveImportRow[] }> {
   const datarawRows = await fetchDataRawRows(option.id);
-  const parsed = mapDataRawToImportRows(option.columns, datarawRows.map((r) => r.raw));
+  const parsed = mapDataRawToImportRows(option.columns, datarawRows.map((r) => r.raw), option.reportType);
   if (parsed.length === 0) {
     throw new Error("Batch Dữ Liệu Gốc này không có dòng phiên live nào đọc được (thiếu thời gian bắt đầu).");
   }
@@ -329,6 +425,12 @@ export async function createImportFromDataRaw(option: DataRawLiveAnalysisOption)
     batch = importFromDb(batchData as DbImport);
   }
 
+  // Cột DB kiểu int (migration 0050, theo Live Analysis vốn luôn ra số nguyên) — Creator-Live-
+  // Performance có field ra số thập phân (vd "Avg. viewing duration" = 34.57), Postgres báo lỗi
+  // "invalid input syntax for type integer" nếu insert thẳng. Làm tròn phòng thủ cho MỌI cột int,
+  // không chỉ avg_watch_time_seconds phát hiện qua lỗi thật, để tránh lặp lại với field khác.
+  const roundInt = (v: number | undefined): number | null => (v != null ? Math.round(v) : null);
+
   const payload = parsed.map((r) => ({
     import_id: batch.id,
     tiktok_room_id: r.tiktokRoomId ?? null,
@@ -336,18 +438,18 @@ export async function createImportFromDataRaw(option: DataRawLiveAnalysisOption)
     start_time: r.startTime,
     end_time: r.endTime ?? null,
     gmv: r.gmv ?? null,
-    items_sold: r.itemsSold ?? null,
-    orders: r.orders ?? null,
-    customers: r.customers ?? null,
+    items_sold: roundInt(r.itemsSold),
+    orders: roundInt(r.orders),
+    customers: roundInt(r.customers),
     avg_price: r.avgPrice ?? null,
     ctor: r.ctor ?? null,
     ctr: r.ctr ?? null,
-    viewers: r.viewers ?? null,
-    views: r.views ?? null,
-    avg_watch_time_seconds: r.avgWatchTimeSeconds ?? null,
-    new_followers: r.newFollowers ?? null,
-    product_impressions: r.productImpressions ?? null,
-    product_clicks: r.productClicks ?? null,
+    viewers: roundInt(r.viewers),
+    views: roundInt(r.views),
+    avg_watch_time_seconds: roundInt(r.avgWatchTimeSeconds),
+    new_followers: roundInt(r.newFollowers),
+    product_impressions: roundInt(r.productImpressions),
+    product_clicks: roundInt(r.productClicks),
     match_confidence: "unmatched",
     raw: r.raw
   }));
@@ -408,8 +510,11 @@ export function compareSessionTimes(row: TikTokLiveImportRow, session: LiveSessi
 }
 
 // Đơn giản hoá tên host tiếng Việt để so khớp gần đúng (bỏ dấu, thường hoá) — file TikTok đặt
-// tên "biệt danh"/kênh, không nhất thiết khớp 100% ký tự với host_name trong hệ thống.
-function normalizeName(s: string | undefined): string {
+// tên "biệt danh"/kênh, không nhất thiết khớp 100% ký tự với host_name trong hệ thống. Dùng cho
+// matchImportRows() bên dưới (đối soát Live Analysis). Report Tháng Tab 02/04 không còn dùng
+// creatorName-matching nữa từ khi đổi nguồn sang creator_live_performance (2026-08-22, file đó
+// không có cột tên host) — export vẫn giữ vì matchImportRows dùng public.
+export function normalizeName(s: string | undefined): string {
   if (!s) return "";
   return s
     .normalize("NFD")
@@ -422,6 +527,75 @@ function normalizeName(s: string | undefined): string {
 // hễ trong ngày có 1 session ứng viên là khớp bất kể lệch bao nhiêu giờ (thực tế gặp cặp 11:00 vs
 // 20:00 vẫn tự khớp), rất dễ ghi đè nhầm phiên.
 const MAX_AUTO_MATCH_MINUTES = 180;
+
+// "Ca nối" (migration 0068) — agency thường xếp nhiều host liên tiếp cho 1 phiên LIVE TikTok
+// không tắt sóng giữa các ca (VD Host A 19h-22h, Host B 22h-01h cùng studio), nhưng TikTok chỉ
+// xuất ĐÚNG 1 dòng cho toàn bộ khoảng thời gian đó. Phát hiện các chuỗi session nội bộ nối liền
+// nhau (cùng brand+platform TikTok+studio, giờ bắt đầu ca sau ≈ giờ kết thúc ca trước) TRƯỚC khi
+// chạy vòng match 1:1 thường, để những dòng TikTok trùng khớp cả chuỗi được gán cho toàn bộ
+// chuỗi thay vì chỉ 1 session gần nhất (làm "mất tích" các host còn lại trong ca nối).
+const CHAIN_GAP_TOLERANCE_MINUTES = 10;
+
+function sessionStartAbsMinutes(s: LiveSession): number {
+  return Date.parse(`${s.date}T00:00:00Z`) / 60000 + toMinutes(s.startTime);
+}
+function sessionEndAbsMinutes(s: LiveSession): number {
+  const start = sessionStartAbsMinutes(s);
+  let end = Date.parse(`${s.date}T00:00:00Z`) / 60000 + toMinutes(s.endTime);
+  if (end <= start) end += 1440; // ca qua nửa đêm
+  return end;
+}
+
+export interface SessionChain {
+  studioId: string;
+  sessions: LiveSession[]; // đã sắp theo giờ bắt đầu
+  startAbsMinutes: number;
+  endAbsMinutes: number;
+}
+
+// Chỉ trả về chuỗi THẬT (≥2 session nối liền) — chuỗi 1 session vẫn đi qua vòng match 1:1 thường
+// bên dưới, không cần xử lý đặc biệt.
+export function detectSessionChains(sessions: LiveSession[], brandId?: string): SessionChain[] {
+  const pool = sessions.filter((s) => s.platform === "TikTok" && (!brandId || s.brandId === brandId) && s.studioId && s.startTime && s.endTime);
+  const byStudio = new Map<string, LiveSession[]>();
+  for (const s of pool) {
+    const list = byStudio.get(s.studioId) ?? [];
+    list.push(s);
+    byStudio.set(s.studioId, list);
+  }
+
+  const chains: SessionChain[] = [];
+  for (const list of byStudio.values()) {
+    const sorted = [...list].sort((a, b) => sessionStartAbsMinutes(a) - sessionStartAbsMinutes(b));
+    let current: LiveSession[] = [];
+    const flush = () => {
+      if (current.length >= 2) {
+        chains.push({
+          studioId: current[0].studioId,
+          sessions: current,
+          startAbsMinutes: sessionStartAbsMinutes(current[0]),
+          endAbsMinutes: sessionEndAbsMinutes(current[current.length - 1])
+        });
+      }
+      current = [];
+    };
+    for (const s of sorted) {
+      if (current.length === 0) {
+        current = [s];
+        continue;
+      }
+      const gap = sessionStartAbsMinutes(s) - sessionEndAbsMinutes(current[current.length - 1]);
+      if (Math.abs(gap) <= CHAIN_GAP_TOLERANCE_MINUTES) {
+        current.push(s);
+      } else {
+        flush();
+        current = [s];
+      }
+    }
+    flush();
+  }
+  return chains;
+}
 
 // Match client-side theo NGÀY + tên host gần đúng + giờ bắt đầu gần nhất — file export không có
 // Room ID nên đây là best-effort, luôn cần ops xác nhận/đổi lại trên UI trước khi apply.
@@ -439,9 +613,38 @@ export function matchImportRows(rows: TikTokLiveImportRow[], sessions: LiveSessi
   const takenSessions = new Set(rows.map((r) => r.matchedSessionId).filter(Boolean) as string[]);
   const takenRows = new Set(rows.filter((r) => r.matchedSessionId).map((r) => r.id));
 
+  // Vòng 1 — khớp CHUỖI ca nối: dòng TikTok nào có khoảng [start,end] gần khớp trọn 1 chuỗi ≥2
+  // session (lệch đầu/cuối trong ngưỡng tự khớp) thì gán cả chuỗi, giữ chỗ mọi session trong chuỗi
+  // khỏi vòng greedy 1:1 bên dưới — nếu không, greedy sẽ vơ session ĐẦU chuỗi cho dòng TikTok này
+  // rồi các session còn lại trong chuỗi thành "chưa khớp" dù thực ra cùng 1 phiên LIVE.
+  const chains = detectSessionChains(sessions, brandId);
+  const rowsWithChain = new Map<string, LiveSession[]>();
+  for (const row of rows) {
+    if (row.matchedSessionId || !row.endTime) continue;
+    // row.startTime/endTime là ISO instant thật (đã quy đổi VN_OFFSET_MS lúc parse) — phải đưa về
+    // "phút tuyệt đối theo wall-clock VN" giống hệt cách sessionStartAbsMinutes tính cho session
+    // (Date.parse(`${date}T00:00:00Z`) + phút-trong-ngày), nếu không 2 bên lệch nguyên 7 tiếng
+    // (giờ UTC vs giờ VN) và không bao giờ khớp được dù đúng thực tế.
+    const rowStartVn = vnParts(row.startTime);
+    const rowEndVn = vnParts(row.endTime);
+    const rowStartAbs = Date.parse(`${rowStartVn.date}T00:00:00Z`) / 60000 + toMinutes(rowStartVn.time);
+    const rowEndAbs = Date.parse(`${rowEndVn.date}T00:00:00Z`) / 60000 + toMinutes(rowEndVn.time);
+    for (const chain of chains) {
+      if (chain.sessions.some((s) => takenSessions.has(s.id))) continue;
+      const startDiff = Math.abs(rowStartAbs - chain.startAbsMinutes);
+      const endDiff = Math.abs(rowEndAbs - chain.endAbsMinutes);
+      if (startDiff <= MAX_AUTO_MATCH_MINUTES && endDiff <= MAX_AUTO_MATCH_MINUTES) {
+        rowsWithChain.set(row.id, chain.sessions);
+        for (const s of chain.sessions) takenSessions.add(s.id);
+        takenRows.add(row.id);
+        break;
+      }
+    }
+  }
+
   const pairs: { rowId: string; sessionId: string; diff: number }[] = [];
   for (const row of rows) {
-    if (row.matchedSessionId) continue;
+    if (row.matchedSessionId || takenRows.has(row.id)) continue;
     const rowVn = vnParts(row.startTime);
     const normalizedCreator = normalizeName(row.creatorName);
 
@@ -476,14 +679,23 @@ export function matchImportRows(rows: TikTokLiveImportRow[], sessions: LiveSessi
 
   return rows.map((row) => {
     if (row.matchedSessionId) return row;
+    const chainSessions = rowsWithChain.get(row.id);
+    if (chainSessions) {
+      return { ...row, matchedSessionId: chainSessions[0].id, matchedSessionIds: chainSessions.map((s) => s.id), matchConfidence: "chain" };
+    }
     const sessionId = assigned.get(row.id);
     if (!sessionId) return { ...row, matchedSessionId: undefined, matchConfidence: "unmatched" };
     return { ...row, matchedSessionId: sessionId, matchConfidence: "time_overlap" };
   });
 }
 
+// Đổi match tay 1 session (override khớp đơn) — luôn xoá matched_session_ids nếu dòng này trước
+// đó là ca nối tự phát hiện, tránh để lại mảng cũ không khớp với matched_session_id mới.
 export async function updateRowMatch(rowId: string, sessionId: string | null, confidence: TikTokLiveImportRow["matchConfidence"]): Promise<void> {
-  const { error } = await supabase.from("tiktok_live_import_rows").update({ matched_session_id: sessionId, match_confidence: confidence }).eq("id", rowId);
+  const { error } = await supabase
+    .from("tiktok_live_import_rows")
+    .update({ matched_session_id: sessionId, matched_session_ids: null, match_confidence: confidence })
+    .eq("id", rowId);
   if (error) throw error;
 }
 
@@ -495,6 +707,15 @@ export async function applyReconciliation(importRowId: string, sessionId: string
   const { error } = await supabase.rpc("apply_tiktok_reconciliation", { p_import_row_id: importRowId, p_session_id: sessionId });
   if (error) throw error;
   return fetchSessionById(sessionId);
+}
+
+// Ghi đè "ca nối" — nhiều session cùng chia GMV từ 1 dòng TikTok (migration 0068). RPC tự tính
+// phần chênh lệch (GMV thật − tổng GMV tạm tính của cả chuỗi) chia đều cho từng session, KHÔNG
+// ghi đè nguyên GMV thật vào từng host (sẽ nhân bản sai số lên N lần).
+export async function applyReconciliationChain(importRowId: string, sessionIds: string[]): Promise<LiveSession[]> {
+  const { error } = await supabase.rpc("apply_tiktok_reconciliation_chain", { p_import_row_id: importRowId, p_session_ids: sessionIds });
+  if (error) throw error;
+  return Promise.all(sessionIds.map((id) => fetchSessionById(id)));
 }
 
 interface DbReconciliation {

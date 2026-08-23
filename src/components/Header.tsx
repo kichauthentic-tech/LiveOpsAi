@@ -144,7 +144,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Logged-in user identity (real auth — role comes from the account, not a switcher) */}
         <div className="hidden md:flex flex-col items-end leading-tight px-2">
           <span className="text-xs font-bold text-[var(--text)]">{activeUserName}</span>
-          <span className="text-[10px] text-blue-400 font-semibold uppercase">
+          <span className="text-[10px] text-[var(--accent-text)] font-semibold uppercase">
             {currentRole} {activeUserTitle ? `• ${activeUserTitle}` : ""}
           </span>
         </div>

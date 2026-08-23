@@ -278,7 +278,10 @@ export interface TikTokLiveImportRow {
   productImpressions?: number;
   productClicks?: number;
   matchedSessionId?: string;
-  matchConfidence?: "room_id" | "time_overlap" | "manual" | "unmatched";
+  // "chain" = nhiều host chung 1 phiên TikTok liên tục (ca nối, migration 0068) — matchedSessionId
+  // là session đầu chuỗi (tương thích ngược UI cũ), matchedSessionIds là đầy đủ cả chuỗi.
+  matchedSessionIds?: string[];
+  matchConfidence?: "room_id" | "time_overlap" | "manual" | "unmatched" | "chain";
 }
 
 // Audit trail 1 lần đối soát — lưu cặp giá trị manual (trước khi ghi đè) vs tiktok (sau khi ghi
@@ -323,17 +326,95 @@ export interface BrandMonthlyReport {
   promotionNotes?: string;
   customerInsightNotes?: string;
   accountHealthNotes?: string;
+  // Kế hoạch tháng sau (migration 0065, Tab 05 Report Tháng) — target GMV/giờ tổng + % phân bổ
+  // theo khung camp (Daily/D-Day/Mid-Month/Pay-Day), nhập tay bởi ops (client gợi ý % mặc định
+  // theo lịch sử nhưng KHÔNG lưu công thức, chỉ lưu giá trị cuối ops đã chốt).
+  planTargetGmv?: number;
+  planTargetNmv?: number;
+  planTargetHours?: number;
+  planPctDaily?: number;
+  planPctDday?: number;
+  planPctMidmonth?: number;
+  planPctPayday?: number;
+  // Khung camp D-Day/Mid-Month/Pay-Day của THÁNG ĐANG XEM (migration 0071, Tab 02 Livestream) —
+  // ghi đè khoảng ngày mặc định (lib/campaignDays.ts) + Target GMV mỗi khung riêng cho Report
+  // Tháng, KHÔNG ảnh hưởng Calendar/Ribbon toàn hệ thống. Để trống thì UI tự fallback về khung mặc
+  // định của tháng đang xem.
+  campDdayStart?: string;
+  campDdayEnd?: string;
+  campDdayTargetGmv?: number;
+  campMidmonthStart?: string;
+  campMidmonthEnd?: string;
+  campMidmonthTargetGmv?: number;
+  campPaydayStart?: string;
+  campPaydayEnd?: string;
+  campPaydayTargetGmv?: number;
   publishedAt?: string;
   publishedBy?: string;
   createdAt: string;
   updatedAt: string;
 }
 
+// Affiliate THỰC TẾ tháng đang xem (migration 0067, Tab 04 Report Tháng) — nhập tay hoàn toàn từ
+// khi đổi nguồn Livestream sang creator_live_performance (không còn cột tên host để ghép tự động
+// với Dataraw như trước). Khác AffiliatePlanEntry (Tab 05) ở chỗ đây là số ĐÃ XẢY RA, không phải
+// kế hoạch — periodMonth trùng đúng tháng report đang xem, không lệch 1 tháng.
+export interface AffiliateActualEntry {
+  id?: string;
+  brandId: string;
+  periodMonth: string; // "YYYY-MM-01" — trùng tháng report đang xem
+  creatorName: string;
+  liveDateLabel?: string;
+  targetGmv?: number;
+  directGmv?: number;
+  durationHours?: number;
+  adsCost?: number;
+  itemsSold?: number;
+  avgPrice?: number;
+  viewer?: number;
+  ctr?: number;
+  ctor?: number;
+  sortOrder?: number;
+}
+
+// Kế hoạch Affiliate theo creator cho tháng sau (migration 0065, Tab 05 Report Tháng) — nhập tay
+// hoàn toàn, không có nguồn tự động (dữ liệu về tương lai, chưa có phiên/Dataraw nào tồn tại).
+export interface AffiliatePlanEntry {
+  id?: string;
+  brandId: string;
+  periodMonth: string; // "YYYY-MM-01" — tháng KẾ HOẠCH, lệch 1 tháng so với periodMonth của report
+  creatorName: string;
+  campTag?: string;
+  scheduleLabel?: string;
+  timelineLabel?: string;
+  durationHours?: number;
+  targetGmv?: number;
+  budgetAds?: number;
+  sortOrder?: number;
+}
+
 // Module Dataraw Brand Workspace (migration 0052) — kho lưu nguyên trạng 4 report Excel tải tay
 // từ TikTok Shop mỗi tuần/tháng, làm cơ sở dựng report + đối soát + tra cứu sau này. Không map
 // cứng cột vào schema (product_list có tới 176 cột) — "columns" giữ thứ tự+tên cột gốc, mỗi dòng
 // "raw" lưu đúng theo key đó.
-export type DataRawReportType = "shop_promotion" | "product_list" | "live_analysis" | "shop_analytics";
+export type DataRawReportType =
+  | "shop_promotion"
+  | "product_list"
+  | "live_analysis"
+  | "shop_analytics"
+  | "live_performance_core_stats"
+  | "product_card_traffic_stats"
+  // migration 0066 (2026-08-22) — thay thế live_analysis làm nguồn duy nhất cho Report Tháng
+  // Tab 02/04 (quyết định của user, chấp nhận đánh đổi: mất tên host tự động, GMV đổi ~15% so với
+  // live_analysis vì khác hệ thống TikTok xuất — xem WORKSPACE_DESIGN.md). live_analysis vẫn giữ
+  // trong union vì dữ liệu cũ các brand đã upload trước đó không xoá, chỉ không dùng cho batch mới.
+  | "creator_live_performance"
+  // migration 0074 (2026-08-23) — export "Transaction Analysis - Creator List" từ TikTok Shop
+  // Partner Center: GMV/đơn/hoa hồng ước tính THEO TỪNG CREATOR affiliate trong kỳ. Đây là nguồn
+  // dữ liệu thật đầu tiên cho Report Tháng Tab 04 Affiliate (trước giờ nhập tay hoàn toàn, xem
+  // migration 0067) — mới dừng ở lưu vào Dataraw, CHƯA nối vào Tab 04 (việc đó cần quyết định
+  // "Direct GMV" nên tính từ cột nào, để phiên sau).
+  | "transaction_analysis_creator_list";
 
 export interface DataRawColumn {
   key: string;

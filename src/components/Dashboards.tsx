@@ -181,7 +181,7 @@ export const Dashboards: React.FC<DashboardsProps> = ({
           onClick={() => setDashboardSubTab("overview")}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
             dashboardSubTab === "overview"
-              ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30"
+              ? "bg-[var(--accent)] text-[var(--surface-base)] shadow-lg shadow-[var(--accent)]/30"
               : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]"
           }`}
         >
@@ -193,7 +193,7 @@ export const Dashboards: React.FC<DashboardsProps> = ({
           onClick={() => setDashboardSubTab("gmv_forecast")}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
             dashboardSubTab === "gmv_forecast"
-              ? "bg-purple-600 text-white shadow-lg shadow-purple-600/30"
+              ? "bg-[var(--accent)] text-[var(--surface-base)] shadow-lg shadow-[var(--accent)]/30"
               : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]"
           }`}
         >
@@ -208,7 +208,7 @@ export const Dashboards: React.FC<DashboardsProps> = ({
           onClick={() => setDashboardSubTab("alerts")}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 relative ${
             dashboardSubTab === "alerts"
-              ? "bg-amber-600 text-white shadow-lg shadow-amber-600/30 font-black"
+              ? "bg-[var(--accent)] text-[var(--surface-base)] shadow-lg shadow-[var(--accent)]/30 font-black"
               : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]"
           }`}
         >
@@ -225,7 +225,7 @@ export const Dashboards: React.FC<DashboardsProps> = ({
           onClick={() => setDashboardSubTab("gmv_calendar")}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
             dashboardSubTab === "gmv_calendar"
-              ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30"
+              ? "bg-[var(--accent)] text-[var(--surface-base)] shadow-lg shadow-[var(--accent)]/30"
               : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]"
           }`}
         >
@@ -237,7 +237,7 @@ export const Dashboards: React.FC<DashboardsProps> = ({
           onClick={() => setDashboardSubTab("kpi_comparison")}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
             dashboardSubTab === "kpi_comparison"
-              ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30"
+              ? "bg-[var(--accent)] text-[var(--surface-base)] shadow-lg shadow-[var(--accent)]/30"
               : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]"
           }`}
         >
