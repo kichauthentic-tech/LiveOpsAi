@@ -1,5 +1,120 @@
 # LiveOps AI — Thiết kế Workspace Model (Agency ↔ Brand)
 
+## ĐỀ XUẤT (chưa triển khai) — Tái cấu trúc tầng dữ liệu: tách 3 grain + fact bất biến (2026-09-05)
+
+**Trạng thái: MỚI LÀ ĐỀ XUẤT. Chưa code, chưa migration, chưa quyết.** User hỏi "luồng data có tối ưu thêm được không" → rà toàn bộ 75 migration + các điểm đọc/ghi số liệu. Bản dễ hiểu cho người không rành kỹ thuật: https://claude.ai/code/artifact/9255e287-cf73-4d83-bdbe-4fc3a53236c4 (private, thuộc account tuananh1902.skt@gmail.com). Mục này là bản kỹ thuật cho session sau.
+
+### Chẩn đoán — 4 lỗi kiến trúc gốc (đều đã verify bằng đọc code, không phải suy đoán)
+
+**A. Fact bị lưu trên dimension row.** `live_sessions` chứa cùng lúc: định danh (brand/host/studio), lịch (`date`+`start_time`), kế hoạch (`target_gmv`), thực đạt (`actual_gmv`/`total_orders`/`ctr_avg`...), và trạng thái đối soát (`data_source`). Vì chỉ có MỘT ô cho `actual_gmv`, đối soát buộc phải ghi đè phá huỷ; và vì ô đó cũng dùng tính lương, mọi thao tác đối soát là thao tác tài chính. **Đây là gốc của 0075/0069/0061/0060/0054** — tất cả đều là vá quanh cùng một ô.
+
+**B. Không có định nghĩa metric duy nhất.**
+- `ads_cost` có **2 nguồn nhập độc lập, không ràng buộc**: `live_session_reports.ads_cost` (trợ live nhập, `SessionReportForm.tsx:43`) và `session_finance.ads_cost` (ops nhập, `FinanceHr.tsx:213`). `lib/pnl.ts:124` tính net profit bằng nguồn 2; `BrandMonthlyReport.tsx:77` tính ROAS gửi khách bằng nguồn 1. Cùng 1 session, 2 con số, không cảnh báo.
+- `talents.avg_gmv_per_session` **là số NHẬP TAY**, chỉ ghi từ form `TalentMatcher.tsx:145` (default 150.000.000), không hề tính từ `live_sessions`. Nhưng đang chạy thẳng vào vận hành: `App.tsx:1285` dùng làm `targetGmv` khi chốt ca thật, `Dashboards.tsx:426` hiện như thành tích host. (Ngược lại `GmvGrowthTrendline.tsx:61` tự tính số thật — 2 định nghĩa cùng tên.) Cùng vấn đề với `talents.ctr_avg`/`cvr_avg`/`overall_score`.
+- CTR/CVR đang lấy **trung bình cộng qua session** — sai toán học trừ khi mọi phiên cùng impression. Số này đang nằm trong report gửi khách.
+- `sessionDurationHours` bị implement 2 lần (`lib/pnl.ts:26` và `ShiftScheduling.tsx:83`, logic trùng khớp nhưng không dùng chung).
+
+**C. Chuẩn hoá xảy ra lúc ĐỌC, không phải lúc GHI.** 5 file trong `src/lib/dataraw/` lặp lại pattern *query imports → lọc overlap → query rows → dò cột bằng regex → cộng bằng JS*, với **2 luật khác nhau** (`weeklySlice` lấy MỌI batch overlap; `monthlyProductSlice.ts:48` lấy ĐÚNG 1). Hệ quả nặng: `monthlyProductSlice.ts:96` `if (!c.name || !c.gmv) return { items: [], hasAnyBatch: true }` — TikTok đổi tên cột là report **im lặng ra 0đ** với cờ báo "có dữ liệu", phát hành được và gửi tới khách. Cột phụ còn êm hơn (`num(c.gmvLive && ...)` → 0). Thêm: `cleanProductName` (`monthlyProductSlice.ts:30`) hardcode prefix tên sản phẩm Crocs trong module dùng chung mọi brand; và `fetchOverlappingBatchRows` sort theo `period_end` muộn nhất chứ không phải overlap nhiều nhất, trái với chính comment của nó.
+
+**D. Không có tầng aggregate.** `fetchSessions()` (`lib/db/sessions.ts:355`) `select("*")` **toàn bộ session mọi brand, không lọc ngày/brand/phân trang**, rồi `fetchChildRowsForSessions` (`:319-324`) kéo thêm `session_skus` + `session_checklist_items` + **`session_minute_metrics` (~180 dòng/phiên)** + `live_session_reports`. Ở 5 brand × 3 ca/ngày, sau 1 năm ≈ 5.500 phiên và ~1 triệu dòng minute-metrics tải về browser mỗi lần mở app. Report Tháng thì 11 slice song song ≈ 22 round-trip, mỗi lượt kéo jsonb thô về rồi cộng bằng JS (`MonthlyReportTabs.tsx:332`). **`live_sessions` chưa có index nào trên `date`** — cột mọi dashboard đều lọc.
+
+### Mô hình đích — tách 3 grain đang bị gộp
+
+```sql
+-- 1. Ca lao động (lịch + lương). timestamptz thay date+time: xoá cả họ bug ca qua đêm,
+--    lệch UTC/VN khi so export TikTok, ngày mặc định nhảy lùi 00:00-07:00 (M6/L8/H3).
+create table shifts (
+  id uuid primary key, brand_id uuid not null references brands(id),
+  studio_id uuid references studios(id),
+  host_id uuid references talents(id), co_host_id uuid references talents(id),
+  starts_at timestamptz not null, ends_at timestamptz not null,
+  ot_minutes int not null default 0, early_leave_minutes int not null default 0,
+  status text not null, check (ends_at > starts_at)
+);
+
+-- 2. Phiên phát sóng (đúng những gì nền tảng ghi nhận). 1 room = 1 dòng.
+create table broadcasts (
+  id uuid primary key, brand_id uuid not null references brands(id),
+  platform session_platform not null, room_id text,
+  started_at timestamptz not null, ended_at timestamptz not null,
+  unique (platform, room_id)
+);
+
+-- 3. Cầu nối N-N + tỷ trọng. ĐÂY là chỗ "ca nối" được giải quyết trung thực:
+--    1 broadcast -> N shift, weight theo phút chồng lấn. Không ghi đè ai,
+--    không "chia đều chênh lệch", tổng luôn khớp 100%. Chiều ngược lại
+--    (mất sóng -> N broadcast cho 1 shift) cũng biểu diễn được — hiện `restart_count`
+--    chỉ đếm được số lần, không mô hình hoá được.
+create table broadcast_shift_allocations (
+  broadcast_id uuid references broadcasts(id) on delete cascade,
+  shift_id uuid references shifts(id) on delete cascade,
+  overlap_minutes int not null, weight numeric not null,
+  method text not null,  -- time_overlap | manual | equal
+  primary key (broadcast_id, shift_id)
+);
+
+-- 4. Fact BẤT BIẾN. Chỉ insert, không update. Sửa = insert mới + set superseded_at.
+create table metric_facts (
+  id bigint generated always as identity primary key,
+  subject_type text not null,   -- broadcast | shift | brand | creator | sku
+  subject_id uuid not null,
+  metric_key text not null references metric_definitions(key),
+  period_start timestamptz not null, period_end timestamptz not null,
+  value numeric not null,
+  source text not null references metric_sources(key),
+  source_ref uuid,              -- trỏ về brand_dataraw_imports.id / live_session_reports
+  observed_at timestamptz not null default now(),
+  superseded_at timestamptz,    -- null = còn hiệu lực
+  recorded_by uuid references profiles(id)
+);
+create table metric_sources (key text primary key, label text not null, priority int not null);
+-- ops_manual 10 | tiktok_live_analysis 50 | tiktok_shop_analytics 60 | finance_adjust 90
+
+-- "Số chính thức" KHÔNG phải một cột — là kết quả luật ưu tiên nguồn.
+-- View này CHÍNH LÀ cơ chế đối soát: đối soát = insert fact source cao hơn.
+-- Bug 0075 (nộp lại report rớt cờ đối soát) biến mất ở mức kiến trúc, không cần sửa.
+create view metric_current as
+select distinct on (subject_type, subject_id, metric_key, period_start) f.*
+from metric_facts f join metric_sources s on s.key = f.source
+where f.superseded_at is null
+order by subject_type, subject_id, metric_key, period_start, s.priority desc, f.observed_at desc;
+
+-- 5. Semantic layer. Tỷ lệ (CTR/CVR/AOV/ROAS/GMV-giờ) KHÔNG BAO GIỜ lưu —
+--    lưu tử+mẫu, cộng tử cộng mẫu rồi mới chia, ở đúng grain đang xem.
+create table metric_definitions (
+  key text primary key, label_vi text not null, unit text not null,
+  aggregation text not null,     -- sum | avg | last | ratio
+  numerator_key text, denominator_key text
+);
+
+-- 6. Hợp đồng đọc file: TikTok đổi tên cột thì sửa DATA ở đây, không sửa code.
+--    Validate lúc UPLOAD, thiếu cột bắt buộc thì CHẶN + nêu tên cột thiếu.
+create table ingest_contracts (
+  report_type text not null, version int not null, column_key text not null,
+  matchers text[] not null,      -- {'GMV','GMV (₫)','Tổng GMV'}
+  required boolean not null, maps_to text references metric_definitions(key),
+  primary key (report_type, version, column_key)
+);
+```
+
+Tầng 0 (`brand_dataraw_imports`/`brand_dataraw_rows` + form nhập trợ live) **giữ nguyên** — vẫn là bằng chứng gốc để tra ngược khi tranh cãi số liệu.
+
+### Lộ trình 5 bước (strangler — schema cũ sống song song tới bước 4)
+
+1. **Gom định nghĩa metric về `src/lib/metrics/`** — không đụng DB. Chốt 1 nguồn `ads_cost`, thay `avg_gmv_per_session` nhập tay bằng số tính thật, sửa CTR/CVR. Rẻ nhất, chặn ngay số sai vào report gửi khách, và ép liệt kê mọi metric = bản nháp `metric_definitions`. **← làm trước**
+2. **`ingest_contracts` + validate lúc upload**, gom 5 bản sao logic chọn batch về 1 module.
+3. **Dựng `metric_facts` chạy song song** — backfill từ `live_sessions` với source `ops_manual`, dual-write, đối chiếu hằng ngày tới khi khớp tuyệt đối. App vẫn đọc schema cũ suốt giai đoạn này.
+4. **Tách `shifts`/`broadcasts`, đối soát chuyển sang append.** Ca nối chuyển sang weight theo phút chồng lấn. Gỡ `data_source` + `live_session_reconciliations` (đã dư thừa). Xếp vào đầu tháng sau khi chốt sổ tháng trước.
+5. **Rollup + bỏ tải toàn bộ về client.** Materialized view ngày × brand × host, thêm index `(brand_id, date)`, phân trang lịch sử, tách `session_minute_metrics` khỏi luồng tải chính.
+
+### 4 quyết định nghiệp vụ CẦN USER CHỐT trước khi code bước nào
+
+1. **Nguồn `ads_cost` chuẩn?** — đề xuất: lấy `live_session_reports` (trợ live thấy số thật lúc chạy phiên), ô Finance chuyển thành khoản điều chỉnh có ghi vết như `host_fix_rate_override`.
+2. **Ca nối chia theo phút chồng lấn hay chia đều?** — đề xuất: theo phút, cho ops sửa tay. Chia đều đang thiệt cho host trực ca dài, và khi chạm sàn 0 thì tổng không khớp số TikTok.
+3. **Report đã phát hành có cập nhật khi số đối soát về muộn?** — đề xuất: KHÔNG, ghim `observed_at` lúc gửi, chênh lệch đưa vào điều chỉnh tháng sau (chuẩn kế toán, tránh số trong file khách khác số trên app).
+4. **Giữ `session_minute_metrics`?** — đề xuất: giữ nhưng tách khỏi luồng tải chính, chỉ nạp khi mở đúng 1 phiên.
+
+
 ## Đã sửa — Nộp lại report ca (chỉ sửa OT/status note, GMV không đổi) tự động xoá cờ "Đã Đối Soát" (2026-08-24)
 
 Phát hiện khi user hỏi rà lại luồng "trợ live nhập report → data đi đâu". `submit_live_session_report` (0061/0063) luôn `set data_source = 'manual', reconciled_at = null` **không điều kiện** mỗi lần được gọi, không so sánh giá trị mới có thực sự khác giá trị đã đối soát hay không. Hệ quả: 1 session đã đối soát TikTok xong, trợ live chỉ mở form bổ sung OT/off sớm muộn hơn (rất có thể xảy ra sau khi Ops đã đối soát) → badge "Đã Đối Soát" biến mất dù `actual_gmv`/`total_orders`/`total_views`/`ctr_avg`/`avg_watch_time_seconds` không đổi 1 đồng, Report Tháng lại gắn cờ "chưa đối soát" cho session thực ra đã chuẩn.
