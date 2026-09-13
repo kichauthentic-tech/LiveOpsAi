@@ -27,8 +27,8 @@ import { fetchTalentRateHistory } from "./lib/db/talentRateHistory";
 import { fetchBrandPlatformRateHistory } from "./lib/db/brandPlatformRateHistory";
 import { fetchBrandSkus, createBrandSku, updateBrandSku, deleteBrandSku } from "./lib/db/brandSkus";
 import { fetchPromoSchemes, createPromoScheme, updatePromoScheme, deletePromoScheme } from "./lib/db/promoSchemes";
+import { computeRealAvgGmvPerSession } from "./lib/metrics/avgGmv";
 import {
-  LayoutDashboard,
   Radio,
   FileText,
   Users,
@@ -47,19 +47,15 @@ import {
   BrainCircuit,
   UserCog,
   CalendarClock,
-  Store,
   Package,
-  BarChart3,
   PanelLeftClose,
   PanelLeftOpen,
   Database
 } from "lucide-react";
 import { Header, WorkspaceContext } from "./components/Header";
-import { BrandDashboard } from "./components/brand-workspace/BrandDashboard";
 import { BrandCalendar } from "./components/brand-workspace/BrandCalendar";
 import { BrandSessions } from "./components/brand-workspace/BrandSessions";
 import { BrandSkuShowcase } from "./components/brand-workspace/BrandSkuShowcase";
-import { BrandAudienceAnalytics } from "./components/brand-workspace/BrandAudienceAnalytics";
 import { BrandMonthlyReport } from "./components/brand-workspace/BrandMonthlyReport";
 import { BrandDataRaw } from "./components/brand-workspace/BrandDataRaw";
 import { Login } from "./components/Login";
@@ -67,7 +63,6 @@ import { ResetPasswordScreen } from "./components/ResetPasswordScreen";
 import { AccountSettings } from "./components/AccountSettings";
 import { MyTalentProfile } from "./components/MyTalentProfile";
 import { useAuth } from "./hooks/useAuth";
-import { Dashboards } from "./components/Dashboards";
 import { LiveSessionHub } from "./components/LiveSessionHub";
 import { LiveCalendar } from "./components/LiveCalendar";
 import { TalentMatcher, NewTalentAccountPayload } from "./components/TalentMatcher";
@@ -84,8 +79,6 @@ const STORAGE_PREFIX = "liveops_os_v2_";
 
 // Các tab mà nội dung chính là lưới lịch — vào là tự thu gọn sidebar để lấy chiều ngang
 // (lưới 7 cột / ma trận 5 khung giờ cần ~150px mỗi ô, xem WORKSPACE_DESIGN.md).
-// 2 dashboard cũng có lịch GMV nhưng nằm trong sub-tab, nên xử lý riêng qua
-// `onCalendarViewChange` chứ không liệt kê ở đây.
 const CALENDAR_TABS = new Set(["calendar", "brand_calendar", "shift_scheduling"]);
 
 // Tab render được nhưng cố ý KHÔNG nằm trong sidebar (vào từ menu user ở Header). Phải khai
@@ -109,27 +102,31 @@ function saveStorage<T>(key: string, value: T): void {
   }
 }
 
+// Tab mặc định khi đăng nhập/đổi user, theo role — module Dashboard đã bị xoá (chờ chốt
+// cấu trúc data raw để build lại), nên không còn tab "dashboard"/"brand_dashboard" nào để về.
+function getDefaultTabForRole(role: UserRole): string {
+  return role === "brand" ? "brand_calendar" : "sessions";
+}
+
 export default function App() {
   const { session, profile, profileError, loading: authLoading, signOut, passwordRecovery, refreshProfile } = useAuth();
 
   const currentRole: UserRole = profile?.role ?? "talent";
-  const [activeTab, setActiveTab] = useState<string>(() => loadStorage("activeTab", "dashboard"));
+  // "sessions" chỉ là fallback cho lần đầu mở app khi chưa biết role (localStorage rỗng);
+  // role thật được set lại ngay bằng getDefaultTabForRole() khi profile load xong (bên dưới).
+  const [activeTab, setActiveTab] = useState<string>(() => loadStorage("activeTab", "sessions"));
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   // Thu gọn sidebar thành thanh icon (w-16) để nhường không gian ngang cho calendar.
   // Chỉ áp dụng từ breakpoint md trở lên — dưới md sidebar vẫn là drawer trượt như cũ.
   //
   // 3 mảnh state:
   //  - `sidebarPref`: lựa chọn tay của user cho các module KHÔNG có lịch (persist).
-  //  - `dashboardCalendarView`: 2 dashboard báo lên khi sub-tab đang mở là lịch GMV.
   //  - `sidebarCollapsed`: trạng thái thật đang render = tự thu gọn trong module có lịch,
   //    ngoài ra trả về đúng `sidebarPref`.
   const [sidebarPref, setSidebarPref] = useState<boolean>(() => loadStorage("sidebarCollapsed", false));
   useEffect(() => saveStorage("sidebarCollapsed", sidebarPref), [sidebarPref]);
 
-  const [dashboardCalendarView, setDashboardCalendarView] = useState(false);
-  const isCalendarModule =
-    CALENDAR_TABS.has(activeTab) ||
-    ((activeTab === "dashboard" || activeTab === "brand_dashboard") && dashboardCalendarView);
+  const isCalendarModule = CALENDAR_TABS.has(activeTab);
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(sidebarPref);
   // Vào module có lịch → tự thu gọn; rời đi → trả lại đúng lựa chọn tay của user.
@@ -640,7 +637,7 @@ export default function App() {
     if (!profile?.id) return;
     if (loadStorage<string | null>("uiStateOwner", null) === profile.id) return;
     saveStorage("uiStateOwner", profile.id);
-    setActiveTab("dashboard");
+    setActiveTab(getDefaultTabForRole(profile.role));
     setWorkspace({ type: "agency" });
   }, [profile?.id]);
 
@@ -1279,10 +1276,10 @@ export default function App() {
       // rate.ratePerHour ở đây là đơn giá AGENCY THU CỦA BRAND theo giờ (brand_platform_rates,
       // dùng cho billingModel="hourly") — không phải mục tiêu doanh số GMV của phiên live, nên
       // dùng nó làm target sai đơn vị: brand tính %GMV thì ratePerHour = 0 nên target luôn 0,
-      // brand tính theo giờ thì hiện ra đúng doanh thu agency chứ không phải GMV. Dùng
-      // avgGmvPerSession của host (GMV trung bình/phiên đã ghi nhận, cùng field TalentMatcher
-      // dùng để dự đoán doanh số) làm target hợp lý hơn — đúng ý nghĩa "kỳ vọng GMV phiên này".
-      targetGmv: host?.avgGmvPerSession ?? 0,
+      // brand tính theo giờ thì hiện ra đúng doanh thu agency chứ không phải GMV. Dùng GMV trung
+      // bình/phiên TÍNH THẬT từ live_sessions của host (Bước 1 tái cấu trúc data — không còn dùng
+      // talents.avgGmvPerSession, số nhập tay không đáng tin, xem src/lib/metrics/avgGmv.ts).
+      targetGmv: computeRealAvgGmvPerSession(sessions, hostId),
       actualGmv: 0,
       totalOrders: 0,
       avgWatchTimeSeconds: 0,
@@ -1341,26 +1338,10 @@ export default function App() {
     }
   };
 
-  const handleSelectSessionFromDashboard = (session: LiveSession) => {
-    setSelectedSession(session);
-    setActiveTab("sessions");
-  };
-
-  const handleSelectSessionFromBrandDashboard = (session: LiveSession) => {
-    setSelectedSession(session);
-    setActiveTab("brand_sessions");
-  };
-
   // Navigation Items mapped to permission keys, grouped theo luồng công việc — đây là
   // nhóm cho Agency Workspace (nhìn xuyên mọi Brand). Xem BRAND_NAV_GROUPS bên dưới cho
   // Brand Workspace (Giai đoạn A, WORKSPACE_DESIGN.md).
   const AGENCY_NAV_GROUPS = [
-    {
-      label: "Tổng Quan",
-      items: [
-        { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, perm: undefined },
-      ],
-    },
     {
       label: "Vận Hành Live",
       items: [
@@ -1439,11 +1420,9 @@ export default function App() {
     {
       label: "Brand Workspace",
       items: [
-        { id: "brand_dashboard", label: "Dashboard", icon: Store, perm: undefined },
         { id: "brand_calendar", label: "Lịch Vận Hành", icon: CalendarIcon, perm: undefined },
         { id: "brand_sessions", label: "Sessions", icon: Radio, perm: undefined },
         { id: "brand_skus", label: "SKU Showcase", icon: Package, badge: "NEW", perm: undefined },
-        { id: "brand_audience_analytics", label: "Hiệu Suất Xem & Chuyển Đổi", icon: BarChart3, badge: "NEW", perm: undefined },
         { id: "brand_monthly_report", label: "Report Tháng", icon: FileText, badge: "NEW", perm: undefined },
         ...(currentRole === "brand"
           ? []
@@ -1785,10 +1764,10 @@ export default function App() {
 
                 <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
                   <button
-                    onClick={() => setActiveTab("dashboard")}
+                    onClick={() => setActiveTab(getDefaultTabForRole(currentRole))}
                     className="px-4 py-2 bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--text)] rounded-xl text-xs font-bold transition-all"
                   >
-                    Về Dashboard Cho Role
+                    Về Trang Mặc Định Cho Role
                   </button>
 
                   {currentRole === "ceo" || currentRole === "admin" ? (
@@ -1811,23 +1790,6 @@ export default function App() {
               </div>
             ) : (
               <>
-                {activeTab === "dashboard" && (
-                  <Dashboards
-                    currentRole={currentRole}
-                    sessions={activeSessions}
-                    studios={activeStudios}
-                    brands={activeBrands}
-                    talents={activeTalents}
-                    financeRecords={financeRecords}
-                    brandPlatformRates={brandPlatformRates}
-                    talentRateHistory={talentRateHistory}
-                    brandPlatformRateHistory={brandPlatformRateHistory}
-                    onSelectSession={handleSelectSessionFromDashboard}
-                    onNavigateTab={setActiveTab}
-                    onCalendarViewChange={setDashboardCalendarView}
-                  />
-                )}
-
                 {activeTab === "sessions" && (
                   <LiveSessionHub
                     sessions={activeSessions}
@@ -1898,17 +1860,6 @@ export default function App() {
                 {/* Brand Workspace (Giai đoạn A) — mọi tab dưới đây chỉ render khi effectiveWorkspace
                     đang scope theo đúng 1 brand; component con nhận thẳng brandId + data đã lọc sẵn
                     (giữ nguyên pattern fetch-1-lần-ở-App/filter-bằng-useMemo hiện có). */}
-                {activeTab === "brand_dashboard" && effectiveWorkspace.type === "brand" && (
-                  <BrandDashboard
-                    brandId={currentBrandId!}
-                    brand={activeBrands.find((b) => b.id === currentBrandId)}
-                    sessions={activeSessions}
-                    talents={activeTalents}
-                    onSelectSession={handleSelectSessionFromBrandDashboard}
-                    onCalendarViewChange={setDashboardCalendarView}
-                  />
-                )}
-
                 {activeTab === "brand_calendar" && effectiveWorkspace.type === "brand" && (
                   <BrandCalendar
                     brandId={currentBrandId!}
@@ -1961,10 +1912,6 @@ export default function App() {
                   />
                 )}
 
-                {activeTab === "brand_audience_analytics" && effectiveWorkspace.type === "brand" && (
-                  <BrandAudienceAnalytics brandId={currentBrandId!} sessions={activeSessions} />
-                )}
-
                 {activeTab === "brand_monthly_report" && effectiveWorkspace.type === "brand" && (
                   <BrandMonthlyReport
                     brandId={currentBrandId!}
@@ -1998,6 +1945,7 @@ export default function App() {
                   <MyTalentProfile
                     activeUser={activeUser}
                     talents={talents}
+                    sessions={sessions}
                     onSaveMyProfile={handleSaveMyTalentProfile}
                   />
                 )}
