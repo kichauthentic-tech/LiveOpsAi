@@ -96,7 +96,7 @@ Luồng thật: talent bấm "Tôi rảnh ca này" ([ShiftScheduling.tsx](src/co
 Điểm nghẽn tìm thấy (chưa fix):
 1. **Không có notification nào xuyên suốt** cả 3 bước (chốt lịch, emergency swap, report bị lệch sau đối soát) — người dùng phải tự mở lại tab để biết trạng thái đổi.
 2. **Đối soát bị tách khỏi ngữ cảnh** — nằm trong tab "TikTok API" thay vì cạnh Live Sessions/lịch, ops phải nhảy 3 màn hình (Brand Workspace upload Dataraw → Agency Workspace nạp/khớp batch → quay lại xem kết quả).
-3. **Chốt lịch xử lý từng ca một, không có thao tác hàng loạt** (đối soát đã có "Áp Dụng Tất Cả", chốt lịch thì chưa).
+3. ~~Chốt lịch xử lý từng ca một, không có thao tác hàng loạt~~ — **đã fix 2026-09-18**, xem mục 6 lộ trình bên dưới.
 4. **Report ca nhập tay 100%, không prefill từ Dataraw** dù phần lớn số sẽ bị đối soát ghi đè sau — cùng 1 số gõ 2 lần độc lập.
 
 Ưu tiên đề xuất: #1 rẻ nhất (không đụng schema, thêm 1 lớp notification) → #2, #3 (thuần UI/điều hướng) → #4 nên làm sau khi hướng data ở trên rõ hơn (đụng đúng ô `actual_gmv` hay bị nêu là ghi-đè-phá-huỷ). **Chưa fix — plan bị người dùng yêu cầu dừng lại để bổ sung insight nghiệp vụ sâu hơn (2026-09-13), xem lại trước khi tiếp tục.**
@@ -148,6 +148,19 @@ Luồng thật: talent bấm "Tôi rảnh ca này" ([ShiftScheduling.tsx](src/co
    - `hostSuggestion.ts` **import lại** `isCountable`/`sessionHours`/`weekdayOf` từ `hostPerformance.ts` chứ không chép — hai màn hình không bao giờ được nói hai con số khác nhau về cùng một host.
    - Bấm 1 dòng xếp hạng = chọn luôn làm Host; nếu người đó đang là Trợ live thì ô Trợ live tự xoá (không ai vừa là host vừa là trợ live).
    - `ShiftScheduling` tự nạp `brand_monthly_commitments` (không truyền từ `App.tsx`) và **không chặn màn hình khi lỗi/thiếu quyền** — banner ẩn đi, việc xếp ca vẫn chạy. RLS của bảng đúng bằng `isAdminRole()` nên talent gọi cũng chỉ ra mảng rỗng.
+
+6. ~~Chốt lịch hàng loạt~~ — **xong 2026-09-18** (điểm nghẽn #3 của audit module Vận Hành Live), verify end-to-end trên Supabase thật. [BulkFinalizePanel.tsx](src/components/BulkFinalizePanel.tsx) + logic thuần [bulkFinalize.ts](src/lib/performance/bulkFinalize.ts). **Không cần migration.**
+
+   **Cái bẫy bắt buộc phải biết trước khi sửa file này:** `checkConflicts()` trong `ShiftScheduling` chỉ đối chiếu với `sessions` ĐÃ TỒN TẠI. Trong một mẻ chốt hàng loạt thì chưa ca nào trong mẻ được tạo, nên nếu tự gán host giỏi nhất cho 5 ca trùng giờ thì cả 5 đều "không trùng" khi xét riêng lẻ — chốt xong mới lòi ra một người bị xếp 5 ca cùng lúc. `planBulkFinalize` vì thế giữ **sổ riêng cho những gì mẻ này đã gán** (`BatchLedger`) và xét trùng trên cả hai nguồn. Đã verify bằng số thật: 3 ca cùng 10:00–14:00 cùng ngày, cả 3 người đăng ký cả 3 ca ⇒ ra 3 host khác nhau; ca 19:00 không trùng thì host giỏi nhất được dùng lại.
+
+   **Quy ước của tầng này:**
+
+   - **Planner chỉ ĐỀ XUẤT, không bao giờ tự chốt ngầm.** Mọi dòng hiện ra cho ops sửa/bỏ tick trước khi bấm. Dòng vướng trùng lịch hoặc không gán được ai thì **không tự tick**.
+   - **Xếp tham lam theo thứ tự thời gian**, không tối ưu toàn cục — ops sửa tay được, và thuật toán "tối ưu" mà ops không đoán được nó nghĩ gì thì tệ hơn là tốt.
+   - **Mọi sửa tay đều quét lại CẢ MẺ** (`recheckPlan`), không sửa cục bộ: đổi 1 dòng có thể giải phóng hoặc gây trùng ở dòng bất kỳ khác. Đã verify: đổi host dòng 2 trùng dòng 1 thì **cả hai** dòng bị gắn cờ, bỏ tick 1 dòng thì dòng kia hết cờ.
+   - **Chỉ dòng ĐANG TICK mới tính vào trùng-trong-mẻ** — dòng đã bỏ tick không được chốt nên không chiếm chỗ của ai.
+   - **Kế hoạch lập MỘT LẦN lúc mở panel**, không tính lại theo `sessions` đang đổi: mỗi ca chốt xong là `App` nạp lại sessions, tính lại giữa chừng sẽ xoá sạch phần ops vừa sửa tay.
+   - **Chạy tuần tự, không `Promise.all`** — mỗi lần chốt ghi DB rồi `App` nạp lại state; bắn song song sẽ đua nhau và ops không biết ca nào hỏng. Hỏng một phần thì liệt kê đúng ca hỏng, ca đó vẫn để mở.
 
 > **Cảnh báo cho session sau — KHÔNG "sửa" quyền của bảng `talents`.** Query thẳng `talents` từ client trả `permission denied for table talents`; đây **không phải lỗi** mà là biện pháp bảo vệ có chủ đích của migration 0047 (`revoke select on talents from authenticated`): rate/lương talent phải được che, nên mọi lượt đọc đi qua view `talents_secure` — view mask cột nhạy cảm trừ khi người đọc là ceo/admin hoặc chính talent đó (0048 giải thích chi tiết vì sao view phải ở chế độ definer). Cấp lại `grant select on talents` sẽ hở toàn bộ rate cho mọi user đăng nhập. **Mọi code mới cần đọc talent phải dùng `talents_secure`.** Rà ngày 2026-09-17: trong 38 bảng app dùng, đây là bảng DUY NHẤT client không đọc trực tiếp được, và đúng như thiết kế.
 

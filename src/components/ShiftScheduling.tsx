@@ -26,7 +26,8 @@ import {
   ChevronRight,
   Flame,
   Target,
-  TrendingUp
+  TrendingUp,
+  Layers
 } from "lucide-react";
 import { CAMPAIGN_DAY_STYLES, getCampaignDayInfo } from "../lib/campaignDays";
 import { timeRangesOverlap } from "../lib/dateUtils";
@@ -40,6 +41,8 @@ import { SessionReportInput } from "../lib/db/sessionReports";
 import { fetchBrandMonthlyCommitments } from "../lib/db/brandContracts";
 import { SchedulingGap, computeSchedulingGaps } from "../lib/performance/brandCommitment";
 import { HostSuggestion, headlineFor, suggestHosts } from "../lib/performance/hostSuggestion";
+import { BulkFinalizePanel } from "./BulkFinalizePanel";
+import { eligibleSlots } from "../lib/performance/bulkFinalize";
 
 interface ShiftSchedulingProps {
   currentRole: UserRole;
@@ -368,6 +371,14 @@ export default function ShiftScheduling({
     [talents]
   );
 
+  // Chốt hàng loạt (điểm nghẽn #3 của audit) — panel tự lập kế hoạch khi mở, nên chỉ cần biết
+  // CÓ ca nào đáng chốt hay không để quyết định hiện nút.
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const bulkCandidateCount = useMemo(
+    () => (admin ? eligibleSlots(shiftSlots, registrationsBySlot, selectedMonth, today).length : 0),
+    [admin, shiftSlots, registrationsBySlot, selectedMonth, today]
+  );
+
   // Mốc lấy lịch sử hiệu suất khi gợi ý host: 90 ngày gần nhất. Lấy cả đời thì host đã tiến bộ
   // (hoặc đi xuống) từ nửa năm trước vẫn kéo trung bình, không phản ánh phong độ hiện tại.
   const perfSince = useMemo(() => {
@@ -422,6 +433,33 @@ export default function ShiftScheduling({
           <AlertTriangle className="w-4 h-4 shrink-0" />
           Tài khoản của bạn chưa được gán hồ sơ Talent (assigned_talent_id) — liên hệ CEO/Operations để gán trước khi tự đăng ký ca được.
         </div>
+      )}
+
+      {admin && bulkCandidateCount > 0 && !bulkOpen && (
+        <button
+          onClick={() => setBulkOpen(true)}
+          className="w-full flex items-center justify-center gap-2 bg-[var(--surface)] border border-[var(--border)] hover:border-blue-700 rounded-2xl px-4 py-3 text-sm font-bold text-[var(--text)] transition-colors"
+        >
+          <Layers className="w-4 h-4 text-blue-400" />
+          Chốt lịch hàng loạt
+          <span className="text-xs font-normal text-[var(--text-muted)]">
+            — {bulkCandidateCount} ca đang mở đã có người đăng ký
+          </span>
+        </button>
+      )}
+
+      {admin && bulkOpen && (
+        <BulkFinalizePanel
+          slots={shiftSlots}
+          registrationsBySlot={registrationsBySlot}
+          sessions={sessions}
+          talentNameById={talentNameById}
+          month={selectedMonth}
+          today={today}
+          perfSince={perfSince}
+          onFinalizeSlot={onFinalizeSlot}
+          onClose={() => setBulkOpen(false)}
+        />
       )}
 
       {/* Cam kết hợp đồng của tháng đang xem — trả lời "còn phải MỞ thêm bao nhiêu giờ ca", tín
