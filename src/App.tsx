@@ -1277,7 +1277,9 @@ export default function App() {
       hostId,
       hostName: host?.name ?? "",
       assistantName: "",
-      coHostId,
+      // Caller diễn đạt "không có trợ live" bằng null, LiveSession.coHostId lại là optional
+      // (string | undefined) — quy về undefined để sessionToDb() ghi null đúng một đường.
+      coHostId: coHostId ?? undefined,
       coHostName: coHost?.name ?? "",
       platform: slot.platform,
       date: slot.date,

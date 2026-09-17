@@ -92,6 +92,16 @@ function nextMonthStrLocal(month: string): string {
 function fmtInt(n: number): string {
   return Math.round(n).toLocaleString("vi-VN");
 }
+
+// recharts khai formatter của <Tooltip> nhận ValueType | undefined (string | number | mảng của
+// chúng), không phải number — viết thẳng `(v: number) => ...` là nói dối kiểu, strict bắt đúng.
+// Bọc một lần ở đây thay vì ép kiểu ở 8 chỗ gọi: ép kiểu thì lần sau recharts đổi signature sẽ
+// không còn ai báo.
+function chartNum(v: unknown): number {
+  if (typeof v === "number") return Number.isFinite(v) ? v : 0;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
 function fmtPct(n: number | null): string {
   return n == null ? "—" : `${n.toFixed(2)}%`;
 }
@@ -1001,7 +1011,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, m
                         <CartesianGrid stroke={PAL.line} vertical={false} />
                         <XAxis dataKey="label" stroke={PAL.muted} fontSize={11} />
                         <YAxis stroke={PAL.muted} fontSize={10} tickFormatter={(v) => formatCurrencyAdaptive(v)} width={70} />
-                        <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatCurrencyAdaptive(v)} />
+                        <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => formatCurrencyAdaptive(chartNum(v))} />
                         <Bar dataKey="kpiTarget" name="Target (Lịch Vận Hành)" fill={`${PAL.gold}33`} radius={[4, 4, 0, 0]} />
                         <Bar dataKey="actual" name="Actual" fill={PAL.gold} radius={[4, 4, 0, 0]} />
                       </BarChart>
@@ -1065,7 +1075,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, m
                                 <Cell key={d.label} fill={d.color} />
                               ))}
                             </Pie>
-                            <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatCurrencyAdaptive(v)} />
+                            <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => formatCurrencyAdaptive(chartNum(v))} />
                           </PieChart>
                         </ResponsiveContainer>
                       </div>
@@ -1204,7 +1214,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, m
                               <XAxis dataKey="label" stroke={PAL.muted} fontSize={10} interval={2} />
                               <YAxis yAxisId="gmv" stroke={PAL.muted} fontSize={10} tickFormatter={(v) => formatCurrencyAdaptive(v)} width={70} />
                               <YAxis yAxisId="gpm" orientation="right" stroke={PAL.green} fontSize={10} tickFormatter={(v) => formatCurrencyAdaptive(v)} width={70} />
-                              <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatCurrencyAdaptive(v)} />
+                              <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => formatCurrencyAdaptive(chartNum(v))} />
                               <Area
                                 yAxisId="gmv"
                                 type="monotone"
@@ -1315,7 +1325,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, m
                             <CartesianGrid stroke={PAL.line} vertical={false} />
                             <XAxis dataKey="label" stroke={PAL.muted} fontSize={11} />
                             <YAxis stroke={PAL.muted} fontSize={10} tickFormatter={(v) => formatCurrencyAdaptive(v)} width={70} />
-                            <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatCurrencyAdaptive(v)} />
+                            <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => formatCurrencyAdaptive(chartNum(v))} />
                             <Bar dataKey="target" name="Target" fill={`${PAL.gold}2e`} stroke={PAL.gold} radius={[4, 4, 0, 0]} />
                             <Bar dataKey="actual" name="Actual" fill={PAL.gold} radius={[4, 4, 0, 0]} />
                           </BarChart>
@@ -1357,7 +1367,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, m
                             <CartesianGrid stroke={PAL.line} horizontal={false} />
                             <XAxis type="number" stroke={PAL.muted} fontSize={10} tickFormatter={(v) => formatCurrencyAdaptive(v)} />
                             <YAxis type="category" dataKey="label" stroke={PAL.muted} fontSize={11} width={90} />
-                            <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatCurrencyAdaptive(v)} />
+                            <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => formatCurrencyAdaptive(chartNum(v))} />
                             <Bar dataKey="gmvHour" radius={[0, 4, 4, 0]}>
                               {hostChartData.map((_, i) => (
                                 <Cell key={i} fill={i === 0 ? PAL.gold : `${PAL.gold}55`} />
@@ -1426,7 +1436,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, m
                             <CartesianGrid stroke={PAL.line} horizontal={false} />
                             <XAxis type="number" stroke={PAL.muted} fontSize={10} tickFormatter={(v) => fmtInt(v)} />
                             <YAxis type="category" dataKey="label" stroke={PAL.muted} fontSize={10} width={90} />
-                            <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => fmtInt(v)} />
+                            <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => fmtInt(chartNum(v))} />
                             <Bar dataKey="value" radius={[0, 4, 4, 0]}>
                               {funnelStages.map((_, i) => (
                                 <Cell key={i} fill={[PAL.gold, PAL.goldDim, `${PAL.gold}88`, PAL.blue, PAL.green][i] ?? PAL.gold} />
@@ -1511,7 +1521,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, m
                             <CartesianGrid stroke={PAL.line} horizontal={false} />
                             <XAxis type="number" stroke={PAL.muted} fontSize={10} tickFormatter={(v) => formatCurrencyAdaptive(v)} />
                             <YAxis type="category" dataKey="label" stroke={PAL.muted} fontSize={10} width={160} />
-                            <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatCurrencyAdaptive(v)} />
+                            <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => formatCurrencyAdaptive(chartNum(v))} />
                             <Bar dataKey="gmv" radius={[0, 4, 4, 0]}>
                               {skuChartData.map((_, i) => (
                                 <Cell key={i} fill={i === 0 ? PAL.gold : `${PAL.gold}55`} />
@@ -1828,7 +1838,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, m
                                   <Cell key={d.label} fill={d.color} />
                                 ))}
                               </Pie>
-                              <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => `${v.toFixed(1)}%`} />
+                              <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => `${chartNum(v).toFixed(1)}%`} />
                             </PieChart>
                           </ResponsiveContainer>
                         </div>

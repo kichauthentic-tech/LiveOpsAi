@@ -93,7 +93,9 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
   }, [completed]);
 
   const dailyByDate = useMemo(() => {
-    const m = new Map<string, (typeof slice.daily)[number]>();
+    // NonNullable vì slice có thể null — thân hàm đã guard bằng `slice?.daily ?? []`, chỉ riêng
+    // chỗ viết KIỂU là deref thẳng nên strict mới bắt được.
+    const m = new Map<string, NonNullable<typeof slice>["daily"][number]>();
     (slice?.daily ?? []).forEach((d) => m.set(d.date, d));
     return m;
   }, [slice]);
