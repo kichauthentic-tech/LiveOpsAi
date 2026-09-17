@@ -25,6 +25,8 @@ Ground truth luôn là `AGENCY_NAV_GROUPS`/`BRAND_NAV_GROUPS` ở [src/App.tsx](
 
 1. **Tầng 0 — Dữ Liệu Gốc (Dataraw):** ops tải tay 5 loại report Excel từ TikTok Shop Seller Center (Shop Promotion List, Product List, Live Analysis, Shop Analytics, Transaction Analysis Creator List) mỗi tuần/tháng, upload vào kho theo brand. Đây là bằng chứng gốc, tự động gộp/ghi đè theo tháng khi upload lại. **Chưa có pipeline API tự động** — cần scope `data.shop_analytics.public.read`, đang treo ở bước đăng ký Developer/ISV TikTok Shop Partner Center.
 2. **Đối soát:** Talent tự nhập report ca (tạm tính, `data_source='manual'`) → Ops đối soát cuối kỳ bằng số đọc thẳng từ Dataraw, ghi đè thành `data_source='tiktok_reconciled'`. Nộp lại report sau khi đã đối soát **không tự xoá cờ** nếu số liệu đối soát (GMV/orders/views/CTR/watch-time) không đổi (migration 0075).
+
+2b. **Snapshot số liệu theo ca (migration 0078/0079, 2026-09-17) — nguồn sự thật MỚI, đang thay dần việc nhập tay.** Trợ live tải file `Creator-Live-Performance` (TikTok Creator Center, 1 dòng/Room ID) rồi up thẳng vào đúng ca đang trực; ca đã biết host/brand nên file không cần cột định danh. Bậc tin cậy thứ 3 `data_source='live_snapshot'` nằm giữa `manual` và `tiktok_reconciled`. Chi tiết cơ chế xem mục "Tầng dữ liệu gốc mới" bên dưới.
 3. **Report Tháng Brand Workspace** (5 tab: Tổng Quan/Livestream/Sản Phẩm & Khuyến Mãi/Affiliate/Kế Hoạch Tháng Sau) — đạt chuẩn brief thật Crocs x YFB, đọc thẳng từ Dataraw + `live_sessions` thật, không số bịa. Toggle Tháng/Tuần dùng chung 1 màn hình.
 4. **P&L** (`lib/pnl.ts`) tính trên NMV ước tính = `actualGmv × (1 − returnRate/100)`, giờ công thực tế = giờ ca + OT − off sớm, rate/giờ song song với rate/phiên cũ (data cũ không đổi).
 
@@ -44,6 +46,23 @@ Ground truth luôn là `AGENCY_NAV_GROUPS`/`BRAND_NAV_GROUPS` ở [src/App.tsx](
 
 - **Tích hợp TikTok API tự động** — hiện 100% nhập tay qua Dataraw, chờ scope Developer/ISV.
 - **Theme toggle (light/dark) chưa phủ hết app** — hạ tầng có sẵn app-wide, nhưng chỉ 2 calendar (`LiveCalendar`/`BrandCalendar`) có class `dark:`, phần còn lại (sidebar, Header, mọi modal/bảng) vẫn hardcode màu dark cũ — không vỡ, chỉ không đổi màu khi toggle. Làm dần khi có yêu cầu, không có deadline.
+
+## Tầng dữ liệu gốc mới — snapshot theo ca (Giai đoạn 1, xong 2026-09-17)
+
+Quyết định nghiệp vụ: **mọi số liệu hiệu suất của toàn app từ nay lấy từ đúng 1 loại file chuẩn** `Creator-Live-Performance`, thay cho 5 loại Dataraw phức tạp. 5 loại cũ **giữ nguyên, không đụng tới** — dành cho module report cuối tháng sẽ build sau.
+
+**Vì sao phải lưu từng lần up thành snapshot riêng:** file là số CỘNG DỒN từ lúc mở room. Ca nối nhau mà host không tắt stream thì 2 ca dùng chung 1 Room ID, nên số ca sau = lần up này TRỪ lần up trước của cùng room. Snapshot lúc giao ca là thứ **duy nhất** ghi lại được ranh giới giữa 2 ca trong cùng một room — file đối soát cuối ngày chỉ có tổng cả room, không tách ngược được. Trợ quên up lúc giao ca ⇒ mất ranh giới vĩnh viễn, chỉ còn chia tay ước lượng.
+
+Bảng/hàm: `session_live_snapshots` + `session_live_snapshot_rows`, RPC `apply_session_live_snapshot` / `delete_session_live_snapshot` / `recompute_session_from_snapshot` (0078, sửa ở 0079). Code: [extractRooms.ts](src/lib/liveSnapshot/extractRooms.ts), [metrics.ts](src/lib/liveSnapshot/metrics.ts), [sessionLiveSnapshots.ts](src/lib/db/sessionLiveSnapshots.ts), UI [SessionLiveSnapshotUpload.tsx](src/components/SessionLiveSnapshotUpload.tsx) nhúng trong ShiftScheduling.
+
+**Quy ước bắt buộc của tầng này:**
+
+- **Chỉ 13 cột ĐẾM ĐƯỢC mới được đem trừ** (GMV, items, orders, SKU orders, views, impressions, product impressions, product clicks, new followers, comments, shares, likes, duration). Mọi tỷ lệ (AOV, GPM, CTR, CTOR, *_rate) **tính lại lúc đọc** từ số đã trừ — hiệu của 2 tỷ lệ cộng dồn là số vô nghĩa. Vẫn lưu nguyên cả 35 cột vào `raw` làm bằng chứng + để kiểm chứng công thức.
+- **Mốc chia ranh giới là GIỜ KẾT THÚC CA (`boundary_at`), không phải giờ bấm up.** Lấy giờ up sẽ sai ngay khi up bù/up lại ca cũ: mốc nhảy ra sau ca kế tiếp rồi trừ nhầm số ca sau thành âm. Ca vắt qua nửa đêm phải cộng sang ngày hôm sau (`session_boundary_at()`).
+- **Room thuộc ca khi khung thời gian GIAO NHAU cả 2 đầu**: bắt đầu trước khi ca kết thúc VÀ kết thúc sau khi ca bắt đầu. Thiếu vế đầu trên (lỗi đã sửa ở 0079) thì up bù 1 ca cũ sẽ hút hết phiên của mọi ngày sau đó vào ca đó.
+- Up lại cho cùng 1 ca là **thay thế** snapshot (unique index theo `session_id`), không cộng dồn. `previous_values` giữ nguyên trạng trước lần up ĐẦU TIÊN để xoá là khôi phục đúng gốc.
+- Mọi thay đổi snapshot đều **tự tính lại các ca sau đó dùng chung room** trong cùng transaction.
+- Công thức tỷ lệ đã đối chiếu khớp tuyệt đối với cột TikTok tự ghi trên 89 phiên thật: `LIVE CTR` = click sản phẩm/lượt xem (KHÔNG phải lượt xem/hiển thị — cái đó là `Tap through rate`), `SKU order rate` = đơn SKU/lượt xem, `CTR` = click/hiển thị sản phẩm, `CTOR` = đơn/click, `Show GPM` = GMV/1000 hiển thị. Thời lượng phải tính từ hiệu mốc giờ, **không** dùng cột `Duration` (làm tròn xuống phút). `Follow rate`/`Like rate` của TikTok chia cho mẫu số KHÔNG có trong file (phiên mẫu 489 trong khi Views = 456) nên cố tình tính trên lượt xem và sẽ lệch — đừng "sửa" cho khớp.
 
 ## Quy ước kỹ thuật bắt buộc tuân theo
 
@@ -84,5 +103,21 @@ Luồng thật: talent bấm "Tôi rảnh ca này" ([ShiftScheduling.tsx](src/co
 Đã xoá: `src/components/Dashboards.tsx`, `src/components/brand-workspace/BrandDashboard.tsx`, `src/components/brand-workspace/BrandAudienceAnalytics.tsx`, cùng các widget chỉ phục vụ riêng 2 file trên (`KpiComparison.tsx`, `GmvGrowthTrendline.tsx`, `PerformanceDeviationAlerts.tsx`, `GmvCalendar.tsx`, `src/lib/gmvMetrics.ts`) và 1 file mồ côi có sẵn từ trước liên quan (`PerformanceMetricsWidget.tsx`). Xoá kèm nav item "Tổng Quan"/"Dashboard" (agency) và "Dashboard"/"Hiệu Suất Xem & Chuyển Đổi" (brand) trong `src/App.tsx`. Tab mặc định sau khi đăng nhập đổi từ "dashboard"/"brand_dashboard" (không còn tồn tại) sang `getDefaultTabForRole()` (`src/App.tsx`) — agency về "Live Sessions", brand về "Lịch Vận Hành".
 
 **Không đụng** (không phải dashboard, có workflow/ghi dữ liệu thật riêng): `BrandMonthlyReport.tsx`/`MonthlyReportTabs.tsx`/`BrandWeeklyReport.tsx` (report tháng/tuần, có publish workflow), `src/lib/pnl.ts`, `src/lib/metrics/*`, `src/lib/db/brandDataRaw.ts`.
+
+**Lộ trình tầng dữ liệu gốc mới (chốt 2026-09-17, làm tuần tự từng giai đoạn, verify xong mới sang giai đoạn sau):**
+
+1. ~~Nạp snapshot theo ca~~ — **xong 2026-09-17**, đã verify end-to-end trên Supabase thật (ca nối chia đúng ranh giới, up nhầm xoá khôi phục đúng, phiên ngày khác không lọt vào, 10/10 công thức khớp cột TikTok trên 89 phiên thật). Xem mục "Tầng dữ liệu gốc mới" ở trên.
+2. ~~Module đối soát cho Operation~~ — **xong 2026-09-17**, verify end-to-end trên Supabase thật. Tab "Đối Soát Số Liệu" ([LiveReconciliation.tsx](src/components/LiveReconciliation.tsx)) đặt trong nhóm Vận Hành Live cạnh Live Sessions, **không** nhét trong tab TikTok API như luồng đối soát cũ (điểm nghẽn #2 của audit). Migration 0080: `live_reconciliation_batches`/`live_reconciliation_rows`, RPC `import_live_reconciliation` / `set_reconciliation_bucket` / `apply_live_reconciliation`.
+
+   **Quy tắc phân bổ số về trễ** (đã verify bằng số thật): rổ `agency` giữ NGUYÊN tỷ lệ đóng góp mà snapshot lúc giao ca ghi nhận rồi scale lên số cuối — ranh giới ca nối từ giai đoạn 1 chính là thứ làm được việc này. Rổ `review` (chuỗi ca nối có ca quên up snapshot) KHÔNG được dùng tỷ lệ snapshot vì tỷ lệ đó thiếu, sẽ dồn hết vào ca có snapshot và bỏ đói ca kia — buộc chia theo số giây khung ca giao với khung phiên. Rổ `unassigned`/`inhouse` không đụng số liệu ca nào.
+
+   Ca inhouse dùng CHUNG creator account với agency nên chỉ phân biệt được bằng khớp khung giờ ca đã chốt: phiên không khớp ca nào mặc định vào rổ `unassigned`, ops bấm 1 nút gán cả rổ thành `inhouse`.
+3. ~~Tầng hiệu suất đọc ra~~ — **xong 2026-09-17**. Tab "Hiệu Suất Host" ([HostPerformance.tsx](src/components/HostPerformance.tsx)) + module thuần [hostPerformance.ts](src/lib/performance/hostPerformance.ts). **Không cần migration** — tổng hợp phía client từ `sessions` đã nạp sẵn trong state, đúng pattern có sẵn của app.
+
+   Quy ước của tầng này: thước đo phân bổ ca là **GMV/giờ** (không phải GMV/ca — GMV/ca thiên vị host được xếp ca dài). Giờ lấy `liveDurationMinutes` (giờ live thật) khi có, rơi về giờ kế hoạch khi chưa có snapshot. Ca `Cancelled`/`Upcoming` và ca không có số đều bị loại. Gom nhóm host bằng `hostKey()` = `hostId` rồi rơi về **tên** — `host_id` có thể null (talent bị xoá, ca tạo tay) trong khi `host_name` denormalized vẫn còn, gom thẳng theo id sẽ trộn nhiều host thành một dòng. Màn hình luôn hiện tỷ lệ nguồn dữ liệu (đã đối soát / lúc giao ca / tự khai tay) để ops biết mức tin cậy trước khi ra quyết định.
+
+4. **Lớp cam kết hợp đồng (chưa làm)** — brand cam kết bao nhiêu giờ/tháng với agency. Bảng độc lập, chưa có gì trong hệ thống, không phụ thuộc giai đoạn nào ở trên. Nên bắt đầu ghi nhận càng sớm càng tốt: dữ liệu hiệu suất thì đã có sẵn lịch sử, còn cam kết hợp đồng mà tới lúc cần mới bắt đầu nhập thì phải chờ thêm vài tháng mới đủ để so sánh run-rate với cam kết.
+
+> **Cảnh báo cho session sau — KHÔNG "sửa" quyền của bảng `talents`.** Query thẳng `talents` từ client trả `permission denied for table talents`; đây **không phải lỗi** mà là biện pháp bảo vệ có chủ đích của migration 0047 (`revoke select on talents from authenticated`): rate/lương talent phải được che, nên mọi lượt đọc đi qua view `talents_secure` — view mask cột nhạy cảm trừ khi người đọc là ceo/admin hoặc chính talent đó (0048 giải thích chi tiết vì sao view phải ở chế độ definer). Cấp lại `grant select on talents` sẽ hở toàn bộ rate cho mọi user đăng nhập. **Mọi code mới cần đọc talent phải dùng `talents_secure`.** Rà ngày 2026-09-17: trong 38 bảng app dùng, đây là bảng DUY NHẤT client không đọc trực tiếp được, và đúng như thiết kế.
 
 **Module tiếp theo (chưa audit):** (2) Điều hướng/UI tổng thể toàn app, (3) Báo cáo/số liệu (Report Tháng, P&L) — riêng phần "Dashboard" của mục (3) không còn áp dụng, đã xử lý ở trên. Audit xong module nào thì cập nhật đúng mục này, không tạo file riêng.

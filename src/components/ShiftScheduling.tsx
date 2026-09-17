@@ -32,6 +32,7 @@ import { PosterDayCell } from "./ui/PosterCalendarGrid";
 import { getBrandTheme } from "../lib/brandTheme";
 import { SessionEventCard, SessionCardTone, buildSlotMeta } from "./ui/SessionEventCard";
 import { SessionReportForm } from "./SessionReportForm";
+import { SessionLiveSnapshotUpload } from "./SessionLiveSnapshotUpload";
 import { SessionReportInput } from "../lib/db/sessionReports";
 
 interface ShiftSchedulingProps {
@@ -50,6 +51,9 @@ interface ShiftSchedulingProps {
   onUpdateSession: (session: LiveSession) => Promise<boolean>;
   onLogAudit: (entry: { action: string; details: string; category: AuditLogEntry["category"] }) => Promise<void>;
   onSubmitSessionReport: (sessionId: string, input: SessionReportInput) => Promise<boolean>;
+  // RPC apply_session_live_snapshot đã ghi DB và trả về LiveSession đầy đủ — chỉ cần đồng bộ
+  // lại state, không gọi updateSession (sẽ ghi đè ngược số vừa tính bằng state cũ của client).
+  onSessionSnapshotApplied: (session: LiveSession) => void;
 }
 
 const WEEKDAY_LABELS = ["CN", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"];
@@ -105,7 +109,8 @@ export default function ShiftScheduling({
   onFinalizeSlot,
   onUpdateSession,
   onLogAudit,
-  onSubmitSessionReport
+  onSubmitSessionReport,
+  onSessionSnapshotApplied
 }: ShiftSchedulingProps) {
   const admin = isAdminRole(currentRole);
   const myTalentId = activeUser.assignedTalentId;
@@ -762,6 +767,12 @@ export default function ShiftScheduling({
                                   Huỷ
                                 </button>
                               </div>
+                            </div>
+                          )}
+                          {(admin || myTalentId === session.hostId || myTalentId === session.coHostId) && (
+                            <div className="pt-2 border-t border-[var(--border)]/80">
+                              <p className="text-[11px] font-bold text-[var(--text-muted)] mb-1.5">Số Liệu Thật Của Ca</p>
+                              <SessionLiveSnapshotUpload session={session} onApplied={onSessionSnapshotApplied} />
                             </div>
                           )}
                           {!admin && (myTalentId === session.hostId || myTalentId === session.coHostId) && (

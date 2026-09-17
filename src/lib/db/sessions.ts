@@ -37,6 +37,21 @@ interface DbLiveSession {
   data_source: LiveSession["dataSource"] | null;
   reconciled_at: string | null;
   tiktok_room_id: string | null;
+  // Snapshot theo ca (migration 0078) — chỉ đọc ở đây, đường ghi duy nhất là RPC
+  // apply_session_live_snapshot/delete_session_live_snapshot (xem sessionToDb bên dưới).
+  actual_start_at: string | null;
+  actual_end_at: string | null;
+  live_duration_minutes: number | null;
+  attributed_items_sold: number | null;
+  attributed_sku_orders: number | null;
+  impressions: number | null;
+  product_impressions: number | null;
+  product_clicks: number | null;
+  new_followers: number | null;
+  comments_count: number | null;
+  shares_count: number | null;
+  likes_count: number | null;
+  live_room_ids: string[] | null;
 }
 
 interface DbSessionSku {
@@ -170,7 +185,20 @@ function sessionFromDb(row: DbLiveSession): Omit<LiveSession, "skus" | "checklis
     aiAnalysis: row.ai_analysis ?? undefined,
     dataSource: row.data_source ?? "manual",
     reconciledAt: row.reconciled_at ?? undefined,
-    tiktokRoomId: row.tiktok_room_id ?? undefined
+    tiktokRoomId: row.tiktok_room_id ?? undefined,
+    actualStartAt: row.actual_start_at ?? undefined,
+    actualEndAt: row.actual_end_at ?? undefined,
+    liveDurationMinutes: row.live_duration_minutes ?? undefined,
+    attributedItemsSold: row.attributed_items_sold ?? undefined,
+    attributedSkuOrders: row.attributed_sku_orders ?? undefined,
+    impressions: row.impressions ?? undefined,
+    productImpressions: row.product_impressions ?? undefined,
+    productClicks: row.product_clicks ?? undefined,
+    newFollowers: row.new_followers ?? undefined,
+    commentsCount: row.comments_count ?? undefined,
+    sharesCount: row.shares_count ?? undefined,
+    likesCount: row.likes_count ?? undefined,
+    liveRoomIds: row.live_room_ids ?? undefined
   };
 }
 

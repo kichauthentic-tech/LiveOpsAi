@@ -98,6 +98,9 @@ export interface CreatorLivePerfRow {
   comments: number;
   shares: number;
   likes: number;
+  // Dòng gốc nguyên trạng (key = đúng tên cột trong file). Snapshot theo ca lưu lại cả 35 cột
+  // làm bằng chứng, kể cả các cột tỷ lệ không dùng để tính — xem lib/liveSnapshot/extractRooms.ts.
+  sourceRow: Record<string, unknown>;
 }
 
 function findCol(columns: DataRawColumn[], pattern: RegExp): string | undefined {
@@ -142,7 +145,8 @@ export function mapCreatorLivePerfRows(columns: DataRawColumn[], rawRows: Record
       newFollowers: toNum(colKey.newFollowers && raw[colKey.newFollowers]),
       comments: toNum(colKey.comments && raw[colKey.comments]),
       shares: toNum(colKey.shares && raw[colKey.shares]),
-      likes: toNum(colKey.likes && raw[colKey.likes])
+      likes: toNum(colKey.likes && raw[colKey.likes]),
+      sourceRow: raw
     });
   }
   return out;

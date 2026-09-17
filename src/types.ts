@@ -182,10 +182,28 @@ export interface LiveSession {
   ctrAvg: number;
   cvrAvg: number;
   // Đối soát TikTok (migration 0050) — "manual" = talent tự nhập, chưa chính xác vì TikTok
-  // chưa chốt hoàn/hủy; "tiktok_reconciled" = đã ghi đè bằng số chính thức từ TikTok cuối tháng.
-  dataSource?: "manual" | "tiktok_reconciled";
+  // chưa chốt hoàn/hủy; "live_snapshot" = số thật đọc từ file trợ live up lúc giao ca, nhưng
+  // TikTok còn cập nhật trễ (migration 0078); "tiktok_reconciled" = đã đối soát chốt.
+  dataSource?: "manual" | "live_snapshot" | "tiktok_reconciled";
   reconciledAt?: string;
   tiktokRoomId?: string;
+  // Số liệu đọc từ snapshot theo ca (migration 0078). Giờ live THỰC TẾ tách hẳn khỏi
+  // startTime/endTime (giờ kế hoạch) — không bao giờ ghi đè lẫn nhau.
+  actualStartAt?: string;
+  actualEndAt?: string;
+  liveDurationMinutes?: number;
+  // Optional vì chỉ có sau khi ca được nạp snapshot — ca chưa live xong hoặc chưa up file thì
+  // không có số nào trong nhóm này, khác với actualGmv/totalOrders vốn còn đường nhập tay.
+  attributedItemsSold?: number;
+  attributedSkuOrders?: number;
+  impressions?: number;
+  productImpressions?: number;
+  productClicks?: number;
+  newFollowers?: number;
+  commentsCount?: number;
+  sharesCount?: number;
+  likesCount?: number;
+  liveRoomIds?: string[];
   skus: ProductSKU[];
   checklist: ChecklistItem[];
   minuteMetrics: MinuteMetric[];

@@ -50,7 +50,9 @@ import {
   Package,
   PanelLeftClose,
   PanelLeftOpen,
-  Database
+  Database,
+  ClipboardCheck,
+  TrendingUp
 } from "lucide-react";
 import { Header, WorkspaceContext } from "./components/Header";
 import { BrandCalendar } from "./components/brand-workspace/BrandCalendar";
@@ -74,6 +76,8 @@ import { AiMultiAgent } from "./components/AiMultiAgent";
 import { UserRoleSettings } from "./components/UserRoleSettings";
 import { AiTrainingCenter } from "./components/AiTrainingCenter";
 import ShiftScheduling from "./components/ShiftScheduling";
+import { LiveReconciliation } from "./components/LiveReconciliation";
+import { HostPerformance } from "./components/HostPerformance";
 
 const STORAGE_PREFIX = "liveops_os_v2_";
 
@@ -1049,6 +1053,11 @@ export default function App() {
   };
   // TikTokLiveReconciliation đã tự gọi RPC apply_tiktok_reconciliation và có sẵn LiveSession
   // đầy đủ (fetchSessionById) — chỉ cần cập nhật lại state, không network round-trip thêm.
+  // Đối soát ghi đè nhiều ca cùng lúc trong 1 RPC nên không có danh sách session trả về — nạp lại
+  // toàn bộ thay vì cố suy ra ca nào đã đổi.
+  const handleReconciliationApplied = async () => {
+    setSessions(await fetchSessions());
+  };
   const handleSessionReconciled = (updated: LiveSession) => {
     setSessions((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
     if (selectedSession && selectedSession.id === updated.id) {
@@ -1351,6 +1360,11 @@ export default function App() {
         // talent cần thấy tab này để tự đăng ký ca (Giai đoạn 14a); màn hình bên trong tự đổi giao
         // diện theo currentRole (talent = đăng ký, ceo/operations/admin = mở ca + chốt lịch).
         { id: "shift_scheduling", label: "Đăng Ký & Chốt Lịch", icon: CalendarClock, badge: "NEW", perm: undefined },
+        // Đối soát đặt ngay cạnh Live Sessions/lịch thay vì nhét trong tab "TikTok API" như luồng
+        // đối soát cũ — đúng chỗ ops đang làm việc, không phải nhảy sang module khác (điểm nghẽn
+        // #2 của audit module Vận Hành Live).
+        { id: "live_reconciliation", label: "Đối Soát Số Liệu", icon: ClipboardCheck, perm: "manage_sessions" as PermissionKey },
+        { id: "host_performance", label: "Hiệu Suất Host", icon: TrendingUp, perm: "manage_sessions" as PermissionKey },
         // Hồ Sơ Của Tôi — chỉ role talent, cùng pattern hardcode-theo-role như ai_training bên
         // dưới (không qua Ma Trận Phân Quyền, vì đây là trang tự quản lý của chính talent đó).
         ...(currentRole === "talent"
@@ -1854,7 +1868,16 @@ export default function App() {
                     onSubmitSessionReport={handleSubmitSessionReport}
                     onUpdateSession={handleUpdateSession}
                     onLogAudit={pushAuditLog}
+                    onSessionSnapshotApplied={handleSessionReconciled}
                   />
+                )}
+
+                {activeTab === "live_reconciliation" && (
+                  <LiveReconciliation onApplied={handleReconciliationApplied} />
+                )}
+
+                {activeTab === "host_performance" && (
+                  <HostPerformance sessions={activeSessions} brands={activeBrands} />
                 )}
 
                 {/* Brand Workspace (Giai đoạn A) — mọi tab dưới đây chỉ render khi effectiveWorkspace
