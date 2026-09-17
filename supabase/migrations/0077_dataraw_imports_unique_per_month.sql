@@ -40,6 +40,13 @@ begin
   end if;
 end $$;
 
+-- SỬA 2026-09-18: bản trước viết `date_trunc('month', period_start)` không ép kiểu, và câu đó
+-- KHÔNG chạy được trên bất kỳ Postgres nào — `period_start` kiểu `date`, mà trong họ kiểu ngày
+-- giờ thì `timestamptz` là kiểu ƯU TIÊN, nên Postgres chọn `date_trunc(text, timestamptz)` (STABLE
+-- vì phụ thuộc TimeZone của session) thay vì bản `timestamp` (IMMUTABLE) — và index expression thì
+-- bắt buộc IMMUTABLE: `ERROR: functions in index expression must be marked IMMUTABLE`.
+-- Ép thẳng `::timestamp` để chốt đúng bản IMMUTABLE. Kết quả không đổi: period_start là `date`,
+-- không mang múi giờ, cắt về đầu tháng cho ra cùng một giá trị.
 create unique index if not exists idx_brand_dataraw_imports_brand_type_month
-  on brand_dataraw_imports (brand_id, report_type, (date_trunc('month', period_start)))
+  on brand_dataraw_imports (brand_id, report_type, (date_trunc('month', period_start::timestamp)))
   where period_start is not null;
