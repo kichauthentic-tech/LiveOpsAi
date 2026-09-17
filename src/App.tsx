@@ -1842,7 +1842,6 @@ export default function App() {
                     onRegisterSlot={handleRegisterSlot}
                     onUnregisterSlot={handleUnregisterSlot}
                     onFinalizeSlot={handleFinalizeShiftSlot}
-                    onSubmitSessionReport={handleSubmitSessionReport}
                     myTalentId={activeUser.assignedTalentId}
                     currentUserId={activeUser.id}
                     currentRole={currentRole}
@@ -1917,7 +1916,6 @@ export default function App() {
                     onRegisterSlot={handleRegisterSlot}
                     onUnregisterSlot={handleUnregisterSlot}
                     onFinalizeSlot={handleFinalizeShiftSlot}
-                    onSubmitSessionReport={handleSubmitSessionReport}
                     recurringShiftTemplates={recurringShiftTemplates}
                     onCreateTemplate={handleCreateRecurringTemplate}
                     onToggleTemplate={handleToggleRecurringTemplate}
