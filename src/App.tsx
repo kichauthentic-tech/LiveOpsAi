@@ -52,7 +52,8 @@ import {
   PanelLeftOpen,
   Database,
   ClipboardCheck,
-  TrendingUp
+  TrendingUp,
+  FileSignature
 } from "lucide-react";
 import { Header, WorkspaceContext } from "./components/Header";
 import { BrandCalendar } from "./components/brand-workspace/BrandCalendar";
@@ -78,6 +79,7 @@ import { AiTrainingCenter } from "./components/AiTrainingCenter";
 import ShiftScheduling from "./components/ShiftScheduling";
 import { LiveReconciliation } from "./components/LiveReconciliation";
 import { HostPerformance } from "./components/HostPerformance";
+import { BrandCommitment } from "./components/BrandCommitment";
 
 const STORAGE_PREFIX = "liveops_os_v2_";
 
@@ -1383,6 +1385,11 @@ export default function App() {
       label: "Kinh Doanh",
       items: [
         { id: "crm", label: "CRM", icon: Briefcase, perm: "manage_crm_projects" as PermissionKey },
+        // Cam kết hợp đồng đặt cạnh CRM vì CRM đang giữ Rate Card (ĐƠN GIÁ mỗi giờ) — cam kết là
+        // KHỐI LƯỢNG giờ mỗi tháng, hai nửa của cùng một điều khoản thương mại. Dùng lại
+        // manage_crm_projects: quyền này mặc định đúng bằng ceo/admin/operations, khớp RLS của
+        // brand_contracts/brand_monthly_commitments (migration 0081) nên không cần key mới.
+        { id: "brand_commitment", label: "Cam Kết Hợp Đồng", icon: FileSignature, perm: "manage_crm_projects" as PermissionKey },
         { id: "tiktok_api", label: "TikTok API", icon: Link2, perm: "manage_tiktok_api" as PermissionKey },
       ],
     },
@@ -1878,6 +1885,10 @@ export default function App() {
 
                 {activeTab === "host_performance" && (
                   <HostPerformance sessions={activeSessions} brands={activeBrands} />
+                )}
+
+                {activeTab === "brand_commitment" && (
+                  <BrandCommitment sessions={activeSessions} brands={activeBrands} />
                 )}
 
                 {/* Brand Workspace (Giai đoạn A) — mọi tab dưới đây chỉ render khi effectiveWorkspace

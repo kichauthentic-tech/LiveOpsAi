@@ -483,6 +483,42 @@ export interface BrandPlatformRate {
   returnRate: number;
 }
 
+// Lớp cam kết hợp đồng (migration 0081) — điều khoản trên GIẤY. Khác BrandPlatformRate: rate là
+// ĐƠN GIÁ mỗi giờ, còn đây là KHỐI LƯỢNG brand cam kết mỗi tháng. Hai thứ nhân với nhau mới ra
+// doanh thu cam kết, nên không gộp chung một bảng.
+export interface BrandContract {
+  id: string;
+  brandId: string;
+  contractCode?: string;
+  startMonth: string; // "YYYY-MM-01"
+  endMonth?: string; // undefined = chưa chốt ngày kết thúc / tự gia hạn
+  monthlyHours: number; // giờ cam kết mặc định, chỉ là giá trị khởi tạo khi sinh dòng tháng
+  monthlyGmv?: number; // undefined = hợp đồng không cam kết GMV
+  status: "draft" | "active" | "ended";
+  note?: string;
+}
+
+// Con số CHỐT của từng tháng — đây mới là mẫu số mọi màn hình run-rate đọc, không phải
+// BrandContract.monthlyHours. Unique (brandId, periodMonth) ở DB: 1 brand 1 tháng đúng 1 con số.
+export interface BrandMonthlyCommitment {
+  id: string;
+  brandId: string;
+  contractId?: string; // undefined = hợp đồng gốc đã bị xoá, dòng vẫn giữ lại làm lịch sử
+  periodMonth: string; // "YYYY-MM-01"
+  committedHours: number;
+  committedGmv?: number;
+  // true = ops sửa tay tháng này; sinh lại từ hợp đồng sẽ không ghi đè.
+  isOverride: boolean;
+  note?: string;
+}
+
+export interface GenerateCommitmentsResult {
+  inserted: number;
+  updated: number;
+  skippedOverride: number;
+  skippedOtherContract: number;
+}
+
 // Giai đoạn 19 — lịch sử rate theo thời gian, tự động ghi bởi DB trigger mỗi khi
 // talents.rate_per_session/commission_rate đổi. Dùng để tra đúng rate tại ngày của 1 session
 // cũ thay vì đọc giá trị hiện tại của Talent (xem finance.ts findTalentRateAsOf).

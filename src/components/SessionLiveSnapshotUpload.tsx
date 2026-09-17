@@ -7,6 +7,7 @@ import {
   deleteSessionLiveSnapshot,
   fetchSessionSnapshot
 } from "../lib/db/sessionLiveSnapshots";
+import { errorMessage } from "../lib/errorMessage";
 
 interface SessionLiveSnapshotUploadProps {
   session: LiveSession;
@@ -36,7 +37,7 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
     setLoading(true);
     fetchSessionSnapshot(session.id)
       .then((s) => { if (alive) setSnapshot(s); })
-      .catch((e) => { if (alive) setError(e instanceof Error ? e.message : String(e)); })
+      .catch((e) => { if (alive) setError(errorMessage(e)); })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, [session.id]);
@@ -49,7 +50,7 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
       onApplied(updated);
       setSnapshot(await fetchSessionSnapshot(session.id));
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorMessage(e));
     } finally {
       setBusy(false);
       if (fileRef.current) fileRef.current.value = "";
@@ -65,7 +66,7 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
       onApplied(updated);
       setSnapshot(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorMessage(e));
     } finally {
       setBusy(false);
     }

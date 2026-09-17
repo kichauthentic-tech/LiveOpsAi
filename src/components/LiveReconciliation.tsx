@@ -11,6 +11,7 @@ import {
   importReconciliationFile,
   setReconciliationBucket
 } from "../lib/db/liveReconciliation";
+import { errorMessage } from "../lib/errorMessage";
 
 interface LiveReconciliationProps {
   onApplied: () => Promise<void> | void;
@@ -64,7 +65,7 @@ export function LiveReconciliation({ onApplied }: LiveReconciliationProps) {
   }
 
   useEffect(() => {
-    reloadBatches().catch((e) => setError(e instanceof Error ? e.message : String(e)));
+    reloadBatches().catch((e) => setError(errorMessage(e)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -75,7 +76,7 @@ export function LiveReconciliation({ onApplied }: LiveReconciliationProps) {
     try {
       await fn();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorMessage(e));
     } finally {
       setBusy(false);
     }

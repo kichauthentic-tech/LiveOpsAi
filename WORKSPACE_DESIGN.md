@@ -34,7 +34,7 @@ Ground truth luôn là `AGENCY_NAV_GROUPS`/`BRAND_NAV_GROUPS` ở [src/App.tsx](
 
 ## Hạ tầng Supabase
 
-- Migration mới nhất: **0077** (đã chạy trên Supabase thật, xem `supabase/migrations/`). Quy trình chạy: user tự dán vào Supabase SQL Editor (không có `DATABASE_URL`/Supabase CLI cấu hình trong máy dev).
+- Migration mới nhất: **0081** (đã chạy trên Supabase thật, xem `supabase/migrations/`). Quy trình chạy: user tự dán vào Supabase SQL Editor (không có `DATABASE_URL`/Supabase CLI cấu hình trong máy dev).
 - Project Supabase này **không còn chia sẻ với app nào khác** (đã dọn 15 bảng CRM/outreach không liên quan ngày 2026-09-07, xem migration 0076 nếu cần đối chiếu).
 - RLS: mọi bảng có `brand_id` trực tiếp đã cô lập theo brand ở tầng đọc (không chỉ tầng UI) — công thức chuẩn `current_user_role() is distinct from 'brand' or brand_id = current_user_brand_id()`.
 
@@ -80,6 +80,7 @@ Bảng/hàm: `session_live_snapshots` + `session_live_snapshot_rows`, RPC `apply
 - **`isTabAllowed`**: "không tìm thấy nav item" phải coi là KHÔNG được phép (không phải mặc định cho qua) — tab ẩn khỏi sidebar vẫn có thể mở lại qua `activeTab` cũ trong localStorage nếu không chặn đúng.
 - **State UI mang ý nghĩa phân quyền** (`activeTab`, `workspace`) phải reset khi đổi user — localStorage không tách theo user trên máy dùng chung. Cơ chế: lưu `uiStateOwner` = id user, khác chủ thì reset.
 - **Không sửa RLS policy bằng vòng lặp quét `pg_tables`/`information_schema`** — luôn liệt kê bảng tường minh trong migration, tránh lỡ tay đụng bảng không liên quan.
+- **Lỗi từ supabase-js KHÔNG phải `instanceof Error`** — `PostgrestError` là object thường `{message, details, hint, code}`, nên `e instanceof Error ? e.message : String(e)` rơi vào `String()` và hiện đúng chữ `[object Object]` trên màn hình, nuốt mất thông tin chẩn đoán duy nhất. Mọi chỗ bắt lỗi của tầng dữ liệu phải đi qua `errorMessage()` ([src/lib/errorMessage.ts](src/lib/errorMessage.ts)).
 - **`brand_dataraw_imports` chỉ được 1 batch/`brand_id`+`report_type`+tháng của `period_start`** (unique index `idx_brand_dataraw_imports_brand_type_month`, migration 0077 — khớp `monthKey()`/`findExistingImportForMonth()` trong `lib/db/brandDataRaw.ts`). Mọi ghi mới vào bảng này phải qua `createOrReplaceDataRawImport()`, không insert thẳng — hàm đã dịch lỗi `23505` (trùng batch do race/double-submit) sang message tiếng Việt, đừng bọc thêm lần nữa ở component.
 
 ## Rà soát UX/workflow theo module (bắt đầu 2026-09-13)
@@ -116,7 +117,19 @@ Luồng thật: talent bấm "Tôi rảnh ca này" ([ShiftScheduling.tsx](src/co
 
    Quy ước của tầng này: thước đo phân bổ ca là **GMV/giờ** (không phải GMV/ca — GMV/ca thiên vị host được xếp ca dài). Giờ lấy `liveDurationMinutes` (giờ live thật) khi có, rơi về giờ kế hoạch khi chưa có snapshot. Ca `Cancelled`/`Upcoming` và ca không có số đều bị loại. Gom nhóm host bằng `hostKey()` = `hostId` rồi rơi về **tên** — `host_id` có thể null (talent bị xoá, ca tạo tay) trong khi `host_name` denormalized vẫn còn, gom thẳng theo id sẽ trộn nhiều host thành một dòng. Màn hình luôn hiện tỷ lệ nguồn dữ liệu (đã đối soát / lúc giao ca / tự khai tay) để ops biết mức tin cậy trước khi ra quyết định.
 
-4. **Lớp cam kết hợp đồng (chưa làm)** — brand cam kết bao nhiêu giờ/tháng với agency. Bảng độc lập, chưa có gì trong hệ thống, không phụ thuộc giai đoạn nào ở trên. Nên bắt đầu ghi nhận càng sớm càng tốt: dữ liệu hiệu suất thì đã có sẵn lịch sử, còn cam kết hợp đồng mà tới lúc cần mới bắt đầu nhập thì phải chờ thêm vài tháng mới đủ để so sánh run-rate với cam kết.
+4. ~~Lớp cam kết hợp đồng~~ — **xong 2026-09-17**, verify end-to-end trên Supabase thật. Tab "Cam Kết Hợp Đồng" ([BrandCommitment.tsx](src/components/BrandCommitment.tsx)) đặt trong nhóm **Kinh Doanh** cạnh CRM (CRM đang giữ Rate Card = ĐƠN GIÁ mỗi giờ, cam kết là KHỐI LƯỢNG giờ mỗi tháng — hai nửa của cùng một điều khoản thương mại). Migration 0081: `brand_contracts` + `brand_monthly_commitments`, RPC `generate_contract_commitments`. Logic thuần: [brandCommitment.ts](src/lib/performance/brandCommitment.ts).
+
+   **Quy ước bắt buộc của tầng này:**
+
+   - **Giờ tính vào cam kết là GIỜ CA THEO LỊCH (`sessionDurationHours`), KHÔNG phải giờ live thật.** Lý do: `computeSessionPnl` (`src/lib/pnl.ts`) tính doanh thu brand hourly = giờ ca theo lịch × rate. Cam kết và hoá đơn phải đếm cùng một loại giờ, nếu không con số theo dõi không bao giờ khớp con số xuất hoá đơn. Giờ live thật vẫn tính song song (`actualLiveHours`) nhưng CHỈ để cảnh báo, không bao giờ đem trừ vào cam kết. *(Ghi chú: comment ở `types.ts` mô tả `billingModel: "hourly"` là "giờ live thật" — sai, code mới đúng.)*
+   - **Số đo chính là "còn thiếu bao nhiêu giờ phải xếp" = cam kết − (ca đã live + ca đang xếp)**, không phải dự phóng theo nhịp. Dự phóng chỉ nói "đang chậm", số kia nói thẳng phải làm gì. Đây là thứ nối tầng này về lại bài toán sắp lịch.
+   - **Loại ca khác `hostPerformance.ts`**: ở đó ca không có số liệu bị loại (không nói lên hiệu suất); ở đây ca lên sóng mà GMV = 0 VẪN giao đủ giờ cho brand nên vẫn phải đếm. Chỉ ca `Cancelled` bị loại hoàn toàn.
+   - **Unique (brand_id, period_month)** — 1 brand 1 tháng đúng 1 con số cam kết. Nới ràng buộc này là làm mọi phép so run-rate thành mơ hồ (chia cho dòng nào?).
+   - **Cờ `is_override`**: ops sửa tay tháng nào thì `generate_contract_commitments` bỏ qua tháng đó. `upsertMonthlyCommitment()` luôn tự đóng dấu cờ này — đừng để component tự quyết, quên một lần là mất ngoại lệ đã nhập (tháng Tết/camp) mà lỗi chỉ lộ ra vào lần "sinh lại" rất lâu sau.
+   - **Xoá hợp đồng KHÔNG xoá cam kết các tháng** (`on delete set null`): tháng đã qua thì con số đó là sự thật đã xảy ra, không được viết lại quá khứ. Dòng mồ côi vẫn hợp lệ, UI hiện "hợp đồng đã xoá".
+   - `generate_contract_commitments` **không giành tháng của hợp đồng khác** (2 hợp đồng chồng khung) — trả về jsonb tóm tắt `{inserted, updated, skipped_override, skipped_other_contract}` để ops biết đã bỏ qua gì, thay vì im lặng.
+   - Ngày "hôm nay" phải lấy qua `todayVn()` (Intl + `Asia/Ho_Chi_Minh`), **không** `toISOString()` — UTC lúc 0-7h sáng VN trả về ngày hôm trước, đầu tháng thì lệch cả THÁNG và làm sai toàn bộ run-rate.
+   - RLS chỉ mở cho ceo/admin/operations (khớp `manage_crm_projects`, mặc định đúng 3 role này). **Role `brand` CHƯA được mở** — cột `note` là ghi chú nội bộ agency; muốn cho brand xem sau này thì thêm policy select riêng và tách `note` ra khỏi payload brand đọc được, đừng nới policy hiện tại.
 
 > **Cảnh báo cho session sau — KHÔNG "sửa" quyền của bảng `talents`.** Query thẳng `talents` từ client trả `permission denied for table talents`; đây **không phải lỗi** mà là biện pháp bảo vệ có chủ đích của migration 0047 (`revoke select on talents from authenticated`): rate/lương talent phải được che, nên mọi lượt đọc đi qua view `talents_secure` — view mask cột nhạy cảm trừ khi người đọc là ceo/admin hoặc chính talent đó (0048 giải thích chi tiết vì sao view phải ở chế độ definer). Cấp lại `grant select on talents` sẽ hở toàn bộ rate cho mọi user đăng nhập. **Mọi code mới cần đọc talent phải dùng `talents_secure`.** Rà ngày 2026-09-17: trong 38 bảng app dùng, đây là bảng DUY NHẤT client không đọc trực tiếp được, và đúng như thiết kế.
 
