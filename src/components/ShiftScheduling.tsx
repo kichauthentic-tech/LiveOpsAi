@@ -1,7 +1,8 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   AuditLogEntry,
   Brand,
+  BrandMonthlyCommitment,
   LiveSession,
   ShiftRegistration,
   ShiftSlot,
@@ -23,7 +24,9 @@ import {
   Zap,
   ChevronLeft,
   ChevronRight,
-  Flame
+  Flame,
+  Target,
+  TrendingUp
 } from "lucide-react";
 import { CAMPAIGN_DAY_STYLES, getCampaignDayInfo } from "../lib/campaignDays";
 import { timeRangesOverlap } from "../lib/dateUtils";
@@ -34,6 +37,9 @@ import { SessionEventCard, SessionCardTone, buildSlotMeta } from "./ui/SessionEv
 import { SessionReportForm } from "./SessionReportForm";
 import { SessionLiveSnapshotUpload } from "./SessionLiveSnapshotUpload";
 import { SessionReportInput } from "../lib/db/sessionReports";
+import { fetchBrandMonthlyCommitments } from "../lib/db/brandContracts";
+import { SchedulingGap, computeSchedulingGaps } from "../lib/performance/brandCommitment";
+import { HostSuggestion, headlineFor, suggestHosts } from "../lib/performance/hostSuggestion";
 
 interface ShiftSchedulingProps {
   currentRole: UserRole;
@@ -94,6 +100,23 @@ const durationHours = (start: string, end: string) => {
 
 const isAdminRole = (role: UserRole) => role === "ceo" || role === "operations" || role === "admin";
 
+// GMV/giờ gọn để nhét cạnh tên host trong dropdown — chỗ này chỉ còn vài ký tự, số đầy đủ xem ở
+// tab Hiệu Suất Host.
+const fmtPerHour = (n: number) => {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toLocaleString("vi-VN", { maximumFractionDigits: 1 })}tr/h`;
+  if (n >= 1_000) return `${Math.round(n / 1_000)}k/h`;
+  return `${Math.round(n)}đ/h`;
+};
+
+// Nhãn cho 1 ứng viên: luôn nói rõ số đang hiện là của brand này hay số chung. Ops tưởng số chung
+// là số của brand rồi xếp nhầm là kiểu sai nguy hiểm nhất mà màn này có thể gây ra.
+const suggestionLabel = (s: HostSuggestion) => {
+  const h = headlineFor(s);
+  if (h.scope === "none") return `${s.name} · chưa có dữ liệu`;
+  const scope = h.scope === "brand" ? "brand này" : "chung";
+  return `${s.name} · ${fmtPerHour(h.value)} (${scope}, ${h.sessions} ca)`;
+};
+
 export default function ShiftScheduling({
   currentRole,
   activeUser,
@@ -132,6 +155,20 @@ export default function ShiftScheduling({
   const [swapCandidateId, setSwapCandidateId] = useState("");
   const [swapReason, setSwapReason] = useState("");
   const [swapBusy, setSwapBusy] = useState(false);
+
+  // Cam kết hợp đồng (migration 0081) — nạp ngay tại đây thay vì truyền từ App: RLS chỉ cho
+  // ceo/admin/operations đọc, đúng bằng isAdminRole(), nên talent gọi cũng chỉ ra mảng rỗng.
+  // Không chặn màn hình nếu lỗi/thiếu quyền — phần cảnh báo cam kết chỉ ẩn đi, việc xếp ca vẫn
+  // chạy bình thường.
+  const [commitments, setCommitments] = useState<BrandMonthlyCommitment[]>([]);
+  useEffect(() => {
+    if (!admin) return;
+    let alive = true;
+    fetchBrandMonthlyCommitments()
+      .then((rows) => { if (alive) setCommitments(rows); })
+      .catch(() => { if (alive) setCommitments([]); });
+    return () => { alive = false; };
+  }, [admin]);
 
   const talentsById = useMemo(() => new Map(talents.map((t) => [t.id, t])), [talents]);
   const brandById = useMemo(() => new Map(brands.map((b) => [b.id, b])), [brands]);
@@ -306,6 +343,39 @@ export default function ShiftScheduling({
     [openFutureSlots, registrationsBySlot]
   );
 
+  // Cam kết hợp đồng của THÁNG ĐANG XEM, đã trừ phần ca đã mở chờ chốt. Chỉ giữ brand còn phải
+  // mở thêm — brand đã đủ không cần chiếm chỗ trên màn xếp lịch.
+  const schedulingGaps = useMemo<SchedulingGap[]>(
+    () =>
+      admin
+        ? computeSchedulingGaps(
+            commitments,
+            Object.fromEntries(brands.map((b) => [b.id, b.name])),
+            sessions,
+            shiftSlots,
+            `${selectedMonth}-01`
+          ).filter((g) => g.committedHours > 0)
+        : [],
+    [admin, commitments, brands, sessions, shiftSlots, selectedMonth]
+  );
+  const gapsNeedingSlots = useMemo(
+    () => schedulingGaps.filter((g) => g.hoursStillToOpen > 0.01),
+    [schedulingGaps]
+  );
+
+  const talentNameById = useMemo(
+    () => new Map(talents.map((t) => [t.id, t.name])),
+    [talents]
+  );
+
+  // Mốc lấy lịch sử hiệu suất khi gợi ý host: 90 ngày gần nhất. Lấy cả đời thì host đã tiến bộ
+  // (hoặc đi xuống) từ nửa năm trước vẫn kéo trung bình, không phản ánh phong độ hiện tại.
+  const perfSince = useMemo(() => {
+    const d = new Date(`${today}T00:00:00`);
+    d.setDate(d.getDate() - 90);
+    return `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, "0")}-${`${d.getDate()}`.padStart(2, "0")}`;
+  }, [today]);
+
   return (
     <div className="space-y-6">
       <div className="bg-[var(--surface)] border border-[var(--border)] p-4 sm:p-6 rounded-2xl shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -351,6 +421,54 @@ export default function ShiftScheduling({
         <div className="bg-amber-950/85 border border-amber-800 rounded-xl p-4 text-sm text-amber-200 flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 shrink-0" />
           Tài khoản của bạn chưa được gán hồ sơ Talent (assigned_talent_id) — liên hệ CEO/Operations để gán trước khi tự đăng ký ca được.
+        </div>
+      )}
+
+      {/* Cam kết hợp đồng của tháng đang xem — trả lời "còn phải MỞ thêm bao nhiêu giờ ca", tín
+          hiệu đứng trước việc chốt ai. Số đã trừ phần ca đã mở chờ chốt nên là việc còn phải làm
+          thật, không phải tổng khoảng cách với cam kết. */}
+      {admin && schedulingGaps.length > 0 && (
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
+          <div className="flex items-center gap-2">
+            <Target className="w-4 h-4 text-blue-400" />
+            <h3 className="text-sm font-bold text-[var(--text)]">Cam kết hợp đồng tháng này</h3>
+            {gapsNeedingSlots.length === 0 && (
+              <span className="text-[11px] text-emerald-400 font-bold">· đã mở đủ ca cho mọi brand</span>
+            )}
+          </div>
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {schedulingGaps.map((g) => {
+              const done = g.hoursStillToOpen <= 0.01;
+              return (
+                <div
+                  key={g.brandId}
+                  className={`rounded-xl p-3 border ${
+                    done ? "bg-emerald-950/30 border-emerald-900" : "bg-rose-950/25 border-rose-900"
+                  }`}
+                >
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-xs font-bold text-[var(--text)] truncate">{g.brandName}</span>
+                    <span className="text-[10px] text-[var(--text-faint)] shrink-0">
+                      cam kết {g.committedHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h
+                    </span>
+                  </div>
+                  <p className={`text-lg font-black mt-0.5 ${done ? "text-emerald-400" : "text-rose-400"}`}>
+                    {done
+                      ? "Đã mở đủ"
+                      : `Cần mở thêm ${g.hoursStillToOpen.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h`}
+                  </p>
+                  <p className="text-[10px] text-[var(--text-muted)] mt-1 leading-relaxed">
+                    Đã live {g.deliveredHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h · đã chốt chưa live{" "}
+                    {g.scheduledHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h · đang mở chờ chốt{" "}
+                    {g.openSlotHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h ({g.openSlotCount} ca)
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+          <p className="text-[10px] text-[var(--text-faint)] mt-2">
+            Giờ ca theo lịch, cùng loại giờ dùng để tính tiền brand. Brand chưa đặt cam kết không hiện ở đây — nhập ở tab Cam Kết Hợp Đồng.
+          </p>
         </div>
       )}
 
@@ -533,6 +651,20 @@ export default function ShiftScheduling({
                 ? checkConflicts(slot.date, slot.startTime, slot.endTime, slot.studioId ?? "", pick.hostId)
                 : { studioConflict: false, hostConflict: false };
               const studioConflicts = findStudioConflicts(slot.date, slot.startTime, slot.endTime, slot.studioId ?? "", slot.brandId ?? "", slot.id);
+              // Hiệu suất của đúng những người đã đăng ký ca này, với đúng brand và đúng thứ của
+              // ca — tính ngay tại đây thay vì bắt ops nhớ số từ tab Hiệu Suất Host rồi quay lại.
+              const suggestions =
+                admin && slot.status === "open" && regs.length > 0
+                  ? suggestHosts(
+                      regs.map((r) => r.talentId),
+                      talentNameById,
+                      sessions,
+                      slot.brandId,
+                      new Date(`${slot.date}T00:00:00`).getDay(),
+                      perfSince
+                    )
+                  : [];
+              const hasAnyPerfData = suggestions.some((s) => s.overallSessions > 0);
               return (
                 <div key={slot.id} className="bg-[var(--surface-base)]/80 border border-[var(--border)] rounded-xl p-3 flex flex-col gap-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -627,9 +759,10 @@ export default function ShiftScheduling({
                             className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1 text-xs text-[var(--text)] focus:outline-none focus:border-blue-500"
                           >
                             <option value="">Host…</option>
-                            {regs.map((r) => (
-                              <option key={r.talentId} value={r.talentId}>
-                                {talentsById.get(r.talentId)?.name ?? r.talentId}
+                            {/* Thứ tự option = thứ tự xếp hạng hiệu suất, không phải thứ tự đăng ký */}
+                            {suggestions.map((s) => (
+                              <option key={s.talentId} value={s.talentId}>
+                                {suggestionLabel(s)}
                               </option>
                             ))}
                           </select>
@@ -638,10 +771,13 @@ export default function ShiftScheduling({
                             onChange={(e) => setPickByLot((prev) => ({ ...prev, [slot.id]: { ...pick, coHostId: e.target.value } }))}
                             className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1 text-xs text-[var(--text)] focus:outline-none focus:border-blue-500"
                           >
+                            {/* Cố ý KHÔNG hiện GMV/giờ ở ô Trợ live: số đó là hiệu suất khi làm
+                                HOST, gắn vào vai trợ live sẽ khiến ops xếp người theo một con số
+                                không nói gì về vai trò họ sắp làm. */}
                             <option value="">Trợ live (tuỳ chọn)…</option>
-                            {regs.filter((r) => r.talentId !== pick.hostId).map((r) => (
-                              <option key={r.talentId} value={r.talentId}>
-                                {talentsById.get(r.talentId)?.name ?? r.talentId}
+                            {suggestions.filter((s) => s.talentId !== pick.hostId).map((s) => (
+                              <option key={s.talentId} value={s.talentId}>
+                                {s.name}
                               </option>
                             ))}
                           </select>
@@ -654,6 +790,66 @@ export default function ShiftScheduling({
                           </button>
                         </div>
                       )}
+                      {/* Bảng xếp hạng chi tiết — dropdown chỉ đủ chỗ cho 1 con số, chỗ này mới
+                          tách được "mạnh với brand này" khác "mạnh vào thứ này". Bấm 1 phát là
+                          chọn luôn làm Host, không phải mở lại dropdown. */}
+                      {suggestions.length > 1 && hasAnyPerfData && (
+                        <div className="w-full pt-2 mt-1 border-t border-[var(--border)]/60">
+                          <div className="flex items-center gap-1.5 mb-1.5">
+                            <TrendingUp className="w-3 h-3 text-[var(--text-faint)]" />
+                            <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wide">
+                              Hiệu suất 90 ngày gần nhất
+                            </span>
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            {suggestions.map((s) => {
+                              const chosen = pick.hostId === s.talentId;
+                              return (
+                                <button
+                                  key={s.talentId}
+                                  type="button"
+                                  onClick={() =>
+                                    setPickByLot((prev) => ({
+                                      ...prev,
+                                      [slot.id]: { ...pick, hostId: s.talentId, coHostId: pick.coHostId === s.talentId ? "" : pick.coHostId }
+                                    }))
+                                  }
+                                  className={`flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-left px-2 py-1 rounded-lg border transition-colors ${
+                                    chosen
+                                      ? "bg-emerald-950/40 border-emerald-800"
+                                      : "bg-[var(--surface-elevated)]/50 border-transparent hover:border-[var(--border)]"
+                                  }`}
+                                  title={chosen ? "Đang chọn làm Host" : "Chọn làm Host"}
+                                >
+                                  <span className={`text-[11px] font-bold ${chosen ? "text-emerald-300" : "text-[var(--text)]"}`}>
+                                    {s.name}
+                                  </span>
+                                  {s.brandSessions > 0 ? (
+                                    <span className="text-[10px] text-emerald-400">
+                                      {fmtPerHour(s.brandGmvPerHour)} với brand này ({s.brandSessions} ca)
+                                    </span>
+                                  ) : s.overallSessions > 0 ? (
+                                    <span className="text-[10px] text-[var(--text-muted)]">
+                                      chưa live brand này · {fmtPerHour(s.overallGmvPerHour)} chung ({s.overallSessions} ca)
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] text-[var(--text-faint)]">chưa có ca nào có số liệu</span>
+                                  )}
+                                  {s.weekdaySessions > 0 && (
+                                    <span className="text-[10px] text-sky-400">
+                                      {fmtPerHour(s.weekdayGmvPerHour)} vào {dayLabel(slot.date)} ({s.weekdaySessions} ca)
+                                    </span>
+                                  )}
+                                  {s.confidence === "low" && (
+                                    <span className="text-[10px] text-amber-400">ít dữ liệu, chỉ tham khảo</span>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
                       {(conflict.studioConflict || conflict.hostConflict) && (
                         <span className="w-full text-[11px] text-rose-400 flex items-center gap-1">
                           <AlertTriangle className="w-3 h-3" />

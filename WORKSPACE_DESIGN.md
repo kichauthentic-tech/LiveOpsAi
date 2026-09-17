@@ -131,6 +131,22 @@ Luồng thật: talent bấm "Tôi rảnh ca này" ([ShiftScheduling.tsx](src/co
    - Ngày "hôm nay" phải lấy qua `todayVn()` (Intl + `Asia/Ho_Chi_Minh`), **không** `toISOString()` — UTC lúc 0-7h sáng VN trả về ngày hôm trước, đầu tháng thì lệch cả THÁNG và làm sai toàn bộ run-rate.
    - RLS chỉ mở cho ceo/admin/operations (khớp `manage_crm_projects`, mặc định đúng 3 role này). **Role `brand` CHƯA được mở** — cột `note` là ghi chú nội bộ agency; muốn cho brand xem sau này thì thêm policy select riêng và tách `note` ra khỏi payload brand đọc được, đừng nới policy hiện tại.
 
+5. ~~Đưa 2 tín hiệu vào thẳng màn xếp ca~~ — **xong 2026-09-17**, verify end-to-end trên Supabase thật. Giai đoạn 3 và 4 sinh ra số đúng nhưng nằm ở 2 tab tách rời màn [ShiftScheduling.tsx](src/components/ShiftScheduling.tsx), ops phải nhớ số rồi nhảy màn hình mới xếp được. Giai đoạn này nhúng cả hai vào đúng chỗ ra quyết định. **Không cần migration.**
+
+   **Tín hiệu 1 — mở bao nhiêu ca (đầu màn hình):** banner cam kết hợp đồng của tháng đang xem. Con số chính là **"cần mở thêm bao nhiêu giờ"** = cam kết − đã live − đã chốt chưa live − **đang mở chờ chốt**. Vế cuối là điểm khác biệt bắt buộc so với màn run-rate: ca đã MỞ chưa chốt thì chưa sinh `LiveSession` nên `scheduledHours` không thấy nó; bỏ qua vế này thì con số bị thổi phồng và ops mở thừa ca. Hàm: `computeSchedulingGaps` / `openSlotHoursByBrand` ([brandCommitment.ts](src/lib/performance/brandCommitment.ts)). Brand chưa đặt cam kết không hiện — không có mẫu số thì không có gì để nói.
+
+   **Tín hiệu 2 — chọn ai (ngay tại ô chọn Host):** [hostSuggestion.ts](src/lib/performance/hostSuggestion.ts) tính hiệu suất của đúng những người đã đăng ký ca đó, với đúng brand và đúng thứ của ca, trong **90 ngày gần nhất** (lấy cả đời thì phong độ nửa năm trước vẫn kéo trung bình).
+
+   **Quy ước của tầng này:**
+
+   - **Xếp hạng ưu tiên người ĐÃ từng live cho đúng brand đó**, kể cả khi người khác có GMV/giờ chung cao hơn. Đã verify bằng số thật: host có 100tr/h chung nhưng chưa live brand này bị xếp DƯỚI host 20tr/h đã live brand này 4 ca. Số chung không dự đoán được kết quả trên một brand chưa từng chạy.
+   - **Nhãn phải nói rõ số đang hiện là của brand này hay số chung** (`headlineFor()` trả kèm `scope`). Ops tưởng số chung là số của brand rồi xếp nhầm là kiểu sai nguy hiểm nhất màn này gây ra được.
+   - **Dưới 3 ca thì gắn cờ "ít dữ liệu, chỉ tham khảo"** nhưng VẪN hiện số — giấu số đi thì ops không có gì để cân nhắc, còn hiện số trần thì ops tin quá mức vào trung bình của 1-2 phiên.
+   - **Ô Trợ live cố ý KHÔNG hiện GMV/giờ** — số đó là hiệu suất khi làm HOST, gắn vào vai trợ live sẽ khiến ops xếp người theo con số không nói gì về vai trò họ sắp làm.
+   - `hostSuggestion.ts` **import lại** `isCountable`/`sessionHours`/`weekdayOf` từ `hostPerformance.ts` chứ không chép — hai màn hình không bao giờ được nói hai con số khác nhau về cùng một host.
+   - Bấm 1 dòng xếp hạng = chọn luôn làm Host; nếu người đó đang là Trợ live thì ô Trợ live tự xoá (không ai vừa là host vừa là trợ live).
+   - `ShiftScheduling` tự nạp `brand_monthly_commitments` (không truyền từ `App.tsx`) và **không chặn màn hình khi lỗi/thiếu quyền** — banner ẩn đi, việc xếp ca vẫn chạy. RLS của bảng đúng bằng `isAdminRole()` nên talent gọi cũng chỉ ra mảng rỗng.
+
 > **Cảnh báo cho session sau — KHÔNG "sửa" quyền của bảng `talents`.** Query thẳng `talents` từ client trả `permission denied for table talents`; đây **không phải lỗi** mà là biện pháp bảo vệ có chủ đích của migration 0047 (`revoke select on talents from authenticated`): rate/lương talent phải được che, nên mọi lượt đọc đi qua view `talents_secure` — view mask cột nhạy cảm trừ khi người đọc là ceo/admin hoặc chính talent đó (0048 giải thích chi tiết vì sao view phải ở chế độ definer). Cấp lại `grant select on talents` sẽ hở toàn bộ rate cho mọi user đăng nhập. **Mọi code mới cần đọc talent phải dùng `talents_secure`.** Rà ngày 2026-09-17: trong 38 bảng app dùng, đây là bảng DUY NHẤT client không đọc trực tiếp được, và đúng như thiết kế.
 
 **Module tiếp theo (chưa audit):** (2) Điều hướng/UI tổng thể toàn app, (3) Báo cáo/số liệu (Report Tháng, P&L) — riêng phần "Dashboard" của mục (3) không còn áp dụng, đã xử lý ở trên. Audit xong module nào thì cập nhật đúng mục này, không tạo file riêng.

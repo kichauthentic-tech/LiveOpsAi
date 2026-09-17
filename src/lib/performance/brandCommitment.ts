@@ -1,4 +1,4 @@
-import { BrandMonthlyCommitment, LiveSession } from "../../types";
+import { BrandMonthlyCommitment, LiveSession, ShiftSlot } from "../../types";
 import { sessionDurationHours } from "../pnl";
 
 // Giai đoạn 4 của tầng dữ liệu gốc mới: đối chiếu CAM KẾT (brand ký bao nhiêu giờ/tháng) với
@@ -173,6 +173,59 @@ export function computeAllProgress(
     .filter((c) => c.periodMonth === periodMonth)
     .map((c) => computeCommitmentProgress(c, brandNameById[c.brandId] ?? "Brand đã xoá", sessions, today))
     .sort((a, b) => b.gapHours - a.gapHours);
+}
+
+// ====================================================================================
+// Bản dùng riêng cho màn ĐĂNG KÝ & CHỐT LỊCH
+// ====================================================================================
+// Khác màn run-rate ở một bậc quan trọng: ca đã MỞ nhưng chưa chốt thì chưa sinh ra LiveSession
+// nên `scheduledHours` không thấy nó. Ở màn xếp lịch mà bỏ qua phần này thì con số "còn thiếu" bị
+// thổi phồng, ops mở thừa ca. Vì vậy tách hẳn 2 số: "còn thiếu" (so với cam kết) và "thực sự cần
+// MỞ THÊM" (đã trừ phần ca đang mở chờ chốt) — số thứ hai mới là việc phải làm trên màn này.
+
+export interface SchedulingGap extends CommitmentProgress {
+  openSlotHours: number;
+  openSlotCount: number;
+  // > 0 = cần mở thêm bấy nhiêu giờ ca nữa. <= 0 = đã mở đủ, chỉ còn việc chốt.
+  hoursStillToOpen: number;
+}
+
+// Giờ của các ca đã mở trong tháng mà CHƯA chốt và chưa bị huỷ, gom theo brand.
+export function openSlotHoursByBrand(slots: ShiftSlot[], periodMonth: string): Map<string, { hours: number; count: number }> {
+  const out = new Map<string, { hours: number; count: number }>();
+  for (const s of slots) {
+    if (s.status !== "open") continue;
+    if (!s.brandId) continue;
+    if (monthKeyOf(s.date) !== periodMonth) continue;
+    const cur = out.get(s.brandId) ?? { hours: 0, count: 0 };
+    out.set(s.brandId, {
+      hours: cur.hours + sessionDurationHours(s.startTime, s.endTime),
+      count: cur.count + 1
+    });
+  }
+  return out;
+}
+
+export function computeSchedulingGaps(
+  commitments: BrandMonthlyCommitment[],
+  brandNameById: Record<string, string>,
+  sessions: LiveSession[],
+  slots: ShiftSlot[],
+  periodMonth: string,
+  today: string = todayVn()
+): SchedulingGap[] {
+  const openBy = openSlotHoursByBrand(slots, periodMonth);
+  return computeAllProgress(commitments, brandNameById, sessions, periodMonth, today)
+    .map((p) => {
+      const open = openBy.get(p.brandId) ?? { hours: 0, count: 0 };
+      return {
+        ...p,
+        openSlotHours: open.hours,
+        openSlotCount: open.count,
+        hoursStillToOpen: p.gapHours - open.hours
+      };
+    })
+    .sort((a, b) => b.hoursStillToOpen - a.hoursStillToOpen);
 }
 
 // Brand có ca trong tháng nhưng KHÔNG có dòng cam kết nào — không phải lỗi, nhưng ops cần biết để
