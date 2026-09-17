@@ -8,6 +8,7 @@ import {
   TalentRateHistoryEntry,
   BrandPlatformRateHistoryEntry
 } from "../types";
+import { getCanonicalAdsCost } from "./metrics/adsCost";
 
 export const DEFAULT_FINANCE: Omit<SessionFinance, "sessionId"> = {
   agencyCommissionRate: 15,
@@ -121,7 +122,7 @@ export function computeSessionPnl(
     ? sessionDurationHours(session.startTime, session.endTime) * hourlyRate
     : (estimatedNmv * finance.agencyCommissionRate) / 100;
   const hostPayout = hostFixRate + (session.actualGmv * hostCommRate) / 100;
-  const totalCost = hostPayout + finance.studioCost + finance.adsCost;
+  const totalCost = hostPayout + finance.studioCost + getCanonicalAdsCost(session, finance);
   const netProfit = grossAgencyRev - totalCost;
   return {
     session, finance, talent, isHourly, grossAgencyRev, hostPayout, netProfit,

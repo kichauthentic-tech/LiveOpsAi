@@ -1,18 +1,20 @@
 import React, { useState } from "react";
-import { SystemUser, Talent } from "../types";
+import { SystemUser, Talent, LiveSession } from "../types";
 import { useAuth } from "../hooks/useAuth";
 import { User, Phone, Cake, Mail, Loader2, Lock, ShieldAlert, Award } from "lucide-react";
+import { computeRealAvgGmvPerSession } from "../lib/metrics/avgGmv";
 
 interface MyTalentProfileProps {
   activeUser: SystemUser;
   talents: Talent[];
+  sessions: LiveSession[];
   // KHÔNG dùng chung handleUpdateTalent của App: handler đó tự nuốt lỗi bằng window.alert rồi
   // trả void, nên try/catch dưới đây thành code chết và form luôn báo "Đã cập nhật" kể cả khi DB
   // không ghi được gì (bug C3). Handler riêng này bắt buộc phải để lỗi nổi lên.
   onSaveMyProfile: (patch: { phone: string; avatar: string; dateOfBirth?: string }) => Promise<void>;
 }
 
-export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({ activeUser, talents, onSaveMyProfile }) => {
+export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({ activeUser, talents, sessions, onSaveMyProfile }) => {
   const { reauthenticate, updateEmail } = useAuth();
   const myTalent = talents.find((t) => t.id === activeUser.assignedTalentId);
 
@@ -239,7 +241,7 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({ activeUser, ta
           </div>
           <div className="bg-[var(--surface-base)]/40 border border-[var(--border)] rounded-xl p-3">
             <div className="text-[var(--text-muted)]">GMV TB / Phiên</div>
-            <div className="font-bold text-emerald-400 mt-0.5">{((myTalent.avgGmvPerSession || 0) / 1000000).toFixed(0)}M đ</div>
+            <div className="font-bold text-emerald-400 mt-0.5">{(computeRealAvgGmvPerSession(sessions, myTalent.id) / 1000000).toFixed(0)}M đ</div>
           </div>
           <div className="bg-[var(--surface-base)]/40 border border-[var(--border)] rounded-xl p-3">
             <div className="text-[var(--text-muted)]">CVR TB</div>

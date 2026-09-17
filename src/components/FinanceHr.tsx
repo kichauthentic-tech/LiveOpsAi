@@ -160,7 +160,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                   <th className="py-2 pr-3">GMV Thật</th>
                   <th className="py-2 pr-3">Doanh Thu Agency</th>
                   <th className="py-2 pr-3">Chi Phí Studio</th>
-                  <th className="py-2 pr-3">Chi Phí Ads</th>
+                  <th className="py-2 pr-3">Chi Phí Ads (điều chỉnh — để 0 nếu dùng số trợ live báo cáo)</th>
                   <th className="py-2 pr-3">Trả Host</th>
                   <th className="py-2 pr-3">Net Profit</th>
                   <th className="py-2 pr-3">Duyệt</th>
@@ -215,6 +215,9 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                         onBlur={(e) => handleFieldChange(s.id, "adsCost", Number(e.target.value))}
                         className="w-24 p-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface-base)] text-[var(--text)] font-bold disabled:opacity-40"
                       />
+                      <div className="text-[9px] text-[var(--text-faint)] mt-0.5">
+                        Trợ live báo cáo: {money(s.report?.adsCost ?? 0)} đ
+                      </div>
                     </td>
                     {/* Giai đoạn 3 — nói rõ con số ra từ đâu: talent ăn theo giờ thì hiện giờ
                         công thực tế + phần OT/off sớm host đã khai, để ops đối chiếu khi duyệt. */}

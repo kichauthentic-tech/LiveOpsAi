@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
 import { getTodayMonth } from "../../lib/dateUtils";
+import { getCanonicalAdsCost } from "../../lib/metrics/adsCost";
 import { isoWeekStart } from "../../lib/dataraw/weeklySlice";
 import {
   fetchMonthlyReport,
@@ -74,7 +75,7 @@ function summarizeAdsReport(completed: LiveSession[]): AdsReportSummary {
   let totalAdsSpend = 0;
   let totalGmv = 0;
   for (const s of reported) {
-    const spend = s.report?.adsCost ?? 0;
+    const spend = getCanonicalAdsCost(s);
     totalAdsSpend += spend;
     totalGmv += s.actualGmv || 0;
     const weekStart = isoWeekStart(s.date);
