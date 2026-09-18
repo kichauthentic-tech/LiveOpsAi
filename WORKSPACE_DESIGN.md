@@ -261,4 +261,17 @@ Verify trên Supabase thật với 3 ca ZZZ (manual/snapshot/reconciled): Financ
 
 Verify: admin bấm qua 13 tab (Hội Đồng AI đã ẩn) — tiêu đề khớp tên tab, kicker = tên nhóm nav, 0 lỗi console; TikTok API còn đúng 2 sub-tab.
 
-**Vòng audit UX/workflow theo module (3 module) đã đi hết một lượt.** Việc tiếp theo không còn nằm trong lộ trình audit này — chọn theo 4 đề xuất trên hoặc theo nhu cầu vận hành thật (dữ liệu thật vẫn chưa chạy qua hệ thống: `live_sessions` = 0).
+**Vòng audit UX/workflow theo module (3 module) đã đi hết một lượt, kể cả đề xuất phát sinh.**
+
+## Giai đoạn hiện tại (từ 2026-09-18): CHẠY THỬ THẬT — không build thêm tính năng
+
+User chốt: dừng build, cho một tuần vận hành thật đi qua app. Tới lúc chốt, `live_sessions` = 0 — mọi thứ đã build chỉ mới verify bằng dữ liệu dựng. Session mới đọc file này: **đừng đề xuất tính năng mới**; hỏi user chạy thử tới đâu, cái gì kêu, rồi sửa đúng chỗ đó.
+
+Vòng chạy thử (đúng luồng app hiện có):
+1. Tab 05 Report Tháng — lưu kế hoạch tháng 10 từng brand (không có thì ca tháng 10 "chưa có target").
+2. Đăng Ký & Chốt Lịch — mở ca tuần tới; mỗi talent thật có tài khoản gắn `assigned_talent_id`; talent tự đăng ký trên điện thoại.
+3. Chốt hàng loạt → talent thấy chuông.
+4. Ca đầu tiên: trợ live up file Creator-Live-Performance lúc giao ca (kiểm parser với file thật).
+5. Cuối tuần: Đối Soát Số Liệu với file thật → xem Finance & P&L.
+
+Chờ sau chạy thử: Zalo OA worker (đọc bảng `notifications` rồi gửi — cần user đăng ký OA doanh nghiệp trước, xem memory `liveops-zalo-notification-plan`); pipeline TikTok API (chờ scope Partner Center); theme phủ hết app.
