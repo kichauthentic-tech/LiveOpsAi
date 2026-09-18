@@ -1,6 +1,6 @@
 import { supabase } from "../supabaseClient";
 import { DataRawColumn } from "../../types";
-import { mapDataRawToImportRows, vnParts } from "../db/tiktokReconciliation";
+import { mapDataRawToImportRows, vnParts } from "./liveAnalysisRows";
 
 // Giai đoạn 4 — Report Tuần lấy dữ liệu bằng cách LỌC từ batch tháng của Dataraw, không thêm
 // batch theo tuần (quyết định của user): TikTok export luôn cộng dồn từ đầu tháng nên batch

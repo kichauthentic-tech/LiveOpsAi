@@ -212,9 +212,9 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
         <div className="flex flex-wrap justify-between items-center gap-4">
           <div>
             <span className="text-[var(--accent-text)] font-semibold text-xs uppercase tracking-wider block flex items-center gap-1.5">
-              <Radio className="w-4 h-4 text-red-500 animate-pulse" /> Operational Data Graph Nexus
+              <Radio className="w-4 h-4 text-red-500" /> Vận Hành Live
             </span>
-            <h2 className="text-2xl font-black">Livestream Session Hub</h2>
+            <h2 className="text-2xl font-black">Live Sessions</h2>
           </div>
 
           <div className="flex items-center gap-3">

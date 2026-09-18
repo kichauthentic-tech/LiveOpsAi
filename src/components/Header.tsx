@@ -155,7 +155,7 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="hidden md:flex flex-col items-end leading-tight px-2">
           <span className="text-xs font-bold text-[var(--text)]">{activeUserName}</span>
           <span className="text-[10px] text-[var(--accent-text)] font-semibold uppercase">
-            {currentRole} {activeUserTitle ? `• ${activeUserTitle}` : ""}
+            {activeUserTitle || currentRole}
           </span>
         </div>
 

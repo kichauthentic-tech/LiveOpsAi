@@ -1,8 +1,7 @@
 import React, { useState } from "react";
-import { TikTokConnectionStatus, TikTokWebhookEvent, WorkflowRule, LiveSession } from "../types";
+import { TikTokConnectionStatus, TikTokWebhookEvent, WorkflowRule } from "../types";
 import { getTikTokAuthorizeUrl, disconnectTikTok } from "../lib/db/tiktokIntegration";
-import { Server, Zap, RefreshCw, ShieldCheck, ShieldAlert, ShieldX, Link2, Unlink, ArrowRight, Activity, FileSpreadsheet, Plus, Edit3, Trash2, X } from "lucide-react";
-import { TikTokLiveReconciliation } from "./TikTokLiveReconciliation";
+import { Server, Zap, RefreshCw, ShieldCheck, ShieldAlert, ShieldX, Link2, Unlink, ArrowRight, Activity, Plus, Edit3, Trash2, X } from "lucide-react";
 
 interface TikTokApiAutomationProps {
   workflowRules: WorkflowRule[];
@@ -15,8 +14,6 @@ interface TikTokApiAutomationProps {
   tiktokStatusError: string | null;
   webhookEvents: TikTokWebhookEvent[];
   onRefreshTikTokStatus: () => void;
-  sessions: LiveSession[];
-  onSessionUpdated: (session: LiveSession) => void;
 }
 
 export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
@@ -29,11 +26,9 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
   tiktokStatusLoading,
   tiktokStatusError,
   webhookEvents,
-  onRefreshTikTokStatus,
-  sessions,
-  onSessionUpdated
+  onRefreshTikTokStatus
 }) => {
-  const [activeTab, setActiveTab] = useState<"api_status" | "rules" | "csv_import">("api_status");
+  const [activeTab, setActiveTab] = useState<"api_status" | "rules">("api_status");
   const [connecting, setConnecting] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -47,7 +42,6 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
   const [ruleEnabled, setRuleEnabled] = useState(true);
 
   const isCeo = currentRole === "ceo" || currentRole === "admin";
-  const canReconcile = currentRole === "ceo" || currentRole === "admin" || currentRole === "operations";
 
   const handleConnect = async () => {
     setActionError(null);
@@ -133,9 +127,9 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
     <div className="space-y-6">
       <div className="bg-[var(--surface)] text-[var(--text)] p-6 rounded-2xl border border-[var(--border)] shadow-xl space-y-2">
         <span className="text-[var(--accent-text)] font-semibold text-xs uppercase tracking-wider block flex items-center gap-1.5">
-          <Server className="w-4 h-4 text-[var(--accent-text)]" /> Modules 07 & 13: TikTok Open API & Automation Engine
+          <Server className="w-4 h-4 text-[var(--accent-text)]" /> Kinh Doanh
         </span>
-        <h2 className="text-2xl font-black">TikTok Open API & Tự Động Hóa Workflow Agency</h2>
+        <h2 className="text-2xl font-black">TikTok API</h2>
       </div>
 
       {/* Sub Tabs */}
@@ -155,14 +149,6 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
           }`}
         >
           <span className="inline-flex items-center gap-1.5"><Zap className="w-3.5 h-3.5" /> Visual Workflow Automation Rules ({workflowRules.filter(r => r.enabled).length} Enabled)</span>
-        </button>
-        <button
-          onClick={() => setActiveTab("csv_import")}
-          className={`px-4 py-2 rounded-xl transition-all ${
-            activeTab === "csv_import" ? "bg-[var(--accent)] text-white shadow" : "bg-[var(--surface-elevated)] text-[var(--text-muted)] hover:bg-[var(--surface-hover)]"
-          }`}
-        >
-          <span className="inline-flex items-center gap-1.5"><FileSpreadsheet className="w-3.5 h-3.5" /> Đối Soát Số Liệu TikTok</span>
         </button>
       </div>
 
@@ -344,18 +330,8 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
         </div>
       )}
 
-      {/* Đối soát số liệu TikTok (migration 0050) — thay placeholder cũ, chỉ ceo/admin/operations
-          dùng được (RLS trên tiktok_live_imports/tiktok_live_import_rows đã khoá cùng mức). */}
-      {activeTab === "csv_import" && (
-        canReconcile ? (
-          <TikTokLiveReconciliation sessions={sessions} onSessionUpdated={onSessionUpdated} />
-        ) : (
-          <div className="bg-[var(--surface)] p-6 rounded-2xl border border-[var(--border)] shadow-sm text-xs text-[var(--text-muted)]">
-            Chỉ CEO/Admin/Operations mới được đối soát số liệu TikTok.
-          </div>
-        )
-      )}
-
+      {/* Tab "Đối Soát Số Liệu TikTok" (module cũ, migration 0050/0053) đã gỡ 2026-09-18 — đối soát
+          giờ ở "Vận Hành Live → Đối Soát Số Liệu" (0080), một lối vào duy nhất. */}
       {/* Rule Form Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-[var(--surface)]/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">

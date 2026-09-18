@@ -250,9 +250,9 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
       {/* Top Banner */}
       <div className="bg-[var(--surface)] text-[var(--text)] p-6 rounded-2xl border border-[var(--border)] shadow-xl space-y-2">
         <span className="text-[var(--accent-text)] font-semibold text-xs uppercase tracking-wider block flex items-center gap-1.5">
-          <Users className="w-4 h-4 text-[var(--accent-text)]" /> Module 03: Talent Management & AI Matcher
+          <Users className="w-4 h-4 text-[var(--accent-text)]" /> Tài Nguyên Chung
         </span>
-        <h2 className="text-2xl font-black">Hệ Thống Quản Lý Talent & Khớp Nối Host Thông Minh</h2>
+        <h2 className="text-2xl font-black">Talent Pool</h2>
       </div>
 
       {/* AI Matching Tool Banner */}

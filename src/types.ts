@@ -258,79 +258,9 @@ export interface LiveSessionReport {
   submittedAt?: string;
 }
 
-// Đối soát TikTok (migration 0050) — xem lib/db/tiktokReconciliation.ts. 1 import = 1 lần
-// upload file "Live Analysis" TikTok cho 1 khoảng ngày; mỗi dòng trong file là 1
-// TikTokLiveImportRow, sau khi match với đúng LiveSession thì apply để ghi đè.
-export interface TikTokLiveImport {
-  id: string;
-  periodStart: string;
-  periodEnd: string;
-  // "dataraw" = sinh ra từ 1 batch Live Analysis trong kho Dataraw của brand (migration 0053,
-  // luồng duy nhất hiện tại); "csv_export" là các batch cũ upload trực tiếp trước đó.
-  source: "csv_export" | "api" | "dataraw";
-  status: "staged" | "matched" | "applied";
-  brandId?: string;
-  brandName?: string;
-  datarawImportId?: string;
-  importedAt: string;
-}
-
-export interface TikTokLiveImportRow {
-  id: string;
-  importId: string;
-  tiktokRoomId?: string;
-  creatorName?: string;
-  startTime: string;
-  endTime?: string;
-  gmv?: number;
-  itemsSold?: number;
-  orders?: number;
-  customers?: number;
-  avgPrice?: number;
-  ctor?: number;
-  ctr?: number;
-  viewers?: number;
-  views?: number;
-  avgWatchTimeSeconds?: number;
-  newFollowers?: number;
-  productImpressions?: number;
-  productClicks?: number;
-  matchedSessionId?: string;
-  // "chain" = nhiều host chung 1 phiên TikTok liên tục (ca nối, migration 0068) — matchedSessionId
-  // là session đầu chuỗi (tương thích ngược UI cũ), matchedSessionIds là đầy đủ cả chuỗi.
-  matchedSessionIds?: string[];
-  matchConfidence?: "room_id" | "time_overlap" | "manual" | "unmatched" | "chain";
-}
-
-// Audit trail 1 lần đối soát — lưu cặp giá trị manual (trước khi ghi đè) vs tiktok (sau khi ghi
-// đè) để phát hiện lệch số lớn (flagged), chỉ ceo/admin/operations xem được.
-export interface LiveSessionReconciliation {
-  id: string;
-  sessionId: string;
-  importRowId?: string;
-  manualActualGmv?: number;
-  tiktokActualGmv?: number;
-  gmvDeltaPct?: number;
-  manualTotalOrders?: number;
-  tiktokTotalOrders?: number;
-  manualTotalViews?: number;
-  tiktokTotalViews?: number;
-  manualCtrAvg?: number;
-  tiktokCtrAvg?: number;
-  // Đối soát giờ live (migration 0054) — chỉ để cảnh báo, KHÔNG ghi đè giờ công tính lương.
-  manualStartTime?: string;
-  tiktokStartTime?: string;
-  manualDurationMinutes?: number;
-  tiktokDurationMinutes?: number;
-  startDeltaMinutes?: number;
-  durationDeltaMinutes?: number;
-  flagReasons: ReconciliationFlagReason[];
-  flagged: boolean;
-  note?: string;
-  reconciledAt: string;
-}
-
-export type ReconciliationFlagReason = "gmv" | "start_time" | "duration";
+// Các type của module đối soát cũ (TikTokLiveImport/TikTokLiveImportRow/LiveSessionReconciliation,
+// migration 0050/0053) đã xoá 2026-09-18 cùng lib/db/tiktokReconciliation.ts — bảng trong DB vẫn
+// giữ (không migration drop), app không đọc nữa. Đối soát hiện tại: LiveReconciliation* (0080).
 
 // Report tháng Brand Workspace (migration 0051) — phần số liệu vận hành (GMV/Host/SKU) luôn
 // tính live từ LiveSession[], object này chỉ giữ phần nhập tay bắt buộc + trạng thái phát hành.

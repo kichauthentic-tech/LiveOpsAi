@@ -137,9 +137,9 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
     <div className="space-y-6">
       <div className="bg-[var(--surface)] text-[var(--text)] p-6 rounded-2xl border border-[var(--border)] shadow-xl space-y-2">
         <span className="text-[var(--accent-text)] font-semibold text-xs uppercase tracking-wider block flex items-center gap-1.5">
-          <Building2 className="w-4 h-4 text-[var(--accent-text)]" /> Module 01: CRM
+          <Building2 className="w-4 h-4 text-[var(--accent-text)]" /> Kinh Doanh
         </span>
-        <h2 className="text-2xl font-black">Quản Lý Khách Hàng (Brand CRM)</h2>
+        <h2 className="text-2xl font-black">CRM</h2>
       </div>
 
       {/* Brand CRM Section */}

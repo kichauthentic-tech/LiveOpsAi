@@ -805,10 +805,10 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
       <div className="bg-[var(--surface)] border border-[var(--border)] p-4 sm:p-6 rounded-2xl shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="space-y-1">
           <span className="text-[var(--accent-text)] font-semibold text-[11px] sm:text-xs uppercase tracking-wider flex items-center gap-1.5">
-            <CalendarIcon className="w-4 h-4 text-[var(--accent-text)] shrink-0" /> Operating Calendar & Multi-View Studio Allocator
+            <CalendarIcon className="w-4 h-4 text-[var(--accent-text)] shrink-0" /> Vận Hành Live
           </span>
           <h2 className="text-xl sm:text-2xl font-black text-[var(--text)] tracking-tight">
-            Lịch Vận Hành Phiên Live
+            Lịch Vận Hành
           </h2>
         </div>
 

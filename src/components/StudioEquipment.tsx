@@ -229,9 +229,9 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
       {/* Top Banner */}
       <div className="bg-[var(--surface)] text-[var(--text)] p-6 rounded-2xl border border-[var(--border)] shadow-xl space-y-2">
         <span className="text-[var(--accent-text)] font-semibold text-xs uppercase tracking-wider block flex items-center gap-1.5">
-          <Building2 className="w-4 h-4 text-[var(--accent-text)]" /> Modules 04 & 05: Studio & QR Equipment Management
+          <Building2 className="w-4 h-4 text-[var(--accent-text)]" /> Tài Nguyên Chung
         </span>
-        <h2 className="text-2xl font-black">Quản Lý Hệ Thống Studio & Thiết Bị Livestream</h2>
+        <h2 className="text-2xl font-black">Studios & Gear</h2>
       </div>
 
       {/* Sub Tabs */}

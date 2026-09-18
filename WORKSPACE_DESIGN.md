@@ -252,11 +252,13 @@ Verify trên Supabase thật với 3 ca ZZZ (manual/snapshot/reconciled): Financ
 - **`<title>` vẫn là "My Google AI Studio App"** từ template, `lang="en"`, không favicon — tab trình duyệt của một hệ thống vận hành thật mang tên template. Đổi "LiveOps AI", `lang="vi"`, favicon SVG inline.
 - `.claude/launch.json`: dev server chuyển sang cổng **3100** (`PORT=3100`) — máy dev có app khác (Next.js "YFB Live Agency OS") chiếm cổng 3000 qua IPv6, `localhost:3000` trỏ nhầm sang nó.
 
-**Đề xuất chưa làm — cần user quyết:**
+**4 đề xuất — user chốt và đã làm 2026-09-18:**
 
-1. **Hai module đối soát song song.** "Đối Soát Số Liệu" (mới, 0080, nhóm Vận Hành Live) và `TikTokLiveReconciliation` cũ vẫn nằm trong tab "TikTok API → CSV Import". Hai lối vào cho cùng một việc với hai cơ chế khác nhau; cảnh báo cũ trong Report Tháng từng trỏ nhầm vào bản cũ (đã sửa ở Module 3). Đề xuất gỡ bản cũ khỏi TikTok API (xoá `TikTokLiveReconciliation.tsx` + `lib/db/tiktokReconciliation.ts` nếu không còn ai import) — cần xác nhận bản mới đã phủ đủ nghiệp vụ bản cũ trước khi xoá.
-2. **"Hội Đồng AI & Simulator" (DEMO)** vẫn trong nav mọi người có `manage_ai_agents`. Giữ hay ẩn tới khi có thật?
-3. **Tiêu đề trang dài kiểu demo** ("Hệ Thống Quản Lý Talent & Khớp Nối Host Thông Minh", kicker "Modules 11 & 12: Finance, Unit Economics & HR"...) — nên rút về đúng tên tab. Thuần cosmetic, nhiều file, làm khi rảnh.
-4. Header user block: "ADMIN • QUẢN TRỊ VIÊN HỆ THỐNG (ADMIN)" — role lặp 2 lần vì `custom_role_title` đã chứa "(Admin)". Sửa dữ liệu profile hoặc bỏ phần role in hoa.
+1. **Gỡ module đối soát cũ** (`TikTokLiveReconciliation.tsx` + `lib/db/tiktokReconciliation.ts` + tab "Đối Soát Số Liệu TikTok" trong TikTok API + 4 type `TikTokLiveImport*`/`LiveSessionReconciliation*`). Một lối vào duy nhất: "Vận Hành Live → Đối Soát Số Liệu" (0080). Phần parse Dataraw thuần (`mapDataRawToImportRows`/`vnParts`) mà Report Tuần vẫn cần được tách sang [liveAnalysisRows.ts](src/lib/dataraw/liveAnalysisRows.ts). **Bảng `tiktok_live_imports`/`tiktok_live_import_rows`/`live_session_reconciliations` (0050/0053) và RPC `apply_tiktok_reconciliation` vẫn còn trong DB** — không migration drop, app không đọc nữa; dọn bằng migration riêng khi chắc không cần tra lại lịch sử.
+2. **"Hội Đồng AI & Simulator" ẩn khỏi nav** tới khi có bản thật. Component `AiMultiAgent` + nhánh render vẫn còn; `isTabAllowed` chặn mở lại qua localStorage.
+3. **Tiêu đề trang rút về đúng tên tab** (10 màn): "Hệ Thống Quản Lý Talent & Khớp Nối Host Thông Minh" → "Talent Pool", kicker "Modules 11 & 12: Finance, Unit Economics & HR" → tên nhóm nav "Tài Chính", bỏ "Module 14"/"Operational Data Graph Nexus"...
+4. **Header/sidebar chỉ hiện chức danh** (`customRoleTitle || role`) — chức danh đã chứa role, in role phía trước là lặp "ADMIN • ... (ADMIN)".
+
+Verify: admin bấm qua 13 tab (Hội Đồng AI đã ẩn) — tiêu đề khớp tên tab, kicker = tên nhóm nav, 0 lỗi console; TikTok API còn đúng 2 sub-tab.
 
 **Vòng audit UX/workflow theo module (3 module) đã đi hết một lượt.** Việc tiếp theo không còn nằm trong lộ trình audit này — chọn theo 4 đề xuất trên hoặc theo nhu cầu vận hành thật (dữ liệu thật vẫn chưa chạy qua hệ thống: `live_sessions` = 0).

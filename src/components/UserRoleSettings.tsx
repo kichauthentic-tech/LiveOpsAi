@@ -425,14 +425,11 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-[var(--accent-text)] uppercase tracking-widest">
-                System Administration
-              </span>
-              <span className="bg-[var(--accent)]/30 text-[var(--accent-text)] border border-[var(--accent)]/40 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">
-                Module 14
+                Hệ Thống
               </span>
             </div>
             <h2 className="text-2xl font-black text-[var(--text)] mt-0.5">
-              Phân Quyền Custom & Setting Người Dùng (Access Control Engine)
+              Phân Quyền & Role
             </h2>
             <p className="text-xs text-[var(--text-muted)] mt-1">
               Cấu hình Ma trận phân quyền chi tiết cho 6 Role tiêu chuẩn, override quyền từng cá nhân & audit nhật ký an ninh.

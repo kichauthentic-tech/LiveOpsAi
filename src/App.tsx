@@ -37,7 +37,6 @@ import {
   Briefcase,
   Link2,
   DollarSign,
-  Bot,
   Menu,
   X,
   Calendar as CalendarIcon,
@@ -122,6 +121,18 @@ function saveStorage<T>(key: string, value: T): void {
 // của ops — mở ca, chốt, cam kết còn thiếu bao nhiêu giờ, up snapshot, report — đều nằm ở đó.
 // "Live Sessions" (Livestream Session Hub) là màn chi tiết từng phiên thời demo, mở app ra thấy
 // một dropdown và trạng thái trống không nói gì về việc hôm nay phải làm.
+interface NavItem {
+  id: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  perm: PermissionKey | undefined;
+  badge?: string;
+}
+interface NavGroup {
+  label: string;
+  items: NavItem[];
+}
+
 function getDefaultTabForRole(role: UserRole): string {
   if (role === "brand") return "brand_calendar";
   return "shift_scheduling";
@@ -1093,13 +1104,12 @@ export default function App() {
       return false;
     }
   };
-  // TikTokLiveReconciliation đã tự gọi RPC apply_tiktok_reconciliation và có sẵn LiveSession
-  // đầy đủ (fetchSessionById) — chỉ cần cập nhật lại state, không network round-trip thêm.
   // Đối soát ghi đè nhiều ca cùng lúc trong 1 RPC nên không có danh sách session trả về — nạp lại
   // toàn bộ thay vì cố suy ra ca nào đã đổi.
   const handleReconciliationApplied = async () => {
     setSessions(await fetchSessions());
   };
+  // Snapshot upload trả về đúng LiveSession vừa tính lại — chỉ cần thay 1 phần tử trong state.
   const handleSessionReconciled = (updated: LiveSession) => {
     setSessions((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
     if (selectedSession && selectedSession.id === updated.id) {
@@ -1400,7 +1410,7 @@ export default function App() {
   // Navigation Items mapped to permission keys, grouped theo luồng công việc — đây là
   // nhóm cho Agency Workspace (nhìn xuyên mọi Brand). Xem BRAND_NAV_GROUPS bên dưới cho
   // Brand Workspace (Giai đoạn A, WORKSPACE_DESIGN.md).
-  const AGENCY_NAV_GROUPS = [
+  const AGENCY_NAV_GROUPS: NavGroup[] = [
     {
       label: "Vận Hành Live",
       items: [
@@ -1455,7 +1465,9 @@ export default function App() {
     {
       label: "Hệ Thống",
       items: [
-        { id: "ai_agents", label: "Hội Đồng AI & Simulator", icon: Bot, badge: "DEMO", perm: "manage_ai_agents" as PermissionKey },
+        // "Hội Đồng AI & Simulator" (AiMultiAgent, mock) ẨN khỏi nav từ 2026-09-18 (user chốt) tới khi
+        // có bản thật. Component + nhánh render vẫn còn; isTabAllowed coi tab không có nav item là
+        // không được phép nên không mở lại được qua localStorage.
         { id: "user_settings", label: "Phân Quyền & Role", icon: ShieldCheck, perm: "manage_users_permissions" as PermissionKey },
         // Tài khoản cá nhân đã dời vào User Card cuối sidebar (bấm vào card để mở), không
         // còn là 1 mục nav riêng — tránh trùng lặp lối vào.
@@ -1485,7 +1497,7 @@ export default function App() {
   // "Report Tuần" không còn là tab riêng (2026-08-23) — đã gộp làm chế độ xem "Tuần" bên trong
   // Report Tháng (BrandMonthlyReport.tsx tự toggle Tháng/Tuần, CAN_VIEW_ROLES trong
   // BrandWeeklyReport.tsx vẫn chặn brand xem như trước).
-  const BRAND_NAV_GROUPS = [
+  const BRAND_NAV_GROUPS: NavGroup[] = [
     {
       label: "Brand Workspace",
       items: [
@@ -1669,7 +1681,7 @@ export default function App() {
                             className={`w-4 h-4 shrink-0 ${isActive ? "text-[var(--accent-text)]" : "text-[var(--text-muted)]"}`}
                           />
                           {/* Thu gọn: badge NEW co lại thành chấm nhỏ trên icon cho khỏi mất tín hiệu. */}
-                          {sidebarCollapsed && "badge" in item && item.badge && (
+                          {sidebarCollapsed && item.badge && (
                             <span className="hidden md:block absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-rose-500" />
                           )}
                         </div>
@@ -1677,7 +1689,7 @@ export default function App() {
                       </div>
 
                       <div className={`flex items-center gap-1.5 shrink-0 ${sidebarCollapsed ? "md:hidden" : ""}`}>
-                        {"badge" in item && item.badge && (
+                        {item.badge && (
                           <span className="bg-rose-600/20 text-rose-400 border border-rose-500/30 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase">
                             {item.badge}
                           </span>
@@ -1719,8 +1731,10 @@ export default function App() {
             )}
             <div className={`text-xs min-w-0 flex-1 ${sidebarCollapsed ? "md:hidden" : ""}`}>
               <p className="font-bold text-[var(--text)] truncate">{activeUser.name}</p>
+              {/* Chức danh đã chứa role ("Quản Trị Viên Hệ Thống (Admin)") — in thêm role phía trước là
+                  lặp "ADMIN • ... (ADMIN)". Chỉ rơi về tên role khi chưa đặt chức danh. */}
               <p className="text-[var(--accent-text)] text-[10px] uppercase font-extrabold truncate">
-                {currentRole} • {activeUser.customRoleTitle}
+                {activeUser.customRoleTitle || currentRole}
               </p>
             </div>
             <UserCog
@@ -2087,8 +2101,6 @@ export default function App() {
                     tiktokStatusError={tiktokStatusError}
                     webhookEvents={tiktokWebhookEvents}
                     onRefreshTikTokStatus={refreshTikTokStatus}
-                    sessions={sessions}
-                    onSessionUpdated={handleSessionReconciled}
                   />
                 )}
 
