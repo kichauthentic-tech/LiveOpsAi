@@ -259,8 +259,8 @@ export interface LiveSessionReport {
 }
 
 // Các type của module đối soát cũ (TikTokLiveImport/TikTokLiveImportRow/LiveSessionReconciliation,
-// migration 0050/0053) đã xoá 2026-09-18 cùng lib/db/tiktokReconciliation.ts — bảng trong DB vẫn
-// giữ (không migration drop), app không đọc nữa. Đối soát hiện tại: LiveReconciliation* (0080).
+// migration 0050/0053) đã xoá 2026-09-18 cùng lib/db/tiktokReconciliation.ts; bảng trong DB drop
+// ở migration 0085. Đối soát hiện tại: LiveReconciliation* (0080).
 
 // Report tháng Brand Workspace (migration 0051) — phần số liệu vận hành (GMV/Host/SKU) luôn
 // tính live từ LiveSession[], object này chỉ giữ phần nhập tay bắt buộc + trạng thái phát hành.
