@@ -204,6 +204,9 @@ export interface LiveSession {
   sharesCount?: number;
   likesCount?: number;
   liveRoomIds?: string[];
+  // Ca sinh từ file Creator-Live-Performance để nạp bù tháng cũ (migration 0086). Số liệu là số
+  // TikTok thật nhưng KHÔNG vào Finance & P&L (rate card tháng đó không chuẩn) — Finance lọc cờ này.
+  isBackfill?: boolean;
   skus: ProductSKU[];
   checklist: ChecklistItem[];
   minuteMetrics: MinuteMetric[];

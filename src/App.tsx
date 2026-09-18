@@ -2036,6 +2036,9 @@ export default function App() {
                     brandId={currentBrandId!}
                     brandName={activeBrands.find((b) => b.id === currentBrandId)?.name || "Brand"}
                     currentRole={currentRole}
+                    sessions={activeSessions}
+                    talents={activeTalents}
+                    onSessionsChanged={handleReconciliationApplied}
                   />
                 )}
 

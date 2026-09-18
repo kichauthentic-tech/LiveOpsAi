@@ -81,10 +81,11 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
   };
 
   // Real P&L is only meaningful for sessions that actually ran and closed with real GMV/orders.
+  // Ca backfill (sinh từ file để nạp bù tháng cũ, 0086) bỏ ra: rate card tháng đó không chuẩn.
   const completedSessions = useMemo(
     () =>
       sessions
-        .filter((s) => s.status === "Completed" && s.date.startsWith(month))
+        .filter((s) => s.status === "Completed" && !s.isBackfill && s.date.startsWith(month))
         .sort((a, b) => (a.date < b.date ? 1 : -1)),
     [sessions, month]
   );

@@ -34,7 +34,7 @@ Ground truth luôn là `AGENCY_NAV_GROUPS`/`BRAND_NAV_GROUPS` ở [src/App.tsx](
 
 ## Hạ tầng Supabase
 
-- Migration mới nhất: **0085** (đã chạy trên Supabase thật 2026-09-18 — 3 bảng cũ trả `PGRST205`, RPC cũ `PGRST202`, bảng đối soát mới và `live_sessions` vẫn đọc bình thường; 0083: bảng `notifications` select được, RPC `mark_notifications_read` trả 0, insert thẳng bị RLS chặn `42501`; 0082 verify bằng gọi RPC thẳng từ app: `can_edit_session_snapshot` tồn tại, `recompute_session_from_snapshot` trả `42501 permission denied` kể cả với admin). Quy trình chạy: user tự dán vào Supabase SQL Editor (không có `DATABASE_URL`/Supabase CLI cấu hình trong máy dev).
+- Migration mới nhất: **0086** (`0086_backfill_sessions_from_rooms.sql` — **chưa chạy trên Supabase thật**, đã test đủ 3 RPC + guard role trên Postgres cục bộ 2026-09-19; xem mục "Nạp bù ca từ file"). 0085 đã chạy trên Supabase thật 2026-09-18 — 3 bảng cũ trả `PGRST205`, RPC cũ `PGRST202`, bảng đối soát mới và `live_sessions` vẫn đọc bình thường; 0083: bảng `notifications` select được, RPC `mark_notifications_read` trả 0, insert thẳng bị RLS chặn `42501`; 0082 verify bằng gọi RPC thẳng từ app: `can_edit_session_snapshot` tồn tại, `recompute_session_from_snapshot` trả `42501 permission denied` kể cả với admin). Quy trình chạy: user tự dán vào Supabase SQL Editor (không có `DATABASE_URL`/Supabase CLI cấu hình trong máy dev).
 - **Chạy thử cả chuỗi migration trước khi giao cho user**: có sẵn cách dựng 1 Postgres 18 cô lập trên máy + schema `auth` giả (`auth.users`, `auth.uid()` đọc từ GUC `test.uid` để giả lập "ai đang đăng nhập"), rồi `psql -f` lần lượt 0001→mới nhất. Hai cái bẫy của cách này: (a) `initdb --locale=C` và phải có `LANG=C LC_ALL=C` trong môi trường `pg_ctl`, kèm `-c unix_socket_directories=` cho đường dẫn socket khỏi quá dài; (b) nếu `drop schema public` rồi `create schema public` bằng tay thì **mất grant mặc định** — thiếu `grant usage on schema public to authenticated` là mọi lời gọi hàm báo `function ... does not exist` (không phải `permission denied`), rất dễ đuổi nhầm hướng.
 - Project Supabase này **không còn chia sẻ với app nào khác** (đã dọn 15 bảng CRM/outreach không liên quan ngày 2026-09-07, xem migration 0076 nếu cần đối chiếu).
 - RLS: mọi bảng có `brand_id` trực tiếp đã cô lập theo brand ở tầng đọc (không chỉ tầng UI) — công thức chuẩn `current_user_role() is distinct from 'brand' or brand_id = current_user_brand_id()`.
@@ -263,6 +263,23 @@ Verify: admin bấm qua 13 tab (Hội Đồng AI đã ẩn) — tiêu đề kh�
 
 **Vòng audit UX/workflow theo module (3 module) đã đi hết một lượt, kể cả đề xuất phát sinh.**
 
+## Nạp bù ca từ file Creator-Live-Performance (2026-09-19, migration 0086)
+
+**Vì sao:** app chạy thật từ 9/2026 nhưng brand đã live từ 4/2026; user muốn nạp bù lịch sử coi như số chính xác. File Creator-Live-Performance có đủ ngày/giờ/số liệu từng room — thứ duy nhất không có là host. Tạo tay 60 ca/tháng/brand rồi gán từng ca là không khả thi → sinh ca tự động, gán host theo mẫu.
+
+**Chốt với user về file (quan trọng):** một loại file duy nhất `Creator-Live-Performance` từ TikTok Creator Center, bản tiếng Anh, **mỗi tháng 1 file** (bộ lọc ngày đúng 01→cuối tháng). File trải nhiều tháng sẽ làm tháng bị **đếm đôi** khi up thêm file tháng lẻ sau đó — kho Dataraw khoá 1 batch/tháng theo `period_start` nhưng Report đọc mọi batch có khoảng ngày chạm tháng. Đã kiểm parser với file thật CROCS 04→09/2026: 340 room, 35 cột, 0 lỗi; file 6 tháng đó đã tách sẵn thành 6 file tháng trong `~/Downloads/Creator-Live-Performance_CROCS_YYYY-MM.xlsx`. Report Tháng là module riêng với bộ file riêng (5 loại cũ) — không gộp.
+
+**Cơ chế (Brand WS → Dữ Liệu Gốc → tab Creator Live Performance → panel "Nạp bù ca từ file"):**
+1. *Sinh ca từ room* — RPC `create_backfill_sessions(brand, rows jsonb)`: 1 room → 1 ca `Completed`, `data_source='tiktok_reconciled'`, `is_backfill=true`, host trống, `tiktok_room_id` + `live_room_ids=[room]`, giờ VN từ `actual_start_at/actual_end_at`. Room đã thuộc ca nào (snapshot/đối soát/lần sinh trước) thì bỏ qua → chạy lại vô hại. **Parse file chỉ ở client** (`creatorLivePerfSlice.ts`), RPC nhận số đã chuẩn hoá — một parser cho mọi đường đi của file. Ca quá khứ nên trigger thông báo 0083 không bắn.
+2. *Gán host hàng loạt* — lưới ngày × Ca 1..N (thứ tự theo giờ bắt đầu trong ngày) với "Điền theo thứ" (chọn thứ + cột + host/trợ, tuỳ chọn chỉ ô trống), "Sao chép tháng trước" (khớp theo thứ + cột, lấy người xuất hiện nhiều nhất), lưu qua RPC `bulk_assign_session_hosts(jsonb)` chỉ gửi ca có thay đổi.
+3. *Tách room dài* — room ≥ 5h (host không tắt stream giữa 2 ca) có nút "tách": RPC `split_backfill_session(id, mốc)` chia số đếm theo tỷ lệ thời gian, phần 2 = tổng − phần 1, cả 2 giữ room id.
+
+Code: [roomsToSessions.ts](src/lib/backfill/roomsToSessions.ts) (thuần, có test), [backfillSessions.ts](src/lib/db/backfillSessions.ts), [BackfillFromRooms.tsx](src/components/brand-workspace/BackfillFromRooms.tsx) nhúng trong `BrandDataRaw` (nhận thêm `sessions/talents/onSessionsChanged` từ App).
+
+**Quy ước:**
+- **Ca `is_backfill` không vào Finance & P&L** (rate card tháng cũ không chuẩn) — `FinanceHr` lọc cờ này. Có vào hiệu suất host, giờ live theo khung, lịch sử phân bổ target. Dùng cùng lưới cho tháng đang chạy khi trợ quên up lúc giao ca cũng được (room chưa khớp ca sẽ ra ca mới).
+- **`fetchSessions()` phân trang 1000 dòng và chia lô `.in()` 50 ca** — PostgREST cắt 1000 dòng/request KHÔNG báo lỗi; trước 0086 chưa chạm ngưỡng, sau nạp bù 4 brand × 6 tháng là vượt. Bảng nào khác có nguy cơ > 1000 dòng phải làm tương tự.
+
 ## Giai đoạn hiện tại (từ 2026-09-18): CHẠY THỬ THẬT — không build thêm tính năng
 
 User chốt: dừng build, cho một tuần vận hành thật đi qua app. Tới lúc chốt, `live_sessions` = 0 — mọi thứ đã build chỉ mới verify bằng dữ liệu dựng. Session mới đọc file này: **đừng đề xuất tính năng mới**; hỏi user chạy thử tới đâu, cái gì kêu, rồi sửa đúng chỗ đó.
@@ -275,5 +292,7 @@ Vòng chạy thử (đúng luồng app hiện có):
 5. Cuối tuần: Đối Soát Số Liệu với file thật → xem Finance & P&L.
 
 **Seed cho tuần chạy thử** (user yêu cầu 2026-09-18, vì DB thật chưa có talent thật / kế hoạch tháng / ca đã xong): `supabase/seed/2026-09_trial_seed.sql` — rate card 4 talent mẫu về mức thật (C theo giờ), kế hoạch tháng JOCKEY & VERA (dòng T8 + T9), 11 ca VERA 20–30/09, 48 lượt đăng ký rảnh, 17 ca JOCKEY 01–17/09 đã xong kèm report tay (1 ca huỷ). Chạy trong SQL Editor; đã test trên Postgres cục bộ (85 migration + seed + rollback). Gỡ bằng `2026-09_trial_seed_rollback.sql`. Dấu nhận biết: title `[SEED] …`, notes/promotion_notes `SEED chạy thử`. Chưa chốt ca nào — bước 3 để ops tự bấm. Thư mục `supabase/seed/` KHÔNG phải migration, không bao giờ chạy tự động.
+
+**Bàn thêm 2026-09-19 (chưa chốt làm, đã phân tích với user):** (a) Module tạo ca — quy tắc lặp hiện tại có lỗi thật (xoá mẫu rồi tạo lại → sinh ca trùng vì `template_id` on delete set null, không có unique brand+ngày+giờ) và UX rời rạc; đề xuất 3 giai đoạn P1 (vá + gom về Đăng Ký & Chốt Lịch + RPC sinh ca có dry-run so giờ cam kết) → P2 (khung lịch tuần theo brand, hiệu lực theo hợp đồng, ngoại lệ) → P3 (camp + nhắc việc). User chốt: chỉ ops tạo ca (bỏ quyền brand tự mở — RLS 0035); ngày camp xử lý lúc sinh tháng; **để từ từ, chưa làm**. (b) Gợi ý lịch từ lịch sử: tích hợp làm lớp gợi ý trong cùng module (không tách module, không auto-commit), chỉ ăn ca `tiktok_reconciled`, cần ≥ 2 tháng đối soát — làm sau P2 khi có dữ liệu thật (nạp bù 0086 chính là để có dữ liệu đó sớm). (c) Phân bổ target: khung camp nhập tay hiện *cộng thêm* vào lịch cố định (D-Day 3 ngày, Mid 13–15, Pay 23–25) chứ không thay thế — user chưa chọn giữ hay đổi.
 
 Chờ sau chạy thử: Zalo OA worker (đọc bảng `notifications` rồi gửi — cần user đăng ký OA doanh nghiệp trước, xem memory `liveops-zalo-notification-plan`); pipeline TikTok API (chờ scope Partner Center); theme phủ hết app.

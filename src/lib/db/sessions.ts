@@ -52,6 +52,7 @@ interface DbLiveSession {
   shares_count: number | null;
   likes_count: number | null;
   live_room_ids: string[] | null;
+  is_backfill: boolean | null;
 }
 
 interface DbSessionSku {
@@ -198,7 +199,8 @@ function sessionFromDb(row: DbLiveSession): Omit<LiveSession, "skus" | "checklis
     commentsCount: row.comments_count ?? undefined,
     sharesCount: row.shares_count ?? undefined,
     likesCount: row.likes_count ?? undefined,
-    liveRoomIds: row.live_room_ids ?? undefined
+    liveRoomIds: row.live_room_ids ?? undefined,
+    isBackfill: row.is_backfill ?? false
   };
 }
 
@@ -345,22 +347,32 @@ async function fetchChildRowsForSessions(sessionIds: string[]) {
       reports: [] as DbSessionReport[]
     };
   }
-  const [skusRes, checklistRes, metricsRes, reportsRes] = await Promise.all([
-    supabase.from("session_skus").select("*").in("session_id", sessionIds),
-    supabase.from("session_checklist_items").select("*").in("session_id", sessionIds),
-    supabase.from("session_minute_metrics").select("*").in("session_id", sessionIds).order("minute", { ascending: true }),
-    supabase.from("live_session_reports").select("*").in("session_id", sessionIds)
-  ]);
-  if (skusRes.error) throw skusRes.error;
-  if (checklistRes.error) throw checklistRes.error;
-  if (metricsRes.error) throw metricsRes.error;
-  if (reportsRes.error) throw reportsRes.error;
-  return {
-    skus: (skusRes.data as DbSessionSku[]) ?? [],
-    checklist: (checklistRes.data as DbChecklistItem[]) ?? [],
-    metrics: (metricsRes.data as DbMinuteMetric[]) ?? [],
-    reports: (reportsRes.data as DbSessionReport[]) ?? []
-  };
+  // .in() đi trên query string — hơn vài trăm uuid là vượt giới hạn URL của gateway, nên chia lô.
+  // Mỗi lô cũng chịu trần 1000 dòng của PostgREST: 50 ca × ~20 SKU/ca vẫn dưới trần. Ca backfill
+  // (0086) không có dòng con nào nên nhiều ca hơn không làm lô nặng thêm.
+  const CHUNK = 50;
+  const skus: DbSessionSku[] = [];
+  const checklist: DbChecklistItem[] = [];
+  const metrics: DbMinuteMetric[] = [];
+  const reports: DbSessionReport[] = [];
+  for (let i = 0; i < sessionIds.length; i += CHUNK) {
+    const ids = sessionIds.slice(i, i + CHUNK);
+    const [skusRes, checklistRes, metricsRes, reportsRes] = await Promise.all([
+      supabase.from("session_skus").select("*").in("session_id", ids),
+      supabase.from("session_checklist_items").select("*").in("session_id", ids),
+      supabase.from("session_minute_metrics").select("*").in("session_id", ids).order("minute", { ascending: true }),
+      supabase.from("live_session_reports").select("*").in("session_id", ids)
+    ]);
+    if (skusRes.error) throw skusRes.error;
+    if (checklistRes.error) throw checklistRes.error;
+    if (metricsRes.error) throw metricsRes.error;
+    if (reportsRes.error) throw reportsRes.error;
+    skus.push(...((skusRes.data as DbSessionSku[]) ?? []));
+    checklist.push(...((checklistRes.data as DbChecklistItem[]) ?? []));
+    metrics.push(...((metricsRes.data as DbMinuteMetric[]) ?? []));
+    reports.push(...((reportsRes.data as DbSessionReport[]) ?? []));
+  }
+  return { skus, checklist, metrics, reports };
 }
 
 function assembleSessions(
@@ -379,10 +391,30 @@ function assembleSessions(
   }));
 }
 
+// PostgREST trên Supabase cắt mỗi request ở 1000 dòng (max-rows) và KHÔNG báo lỗi — trước khi có
+// nạp bù ca từ file (0086) tổng ca chưa bao giờ chạm ngưỡng, nhưng 4 brand × 6 tháng × ~60 room là
+// vượt ngay. Phân trang bằng range() tới khi trang trả về ít hơn PAGE.
+const PAGE = 1000;
+async function fetchAllSessionRows(): Promise<DbLiveSession[]> {
+  const out: DbLiveSession[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from("live_sessions")
+      .select("*")
+      .order("date", { ascending: false })
+      .order("start_time", { ascending: false })
+      .order("id", { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    const rows = (data as DbLiveSession[]) ?? [];
+    out.push(...rows);
+    if (rows.length < PAGE) break;
+  }
+  return out;
+}
+
 export async function fetchSessions(): Promise<LiveSession[]> {
-  const { data, error } = await supabase.from("live_sessions").select("*").order("date", { ascending: false }).order("start_time", { ascending: false });
-  if (error) throw error;
-  const rows = (data as DbLiveSession[]) ?? [];
+  const rows = await fetchAllSessionRows();
   const { skus, checklist, metrics, reports } = await fetchChildRowsForSessions(rows.map((r) => r.id));
   return assembleSessions(rows, skus, checklist, metrics, reports);
 }

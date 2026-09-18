@@ -1,13 +1,19 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { BrandDataRawImport, BrandDataRawRow, DataRawReportType, UserRole } from "../../types";
+import { BrandDataRawImport, BrandDataRawRow, DataRawReportType, UserRole, LiveSession, Talent } from "../../types";
 import { parseDataRawExcel, ParsedDataRawImport } from "../../lib/dataraw/parseDataRawExcel";
 import { fetchDataRawImports, fetchDataRawRows, createOrReplaceDataRawImport, findExistingImportForMonth, deleteDataRawImport } from "../../lib/db/brandDataRaw";
 import { Database, Upload, FileSpreadsheet, AlertTriangle, Trash2, Search, ChevronDown, ChevronRight } from "lucide-react";
+import { BackfillFromRooms } from "./BackfillFromRooms";
 
 interface BrandDataRawProps {
   brandId: string;
   brandName: string;
   currentRole: UserRole;
+  // Nạp bù ca từ file Creator-Live-Performance (0086) — cần danh sách ca + talent để biết room nào
+  // đã có ca và để gán host; onSessionsChanged nạp lại ca sau khi sinh/gán.
+  sessions: LiveSession[];
+  talents: Talent[];
+  onSessionsChanged: () => Promise<void>;
 }
 
 const REPORT_TABS: { id: DataRawReportType; label: string; hint: string }[] = [
@@ -59,7 +65,7 @@ function formatPeriodShort(imp: BrandDataRawImport): string {
 // này (theo quyết định thiết kế: report tháng chỉ export ra ngoài, không có brand-facing access).
 const CAN_MANAGE: UserRole[] = ["ceo", "admin", "operations"];
 
-export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ brandId, brandName, currentRole }) => {
+export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ brandId, brandName, currentRole, sessions, talents, onSessionsChanged }) => {
   const canManage = CAN_MANAGE.includes(currentRole);
   const [activeType, setActiveType] = useState<DataRawReportType>("shop_promotion");
   const [imports, setImports] = useState<BrandDataRawImport[]>([]);
@@ -206,6 +212,18 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ brandId, brandName, 
           </button>
         ))}
       </div>
+
+      {/* Nạp bù ca từ room — chỉ có ý nghĩa với file Creator-Live-Performance */}
+      {activeType === "creator_live_performance" && (
+        <BackfillFromRooms
+          brandId={brandId}
+          brandName={brandName}
+          months={groups.map(([monthKey]) => monthKey)}
+          sessions={sessions}
+          talents={talents}
+          onSessionsChanged={onSessionsChanged}
+        />
+      )}
 
       {/* Upload */}
       <div className="bg-[var(--surface)] p-6 rounded-2xl border border-[var(--border)] shadow-sm space-y-4">
