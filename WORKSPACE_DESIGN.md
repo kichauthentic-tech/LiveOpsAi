@@ -274,4 +274,6 @@ Vòng chạy thử (đúng luồng app hiện có):
 4. Ca đầu tiên: trợ live up file Creator-Live-Performance lúc giao ca (kiểm parser với file thật).
 5. Cuối tuần: Đối Soát Số Liệu với file thật → xem Finance & P&L.
 
+**Seed cho tuần chạy thử** (user yêu cầu 2026-09-18, vì DB thật chưa có talent thật / kế hoạch tháng / ca đã xong): `supabase/seed/2026-09_trial_seed.sql` — rate card 4 talent mẫu về mức thật (C theo giờ), kế hoạch tháng JOCKEY & VERA (dòng T8 + T9), 11 ca VERA 20–30/09, 48 lượt đăng ký rảnh, 17 ca JOCKEY 01–17/09 đã xong kèm report tay (1 ca huỷ). Chạy trong SQL Editor; đã test trên Postgres cục bộ (85 migration + seed + rollback). Gỡ bằng `2026-09_trial_seed_rollback.sql`. Dấu nhận biết: title `[SEED] …`, notes/promotion_notes `SEED chạy thử`. Chưa chốt ca nào — bước 3 để ops tự bấm. Thư mục `supabase/seed/` KHÔNG phải migration, không bao giờ chạy tự động.
+
 Chờ sau chạy thử: Zalo OA worker (đọc bảng `notifications` rồi gửi — cần user đăng ký OA doanh nghiệp trước, xem memory `liveops-zalo-notification-plan`); pipeline TikTok API (chờ scope Partner Center); theme phủ hết app.
