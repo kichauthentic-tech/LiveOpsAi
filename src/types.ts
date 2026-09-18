@@ -709,3 +709,23 @@ export interface PromoScheme {
   createdAt?: string;
 }
 
+
+// Thông báo trong app (migration 0083). Sinh bằng trigger trên live_sessions, người nhận chỉ
+// đọc + đánh dấu đã đọc. Đặt tên AppNotification để không đụng `Notification` của DOM.
+export type AppNotificationKind =
+  | "shift_assigned"
+  | "shift_unassigned"
+  | "shift_time_changed"
+  | "shift_cancelled"
+  | "report_reconciled";
+
+export interface AppNotification {
+  id: string;
+  kind: AppNotificationKind;
+  title: string;
+  body: string;
+  sessionId?: string;
+  brandId?: string;
+  readAt?: string;
+  createdAt: string;
+}

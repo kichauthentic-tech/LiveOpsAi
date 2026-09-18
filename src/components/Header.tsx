@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { UserRole, Brand } from "../types";
+import { UserRole, Brand, AppNotification } from "../types";
+import { NotificationBell } from "./NotificationBell";
 import { LogOut, Building2, ChevronDown, Check, Palette } from "lucide-react";
 import { useTheme, THEME_OPTIONS } from "../hooks/useTheme";
 import { BrandLogo } from "./ui/BrandLogo";
@@ -17,6 +18,14 @@ interface HeaderProps {
   workspace?: WorkspaceContext;
   onWorkspaceChange?: (next: WorkspaceContext) => void;
   brands?: Brand[];
+  // Chuông thông báo (migration 0083). App giữ state qua useNotifications và quyết định bấm vào
+  // thì nhảy tab nào — Header chỉ vẽ. Không truyền là không hiện chuông (màn chưa đăng nhập).
+  notifications?: {
+    items: AppNotification[];
+    unreadCount: number;
+    onMarkRead: (ids?: string[]) => void;
+    onOpen: (n: AppNotification) => void;
+  };
 }
 
 const WorkspaceSwitcher: React.FC<{
@@ -128,7 +137,8 @@ export const Header: React.FC<HeaderProps> = ({
   onSignOut,
   workspace,
   onWorkspaceChange,
-  brands = []
+  brands = [],
+  notifications
 }) => {
   return (
     <header className="h-16 border-b border-[var(--border)]/80 px-6 flex items-center justify-between bg-[var(--surface)]/40 backdrop-blur-md sticky top-0 z-40 text-[var(--text)] gap-4">
@@ -148,6 +158,8 @@ export const Header: React.FC<HeaderProps> = ({
             {currentRole} {activeUserTitle ? `• ${activeUserTitle}` : ""}
           </span>
         </div>
+
+        {notifications && <NotificationBell {...notifications} />}
 
         <ThemeSwitcher />
 

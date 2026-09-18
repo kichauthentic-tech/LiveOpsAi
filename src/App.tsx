@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, WorkflowRule, Talent, Studio, Equipment, Brand, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, TalentRateHistoryEntry, BrandPlatformRateHistoryEntry, BrandSku, PromoScheme } from "./types";
+import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, WorkflowRule, Talent, Studio, Equipment, Brand, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, TalentRateHistoryEntry, BrandPlatformRateHistoryEntry, BrandSku, PromoScheme, AppNotification } from "./types";
 import { ALL_PERMISSION_DEFINITIONS } from "./data/mockData";
 import { fetchTalents, updateTalent, updateMyTalentProfile, deleteTalent } from "./lib/db/talents";
 import { fetchStudios, createStudio, updateStudio, deleteStudio } from "./lib/db/studios";
@@ -66,6 +66,7 @@ import { ResetPasswordScreen } from "./components/ResetPasswordScreen";
 import { AccountSettings } from "./components/AccountSettings";
 import { MyTalentProfile } from "./components/MyTalentProfile";
 import { useAuth } from "./hooks/useAuth";
+import { useNotifications } from "./hooks/useNotifications";
 import { LiveSessionHub } from "./components/LiveSessionHub";
 import { LiveCalendar } from "./components/LiveCalendar";
 import { TalentMatcher, NewTalentAccountPayload } from "./components/TalentMatcher";
@@ -118,6 +119,10 @@ export default function App() {
   const { session, profile, profileError, loading: authLoading, signOut, passwordRecovery, refreshProfile } = useAuth();
 
   const currentRole: UserRole = profile?.role ?? "talent";
+
+  // Chuông thông báo (migration 0083) — chỉ poll khi đã có profile; đổi user thì hook tự nạp lại
+  // vì RLS lọc theo auth.uid() của phiên hiện tại.
+  const notifications = useNotifications(!!profile);
   // "sessions" chỉ là fallback cho lần đầu mở app khi chưa biết role (localStorage rỗng);
   // role thật được set lại ngay bằng getDefaultTabForRole() khi profile load xong (bên dưới).
   const [activeTab, setActiveTab] = useState<string>(() => loadStorage("activeTab", "sessions"));
@@ -1457,6 +1462,15 @@ export default function App() {
   const navGroups = effectiveWorkspace.type === "brand" ? BRAND_NAV_GROUPS : AGENCY_NAV_GROUPS;
   const navItems = navGroups.flatMap((g) => g.items);
 
+  // Mọi loại thông báo hiện có đều là về MỘT CA của chính người nhận (xếp/rút/đổi giờ/huỷ/đối
+  // soát) — màn "Đăng Ký & Chốt Lịch" là nơi talent thấy ca của mình và nộp/xem report, nên
+  // nhảy về đó. Talent luôn ở Agency Workspace (không có switcher), nên không cần đổi workspace.
+  const handleOpenNotification = (n: AppNotification) => {
+    void notifications.markRead([n.id]);
+    setActiveTab("shift_scheduling");
+    setMobileMenuOpen(false);
+  };
+
   const handleWorkspaceChange = (next: WorkspaceContext) => {
     setWorkspace(next);
     const nextGroups = next.type === "brand" ? BRAND_NAV_GROUPS : AGENCY_NAV_GROUPS;
@@ -1726,6 +1740,12 @@ export default function App() {
                   : undefined
               }
               brands={activeBrands}
+              notifications={{
+                items: notifications.items,
+                unreadCount: notifications.unreadCount,
+                onMarkRead: notifications.markRead,
+                onOpen: handleOpenNotification
+              }}
             />
           </div>
         </div>
