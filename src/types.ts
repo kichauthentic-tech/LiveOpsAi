@@ -69,8 +69,13 @@ export interface Brand {
 export interface Talent {
   id: string;
   name: string;
+  // Tên ngắn ops đặt để hiện ở ô lịch/lưới (0087) — agency có nhiều người trùng 2 từ cuối họ tên
+  // ("Kim Vân" ×3). Rỗng thì UI tự cắt 2 từ cuối như trước. Xem lib/talentName.ts.
+  nickname?: string;
   avatar: string;
-  role: "Host" | "KOC" | "KOL" | "MC";
+  // Chỉ là nhãn phân loại hồ sơ, KHÔNG chặn gì: ai cũng chọn được vào ô host lẫn ô trợ live của
+  // từng ca. KOC/KOL/MC là nhãn demo cũ, giữ trong union để không vỡ dòng cũ, UI không đưa ra nữa.
+  role: "Host" | "Assistant" | "KOC" | "KOL" | "MC";
   gender: string;
   niches: string[];
   avgGmvPerSession: number;

@@ -8,6 +8,7 @@ import {
   diffAssignments, currentAssignment, DraftAssignments, prevMonthOf, LONG_ROOM_MINUTES
 } from "../../lib/backfill/roomsToSessions";
 import { vnParts } from "../../lib/dataraw/liveAnalysisRows";
+import { talentOptionLabel } from "../../lib/talentName";
 
 // Nạp bù ca từ file Creator-Live-Performance (migration 0086) — 2 bước, nằm ngay dưới ô import
 // của tab "Creator Live Performance" trong Dữ Liệu Gốc:
@@ -231,12 +232,12 @@ export const BackfillFromRooms: React.FC<Props> = ({ brandId, brandName, months,
                 </select>
                 <select value={toolHost} onChange={(e) => setToolHost(e.target.value)} className={`${selectCls} !w-auto`}>
                   <option value="">Host: giữ nguyên</option>
-                  {hostOptions.map((t) => <option key={t.id} value={t.id}>Host: {t.name}</option>)}
+                  {hostOptions.map((t) => <option key={t.id} value={t.id}>Host: {talentOptionLabel(t)}</option>)}
                 </select>
                 <select value={toolCoHost} onChange={(e) => setToolCoHost(e.target.value)} className={`${selectCls} !w-auto`}>
                   <option value="">Trợ: giữ nguyên</option>
                   <option value="__none__">Trợ: không có</option>
-                  {hostOptions.map((t) => <option key={t.id} value={t.id}>Trợ: {t.name}</option>)}
+                  {hostOptions.map((t) => <option key={t.id} value={t.id}>Trợ: {talentOptionLabel(t)}</option>)}
                 </select>
                 <label className="flex items-center gap-1 text-[var(--text-muted)]">
                   <input type="checkbox" checked={toolOnlyEmpty} onChange={(e) => setToolOnlyEmpty(e.target.checked)} /> chỉ ô trống
@@ -321,11 +322,11 @@ export const BackfillFromRooms: React.FC<Props> = ({ brandId, brandName, months,
                             <div className="space-y-1">
                               <select value={a.hostId} onChange={(e) => setCell(s.id, { hostId: e.target.value })} className={`${selectCls} ${!a.hostId ? "border-rose-300 dark:border-rose-800" : ""}`}>
                                 <option value="">— Host —</option>
-                                {hostOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                {hostOptions.map((t) => <option key={t.id} value={t.id}>{talentOptionLabel(t)}</option>)}
                               </select>
                               <select value={a.coHostId} onChange={(e) => setCell(s.id, { coHostId: e.target.value })} className={selectCls}>
                                 <option value="">— Trợ live —</option>
-                                {hostOptions.filter((t) => t.id !== a.hostId).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                {hostOptions.filter((t) => t.id !== a.hostId).map((t) => <option key={t.id} value={t.id}>{talentOptionLabel(t)}</option>)}
                               </select>
                             </div>
                           </td>

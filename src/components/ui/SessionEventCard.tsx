@@ -1,6 +1,7 @@
 import React from "react";
 import { Building2, GripVertical, LucideIcon, Mic, ShoppingBag, Users } from "lucide-react";
-import { Brand, LiveSession, ShiftSlot } from "../../types";
+import { Brand, LiveSession, ShiftSlot, Talent } from "../../types";
+import { talentShortName } from "../../lib/talentName";
 import { BrandTheme, brandGradient } from "../../lib/brandTheme";
 import { BrandLogo } from "./BrandLogo";
 
@@ -218,18 +219,19 @@ export const SESSION_STATUS_LABEL: Record<LiveSession["status"], string | undefi
   Cancelled: "HUỶ"
 };
 
-// Rút tên còn "họ cuối + tên" cho vừa chip mà vẫn nhận ra người (Nguyễn Thị Mai Anh → Mai Anh).
-const shortName = (full: string): string => full.trim().split(/\s+/).slice(-2).join(" ");
+// Tên trên chip: nickname ops đặt (0087) nếu tra được talent, không thì cắt 2 từ cuối họ tên
+// (Nguyễn Thị Mai Anh → Mai Anh) — xem lib/talentName.ts.
+type TalentLookup = (id: string | undefined) => Pick<Talent, "name" | "nickname"> | undefined;
 
 /** Thứ tự chip = thứ tự ưu tiên khi ô lịch hẹp (size "sm" chỉ hiện `metaLimit` chip đầu).
  * Target GMV KHÔNG nằm trong danh sách này — nó có badge riêng ở góc phải hàng brand (xem prop
  * `targetGmv` của SessionEventCard, đổ trực tiếp từ `s.targetGmv` ở call-site).
  * Actual GMV (kết quả) cũng không thuộc đây — đó là số của lịch báo cáo hiệu suất, không phải lịch vận hành. */
-export const buildSessionMeta = (s: LiveSession): SessionCardMeta[] => {
+export const buildSessionMeta = (s: LiveSession, lookup?: TalentLookup): SessionCardMeta[] => {
   const meta: SessionCardMeta[] = [];
   if (s.platform) meta.push({ icon: ShoppingBag, label: s.platform, title: `Nền tảng: ${s.platform}` });
-  if (s.hostName) meta.push({ icon: Mic, label: shortName(s.hostName), title: `Host: ${s.hostName}` });
-  if (s.coHostName) meta.push({ icon: Users, label: shortName(s.coHostName), title: `Trợ (Co-Host): ${s.coHostName}` });
+  if (s.hostName) meta.push({ icon: Mic, label: talentShortName(lookup?.(s.hostId), s.hostName), title: `Host: ${s.hostName}` });
+  if (s.coHostName) meta.push({ icon: Users, label: talentShortName(lookup?.(s.coHostId), s.coHostName), title: `Trợ (Co-Host): ${s.coHostName}` });
   return meta;
 };
 

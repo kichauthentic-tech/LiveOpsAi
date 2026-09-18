@@ -38,7 +38,7 @@ export interface NewUserPayload {
   newTalentProfile?: {
     name: string;
     phone: string;
-    role: "Host" | "KOC" | "KOL" | "MC";
+    role: Talent["role"];
     gender: string;
     niches: string[];
   };
@@ -108,7 +108,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
   // bằng dữ liệu talent thật nên không cần giữ đường link hồ sơ cũ).
   const [newTalentForm, setNewTalentForm] = useState<{
     phone: string;
-    role: "Host" | "KOC" | "KOL" | "MC";
+    role: Talent["role"];
     gender: string;
     niches: string;
   }>({ phone: "", role: "Host", gender: "Nữ", niches: "" });
@@ -525,7 +525,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                       {roleKey === "ceo" && "Truy cập toàn quyền điều hành agency, P&L tài chính, CRM & phân quyền system."}
                       {roleKey === "operations" && "Điều phối phòng studio, xếp lịch ca live, kiểm kê gear QR & duyệt script."}
                       {roleKey === "brand" && "Cổng báo cáo dành cho Khách hàng: xem GMV thực thu, ROI, order analytics."}
-                      {roleKey === "talent" && "Cổng dành cho Host/KOC: xem lịch livestream, commission dự kiến & AI coaching."}
+                      {roleKey === "talent" && "Cổng dành cho Host / Trợ live: xem lịch livestream, commission dự kiến & AI coaching."}
                       {roleKey === "moderator" && "Cổng dành cho Trợ Lý/Moderator: chỉ xem lịch ca được gán & checklist gear."}
                     </p>
                   </div>
@@ -1015,9 +1015,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                           className="px-3 py-2 bg-[var(--surface-base)] rounded-xl border border-[var(--border)] text-[var(--text)] focus:outline-none focus:border-amber-500"
                         >
                           <option value="Host">Host</option>
-                          <option value="KOC">KOC</option>
-                          <option value="KOL">KOL</option>
-                          <option value="MC">MC</option>
+<option value="Assistant">Trợ live (Assistant)</option>
                         </select>
                         <select
                           value={newTalentForm.gender}

@@ -740,6 +740,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   };
 
   const brandById = new Map<string, Brand>(brands.map((b) => [b.id, b]));
+  const talentLookup = (id: string | undefined) => (id ? talents.find((t) => t.id === id) : undefined);
   // Session/ShiftSlot lưu sẵn `brandName`; tra theo tên để lấy logo cho các chỗ chỉ có tên (chú giải).
   const brandByName = new Map<string, Brand>(brands.map((b) => [b.name, b]));
 
@@ -1000,7 +1001,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
           onChange={(e) => setSelectedHostFilter(e.target.value)}
           className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-2 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
         >
-          <option value="ALL">Tất cả Host / KOC ({talents.length})</option>
+          <option value="ALL">Tất cả talent ({talents.length})</option>
           {talents.map((t) => (
             <option key={t.id} value={t.id}>{t.name} ({t.role})</option>
           ))}
@@ -1166,7 +1167,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                         brandName={ds.brandName}
                         startTime={ds.startTime}
                         endTime={ds.endTime}
-                        meta={buildSessionMeta(ds)}
+                        meta={buildSessionMeta(ds, talentLookup)}
                         targetGmv={ds.targetGmv}
                         metaLimit={4}
                         tone={SESSION_TONE[ds.status]}
@@ -1335,7 +1336,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                         startTime={ds.startTime}
                         endTime={ds.endTime}
                         title={ds.title}
-                        meta={buildSessionMeta(ds)}
+                        meta={buildSessionMeta(ds, talentLookup)}
                         targetGmv={ds.targetGmv}
                         size="md"
                         tone={SESSION_TONE[ds.status]}
@@ -1484,7 +1485,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                               startTime={matchedSession.startTime}
                         endTime={matchedSession.endTime}
                               title={matchedSession.title}
-                              meta={buildSessionMeta(matchedSession)}
+                              meta={buildSessionMeta(matchedSession, talentLookup)}
                               targetGmv={matchedSession.targetGmv}
                               size="md"
                               tone={SESSION_TONE[matchedSession.status]}
@@ -1548,7 +1549,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
           <div className="border-b border-[var(--border)] pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
               <h3 className="font-bold text-[var(--text)] text-base flex items-center gap-2">
-                <User className="w-5 h-5 text-[var(--accent-text)] shrink-0" /> Tải Làm Việc Host & KOC - Ngày {selectedDate}
+                <User className="w-5 h-5 text-[var(--accent-text)] shrink-0" /> Tải Làm Việc Host - Ngày {selectedDate}
               </h3>
               <p className="text-xs text-[var(--text-muted)]">Tổng thời lượng live trong ngày</p>
             </div>

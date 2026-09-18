@@ -7,7 +7,7 @@ export interface NewTalentAccountPayload {
   name: string;
   email: string;
   phone: string;
-  role: "Host" | "KOC" | "KOL" | "MC";
+  role: Talent["role"];
   gender: string;
   niches: string[];
   avatar: string;
@@ -67,10 +67,11 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
 
   // Form State
   const [formName, setFormName] = useState("");
+  const [formNickname, setFormNickname] = useState("");
   const [formEmail, setFormEmail] = useState("");
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
   const [createAccountError, setCreateAccountError] = useState<string | null>(null);
-  const [formRole, setFormRole] = useState<"Host" | "KOC" | "KOL" | "MC">("Host");
+  const [formRole, setFormRole] = useState<Talent["role"]>("Host");
   const [formGender, setFormGender] = useState("Nữ");
   const [formNiches, setFormNiches] = useState("Mỹ phẩm, Skincare");
   const [formGmv, setFormGmv] = useState(150000000);
@@ -92,6 +93,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
     setEditingTalent(null);
     setCreateAccountError(null);
     setFormName("");
+    setFormNickname("");
     setFormEmail("");
     setFormRole("Host");
     setFormGender("Nữ");
@@ -112,6 +114,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
   const openEditModal = (t: Talent) => {
     setEditingTalent(t);
     setFormName(t.name);
+    setFormNickname(t.nickname ?? "");
     setFormRole(t.role || "Host");
     setFormGender(t.gender || "Nữ");
     const nicheArr = t.niches || (t as any).niche || [];
@@ -138,6 +141,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
 
     const basePayload: Omit<Talent, "id" | "ratePerSession" | "ratePerHour" | "commissionRate"> = {
       name: formName,
+      nickname: formNickname.trim(),
       avatar: formAvatar,
       role: formRole,
       gender: formGender,
@@ -332,7 +336,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
             <h3 className="font-bold text-[var(--text)] text-base">
               Danh Sách Đội Ngũ Talent & Host Agency ({filteredTalents.length}/{talents.length} Talent)
             </h3>
-            <p className="text-xs text-[var(--text-muted)]">Quản lý danh sách Host/KOC, theo dõi doanh thu TB và cập nhật thông tin</p>
+            <p className="text-xs text-[var(--text-muted)]">Quản lý danh sách Host / Trợ live, theo dõi doanh thu TB và cập nhật thông tin</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
@@ -356,9 +360,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
             >
               <option value="All">Tất cả vai trò</option>
               <option value="Host">Host</option>
-              <option value="KOC">KOC</option>
-              <option value="KOL">KOL</option>
-              <option value="MC">MC</option>
+<option value="Assistant">Trợ live (Assistant)</option>
             </select>
 
             {/* Add New Talent Button — tạo mới giờ kèm tạo account thật nên chỉ ceo/admin */}
@@ -394,9 +396,12 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                     <img src={avatar} alt={t.name} className="w-12 h-12 rounded-full object-cover border-2 border-[var(--accent)] shadow-sm shrink-0" />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 whitespace-nowrap">
-                        <h4 className="font-bold text-[var(--text)] text-xs truncate">{t.name}</h4>
+                        <h4 className="font-bold text-[var(--text)] text-xs truncate">
+                          {t.name}
+                          {t.nickname && <span className="font-normal text-[var(--text-muted)]"> · {t.nickname}</span>}
+                        </h4>
                         <span className="bg-[var(--accent)]/50 text-[var(--accent-text)] text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0">
-                          {t.role || "Host"}
+                          {t.role === "Assistant" ? "Trợ live" : t.role || "Host"}
                         </span>
                       </div>
                       <p className="text-[10px] text-[var(--accent-text)] font-medium truncate">{nicheStr}</p>
@@ -480,7 +485,17 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                     required
                     value={formName}
                     onChange={(e) => setFormName(e.target.value)}
-                    placeholder="VD: Nguyễn Văn A (A Live)"
+                    placeholder="VD: Nguyễn Thị Kim Vân"
+                    className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)] focus:ring-2 focus:ring-[var(--accent)]"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-[var(--text-muted)] block mb-1">Tên ngắn trên lịch</label>
+                  <input
+                    type="text"
+                    value={formNickname}
+                    onChange={(e) => setFormNickname(e.target.value)}
+                    placeholder="VD: Vân Kim — để trống thì lấy 2 từ cuối"
                     className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)] focus:ring-2 focus:ring-[var(--accent)]"
                   />
                 </div>
@@ -525,9 +540,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                     className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
                   >
                     <option value="Host">Host</option>
-                    <option value="KOC">KOC</option>
-                    <option value="KOL">KOL</option>
-                    <option value="MC">MC</option>
+<option value="Assistant">Trợ live (Assistant)</option>
                   </select>
                 </div>
                 <div>

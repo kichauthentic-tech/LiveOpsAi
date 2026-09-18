@@ -151,6 +151,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
     for (const t of talents) map[t.id] = t;
     return map;
   }, [talents]);
+  const talentLookup = (id: string | undefined) => (id ? talentById[id] : undefined);
   const [y, m] = month.split("-").map(Number);
   const firstDay = new Date(y, m - 1, 1);
   const daysInMonth = new Date(y, m, 0).getDate();
@@ -243,7 +244,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
             brandName={s.brandName || brandName}
             startTime={s.startTime}
             endTime={s.endTime}
-            meta={buildSessionMeta({ ...s, hostName: talentById[s.hostId]?.name ?? s.hostName, studioName: studioById[s.studioId]?.name ?? s.studioName })}
+            meta={buildSessionMeta({ ...s, hostName: talentById[s.hostId]?.name ?? s.hostName, studioName: studioById[s.studioId]?.name ?? s.studioName }, talentLookup)}
             targetGmv={s.targetGmv}
             metaLimit={4}
             tone={SESSION_TONE[s.status]}
@@ -545,7 +546,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
                           ...s,
                           hostName: talentById[s.hostId]?.name ?? s.hostName,
                           studioName: studioById[s.studioId]?.name ?? s.studioName
-                        })}
+                        }, talentLookup)}
                         targetGmv={s.targetGmv}
                         size="md"
                         tone={SESSION_TONE[s.status]}

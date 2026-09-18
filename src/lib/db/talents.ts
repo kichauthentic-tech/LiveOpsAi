@@ -4,6 +4,7 @@ import { Talent } from "../../types";
 interface DbTalent {
   id: string;
   name: string;
+  nickname: string | null;
   avatar: string;
   role: Talent["role"];
   gender: string;
@@ -29,6 +30,7 @@ function fromDb(row: DbTalent): Talent {
   return {
     id: row.id,
     name: row.name,
+    nickname: row.nickname ?? "",
     avatar: row.avatar,
     role: row.role,
     gender: row.gender,
@@ -52,6 +54,7 @@ function fromDb(row: DbTalent): Talent {
 function toDb(t: Partial<Talent>) {
   const patch: Record<string, unknown> = {};
   if (t.name !== undefined) patch.name = t.name;
+  if (t.nickname !== undefined) patch.nickname = t.nickname;
   if (t.avatar !== undefined) patch.avatar = t.avatar;
   if (t.role !== undefined) patch.role = t.role;
   if (t.gender !== undefined) patch.gender = t.gender;

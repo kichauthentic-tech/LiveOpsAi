@@ -1,5 +1,5 @@
 import { supabase } from "../supabaseClient";
-import { PermissionKey, SystemUser, UserRole } from "../../types";
+import { PermissionKey, SystemUser, UserRole, Talent } from "../../types";
 
 interface DbProfile {
   id: string;
@@ -64,7 +64,7 @@ export async function updateUserProfile(u: SystemUser): Promise<SystemUser> {
 export interface NewTalentProfilePayload {
   name: string;
   phone: string;
-  role: "Host" | "KOC" | "KOL" | "MC";
+  role: Talent["role"];
   gender: string;
   niches: string[];
   avatar?: string;

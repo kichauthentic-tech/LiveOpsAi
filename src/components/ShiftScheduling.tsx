@@ -29,6 +29,7 @@ import {
   TrendingUp,
   Layers
 } from "lucide-react";
+import { talentShortName } from "../lib/talentName";
 import { CAMPAIGN_DAY_STYLES, getCampaignDayInfo } from "../lib/campaignDays";
 import { timeRangesOverlap } from "../lib/dateUtils";
 import { CampaignDayRibbon } from "./ui/CampaignDayRibbon";
@@ -366,8 +367,9 @@ export default function ShiftScheduling({
     [schedulingGaps]
   );
 
+  // Tên ngắn (nickname 0087, không có thì 2 từ cuối) — ma trận tháng chật, cần phân biệt người trùng tên.
   const talentNameById = useMemo(
-    () => new Map(talents.map((t) => [t.id, t.name])),
+    () => new Map(talents.map((t) => [t.id, talentShortName(t)])),
     [talents]
   );
 
