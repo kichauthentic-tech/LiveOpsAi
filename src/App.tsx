@@ -117,10 +117,14 @@ function saveStorage<T>(key: string, value: T): void {
 // talent vừa đăng nhập đã đập ngay vào màn "Quyền Truy Cập Bị Hạn Chế" (bắt được khi verify chuông
 // thông báo bằng tài khoản talent thật, 2026-09-18). Về "shift_scheduling" — màn duy nhất talent
 // thật sự làm việc, và cũng là nơi mọi thông báo trỏ tới.
+//
+// ceo/admin/operations về "Đăng Ký & Chốt Lịch" (audit Module 2, 2026-09-18): vòng việc hằng ngày
+// của ops — mở ca, chốt, cam kết còn thiếu bao nhiêu giờ, up snapshot, report — đều nằm ở đó.
+// "Live Sessions" (Livestream Session Hub) là màn chi tiết từng phiên thời demo, mở app ra thấy
+// một dropdown và trạng thái trống không nói gì về việc hôm nay phải làm.
 function getDefaultTabForRole(role: UserRole): string {
   if (role === "brand") return "brand_calendar";
-  if (role === "talent") return "shift_scheduling";
-  return "sessions";
+  return "shift_scheduling";
 }
 
 export default function App() {
@@ -131,9 +135,9 @@ export default function App() {
   // Chuông thông báo (migration 0083) — chỉ poll khi đã có profile; đổi user thì hook tự nạp lại
   // vì RLS lọc theo auth.uid() của phiên hiện tại.
   const notifications = useNotifications(!!profile);
-  // "sessions" chỉ là fallback cho lần đầu mở app khi chưa biết role (localStorage rỗng);
+  // "shift_scheduling" chỉ là fallback cho lần đầu mở app khi chưa biết role (localStorage rỗng);
   // role thật được set lại ngay bằng getDefaultTabForRole() khi profile load xong (bên dưới).
-  const [activeTab, setActiveTab] = useState<string>(() => loadStorage("activeTab", "sessions"));
+  const [activeTab, setActiveTab] = useState<string>(() => loadStorage("activeTab", "shift_scheduling"));
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   // Thu gọn sidebar thành thanh icon (w-16) để nhường không gian ngang cho calendar.
   // Chỉ áp dụng từ breakpoint md trở lên — dưới md sidebar vẫn là drawer trượt như cũ.
@@ -796,10 +800,18 @@ export default function App() {
       return activeUser.assignedBrandId ? { type: "brand", brandId: activeUser.assignedBrandId } : { type: "agency" };
     }
     if (currentRole === "ceo" || currentRole === "admin" || currentRole === "operations") {
+      // Audit Module 2 (2026-09-18): `workspace` sống trong localStorage, brand thì có thể đã bị
+      // xoá — trước đây Header hiện chữ "Brand" trống, sidebar vẫn là Brand Workspace với dữ liệu
+      // rỗng và không có cách nào thoát ngoài mở switcher. Brand đã nạp xong mà không có id đó
+      // thì về Agency. Chỉ xét sau khi brands nạp xong, nếu không lần mở đầu (brands = []) sẽ
+      // luôn văng về Agency dù workspace hợp lệ.
+      if (workspace.type === "brand" && !phase1Loading && !brands.some((b) => b.id === workspace.brandId)) {
+        return { type: "agency" };
+      }
       return workspace;
     }
     return { type: "agency" };
-  }, [currentRole, workspace, activeUser.assignedBrandId]);
+  }, [currentRole, workspace, activeUser.assignedBrandId, phase1Loading, brands]);
   const currentBrandId = effectiveWorkspace.type === "brand" ? effectiveWorkspace.brandId : undefined;
 
   // Helper to check permission for a specific key under current role/user
@@ -1382,6 +1394,9 @@ export default function App() {
     }
   };
 
+  // Badge trên nav: chỉ còn "DEMO" (đánh dấu module mock, thật sự cần biết trước khi bấm). Các
+  // badge LIVE/SMART/NEW/CUSTOM/ADMIN đã bỏ (audit Module 2, 2026-09-18) — "NEW" trên tab đã có
+  // nhiều tháng, "SMART"/"LIVE" không mang thông tin; badge nào cũng có thì không badge nào được đọc.
   // Navigation Items mapped to permission keys, grouped theo luồng công việc — đây là
   // nhóm cho Agency Workspace (nhìn xuyên mọi Brand). Xem BRAND_NAV_GROUPS bên dưới cho
   // Brand Workspace (Giai đoạn A, WORKSPACE_DESIGN.md).
@@ -1389,12 +1404,12 @@ export default function App() {
     {
       label: "Vận Hành Live",
       items: [
-        { id: "sessions", label: "Live Sessions", icon: Radio, badge: "LIVE", perm: "manage_sessions" as PermissionKey },
-        { id: "calendar", label: "Lịch Vận Hành", icon: CalendarIcon, badge: "SMART", perm: "manage_calendar" as PermissionKey },
+        { id: "sessions", label: "Live Sessions", icon: Radio, perm: "manage_sessions" as PermissionKey },
+        { id: "calendar", label: "Lịch Vận Hành", icon: CalendarIcon, perm: "manage_calendar" as PermissionKey },
         // Đăng ký & Chốt Lịch Host — luôn hiện với mọi role, không gate theo PermissionKey: role
         // talent cần thấy tab này để tự đăng ký ca (Giai đoạn 14a); màn hình bên trong tự đổi giao
         // diện theo currentRole (talent = đăng ký, ceo/operations/admin = mở ca + chốt lịch).
-        { id: "shift_scheduling", label: "Đăng Ký & Chốt Lịch", icon: CalendarClock, badge: "NEW", perm: undefined },
+        { id: "shift_scheduling", label: "Đăng Ký & Chốt Lịch", icon: CalendarClock, perm: undefined },
         // Đối soát đặt ngay cạnh Live Sessions/lịch thay vì nhét trong tab "TikTok API" như luồng
         // đối soát cũ — đúng chỗ ops đang làm việc, không phải nhảy sang module khác (điểm nghẽn
         // #2 của audit module Vận Hành Live).
@@ -1441,13 +1456,13 @@ export default function App() {
       label: "Hệ Thống",
       items: [
         { id: "ai_agents", label: "Hội Đồng AI & Simulator", icon: Bot, badge: "DEMO", perm: "manage_ai_agents" as PermissionKey },
-        { id: "user_settings", label: "Phân Quyền & Role", icon: ShieldCheck, badge: "CUSTOM", perm: "manage_users_permissions" as PermissionKey },
+        { id: "user_settings", label: "Phân Quyền & Role", icon: ShieldCheck, perm: "manage_users_permissions" as PermissionKey },
         // Tài khoản cá nhân đã dời vào User Card cuối sidebar (bấm vào card để mở), không
         // còn là 1 mục nav riêng — tránh trùng lặp lối vào.
         // Độc quyền Admin — không dùng PermissionKey/Ma Trận Role để gate (không thể cấp
         // qua Ma Trận cho role khác, kể cả ceo), chỉ hiện khi currentRole === "admin".
         ...(currentRole === "admin"
-          ? [{ id: "ai_training", label: "AI Training Center", icon: BrainCircuit, badge: "ADMIN", perm: undefined }]
+          ? [{ id: "ai_training", label: "AI Training Center", icon: BrainCircuit, perm: undefined }]
           : []),
       ],
     },
@@ -1476,11 +1491,11 @@ export default function App() {
       items: [
         { id: "brand_calendar", label: "Lịch Vận Hành", icon: CalendarIcon, perm: undefined },
         { id: "brand_sessions", label: "Sessions", icon: Radio, perm: undefined },
-        { id: "brand_skus", label: "SKU Showcase", icon: Package, badge: "NEW", perm: undefined },
-        { id: "brand_monthly_report", label: "Report Tháng", icon: FileText, badge: "NEW", perm: undefined },
+        { id: "brand_skus", label: "SKU Showcase", icon: Package, perm: undefined },
+        { id: "brand_monthly_report", label: "Report Tháng", icon: FileText, perm: undefined },
         ...(currentRole === "brand"
           ? []
-          : [{ id: "brand_dataraw", label: "Dữ Liệu Gốc", icon: Database, badge: "NEW", perm: undefined }]),
+          : [{ id: "brand_dataraw", label: "Dữ Liệu Gốc", icon: Database, perm: undefined }]),
       ],
     },
   ];
@@ -1654,7 +1669,7 @@ export default function App() {
                             className={`w-4 h-4 shrink-0 ${isActive ? "text-[var(--accent-text)]" : "text-[var(--text-muted)]"}`}
                           />
                           {/* Thu gọn: badge NEW co lại thành chấm nhỏ trên icon cho khỏi mất tín hiệu. */}
-                          {sidebarCollapsed && item.badge && (
+                          {sidebarCollapsed && "badge" in item && item.badge && (
                             <span className="hidden md:block absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-rose-500" />
                           )}
                         </div>
@@ -1662,8 +1677,8 @@ export default function App() {
                       </div>
 
                       <div className={`flex items-center gap-1.5 shrink-0 ${sidebarCollapsed ? "md:hidden" : ""}`}>
-                        {item.badge && (
-                          <span className="bg-rose-600/20 text-rose-400 border border-rose-500/30 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase animate-pulse">
+                        {"badge" in item && item.badge && (
+                          <span className="bg-rose-600/20 text-rose-400 border border-rose-500/30 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase">
                             {item.badge}
                           </span>
                         )}
@@ -1758,7 +1773,7 @@ export default function App() {
               // cứng vào effectiveWorkspace của họ (không truyền props này xuống thì Header
               // tự ẩn switcher, xem Header.tsx).
               workspace={
-                currentRole === "ceo" || currentRole === "admin" || currentRole === "operations" ? workspace : undefined
+                currentRole === "ceo" || currentRole === "admin" || currentRole === "operations" ? effectiveWorkspace : undefined
               }
               onWorkspaceChange={
                 currentRole === "ceo" || currentRole === "admin" || currentRole === "operations"

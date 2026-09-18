@@ -93,7 +93,7 @@ Bảng/hàm: `session_live_snapshots` + `session_live_snapshot_rows`, RPC `apply
 
 Mục tiêu: app hiện đúng chức năng nhưng chưa tiện lợi cho vận hành thật — rà từng cụm module (theo nhóm nav), audit hiện trạng bằng đọc code thật, tìm điểm nghẽn, rồi sửa dần. Không đợi tái cấu trúc data ở trên xong mới làm — 2 việc độc lập.
 
-**Module 1 — Vận Hành Live (đăng ký ca → chốt lịch → report ca → đối soát): đã audit, chưa fix.**
+**Module 1 — Vận Hành Live (đăng ký ca → chốt lịch → report ca → đối soát): đã audit và fix xong cả 4 điểm nghẽn (2026-09-17 → 18).**
 
 Luồng thật: talent bấm "Tôi rảnh ca này" ([ShiftScheduling.tsx](src/components/ShiftScheduling.tsx)) → ops chọn Host/Co-host, bấm "Chốt Lịch" (`handleFinalizeShiftSlot`, `src/App.tsx:1256-1316`) → talent nhập [SessionReportForm.tsx](src/components/SessionReportForm.tsx) tay 100% → ops đối soát ở [TikTokLiveReconciliation.tsx](src/components/TikTokLiveReconciliation.tsx) (nhúng trong tab "TikTok API").
 
@@ -242,4 +242,21 @@ Verify trên Supabase thật với 3 ca ZZZ (manual/snapshot/reconciled): Financ
 
    **Verify:** 16 unit test (chia theo giờ trong khung, ca huỷ = 0, khung trống dồn sang tháng, override camp thắng %, brand không kế hoạch giữ số cũ). Supabase thật: kế hoạch 1 tỷ (40/20/25/15) + 6 ca ZZZ tháng 09 ⇒ Lịch Vận Hành brand hiện đúng 133,3M / 266,7M (daily 2h/4h) / 200M (D-Day) / 250M (Mid) / 150M (Pay), ca huỷ không số; Report Tháng Tab 01 "Target GMV (Lịch Vận Hành)" = **1 tỷ đ**. Đã dọn.
 
-**Module tiếp theo (chưa audit):** (2) Điều hướng/UI tổng thể toàn app. Audit xong module nào thì cập nhật đúng mục này, không tạo file riêng.
+**Module 2 — Điều hướng/UI tổng thể: đã audit 2026-09-18.** Cách audit: đọc `AGENCY_NAV_GROUPS`/`BRAND_NAV_GROUPS`/Header, rồi đăng nhập admin bấm qua 14 tab agency (0 lỗi console, không tab nào Access Denied), đăng nhập talent và brand-workspace xem landing.
+
+Đã fix (không cần migration):
+
+- **Landing của ceo/admin/operations đổi từ "Live Sessions" sang "Đăng Ký & Chốt Lịch"** (`getDefaultTabForRole`). Live Sessions Hub là màn chi tiết từng phiên thời demo (dropdown chọn phiên, chart theo phút, checklist) — mở app ra thấy một dropdown và trạng thái trống, không nói gì về việc hôm nay phải làm; vòng việc hằng ngày của ops (mở ca, chốt, cam kết còn thiếu, snapshot, report) nằm hết ở Đăng Ký & Chốt Lịch.
+- **Workspace trỏ vào brand đã bị xoá** (state sống ở localStorage): Header hiện chữ "Brand" trống, sidebar là Brand Workspace rỗng, không có lối thoát ngoài mở switcher. `effectiveWorkspace` giờ về Agency khi brands đã nạp xong mà không có id đó (phải chờ `phase1Loading` xong, không thì lần mở đầu luôn văng về Agency). Kèm sửa Header nhận `effectiveWorkspace` thay vì `workspace` thô — trước đó nội dung đã về Agency mà nhãn switcher vẫn "Brand".
+- **Bỏ badge LIVE/SMART/NEW/CUSTOM/ADMIN trên nav** (8 chỗ), bỏ `animate-pulse`. Chỉ giữ "DEMO" — đánh dấu module mock, thật sự cần biết trước khi bấm. "NEW" trên tab đã có nhiều tháng; badge nào cũng có thì không badge nào được đọc.
+- **`<title>` vẫn là "My Google AI Studio App"** từ template, `lang="en"`, không favicon — tab trình duyệt của một hệ thống vận hành thật mang tên template. Đổi "LiveOps AI", `lang="vi"`, favicon SVG inline.
+- `.claude/launch.json`: dev server chuyển sang cổng **3100** (`PORT=3100`) — máy dev có app khác (Next.js "YFB Live Agency OS") chiếm cổng 3000 qua IPv6, `localhost:3000` trỏ nhầm sang nó.
+
+**Đề xuất chưa làm — cần user quyết:**
+
+1. **Hai module đối soát song song.** "Đối Soát Số Liệu" (mới, 0080, nhóm Vận Hành Live) và `TikTokLiveReconciliation` cũ vẫn nằm trong tab "TikTok API → CSV Import". Hai lối vào cho cùng một việc với hai cơ chế khác nhau; cảnh báo cũ trong Report Tháng từng trỏ nhầm vào bản cũ (đã sửa ở Module 3). Đề xuất gỡ bản cũ khỏi TikTok API (xoá `TikTokLiveReconciliation.tsx` + `lib/db/tiktokReconciliation.ts` nếu không còn ai import) — cần xác nhận bản mới đã phủ đủ nghiệp vụ bản cũ trước khi xoá.
+2. **"Hội Đồng AI & Simulator" (DEMO)** vẫn trong nav mọi người có `manage_ai_agents`. Giữ hay ẩn tới khi có thật?
+3. **Tiêu đề trang dài kiểu demo** ("Hệ Thống Quản Lý Talent & Khớp Nối Host Thông Minh", kicker "Modules 11 & 12: Finance, Unit Economics & HR"...) — nên rút về đúng tên tab. Thuần cosmetic, nhiều file, làm khi rảnh.
+4. Header user block: "ADMIN • QUẢN TRỊ VIÊN HỆ THỐNG (ADMIN)" — role lặp 2 lần vì `custom_role_title` đã chứa "(Admin)". Sửa dữ liệu profile hoặc bỏ phần role in hoa.
+
+**Vòng audit UX/workflow theo module (3 module) đã đi hết một lượt.** Việc tiếp theo không còn nằm trong lộ trình audit này — chọn theo 4 đề xuất trên hoặc theo nhu cầu vận hành thật (dữ liệu thật vẫn chưa chạy qua hệ thống: `live_sessions` = 0).

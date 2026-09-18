@@ -4,9 +4,15 @@
     {
       "name": "liveops-dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
-      "port": 3000,
-      "autoPort": true
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "port": 3100,
+      "autoPort": true,
+      "env": {
+        "PORT": "3100"
+      }
     }
   ]
 }
