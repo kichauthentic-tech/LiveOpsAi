@@ -34,7 +34,7 @@ Ground truth luôn là `AGENCY_NAV_GROUPS`/`BRAND_NAV_GROUPS` ở [src/App.tsx](
 
 ## Hạ tầng Supabase
 
-- Migration mới nhất: **0082** — ⚠️ **chưa chạy trên Supabase thật**, đang chờ user dán vào SQL Editor. 0081 trở về trước đã chạy. Quy trình chạy: user tự dán vào Supabase SQL Editor (không có `DATABASE_URL`/Supabase CLI cấu hình trong máy dev).
+- Migration mới nhất: **0082** (đã chạy trên Supabase thật 2026-09-18, verify bằng gọi RPC thẳng từ app: `can_edit_session_snapshot` tồn tại, `recompute_session_from_snapshot` trả `42501 permission denied` kể cả với admin). Quy trình chạy: user tự dán vào Supabase SQL Editor (không có `DATABASE_URL`/Supabase CLI cấu hình trong máy dev).
 - **Chạy thử cả chuỗi migration trước khi giao cho user**: có sẵn cách dựng 1 Postgres 18 cô lập trên máy + schema `auth` giả (`auth.users`, `auth.uid()` đọc từ GUC `test.uid` để giả lập "ai đang đăng nhập"), rồi `psql -f` lần lượt 0001→mới nhất. Hai cái bẫy của cách này: (a) `initdb --locale=C` và phải có `LANG=C LC_ALL=C` trong môi trường `pg_ctl`, kèm `-c unix_socket_directories=` cho đường dẫn socket khỏi quá dài; (b) nếu `drop schema public` rồi `create schema public` bằng tay thì **mất grant mặc định** — thiếu `grant usage on schema public to authenticated` là mọi lời gọi hàm báo `function ... does not exist` (không phải `permission denied`), rất dễ đuổi nhầm hướng.
 - Project Supabase này **không còn chia sẻ với app nào khác** (đã dọn 15 bảng CRM/outreach không liên quan ngày 2026-09-07, xem migration 0076 nếu cần đối chiếu).
 - RLS: mọi bảng có `brand_id` trực tiếp đã cô lập theo brand ở tầng đọc (không chỉ tầng UI) — công thức chuẩn `current_user_role() is distinct from 'brand' or brand_id = current_user_brand_id()`.
@@ -166,7 +166,7 @@ Luồng thật: talent bấm "Tôi rảnh ca này" ([ShiftScheduling.tsx](src/co
    - **Kế hoạch lập MỘT LẦN lúc mở panel**, không tính lại theo `sessions` đang đổi: mỗi ca chốt xong là `App` nạp lại sessions, tính lại giữa chừng sẽ xoá sạch phần ops vừa sửa tay.
    - **Chạy tuần tự, không `Promise.all`** — mỗi lần chốt ghi DB rồi `App` nạp lại state; bắn song song sẽ đua nhau và ops không biết ca nào hỏng. Hỏng một phần thì liệt kê đúng ca hỏng, ca đó vẫn để mở.
 
-7. **Vá lỗ phân quyền 7 RPC `security definer`** — migration `0082_rpc_role_guards.sql`, **chưa chạy trên Supabase thật**. Đây không phải tính năng mới mà là lỗ hổng phát hiện khi chuẩn bị làm mục notification.
+7. **Vá lỗ phân quyền 7 RPC `security definer`** — migration `0082_rpc_role_guards.sql`, **đã chạy trên Supabase thật 2026-09-18**. Đây không phải tính năng mới mà là lỗ hổng phát hiện khi chuẩn bị làm mục notification.
 
    **Lỗ hổng:** `apply_session_live_snapshot`, `delete_session_live_snapshot`, `recompute_session_from_snapshot` (0078), `import_live_reconciliation`, `set_reconciliation_bucket`, `apply_live_reconciliation` (0080) và `generate_contract_commitments` (0081) đều là `security definer` nhưng **không hàm nào kiểm tra quyền người gọi**. Hàm definer chạy dưới quyền owner nên bỏ qua RLS — policy "chỉ ceo/admin/operations" trên các bảng đối soát chỉ chặn đường PostgREST đọc/ghi thẳng, gọi RPC là đi vòng qua hết. Hệ quả: bất kỳ tài khoản talent/brand nào (thậm chí chưa có `profiles`) cũng gọi được `import_live_reconciliation` + `apply_live_reconciliation` với số bịa và **ghi đè `actual_gmv`/`total_orders`/`live_duration_minutes` của bất kỳ ca nào** — đúng những con số P&L và lương talent đọc vào. Ẩn tab ở UI không chặn được gì.
 
