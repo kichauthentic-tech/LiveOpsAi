@@ -95,6 +95,19 @@ export interface MonthlyReportManualInput {
   campPaydayTargetGmv?: number;
 }
 
+// Mọi dòng report (RLS tự cắt theo brand cho role brand) — App dùng để phân bổ target xuống từng
+// ca (lib/performance/targetAllocation.ts). Khoá map là "brandId|YYYY-MM".
+export async function fetchAllMonthlyReports(): Promise<Map<string, BrandMonthlyReport>> {
+  const { data, error } = await supabase.from("brand_monthly_reports").select("*");
+  if (error) throw error;
+  const out = new Map<string, BrandMonthlyReport>();
+  for (const row of (data as DbMonthlyReport[]) ?? []) {
+    const r = reportFromDb(row);
+    out.set(`${r.brandId}|${r.periodMonth.slice(0, 7)}`, r);
+  }
+  return out;
+}
+
 // periodMonth: "YYYY-MM-01". Lấy report hiện có nếu đã tạo, không tự tạo mới — UI gọi
 // upsertMonthlyReport() khi ops lưu nháp lần đầu.
 export async function fetchMonthlyReport(brandId: string, periodMonth: string): Promise<BrandMonthlyReport | null> {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, WorkflowRule, Talent, Studio, Equipment, Brand, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, TalentRateHistoryEntry, BrandPlatformRateHistoryEntry, BrandSku, PromoScheme, AppNotification } from "./types";
+import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, WorkflowRule, Talent, Studio, Equipment, Brand, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, TalentRateHistoryEntry, BrandPlatformRateHistoryEntry, BrandSku, PromoScheme, AppNotification, BrandMonthlyReport as BrandMonthlyReportRow } from "./types";
 import { ALL_PERMISSION_DEFINITIONS } from "./data/mockData";
 import { fetchTalents, updateTalent, updateMyTalentProfile, deleteTalent } from "./lib/db/talents";
 import { fetchStudios, createStudio, updateStudio, deleteStudio } from "./lib/db/studios";
@@ -27,7 +27,8 @@ import { fetchTalentRateHistory } from "./lib/db/talentRateHistory";
 import { fetchBrandPlatformRateHistory } from "./lib/db/brandPlatformRateHistory";
 import { fetchBrandSkus, createBrandSku, updateBrandSku, deleteBrandSku } from "./lib/db/brandSkus";
 import { fetchPromoSchemes, createPromoScheme, updatePromoScheme, deletePromoScheme } from "./lib/db/promoSchemes";
-import { computeRealAvgGmvPerSession } from "./lib/metrics/avgGmv";
+import { applyAllocatedTargets } from "./lib/performance/targetAllocation";
+import { fetchAllMonthlyReports } from "./lib/db/monthlyReports";
 import {
   Radio,
   FileText,
@@ -226,7 +227,21 @@ export default function App() {
   const [phase1Error, setPhase1Error] = useState<string | null>(null);
 
   // Live Sessions — real data from Supabase (Phase 2), no mock fallback
-  const [sessions, setSessions] = useState<LiveSession[]>([]);
+  const [rawSessions, setSessions] = useState<LiveSession[]>([]);
+  // Target GMV từng ca phân bổ TỪ TRÊN XUỐNG theo kế hoạch tháng của brand (user chốt 2026-09-18,
+  // xem lib/performance/targetAllocation.ts) — ghi đè `targetGmv` lưu trong DB (vốn là GMV trung
+  // bình của host, sai bản chất) ở đúng MỘT chỗ này, mọi màn hình bên dưới nhận `sessions` đã
+  // đúng. Tháng/brand chưa có kế hoạch thì giữ số DB.
+  const [monthlyReports, setMonthlyReports] = useState<Map<string, BrandMonthlyReportRow>>(new Map());
+  const sessions = useMemo(() => applyAllocatedTargets(rawSessions, monthlyReports), [rawSessions, monthlyReports]);
+  // Kế hoạch tháng được sửa ở Report Tháng (Tab 05) mà App không nhận callback — nạp lại mỗi khi
+  // đổi tab là đủ, bảng nhỏ và target chỉ cần đúng khi người dùng nhìn sang màn khác.
+  useEffect(() => {
+    if (!session) return;
+    fetchAllMonthlyReports().then(setMonthlyReports).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
   const [selectedSession, setSelectedSession] = useState<LiveSession | null>(null);
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [sessionsError, setSessionsError] = useState<string | null>(null);
@@ -299,6 +314,7 @@ export default function App() {
     if (!session) return;
     let cancelled = false;
     setSessionsLoading(true);
+    fetchAllMonthlyReports().then((m) => { if (!cancelled) setMonthlyReports(m); }).catch(() => {});
     fetchSessions()
       .then((s) => {
         if (cancelled) return;
@@ -1304,7 +1320,10 @@ export default function App() {
       // brand tính theo giờ thì hiện ra đúng doanh thu agency chứ không phải GMV. Dùng GMV trung
       // bình/phiên TÍNH THẬT từ live_sessions của host (Bước 1 tái cấu trúc data — không còn dùng
       // talents.avgGmvPerSession, số nhập tay không đáng tin, xem src/lib/metrics/avgGmv.ts).
-      targetGmv: computeRealAvgGmvPerSession(sessions, hostId),
+      // Target không còn gán theo host lúc chốt (user chốt 2026-09-18): ghi 0, App phân bổ từ kế
+      // hoạch tháng của brand xuống từng ca lúc đọc (applyAllocatedTargets). Tháng chưa có kế
+      // hoạch thì ca đơn giản là chưa có target — không bịa số từ phong độ cũ của host.
+      targetGmv: 0,
       actualGmv: 0,
       totalOrders: 0,
       avgWatchTimeSeconds: 0,

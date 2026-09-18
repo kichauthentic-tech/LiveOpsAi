@@ -223,14 +223,23 @@ Lý do audit ngay sau Module 1: 4 phase vừa rồi đổi nguồn số của ca
 
 Verify trên Supabase thật với 3 ca ZZZ (manual/snapshot/reconciled): Finance hiện đúng 3 badge + dòng tóm tắt "1 đã đối soát, 1 số lúc giao ca, 1 talent tự khai"; Tab 02 Report Tháng hiện host với 4h (1h kế hoạch + 2×1.5h live thật), 1,5 triệu/giờ, CTR 2% — đúng quy tắc `hostPerformance.ts`; banner Report Tháng tách "1 phiên tự khai, 1 phiên có số lúc giao ca". Đã dọn sạch.
 
-**Đã chốt với user 2026-09-18:**
+**Đã chốt với user 2026-09-18 (cả 4 câu):**
 
 1. **Trợ live CÓ được trả công.** `computeSessionPnl` giờ tính `coHostPayout` theo rate card của **chính trợ live** (`talent_rate_history` tại ngày ca, rơi về `talents`), cùng công thức với host: giờ tính lương của ca × rate/giờ nếu có, không thì rate/phiên, cộng % GMV theo `commission_rate` của họ nếu có đặt. Không có override tay ở Finance cho trợ live. Ca có `co_host_id` nhưng hồ sơ talent đã xoá thì Finance hiện dòng đỏ "chưa tính công" chứ không im lặng ra 0. Unit test: 4h ca + OT 30p, host 200k/h + 2% GMV, trợ 300k/phiên, brand hourly 1tr/h ⇒ gross 4.000.000 (không cộng OT), host 1.100.000, trợ 300.000, net 2.600.000.
 2. **OT là agency chịu** — hành vi hiện tại đúng, giữ nguyên, đã ghi comment ở `billableSessionHours` để không ai "sửa cho khớp".
 
-**2 câu còn chờ (user chưa hiểu câu hỏi, cần giải thích lại bằng ví dụ — xem lịch sử chat 2026-09-18):**
+3 + 4. **Target GMV phân bổ TỪ TRÊN XUỐNG theo kế hoạch tháng, ca huỷ không mang target** (user chốt 2026-09-18). Module thuần [targetAllocation.ts](src/lib/performance/targetAllocation.ts), nối vào App ở đúng MỘT chỗ: `sessions` = `applyAllocatedTargets(rawSessions, monthlyReports)` — mọi màn hình bên dưới (2 calendar, LiveSessionHub, Report Tháng) nhận `targetGmv` đã đúng mà không phải sửa gì. **Không cần migration.**
 
-3. **"Target GMV" trong Report Tháng.** `targetGmv` của mỗi ca được gán lúc chốt lịch = GMV trung bình quá khứ của chính host đó (`computeRealAvgGmvPerSession`). Biểu đồ "Target vs Thực đạt" ở Tab 01 vì thế so brand với quá khứ của host, không phải với kế hoạch brand giao.
-4. **Tổng target cộng cả ca đã Huỷ** (`scheduledTargetGmv` cố ý không lọc status theo comment cũ để khớp GmvCalendar — đã xoá).
+   **Mô hình** (đã có sẵn ở Tab 05 "Kế Hoạch Tháng Sau", chỉ chưa nối xuống từng ca): tháng X có 1 tổng target (dòng `brand_monthly_reports` tháng X−1: `plan_target_gmv` + `plan_pct_*` chia 4 khung Daily/D-Day/Mid-Month/Pay-Day; % gợi ý từ lịch sử Dataraw, ops sửa được). Target riêng từng camp của dòng tháng X (`camp_*_target_gmv`) nếu ops đã điền thì **thắng** % kế hoạch. Khung camp lấy override tháng X, fallback khung cố định `campaignDays.ts`. Target mỗi khung chia cho các ca **chưa huỷ** trong khung theo **giờ ca kế hoạch**.
+
+   **Quy ước của tầng này:**
+
+   - **Ca huỷ không mang target; target khung tự dồn sang ca còn lại trong khung** — ca bù agency xếp thêm tự gánh phần đó. **Khung không còn ca nào thì target khung dồn sang mọi ca còn lại của tháng** — tổng target tháng là cam kết với brand, không được bốc hơi.
+   - **Lúc chốt lịch ghi `targetGmv = 0`**, không còn gán GMV trung bình của host (`computeRealAvgGmvPerSession` vẫn dùng ở Hồ Sơ Talent, chỉ bỏ ở finalize). Tháng/brand chưa có kế hoạch thì giữ số đang có trong DB (số cũ/ops gõ tay) — không xoá thứ chưa thay được, nhưng ca mới chốt sẽ là 0 = "chưa có target", không bịa.
+   - `resolveCampBucketType`/`CampOverrides`/`CAMP_DAY_BUCKET_*` chuyển từ `dataraw/creatorLivePerfMetrics.ts` sang `campaignDays.ts` (re-export giữ import cũ) — module thuần phải chạy được trong unit test không có `import.meta.env`, kéo `supabaseClient` qua chuỗi import là hỏng.
+   - App nạp lại `brand_monthly_reports` mỗi khi đổi tab (Tab 05 lưu kế hoạch không có callback lên App; bảng nhỏ).
+   - Tổng "Target GMV (Lịch Vận Hành)" ở Tab 01 Report Tháng lọc `status !== 'Cancelled'` — khi có kế hoạch, tổng này = đúng tổng kế hoạch tháng.
+
+   **Verify:** 16 unit test (chia theo giờ trong khung, ca huỷ = 0, khung trống dồn sang tháng, override camp thắng %, brand không kế hoạch giữ số cũ). Supabase thật: kế hoạch 1 tỷ (40/20/25/15) + 6 ca ZZZ tháng 09 ⇒ Lịch Vận Hành brand hiện đúng 133,3M / 266,7M (daily 2h/4h) / 200M (D-Day) / 250M (Mid) / 150M (Pay), ca huỷ không số; Report Tháng Tab 01 "Target GMV (Lịch Vận Hành)" = **1 tỷ đ**. Đã dọn.
 
 **Module tiếp theo (chưa audit):** (2) Điều hướng/UI tổng thể toàn app. Audit xong module nào thì cập nhật đúng mục này, không tạo file riêng.

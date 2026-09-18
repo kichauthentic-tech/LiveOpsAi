@@ -735,15 +735,17 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, m
   const hostChartData = useMemo(() => hostPerformance.map((h) => ({ label: h.hostName, gmvHour: h.gmvPerHour ?? 0 })), [hostPerformance]);
   const totalGmvCur = useMemo(() => completedInPeriod.reduce((sum, s) => sum + (s.actualGmv || 0), 0), [completedInPeriod]);
 
-  // Target GMV/NMV (Tab 01 Tổng Quan) — trước đây là KPI loại B nhập tay riêng ("brand giao"),
-  // nay đổi theo yêu cầu user: tự tính từ Lịch Vận Hành, tổng targetGmv của mọi session trong kỳ
-  // (không lọc status, khớp đúng cách GmvCalendar.tsx/lib/gmvMetrics.ts tính "target" của lịch) —
-  // để 2 nơi trong app luôn hiện cùng 1 con số target, không còn nhập tay lệch nhau.
+  // Target GMV/NMV (Tab 01 Tổng Quan) = tổng targetGmv của các ca CHƯA HUỶ trong kỳ. Từ 2026-09-18
+  // `targetGmv` của ca là số App đã phân bổ từ kế hoạch tháng (Tab 05) xuống từng ca — xem
+  // lib/performance/targetAllocation.ts — nên tổng này = đúng tổng kế hoạch tháng khi có kế hoạch.
+  // Ca huỷ không mang target (user chốt): agency bù bằng ca khác, target tự dồn sang ca đó.
   const scheduledTargetGmv = (s: string, e: string) =>
-    sessions.filter((x) => x.brandId === brandId && x.date >= s && x.date <= e).reduce((sum, x) => sum + (x.targetGmv || 0), 0);
+    sessions
+      .filter((x) => x.brandId === brandId && x.date >= s && x.date <= e && x.status !== "Cancelled")
+      .reduce((sum, x) => sum + (x.targetGmv || 0), 0);
   const scheduledTargetNmv = (s: string, e: string) =>
     sessions
-      .filter((x) => x.brandId === brandId && x.date >= s && x.date <= e)
+      .filter((x) => x.brandId === brandId && x.date >= s && x.date <= e && x.status !== "Cancelled")
       .reduce((sum, x) => {
         const rate = brandPlatformRates.find((r) => r.brandId === brandId && r.platform === x.platform)?.returnRate ?? 0;
         return sum + (x.targetGmv || 0) * (1 - rate / 100);

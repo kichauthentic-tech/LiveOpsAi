@@ -105,3 +105,36 @@ export const CAMPAIGN_DAY_STYLES: Record<
     glow: "shadow-violet-500/40"
   }
 };
+
+export type CampDayBucket = CampaignDayType | "daily";
+export const CAMP_DAY_BUCKET_ORDER: CampDayBucket[] = ["dday", "midmonth", "payday", "daily"];
+export const CAMP_DAY_BUCKET_LABEL: Record<CampDayBucket, string> = {
+  dday: "D-Day (double-day)",
+  midmonth: "Mid-Month (13-15)",
+  payday: "Pay-Day (23-25)",
+  daily: "Daily (ngày thường)"
+};
+
+// Chuyển từ dataraw/creatorLivePerfMetrics.ts (2026-09-18) để lib/performance/targetAllocation.ts
+// import được mà không kéo theo supabaseClient — module thuần phải chạy trong unit test không có
+// import.meta.env.
+// Khung camp Report Tháng có thể bị ghi đè theo brand+tháng (migration 0071, loại B) — override
+// giữ nguyên type "dday"/"midmonth"/"payday" nhưng đổi khoảng ngày; không đụng đến
+// lib/campaignDays.ts (dùng chung cho Calendar/Ribbon toàn hệ thống). Không có override thì fallback
+// về getCampaignDayInfo (khung cố định mặc định) như trước.
+export interface CampRangeOverride {
+  start: string; // "YYYY-MM-DD"
+  end: string;
+}
+export type CampOverrides = Partial<Record<CampaignDayType, CampRangeOverride>>;
+
+export function resolveCampBucketType(dateStr: string, overrides?: CampOverrides): CampDayBucket {
+  if (overrides) {
+    for (const type of ["dday", "midmonth", "payday"] as CampaignDayType[]) {
+      const range = overrides[type];
+      if (range?.start && range?.end && dateStr >= range.start && dateStr <= range.end) return type;
+    }
+  }
+  return getCampaignDayInfo(dateStr)?.type ?? "daily";
+}
+

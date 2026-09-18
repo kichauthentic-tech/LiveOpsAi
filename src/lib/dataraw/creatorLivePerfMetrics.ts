@@ -1,5 +1,4 @@
 import { CreatorLivePerfRow, vnDateOf } from "./creatorLivePerfSlice";
-import { getCampaignDayInfo, CampaignDayType } from "../campaignDays";
 
 // Report Tháng Tab 02 — lớp tính toán thuần JS trên nguồn Creator-Live-Performance (thay
 // live_analysis). Không nhóm theo host (không có cột tên host trong file) — chỉ tổng hợp theo
@@ -79,34 +78,12 @@ export function aggregateCreatorLivePerfRows(rows: CreatorLivePerfRow[]): Creato
   };
 }
 
-export type CampDayBucket = CampaignDayType | "daily";
-export const CAMP_DAY_BUCKET_ORDER: CampDayBucket[] = ["dday", "midmonth", "payday", "daily"];
-export const CAMP_DAY_BUCKET_LABEL: Record<CampDayBucket, string> = {
-  dday: "D-Day (double-day)",
-  midmonth: "Mid-Month (13-15)",
-  payday: "Pay-Day (23-25)",
-  daily: "Daily (ngày thường)"
-};
-
-// Khung camp Report Tháng có thể bị ghi đè theo brand+tháng (migration 0071, loại B) — override
-// giữ nguyên type "dday"/"midmonth"/"payday" nhưng đổi khoảng ngày; không đụng đến
-// lib/campaignDays.ts (dùng chung cho Calendar/Ribbon toàn hệ thống). Không có override thì fallback
-// về getCampaignDayInfo (khung cố định mặc định) như trước.
-export interface CampRangeOverride {
-  start: string; // "YYYY-MM-DD"
-  end: string;
-}
-export type CampOverrides = Partial<Record<CampaignDayType, CampRangeOverride>>;
-
-function resolveCampBucketType(dateStr: string, overrides?: CampOverrides): CampDayBucket {
-  if (overrides) {
-    for (const type of ["dday", "midmonth", "payday"] as CampaignDayType[]) {
-      const range = overrides[type];
-      if (range?.start && range?.end && dateStr >= range.start && dateStr <= range.end) return type;
-    }
-  }
-  return getCampaignDayInfo(dateStr)?.type ?? "daily";
-}
+// CampDayBucket / CampOverrides / resolveCampBucketType đã chuyển sang lib/campaignDays.ts (thuần,
+// không kéo supabaseClient) để lib/performance/targetAllocation.ts dùng chung — re-export để các
+// import cũ không đổi.
+export { CAMP_DAY_BUCKET_ORDER, CAMP_DAY_BUCKET_LABEL, resolveCampBucketType } from "../campaignDays";
+export type { CampDayBucket, CampRangeOverride, CampOverrides } from "../campaignDays";
+import { CampDayBucket, CampOverrides, resolveCampBucketType } from "../campaignDays";
 
 export function bucketByCampaignDay(rows: CreatorLivePerfRow[], overrides?: CampOverrides): Record<CampDayBucket, CreatorLivePerfRow[]> {
   const out: Record<CampDayBucket, CreatorLivePerfRow[]> = { dday: [], midmonth: [], payday: [], daily: [] };
