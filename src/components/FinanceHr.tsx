@@ -104,7 +104,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
         (acc, r) => ({
           gmv: acc.gmv + r.session.actualGmv,
           grossAgencyRev: acc.grossAgencyRev + r.grossAgencyRev,
-          hostPayout: acc.hostPayout + r.hostPayout,
+          hostPayout: acc.hostPayout + r.hostPayout + r.coHostPayout,
           netProfit: acc.netProfit + r.netProfit
         }),
         { gmv: 0, grossAgencyRev: 0, hostPayout: 0, netProfit: 0 }
@@ -198,13 +198,13 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                   <th className="py-2 pr-3">Doanh Thu Agency</th>
                   <th className="py-2 pr-3">Chi Phí Studio</th>
                   <th className="py-2 pr-3">Chi Phí Ads (điều chỉnh — để 0 nếu dùng số trợ live báo cáo)</th>
-                  <th className="py-2 pr-3">Trả Host</th>
+                  <th className="py-2 pr-3">Trả Host / Trợ Live</th>
                   <th className="py-2 pr-3">Net Profit</th>
                   <th className="py-2 pr-3">Duyệt</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map(({ session: s, finance, talent, isHourly, grossAgencyRev, hostPayout, netProfit, hostPaidHourly, billableHours, otMinutes, earlyLeaveMinutes }) => {
+                {rows.map(({ session: s, finance, talent, isHourly, grossAgencyRev, hostPayout, netProfit, hostPaidHourly, billableHours, otMinutes, earlyLeaveMinutes, coHost, coHostPayout, coHostPaidHourly }) => {
                   return (
                   <tr key={s.id} className="border-b border-[var(--border)]/60 align-middle">
                     <td className="py-2 pr-3">
@@ -270,6 +270,17 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                           {earlyLeaveMinutes > 0 && <span className="text-amber-400 font-bold"> · off sớm −{earlyLeaveMinutes}p</span>}
                         </div>
                       )}
+                      {/* Trợ live có công (user chốt 2026-09-18) — hiện tách dòng để ops thấy Net
+                          Profit trừ những ai. Ca có co_host_id nhưng talent đã bị xoá thì không
+                          tính được, phải nói ra chứ không im lặng ra 0. */}
+                      {coHost ? (
+                        <div className="text-[10px] text-amber-300/80 mt-1">
+                          Trợ live {coHost.name}: <b>{money(coHostPayout)} đ</b>
+                          {coHostPaidHourly && <span className="text-[var(--text-muted)]"> ({billableHours.toFixed(2)}h × rate/giờ)</span>}
+                        </div>
+                      ) : s.coHostId ? (
+                        <div className="text-[10px] text-red-300 mt-1">Trợ live {s.coHostName || "—"} không còn hồ sơ talent — chưa tính công</div>
+                      ) : null}
                     </td>
                     <td className={`py-2 pr-3 font-black ${netProfit >= 0 ? "text-emerald-400" : "text-red-400"}`}>
                       {money(netProfit)} đ

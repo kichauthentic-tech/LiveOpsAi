@@ -223,11 +223,14 @@ Lý do audit ngay sau Module 1: 4 phase vừa rồi đổi nguồn số của ca
 
 Verify trên Supabase thật với 3 ca ZZZ (manual/snapshot/reconciled): Finance hiện đúng 3 badge + dòng tóm tắt "1 đã đối soát, 1 số lúc giao ca, 1 talent tự khai"; Tab 02 Report Tháng hiện host với 4h (1h kế hoạch + 2×1.5h live thật), 1,5 triệu/giờ, CTR 2% — đúng quy tắc `hostPerformance.ts`; banner Report Tháng tách "1 phiên tự khai, 1 phiên có số lúc giao ca". Đã dọn sạch.
 
-**4 câu nghiệp vụ chờ user chốt — KHÔNG tự quyết** (mỗi câu đổi con số tiền):
+**Đã chốt với user 2026-09-18:**
 
-1. **Trợ live (co-host) có được trả công không?** `computeSessionPnl` chỉ tính `hostPayout` cho `host_id`; `co_host_id` không xuất hiện ở đâu trong P&L. Nếu trợ live có lương thì Net Profit đang bị thổi phồng đúng bằng khoản đó.
-2. **OT của host có tính vào brand không?** Brand hourly bị tính đúng giờ kế hoạch (`sessionDurationHours`), host được trả giờ kế hoạch + OT − off sớm. Tức OT là agency chịu. Đúng ý hay sót?
-3. **"Target GMV" trong Report Tháng nghĩa là gì?** `targetGmv` của mỗi ca được gán lúc chốt lịch = GMV trung bình lịch sử của chính host đó (`computeRealAvgGmvPerSession`). Nên "Target vs Thực đạt" ở Tab 01 đang so brand với **trung bình quá khứ của host**, không phải với kế hoạch brand giao. Có nên đưa cho brand xem con số này không?
-4. **Tổng target cộng cả ca đã Huỷ** (`scheduledTargetGmv` cố ý không lọc status, theo comment cũ để khớp GmvCalendar — mà GmvCalendar đã xoá). Ca huỷ có nên vẫn kéo target lên không?
+1. **Trợ live CÓ được trả công.** `computeSessionPnl` giờ tính `coHostPayout` theo rate card của **chính trợ live** (`talent_rate_history` tại ngày ca, rơi về `talents`), cùng công thức với host: giờ tính lương của ca × rate/giờ nếu có, không thì rate/phiên, cộng % GMV theo `commission_rate` của họ nếu có đặt. Không có override tay ở Finance cho trợ live. Ca có `co_host_id` nhưng hồ sơ talent đã xoá thì Finance hiện dòng đỏ "chưa tính công" chứ không im lặng ra 0. Unit test: 4h ca + OT 30p, host 200k/h + 2% GMV, trợ 300k/phiên, brand hourly 1tr/h ⇒ gross 4.000.000 (không cộng OT), host 1.100.000, trợ 300.000, net 2.600.000.
+2. **OT là agency chịu** — hành vi hiện tại đúng, giữ nguyên, đã ghi comment ở `billableSessionHours` để không ai "sửa cho khớp".
+
+**2 câu còn chờ (user chưa hiểu câu hỏi, cần giải thích lại bằng ví dụ — xem lịch sử chat 2026-09-18):**
+
+3. **"Target GMV" trong Report Tháng.** `targetGmv` của mỗi ca được gán lúc chốt lịch = GMV trung bình quá khứ của chính host đó (`computeRealAvgGmvPerSession`). Biểu đồ "Target vs Thực đạt" ở Tab 01 vì thế so brand với quá khứ của host, không phải với kế hoạch brand giao.
+4. **Tổng target cộng cả ca đã Huỷ** (`scheduledTargetGmv` cố ý không lọc status theo comment cũ để khớp GmvCalendar — đã xoá).
 
 **Module tiếp theo (chưa audit):** (2) Điều hướng/UI tổng thể toàn app. Audit xong module nào thì cập nhật đúng mục này, không tạo file riêng.

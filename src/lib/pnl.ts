@@ -70,11 +70,23 @@ export interface SessionPnl {
   billableHours: number;
   otMinutes: number;
   earlyLeaveMinutes: number;
+  // Audit Module 3 (2026-09-18, user chốt): TRỢ LIVE CÓ ĐƯỢC TRẢ CÔNG. Trước đó P&L chỉ trả cho
+  // host_id, co_host_id không xuất hiện ở đâu — Net Profit bị thổi phồng đúng bằng khoản này.
+  // Trợ live trả theo rate card của CHÍNH HỌ (talent_rate_history tại ngày ca, rơi về talents),
+  // cùng công thức với host: giờ × rate/giờ nếu có rate giờ, không thì rate/phiên; cộng % GMV
+  // theo commission_rate của họ nếu có đặt. Không có override tay ở Finance cho trợ live.
+  coHost?: Talent;
+  coHostPayout: number;
+  coHostPaidHourly: boolean;
 }
 
 // Giờ tính lương của 1 phiên = giờ ca theo lịch + OT − off sớm (host tự khai trong report sau
 // phiên, ops duyệt). KHÔNG dùng thời lượng live thật từ TikTok: đối soát Giai đoạn 2 chỉ cảnh
 // báo lệch giờ chứ không ghi đè, theo đúng quyết định đã chốt với user.
+//
+// OT là AGENCY CHỊU (user chốt 2026-09-18): brand hourly vẫn bị tính đúng giờ kế hoạch
+// (`sessionDurationHours` trong computeSessionPnl), chỉ phía trả talent mới cộng OT. Đừng "sửa"
+// cho hai bên khớp nhau.
 export function billableSessionHours(session: LiveSession): number {
   const scheduled = sessionDurationHours(session.startTime, session.endTime);
   const otMinutes = session.report?.otMinutes ?? 0;
@@ -122,13 +134,31 @@ export function computeSessionPnl(
     ? sessionDurationHours(session.startTime, session.endTime) * hourlyRate
     : (estimatedNmv * finance.agencyCommissionRate) / 100;
   const hostPayout = hostFixRate + (session.actualGmv * hostCommRate) / 100;
-  const totalCost = hostPayout + finance.studioCost + getCanonicalAdsCost(session, finance);
+
+  // OT/off sớm khai theo CA (report là của ca, không phải của từng người) nên giờ tính lương của
+  // trợ live = giờ tính lương của host trong cùng ca.
+  const coHost = session.coHostId ? talentById[session.coHostId] : undefined;
+  const coHostRateAtDate = coHost ? findTalentRateAsOf(talentRateHistory, coHost.id, session.date) : undefined;
+  const coHostHourRate = coHostRateAtDate?.ratePerHour ?? coHost?.ratePerHour ?? 0;
+  const coHostPaidHourly = !!coHost && coHostHourRate > 0;
+  const coHostFixRate = coHost
+    ? coHostPaidHourly
+      ? coHostHourRate * billableHours
+      : coHostRateAtDate?.ratePerSession ?? coHost.ratePerSession ?? 0
+    : 0;
+  const coHostCommRate = coHost ? coHostRateAtDate?.commissionRate ?? coHost.commissionRate ?? 0 : 0;
+  const coHostPayout = coHost ? coHostFixRate + (session.actualGmv * coHostCommRate) / 100 : 0;
+
+  const totalCost = hostPayout + coHostPayout + finance.studioCost + getCanonicalAdsCost(session, finance);
   const netProfit = grossAgencyRev - totalCost;
   return {
     session, finance, talent, isHourly, grossAgencyRev, hostPayout, netProfit,
     hostPaidHourly,
     billableHours,
     otMinutes: session.report?.otMinutes ?? 0,
-    earlyLeaveMinutes: session.report?.earlyLeaveMinutes ?? 0
+    earlyLeaveMinutes: session.report?.earlyLeaveMinutes ?? 0,
+    coHost,
+    coHostPayout,
+    coHostPaidHourly
   };
 }
