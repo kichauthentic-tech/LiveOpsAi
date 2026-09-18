@@ -111,8 +111,15 @@ function saveStorage<T>(key: string, value: T): void {
 
 // Tab mặc định khi đăng nhập/đổi user, theo role — module Dashboard đã bị xoá (chờ chốt
 // cấu trúc data raw để build lại), nên không còn tab "dashboard"/"brand_dashboard" nào để về.
+//
+// Talent KHÔNG về "sessions": tab đó gate bằng manage_sessions mà talent không có, nên tài khoản
+// talent vừa đăng nhập đã đập ngay vào màn "Quyền Truy Cập Bị Hạn Chế" (bắt được khi verify chuông
+// thông báo bằng tài khoản talent thật, 2026-09-18). Về "shift_scheduling" — màn duy nhất talent
+// thật sự làm việc, và cũng là nơi mọi thông báo trỏ tới.
 function getDefaultTabForRole(role: UserRole): string {
-  return role === "brand" ? "brand_calendar" : "sessions";
+  if (role === "brand") return "brand_calendar";
+  if (role === "talent") return "shift_scheduling";
+  return "sessions";
 }
 
 export default function App() {
