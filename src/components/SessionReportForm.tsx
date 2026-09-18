@@ -2,11 +2,15 @@ import { useState, FormEvent } from "react";
 import { LiveSession } from "../types";
 import { SessionReportInput } from "../lib/db/sessionReports";
 import { sessionDurationHours } from "../lib/pnl";
+import { DataSourceBadge } from "./common/DataSourceBadge";
 
 interface SessionReportFormProps {
   session: LiveSession;
   onSubmit: (input: SessionReportInput) => Promise<boolean>;
   onCancel: () => void;
+  // ceo/admin/operations: được bật công tắc sửa tay 5 ô số dù ca đã có snapshot/đối soát (hạ bậc
+  // về 'manual' có chủ đích). Talent không có — RPC cũng từ chối (migration 0084), đây chỉ là UI.
+  canOverrideMetrics?: boolean;
 }
 
 const inputClass =
@@ -21,8 +25,17 @@ const MINUTE_PRESETS = [15, 30, 45, 60];
 // nhóm riêng TikTok/Shopee. actualGmv/totalViews/ctrAvg/avgWatchTimeSeconds ghi thẳng vào
 // live_sessions (đã có sẵn từ Giai đoạn B6), phần còn lại vào sidecar live_session_reports
 // (migration 0046). peakViewers/cvrAvg (B6) không thuộc form này — Excel không có 2 chỉ số đó.
-export function SessionReportForm({ session, onSubmit, onCancel }: SessionReportFormProps) {
+export function SessionReportForm({ session, onSubmit, onCancel, canOverrideMetrics = false }: SessionReportFormProps) {
   const r = session.report;
+
+  // Điểm nghẽn #4 (audit Vận Hành Live): "cùng một số gõ hai lần". Từ khi có tầng snapshot
+  // (0078), 5 ô số ghi vào live_sessions đã có nguồn tốt hơn nhập tay — khoá lại khi ca đã có
+  // snapshot/đối soát, talent chỉ còn khai phần máy không biết (OT/off sớm/host trễ/restart/ghi
+  // chú). Gửi lên vẫn đủ 5 số nhưng là số hiện tại của ca ⇒ RPC thấy không đổi, giữ nguyên bậc.
+  const hasBetterSource = session.dataSource === "live_snapshot" || session.dataSource === "tiktok_reconciled";
+  const [overrideMetrics, setOverrideMetrics] = useState(false);
+  const metricsLocked = hasBetterSource && !(canOverrideMetrics && overrideMetrics);
+
   const [actualGmv, setActualGmv] = useState(session.actualGmv || 0);
   const [totalOrders, setTotalOrders] = useState(session.totalOrders || 0);
   const [totalViews, setTotalViews] = useState(session.totalViews || 0);
@@ -39,11 +52,19 @@ export function SessionReportForm({ session, onSubmit, onCancel }: SessionReport
   const [dashboardLink1, setDashboardLink1] = useState(r?.dashboardLink1 || "");
   const [dashboardLink2, setDashboardLink2] = useState(r?.dashboardLink2 || "");
 
-  const [impressionCount, setImpressionCount] = useState(r?.impressionCount ?? 0);
+  // Sidecar TikTok: lần nhập đầu thì điền sẵn từ snapshot nếu có (impression đọc thẳng; CTOR =
+  // đơn/click sản phẩm, AVG.price = GMV/đơn — cùng công thức lib/liveSnapshot/metrics.ts). Vẫn
+  // cho sửa vì đây là cột report, không phải cột đối soát.
+  const snap = hasBetterSource && !r;
+  const [impressionCount, setImpressionCount] = useState(r?.impressionCount ?? (snap ? session.impressions ?? 0 : 0));
   const [adsCost, setAdsCost] = useState(r?.adsCost ?? 0);
   const [enterRoomRate, setEnterRoomRate] = useState(r?.enterRoomRate ?? 0);
-  const [ctor, setCtor] = useState(r?.ctor ?? 0);
-  const [avgOrderValue, setAvgOrderValue] = useState(r?.avgOrderValue ?? 0);
+  const [ctor, setCtor] = useState(
+    r?.ctor ?? (snap && session.productClicks ? Math.round((session.totalOrders / session.productClicks) * 10000) / 100 : 0)
+  );
+  const [avgOrderValue, setAvgOrderValue] = useState(
+    r?.avgOrderValue ?? (snap && session.totalOrders ? Math.round(session.actualGmv / session.totalOrders) : 0)
+  );
 
   const [atcCount, setAtcCount] = useState(r?.atcCount ?? 0);
   const [gpm, setGpm] = useState(r?.gpm ?? 0);
@@ -64,11 +85,13 @@ export function SessionReportForm({ session, onSubmit, onCancel }: SessionReport
     e.preventDefault();
     setSaving(true);
     const ok = await onSubmit({
-      actualGmv,
-      totalOrders,
-      totalViews,
-      ctrAvg,
-      avgWatchTimeSeconds,
+      // Khoá thì gửi đúng số hiện tại của ca (không phải state — state cũng bằng nhưng đừng để
+      // hai nguồn), RPC so thấy không đổi ⇒ giữ nguyên data_source/reconciled_at (0075).
+      actualGmv: metricsLocked ? session.actualGmv : actualGmv,
+      totalOrders: metricsLocked ? session.totalOrders : totalOrders,
+      totalViews: metricsLocked ? session.totalViews : totalViews,
+      ctrAvg: metricsLocked ? session.ctrAvg : ctrAvg,
+      avgWatchTimeSeconds: metricsLocked ? session.avgWatchTimeSeconds : avgWatchTimeSeconds,
       restartCount,
       crossLive,
       hostLate,
@@ -86,16 +109,48 @@ export function SessionReportForm({ session, onSubmit, onCancel }: SessionReport
     if (ok) onCancel();
   };
 
+  const metricClass = metricsLocked ? `${inputClass} opacity-60 cursor-not-allowed` : inputClass;
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      <div
+        className={`flex items-start gap-2.5 rounded-xl border px-3 py-2.5 text-[11px] leading-relaxed ${
+          hasBetterSource
+            ? "border-sky-800/60 bg-sky-950/40 text-sky-200"
+            : "border-amber-800/60 bg-amber-950/40 text-amber-200"
+        }`}
+      >
+        <DataSourceBadge dataSource={session.dataSource} className="mt-0.5 shrink-0" />
+        <div className="flex-1 min-w-0">
+          {hasBetterSource ? (
+            <>
+              GMV / Đơn / View / CTR / AVG.view lấy từ file TikTok{" "}
+              {session.dataSource === "tiktok_reconciled" ? "đã đối soát" : "trợ live up lúc giao ca"} — không nhập tay
+              nữa. Bạn chỉ cần khai phần máy không biết: OT, off sớm, host trễ, restart, ghi chú.
+              {canOverrideMetrics && (
+                <label className="flex items-center gap-1.5 mt-1.5 font-bold cursor-pointer">
+                  <input type="checkbox" checked={overrideMetrics} onChange={(e) => setOverrideMetrics(e.target.checked)} className="w-3.5 h-3.5" />
+                  Sửa tay 5 ô số (hạ bậc về "Tạm Tính")
+                </label>
+              )}
+            </>
+          ) : (
+            <>
+              Ca chưa có file số liệu — số nhập ở đây là tạm tính, sẽ bị đối soát cuối kỳ ghi đè. Có file
+              Creator-Live-Performance thì up ở mục "Số Liệu Thật Của Ca" thay vì gõ.
+            </>
+          )}
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <div>
           <label className={labelClass}>GMV Live (VNĐ)</label>
-          <input type="number" value={actualGmv} onChange={(e) => setActualGmv(Number(e.target.value))} className={inputClass} />
+          <input type="number" value={actualGmv} onChange={(e) => setActualGmv(Number(e.target.value))} className={metricClass} disabled={metricsLocked} />
         </div>
         <div>
           <label className={labelClass}>Đơn Hàng</label>
-          <input type="number" min={0} value={totalOrders} onChange={(e) => setTotalOrders(Math.max(0, Number(e.target.value)))} className={inputClass} />
+          <input type="number" min={0} value={totalOrders} onChange={(e) => setTotalOrders(Math.max(0, Number(e.target.value)))} className={metricClass} disabled={metricsLocked} />
         </div>
         <div>
           <label className={labelClass}>GMV Tổng (VNĐ)</label>
@@ -103,7 +158,7 @@ export function SessionReportForm({ session, onSubmit, onCancel }: SessionReport
         </div>
         <div>
           <label className={labelClass}>View</label>
-          <input type="number" value={totalViews} onChange={(e) => setTotalViews(Number(e.target.value))} className={inputClass} />
+          <input type="number" value={totalViews} onChange={(e) => setTotalViews(Number(e.target.value))} className={metricClass} disabled={metricsLocked} />
         </div>
         <div>
           <label className={labelClass}>AVG.view (giây)</label>
@@ -111,7 +166,8 @@ export function SessionReportForm({ session, onSubmit, onCancel }: SessionReport
             type="number"
             value={avgWatchTimeSeconds}
             onChange={(e) => setAvgWatchTimeSeconds(Number(e.target.value))}
-            className={inputClass}
+            className={metricClass}
+            disabled={metricsLocked}
           />
         </div>
       </div>
@@ -132,7 +188,7 @@ export function SessionReportForm({ session, onSubmit, onCancel }: SessionReport
           </div>
           <div>
             <label className={labelClass}>CTR LIVE (%)</label>
-            <input type="number" step="0.01" value={ctrAvg} onChange={(e) => setCtrAvg(Number(e.target.value))} className={inputClass} />
+            <input type="number" step="0.01" value={ctrAvg} onChange={(e) => setCtrAvg(Number(e.target.value))} className={metricClass} disabled={metricsLocked} />
           </div>
           <div>
             <label className={labelClass}>CTOR (%)</label>
@@ -151,7 +207,7 @@ export function SessionReportForm({ session, onSubmit, onCancel }: SessionReport
           </div>
           <div>
             <label className={labelClass}>CTR (%)</label>
-            <input type="number" step="0.01" value={ctrAvg} onChange={(e) => setCtrAvg(Number(e.target.value))} className={inputClass} />
+            <input type="number" step="0.01" value={ctrAvg} onChange={(e) => setCtrAvg(Number(e.target.value))} className={metricClass} disabled={metricsLocked} />
           </div>
           <div>
             <label className={labelClass}>GPM</label>

@@ -144,6 +144,7 @@ export const BrandSessions: React.FC<BrandSessionsProps> = ({ brandId, sessions,
                   session={session}
                   onSubmit={(input) => onSubmitSessionReport(session.id, input)}
                   onCancel={() => setReportSessionId(null)}
+                  canOverrideMetrics={canEditReport}
                 />
               </div>
             </div>
