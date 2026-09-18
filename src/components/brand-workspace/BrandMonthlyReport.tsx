@@ -155,6 +155,10 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
     () => completedSessions.filter((s) => (s.dataSource ?? "manual") !== "tiktok_reconciled"),
     [completedSessions]
   );
+  // Từ 0078 có bậc giữa: số đọc từ file lúc giao ca — chưa chốt nhưng không còn là "tự nhập".
+  // Gộp chung với ca tự khai thì cảnh báo nói sai về phần lớn ca, ops sẽ học cách bỏ qua nó.
+  const manualOnly = useMemo(() => unreconciledSessions.filter((s) => (s.dataSource ?? "manual") === "manual"), [unreconciledSessions]);
+  const snapshotOnly = unreconciledSessions.length - manualOnly.length;
 
   useEffect(() => {
     let cancelled = false;
@@ -321,8 +325,9 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
             {unreconciledSessions.length} Phiên Live Completed Trong Tháng Chưa Đối Soát Với TikTok
           </div>
           <p className="text-[11px] text-amber-300">
-            Số liệu các phiên này vẫn là tạm tính do talent tự nhập, có thể lệch so với số TikTok chính thức (hoàn/hủy chưa chốt).
-            Đối soát trước khi phát hành report cho khách để tránh sai số — vào tab "TikTok API → Đối Soát Số Liệu TikTok".
+            {manualOnly.length > 0 && `${manualOnly.length} phiên là số talent tự khai, chưa có gì bảo chứng. `}
+            {snapshotOnly > 0 && `${snapshotOnly} phiên đã có số từ file lúc giao ca nhưng TikTok còn cập nhật hoàn/huỷ trễ. `}
+            Đối soát trước khi phát hành report cho khách — vào "Vận Hành Live → Đối Soát Số Liệu".
           </p>
           <div className="flex flex-wrap gap-1.5">
             {unreconciledSessions.slice(0, 12).map((s) => (

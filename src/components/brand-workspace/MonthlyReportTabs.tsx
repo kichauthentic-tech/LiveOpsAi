@@ -42,7 +42,7 @@ import { fetchAffiliateCreatorListMonthSlice } from "../../lib/dataraw/affiliate
 import { fetchMonthlyReport, upsertMonthlyReport, MonthlyReportManualInput } from "../../lib/db/monthlyReports";
 import { fetchAffiliatePlans, replaceAffiliatePlans } from "../../lib/db/affiliatePlans";
 import { fetchAffiliateActuals, replaceAffiliateActuals } from "../../lib/db/affiliateActuals";
-import { sessionDurationHours } from "../../lib/pnl";
+import { byHost, dataQuality, filterSessions, hostKey, DataQuality } from "../../lib/performance/hostPerformance";
 import {
   aggregateCreatorLivePerfRows,
   bucketByCampaignDay,
@@ -688,52 +688,50 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, m
   );
 
   // Host Performance (Tab 02) — Creator-Live-Performance không có tên host nên KHÔNG tính từ
-  // Dataraw như trước; thay vào đó tổng hợp trực tiếp từ session nội bộ (đã biết hostName sẵn).
-  // GMV chính xác nhất khi session đã qua Đối Soát TikTok (data_source='tiktok_reconciled', module
-  // "Đối Soát Số Liệu TikTok" giờ đọc được cả nguồn creator_live_performance, khớp theo ngày+giờ vì
-  // file đó không có tên host) — session chưa đối soát vẫn hiện nhưng dùng số tạm tính, đếm riêng
-  // để cảnh báo minh bạch thay vì im lặng trộn 2 nguồn độ tin cậy khác nhau.
+  // Dataraw; tổng hợp từ session nội bộ (đã biết hostName sẵn).
+  //
+  // Audit Module 3 (2026-09-18): trước đây tab này tự gom bằng một vòng lặp riêng — giờ KẾ HOẠCH,
+  // đếm cả ca GMV = 0, gom theo tên, kèm cột CVR mà không luồng nào ghi — nên brand đọc ra một
+  // GMV/giờ KHÁC với tab "Hiệu Suất Host" của agency về cùng một host. Giờ dùng đúng
+  // lib/performance/hostPerformance.ts (giờ live thật khi có, loại ca không có số, gom theo id rồi
+  // mới tới tên) — hai màn hình không bao giờ được nói hai con số về cùng một người.
   interface HostPerfRow {
+    key: string;
     hostName: string;
     sessionCount: number;
-    reconciledCount: number;
+    quality: DataQuality;
     gmv: number;
     orders: number;
     hours: number;
     gmvPerHour: number | null;
-    ctrAvg: number | null;
-    cvrAvg: number | null;
+    ctr: number | null;
   }
   const hostPerformance = useMemo<HostPerfRow[]>(() => {
-    const tiktokSessions = completedInPeriod.filter((s) => s.platform === "TikTok");
-    const map = new Map<string, LiveSession[]>();
+    const tiktokSessions = filterSessions(
+      completedInPeriod.filter((s) => s.platform === "TikTok"),
+      {}
+    );
+    const byKey = new Map<string, LiveSession[]>();
     for (const s of tiktokSessions) {
-      const key = s.hostName?.trim() || "Không xác định";
-      const list = map.get(key) ?? [];
+      const list = byKey.get(hostKey(s)) ?? [];
       list.push(s);
-      map.set(key, list);
+      byKey.set(hostKey(s), list);
     }
-    const out: HostPerfRow[] = [];
-    for (const [hostName, list] of map) {
-      const gmv = list.reduce((sum, s) => sum + (s.actualGmv || 0), 0);
-      const orders = list.reduce((sum, s) => sum + (s.totalOrders || 0), 0);
-      const hours = list.reduce((sum, s) => sum + sessionDurationHours(s.startTime, s.endTime), 0);
-      const ctrVals = list.map((s) => s.ctrAvg).filter((v) => v > 0);
-      const cvrVals = list.map((s) => s.cvrAvg).filter((v) => v > 0);
-      out.push({
-        hostName,
-        sessionCount: list.length,
-        reconciledCount: list.filter((s) => s.dataSource === "tiktok_reconciled").length,
-        gmv,
-        orders,
-        hours,
-        gmvPerHour: hours > 0 ? gmv / hours : null,
-        ctrAvg: ctrVals.length > 0 ? ctrVals.reduce((a, b) => a + b, 0) / ctrVals.length : null,
-        cvrAvg: cvrVals.length > 0 ? cvrVals.reduce((a, b) => a + b, 0) / cvrVals.length : null
-      });
-    }
-    return out.sort((a, b) => b.gmv - a.gmv);
+    return byHost(tiktokSessions)
+      .sort((a, b) => b.gmv - a.gmv)
+      .map((r) => ({
+        key: r.key,
+        hostName: r.label,
+        sessionCount: r.sessionCount,
+        quality: dataQuality(byKey.get(r.key) ?? []),
+        gmv: r.gmv,
+        orders: r.orders,
+        hours: r.hours,
+        gmvPerHour: r.hours > 0 ? r.gmvPerHour : null,
+        ctr: r.productImpressions > 0 ? r.ctr : null
+      }));
   }, [completedInPeriod]);
+  const hostQuality = useMemo(() => dataQuality(filterSessions(completedInPeriod.filter((s) => s.platform === "TikTok"), {})), [completedInPeriod]);
   const hostChartData = useMemo(() => hostPerformance.map((h) => ({ label: h.hostName, gmvHour: h.gmvPerHour ?? 0 })), [hostPerformance]);
   const totalGmvCur = useMemo(() => completedInPeriod.reduce((sum, s) => sum + (s.actualGmv || 0), 0), [completedInPeriod]);
 
@@ -1360,74 +1358,6 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, m
                       </ReportTable>
                     </Panel>
 
-                    <Panel title="Host Performance" icon={<Users className="w-4 h-4" />} sub="GMV/giờ theo host — tổng hợp từ lịch vận hành nội bộ">
-                      <div style={{ height: 220 }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={hostChartData} layout="vertical" margin={{ left: 10 }}>
-                            <CartesianGrid stroke={PAL.line} horizontal={false} />
-                            <XAxis type="number" stroke={PAL.muted} fontSize={10} tickFormatter={(v) => formatCurrencyAdaptive(v)} />
-                            <YAxis type="category" dataKey="label" stroke={PAL.muted} fontSize={11} width={90} />
-                            <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => formatCurrencyAdaptive(chartNum(v))} />
-                            <Bar dataKey="gmvHour" radius={[0, 4, 4, 0]}>
-                              {hostChartData.map((_, i) => (
-                                <Cell key={i} fill={i === 0 ? PAL.gold : `${PAL.gold}55`} />
-                              ))}
-                            </Bar>
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </Panel>
-
-                    <Panel title="Bảng Chi Tiết Host" icon={<Users className="w-4 h-4" />} sub="Nguồn: LiveSession nội bộ (GMV chính xác nhất sau khi đối soát TikTok)">
-                      {hostPerformance.some((h) => h.reconciledCount < h.sessionCount) && (
-                        <div
-                          className="flex items-start gap-2 text-[11px] rounded-xl p-2.5 mb-3"
-                          style={{ background: "#2a2410", border: `1px solid ${PAL.gold}55`, color: PAL.gold }}
-                        >
-                          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                          Một số phiên chưa đối soát với TikTok — GMV của các phiên đó vẫn là số tạm tính tự nhập, chưa phải số chính
-                          thức. Vào "TikTok API → Đối Soát Số Liệu TikTok" để cập nhật trước khi phát hành report.
-                        </div>
-                      )}
-                      <ReportTable head={["Host", "Số Phiên", "GMV", "Giờ", "GMV/Giờ", "Đơn Hàng", "CTR", "CVR"]}>
-                        {hostPerformance.map((h, idx) => (
-                          <tr key={h.hostName} style={{ borderBottom: `1px solid ${PAL.line}`, background: idx % 2 ? `${PAL.panel2}55` : "transparent" }}>
-                            <td className="py-2 px-3 font-semibold" style={{ color: PAL.gold }}>
-                              {h.hostName}
-                            </td>
-                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
-                              {h.sessionCount}
-                              {h.reconciledCount < h.sessionCount ? ` (${h.reconciledCount} đã đối soát)` : ""}
-                            </td>
-                            <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>
-                              {formatCurrencyAdaptive(h.gmv)}
-                            </td>
-                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
-                              {fmtHours(h.hours)}
-                            </td>
-                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
-                              {h.gmvPerHour != null ? formatCurrencyAdaptive(h.gmvPerHour) : "—"}
-                            </td>
-                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
-                              {fmtInt(h.orders)}
-                            </td>
-                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
-                              {fmtPct(h.ctrAvg)}
-                            </td>
-                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
-                              {fmtPct(h.cvrAvg)}
-                            </td>
-                          </tr>
-                        ))}
-                        {hostPerformance.length === 0 && (
-                          <tr>
-                            <td colSpan={8} className="py-6 text-center italic" style={{ color: PAL.muted }}>
-                              Chưa có phiên TikTok Completed nào trong tháng.
-                            </td>
-                          </tr>
-                        )}
-                      </ReportTable>
-                    </Panel>
 
                     <Panel title="Phễu Chuyển Đổi" icon={<Filter className="w-4 h-4" />} sub="Live Impressions → Views → Product Views → Clicks → Orders">
                       <div style={{ height: 220 }}>
@@ -1494,6 +1424,80 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, m
                     </Panel>
                   </>
                 )}
+
+                {/* Audit Module 3 (2026-09-18): 2 panel Host nằm NGOÀI điều kiện "đã có file
+                    Creator-Live-Performance trong Dataraw" — chúng tính từ session nội bộ, không
+                    dính gì tới file đó. Trước đây chưa up file Dataraw tháng nào là toàn bộ tab
+                    Livestream trống, kể cả phần vốn có số. */}
+                <Panel title="Host Performance" icon={<Users className="w-4 h-4" />} sub="GMV/giờ theo host — tổng hợp từ lịch vận hành nội bộ">
+                  <div style={{ height: 220 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={hostChartData} layout="vertical" margin={{ left: 10 }}>
+                        <CartesianGrid stroke={PAL.line} horizontal={false} />
+                        <XAxis type="number" stroke={PAL.muted} fontSize={10} tickFormatter={(v) => formatCurrencyAdaptive(v)} />
+                        <YAxis type="category" dataKey="label" stroke={PAL.muted} fontSize={11} width={90} />
+                        <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => formatCurrencyAdaptive(chartNum(v))} />
+                        <Bar dataKey="gmvHour" radius={[0, 4, 4, 0]}>
+                          {hostChartData.map((_, i) => (
+                            <Cell key={i} fill={i === 0 ? PAL.gold : `${PAL.gold}55`} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </Panel>
+
+                <Panel title="Bảng Chi Tiết Host" icon={<Users className="w-4 h-4" />} sub="Cùng cách tính với tab Hiệu Suất Host của agency — giờ live thật khi có file, ca không có số không tính">
+                  {hostQuality.reconciled < hostQuality.total && (
+                    <div
+                      className="flex items-start gap-2 text-[11px] rounded-xl p-2.5 mb-3"
+                      style={{ background: "#2a2410", border: `1px solid ${PAL.gold}55`, color: PAL.gold }}
+                    >
+                      <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                      <span>
+                        {hostQuality.total} phiên: {hostQuality.reconciled} đã đối soát
+                        {hostQuality.snapshot > 0 ? `, ${hostQuality.snapshot} số lúc giao ca (chờ đối soát cuối kỳ)` : ""}
+                        {hostQuality.manual > 0 ? `, ${hostQuality.manual} talent tự khai (chưa có gì bảo chứng)` : ""}.
+                        {" "}Đối soát ở "Vận Hành Live → Đối Soát Số Liệu" trước khi phát hành report.
+                      </span>
+                    </div>
+                  )}
+                  <ReportTable head={["Host", "Số Phiên", "GMV", "Giờ", "GMV/Giờ", "Đơn Hàng", "CTR"]}>
+                    {hostPerformance.map((h, idx) => (
+                      <tr key={h.key} style={{ borderBottom: `1px solid ${PAL.line}`, background: idx % 2 ? `${PAL.panel2}55` : "transparent" }}>
+                        <td className="py-2 px-3 font-semibold" style={{ color: PAL.gold }}>
+                          {h.hostName}
+                        </td>
+                        <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
+                          {h.sessionCount}
+                          {h.quality.reconciled < h.sessionCount ? ` (${h.quality.reconciled} đã đối soát)` : ""}
+                        </td>
+                        <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>
+                          {formatCurrencyAdaptive(h.gmv)}
+                        </td>
+                        <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
+                          {fmtHours(h.hours)}
+                        </td>
+                        <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
+                          {h.gmvPerHour != null ? formatCurrencyAdaptive(h.gmvPerHour) : "—"}
+                        </td>
+                        <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
+                          {fmtInt(h.orders)}
+                        </td>
+                        <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
+                          {fmtPct(h.ctr)}
+                        </td>
+                      </tr>
+                    ))}
+                    {hostPerformance.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="py-6 text-center italic" style={{ color: PAL.muted }}>
+                          Chưa có phiên TikTok nào có số liệu trong tháng.
+                        </td>
+                      </tr>
+                    )}
+                  </ReportTable>
+                </Panel>
               </div>
             )}
 

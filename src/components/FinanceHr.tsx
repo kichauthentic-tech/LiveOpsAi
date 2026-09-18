@@ -11,6 +11,9 @@ import {
 } from "../types";
 import { DollarSign, TrendingUp, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { DEFAULT_FINANCE, computeSessionPnl } from "../lib/pnl";
+import { DataSourceBadge } from "./common/DataSourceBadge";
+import { dataQuality } from "../lib/performance/hostPerformance";
+import { todayVn } from "../lib/performance/brandCommitment";
 
 interface FinanceHrProps {
   sessions: LiveSession[];
@@ -68,11 +71,26 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
     return map;
   }, [users]);
 
+  // Audit Module 3 (2026-09-18): trước đây là MỘT danh sách mọi ca Completed từ đầu tới giờ, tổng
+  // cộng dồn cả đời — vài tháng nữa là vô nghĩa. Lọc theo tháng, mặc định tháng hiện tại (VN).
+  const [month, setMonth] = useState(() => todayVn().slice(0, 7));
+  const shiftMonth = (delta: number) => {
+    const [y, m] = month.split("-").map(Number);
+    const d = new Date(y, m - 1 + delta, 1);
+    setMonth(`${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, "0")}`);
+  };
+
   // Real P&L is only meaningful for sessions that actually ran and closed with real GMV/orders.
   const completedSessions = useMemo(
-    () => sessions.filter((s) => s.status === "Completed").sort((a, b) => (a.date < b.date ? 1 : -1)),
-    [sessions]
+    () =>
+      sessions
+        .filter((s) => s.status === "Completed" && s.date.startsWith(month))
+        .sort((a, b) => (a.date < b.date ? 1 : -1)),
+    [sessions, month]
   );
+  // Độ tin cậy của con số tiền: tổng P&L cộng từ GMV, mà GMV thì có 3 bậc nguồn. Màn tiền phải
+  // nói rõ bao nhiêu phần là số chốt — ký duyệt trên số tự khai và số đã đối soát là hai việc khác.
+  const quality = useMemo(() => dataQuality(completedSessions), [completedSessions]);
 
   const rows = useMemo(() => {
     return completedSessions.map((s) =>
@@ -141,6 +159,16 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
               GMV & Host lấy từ dữ liệu phiên/talent thật trên Supabase. Commission Agency, chi phí Studio/Ads nhập & lưu thật, chỉ CEO mới duyệt được.
             </p>
           </div>
+          <div className="flex items-center gap-1 text-xs">
+            <button onClick={() => shiftMonth(-1)} className="px-2 py-1 rounded-lg border border-[var(--border)] hover:bg-[var(--surface-elevated)]">‹</button>
+            <input
+              type="month"
+              value={month}
+              onChange={(e) => e.target.value && setMonth(e.target.value)}
+              className="px-2 py-1 rounded-lg border border-[var(--border)] bg-[var(--surface-base)] text-[var(--text)] font-bold"
+            />
+            <button onClick={() => shiftMonth(1)} className="px-2 py-1 rounded-lg border border-[var(--border)] hover:bg-[var(--surface-elevated)]">›</button>
+          </div>
           <div className="text-right text-xs bg-[var(--surface-elevated)]/50 border border-[var(--border)] rounded-xl px-4 py-2">
             <div className="text-[var(--text-muted)]">Tổng {rows.length} phiên · Net Profit</div>
             <div className={`text-lg font-black ${totals.netProfit >= 0 ? "text-emerald-400" : "text-red-400"}`}>
@@ -149,8 +177,17 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
           </div>
         </div>
 
+        {rows.length > 0 && quality.reconciled < quality.total && (
+          <div className="text-[11px] rounded-xl px-3 py-2 border border-amber-800/60 bg-amber-950/40 text-amber-200">
+            Nguồn GMV của {quality.total} phiên: <b>{quality.reconciled}</b> đã đối soát
+            {quality.snapshot > 0 && <>, <b>{quality.snapshot}</b> số lúc giao ca (TikTok còn cập nhật hoàn/huỷ)</>}
+            {quality.manual > 0 && <>, <b>{quality.manual}</b> talent tự khai (chưa có gì bảo chứng)</>}.
+            Số tiền của các phiên chưa đối soát là tạm tính — duyệt sau khi đối soát ở "Vận Hành Live → Đối Soát Số Liệu".
+          </div>
+        )}
+
         {rows.length === 0 ? (
-          <p className="text-xs text-[var(--text-muted)] italic py-6 text-center">Chưa có phiên live nào ở trạng thái "Completed" để tính P&L thật.</p>
+          <p className="text-xs text-[var(--text-muted)] italic py-6 text-center">Không có phiên "Completed" nào trong tháng {month} để tính P&L.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
@@ -176,7 +213,10 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                       </div>
                       <div className="text-[var(--text-muted)]">{s.brandName} · {s.date} · Host {talent?.name ?? s.hostName}</div>
                     </td>
-                    <td className="py-2 pr-3 font-bold text-[var(--text-muted)]">{money(s.actualGmv)} đ</td>
+                    <td className="py-2 pr-3">
+                      <div className="font-bold text-[var(--text-muted)]">{money(s.actualGmv)} đ</div>
+                      <DataSourceBadge dataSource={s.dataSource} className="mt-0.5" />
+                    </td>
                     <td className="py-2 pr-3">
                       {isHourly ? (
                         <div>

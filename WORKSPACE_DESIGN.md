@@ -210,4 +210,24 @@ Luồng thật: talent bấm "Tôi rảnh ca này" ([ShiftScheduling.tsx](src/co
 
 > **Cảnh báo cho session sau — KHÔNG "sửa" quyền của bảng `talents`.** Query thẳng `talents` từ client trả `permission denied for table talents`; đây **không phải lỗi** mà là biện pháp bảo vệ có chủ đích của migration 0047 (`revoke select on talents from authenticated`): rate/lương talent phải được che, nên mọi lượt đọc đi qua view `talents_secure` — view mask cột nhạy cảm trừ khi người đọc là ceo/admin hoặc chính talent đó (0048 giải thích chi tiết vì sao view phải ở chế độ definer). Cấp lại `grant select on talents` sẽ hở toàn bộ rate cho mọi user đăng nhập. **Mọi code mới cần đọc talent phải dùng `talents_secure`.** Rà ngày 2026-09-17: trong 38 bảng app dùng, đây là bảng DUY NHẤT client không đọc trực tiếp được, và đúng như thiết kế.
 
-**Module tiếp theo (chưa audit):** (2) Điều hướng/UI tổng thể toàn app, (3) Báo cáo/số liệu (Report Tháng, P&L) — riêng phần "Dashboard" của mục (3) không còn áp dụng, đã xử lý ở trên. Audit xong module nào thì cập nhật đúng mục này, không tạo file riêng.
+**Module 3 — Báo cáo/số liệu (Report Tháng, Report Tuần, Finance & P&L): đã audit 2026-09-18, phần kỹ thuật đã fix, còn 4 câu nghiệp vụ chờ chốt.**
+
+Lý do audit ngay sau Module 1: 4 phase vừa rồi đổi nguồn số của ca (snapshot → đối soát → khoá report), mà P&L và Report Tháng đọc `actual_gmv` không biết gì về `data_source`.
+
+Đã fix (không cần migration):
+
+- **Tab 02 Livestream của Report Tháng tự gom "Host Performance" bằng vòng lặp riêng** — giờ KẾ HOẠCH thay vì giờ live thật, đếm cả ca GMV = 0, gom theo tên, kèm cột CVR mà không luồng nào ghi (`cvr_avg` chỉ được chép qua lại, chưa từng có nguồn). Kết quả: brand đọc ra GMV/giờ KHÁC tab "Hiệu Suất Host" của agency về cùng một host. Giờ import thẳng `byHost`/`filterSessions`/`dataQuality` từ [hostPerformance.ts](src/lib/performance/hostPerformance.ts) — cùng quy ước đã đặt cho `hostSuggestion.ts`. Cột CVR bỏ.
+- **2 panel Host bị giấu sau điều kiện "đã up file Creator-Live-Performance vào Dataraw tháng này"** dù chúng tính từ session nội bộ, không dính gì file đó — chưa up Dataraw là cả tab Livestream trống, kể cả phần vốn có số. Đã kéo ra ngoài điều kiện.
+- **Cảnh báo "chưa đối soát" ở Report Tháng/Tuần gộp `live_snapshot` với `manual`** ("số talent tự nhập") — nói sai về phần lớn ca sau khi có tầng snapshot, ops sẽ học cách bỏ qua. Giờ tách 2 con số. Kèm sửa hướng dẫn cũ "TikTok API → Đối Soát Số Liệu TikTok" (tab đó đã bị thay bởi "Vận Hành Live → Đối Soát Số Liệu" từ mục 2 lộ trình).
+- **Finance & P&L**: (a) trước là MỘT danh sách mọi ca Completed từ đầu tới giờ, tổng cộng dồn cả đời — thêm lọc tháng, mặc định tháng hiện tại VN; (b) mỗi dòng GMV giờ có `DataSourceBadge`, và một dòng tóm tắt "N đã đối soát / N số lúc giao ca / N tự khai" trên tổng — ký duyệt số tự khai và số đã đối soát là hai việc khác nhau, màn tiền phải nói rõ.
+
+Verify trên Supabase thật với 3 ca ZZZ (manual/snapshot/reconciled): Finance hiện đúng 3 badge + dòng tóm tắt "1 đã đối soát, 1 số lúc giao ca, 1 talent tự khai"; Tab 02 Report Tháng hiện host với 4h (1h kế hoạch + 2×1.5h live thật), 1,5 triệu/giờ, CTR 2% — đúng quy tắc `hostPerformance.ts`; banner Report Tháng tách "1 phiên tự khai, 1 phiên có số lúc giao ca". Đã dọn sạch.
+
+**4 câu nghiệp vụ chờ user chốt — KHÔNG tự quyết** (mỗi câu đổi con số tiền):
+
+1. **Trợ live (co-host) có được trả công không?** `computeSessionPnl` chỉ tính `hostPayout` cho `host_id`; `co_host_id` không xuất hiện ở đâu trong P&L. Nếu trợ live có lương thì Net Profit đang bị thổi phồng đúng bằng khoản đó.
+2. **OT của host có tính vào brand không?** Brand hourly bị tính đúng giờ kế hoạch (`sessionDurationHours`), host được trả giờ kế hoạch + OT − off sớm. Tức OT là agency chịu. Đúng ý hay sót?
+3. **"Target GMV" trong Report Tháng nghĩa là gì?** `targetGmv` của mỗi ca được gán lúc chốt lịch = GMV trung bình lịch sử của chính host đó (`computeRealAvgGmvPerSession`). Nên "Target vs Thực đạt" ở Tab 01 đang so brand với **trung bình quá khứ của host**, không phải với kế hoạch brand giao. Có nên đưa cho brand xem con số này không?
+4. **Tổng target cộng cả ca đã Huỷ** (`scheduledTargetGmv` cố ý không lọc status, theo comment cũ để khớp GmvCalendar — mà GmvCalendar đã xoá). Ca huỷ có nên vẫn kéo target lên không?
+
+**Module tiếp theo (chưa audit):** (2) Điều hướng/UI tổng thể toàn app. Audit xong module nào thì cập nhật đúng mục này, không tạo file riêng.

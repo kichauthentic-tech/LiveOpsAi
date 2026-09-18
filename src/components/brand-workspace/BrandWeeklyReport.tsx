@@ -159,7 +159,11 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
         {!loading && unreconciled.length > 0 && (
           <div className="bg-blue-950/40 border border-blue-800/50 text-blue-300 text-xs font-semibold p-3 rounded-xl flex items-start gap-2">
             <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-            {unreconciled.length} phiên Completed trong tuần chưa đối soát với TikTok — cột "Hệ thống" bên dưới còn là số tạm tính.
+            {unreconciled.length} phiên Completed trong tuần chưa đối soát với TikTok
+            {unreconciled.some((s) => (s.dataSource ?? "manual") === "manual")
+              ? ` (${unreconciled.filter((s) => (s.dataSource ?? "manual") === "manual").length} phiên còn là số talent tự khai)`
+              : " (đã có số từ file lúc giao ca, chờ chốt hoàn/huỷ)"}
+            {" "}— cột "Hệ thống" bên dưới chưa phải số chốt.
           </div>
         )}
       </div>
