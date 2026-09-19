@@ -18,6 +18,7 @@ export interface NewTalentAccountPayload {
   overallScore: number;
   ratePerSession: number;
   ratePerHour: number;
+  assistantRatePerHour: number;
   commissionRate: number;
   availabilityStatus: "Available" | "Busy" | "On Live";
 }
@@ -80,6 +81,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
   const [formCtr, setFormCtr] = useState(8.0);
   const [formRate, setFormRate] = useState(5000000);
   const [formRateHour, setFormRateHour] = useState(0);
+  const [formAssistantRateHour, setFormAssistantRateHour] = useState(0);
   const [formCommission, setFormCommission] = useState(3.5);
   const [formScore, setFormScore] = useState(90);
   // FIX L5 (audit 2026-08-21): trước đây mặc định số điện thoại/avatar demo cố định (nhìn như đã
@@ -125,6 +127,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
     setFormCtr(t.ctrAvg || 8.0);
     setFormRate(t.ratePerSession || (t as any).rateCardFee || 5000000);
     setFormRateHour(t.ratePerHour || 0);
+    setFormAssistantRateHour(t.assistantRatePerHour || 0);
     setFormCommission(t.commissionRate || 3.5);
     setFormScore(t.overallScore || (t as any).aiMatchScore || 90);
     setFormPhone(t.phone || "");
@@ -139,7 +142,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
 
     const nichesParsed = formNiches.split(",").map((s) => s.trim()).filter(Boolean);
 
-    const basePayload: Omit<Talent, "id" | "ratePerSession" | "ratePerHour" | "commissionRate"> = {
+    const basePayload: Omit<Talent, "id" | "ratePerSession" | "ratePerHour" | "assistantRatePerHour" | "commissionRate"> = {
       name: formName,
       nickname: formNickname.trim(),
       avatar: formAvatar,
@@ -164,6 +167,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
       if (canSeeRate) {
         patch.ratePerSession = Number(formRate);
         patch.ratePerHour = Number(formRateHour);
+        patch.assistantRatePerHour = Number(formAssistantRateHour);
         patch.commissionRate = Number(formCommission);
       }
       if (onUpdateTalent) onUpdateTalent(editingTalent.id, patch);
@@ -183,6 +187,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
           email: formEmail.trim(),
           ratePerSession: Number(formRate),
           ratePerHour: Number(formRateHour),
+          assistantRatePerHour: Number(formAssistantRateHour),
           commissionRate: Number(formCommission)
         });
       }
@@ -637,6 +642,20 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                       />
                       <p className="text-[10px] text-[var(--text-faint)] mt-1">
                         {Number(formRateHour) > 0 ? "Đang tính lương theo giờ — bỏ qua rate/live." : "Để 0 = tính theo rate/live."}
+                      </p>
+                    </div>
+                    <div>
+                      {/* 0089 — rate khi làm TRỢ LIVE, tách khỏi rate host: cùng người hôm nay host mai trợ
+                          ăn 2 mức khác nhau. Để 0 thì ca làm trợ vẫn tính theo rate host như cũ. */}
+                      <label className="font-bold text-[var(--text-muted)] block mb-1">Rate Trợ Live (VND/Giờ)</label>
+                      <input
+                        type="number"
+                        value={formAssistantRateHour}
+                        onChange={(e) => setFormAssistantRateHour(Number(e.target.value))}
+                        className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
+                      />
+                      <p className="text-[10px] text-[var(--text-faint)] mt-1">
+                        {Number(formAssistantRateHour) > 0 ? "Ca làm trợ live tính theo rate này × giờ." : "Để 0 = ca làm trợ tính theo rate host ở trên."}
                       </p>
                     </div>
                     <div>

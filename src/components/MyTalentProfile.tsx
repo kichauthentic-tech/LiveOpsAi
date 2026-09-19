@@ -259,6 +259,9 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({ activeUser, ta
             ) : (
               <div className="font-bold text-[var(--text)] mt-0.5">{(myTalent.ratePerSession || 0).toLocaleString()} đ<span className="text-amber-300/80 font-semibold">/live</span></div>
             )}
+            {(myTalent.assistantRatePerHour || 0) > 0 && (
+              <div className="text-[10px] text-amber-300/80 mt-0.5">Trợ live: {(myTalent.assistantRatePerHour || 0).toLocaleString()} đ/giờ</div>
+            )}
           </div>
           <div>
             <div className="text-amber-300/80">Hoa Hồng</div>

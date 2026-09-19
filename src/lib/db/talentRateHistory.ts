@@ -6,6 +6,7 @@ interface DbTalentRateHistoryEntry {
   talent_id: string;
   rate_per_session: number;
   rate_per_hour: number;
+  assistant_rate_per_hour: number | null;
   commission_rate: number;
   effective_from: string;
   effective_to: string | null;
@@ -17,6 +18,7 @@ function fromDb(row: DbTalentRateHistoryEntry): TalentRateHistoryEntry {
     talentId: row.talent_id,
     ratePerSession: row.rate_per_session,
     ratePerHour: row.rate_per_hour ?? 0,
+    assistantRatePerHour: row.assistant_rate_per_hour ?? 0,
     commissionRate: row.commission_rate,
     effectiveFrom: row.effective_from,
     effectiveTo: row.effective_to ?? undefined

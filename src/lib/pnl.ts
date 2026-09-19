@@ -78,6 +78,8 @@ export interface SessionPnl {
   coHost?: Talent;
   coHostPayout: number;
   coHostPaidHourly: boolean;
+  // true = lương trợ live tính bằng rate trợ riêng (0089); false = rơi về rate host của người đó.
+  coHostUsesAssistantRate: boolean;
 }
 
 // Giờ tính lương của 1 phiên = giờ ca theo lịch + OT − off sớm (host tự khai trong report sau
@@ -137,9 +139,12 @@ export function computeSessionPnl(
 
   // OT/off sớm khai theo CA (report là của ca, không phải của từng người) nên giờ tính lương của
   // trợ live = giờ tính lương của host trong cùng ca.
+  // Rate TRỢ LIVE riêng (0089) đứng trước: cùng một người làm trợ ăn rate trợ, làm host ăn rate
+  // host. Chưa đặt rate trợ (= 0) thì rơi về rate host theo giờ rồi rate/phiên như trước.
   const coHost = session.coHostId ? talentById[session.coHostId] : undefined;
   const coHostRateAtDate = coHost ? findTalentRateAsOf(talentRateHistory, coHost.id, session.date) : undefined;
-  const coHostHourRate = coHostRateAtDate?.ratePerHour ?? coHost?.ratePerHour ?? 0;
+  const coHostAssistantRate = coHostRateAtDate?.assistantRatePerHour ?? coHost?.assistantRatePerHour ?? 0;
+  const coHostHourRate = coHostAssistantRate > 0 ? coHostAssistantRate : coHostRateAtDate?.ratePerHour ?? coHost?.ratePerHour ?? 0;
   const coHostPaidHourly = !!coHost && coHostHourRate > 0;
   const coHostFixRate = coHost
     ? coHostPaidHourly
@@ -159,6 +164,7 @@ export function computeSessionPnl(
     earlyLeaveMinutes: session.report?.earlyLeaveMinutes ?? 0,
     coHost,
     coHostPayout,
-    coHostPaidHourly
+    coHostPaidHourly,
+    coHostUsesAssistantRate: !!coHost && coHostAssistantRate > 0
   };
 }

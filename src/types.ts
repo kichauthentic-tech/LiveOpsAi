@@ -86,6 +86,9 @@ export interface Talent {
   // Rate theo GIỜ (Giai đoạn 3, migration 0055) — song song với ratePerSession (tiền/phiên cố
   // định, data cũ giữ nguyên). > 0 = talent này tính lương theo giờ; 0 = giữ công thức flat cũ.
   ratePerHour: number;
+  // Rate theo giờ khi làm TRỢ LIVE (co_host) — migration 0089. > 0 = trợ live tính theo rate này;
+  // 0 = giữ công thức cũ (rate_per_hour host rồi rate_per_session), P&L ca cũ không đổi.
+  assistantRatePerHour: number;
   commissionRate: number; // e.g. 3%
   overallScore: number; // 0-100
   availabilityStatus: "Available" | "Busy" | "On Live";
@@ -465,6 +468,7 @@ export interface TalentRateHistoryEntry {
   talentId: string;
   ratePerSession: number;
   ratePerHour: number;
+  assistantRatePerHour: number;
   commissionRate: number;
   effectiveFrom: string; // "YYYY-MM-DD"
   effectiveTo?: string; // "YYYY-MM-DD", undefined = đang áp dụng

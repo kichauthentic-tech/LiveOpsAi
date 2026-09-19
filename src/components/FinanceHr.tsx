@@ -205,7 +205,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                 </tr>
               </thead>
               <tbody>
-                {rows.map(({ session: s, finance, talent, isHourly, grossAgencyRev, hostPayout, netProfit, hostPaidHourly, billableHours, otMinutes, earlyLeaveMinutes, coHost, coHostPayout, coHostPaidHourly }) => {
+                {rows.map(({ session: s, finance, talent, isHourly, grossAgencyRev, hostPayout, netProfit, hostPaidHourly, billableHours, otMinutes, earlyLeaveMinutes, coHost, coHostPayout, coHostPaidHourly, coHostUsesAssistantRate }) => {
                   return (
                   <tr key={s.id} className="border-b border-[var(--border)]/60 align-middle">
                     <td className="py-2 pr-3">
@@ -277,7 +277,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                       {coHost ? (
                         <div className="text-[10px] text-amber-300/80 mt-1">
                           Trợ live {coHost.name}: <b>{money(coHostPayout)} đ</b>
-                          {coHostPaidHourly && <span className="text-[var(--text-muted)]"> ({billableHours.toFixed(2)}h × rate/giờ)</span>}
+                          {coHostPaidHourly && <span className="text-[var(--text-muted)]"> ({billableHours.toFixed(2)}h × {coHostUsesAssistantRate ? "rate trợ/giờ" : "rate host/giờ — chưa đặt rate trợ"})</span>}
                         </div>
                       ) : s.coHostId ? (
                         <div className="text-[10px] text-red-300 mt-1">Trợ live {s.coHostName || "—"} không còn hồ sơ talent — chưa tính công</div>

@@ -196,6 +196,7 @@ export function createApp() {
             overall_score: newTalentProfile.overallScore || 0,
             rate_per_session: newTalentProfile.ratePerSession || 0,
             rate_per_hour: newTalentProfile.ratePerHour || 0,
+            assistant_rate_per_hour: newTalentProfile.assistantRatePerHour || 0,
             commission_rate: newTalentProfile.commissionRate || 0,
             availability_status: newTalentProfile.availabilityStatus || "Available",
             profile_id: data.user.id

@@ -942,6 +942,7 @@ export default function App() {
         overallScore: payload.overallScore,
         ratePerSession: payload.ratePerSession,
         ratePerHour: payload.ratePerHour,
+        assistantRatePerHour: payload.assistantRatePerHour,
         commissionRate: payload.commissionRate,
         availabilityStatus: payload.availabilityStatus
       }
@@ -958,7 +959,7 @@ export default function App() {
       // talent_rate_history. State history chỉ nạp 1 lần lúc mở app, nên không nạp lại thì P&L
       // (lib/pnl.ts tra rate theo NGÀY session qua history) vẫn tính bằng rate cũ cho tới khi
       // user F5 — đúng lỗi đã gặp khi verify Giai đoạn 3.
-      if (patch.ratePerSession !== undefined || patch.ratePerHour !== undefined || patch.commissionRate !== undefined) {
+      if (patch.ratePerSession !== undefined || patch.ratePerHour !== undefined || patch.assistantRatePerHour !== undefined || patch.commissionRate !== undefined) {
         setTalentRateHistory(await fetchTalentRateHistory());
       }
     } catch (e: any) {

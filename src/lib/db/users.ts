@@ -75,6 +75,7 @@ export interface NewTalentProfilePayload {
   overallScore?: number;
   ratePerSession?: number;
   ratePerHour?: number;
+  assistantRatePerHour?: number;
   commissionRate?: number;
   availabilityStatus?: "Available" | "Busy" | "On Live";
 }
