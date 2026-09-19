@@ -120,21 +120,30 @@ export const CAMP_DAY_BUCKET_LABEL: Record<CampDayBucket, string> = {
 // import.meta.env.
 // Khung camp Report Tháng có thể bị ghi đè theo brand+tháng (migration 0071, loại B) — override
 // giữ nguyên type "dday"/"midmonth"/"payday" nhưng đổi khoảng ngày; không đụng đến
-// lib/campaignDays.ts (dùng chung cho Calendar/Ribbon toàn hệ thống). Không có override thì fallback
-// về getCampaignDayInfo (khung cố định mặc định) như trước.
+// getCampaignDayInfo (dùng chung cho Calendar/Ribbon toàn hệ thống).
+//
+// Ngữ nghĩa THAY THẾ (user chốt 2026-09-19): camp nào đã nhập tay thì camp đó CHỈ tính đúng khoảng
+// nhập — lịch cố định của camp đó bị bỏ. Camp không nhập tay mới dùng lịch cố định. Trước đây là
+// "cộng thêm": nhập Mid 10–12 thì 10–12 lẫn 13–15 đều thành Mid → Report gom 6 ngày vào 1 ô camp,
+// vênh với target.
 export interface CampRangeOverride {
   start: string; // "YYYY-MM-DD"
   end: string;
 }
 export type CampOverrides = Partial<Record<CampaignDayType, CampRangeOverride>>;
 
+const hasRange = (r?: CampRangeOverride): r is CampRangeOverride => !!(r?.start && r?.end);
+
 export function resolveCampBucketType(dateStr: string, overrides?: CampOverrides): CampDayBucket {
   if (overrides) {
     for (const type of ["dday", "midmonth", "payday"] as CampaignDayType[]) {
       const range = overrides[type];
-      if (range?.start && range?.end && dateStr >= range.start && dateStr <= range.end) return type;
+      if (hasRange(range) && dateStr >= range.start && dateStr <= range.end) return type;
     }
   }
-  return getCampaignDayInfo(dateStr)?.type ?? "daily";
+  const fixed = getCampaignDayInfo(dateStr)?.type;
+  // Ngày rơi vào lịch cố định của một camp đã bị ghi đè → không còn là camp đó nữa.
+  if (fixed && overrides && hasRange(overrides[fixed])) return "daily";
+  return fixed ?? "daily";
 }
 

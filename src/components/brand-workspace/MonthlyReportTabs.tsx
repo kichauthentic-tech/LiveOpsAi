@@ -1314,7 +1314,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, m
                               </span>
                             )}
                             <span className="text-[10.5px] italic" style={{ color: PAL.muted }}>
-                              Để trống thì dùng khung mặc định (Mid-Month 13-15, Pay-Day 23-25, D-Day theo ngày trùng lặp gần nhất).
+                              Để trống thì dùng khung mặc định (Mid-Month 13-15, Pay-Day 23-25, D-Day theo ngày trùng lặp gần nhất). Đã nhập camp nào thì camp đó chỉ tính đúng khoảng nhập — khung mặc định của camp đó không còn áp dụng.
                             </span>
                           </div>
                         </div>
