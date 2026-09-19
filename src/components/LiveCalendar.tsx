@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { LiveSession, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, Studio, Talent, Brand, SystemUser, PromoScheme, UserRole } from "../types";
+import { LiveSession, ShiftSlot, ShiftRegistration, Studio, Talent, Brand, SystemUser, PromoScheme, UserRole } from "../types";
 import { schemesForDate } from "../lib/schemeUtils";
 import { timeRangesOverlap } from "../lib/dateUtils";
 import { CAMPAIGN_DAY_STYLES, getCampaignDayInfo } from "../lib/campaignDays";
@@ -65,11 +65,6 @@ interface LiveCalendarProps {
   myTalentId?: string;
   currentUserId?: string;
   currentRole?: UserRole;
-  recurringShiftTemplates?: RecurringShiftTemplate[];
-  onCreateTemplate?: (t: RecurringShiftTemplate) => Promise<boolean>;
-  onToggleTemplate?: (t: RecurringShiftTemplate) => Promise<boolean>;
-  onDeleteTemplate?: (id: string) => Promise<void>;
-  onGenerateMonthSlots?: (month: string) => Promise<number>;
   schemes?: PromoScheme[];
   onAddScheme?: (scheme: { title: string; description: string; startDate: string; endDate: string }) => Promise<void>;
   onUpdateScheme?: (id: string, patch: Partial<Pick<PromoScheme, "title" | "description" | "startDate" | "endDate">>) => Promise<void>;
@@ -116,11 +111,6 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   myTalentId,
   currentUserId,
   currentRole,
-  recurringShiftTemplates = [],
-  onCreateTemplate,
-  onToggleTemplate,
-  onDeleteTemplate,
-  onGenerateMonthSlots,
   schemes = [],
   onAddScheme,
   onUpdateScheme,

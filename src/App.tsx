@@ -15,7 +15,8 @@ import { fetchSessionFinances, upsertSessionFinance, setSessionFinanceApproval }
 import { fetchTikTokStatus, fetchTikTokWebhookEvents } from "./lib/db/tiktokIntegration";
 import { fetchAiAgentPrompts, updateAiAgentPrompt } from "./lib/db/aiAgentPrompts";
 import { fetchBrandPlatformRates, upsertBrandPlatformRate, upsertBrandPlatformReturnRate } from "./lib/db/brandPlatformRates";
-import { fetchShiftSlots, createShiftSlot, createShiftSlots, updateShiftSlot, deleteShiftSlot } from "./lib/db/shiftSlots";
+import { fetchShiftSlots, createShiftSlot, generateShiftSlots, GenerateSlotsResult, updateShiftSlot, deleteShiftSlot } from "./lib/db/shiftSlots";
+import { PlannedSlot } from "./lib/scheduling/planMonthSlots";
 import { fetchShiftRegistrations, registerForSlot, unregisterFromSlot } from "./lib/db/shiftRegistrations";
 import {
   fetchRecurringShiftTemplates,
@@ -1186,52 +1187,16 @@ export default function App() {
     }
   };
 
-  // Sinh ca cho cả tháng từ các quy tắc lặp đang active — bỏ qua ngày đã có
-  // ca sinh từ đúng quy tắc đó rồi (tránh tạo trùng khi bấm lại nhiều lần).
-  // brandId có giá trị khi gọi từ Brand Workspace (BrandCalendar) — chỉ sinh ca cho quy tắc
-  // của đúng brand đó, không phải toàn bộ agency (audit M4).
-  const handleGenerateMonthSlots = async (month: string, brandId?: string): Promise<number> => {
-    const [yearStr, monthStr] = month.split("-");
-    const year = Number(yearStr);
-    const monthIdx = Number(monthStr) - 1;
-    const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
-
-    const existingByTemplateAndDate = new Set(
-      shiftSlots.filter((s) => s.templateId).map((s) => `${s.templateId}:${s.date}`)
-    );
-
-    const toCreate: ShiftSlot[] = [];
-    for (const template of recurringShiftTemplates.filter((t) => t.active && (!brandId || t.brandId === brandId))) {
-      for (let day = 1; day <= daysInMonth; day++) {
-        const date = new Date(year, monthIdx, day);
-        if (!template.isDaily && date.getDay() !== template.weekday) continue;
-        const dateStr = `${year}-${monthStr.padStart(2, "0")}-${`${day}`.padStart(2, "0")}`;
-        if (existingByTemplateAndDate.has(`${template.id}:${dateStr}`)) continue;
-        toCreate.push({
-          id: `slot-${Date.now()}-${toCreate.length}`,
-          date: dateStr,
-          startTime: template.startTime,
-          endTime: template.endTime,
-          brandId: template.brandId,
-          brandName: template.brandName,
-          platform: template.platform,
-          studioId: template.studioId,
-          studioName: template.studioName,
-          notes: template.notes,
-          status: "open",
-          templateId: template.id
-        });
-      }
-    }
-
-    if (toCreate.length === 0) return 0;
+  // P1 (0088): sinh ca theo lô đã lập kế hoạch ở màn Đăng Ký & Chốt Lịch (planMonthSlots — thuần,
+  // có xem trước). Server dedupe theo khoá brand|ngày|giờ|nền tảng, chỉ trả về dòng thật sự chèn.
+  const handleGenerateSlots = async (slots: PlannedSlot[]): Promise<GenerateSlotsResult | null> => {
     try {
-      const created = await createShiftSlots(toCreate);
-      setShiftSlots((prev) => [...prev, ...created]);
-      return created.length;
+      const result = await generateShiftSlots(slots);
+      if (result.inserted.length > 0) setShiftSlots((prev) => [...prev, ...result.inserted]);
+      return result;
     } catch (e: any) {
       window.alert(`Không thể sinh ca tự động: ${e.message ?? e}`);
-      return 0;
+      return null;
     }
   };
 
@@ -1926,11 +1891,6 @@ export default function App() {
                     onAddScheme={handleAddPromoScheme}
                     onUpdateScheme={handleUpdatePromoScheme}
                     onDeleteScheme={handleDeletePromoScheme}
-                    recurringShiftTemplates={recurringShiftTemplates}
-                    onCreateTemplate={handleCreateRecurringTemplate}
-                    onToggleTemplate={handleToggleRecurringTemplate}
-                    onDeleteTemplate={handleDeleteRecurringTemplate}
-                    onGenerateMonthSlots={handleGenerateMonthSlots}
                   />
                 )}
 
@@ -1944,6 +1904,11 @@ export default function App() {
                     studios={activeStudios}
                     shiftSlots={shiftSlots}
                     shiftRegistrations={shiftRegistrations}
+                    recurringShiftTemplates={recurringShiftTemplates}
+                    onCreateTemplate={handleCreateRecurringTemplate}
+                    onToggleTemplate={handleToggleRecurringTemplate}
+                    onDeleteTemplate={handleDeleteRecurringTemplate}
+                    onGenerateSlots={handleGenerateSlots}
                     onDeleteSlot={handleDeleteShiftSlot}
                     onRegister={handleRegisterSlot}
                     onUnregister={handleUnregisterSlot}
@@ -1986,6 +1951,8 @@ export default function App() {
                     onDeleteScheme={handleDeletePromoScheme}
                     currentUserId={activeUser.id}
                     myTalentId={activeUser.assignedTalentId}
+                    // P1 (0088): chỉ ops tạo/sửa ca — brand xem lịch, không có nút tạo (RLS 0035 đã gỡ).
+                    canEdit={currentRole === "ceo" || currentRole === "operations" || currentRole === "admin"}
                     onAddSession={handleAddSession}
                     onUpdateSession={handleUpdateSession}
                     onCreateSlot={handleCreateShiftSlot}
@@ -1993,11 +1960,6 @@ export default function App() {
                     onRegisterSlot={handleRegisterSlot}
                     onUnregisterSlot={handleUnregisterSlot}
                     onFinalizeSlot={handleFinalizeShiftSlot}
-                    recurringShiftTemplates={recurringShiftTemplates}
-                    onCreateTemplate={handleCreateRecurringTemplate}
-                    onToggleTemplate={handleToggleRecurringTemplate}
-                    onDeleteTemplate={handleDeleteRecurringTemplate}
-                    onGenerateMonthSlots={(month) => handleGenerateMonthSlots(month, currentBrandId!)}
                   />
                 )}
 

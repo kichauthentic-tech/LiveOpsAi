@@ -1,11 +1,10 @@
 import React, { useMemo, useState } from "react";
-import { LiveSession, PromoScheme, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, Studio, SystemUser, Talent } from "../../types";
+import { LiveSession, PromoScheme, ShiftSlot, ShiftRegistration, Studio, SystemUser, Talent } from "../../types";
 import { CalendarIcon, ChevronLeft, ChevronRight, Plus, Tag } from "lucide-react";
 import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
 import { schemesForDate } from "../../lib/schemeUtils";
 import { CAMPAIGN_DAY_STYLES, getCampaignDayInfo } from "../../lib/campaignDays";
 import { BrandSessionModal } from "./BrandSessionModal";
-import { RecurringTemplateManager } from "../scheduling/RecurringTemplateManager";
 import { SlotDetailModal } from "../scheduling/SlotDetailModal";
 import { PosterCalendarHeader, PosterCalendarGrid, PosterDayCell } from "../ui/PosterCalendarGrid";
 import { EventPill, EventPillTier } from "../ui/EventPill";
@@ -44,11 +43,6 @@ interface BrandCalendarProps {
   onRegisterSlot?: (slotId: string, talentId: string) => Promise<boolean>;
   onUnregisterSlot?: (slotId: string, talentId: string) => Promise<boolean>;
   onFinalizeSlot?: (slot: ShiftSlot, hostId: string, coHostId: string | null) => Promise<boolean>;
-  recurringShiftTemplates?: RecurringShiftTemplate[];
-  onCreateTemplate?: (t: RecurringShiftTemplate) => Promise<boolean>;
-  onToggleTemplate?: (t: RecurringShiftTemplate) => Promise<boolean>;
-  onDeleteTemplate?: (id: string) => Promise<void>;
-  onGenerateMonthSlots?: (month: string) => Promise<number>;
 }
 
 const WEEKDAY_LABELS = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
@@ -110,12 +104,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
   onDeleteSlot,
   onRegisterSlot,
   onUnregisterSlot,
-  onFinalizeSlot,
-  recurringShiftTemplates = [],
-  onCreateTemplate,
-  onToggleTemplate,
-  onDeleteTemplate,
-  onGenerateMonthSlots
+  onFinalizeSlot
 }) => {
   const today = new Date();
   const [month, setMonth] = useState(`${today.getFullYear()}-${`${today.getMonth() + 1}`.padStart(2, "0")}`);
@@ -130,8 +119,6 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
   const brandTheme = getBrandTheme(brandName);
   const moderators = users.filter((u) => u.role === "moderator");
   const canManage = canEdit && !!onAddSession && !!onUpdateSession && !!onCreateSlot;
-  const canManageTemplates = canManage && !!onCreateTemplate && !!onToggleTemplate && !!onDeleteTemplate && !!onGenerateMonthSlots;
-  const brandTemplates = useMemo(() => recurringShiftTemplates.filter((t) => t.brandId === brandId), [recurringShiftTemplates, brandId]);
 
   const brandSessions = useMemo(() => sessions.filter((s) => s.brandId === brandId), [sessions, brandId]);
   const brandSchemes = useMemo(() => schemes.filter((s) => s.brandId === brandId), [schemes, brandId]);
@@ -374,23 +361,6 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
           </>
         }
       />
-
-      {viewMode === "month" && canManageTemplates && (
-        <RecurringTemplateManager
-          templates={brandTemplates}
-          brands={[]}
-          studios={studios}
-          lockedBrandId={brandId}
-          lockedBrandName={brandName}
-          currentMonth={m}
-          currentYear={y}
-          currentUserId={currentUserId}
-          onCreateTemplate={onCreateTemplate!}
-          onToggleTemplate={onToggleTemplate!}
-          onDeleteTemplate={onDeleteTemplate!}
-          onGenerateMonthSlots={onGenerateMonthSlots!}
-        />
-      )}
 
       {viewMode === "month" && (
       <PosterCalendarGrid weekdayLabels={WEEKDAY_LABELS} minWidthClassName="min-w-[1080px] xl:min-w-0">
