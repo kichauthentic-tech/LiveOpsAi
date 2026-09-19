@@ -243,7 +243,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
           talentId: t.id,
           name: t.name,
           matchScore,
-          predictedGmv: `${((t.avgGmvPerSession || 100000000) / 1000000).toFixed(0)}M - ${(((t.avgGmvPerSession || 100000000) * 1.25) / 1000000).toFixed(0)}M đ`,
+          predictedGmv: t.avgGmvPerSession > 0 ? `${(t.avgGmvPerSession / 1000000).toFixed(0)}M - ${((t.avgGmvPerSession * 1.25) / 1000000).toFixed(0)}M đ` : "chưa có dữ liệu",
           reasoning: `Thế mạnh ngành ${nicheStr}, CVR trung bình ${t.cvrAvg}%, GMV tích lũy ${((t.totalGmv || 0) / 1000000).toFixed(0)}M đ. Rất phù hợp với ${activeBrand?.name || "Brand"}.`
         };
       });
@@ -391,7 +391,6 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
             const nicheArr = t.niches || (t as any).niche || [];
             const nicheStr = Array.isArray(nicheArr) ? nicheArr.join(", ") : String(nicheArr || "Đa ngành");
             const avatar = t.avatar || (t as any).avatarUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250";
-            const score = t.overallScore || (t as any).aiMatchScore || 90;
             const rate = t.ratePerSession || (t as any).rateCardFee || 0;
 
             return (
@@ -445,8 +444,8 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 text-[10px] text-[var(--text-muted)] bg-[var(--surface-base)]/40 p-2.5 rounded-xl border border-[var(--border)] font-medium">
-                  <div>GMV TB: <strong className="text-emerald-400 block text-xs font-bold">{((t.avgGmvPerSession || 100000000) / 1000000).toFixed(0)}M đ</strong></div>
-                  <div>CVR TB: <strong className="text-[var(--accent-text)] block text-xs font-bold">{t.cvrAvg || 4.5}%</strong></div>
+                  <div>GMV TB: <strong className="text-emerald-400 block text-xs font-bold">{t.avgGmvPerSession > 0 ? `${(t.avgGmvPerSession / 1000000).toFixed(0)}M đ` : "—"}</strong></div>
+                  <div>CVR TB: <strong className="text-[var(--accent-text)] block text-xs font-bold">{t.cvrAvg > 0 ? `${t.cvrAvg}%` : "—"}</strong></div>
                   {canSeeRate && (
                     <>
                       <div>Rate Card: <strong className="text-[var(--text)] block font-bold">{rate.toLocaleString()} đ</strong></div>

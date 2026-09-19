@@ -46,7 +46,7 @@ Ground truth luôn là `AGENCY_NAV_GROUPS`/`BRAND_NAV_GROUPS` ở [src/App.tsx](
 ## Còn lại — chưa làm / còn mock
 
 - **Tích hợp TikTok API tự động** — hiện 100% nhập tay qua Dataraw, chờ scope Developer/ISV.
-- **Theme toggle (light/dark) chưa phủ hết app** — hạ tầng có sẵn app-wide, nhưng chỉ 2 calendar (`LiveCalendar`/`BrandCalendar`) có class `dark:`, phần còn lại (sidebar, Header, mọi modal/bảng) vẫn hardcode màu dark cũ — không vỡ, chỉ không đổi màu khi toggle. Làm dần khi có yêu cầu, không có deadline.
+- **Theme sáng (sand) — xong 2026-09-19 bằng lớp chuyển màu CSS**, không sửa từng component: cuối `src/index.css` có bộ selector `html:not(.dark) [class~="bg-{màu}-950"]…` ánh xạ ~130 nền tối `bg-*-950/900`, ~300 chữ nhạt `text-*-200/300/400`, ~70 viền `border-*-700/800/900` và slate rời rạc sang sắc độ sáng (100 / 700 / 300 / token). Nằm ngoài `@layer` nên thắng utility Tailwind; theme tối (.dark) không bị đụng. Token `--text-faint` của sand đổi #a8a29e → #78716c (2.5:1 → 4.6:1). Đã soát 13 tab agency + 5 tab brand bằng script đo tương phản trong browser — còn lại là false positive (chữ trắng trên gradient thẻ ca). Component mới: cứ viết dark-first như cũ, lớp này tự lo theme sáng; muốn màu riêng cho theme sáng thì dùng token `var(--…)`.
 
 ## Tầng dữ liệu gốc mới — snapshot theo ca (Giai đoạn 1, xong 2026-09-17)
 
