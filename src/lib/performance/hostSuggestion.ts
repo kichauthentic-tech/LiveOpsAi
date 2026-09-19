@@ -40,7 +40,7 @@ export interface SlotContext {
 // Ngưỡng cảnh báo mệt: > 24h/tuần đã xếp (≈ 8 ca 3h) — ops vẫn chọn được, chỉ được nhắc.
 export const FATIGUE_WEEK_HOURS = 24;
 
-const mondayOf = (date: string) => {
+export const mondayOf = (date: string) => {
   const d = new Date(`${date}T00:00:00`);
   const diff = (d.getDay() + 6) % 7;
   d.setDate(d.getDate() - diff);

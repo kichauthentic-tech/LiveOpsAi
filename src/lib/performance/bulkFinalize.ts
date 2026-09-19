@@ -1,6 +1,7 @@
 import { LiveSession, ShiftRegistration, ShiftSlot } from "../../types";
 import { timeRangesOverlap } from "../dateUtils";
-import { FATIGUE_WEEK_HOURS, HostSuggestion, suggestHosts } from "./hostSuggestion";
+import { FATIGUE_WEEK_HOURS, HostSuggestion, mondayOf, suggestHosts } from "./hostSuggestion";
+import { sessionDurationHours } from "../pnl";
 
 // Chốt lịch hàng loạt (điểm nghẽn #3 của audit module Vận Hành Live). Không phải vòng lặp gọi
 // onFinalizeSlot nhiều lần — có một cái bẫy bắt buộc phải xử ở đây:
@@ -88,7 +89,13 @@ interface BatchLedger {
   // talentId -> các khung giờ đã bị chiếm
   byTalent: Map<string, { date: string; startTime: string; endTime: string }[]>;
   byStudio: Map<string, { date: string; startTime: string; endTime: string }[]>;
+  // "talentId|thứ-hai-của-tuần" -> giờ đã gán trong mẻ. `weekHours` từ suggestHosts chỉ đếm ca ĐÃ
+  // TỒN TẠI; không cộng sổ này thì một người có thể nhận 30h trong một lần bấm mà không ai bị coi
+  // là mệt.
+  weekHoursByTalent: Map<string, number>;
 }
+
+const weekKey = (talentId: string, date: string) => `${talentId}|${mondayOf(date)}`;
 
 function busyInBatch(
   ledger: Map<string, { date: string; startTime: string; endTime: string }[]>,
@@ -129,7 +136,7 @@ export function planBulkFinalize(
   opts: PlanOptions
 ): BulkPlanRow[] {
   const eligible = eligibleSlots(slots, registrationsBySlot, opts.month, opts.today);
-  const ledger: BatchLedger = { byTalent: new Map(), byStudio: new Map() };
+  const ledger: BatchLedger = { byTalent: new Map(), byStudio: new Map(), weekHoursByTalent: new Map() };
   const rows: BulkPlanRow[] = [];
 
   for (const slot of eligible) {
@@ -145,8 +152,11 @@ export function planBulkFinalize(
     );
 
     // Người đầu tiên (theo xếp hạng) mà không bận ở khung giờ này. Giai đoạn D: người đã quá ngưỡng
-    // giờ/tuần bị đẩy xuống cuối hàng (vẫn được chọn nếu không còn ai) — mệt thì bán kém.
-    const ordered = [...candidates].sort((a, b) => Number(a.weekHours > FATIGUE_WEEK_HOURS) - Number(b.weekHours > FATIGUE_WEEK_HOURS));
+    // giờ/tuần (ca đã có + ca mẻ này vừa gán) bị đẩy xuống cuối hàng — vẫn được chọn nếu không còn ai.
+    const slotHours = sessionDurationHours(slot.startTime, slot.endTime);
+    const tired = (c: HostSuggestion) =>
+      c.weekHours + (ledger.weekHoursByTalent.get(weekKey(c.talentId, slot.date)) ?? 0) + slotHours > FATIGUE_WEEK_HOURS;
+    const ordered = [...candidates].sort((a, b) => Number(tired(a)) - Number(tired(b)));
     const free = ordered.find(
       (c) =>
         !conflictsWithExisting(sessions, slot, c.talentId).host &&
@@ -154,7 +164,11 @@ export function planBulkFinalize(
     );
     const hostId = free?.talentId ?? "";
 
-    if (hostId) claim(ledger.byTalent, hostId, slot);
+    if (hostId) {
+      claim(ledger.byTalent, hostId, slot);
+      const wk = weekKey(hostId, slot.date);
+      ledger.weekHoursByTalent.set(wk, (ledger.weekHoursByTalent.get(wk) ?? 0) + slotHours);
+    }
     // Studio bị chiếm theo ca chứ không theo người — claim kể cả khi chưa gán được host, vì ca vẫn
     // sẽ dùng phòng đó nếu ops tự chọn người sau.
     const studioBusyInBatch = slot.studioId ? busyInBatch(ledger.byStudio, slot.studioId, slot) : false;
