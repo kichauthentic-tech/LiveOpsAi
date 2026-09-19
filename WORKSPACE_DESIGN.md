@@ -316,11 +316,21 @@ Quyết định của user: **chỉ Ops tạo ca**; brand xem lịch, không t�
 3. *Chỉnh tay*: thêm/bớt/kéo ca, sửa target/ca; thanh trạng thái hiện lệch giờ/target so với cam kết theo thời gian thực.
 4. *Chốt kế hoạch*: sinh `shift_slots` qua RPC `generate_shift_slots` (0088, chống trùng sẵn) + lưu target/ca. **Chốt lại** sau khi sửa = diff: thêm ca mới, huỷ ca `open` chưa ai đăng ký bị bỏ, KHÔNG đụng ca đã chốt host / đã có đăng ký (báo ra để ops tự xử).
 
-**Engine gợi ý (thuần, test được):** từ ca `tiktok_reconciled` của brand ≥ 2 tháng gần nhất: ma trận thứ-trong-tuần × khối giờ (2h) → GMV/giờ trung bình và số giờ đã live. Điểm mỗi ô = GMV/giờ chuẩn hoá × hệ số camp (ngày camp nhân theo % tab 05). Phân giờ cam kết vào các ô điểm cao nhất, gom thành ca liền kề (mặc định 3h), tối đa N ca/ngày, ngày nào có ca thì ≥ 1 ca đủ 3h. Target/ca = target khung × (giờ ca × GMV/giờ dự kiến của ô) / Σ cùng khung. Brand chưa đủ lịch sử → rơi về quy tắc lặp hiện có (P1) + chia target đều theo giờ, ghi rõ "chưa có lịch sử".
+**Engine gợi ý (thuần, test được) — user yêu cầu 2026-09-19 "phức tạp, chi tiết, thông minh hơn"; đã chốt phạm vi:**
+
+*Bỏ khỏi phạm vi (user chốt):* ràng buộc studio (mỗi brand 1 phòng riêng, không trùng); ràng buộc quỹ talent (host dùng chéo brand thoải mái, không thiếu người); lớp Ads (ads phân bổ theo % target GMV — chỉ là số suy ra từ target/ca, không phải đầu vào engine).
+
+1. *Tín hiệu (không chỉ GMV/giờ):* tách GMV = người xem × CTR × CVR × giá trị đơn, mỗi thành phần có nhịp giờ riêng → gắn nhãn ô "nhiều traffic – yếu chuyển đổi"; **lợi suất giảm dần** theo số ca/ngày (ước từ lịch sử) để biết khi nào thêm ngày thay vì thêm ca; **trọng số thời gian** (suy giảm mũ theo tháng, xu hướng tháng-qua-tháng, cùng-tháng-năm-trước khi có); **shrinkage** ô ít quan sát về trung bình brand + winsorize outlier. Dữ liệu: cột Creator-Live-Performance đã có.
+2. *Lịch:* hệ số camp **học từ lịch sử của chính brand** (D-Day/Mid/Pay thực tế gấp mấy lần ngày thường), kèm ngày "nóng máy" trước camp và "hụt" sau camp; bảng **ngày lễ VN + mega sale nền tảng** dùng chung (mới); ngày trùng **scheme khuyến mãi** (promo_schemes / file Khuyến Mãi) được ưu tiên theo uplift đo được.
+3. *Tối ưu có ràng buộc* (tham lam + hoán đổi cục bộ, không hộp đen): tối đa GMV kỳ vọng với ràng buộc cứng Σ giờ = cam kết, khung giờ được live, tối đa N ca/ngày, nghỉ tối thiểu giữa 2 ca, ngày brand cấm; ràng buộc mềm % theo khung camp của tab 05, rải đều theo tuần, **điểm đều đặn** (thuật toán TikTok ưu tiên live cùng giờ hằng ngày → khung neo cố định được thưởng), khung brand yêu cầu.
+4. *Giải thích + kịch bản:* mỗi ca có lý do ("T7 20–23h · GMV/giờ 8,2tr (9 ca, 3 tháng) · +35% vs TB · Pay-Day ×1,4"); **đường cong biên** (giờ 1–80 mang X, giờ 81–100 chỉ thêm Y); **khả thi target** ("100h → dự báo 3,9 tỷ vs target 4,5 tỷ: cần 115h hoặc CVR +0,3 điểm hoặc dồn 12h vào camp"); 3 phương án *Tối đa GMV / Cân bằng / Tiết kiệm*; target/ca = dự báo GMV từng ca scale về tổng, cờ "kỳ vọng cao" khi target > dự báo ×1,3.
+5. *Tự hiệu chỉnh:* cuối tháng so kế hoạch vs thực tế từng ca (sau đối soát) → sai số theo ô thứ × giờ chỉnh trọng số tháng sau, hiện "độ tin cậy gợi ý"; khi có host gán: lớp host × brand × khung giờ, mệt mỏi (giờ/tuần), công bằng — gợi ý host (để sau).
+
+Brand chưa đủ lịch sử (< 2 tháng đối soát) → rơi về quy tắc lặp (P1) + chia target đều theo giờ, ghi rõ "chưa có lịch sử".
 
 **DB dự kiến:** `brand_month_plans(id, brand_id, month date, status draft|locked, settings jsonb, locked_at, locked_by)` + `brand_month_plan_slots(id, plan_id, date, start_time, end_time, target_gmv, slot_id → shift_slots null, note)`. RLS ceo/admin/operations ghi, authenticated đọc. Chốt = RPC security definer (guard trong thân hàm theo mẫu 0082) làm cả sinh slot + ghi slot_id trong 1 transaction.
 
-**Thứ tự làm:** A — khung module + lưới + chốt (dời P1 vào, chưa gợi ý) → B — engine gợi ý + target/ca nối vào `applyAllocatedTargets` → C — chốt lại/diff + nhắc việc ("tháng sau chưa có kế hoạch"). Điều kiện bắt đầu B có ý nghĩa: ≥ 2 tháng ca đối soát của brand (CROCS đã đủ về khung giờ).
+**Thứ tự làm:** A — khung module + lưới + chốt (dời P1 vào, chưa gợi ý) → B — engine lớp 1 + 3 + 4 (tín hiệu đầy đủ, tối ưu ràng buộc, giải thích/đường cong biên/khả thi target) + target/ca nối vào `applyAllocatedTargets` → C — lớp 2 (ngày lễ, camp học từ lịch sử, scheme) + 3 phương án + chốt lại/diff + nhắc việc → D — lớp 5 (tự hiệu chỉnh, host). Điều kiện bắt đầu B có ý nghĩa: ≥ 2 tháng ca đối soát của brand (CROCS đã đủ về khung giờ).
 
 ## Giai đoạn hiện tại (từ 2026-09-18): CHẠY THỬ THẬT — không build thêm tính năng
 
