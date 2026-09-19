@@ -79,8 +79,10 @@ export interface SuggestConstraints {
   today: string;
   committedHours: number;
   targetGmv: number; // 0 = chưa có
-  bucketShare?: Partial<Record<CampDayBucket, number>>; // tỷ trọng target theo khung (0..1) từ tab 05
-  camp?: CampOverrides;
+  // "hours" (mặc định): xếp đủ committedHours. "target": xếp tới khi dự báo chạm targetGmv (hoặc hết
+  // chỗ trong khung) — trả về số giờ cần; committedHours chỉ dùng để so trong ghi chú.
+  mode?: "hours" | "target";
+  camp?: CampOverrides; // khoảng ngày camp riêng của kế hoạch (trống = lịch camp cố định)
   liveWindowStart: string;
   liveWindowEnd: string;
   defaultSlotHours: number;
@@ -494,14 +496,6 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
     // Phương án: "lean" dồn vào ngày đã có ca (mở ngày mới ×0.92); "balanced" phạt ngày ≥ 2 ca ×0.9.
     if (strategy === "lean" && sameDay.length === 0 && state.length > 0) score *= 0.92;
     if (strategy === "balanced" && sameDay.length >= 1) score *= 0.9;
-    // Mềm: tỷ trọng khung camp theo tab 05 — vượt 125% tỷ trọng thì giảm 15%.
-    if (c.bucketShare && target > 0) {
-      const share = c.bucketShare[cand.bucket];
-      if (share !== undefined && share > 0) {
-        const bucketHours = state.filter((s) => s.bucket === cand.bucket).reduce((a, s) => a + s.hours, 0);
-        if ((bucketHours + cand.hours) / target > share * 1.25) score *= 0.85;
-      } else if (share === 0) score *= 0.7;
-    }
     // Mềm: rải đều tuần — tuần đã > 130% mức trung bình thì giảm 10%.
     if (target > 0) {
       const wk = weekOf(cand.date);
@@ -515,6 +509,7 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
     return score;
   };
 
+  const stopAtTarget = c.mode === "target" && c.targetGmv > 0;
   const greedy = (targetHours: number): { picked: Candidate[]; curve: MarginalPoint[] } => {
     const state = [...chosen];
     const picked: Candidate[] = [];
@@ -561,8 +556,9 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
     const campDates = [...new Set(candidates.filter((x) => x.bucket !== "daily" && history.campHoursPerDay[x.bucket] > 0).map((x) => x.date))].sort();
     const campGoalTotal = campDates.reduce((a, d) => a + history.campHoursPerDay[resolveCampBucketType(d, c.camp)], 0);
     const campScale = campGoalTotal > 0 ? Math.min(1, Math.max(0, targetHours - hours) / campGoalTotal) : 0;
+    const reached = () => stopAtTarget && cum >= c.targetGmv;
     for (const date of campDates) {
-      if (hours + 0.01 >= targetHours) break;
+      if (hours + 0.01 >= targetHours || reached()) break;
       const bucket = resolveCampBucketType(date, c.camp);
       const goal = history.campHoursPerDay[bucket] * campScale;
       const already = state.filter((x) => x.date === date);
@@ -587,14 +583,14 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
       }
       if (!bestBlock) continue;
       for (const slot of bestBlock) {
-        if (hours + 0.01 >= targetHours) break;
+        if (hours + 0.01 >= targetHours || reached()) break;
         if (!take([slot])) break;
       }
     }
 
     // Pha 2 — phần còn lại theo điểm biên trên toàn tháng.
     let guard = 0;
-    while (hours + 0.01 < targetHours && guard++ < 400) {
+    while (hours + 0.01 < targetHours && !reached() && guard++ < 400) {
       if (!take(candidates)) break;
     }
     return { picked, curve };
@@ -610,7 +606,9 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
     }
   }
   if (c.calibration && c.calibration.size > 0) notes.push(`Đã hiệu chỉnh GMV/giờ theo kế hoạch vs thực tế các tháng trước (${c.calibration.size} ô thứ × giờ có dữ liệu).`);
-  const main = greedy(committed);
+  // Chế độ target: trần giờ = sức chứa khung (mọi ngày còn lại × giờ khung), dừng khi dự báo chạm target.
+  const capacityHours = [...new Set(candidates.map((x) => x.date))].length * ((winEnd - winStart) / 60);
+  const main = greedy(stopAtTarget ? capacityHours : committed);
 
   // Dự báo + target/ca.
   const all = [...chosen, ...main.picked];
@@ -653,6 +651,7 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
   let hoursToHitTarget: number | null = null;
   if (c.targetGmv > 0) {
     if (forecastGmv >= c.targetGmv) hoursToHitTarget = all.reduce((a, s) => a + s.hours, 0);
+    else if (stopAtTarget) hoursToHitTarget = null; // đã chạy hết sức chứa mà chưa chạm
     else {
       const ext = greedy(Math.max(committed * 2, committed + 40));
       const hit = ext.curve.find((p) => p.gmv >= c.targetGmv);
@@ -661,8 +660,11 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
   }
 
   const totalHours = all.reduce((a, s) => a + s.hours, 0);
-  if (committed > 0 && totalHours + 0.01 < committed) notes.push(`Chỉ xếp được ${totalHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h / ${committed}h — hết chỗ trong khung giờ hoặc chạm tối đa ca/ngày; nới khung hoặc số ca/ngày.`);
-  if (c.targetGmv > 0) {
+  if (stopAtTarget) {
+    if (forecastGmv >= c.targetGmv) notes.push(`Xếp theo target: cần ${totalHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h để dự báo chạm ${fmtM(c.targetGmv)}${committed > 0 ? ` (cam kết ${committed}h → ${totalHours > committed ? "thiếu" : "dư"} ${Math.abs(totalHours - committed).toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h)` : ""}.`);
+    else notes.push(`Xếp theo target: lấp hết chỗ (${totalHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h trong khung giờ / tối đa ca/ngày) vẫn chỉ dự báo ${fmtM(forecastGmv)} / ${fmtM(c.targetGmv)} — target vượt sức lịch sử; nới khung giờ, tăng CVR/AOV hoặc hạ target.`);
+  } else if (committed > 0 && totalHours + 0.01 < committed) notes.push(`Chỉ xếp được ${totalHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h / ${committed}h — hết chỗ trong khung giờ hoặc chạm tối đa ca/ngày; nới khung hoặc số ca/ngày.`);
+  if (c.targetGmv > 0 && !stopAtTarget) {
     const gap = c.targetGmv - forecastGmv;
     if (gap > 0) notes.push(hoursToHitTarget ? `Dự báo thiếu ${fmtM(gap)} so với target — cần ~${Math.ceil(hoursToHitTarget)}h (thay vì ${committed}h) theo cùng cách xếp.` : `Dự báo thiếu ${fmtM(gap)} so với target — thêm giờ trong khung cũng không chạm được; cần tăng CVR/AOV hoặc hạ target.`);
     else notes.push(`Dự báo vượt target ${fmtM(-gap)} — có dư địa giảm giờ hoặc nâng target.`);
@@ -679,4 +681,34 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
     confidence,
     notes
   };
+}
+
+// Dự báo GMV cho một lưới ca đã có (không xếp gì thêm) — cùng công thức với gợi ý, để "Chia target"
+// trên lưới ops tự vẽ ra cùng một con số với lưới engine vẽ. Không có lịch sử → trả toàn 0, người
+// gọi tự rơi về chia theo giờ.
+export function estimateSlots(
+  history: HistorySummary,
+  slots: { date: string; startTime: string; endTime: string }[],
+  ctx: Pick<SuggestConstraints, "camp" | "events" | "schemes" | "calibration">
+): number[] {
+  if (history.brandGmvPerHour <= 0) return slots.map(() => 0);
+  const get = cellLookup(history);
+  const eventByDate = new Map<string, CalendarEvent>();
+  for (const e of ctx.events ?? []) if (!eventByDate.has(e.date)) eventByDate.set(e.date, e);
+  const dayFactor = (date: string) => {
+    const e = eventByDate.get(date);
+    const sch = (ctx.schemes ?? []).some((r) => date >= r.start && date <= r.end);
+    return (e ? history.eventMultipliers[e.kind] : 1) * (sch ? history.schemeMultiplier : 1);
+  };
+  const parsed = slots.map((s) => ({ ...s, start: toMin(s.startTime), end: toMin(s.endTime), bucket: resolveCampBucketType(s.date, ctx.camp) }));
+  return parsed.map((s) => {
+    const hours = (s.end - s.start) / 60;
+    if (hours <= 0) return 0;
+    const { gph } = expectedGphFor(s.date, s.start, s.end, history, get, ctx.calibration);
+    const before = parsed.filter((x) => x.date === s.date && x.start < s.start);
+    const hoursBefore = before.reduce((a, x) => a + Math.max(0, (x.end - x.start) / 60), 0);
+    const goal = history.campHoursPerDay[s.bucket];
+    const dim = goal > 0 && hoursBefore + hours <= goal + 0.01 ? 1 : history.diminishing[Math.min(before.length, history.diminishing.length - 1)];
+    return gph * history.campMultipliers[s.bucket] * dim * dayFactor(s.date) * hours;
+  });
 }

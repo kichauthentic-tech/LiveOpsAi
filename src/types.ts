@@ -686,8 +686,12 @@ export interface BrandMonthPlan {
   maxSlotsPerDay: number;
   notes: string;
   blackoutDates: string[]; // ngày brand cấm live (0091)
+  targetGmv: number; // target GMV tháng của kế hoạch (0094) — riêng, không đọc Report Tháng
+  campRanges: PlanCampRanges; // khoảng ngày camp riêng (0094); thiếu khoá = lịch camp cố định
   lockedAt?: string;
 }
+
+export type PlanCampRanges = Partial<Record<"dday" | "midmonth" | "payday", { start: string; end: string }>>;
 
 // Lịch sự kiện dùng chung (0091): ngày lễ VN, mega sale nền tảng, sự kiện — engine gợi ý học hệ số.
 export interface CalendarEventRow {

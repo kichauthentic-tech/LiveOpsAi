@@ -1,7 +1,6 @@
 // Kế Hoạch Tháng — phần thuần cho lưới ngày × ca (giai đoạn A, 0090). Không gọi DB.
-import { BrandMonthPlan, BrandMonthPlanSlot, LiveSession, RecurringShiftTemplate } from "../../types";
+import { BrandMonthPlan, BrandMonthPlanSlot, RecurringShiftTemplate } from "../../types";
 import { sessionDurationHours } from "../pnl";
-import { MonthTargetPlan, allocateSessionTargets } from "../performance/targetAllocation";
 import { planMonthSlots } from "./planMonthSlots";
 
 export interface PlanDraftSlot {
@@ -77,14 +76,18 @@ export function mergeFromTemplates(
   return { next: [...drafts, ...added], added: added.length };
 }
 
-// Chia target tổng xuống từng ca theo đúng quy tắc đang dùng cho ca thật (targetAllocation):
-// theo giờ trong từng khung camp, khung không có ca thì dồn sang ca còn lại.
-export function allocateDraftTargets(drafts: PlanDraftSlot[], plan: MonthTargetPlan): PlanDraftSlot[] {
-  const pseudo = drafts.map(
-    (d) => ({ id: d.key, brandId: plan.brandId, date: d.date, startTime: d.startTime, endTime: d.endTime, status: "Upcoming" }) as unknown as LiveSession
-  );
-  const alloc = allocateSessionTargets(pseudo, plan);
-  return drafts.map((d) => ({ ...d, targetGmv: Math.round(alloc.get(d.key) ?? 0) }));
+// Chia target tổng xuống từng ca theo trọng số (dự báo engine; không có lịch sử thì theo giờ) — một
+// công thức duy nhất cho cả lưới ops tự vẽ lẫn lưới engine gợi ý. Ca cuối nhận phần dư làm tròn.
+export function allocateDraftTargets(drafts: PlanDraftSlot[], targetTotal: number, weights: number[]): PlanDraftSlot[] {
+  const w = weights.some((x) => x > 0) ? weights : drafts.map(slotHours);
+  const sum = w.reduce((a, b) => a + b, 0);
+  if (sum <= 0 || targetTotal <= 0) return drafts.map((d) => ({ ...d, targetGmv: 0 }));
+  let assigned = 0;
+  return drafts.map((d, i) => {
+    const t = i === drafts.length - 1 ? Math.round(targetTotal - assigned) : Math.round((targetTotal * w[i]) / sum);
+    assigned += t;
+    return { ...d, targetGmv: t, expectedGmv: weights[i] > 0 ? Math.round(weights[i]) : d.expectedGmv };
+  });
 }
 
 export interface PlanTotals {

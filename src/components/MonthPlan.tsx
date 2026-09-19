@@ -1,12 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Brand, BrandMonthPlan, BrandMonthPlanSlot, BrandMonthlyCommitment, BrandMonthlyReport, CalendarEventRow, LiveSession, PromoScheme, RecurringShiftTemplate, ShiftSlot, Studio } from "../types";
+import { Brand, BrandMonthPlan, BrandMonthPlanSlot, BrandMonthlyCommitment, CalendarEventRow, LiveSession, PlanCampRanges, PromoScheme, RecurringShiftTemplate, ShiftSlot, Studio } from "../types";
 import { AlertTriangle, Ban, CalendarRange, ChevronLeft, ChevronRight, Lock, Plus, Repeat, Save, Sparkles, Wand2, X } from "lucide-react";
 import { fetchBrandMonthlyCommitments } from "../lib/db/brandContracts";
 import { PlanSettings, fetchBrandLockedPlanSlots, fetchCalendarEvents, fetchMonthPlan, fetchPlanStatuses, lockMonthPlan, replacePlanSlots, upsertMonthPlan } from "../lib/db/monthPlans";
 import { PlanEvaluation, buildCalibration, evaluatePlan } from "../lib/scheduling/planEvaluation";
-import { buildMonthTargetPlan, monthTotalTarget } from "../lib/performance/targetAllocation";
 import { todayVn } from "../lib/performance/brandCommitment";
-import { CAMPAIGN_DAY_STYLES, getCampaignDayInfo, resolveCampBucketType } from "../lib/campaignDays";
+import { CAMPAIGN_DAY_STYLES, resolveCampBucketType } from "../lib/campaignDays";
 import {
   PlanDraftSlot,
   allocateDraftTargets,
@@ -20,7 +19,7 @@ import {
   validateDrafts
 } from "../lib/scheduling/monthPlanGrid";
 import { RecurringRulesPanel } from "./scheduling/RecurringRulesPanel";
-import { HistorySummary, STRATEGY_LABEL, SuggestResult, SuggestStrategy, buildHistory, suggestMonthPlan } from "../lib/scheduling/suggestEngine";
+import { HistorySummary, STRATEGY_LABEL, SuggestResult, SuggestStrategy, buildHistory, estimateSlots, suggestMonthPlan } from "../lib/scheduling/suggestEngine";
 import { formatCurrencyAdaptive } from "../lib/formatCurrency";
 
 interface MonthPlanProps {
@@ -31,7 +30,6 @@ interface MonthPlanProps {
   shiftSlots: ShiftSlot[];
   promoSchemes: PromoScheme[];
   currentUserId: string;
-  monthlyReports: Map<string, BrandMonthlyReport>;
   recurringShiftTemplates: RecurringShiftTemplate[];
   onCreateTemplate: (t: RecurringShiftTemplate) => Promise<boolean>;
   onToggleTemplate: (t: RecurringShiftTemplate) => Promise<boolean>;
@@ -42,7 +40,8 @@ interface MonthPlanProps {
 
 const WEEKDAY_LABELS = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
 const fmtH = (n: number) => n.toLocaleString("vi-VN", { maximumFractionDigits: 1 });
-const DEFAULT_SETTINGS: PlanSettings = { defaultSlotHours: 3, liveWindowStart: "09:00", liveWindowEnd: "23:00", maxSlotsPerDay: 3, notes: "", blackoutDates: [] };
+const DEFAULT_SETTINGS: PlanSettings = { defaultSlotHours: 3, liveWindowStart: "09:00", liveWindowEnd: "23:00", maxSlotsPerDay: 3, notes: "", blackoutDates: [], targetGmv: 0, campRanges: {} };
+const CAMP_RANGE_LABEL: Record<keyof PlanCampRanges, string> = { dday: "D-Day", midmonth: "Mid-Month", payday: "Pay-Day" };
 
 const nextMonthOf = (month: string, delta: number) => {
   const [y, m] = month.split("-").map(Number);
@@ -59,7 +58,6 @@ export default function MonthPlan({
   shiftSlots,
   promoSchemes,
   currentUserId,
-  monthlyReports,
   recurringShiftTemplates,
   onCreateTemplate,
   onToggleTemplate,
@@ -141,7 +139,7 @@ export default function MonthPlan({
         if (!alive) return;
         if (r) {
           setPlan(r.plan);
-          setSettings({ defaultSlotHours: r.plan.defaultSlotHours, liveWindowStart: r.plan.liveWindowStart, liveWindowEnd: r.plan.liveWindowEnd, maxSlotsPerDay: r.plan.maxSlotsPerDay, notes: r.plan.notes, blackoutDates: r.plan.blackoutDates });
+          setSettings({ defaultSlotHours: r.plan.defaultSlotHours, liveWindowStart: r.plan.liveWindowStart, liveWindowEnd: r.plan.liveWindowEnd, maxSlotsPerDay: r.plan.maxSlotsPerDay, notes: r.plan.notes, blackoutDates: r.plan.blackoutDates, targetGmv: r.plan.targetGmv, campRanges: r.plan.campRanges });
           setDrafts(draftsFromSaved(r.slots));
         } else {
           setPlan(null);
@@ -163,8 +161,9 @@ export default function MonthPlan({
     [commitments, brandId, month]
   );
   const planHours = hoursOverride ?? committedHours;
-  const targetPlan = useMemo(() => (brandId ? buildMonthTargetPlan(brandId, month, monthlyReports) : null), [brandId, month, monthlyReports]);
-  const targetTotal = targetPlan ? monthTotalTarget(targetPlan) : 0;
+  // Target và khoảng camp là của riêng kế hoạch (0094) — không đọc Report Tháng.
+  const targetTotal = settings.targetGmv > 0 ? settings.targetGmv : 0;
+  const campRanges = settings.campRanges;
   const totals = useMemo(() => totalsOf(drafts), [drafts]);
   const errors = useMemo(() => validateDrafts(drafts, settings), [drafts, settings]);
   const locked = plan?.status === "locked";
@@ -217,14 +216,23 @@ export default function MonthPlan({
     setDirty(added > 0 || dirty);
     setMsg(added > 0 ? `Nạp thêm ${added} ca từ quy tắc lặp.` : brandTemplates.filter((t) => t.active).length === 0 ? "Brand chưa có quy tắc lặp nào active." : "Mọi ca theo quy tắc đã có trong lưới.");
   };
+  // Chia target tổng xuống ca theo DỰ BÁO từng ca (cùng công thức engine gợi ý); brand chưa có lịch
+  // sử thì chia theo giờ.
   const allocate = () => {
-    if (!targetPlan || targetTotal <= 0) {
-      setMsg("Chưa có target tháng này ở Report Tháng tab 05 (kế hoạch tháng sau của tháng trước).");
+    if (targetTotal <= 0) {
+      setMsg("Nhập Target GMV tháng ở Tham số lập kế hoạch trước.");
       return;
     }
-    setDrafts(allocateDraftTargets(drafts, targetPlan));
+    if (drafts.length === 0) {
+      setMsg("Lưới đang trống — vẽ ca hoặc bấm Gợi ý phân bổ trước.");
+      return;
+    }
+    const history = buildHistory(sessions, brandId, today, { events, schemes: brandSchemes });
+    const weights = estimateSlots(history, drafts, { camp: campRanges, events, schemes: brandSchemes, calibration: calibration?.factors });
+    const byForecast = weights.some((w) => w > 0);
+    setDrafts(allocateDraftTargets(drafts, targetTotal, weights));
     setDirty(true);
-    setMsg(`Đã chia ${formatCurrencyAdaptive(targetTotal)} theo giờ trong từng khung camp.`);
+    setMsg(byForecast ? `Đã chia ${formatCurrencyAdaptive(targetTotal)} theo dự báo từng ca (${history.sessions} ca lịch sử).` : `Brand chưa có lịch sử đối soát — đã chia ${formatCurrencyAdaptive(targetTotal)} đều theo giờ.`);
   };
   // Đổ gợi ý vào lưới. Ngày camp có thể nhiều ca hơn trần ops đặt (engine nới theo giờ/ngày lịch sử) —
   // nâng trần kế hoạch theo, không thì validateDrafts chặn lưu chính cái gợi ý vừa áp.
@@ -239,22 +247,23 @@ export default function MonthPlan({
   };
   // Giai đoạn B — engine gợi ý: ca đang có trong lưới được giữ làm ca cố định, engine xếp thêm cho đủ
   // giờ cam kết và chia target theo dự báo từng ca.
-  const suggest = () => {
-    if (planHours <= 0) {
-      setMsg("Nhập giờ cần xếp (hoặc cam kết ở Cam Kết Hợp Đồng) để engine biết phải xếp bao nhiêu giờ.");
+  const suggest = (mode: "hours" | "target" = "hours") => {
+    if (mode === "hours" && planHours <= 0) {
+      setMsg("Nhập giờ cần xếp (hoặc cam kết ở Cam Kết Hợp Đồng) để engine biết phải xếp bao nhiêu giờ — hoặc nhập Target GMV rồi bấm Xếp theo target.");
+      return;
+    }
+    if (mode === "target" && targetTotal <= 0) {
+      setMsg("Nhập Target GMV tháng ở Tham số lập kế hoạch trước.");
       return;
     }
     const history = buildHistory(sessions, brandId, today, { events, schemes: brandSchemes });
-    const shareBase = targetPlan && targetTotal > 0 ? targetPlan.byBucket : null;
     const base = {
       month,
       today,
+      mode,
       committedHours: planHours,
       targetGmv: targetTotal,
-      bucketShare: shareBase
-        ? { daily: shareBase.daily / targetTotal, dday: shareBase.dday / targetTotal, midmonth: shareBase.midmonth / targetTotal, payday: shareBase.payday / targetTotal }
-        : undefined,
-      camp: targetPlan?.camp,
+      camp: campRanges,
       liveWindowStart: settings.liveWindowStart,
       liveWindowEnd: settings.liveWindowEnd,
       defaultSlotHours: settings.defaultSlotHours,
@@ -279,7 +288,7 @@ export default function MonthPlan({
       return;
     }
     applySuggestion(drafts, result);
-    setMsg(`Gợi ý ${result.slots.length} ca · ${fmtH(result.totalHours)}h · dự báo ${formatCurrencyAdaptive(result.forecastGmv)}${drafts.length > 0 ? ` (giữ ${drafts.length} ca đang có)` : ""}.`);
+    setMsg(`${mode === "target" ? "Xếp theo target" : "Gợi ý"} ${result.slots.length} ca · ${fmtH(result.totalHours)}h · dự báo ${formatCurrencyAdaptive(result.forecastGmv)}${targetTotal > 0 ? ` / target ${formatCurrencyAdaptive(targetTotal)}` : ""}${drafts.length > 0 ? ` (giữ ${drafts.length} ca đang có)` : ""}.`);
   };
 
   const clearAll = () => {
@@ -398,22 +407,47 @@ export default function MonthPlan({
               <input type="time" disabled={!editable} value={settings.liveWindowEnd} onChange={(e) => { setSettings((s) => ({ ...s, liveWindowEnd: e.target.value })); setDirty(true); }} className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] font-mono disabled:opacity-60" />
             </label>
           </div>
+          <label className="block text-xs">
+            <span className="font-bold text-[var(--text-muted)] block mb-1">Target GMV tháng (đ)</span>
+            <input type="number" min="0" step="1000000" disabled={!editable} value={settings.targetGmv || ""} placeholder="0 = chưa đặt" onChange={(e) => { setSettings((s) => ({ ...s, targetGmv: Number(e.target.value) || 0 })); setDirty(true); }} className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] font-mono disabled:opacity-60" />
+            {targetTotal > 0 && <span className="text-[10px] text-[var(--text-faint)]">{formatCurrencyAdaptive(targetTotal)}</span>}
+          </label>
+          <div className="text-xs space-y-1">
+            <span className="font-bold text-[var(--text-muted)] block">Khoảng ngày camp <span className="font-normal text-[var(--text-faint)]">(trống = lịch cố định)</span></span>
+            {(Object.keys(CAMP_RANGE_LABEL) as (keyof PlanCampRanges)[]).map((k) => {
+              const r = campRanges[k];
+              const setRange = (start: string, end: string) => {
+                setSettings((s) => {
+                  const next = { ...s.campRanges };
+                  if (start && end) next[k] = { start, end };
+                  else delete next[k];
+                  return { ...s, campRanges: next };
+                });
+                setDirty(true);
+              };
+              return (
+                <div key={k} className="flex items-center gap-1.5">
+                  <span className="w-20 text-[var(--text)]">{CAMP_RANGE_LABEL[k]}</span>
+                  <input type="date" disabled={!editable} value={r?.start ?? ""} onChange={(e) => setRange(e.target.value, r?.end ?? e.target.value)} className="flex-1 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-1.5 py-1 text-[11px] text-[var(--text)] font-mono disabled:opacity-60" />
+                  <span className="text-[var(--text-faint)]">→</span>
+                  <input type="date" disabled={!editable} value={r?.end ?? ""} onChange={(e) => setRange(r?.start ?? e.target.value, e.target.value)} className="flex-1 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-1.5 py-1 text-[11px] text-[var(--text)] font-mono disabled:opacity-60" />
+                  {r && editable && <button onClick={() => setRange("", "")} className="text-[var(--text-faint)] hover:text-rose-400" title="Bỏ, dùng lịch cố định"><X className="w-3 h-3" /></button>}
+                </div>
+              );
+            })}
+          </div>
           <input type="text" disabled={!editable} value={settings.notes} onChange={(e) => { setSettings((s) => ({ ...s, notes: e.target.value })); setDirty(true); }} placeholder="Ghi chú kế hoạch (tuỳ chọn)" className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-xs text-[var(--text)] disabled:opacity-60" />
         </div>
 
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 space-y-2">
-          <h3 className="text-sm font-bold text-[var(--text)]">Đọc từ nguồn</h3>
+          <h3 className="text-sm font-bold text-[var(--text)]">Giờ live</h3>
           <div className="text-xs space-y-1.5">
             <div className="flex justify-between gap-2"><span className="text-[var(--text-muted)]">Giờ cam kết (Cam Kết Hợp Đồng)</span><b className="text-[var(--text)]">{committedHours > 0 ? `${fmtH(committedHours)}h` : "chưa nhập"}</b></div>
             <div className="flex justify-between items-center gap-2"><span className="text-[var(--text-muted)]">Giờ cần xếp tháng này</span>
               <input type="number" min="0" step="1" disabled={!editable} value={planHours || ""} placeholder="= cam kết" onChange={(e) => setHoursOverride(e.target.value === "" ? null : Number(e.target.value))} className="w-24 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1 text-right font-mono text-[var(--text)] disabled:opacity-60" />
             </div>
-            <div className="flex justify-between gap-2"><span className="text-[var(--text-muted)]">Target GMV (Report Tháng tab 05)</span><b className="text-[var(--text)]">{targetTotal > 0 ? formatCurrencyAdaptive(targetTotal) : "chưa nhập"}</b></div>
-            {targetPlan && targetTotal > 0 && (
-              <div className="text-[10px] text-[var(--text-faint)] leading-relaxed">
-                Ngày thường {formatCurrencyAdaptive(targetPlan.byBucket.daily)} · D-Day {formatCurrencyAdaptive(targetPlan.byBucket.dday)} · Mid {formatCurrencyAdaptive(targetPlan.byBucket.midmonth)} · Pay {formatCurrencyAdaptive(targetPlan.byBucket.payday)}
-              </div>
-            )}
+            <div className="flex justify-between gap-2"><span className="text-[var(--text-muted)]">Target GMV tháng</span><b className="text-[var(--text)]">{targetTotal > 0 ? formatCurrencyAdaptive(targetTotal) : "chưa đặt"}</b></div>
+            <p className="text-[10px] text-[var(--text-faint)] leading-relaxed">Giờ cam kết lấy từ hợp đồng; target đặt ngay trong kế hoạch này. "Gợi ý phân bổ" xếp đủ giờ; "Xếp theo target" xếp tới khi dự báo chạm target và cho biết cần bao nhiêu giờ.</p>
           </div>
         </div>
 
@@ -446,9 +480,10 @@ export default function MonthPlan({
             <select value={strategy} onChange={(e) => setStrategy(e.target.value as SuggestStrategy)} className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs font-bold text-[var(--text)]" title="Phương án gợi ý">
               {(Object.keys(STRATEGY_LABEL) as SuggestStrategy[]).map((k) => <option key={k} value={k}>{STRATEGY_LABEL[k]}</option>)}
             </select>
-            <button onClick={suggest} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] border border-[var(--accent)]/60 text-xs font-bold text-[var(--accent-text)] flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" /> Gợi ý phân bổ</button>
+            <button onClick={() => suggest("hours")} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] border border-[var(--accent)]/60 text-xs font-bold text-[var(--accent-text)] flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" /> Gợi ý phân bổ</button>
+            <button onClick={() => suggest("target")} disabled={targetTotal <= 0} title={targetTotal <= 0 ? "Nhập Target GMV tháng trước" : "Xếp tới khi dự báo chạm target"} className="px-3 py-1.5 rounded-lg border border-[var(--accent)]/40 text-xs font-bold text-[var(--accent-text)] disabled:opacity-40 flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" /> Xếp theo target</button>
             <button onClick={loadTemplates} className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-xs font-bold text-[var(--text)] hover:border-[var(--accent)]">Nạp từ quy tắc</button>
-            <button onClick={allocate} className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-xs font-bold text-[var(--text)] hover:border-[var(--accent)] flex items-center gap-1.5"><Wand2 className="w-3.5 h-3.5" /> Chia target theo khung</button>
+            <button onClick={allocate} className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-xs font-bold text-[var(--text)] hover:border-[var(--accent)] flex items-center gap-1.5"><Wand2 className="w-3.5 h-3.5" /> Chia target theo dự báo</button>
             <button onClick={clearAll} disabled={drafts.length === 0} className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-xs font-bold text-rose-400 disabled:opacity-40">Xoá hết</button>
           </>
         )}
@@ -480,8 +515,7 @@ export default function MonthPlan({
           {cells.map((day, idx) => {
             if (!day) return <div key={`e${idx}`} className="min-h-[96px] rounded-xl bg-[var(--surface-base)]/40" />;
             const list = draftsByDay.get(day) ?? [];
-            const camp = getCampaignDayInfo(day);
-            const bucket = targetPlan ? resolveCampBucketType(day, targetPlan.camp) : camp?.type ?? "daily";
+            const bucket = resolveCampBucketType(day, campRanges);
             const style = bucket !== "daily" ? CAMPAIGN_DAY_STYLES[bucket] : null;
             const past = day < today;
             const dayHours = list.reduce((a, d) => a + slotHours(d), 0);
@@ -491,7 +525,7 @@ export default function MonthPlan({
             return (
               <div key={day} className={`min-h-[96px] rounded-xl border p-1.5 flex flex-col gap-1 ${isBlackout ? "bg-[var(--surface-base)] border-dashed border-rose-800 opacity-70" : style ? style.cell : "bg-[var(--surface-base)] border-[var(--border)]"} ${past ? "opacity-50" : ""}`}>
                 <div className="flex items-center justify-between gap-1">
-                  <span className={`text-xs font-black ${style ? style.text : "text-[var(--text)]"}`}>{Number(day.slice(-2))}{style ? ` · ${camp?.shortLabel ?? bucket}` : ""}</span>
+                  <span className={`text-xs font-black ${style ? style.text : "text-[var(--text)]"}`}>{Number(day.slice(-2))}{style ? ` · ${BUCKET_LABEL[bucket]}` : ""}</span>
                   <span className="text-[9px] text-[var(--text-faint)] flex items-center gap-1">
                     {list.length > 0 ? `${list.length} ca · ${fmtH(dayHours)}h` : ""}
                     {!past && <button onClick={() => toggleBlackout(day)} className={`${isBlackout ? "text-rose-400" : "text-[var(--text-faint)] hover:text-rose-400"}`} title={isBlackout ? "Bỏ cấm live ngày này" : "Cấm live ngày này (engine bỏ qua)"}><Ban className="w-3 h-3" /></button>}

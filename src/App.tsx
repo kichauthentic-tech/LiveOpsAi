@@ -1918,7 +1918,6 @@ export default function App() {
                     shiftSlots={shiftSlots}
                     promoSchemes={promoSchemes}
                     currentUserId={activeUser.id}
-                    monthlyReports={monthlyReports}
                     recurringShiftTemplates={recurringShiftTemplates}
                     onCreateTemplate={handleCreateRecurringTemplate}
                     onToggleTemplate={handleToggleRecurringTemplate}

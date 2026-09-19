@@ -1,5 +1,5 @@
 import { supabase } from "../supabaseClient";
-import { BrandMonthPlan, BrandMonthPlanSlot, CalendarEventRow } from "../../types";
+import { BrandMonthPlan, BrandMonthPlanSlot, CalendarEventRow, PlanCampRanges } from "../../types";
 
 // Kế Hoạch Tháng (0090). Bảng nhỏ (1 dòng plan + ≤ ~100 ca/brand/tháng) — đọc theo brand+tháng,
 // ghi ca kế hoạch bằng cách thay cả lô (xoá dòng không còn, upsert dòng còn) để UI lưới không phải
@@ -16,6 +16,8 @@ interface DbPlan {
   max_slots_per_day: number;
   notes: string;
   blackout_dates: string[] | null;
+  target_gmv: number | null;
+  camp_ranges: PlanCampRanges | null;
   locked_at: string | null;
 }
 
@@ -44,6 +46,8 @@ const planFromDb = (r: DbPlan): BrandMonthPlan => ({
   maxSlotsPerDay: r.max_slots_per_day,
   notes: r.notes,
   blackoutDates: r.blackout_dates ?? [],
+  targetGmv: Number(r.target_gmv ?? 0),
+  campRanges: r.camp_ranges ?? {},
   lockedAt: r.locked_at ?? undefined
 });
 
@@ -85,7 +89,7 @@ export async function fetchPlanStatuses(month: string): Promise<Map<string, Bran
   return new Map((data as DbPlan[]).map((r) => [r.brand_id, planFromDb(r)]));
 }
 
-export type PlanSettings = Pick<BrandMonthPlan, "defaultSlotHours" | "liveWindowStart" | "liveWindowEnd" | "maxSlotsPerDay" | "notes" | "blackoutDates">;
+export type PlanSettings = Pick<BrandMonthPlan, "defaultSlotHours" | "liveWindowStart" | "liveWindowEnd" | "maxSlotsPerDay" | "notes" | "blackoutDates" | "targetGmv" | "campRanges">;
 
 export async function upsertMonthPlan(brandId: string, month: string, settings: PlanSettings): Promise<BrandMonthPlan> {
   const { data, error } = await supabase
@@ -99,7 +103,9 @@ export async function upsertMonthPlan(brandId: string, month: string, settings: 
         live_window_end: settings.liveWindowEnd,
         max_slots_per_day: settings.maxSlotsPerDay,
         notes: settings.notes,
-        blackout_dates: settings.blackoutDates
+        blackout_dates: settings.blackoutDates,
+        target_gmv: settings.targetGmv,
+        camp_ranges: settings.campRanges
       },
       { onConflict: "brand_id,month" }
     )
