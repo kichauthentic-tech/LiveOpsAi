@@ -99,14 +99,17 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
     setFormEmail("");
     setFormRole("Host");
     setFormGender("Nữ");
-    setFormNiches("Mỹ phẩm, Skincare");
-    setFormGmv(150000000);
+    setFormNiches("");
+    // Tạo mới: mọi số về 0 — hiệu suất tự tính từ ca thật, rate ops nhập tay (không còn số demo).
+    setFormGmv(0);
     setFormTotalGmv(0);
-    setFormCvr(5.0);
-    setFormCtr(8.0);
-    setFormRate(5000000);
-    setFormCommission(3.5);
-    setFormScore(90);
+    setFormCvr(0);
+    setFormCtr(0);
+    setFormRate(0);
+    setFormRateHour(0);
+    setFormAssistantRateHour(0);
+    setFormCommission(0);
+    setFormScore(0);
     setFormPhone("");
     setFormAvatar("");
     setFormStatus("Available");
@@ -121,15 +124,17 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
     setFormGender(t.gender || "Nữ");
     const nicheArr = t.niches || (t as any).niche || [];
     setFormNiches(Array.isArray(nicheArr) ? nicheArr.join(", ") : String(nicheArr));
-    setFormGmv(t.avgGmvPerSession || 150000000);
+    // Không điền số demo thay cho 0 (bug thời mock: talent thật rate = 0 mở form là thấy 5tr/live,
+    // 3.5% hoa hồng, GMV 150tr, điểm 90 — bấm Lưu là ghi thẳng vào DB). 0 là 0.
+    setFormGmv(t.avgGmvPerSession || 0);
     setFormTotalGmv(t.totalGmv || 0);
-    setFormCvr(t.cvrAvg || 5.0);
-    setFormCtr(t.ctrAvg || 8.0);
-    setFormRate(t.ratePerSession || (t as any).rateCardFee || 5000000);
+    setFormCvr(t.cvrAvg || 0);
+    setFormCtr(t.ctrAvg || 0);
+    setFormRate(t.ratePerSession || 0);
     setFormRateHour(t.ratePerHour || 0);
     setFormAssistantRateHour(t.assistantRatePerHour || 0);
-    setFormCommission(t.commissionRate || 3.5);
-    setFormScore(t.overallScore || (t as any).aiMatchScore || 90);
+    setFormCommission(t.commissionRate || 0);
+    setFormScore(t.overallScore || 0);
     setFormPhone(t.phone || "");
     setFormAvatar(t.avatar || (t as any).avatarUrl || "");
     setFormStatus(t.availabilityStatus || "Available");
