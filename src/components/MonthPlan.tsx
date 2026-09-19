@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Brand, BrandMonthPlan, BrandMonthlyCommitment, BrandMonthlyReport, CalendarEventRow, LiveSession, PromoScheme, RecurringShiftTemplate, Studio } from "../types";
+import { Brand, BrandMonthPlan, BrandMonthPlanSlot, BrandMonthlyCommitment, BrandMonthlyReport, CalendarEventRow, LiveSession, PromoScheme, RecurringShiftTemplate, ShiftSlot, Studio } from "../types";
 import { AlertTriangle, Ban, CalendarRange, ChevronLeft, ChevronRight, Lock, Plus, Repeat, Save, Sparkles, Wand2, X } from "lucide-react";
 import { fetchBrandMonthlyCommitments } from "../lib/db/brandContracts";
-import { PlanSettings, fetchCalendarEvents, fetchMonthPlan, fetchPlanStatuses, lockMonthPlan, replacePlanSlots, upsertMonthPlan } from "../lib/db/monthPlans";
+import { PlanSettings, fetchBrandLockedPlanSlots, fetchCalendarEvents, fetchMonthPlan, fetchPlanStatuses, lockMonthPlan, replacePlanSlots, upsertMonthPlan } from "../lib/db/monthPlans";
+import { PlanEvaluation, buildCalibration, evaluatePlan } from "../lib/scheduling/planEvaluation";
 import { buildMonthTargetPlan, monthTotalTarget } from "../lib/performance/targetAllocation";
 import { todayVn } from "../lib/performance/brandCommitment";
 import { CAMPAIGN_DAY_STYLES, getCampaignDayInfo, resolveCampBucketType } from "../lib/campaignDays";
@@ -27,6 +28,7 @@ interface MonthPlanProps {
   studios: Studio[];
   // Lịch sử ca (engine chỉ ăn ca Completed + tiktok_reconciled của đúng brand).
   sessions: LiveSession[];
+  shiftSlots: ShiftSlot[];
   promoSchemes: PromoScheme[];
   currentUserId: string;
   monthlyReports: Map<string, BrandMonthlyReport>;
@@ -54,6 +56,7 @@ export default function MonthPlan({
   brands,
   studios,
   sessions,
+  shiftSlots,
   promoSchemes,
   currentUserId,
   monthlyReports,
@@ -84,6 +87,9 @@ export default function MonthPlan({
   const [compare, setCompare] = useState<Record<SuggestStrategy, SuggestResult> | null>(null);
   // Nhắc việc: brand chưa chốt kế hoạch cho THÁNG SAU (theo hôm nay), bất kể đang xem tháng nào.
   const [nextMonthMissing, setNextMonthMissing] = useState<string[]>([]);
+  // Giai đoạn D: mọi ca kế hoạch đã chốt của brand (mọi tháng) → đối chiếu thực tế + hiệu chỉnh.
+  const [lockedSlots, setLockedSlots] = useState<BrandMonthPlanSlot[]>([]);
+  const [lockedSlotsTick, setLockedSlotsTick] = useState(0);
 
   const brand = brands.find((b) => b.id === brandId);
   const brandTemplates = useMemo(() => recurringShiftTemplates.filter((t) => t.brandId === brandId), [recurringShiftTemplates, brandId]);
@@ -99,6 +105,26 @@ export default function MonthPlan({
       .catch(() => setNextMonthMissing([]));
   };
   useEffect(refreshMissing, [brands, nextMonth]);
+  useEffect(() => {
+    if (!brandId) return;
+    let alive = true;
+    fetchBrandLockedPlanSlots(brandId).then((r) => alive && setLockedSlots(r)).catch(() => alive && setLockedSlots([]));
+    return () => { alive = false; };
+  }, [brandId, lockedSlotsTick]);
+  // Kế hoạch vs thực tế của THÁNG ĐANG XEM (chỉ khi đã chốt và có ca gắn).
+  const evaluation = useMemo<PlanEvaluation | null>(() => {
+    const cur = lockedSlots.filter((ps) => ps.date.startsWith(month));
+    return cur.length > 0 ? evaluatePlan(cur, shiftSlots, sessions) : null;
+  }, [lockedSlots, month, shiftSlots, sessions]);
+  // Hiệu chỉnh cho engine: từ mọi tháng KHÁC tháng đang lập (tránh tự soi vào chính nó).
+  const calibration = useMemo(() => {
+    const others = lockedSlots.filter((ps) => !ps.date.startsWith(month));
+    if (others.length === 0) return null;
+    const byMonth = new Map<string, BrandMonthPlanSlot[]>();
+    for (const ps of others) { const l = byMonth.get(ps.date.slice(0, 7)) ?? []; l.push(ps); byMonth.set(ps.date.slice(0, 7), l); }
+    const cal = buildCalibration([...byMonth.values()].map((l) => evaluatePlan(l, shiftSlots, sessions)));
+    return cal.observations > 0 ? cal : null;
+  }, [lockedSlots, month, shiftSlots, sessions]);
 
   useEffect(() => {
     if (!brandId) return;
@@ -218,7 +244,8 @@ export default function MonthPlan({
       blackoutDates: settings.blackoutDates,
       fixedSlots: drafts.map((d) => ({ date: d.date, startTime: d.startTime, endTime: d.endTime })),
       events,
-      schemes: brandSchemes
+      schemes: brandSchemes,
+      calibration: calibration?.factors
     };
     // Chạy cả 3 phương án để so sánh; áp phương án đang chọn vào lưới.
     const all: Record<SuggestStrategy, SuggestResult> = {
@@ -252,7 +279,7 @@ export default function MonthPlan({
     setSaving(true);
     try {
       const p = await upsertMonthPlan(brandId, month, settings);
-      const saved = await replacePlanSlots(p.id, drafts.map((d) => ({ id: d.id, date: d.date, startTime: d.startTime, endTime: d.endTime, targetGmv: d.targetGmv, note: d.note })));
+      const saved = await replacePlanSlots(p.id, drafts.map((d) => ({ id: d.id, date: d.date, startTime: d.startTime, endTime: d.endTime, targetGmv: d.targetGmv, expectedGmv: d.expectedGmv, note: d.note })));
       setPlan(p);
       setDrafts(draftsFromSaved(saved));
       setDirty(false);
@@ -287,6 +314,7 @@ export default function MonthPlan({
         setDrafts(draftsFromSaved(fresh.slots));
       }
       refreshMissing();
+      setLockedSlotsTick((t) => t + 1);
       setMsg(
         `Đã chốt: mở ${r.created} ca mới${r.linked > 0 ? `, gắn ${r.linked} ca đã có sẵn` : ""}${r.cancelled > 0 ? `, huỷ ${r.cancelled} ca bị bỏ` : ""}` +
           `${r.kept_registered > 0 ? `, GIỮ ${r.kept_registered} ca bị bỏ nhưng đã có người đăng ký (xử lý ở Đăng Ký & Chốt Lịch)` : ""} — ${r.total_slots} ca đang chờ đăng ký.`
@@ -418,6 +446,8 @@ export default function MonthPlan({
           <RecurringRulesPanel brandId={brandId} brandName={brand.name} templates={brandTemplates} studios={studios} currentUserId={currentUserId} defaultHours={settings.defaultSlotHours} onCreateTemplate={onCreateTemplate} onToggleTemplate={onToggleTemplate} onDeleteTemplate={onDeleteTemplate} />
         </div>
       )}
+
+      {evaluation && <EvaluationPanel ev={evaluation} calibration={calibration} />}
 
       {suggestion && (
         <SuggestionPanel history={suggestion.history} result={suggestion.result} committedHours={planHours} targetTotal={targetTotal} compare={compare} current={strategy} onPick={(k) => { setStrategy(k); if (compare) { setSuggestion({ history: suggestion.history, result: compare[k] }); setDrafts(draftsFromSuggestion(drafts.filter((d) => d.id || d.slotId), compare[k].slots)); setDirty(true); } }} />
@@ -559,6 +589,38 @@ function SuggestionPanel({ history: h, result: r, committedHours, targetTotal, c
           </p>
         </div>
       </div>
+    </div>
+  );
+}
+
+// Giai đoạn D — kế hoạch vs thực tế của tháng đang xem + tình trạng hiệu chỉnh.
+function EvaluationPanel({ ev, calibration }: { ev: PlanEvaluation; calibration: ReturnType<typeof buildCalibration> | null }) {
+  const pending = ev.rows.filter((r) => r.status === "pending").length;
+  const worst = ev.rows.filter((r) => r.status === "done" && r.errorPct !== null).sort((a, b) => Math.abs(b.errorPct!) - Math.abs(a.errorPct!)).slice(0, 5);
+  const pct = (v: number | null) => (v === null ? "—" : `${v >= 0 ? "+" : ""}${Math.round(v * 100)}%`);
+  return (
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 space-y-2 text-xs">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+        <h3 className="text-sm font-bold text-[var(--text)]">Kế hoạch vs thực tế</h3>
+        <span className="text-[var(--text-muted)]">{ev.doneCount} ca đã có số · {pending} ca chưa diễn ra</span>
+        {ev.doneCount > 0 && (
+          <span className="text-[var(--text-muted)]">Dự báo {formatCurrencyAdaptive(ev.expectedDone)} · target {formatCurrencyAdaptive(ev.targetDone)} · <b className="text-[var(--text)]">thực tế {formatCurrencyAdaptive(ev.actualDone)}</b>{ev.bias !== null ? ` · lệch ${pct(ev.bias)}` : ""}{ev.mape !== null ? ` · sai số TB/ca ${Math.round(ev.mape * 100)}%` : ""}</span>
+        )}
+      </div>
+      {worst.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-1.5">
+          {worst.map((r) => (
+            <div key={`${r.date}${r.startTime}`} className="rounded-lg border border-[var(--border)] bg-[var(--surface-base)] px-2 py-1">
+              <div className="font-mono text-[10px] text-[var(--text-muted)]">{r.date.slice(5)} {r.startTime}–{r.endTime}</div>
+              <div className="text-[var(--text)]">{formatCurrencyAdaptive(r.actualGmv ?? 0)} <span className="text-[var(--text-faint)]">vs dự báo {formatCurrencyAdaptive(r.expectedGmv)}</span> <b className={r.errorPct! >= 0 ? "text-emerald-400" : "text-rose-400"}>{pct(r.errorPct)}</b></div>
+            </div>
+          ))}
+        </div>
+      )}
+      <p className="text-[10px] text-[var(--text-faint)]">
+        {calibration ? `Engine tháng này đã hiệu chỉnh từ ${calibration.observations} ca kế hoạch có thực tế ở các tháng khác (lệch chung ${pct(calibration.overallBias)}).` : "Chưa có tháng nào khác đã chốt kế hoạch và có thực tế — engine chưa hiệu chỉnh."}
+        {" "}Ca ops đặt tay (không có dự báo) không tham gia hiệu chỉnh.
+      </p>
     </div>
   );
 }

@@ -21,7 +21,41 @@ export interface HostSuggestion {
   // "none" = chưa có ca nào đáng đếm; "low" = có nhưng dưới ngưỡng, số chỉ để tham khảo;
   // "ok" = đủ mẫu. Hiện cảnh báo chứ KHÔNG giấu số: ops vẫn cần thấy để tự cân nhắc.
   confidence: "none" | "low" | "ok";
+  // Giai đoạn D (Kế Hoạch Tháng) — lớp host × khung giờ + mệt mỏi + công bằng:
+  // GMV/giờ của host trong ca CHỒNG KHUNG GIỜ với ca đang chốt (mọi brand) — host mạnh tối khác host mạnh trưa.
+  blockGmvPerHour: number;
+  blockSessions: number;
+  // Giờ đã xếp (chốt host, chưa huỷ) trong cùng tuần T2–CN với ca đang chốt, tính cả vai trò trợ.
+  weekHours: number;
+  // Số ca đã xếp trong cùng tháng (host + trợ) — để chia đều, không dồn 1 người.
+  monthSessions: number;
 }
+
+export interface SlotContext {
+  date: string;
+  startTime: string;
+  endTime: string;
+}
+
+// Ngưỡng cảnh báo mệt: > 24h/tuần đã xếp (≈ 8 ca 3h) — ops vẫn chọn được, chỉ được nhắc.
+export const FATIGUE_WEEK_HOURS = 24;
+
+const mondayOf = (date: string) => {
+  const d = new Date(`${date}T00:00:00`);
+  const diff = (d.getDay() + 6) % 7;
+  d.setDate(d.getDate() - diff);
+  return `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, "0")}-${`${d.getDate()}`.padStart(2, "0")}`;
+};
+const toMin = (t: string) => {
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+};
+const rangesOverlap = (aS: string, aE: string, bS: string, bE: string) => {
+  let a1 = toMin(aS), a2 = toMin(aE), b1 = toMin(bS), b2 = toMin(bE);
+  if (a2 <= a1) a2 += 1440;
+  if (b2 <= b1) b2 += 1440;
+  return a1 < b2 && b1 < a2;
+};
 
 // Dưới 3 ca thì trung bình GMV/giờ bị 1 phiên bùng nổ (hoặc 1 phiên chết) kéo lệch hoàn toàn.
 const MIN_SESSIONS_FOR_CONFIDENCE = 3;
@@ -48,20 +82,36 @@ export function suggestHosts(
   sessions: LiveSession[],
   brandId: string | undefined,
   weekday: number,
-  sinceDate?: string // "YYYY-MM-DD", bỏ qua ca cũ hơn mốc này
+  sinceDate?: string, // "YYYY-MM-DD", bỏ qua ca cũ hơn mốc này
+  slot?: SlotContext
 ): HostSuggestion[] {
   const ids = new Set(candidateIds);
   const overall = new Map<string, Acc>();
   const byBrand = new Map<string, Acc>();
   const byWeekday = new Map<string, Acc>();
+  const byBlock = new Map<string, Acc>();
+  const weekHours = new Map<string, number>();
+  const monthSessions = new Map<string, number>();
+  const weekStart = slot ? mondayOf(slot.date) : "";
+  const weekEnd = slot ? (() => { const d = new Date(`${weekStart}T00:00:00`); d.setDate(d.getDate() + 6); return `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, "0")}-${`${d.getDate()}`.padStart(2, "0")}`; })() : "";
+  const monthKey = slot ? slot.date.slice(0, 7) : "";
 
   for (const s of sessions) {
+    // Mệt mỏi / công bằng: đếm cả vai trò trợ, cả ca sắp tới, trừ ca huỷ.
+    if (slot && s.status !== "Cancelled") {
+      for (const pid of [s.hostId, s.coHostId]) {
+        if (!pid || !ids.has(pid)) continue;
+        if (s.date >= weekStart && s.date <= weekEnd) weekHours.set(pid, (weekHours.get(pid) ?? 0) + sessionHours(s));
+        if (s.date.startsWith(monthKey)) monthSessions.set(pid, (monthSessions.get(pid) ?? 0) + 1);
+      }
+    }
     if (!s.hostId || !ids.has(s.hostId)) continue;
     if (!isCountable(s)) continue;
     if (sinceDate && s.date < sinceDate) continue;
     overall.set(s.hostId, add(overall.get(s.hostId) ?? EMPTY, s));
     if (brandId && s.brandId === brandId) byBrand.set(s.hostId, add(byBrand.get(s.hostId) ?? EMPTY, s));
     if (weekdayOf(s.date) === weekday) byWeekday.set(s.hostId, add(byWeekday.get(s.hostId) ?? EMPTY, s));
+    if (slot && rangesOverlap(s.startTime, s.endTime, slot.startTime, slot.endTime)) byBlock.set(s.hostId, add(byBlock.get(s.hostId) ?? EMPTY, s));
   }
 
   const rows = candidateIds.map<HostSuggestion>((id) => {
@@ -77,7 +127,11 @@ export function suggestHosts(
       weekdaySessions: w.count,
       overallGmvPerHour: perHour(o),
       overallSessions: o.count,
-      confidence: o.count === 0 ? "none" : o.count < MIN_SESSIONS_FOR_CONFIDENCE ? "low" : "ok"
+      confidence: o.count === 0 ? "none" : o.count < MIN_SESSIONS_FOR_CONFIDENCE ? "low" : "ok",
+      blockGmvPerHour: perHour(byBlock.get(id) ?? EMPTY),
+      blockSessions: (byBlock.get(id) ?? EMPTY).count,
+      weekHours: weekHours.get(id) ?? 0,
+      monthSessions: monthSessions.get(id) ?? 0
     };
   });
 

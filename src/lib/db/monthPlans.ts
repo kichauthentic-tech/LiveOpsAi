@@ -26,6 +26,7 @@ interface DbPlanSlot {
   start_time: string;
   end_time: string;
   target_gmv: number;
+  expected_gmv: number | null;
   slot_id: string | null;
   note: string;
 }
@@ -53,6 +54,7 @@ const slotFromDb = (r: DbPlanSlot): BrandMonthPlanSlot => ({
   startTime: hhmm(r.start_time),
   endTime: hhmm(r.end_time),
   targetGmv: Number(r.target_gmv),
+  expectedGmv: Number(r.expected_gmv ?? 0),
   slotId: r.slot_id ?? undefined,
   note: r.note
 });
@@ -113,6 +115,7 @@ export interface PlanSlotDraft {
   startTime: string;
   endTime: string;
   targetGmv: number;
+  expectedGmv?: number;
   note: string;
 }
 
@@ -141,6 +144,7 @@ export async function replacePlanSlots(planId: string, drafts: PlanSlotDraft[]):
         start_time: d.startTime,
         end_time: d.endTime,
         target_gmv: d.targetGmv,
+        expected_gmv: d.expectedGmv ?? 0,
         note: d.note
       })),
       { onConflict: "plan_id,date,start_time,end_time" }
@@ -186,4 +190,18 @@ export async function fetchCalendarEvents(): Promise<CalendarEventRow[]> {
   const { data, error } = await supabase.from("calendar_events").select("id,date,kind,label").order("date");
   if (error) throw error;
   return (data as CalendarEventRow[]) ?? [];
+}
+
+// Mọi ca kế hoạch ĐÃ CHỐT của 1 brand có dự báo engine (expected_gmv > 0) và đã gắn ca thật — đầu vào
+// cho đối chiếu kế hoạch vs thực tế + hiệu chỉnh (giai đoạn D).
+export async function fetchBrandLockedPlanSlots(brandId: string): Promise<BrandMonthPlanSlot[]> {
+  const { data, error } = await supabase
+    .from("brand_month_plan_slots")
+    .select("*,plan:brand_month_plans!inner(status,brand_id)")
+    .eq("plan.status", "locked")
+    .eq("plan.brand_id", brandId)
+    .not("slot_id", "is", null)
+    .order("date");
+  if (error) throw error;
+  return ((data as DbPlanSlot[]) ?? []).map(slotFromDb);
 }

@@ -84,6 +84,8 @@ export interface SuggestConstraints {
   fixedSlots?: { date: string; startTime: string; endTime: string }[]; // ca ops đã đặt tay, giữ nguyên
   events?: CalendarEvent[];
   schemes?: DateRange[];
+  // Giai đoạn D: hệ số hiệu chỉnh theo ô "weekday|block" học từ kế hoạch vs thực tế các tháng trước.
+  calibration?: Map<string, number>;
   // "max": tối đa GMV kỳ vọng (mặc định). "balanced": rải đều tuần/ngày, thưởng đều đặn mạnh, tối
   // đa 2 ca/ngày. "lean": ít ca dài hơn (ca = mặc định + 1h), dồn ngày đã có ca.
   strategy?: SuggestStrategy;
@@ -348,7 +350,7 @@ function cellLookup(h: HistorySummary) {
   return (wd: number, block: number) => m.get(`${wd}|${block}`);
 }
 
-function expectedGphFor(date: string, start: number, end: number, h: HistorySummary, get: ReturnType<typeof cellLookup>): { gph: number; cells: HistoryCell[] } {
+function expectedGphFor(date: string, start: number, end: number, h: HistorySummary, get: ReturnType<typeof cellLookup>, calibration?: Map<string, number>): { gph: number; cells: HistoryCell[] } {
   const wd = weekdayOf(date);
   let cur = start;
   let sum = 0;
@@ -358,8 +360,9 @@ function expectedGphFor(date: string, start: number, end: number, h: HistorySumm
     const seg = Math.min(blockEnd, end) - cur;
     const block = Math.floor((cur % (24 * 60)) / (BLOCK_HOURS * 60));
     const c = get(wd, block);
+    const cal = calibration?.get(`${wd}|${block}`) ?? 1;
     // Ô chưa có lịch sử: 70% trung bình brand — vẫn chọn được nhưng thua ô đã chứng minh.
-    sum += (c ? c.gmvPerHour : h.brandGmvPerHour * 0.7) * (seg / 60);
+    sum += (c ? c.gmvPerHour : h.brandGmvPerHour * 0.7) * cal * (seg / 60);
     if (c) cells.push(c);
     cur += seg;
   }
@@ -413,7 +416,7 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
     const start = toMin(f.startTime);
     const end = toMin(f.endTime);
     if (end <= start) continue;
-    const { gph, cells } = expectedGphFor(f.date, start, end, history, get);
+    const { gph, cells } = expectedGphFor(f.date, start, end, history, get, c.calibration);
     chosen.push({ date: f.date, start, end, hours: (end - start) / 60, bucket: resolveCampBucketType(f.date, c.camp), baseGph: gph, cellRefs: cells });
     fixedKeys.add(`${f.date}|${f.startTime}`);
   }
@@ -426,7 +429,7 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
     const bucket = resolveCampBucketType(date, c.camp);
     for (let start = winStart; start + slotMin <= winEnd; start += 60) {
       const end = start + slotMin;
-      const { gph, cells } = expectedGphFor(date, start, end, history, get);
+      const { gph, cells } = expectedGphFor(date, start, end, history, get, c.calibration);
       candidates.push({ date, start, end, hours: slotMin / 60, bucket, baseGph: gph, cellRefs: cells });
     }
   }
@@ -500,7 +503,7 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
       if (remaining < best.hours) {
         if (remaining < 1) break;
         const end = best.start + Math.round(remaining * 60);
-        const { gph, cells } = expectedGphFor(best.date, best.start, end, history, get);
+        const { gph, cells } = expectedGphFor(best.date, best.start, end, history, get, c.calibration);
         pick = { ...best, end, hours: remaining, baseGph: gph, cellRefs: cells };
       }
       const exp = expectedGph(pick, state) * pick.hours;
@@ -515,6 +518,7 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
 
   const committed = c.committedHours > 0 ? c.committedHours : 0;
   if (committed <= 0) notes.push("Chưa có giờ cam kết tháng này — nhập ở Cam Kết Hợp Đồng để engine biết phải xếp bao nhiêu giờ.");
+  if (c.calibration && c.calibration.size > 0) notes.push(`Đã hiệu chỉnh GMV/giờ theo kế hoạch vs thực tế các tháng trước (${c.calibration.size} ô thứ × giờ có dữ liệu).`);
   const main = greedy(committed);
 
   // Dự báo + target/ca.

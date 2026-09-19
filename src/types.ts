@@ -704,6 +704,7 @@ export interface BrandMonthPlanSlot {
   startTime: string;
   endTime: string;
   targetGmv: number;
+  expectedGmv: number; // dự báo engine lúc lưu (0092); 0 = không qua engine
   slotId?: string;
   note: string;
 }

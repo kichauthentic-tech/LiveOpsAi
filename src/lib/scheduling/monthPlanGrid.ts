@@ -42,7 +42,7 @@ export const slotHours = (s: Pick<PlanDraftSlot, "startTime" | "endTime">) =>
 export const draftKeyOf = (s: Pick<PlanDraftSlot, "date" | "startTime" | "endTime">) => `${s.date}|${s.startTime}|${s.endTime}`;
 
 export function draftsFromSaved(slots: BrandMonthPlanSlot[]): PlanDraftSlot[] {
-  return slots.map((s) => ({ key: s.id, id: s.id, date: s.date, startTime: s.startTime, endTime: s.endTime, targetGmv: s.targetGmv, note: s.note, slotId: s.slotId }));
+  return slots.map((s) => ({ key: s.id, id: s.id, date: s.date, startTime: s.startTime, endTime: s.endTime, targetGmv: s.targetGmv, note: s.note, slotId: s.slotId, expectedGmv: s.expectedGmv > 0 ? s.expectedGmv : undefined }));
 }
 
 // Ca mới cho 1 ngày: nối sau ca cuối của ngày (hoặc đầu khung giờ), dài = mặc định, không vượt

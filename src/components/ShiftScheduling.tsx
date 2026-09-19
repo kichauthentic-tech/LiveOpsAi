@@ -42,7 +42,7 @@ import { SessionReportInput } from "../lib/db/sessionReports";
 import { fetchBrandMonthlyCommitments } from "../lib/db/brandContracts";
 import { fetchPlanStatuses } from "../lib/db/monthPlans";
 import { SchedulingGap, computeSchedulingGaps } from "../lib/performance/brandCommitment";
-import { HostSuggestion, headlineFor, suggestHosts } from "../lib/performance/hostSuggestion";
+import { FATIGUE_WEEK_HOURS, HostSuggestion, headlineFor, suggestHosts } from "../lib/performance/hostSuggestion";
 import { BulkFinalizePanel } from "./BulkFinalizePanel";
 import { eligibleSlots } from "../lib/performance/bulkFinalize";
 
@@ -119,9 +119,16 @@ const fmtPerHour = (n: number) => {
 // là số của brand rồi xếp nhầm là kiểu sai nguy hiểm nhất mà màn này có thể gây ra.
 const suggestionLabel = (s: HostSuggestion) => {
   const h = headlineFor(s);
-  if (h.scope === "none") return `${s.name} · chưa có dữ liệu`;
+  // Giai đoạn D: thêm khung giờ (host mạnh tối ≠ mạnh trưa), số ca đã xếp trong tháng, cảnh mệt.
+  const extras = [
+    s.blockSessions >= 2 ? `khung này ${fmtPerHour(s.blockGmvPerHour)}` : "",
+    s.monthSessions > 0 ? `${s.monthSessions} ca tháng này` : "",
+    s.weekHours > FATIGUE_WEEK_HOURS ? `⚠ ${s.weekHours.toFixed(0)}h tuần này` : ""
+  ].filter(Boolean);
+  const tail = extras.length > 0 ? ` · ${extras.join(" · ")}` : "";
+  if (h.scope === "none") return `${s.name} · chưa có dữ liệu${tail}`;
   const scope = h.scope === "brand" ? "brand này" : "chung";
-  return `${s.name} · ${fmtPerHour(h.value)} (${scope}, ${h.sessions} ca)`;
+  return `${s.name} · ${fmtPerHour(h.value)} (${scope}, ${h.sessions} ca)${tail}`;
 };
 
 export default function ShiftScheduling({
@@ -726,7 +733,8 @@ export default function ShiftScheduling({
                       sessions,
                       slot.brandId,
                       new Date(`${slot.date}T00:00:00`).getDay(),
-                      perfSince
+                      perfSince,
+                      { date: slot.date, startTime: slot.startTime, endTime: slot.endTime }
                     )
                   : [];
               const hasAnyPerfData = suggestions.some((s) => s.overallSessions > 0);

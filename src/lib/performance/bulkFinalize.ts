@@ -1,6 +1,6 @@
 import { LiveSession, ShiftRegistration, ShiftSlot } from "../../types";
 import { timeRangesOverlap } from "../dateUtils";
-import { HostSuggestion, suggestHosts } from "./hostSuggestion";
+import { FATIGUE_WEEK_HOURS, HostSuggestion, suggestHosts } from "./hostSuggestion";
 
 // Chốt lịch hàng loạt (điểm nghẽn #3 của audit module Vận Hành Live). Không phải vòng lặp gọi
 // onFinalizeSlot nhiều lần — có một cái bẫy bắt buộc phải xử ở đây:
@@ -140,11 +140,14 @@ export function planBulkFinalize(
       sessions,
       slot.brandId,
       new Date(`${slot.date}T00:00:00`).getDay(),
-      opts.perfSince
+      opts.perfSince,
+      { date: slot.date, startTime: slot.startTime, endTime: slot.endTime }
     );
 
-    // Người đầu tiên (theo xếp hạng) mà không bận ở khung giờ này.
-    const free = candidates.find(
+    // Người đầu tiên (theo xếp hạng) mà không bận ở khung giờ này. Giai đoạn D: người đã quá ngưỡng
+    // giờ/tuần bị đẩy xuống cuối hàng (vẫn được chọn nếu không còn ai) — mệt thì bán kém.
+    const ordered = [...candidates].sort((a, b) => Number(a.weekHours > FATIGUE_WEEK_HOURS) - Number(b.weekHours > FATIGUE_WEEK_HOURS));
+    const free = ordered.find(
       (c) =>
         !conflictsWithExisting(sessions, slot, c.talentId).host &&
         !busyInBatch(ledger.byTalent, c.talentId, slot)

@@ -1915,6 +1915,7 @@ export default function App() {
                     brands={activeBrands}
                     studios={activeStudios}
                     sessions={activeSessions}
+                    shiftSlots={shiftSlots}
                     promoSchemes={promoSchemes}
                     currentUserId={activeUser.id}
                     monthlyReports={monthlyReports}
