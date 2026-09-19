@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Brand, BrandMonthPlan, BrandMonthlyCommitment, BrandMonthlyReport, RecurringShiftTemplate, Studio } from "../types";
-import { CalendarRange, ChevronLeft, ChevronRight, Lock, Plus, Repeat, Save, Trash2, Wand2, X } from "lucide-react";
+import { Brand, BrandMonthPlan, BrandMonthlyCommitment, BrandMonthlyReport, LiveSession, RecurringShiftTemplate, Studio } from "../types";
+import { CalendarRange, ChevronLeft, ChevronRight, Lock, Plus, Repeat, Save, Sparkles, Trash2, Wand2, X } from "lucide-react";
 import { fetchBrandMonthlyCommitments } from "../lib/db/brandContracts";
 import { PlanSettings, fetchMonthPlan, lockMonthPlan, replacePlanSlots, upsertMonthPlan } from "../lib/db/monthPlans";
 import { buildMonthTargetPlan, monthTotalTarget } from "../lib/performance/targetAllocation";
@@ -11,6 +11,7 @@ import {
   allocateDraftTargets,
   daysOfMonth,
   draftsFromSaved,
+  draftsFromSuggestion,
   mergeFromTemplates,
   nextSlotForDay,
   slotHours,
@@ -18,11 +19,14 @@ import {
   validateDrafts
 } from "../lib/scheduling/monthPlanGrid";
 import { RecurringRulesPanel } from "./scheduling/RecurringRulesPanel";
+import { HistorySummary, SuggestResult, buildHistory, suggestMonthPlan } from "../lib/scheduling/suggestEngine";
 import { formatCurrencyAdaptive } from "../lib/formatCurrency";
 
 interface MonthPlanProps {
   brands: Brand[];
   studios: Studio[];
+  // Lịch sử ca (engine chỉ ăn ca Completed + tiktok_reconciled của đúng brand).
+  sessions: LiveSession[];
   currentUserId: string;
   monthlyReports: Map<string, BrandMonthlyReport>;
   recurringShiftTemplates: RecurringShiftTemplate[];
@@ -48,6 +52,7 @@ const nextMonthOf = (month: string, delta: number) => {
 export default function MonthPlan({
   brands,
   studios,
+  sessions,
   currentUserId,
   monthlyReports,
   recurringShiftTemplates,
@@ -68,6 +73,10 @@ export default function MonthPlan({
   const [msg, setMsg] = useState<string | null>(null);
   const [rulesOpen, setRulesOpen] = useState(false);
   const [commitments, setCommitments] = useState<BrandMonthlyCommitment[]>([]);
+  const [suggestion, setSuggestion] = useState<{ history: HistorySummary; result: SuggestResult } | null>(null);
+  // Giờ engine phải xếp: mặc định = cam kết hợp đồng; ops sửa tại chỗ khi tháng này thoả thuận khác
+  // (không lưu — cam kết chính thức vẫn ở Cam Kết Hợp Đồng).
+  const [hoursOverride, setHoursOverride] = useState<number | null>(null);
 
   const brand = brands.find((b) => b.id === brandId);
   const brandTemplates = useMemo(() => recurringShiftTemplates.filter((t) => t.brandId === brandId), [recurringShiftTemplates, brandId]);
@@ -94,6 +103,7 @@ export default function MonthPlan({
           setDrafts([]);
         }
         setDirty(false);
+        setSuggestion(null);
       })
       .catch((e) => alive && setMsg(`Không tải được kế hoạch: ${e.message ?? e}`))
       .finally(() => alive && setLoading(false));
@@ -104,6 +114,7 @@ export default function MonthPlan({
     () => commitments.find((c) => c.brandId === brandId && c.periodMonth === `${month}-01`)?.committedHours ?? 0,
     [commitments, brandId, month]
   );
+  const planHours = hoursOverride ?? committedHours;
   const targetPlan = useMemo(() => (brandId ? buildMonthTargetPlan(brandId, month, monthlyReports) : null), [brandId, month, monthlyReports]);
   const targetTotal = targetPlan ? monthTotalTarget(targetPlan) : 0;
   const totals = useMemo(() => totalsOf(drafts), [drafts]);
@@ -158,6 +169,40 @@ export default function MonthPlan({
     setDirty(true);
     setMsg(`Đã chia ${formatCurrencyAdaptive(targetTotal)} theo giờ trong từng khung camp.`);
   };
+  // Giai đoạn B — engine gợi ý: ca đang có trong lưới được giữ làm ca cố định, engine xếp thêm cho đủ
+  // giờ cam kết và chia target theo dự báo từng ca.
+  const suggest = () => {
+    if (planHours <= 0) {
+      setMsg("Nhập giờ cần xếp (hoặc cam kết ở Cam Kết Hợp Đồng) để engine biết phải xếp bao nhiêu giờ.");
+      return;
+    }
+    const history = buildHistory(sessions, brandId, today);
+    const shareBase = targetPlan && targetTotal > 0 ? targetPlan.byBucket : null;
+    const result = suggestMonthPlan(history, {
+      month,
+      today,
+      committedHours: planHours,
+      targetGmv: targetTotal,
+      bucketShare: shareBase
+        ? { daily: shareBase.daily / targetTotal, dday: shareBase.dday / targetTotal, midmonth: shareBase.midmonth / targetTotal, payday: shareBase.payday / targetTotal }
+        : undefined,
+      camp: targetPlan?.camp,
+      liveWindowStart: settings.liveWindowStart,
+      liveWindowEnd: settings.liveWindowEnd,
+      defaultSlotHours: settings.defaultSlotHours,
+      maxSlotsPerDay: settings.maxSlotsPerDay,
+      fixedSlots: drafts.map((d) => ({ date: d.date, startTime: d.startTime, endTime: d.endTime }))
+    });
+    setSuggestion({ history, result });
+    if (result.slots.length === 0) {
+      setMsg(result.notes[0] ?? "Không có gợi ý.");
+      return;
+    }
+    setDrafts(draftsFromSuggestion(drafts, result.slots));
+    setDirty(true);
+    setMsg(`Gợi ý ${result.slots.length} ca · ${fmtH(result.totalHours)}h · dự báo ${formatCurrencyAdaptive(result.forecastGmv)}${drafts.length > 0 ? ` (giữ ${drafts.length} ca đang có)` : ""}.`);
+  };
+
   const clearAll = () => {
     if (!window.confirm("Xoá toàn bộ ca trong lưới nháp?")) return;
     setDrafts([]);
@@ -191,8 +236,8 @@ export default function MonthPlan({
       setMsg("Lưới trống — chưa có gì để chốt.");
       return;
     }
-    const gap = committedHours - totals.hours;
-    const warn = committedHours > 0 && Math.abs(gap) > 0.01 ? `\n\nGiờ kế hoạch ${fmtH(totals.hours)}h ${gap > 0 ? "THIẾU" : "VƯỢT"} ${fmtH(Math.abs(gap))}h so với cam kết ${fmtH(committedHours)}h.` : "";
+    const gap = planHours - totals.hours;
+    const warn = planHours > 0 && Math.abs(gap) > 0.01 ? `\n\nGiờ kế hoạch ${fmtH(totals.hours)}h ${gap > 0 ? "THIẾU" : "VƯỢT"} ${fmtH(Math.abs(gap))}h so với ${fmtH(planHours)}h cần xếp.` : "";
     if (!window.confirm(`Chốt kế hoạch ${brand?.name} tháng ${month}: mở ${drafts.length} ca chờ đăng ký?${warn}`)) return;
     const p = await save();
     if (!p) return;
@@ -213,7 +258,7 @@ export default function MonthPlan({
     }
   };
 
-  const hoursDelta = committedHours > 0 ? totals.hours - committedHours : null;
+  const hoursDelta = planHours > 0 ? totals.hours - planHours : null;
   const targetDelta = targetTotal > 0 ? totals.target - targetTotal : null;
 
   return (
@@ -267,6 +312,9 @@ export default function MonthPlan({
           <h3 className="text-sm font-bold text-[var(--text)]">Đọc từ nguồn</h3>
           <div className="text-xs space-y-1.5">
             <div className="flex justify-between gap-2"><span className="text-[var(--text-muted)]">Giờ cam kết (Cam Kết Hợp Đồng)</span><b className="text-[var(--text)]">{committedHours > 0 ? `${fmtH(committedHours)}h` : "chưa nhập"}</b></div>
+            <div className="flex justify-between items-center gap-2"><span className="text-[var(--text-muted)]">Giờ cần xếp tháng này</span>
+              <input type="number" min="0" step="1" disabled={!editable} value={planHours || ""} placeholder="= cam kết" onChange={(e) => setHoursOverride(e.target.value === "" ? null : Number(e.target.value))} className="w-24 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1 text-right font-mono text-[var(--text)] disabled:opacity-60" />
+            </div>
             <div className="flex justify-between gap-2"><span className="text-[var(--text-muted)]">Target GMV (Report Tháng tab 05)</span><b className="text-[var(--text)]">{targetTotal > 0 ? formatCurrencyAdaptive(targetTotal) : "chưa nhập"}</b></div>
             {targetPlan && targetTotal > 0 && (
               <div className="text-[10px] text-[var(--text-faint)] leading-relaxed">
@@ -302,6 +350,7 @@ export default function MonthPlan({
         <button onClick={() => setRulesOpen((v) => !v)} className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-xs font-bold text-[var(--accent-text)] flex items-center gap-1.5"><Repeat className="w-3.5 h-3.5" /> Quy tắc lặp ({brandTemplates.length})</button>
         {editable && (
           <>
+            <button onClick={suggest} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] border border-[var(--accent)]/60 text-xs font-bold text-[var(--accent-text)] flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" /> Gợi ý phân bổ</button>
             <button onClick={loadTemplates} className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-xs font-bold text-[var(--text)] hover:border-[var(--accent)]">Nạp từ quy tắc</button>
             <button onClick={allocate} className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-xs font-bold text-[var(--text)] hover:border-[var(--accent)] flex items-center gap-1.5"><Wand2 className="w-3.5 h-3.5" /> Chia target theo khung</button>
             <button onClick={clearAll} disabled={drafts.length === 0} className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-xs font-bold text-rose-400 disabled:opacity-40">Xoá hết</button>
@@ -319,6 +368,8 @@ export default function MonthPlan({
           <RecurringRulesPanel brandId={brandId} brandName={brand.name} templates={brandTemplates} studios={studios} currentUserId={currentUserId} defaultHours={settings.defaultSlotHours} onCreateTemplate={onCreateTemplate} onToggleTemplate={onToggleTemplate} onDeleteTemplate={onDeleteTemplate} />
         </div>
       )}
+
+      {suggestion && <SuggestionPanel history={suggestion.history} result={suggestion.result} committedHours={planHours} targetTotal={targetTotal} />}
 
       {/* Lưới ngày × ca */}
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 overflow-x-auto">
@@ -352,6 +403,11 @@ export default function MonthPlan({
                       <span className="text-[var(--text-faint)] shrink-0">target</span>
                       <input type="number" disabled={!editable} value={d.targetGmv} onChange={(e) => update(d.key, { targetGmv: Number(e.target.value) })} className="w-full min-w-0 bg-[var(--surface-base)] border border-[var(--border)] rounded px-1 py-0.5 font-mono text-[10px] text-[var(--text)] disabled:opacity-70" />
                     </div>
+                    {d.expectedGmv !== undefined && (
+                      <div className={`text-[9px] font-bold ${d.highExpectation ? "text-amber-400" : "text-[var(--text-faint)]"}`} title={d.reason}>
+                        dự báo {formatCurrencyAdaptive(d.expectedGmv)}{d.highExpectation ? " · target cao" : ""}
+                      </div>
+                    )}
                     {d.slotId && <div className="text-[9px] text-emerald-400 font-bold">đã mở ca</div>}
                   </div>
                 ))}
@@ -367,6 +423,52 @@ export default function MonthPlan({
         )}
       </div>
       {locked && <p className="text-[11px] text-[var(--text-faint)] flex items-center gap-1"><Trash2 className="w-3 h-3" /> Kế hoạch đã chốt là chỉ đọc. Cần thêm/bớt ca: dùng Lịch Vận Hành (mở ca lẻ) hoặc Đăng Ký &amp; Chốt Lịch (xoá ca chưa ai đăng ký). Chốt lại/diff làm ở giai đoạn C.</p>}
+    </div>
+  );
+}
+
+const WD = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
+const BUCKET_LABEL: Record<string, string> = { daily: "Ngày thường", dday: "D-Day", midmonth: "Mid-Month", payday: "Pay-Day" };
+const CONF_LABEL: Record<SuggestResult["confidence"], string> = { none: "không có lịch sử", low: "thấp", medium: "vừa", high: "cao" };
+
+// Lớp 4 — giải thích gợi ý: lịch sử dùng, hệ số học được, ô giờ mạnh/yếu, đường cong biên, khả thi target.
+function SuggestionPanel({ history: h, result: r, committedHours, targetTotal }: { history: HistorySummary; result: SuggestResult; committedHours: number; targetTotal: number }) {
+  const top = h.cells.filter((c) => c.n >= 2).slice(0, 6);
+  const weak = h.cells.filter((c) => c.tag === "weak").slice(-4);
+  const curve = r.marginal.filter((_, i, arr) => i === arr.length - 1 || i % Math.max(1, Math.floor(arr.length / 5)) === 0);
+  return (
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 space-y-3 text-xs">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+        <h3 className="text-sm font-bold text-[var(--text)] flex items-center gap-2"><Sparkles className="w-4 h-4 text-[var(--accent-text)]" /> Vì sao gợi ý như vậy</h3>
+        <span className="text-[var(--text-muted)]">Độ tin cậy: <b className="text-[var(--text)]">{CONF_LABEL[r.confidence]}</b> · {h.sessions} ca đối soát / {h.months} tháng{h.firstDate ? ` (${h.firstDate} → ${h.lastDate})` : ""} · GMV/giờ TB {formatCurrencyAdaptive(h.brandGmvPerHour)}</span>
+      </div>
+      {r.notes.map((n, i) => <p key={i} className="text-[11px] text-amber-300">{n}</p>)}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div>
+          <p className="font-bold text-[var(--text-muted)] mb-1">Khung giờ mạnh nhất (thứ × khối 2h)</p>
+          {top.map((c) => (
+            <div key={`${c.weekday}-${c.block}`} className="flex justify-between gap-2"><span className="text-[var(--text)]">{WD[c.weekday]} {c.block * 2}–{c.block * 2 + 2}h <span className="text-[var(--text-faint)]">({c.n} ca)</span></span><b className={c.tag === "strong" ? "text-emerald-400" : "text-[var(--text)]"}>{formatCurrencyAdaptive(c.gmvPerHour)}/h</b></div>
+          ))}
+          {weak.length > 0 && <p className="mt-1 text-[10px] text-[var(--text-faint)]">Yếu: {weak.map((c) => `${WD[c.weekday]} ${c.block * 2}h`).join(", ")}</p>}
+        </div>
+        <div>
+          <p className="font-bold text-[var(--text-muted)] mb-1">Hệ số học từ lịch sử</p>
+          {(["dday", "midmonth", "payday"] as const).map((b) => (
+            <div key={b} className="flex justify-between gap-2"><span className="text-[var(--text)]">{BUCKET_LABEL[b]}</span><b className="text-[var(--text)]">×{h.campMultipliers[b].toFixed(2)} <span className="text-[10px] font-normal text-[var(--text-faint)]">{h.campLearned[b] ? "học được" : "mặc định"}</span></b></div>
+          ))}
+          <div className="flex justify-between gap-2 mt-1"><span className="text-[var(--text)]">Ca thứ 2/3 trong ngày</span><b className="text-[var(--text)]">×{h.diminishing[1].toFixed(2)} / ×{h.diminishing[2].toFixed(2)}</b></div>
+        </div>
+        <div>
+          <p className="font-bold text-[var(--text-muted)] mb-1">Đường cong biên (giờ luỹ kế → GMV dự báo)</p>
+          {curve.map((p) => (
+            <div key={p.hours} className="flex justify-between gap-2"><span className="text-[var(--text)]">{fmtH(p.hours)}h</span><b className="text-[var(--text)]">{formatCurrencyAdaptive(p.gmv)}</b></div>
+          ))}
+          <p className="mt-1 text-[10px] text-[var(--text-faint)]">
+            {committedHours > 0 ? `Cam kết ${fmtH(committedHours)}h → dự báo ${formatCurrencyAdaptive(r.forecastGmv)}` : ""}
+            {targetTotal > 0 ? ` · target ${formatCurrencyAdaptive(targetTotal)}${r.hoursToHitTarget !== null ? ` cần ~${Math.ceil(r.hoursToHitTarget)}h` : " (không chạm được trong khung)"}` : ""}
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

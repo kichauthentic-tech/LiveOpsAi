@@ -29,8 +29,9 @@ import { fetchBrandSkus, createBrandSku, updateBrandSku, deleteBrandSku } from "
 import { fetchPromoSchemes, createPromoScheme, updatePromoScheme, deletePromoScheme } from "./lib/db/promoSchemes";
 import { applyAllocatedTargets } from "./lib/performance/targetAllocation";
 import { fetchAllMonthlyReports } from "./lib/db/monthlyReports";
+import { fetchLockedPlanTargets } from "./lib/db/monthPlans";
 import {
-  Radio,
+  BookOpen,
   FileText,
   Users,
   Building2,
@@ -58,7 +59,6 @@ import {
 } from "lucide-react";
 import { Header, WorkspaceContext } from "./components/Header";
 import { BrandCalendar } from "./components/brand-workspace/BrandCalendar";
-import { BrandSessions } from "./components/brand-workspace/BrandSessions";
 import { BrandSkuShowcase } from "./components/brand-workspace/BrandSkuShowcase";
 import { BrandMonthlyReport } from "./components/brand-workspace/BrandMonthlyReport";
 import { BrandDataRaw } from "./components/brand-workspace/BrandDataRaw";
@@ -68,7 +68,7 @@ import { AccountSettings } from "./components/AccountSettings";
 import { MyTalentProfile } from "./components/MyTalentProfile";
 import { useAuth } from "./hooks/useAuth";
 import { useNotifications } from "./hooks/useNotifications";
-import { LiveSessionHub } from "./components/LiveSessionHub";
+import { SessionLedger } from "./components/SessionLedger";
 import { LiveCalendar } from "./components/LiveCalendar";
 import { TalentMatcher, NewTalentAccountPayload } from "./components/TalentMatcher";
 import { StudioEquipment } from "./components/StudioEquipment";
@@ -121,8 +121,8 @@ function saveStorage<T>(key: string, value: T): void {
 //
 // ceo/admin/operations về "Đăng Ký & Chốt Lịch" (audit Module 2, 2026-09-18): vòng việc hằng ngày
 // của ops — mở ca, chốt, cam kết còn thiếu bao nhiêu giờ, up snapshot, report — đều nằm ở đó.
-// "Live Sessions" (Livestream Session Hub) là màn chi tiết từng phiên thời demo, mở app ra thấy
-// một dropdown và trạng thái trống không nói gì về việc hôm nay phải làm.
+// "Sổ Ca" (SessionLedger, thay Live Sessions Hub thời demo ngày 2026-09-19) là màn tra cứu từng
+// ca đã chạy + việc còn thiếu để chốt tháng — không phải màn "hôm nay phải làm gì".
 interface NavItem {
   id: string;
   label: string;
@@ -250,7 +250,23 @@ export default function App() {
   // bình của host, sai bản chất) ở đúng MỘT chỗ này, mọi màn hình bên dưới nhận `sessions` đã
   // đúng. Tháng/brand chưa có kế hoạch thì giữ số DB.
   const [monthlyReports, setMonthlyReports] = useState<Map<string, BrandMonthlyReportRow>>(new Map());
-  const sessions = useMemo(() => applyAllocatedTargets(rawSessions, monthlyReports), [rawSessions, monthlyReports]);
+  // Target/ca từ Kế Hoạch Tháng đã chốt (0090): khoá shift_slot id → nối qua shift_slots.session_id
+  // thành khoá session id cho applyAllocatedTargets. Nạp cùng lúc với shift_slots, nạp lại sau mỗi chốt.
+  // (khai báo sớm hơn nhóm state Giai đoạn 14 vì useMemo ngay dưới đọc nó)
+  const [shiftSlots, setShiftSlots] = useState<ShiftSlot[]>([]);
+  const [planTargetsBySlotId, setPlanTargetsBySlotId] = useState<Map<string, number>>(new Map());
+  const planTargetsBySessionId = useMemo(() => {
+    const out = new Map<string, number>();
+    if (planTargetsBySlotId.size === 0) return out;
+    for (const sl of shiftSlots) {
+      if (sl.sessionId && planTargetsBySlotId.has(sl.id)) out.set(sl.sessionId, planTargetsBySlotId.get(sl.id)!);
+    }
+    return out;
+  }, [planTargetsBySlotId, shiftSlots]);
+  const sessions = useMemo(
+    () => applyAllocatedTargets(rawSessions, monthlyReports, planTargetsBySessionId),
+    [rawSessions, monthlyReports, planTargetsBySessionId]
+  );
   // Kế hoạch tháng được sửa ở Report Tháng (Tab 05) mà App không nhận callback — nạp lại mỗi khi
   // đổi tab là đủ, bảng nhỏ và target chỉ cần đúng khi người dùng nhìn sang màn khác.
   useEffect(() => {
@@ -259,7 +275,6 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
-  const [selectedSession, setSelectedSession] = useState<LiveSession | null>(null);
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [sessionsError, setSessionsError] = useState<string | null>(null);
 
@@ -271,7 +286,6 @@ export default function App() {
   // Đăng ký & Chốt Lịch Host — real data from Supabase `brand_platform_rates`/`shift_slots`/
   // `session_availability` (Giai đoạn 14a), no mock fallback.
   const [brandPlatformRates, setBrandPlatformRates] = useState<BrandPlatformRate[]>([]);
-  const [shiftSlots, setShiftSlots] = useState<ShiftSlot[]>([]);
   const [shiftRegistrations, setShiftRegistrations] = useState<ShiftRegistration[]>([]);
   const [recurringShiftTemplates, setRecurringShiftTemplates] = useState<RecurringShiftTemplate[]>([]);
   const [phase14Loading, setPhase14Loading] = useState(true);
@@ -336,7 +350,6 @@ export default function App() {
       .then((s) => {
         if (cancelled) return;
         setSessions(s);
-        setSelectedSession((prev) => prev ?? s[0] ?? null);
         setSessionsError(null);
       })
       .catch((err) => {
@@ -444,13 +457,14 @@ export default function App() {
     if (!session) return;
     let cancelled = false;
     setPhase14Loading(true);
-    Promise.all([fetchBrandPlatformRates(), fetchShiftSlots(), fetchShiftRegistrations(), fetchRecurringShiftTemplates()])
-      .then(([rates, slots, regs, templates]) => {
+    Promise.all([fetchBrandPlatformRates(), fetchShiftSlots(), fetchShiftRegistrations(), fetchRecurringShiftTemplates(), fetchLockedPlanTargets().catch(() => new Map<string, number>())])
+      .then(([rates, slots, regs, templates, planTargets]) => {
         if (cancelled) return;
         setBrandPlatformRates(rates);
         setShiftSlots(slots);
         setShiftRegistrations(regs);
         setRecurringShiftTemplates(templates);
+        setPlanTargetsBySlotId(planTargets);
         setPhase14Error(null);
       })
       .catch((err) => {
@@ -776,9 +790,6 @@ export default function App() {
   const dataLoadErrorSignature = dataLoadErrors.map((e) => e.key + ":" + e.message).join("|");
   const showDataLoadErrorBanner = dataLoadErrors.length > 0 && dismissedDataErrorSignature !== dataLoadErrorSignature;
 
-  // Active Selected Session (null/undefined when activeSessions is empty)
-  const activeSelectedSession = activeSessions.find((s) => s.id === selectedSession?.id) || activeSessions[0] || null;
-
   // Active User object — derived from the real authenticated Supabase profile, not a fake switcher
   const activeUser: SystemUser = profile
     ? {
@@ -1068,13 +1079,12 @@ export default function App() {
   };
 
   // Handlers for Live Sessions — persisted to Supabase. Return a success boolean so callers that
-  // manage their own UI state (e.g. LiveSessionHub's modal) know whether to close/reset — only
+  // manage their own UI state (e.g. the calendars' session modal) know whether to close/reset — only
   // dismiss on caught errors below, not on an unconditional "we sent the request" assumption.
   const handleAddSession = async (newSession: LiveSession): Promise<boolean> => {
     try {
       const created = await createSession(newSession);
       setSessions(prev => [created, ...prev]);
-      setSelectedSession(created);
       return true;
     } catch (e: any) {
       window.alert(`Không thể tạo Live Session: ${e.message ?? e}`);
@@ -1085,9 +1095,6 @@ export default function App() {
     try {
       const saved = await updateSession(updatedSession);
       setSessions(prev => prev.map(s => s.id === saved.id ? saved : s));
-      if (selectedSession && selectedSession.id === saved.id) {
-        setSelectedSession(saved);
-      }
       return true;
     } catch (e: any) {
       window.alert(`Không thể cập nhật Live Session: ${e.message ?? e}`);
@@ -1098,9 +1105,6 @@ export default function App() {
     try {
       const saved = await submitSessionReport(sessionId, input);
       setSessions((prev) => prev.map((s) => (s.id === saved.id ? saved : s)));
-      if (selectedSession && selectedSession.id === saved.id) {
-        setSelectedSession(saved);
-      }
       return true;
     } catch (e: any) {
       window.alert(`Không thể lưu report ca live: ${e.message ?? e}`);
@@ -1115,22 +1119,11 @@ export default function App() {
   // Snapshot upload trả về đúng LiveSession vừa tính lại — chỉ cần thay 1 phần tử trong state.
   const handleSessionReconciled = (updated: LiveSession) => {
     setSessions((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
-    if (selectedSession && selectedSession.id === updated.id) {
-      setSelectedSession(updated);
-    }
   };
-  // FIX L10 (audit 2026-08-21): gọi setSelectedSession bên trong updater của setSessions là side
-  // effect trong hàm lẽ ra phải thuần (pure) — ở React StrictMode dev, updater chạy 2 lần nên side
-  // effect này cũng chạy 2 lần. Tính "next" từ state `sessions` đọc trực tiếp (đã có sẵn qua
-  // closure, cùng cách handleSessionReconciled ở trên đang làm) thay vì qua callback của setSessions.
   const handleDeleteSession = async (id: string) => {
     try {
       await deleteSession(id);
-      const next = sessions.filter((s) => s.id !== id);
-      setSessions(next);
-      if (selectedSession && selectedSession.id === id) {
-        setSelectedSession(next[0] ?? null);
-      }
+      setSessions((prev) => prev.filter((s) => s.id !== id));
     } catch (e: any) {
       window.alert(`Không thể xóa Live Session: ${e.message ?? e}`);
     }
@@ -1193,7 +1186,9 @@ export default function App() {
   // ca để Đăng Ký & Chốt Lịch / lịch thấy ngay, không cần F5.
   const reloadShiftSlots = async () => {
     try {
-      setShiftSlots(await fetchShiftSlots());
+      const [slots, planTargets] = await Promise.all([fetchShiftSlots(), fetchLockedPlanTargets()]);
+      setShiftSlots(slots);
+      setPlanTargetsBySlotId(planTargets);
     } catch (e: any) {
       window.alert(`Không nạp lại được danh sách ca: ${e.message ?? e}`);
     }
@@ -1378,7 +1373,7 @@ export default function App() {
     {
       label: "Vận Hành Live",
       items: [
-        { id: "sessions", label: "Live Sessions", icon: Radio, perm: "manage_sessions" as PermissionKey },
+        { id: "sessions", label: "Sổ Ca", icon: BookOpen, perm: "manage_sessions" as PermissionKey },
         { id: "calendar", label: "Lịch Vận Hành", icon: CalendarIcon, perm: "manage_calendar" as PermissionKey },
         // Đăng ký & Chốt Lịch Host — luôn hiện với mọi role, không gate theo PermissionKey: role
         // talent cần thấy tab này để tự đăng ký ca (Giai đoạn 14a); màn hình bên trong tự đổi giao
@@ -1469,7 +1464,7 @@ export default function App() {
       label: "Brand Workspace",
       items: [
         { id: "brand_calendar", label: "Lịch Vận Hành", icon: CalendarIcon, perm: undefined },
-        { id: "brand_sessions", label: "Sessions", icon: Radio, perm: undefined },
+        { id: "brand_sessions", label: "Sổ Ca", icon: BookOpen, perm: undefined },
         { id: "brand_skus", label: "SKU Showcase", icon: Package, perm: undefined },
         { id: "brand_monthly_report", label: "Report Tháng", icon: FileText, perm: undefined },
         ...(currentRole === "brand"
@@ -1856,16 +1851,13 @@ export default function App() {
             ) : (
               <>
                 {activeTab === "sessions" && (
-                  <LiveSessionHub
+                  <SessionLedger
+                    variant="agency"
                     sessions={activeSessions}
-                    selectedSession={activeSelectedSession}
-                    studios={activeStudios}
-                    talents={activeTalents}
                     brands={activeBrands}
-                    users={activeUsers}
-                    onSelectSession={setSelectedSession}
-                    onAddSession={handleAddSession}
-                    onUpdateSession={handleUpdateSession}
+                    currentRole={currentRole}
+                    onSubmitSessionReport={handleSubmitSessionReport}
+                    onSessionSnapshotApplied={handleSessionReconciled}
                     onDeleteSession={handleDeleteSession}
                   />
                 )}
@@ -1921,6 +1913,7 @@ export default function App() {
                   <MonthPlan
                     brands={activeBrands}
                     studios={activeStudios}
+                    sessions={activeSessions}
                     currentUserId={activeUser.id}
                     monthlyReports={monthlyReports}
                     recurringShiftTemplates={recurringShiftTemplates}
@@ -1975,11 +1968,14 @@ export default function App() {
                 )}
 
                 {activeTab === "brand_sessions" && effectiveWorkspace.type === "brand" && (
-                  <BrandSessions
+                  <SessionLedger
+                    variant="brand"
                     brandId={currentBrandId!}
                     sessions={activeSessions}
+                    brands={activeBrands}
                     currentRole={currentRole}
                     onSubmitSessionReport={handleSubmitSessionReport}
+                    onSessionSnapshotApplied={handleSessionReconciled}
                   />
                 )}
 

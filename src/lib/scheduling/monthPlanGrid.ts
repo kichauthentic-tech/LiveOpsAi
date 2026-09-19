@@ -13,6 +13,10 @@ export interface PlanDraftSlot {
   targetGmv: number;
   note: string;
   slotId?: string;
+  // Chỉ có khi ca đến từ engine gợi ý (giai đoạn B) — không lưu DB, chỉ để hiển thị/giải thích.
+  expectedGmv?: number;
+  reason?: string;
+  highExpectation?: boolean;
 }
 
 let seq = 0;
@@ -118,4 +122,29 @@ export function validateDrafts(drafts: PlanDraftSlot[], plan: Pick<BrandMonthPla
     }
   }
   return errors;
+}
+
+// Đổ kết quả engine vào lưới: ca cố định (ops đặt tay, engine giữ nguyên) khớp theo ngày|giờ với
+// draft đang có để giữ id/slotId; ca mới sinh key mới.
+export function draftsFromSuggestion(
+  current: PlanDraftSlot[],
+  suggested: { date: string; startTime: string; endTime: string; targetGmv: number; expectedGmv: number; reason: string; highExpectation: boolean }[]
+): PlanDraftSlot[] {
+  const byKey = new Map(current.map((d) => [draftKeyOf(d), d]));
+  return suggested.map((s) => {
+    const cur = byKey.get(draftKeyOf(s));
+    return {
+      key: cur?.key ?? newKey(),
+      id: cur?.id,
+      slotId: cur?.slotId,
+      note: cur?.note ?? "",
+      date: s.date,
+      startTime: s.startTime,
+      endTime: s.endTime,
+      targetGmv: s.targetGmv,
+      expectedGmv: s.expectedGmv,
+      reason: s.reason,
+      highExpectation: s.highExpectation
+    };
+  });
 }

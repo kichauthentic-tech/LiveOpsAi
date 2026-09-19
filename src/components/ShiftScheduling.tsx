@@ -909,7 +909,7 @@ export default function ShiftScheduling({
                       if (!session) {
                         return (
                           <div className="text-xs text-emerald-300 flex items-center gap-1.5 pt-1 border-t border-[var(--border)]/80">
-                            <Check className="w-3.5 h-3.5" /> Đã chốt — xem chi tiết ở tab Live Sessions / Lịch Vận Hành.
+                            <Check className="w-3.5 h-3.5" /> Đã chốt — xem chi tiết ở tab Sổ Ca / Lịch Vận Hành.
                           </div>
                         );
                       }

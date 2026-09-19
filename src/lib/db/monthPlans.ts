@@ -153,3 +153,19 @@ export async function lockMonthPlan(planId: string): Promise<LockPlanResult> {
   if (error) throw error;
   return data as LockPlanResult;
 }
+
+// Target/ca của mọi kế hoạch ĐÃ CHỐT, khoá theo shift_slot id — App nối shift_slots.session_id →
+// live_sessions để đổ target xuống ca thật (applyAllocatedTargets). Bảng nhỏ, đọc 1 lần + sau mỗi chốt.
+export async function fetchLockedPlanTargets(): Promise<Map<string, number>> {
+  const { data, error } = await supabase
+    .from("brand_month_plan_slots")
+    .select("slot_id,target_gmv,plan:brand_month_plans!inner(status)")
+    .eq("plan.status", "locked")
+    .not("slot_id", "is", null);
+  if (error) throw error;
+  const out = new Map<string, number>();
+  for (const r of (data as { slot_id: string | null; target_gmv: number }[]) ?? []) {
+    if (r.slot_id) out.set(r.slot_id, Number(r.target_gmv));
+  }
+  return out;
+}

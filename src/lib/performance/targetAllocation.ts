@@ -117,19 +117,46 @@ export function allocateSessionTargets(sessions: LiveSession[], plan: MonthTarge
 
 // Ghi target đã phân bổ đè lên `targetGmv` của từng ca. Tháng/brand không có kế hoạch thì giữ
 // nguyên số đang có trong DB (số cũ gán theo host, hoặc ops gõ tay) — không xoá thứ chưa thay được.
-export function applyAllocatedTargets(sessions: LiveSession[], reportsByBrandMonth: Map<string, BrandMonthlyReport>): LiveSession[] {
+//
+// Kế Hoạch Tháng đã chốt (0090, giai đoạn B): `planTargetBySessionId` = target/ca ops đã chốt cho ca
+// thật sinh từ kế hoạch. Brand-tháng nào có ít nhất 1 ca như vậy thì: ca có target kế hoạch dùng
+// đúng số đó; ca còn lại (mở lẻ, thêm sau) chia phần target tổng CÒN LẠI (tổng tab 05 − Σ target kế
+// hoạch) theo giờ, không còn thì 0 — tổng tháng vẫn là con số cam kết với brand.
+export function applyAllocatedTargets(
+  sessions: LiveSession[],
+  reportsByBrandMonth: Map<string, BrandMonthlyReport>,
+  planTargetBySessionId?: Map<string, number>
+): LiveSession[] {
   const plans = new Map<string, MonthTargetPlan | null>();
   const alloc = new Map<string, number>();
   const planned = new Set<string>(); // "brand|month" có kế hoạch
+  const monthsWithPlanTargets = new Set<string>();
+  if (planTargetBySessionId && planTargetBySessionId.size > 0) {
+    for (const s of sessions) if (planTargetBySessionId.has(s.id)) monthsWithPlanTargets.add(`${s.brandId}|${s.date.slice(0, 7)}`);
+  }
   for (const s of sessions) {
     const key = `${s.brandId}|${s.date.slice(0, 7)}`;
-    if (!plans.has(key)) {
-      const p = buildMonthTargetPlan(s.brandId, s.date.slice(0, 7), reportsByBrandMonth);
-      plans.set(key, p);
-      if (p) {
-        planned.add(key);
-        for (const [id, v] of allocateSessionTargets(sessions, p)) alloc.set(id, v);
+    if (plans.has(key)) continue;
+    const p = buildMonthTargetPlan(s.brandId, s.date.slice(0, 7), reportsByBrandMonth);
+    plans.set(key, p);
+    if (monthsWithPlanTargets.has(key)) {
+      planned.add(key);
+      const inMonth = sessions.filter((x) => `${x.brandId}|${x.date.slice(0, 7)}` === key && x.status !== "Cancelled");
+      let linkedSum = 0;
+      const rest: LiveSession[] = [];
+      for (const x of inMonth) {
+        const t = planTargetBySessionId!.get(x.id);
+        if (t !== undefined) {
+          alloc.set(x.id, t);
+          linkedSum += t;
+        } else rest.push(x);
       }
+      const remaining = p ? Math.max(0, monthTotalTarget(p) - linkedSum) : 0;
+      const restHours = rest.reduce((a, x) => a + Math.max(sessionDurationHours(x.startTime, x.endTime), 0), 0);
+      for (const x of rest) alloc.set(x.id, restHours > 0 ? (remaining * Math.max(sessionDurationHours(x.startTime, x.endTime), 0)) / restHours : 0);
+    } else if (p) {
+      planned.add(key);
+      for (const [id, v] of allocateSessionTargets(sessions, p)) alloc.set(id, v);
     }
   }
   if (planned.size === 0) return sessions;
