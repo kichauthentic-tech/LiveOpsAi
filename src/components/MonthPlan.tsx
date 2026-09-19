@@ -226,6 +226,17 @@ export default function MonthPlan({
     setDirty(true);
     setMsg(`Đã chia ${formatCurrencyAdaptive(targetTotal)} theo giờ trong từng khung camp.`);
   };
+  // Đổ gợi ý vào lưới. Ngày camp có thể nhiều ca hơn trần ops đặt (engine nới theo giờ/ngày lịch sử) —
+  // nâng trần kế hoạch theo, không thì validateDrafts chặn lưu chính cái gợi ý vừa áp.
+  const applySuggestion = (base: PlanDraftSlot[], result: SuggestResult) => {
+    const next = draftsFromSuggestion(base, result.slots);
+    const perDay = new Map<string, number>();
+    for (const d of next) perDay.set(d.date, (perDay.get(d.date) ?? 0) + 1);
+    const maxDay = Math.max(0, ...perDay.values());
+    if (maxDay > settings.maxSlotsPerDay) setSettings((st) => ({ ...st, maxSlotsPerDay: maxDay }));
+    setDrafts(next);
+    setDirty(true);
+  };
   // Giai đoạn B — engine gợi ý: ca đang có trong lưới được giữ làm ca cố định, engine xếp thêm cho đủ
   // giờ cam kết và chia target theo dự báo từng ca.
   const suggest = () => {
@@ -267,8 +278,7 @@ export default function MonthPlan({
       setMsg(result.notes[0] ?? "Không có gợi ý.");
       return;
     }
-    setDrafts(draftsFromSuggestion(drafts, result.slots));
-    setDirty(true);
+    applySuggestion(drafts, result);
     setMsg(`Gợi ý ${result.slots.length} ca · ${fmtH(result.totalHours)}h · dự báo ${formatCurrencyAdaptive(result.forecastGmv)}${drafts.length > 0 ? ` (giữ ${drafts.length} ca đang có)` : ""}.`);
   };
 
@@ -458,7 +468,7 @@ export default function MonthPlan({
       {evaluation && <EvaluationPanel ev={evaluation} calibration={calibration} />}
 
       {suggestion && (
-        <SuggestionPanel history={suggestion.history} result={suggestion.result} committedHours={planHours} targetTotal={targetTotal} compare={compare} current={strategy} onPick={(k) => { setStrategy(k); if (compare) { setSuggestion({ history: suggestion.history, result: compare[k] }); setDrafts(draftsFromSuggestion(drafts.filter((d) => d.id || d.slotId), compare[k].slots)); setDirty(true); } }} />
+        <SuggestionPanel history={suggestion.history} result={suggestion.result} committedHours={planHours} targetTotal={targetTotal} compare={compare} current={strategy} onPick={(k) => { setStrategy(k); if (compare) { setSuggestion({ history: suggestion.history, result: compare[k] }); applySuggestion(drafts.filter((d) => d.id || d.slotId), compare[k]); } }} />
       )}
 
       {/* Lưới ngày × ca */}
@@ -584,6 +594,7 @@ function SuggestionPanel({ history: h, result: r, committedHours, targetTotal, c
           {(["dday", "midmonth", "payday"] as const).map((b) => (
             <div key={b} className="flex justify-between gap-2"><span className="text-[var(--text)]">{BUCKET_LABEL[b]}</span><b className="text-[var(--text)]">×{h.campMultipliers[b].toFixed(2)} <span className="text-[10px] font-normal text-[var(--text-faint)]">{h.campLearned[b] ? "học được" : "mặc định"}</span></b></div>
           ))}
+          <div className="flex justify-between gap-2 mt-1"><span className="text-[var(--text)]">Giờ/ngày lịch sử</span><b className="text-[var(--text)]">{(["daily", "dday", "midmonth", "payday"] as const).map((b) => h.campHoursLearned[b] ? `${b === "daily" ? "thường" : BUCKET_LABEL[b]} ${h.campHoursPerDay[b].toFixed(1)}h` : "").filter(Boolean).join(" · ") || "chưa học được"}</b></div>
           <div className="flex justify-between gap-2 mt-1"><span className="text-[var(--text)]">Ca thứ 2/3 trong ngày</span><b className="text-[var(--text)]">×{h.diminishing[1].toFixed(2)} / ×{h.diminishing[2].toFixed(2)}</b></div>
         </div>
         <div>

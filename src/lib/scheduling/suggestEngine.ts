@@ -55,6 +55,11 @@ export interface HistorySummary {
   campMultipliers: Record<CampDayBucket, number>;
   campLearned: Record<CampDayBucket, boolean>;
   diminishing: number[]; // hệ số ca thứ 1, 2, 3… trong ngày
+  // Giờ live/ngày (median) theo loại ngày, học từ lịch sử (≥ 3 ngày). Hệ số camp ở trên đo TRÊN
+  // TOÀN BỘ số giờ này (CROCS: D-Day ~12h/ngày liên tục), nên trong khuôn giờ đó không áp lợi suất
+  // giảm dần, và trần ca/ngày của ngày camp được nới cho đủ số giờ.
+  campHoursPerDay: Record<CampDayBucket, number>;
+  campHoursLearned: Record<CampDayBucket, boolean>;
   cells: HistoryCell[];
   enough: boolean;
   // Lớp 2 — học từ lịch sử nếu đủ ca (≥ 5), không thì 1.0 và chỉ ghi nhãn.
@@ -166,6 +171,8 @@ export function buildHistory(sessions: LiveSession[], brandId: string, asOf: str
     campMultipliers: { daily: 1, dday: 1, midmonth: 1, payday: 1 },
     campLearned: { daily: false, dday: false, midmonth: false, payday: false },
     diminishing: [1, 0.85, 0.7, 0.6],
+    campHoursPerDay: { daily: 0, dday: 0, midmonth: 0, payday: 0 },
+    campHoursLearned: { daily: false, dday: false, midmonth: false, payday: false },
     cells: [],
     enough: false,
     eventMultipliers: { holiday: 1, mega_sale: 1, event: 1 },
@@ -275,6 +282,21 @@ export function buildHistory(sessions: LiveSession[], brandId: string, asOf: str
     }
   }
 
+  // Giờ live/ngày theo loại ngày — median các ngày có ca (không trọng số: đây là thói quen vận hành,
+  // không phải hiệu suất).
+  const dayHoursByBucket: Record<CampDayBucket, number[]> = { daily: [], dday: [], midmonth: [], payday: [] };
+  for (const [date, list] of byDate) {
+    dayHoursByBucket[resolveCampBucketType(date)].push(list.reduce((a, x) => a + sessionDurationHours(x.startTime, x.endTime), 0));
+  }
+  const campHoursPerDay = { ...empty.campHoursPerDay };
+  const campHoursLearned = { ...empty.campHoursLearned };
+  for (const b of Object.keys(dayHoursByBucket) as CampDayBucket[]) {
+    if (dayHoursByBucket[b].length >= 3) {
+      campHoursPerDay[b] = percentile(dayHoursByBucket[b], 0.5);
+      campHoursLearned[b] = true;
+    }
+  }
+
   // Lợi suất giảm dần: GMV/giờ của ca thứ k trong ngày so với ca thứ 1 (cùng ngày, thứ tự theo giờ).
   const byPos: { g: number; h: number }[] = [];
   for (const list of byDate.values()) {
@@ -322,6 +344,8 @@ export function buildHistory(sessions: LiveSession[], brandId: string, asOf: str
     campMultipliers,
     campLearned,
     diminishing,
+    campHoursPerDay,
+    campHoursLearned,
     cells: cells.sort((a, b) => b.gmvPerHour - a.gmvPerHour),
     enough: usable.length >= MIN_HISTORY_SESSIONS && months >= 2,
     eventMultipliers,
@@ -381,6 +405,20 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
   const slotHoursEff = strategy === "lean" ? c.defaultSlotHours + 1 : c.defaultSlotHours;
   const maxPerDay = strategy === "balanced" ? Math.min(c.maxSlotsPerDay, 2) : c.maxSlotsPerDay;
   const slotMin = Math.round(slotHoursEff * 60);
+  // Ngày camp: trần ca/ngày nới theo giờ/ngày học từ lịch sử (không bao giờ thấp hơn trần ops đặt).
+  const dayCapOf = (bucket: CampDayBucket) => {
+    const goal = history.campHoursPerDay[bucket];
+    if (bucket === "daily" || goal <= 0) return maxPerDay;
+    return Math.max(maxPerDay, Math.round(goal / slotHoursEff));
+  };
+  // Lợi suất giảm dần chỉ áp NGOÀI khuôn giờ/ngày đã đo hệ số camp — trong khuôn thì hệ số camp đã
+  // gồm cả giờ thứ 10–12 của ngày đó rồi, áp thêm là phạt hai lần.
+  const dimFor = (cand: Candidate, before: Candidate[]) => {
+    const goal = history.campHoursPerDay[cand.bucket];
+    const hoursBefore = before.reduce((a, s) => a + s.hours, 0);
+    if (goal > 0 && hoursBefore + cand.hours <= goal + 0.01) return 1;
+    return history.diminishing[Math.min(before.length, history.diminishing.length - 1)];
+  };
   // Lớp 2: hệ số theo ngày (lễ/sự kiện × scheme) + nhãn để giải thích.
   const eventByDate = new Map<string, CalendarEvent>();
   for (const e of c.events ?? []) if (!eventByDate.has(e.date)) eventByDate.set(e.date, e);
@@ -442,15 +480,14 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
   // Điểm biên của 1 ứng viên trong trạng thái hiện tại.
   // GMV/giờ kỳ vọng thật của ứng viên trong trạng thái hiện tại (đã nhân camp + lợi suất giảm dần).
   const expectedGph = (cand: Candidate, state: Candidate[]) => {
-    const pos = state.filter((s) => s.date === cand.date && s.start < cand.start).length;
-    const dim = history.diminishing[Math.min(pos, history.diminishing.length - 1)];
+    const dim = dimFor(cand, state.filter((s) => s.date === cand.date && s.start < cand.start));
     return cand.baseGph * history.campMultipliers[cand.bucket] * dim * dayFactor(cand.date);
   };
 
   // Điểm biên = kỳ vọng × các phạt/thưởng mềm — chỉ để XẾP HẠNG, không phải dự báo.
   const marginalScore = (cand: Candidate, state: Candidate[], targetHours: number) => {
     const sameDay = state.filter((s) => s.date === cand.date);
-    if (sameDay.length >= maxPerDay) return -1;
+    if (sameDay.length >= dayCapOf(cand.bucket)) return -1;
     if (sameDay.some((s) => overlaps(s, cand))) return -1;
     const target = targetHours;
     let score = expectedGph(cand, state);
@@ -485,23 +522,23 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
     const curve: MarginalPoint[] = [];
     let cum = state.reduce((a, s) => a + expectedGph(s, state.filter((x) => x !== s)) * s.hours, 0);
     if (hours > 0) curve.push({ hours, gmv: cum });
-    let guard = 0;
-    while (hours + 0.01 < targetHours && guard++ < 400) {
+
+    // Chọn ứng viên tốt nhất trong `pool` rồi đưa vào lưới; ca cuối cắt cho vừa giờ còn lại nếu ≥ 1h.
+    const take = (pool: Candidate[]): boolean => {
       let best: Candidate | null = null;
       let bestScore = 0;
-      const remaining = targetHours - hours;
-      for (const cand of candidates) {
+      for (const cand of pool) {
         const sc = marginalScore(cand, state, targetHours);
         if (sc > bestScore) {
           bestScore = sc;
           best = cand;
         }
       }
-      if (!best) break;
-      // Ca cuối: cắt cho vừa giờ còn lại nếu còn ≥ 1h, không thì thôi.
+      if (!best) return false;
+      const remaining = targetHours - hours;
       let pick = best;
       if (remaining < best.hours) {
-        if (remaining < 1) break;
+        if (remaining < 1) return false;
         const end = best.start + Math.round(remaining * 60);
         const { gph, cells } = expectedGphFor(best.date, best.start, end, history, get, c.calibration);
         pick = { ...best, end, hours: remaining, baseGph: gph, cellRefs: cells };
@@ -512,20 +549,73 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
       hours += pick.hours;
       cum += exp;
       curve.push({ hours, gmv: cum });
+      return true;
+    };
+
+    // Pha 1 — khuôn ngày camp: lịch sử cho thấy brand live đủ ~N giờ mỗi ngày camp bất kể loại
+    // (Mid-Month GMV/giờ thấp hơn ngày thường vẫn live 12h) và live LIỀN MẠCH (1–2 room kéo dài).
+    // Đó là cách vận hành, không phải hiệu suất, nên lấp ngày camp đủ giờ TRƯỚC — bằng một khối ca
+    // liên tục có tổng GMV/giờ cao nhất trong khung — rồi mới chia phần còn lại; nếu tổng giờ cam kết
+    // không đủ cho mọi ngày camp thì co đều các ngày camp lại. Nhặt từng ca theo ô tốt nhất sẽ để
+    // lại khe 1–2h không nhét ca nào được (10–13, 15–18, 20–23 → ngày chỉ 9h).
+    const campDates = [...new Set(candidates.filter((x) => x.bucket !== "daily" && history.campHoursPerDay[x.bucket] > 0).map((x) => x.date))].sort();
+    const campGoalTotal = campDates.reduce((a, d) => a + history.campHoursPerDay[resolveCampBucketType(d, c.camp)], 0);
+    const campScale = campGoalTotal > 0 ? Math.min(1, Math.max(0, targetHours - hours) / campGoalTotal) : 0;
+    for (const date of campDates) {
+      if (hours + 0.01 >= targetHours) break;
+      const bucket = resolveCampBucketType(date, c.camp);
+      const goal = history.campHoursPerDay[bucket] * campScale;
+      const already = state.filter((x) => x.date === date);
+      const k = Math.min(Math.round(goal / slotHoursEff), Math.floor((winEnd - winStart) / slotMin), dayCapOf(bucket)) - already.length;
+      if (k <= 0) continue;
+      // Khối k ca liền nhau, không đè ca ops đã đặt, tổng GMV/giờ nền cao nhất.
+      let bestBlock: Candidate[] | null = null;
+      let bestSum = 0;
+      for (let start = winStart; start + k * slotMin <= winEnd; start += 60) {
+        const block: Candidate[] = [];
+        for (let i = 0; i < k; i++) {
+          const st = start + i * slotMin;
+          const { gph, cells } = expectedGphFor(date, st, st + slotMin, history, get, c.calibration);
+          block.push({ date, start: st, end: st + slotMin, hours: slotHoursEff, bucket, baseGph: gph, cellRefs: cells });
+        }
+        if (block.some((b) => already.some((a) => overlaps(a, b)))) continue;
+        const sum = block.reduce((a, b) => a + b.baseGph, 0);
+        if (sum > bestSum) {
+          bestSum = sum;
+          bestBlock = block;
+        }
+      }
+      if (!bestBlock) continue;
+      for (const slot of bestBlock) {
+        if (hours + 0.01 >= targetHours) break;
+        if (!take([slot])) break;
+      }
+    }
+
+    // Pha 2 — phần còn lại theo điểm biên trên toàn tháng.
+    let guard = 0;
+    while (hours + 0.01 < targetHours && guard++ < 400) {
+      if (!take(candidates)) break;
     }
     return { picked, curve };
   };
 
   const committed = c.committedHours > 0 ? c.committedHours : 0;
   if (committed <= 0) notes.push("Chưa có giờ cam kết tháng này — nhập ở Cam Kết Hợp Đồng để engine biết phải xếp bao nhiêu giờ.");
+  {
+    const raised = (["dday", "midmonth", "payday"] as CampDayBucket[]).filter((b) => dayCapOf(b) > maxPerDay);
+    if (raised.length > 0) {
+      const label: Record<CampDayBucket, string> = { daily: "ngày thường", dday: "D-Day", midmonth: "Mid-Month", payday: "Pay-Day" };
+      notes.push(`Khuôn ngày camp học từ lịch sử: ${raised.map((b) => `${label[b]} ~${history.campHoursPerDay[b].toFixed(0)}h/ngày`).join(", ")} → lấp đủ giờ ngày camp trước (tới ${raised.map((b) => `${dayCapOf(b)} ca`).join("/")}), phần còn lại mới chia cho ngày thường (tối đa ${maxPerDay} ca); tối đa ca/ngày của kế hoạch được nâng theo khi áp gợi ý.`);
+    }
+  }
   if (c.calibration && c.calibration.size > 0) notes.push(`Đã hiệu chỉnh GMV/giờ theo kế hoạch vs thực tế các tháng trước (${c.calibration.size} ô thứ × giờ có dữ liệu).`);
   const main = greedy(committed);
 
   // Dự báo + target/ca.
   const all = [...chosen, ...main.picked];
   const expected = all.map((s) => {
-    const sameDay = all.filter((x) => x.date === s.date && x.start < s.start).length;
-    const dim = history.diminishing[Math.min(sameDay, history.diminishing.length - 1)];
+    const dim = dimFor(s, all.filter((x) => x.date === s.date && x.start < s.start));
     return s.baseGph * history.campMultipliers[s.bucket] * dim * dayFactor(s.date) * s.hours;
   });
   const forecastGmv = expected.reduce((a, b) => a + b, 0);
