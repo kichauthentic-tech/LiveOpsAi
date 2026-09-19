@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Brand, BrandMonthPlan, BrandMonthlyCommitment, BrandMonthlyReport, LiveSession, RecurringShiftTemplate, Studio } from "../types";
-import { CalendarRange, ChevronLeft, ChevronRight, Lock, Plus, Repeat, Save, Sparkles, Trash2, Wand2, X } from "lucide-react";
+import { Brand, BrandMonthPlan, BrandMonthlyCommitment, BrandMonthlyReport, CalendarEventRow, LiveSession, PromoScheme, RecurringShiftTemplate, Studio } from "../types";
+import { AlertTriangle, Ban, CalendarRange, ChevronLeft, ChevronRight, Lock, Plus, Repeat, Save, Sparkles, Wand2, X } from "lucide-react";
 import { fetchBrandMonthlyCommitments } from "../lib/db/brandContracts";
-import { PlanSettings, fetchMonthPlan, lockMonthPlan, replacePlanSlots, upsertMonthPlan } from "../lib/db/monthPlans";
+import { PlanSettings, fetchCalendarEvents, fetchMonthPlan, fetchPlanStatuses, lockMonthPlan, replacePlanSlots, upsertMonthPlan } from "../lib/db/monthPlans";
 import { buildMonthTargetPlan, monthTotalTarget } from "../lib/performance/targetAllocation";
 import { todayVn } from "../lib/performance/brandCommitment";
 import { CAMPAIGN_DAY_STYLES, getCampaignDayInfo, resolveCampBucketType } from "../lib/campaignDays";
@@ -19,7 +19,7 @@ import {
   validateDrafts
 } from "../lib/scheduling/monthPlanGrid";
 import { RecurringRulesPanel } from "./scheduling/RecurringRulesPanel";
-import { HistorySummary, SuggestResult, buildHistory, suggestMonthPlan } from "../lib/scheduling/suggestEngine";
+import { HistorySummary, STRATEGY_LABEL, SuggestResult, SuggestStrategy, buildHistory, suggestMonthPlan } from "../lib/scheduling/suggestEngine";
 import { formatCurrencyAdaptive } from "../lib/formatCurrency";
 
 interface MonthPlanProps {
@@ -27,6 +27,7 @@ interface MonthPlanProps {
   studios: Studio[];
   // Lịch sử ca (engine chỉ ăn ca Completed + tiktok_reconciled của đúng brand).
   sessions: LiveSession[];
+  promoSchemes: PromoScheme[];
   currentUserId: string;
   monthlyReports: Map<string, BrandMonthlyReport>;
   recurringShiftTemplates: RecurringShiftTemplate[];
@@ -39,7 +40,7 @@ interface MonthPlanProps {
 
 const WEEKDAY_LABELS = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
 const fmtH = (n: number) => n.toLocaleString("vi-VN", { maximumFractionDigits: 1 });
-const DEFAULT_SETTINGS: PlanSettings = { defaultSlotHours: 3, liveWindowStart: "09:00", liveWindowEnd: "23:00", maxSlotsPerDay: 3, notes: "" };
+const DEFAULT_SETTINGS: PlanSettings = { defaultSlotHours: 3, liveWindowStart: "09:00", liveWindowEnd: "23:00", maxSlotsPerDay: 3, notes: "", blackoutDates: [] };
 
 const nextMonthOf = (month: string, delta: number) => {
   const [y, m] = month.split("-").map(Number);
@@ -53,6 +54,7 @@ export default function MonthPlan({
   brands,
   studios,
   sessions,
+  promoSchemes,
   currentUserId,
   monthlyReports,
   recurringShiftTemplates,
@@ -77,13 +79,26 @@ export default function MonthPlan({
   // Giờ engine phải xếp: mặc định = cam kết hợp đồng; ops sửa tại chỗ khi tháng này thoả thuận khác
   // (không lưu — cam kết chính thức vẫn ở Cam Kết Hợp Đồng).
   const [hoursOverride, setHoursOverride] = useState<number | null>(null);
+  const [events, setEvents] = useState<CalendarEventRow[]>([]);
+  const [strategy, setStrategy] = useState<SuggestStrategy>("max");
+  const [compare, setCompare] = useState<Record<SuggestStrategy, SuggestResult> | null>(null);
+  // Nhắc việc: brand chưa chốt kế hoạch cho THÁNG SAU (theo hôm nay), bất kể đang xem tháng nào.
+  const [nextMonthMissing, setNextMonthMissing] = useState<string[]>([]);
 
   const brand = brands.find((b) => b.id === brandId);
   const brandTemplates = useMemo(() => recurringShiftTemplates.filter((t) => t.brandId === brandId), [recurringShiftTemplates, brandId]);
 
   useEffect(() => {
     fetchBrandMonthlyCommitments().then(setCommitments).catch(() => setCommitments([]));
+    fetchCalendarEvents().then(setEvents).catch(() => setEvents([]));
   }, []);
+  const nextMonth = nextMonthOf(today.slice(0, 7), 1);
+  const refreshMissing = () => {
+    fetchPlanStatuses(nextMonth)
+      .then((m) => setNextMonthMissing(brands.filter((b) => m.get(b.id)?.status !== "locked").map((b) => b.name)))
+      .catch(() => setNextMonthMissing([]));
+  };
+  useEffect(refreshMissing, [brands, nextMonth]);
 
   useEffect(() => {
     if (!brandId) return;
@@ -95,7 +110,7 @@ export default function MonthPlan({
         if (!alive) return;
         if (r) {
           setPlan(r.plan);
-          setSettings({ defaultSlotHours: r.plan.defaultSlotHours, liveWindowStart: r.plan.liveWindowStart, liveWindowEnd: r.plan.liveWindowEnd, maxSlotsPerDay: r.plan.maxSlotsPerDay, notes: r.plan.notes });
+          setSettings({ defaultSlotHours: r.plan.defaultSlotHours, liveWindowStart: r.plan.liveWindowStart, liveWindowEnd: r.plan.liveWindowEnd, maxSlotsPerDay: r.plan.maxSlotsPerDay, notes: r.plan.notes, blackoutDates: r.plan.blackoutDates });
           setDrafts(draftsFromSaved(r.slots));
         } else {
           setPlan(null);
@@ -120,7 +135,16 @@ export default function MonthPlan({
   const totals = useMemo(() => totalsOf(drafts), [drafts]);
   const errors = useMemo(() => validateDrafts(drafts, settings), [drafts, settings]);
   const locked = plan?.status === "locked";
-  const editable = !locked;
+  // 0091: kế hoạch đã chốt vẫn sửa được; "Chốt lại" đồng bộ ca (thêm mới / huỷ ca mở bị bỏ).
+  const editable = true;
+  const unsynced = locked ? drafts.filter((d) => !d.slotId).length : 0;
+  const eventByDate = useMemo(() => new Map(events.map((e) => [e.date, e])), [events]);
+  const brandSchemes = useMemo(() => promoSchemes.filter((sc) => sc.brandId === brandId).map((sc) => ({ start: sc.startDate, end: sc.endDate, label: sc.title })), [promoSchemes, brandId]);
+  const toggleBlackout = (day: string) => {
+    setSettings((st) => ({ ...st, blackoutDates: st.blackoutDates.includes(day) ? st.blackoutDates.filter((d) => d !== day) : [...st.blackoutDates, day].sort() }));
+    setDrafts((prev) => prev.filter((d) => d.date !== day || settings.blackoutDates.includes(day)));
+    setDirty(true);
+  };
 
   const days = useMemo(() => daysOfMonth(month), [month]);
   const leading = new Date(`${days[0]}T00:00:00`).getDay();
@@ -176,9 +200,9 @@ export default function MonthPlan({
       setMsg("Nhập giờ cần xếp (hoặc cam kết ở Cam Kết Hợp Đồng) để engine biết phải xếp bao nhiêu giờ.");
       return;
     }
-    const history = buildHistory(sessions, brandId, today);
+    const history = buildHistory(sessions, brandId, today, { events, schemes: brandSchemes });
     const shareBase = targetPlan && targetTotal > 0 ? targetPlan.byBucket : null;
-    const result = suggestMonthPlan(history, {
+    const base = {
       month,
       today,
       committedHours: planHours,
@@ -191,8 +215,19 @@ export default function MonthPlan({
       liveWindowEnd: settings.liveWindowEnd,
       defaultSlotHours: settings.defaultSlotHours,
       maxSlotsPerDay: settings.maxSlotsPerDay,
-      fixedSlots: drafts.map((d) => ({ date: d.date, startTime: d.startTime, endTime: d.endTime }))
-    });
+      blackoutDates: settings.blackoutDates,
+      fixedSlots: drafts.map((d) => ({ date: d.date, startTime: d.startTime, endTime: d.endTime })),
+      events,
+      schemes: brandSchemes
+    };
+    // Chạy cả 3 phương án để so sánh; áp phương án đang chọn vào lưới.
+    const all: Record<SuggestStrategy, SuggestResult> = {
+      max: suggestMonthPlan(history, { ...base, strategy: "max" }),
+      balanced: suggestMonthPlan(history, { ...base, strategy: "balanced" }),
+      lean: suggestMonthPlan(history, { ...base, strategy: "lean" })
+    };
+    setCompare(all);
+    const result = all[strategy];
     setSuggestion({ history, result });
     if (result.slots.length === 0) {
       setMsg(result.notes[0] ?? "Không có gợi ý.");
@@ -238,7 +273,8 @@ export default function MonthPlan({
     }
     const gap = planHours - totals.hours;
     const warn = planHours > 0 && Math.abs(gap) > 0.01 ? `\n\nGiờ kế hoạch ${fmtH(totals.hours)}h ${gap > 0 ? "THIẾU" : "VƯỢT"} ${fmtH(Math.abs(gap))}h so với ${fmtH(planHours)}h cần xếp.` : "";
-    if (!window.confirm(`Chốt kế hoạch ${brand?.name} tháng ${month}: mở ${drafts.length} ca chờ đăng ký?${warn}`)) return;
+    const relockNote = locked ? "\n\nChốt lại sẽ mở thêm ca mới và HUỶ ca đang mở đã bị bỏ khỏi kế hoạch (trừ ca đã có người đăng ký)." : "";
+    if (!window.confirm(`${locked ? "Chốt lại" : "Chốt"} kế hoạch ${brand?.name} tháng ${month}: ${drafts.length} ca chờ đăng ký?${warn}${relockNote}`)) return;
     const p = await save();
     if (!p) return;
     setSaving(true);
@@ -250,7 +286,11 @@ export default function MonthPlan({
         setPlan(fresh.plan);
         setDrafts(draftsFromSaved(fresh.slots));
       }
-      setMsg(`Đã chốt: mở ${r.created} ca mới${r.linked > 0 ? `, gắn ${r.linked} ca đã có sẵn` : ""} — ${r.total_slots} ca đang chờ đăng ký.`);
+      refreshMissing();
+      setMsg(
+        `Đã chốt: mở ${r.created} ca mới${r.linked > 0 ? `, gắn ${r.linked} ca đã có sẵn` : ""}${r.cancelled > 0 ? `, huỷ ${r.cancelled} ca bị bỏ` : ""}` +
+          `${r.kept_registered > 0 ? `, GIỮ ${r.kept_registered} ca bị bỏ nhưng đã có người đăng ký (xử lý ở Đăng Ký & Chốt Lịch)` : ""} — ${r.total_slots} ca đang chờ đăng ký.`
+      );
     } catch (e: any) {
       setMsg(`Không chốt được: ${e.message ?? e}`);
     } finally {
@@ -282,6 +322,13 @@ export default function MonthPlan({
           <button onClick={() => setMonth((m) => nextMonthOf(m, 1))} className="p-2 rounded-xl bg-[var(--surface-base)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]" title="Tháng sau"><ChevronRight className="w-4 h-4" /></button>
         </div>
       </div>
+
+      {nextMonthMissing.length > 0 && (
+        <div className="bg-amber-950/40 border border-amber-900 rounded-xl px-4 py-2.5 text-xs text-amber-200 flex flex-wrap items-center gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>Tháng {nextMonth.slice(5)}/{nextMonth.slice(0, 4)} chưa chốt kế hoạch: <b>{nextMonthMissing.join(", ")}</b> — chốt trước khi mở đăng ký để talent còn thời gian đăng ký.</span>
+        </div>
+      )}
 
       {/* Đầu vào + tổng */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -350,6 +397,9 @@ export default function MonthPlan({
         <button onClick={() => setRulesOpen((v) => !v)} className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-xs font-bold text-[var(--accent-text)] flex items-center gap-1.5"><Repeat className="w-3.5 h-3.5" /> Quy tắc lặp ({brandTemplates.length})</button>
         {editable && (
           <>
+            <select value={strategy} onChange={(e) => setStrategy(e.target.value as SuggestStrategy)} className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs font-bold text-[var(--text)]" title="Phương án gợi ý">
+              {(Object.keys(STRATEGY_LABEL) as SuggestStrategy[]).map((k) => <option key={k} value={k}>{STRATEGY_LABEL[k]}</option>)}
+            </select>
             <button onClick={suggest} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] border border-[var(--accent)]/60 text-xs font-bold text-[var(--accent-text)] flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" /> Gợi ý phân bổ</button>
             <button onClick={loadTemplates} className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-xs font-bold text-[var(--text)] hover:border-[var(--accent)]">Nạp từ quy tắc</button>
             <button onClick={allocate} className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-xs font-bold text-[var(--text)] hover:border-[var(--accent)] flex items-center gap-1.5"><Wand2 className="w-3.5 h-3.5" /> Chia target theo khung</button>
@@ -360,7 +410,7 @@ export default function MonthPlan({
         {editable && (
           <button onClick={save} disabled={saving || !dirty} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] border border-[var(--border)] text-xs font-bold text-[var(--text)] disabled:opacity-40 flex items-center gap-1.5"><Save className="w-3.5 h-3.5" /> Lưu nháp</button>
         )}
-        <button onClick={lock} disabled={saving || loading || errors.length > 0} className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-bold disabled:opacity-40 flex items-center gap-1.5"><Lock className="w-3.5 h-3.5" /> {locked ? "Chốt lại (mở ca còn thiếu)" : `Chốt kế hoạch`}</button>
+        <button onClick={lock} disabled={saving || loading || errors.length > 0} className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-bold disabled:opacity-40 flex items-center gap-1.5"><Lock className="w-3.5 h-3.5" /> {locked ? `Chốt lại (đồng bộ ca)` : `Chốt kế hoạch`}</button>
       </div>
 
       {rulesOpen && brand && (
@@ -369,7 +419,9 @@ export default function MonthPlan({
         </div>
       )}
 
-      {suggestion && <SuggestionPanel history={suggestion.history} result={suggestion.result} committedHours={planHours} targetTotal={targetTotal} />}
+      {suggestion && (
+        <SuggestionPanel history={suggestion.history} result={suggestion.result} committedHours={planHours} targetTotal={targetTotal} compare={compare} current={strategy} onPick={(k) => { setStrategy(k); if (compare) { setSuggestion({ history: suggestion.history, result: compare[k] }); setDrafts(draftsFromSuggestion(drafts.filter((d) => d.id || d.slotId), compare[k].slots)); setDirty(true); } }} />
+      )}
 
       {/* Lưới ngày × ca */}
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 overflow-x-auto">
@@ -385,12 +437,20 @@ export default function MonthPlan({
             const style = bucket !== "daily" ? CAMPAIGN_DAY_STYLES[bucket] : null;
             const past = day < today;
             const dayHours = list.reduce((a, d) => a + slotHours(d), 0);
+            const isBlackout = settings.blackoutDates.includes(day);
+            const ev = eventByDate.get(day);
+            const sch = brandSchemes.find((r) => day >= r.start && day <= r.end);
             return (
-              <div key={day} className={`min-h-[96px] rounded-xl border p-1.5 flex flex-col gap-1 ${style ? style.cell : "bg-[var(--surface-base)] border-[var(--border)]"} ${past ? "opacity-50" : ""}`}>
-                <div className="flex items-center justify-between">
+              <div key={day} className={`min-h-[96px] rounded-xl border p-1.5 flex flex-col gap-1 ${isBlackout ? "bg-[var(--surface-base)] border-dashed border-rose-800 opacity-70" : style ? style.cell : "bg-[var(--surface-base)] border-[var(--border)]"} ${past ? "opacity-50" : ""}`}>
+                <div className="flex items-center justify-between gap-1">
                   <span className={`text-xs font-black ${style ? style.text : "text-[var(--text)]"}`}>{Number(day.slice(-2))}{style ? ` · ${camp?.shortLabel ?? bucket}` : ""}</span>
-                  <span className="text-[9px] text-[var(--text-faint)]">{list.length > 0 ? `${list.length} ca · ${fmtH(dayHours)}h` : ""}</span>
+                  <span className="text-[9px] text-[var(--text-faint)] flex items-center gap-1">
+                    {list.length > 0 ? `${list.length} ca · ${fmtH(dayHours)}h` : ""}
+                    {!past && <button onClick={() => toggleBlackout(day)} className={`${isBlackout ? "text-rose-400" : "text-[var(--text-faint)] hover:text-rose-400"}`} title={isBlackout ? "Bỏ cấm live ngày này" : "Cấm live ngày này (engine bỏ qua)"}><Ban className="w-3 h-3" /></button>}
+                  </span>
                 </div>
+                {(ev || sch) && <div className="text-[9px] text-[var(--accent-text)] truncate" title={[ev?.label, sch?.label].filter(Boolean).join(" · ")}>{ev?.label}{ev && sch ? " · " : ""}{sch ? `KM: ${sch.label}` : ""}</div>}
+                {isBlackout && <div className="text-[9px] text-rose-400 font-bold">cấm live</div>}
                 {list.map((d) => (
                   <div key={d.key} className={`rounded-lg border px-1.5 py-1 text-[10px] space-y-1 ${d.slotId ? "border-emerald-900 bg-emerald-950/30" : "border-[var(--border)] bg-[var(--surface)]"}`}>
                     <div className="flex items-center gap-1">
@@ -411,7 +471,7 @@ export default function MonthPlan({
                     {d.slotId && <div className="text-[9px] text-emerald-400 font-bold">đã mở ca</div>}
                   </div>
                 ))}
-                {editable && !past && list.length < settings.maxSlotsPerDay && (
+                {editable && !past && !isBlackout && list.length < settings.maxSlotsPerDay && (
                   <button onClick={() => addForDay(day)} className="mt-auto text-[10px] font-bold text-[var(--text-faint)] hover:text-[var(--accent-text)] flex items-center justify-center gap-1 py-1 border border-dashed border-[var(--border)] rounded-lg"><Plus className="w-3 h-3" /> ca</button>
                 )}
               </div>
@@ -422,7 +482,9 @@ export default function MonthPlan({
           <p className="text-center text-xs text-[var(--text-muted)] py-6">Lưới trống — bấm "+ ca" ở từng ngày, hoặc "Nạp từ quy tắc" để điền cả tháng theo khung giờ cố định của brand.</p>
         )}
       </div>
-      {locked && <p className="text-[11px] text-[var(--text-faint)] flex items-center gap-1"><Trash2 className="w-3 h-3" /> Kế hoạch đã chốt là chỉ đọc. Cần thêm/bớt ca: dùng Lịch Vận Hành (mở ca lẻ) hoặc Đăng Ký &amp; Chốt Lịch (xoá ca chưa ai đăng ký). Chốt lại/diff làm ở giai đoạn C.</p>}
+      {locked && (unsynced > 0 || dirty) && (
+        <p className="text-[11px] text-amber-300 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Kế hoạch đã chốt nhưng lưới có thay đổi chưa đồng bộ ra ca ({unsynced} ca chưa mở{dirty ? ", có sửa chưa lưu" : ""}) — bấm "Chốt lại (đồng bộ ca)".</p>
+      )}
     </div>
   );
 }
@@ -432,7 +494,7 @@ const BUCKET_LABEL: Record<string, string> = { daily: "Ngày thường", dday: "
 const CONF_LABEL: Record<SuggestResult["confidence"], string> = { none: "không có lịch sử", low: "thấp", medium: "vừa", high: "cao" };
 
 // Lớp 4 — giải thích gợi ý: lịch sử dùng, hệ số học được, ô giờ mạnh/yếu, đường cong biên, khả thi target.
-function SuggestionPanel({ history: h, result: r, committedHours, targetTotal }: { history: HistorySummary; result: SuggestResult; committedHours: number; targetTotal: number }) {
+function SuggestionPanel({ history: h, result: r, committedHours, targetTotal, compare, current, onPick }: { history: HistorySummary; result: SuggestResult; committedHours: number; targetTotal: number; compare: Record<SuggestStrategy, SuggestResult> | null; current: SuggestStrategy; onPick: (k: SuggestStrategy) => void }) {
   const top = h.cells.filter((c) => c.n >= 2).slice(0, 6);
   const weak = h.cells.filter((c) => c.tag === "weak").slice(-4);
   const curve = r.marginal.filter((_, i, arr) => i === arr.length - 1 || i % Math.max(1, Math.floor(arr.length / 5)) === 0);
@@ -443,6 +505,34 @@ function SuggestionPanel({ history: h, result: r, committedHours, targetTotal }:
         <span className="text-[var(--text-muted)]">Độ tin cậy: <b className="text-[var(--text)]">{CONF_LABEL[r.confidence]}</b> · {h.sessions} ca đối soát / {h.months} tháng{h.firstDate ? ` (${h.firstDate} → ${h.lastDate})` : ""} · GMV/giờ TB {formatCurrencyAdaptive(h.brandGmvPerHour)}</span>
       </div>
       {r.notes.map((n, i) => <p key={i} className="text-[11px] text-amber-300">{n}</p>)}
+      {compare && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-[11px]">
+            <thead><tr className="text-[10px] uppercase tracking-wide text-[var(--text-faint)]"><th className="text-left py-1 pr-3">Phương án</th><th className="text-right py-1 pr-3">Ca</th><th className="text-right py-1 pr-3">Ngày</th><th className="text-right py-1 pr-3">Giờ</th><th className="text-right py-1 pr-3">Dự báo</th><th className="py-1"></th></tr></thead>
+            <tbody>
+              {(Object.keys(STRATEGY_LABEL) as SuggestStrategy[]).map((k) => {
+                const x = compare[k];
+                const days = new Set(x.slots.map((sl) => sl.date)).size;
+                return (
+                  <tr key={k} className={`border-t border-[var(--border)] ${k === current ? "bg-[var(--surface-elevated)]/60" : ""}`}>
+                    <td className="py-1 pr-3 font-bold text-[var(--text)]">{STRATEGY_LABEL[k]}<span className="font-normal text-[var(--text-faint)]"> · {k === "max" ? "GMV cao nhất" : k === "balanced" ? "rải đều, ≤ 2 ca/ngày, giờ neo cố định" : "ca dài hơn, ít ngày"}</span></td>
+                    <td className="py-1 pr-3 text-right text-[var(--text)]">{x.slots.length}</td>
+                    <td className="py-1 pr-3 text-right text-[var(--text)]">{days}</td>
+                    <td className="py-1 pr-3 text-right text-[var(--text)]">{fmtH(x.totalHours)}h</td>
+                    <td className="py-1 pr-3 text-right font-bold text-[var(--text)]">{formatCurrencyAdaptive(x.forecastGmv)}</td>
+                    <td className="py-1 text-right">{k === current ? <span className="text-[10px] text-emerald-400 font-bold">đang dùng</span> : <button onClick={() => onPick(k)} className="text-[10px] font-bold text-[var(--accent-text)]">Dùng</button>}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {(h.eventLearned.holiday || h.eventLearned.event || h.eventLearned.mega_sale || h.schemeLearned) && (
+        <p className="text-[10px] text-[var(--text-faint)]">
+          Học được từ lịch sử: {h.eventLearned.holiday ? `ngày lễ ×${h.eventMultipliers.holiday.toFixed(2)} · ` : ""}{h.eventLearned.mega_sale ? `mega sale ×${h.eventMultipliers.mega_sale.toFixed(2)} · ` : ""}{h.eventLearned.event ? `sự kiện ×${h.eventMultipliers.event.toFixed(2)} · ` : ""}{h.schemeLearned ? `ngày có scheme KM ×${h.schemeMultiplier.toFixed(2)}` : ""}
+        </p>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div>
           <p className="font-bold text-[var(--text-muted)] mb-1">Khung giờ mạnh nhất (thứ × khối 2h)</p>

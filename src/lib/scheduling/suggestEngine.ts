@@ -34,6 +34,18 @@ export interface HistoryCell {
   tag: "strong" | "traffic_low_cvr" | "weak" | "thin"; // nhãn giải thích
 }
 
+export type CalendarEventKind = "holiday" | "mega_sale" | "event";
+export interface CalendarEvent {
+  date: string;
+  kind: CalendarEventKind;
+  label: string;
+}
+export interface DateRange {
+  start: string;
+  end: string;
+  label?: string;
+}
+
 export interface HistorySummary {
   sessions: number;
   months: number;
@@ -45,6 +57,16 @@ export interface HistorySummary {
   diminishing: number[]; // hệ số ca thứ 1, 2, 3… trong ngày
   cells: HistoryCell[];
   enough: boolean;
+  // Lớp 2 — học từ lịch sử nếu đủ ca (≥ 5), không thì 1.0 và chỉ ghi nhãn.
+  eventMultipliers: Record<CalendarEventKind, number>;
+  eventLearned: Record<CalendarEventKind, boolean>;
+  schemeMultiplier: number; // ngày trùng scheme khuyến mãi so với ngày không
+  schemeLearned: boolean;
+}
+
+export interface HistoryContext {
+  events?: CalendarEvent[]; // lịch sự kiện dùng chung (calendar_events)
+  schemes?: DateRange[]; // scheme khuyến mãi của brand (quá khứ lẫn tương lai)
 }
 
 export interface SuggestConstraints {
@@ -60,7 +82,15 @@ export interface SuggestConstraints {
   maxSlotsPerDay: number;
   blackoutDates?: string[];
   fixedSlots?: { date: string; startTime: string; endTime: string }[]; // ca ops đã đặt tay, giữ nguyên
+  events?: CalendarEvent[];
+  schemes?: DateRange[];
+  // "max": tối đa GMV kỳ vọng (mặc định). "balanced": rải đều tuần/ngày, thưởng đều đặn mạnh, tối
+  // đa 2 ca/ngày. "lean": ít ca dài hơn (ca = mặc định + 1h), dồn ngày đã có ca.
+  strategy?: SuggestStrategy;
 }
+
+export type SuggestStrategy = "max" | "balanced" | "lean";
+export const STRATEGY_LABEL: Record<SuggestStrategy, string> = { max: "Tối đa GMV", balanced: "Cân bằng", lean: "Tiết kiệm" };
 
 export interface SuggestedSlot {
   date: string;
@@ -73,6 +103,7 @@ export interface SuggestedSlot {
   reason: string;
   highExpectation: boolean; // target > dự báo × 1.3
   fixed: boolean;
+  dayLabel?: string; // ngày lễ / sự kiện / scheme trùng ngày (để lưới ghi nhãn)
 }
 
 export interface MarginalPoint {
@@ -112,7 +143,12 @@ const percentile = (xs: number[], p: number) => {
 };
 
 // ============ Lớp 1: lịch sử → ma trận ============
-export function buildHistory(sessions: LiveSession[], brandId: string, asOf: string): HistorySummary {
+export function buildHistory(sessions: LiveSession[], brandId: string, asOf: string, ctx: HistoryContext = {}): HistorySummary {
+  const eventKindOf = (date: string): CalendarEventKind | null => {
+    const hit = (ctx.events ?? []).find((e) => e.date === date);
+    return hit ? hit.kind : null;
+  };
+  const inScheme = (date: string) => (ctx.schemes ?? []).some((r) => date >= r.start && date <= r.end);
   const usable = sessions.filter(
     (s) =>
       s.brandId === brandId &&
@@ -129,7 +165,11 @@ export function buildHistory(sessions: LiveSession[], brandId: string, asOf: str
     campLearned: { daily: false, dday: false, midmonth: false, payday: false },
     diminishing: [1, 0.85, 0.7, 0.6],
     cells: [],
-    enough: false
+    enough: false,
+    eventMultipliers: { holiday: 1, mega_sale: 1, event: 1 },
+    eventLearned: { holiday: false, mega_sale: false, event: false },
+    schemeMultiplier: 1,
+    schemeLearned: false
   };
   if (usable.length === 0) return empty;
 
@@ -151,6 +191,10 @@ export function buildHistory(sessions: LiveSession[], brandId: string, asOf: str
     daily: { h: 0, g: 0, n: 0 }, dday: { h: 0, g: 0, n: 0 }, midmonth: { h: 0, g: 0, n: 0 }, payday: { h: 0, g: 0, n: 0 }
   };
   const byDate = new Map<string, LiveSession[]>();
+  const eventAcc: Record<CalendarEventKind, { h: number; g: number; n: number }> = { holiday: { h: 0, g: 0, n: 0 }, mega_sale: { h: 0, g: 0, n: 0 }, event: { h: 0, g: 0, n: 0 } };
+  const plainAcc = { h: 0, g: 0 };
+  const schemeAcc = { h: 0, g: 0, n: 0 };
+  const noSchemeAcc = { h: 0, g: 0 };
   for (const s of usable) {
     const hours = sessionDurationHours(s.startTime, s.endTime);
     const gph = Math.min(s.actualGmv / hours, cap);
@@ -162,6 +206,11 @@ export function buildHistory(sessions: LiveSession[], brandId: string, asOf: str
     bucketAcc[b].h += hours * w;
     bucketAcc[b].g += gmvCapped * w;
     bucketAcc[b].n += 1;
+    const ek = eventKindOf(s.date);
+    if (ek) { eventAcc[ek].h += hours * w; eventAcc[ek].g += gmvCapped * w; eventAcc[ek].n += 1; }
+    else { plainAcc.h += hours * w; plainAcc.g += gmvCapped * w; }
+    if (inScheme(s.date)) { schemeAcc.h += hours * w; schemeAcc.g += gmvCapped * w; schemeAcc.n += 1; }
+    else { noSchemeAcc.h += hours * w; noSchemeAcc.g += gmvCapped * w; }
     const list = byDate.get(s.date) ?? [];
     list.push(s);
     byDate.set(s.date, list);
@@ -243,6 +292,25 @@ export function buildHistory(sessions: LiveSession[], brandId: string, asOf: str
     }
   }
 
+  // Lớp 2: ngày lễ/sự kiện & scheme — so GMV/giờ ngày có vs không, cần ≥ 5 ca, clamp [0.6, 2.5].
+  const plainGph = plainAcc.h > 0 ? plainAcc.g / plainAcc.h : brandGmvPerHour;
+  const eventMultipliers: Record<CalendarEventKind, number> = { holiday: 1, mega_sale: 1, event: 1 };
+  const eventLearned: Record<CalendarEventKind, boolean> = { holiday: false, mega_sale: false, event: false };
+  for (const k of ["holiday", "mega_sale", "event"] as CalendarEventKind[]) {
+    const a = eventAcc[k];
+    if (a.n >= 5 && a.h > 0 && plainGph > 0) {
+      eventMultipliers[k] = Math.min(2.5, Math.max(0.6, a.g / a.h / plainGph));
+      eventLearned[k] = true;
+    }
+  }
+  const noSchemeGph = noSchemeAcc.h > 0 ? noSchemeAcc.g / noSchemeAcc.h : brandGmvPerHour;
+  let schemeMultiplier = 1;
+  let schemeLearned = false;
+  if (schemeAcc.n >= 5 && schemeAcc.h > 0 && noSchemeGph > 0) {
+    schemeMultiplier = Math.min(2, Math.max(0.8, schemeAcc.g / schemeAcc.h / noSchemeGph));
+    schemeLearned = true;
+  }
+
   return {
     sessions: usable.length,
     months,
@@ -253,7 +321,11 @@ export function buildHistory(sessions: LiveSession[], brandId: string, asOf: str
     campLearned,
     diminishing,
     cells: cells.sort((a, b) => b.gmvPerHour - a.gmvPerHour),
-    enough: usable.length >= MIN_HISTORY_SESSIONS && months >= 2
+    enough: usable.length >= MIN_HISTORY_SESSIONS && months >= 2,
+    eventMultipliers,
+    eventLearned,
+    schemeMultiplier,
+    schemeLearned
   };
 }
 
@@ -302,7 +374,24 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
   const blackout = new Set(c.blackoutDates ?? []);
   const winStart = toMin(c.liveWindowStart);
   const winEnd = toMin(c.liveWindowEnd);
-  const slotMin = Math.round(c.defaultSlotHours * 60);
+  const strategy: SuggestStrategy = c.strategy ?? "max";
+  const slotHoursEff = strategy === "lean" ? c.defaultSlotHours + 1 : c.defaultSlotHours;
+  const maxPerDay = strategy === "balanced" ? Math.min(c.maxSlotsPerDay, 2) : c.maxSlotsPerDay;
+  const slotMin = Math.round(slotHoursEff * 60);
+  // Lớp 2: hệ số theo ngày (lễ/sự kiện × scheme) + nhãn để giải thích.
+  const eventByDate = new Map<string, CalendarEvent>();
+  for (const e of c.events ?? []) if (!eventByDate.has(e.date)) eventByDate.set(e.date, e);
+  const schemeOf = (date: string) => (c.schemes ?? []).find((r) => date >= r.start && date <= r.end);
+  const dayFactor = (date: string) => {
+    const e = eventByDate.get(date);
+    const sch = schemeOf(date);
+    return (e ? history.eventMultipliers[e.kind] : 1) * (sch ? history.schemeMultiplier : 1);
+  };
+  const dayLabelOf = (date: string) => {
+    const e = eventByDate.get(date);
+    const sch = schemeOf(date);
+    return [e?.label, sch ? `KM: ${sch.label ?? "scheme"}` : ""].filter(Boolean).join(" · ") || undefined;
+  };
   const get = cellLookup(history);
   const brandGph = history.brandGmvPerHour;
 
@@ -352,16 +441,19 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
   const expectedGph = (cand: Candidate, state: Candidate[]) => {
     const pos = state.filter((s) => s.date === cand.date && s.start < cand.start).length;
     const dim = history.diminishing[Math.min(pos, history.diminishing.length - 1)];
-    return cand.baseGph * history.campMultipliers[cand.bucket] * dim;
+    return cand.baseGph * history.campMultipliers[cand.bucket] * dim * dayFactor(cand.date);
   };
 
   // Điểm biên = kỳ vọng × các phạt/thưởng mềm — chỉ để XẾP HẠNG, không phải dự báo.
   const marginalScore = (cand: Candidate, state: Candidate[], targetHours: number) => {
     const sameDay = state.filter((s) => s.date === cand.date);
-    if (sameDay.length >= c.maxSlotsPerDay) return -1;
+    if (sameDay.length >= maxPerDay) return -1;
     if (sameDay.some((s) => overlaps(s, cand))) return -1;
     const target = targetHours;
     let score = expectedGph(cand, state);
+    // Phương án: "lean" dồn vào ngày đã có ca (mở ngày mới ×0.92); "balanced" phạt ngày ≥ 2 ca ×0.9.
+    if (strategy === "lean" && sameDay.length === 0 && state.length > 0) score *= 0.92;
+    if (strategy === "balanced" && sameDay.length >= 1) score *= 0.9;
     // Mềm: tỷ trọng khung camp theo tab 05 — vượt 125% tỷ trọng thì giảm 15%.
     if (c.bucketShare && target > 0) {
       const share = c.bucketShare[cand.bucket];
@@ -374,11 +466,12 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
     if (target > 0) {
       const wk = weekOf(cand.date);
       const weekHours = state.filter((s) => weekOf(s.date) === wk).reduce((a, s) => a + s.hours, 0);
-      if ((weekHours + cand.hours) > (target / weeksInMonth) * 1.3) score *= 0.9;
+      const cap = strategy === "balanced" ? 1.15 : 1.3;
+      if ((weekHours + cand.hours) > (target / weeksInMonth) * cap) score *= strategy === "balanced" ? 0.75 : 0.9;
     }
-    // Mềm: đều đặn — cùng giờ bắt đầu đã có ≥ 3 ngày khác → +5%.
+    // Mềm: đều đặn — cùng giờ bắt đầu đã có ≥ 3 ngày khác → +5% (cân bằng: +10%).
     const anchors = state.filter((s) => s.start === cand.start && s.date !== cand.date).length;
-    if (anchors >= 3) score *= 1.05;
+    if (anchors >= 3) score *= strategy === "balanced" ? 1.1 : 1.05;
     return score;
   };
 
@@ -429,7 +522,7 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
   const expected = all.map((s) => {
     const sameDay = all.filter((x) => x.date === s.date && x.start < s.start).length;
     const dim = history.diminishing[Math.min(sameDay, history.diminishing.length - 1)];
-    return s.baseGph * history.campMultipliers[s.bucket] * dim * s.hours;
+    return s.baseGph * history.campMultipliers[s.bucket] * dim * dayFactor(s.date) * s.hours;
   });
   const forecastGmv = expected.reduce((a, b) => a + b, 0);
   const scale = c.targetGmv > 0 && forecastGmv > 0 ? c.targetGmv / forecastGmv : 0;
@@ -443,6 +536,8 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
       brandGph > 0 ? `${s.baseGph >= brandGph ? "+" : "−"}${Math.abs(Math.round((s.baseGph / brandGph - 1) * 100))}% vs TB brand` : "",
       s.bucket !== "daily" ? `${s.bucket === "dday" ? "D-Day" : s.bucket === "midmonth" ? "Mid-Month" : "Pay-Day"} ×${history.campMultipliers[s.bucket].toFixed(2)}${history.campLearned[s.bucket] ? "" : " (mặc định)"}` : "",
       top?.tag === "traffic_low_cvr" ? "nhiều người xem, chuyển đổi yếu — ca kéo follow/giới thiệu SP" : "",
+      eventByDate.get(s.date) ? `${eventByDate.get(s.date)!.label} ×${history.eventMultipliers[eventByDate.get(s.date)!.kind].toFixed(2)}${history.eventLearned[eventByDate.get(s.date)!.kind] ? "" : " (chưa có lịch sử, chỉ ghi nhãn)"}` : "",
+      schemeOf(s.date) ? `trùng KM ×${history.schemeMultiplier.toFixed(2)}${history.schemeLearned ? "" : " (chưa học được)"}` : "",
       fixedKeys.has(`${s.date}|${toHhmm(s.start)}`) ? "ops đặt tay" : ""
     ].filter(Boolean);
     return {
@@ -455,7 +550,8 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
       bucket: s.bucket,
       reason: reasonParts.join(" · "),
       highExpectation: target > exp * 1.3,
-      fixed: fixedKeys.has(`${s.date}|${toHhmm(s.start)}`)
+      fixed: fixedKeys.has(`${s.date}|${toHhmm(s.start)}`),
+      dayLabel: dayLabelOf(s.date)
     };
   }).sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
 

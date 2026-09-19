@@ -685,7 +685,16 @@ export interface BrandMonthPlan {
   liveWindowEnd: string;
   maxSlotsPerDay: number;
   notes: string;
+  blackoutDates: string[]; // ngày brand cấm live (0091)
   lockedAt?: string;
+}
+
+// Lịch sự kiện dùng chung (0091): ngày lễ VN, mega sale nền tảng, sự kiện — engine gợi ý học hệ số.
+export interface CalendarEventRow {
+  id: string;
+  date: string;
+  kind: "holiday" | "mega_sale" | "event";
+  label: string;
 }
 
 export interface BrandMonthPlanSlot {

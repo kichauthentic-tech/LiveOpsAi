@@ -4,7 +4,7 @@
 delete from shift_slots s
 where s.id in (select slot_id from brand_month_plan_slots ps join brand_month_plans p on p.id = ps.plan_id
                where p.month = '2026-10-01' and p.brand_id = (select id from brands where name = 'CROCS'))
-  and s.status = 'open'
+  and s.status in ('open', 'cancelled')
   and not exists (select 1 from session_availability a where a.slot_id = s.id);
 delete from brand_month_plans where month = '2026-10-01' and brand_id = (select id from brands where name = 'CROCS');
 delete from recurring_shift_templates where notes = 'test ke hoach';

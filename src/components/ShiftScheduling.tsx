@@ -40,6 +40,7 @@ import { SessionReportForm } from "./SessionReportForm";
 import { SessionLiveSnapshotUpload } from "./SessionLiveSnapshotUpload";
 import { SessionReportInput } from "../lib/db/sessionReports";
 import { fetchBrandMonthlyCommitments } from "../lib/db/brandContracts";
+import { fetchPlanStatuses } from "../lib/db/monthPlans";
 import { SchedulingGap, computeSchedulingGaps } from "../lib/performance/brandCommitment";
 import { HostSuggestion, headlineFor, suggestHosts } from "../lib/performance/hostSuggestion";
 import { BulkFinalizePanel } from "./BulkFinalizePanel";
@@ -64,6 +65,8 @@ interface ShiftSchedulingProps {
   // RPC apply_session_live_snapshot đã ghi DB và trả về LiveSession đầy đủ — chỉ cần đồng bộ
   // lại state, không gọi updateSession (sẽ ghi đè ngược số vừa tính bằng state cũ của client).
   onSessionSnapshotApplied: (session: LiveSession) => void;
+  // Nhắc việc (0091): brand chưa chốt Kế Hoạch Tháng cho tháng sau → nút nhảy sang tab đó.
+  onOpenMonthPlan?: () => void;
 }
 
 const WEEKDAY_LABELS = ["CN", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"];
@@ -137,7 +140,8 @@ export default function ShiftScheduling({
   onUpdateSession,
   onLogAudit,
   onSubmitSessionReport,
-  onSessionSnapshotApplied
+  onSessionSnapshotApplied,
+  onOpenMonthPlan
 }: ShiftSchedulingProps) {
   const admin = isAdminRole(currentRole);
   const myTalentId = activeUser.assignedTalentId;
@@ -173,6 +177,19 @@ export default function ShiftScheduling({
       .catch(() => { if (alive) setCommitments([]); });
     return () => { alive = false; };
   }, [admin]);
+
+  const [planMissing, setPlanMissing] = useState<string[]>([]);
+  useEffect(() => {
+    if (!admin) return;
+    const [y, m] = today.slice(0, 7).split("-").map(Number);
+    const d = new Date(y, m, 1);
+    const next = `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, "0")}`;
+    let alive = true;
+    fetchPlanStatuses(next)
+      .then((map) => { if (alive) setPlanMissing(brands.filter((b) => map.get(b.id)?.status !== "locked").map((b) => b.name)); })
+      .catch(() => { if (alive) setPlanMissing([]); });
+    return () => { alive = false; };
+  }, [admin, brands, today]);
 
   const talentsById = useMemo(() => new Map(talents.map((t) => [t.id, t])), [talents]);
   const brandById = useMemo(() => new Map(brands.map((b) => [b.id, b])), [brands]);
@@ -434,6 +451,14 @@ export default function ShiftScheduling({
         <div className="bg-amber-950/85 border border-amber-800 rounded-xl p-4 text-sm text-amber-200 flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 shrink-0" />
           Tài khoản của bạn chưa được gán hồ sơ Talent (assigned_talent_id) — liên hệ CEO/Operations để gán trước khi tự đăng ký ca được.
+        </div>
+      )}
+
+      {admin && planMissing.length > 0 && (
+        <div className="bg-amber-950/40 border border-amber-900 rounded-xl px-4 py-2.5 text-xs text-amber-200 flex flex-wrap items-center gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>Tháng sau chưa chốt kế hoạch ca: <b>{planMissing.join(", ")}</b>.</span>
+          {onOpenMonthPlan && <button onClick={onOpenMonthPlan} className="ml-auto text-[11px] font-bold text-amber-100 underline underline-offset-2">Mở Kế Hoạch Tháng →</button>}
         </div>
       )}
 

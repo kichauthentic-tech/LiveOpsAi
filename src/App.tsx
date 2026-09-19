@@ -1906,6 +1906,7 @@ export default function App() {
                     onUpdateSession={handleUpdateSession}
                     onLogAudit={pushAuditLog}
                     onSessionSnapshotApplied={handleSessionReconciled}
+                    onOpenMonthPlan={() => setActiveTab("month_plan")}
                   />
                 )}
 
@@ -1914,6 +1915,7 @@ export default function App() {
                     brands={activeBrands}
                     studios={activeStudios}
                     sessions={activeSessions}
+                    promoSchemes={promoSchemes}
                     currentUserId={activeUser.id}
                     monthlyReports={monthlyReports}
                     recurringShiftTemplates={recurringShiftTemplates}

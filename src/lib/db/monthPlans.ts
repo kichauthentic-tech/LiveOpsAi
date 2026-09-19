@@ -1,5 +1,5 @@
 import { supabase } from "../supabaseClient";
-import { BrandMonthPlan, BrandMonthPlanSlot } from "../../types";
+import { BrandMonthPlan, BrandMonthPlanSlot, CalendarEventRow } from "../../types";
 
 // Kế Hoạch Tháng (0090). Bảng nhỏ (1 dòng plan + ≤ ~100 ca/brand/tháng) — đọc theo brand+tháng,
 // ghi ca kế hoạch bằng cách thay cả lô (xoá dòng không còn, upsert dòng còn) để UI lưới không phải
@@ -15,6 +15,7 @@ interface DbPlan {
   live_window_end: string;
   max_slots_per_day: number;
   notes: string;
+  blackout_dates: string[] | null;
   locked_at: string | null;
 }
 
@@ -41,6 +42,7 @@ const planFromDb = (r: DbPlan): BrandMonthPlan => ({
   liveWindowEnd: hhmm(r.live_window_end),
   maxSlotsPerDay: r.max_slots_per_day,
   notes: r.notes,
+  blackoutDates: r.blackout_dates ?? [],
   lockedAt: r.locked_at ?? undefined
 });
 
@@ -81,7 +83,7 @@ export async function fetchPlanStatuses(month: string): Promise<Map<string, Bran
   return new Map((data as DbPlan[]).map((r) => [r.brand_id, planFromDb(r)]));
 }
 
-export type PlanSettings = Pick<BrandMonthPlan, "defaultSlotHours" | "liveWindowStart" | "liveWindowEnd" | "maxSlotsPerDay" | "notes">;
+export type PlanSettings = Pick<BrandMonthPlan, "defaultSlotHours" | "liveWindowStart" | "liveWindowEnd" | "maxSlotsPerDay" | "notes" | "blackoutDates">;
 
 export async function upsertMonthPlan(brandId: string, month: string, settings: PlanSettings): Promise<BrandMonthPlan> {
   const { data, error } = await supabase
@@ -94,7 +96,8 @@ export async function upsertMonthPlan(brandId: string, month: string, settings: 
         live_window_start: settings.liveWindowStart,
         live_window_end: settings.liveWindowEnd,
         max_slots_per_day: settings.maxSlotsPerDay,
-        notes: settings.notes
+        notes: settings.notes,
+        blackout_dates: settings.blackoutDates
       },
       { onConflict: "brand_id,month" }
     )
@@ -113,19 +116,26 @@ export interface PlanSlotDraft {
   note: string;
 }
 
-// Thay toàn bộ ca kế hoạch của plan bằng bản nháp: xoá dòng không còn trong nháp, upsert phần còn
-// lại (theo khoá plan|ngày|giờ nên đổi giờ một ca = dòng mới; slot_id của dòng cũ mất theo — đúng,
-// vì ca thật cũ không còn khớp kế hoạch nữa, giai đoạn C xử lý huỷ).
+// Thay toàn bộ ca kế hoạch của plan bằng bản nháp, khoá theo (ngày, giờ bắt đầu, giờ kết thúc):
+// dòng DB có khoá không còn trong nháp → xoá; phần còn lại upsert theo khoá tự nhiên (không gửi id —
+// PostgREST upsert bắt mọi dòng cùng cột, trộn dòng có/không id là "null value in column id").
+// Đổi giờ một ca = khoá mới → dòng mới, dòng cũ bị xoá (slot_id cũ mất theo — ca thật cũ sẽ được
+// lock_month_plan 0091 huỷ khi chốt lại).
 export async function replacePlanSlots(planId: string, drafts: PlanSlotDraft[]): Promise<BrandMonthPlanSlot[]> {
-  const keep = drafts.map((d) => d.id).filter((x): x is string => !!x);
-  let del = supabase.from("brand_month_plan_slots").delete().eq("plan_id", planId);
-  if (keep.length > 0) del = del.not("id", "in", `(${keep.join(",")})`);
-  const { error: e1 } = await del;
-  if (e1) throw e1;
+  const keyOf = (d: { date: string; startTime: string; endTime: string }) => `${d.date}|${d.startTime}|${d.endTime}`;
+  const want = new Set(drafts.map(keyOf));
+  const { data: existing, error: e0 } = await supabase.from("brand_month_plan_slots").select("id,date,start_time,end_time").eq("plan_id", planId);
+  if (e0) throw e0;
+  const stale = ((existing as { id: string; date: string; start_time: string; end_time: string }[]) ?? [])
+    .filter((r) => !want.has(keyOf({ date: r.date, startTime: hhmm(r.start_time), endTime: hhmm(r.end_time) })))
+    .map((r) => r.id);
+  if (stale.length > 0) {
+    const { error: e1 } = await supabase.from("brand_month_plan_slots").delete().in("id", stale);
+    if (e1) throw e1;
+  }
   if (drafts.length > 0) {
     const { error: e2 } = await supabase.from("brand_month_plan_slots").upsert(
       drafts.map((d) => ({
-        ...(d.id ? { id: d.id } : {}),
         plan_id: planId,
         date: d.date,
         start_time: d.startTime,
@@ -145,6 +155,8 @@ export async function replacePlanSlots(planId: string, drafts: PlanSlotDraft[]):
 export interface LockPlanResult {
   created: number;
   linked: number;
+  cancelled: number; // 0091: ca mở bị bỏ khỏi kế hoạch, chưa ai đăng ký → huỷ
+  kept_registered: number; // bị bỏ khỏi kế hoạch nhưng đã có người đăng ký → giữ, ops tự xử
   total_slots: number;
 }
 
@@ -168,4 +180,10 @@ export async function fetchLockedPlanTargets(): Promise<Map<string, number>> {
     if (r.slot_id) out.set(r.slot_id, Number(r.target_gmv));
   }
   return out;
+}
+
+export async function fetchCalendarEvents(): Promise<CalendarEventRow[]> {
+  const { data, error } = await supabase.from("calendar_events").select("id,date,kind,label").order("date");
+  if (error) throw error;
+  return (data as CalendarEventRow[]) ?? [];
 }
