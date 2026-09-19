@@ -91,6 +91,11 @@ export default function MonthPlan({
   const [lockedSlots, setLockedSlots] = useState<BrandMonthPlanSlot[]>([]);
   const [lockedSlotsTick, setLockedSlotsTick] = useState(0);
 
+  // brands nạp async từ Supabase — mở thẳng tab này lúc chưa có brand thì brandId rỗng dù select
+  // đang hiện brand đầu; đồng bộ lại khi brands tới.
+  useEffect(() => {
+    if (!brandId && brands.length > 0) setBrandId(brands[0].id);
+  }, [brands, brandId]);
   const brand = brands.find((b) => b.id === brandId);
   const brandTemplates = useMemo(() => recurringShiftTemplates.filter((t) => t.brandId === brandId), [recurringShiftTemplates, brandId]);
 
@@ -145,6 +150,8 @@ export default function MonthPlan({
         }
         setDirty(false);
         setSuggestion(null);
+        setCompare(null);
+        setHoursOverride(null); // override giờ là theo brand+tháng, không mang sang brand khác
       })
       .catch((e) => alive && setMsg(`Không tải được kế hoạch: ${e.message ?? e}`))
       .finally(() => alive && setLoading(false));
@@ -294,10 +301,11 @@ export default function MonthPlan({
   };
 
   const lock = async () => {
-    if (drafts.length === 0) {
+    if (drafts.length === 0 && !locked) {
       setMsg("Lưới trống — chưa có gì để chốt.");
       return;
     }
+    if (drafts.length === 0 && locked && !window.confirm(`Lưới trống — chốt lại sẽ HUỶ toàn bộ ca đang mở của kế hoạch ${brand?.name} tháng ${month} (trừ ca đã có người đăng ký). Tiếp tục?`)) return;
     const gap = planHours - totals.hours;
     const warn = planHours > 0 && Math.abs(gap) > 0.01 ? `\n\nGiờ kế hoạch ${fmtH(totals.hours)}h ${gap > 0 ? "THIẾU" : "VƯỢT"} ${fmtH(Math.abs(gap))}h so với ${fmtH(planHours)}h cần xếp.` : "";
     const relockNote = locked ? "\n\nChốt lại sẽ mở thêm ca mới và HUỶ ca đang mở đã bị bỏ khỏi kế hoạch (trừ ca đã có người đăng ký)." : "";
