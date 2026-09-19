@@ -298,6 +298,30 @@ Quyết định của user: **chỉ Ops tạo ca**; brand xem lịch, không t�
 
 **Trạng thái dữ liệu (2026-09-19):** 153 ca `open` còn lại đều từ thời demo (T8: 4 brand × 31; T9: JOCKEY 29; tạo 11–20/08, không ai đăng ký) + 4 quy tắc "Hàng Ngày" demo. User đã chạy `supabase/seed/2026-09_clear_demo_slots.sql` (2026-09-19): `shift_slots` = 0, `recurring_shift_templates` = 0, panel hiện "0 quy tắc active". **Bước tiếp theo của ops:** khai quy tắc lặp thật cho từng brand ở Đăng Ký & Chốt Lịch → bấm "Mở ca tháng" → talent đăng ký.
 
+## Thiết kế module "Kế Hoạch Tháng" (Phân bổ Lịch/Target) — chốt hướng 2026-09-19, CHƯA làm
+
+**Ý user:** tách một module riêng: ops đặt giờ live + target tổng của brand → hệ thống chạy phân tích lịch sử gợi ý phân bổ lịch → ops chỉnh → **chốt** → lịch đẩy ra cho host/trợ đăng ký và hiện trên mọi lịch (agency + brand). Thay thế hướng "gợi ý nằm trong Đăng Ký & Chốt Lịch" bàn hôm trước — vì đây là *giai đoạn lập kế hoạch* (1 lần/tháng, trước tháng), khác nhịp với vận hành hằng ngày.
+
+**Đã chốt:** (1) bước đầu chỉ gợi ý **ngày + khung giờ + target/ca**, chưa gợi ý host (CROCS backfill chưa gán host). (2) **Report Tháng tab 05 giữ nguyên** — là phần của báo cáo gửi brand; module mới chỉ *đọc* target tổng + % khung ở đó làm điểm xuất phát, không dời. (3) Đơn vị là **ca**, mặc định 3h, ops kéo dài/rút ngắn từng ca hoặc đổi mặc định theo brand.
+
+**Nguồn sự thật (tránh 2 chỗ nhập một số):**
+- Giờ cam kết tháng → `brand_monthly_commitments` (Cam Kết Hợp Đồng). Module đọc, cho override theo tháng ngay trong plan (ghi lại vào commitments với `is_override`).
+- Target GMV tổng + % khung + ngày camp → `brand_monthly_reports` tab 05 (dòng tháng trước cho tháng sau). Module đọc.
+- **Target từng ca** → module này sở hữu. Khi plan đã chốt, `applyAllocatedTargets` ưu tiên target/ca của plan; chưa chốt thì chia theo % khung như hiện nay.
+- Quy tắc lặp + "Mở ca tháng" (P1, `MonthSlotGenerator`) **dời vào module này** (là bước "Chốt kế hoạch"); Đăng Ký & Chốt Lịch chỉ còn việc *người*.
+
+**Màn hình (agency workspace, nhóm Kinh Doanh hoặc Vận Hành):** chọn brand + tháng →
+1. *Đầu vào*: giờ cam kết (đọc), target tổng (đọc), khung giờ được live (VD 09:00–23:00), ca mặc định (3h), số ca tối đa/ngày, ngày nghỉ.
+2. *Gợi ý*: bấm "Gợi ý phân bổ" → lưới ngày × ca: mỗi ngày N ca (giờ bắt đầu–kết thúc) + target GMV/ca. Ràng buộc: Σ giờ = cam kết, Σ target = target tổng, tỷ trọng theo khung camp = % tab 05.
+3. *Chỉnh tay*: thêm/bớt/kéo ca, sửa target/ca; thanh trạng thái hiện lệch giờ/target so với cam kết theo thời gian thực.
+4. *Chốt kế hoạch*: sinh `shift_slots` qua RPC `generate_shift_slots` (0088, chống trùng sẵn) + lưu target/ca. **Chốt lại** sau khi sửa = diff: thêm ca mới, huỷ ca `open` chưa ai đăng ký bị bỏ, KHÔNG đụng ca đã chốt host / đã có đăng ký (báo ra để ops tự xử).
+
+**Engine gợi ý (thuần, test được):** từ ca `tiktok_reconciled` của brand ≥ 2 tháng gần nhất: ma trận thứ-trong-tuần × khối giờ (2h) → GMV/giờ trung bình và số giờ đã live. Điểm mỗi ô = GMV/giờ chuẩn hoá × hệ số camp (ngày camp nhân theo % tab 05). Phân giờ cam kết vào các ô điểm cao nhất, gom thành ca liền kề (mặc định 3h), tối đa N ca/ngày, ngày nào có ca thì ≥ 1 ca đủ 3h. Target/ca = target khung × (giờ ca × GMV/giờ dự kiến của ô) / Σ cùng khung. Brand chưa đủ lịch sử → rơi về quy tắc lặp hiện có (P1) + chia target đều theo giờ, ghi rõ "chưa có lịch sử".
+
+**DB dự kiến:** `brand_month_plans(id, brand_id, month date, status draft|locked, settings jsonb, locked_at, locked_by)` + `brand_month_plan_slots(id, plan_id, date, start_time, end_time, target_gmv, slot_id → shift_slots null, note)`. RLS ceo/admin/operations ghi, authenticated đọc. Chốt = RPC security definer (guard trong thân hàm theo mẫu 0082) làm cả sinh slot + ghi slot_id trong 1 transaction.
+
+**Thứ tự làm:** A — khung module + lưới + chốt (dời P1 vào, chưa gợi ý) → B — engine gợi ý + target/ca nối vào `applyAllocatedTargets` → C — chốt lại/diff + nhắc việc ("tháng sau chưa có kế hoạch"). Điều kiện bắt đầu B có ý nghĩa: ≥ 2 tháng ca đối soát của brand (CROCS đã đủ về khung giờ).
+
 ## Giai đoạn hiện tại (từ 2026-09-18): CHẠY THỬ THẬT — không build thêm tính năng
 
 User chốt: dừng build, cho một tuần vận hành thật đi qua app. Tới lúc chốt, `live_sessions` = 0 — mọi thứ đã build chỉ mới verify bằng dữ liệu dựng. Session mới đọc file này: **đừng đề xuất tính năng mới**; hỏi user chạy thử tới đâu, cái gì kêu, rồi sửa đúng chỗ đó.
