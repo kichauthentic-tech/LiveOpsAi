@@ -671,3 +671,30 @@ export interface AppNotification {
   readAt?: string;
   createdAt: string;
 }
+
+// Kế Hoạch Tháng (migration 0090) — lưới ngày × ca của brand cho 1 tháng, lập trước khi mở đăng ký.
+// Chốt (lock_month_plan) sinh shift_slots và ghi slotId ngược lại. Target/ca ở đây là nguồn target
+// cho ca khi kế hoạch đã chốt (giai đoạn B).
+export interface BrandMonthPlan {
+  id: string;
+  brandId: string;
+  month: string; // "YYYY-MM"
+  status: "draft" | "locked";
+  defaultSlotHours: number;
+  liveWindowStart: string; // "HH:MM"
+  liveWindowEnd: string;
+  maxSlotsPerDay: number;
+  notes: string;
+  lockedAt?: string;
+}
+
+export interface BrandMonthPlanSlot {
+  id: string;
+  planId: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  targetGmv: number;
+  slotId?: string;
+  note: string;
+}

@@ -1,6 +1,5 @@
 import { supabase } from "../supabaseClient";
 import { ShiftSlot } from "../../types";
-import { PlannedSlot } from "../scheduling/planMonthSlots";
 
 const orNull = (v: string | undefined | null) => (v ? v : null);
 
@@ -82,33 +81,8 @@ export async function createShiftSlot(s: ShiftSlot): Promise<ShiftSlot> {
   return fromDb(data as DbShiftSlot);
 }
 
-// Sinh hàng loạt ca từ quy tắc lặp — RPC generate_shift_slots (0088) dedupe ở server theo khoá
-// tự nhiên brand|ngày|giờ|nền tảng và bỏ qua ca đã có; trả về đúng những dòng vừa chèn để cộng vào
-// state. Không insert thẳng nữa: 2 ops bấm cùng lúc / bấm 2 lần đều không trùng.
-export interface GenerateSlotsResult {
-  inserted: ShiftSlot[];
-  skippedExisting: number;
-}
-
-export async function generateShiftSlots(slots: PlannedSlot[]): Promise<GenerateSlotsResult> {
-  if (slots.length === 0) return { inserted: [], skippedExisting: 0 };
-  const payload = slots.map((s) => ({
-    date: s.date,
-    start_time: s.startTime,
-    end_time: s.endTime,
-    brand_id: orNull(s.brandId),
-    brand_name: s.brandName,
-    platform: s.platform,
-    studio_id: orNull(s.studioId),
-    studio_name: s.studioName,
-    notes: s.notes,
-    template_id: s.templateId
-  }));
-  const { data, error } = await supabase.rpc("generate_shift_slots", { p_slots: payload });
-  if (error) throw error;
-  const r = data as { inserted: number; skipped_existing: number; rows: DbShiftSlot[] };
-  return { inserted: (r.rows ?? []).map(fromDb), skippedExisting: r.skipped_existing };
-}
+// Sinh ca hàng loạt: RPC generate_shift_slots (0088) vẫn tồn tại nhưng app không gọi từ 0090 —
+// Kế Hoạch Tháng chốt qua lock_month_plan (tự sinh shift_slots cùng khoá chống trùng).
 
 export async function updateShiftSlot(s: ShiftSlot): Promise<ShiftSlot> {
   const { data, error } = await supabase.from("shift_slots").update(toDb(s)).eq("id", s.id).select().single();

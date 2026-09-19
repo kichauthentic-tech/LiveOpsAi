@@ -15,8 +15,7 @@ import { fetchSessionFinances, upsertSessionFinance, setSessionFinanceApproval }
 import { fetchTikTokStatus, fetchTikTokWebhookEvents } from "./lib/db/tiktokIntegration";
 import { fetchAiAgentPrompts, updateAiAgentPrompt } from "./lib/db/aiAgentPrompts";
 import { fetchBrandPlatformRates, upsertBrandPlatformRate, upsertBrandPlatformReturnRate } from "./lib/db/brandPlatformRates";
-import { fetchShiftSlots, createShiftSlot, generateShiftSlots, GenerateSlotsResult, updateShiftSlot, deleteShiftSlot } from "./lib/db/shiftSlots";
-import { PlannedSlot } from "./lib/scheduling/planMonthSlots";
+import { fetchShiftSlots, createShiftSlot, updateShiftSlot, deleteShiftSlot } from "./lib/db/shiftSlots";
 import { fetchShiftRegistrations, registerForSlot, unregisterFromSlot } from "./lib/db/shiftRegistrations";
 import {
   fetchRecurringShiftTemplates,
@@ -48,6 +47,7 @@ import {
   BrainCircuit,
   UserCog,
   CalendarClock,
+  CalendarRange,
   Package,
   PanelLeftClose,
   PanelLeftOpen,
@@ -79,6 +79,7 @@ import { AiMultiAgent } from "./components/AiMultiAgent";
 import { UserRoleSettings } from "./components/UserRoleSettings";
 import { AiTrainingCenter } from "./components/AiTrainingCenter";
 import ShiftScheduling from "./components/ShiftScheduling";
+import MonthPlan from "./components/MonthPlan";
 import { LiveReconciliation } from "./components/LiveReconciliation";
 import { HostPerformance } from "./components/HostPerformance";
 import { BrandCommitment } from "./components/BrandCommitment";
@@ -1188,16 +1189,13 @@ export default function App() {
     }
   };
 
-  // P1 (0088): sinh ca theo lô đã lập kế hoạch ở màn Đăng Ký & Chốt Lịch (planMonthSlots — thuần,
-  // có xem trước). Server dedupe theo khoá brand|ngày|giờ|nền tảng, chỉ trả về dòng thật sự chèn.
-  const handleGenerateSlots = async (slots: PlannedSlot[]): Promise<GenerateSlotsResult | null> => {
+  // Kế Hoạch Tháng chốt xong (RPC lock_month_plan sinh shift_slots phía server) → nạp lại danh sách
+  // ca để Đăng Ký & Chốt Lịch / lịch thấy ngay, không cần F5.
+  const reloadShiftSlots = async () => {
     try {
-      const result = await generateShiftSlots(slots);
-      if (result.inserted.length > 0) setShiftSlots((prev) => [...prev, ...result.inserted]);
-      return result;
+      setShiftSlots(await fetchShiftSlots());
     } catch (e: any) {
-      window.alert(`Không thể sinh ca tự động: ${e.message ?? e}`);
-      return null;
+      window.alert(`Không nạp lại được danh sách ca: ${e.message ?? e}`);
     }
   };
 
@@ -1385,6 +1383,9 @@ export default function App() {
         // Đăng ký & Chốt Lịch Host — luôn hiện với mọi role, không gate theo PermissionKey: role
         // talent cần thấy tab này để tự đăng ký ca (Giai đoạn 14a); màn hình bên trong tự đổi giao
         // diện theo currentRole (talent = đăng ký, ceo/operations/admin = mở ca + chốt lịch).
+        // Kế Hoạch Tháng (0090) — lập lưới ca + target trước khi mở đăng ký; chốt là ca đổ xuống
+        // Đăng Ký & Chốt Lịch. Chỉ ops (manage_sessions = ceo/admin/operations).
+        { id: "month_plan", label: "Kế Hoạch Tháng", icon: CalendarRange, perm: "manage_sessions" as PermissionKey },
         { id: "shift_scheduling", label: "Đăng Ký & Chốt Lịch", icon: CalendarClock, perm: undefined },
         // Đối soát đặt ngay cạnh Live Sessions/lịch thay vì nhét trong tab "TikTok API" như luồng
         // đối soát cũ — đúng chỗ ops đang làm việc, không phải nhảy sang module khác (điểm nghẽn
@@ -1905,11 +1906,6 @@ export default function App() {
                     studios={activeStudios}
                     shiftSlots={shiftSlots}
                     shiftRegistrations={shiftRegistrations}
-                    recurringShiftTemplates={recurringShiftTemplates}
-                    onCreateTemplate={handleCreateRecurringTemplate}
-                    onToggleTemplate={handleToggleRecurringTemplate}
-                    onDeleteTemplate={handleDeleteRecurringTemplate}
-                    onGenerateSlots={handleGenerateSlots}
                     onDeleteSlot={handleDeleteShiftSlot}
                     onRegister={handleRegisterSlot}
                     onUnregister={handleUnregisterSlot}
@@ -1918,6 +1914,20 @@ export default function App() {
                     onUpdateSession={handleUpdateSession}
                     onLogAudit={pushAuditLog}
                     onSessionSnapshotApplied={handleSessionReconciled}
+                  />
+                )}
+
+                {activeTab === "month_plan" && (
+                  <MonthPlan
+                    brands={activeBrands}
+                    studios={activeStudios}
+                    currentUserId={activeUser.id}
+                    monthlyReports={monthlyReports}
+                    recurringShiftTemplates={recurringShiftTemplates}
+                    onCreateTemplate={handleCreateRecurringTemplate}
+                    onToggleTemplate={handleToggleRecurringTemplate}
+                    onDeleteTemplate={handleDeleteRecurringTemplate}
+                    onPlanLocked={reloadShiftSlots}
                   />
                 )}
 

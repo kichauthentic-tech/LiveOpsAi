@@ -1,0 +1,372 @@
+import React, { useEffect, useMemo, useState } from "react";
+import { Brand, BrandMonthPlan, BrandMonthlyCommitment, BrandMonthlyReport, RecurringShiftTemplate, Studio } from "../types";
+import { CalendarRange, ChevronLeft, ChevronRight, Lock, Plus, Repeat, Save, Trash2, Wand2, X } from "lucide-react";
+import { fetchBrandMonthlyCommitments } from "../lib/db/brandContracts";
+import { PlanSettings, fetchMonthPlan, lockMonthPlan, replacePlanSlots, upsertMonthPlan } from "../lib/db/monthPlans";
+import { buildMonthTargetPlan, monthTotalTarget } from "../lib/performance/targetAllocation";
+import { todayVn } from "../lib/performance/brandCommitment";
+import { CAMPAIGN_DAY_STYLES, getCampaignDayInfo, resolveCampBucketType } from "../lib/campaignDays";
+import {
+  PlanDraftSlot,
+  allocateDraftTargets,
+  daysOfMonth,
+  draftsFromSaved,
+  mergeFromTemplates,
+  nextSlotForDay,
+  slotHours,
+  totalsOf,
+  validateDrafts
+} from "../lib/scheduling/monthPlanGrid";
+import { RecurringRulesPanel } from "./scheduling/RecurringRulesPanel";
+import { formatCurrencyAdaptive } from "../lib/formatCurrency";
+
+interface MonthPlanProps {
+  brands: Brand[];
+  studios: Studio[];
+  currentUserId: string;
+  monthlyReports: Map<string, BrandMonthlyReport>;
+  recurringShiftTemplates: RecurringShiftTemplate[];
+  onCreateTemplate: (t: RecurringShiftTemplate) => Promise<boolean>;
+  onToggleTemplate: (t: RecurringShiftTemplate) => Promise<boolean>;
+  onDeleteTemplate: (id: string) => Promise<void>;
+  // Chốt xong → App nạp lại shift_slots để Đăng Ký & Chốt Lịch / lịch thấy ca mới.
+  onPlanLocked: () => Promise<void>;
+}
+
+const WEEKDAY_LABELS = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
+const fmtH = (n: number) => n.toLocaleString("vi-VN", { maximumFractionDigits: 1 });
+const DEFAULT_SETTINGS: PlanSettings = { defaultSlotHours: 3, liveWindowStart: "09:00", liveWindowEnd: "23:00", maxSlotsPerDay: 3, notes: "" };
+
+const nextMonthOf = (month: string, delta: number) => {
+  const [y, m] = month.split("-").map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, "0")}`;
+};
+
+// Kế Hoạch Tháng — giai đoạn A (0090): lập lưới ngày × ca cho brand, nạp nhanh từ quy tắc lặp,
+// chia target theo khung camp của tab 05, chốt → sinh shift_slots. Gợi ý từ lịch sử là giai đoạn B.
+export default function MonthPlan({
+  brands,
+  studios,
+  currentUserId,
+  monthlyReports,
+  recurringShiftTemplates,
+  onCreateTemplate,
+  onToggleTemplate,
+  onDeleteTemplate,
+  onPlanLocked
+}: MonthPlanProps) {
+  const today = todayVn();
+  const [brandId, setBrandId] = useState(brands[0]?.id ?? "");
+  const [month, setMonth] = useState(nextMonthOf(today.slice(0, 7), 1));
+  const [plan, setPlan] = useState<BrandMonthPlan | null>(null);
+  const [settings, setSettings] = useState<PlanSettings>(DEFAULT_SETTINGS);
+  const [drafts, setDrafts] = useState<PlanDraftSlot[]>([]);
+  const [dirty, setDirty] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [rulesOpen, setRulesOpen] = useState(false);
+  const [commitments, setCommitments] = useState<BrandMonthlyCommitment[]>([]);
+
+  const brand = brands.find((b) => b.id === brandId);
+  const brandTemplates = useMemo(() => recurringShiftTemplates.filter((t) => t.brandId === brandId), [recurringShiftTemplates, brandId]);
+
+  useEffect(() => {
+    fetchBrandMonthlyCommitments().then(setCommitments).catch(() => setCommitments([]));
+  }, []);
+
+  useEffect(() => {
+    if (!brandId) return;
+    let alive = true;
+    setLoading(true);
+    setMsg(null);
+    fetchMonthPlan(brandId, month)
+      .then((r) => {
+        if (!alive) return;
+        if (r) {
+          setPlan(r.plan);
+          setSettings({ defaultSlotHours: r.plan.defaultSlotHours, liveWindowStart: r.plan.liveWindowStart, liveWindowEnd: r.plan.liveWindowEnd, maxSlotsPerDay: r.plan.maxSlotsPerDay, notes: r.plan.notes });
+          setDrafts(draftsFromSaved(r.slots));
+        } else {
+          setPlan(null);
+          setSettings(DEFAULT_SETTINGS);
+          setDrafts([]);
+        }
+        setDirty(false);
+      })
+      .catch((e) => alive && setMsg(`Không tải được kế hoạch: ${e.message ?? e}`))
+      .finally(() => alive && setLoading(false));
+    return () => { alive = false; };
+  }, [brandId, month]);
+
+  const committedHours = useMemo(
+    () => commitments.find((c) => c.brandId === brandId && c.periodMonth === `${month}-01`)?.committedHours ?? 0,
+    [commitments, brandId, month]
+  );
+  const targetPlan = useMemo(() => (brandId ? buildMonthTargetPlan(brandId, month, monthlyReports) : null), [brandId, month, monthlyReports]);
+  const targetTotal = targetPlan ? monthTotalTarget(targetPlan) : 0;
+  const totals = useMemo(() => totalsOf(drafts), [drafts]);
+  const errors = useMemo(() => validateDrafts(drafts, settings), [drafts, settings]);
+  const locked = plan?.status === "locked";
+  const editable = !locked;
+
+  const days = useMemo(() => daysOfMonth(month), [month]);
+  const leading = new Date(`${days[0]}T00:00:00`).getDay();
+  const cells: (string | null)[] = [...Array(leading).fill(null), ...days];
+  while (cells.length % 7 !== 0) cells.push(null);
+  const draftsByDay = useMemo(() => {
+    const m = new Map<string, PlanDraftSlot[]>();
+    for (const d of drafts) {
+      const l = m.get(d.date) ?? [];
+      l.push(d);
+      m.set(d.date, l);
+    }
+    for (const l of m.values()) l.sort((a, b) => a.startTime.localeCompare(b.startTime));
+    return m;
+  }, [drafts]);
+
+  const update = (key: string, patch: Partial<PlanDraftSlot>) => {
+    setDrafts((prev) => prev.map((d) => (d.key === key ? { ...d, ...patch } : d)));
+    setDirty(true);
+  };
+  const remove = (key: string) => {
+    setDrafts((prev) => prev.filter((d) => d.key !== key));
+    setDirty(true);
+  };
+  const addForDay = (day: string) => {
+    const s = nextSlotForDay(day, drafts, settings);
+    if (!s) {
+      setMsg(`Ngày ${day}: đã đủ ${settings.maxSlotsPerDay} ca hoặc hết chỗ trong khung ${settings.liveWindowStart}-${settings.liveWindowEnd}.`);
+      return;
+    }
+    setDrafts((prev) => [...prev, s]);
+    setDirty(true);
+  };
+  const loadTemplates = () => {
+    const { next, added } = mergeFromTemplates(drafts, brandTemplates, month, brandId, today);
+    setDrafts(next);
+    setDirty(added > 0 || dirty);
+    setMsg(added > 0 ? `Nạp thêm ${added} ca từ quy tắc lặp.` : brandTemplates.filter((t) => t.active).length === 0 ? "Brand chưa có quy tắc lặp nào active." : "Mọi ca theo quy tắc đã có trong lưới.");
+  };
+  const allocate = () => {
+    if (!targetPlan || targetTotal <= 0) {
+      setMsg("Chưa có target tháng này ở Report Tháng tab 05 (kế hoạch tháng sau của tháng trước).");
+      return;
+    }
+    setDrafts(allocateDraftTargets(drafts, targetPlan));
+    setDirty(true);
+    setMsg(`Đã chia ${formatCurrencyAdaptive(targetTotal)} theo giờ trong từng khung camp.`);
+  };
+  const clearAll = () => {
+    if (!window.confirm("Xoá toàn bộ ca trong lưới nháp?")) return;
+    setDrafts([]);
+    setDirty(true);
+  };
+
+  const save = async (): Promise<BrandMonthPlan | null> => {
+    if (errors.length > 0) {
+      setMsg(`Sửa lỗi trước khi lưu: ${errors[0]}${errors.length > 1 ? ` (+${errors.length - 1})` : ""}`);
+      return null;
+    }
+    setSaving(true);
+    try {
+      const p = await upsertMonthPlan(brandId, month, settings);
+      const saved = await replacePlanSlots(p.id, drafts.map((d) => ({ id: d.id, date: d.date, startTime: d.startTime, endTime: d.endTime, targetGmv: d.targetGmv, note: d.note })));
+      setPlan(p);
+      setDrafts(draftsFromSaved(saved));
+      setDirty(false);
+      setMsg(`Đã lưu nháp: ${saved.length} ca.`);
+      return p;
+    } catch (e: any) {
+      setMsg(`Không lưu được: ${e.message ?? e}`);
+      return null;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const lock = async () => {
+    if (drafts.length === 0) {
+      setMsg("Lưới trống — chưa có gì để chốt.");
+      return;
+    }
+    const gap = committedHours - totals.hours;
+    const warn = committedHours > 0 && Math.abs(gap) > 0.01 ? `\n\nGiờ kế hoạch ${fmtH(totals.hours)}h ${gap > 0 ? "THIẾU" : "VƯỢT"} ${fmtH(Math.abs(gap))}h so với cam kết ${fmtH(committedHours)}h.` : "";
+    if (!window.confirm(`Chốt kế hoạch ${brand?.name} tháng ${month}: mở ${drafts.length} ca chờ đăng ký?${warn}`)) return;
+    const p = await save();
+    if (!p) return;
+    setSaving(true);
+    try {
+      const r = await lockMonthPlan(p.id);
+      await onPlanLocked();
+      const fresh = await fetchMonthPlan(brandId, month);
+      if (fresh) {
+        setPlan(fresh.plan);
+        setDrafts(draftsFromSaved(fresh.slots));
+      }
+      setMsg(`Đã chốt: mở ${r.created} ca mới${r.linked > 0 ? `, gắn ${r.linked} ca đã có sẵn` : ""} — ${r.total_slots} ca đang chờ đăng ký.`);
+    } catch (e: any) {
+      setMsg(`Không chốt được: ${e.message ?? e}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const hoursDelta = committedHours > 0 ? totals.hours - committedHours : null;
+  const targetDelta = targetTotal > 0 ? totals.target - targetTotal : null;
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-[var(--surface)] border border-[var(--border)] p-4 sm:p-6 rounded-2xl shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-bold text-[var(--text)] flex items-center gap-2">
+            <CalendarRange className="w-5 h-5 text-blue-400" />
+            Kế Hoạch Tháng
+          </h2>
+          <p className="text-sm text-[var(--text-muted)] mt-1">
+            Lập lưới ca cho brand trước khi mở đăng ký: giờ theo cam kết, target theo Report Tháng, chốt là ca đổ xuống Đăng Ký &amp; Chốt Lịch.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <select value={brandId} onChange={(e) => setBrandId(e.target.value)} className="bg-[var(--surface-base)] border border-[var(--border)] rounded-xl px-3 py-2 text-[var(--text)] text-sm font-bold">
+            {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select>
+          <button onClick={() => setMonth((m) => nextMonthOf(m, -1))} className="p-2 rounded-xl bg-[var(--surface-base)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]" title="Tháng trước"><ChevronLeft className="w-4 h-4" /></button>
+          <input type="month" value={month} onChange={(e) => e.target.value && setMonth(e.target.value)} className="bg-[var(--surface-base)] border border-[var(--border)] rounded-xl px-3 py-2 text-[var(--text)] font-mono text-sm" />
+          <button onClick={() => setMonth((m) => nextMonthOf(m, 1))} className="p-2 rounded-xl bg-[var(--surface-base)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]" title="Tháng sau"><ChevronRight className="w-4 h-4" /></button>
+        </div>
+      </div>
+
+      {/* Đầu vào + tổng */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 space-y-3">
+          <h3 className="text-sm font-bold text-[var(--text)]">Tham số lập kế hoạch</h3>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <label className="block">
+              <span className="font-bold text-[var(--text-muted)] block mb-1">Ca mặc định (giờ)</span>
+              <input type="number" step="0.5" min="0.5" max="12" disabled={!editable} value={settings.defaultSlotHours} onChange={(e) => { setSettings((s) => ({ ...s, defaultSlotHours: Number(e.target.value) })); setDirty(true); }} className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] font-mono disabled:opacity-60" />
+            </label>
+            <label className="block">
+              <span className="font-bold text-[var(--text-muted)] block mb-1">Tối đa ca/ngày</span>
+              <input type="number" min="1" max="8" disabled={!editable} value={settings.maxSlotsPerDay} onChange={(e) => { setSettings((s) => ({ ...s, maxSlotsPerDay: Number(e.target.value) })); setDirty(true); }} className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] font-mono disabled:opacity-60" />
+            </label>
+            <label className="block">
+              <span className="font-bold text-[var(--text-muted)] block mb-1">Live từ</span>
+              <input type="time" disabled={!editable} value={settings.liveWindowStart} onChange={(e) => { setSettings((s) => ({ ...s, liveWindowStart: e.target.value })); setDirty(true); }} className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] font-mono disabled:opacity-60" />
+            </label>
+            <label className="block">
+              <span className="font-bold text-[var(--text-muted)] block mb-1">đến</span>
+              <input type="time" disabled={!editable} value={settings.liveWindowEnd} onChange={(e) => { setSettings((s) => ({ ...s, liveWindowEnd: e.target.value })); setDirty(true); }} className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] font-mono disabled:opacity-60" />
+            </label>
+          </div>
+          <input type="text" disabled={!editable} value={settings.notes} onChange={(e) => { setSettings((s) => ({ ...s, notes: e.target.value })); setDirty(true); }} placeholder="Ghi chú kế hoạch (tuỳ chọn)" className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-xs text-[var(--text)] disabled:opacity-60" />
+        </div>
+
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 space-y-2">
+          <h3 className="text-sm font-bold text-[var(--text)]">Đọc từ nguồn</h3>
+          <div className="text-xs space-y-1.5">
+            <div className="flex justify-between gap-2"><span className="text-[var(--text-muted)]">Giờ cam kết (Cam Kết Hợp Đồng)</span><b className="text-[var(--text)]">{committedHours > 0 ? `${fmtH(committedHours)}h` : "chưa nhập"}</b></div>
+            <div className="flex justify-between gap-2"><span className="text-[var(--text-muted)]">Target GMV (Report Tháng tab 05)</span><b className="text-[var(--text)]">{targetTotal > 0 ? formatCurrencyAdaptive(targetTotal) : "chưa nhập"}</b></div>
+            {targetPlan && targetTotal > 0 && (
+              <div className="text-[10px] text-[var(--text-faint)] leading-relaxed">
+                Ngày thường {formatCurrencyAdaptive(targetPlan.byBucket.daily)} · D-Day {formatCurrencyAdaptive(targetPlan.byBucket.dday)} · Mid {formatCurrencyAdaptive(targetPlan.byBucket.midmonth)} · Pay {formatCurrencyAdaptive(targetPlan.byBucket.payday)}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className={`rounded-2xl p-4 border space-y-2 ${errors.length > 0 ? "bg-rose-950/25 border-rose-900" : "bg-[var(--surface)] border-[var(--border)]"}`}>
+          <h3 className="text-sm font-bold text-[var(--text)] flex items-center gap-2">
+            Lưới hiện tại
+            {locked && <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 font-bold flex items-center gap-1"><Lock className="w-3 h-3" /> Đã chốt</span>}
+            {dirty && <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-950/60 text-amber-300 font-bold">chưa lưu</span>}
+          </h3>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+            <span className="text-[var(--text-muted)]">Số ca / ngày có ca</span><b className="text-[var(--text)] text-right">{totals.slots} / {totals.days}</b>
+            <span className="text-[var(--text-muted)]">Tổng giờ</span>
+            <b className={`text-right ${hoursDelta === null ? "text-[var(--text)]" : Math.abs(hoursDelta) < 0.01 ? "text-emerald-400" : hoursDelta < 0 ? "text-rose-400" : "text-amber-400"}`}>
+              {fmtH(totals.hours)}h{hoursDelta !== null && Math.abs(hoursDelta) >= 0.01 ? ` (${hoursDelta < 0 ? "thiếu" : "vượt"} ${fmtH(Math.abs(hoursDelta))}h)` : ""}
+            </b>
+            <span className="text-[var(--text-muted)]">Tổng target</span>
+            <b className={`text-right ${targetDelta === null ? "text-[var(--text)]" : Math.abs(targetDelta) < 1 ? "text-emerald-400" : "text-amber-400"}`}>
+              {formatCurrencyAdaptive(totals.target)}{targetDelta !== null && Math.abs(targetDelta) >= 1 ? ` (${targetDelta < 0 ? "thiếu" : "vượt"} ${formatCurrencyAdaptive(Math.abs(targetDelta))})` : ""}
+            </b>
+          </div>
+          {errors.length > 0 && <p className="text-[11px] text-rose-300">{errors[0]}{errors.length > 1 ? ` · +${errors.length - 1} lỗi` : ""}</p>}
+        </div>
+      </div>
+
+      {/* Thanh công cụ */}
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 flex flex-wrap items-center gap-2">
+        <button onClick={() => setRulesOpen((v) => !v)} className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-xs font-bold text-[var(--accent-text)] flex items-center gap-1.5"><Repeat className="w-3.5 h-3.5" /> Quy tắc lặp ({brandTemplates.length})</button>
+        {editable && (
+          <>
+            <button onClick={loadTemplates} className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-xs font-bold text-[var(--text)] hover:border-[var(--accent)]">Nạp từ quy tắc</button>
+            <button onClick={allocate} className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-xs font-bold text-[var(--text)] hover:border-[var(--accent)] flex items-center gap-1.5"><Wand2 className="w-3.5 h-3.5" /> Chia target theo khung</button>
+            <button onClick={clearAll} disabled={drafts.length === 0} className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-xs font-bold text-rose-400 disabled:opacity-40">Xoá hết</button>
+          </>
+        )}
+        <span className="flex-1 text-[11px] text-[var(--text-muted)] min-w-[160px]">{loading ? "Đang tải…" : msg ?? (locked ? `Đã chốt lúc ${plan?.lockedAt ? new Date(plan.lockedAt).toLocaleString("vi-VN") : ""}. Chốt lại chỉ mở thêm ca chưa có.` : "")}</span>
+        {editable && (
+          <button onClick={save} disabled={saving || !dirty} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] border border-[var(--border)] text-xs font-bold text-[var(--text)] disabled:opacity-40 flex items-center gap-1.5"><Save className="w-3.5 h-3.5" /> Lưu nháp</button>
+        )}
+        <button onClick={lock} disabled={saving || loading || errors.length > 0} className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-bold disabled:opacity-40 flex items-center gap-1.5"><Lock className="w-3.5 h-3.5" /> {locked ? "Chốt lại (mở ca còn thiếu)" : `Chốt kế hoạch`}</button>
+      </div>
+
+      {rulesOpen && brand && (
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
+          <RecurringRulesPanel brandId={brandId} brandName={brand.name} templates={brandTemplates} studios={studios} currentUserId={currentUserId} defaultHours={settings.defaultSlotHours} onCreateTemplate={onCreateTemplate} onToggleTemplate={onToggleTemplate} onDeleteTemplate={onDeleteTemplate} />
+        </div>
+      )}
+
+      {/* Lưới ngày × ca */}
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 overflow-x-auto">
+        <div className="grid grid-cols-7 gap-1.5 min-w-[980px]">
+          {WEEKDAY_LABELS.map((w, i) => (
+            <div key={w} className={`text-center text-[10px] font-black uppercase tracking-wide py-1 rounded-lg ${i === 0 || i === 6 ? "text-rose-300 bg-rose-950/30" : "text-[var(--text-faint)] bg-[var(--surface-base)]"}`}>{w}</div>
+          ))}
+          {cells.map((day, idx) => {
+            if (!day) return <div key={`e${idx}`} className="min-h-[96px] rounded-xl bg-[var(--surface-base)]/40" />;
+            const list = draftsByDay.get(day) ?? [];
+            const camp = getCampaignDayInfo(day);
+            const bucket = targetPlan ? resolveCampBucketType(day, targetPlan.camp) : camp?.type ?? "daily";
+            const style = bucket !== "daily" ? CAMPAIGN_DAY_STYLES[bucket] : null;
+            const past = day < today;
+            const dayHours = list.reduce((a, d) => a + slotHours(d), 0);
+            return (
+              <div key={day} className={`min-h-[96px] rounded-xl border p-1.5 flex flex-col gap-1 ${style ? style.cell : "bg-[var(--surface-base)] border-[var(--border)]"} ${past ? "opacity-50" : ""}`}>
+                <div className="flex items-center justify-between">
+                  <span className={`text-xs font-black ${style ? style.text : "text-[var(--text)]"}`}>{Number(day.slice(-2))}{style ? ` · ${camp?.shortLabel ?? bucket}` : ""}</span>
+                  <span className="text-[9px] text-[var(--text-faint)]">{list.length > 0 ? `${list.length} ca · ${fmtH(dayHours)}h` : ""}</span>
+                </div>
+                {list.map((d) => (
+                  <div key={d.key} className={`rounded-lg border px-1.5 py-1 text-[10px] space-y-1 ${d.slotId ? "border-emerald-900 bg-emerald-950/30" : "border-[var(--border)] bg-[var(--surface)]"}`}>
+                    <div className="flex items-center gap-1">
+                      <input type="time" disabled={!editable} value={d.startTime} onChange={(e) => update(d.key, { startTime: e.target.value })} className="w-[62px] bg-transparent font-mono text-[10px] text-[var(--text)] disabled:opacity-70" />
+                      <span className="text-[var(--text-faint)]">–</span>
+                      <input type="time" disabled={!editable} value={d.endTime} onChange={(e) => update(d.key, { endTime: e.target.value })} className="w-[62px] bg-transparent font-mono text-[10px] text-[var(--text)] disabled:opacity-70" />
+                      {editable && <button onClick={() => remove(d.key)} className="ml-auto text-rose-400 hover:text-rose-300" title="Bỏ ca"><X className="w-3 h-3" /></button>}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[var(--text-faint)] shrink-0">target</span>
+                      <input type="number" disabled={!editable} value={d.targetGmv} onChange={(e) => update(d.key, { targetGmv: Number(e.target.value) })} className="w-full min-w-0 bg-[var(--surface-base)] border border-[var(--border)] rounded px-1 py-0.5 font-mono text-[10px] text-[var(--text)] disabled:opacity-70" />
+                    </div>
+                    {d.slotId && <div className="text-[9px] text-emerald-400 font-bold">đã mở ca</div>}
+                  </div>
+                ))}
+                {editable && !past && list.length < settings.maxSlotsPerDay && (
+                  <button onClick={() => addForDay(day)} className="mt-auto text-[10px] font-bold text-[var(--text-faint)] hover:text-[var(--accent-text)] flex items-center justify-center gap-1 py-1 border border-dashed border-[var(--border)] rounded-lg"><Plus className="w-3 h-3" /> ca</button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {drafts.length === 0 && !loading && (
+          <p className="text-center text-xs text-[var(--text-muted)] py-6">Lưới trống — bấm "+ ca" ở từng ngày, hoặc "Nạp từ quy tắc" để điền cả tháng theo khung giờ cố định của brand.</p>
+        )}
+      </div>
+      {locked && <p className="text-[11px] text-[var(--text-faint)] flex items-center gap-1"><Trash2 className="w-3 h-3" /> Kế hoạch đã chốt là chỉ đọc. Cần thêm/bớt ca: dùng Lịch Vận Hành (mở ca lẻ) hoặc Đăng Ký &amp; Chốt Lịch (xoá ca chưa ai đăng ký). Chốt lại/diff làm ở giai đoạn C.</p>}
+    </div>
+  );
+}

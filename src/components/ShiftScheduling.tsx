@@ -4,7 +4,6 @@ import {
   Brand,
   BrandMonthlyCommitment,
   LiveSession,
-  RecurringShiftTemplate,
   ShiftRegistration,
   ShiftSlot,
   Studio,
@@ -45,9 +44,6 @@ import { SchedulingGap, computeSchedulingGaps } from "../lib/performance/brandCo
 import { HostSuggestion, headlineFor, suggestHosts } from "../lib/performance/hostSuggestion";
 import { BulkFinalizePanel } from "./BulkFinalizePanel";
 import { eligibleSlots } from "../lib/performance/bulkFinalize";
-import { MonthSlotGenerator } from "./scheduling/MonthSlotGenerator";
-import { PlannedSlot } from "../lib/scheduling/planMonthSlots";
-import { GenerateSlotsResult } from "../lib/db/shiftSlots";
 
 interface ShiftSchedulingProps {
   currentRole: UserRole;
@@ -68,12 +64,6 @@ interface ShiftSchedulingProps {
   // RPC apply_session_live_snapshot đã ghi DB và trả về LiveSession đầy đủ — chỉ cần đồng bộ
   // lại state, không gọi updateSession (sẽ ghi đè ngược số vừa tính bằng state cũ của client).
   onSessionSnapshotApplied: (session: LiveSession) => void;
-  // P1 (0088): mở ca hàng loạt gom về màn này — chỉ admin thấy panel.
-  recurringShiftTemplates: RecurringShiftTemplate[];
-  onCreateTemplate: (t: RecurringShiftTemplate) => Promise<boolean>;
-  onToggleTemplate: (t: RecurringShiftTemplate) => Promise<boolean>;
-  onDeleteTemplate: (id: string) => Promise<void>;
-  onGenerateSlots: (slots: PlannedSlot[]) => Promise<GenerateSlotsResult | null>;
 }
 
 const WEEKDAY_LABELS = ["CN", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"];
@@ -147,12 +137,7 @@ export default function ShiftScheduling({
   onUpdateSession,
   onLogAudit,
   onSubmitSessionReport,
-  onSessionSnapshotApplied,
-  recurringShiftTemplates,
-  onCreateTemplate,
-  onToggleTemplate,
-  onDeleteTemplate,
-  onGenerateSlots
+  onSessionSnapshotApplied
 }: ShiftSchedulingProps) {
   const admin = isAdminRole(currentRole);
   const myTalentId = activeUser.assignedTalentId;
@@ -476,23 +461,6 @@ export default function ShiftScheduling({
           perfSince={perfSince}
           onFinalizeSlot={onFinalizeSlot}
           onClose={() => setBulkOpen(false)}
-        />
-      )}
-
-      {admin && (
-        <MonthSlotGenerator
-          month={selectedMonth}
-          today={today}
-          templates={recurringShiftTemplates}
-          brands={brands}
-          studios={studios}
-          shiftSlots={shiftSlots}
-          gaps={schedulingGaps}
-          currentUserId={activeUser.id}
-          onCreateTemplate={onCreateTemplate}
-          onToggleTemplate={onToggleTemplate}
-          onDeleteTemplate={onDeleteTemplate}
-          onGenerateSlots={onGenerateSlots}
         />
       )}
 
