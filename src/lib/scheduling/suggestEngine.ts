@@ -398,6 +398,26 @@ function expectedGphFor(date: string, start: number, end: number, h: HistorySumm
   return { gph: hours > 0 ? sum / hours : 0, cells };
 }
 
+// Các ô lịch sử (thứ × khối 2h) mà một khung giờ chạm tới, kèm số giờ chạm từng ô — cho module hỗ trợ
+// vận hành dựng benchmark view/CVR/AOV của ca sắp live từ đúng những ô engine dùng để dự báo GMV.
+export function cellsForWindow(history: HistorySummary, date: string, startTime: string, endTime: string): { cell: HistoryCell | undefined; block: number; hours: number }[] {
+  const get = cellLookup(history);
+  const wd = weekdayOf(date);
+  const start = toMin(startTime);
+  let end = toMin(endTime);
+  if (end <= start) end += 24 * 60;
+  const out: { cell: HistoryCell | undefined; block: number; hours: number }[] = [];
+  let cur = start;
+  while (cur < end) {
+    const blockEnd = (Math.floor(cur / (BLOCK_HOURS * 60)) + 1) * BLOCK_HOURS * 60;
+    const seg = Math.min(blockEnd, end) - cur;
+    const block = Math.floor((cur % (24 * 60)) / (BLOCK_HOURS * 60));
+    out.push({ cell: get(wd, block), block, hours: seg / 60 });
+    cur += seg;
+  }
+  return out;
+}
+
 export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints): SuggestResult {
   const P = c.params ?? DEFAULT_ENGINE_PARAMS;
   const notes: string[] = [];

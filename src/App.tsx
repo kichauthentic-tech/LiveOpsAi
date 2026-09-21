@@ -57,6 +57,7 @@ import {
   Database,
   ClipboardCheck,
   TrendingUp,
+  Gauge,
   FileSignature,
   Radio
 } from "lucide-react";
@@ -87,6 +88,7 @@ import { fetchEngineParams, saveEngineParams } from "./lib/db/engineParams";
 import { DEFAULT_ENGINE_PARAMS, EngineParams } from "./lib/scheduling/engineParams";
 import ShiftScheduling from "./components/ShiftScheduling";
 import MonthPlan from "./components/MonthPlan";
+import OpsSupport from "./components/OpsSupport";
 import { LiveReconciliation } from "./components/LiveReconciliation";
 import { HostPerformance } from "./components/HostPerformance";
 import { BrandCommitment } from "./components/BrandCommitment";
@@ -1454,7 +1456,9 @@ export default function App() {
               // (hôm nay/tuần, việc còn thiếu) + chế độ xem Lịch & Studio (LiveCalendar cũ).
               { id: "calendar", label: "Bảng Vận Hành", icon: CalendarIcon, perm: "manage_calendar" as PermissionKey },
               { id: "sessions", label: "Sổ Ca", icon: BookOpen, perm: "manage_sessions" as PermissionKey },
-              { id: "live_reconciliation", label: "Đối Soát Số Liệu", icon: ClipboardCheck, perm: "manage_sessions" as PermissionKey }
+              { id: "live_reconciliation", label: "Đối Soát Số Liệu", icon: ClipboardCheck, perm: "manage_sessions" as PermissionKey },
+              // Hỗ Trợ Vận Hành (2026-09-21): run-rate vs target đã chốt + benchmark ca sắp live; không đụng target cam kết.
+              { id: "ops_support", label: "Hỗ Trợ Vận Hành", icon: Gauge, perm: "manage_sessions" as PermissionKey }
             ]
           },
           {
@@ -2072,6 +2076,18 @@ export default function App() {
 
                 {activeTab === "host_performance" && (
                   <HostPerformance sessions={activeSessions} brands={activeBrands} />
+                )}
+
+                {activeTab === "ops_support" && (
+                  <OpsSupport
+                    brands={activeBrands}
+                    sessions={activeSessions}
+                    shiftSlots={shiftSlots}
+                    promoSchemes={promoSchemes}
+                    engineParams={engineParams}
+                    onOpenMonthPlan={() => setActiveTab("month_plan")}
+                    onOpenSession={(id) => { setOpsView("board"); setActiveTab("calendar"); setNotifOpenSessionId(id); }}
+                  />
                 )}
 
                 {activeTab === "brand_commitment" && (

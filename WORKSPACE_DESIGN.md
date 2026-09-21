@@ -423,13 +423,17 @@ Phạm vi: Kế Hoạch Tháng, Đăng Ký & Chốt Lịch (+ SlotDetailModal, c
 
 **Trạng thái 2026-09-21: TOÀN BỘ audit N1–N3, Q1–Q7, U1–U7 đã sửa và verify trên DB thật** (migration 0096–0099 đã chạy). Còn để sau: URL dashboard tự sinh (cần mẫu link TikTok Streamer thật), nhắc trợ từ Đối Soát (sau Zalo), Kế Hoạch Tháng cho nền tảng Shopee (plan chưa có chiều platform), endpoint `/api/gemini/optimize-schedule` không còn ai gọi.
 
-## Module hỗ trợ vận hành (Ops Support) — DỰ KIẾN, chưa làm (ý user 2026-09-21)
+## Module hỗ trợ vận hành (Ops Support) — ĐÃ LÀM 2026-09-21 (tab "Hỗ Trợ Vận Hành", nhóm Vận Hành Hằng Ngày, quyền manage_sessions)
 
-Tầng "target vận hành" tách khỏi "target cam kết" của Kế Hoạch Tháng (xem mục trên). Mục tiêu: hỗ trợ ops trong và giữa các phiên, không đụng target đã chốt.
-1. **Tracking target performance theo tháng:** run-rate = Σ thực tế ca đã xong ÷ Σ target ca đã xong; ước tính cuối tháng = thực tế + dự báo ca còn lại × hệ số run-rate; % target đạt được, còn thiếu bao nhiêu; **đề xuất phương án bù** (thêm giờ vào đâu — chạy engine phase 2 với giờ = phần thiếu, có sẵn; hoặc cần tăng CVR/view/AOV bao nhiêu điểm — engine đã tách GMV = view × CTR × CVR × AOV). Là lớp *đề xuất*: ops quyết rồi mới thêm ca vào kế hoạch (ca bù mang target riêng), target cam kết giữ nguyên để chốt với brand.
-2. **Benchmark cho phiên sắp live:** từ ma trận thứ × khối 2h của engine (`buildHistory`: median view, CTR, CVR, GMV/giờ từng ô, hệ số camp/lễ/scheme) → chuẩn kỳ vọng cho ca đó (view, traffic, CTR, CVR, ads spend, GMV/giờ).
-3. **Trong phiên — KHÔNG cần realtime API (user chốt 2026-09-21):** module chỉ *đưa ra bộ chỉ số benchmark* cho ca sắp live (view, traffic, CTR, CVR, ads spend, GMV/giờ kỳ vọng theo ô thứ × giờ + hệ số camp/lễ/scheme); ops tự đối chiếu bằng mắt với dashboard live của TikTok trong ca và tự hành động (view thấp → đẩy traffic, CTR/CVR thấp → tối ưu, ads đốt mạnh → hãm). App không đọc số trong phiên. Vì vậy cả 3 phần làm được ngay với dữ liệu hiện có (ca đối soát + Dataraw sau ca).
-Chưa chốt màn hình/DB. Không build trong giai đoạn chạy thử trừ khi user yêu cầu.
+Tầng "target vận hành" tách khỏi "target cam kết" của Kế Hoạch Tháng: **không ghi DB, không đọc số realtime, không đổi target đã chốt** — chỉ tính từ ca đã xong + kế hoạch đã chốt + ma trận lịch sử của engine. Không có migration.
+
+**File:** `lib/opsSupport.ts` (thuần hàm: `trackMonth`, `suggestFill`, `benchmarkForWindow`), `components/OpsSupport.tsx` (UI), engine thêm export `cellsForWindow` (suggestEngine.ts). App: tab `ops_support`, `onOpenSession` dùng lại cơ chế Q4 (Bảng Vận Hành + mở Cửa sổ Ca Live), `onOpenMonthPlan` → Kế Hoạch Tháng.
+
+1. **Tracking target tháng (chỉ khi kế hoạch tháng đã CHỐT):** mỗi ca kế hoạch (`brand_month_plan_slots`) nối `slot_id → shift_slots.session_id → live_sessions` → trạng thái `done` (Completed có số) / `pending` / `no_data` (qua giờ chưa có số) / `cancelled` (mất target). Run-rate = Σthực tế ÷ Σtarget ca xong. **k** = Σthực tế ÷ Σdự báo engine ca xong (chỉ tin khi ≥ 3 ca xong) → dự kiến cuối tháng = thực tế + dự báo engine phần còn lại × k (không có dự báo → target × run-rate). Thiếu/vượt so target, % tháng đã trôi (vạch trên thanh), "về đích cần X/ca so với TB đang đạt". Bảng chi tiết từng ca (bấm mở ca).
+2. **Phương án bù (khi thiếu > `targetGapWarnPct`):** A · thêm giờ — engine chế độ target với toàn bộ ca kế hoạch là ca cố định, target = dự báo lưới + thiếu/k → ca xếp thêm = ca cần bù (nút "Thêm ca ở Kế Hoạch Tháng" — ops tự thêm, ca mới mang target riêng); B · nâng hiệu suất — phần còn lại phải +X% ⇒ view / CVR / AOV +X% hoặc mỗi thứ +∛.
+3. **Benchmark ca sắp live (7 ngày, kể cả ca mở chưa host):** từ ô thứ × khối 2h của `buildHistory` (median view/giờ, CVR, AOV, GMV/giờ, nhãn ô) × hệ số ngày (camp/lễ/scheme, `estimateSlots`) × k; CTR live = median ca có file cùng thứ; ads/giờ = median `report.adsCost`. Cảnh báo "ít dữ liệu" (ô < 3 ca), "view khá CVR thấp", "khung yếu". Ops đối chiếu bằng mắt với dashboard TikTok trong phiên.
+
+**Verify 2026-09-21** trên DB thật bằng plan test CROCS 09/2026 (locked, 3 ca xong 50/70/55tr trên target 60tr + 2 ca mở): run-rate 97%, k=0,85, dự kiến 286,1tr/300tr → thiếu 4,6% → phương án A đề xuất 1 ca T4 23/09 11–14 ≈ 58tr, B +13%; benchmark ca 25/09 20–23: GMV 55,2tr, 3.370 view/h, CVR 0,56%, CTR 52,8%, AOV 1,1tr. Test data đã xoá.
 
 ## Giai đoạn hiện tại (từ 2026-09-18): CHẠY THỬ THẬT — không build thêm tính năng
 
