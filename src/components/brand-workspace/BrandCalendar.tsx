@@ -1,5 +1,7 @@
 import React, { useMemo, useState } from "react";
-import { LiveSession, PromoScheme, ShiftSlot, ShiftRegistration, Studio, SystemUser, Talent } from "../../types";
+import { Brand, LiveSession, PromoScheme, ShiftSlot, ShiftRegistration, Studio, SystemUser, Talent, UserRole } from "../../types";
+import { SessionWindow } from "../SessionWindow";
+import { SessionReportInput } from "../../lib/db/sessionReports";
 import { CalendarIcon, ChevronLeft, ChevronRight, Plus, Tag } from "lucide-react";
 import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
 import { schemesForDate } from "../../lib/schemeUtils";
@@ -43,6 +45,11 @@ interface BrandCalendarProps {
   onRegisterSlot?: (slotId: string, talentId: string) => Promise<boolean>;
   onUnregisterSlot?: (slotId: string, talentId: string) => Promise<boolean>;
   onFinalizeSlot?: (slot: ShiftSlot, hostId: string, coHostId: string | null) => Promise<boolean>;
+  // Cửa sổ Ca Live (2026-09-21): click ca đã có → cùng cửa sổ với agency; brand chỉ đọc.
+  currentRole?: UserRole;
+  onSubmitSessionReport?: (sessionId: string, input: SessionReportInput) => Promise<boolean>;
+  onSessionSnapshotApplied?: (session: LiveSession) => void;
+  onDeleteSession?: (id: string) => Promise<void>;
 }
 
 const WEEKDAY_LABELS = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
@@ -104,7 +111,11 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
   onDeleteSlot,
   onRegisterSlot,
   onUnregisterSlot,
-  onFinalizeSlot
+  onFinalizeSlot,
+  currentRole,
+  onSubmitSessionReport,
+  onSessionSnapshotApplied,
+  onDeleteSession
 }) => {
   const today = new Date();
   const [month, setMonth] = useState(`${today.getFullYear()}-${`${today.getMonth() + 1}`.padStart(2, "0")}`);
@@ -119,6 +130,8 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
   const brandTheme = getBrandTheme(brandName);
   const moderators = users.filter((u) => u.role === "moderator");
   const canManage = canEdit && !!onAddSession && !!onUpdateSession && !!onCreateSlot;
+  const [openSessionId, setOpenSessionId] = useState<string | null>(null);
+  const openSession = openSessionId ? sessions.find((x) => x.id === openSessionId) ?? null : null;
 
   const brandSessions = useMemo(() => sessions.filter((s) => s.brandId === brandId), [sessions, brandId]);
   const brandSchemes = useMemo(() => schemes.filter((s) => s.brandId === brandId), [schemes, brandId]);
@@ -239,14 +252,10 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
             tooltip={`${s.title} · ${studioById[s.studioId]?.name ?? s.studioName} · Host ${
               talentById[s.hostId]?.name ?? s.hostName
             }${s.coHostName ? ` · Co-Host ${s.coHostName}` : ""}`}
-            onClick={
-              canManage
-                ? (e) => {
-                    e.stopPropagation();
-                    setModalState({ open: true, session: s });
-                  }
-                : undefined
-            }
+            onClick={(e) => {
+              e.stopPropagation();
+              setOpenSessionId(s.id);
+            }}
           />
         ))}
         {daySlots.map((sl) => (
@@ -454,8 +463,8 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
               {list.map((s) => (
                 <div
                   key={s.id}
-                  onClick={() => canManage && setModalState({ open: true, session: s })}
-                  className={`flex flex-wrap items-center gap-2 text-[11px] text-[var(--text-faint)] ${canManage ? "cursor-pointer hover:text-[var(--text)]" : ""}`}
+                  onClick={() => setOpenSessionId(s.id)}
+                  className={`flex flex-wrap items-center gap-2 text-[11px] text-[var(--text-faint)] cursor-pointer hover:text-[var(--text)]`}
                 >
                   <EventPill tier={STATUS_TIER[s.status]} label={s.status} />
                   <span>
@@ -524,7 +533,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
                         tooltip={`${s.title} · ${studioById[s.studioId]?.name ?? s.studioName} · Host ${
                           talentById[s.hostId]?.name ?? s.hostName
                         }`}
-                        onClick={canManage ? () => setModalState({ open: true, session: s }) : undefined}
+                        onClick={() => setOpenSessionId(s.id)}
                       />
                     ))}
                   {daySlots.map((sl) => (
@@ -557,6 +566,23 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
             onDelete={onDeleteScheme}
           />
         </div>
+      )}
+
+      {openSession && (
+        <SessionWindow
+          session={openSession}
+          brand={{ name: brandName, logo: "" } as Brand}
+          viewer={{ role: currentRole ?? "brand", myTalentId }}
+          today={getTodayDateString()}
+          allSessions={sessions}
+          studios={canManage ? studios : undefined}
+          talents={canManage ? talents : undefined}
+          onClose={() => setOpenSessionId(null)}
+          onSubmitSessionReport={onSubmitSessionReport}
+          onSessionSnapshotApplied={onSessionSnapshotApplied}
+          onUpdateSession={canManage ? onUpdateSession : undefined}
+          onDeleteSession={canManage ? onDeleteSession : undefined}
+        />
       )}
 
       {modalState.open && canManage && (

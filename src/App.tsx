@@ -2044,6 +2044,10 @@ export default function App() {
                     myTalentId={activeUser.assignedTalentId}
                     // P1 (0088): chỉ ops tạo/sửa ca — brand xem lịch, không có nút tạo (RLS 0035 đã gỡ).
                     canEdit={currentRole === "ceo" || currentRole === "operations" || currentRole === "admin"}
+                    currentRole={currentRole}
+                    onSubmitSessionReport={handleSubmitSessionReport}
+                    onSessionSnapshotApplied={handleSessionReconciled}
+                    onDeleteSession={handleDeleteSession}
                     onAddSession={handleAddSession}
                     onUpdateSession={handleUpdateSession}
                     onCreateSlot={handleCreateShiftSlot}
