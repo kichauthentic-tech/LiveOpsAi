@@ -597,7 +597,7 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
   };
 
   const committed = c.committedHours > 0 ? c.committedHours : 0;
-  if (committed <= 0) notes.push("Chưa có giờ cam kết tháng này — nhập ở Cam Kết Hợp Đồng để engine biết phải xếp bao nhiêu giờ.");
+  if (committed <= 0 && c.mode !== "target") notes.push("Chưa có giờ cam kết tháng này — nhập ở Cam Kết Hợp Đồng để engine biết phải xếp bao nhiêu giờ.");
   {
     const raised = (["dday", "midmonth", "payday"] as CampDayBucket[]).filter((b) => dayCapOf(b) > maxPerDay);
     if (raised.length > 0) {
@@ -619,9 +619,12 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
   const forecastGmv = expected.reduce((a, b) => a + b, 0);
   const scale = c.targetGmv > 0 && forecastGmv > 0 ? c.targetGmv / forecastGmv : 0;
 
+  // Target/ca làm tròn từng ca, phần dư dồn vào ca cuối để tổng cộng đúng bằng target.
+  const targetsRounded = expected.map((e) => Math.round(e * scale));
+  if (scale > 0 && targetsRounded.length > 0) targetsRounded[targetsRounded.length - 1] += Math.round(c.targetGmv - targetsRounded.reduce((a, b) => a + b, 0));
   const slots: SuggestedSlot[] = all.map((s, i) => {
     const exp = expected[i];
-    const target = Math.round(exp * scale);
+    const target = targetsRounded[i];
     const top = s.cellRefs[0];
     const reasonParts = [
       `GMV/giờ kỳ vọng ${fmtM(s.baseGph)} (${top ? `${top.n} ca lịch sử` : "ô chưa có lịch sử"}, ${history.months} tháng)`,
