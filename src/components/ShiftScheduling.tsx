@@ -67,6 +67,7 @@ interface ShiftSchedulingProps {
   // Nhắc việc (0091): brand chưa chốt Kế Hoạch Tháng cho tháng sau → nút nhảy sang tab đó.
   onOpenMonthPlan?: () => void;
   fatigueWeekHours?: number; // ngưỡng mệt, admin vặn ở AI Training Center; mặc định FATIGUE_WEEK_HOURS
+  onCancelSession?: (id: string, reason: string) => Promise<boolean>; // 0097, dùng trong Cửa sổ Ca Live
 }
 
 const WEEKDAY_LABELS = ["CN", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"];
@@ -149,7 +150,8 @@ export default function ShiftScheduling({
   onSubmitSessionReport,
   onSessionSnapshotApplied,
   onOpenMonthPlan,
-  fatigueWeekHours = FATIGUE_WEEK_HOURS
+  fatigueWeekHours = FATIGUE_WEEK_HOURS,
+  onCancelSession
 }: ShiftSchedulingProps) {
   const admin = isAdminRole(currentRole);
   const myTalentId = activeUser.assignedTalentId;
@@ -1139,6 +1141,7 @@ export default function ShiftScheduling({
             onSubmitSessionReport={onSubmitSessionReport}
             onSessionSnapshotApplied={onSessionSnapshotApplied}
             onUpdateSession={admin ? onUpdateSession : undefined}
+            onCancelSession={admin ? onCancelSession : undefined}
           />
         ) : null;
       })()}

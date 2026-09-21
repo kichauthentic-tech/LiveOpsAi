@@ -47,6 +47,7 @@ interface SessionLedgerProps {
   onSessionSnapshotApplied: (session: LiveSession) => void;
   onUpdateSession?: (session: LiveSession) => Promise<boolean>;
   onDeleteSession?: (id: string) => Promise<void>;
+  onCancelSession?: (id: string, reason: string) => Promise<boolean>;
 }
 
 
@@ -111,7 +112,8 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
   onSubmitSessionReport,
   onSessionSnapshotApplied,
   onUpdateSession,
-  onDeleteSession
+  onDeleteSession,
+  onCancelSession
 }) => {
   const isBrandView = variant === "brand";
   const today = getTodayDate();
@@ -410,6 +412,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
           onSessionSnapshotApplied={onSessionSnapshotApplied}
           onUpdateSession={isBrandView ? undefined : onUpdateSession}
           onDeleteSession={onDeleteSession}
+          onCancelSession={onCancelSession}
         />
       )}
     </div>

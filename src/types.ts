@@ -194,6 +194,8 @@ export interface LiveSession {
   // TikTok còn cập nhật trễ (migration 0078); "tiktok_reconciled" = đã đối soát chốt.
   dataSource?: "manual" | "live_snapshot" | "tiktok_reconciled";
   reconciledAt?: string;
+  cancelReason?: string; // 0097 — lý do huỷ ca (ops)
+  cancelledAt?: string;
   tiktokRoomId?: string;
   // Số liệu đọc từ snapshot theo ca (migration 0078). Giờ live THỰC TẾ tách hẳn khỏi
   // startTime/endTime (giờ kế hoạch) — không bao giờ ghi đè lẫn nhau.

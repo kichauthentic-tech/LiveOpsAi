@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, Circle, Link2, Pencil, Trash2, X } from "lucide-react";
+import { AlertTriangle, Ban, CheckCircle2, Circle, Link2, Pencil, Trash2, X } from "lucide-react";
 import { Brand, LiveSession, Studio, Talent, UserRole } from "../types";
 import { timeRangesOverlap } from "../lib/dateUtils";
 import { formatCurrencyAdaptive } from "../lib/formatCurrency";
@@ -51,6 +51,8 @@ export interface SessionWindowProps {
   onSessionSnapshotApplied?: (session: LiveSession) => void;
   onUpdateSession?: (session: LiveSession) => Promise<boolean>;
   onDeleteSession?: (id: string) => Promise<void>;
+  // 0097: huỷ ca (ops) — ca chưa có số liệu; slot đã chốt về 'cancelled', talent được báo.
+  onCancelSession?: (id: string, reason: string) => Promise<boolean>;
 }
 
 const OPS_ROLES: UserRole[] = ["ceo", "operations", "admin"];
@@ -97,7 +99,8 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
   onSubmitSessionReport,
   onSessionSnapshotApplied,
   onUpdateSession,
-  onDeleteSession
+  onDeleteSession,
+  onCancelSession
 }) => {
   const isBrandView = viewer.role === "brand";
   const isOps = OPS_ROLES.includes(viewer.role);
@@ -111,6 +114,9 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelOpen, setCancelOpen] = useState(false);
   const [edit, setEdit] = useState({ date: s.date, startTime: s.startTime, endTime: s.endTime, studioId: s.studioId, hostId: s.hostId, coHostId: s.coHostId ?? "" });
   useEffect(() => {
     setEditingReport(false);
@@ -188,6 +194,15 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
     }
   };
 
+  const hasData = s.dataSource !== "manual" || (s.actualGmv ?? 0) > 0 || (s.totalOrders ?? 0) > 0;
+  const canCancel = isOps && !!onCancelSession && s.status !== "Cancelled" && !hasData;
+  const doCancel = async () => {
+    if (!onCancelSession) return;
+    setCancelling(true);
+    const ok = await onCancelSession(s.id, cancelReason.trim());
+    setCancelling(false);
+    if (ok) { setCancelOpen(false); setCancelReason(""); }
+  };
   const snapshotDone = hasSnapshot(s);
   const reportDone = hasReport(s);
 
@@ -231,7 +246,12 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
         </div>
 
         <div className="p-4 space-y-5">
-          {missing.length > 0 && (
+          {s.status === "Cancelled" && (
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-base)] p-3 text-xs text-[var(--text-muted)]">
+              Ca đã huỷ{s.cancelledAt ? ` lúc ${new Date(s.cancelledAt).toLocaleString("vi-VN")}` : ""}{s.cancelReason ? ` — lý do: ${s.cancelReason}` : ""}.
+            </div>
+          )}
+          {missing.length > 0 && s.status !== "Cancelled" && (
             <div className="rounded-xl border border-amber-800 bg-amber-950/50 p-3 text-xs text-amber-200 flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
               <span>Còn thiếu để chốt: {missing.map((m) => MISSING_LABEL[m]).join(" · ")}</span>
@@ -423,11 +443,31 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
             </section>
           )}
 
-          {isOps && onDeleteSession && (
-            <div className="pt-3 border-t border-[var(--border)]">
-              <button onClick={handleDelete} disabled={deleting} className="inline-flex items-center gap-1.5 text-[11px] text-[var(--text-faint)] hover:text-rose-400 disabled:opacity-40 transition-colors">
-                <Trash2 className="w-3.5 h-3.5" /> {deleting ? "Đang xoá..." : "Xoá ca này"}
-              </button>
+          {isOps && (canCancel || (onDeleteSession && !hasData)) && (
+            <div className="pt-3 border-t border-[var(--border)] space-y-2">
+              {canCancel && !cancelOpen && (
+                <button onClick={() => setCancelOpen(true)} className="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-300 hover:text-amber-200 transition-colors">
+                  <Ban className="w-3.5 h-3.5" /> Huỷ ca này
+                </button>
+              )}
+              {canCancel && cancelOpen && (
+                <div className="rounded-xl border border-amber-800 bg-amber-950/40 p-3 space-y-2">
+                  <p className="text-xs text-amber-200">Huỷ ca {fmtDate(s.date)} {s.startTime}–{s.endTime}: ca về "Đã huỷ", ca mở đang gắn về "cancelled", host/trợ được báo nếu ca chưa diễn ra.</p>
+                  <input value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} placeholder="Lý do (vd: brand đổi lịch, host bận không thay được)" className={inputCls} />
+                  <div className="flex gap-2 justify-end">
+                    <button onClick={() => setCancelOpen(false)} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] text-[var(--text-muted)] font-bold text-[11px]">Không</button>
+                    <button onClick={doCancel} disabled={cancelling} className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-60 text-white font-bold text-[11px]">{cancelling ? "Đang huỷ..." : "Xác nhận huỷ"}</button>
+                  </div>
+                </div>
+              )}
+              {onDeleteSession && !hasData && (
+                <div>
+                  <button onClick={handleDelete} disabled={deleting} className="inline-flex items-center gap-1.5 text-[11px] text-[var(--text-faint)] hover:text-rose-400 disabled:opacity-40 transition-colors">
+                    <Trash2 className="w-3.5 h-3.5" /> {deleting ? "Đang xoá..." : "Xoá hẳn ca này"}
+                  </button>
+                  <span className="text-[10px] text-[var(--text-faint)] ml-2">— ca mở đang gắn sẽ về "mở" để chốt người khác; ca đã có số liệu không xoá được.</span>
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -75,6 +75,7 @@ interface LiveCalendarProps {
   onSubmitSessionReport?: (sessionId: string, input: SessionReportInput) => Promise<boolean>;
   onSessionSnapshotApplied?: (session: LiveSession) => void;
   onDeleteSession?: (id: string) => Promise<void>;
+  onCancelSession?: (id: string, reason: string) => Promise<boolean>;
 }
 
 // Chiều cao vùng card trong 1 ô lịch tháng — đủ cho ~2 card, ô nào nhiều hơn thì cuộn dọc
@@ -123,7 +124,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   onDeleteScheme,
   onSubmitSessionReport,
   onSessionSnapshotApplied,
-  onDeleteSession
+  onDeleteSession,
+  onCancelSession
 }) => {
   const moderators = users.filter((u) => u.role === "moderator");
   // Sync sessions with propSessions so clean test mode is respected
@@ -1853,6 +1855,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
           onSessionSnapshotApplied={onSessionSnapshotApplied}
           onUpdateSession={onUpdateSession}
           onDeleteSession={onDeleteSession}
+          onCancelSession={onCancelSession}
         />
       )}
 

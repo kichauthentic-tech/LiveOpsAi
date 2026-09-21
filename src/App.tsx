@@ -4,7 +4,7 @@ import { ALL_PERMISSION_DEFINITIONS } from "./data/mockData";
 import { fetchTalents, updateTalent, updateMyTalentProfile, deleteTalent } from "./lib/db/talents";
 import { fetchStudios, createStudio, updateStudio, deleteStudio } from "./lib/db/studios";
 import { fetchEquipments, createEquipment, updateEquipment, deleteEquipment } from "./lib/db/equipments";
-import { fetchSessions, createSession, updateSession, deleteSession, completePastSessions } from "./lib/db/sessions";
+import { fetchSessions, createSession, updateSession, deleteSession, completePastSessions, cancelSession } from "./lib/db/sessions";
 import { submitSessionReport, SessionReportInput } from "./lib/db/sessionReports";
 import { fetchBrands, createBrand, updateBrand, deleteBrand } from "./lib/db/brands";
 import { fetchUsers, updateUserProfile, inviteUser, deleteUserAccount, InviteUserPayload } from "./lib/db/users";
@@ -1153,8 +1153,22 @@ export default function App() {
     try {
       await deleteSession(id);
       setSessions((prev) => prev.filter((s) => s.id !== id));
+      // 0097: trigger DB đã trả slot đã chốt về 'open' — đồng bộ lại state slot.
+      setShiftSlots((prev) => prev.map((sl) => (sl.sessionId === id ? { ...sl, status: "open", sessionId: undefined } : sl)));
     } catch (e: any) {
       window.alert(`Không thể xóa Live Session: ${e.message ?? e}`);
+    }
+  };
+  // Huỷ ca (0097): RPC đổi ca + slot trong 1 transaction; trigger 0083 tự báo host/trợ nếu ca chưa diễn ra.
+  const handleCancelSession = async (id: string, reason: string): Promise<boolean> => {
+    try {
+      const updated = await cancelSession(id, reason);
+      setSessions((prev) => prev.map((s) => (s.id === id ? updated : s)));
+      setShiftSlots((prev) => prev.map((sl) => (sl.sessionId === id && sl.status === "finalized" ? { ...sl, status: "cancelled" } : sl)));
+      return true;
+    } catch (e: any) {
+      window.alert(`Không huỷ được ca: ${e.message ?? e}`);
+      return false;
     }
   };
 
@@ -1907,6 +1921,7 @@ export default function App() {
                     onSessionSnapshotApplied={handleSessionReconciled}
                     onUpdateSession={handleUpdateSession}
                     onDeleteSession={handleDeleteSession}
+                    onCancelSession={handleCancelSession}
                   />
                 )}
 
@@ -1931,6 +1946,7 @@ export default function App() {
                         onSessionSnapshotApplied={handleSessionReconciled}
                         onUpdateSession={handleUpdateSession}
                         onDeleteSession={handleDeleteSession}
+                    onCancelSession={handleCancelSession}
                         onOpenScheduling={() => setActiveTab("shift_scheduling")}
                       />
                     )}
@@ -1960,6 +1976,7 @@ export default function App() {
                     onSubmitSessionReport={handleSubmitSessionReport}
                     onSessionSnapshotApplied={handleSessionReconciled}
                     onDeleteSession={handleDeleteSession}
+                    onCancelSession={handleCancelSession}
                   />
                     )}
                   </div>
@@ -2001,6 +2018,7 @@ export default function App() {
                     onSessionSnapshotApplied={handleSessionReconciled}
                     onOpenMonthPlan={() => setActiveTab("month_plan")}
                     fatigueWeekHours={engineParams.fatigueWeekHours}
+                    onCancelSession={handleCancelSession}
                   />
                 )}
 
@@ -2058,6 +2076,7 @@ export default function App() {
                     onSubmitSessionReport={handleSubmitSessionReport}
                     onSessionSnapshotApplied={handleSessionReconciled}
                     onDeleteSession={handleDeleteSession}
+                    onCancelSession={handleCancelSession}
                     onAddSession={handleAddSession}
                     onUpdateSession={handleUpdateSession}
                     onCreateSlot={handleCreateShiftSlot}

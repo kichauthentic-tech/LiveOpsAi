@@ -30,6 +30,7 @@ export interface OpsBoardProps {
   onSessionSnapshotApplied: (session: LiveSession) => void;
   onUpdateSession?: (session: LiveSession) => Promise<boolean>;
   onDeleteSession?: (id: string) => Promise<void>;
+  onCancelSession?: (id: string, reason: string) => Promise<boolean>;
   // Ca chưa có người → nhảy sang Đăng Ký & Chốt Lịch.
   onOpenScheduling?: () => void;
 }
@@ -80,6 +81,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
   onSessionSnapshotApplied,
   onUpdateSession,
   onDeleteSession,
+  onCancelSession,
   onOpenScheduling
 }) => {
   const today = getTodayDate();
@@ -275,6 +277,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
           onSessionSnapshotApplied={onSessionSnapshotApplied}
           onUpdateSession={mode === "ops" ? onUpdateSession : undefined}
           onDeleteSession={mode === "ops" ? onDeleteSession : undefined}
+          onCancelSession={mode === "ops" ? onCancelSession : undefined}
         />
       )}
     </div>

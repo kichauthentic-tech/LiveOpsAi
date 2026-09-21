@@ -50,6 +50,7 @@ interface BrandCalendarProps {
   onSubmitSessionReport?: (sessionId: string, input: SessionReportInput) => Promise<boolean>;
   onSessionSnapshotApplied?: (session: LiveSession) => void;
   onDeleteSession?: (id: string) => Promise<void>;
+  onCancelSession?: (id: string, reason: string) => Promise<boolean>;
 }
 
 const WEEKDAY_LABELS = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
@@ -115,7 +116,8 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
   currentRole,
   onSubmitSessionReport,
   onSessionSnapshotApplied,
-  onDeleteSession
+  onDeleteSession,
+  onCancelSession
 }) => {
   const today = new Date();
   const [month, setMonth] = useState(`${today.getFullYear()}-${`${today.getMonth() + 1}`.padStart(2, "0")}`);
@@ -582,6 +584,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
           onSessionSnapshotApplied={onSessionSnapshotApplied}
           onUpdateSession={canManage ? onUpdateSession : undefined}
           onDeleteSession={canManage ? onDeleteSession : undefined}
+          onCancelSession={canManage ? onCancelSession : undefined}
         />
       )}
 

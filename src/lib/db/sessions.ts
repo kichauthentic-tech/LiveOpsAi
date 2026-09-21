@@ -36,6 +36,8 @@ interface DbLiveSession {
   ai_analysis: LiveSession["aiAnalysis"] | null;
   data_source: LiveSession["dataSource"] | null;
   reconciled_at: string | null;
+  cancel_reason?: string | null;
+  cancelled_at?: string | null;
   tiktok_room_id: string | null;
   // Snapshot theo ca (migration 0078) — chỉ đọc ở đây, đường ghi duy nhất là RPC
   // apply_session_live_snapshot/delete_session_live_snapshot (xem sessionToDb bên dưới).
@@ -186,6 +188,8 @@ function sessionFromDb(row: DbLiveSession): Omit<LiveSession, "skus" | "checklis
     aiAnalysis: row.ai_analysis ?? undefined,
     dataSource: row.data_source ?? "manual",
     reconciledAt: row.reconciled_at ?? undefined,
+    cancelReason: row.cancel_reason || undefined,
+    cancelledAt: row.cancelled_at ?? undefined,
     tiktokRoomId: row.tiktok_room_id ?? undefined,
     actualStartAt: row.actual_start_at ?? undefined,
     actualEndAt: row.actual_end_at ?? undefined,
@@ -467,6 +471,15 @@ export async function fetchSessionById(id: string): Promise<LiveSession> {
   const row = data as DbLiveSession;
   const { skus, checklist, metrics, reports } = await fetchChildRowsForSessions([row.id]);
   return assembleSessions([row], skus, checklist, metrics, reports)[0];
+}
+
+// Huỷ ca (0097): ca -> Cancelled + slot đã chốt -> cancelled trong 1 transaction; chặn nếu ca đã có số.
+export async function cancelSession(id: string, reason: string): Promise<LiveSession> {
+  const { data, error } = await supabase.rpc("cancel_session", { p_session_id: id, p_reason: reason });
+  if (error) throw error;
+  const rows = [data as DbLiveSession];
+  const { skus, checklist, metrics, reports } = await fetchChildRowsForSessions([id]);
+  return assembleSessions(rows, skus, checklist, metrics, reports)[0];
 }
 
 export async function deleteSession(id: string): Promise<void> {
