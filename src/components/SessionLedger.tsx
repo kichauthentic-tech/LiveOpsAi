@@ -1,15 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  AlertTriangle,
-  BookOpen,
-  CheckCircle2,
-  ChevronRight,
-  Circle,
-  Link2,
-  Trash2,
-  X
-} from "lucide-react";
-import { Brand, LiveSession, UserRole } from "../types";
+import { BookOpen, CheckCircle2, ChevronRight, Circle, Link2 } from "lucide-react";
+import { Brand, LiveSession, Studio, Talent, UserRole } from "../types";
 import { getTodayDate } from "../lib/dateUtils";
 import { formatCurrencyAdaptive } from "../lib/formatCurrency";
 import { sessionHours } from "../lib/performance/hostPerformance";
@@ -29,15 +20,12 @@ import {
   linkedSessions,
   missingSteps,
   needsClosing,
-  sessionCounters,
   sessionIncidents,
-  sessionRatios,
   summarize
 } from "../lib/sessionLedger";
 import { DataSourceBadge } from "./common/DataSourceBadge";
 import { BrandLogo } from "./ui/BrandLogo";
-import { SessionLiveSnapshotUpload } from "./SessionLiveSnapshotUpload";
-import { SessionReportForm } from "./SessionReportForm";
+import { SessionWindow } from "./SessionWindow";
 
 // Sổ Ca — một component, hai biến thể (cùng cách SessionEventCard dùng chung cho 2 lịch):
 //  - agency: mọi brand, thấy target/studio/trợ live, 3 ô tiến trình dữ liệu, mọi sự cố, hành động.
@@ -51,12 +39,16 @@ interface SessionLedgerProps {
   brands: Brand[];
   brandId?: string; // bắt buộc với variant brand
   currentRole: UserRole;
+  myTalentId?: string;
+  // Cho Cửa sổ Ca Live: ops sửa giờ/studio/người ngay trong cửa sổ (agency).
+  studios?: Studio[];
+  talents?: Talent[];
   onSubmitSessionReport: (sessionId: string, input: SessionReportInput) => Promise<boolean>;
   onSessionSnapshotApplied: (session: LiveSession) => void;
+  onUpdateSession?: (session: LiveSession) => Promise<boolean>;
   onDeleteSession?: (id: string) => Promise<void>;
 }
 
-const OPS_ROLES: UserRole[] = ["ceo", "operations", "admin"];
 
 const STATUS_LABEL: Record<LiveSession["status"], string> = {
   "Live Now": "Đang live",
@@ -103,9 +95,6 @@ function fmtInt(n: number | undefined): string {
   return (n ?? 0).toLocaleString("vi-VN");
 }
 
-function fmtPct(n: number): string {
-  return `${n.toLocaleString("vi-VN", { maximumFractionDigits: 2 })}%`;
-}
 
 const inputCls =
   "bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs text-[var(--text)] focus:outline-none focus:border-[var(--accent)]";
@@ -116,12 +105,15 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
   brands,
   brandId,
   currentRole,
+  myTalentId,
+  studios,
+  talents,
   onSubmitSessionReport,
   onSessionSnapshotApplied,
+  onUpdateSession,
   onDeleteSession
 }) => {
   const isBrandView = variant === "brand";
-  const isOps = OPS_ROLES.includes(currentRole);
   const today = getTodayDate();
 
   const scoped = useMemo(
@@ -405,17 +397,18 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
       </div>
 
       {openSession && (
-        <SessionDrawer
+        <SessionWindow
           session={openSession}
           brand={brandsById.get(openSession.brandId)}
-          isBrandView={isBrandView}
-          isOps={isOps}
+          viewer={{ role: currentRole, myTalentId }}
           today={today}
-          linkedIds={linked.get(openSession.id) ?? []}
           allSessions={sessions}
+          studios={isBrandView ? undefined : studios}
+          talents={isBrandView ? undefined : talents}
           onClose={() => setOpenId(null)}
           onSubmitSessionReport={onSubmitSessionReport}
           onSessionSnapshotApplied={onSessionSnapshotApplied}
+          onUpdateSession={isBrandView ? undefined : onUpdateSession}
           onDeleteSession={onDeleteSession}
         />
       )}
@@ -475,280 +468,3 @@ const PipelineDots: React.FC<{ session: LiveSession; today: string }> = ({ sessi
     </div>
   );
 };
-
-interface SessionDrawerProps {
-  session: LiveSession;
-  brand?: Brand;
-  isBrandView: boolean;
-  isOps: boolean;
-  today: string;
-  linkedIds: string[];
-  allSessions: LiveSession[];
-  onClose: () => void;
-  onSubmitSessionReport: (sessionId: string, input: SessionReportInput) => Promise<boolean>;
-  onSessionSnapshotApplied: (session: LiveSession) => void;
-  onDeleteSession?: (id: string) => Promise<void>;
-}
-
-const SessionDrawer: React.FC<SessionDrawerProps> = ({
-  session: s,
-  brand,
-  isBrandView,
-  isOps,
-  today,
-  linkedIds,
-  allSessions,
-  onClose,
-  onSubmitSessionReport,
-  onSessionSnapshotApplied,
-  onDeleteSession
-}) => {
-  const [editingReport, setEditingReport] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  useEffect(() => setEditingReport(false), [s.id]);
-
-  const counters = sessionCounters(s);
-  const ratios = sessionRatios(s);
-  const incidents = sessionIncidents(s).filter((i) => !isBrandView || !i.internal);
-  const missing = isBrandView ? [] : missingSteps(s, today);
-  const planHours = sessionHours({ ...s, liveDurationMinutes: undefined });
-  const liveHours = s.liveDurationMinutes ? s.liveDurationMinutes / 60 : 0;
-  const gmvPerHour = liveHours > 0 ? (s.actualGmv ?? 0) / liveHours : planHours > 0 ? (s.actualGmv ?? 0) / planHours : 0;
-  const linkedLabel = linkedIds
-    .map((id) => allSessions.find((x) => x.id === id))
-    .filter((x): x is LiveSession => !!x)
-    .map((x) => `${fmtDate(x.date)} ${x.startTime}–${x.endTime} (${x.hostName || "chưa gán"})`);
-
-  const handleDelete = async () => {
-    if (!onDeleteSession) return;
-    if (!window.confirm(`Xoá ca ${fmtDate(s.date)} ${s.startTime}–${s.endTime} (${s.brandName})? Không hoàn tác được.`)) return;
-    setDeleting(true);
-    try {
-      await onDeleteSession(s.id);
-      onClose();
-    } finally {
-      setDeleting(false);
-    }
-  };
-
-  return (
-    <>
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-[2px] z-40" onClick={onClose} />
-      <aside className="fixed inset-y-0 right-0 z-50 w-full sm:w-[520px] bg-[var(--surface)] border-l border-[var(--border)] shadow-2xl overflow-y-auto">
-        <div className="sticky top-0 bg-[var(--surface)] border-b border-[var(--border)] p-4 flex items-start justify-between gap-3 z-10">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <BrandLogo brand={brand ?? { name: s.brandName, logo: "" }} size="sm" />
-              <div className="min-w-0">
-                <p className="text-sm font-black text-[var(--text)] truncate">
-                  {s.brandName} · {fmtDate(s.date)} · {s.startTime}–{s.endTime}
-                </p>
-                <p className="text-[11px] text-[var(--text-muted)] truncate">
-                  Host {s.hostName || (isBrandView ? "—" : "chưa gán")}
-                  {!isBrandView && s.coHostName ? ` · Trợ ${s.coHostName}` : ""}
-                  {!isBrandView && s.studioName ? ` · ${s.studioName}` : ""}
-                </p>
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-1.5 mt-2">
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${STATUS_CLS[s.status]}`}>{STATUS_LABEL[s.status]}</span>
-              {isBrandView ? <TrustBadge session={s} /> : <DataSourceBadge dataSource={s.dataSource} />}
-              {!isBrandView && s.isBackfill && (
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-[var(--surface-elevated)] text-[var(--text-faint)] border-[var(--border)]">
-                  nạp bù từ file
-                </span>
-              )}
-              {s.reconciledAt && (
-                <span className="text-[10px] text-[var(--text-faint)]">
-                  đối soát {new Date(s.reconciledAt).toLocaleDateString("vi-VN")}
-                </span>
-              )}
-            </div>
-          </div>
-          <button onClick={onClose} className="text-[var(--text-faint)] hover:text-[var(--text)] shrink-0">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="p-4 space-y-5">
-          {missing.length > 0 && (
-            <div className="rounded-xl border border-amber-800 bg-amber-950/50 p-3 text-xs text-amber-200 flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>Còn thiếu để chốt: {missing.map((m) => MISSING_LABEL[m]).join(" · ")}</span>
-            </div>
-          )}
-
-          {/* Kế hoạch vs thực tế */}
-          <section>
-            <h4 className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-bold mb-2">Kế hoạch vs thực tế</h4>
-            <div className="grid grid-cols-2 gap-2">
-              <KV label="Giờ kế hoạch" value={`${s.startTime}–${s.endTime} (${fmtHours(planHours)})`} />
-              <KV
-                label="Giờ live thật"
-                value={s.actualStartAt ? `${fmtTime(s.actualStartAt)}–${fmtTime(s.actualEndAt)} (${fmtHours(liveHours)})` : "chưa có file"}
-                muted={!s.actualStartAt}
-              />
-              {!isBrandView && <KV label="Target GMV" value={s.targetGmv ? formatCurrencyAdaptive(s.targetGmv) : "chưa có target"} muted={!s.targetGmv} />}
-              <KV label="GMV thực tế" value={s.actualGmv ? formatCurrencyAdaptive(s.actualGmv) : "—"} accent={!!s.actualGmv} />
-              {!isBrandView && s.targetGmv > 0 && (
-                <KV label="Đạt target" value={fmtPct(((s.actualGmv ?? 0) / s.targetGmv) * 100)} />
-              )}
-              <KV label="GMV / giờ" value={gmvPerHour > 0 ? formatCurrencyAdaptive(gmvPerHour) : "—"} />
-            </div>
-          </section>
-
-          {/* Số liệu ca */}
-          <section>
-            <h4 className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-bold mb-2">Số liệu ca</h4>
-            {counters ? (
-              <>
-                <div className="grid grid-cols-3 gap-2">
-                  <KV label="Đơn" value={fmtInt(counters.orders)} />
-                  <KV label="Sản phẩm bán" value={fmtInt(counters.itemsSold)} />
-                  <KV label="Đơn SKU" value={fmtInt(counters.skuOrders)} />
-                  <KV label="Lượt xem" value={fmtInt(counters.views)} />
-                  <KV label="Hiển thị" value={fmtInt(counters.impressions)} />
-                  <KV label="Hiển thị SP" value={fmtInt(counters.productImpressions)} />
-                  <KV label="Click SP" value={fmtInt(counters.productClicks)} />
-                  <KV label="Follow mới" value={fmtInt(counters.newFollowers)} />
-                  <KV label="Bình luận" value={fmtInt(counters.comments)} />
-                  <KV label="Chia sẻ" value={fmtInt(counters.shares)} />
-                  <KV label="Thích" value={fmtInt(counters.likes)} />
-                  <KV label="Peak viewers" value={fmtInt(s.peakViewers)} />
-                </div>
-                {ratios && (
-                  <div className="grid grid-cols-3 gap-2 mt-2">
-                    <KV label="AOV" value={formatCurrencyAdaptive(ratios.aov)} />
-                    <KV label="CTR" value={fmtPct(ratios.ctr)} />
-                    <KV label="CTOR" value={fmtPct(ratios.ctor)} />
-                    <KV label="LIVE CTR" value={fmtPct(ratios.liveCtr)} />
-                    <KV label="SKU order rate" value={fmtPct(ratios.skuOrderRate)} />
-                    <KV label="Show GPM" value={formatCurrencyAdaptive(ratios.showGpm)} />
-                  </div>
-                )}
-                <p className="text-[10px] text-[var(--text-faint)] mt-2">
-                  Tỷ lệ tính lại từ số đã tách theo ca, không lấy cột tỷ lệ cộng dồn của file.
-                </p>
-              </>
-            ) : s.actualGmv || s.totalOrders || s.totalViews ? (
-              <>
-                <div className="grid grid-cols-3 gap-2">
-                  <KV label="Đơn" value={fmtInt(s.totalOrders)} />
-                  <KV label="Lượt xem" value={fmtInt(s.totalViews)} />
-                  <KV label="Peak viewers" value={fmtInt(s.peakViewers)} />
-                </div>
-                <p className="text-[10px] text-amber-300 mt-2">Số tự khai tay — chưa có file snapshot nên không tính được tỷ lệ.</p>
-              </>
-            ) : (
-              <p className="text-xs text-[var(--text-faint)] italic">Chưa có số liệu.</p>
-            )}
-          </section>
-
-          {/* Room / ca nối */}
-          {!isBrandView && ((s.liveRoomIds?.length ?? 0) > 0 || linkedLabel.length > 0) && (
-            <section>
-              <h4 className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-bold mb-2">Phiên TikTok</h4>
-              {(s.liveRoomIds?.length ?? 0) > 0 && (
-                <p className="text-xs text-[var(--text-muted)] font-mono break-all">Room: {s.liveRoomIds!.join(", ")}</p>
-              )}
-              {linkedLabel.length > 0 && (
-                <p className="text-xs text-sky-300 mt-1 flex items-start gap-1">
-                  <Link2 className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                  <span>Ca nối, chung room với: {linkedLabel.join("; ")}</span>
-                </p>
-              )}
-            </section>
-          )}
-
-          {/* Report ca */}
-          <section>
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-bold">Report ca</h4>
-              {isOps && !editingReport && (
-                <button
-                  onClick={() => setEditingReport(true)}
-                  className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-emerald-950 text-emerald-300 border border-emerald-800 hover:bg-emerald-900 transition-colors"
-                >
-                  {s.report ? "Sửa report" : "Nhập report"}
-                </button>
-              )}
-            </div>
-            {editingReport ? (
-              <SessionReportForm
-                session={s}
-                onSubmit={async (input) => {
-                  const ok = await onSubmitSessionReport(s.id, input);
-                  if (ok) setEditingReport(false);
-                  return ok;
-                }}
-                onCancel={() => setEditingReport(false)}
-                canOverrideMetrics={isOps}
-              />
-            ) : s.report ? (
-              <div className="space-y-2">
-                <div className="flex flex-wrap gap-1">
-                  {incidents.length === 0 && <span className="text-xs text-emerald-300">Không có sự cố</span>}
-                  {incidents.map((i) => (
-                    <span key={i.key} className="text-[10px] font-bold px-1.5 py-0.5 rounded border bg-rose-950/60 text-rose-300 border-rose-800">
-                      {i.label}
-                    </span>
-                  ))}
-                </div>
-                {s.report.statusNote && <p className="text-xs text-[var(--text)] whitespace-pre-wrap">{s.report.statusNote}</p>}
-                {(s.report.dashboardLink1 || s.report.dashboardLink2) && (
-                  <div className="flex flex-wrap gap-2 text-[11px]">
-                    {s.report.dashboardLink1 && (
-                      <a href={s.report.dashboardLink1} target="_blank" rel="noreferrer" className="text-[var(--accent-text)] underline">
-                        Dashboard 1
-                      </a>
-                    )}
-                    {s.report.dashboardLink2 && (
-                      <a href={s.report.dashboardLink2} target="_blank" rel="noreferrer" className="text-[var(--accent-text)] underline">
-                        Dashboard 2
-                      </a>
-                    )}
-                  </div>
-                )}
-                {s.report.submittedAt && (
-                  <p className="text-[10px] text-[var(--text-faint)]">
-                    Nhập lúc {new Date(s.report.submittedAt).toLocaleString("vi-VN")}
-                    {s.report.submittedByRole ? ` · ${s.report.submittedByRole}` : ""}
-                  </p>
-                )}
-              </div>
-            ) : (
-              <p className="text-xs text-[var(--text-faint)] italic">Chưa có report.</p>
-            )}
-          </section>
-
-          {/* Snapshot — chỉ agency; RPC tự guard quyền, UI chỉ giấu với brand */}
-          {!isBrandView && isOps && !s.isBackfill && (
-            <section>
-              <h4 className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-bold mb-2">File số liệu (snapshot)</h4>
-              <SessionLiveSnapshotUpload session={s} onApplied={onSessionSnapshotApplied} />
-            </section>
-          )}
-
-          {!isBrandView && isOps && onDeleteSession && (
-            <div className="pt-3 border-t border-[var(--border)]">
-              <button
-                onClick={handleDelete}
-                disabled={deleting}
-                className="inline-flex items-center gap-1.5 text-[11px] text-[var(--text-faint)] hover:text-rose-400 disabled:opacity-40 transition-colors"
-              >
-                <Trash2 className="w-3.5 h-3.5" /> {deleting ? "Đang xoá..." : "Xoá ca này"}
-              </button>
-            </div>
-          )}
-        </div>
-      </aside>
-    </>
-  );
-};
-
-const KV: React.FC<{ label: string; value: string; muted?: boolean; accent?: boolean }> = ({ label, value, muted, accent }) => (
-  <div className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2.5 py-2">
-    <p className="text-[10px] text-[var(--text-faint)]">{label}</p>
-    <p className={`text-xs font-bold ${accent ? "text-[var(--success)]" : muted ? "text-[var(--text-faint)] font-normal italic" : "text-[var(--text)]"}`}>{value}</p>
-  </div>
-);

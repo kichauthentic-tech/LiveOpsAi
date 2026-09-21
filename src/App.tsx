@@ -1869,8 +1869,12 @@ export default function App() {
                     sessions={activeSessions}
                     brands={activeBrands}
                     currentRole={currentRole}
+                    myTalentId={activeUser.assignedTalentId}
+                    studios={activeStudios}
+                    talents={activeTalents}
                     onSubmitSessionReport={handleSubmitSessionReport}
                     onSessionSnapshotApplied={handleSessionReconciled}
+                    onUpdateSession={handleUpdateSession}
                     onDeleteSession={handleDeleteSession}
                   />
                 )}
@@ -1898,6 +1902,9 @@ export default function App() {
                     onAddScheme={handleAddPromoScheme}
                     onUpdateScheme={handleUpdatePromoScheme}
                     onDeleteScheme={handleDeletePromoScheme}
+                    onSubmitSessionReport={handleSubmitSessionReport}
+                    onSessionSnapshotApplied={handleSessionReconciled}
+                    onDeleteSession={handleDeleteSession}
                   />
                 )}
 

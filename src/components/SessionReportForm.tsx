@@ -137,7 +137,7 @@ export function SessionReportForm({ session, onSubmit, onCancel, canOverrideMetr
           ) : (
             <>
               Ca chưa có file số liệu — số nhập ở đây là tạm tính, sẽ bị đối soát cuối kỳ ghi đè. Có file
-              Creator-Live-Performance thì up ở mục "Số Liệu Thật Của Ca" thay vì gõ.
+              Creator-Live-Performance thì up ở Bước 1 phía trên thay vì gõ.
             </>
           )}
         </div>

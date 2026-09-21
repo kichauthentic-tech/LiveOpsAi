@@ -36,8 +36,7 @@ import { CampaignDayRibbon } from "./ui/CampaignDayRibbon";
 import { PosterDayCell } from "./ui/PosterCalendarGrid";
 import { getBrandTheme } from "../lib/brandTheme";
 import { SessionEventCard, SessionCardTone, buildSlotMeta } from "./ui/SessionEventCard";
-import { SessionReportForm } from "./SessionReportForm";
-import { SessionLiveSnapshotUpload } from "./SessionLiveSnapshotUpload";
+import { SessionWindow } from "./SessionWindow";
 import { SessionReportInput } from "../lib/db/sessionReports";
 import { fetchBrandMonthlyCommitments } from "../lib/db/brandContracts";
 import { fetchPlanStatuses } from "../lib/db/monthPlans";
@@ -162,7 +161,7 @@ export default function ShiftScheduling({
   const [busySlotId, setBusySlotId] = useState<string | null>(null);
 
   // Talent tự nhập report cho đúng ca của mình (chỉ 1 form mở tại 1 thời điểm).
-  const [openReportSessionId, setOpenReportSessionId] = useState<string | null>(null);
+  const [openSessionId, setOpenSessionId] = useState<string | null>(null);
 
   // Giai đoạn 15c — thay người khẩn cấp trên 1 ca đã chốt (Host/Trợ live báo bận
   // sát giờ live). Danh sách ứng viên thay thế lấy từ session_availability của
@@ -1041,36 +1040,19 @@ export default function ShiftScheduling({
                               </div>
                             </div>
                           )}
-                          {(admin || myTalentId === session.hostId || myTalentId === session.coHostId) && (
-                            <div className="pt-2 border-t border-[var(--border)]/80">
-                              <p className="text-[11px] font-bold text-[var(--text-muted)] mb-1.5">Số Liệu Thật Của Ca</p>
-                              <SessionLiveSnapshotUpload session={session} onApplied={onSessionSnapshotApplied} />
-                            </div>
-                          )}
-                          {!admin && (myTalentId === session.hostId || myTalentId === session.coHostId) && (
-                            <div className="pt-2 border-t border-[var(--border)]/80">
-                              {openReportSessionId === session.id ? (
-                                <SessionReportForm
-                                  session={session}
-                                  onSubmit={(input) => onSubmitSessionReport(session.id, input)}
-                                  onCancel={() => setOpenReportSessionId(null)}
-                                />
-                              ) : (
-                                <button
-                                  onClick={() => setOpenReportSessionId(session.id)}
-                                  className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-emerald-950 text-emerald-300 border border-emerald-800 hover:bg-emerald-900 transition-colors"
-                                >
-                                  <Radio className="w-3.5 h-3.5" />
-                                  {session.report ? "Sửa Report Ca Này" : "Nhập Report Ca Này"}
-                                </button>
-                              )}
-                              {session.report?.submittedAt && openReportSessionId !== session.id && (
-                                <p className="text-[11px] text-[var(--text-faint)] mt-1">
-                                  Đã nhập lúc {new Date(session.report.submittedAt).toLocaleString("vi-VN")}
-                                </p>
-                              )}
-                            </div>
-                          )}
+                          {/* Cửa sổ Ca Live (2026-09-21): file số liệu + report nộp trong cửa sổ ca, không còn inline ở màn xếp lịch. */}
+                          <div className="pt-2 border-t border-[var(--border)]/80 flex flex-wrap items-center gap-2">
+                            <button
+                              onClick={() => setOpenSessionId(session.id)}
+                              className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-emerald-950 text-emerald-300 border border-emerald-800 hover:bg-emerald-900 transition-colors"
+                            >
+                              <Radio className="w-3.5 h-3.5" />
+                              {admin || myTalentId === session.hostId || myTalentId === session.coHostId ? "Mở ca · nộp số liệu & report" : "Xem ca"}
+                            </button>
+                            {session.report?.submittedAt && (
+                              <span className="text-[11px] text-[var(--text-faint)]">Report đã nhập lúc {new Date(session.report.submittedAt).toLocaleString("vi-VN")}</span>
+                            )}
+                          </div>
                         </div>
                       );
                     })()}
@@ -1111,6 +1093,25 @@ export default function ShiftScheduling({
           </div>
         )}
       </div>
+
+      {openSessionId && (() => {
+        const os = sessions.find((x) => x.id === openSessionId);
+        return os ? (
+          <SessionWindow
+            session={os}
+            brand={brandById.get(os.brandId)}
+            viewer={{ role: currentRole, myTalentId }}
+            today={today}
+            allSessions={sessions}
+            studios={admin ? studios : undefined}
+            talents={admin ? talents : undefined}
+            onClose={() => setOpenSessionId(null)}
+            onSubmitSessionReport={onSubmitSessionReport}
+            onSessionSnapshotApplied={onSessionSnapshotApplied}
+            onUpdateSession={admin ? onUpdateSession : undefined}
+          />
+        ) : null;
+      })()}
     </div>
   );
 }

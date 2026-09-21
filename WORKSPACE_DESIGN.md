@@ -365,6 +365,18 @@ Dữ liệu test còn trên DB thật sau verify D: plan CROCS 10/2026 locked v�
 
 **Thứ tự làm:** A → B → C → D — tất cả xong 2026-09-19. Còn mở: gợi ý host ngay trong lưới kế hoạch (cần host gán trong lịch sử), phối hợp đa brand (user nói không cần), ads (user nói theo % target). — engine lớp 1 + 3 + 4 (tín hiệu đầy đủ, tối ưu ràng buộc, giải thích/đường cong biên/khả thi target) + target/ca nối vào `applyAllocatedTargets` → C — lớp 2 (ngày lễ, camp học từ lịch sử, scheme) + 3 phương án + chốt lại/diff + nhắc việc → D — lớp 5 (tự hiệu chỉnh, host). Điều kiện bắt đầu B có ý nghĩa: ≥ 2 tháng ca đối soát của brand (CROCS đã đủ về khung giờ).
 
+## Tái cấu trúc màn hình Vận Hành Live — tách LẬP KẾ HOẠCH vs VẬN HÀNH HẰNG NGÀY (user chốt 2026-09-21)
+
+**Chẩn đoán (user + Claude cùng thấy):** 3 lịch tháng cho cùng một thứ (Kế Hoạch Tháng / Đăng Ký & Chốt Lịch / Lịch Vận Hành), 3 "chi tiết ca" khác nhau không cái nào đủ (modal Lịch Vận Hành chỉ sửa giờ-studio-host; thẻ bung inline ở Đăng Ký & Chốt Lịch có file + report nhưng cắt trên điện thoại; panel Sổ Ca có số liệu + snapshot, không có report), và mỗi màn trộn 2 nhịp thời gian (trước tháng vs trong ngày). Trợ live nhập report trong màn xếp lịch là sai chỗ.
+
+**Đích:**
+- *Lập kế hoạch (1 lần/tháng, ops):* **Kế Hoạch Tháng** (giữ) → **Nhân sự ca** (thay Đăng Ký & Chốt Lịch: ca thiếu người theo tuần, ai đăng ký, chốt/đổi, tải theo host; talent thấy dạng "Đăng ký ca"). Không còn lịch tháng ở đây.
+- *Vận hành hằng ngày (ops + host + trợ):* **Bảng Vận Hành** (thay Lịch Vận Hành: mặc định hôm nay, theo ngày/tuần, mỗi ca 1 dòng với "việc còn thiếu": chưa người / chưa file / chưa report / chưa đối soát; ma trận studio là 1 chế độ xem) → talent thấy thu gọn thành **"Ca của tôi"** (sắp tới + cần nộp số) — đây là nơi nhập report. **Sổ Ca** = sổ cái tra cứu/hậu kiểm. **Đối Soát** giữ.
+- *Dùng chung:* **Cửa sổ Ca Live** — một component, mọi nơi click ca đều mở nó, toàn màn hình trên điện thoại, phân quyền theo vai: talent (host/trợ của ca) thấy thông tin + số liệu 2 bước (up file Creator-Live-Performance → hiện số đọc được → khai phần máy không biết → Nộp); ops thêm sửa giờ/studio/đổi người/huỷ + badge nguồn số + hạ bậc sửa tay; brand chỉ đọc + số đã đối soát. Có mục Lịch sử (snapshot, đối soát, audit).
+- Nav "Vận Hành Live" → 2 nhóm: *Lập kế hoạch* (Kế Hoạch Tháng · Nhân sự ca) và *Vận hành* (Bảng Vận Hành · Sổ Ca · Đối Soát); Hiệu Suất Host sang nhóm phân tích. Không đụng DB.
+
+**Thứ tự:** (1) Cửa sổ Ca Live — ĐANG LÀM; (2) Bảng Vận Hành + Ca của tôi; (3) Nhân sự ca, bỏ lịch tháng trùng. Ca test để thử: CROCS 21/09/2026 08:00–11:00 (host Kim Vân, trợ Quốc Việt) — xoá khi xong.
+
 ## Module hỗ trợ vận hành (Ops Support) — DỰ KIẾN, chưa làm (ý user 2026-09-21)
 
 Tầng "target vận hành" tách khỏi "target cam kết" của Kế Hoạch Tháng (xem mục trên). Mục tiêu: hỗ trợ ops trong và giữa các phiên, không đụng target đã chốt.

@@ -15,6 +15,8 @@ import {
   buildSlotMeta
 } from "./ui/SessionEventCard";
 import { SlotDetailModal } from "./scheduling/SlotDetailModal";
+import { SessionWindow } from "./SessionWindow";
+import { SessionReportInput } from "../lib/db/sessionReports";
 import {
   Calendar as CalendarIcon,
   Clock,
@@ -69,6 +71,10 @@ interface LiveCalendarProps {
   onAddScheme?: (scheme: { title: string; description: string; startDate: string; endDate: string }) => Promise<void>;
   onUpdateScheme?: (id: string, patch: Partial<Pick<PromoScheme, "title" | "description" | "startDate" | "endDate">>) => Promise<void>;
   onDeleteScheme?: (id: string) => Promise<void>;
+  // Cửa sổ Ca Live (2026-09-21): click ca → cùng một cửa sổ với Sổ Ca / Đăng Ký & Chốt Lịch.
+  onSubmitSessionReport?: (sessionId: string, input: SessionReportInput) => Promise<boolean>;
+  onSessionSnapshotApplied?: (session: LiveSession) => void;
+  onDeleteSession?: (id: string) => Promise<void>;
 }
 
 // Chiều cao vùng card trong 1 ô lịch tháng — đủ cho ~2 card, ô nào nhiều hơn thì cuộn dọc
@@ -114,7 +120,10 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   schemes = [],
   onAddScheme,
   onUpdateScheme,
-  onDeleteScheme
+  onDeleteScheme,
+  onSubmitSessionReport,
+  onSessionSnapshotApplied,
+  onDeleteSession
 }) => {
   const moderators = users.filter((u) => u.role === "moderator");
   // Sync sessions with propSessions so clean test mode is respected
@@ -160,14 +169,6 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   const [newAssistantId, setNewAssistantId] = useState(moderators[0]?.id || "");
 
   // Edit state cho session đã có (mở từ panel chi tiết)
-  const [isEditingDetail, setIsEditingDetail] = useState(false);
-  const [editDate, setEditDate] = useState("");
-  const [editStartTime, setEditStartTime] = useState("");
-  const [editEndTime, setEditEndTime] = useState("");
-  const [editStudioId, setEditStudioId] = useState("");
-  const [editHostId, setEditHostId] = useState("");
-  const [editCoHostId, setEditCoHostId] = useState("");
-  const [savingEdit, setSavingEdit] = useState(false);
 
   // AI Recommendation State
   const [aiSuggestion, setAiSuggestion] = useState<string | null>(null);
@@ -515,10 +516,6 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   };
 
   const currentFormConflicts = checkConflicts(newStudioId, newHostId, newDate, newStartTime, newEndTime);
-  const currentEditConflicts = selectedSessionDetail
-    ? checkConflicts(editStudioId, editHostId, editDate, editStartTime, editEndTime, selectedSessionDetail.id)
-    : { studioConflict: false, hostConflict: false, studioConflictWith: "", hostConflictWith: "" };
-
   // Save new session hoặc mở ca chờ đăng ký (tuỳ bookingMode)
   const handleSaveBooking = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -608,51 +605,6 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
     setNewTitle("");
     setNewCoHostId("");
     setAiSuggestion(null);
-  };
-
-  const openEditDetail = (session: LiveSession) => {
-    setEditDate(session.date);
-    setEditStartTime(session.startTime);
-    setEditEndTime(session.endTime);
-    setEditStudioId(session.studioId);
-    setEditHostId(session.hostId);
-    setEditCoHostId(session.coHostId || "");
-    setIsEditingDetail(true);
-  };
-
-  const handleSaveDetailEdit = async () => {
-    if (!selectedSessionDetail) return;
-
-    // FIX L8 (audit 2026-08-21): gõ nhầm giờ kết thúc trùng giờ bắt đầu trước đây bị tính thành
-    // ca qua đêm 24 giờ công (sessionDurationHours ở lib/pnl.ts) — chặn ngay ở form.
-    if (editStartTime === editEndTime) {
-      window.alert("Giờ bắt đầu và giờ kết thúc không được trùng nhau.");
-      return;
-    }
-
-    const studioObj = studios.find((s) => s.id === editStudioId);
-    const hostObj = talents.find((t) => t.id === editHostId);
-    const coHostObj = talents.find((t) => t.id === editCoHostId);
-
-    const updated: LiveSession = {
-      ...selectedSessionDetail,
-      date: editDate,
-      startTime: editStartTime,
-      endTime: editEndTime,
-      studioId: editStudioId,
-      studioName: studioObj?.name || selectedSessionDetail.studioName,
-      hostId: editHostId,
-      hostName: hostObj?.name || selectedSessionDetail.hostName,
-      coHostId: editCoHostId || undefined,
-      coHostName: coHostObj?.name || ""
-    };
-
-    setSavingEdit(true);
-    const ok = onUpdateSession ? await onUpdateSession(updated) : true;
-    setSavingEdit(false);
-    if (!ok) return;
-    setSelectedSessionDetail(updated);
-    setIsEditingDetail(false);
   };
 
   // AI Optimizer
@@ -1888,139 +1840,20 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
 
       {/* SESSION DETAIL MODAL */}
       {selectedSessionDetail && (
-        <div className="fixed inset-0 z-50 bg-[var(--surface-base)]/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
-          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl max-w-xl w-full p-4 sm:p-6 space-y-4 shadow-2xl">
-            <div className="flex justify-between items-start border-b border-[var(--border)] pb-3">
-              <div>
-                <span className="text-[10px] font-bold text-[var(--accent-text)] uppercase font-mono inline-flex items-center gap-1">
-                  <BrandLogo brand={brandById.get(selectedSessionDetail.brandId)} size="xs" /> {selectedSessionDetail.brandName}
-                </span>
-                <h3 className="font-bold text-[var(--text)] text-base sm:text-lg">{selectedSessionDetail.title}</h3>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                {onUpdateSession && !isEditingDetail && (
-                  <button
-                    onClick={() => openEditDetail(selectedSessionDetail)}
-                    className="text-[11px] font-bold text-[var(--accent-text)] hover:opacity-80 px-2.5 py-1.5 rounded-lg border border-[var(--accent)]/40 bg-[var(--accent)]/10"
-                  >
-                    Sửa
-                  </button>
-                )}
-                <button
-                  onClick={() => {
-                    setSelectedSessionDetail(null);
-                    setIsEditingDetail(false);
-                  }}
-                  className="text-[var(--text-muted)] hover:text-[var(--text)] p-1 rounded-lg"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-
-            {isEditingDetail ? (
-              <div className="space-y-3 text-xs bg-[var(--surface-base)] p-3 rounded-xl border border-[var(--border)]">
-                {(currentEditConflicts.studioConflict || currentEditConflicts.hostConflict) && (
-                  <div className="p-2.5 bg-rose-950/80 border border-rose-700/80 rounded-xl text-[11px] space-y-1 text-rose-200 font-medium">
-                    {currentEditConflicts.studioConflict && <p>• Trùng Studio: "{currentEditConflicts.studioConflictWith}"!</p>}
-                    {currentEditConflicts.hostConflict && <p>• Trùng Host: "{currentEditConflicts.hostConflictWith}"!</p>}
-                  </div>
-                )}
-                <div className="grid grid-cols-3 gap-2">
-                  <div>
-                    <label className="font-bold text-[var(--text-muted)] block mb-1">Ngày:</label>
-                    <input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)}
-                      className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] font-mono" />
-                  </div>
-                  <div>
-                    <label className="font-bold text-[var(--text-muted)] block mb-1">Giờ bắt đầu:</label>
-                    <input type="time" value={editStartTime} onChange={(e) => setEditStartTime(e.target.value)}
-                      className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] font-mono" />
-                  </div>
-                  <div>
-                    <label className="font-bold text-[var(--text-muted)] block mb-1">Giờ kết thúc:</label>
-                    <input type="time" value={editEndTime} onChange={(e) => setEditEndTime(e.target.value)}
-                      className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] font-mono" />
-                  </div>
-                </div>
-                <div>
-                  <label className="font-bold text-[var(--text-muted)] block mb-1">Phòng Studio:</label>
-                  <select value={editStudioId} onChange={(e) => setEditStudioId(e.target.value)}
-                    className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)]">
-                    {studios.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="font-bold text-[var(--text-muted)] block mb-1">Host chính:</label>
-                    <select value={editHostId} onChange={(e) => setEditHostId(e.target.value)}
-                      className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)]">
-                      {talents.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="font-bold text-[var(--text-muted)] block mb-1">Co-Host:</label>
-                    <select value={editCoHostId} onChange={(e) => setEditCoHostId(e.target.value)}
-                      className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)]">
-                      <option value="">-- Không có --</option>
-                      {talents.filter((t) => t.id !== editHostId).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <div className="flex justify-end gap-2 pt-1">
-                  <button
-                    onClick={() => setIsEditingDetail(false)}
-                    className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] text-[var(--text-muted)] hover:bg-[var(--surface-hover)] font-bold text-[11px]"
-                  >
-                    Huỷ
-                  </button>
-                  <button
-                    onClick={handleSaveDetailEdit}
-                    disabled={savingEdit}
-                    className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-60 text-white font-bold text-[11px]"
-                  >
-                    {savingEdit ? "Đang lưu..." : "Lưu Thay Đổi"}
-                  </button>
-                </div>
-              </div>
-            ) : (
-            <div className="grid grid-cols-2 gap-3 text-xs bg-[var(--surface-base)] p-3 rounded-xl border border-[var(--border)]">
-              <div>Ngày Live: <strong className="text-[var(--text)] block font-mono">{selectedSessionDetail.date}</strong></div>
-              <div>Khung giờ: <strong className="text-[var(--text)] block font-mono">{selectedSessionDetail.startTime} - {selectedSessionDetail.endTime}</strong></div>
-              <div>Phòng Studio: <strong className="text-[var(--text)] block">{selectedSessionDetail.studioName}</strong></div>
-              <div>Host chính: <strong className="text-[var(--text)] block">{selectedSessionDetail.hostName}</strong></div>
-              {selectedSessionDetail.coHostName && (
-                <div>Co-Host: <strong className="text-[var(--text)] block">{selectedSessionDetail.coHostName}</strong></div>
-              )}
-              <div>Trợ lý / Moderator: <strong className="text-[var(--text)] block">{selectedSessionDetail.assistantName}</strong></div>
-              <div>Target GMV: <strong className="text-emerald-400 block font-mono font-bold">{selectedSessionDetail.targetGmv.toLocaleString()} VNĐ</strong></div>
-            </div>
-            )}
-
-            <div className="space-y-2 text-xs">
-              <h4 className="font-bold text-[var(--text-muted)]">Checklist Chuẩn Bị ({selectedSessionDetail.checklist.filter(c => c.completed).length}/{selectedSessionDetail.checklist.length}):</h4>
-              <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
-                {selectedSessionDetail.checklist.map((ck) => (
-                  <div key={ck.id} className="p-2 bg-[var(--surface-base)] rounded-lg border border-[var(--border)]/80 flex items-center justify-between">
-                    <span className={`text-[var(--text-muted)] ${ck.completed ? "line-through opacity-60" : ""}`}>{ck.task}</span>
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${ck.completed ? "bg-emerald-950 text-emerald-400" : "bg-amber-950 text-amber-400"}`}>
-                      {ck.completed ? "Đã xong" : "Chưa làm"}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="pt-2 border-t border-[var(--border)] flex justify-end">
-              <button
-                onClick={() => setSelectedSessionDetail(null)}
-                className="px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold rounded-xl text-xs"
-              >
-                Đóng
-              </button>
-            </div>
-          </div>
-        </div>
+        <SessionWindow
+          session={sessions.find((x) => x.id === selectedSessionDetail.id) ?? selectedSessionDetail}
+          brand={brandById.get(selectedSessionDetail.brandId)}
+          viewer={{ role: currentRole ?? "talent", myTalentId }}
+          today={getTodayDateString()}
+          allSessions={sessions}
+          studios={studios}
+          talents={talents}
+          onClose={() => setSelectedSessionDetail(null)}
+          onSubmitSessionReport={onSubmitSessionReport}
+          onSessionSnapshotApplied={onSessionSnapshotApplied}
+          onUpdateSession={onUpdateSession}
+          onDeleteSession={onDeleteSession}
+        />
       )}
 
       {selectedSlotDetail && (
