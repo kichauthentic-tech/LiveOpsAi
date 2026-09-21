@@ -59,12 +59,14 @@ import {
   TrendingUp,
   Gauge,
   FileSignature,
-  Radio
+  Radio,
+  Megaphone
 } from "lucide-react";
 import { Header, WorkspaceContext } from "./components/Header";
 import { BrandCalendar } from "./components/brand-workspace/BrandCalendar";
 import { BrandSkuShowcase } from "./components/brand-workspace/BrandSkuShowcase";
 import { BrandMonthlyReport } from "./components/brand-workspace/BrandMonthlyReport";
+import { BrandAdsReport } from "./components/brand-workspace/BrandAdsReport";
 import { BrandDataRaw } from "./components/brand-workspace/BrandDataRaw";
 import { Login } from "./components/Login";
 import { ResetPasswordScreen } from "./components/ResetPasswordScreen";
@@ -1539,9 +1541,13 @@ export default function App() {
         { id: "brand_sessions", label: "Sổ Ca", icon: BookOpen, perm: undefined },
         { id: "brand_skus", label: "SKU Showcase", icon: Package, perm: undefined },
         { id: "brand_monthly_report", label: "Report Tháng", icon: FileText, perm: undefined },
+        // "Nhập Ads & Ghi Chú" (2026-09-21): phần nhập tay tách khỏi Report Tháng, ops-only như Dữ Liệu Gốc.
         ...(currentRole === "brand"
           ? []
-          : [{ id: "brand_dataraw", label: "Dữ Liệu Gốc", icon: Database, perm: undefined }]),
+          : [
+              { id: "brand_ads_report", label: "Nhập Ads & Ghi Chú", icon: Megaphone, perm: undefined },
+              { id: "brand_dataraw", label: "Dữ Liệu Gốc", icon: Database, perm: undefined }
+            ]),
       ],
     },
   ];
@@ -2161,6 +2167,15 @@ export default function App() {
                     currentRole={currentRole}
                     brandPlatformRates={brandPlatformRates}
                     shiftSlots={shiftSlots}
+                  />
+                )}
+
+                {activeTab === "brand_ads_report" && effectiveWorkspace.type === "brand" && currentRole !== "brand" && (
+                  <BrandAdsReport
+                    brandId={currentBrandId!}
+                    brandName={activeBrands.find((b) => b.id === currentBrandId)?.name || "Brand"}
+                    sessions={activeSessions}
+                    currentRole={currentRole}
                   />
                 )}
 
