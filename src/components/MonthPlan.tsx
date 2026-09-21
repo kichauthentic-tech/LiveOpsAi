@@ -21,6 +21,7 @@ import {
 import { RecurringRulesPanel } from "./scheduling/RecurringRulesPanel";
 import { HistorySummary, STRATEGY_LABEL, SuggestResult, SuggestStrategy, buildHistory, estimateSlots, suggestMonthPlan } from "../lib/scheduling/suggestEngine";
 import { formatCurrencyAdaptive } from "../lib/formatCurrency";
+import { EngineParams } from "../lib/scheduling/engineParams";
 
 interface MonthPlanProps {
   brands: Brand[];
@@ -36,6 +37,7 @@ interface MonthPlanProps {
   onDeleteTemplate: (id: string) => Promise<void>;
   // Chốt xong → App nạp lại shift_slots để Đăng Ký & Chốt Lịch / lịch thấy ca mới.
   onPlanLocked: () => Promise<void>;
+  engineParams: EngineParams; // admin vặn ở AI Training Center (0095)
 }
 
 const WEEKDAY_LABELS = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
@@ -62,7 +64,8 @@ export default function MonthPlan({
   onCreateTemplate,
   onToggleTemplate,
   onDeleteTemplate,
-  onPlanLocked
+  onPlanLocked,
+  engineParams
 }: MonthPlanProps) {
   const today = todayVn();
   const [brandId, setBrandId] = useState(brands[0]?.id ?? "");
@@ -125,9 +128,9 @@ export default function MonthPlan({
     if (others.length === 0) return null;
     const byMonth = new Map<string, BrandMonthPlanSlot[]>();
     for (const ps of others) { const l = byMonth.get(ps.date.slice(0, 7)) ?? []; l.push(ps); byMonth.set(ps.date.slice(0, 7), l); }
-    const cal = buildCalibration([...byMonth.values()].map((l) => evaluatePlan(l, shiftSlots, sessions)));
+    const cal = buildCalibration([...byMonth.values()].map((l) => evaluatePlan(l, shiftSlots, sessions)), engineParams);
     return cal.observations > 0 ? cal : null;
-  }, [lockedSlots, month, shiftSlots, sessions]);
+  }, [lockedSlots, month, shiftSlots, sessions, engineParams]);
 
   useEffect(() => {
     if (!brandId) return;
@@ -227,7 +230,7 @@ export default function MonthPlan({
       setMsg("Lưới đang trống — vẽ ca hoặc bấm Gợi ý phân bổ trước.");
       return;
     }
-    const history = buildHistory(sessions, brandId, today, { events, schemes: brandSchemes });
+    const history = buildHistory(sessions, brandId, today, { events, schemes: brandSchemes, params: engineParams });
     const weights = estimateSlots(history, drafts, { camp: campRanges, events, schemes: brandSchemes, calibration: calibration?.factors });
     const byForecast = weights.some((w) => w > 0);
     setDrafts(allocateDraftTargets(drafts, targetTotal, weights));
@@ -256,11 +259,12 @@ export default function MonthPlan({
       setMsg("Nhập Target GMV tháng ở Tham số lập kế hoạch trước.");
       return;
     }
-    const history = buildHistory(sessions, brandId, today, { events, schemes: brandSchemes });
+    const history = buildHistory(sessions, brandId, today, { events, schemes: brandSchemes, params: engineParams });
     const base = {
       month,
       today,
       mode,
+      params: engineParams,
       committedHours: planHours,
       targetGmv: targetTotal,
       camp: campRanges,

@@ -78,6 +78,9 @@ import { FinanceHr } from "./components/FinanceHr";
 import { AiMultiAgent } from "./components/AiMultiAgent";
 import { UserRoleSettings } from "./components/UserRoleSettings";
 import { AiTrainingCenter } from "./components/AiTrainingCenter";
+import { EngineTrainingPanel } from "./components/EngineTrainingPanel";
+import { fetchEngineParams, saveEngineParams } from "./lib/db/engineParams";
+import { DEFAULT_ENGINE_PARAMS, EngineParams } from "./lib/scheduling/engineParams";
 import ShiftScheduling from "./components/ShiftScheduling";
 import MonthPlan from "./components/MonthPlan";
 import { LiveReconciliation } from "./components/LiveReconciliation";
@@ -255,6 +258,11 @@ export default function App() {
   // (khai báo sớm hơn nhóm state Giai đoạn 14 vì useMemo ngay dưới đọc nó)
   const [shiftSlots, setShiftSlots] = useState<ShiftSlot[]>([]);
   const [planTargetsBySlotId, setPlanTargetsBySlotId] = useState<Map<string, number>>(new Map());
+  // Tham số engine Kế Hoạch Tháng (0095) — nạp cùng Phase 14; lỗi thì dùng mặc định, không chặn app.
+  const [engineParams, setEngineParams] = useState<EngineParams>(DEFAULT_ENGINE_PARAMS);
+  const [engineParamsUpdatedAt, setEngineParamsUpdatedAt] = useState<string | null>(null);
+  const [engineParamsError, setEngineParamsError] = useState<string | null>(null);
+  const [engineParamsLoading, setEngineParamsLoading] = useState(false);
   const planTargetsBySessionId = useMemo(() => {
     const out = new Map<string, number>();
     if (planTargetsBySlotId.size === 0) return out;
@@ -457,6 +465,11 @@ export default function App() {
     if (!session) return;
     let cancelled = false;
     setPhase14Loading(true);
+    setEngineParamsLoading(true);
+    fetchEngineParams()
+      .then((r) => { if (cancelled) return; setEngineParams(r.params); setEngineParamsUpdatedAt(r.updatedAt); setEngineParamsError(null); })
+      .catch((e) => { if (!cancelled) setEngineParamsError(`Không tải được tham số engine (dùng mặc định): ${e.message ?? e}`); })
+      .finally(() => { if (!cancelled) setEngineParamsLoading(false); });
     Promise.all([fetchBrandPlatformRates(), fetchShiftSlots(), fetchShiftRegistrations(), fetchRecurringShiftTemplates(), fetchLockedPlanTargets().catch(() => new Map<string, number>())])
       .then(([rates, slots, regs, templates, planTargets]) => {
         if (cancelled) return;
@@ -1907,6 +1920,7 @@ export default function App() {
                     onLogAudit={pushAuditLog}
                     onSessionSnapshotApplied={handleSessionReconciled}
                     onOpenMonthPlan={() => setActiveTab("month_plan")}
+                    fatigueWeekHours={engineParams.fatigueWeekHours}
                   />
                 )}
 
@@ -1923,6 +1937,7 @@ export default function App() {
                     onToggleTemplate={handleToggleRecurringTemplate}
                     onDeleteTemplate={handleDeleteRecurringTemplate}
                     onPlanLocked={reloadShiftSlots}
+                    engineParams={engineParams}
                   />
                 )}
 
@@ -2098,12 +2113,29 @@ export default function App() {
                 {activeTab === "ai_agents" && <AiMultiAgent />}
 
                 {activeTab === "ai_training" && currentRole === "admin" && (
-                  <AiTrainingCenter
-                    prompts={aiAgentPrompts}
-                    loading={aiAgentPromptsLoading}
-                    error={aiAgentPromptsError}
-                    onUpdate={handleUpdateAiAgentPrompt}
-                  />
+                  <div className="space-y-8">
+                    <AiTrainingCenter
+                      prompts={aiAgentPrompts}
+                      loading={aiAgentPromptsLoading}
+                      error={aiAgentPromptsError}
+                      onUpdate={handleUpdateAiAgentPrompt}
+                    />
+                    <EngineTrainingPanel
+                      brands={activeBrands}
+                      sessions={activeSessions}
+                      shiftSlots={shiftSlots}
+                      promoSchemes={promoSchemes}
+                      params={engineParams}
+                      updatedAt={engineParamsUpdatedAt}
+                      loading={engineParamsLoading}
+                      error={engineParamsError}
+                      onSave={async (p) => {
+                        const r = await saveEngineParams(p, activeUser.id);
+                        setEngineParams(r.params);
+                        setEngineParamsUpdatedAt(r.updatedAt);
+                      }}
+                    />
+                  </div>
                 )}
 
                 {activeTab === "user_settings" && (

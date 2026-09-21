@@ -123,6 +123,7 @@ export interface PlanOptions {
   perfSince?: string;
   today: string;
   month: string;
+  fatigueWeekHours?: number; // mặc định FATIGUE_WEEK_HOURS; admin vặn trong AI Training Center
 }
 
 // Xếp tham lam theo thứ tự thời gian: mỗi ca lấy người xếp hạng cao nhất mà chưa bận — bận theo ca
@@ -154,8 +155,9 @@ export function planBulkFinalize(
     // Người đầu tiên (theo xếp hạng) mà không bận ở khung giờ này. Giai đoạn D: người đã quá ngưỡng
     // giờ/tuần (ca đã có + ca mẻ này vừa gán) bị đẩy xuống cuối hàng — vẫn được chọn nếu không còn ai.
     const slotHours = sessionDurationHours(slot.startTime, slot.endTime);
+    const fatigueAt = opts.fatigueWeekHours ?? FATIGUE_WEEK_HOURS;
     const tired = (c: HostSuggestion) =>
-      c.weekHours + (ledger.weekHoursByTalent.get(weekKey(c.talentId, slot.date)) ?? 0) + slotHours > FATIGUE_WEEK_HOURS;
+      c.weekHours + (ledger.weekHoursByTalent.get(weekKey(c.talentId, slot.date)) ?? 0) + slotHours > fatigueAt;
     const ordered = [...candidates].sort((a, b) => Number(tired(a)) - Number(tired(b)));
     const free = ordered.find(
       (c) =>

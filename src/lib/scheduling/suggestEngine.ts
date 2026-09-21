@@ -12,12 +12,11 @@
 // Lớp 4 — giải thích: lý do từng ca, đường cong biên, khả thi target, độ tin cậy.
 import { LiveSession } from "../../types";
 import { CampDayBucket, CampOverrides, resolveCampBucketType } from "../campaignDays";
+import { DEFAULT_ENGINE_PARAMS, EngineParams } from "./engineParams";
 import { sessionDurationHours } from "../pnl";
 
 export const BLOCK_HOURS = 2; // khối giờ 2h → 12 khối/ngày
-const RECENCY_LAMBDA = 0.35; // e^-0.35 ≈ 0.70/tháng → nửa đời ~2 tháng
-const SHRINK_K = 3; // số quan sát "ảo" kéo về trung bình brand
-const MIN_HISTORY_SESSIONS = 20;
+// Các hằng số học/xếp nằm ở engineParams.ts (admin vặn được trong AI Training Center).
 
 export interface HistoryCell {
   weekday: number; // 0=CN
@@ -72,6 +71,7 @@ export interface HistorySummary {
 export interface HistoryContext {
   events?: CalendarEvent[]; // lịch sự kiện dùng chung (calendar_events)
   schemes?: DateRange[]; // scheme khuyến mãi của brand (quá khứ lẫn tương lai)
+  params?: EngineParams; // thiếu = mặc định
 }
 
 export interface SuggestConstraints {
@@ -96,6 +96,7 @@ export interface SuggestConstraints {
   // "max": tối đa GMV kỳ vọng (mặc định). "balanced": rải đều tuần/ngày, thưởng đều đặn mạnh, tối
   // đa 2 ca/ngày. "lean": ít ca dài hơn (ca = mặc định + 1h), dồn ngày đã có ca.
   strategy?: SuggestStrategy;
+  params?: EngineParams; // thiếu = mặc định
 }
 
 export type SuggestStrategy = "max" | "balanced" | "lean";
@@ -153,6 +154,7 @@ const percentile = (xs: number[], p: number) => {
 
 // ============ Lớp 1: lịch sử → ma trận ============
 export function buildHistory(sessions: LiveSession[], brandId: string, asOf: string, ctx: HistoryContext = {}): HistorySummary {
+  const P = ctx.params ?? DEFAULT_ENGINE_PARAMS;
   const eventKindOf = (date: string): CalendarEventKind | null => {
     const hit = (ctx.events ?? []).find((e) => e.date === date);
     return hit ? hit.kind : null;
@@ -191,8 +193,8 @@ export function buildHistory(sessions: LiveSession[], brandId: string, asOf: str
 
   // GMV/giờ từng ca, winsorize p95 để 1 ca viral không kéo cả ô.
   const perHour = usable.map((s) => s.actualGmv / sessionDurationHours(s.startTime, s.endTime));
-  const cap = percentile(perHour, 0.95);
-  const weightOf = (s: LiveSession) => Math.exp(-RECENCY_LAMBDA * Math.max(0, monthsBetween(s.date.slice(0, 7), asOf.slice(0, 7))));
+  const cap = percentile(perHour, P.winsorizePct);
+  const weightOf = (s: LiveSession) => Math.exp(-P.recencyLambda * Math.max(0, monthsBetween(s.date.slice(0, 7), asOf.slice(0, 7))));
 
   // Rải từng ca vào ô thứ × khối theo phút phủ.
   const acc = new Map<string, { hours: number; gmv: number; views: number; orders: number; n: Set<string> }>();
@@ -255,7 +257,7 @@ export function buildHistory(sessions: LiveSession[], brandId: string, asOf: str
     const [wd, block] = key.split("|").map(Number);
     const raw = c.hours > 0 ? c.gmv / c.hours : 0;
     const n = c.n.size;
-    const shrunk = (n * raw + SHRINK_K * brandGmvPerHour) / (n + SHRINK_K);
+    const shrunk = (n * raw + P.shrinkK * brandGmvPerHour) / (n + P.shrinkK);
     const viewsPerHour = c.hours > 0 ? c.views / c.hours : 0;
     const conversion = c.views > 0 ? c.orders / c.views : 0;
     cells.push({ weekday: wd, block, hours: c.hours, gmv: c.gmv, views: c.views, orders: c.orders, n, gmvPerHour: shrunk, rawGmvPerHour: raw, viewsPerHour, conversion, tag: "thin" });
@@ -273,13 +275,13 @@ export function buildHistory(sessions: LiveSession[], brandId: string, asOf: str
 
   // Hệ số camp học từ lịch sử — cần ≥ 3 ca trong khung và có ngày thường để so; clamp [0.8, 3].
   const dailyGph = bucketAcc.daily.h > 0 ? bucketAcc.daily.g / bucketAcc.daily.h : brandGmvPerHour;
-  const defaults: Record<CampDayBucket, number> = { daily: 1, dday: 1.3, midmonth: 1.15, payday: 1.15 };
+  const defaults: Record<CampDayBucket, number> = { daily: 1, dday: P.campDefaultDday, midmonth: P.campDefaultMidmonth, payday: P.campDefaultPayday };
   const campMultipliers = { ...defaults };
   const campLearned: Record<CampDayBucket, boolean> = { daily: true, dday: false, midmonth: false, payday: false };
   for (const b of ["dday", "midmonth", "payday"] as CampDayBucket[]) {
     const a = bucketAcc[b];
-    if (a.n >= 3 && a.h > 0 && dailyGph > 0) {
-      campMultipliers[b] = Math.min(3, Math.max(0.8, a.g / a.h / dailyGph));
+    if (a.n >= P.minCampSessions && a.h > 0 && dailyGph > 0) {
+      campMultipliers[b] = Math.min(P.campMultMax, Math.max(P.campMultMin, a.g / a.h / dailyGph));
       campLearned[b] = true;
     }
   }
@@ -293,7 +295,7 @@ export function buildHistory(sessions: LiveSession[], brandId: string, asOf: str
   const campHoursPerDay = { ...empty.campHoursPerDay };
   const campHoursLearned = { ...empty.campHoursLearned };
   for (const b of Object.keys(dayHoursByBucket) as CampDayBucket[]) {
-    if (dayHoursByBucket[b].length >= 3) {
+    if (P.campPatternEnabled && dayHoursByBucket[b].length >= P.minCampDays) {
       campHoursPerDay[b] = percentile(dayHoursByBucket[b], 0.5);
       campHoursLearned[b] = true;
     }
@@ -314,7 +316,7 @@ export function buildHistory(sessions: LiveSession[], brandId: string, asOf: str
   if (byPos[0] && byPos[0].h > 0) {
     const first = byPos[0].g / byPos[0].h;
     for (let k = 1; k < Math.min(byPos.length, 4); k++) {
-      if (byPos[k].h >= 6 && first > 0) diminishing[k] = Math.min(1, Math.max(0.4, byPos[k].g / byPos[k].h / first));
+      if (byPos[k].h >= P.diminishingMinHours && first > 0) diminishing[k] = Math.min(1, Math.max(P.diminishingMin, byPos[k].g / byPos[k].h / first));
     }
   }
 
@@ -324,16 +326,16 @@ export function buildHistory(sessions: LiveSession[], brandId: string, asOf: str
   const eventLearned: Record<CalendarEventKind, boolean> = { holiday: false, mega_sale: false, event: false };
   for (const k of ["holiday", "mega_sale", "event"] as CalendarEventKind[]) {
     const a = eventAcc[k];
-    if (a.n >= 5 && a.h > 0 && plainGph > 0) {
-      eventMultipliers[k] = Math.min(2.5, Math.max(0.6, a.g / a.h / plainGph));
+    if (a.n >= P.minEventSessions && a.h > 0 && plainGph > 0) {
+      eventMultipliers[k] = Math.min(P.eventMultMax, Math.max(P.eventMultMin, a.g / a.h / plainGph));
       eventLearned[k] = true;
     }
   }
   const noSchemeGph = noSchemeAcc.h > 0 ? noSchemeAcc.g / noSchemeAcc.h : brandGmvPerHour;
   let schemeMultiplier = 1;
   let schemeLearned = false;
-  if (schemeAcc.n >= 5 && schemeAcc.h > 0 && noSchemeGph > 0) {
-    schemeMultiplier = Math.min(2, Math.max(0.8, schemeAcc.g / schemeAcc.h / noSchemeGph));
+  if (schemeAcc.n >= P.minEventSessions && schemeAcc.h > 0 && noSchemeGph > 0) {
+    schemeMultiplier = Math.min(P.schemeMultMax, Math.max(P.schemeMultMin, schemeAcc.g / schemeAcc.h / noSchemeGph));
     schemeLearned = true;
   }
 
@@ -349,7 +351,7 @@ export function buildHistory(sessions: LiveSession[], brandId: string, asOf: str
     campHoursPerDay,
     campHoursLearned,
     cells: cells.sort((a, b) => b.gmvPerHour - a.gmvPerHour),
-    enough: usable.length >= MIN_HISTORY_SESSIONS && months >= 2,
+    enough: usable.length >= P.minHistorySessions && months >= P.minHistoryMonths,
     eventMultipliers,
     eventLearned,
     schemeMultiplier,
@@ -397,6 +399,7 @@ function expectedGphFor(date: string, start: number, end: number, h: HistorySumm
 }
 
 export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints): SuggestResult {
+  const P = c.params ?? DEFAULT_ENGINE_PARAMS;
   const notes: string[] = [];
   const [y, m] = c.month.split("-").map(Number);
   const daysInMonth = new Date(y, m, 0).getDate();
@@ -404,8 +407,8 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
   const winStart = toMin(c.liveWindowStart);
   const winEnd = toMin(c.liveWindowEnd);
   const strategy: SuggestStrategy = c.strategy ?? "max";
-  const slotHoursEff = strategy === "lean" ? c.defaultSlotHours + 1 : c.defaultSlotHours;
-  const maxPerDay = strategy === "balanced" ? Math.min(c.maxSlotsPerDay, 2) : c.maxSlotsPerDay;
+  const slotHoursEff = strategy === "lean" ? c.defaultSlotHours + P.leanExtraHours : c.defaultSlotHours;
+  const maxPerDay = strategy === "balanced" ? Math.min(c.maxSlotsPerDay, P.balancedMaxPerDay) : c.maxSlotsPerDay;
   const slotMin = Math.round(slotHoursEff * 60);
   // Ngày camp: trần ca/ngày nới theo giờ/ngày học từ lịch sử (không bao giờ thấp hơn trần ops đặt).
   const dayCapOf = (bucket: CampDayBucket) => {
@@ -442,7 +445,7 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
     notes.push(
       history.sessions === 0
         ? "Brand chưa có ca đối soát nào — không có lịch sử để gợi ý. Dùng quy tắc lặp."
-        : `Lịch sử mỏng (${history.sessions} ca, ${history.months} tháng; cần ≥ ${MIN_HISTORY_SESSIONS} ca và ≥ 2 tháng) — gợi ý chỉ để tham khảo.`
+        : `Lịch sử mỏng (${history.sessions} ca, ${history.months} tháng; cần ≥ ${P.minHistorySessions} ca và ≥ ${P.minHistoryMonths} tháng) — gợi ý chỉ để tham khảo.`
     );
   }
   if (brandGph <= 0) {
@@ -494,18 +497,18 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
     const target = targetHours;
     let score = expectedGph(cand, state);
     // Phương án: "lean" dồn vào ngày đã có ca (mở ngày mới ×0.92); "balanced" phạt ngày ≥ 2 ca ×0.9.
-    if (strategy === "lean" && sameDay.length === 0 && state.length > 0) score *= 0.92;
-    if (strategy === "balanced" && sameDay.length >= 1) score *= 0.9;
+    if (strategy === "lean" && sameDay.length === 0 && state.length > 0) score *= P.leanNewDayPenalty;
+    if (strategy === "balanced" && sameDay.length >= 1) score *= P.balancedSecondSlotPenalty;
     // Mềm: rải đều tuần — tuần đã > 130% mức trung bình thì giảm 10%.
     if (target > 0) {
       const wk = weekOf(cand.date);
       const weekHours = state.filter((s) => weekOf(s.date) === wk).reduce((a, s) => a + s.hours, 0);
-      const cap = strategy === "balanced" ? 1.15 : 1.3;
-      if ((weekHours + cand.hours) > (target / weeksInMonth) * cap) score *= strategy === "balanced" ? 0.75 : 0.9;
+      const cap = strategy === "balanced" ? P.balancedWeekCap : P.weekEvenCap;
+      if ((weekHours + cand.hours) > (target / weeksInMonth) * cap) score *= strategy === "balanced" ? P.balancedWeekPenalty : P.weekEvenPenalty;
     }
     // Mềm: đều đặn — cùng giờ bắt đầu đã có ≥ 3 ngày khác → +5% (cân bằng: +10%).
     const anchors = state.filter((s) => s.start === cand.start && s.date !== cand.date).length;
-    if (anchors >= 3) score *= strategy === "balanced" ? 1.1 : 1.05;
+    if (anchors >= P.anchorMinDays) score *= strategy === "balanced" ? P.balancedAnchorBonus : P.anchorBonus;
     return score;
   };
 
@@ -644,7 +647,7 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
       targetGmv: target,
       bucket: s.bucket,
       reason: reasonParts.join(" · "),
-      highExpectation: target > exp * 1.3,
+      highExpectation: target > exp * P.highExpectationRatio,
       fixed: fixedKeys.has(`${s.date}|${toHhmm(s.start)}`),
       dayLabel: dayLabelOf(s.date)
     };
@@ -656,7 +659,7 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
     if (forecastGmv >= c.targetGmv) hoursToHitTarget = all.reduce((a, s) => a + s.hours, 0);
     else if (stopAtTarget) hoursToHitTarget = null; // đã chạy hết sức chứa mà chưa chạm
     else {
-      const ext = greedy(Math.max(committed * 2, committed + 40));
+      const ext = greedy(Math.max(committed * P.hoursToHitMultiplier, committed + 40));
       const hit = ext.curve.find((p) => p.gmv >= c.targetGmv);
       hoursToHitTarget = hit ? hit.hours : null;
     }

@@ -18,6 +18,7 @@ interface BulkFinalizePanelProps {
   month: string; // "YYYY-MM"
   today: string;
   perfSince: string;
+  fatigueWeekHours?: number;
   onFinalizeSlot: (slot: ShiftSlot, hostId: string, coHostId: string | null) => Promise<boolean>;
   onClose: () => void;
 }
@@ -51,13 +52,14 @@ export function BulkFinalizePanel({
   month,
   today,
   perfSince,
+  fatigueWeekHours,
   onFinalizeSlot,
   onClose
 }: BulkFinalizePanelProps) {
   // Lập kế hoạch MỘT LẦN lúc mở panel. Không tính lại theo `sessions` đang đổi: mỗi ca chốt xong
   // là App nạp lại sessions, tính lại giữa chừng sẽ xoá sạch phần ops vừa sửa tay.
   const [rows, setRows] = useState<BulkPlanRow[]>(() =>
-    planBulkFinalize(slots, registrationsBySlot, sessions, talentNameById, { month, today, perfSince })
+    planBulkFinalize(slots, registrationsBySlot, sessions, talentNameById, { month, today, perfSince, fatigueWeekHours })
   );
   const [state, setState] = useState<RunState>({ phase: "editing" });
 

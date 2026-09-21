@@ -8,6 +8,7 @@
 // không tham gia hiệu chỉnh — không có gì để so.
 import { BrandMonthPlanSlot, LiveSession, ShiftSlot } from "../../types";
 import { BLOCK_HOURS } from "./suggestEngine";
+import { DEFAULT_ENGINE_PARAMS, EngineParams } from "./engineParams";
 
 export interface PlanEvalRow {
   date: string;
@@ -59,10 +60,6 @@ export function evaluatePlan(planSlots: BrandMonthPlanSlot[], shiftSlots: ShiftS
   };
 }
 
-const CAL_K = 3;
-const CAL_MIN = 0.5;
-const CAL_MAX = 1.6;
-
 export interface Calibration {
   factors: Map<string, number>; // "weekday|block" → hệ số
   observations: number; // số ca đã có thực tế tham gia
@@ -73,7 +70,7 @@ export const calibrationKey = (weekday: number, block: number) => `${weekday}|${
 
 // Gom mọi ca kế hoạch có dự báo + thực tế (nhiều tháng) → hệ số theo ô. GMV của ca rải đều theo phút
 // vào các khối nó phủ, giống buildHistory, để cùng một ca dài 6h không chỉ hiệu chỉnh 1 ô.
-export function buildCalibration(evals: PlanEvaluation[]): Calibration {
+export function buildCalibration(evals: PlanEvaluation[], params: EngineParams = DEFAULT_ENGINE_PARAMS): Calibration {
   const acc = new Map<string, { expected: number; actual: number; n: number }>();
   let obs = 0;
   let sumE = 0;
@@ -111,8 +108,8 @@ export function buildCalibration(evals: PlanEvaluation[]): Calibration {
     if (c.expected <= 0) continue;
     // shrink về 1 theo số quan sát (n theo phần ca), clamp.
     const raw = c.actual / c.expected;
-    const f = (c.n * raw + CAL_K * 1) / (c.n + CAL_K);
-    factors.set(key, Math.min(CAL_MAX, Math.max(CAL_MIN, f)));
+    const f = (c.n * raw + params.calibrationK * 1) / (c.n + params.calibrationK);
+    factors.set(key, Math.min(params.calibrationMax, Math.max(params.calibrationMin, f)));
   }
   return { factors, observations: obs, overallBias: sumE > 0 ? sumA / sumE - 1 : null };
 }

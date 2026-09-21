@@ -67,6 +67,7 @@ interface ShiftSchedulingProps {
   onSessionSnapshotApplied: (session: LiveSession) => void;
   // Nhắc việc (0091): brand chưa chốt Kế Hoạch Tháng cho tháng sau → nút nhảy sang tab đó.
   onOpenMonthPlan?: () => void;
+  fatigueWeekHours?: number; // ngưỡng mệt, admin vặn ở AI Training Center; mặc định FATIGUE_WEEK_HOURS
 }
 
 const WEEKDAY_LABELS = ["CN", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"];
@@ -117,13 +118,13 @@ const fmtPerHour = (n: number) => {
 
 // Nhãn cho 1 ứng viên: luôn nói rõ số đang hiện là của brand này hay số chung. Ops tưởng số chung
 // là số của brand rồi xếp nhầm là kiểu sai nguy hiểm nhất mà màn này có thể gây ra.
-const suggestionLabel = (s: HostSuggestion) => {
+const suggestionLabel = (s: HostSuggestion, fatigueAt: number) => {
   const h = headlineFor(s);
   // Giai đoạn D: thêm khung giờ (host mạnh tối ≠ mạnh trưa), số ca đã xếp trong tháng, cảnh mệt.
   const extras = [
     s.blockSessions >= 2 ? `khung này ${fmtPerHour(s.blockGmvPerHour)}` : "",
     s.monthSessions > 0 ? `${s.monthSessions} ca tháng này` : "",
-    s.weekHours > FATIGUE_WEEK_HOURS ? `⚠ ${s.weekHours.toFixed(0)}h tuần này` : ""
+    s.weekHours > fatigueAt ? `⚠ ${s.weekHours.toFixed(0)}h tuần này` : ""
   ].filter(Boolean);
   const tail = extras.length > 0 ? ` · ${extras.join(" · ")}` : "";
   if (h.scope === "none") return `${s.name} · chưa có dữ liệu${tail}`;
@@ -148,7 +149,8 @@ export default function ShiftScheduling({
   onLogAudit,
   onSubmitSessionReport,
   onSessionSnapshotApplied,
-  onOpenMonthPlan
+  onOpenMonthPlan,
+  fatigueWeekHours = FATIGUE_WEEK_HOURS
 }: ShiftSchedulingProps) {
   const admin = isAdminRole(currentRole);
   const myTalentId = activeUser.assignedTalentId;
@@ -491,6 +493,7 @@ export default function ShiftScheduling({
           month={selectedMonth}
           today={today}
           perfSince={perfSince}
+          fatigueWeekHours={fatigueWeekHours}
           onFinalizeSlot={onFinalizeSlot}
           onClose={() => setBulkOpen(false)}
         />
@@ -835,7 +838,7 @@ export default function ShiftScheduling({
                             {/* Thứ tự option = thứ tự xếp hạng hiệu suất, không phải thứ tự đăng ký */}
                             {suggestions.map((s) => (
                               <option key={s.talentId} value={s.talentId}>
-                                {suggestionLabel(s)}
+                                {suggestionLabel(s, fatigueWeekHours)}
                               </option>
                             ))}
                           </select>
