@@ -36,6 +36,7 @@ import {
 import { LiveSession, BrandMonthlyReport as BrandMonthlyReportType, AffiliatePlanEntry, AffiliateActualEntry, BrandPlatformRate } from "../../types";
 import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
 import { fetchCreatorLivePerfMonthSlice } from "../../lib/dataraw/creatorLivePerfSlice";
+import { dailyFromSessions, monthRunRate, pickLivePerfSource } from "../../lib/report/sessionsLivePerf";
 import { fetchLivePerformanceCoreMonthSlice, fetchProductCardTrafficMonthSlice, ProductCardMonthSlice } from "../../lib/dataraw/monthlyDailySlice";
 import { fetchTopSkuMonthSlice, fetchTopPromotionsMonthSlice } from "../../lib/dataraw/monthlyProductSlice";
 import { fetchAffiliateCreatorListMonthSlice } from "../../lib/dataraw/affiliateCreatorListSlice";
@@ -307,12 +308,14 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, m
   const [creatorListImporting, setCreatorListImporting] = useState(false);
   const [creatorListErrorMsg, setCreatorListErrorMsg] = useState<string | null>(null);
 
-  const [liveCurrent, setLiveCurrent] = useState<Awaited<ReturnType<typeof fetchCreatorLivePerfMonthSlice>> | null>(null);
-  const [livePrev, setLivePrev] = useState<Awaited<ReturnType<typeof fetchCreatorLivePerfMonthSlice>> | null>(null);
+  // Đổi nguồn số (2026-09-21): file Dataraw chỉ còn là DỰ PHÒNG — tháng nào có ca có số thì Tab 01/02
+  // đọc từ ca (lib/report/sessionsLivePerf.ts). *Raw = slice từ Dataraw; liveCurrent/livePrev = nguồn đã chọn.
+  const [liveCurrentRaw, setLiveCurrentRaw] = useState<Awaited<ReturnType<typeof fetchCreatorLivePerfMonthSlice>> | null>(null);
+  const [livePrevRaw, setLivePrevRaw] = useState<Awaited<ReturnType<typeof fetchCreatorLivePerfMonthSlice>> | null>(null);
   // Chart "GMV/Giờ & Số Giờ Live" (Tab 02, brief Module 2) cần 4 tháng — liveCurrent/livePrev đã
   // phủ 2 tháng gần nhất, chỉ cần fetch thêm 2 tháng cũ hơn (last4Months[0..1]), keyed theo "YYYY-MM".
   const [liveOlderMonths, setLiveOlderMonths] = useState<Record<string, Awaited<ReturnType<typeof fetchCreatorLivePerfMonthSlice>>>>({});
-  const [dailyPerf, setDailyPerf] = useState<Awaited<ReturnType<typeof fetchLivePerformanceCoreMonthSlice>> | null>(null);
+  const [dailyPerfRaw, setDailyPerfRaw] = useState<Awaited<ReturnType<typeof fetchLivePerformanceCoreMonthSlice>> | null>(null);
   const [productCard, setProductCard] = useState<ProductCardMonthSlice | null>(null);
   const [productCardPrev, setProductCardPrev] = useState<ProductCardMonthSlice | null>(null);
   const [topSku, setTopSku] = useState<Awaited<ReturnType<typeof fetchTopSkuMonthSlice>> | null>(null);
@@ -357,9 +360,9 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, m
     ])
       .then(([lc, lp, dp, pc, pcPrev, sku, promo, affPrev, olderEntries]) => {
         if (cancelled) return;
-        setLiveCurrent(lc);
-        setLivePrev(lp);
-        setDailyPerf(dp);
+        setLiveCurrentRaw(lc);
+        setLivePrevRaw(lp);
+        setDailyPerfRaw(dp);
         setProductCard(pc);
         setProductCardPrev(pcPrev);
         setTopSku(sku);
@@ -374,6 +377,14 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, m
     };
   }, [brandId, start, end, prevStart, prevEnd, prevMonth, last4Months]);
 
+  const liveSource = useMemo(() => pickLivePerfSource(sessions, brandId, start, end, liveCurrentRaw), [sessions, brandId, start, end, liveCurrentRaw]);
+  const livePrevSource = useMemo(() => pickLivePerfSource(sessions, brandId, prevStart, prevEnd, livePrevRaw), [sessions, brandId, prevStart, prevEnd, livePrevRaw]);
+  const liveCurrent = liveSource.slice;
+  const livePrev = livePrevSource.slice;
+  // Diễn biến theo ngày: file Live Performance Core Stats có GMV gián tiếp — ưu tiên khi có; không có
+  // thì gộp ca theo ngày.
+  const dailyPerf = useMemo(() => (dailyPerfRaw?.hasAnyBatch ? dailyPerfRaw : dailyFromSessions(sessions, brandId, start, end)), [dailyPerfRaw, sessions, brandId, start, end]);
+  const runRate = useMemo(() => monthRunRate(sessions, brandId, start, end), [sessions, brandId, start, end]);
   const currentAgg = useMemo(() => aggregateCreatorLivePerfRows(liveCurrent?.rows ?? []), [liveCurrent]);
   const prevAgg = useMemo(() => aggregateCreatorLivePerfRows(livePrev?.rows ?? []), [livePrev]);
 
@@ -400,10 +411,11 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, m
   const gmvHourTrend = useMemo(
     () =>
       last4Months.map((m) => {
-        const agg = m === month ? currentAgg : m === prevMonth ? prevAgg : aggregateCreatorLivePerfRows(liveOlderMonths[m]?.rows ?? []);
+        const older = m === month || m === prevMonth ? null : pickLivePerfSource(sessions, brandId, monthRangeLocal(m).start, monthRangeLocal(m).end, liveOlderMonths[m] ?? null).slice;
+        const agg = m === month ? currentAgg : m === prevMonth ? prevAgg : aggregateCreatorLivePerfRows(older?.rows ?? []);
         return { label: m.slice(5, 7) + "/" + m.slice(2, 4), gmvPerHour: agg.gmvPerHour ?? 0, hours: agg.hours };
       }),
-    [last4Months, month, prevMonth, currentAgg, prevAgg, liveOlderMonths]
+    [last4Months, month, prevMonth, currentAgg, prevAgg, liveOlderMonths, sessions, brandId]
   );
 
   // Gợi ý % phân bổ mặc định cho Tab 05 — trung bình tỷ trọng GMV thực đạt theo khung camp của
@@ -942,6 +954,37 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, m
           <>
             {tab === "overview" && (
               <div className="space-y-4">
+                {runRate && runRate.doneCount > 0 && (
+                  <div className="rounded-xl p-4 grid grid-cols-2 sm:grid-cols-5 gap-3" style={{ background: PAL.panel2, border: `1px solid ${PAL.line}` }}>
+                    <div>
+                      <div className="text-[10.5px] uppercase tracking-wider" style={{ color: PAL.muted }}>Target kế hoạch</div>
+                      <div className="font-mono text-lg font-bold mt-1" style={{ color: PAL.cream }}>{formatCurrencyAdaptive(runRate.targetTotal)}</div>
+                      <div className="text-[10px]" style={{ color: PAL.muted }}>{runRate.doneCount} ca xong · {runRate.pendingCount} còn lại</div>
+                    </div>
+                    <div>
+                      <div className="text-[10.5px] uppercase tracking-wider" style={{ color: PAL.muted }}>Đã đạt</div>
+                      <div className="font-mono text-lg font-bold mt-1" style={{ color: PAL.green }}>{formatCurrencyAdaptive(runRate.actualDone)}</div>
+                      <div className="text-[10px]" style={{ color: PAL.muted }}>{runRate.targetTotal > 0 ? `${((runRate.actualDone / runRate.targetTotal) * 100).toFixed(0)}% target` : ""}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10.5px] uppercase tracking-wider" style={{ color: PAL.muted }}>Run-rate</div>
+                      <div className="font-mono text-lg font-bold mt-1" style={{ color: runRate.runRate === null ? PAL.muted : runRate.runRate >= 1 ? PAL.green : runRate.runRate >= 0.9 ? PAL.gold : PAL.red }}>
+                        {runRate.runRate === null ? "—" : `${(runRate.runRate * 100).toFixed(0)}%`}
+                      </div>
+                      <div className="text-[10px]" style={{ color: PAL.muted }}>thực tế ÷ target ca đã xong</div>
+                    </div>
+                    <div>
+                      <div className="text-[10.5px] uppercase tracking-wider" style={{ color: PAL.muted }}>Dự kiến cuối tháng</div>
+                      <div className="font-mono text-lg font-bold mt-1" style={{ color: PAL.cream }}>{formatCurrencyAdaptive(runRate.projected)}</div>
+                      <div className="text-[10px]" style={{ color: PAL.muted }}>còn lại = target × run-rate</div>
+                    </div>
+                    <div>
+                      <div className="text-[10.5px] uppercase tracking-wider" style={{ color: PAL.muted }}>{runRate.gap > 0 ? "Thiếu" : "Vượt"}</div>
+                      <div className="font-mono text-lg font-bold mt-1" style={{ color: runRate.gap > 0 ? PAL.red : PAL.green }}>{formatCurrencyAdaptive(Math.abs(runRate.gap))}</div>
+                      <div className="text-[10px]" style={{ color: PAL.muted }}>{runRate.targetTotal > 0 ? `${((Math.abs(runRate.gap) / runRate.targetTotal) * 100).toFixed(1)}% target` : ""}</div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div className="rounded-xl p-4" style={{ background: PAL.panel2, border: `1px solid ${PAL.line}` }}>
@@ -1098,11 +1141,24 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, m
                 {!liveCurrent?.hasAnyBatch ? (
                   <Panel title="Livestream Channel" icon={<Radio className="w-4 h-4" />} sub="TikTok Creator Live Performance">
                     <p className="text-sm text-center py-6" style={{ color: PAL.muted }}>
-                      Chưa có file "Creator-Live-Performance" nào được import trong Dữ Liệu Gốc cho tháng này.
+                      Tháng này chưa có ca nào có số liệu (trợ live up file vào ca / đối soát / nạp bù) và cũng chưa có file "Creator-Live-Performance" ở Dữ Liệu Gốc.
                     </p>
                   </Panel>
                 ) : (
                   <>
+                    <div className="flex items-center gap-2 text-[11px] rounded-xl px-2.5 py-2" style={{ background: PAL.panel2, border: `1px solid ${PAL.line}`, color: PAL.muted }}>
+                      <span className="uppercase tracking-wider text-[10px] font-bold" style={{ color: PAL.cream }}>Nguồn số</span>
+                      {liveSource.source === "sessions" ? (
+                        <span>
+                          {liveSource.sessionCount} ca có số — {liveSource.reconciled} đã đối soát
+                          {liveSource.snapshot > 0 ? `, ${liveSource.snapshot} số lúc giao ca` : ""}
+                          {liveSource.manual > 0 ? `, ${liveSource.manual} tự khai` : ""}
+                          {dailyPerfRaw?.hasAnyBatch ? " · diễn biến ngày từ file Live Performance Core Stats" : ""}
+                        </span>
+                      ) : (
+                        <span>file Creator-Live-Performance ở Dữ Liệu Gốc (tháng này chưa có ca nào có số)</span>
+                      )}
+                    </div>
                     {(liveCurrent.missingDays.length > 0 || (dailyPerf?.missingDays.length ?? 0) > 0) && (
                       <div
                         className="flex items-start gap-2 text-[11px] rounded-xl p-2.5"
