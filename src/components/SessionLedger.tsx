@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { BookOpen, CheckCircle2, ChevronRight, Circle, Link2 } from "lucide-react";
-import { Brand, LiveSession, Studio, Talent, UserRole } from "../types";
+import { Brand, LiveSession, Studio, Talent, UserRole, AuditLogEntry } from "../types";
 import { getTodayDate } from "../lib/dateUtils";
 import { formatCurrencyAdaptive } from "../lib/formatCurrency";
 import { sessionHours } from "../lib/performance/hostPerformance";
@@ -48,6 +48,7 @@ interface SessionLedgerProps {
   onUpdateSession?: (session: LiveSession) => Promise<boolean>;
   onDeleteSession?: (id: string) => Promise<void>;
   onCancelSession?: (id: string, reason: string) => Promise<boolean>;
+  onLogAudit?: (entry: { action: string; details: string; category: AuditLogEntry["category"] }) => Promise<void>;
 }
 
 
@@ -113,7 +114,8 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
   onSessionSnapshotApplied,
   onUpdateSession,
   onDeleteSession,
-  onCancelSession
+  onCancelSession,
+  onLogAudit
 }) => {
   const isBrandView = variant === "brand";
   const today = getTodayDate();
@@ -413,6 +415,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
           onUpdateSession={isBrandView ? undefined : onUpdateSession}
           onDeleteSession={onDeleteSession}
           onCancelSession={onCancelSession}
+          onLogAudit={onLogAudit}
         />
       )}
     </div>

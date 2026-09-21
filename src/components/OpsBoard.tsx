@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, Radio, UserX } from "lucide-react";
-import { Brand, LiveSession, ShiftRegistration, ShiftSlot, Studio, Talent, UserRole } from "../types";
+import { Brand, LiveSession, ShiftRegistration, ShiftSlot, Studio, Talent, UserRole, AuditLogEntry } from "../types";
 import { getTodayDate } from "../lib/dateUtils";
 import { formatCurrencyAdaptive } from "../lib/formatCurrency";
 import { SessionReportInput } from "../lib/db/sessionReports";
@@ -31,6 +31,7 @@ export interface OpsBoardProps {
   onUpdateSession?: (session: LiveSession) => Promise<boolean>;
   onDeleteSession?: (id: string) => Promise<void>;
   onCancelSession?: (id: string, reason: string) => Promise<boolean>;
+  onLogAudit?: (entry: { action: string; details: string; category: AuditLogEntry["category"] }) => Promise<void>;
   // Ca chưa có người → nhảy sang Đăng Ký & Chốt Lịch.
   onOpenScheduling?: () => void;
   // Q4: bấm thông báo → App đặt id ca cần mở; bảng mở Cửa sổ Ca Live rồi báo lại để App xoá yêu cầu.
@@ -85,6 +86,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
   onUpdateSession,
   onDeleteSession,
   onCancelSession,
+  onLogAudit,
   onOpenScheduling,
   requestOpenSessionId = null,
   onOpenRequestHandled
@@ -181,14 +183,14 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
   };
 
   const SlotRow = ({ r }: { r: Extract<Row, { kind: "slot" }> }) => (
-    <button onClick={onOpenScheduling} className="w-full text-left bg-[var(--surface-base)] border border-dashed border-rose-800/70 hover:border-rose-500 rounded-xl p-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 transition-colors" title="Chốt người ở Đăng Ký & Chốt Lịch">
+    <button onClick={onOpenScheduling} className="w-full text-left bg-[var(--surface-base)] border border-dashed border-rose-800/70 hover:border-rose-500 rounded-xl p-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 transition-colors" title="Chốt người ở Nhân sự ca">
       <span className="font-mono text-sm font-black text-[var(--text)] w-[104px] shrink-0">{r.startTime.slice(0, 5)}–{r.endTime.slice(0, 5)}</span>
       <span className="flex items-center gap-1.5 min-w-0">
         <BrandLogo brand={r.slot.brandId ? brandById.get(r.slot.brandId) : undefined} size="xs" />
         <span className="text-sm font-bold text-[var(--text)] truncate">{r.slot.brandName}</span>
       </span>
       <span className="text-xs text-rose-300 font-bold flex items-center gap-1"><UserX className="w-3.5 h-3.5" /> chưa có người · {r.registered} đăng ký</span>
-      <span className="ml-auto text-[11px] text-[var(--text-faint)] flex items-center gap-1"><CalendarClock className="w-3.5 h-3.5" /> chốt ở Đăng Ký & Chốt Lịch</span>
+      <span className="ml-auto text-[11px] text-[var(--text-faint)] flex items-center gap-1"><CalendarClock className="w-3.5 h-3.5" /> chốt ở Nhân sự ca</span>
     </button>
   );
 
@@ -239,7 +241,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 sm:p-4 space-y-4">
             {rows.length === 0 && (
               <p className="text-sm text-[var(--text-faint)] italic py-6 text-center">
-                Không có ca nào {range === "today" ? "hôm nay" : range === "tomorrow" ? "ngày mai" : "trong khoảng này"}. Ca được mở từ Kế Hoạch Tháng hoặc Đăng Ký & Chốt Lịch.
+                Không có ca nào {range === "today" ? "hôm nay" : range === "tomorrow" ? "ngày mai" : "trong khoảng này"}. Ca được mở từ Kế Hoạch Tháng hoặc nút "Mở ca chờ đăng ký" ở Lịch & Studio.
               </p>
             )}
             {groupedByDay(rows).map(([day, list]) => (
@@ -269,7 +271,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
           </section>
           <section className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 sm:p-4 space-y-2">
             <h3 className="text-sm font-black text-[var(--text)]">Sắp tới (14 ngày)</h3>
-            {mineUpcoming.length === 0 ? <p className="text-xs text-[var(--text-faint)] italic">Chưa có ca nào được chốt cho bạn. Đăng ký ca mở ở tab Đăng Ký & Chốt Lịch.</p> : mineUpcoming.map((s) => <SessionRow key={s.id} s={s} />)}
+            {mineUpcoming.length === 0 ? <p className="text-xs text-[var(--text-faint)] italic">Chưa có ca nào được chốt cho bạn. Đăng ký ca mở ở tab Đăng Ký Ca.</p> : mineUpcoming.map((s) => <SessionRow key={s.id} s={s} />)}
           </section>
         </>
       )}
@@ -289,6 +291,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
           onUpdateSession={mode === "ops" ? onUpdateSession : undefined}
           onDeleteSession={mode === "ops" ? onDeleteSession : undefined}
           onCancelSession={mode === "ops" ? onCancelSession : undefined}
+          onLogAudit={mode === "ops" ? onLogAudit : undefined}
         />
       )}
     </div>

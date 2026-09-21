@@ -20,7 +20,6 @@ import {
   Users,
   Radio,
   Check,
-  Repeat,
   Zap,
   ChevronLeft,
   ChevronRight,
@@ -169,14 +168,6 @@ export default function ShiftScheduling({
   // Talent tự nhập report cho đúng ca của mình (chỉ 1 form mở tại 1 thời điểm).
   const [openSessionId, setOpenSessionId] = useState<string | null>(null);
 
-  // Giai đoạn 15c — thay người khẩn cấp trên 1 ca đã chốt (Host/Trợ live báo bận
-  // sát giờ live). Danh sách ứng viên thay thế lấy từ session_availability của
-  // chính slot đó (những người đã đăng ký rảnh nhưng không được chọn lúc chốt) —
-  // không cần bảng mới, đúng phạm vi đã CEO duyệt ở BUSINESS_ROADMAP.md.
-  const [emergencySwap, setEmergencySwap] = useState<{ slotId: string; role: "host" | "coHost" } | null>(null);
-  const [swapCandidateId, setSwapCandidateId] = useState("");
-  const [swapReason, setSwapReason] = useState("");
-  const [swapBusy, setSwapBusy] = useState(false);
 
   // Cam kết hợp đồng (migration 0081) — nạp ngay tại đây thay vì truyền từ App: RLS chỉ cho
   // ceo/admin/operations đọc, đúng bằng isAdminRole(), nên talent gọi cũng chỉ ra mảng rỗng.
@@ -313,31 +304,6 @@ export default function ShiftScheduling({
     if (ok) setPickByLot((prev) => ({ ...prev, [slot.id]: { hostId: "", coHostId: "" } }));
   };
 
-  const handleEmergencySwap = async (slot: ShiftSlot, session: LiveSession, role: "host" | "coHost") => {
-    const candidate = talentsById.get(swapCandidateId);
-    if (!candidate) return;
-    setSwapBusy(true);
-    const oldName = role === "host" ? session.hostName : session.coHostName;
-    const updated: LiveSession =
-      role === "host"
-        ? { ...session, hostId: candidate.id, hostName: candidate.name }
-        : { ...session, coHostId: candidate.id, coHostName: candidate.name };
-    const ok = await onUpdateSession(updated);
-    if (ok) {
-      await onLogAudit({
-        action: `Thay người khẩn cấp — ${role === "host" ? "Host" : "Trợ live"}`,
-        details: `Ca ${slot.date} ${slot.startTime}-${slot.endTime} (${slot.brandName}): ${oldName || "—"} → ${candidate.name}. Lý do: ${
-          swapReason.trim() || "Không ghi lý do"
-        }.`,
-        category: "Security Alert"
-      });
-      setEmergencySwap(null);
-      setSwapCandidateId("");
-      setSwapReason("");
-    }
-    setSwapBusy(false);
-  };
-
   // Tải theo host trong tháng đang xem — gộp cả vai trò Host lẫn Co-host.
   const loadByTalent = useMemo(() => {
     const map = new Map<string, { name: string; hours: number; shifts: number }>();
@@ -428,11 +394,11 @@ export default function ShiftScheduling({
         <div>
           <h2 className="text-xl font-bold text-[var(--text)] flex items-center gap-2">
             <CalendarIcon className="w-5 h-5 text-blue-400" />
-            Đăng Ký &amp; Chốt Lịch Host
+            {admin ? "Nhân sự ca" : "Đăng Ký Ca"}
           </h2>
           <p className="text-sm text-[var(--text-muted)] mt-1">
             {admin
-              ? "Mở ca, xem ai đã đăng ký, chốt Host + Co-host cho từng ca."
+              ? "Chốt Host + Trợ live cho từng ca trước tháng. Đổi người, số liệu, report của ca đã chốt: mở ca (Cửa sổ Ca Live)."
               : "Đăng ký các ca bạn rảnh — Operations sẽ chốt lịch từ danh sách đã đăng ký."}
           </p>
         </div>
@@ -736,8 +702,8 @@ export default function ShiftScheduling({
             </button>
           )}
         </div>
-        <div className="overflow-x-auto -mx-2">
-          <div className="min-w-[720px] px-2 space-y-2">
+        <div className="-mx-2">
+          <div className="px-2 space-y-2">
             {visibleSlots.length === 0 && (
               <p className="text-sm text-[var(--text-faint)] py-6 text-center">{selectedDate ? "Chưa có ca nào trong ngày này." : "Chưa có ca nào — ca được mở khi chốt Kế Hoạch Tháng."}</p>
             )}
@@ -781,7 +747,7 @@ export default function ShiftScheduling({
                 )}
                 <div className="bg-[var(--surface-base)]/80 border border-[var(--border)] rounded-xl p-3 flex flex-col gap-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-3 text-sm">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
                       <span className="font-mono font-bold text-[var(--text)]">
                         {dayLabel(slot.date)} {slot.date} · {slot.startTime}-{slot.endTime}
                       </span>
@@ -844,7 +810,7 @@ export default function ShiftScheduling({
                     <button
                       onClick={() => handleToggleRegister(slot)}
                       disabled={busySlotId === slot.id}
-                      className={`self-start flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 ${
+                      className={`w-full sm:w-auto sm:self-start justify-center flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-lg transition-colors disabled:opacity-50 ${
                         iAmRegistered
                           ? "bg-emerald-950 text-emerald-300 border border-emerald-800 hover:bg-rose-950 hover:text-rose-300 hover:border-rose-800"
                           : "bg-blue-950 text-blue-300 border border-blue-800 hover:bg-blue-900"
@@ -864,11 +830,11 @@ export default function ShiftScheduling({
                           {talentsById.get(r.talentId)?.name ?? r.talentId}
                         </span>
                       ))}
-                      <div className="flex flex-wrap items-center gap-2 ml-auto">
+                      <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:ml-auto">
                           <select
                             value={pick.hostId}
                             onChange={(e) => setPickByLot((prev) => ({ ...prev, [slot.id]: { ...pick, hostId: e.target.value } }))}
-                            className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1 text-xs text-[var(--text)] focus:outline-none focus:border-blue-500"
+                            className="flex-1 min-w-[140px] bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs text-[var(--text)] focus:outline-none focus:border-blue-500"
                           >
                             <option value="">Host…</option>
                             {/* Thứ tự option = thứ tự xếp hạng hiệu suất, không phải thứ tự đăng ký */}
@@ -892,7 +858,7 @@ export default function ShiftScheduling({
                           <select
                             value={pick.coHostId}
                             onChange={(e) => setPickByLot((prev) => ({ ...prev, [slot.id]: { ...pick, coHostId: e.target.value } }))}
-                            className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1 text-xs text-[var(--text)] focus:outline-none focus:border-blue-500"
+                            className="flex-1 min-w-[140px] bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs text-[var(--text)] focus:outline-none focus:border-blue-500"
                           >
                             {/* Cố ý KHÔNG hiện GMV/giờ ở ô Trợ live: số đó là hiệu suất khi làm
                                 HOST, gắn vào vai trợ live sẽ khiến ops xếp người theo một con số
@@ -1017,130 +983,21 @@ export default function ShiftScheduling({
                           </div>
                         );
                       }
-                      const swapping = emergencySwap?.slotId === slot.id ? emergencySwap : null;
-                      const candidateRegs = regs.filter((r) => r.talentId !== session.hostId && r.talentId !== session.coHostId);
-                      const swapRegIds = new Set(candidateRegs.map((r) => r.talentId));
-                      // Q1: người thay không bắt buộc đã đăng ký rảnh (ops gọi tay được).
-                      const swapOthers = talents.filter((t) => !swapRegIds.has(t.id) && t.id !== session.hostId && t.id !== session.coHostId).sort((a, b) => a.name.localeCompare(b.name, "vi"));
-                      const swapUnregistered = !!swapCandidateId && !swapRegIds.has(swapCandidateId);
                       return (
-                        <div className="pt-1 border-t border-[var(--border)]/80 space-y-2">
-                          <div className="flex flex-wrap items-center gap-2 text-xs">
-                            <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                            <span className="text-emerald-300">Đã chốt</span>
-                            <span className="text-[var(--text-muted)]">
-                              Host: <span className="text-[var(--text)] font-medium">{session.hostName || "—"}</span>
-                            </span>
-                            {admin && (
-                              <button
-                                onClick={() => {
-                                  setEmergencySwap({ slotId: slot.id, role: "host" });
-                                  setSwapCandidateId("");
-                                  setSwapReason("");
-                                }}
-                                className="flex items-center gap-1 text-amber-400 hover:text-amber-300 font-bold"
-                              >
-                                <Repeat className="w-3 h-3" /> Báo bận / Tìm người thay
-                              </button>
-                            )}
-                            {session.coHostId && (
-                              <>
-                                <span className="text-[var(--text-muted)]">
-                                  · Trợ live: <span className="text-[var(--text)] font-medium">{session.coHostName}</span>
-                                </span>
-                                {admin && (
-                                  <button
-                                    onClick={() => {
-                                      setEmergencySwap({ slotId: slot.id, role: "coHost" });
-                                      setSwapCandidateId("");
-                                      setSwapReason("");
-                                    }}
-                                    className="flex items-center gap-1 text-amber-400 hover:text-amber-300 font-bold"
-                                  >
-                                    <Repeat className="w-3 h-3" /> Báo bận / Tìm người thay
-                                  </button>
-                                )}
-                              </>
-                            )}
-                          </div>
-                          {swapping && (
-                            <div className="bg-amber-950/80 border border-amber-800 rounded-lg p-2.5 space-y-2">
-                              <div className="text-[11px] text-amber-200 font-bold">
-                                Tìm người thay cho vai trò {swapping.role === "host" ? "Host" : "Trợ live"}
-                              </div>
-                              {candidateRegs.length === 0 && (
-                                <div className="text-[11px] text-[var(--text-faint)]">
-                                  Không ai khác đã đăng ký rảnh ca này — chọn ở nhóm "Người khác" sau khi đã gọi xác nhận.
-                                </div>
-                              )}
-                              <select
-                                value={swapCandidateId}
-                                onChange={(e) => setSwapCandidateId(e.target.value)}
-                                className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1 text-xs text-[var(--text)] focus:outline-none focus:border-amber-500"
-                              >
-                                <option value="">— Chọn người thay —</option>
-                                {candidateRegs.length > 0 && (
-                                  <optgroup label="Đã đăng ký rảnh">
-                                    {candidateRegs.map((r) => (
-                                      <option key={r.talentId} value={r.talentId}>
-                                        {talentsById.get(r.talentId)?.name ?? r.talentId}
-                                      </option>
-                                    ))}
-                                  </optgroup>
-                                )}
-                                {swapOthers.length > 0 && (
-                                  <optgroup label="Người khác (chưa đăng ký rảnh)">
-                                    {swapOthers.map((t) => (
-                                      <option key={t.id} value={t.id}>{t.name}</option>
-                                    ))}
-                                  </optgroup>
-                                )}
-                              </select>
-                              {swapUnregistered && (
-                                <div className="text-[11px] text-amber-300 flex items-center gap-1">
-                                  <AlertTriangle className="w-3 h-3" /> Người này chưa đăng ký rảnh ca — xác nhận trước khi thay.
-                                </div>
-                              )}
-                              <input
-                                placeholder="Lý do đổi (vd: Host báo bận đột xuất)"
-                                value={swapReason}
-                                onChange={(e) => setSwapReason(e.target.value)}
-                                className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1 text-xs text-[var(--text)] focus:outline-none focus:border-amber-500"
-                              />
-                              <div className="flex items-center gap-2">
-                                <button
-                                  onClick={() => handleEmergencySwap(slot, session, swapping.role)}
-                                  disabled={!swapCandidateId || swapBusy}
-                                  className="bg-amber-600 hover:bg-amber-500 disabled:opacity-40 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"
-                                >
-                                  {swapBusy ? "Đang xử lý..." : "Xác nhận thay người"}
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setEmergencySwap(null);
-                                    setSwapCandidateId("");
-                                    setSwapReason("");
-                                  }}
-                                  className="text-xs text-[var(--text-muted)] hover:text-[var(--text)]"
-                                >
-                                  Huỷ
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                          {/* Cửa sổ Ca Live (2026-09-21): file số liệu + report nộp trong cửa sổ ca, không còn inline ở màn xếp lịch. */}
-                          <div className="pt-2 border-t border-[var(--border)]/80 flex flex-wrap items-center gap-2">
-                            <button
-                              onClick={() => setOpenSessionId(session.id)}
-                              className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-emerald-950 text-emerald-300 border border-emerald-800 hover:bg-emerald-900 transition-colors"
-                            >
-                              <Radio className="w-3.5 h-3.5" />
-                              {admin || myTalentId === session.hostId || myTalentId === session.coHostId ? "Mở ca · nộp số liệu & report" : "Xem ca"}
-                            </button>
-                            {session.report?.submittedAt && (
-                              <span className="text-[11px] text-[var(--text-faint)]">Report đã nhập lúc {new Date(session.report.submittedAt).toLocaleString("vi-VN")}</span>
-                            )}
-                          </div>
+                        <div className="pt-1 border-t border-[var(--border)]/80 flex flex-wrap items-center gap-2 text-xs">
+                          <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                          <span className="text-emerald-300">Đã chốt</span>
+                          <span className="text-[var(--text-muted)]">
+                            Host: <span className="text-[var(--text)] font-medium">{session.hostName || "—"}</span>
+                            {session.coHostId && <> · Trợ live: <span className="text-[var(--text)] font-medium">{session.coHostName}</span></>}
+                          </span>
+                          {/* U2 (2026-09-21): báo bận/thay người, số liệu, report — tất cả trong Cửa sổ Ca Live. */}
+                          <button
+                            onClick={() => setOpenSessionId(session.id)}
+                            className="ml-auto flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-emerald-950 text-emerald-300 border border-emerald-800 hover:bg-emerald-900 transition-colors"
+                          >
+                            <Radio className="w-3.5 h-3.5" /> {admin ? "Mở ca · đổi người" : "Mở ca"}
+                          </button>
                         </div>
                       );
                     })()}
@@ -1199,6 +1056,7 @@ export default function ShiftScheduling({
             onSessionSnapshotApplied={onSessionSnapshotApplied}
             onUpdateSession={admin ? onUpdateSession : undefined}
             onCancelSession={admin ? onCancelSession : undefined}
+            onLogAudit={admin ? onLogAudit : undefined}
           />
         ) : null;
       })()}

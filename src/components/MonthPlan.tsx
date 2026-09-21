@@ -393,7 +393,7 @@ export default function MonthPlan({
       setLockedSlotsTick((t) => t + 1);
       setMsg(
         `Đã chốt: mở ${r.created} ca mới${r.linked > 0 ? `, gắn ${r.linked} ca đã có sẵn` : ""}${r.cancelled > 0 ? `, huỷ ${r.cancelled} ca bị bỏ` : ""}` +
-          `${r.kept_registered > 0 ? `, GIỮ ${r.kept_registered} ca bị bỏ nhưng đã có người đăng ký (xử lý ở Đăng Ký & Chốt Lịch)` : ""} — ${r.total_slots} ca đang chờ đăng ký.`
+          `${r.kept_registered > 0 ? `, GIỮ ${r.kept_registered} ca bị bỏ nhưng đã có người đăng ký (xử lý ở Nhân sự ca)` : ""} — ${r.total_slots} ca đang chờ đăng ký.`
       );
     } catch (e: any) {
       setMsg(`Không chốt được: ${e.message ?? e}`);
@@ -414,7 +414,7 @@ export default function MonthPlan({
             Kế Hoạch Tháng
           </h2>
           <p className="text-sm text-[var(--text-muted)] mt-1">
-            Lập lưới ca cho brand trước khi mở đăng ký: giờ theo cam kết, target đặt ngay trong kế hoạch, chốt là ca đổ xuống Đăng Ký &amp; Chốt Lịch.
+            Lập lưới ca cho brand trước khi mở đăng ký: giờ theo cam kết, target đặt ngay trong kế hoạch, chốt là ca đổ xuống Nhân sự ca chờ talent đăng ký.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">

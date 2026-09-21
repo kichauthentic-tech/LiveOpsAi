@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { LiveSession, ShiftSlot, ShiftRegistration, Studio, Talent, Brand, PromoScheme, UserRole, BrandStudio } from "../types";
+import { LiveSession, ShiftSlot, ShiftRegistration, Studio, Talent, Brand, PromoScheme, UserRole, BrandStudio, AuditLogEntry } from "../types";
 import { schemesForDate } from "../lib/schemeUtils";
 import { findBrandStudioId } from "../lib/db/brandStudios";
 import { timeRangesOverlap } from "../lib/dateUtils";
@@ -61,6 +61,7 @@ interface LiveCalendarProps {
   onSessionSnapshotApplied?: (session: LiveSession) => void;
   onDeleteSession?: (id: string) => Promise<void>;
   onCancelSession?: (id: string, reason: string) => Promise<boolean>;
+  onLogAudit?: (entry: { action: string; details: string; category: AuditLogEntry["category"] }) => Promise<void>;
 }
 
 // Chiều cao vùng card trong 1 ô lịch tháng — đủ cho ~2 card, ô nào nhiều hơn thì cuộn dọc
@@ -100,7 +101,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   onSubmitSessionReport,
   onSessionSnapshotApplied,
   onDeleteSession,
-  onCancelSession
+  onCancelSession,
+  onLogAudit
 }) => {
   // Sync sessions with propSessions so clean test mode is respected
   const [sessions, setSessions] = useState<LiveSession[]>(propSessions);
@@ -1316,6 +1318,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
           onUpdateSession={onUpdateSession}
           onDeleteSession={onDeleteSession}
           onCancelSession={onCancelSession}
+          onLogAudit={onLogAudit}
         />
       )}
 

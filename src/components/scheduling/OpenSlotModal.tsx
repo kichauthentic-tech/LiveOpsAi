@@ -122,7 +122,7 @@ export const OpenSlotModal: React.FC<OpenSlotModalProps> = ({
           <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text)] p-1 rounded-lg"><X className="w-5 h-5" /></button>
         </div>
         <p className="text-[11px] text-[var(--text-muted)] bg-[var(--surface-base)]/60 border border-[var(--border)] rounded-xl p-2.5">
-          Ca hiện ở <b>Đăng Ký &amp; Chốt Lịch</b> để talent đăng ký rảnh, ops chốt Host/Trợ sau. Ca đều đặn hằng tháng nên lập ở Kế Hoạch Tháng — chỗ này cho ca phát sinh.
+          Ca hiện ở <b>Nhân sự ca</b> (talent thấy ở Đăng Ký Ca) để talent đăng ký rảnh, ops chốt Host/Trợ sau. Ca đều đặn hằng tháng nên lập ở Kế Hoạch Tháng — chỗ này cho ca phát sinh.
         </p>
 
         <form onSubmit={submit} className="space-y-3 text-xs">

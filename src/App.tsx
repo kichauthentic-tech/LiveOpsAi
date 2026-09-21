@@ -1444,7 +1444,7 @@ export default function App() {
               // Đăng Ký & Chốt Lịch. Chỉ ops (manage_sessions = ceo/admin/operations).
               { id: "month_plan", label: "Kế Hoạch Tháng", icon: CalendarRange, perm: "manage_sessions" as PermissionKey },
               // Đăng ký & Chốt Lịch Host — không gate theo PermissionKey (talent cũng dùng, ở nhóm trên).
-              { id: "shift_scheduling", label: "Đăng Ký & Chốt Lịch", icon: CalendarClock, perm: undefined }
+              { id: "shift_scheduling", label: "Nhân sự ca", icon: CalendarClock, perm: undefined }
             ]
           },
           {
@@ -1937,6 +1937,7 @@ export default function App() {
                     onUpdateSession={handleUpdateSession}
                     onDeleteSession={handleDeleteSession}
                     onCancelSession={handleCancelSession}
+                    onLogAudit={pushAuditLog}
                   />
                 )}
 
@@ -1962,6 +1963,7 @@ export default function App() {
                         onUpdateSession={handleUpdateSession}
                         onDeleteSession={handleDeleteSession}
                     onCancelSession={handleCancelSession}
+                    onLogAudit={pushAuditLog}
                         onOpenScheduling={() => setActiveTab("shift_scheduling")}
                         requestOpenSessionId={notifOpenSessionId}
                         onOpenRequestHandled={() => setNotifOpenSessionId(null)}
@@ -1993,6 +1995,7 @@ export default function App() {
                     onSessionSnapshotApplied={handleSessionReconciled}
                     onDeleteSession={handleDeleteSession}
                     onCancelSession={handleCancelSession}
+                    onLogAudit={pushAuditLog}
                   />
                     )}
                   </div>
@@ -2097,6 +2100,7 @@ export default function App() {
                     onSessionSnapshotApplied={handleSessionReconciled}
                     onDeleteSession={handleDeleteSession}
                     onCancelSession={handleCancelSession}
+                    onLogAudit={pushAuditLog}
                     onUpdateSession={handleUpdateSession}
                     onCreateSlot={handleCreateShiftSlot}
                     onDeleteSlot={handleDeleteShiftSlot}

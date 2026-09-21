@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Ban, CheckCircle2, Circle, Link2, Pencil, Trash2, X } from "lucide-react";
-import { Brand, LiveSession, Studio, Talent, UserRole } from "../types";
+import { AuditLogEntry, Brand, LiveSession, Studio, Talent, UserRole } from "../types";
 import { timeRangesOverlap } from "../lib/dateUtils";
 import { formatCurrencyAdaptive } from "../lib/formatCurrency";
 import { sessionHours } from "../lib/performance/hostPerformance";
@@ -53,6 +53,9 @@ export interface SessionWindowProps {
   onDeleteSession?: (id: string) => Promise<void>;
   // 0097: huỷ ca (ops) — ca chưa có số liệu; slot đã chốt về 'cancelled', talent được báo.
   onCancelSession?: (id: string, reason: string) => Promise<boolean>;
+  // U2 (audit 2026-09-21): "Báo bận / thay người" gộp vào Sửa ca ở đây — đổi Host/Trợ thì ghi lý do,
+  // lưu audit log như luồng cũ ở Đăng Ký & Chốt Lịch (trigger 0083 tự báo người mới/cũ).
+  onLogAudit?: (entry: { action: string; details: string; category: AuditLogEntry["category"] }) => Promise<void>;
 }
 
 const OPS_ROLES: UserRole[] = ["ceo", "operations", "admin"];
@@ -100,7 +103,8 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
   onSessionSnapshotApplied,
   onUpdateSession,
   onDeleteSession,
-  onCancelSession
+  onCancelSession,
+  onLogAudit
 }) => {
   const isBrandView = viewer.role === "brand";
   const isOps = OPS_ROLES.includes(viewer.role);
@@ -118,6 +122,8 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
   const [cancelReason, setCancelReason] = useState("");
   const [cancelOpen, setCancelOpen] = useState(false);
   const [edit, setEdit] = useState({ date: s.date, startTime: s.startTime, endTime: s.endTime, studioId: s.studioId, hostId: s.hostId, coHostId: s.coHostId ?? "" });
+  const [changeReason, setChangeReason] = useState("");
+  const peopleChanged = edit.hostId !== s.hostId || (edit.coHostId || "") !== (s.coHostId ?? "");
   useEffect(() => {
     setEditingReport(false);
     setEditing(false);
@@ -178,8 +184,18 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
     };
     setSaving(true);
     const ok = await onUpdateSession(updated);
+    if (ok && peopleChanged && onLogAudit) {
+      const parts: string[] = [];
+      if (edit.hostId !== s.hostId) parts.push(`Host: ${s.hostName || "—"} → ${hostObj?.name ?? "—"}`);
+      if ((edit.coHostId || "") !== (s.coHostId ?? "")) parts.push(`Trợ live: ${s.coHostName || "—"} → ${coObj?.name ?? "—"}`);
+      await onLogAudit({
+        action: "Thay người trên ca",
+        details: `Ca ${s.date} ${s.startTime}-${s.endTime} (${s.brandName}): ${parts.join("; ")}. Lý do: ${changeReason.trim() || "Không ghi lý do"}.`,
+        category: "Security Alert"
+      });
+    }
     setSaving(false);
-    if (ok) setEditing(false);
+    if (ok) { setEditing(false); setChangeReason(""); }
   };
 
   const handleDelete = async () => {
@@ -239,7 +255,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
           </div>
           <div className="flex items-center gap-1 shrink-0">
             {canEdit && !editing && (
-              <button onClick={() => setEditing(true)} className="text-[11px] font-bold text-[var(--accent-text)] px-2.5 py-1.5 rounded-lg border border-[var(--accent)]/40 flex items-center gap-1"><Pencil className="w-3 h-3" /> Sửa</button>
+              <button onClick={() => setEditing(true)} className="text-[11px] font-bold text-[var(--accent-text)] px-2.5 py-1.5 rounded-lg border border-[var(--accent)]/40 flex items-center gap-1"><Pencil className="w-3 h-3" /> Sửa ca · thay người</button>
             )}
             <button onClick={onClose} className="text-[var(--text-faint)] hover:text-[var(--text)] p-1" aria-label="Đóng"><X className="w-5 h-5" /></button>
           </div>
@@ -291,6 +307,11 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                   </select>
                 </label>
               </div>
+              {peopleChanged && (
+                <label className="block"><span className="font-bold text-amber-300 block mb-1">Lý do đổi người <span className="font-normal text-[var(--text-faint)]">(báo bận, đổi ca…) — ghi vào nhật ký, người mới/cũ được báo</span></span>
+                  <input type="text" value={changeReason} onChange={(e) => setChangeReason(e.target.value)} placeholder="Vd: Host báo bận đột xuất" className={inputCls} />
+                </label>
+              )}
               <p className="text-[10px] text-[var(--text-faint)]">Target GMV của ca lấy từ Kế Hoạch Tháng đã chốt — không sửa ở đây.</p>
               <div className="flex justify-end gap-2 pt-1">
                 <button onClick={() => setEditing(false)} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] text-[var(--text-muted)] font-bold text-[11px]">Huỷ</button>

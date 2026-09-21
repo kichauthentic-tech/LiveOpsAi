@@ -226,7 +226,7 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
         )}
 
         {!myTalentId && !canManage && (
-          <p className="text-xs text-[var(--text-faint)] text-center py-2">Xem chi tiết đăng ký ở "Đăng Ký &amp; Chốt Lịch".</p>
+          <p className="text-xs text-[var(--text-faint)] text-center py-2">Xem chi tiết đăng ký ở "Nhân sự ca".</p>
         )}
 
         <div className="pt-2 border-t border-[var(--border)] flex justify-end">

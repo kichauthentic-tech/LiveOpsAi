@@ -66,6 +66,17 @@ export function SessionReportForm({ session, onSubmit, onCancel, canOverrideMetr
     r?.avgOrderValue ?? (snap && session.totalOrders ? Math.round(session.actualGmv / session.totalOrders) : 0)
   );
 
+  // Q5 (audit 2026-09-21): khi ca đã có file, mọi tỷ lệ suy được từ snapshot KHÔNG hỏi lại — tính
+  // tại đây (cùng công thức lib/liveSnapshot/metrics.ts) và gửi lên thay state. Form còn lại đúng
+  // phần máy không biết: ADS, GMV tổng, restart/trễ/cross, status, OT/off sớm, link dashboard.
+  const derived = {
+    impressionCount: session.impressions ?? 0,
+    enterRoomRate: session.impressions ? Math.round((session.totalViews / session.impressions) * 10000) / 100 : 0,
+    ctor: session.productClicks ? Math.round((session.totalOrders / session.productClicks) * 10000) / 100 : 0,
+    avgOrderValue: session.totalOrders ? Math.round(session.actualGmv / session.totalOrders) : 0,
+    gpm: session.totalViews ? Math.round(session.actualGmv / (session.totalViews / 1000)) : 0
+  };
+
   const [atcCount, setAtcCount] = useState(r?.atcCount ?? 0);
   const [gpm, setGpm] = useState(r?.gpm ?? 0);
   const [checkoutCount, setCheckoutCount] = useState(r?.checkoutCount ?? 0);
@@ -102,8 +113,10 @@ export function SessionReportForm({ session, onSubmit, onCancel, canOverrideMetr
       dashboardLink1: dashboardLink1 || undefined,
       dashboardLink2: dashboardLink2 || undefined,
       ...(isTikTok
-        ? { impressionCount, adsCost, enterRoomRate, ctor, avgOrderValue }
-        : { atcCount, gpm, checkoutCount, coinSpent })
+        ? metricsLocked
+          ? { impressionCount: derived.impressionCount, adsCost, enterRoomRate: derived.enterRoomRate, ctor: derived.ctor, avgOrderValue: derived.avgOrderValue }
+          : { impressionCount, adsCost, enterRoomRate, ctor, avgOrderValue }
+        : { atcCount, gpm: metricsLocked ? derived.gpm : gpm, checkoutCount, coinSpent })
     });
     setSaving(false);
     if (ok) onCancel();
@@ -143,6 +156,64 @@ export function SessionReportForm({ session, onSubmit, onCancel, canOverrideMetr
         </div>
       </div>
 
+      {metricsLocked ? (
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-base)]/60 p-3 space-y-2">
+          <div className="flex items-baseline justify-between gap-2 flex-wrap">
+            <p className="font-bold text-[var(--text)] text-xs">Số máy đã biết — từ file, không nhập lại</p>
+            <span className="text-[10px] text-[var(--text-faint)]">tỷ lệ tính lại từ số đếm của riêng ca này</span>
+          </div>
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-x-3 gap-y-1.5 text-[11px]">
+            {[
+              ["GMV Live", `${Math.round(session.actualGmv).toLocaleString("vi-VN")}đ`],
+              ["Đơn", session.totalOrders.toLocaleString("vi-VN")],
+              ["View", session.totalViews.toLocaleString("vi-VN")],
+              ["AVG.view", `${session.avgWatchTimeSeconds}s`],
+              [isTikTok ? "CTR LIVE" : "CTR", `${(Math.round(session.ctrAvg * 100) / 100).toLocaleString("vi-VN")}%`],
+              ...(isTikTok
+                ? [
+                    ["Impression", derived.impressionCount.toLocaleString("vi-VN")],
+                    ["ERR", `${derived.enterRoomRate}%`],
+                    ["CTOR", `${derived.ctor}%`],
+                    ["AVG.price", `${derived.avgOrderValue.toLocaleString("vi-VN")}đ`]
+                  ]
+                : [["GPM", derived.gpm.toLocaleString("vi-VN")]])
+            ].map(([k, v]) => (
+              <div key={k as string} className="min-w-0">
+                <p className="text-[var(--text-faint)] font-bold uppercase tracking-wide text-[9px]">{k}</p>
+                <p className="font-mono font-bold text-[var(--text)] truncate">{v}</p>
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+            <div>
+              <label className={labelClass}>GMV Tổng (VNĐ) <span className="font-normal text-[var(--text-faint)]">— nếu khác GMV Live</span></label>
+              <input type="number" value={gmvTotal} onChange={(e) => setGmvTotal(Number(e.target.value))} className={inputClass} />
+            </div>
+            {isTikTok ? (
+              <div>
+                <label className={labelClass}>ADS Cost (VNĐ)</label>
+                <input type="number" value={adsCost} onChange={(e) => setAdsCost(Number(e.target.value))} className={inputClass} />
+              </div>
+            ) : (
+              <>
+                <div>
+                  <label className={labelClass}>ATC</label>
+                  <input type="number" value={atcCount} onChange={(e) => setAtcCount(Number(e.target.value))} className={inputClass} />
+                </div>
+                <div>
+                  <label className={labelClass}>CO (Checkout)</label>
+                  <input type="number" value={checkoutCount} onChange={(e) => setCheckoutCount(Number(e.target.value))} className={inputClass} />
+                </div>
+                <div>
+                  <label className={labelClass}>Xu Đã Tung</label>
+                  <input type="number" value={coinSpent} onChange={(e) => setCoinSpent(Number(e.target.value))} className={inputClass} />
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      ) : (
+        <>
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <div>
           <label className={labelClass}>GMV Live (VNĐ)</label>
@@ -222,6 +293,9 @@ export function SessionReportForm({ session, onSubmit, onCancel, canOverrideMetr
             <input type="number" value={coinSpent} onChange={(e) => setCoinSpent(Number(e.target.value))} className={inputClass} />
           </div>
         </div>
+      )}
+
+        </>
       )}
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 items-end">
@@ -311,6 +385,12 @@ export function SessionReportForm({ session, onSubmit, onCancel, canOverrideMetr
         </div>
       </div>
 
+      {session.liveRoomIds && session.liveRoomIds.length > 0 && (
+        <p className="text-[11px] text-[var(--text-muted)]">
+          Room ID từ file: {session.liveRoomIds.map((id) => <code key={id} className="font-mono text-[var(--text)] bg-[var(--surface-elevated)] px-1.5 py-0.5 rounded mr-1">{id}</code>)}
+          <span className="text-[var(--text-faint)]">— dán link dashboard của room tương ứng nếu ops cần đối chiếu.</span>
+        </p>
+      )}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className={labelClass}>Link Dashboard 1</label>

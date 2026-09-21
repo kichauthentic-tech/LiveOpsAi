@@ -75,7 +75,7 @@ export function HostPerformance({ sessions, brands }: HostPerformanceProps) {
 
         {quality.total === 0 ? (
           <p className="text-xs text-[var(--text-faint)] mt-4">
-            Chưa có ca nào có số liệu trong khoảng này. Số liệu sinh ra khi trợ live up file vào ca (xem tab Đăng Ký &amp; Chốt Lịch).
+            Chưa có ca nào có số liệu trong khoảng này. Số liệu sinh ra khi trợ live up file vào ca (mở ca ở Bảng Vận Hành).
           </p>
         ) : (
           <p className="text-[11px] text-[var(--text-muted)] mt-4 flex items-start gap-1.5">

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { Brand, LiveSession, PromoScheme, ShiftSlot, ShiftRegistration, Studio, Talent, UserRole, BrandStudio } from "../../types";
+import { Brand, LiveSession, PromoScheme, ShiftSlot, ShiftRegistration, Studio, Talent, UserRole, BrandStudio, AuditLogEntry } from "../../types";
 import { SessionWindow } from "../SessionWindow";
 import { SessionReportInput } from "../../lib/db/sessionReports";
 import { CalendarIcon, ChevronLeft, ChevronRight, Plus, Tag } from "lucide-react";
@@ -50,6 +50,7 @@ interface BrandCalendarProps {
   onSessionSnapshotApplied?: (session: LiveSession) => void;
   onDeleteSession?: (id: string) => Promise<void>;
   onCancelSession?: (id: string, reason: string) => Promise<boolean>;
+  onLogAudit?: (entry: { action: string; details: string; category: AuditLogEntry["category"] }) => Promise<void>;
 }
 
 const WEEKDAY_LABELS = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
@@ -115,7 +116,8 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
   onSubmitSessionReport,
   onSessionSnapshotApplied,
   onDeleteSession,
-  onCancelSession
+  onCancelSession,
+  onLogAudit
 }) => {
   const today = new Date();
   const [month, setMonth] = useState(`${today.getFullYear()}-${`${today.getMonth() + 1}`.padStart(2, "0")}`);
@@ -582,6 +584,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
           onUpdateSession={canManage ? onUpdateSession : undefined}
           onDeleteSession={canManage ? onDeleteSession : undefined}
           onCancelSession={canManage ? onCancelSession : undefined}
+          onLogAudit={canManage ? onLogAudit : undefined}
         />
       )}
 
