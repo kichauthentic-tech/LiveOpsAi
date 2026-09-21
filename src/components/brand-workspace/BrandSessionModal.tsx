@@ -7,6 +7,7 @@ interface BrandSessionModalProps {
   brandId: string;
   brandName: string;
   studios: Studio[];
+  defaultStudioId?: string; // phòng mặc định của brand (0098) — chọn sẵn khi tạo mới
   talents: Talent[];
   moderators: SystemUser[];
   sessions: LiveSession[]; // agency-wide — để check trùng lịch xuyên brand
@@ -23,6 +24,7 @@ export const BrandSessionModal: React.FC<BrandSessionModalProps> = ({
   brandId,
   brandName,
   studios,
+  defaultStudioId = "",
   talents,
   moderators,
   sessions,
@@ -37,7 +39,7 @@ export const BrandSessionModal: React.FC<BrandSessionModalProps> = ({
   const isEdit = !!existingSession;
   const [mode, setMode] = useState<"session" | "slot">("session");
   const [title, setTitle] = useState(existingSession?.title || "");
-  const [studioId, setStudioId] = useState(existingSession?.studioId || studios[0]?.id || "");
+  const [studioId, setStudioId] = useState(existingSession?.studioId || defaultStudioId || studios[0]?.id || "");
   const [hostId, setHostId] = useState(existingSession?.hostId || talents[0]?.id || "");
   const [coHostId, setCoHostId] = useState(existingSession?.coHostId || "");
   const [assistantId, setAssistantId] = useState(existingSession?.assistantId || "");
@@ -48,8 +50,8 @@ export const BrandSessionModal: React.FC<BrandSessionModalProps> = ({
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!isEdit && !studioId && studios[0]) setStudioId(studios[0].id);
-  }, [studios, isEdit, studioId]);
+    if (!isEdit && !studioId && (defaultStudioId || studios[0])) setStudioId(defaultStudioId || studios[0].id);
+  }, [studios, isEdit, studioId, defaultStudioId]);
   useEffect(() => {
     if (!isEdit && !hostId && talents[0]) setHostId(talents[0].id);
   }, [talents, isEdit, hostId]);

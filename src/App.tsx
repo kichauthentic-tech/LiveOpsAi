@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, WorkflowRule, Talent, Studio, Equipment, Brand, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, TalentRateHistoryEntry, BrandPlatformRateHistoryEntry, BrandSku, PromoScheme, AppNotification, BrandMonthlyReport as BrandMonthlyReportRow } from "./types";
+import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, WorkflowRule, Talent, Studio, Equipment, Brand, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, BrandStudio, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, TalentRateHistoryEntry, BrandPlatformRateHistoryEntry, BrandSku, PromoScheme, AppNotification, BrandMonthlyReport as BrandMonthlyReportRow } from "./types";
 import { ALL_PERMISSION_DEFINITIONS } from "./data/mockData";
 import { fetchTalents, updateTalent, updateMyTalentProfile, deleteTalent } from "./lib/db/talents";
 import { fetchStudios, createStudio, updateStudio, deleteStudio } from "./lib/db/studios";
@@ -15,6 +15,7 @@ import { fetchSessionFinances, upsertSessionFinance, setSessionFinanceApproval }
 import { fetchTikTokStatus, fetchTikTokWebhookEvents } from "./lib/db/tiktokIntegration";
 import { fetchAiAgentPrompts, updateAiAgentPrompt } from "./lib/db/aiAgentPrompts";
 import { fetchBrandPlatformRates, upsertBrandPlatformRate, upsertBrandPlatformReturnRate } from "./lib/db/brandPlatformRates";
+import { fetchBrandStudios, setBrandStudio } from "./lib/db/brandStudios";
 import { fetchShiftSlots, createShiftSlot, updateShiftSlot, deleteShiftSlot } from "./lib/db/shiftSlots";
 import { fetchShiftRegistrations, registerForSlot, unregisterFromSlot } from "./lib/db/shiftRegistrations";
 import {
@@ -307,6 +308,8 @@ export default function App() {
   // Đăng ký & Chốt Lịch Host — real data from Supabase `brand_platform_rates`/`shift_slots`/
   // `session_availability` (Giai đoạn 14a), no mock fallback.
   const [brandPlatformRates, setBrandPlatformRates] = useState<BrandPlatformRate[]>([]);
+  // Phòng live mặc định brand × nền tảng (0098) — chốt kế hoạch ghi vào ca, form mở ca chọn sẵn.
+  const [brandStudios, setBrandStudios] = useState<BrandStudio[]>([]);
   const [shiftRegistrations, setShiftRegistrations] = useState<ShiftRegistration[]>([]);
   const [recurringShiftTemplates, setRecurringShiftTemplates] = useState<RecurringShiftTemplate[]>([]);
   const [phase14Loading, setPhase14Loading] = useState(true);
@@ -486,10 +489,11 @@ export default function App() {
       .then((r) => { if (cancelled) return; setEngineParams(r.params); setEngineParamsUpdatedAt(r.updatedAt); setEngineParamsError(null); })
       .catch((e) => { if (!cancelled) setEngineParamsError(`Không tải được tham số engine (dùng mặc định): ${e.message ?? e}`); })
       .finally(() => { if (!cancelled) setEngineParamsLoading(false); });
-    Promise.all([fetchBrandPlatformRates(), fetchShiftSlots(), fetchShiftRegistrations(), fetchRecurringShiftTemplates(), fetchLockedPlanTargets().catch(() => new Map<string, number>())])
-      .then(([rates, slots, regs, templates, planTargets]) => {
+    Promise.all([fetchBrandPlatformRates(), fetchShiftSlots(), fetchShiftRegistrations(), fetchRecurringShiftTemplates(), fetchLockedPlanTargets().catch(() => new Map<string, number>()), fetchBrandStudios().catch(() => [] as BrandStudio[])])
+      .then(([rates, slots, regs, templates, planTargets, bStudios]) => {
         if (cancelled) return;
         setBrandPlatformRates(rates);
+        setBrandStudios(bStudios);
         setShiftSlots(slots);
         setShiftRegistrations(regs);
         setRecurringShiftTemplates(templates);
@@ -1259,6 +1263,20 @@ export default function App() {
     }
   };
 
+  const handleSetBrandStudio = async (brandId: string, platform: "TikTok" | "Shopee", studioId: string): Promise<boolean> => {
+    try {
+      await setBrandStudio(brandId, platform, studioId);
+      setBrandStudios((prev) => {
+        const next = prev.filter((b) => !(b.brandId === brandId && b.platform === platform));
+        return studioId ? [...next, { brandId, platform, studioId }] : next;
+      });
+      return true;
+    } catch (e: any) {
+      window.alert(`Không lưu được phòng mặc định: ${e.message ?? e}`);
+      return false;
+    }
+  };
+
   const handleSaveBrandPlatformRate = async (
     brandId: string,
     platform: "TikTok" | "Shopee",
@@ -1958,6 +1976,7 @@ export default function App() {
                     studios={activeStudios}
                     talents={activeTalents}
                     brands={activeBrands}
+                    brandStudios={brandStudios}
                     users={activeUsers}
                     onAddSession={handleAddSession}
                     onUpdateSession={handleUpdateSession}
@@ -2036,6 +2055,8 @@ export default function App() {
                     onDeleteTemplate={handleDeleteRecurringTemplate}
                     onPlanLocked={reloadShiftSlots}
                     engineParams={engineParams}
+                    brandStudios={brandStudios}
+                    onSetBrandStudio={handleSetBrandStudio}
                   />
                 )}
 
@@ -2062,6 +2083,7 @@ export default function App() {
                     shiftSlots={shiftSlots}
                     shiftRegistrations={shiftRegistrations}
                     studios={activeStudios}
+                    brandStudios={brandStudios}
                     talents={activeTalents}
                     users={activeUsers}
                     schemes={promoSchemes}

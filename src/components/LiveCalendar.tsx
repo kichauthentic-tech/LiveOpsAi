@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { LiveSession, ShiftSlot, ShiftRegistration, Studio, Talent, Brand, SystemUser, PromoScheme, UserRole } from "../types";
+import { LiveSession, ShiftSlot, ShiftRegistration, Studio, Talent, Brand, SystemUser, PromoScheme, UserRole, BrandStudio } from "../types";
 import { schemesForDate } from "../lib/schemeUtils";
+import { findBrandStudioId } from "../lib/db/brandStudios";
 import { timeRangesOverlap } from "../lib/dateUtils";
 import { CAMPAIGN_DAY_STYLES, getCampaignDayInfo } from "../lib/campaignDays";
 import { BrandLogo } from "./ui/BrandLogo";
@@ -56,6 +57,7 @@ interface LiveCalendarProps {
   studios: Studio[];
   talents: Talent[];
   brands: Brand[];
+  brandStudios?: BrandStudio[]; // phòng mặc định brand × nền tảng (0098) — đổi brand trong form mở ca thì chọn sẵn phòng
   users: SystemUser[];
   onAddSession?: (newSession: LiveSession) => Promise<boolean>;
   onUpdateSession?: (updatedSession: LiveSession) => Promise<boolean>;
@@ -107,6 +109,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   studios,
   talents,
   brands,
+  brandStudios = [],
   users,
   onAddSession,
   onUpdateSession,
@@ -1695,7 +1698,11 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   <label className="font-bold text-[var(--text-muted)] block mb-1">Thương Hiệu (Brand):</label>
                   <select
                     value={newBrandId}
-                    onChange={(e) => setNewBrandId(e.target.value)}
+                    onChange={(e) => {
+                      setNewBrandId(e.target.value);
+                      const def = findBrandStudioId(brandStudios, e.target.value);
+                      if (def) setNewStudioId(def);
+                    }}
                     className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
                   >
                     {brands.map((b) => (

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { Brand, LiveSession, PromoScheme, ShiftSlot, ShiftRegistration, Studio, SystemUser, Talent, UserRole } from "../../types";
+import { Brand, LiveSession, PromoScheme, ShiftSlot, ShiftRegistration, Studio, SystemUser, Talent, UserRole, BrandStudio } from "../../types";
 import { SessionWindow } from "../SessionWindow";
 import { SessionReportInput } from "../../lib/db/sessionReports";
 import { CalendarIcon, ChevronLeft, ChevronRight, Plus, Tag } from "lucide-react";
@@ -7,6 +7,7 @@ import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
 import { schemesForDate } from "../../lib/schemeUtils";
 import { CAMPAIGN_DAY_STYLES, getCampaignDayInfo } from "../../lib/campaignDays";
 import { BrandSessionModal } from "./BrandSessionModal";
+import { findBrandStudioId } from "../../lib/db/brandStudios";
 import { SlotDetailModal } from "../scheduling/SlotDetailModal";
 import { PosterCalendarHeader, PosterCalendarGrid, PosterDayCell } from "../ui/PosterCalendarGrid";
 import { EventPill, EventPillTier } from "../ui/EventPill";
@@ -29,6 +30,7 @@ interface BrandCalendarProps {
   shiftSlots?: ShiftSlot[];
   shiftRegistrations?: ShiftRegistration[];
   studios: Studio[];
+  brandStudios?: BrandStudio[]; // phòng mặc định brand × nền tảng (0098) — form mở ca chọn sẵn
   talents: Talent[];
   users?: SystemUser[];
   schemes?: PromoScheme[];
@@ -97,6 +99,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
   shiftSlots = [],
   shiftRegistrations = [],
   studios,
+  brandStudios = [],
   talents,
   users = [],
   schemes = [],
@@ -593,6 +596,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
           brandId={brandId}
           brandName={brandName}
           studios={studios}
+          defaultStudioId={findBrandStudioId(brandStudios, brandId)}
           talents={talents}
           moderators={moderators}
           sessions={sessions}

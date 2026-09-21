@@ -426,6 +426,14 @@ export interface BrandPlatformRate {
   returnRate: number;
 }
 
+// Phòng live mặc định theo brand × nền tảng (0098): chốt Kế Hoạch Tháng ghi phòng này vào ca sinh ra;
+// form mở ca chọn sẵn. VERA có 2 phòng (TTS/SPE) vì live 2 nền tảng — nên không gắn thẳng lên Brand.
+export interface BrandStudio {
+  brandId: string;
+  platform: "TikTok" | "Shopee";
+  studioId: string;
+}
+
 // Lớp cam kết hợp đồng (migration 0081) — điều khoản trên GIẤY. Khác BrandPlatformRate: rate là
 // ĐƠN GIÁ mỗi giờ, còn đây là KHỐI LƯỢNG brand cam kết mỗi tháng. Hai thứ nhân với nhau mới ra
 // doanh thu cam kết, nên không gộp chung một bảng.

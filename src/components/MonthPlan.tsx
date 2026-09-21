@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Brand, BrandMonthPlan, BrandMonthPlanSlot, BrandMonthlyCommitment, CalendarEventRow, LiveSession, PlanCampRanges, PromoScheme, RecurringShiftTemplate, ShiftSlot, Studio } from "../types";
+import { Brand, BrandMonthPlan, BrandMonthPlanSlot, BrandMonthlyCommitment, BrandStudio, CalendarEventRow, LiveSession, PlanCampRanges, PromoScheme, RecurringShiftTemplate, ShiftSlot, Studio } from "../types";
 import { AlertTriangle, Ban, CalendarRange, ChevronLeft, ChevronRight, Lock, Plus, Repeat, Save, Sparkles, Wand2, X } from "lucide-react";
 import { fetchBrandMonthlyCommitments } from "../lib/db/brandContracts";
 import { PlanSettings, fetchBrandLockedPlanSlots, fetchCalendarEvents, fetchMonthPlan, fetchPlanStatuses, lockMonthPlan, replacePlanSlots, upsertMonthPlan } from "../lib/db/monthPlans";
@@ -22,6 +22,7 @@ import { RecurringRulesPanel } from "./scheduling/RecurringRulesPanel";
 import { HistorySummary, STRATEGY_LABEL, SuggestResult, SuggestStrategy, buildHistory, estimateSlots, suggestMonthPlan } from "../lib/scheduling/suggestEngine";
 import { formatCurrencyAdaptive } from "../lib/formatCurrency";
 import { EngineParams } from "../lib/scheduling/engineParams";
+import { findBrandStudioId } from "../lib/db/brandStudios";
 
 interface MonthPlanProps {
   brands: Brand[];
@@ -38,6 +39,10 @@ interface MonthPlanProps {
   // Chốt xong → App nạp lại shift_slots để Đăng Ký & Chốt Lịch / lịch thấy ca mới.
   onPlanLocked: () => Promise<void>;
   engineParams: EngineParams; // admin vặn ở AI Training Center (0095)
+  // Phòng live mặc định của brand (0098) — chốt ghi vào ca sinh ra. Cấu hình của brand, không thuộc
+  // kế hoạch: đổi được cả khi kế hoạch đã chốt (chỉ ảnh hưởng lần chốt sau).
+  brandStudios: BrandStudio[];
+  onSetBrandStudio: (brandId: string, platform: "TikTok" | "Shopee", studioId: string) => Promise<boolean>;
 }
 
 const WEEKDAY_LABELS = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
@@ -65,7 +70,9 @@ export default function MonthPlan({
   onToggleTemplate,
   onDeleteTemplate,
   onPlanLocked,
-  engineParams
+  engineParams,
+  brandStudios,
+  onSetBrandStudio
 }: MonthPlanProps) {
   const today = todayVn();
   const [brandId, setBrandId] = useState(brands[0]?.id ?? "");
@@ -98,6 +105,8 @@ export default function MonthPlan({
     if (!brandId && brands.length > 0) setBrandId(brands[0].id);
   }, [brands, brandId]);
   const brand = brands.find((b) => b.id === brandId);
+  const brandStudioId = findBrandStudioId(brandStudios, brandId);
+  const brandStudio = studios.find((s) => s.id === brandStudioId);
   const brandTemplates = useMemo(() => recurringShiftTemplates.filter((t) => t.brandId === brandId), [recurringShiftTemplates, brandId]);
 
   useEffect(() => {
@@ -367,7 +376,8 @@ export default function MonthPlan({
     const warn = planHours > 0 && Math.abs(gap) > 0.01 ? `\n\nGiờ kế hoạch ${fmtH(totals.hours)}h ${gap > 0 ? "THIẾU" : "VƯỢT"} ${fmtH(Math.abs(gap))}h so với ${fmtH(planHours)}h cần xếp.` : "";
     const relockNote = locked ? "\n\nChốt lại sẽ mở thêm ca mới và HUỶ ca đang mở đã bị bỏ khỏi kế hoạch (trừ ca đã có người đăng ký)." : "";
     const targetWarn = targetGap && targetGap.pct > engineParams.targetGapWarnPct ? `\n\nDự báo lưới ${formatCurrencyAdaptive(targetGap.forecast)} THIẾU ${formatCurrencyAdaptive(targetGap.gap)} (${Math.round(targetGap.pct * 100)}%) so với target ${formatCurrencyAdaptive(targetTotal)}${targetGap.fill ? ` — cần bù ~${fmtH(targetGap.extraHours)}h.` : " — thêm giờ trong khung cũng không chạm."} Sau khi chốt, target/ca KHÔNG chia lại nữa.` : "";
-    if (!window.confirm(`${locked ? "Chốt lại" : "Chốt"} kế hoạch ${brand?.name} tháng ${month}: ${drafts.length} ca chờ đăng ký?${warn}${targetWarn}${relockNote}`)) return;
+    const studioNote = brandStudio ? `\n\nCa sinh ra gắn phòng ${brandStudio.name} (${brandStudio.roomNumber}).` : "\n\nBrand CHƯA có phòng live mặc định — ca sinh ra sẽ không có phòng (không kiểm được trùng phòng). Chọn ở Tham số → Phòng live trước nếu cần.";
+    if (!window.confirm(`${locked ? "Chốt lại" : "Chốt"} kế hoạch ${brand?.name} tháng ${month}: ${drafts.length} ca chờ đăng ký?${warn}${targetWarn}${relockNote}${studioNote}`)) return;
     const p = await save();
     if (!p) return;
     setSaving(true);
@@ -475,6 +485,13 @@ export default function MonthPlan({
             })}
           </div>
           <input type="text" disabled={!editable} value={settings.notes} onChange={(e) => { setSettings((s) => ({ ...s, notes: e.target.value })); setDirty(true); }} placeholder="Ghi chú kế hoạch (tuỳ chọn)" className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-xs text-[var(--text)] disabled:opacity-60" />
+          <label className="block text-xs">
+            <span className="font-bold text-[var(--text-muted)] block mb-1">Phòng live (TikTok) <span className="font-normal text-[var(--text-faint)]">— cấu hình brand, ca chốt ra gắn phòng này</span></span>
+            <select value={brandStudioId} onChange={(e) => { if (brandId) void onSetBrandStudio(brandId, "TikTok", e.target.value); }} className={`w-full bg-[var(--surface-base)] border rounded-lg p-2 text-[var(--text)] ${brandStudioId ? "border-[var(--border)]" : "border-amber-700"}`}>
+              <option value="">— Chưa chọn phòng —</option>
+              {studios.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.roomNumber})</option>)}
+            </select>
+          </label>
         </div>
 
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 space-y-2">
