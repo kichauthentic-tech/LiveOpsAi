@@ -1,13 +1,12 @@
 import React, { useMemo, useState } from "react";
-import { Brand, LiveSession, PromoScheme, ShiftSlot, ShiftRegistration, Studio, SystemUser, Talent, UserRole, BrandStudio } from "../../types";
+import { Brand, LiveSession, PromoScheme, ShiftSlot, ShiftRegistration, Studio, Talent, UserRole, BrandStudio } from "../../types";
 import { SessionWindow } from "../SessionWindow";
 import { SessionReportInput } from "../../lib/db/sessionReports";
 import { CalendarIcon, ChevronLeft, ChevronRight, Plus, Tag } from "lucide-react";
 import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
 import { schemesForDate } from "../../lib/schemeUtils";
 import { CAMPAIGN_DAY_STYLES, getCampaignDayInfo } from "../../lib/campaignDays";
-import { BrandSessionModal } from "./BrandSessionModal";
-import { findBrandStudioId } from "../../lib/db/brandStudios";
+import { OpenSlotModal } from "../scheduling/OpenSlotModal";
 import { SlotDetailModal } from "../scheduling/SlotDetailModal";
 import { PosterCalendarHeader, PosterCalendarGrid, PosterDayCell } from "../ui/PosterCalendarGrid";
 import { EventPill, EventPillTier } from "../ui/EventPill";
@@ -32,7 +31,6 @@ interface BrandCalendarProps {
   studios: Studio[];
   brandStudios?: BrandStudio[]; // phòng mặc định brand × nền tảng (0098) — form mở ca chọn sẵn
   talents: Talent[];
-  users?: SystemUser[];
   schemes?: PromoScheme[];
   onAddScheme?: (scheme: { title: string; description: string; startDate: string; endDate: string; brandId: string; category: string }) => Promise<void>;
   onUpdateScheme?: (id: string, patch: Partial<Pick<PromoScheme, "title" | "description" | "startDate" | "endDate" | "category">>) => Promise<void>;
@@ -40,7 +38,6 @@ interface BrandCalendarProps {
   currentUserId?: string;
   myTalentId?: string;
   canEdit?: boolean;
-  onAddSession?: (s: LiveSession) => Promise<boolean>;
   onUpdateSession?: (s: LiveSession) => Promise<boolean>;
   onCreateSlot?: (s: ShiftSlot) => Promise<boolean>;
   onDeleteSlot?: (id: string) => Promise<void>;
@@ -101,7 +98,6 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
   studios,
   brandStudios = [],
   talents,
-  users = [],
   schemes = [],
   onAddScheme,
   onUpdateScheme,
@@ -109,7 +105,6 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
   currentUserId,
   myTalentId,
   canEdit = true,
-  onAddSession,
   onUpdateSession,
   onCreateSlot,
   onDeleteSlot,
@@ -133,8 +128,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
   const [selectedSlotDetail, setSelectedSlotDetail] = useState<ShiftSlot | null>(null);
   // Cả workspace này chỉ có 1 brand → 1 theme màu duy nhất, tính 1 lần thay vì mỗi card.
   const brandTheme = getBrandTheme(brandName);
-  const moderators = users.filter((u) => u.role === "moderator");
-  const canManage = canEdit && !!onAddSession && !!onUpdateSession && !!onCreateSlot;
+  const canManage = canEdit && !!onUpdateSession && !!onCreateSlot;
   const [openSessionId, setOpenSessionId] = useState<string | null>(null);
   const openSession = openSessionId ? sessions.find((x) => x.id === openSessionId) ?? null : null;
 
@@ -297,7 +291,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
               onClick={() => setModalState({ open: true, session: null, initialDate: undefined })}
               className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-lg transition-all active:scale-95"
             >
-              <Plus className="w-4 h-4" /> Đặt Lịch Mới
+              <Plus className="w-4 h-4" /> Mở ca chờ đăng ký
             </button>
           )
         }
@@ -592,20 +586,15 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
       )}
 
       {modalState.open && canManage && (
-        <BrandSessionModal
-          brandId={brandId}
-          brandName={brandName}
+        <OpenSlotModal
+          fixedBrand={{ id: brandId, name: brandName }}
           studios={studios}
-          defaultStudioId={findBrandStudioId(brandStudios, brandId)}
-          talents={talents}
-          moderators={moderators}
+          brandStudios={brandStudios}
           sessions={sessions}
-          existingSession={modalState.session}
-          initialDate={modalState.initialDate}
+          shiftSlots={shiftSlots}
+          initialDate={modalState.initialDate ?? selectedDate}
           currentUserId={currentUserId}
           onClose={() => setModalState({ open: false, session: null })}
-          onAddSession={onAddSession!}
-          onUpdateSession={onUpdateSession!}
           onCreateSlot={onCreateSlot!}
         />
       )}

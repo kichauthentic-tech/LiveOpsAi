@@ -1116,16 +1116,6 @@ export default function App() {
   // Handlers for Live Sessions — persisted to Supabase. Return a success boolean so callers that
   // manage their own UI state (e.g. the calendars' session modal) know whether to close/reset — only
   // dismiss on caught errors below, not on an unconditional "we sent the request" assumption.
-  const handleAddSession = async (newSession: LiveSession): Promise<boolean> => {
-    try {
-      const created = await createSession(newSession);
-      setSessions(prev => [created, ...prev]);
-      return true;
-    } catch (e: any) {
-      window.alert(`Không thể tạo Live Session: ${e.message ?? e}`);
-      return false;
-    }
-  };
   const handleUpdateSession = async (updatedSession: LiveSession): Promise<boolean> => {
     try {
       const saved = await updateSession(updatedSession);
@@ -1986,8 +1976,6 @@ export default function App() {
                     talents={activeTalents}
                     brands={activeBrands}
                     brandStudios={brandStudios}
-                    users={activeUsers}
-                    onAddSession={handleAddSession}
                     onUpdateSession={handleUpdateSession}
                     onCreateSlot={handleCreateShiftSlot}
                     onDeleteSlot={handleDeleteShiftSlot}
@@ -2096,7 +2084,6 @@ export default function App() {
                     studios={activeStudios}
                     brandStudios={brandStudios}
                     talents={activeTalents}
-                    users={activeUsers}
                     schemes={promoSchemes}
                     onAddScheme={handleAddPromoScheme}
                     onUpdateScheme={handleUpdatePromoScheme}
@@ -2110,7 +2097,6 @@ export default function App() {
                     onSessionSnapshotApplied={handleSessionReconciled}
                     onDeleteSession={handleDeleteSession}
                     onCancelSession={handleCancelSession}
-                    onAddSession={handleAddSession}
                     onUpdateSession={handleUpdateSession}
                     onCreateSlot={handleCreateShiftSlot}
                     onDeleteSlot={handleDeleteShiftSlot}

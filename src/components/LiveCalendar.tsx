@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { LiveSession, ShiftSlot, ShiftRegistration, Studio, Talent, Brand, SystemUser, PromoScheme, UserRole, BrandStudio } from "../types";
+import { LiveSession, ShiftSlot, ShiftRegistration, Studio, Talent, Brand, PromoScheme, UserRole, BrandStudio } from "../types";
 import { schemesForDate } from "../lib/schemeUtils";
 import { findBrandStudioId } from "../lib/db/brandStudios";
 import { timeRangesOverlap } from "../lib/dateUtils";
@@ -16,39 +16,24 @@ import {
   buildSlotMeta
 } from "./ui/SessionEventCard";
 import { SlotDetailModal } from "./scheduling/SlotDetailModal";
+import { OpenSlotModal } from "./scheduling/OpenSlotModal";
 import { SessionWindow } from "./SessionWindow";
 import { SessionReportInput } from "../lib/db/sessionReports";
 import {
   Calendar as CalendarIcon,
-  Clock,
   Building2,
   User,
   Plus,
   AlertTriangle,
   CheckCircle2,
-  Sparkles,
   Search,
   X,
-  Zap,
-  Info,
   ChevronLeft,
   ChevronRight,
-  Eye,
-  TrendingUp,
   Tag,
-  Check,
   GripVertical,
   Move
 } from "lucide-react";
-import { authedFetch } from "../lib/authedFetch";
-
-export interface TimeSlot {
-  id: string;
-  label: string;
-  start: string;
-  end: string;
-  name: string;
-}
 
 interface LiveCalendarProps {
   sessions: LiveSession[];
@@ -58,8 +43,6 @@ interface LiveCalendarProps {
   talents: Talent[];
   brands: Brand[];
   brandStudios?: BrandStudio[]; // phòng mặc định brand × nền tảng (0098) — đổi brand trong form mở ca thì chọn sẵn phòng
-  users: SystemUser[];
-  onAddSession?: (newSession: LiveSession) => Promise<boolean>;
   onUpdateSession?: (updatedSession: LiveSession) => Promise<boolean>;
   onCreateSlot?: (slot: ShiftSlot) => Promise<boolean>;
   onDeleteSlot?: (id: string) => Promise<void>;
@@ -93,15 +76,6 @@ const getTodayDateString = () => {
   return `${year}-${month}-${day}`;
 };
 
-// Cố định 5 Ca Live Chuẩn
-const FIXED_TIME_SLOTS: TimeSlot[] = [
-  { id: "slot1", label: "08:00 - 11:00", start: "08:00", end: "11:00", name: "Sáng (Khai Mạc)" },
-  { id: "slot2", label: "11:00 - 14:00", start: "11:00", end: "14:00", name: "Trưa (Flash Sale)" },
-  { id: "slot3", label: "14:00 - 17:00", start: "14:00", end: "17:00", name: "Chiều (Khung Giờ Bạc)" },
-  { id: "slot4", label: "17:00 - 20:00", start: "17:00", end: "20:00", name: "Tối Sớm (Giờ Tan Tầm)" },
-  { id: "slot5", label: "20:00 - 23:00", start: "20:00", end: "23:00", name: "Đêm Vàng (GOLDEN MEGA)" },
-];
-
 export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   sessions: propSessions,
   shiftSlots = [],
@@ -110,8 +84,6 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   talents,
   brands,
   brandStudios = [],
-  users,
-  onAddSession,
   onUpdateSession,
   onCreateSlot,
   onDeleteSlot,
@@ -130,7 +102,6 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   onDeleteSession,
   onCancelSession
 }) => {
-  const moderators = users.filter((u) => u.role === "moderator");
   // Sync sessions with propSessions so clean test mode is respected
   const [sessions, setSessions] = useState<LiveSession[]>(propSessions);
 
@@ -155,29 +126,12 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   const [searchQuery, setSearchQuery] = useState("");
 
   // Modal State
-  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [selectedSessionDetail, setSelectedSessionDetail] = useState<LiveSession | null>(null);
   const [selectedSlotDetail, setSelectedSlotDetail] = useState<ShiftSlot | null>(null);
   const canManageSlots = currentRole === "ceo" || currentRole === "admin" || currentRole === "operations";
+  // Q2: form duy nhất là "Mở ca chờ đăng ký" (OpenSlotModal); prefill ngày/phòng/giờ từ ô được bấm.
+  const [slotModal, setSlotModal] = useState<{ date: string; studioId?: string; start?: string; end?: string } | null>(null);
 
-  // New Booking Form State
-  const [bookingMode, setBookingMode] = useState<"session" | "slot">("session");
-  const [newTitle, setNewTitle] = useState("");
-  const [newBrandId, setNewBrandId] = useState(brands[0]?.id || "");
-  const [newStudioId, setNewStudioId] = useState(studios[0]?.id || "");
-  const [newHostId, setNewHostId] = useState(talents[0]?.id || "");
-  const [newCoHostId, setNewCoHostId] = useState("");
-  const [newDate, setNewDate] = useState(selectedDate);
-  const [newStartTime, setNewStartTime] = useState("14:00");
-  const [newEndTime, setNewEndTime] = useState("17:00");
-  const [newTargetGmv, setNewTargetGmv] = useState(200000000);
-  const [newAssistantId, setNewAssistantId] = useState(moderators[0]?.id || "");
-
-  // Edit state cho session đã có (mở từ panel chi tiết)
-
-  // AI Recommendation State
-  const [aiSuggestion, setAiSuggestion] = useState<string | null>(null);
-  const [isOptimizingSchedule, setIsOptimizingSchedule] = useState(false);
 
   // Drag and Drop State
   const [draggedSessionId, setDraggedSessionId] = useState<string | null>(null);
@@ -221,68 +175,36 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
     }
   };
 
-  const handleDropOnDayMatrix = async (e: React.DragEvent, targetStudio: Studio, targetSlot: TimeSlot) => {
+  // Q3: thả thẻ ca vào hàng phòng khác → chỉ đổi phòng, giữ nguyên giờ (giờ là cam kết với brand).
+  const handleDropOnStudioRow = async (e: React.DragEvent, targetStudio: Studio) => {
     e.preventDefault();
     setDragOverCellKey(null);
     const sessionId = e.dataTransfer.getData("text/plain") || draggedSessionId;
     if (!sessionId) return;
-
     const session = sessions.find((s) => s.id === sessionId);
     if (!session) return;
-
-    // Check if dropping on exact same slot and studio
-    if (
-      session.studioId === targetStudio.id &&
-      session.startTime === targetSlot.start &&
-      session.endTime === targetSlot.end &&
-      session.date === selectedDate
-    ) {
+    if (session.studioId === targetStudio.id) {
       setDraggedSessionId(null);
       return;
     }
-
-    // Check conflict on target studio and slot
     const conflict = sessions.find(
       (s) =>
         s.id !== sessionId &&
-        s.date === selectedDate &&
+        s.date === session.date &&
         s.studioId === targetStudio.id &&
-        timeRangesOverlap(s.startTime, s.endTime, targetSlot.start, targetSlot.end) &&
+        timeRangesOverlap(s.startTime, s.endTime, session.startTime, session.endTime) &&
         s.status !== "Cancelled"
     );
-
     if (conflict) {
-      showToast(
-        `Không thể chuyển! Phòng ${targetStudio.name} đã có phiên live "${conflict.brandName}" ở ca ${targetSlot.label}!`,
-        "warning"
-      );
+      showToast(`Không thể chuyển! Phòng ${targetStudio.name} đã có "${conflict.brandName}" ${conflict.startTime}–${conflict.endTime}.`, "warning");
       setDraggedSessionId(null);
       return;
     }
-
-    // Update session
-    const updatedSession: LiveSession = {
-      ...session,
-      studioId: targetStudio.id,
-      studioName: targetStudio.name,
-      startTime: targetSlot.start,
-      endTime: targetSlot.end,
-      date: selectedDate
-    };
-
-    // Don't optimistically mutate local `sessions` here — it's synced from propSessions
-    // (source of truth in App.tsx). Painting the move before the write is confirmed would
-    // leave a stale/incorrect position on screen if the Supabase update fails, since nothing
-    // would ever revert it back. Await the real result and only celebrate on success.
     setDraggedSessionId(null);
-    const ok = onUpdateSession ? await onUpdateSession(updatedSession) : true;
-    if (ok) {
-      showToast(
-        `Đã chuyển phiên live "${session.brandName}" sang ${targetStudio.name} (${targetSlot.label})!`,
-        "success"
-      );
-    }
+    const ok = onUpdateSession ? await onUpdateSession({ ...session, studioId: targetStudio.id, studioName: targetStudio.name }) : true;
+    if (ok) showToast(`Đã chuyển "${session.brandName}" ${session.startTime}–${session.endTime} sang ${targetStudio.name}.`, "success");
   };
+
 
   const handleDropOnWeekDay = async (e: React.DragEvent, targetDateStr: string) => {
     e.preventDefault();
@@ -492,200 +414,6 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
     setCurrentMonth(parsed.month);
   };
 
-  // Conflict Checker
-  const checkConflicts = (studioId: string, hostId: string, date: string, start: string, end: string, excludeSessionId?: string) => {
-    const conflicts = {
-      studioConflict: false,
-      hostConflict: false,
-      studioConflictWith: "",
-      hostConflictWith: ""
-    };
-
-    sessions.forEach((s) => {
-      if (s.id === excludeSessionId) return;
-      if (s.date === date && s.status !== "Cancelled") {
-        if (timeRangesOverlap(s.startTime, s.endTime, start, end)) {
-          if (s.studioId === studioId) {
-            conflicts.studioConflict = true;
-            conflicts.studioConflictWith = s.title;
-          }
-          if (s.hostId === hostId) {
-            conflicts.hostConflict = true;
-            conflicts.hostConflictWith = `${s.hostName} (${s.title})`;
-          }
-        }
-      }
-    });
-
-    return conflicts;
-  };
-
-  const currentFormConflicts = checkConflicts(newStudioId, newHostId, newDate, newStartTime, newEndTime);
-  // Save new session hoặc mở ca chờ đăng ký (tuỳ bookingMode)
-  const handleSaveBooking = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // FIX L8 (audit 2026-08-21): gõ nhầm giờ kết thúc trùng giờ bắt đầu trước đây bị tính thành
-    // ca qua đêm 24 giờ công (sessionDurationHours ở lib/pnl.ts) — chặn ngay ở form.
-    if (newStartTime === newEndTime) {
-      window.alert("Giờ bắt đầu và giờ kết thúc không được trùng nhau.");
-      return;
-    }
-
-    const brandObj = brands.find((b) => b.id === newBrandId);
-    const studioObj = studios.find((s) => s.id === newStudioId);
-
-    if (bookingMode === "slot") {
-      const newSlot: ShiftSlot = {
-        id: `slot-${Date.now()}`,
-        date: newDate,
-        startTime: newStartTime,
-        endTime: newEndTime,
-        brandId: newBrandId || undefined,
-        brandName: brandObj?.name || "Brand Partner",
-        platform: "TikTok",
-        studioId: newStudioId || undefined,
-        studioName: studioObj?.name || "Studio Standard",
-        notes: newTitle,
-        status: "open",
-        createdBy: currentUserId
-      };
-      const ok = onCreateSlot ? await onCreateSlot(newSlot) : true;
-      if (!ok) return;
-      setIsBookingModalOpen(false);
-      setNewTitle("");
-      setAiSuggestion(null);
-      return;
-    }
-
-    const hostObj = talents.find((t) => t.id === newHostId);
-    const coHostObj = talents.find((t) => t.id === newCoHostId);
-    const assistantObj = moderators.find((m) => m.id === newAssistantId);
-    const assistantName = assistantObj?.name || "Chưa gán Trợ Lý";
-
-    const createdSession: LiveSession = {
-      id: `session-${Date.now()}`,
-      title: newTitle || `Phiên Live ${brandObj?.name || 'Brand'} - ${newStartTime}`,
-      brandId: newBrandId,
-      brandName: brandObj?.name || "Brand Partner",
-      shopTikTokHandle: `@${brandObj?.name.toLowerCase().replace(/\s+/g, '') || 'shop'}_official`,
-      studioId: newStudioId,
-      studioName: studioObj?.name || "Studio Standard",
-      hostId: newHostId,
-      hostName: hostObj?.name || "Host Live",
-      assistantId: newAssistantId || undefined,
-      assistantName,
-      coHostId: newCoHostId || undefined,
-      coHostName: coHostObj?.name || "",
-      platform: "TikTok",
-      date: newDate,
-      startTime: newStartTime,
-      endTime: newEndTime,
-      status: "Upcoming",
-      targetGmv: Number(newTargetGmv),
-      actualGmv: 0,
-      totalOrders: 0,
-      avgWatchTimeSeconds: 0,
-      peakViewers: 0,
-      totalViews: 0,
-      ctrAvg: 0,
-      cvrAvg: 0,
-      skus: [],
-      checklist: [
-        { id: "c1", task: "Kiểm tra hệ thống mic & camera studio", category: "Tech", completed: false, assignedTo: "Kỹ thuật viên" },
-        { id: "c2", task: "Setup ánh sáng & bối cảnh chụp mẫu sản phẩm", category: "Studio", completed: false, assignedTo: "Stylist" },
-        { id: "c3", task: "Duyệt danh sách SKU & Mã Giảm Giá TikTok Shop", category: "TikTok App", completed: false, assignedTo: assistantName },
-        { id: "c4", task: "Duyệt Kịch bản chốt đơn & tung Deal Flash Sale", category: "Host & Script", completed: false, assignedTo: hostObj?.name || "Host" }
-      ],
-      minuteMetrics: []
-    };
-
-    // Rely on propSessions (source of truth) updating after the write succeeds — the local
-    // `sessions` mirror re-syncs via the useEffect above — instead of optimistically inserting
-    // here and risking a phantom session staying visible if the create actually fails.
-    const ok = onAddSession ? await onAddSession(createdSession) : true;
-    if (!ok) return;
-
-    setIsBookingModalOpen(false);
-    setNewTitle("");
-    setNewCoHostId("");
-    setAiSuggestion(null);
-  };
-
-  // AI Optimizer
-  const runFallbackScheduleOptimizer = (brandName: string, industry: string) => {
-    let suggestedSlot = "20:00 - 23:00";
-    let suggestedHostName = "Yến Nhi";
-    let reason = "Ngành Beauty/Mỹ phẩm có CVR cao nhất vào khung giờ Tối Đêm Vàng.";
-
-    if (industry.includes("Thời trang") || industry.includes("Nam")) {
-      suggestedSlot = "14:00 - 17:00";
-      suggestedHostName = "Hoàng Nam";
-      reason = "Ngành Thời trang Nam đạt đòn bẩy đơn cao vào chiều trước giờ tan tầm.";
-    } else if (industry.includes("Gia dụng")) {
-      suggestedSlot = "11:00 - 14:00";
-      suggestedHostName = "Bích Ngọc";
-      reason = "Gia dụng bếp phù hợp nghỉ trưa dân văn phòng.";
-    }
-
-    const matchedHost = talents.find((t) => t.name.includes(suggestedHostName)) || talents[0];
-
-    return {
-      suggestedSlot,
-      suggestedHostId: matchedHost?.id || null,
-      suggestedHostName: matchedHost?.name || suggestedHostName,
-      reason,
-      predictedGmvLift: "+25%"
-    };
-  };
-
-  const applyScheduleSuggestion = (
-    brandName: string,
-    industry: string,
-    result: { suggestedSlot: string; suggestedHostId: string | null; suggestedHostName: string; reason: string; predictedGmvLift: string },
-    isMock: boolean
-  ) => {
-    const [slotStart, slotEnd] = result.suggestedSlot.split(" - ");
-    setNewStartTime(slotStart);
-    setNewEndTime(slotEnd);
-    const matchedHost = talents.find((t) => t.id === result.suggestedHostId) || talents.find((t) => t.name.includes(result.suggestedHostName));
-    if (matchedHost) setNewHostId(matchedHost.id);
-
-    setAiSuggestion(
-      `${isMock ? "AI Recommendation (chưa cấu hình Gemini API key)" : "Gemini AI Recommendation"} cho ${brandName} (${industry}):\n` +
-      `• Khung giờ Vàng tối ưu: ${result.suggestedSlot}\n` +
-      `• Host đề xuất: ${result.suggestedHostName}\n` +
-      `• Lý do: ${result.reason}\n` +
-      `• Dự báo GMV tiềm năng: ${result.predictedGmvLift} so với phiên thường.`
-    );
-  };
-
-  const handleAiOptimizeSchedule = async () => {
-    const brandObj = brands.find((b) => b.id === newBrandId);
-    const brandName = brandObj?.name || "Thương hiệu";
-    const industry = brandObj?.industry || "Thương mại điện tử";
-
-    setIsOptimizingSchedule(true);
-    try {
-      const res = await authedFetch("/api/gemini/optimize-schedule", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ brand: brandObj, timeSlots: FIXED_TIME_SLOTS, talents })
-      });
-      const data = await res.json();
-      if (data.success && data.suggestedSlot) {
-        applyScheduleSuggestion(brandName, industry, data, !!data.isMock);
-        return;
-      }
-      throw new Error(data.error || "Empty AI schedule result");
-    } catch (e) {
-      console.error("AI Schedule Optimizer failed, dùng fallback công thức:", e);
-      applyScheduleSuggestion(brandName, industry, runFallbackScheduleOptimizer(brandName, industry), true);
-    } finally {
-      setIsOptimizingSchedule(false);
-    }
-  };
-
   const brandById = new Map<string, Brand>(brands.map((b) => [b.id, b]));
   const talentLookup = (id: string | undefined) => (id ? talents.find((t) => t.id === id) : undefined);
   // Session/ShiftSlot lưu sẵn `brandName`; tra theo tên để lấy logo cho các chỗ chỉ có tên (chú giải).
@@ -724,10 +452,6 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
     return true;
   });
 
-  // Calculate Occupancy KPI for selected date
-  const totalSlotsForDay = FIXED_TIME_SLOTS.length * studios.length;
-  const bookedSlotsCount = sessions.filter((s) => s.date === selectedDate && s.status !== "Cancelled").length;
-  const occupancyPercent = Math.min(100, Math.round((bookedSlotsCount / totalSlotsForDay) * 100));
 
   // Current Week dates for Week View
   const currentWeekDates = getWeekDates(selectedDate);
@@ -762,13 +486,10 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
 
         <div className="flex items-center gap-3">
           <button
-            onClick={() => {
-              setNewDate(selectedDate);
-              setIsBookingModalOpen(true);
-            }}
+            onClick={() => setSlotModal({ date: selectedDate })}
             className="w-full sm:w-auto bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-[var(--accent)]/20 transition-all active:scale-95"
           >
-            <Plus className="w-4 h-4" /> Đặt Lịch Phiên Live Mới
+            <Plus className="w-4 h-4" /> Mở ca chờ đăng ký
           </button>
         </div>
       </div>
@@ -806,7 +527,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   : "text-[var(--text-muted)] hover:text-[var(--text)]"
               }`}
             >
-              <Building2 className="w-3.5 h-3.5" /> Ma Trận Ngày (Studio)
+              <Building2 className="w-3.5 h-3.5" /> Phòng theo giờ
             </button>
             <button
               onClick={() => setViewMode("talent_workload")}
@@ -890,7 +611,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
         <div className="bg-[var(--surface)]/60 border border-[var(--border)]/80 px-4 py-2.5 rounded-xl text-xs text-[var(--text-muted)] flex items-center gap-2">
           <GripVertical className="w-4 h-4 text-blue-400 shrink-0" />
           <span>
-            <strong className="text-blue-300 font-semibold">Tính năng Kéo-Thả (Drag &amp; Drop):</strong> Kéo trực tiếp thẻ ca live sang ô Studio/Khung giờ mới hoặc Ngày khác để đổi thời gian lịch live nhanh chóng không cần mở form.
+            <strong className="text-blue-300 font-semibold">Kéo-thả:</strong> ở Phòng theo giờ, kéo thẻ ca sang hàng phòng khác để đổi phòng (giữ giờ); ở Lịch Tuần/Tháng, kéo sang ngày khác để đổi ngày. Đổi giờ thì mở ca → Sửa.
           </span>
         </div>
       )}
@@ -1301,8 +1022,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                       <div
                         onClick={() => {
                           setSelectedDate(wDay.dateStr);
-                          setNewDate(wDay.dateStr);
-                          setIsBookingModalOpen(true);
+                          if (canManageSlots) setSlotModal({ date: wDay.dateStr });
                         }}
                         className={`h-24 rounded-xl border border-dashed transition-all cursor-pointer flex flex-col items-center justify-center space-y-1 ${
                           isWeekHovered
@@ -1324,171 +1044,159 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
         </div>
       )}
 
-      {/* VIEW 3: DAY MATRIX VIEW (Ma Trận Phòng Studio Với 5 Ca Cố Định) */}
-      {viewMode === "day" && (
+      {/* VIEW 3: TIMELINE PHÒNG STUDIO — Q3 (audit 2026-09-21): trục giờ liên tục thay 5 khối 3h cố
+          định; mỗi ca là 1 khối đúng giờ thật (09–12, 21–00…), 2 ca sát nhau không đè nhau. */}
+      {viewMode === "day" && (() => {
+        const toMin = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+        // Ca qua đêm (end <= start) kéo sang hôm sau.
+        const endMin = (start: string, end: string) => { const e = toMin(end); return e <= toMin(start) ? e + 24 * 60 : e; };
+        const daySessions = filteredSessions.filter((s) => s.date === selectedDate && s.status !== "Cancelled");
+        const daySlots = openSlots.filter((sl) => sl.date === selectedDate);
+        const allStarts = [...daySessions.map((s) => toMin(s.startTime)), ...daySlots.map((sl) => toMin(sl.startTime))];
+        const allEnds = [...daySessions.map((s) => endMin(s.startTime, s.endTime)), ...daySlots.map((sl) => endMin(sl.startTime, sl.endTime))];
+        const axisStart = Math.min(8 * 60, ...allStarts.map((m) => Math.floor(m / 60) * 60));
+        const axisEnd = Math.max(23 * 60, ...allEnds.map((m) => Math.ceil(m / 60) * 60));
+        const span = axisEnd - axisStart;
+        const hours: number[] = [];
+        for (let m = axisStart; m <= axisEnd; m += 60) hours.push(m);
+        const fmtHour = (m: number) => `${`${Math.floor(m / 60) % 24}`.padStart(2, "0")}:00`;
+        const pos = (start: string, end: string) => ({ left: `${((toMin(start) - axisStart) / span) * 100}%`, width: `${((endMin(start, end) - toMin(start)) / span) * 100}%` });
+        const noRoomSessions = daySessions.filter((s) => !studios.some((st) => st.id === s.studioId));
+        const noRoomSlots = daySlots.filter((sl) => !studios.some((st) => st.id === sl.studioId));
+        const totalHours = daySessions.reduce((a, s) => a + (endMin(s.startTime, s.endTime) - toMin(s.startTime)) / 60, 0);
+        const campaignDay = getCampaignDayInfo(selectedDate);
+        return (
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-6 shadow-xl space-y-4">
-          {(() => {
-            const campaignDay = getCampaignDayInfo(selectedDate);
-            return campaignDay ? <CampaignDayBanner info={campaignDay} className="w-full !rounded-xl justify-center py-1.5" /> : null;
-          })()}
+          {campaignDay && <CampaignDayBanner info={campaignDay} className="w-full !rounded-xl justify-center py-1.5" />}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-[var(--border)] pb-3 gap-2">
             <div>
               <h3 className="font-bold text-[var(--text)] text-base flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-[var(--accent-text)] shrink-0" /> Ma Trận Phân Bổ Phòng Studio - Ngày {selectedDate} ({getDayOfWeekName(selectedDate)})
+                <Building2 className="w-5 h-5 text-[var(--accent-text)] shrink-0" /> Phòng Studio theo giờ — {selectedDate} ({getDayOfWeekName(selectedDate)})
               </h3>
-              <p className="text-xs text-[var(--text-muted)]">Kéo thả ca live vào bất kỳ ô Studio/Ca Live để đổi phòng hoặc ca làm việc linh hoạt</p>
+              <p className="text-xs text-[var(--text-muted)]">
+                {daySessions.length} ca đã chốt · {daySlots.length} ca chờ đăng ký · {totalHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h live. Kéo thẻ ca sang hàng phòng khác để đổi phòng (giữ giờ).
+              </p>
             </div>
-            {/* Chú giải phải khớp đúng cách card thật vẽ trạng thái (SessionEventCard dùng màu
-                brand cho nền, KHÔNG dùng rose/blue/amber cố định) — nếu không chú giải nói dối
-                người dùng về ý nghĩa màu sắc trên ô lịch. Trạng thái phân biệt bằng viền/hiệu ứng:
-                Live = viền đỏ nhấp nháy, Đã Đặt = viền liền, Chờ Đăng Ký = viền đứt mờ hơn,
-                Trống = ô đứt nét xám có dấu "+". */}
             <div className="flex flex-wrap items-center gap-3 text-[11px] font-semibold text-[var(--text-muted)]">
-              <span className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-md bg-rose-500 ring-2 ring-rose-400 ring-offset-1 ring-offset-[var(--surface)] animate-pulse" />
-                Live
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-md bg-[var(--surface-hover)] border-2 border-solid border-[var(--border)]" />
-                Đã Đặt
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-md bg-[var(--surface-elevated)]/60 border-2 border-dashed border-[var(--border)]" />
-                Chờ Đăng Ký
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-md border border-dashed border-[var(--border)] flex items-center justify-center">
-                  <Plus className="w-2 h-2 text-[var(--text-faint)]" />
-                </span>
-                Trống
-              </span>
+              <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-md bg-rose-500 ring-2 ring-rose-400 ring-offset-1 ring-offset-[var(--surface)] animate-pulse" /> Live</span>
+              <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-md bg-[var(--surface-hover)] border-2 border-solid border-[var(--border)]" /> Đã chốt</span>
+              <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-md bg-[var(--surface-elevated)]/60 border-2 border-dashed border-[var(--border)]" /> Chờ đăng ký</span>
             </div>
           </div>
 
-          {/* Table Container with Sticky Room Name Column */}
-          <div className="overflow-x-auto relative rounded-xl border border-[var(--border)]/80 scrollbar-thin">
-            <table className="w-full text-left border-collapse min-w-[780px]">
-              <thead>
-                <tr className="border-b border-[var(--border)] text-xs font-bold text-[var(--text-muted)] bg-[var(--surface-base)]">
-                  <th className="p-3 w-48 uppercase tracking-wider sticky left-0 bg-[var(--surface-base)] z-20 border-r border-[var(--border)] shadow-md">
-                    Phòng Studio
-                  </th>
-                  {FIXED_TIME_SLOTS.map((slot) => (
-                    <th key={slot.id} className="p-3 text-center border-r border-[var(--border)]/80 min-w-[170px] bg-[var(--surface-base)]">
-                      <div className="font-mono text-[var(--text)] text-xs">{slot.label}</div>
-                      <span className="text-[10px] text-[var(--text-muted)] font-medium line-clamp-1">{slot.name}</span>
-                    </th>
+          <div className="overflow-x-auto rounded-xl border border-[var(--border)]/80 scrollbar-thin">
+            <div className="min-w-[860px]">
+              {/* Trục giờ */}
+              <div className="flex border-b border-[var(--border)] bg-[var(--surface-base)] text-[10px] font-mono text-[var(--text-muted)]">
+                <div className="w-44 shrink-0 p-2 font-bold uppercase tracking-wider border-r border-[var(--border)] sticky left-0 bg-[var(--surface-base)] z-10">Phòng</div>
+                <div className="relative flex-1 h-8">
+                  {hours.map((m) => (
+                    <span key={m} className="absolute top-2 -translate-x-1/2" style={{ left: `${((m - axisStart) / span) * 100}%` }}>{fmtHour(m)}</span>
                   ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--border)]/60 text-xs">
-                {studios.map((std) => (
-                  <tr key={std.id} className="hover:bg-[var(--surface-elevated)]/20 transition-colors">
-                    <td className="p-3 font-bold text-[var(--text)] sticky left-0 bg-[var(--surface)] z-10 border-r border-[var(--border)] shadow-md">
+                </div>
+              </div>
+              {studios.map((std) => {
+                const rowSessions = daySessions.filter((s) => s.studioId === std.id).sort((a, b) => a.startTime.localeCompare(b.startTime));
+                const rowSlots = daySlots.filter((sl) => sl.studioId === std.id);
+                const rowKey = `row_${std.id}`;
+                const hovered = dragOverCellKey === rowKey;
+                return (
+                  <div key={std.id} className={`flex border-b border-[var(--border)]/60 last:border-b-0 transition-colors ${hovered ? "bg-[var(--accent)]/15" : "hover:bg-[var(--surface-elevated)]/20"}`}>
+                    <div className="w-44 shrink-0 p-3 border-r border-[var(--border)] sticky left-0 bg-[var(--surface)] z-10">
                       <div className="flex items-center gap-2">
                         <span className="p-1.5 rounded-lg bg-[var(--surface-elevated)] border border-[var(--border)] text-[var(--accent-text)] shrink-0"><Building2 className="w-3.5 h-3.5" /></span>
-                        <div>
-                          <p className="text-xs sm:text-sm font-bold text-[var(--text)] line-clamp-1">{std.name}</p>
+                        <div className="min-w-0">
+                          <p className="text-xs sm:text-sm font-bold text-[var(--text)] truncate">{std.name}</p>
                           <p className="text-[10px] text-[var(--text-muted)] font-mono">{std.roomNumber}</p>
                         </div>
                       </div>
-                    </td>
-
-                    {FIXED_TIME_SLOTS.map((slot) => {
-                      const matchedSession = filteredSessions.find(
-                        (s) =>
-                          s.date === selectedDate &&
-                          s.studioId === std.id &&
-                          timeRangesOverlap(s.startTime, s.endTime, slot.start, slot.end) &&
-                          s.status !== "Cancelled"
-                      );
-                      const matchedSlot = !matchedSession
-                        ? openSlots.find(
-                            (sl) =>
-                              sl.date === selectedDate &&
-                              sl.studioId === std.id &&
-                              timeRangesOverlap(sl.startTime, sl.endTime, slot.start, slot.end)
-                          )
-                        : undefined;
-
-                      const matrixCellKey = `matrix_${std.id}_${slot.id}`;
-                      const isMatrixHovered = dragOverCellKey === matrixCellKey;
-
-                      return (
-                        <td
-                          key={slot.id}
-                          onDragOver={(e) => handleDragOver(e, matrixCellKey)}
-                          onDragLeave={(e) => handleDragLeave(e, matrixCellKey)}
-                          onDrop={(e) => handleDropOnDayMatrix(e, std, slot)}
-                          className={`p-2 border-r border-[var(--border)]/60 align-top transition-all ${
-                            isMatrixHovered ? "bg-[var(--accent)]/20 border-2 border-dashed border-[var(--accent)] scale-[1.01]" : ""
-                          }`}
-                        >
-                          {matchedSession ? (
-                            <SessionEventCard
-                              theme={getBrandTheme(matchedSession.brandName)}
-                              brand={brandById.get(matchedSession.brandId)}
-                              brandName={matchedSession.brandName}
-                              startTime={matchedSession.startTime}
-                        endTime={matchedSession.endTime}
-                              title={matchedSession.title}
-                              meta={buildSessionMeta(matchedSession, talentLookup)}
-                              targetGmv={matchedSession.targetGmv}
-                              size="md"
-                              tone={SESSION_TONE[matchedSession.status]}
-                              statusLabel={SESSION_STATUS_LABEL[matchedSession.status]}
-                              dragging={draggedSessionId === matchedSession.id}
-                              draggable
-                              tooltip="Kéo để đổi ca"
-                              onDragStart={(e) => handleDragStart(e, matchedSession)}
-                              onDragEnd={handleDragEnd}
-                              onClick={() => setSelectedSessionDetail(matchedSession)}
-                            />
-                          ) : matchedSlot ? (
-                            <SessionEventCard
-                              theme={getBrandTheme(matchedSlot.brandName)}
-                              brand={brandById.get(matchedSlot.brandId ?? "")}
-                              brandName={matchedSlot.brandName}
-                              startTime={matchedSlot.startTime}
-                        endTime={matchedSlot.endTime}
-                              meta={buildSlotMeta(matchedSlot)}
-                              size="md"
-                              tone="pending"
-                              pending
-                              tooltip={`Ca chờ đăng ký · ${matchedSlot.startTime}-${matchedSlot.endTime} · Bấm để xem/đăng ký/chốt lịch`}
-                              onClick={() => setSelectedSlotDetail(matchedSlot)}
-                            />
-                          ) : (
-                            <div
-                              onClick={() => {
-                                setNewStudioId(std.id);
-                                setNewDate(selectedDate);
-                                setNewStartTime(slot.start);
-                                setNewEndTime(slot.end);
-                                setIsBookingModalOpen(true);
-                              }}
-                              className={`h-20 rounded-xl border border-dashed transition-all cursor-pointer flex flex-col items-center justify-center space-y-1 ${
-                                isMatrixHovered
-                                  ? "border-emerald-400 bg-emerald-950/50 text-emerald-300 font-bold scale-105"
-                                  : "border-[var(--border)]/80 hover:border-[var(--accent)]/50 hover:bg-[var(--accent)]/10 text-[var(--text-faint)] hover:text-[var(--accent-text)]"
-                              }`}
-                            >
-                              <Plus className="w-4 h-4" />
-                              <span className="text-[10px] font-semibold">
-                                {isMatrixHovered ? "Thả vào đây" : "Trống - Đặt"}
-                              </span>
-                            </div>
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                    <div
+                      className="relative flex-1 h-[132px]"
+                      onDragOver={(e) => handleDragOver(e, rowKey)}
+                      onDragLeave={(e) => handleDragLeave(e, rowKey)}
+                      onDrop={(e) => handleDropOnStudioRow(e, std)}
+                      onDoubleClick={() => canManageSlots && setSlotModal({ date: selectedDate, studioId: std.id })}
+                      title={canManageSlots ? "Bấm đôi để mở ca chờ đăng ký ở phòng này" : undefined}
+                    >
+                      {hours.map((m) => (
+                        <span key={m} className="absolute top-0 bottom-0 border-l border-[var(--border)]/40" style={{ left: `${((m - axisStart) / span) * 100}%` }} />
+                      ))}
+                      {rowSlots.map((sl) => (
+                        <div key={sl.id} className="absolute top-2 bottom-2 px-0.5" style={pos(sl.startTime, sl.endTime)}>
+                          <SessionEventCard
+                            theme={getBrandTheme(sl.brandName)}
+                            brand={brandById.get(sl.brandId ?? "")}
+                            brandName={sl.brandName}
+                            startTime={sl.startTime}
+                            endTime={sl.endTime}
+                            meta={buildSlotMeta(sl)}
+                            size="md"
+                            tone="pending"
+                            pending
+                            tooltip={`Ca chờ đăng ký · ${sl.startTime}-${sl.endTime} · Bấm để xem/đăng ký/chốt lịch`}
+                            onClick={() => setSelectedSlotDetail(sl)}
+                          />
+                        </div>
+                      ))}
+                      {rowSessions.map((ms) => (
+                        <div key={ms.id} className="absolute top-2 bottom-2 px-0.5" style={pos(ms.startTime, ms.endTime)}>
+                          <SessionEventCard
+                            theme={getBrandTheme(ms.brandName)}
+                            brand={brandById.get(ms.brandId)}
+                            brandName={ms.brandName}
+                            startTime={ms.startTime}
+                            endTime={ms.endTime}
+                            title={ms.title}
+                            meta={buildSessionMeta(ms, talentLookup)}
+                            targetGmv={ms.targetGmv}
+                            size="md"
+                            tone={SESSION_TONE[ms.status]}
+                            statusLabel={SESSION_STATUS_LABEL[ms.status]}
+                            dragging={draggedSessionId === ms.id}
+                            draggable
+                            tooltip="Kéo sang hàng phòng khác để đổi phòng"
+                            onDragStart={(e) => handleDragStart(e, ms)}
+                            onDragEnd={handleDragEnd}
+                            onClick={() => setSelectedSessionDetail(ms)}
+                          />
+                        </div>
+                      ))}
+                      {rowSessions.length === 0 && rowSlots.length === 0 && (
+                        <span className="absolute inset-0 flex items-center justify-center text-[11px] text-[var(--text-faint)] pointer-events-none">
+                          {hovered ? "Thả vào đây để đổi phòng" : "Trống"}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+              {(noRoomSessions.length > 0 || noRoomSlots.length > 0) && (
+                <div className="flex border-t border-amber-900/60 bg-amber-950/20">
+                  <div className="w-44 shrink-0 p-3 border-r border-[var(--border)] sticky left-0 bg-[var(--surface)] z-10">
+                    <p className="text-xs font-bold text-amber-300">Chưa gán phòng</p>
+                    <p className="text-[10px] text-[var(--text-muted)]">mở ca → sửa phòng</p>
+                  </div>
+                  <div className="relative flex-1 h-[132px]">
+                    {noRoomSlots.map((sl) => (
+                      <div key={sl.id} className="absolute top-2 bottom-2 px-0.5" style={pos(sl.startTime, sl.endTime)}>
+                        <SessionEventCard theme={getBrandTheme(sl.brandName)} brand={brandById.get(sl.brandId ?? "")} brandName={sl.brandName} startTime={sl.startTime} endTime={sl.endTime} meta={buildSlotMeta(sl)} size="md" tone="pending" pending onClick={() => setSelectedSlotDetail(sl)} />
+                      </div>
+                    ))}
+                    {noRoomSessions.map((ms) => (
+                      <div key={ms.id} className="absolute top-2 bottom-2 px-0.5" style={pos(ms.startTime, ms.endTime)}>
+                        <SessionEventCard theme={getBrandTheme(ms.brandName)} brand={brandById.get(ms.brandId)} brandName={ms.brandName} startTime={ms.startTime} endTime={ms.endTime} title={ms.title} meta={buildSessionMeta(ms, talentLookup)} targetGmv={ms.targetGmv} size="md" tone={SESSION_TONE[ms.status]} statusLabel={SESSION_STATUS_LABEL[ms.status]} dragging={draggedSessionId === ms.id} draggable onDragStart={(e) => handleDragStart(e, ms)} onDragEnd={handleDragEnd} onClick={() => setSelectedSessionDetail(ms)} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      )}
+        );
+      })()}
+
 
       {/* VIEW 4: TALENT WORKLOAD */}
       {viewMode === "talent_workload" && (
@@ -1575,276 +1283,21 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
         </div>
       )}
 
-      {/* QUICK BOOKING MODAL */}
-      {isBookingModalOpen && (
-        <div className="fixed inset-0 z-50 bg-[var(--surface-base)]/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
-          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl max-w-2xl w-full p-4 sm:p-6 space-y-4 sm:space-y-5 shadow-2xl overflow-y-auto max-h-[92vh]">
-            <div className="flex justify-between items-center border-b border-[var(--border)] pb-3">
-              <div className="flex items-center gap-2">
-                <CalendarIcon className="w-5 h-5 text-[var(--accent-text)]" />
-                <h3 className="font-bold text-[var(--text)] text-base sm:text-lg">Đặt Lịch Phiên Live Mới</h3>
-              </div>
-              <button
-                onClick={() => setIsBookingModalOpen(false)}
-                className="text-[var(--text-muted)] hover:text-[var(--text)] p-1 rounded-lg"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Chế độ tạo: Session đã có host hay Ca mở chờ đăng ký */}
-            <div className="flex items-center bg-[var(--surface-base)] p-1 rounded-xl border border-[var(--border)] text-xs font-bold">
-              <button
-                type="button"
-                onClick={() => setBookingMode("session")}
-                className={`flex-1 px-3 py-2 rounded-lg transition-all ${
-                  bookingMode === "session" ? "bg-[var(--accent)] text-white shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text)]"
-                }`}
-              >
-                Tạo Session Trực Tiếp (đã có Host)
-              </button>
-              <button
-                type="button"
-                onClick={() => setBookingMode("slot")}
-                className={`flex-1 px-3 py-2 rounded-lg transition-all ${
-                  bookingMode === "slot" ? "bg-[var(--accent)] text-white shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text)]"
-                }`}
-              >
-                Mở Ca Chờ Đăng Ký
-              </button>
-            </div>
-            {bookingMode === "slot" && (
-              <p className="text-[11px] text-[var(--text-muted)] bg-[var(--surface-base)]/60 border border-[var(--border)] rounded-xl p-2.5">
-                Ca sẽ hiện ở "Đăng Ký &amp; Chốt Lịch" để host tự đăng ký — Ops chốt Host chính thức sau, chưa cần chọn Host ở đây.
-              </p>
-            )}
-
-            {/* AI Optimizer Trigger Button */}
-            <div className={`bg-gradient-to-r from-blue-950 to-indigo-950 border border-blue-800/80 p-3.5 rounded-xl space-y-2 ${bookingMode === "slot" ? "opacity-40 pointer-events-none" : ""}`}>
-              <div className="flex justify-between items-center flex-wrap gap-2">
-                <span className="text-xs font-bold text-blue-300 flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4 text-blue-400 shrink-0" /> Gemini AI Schedule Matching
-                </span>
-                <button
-                  type="button"
-                  onClick={handleAiOptimizeSchedule}
-                  disabled={isOptimizingSchedule}
-                  className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-60 disabled:cursor-not-allowed text-[var(--surface-base)] font-bold text-xs px-3 py-1.5 rounded-lg flex items-center gap-1 shadow transition-all active:scale-95"
-                >
-                  <Zap className="w-3.5 h-3.5" /> {isOptimizingSchedule ? "Đang phân tích..." : "Gợi Ý Khung Giờ Vàng AI"}
-                </button>
-              </div>
-              {aiSuggestion && (
-                <div className="text-xs text-[var(--text)] font-mono whitespace-pre-line bg-[var(--surface-base)]/80 p-3 rounded-lg border border-blue-500/30">
-                  {aiSuggestion}
-                </div>
-              )}
-            </div>
-
-            {/* Quick Shift Slot Presets */}
-            <div className="space-y-1 text-xs">
-              <label className="font-bold text-[var(--text-muted)] block">Chọn Nhanh Ca Live Cố Định:</label>
-              <div className="flex flex-wrap gap-1.5">
-                {FIXED_TIME_SLOTS.map((st) => (
-                  <button
-                    key={st.id}
-                    type="button"
-                    onClick={() => {
-                      setNewStartTime(st.start);
-                      setNewEndTime(st.end);
-                    }}
-                    className={`px-2.5 py-1.5 rounded-lg border font-mono font-bold text-[11px] transition-all ${
-                      newStartTime === st.start && newEndTime === st.end
-                        ? "bg-[var(--accent)] text-white border-[var(--accent)] shadow-sm"
-                        : "bg-[var(--surface-base)] text-[var(--text-muted)] border-[var(--border)] hover:border-[var(--border)]"
-                    }`}
-                  >
-                    {st.label} ({st.name.split(" ")[0]})
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Conflict Warnings */}
-            {(currentFormConflicts.studioConflict || currentFormConflicts.hostConflict) && (
-              <div className="p-3.5 bg-rose-950/80 border border-rose-700/80 rounded-xl text-xs space-y-1 text-rose-200 font-medium">
-                <div className="flex items-center gap-1.5 font-bold text-rose-300">
-                  <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" /> XUNG ĐỘT LỊCH ĐƯỢC PHÁT HIỆN:
-                </div>
-                {currentFormConflicts.studioConflict && (
-                  <p>• Trùng Studio: Phòng đã có phiên live "{currentFormConflicts.studioConflictWith}"!</p>
-                )}
-                {currentFormConflicts.hostConflict && (
-                  <p>• Trùng Host: Host đã có lịch phiên "{currentFormConflicts.hostConflictWith}"!</p>
-                )}
-              </div>
-            )}
-
-            <form onSubmit={handleSaveBooking} className="space-y-4 text-xs">
-              <div>
-                <label className="font-bold text-[var(--text-muted)] block mb-1">Tiêu Đề Chiến Dịch / Phiên Live:</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ví dụ: Mega Live 8/8 Flash Sale Mỹ Phẩm Cocoon"
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="font-bold text-[var(--text-muted)] block mb-1">Thương Hiệu (Brand):</label>
-                  <select
-                    value={newBrandId}
-                    onChange={(e) => {
-                      setNewBrandId(e.target.value);
-                      const def = findBrandStudioId(brandStudios, e.target.value);
-                      if (def) setNewStudioId(def);
-                    }}
-                    className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
-                  >
-                    {brands.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.name} ({b.industry})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="font-bold text-[var(--text-muted)] block mb-1">Phòng Studio:</label>
-                  <select
-                    value={newStudioId}
-                    onChange={(e) => setNewStudioId(e.target.value)}
-                    className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
-                  >
-                    {studios.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} ({s.roomNumber})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {bookingMode === "session" && (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="font-bold text-[var(--text-muted)] block mb-1">Host Chính (Main Host):</label>
-                  <select
-                    value={newHostId}
-                    onChange={(e) => setNewHostId(e.target.value)}
-                    className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
-                  >
-                    {talents.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name} ({t.role} • CVR: {t.cvrAvg}%)
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="font-bold text-[var(--text-muted)] block mb-1">Co-Host (tuỳ chọn):</label>
-                  <select
-                    value={newCoHostId}
-                    onChange={(e) => setNewCoHostId(e.target.value)}
-                    className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
-                  >
-                    <option value="">-- Không có Co-Host --</option>
-                    {talents.filter((t) => t.id !== newHostId).map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name} ({t.role})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="font-bold text-[var(--text-muted)] block mb-1">Trợ Lý Vận Hành (Moderator):</label>
-                  <select
-                    value={newAssistantId}
-                    onChange={(e) => setNewAssistantId(e.target.value)}
-                    className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
-                  >
-                    <option value="">-- Chưa gán Trợ Lý --</option>
-                    {moderators.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name} ({m.customRoleTitle || "Moderator"})
-                      </option>
-                    ))}
-                  </select>
-                  {moderators.length === 0 && (
-                    <p className="text-[10px] text-amber-400 mt-1">
-                      Chưa có tài khoản role Moderator nào — tạo ở tab Users &amp; Permissions.
-                    </p>
-                  )}
-                </div>
-              </div>
-              )}
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="font-bold text-[var(--text-muted)] block mb-1">Ngày Live:</label>
-                  <input
-                    type="date"
-                    value={newDate}
-                    onChange={(e) => setNewDate(e.target.value)}
-                    className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="font-bold text-[var(--text-muted)] block mb-1">Giờ Bắt Đầu:</label>
-                  <input
-                    type="time"
-                    value={newStartTime}
-                    onChange={(e) => setNewStartTime(e.target.value)}
-                    className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="font-bold text-[var(--text-muted)] block mb-1">Giờ Kết Thúc:</label>
-                  <input
-                    type="time"
-                    value={newEndTime}
-                    onChange={(e) => setNewEndTime(e.target.value)}
-                    className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-mono"
-                  />
-                </div>
-              </div>
-
-              {bookingMode === "session" && (
-              <div>
-                <label className="font-bold text-[var(--text-muted)] block mb-1">KPI Target GMV Cam Kết (VNĐ):</label>
-                <input
-                  type="number"
-                  value={newTargetGmv}
-                  onChange={(e) => setNewTargetGmv(Number(e.target.value))}
-                  className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-mono font-bold"
-                />
-              </div>
-              )}
-
-              <div className="pt-3 border-t border-[var(--border)] flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsBookingModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl bg-[var(--surface-elevated)] text-[var(--text-muted)] hover:bg-[var(--surface-hover)] font-bold"
-                >
-                  Hủy Bỏ
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold shadow-lg shadow-[var(--accent)]/30"
-                >
-                  Xác Nhận Đặt Lịch
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {slotModal && canManageSlots && onCreateSlot && (
+        <OpenSlotModal
+          brands={brands}
+          studios={studios}
+          brandStudios={brandStudios}
+          sessions={sessions}
+          shiftSlots={shiftSlots}
+          initialDate={slotModal.date}
+          initialStudioId={slotModal.studioId}
+          initialStart={slotModal.start}
+          initialEnd={slotModal.end}
+          currentUserId={currentUserId}
+          onClose={() => setSlotModal(null)}
+          onCreateSlot={onCreateSlot}
+        />
       )}
 
       {/* SESSION DETAIL MODAL */}
