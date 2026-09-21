@@ -55,7 +55,8 @@ import {
   Database,
   ClipboardCheck,
   TrendingUp,
-  FileSignature
+  FileSignature,
+  Radio
 } from "lucide-react";
 import { Header, WorkspaceContext } from "./components/Header";
 import { BrandCalendar } from "./components/brand-workspace/BrandCalendar";
@@ -79,6 +80,7 @@ import { AiMultiAgent } from "./components/AiMultiAgent";
 import { UserRoleSettings } from "./components/UserRoleSettings";
 import { AiTrainingCenter } from "./components/AiTrainingCenter";
 import { EngineTrainingPanel } from "./components/EngineTrainingPanel";
+import { OpsBoard } from "./components/OpsBoard";
 import { fetchEngineParams, saveEngineParams } from "./lib/db/engineParams";
 import { DEFAULT_ENGINE_PARAMS, EngineParams } from "./lib/scheduling/engineParams";
 import ShiftScheduling from "./components/ShiftScheduling";
@@ -140,7 +142,8 @@ interface NavGroup {
 
 function getDefaultTabForRole(role: UserRole): string {
   if (role === "brand") return "brand_calendar";
-  return "shift_scheduling";
+  if (role === "talent") return "my_shifts";
+  return "calendar";
 }
 
 export default function App() {
@@ -154,6 +157,9 @@ export default function App() {
   // "shift_scheduling" chỉ là fallback cho lần đầu mở app khi chưa biết role (localStorage rỗng);
   // role thật được set lại ngay bằng getDefaultTabForRole() khi profile load xong (bên dưới).
   const [activeTab, setActiveTab] = useState<string>(() => loadStorage("activeTab", "shift_scheduling"));
+  // Bảng Vận Hành (2026-09-21): "board" = hôm nay/tuần + việc còn thiếu; "calendar" = Lịch & Studio cũ.
+  const [opsView, setOpsView] = useState<"board" | "calendar">(() => loadStorage("opsView", "board"));
+  useEffect(() => saveStorage("opsView", opsView), [opsView]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   // Thu gọn sidebar thành thanh icon (w-16) để nhường không gian ngang cho calendar.
   // Chỉ áp dụng từ breakpoint md trở lên — dưới md sidebar vẫn là drawer trượt như cũ.
@@ -1383,30 +1389,45 @@ export default function App() {
   // nhóm cho Agency Workspace (nhìn xuyên mọi Brand). Xem BRAND_NAV_GROUPS bên dưới cho
   // Brand Workspace (Giai đoạn A, WORKSPACE_DESIGN.md).
   const AGENCY_NAV_GROUPS: NavGroup[] = [
-    {
-      label: "Vận Hành Live",
-      items: [
-        { id: "sessions", label: "Sổ Ca", icon: BookOpen, perm: "manage_sessions" as PermissionKey },
-        { id: "calendar", label: "Lịch Vận Hành", icon: CalendarIcon, perm: "manage_calendar" as PermissionKey },
-        // Đăng ký & Chốt Lịch Host — luôn hiện với mọi role, không gate theo PermissionKey: role
-        // talent cần thấy tab này để tự đăng ký ca (Giai đoạn 14a); màn hình bên trong tự đổi giao
-        // diện theo currentRole (talent = đăng ký, ceo/operations/admin = mở ca + chốt lịch).
-        // Kế Hoạch Tháng (0090) — lập lưới ca + target trước khi mở đăng ký; chốt là ca đổ xuống
-        // Đăng Ký & Chốt Lịch. Chỉ ops (manage_sessions = ceo/admin/operations).
-        { id: "month_plan", label: "Kế Hoạch Tháng", icon: CalendarRange, perm: "manage_sessions" as PermissionKey },
-        { id: "shift_scheduling", label: "Đăng Ký & Chốt Lịch", icon: CalendarClock, perm: undefined },
-        // Đối soát đặt ngay cạnh Live Sessions/lịch thay vì nhét trong tab "TikTok API" như luồng
-        // đối soát cũ — đúng chỗ ops đang làm việc, không phải nhảy sang module khác (điểm nghẽn
-        // #2 của audit module Vận Hành Live).
-        { id: "live_reconciliation", label: "Đối Soát Số Liệu", icon: ClipboardCheck, perm: "manage_sessions" as PermissionKey },
-        { id: "host_performance", label: "Hiệu Suất Host", icon: TrendingUp, perm: "manage_sessions" as PermissionKey },
-        // Hồ Sơ Của Tôi — chỉ role talent, cùng pattern hardcode-theo-role như ai_training bên
-        // dưới (không qua Ma Trận Phân Quyền, vì đây là trang tự quản lý của chính talent đó).
-        ...(currentRole === "talent"
-          ? [{ id: "my_talent_profile", label: "Hồ Sơ Của Tôi", icon: Users, perm: undefined }]
-          : []),
-      ],
-    },
+    // Tái cấu trúc 2026-09-21: tách LẬP KẾ HOẠCH (trước tháng) khỏi VẬN HÀNH (hằng ngày).
+    // Talent chỉ thấy: Ca Của Tôi (nơi nộp số liệu/report), Đăng Ký ca, Hồ Sơ.
+    ...(currentRole === "talent"
+      ? [
+          {
+            label: "Của Tôi",
+            items: [
+              { id: "my_shifts", label: "Ca Của Tôi", icon: Radio, perm: undefined },
+              { id: "shift_scheduling", label: "Đăng Ký Ca", icon: CalendarClock, perm: undefined },
+              { id: "my_talent_profile", label: "Hồ Sơ Của Tôi", icon: Users, perm: undefined }
+            ]
+          }
+        ]
+      : [
+          {
+            label: "Lập Kế Hoạch",
+            items: [
+              // Kế Hoạch Tháng (0090) — lập lưới ca + target trước khi mở đăng ký; chốt là ca đổ xuống
+              // Đăng Ký & Chốt Lịch. Chỉ ops (manage_sessions = ceo/admin/operations).
+              { id: "month_plan", label: "Kế Hoạch Tháng", icon: CalendarRange, perm: "manage_sessions" as PermissionKey },
+              // Đăng ký & Chốt Lịch Host — không gate theo PermissionKey (talent cũng dùng, ở nhóm trên).
+              { id: "shift_scheduling", label: "Đăng Ký & Chốt Lịch", icon: CalendarClock, perm: undefined }
+            ]
+          },
+          {
+            label: "Vận Hành Hằng Ngày",
+            items: [
+              // "calendar" giữ id cũ (quyền manage_calendar, localStorage) — nội dung là Bảng Vận Hành
+              // (hôm nay/tuần, việc còn thiếu) + chế độ xem Lịch & Studio (LiveCalendar cũ).
+              { id: "calendar", label: "Bảng Vận Hành", icon: CalendarIcon, perm: "manage_calendar" as PermissionKey },
+              { id: "sessions", label: "Sổ Ca", icon: BookOpen, perm: "manage_sessions" as PermissionKey },
+              { id: "live_reconciliation", label: "Đối Soát Số Liệu", icon: ClipboardCheck, perm: "manage_sessions" as PermissionKey }
+            ]
+          },
+          {
+            label: "Phân Tích",
+            items: [{ id: "host_performance", label: "Hiệu Suất Host", icon: TrendingUp, perm: "manage_sessions" as PermissionKey }]
+          }
+        ]),
     {
       label: "Tài Nguyên Chung",
       items: [
@@ -1880,6 +1901,30 @@ export default function App() {
                 )}
 
                 {activeTab === "calendar" && (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-1 bg-[var(--surface)] border border-[var(--border)] rounded-xl p-1 w-fit">
+                      <button onClick={() => setOpsView("board")} className={`px-3 py-1.5 rounded-lg text-xs font-bold ${opsView === "board" ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)] hover:text-[var(--text)]"}`}>Bảng hôm nay / tuần</button>
+                      <button onClick={() => setOpsView("calendar")} className={`px-3 py-1.5 rounded-lg text-xs font-bold ${opsView === "calendar" ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)] hover:text-[var(--text)]"}`}>Lịch & Studio</button>
+                    </div>
+                    {opsView === "board" && (
+                      <OpsBoard
+                        mode="ops"
+                        sessions={activeSessions}
+                        shiftSlots={shiftSlots}
+                        shiftRegistrations={shiftRegistrations}
+                        brands={activeBrands}
+                        studios={activeStudios}
+                        talents={activeTalents}
+                        currentRole={currentRole}
+                        myTalentId={activeUser.assignedTalentId}
+                        onSubmitSessionReport={handleSubmitSessionReport}
+                        onSessionSnapshotApplied={handleSessionReconciled}
+                        onUpdateSession={handleUpdateSession}
+                        onDeleteSession={handleDeleteSession}
+                        onOpenScheduling={() => setActiveTab("shift_scheduling")}
+                      />
+                    )}
+                    {opsView === "calendar" && (
                   <LiveCalendar
                     sessions={activeSessions}
                     shiftSlots={shiftSlots}
@@ -1905,6 +1950,24 @@ export default function App() {
                     onSubmitSessionReport={handleSubmitSessionReport}
                     onSessionSnapshotApplied={handleSessionReconciled}
                     onDeleteSession={handleDeleteSession}
+                  />
+                    )}
+                  </div>
+                )}
+
+                {activeTab === "my_shifts" && currentRole === "talent" && (
+                  <OpsBoard
+                    mode="mine"
+                    sessions={activeSessions}
+                    shiftSlots={shiftSlots}
+                    shiftRegistrations={shiftRegistrations}
+                    brands={activeBrands}
+                    studios={activeStudios}
+                    talents={activeTalents}
+                    currentRole={currentRole}
+                    myTalentId={activeUser.assignedTalentId}
+                    onSubmitSessionReport={handleSubmitSessionReport}
+                    onSessionSnapshotApplied={handleSessionReconciled}
                   />
                 )}
 
