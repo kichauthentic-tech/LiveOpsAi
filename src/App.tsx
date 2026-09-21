@@ -2160,6 +2160,7 @@ export default function App() {
                     sessions={activeSessions}
                     currentRole={currentRole}
                     brandPlatformRates={brandPlatformRates}
+                    shiftSlots={shiftSlots}
                   />
                 )}
 

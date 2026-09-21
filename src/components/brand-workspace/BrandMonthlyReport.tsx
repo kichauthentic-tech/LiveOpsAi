@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { LiveSession, UserRole, BrandMonthlyReport as BrandMonthlyReportType, BrandPlatformRate } from "../../types";
+import { LiveSession, ShiftSlot, UserRole, BrandMonthlyReport as BrandMonthlyReportType, BrandPlatformRate } from "../../types";
 import {
   FileText,
   TrendingUp,
@@ -38,6 +38,7 @@ interface BrandMonthlyReportProps {
   sessions: LiveSession[];
   currentRole: UserRole;
   brandPlatformRates: BrandPlatformRate[];
+  shiftSlots?: ShiftSlot[]; // Report Tuần: ca mở chưa có người tuần tới
 }
 
 const CAN_MANAGE_ROLES: UserRole[] = ["ceo", "operations", "admin"];
@@ -112,7 +113,7 @@ const MomChip: React.FC<{ current: number | null; previous: number | null }> = (
   );
 };
 
-export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId, brandName, sessions, currentRole, brandPlatformRates }) => {
+export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId, brandName, sessions, currentRole, brandPlatformRates, shiftSlots }) => {
   const canManage = CAN_MANAGE_ROLES.includes(currentRole);
   const canViewWeekly = CAN_VIEW_WEEKLY_ROLES.includes(currentRole);
   const [viewMode, setViewMode] = useState<"month" | "week">("month");
@@ -273,7 +274,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
       )}
 
       {viewMode === "week" ? (
-        <BrandWeeklyReport brandId={brandId} brandName={brandName} sessions={sessions} currentRole={currentRole} />
+        <BrandWeeklyReport brandId={brandId} brandName={brandName} sessions={sessions} currentRole={currentRole} shiftSlots={shiftSlots} />
       ) : (
         <>
       <div className="bg-[var(--surface)] text-[var(--text)] p-6 rounded-2xl border border-[var(--border)] shadow-xl space-y-3">
