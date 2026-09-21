@@ -156,6 +156,10 @@ export default function ShiftScheduling({
   const today = getTodayDateString();
   const [selectedMonth, setSelectedMonth] = useState(today.slice(0, 7)); // "YYYY-MM"
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  // Tái cấu trúc 2026-09-21 ("Nhân sự ca"): mặc định là DANH SÁCH ca theo ngày (từ hôm nay), lịch
+  // tháng chỉ là chế độ xem phụ — tránh lặp lại lịch tháng của Kế Hoạch Tháng.
+  const [view, setView] = useState<"list" | "calendar">("list");
+  const [showPast, setShowPast] = useState(false);
 
   const [pickByLot, setPickByLot] = useState<Record<string, { hostId: string; coHostId: string }>>({});
   const [busySlotId, setBusySlotId] = useState<string | null>(null);
@@ -258,7 +262,9 @@ export default function ShiftScheduling({
     return cells;
   }, [selectedMonth]);
 
-  const visibleSlots = selectedDate ? slotsByDate.get(selectedDate) ?? [] : monthSlots;
+  const visibleSlots = selectedDate
+    ? slotsByDate.get(selectedDate) ?? []
+    : monthSlots.filter((sl) => showPast || sl.date >= today).filter((sl) => admin || sl.status !== "cancelled");
 
   const shiftMonth = (delta: number) => {
     const [y, m] = selectedMonth.split("-").map(Number);
@@ -565,6 +571,19 @@ export default function ShiftScheduling({
         </div>
       )}
 
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-1 bg-[var(--surface)] border border-[var(--border)] rounded-xl p-1 w-fit">
+          <button onClick={() => { setView("list"); setSelectedDate(null); }} className={`px-3 py-1.5 rounded-lg text-xs font-bold ${view === "list" ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)] hover:text-[var(--text)]"}`}>Danh sách ca</button>
+          <button onClick={() => setView("calendar")} className={`px-3 py-1.5 rounded-lg text-xs font-bold ${view === "calendar" ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)] hover:text-[var(--text)]"}`}>Lịch tháng</button>
+        </div>
+        {view === "list" && !selectedDate && (
+          <label className="text-xs text-[var(--text-muted)] flex items-center gap-1.5 cursor-pointer">
+            <input type="checkbox" checked={showPast} onChange={(e) => setShowPast(e.target.checked)} /> gồm ca đã qua
+          </label>
+        )}
+      </div>
+
+      {view === "calendar" && (
       <div className="bg-[#f8f9fa] dark:bg-slate-900 border border-pink-200 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl">
         <h3 className="font-black text-slate-900 dark:text-white flex items-center gap-2 mb-4">
           <CalendarIcon className="w-4 h-4 text-blue-500 dark:text-blue-400" /> Lịch Ma Trận Tháng {selectedMonth}
@@ -699,25 +718,29 @@ export default function ShiftScheduling({
           )}
         </div>
       </div>
+      )}
 
-      {/* Chỉ hiện danh sách ca của ngày đang chọn — bỏ danh sách dàn trải cả tháng */}
-      {selectedDate && (
+      {/* Danh sách ca: chế độ "list" = cả tháng từ hôm nay, nhóm theo ngày; chế độ lịch = ngày đang chọn */}
+      {(selectedDate || view === "list") && (
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-6 shadow-xl">
         <div className="flex items-center justify-between gap-2 flex-wrap mb-4">
           <h3 className="font-bold text-[var(--text)] flex items-center gap-2">
             <Radio className="w-4 h-4 text-blue-400" />
-            {`Ca Ngày ${dayLabel(selectedDate)} ${selectedDate}`}
+            {selectedDate ? `Ca Ngày ${dayLabel(selectedDate)} ${selectedDate}` : `Ca tháng ${selectedMonth}${showPast ? "" : " · từ hôm nay"}`}
           </h3>
-          <button onClick={() => setSelectedDate(null)} className="text-xs text-blue-400 hover:text-blue-300 font-bold">
-            × Đóng
-          </button>
+          {selectedDate && (
+            <button onClick={() => setSelectedDate(null)} className="text-xs text-blue-400 hover:text-blue-300 font-bold">
+              × Đóng
+            </button>
+          )}
         </div>
         <div className="overflow-x-auto -mx-2">
           <div className="min-w-[720px] px-2 space-y-2">
             {visibleSlots.length === 0 && (
-              <p className="text-sm text-[var(--text-faint)] py-6 text-center">Chưa có ca nào trong ngày này.</p>
+              <p className="text-sm text-[var(--text-faint)] py-6 text-center">{selectedDate ? "Chưa có ca nào trong ngày này." : "Chưa có ca nào — ca được mở khi chốt Kế Hoạch Tháng."}</p>
             )}
-            {visibleSlots.map((slot) => {
+            {visibleSlots.map((slot, idx) => {
+              const dayHeader = !selectedDate && (idx === 0 || visibleSlots[idx - 1].date !== slot.date);
               const regs = registrationsBySlot.get(slot.id) ?? [];
               const iAmRegistered = myTalentId ? regs.some((r) => r.talentId === myTalentId) : false;
               const pick = pickByLot[slot.id] ?? { hostId: "", coHostId: "" };
@@ -741,7 +764,13 @@ export default function ShiftScheduling({
                   : [];
               const hasAnyPerfData = suggestions.some((s) => s.overallSessions > 0);
               return (
-                <div key={slot.id} className="bg-[var(--surface-base)]/80 border border-[var(--border)] rounded-xl p-3 flex flex-col gap-2">
+                <React.Fragment key={slot.id}>
+                {dayHeader && (
+                  <p className={`text-[11px] font-black uppercase tracking-wide pt-2 ${slot.date === today ? "text-[var(--accent-text)]" : "text-[var(--text-faint)]"}`}>
+                    {dayLabel(slot.date)} {slot.date}{slot.date === today ? " · hôm nay" : ""}
+                  </p>
+                )}
+                <div className="bg-[var(--surface-base)]/80 border border-[var(--border)] rounded-xl p-3 flex flex-col gap-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-3 text-sm">
                       <span className="font-mono font-bold text-[var(--text)]">
@@ -1057,6 +1086,7 @@ export default function ShiftScheduling({
                       );
                     })()}
                 </div>
+                </React.Fragment>
               );
             })}
           </div>
