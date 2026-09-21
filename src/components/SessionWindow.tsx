@@ -217,7 +217,8 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
               {!isBrandView && s.isBackfill && (
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-[var(--surface-elevated)] text-[var(--text-faint)] border-[var(--border)]">nạp bù từ file</span>
               )}
-              {s.reconciledAt && <span className="text-[10px] text-[var(--text-faint)]">đối soát {new Date(s.reconciledAt).toLocaleDateString("vi-VN")}</span>}
+              {/* RPC snapshot (0078) cũng ghi reconciled_at — chỉ gọi là "đối soát" khi nguồn số thật sự là tiktok_reconciled. */}
+              {s.reconciledAt && s.dataSource === "tiktok_reconciled" && <span className="text-[10px] text-[var(--text-faint)]">đối soát {new Date(s.reconciledAt).toLocaleDateString("vi-VN")}</span>}
               {isMine && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-sky-950 text-sky-300 border-sky-800">ca của tôi</span>}
             </div>
           </div>
