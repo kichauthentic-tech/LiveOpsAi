@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { SESSION_STATUS_CLS, SESSION_STATUS_LABEL_VI } from "../lib/sessionStatusUi";
 import { AlertTriangle, Ban, CheckCircle2, Circle, Link2, Pencil, Trash2, X } from "lucide-react";
 import { AuditLogEntry, Brand, LiveSession, Studio, Talent, UserRole } from "../types";
-import { timeRangesOverlap } from "../lib/dateUtils";
+import { dateTimeRangesOverlap } from "../lib/dateUtils";
 import { formatCurrencyAdaptive } from "../lib/formatCurrency";
 import { sessionHours } from "../lib/performance/hostPerformance";
 import { SessionReportInput } from "../lib/db/sessionReports";
@@ -61,18 +62,8 @@ export interface SessionWindowProps {
 const OPS_ROLES: UserRole[] = ["ceo", "operations", "admin"];
 const WEEKDAY = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
 
-const STATUS_LABEL: Record<LiveSession["status"], string> = {
-  "Live Now": "Đang live",
-  Upcoming: "Sắp tới",
-  Completed: "Đã xong",
-  Cancelled: "Đã huỷ"
-};
-const STATUS_CLS: Record<LiveSession["status"], string> = {
-  "Live Now": "bg-red-950 text-red-300 border-red-800",
-  Upcoming: "bg-amber-950 text-amber-300 border-amber-800",
-  Completed: "bg-emerald-950 text-emerald-300 border-emerald-800",
-  Cancelled: "bg-[var(--surface-elevated)] text-[var(--text-faint)] border-[var(--border)]"
-};
+const STATUS_LABEL = SESSION_STATUS_LABEL_VI;
+const STATUS_CLS = SESSION_STATUS_CLS;
 const MISSING_LABEL: Record<MissingStep, string> = {
   snapshot: "Chưa up file số liệu",
   report: "Chưa có report",
@@ -110,7 +101,8 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
   const isOps = OPS_ROLES.includes(viewer.role);
   const isMine = !!viewer.myTalentId && (viewer.myTalentId === s.hostId || viewer.myTalentId === s.coHostId);
   // Up file / nộp report: ops, hoặc host/trợ của đúng ca (khớp guard can_edit_session_snapshot, 0082).
-  const canReport = !isBrandView && (isOps || isMine) && !!onSubmitSessionReport;
+  // U6: ca nạp bù (tháng cũ) không có report — không hiện form.
+  const canReport = !isBrandView && (isOps || isMine) && !s.isBackfill && !!onSubmitSessionReport;
   const canSnapshot = !isBrandView && (isOps || isMine) && !s.isBackfill && !!onSessionSnapshotApplied;
   const canEdit = isOps && !!onUpdateSession && !!studios && !!talents;
 
@@ -151,13 +143,13 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
     .filter((x): x is LiveSession => !!x)
     .map((x) => `${fmtDate(x.date)} ${x.startTime}–${x.endTime} (${x.hostName || "chưa gán"})`);
 
-  // Trùng studio / host cùng ngày, cùng cách checkConflicts của Lịch Vận Hành cũ.
+  // Trùng studio / host — xét cả ca qua đêm của ngày trước (Q6).
   const conflicts = useMemo(() => {
     const out = { studio: "", host: "" };
     if (!editing) return out;
     for (const x of allSessions) {
-      if (x.id === s.id || x.date !== edit.date || x.status === "Cancelled") continue;
-      if (!timeRangesOverlap(x.startTime, x.endTime, edit.startTime, edit.endTime)) continue;
+      if (x.id === s.id || x.status === "Cancelled") continue;
+      if (!dateTimeRangesOverlap(x, edit)) continue;
       if (x.studioId === edit.studioId && !out.studio) out.studio = x.title || `${x.brandName} ${x.startTime}–${x.endTime}`;
       if (x.hostId === edit.hostId && !out.host) out.host = `${x.hostName} (${x.title || x.brandName})`;
     }
@@ -452,6 +444,31 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
               <p className="text-xs text-[var(--text-faint)] italic">Chưa có số liệu.</p>
             )}
           </section>
+
+          {/* Lịch sử — mốc có trong dữ liệu ca (U6). Audit log chi tiết xem ở Nhật ký hệ thống. */}
+          {!isBrandView && (() => {
+            const fmtAt = (iso: string) => new Date(iso).toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+            const events: { at: string; label: string }[] = [];
+            if (s.report?.submittedAt) events.push({ at: s.report.submittedAt, label: `Report nộp${s.report.submittedByRole ? ` (${s.report.submittedByRole})` : ""}` });
+            if (s.actualStartAt && (s.liveRoomIds?.length ?? 0) > 0) events.push({ at: s.actualStartAt, label: `File số liệu · live thật ${fmtTime(s.actualStartAt)}–${fmtTime(s.actualEndAt)}` });
+            if (s.reconciledAt) events.push({ at: s.reconciledAt, label: "Đối soát TikTok ghi đè số liệu" });
+            if (s.cancelledAt) events.push({ at: s.cancelledAt, label: `Huỷ ca${s.cancelReason ? ` — ${s.cancelReason}` : ""}` });
+            if (events.length === 0) return null;
+            events.sort((a, b) => a.at.localeCompare(b.at));
+            return (
+              <section>
+                <h4 className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-bold mb-2">Lịch sử</h4>
+                <ul className="space-y-1">
+                  {events.map((e, i) => (
+                    <li key={i} className="text-xs flex items-start gap-2">
+                      <span className="font-mono text-[var(--text-faint)] shrink-0">{fmtAt(e.at)}</span>
+                      <span className="text-[var(--text-muted)]">{e.label}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            );
+          })()}
 
           {/* Phiên TikTok / ca nối */}
           {!isBrandView && ((s.liveRoomIds?.length ?? 0) > 0 || linkedLabel.length > 0) && (

@@ -31,3 +31,31 @@ export const timeRangesOverlap = (aStart: string, aEnd: string, bStart: string, 
   if (bEndM <= bStartM) bEndM += 24 * 60;
   return aStartM < bEndM && bStartM < aEndM;
 };
+
+// Q6 (audit 2026-09-21): trùng lịch xét THEO NGÀY + GIỜ, kể cả ca qua đêm của ngày trước — ca
+// 21:00–00:30 hôm qua phải chặn ca 00:00–01:00 hôm nay. Lọc `date === date` rồi mới
+// timeRangesOverlap bỏ sót trường hợp đó. Quy mọi ca về phút tuyệt đối kể từ epoch ngày.
+export interface DateTimeRange {
+  date: string; // YYYY-MM-DD
+  startTime: string;
+  endTime: string;
+}
+const dayIndex = (date: string) => Math.round(Date.UTC(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, Number(date.slice(8, 10))) / 86400000);
+const absRange = (r: DateTimeRange): [number, number] => {
+  const toMinutes = (t: string) => {
+    const [h, m] = t.split(":").map(Number);
+    return h * 60 + m;
+  };
+  const base = dayIndex(r.date) * 24 * 60;
+  const start = base + toMinutes(r.startTime);
+  let end = base + toMinutes(r.endTime);
+  if (end <= start) end += 24 * 60;
+  return [start, end];
+};
+export const dateTimeRangesOverlap = (a: DateTimeRange, b: DateTimeRange): boolean => {
+  // Cách nhau ≥ 2 ngày thì không thể chạm (ca dài nhất < 24h) — tránh tính cho cả kho ca.
+  if (Math.abs(dayIndex(a.date) - dayIndex(b.date)) > 1) return false;
+  const [as, ae] = absRange(a);
+  const [bs, be] = absRange(b);
+  return as < be && bs < ae;
+};

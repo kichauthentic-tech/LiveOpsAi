@@ -231,7 +231,7 @@ export const buildSessionMeta = (s: LiveSession, lookup?: TalentLookup): Session
   const meta: SessionCardMeta[] = [];
   if (s.platform) meta.push({ icon: ShoppingBag, label: s.platform, title: `Nền tảng: ${s.platform}` });
   if (s.hostName) meta.push({ icon: Mic, label: talentShortName(lookup?.(s.hostId), s.hostName), title: `Host: ${s.hostName}` });
-  if (s.coHostName) meta.push({ icon: Users, label: talentShortName(lookup?.(s.coHostId), s.coHostName), title: `Trợ (Co-Host): ${s.coHostName}` });
+  if (s.coHostName) meta.push({ icon: Users, label: talentShortName(lookup?.(s.coHostId), s.coHostName), title: `Trợ live: ${s.coHostName}` });
   return meta;
 };
 

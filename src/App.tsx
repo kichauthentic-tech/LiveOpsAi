@@ -2014,6 +2014,7 @@ export default function App() {
                     myTalentId={activeUser.assignedTalentId}
                     onSubmitSessionReport={handleSubmitSessionReport}
                     onSessionSnapshotApplied={handleSessionReconciled}
+                    onOpenScheduling={() => setActiveTab("shift_scheduling")}
                     requestOpenSessionId={notifOpenSessionId}
                     onOpenRequestHandled={() => setNotifOpenSessionId(null)}
                   />
@@ -2063,7 +2064,10 @@ export default function App() {
                 )}
 
                 {activeTab === "live_reconciliation" && (
-                  <LiveReconciliation onApplied={handleReconciliationApplied} />
+                  <LiveReconciliation
+                    onApplied={handleReconciliationApplied}
+                    onOpenSession={(id) => { setOpsView("board"); setActiveTab("calendar"); setNotifOpenSessionId(id); }}
+                  />
                 )}
 
                 {activeTab === "host_performance" && (

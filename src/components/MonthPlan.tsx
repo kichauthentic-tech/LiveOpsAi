@@ -376,8 +376,10 @@ export default function MonthPlan({
     const warn = planHours > 0 && Math.abs(gap) > 0.01 ? `\n\nGiờ kế hoạch ${fmtH(totals.hours)}h ${gap > 0 ? "THIẾU" : "VƯỢT"} ${fmtH(Math.abs(gap))}h so với ${fmtH(planHours)}h cần xếp.` : "";
     const relockNote = locked ? "\n\nChốt lại sẽ mở thêm ca mới và HUỶ ca đang mở đã bị bỏ khỏi kế hoạch (trừ ca đã có người đăng ký)." : "";
     const targetWarn = targetGap && targetGap.pct > engineParams.targetGapWarnPct ? `\n\nDự báo lưới ${formatCurrencyAdaptive(targetGap.forecast)} THIẾU ${formatCurrencyAdaptive(targetGap.gap)} (${Math.round(targetGap.pct * 100)}%) so với target ${formatCurrencyAdaptive(targetTotal)}${targetGap.fill ? ` — cần bù ~${fmtH(targetGap.extraHours)}h.` : " — thêm giờ trong khung cũng không chạm."} Sau khi chốt, target/ca KHÔNG chia lại nữa.` : "";
+    const pastCount = drafts.filter((d) => d.date < today).length;
+    const pastNote = pastCount > 0 ? `\n\n${pastCount} ca ở ngày đã qua sẽ KHÔNG mở chờ đăng ký (chỉ giữ trong kế hoạch để đối chiếu).` : "";
     const studioNote = brandStudio ? `\n\nCa sinh ra gắn phòng ${brandStudio.name} (${brandStudio.roomNumber}).` : "\n\nBrand CHƯA có phòng live mặc định — ca sinh ra sẽ không có phòng (không kiểm được trùng phòng). Chọn ở Tham số → Phòng live trước nếu cần.";
-    if (!window.confirm(`${locked ? "Chốt lại" : "Chốt"} kế hoạch ${brand?.name} tháng ${month}: ${drafts.length} ca chờ đăng ký?${warn}${targetWarn}${relockNote}${studioNote}`)) return;
+    if (!window.confirm(`${locked ? "Chốt lại" : "Chốt"} kế hoạch ${brand?.name} tháng ${month}: ${drafts.length} ca chờ đăng ký?${warn}${targetWarn}${relockNote}${studioNote}${pastNote}`)) return;
     const p = await save();
     if (!p) return;
     setSaving(true);
@@ -393,7 +395,7 @@ export default function MonthPlan({
       setLockedSlotsTick((t) => t + 1);
       setMsg(
         `Đã chốt: mở ${r.created} ca mới${r.linked > 0 ? `, gắn ${r.linked} ca đã có sẵn` : ""}${r.cancelled > 0 ? `, huỷ ${r.cancelled} ca bị bỏ` : ""}` +
-          `${r.kept_registered > 0 ? `, GIỮ ${r.kept_registered} ca bị bỏ nhưng đã có người đăng ký (xử lý ở Nhân sự ca)` : ""} — ${r.total_slots} ca đang chờ đăng ký.`
+          `${r.kept_registered > 0 ? `, GIỮ ${r.kept_registered} ca bị bỏ nhưng đã có người đăng ký (xử lý ở Nhân sự ca)` : ""}${(r.skipped_past ?? 0) > 0 ? `, bỏ qua ${r.skipped_past} ca ngày đã qua` : ""} — ${r.total_slots} ca đang chờ đăng ký.`
       );
     } catch (e: any) {
       setMsg(`Không chốt được: ${e.message ?? e}`);

@@ -15,6 +15,8 @@ import { errorMessage } from "../lib/errorMessage";
 
 interface LiveReconciliationProps {
   onApplied: () => Promise<void> | void;
+  // U7 (audit 2026-09-21): mở Cửa sổ Ca Live của ca khớp với phiên (xem số bị ghi đè ngay tại chỗ).
+  onOpenSession?: (sessionId: string) => void;
 }
 
 const BUCKET_LABEL: Record<ReconciliationBucket, string> = {
@@ -48,7 +50,7 @@ function fmtTime(iso?: string): string {
   return iso ? new Date(iso).toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—";
 }
 
-export function LiveReconciliation({ onApplied }: LiveReconciliationProps) {
+export function LiveReconciliation({ onApplied, onOpenSession }: LiveReconciliationProps) {
   const [batches, setBatches] = useState<ReconciliationBatch[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [rows, setRows] = useState<ReconciliationRow[]>([]);
@@ -216,7 +218,17 @@ export function LiveReconciliation({ onApplied }: LiveReconciliationProps) {
                           </td>
                           <td className="py-1.5 pr-3 text-right font-bold text-[var(--text)]">{fmtVnd(r.gmv)}</td>
                           <td className="py-1.5 pr-3 text-right text-[var(--text-muted)]">{r.orders}</td>
-                          <td className="py-1.5 text-right text-[var(--text-muted)]">{r.matchedSessionIds.length || "—"}</td>
+                          <td className="py-1.5 text-right text-[var(--text-muted)]">
+                            {r.matchedSessionIds.length === 0 ? "—" : onOpenSession ? (
+                              <span className="inline-flex gap-1 justify-end flex-wrap">
+                                {r.matchedSessionIds.map((id, i) => (
+                                  <button key={id} onClick={() => onOpenSession(id)} className="px-1.5 py-0.5 rounded border border-sky-800 text-sky-300 hover:bg-sky-950 font-bold" title="Mở ca">
+                                    ca {i + 1}
+                                  </button>
+                                ))}
+                              </span>
+                            ) : r.matchedSessionIds.length}
+                          </td>
                         </tr>
                       ))}
                     </tbody>

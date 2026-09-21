@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { SESSION_STATUS_CLS, SESSION_STATUS_LABEL_VI } from "../lib/sessionStatusUi";
 import { BookOpen, CheckCircle2, ChevronRight, Circle, Link2 } from "lucide-react";
 import { Brand, LiveSession, Studio, Talent, UserRole, AuditLogEntry } from "../types";
 import { getTodayDate } from "../lib/dateUtils";
@@ -52,19 +53,9 @@ interface SessionLedgerProps {
 }
 
 
-const STATUS_LABEL: Record<LiveSession["status"], string> = {
-  "Live Now": "Đang live",
-  Upcoming: "Sắp tới",
-  Completed: "Đã xong",
-  Cancelled: "Đã huỷ"
-};
+const STATUS_LABEL = SESSION_STATUS_LABEL_VI;
 
-const STATUS_CLS: Record<LiveSession["status"], string> = {
-  "Live Now": "bg-red-950 text-red-300 border-red-800",
-  Upcoming: "bg-amber-950 text-amber-300 border-amber-800",
-  Completed: "bg-emerald-950 text-emerald-300 border-emerald-800",
-  Cancelled: "bg-[var(--surface-elevated)] text-[var(--text-faint)] border-[var(--border)]"
-};
+const STATUS_CLS = SESSION_STATUS_CLS;
 
 const MISSING_LABEL: Record<MissingStep, string> = {
   snapshot: "Chưa up snapshot",

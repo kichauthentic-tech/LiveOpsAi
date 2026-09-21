@@ -252,7 +252,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
             statusLabel={SESSION_STATUS_LABEL[s.status]}
             tooltip={`${s.title} · ${studioById[s.studioId]?.name ?? s.studioName} · Host ${
               talentById[s.hostId]?.name ?? s.hostName
-            }${s.coHostName ? ` · Co-Host ${s.coHostName}` : ""}`}
+            }${s.coHostName ? ` · Trợ ${s.coHostName}` : ""}`}
             onClick={(e) => {
               e.stopPropagation();
               setOpenSessionId(s.id);
@@ -472,7 +472,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
                     {s.startTime}-{s.endTime}
                   </span>
                   <span>Host: {s.hostName}</span>
-                  {s.coHostName && <span>Co-Host: {s.coHostName}</span>}
+                  {s.coHostName && <span>Trợ live: {s.coHostName}</span>}
                   <span>Studio: {s.studioName}</span>
                   <span className="ml-auto font-bold text-[var(--success)]">{formatCurrencyAdaptive(s.actualGmv || 0)}</span>
                 </div>

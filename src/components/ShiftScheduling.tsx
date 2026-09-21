@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 import { talentShortName } from "../lib/talentName";
 import { CAMPAIGN_DAY_STYLES, getCampaignDayInfo } from "../lib/campaignDays";
-import { timeRangesOverlap } from "../lib/dateUtils";
+import { dateTimeRangesOverlap } from "../lib/dateUtils";
 import { CampaignDayRibbon } from "./ui/CampaignDayRibbon";
 import { PosterDayCell } from "./ui/PosterCalendarGrid";
 import { getBrandTheme } from "../lib/brandTheme";
@@ -232,10 +232,9 @@ export default function ShiftScheduling({
       (s) =>
         s.id !== excludeSlotId &&
         s.status !== "cancelled" &&
-        s.date === date &&
         s.studioId === studioId &&
         s.brandId !== brandId &&
-        timeRangesOverlap(start, end, s.startTime, s.endTime)
+        dateTimeRangesOverlap({ date, startTime: start, endTime: end }, s)
     );
   };
   // Lưới ngày đủ tuần (kể cả ngày lấp đầu/cuối từ tháng liền kề) để vẽ lịch ma trận.
@@ -275,8 +274,8 @@ export default function ShiftScheduling({
     let studioConflict = false;
     let hostConflict = false;
     for (const s of sessions) {
-      if (s.date !== date || s.status === "Cancelled") continue;
-      if (!timeRangesOverlap(s.startTime, s.endTime, start, end)) continue;
+      if (s.status === "Cancelled") continue;
+      if (!dateTimeRangesOverlap(s, { date, startTime: start, endTime: end })) continue;
       if (studioId && s.studioId === studioId) studioConflict = true;
       if (s.hostId === talentId || s.coHostId === talentId) hostConflict = true;
     }

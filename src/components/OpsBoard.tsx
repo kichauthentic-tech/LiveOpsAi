@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { SESSION_STATUS_CLS, SESSION_STATUS_LABEL_VI } from "../lib/sessionStatusUi";
 import { AlertTriangle, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, Radio, UserX } from "lucide-react";
 import { Brand, LiveSession, ShiftRegistration, ShiftSlot, Studio, Talent, UserRole, AuditLogEntry } from "../types";
 import { getTodayDate } from "../lib/dateUtils";
@@ -43,13 +44,8 @@ type Range = "today" | "tomorrow" | "week" | "day";
 
 const WEEKDAY = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
 const MISSING_LABEL: Record<MissingStep, string> = { snapshot: "chưa up file", report: "chưa report", reconcile: "chưa đối soát" };
-const STATUS_LABEL: Record<LiveSession["status"], string> = { "Live Now": "Đang live", Upcoming: "Sắp tới", Completed: "Đã xong", Cancelled: "Đã huỷ" };
-const STATUS_CLS: Record<LiveSession["status"], string> = {
-  "Live Now": "bg-red-950 text-red-300 border-red-800",
-  Upcoming: "bg-amber-950 text-amber-300 border-amber-800",
-  Completed: "bg-emerald-950 text-emerald-300 border-emerald-800",
-  Cancelled: "bg-[var(--surface-elevated)] text-[var(--text-faint)] border-[var(--border)]"
-};
+const STATUS_LABEL = SESSION_STATUS_LABEL_VI;
+const STATUS_CLS = SESSION_STATUS_CLS;
 
 function addDays(date: string, n: number): string {
   const [y, m, d] = date.split("-").map(Number);
@@ -270,7 +266,12 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
             {mineDue.length === 0 ? <p className="text-xs text-[var(--text-faint)] italic">Không còn ca nào thiếu file/report.</p> : mineDue.map((s) => <SessionRow key={s.id} s={s} />)}
           </section>
           <section className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 sm:p-4 space-y-2">
-            <h3 className="text-sm font-black text-[var(--text)]">Sắp tới (14 ngày)</h3>
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-sm font-black text-[var(--text)]">Sắp tới (14 ngày)</h3>
+              {onOpenScheduling && (
+                <button onClick={onOpenScheduling} className="text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-blue-950 text-blue-300 border border-blue-800 hover:bg-blue-900 flex items-center gap-1"><CalendarClock className="w-3.5 h-3.5" /> Đăng ký ca</button>
+              )}
+            </div>
             {mineUpcoming.length === 0 ? <p className="text-xs text-[var(--text-faint)] italic">Chưa có ca nào được chốt cho bạn. Đăng ký ca mở ở tab Đăng Ký Ca.</p> : mineUpcoming.map((s) => <SessionRow key={s.id} s={s} />)}
           </section>
         </>

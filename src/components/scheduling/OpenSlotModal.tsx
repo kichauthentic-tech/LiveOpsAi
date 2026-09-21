@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { Brand, BrandStudio, LiveSession, ShiftSlot, Studio } from "../../types";
 import { AlertTriangle, CalendarClock, X } from "lucide-react";
-import { timeRangesOverlap } from "../../lib/dateUtils";
+import { dateTimeRangesOverlap } from "../../lib/dateUtils";
 import { findBrandStudioId } from "../../lib/db/brandStudios";
 
 // Q2 (audit 2026-09-21): con đường DUY NHẤT tạo ca ngoài Kế Hoạch Tháng là "mở ca chờ đăng ký" —
@@ -73,9 +73,10 @@ export const OpenSlotModal: React.FC<OpenSlotModalProps> = ({
   // Trùng phòng với ca đã chốt hoặc ca đang mở cùng ngày (ca đang mở cũng giữ phòng).
   const studioClash = useMemo(() => {
     if (!studioId) return null;
-    const s = sessions.find((x) => x.date === date && x.status !== "Cancelled" && x.studioId === studioId && timeRangesOverlap(x.startTime, x.endTime, start, end));
+    const want = { date, startTime: start, endTime: end };
+    const s = sessions.find((x) => x.status !== "Cancelled" && x.studioId === studioId && dateTimeRangesOverlap(x, want));
     if (s) return `${s.brandName} ${s.startTime}–${s.endTime} (đã chốt)`;
-    const sl = shiftSlots.find((x) => x.date === date && x.status === "open" && x.studioId === studioId && timeRangesOverlap(x.startTime, x.endTime, start, end));
+    const sl = shiftSlots.find((x) => x.status === "open" && x.studioId === studioId && dateTimeRangesOverlap(x, want));
     return sl ? `${sl.brandName} ${sl.startTime}–${sl.endTime} (chờ đăng ký)` : null;
   }, [sessions, shiftSlots, date, start, end, studioId]);
 

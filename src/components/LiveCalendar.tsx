@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { LiveSession, ShiftSlot, ShiftRegistration, Studio, Talent, Brand, PromoScheme, UserRole, BrandStudio, AuditLogEntry } from "../types";
 import { schemesForDate } from "../lib/schemeUtils";
 import { findBrandStudioId } from "../lib/db/brandStudios";
-import { timeRangesOverlap } from "../lib/dateUtils";
+import { dateTimeRangesOverlap } from "../lib/dateUtils";
 import { CAMPAIGN_DAY_STYLES, getCampaignDayInfo } from "../lib/campaignDays";
 import { BrandLogo } from "./ui/BrandLogo";
 import { getBrandTheme } from "../lib/brandTheme";
@@ -192,9 +192,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
     const conflict = sessions.find(
       (s) =>
         s.id !== sessionId &&
-        s.date === session.date &&
         s.studioId === targetStudio.id &&
-        timeRangesOverlap(s.startTime, s.endTime, session.startTime, session.endTime) &&
+        dateTimeRangesOverlap(s, session) &&
         s.status !== "Cancelled"
     );
     if (conflict) {
@@ -845,7 +844,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                         dragging={draggedSessionId === ds.id}
                         draggable
                         tooltip={`${ds.title} · ${ds.studioName} · Host ${ds.hostName}${
-                          ds.coHostName ? ` · Co-Host ${ds.coHostName}` : ""
+                          ds.coHostName ? ` · Trợ ${ds.coHostName}` : ""
                         } — kéo thả sang ngày khác để chuyển lịch`}
                         onDragStart={(e) => {
                           e.stopPropagation();

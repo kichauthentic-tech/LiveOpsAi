@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { LiveSession, ShiftSlot, ShiftRegistration, Talent } from "../../types";
 import { X, Users, UserCheck, UserX, Check, AlertTriangle, Trash2 } from "lucide-react";
-import { timeRangesOverlap } from "../../lib/dateUtils";
+import { dateTimeRangesOverlap } from "../../lib/dateUtils";
 
 interface SlotDetailModalProps {
   slot: ShiftSlot;
@@ -10,7 +10,7 @@ interface SlotDetailModalProps {
   registrations: ShiftRegistration[]; // toàn bộ, tự lọc theo slot.id
   sessions: LiveSession[]; // agency-wide — check trùng lịch
   shiftSlots: ShiftSlot[]; // agency-wide — check trùng studio với slot khác
-  canManage: boolean; // được xem người đăng ký + chọn Host/Co-Host + chốt lịch + xoá
+  canManage: boolean; // được xem người đăng ký + chọn Host/Trợ live + chốt lịch + xoá
   myTalentId?: string; // nếu có — được tự đăng ký/huỷ đăng ký
   onRegister?: (slotId: string, talentId: string) => Promise<boolean>;
   onUnregister?: (slotId: string, talentId: string) => Promise<boolean>;
@@ -50,9 +50,8 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
     !!hostId &&
     sessions.some(
       (s) =>
-        s.date === slot.date &&
         s.status !== "Cancelled" &&
-        timeRangesOverlap(s.startTime, s.endTime, slot.startTime, slot.endTime) &&
+        dateTimeRangesOverlap(s, slot) &&
         (s.hostId === hostId || s.coHostId === hostId)
     );
 
@@ -61,10 +60,9 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
         (s) =>
           s.id !== slot.id &&
           s.status !== "cancelled" &&
-          s.date === slot.date &&
           s.studioId === slot.studioId &&
           s.brandId !== slot.brandId &&
-          timeRangesOverlap(slot.startTime, slot.endTime, s.startTime, s.endTime)
+          dateTimeRangesOverlap(slot, s)
       )
     : [];
 

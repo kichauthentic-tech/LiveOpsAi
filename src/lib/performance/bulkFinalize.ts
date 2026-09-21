@@ -1,5 +1,5 @@
 import { LiveSession, ShiftRegistration, ShiftSlot } from "../../types";
-import { timeRangesOverlap } from "../dateUtils";
+import { dateTimeRangesOverlap } from "../dateUtils";
 import { FATIGUE_WEEK_HOURS, HostSuggestion, mondayOf, suggestHosts } from "./hostSuggestion";
 import { sessionDurationHours } from "../pnl";
 
@@ -76,8 +76,8 @@ function conflictsWithExisting(
   let host = false;
   let studio = false;
   for (const s of sessions) {
-    if (s.date !== slot.date || s.status === "Cancelled") continue;
-    if (!timeRangesOverlap(s.startTime, s.endTime, slot.startTime, slot.endTime)) continue;
+    if (s.status === "Cancelled") continue;
+    if (!dateTimeRangesOverlap(s, slot)) continue;
     if (slot.studioId && s.studioId === slot.studioId) studio = true;
     if (talentId && (s.hostId === talentId || s.coHostId === talentId)) host = true;
   }
@@ -103,8 +103,7 @@ function busyInBatch(
   slot: TimeWindow
 ): boolean {
   for (const t of ledger.get(key) ?? []) {
-    if (t.date !== slot.date) continue;
-    if (timeRangesOverlap(t.startTime, t.endTime, slot.startTime, slot.endTime)) return true;
+    if (dateTimeRangesOverlap(t, slot)) return true;
   }
   return false;
 }
@@ -231,7 +230,7 @@ export function recheckPlan(rows: BulkPlanRow[], sessions: LiveSession[]): BulkP
     if (r.hostId) {
       const peers = talentSeen.get(r.hostId) ?? [];
       for (const p of peers) {
-        if (p.date === r.date && timeRangesOverlap(p.startTime, p.endTime, r.startTime, r.endTime)) {
+        if (dateTimeRangesOverlap(p, r)) {
           r.conflicts.hostInBatch = true;
           p.conflicts.hostInBatch = true;
         }
@@ -242,7 +241,7 @@ export function recheckPlan(rows: BulkPlanRow[], sessions: LiveSession[]): BulkP
     if (r.studioId) {
       const peers = studioSeen.get(r.studioId) ?? [];
       for (const p of peers) {
-        if (p.date === r.date && timeRangesOverlap(p.startTime, p.endTime, r.startTime, r.endTime)) {
+        if (dateTimeRangesOverlap(p, r)) {
           r.conflicts.studioInBatch = true;
           p.conflicts.studioInBatch = true;
         }
