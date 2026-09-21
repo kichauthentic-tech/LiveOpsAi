@@ -175,9 +175,27 @@ export default function MonthPlan({
   const unsynced = locked ? drafts.filter((d) => !d.slotId).length : 0;
   const eventByDate = useMemo(() => new Map(events.map((e) => [e.date, e])), [events]);
   const brandSchemes = useMemo(() => promoSchemes.filter((sc) => sc.brandId === brandId).map((sc) => ({ start: sc.startDate, end: sc.endDate, label: sc.title })), [promoSchemes, brandId]);
+  const history = useMemo(() => buildHistory(sessions, brandId, today, { events, schemes: brandSchemes, params: engineParams }), [sessions, brandId, today, events, brandSchemes, engineParams]);
+  const estimateCtx = useMemo(() => ({ camp: campRanges, events, schemes: brandSchemes, calibration: calibration?.factors }), [campRanges, events, brandSchemes, calibration]);
+  // Target đi theo lưới (user chốt 2026-09-21): ở giai đoạn NHÁP, mọi thay đổi cấu trúc (thêm/bỏ/dời
+  // ca, đổi giờ, cấm ngày, nạp quy tắc) → chia lại target tháng theo dự báo mới của cả lưới, không
+  // chờ bấm "Chia target theo dự báo". Sau khi CHỐT, target/ca là số cam kết với brand/host — không
+  // chia lại; ca thêm sau chốt mang target = dự báo riêng của nó, phần bù/run-rate là việc của module
+  // hỗ trợ vận hành (sau). Sửa target/ca bằng tay không kích hoạt chia lại (thanh "Tổng target" báo lệch).
+  const withForecast = (next: PlanDraftSlot[], target = targetTotal, ctx = estimateCtx): PlanDraftSlot[] => {
+    if (next.length === 0) return next;
+    const w = estimateSlots(history, next, ctx);
+    const flag = (d: PlanDraftSlot) => ({ ...d, highExpectation: d.expectedGmv ? d.targetGmv > d.expectedGmv * engineParams.highExpectationRatio : d.highExpectation });
+    if (!locked && target > 0) return allocateDraftTargets(next, target, w).map(flag);
+    return next.map((d, i) => flag({
+      ...d,
+      expectedGmv: w[i] > 0 ? Math.round(w[i]) : d.expectedGmv,
+      targetGmv: locked && !d.id && d.targetGmv === 0 && w[i] > 0 ? Math.round(w[i]) : d.targetGmv
+    }));
+  };
   const toggleBlackout = (day: string) => {
     setSettings((st) => ({ ...st, blackoutDates: st.blackoutDates.includes(day) ? st.blackoutDates.filter((d) => d !== day) : [...st.blackoutDates, day].sort() }));
-    setDrafts((prev) => prev.filter((d) => d.date !== day || settings.blackoutDates.includes(day)));
+    setDrafts((prev) => withForecast(prev.filter((d) => d.date !== day || settings.blackoutDates.includes(day))));
     setDirty(true);
   };
 
@@ -197,11 +215,15 @@ export default function MonthPlan({
   }, [drafts]);
 
   const update = (key: string, patch: Partial<PlanDraftSlot>) => {
-    setDrafts((prev) => prev.map((d) => (d.key === key ? { ...d, ...patch } : d)));
+    const structural = patch.startTime !== undefined || patch.endTime !== undefined || patch.date !== undefined;
+    setDrafts((prev) => {
+      const next = prev.map((d) => (d.key === key ? { ...d, ...patch } : d));
+      return structural ? withForecast(next) : next;
+    });
     setDirty(true);
   };
   const remove = (key: string) => {
-    setDrafts((prev) => prev.filter((d) => d.key !== key));
+    setDrafts((prev) => withForecast(prev.filter((d) => d.key !== key)));
     setDirty(true);
   };
   const addForDay = (day: string) => {
@@ -210,12 +232,12 @@ export default function MonthPlan({
       setMsg(`Ngày ${day}: đã đủ ${settings.maxSlotsPerDay} ca hoặc hết chỗ trong khung ${settings.liveWindowStart}-${settings.liveWindowEnd}.`);
       return;
     }
-    setDrafts((prev) => [...prev, s]);
+    setDrafts((prev) => withForecast([...prev, s]));
     setDirty(true);
   };
   const loadTemplates = () => {
     const { next, added } = mergeFromTemplates(drafts, brandTemplates, month, brandId, today);
-    setDrafts(next);
+    setDrafts(added > 0 ? withForecast(next) : next);
     setDirty(added > 0 || dirty);
     setMsg(added > 0 ? `Nạp thêm ${added} ca từ quy tắc lặp.` : brandTemplates.filter((t) => t.active).length === 0 ? "Brand chưa có quy tắc lặp nào active." : "Mọi ca theo quy tắc đã có trong lưới.");
   };
@@ -230,8 +252,7 @@ export default function MonthPlan({
       setMsg("Lưới đang trống — vẽ ca hoặc bấm Gợi ý phân bổ trước.");
       return;
     }
-    const history = buildHistory(sessions, brandId, today, { events, schemes: brandSchemes, params: engineParams });
-    const weights = estimateSlots(history, drafts, { camp: campRanges, events, schemes: brandSchemes, calibration: calibration?.factors });
+    const weights = estimateSlots(history, drafts, estimateCtx);
     const byForecast = weights.some((w) => w > 0);
     setDrafts(allocateDraftTargets(drafts, targetTotal, weights));
     setDirty(true);
@@ -248,6 +269,37 @@ export default function MonthPlan({
     setDrafts(next);
     setDirty(true);
   };
+  const baseConstraints = useMemo(() => ({
+    month,
+    today,
+    params: engineParams,
+    committedHours: planHours,
+    targetGmv: targetTotal,
+    camp: campRanges,
+    liveWindowStart: settings.liveWindowStart,
+    liveWindowEnd: settings.liveWindowEnd,
+    defaultSlotHours: settings.defaultSlotHours,
+    maxSlotsPerDay: settings.maxSlotsPerDay,
+    blackoutDates: settings.blackoutDates,
+    fixedSlots: drafts.map((d) => ({ date: d.date, startTime: d.startTime, endTime: d.endTime })),
+    events,
+    schemes: brandSchemes,
+    calibration: calibration?.factors
+  }), [month, today, engineParams, planHours, targetTotal, campRanges, settings, drafts, events, brandSchemes, calibration]);
+  // Lưới nháp vs target: dự báo cả lưới hụt quá ngưỡng → cảnh báo kèm phương án bù giờ (engine chạy
+  // chế độ target với lưới hiện tại là ca cố định → phần xếp thêm chính là ca cần bù). Chỉ ở nháp.
+  const targetGap = useMemo(() => {
+    if (locked || targetTotal <= 0 || drafts.length === 0 || history.brandGmvPerHour <= 0) return null;
+    const forecast = estimateSlots(history, drafts, estimateCtx).reduce((a, b) => a + b, 0);
+    const gap = targetTotal - forecast;
+    const pct = gap / targetTotal;
+    if (pct <= engineParams.targetGapWarnPct) return { forecast, gap, pct, fill: null as SuggestResult | null, extraHours: 0, extraSlots: [] as SuggestResult["slots"] };
+    const fill = suggestMonthPlan(history, { ...baseConstraints, mode: "target", strategy });
+    const fixed = new Set(drafts.map((d) => `${d.date}|${d.startTime}|${d.endTime}`));
+    const extraSlots = fill.slots.filter((sl) => !fixed.has(`${sl.date}|${sl.startTime}|${sl.endTime}`));
+    const extraHours = extraSlots.reduce((a, sl) => a + sl.hours, 0);
+    return { forecast, gap, pct, fill: fill.hoursToHitTarget !== null && extraSlots.length > 0 ? fill : null, extraHours, extraSlots };
+  }, [locked, targetTotal, drafts, history, estimateCtx, engineParams.targetGapWarnPct, baseConstraints, strategy]);
   // Giai đoạn B — engine gợi ý: ca đang có trong lưới được giữ làm ca cố định, engine xếp thêm cho đủ
   // giờ cam kết và chia target theo dự báo từng ca.
   const suggest = (mode: "hours" | "target" = "hours") => {
@@ -259,25 +311,7 @@ export default function MonthPlan({
       setMsg("Nhập Target GMV tháng ở Tham số lập kế hoạch trước.");
       return;
     }
-    const history = buildHistory(sessions, brandId, today, { events, schemes: brandSchemes, params: engineParams });
-    const base = {
-      month,
-      today,
-      mode,
-      params: engineParams,
-      committedHours: planHours,
-      targetGmv: targetTotal,
-      camp: campRanges,
-      liveWindowStart: settings.liveWindowStart,
-      liveWindowEnd: settings.liveWindowEnd,
-      defaultSlotHours: settings.defaultSlotHours,
-      maxSlotsPerDay: settings.maxSlotsPerDay,
-      blackoutDates: settings.blackoutDates,
-      fixedSlots: drafts.map((d) => ({ date: d.date, startTime: d.startTime, endTime: d.endTime })),
-      events,
-      schemes: brandSchemes,
-      calibration: calibration?.factors
-    };
+    const base = { ...baseConstraints, mode };
     // Chạy cả 3 phương án để so sánh; áp phương án đang chọn vào lưới.
     const all: Record<SuggestStrategy, SuggestResult> = {
       max: suggestMonthPlan(history, { ...base, strategy: "max" }),
@@ -332,7 +366,8 @@ export default function MonthPlan({
     const gap = planHours - totals.hours;
     const warn = planHours > 0 && Math.abs(gap) > 0.01 ? `\n\nGiờ kế hoạch ${fmtH(totals.hours)}h ${gap > 0 ? "THIẾU" : "VƯỢT"} ${fmtH(Math.abs(gap))}h so với ${fmtH(planHours)}h cần xếp.` : "";
     const relockNote = locked ? "\n\nChốt lại sẽ mở thêm ca mới và HUỶ ca đang mở đã bị bỏ khỏi kế hoạch (trừ ca đã có người đăng ký)." : "";
-    if (!window.confirm(`${locked ? "Chốt lại" : "Chốt"} kế hoạch ${brand?.name} tháng ${month}: ${drafts.length} ca chờ đăng ký?${warn}${relockNote}`)) return;
+    const targetWarn = targetGap && targetGap.pct > engineParams.targetGapWarnPct ? `\n\nDự báo lưới ${formatCurrencyAdaptive(targetGap.forecast)} THIẾU ${formatCurrencyAdaptive(targetGap.gap)} (${Math.round(targetGap.pct * 100)}%) so với target ${formatCurrencyAdaptive(targetTotal)}${targetGap.fill ? ` — cần bù ~${fmtH(targetGap.extraHours)}h.` : " — thêm giờ trong khung cũng không chạm."} Sau khi chốt, target/ca KHÔNG chia lại nữa.` : "";
+    if (!window.confirm(`${locked ? "Chốt lại" : "Chốt"} kế hoạch ${brand?.name} tháng ${month}: ${drafts.length} ca chờ đăng ký?${warn}${targetWarn}${relockNote}`)) return;
     const p = await save();
     if (!p) return;
     setSaving(true);
@@ -413,7 +448,7 @@ export default function MonthPlan({
           </div>
           <label className="block text-xs">
             <span className="font-bold text-[var(--text-muted)] block mb-1">Target GMV tháng (đ)</span>
-            <input type="number" min="0" step="1000000" disabled={!editable} value={settings.targetGmv || ""} placeholder="0 = chưa đặt" onChange={(e) => { setSettings((s) => ({ ...s, targetGmv: Number(e.target.value) || 0 })); setDirty(true); }} className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] font-mono disabled:opacity-60" />
+            <input type="number" min="0" step="1000000" disabled={!editable} value={settings.targetGmv || ""} placeholder="0 = chưa đặt" onChange={(e) => { const t = Number(e.target.value) || 0; setSettings((s) => ({ ...s, targetGmv: t })); if (!locked && t > 0) setDrafts((prev) => withForecast(prev, t)); setDirty(true); }} className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] font-mono disabled:opacity-60" />
             {targetTotal > 0 && <span className="text-[10px] text-[var(--text-faint)]">{formatCurrencyAdaptive(targetTotal)}</span>}
           </label>
           <div className="text-xs space-y-1">
@@ -421,12 +456,11 @@ export default function MonthPlan({
             {(Object.keys(CAMP_RANGE_LABEL) as (keyof PlanCampRanges)[]).map((k) => {
               const r = campRanges[k];
               const setRange = (start: string, end: string) => {
-                setSettings((s) => {
-                  const next = { ...s.campRanges };
-                  if (start && end) next[k] = { start, end };
-                  else delete next[k];
-                  return { ...s, campRanges: next };
-                });
+                const next = { ...campRanges };
+                if (start && end) next[k] = { start, end };
+                else delete next[k];
+                setSettings((s) => ({ ...s, campRanges: next }));
+                if (!locked) setDrafts((prev) => withForecast(prev, targetTotal, { ...estimateCtx, camp: next }));
                 setDirty(true);
               };
               return (
@@ -497,6 +531,31 @@ export default function MonthPlan({
         )}
         <button onClick={lock} disabled={saving || loading || errors.length > 0} className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-bold disabled:opacity-40 flex items-center gap-1.5"><Lock className="w-3.5 h-3.5" /> {locked ? `Chốt lại (đồng bộ ca)` : `Chốt kế hoạch`}</button>
       </div>
+
+      {targetGap && targetGap.pct > engineParams.targetGapWarnPct && (
+        <div className="bg-amber-950/40 border border-amber-800/60 rounded-2xl p-3 flex flex-wrap items-center gap-3 text-xs text-amber-200">
+          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+          <div className="flex-1 min-w-[240px] space-y-0.5">
+            <p>
+              <b>Lưới này dự báo {formatCurrencyAdaptive(targetGap.forecast)}, thiếu {formatCurrencyAdaptive(targetGap.gap)} ({Math.round(targetGap.pct * 100)}%) so với target {formatCurrencyAdaptive(targetTotal)}</b>
+              {" "}— target/ca đang cao hơn dự báo ×{(targetTotal / Math.max(1, targetGap.forecast)).toFixed(2)}.
+            </p>
+            <p className="text-amber-300/90">
+              {targetGap.fill
+                ? `Bù: thêm ~${fmtH(targetGap.extraHours)}h (${targetGap.extraSlots.length} ca) → ${targetGap.extraSlots.slice(0, 6).map((sl) => `${Number(sl.date.slice(8, 10))}/${Number(sl.date.slice(5, 7))} ${sl.startTime}–${sl.endTime}`).join(", ")}${targetGap.extraSlots.length > 6 ? ` +${targetGap.extraSlots.length - 6} ca` : ""}.`
+                : "Lấp hết khung giờ cũng không chạm target theo lịch sử — cần tăng CVR/AOV (scheme KM, ads) hoặc hạ target."}
+            </p>
+          </div>
+          {targetGap.fill && (
+            <button onClick={() => { const r = targetGap.fill!; setSuggestion({ history, result: r }); applySuggestion(drafts, r); setMsg(`Đã bù ${targetGap.extraSlots.length} ca · ${fmtH(targetGap.extraHours)}h theo target.`); }} className="px-3 py-1.5 rounded-lg bg-amber-500/20 border border-amber-500/60 text-xs font-bold text-amber-200 hover:bg-amber-500/30 flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5" /> Bù giờ theo gợi ý
+            </button>
+          )}
+        </div>
+      )}
+      {targetGap && targetGap.pct < -engineParams.targetGapWarnPct && (
+        <p className="text-[11px] text-emerald-400 px-1">Lưới này dự báo {formatCurrencyAdaptive(targetGap.forecast)} — vượt target {Math.round(-targetGap.pct * 100)}%; target/ca đang thấp hơn dự báo.</p>
+      )}
 
       {rulesOpen && brand && (
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">

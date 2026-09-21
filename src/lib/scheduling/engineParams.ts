@@ -44,6 +44,7 @@ export interface EngineParams {
   // --- Target ---
   highExpectationRatio: number; // target/ca > dự báo × X → cờ đỏ "kỳ vọng quá sức"
   hoursToHitMultiplier: number; // tìm giờ cần cho target tới X× cam kết
+  targetGapWarnPct: number; // lưới nháp dự báo thiếu > X% target → dải cảnh báo + phương án bù giờ
   // --- Hiệu chỉnh kế hoạch vs thực tế ---
   calibrationK: number;
   calibrationMin: number;
@@ -86,6 +87,7 @@ export const DEFAULT_ENGINE_PARAMS: EngineParams = {
   leanNewDayPenalty: 0.92,
   highExpectationRatio: 1.3,
   hoursToHitMultiplier: 2,
+  targetGapWarnPct: 0.03,
   calibrationK: 3,
   calibrationMin: 0.5,
   calibrationMax: 1.6,
@@ -147,6 +149,7 @@ export const ENGINE_PARAM_META: EngineParamMeta[] = [
   { key: "leanNewDayPenalty", group: "schedule", label: "Tiết kiệm: phạt mở ngày mới", help: "", kind: "number", min: 0.1, max: 1, step: 0.01 },
   { key: "highExpectationRatio", group: "target", label: "Cờ đỏ khi target/ca > dự báo × X", help: "Ca bị kỳ vọng quá sức so với lịch sử — ops nên xem lại target hoặc thêm giờ.", kind: "number", min: 1, max: 3, step: 0.05 },
   { key: "hoursToHitMultiplier", group: "target", label: "Tìm giờ cần cho target tới X× cam kết", help: "Khi dự báo thiếu target, engine chạy tiếp tới X× giờ cam kết để tìm mốc đủ.", kind: "number", min: 1, max: 5, step: 0.5 },
+  { key: "targetGapWarnPct", group: "target", label: "Cảnh báo khi lưới nháp dự báo thiếu > X target", help: "Sửa ca trong nháp là target chia lại tự động; dự báo cả lưới hụt quá ngưỡng này thì hiện dải cảnh báo kèm số giờ cần bù và nút bù giờ. 0.03 = 3%.", kind: "number", min: 0, max: 0.5, step: 0.01 },
   { key: "calibrationK", group: "calibration", label: "Kéo hệ số hiệu chỉnh về 1", help: "Ô có ít ca kế hoạch đã có thực tế bị kéo về 1 (không hiệu chỉnh). k lớn = thận trọng hơn.", kind: "number", min: 0, max: 20, step: 1 },
   { key: "calibrationMin", group: "calibration", label: "Hệ số hiệu chỉnh — sàn", help: "", kind: "number", min: 0.1, max: 1, step: 0.05 },
   { key: "calibrationMax", group: "calibration", label: "Hệ số hiệu chỉnh — trần", help: "", kind: "number", min: 1, max: 5, step: 0.1 },
