@@ -559,7 +559,10 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
     const campDates = [...new Set(candidates.filter((x) => x.bucket !== "daily" && history.campHoursPerDay[x.bucket] > 0).map((x) => x.date))].sort();
     const campGoalTotal = campDates.reduce((a, d) => a + history.campHoursPerDay[resolveCampBucketType(d, c.camp)], 0);
     const campScale = campGoalTotal > 0 ? Math.min(1, Math.max(0, targetHours - hours) / campGoalTotal) : 0;
-    const reached = () => stopAtTarget && cum >= c.targetGmv;
+    // Dừng theo DỰ BÁO THẬT của cả lưới (tính lại thứ tự ca trong ngày), không theo `cum` cộng dồn —
+    // ca thêm sau nhưng giờ sớm hơn làm ca trước tụt vị trí, cum hơi cao hơn thật, dễ hụt target vài chục triệu.
+    const trueForecast = () => state.reduce((a, s) => a + expectedGph(s, state) * s.hours, 0);
+    const reached = () => stopAtTarget && trueForecast() >= c.targetGmv;
     for (const date of campDates) {
       if (hours + 0.01 >= targetHours || reached()) break;
       const bucket = resolveCampBucketType(date, c.camp);
