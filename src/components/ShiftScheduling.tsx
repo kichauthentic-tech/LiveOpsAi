@@ -753,7 +753,7 @@ export default function ShiftScheduling({
               // Hiệu suất của đúng những người đã đăng ký ca này, với đúng brand và đúng thứ của
               // ca — tính ngay tại đây thay vì bắt ops nhớ số từ tab Hiệu Suất Host rồi quay lại.
               const suggestions =
-                admin && slot.status === "open" && regs.length > 0
+                admin && slot.status === "open"
                   ? suggestHosts(
                       regs.map((r) => r.talentId),
                       talentNameById,
@@ -765,6 +765,13 @@ export default function ShiftScheduling({
                     )
                   : [];
               const hasAnyPerfData = suggestions.some((s) => s.overallSessions > 0);
+              // Q1 (audit 2026-09-21): ops hay xếp qua Zalo rồi mới vào app → cho chọn cả người CHƯA
+              // đăng ký rảnh (nhóm "Người khác"), cảnh báo rõ; gợi ý xếp hạng vẫn chỉ cho người đã đăng ký.
+              const registeredIds = new Set(regs.map((r) => r.talentId));
+              const others = admin && slot.status === "open" ? talents.filter((t) => !registeredIds.has(t.id)).sort((a, b) => a.name.localeCompare(b.name, "vi")) : [];
+              const hostUnregistered = !!pick.hostId && !registeredIds.has(pick.hostId);
+              const coHostUnregistered = !!pick.coHostId && !registeredIds.has(pick.coHostId);
+              const coHostConflict = pick.coHostId ? checkConflicts(slot.date, slot.startTime, slot.endTime, "", pick.coHostId).hostConflict : false;
               return (
                 <React.Fragment key={slot.id}>
                 {dayHeader && (
@@ -857,8 +864,7 @@ export default function ShiftScheduling({
                           {talentsById.get(r.talentId)?.name ?? r.talentId}
                         </span>
                       ))}
-                      {regs.length > 0 && (
-                        <div className="flex flex-wrap items-center gap-2 ml-auto">
+                      <div className="flex flex-wrap items-center gap-2 ml-auto">
                           <select
                             value={pick.hostId}
                             onChange={(e) => setPickByLot((prev) => ({ ...prev, [slot.id]: { ...pick, hostId: e.target.value } }))}
@@ -866,11 +872,22 @@ export default function ShiftScheduling({
                           >
                             <option value="">Host…</option>
                             {/* Thứ tự option = thứ tự xếp hạng hiệu suất, không phải thứ tự đăng ký */}
-                            {suggestions.map((s) => (
-                              <option key={s.talentId} value={s.talentId}>
-                                {suggestionLabel(s, fatigueWeekHours)}
-                              </option>
-                            ))}
+                            {suggestions.length > 0 && (
+                              <optgroup label="Đã đăng ký rảnh">
+                                {suggestions.map((s) => (
+                                  <option key={s.talentId} value={s.talentId}>
+                                    {suggestionLabel(s, fatigueWeekHours)}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            )}
+                            {others.length > 0 && (
+                              <optgroup label="Người khác (chưa đăng ký rảnh)">
+                                {others.map((t) => (
+                                  <option key={t.id} value={t.id}>{t.name}</option>
+                                ))}
+                              </optgroup>
+                            )}
                           </select>
                           <select
                             value={pick.coHostId}
@@ -881,11 +898,22 @@ export default function ShiftScheduling({
                                 HOST, gắn vào vai trợ live sẽ khiến ops xếp người theo một con số
                                 không nói gì về vai trò họ sắp làm. */}
                             <option value="">Trợ live (tuỳ chọn)…</option>
-                            {suggestions.filter((s) => s.talentId !== pick.hostId).map((s) => (
-                              <option key={s.talentId} value={s.talentId}>
-                                {s.name}
-                              </option>
-                            ))}
+                            {suggestions.some((s) => s.talentId !== pick.hostId) && (
+                              <optgroup label="Đã đăng ký rảnh">
+                                {suggestions.filter((s) => s.talentId !== pick.hostId).map((s) => (
+                                  <option key={s.talentId} value={s.talentId}>
+                                    {s.name}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            )}
+                            {others.some((t) => t.id !== pick.hostId) && (
+                              <optgroup label="Người khác (chưa đăng ký rảnh)">
+                                {others.filter((t) => t.id !== pick.hostId).map((t) => (
+                                  <option key={t.id} value={t.id}>{t.name}</option>
+                                ))}
+                              </optgroup>
+                            )}
                           </select>
                           <button
                             onClick={() => handleFinalize(slot)}
@@ -895,6 +923,16 @@ export default function ShiftScheduling({
                             <Check className="w-3.5 h-3.5" /> Chốt Lịch
                           </button>
                         </div>
+                      {(hostUnregistered || coHostUnregistered) && (
+                        <span className="w-full text-[11px] text-amber-400 flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3" />
+                          {hostUnregistered && coHostUnregistered ? "Host và Trợ live" : hostUnregistered ? "Host" : "Trợ live"} đã chọn CHƯA đăng ký rảnh ca này — xác nhận với bạn ấy trước khi chốt (chốt xong hệ thống mới báo).
+                        </span>
+                      )}
+                      {coHostConflict && (
+                        <span className="w-full text-[11px] text-rose-400 flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3" /> Trợ live đã chọn trùng lịch với 1 ca khác cùng ngày.
+                        </span>
                       )}
                       {/* Bảng xếp hạng chi tiết — dropdown chỉ đủ chỗ cho 1 con số, chỗ này mới
                           tách được "mạnh với brand này" khác "mạnh vào thứ này". Bấm 1 phát là
@@ -981,6 +1019,10 @@ export default function ShiftScheduling({
                       }
                       const swapping = emergencySwap?.slotId === slot.id ? emergencySwap : null;
                       const candidateRegs = regs.filter((r) => r.talentId !== session.hostId && r.talentId !== session.coHostId);
+                      const swapRegIds = new Set(candidateRegs.map((r) => r.talentId));
+                      // Q1: người thay không bắt buộc đã đăng ký rảnh (ops gọi tay được).
+                      const swapOthers = talents.filter((t) => !swapRegIds.has(t.id) && t.id !== session.hostId && t.id !== session.coHostId).sort((a, b) => a.name.localeCompare(b.name, "vi"));
+                      const swapUnregistered = !!swapCandidateId && !swapRegIds.has(swapCandidateId);
                       return (
                         <div className="pt-1 border-t border-[var(--border)]/80 space-y-2">
                           <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -1026,23 +1068,38 @@ export default function ShiftScheduling({
                               <div className="text-[11px] text-amber-200 font-bold">
                                 Tìm người thay cho vai trò {swapping.role === "host" ? "Host" : "Trợ live"}
                               </div>
-                              {candidateRegs.length === 0 ? (
+                              {candidateRegs.length === 0 && (
                                 <div className="text-[11px] text-[var(--text-faint)]">
-                                  Không có ứng viên nào khác đã đăng ký rảnh ca này — cần báo tay/mở đăng ký lại.
+                                  Không ai khác đã đăng ký rảnh ca này — chọn ở nhóm "Người khác" sau khi đã gọi xác nhận.
                                 </div>
-                              ) : (
-                                <select
-                                  value={swapCandidateId}
-                                  onChange={(e) => setSwapCandidateId(e.target.value)}
-                                  className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1 text-xs text-[var(--text)] focus:outline-none focus:border-amber-500"
-                                >
-                                  <option value="">— Chọn người thay —</option>
-                                  {candidateRegs.map((r) => (
-                                    <option key={r.talentId} value={r.talentId}>
-                                      {talentsById.get(r.talentId)?.name ?? r.talentId}
-                                    </option>
-                                  ))}
-                                </select>
+                              )}
+                              <select
+                                value={swapCandidateId}
+                                onChange={(e) => setSwapCandidateId(e.target.value)}
+                                className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1 text-xs text-[var(--text)] focus:outline-none focus:border-amber-500"
+                              >
+                                <option value="">— Chọn người thay —</option>
+                                {candidateRegs.length > 0 && (
+                                  <optgroup label="Đã đăng ký rảnh">
+                                    {candidateRegs.map((r) => (
+                                      <option key={r.talentId} value={r.talentId}>
+                                        {talentsById.get(r.talentId)?.name ?? r.talentId}
+                                      </option>
+                                    ))}
+                                  </optgroup>
+                                )}
+                                {swapOthers.length > 0 && (
+                                  <optgroup label="Người khác (chưa đăng ký rảnh)">
+                                    {swapOthers.map((t) => (
+                                      <option key={t.id} value={t.id}>{t.name}</option>
+                                    ))}
+                                  </optgroup>
+                                )}
+                              </select>
+                              {swapUnregistered && (
+                                <div className="text-[11px] text-amber-300 flex items-center gap-1">
+                                  <AlertTriangle className="w-3 h-3" /> Người này chưa đăng ký rảnh ca — xác nhận trước khi thay.
+                                </div>
                               )}
                               <input
                                 placeholder="Lý do đổi (vd: Host báo bận đột xuất)"

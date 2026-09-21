@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, Radio, UserX } from "lucide-react";
 import { Brand, LiveSession, ShiftRegistration, ShiftSlot, Studio, Talent, UserRole } from "../types";
 import { getTodayDate } from "../lib/dateUtils";
@@ -33,6 +33,9 @@ export interface OpsBoardProps {
   onCancelSession?: (id: string, reason: string) => Promise<boolean>;
   // Ca chưa có người → nhảy sang Đăng Ký & Chốt Lịch.
   onOpenScheduling?: () => void;
+  // Q4: bấm thông báo → App đặt id ca cần mở; bảng mở Cửa sổ Ca Live rồi báo lại để App xoá yêu cầu.
+  requestOpenSessionId?: string | null;
+  onOpenRequestHandled?: () => void;
 }
 
 type Range = "today" | "tomorrow" | "week" | "day";
@@ -82,12 +85,20 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
   onUpdateSession,
   onDeleteSession,
   onCancelSession,
-  onOpenScheduling
+  onOpenScheduling,
+  requestOpenSessionId = null,
+  onOpenRequestHandled
 }) => {
   const today = getTodayDate();
   const [range, setRange] = useState<Range>("today");
   const [anchor, setAnchor] = useState(today);
   const [openId, setOpenId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!requestOpenSessionId) return;
+    setOpenId(requestOpenSessionId);
+    onOpenRequestHandled?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestOpenSessionId]);
   const brandById = useMemo(() => new Map(brands.map((b) => [b.id, b])), [brands]);
   const regsBySlot = useMemo(() => {
     const m = new Map<string, number>();

@@ -41,6 +41,9 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
 
   const talentsById = new Map<string, Talent>(talents.map((t) => [t.id, t]));
   const regs = registrations.filter((r) => r.slotId === slot.id);
+  // Q1 (audit 2026-09-21): cho chốt cả người chưa đăng ký rảnh (ops xếp tay), có cảnh báo.
+  const regIds = new Set(regs.map((r) => r.talentId));
+  const others = talents.filter((t) => !regIds.has(t.id)).sort((a, b) => a.name.localeCompare(b.name, "vi"));
   const iAmRegistered = myTalentId ? regs.some((r) => r.talentId === myTalentId) : false;
 
   const hostConflict =
@@ -158,29 +161,50 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
               </div>
             )}
 
-            {regs.length > 0 && (
-              <div className="grid grid-cols-2 gap-2 pt-1">
-                <select
-                  value={hostId}
-                  onChange={(e) => setHostId(e.target.value)}
-                  className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-2 text-xs text-[var(--text)] focus:outline-none focus:border-blue-500"
-                >
-                  <option value="">Host…</option>
-                  {regs.map((r) => (
-                    <option key={r.talentId} value={r.talentId}>{talentsById.get(r.talentId)?.name ?? r.talentId}</option>
-                  ))}
-                </select>
-                <select
-                  value={coHostId}
-                  onChange={(e) => setCoHostId(e.target.value)}
-                  className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-2 text-xs text-[var(--text)] focus:outline-none focus:border-blue-500"
-                >
-                  <option value="">Trợ live (tuỳ chọn)…</option>
-                  {regs.filter((r) => r.talentId !== hostId).map((r) => (
-                    <option key={r.talentId} value={r.talentId}>{talentsById.get(r.talentId)?.name ?? r.talentId}</option>
-                  ))}
-                </select>
-              </div>
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <select
+                value={hostId}
+                onChange={(e) => setHostId(e.target.value)}
+                className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-2 text-xs text-[var(--text)] focus:outline-none focus:border-blue-500"
+              >
+                <option value="">Host…</option>
+                {regs.length > 0 && (
+                  <optgroup label="Đã đăng ký rảnh">
+                    {regs.map((r) => (
+                      <option key={r.talentId} value={r.talentId}>{talentsById.get(r.talentId)?.name ?? r.talentId}</option>
+                    ))}
+                  </optgroup>
+                )}
+                {others.length > 0 && (
+                  <optgroup label="Người khác (chưa đăng ký rảnh)">
+                    {others.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </optgroup>
+                )}
+              </select>
+              <select
+                value={coHostId}
+                onChange={(e) => setCoHostId(e.target.value)}
+                className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-2 text-xs text-[var(--text)] focus:outline-none focus:border-blue-500"
+              >
+                <option value="">Trợ live (tuỳ chọn)…</option>
+                {regs.some((r) => r.talentId !== hostId) && (
+                  <optgroup label="Đã đăng ký rảnh">
+                    {regs.filter((r) => r.talentId !== hostId).map((r) => (
+                      <option key={r.talentId} value={r.talentId}>{talentsById.get(r.talentId)?.name ?? r.talentId}</option>
+                    ))}
+                  </optgroup>
+                )}
+                {others.some((t) => t.id !== hostId) && (
+                  <optgroup label="Người khác (chưa đăng ký rảnh)">
+                    {others.filter((t) => t.id !== hostId).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </optgroup>
+                )}
+              </select>
+            </div>
+            {((hostId && !regIds.has(hostId)) || (coHostId && !regIds.has(coHostId))) && (
+              <p className="text-[11px] text-amber-400 flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3 shrink-0" /> Người đã chọn CHƯA đăng ký rảnh ca này — xác nhận trước khi chốt.
+              </p>
             )}
 
             {hostConflict && (
@@ -192,7 +216,7 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
             {onFinalizeSlot && (
               <button
                 onClick={handleFinalize}
-                disabled={!hostId || busy || regs.length === 0}
+                disabled={!hostId || busy}
                 className="w-full flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-bold px-3 py-2.5 rounded-xl transition-colors"
               >
                 <Check className="w-3.5 h-3.5" /> {busy ? "Đang chốt..." : "Chốt Lịch"}

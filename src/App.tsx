@@ -161,6 +161,8 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<string>(() => loadStorage("activeTab", "shift_scheduling"));
   // Bảng Vận Hành (2026-09-21): "board" = hôm nay/tuần + việc còn thiếu; "calendar" = Lịch & Studio cũ.
   const [opsView, setOpsView] = useState<"board" | "calendar">(() => loadStorage("opsView", "board"));
+  // Q4: ca cần mở sau khi bấm thông báo (OpsBoard tiêu thụ rồi xoá).
+  const [notifOpenSessionId, setNotifOpenSessionId] = useState<string | null>(null);
   useEffect(() => saveStorage("opsView", opsView), [opsView]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   // Thu gọn sidebar thành thanh icon (w-16) để nhường không gian ngang cho calendar.
@@ -1554,11 +1556,16 @@ export default function App() {
   const navItems = navGroups.flatMap((g) => g.items);
 
   // Mọi loại thông báo hiện có đều là về MỘT CA của chính người nhận (xếp/rút/đổi giờ/huỷ/đối
-  // soát) — màn "Đăng Ký & Chốt Lịch" là nơi talent thấy ca của mình và nộp/xem report, nên
-  // nhảy về đó. Talent luôn ở Agency Workspace (không có switcher), nên không cần đổi workspace.
+  // soát). Q4 (audit 2026-09-21): talent → Ca Của Tôi, ops → Bảng Vận Hành, và mở luôn Cửa sổ Ca
+  // Live của ca đó (notification.session_id). Talent luôn ở Agency Workspace, không cần đổi workspace.
   const handleOpenNotification = (n: AppNotification) => {
     void notifications.markRead([n.id]);
-    setActiveTab("shift_scheduling");
+    if (currentRole === "talent") setActiveTab("my_shifts");
+    else {
+      setOpsView("board");
+      setActiveTab("calendar");
+    }
+    if (n.sessionId) setNotifOpenSessionId(n.sessionId);
     setMobileMenuOpen(false);
   };
 
@@ -1966,6 +1973,8 @@ export default function App() {
                         onDeleteSession={handleDeleteSession}
                     onCancelSession={handleCancelSession}
                         onOpenScheduling={() => setActiveTab("shift_scheduling")}
+                        requestOpenSessionId={notifOpenSessionId}
+                        onOpenRequestHandled={() => setNotifOpenSessionId(null)}
                       />
                     )}
                     {opsView === "calendar" && (
@@ -2014,6 +2023,8 @@ export default function App() {
                     myTalentId={activeUser.assignedTalentId}
                     onSubmitSessionReport={handleSubmitSessionReport}
                     onSessionSnapshotApplied={handleSessionReconciled}
+                    requestOpenSessionId={notifOpenSessionId}
+                    onOpenRequestHandled={() => setNotifOpenSessionId(null)}
                   />
                 )}
 
