@@ -4,7 +4,7 @@ import { ALL_PERMISSION_DEFINITIONS } from "./data/mockData";
 import { fetchTalents, updateTalent, updateMyTalentProfile, deleteTalent } from "./lib/db/talents";
 import { fetchStudios, createStudio, updateStudio, deleteStudio } from "./lib/db/studios";
 import { fetchEquipments, createEquipment, updateEquipment, deleteEquipment } from "./lib/db/equipments";
-import { fetchSessions, createSession, updateSession, deleteSession } from "./lib/db/sessions";
+import { fetchSessions, createSession, updateSession, deleteSession, completePastSessions } from "./lib/db/sessions";
 import { submitSessionReport, SessionReportInput } from "./lib/db/sessionReports";
 import { fetchBrands, createBrand, updateBrand, deleteBrand } from "./lib/db/brands";
 import { fetchUsers, updateUserProfile, inviteUser, deleteUserAccount, InviteUserPayload } from "./lib/db/users";
@@ -28,6 +28,7 @@ import { fetchBrandPlatformRateHistory } from "./lib/db/brandPlatformRateHistory
 import { fetchBrandSkus, createBrandSku, updateBrandSku, deleteBrandSku } from "./lib/db/brandSkus";
 import { fetchPromoSchemes, createPromoScheme, updatePromoScheme, deletePromoScheme } from "./lib/db/promoSchemes";
 import { applyAllocatedTargets } from "./lib/performance/targetAllocation";
+import { withEffectiveStatus } from "./lib/sessionStatus";
 import { fetchAllMonthlyReports } from "./lib/db/monthlyReports";
 import { fetchLockedPlanTargets } from "./lib/db/monthPlans";
 import {
@@ -277,9 +278,15 @@ export default function App() {
     }
     return out;
   }, [planTargetsBySlotId, shiftSlots]);
+  // Trạng thái hiển thị theo giờ thật (0096): tick mỗi phút để "Đang live"/"Đã xong" tự đổi khi mở lâu.
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const t = window.setInterval(() => setNowMs(Date.now()), 60_000);
+    return () => window.clearInterval(t);
+  }, []);
   const sessions = useMemo(
-    () => applyAllocatedTargets(rawSessions, monthlyReports, planTargetsBySessionId),
-    [rawSessions, monthlyReports, planTargetsBySessionId]
+    () => applyAllocatedTargets(withEffectiveStatus(rawSessions, nowMs), monthlyReports, planTargetsBySessionId),
+    [rawSessions, nowMs, monthlyReports, planTargetsBySessionId]
   );
   // Kế hoạch tháng được sửa ở Report Tháng (Tab 05) mà App không nhận callback — nạp lại mỗi khi
   // đổi tab là đủ, bảng nhỏ và target chỉ cần đúng khi người dùng nhìn sang màn khác.
@@ -360,7 +367,10 @@ export default function App() {
     let cancelled = false;
     setSessionsLoading(true);
     fetchAllMonthlyReports().then((m) => { if (!cancelled) setMonthlyReports(m); }).catch(() => {});
-    fetchSessions()
+    // 0096: đóng ca đã qua giờ trước khi nạp — không chặn nếu RPC lỗi.
+    completePastSessions()
+      .catch(() => 0)
+      .then(() => fetchSessions())
       .then((s) => {
         if (cancelled) return;
         setSessions(s);

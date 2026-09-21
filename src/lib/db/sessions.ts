@@ -413,6 +413,14 @@ async function fetchAllSessionRows(): Promise<DbLiveSession[]> {
   return out;
 }
 
+// Đóng ca đã qua giờ kết thúc mà chưa ai ghi số (0096). Gọi lúc app mở; lỗi thì bỏ qua — client vẫn
+// suy trạng thái theo giờ để hiển thị (lib/sessionStatus.ts).
+export async function completePastSessions(): Promise<number> {
+  const { data, error } = await supabase.rpc("complete_past_sessions");
+  if (error) throw error;
+  return Number(data ?? 0);
+}
+
 export async function fetchSessions(): Promise<LiveSession[]> {
   const rows = await fetchAllSessionRows();
   const { skus, checklist, metrics, reports } = await fetchChildRowsForSessions(rows.map((r) => r.id));
