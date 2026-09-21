@@ -369,7 +369,7 @@ export default function MonthPlan({
             Kế Hoạch Tháng
           </h2>
           <p className="text-sm text-[var(--text-muted)] mt-1">
-            Lập lưới ca cho brand trước khi mở đăng ký: giờ theo cam kết, target theo Report Tháng, chốt là ca đổ xuống Đăng Ký &amp; Chốt Lịch.
+            Lập lưới ca cho brand trước khi mở đăng ký: giờ theo cam kết, target đặt ngay trong kế hoạch, chốt là ca đổ xuống Đăng Ký &amp; Chốt Lịch.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
