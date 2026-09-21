@@ -50,7 +50,7 @@ Ground truth luôn là `AGENCY_NAV_GROUPS`/`BRAND_NAV_GROUPS` ở [src/App.tsx](
 
 ## Tầng dữ liệu gốc mới — snapshot theo ca (Giai đoạn 1, xong 2026-09-17)
 
-Quyết định nghiệp vụ: **mọi số liệu hiệu suất của toàn app từ nay lấy từ đúng 1 loại file chuẩn** `Creator-Live-Performance`, thay cho 5 loại Dataraw phức tạp. 5 loại cũ **giữ nguyên, không đụng tới** — dành cho module report cuối tháng sẽ build sau.
+Quyết định nghiệp vụ: **mọi số liệu hiệu suất của toàn app từ nay lấy từ đúng 1 loại file chuẩn** `Creator-Live-Performance` (trợ live tải từ **TikTok Streamer**, không phải Seller Center — user nhắc 2026-09-21), thay cho 5 loại Dataraw phức tạp. 5 loại cũ **giữ nguyên, không đụng tới** — dành cho module report cuối tháng sẽ build sau.
 
 **Vì sao phải lưu từng lần up thành snapshot riêng:** file là số CỘNG DỒN từ lúc mở room. Ca nối nhau mà host không tắt stream thì 2 ca dùng chung 1 Room ID, nên số ca sau = lần up này TRỪ lần up trước của cùng room. Snapshot lúc giao ca là thứ **duy nhất** ghi lại được ranh giới giữa 2 ca trong cùng một room — file đối soát cuối ngày chỉ có tổng cả room, không tách ngược được. Trợ quên up lúc giao ca ⇒ mất ranh giới vĩnh viễn, chỉ còn chia tay ước lượng.
 

@@ -22,7 +22,7 @@ function fmtTime(iso?: string): string {
   return iso ? new Date(iso).toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" }) : "—";
 }
 
-// Trợ live tải file "Creator-Live-Performance" từ TikTok Creator Center ngay khi hết ca rồi up
+// Trợ live tải file "Creator-Live-Performance" từ TikTok Streamer (Creator Center) ngay khi hết ca rồi up
 // vào đúng ca đang trực. Số của ca = hiệu so với lần up gần nhất của cùng Room ID (migration
 // 0078) — nên up đúng lúc giao ca là bắt buộc với ca nối, không phải thủ tục cho có.
 export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSnapshotUploadProps) {
@@ -133,7 +133,7 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
         <div className="rounded-xl border border-dashed border-[var(--border)] p-3 text-center">
           <FileSpreadsheet className="w-5 h-5 text-[var(--text-faint)] mx-auto mb-1.5" />
           <p className="text-[11px] text-[var(--text-muted)] mb-2">
-            Tải file <span className="font-bold">Creator-Live-Performance</span> từ TikTok Creator Center rồi up vào ngay khi hết ca.
+            Tải file <span className="font-bold">Creator-Live-Performance</span> từ TikTok Streamer rồi up vào ngay khi hết ca.
           </p>
           <button
             onClick={() => fileRef.current?.click()}
