@@ -1,4 +1,5 @@
 import { supabase } from "../supabaseClient";
+import { assertAffected } from "./assertAffected";
 import { Studio } from "../../types";
 
 // `??` only catches null/undefined, not "" — an empty string sent to this uuid FK
@@ -62,6 +63,7 @@ export async function updateStudio(s: Studio): Promise<Studio> {
 }
 
 export async function deleteStudio(id: string): Promise<void> {
-  const { error } = await supabase.from("studios").delete().eq("id", id);
+  const { data, error } = await supabase.from("studios").delete().eq("id", id).select("id");
   if (error) throw error;
+  assertAffected(data, "xoá studio");
 }

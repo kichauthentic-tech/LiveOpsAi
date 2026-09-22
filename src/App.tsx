@@ -2195,6 +2195,7 @@ export default function App() {
                     currentRole={currentRole}
                     talents={activeTalents}
                     brands={activeBrands}
+                    sessions={activeSessions}
                     onCreateTalentAccount={handleCreateTalentAccount}
                     onUpdateTalent={handleUpdateTalent}
                     onDeleteTalent={handleDeleteTalent}

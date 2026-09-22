@@ -1,4 +1,5 @@
 import { supabase } from "../supabaseClient";
+import { assertAffected } from "./assertAffected";
 import { BrandDataRawImport, BrandDataRawRow, DataRawReportType } from "../../types";
 import { ParsedDataRawImport } from "../dataraw/parseDataRawExcel";
 
@@ -157,6 +158,7 @@ export async function createOrReplaceDataRawImport(
 }
 
 export async function deleteDataRawImport(importId: string): Promise<void> {
-  const { error } = await supabase.from("brand_dataraw_imports").delete().eq("id", importId);
+  const { data, error } = await supabase.from("brand_dataraw_imports").delete().eq("id", importId).select("id");
   if (error) throw error;
+  assertAffected(data, "xoá import Dữ Liệu Gốc");
 }

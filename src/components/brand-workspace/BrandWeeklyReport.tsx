@@ -4,7 +4,7 @@ import { AlertTriangle, CalendarRange, ChevronLeft, ChevronRight, ClipboardList,
 import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
 import { DataRawWeekSlice, addDays, eachDay, fetchDataRawWeekSlice, isoWeekNumber, isoWeekStart } from "../../lib/dataraw/weeklySlice";
 import { getTodayDate } from "../../lib/dateUtils";
-import { byHost, filterSessions, sessionHours } from "../../lib/performance/hostPerformance";
+import { byHost, filterSessions, sessionHours, splitUnassignedHost } from "../../lib/performance/hostPerformance";
 import { hasLiveNumbers, monthRunRate } from "../../lib/report/sessionsLivePerf";
 import { MissingStep, missingSteps } from "../../lib/sessionLedger";
 import { DataSourceBadge } from "../common/DataSourceBadge";
@@ -66,6 +66,11 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
     const orders = done.reduce((a, s) => a + (s.totalOrders ?? 0), 0);
     const views = done.reduce((a, s) => a + (s.totalViews ?? 0), 0);
     const clicks = done.reduce((a, s) => a + (s.productClicks ?? 0), 0);
+    // "CTR live" phải cùng công thức với Report Tháng (lib/report/sessionsLivePerf.ts: views /
+    // impressions). Bản cũ lấy productClicks / views nên cùng một cái tên mà hai màn ra hai số
+    // (tuần 38: 50,6% ở đây vs 3,2% ở Tab 02) — audit 2026-09-21.
+    const impressions = done.reduce((a, s) => a + (s.impressions ?? 0), 0);
+    const productImpressions = done.reduce((a, s) => a + (s.productImpressions ?? 0), 0);
     const target = list.filter((s) => s.status !== "Cancelled").reduce((a, s) => a + (s.targetGmv ?? 0), 0);
     const targetDone = done.reduce((a, s) => a + (s.targetGmv ?? 0), 0);
     return {
@@ -80,7 +85,8 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
       aov: orders > 0 ? gmv / orders : 0,
       views,
       cvr: views > 0 ? orders / views : null,
-      liveCtr: views > 0 ? clicks / views : null,
+      liveCtr: impressions > 0 ? views / impressions : null,
+      productCtr: productImpressions > 0 ? clicks / productImpressions : null,
       target,
       targetDone,
       achieved: targetDone > 0 ? gmv / targetDone : null,
@@ -114,7 +120,11 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
   );
 
   const topSessions = useMemo(() => weekSessions.filter(hasLiveNumbers).sort((a, b) => (b.actualGmv ?? 0) - (a.actualGmv ?? 0)).slice(0, 5), [weekSessions]);
-  const hosts = useMemo(() => byHost(filterSessions(weekSessions, {})).sort((a, b) => b.gmv - a.gmv), [weekSessions]);
+  // Ca chưa gán host không đứng chung bảng host (audit 2026-09-21) — hiện thành dòng nhắc riêng.
+  const { ranked: hosts, unassigned: unassignedHost } = useMemo(
+    () => splitUnassignedHost(byHost(filterSessions(weekSessions, {})).sort((a, b) => b.gmv - a.gmv)),
+    [weekSessions]
+  );
   const todo = useMemo(() => weekSessions.map((s) => ({ s, missing: missingSteps(s, today) })).filter((x) => x.missing.length > 0).sort((a, b) => a.s.date.localeCompare(b.s.date)), [weekSessions, today]);
   const nextOpenSlots = useMemo(() => shiftSlots.filter((sl) => sl.brandId === brandId && sl.status === "open" && sl.date >= nextStart && sl.date <= nextEnd), [shiftSlots, brandId, nextStart, nextEnd]);
   const nextTarget = nextSessions.reduce((a, s) => a + (s.targetGmv ?? 0), 0);
@@ -170,7 +180,16 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
         <Kpi label="GMV / giờ" value={formatCurrencyAdaptive(cur.gmvPerHour)} delta={wow(cur.gmvPerHour, prev.gmvPerHour)} />
         <Kpi label="Đơn" value={fmtInt(cur.orders)} delta={wow(cur.orders, prev.orders)} hint={cur.aov > 0 ? `AOV ${formatCurrencyAdaptive(cur.aov)}` : undefined} />
         <Kpi label="View" value={fmtInt(cur.views)} delta={wow(cur.views, prev.views)} />
-        <Kpi label="CVR (đơn/view)" value={fmtPct(cur.cvr, 2)} hint={cur.liveCtr !== null ? `CTR live ${fmtPct(cur.liveCtr, 1)}` : undefined} />
+        <Kpi
+          label="CVR (đơn/view)"
+          value={fmtPct(cur.cvr, 2)}
+          hint={[
+            cur.liveCtr !== null ? `CTR live ${fmtPct(cur.liveCtr, 1)}` : null,
+            cur.productCtr !== null ? `CTR sản phẩm ${fmtPct(cur.productCtr, 2)}` : null
+          ]
+            .filter(Boolean)
+            .join(" · ") || undefined}
+        />
         <Kpi
           label={`Run-rate tháng ${monthKey.slice(5, 7)}`}
           value={monthRr?.runRate === null || monthRr?.runRate === undefined ? "—" : fmtPct(monthRr.runRate)}
@@ -269,6 +288,11 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
         {/* Host */}
         <div className="bg-[var(--surface)] rounded-2xl border border-[var(--border)] p-4 space-y-2">
           <h4 className="font-bold text-[var(--text)] text-sm flex items-center gap-2"><Users className="w-4 h-4 text-[var(--accent-text)]" /> Host tuần này</h4>
+          {unassignedHost && (
+            <p className="text-[10px] text-amber-300">
+              {unassignedHost.sessionCount} ca chưa gán host ({formatCurrencyAdaptive(unassignedHost.gmv)}) không tính vào bảng này.
+            </p>
+          )}
           {hosts.length === 0 ? (
             <p className="text-xs text-[var(--text-faint)] italic">Chưa có ca nào có số.</p>
           ) : (

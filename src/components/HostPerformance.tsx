@@ -7,7 +7,8 @@ import {
   byWeekday,
   dataQuality,
   filterSessions,
-  hostWeekdayGrid
+  hostWeekdayGrid,
+  splitUnassignedHost
 } from "../lib/performance/hostPerformance";
 
 interface HostPerformanceProps {
@@ -38,7 +39,9 @@ export function HostPerformance({ sessions, brands }: HostPerformanceProps) {
     [sessions, from, to, brandId]
   );
 
-  const hosts = useMemo(() => byHost(scoped), [scoped]);
+  // Ca chưa gán host tách khỏi xếp hạng (audit 2026-09-21): trước đây nó đứng chung bảng như một
+  // "host" tên "Chưa gán host" và chiếm luôn một hạng trong top.
+  const { ranked: hosts, unassigned: unassignedHost } = useMemo(() => splitUnassignedHost(byHost(scoped)), [scoped]);
   const weekdays = useMemo(() => byWeekday(scoped), [scoped]);
   const grid = useMemo(() => hostWeekdayGrid(scoped), [scoped]);
   const quality = useMemo(() => dataQuality(scoped), [scoped]);
@@ -105,6 +108,15 @@ export function HostPerformance({ sessions, brands }: HostPerformanceProps) {
             <p className="text-[11px] text-[var(--text-faint)] mt-0.5">
               GMV/giờ là thước đo dùng để phân bổ ca — đo hiệu quả trên mỗi giờ nhân lực bỏ ra, không thiên vị host được xếp nhiều ca dài.
             </p>
+            {unassignedHost && (
+              <div className="mt-2 flex items-start gap-2 text-[11px] rounded-xl p-2.5 bg-amber-500/10 border border-amber-500/30 text-amber-300">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                <span>
+                  {unassignedHost.sessionCount} ca chưa gán host ({fmtVnd(unassignedHost.gmv)} GMV · {unassignedHost.hours.toFixed(1)}h) không được tính
+                  vào xếp hạng — gán host cho ca ở "Dữ Liệu Gốc → nạp bù" hoặc Cửa sổ Ca Live để số này về đúng người.
+                </span>
+              </div>
+            )}
             <div className="mt-3 overflow-x-auto">
               <table className="w-full text-xs min-w-[560px]">
                 <thead>

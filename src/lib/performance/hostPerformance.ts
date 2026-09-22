@@ -116,11 +116,24 @@ function groupBy(
     .sort((a, b) => b.gmvPerHour - a.gmvPerHour);
 }
 
+export const UNASSIGNED_HOST_KEY = "chua-gan-host";
+
 // host_id có thể rỗng (talent bị xoá -> on delete set null, hoặc ca tạo tay không gán host) trong
 // khi host_name denormalized vẫn còn. Gom theo id rồi rơi về TÊN, chứ không dồn mọi ca thiếu id
 // vào chung một khoá — làm vậy sẽ trộn nhiều host thành một dòng và mượn nhầm tên của ca đầu tiên.
 export function hostKey(s: LiveSession): string {
-  return s.hostId || (s.hostName ? `ten:${s.hostName}` : "chua-gan-host");
+  return s.hostId || (s.hostName ? `ten:${s.hostName}` : UNASSIGNED_HOST_KEY);
+}
+
+// Ca chưa gán host (nạp bù từ file, host_id lẫn host_name đều rỗng) KHÔNG phải một host — để nó
+// nằm trong bảng xếp hạng là đem GMV của nhiều người vô danh đi so với người thật, và nó còn chiếm
+// một hạng trong top. Tách ra để màn hình hiển thị thành một dòng cảnh báo "còn N ca chưa gán host"
+// thay vì một dòng xếp hạng.
+export function splitUnassignedHost(rows: PerfRow[]): { ranked: PerfRow[]; unassigned: PerfRow | null } {
+  return {
+    ranked: rows.filter((r) => r.key !== UNASSIGNED_HOST_KEY),
+    unassigned: rows.find((r) => r.key === UNASSIGNED_HOST_KEY) ?? null
+  };
 }
 
 export function byHost(sessions: LiveSession[]): PerfRow[] {

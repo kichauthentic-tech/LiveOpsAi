@@ -1,7 +1,8 @@
 import React, { useState } from "react";
-import { Talent, Brand, UserRole } from "../types";
+import { Talent, Brand, UserRole, LiveSession } from "../types";
 import { Users, Sparkles, Award, Search, Filter, Plus, Edit3, Trash2, X, Phone, CheckCircle2, Loader2, AlertTriangle } from "lucide-react";
 import { authedFetch } from "../lib/authedFetch";
+import { computeTalentRealTotals } from "../lib/metrics/avgGmv";
 
 export interface NewTalentAccountPayload {
   name: string;
@@ -27,6 +28,8 @@ interface TalentMatcherProps {
   currentRole: UserRole;
   talents: Talent[];
   brands: Brand[];
+  // Số GMV/số ca của talent cộng từ ca thật, thay cho cột nhập tay trên hồ sơ (audit 2026-09-21).
+  sessions: LiveSession[];
   onCreateTalentAccount?: (payload: NewTalentAccountPayload) => Promise<void>;
   onUpdateTalent?: (id: string, patch: Partial<Talent>) => void;
   onDeleteTalent?: (id: string) => void;
@@ -36,6 +39,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
   currentRole,
   talents,
   brands,
+  sessions,
   onCreateTalentAccount,
   onUpdateTalent,
   onDeleteTalent
@@ -392,6 +396,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
             const nicheStr = Array.isArray(nicheArr) ? nicheArr.join(", ") : String(nicheArr || "Đa ngành");
             const avatar = t.avatar || (t as any).avatarUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250";
             const rate = t.ratePerSession || (t as any).rateCardFee || 0;
+            const real = computeTalentRealTotals(sessions, t.id);
 
             return (
               <div
@@ -414,7 +419,9 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                         </span>
                       </div>
                       <p className="text-[10px] text-[var(--accent-text)] font-medium truncate">{nicheStr}</p>
-                      <span className="text-[10px] text-[var(--text-muted)] block truncate whitespace-nowrap">GMV tích lũy {((t.totalGmv || 0) / 1000000).toFixed(0)}M đ</span>
+                      <span className="text-[10px] text-[var(--text-muted)] block truncate whitespace-nowrap">
+                        {real.sessionCount > 0 ? `GMV tích lũy ${(real.totalGmv / 1000000).toFixed(0)}M đ · ${real.sessionCount} ca` : "Chưa có ca nào có số"}
+                      </span>
                     </div>
                   </div>
 
@@ -444,12 +451,12 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 text-[10px] text-[var(--text-muted)] bg-[var(--surface-base)]/40 p-2.5 rounded-xl border border-[var(--border)] font-medium">
-                  <div>GMV TB: <strong className="text-emerald-400 block text-xs font-bold">{t.avgGmvPerSession > 0 ? `${(t.avgGmvPerSession / 1000000).toFixed(0)}M đ` : "—"}</strong></div>
+                  <div>GMV TB: <strong className="text-emerald-400 block text-xs font-bold">{real.avgGmvPerSession > 0 ? `${(real.avgGmvPerSession / 1000000).toFixed(0)}M đ` : "—"}</strong></div>
                   <div>CVR TB: <strong className="text-[var(--accent-text)] block text-xs font-bold">{t.cvrAvg > 0 ? `${t.cvrAvg}%` : "—"}</strong></div>
                   {canSeeRate && (
                     <>
-                      <div>Rate Card: <strong className="text-[var(--text)] block font-bold">{rate.toLocaleString()} đ</strong></div>
-                      <div>Hoa hồng: <strong className="text-[var(--accent-text)] block font-bold">{t.commissionRate || 0}%</strong></div>
+                      <div>Rate Card: <strong className="text-[var(--text)] block font-bold">{t.rateHidden ? "ẩn" : `${rate.toLocaleString()} đ`}</strong></div>
+                      <div>Hoa hồng: <strong className="text-[var(--accent-text)] block font-bold">{t.rateHidden ? "ẩn" : `${t.commissionRate || 0}%`}</strong></div>
                     </>
                   )}
                 </div>
@@ -751,9 +758,9 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
               </div>
 
               <div className="grid grid-cols-2 gap-2 bg-[var(--surface-base)]/40 p-3 rounded-xl border border-[var(--border)]">
-                <div>GMV Tích Lũy: <strong className="text-[var(--text)] block text-sm font-bold">{((detailTalent.totalGmv || 0) / 1000000).toFixed(0)}M đ</strong></div>
-                <div>Điểm Tổng Hợp: <strong className="text-[var(--text)] block text-sm font-bold">{detailTalent.overallScore || 0}</strong></div>
-                <div>GMV TB / Phiên: <strong className="text-emerald-400 block text-sm font-bold">{((detailTalent.avgGmvPerSession || 0) / 1000000).toFixed(0)}M đ</strong></div>
+                <div>GMV Tích Lũy: <strong className="text-[var(--text)] block text-sm font-bold">{(computeTalentRealTotals(sessions, detailTalent.id).totalGmv / 1000000).toFixed(0)}M đ</strong></div>
+                <div>Số Ca Có Số: <strong className="text-[var(--text)] block text-sm font-bold">{computeTalentRealTotals(sessions, detailTalent.id).sessionCount}</strong></div>
+                <div>GMV TB / Phiên: <strong className="text-emerald-400 block text-sm font-bold">{(computeTalentRealTotals(sessions, detailTalent.id).avgGmvPerSession / 1000000).toFixed(0)}M đ</strong></div>
                 <div>CVR TB: <strong className="text-[var(--accent-text)] block text-sm font-bold">{detailTalent.cvrAvg || 0}%</strong></div>
                 <div>CTR TB: <strong className="text-[var(--accent-text)] block text-sm font-bold">{detailTalent.ctrAvg || 0}%</strong></div>
                 <div>Trạng Thái: <strong className="text-[var(--text)] block text-sm font-bold">{detailTalent.availabilityStatus || "Available"}</strong></div>
@@ -761,8 +768,8 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
 
               {canSeeRate && (
                 <div className="grid grid-cols-2 gap-2 bg-amber-950/30 p-3 rounded-xl border border-amber-500/30">
-                  <div>Rate Card: <strong className="text-[var(--text)] block text-sm font-bold">{(detailTalent.ratePerSession || 0).toLocaleString()} đ</strong></div>
-                  <div>Hoa Hồng: <strong className="text-[var(--accent-text)] block text-sm font-bold">{detailTalent.commissionRate || 0}%</strong></div>
+                  <div>Rate Card: <strong className="text-[var(--text)] block text-sm font-bold">{detailTalent.rateHidden ? "ẩn" : `${(detailTalent.ratePerSession || 0).toLocaleString()} đ`}</strong></div>
+                  <div>Hoa Hồng: <strong className="text-[var(--accent-text)] block text-sm font-bold">{detailTalent.rateHidden ? "ẩn" : `${detailTalent.commissionRate || 0}%`}</strong></div>
                 </div>
               )}
             </div>

@@ -1,4 +1,5 @@
 import { supabase } from "../supabaseClient";
+import { assertAffected } from "./assertAffected";
 import { BrandPlatformRate } from "../../types";
 
 interface DbBrandPlatformRate {
@@ -58,6 +59,7 @@ export async function upsertBrandPlatformReturnRate(
 }
 
 export async function deleteBrandPlatformRate(id: string): Promise<void> {
-  const { error } = await supabase.from("brand_platform_rates").delete().eq("id", id);
+  const { data, error } = await supabase.from("brand_platform_rates").delete().eq("id", id).select("id");
   if (error) throw error;
+  assertAffected(data, "xoá dòng rate card");
 }

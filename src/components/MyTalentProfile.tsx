@@ -252,23 +252,33 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({ activeUser, ta
         <div className="bg-amber-950/30 border border-amber-500/30 rounded-xl p-3 grid grid-cols-3 gap-3 text-xs">
           <div>
             <div className="text-amber-300/80">Rate Card</div>
-            {/* Talent đặt rate/giờ > 0 thì lương ca tính theo giờ công thực tế (giờ ca + OT −
-                off sớm) — hiện đúng loại rate đang áp dụng thay vì luôn hiện rate/live. */}
-            {(myTalent.ratePerHour || 0) > 0 ? (
+            {/* rateHidden = view `talents_secure` mask cột lương với người đang đăng nhập. Phải hiện
+                "chưa xem được" chứ KHÔNG hiện 0 đ — số 0 đọc như "lương của bạn bằng 0"
+                (audit 2026-09-21). Talent đặt rate/giờ > 0 thì lương ca tính theo giờ công thực tế
+                (giờ ca + OT − off sớm) — hiện đúng loại rate đang áp dụng. */}
+            {myTalent.rateHidden ? (
+              <div className="font-bold text-[var(--text-muted)] mt-0.5">chưa xem được</div>
+            ) : (myTalent.ratePerHour || 0) > 0 ? (
               <div className="font-bold text-[var(--text)] mt-0.5">{(myTalent.ratePerHour || 0).toLocaleString()} đ<span className="text-amber-300/80 font-semibold">/giờ</span></div>
             ) : (
               <div className="font-bold text-[var(--text)] mt-0.5">{(myTalent.ratePerSession || 0).toLocaleString()} đ<span className="text-amber-300/80 font-semibold">/live</span></div>
             )}
-            {(myTalent.assistantRatePerHour || 0) > 0 && (
+            {!myTalent.rateHidden && (myTalent.assistantRatePerHour || 0) > 0 && (
               <div className="text-[10px] text-amber-300/80 mt-0.5">Trợ live: {(myTalent.assistantRatePerHour || 0).toLocaleString()} đ/giờ</div>
             )}
           </div>
           <div>
             <div className="text-amber-300/80">Hoa Hồng</div>
-            <div className="font-bold text-[var(--accent-text)] mt-0.5">{myTalent.commissionRate || 0}%</div>
+            <div className="font-bold text-[var(--accent-text)] mt-0.5">
+              {myTalent.rateHidden ? <span className="text-[var(--text-muted)]">chưa xem được</span> : `${myTalent.commissionRate || 0}%`}
+            </div>
           </div>
         </div>
-        <p className="text-[10px] text-[var(--text-faint)]">Rate Card/Hoa hồng chỉ hiện cho chính bạn và CEO/Admin.</p>
+        <p className="text-[10px] text-[var(--text-faint)]">
+          {myTalent.rateHidden
+            ? "Tài khoản của bạn chưa được liên kết đúng hồ sơ Talent nên chưa xem được Rate Card/Hoa hồng — báo Admin gán lại giúp."
+            : "Rate Card/Hoa hồng chỉ hiện cho chính bạn và CEO/Admin."}
+        </p>
       </div>
     </div>
   );

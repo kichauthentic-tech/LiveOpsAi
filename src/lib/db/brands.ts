@@ -1,4 +1,5 @@
 import { supabase } from "../supabaseClient";
+import { assertAffected } from "./assertAffected";
 import { Brand } from "../../types";
 
 // `users`/profiles is a real Supabase table now (Phase 4) and the owner picker in
@@ -73,6 +74,7 @@ export async function updateBrand(b: Brand): Promise<Brand> {
 }
 
 export async function deleteBrand(id: string): Promise<void> {
-  const { error } = await supabase.from("brands").delete().eq("id", id);
+  const { data, error } = await supabase.from("brands").delete().eq("id", id).select("id");
   if (error) throw error;
+  assertAffected(data, "xoá brand");
 }

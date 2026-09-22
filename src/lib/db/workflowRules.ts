@@ -1,4 +1,5 @@
 import { supabase } from "../supabaseClient";
+import { assertAffected } from "./assertAffected";
 import { WorkflowRule } from "../../types";
 
 interface DbWorkflowRule {
@@ -53,6 +54,7 @@ export async function updateWorkflowRule(r: WorkflowRule): Promise<WorkflowRule>
 }
 
 export async function deleteWorkflowRule(id: string): Promise<void> {
-  const { error } = await supabase.from("workflow_rules").delete().eq("id", id);
+  const { data, error } = await supabase.from("workflow_rules").delete().eq("id", id).select("id");
   if (error) throw error;
+  assertAffected(data, "xoá workflow rule");
 }

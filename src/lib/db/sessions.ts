@@ -1,4 +1,5 @@
 import { supabase } from "../supabaseClient";
+import { assertAffected } from "./assertAffected";
 import { LiveSession, ProductSKU, ChecklistItem, MinuteMetric, LiveSessionReport, UserRole } from "../../types";
 
 // brands/studios/talents are all real Supabase tables now (Phases 1/3) and every
@@ -483,6 +484,7 @@ export async function cancelSession(id: string, reason: string): Promise<LiveSes
 }
 
 export async function deleteSession(id: string): Promise<void> {
-  const { error } = await supabase.from("live_sessions").delete().eq("id", id);
+  const { data, error } = await supabase.from("live_sessions").delete().eq("id", id).select("id");
   if (error) throw error;
+  assertAffected(data, "xoá ca");
 }

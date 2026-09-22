@@ -485,7 +485,12 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
             {(["admin", "ceo", "operations", "brand", "talent", "moderator"] as UserRole[]).map((roleKey) => {
               const isSelected = selectedRole === roleKey;
               const permsMap = rolePermissions[roleKey];
-              const enabledCount = Object.values(permsMap).filter(Boolean).length;
+              // Chỉ đếm quyền CÓ ĐỊNH NGHĨA trong app. Bảng `role_permissions` dưới DB còn sót key
+              // của module đã xoá (`generate_scripts` — 0042, `view_executive_brief` — Dashboard gỡ
+              // 2026-09-13), đếm thẳng Object.values ra "13/12 Permissions" (audit 2026-09-21).
+              // Migration 0100 dọn DB; chỗ này vẫn giữ cách đếm theo định nghĩa để lần sau lệch nữa
+              // thì hiện sai lệch chứ không hiện số vô lý.
+              const enabledCount = permissionDefinitions.filter((def) => permsMap?.[def.key]).length;
               const totalCount = permissionDefinitions.length;
 
               return (

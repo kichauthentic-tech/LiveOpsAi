@@ -1,4 +1,5 @@
 import { supabase } from "../supabaseClient";
+import { assertAffected } from "./assertAffected";
 import { parseSnapshotFile } from "../liveSnapshot/extractRooms";
 
 export type ReconciliationBucket = "agency" | "review" | "unassigned" | "inhouse";
@@ -133,6 +134,7 @@ export async function applyReconciliation(batchId: string): Promise<number> {
 }
 
 export async function deleteReconciliationBatch(batchId: string): Promise<void> {
-  const { error } = await supabase.from("live_reconciliation_batches").delete().eq("id", batchId);
+  const { data, error } = await supabase.from("live_reconciliation_batches").delete().eq("id", batchId).select("id");
   if (error) throw error;
+  assertAffected(data, "xoá batch đối soát");
 }

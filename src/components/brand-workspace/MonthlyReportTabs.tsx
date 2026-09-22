@@ -43,7 +43,7 @@ import { fetchAffiliateCreatorListMonthSlice } from "../../lib/dataraw/affiliate
 import { fetchMonthlyReport, upsertMonthlyReport, MonthlyReportManualInput } from "../../lib/db/monthlyReports";
 import { fetchAffiliatePlans, replaceAffiliatePlans } from "../../lib/db/affiliatePlans";
 import { fetchAffiliateActuals, replaceAffiliateActuals } from "../../lib/db/affiliateActuals";
-import { byHost, dataQuality, filterSessions, hostKey, DataQuality } from "../../lib/performance/hostPerformance";
+import { byHost, dataQuality, filterSessions, hostKey, splitUnassignedHost, DataQuality } from "../../lib/performance/hostPerformance";
 import {
   aggregateCreatorLivePerfRows,
   bucketByCampaignDay,
@@ -729,8 +729,10 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, m
       list.push(s);
       byKey.set(hostKey(s), list);
     }
-    return byHost(tiktokSessions)
-      .sort((a, b) => b.gmv - a.gmv)
+    // Ca chưa gán host bị tách khỏi bảng/biểu đồ host (audit 2026-09-21): gom mọi ca vô danh thành
+    // một dòng rồi xếp hạng chung với người thật là so sai đối tượng.
+    return splitUnassignedHost(byHost(tiktokSessions))
+      .ranked.sort((a, b) => b.gmv - a.gmv)
       .map((r) => ({
         key: r.key,
         hostName: r.label,
@@ -744,6 +746,10 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, m
       }));
   }, [completedInPeriod]);
   const hostQuality = useMemo(() => dataQuality(filterSessions(completedInPeriod.filter((s) => s.platform === "TikTok"), {})), [completedInPeriod]);
+  const unassignedHost = useMemo(
+    () => splitUnassignedHost(byHost(filterSessions(completedInPeriod.filter((s) => s.platform === "TikTok"), {}))).unassigned,
+    [completedInPeriod]
+  );
   const hostChartData = useMemo(() => hostPerformance.map((h) => ({ label: h.hostName, gmvHour: h.gmvPerHour ?? 0 })), [hostPerformance]);
   const totalGmvCur = useMemo(() => completedInPeriod.reduce((sum, s) => sum + (s.actualGmv || 0), 0), [completedInPeriod]);
 
@@ -1488,12 +1494,16 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, m
                     dính gì tới file đó. Trước đây chưa up file Dataraw tháng nào là toàn bộ tab
                     Livestream trống, kể cả phần vốn có số. */}
                 <Panel title="Host Performance" icon={<Users className="w-4 h-4" />} sub="GMV/giờ theo host — tổng hợp từ lịch vận hành nội bộ">
-                  <div style={{ height: 220 }}>
+                  {/* Audit 2026-09-21: khung cao cố định 220px + YAxis interval mặc định khiến recharts
+                      GIẤU bớt nhãn khi nhiều host (10 host → 5 nhãn), nhãn còn lại rơi lệch sang thanh
+                      bên cạnh nên người đọc tưởng host hạng 2 mới là cao nhất. Cao theo số host +
+                      interval={0} để mỗi thanh luôn có đúng nhãn của nó. */}
+                  <div style={{ height: Math.max(220, hostChartData.length * 28 + 40) }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={hostChartData} layout="vertical" margin={{ left: 10 }}>
                         <CartesianGrid stroke={PAL.line} horizontal={false} />
                         <XAxis type="number" stroke={PAL.muted} fontSize={10} tickFormatter={(v) => formatCurrencyAdaptive(v)} />
-                        <YAxis type="category" dataKey="label" stroke={PAL.muted} fontSize={11} width={90} />
+                        <YAxis type="category" dataKey="label" stroke={PAL.muted} fontSize={11} width={110} interval={0} />
                         <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => formatCurrencyAdaptive(chartNum(v))} />
                         <Bar dataKey="gmvHour" radius={[0, 4, 4, 0]}>
                           {hostChartData.map((_, i) => (
@@ -1517,6 +1527,18 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, m
                         {hostQuality.snapshot > 0 ? `, ${hostQuality.snapshot} số lúc giao ca (chờ đối soát cuối kỳ)` : ""}
                         {hostQuality.manual > 0 ? `, ${hostQuality.manual} talent tự khai (chưa có gì bảo chứng)` : ""}.
                         {" "}Đối soát ở "Vận Hành Live → Đối Soát Số Liệu" trước khi phát hành report.
+                      </span>
+                    </div>
+                  )}
+                  {unassignedHost && (
+                    <div
+                      className="flex items-start gap-2 text-[11px] rounded-xl p-2.5 mb-3"
+                      style={{ background: "#2a2410", border: `1px solid ${PAL.gold}55`, color: PAL.gold }}
+                    >
+                      <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                      <span>
+                        {unassignedHost.sessionCount} ca chưa gán host ({formatCurrencyAdaptive(unassignedHost.gmv)} ·{" "}
+                        {unassignedHost.hours.toFixed(1)}h) không nằm trong bảng/biểu đồ này — gán host cho ca để số về đúng người.
                       </span>
                     </div>
                   )}

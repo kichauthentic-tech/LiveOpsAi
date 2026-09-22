@@ -1,4 +1,5 @@
 import { supabase } from "../supabaseClient";
+import { assertAffected } from "./assertAffected";
 import { ShiftRegistration } from "../../types";
 
 interface DbShiftRegistration {
@@ -36,10 +37,12 @@ export async function registerForSlot(slotId: string, talentId: string): Promise
 }
 
 export async function unregisterFromSlot(slotId: string, talentId: string): Promise<void> {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("session_availability")
     .delete()
     .eq("slot_id", slotId)
-    .eq("talent_id", talentId);
+    .eq("talent_id", talentId)
+    .select("id");
   if (error) throw error;
+  assertAffected(data, "huỷ đăng ký ca");
 }

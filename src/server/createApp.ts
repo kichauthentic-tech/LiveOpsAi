@@ -223,6 +223,20 @@ export function createApp() {
           assignmentWarning = "Tài khoản đã được tạo nhưng gán Brand/Talent thất bại — vui lòng sửa lại thủ công.";
         }
       }
+      // Link NGƯỢC talents.profile_id (audit 2026-09-21): nhánh "tạo hồ sơ mới" phía trên đã ghi
+      // sẵn, nhưng nhánh chọn talent CÓ SẴN thì trước đây không ghi — trong khi `talents_secure`
+      // (0047…0089) dựa vào đúng cột đó để quyết định talent có được xem rate của chính mình không.
+      // Kết quả: talent thật mở "Hồ Sơ Của Tôi" thấy rate bằng 0. Migration 0100 đã nới điều kiện
+      // của view sang `profiles.assigned_talent_id`, chỗ này giữ cho 2 chiều luôn khớp nhau.
+      if (data.user && assignedTalentId) {
+        const { error: backLinkError } = await supabaseAdmin
+          .from("talents")
+          .update({ profile_id: data.user.id })
+          .eq("id", assignedTalentId);
+        if (backLinkError) {
+          console.error("Gán ngược talents.profile_id thất bại sau khi invite:", backLinkError);
+        }
+      }
       res.json({ success: true, id: data.user?.id, warning: assignmentWarning });
     } catch (err: any) {
       console.error("Invite user error:", err);

@@ -1,4 +1,5 @@
 import { supabase } from "../supabaseClient";
+import { assertAffected } from "./assertAffected";
 import { BrandStudio } from "../../types";
 
 interface DbBrandStudio {
@@ -18,8 +19,14 @@ export async function fetchBrandStudios(): Promise<BrandStudio[]> {
 // Một dòng mỗi (brand, nền tảng) — upsert như brandPlatformRates.ts. studioId rỗng = bỏ phòng mặc định.
 export async function setBrandStudio(brandId: string, platform: BrandStudio["platform"], studioId: string): Promise<void> {
   if (!studioId) {
-    const { error } = await supabase.from("brand_studios").delete().eq("brand_id", brandId).eq("platform", platform);
+    const { data, error } = await supabase
+      .from("brand_studios")
+      .delete()
+      .eq("brand_id", brandId)
+      .eq("platform", platform)
+      .select("brand_id");
     if (error) throw error;
+    assertAffected(data, "bỏ gán phòng live");
     return;
   }
   const { error } = await supabase

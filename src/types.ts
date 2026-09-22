@@ -96,6 +96,11 @@ export interface Talent {
   phone: string;
   dateOfBirth?: string; // "YYYY-MM-DD"
   profileId?: string; // liên kết tới profiles.id (tài khoản đăng nhập của chính talent này)
+  // true = view `talents_secure` đã MASK các cột lương với người đang đăng nhập (không phải
+  // ceo/admin, cũng không phải chính talent này). Cần cờ riêng vì cả 4 cột lương đều rơi về 0 sau
+  // khi map null → 0, nên màn hình không phân biệt được "chưa đặt rate" với "không được xem"
+  // (audit 2026-09-21: talent thật nhìn thấy "0 đ/live" tưởng lương mình bằng 0).
+  rateHidden?: boolean;
   isCustom?: boolean;
 }
 

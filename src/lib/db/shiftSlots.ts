@@ -1,4 +1,5 @@
 import { supabase } from "../supabaseClient";
+import { assertAffected } from "./assertAffected";
 import { ShiftSlot } from "../../types";
 
 const orNull = (v: string | undefined | null) => (v ? v : null);
@@ -91,6 +92,7 @@ export async function updateShiftSlot(s: ShiftSlot): Promise<ShiftSlot> {
 }
 
 export async function deleteShiftSlot(id: string): Promise<void> {
-  const { error } = await supabase.from("shift_slots").delete().eq("id", id);
+  const { data, error } = await supabase.from("shift_slots").delete().eq("id", id).select("id");
   if (error) throw error;
+  assertAffected(data, "xoá ca chờ đăng ký");
 }

@@ -1,4 +1,5 @@
 import { supabase } from "../supabaseClient";
+import { assertAffected } from "./assertAffected";
 import { Equipment } from "../../types";
 
 interface DbEquipment {
@@ -56,6 +57,7 @@ export async function updateEquipment(e: Equipment): Promise<Equipment> {
 }
 
 export async function deleteEquipment(id: string): Promise<void> {
-  const { error } = await supabase.from("equipments").delete().eq("id", id);
+  const { data, error } = await supabase.from("equipments").delete().eq("id", id).select("id");
   if (error) throw error;
+  assertAffected(data, "xoá thiết bị");
 }

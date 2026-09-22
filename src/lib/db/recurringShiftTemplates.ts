@@ -1,4 +1,5 @@
 import { supabase } from "../supabaseClient";
+import { assertAffected } from "./assertAffected";
 import { RecurringShiftTemplate } from "../../types";
 
 const orNull = (v: string | undefined | null) => (v ? v : null);
@@ -79,6 +80,7 @@ export async function updateRecurringShiftTemplate(t: RecurringShiftTemplate): P
 }
 
 export async function deleteRecurringShiftTemplate(id: string): Promise<void> {
-  const { error } = await supabase.from("recurring_shift_templates").delete().eq("id", id);
+  const { data, error } = await supabase.from("recurring_shift_templates").delete().eq("id", id).select("id");
   if (error) throw error;
+  assertAffected(data, "xoá quy tắc lặp");
 }

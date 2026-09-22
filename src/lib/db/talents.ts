@@ -1,4 +1,5 @@
 import { supabase } from "../supabaseClient";
+import { assertAffected } from "./assertAffected";
 import { Talent } from "../../types";
 
 interface DbTalent {
@@ -49,7 +50,10 @@ function fromDb(row: DbTalent): Talent {
     brandsWorkedWith: row.brands_worked_with ?? [],
     phone: row.phone,
     dateOfBirth: row.date_of_birth ?? undefined,
-    profileId: row.profile_id ?? undefined
+    profileId: row.profile_id ?? undefined,
+    // Cả 4 cột lương cùng đi qua một điều kiện mask trong view, nên chỉ cần nhìn một cột là biết
+    // người đọc có quyền xem hay không (0047…0100).
+    rateHidden: row.rate_per_session === null
   };
 }
 
@@ -133,6 +137,7 @@ export async function updateMyTalentProfile(patch: {
 }
 
 export async function deleteTalent(id: string): Promise<void> {
-  const { error } = await supabase.from("talents").delete().eq("id", id);
+  const { data, error } = await supabase.from("talents").delete().eq("id", id).select("id");
   if (error) throw error;
+  assertAffected(data, "xoá talent");
 }

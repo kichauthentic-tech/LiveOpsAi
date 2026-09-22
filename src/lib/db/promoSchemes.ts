@@ -1,4 +1,5 @@
 import { supabase } from "../supabaseClient";
+import { assertAffected } from "./assertAffected";
 import { PromoScheme } from "../../types";
 
 interface DbPromoScheme {
@@ -69,6 +70,7 @@ export async function updatePromoScheme(
 }
 
 export async function deletePromoScheme(id: string): Promise<void> {
-  const { error } = await supabase.from("promo_schemes").delete().eq("id", id);
+  const { data, error } = await supabase.from("promo_schemes").delete().eq("id", id).select("id");
   if (error) throw error;
+  assertAffected(data, "xoá scheme");
 }
