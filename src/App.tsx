@@ -62,7 +62,8 @@ import {
   Radio,
   Megaphone,
   CalendarCheck2,
-  Tag
+  Tag,
+  LayoutGrid
 } from "lucide-react";
 import { Header, WorkspaceContext } from "./components/Header";
 import { BrandCalendar } from "./components/brand-workspace/BrandCalendar";
@@ -99,6 +100,7 @@ import MonthPlan from "./components/MonthPlan";
 import OpsSupport from "./components/OpsSupport";
 import { LiveReconciliation } from "./components/LiveReconciliation";
 import { HostPerformance } from "./components/HostPerformance";
+import { BrandsOverview } from "./components/BrandsOverview";
 import { BrandCommitment } from "./components/BrandCommitment";
 
 const STORAGE_PREFIX = "liveops_os_v2_";
@@ -1491,7 +1493,13 @@ export default function App() {
           },
           {
             label: "Phân Tích",
-            items: [{ id: "host_performance", label: "Hiệu Suất Host", icon: TrendingUp, perm: "manage_sessions" as PermissionKey }]
+            items: [
+              { id: "host_performance", label: "Hiệu Suất Host", icon: TrendingUp, perm: "manage_sessions" as PermissionKey },
+              // Toàn Cảnh Brand (Đợt C/6, 2026-09-23): bảng trạng thái 4 brand cho 1 tháng — kế
+              // hoạch/cam kết/report/rate đọc thẳng từ DB, không phải widget KPI dự phóng kiểu
+              // Dashboard cũ (đã xoá 2026-09-13).
+              { id: "brands_overview", label: "Toàn Cảnh Brand", icon: LayoutGrid, perm: "manage_sessions" as PermissionKey }
+            ]
           }
         ]),
     {
@@ -2148,6 +2156,15 @@ export default function App() {
 
                 {activeTab === "host_performance" && (
                   <HostPerformance sessions={activeSessions} brands={activeBrands} />
+                )}
+
+                {activeTab === "brands_overview" && (
+                  <BrandsOverview
+                    brands={activeBrands}
+                    sessions={activeSessions}
+                    brandPlatformRates={brandPlatformRates}
+                    monthlyReports={monthlyReports}
+                  />
                 )}
 
                 {activeTab === "ops_support" && (

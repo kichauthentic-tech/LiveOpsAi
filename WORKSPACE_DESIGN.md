@@ -4,7 +4,7 @@
 
 1. ~~Chạy `0111_signup_role_and_null_role_guard.sql`~~ + ~~tắt "Allow new users to sign up"~~ — **XONG, verify 2026-09-23**: `GET /auth/v1/settings` → `disable_signup: true`; `POST /auth/v1/signup` (kèm `data:{"role":"ceo"}`) → `422 signup_disabled`, không tạo ra tài khoản nào. Cổng tự phong role đã đóng ở lớp ngoài cùng. Phần SQL (trigger + 11 policy) không tự re-verify được qua REST như các migration khác — xem "CÒN LẠI, PHẢI VÀO DASHBOARD" cũ đã xoá, thay bằng đoạn verify trong mục `## BẢO MẬT — tự phong role`.
 2. Migration 0103→0111 **đã chạy** trên production (xem "Sự cố 0105" ở mục Hạ tầng Supabase cho cách đo, không tin lời kể) — không cần chạy lại. Lưu ý: `0110`/`0111` từng trùng số do 2 phiên chạy song song, đã tách — xem ghi chú "Lưu ý đánh số" trong dòng "Migration mới nhất" bên dưới.
-3. Đợt C (audit role × workspace) đang dở, C/1–C/5 đã xong + verify (xem mục `## Audit Role × Workspace`). Việc tiếp theo theo đúng thứ tự đã đề xuất với user: **màn toàn cảnh 4 brand cho agency → bảng điều phối phát hành report → gộp lối vào Dataraw/Nhập Ads/Affiliate-edit**. Hỏi user trước khi đổi thứ tự.
+3. Đợt C (audit role × workspace) đang dở, C/1–C/6 đã xong + verify (xem mục `## Audit Role × Workspace`). Việc tiếp theo theo đúng thứ tự đã đề xuất với user: **bảng điều phối phát hành report → gộp lối vào Dataraw/Nhập Ads/Affiliate-edit**. Hỏi user trước khi đổi thứ tự.
 4. Đọc kỹ mục `## Hạ tầng Supabase` trước khi viết migration mới — có quy ước bắt buộc (`(select current_user_role())`, guard trong thân RPC, `to_regclass(...) is null` khi loop qua danh sách bảng) đúc kết từ nhiều sự cố thật, bỏ qua là lặp lại lỗi cũ.
 
 > File này được viết lại gọn ngày 2026-09-08 — bản cũ (1459 dòng, đã vượt giới hạn đọc 1 lần của Claude Code) vẫn còn nguyên trong Git (`git log -- WORKSPACE_DESIGN.md`), tra lại lịch sử chi tiết từng bug/migration bằng lệnh đó thay vì mở file này. Từ nay giữ nguyên tắc: file này chỉ ghi **trạng thái hiện tại**, không tường thuật quá trình.
@@ -20,7 +20,7 @@ App tách 2 lớp workspace, chuyển qua dropdown switcher trên Header (không
 
 Ground truth luôn là `AGENCY_NAV_GROUPS`/`BRAND_NAV_GROUPS` ở [src/App.tsx](src/App.tsx) — danh sách dưới đây chỉ là ảnh chụp, lệch thì tin code.
 
-**Agency:** Sổ Ca · Lịch Vận Hành · Đăng Ký & Chốt Lịch · Talent Pool · Studios & Gear · CRM (gồm Rate Card từng brand) · TikTok API · Finance & P&L · Hội Đồng AI · Phân Quyền & Role · AI Training Center.
+**Agency:** Sổ Ca · Lịch Vận Hành · Đăng Ký & Chốt Lịch · Talent Pool · Studios & Gear · CRM (gồm Rate Card từng brand) · TikTok API · Finance & P&L · Hội Đồng AI · Phân Quyền & Role · AI Training Center · Hiệu Suất Host · **Toàn Cảnh Brand** (bảng trạng thái 4 brand/tháng, Đợt C/6).
 
 **Brand:** Lịch Vận Hành · Sổ Ca · SKU Showcase · Report Tháng (có toggle chế độ xem Tháng/Tuần) · Cam Kết Hợp Đồng (read-only, Đợt C/1) · Kế Hoạch Tháng Sau (read-only + nút xác nhận, Đợt C/2) · Rate Card (read-only, Đợt C/3) · Affiliate · Nhập Ads & Ghi Chú (ops-only) · Dữ Liệu Gốc (Dataraw — ẩn với role `brand`, chỉ ceo/admin/operations).
 
@@ -784,7 +784,17 @@ Verify: xuất từ Sổ Ca Agency (mọi brand, tháng 9/2026, 47 ca) và Sổ 
 
 Verify trên app thật (CROCS): tạo `brand_skus` test trùng tên thật trong `product_list` tháng 9 (batch 01–22/09 có thật) → hiện đúng **490,9 triệu · 406 đơn** (đúng bằng tổng nhiều dòng cùng tên gộp lại, lớn hơn 1 dòng đơn lẻ 462,8tr — khớp cơ chế gộp-theo-tên của Top SKU); đổi tên sai/thêm prefix → "Chưa khớp" đúng; xoá test sạch. Console sạch, `tsc` + `vite build` pass.
 
-**Còn lại của Đợt C (chưa làm):** màn toàn cảnh 4 brand cho agency · bảng điều phối phát hành report · gộp lối vào Dataraw/Nhập Ads/Affiliate-edit.
+**C/6 — Toàn Cảnh Brand cho agency: XONG (2026-09-23, không cần migration).**
+
+Tab mới `brands_overview` ([BrandsOverview.tsx](src/components/BrandsOverview.tsx)), nhóm nav **Phân Tích** cạnh Hiệu Suất Host. Một BẢNG (không phải widget KPI kiểu Dashboard cũ — module đó đã xoá hẳn 2026-09-13 chính vì số tính live/dự phóng không đáng tin, xem mục "Module Dashboard"): mỗi dòng 1 brand, cột là **trạng thái đọc thẳng từ DB** (kế hoạch tháng draft/locked, report tháng draft/published, rate card đã set chưa) hoặc **số thật đã xảy ra** (giờ live + GMV từ `live_sessions`) cho ĐÚNG một tháng đang xem (điều hướng tháng như các màn khác) — không có ô nào là dự phóng/ước tính cuối tháng, tránh lặp lại đúng lỗi khiến Dashboard cũ bị xoá.
+
+**Không fetch gì mới ngoài 2 lời gọi nhỏ** (`fetchPlanStatuses(month)`, `fetchBrandMonthlyCommitments()`) — phần còn lại tái dùng nguyên state đã có sẵn ở `App.tsx`: `activeSessions`/`activeBrands` (qua `filterLedger`+`summarize` của `sessionLedger.ts`, đúng hàm Sổ Ca đang dùng), `brandPlatformRates`, và **`monthlyReports: Map<"brandId|YYYY-MM", BrandMonthlyReport>`** — map này đã tồn tại từ lâu để đổ target xuống ca (`applyAllocatedTargets`) nhưng CHƯA TỪNG được hiện ra UI nào, nay dùng thẳng làm nguồn "Report Tháng" mà không cần fetch riêng.
+
+**Cột "Cam kết" tái dùng nguyên `computeAllProgress()`/nhãn màu của `BrandCommitmentView.tsx`** (màn brand tự xem, Đợt C/1) — hai màn không được nói khác màu nhau cho cùng một trạng thái cam kết.
+
+Verify trên app thật, đối chiếu chéo với số đã biết từ trước: tháng 9/2026 CROCS **177,8h · 47 ca · 3,52 tỷ** (khớp Sổ Ca); lùi về tháng 8/2026 → **228,6h · 60 ca · 5,89 tỷ** (khớp đúng số đã ghi trong mục "Report Tháng Chuyên Sâu" ở trên — "T8 đọc từ live_sessions ra GMV 5.885.482.631"); JOCKEY có 1 dòng rate 0đ/h nhưng cột Rate Card vẫn hiện "Chưa set" (cố ý lọc `ratePerHour <= 0` — 0đ không phải rate dùng được, không phải chưa lọc); điều hướng tháng không lỗi; console sạch, `tsc` + `vite build` pass.
+
+**Còn lại của Đợt C (chưa làm):** bảng điều phối phát hành report · gộp lối vào Dataraw/Nhập Ads/Affiliate-edit.
 
 Từng role còn thiếu: **talent** chưa có "thu nhập tháng này" (`MyTalentProfile` chỉ hiện ĐƠN GIÁ, không hiện thành tiền) · **operations** vẫn chưa có tài khoản nào tồn tại · **admin** nên tách thành role hệ thống thuần.
 
