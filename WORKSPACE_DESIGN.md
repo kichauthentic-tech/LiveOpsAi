@@ -4,7 +4,7 @@
 
 1. ~~Chạy `0111_signup_role_and_null_role_guard.sql`~~ + ~~tắt "Allow new users to sign up"~~ — **XONG, verify 2026-09-23**: `GET /auth/v1/settings` → `disable_signup: true`; `POST /auth/v1/signup` (kèm `data:{"role":"ceo"}`) → `422 signup_disabled`, không tạo ra tài khoản nào. Cổng tự phong role đã đóng ở lớp ngoài cùng. Phần SQL (trigger + 11 policy) không tự re-verify được qua REST như các migration khác — xem "CÒN LẠI, PHẢI VÀO DASHBOARD" cũ đã xoá, thay bằng đoạn verify trong mục `## BẢO MẬT — tự phong role`.
 2. Migration 0103→0111 **đã chạy** trên production (xem "Sự cố 0105" ở mục Hạ tầng Supabase cho cách đo, không tin lời kể) — không cần chạy lại. Lưu ý: `0110`/`0111` từng trùng số do 2 phiên chạy song song, đã tách — xem ghi chú "Lưu ý đánh số" trong dòng "Migration mới nhất" bên dưới.
-3. Đợt C (audit role × workspace) đang dở, C/1–C/4 đã xong + verify (xem mục `## Audit Role × Workspace`). Việc tiếp theo theo đúng thứ tự đã đề xuất với user: **SKU gắn hiệu suất → màn toàn cảnh 4 brand cho agency → bảng điều phối phát hành report → gộp lối vào Dataraw/Nhập Ads/Affiliate-edit**. Hỏi user trước khi đổi thứ tự.
+3. Đợt C (audit role × workspace) đang dở, C/1–C/5 đã xong + verify (xem mục `## Audit Role × Workspace`). Việc tiếp theo theo đúng thứ tự đã đề xuất với user: **màn toàn cảnh 4 brand cho agency → bảng điều phối phát hành report → gộp lối vào Dataraw/Nhập Ads/Affiliate-edit**. Hỏi user trước khi đổi thứ tự.
 4. Đọc kỹ mục `## Hạ tầng Supabase` trước khi viết migration mới — có quy ước bắt buộc (`(select current_user_role())`, guard trong thân RPC, `to_regclass(...) is null` khi loop qua danh sách bảng) đúc kết từ nhiều sự cố thật, bỏ qua là lặp lại lỗi cũ.
 
 > File này được viết lại gọn ngày 2026-09-08 — bản cũ (1459 dòng, đã vượt giới hạn đọc 1 lần của Claude Code) vẫn còn nguyên trong Git (`git log -- WORKSPACE_DESIGN.md`), tra lại lịch sử chi tiết từng bug/migration bằng lệnh đó thay vì mở file này. Từ nay giữ nguyên tắc: file này chỉ ghi **trạng thái hiện tại**, không tường thuật quá trình.
@@ -596,6 +596,7 @@ Quét lại toàn bộ `pg_policy` sau 0111: **0 policy** còn khuôn hở. Ch�
 
 **Verify trên production 2026-09-23 (không tạo tài khoản thật — POST thẳng `/auth/v1/signup` với `data:{"role":"ceo"}` và xem response, không cần tài khoản thành công mới đo được cổng có mở hay không):**
 - `GET /auth/v1/settings` → `disable_signup: true` (trước đó `false`) — user đã tắt "Allow new users to sign up" trên Dashboard.
+- **Màn hình đăng nhập đã bỏ hẳn ô "Tạo tài khoản"** (2026-09-23): giữ lại nút chỉ khiến người bấm nhận lỗi GoTrue tiếng Anh, trông như app hỏng. `Login.tsx` còn đúng 2 chế độ `signin`/`forgot`; `signUp` đã gỡ khỏi `useAuth` vì không còn ai gọi. Người dùng mới vào bằng đường mời ở "Phân Quyền & Role". Chưa xem tận mắt màn này vì muốn xem phải đăng xuất phiên của user — `tsc` + `vite build` sạch.
 - `POST /auth/v1/signup` (kèm `data:{"role":"ceo"}`) → `422 signup_disabled` — cổng đăng ký công khai đã đóng hẳn, không tạo ra tài khoản nào. **Đường tự phong role coi như đã chặn ở lớp ngoài cùng**, bất kể migration 0111 thi hành đúng hay chưa.
 - Phần SQL của 0111 (trigger `handle_new_user` + 11 policy) **không kiểm chứng lại được bằng REST** như các migration trước (không có function/table mới để bắn `PGRST202`/`PGRST205` dò) — tin theo báo cáo "đã chạy" của user, không tự chạy SQL được (không có quyền DDL trực tiếp). Muốn tái xác nhận thì cần `service_role` chạy 1 câu `select polqual from pg_policy where polname = 'live_session_reports_...'` qua SQL Editor.
 
@@ -771,7 +772,19 @@ Verify: xuất từ Sổ Ca Agency (mọi brand, tháng 9/2026, 47 ca) và Sổ 
 
 **Còn lại của "trung tâm report + xuất file":** export chỉ mới có ở Sổ Ca — Report Tháng (6 tab), Report Tuần, Cam Kết Hợp Đồng, Affiliate đều chưa có nút xuất. Chưa có "trung tâm" gom các export lại một chỗ (hiện mỗi màn tự có nút riêng nếu có).
 
-**Còn lại của Đợt C (chưa làm):** SKU gắn hiệu suất · màn toàn cảnh 4 brand cho agency · bảng điều phối phát hành report · gộp lối vào Dataraw/Nhập Ads/Affiliate-edit.
+**C/5 — SKU gắn hiệu suất: XONG (2026-09-23, không cần migration).**
+
+`brand_skus` ([BrandSkuShowcase.tsx](src/components/brand-workspace/BrandSkuShowcase.tsx)) trước giờ là catalog THUẦN merchandising (tên, giá flash-deal, hero, xả kho %) — không có cột doanh số nào, và `types.ts` từng ghi rõ "không dùng chung với module nào khác". Trong khi đó GMV/đơn hàng theo SKU đã có sẵn từ lâu qua Dataraw `product_list` (dùng cho Top SKU ở Report Tháng và Pareto sản phẩm ở deepdive) — hai nguồn chưa từng nối với nhau.
+
+**Cách nối: khớp theo TÊN đã chuẩn hoá, không tạo bảng/cột DB mới.** [monthlyProductSlice.ts](src/lib/dataraw/monthlyProductSlice.ts) thêm `fetchSkuPerfMonthSlice()` (tái dùng đúng logic gộp-theo-tên `cleanProductName` mà Top SKU đã dùng — 2 màn không được nói 2 con số khác nhau về cùng một sản phẩm) trả về `Map<tên đã chuẩn hoá, {gmv, gmvLive, orders}>` cho TOÀN BỘ sản phẩm tháng này (không cắt top N như Top SKU). `BrandSkuShowcase.tsx` khớp từng dòng catalog vào map này qua `normalizeSkuName()`.
+
+**Chỉ khớp CHÍNH XÁC, không suy đoán gần đúng.** Tên catalog ops gõ tay thường ngắn/khác tên đầy đủ TikTok đặt — khớp mờ (substring/fuzzy) dễ gán nhầm doanh số của SKU này cho SKU khác, sai một con số tiền tệ hơn không có con số. Không khớp được thì hiện "Chưa khớp" (không phải "0" hay "—" — ba trạng thái phải phân biệt được: chưa khớp / không có dữ liệu tháng này / có số 0 thật).
+
+**Cột chỉ hiện với `canEdit` (ceo/operations/admin), brand không thấy.** Lý do KHÔNG phải Đợt B (Dataraw sản phẩm chưa từng bị chặn theo trạng thái phát hành — `MonthlyReportTabs.tsx` gọi `fetchTopSkuMonthSlice` vô điều kiện, không gate role) mà là **RLS của chính `brand_dataraw_imports`/`brand_dataraw_rows`** (0052): chỉ mở cho ceo/operations/admin, brand đọc trực tiếp bảng này ra 0 dòng — cùng lý do Top SKU ở Report Tháng thực ra CŨNG im lặng trống với brand dù ops đã upload đủ file (giới hạn có sẵn từ trước, không phải lỗi mới). Không mở RLS Dataraw cho brand ở đây — việc đó lộ MỌI cột thô của `product_list` (giá vốn, tồn kho nội bộ...), cần một quyết định bảo mật riêng, không lồng vào tính năng này.
+
+Verify trên app thật (CROCS): tạo `brand_skus` test trùng tên thật trong `product_list` tháng 9 (batch 01–22/09 có thật) → hiện đúng **490,9 triệu · 406 đơn** (đúng bằng tổng nhiều dòng cùng tên gộp lại, lớn hơn 1 dòng đơn lẻ 462,8tr — khớp cơ chế gộp-theo-tên của Top SKU); đổi tên sai/thêm prefix → "Chưa khớp" đúng; xoá test sạch. Console sạch, `tsc` + `vite build` pass.
+
+**Còn lại của Đợt C (chưa làm):** màn toàn cảnh 4 brand cho agency · bảng điều phối phát hành report · gộp lối vào Dataraw/Nhập Ads/Affiliate-edit.
 
 Từng role còn thiếu: **talent** chưa có "thu nhập tháng này" (`MyTalentProfile` chỉ hiện ĐƠN GIÁ, không hiện thành tiền) · **operations** vẫn chưa có tài khoản nào tồn tại · **admin** nên tách thành role hệ thống thuần.
 

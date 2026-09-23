@@ -83,9 +83,12 @@ export interface TopSkuMonthSlice {
   hasAnyBatch: boolean;
 }
 
-export async function fetchTopSkuMonthSlice(brandId: string, monthStart: string, monthEnd: string, limit = 10): Promise<TopSkuMonthSlice> {
+// Gộp mọi dòng product_list của tháng theo TÊN đã làm sạch → 1 dòng GMV/dòng SKU. Dùng chung cho
+// Top SKU (xếp hạng, cắt limit) và SKU gắn hiệu suất (khớp theo tên với brand_skus, cần ĐỦ SKU
+// chứ không chỉ top N).
+async function fetchSkuPerfByName(brandId: string, monthStart: string, monthEnd: string): Promise<{ byName: Map<string, TopSkuRow>; hasAnyBatch: boolean }> {
   const { rows, columns, hasAnyBatch } = await fetchOverlappingBatchRows(brandId, "product_list", monthStart, monthEnd);
-  if (!hasAnyBatch) return { items: [], hasAnyBatch: false };
+  if (!hasAnyBatch) return { byName: new Map(), hasAnyBatch: false };
 
   const c = {
     // Song ngữ — neo ^...$ vì "Seller LIVE GMV" ≠ "Seller LIVE-attributed GMV" ≠ "Seller LIVE
@@ -95,7 +98,7 @@ export async function fetchTopSkuMonthSlice(brandId: string, monthStart: string,
     gmvLive: findCol(columns, /^(?:GMV LIVE của người bán|Seller LIVE GMV)$/i),
     orders: findCol(columns, /^(?:Đơn hàng|Orders)$/i)
   };
-  if (!c.name || !c.gmv) return { items: [], hasAnyBatch: true };
+  if (!c.name || !c.gmv) return { byName: new Map(), hasAnyBatch: true };
 
   // product_list có nhiều dòng trùng "Tên" (mỗi biến thể/ID sản phẩm tách dòng riêng dù cùng tên
   // hiển thị) — PHẢI gộp theo tên rồi cộng dồn GMV trước khi xếp hạng, nếu không thứ hạng Top SKU
@@ -111,11 +114,39 @@ export async function fetchTopSkuMonthSlice(brandId: string, monthStart: string,
     byName.set(name, existing);
   }
 
+  return { byName, hasAnyBatch: true };
+}
+
+export async function fetchTopSkuMonthSlice(brandId: string, monthStart: string, monthEnd: string, limit = 10): Promise<TopSkuMonthSlice> {
+  const { byName, hasAnyBatch } = await fetchSkuPerfByName(brandId, monthStart, monthEnd);
+  if (!hasAnyBatch) return { items: [], hasAnyBatch: false };
+
   const items = Array.from(byName.values())
     .sort((a, b) => b.gmv - a.gmv)
     .slice(0, limit);
 
   return { items, hasAnyBatch: true };
+}
+
+// SKU gắn hiệu suất (Đợt C, 2026-09-23): khớp catalog `brand_skus` với GMV/đơn hàng tháng này của
+// product_list, theo TÊN đã làm sạch (cùng chuẩn hoá `cleanProductName` dùng cho Top SKU — 2 màn
+// không được nói 2 con số khác nhau về cùng một sản phẩm). CHỈ khớp CHÍNH XÁC (không suy đoán gần
+// đúng): tên catalog do ops gõ tay thường ngắn hơn tên đầy đủ TikTok đặt, khớp gần đúng dễ gán
+// nhầm hiệu suất của SKU này cho SKU khác — sai một con số tiền còn tệ hơn không có con số.
+export interface SkuPerfSlice {
+  byNormalizedName: Map<string, TopSkuRow>;
+  hasAnyBatch: boolean;
+}
+
+export function normalizeSkuName(name: string): string {
+  return cleanProductName(name).toLowerCase();
+}
+
+export async function fetchSkuPerfMonthSlice(brandId: string, monthStart: string, monthEnd: string): Promise<SkuPerfSlice> {
+  const { byName, hasAnyBatch } = await fetchSkuPerfByName(brandId, monthStart, monthEnd);
+  const byNormalizedName = new Map<string, TopSkuRow>();
+  for (const [name, row] of byName) byNormalizedName.set(name.toLowerCase(), row);
+  return { byNormalizedName, hasAnyBatch };
 }
 
 export interface PromotionRow {

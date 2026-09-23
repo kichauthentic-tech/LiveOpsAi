@@ -1,13 +1,16 @@
 import React, { useState } from "react";
 import { useAuth } from "../hooks/useAuth";
-import { Lock, Mail, User, Loader2 } from "lucide-react";
+import { Lock, Mail, Loader2 } from "lucide-react";
 
 export const Login: React.FC = () => {
-  const { signIn, signUp, sendPasswordResetEmail } = useAuth();
-  const [mode, setMode] = useState<"signin" | "signup" | "forgot">("signin");
+  const { signIn, sendPasswordResetEmail } = useAuth();
+  // Không còn ô "Tạo tài khoản": tự đăng ký đã tắt ở Supabase (Authentication → Email →
+  // "Allow new users to sign up", tắt 2026-09-23) sau khi phát hiện `handle_new_user` cũ nhận
+  // role do client gửi lên — xem migration 0110. Người dùng mới vào bằng đường mời ở màn hình
+  // "Phân Quyền & Role". Giữ lại nút chỉ khiến nó bung lỗi GoTrue tiếng Anh, trông như app hỏng.
+  const [mode, setMode] = useState<"signin" | "forgot">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -29,17 +32,9 @@ export const Login: React.FC = () => {
       return;
     }
 
-    const result =
-      mode === "signin" ? await signIn(email, password) : await signUp(email, password, name);
+    const result = await signIn(email, password);
     setSubmitting(false);
-    if (result.error) {
-      setError(result.error);
-      return;
-    }
-    if (mode === "signup") {
-      setInfo("Tạo tài khoản thành công. Kiểm tra email để xác nhận, sau đó đăng nhập.");
-      setMode("signin");
-    }
+    if (result.error) setError(result.error);
   };
 
   return (
@@ -52,37 +47,6 @@ export const Login: React.FC = () => {
           </p>
         </div>
 
-        {mode !== "forgot" && (
-          <div className="flex bg-[var(--surface-base)]/80 border border-[var(--border)] rounded-xl p-1 mb-6">
-            <button
-              type="button"
-              onClick={() => {
-                setMode("signin");
-                setError(null);
-                setInfo(null);
-              }}
-              className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                mode === "signin" ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)]"
-              }`}
-            >
-              Đăng nhập
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMode("signup");
-                setError(null);
-                setInfo(null);
-              }}
-              className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                mode === "signup" ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)]"
-              }`}
-            >
-              Tạo tài khoản
-            </button>
-          </div>
-        )}
-
         {mode === "forgot" && (
           <div className="mb-6">
             <h2 className="text-sm font-bold text-[var(--text)]">Quên mật khẩu</h2>
@@ -93,19 +57,6 @@ export const Login: React.FC = () => {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {mode === "signup" && (
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-faint)]" />
-              <input
-                type="text"
-                required
-                placeholder="Họ tên"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full pl-9 pr-3 py-2.5 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl text-sm outline-none focus:border-[var(--accent)]"
-              />
-            </div>
-          )}
           <div className="relative">
             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-faint)]" />
             <input
@@ -165,7 +116,7 @@ export const Login: React.FC = () => {
             className="w-full py-2.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-60 text-white font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-2"
           >
             {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-            {mode === "signin" ? "Đăng nhập" : mode === "signup" ? "Tạo tài khoản" : "Gửi liên kết đặt lại"}
+            {mode === "signin" ? "Đăng nhập" : "Gửi liên kết đặt lại"}
           </button>
 
           {mode === "forgot" && (

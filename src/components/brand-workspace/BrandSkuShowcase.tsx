@@ -1,6 +1,10 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { BrandSku, UserRole } from "../../types";
-import { Package, Plus, Trash2, Star } from "lucide-react";
+import { Package, Plus, Trash2, Star, TrendingUp } from "lucide-react";
+import { fetchSkuPerfMonthSlice, normalizeSkuName, TopSkuRow } from "../../lib/dataraw/monthlyProductSlice";
+import { todayVn } from "../../lib/performance/brandCommitment";
+import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
+import { errorMessage } from "../../lib/errorMessage";
 
 interface BrandSkuShowcaseProps {
   brandId: string;
@@ -21,6 +25,14 @@ const STATUS_LABEL: Record<BrandSku["status"], string> = {
   inactive: "Tạm ẩn"
 };
 
+function monthBounds(month: string): { start: string; end: string } {
+  const [y, m] = month.split("-").map(Number);
+  const lastDay = new Date(y, m, 0).getDate();
+  return { start: `${month}-01`, end: `${month}-${String(lastDay).padStart(2, "0")}` };
+}
+
+const fmtMonthShort = (month: string) => `T${Number(month.slice(5, 7))}`;
+
 export const BrandSkuShowcase: React.FC<BrandSkuShowcaseProps> = ({ brandId, currentRole, brandSkus, onAddSku, onUpdateSku, onDeleteSku }) => {
   const canEdit = currentRole === "ceo" || currentRole === "admin" || currentRole === "operations";
   const [busy, setBusy] = useState(false);
@@ -39,6 +51,38 @@ export const BrandSkuShowcase: React.FC<BrandSkuShowcaseProps> = ({ brandId, cur
   );
 
   const heroCount = useMemo(() => skus.filter((s) => s.isHero).length, [skus]);
+
+  // SKU gắn hiệu suất (Đợt C, 2026-09-23) — GMV/đơn hàng THÁNG NÀY từ product_list (Dữ Liệu Gốc),
+  // khớp theo tên đã chuẩn hoá. Bảng `brand_dataraw_imports`/`brand_dataraw_rows` chỉ mở RLS cho
+  // ceo/operations/admin (0052) — brand không đọc được, nên cột này CHỈ hiện với `canEdit`, đúng
+  // hiện trạng của Top SKU ở Report Tháng (brand cũng không thấy tab đó ra số vì cùng lý do RLS).
+  // Không mở RLS ở đây để tránh lộ mọi cột thô của product_list cho brand — việc đó cần một quyết
+  // định riêng, không lồng vào tính năng này.
+  const currentMonth = useMemo(() => todayVn().slice(0, 7), []);
+  const [perfByName, setPerfByName] = useState<Map<string, TopSkuRow> | null>(null);
+  const [perfHasBatch, setPerfHasBatch] = useState(true);
+  const [perfError, setPerfError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!canEdit) return;
+    let cancelled = false;
+    const { start, end } = monthBounds(currentMonth);
+    fetchSkuPerfMonthSlice(brandId, start, end)
+      .then((r) => {
+        if (cancelled) return;
+        setPerfByName(r.byNormalizedName);
+        setPerfHasBatch(r.hasAnyBatch);
+        setPerfError(null);
+      })
+      .catch((e) => {
+        if (!cancelled) setPerfError(errorMessage(e, "Không tải được hiệu suất SKU"));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [canEdit, brandId, currentMonth]);
+
+  const perfOf = (sku: BrandSku): TopSkuRow | undefined => perfByName?.get(normalizeSkuName(sku.name));
 
   const handleCreate = async () => {
     const flashPrice = Number(newFlashPrice);
@@ -127,6 +171,15 @@ export const BrandSkuShowcase: React.FC<BrandSkuShowcaseProps> = ({ brandId, cur
         </div>
       )}
 
+      {canEdit && perfError && (
+        <div className="p-3 bg-red-950/80 border border-red-800/50 rounded-xl text-red-300 text-xs font-semibold">{perfError}</div>
+      )}
+      {canEdit && !perfError && perfByName && !perfHasBatch && (
+        <div className="p-3 bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl text-[var(--text-faint)] text-xs">
+          Chưa có Dữ Liệu Gốc (product_list) cho tháng {fmtMonthShort(currentMonth)} — cột hiệu suất sẽ trống tới khi upload ở tab Dữ Liệu Gốc.
+        </div>
+      )}
+
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-xl">
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
@@ -134,6 +187,7 @@ export const BrandSkuShowcase: React.FC<BrandSkuShowcaseProps> = ({ brandId, cur
               <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)]">
                 <th className="py-2.5 px-4">Ghim</th>
                 <th className="py-2.5 px-2">SKU</th>
+                {canEdit && <th className="py-2.5 px-2">Hiệu suất {fmtMonthShort(currentMonth)}</th>}
                 <th className="py-2.5 px-2 text-right">Giá flash-deal</th>
                 <th className="py-2.5 px-2 text-right">Giá gốc</th>
                 <th className="py-2.5 px-2 text-right">Xả kho %</th>
@@ -161,6 +215,28 @@ export const BrandSkuShowcase: React.FC<BrandSkuShowcaseProps> = ({ brandId, cur
                     <div className="font-bold text-[var(--text-muted)]">{s.name}</div>
                     <div className="text-[var(--text-faint)] font-mono">{s.skuCode || "—"}</div>
                   </td>
+                  {canEdit && (
+                    <td className="py-2.5 px-2">
+                      {(() => {
+                        const perf = perfOf(s);
+                        if (!perfByName) return <span className="text-[var(--text-faint)]">…</span>;
+                        if (!perf)
+                          return (
+                            <span className="text-[var(--text-faint)] italic" title="Không khớp được tên với Dữ Liệu Gốc tháng này — đổi tên SKU trùng khớp TikTok nếu muốn thấy số.">
+                              {perfHasBatch ? "Chưa khớp" : "—"}
+                            </span>
+                          );
+                        return (
+                          <div className="flex items-center gap-1 text-emerald-400 font-bold">
+                            <TrendingUp className="w-3 h-3" />
+                            <span>
+                              {formatCurrencyAdaptive(perf.gmv, "")} · {perf.orders.toLocaleString("vi-VN")} đơn
+                            </span>
+                          </div>
+                        );
+                      })()}
+                    </td>
+                  )}
                   <td className="py-2.5 px-2 text-right">
                     {canEdit ? (
                       <input
@@ -237,7 +313,7 @@ export const BrandSkuShowcase: React.FC<BrandSkuShowcaseProps> = ({ brandId, cur
               ))}
               {skus.length === 0 && (
                 <tr>
-                  <td colSpan={canEdit ? 8 : 7} className="py-8 text-center text-[var(--text-faint)] italic">
+                  <td colSpan={canEdit ? 9 : 7} className="py-8 text-center text-[var(--text-faint)] italic">
                     Chưa có SKU nào lên sóng.
                   </td>
                 </tr>

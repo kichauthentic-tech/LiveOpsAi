@@ -25,7 +25,6 @@ interface AuthContextValue {
   passwordRecovery: boolean;
   isInvite: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
-  signUp: (email: string, password: string, name: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   sendPasswordResetEmail: (email: string) => Promise<{ error: string | null }>;
@@ -115,15 +114,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { error: error?.message ?? null };
   };
 
-  const signUp: AuthContextValue["signUp"] = async (email, password, name) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { name } }
-    });
-    return { error: error?.message ?? null };
-  };
-
   const signOut = async () => {
     await supabase.auth.signOut();
   };
@@ -175,7 +165,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         passwordRecovery,
         isInvite,
         signIn,
-        signUp,
         signOut,
         refreshProfile,
         sendPasswordResetEmail,
