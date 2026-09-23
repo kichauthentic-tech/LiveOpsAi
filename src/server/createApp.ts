@@ -172,6 +172,22 @@ export function createApp() {
         return res.status(400).json({ error: error.message });
       }
       let assignmentWarning: string | null = null;
+      // Cấp role THẬT ở đây, bằng service_role — trigger `handle_new_user` từ 0110 luôn tạo
+      // profile ở role thấp nhất (`talent`) và KHÔNG còn đọc role từ user_metadata nữa, vì
+      // `options.data` của `auth.signUp()` là do client tự đặt: ai có khoá anon đều POST thẳng
+      // `/auth/v1/signup` với `{"role":"ceo"}` được. Quyền cấp role vì vậy phải nằm sau
+      // `requireCeoCaller` ở route này, không nằm trong trigger. Cùng pattern best-effort với
+      // gán assigned_brand_id/assigned_talent_id bên dưới — tài khoản đã tạo xong dù bước này lỗi.
+      if (data.user) {
+        const { error: roleError } = await supabaseAdmin
+          .from("profiles")
+          .update({ role, custom_role_title: customRoleTitle || "" })
+          .eq("id", data.user.id);
+        if (roleError) {
+          console.error("Cấp role sau khi tạo tài khoản thất bại:", roleError);
+          assignmentWarning = `Tài khoản đã được tạo nhưng chưa cấp được role "${role}" — vào Phân Quyền & Role sửa lại thủ công.`;
+        }
+      }
       // Đảo chiều: role=talent không chọn hồ sơ có sẵn (assignedTalentId) nhưng có
       // newTalentProfile → tự tạo row `talents` rồi link 2 chiều, thay vì bắt phải tạo
       // Talent Pool trước ở màn hình khác. Best-effort, không transaction (cùng pattern

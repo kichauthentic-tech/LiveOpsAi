@@ -60,6 +60,12 @@ interface UserRoleSettingsProps {
   sessions: LiveSession[];
 }
 
+// Danh sách role app thật sự hiển thị trong Ma Trận. Cố ý KHÔNG suy từ Object.keys(rolePermissions)
+// (tức các dòng có trong bảng `role_permissions` dưới DB): hai thứ đó lệch nhau mỗi khi một role bị
+// gỡ khỏi app mà dòng dưới DB chưa kịp dọn — đúng tình huống của 'moderator' 2026-09-22, lưới vẽ 5
+// thẻ trong khi nhãn tab ghi "Ma Trận Role (6)". Nguồn sự thật cho MÀN HÌNH là danh sách này.
+const MATRIX_ROLES: UserRole[] = ["admin", "ceo", "operations", "brand", "talent"];
+
 export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
   currentRole,
   currentUserId,
@@ -128,19 +134,18 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
     });
   }, [users, userSearch, userRoleFilter]);
 
-  // Group permissions by category — bỏ view_financials/manage_finance_hr khỏi Ma Trận: Finance &
-  // HR giờ khoá cứng ceo/admin ở App.tsx, không còn togglable qua đây (tránh hiểu lầm là bật
-  // được cho role khác — xem "Khoá cứng Finance & HR" trong WORKSPACE_DESIGN.md).
+  // Group permissions by category. Không còn filter nào ở đây: từ 2026-09-22 mọi PermissionKey
+  // đều gate đúng một nav item thật (xem bất biến ở types.ts), nên lưới Ma Trận hiện đúng bằng
+  // danh sách key — trước đây view_financials/manage_finance_hr bị lọc khỏi lưới nhưng vẫn nằm
+  // trong tổng số đếm ở dưới, làm nhãn ghi "x/12" trong khi chỉ vẽ 10 ô.
   const groupedPermissions = useMemo(() => {
     const groups: Record<string, PermissionDefinition[]> = {};
-    permissionDefinitions
-      .filter((def) => def.key !== "view_financials" && def.key !== "manage_finance_hr")
-      .forEach((def) => {
-        if (!groups[def.category]) {
-          groups[def.category] = [];
-        }
-        groups[def.category].push(def);
-      });
+    permissionDefinitions.forEach((def) => {
+      if (!groups[def.category]) {
+        groups[def.category] = [];
+      }
+      groups[def.category].push(def);
+    });
     return groups;
   }, [permissionDefinitions]);
 
@@ -202,95 +207,55 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
       // Quyền độc quyền thật sự của Admin (cấu hình AI Training) KHÔNG nằm trong Ma
       // Trận này — xem RLS "admin only" của bảng ai_agent_prompts.
       preset = {
-        view_financials: true,
         manage_sessions: true,
         manage_calendar: true,
         manage_talents: true,
         manage_studios_gear: true,
         manage_crm_projects: true,
         manage_tiktok_api: true,
-        manage_finance_hr: true,
-        manage_ai_agents: true,
-        manage_users_permissions: true,
-        export_reports: true,
-        view_rate_card: true
+        manage_users_permissions: true
       };
     } else if (role === "ceo") {
       preset = {
-        view_financials: true,
         manage_sessions: true,
         manage_calendar: true,
         manage_talents: true,
         manage_studios_gear: true,
         manage_crm_projects: true,
         manage_tiktok_api: true,
-        manage_finance_hr: true,
-        manage_ai_agents: true,
-        manage_users_permissions: true,
-        export_reports: true,
-        view_rate_card: true
+        manage_users_permissions: true
       };
     } else if (role === "operations") {
       preset = {
-        view_financials: false,
         manage_sessions: true,
         manage_calendar: true,
         manage_talents: true,
         manage_studios_gear: true,
         manage_crm_projects: true,
         manage_tiktok_api: true,
-        manage_finance_hr: false,
-        manage_ai_agents: true,
-        manage_users_permissions: false,
-        export_reports: true,
-        view_rate_card: true
+        manage_users_permissions: false
       };
     } else if (role === "brand") {
       preset = {
-        view_financials: false,
         manage_sessions: false,
         manage_calendar: false,
         manage_talents: false,
         manage_studios_gear: false,
         manage_crm_projects: false,
         manage_tiktok_api: false,
-        manage_finance_hr: false,
-        manage_ai_agents: false,
-        manage_users_permissions: false,
-        export_reports: true,
-        view_rate_card: true
-      };
-    } else if (role === "talent") {
-      preset = {
-        view_financials: false,
-        manage_sessions: false,
-        manage_calendar: false,
-        manage_talents: false,
-        manage_studios_gear: false,
-        manage_crm_projects: false,
-        manage_tiktok_api: false,
-        manage_finance_hr: false,
-        manage_ai_agents: false,
-        manage_users_permissions: false,
-        export_reports: false,
-        view_rate_card: false
+        manage_users_permissions: false
       };
     } else {
-      // moderator — hẹp nhất: chỉ đọc dữ liệu (lịch/checklist) qua RLS "*_read_all"
-      // mặc định cho mọi authenticated user, không bật quyền quản lý/ghi nào.
+      // talent — hẹp nhất: 3 tab của chính mình (Ca Của Tôi / Đăng Ký Ca / Hồ Sơ) đều không gate
+      // bằng PermissionKey nào, nên không bật quyền quản lý/ghi nào.
       preset = {
-        view_financials: false,
         manage_sessions: false,
         manage_calendar: false,
         manage_talents: false,
         manage_studios_gear: false,
         manage_crm_projects: false,
         manage_tiktok_api: false,
-        manage_finance_hr: false,
-        manage_ai_agents: false,
-        manage_users_permissions: false,
-        export_reports: false,
-        view_rate_card: false
+        manage_users_permissions: false
       };
     }
 
@@ -388,8 +353,6 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
         return "bg-emerald-500/20 text-emerald-300 border-emerald-500/40";
       case "talent":
         return "bg-amber-500/20 text-amber-300 border-amber-500/40";
-      case "moderator":
-        return "bg-cyan-500/20 text-cyan-300 border-cyan-500/40";
     }
   };
 
@@ -405,14 +368,8 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
         return "Brand Client Representative";
       case "talent":
         return "Livestream Host & Talent";
-      case "moderator":
-        return "Trợ Lý Vận Hành (Moderator)";
     }
   };
-
-  // Số ca live đã/đang phụ trách với vai trò Moderator — tra theo assistantId thật
-  // của session, không phải chuỗi assistantName gõ tay (xem migration 0010).
-  const countModeratorSessions = (userId: string) => sessions.filter((s) => s.assistantId === userId).length;
 
   return (
     <div className="space-y-6">
@@ -432,7 +389,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
               Phân Quyền & Role
             </h2>
             <p className="text-xs text-[var(--text-muted)] mt-1">
-              Cấu hình Ma trận phân quyền chi tiết cho 6 Role tiêu chuẩn, override quyền từng cá nhân & audit nhật ký an ninh.
+              Cấu hình Ma trận phân quyền chi tiết cho {MATRIX_ROLES.length} Role tiêu chuẩn, override quyền từng cá nhân & audit nhật ký an ninh.
             </p>
           </div>
         </div>
@@ -448,7 +405,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
             }`}
           >
             <Key className="w-4 h-4" />
-            <span>Ma Trận Role ({Object.keys(rolePermissions).length})</span>
+            <span>Ma Trận Role ({MATRIX_ROLES.length})</span>
           </button>
 
           <button
@@ -482,7 +439,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
         <div className="space-y-6">
           {/* Role selector selector cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-            {(["admin", "ceo", "operations", "brand", "talent", "moderator"] as UserRole[]).map((roleKey) => {
+            {MATRIX_ROLES.map((roleKey) => {
               const isSelected = selectedRole === roleKey;
               const permsMap = rolePermissions[roleKey];
               // Chỉ đếm quyền CÓ ĐỊNH NGHĨA trong app. Bảng `role_permissions` dưới DB còn sót key
@@ -523,7 +480,6 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                       {roleKey === "operations" && "Operations Manager"}
                       {roleKey === "brand" && "Brand Client Portal"}
                       {roleKey === "talent" && "Talent / Host Portal"}
-                      {roleKey === "moderator" && "Trợ Lý Vận Hành Portal"}
                     </h3>
                     <p className="text-[11px] text-[var(--text-muted)] line-clamp-2 mt-1">
                       {roleKey === "admin" && "Quyền tối cao — mọi thứ CEO làm được + độc quyền cấu hình AI Training Center (kể cả CEO không sửa được)."}
@@ -531,7 +487,6 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                       {roleKey === "operations" && "Điều phối phòng studio, xếp lịch ca live, kiểm kê gear QR & duyệt script."}
                       {roleKey === "brand" && "Cổng báo cáo dành cho Khách hàng: xem GMV thực thu, ROI, order analytics."}
                       {roleKey === "talent" && "Cổng dành cho Host / Trợ live: xem lịch livestream, commission dự kiến & AI coaching."}
-                      {roleKey === "moderator" && "Cổng dành cho Trợ Lý/Moderator: chỉ xem lịch ca được gán & checklist gear."}
                     </p>
                   </div>
 
@@ -664,7 +619,6 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                 <option value="operations">Operations</option>
                 <option value="brand">Brand Portal</option>
                 <option value="talent">Talent Host</option>
-                <option value="moderator">Trợ Lý Vận Hành</option>
               </select>
             </div>
 
@@ -747,11 +701,6 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                             <span className="bg-amber-950/85 text-amber-300 border border-amber-500/30 px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1.5 w-fit">
                               <Radio className="w-3.5 h-3.5 text-amber-400" />
                               <span>{assignedTalent.name}</span>
-                            </span>
-                          ) : u.role === "moderator" ? (
-                            <span className="bg-cyan-950/85 text-cyan-300 border border-cyan-500/30 px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1.5 w-fit">
-                              <Radio className="w-3.5 h-3.5 text-cyan-400" />
-                              <span>{countModeratorSessions(u.id)} ca đã phụ trách</span>
                             </span>
                           ) : (
                             <span className="text-[var(--text-faint)] text-[11px]">Toàn Cơ Quan (Agency-wide)</span>
@@ -929,7 +878,6 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                     <option value="operations">Operations Manager</option>
                     <option value="brand">Brand Client Portal</option>
                     <option value="talent">Talent Host Portal</option>
-                    <option value="moderator">Trợ Lý Vận Hành (Moderator)</option>
                   </select>
                 </div>
 

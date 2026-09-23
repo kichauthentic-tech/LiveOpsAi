@@ -19,6 +19,10 @@ interface DbAffiliateActual {
   viewer: number | null;
   ctr: number | null;
   ctor: number | null;
+  campaign_type: string | null;
+  timeline_label: string | null;
+  live_impressions: number | null;
+  orders: number | null;
   sort_order: number;
 }
 
@@ -38,6 +42,10 @@ function fromDb(row: DbAffiliateActual): AffiliateActualEntry {
     viewer: row.viewer ?? undefined,
     ctr: row.ctr ?? undefined,
     ctor: row.ctor ?? undefined,
+    campaignType: row.campaign_type ?? undefined,
+    timelineLabel: row.timeline_label ?? undefined,
+    liveImpressions: row.live_impressions ?? undefined,
+    orders: row.orders ?? undefined,
     sortOrder: row.sort_order
   };
 }
@@ -78,6 +86,10 @@ export async function replaceAffiliateActuals(brandId: string, periodMonth: stri
       viewer: e.viewer ?? null,
       ctr: e.ctr ?? null,
       ctor: e.ctor ?? null,
+      campaign_type: e.campaignType?.trim() || null,
+      timeline_label: e.timelineLabel?.trim() || null,
+      live_impressions: e.liveImpressions ?? null,
+      orders: e.orders ?? null,
       sort_order: idx
     }));
   if (rows.length === 0) return [];

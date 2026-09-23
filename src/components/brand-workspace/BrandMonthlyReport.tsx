@@ -49,7 +49,7 @@ function monthRange(month: string): { start: string; end: string } {
 
 // Phần nhập tay Ads/ROAS/Promotion/Customer Insight/Account Health + Ads Report Chi Tiết (TikTok)
 // đã tách sang tab riêng "Nhập Ads & Ghi Chú" (BrandAdsReport.tsx, 2026-09-21) — Report Tháng chỉ
-// còn tài liệu 5 tab + phát hành/thu hồi.
+// còn tài liệu 6 tab + phát hành/thu hồi (tab 05 "Phân Tích Sâu" gộp vào 2026-09-23, ops-only).
 
 export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId, brandName, sessions, currentRole, brandPlatformRates, shiftSlots }) => {
   const canManage = CAN_MANAGE_ROLES.includes(currentRole);

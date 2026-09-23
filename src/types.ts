@@ -1,18 +1,33 @@
-export type UserRole = "ceo" | "operations" | "brand" | "talent" | "moderator" | "admin";
+// Role 'moderator' đã bị gỡ khỏi app 2026-09-22 (audit role × workspace). Lý do: (1) nó chưa bao
+// giờ đăng nhập được — mặc định rơi vào tab "calendar" gate `manage_calendar` = false; (2) cột liên
+// kết của nó (`live_sessions.assistant_id`) không có luồng ghi nào nên luôn null; (3) "trợ live"
+// thật trong app là một `talent` có `talents.role = 'Assistant'` gắn vào `co_host_id` (212/218 ca
+// thật đang dùng đường này). Giá trị 'moderator' vẫn còn trong enum `user_role` của Postgres —
+// Postgres không xoá được value khỏi enum một cách an toàn — nhưng không role nào dùng nó và
+// migration 0103 đã chặn không cho gán lại.
+export type UserRole = "ceo" | "operations" | "brand" | "talent" | "admin";
 
+// BẤT BIẾN (chốt 2026-09-22, audit role × workspace): mỗi PermissionKey phải gate ĐÚNG MỘT nav
+// item trong AGENCY_NAV_GROUPS. Thêm key mà không gắn vào nav item nào là tạo một công tắc giả
+// trong Ma Trận Phân Quyền — CEO tắt nó và tin là đã tắt, trong khi màn hình vẫn mở.
+//
+// 5 key đã gỡ ở đợt này vì đúng lý do đó (migration 0104 dọn nốt dưới DB):
+//   view_financials / manage_finance_hr — Finance & P&L khoá cứng ceo|admin ở App.tsx, CỐ Ý không
+//     đi qua Ma Trận (CEO bật nhầm cho operations là lộ lương toàn bộ). Hai key này đã bị lọc khỏi
+//     lưới Ma Trận từ trước nhưng vẫn nằm trong tổng số đếm — lưới hiện 10 ô mà nhãn ghi "12".
+//   manage_ai_agents — "Hội Đồng AI" ẩn khỏi nav từ 2026-09-18 tới khi có bản thật.
+//   export_reports — chưa từng có chức năng xuất file nào trong app.
+//   view_rate_card — Rate Card nằm trong CRM, thực tế gate bằng manage_crm_projects.
+// Khi module tương ứng quay lại thì thêm key MỚI cùng lúc với nav item của nó, không khôi phục
+// key trước rồi chờ màn hình sau.
 export type PermissionKey =
-  | "view_financials"
   | "manage_sessions"
   | "manage_calendar"
   | "manage_talents"
   | "manage_studios_gear"
   | "manage_crm_projects"
   | "manage_tiktok_api"
-  | "manage_finance_hr"
-  | "manage_ai_agents"
-  | "manage_users_permissions"
-  | "export_reports"
-  | "view_rate_card";
+  | "manage_users_permissions";
 
 export interface PermissionDefinition {
   key: PermissionKey;
@@ -187,6 +202,11 @@ export interface LiveSession {
   endTime: string;
   status: "Live Now" | "Upcoming" | "Completed" | "Cancelled";
   targetGmv: number;
+  /** Tháng của ca này đã phát hành Report Tháng cho brand chưa (migration 0107).
+   *  Với ceo/admin/operations/talent luôn là true — cờ chỉ có ý nghĩa với role brand.
+   *  UI hiện số cho brand PHẢI xét cờ này trước: các cột số bị che về 0, hiện thẳng sẽ đọc
+   *  thành "bán được 0 đồng" thay vì "chưa phát hành". */
+  monthPublished: boolean;
   actualGmv: number;
   totalOrders: number;
   avgWatchTimeSeconds: number;
@@ -340,6 +360,14 @@ export interface AffiliateActualEntry {
   viewer?: number;
   ctr?: number;
   ctor?: number;
+  // 4 trường bổ sung cho trang Affiliate riêng (migration 0102). campaignType/adsCost/targetGmv là
+  // 3 thứ KHÔNG file TikTok nào có — luôn nhập tay. durationHours nạp gợi ý từ file nhưng vẫn cho
+  // sửa: TikTok gộp phiên nhiều ngày thành một (vd 06→09/08 ra "74h 48min") nên số của file không
+  // dùng thẳng để tính GMV/giờ được.
+  campaignType?: string;
+  timelineLabel?: string;
+  liveImpressions?: number;
+  orders?: number;
   sortOrder?: number;
 }
 
@@ -369,18 +397,18 @@ export type DataRawReportType =
   | "live_analysis"
   | "shop_analytics"
   | "live_performance_core_stats"
-  | "product_card_traffic_stats"
   // migration 0066 (2026-08-22) — thay thế live_analysis làm nguồn duy nhất cho Report Tháng
   // Tab 02/04 (quyết định của user, chấp nhận đánh đổi: mất tên host tự động, GMV đổi ~15% so với
   // live_analysis vì khác hệ thống TikTok xuất — xem WORKSPACE_DESIGN.md). live_analysis vẫn giữ
   // trong union vì dữ liệu cũ các brand đã upload trước đó không xoá, chỉ không dùng cho batch mới.
-  | "creator_live_performance"
-  // migration 0074 (2026-08-23) — export "Transaction Analysis - Creator List" từ TikTok Shop
-  // Partner Center: GMV/đơn/hoa hồng ước tính THEO TỪNG CREATOR affiliate trong kỳ. Đây là nguồn
-  // dữ liệu thật đầu tiên cho Report Tháng Tab 04 Affiliate (trước giờ nhập tay hoàn toàn, xem
-  // migration 0067) — mới dừng ở lưu vào Dataraw, CHƯA nối vào Tab 04 (việc đó cần quyết định
-  // "Direct GMV" nên tính từ cột nào, để phiên sau).
-  | "transaction_analysis_creator_list";
+  | "creator_live_performance";
+// Đã gỡ 2026-09-22 (quyết định của user):
+//   - "product_card_traffic_stats" (migration 0064): chưa từng có file thật nào được upload nên 2
+//     dòng Video/Product Card GMV của Report Tháng luôn bằng 0. Nay lấy từ shop_analytics +
+//     product_list — xem fetchChannelGmvMonthSlice() ở lib/dataraw/monthlyProductSlice.ts.
+//   - "transaction_analysis_creator_list" (migration 0074): agency chỉ theo dõi creator CÓ LIVE,
+//     mảng affiliate video/thẻ sản phẩm không quan tâm. Số liệu duy nhất chỉ loại này có là hoa
+//     hồng ước tính (~1% GMV) — user chốt không cần.
 
 export interface DataRawColumn {
   key: string;
@@ -704,6 +732,9 @@ export interface BrandMonthPlan {
   targetGmv: number; // target GMV tháng của kế hoạch (0094) — riêng, không đọc Report Tháng
   campRanges: PlanCampRanges; // khoảng ngày camp riêng (0094); thiếu khoá = lịch camp cố định
   lockedAt?: string;
+  /** Brand đã bấm "xác nhận đã xem lịch" (migration 0110). Tự rớt về undefined nếu ops sửa tham số
+   *  kế hoạch hoặc ca kế hoạch SAU khi brand đã xác nhận — xem trigger ở migration, đừng set tay. */
+  brandConfirmedAt?: string;
 }
 
 export type PlanCampRanges = Partial<Record<"dday" | "midmonth" | "payday", { start: string; end: string }>>;

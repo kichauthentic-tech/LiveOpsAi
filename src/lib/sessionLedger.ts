@@ -1,4 +1,4 @@
-import { LiveSession } from "../types";
+import { LiveSession, UserRole } from "../types";
 import { SnapshotCounters, SnapshotRatios, computeSnapshotRatios } from "./liveSnapshot/metrics";
 import { dataQuality, DataQuality, isCountable, sessionHours } from "./performance/hostPerformance";
 
@@ -181,6 +181,19 @@ export function linkedSessions(sessions: LiveSession[]): Map<string, string[]> {
 }
 
 // Brand không cần hiểu 3 bậc nguồn: chưa đối soát là "tạm tính", đối soát xong là "đã chốt".
+/** Số liệu của ca này có được phép hiện cho người đang xem không (migration 0107, Đợt B).
+ *
+ *  Chỉ role `brand` mới bị chặn, và chỉ khi tháng của ca CHƯA phát hành Report Tháng. Các cột số
+ *  lúc đó đã bị view `live_sessions_secure` che về null → client ép thành 0, nên KHÔNG được hiện
+ *  thẳng: "0 đ" đọc thành "agency bán được 0 đồng" chứ không phải "chưa tới lúc bạn xem".
+ *
+ *  Cố ý xét `role` chứ không xét `variant === "brand"` của Sổ Ca: ops mở Brand Workspace hộ khách
+ *  qua switcher vẫn đang là ops và vẫn phải thấy đủ số để soát trước khi phát hành.
+ */
+export function metricsHiddenFor(s: LiveSession, role: UserRole): boolean {
+  return role === "brand" && !s.monthPublished;
+}
+
 export function brandTrustLabel(s: LiveSession): "Đã chốt" | "Tạm tính" {
   return isReconciled(s) ? "Đã chốt" : "Tạm tính";
 }

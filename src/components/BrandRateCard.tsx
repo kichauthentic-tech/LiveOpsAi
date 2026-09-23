@@ -10,6 +10,9 @@ interface BrandRateCardProps {
   sessions: LiveSession[];
   onSaveRate: (brandId: string, platform: "TikTok" | "Shopee", ratePerHour: number) => Promise<boolean>;
   onSaveReturnRate: (brandId: string, platform: "TikTok" | "Shopee", returnRate: number) => Promise<boolean>;
+  // Đợt C/3: Brand Workspace nhúng lại đúng component này cho brand xem rate của chính mình —
+  // CHỈ ĐỌC dù người đang xem là ops (mở hộ khách). Sửa rate vẫn làm ở CRM bên Agency như cũ.
+  readOnly?: boolean;
 }
 
 const PLATFORMS: ("TikTok" | "Shopee")[] = ["TikTok", "Shopee"];
@@ -21,9 +24,10 @@ export const BrandRateCard: React.FC<BrandRateCardProps> = ({
   brandPlatformRateHistory,
   sessions,
   onSaveRate,
-  onSaveReturnRate
+  onSaveReturnRate,
+  readOnly = false
 }) => {
-  const canEdit = currentRole === "ceo" || currentRole === "admin" || currentRole === "operations";
+  const canEdit = !readOnly && (currentRole === "ceo" || currentRole === "admin" || currentRole === "operations");
   const [drafts, setDrafts] = useState<Partial<Record<"TikTok" | "Shopee", string>>>({});
   const [busy, setBusy] = useState<"TikTok" | "Shopee" | null>(null);
   const [returnDrafts, setReturnDrafts] = useState<Partial<Record<"TikTok" | "Shopee", string>>>({});

@@ -178,3 +178,57 @@ export async function deleteMonthlyCommitment(id: string): Promise<void> {
     throw new Error("Không xoá được cam kết tháng — có thể bạn không đủ quyền.");
   }
 }
+
+// ---------------------------------------------------------------------------
+// Đường đọc cho Brand Workspace (migration 0108)
+// ---------------------------------------------------------------------------
+// Role `brand` KHÔNG có policy nào trên `brand_contracts`/`brand_monthly_commitments` (0081 khoá ở
+// ceo/admin/ops, và 0108 cố ý không nới), nên 2 hàm fetch bên trên trả về mảng rỗng cho họ. Đường
+// đọc duy nhất của brand là view `brand_commitment_progress` — nó đã bỏ sẵn cột `note` (ghi chú
+// nội bộ agency) và tự lọc theo brand đang đăng nhập.
+//
+// ops đọc view này được luôn, và thấy MỌI brand — cố ý, để mở Brand Workspace hộ khách qua
+// switcher là thấy đúng cái khách thấy.
+export interface BrandCommitmentRow {
+  brandId: string;
+  periodMonth: string;
+  committedHours: number;
+  committedGmv?: number;
+  isOverride: boolean;
+  contractCode?: string;
+  contractStartMonth?: string;
+  contractEndMonth?: string;
+}
+
+interface DbBrandCommitmentRow {
+  brand_id: string;
+  period_month: string;
+  committed_hours: number | string | null;
+  committed_gmv: number | string | null;
+  is_override: boolean | null;
+  contract_code: string | null;
+  contract_start_month: string | null;
+  contract_end_month: string | null;
+}
+
+// Postgres `numeric` về PostgREST là STRING, không phải number — cộng thẳng sẽ nối chuỗi.
+const num = (v: number | string | null): number => (v == null ? 0 : typeof v === "number" ? v : Number(v) || 0);
+
+export async function fetchBrandCommitmentProgress(brandId: string): Promise<BrandCommitmentRow[]> {
+  const { data, error } = await supabase
+    .from("brand_commitment_progress")
+    .select("*")
+    .eq("brand_id", brandId)
+    .order("period_month", { ascending: true });
+  if (error) throw error;
+  return ((data as DbBrandCommitmentRow[]) ?? []).map((r) => ({
+    brandId: r.brand_id,
+    periodMonth: r.period_month,
+    committedHours: num(r.committed_hours),
+    committedGmv: r.committed_gmv == null ? undefined : num(r.committed_gmv),
+    isOverride: !!r.is_override,
+    contractCode: r.contract_code ?? undefined,
+    contractStartMonth: r.contract_start_month ?? undefined,
+    contractEndMonth: r.contract_end_month ?? undefined
+  }));
+}

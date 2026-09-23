@@ -52,8 +52,9 @@ function num(v: unknown): number {
   return Number.isNaN(n) ? 0 : n;
 }
 
-// "dd/mm/yyyy" -> "yyyy-mm-dd"
-function vnDateToIso(s: unknown): string | undefined {
+// "dd/mm/yyyy" -> "yyyy-mm-dd". Export để monthlyProductSlice.ts dùng lại cho bảng theo ngày của
+// shop_analytics.
+export function vnDateToIso(s: unknown): string | undefined {
   const m = String(s ?? "").match(/(\d{2})\/(\d{2})\/(\d{4})/);
   return m ? `${m[3]}-${m[2]}-${m[1]}` : undefined;
 }
@@ -147,18 +148,21 @@ export async function fetchDataRawWeekSlice(brandId: string, weekStart: string, 
     }
 
     if (imp.report_type === "shop_analytics") {
+      // Shop Analytics xuất được cả tiếng Việt lẫn tiếng Anh (xem parseShopAnalytics) — cột lưu
+      // trong DB giữ nguyên tên gốc của file nên phải dò cả 2 tên, neo ^...$ vì nhiều tên tiếng
+      // Anh là tiền tố của nhau ("Creator LIVE GMV" vs "Creator LIVE-attributed GMV").
       const c = {
-        date: findCol(imp.columns, /^Ngày$/i),
+        date: findCol(imp.columns, /^(?:Ngày|Date)$/i),
         gmv: findCol(imp.columns, /^GMV$/i),
-        orders: findCol(imp.columns, /^Đơn hàng$/i),
-        customers: findCol(imp.columns, /^Khách hàng$/i),
-        itemsSold: findCol(imp.columns, /^Số món bán ra$/i),
-        visitors: findCol(imp.columns, /^Khách truy cập$/i),
-        pageViews: findCol(imp.columns, /^Lượt xem trang$/i),
+        orders: findCol(imp.columns, /^(?:Đơn hàng|Orders)$/i),
+        customers: findCol(imp.columns, /^(?:Khách hàng|Customers)$/i),
+        itemsSold: findCol(imp.columns, /^(?:Số món bán ra|Items sold)$/i),
+        visitors: findCol(imp.columns, /^(?:Khách truy cập|Visitors)$/i),
+        pageViews: findCol(imp.columns, /^(?:Lượt xem trang|Page views)$/i),
         aov: findCol(imp.columns, /^AOV$/i),
-        cvr: findCol(imp.columns, /^Tỷ lệ chuyển đổi$/i),
-        gmvLiveSeller: findCol(imp.columns, /^GMV LIVE của người bán$/i),
-        gmvLiveCreator: findCol(imp.columns, /^GMV LIVE của nhà sáng tạo$/i)
+        cvr: findCol(imp.columns, /^(?:Tỷ lệ chuyển đổi|Conversion rate)$/i),
+        gmvLiveSeller: findCol(imp.columns, /^(?:GMV LIVE của người bán|Seller LIVE GMV)$/i),
+        gmvLiveCreator: findCol(imp.columns, /^(?:GMV LIVE của nhà sáng tạo|Creator LIVE GMV)$/i)
       };
       if (!c.date) continue;
       for (const raw of rows) {
@@ -182,20 +186,29 @@ export async function fetchDataRawWeekSlice(brandId: string, weekStart: string, 
     } else {
       // Dùng lại mapper của module Đối Soát để không lặp logic dò cột "Thời gian bắt đầu"/
       // "GMV LIVE"/"Lượt xem"/"CTR" của file Live Analysis.
-      for (const parsed of mapDataRawToImportRows(imp.columns, rows)) {
-        const vn = vnParts(parsed.startTime);
-        if (vn.date < weekStart || vn.date > weekEnd) continue;
-        live.push({
-          date: vn.date,
-          time: vn.time,
-          creatorName: parsed.creatorName,
-          durationMinutes: parsed.endTime
-            ? Math.round((new Date(parsed.endTime).getTime() - new Date(parsed.startTime).getTime()) / 60000)
-            : undefined,
-          gmv: parsed.gmv ?? 0,
-          views: parsed.views ?? 0,
-          ctr: parsed.ctr ?? 0
-        });
+      //
+      // try/catch: mapDataRawToImportRows() NÉM lỗi khi batch không dò ra cột thời gian bắt đầu
+      // (import nhầm report type, hoặc bản export có tên cột lạ). Trước đây không bọc nên 1 batch
+      // hỏng là chết cả trang Report Tuần — giờ bỏ qua đúng batch đó, như creatorLivePerfSlice.ts
+      // vẫn làm.
+      try {
+        for (const parsed of mapDataRawToImportRows(imp.columns, rows)) {
+          const vn = vnParts(parsed.startTime);
+          if (vn.date < weekStart || vn.date > weekEnd) continue;
+          live.push({
+            date: vn.date,
+            time: vn.time,
+            creatorName: parsed.creatorName,
+            durationMinutes: parsed.endTime
+              ? Math.round((new Date(parsed.endTime).getTime() - new Date(parsed.startTime).getTime()) / 60000)
+              : undefined,
+            gmv: parsed.gmv ?? 0,
+            views: parsed.views ?? 0,
+            ctr: parsed.ctr ?? 0
+          });
+        }
+      } catch {
+        // Batch thiếu cột "Thời gian bắt đầu" — bỏ qua batch này thay vì làm chết Report Tuần.
       }
     }
   }

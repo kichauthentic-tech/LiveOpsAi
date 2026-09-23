@@ -12,24 +12,31 @@ import { DataRawColumn } from "../../types";
 // matchImportRows() tự động rơi về khớp theo ngày+giờ (xem comment ở matchImportRows bên dưới),
 // không cần sửa gì logic match cả.
 
-// Cột trong file export thật (xem sample đã xem qua trong phiên trước) — tên cột tiếng Việt do
-// TikTok đặt, có thể đổi nhẹ theo version export nên match theo substring thay vì exact string.
+// Cột trong file export thật (xem sample đã xem qua trong phiên trước) — tên cột do TikTok đặt, có
+// thể đổi nhẹ theo version export nên match theo substring thay vì exact string.
+//
+// Nhận CẢ tiếng Việt lẫn tiếng Anh: Seller Center xuất Live Analysis theo ngôn ngữ giao diện, và
+// bản tiếng Anh là bản ops dùng cho bảng Affiliate (xem parseLiveAnalysis ở parseDataRawExcel.ts).
+// Vài cột bản Anh phải neo 2 đầu ^...$ vì file có nhiều cột chung tiền tố dễ match nhầm:
+//   "LIVE GMV" ≠ "LIVE-attributed GMV" ≠ "LIVE indirect GMV"
+//   "LIVE items sold" ≠ "LIVE-attributed items sold" ≠ "LIVE indirect items sold"
+//   "Duration" ≠ "Average viewing duration (LIVE streams)"
 const COLUMN_PATTERNS: Record<string, RegExp> = {
-  creatorName: /^Nhà sáng tạo$/i,
-  startTime: /Thời gian bắt đầu/i,
-  duration: /Thời lượng$/i,
-  gmvLive: /^GMV LIVE/i,
-  ordersPaid: /Đơn hàng đã thanh toán/i,
-  itemsSoldLive: /Số món bán ra từ LIVE/i,
-  customers: /Số khách hàng độc nhất/i,
-  avgPrice: /Giá trung bình/i,
+  creatorName: /^(?:Nhà sáng tạo|Creator)$/i,
+  startTime: /Thời gian bắt đầu|^Launched Time$/i,
+  duration: /Thời lượng$|^Duration$/i,
+  gmvLive: /^GMV LIVE|^LIVE GMV/i,
+  ordersPaid: /Đơn hàng đã thanh toán|^Orders Paid$/i,
+  itemsSoldLive: /Số món bán ra từ LIVE|^LIVE items sold$/i,
+  customers: /Số khách hàng độc nhất|^Unique customers$/i,
+  avgPrice: /Giá trung bình|^Average Price/i,
   ctor: /^CTOR$/i,
-  viewers: /^Người xem$/i,
-  views: /^Lượt xem$/i,
-  avgWatchTime: /Thời lượng xem trung bình/i,
-  newFollowers: /Người theo dõi mới/i,
-  productImpressions: /Lượt hiển thị sản phẩm/i,
-  productClicks: /Lượt nhấp Sản phẩm/i,
+  viewers: /^(?:Người xem|Viewers)$/i,
+  views: /^(?:Lượt xem|Views)$/i,
+  avgWatchTime: /Thời lượng xem trung bình|Average viewing duration/i,
+  newFollowers: /Người theo dõi mới|New followers/i,
+  productImpressions: /Lượt hiển thị sản phẩm|^Product Impressions$/i,
+  productClicks: /Lượt nhấp Sản phẩm|^Product Clicks$/i,
   ctr: /^CTR$/i
 };
 

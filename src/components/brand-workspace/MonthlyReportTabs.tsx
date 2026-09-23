@@ -30,19 +30,19 @@ import {
   Save,
   Filter,
   Users,
-  Database,
-  PieChart as PieChartIcon
+  PieChart as PieChartIcon,
+  Activity
 } from "lucide-react";
 import { LiveSession, BrandMonthlyReport as BrandMonthlyReportType, AffiliatePlanEntry, AffiliateActualEntry, BrandPlatformRate } from "../../types";
 import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
 import { fetchCreatorLivePerfMonthSlice } from "../../lib/dataraw/creatorLivePerfSlice";
 import { dailyFromSessions, monthRunRate, pickLivePerfSource } from "../../lib/report/sessionsLivePerf";
-import { fetchLivePerformanceCoreMonthSlice, fetchProductCardTrafficMonthSlice, ProductCardMonthSlice } from "../../lib/dataraw/monthlyDailySlice";
-import { fetchTopSkuMonthSlice, fetchTopPromotionsMonthSlice } from "../../lib/dataraw/monthlyProductSlice";
-import { fetchAffiliateCreatorListMonthSlice } from "../../lib/dataraw/affiliateCreatorListSlice";
+import { fetchLivePerformanceCoreMonthSlice } from "../../lib/dataraw/monthlyDailySlice";
+import { fetchTopSkuMonthSlice, fetchTopPromotionsMonthSlice, fetchChannelGmvMonthSlice, ChannelGmvMonthSlice } from "../../lib/dataraw/monthlyProductSlice";
 import { fetchMonthlyReport, upsertMonthlyReport, MonthlyReportManualInput } from "../../lib/db/monthlyReports";
 import { fetchAffiliatePlans, replaceAffiliatePlans } from "../../lib/db/affiliatePlans";
 import { fetchAffiliateActuals, replaceAffiliateActuals } from "../../lib/db/affiliateActuals";
+import { MonthlyDeepDive } from "./deepdive/MonthlyDeepDive";
 import { byHost, dataQuality, filterSessions, hostKey, splitUnassignedHost, DataQuality } from "../../lib/performance/hostPerformance";
 import {
   aggregateCreatorLivePerfRows,
@@ -191,15 +191,23 @@ interface MonthlyReportTabsProps {
   brandPlatformRates: BrandPlatformRate[];
 }
 
-type TabId = "overview" | "livestream" | "products" | "affiliate" | "plan";
+type TabId = "overview" | "livestream" | "products" | "affiliate" | "deepdive" | "plan";
 
 const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: "overview", label: "01 · Tổng Quan", icon: <BarChart3 className="w-3.5 h-3.5" /> },
   { id: "livestream", label: "02 · Livestream", icon: <Radio className="w-3.5 h-3.5" /> },
   { id: "products", label: "03 · Sản Phẩm & Khuyến Mãi", icon: <ShoppingBag className="w-3.5 h-3.5" /> },
   { id: "affiliate", label: "04 · Affiliate", icon: <Handshake className="w-3.5 h-3.5" /> },
-  { id: "plan", label: "05 · Kế Hoạch Tháng Sau", icon: <CalendarClock className="w-3.5 h-3.5" /> }
+  // Tab 05 gộp từ trang "Phân Tích Chuyên Sâu" đứng riêng (2026-09-23) — ops-only, lọc ở TABS_FOR().
+  { id: "deepdive", label: "05 · Phân Tích Sâu", icon: <Activity className="w-3.5 h-3.5" /> },
+  { id: "plan", label: "06 · Kế Hoạch Tháng Sau", icon: <CalendarClock className="w-3.5 h-3.5" /> }
 ];
+
+// Tab 05 phơi số chưa đối soát + cảnh báo chất lượng dữ liệu ("12/47 phiên chưa gắn host") — thứ
+// brand không cần và không nên thấy. 5 tab còn lại giữ nguyên cho cả brand lẫn ops.
+function tabsFor(canManage: boolean): typeof TABS {
+  return canManage ? TABS : TABS.filter((t) => t.id !== "deepdive");
+}
 
 const Panel: React.FC<{ title: string; icon: React.ReactNode; sub?: string; children: React.ReactNode }> = ({ title, icon, sub, children }) => (
   <div className="rounded-2xl overflow-hidden" style={{ background: PAL.panel, border: `1px solid ${PAL.line}` }}>
@@ -305,8 +313,6 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, m
   // Nút "Nhập Từ Dữ Liệu Gốc" (migration 0074) — điền directGmv/itemsSold/avgPrice/ctr/ctor từ file
   // Transaction Analysis - Creator List, KHÔNG đụng targetGmv/durationHours/adsCost/liveDateLabel
   // (vẫn nhập tay, file không có các số này).
-  const [creatorListImporting, setCreatorListImporting] = useState(false);
-  const [creatorListErrorMsg, setCreatorListErrorMsg] = useState<string | null>(null);
 
   // Đổi nguồn số (2026-09-21): file Dataraw chỉ còn là DỰ PHÒNG — tháng nào có ca có số thì Tab 01/02
   // đọc từ ca (lib/report/sessionsLivePerf.ts). *Raw = slice từ Dataraw; liveCurrent/livePrev = nguồn đã chọn.
@@ -316,8 +322,8 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, m
   // phủ 2 tháng gần nhất, chỉ cần fetch thêm 2 tháng cũ hơn (last4Months[0..1]), keyed theo "YYYY-MM".
   const [liveOlderMonths, setLiveOlderMonths] = useState<Record<string, Awaited<ReturnType<typeof fetchCreatorLivePerfMonthSlice>>>>({});
   const [dailyPerfRaw, setDailyPerfRaw] = useState<Awaited<ReturnType<typeof fetchLivePerformanceCoreMonthSlice>> | null>(null);
-  const [productCard, setProductCard] = useState<ProductCardMonthSlice | null>(null);
-  const [productCardPrev, setProductCardPrev] = useState<ProductCardMonthSlice | null>(null);
+  const [channelGmv, setChannelGmv] = useState<ChannelGmvMonthSlice | null>(null);
+  const [channelGmvPrev, setChannelGmvPrev] = useState<ChannelGmvMonthSlice | null>(null);
   const [topSku, setTopSku] = useState<Awaited<ReturnType<typeof fetchTopSkuMonthSlice>> | null>(null);
   const [topPromo, setTopPromo] = useState<Awaited<ReturnType<typeof fetchTopPromotionsMonthSlice>> | null>(null);
   // Tab 01 Tổng Quan — Affiliate GMV tháng trước (chỉ cần tổng Direct GMV, không cần state editable
@@ -346,8 +352,8 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, m
       fetchCreatorLivePerfMonthSlice(brandId, start, end),
       fetchCreatorLivePerfMonthSlice(brandId, prevStart, prevEnd),
       fetchLivePerformanceCoreMonthSlice(brandId, start, end),
-      fetchProductCardTrafficMonthSlice(brandId, start, end),
-      fetchProductCardTrafficMonthSlice(brandId, prevStart, prevEnd),
+      fetchChannelGmvMonthSlice(brandId, start, end),
+      fetchChannelGmvMonthSlice(brandId, prevStart, prevEnd),
       fetchTopSkuMonthSlice(brandId, start, end),
       fetchTopPromotionsMonthSlice(brandId, start, end),
       fetchAffiliateActuals(brandId, `${prevMonth}-01`),
@@ -363,8 +369,8 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, m
         setLiveCurrentRaw(lc);
         setLivePrevRaw(lp);
         setDailyPerfRaw(dp);
-        setProductCard(pc);
-        setProductCardPrev(pcPrev);
+        setChannelGmv(pc);
+        setChannelGmvPrev(pcPrev);
         setTopSku(sku);
         setTopPromo(promo);
         setAffiliateGmvPrevTotal(affPrev.reduce((sum, r) => sum + (r.directGmv || 0), 0));
@@ -643,45 +649,6 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, m
     }
   };
 
-  // Ghép theo creatorName (không phân biệt hoa/thường + khoảng trắng thừa) — creator đã có trong
-  // danh sách thì cập nhật đè 5 field lấy được từ file, creator mới trong file thì thêm dòng mới.
-  // targetGmv/durationHours/adsCost/liveDateLabel không đụng tới, vẫn giữ giá trị ops đã nhập tay.
-  const handleImportAffiliateFromDataraw = async () => {
-    setCreatorListImporting(true);
-    setCreatorListErrorMsg(null);
-    try {
-      const slice = await fetchAffiliateCreatorListMonthSlice(brandId, start, end);
-      if (!slice.hasAnyBatch) {
-        setCreatorListErrorMsg('Chưa có file "Affiliate — Creator List" nào phủ tháng này trong Dữ Liệu Gốc.');
-        return;
-      }
-      setAffiliateRows((rows) => {
-        const byKey = new Map<string, EditableAffiliateActualEntry>(rows.map((r) => [r.creatorName.trim().toLowerCase(), r]));
-        for (const item of slice.items) {
-          const key = item.creatorName.trim().toLowerCase();
-          if (!key) continue;
-          const patch: Partial<AffiliateActualEntry> = {
-            directGmv: item.directGmv,
-            itemsSold: item.itemsSold,
-            avgPrice: item.avgPrice,
-            ctr: item.ctr,
-            ctor: item.ctor
-          };
-          const existing = byKey.get(key);
-          const merged: EditableAffiliateActualEntry = existing
-            ? { ...existing, ...patch }
-            : { _key: newAffiliateRowKey(), brandId, periodMonth: `${month}-01`, creatorName: item.creatorName, ...patch };
-          byKey.set(key, merged);
-        }
-        return Array.from(byKey.values());
-      });
-    } catch (e: any) {
-      setCreatorListErrorMsg(e.message || "Nhập dữ liệu từ Dữ Liệu Gốc thất bại");
-    } finally {
-      setCreatorListImporting(false);
-    }
-  };
-
   const affiliateChartData = useMemo(
     () =>
       affiliateRows
@@ -813,10 +780,11 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, m
   const liveGmvPrev = prevAgg.gmv;
   const liveAffCur = liveGmvCur + affiliateGmvCur;
   const liveAffPrev = liveGmvPrev + affiliateGmvPrev;
-  const videoGmvCur = productCard?.totals.gmvContent ?? 0;
-  const videoGmvPrev = productCardPrev?.totals.gmvContent ?? 0;
-  const productCardGmvCur = productCard?.totals.gmvCard ?? 0;
-  const productCardGmvPrev = productCardPrev?.totals.gmvCard ?? 0;
+  // Nguồn: shop_analytics (video) + product_list (thẻ SP) — xem fetchChannelGmvMonthSlice.
+  const videoGmvCur = channelGmv?.videoGmv ?? 0;
+  const videoGmvPrev = channelGmvPrev?.videoGmv ?? 0;
+  const productCardGmvCur = channelGmv?.cardGmv ?? 0;
+  const productCardGmvPrev = channelGmvPrev?.cardGmv ?? 0;
 
   const kpiTargetGmvCurRaw = scheduledTargetGmv(start, end);
   const kpiTargetGmvPrevRaw = scheduledTargetGmv(prevStart, prevEnd);
@@ -932,7 +900,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, m
   return (
     <div className="rounded-2xl overflow-hidden" style={{ background: PAL.bg, border: `1px solid ${PAL.line}` }}>
       <div className="flex gap-1 px-4 pt-3 overflow-x-auto" style={{ borderBottom: `1px solid ${PAL.line}` }}>
-        {TABS.map((t) => (
+        {tabsFor(canManage).map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
@@ -1583,12 +1551,10 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, m
 
             {tab === "products" && (
               <div className="space-y-4">
-                {productCard?.hasAnyBatch && (
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <KpiCard label="Lượt Xem Thẻ SP" value={fmtInt(productCard.totals.views)} />
-                    <KpiCard label="Lượt Nhấp" value={fmtInt(productCard.totals.clicks)} />
-                    <KpiCard label="CTR Trung Bình" value={fmtPct(productCard.totals.ctr)} />
-                    <KpiCard label="GMV Từ Thẻ Sản Phẩm" value={formatCurrencyAdaptive(productCard.totals.gmvCard)} />
+                {(channelGmv?.hasCardBatch || channelGmv?.hasVideoBatch) && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <KpiCard label="GMV Từ Thẻ Sản Phẩm" value={formatCurrencyAdaptive(productCardGmvCur)} />
+                    <KpiCard label="GMV Từ Video" value={formatCurrencyAdaptive(videoGmvCur)} />
                   </div>
                 )}
 
@@ -1639,10 +1605,19 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, m
                   )}
                 </Panel>
 
-                <Panel title="Top Chương Trình Khuyến Mãi" icon={<Megaphone className="w-4 h-4" />} sub="Nguồn: Shop Promotion List">
+                <Panel
+                  title="Top Chương Trình Khuyến Mãi"
+                  icon={<Megaphone className="w-4 h-4" />}
+                  sub={`Nguồn: Shop Promotion List — chỉ xếp hạng chương trình chạy TRỌN trong tháng${topPromo?.excludedMultiMonth ? ` (đã loại ${topPromo.excludedMultiMonth} chương trình vắt qua tháng khác)` : ""}`}
+                >
                   {!topPromo?.hasAnyBatch ? (
                     <p className="text-sm text-center py-6" style={{ color: PAL.muted }}>
                       Chưa có file "Shop Promotion List" nào được import trong Dữ Liệu Gốc cho tháng này.
+                    </p>
+                  ) : topPromo.items.length === 0 ? (
+                    <p className="text-sm text-center py-6" style={{ color: PAL.muted }}>
+                      Không có chương trình nào chạy trọn trong tháng này. Chương trình vắt qua nhiều tháng bị loại vì
+                      cột GMV trong file TikTok là luỹ kế cả chương trình, không tách được phần thuộc tháng.
                     </p>
                   ) : (
                     <ReportTable head={["#", "Chương Trình", "Trạng Thái", "GMV", "Đơn Hàng", "AOV"]}>
@@ -1686,11 +1661,9 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, m
                   style={{ background: "#2a2410", border: `1px solid ${PAL.gold}55`, color: PAL.gold }}
                 >
                   <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                  Direct GMV/Sản Phẩm Bán/Giá TB/CTR/CTOR có thể nhập từ file "Affiliate — Creator List" (Dữ Liệu Gốc) bằng nút
-                  bên dưới — chỉ lấy GMV video + product card, KHÔNG cộng GMV LIVE (đã tính ở Tab 02 Livestream, Room ID không
-                  phân biệt được phiên Affiliate với phiên Live thường nên cộng vào đây sẽ đếm trùng). Target/Thời Lượng/Ads
-                  Cost/Ngày Live vẫn luôn nhập tay — file này không có các số đó. Runrate/ROAS tự tính từ Direct GMV so với
-                  Target/Ads Cost.
+                  Bảng này tổng hợp theo CREATOR/THÁNG và nhập tay hoàn toàn. Số chi tiết theo TỪNG PHIÊN LIVE (đọc tự
+                  động từ file "Live Analysis") nằm ở trang <b>Affiliate</b> ngoài menu trái — hai nơi dùng chung một bảng dữ
+                  liệu. Runrate/ROAS tự tính từ Direct GMV so với Target/Ads Cost.
                 </div>
 
                 {affiliateLoading ? (
@@ -1705,25 +1678,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, m
                       </div>
                     )}
 
-                    {canManage && (
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <button
-                          onClick={handleImportAffiliateFromDataraw}
-                          disabled={creatorListImporting}
-                          className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold disabled:opacity-60"
-                          style={{ background: PAL.panel2, border: `1px solid ${PAL.gold}55`, color: PAL.gold }}
-                        >
-                          {creatorListImporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Database className="w-3.5 h-3.5" />} Nhập Từ Dữ Liệu Gốc
-                        </button>
-                        {creatorListErrorMsg && (
-                          <span className="text-xs font-semibold" style={{ color: PAL.red }}>
-                            {creatorListErrorMsg}
-                          </span>
-                        )}
-                      </div>
-                    )}
-
-                    <Panel title="Hiệu Suất Creator Affiliate" icon={<Handshake className="w-4 h-4" />} sub={`Tháng ${month} — nhập tay + nhập từ Dữ Liệu Gốc`}>
+                    <Panel title="Hiệu Suất Creator Affiliate" icon={<Handshake className="w-4 h-4" />} sub={`Tháng ${month} — nhập tay; số theo PHIÊN xem ở trang Affiliate`}>
                       <div className="space-y-3">
                         {affiliateRows.map((a) => {
                           const roas = roasOf(a.directGmv, a.adsCost);
@@ -1845,6 +1800,10 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, m
                   </>
                 )}
               </div>
+            )}
+
+            {tab === "deepdive" && canManage && (
+              <MonthlyDeepDive brandId={brandId} sessions={sessions} canManage={canManage} month={month} embedded />
             )}
 
             {tab === "plan" && (

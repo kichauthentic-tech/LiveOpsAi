@@ -19,6 +19,7 @@ interface DbPlan {
   target_gmv: number | null;
   camp_ranges: PlanCampRanges | null;
   locked_at: string | null;
+  brand_confirmed_at: string | null;
 }
 
 interface DbPlanSlot {
@@ -48,7 +49,8 @@ const planFromDb = (r: DbPlan): BrandMonthPlan => ({
   blackoutDates: r.blackout_dates ?? [],
   targetGmv: Number(r.target_gmv ?? 0),
   campRanges: r.camp_ranges ?? {},
-  lockedAt: r.locked_at ?? undefined
+  lockedAt: r.locked_at ?? undefined,
+  brandConfirmedAt: r.brand_confirmed_at ?? undefined
 });
 
 const slotFromDb = (r: DbPlanSlot): BrandMonthPlanSlot => ({
@@ -201,6 +203,14 @@ export async function fetchCalendarEvents(): Promise<CalendarEventRow[]> {
 
 // Mọi ca kế hoạch ĐÃ CHỐT của 1 brand có dự báo engine (expected_gmv > 0) và đã gắn ca thật — đầu vào
 // cho đối chiếu kế hoạch vs thực tế + hiệu chỉnh (giai đoạn D).
+// Brand xác nhận đã xem lịch tháng sau (0110). RPC security definer — brand không có policy UPDATE
+// nào trên brand_month_plans, guard role/chủ sở hữu nằm trong thân hàm phía DB.
+export async function confirmMonthPlan(planId: string): Promise<BrandMonthPlan> {
+  const { data, error } = await supabase.rpc("confirm_month_plan", { p_plan_id: planId });
+  if (error) throw error;
+  return planFromDb(data as DbPlan);
+}
+
 export async function fetchBrandLockedPlanSlots(brandId: string): Promise<BrandMonthPlanSlot[]> {
   const { data, error } = await supabase
     .from("brand_month_plan_slots")

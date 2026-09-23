@@ -227,19 +227,34 @@ type TalentLookup = (id: string | undefined) => Pick<Talent, "name" | "nickname"
  * Target GMV KHÔNG nằm trong danh sách này — nó có badge riêng ở góc phải hàng brand (xem prop
  * `targetGmv` của SessionEventCard, đổ trực tiếp từ `s.targetGmv` ở call-site).
  * Actual GMV (kết quả) cũng không thuộc đây — đó là số của lịch báo cáo hiệu suất, không phải lịch vận hành. */
-export const buildSessionMeta = (s: LiveSession, lookup?: TalentLookup): SessionCardMeta[] => {
+export const buildSessionMeta = (
+  s: LiveSession,
+  lookup?: TalentLookup,
+  /** Cách nhìn của người đang xem. "brand" bỏ các chip là chuyện nội bộ agency — xem ghi chú dưới. */
+  viewerRole?: "agency" | "brand"
+): SessionCardMeta[] => {
   const meta: SessionCardMeta[] = [];
   if (s.platform) meta.push({ icon: ShoppingBag, label: s.platform, title: `Nền tảng: ${s.platform}` });
   if (s.hostName) meta.push({ icon: Mic, label: talentShortName(lookup?.(s.hostId), s.hostName), title: `Host: ${s.hostName}` });
-  if (s.coHostName) meta.push({ icon: Users, label: talentShortName(lookup?.(s.coHostId), s.coHostName), title: `Trợ live: ${s.coHostName}` });
+  // Trợ live là nhân sự nội bộ agency bố trí, không phải thứ brand mua. SessionWindow đã giấu chip
+  // này (và cả studio + Target GMV) với role brand từ trước — lịch thì không, nên cùng một ca hiện
+  // hai kiểu ở hai màn. Audit 2026-09-22 chọn theo SessionWindow: nó là màn chi tiết, lập trường ở
+  // đó mới là lập trường đã cân nhắc.
+  if (s.coHostName && viewerRole !== "brand") {
+    meta.push({ icon: Users, label: talentShortName(lookup?.(s.coHostId), s.coHostName), title: `Trợ live: ${s.coHostName}` });
+  }
   return meta;
 };
 
 /** Ca chờ đăng ký chưa có host — nền tảng đứng đầu vì đó là thứ host cần biết trước khi nhận ca. */
-export const buildSlotMeta = (sl: ShiftSlot): SessionCardMeta[] => {
+export const buildSlotMeta = (sl: ShiftSlot, viewerRole?: "agency" | "brand"): SessionCardMeta[] => {
   const meta: SessionCardMeta[] = [];
   if (sl.platform) meta.push({ icon: ShoppingBag, label: sl.platform, title: `Nền tảng: ${sl.platform}` });
-  if (sl.studioName) meta.push({ icon: Building2, label: sl.studioName.split(" - ")[0], title: `Studio: ${sl.studioName}` });
-  if (sl.notes) meta.push({ label: sl.notes, title: sl.notes });
+  // Phòng live + ghi chú điều phối là chuyện bố trí nội bộ, cùng lý do với chip trợ live ở
+  // buildSessionMeta bên trên.
+  if (sl.studioName && viewerRole !== "brand") {
+    meta.push({ icon: Building2, label: sl.studioName.split(" - ")[0], title: `Studio: ${sl.studioName}` });
+  }
+  if (sl.notes && viewerRole !== "brand") meta.push({ label: sl.notes, title: sl.notes });
   return meta;
 };

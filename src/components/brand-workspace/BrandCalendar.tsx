@@ -153,6 +153,16 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
     return map;
   }, [talents]);
   const talentLookup = (id: string | undefined) => (id ? talentById[id] : undefined);
+
+  // Brand Workspace được ceo/admin/operations mở hộ qua switcher, nên "đang ở Brand Workspace"
+  // KHÔNG đồng nghĩa "người xem là khách". Chỉ role brand thật mới bị giấu phần nội bộ.
+  //
+  // Audit 2026-09-22: trước đây lịch của brand truyền thẳng `targetGmv` xuống thẻ ca và in studio
+  // vào tooltip, trong khi SessionWindow của cùng ca đó cố tình giấu cả hai với role brand
+  // (`!isBrandView`). Chưa ai phát hiện vì `target_gmv` trên DB thật đang = 0 ở cả 218 ca — badge
+  // không vẽ ra nên lỗi vô hình. Nó sẽ lộ ngay lần đầu ops chốt một Kế Hoạch Tháng có target.
+  const brandViewer = currentRole === "brand";
+  const metaViewer = brandViewer ? ("brand" as const) : ("agency" as const);
   const [y, m] = month.split("-").map(Number);
   const firstDay = new Date(y, m - 1, 1);
   const daysInMonth = new Date(y, m, 0).getDate();
@@ -245,14 +255,18 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
             brandName={s.brandName || brandName}
             startTime={s.startTime}
             endTime={s.endTime}
-            meta={buildSessionMeta({ ...s, hostName: talentById[s.hostId]?.name ?? s.hostName, studioName: studioById[s.studioId]?.name ?? s.studioName }, talentLookup)}
-            targetGmv={s.targetGmv}
+            meta={buildSessionMeta({ ...s, hostName: talentById[s.hostId]?.name ?? s.hostName, studioName: studioById[s.studioId]?.name ?? s.studioName }, talentLookup, metaViewer)}
+            targetGmv={brandViewer ? undefined : s.targetGmv}
             metaLimit={4}
             tone={SESSION_TONE[s.status]}
             statusLabel={SESSION_STATUS_LABEL[s.status]}
-            tooltip={`${s.title} · ${studioById[s.studioId]?.name ?? s.studioName} · Host ${
-              talentById[s.hostId]?.name ?? s.hostName
-            }${s.coHostName ? ` · Trợ ${s.coHostName}` : ""}`}
+            tooltip={
+              brandViewer
+                ? `${s.title} · Host ${talentById[s.hostId]?.name ?? s.hostName}`
+                : `${s.title} · ${studioById[s.studioId]?.name ?? s.studioName} · Host ${
+                    talentById[s.hostId]?.name ?? s.hostName
+                  }${s.coHostName ? ` · Trợ ${s.coHostName}` : ""}`
+            }
             onClick={(e) => {
               e.stopPropagation();
               setOpenSessionId(s.id);
@@ -266,11 +280,11 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
             brandName={sl.brandName || brandName}
             startTime={sl.startTime}
             endTime={sl.endTime}
-            meta={buildSlotMeta(sl)}
+            meta={buildSlotMeta(sl, metaViewer)}
             metaLimit={2}
             tone="pending"
             pending
-            tooltip={`Ca chờ đăng ký · ${sl.startTime}-${sl.endTime} · ${sl.studioName}`}
+            tooltip={brandViewer ? `Ca chờ đăng ký · ${sl.startTime}-${sl.endTime}` : `Ca chờ đăng ký · ${sl.startTime}-${sl.endTime} · ${sl.studioName}`}
             onClick={(e) => {
               e.stopPropagation();
               setSelectedSlotDetail(sl);
@@ -526,14 +540,18 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
                           ...s,
                           hostName: talentById[s.hostId]?.name ?? s.hostName,
                           studioName: studioById[s.studioId]?.name ?? s.studioName
-                        }, talentLookup)}
-                        targetGmv={s.targetGmv}
+                        }, talentLookup, metaViewer)}
+                        targetGmv={brandViewer ? undefined : s.targetGmv}
                         size="md"
                         tone={SESSION_TONE[s.status]}
                         statusLabel={SESSION_STATUS_LABEL[s.status]}
-                        tooltip={`${s.title} · ${studioById[s.studioId]?.name ?? s.studioName} · Host ${
-                          talentById[s.hostId]?.name ?? s.hostName
-                        }`}
+                        tooltip={
+                          brandViewer
+                            ? `${s.title} · Host ${talentById[s.hostId]?.name ?? s.hostName}`
+                            : `${s.title} · ${studioById[s.studioId]?.name ?? s.studioName} · Host ${
+                                talentById[s.hostId]?.name ?? s.hostName
+                              }`
+                        }
                         onClick={() => setOpenSessionId(s.id)}
                       />
                     ))}
@@ -544,11 +562,11 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
                       brandName={sl.brandName || brandName}
                       startTime={sl.startTime}
                       endTime={sl.endTime}
-                      meta={buildSlotMeta(sl)}
+                      meta={buildSlotMeta(sl, metaViewer)}
                       size="md"
                       tone="pending"
                       pending
-                      tooltip={`Ca chờ đăng ký · ${sl.startTime}-${sl.endTime} · ${sl.studioName}`}
+                      tooltip={brandViewer ? `Ca chờ đăng ký · ${sl.startTime}-${sl.endTime}` : `Ca chờ đăng ký · ${sl.startTime}-${sl.endTime} · ${sl.studioName}`}
                       onClick={() => setSelectedSlotDetail(sl)}
                     />
                   ))}

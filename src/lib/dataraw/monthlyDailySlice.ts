@@ -2,8 +2,9 @@ import { supabase } from "../supabaseClient";
 import { DataRawColumn, DataRawReportType } from "../../types";
 import { eachDay } from "./weeklySlice";
 
-// Deep Dive Report Tháng — 2 report Dataraw mới (migration 0064), cả 2 đều là bảng phẳng 1
-// dòng/ngày, header anchored ở cột "Thời gian". Cùng pattern overlap-batch như
+// Deep Dive Report Tháng — report "Live Performance Core Stats" (migration 0064): bảng phẳng 1
+// dòng/ngày, header anchored ở cột "Thời gian"/"Time". Report thứ 2 của migration đó
+// ("Product Card Traffic Stats") đã gỡ 2026-09-22 — xem comment ở types.ts. Cùng pattern overlap-batch như
 // monthlyLiveSlice.ts/weeklySlice.ts nhưng không cần map qua ParsedImportRow (không có khái niệm
 // phiên live ở đây, mỗi dòng đã là 1 ngày sẵn).
 
@@ -60,7 +61,7 @@ async function fetchDailyRows(
     rowsByImport.set(r.import_id, list);
   }
 
-  const dateCol = findCol(overlapping[0].columns, /^Thời gian$/i);
+  const dateCol = findCol(overlapping[0].columns, /^(?:Thời gian|Time)$/i);
   const raws: { date: string; raw: Record<string, unknown> }[] = [];
   const coveredDays = new Set<string>();
   for (const imp of overlapping) {
@@ -72,7 +73,7 @@ async function fetchDailyRows(
     ) {
       coveredDays.add(d);
     }
-    const dc = findCol(imp.columns, /^Thời gian$/i);
+    const dc = findCol(imp.columns, /^(?:Thời gian|Time)$/i);
     if (!dc) continue;
     for (const raw of rowsByImport.get(imp.id) ?? []) {
       const date = String(raw[dc] ?? "").slice(0, 10);
@@ -115,16 +116,20 @@ export async function fetchLivePerformanceCoreMonthSlice(brandId: string, monthS
   if (!hasAnyBatch) return { daily: [], missingDays, hasAnyBatch };
 
   const c = {
-    gmvLiveSession: findCol(columns, /^GMV đến từ buổi LIVE/i),
-    gmvLive: findCol(columns, /^GMV LIVE \(/i),
-    gmvIndirect: findCol(columns, /^GMV gián tiếp của LIVE/i),
-    gpm: findCol(columns, /^Hiển thị GPM/i),
-    sessions: findCol(columns, /^Buổi LIVE$/i),
-    itemsSoldLive: findCol(columns, /^Số món bán ra từ LIVE$/i),
-    ordersSkuLive: findCol(columns, /^Đơn hàng SKU từ LIVE$/i),
-    views: findCol(columns, /^Lượt xem phiên LIVE$/i),
-    ctrLive: findCol(columns, /^Tỷ lệ nhấp \(LIVE\)$/i),
-    ctorLive: findCol(columns, /^CTOR \(đơn hàng SKU\) \(LIVE\)$/i)
+    // Nhận cả bản tiếng Việt lẫn tiếng Anh (xem parseLivePerformanceCoreStats). Tên tiếng Anh
+    // chồng tiền tố nhau nhiều nên phải neo chặt: "LIVE GMV" ≠ "LIVE-attributed GMV" ≠
+    // "LIVE indirect GMV"; "LIVE items sold" ≠ "LIVE-attributed/indirect items sold";
+    // "LIVE SKU orders" ≠ "Attributed/LIVE indirect SKU orders".
+    gmvLiveSession: findCol(columns, /^(?:GMV đến từ buổi LIVE|LIVE-attributed GMV)/i),
+    gmvLive: findCol(columns, /^(?:GMV LIVE|LIVE GMV) \(/i),
+    gmvIndirect: findCol(columns, /^(?:GMV gián tiếp của LIVE|LIVE indirect GMV)/i),
+    gpm: findCol(columns, /^(?:Hiển thị GPM|Show GPM)/i),
+    sessions: findCol(columns, /^(?:Buổi LIVE|LIVE streams)$/i),
+    itemsSoldLive: findCol(columns, /^(?:Số món bán ra từ LIVE|LIVE items sold)$/i),
+    ordersSkuLive: findCol(columns, /^(?:Đơn hàng SKU từ LIVE|LIVE SKU orders)$/i),
+    views: findCol(columns, /^(?:Lượt xem phiên LIVE|LIVE Views)$/i),
+    ctrLive: findCol(columns, /^(?:Tỷ lệ nhấp|Click-through rate) \(LIVE\)$/i),
+    ctorLive: findCol(columns, /^CTOR \((?:đơn hàng SKU|SKU order)\) \(LIVE\)$/i)
   };
 
   const daily: DailyLivePerformance[] = raws.map(({ date, raw }) => ({
@@ -142,51 +147,4 @@ export async function fetchLivePerformanceCoreMonthSlice(brandId: string, monthS
   }));
 
   return { daily, missingDays, hasAnyBatch };
-}
-
-export interface ProductCardTotals {
-  views: number;
-  clicks: number;
-  customers: number;
-  orders: number;
-  gmvCard: number;
-  gmvContent: number;
-  ctr: number | null;
-}
-
-export interface ProductCardMonthSlice {
-  totals: ProductCardTotals;
-  missingDays: string[];
-  hasAnyBatch: boolean;
-}
-
-export async function fetchProductCardTrafficMonthSlice(brandId: string, monthStart: string, monthEnd: string): Promise<ProductCardMonthSlice> {
-  const { raws, columns, missingDays, hasAnyBatch } = await fetchDailyRows(brandId, "product_card_traffic_stats", monthStart, monthEnd);
-  const empty: ProductCardTotals = { views: 0, clicks: 0, customers: 0, orders: 0, gmvCard: 0, gmvContent: 0, ctr: null };
-  if (!hasAnyBatch) return { totals: empty, missingDays, hasAnyBatch };
-
-  const c = {
-    views: findCol(columns, /^Lượt xem$/i),
-    clicks: findCol(columns, /^Lượt nhấp$/i),
-    customers: findCol(columns, /^Khách hàng$/i),
-    orders: findCol(columns, /^Đơn hàng SKU đã ghi nhận$/i),
-    gmvCard: findCol(columns, /^GMV nhờ thẻ sản phẩm/i),
-    gmvContent: findCol(columns, /^GMV quy ra từ nội dung/i)
-  };
-
-  const totals = raws.reduce(
-    (acc, { raw }) => {
-      acc.views += num(c.views && raw[c.views]);
-      acc.clicks += num(c.clicks && raw[c.clicks]);
-      acc.customers += num(c.customers && raw[c.customers]);
-      acc.orders += num(c.orders && raw[c.orders]);
-      acc.gmvCard += num(c.gmvCard && raw[c.gmvCard]);
-      acc.gmvContent += num(c.gmvContent && raw[c.gmvContent]);
-      return acc;
-    },
-    { ...empty }
-  );
-  totals.ctr = totals.views > 0 ? (totals.clicks / totals.views) * 100 : null;
-
-  return { totals, missingDays, hasAnyBatch };
 }

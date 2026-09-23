@@ -1,5 +1,6 @@
 import { supabase } from "../supabaseClient";
 import { DataRawColumn, DataRawReportType } from "../../types";
+import { vnDateToIso } from "./weeklySlice";
 
 // Deep Dive Report Tháng — Top SKU (product_list) + Top khuyến mãi (shop_promotion). Cả 2 report
 // này KHÔNG có chiều ngày theo dòng (product_list là tổng cả kỳ/SKU, shop_promotion là tổng cả kỳ
@@ -11,7 +12,6 @@ import { DataRawColumn, DataRawReportType } from "../../types";
 // 627.840.828 đ, không phải 627,84) — khác live_analysis/shop_analytics/shop_promotion vốn ghi số
 // thô không định dạng. Coi mọi ký tự "," và "." đều là phân cách nghìn (an toàn vì GMV/đơn hàng
 // VNĐ trong các report này luôn là số nguyên, không có phần thập phân thật).
-// Export để affiliateCreatorListSlice.ts dùng lại — cùng dialect "chấm phân cách nghìn + ₫/%".
 export function num(v: unknown): number {
   if (v === null || v === undefined || v === "" || v === "-") return 0;
   if (typeof v === "number") return v;
@@ -43,8 +43,8 @@ interface DbImportLite {
   columns: DataRawColumn[];
 }
 
-// Export để affiliateCreatorListSlice.ts dùng lại — cùng cách chọn batch "overlap nhiều nhất,
-// không cộng dồn nhiều batch" cho report loại "tổng cả kỳ, không có chiều ngày theo dòng".
+// Chọn batch "overlap nhiều nhất, không cộng dồn nhiều batch" cho report loại "tổng cả kỳ, không
+// có chiều ngày theo dòng" (product_list, shop_promotion).
 export async function fetchOverlappingBatchRows(brandId: string, reportType: DataRawReportType, monthStart: string, monthEnd: string) {
   const { data: imports, error } = await supabase
     .from("brand_dataraw_imports")
@@ -88,10 +88,12 @@ export async function fetchTopSkuMonthSlice(brandId: string, monthStart: string,
   if (!hasAnyBatch) return { items: [], hasAnyBatch: false };
 
   const c = {
-    name: findCol(columns, /^Tên$/i),
+    // Song ngữ — neo ^...$ vì "Seller LIVE GMV" ≠ "Seller LIVE-attributed GMV" ≠ "Seller LIVE
+    // indirect GMV", và "Orders" ≠ "SKU orders".
+    name: findCol(columns, /^(?:Tên|Product Name)$/i),
     gmv: findCol(columns, /^GMV$/i),
-    gmvLive: findCol(columns, /^GMV LIVE của người bán$/i),
-    orders: findCol(columns, /^Đơn hàng$/i)
+    gmvLive: findCol(columns, /^(?:GMV LIVE của người bán|Seller LIVE GMV)$/i),
+    orders: findCol(columns, /^(?:Đơn hàng|Orders)$/i)
   };
   if (!c.name || !c.gmv) return { items: [], hasAnyBatch: true };
 
@@ -129,24 +131,34 @@ export interface PromotionRow {
 export interface PromotionMonthSlice {
   items: PromotionRow[];
   hasAnyBatch: boolean;
+  /** Số chương trình bị loại vì kỳ chạy vắt qua tháng khác — UI phải nói ra, nếu không ops tưởng
+   *  tháng đó chỉ có bấy nhiêu chương trình. */
+  excludedMultiMonth: number;
+}
+
+/** "2026-06-08 09:22 - 2026-07-05 23:58" -> {start,end}. */
+function promoPeriodBounds(label: string): { start?: string; end?: string } {
+  const m = label.match(/(\d{4}-\d{2}-\d{2}).*?(\d{4}-\d{2}-\d{2})/);
+  return { start: m?.[1], end: m?.[2] };
 }
 
 export async function fetchTopPromotionsMonthSlice(brandId: string, monthStart: string, monthEnd: string, limit = 10): Promise<PromotionMonthSlice> {
   const { rows, columns, hasAnyBatch } = await fetchOverlappingBatchRows(brandId, "shop_promotion", monthStart, monthEnd);
-  if (!hasAnyBatch) return { items: [], hasAnyBatch: false };
+  if (!hasAnyBatch) return { items: [], hasAnyBatch: false, excludedMultiMonth: 0 };
 
   const c = {
-    name: findCol(columns, /^Tên khuyến mãi$/i),
-    status: findCol(columns, /^Trạng thái$/i),
-    period: findCol(columns, /^Thời gian khuyến mãi$/i),
+    // Song ngữ — 14 cột của 2 bản khớp 1:1 đúng thứ tự.
+    name: findCol(columns, /^(?:Tên khuyến mãi|Promotion name)$/i),
+    status: findCol(columns, /^(?:Trạng thái|Status)$/i),
+    period: findCol(columns, /^(?:Thời gian khuyến mãi|Promotion period)$/i),
     gmv: findCol(columns, /^GMV/i),
-    orders: findCol(columns, /^Đơn hàng$/i),
-    aov: findCol(columns, /^Giá trị trung bình đơn/i),
-    itemsSold: findCol(columns, /^Số món bán ra$/i)
+    orders: findCol(columns, /^(?:Đơn hàng|Orders)$/i),
+    aov: findCol(columns, /^(?:Giá trị trung bình đơn|Avg\. order value)/i),
+    itemsSold: findCol(columns, /^(?:Số món bán ra|Items sold)$/i)
   };
-  if (!c.name || !c.gmv) return { items: [], hasAnyBatch: true };
+  if (!c.name || !c.gmv) return { items: [], hasAnyBatch: true, excludedMultiMonth: 0 };
 
-  const items = rows
+  const parsed = rows
     .map((raw) => ({
       name: String(raw[c.name!] ?? "").trim(),
       status: String((c.status && raw[c.status]) ?? "").trim(),
@@ -156,13 +168,71 @@ export async function fetchTopPromotionsMonthSlice(brandId: string, monthStart: 
       aov: num(c.aov && raw[c.aov]),
       itemsSold: num(c.itemsSold && raw[c.itemsSold])
     }))
-    // "ongoing" = voucher/khuyến mãi chạy nền quanh năm (freeship, giảm giá cố định) — luôn đứng
-    // đầu bảng nếu không lọc vì cộng dồn GMV suốt nhiều tháng, làm sai lệch insight "khuyến mãi nổi
-    // bật tháng này". Giá trị status xác nhận đúng tiếng Anh nguyên văn từ file export thật (không
-    // phải tiếng Việt) — xem brief kỹ thuật + đối chiếu file thật 2026-08-22.
-    .filter((r) => r.name && r.gmv > 0 && r.status.toLowerCase() !== "ongoing")
-    .sort((a, b) => b.gmv - a.gmv)
-    .slice(0, limit);
+    .filter((r) => r.name && r.gmv > 0);
 
-  return { items, hasAnyBatch: true };
+  // FIX 2026-09-23: cột GMV của file Shop Promotion List là **LUỸ KẾ CẢ CHƯƠNG TRÌNH**, TikTok
+  // không cắt theo kỳ export. Bằng chứng: "1-12.2026 - VC 10K MS 50K" hiện đúng 24.746.378.275đ ở
+  // cả 4 file T6/T7/T8/T9 của CROCS — lớn hơn cả GMV 4 tháng của shop.
+  //
+  // Bộ lọc cũ chỉ bỏ status "ongoing" nên vẫn lọt chương trình ĐÃ KẾT THÚC mà chạy vắt 2 tháng:
+  // "MD July 6.7 - TBU (1)" đứng đầu bảng cả T7 lẫn T8 với CÙNG một con số 2.148.591.440đ.
+  //
+  // Mốc đúng là KỲ CHẠY nằm TRỌN trong tháng — khi đó luỹ kế chính là số của tháng. Chương trình
+  // vắt qua tháng khác thì không có cách nào tách phần thuộc tháng này từ file, nên loại hẳn khỏi
+  // bảng xếp hạng và báo số lượng để ops biết đã bỏ bao nhiêu.
+  const insideMonth = parsed.filter((r) => {
+    const { start, end } = promoPeriodBounds(r.period);
+    return !!start && !!end && start >= monthStart && end <= monthEnd;
+  });
+
+  return {
+    items: insideMonth.sort((a, b) => b.gmv - a.gmv).slice(0, limit),
+    hasAnyBatch: true,
+    excludedMultiMonth: parsed.length - insideMonth.length
+  };
+}
+
+// "Video GMV" + "Product Card GMV" của Report Tháng (dải so sánh kênh + biểu đồ tỷ trọng). Trước
+// đây 2 số này đọc từ report riêng "Product Card Traffic Stats" (migration 0064) nhưng loại report
+// đó CHƯA TỪNG có file thật nào được upload nên 2 dòng luôn hiện 0. Nay lấy từ 2 file ops vẫn
+// upload hằng tháng, khỏi phải export thêm loại report thứ 8:
+//   - Video GMV = shop_analytics: "GMV đến từ video liên kết" + "GMV nhờ video của tài khoản kết nối"
+//   - Card GMV  = product_list:   tổng cột "GMV thẻ sản phẩm của người bán" trên mọi SKU
+// Đã đối chiếu với file "Product Traffic — Shop [total]" của CROCS kỳ 01/06–22/09/2026:
+// video 1.431.260.521 vs 1.430.022.521 (lệch 0,09%), thẻ SP 5.293.989.509 vs 5.284.560.473 (0,18%)
+// — chênh do 2 file được tải lệch nhau vài tiếng trong ngày 22/9 vốn còn đang chạy.
+export interface ChannelGmvMonthSlice {
+  videoGmv: number;
+  cardGmv: number;
+  hasVideoBatch: boolean;
+  hasCardBatch: boolean;
+}
+
+export async function fetchChannelGmvMonthSlice(brandId: string, monthStart: string, monthEnd: string): Promise<ChannelGmvMonthSlice> {
+  const [video, card] = await Promise.all([
+    fetchOverlappingBatchRows(brandId, "shop_analytics", monthStart, monthEnd),
+    fetchOverlappingBatchRows(brandId, "product_list", monthStart, monthEnd)
+  ]);
+
+  let videoGmv = 0;
+  if (video.hasAnyBatch) {
+    const dateCol = findCol(video.columns, /^(?:Ngày|Date)$/i);
+    const creatorVideo = findCol(video.columns, /^(?:GMV đến từ video liên kết|Creator video-attributed GMV)$/i);
+    const linkedVideo = findCol(video.columns, /^(?:GMV nhờ video của tài khoản kết nối|Linked account video-attributed GMV)$/i);
+    for (const raw of video.rows) {
+      // shop_analytics là bảng theo NGÀY nên phải lọc dòng về đúng tháng đang xem (batch có thể
+      // phủ rộng hơn 1 tháng) — khác product_list vốn đã là tổng cả kỳ, cộng thẳng mọi dòng.
+      const d = dateCol ? vnDateToIso(raw[dateCol]) : undefined;
+      if (!d || d < monthStart || d > monthEnd) continue;
+      videoGmv += num(creatorVideo && raw[creatorVideo]) + num(linkedVideo && raw[linkedVideo]);
+    }
+  }
+
+  let cardGmv = 0;
+  if (card.hasAnyBatch) {
+    const cardCol = findCol(card.columns, /^(?:GMV thẻ sản phẩm của người bán|Seller product card GMV)$/i);
+    if (cardCol) for (const raw of card.rows) cardGmv += num(raw[cardCol]);
+  }
+
+  return { videoGmv, cardGmv, hasVideoBatch: video.hasAnyBatch, hasCardBatch: card.hasAnyBatch };
 }

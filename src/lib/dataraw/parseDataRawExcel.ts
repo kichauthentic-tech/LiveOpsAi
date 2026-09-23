@@ -70,7 +70,11 @@ function vnDateToIso(s: string): string | undefined {
 
 function parseShopPromotion(rows: unknown[][]): ParsedDataRawImport {
   const metaLine = String(rows[0]?.[0] ?? "");
-  const metaMatch = metaLine.match(/\[Phạm vi ngày\]:\s*([\d\-T:]+)\s*~\s*([\d\-T:]+)/);
+  // Song ngữ — xem parseLiveAnalysis. Cột neo "ID" giống nhau ở cả 2 bản nên TRƯỚC bản vá này
+  // file tiếng Anh vẫn parse "thành công" nhưng periodStart/periodEnd về undefined: batch vào kho
+  // mà Report Tháng không thấy (lọc overlap yêu cầu period_start/end khác null) và cũng không gộp
+  // được theo tháng (monthKey undefined -> luôn insert mới, không hỏi ghi đè). Hỏng im lặng.
+  const metaMatch = metaLine.match(/\[(?:Phạm vi ngày|Date Range)\]:\s*([\d\-T:]+)\s*~\s*([\d\-T:]+)/);
   const headerIdx = rows.findIndex((r) => r && String(r[0] ?? "").trim() === "ID");
   if (headerIdx === -1) {
     throw new Error('Không tìm thấy dòng tiêu đề (cột "ID") — file có đúng định dạng "Shop Promotion List" từ TikTok Shop không?');
@@ -78,7 +82,7 @@ function parseShopPromotion(rows: unknown[][]): ParsedDataRawImport {
   const header = trimTrailingEmpty(rows[headerIdx]);
   const columns = dedupeHeaders(header);
   return {
-    periodLabel: metaLine.replace(/^\[Phạm vi ngày\]:\s*/, "").trim() || undefined,
+    periodLabel: metaLine.replace(/^\[(?:Phạm vi ngày|Date Range)\]:\s*/, "").trim() || undefined,
     periodStart: metaMatch?.[1]?.slice(0, 10),
     periodEnd: metaMatch?.[2]?.slice(0, 10),
     columns,
@@ -86,17 +90,22 @@ function parseShopPromotion(rows: unknown[][]): ParsedDataRawImport {
   };
 }
 
+// Song ngữ — xem parseLiveAnalysis. 175 cột của bản Việt và bản Anh khớp 1:1 đúng thứ tự.
 function parseProductList(rows: unknown[][]): ParsedDataRawImport {
   const metaLine = String(rows[0]?.[0] ?? "");
-  const metaMatch = metaLine.match(/Ngày phân tích:\s*(\d{2}\/\d{2}\/\d{4})~(\d{2}\/\d{2}\/\d{4})/);
-  const headerIdx = rows.findIndex((r) => r && String(r[0] ?? "").trim() === "Tên" && String(r[1] ?? "").trim() === "ID sản phẩm");
+  const metaMatch = metaLine.match(/(?:Ngày phân tích|Analysis date):\s*(\d{2}\/\d{2}\/\d{4})~(\d{2}\/\d{2}\/\d{4})/);
+  const headerIdx = rows.findIndex((r) => {
+    const a = String(r?.[0] ?? "").trim();
+    const b = String(r?.[1] ?? "").trim();
+    return (a === "Tên" && b === "ID sản phẩm") || (a === "Product Name" && b === "Product ID");
+  });
   if (headerIdx === -1) {
-    throw new Error('Không tìm thấy dòng tiêu đề (cột "Tên"/"ID sản phẩm") — file có đúng định dạng "Product List" từ TikTok Shop không?');
+    throw new Error('Không tìm thấy dòng tiêu đề (cột "Tên"/"ID sản phẩm" hoặc "Product Name"/"Product ID") — file có đúng định dạng "Product List" từ TikTok Shop không?');
   }
   const header = trimTrailingEmpty(rows[headerIdx]);
   const columns = dedupeHeaders(header);
   return {
-    periodLabel: metaLine.replace(/^Ngày phân tích:\s*/, "").trim() || undefined,
+    periodLabel: metaLine.replace(/^(?:Ngày phân tích|Analysis date):\s*/, "").trim() || undefined,
     periodStart: metaMatch ? vnDateToIso(metaMatch[1]) : undefined,
     periodEnd: metaMatch ? vnDateToIso(metaMatch[2]) : undefined,
     columns,
@@ -104,17 +113,25 @@ function parseProductList(rows: unknown[][]): ParsedDataRawImport {
   };
 }
 
+// Live Analysis xuất được cả 2 ngôn ngữ tuỳ ngôn ngữ giao diện Seller Center, và ops phải đổi qua
+// lại giữa Seller Center với Partner Center (vốn hay để tiếng Anh) nên nhận cả hai thay vì bắt ops
+// nhớ đổi ngôn ngữ trước mỗi lần export. Bản tiếng Anh dùng cho bảng Affiliate (view "linked
+// accounts" mới có dòng của creator affiliate, view mặc định chỉ có tài khoản shop).
+// Tên cột của 2 bản khác nhau nữa — xem COLUMN_PATTERNS ở lib/dataraw/liveAnalysisRows.ts.
 function parseLiveAnalysis(rows: unknown[][]): ParsedDataRawImport {
   const metaLine = String(rows[0]?.[0] ?? "");
-  const metaMatch = metaLine.match(/Phạm vi ngày:\s*([\d\-]+)\s*~\s*([\d\-]+)/);
-  const headerIdx = rows.findIndex((r) => r && String(r[0] ?? "").trim() === "ID nhà sáng tạo");
+  const metaMatch = metaLine.match(/(?:Phạm vi ngày|Date Range):\s*([\d\-]+)\s*~\s*([\d\-]+)/);
+  const headerIdx = rows.findIndex((r) => {
+    const first = String(r?.[0] ?? "").trim();
+    return first === "ID nhà sáng tạo" || first === "Creator ID";
+  });
   if (headerIdx === -1) {
-    throw new Error('Không tìm thấy dòng tiêu đề (cột "ID nhà sáng tạo") — file có đúng định dạng "Live Analysis" từ TikTok Shop không?');
+    throw new Error('Không tìm thấy dòng tiêu đề (cột "ID nhà sáng tạo"/"Creator ID") — file có đúng định dạng "Live Analysis" từ TikTok Shop không?');
   }
   const header = trimTrailingEmpty(rows[headerIdx]);
   const columns = dedupeHeaders(header);
   return {
-    periodLabel: metaLine.replace(/^Phạm vi ngày:\s*/, "").trim() || undefined,
+    periodLabel: metaLine.replace(/^(?:Phạm vi ngày|Date Range):\s*/, "").trim() || undefined,
     periodStart: metaMatch?.[1],
     periodEnd: metaMatch?.[2],
     columns,
@@ -125,9 +142,12 @@ function parseLiveAnalysis(rows: unknown[][]): ParsedDataRawImport {
 // Shop Analytics có 2 khối tách biệt: "Tổng quan dữ liệu" (2 dòng: Tổng giá trị/Phần trăm thay
 // đổi, theo cột chỉ số) rồi "Dữ liệu theo ngày" (bảng theo ngày, header riêng). Khối tổng quan
 // lưu vào "summary" ở batch, không trộn vào rows — rows chỉ chứa bảng theo ngày.
+// Nhận cả bản tiếng Việt lẫn tiếng Anh: ops phải để Seller Center tiếng Anh mới xuất được
+// Affiliate Creator List (Partner Center chỉ có tiếng Anh), nên file Shop Analytics tải trong
+// cùng phiên sẽ ra tiếng Anh. 28 cột của 2 bản khớp 1:1 theo đúng thứ tự, chỉ khác tên.
 function parseShopAnalytics(rows: unknown[][]): ParsedDataRawImport {
   const metaLine = String(rows[0]?.[0] ?? "");
-  const metaMatch = metaLine.match(/Ngày phân tích:\s*(\d{2}\/\d{2}\/\d{4})-(\d{2}\/\d{2}\/\d{4})/);
+  const metaMatch = metaLine.match(/(?:Ngày phân tích|Analysis date):\s*(\d{2}\/\d{2}\/\d{4})-(\d{2}\/\d{2}\/\d{4})/);
   const compareLine = String(rows[0]?.[1] ?? "");
 
   const overviewHeaderIdx = rows.findIndex((r, i) => i > 0 && r && String(r[1] ?? "").trim() === "GMV");
@@ -146,7 +166,10 @@ function parseShopAnalytics(rows: unknown[][]): ParsedDataRawImport {
     summary = { totals, changePct };
   }
 
-  const dailyHeaderIdx = rows.findIndex((r) => r && String(r[0] ?? "").trim() === "Ngày");
+  const dailyHeaderIdx = rows.findIndex((r) => {
+    const first = r && String(r[0] ?? "").trim();
+    return first === "Ngày" || first === "Date";
+  });
   if (dailyHeaderIdx === -1) {
     throw new Error('Không tìm thấy bảng "Dữ liệu theo ngày" — file có đúng định dạng "Shop Analytics" từ TikTok Shop không?');
   }
@@ -154,7 +177,7 @@ function parseShopAnalytics(rows: unknown[][]): ParsedDataRawImport {
   const columns = dedupeHeaders(header);
 
   return {
-    periodLabel: [metaLine.replace(/^Ngày phân tích:\s*/, "").trim(), compareLine.trim()].filter(Boolean).join(" | ") || undefined,
+    periodLabel: [metaLine.replace(/^(?:Ngày phân tích|Analysis date):\s*/, "").trim(), compareLine.trim()].filter(Boolean).join(" | ") || undefined,
     periodStart: metaMatch ? vnDateToIso(metaMatch[1]) : undefined,
     periodEnd: metaMatch ? vnDateToIso(metaMatch[2]) : undefined,
     columns,
@@ -170,9 +193,12 @@ function parseShopAnalytics(rows: unknown[][]): ParsedDataRawImport {
 function parseDailyByThoiGianHeader(rows: unknown[][], metaRegex: RegExp, metaPrefix: RegExp, reportLabel: string): ParsedDataRawImport {
   const metaLine = String(rows[0]?.[0] ?? "");
   const metaMatch = metaLine.match(metaRegex);
-  const headerIdx = rows.findIndex((r) => r && String(r[0] ?? "").trim() === "Thời gian");
+  const headerIdx = rows.findIndex((r) => {
+    const first = r && String(r[0] ?? "").trim();
+    return first === "Thời gian" || first === "Time";
+  });
   if (headerIdx === -1) {
-    throw new Error(`Không tìm thấy dòng tiêu đề (cột "Thời gian") — file có đúng định dạng "${reportLabel}" từ TikTok Shop không?`);
+    throw new Error(`Không tìm thấy dòng tiêu đề (cột "Thời gian"/"Time") — file có đúng định dạng "${reportLabel}" từ TikTok Shop không?`);
   }
   const header = trimTrailingEmpty(rows[headerIdx]);
   const columns = dedupeHeaders(header);
@@ -185,12 +211,11 @@ function parseDailyByThoiGianHeader(rows: unknown[][], metaRegex: RegExp, metaPr
   };
 }
 
+// Bản tiếng Anh dùng "Date Range:" thay "Phạm vi ngày:" (đã đối chiếu file thật 2026-09-22, 18 cột
+// khớp 1:1 đúng thứ tự). Product Card Traffic Stats chưa từng có file tiếng Anh để đối chiếu —
+// biến thể "[Date Range]:" ở đây là suy ra theo cùng quy luật, CHƯA verify bằng file thật.
 function parseLivePerformanceCoreStats(rows: unknown[][]): ParsedDataRawImport {
-  return parseDailyByThoiGianHeader(rows, /Phạm vi ngày:\s*([\d\-]+)\s*~\s*([\d\-]+)/, /^Phạm vi ngày:\s*/, "Live Performance Core Stats");
-}
-
-function parseProductCardTrafficStats(rows: unknown[][]): ParsedDataRawImport {
-  return parseDailyByThoiGianHeader(rows, /\[Phạm vi ngày\]:\s*([\d\-]+)\s*~\s*([\d\-]+)/, /^\[Phạm vi ngày\]:\s*/, "Product Card Traffic Stats");
+  return parseDailyByThoiGianHeader(rows, /(?:Phạm vi ngày|Date Range):\s*([\d\-]+)\s*~\s*([\d\-]+)/, /^(?:Phạm vi ngày|Date Range):\s*/, "Live Performance Core Stats");
 }
 
 // Creator-Live-Performance (migration 0066) — xuất từ TikTok Creator Center, tiếng Anh, 1
@@ -214,36 +239,6 @@ function parseCreatorLivePerformance(rows: unknown[][]): ParsedDataRawImport {
   };
 }
 
-// "..._20260701-20260731.xlsx" -> {start: "2026-07-01", end: "2026-07-31"}
-function periodFromFileName(fileName: string): { start?: string; end?: string } {
-  const m = fileName.match(/(\d{4})(\d{2})(\d{2})-(\d{4})(\d{2})(\d{2})/);
-  if (!m) return {};
-  const [, y1, m1, d1, y2, m2, d2] = m;
-  return { start: `${y1}-${m1}-${d1}`, end: `${y2}-${m2}-${d2}` };
-}
-
-// Transaction Analysis — Creator List (migration 0074) — export tiếng Anh từ TikTok Shop Partner
-// Center, 1 dòng/creator affiliate. Khác mọi report khác ở chỗ hàng 0 LÀ header luôn (không có
-// dòng meta phạm vi ngày riêng), hàng 1 là mô tả cột (bỏ qua) rồi mới tới data — nên kỳ báo cáo
-// phải lấy từ chính tên file (dạng "..._YYYYMMDD-YYYYMMDD.xlsx").
-function parseTransactionAnalysisCreatorList(rows: unknown[][], fileName: string): ParsedDataRawImport {
-  const headerIdx = rows.findIndex((r) => r && String(r[0] ?? "").trim() === "Creator name");
-  if (headerIdx === -1) {
-    throw new Error('Không tìm thấy dòng tiêu đề (cột "Creator name") — file có đúng định dạng "Transaction Analysis - Creator List" từ TikTok Shop Partner Center không?');
-  }
-  const header = trimTrailingEmpty(rows[headerIdx]);
-  const columns = dedupeHeaders(header);
-  const period = periodFromFileName(fileName);
-  return {
-    periodLabel: period.start && period.end ? `${period.start} ~ ${period.end}` : undefined,
-    periodStart: period.start,
-    periodEnd: period.end,
-    columns,
-    // headerIdx + 2: hàng headerIdx + 1 là dòng mô tả cột (text dài, không phải data), bỏ qua.
-    rows: buildRows(rows, headerIdx + 2, columns)
-  };
-}
-
 export async function parseDataRawExcel(file: File, reportType: DataRawReportType): Promise<ParsedDataRawImport> {
   const buf = await file.arrayBuffer();
   const rows = readSheetRows(buf);
@@ -253,8 +248,6 @@ export async function parseDataRawExcel(file: File, reportType: DataRawReportTyp
     case "live_analysis": return parseLiveAnalysis(rows);
     case "shop_analytics": return parseShopAnalytics(rows);
     case "live_performance_core_stats": return parseLivePerformanceCoreStats(rows);
-    case "product_card_traffic_stats": return parseProductCardTrafficStats(rows);
     case "creator_live_performance": return parseCreatorLivePerformance(rows);
-    case "transaction_analysis_creator_list": return parseTransactionAnalysisCreatorList(rows, file.name);
   }
 }

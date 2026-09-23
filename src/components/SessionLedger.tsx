@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { SESSION_STATUS_CLS, SESSION_STATUS_LABEL_VI } from "../lib/sessionStatusUi";
-import { BookOpen, CheckCircle2, ChevronRight, Circle, Link2 } from "lucide-react";
+import { BookOpen, CheckCircle2, ChevronRight, Circle, Download, Link2 } from "lucide-react";
 import { Brand, LiveSession, Studio, Talent, UserRole, AuditLogEntry } from "../types";
 import { getTodayDate } from "../lib/dateUtils";
 import { formatCurrencyAdaptive } from "../lib/formatCurrency";
 import { sessionHours } from "../lib/performance/hostPerformance";
 import { SessionReportInput } from "../lib/db/sessionReports";
+import { downloadRowsAsXlsx } from "../lib/exportXlsx";
 import {
   LedgerFilter,
   MissingStep,
@@ -15,12 +16,13 @@ import {
   hasReport,
   hasSnapshot,
   isReconciled,
+  needsClosing,
+  metricsHiddenFor,
   ledgerHostKey,
   ledgerHosts,
   ledgerMonths,
   linkedSessions,
   missingSteps,
-  needsClosing,
   sessionIncidents,
   summarize
 } from "../lib/sessionLedger";
@@ -92,6 +94,17 @@ function fmtInt(n: number | undefined): string {
 const inputCls =
   "bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs text-[var(--text)] focus:outline-none focus:border-[var(--accent)]";
 
+// Ô số bị khoá vì tháng chưa phát hành. Cố ý KHÔNG dùng dấu "—" như ô rỗng: brand phải phân biệt
+// được "ca này chưa có số" với "có số rồi nhưng chưa tới lượt bạn xem".
+const LockedCell: React.FC = () => (
+  <span
+    title="Số liệu tháng này sẽ hiện sau khi Report Tháng được phát hành."
+    className="text-[10px] text-[var(--text-faint)] font-normal italic"
+  >
+    chưa phát hành
+  </span>
+);
+
 export const SessionLedger: React.FC<SessionLedgerProps> = ({
   variant,
   sessions,
@@ -135,10 +148,63 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
   const days = useMemo(() => groupByDate(rows), [rows]);
   const summary = useMemo(() => summarize(rows, today), [rows, today]);
 
+  // Số ca trong bộ lọc hiện tại mà người đang xem KHÔNG được thấy số (brand + tháng chưa phát
+  // hành). Các ca đó đóng góp 0 vào mọi ô KPI ở dải tổng bên dưới, nên phải nói ra: không thì
+  // brand đọc "3,5 tỷ" mà thực tế là tổng của riêng những tháng đã phát hành, và tưởng đó là
+  // toàn bộ kết quả.
+  const hiddenCount = useMemo(
+    () => rows.filter((s) => metricsHiddenFor(s, currentRole)).length,
+    [rows, currentRole]
+  );
+
   const [openId, setOpenId] = useState<string | null>(null);
   const openSession = openId ? sessions.find((s) => s.id === openId) ?? null : null;
 
   const patch = (p: Partial<LedgerFilter>) => setFilter((f) => ({ ...f, ...p }));
+
+  // Xuất Excel (Đợt C/4) — đúng những dòng/cột đang hiện trên bảng bên dưới, kể cả phần bị che.
+  // Không đọc thêm gì ngoài `rows` (đã lọc + đã che theo role từ chính state đang render), nên
+  // không thể lộ hơn những gì màn hình đang cho xem.
+  const handleExport = () => {
+    const exportRows = rows.map((s) => {
+      const hours = sessionHours(s);
+      const gmvPerHour = hours > 0 ? (s.actualGmv ?? 0) / hours : 0;
+      const hideMetrics = metricsHiddenFor(s, currentRole);
+      const incidents = sessionIncidents(s).filter((i) => !isBrandView || !i.internal);
+      const row: Record<string, string | number> = {
+        "Ngày": s.date,
+        "Giờ": `${s.startTime}–${s.endTime}`
+      };
+      if (!isBrandView) row["Brand"] = s.brandName;
+      row["Host"] = s.hostName || (isBrandView ? "" : "chưa gán");
+      if (!isBrandView) row["Trợ live"] = s.coHostName || "";
+      row["Trạng thái"] = STATUS_LABEL[s.status];
+      row["Giờ live"] = s.liveDurationMinutes ? Number((s.liveDurationMinutes / 60).toFixed(2)) : Number(hours.toFixed(2));
+      if (!isBrandView) row["Target"] = s.targetGmv || 0;
+      row["GMV"] = hideMetrics ? "Chưa phát hành" : s.actualGmv || 0;
+      row["Đơn"] = hideMetrics ? "Chưa phát hành" : s.totalOrders || 0;
+      if (isBrandView) row["Lượt xem"] = hideMetrics ? "Chưa phát hành" : s.totalViews || 0;
+      row["GMV/giờ"] = hideMetrics ? "Chưa phát hành" : Math.round(gmvPerHour);
+      row[isBrandView ? "Số liệu" : "Dữ liệu"] = isBrandView
+        ? hideMetrics
+          ? "Chờ phát hành"
+          : s.status === "Completed" || s.actualGmv
+            ? brandTrustLabel(s)
+            : ""
+        : !needsClosing(s, today)
+          ? "Chưa cần đóng"
+          : [
+              hasSnapshot(s) ? "Snapshot ✓" : "Snapshot ✗",
+              hasReport(s) ? "Report ✓" : "Report ✗",
+              isReconciled(s) ? "Đối soát ✓" : "Đối soát ✗"
+            ].join(", ");
+      row["Sự cố"] = incidents.map((i) => i.label).join(", ");
+      return row;
+    });
+    const monthLabel = filter.month || "moi-thang";
+    const scopeLabel = isBrandView ? (brandsById.get(brandId ?? "")?.name ?? "brand") : (filter.brandId ? brandsById.get(filter.brandId)?.name ?? "brand" : "tat-ca-brand");
+    downloadRowsAsXlsx("So Ca", exportRows, `SoCa_${scopeLabel}_${monthLabel}.xlsx`.replace(/\s+/g, "_"));
+  };
 
   return (
     <div className="space-y-4">
@@ -154,6 +220,12 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
                 ? "Từng ca live đã chạy cho brand: giờ live thật, GMV, đơn, lượt xem. Số “Tạm tính” còn chờ TikTok cập nhật, “Đã chốt” là số đối soát cuối kỳ."
                 : "Từng ca đã/đang chạy: số thật của ca, số đó tin được tới đâu, và còn thiếu bước nào (snapshot → report → đối soát) để chốt tháng."}
             </p>
+            {hiddenCount > 0 && (
+              <p className="text-[11px] text-amber-300 mt-1.5 max-w-2xl">
+                {hiddenCount}/{rows.length} ca thuộc tháng chưa phát hành Report Tháng — số liệu của các ca đó chưa hiển thị,
+                và <b>chưa được tính</b> vào các ô tổng bên dưới.
+              </p>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <select value={filter.month} onChange={(e) => patch({ month: e.target.value })} className={inputCls}>
@@ -194,6 +266,14 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
                 </option>
               ))}
             </select>
+            <button
+              onClick={handleExport}
+              disabled={rows.length === 0}
+              title="Xuất đúng các dòng đang lọc ra file Excel"
+              className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface-base)] text-[var(--text-muted)] hover:text-[var(--text)] hover:border-[var(--accent)] disabled:opacity-40 transition-colors"
+            >
+              <Download className="w-3.5 h-3.5" /> Xuất Excel
+            </button>
           </div>
         </div>
 
@@ -282,6 +362,8 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
                   {day.sessions.map((s) => {
                     const hours = sessionHours(s);
                     const gmvPerHour = hours > 0 ? (s.actualGmv ?? 0) / hours : 0;
+                    // Brand + tháng chưa phát hành: số đã bị view che, ô phải nói rõ LÝ DO.
+                    const hideMetrics = metricsHiddenFor(s, currentRole);
                     const incidents = sessionIncidents(s).filter((i) => !isBrandView || !i.internal);
                     const missing = isBrandView ? [] : missingSteps(s, today);
                     const isOpen = openId === s.id;
@@ -332,18 +414,34 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
                           </td>
                         )}
                         <td className="py-2.5 px-2 text-right font-bold text-[var(--success)] whitespace-nowrap">
-                          {s.actualGmv ? formatCurrencyAdaptive(s.actualGmv, "") : <span className="text-[var(--text-faint)] font-normal">—</span>}
+                          {hideMetrics ? (
+                            <LockedCell />
+                          ) : s.actualGmv ? (
+                            formatCurrencyAdaptive(s.actualGmv, "")
+                          ) : (
+                            <span className="text-[var(--text-faint)] font-normal">—</span>
+                          )}
                         </td>
-                        <td className="py-2.5 px-2 text-right text-[var(--text-muted)]">{s.totalOrders ? fmtInt(s.totalOrders) : "—"}</td>
+                        <td className="py-2.5 px-2 text-right text-[var(--text-muted)]">
+                          {hideMetrics ? <LockedCell /> : s.totalOrders ? fmtInt(s.totalOrders) : "—"}
+                        </td>
                         {isBrandView && (
-                          <td className="py-2.5 px-2 text-right text-[var(--text-muted)]">{s.totalViews ? fmtInt(s.totalViews) : "—"}</td>
+                          <td className="py-2.5 px-2 text-right text-[var(--text-muted)]">
+                            {hideMetrics ? <LockedCell /> : s.totalViews ? fmtInt(s.totalViews) : "—"}
+                          </td>
                         )}
                         <td className="py-2.5 px-2 text-right text-[var(--text-muted)] whitespace-nowrap">
-                          {gmvPerHour > 0 ? formatCurrencyAdaptive(gmvPerHour, "") : "—"}
+                          {hideMetrics ? <LockedCell /> : gmvPerHour > 0 ? formatCurrencyAdaptive(gmvPerHour, "") : "—"}
                         </td>
                         <td className="py-2.5 px-2">
                           {isBrandView ? (
-                            s.status === "Completed" || s.actualGmv ? <TrustBadge session={s} /> : <span className="text-[var(--text-faint)]">—</span>
+                            hideMetrics ? (
+                              <span className="text-[10px] text-[var(--text-faint)]">chờ phát hành</span>
+                            ) : s.status === "Completed" || s.actualGmv ? (
+                              <TrustBadge session={s} />
+                            ) : (
+                              <span className="text-[var(--text-faint)]">—</span>
+                            )
                           ) : (
                             <PipelineDots session={s} today={today} />
                           )}

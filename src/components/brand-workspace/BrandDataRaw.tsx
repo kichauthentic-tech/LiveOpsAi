@@ -24,15 +24,9 @@ const REPORT_TABS: { id: DataRawReportType; label: string; hint: string }[] = [
     label: "Creator Live Performance",
     hint: 'Export "Creator-Live-Performance" từ TikTok Creator Center — nguồn chính cho GMV/CTR/CTOR Livestream trong Report Tháng (thay thế Live Analysis).'
   },
-  { id: "live_analysis", label: "Live Analysis (Cũ)", hint: 'Export "Live Analysis" từ TikTok Shop Seller Center — KHÔNG còn dùng cho Report Tháng, chỉ giữ lại để tra cứu batch cũ đã import trước đây.' },
+  { id: "live_analysis", label: "Live Analysis", hint: 'Export "Live Analysis" từ TikTok Shop Seller Center ở chế độ xem "linked accounts" (chế độ mặc định chỉ có tài khoản shop, không có creator affiliate nào) — nguồn cho trang Affiliate và cột đối chiếu của Report Tuần.' },
   { id: "shop_analytics", label: "Shop Analytics", hint: 'Export "Shop Analytics — Key metrics" từ TikTok Shop Seller Center.' },
-  { id: "live_performance_core_stats", label: "Live Performance", hint: 'Export "Live Performance Core Stats" từ TikTok Shop Seller Center — GMV LIVE theo ngày, dùng cho biểu đồ xu hướng ngày trong Report Tháng.' },
-  { id: "product_card_traffic_stats", label: "Product Card Traffic", hint: 'Export "Product Card Traffic Stats" từ TikTok Shop Seller Center — traffic thẻ sản phẩm theo ngày.' },
-  {
-    id: "transaction_analysis_creator_list",
-    label: "Affiliate — Creator List",
-    hint: 'Export "Transaction Analysis - Creator List" từ TikTok Shop Partner Center (tên file dạng "..._YYYYMMDD-YYYYMMDD.xlsx") — GMV/đơn/hoa hồng theo từng creator affiliate trong kỳ. Hiện chỉ lưu để tra cứu, chưa nối vào Report Tháng Tab 04.'
-  }
+  { id: "live_performance_core_stats", label: "Live Performance", hint: 'Export "Live Performance Core Stats" từ TikTok Shop Seller Center — GMV LIVE theo ngày, dùng cho biểu đồ xu hướng ngày trong Report Tháng.' }
 ];
 
 function fmtCell(v: unknown): string {
@@ -44,6 +38,26 @@ function fmtCell(v: unknown): string {
 // khi file không đọc được kỳ — vẫn gộp được theo tháng upload thay vì rơi hết vào 1 nhóm "không rõ".
 function groupMonthKey(imp: BrandDataRawImport): string {
   return (imp.periodStart || imp.importedAt).slice(0, 7);
+}
+
+// Mọi tháng mà batch PHỦ, không chỉ tháng của periodStart. Cần cho panel "Nạp bù ca từ file":
+// từ 2026-09-22 ops upload Creator-Live-Performance bằng 1 file trải nhiều tháng (bản export theo
+// từng tháng hay rụng phiên ngày đầu tháng — xem WORKSPACE_DESIGN.md), nên gom theo periodStart sẽ
+// chỉ cho chọn đúng tháng 6 và không nạp bù được ca của 7/8/9.
+function monthsCoveredBy(imports: BrandDataRawImport[]): string[] {
+  const out = new Set<string>();
+  for (const imp of imports) {
+    const from = (imp.periodStart || imp.importedAt).slice(0, 7);
+    const to = (imp.periodEnd || imp.periodStart || imp.importedAt).slice(0, 7);
+    let [y, m] = from.split("-").map(Number);
+    for (let guard = 0; guard < 120; guard++) {
+      const key = `${y}-${String(m).padStart(2, "0")}`;
+      out.add(key);
+      if (key >= to) break;
+      if (++m > 12) { m = 1; y++; }
+    }
+  }
+  return Array.from(out).sort((a, b) => (a < b ? 1 : -1));
 }
 
 function formatMonthLabel(key: string): string {
@@ -218,7 +232,7 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ brandId, brandName, 
         <BackfillFromRooms
           brandId={brandId}
           brandName={brandName}
-          months={groups.map(([monthKey]) => monthKey)}
+          months={monthsCoveredBy(imports)}
           sessions={sessions}
           talents={talents}
           onSessionsChanged={onSessionsChanged}

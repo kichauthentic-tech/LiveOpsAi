@@ -15,6 +15,7 @@ import {
   missingSteps,
   sessionCounters,
   sessionIncidents,
+  metricsHiddenFor,
   sessionRatios
 } from "../lib/sessionLedger";
 import { DataSourceBadge } from "./common/DataSourceBadge";
@@ -105,6 +106,9 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
   const canReport = !isBrandView && (isOps || isMine) && !s.isBackfill && !!onSubmitSessionReport;
   const canSnapshot = !isBrandView && (isOps || isMine) && !s.isBackfill && !!onSessionSnapshotApplied;
   const canEdit = isOps && !!onUpdateSession && !!studios && !!talents;
+  // Brand + tháng chưa phát hành Report Tháng (0107): view đã che số về null/0, cửa sổ này phải
+  // nói rõ lý do thay vì hiện "—" như ca chưa có số.
+  const hideMetrics = metricsHiddenFor(s, viewer.role);
 
   const [editingReport, setEditingReport] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -236,7 +240,18 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
             </div>
             <div className="flex flex-wrap items-center gap-1.5 mt-2">
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${STATUS_CLS[s.status]}`}>{STATUS_LABEL[s.status]}</span>
-              {isBrandView ? <TrustBadge session={s} /> : <DataSourceBadge dataSource={s.dataSource} />}
+              {/* Nhãn tin cậy nói "số này chốt tới đâu" — vô nghĩa khi chưa được thấy số nào. */}
+              {isBrandView ? (
+                hideMetrics ? (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-[var(--surface-elevated)] text-[var(--text-faint)] border-[var(--border)]">
+                    chưa phát hành
+                  </span>
+                ) : (
+                  <TrustBadge session={s} />
+                )
+              ) : (
+                <DataSourceBadge dataSource={s.dataSource} />
+              )}
               {!isBrandView && s.isBackfill && (
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-[var(--surface-elevated)] text-[var(--text-faint)] border-[var(--border)]">nạp bù từ file</span>
               )}
@@ -317,12 +332,27 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
             <h4 className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-bold mb-2">Kế hoạch vs thực tế</h4>
             <div className="grid grid-cols-2 gap-2">
               <KV label="Giờ kế hoạch" value={`${s.startTime}–${s.endTime} (${fmtHours(planHours)})`} />
-              <KV label="Giờ live thật" value={s.actualStartAt ? `${fmtTime(s.actualStartAt)}–${fmtTime(s.actualEndAt)} (${fmtHours(liveHours)})` : "chưa có file"} muted={!s.actualStartAt} />
-              {!isBrandView && <KV label="Target GMV" value={s.targetGmv ? formatCurrencyAdaptive(s.targetGmv) : "chưa có target"} muted={!s.targetGmv} />}
-              <KV label="GMV thực tế" value={s.actualGmv ? formatCurrencyAdaptive(s.actualGmv) : "—"} accent={!!s.actualGmv} />
-              {!isBrandView && s.targetGmv > 0 && <KV label="Đạt target" value={fmtPct(((s.actualGmv ?? 0) / s.targetGmv) * 100)} />}
-              <KV label="GMV / giờ" value={gmvPerHour > 0 ? formatCurrencyAdaptive(gmvPerHour) : "—"} />
+              {hideMetrics ? (
+                <>
+                  <KV label="Giờ live thật" value="chưa phát hành" muted />
+                  <KV label="GMV thực tế" value="chưa phát hành" muted />
+                  <KV label="GMV / giờ" value="chưa phát hành" muted />
+                </>
+              ) : (
+                <>
+                  <KV label="Giờ live thật" value={s.actualStartAt ? `${fmtTime(s.actualStartAt)}–${fmtTime(s.actualEndAt)} (${fmtHours(liveHours)})` : "chưa có file"} muted={!s.actualStartAt} />
+                  {!isBrandView && <KV label="Target GMV" value={s.targetGmv ? formatCurrencyAdaptive(s.targetGmv) : "chưa có target"} muted={!s.targetGmv} />}
+                  <KV label="GMV thực tế" value={s.actualGmv ? formatCurrencyAdaptive(s.actualGmv) : "—"} accent={!!s.actualGmv} />
+                  {!isBrandView && s.targetGmv > 0 && <KV label="Đạt target" value={fmtPct(((s.actualGmv ?? 0) / s.targetGmv) * 100)} />}
+                  <KV label="GMV / giờ" value={gmvPerHour > 0 ? formatCurrencyAdaptive(gmvPerHour) : "—"} />
+                </>
+              )}
             </div>
+            {hideMetrics && (
+              <p className="mt-2 text-[11px] text-[var(--text-faint)] italic">
+                Số liệu tháng {s.date.slice(0, 7)} sẽ hiện tại đây sau khi Report Tháng được phát hành.
+              </p>
+            )}
           </section>
 
           {/* Số liệu ca — 2 bước cho người trực ca: up file → khai thêm → nộp */}

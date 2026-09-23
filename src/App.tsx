@@ -60,13 +60,19 @@ import {
   Gauge,
   FileSignature,
   Radio,
-  Megaphone
+  Megaphone,
+  CalendarCheck2,
+  Tag
 } from "lucide-react";
 import { Header, WorkspaceContext } from "./components/Header";
 import { BrandCalendar } from "./components/brand-workspace/BrandCalendar";
 import { BrandSkuShowcase } from "./components/brand-workspace/BrandSkuShowcase";
 import { BrandMonthlyReport } from "./components/brand-workspace/BrandMonthlyReport";
 import { BrandAdsReport } from "./components/brand-workspace/BrandAdsReport";
+import { BrandCommitmentView } from "./components/brand-workspace/BrandCommitmentView";
+import { BrandAffiliateTable } from "./components/brand-workspace/BrandAffiliateTable";
+import { BrandNextMonthPlan } from "./components/brand-workspace/BrandNextMonthPlan";
+import { BrandRateCard } from "./components/BrandRateCard";
 import { BrandDataRaw } from "./components/brand-workspace/BrandDataRaw";
 import { Login } from "./components/Login";
 import { ResetPasswordScreen } from "./components/ResetPasswordScreen";
@@ -156,6 +162,16 @@ export default function App() {
   const { session, profile, profileError, loading: authLoading, signOut, passwordRecovery, refreshProfile } = useAuth();
 
   const currentRole: UserRole = profile?.role ?? "talent";
+
+  // Audit 2026-09-22 (#2.10): mọi effect nạp dữ liệu dưới đây chạy cho MỌI role đã đăng nhập, kể cả
+  // talent và brand — app kéo về danh sách tài khoản, audit log, thiết bị, tham số engine... cho
+  // những người không có màn hình nào hiện chúng. Sau migration 0105 thì RLS đã trả 0 dòng nên
+  // không còn là lỗ dữ liệu, nhưng vẫn là request thừa mỗi lần đăng nhập. Gate ở client là lớp
+  // thứ hai, KHÔNG phải lớp bảo vệ — lớp bảo vệ là RLS.
+  //
+  // `profile` lúc đầu là null nên currentRole rơi về "talent"; vì vậy mọi effect gate theo cờ này
+  // phải có `currentRole` trong mảng dependency để chạy lại khi profile nạp xong.
+  const isOpsRole = currentRole === "ceo" || currentRole === "admin" || currentRole === "operations";
 
   // Chuông thông báo (migration 0083) — chỉ poll khi đã có profile; đổi user thì hook tự nạp lại
   // vì RLS lọc theo auth.uid() của phiên hiện tại.
@@ -421,6 +437,8 @@ export default function App() {
 
   useEffect(() => {
     if (!session) return;
+    // Chỉ 2 màn đọc danh sách này — Phân Quyền & Role và CRM — và cả hai đều gate ở ops.
+    if (!isOpsRole) { setPhase4Loading(false); return; }
     let cancelled = false;
     setPhase4Loading(true);
     fetchUsers()
@@ -439,10 +457,12 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [session?.user?.id]);
+  }, [session?.user?.id, isOpsRole]);
 
   useEffect(() => {
     if (!session) return;
+    // Cả 2 bảng đã khoá ở ceo/operations/admin trong migration 0105.
+    if (!isOpsRole) { setPhase5Loading(false); return; }
     let cancelled = false;
     setPhase5Loading(true);
     Promise.all([fetchWorkflowRules(), fetchAuditLogs()])
@@ -462,7 +482,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [session?.user?.id]);
+  }, [session?.user?.id, isOpsRole]);
 
   useEffect(() => {
     if (!session) return;
@@ -490,11 +510,15 @@ export default function App() {
     if (!session) return;
     let cancelled = false;
     setPhase14Loading(true);
-    setEngineParamsLoading(true);
-    fetchEngineParams()
-      .then((r) => { if (cancelled) return; setEngineParams(r.params); setEngineParamsUpdatedAt(r.updatedAt); setEngineParamsError(null); })
-      .catch((e) => { if (!cancelled) setEngineParamsError(`Không tải được tham số engine (dùng mặc định): ${e.message ?? e}`); })
-      .finally(() => { if (!cancelled) setEngineParamsLoading(false); });
+    // Tham số engine gợi ý lịch — chỉ màn Kế Hoạch Tháng / Hỗ Trợ Vận Hành dùng (ops). Khoá ở
+    // ceo/operations/admin trong 0105, nên role khác gọi cũng chỉ nhận về rỗng.
+    if (isOpsRole) {
+      setEngineParamsLoading(true);
+      fetchEngineParams()
+        .then((r) => { if (cancelled) return; setEngineParams(r.params); setEngineParamsUpdatedAt(r.updatedAt); setEngineParamsError(null); })
+        .catch((e) => { if (!cancelled) setEngineParamsError(`Không tải được tham số engine (dùng mặc định): ${e.message ?? e}`); })
+        .finally(() => { if (!cancelled) setEngineParamsLoading(false); });
+    }
     Promise.all([fetchBrandPlatformRates(), fetchShiftSlots(), fetchShiftRegistrations(), fetchRecurringShiftTemplates(), fetchLockedPlanTargets().catch(() => new Map<string, number>()), fetchBrandStudios().catch(() => [] as BrandStudio[])])
       .then(([rates, slots, regs, templates, planTargets, bStudios]) => {
         if (cancelled) return;
@@ -516,7 +540,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [session?.user?.id]);
+  }, [session?.user?.id, isOpsRole]);
 
   useEffect(() => {
     if (!session) return;
@@ -857,7 +881,7 @@ export default function App() {
 
   // Workspace thật đang áp dụng — role "brand" bị ép cứng vào brand của chính họ (không cho
   // chọn lại); ceo/admin/operations dùng state `workspace` từ switcher; các role khác
-  // (talent/moderator) luôn ở Agency Workspace vì chưa có nhu cầu nghiệp vụ nhìn theo brand.
+  // (talent) luôn ở Agency Workspace vì chưa có nhu cầu nghiệp vụ nhìn theo brand.
   const effectiveWorkspace: WorkspaceContext = useMemo(() => {
     if (currentRole === "brand") {
       return activeUser.assignedBrandId ? { type: "brand", brandId: activeUser.assignedBrandId } : { type: "agency" };
@@ -1338,6 +1362,8 @@ export default function App() {
       brandId: slot.brandId ?? "",
       brandName: brand?.name ?? slot.brandName,
       shopTikTokHandle: `@${(brand?.name ?? slot.brandName).toLowerCase().replace(/\s+/g, "") || "shop"}_official`,
+      // Ca mới chốt, chỉ ops mới tới được đây — cờ của view 0107 không áp dụng cho đường ghi.
+      monthPublished: true,
       studioId: slot.studioId ?? "",
       studioName: studio?.name ?? slot.studioName,
       hostId,
@@ -1522,9 +1548,10 @@ export default function App() {
   // (role_permissions của "brand" mặc định false cho manage_calendar/view_financials — dùng
   // lại các key đó ở đây sẽ khoá nhầm chính brand ra khỏi dữ liệu của họ); còn ceo/admin/
   // operations vào xem hộ qua switcher vốn đã có toàn quyền agency-level rồi.
-  // Rate Card không còn ở đây — đã chuyển hẳn sang CRM (Agency-side, gate `view_rate_card`)
-  // để ceo/admin/operations set giá 1 lần cho mọi brand, không cần vào từng brand workspace
-  // (xem "Đã chuyển — Rate Card vào CRM" trong WORKSPACE_DESIGN.md).
+  // Rate Card không còn ở đây — đã chuyển hẳn sang CRM (Agency-side, thực tế gate bằng
+  // `manage_crm_projects` của nav item CRM, KHÔNG phải `view_rate_card` như comment cũ ghi nhầm;
+  // key đó chưa bao giờ gate gì và đã bị gỡ 2026-09-22) để ceo/admin/operations set giá 1 lần cho
+  // mọi brand, không cần vào từng brand workspace.
   // FIX L3 (audit 2026-08-21): "Dữ Liệu Gốc" (RLS ceo/admin/operations trong 0052_brand_dataraw.sql)
   // là công cụ VẬN HÀNH NỘI BỘ — đúng như thiết kế ban đầu ("report tháng brand chỉ xuất ra ngoài
   // app, brand không tự vào xem raw data qua hệ thống", comment trong chính migration 0052). Bỏ
@@ -1541,6 +1568,22 @@ export default function App() {
         { id: "brand_sessions", label: "Sổ Ca", icon: BookOpen, perm: undefined },
         { id: "brand_skus", label: "SKU Showcase", icon: Package, perm: undefined },
         { id: "brand_monthly_report", label: "Report Tháng", icon: FileText, perm: undefined },
+        // Cam Kết Hợp Đồng bản CHỈ ĐỌC cho khách (Đợt C/1, migration 0108). Khác hẳn tab cùng tên
+        // bên Agency: bên đó ops soạn hợp đồng + nhìn xuyên mọi brand, đây chỉ trả lời "tháng này
+        // cam kết bao nhiêu giờ, đã chạy bao nhiêu, còn bao nhiêu". Brand đọc qua view
+        // `brand_commitment_progress` (đã bỏ cột note nội bộ); 2 bảng gốc vẫn khoá ở ops như cũ.
+        { id: "brand_commitment_view", label: "Cam Kết Hợp Đồng", icon: FileSignature, perm: undefined },
+        // Kế hoạch tháng sau, chỉ đọc + nút xác nhận (Đợt C/2, migration 0110). Đường đọc đã mở từ
+        // 0105 (brand_month_plans_read_scoped); xác nhận đi qua RPC confirm_month_plan riêng.
+        { id: "brand_next_month_plan", label: "Kế Hoạch Tháng Sau", icon: CalendarCheck2, perm: undefined },
+        // Rate Card của chính brand — CHỈ ĐỌC (Đợt C/3). RLS đã mở từ 0105
+        // (brand_platform_rates_read_scoped/_history), chỉ thiếu UI. Tái dùng nguyên BrandRateCard
+        // của CRM bên Agency với readOnly — sửa rate vẫn phải làm ở CRM, không mở đường ghi ở đây.
+        { id: "brand_rate_card", label: "Rate Card", icon: Tag, perm: undefined },
+        // Trang Affiliate (2026-09-22) — bảng phân tích theo TỪNG PHIÊN của creator affiliate,
+        // tách hẳn khỏi form Report Tháng (yêu cầu ops). Brand xem được (migration 0102 nới RLS
+        // đọc), chỉ ops mới sửa được — khác "Nhập Ads & Ghi Chú"/"Dữ Liệu Gốc" vốn ẩn với brand.
+        { id: "brand_affiliate", label: "Affiliate", icon: Users, perm: undefined },
         // "Nhập Ads & Ghi Chú" (2026-09-21): phần nhập tay tách khỏi Report Tháng, ops-only như Dữ Liệu Gốc.
         ...(currentRole === "brand"
           ? []
@@ -1592,6 +1635,29 @@ export default function App() {
   const isTabAllowed =
     TABS_WITHOUT_NAV_ITEM.has(activeTab) ||
     (!!currentTabNavItem && (!currentTabNavItem.perm || checkPermission(currentTabNavItem.perm)));
+
+  // Tab hợp lệ ĐẦU TIÊN của role hiện tại — lưới an toàn cho getDefaultTabForRole().
+  //
+  // Audit 2026-09-22: getDefaultTabForRole() trả tab CỐ ĐỊNH theo role, nhưng tab đó lại gate bằng
+  // PermissionKey đọc từ `role_permissions` — một bảng CEO sửa được ở Ma Trận Phân Quyền. Hai nguồn
+  // sự thật này lệch nhau là người dùng vừa đăng nhập đã đập vào màn "Quyền Truy Cập Bị Hạn Chế",
+  // không có lối ra nào ngoài bấm nút "về trang mặc định" — vốn trỏ đúng về cái tab đang bị cấm.
+  // Đã xảy ra 2 lần: role talent (sửa 2026-09-18 bằng cách đổi hằng số) và role moderator (mặc định
+  // rơi vào "calendar" gate `manage_calendar` = false, tức moderator CHƯA BAO GIỜ đăng nhập được).
+  // Sửa hằng số chỉ vá được đúng role vừa phát hiện; CEO tắt `manage_calendar` của operations ở Ma
+  // Trận là lỗi quay lại ngay. Nên vá bằng lưới an toàn tính từ chính navItems.
+  const firstAllowedTab = navItems.find((n) => !n.perm || checkPermission(n.perm))?.id;
+
+  // Chỉ tự chuyển khi người dùng CHƯA tự chọn tab nào — tức activeTab vẫn đúng bằng mặc định theo
+  // role. Người dùng tự bấm vào một tab bị cấm (qua localStorage cũ, hoặc link) thì vẫn phải thấy
+  // màn Access Restricted, không im lặng đẩy đi chỗ khác.
+  useEffect(() => {
+    if (phase6Loading) return; // chưa nạp xong Ma Trận thì checkPermission() nào cũng false
+    if (isTabAllowed) return;
+    if (activeTab !== getDefaultTabForRole(currentRole)) return;
+    if (!firstAllowedTab) return;
+    setActiveTab(firstAllowedTab);
+  }, [phase6Loading, isTabAllowed, activeTab, currentRole, firstAllowedTab]);
 
   if (authLoading) {
     return (
@@ -1907,7 +1973,7 @@ export default function App() {
 
                 <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
                   <button
-                    onClick={() => setActiveTab(getDefaultTabForRole(currentRole))}
+                    onClick={() => setActiveTab(firstAllowedTab ?? getDefaultTabForRole(currentRole))}
                     className="px-4 py-2 bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--text)] rounded-xl text-xs font-bold transition-all"
                   >
                     Về Trang Mặc Định Cho Role
@@ -2167,6 +2233,45 @@ export default function App() {
                     currentRole={currentRole}
                     brandPlatformRates={brandPlatformRates}
                     shiftSlots={shiftSlots}
+                  />
+                )}
+
+                {activeTab === "brand_commitment_view" && effectiveWorkspace.type === "brand" && (
+                  <BrandCommitmentView
+                    brandId={currentBrandId!}
+                    brandName={activeBrands.find((b) => b.id === currentBrandId)?.name || "Brand"}
+                    sessions={activeSessions}
+                    currentRole={currentRole}
+                  />
+                )}
+
+                {activeTab === "brand_next_month_plan" && effectiveWorkspace.type === "brand" && (
+                  <BrandNextMonthPlan
+                    brandId={currentBrandId!}
+                    brandName={activeBrands.find((b) => b.id === currentBrandId)?.name || "Brand"}
+                    currentRole={currentRole}
+                  />
+                )}
+
+                {activeTab === "brand_rate_card" && effectiveWorkspace.type === "brand" && (
+                  <BrandRateCard
+                    brandId={currentBrandId!}
+                    currentRole={currentRole}
+                    brandPlatformRates={brandPlatformRates}
+                    brandPlatformRateHistory={brandPlatformRateHistory}
+                    sessions={activeSessions}
+                    onSaveRate={handleSaveBrandPlatformRate}
+                    onSaveReturnRate={handleSaveBrandPlatformReturnRate}
+                    readOnly
+                  />
+                )}
+
+                {activeTab === "brand_affiliate" && effectiveWorkspace.type === "brand" && (
+                  <BrandAffiliateTable
+                    brandId={currentBrandId!}
+                    brandName={activeBrands.find((b) => b.id === currentBrandId)?.name || "Brand"}
+                    sessions={activeSessions}
+                    currentRole={currentRole}
                   />
                 )}
 

@@ -7,6 +7,36 @@ import { LiveSession, ProductSKU, ChecklistItem, MinuteMetric, LiveSessionReport
 // a plain empty-string-to-null coercion is enough (see Phase 5 in PROJECT_STATUS.md).
 const orNull = (v: string | undefined | null) => (v ? v : null);
 
+// ĐỌC ca luôn qua view, GHI luôn vào bảng. View `live_sessions_secure` (migration 0107) che cột
+// theo role: brand không thấy phần nội bộ agency (target/studio/trợ live/room id) và không thấy
+// SỐ LIỆU của tháng chưa phát hành, nhưng vẫn thấy LỊCH.
+//
+// Đừng "tối ưu" chỗ này về lại `live_sessions`: từ 0107 bảng gốc đã ĐÓNG hẳn với role brand
+// (policy `live_sessions_read_no_brand`), nên đọc thẳng bảng sẽ trả 0 ca cho mọi tài khoản brand
+// — màn hình trắng chứ không phải rò rỉ, nhưng vẫn là hỏng.
+const READ_VIEW = "live_sessions_secure";
+
+// PostgREST trả PGRST205 ("Could not find the table ... in the schema cache") khi view chưa tồn
+// tại. Tình huống này chỉ xảy ra đúng một lần: client đã deploy nhưng migration 0107 CHƯA chạy
+// trên Supabase (2 việc tách rời nhau — migration phải dán tay vào SQL Editor).
+//
+// Không có fallback thì hậu quả là TOÀN BỘ app mất sạch ca cho MỌI role cho tới khi ai đó nhớ ra
+// phải chạy migration. Có fallback thì app chạy y như trước khi có 0107 — tức không an toàn hơn,
+// nhưng cũng không kém đi một chút nào so với hiện trạng, vì bảng gốc lúc đó vẫn đang mở cho brand
+// đúng như từ trước tới giờ. Đổi "hỏng toàn bộ" lấy "chưa siết được", rõ ràng là đáng.
+//
+// Cảnh báo ra console CHỨ KHÔNG nuốt im: fallback này là trạng thái tạm, không phải thiết kế.
+const VIEW_MISSING = "PGRST205";
+let warnedViewMissing = false;
+function warnViewMissing(): void {
+  if (warnedViewMissing) return;
+  warnedViewMissing = true;
+  console.warn(
+    `[LiveOps] View "${READ_VIEW}" chưa có trên Supabase — đang đọc tạm từ bảng live_sessions. ` +
+      "Role brand vì vậy VẪN thấy số liệu của tháng chưa phát hành. Chạy migration 0107 để đóng lại."
+  );
+}
+
 interface DbLiveSession {
   id: string;
   title: string;
@@ -56,6 +86,10 @@ interface DbLiveSession {
   likes_count: number | null;
   live_room_ids: string[] | null;
   is_backfill: boolean | null;
+  // Cột CHỈ CÓ ở view `live_sessions_secure` (migration 0107): tháng của ca này đã phát hành cho
+  // brand chưa. Các đường trả về row thô từ RPC (cancel_session, submit_live_session_report…)
+  // không có cột này — đó đều là đường của ops, và ops thì luôn thấy số, nên mặc định `true`.
+  month_published?: boolean | null;
 }
 
 interface DbSessionSku {
@@ -178,14 +212,18 @@ function sessionFromDb(row: DbLiveSession): Omit<LiveSession, "skus" | "checklis
     startTime: toHhMm(row.start_time),
     endTime: toHhMm(row.end_time),
     status: row.status,
-    targetGmv: row.target_gmv,
-    actualGmv: row.actual_gmv,
-    totalOrders: row.total_orders,
-    avgWatchTimeSeconds: row.avg_watch_time_seconds,
-    peakViewers: row.peak_viewers,
-    totalViews: row.total_views,
-    ctrAvg: row.ctr_avg,
-    cvrAvg: row.cvr_avg,
+    // View trả NULL cho các cột bị che (brand + tháng chưa phát hành). Ép về 0 để giữ kiểu
+    // `number` của LiveSession — nếu không phải sửa lan ra hàng chục component. Số 0 này KHÔNG
+    // được hiện thẳng cho brand ("0 đ" đọc như agency bán được 0 đồng): UI phải xét `monthPublished`
+    // trước rồi mới quyết hiện số hay hiện "chưa phát hành".
+    targetGmv: row.target_gmv ?? 0,
+    actualGmv: row.actual_gmv ?? 0,
+    totalOrders: row.total_orders ?? 0,
+    avgWatchTimeSeconds: row.avg_watch_time_seconds ?? 0,
+    peakViewers: row.peak_viewers ?? 0,
+    totalViews: row.total_views ?? 0,
+    ctrAvg: row.ctr_avg ?? 0,
+    cvrAvg: row.cvr_avg ?? 0,
     aiAnalysis: row.ai_analysis ?? undefined,
     dataSource: row.data_source ?? "manual",
     reconciledAt: row.reconciled_at ?? undefined,
@@ -205,7 +243,8 @@ function sessionFromDb(row: DbLiveSession): Omit<LiveSession, "skus" | "checklis
     sharesCount: row.shares_count ?? undefined,
     likesCount: row.likes_count ?? undefined,
     liveRoomIds: row.live_room_ids ?? undefined,
-    isBackfill: row.is_backfill ?? false
+    isBackfill: row.is_backfill ?? false,
+    monthPublished: row.month_published ?? true
   };
 }
 
@@ -402,14 +441,23 @@ function assembleSessions(
 const PAGE = 1000;
 async function fetchAllSessionRows(): Promise<DbLiveSession[]> {
   const out: DbLiveSession[] = [];
+  // Rơi về bảng gốc một lần rồi giữ nguyên cho các trang sau — không thử lại view mỗi trang.
+  let source: string = READ_VIEW;
   for (let from = 0; ; from += PAGE) {
-    const { data, error } = await supabase
-      .from("live_sessions")
-      .select("*")
-      .order("date", { ascending: false })
-      .order("start_time", { ascending: false })
-      .order("id", { ascending: true })
-      .range(from, from + PAGE - 1);
+    const page = () =>
+      supabase
+        .from(source)
+        .select("*")
+        .order("date", { ascending: false })
+        .order("start_time", { ascending: false })
+        .order("id", { ascending: true })
+        .range(from, from + PAGE - 1);
+    let { data, error } = await page();
+    if (error?.code === VIEW_MISSING && source === READ_VIEW) {
+      warnViewMissing();
+      source = "live_sessions";
+      ({ data, error } = await page());
+    }
     if (error) throw error;
     const rows = (data as DbLiveSession[]) ?? [];
     out.push(...rows);
@@ -467,7 +515,11 @@ export async function updateSession(session: LiveSession): Promise<LiveSession> 
 // Dùng sau khi gọi RPC submit_live_session_report (src/lib/db/sessionReports.ts) — RPC đó chỉ
 // trả về row live_sessions thô, cần assemble lại đầy đủ (kèm .report) trước khi cập nhật state.
 export async function fetchSessionById(id: string): Promise<LiveSession> {
-  const { data, error } = await supabase.from("live_sessions").select("*").eq("id", id).single();
+  let { data, error } = await supabase.from(READ_VIEW).select("*").eq("id", id).single();
+  if (error?.code === VIEW_MISSING) {
+    warnViewMissing();
+    ({ data, error } = await supabase.from("live_sessions").select("*").eq("id", id).single());
+  }
   if (error) throw error;
   const row = data as DbLiveSession;
   const { skus, checklist, metrics, reports } = await fetchChildRowsForSessions([row.id]);
