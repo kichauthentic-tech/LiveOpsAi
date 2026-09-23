@@ -1,22 +1,62 @@
-import React, { useState } from "react";
-import { SystemUser, Talent, LiveSession } from "../types";
+import React, { useMemo, useState } from "react";
+import { SystemUser, Talent, LiveSession, SessionFinance, TalentRateHistoryEntry } from "../types";
 import { useAuth } from "../hooks/useAuth";
-import { User, Phone, Cake, Mail, Loader2, Lock, ShieldAlert, Award } from "lucide-react";
+import { User, Phone, Cake, Mail, Loader2, Lock, ShieldAlert, Award, Wallet, ChevronLeft, ChevronRight } from "lucide-react";
 import { computeRealAvgGmvPerSession } from "../lib/metrics/avgGmv";
+import { computeTalentMonthlyIncome } from "../lib/pnl";
+import { todayVn } from "../lib/performance/brandCommitment";
 
 interface MyTalentProfileProps {
   activeUser: SystemUser;
   talents: Talent[];
   sessions: LiveSession[];
+  financeRecords: SessionFinance[];
+  talentRateHistory: TalentRateHistoryEntry[];
   // KHÔNG dùng chung handleUpdateTalent của App: handler đó tự nuốt lỗi bằng window.alert rồi
   // trả void, nên try/catch dưới đây thành code chết và form luôn báo "Đã cập nhật" kể cả khi DB
   // không ghi được gì (bug C3). Handler riêng này bắt buộc phải để lỗi nổi lên.
   onSaveMyProfile: (patch: { phone: string; avatar: string; dateOfBirth?: string }) => Promise<void>;
 }
 
-export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({ activeUser, talents, sessions, onSaveMyProfile }) => {
+const money = (n: number) => Math.round(n).toLocaleString("vi-VN");
+const ROLE_LABEL: Record<"host" | "co_host", string> = { host: "Host", co_host: "Trợ live" };
+
+export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
+  activeUser,
+  talents,
+  sessions,
+  financeRecords,
+  talentRateHistory,
+  onSaveMyProfile
+}) => {
   const { reauthenticate, updateEmail } = useAuth();
   const myTalent = talents.find((t) => t.id === activeUser.assignedTalentId);
+
+  const [incomeMonth, setIncomeMonth] = useState(() => todayVn().slice(0, 7));
+  const shiftIncomeMonth = (delta: number) => {
+    const [y, m] = incomeMonth.split("-").map(Number);
+    const d = new Date(y, m - 1 + delta, 1);
+    setIncomeMonth(`${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, "0")}`);
+  };
+
+  const financeBySessionId = useMemo(() => {
+    const map: Record<string, SessionFinance> = {};
+    for (const f of financeRecords) map[f.sessionId] = f;
+    return map;
+  }, [financeRecords]);
+
+  const talentById = useMemo(() => {
+    const map: Record<string, Talent> = {};
+    for (const t of talents) map[t.id] = t;
+    return map;
+  }, [talents]);
+
+  // rateHidden = rate của mình bị mask (xem khối Rate Card bên dưới) — tính thu nhập lúc này sẽ
+  // ra số SAI (dùng rate đã bị zero-hoá) chứ không phải số đúng nhưng thiếu, nên bỏ tính hẳn.
+  const income = useMemo(() => {
+    if (!myTalent || myTalent.rateHidden) return { rows: [], total: 0 };
+    return computeTalentMonthlyIncome(sessions, myTalent.id, incomeMonth, financeBySessionId, talentById, talentRateHistory);
+  }, [sessions, myTalent, incomeMonth, financeBySessionId, talentById, talentRateHistory]);
 
   const [phone, setPhone] = useState(myTalent?.phone ?? "");
   const [avatar, setAvatar] = useState(myTalent?.avatar ?? "");
@@ -279,6 +319,71 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({ activeUser, ta
             ? "Tài khoản của bạn chưa được liên kết đúng hồ sơ Talent nên chưa xem được Rate Card/Hoa hồng — báo Admin gán lại giúp."
             : "Rate Card/Hoa hồng chỉ hiện cho chính bạn và CEO/Admin."}
         </p>
+      </div>
+
+      {/* Thu nhập tháng — tái dùng đúng công thức hostPayout/coHostPayout của Finance & P&L
+          (computeTalentMonthlyIncome trong lib/pnl.ts) để không bao giờ ra 2 số khác nhau cho
+          cùng 1 ca giữa màn của talent và màn của ops. */}
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-6 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-sm font-bold text-[var(--text)]">
+            <Wallet className="w-4 h-4 text-[var(--accent-text)]" />
+            Thu Nhập Tháng Này
+          </div>
+          <div className="flex items-center gap-1">
+            <button onClick={() => shiftIncomeMonth(-1)} className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--surface-elevated)]">
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+            <span className="text-xs font-bold text-[var(--text)] w-20 text-center">{incomeMonth}</span>
+            <button onClick={() => shiftIncomeMonth(1)} className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--surface-elevated)]">
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+
+        {myTalent.rateHidden ? (
+          <p className="text-xs text-[var(--text-muted)]">Chưa xem được — tài khoản của bạn chưa được liên kết đúng hồ sơ Talent.</p>
+        ) : (
+          <>
+            <div className="bg-amber-950/30 border border-amber-500/30 rounded-xl p-4">
+              <div className="text-amber-300/80 text-[11px]">Tổng thu nhập tạm tính</div>
+              <div className="font-black text-2xl text-[var(--text)] mt-0.5">{money(income.total)} đ</div>
+            </div>
+
+            {income.rows.length === 0 ? (
+              <p className="text-xs text-[var(--text-faint)] italic">Chưa có ca nào tính lương trong tháng này.</p>
+            ) : (
+              <div className="overflow-x-auto -mx-1">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)] uppercase text-[10px] tracking-wider">
+                      <th className="py-1.5 px-1">Ngày</th>
+                      <th className="py-1.5 px-1">Brand</th>
+                      <th className="py-1.5 px-1">Vai trò</th>
+                      <th className="py-1.5 px-1 text-right">Giờ công</th>
+                      <th className="py-1.5 px-1 text-right">Thành tiền</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {income.rows.map((r) => (
+                      <tr key={`${r.session.id}:${r.role}`} className="border-b border-[var(--border-muted)]">
+                        <td className="py-1.5 px-1 whitespace-nowrap">{r.session.date}</td>
+                        <td className="py-1.5 px-1 whitespace-nowrap">{r.session.brandName}</td>
+                        <td className="py-1.5 px-1 whitespace-nowrap">{ROLE_LABEL[r.role]}</td>
+                        <td className="py-1.5 px-1 text-right whitespace-nowrap">{r.billableHours.toFixed(1)}h</td>
+                        <td className="py-1.5 px-1 text-right font-bold text-[var(--text)] whitespace-nowrap">{money(r.payout)} đ</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <p className="text-[10px] text-[var(--text-faint)]">
+              Tính tự động từ các ca Completed trong tháng theo rate card hiện tại — số tạm tính, có thể đổi nếu ca chưa
+              đối soát xong hoặc Rate Card của bạn vừa được cập nhật.
+            </p>
+          </>
+        )}
       </div>
     </div>
   );

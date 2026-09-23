@@ -168,3 +168,41 @@ export function computeSessionPnl(
     coHostUsesAssistantRate: !!coHost && coHostAssistantRate > 0
   };
 }
+
+export interface TalentIncomeRow {
+  session: LiveSession;
+  role: "host" | "co_host";
+  payout: number;
+  billableHours: number;
+}
+
+// Thu nhập 1 talent trong 1 tháng — dùng cho "Hồ Sơ Của Tôi" (talent tự xem). Tái dùng ĐÚNG
+// công thức hostPayout/coHostPayout của computeSessionPnl (Finance & P&L dùng), không viết công
+// thức lương thứ hai — hai màn không được ra hai số khác nhau cho cùng một ca. Chỉ phần
+// grossAgencyRev/netProfit (doanh thu BRAND) không cần nên brandById/brandPlatformRates* truyền
+// rỗng — hostPayout/coHostPayout không đọc tới các tham số đó.
+//
+// Lọc giống computeSessionPnl đang được gọi ở FinanceHr.tsx: chỉ ca Completed, không phải ca
+// backfill (rate card tháng đó không chuẩn), đúng tháng đang xem — một talent có thể vừa là
+// host vừa là trợ live của 2 ca khác nhau trong cùng tháng nên trả về DANH SÁCH, không phải 1 số.
+export function computeTalentMonthlyIncome(
+  sessions: LiveSession[],
+  talentId: string,
+  month: string,
+  financeBySessionId: Record<string, SessionFinance>,
+  talentById: Record<string, Talent>,
+  talentRateHistory: TalentRateHistoryEntry[]
+): { rows: TalentIncomeRow[]; total: number } {
+  const rows: TalentIncomeRow[] = [];
+  for (const session of sessions) {
+    if (session.status !== "Completed" || session.isBackfill || !session.date.startsWith(month)) continue;
+    const isHost = session.hostId === talentId;
+    const isCoHost = session.coHostId === talentId;
+    if (!isHost && !isCoHost) continue;
+    const pnl = computeSessionPnl(session, financeBySessionId, talentById, {}, [], talentRateHistory, []);
+    if (isHost) rows.push({ session, role: "host", payout: pnl.hostPayout, billableHours: pnl.billableHours });
+    if (isCoHost) rows.push({ session, role: "co_host", payout: pnl.coHostPayout, billableHours: pnl.billableHours });
+  }
+  rows.sort((a, b) => (a.session.date < b.session.date ? 1 : -1));
+  return { rows, total: rows.reduce((sum, r) => sum + r.payout, 0) };
+}

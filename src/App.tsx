@@ -2347,6 +2347,8 @@ export default function App() {
                     activeUser={activeUser}
                     talents={talents}
                     sessions={sessions}
+                    financeRecords={financeRecords}
+                    talentRateHistory={talentRateHistory}
                     onSaveMyProfile={handleSaveMyTalentProfile}
                   />
                 )}
