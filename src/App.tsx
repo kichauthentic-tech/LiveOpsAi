@@ -63,7 +63,8 @@ import {
   Megaphone,
   CalendarCheck2,
   Tag,
-  LayoutGrid
+  LayoutGrid,
+  Send
 } from "lucide-react";
 import { Header, WorkspaceContext } from "./components/Header";
 import { BrandCalendar } from "./components/brand-workspace/BrandCalendar";
@@ -101,6 +102,7 @@ import OpsSupport from "./components/OpsSupport";
 import { LiveReconciliation } from "./components/LiveReconciliation";
 import { HostPerformance } from "./components/HostPerformance";
 import { BrandsOverview } from "./components/BrandsOverview";
+import { ReportPublishBoard } from "./components/ReportPublishBoard";
 import { BrandCommitment } from "./components/BrandCommitment";
 
 const STORAGE_PREFIX = "liveops_os_v2_";
@@ -1498,7 +1500,10 @@ export default function App() {
               // Toàn Cảnh Brand (Đợt C/6, 2026-09-23): bảng trạng thái 4 brand cho 1 tháng — kế
               // hoạch/cam kết/report/rate đọc thẳng từ DB, không phải widget KPI dự phóng kiểu
               // Dashboard cũ (đã xoá 2026-09-13).
-              { id: "brands_overview", label: "Toàn Cảnh Brand", icon: LayoutGrid, perm: "manage_sessions" as PermissionKey }
+              { id: "brands_overview", label: "Toàn Cảnh Brand", icon: LayoutGrid, perm: "manage_sessions" as PermissionKey },
+              // Điều Phối Phát Hành Report (còn lại của Đợt C, Audit Role × Workspace) — bảng
+              // brand × tháng để phát hành/thu hồi Report Tháng thẳng từ đây.
+              { id: "report_publish_board", label: "Điều Phối Phát Hành", icon: Send, perm: "manage_sessions" as PermissionKey }
             ]
           }
         ]),
@@ -2164,6 +2169,17 @@ export default function App() {
                     sessions={activeSessions}
                     brandPlatformRates={brandPlatformRates}
                     monthlyReports={monthlyReports}
+                  />
+                )}
+
+                {activeTab === "report_publish_board" && (
+                  <ReportPublishBoard
+                    brands={activeBrands}
+                    sessions={activeSessions}
+                    monthlyReports={monthlyReports}
+                    onReportsChanged={() => {
+                      fetchAllMonthlyReports().then(setMonthlyReports).catch(() => {});
+                    }}
                   />
                 )}
 
