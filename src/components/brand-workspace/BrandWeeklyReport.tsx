@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { LiveSession, ShiftSlot, UserRole } from "../../types";
-import { AlertTriangle, CalendarRange, ChevronLeft, ChevronRight, ClipboardList, Database, Loader2, Radio, TrendingDown, TrendingUp, Users } from "lucide-react";
+import { AlertTriangle, CalendarRange, ChevronLeft, ChevronRight, ClipboardList, Database, Download, Loader2, Radio, TrendingDown, TrendingUp, Users } from "lucide-react";
 import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
+import { downloadSheetsAsXlsx } from "../../lib/exportXlsx";
 import { DataRawWeekSlice, addDays, eachDay, fetchDataRawWeekSlice, isoWeekNumber, isoWeekStart } from "../../lib/dataraw/weeklySlice";
 import { getTodayDate } from "../../lib/dateUtils";
 import { byHost, filterSessions, sessionHours, splitUnassignedHost } from "../../lib/performance/hostPerformance";
@@ -129,6 +130,39 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
   const nextOpenSlots = useMemo(() => shiftSlots.filter((sl) => sl.brandId === brandId && sl.status === "open" && sl.date >= nextStart && sl.date <= nextEnd), [shiftSlots, brandId, nextStart, nextEnd]);
   const nextTarget = nextSessions.reduce((a, s) => a + (s.targetGmv ?? 0), 0);
 
+  // Xuất Excel — đúng 2 bảng đang hiện trên màn (Theo ngày + Host tuần này), không tính số mới.
+  const handleExport = () => {
+    downloadSheetsAsXlsx(
+      [
+        {
+          name: "Theo Ngay",
+          rows: dailyRows.map((r) => ({
+            "Ngày": `${r.dow} ${r.date}`,
+            "Ca": r.planned > 0 ? `${r.done}/${r.planned}` : "",
+            "Giờ": Math.round(r.hours * 100) / 100,
+            "GMV Live": Math.round(r.gmv),
+            "Target": Math.round(r.target),
+            "Đạt": r.achieved == null ? "" : Math.round(r.achieved * 10000) / 100,
+            "GMV/Giờ": Math.round(r.gmvPerHour),
+            "Đơn": r.orders,
+            ...(slice?.hasAnyBatch ? { "Shop (TikTok)": r.shopGmv ?? "" } : {})
+          }))
+        },
+        {
+          name: "Host Tuan Nay",
+          rows: hosts.map((h) => ({
+            "Host": h.label,
+            "Ca": h.sessionCount,
+            "Giờ": Math.round(h.hours * 100) / 100,
+            "GMV": Math.round(h.gmv),
+            "GMV/Giờ": Math.round(h.gmvPerHour)
+          }))
+        }
+      ],
+      `ReportTuan_${brandName}_tuan${week}-${year}.xlsx`.replace(/\s+/g, "_")
+    );
+  };
+
   if (!CAN_VIEW_ROLES.includes(currentRole)) {
     return <div className="bg-[var(--surface)] p-6 rounded-2xl border border-[var(--border)] text-sm text-[var(--text-muted)]">Bạn không có quyền xem Report Tuần.</div>;
   }
@@ -162,6 +196,13 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
             <button onClick={() => setWeekStart(addDays(weekStart, -7))} className="p-2 rounded-xl bg-[var(--surface-base)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]" title="Tuần trước"><ChevronLeft className="w-4 h-4" /></button>
             <button onClick={() => setWeekStart(isoWeekStart(today))} className="px-3 py-2 rounded-xl bg-[var(--surface-base)] border border-[var(--border)] text-xs font-bold text-[var(--text-muted)] hover:text-[var(--text)]">Tuần này</button>
             <button onClick={() => setWeekStart(addDays(weekStart, 7))} className="p-2 rounded-xl bg-[var(--surface-base)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]" title="Tuần sau"><ChevronRight className="w-4 h-4" /></button>
+            <button
+              onClick={handleExport}
+              title="Xuất Theo Ngày + Host Tuần Này ra Excel"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--surface-base)] border border-[var(--border)] text-xs font-bold text-[var(--text-muted)] hover:text-[var(--text)]"
+            >
+              <Download className="w-3.5 h-3.5" /> Xuất Excel
+            </button>
           </div>
         </div>
         <p className="text-[11px] text-[var(--text-muted)]">

@@ -259,7 +259,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
           {/* Report Tháng redesign (2026-08-22) — tabbed, skin đen-vàng cố định cho tài liệu gửi
               brand, thay toàn bộ khối Overview/Host Performance/Top SKU/Deep Dive cũ. Xem note thiết
               kế trong MonthlyReportTabs.tsx (nguồn dữ liệu từng tab, giới hạn phạm vi). */}
-          <MonthlyReportTabs brandId={brandId} month={month} sessions={sessions} canManage={canManage} brandPlatformRates={brandPlatformRates} />
+          <MonthlyReportTabs brandId={brandId} brandName={brandName} month={month} sessions={sessions} canManage={canManage} brandPlatformRates={brandPlatformRates} />
 
             </>
           ) : (

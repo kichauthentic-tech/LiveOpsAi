@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { FileSignature, Loader2, TrendingUp } from "lucide-react";
+import { Download, FileSignature, Loader2, TrendingUp } from "lucide-react";
 import { LiveSession, UserRole } from "../../types";
 import { BrandCommitmentRow, fetchBrandCommitmentProgress } from "../../lib/db/brandContracts";
 import {
@@ -11,6 +11,7 @@ import {
 import { errorMessage } from "../../lib/errorMessage";
 import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
 import { metricsHiddenFor } from "../../lib/sessionLedger";
+import { downloadRowsAsXlsx } from "../../lib/exportXlsx";
 
 // Cam Kết Hợp Đồng — bản CHỈ ĐỌC cho Brand Workspace (Đợt C/1, migration 0108).
 //
@@ -159,6 +160,27 @@ export const BrandCommitmentView: React.FC<BrandCommitmentViewProps> = ({
     return map;
   }, [sessions, brandId, currentRole]);
 
+  // Xuất Excel — đúng bảng "Lịch sử theo tháng" bên dưới, kể cả cột GMV bị che tháng chưa phát
+  // hành (giữ nguyên chữ "chưa phát hành" như trên màn, không tự đoán số).
+  const handleExport = () => {
+    downloadRowsAsXlsx(
+      "Cam Ket Hop Dong",
+      progress.map((p) => {
+        const gmvHidden = monthHasHiddenMetrics.get(p.periodMonth) ?? false;
+        return {
+          "Tháng": fmtMonth(p.periodMonth),
+          "Cam Kết (giờ)": Math.round(p.committedHours * 10) / 10,
+          "Đã Chạy (giờ)": Math.round(p.deliveredHours * 10) / 10,
+          "Đã Xếp (giờ)": Math.round(p.scheduledHours * 10) / 10,
+          "Chênh Lệch (giờ)": Math.round((p.gapHours > 0 ? -p.gapHours : Math.abs(p.gapHours)) * 10) / 10,
+          "GMV": gmvHidden ? "Chưa phát hành" : p.deliveredGmv || 0,
+          "Tình Trạng": STATUS_LABEL[p.status]
+        };
+      }),
+      `CamKetHopDong_${brandName}.xlsx`.replace(/\s+/g, "_")
+    );
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12 text-[var(--text-faint)] text-sm gap-2">
@@ -170,13 +192,25 @@ export const BrandCommitmentView: React.FC<BrandCommitmentViewProps> = ({
   return (
     <div className="space-y-5">
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 sm:p-6 shadow-xl space-y-2">
-        <span className="text-[var(--accent-text)] font-semibold text-xs uppercase tracking-wider flex items-center gap-1.5">
-          <FileSignature className="w-4 h-4" /> Cam Kết Hợp Đồng
-        </span>
-        <h2 className="text-2xl font-black text-[var(--text)]">
-          {brandName}
-          {contractCode && <span className="ml-2 text-sm font-bold text-[var(--text-faint)]">· {contractCode}</span>}
-        </h2>
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <span className="text-[var(--accent-text)] font-semibold text-xs uppercase tracking-wider flex items-center gap-1.5">
+              <FileSignature className="w-4 h-4" /> Cam Kết Hợp Đồng
+            </span>
+            <h2 className="text-2xl font-black text-[var(--text)]">
+              {brandName}
+              {contractCode && <span className="ml-2 text-sm font-bold text-[var(--text-faint)]">· {contractCode}</span>}
+            </h2>
+          </div>
+          {progress.length > 0 && (
+            <button
+              onClick={handleExport}
+              className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface-base)] text-[var(--text-muted)] hover:text-[var(--text)] hover:border-[var(--accent)] transition-colors"
+            >
+              <Download className="w-3.5 h-3.5" /> Xuất Excel
+            </button>
+          )}
+        </div>
         <p className="text-xs text-[var(--text-muted)] max-w-3xl">
           Số giờ lên sóng cam kết mỗi tháng và tiến độ thực hiện. Giờ tính theo <b>khung giờ ca đã chốt</b> — cùng loại giờ
           dùng để đối chiếu hợp đồng.

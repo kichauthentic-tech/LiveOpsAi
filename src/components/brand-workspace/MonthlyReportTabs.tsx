@@ -31,10 +31,12 @@ import {
   Filter,
   Users,
   PieChart as PieChartIcon,
-  Activity
+  Activity,
+  Download
 } from "lucide-react";
 import { LiveSession, BrandMonthlyReport as BrandMonthlyReportType, AffiliatePlanEntry, AffiliateActualEntry, BrandPlatformRate } from "../../types";
 import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
+import { downloadSheetsAsXlsx } from "../../lib/exportXlsx";
 import { fetchCreatorLivePerfMonthSlice } from "../../lib/dataraw/creatorLivePerfSlice";
 import { dailyFromSessions, monthRunRate, pickLivePerfSource } from "../../lib/report/sessionsLivePerf";
 import { fetchLivePerformanceCoreMonthSlice } from "../../lib/dataraw/monthlyDailySlice";
@@ -185,6 +187,7 @@ const ProgressBar: React.FC<{ pct: number | null }> = ({ pct }) => {
 
 interface MonthlyReportTabsProps {
   brandId: string;
+  brandName: string;
   month: string;
   sessions: LiveSession[];
   canManage: boolean;
@@ -272,7 +275,7 @@ const ReportTable: React.FC<{ head: string[]; children: React.ReactNode }> = ({ 
 
 const chartTooltipStyle = { background: PAL.panel2, border: `1px solid ${PAL.line}`, borderRadius: 8, fontSize: 11, color: PAL.cream };
 
-export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, month, sessions, canManage, brandPlatformRates }) => {
+export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, brandName, month, sessions, canManage, brandPlatformRates }) => {
   const [tab, setTab] = useState<TabId>("overview");
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -897,9 +900,119 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, m
 
   const skuChartData = useMemo(() => (topSku?.items ?? []).slice(0, 8).map((s) => ({ label: s.name.slice(0, 24), gmv: s.gmv })), [topSku]);
 
+  // Xuất Excel toàn bộ Report Tháng (Đợt "trung tâm report") — 1 file, mỗi bảng đang có trên các
+  // tab (trừ 05 Phân Tích Sâu, ops-only, không thuộc tài liệu gửi brand) là 1 sheet, để không phải
+  // bấm xuất từng tab. Chỉ đọc lại đúng các mảng đã tính cho phần hiển thị — không tính số mới.
+  const handleExportAll = () => {
+    const n = (v: number | null | undefined) => (v == null ? "" : Math.round(v * 100) / 100);
+    downloadSheetsAsXlsx(
+      [
+        {
+          name: "01 Tong Quan",
+          rows: revenueSourceRows.map((r) => ({ "Chỉ Số": r.label, [prevMonth]: n(r.prev), [month]: n(r.cur) }))
+        },
+        {
+          name: "02 Livestream - Camp",
+          rows: campDetailRows.map((r) => ({
+            "Khung": r.label,
+            "Target GMV": n(r.target),
+            "Actual GMV": n(r.actual),
+            "Giờ Live": n(r.hours),
+            "GMV/Giờ": n(r.gmvPerHour),
+            "CTR": n(r.ctr),
+            "CTOR": n(r.ctor)
+          }))
+        },
+        {
+          name: "02 Livestream - Top Ca",
+          rows: topSessions.map((s, idx) => ({
+            "#": idx + 1,
+            "Bắt Đầu": fmtSessionStart(s.startTime),
+            "Giờ": n(s.hours),
+            "GMV": n(s.gmv),
+            "GMV/Giờ": n(s.gmvPerHour),
+            "Đơn": n(s.orders),
+            "SP Bán": n(s.itemsSold),
+            "Views": n(s.views),
+            "CTR": n(s.ctr),
+            "CTOR": n(s.ctor)
+          }))
+        },
+        {
+          name: "02 Livestream - Host",
+          rows: hostPerformance.map((h) => ({
+            "Host": h.hostName,
+            "Số Phiên": h.sessionCount,
+            "GMV": n(h.gmv),
+            "Giờ": n(h.hours),
+            "GMV/Giờ": n(h.gmvPerHour),
+            "Đơn": n(h.orders),
+            "CTR": n(h.ctr)
+          }))
+        },
+        {
+          name: "03 San Pham - Top SKU",
+          rows: (topSku?.items ?? []).map((s, idx) => ({ "#": idx + 1, "Sản Phẩm": s.name, "GMV": n(s.gmv), "GMV Live": n(s.gmvLive), "Đơn": n(s.orders) }))
+        },
+        {
+          name: "03 San Pham - Khuyen Mai",
+          rows: (topPromo?.items ?? []).map((p, idx) => ({
+            "#": idx + 1,
+            "Chương Trình": p.name,
+            "Trạng Thái": promoStatusLabel(p.status).label,
+            "GMV": n(p.gmv),
+            "Đơn": n(p.orders),
+            "AOV": n(p.aov)
+          }))
+        },
+        {
+          name: "04 Affiliate",
+          rows: affiliateRows.map((a) => ({
+            "Creator": a.creatorName,
+            "Ngày Live": a.liveDateLabel ?? "",
+            "Target GMV": n(a.targetGmv),
+            "Direct GMV": n(a.directGmv),
+            "Thời Lượng (h)": n(a.durationHours),
+            "Ads Cost": n(a.adsCost),
+            "SP Bán": n(a.itemsSold),
+            "Viewer": n(a.viewer),
+            "Giá TB": n(a.avgPrice),
+            "CTR": n(a.ctr),
+            "CTOR": n(a.ctor),
+            "Runrate %": n(runrateOf(a.directGmv, a.targetGmv)),
+            "ROAS": n(roasOf(a.directGmv, a.adsCost))
+          }))
+        },
+        {
+          name: "06 Ke Hoach - Phan Bo",
+          rows: planBucketRows.map((b) => ({
+            "Khung": b.label,
+            "Phân Bổ (%)": n(b.pct),
+            "Target GMV": n(b.gmv),
+            "Giờ Live": n(b.hours),
+            "GMV/Giờ": n(b.gmvPerHour)
+          }))
+        },
+        {
+          name: "06 Ke Hoach - Affiliate",
+          rows: planRows.map((r) => ({
+            "Lịch Live": r.scheduleLabel ?? "",
+            "Creator": r.creatorName,
+            "Camp": r.campTag ?? "",
+            "Timeline": r.timelineLabel ?? "",
+            "Duration (h)": n(r.durationHours),
+            "Target GMV": n(r.targetGmv),
+            "Budget Ads": n(r.budgetAds)
+          }))
+        }
+      ],
+      `ReportThang_${brandName}_${month}.xlsx`.replace(/\s+/g, "_")
+    );
+  };
+
   return (
     <div className="rounded-2xl overflow-hidden" style={{ background: PAL.bg, border: `1px solid ${PAL.line}` }}>
-      <div className="flex gap-1 px-4 pt-3 overflow-x-auto" style={{ borderBottom: `1px solid ${PAL.line}` }}>
+      <div className="flex items-center gap-1 px-4 pt-3 overflow-x-auto" style={{ borderBottom: `1px solid ${PAL.line}` }}>
         {tabsFor(canManage).map((t) => (
           <button
             key={t.id}
@@ -913,6 +1026,15 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, m
             {t.icon} {t.label}
           </button>
         ))}
+        <button
+          onClick={handleExportAll}
+          disabled={loading}
+          title="Xuất toàn bộ Report Tháng (mọi tab, trừ Phân Tích Sâu) ra 1 file Excel nhiều sheet"
+          className="ml-auto mb-2 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap disabled:opacity-40 shrink-0"
+          style={{ background: PAL.panel2, border: `1px solid ${PAL.line}`, color: PAL.gold }}
+        >
+          <Download className="w-3.5 h-3.5" /> Xuất Excel
+        </button>
       </div>
 
       <div className="p-5 space-y-4">

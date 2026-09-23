@@ -3,6 +3,7 @@ import { AffiliateActualEntry, LiveSession, UserRole } from "../../types";
 import { fetchAffiliateActuals, replaceAffiliateActuals } from "../../lib/db/affiliateActuals";
 import { AffiliateLiveSessionRow, fetchAffiliateLiveSessions } from "../../lib/dataraw/affiliateLiveSessionSlice";
 import { errorMessage } from "../../lib/errorMessage";
+import { downloadRowsAsXlsx } from "../../lib/exportXlsx";
 import { Database, Download, Loader2, Plus, Save, Trash2, Users } from "lucide-react";
 
 // Trang Affiliate (2026-09-22) — tách RIÊNG khỏi form Report Tháng theo yêu cầu ops. Bảng dựng
@@ -179,6 +180,37 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
 
   const flatColumns = useMemo(() => columns.flatMap((g) => g.items), [columns]);
 
+  // Xuất Excel — mỗi cột (1 phiên/creator) đang hiện trên bảng thành 1 dòng, đúng dải tháng đang
+  // lọc. Bảng UI xoay ngang (chỉ số theo dòng, phiên theo cột) chỉ để đọc trên màn; ra Excel thì
+  // trả về chiều thường (mỗi dòng 1 phiên) cho dễ lọc/pivot tiếp.
+  const handleExport = () => {
+    downloadRowsAsXlsx(
+      "Affiliate",
+      flatColumns.map((e) => ({
+        "Tháng": e.periodMonth.slice(0, 7),
+        "Creator": e.creatorName,
+        "Campaign Type": e.campaignType ?? "",
+        "Ngày Live": e.liveDateLabel ?? "",
+        "Timeline": e.timelineLabel ?? "",
+        "Target": e.targetGmv ?? "",
+        "Direct GMV": e.directGmv ?? "",
+        "Duration (h)": e.durationHours ?? "",
+        "GMV/Giờ": e.directGmv && e.durationHours ? Math.round(e.directGmv / e.durationHours) : "",
+        "% Target": e.directGmv && e.targetGmv ? Math.round((e.directGmv / e.targetGmv) * 10000) / 100 : "",
+        "Live Impressions": e.liveImpressions ?? "",
+        "CTR": e.ctr ?? "",
+        "CTOR": e.ctor ?? "",
+        "Ads Cost": e.adsCost ?? "",
+        "ROAS": e.directGmv && e.adsCost ? Math.round((e.directGmv / e.adsCost) * 10) / 10 : "",
+        "Đơn": e.orders ?? "",
+        "SP Bán": e.itemsSold ?? "",
+        "Giá TB": e.avgPrice ?? "",
+        "Viewer": e.viewer ?? ""
+      })),
+      `Affiliate_${brandName}_${fromMonth}_${toMonth}.xlsx`.replace(/\s+/g, "_")
+    );
+  };
+
   const update = (entry: Row, patch: Partial<AffiliateActualEntry>) => {
     setEntries((prev) => prev.map((e) => (e._key === entry._key ? { ...e, ...patch } : e)));
     setDirty(true);
@@ -334,6 +366,14 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
           <input type="month" value={fromMonth} max={toMonth} onChange={(e) => setFromMonth(e.target.value)} className="p-2 border border-[var(--border)] rounded-lg bg-[var(--surface-base)] text-sm" />
           <span className="text-[var(--text-faint)]">→</span>
           <input type="month" value={toMonth} min={fromMonth} onChange={(e) => setToMonth(e.target.value)} className="p-2 border border-[var(--border)] rounded-lg bg-[var(--surface-base)] text-sm" />
+          <button
+            onClick={handleExport}
+            disabled={flatColumns.length === 0}
+            title="Xuất đúng dải tháng đang xem ra Excel"
+            className="px-3 py-2 rounded-lg bg-[var(--surface-elevated)] border border-[var(--border)] text-sm font-semibold flex items-center gap-1.5 disabled:opacity-50"
+          >
+            <Download className="w-4 h-4" /> Xuất Excel
+          </button>
           {canManage && (
             <>
               <button onClick={openImport} disabled={importing || loading} className="px-3 py-2 rounded-lg bg-[var(--surface-elevated)] border border-[var(--border)] text-sm font-semibold flex items-center gap-1.5 disabled:opacity-60">
