@@ -92,6 +92,9 @@ interface DbLiveSession {
   month_published?: boolean | null;
 }
 
+// 3 interface dưới đây chỉ còn phục vụ ĐƯỜNG GHI (*ToDb → replace_session_children). Hàm đọc
+// ngược (*FromDb) đã xoá 2026-09-23 cùng với việc bỏ nạp 3 bảng con — xem ghi chú dài ở
+// fetchChildRowsForSessions() nếu cần dựng lại đường đọc.
 interface DbSessionSku {
   id: string;
   session_id: string;
@@ -279,23 +282,6 @@ function sessionToDb(s: LiveSession) {
   };
 }
 
-function skuFromDb(row: DbSessionSku): ProductSKU {
-  return {
-    id: row.id,
-    code: row.code,
-    name: row.name,
-    category: row.category,
-    originalPrice: row.original_price,
-    livePrice: row.live_price,
-    commission: row.commission,
-    stock: row.stock,
-    soldInSession: row.sold_in_session,
-    clickCount: row.click_count,
-    ctr: row.ctr,
-    cvr: row.cvr
-  };
-}
-
 function skuToDb(sessionId: string, sku: ProductSKU) {
   return {
     session_id: sessionId,
@@ -313,16 +299,6 @@ function skuToDb(sessionId: string, sku: ProductSKU) {
   };
 }
 
-function checklistFromDb(row: DbChecklistItem): ChecklistItem {
-  return {
-    id: row.id,
-    task: row.task,
-    category: row.category,
-    completed: row.completed,
-    assignedTo: row.assigned_to
-  };
-}
-
 function checklistToDb(sessionId: string, item: ChecklistItem) {
   return {
     session_id: sessionId,
@@ -330,22 +306,6 @@ function checklistToDb(sessionId: string, item: ChecklistItem) {
     category: item.category,
     completed: item.completed,
     assigned_to: item.assignedTo
-  };
-}
-
-function minuteMetricFromDb(row: DbMinuteMetric): MinuteMetric {
-  return {
-    minute: row.minute,
-    timeString: row.time_string,
-    viewers: row.viewers,
-    peakViewers: row.peak_viewers,
-    gmvCumulative: row.gmv_cumulative,
-    gmvPerMinute: row.gmv_per_minute,
-    ctr: row.ctr,
-    cvr: row.cvr,
-    productClicks: row.product_clicks,
-    comments: row.comments,
-    eventTrigger: row.event_trigger ?? undefined
   };
 }
 
@@ -382,57 +342,53 @@ async function replaceChildRows(sessionId: string, session: LiveSession) {
   if (error) throw error;
 }
 
-async function fetchChildRowsForSessions(sessionIds: string[]) {
-  if (sessionIds.length === 0) {
-    return {
-      skus: [] as DbSessionSku[],
-      checklist: [] as DbChecklistItem[],
-      metrics: [] as DbMinuteMetric[],
-      reports: [] as DbSessionReport[]
-    };
-  }
-  // .in() đi trên query string — hơn vài trăm uuid là vượt giới hạn URL của gateway, nên chia lô.
-  // Mỗi lô cũng chịu trần 1000 dòng của PostgREST: 50 ca × ~20 SKU/ca vẫn dưới trần. Ca backfill
-  // (0086) không có dòng con nào nên nhiều ca hơn không làm lô nặng thêm.
+// CHỈ nạp `live_session_reports`. Ba bảng con còn lại (`session_skus`, `session_checklist_items`,
+// `session_minute_metrics`) CỐ Ý không nạp nữa — audit 2026-09-23:
+//
+//   - Không một màn hình nào đọc `session.skus` / `.checklist` / `.minuteMetrics`. Chúng là di
+//     sản của Live Sessions Hub (màn demo: chart phút / checklist / SKU / AI coach) đã xoá hẳn
+//     ngày 2026-09-13; grep toàn repo chỉ còn khai báo kiểu trong types.ts và literal `[]` lúc
+//     tạo ca ở App.tsx. Trên DB thật cả 3 bảng đang 0 dòng.
+//   - Chi phí thì có thật: 229 ca ÷ lô 50 = 5 lô × 4 bảng = 20 request MỖI LẦN TẢI TRANG, và
+//     vòng `for ... await` cũ làm các lô chạy NỐI TIẾP nhau — đo được 1078ms → 2955ms, tức gần
+//     2 giây chỉ để nhận về 0 dòng.
+//
+// Đường GHI (replace_session_children / update_session_with_children) giữ nguyên, kiểu LiveSession
+// giữ nguyên, 3 trường trả về mảng rỗng — đúng bằng thứ mọi consumer đang thấy hôm nay. Muốn dựng
+// lại màn nào cần 3 bảng đó thì nạp riêng cho ĐÚNG ca đang mở, đừng kéo cả bảng lúc mở app.
+async function fetchChildRowsForSessions(sessionIds: string[]): Promise<{ reports: DbSessionReport[] }> {
+  if (sessionIds.length === 0) return { reports: [] };
+  // .in() đi trên query string — hơn vài trăm uuid là vượt giới hạn URL của gateway, nên vẫn chia
+  // lô. Mỗi lô cũng chịu trần 1000 dòng của PostgREST (1 report/ca nên 50 ca là 50 dòng).
+  // Các lô chạy SONG SONG: chúng độc lập hoàn toàn, nối tiếp chỉ cộng dồn RTT vô ích.
   const CHUNK = 50;
-  const skus: DbSessionSku[] = [];
-  const checklist: DbChecklistItem[] = [];
-  const metrics: DbMinuteMetric[] = [];
+  const chunks: string[][] = [];
+  for (let i = 0; i < sessionIds.length; i += CHUNK) chunks.push(sessionIds.slice(i, i + CHUNK));
+  const results = await Promise.all(
+    chunks.map((ids) => supabase.from("live_session_reports").select("*").in("session_id", ids))
+  );
   const reports: DbSessionReport[] = [];
-  for (let i = 0; i < sessionIds.length; i += CHUNK) {
-    const ids = sessionIds.slice(i, i + CHUNK);
-    const [skusRes, checklistRes, metricsRes, reportsRes] = await Promise.all([
-      supabase.from("session_skus").select("*").in("session_id", ids),
-      supabase.from("session_checklist_items").select("*").in("session_id", ids),
-      supabase.from("session_minute_metrics").select("*").in("session_id", ids).order("minute", { ascending: true }),
-      supabase.from("live_session_reports").select("*").in("session_id", ids)
-    ]);
-    if (skusRes.error) throw skusRes.error;
-    if (checklistRes.error) throw checklistRes.error;
-    if (metricsRes.error) throw metricsRes.error;
-    if (reportsRes.error) throw reportsRes.error;
-    skus.push(...((skusRes.data as DbSessionSku[]) ?? []));
-    checklist.push(...((checklistRes.data as DbChecklistItem[]) ?? []));
-    metrics.push(...((metricsRes.data as DbMinuteMetric[]) ?? []));
-    reports.push(...((reportsRes.data as DbSessionReport[]) ?? []));
+  for (const res of results) {
+    if (res.error) throw res.error;
+    reports.push(...((res.data as DbSessionReport[]) ?? []));
   }
-  return { skus, checklist, metrics, reports };
+  return { reports };
 }
 
-function assembleSessions(
-  rows: DbLiveSession[],
-  skus: DbSessionSku[],
-  checklist: DbChecklistItem[],
-  metrics: DbMinuteMetric[],
-  reports: DbSessionReport[]
-): LiveSession[] {
-  return rows.map((row) => ({
-    ...sessionFromDb(row),
-    skus: skus.filter((r) => r.session_id === row.id).map(skuFromDb),
-    checklist: checklist.filter((r) => r.session_id === row.id).map(checklistFromDb),
-    minuteMetrics: metrics.filter((r) => r.session_id === row.id).map(minuteMetricFromDb),
-    report: reports.find((r) => r.session_id === row.id) ? reportFromDb(reports.find((r) => r.session_id === row.id)!) : undefined
-  }));
+function assembleSessions(rows: DbLiveSession[], reports: DbSessionReport[]): LiveSession[] {
+  // Index trước thay vì .find() trong vòng lặp — assemble chạy trên toàn bộ ca mỗi lần nạp lại.
+  const reportBySessionId = new Map<string, DbSessionReport>();
+  for (const r of reports) reportBySessionId.set(r.session_id, r);
+  return rows.map((row) => {
+    const report = reportBySessionId.get(row.id);
+    return {
+      ...sessionFromDb(row),
+      skus: [],
+      checklist: [],
+      minuteMetrics: [],
+      report: report ? reportFromDb(report) : undefined
+    };
+  });
 }
 
 // PostgREST trên Supabase cắt mỗi request ở 1000 dòng (max-rows) và KHÔNG báo lỗi — trước khi có
@@ -476,8 +432,8 @@ export async function completePastSessions(): Promise<number> {
 
 export async function fetchSessions(): Promise<LiveSession[]> {
   const rows = await fetchAllSessionRows();
-  const { skus, checklist, metrics, reports } = await fetchChildRowsForSessions(rows.map((r) => r.id));
-  return assembleSessions(rows, skus, checklist, metrics, reports);
+  const { reports } = await fetchChildRowsForSessions(rows.map((r) => r.id));
+  return assembleSessions(rows, reports);
 }
 
 export async function createSession(session: LiveSession): Promise<LiveSession> {
@@ -508,8 +464,8 @@ export async function updateSession(session: LiveSession): Promise<LiveSession> 
   });
   if (error) throw error;
   const row = data as DbLiveSession;
-  const { skus, checklist, metrics, reports } = await fetchChildRowsForSessions([row.id]);
-  return assembleSessions([row], skus, checklist, metrics, reports)[0];
+  const { reports } = await fetchChildRowsForSessions([row.id]);
+  return assembleSessions([row], reports)[0];
 }
 
 // Dùng sau khi gọi RPC submit_live_session_report (src/lib/db/sessionReports.ts) — RPC đó chỉ
@@ -522,8 +478,8 @@ export async function fetchSessionById(id: string): Promise<LiveSession> {
   }
   if (error) throw error;
   const row = data as DbLiveSession;
-  const { skus, checklist, metrics, reports } = await fetchChildRowsForSessions([row.id]);
-  return assembleSessions([row], skus, checklist, metrics, reports)[0];
+  const { reports } = await fetchChildRowsForSessions([row.id]);
+  return assembleSessions([row], reports)[0];
 }
 
 // Huỷ ca (0097): ca -> Cancelled + slot đã chốt -> cancelled trong 1 transaction; chặn nếu ca đã có số.
@@ -531,8 +487,8 @@ export async function cancelSession(id: string, reason: string): Promise<LiveSes
   const { data, error } = await supabase.rpc("cancel_session", { p_session_id: id, p_reason: reason });
   if (error) throw error;
   const rows = [data as DbLiveSession];
-  const { skus, checklist, metrics, reports } = await fetchChildRowsForSessions([id]);
-  return assembleSessions(rows, skus, checklist, metrics, reports)[0];
+  const { reports } = await fetchChildRowsForSessions([id]);
+  return assembleSessions(rows, reports)[0];
 }
 
 export async function deleteSession(id: string): Promise<void> {

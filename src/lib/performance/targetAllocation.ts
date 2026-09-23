@@ -160,9 +160,18 @@ export function applyAllocatedTargets(
     }
   }
   if (planned.size === 0) return sessions;
-  return sessions.map((s) => {
+  // Giữ identity của mảng VÀ của từng ca khi target không đổi — hàm này nằm ngay sau
+  // withEffectiveStatus trong useMemo `sessions` của App.tsx, vốn chạy lại mỗi 60 giây theo
+  // nhịp tick `nowMs`. Luôn trả mảng mới thì công giữ identity ở withEffectiveStatus thành vô
+  // nghĩa: ~33 useMemo phía dưới vẫn invalidate mỗi phút.
+  let changed = false;
+  const next = sessions.map((s) => {
     const key = `${s.brandId}|${s.date.slice(0, 7)}`;
     if (!planned.has(key)) return s;
-    return { ...s, targetGmv: Math.round(alloc.get(s.id) ?? 0) };
+    const target = Math.round(alloc.get(s.id) ?? 0);
+    if (target === s.targetGmv) return s;
+    changed = true;
+    return { ...s, targetGmv: target };
   });
+  return changed ? next : sessions;
 }

@@ -13,6 +13,7 @@ import { DollarSign, TrendingUp, CheckCircle2, XCircle, Clock } from "lucide-rea
 import { DEFAULT_FINANCE, computeSessionPnl } from "../lib/pnl";
 import { DataSourceBadge } from "./common/DataSourceBadge";
 import { dataQuality } from "../lib/performance/hostPerformance";
+import { errorMessage } from "../lib/errorMessage";
 import { todayVn } from "../lib/performance/brandCommitment";
 
 interface FinanceHrProps {
@@ -123,7 +124,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
     try {
       await onUpdateFinance(sessionId, { [field]: value });
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : "Không lưu được số liệu tài chính.");
+      window.alert(errorMessage(e, "Không lưu được số liệu tài chính."));
     } finally {
       setSavingId(null);
     }
@@ -134,7 +135,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
     try {
       await onSetFinanceApproval(sessionId, status);
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : "Không cập nhật được trạng thái duyệt. Có thể bạn không có quyền CEO.");
+      window.alert(errorMessage(e, "Không cập nhật được trạng thái duyệt. Có thể bạn không có quyền CEO."));
     } finally {
       setSavingId(null);
     }

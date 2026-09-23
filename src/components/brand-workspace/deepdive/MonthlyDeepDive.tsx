@@ -10,6 +10,7 @@ import {
 import { LiveSession } from "../../../types";
 import { fetchDeepDiveSources, MonthSource } from "../../../lib/dataraw/deepDiveSource";
 import { buildDeepDive, lastNMonths, prevMonthOf, DeepDive } from "../../../lib/report/deepdive/metrics";
+import { errorMessage } from "../../../lib/errorMessage";
 import {
   PAL, CHANNEL_COLORS, chartTooltipStyle, chartNum, Section, StatCard, Delta, BarCell, Empty,
   Th, Td, fmtInt, fmtDec, fmtPct, fmtMoney, fmtMoneyShort
@@ -78,7 +79,7 @@ export const MonthlyDeepDive: React.FC<Props> = ({ brandId, brandName = "", canM
     setError(null);
     fetchDeepDiveSources(brandId, trendMonths, { promotionMonths: [prev, month], productMonths: [] })
       .then((s) => { if (!cancelled) { setSources(s); setLoading(false); } })
-      .catch((e: unknown) => { if (!cancelled) { setError(e instanceof Error ? e.message : String(e)); setLoading(false); } });
+      .catch((e: unknown) => { if (!cancelled) { setError(errorMessage(e, "Không tải được dữ liệu phân tích chuyên sâu.")); setLoading(false); } });
     return () => { cancelled = true; };
   }, [brandId, trendMonths, prev, month]);
 

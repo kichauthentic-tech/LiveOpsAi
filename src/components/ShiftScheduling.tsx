@@ -224,18 +224,48 @@ export default function ShiftScheduling({
     return map;
   }, [shiftSlots]);
 
+  // Hai hàm dò trùng dưới đây chạy MỖI DÒNG ca trong `visibleSlots.map()` — bản cũ quét trọn
+  // `sessions` (229 ca thật) và trọn `shiftSlots` cho từng dòng, tức O(số dòng × kho ca). Một
+  // tháng 60 ca là ~28k vòng lặp mỗi lần render.
+  //
+  // `dateTimeRangesOverlap` đã tự trả false khi 2 ngày cách nhau > 1 (ca dài nhất < 24h), nên
+  // chỉ cần soi ngày hôm trước / hôm đó / hôm sau. Index sẵn theo ngày là đủ đưa về O(số dòng).
+  const neighborDates = (date: string) => {
+    const d = new Date(`${date}T00:00:00`);
+    const fmt = (x: Date) => `${x.getFullYear()}-${`${x.getMonth() + 1}`.padStart(2, "0")}-${`${x.getDate()}`.padStart(2, "0")}`;
+    const prev = new Date(d); prev.setDate(prev.getDate() - 1);
+    const next = new Date(d); next.setDate(next.getDate() + 1);
+    return [fmt(prev), date, fmt(next)];
+  };
+  const sessionsByDate = useMemo(() => {
+    const map = new Map<string, LiveSession[]>();
+    for (const s of sessions) {
+      const list = map.get(s.date) ?? [];
+      list.push(s);
+      map.set(s.date, list);
+    }
+    return map;
+  }, [sessions]);
+
   // Ưu tiên hoá studio (mục #5 CEO đã duyệt) — 2-3 brand cùng cần 1 studio/khung giờ
   // vàng thì cảnh báo cho Ops quyết định thủ công, không tự động chọn ai được ưu tiên.
   const findStudioConflicts = (date: string, start: string, end: string, studioId: string, brandId: string, excludeSlotId?: string) => {
     if (!studioId) return [];
-    return shiftSlots.filter(
-      (s) =>
-        s.id !== excludeSlotId &&
-        s.status !== "cancelled" &&
-        s.studioId === studioId &&
-        s.brandId !== brandId &&
-        dateTimeRangesOverlap({ date, startTime: start, endTime: end }, s)
-    );
+    const out: ShiftSlot[] = [];
+    for (const day of neighborDates(date)) {
+      for (const s of slotsByDate.get(day) ?? []) {
+        if (
+          s.id !== excludeSlotId &&
+          s.status !== "cancelled" &&
+          s.studioId === studioId &&
+          s.brandId !== brandId &&
+          dateTimeRangesOverlap({ date, startTime: start, endTime: end }, s)
+        ) {
+          out.push(s);
+        }
+      }
+    }
+    return out;
   };
   // Lưới ngày đủ tuần (kể cả ngày lấp đầu/cuối từ tháng liền kề) để vẽ lịch ma trận.
   const monthGrid = useMemo(() => {
@@ -254,9 +284,13 @@ export default function ShiftScheduling({
     return cells;
   }, [selectedMonth]);
 
-  const visibleSlots = selectedDate
-    ? slotsByDate.get(selectedDate) ?? []
-    : monthSlots.filter((sl) => showPast || sl.date >= today).filter((sl) => admin || sl.status !== "cancelled");
+  const visibleSlots = useMemo(
+    () =>
+      selectedDate
+        ? slotsByDate.get(selectedDate) ?? []
+        : monthSlots.filter((sl) => showPast || sl.date >= today).filter((sl) => admin || sl.status !== "cancelled"),
+    [selectedDate, slotsByDate, monthSlots, showPast, today, admin]
+  );
 
   const shiftMonth = (delta: number) => {
     const [y, m] = selectedMonth.split("-").map(Number);
@@ -273,11 +307,14 @@ export default function ShiftScheduling({
   const checkConflicts = (date: string, start: string, end: string, studioId: string, talentId: string) => {
     let studioConflict = false;
     let hostConflict = false;
-    for (const s of sessions) {
-      if (s.status === "Cancelled") continue;
-      if (!dateTimeRangesOverlap(s, { date, startTime: start, endTime: end })) continue;
-      if (studioId && s.studioId === studioId) studioConflict = true;
-      if (s.hostId === talentId || s.coHostId === talentId) hostConflict = true;
+    // Chỉ ngày liền kề — xem ghi chú ở findStudioConflicts phía trên.
+    for (const day of neighborDates(date)) {
+      for (const s of sessionsByDate.get(day) ?? []) {
+        if (s.status === "Cancelled") continue;
+        if (!dateTimeRangesOverlap(s, { date, startTime: start, endTime: end })) continue;
+        if (studioId && s.studioId === studioId) studioConflict = true;
+        if (s.hostId === talentId || s.coHostId === talentId) hostConflict = true;
+      }
     }
     return { studioConflict, hostConflict };
   };
@@ -386,6 +423,39 @@ export default function ShiftScheduling({
     d.setDate(d.getDate() - 90);
     return `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, "0")}-${`${d.getDate()}`.padStart(2, "0")}`;
   }, [today]);
+
+  // Gợi ý host: `suggestHosts()` quét TRỌN kho ca (229 ca thật) cho mỗi ca mở. Bản cũ gọi thẳng
+  // trong thân `visibleSlots.map()`, nên mọi lần render — kể cả nhịp tick mỗi phút của App —
+  // đều quét lại số ca × số dòng. Gom về một useMemo, chỉ tính lại khi danh sách ca / người đăng
+  // ký / kho ca thật sự đổi.
+  const suggestionsBySlot = useMemo(() => {
+    const map = new Map<string, HostSuggestion[]>();
+    if (!admin) return map;
+    for (const slot of visibleSlots) {
+      if (slot.status !== "open") continue;
+      const regs = registrationsBySlot.get(slot.id) ?? [];
+      map.set(
+        slot.id,
+        suggestHosts(
+          regs.map((r) => r.talentId),
+          talentNameById,
+          sessions,
+          slot.brandId,
+          new Date(`${slot.date}T00:00:00`).getDay(),
+          perfSince,
+          { date: slot.date, startTime: slot.startTime, endTime: slot.endTime }
+        )
+      );
+    }
+    return map;
+  }, [admin, visibleSlots, registrationsBySlot, talentNameById, sessions, perfSince]);
+
+  // Sắp xếp theo tên tiếng Việt 1 lần cho cả màn, thay vì `.sort()` lại trong từng dòng ca —
+  // mỗi dòng chỉ còn lọc ra người chưa đăng ký (giữ nguyên thứ tự đã sắp).
+  const talentsSortedByName = useMemo(
+    () => [...talents].sort((a, b) => a.name.localeCompare(b.name, "vi")),
+    [talents]
+  );
 
   return (
     <div className="space-y-6">
@@ -717,23 +787,12 @@ export default function ShiftScheduling({
               const studioConflicts = findStudioConflicts(slot.date, slot.startTime, slot.endTime, slot.studioId ?? "", slot.brandId ?? "", slot.id);
               // Hiệu suất của đúng những người đã đăng ký ca này, với đúng brand và đúng thứ của
               // ca — tính ngay tại đây thay vì bắt ops nhớ số từ tab Hiệu Suất Host rồi quay lại.
-              const suggestions =
-                admin && slot.status === "open"
-                  ? suggestHosts(
-                      regs.map((r) => r.talentId),
-                      talentNameById,
-                      sessions,
-                      slot.brandId,
-                      new Date(`${slot.date}T00:00:00`).getDay(),
-                      perfSince,
-                      { date: slot.date, startTime: slot.startTime, endTime: slot.endTime }
-                    )
-                  : [];
+              const suggestions = suggestionsBySlot.get(slot.id) ?? [];
               const hasAnyPerfData = suggestions.some((s) => s.overallSessions > 0);
               // Q1 (audit 2026-09-21): ops hay xếp qua Zalo rồi mới vào app → cho chọn cả người CHƯA
               // đăng ký rảnh (nhóm "Người khác"), cảnh báo rõ; gợi ý xếp hạng vẫn chỉ cho người đã đăng ký.
               const registeredIds = new Set(regs.map((r) => r.talentId));
-              const others = admin && slot.status === "open" ? talents.filter((t) => !registeredIds.has(t.id)).sort((a, b) => a.name.localeCompare(b.name, "vi")) : [];
+              const others = admin && slot.status === "open" ? talentsSortedByName.filter((t) => !registeredIds.has(t.id)) : [];
               const hostUnregistered = !!pick.hostId && !registeredIds.has(pick.hostId);
               const coHostUnregistered = !!pick.coHostId && !registeredIds.has(pick.coHostId);
               const coHostConflict = pick.coHostId ? checkConflicts(slot.date, slot.startTime, slot.endTime, "", pick.coHostId).hostConflict : false;

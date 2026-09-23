@@ -4,12 +4,76 @@
 
 1. ~~Chạy `0111_signup_role_and_null_role_guard.sql`~~ + ~~tắt "Allow new users to sign up"~~ — **XONG, verify 2026-09-23**: `GET /auth/v1/settings` → `disable_signup: true`; `POST /auth/v1/signup` (kèm `data:{"role":"ceo"}`) → `422 signup_disabled`, không tạo ra tài khoản nào. Cổng tự phong role đã đóng ở lớp ngoài cùng. Phần SQL (trigger + 11 policy) đã re-verify được bằng `pg_policy`/`pg_proc` qua Supabase SQL Editor (2026-09-23) — phát hiện 0111 vá SÓT 7/10 policy, đã vá tiếp bằng **0112**, verify lại ra 0 dòng hở. Xem đoạn "Verify lại phần SQL bằng pg_policy" trong mục `## BẢO MẬT — tự phong role`.
 2. Migration 0103→0112 **đã chạy** trên production (xem "Sự cố 0105" ở mục Hạ tầng Supabase cho cách đo, không tin lời kể) — không cần chạy lại. Lưu ý: `0110`/`0111` từng trùng số do 2 phiên chạy song song, đã tách — xem ghi chú "Lưu ý đánh số" trong dòng "Migration mới nhất" bên dưới.
-3. Đợt C (audit role × workspace) **XONG HOÀN TOÀN cả C/1–C/8** (xem mục `## Audit Role × Workspace`). "Talent thu nhập tháng này" **XONG** (2026-09-23) — chưa verify được số thật trên browser, chỉ verify logic đơn vị (lý do: DB thật hiện 0 phiên tính lương). "Trung tâm report + xuất file" **XONG** (2026-09-23, xem cuối mục Đợt C) — verify trên browser thật với data CROCS. "Verify SQL 0111" **XONG** (2026-09-23) — phát hiện + vá sót bằng 0112, xem mục `## BẢO MẬT`. "Verify role operations" **XONG** (2026-09-23, tạo tài khoản test, đi hết 14/14 tab, không tìm thấy gate sai). "Admin nên tách thành role hệ thống thuần" — **QUYẾT ĐỊNH KHÔNG TÁCH** (user chốt "admin > CEO luôn" 2026-09-23), coi như đóng, không phải việc cần làm. **Không còn mục nào tồn đọng từ Đợt C — phiên tiếp theo cần hỏi user muốn làm gì mới.**
+3. Đợt C (audit role × workspace) **XONG HOÀN TOÀN cả C/1–C/8** (xem mục `## Audit Role × Workspace`). "Talent thu nhập tháng này" **XONG** (2026-09-23) — chưa verify được số thật trên browser, chỉ verify logic đơn vị (lý do: DB thật hiện 0 phiên tính lương). "Trung tâm report + xuất file" **XONG** (2026-09-23, xem cuối mục Đợt C) — verify trên browser thật với data CROCS. "Verify SQL 0111" **XONG** (2026-09-23) — phát hiện + vá sót bằng 0112, xem mục `## BẢO MẬT`. "Verify role operations" **XONG** (2026-09-23, tạo tài khoản test, đi hết 14/14 tab, không tìm thấy gate sai). "Admin nên tách thành role hệ thống thuần" — **QUYẾT ĐỊNH KHÔNG TÁCH** (user chốt "admin > CEO luôn" 2026-09-23), coi như đóng, không phải việc cần làm. **Không còn mục nào tồn đọng từ Đợt C.** Từ 2026-09-23 việc đang chạy là **audit toàn diện code base** — Phần 1 (nền tảng chung) XONG + đã vá 4 mục user chọn, xem mục `## Audit toàn diện code base (2026-09-23)` ngay dưới. Phiên tiếp theo: hỏi user muốn audit tiếp module nào (danh sách Phần 2 ở cuối mục đó), hay làm nốt ưu tiên #3 (mật khẩu talent `000000`) / #5 (ESLint + test).
 4. Đọc kỹ mục `## Hạ tầng Supabase` trước khi viết migration mới — có quy ước bắt buộc (`(select current_user_role())`, guard trong thân RPC, `to_regclass(...) is null` khi loop qua danh sách bảng) đúc kết từ nhiều sự cố thật, bỏ qua là lặp lại lỗi cũ.
 
 > File này được viết lại gọn ngày 2026-09-08 — bản cũ (1459 dòng, đã vượt giới hạn đọc 1 lần của Claude Code) vẫn còn nguyên trong Git (`git log -- WORKSPACE_DESIGN.md`), tra lại lịch sử chi tiết từng bug/migration bằng lệnh đó thay vì mở file này. Từ nay giữ nguyên tắc: file này chỉ ghi **trạng thái hiện tại**, không tường thuật quá trình.
 
 > **Cập nhật 2026-09-13:** Các phần dưới đây được viết ở các thời điểm khác nhau và nghiệp vụ/code đã đổi khá nhiều kể từ đó. Từ nay **không coi nội dung cũ trong file này là ground truth mặc định** — mọi mục (kiến trúc, luồng dữ liệu, quy ước kỹ thuật...) cần được re-verify bằng đọc code hiện tại trước khi dựa vào để quyết định, đặc biệt là mục nào chưa có ghi chú "đã audit lại". Đang làm 1 vòng rà soát UX/workflow theo từng module (xem "Giai đoạn tiếp theo") — mỗi module audit xong sẽ cập nhật lại đúng phần liên quan trong file.
+
+## Audit toàn diện code base (2026-09-23) — Phần 1 XONG, 4 bản vá đã verify
+
+Theo yêu cầu user "audit toàn bộ code base về logic và UI/UX, workflow". Cách làm: đọc code thật + **đếm dòng thật trên Supabase production** + chạy app thật trong browser, không suy đoán.
+
+### Ảnh chụp dữ liệu thật 2026-09-23 — đọc trước khi kết luận bất cứ gì về "app đang chạy thế nào"
+
+| Bảng | Dòng | |
+|---|---|---|
+| `live_sessions` | 229 | **100% `is_backfill=true` + `tiktok_reconciled` + `Completed`**, toàn bộ là CROCS T6–T9 nạp bù |
+| `shift_slots` / `session_availability` | 0 / 0 | |
+| `live_session_reports` / `session_live_snapshots` | 0 / 0 | |
+| `session_finance` / `brand_contracts` / `brand_monthly_commitments` | 0 | |
+| `session_skus` / `session_checklist_items` / `session_minute_metrics` | 0 | |
+| `talents` / `profiles` | 33 / **3** | 30 talent chưa có tài khoản |
+| `brand_dataraw_imports` / `brand_monthly_reports` / `brand_month_plans` | 24 / 2 / 1 (draft) | |
+
+**Kết luận quan trọng nhất: chưa MỘT ca nào đi qua vòng đời của chính app** (mở ca → đăng ký → chốt → up snapshot → report → đối soát). Mọi số đang thấy đều từ đường nạp bù. Nhiều lỗi hiệu năng dưới đây vì vậy đang *vô hình*, và sẽ bật ra đúng lúc chốt Kế Hoạch Tháng đầu tiên (sinh ra `shift_slots`).
+
+### 4 bản vá đã làm + verify (user chọn ưu tiên 1/2/4/6)
+
+**#1 — Hết màn "Quyền Truy Cập Bị Hạn Chế ... DENIED" nháy mỗi lần tải trang.** `App.tsx` render `{!isTabAllowed ? <AccessRestricted/> : ...}` mà KHÔNG guard `phase6Loading`. Trong lúc `role_permissions` đang fetch thì `rolePermissions` = `{}` → mọi `checkPermission()` false → mọi nav item có `perm` biến mất → `isTabAllowed` false. Effect tự-chuyển-tab (dòng ~1668) *có* guard `phase6Loading`, phần render thì không. Bắt được nguyên trạng bằng tài khoản `operations` thật, dù DB bật đủ 6/7 key cho role đó.
+
+Nay tách 3 trạng thái: **đang nạp** → skeleton + "Đang kiểm tra quyền truy cập..." (cả sidebar lẫn khung chính); **nạp lỗi** → màn riêng nói đúng nguyên nhân ("Đây KHÔNG phải là bạn bị thu quyền") + nút **Thử lại** (nonce `permissionsNonce` chạy lại đúng effect, không phải F5) + Đăng xuất; **nạp xong mà đúng là không có quyền** → mới được nói DENIED.
+
+Verify: chèn tạm `setTimeout(4000)` rồi `throw PostgrestError` vào `fetchRolePermissions`, chụp cả 2 màn, bấm Thử lại thấy app hồi phục tại chỗ (sidebar về đủ 14 mục) — rồi gỡ bỏ đoạn chèn tạm.
+
+**#2 — Cắt 15 request rỗng + song song hoá lô còn lại.** `fetchChildRowsForSessions` chia lô 50 id × 4 bảng con, và vòng `for ... await` làm **các lô chạy nối tiếp**. Đo thật: 20 request trải 1078ms → 2955ms (**1.9 giây**) để nhận về 0 dòng.
+
+Sửa 2 việc: (a) **bỏ hẳn** việc nạp `session_skus` / `session_checklist_items` / `session_minute_metrics` — grep toàn repo: không màn hình nào đọc `session.skus` / `.checklist` / `.minuteMetrics`, chúng là di sản của Live Sessions Hub đã xoá 2026-09-13, cả 3 bảng đang 0 dòng; đường GHI và kiểu `LiveSession` giữ nguyên, 3 trường trả `[]`. Xoá luôn 3 hàm `*FromDb` đã chết theo. (b) lô của `live_session_reports` chạy `Promise.all` song song; `assembleSessions` index bằng Map thay vì `.find()` trong vòng lặp.
+
+Đo lại trên browser thật (cùng tài khoản, cùng dữ liệu):
+
+| | Trước | Sau |
+|---|---|---|
+| Request Supabase / lần tải trang | 54 | **39** |
+| Request bảng con của ca | 20, nối tiếp | **5, song song** |
+| Cửa sổ nạp bảng con | 1877ms | **281ms** |
+| Response Supabase cuối cùng | 2955ms | **880ms** |
+
+**#4 — Cắt dây chuyền re-render mỗi 60 giây.** `App.tsx` tick `nowMs` mỗi phút để "Đang live"/"Đã xong" tự đổi. `withEffectiveStatus()` luôn `.map()` ra **mảng mới** kể cả khi không ca nào đổi trạng thái → `sessions` đổi identity mỗi phút → ~33 `useMemo` trong các component con (đều có `sessions` trong deps) invalidate và tính lại toàn bộ. `applyAllocatedTargets()` cũng vậy khi brand-tháng có kế hoạch.
+
+Cả hai nay **trả về đúng mảng đầu vào khi không có gì đổi** (`applyAllocatedTargets` so cả `targetGmv` từng ca). Verify: 5 check bằng `tsx` — giữ identity khi không đổi / VẪN đổi đúng khi ca bước qua giờ bắt đầu ("Live Now") / không kế hoạch trả nguyên mảng / lần 1 phân bổ đúng 500+500 / lần 2 trên kết quả đó trả nguyên mảng. Verify trên browser: MutationObserver trên `<main>` đếm **0 mutation trong 78 giây** (đã qua trọn 1 tick 60s).
+
+Kèm theo, `ShiftScheduling.tsx` — mỗi dòng ca trong `visibleSlots.map()` trước đây quét trọn `sessions` (229 ca) qua `checkConflicts`, trọn `shiftSlots` qua `findStudioConflicts`, gọi `suggestHosts()` (lại quét 229 ca), và `talents.filter().sort()`. Một tháng 60 ca ≈ 28k vòng lặp mỗi lần render. Nay: index `sessionsByDate` + chỉ soi **3 ngày liền kề** (`dateTimeRangesOverlap` vốn tự trả false khi cách > 1 ngày); `suggestionsBySlot` gom về 1 `useMemo`; `talentsSortedByName` sort 1 lần cho cả màn; `visibleSlots` được memo.
+
+**#6 — 4 chỗ còn `e instanceof Error`** (vi phạm quy ước đã ghi trong file này, `PostgrestError` hiện ra `[object Object]`): `FinanceHr.tsx` ×2, `useNotifications.tsx`, `MonthlyDeepDive.tsx` → đổi sang `errorMessage()`. `App.tsx` chỗ nạp `role_permissions` cũng đổi theo. Lợi ích thấy ngay khi verify #1: màn lỗi hiện đủ `message — hint (code)` thay vì chỉ `message`.
+
+### Quy ước mới rút ra từ đợt này
+
+- **Không được render màn "bị từ chối quyền" khi chưa biết quyền.** Mọi guard đọc từ state fetch async phải phân biệt 3 trạng thái *đang nạp / nạp lỗi / đã biết và bị từ chối*. Gộp 2 cái đầu vào cái thứ ba là nói dối người dùng, và trên mạng chậm thì lời nói dối đó kéo dài vài giây.
+- **Hàm dẫn xuất chạy trong `useMemo` theo nhịp thời gian phải giữ IDENTITY của mảng khi không có gì đổi.** `.map()` vô điều kiện là đủ để làm hỏng mọi memo phía dưới. Mẫu: cờ `changed`, `return changed ? next : input`.
+- **Đừng nạp bảng con của cả kho ca lúc mở app.** Cần dữ liệu con cho 1 ca thì nạp lúc mở đúng ca đó. Và khi đã chia lô theo giới hạn URL thì các lô phải `Promise.all`, nối tiếp chỉ cộng dồn RTT.
+- **Trước khi tối ưu, đếm dòng thật trên production.** Ba bảng con bị bỏ nạp đều đang 0 dòng và 0 consumer — không đo thì đã đi song song hoá một thứ lẽ ra nên xoá.
+
+### Còn lại của audit — chưa làm, user chưa chọn
+
+Ưu tiên **#3 (bảo mật)** user chưa yêu cầu làm: `handleCreateTalentAccount` ([App.tsx](src/App.tsx)) hardcode `defaultPassword: "000000"` cho MỌI tài khoản talent tạo từ Talent Pool, `email_confirm: true`, và **không có cơ chế bắt buộc đổi mật khẩu lần đầu** — chỉ có dòng chữ nhắc trong UI (`TalentMatcher.tsx:545`). Hiện mới 3 profile nên rủi ro nhỏ; cấp tài khoản cho 33 talent là thành 33 tài khoản chung một mật khẩu đoán được. Đề xuất: sinh mật khẩu ngẫu nhiên hiện 1 lần cho ops + cờ `must_change_password`.
+
+Ưu tiên **#5**: chưa có **test nào** (không vitest/jest; `npm run lint` thực chất chỉ là `tsc --noEmit`) và **chưa có ESLint** — 11 comment `// eslint-disable-next-line react-hooks/exhaustive-deps` trong source hiện **không có tác dụng gì**. `exhaustive-deps` chính là rule bắt được lớp lỗi #4.
+
+Khác, đã ghi nhận nhưng chưa sửa: bundle **2.4 MB một mảnh**, không code-split (talent chỉ dùng 3 màn vẫn tải recharts + xlsx + 14 module); ~13 cụm fetch nổ cùng lúc lúc đăng nhập cho **mọi role** bất kể đang ở tab nào (mới gate 4 cụm theo `isOpsRole`); `useNotifications` poll 45s không kiểm `document.visibilityState`; **47 `alert()` + 23 `confirm()`** native; `App.tsx` 2475 dòng / `MonthlyReportTabs.tsx` 2187 dòng (40 `useState` + 40 `useMemo`, 5 tab fetch hết lúc mount); chỉ 1 ErrorBoundary ở root nên lỗi render ở module nào cũng trắng cả app; CI chạy Node 20 trong khi `package.json` khai `engines: 22.x`; `src/lib/metrics/definitions.ts` + `rateAverage.ts` không được import ở đâu; nhánh `activeTab === "ai_agents"` không bao giờ vào được; `/api/gemini/*` vẫn trả reply bịa ("Host Yến Nhi", "Studio B") khi thiếu `GEMINI_API_KEY`.
+
+**Phần 2 trở đi chưa audit** (theo module): Vận Hành Live (SessionWindow / OpsBoard / SessionLedger / LiveCalendar / SessionReportForm / snapshot upload) · Lập kế hoạch (MonthPlan / suggestEngine / planMonthSlots / BulkFinalizePanel) · Brand Workspace & Report (MonthlyReportTabs / MonthlyDeepDive / `dataraw/*` / `report/*`) · Tài chính & nhân sự (FinanceHr / BrandCommitment / HostPerformance / TalentMatcher) · Hệ thống (UserRoleSettings / AccountSettings / Header / notification / theme).
 
 ## Kiến trúc tổng quan
 

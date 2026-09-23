@@ -24,9 +24,20 @@ export function effectiveStatus(s: LiveSession, nowMs: number): LiveSession["sta
   return "Upcoming";
 }
 
+// Trả về ĐÚNG mảng đầu vào khi không ca nào đổi trạng thái — không phải tiết kiệm vài phép map,
+// mà để giữ IDENTITY của mảng.
+//
+// App.tsx tick `nowMs` mỗi 60 giây để "Đang live"/"Đã xong" tự đổi khi mở lâu. Bản cũ luôn
+// `.map()` ra mảng mới, nên mỗi phút `sessions` lại là một tham chiếu khác — kéo theo ~33 useMemo
+// trong các component con (đều có `sessions` trong mảng dependency) invalidate và tính lại toàn
+// bộ, dù 59/60 lần tick chẳng có gì đổi. Giữ identity là cắt đứt đúng dây chuyền đó ngay gốc.
 export function withEffectiveStatus(sessions: LiveSession[], nowMs: number): LiveSession[] {
-  return sessions.map((s) => {
+  let changed = false;
+  const next = sessions.map((s) => {
     const st = effectiveStatus(s, nowMs);
-    return st === s.status ? s : { ...s, status: st };
+    if (st === s.status) return s;
+    changed = true;
+    return { ...s, status: st };
   });
+  return changed ? next : sessions;
 }

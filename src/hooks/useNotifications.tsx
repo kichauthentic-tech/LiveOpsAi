@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppNotification } from "../types";
 import { fetchMyNotifications, markNotificationsRead } from "../lib/db/notifications";
+import { errorMessage } from "../lib/errorMessage";
 
 // Poll thay vì Supabase Realtime: app chưa bật Realtime cho bảng nào, và một cái chuông đến trễ
 // tối đa 45 giây là chấp nhận được với nghiệp vụ xếp ca theo ngày. Bật Realtime là thêm một cơ
@@ -23,7 +24,7 @@ export function useNotifications(enabled: boolean) {
       }
     } catch (e) {
       // Chuông hỏng không được làm hỏng app — chỉ ghi lại, UI hiện chuông trống.
-      if (alive.current) setError(e instanceof Error ? e.message : String(e));
+      if (alive.current) setError(errorMessage(e, "Không tải được thông báo."));
     }
   }, [enabled]);
 

@@ -32,6 +32,7 @@ import { applyAllocatedTargets } from "./lib/performance/targetAllocation";
 import { withEffectiveStatus } from "./lib/sessionStatus";
 import { fetchAllMonthlyReports } from "./lib/db/monthlyReports";
 import { fetchLockedPlanTargets } from "./lib/db/monthPlans";
+import { errorMessage } from "./lib/errorMessage";
 import {
   BookOpen,
   FileText,
@@ -488,6 +489,11 @@ export default function App() {
     };
   }, [session?.user?.id, isOpsRole]);
 
+  // Ma Trận Phân Quyền là thứ DUY NHẤT quyết định tab nào mở được, nên fetch hỏng ở đây không
+  // được để người dùng kẹt: `permissionsNonce` cho nút "Thử lại" chạy lại đúng effect này mà
+  // không phải F5 (F5 sẽ kéo lại cả 54 request của lần tải trang).
+  const [permissionsNonce, setPermissionsNonce] = useState(0);
+  const reloadRolePermissions = React.useCallback(() => setPermissionsNonce((n) => n + 1), []);
   useEffect(() => {
     if (!session) return;
     let cancelled = false;
@@ -500,7 +506,7 @@ export default function App() {
       })
       .catch((err) => {
         if (cancelled) return;
-        setPhase6Error(err.message ?? "Không tải được Ma Trận Phân Quyền Role từ Supabase.");
+        setPhase6Error(errorMessage(err, "Không tải được Ma Trận Phân Quyền Role từ Supabase."));
       })
       .finally(() => {
         if (!cancelled) setPhase6Loading(false);
@@ -508,7 +514,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [session?.user?.id]);
+  }, [session?.user?.id, permissionsNonce]);
 
   useEffect(() => {
     if (!session) return;
@@ -1761,7 +1767,17 @@ export default function App() {
             sidebarCollapsed ? "px-3 md:px-2" : "px-3"
           }`}
         >
-          {navGroups.map((group) => {
+          {/* Trong lúc Ma Trận Phân Quyền chưa về, checkPermission() nào cũng false nên MỌI nav
+              item có `perm` biến mất — sidebar còn trơ 1-2 mục và trông như tài khoản vừa bị thu
+              quyền. Hiện skeleton thay vì sự thật sai đó (cùng lý do với nhánh render bên dưới). */}
+          {phase6Loading
+            ? Array.from({ length: 6 }).map((_, i) => (
+                <div
+                  key={`nav-skeleton-${i}`}
+                  className="mx-1 h-9 rounded-xl bg-[var(--surface-elevated)]/60 animate-pulse"
+                />
+              ))
+            : navGroups.map((group) => {
             const visibleItems = group.items.filter(
               (item) => !item.perm || checkPermission(item.perm)
             );
@@ -1824,7 +1840,7 @@ export default function App() {
                 })}
               </div>
             );
-          })}
+              })}
         </nav>
 
         {/* User Card — bấm để mở Tài Khoản Của Tôi (thay cho mục nav riêng đã bỏ) */}
@@ -1960,8 +1976,55 @@ export default function App() {
         {/* Dynamic View Content */}
         <main className="flex-1 overflow-y-auto p-3 sm:p-6 scrollbar-thin">
           <div className={`mx-auto space-y-6 ${isCalendarModule ? "max-w-none" : "max-w-7xl"}`}>
-            {!isTabAllowed ? (
-              /* Access Guard Fallback */
+            {!isTabAllowed && phase6Loading ? (
+              /* Ma Trận Phân Quyền CHƯA về — `rolePermissions` còn là {} nên checkPermission()
+                 nào cũng false và isTabAllowed false theo. Trước bản vá này người dùng đập thẳng
+                 vào màn "Access Restricted ... Status: DENIED" mỗi lần tải trang, kéo dài đúng
+                 bằng RTT tới Supabase (đo được ~580ms trên localhost, tệ hơn nhiều trên 4G của
+                 host ngoài studio). Đó là một lời nói dối về phân quyền, không phải chậm vô hại.
+                 Chưa biết thì im lặng chờ, đừng kết tội. */
+              <div className="max-w-2xl mx-auto my-12 space-y-4">
+                <div className="h-8 w-1/3 rounded-xl bg-[var(--surface-elevated)]/60 animate-pulse" />
+                <div className="h-40 rounded-2xl bg-[var(--surface-elevated)]/60 animate-pulse" />
+                <p className="text-xs text-[var(--text-faint)] text-center">Đang kiểm tra quyền truy cập...</p>
+              </div>
+            ) : !isTabAllowed && phase6Error ? (
+              /* Nạp Ma Trận HỎNG THẬT (mất mạng, token hết hạn, RLS đổi). Cũng ra isTabAllowed =
+                 false, nhưng nguyên nhân khác hẳn "role bạn không được cấp quyền" — nói đúng
+                 nguyên nhân, và cho đường thử lại tại chỗ. Nút "Về Trang Mặc Định" của màn cấm
+                 bên dưới vô dụng ở đây: firstAllowedTab cũng tính từ rolePermissions rỗng. */
+              <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-8 text-center max-w-2xl mx-auto my-12 space-y-5 text-[var(--text)] shadow-2xl">
+                <div className="w-16 h-16 bg-red-500/20 text-red-400 border border-red-500/30 rounded-2xl flex items-center justify-center mx-auto">
+                  <ShieldAlert className="w-8 h-8" />
+                </div>
+                <div className="space-y-2">
+                  <h2 className="text-xl font-black text-[var(--text)]">Không tải được Ma Trận Phân Quyền</h2>
+                  <p className="text-xs text-[var(--text-muted)] max-w-md mx-auto">
+                    Đây KHÔNG phải là bạn bị thu quyền — app chưa đọc được bảng phân quyền nên chưa
+                    biết bạn mở được tab nào. Thử lại, hoặc đăng nhập lại nếu phiên đã hết hạn.
+                  </p>
+                </div>
+                <div className="p-4 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl text-left text-xs font-mono text-[var(--text-muted)] break-words">
+                  {phase6Error}
+                </div>
+                <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                  <button
+                    onClick={reloadRolePermissions}
+                    className="px-5 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-xl text-xs font-black shadow-lg shadow-[var(--accent)]/30 transition-all"
+                  >
+                    Thử lại
+                  </button>
+                  <button
+                    onClick={() => void signOut()}
+                    className="px-4 py-2 bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--text)] rounded-xl text-xs font-bold transition-all"
+                  >
+                    Đăng xuất
+                  </button>
+                </div>
+              </div>
+            ) : !isTabAllowed ? (
+              /* Access Guard Fallback — tới đây thì Ma Trận ĐÃ nạp xong và đúng là role này
+                 không được cấp quyền. Chỉ lúc này mới được nói "DENIED". */
               <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-8 text-center max-w-2xl mx-auto my-12 space-y-5 text-[var(--text)] shadow-2xl">
                 <div className="w-16 h-16 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-2xl flex items-center justify-center mx-auto">
                   <ShieldAlert className="w-8 h-8 animate-bounce" />
