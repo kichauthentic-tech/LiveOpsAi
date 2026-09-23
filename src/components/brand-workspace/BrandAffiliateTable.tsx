@@ -18,6 +18,10 @@ interface BrandAffiliateTableProps {
   brandName: string;
   sessions: LiveSession[];
   currentRole: UserRole;
+  // Nhảy sang tab "Dữ Liệu Gốc" — trước đây openImport() chỉ NHẮC tên tab bằng chữ trong thông
+  // báo lỗi khi chưa có batch Live Analysis, ops phải tự tìm trong sidebar. Chỉ được gọi từ
+  // đường canManage (nút "Nạp Từ Dữ Liệu Gốc" đã tự gate canManage) nên không cần gate lại ở đây.
+  onOpenDataRaw?: () => void;
 }
 
 // Phân loại camp do ops đặt, không file TikTok nào có. Màu bám theo file Excel gốc của ops
@@ -109,7 +113,7 @@ function rowToEntry(brandId: string, r: AffiliateLiveSessionRow): Row {
   };
 }
 
-export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole }: BrandAffiliateTableProps) {
+export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole, onOpenDataRaw }: BrandAffiliateTableProps) {
   const canManage = currentRole === "ceo" || currentRole === "admin" || currentRole === "operations";
 
   const [fromMonth, setFromMonth] = useState(() => addMonths(thisMonth(), -3));
@@ -118,6 +122,9 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // true khi openImport() không tìm thấy batch Live Analysis nào — errorMsg là string thô nên
+  // không nhúng được nút bấm; cờ riêng để render nút "Mở Dữ Liệu Gốc" cạnh thông báo lỗi đó.
+  const [missingDataraw, setMissingDataraw] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
 
@@ -193,6 +200,7 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole 
   const handleSave = async () => {
     setSaving(true);
     setErrorMsg(null);
+    setMissingDataraw(false);
     try {
       // Lưu TỪNG tháng trong dải đang xem, kể cả tháng giờ rỗng — replaceAffiliateActuals() xoá
       // sạch tháng đó trước khi insert, nên tháng bị ops xoá hết cột cũng được dọn đúng.
@@ -214,12 +222,14 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole 
   const openImport = async () => {
     setImporting(true);
     setErrorMsg(null);
+    setMissingDataraw(false);
     try {
       const { start } = monthRange(months[0]);
       const { end } = monthRange(months[months.length - 1]);
       const slice = await fetchAffiliateLiveSessions(brandId, start, end, shopHandle);
       if (!slice.hasAnyBatch) {
         setErrorMsg('Chưa có batch "Live Analysis" nào phủ dải tháng này trong Dữ Liệu Gốc. Export ở Seller Center với chế độ xem "linked accounts" rồi import vào tab Live Analysis.');
+        setMissingDataraw(true);
         return;
       }
       setImportRows(slice.rows);
@@ -337,7 +347,16 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole 
         </div>
       </div>
 
-      {errorMsg && <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">{errorMsg}</div>}
+      {errorMsg && (
+        <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700 flex flex-wrap items-center gap-2">
+          <span>{errorMsg}</span>
+          {missingDataraw && onOpenDataRaw && (
+            <button onClick={onOpenDataRaw} className="px-2.5 py-1 rounded-lg bg-red-700 text-white text-xs font-semibold whitespace-nowrap">
+              Mở Dữ Liệu Gốc →
+            </button>
+          )}
+        </div>
+      )}
       {savedAt && !dirty && <div className="p-2 rounded-xl bg-emerald-50 border border-emerald-200 text-sm text-emerald-700">Đã lưu lúc {savedAt}.</div>}
 
       {importRows && (

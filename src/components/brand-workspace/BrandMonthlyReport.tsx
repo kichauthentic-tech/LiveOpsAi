@@ -35,6 +35,9 @@ interface BrandMonthlyReportProps {
   currentRole: UserRole;
   brandPlatformRates: BrandPlatformRate[];
   shiftSlots?: ShiftSlot[]; // Report Tuần: ca mở chưa có người tuần tới
+  // Nhảy sang tab "Nhập Ads & Ghi Chú" (ops-only, tab bị ẩn với brand nên chỉ truyền/dùng khi
+  // canManage) — thay 2 chỗ trước đây chỉ NHẮC TÊN TAB bằng chữ, ops phải tự tìm trong sidebar.
+  onOpenAdsReport?: () => void;
 }
 
 const CAN_MANAGE_ROLES: UserRole[] = ["ceo", "operations", "admin"];
@@ -51,7 +54,7 @@ function monthRange(month: string): { start: string; end: string } {
 // đã tách sang tab riêng "Nhập Ads & Ghi Chú" (BrandAdsReport.tsx, 2026-09-21) — Report Tháng chỉ
 // còn tài liệu 6 tab + phát hành/thu hồi (tab 05 "Phân Tích Sâu" gộp vào 2026-09-23, ops-only).
 
-export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId, brandName, sessions, currentRole, brandPlatformRates, shiftSlots }) => {
+export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId, brandName, sessions, currentRole, brandPlatformRates, shiftSlots, onOpenAdsReport }) => {
   const canManage = CAN_MANAGE_ROLES.includes(currentRole);
   const canViewWeekly = CAN_VIEW_WEEKLY_ROLES.includes(currentRole);
   const [viewMode, setViewMode] = useState<"month" | "week">("month");
@@ -136,6 +139,18 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
 
   const isPublished = report?.status === "published";
 
+  // canManage && onOpenAdsReport: tab "Nhập Ads & Ghi Chú" bị ẩn khỏi sidebar với role brand
+  // (App.tsx), nên chỉ hiện nút nhảy tab khi chắc chắn tới được — brand vẫn thấy đúng tên tab
+  // bằng chữ như trước, không phải nút bấm rồi đập vào Access Restricted.
+  const adsReportLink =
+    canManage && onOpenAdsReport ? (
+      <button onClick={onOpenAdsReport} className="font-semibold underline text-[var(--accent-text)] hover:opacity-80">
+        Nhập Ads & Ghi Chú
+      </button>
+    ) : (
+      <>"Nhập Ads & Ghi Chú"</>
+    );
+
   return (
     <div className="space-y-5">
       {canViewWeekly && (
@@ -194,7 +209,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
         </div>
         <p className="text-[var(--text-muted)] text-xs">
           Số liệu vận hành tính từ các ca có số trong tháng (Dữ Liệu Gốc chỉ dự phòng). Ads/ROAS, Promotion, Customer Insight,
-          Account Health nhập tay ở tab "Nhập Ads & Ghi Chú".
+          Account Health nhập tay ở tab {adsReportLink}.
         </p>
       </div>
 
@@ -261,7 +276,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
               </h3>
               <p className="text-[11px] text-[var(--text-faint)] flex items-center gap-1.5">
                 <Megaphone className="w-3.5 h-3.5" /> Ads Spend bổ sung, ROAS, Promotion, Customer Insight, Account Health nhập ở tab
-                "Nhập Ads & Ghi Chú" — phát hành xong thì phần đó khoá theo report.
+                {adsReportLink} — phát hành xong thì phần đó khoá theo report.
               </p>
               {!isPublished ? (
                 <div className="space-y-3">

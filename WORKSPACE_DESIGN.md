@@ -4,7 +4,7 @@
 
 1. ~~Chạy `0111_signup_role_and_null_role_guard.sql`~~ + ~~tắt "Allow new users to sign up"~~ — **XONG, verify 2026-09-23**: `GET /auth/v1/settings` → `disable_signup: true`; `POST /auth/v1/signup` (kèm `data:{"role":"ceo"}`) → `422 signup_disabled`, không tạo ra tài khoản nào. Cổng tự phong role đã đóng ở lớp ngoài cùng. Phần SQL (trigger + 11 policy) không tự re-verify được qua REST như các migration khác — xem "CÒN LẠI, PHẢI VÀO DASHBOARD" cũ đã xoá, thay bằng đoạn verify trong mục `## BẢO MẬT — tự phong role`.
 2. Migration 0103→0111 **đã chạy** trên production (xem "Sự cố 0105" ở mục Hạ tầng Supabase cho cách đo, không tin lời kể) — không cần chạy lại. Lưu ý: `0110`/`0111` từng trùng số do 2 phiên chạy song song, đã tách — xem ghi chú "Lưu ý đánh số" trong dòng "Migration mới nhất" bên dưới.
-3. Đợt C (audit role × workspace) đang dở, C/1–C/7 đã xong + verify (xem mục `## Audit Role × Workspace`). Còn lại đúng 1 việc của Đợt C: **gộp lối vào Dataraw/Nhập Ads/Affiliate-edit**. Hỏi user trước khi đổi thứ tự hoặc chuyển sang việc khác (role gaps talent/operations/admin, verify SQL 0111, "trung tâm report + xuất file" — xem cuối mục Đợt C).
+3. Đợt C (audit role × workspace) **XONG cả C/1–C/8** (xem mục `## Audit Role × Workspace`). Không còn việc "chưa làm" nào trong Đợt C — việc tiếp theo tự chọn giữa: role gaps talent/operations/admin, verify SQL 0111, "trung tâm report + xuất file" (xem cuối mục Đợt C). Hỏi user trước khi chọn.
 4. Đọc kỹ mục `## Hạ tầng Supabase` trước khi viết migration mới — có quy ước bắt buộc (`(select current_user_role())`, guard trong thân RPC, `to_regclass(...) is null` khi loop qua danh sách bảng) đúc kết từ nhiều sự cố thật, bỏ qua là lặp lại lỗi cũ.
 
 > File này được viết lại gọn ngày 2026-09-08 — bản cũ (1459 dòng, đã vượt giới hạn đọc 1 lần của Claude Code) vẫn còn nguyên trong Git (`git log -- WORKSPACE_DESIGN.md`), tra lại lịch sử chi tiết từng bug/migration bằng lệnh đó thay vì mở file này. Từ nay giữ nguyên tắc: file này chỉ ghi **trạng thái hiện tại**, không tường thuật quá trình.
@@ -806,7 +806,18 @@ Tab mới `report_publish_board` ([ReportPublishBoard.tsx](src/components/Report
 
 **Đã verify trên app thật + DB thật (admin, 2026-09-23):** bảng hiện đúng 24 dòng (4 brand × 6 tháng), khớp DB (CROCS + Franklin tháng 8/2026 "Nháp", còn lại "Chưa có dòng"); bấm Phát hành CROCS tháng 8/2026 → chuyển đúng "Đã phát hành 23/9/2026", network request thật, console sạch; test round-trip xong dùng REST RPC trả `status: "draft", published_at: null` — **đã xoá sạch dấu vết test, production về đúng trạng thái ban đầu**. `tsc --noEmit` + `vite build` pass.
 
-**Còn lại của Đợt C (chưa làm):** gộp lối vào Dataraw/Nhập Ads/Affiliate-edit.
+**C/8 — Gộp lối vào Dataraw/Nhập Ads/Affiliate-edit: XONG (2026-09-23, không cần migration).**
+
+Khảo sát trước khi sửa: grep toàn `src/` không tìm thấy nút/link nào khác (ngoài chính sidebar) từng điều hướng tới 3 tab `brand_dataraw`/`brand_ads_report`/`brand_affiliate` — nghĩa là không có "lối vào" trùng lặp cần dọn. Cái thật sự rời rạc là NGƯỢC LẠI: 3 chỗ trong code **nhắc tên tab bằng chữ thường** (không phải link bấm được) rồi bỏ ops tự đi tìm trong sidebar — 2 chỗ ở [BrandMonthlyReport.tsx](src/components/brand-workspace/BrandMonthlyReport.tsx) (mô tả đầu trang + khối Phát Hành Report, cả hai đều nói "nhập tay ở tab Nhập Ads & Ghi Chú") và 1 chỗ ở [BrandAffiliateTable.tsx](src/components/brand-workspace/BrandAffiliateTable.tsx) (banner lỗi khi `openImport()` không tìm thấy batch Live Analysis, nói "trong Dữ Liệu Gốc" nhưng không có cách bấm tới đó).
+
+**Sửa: 2 prop `onOpenAdsReport?`/`onOpenDataRaw?` theo đúng pattern `onOpenX` App.tsx đã dùng sẵn** (`onOpenScheduling`, `onOpenMonthPlan`) — không phát sinh cơ chế điều hướng mới. `App.tsx` truyền `() => setActiveTab("brand_ads_report")` / `() => setActiveTab("brand_dataraw")`; cả 3 tab đích đều nằm trong CÙNG Brand Workspace nên chỉ cần đổi `activeTab`, không cần đụng `effectiveWorkspace`.
+
+- `BrandMonthlyReport.tsx`: `adsReportLink` — render `<button>` gạch chân khi `canManage && onOpenAdsReport`, rơi về chữ thường có ngoặc kép như cũ nếu không (role `brand` không thấy tab này trong sidebar, không cho bấm rồi đập vào Access Restricted).
+- `BrandAffiliateTable.tsx`: cờ riêng `missingDataraw` (không nhúng được nút vào state `errorMsg` vốn là string) — khi `!slice.hasAnyBatch`, banner lỗi thêm nút "Mở Dữ Liệu Gốc →". Đường này chỉ tới được từ nút `canManage`-only nên không cần gate lại.
+
+**Verify trên app thật (admin, cả 3 nút):** Report Tháng CROCS → bấm "Nhập Ads & Ghi Chú" (link gạch chân xanh) → sang đúng tab Nhập Ads & Ghi Chú CROCS. Affiliate Franklin, đổi dải tháng về 01/2020–02/2020 (chắc chắn không có batch) → bấm "Nạp Từ Dữ Liệu Gốc" → banner đỏ "Chưa có batch..." kèm nút "Mở Dữ Liệu Gốc →" → bấm → sang đúng tab Dữ Liệu Gốc (Dataraw) Franklin. Không có tác dụng phụ lên DB (nhánh test chỉ đọc, không lưu). `tsc --noEmit` + `vite build` pass.
+
+**Không còn "còn lại" nào của Đợt C** — 8/8 mục đã xong + verify.
 
 Từng role còn thiếu: **talent** chưa có "thu nhập tháng này" (`MyTalentProfile` chỉ hiện ĐƠN GIÁ, không hiện thành tiền) · **operations** vẫn chưa có tài khoản nào tồn tại · **admin** nên tách thành role hệ thống thuần.
 

@@ -2266,6 +2266,7 @@ export default function App() {
                     currentRole={currentRole}
                     brandPlatformRates={brandPlatformRates}
                     shiftSlots={shiftSlots}
+                    onOpenAdsReport={() => setActiveTab("brand_ads_report")}
                   />
                 )}
 
@@ -2305,6 +2306,7 @@ export default function App() {
                     brandName={activeBrands.find((b) => b.id === currentBrandId)?.name || "Brand"}
                     sessions={activeSessions}
                     currentRole={currentRole}
+                    onOpenDataRaw={() => setActiveTab("brand_dataraw")}
                   />
                 )}
 
