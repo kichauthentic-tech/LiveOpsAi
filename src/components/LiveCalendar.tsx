@@ -251,17 +251,25 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
     return { year: parts[0], month: parts[1], day: parts[2] };
   };
 
+  // `new Date("YYYY-MM-DD")` parses là UTC nửa đêm rồi các getter (getDay/getDate…) đọc lại theo
+  // giờ LOCAL — lệch 1 ngày ở múi giờ âm so với UTC (Mỹ/Canada…). Agency dùng giờ VN (+7, luôn
+  // sau UTC) nên chưa ai thấy lỗi, nhưng vẫn là bẫy thật nếu có ai mở app từ múi giờ khác. Dựng
+  // Date bằng đúng 3 số (local) như các hàm fmtDate khác trong repo đã làm, không parse chuỗi.
+  const toLocalDate = (dateStr: string) => {
+    const { year, month, day } = parseDateString(dateStr);
+    return new Date(year, month - 1, day);
+  };
+
   // Helper to get day of week name in Vietnamese
   const getDayOfWeekName = (dateStr: string) => {
-    const d = new Date(dateStr);
-    const dayIndex = d.getDay(); // 0 = Sun, 1 = Mon...
+    const dayIndex = toLocalDate(dateStr).getDay(); // 0 = Sun, 1 = Mon...
     const names = ["Chủ Nhật", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"];
     return names[dayIndex];
   };
 
   // Get week date range (Monday to Sunday) containing selectedDate
   const getWeekDates = (dateStr: string) => {
-    const curr = new Date(dateStr);
+    const curr = toLocalDate(dateStr);
     const day = curr.getDay();
     // distance to Monday (0 is Sunday, so if Sunday go back 6 days, else go back day - 1)
     const diffToMon = day === 0 ? -6 : 1 - day;
@@ -346,7 +354,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
         setCurrentMonth(currentMonth - 1);
       }
     } else if (viewMode === "week") {
-      const d = new Date(selectedDate);
+      const d = toLocalDate(selectedDate);
       d.setDate(d.getDate() - 7);
       const newStr = formatDateString(d.getFullYear(), d.getMonth() + 1, d.getDate());
       setSelectedDate(newStr);
@@ -354,7 +362,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
       setCurrentYear(d.getFullYear());
     } else {
       // Day / Talent
-      const d = new Date(selectedDate);
+      const d = toLocalDate(selectedDate);
       d.setDate(d.getDate() - 1);
       const newStr = formatDateString(d.getFullYear(), d.getMonth() + 1, d.getDate());
       setSelectedDate(newStr);
@@ -372,7 +380,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
         setCurrentMonth(currentMonth + 1);
       }
     } else if (viewMode === "week") {
-      const d = new Date(selectedDate);
+      const d = toLocalDate(selectedDate);
       d.setDate(d.getDate() + 7);
       const newStr = formatDateString(d.getFullYear(), d.getMonth() + 1, d.getDate());
       setSelectedDate(newStr);
@@ -380,7 +388,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
       setCurrentYear(d.getFullYear());
     } else {
       // Day / Talent
-      const d = new Date(selectedDate);
+      const d = toLocalDate(selectedDate);
       d.setDate(d.getDate() + 1);
       const newStr = formatDateString(d.getFullYear(), d.getMonth() + 1, d.getDate());
       setSelectedDate(newStr);

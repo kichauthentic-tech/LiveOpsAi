@@ -129,8 +129,11 @@
 >    `@typescript-eslint/no-explicit-any` từ "warn" lên **"error"** (đã 0 vi phạm từ mục 5, đúng quy
 >    tắc "rule nào cây code đã xanh thì để error"). `tsc --noEmit` / `eslint .` (0 lỗi, 41 warning —
 >    đúng bằng `set-state-in-effect`) / `vitest` (38/38) đều xanh; app khởi động lại không lỗi console.
-> 7. **Phần 2 của audit code base chưa làm** (theo module) — danh sách ở cuối mục
->    `## Audit toàn diện code base (2026-09-23)`.
+> 7. **Phần 2 của audit code base — đang làm theo module.** Module 1/5 **Vận Hành Live XONG
+>    2026-09-24**: 2 lỗi thật tìm thấy + sửa (dropout của "Ca Của Tôi" vẫn thiếu dây `onRequestDropout`
+>    ở App.tsx; `LiveCalendar` dựng Date từ chuỗi kiểu lệch múi giờ ở 6 chỗ, dormant vì agency chỉ
+>    dùng giờ VN). Còn 4 module: Lập kế hoạch · Brand Workspace & Report · Tài chính & nhân sự ·
+>    Hệ thống — chi tiết ở mục `## Audit toàn diện code base (2026-09-23)`.
 
 
 1. ~~Chạy `0111_signup_role_and_null_role_guard.sql`~~ + ~~tắt "Allow new users to sign up"~~ — **XONG, verify 2026-09-23**: `GET /auth/v1/settings` → `disable_signup: true`; `POST /auth/v1/signup` (kèm `data:{"role":"ceo"}`) → `422 signup_disabled`, không tạo ra tài khoản nào. Cổng tự phong role đã đóng ở lớp ngoài cùng. Phần SQL (trigger + 11 policy) đã re-verify được bằng `pg_policy`/`pg_proc` qua Supabase SQL Editor (2026-09-23) — phát hiện 0111 vá SÓT 7/10 policy, đã vá tiếp bằng **0112**, verify lại ra 0 dòng hở. Xem đoạn "Verify lại phần SQL bằng pg_policy" trong mục `## BẢO MẬT — tự phong role`.
@@ -216,7 +219,37 @@ Kèm theo, `ShiftScheduling.tsx` — mỗi dòng ca trong `visibleSlots.map()` t
 
 Khác, đã ghi nhận nhưng chưa sửa: bundle **2.4 MB một mảnh**, không code-split (talent chỉ dùng 3 màn vẫn tải recharts + xlsx + 14 module); ~13 cụm fetch nổ cùng lúc lúc đăng nhập cho **mọi role** bất kể đang ở tab nào (mới gate 4 cụm theo `isOpsRole`); `useNotifications` poll 45s không kiểm `document.visibilityState`; **47 `alert()` + 23 `confirm()`** native; `App.tsx` 2475 dòng / `MonthlyReportTabs.tsx` 2187 dòng (40 `useState` + 40 `useMemo`, 5 tab fetch hết lúc mount); chỉ 1 ErrorBoundary ở root nên lỗi render ở module nào cũng trắng cả app; `src/lib/metrics/definitions.ts` + `rateAverage.ts` không được import ở đâu; nhánh `activeTab === "ai_agents"` không bao giờ vào được; `/api/gemini/*` vẫn trả reply bịa ("Host Yến Nhi", "Studio B") khi thiếu `GEMINI_API_KEY`.
 
-**Phần 2 trở đi chưa audit** (theo module): Vận Hành Live (SessionWindow / OpsBoard / SessionLedger / LiveCalendar / SessionReportForm / snapshot upload) · Lập kế hoạch (MonthPlan / suggestEngine / planMonthSlots / BulkFinalizePanel) · Brand Workspace & Report (MonthlyReportTabs / MonthlyDeepDive / `dataraw/*` / `report/*`) · Tài chính & nhân sự (FinanceHr / BrandCommitment / HostPerformance / TalentMatcher) · Hệ thống (UserRoleSettings / AccountSettings / Header / notification / theme).
+**Phần 2 — module Vận Hành Live: XONG 2026-09-24, đọc code (SessionWindow / OpsBoard / SessionLedger /
+lib/sessionLedger.ts / LiveCalendar / SessionReportForm / SessionLiveSnapshotUpload / lib/db/sessionReports.ts
+/ sessionLiveSnapshots.ts), chưa chạy lại toàn bộ workflow trên browser thật (chỉ smoke-test app khởi
+động không lỗi console — muốn verify sâu hơn thì cần tài khoản thật, user tự đăng nhập).** 2 lỗi thật
+tìm thấy, cả 2 đã sửa:
+
+1. **`onRequestDropout` vẫn chưa tới `OpsBoard mode="mine"`** — đúng lỗi đã ghi nhận lúc verify Đ9
+   (mục "VIỆC ĐANG TREO" đầu file) nhưng chưa ai sửa. `OpsBoard.tsx` tự nó ĐÃ đúng — forward thẳng
+   `onRequestDropout` xuống `SessionWindow` không điều kiện ([OpsBoard.tsx:305](src/components/OpsBoard.tsx:305));
+   lỗi nằm ở `App.tsx` không truyền prop này vào lời gọi `<OpsBoard mode="mine">` (tab "Ca Của Tôi"),
+   nên `SessionWindow.canDropout` luôn `false` ở đúng tab talent hạ cánh đầu tiên. **ĐÃ SỬA**: thêm
+   `onRequestDropout={handleRequestDropout}` vào lời gọi đó, giống `ShiftScheduling` đã làm.
+2. **`LiveCalendar.tsx` dựng `Date` từ chuỗi `"YYYY-MM-DD"` bằng `new Date(dateStr)` ở 6 chỗ**
+   (`getDayOfWeekName`, `getWeekDates`, cả 2 nhánh tuần/ngày của `handlePrevPeriod`/`handleNextPeriod`)
+   — cách này parse theo UTC rồi đọc lại bằng getter LOCAL, lệch 1 ngày ở múi giờ ÂM so với UTC (Mỹ/
+   Canada…). Agency dùng giờ VN (+7, luôn sau UTC) nên chưa ai thấy lỗi — **dormant, không phải bug
+   đang ảnh hưởng người dùng thật**, nhưng là bẫy có thật và khác quy ước AN TOÀN mà chính file này
+   dùng ở chỗ khác (`new Date(year, month-1, day)`, xem `fmtDate` trong SessionWindow/SessionLedger).
+   **ĐÃ SỬA**: thêm helper `toLocalDate()` dựng Date bằng 3 số local, thay hết 6 chỗ.
+
+Đọc thêm không thấy lỗi logic mới: `sessionLedger.ts` (hasHappened/needsClosing/metricsHiddenFor đã
+đúng theo các lần vá Đ11/0107 trước), `SessionReportForm.tsx` (khoá/mở 5 ô số theo `dataSource`, nhánh
+`metricsLocked` gửi `derived.*` thay vì state — cố ý, không phải bug), `SessionLiveSnapshotUpload.tsx`,
+`lib/db/sessionReports.ts`/`sessionLiveSnapshots.ts` (mỏng, chỉ gọi RPC — logic diff snapshot thật nằm
+trong SQL migration 0078, chưa soát riêng). `tsc --noEmit` / `eslint .` (0 lỗi, 41 warning cũ) / `vitest`
+(38/38) xanh; app khởi động lại trong Browser pane không lỗi console.
+
+**Phần 2 còn lại chưa audit** (theo module): Lập kế hoạch (MonthPlan / suggestEngine / planMonthSlots /
+BulkFinalizePanel) · Brand Workspace & Report (MonthlyReportTabs / MonthlyDeepDive / `dataraw/*` /
+`report/*`) · Tài chính & nhân sự (FinanceHr / BrandCommitment / HostPerformance / TalentMatcher) ·
+Hệ thống (UserRoleSettings / AccountSettings / Header / notification / theme).
 
 ## Chạy thử TOÀN BỘ workflow trên app thật (2026-09-24) — 12 điểm đứt gãy, ĐÃ SỬA CẢ 12
 

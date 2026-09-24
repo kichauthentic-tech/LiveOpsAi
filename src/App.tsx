@@ -2204,6 +2204,7 @@ export default function App() {
                     onOpenScheduling={() => setActiveTab("shift_scheduling")}
                     requestOpenSessionId={notifOpenSessionId}
                     onOpenRequestHandled={() => setNotifOpenSessionId(null)}
+                    onRequestDropout={handleRequestDropout}
                   />
                 )}
 
