@@ -2,19 +2,36 @@
 
 ## CẦN LÀM NGAY khi mở phiên mới (cập nhật 2026-09-24)
 
-> **VIỆC ĐANG TREO — bàn giao 2026-09-24, cập nhật lại cùng ngày sau khi merge (đọc mục này trước danh
-> sách dưới; mục 1 đã xong, còn 6 mục treo).** Xếp theo thứ tự nên làm:
+> **VIỆC ĐANG TREO — bàn giao 2026-09-24, cập nhật lại cùng ngày sau khi merge + verify Đ7/Đ9 (đọc mục
+> này trước danh sách dưới; mục 1–2 đã xong phần chính, còn 6 mục treo).** Xếp theo thứ tự nên làm:
 >
 > 1. ~~Merge nhánh về `main`~~ — **XONG 2026-09-24**: `git merge --ff-only audit/workflow-12-diem-dut-gay`
 >    rồi `git push origin main`, `main` giờ ở `45fe3af` (trước đó `f4e692e`, chậm 3 commit `d45529d` /
 >    `0b3a1fc` / `8642c9b`). Nhánh `audit/workflow-12-diem-dut-gay` đã xoá cả local lẫn remote (đã nằm
 >    trọn trong `main`, không mất gì). Từ nay làm việc thẳng trên `main`, không còn nhánh audit riêng.
-> 2. **Đ7 + Đ9 phía talent — CẦN USER, không làm hộ được.** `notifications` có RLS chỉ cho chính chủ
->    đọc, mà Claude không tự nhập mật khẩu. Cần một lần đăng nhập bằng tài khoản talent để đi: chuông →
->    "Có ca mới đang mở đăng ký" → Đăng Ký Ca; và nút "Tôi không đi được ca này" → thông báo về ops.
->    Logic DB đã verify gián tiếp (RPC đúng guard, trigger bắn được). Cùng lần đó verify nốt nửa luồng
->    talent chưa ai xem: Ca Của Tôi, Hồ Sơ Của Tôi, Thu Nhập Tháng Này. Và role `brand` bằng JWT thật
->    (mọi màn brand tới giờ đều xem bằng admin mở hộ, nên phần che số của 0107 chưa bị thử).
+> 2. ~~Đ7 + Đ9 phía talent~~ — **XONG 2026-09-24**, verify bằng mắt thật qua tài khoản talent
+>    (`kichauthentic@gmail.com`, user tự đăng nhập, Claude không nhập mật khẩu — đổi qua lại 3 vòng
+>    admin/talent trong Browser pane). Tạo 1 ca test (Franklin, ghi chú `ZZZ TEST`) → talent nhận đúng
+>    thông báo "Có ca mới đang mở đăng ký" kèm đúng brand/giờ/ghi chú (**Đ7 OK**) → đăng ký rảnh → admin
+>    chốt Host/Trợ live → talent bấm "Tôi không đi được ca này", nhập lý do → admin nhận đúng thông báo
+>    dropout kèm lý do, đúng "ca CHƯA đổi gì" (**Đ9 OK**). Cũng verify nốt **Ca Của Tôi, Hồ Sơ Của Tôi,
+>    Thu Nhập Tháng Này** (Thu Nhập Tháng Này ra 0đ đúng logic, tài khoản test chưa có ca Completed
+>    thật). **Còn treo: role `brand` bằng JWT thật** — hệ thống chỉ có 3 tài khoản (admin/operations/
+>    talent), chưa có account role `brand`; tạo mới phải qua "Thêm Tài Khoản Mới" → email mời đặt mật
+>    khẩu (không có cách nhập password trực tiếp), user chọn để dịp khác. Phần che số của 0107 vẫn
+>    chưa bị thử bằng JWT brand thật.
+>
+>    **Phát hiện thêm 1 lỗi UI khi verify Đ9** (chưa sửa): nút "Tôi không đi được ca này" **không tới
+>    được từ "Ca Của Tôi"** — tab mặc định/duy nhất mà talent hạ cánh. `App.tsx` (~dòng 2185–2201,
+>    `OpsBoard mode="mine"`) không truyền prop `onRequestDropout` xuống `SessionWindow`, nên
+>    `canDropout` ở [SessionWindow.tsx:249](src/components/SessionWindow.tsx:249) luôn false ở đó. Nút
+>    chỉ xuất hiện khi mở đúng ca từ tab **"Đăng Ký Ca"** (`ShiftScheduling`, App.tsx dòng ~2226, có
+>    truyền `onRequestDropout`). Sửa: truyền `onRequestDropout` cho `OpsBoard mode="mine"` ở App.tsx
+>    giống cách `ShiftScheduling` đang làm.
+>
+>    **Dữ liệu test còn sót lại trên production** (đã Huỷ mềm qua `cancel_session`, chưa xoá cứng — xoá
+>    cứng bị chặn tự làm, đụng data production thật): script dọn sẵn ở
+>    `supabase/seed/2026-09-24e_cleanup_verify_D7_D9.sql`, cần chạy tay 1 lần trong SQL Editor.
 > 3. **Ưu tiên #3 (bảo mật) — user chưa yêu cầu làm.** `handleCreateTalentAccount` hardcode
 >    `defaultPassword: "000000"` cho MỌI tài khoản talent tạo từ Talent Pool, không có cơ chế bắt đổi
 >    mật khẩu lần đầu. Hiện 3 profile nên rủi ro nhỏ; cấp tài khoản cho 33 talent là 33 tài khoản chung
@@ -124,7 +141,7 @@ Theo yêu cầu user "tự tạo và test workflow trên app sao cho không flow
 
 **Chuỗi đã chạy được, không đứt ở đâu:** Cam Kết Hợp Đồng (hợp đồng → "Sinh cam kết theo tháng" → cam kết tháng) → Kế Hoạch Tháng VERA 09/2026 (vẽ tay 2 ca, target 100tr tự chia 50/50 xuống từng ca kế hoạch) → Chốt → 2 `shift_slots` open kèm phòng brand → Nhân sự ca (chốt host/trợ CHƯA đăng ký, có cảnh báo amber đúng) → `live_sessions` Upcoming + slot finalized → `complete_past_sessions()` đóng ca quá giờ → Cửa sổ Ca Live: up file Creator-Live-Performance → `live_snapshot`, giờ live thật 09:02–11:58, tỷ lệ tính lại → Nhập report (form rút còn ~9 ô đúng như Q5) → Đối Soát Số Liệu (file cả kỳ) → `tiktok_reconciled`, GMV 60tr → 72,5tr → Sổ Ca / Hiệu Suất Host / Finance & P&L / Toàn Cảnh Brand / Report Tháng đều nhận số → Phát Hành Report → Điều Phối Phát Hành thấy "Đã phát hành". Huỷ ca (0097) cũng chạy đúng: ca → Cancelled, slot → cancelled, ghi lý do.
 
-**Trạng thái sửa (2026-09-24): cả 12 điểm đã sửa.** Đ1–Đ6, Đ10–Đ12 verify trên app/DB thật; `0114`/`0115`/`0116` đã chạy trên production. **Còn lại chưa xác nhận bằng mắt: Đ7 và Đ9 phía talent** — RLS chỉ cho chính chủ đọc `notifications`, cần một phiên đăng nhập bằng tài khoản talent (Claude không tự nhập mật khẩu). Logic DB của cả hai đã verify gián tiếp: RPC tồn tại đúng guard, trigger bắn được (tạo shift_slot thành công ⇒ constraint nhận kind mới).
+**Trạng thái sửa: cả 12 điểm đã sửa VÀ verify bằng mắt.** Đ1–Đ6, Đ10–Đ12 verify trên app/DB thật 2026-09-24; `0114`/`0115`/`0116` đã chạy trên production. **Đ7 + Đ9 verify xong 2026-09-24** qua tài khoản talent thật (chuông báo đúng "Có ca mới đang mở đăng ký", "Tôi không đi được ca này" gửi đúng thông báo dropout về ops) — chi tiết + 1 lỗi UI phát hiện thêm (nút dropout không tới được từ "Ca Của Tôi") xem mục "VIỆC ĐANG TREO" đầu file.
 
 **Dữ liệu test còn lại trên production** (chưa xoá được: xoá thẳng DB bị auto-mode chặn, và UI cố ý không cho xoá ca đã có số liệu) — script dọn đã viết sẵn: `supabase/seed/2026-09-24_cleanup_workflow_test.sql`, chạy tay 1 lần trong SQL Editor. Gồm: 2 ca VERA 23/09 + 25/09, 3 shift_slots, plan VERA 09/2026, 1 lô đối soát `ZZZ-Doi-Soat-test.xlsx`, hợp đồng `ZZZ-TEST-VERA-01` + cam kết tháng, report tháng VERA 09/2026 đã phát hành.
 
