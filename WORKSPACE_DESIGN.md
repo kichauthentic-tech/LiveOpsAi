@@ -132,8 +132,10 @@
 > 7. **Phần 2 của audit code base — đang làm theo module.** Module 1/5 **Vận Hành Live XONG
 >    2026-09-24**: 2 lỗi thật tìm thấy + sửa (dropout của "Ca Của Tôi" vẫn thiếu dây `onRequestDropout`
 >    ở App.tsx; `LiveCalendar` dựng Date từ chuỗi kiểu lệch múi giờ ở 6 chỗ, dormant vì agency chỉ
->    dùng giờ VN). Còn 4 module: Lập kế hoạch · Brand Workspace & Report · Tài chính & nhân sự ·
->    Hệ thống — chi tiết ở mục `## Audit toàn diện code base (2026-09-23)`.
+>    dùng giờ VN). Module 2/5 **Lập kế hoạch XONG 2026-09-25**: đọc kỹ MonthPlan/suggestEngine/
+>    planMonthSlots/BulkFinalizePanel/bulkFinalize + lib phụ trợ — **không tìm thấy lỗi**, không sửa
+>    gì. Còn 3 module: Brand Workspace & Report · Tài chính & nhân sự · Hệ thống — chi tiết ở mục
+>    `## Audit toàn diện code base (2026-09-23)`.
 
 
 1. ~~Chạy `0111_signup_role_and_null_role_guard.sql`~~ + ~~tắt "Allow new users to sign up"~~ — **XONG, verify 2026-09-23**: `GET /auth/v1/settings` → `disable_signup: true`; `POST /auth/v1/signup` (kèm `data:{"role":"ceo"}`) → `422 signup_disabled`, không tạo ra tài khoản nào. Cổng tự phong role đã đóng ở lớp ngoài cùng. Phần SQL (trigger + 11 policy) đã re-verify được bằng `pg_policy`/`pg_proc` qua Supabase SQL Editor (2026-09-23) — phát hiện 0111 vá SÓT 7/10 policy, đã vá tiếp bằng **0112**, verify lại ra 0 dòng hở. Xem đoạn "Verify lại phần SQL bằng pg_policy" trong mục `## BẢO MẬT — tự phong role`.
@@ -246,10 +248,37 @@ tìm thấy, cả 2 đã sửa:
 trong SQL migration 0078, chưa soát riêng). `tsc --noEmit` / `eslint .` (0 lỗi, 41 warning cũ) / `vitest`
 (38/38) xanh; app khởi động lại trong Browser pane không lỗi console.
 
-**Phần 2 còn lại chưa audit** (theo module): Lập kế hoạch (MonthPlan / suggestEngine / planMonthSlots /
-BulkFinalizePanel) · Brand Workspace & Report (MonthlyReportTabs / MonthlyDeepDive / `dataraw/*` /
-`report/*`) · Tài chính & nhân sự (FinanceHr / BrandCommitment / HostPerformance / TalentMatcher) ·
-Hệ thống (UserRoleSettings / AccountSettings / Header / notification / theme).
+**Phần 2 — module Lập kế hoạch: XONG 2026-09-25, đọc code (MonthPlan.tsx / suggestEngine.ts /
+planMonthSlots.ts / BulkFinalizePanel.tsx / lib/performance/bulkFinalize.ts, kèm lib phụ trợ trực tiếp
+nuôi 5 file trên: monthPlanGrid.ts / planEvaluation.ts / engineParams.ts / hostSuggestion.ts +
+hostPerformance.weekdayOf / dateUtils.ts), chưa chạy lại workflow trên browser thật (chỉ `tsc`/`eslint`/
+`vitest`).** **Không tìm thấy lỗi logic nào** — khác Vận Hành Live, module này không sửa gì. Điểm đáng
+chú ý đã soát kỹ và xác nhận ĐÚNG (không phải bug):
+- Mọi chỗ dựng `Date` từ chuỗi ngày trong cả 9 file đều dùng đúng 1 trong 2 quy ước AN TOÀN — hoặc
+  `new Date(\`${dateStr}T00:00:00\`)` (không có `Z`) rồi đọc bằng getter LOCAL (`getDay`/`getDate`...),
+  hoặc `Date.UTC(...)`/`T00:00:00Z` rồi đọc bằng getter UTC (`dateUtils.ts`: `isoWeekStart`/`addDays`/
+  `isoWeekNumber`; `hostPerformance.weekdayOf`) — không có chỗ nào TRỘN parse-UTC với đọc-LOCAL như bug
+  đã sửa ở LiveCalendar.tsx (module Vận Hành Live).
+- `App.tsx` truyền đủ props cho cả `<MonthPlan>` và `<BulkFinalizePanel>` (qua `ShiftScheduling.tsx`) —
+  không lặp lại kiểu lỗi "prop khai trong type nhưng quên truyền ở 1 call site" đã thấy ở Đ-dropout.
+  `bulkCandidateCount` (nút mở panel) và `eligibleSlots()` (logic chọn dòng bên trong panel) dùng
+  chung một hàm nên số ở nút luôn khớp số dòng thực khi mở ra.
+- `BulkFinalizePanel` chốt tuần tự (không `Promise.all`) và giữ sổ riêng (`BatchLedger`) cho những gì
+  MẺ NÀY vừa gán, xét trùng trên cả sổ đó lẫn `sessions` đã tồn tại — đúng thiết kế đã ghi ở đầu
+  `bulkFinalize.ts`, tránh bug "5 ca trùng giờ cùng gán 1 host vì xét trùng lẻ từng ca".
+- `allocateDraftTargets`/`estimateSlots` (chia target xuống từng ca) dùng chung 1 công thức cho cả
+  lưới ops tự vẽ lẫn lưới engine gợi ý, ca cuối nhận phần dư làm tròn — tổng luôn khớp target, không
+  lệch vì làm tròn từng ca.
+- `suggestEngine.ts`/`planEvaluation.ts` là code thuần (không DB), mọi phép chia đều có guard `> 0`
+  trước khi chia — không có chỗ chia cho 0 khi brand/ô lịch sử rỗng.
+
+Chưa có unit test riêng cho `bulkFinalize.ts`/`planMonthSlots.ts`/`monthPlanGrid.ts` (chỉ
+`suggestEngineBorrowed.test.ts` cho nhánh Đ12 mượn lịch sử) — ghi nhận là khoảng trống, chưa phải việc
+được yêu cầu làm ở đợt audit này. `tsc --noEmit` xanh (không sửa gì nên không cần chạy lại `eslint`/`vitest`).
+
+**Phần 2 còn lại chưa audit** (theo module): Brand Workspace & Report (MonthlyReportTabs / MonthlyDeepDive /
+`dataraw/*` / `report/*`) · Tài chính & nhân sự (FinanceHr / BrandCommitment / HostPerformance /
+TalentMatcher) · Hệ thống (UserRoleSettings / AccountSettings / Header / notification / theme).
 
 ## Chạy thử TOÀN BỘ workflow trên app thật (2026-09-24) — 12 điểm đứt gãy, ĐÃ SỬA CẢ 12
 
