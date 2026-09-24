@@ -26,6 +26,22 @@ const fmtH = (n: number) => `${n.toLocaleString("vi-VN", { maximumFractionDigits
 const fmtPct = (x: number | null, d = 0) => (x === null ? "—" : `${(x * 100).toLocaleString("vi-VN", { maximumFractionDigits: d })}%`);
 const MISSING_LABEL: Record<MissingStep, string> = { snapshot: "chưa up file", report: "chưa report", reconcile: "chưa đối soát" };
 
+// Hoisted ra module scope (react-hooks/static-components, audit 2026-09-24) — định nghĩa lại bên
+// trong BrandWeeklyReport thì mỗi render tạo ra một component KHÁC (identity mới), React coi như
+// unmount/remount toàn bộ 8 ô KPI thay vì chỉ update props.
+const Kpi: React.FC<{ label: string; value: string; delta?: number | null; hint?: string; tone?: "good" | "bad" | "warn" }> = ({ label, value, delta, hint, tone }) => (
+  <div className="bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3">
+    <p className="text-[10px] uppercase tracking-wider font-bold text-[var(--text-faint)]">{label}</p>
+    <p className={`text-lg font-black mt-0.5 ${tone === "good" ? "text-emerald-400" : tone === "bad" ? "text-rose-400" : tone === "warn" ? "text-amber-300" : "text-[var(--text)]"}`}>{value}</p>
+    {delta !== undefined && (
+      <p className={`text-[10px] font-bold mt-0.5 flex items-center gap-1 ${delta === null ? "text-[var(--text-faint)]" : delta >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+        {delta === null ? "tuần trước chưa có số" : <>{delta >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />} {fmtPct(Math.abs(delta))} so tuần trước</>}
+      </p>
+    )}
+    {hint && <p className="text-[10px] text-[var(--text-faint)] mt-0.5">{hint}</p>}
+  </div>
+);
+
 // Report Tuần (làm lại 2026-09-21) — báo cáo VẬN HÀNH nội bộ, đọc-only, không draft/publish (Report
 // Tháng mới là bản giao brand). Nguồn: `live_sessions` (ca có số: đối soát/snapshot/nạp bù) + target
 // kế hoạch đã đổ xuống ca + shift_slots cho tuần tới. Dataraw (số TikTok toàn shop theo ngày) chỉ
@@ -166,19 +182,6 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
   if (!CAN_VIEW_ROLES.includes(currentRole)) {
     return <div className="bg-[var(--surface)] p-6 rounded-2xl border border-[var(--border)] text-sm text-[var(--text-muted)]">Bạn không có quyền xem Report Tuần.</div>;
   }
-
-  const Kpi: React.FC<{ label: string; value: string; delta?: number | null; hint?: string; tone?: "good" | "bad" | "warn" }> = ({ label, value, delta, hint, tone }) => (
-    <div className="bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3">
-      <p className="text-[10px] uppercase tracking-wider font-bold text-[var(--text-faint)]">{label}</p>
-      <p className={`text-lg font-black mt-0.5 ${tone === "good" ? "text-emerald-400" : tone === "bad" ? "text-rose-400" : tone === "warn" ? "text-amber-300" : "text-[var(--text)]"}`}>{value}</p>
-      {delta !== undefined && (
-        <p className={`text-[10px] font-bold mt-0.5 flex items-center gap-1 ${delta === null ? "text-[var(--text-faint)]" : delta >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-          {delta === null ? "tuần trước chưa có số" : <>{delta >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />} {fmtPct(Math.abs(delta))} so tuần trước</>}
-        </p>
-      )}
-      {hint && <p className="text-[10px] text-[var(--text-faint)] mt-0.5">{hint}</p>}
-    </div>
-  );
 
   return (
     <div className="space-y-4">

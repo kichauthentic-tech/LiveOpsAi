@@ -24,10 +24,9 @@ export default tseslint.config(
 
   {
     rules: {
-      // 93 chỗ, riêng App.tsx 36 + createApp.ts 18. Phần lớn là handler Express và payload Excel —
-      // gắn kiểu thật cho từng chỗ là một đợt refactor riêng, không phải việc của phiên dựng lint.
-      // Để "warn" nên vẫn đếm được và không trôi thêm, nhưng không chặn CI.
-      "@typescript-eslint/no-explicit-any": "warn",
+      // Từng 93 chỗ lúc dựng file này (App.tsx 36 + createApp.ts 18 + 15 file khác) — đã vá sạch
+      // 2026-09-24 (ưu tiên #5), giờ lên "error" theo đúng QUY TẮC CHỌN MỨC ở trên.
+      "@typescript-eslint/no-explicit-any": "error",
 
       // Tiền tố _ = "biến/prop này CỐ Ý không dùng" (xem LiveCalendar: 3 handler App.tsx truyền vào
       // mà component không hề dùng — giữ dấu vết thay vì xoá dây nối).
@@ -49,7 +48,35 @@ export default tseslint.config(
     rules: {
       // Hai rule chính, cả hai ERROR — đây là mục đích của cả file này.
       "react-hooks/rules-of-hooks": "error",
-      "react-hooks/exhaustive-deps": "error"
+      "react-hooks/exhaustive-deps": "error",
+
+      // Bộ rule React Compiler (eslint-plugin-react-hooks v7, `configs["recommended-latest"]`) —
+      // bắt lớp lỗi sâu hơn exhaustive-deps: mutate props/state ngay trong render, setState trong
+      // effect gây double-render, component định nghĩa lại mỗi render (không memo hoá được), v.v.
+      // Bật hết ở "warn" trước để đo (audit 2026-09-24): ra đúng 3 rule có vi phạm trên cây code
+      // hiện tại — `static-components` (8, cả 8 cùng 1 file: BrandWeeklyReport định nghĩa lại
+      // component `Kpi` mỗi render — đã hoisted ra module scope), `immutability` (1, MonthlyDeepDive
+      // cộng dồn biến `acc` ngay trong .map — đã đổi qua slice+reduce), và `set-state-in-effect` (41,
+      // rải 24 file). 2 rule đầu đã sửa sạch, lên "error". `set-state-in-effect` GIỮ "warn": đây gần
+      // như toàn bộ là pattern setLoading(true) đầu effect rồi fetch async — hợp lệ, phổ biến, không
+      // phải bug thật; "sửa đúng" theo khuyến nghị của rule (bỏ effect, dùng data-fetching lib như
+      // React Query/SWR, hoặc tách state machine) là một đợt kiến trúc lại lớn, không phải việc của
+      // 1 dòng cấu hình — để nguyên "warn" làm khoản nợ đã đo được (41 chỗ, 24 file), không che đi.
+      "react-hooks/purity": "error",
+      "react-hooks/set-state-in-effect": "warn",
+      "react-hooks/set-state-in-render": "error",
+      "react-hooks/static-components": "error",
+      "react-hooks/immutability": "error",
+      "react-hooks/preserve-manual-memoization": "error",
+      "react-hooks/use-memo": "error",
+      "react-hooks/void-use-memo": "error",
+      "react-hooks/refs": "error",
+      "react-hooks/globals": "error",
+      "react-hooks/error-boundaries": "error",
+      "react-hooks/config": "error",
+      "react-hooks/gating": "error",
+      "react-hooks/incompatible-library": "error",
+      "react-hooks/unsupported-syntax": "error"
     }
   },
 

@@ -407,9 +407,10 @@ const Daily: React.FC<{ dd: DeepDive }> = ({ dd }) => {
 const Rhythm: React.FC<{ dd: DeepDive }> = ({ dd }) => {
   const pareto = [...dd.daily].sort((a, b) => b.gmv - a.gmv);
   const total = pareto.reduce((a, d) => a + d.gmv, 0);
-  let acc = 0;
+  // react-hooks/immutability (audit 2026-09-24): tránh biến acc bị mutate qua từng vòng .map —
+  // cộng dồn bằng slice+reduce, mảng ngày trong tháng nhỏ (≤31) nên O(n²) không đáng kể.
   const paretoData = pareto.map((d, i) => {
-    acc += d.gmv;
+    const acc = pareto.slice(0, i + 1).reduce((sum, x) => sum + x.gmv, 0);
     return { rank: i + 1, date: d.date.slice(8), gmv: d.gmv, cum: total > 0 ? (acc / total) * 100 : 0 };
   });
   return (

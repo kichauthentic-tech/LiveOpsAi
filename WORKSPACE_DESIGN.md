@@ -3,8 +3,9 @@
 ## CẦN LÀM NGAY khi mở phiên mới (cập nhật 2026-09-24)
 
 > **VIỆC ĐANG TREO — bàn giao 2026-09-24, cập nhật lại cùng ngày sau khi merge + verify Đ7/Đ9 + vá
-> ưu tiên #3 + gỡ dây nối CRUD chiến dịch chết ở LiveCalendar + vá sạch 93 warning `no-explicit-any`
-> (đọc mục này trước danh sách dưới; mục 1–5 đã xong, còn 2 mục treo).** Xếp theo thứ tự nên làm:
+> ưu tiên #3 + gỡ dây nối CRUD chiến dịch chết ở LiveCalendar + vá sạch 93 warning `no-explicit-any` +
+> bật bộ rule React Compiler (đọc mục này trước danh sách dưới; mục 1–6 đã xong, còn 1 mục treo).**
+> Xếp theo thứ tự nên làm:
 >
 > 1. ~~Merge nhánh về `main`~~ — **XONG 2026-09-24**: `git merge --ff-only audit/workflow-12-diem-dut-gay`
 >    rồi `git push origin main`, `main` giờ ở `45fe3af` (trước đó `f4e692e`, chậm 3 commit `d45529d` /
@@ -104,9 +105,30 @@
 >      khớp shape cả nhánh AI thật lẫn fallback công thức.
 >    `tsc --noEmit` / `eslint .` / `vitest` (38/38) xanh; app chạy lại trong Browser pane không lỗi
 >    console (ngoài WebSocket HMR đã biết).
-> 6. **Chưa bật bộ rule React Compiler** của eslint-plugin-react-hooks v7 (`purity`,
->    `set-state-in-effect`, `static-components`, `immutability`, `preserve-manual-memoization`…) — bắt
->    lớp lỗi sâu hơn hẳn `exhaustive-deps`. Đo số vi phạm trước rồi mới quyết mức.
+> 6. ~~Chưa bật bộ rule React Compiler~~ — **XONG 2026-09-24.** Bật toàn bộ 15 rule của
+>    `eslint-plugin-react-hooks` v7 (`configs["recommended-latest"]`, ngoài 2 rule cũ đã có
+>    `rules-of-hooks`/`exhaustive-deps`) — đúng quy trình đã ghi: bật hết ở "warn" trước để ĐO, ra
+>    đúng **3 rule có vi phạm thật** trên cây code hiện tại:
+>    - **`static-components` (8, cả 8 cùng [BrandWeeklyReport.tsx](src/components/brand-workspace/BrandWeeklyReport.tsx))**
+>      — component `Kpi` định nghĩa NGAY BÊN TRONG render của `BrandWeeklyReport` → mỗi render tạo
+>      component identity mới, React unmount/remount cả 8 ô KPI thay vì chỉ update props. **ĐÃ SỬA**:
+>      hoist `Kpi` ra module scope (không đóng closure biến nào của component cha, an toàn hoist).
+>    - **`immutability` (1, [MonthlyDeepDive.tsx](src/components/brand-workspace/deepdive/MonthlyDeepDive.tsx):412)**
+>      — biến `acc` bị mutate (`acc += d.gmv`) ngay trong `.map()` để tính % dồn của biểu đồ Pareto.
+>      **ĐÃ SỬA**: đổi qua `pareto.slice(0, i+1).reduce(...)` — O(n²) nhưng mảng ngày trong tháng ≤31,
+>      không đáng kể.
+>    - **`set-state-in-effect` (41, rải 24 file — App.tsx 8, còn lại 1–3/file)** — hầu hết là pattern
+>      `setLoading(true)` đầu effect rồi fetch async, `setData`/`setLoading(false)` trong `.then()`:
+>      hợp lệ, cực phổ biến trong repo này, KHÔNG phải bug thật. Sửa "đúng" theo khuyến nghị của rule
+>      (bỏ hẳn effect, chuyển qua data-fetching lib như React Query/SWR, hoặc tách state machine) là
+>      một đợt kiến trúc lại lớn — không xử lý trong lượt bật rule này. **GIỮ "warn"**, không "error"
+>      (đúng QUY TẮC CHỌN MỨC đầu [eslint.config.js](eslint.config.js)) — khoản nợ đã đo được, chưa
+>      che đi, giai đoạn sau muốn dọn thì đã có sẵn danh sách 24 file + số dòng.
+>
+>    14/15 rule mới (trừ `set-state-in-effect`) đã lên **"error"** — cùng lượt cũng nâng luôn
+>    `@typescript-eslint/no-explicit-any` từ "warn" lên **"error"** (đã 0 vi phạm từ mục 5, đúng quy
+>    tắc "rule nào cây code đã xanh thì để error"). `tsc --noEmit` / `eslint .` (0 lỗi, 41 warning —
+>    đúng bằng `set-state-in-effect`) / `vitest` (38/38) đều xanh; app khởi động lại không lỗi console.
 > 7. **Phần 2 của audit code base chưa làm** (theo module) — danh sách ở cuối mục
 >    `## Audit toàn diện code base (2026-09-23)`.
 
