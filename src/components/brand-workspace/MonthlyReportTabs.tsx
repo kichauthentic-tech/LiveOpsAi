@@ -122,11 +122,6 @@ function promoStatusLabel(status: string): { label: string; color: string } {
   if (s === "deactivated") return { label: "Đã Tắt", color: PAL.red };
   return { label: status, color: PAL.muted };
 }
-function fmtDateRange(r: { first: string; last: string } | null): string {
-  if (!r) return "Chưa khớp phiên nội bộ";
-  const short = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
-  return r.first === r.last ? short(r.first) : `${short(r.first)} - ${short(r.last)}`;
-}
 function fmtSessionStart(iso: string): string {
   const shifted = new Date(new Date(iso).getTime() + 7 * 60 * 60 * 1000);
   const p = (n: number) => String(n).padStart(2, "0");

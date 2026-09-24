@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { SESSION_STATUS_CLS, SESSION_STATUS_LABEL_VI } from "../lib/sessionStatusUi";
 import { AlertTriangle, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, Radio, UserX } from "lucide-react";
 import { Brand, LiveSession, ShiftRegistration, ShiftSlot, Studio, Talent, UserRole, AuditLogEntry } from "../types";
@@ -115,7 +115,12 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
     return [anchor, anchor];
   }, [range, anchor, today]);
 
-  const mine = (s: LiveSession) => !!myTalentId && (s.hostId === myTalentId || s.coHostId === myTalentId);
+  // useCallback để hai useMemo dưới dep được vào chính `mine` thay vì `myTalentId` (dep sai mà
+  // `exhaustive-deps` chưa từng chạy nên không ai thấy) — và giữ identity theo quy ước chống re-render.
+  const mine = useCallback(
+    (s: LiveSession) => !!myTalentId && (s.hostId === myTalentId || s.coHostId === myTalentId),
+    [myTalentId]
+  );
 
   // Ops: mọi ca (session + slot mở chưa chốt) trong khoảng đang xem.
   const rows = useMemo<Row[]>(() => {
@@ -135,11 +140,11 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
   // Talent: ca của tôi cần nộp (đã qua, thiếu file/report) + sắp tới 14 ngày.
   const mineDue = useMemo(
     () => (mode === "mine" ? sessions.filter((s) => mine(s) && s.date <= today && missingSteps(s, today).some((m) => m !== "reconcile")).sort((a, b) => b.date.localeCompare(a.date) || b.startTime.localeCompare(a.startTime)) : []),
-    [mode, sessions, myTalentId, today]
+    [mode, sessions, mine, today]
   );
   const mineUpcoming = useMemo(
     () => (mode === "mine" ? sessions.filter((s) => mine(s) && s.date >= today && s.date <= addDays(today, 14) && s.status !== "Cancelled" && !mineDue.includes(s)).sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(a.startTime)) : []),
-    [mode, sessions, myTalentId, today, mineDue]
+    [mode, sessions, mine, today, mineDue]
   );
 
   const summary = useMemo(() => {

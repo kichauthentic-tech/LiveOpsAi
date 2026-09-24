@@ -1,21 +1,6 @@
 import React, { useState } from "react";
 import { Studio, Equipment, LiveSession } from "../types";
-import {
-  Building2,
-  Camera,
-  QrCode,
-  Calendar,
-  Clock,
-  CheckCircle2,
-  AlertTriangle,
-  Wrench,
-  Plus,
-  Edit3,
-  Trash2,
-  X,
-  Search,
-  Filter
-} from "lucide-react";
+import { Building2, Camera, QrCode, Plus, Edit3, Trash2, X, Search } from "lucide-react";
 import { getTodayDate } from "../lib/dateUtils";
 
 interface StudioEquipmentProps {

@@ -3,10 +3,7 @@ import {
   ResponsiveContainer, ComposedChart, BarChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   Legend, PieChart, Pie, Cell, ScatterChart, Scatter, ZAxis, ReferenceLine, LabelList
 } from "recharts";
-import {
-  Activity, AlertTriangle, BarChart3, CalendarDays, Filter, Flame, Gauge, Layers, Loader2,
-  Megaphone, Package, Radio, ShoppingBag, Target, TrendingUp, Users
-} from "lucide-react";
+import { Activity, AlertTriangle, CalendarDays, Filter, Flame, Gauge, Layers, Loader2, Megaphone, Package, Radio, TrendingUp, Users } from "lucide-react";
 import { LiveSession } from "../../../types";
 import { fetchDeepDiveSources, MonthSource } from "../../../lib/dataraw/deepDiveSource";
 import { buildDeepDive, lastNMonths, prevMonthOf, DeepDive } from "../../../lib/report/deepdive/metrics";
@@ -84,8 +81,12 @@ export const MonthlyDeepDive: React.FC<Props> = ({ brandId, brandName = "", canM
   }, [brandId, trendMonths, prev, month]);
 
   // Pha 2 — product_list cho tháng này + tháng trước (để so MoM theo SKU).
+  // Dep là BOOLEAN "đã có sources chưa", không phải object `sources`: pha 2 tự gọi setSources nên dep
+  // theo object là vòng lặp vô hạn. Trước viết thẳng `sources === null` trong dep array — biểu thức
+  // trong dep array thì rule không kiểm tĩnh được, nên tách thành biến.
+  const sourcesLoaded = sources !== null;
   useEffect(() => {
-    if (loading || !sources) return;
+    if (loading || !sourcesLoaded) return;
     let cancelled = false;
     setProductLoading(true);
     fetchDeepDiveSources(brandId, [prev, month], { promotionMonths: [], productMonths: [prev, month] })
@@ -105,7 +106,7 @@ export const MonthlyDeepDive: React.FC<Props> = ({ brandId, brandName = "", canM
       })
       .catch(() => { if (!cancelled) setProductLoading(false); });
     return () => { cancelled = true; };
-  }, [brandId, loading, month, prev, sources === null]);
+  }, [brandId, loading, month, prev, sourcesLoaded]);
 
   const sessionsByMonth = useMemo(() => {
     const m = new Map<string, LiveSession[]>();

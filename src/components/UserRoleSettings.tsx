@@ -1,32 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { UserRole, PermissionKey, PermissionDefinition, RolePermissionsMap, SystemUser, AuditLogEntry, Brand, Talent, LiveSession } from "../types";
-import {
-  ShieldCheck,
-  ShieldAlert,
-  UserPlus,
-  Users,
-  Key,
-  Lock,
-  Unlock,
-  Check,
-  X,
-  Search,
-  Sliders,
-  History,
-  Sparkles,
-  AlertTriangle,
-  Mail,
-  User,
-  Building,
-  CheckCircle2,
-  Trash2,
-  Edit2,
-  Radio,
-  Building2,
-  Briefcase,
-  FileText,
-  Zap
-} from "lucide-react";
+import { ShieldCheck, UserPlus, Users, Key, Lock, Unlock, Check, X, Search, Sliders, History, Sparkles, Trash2, Edit2, Radio, Building2, Zap } from "lucide-react";
 
 export interface NewUserPayload {
   name: string;
@@ -66,8 +40,9 @@ interface UserRoleSettingsProps {
 // thẻ trong khi nhãn tab ghi "Ma Trận Role (6)". Nguồn sự thật cho MÀN HÌNH là danh sách này.
 const MATRIX_ROLES: UserRole[] = ["admin", "ceo", "operations", "brand", "talent"];
 
+// currentRole + sessions nằm trong props type và App.tsx vẫn truyền, nhưng màn này không đọc tới
+// (ESLint 2026-09-24). Không bỏ khỏi type vì đó là sửa cả chỗ gọi — chỉ thôi nhận ở đây.
 export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
-  currentRole,
   currentUserId,
   rolePermissions,
   onUpdateRolePermissions,
@@ -78,8 +53,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
   auditLogs,
   permissionDefinitions,
   brands,
-  talents,
-  sessions
+  talents
 }) => {
   const [activeTab, setActiveTab] = useState<"roles" | "users" | "audit">("roles");
   const [selectedRole, setSelectedRole] = useState<UserRole>("operations");

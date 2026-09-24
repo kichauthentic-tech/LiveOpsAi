@@ -12,13 +12,7 @@ import {
   Megaphone
 } from "lucide-react";
 import { getTodayMonth } from "../../lib/dateUtils";
-import {
-  fetchMonthlyReport,
-  upsertMonthlyReport,
-  publishMonthlyReport,
-  unpublishMonthlyReport,
-  MonthlyReportManualInput
-} from "../../lib/db/monthlyReports";
+import { fetchMonthlyReport, upsertMonthlyReport, publishMonthlyReport, unpublishMonthlyReport } from "../../lib/db/monthlyReports";
 import { MonthlyReportTabs } from "./MonthlyReportTabs";
 import { BrandWeeklyReport } from "./BrandWeeklyReport";
 

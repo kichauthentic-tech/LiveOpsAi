@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Talent, Brand, UserRole, LiveSession } from "../types";
-import { Users, Sparkles, Award, Search, Filter, Plus, Edit3, Trash2, X, Phone, CheckCircle2, Loader2, AlertTriangle } from "lucide-react";
+import { Users, Sparkles, Award, Search, Plus, Edit3, Trash2, X, Phone, Loader2, AlertTriangle } from "lucide-react";
 import { authedFetch } from "../lib/authedFetch";
 import { computeTalentRealTotals } from "../lib/metrics/avgGmv";
 

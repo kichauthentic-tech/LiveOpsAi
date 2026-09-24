@@ -1,9 +1,10 @@
 // Đ11 (2026-09-24) — "số ca đã xảy ra" của Toàn Cảnh Brand.
-// Chạy: npx tsx scratchpad/ledgerSummaryTest.ts
+// Chạy: npm test    (chỉ file này: npx vitest run tests/sessionLedger.test.ts)
 //
 // Không verify được trên production: cả 229 ca thật đều là ca nạp bù ở quá khứ, nên
 // upcoming = 0 ở mọi dòng và bản sửa vô hình. Test này dựng đúng tình huống đã bắt được lỗi
 // (VERA: 1 ca đã chạy + 1 ca 25/09 chưa tới → bảng hiện "2 ca").
+import { expect, test } from "vitest";
 import { LiveSession } from "../src/types";
 import { summarize, hasHappened } from "../src/lib/sessionLedger";
 
@@ -33,12 +34,9 @@ const mk = (over: Partial<LiveSession>): LiveSession =>
     ...over
   }) as LiveSession;
 
-let fail = 0;
-const eq = (name: string, got: unknown, want: unknown) => {
-  const ok = JSON.stringify(got) === JSON.stringify(want);
-  if (!ok) fail++;
-  console.log(`${ok ? "PASS" : "FAIL"}  ${name}${ok ? "" : `\n      got  ${JSON.stringify(got)}\n      want ${JSON.stringify(want)}`}`);
-};
+// So bằng JSON.stringify chứ không toEqual: giữ nguyên phép so của bản gốc (thứ tự khoá có nghĩa).
+const eq = (name: string, got: unknown, want: unknown) =>
+  test(name, () => { expect(JSON.stringify(got)).toBe(JSON.stringify(want)); });
 
 // --- hasHappened từng trường hợp ---
 eq("ca quá khứ Completed = đã xảy ra", hasHappened(mk({ date: "2026-09-20" }), TODAY), true);
@@ -81,5 +79,3 @@ const crocs = summarize(
 );
 eq("CROCS toàn ca nạp bù: happened == total, upcoming 0", [crocs.happened, crocs.total, crocs.upcoming], [47, 47, 0]);
 
-console.log(fail === 0 ? "\nTất cả PASS" : `\n${fail} test FAIL`);
-process.exit(fail === 0 ? 0 : 1);

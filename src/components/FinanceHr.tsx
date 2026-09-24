@@ -10,7 +10,7 @@ import {
   BrandPlatformRateHistoryEntry
 } from "../types";
 import { DollarSign, TrendingUp, CheckCircle2, XCircle, Clock } from "lucide-react";
-import { DEFAULT_FINANCE, PNL_MISSING_LABEL, PnlMissingInput, computeSessionPnl } from "../lib/pnl";
+import { PNL_MISSING_LABEL, PnlMissingInput, computeSessionPnl } from "../lib/pnl";
 import { DataSourceBadge } from "./common/DataSourceBadge";
 import { dataQuality } from "../lib/performance/hostPerformance";
 import { errorMessage } from "../lib/errorMessage";

@@ -1,6 +1,6 @@
 import { LiveSession } from "../../../types";
-import { MonthSource, ShopDayRow, ProductRow, PromotionRow, eachDateOf } from "../../dataraw/deepDiveSource";
-import { vnDateOf } from "../../dataraw/creatorLivePerfSlice";
+import { MonthSource, ProductRow, PromotionRow, eachDateOf } from "../../dataraw/deepDiveSource";
+
 import { pickLiveUnits, LiveUnit, LiveSourceKind, LIVE_SOURCE_LABEL } from "./liveUnits";
 
 // ---------------------------------------------------------------------------

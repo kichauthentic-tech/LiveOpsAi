@@ -1,5 +1,6 @@
 // Đ5 (2026-09-24) — target tháng khi có Kế Hoạch Tháng đã chốt.
-// Chạy: npx tsx scratchpad/targetAllocationTest.ts
+// Chạy: npm test    (chỉ file này: npx vitest run tests/targetAllocation.test.ts)
+import { expect, test } from "vitest";
 import { applyAllocatedTargets } from "../src/lib/performance/targetAllocation";
 import { LiveSession, BrandMonthlyReport } from "../src/types";
 
@@ -16,11 +17,9 @@ function ca(id: string, date: string, start: string, end: string, extra: Partial
   } as LiveSession;
 }
 
-let failed = 0;
+// So bằng JSON.stringify chứ không toEqual: giữ nguyên phép so của bản gốc (thứ tự khoá có nghĩa).
 function eq(label: string, got: unknown, want: unknown) {
-  const ok = JSON.stringify(got) === JSON.stringify(want);
-  if (!ok) failed++;
-  console.log(`${ok ? "PASS" : "FAIL"}  ${label}${ok ? "" : `\n        got  ${JSON.stringify(got)}\n        want ${JSON.stringify(want)}`}`);
+  test(label, () => { expect(JSON.stringify(got)).toBe(JSON.stringify(want)); });
 }
 const targets = (list: LiveSession[]) => Object.fromEntries(list.map((s) => [s.id, s.targetGmv]));
 
@@ -73,5 +72,3 @@ const planMonthTotals = new Map([[`${B}|${M}`, 100_000_000]]);
   eq("không đổi → trả đúng mảng đầu vào", out === input, true);
 }
 
-console.log(failed === 0 ? "\nTất cả PASS" : `\n${failed} test FAIL`);
-process.exit(failed === 0 ? 0 : 1);

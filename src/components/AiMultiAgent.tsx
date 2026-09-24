@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Sparkles, Send, Bot, User, RefreshCw, Cpu, Award, Zap, Briefcase, LineChart } from "lucide-react";
+import { Send, Bot, User, RefreshCw, Briefcase, LineChart } from "lucide-react";
 import { authedFetch } from "../lib/authedFetch";
 
 type AgentRole = "ceo" | "data_analyst";
@@ -77,7 +77,7 @@ export const AiMultiAgent: React.FC = () => {
         setLoading(false);
         return;
       }
-    } catch (e) {
+    } catch {
       console.log("Using client AI Agent fallback...");
     }
 

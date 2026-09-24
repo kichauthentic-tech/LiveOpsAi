@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    name: Typecheck & Build
+    name: Lint, Typecheck, Test & Build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -17,14 +17,24 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # 22 để khớp `engines.node` trong package.json — trước đây CI chạy 20 trong khi
+          # package.json khai 22.x, tức CI xanh không bảo đảm gì cho môi trường chạy thật.
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Typecheck
+      # `lint` từ 2026-09-24 là ESLint thật (trước đó chỉ là alias của tsc), `typecheck` mới là tsc.
+      # Hai bước tách ra để đọc log biết ngay hỏng ở đâu.
+      - name: Lint (ESLint)
         run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test (vitest)
+        run: npm test
 
       - name: Build (client + server bundle)
         run: npm run build

@@ -139,6 +139,9 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
     setEditingReport(false);
     setEditing(false);
     setEdit({ date: s.date, startTime: s.startTime, endTime: s.endTime, studioId: s.studioId, hostId: s.hostId, coHostId: s.coHostId ?? "" });
+    // Chỉ reset khi MỞ MỘT CA KHÁC. Nghe theo exhaustive-deps (thêm s.date/s.startTime/...) thì mỗi
+    // lần refetch nền trả về ca có giá trị đổi sẽ xoá sạch phần ops đang sửa giữa dòng.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset theo danh tính ca, không theo nội dung
   }, [s.id]);
   // Đóng bằng Esc; khoá cuộn nền khi mở (điện thoại).
   useEffect(() => {

@@ -7,26 +7,8 @@ import { formatCurrencyAdaptive } from "../lib/formatCurrency";
 import { sessionHours } from "../lib/performance/hostPerformance";
 import { SessionReportInput } from "../lib/db/sessionReports";
 import { downloadRowsAsXlsx } from "../lib/exportXlsx";
-import {
-  LedgerFilter,
-  MissingStep,
-  brandTrustLabel,
-  filterLedger,
-  groupByDate,
-  hasReport,
-  hasSnapshot,
-  isReconciled,
-  needsClosing,
-  metricsHiddenFor,
-  ledgerHostKey,
-  ledgerHosts,
-  ledgerMonths,
-  linkedSessions,
-  missingSteps,
-  sessionIncidents,
-  summarize
-} from "../lib/sessionLedger";
-import { DataSourceBadge } from "./common/DataSourceBadge";
+import { LedgerFilter, MissingStep, brandTrustLabel, filterLedger, groupByDate, hasReport, hasSnapshot, isReconciled, needsClosing, metricsHiddenFor, ledgerHosts, ledgerMonths, linkedSessions, missingSteps, sessionIncidents, summarize } from "../lib/sessionLedger";
+
 import { BrandLogo } from "./ui/BrandLogo";
 import { SessionWindow } from "./SessionWindow";
 
@@ -60,7 +42,6 @@ interface SessionLedgerProps {
   excludedSessions?: LiveSession[];
   onLogAudit?: (entry: { action: string; details: string; category: AuditLogEntry["category"] }) => Promise<void>;
 }
-
 
 const STATUS_LABEL = SESSION_STATUS_LABEL_VI;
 
@@ -96,7 +77,6 @@ function fmtHours(h: number): string {
 function fmtInt(n: number | undefined): string {
   return (n ?? 0).toLocaleString("vi-VN");
 }
-
 
 const inputCls =
   "bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs text-[var(--text)] focus:outline-none focus:border-[var(--accent)]";

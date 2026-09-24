@@ -48,7 +48,6 @@ import {
   ShieldCheck,
   Lock,
   ShieldAlert,
-  UserCheck,
   BrainCircuit,
   UserCog,
   CalendarClock,
@@ -123,7 +122,7 @@ function loadStorage<T>(key: string, fallback: T): T {
   try {
     const item = localStorage.getItem(STORAGE_PREFIX + key);
     return item ? JSON.parse(item) : fallback;
-  } catch (e) {
+  } catch {
     return fallback;
   }
 }
@@ -250,7 +249,6 @@ export default function App() {
 
   // Session Finance (P&L per completed session) — real data from Supabase `session_finance` (Phase 7), no mock fallback
   const [financeRecords, setFinanceRecords] = useState<SessionFinance[]>([]);
-  const [phase7Loading, setPhase7Loading] = useState(true);
   const [phase7Error, setPhase7Error] = useState<string | null>(null);
 
   // TikTok Shop Partner API connection status + webhook log (Phase 9), no mock fallback
@@ -269,12 +267,10 @@ export default function App() {
   // Workflow Rules / Audit Logs — real data from Supabase (Phase 5), no mock fallback
   const [workflowRules, setWorkflowRules] = useState<WorkflowRule[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
-  const [phase5Loading, setPhase5Loading] = useState(true);
   const [phase5Error, setPhase5Error] = useState<string | null>(null);
 
   // System Users — real data from Supabase `profiles` (Phase 4), no mock fallback
   const [users, setUsers] = useState<SystemUser[]>([]);
-  const [phase4Loading, setPhase4Loading] = useState(true);
   const [phase4Error, setPhase4Error] = useState<string | null>(null);
 
   // Talents / Studios / Equipments — real data from Supabase (Phase 1), no mock fallback
@@ -331,12 +327,10 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
-  const [sessionsLoading, setSessionsLoading] = useState(true);
   const [sessionsError, setSessionsError] = useState<string | null>(null);
 
   // Brands — real data from Supabase (Phase 3), no mock fallback
   const [brands, setBrands] = useState<Brand[]>([]);
-  const [phase3Loading, setPhase3Loading] = useState(true);
   const [phase3Error, setPhase3Error] = useState<string | null>(null);
 
   // Đăng ký & Chốt Lịch Host — real data from Supabase `brand_platform_rates`/`shift_slots`/
@@ -346,7 +340,6 @@ export default function App() {
   const [brandStudios, setBrandStudios] = useState<BrandStudio[]>([]);
   const [shiftRegistrations, setShiftRegistrations] = useState<ShiftRegistration[]>([]);
   const [recurringShiftTemplates, setRecurringShiftTemplates] = useState<RecurringShiftTemplate[]>([]);
-  const [phase14Loading, setPhase14Loading] = useState(true);
   const [phase14Error, setPhase14Error] = useState<string | null>(null);
 
 
@@ -355,18 +348,15 @@ export default function App() {
   // FinanceHr.tsx thay vì đọc giá trị hiện tại của talents/brandPlatformRates.
   const [talentRateHistory, setTalentRateHistory] = useState<TalentRateHistoryEntry[]>([]);
   const [brandPlatformRateHistory, setBrandPlatformRateHistory] = useState<BrandPlatformRateHistoryEntry[]>([]);
-  const [phase19Loading, setPhase19Loading] = useState(true);
   const [phase19Error, setPhase19Error] = useState<string | null>(null);
 
   // Giai đoạn B1 — SKU Showcase & Hero Product Catalog (Brand Workspace, xem
   // WORKSPACE_DESIGN.md#6). Fetch 1 lần ở agency-level, mỗi Brand Workspace
   // tự filter theo brandId.
   const [brandSkus, setBrandSkus] = useState<BrandSku[]>([]);
-  const [phaseB1Loading, setPhaseB1Loading] = useState(true);
   const [phaseB1Error, setPhaseB1Error] = useState<string | null>(null);
   // Giai đoạn C3 — Scheme khuyến mãi tích hợp Calendar. Áp dụng theo khoảng ngày, agency-wide.
   const [promoSchemes, setPromoSchemes] = useState<PromoScheme[]>([]);
-  const [phaseC3Loading, setPhaseC3Loading] = useState(true);
   const [phaseC3Error, setPhaseC3Error] = useState<string | null>(null);
 
   // Giai đoạn C4 — Price List Import (SKU pricing theo platform, Brand Workspace).
@@ -375,8 +365,16 @@ export default function App() {
   // failed fetch left a tab silently empty forever with no indication anything went wrong.
   const [dismissedDataErrorSignature, setDismissedDataErrorSignature] = useState<string | null>(null);
 
+  // 2026-09-24 (#5 ESLint): mọi effect nạp dữ liệu dưới đây khoá theo ID người đăng nhập, KHÔNG theo
+  // object `session`. Supabase làm mới access token mỗi ~1h và trả về một object session MỚI với cùng
+  // user id — dep theo cả object là bật lại đúng vòng refetch toàn bộ ~13 cụm dữ liệu mỗi giờ mà đợt
+  // audit Phần 1 vừa dập. Trước đây thân effect guard bằng `if (!session)` nên `exhaustive-deps` đòi
+  // thêm `session` vào dep (12 lỗi); guard bằng chính `authUserId` thì rule hết đòi mà hành vi y nguyên
+  // — `authUserId` truthy đúng khi và chỉ khi có session kèm user.
+  const authUserId = session?.user?.id;
+
   useEffect(() => {
-    if (!session) return;
+    if (!authUserId) return;
     let cancelled = false;
     setPhase1Loading(true);
     Promise.all([fetchTalents(), fetchStudios(), fetchEquipments()])
@@ -397,12 +395,11 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [session?.user?.id]);
+  }, [authUserId]);
 
   useEffect(() => {
-    if (!session) return;
+    if (!authUserId) return;
     let cancelled = false;
-    setSessionsLoading(true);
     fetchAllMonthlyReports().then((m) => { if (!cancelled) setMonthlyReports(m); }).catch(() => {});
     // 0096: đóng ca đã qua giờ trước khi nạp — không chặn nếu RPC lỗi.
     completePastSessions()
@@ -416,19 +413,15 @@ export default function App() {
       .catch((err) => {
         if (cancelled) return;
         setSessionsError(err.message ?? "Không tải được dữ liệu Live Sessions từ Supabase.");
-      })
-      .finally(() => {
-        if (!cancelled) setSessionsLoading(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [session?.user?.id]);
+  }, [authUserId]);
 
   useEffect(() => {
-    if (!session) return;
+    if (!authUserId) return;
     let cancelled = false;
-    setPhase3Loading(true);
     fetchBrands()
       .then((b) => {
         if (cancelled) return;
@@ -438,21 +431,17 @@ export default function App() {
       .catch((err) => {
         if (cancelled) return;
         setPhase3Error(err.message ?? "Không tải được dữ liệu Brand từ Supabase.");
-      })
-      .finally(() => {
-        if (!cancelled) setPhase3Loading(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [session?.user?.id]);
+  }, [authUserId]);
 
   useEffect(() => {
-    if (!session) return;
+    if (!authUserId) return;
     // Chỉ 2 màn đọc danh sách này — Phân Quyền & Role và CRM — và cả hai đều gate ở ops.
-    if (!isOpsRole) { setPhase4Loading(false); return; }
+    if (!isOpsRole) return;
     let cancelled = false;
-    setPhase4Loading(true);
     fetchUsers()
       .then((u) => {
         if (cancelled) return;
@@ -462,21 +451,17 @@ export default function App() {
       .catch((err) => {
         if (cancelled) return;
         setPhase4Error(err.message ?? "Không tải được danh sách tài khoản người dùng từ Supabase.");
-      })
-      .finally(() => {
-        if (!cancelled) setPhase4Loading(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [session?.user?.id, isOpsRole]);
+  }, [authUserId, isOpsRole]);
 
   useEffect(() => {
-    if (!session) return;
+    if (!authUserId) return;
     // Cả 2 bảng đã khoá ở ceo/operations/admin trong migration 0105.
-    if (!isOpsRole) { setPhase5Loading(false); return; }
+    if (!isOpsRole) return;
     let cancelled = false;
-    setPhase5Loading(true);
     Promise.all([fetchWorkflowRules(), fetchAuditLogs()])
       .then(([w, a]) => {
         if (cancelled) return;
@@ -487,14 +472,11 @@ export default function App() {
       .catch((err) => {
         if (cancelled) return;
         setPhase5Error(err.message ?? "Không tải được Workflow Rules/Audit Logs từ Supabase.");
-      })
-      .finally(() => {
-        if (!cancelled) setPhase5Loading(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [session?.user?.id, isOpsRole]);
+  }, [authUserId, isOpsRole]);
 
   // Ma Trận Phân Quyền là thứ DUY NHẤT quyết định tab nào mở được, nên fetch hỏng ở đây không
   // được để người dùng kẹt: `permissionsNonce` cho nút "Thử lại" chạy lại đúng effect này mà
@@ -502,7 +484,7 @@ export default function App() {
   const [permissionsNonce, setPermissionsNonce] = useState(0);
   const reloadRolePermissions = React.useCallback(() => setPermissionsNonce((n) => n + 1), []);
   useEffect(() => {
-    if (!session) return;
+    if (!authUserId) return;
     let cancelled = false;
     setPhase6Loading(true);
     fetchRolePermissions()
@@ -521,12 +503,11 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [session?.user?.id, permissionsNonce]);
+  }, [authUserId, permissionsNonce]);
 
   useEffect(() => {
-    if (!session) return;
+    if (!authUserId) return;
     let cancelled = false;
-    setPhase14Loading(true);
     // Tham số engine gợi ý lịch — chỉ màn Kế Hoạch Tháng / Hỗ Trợ Vận Hành dùng (ops). Khoá ở
     // ceo/operations/admin trong 0105, nên role khác gọi cũng chỉ nhận về rỗng.
     if (isOpsRole) {
@@ -551,19 +532,15 @@ export default function App() {
       .catch((err) => {
         if (cancelled) return;
         setPhase14Error(err.message ?? "Không tải được dữ liệu Đăng Ký & Chốt Lịch Host từ Supabase.");
-      })
-      .finally(() => {
-        if (!cancelled) setPhase14Loading(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [session?.user?.id, isOpsRole]);
+  }, [authUserId, isOpsRole]);
 
   useEffect(() => {
-    if (!session) return;
+    if (!authUserId) return;
     let cancelled = false;
-    setPhase19Loading(true);
     Promise.all([fetchTalentRateHistory(), fetchBrandPlatformRateHistory()])
       .then(([talentHistory, brandHistory]) => {
         if (cancelled) return;
@@ -574,19 +551,15 @@ export default function App() {
       .catch((err) => {
         if (cancelled) return;
         setPhase19Error(err.message ?? "Không tải được Lịch Sử Rate Card từ Supabase.");
-      })
-      .finally(() => {
-        if (!cancelled) setPhase19Loading(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [session?.user?.id]);
+  }, [authUserId]);
 
   useEffect(() => {
-    if (!session) return;
+    if (!authUserId) return;
     let cancelled = false;
-    setPhase7Loading(true);
     fetchSessionFinances()
       .then((f) => {
         if (cancelled) return;
@@ -596,19 +569,15 @@ export default function App() {
       .catch((err) => {
         if (cancelled) return;
         setPhase7Error(err.message ?? "Không tải được dữ liệu Finance & HR từ Supabase.");
-      })
-      .finally(() => {
-        if (!cancelled) setPhase7Loading(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [session?.user?.id]);
+  }, [authUserId]);
 
   useEffect(() => {
-    if (!session) return;
+    if (!authUserId) return;
     let cancelled = false;
-    setPhaseB1Loading(true);
     fetchBrandSkus()
       .then((skus) => {
         if (cancelled) return;
@@ -618,19 +587,15 @@ export default function App() {
       .catch((err) => {
         if (cancelled) return;
         setPhaseB1Error(err.message ?? "Không tải được SKU Showcase từ Supabase.");
-      })
-      .finally(() => {
-        if (!cancelled) setPhaseB1Loading(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [session?.user?.id]);
+  }, [authUserId]);
 
   useEffect(() => {
-    if (!session) return;
+    if (!authUserId) return;
     let cancelled = false;
-    setPhaseC3Loading(true);
     fetchPromoSchemes()
       .then((schemes) => {
         if (cancelled) return;
@@ -640,17 +605,14 @@ export default function App() {
       .catch((err) => {
         if (cancelled) return;
         setPhaseC3Error(err.message ?? "Không tải được Scheme khuyến mãi từ Supabase.");
-      })
-      .finally(() => {
-        if (!cancelled) setPhaseC3Loading(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [session?.user?.id]);
+  }, [authUserId]);
 
   useEffect(() => {
-    if (!session || currentRole !== "admin") {
+    if (!authUserId || currentRole !== "admin") {
       setAiAgentPromptsLoading(false);
       return;
     }
@@ -672,7 +634,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [session?.user?.id, currentRole]);
+  }, [authUserId, currentRole]);
 
   async function handleUpdateAiAgentPrompt(agentKey: string, systemPrompt: string) {
     const updated = await updateAiAgentPrompt(agentKey, systemPrompt);
@@ -680,7 +642,7 @@ export default function App() {
   }
 
   const refreshTikTokStatus = () => {
-    if (!session) return;
+    if (!authUserId) return;
     setTiktokStatusLoading(true);
     Promise.all([fetchTikTokStatus(), fetchTikTokWebhookEvents()])
       .then(([status, events]) => {
@@ -695,10 +657,10 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (!session) return;
+    if (!authUserId) return;
     refreshTikTokStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.user?.id]);
+  }, [authUserId]);
 
   async function handleUpdateSessionFinance(
     sessionId: string,
@@ -785,7 +747,7 @@ export default function App() {
     saveStorage("uiStateOwner", profile.id);
     setActiveTab(getDefaultTabForRole(profile.role));
     setWorkspace({ type: "agency" });
-  }, [profile?.id]);
+  }, [profile?.id, profile?.role]);
 
   // Live Sessions are real Supabase data now (Phase 2) — no mock filtering applies
   const rawActiveSessions = sessions;

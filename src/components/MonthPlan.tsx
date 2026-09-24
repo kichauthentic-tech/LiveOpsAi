@@ -323,7 +323,9 @@ export default function MonthPlan({
   // Lưới nháp vs target: dự báo cả lưới hụt quá ngưỡng → cảnh báo kèm phương án bù giờ (engine chạy
   // chế độ target với lưới hiện tại là ca cố định → phần xếp thêm chính là ca cần bù). Chỉ ở nháp.
   const targetGap = useMemo(() => {
-    if (locked || targetTotal <= 0 || drafts.length === 0 || history.brandGmvPerHour <= 0) return null;
+    // engineHistory, KHÔNG phải history: cold start có mượn hình dạng thì vẫn dự báo được, nên vẫn
+    // phải cảnh báo hụt target. Bỏ sót chỗ này khi vá Đ12 (2026-09-24), `exhaustive-deps` bắt được.
+    if (locked || targetTotal <= 0 || drafts.length === 0 || engineHistory.brandGmvPerHour <= 0) return null;
     const forecast = estimateSlots(engineHistory, drafts, estimateCtx).reduce((a, b) => a + b, 0);
     const gap = targetTotal - forecast;
     const pct = gap / targetTotal;
@@ -333,7 +335,7 @@ export default function MonthPlan({
     const extraSlots = fill.slots.filter((sl) => !fixed.has(`${sl.date}|${sl.startTime}|${sl.endTime}`));
     const extraHours = extraSlots.reduce((a, sl) => a + sl.hours, 0);
     return { forecast, gap, pct, fill: fill.hoursToHitTarget !== null && extraSlots.length > 0 ? fill : null, extraHours, extraSlots };
-  }, [locked, targetTotal, drafts, history, estimateCtx, engineParams.targetGapWarnPct, baseConstraints, strategy]);
+  }, [locked, targetTotal, drafts, engineHistory, estimateCtx, engineParams.targetGapWarnPct, baseConstraints, strategy]);
   // Giai đoạn B — engine gợi ý: ca đang có trong lưới được giữ làm ca cố định, engine xếp thêm cho đủ
   // giờ cam kết và chia target theo dự báo từng ca.
   const suggest = (mode: "hours" | "target" = "hours") => {

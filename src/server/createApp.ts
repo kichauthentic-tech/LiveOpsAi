@@ -135,7 +135,6 @@ export function createApp() {
       if (!caller.userId) {
         return res.status(403).json({ error: `Chỉ tài khoản CEO/Admin mới được tạo tài khoản mới. (${caller.reason})` });
       }
-      const callerId = caller.userId;
       const { name, email, role, customRoleTitle, assignedBrandId, assignedTalentId, newTalentProfile, defaultPassword } = req.body || {};
       if (!name || !email || !role) {
         return res.status(400).json({ error: "Thiếu name/email/role." });

@@ -220,7 +220,7 @@ export const BackfillFromRooms: React.FC<Props> = ({ brandId, brandName, months,
                     <button
                       key={wd}
                       type="button"
-                      onClick={() => setToolWeekdays((prev) => { const n = new Set(prev); n.has(wd) ? n.delete(wd) : n.add(wd); return n; })}
+                      onClick={() => setToolWeekdays((prev) => { const n = new Set(prev); if (n.has(wd)) n.delete(wd); else n.add(wd); return n; })}
                       className={`px-1.5 py-0.5 rounded font-bold border ${toolWeekdays.has(wd) ? "bg-[var(--accent)] text-white border-[var(--accent)]" : "border-[var(--border)] text-[var(--text-muted)]"}`}
                     >
                       {WEEKDAY_SHORT[wd]}

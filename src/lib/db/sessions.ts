@@ -97,9 +97,12 @@ interface DbLiveSession {
   excluded_at?: string | null;
 }
 
-// 3 interface dưới đây chỉ còn phục vụ ĐƯỜNG GHI (*ToDb → replace_session_children). Hàm đọc
-// ngược (*FromDb) đã xoá 2026-09-23 cùng với việc bỏ nạp 3 bảng con — xem ghi chú dài ở
-// fetchChildRowsForSessions() nếu cần dựng lại đường đọc.
+// DbSessionSku / DbChecklistItem / DbMinuteMetric KHÔNG còn được tham chiếu ở bất cứ đâu (ESLint
+// 2026-09-24 chỉ ra; comment cũ ghi "còn phục vụ đường ghi *ToDb" đã lạc hậu — đường ghi dựng row
+// thẳng tại chỗ). Giữ lại làm TÀI LIỆU hình dạng 3 bảng con `session_skus` / `session_checklist` /
+// `session_minute_metrics` mà `replace_session_children` vẫn ghi vào, để lần dựng lại đường đọc
+// không phải tra schema từ đầu — xem ghi chú dài ở fetchChildRowsForSessions().
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- giữ có chủ đích, lý do ngay trên
 interface DbSessionSku {
   id: string;
   session_id: string;
@@ -116,6 +119,7 @@ interface DbSessionSku {
   cvr: number;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- tài liệu schema, xem DbSessionSku
 interface DbChecklistItem {
   id: string;
   session_id: string;
@@ -150,6 +154,7 @@ interface DbSessionReport {
   submitted_at: string | null;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- tài liệu schema, xem DbSessionSku
 interface DbMinuteMetric {
   id: string;
   session_id: string;

@@ -51,7 +51,8 @@ const toMin = (t: string) => {
   return h * 60 + m;
 };
 const rangesOverlap = (aS: string, aE: string, bS: string, bE: string) => {
-  let a1 = toMin(aS), a2 = toMin(aE), b1 = toMin(bS), b2 = toMin(bE);
+  const a1 = toMin(aS), b1 = toMin(bS);
+  let a2 = toMin(aE), b2 = toMin(bE);
   if (a2 <= a1) a2 += 1440;
   if (b2 <= b1) b2 += 1440;
   return a1 < b2 && b1 < a2;

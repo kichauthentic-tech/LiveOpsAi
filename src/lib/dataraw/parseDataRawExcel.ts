@@ -120,7 +120,7 @@ function parseProductList(rows: unknown[][]): ParsedDataRawImport {
 // Tên cột của 2 bản khác nhau nữa — xem COLUMN_PATTERNS ở lib/dataraw/liveAnalysisRows.ts.
 function parseLiveAnalysis(rows: unknown[][]): ParsedDataRawImport {
   const metaLine = String(rows[0]?.[0] ?? "");
-  const metaMatch = metaLine.match(/(?:Phạm vi ngày|Date Range):\s*([\d\-]+)\s*~\s*([\d\-]+)/);
+  const metaMatch = metaLine.match(/(?:Phạm vi ngày|Date Range):\s*([\d-]+)\s*~\s*([\d-]+)/);
   const headerIdx = rows.findIndex((r) => {
     const first = String(r?.[0] ?? "").trim();
     return first === "ID nhà sáng tạo" || first === "Creator ID";
@@ -215,7 +215,7 @@ function parseDailyByThoiGianHeader(rows: unknown[][], metaRegex: RegExp, metaPr
 // khớp 1:1 đúng thứ tự). Product Card Traffic Stats chưa từng có file tiếng Anh để đối chiếu —
 // biến thể "[Date Range]:" ở đây là suy ra theo cùng quy luật, CHƯA verify bằng file thật.
 function parseLivePerformanceCoreStats(rows: unknown[][]): ParsedDataRawImport {
-  return parseDailyByThoiGianHeader(rows, /(?:Phạm vi ngày|Date Range):\s*([\d\-]+)\s*~\s*([\d\-]+)/, /^(?:Phạm vi ngày|Date Range):\s*/, "Live Performance Core Stats");
+  return parseDailyByThoiGianHeader(rows, /(?:Phạm vi ngày|Date Range):\s*([\d-]+)\s*~\s*([\d-]+)/, /^(?:Phạm vi ngày|Date Range):\s*/, "Live Performance Core Stats");
 }
 
 // Creator-Live-Performance (migration 0066) — xuất từ TikTok Creator Center, tiếng Anh, 1

@@ -1,8 +1,9 @@
 // Đ12 (2026-09-24) — "mượn HÌNH DẠNG toàn agency, MỨC do ops nhập".
-// Chạy: npx tsx scratchpad/borrowedHistoryTest.ts
+// Chạy: npm test    (chỉ file này: npx vitest run tests/suggestEngineBorrowed.test.ts)
 //
 // Điều PHẢI đúng: tỷ lệ giữa các ô (= hình dạng) giữ y nguyên của agency, còn mức tuyệt đối
 // bằng đúng con số ops nhập. Sai một trong hai là hỏng cả ý nghĩa của phương án B.
+import { expect, test } from "vitest";
 import { LiveSession } from "../src/types";
 import { SuggestConstraints, buildHistory, buildBorrowedHistory, suggestMonthPlan, ALL_BRANDS } from "../src/lib/scheduling/suggestEngine";
 
@@ -22,11 +23,8 @@ for (let d = 1; d <= 24; d++) {
   sessions.push(mk(`e${d}`, "crocs", day, "19:00", "22:00", 90_000_000));  // 30tr/giờ
 }
 
-let fail = 0;
-const ok = (name: string, cond: boolean, extra = "") => {
-  if (!cond) fail++;
-  console.log(`${cond ? "PASS" : "FAIL"}  ${name}${cond ? "" : `  ${extra}`}`);
-};
+const ok = (name: string, cond: boolean, extra = "") =>
+  test(name, () => { expect(cond, extra).toBe(true); });
 const near = (a: number, b: number, tol = 1e-6) => Math.abs(a - b) <= tol * Math.max(1, Math.abs(b));
 
 const ASOF = "2026-09-24";
@@ -110,5 +108,3 @@ ok("brand có lịch sử vẫn dùng lịch sử thật", crocsHist.brandGmvPer
 ok("agency trắng → trả null", buildBorrowedHistory([], ASOF, CTX, LEVEL, "(test)") === null);
 ok("mức <= 0 → trả null", buildBorrowedHistory(sessions, ASOF, CTX, 0, "(test)") === null);
 
-console.log(fail === 0 ? "\nTất cả PASS" : `\n${fail} test FAIL`);
-process.exit(fail === 0 ? 0 : 1);

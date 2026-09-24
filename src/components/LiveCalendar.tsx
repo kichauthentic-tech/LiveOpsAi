@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { LiveSession, ShiftSlot, ShiftRegistration, Studio, Talent, Brand, PromoScheme, UserRole, BrandStudio, AuditLogEntry } from "../types";
 import { schemesForDate } from "../lib/schemeUtils";
-import { findBrandStudioId } from "../lib/db/brandStudios";
+
 import { dateTimeRangesOverlap } from "../lib/dateUtils";
 import { CAMPAIGN_DAY_STYLES, getCampaignDayInfo } from "../lib/campaignDays";
 import { BrandLogo } from "./ui/BrandLogo";
 import { getBrandTheme } from "../lib/brandTheme";
-import { EventPill } from "./ui/EventPill";
+
 import { CampaignDayRibbon, CampaignDayBanner } from "./ui/CampaignDayRibbon";
 import {
   SessionEventCard,
@@ -19,21 +19,7 @@ import { SlotDetailModal } from "./scheduling/SlotDetailModal";
 import { OpenSlotModal } from "./scheduling/OpenSlotModal";
 import { SessionWindow } from "./SessionWindow";
 import { SessionReportInput } from "../lib/db/sessionReports";
-import {
-  Calendar as CalendarIcon,
-  Building2,
-  User,
-  Plus,
-  AlertTriangle,
-  CheckCircle2,
-  Search,
-  X,
-  ChevronLeft,
-  ChevronRight,
-  Tag,
-  GripVertical,
-  Move
-} from "lucide-react";
+import { Calendar as CalendarIcon, Building2, User, Plus, AlertTriangle, CheckCircle2, Search, X, ChevronLeft, ChevronRight, Tag, GripVertical } from "lucide-react";
 
 interface LiveCalendarProps {
   sessions: LiveSession[];
@@ -97,9 +83,13 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   currentUserId,
   currentRole,
   schemes = [],
-  onAddScheme,
-  onUpdateScheme,
-  onDeleteScheme,
+  // PHÁT HIỆN 2026-09-24 (ESLint): App.tsx truyền 3 handler này vào (2 chỗ) nhưng LiveCalendar
+  // KHÔNG dùng chỗ nào — lịch agency không có đường thêm/sửa/xoá chiến dịch, chỉ BrandCalendar có.
+  // Giữ nguyên dây nối, đổi tên có tiền tố _ để ESLint thôi báo mà dấu vết không bị xoá: bù UI vào
+  // đây là THÊM TÍNH NĂNG, mà giai đoạn này chốt là không thêm. Ghi vào WORKSPACE_DESIGN.md.
+  onAddScheme: _onAddScheme,
+  onUpdateScheme: _onUpdateScheme,
+  onDeleteScheme: _onDeleteScheme,
   onSubmitSessionReport,
   onSessionSnapshotApplied,
   onDeleteSession,
@@ -137,7 +127,6 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   const canManageSlots = currentRole === "ceo" || currentRole === "admin" || currentRole === "operations";
   // Q2: form duy nhất là "Mở ca chờ đăng ký" (OpenSlotModal); prefill ngày/phòng/giờ từ ô được bấm.
   const [slotModal, setSlotModal] = useState<{ date: string; studioId?: string; start?: string; end?: string } | null>(null);
-
 
   // Drag and Drop State
   const [draggedSessionId, setDraggedSessionId] = useState<string | null>(null);
@@ -209,7 +198,6 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
     const ok = onUpdateSession ? await onUpdateSession({ ...session, studioId: targetStudio.id, studioName: targetStudio.name }) : true;
     if (ok) showToast(`Đã chuyển "${session.brandName}" ${session.startTime}–${session.endTime} sang ${targetStudio.name}.`, "success");
   };
-
 
   const handleDropOnWeekDay = async (e: React.DragEvent, targetDateStr: string) => {
     e.preventDefault();
@@ -456,7 +444,6 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
     }
     return true;
   });
-
 
   // Current Week dates for Week View
   const currentWeekDates = getWeekDates(selectedDate);
@@ -1201,7 +1188,6 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
         </div>
         );
       })()}
-
 
       {/* VIEW 4: TALENT WORKLOAD */}
       {viewMode === "talent_workload" && (
