@@ -35,6 +35,9 @@ interface BrandMonthlyReportProps {
   currentRole: UserRole;
   brandPlatformRates: BrandPlatformRate[];
   shiftSlots?: ShiftSlot[]; // Report Tuần: ca mở chưa có người tuần tới
+  // "brandId|YYYY-MM" → tổng target Kế Hoạch Tháng đã chốt (Đ5) — chỉ chuyển tiếp xuống
+  // MonthlyReportTabs, màn này không tự dùng.
+  planMonthTotals?: Map<string, number>;
   // Nhảy sang tab "Nhập Ads & Ghi Chú" (ops-only, tab bị ẩn với brand nên chỉ truyền/dùng khi
   // canManage) — thay 2 chỗ trước đây chỉ NHẮC TÊN TAB bằng chữ, ops phải tự tìm trong sidebar.
   onOpenAdsReport?: () => void;
@@ -54,7 +57,7 @@ function monthRange(month: string): { start: string; end: string } {
 // đã tách sang tab riêng "Nhập Ads & Ghi Chú" (BrandAdsReport.tsx, 2026-09-21) — Report Tháng chỉ
 // còn tài liệu 6 tab + phát hành/thu hồi (tab 05 "Phân Tích Sâu" gộp vào 2026-09-23, ops-only).
 
-export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId, brandName, sessions, currentRole, brandPlatformRates, shiftSlots, onOpenAdsReport }) => {
+export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId, brandName, sessions, currentRole, brandPlatformRates, shiftSlots, onOpenAdsReport, planMonthTotals }) => {
   const canManage = CAN_MANAGE_ROLES.includes(currentRole);
   const canViewWeekly = CAN_VIEW_WEEKLY_ROLES.includes(currentRole);
   const [viewMode, setViewMode] = useState<"month" | "week">("month");
@@ -259,7 +262,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
           {/* Report Tháng redesign (2026-08-22) — tabbed, skin đen-vàng cố định cho tài liệu gửi
               brand, thay toàn bộ khối Overview/Host Performance/Top SKU/Deep Dive cũ. Xem note thiết
               kế trong MonthlyReportTabs.tsx (nguồn dữ liệu từng tab, giới hạn phạm vi). */}
-          <MonthlyReportTabs brandId={brandId} brandName={brandName} month={month} sessions={sessions} canManage={canManage} brandPlatformRates={brandPlatformRates} />
+          <MonthlyReportTabs brandId={brandId} brandName={brandName} month={month} sessions={sessions} canManage={canManage} brandPlatformRates={brandPlatformRates} planMonthTotals={planMonthTotals} />
 
             </>
           ) : (

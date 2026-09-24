@@ -60,7 +60,9 @@ interface LiveCalendarProps {
   onSubmitSessionReport?: (sessionId: string, input: SessionReportInput) => Promise<boolean>;
   onSessionSnapshotApplied?: (session: LiveSession) => void;
   onDeleteSession?: (id: string) => Promise<void>;
-  onCancelSession?: (id: string, reason: string) => Promise<boolean>;
+  onCancelSession?: (id: string, reason: string, reopenSlot: boolean) => Promise<boolean>;
+  onSetSessionExcluded?: (id: string, excluded: boolean, reason: string) => Promise<boolean>;
+  onRequestDropout?: (sessionId: string, reason: string) => Promise<boolean>; // Đ7 (0116) — talent báo bận, chỉ gửi thông báo cho ops
   onLogAudit?: (entry: { action: string; details: string; category: AuditLogEntry["category"] }) => Promise<void>;
 }
 
@@ -102,6 +104,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   onSessionSnapshotApplied,
   onDeleteSession,
   onCancelSession,
+  onSetSessionExcluded,
+  onRequestDropout,
   onLogAudit
 }) => {
   // Sync sessions with propSessions so clean test mode is respected
@@ -1317,6 +1321,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
           onUpdateSession={onUpdateSession}
           onDeleteSession={onDeleteSession}
           onCancelSession={onCancelSession}
+          onSetSessionExcluded={onSetSessionExcluded}
+          onRequestDropout={onRequestDropout}
           onLogAudit={onLogAudit}
         />
       )}

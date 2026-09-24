@@ -12,38 +12,11 @@ import { mapDataRawToImportRows, vnParts } from "./liveAnalysisRows";
 // shop_promotion và product_list là số tổng hợp cả kỳ, không có cột ngày theo dòng → không thể
 // quy về tuần, nên Report Tuần không dùng 2 loại đó.
 
-// Thứ Hai của tuần chứa `date` (ISO week, tuần bắt đầu thứ Hai).
-export function isoWeekStart(date: string): string {
-  const d = new Date(`${date}T00:00:00Z`);
-  const dow = d.getUTCDay(); // 0 = CN
-  const diff = dow === 0 ? -6 : 1 - dow;
-  d.setUTCDate(d.getUTCDate() + diff);
-  return d.toISOString().slice(0, 10);
-}
-
-export function addDays(date: string, days: number): string {
-  const d = new Date(`${date}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
-// Số tuần ISO — dùng cho nhãn "Tuần 34/2026". Thuật toán chuẩn ISO-8601: tuần chứa thứ Năm
-// quyết định năm của tuần đó.
-export function isoWeekNumber(date: string): { week: number; year: number } {
-  const d = new Date(`${date}T00:00:00Z`);
-  const dow = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dow);
-  const year = d.getUTCFullYear();
-  const yearStart = new Date(Date.UTC(year, 0, 1));
-  const week = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
-  return { week, year };
-}
-
-export function eachDay(start: string, end: string): string[] {
-  const out: string[] = [];
-  for (let d = start; d <= end; d = addDays(d, 1)) out.push(d);
-  return out;
-}
+// 4 hàm ngày thuần (isoWeekStart/addDays/isoWeekNumber/eachDay) đã chuyển về lib/dateUtils.ts
+// (2026-09-24) để module không đụng Supabase dùng lại được — file này import supabaseClient nên
+// không chạy được dưới `tsx`. Re-export nguyên tên để mọi nơi đang import từ đây không phải đổi.
+import { addDays, eachDay, isoWeekNumber, isoWeekStart } from "../dateUtils";
+export { addDays, eachDay, isoWeekNumber, isoWeekStart };
 
 function num(v: unknown): number {
   if (v === null || v === undefined || v === "" || v === "-") return 0;

@@ -10,7 +10,7 @@ import {
   BrandPlatformRateHistoryEntry
 } from "../types";
 import { DollarSign, TrendingUp, CheckCircle2, XCircle, Clock } from "lucide-react";
-import { DEFAULT_FINANCE, computeSessionPnl } from "../lib/pnl";
+import { DEFAULT_FINANCE, PNL_MISSING_LABEL, PnlMissingInput, computeSessionPnl } from "../lib/pnl";
 import { DataSourceBadge } from "./common/DataSourceBadge";
 import { dataQuality } from "../lib/performance/hostPerformance";
 import { errorMessage } from "../lib/errorMessage";
@@ -115,6 +115,20 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
   );
   const totalMargin = totals.grossAgencyRev > 0 ? ((totals.netProfit / totals.grossAgencyRev) * 100).toFixed(1) : "0";
 
+  // Đ3: phiên nào đang được tính bằng rate = 0 / % mặc định. Số 0 vì "chưa nhập rate" và số 0 vì
+  // "thật sự không tốn tiền" cho ra cùng một Net Profit, nên màn tiền phải tự nói ra — chứ không
+  // phải để người đọc tự đoán. Đếm theo từng loại thiếu để câu cảnh báo chỉ đúng chỗ cần sửa.
+  const missingSummary = useMemo(() => {
+    const byKind = new Map<PnlMissingInput, number>();
+    let rowsAffected = 0;
+    for (const r of rows) {
+      if (r.missingInputs.length === 0) continue;
+      rowsAffected += 1;
+      for (const m of r.missingInputs) byKind.set(m, (byKind.get(m) ?? 0) + 1);
+    }
+    return { rowsAffected, byKind: [...byKind.entries()] };
+  }, [rows]);
+
   async function handleFieldChange(
     sessionId: string,
     field: "agencyCommissionRate" | "studioCost" | "adsCost",
@@ -172,12 +186,38 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
             <button onClick={() => shiftMonth(1)} className="px-2 py-1 rounded-lg border border-[var(--border)] hover:bg-[var(--surface-elevated)]">›</button>
           </div>
           <div className="text-right text-xs bg-[var(--surface-elevated)]/50 border border-[var(--border)] rounded-xl px-4 py-2">
-            <div className="text-[var(--text-muted)]">Tổng {rows.length} phiên · Net Profit</div>
+            <div className="text-[var(--text-muted)]">
+              Tổng {rows.length} phiên · Net Profit
+              {missingSummary.rowsAffected > 0 && (
+                <span className="text-amber-300 font-bold"> · {rows.length - missingSummary.rowsAffected}/{rows.length} phiên đủ rate</span>
+              )}
+            </div>
             <div className={`text-lg font-black ${totals.netProfit >= 0 ? "text-emerald-400" : "text-red-400"}`}>
               {money(totals.netProfit)} đ <span className="text-xs font-bold text-[var(--text-muted)]">({totalMargin}%)</span>
             </div>
           </div>
         </div>
+
+        {/* Đ3 (2026-09-24): trước bản này màn P&L in ra con số chắc nịch dựng trên rate = 0 và %
+            commission mặc định trong code, không một chữ cảnh báo — trong khi Report Tháng thì đã
+            cảnh báo đúng kiểu này cho tỷ lệ hoàn huỷ. Đây là cùng một câu, đặt đúng chỗ. */}
+        {missingSummary.rowsAffected > 0 && (
+          <div className="text-[11px] rounded-xl px-3 py-2 border border-rose-800/60 bg-rose-950/40 text-rose-200 space-y-1">
+            <p>
+              <b>{missingSummary.rowsAffected}/{rows.length} phiên đang tính bằng rate chưa nhập</b> — Net Profit ở trên KHÔNG phải số thật,
+              nó đang coi phần chưa nhập là 0đ (hoặc dùng % mặc định trong code).
+            </p>
+            <p className="text-rose-300/90">
+              {missingSummary.byKind.map(([kind, n], i) => (
+                <span key={kind}>
+                  {i > 0 && " · "}
+                  {PNL_MISSING_LABEL[kind]}: {n} phiên
+                </span>
+              ))}
+            </p>
+            <p className="text-rose-300/90">Nhập rate talent ở "Talent Pool", rate/giờ + tỷ lệ hoàn huỷ của brand ở "CRM → Rate Card".</p>
+          </div>
+        )}
 
         {rows.length > 0 && quality.reconciled < quality.total && (
           <div className="text-[11px] rounded-xl px-3 py-2 border border-amber-800/60 bg-amber-950/40 text-amber-200">
@@ -206,12 +246,17 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                 </tr>
               </thead>
               <tbody>
-                {rows.map(({ session: s, finance, talent, isHourly, grossAgencyRev, hostPayout, netProfit, hostPaidHourly, billableHours, otMinutes, earlyLeaveMinutes, coHost, coHostPayout, coHostPaidHourly, coHostUsesAssistantRate }) => {
+                {rows.map(({ session: s, finance, talent, isHourly, grossAgencyRev, hostPayout, netProfit, hostPaidHourly, billableHours, otMinutes, earlyLeaveMinutes, coHost, coHostPayout, coHostPaidHourly, coHostUsesAssistantRate, missingInputs }) => {
                   return (
                   <tr key={s.id} className="border-b border-[var(--border)]/60 align-middle">
                     <td className="py-2 pr-3">
-                      <div className="font-bold text-[var(--text)] flex items-center gap-1.5">
+                      <div className="font-bold text-[var(--text)] flex items-center gap-1.5 flex-wrap">
                         {s.title}
+                        {missingInputs.map((m) => (
+                          <span key={m} className="text-[9px] font-bold bg-rose-950 text-rose-300 border border-rose-800 px-1.5 py-0.5 rounded-full" title={PNL_MISSING_LABEL[m]}>
+                            {PNL_MISSING_LABEL[m]}
+                          </span>
+                        ))}
                       </div>
                       <div className="text-[var(--text-muted)]">{s.brandName} · {s.date} · Host {talent?.name ?? s.hostName}</div>
                     </td>

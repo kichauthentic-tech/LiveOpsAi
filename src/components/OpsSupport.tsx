@@ -100,7 +100,14 @@ export default function OpsSupport({ brands, sessions, shiftSlots, promoSchemes,
   const ctx = useMemo<EstimateCtx>(() => ({ camp: plan?.plan.campRanges, events, schemes: brandSchemes, calibration }), [plan, events, brandSchemes, calibration]);
 
   const locked = plan?.plan.status === "locked";
-  const tracking = useMemo(() => (locked && plan ? trackMonth(plan.slots, shiftSlots, sessions, history, ctx) : null), [locked, plan, shiftSlots, sessions, history, ctx]);
+  // Ca của brand trong ĐÚNG tháng đang xem — trackMonth cần để nhận ra ca có số nằm ngoài lưới kế
+  // hoạch (ops mở tay, ca thay thế sau khi huỷ, ca nạp bù). Không lọc theo tháng thì tiền của tháng
+  // khác sẽ chảy nhầm vào run-rate tháng này.
+  const brandMonthSessions = useMemo(() => brandSessions.filter((s) => s.date.startsWith(month)), [brandSessions, month]);
+  const tracking = useMemo(
+    () => (locked && plan ? trackMonth(plan.slots, shiftSlots, sessions, history, ctx, brandMonthSessions) : null),
+    [locked, plan, shiftSlots, sessions, history, ctx, brandMonthSessions]
+  );
   const fill = useMemo(
     () => (tracking && plan && tracking.gapPct > engineParams.targetGapWarnPct ? suggestFill(tracking, history, plan.plan, month, today, ctx, engineParams) : null),
     [tracking, plan, history, month, today, ctx, engineParams]
@@ -167,11 +174,20 @@ export default function OpsSupport({ brands, sessions, shiftSlots, promoSchemes,
           <>
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
               <Stat label="Target đã chốt" value={formatCurrencyAdaptive(tracking.targetTotal)} hint={`${tracking.slots.length} ca kế hoạch`} />
-              <Stat label="Thực tế" value={formatCurrencyAdaptive(tracking.actualDone)} hint={`${tracking.doneCount} ca có số · TB ${formatCurrencyAdaptive(tracking.avgActualDone)}/ca`} tone={tracking.actualDone > 0 ? "good" : "muted"} />
+              <Stat
+                label="Thực tế"
+                value={formatCurrencyAdaptive(tracking.actualAll)}
+                hint={
+                  tracking.offPlanCount > 0
+                    ? `${tracking.doneCount} ca kế hoạch + ${tracking.offPlanCount} ca ngoài kế hoạch (${formatCurrencyAdaptive(tracking.offPlanActual)})`
+                    : `${tracking.doneCount} ca có số · TB ${formatCurrencyAdaptive(tracking.avgActualDone)}/ca`
+                }
+                tone={tracking.actualAll > 0 ? "good" : "muted"}
+              />
               <Stat
                 label="Run-rate"
                 value={tracking.runRate === null ? "—" : fmtPct(tracking.runRate)}
-                hint={tracking.runRate === null ? "chưa có ca xong" : `thực tế ÷ target của ca đã xong (${formatCurrencyAdaptive(tracking.targetDone)})`}
+                hint={tracking.runRate === null ? "chưa có ca xong" : `thực tế ÷ target của ca KẾ HOẠCH đã xong (${formatCurrencyAdaptive(tracking.targetDone)})`}
                 tone={tracking.runRate === null ? "muted" : tracking.runRate >= 1 ? "good" : tracking.runRate >= 0.9 ? "warn" : "bad"}
               />
               <Stat
@@ -190,15 +206,41 @@ export default function OpsSupport({ brands, sessions, shiftSlots, promoSchemes,
             {/* Tiến độ: thực tế / target, vạch = phần tháng đã trôi */}
             <div>
               <div className="relative h-3 rounded-full bg-[var(--surface-base)] border border-[var(--border)] overflow-hidden">
-                <div className={`absolute inset-y-0 left-0 ${tracking.gap > 0 && tracking.gapPct > engineParams.targetGapWarnPct ? "bg-rose-500/70" : "bg-emerald-500/70"}`} style={{ width: `${Math.min(100, (tracking.actualDone / Math.max(1, tracking.targetTotal)) * 100)}%` }} />
+                <div className={`absolute inset-y-0 left-0 ${tracking.gap > 0 && tracking.gapPct > engineParams.targetGapWarnPct ? "bg-rose-500/70" : "bg-emerald-500/70"}`} style={{ width: `${Math.min(100, (tracking.actualAll / Math.max(1, tracking.targetTotal)) * 100)}%` }} />
                 <div className="absolute inset-y-0 left-0 bg-[var(--accent)]/25" style={{ width: `${Math.min(100, (tracking.projected / Math.max(1, tracking.targetTotal)) * 100)}%` }} />
                 <div className="absolute inset-y-0 w-0.5 bg-[var(--text)]" style={{ left: `${Math.min(100, elapsed * 100)}%` }} title={`Đã trôi ${fmtPct(elapsed)} tháng`} />
               </div>
               <div className="flex justify-between text-[10px] text-[var(--text-faint)] mt-1">
-                <span>Thực tế {fmtPct(tracking.targetTotal > 0 ? tracking.actualDone / tracking.targetTotal : 0)} · dự kiến {fmtPct(tracking.targetTotal > 0 ? tracking.projected / tracking.targetTotal : 0)}</span>
+                <span>Thực tế {fmtPct(tracking.targetTotal > 0 ? tracking.actualAll / tracking.targetTotal : 0)} · dự kiến {fmtPct(tracking.targetTotal > 0 ? tracking.projected / tracking.targetTotal : 0)}</span>
                 <span>vạch = {fmtPct(elapsed)} tháng đã trôi</span>
               </div>
             </div>
+
+            {/* Ca có số nhưng không nằm trong lưới kế hoạch — trước đây bị bỏ hẳn khỏi tracking nên
+                màn này báo "thực tế 0đ" cho tháng đã ra tiền. Liệt kê để ops biết số cộng thêm từ đâu
+                và quyết định có nên kéo chúng vào kế hoạch (chốt lại) hay không. */}
+            {tracking.offPlanCount > 0 && (
+              <div className="rounded-xl border border-sky-800/70 bg-sky-950/25 p-3 text-xs space-y-1.5">
+                <p className="font-bold text-sky-200">
+                  {tracking.offPlanCount} ca có số ngoài kế hoạch · {formatCurrencyAdaptive(tracking.offPlanActual)}
+                </p>
+                <p className="text-[var(--text-muted)]">
+                  Ca mở tay ở Lịch &amp; Studio, ca thay thế sau khi huỷ, hoặc ca nạp bù. Đã cộng vào <b className="text-[var(--text)]">Thực tế</b> và <b className="text-[var(--text)]">Dự kiến cuối tháng</b>; cố ý KHÔNG tính vào Run-rate vì chúng không mang target nào.
+                </p>
+                <ul className="space-y-0.5 max-h-32 overflow-y-auto">
+                  {tracking.offPlanSessions.map((s) => (
+                    <li key={s.id} className="flex justify-between gap-2">
+                      <button onClick={() => onOpenSession(s.id)} className="text-[var(--accent-text)] hover:underline text-left">
+                        {s.date.slice(8)}/{s.date.slice(5, 7)} · {s.startTime}–{s.endTime}
+                        {s.hostName ? ` · ${s.hostName}` : ""}
+                        {s.isBackfill ? " · nạp bù" : ""}
+                      </button>
+                      <span className="font-bold text-[var(--text)] shrink-0">{formatCurrencyAdaptive(s.actualGmv ?? 0)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {tracking.pendingCount > 0 && (
               <p className="text-xs text-[var(--text-muted)]">

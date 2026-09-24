@@ -125,7 +125,14 @@ export function allocateSessionTargets(sessions: LiveSession[], plan: MonthTarge
 export function applyAllocatedTargets(
   sessions: LiveSession[],
   reportsByBrandMonth: Map<string, BrandMonthlyReport>,
-  planTargetBySessionId?: Map<string, number>
+  planTargetBySessionId?: Map<string, number>,
+  // Đ5 (2026-09-24): "brandId|YYYY-MM" → tổng target của Kế Hoạch Tháng ĐÃ CHỐT. Trước đây phần
+  // target còn dư (chia cho ca mở lẻ/thêm sau) lấy từ `buildMonthTargetPlan`, tức từ dòng
+  // brand_monthly_reports của tháng TRƯỚC (tab "Kế Hoạch Tháng Sau") — một ô nhập KHÁC với ô
+  // "Target GMV tháng" mà ops vừa gõ ở Kế Hoạch Tháng. Hai nguồn lệch nhau thì phần dư tính bằng
+  // tổng của nguồn này trừ đi target/ca của nguồn kia, ra một con số không của ai cả.
+  // Có kế hoạch tháng đã chốt thì NÓ là cam kết của tháng đó, thắng.
+  planMonthTotals?: Map<string, number>
 ): LiveSession[] {
   const plans = new Map<string, MonthTargetPlan | null>();
   const alloc = new Map<string, number>();
@@ -151,7 +158,19 @@ export function applyAllocatedTargets(
           linkedSum += t;
         } else rest.push(x);
       }
-      const remaining = p ? Math.max(0, monthTotalTarget(p) - linkedSum) : 0;
+      // Có Kế Hoạch Tháng đã chốt ⇒ cam kết của tháng đã chia hết cho các ca CỦA KẾ HOẠCH, kể cả
+      // ca chưa chốt người. Ca mở lẻ nằm NGOÀI cam kết đó ⇒ target 0.
+      //
+      // Hai cái bẫy ở đây, đều đã thử và đều sai, đừng đi lại:
+      //  (a) `monthTotalTarget(p) − linkedSum` (bản trước Đ5): `p` dựng từ dòng brand_monthly_reports
+      //      THÁNG TRƯỚC — một ô nhập khác hẳn ô "Target GMV tháng" của Kế Hoạch Tháng. Lấy tổng của
+      //      nguồn này trừ target/ca của nguồn kia ra con số không thuộc về ai.
+      //  (b) `Σ target mọi ca kế hoạch − linkedSum`: `linkedSum` chỉ cộng ca ĐÃ chốt người, nên phần
+      //      dư chính là target của ca kế hoạch CHƯA xếp — đem chia cho ca mở lẻ là cướp target của
+      //      ca chưa xếp và thổi phồng tổng tháng. Đã dựng test bắt đúng ca này (xem
+      //      scratchpad/targetAllocationTest.ts, ca "off-plan không ăn phần của ca chưa xếp").
+      const hasLockedPlan = (planMonthTotals?.get(key) ?? 0) > 0;
+      const remaining = hasLockedPlan ? 0 : p ? Math.max(0, monthTotalTarget(p) - linkedSum) : 0;
       const restHours = rest.reduce((a, x) => a + Math.max(sessionDurationHours(x.startTime, x.endTime), 0), 0);
       for (const x of rest) alloc.set(x.id, restHours > 0 ? (remaining * Math.max(sessionDurationHours(x.startTime, x.endTime), 0)) / restHours : 0);
     } else if (p) {

@@ -90,6 +90,11 @@ interface DbLiveSession {
   // brand chưa. Các đường trả về row thô từ RPC (cancel_session, submit_live_session_report…)
   // không có cột này — đó đều là đường của ops, và ops thì luôn thấy số, nên mặc định `true`.
   month_published?: boolean | null;
+  // 0114 — cờ "đã loại khỏi báo cáo". Có ở cả bảng gốc và view, nhưng row thô do RPC cũ trả về
+  // (update_session_with_children, submit_live_session_report…) có sẵn vì chúng `returning *`.
+  excluded_from_reports?: boolean | null;
+  excluded_reason?: string | null;
+  excluded_at?: string | null;
 }
 
 // 3 interface dưới đây chỉ còn phục vụ ĐƯỜNG GHI (*ToDb → replace_session_children). Hàm đọc
@@ -232,6 +237,9 @@ function sessionFromDb(row: DbLiveSession): Omit<LiveSession, "skus" | "checklis
     reconciledAt: row.reconciled_at ?? undefined,
     cancelReason: row.cancel_reason || undefined,
     cancelledAt: row.cancelled_at ?? undefined,
+    excludedFromReports: row.excluded_from_reports ?? false,
+    excludedReason: row.excluded_reason || undefined,
+    excludedAt: row.excluded_at ?? undefined,
     tiktokRoomId: row.tiktok_room_id ?? undefined,
     actualStartAt: row.actual_start_at ?? undefined,
     actualEndAt: row.actual_end_at ?? undefined,
@@ -483,12 +491,28 @@ export async function fetchSessionById(id: string): Promise<LiveSession> {
 }
 
 // Huỷ ca (0097): ca -> Cancelled + slot đã chốt -> cancelled trong 1 transaction; chặn nếu ca đã có số.
-export async function cancelSession(id: string, reason: string): Promise<LiveSession> {
-  const { data, error } = await supabase.rpc("cancel_session", { p_session_id: id, p_reason: reason });
+// reopenSlot (0113): true = ca chờ đăng ký gắn với ca này về "mở" để ops chốt người khác, giữ
+// nguyên đăng ký rảnh cũ + liên kết với ca kế hoạch. false = huỷ hẳn cả slot (hành vi của 0097).
+export async function cancelSession(id: string, reason: string, reopenSlot = false): Promise<LiveSession> {
+  const { data, error } = await supabase.rpc("cancel_session", { p_session_id: id, p_reason: reason, p_reopen_slot: reopenSlot });
   if (error) throw error;
   const rows = [data as DbLiveSession];
   const { reports } = await fetchChildRowsForSessions([id]);
   return assembleSessions(rows, reports)[0];
+}
+
+// Loại ca khỏi báo cáo / đưa trở lại (0114). Đường THAY THẾ cho việc xoá cứng khi ca đã có số:
+// `cancel_session` cố ý chặn ca có số, `deleteSession` thì ẩn nút ở UI — nên trước 0114 ca nhập
+// nhầm chỉ gỡ được bằng SQL tay. Lý do là bắt buộc khi loại (DB tự chặn, errcode 22023).
+export async function setSessionExcluded(id: string, excluded: boolean, reason = ""): Promise<LiveSession> {
+  const { data, error } = await supabase.rpc("set_session_excluded", {
+    p_session_id: id,
+    p_excluded: excluded,
+    p_reason: reason
+  });
+  if (error) throw error;
+  const { reports } = await fetchChildRowsForSessions([id]);
+  return assembleSessions([data as DbLiveSession], reports)[0];
 }
 
 export async function deleteSession(id: string): Promise<void> {

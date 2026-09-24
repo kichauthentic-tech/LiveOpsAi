@@ -49,7 +49,8 @@ interface BrandCalendarProps {
   onSubmitSessionReport?: (sessionId: string, input: SessionReportInput) => Promise<boolean>;
   onSessionSnapshotApplied?: (session: LiveSession) => void;
   onDeleteSession?: (id: string) => Promise<void>;
-  onCancelSession?: (id: string, reason: string) => Promise<boolean>;
+  onCancelSession?: (id: string, reason: string, reopenSlot: boolean) => Promise<boolean>;
+  onSetSessionExcluded?: (id: string, excluded: boolean, reason: string) => Promise<boolean>;
   onLogAudit?: (entry: { action: string; details: string; category: AuditLogEntry["category"] }) => Promise<void>;
 }
 
@@ -117,6 +118,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
   onSessionSnapshotApplied,
   onDeleteSession,
   onCancelSession,
+  onSetSessionExcluded,
   onLogAudit
 }) => {
   const today = new Date();
@@ -602,6 +604,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
           onUpdateSession={canManage ? onUpdateSession : undefined}
           onDeleteSession={canManage ? onDeleteSession : undefined}
           onCancelSession={canManage ? onCancelSession : undefined}
+          onSetSessionExcluded={canManage ? onSetSessionExcluded : undefined}
           onLogAudit={canManage ? onLogAudit : undefined}
         />
       )}

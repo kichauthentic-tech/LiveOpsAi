@@ -54,7 +54,7 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
   // rateHidden = rate của mình bị mask (xem khối Rate Card bên dưới) — tính thu nhập lúc này sẽ
   // ra số SAI (dùng rate đã bị zero-hoá) chứ không phải số đúng nhưng thiếu, nên bỏ tính hẳn.
   const income = useMemo(() => {
-    if (!myTalent || myTalent.rateHidden) return { rows: [], total: 0 };
+    if (!myTalent || myTalent.rateHidden) return { rows: [], total: 0, missingRate: false };
     return computeTalentMonthlyIncome(sessions, myTalent.id, incomeMonth, financeBySessionId, talentById, talentRateHistory);
   }, [sessions, myTalent, incomeMonth, financeBySessionId, talentById, talentRateHistory]);
 
@@ -349,6 +349,14 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
               <div className="text-amber-300/80 text-[11px]">Tổng thu nhập tạm tính</div>
               <div className="font-black text-2xl text-[var(--text)] mt-0.5">{money(income.total)} đ</div>
             </div>
+
+            {/* Đ3: rate chưa nhập ra payout 0đ, giống hệt "tháng này không có ca" — với người vừa
+                chạy ca thật thì đó là câu trả lời sai. Nói thẳng là thiếu rate, đừng in số 0. */}
+            {income.missingRate && (
+              <div className="text-xs rounded-xl px-3 py-2 border border-rose-800/60 bg-rose-950/40 text-rose-200">
+                Có ca trong tháng chưa được đặt rate, nên số trên đang thiếu phần của những ca đó. Nhờ ops nhập rate ở Talent Pool.
+              </div>
+            )}
 
             {income.rows.length === 0 ? (
               <p className="text-xs text-[var(--text-faint)] italic">Chưa có ca nào tính lương trong tháng này.</p>

@@ -44,7 +44,15 @@ export interface MonthTracking {
   targetLost: number; // target của ca đã huỷ — mất hẳn, phải bù chỗ khác
   runRate: number | null; // thực tế ÷ target của ca đã xong
   realityFactor: number | null; // thực tế ÷ dự báo engine của ca đã xong (k) — dùng để chiếu phần còn lại
-  projected: number; // thực tế + dự báo còn lại × k
+  // Ca CÓ SỐ của brand trong tháng nhưng KHÔNG nằm trong lưới kế hoạch (ops mở tay ở Lịch & Studio,
+  // ca thay thế sau khi huỷ, ca nạp bù). Tiền của chúng là tiền thật đã vào, nên phải cộng vào
+  // `projected`/`gap`; nhưng chúng không mang target nào nên cố ý KHÔNG đụng vào runRate/k —
+  // hai số đó đo chất lượng THỰC THI KẾ HOẠCH, cộng doanh thu không có mẫu số vào là làm hỏng.
+  offPlanSessions: LiveSession[];
+  offPlanCount: number;
+  offPlanActual: number;
+  actualAll: number; // actualDone + offPlanActual — tiền thật của brand trong tháng, dùng cho thanh tiến độ/gap
+  projected: number; // thực tế (kế hoạch + ngoài kế hoạch) + dự báo còn lại × k
   gap: number; // target − dự kiến (dương = thiếu)
   gapPct: number;
   requiredPerPending: number; // mỗi ca còn lại phải đạt bao nhiêu để về đích
@@ -59,7 +67,12 @@ export function trackMonth(
   shiftSlots: ShiftSlot[],
   sessions: LiveSession[],
   history: HistorySummary,
-  ctx: EstimateCtx
+  ctx: EstimateCtx,
+  // Toàn bộ ca của ĐÚNG brand + ĐÚNG tháng đang xem. Dùng để tìm ca có số nằm ngoài lưới kế hoạch:
+  // đường `plan_slot → shift_slot.session_id → live_session` không bao giờ thấy chúng, nên trước
+  // bản này màn Hỗ Trợ Vận Hành báo "thực tế 0đ" cho tháng đã chạy ra tiền và đề xuất thêm ca để
+  // bù khoản đã bù xong. Bỏ trống = giữ hành vi cũ (chỉ đếm ca trong kế hoạch).
+  brandMonthSessions: LiveSession[] = []
 ): MonthTracking {
   const slotById = new Map(shiftSlots.map((sl) => [sl.id, sl]));
   const sessionById = new Map(sessions.map((s) => [s.id, s]));
@@ -88,10 +101,18 @@ export function trackMonth(
   // Không có dự báo (thiếu lịch sử) thì phần còn lại chiếu theo target × run-rate; có dự báo thì dự
   // báo × k. k chỉ tin khi đã ≥ 3 ca xong.
   const forecastPending = forecastPendingRaw > 0 ? forecastPendingRaw * (realityFactor ?? 1) : targetPending * (runRate ?? 1);
-  const projected = actualDone + forecastPending;
+
+  // Ca ngoài kế hoạch: có số, không huỷ, và không phải ca mà một dòng kế hoạch nào đang trỏ tới.
+  // Khoá theo session id chứ không theo ngày/giờ — ca thay thế sau khi huỷ thường lệch giờ.
+  const plannedSessionIds = new Set(slots.map((t) => t.session?.id).filter((id): id is string => !!id));
+  const offPlanSessions = brandMonthSessions.filter((s) => !plannedSessionIds.has(s.id) && isDone(s));
+  const offPlanActual = offPlanSessions.reduce((a, s) => a + (s.actualGmv ?? 0), 0);
+
+  const actualAll = actualDone + offPlanActual;
+  const projected = actualAll + forecastPending;
   const gap = targetTotal - projected;
   const gapPct = targetTotal > 0 ? gap / targetTotal : 0;
-  const remainingToTarget = Math.max(0, targetTotal - actualDone);
+  const remainingToTarget = Math.max(0, targetTotal - actualAll);
   return {
     targetTotal,
     slots,
@@ -107,6 +128,10 @@ export function trackMonth(
     targetLost: sum(by("cancelled"), (t) => t.target),
     runRate,
     realityFactor,
+    offPlanSessions,
+    offPlanCount: offPlanSessions.length,
+    offPlanActual,
+    actualAll,
     projected,
     gap,
     gapPct,

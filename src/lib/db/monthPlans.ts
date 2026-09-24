@@ -179,20 +179,57 @@ export async function lockMonthPlan(planId: string): Promise<LockPlanResult> {
   return data as LockPlanResult;
 }
 
-// Target/ca của mọi kế hoạch ĐÃ CHỐT, khoá theo shift_slot id — App nối shift_slots.session_id →
-// live_sessions để đổ target xuống ca thật (applyAllocatedTargets). Bảng nhỏ, đọc 1 lần + sau mỗi chốt.
-export async function fetchLockedPlanTargets(): Promise<Map<string, number>> {
+export interface LockedPlanTargets {
+  // shift_slot id → target/ca. App nối shift_slots.session_id → live_sessions để đổ xuống ca thật.
+  bySlotId: Map<string, number>;
+  // "brandId|YYYY-MM" → TỔNG target đã chốt của tháng đó (Σ mọi ca kế hoạch, kể cả ca CHƯA chốt
+  // người nên chưa có live_session). Đ5 (2026-09-24): thiếu con số này thì mọi chỗ hỏi "target
+  // tháng bao nhiêu" phải cộng ngược từ các ca đang tồn tại, và tổng đó TỤT mỗi khi còn ca kế
+  // hoạch chưa xếp người — Report Tháng vì thế báo 145% target trong khi thực tế mới đạt 72,5%.
+  monthTotals: Map<string, number>;
+}
+
+// Target/ca của mọi kế hoạch ĐÃ CHỐT. Bảng nhỏ, đọc 1 lần + sau mỗi lần chốt.
+// RLS lọc sẵn theo brand với role `brand` (0105), nên map trả về của họ chỉ có brand của họ.
+export async function fetchLockedPlanTargets(): Promise<LockedPlanTargets> {
   const { data, error } = await supabase
     .from("brand_month_plan_slots")
-    .select("slot_id,target_gmv,plan:brand_month_plans!inner(status)")
+    .select("slot_id,target_gmv,date,plan:brand_month_plans!inner(status,brand_id)")
     .eq("plan.status", "locked")
     .not("slot_id", "is", null);
   if (error) throw error;
-  const out = new Map<string, number>();
-  for (const r of (data as { slot_id: string | null; target_gmv: number }[]) ?? []) {
-    if (r.slot_id) out.set(r.slot_id, Number(r.target_gmv));
+  const bySlotId = new Map<string, number>();
+  const monthTotals = new Map<string, number>();
+  type Row = { slot_id: string | null; target_gmv: number; date: string; plan: { brand_id: string } | { brand_id: string }[] };
+  for (const r of (data as Row[]) ?? []) {
+    const target = Number(r.target_gmv) || 0;
+    if (r.slot_id) bySlotId.set(r.slot_id, target);
+    // PostgREST trả quan hệ !inner ra object hay mảng 1 phần tử tuỳ cách suy khoá — nhận cả hai
+    // thay vì cược vào một dạng (đoán sai thì brand_id ra undefined và tổng tháng âm thầm về 0).
+    const brandId = Array.isArray(r.plan) ? r.plan[0]?.brand_id : r.plan?.brand_id;
+    if (!brandId || !r.date) continue;
+    const key = `${brandId}|${r.date.slice(0, 7)}`;
+    monthTotals.set(key, (monthTotals.get(key) ?? 0) + target);
   }
-  return out;
+  return { bySlotId, monthTotals };
+}
+
+export interface DeletePlanResult {
+  brand_id: string;
+  month: string;
+  plan_slots_deleted: number;
+  slots_cancelled: number;
+  slots_had_registrations: number;
+}
+
+// Xoá kế hoạch tháng (0115). RPC chứ không phải `.delete()`: `shift_slots.plan_id` là
+// `on delete set null` nên xoá thẳng dòng plan sẽ để lại ca chờ đăng ký MỒ CÔI (vẫn hiện ở Nhân sự
+// ca, vẫn cho đăng ký, không còn đường tra về kế hoạch). RPC huỷ ca `open` + xoá plan trong một
+// transaction, và chặn nếu đã có ca chốt người.
+export async function deleteMonthPlan(planId: string): Promise<DeletePlanResult> {
+  const { data, error } = await supabase.rpc("delete_month_plan", { p_plan_id: planId });
+  if (error) throw error;
+  return data as DeletePlanResult;
 }
 
 export async function fetchCalendarEvents(): Promise<CalendarEventRow[]> {

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { SESSION_STATUS_CLS, SESSION_STATUS_LABEL_VI } from "../lib/sessionStatusUi";
-import { AlertTriangle, Ban, CheckCircle2, Circle, Link2, Pencil, Trash2, X } from "lucide-react";
+import { AlertTriangle, Ban, CheckCircle2, Circle, EyeOff, Hand, Link2, Pencil, RotateCcw, Trash2, X } from "lucide-react";
 import { AuditLogEntry, Brand, LiveSession, Studio, Talent, UserRole } from "../types";
 import { dateTimeRangesOverlap } from "../lib/dateUtils";
 import { formatCurrencyAdaptive } from "../lib/formatCurrency";
@@ -54,7 +54,13 @@ export interface SessionWindowProps {
   onUpdateSession?: (session: LiveSession) => Promise<boolean>;
   onDeleteSession?: (id: string) => Promise<void>;
   // 0097: huỷ ca (ops) — ca chưa có số liệu; slot đã chốt về 'cancelled', talent được báo.
-  onCancelSession?: (id: string, reason: string) => Promise<boolean>;
+  onCancelSession?: (id: string, reason: string, reopenSlot: boolean) => Promise<boolean>;
+  // Đ10 (0114): ca ĐÃ có số thì không huỷ/xoá được (chủ ý — số là bằng chứng). Đường này giữ dòng
+  // + số nhưng tách khỏi mọi tổng hợp, và đảo lại được.
+  onSetSessionExcluded?: (id: string, excluded: boolean, reason: string) => Promise<boolean>;
+  // Đ7 (0116): talent báo KHÔNG ĐI ĐƯỢC ca đã chốt. Chỉ gửi thông báo cho ops — cố ý không tự đổi
+  // lịch, không tự nhả ca: việc thay người vẫn của ops (giữ nguyên quyết định U2 2026-09-21).
+  onRequestDropout?: (sessionId: string, reason: string) => Promise<boolean>;
   // U2 (audit 2026-09-21): "Báo bận / thay người" gộp vào Sửa ca ở đây — đổi Host/Trợ thì ghi lý do,
   // lưu audit log như luồng cũ ở Đăng Ký & Chốt Lịch (trigger 0083 tự báo người mới/cũ).
   onLogAudit?: (entry: { action: string; details: string; category: AuditLogEntry["category"] }) => Promise<void>;
@@ -96,6 +102,8 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
   onUpdateSession,
   onDeleteSession,
   onCancelSession,
+  onSetSessionExcluded,
+  onRequestDropout,
   onLogAudit
 }) => {
   const isBrandView = viewer.role === "brand";
@@ -117,6 +125,13 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
   const [cancelling, setCancelling] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [excludeOpen, setExcludeOpen] = useState(false);
+  const [excludeReason, setExcludeReason] = useState("");
+  const [excluding, setExcluding] = useState(false);
+  const [dropoutOpen, setDropoutOpen] = useState(false);
+  const [dropoutReason, setDropoutReason] = useState("");
+  const [dropoutSending, setDropoutSending] = useState(false);
+  const [dropoutSent, setDropoutSent] = useState(false);
   const [edit, setEdit] = useState({ date: s.date, startTime: s.startTime, endTime: s.endTime, studioId: s.studioId, hostId: s.hostId, coHostId: s.coHostId ?? "" });
   const [changeReason, setChangeReason] = useState("");
   const peopleChanged = edit.hostId !== s.hostId || (edit.coHostId || "") !== (s.coHostId ?? "");
@@ -208,13 +223,35 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
 
   const hasData = s.dataSource !== "manual" || (s.actualGmv ?? 0) > 0 || (s.totalOrders ?? 0) > 0;
   const canCancel = isOps && !!onCancelSession && s.status !== "Cancelled" && !hasData;
-  const doCancel = async () => {
+  const doCancel = async (reopenSlot: boolean) => {
     if (!onCancelSession) return;
     setCancelling(true);
-    const ok = await onCancelSession(s.id, cancelReason.trim());
+    const ok = await onCancelSession(s.id, cancelReason.trim(), reopenSlot);
     setCancelling(false);
     if (ok) { setCancelOpen(false); setCancelReason(""); }
   };
+  // Loại khỏi báo cáo (Đ10/0114). Chỉ chào khi ca THẬT SỰ không huỷ/xoá được — còn huỷ được thì
+  // huỷ đúng hơn (ca không diễn ra), tách sổ chỉ dành cho ca đã diễn ra mà số của nó là rác.
+  const canExclude = isOps && !!onSetSessionExcluded && (hasData || !!s.excludedFromReports);
+  const doExclude = async (excluded: boolean) => {
+    if (!onSetSessionExcluded) return;
+    setExcluding(true);
+    const ok = await onSetSessionExcluded(s.id, excluded, excludeReason.trim());
+    setExcluding(false);
+    if (ok) { setExcludeOpen(false); setExcludeReason(""); }
+  };
+
+  // Đ7: chỉ người ĐANG giữ ca, ca chưa diễn ra, ca chưa huỷ. (DB guard lại đúng ba điều này —
+  // đây chỉ là để không chào một cái nút chắc chắn lỗi.)
+  const canDropout = isMine && !isOps && !!onRequestDropout && s.status !== "Cancelled" && s.date >= today;
+  const doDropout = async () => {
+    if (!onRequestDropout) return;
+    setDropoutSending(true);
+    const ok = await onRequestDropout(s.id, dropoutReason.trim());
+    setDropoutSending(false);
+    if (ok) { setDropoutOpen(false); setDropoutReason(""); setDropoutSent(true); }
+  };
+
   const snapshotDone = hasSnapshot(s);
   const reportDone = hasReport(s);
 
@@ -274,7 +311,18 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
               Ca đã huỷ{s.cancelledAt ? ` lúc ${new Date(s.cancelledAt).toLocaleString("vi-VN")}` : ""}{s.cancelReason ? ` — lý do: ${s.cancelReason}` : ""}.
             </div>
           )}
-          {missing.length > 0 && s.status !== "Cancelled" && (
+          {s.excludedFromReports && (
+            <div className="rounded-xl border border-violet-800 bg-violet-950/40 p-3 text-xs text-violet-200 flex items-start gap-2">
+              <EyeOff className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>
+                <b>Ca đã loại khỏi báo cáo.</b> Số của ca giữ nguyên ở đây làm lịch sử, nhưng không được tính vào bất kỳ tổng
+                hợp nào (Report Tháng, Hiệu Suất Host, cam kết giờ, P&amp;L) và brand không thấy ca này.
+                {s.excludedReason ? ` Lý do: ${s.excludedReason}.` : ""}
+                {s.excludedAt ? ` Loại lúc ${new Date(s.excludedAt).toLocaleString("vi-VN")}.` : ""}
+              </span>
+            </div>
+          )}
+          {missing.length > 0 && s.status !== "Cancelled" && !s.excludedFromReports && (
             <div className="rounded-xl border border-amber-800 bg-amber-950/50 p-3 text-xs text-amber-200 flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
               <span>Còn thiếu để chốt: {missing.map((m) => MISSING_LABEL[m]).join(" · ")}</span>
@@ -481,7 +529,14 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
             const events: { at: string; label: string }[] = [];
             if (s.report?.submittedAt) events.push({ at: s.report.submittedAt, label: `Report nộp${s.report.submittedByRole ? ` (${s.report.submittedByRole})` : ""}` });
             if (s.actualStartAt && (s.liveRoomIds?.length ?? 0) > 0) events.push({ at: s.actualStartAt, label: `File số liệu · live thật ${fmtTime(s.actualStartAt)}–${fmtTime(s.actualEndAt)}` });
-            if (s.reconciledAt) events.push({ at: s.reconciledAt, label: "Đối soát TikTok ghi đè số liệu" });
+            // `reconciled_at` là "lần cuối ghi số vào ca", KHÔNG phải "đã đối soát": RPC snapshot
+            // (0078/0079 `recompute_session_from_snapshot`) cũng set cột này. Không guard theo
+            // dataSource thì ca vừa up file đã hiện "Đối soát TikTok ghi đè số liệu" ngay dưới dòng
+            // "Còn thiếu để chốt: Chưa đối soát" — cùng một cửa sổ nói hai điều ngược nhau. Đây là
+            // đúng guard đã dùng ở badge nguồn số phía trên.
+            if (s.reconciledAt && s.dataSource === "tiktok_reconciled") {
+              events.push({ at: s.reconciledAt, label: "Đối soát TikTok ghi đè số liệu" });
+            }
             if (s.cancelledAt) events.push({ at: s.cancelledAt, label: `Huỷ ca${s.cancelReason ? ` — ${s.cancelReason}` : ""}` });
             if (events.length === 0) return null;
             events.sort((a, b) => a.at.localeCompare(b.at));
@@ -511,7 +566,36 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
             </section>
           )}
 
-          {isOps && (canCancel || (onDeleteSession && !hasData)) && (
+          {canDropout && (
+            <div className="pt-3 border-t border-[var(--border)]">
+              {dropoutSent ? (
+                <p className="text-[11px] text-emerald-300 flex items-start gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-px" />
+                  Đã báo cho vận hành. <b>Lịch chưa đổi</b> — chờ ops xác nhận người thay, và nhớ theo dõi chuông.
+                </p>
+              ) : !dropoutOpen ? (
+                <button onClick={() => setDropoutOpen(true)} className="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-300 hover:text-amber-200 transition-colors">
+                  <Hand className="w-3.5 h-3.5" /> Tôi không đi được ca này
+                </button>
+              ) : (
+                <div className="rounded-xl border border-amber-800 bg-amber-950/40 p-3 space-y-2">
+                  <p className="text-xs text-amber-200">
+                    Gửi cho vận hành: bạn không đi được ca {fmtDate(s.date)} {s.startTime}–{s.endTime}. <b>Lịch KHÔNG tự đổi</b> —
+                    ops sẽ tìm người thay hoặc huỷ ca, và bạn nhận thông báo khi có kết quả. Báo càng sớm càng dễ thay.
+                  </p>
+                  <input value={dropoutReason} onChange={(e) => setDropoutReason(e.target.value)} placeholder="Lý do (vd: bị bệnh, trùng lịch học, việc gia đình)" className={inputCls} />
+                  <div className="flex flex-wrap gap-2 justify-end">
+                    <button onClick={() => { setDropoutOpen(false); setDropoutReason(""); }} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] text-[var(--text-muted)] font-bold text-[11px]">Thôi</button>
+                    <button onClick={doDropout} disabled={dropoutSending} className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-60 text-white font-bold text-[11px]">
+                      {dropoutSending ? "Đang gửi..." : "Gửi cho vận hành"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {isOps && (canCancel || canExclude || (onDeleteSession && !hasData)) && (
             <div className="pt-3 border-t border-[var(--border)] space-y-2">
               {canCancel && !cancelOpen && (
                 <button onClick={() => setCancelOpen(true)} className="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-300 hover:text-amber-200 transition-colors">
@@ -520,13 +604,50 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
               )}
               {canCancel && cancelOpen && (
                 <div className="rounded-xl border border-amber-800 bg-amber-950/40 p-3 space-y-2">
-                  <p className="text-xs text-amber-200">Huỷ ca {fmtDate(s.date)} {s.startTime}–{s.endTime}: ca về "Đã huỷ", ca mở đang gắn về "cancelled", host/trợ được báo nếu ca chưa diễn ra.</p>
+                  <p className="text-xs text-amber-200">Huỷ ca {fmtDate(s.date)} {s.startTime}–{s.endTime}: ca về "Đã huỷ", host/trợ được báo nếu ca chưa diễn ra. Chọn tiếp ca chờ đăng ký đi đâu:</p>
                   <input value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} placeholder="Lý do (vd: brand đổi lịch, host bận không thay được)" className={inputCls} />
-                  <div className="flex gap-2 justify-end">
+                  {/* Đ2 (0113): trước đây chỉ có một đường và nó luôn đóng luôn ca chờ đăng ký, mà
+                      slot 'cancelled' thì KHÔNG có cách nào mở lại — ops mất cả đăng ký rảnh cũ lẫn
+                      liên kết với ca kế hoạch. Đặt lựa chọn ngay ở đây vì đây đúng là lúc ops biết
+                      mình đang bỏ hẳn ca hay chỉ cần đổi người. */}
+                  <div className="flex flex-wrap gap-2 justify-end">
                     <button onClick={() => setCancelOpen(false)} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] text-[var(--text-muted)] font-bold text-[11px]">Không</button>
-                    <button onClick={doCancel} disabled={cancelling} className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-60 text-white font-bold text-[11px]">{cancelling ? "Đang huỷ..." : "Xác nhận huỷ"}</button>
+                    <button onClick={() => doCancel(false)} disabled={cancelling} className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-60 text-white font-bold text-[11px]" title="Ca chờ đăng ký cũng đóng luôn — không live khung này nữa">
+                      {cancelling ? "Đang huỷ..." : "Huỷ hẳn ca"}
+                    </button>
+                    <button onClick={() => doCancel(true)} disabled={cancelling} className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white font-bold text-[11px]" title="Ca chờ đăng ký về 'mở' — giữ nguyên đăng ký rảnh cũ và liên kết với Kế Hoạch Tháng">
+                      {cancelling ? "Đang huỷ..." : "Huỷ ca, mở lại tìm người khác"}
+                    </button>
                   </div>
                 </div>
+              )}
+              {/* Đ10 (0114): ca đã có số KHÔNG huỷ/xoá được — chủ ý, số đã ghi là bằng chứng. Nhưng
+                  trước 0114 hệ quả là ca nhập nhầm brand / ca test kẹt vĩnh viễn trong mọi tổng hợp,
+                  gỡ được bằng đúng một cách: SQL tay. Đây là đường thứ ba: giữ dòng, bỏ khỏi sổ. */}
+              {canExclude && !s.excludedFromReports && !excludeOpen && (
+                <button onClick={() => setExcludeOpen(true)} className="inline-flex items-center gap-1.5 text-[11px] font-bold text-violet-300 hover:text-violet-200 transition-colors">
+                  <EyeOff className="w-3.5 h-3.5" /> Loại ca này khỏi báo cáo
+                </button>
+              )}
+              {canExclude && !s.excludedFromReports && excludeOpen && (
+                <div className="rounded-xl border border-violet-800 bg-violet-950/40 p-3 space-y-2">
+                  <p className="text-xs text-violet-200">
+                    Ca {fmtDate(s.date)} {s.startTime}–{s.endTime} sẽ <b>không được tính vào bất kỳ con số nào</b> nữa, và brand
+                    không còn thấy ca. Dòng + số liệu vẫn ở lại đây làm lịch sử, bỏ cờ lúc nào cũng được.
+                  </p>
+                  <input value={excludeReason} onChange={(e) => setExcludeReason(e.target.value)} placeholder="Lý do (bắt buộc — vd: nhập nhầm brand, ca test, trùng room với ca 12/09)" className={inputCls} />
+                  <div className="flex flex-wrap gap-2 justify-end">
+                    <button onClick={() => { setExcludeOpen(false); setExcludeReason(""); }} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] text-[var(--text-muted)] font-bold text-[11px]">Không</button>
+                    <button onClick={() => doExclude(true)} disabled={excluding || excludeReason.trim() === ""} className="px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-bold text-[11px]">
+                      {excluding ? "Đang loại..." : "Loại khỏi báo cáo"}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {canExclude && s.excludedFromReports && (
+                <button onClick={() => doExclude(false)} disabled={excluding} className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-300 hover:text-emerald-200 disabled:opacity-50 transition-colors">
+                  <RotateCcw className="w-3.5 h-3.5" /> {excluding ? "Đang đưa lại..." : "Đưa ca trở lại báo cáo"}
+                </button>
               )}
               {onDeleteSession && !hasData && (
                 <div>

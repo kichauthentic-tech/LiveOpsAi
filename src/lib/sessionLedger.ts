@@ -47,6 +47,16 @@ export function missingSteps(s: LiveSession, today: string): MissingStep[] {
   return out;
 }
 
+// Ca ĐÃ DIỄN RA tính tới `today`. Khác cả hai con số đang có: `rows.length` gộp luôn ca sắp tới,
+// còn `isCountable` đòi đã có số nên bỏ ca đã chạy mà chưa nạp file. Đ11 (2026-09-24): Toàn Cảnh
+// Brand tự nhận "không có ô nào là dự phóng" nhưng cột số ca lại dùng `rows.length` — VERA hiện
+// "2 ca · 72,5tr" khi mới chạy 1 ca, ca kia là ca 25/09 chưa tới.
+export function hasHappened(s: LiveSession, today: string): boolean {
+  if (s.status === "Cancelled") return false;
+  if (s.status === "Completed" || s.status === "Live Now") return true;
+  return s.date < today;
+}
+
 export function monthOf(dateStr: string): string {
   return dateStr.slice(0, 7);
 }
@@ -101,6 +111,8 @@ export function groupByDate(rows: LiveSession[]): LedgerDay[] {
 
 export interface LedgerSummary {
   total: number;
+  happened: number; // ca đã diễn ra (Đ11) — dùng cho bảng tự nhận "chỉ số thật"
+  upcoming: number; // total − happened − ca huỷ
   countable: number;
   hours: number;
   gmv: number;
@@ -114,6 +126,8 @@ export interface LedgerSummary {
 // quy ước với Hiệu Suất Host) để GMV/giờ không bị pha loãng bởi ca chưa có số.
 export function summarize(rows: LiveSession[], today: string): LedgerSummary {
   const countable = rows.filter(isCountable);
+  const happened = rows.filter((s) => hasHappened(s, today)).length;
+  const cancelled = rows.filter((s) => s.status === "Cancelled").length;
   const hours = countable.reduce((a, s) => a + sessionHours(s), 0);
   const gmv = countable.reduce((a, s) => a + (s.actualGmv ?? 0), 0);
   const orders = countable.reduce((a, s) => a + (s.totalOrders ?? 0), 0);
@@ -121,6 +135,8 @@ export function summarize(rows: LiveSession[], today: string): LedgerSummary {
   for (const s of rows) for (const m of missingSteps(s, today)) missing[m]++;
   return {
     total: rows.length,
+    happened,
+    upcoming: rows.length - happened - cancelled,
     countable: countable.length,
     hours,
     gmv,

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { SESSION_STATUS_CLS, SESSION_STATUS_LABEL_VI } from "../lib/sessionStatusUi";
-import { BookOpen, CheckCircle2, ChevronRight, Circle, Download, Link2 } from "lucide-react";
+import { BookOpen, CheckCircle2, ChevronRight, Circle, Download, EyeOff, Link2 } from "lucide-react";
 import { Brand, LiveSession, Studio, Talent, UserRole, AuditLogEntry } from "../types";
 import { getTodayDate } from "../lib/dateUtils";
 import { formatCurrencyAdaptive } from "../lib/formatCurrency";
@@ -50,7 +50,14 @@ interface SessionLedgerProps {
   onSessionSnapshotApplied: (session: LiveSession) => void;
   onUpdateSession?: (session: LiveSession) => Promise<boolean>;
   onDeleteSession?: (id: string) => Promise<void>;
-  onCancelSession?: (id: string, reason: string) => Promise<boolean>;
+  onCancelSession?: (id: string, reason: string, reopenSlot: boolean) => Promise<boolean>;
+  onSetSessionExcluded?: (id: string, excluded: boolean, reason: string) => Promise<boolean>;
+  onRequestDropout?: (sessionId: string, reason: string) => Promise<boolean>; // Đ7 (0116) — talent báo bận, chỉ gửi thông báo cho ops
+  /** Đ10 (0114): ca đã loại khỏi báo cáo — App lọc chúng ra khỏi `activeSessions` nên chúng KHÔNG
+   *  có trong `sessions` ở đây, và không được có (mọi ô tổng ở màn này sẽ sai). Sổ Ca là màn duy
+   *  nhất nhận riêng danh sách đó: không có đường này thì cờ là một chiều — loại rồi thì chính ops
+   *  cũng không tìm lại được ca để bỏ cờ. Cố ý KHÔNG trộn vào `rows`/`summary`/Xuất Excel. */
+  excludedSessions?: LiveSession[];
   onLogAudit?: (entry: { action: string; details: string; category: AuditLogEntry["category"] }) => Promise<void>;
 }
 
@@ -119,6 +126,9 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
   onUpdateSession,
   onDeleteSession,
   onCancelSession,
+  onSetSessionExcluded,
+  onRequestDropout,
+  excludedSessions = [],
   onLogAudit
 }) => {
   const isBrandView = variant === "brand";
@@ -158,7 +168,15 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
   );
 
   const [openId, setOpenId] = useState<string | null>(null);
-  const openSession = openId ? sessions.find((s) => s.id === openId) ?? null : null;
+  const openSession = openId ? sessions.find((s) => s.id === openId) ?? excludedSessions.find((s) => s.id === openId) ?? null : null;
+  // Không lọc theo tháng đang chọn: cả điểm của khối này là tìm lại được ca đã loại, mà người đi
+  // tìm thường không nhớ nó nằm tháng nào. Số lượng luôn rất nhỏ.
+  const excludedScoped = useMemo(
+    () => (isBrandView && brandId ? excludedSessions.filter((s) => s.brandId === brandId) : excludedSessions)
+      .slice()
+      .sort((a, b) => b.date.localeCompare(a.date)),
+    [excludedSessions, isBrandView, brandId]
+  );
 
   const patch = (p: Partial<LedgerFilter>) => setFilter((f) => ({ ...f, ...p }));
 
@@ -489,6 +507,32 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
         </div>
       </div>
 
+      {excludedScoped.length > 0 && (
+        <div className="bg-[var(--surface)] border border-violet-900/60 rounded-2xl p-4 space-y-2">
+          <div className="flex items-center gap-2">
+            <EyeOff className="w-4 h-4 text-violet-300" />
+            <h3 className="text-sm font-bold text-[var(--text)]">Ca đã loại khỏi báo cáo ({excludedScoped.length})</h3>
+          </div>
+          <p className="text-[11px] text-[var(--text-muted)]">
+            Mọi tháng, không theo bộ lọc trên. Số của các ca này <b>không</b> nằm trong dải tổng ở trên, cũng không nằm trong
+            Report Tháng / Hiệu Suất Host / P&amp;L, và brand không thấy chúng. Bấm vào ca để xem số cũ hoặc đưa trở lại.
+          </p>
+          <ul className="divide-y divide-[var(--border-muted)]">
+            {excludedScoped.map((s) => (
+              <li key={s.id}>
+                <button onClick={() => setOpenId(s.id)} className="w-full text-left py-2 hover:bg-[var(--surface-hover)] rounded-lg px-2 -mx-2 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                  <span className="font-mono text-[11px] text-[var(--text-muted)]">{s.date} {s.startTime}–{s.endTime}</span>
+                  <span className="text-xs font-bold text-[var(--text)]">{s.brandName}</span>
+                  <span className="text-[11px] text-[var(--text-muted)]">{s.hostName || "—"}</span>
+                  <span className="text-[11px] font-bold text-violet-300">{formatCurrencyAdaptive(s.actualGmv ?? 0, "")}</span>
+                  {s.excludedReason && <span className="text-[11px] text-[var(--text-faint)] italic">— {s.excludedReason}</span>}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {openSession && (
         <SessionWindow
           session={openSession}
@@ -504,6 +548,8 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
           onUpdateSession={isBrandView ? undefined : onUpdateSession}
           onDeleteSession={onDeleteSession}
           onCancelSession={onCancelSession}
+          onSetSessionExcluded={onSetSessionExcluded}
+          onRequestDropout={onRequestDropout}
           onLogAudit={onLogAudit}
         />
       )}

@@ -66,7 +66,16 @@ export interface HistorySummary {
   eventLearned: Record<CalendarEventKind, boolean>;
   schemeMultiplier: number; // ngày trùng scheme khuyến mãi so với ngày không
   schemeLearned: boolean;
+  /** Đ12 (2026-09-24) — lịch sử này KHÔNG phải của brand đang xem: hình dạng (ô thứ×giờ, hệ số
+   *  camp/lễ/scheme, lợi suất giảm dần) mượn của toàn agency, còn MỨC (`brandGmvPerHour`) là con số
+   *  ops tự nhập. Có mặt trường này = mọi con số dự báo đi kèm là GIẢ ĐỊNH, không phải học từ brand.
+   *  Đọc kỹ: đừng dùng nó cho benchmark từng ca (opsSupport) — ở đó câu hỏi là "ca này so với chính
+   *  brand này thế nào", mượn brand khác trả lời là trả lời sai câu hỏi. */
+  borrowedFrom?: { sessions: number; brands: number; months: number; levelSource: string };
 }
+
+/** Truyền vào `buildHistory` thay cho một brandId cụ thể để gộp lịch sử MỌI brand. */
+export const ALL_BRANDS = "*";
 
 export interface HistoryContext {
   events?: CalendarEvent[]; // lịch sự kiện dùng chung (calendar_events)
@@ -162,7 +171,7 @@ export function buildHistory(sessions: LiveSession[], brandId: string, asOf: str
   const inScheme = (date: string) => (ctx.schemes ?? []).some((r) => date >= r.start && date <= r.end);
   const usable = sessions.filter(
     (s) =>
-      s.brandId === brandId &&
+      (brandId === ALL_BRANDS || s.brandId === brandId) &&
       s.status === "Completed" &&
       s.dataSource === "tiktok_reconciled" &&
       s.actualGmv > 0 &&
@@ -359,6 +368,54 @@ export function buildHistory(sessions: LiveSession[], brandId: string, asOf: str
   };
 }
 
+// ============ Đ12 — lịch sử "mượn hình dạng" cho brand chưa có dữ liệu ============
+//
+// Bài toán: brand mới có 0 ca đối soát ⇒ `brandGmvPerHour = 0` ⇒ `suggestMonthPlan` trả mảng rỗng.
+// 3/4 brand trong DB đang ở tình trạng đó, và `recurring_shift_templates` cũng 0 dòng, nên Kế Hoạch
+// Tháng không còn đường tự động nào.
+//
+// Vì sao KHÔNG mượn thẳng cả ma trận của agency (phương án đã cân nhắc và loại): nguồn dữ liệu duy
+// nhất hiện nay là CROCS. Mượn nguyên si nghĩa là lấy GMV/giờ của một brand giày đắp cho brand đồ
+// lót — con số ra trông rất tự tin mà sai to, và đó là kiểu sai tệ nhất vì ops sẽ tin nó.
+//
+// Nên tách làm hai phần theo mức độ phụ thuộc ngành hàng:
+//   • HÌNH DẠNG — thứ mấy × khung giờ nào tốt hơn, hệ số D-Day/mid/payday, hệ số lễ & khuyến mãi,
+//     lợi suất giảm dần khi live nhiều ca trong ngày. Đây là hành vi NGƯỜI XEM TikTok theo nhịp
+//     tuần/tháng, dùng chung giữa các brand hợp lý hơn nhiều so với mức tuyệt đối.
+//   • MỨC — `brandGmvPerHour`. Cái này thì ops nhập, vì brand mới thường ĐÃ có con số kỳ vọng từ
+//     cam kết hợp đồng. Engine không bịa nó ra.
+//
+// Kết quả: mọi ô được nhân cùng một hệ số k = mức_ops_nhập / mức_agency, nên TỶ LỆ giữa các ô giữ
+// nguyên (đó chính là "hình dạng") còn tổng thì đúng bằng giả định của ops.
+export function buildBorrowedHistory(
+  sessions: LiveSession[],
+  asOf: string,
+  ctx: HistoryContext,
+  levelGmvPerHour: number,
+  levelSource: string
+): HistorySummary | null {
+  if (!(levelGmvPerHour > 0)) return null;
+  const agency = buildHistory(sessions, ALL_BRANDS, asOf, ctx);
+  if (agency.brandGmvPerHour <= 0) return null; // cả agency cũng chưa có gì để mượn
+  const k = levelGmvPerHour / agency.brandGmvPerHour;
+  const brands = new Set(
+    sessions.filter((s) => s.status === "Completed" && s.dataSource === "tiktok_reconciled" && s.actualGmv > 0).map((s) => s.brandId)
+  ).size;
+  return {
+    ...agency,
+    brandGmvPerHour: levelGmvPerHour,
+    // Chỉ các cột TIỀN được scale. `viewsPerHour`/`conversion` giữ nguyên của agency: chúng không
+    // suy ra được từ mức GMV ops nhập (cùng GMV/giờ có thể tới từ ít người xem giá cao hoặc ngược
+    // lại), và engine xếp lịch không đọc tới chúng — chỉ benchmark từng ca mới đọc, mà benchmark
+    // thì cố ý KHÔNG dùng lịch sử mượn (xem chú thích ở `borrowedFrom`).
+    cells: agency.cells.map((c) => ({ ...c, gmv: c.gmv * k, gmvPerHour: c.gmvPerHour * k, rawGmvPerHour: c.rawGmvPerHour * k })),
+    // `enough` = false có chủ đích dù agency có 228 ca: độ tin cậy phải bị kẹp xuống "low", và nhãn
+    // "lịch sử mỏng" bị thay bằng nhãn "đang mượn" ở `suggestMonthPlan`.
+    enough: false,
+    borrowedFrom: { sessions: agency.sessions, brands, months: agency.months, levelSource }
+  };
+}
+
 // ============ Lớp 3: tối ưu ============
 interface Candidate {
   date: string;
@@ -461,10 +518,20 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
   const get = cellLookup(history);
   const brandGph = history.brandGmvPerHour;
 
-  if (!history.enough) {
+  if (history.borrowedFrom) {
+    // Nói thẳng cái gì đi mượn và cái gì là giả định của người — không có câu này thì ops đọc con số
+    // dự báo y như dự báo học từ chính brand mình, và đó mới là chỗ nguy hiểm thật sự của Đ12.
+    const b = history.borrowedFrom;
+    notes.push(
+      `Brand chưa có ca đối soát nào. Đang mượn HÌNH DẠNG lịch sử toàn agency (${b.sessions} ca · ${b.brands} brand · ${b.months} tháng): khung giờ/thứ nào tốt hơn, hệ số D-Day/lễ/khuyến mãi, lợi suất giảm dần.`
+    );
+    notes.push(
+      `MỨC thì không mượn được — đang dùng ${Math.round(history.brandGmvPerHour).toLocaleString("vi-VN")} đ/giờ ${b.levelSource}. Toàn bộ số tiền dưới đây tỷ lệ thuận với con số đó: nó là GIẢ ĐỊNH của bạn, không phải dự báo engine học được.`
+    );
+  } else if (!history.enough) {
     notes.push(
       history.sessions === 0
-        ? "Brand chưa có ca đối soát nào — không có lịch sử để gợi ý. Dùng quy tắc lặp."
+        ? "Brand chưa có ca đối soát nào — không có lịch sử để gợi ý. Dùng quy tắc lặp, hoặc mượn hình dạng toàn agency (nhập GMV/giờ kỳ vọng)."
         : `Lịch sử mỏng (${history.sessions} ca, ${history.months} tháng; cần ≥ ${P.minHistorySessions} ca và ≥ ${P.minHistoryMonths} tháng) — gợi ý chỉ để tham khảo.`
     );
   }
@@ -698,7 +765,13 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
     if (gap > 0) notes.push(hoursToHitTarget ? `Dự báo thiếu ${fmtM(gap)} so với target — cần ~${Math.ceil(hoursToHitTarget)}h (thay vì ${committed}h) theo cùng cách xếp.` : `Dự báo thiếu ${fmtM(gap)} so với target — thêm giờ trong khung cũng không chạm được; cần tăng CVR/AOV hoặc hạ target.`);
     else notes.push(`Dự báo vượt target ${fmtM(-gap)} — có dư địa giảm giờ hoặc nâng target.`);
   }
-  const confidence: SuggestResult["confidence"] = !history.enough ? (history.sessions > 0 ? "low" : "none") : history.sessions >= 100 && history.months >= 3 ? "high" : "medium";
+  // Lịch sử mượn luôn kẹp ở "low" bất kể agency có bao nhiêu ca: `enough` đã là false nên nhánh đầu
+  // đúng sẵn, nhưng ghi rõ ra đây để lần sau ai sửa `enough` không vô tình thổi nó lên "high".
+  const confidence: SuggestResult["confidence"] = history.borrowedFrom
+    ? "low"
+    : !history.enough
+      ? history.sessions > 0 ? "low" : "none"
+      : history.sessions >= 100 && history.months >= 3 ? "high" : "medium";
 
   return {
     slots,

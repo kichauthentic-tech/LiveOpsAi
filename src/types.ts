@@ -221,6 +221,14 @@ export interface LiveSession {
   reconciledAt?: string;
   cancelReason?: string; // 0097 — lý do huỷ ca (ops)
   cancelledAt?: string;
+  /** 0114 — ops đã tách ca này khỏi MỌI tổng hợp (ca nhập nhầm brand, ca test, ca trùng room).
+   *  Dòng + số giữ nguyên làm lịch sử. KHÁC `status === "Cancelled"`: ca huỷ là ca KHÔNG diễn ra,
+   *  ca bị loại VẪN đã diễn ra thật — chỉ là không được tính vào con số nào.
+   *  App.tsx lọc cờ này ở `activeSessions` một lần cho toàn app; đừng tự lọc lại ở từng màn, và
+   *  cũng đừng đọc `sessions` thô ở màn có cộng số. */
+  excludedFromReports?: boolean;
+  excludedReason?: string;
+  excludedAt?: string;
   tiktokRoomId?: string;
   // Số liệu đọc từ snapshot theo ca (migration 0078). Giờ live THỰC TẾ tách hẳn khỏi
   // startTime/endTime (giờ kế hoạch) — không bao giờ ghi đè lẫn nhau.
@@ -702,7 +710,9 @@ export type AppNotificationKind =
   | "shift_unassigned"
   | "shift_time_changed"
   | "shift_cancelled"
-  | "report_reconciled";
+  | "report_reconciled"
+  | "shift_open"              // 0116/Đ9 — có ca đang mở chờ đăng ký (ca phát sinh, hoặc tổng cả tháng)
+  | "shift_dropout_request";  // 0116/Đ7 — talent báo không đi được ca đã chốt; gửi cho OPS
 
 export interface AppNotification {
   id: string;

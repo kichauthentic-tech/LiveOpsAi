@@ -80,7 +80,27 @@ export interface SessionPnl {
   coHostPaidHourly: boolean;
   // true = lương trợ live tính bằng rate trợ riêng (0089); false = rơi về rate host của người đó.
   coHostUsesAssistantRate: boolean;
+  // Đ3 (chạy thử workflow 2026-09-24): những ô rate mà công thức PHẢI có nhưng chưa ai nhập, và
+  // hàm này đang lặng lẽ thay bằng 0 / bằng mặc định trong code. Đo trên production hôm đó: 33/33
+  // talent rate = 0, `brand_platform_rates` đúng 1 dòng (JOCKEY, 0đ/h) — nên P&L in ra
+  // "Net Profit 7.875.000đ (72.4%)" với chi phí nhân sự = 0 và doanh thu = 15% mặc định của
+  // DEFAULT_FINANCE, không một chữ nào nói là đang thiếu. Số 0 ở đây KHÔNG phải "miễn phí", nó là
+  // "chưa biết", và hai thứ đó không được hiện giống nhau trên màn tiền.
+  missingInputs: PnlMissingInput[];
 }
+
+export type PnlMissingInput =
+  | "host_rate" // host của ca không có rate/giờ, rate/phiên lẫn commission
+  | "cohost_rate" // ca có trợ live nhưng người đó không có rate nào
+  | "brand_rate" // brand tính theo giờ mà chưa set rate/giờ ở Rate Card
+  | "commission_default"; // brand tính %GMV mà chưa ai đặt tỷ lệ -> đang dùng DEFAULT_FINANCE
+
+export const PNL_MISSING_LABEL: Record<PnlMissingInput, string> = {
+  host_rate: "Host chưa có rate",
+  cohost_rate: "Trợ live chưa có rate",
+  brand_rate: "Brand chưa set rate/giờ",
+  commission_default: `Chưa đặt % commission (đang dùng mặc định ${DEFAULT_FINANCE.agencyCommissionRate}%)`
+};
 
 // Giờ tính lương của 1 phiên = giờ ca theo lịch + OT − off sớm (host tự khai trong report sau
 // phiên, ops duyệt). KHÔNG dùng thời lượng live thật từ TikTok: đối soát Giai đoạn 2 chỉ cảnh
@@ -156,7 +176,20 @@ export function computeSessionPnl(
 
   const totalCost = hostPayout + coHostPayout + finance.studioCost + getCanonicalAdsCost(session, finance);
   const netProfit = grossAgencyRev - totalCost;
+
+  // Đ3: ghi nhận đúng những ô đang bị thay bằng 0/mặc định. Điều kiện bám sát ĐƯỜNG TÍNH thật ở
+  // trên, không bám vào `talent.ratePerHour` thô — override tay ở Finance (hostFixRateOverride)
+  // là ops đã chốt số nên KHÔNG coi là thiếu.
+  const missingInputs: PnlMissingInput[] = [];
+  if (hostFixRate <= 0 && hostCommRate <= 0) missingInputs.push("host_rate");
+  if (coHost && coHostFixRate <= 0 && coHostCommRate <= 0) missingInputs.push("cohost_rate");
+  if (isHourly && hourlyRate <= 0) missingInputs.push("brand_rate");
+  // Chỉ là "mặc định" khi KHÔNG có dòng session_finance nào cho ca này — ops đã vào sửa thì con số
+  // 15% là do họ chọn giữ, không phải app tự bịa.
+  if (!isHourly && !financeBySessionId[session.id]) missingInputs.push("commission_default");
+
   return {
+    missingInputs,
     session, finance, talent, isHourly, grossAgencyRev, hostPayout, netProfit,
     hostPaidHourly,
     billableHours,
@@ -192,17 +225,26 @@ export function computeTalentMonthlyIncome(
   financeBySessionId: Record<string, SessionFinance>,
   talentById: Record<string, Talent>,
   talentRateHistory: TalentRateHistoryEntry[]
-): { rows: TalentIncomeRow[]; total: number } {
+): { rows: TalentIncomeRow[]; total: number; missingRate: boolean } {
   const rows: TalentIncomeRow[] = [];
+  // Đ3: talent chưa được nhập rate sẽ thấy "0 đ" cho ca họ đã chạy thật — không phân biệt được với
+  // "tháng này không có ca". Trả cờ ra để màn hồ sơ nói "chưa có rate" thay vì in số 0.
+  let missingRate = false;
   for (const session of sessions) {
     if (session.status !== "Completed" || session.isBackfill || !session.date.startsWith(month)) continue;
     const isHost = session.hostId === talentId;
     const isCoHost = session.coHostId === talentId;
     if (!isHost && !isCoHost) continue;
     const pnl = computeSessionPnl(session, financeBySessionId, talentById, {}, [], talentRateHistory, []);
-    if (isHost) rows.push({ session, role: "host", payout: pnl.hostPayout, billableHours: pnl.billableHours });
-    if (isCoHost) rows.push({ session, role: "co_host", payout: pnl.coHostPayout, billableHours: pnl.billableHours });
+    if (isHost) {
+      rows.push({ session, role: "host", payout: pnl.hostPayout, billableHours: pnl.billableHours });
+      if (pnl.missingInputs.includes("host_rate")) missingRate = true;
+    }
+    if (isCoHost) {
+      rows.push({ session, role: "co_host", payout: pnl.coHostPayout, billableHours: pnl.billableHours });
+      if (pnl.missingInputs.includes("cohost_rate")) missingRate = true;
+    }
   }
   rows.sort((a, b) => (a.session.date < b.session.date ? 1 : -1));
-  return { rows, total: rows.reduce((sum, r) => sum + r.payout, 0) };
+  return { rows, total: rows.reduce((sum, r) => sum + r.payout, 0), missingRate };
 }

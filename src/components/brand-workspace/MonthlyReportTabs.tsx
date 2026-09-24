@@ -192,6 +192,8 @@ interface MonthlyReportTabsProps {
   sessions: LiveSession[];
   canManage: boolean;
   brandPlatformRates: BrandPlatformRate[];
+  // "brandId|YYYY-MM" → tổng target của Kế Hoạch Tháng đã chốt (Đ5). Xem scheduledTargetGmv.
+  planMonthTotals?: Map<string, number>;
 }
 
 type TabId = "overview" | "livestream" | "products" | "affiliate" | "deepdive" | "plan";
@@ -275,7 +277,7 @@ const ReportTable: React.FC<{ head: string[]; children: React.ReactNode }> = ({ 
 
 const chartTooltipStyle = { background: PAL.panel2, border: `1px solid ${PAL.line}`, borderRadius: 8, fontSize: 11, color: PAL.cream };
 
-export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, brandName, month, sessions, canManage, brandPlatformRates }) => {
+export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, brandName, month, sessions, canManage, brandPlatformRates, planMonthTotals }) => {
   const [tab, setTab] = useState<TabId>("overview");
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -723,21 +725,53 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   const hostChartData = useMemo(() => hostPerformance.map((h) => ({ label: h.hostName, gmvHour: h.gmvPerHour ?? 0 })), [hostPerformance]);
   const totalGmvCur = useMemo(() => completedInPeriod.reduce((sum, s) => sum + (s.actualGmv || 0), 0), [completedInPeriod]);
 
-  // Target GMV/NMV (Tab 01 Tổng Quan) = tổng targetGmv của các ca CHƯA HUỶ trong kỳ. Từ 2026-09-18
-  // `targetGmv` của ca là số App đã phân bổ từ kế hoạch tháng (Tab 05) xuống từng ca — xem
-  // lib/performance/targetAllocation.ts — nên tổng này = đúng tổng kế hoạch tháng khi có kế hoạch.
-  // Ca huỷ không mang target (user chốt): agency bù bằng ca khác, target tự dồn sang ca đó.
-  const scheduledTargetGmv = (s: string, e: string) =>
+  // Target GMV/NMV (Tab 01 Tổng Quan) = target CAM KẾT của tháng.
+  //
+  // Đ5 (2026-09-24) — cách cũ cộng `targetGmv` của các ca chưa huỷ trong kỳ, với ghi chú "tổng này =
+  // đúng tổng kế hoạch tháng khi có kế hoạch". Bất biến đó KHÔNG đúng: ca kế hoạch chưa chốt người
+  // thì chưa có `live_session` nào để cộng, nên mẫu số tụt đúng bằng phần chưa xếp. Đo được trên
+  // VERA 09/2026: kế hoạch 100tr (2 ca × 50tr), mới xếp người 1 ca ⇒ mẫu số ra 50tr ⇒ Report báo
+  // "145% target" trong khi thực tế mới đạt 72,5% cam kết. Càng sớm trong tháng càng sai nhiều —
+  // tức là sai to nhất đúng lúc người ta nhìn để quyết xếp thêm ca hay không.
+  //
+  // Nay: tháng nào có Kế Hoạch Tháng ĐÃ CHỐT thì lấy thẳng tổng target của kế hoạch đó (cùng con
+  // số Hỗ Trợ Vận Hành gọi là "TARGET ĐÃ CHỐT" và Toàn Cảnh Brand hiện ở cột Kế hoạch tháng — ba
+  // màn không được nói ba số). Không có kế hoạch chốt thì giữ nguyên cách cũ (target đi từ tab 05
+  // của tháng trước, phân bổ xuống từng ca).
+  //
+  // Chỉ áp cho khoảng đúng bằng TRỌN 1 tháng — mọi lời gọi trong file này đều là monthRangeLocal(),
+  // nhưng để ai đó sau này truyền khoảng tuỳ ý vào thì rơi về cách cũ thay vì trả nhầm target tháng.
+  const wholeMonthKey = (s: string, e: string): string | null => {
+    if (s.slice(0, 7) !== e.slice(0, 7) || !s.endsWith("-01")) return null;
+    const { end: lastDay } = monthRangeLocal(s.slice(0, 7));
+    return e === lastDay ? `${brandId}|${s.slice(0, 7)}` : null;
+  };
+  const plannedMonthTarget = (s: string, e: string): number | null => {
+    const key = wholeMonthKey(s, e);
+    const total = key ? planMonthTotals?.get(key) : undefined;
+    return total !== undefined && total > 0 ? total : null;
+  };
+  const sumSessionTargets = (s: string, e: string) =>
     sessions
       .filter((x) => x.brandId === brandId && x.date >= s && x.date <= e && x.status !== "Cancelled")
       .reduce((sum, x) => sum + (x.targetGmv || 0), 0);
-  const scheduledTargetNmv = (s: string, e: string) =>
-    sessions
+
+  const scheduledTargetGmv = (s: string, e: string) => plannedMonthTarget(s, e) ?? sumSessionTargets(s, e);
+  const scheduledTargetNmv = (s: string, e: string) => {
+    // Ca kế hoạch do lock_month_plan sinh ra đều là TikTok, nên quy target tháng về NMV bằng đúng
+    // returnRate TikTok của brand. Nhánh cũ (không có kế hoạch chốt) vẫn quy theo platform từng ca.
+    const planned = plannedMonthTarget(s, e);
+    if (planned !== null) {
+      const rate = brandPlatformRates.find((r) => r.brandId === brandId && r.platform === "TikTok")?.returnRate ?? 0;
+      return planned * (1 - rate / 100);
+    }
+    return sessions
       .filter((x) => x.brandId === brandId && x.date >= s && x.date <= e && x.status !== "Cancelled")
       .reduce((sum, x) => {
         const rate = brandPlatformRates.find((r) => r.brandId === brandId && r.platform === x.platform)?.returnRate ?? 0;
         return sum + (x.targetGmv || 0) * (1 - rate / 100);
       }, 0);
+  };
 
   // Chart "Target vs Thực Đạt GMV" (brief Module 1) — Target = tổng target đã lên lịch (xem trên),
   // Actual = Total GMV thực tế.

@@ -203,7 +203,12 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ brands, sessions
                     </td>
                     <td className="py-2.5 px-2 text-right font-bold text-[var(--text)] whitespace-nowrap">
                       {s.countable > 0 ? fmtHours(s.hours) : <span className="text-[var(--text-faint)] font-normal">—</span>}
-                      <span className="block text-[10px] text-[var(--text-faint)] font-normal">{s.total} ca</span>
+                      {/* Đ11: `happened` chứ không phải `total` — bảng này tự nhận chỉ hiện số đã xảy ra,
+                          nên ca sắp tới tách ra thành dòng riêng thay vì cộng chung vào "N ca". */}
+                      <span className="block text-[10px] text-[var(--text-faint)] font-normal">{s.happened} ca</span>
+                      {s.upcoming > 0 && (
+                        <span className="block text-[10px] text-[var(--text-muted)] font-normal">+{s.upcoming} ca sắp tới</span>
+                      )}
                     </td>
                     <td className="py-2.5 px-2 text-right font-bold text-[var(--success)] whitespace-nowrap">
                       {s.gmv > 0 ? formatCurrencyAdaptive(s.gmv, "") : <span className="text-[var(--text-faint)] font-normal">—</span>}

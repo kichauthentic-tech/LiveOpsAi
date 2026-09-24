@@ -31,7 +31,9 @@ export interface OpsBoardProps {
   onSessionSnapshotApplied: (session: LiveSession) => void;
   onUpdateSession?: (session: LiveSession) => Promise<boolean>;
   onDeleteSession?: (id: string) => Promise<void>;
-  onCancelSession?: (id: string, reason: string) => Promise<boolean>;
+  onCancelSession?: (id: string, reason: string, reopenSlot: boolean) => Promise<boolean>;
+  onSetSessionExcluded?: (id: string, excluded: boolean, reason: string) => Promise<boolean>;
+  onRequestDropout?: (sessionId: string, reason: string) => Promise<boolean>; // Đ7 (0116) — talent báo bận, chỉ gửi thông báo cho ops
   onLogAudit?: (entry: { action: string; details: string; category: AuditLogEntry["category"] }) => Promise<void>;
   // Ca chưa có người → nhảy sang Đăng Ký & Chốt Lịch.
   onOpenScheduling?: () => void;
@@ -82,6 +84,8 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
   onUpdateSession,
   onDeleteSession,
   onCancelSession,
+  onSetSessionExcluded,
+  onRequestDropout,
   onLogAudit,
   onOpenScheduling,
   requestOpenSessionId = null,
@@ -292,6 +296,8 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
           onUpdateSession={mode === "ops" ? onUpdateSession : undefined}
           onDeleteSession={mode === "ops" ? onDeleteSession : undefined}
           onCancelSession={mode === "ops" ? onCancelSession : undefined}
+          onSetSessionExcluded={mode === "ops" ? onSetSessionExcluded : undefined}
+          onRequestDropout={onRequestDropout}
           onLogAudit={mode === "ops" ? onLogAudit : undefined}
         />
       )}

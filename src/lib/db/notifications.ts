@@ -46,3 +46,12 @@ export async function markNotificationsRead(ids?: string[]): Promise<number> {
   if (error) throw error;
   return (data as number) ?? 0;
 }
+
+// Đ7 (0116): talent báo không đi được ca ĐÃ CHỐT. Ngoại lệ có chủ ý so với ghi chú ở đầu file —
+// đây không phải "tạo thông báo cho một lần ghi dữ liệu" (không cột nào đổi: talent KHÔNG được tự
+// đổi lịch, việc thay người vẫn của ops), mà là một lời nhắn không có sự kiện DB nào để trigger
+// bám vào. Guard "chỉ Host/Trợ của chính ca đó" nằm ở DB.
+export async function requestShiftDropout(sessionId: string, reason: string): Promise<void> {
+  const { error } = await supabase.rpc("request_shift_dropout", { p_session_id: sessionId, p_reason: reason });
+  if (error) throw error;
+}

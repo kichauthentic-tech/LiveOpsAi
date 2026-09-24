@@ -4,7 +4,7 @@ import { ALL_PERMISSION_DEFINITIONS } from "./data/mockData";
 import { fetchTalents, updateTalent, updateMyTalentProfile, deleteTalent } from "./lib/db/talents";
 import { fetchStudios, createStudio, updateStudio, deleteStudio } from "./lib/db/studios";
 import { fetchEquipments, createEquipment, updateEquipment, deleteEquipment } from "./lib/db/equipments";
-import { fetchSessions, createSession, updateSession, deleteSession, completePastSessions, cancelSession } from "./lib/db/sessions";
+import { fetchSessions, createSession, updateSession, deleteSession, completePastSessions, cancelSession, setSessionExcluded } from "./lib/db/sessions";
 import { submitSessionReport, SessionReportInput } from "./lib/db/sessionReports";
 import { fetchBrands, createBrand, updateBrand, deleteBrand } from "./lib/db/brands";
 import { fetchUsers, updateUserProfile, inviteUser, deleteUserAccount, InviteUserPayload } from "./lib/db/users";
@@ -33,6 +33,7 @@ import { withEffectiveStatus } from "./lib/sessionStatus";
 import { fetchAllMonthlyReports } from "./lib/db/monthlyReports";
 import { fetchLockedPlanTargets } from "./lib/db/monthPlans";
 import { errorMessage } from "./lib/errorMessage";
+import { requestShiftDropout } from "./lib/db/notifications";
 import {
   BookOpen,
   FileText,
@@ -293,6 +294,10 @@ export default function App() {
   // (khai báo sớm hơn nhóm state Giai đoạn 14 vì useMemo ngay dưới đọc nó)
   const [shiftSlots, setShiftSlots] = useState<ShiftSlot[]>([]);
   const [planTargetsBySlotId, setPlanTargetsBySlotId] = useState<Map<string, number>>(new Map());
+  // "brandId|YYYY-MM" → tổng target đã chốt của tháng (Đ5). Nguồn sự thật cho câu hỏi "tháng này
+  // cam kết bao nhiêu", KHÔNG cộng ngược từ targetGmv của các ca đang tồn tại — ca kế hoạch chưa
+  // chốt người thì chưa có live_session, cộng ngược sẽ ra thiếu.
+  const [planMonthTotals, setPlanMonthTotals] = useState<Map<string, number>>(new Map());
   // Tham số engine Kế Hoạch Tháng (0095) — nạp cùng Phase 14; lỗi thì dùng mặc định, không chặn app.
   const [engineParams, setEngineParams] = useState<EngineParams>(DEFAULT_ENGINE_PARAMS);
   const [engineParamsUpdatedAt, setEngineParamsUpdatedAt] = useState<string | null>(null);
@@ -313,8 +318,8 @@ export default function App() {
     return () => window.clearInterval(t);
   }, []);
   const sessions = useMemo(
-    () => applyAllocatedTargets(withEffectiveStatus(rawSessions, nowMs), monthlyReports, planTargetsBySessionId),
-    [rawSessions, nowMs, monthlyReports, planTargetsBySessionId]
+    () => applyAllocatedTargets(withEffectiveStatus(rawSessions, nowMs), monthlyReports, planTargetsBySessionId, planMonthTotals),
+    [rawSessions, nowMs, monthlyReports, planTargetsBySessionId, planMonthTotals]
   );
   // Kế hoạch tháng được sửa ở Report Tháng (Tab 05) mà App không nhận callback — nạp lại mỗi khi
   // đổi tab là đủ, bảng nhỏ và target chỉ cần đúng khi người dùng nhìn sang màn khác.
@@ -529,7 +534,7 @@ export default function App() {
         .catch((e) => { if (!cancelled) setEngineParamsError(`Không tải được tham số engine (dùng mặc định): ${e.message ?? e}`); })
         .finally(() => { if (!cancelled) setEngineParamsLoading(false); });
     }
-    Promise.all([fetchBrandPlatformRates(), fetchShiftSlots(), fetchShiftRegistrations(), fetchRecurringShiftTemplates(), fetchLockedPlanTargets().catch(() => new Map<string, number>()), fetchBrandStudios().catch(() => [] as BrandStudio[])])
+    Promise.all([fetchBrandPlatformRates(), fetchShiftSlots(), fetchShiftRegistrations(), fetchRecurringShiftTemplates(), fetchLockedPlanTargets().catch(() => ({ bySlotId: new Map<string, number>(), monthTotals: new Map<string, number>() })), fetchBrandStudios().catch(() => [] as BrandStudio[])])
       .then(([rates, slots, regs, templates, planTargets, bStudios]) => {
         if (cancelled) return;
         setBrandPlatformRates(rates);
@@ -537,7 +542,8 @@ export default function App() {
         setShiftSlots(slots);
         setShiftRegistrations(regs);
         setRecurringShiftTemplates(templates);
-        setPlanTargetsBySlotId(planTargets);
+        setPlanTargetsBySlotId(planTargets.bySlotId);
+        setPlanMonthTotals(planTargets.monthTotals);
         setPhase14Error(null);
       })
       .catch((err) => {
@@ -827,7 +833,13 @@ export default function App() {
     });
   }, [rawActiveTalents, rawActiveSessions]);
 
-  const activeSessions = rawActiveSessions;
+  // Đ10/0114: ca đã "loại khỏi báo cáo" bị chặn ĐÚNG MỘT LẦN ở đây. Mọi màn cộng số (Report Tháng,
+  // Hiệu Suất Host, cam kết giờ, P&L, Toàn Cảnh Brand…) nhận `activeSessions`, nên không màn nào
+  // phải tự nhớ lọc — đúng loại lỗi sẽ quên ở màn thứ tư. Chỉ Sổ Ca nhận mảng thô (`sessions`) để
+  // ops còn tìm lại và bỏ cờ; không có đường đó thì cờ là một chiều.
+  const activeSessions = useMemo(() => rawActiveSessions.filter((s) => !s.excludedFromReports), [rawActiveSessions]);
+  // Chỉ Sổ Ca nhận danh sách này (prop riêng, không trộn vào `sessions`) — xem SessionLedger.
+  const excludedSessions = useMemo(() => rawActiveSessions.filter((s) => s.excludedFromReports), [rawActiveSessions]);
   const activeBrands = rawActiveBrands;
   const activeEquipments = rawActiveEquipments;
 
@@ -1194,14 +1206,49 @@ export default function App() {
     }
   };
   // Huỷ ca (0097): RPC đổi ca + slot trong 1 transaction; trigger 0083 tự báo host/trợ nếu ca chưa diễn ra.
-  const handleCancelSession = async (id: string, reason: string): Promise<boolean> => {
+  const handleCancelSession = async (id: string, reason: string, reopenSlot = false): Promise<boolean> => {
     try {
-      const updated = await cancelSession(id, reason);
+      const updated = await cancelSession(id, reason, reopenSlot);
       setSessions((prev) => prev.map((s) => (s.id === id ? updated : s)));
-      setShiftSlots((prev) => prev.map((sl) => (sl.sessionId === id && sl.status === "finalized" ? { ...sl, status: "cancelled" } : sl)));
+      // 0113: "mở lại" nhả luôn session_id ở DB — state phải theo, nếu không card vẫn hiện nhưng
+      // bấm Chốt sẽ gắn nhầm ca vừa huỷ.
+      setShiftSlots((prev) =>
+        prev.map((sl) =>
+          sl.sessionId === id && sl.status === "finalized"
+            ? reopenSlot
+              ? { ...sl, status: "open", sessionId: undefined }
+              : { ...sl, status: "cancelled" }
+            : sl
+        )
+      );
       return true;
     } catch (e: any) {
       window.alert(`Không huỷ được ca: ${e.message ?? e}`);
+      return false;
+    }
+  };
+
+  // Loại ca khỏi báo cáo / đưa trở lại (0114). Không sinh audit riêng: DB đã ghi excluded_by +
+  // excluded_at + lý do trên chính dòng ca, đó là nơi người đọc report sẽ tìm.
+  const handleSetSessionExcluded = async (id: string, excluded: boolean, reason: string): Promise<boolean> => {
+    try {
+      const updated = await setSessionExcluded(id, excluded, reason);
+      setSessions((prev) => prev.map((s) => (s.id === id ? updated : s)));
+      return true;
+    } catch (e: unknown) {
+      window.alert(`${excluded ? "Không loại được ca" : "Không đưa lại được ca"}: ${errorMessage(e)}`);
+      return false;
+    }
+  };
+
+  // Đ7 (0116): talent báo không đi được ca đã chốt → thông báo cho ops. KHÔNG đổi lịch gì cả, nên
+  // không có state nào phải cập nhật ở đây.
+  const handleRequestDropout = async (sessionId: string, reason: string): Promise<boolean> => {
+    try {
+      await requestShiftDropout(sessionId, reason);
+      return true;
+    } catch (e: unknown) {
+      window.alert(`Không gửi được: ${errorMessage(e)}`);
       return false;
     }
   };
@@ -1265,7 +1312,8 @@ export default function App() {
     try {
       const [slots, planTargets] = await Promise.all([fetchShiftSlots(), fetchLockedPlanTargets()]);
       setShiftSlots(slots);
-      setPlanTargetsBySlotId(planTargets);
+      setPlanTargetsBySlotId(planTargets.bySlotId);
+      setPlanMonthTotals(planTargets.monthTotals);
     } catch (e: any) {
       window.alert(`Không nạp lại được danh sách ca: ${e.message ?? e}`);
     }
@@ -1617,12 +1665,17 @@ export default function App() {
   const navGroups = effectiveWorkspace.type === "brand" ? BRAND_NAV_GROUPS : AGENCY_NAV_GROUPS;
   const navItems = navGroups.flatMap((g) => g.items);
 
-  // Mọi loại thông báo hiện có đều là về MỘT CA của chính người nhận (xếp/rút/đổi giờ/huỷ/đối
-  // soát). Q4 (audit 2026-09-21): talent → Ca Của Tôi, ops → Bảng Vận Hành, và mở luôn Cửa sổ Ca
-  // Live của ca đó (notification.session_id). Talent luôn ở Agency Workspace, không cần đổi workspace.
+  // Phần lớn thông báo là về MỘT CA của chính người nhận (xếp/rút/đổi giờ/huỷ/đối soát). Q4 (audit
+  // 2026-09-21): talent → Ca Của Tôi, ops → Bảng Vận Hành, và mở luôn Cửa sổ Ca Live của ca đó
+  // (notification.session_id). Talent luôn ở Agency Workspace, không cần đổi workspace.
+  //
+  // 0116/Đ9 thêm `shift_open` — thông báo DUY NHẤT không gắn với ca nào (ca chờ đăng ký chưa phải
+  // live_session, và bản tổng cả tháng thì nói về 60 ca). Đích của nó là Đăng Ký Ca, không phải
+  // Ca Của Tôi: gửi tới "Ca Của Tôi" thì talent mở ra thấy trống và không hiểu mình vừa bấm gì.
   const handleOpenNotification = (n: AppNotification) => {
     void notifications.markRead([n.id]);
-    if (currentRole === "talent") setActiveTab("my_shifts");
+    if (n.kind === "shift_open") setActiveTab("shift_scheduling");
+    else if (currentRole === "talent") setActiveTab("my_shifts");
     else {
       setOpsView("board");
       setActiveTab("calendar");
@@ -2079,6 +2132,7 @@ export default function App() {
                   <SessionLedger
                     variant="agency"
                     sessions={activeSessions}
+                    excludedSessions={excludedSessions}
                     brands={activeBrands}
                     currentRole={currentRole}
                     myTalentId={activeUser.assignedTalentId}
@@ -2089,6 +2143,8 @@ export default function App() {
                     onUpdateSession={handleUpdateSession}
                     onDeleteSession={handleDeleteSession}
                     onCancelSession={handleCancelSession}
+                    onSetSessionExcluded={handleSetSessionExcluded}
+                    onRequestDropout={handleRequestDropout}
                     onLogAudit={pushAuditLog}
                   />
                 )}
@@ -2115,6 +2171,8 @@ export default function App() {
                         onUpdateSession={handleUpdateSession}
                         onDeleteSession={handleDeleteSession}
                     onCancelSession={handleCancelSession}
+                    onSetSessionExcluded={handleSetSessionExcluded}
+                    onRequestDropout={handleRequestDropout}
                     onLogAudit={pushAuditLog}
                         onOpenScheduling={() => setActiveTab("shift_scheduling")}
                         requestOpenSessionId={notifOpenSessionId}
@@ -2147,6 +2205,8 @@ export default function App() {
                     onSessionSnapshotApplied={handleSessionReconciled}
                     onDeleteSession={handleDeleteSession}
                     onCancelSession={handleCancelSession}
+                    onSetSessionExcluded={handleSetSessionExcluded}
+                    onRequestDropout={handleRequestDropout}
                     onLogAudit={pushAuditLog}
                   />
                     )}
@@ -2193,6 +2253,8 @@ export default function App() {
                     onOpenMonthPlan={() => setActiveTab("month_plan")}
                     fatigueWeekHours={engineParams.fatigueWeekHours}
                     onCancelSession={handleCancelSession}
+                    onSetSessionExcluded={handleSetSessionExcluded}
+                    onRequestDropout={handleRequestDropout}
                   />
                 )}
 
@@ -2288,6 +2350,7 @@ export default function App() {
                     onSessionSnapshotApplied={handleSessionReconciled}
                     onDeleteSession={handleDeleteSession}
                     onCancelSession={handleCancelSession}
+                    onSetSessionExcluded={handleSetSessionExcluded}
                     onLogAudit={pushAuditLog}
                     onUpdateSession={handleUpdateSession}
                     onCreateSlot={handleCreateShiftSlot}
@@ -2329,6 +2392,7 @@ export default function App() {
                     currentRole={currentRole}
                     brandPlatformRates={brandPlatformRates}
                     shiftSlots={shiftSlots}
+                    planMonthTotals={planMonthTotals}
                     onOpenAdsReport={() => setActiveTab("brand_ads_report")}
                   />
                 )}
@@ -2409,7 +2473,10 @@ export default function App() {
                   <MyTalentProfile
                     activeUser={activeUser}
                     talents={talents}
-                    sessions={sessions}
+                    sessions={activeSessions} /* 0114: KHÔNG phải `sessions`. Hai mảng này trước
+                      0114 là cùng một object nên chỗ này viết gì cũng như nhau; từ 0114 thì khác —
+                      ca đã loại khỏi báo cáo phải biến mất khỏi cả Thu Nhập Tháng Này, không thì
+                      talent đọc một con số mà P&L của ops (đã lọc) ra con số khác. */
                     financeRecords={financeRecords}
                     talentRateHistory={talentRateHistory}
                     onSaveMyProfile={handleSaveMyTalentProfile}

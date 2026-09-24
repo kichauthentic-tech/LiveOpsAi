@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { Brand, BrandStudio, LiveSession, ShiftSlot, Studio } from "../../types";
 import { AlertTriangle, CalendarClock, X } from "lucide-react";
-import { dateTimeRangesOverlap } from "../../lib/dateUtils";
+import { dateTimeRangesOverlap, getTodayDate } from "../../lib/dateUtils";
 import { findBrandStudioId } from "../../lib/db/brandStudios";
 
 // Q2 (audit 2026-09-21): con đường DUY NHẤT tạo ca ngoài Kế Hoạch Tháng là "mở ca chờ đăng ký" —
@@ -80,6 +80,15 @@ export const OpenSlotModal: React.FC<OpenSlotModalProps> = ({
     return sl ? `${sl.brandName} ${sl.startTime}–${sl.endTime} (chờ đăng ký)` : null;
   }, [sessions, shiftSlots, date, start, end, studioId]);
 
+  // Đ6 (2026-09-24): `lock_month_plan` (0099) BỎ QUA ca kế hoạch ở ngày đã qua, nhưng cửa này thì
+  // cho mở thoải mái và im lặng — hai cửa hai luật. Không chặn cứng vì nạp bù ca đã live là nhu cầu
+  // thật (CROCS T6–T9 vào app bằng đường này), chỉ nói rõ hệ quả: slot quá khứ không ai đăng ký nữa.
+  const pastDays = useMemo(() => {
+    const today = getTodayDate();
+    if (!date || date >= today) return 0;
+    return Math.round((Date.parse(`${today}T00:00:00`) - Date.parse(`${date}T00:00:00`)) / 86400000);
+  }, [date]);
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (start === end) {
@@ -91,6 +100,7 @@ export const OpenSlotModal: React.FC<OpenSlotModalProps> = ({
       return;
     }
     if (studioClash && !window.confirm(`Phòng ${studio?.name ?? ""} đang trùng với ${studioClash}. Vẫn mở ca?`)) return;
+    if (pastDays > 0 && !window.confirm(`Ngày ${date} đã qua ${pastDays} ngày. Ca mở ở quá khứ sẽ KHÔNG ai đăng ký được — chỉ dùng khi bạn đang nạp bù ca đã live (ops tự chốt người sau). Vẫn mở ca?`)) return;
     setSaving(true);
     const ok = await onCreateSlot({
       id: `slot-${Date.now()}`,
@@ -191,6 +201,15 @@ export const OpenSlotModal: React.FC<OpenSlotModalProps> = ({
             <span className="font-bold text-[var(--text-muted)] block mb-1">Ghi chú <span className="font-normal text-[var(--text-faint)]">(tuỳ chọn — talent thấy khi đăng ký)</span></span>
             <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Vd: ca tăng cường D-Day, cần host quen SKU giày" className={input} />
           </label>
+
+          {pastDays > 0 && (
+            <p className="text-[11px] text-amber-300 flex items-start gap-1.5 bg-amber-950/40 border border-amber-900 rounded-xl p-2.5">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
+              <span>
+                <b>Ngày đã qua {pastDays} ngày.</b> Talent không đăng ký được ca ở quá khứ — chỉ mở nếu bạn đang <b>nạp bù ca đã live</b>, rồi tự chốt Host ở Đăng Ký &amp; Chốt Lịch.
+              </span>
+            </p>
+          )}
 
           {studioClash && (
             <p className="text-[11px] text-rose-300 flex items-center gap-1.5 bg-rose-950/50 border border-rose-900 rounded-xl p-2.5">
