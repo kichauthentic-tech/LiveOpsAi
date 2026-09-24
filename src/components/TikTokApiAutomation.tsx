@@ -3,6 +3,7 @@ import { TikTokConnectionStatus, TikTokWebhookEvent, WorkflowRule } from "../typ
 import { getTikTokAuthorizeUrl, disconnectTikTok } from "../lib/db/tiktokIntegration";
 import { Server, Zap, RefreshCw, ShieldCheck, ShieldAlert, ShieldX, Link2, Unlink, ArrowRight, Activity, Plus, Edit3, Trash2, X } from "lucide-react";
 import { errorMessage } from "../lib/errorMessage";
+import { useConfirm } from "../hooks/useConfirm";
 
 interface TikTokApiAutomationProps {
   workflowRules: WorkflowRule[];
@@ -29,6 +30,7 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
   webhookEvents,
   onRefreshTikTokStatus
 }) => {
+  const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState<"api_status" | "rules">("api_status");
   const [connecting, setConnecting] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
@@ -58,7 +60,7 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
 
   const handleDisconnect = async () => {
     if (!tiktokStatus?.shopId) return;
-    if (!window.confirm("Ngắt kết nối TikTok Shop hiện tại? Mọi webhook sẽ ngừng nhận sự kiện.")) return;
+    if (!(await confirm("Ngắt kết nối TikTok Shop hiện tại? Mọi webhook sẽ ngừng nhận sự kiện.", { danger: true }))) return;
     setActionError(null);
     setDisconnecting(true);
     try {
@@ -118,8 +120,8 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
     setIsModalOpen(false);
   };
 
-  const handleDeleteRule = (id: string, name: string) => {
-    if (window.confirm(`Bạn có chắc muốn xóa quy tắc automation "${name}"?`)) {
+  const handleDeleteRule = async (id: string, name: string) => {
+    if (await confirm(`Bạn có chắc muốn xóa quy tắc automation "${name}"?`, { danger: true })) {
       if (onDeleteWorkflowRule) onDeleteWorkflowRule(id);
     }
   };

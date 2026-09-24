@@ -4,6 +4,7 @@ import { AlertTriangle, CalendarClock, X } from "lucide-react";
 import { dateTimeRangesOverlap, getTodayDate } from "../../lib/dateUtils";
 import { findBrandStudioId } from "../../lib/db/brandStudios";
 import { useToast } from "../../hooks/useToast";
+import { useConfirm } from "../../hooks/useConfirm";
 
 // Q2 (audit 2026-09-21): con đường DUY NHẤT tạo ca ngoài Kế Hoạch Tháng là "mở ca chờ đăng ký" —
 // ca đi vào Đăng Ký & Chốt Lịch như mọi ca khác (talent đăng ký, ops chốt host, target từ kế hoạch
@@ -47,6 +48,7 @@ export const OpenSlotModal: React.FC<OpenSlotModalProps> = ({
   onCreateSlot
 }) => {
   const { showToast } = useToast();
+  const confirm = useConfirm();
   const [brandId, setBrandId] = useState(fixedBrand?.id ?? brands[0]?.id ?? "");
   const [studioId, setStudioId] = useState(initialStudioId || findBrandStudioId(brandStudios, fixedBrand?.id ?? brands[0]?.id ?? "") || "");
   const [date, setDate] = useState(initialDate);
@@ -101,8 +103,8 @@ export const OpenSlotModal: React.FC<OpenSlotModalProps> = ({
       showToast("Chọn brand cho ca.");
       return;
     }
-    if (studioClash && !window.confirm(`Phòng ${studio?.name ?? ""} đang trùng với ${studioClash}. Vẫn mở ca?`)) return;
-    if (pastDays > 0 && !window.confirm(`Ngày ${date} đã qua ${pastDays} ngày. Ca mở ở quá khứ sẽ KHÔNG ai đăng ký được — chỉ dùng khi bạn đang nạp bù ca đã live (ops tự chốt người sau). Vẫn mở ca?`)) return;
+    if (studioClash && !(await confirm(`Phòng ${studio?.name ?? ""} đang trùng với ${studioClash}. Vẫn mở ca?`))) return;
+    if (pastDays > 0 && !(await confirm(`Ngày ${date} đã qua ${pastDays} ngày. Ca mở ở quá khứ sẽ KHÔNG ai đăng ký được — chỉ dùng khi bạn đang nạp bù ca đã live (ops tự chốt người sau). Vẫn mở ca?`))) return;
     setSaving(true);
     const ok = await onCreateSlot({
       id: `slot-${Date.now()}`,

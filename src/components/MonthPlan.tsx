@@ -24,6 +24,7 @@ import { HistorySummary, STRATEGY_LABEL, SuggestResult, SuggestStrategy, buildBo
 import { formatCurrencyAdaptive } from "../lib/formatCurrency";
 import { EngineParams } from "../lib/scheduling/engineParams";
 import { findBrandStudioId } from "../lib/db/brandStudios";
+import { useConfirm } from "../hooks/useConfirm";
 
 interface MonthPlanProps {
   brands: Brand[];
@@ -75,6 +76,7 @@ export default function MonthPlan({
   brandStudios,
   onSetBrandStudio
 }: MonthPlanProps) {
+  const confirm = useConfirm();
   const today = todayVn();
   const [brandId, setBrandId] = useState(brands[0]?.id ?? "");
   const [month, setMonth] = useState(nextMonthOf(today.slice(0, 7), 1));
@@ -365,8 +367,8 @@ export default function MonthPlan({
     setMsg(`${mode === "target" ? "Xếp theo target" : "Gợi ý"} ${result.slots.length} ca · ${fmtH(result.totalHours)}h · dự báo ${formatCurrencyAdaptive(result.forecastGmv)}${targetTotal > 0 ? ` / target ${formatCurrencyAdaptive(targetTotal)}` : ""}${drafts.length > 0 ? ` (giữ ${drafts.length} ca đang có)` : ""}.`);
   };
 
-  const clearAll = () => {
-    if (!window.confirm("Xoá toàn bộ ca trong lưới nháp?")) return;
+  const clearAll = async () => {
+    if (!(await confirm("Xoá toàn bộ ca trong lưới nháp?", { danger: true }))) return;
     setDrafts([]);
     setDirty(true);
   };
@@ -398,7 +400,7 @@ export default function MonthPlan({
       setMsg("Lưới trống — chưa có gì để chốt.");
       return;
     }
-    if (drafts.length === 0 && locked && !window.confirm(`Lưới trống — chốt lại sẽ HUỶ toàn bộ ca đang mở của kế hoạch ${brand?.name} tháng ${month} (trừ ca đã có người đăng ký). Tiếp tục?`)) return;
+    if (drafts.length === 0 && locked && !(await confirm(`Lưới trống — chốt lại sẽ HUỶ toàn bộ ca đang mở của kế hoạch ${brand?.name} tháng ${month} (trừ ca đã có người đăng ký). Tiếp tục?`, { danger: true }))) return;
     const gap = planHours - totals.hours;
     const warn = planHours > 0 && Math.abs(gap) > 0.01 ? `\n\nGiờ kế hoạch ${fmtH(totals.hours)}h ${gap > 0 ? "THIẾU" : "VƯỢT"} ${fmtH(Math.abs(gap))}h so với ${fmtH(planHours)}h cần xếp.` : "";
     const relockNote = locked ? "\n\nChốt lại sẽ mở thêm ca mới và HUỶ ca đang mở đã bị bỏ khỏi kế hoạch (trừ ca đã có người đăng ký)." : "";
@@ -406,7 +408,7 @@ export default function MonthPlan({
     const pastCount = drafts.filter((d) => d.date < today).length;
     const pastNote = pastCount > 0 ? `\n\n${pastCount} ca ở ngày đã qua sẽ KHÔNG mở chờ đăng ký (chỉ giữ trong kế hoạch để đối chiếu).` : "";
     const studioNote = brandStudio ? `\n\nCa sinh ra gắn phòng ${brandStudio.name} (${brandStudio.roomNumber}).` : "\n\nBrand CHƯA có phòng live mặc định — ca sinh ra sẽ không có phòng (không kiểm được trùng phòng). Chọn ở Tham số → Phòng live trước nếu cần.";
-    if (!window.confirm(`${locked ? "Chốt lại" : "Chốt"} kế hoạch ${brand?.name} tháng ${month}: ${drafts.length} ca chờ đăng ký?${warn}${targetWarn}${relockNote}${studioNote}${pastNote}`)) return;
+    if (!(await confirm(`${locked ? "Chốt lại" : "Chốt"} kế hoạch ${brand?.name} tháng ${month}: ${drafts.length} ca chờ đăng ký?${warn}${targetWarn}${relockNote}${studioNote}${pastNote}`))) return;
     const p = await save();
     if (!p) return;
     setSaving(true);
@@ -438,7 +440,7 @@ export default function MonthPlan({
     if (!plan) return;
     const openFromPlan = shiftSlots.filter((sl) => sl.status === "open" && sl.brandId === brandId && sl.date.slice(0, 7) === month).length;
     if (
-      !window.confirm(
+      !(await confirm(
         `XOÁ HẲN kế hoạch ${brand?.name} tháng ${month}?
 
 ` +
@@ -449,8 +451,9 @@ export default function MonthPlan({
           `• Ca đã chốt người thì KHÔNG xoá được — nếu có, DB sẽ chặn và bạn phải xử từng ca ở Nhân sự ca trước.
 
 ` +
-          `Không hoàn tác được.`
-      )
+          `Không hoàn tác được.`,
+        { danger: true }
+      ))
     )
       return;
     setSaving(true);

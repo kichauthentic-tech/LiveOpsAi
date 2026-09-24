@@ -11,6 +11,7 @@ import { vnParts } from "../../lib/dataraw/liveAnalysisRows";
 import { talentOptionLabel } from "../../lib/talentName";
 import { errorMessage } from "../../lib/errorMessage";
 import { useToast } from "../../hooks/useToast";
+import { useConfirm } from "../../hooks/useConfirm";
 
 // Nạp bù ca từ file Creator-Live-Performance (migration 0086) — 2 bước, nằm ngay dưới ô import
 // của tab "Creator Live Performance" trong Dữ Liệu Gốc:
@@ -39,6 +40,7 @@ function monthBounds(m: string): [string, string] {
 
 export const BackfillFromRooms: React.FC<Props> = ({ brandId, brandName, months, sessions, talents, onSessionsChanged }) => {
   const { showToast } = useToast();
+  const confirm = useConfirm();
   const [month, setMonth] = useState<string>(months[0] ?? "");
   const [rows, setRows] = useState<CreatorLivePerfRow[]>([]);
   const [loadingRows, setLoadingRows] = useState(false);
@@ -86,7 +88,7 @@ export const BackfillFromRooms: React.FC<Props> = ({ brandId, brandName, months,
 
   const handleGenerate = async () => {
     if (plan.toCreate.length === 0) return;
-    if (!window.confirm(`Sinh ${plan.toCreate.length} ca cho ${brandName} ${monthLabel(month)} từ file? Host để trống, gán ở lưới bên dưới.`)) return;
+    if (!(await confirm(`Sinh ${plan.toCreate.length} ca cho ${brandName} ${monthLabel(month)} từ file? Host để trống, gán ở lưới bên dưới.`))) return;
     setGenerating(true);
     setError(null);
     try {

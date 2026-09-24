@@ -12,6 +12,7 @@ import {
   setReconciliationBucket
 } from "../lib/db/liveReconciliation";
 import { errorMessage } from "../lib/errorMessage";
+import { useConfirm } from "../hooks/useConfirm";
 
 interface LiveReconciliationProps {
   onApplied: () => Promise<void> | void;
@@ -51,6 +52,7 @@ function fmtTime(iso?: string): string {
 }
 
 export function LiveReconciliation({ onApplied, onOpenSession }: LiveReconciliationProps) {
+  const confirm = useConfirm();
   const [batches, setBatches] = useState<ReconciliationBatch[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [rows, setRows] = useState<ReconciliationRow[]>([]);
@@ -249,7 +251,7 @@ export function LiveReconciliation({ onApplied, onOpenSession }: LiveReconciliat
             <div className="flex items-center gap-2">
               <button
                 onClick={() => void run(async () => {
-                  if (!window.confirm("Áp dụng đối soát và ghi đè số liệu các ca trong kỳ này?")) return;
+                  if (!(await confirm("Áp dụng đối soát và ghi đè số liệu các ca trong kỳ này?"))) return;
                   const n = await applyReconciliation(active.id);
                   await onApplied();
                   await reloadBatches(active.id);
@@ -263,7 +265,7 @@ export function LiveReconciliation({ onApplied, onOpenSession }: LiveReconciliat
               </button>
               <button
                 onClick={() => void run(async () => {
-                  if (!window.confirm("Xoá lần đối soát này? Số liệu đã ghi vào các ca KHÔNG bị hoàn lại.")) return;
+                  if (!(await confirm("Xoá lần đối soát này? Số liệu đã ghi vào các ca KHÔNG bị hoàn lại.", { danger: true }))) return;
                   await deleteReconciliationBatch(active.id);
                   setActiveId(null);
                   await reloadBatches();

@@ -20,6 +20,7 @@ import {
   monthKeyOf,
   todayVn
 } from "../lib/performance/brandCommitment";
+import { useConfirm } from "../hooks/useConfirm";
 
 interface BrandCommitmentProps {
   sessions: LiveSession[];
@@ -98,6 +99,7 @@ function emptyDraft(brandId: string, today: string): ContractDraft {
 }
 
 export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
+  const confirm = useConfirm();
   const today = todayVn();
   const [view, setView] = useState<"runrate" | "contracts">("runrate");
   const [periodMonth, setPeriodMonth] = useState(() => monthKeyOf(today));
@@ -614,11 +616,12 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       if (
-                        !window.confirm(
-                          `Xoá hợp đồng của ${brandNameById[c.brandId] ?? "brand này"}?\n\nCác dòng cam kết theo tháng đã sinh ra sẽ ĐƯỢC GIỮ LẠI (lịch sử cam kết không bị viết lại), chỉ mất liên kết tới hợp đồng.`
-                        )
+                        !(await confirm(
+                          `Xoá hợp đồng của ${brandNameById[c.brandId] ?? "brand này"}?\n\nCác dòng cam kết theo tháng đã sinh ra sẽ ĐƯỢC GIỮ LẠI (lịch sử cam kết không bị viết lại), chỉ mất liên kết tới hợp đồng.`,
+                          { danger: true }
+                        ))
                       )
                         return;
                       run(async () => {
@@ -674,8 +677,8 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
                         </td>
                         <td className="py-1.5 text-right">
                           <button
-                            onClick={() => {
-                              if (!window.confirm(`Xoá cam kết ${monthLabel(m.periodMonth).toLowerCase()} của brand này?`)) return;
+                            onClick={async () => {
+                              if (!(await confirm(`Xoá cam kết ${monthLabel(m.periodMonth).toLowerCase()} của brand này?`, { danger: true }))) return;
                               run(async () => {
                                 await deleteMonthlyCommitment(m.id);
                                 await reload();

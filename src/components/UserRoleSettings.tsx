@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { UserRole, PermissionKey, PermissionDefinition, RolePermissionsMap, SystemUser, AuditLogEntry, Brand, Talent, LiveSession } from "../types";
 import { ShieldCheck, UserPlus, Users, Key, Lock, Unlock, Check, X, Search, Sliders, History, Sparkles, Trash2, Edit2, Radio, Building2, Zap } from "lucide-react";
+import { useConfirm } from "../hooks/useConfirm";
 
 export interface NewUserPayload {
   name: string;
@@ -55,6 +56,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
   brands,
   talents
 }) => {
+  const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState<"roles" | "users" | "audit">("roles");
   const [selectedRole, setSelectedRole] = useState<UserRole>("operations");
   const [userSearch, setUserSearch] = useState("");
@@ -719,8 +721,8 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                             {/* Delete Button */}
                             {u.role !== "ceo" && u.role !== "admin" && (
                               <button
-                                onClick={() => {
-                                  if (window.confirm(`Bạn có chắc chắn muốn xóa vĩnh viễn tài khoản "${u.name}" (${u.email})?`)) {
+                                onClick={async () => {
+                                  if (await confirm(`Bạn có chắc chắn muốn xóa vĩnh viễn tài khoản "${u.name}" (${u.email})?`, { danger: true })) {
                                     onDeleteUser(u.id);
                                   }
                                 }}

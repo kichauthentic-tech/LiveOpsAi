@@ -9,6 +9,7 @@ import {
   rowsReadyToFinalize
 } from "../lib/performance/bulkFinalize";
 import { headlineFor } from "../lib/performance/hostSuggestion";
+import { useConfirm } from "../hooks/useConfirm";
 
 interface BulkFinalizePanelProps {
   slots: ShiftSlot[];
@@ -56,6 +57,7 @@ export function BulkFinalizePanel({
   onFinalizeSlot,
   onClose
 }: BulkFinalizePanelProps) {
+  const confirm = useConfirm();
   // Lập kế hoạch MỘT LẦN lúc mở panel. Không tính lại theo `sessions` đang đổi: mỗi ca chốt xong
   // là App nạp lại sessions, tính lại giữa chừng sẽ xoá sạch phần ops vừa sửa tay.
   const [rows, setRows] = useState<BulkPlanRow[]>(() =>
@@ -86,9 +88,9 @@ export function BulkFinalizePanel({
     const batch = rowsReadyToFinalize(rows);
     if (batch.length === 0) return;
     if (
-      !window.confirm(
+      !(await confirm(
         `Chốt ${batch.length} ca?\n\nMỗi ca sẽ tạo một phiên live thật và gán Host đã chọn. Các dòng đang báo trùng lịch hoặc chưa có Host sẽ được bỏ qua.`
-      )
+      ))
     )
       return;
 

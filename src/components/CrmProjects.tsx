@@ -3,6 +3,7 @@ import { Brand, BrandPlatformRate, BrandPlatformRateHistoryEntry, LiveSession, S
 import { Building2, Plus, Edit3, Trash2, X, Tag, DollarSign, Percent } from "lucide-react";
 import { BrandLogo } from "./ui/BrandLogo";
 import { BrandRateCard } from "./BrandRateCard";
+import { useConfirm } from "../hooks/useConfirm";
 
 interface CrmProjectsProps {
   brands: Brand[];
@@ -31,6 +32,7 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
   onSaveRate,
   onSaveReturnRate
 }) => {
+  const confirm = useConfirm();
   // Internal agency staff eligible to be KAM owners
   const staffUsers = users.filter((u) => u.role === "ceo" || u.role === "admin" || u.role === "operations");
   // Rate Card set tập trung ở đây (CRM) thay vì phải vào từng Brand Workspace — chỉ mở 1
@@ -127,8 +129,8 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
     isSavingBrandRef.current = false;
   };
 
-  const handleDeleteBrand = (id: string, name: string) => {
-    if (window.confirm(`Bạn có chắc chắn muốn xóa thương hiệu "${name}"?`)) {
+  const handleDeleteBrand = async (id: string, name: string) => {
+    if (await confirm(`Bạn có chắc chắn muốn xóa thương hiệu "${name}"?`, { danger: true })) {
       if (onDeleteBrand) onDeleteBrand(id);
     }
   };

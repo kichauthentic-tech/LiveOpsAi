@@ -16,6 +16,7 @@ import { fetchMonthlyReport, upsertMonthlyReport, publishMonthlyReport, unpublis
 import { MonthlyReportTabs } from "./MonthlyReportTabs";
 import { BrandWeeklyReport } from "./BrandWeeklyReport";
 import { errorMessage } from "../../lib/errorMessage";
+import { useConfirm } from "../../hooks/useConfirm";
 
 // Report Tuần không còn là tab riêng ở menu (2026-08-23) — gộp làm chế độ xem "Tuần" ngay trong
 // Report Tháng qua toggle bên dưới, tái dùng nguyên BrandWeeklyReport.tsx (đã tự chặn quyền qua
@@ -53,6 +54,7 @@ function monthRange(month: string): { start: string; end: string } {
 // còn tài liệu 6 tab + phát hành/thu hồi (tab 05 "Phân Tích Sâu" gộp vào 2026-09-23, ops-only).
 
 export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId, brandName, sessions, currentRole, brandPlatformRates, shiftSlots, onOpenAdsReport, planMonthTotals }) => {
+  const confirm = useConfirm();
   const canManage = CAN_MANAGE_ROLES.includes(currentRole);
   const canViewWeekly = CAN_VIEW_WEEKLY_ROLES.includes(currentRole);
   const [viewMode, setViewMode] = useState<"month" | "week">("month");
@@ -122,7 +124,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
 
   const handleUnpublish = async () => {
     if (!report) return;
-    if (!window.confirm("Thu hồi report đã phát hành về bản nháp?")) return;
+    if (!(await confirm("Thu hồi report đã phát hành về bản nháp?"))) return;
     setPublishing(true);
     setErrorMsg(null);
     try {

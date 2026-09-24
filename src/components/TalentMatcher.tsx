@@ -4,6 +4,7 @@ import { Users, Sparkles, Award, Search, Plus, Edit3, Trash2, X, Phone, Loader2,
 import { authedFetch } from "../lib/authedFetch";
 import { computeTalentRealTotals } from "../lib/metrics/avgGmv";
 import { errorMessage } from "../lib/errorMessage";
+import { useConfirm } from "../hooks/useConfirm";
 
 // Vài bản ghi talent cũ (trước khi field chuẩn hoá về `niches`/`avatar`/`ratePerSession`) có thể
 // còn lưu dưới tên cột cũ — đọc dự phòng, không phải lỗi kiểu dữ liệu.
@@ -62,6 +63,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
   onUpdateTalent,
   onDeleteTalent
 }) => {
+  const confirm = useConfirm();
   // Rate Card/Hoa hồng — chỉ ceo/admin xem được (đúng dữ liệu trả về từ view `talents_secure`,
   // vốn đã mask thành 0 cho role khác — ẩn luôn UI cho nhất quán thay vì hiện "0đ" gây hiểu lầm).
   // Tạo talent mới giờ luôn kèm tạo account thật (Supabase Admin API) nên cũng chỉ ceo/admin
@@ -235,8 +237,8 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
     }
   };
 
-  const handleDelete = (id: string, name: string) => {
-    if (window.confirm(`Bạn có chắc chắn muốn xóa Talent "${name}" khỏi hệ thống?`)) {
+  const handleDelete = async (id: string, name: string) => {
+    if (await confirm(`Bạn có chắc chắn muốn xóa Talent "${name}" khỏi hệ thống?`, { danger: true })) {
       if (onDeleteTalent) onDeleteTalent(id);
     }
   };

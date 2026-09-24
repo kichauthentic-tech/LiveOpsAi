@@ -5,6 +5,7 @@ import { upsertMonthlyReport, publishMonthlyReport, unpublishMonthlyReport } fro
 import { errorMessage } from "../lib/errorMessage";
 import { getTodayMonth } from "../lib/dateUtils";
 import { BrandLogo } from "./ui/BrandLogo";
+import { useConfirm } from "../hooks/useConfirm";
 
 // Bảng điều phối phát hành report (còn lại của Đợt C, Audit Role × Workspace — xem
 // WORKSPACE_DESIGN.md) — ops coi trạng thái phát hành Report Tháng của TẤT CẢ brand × nhiều tháng
@@ -41,6 +42,7 @@ const monthRange = (month: string): { start: string; end: string } => {
 };
 
 export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ brands, sessions, monthlyReports, onReportsChanged }) => {
+  const confirm = useConfirm();
   const today = getTodayMonth();
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [rowError, setRowError] = useState<Record<string, string>>({});
@@ -75,7 +77,7 @@ export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ brands, 
     const unreconciled = unreconciledCountFor(brandId, month);
     let force = false;
     if (unreconciled > 0) {
-      const ok = window.confirm(
+      const ok = await confirm(
         `Còn ${unreconciled} phiên live Completed trong ${fmtMonthLabel(month)} chưa đối soát với TikTok. Vẫn muốn phát hành report này?`
       );
       if (!ok) return;
@@ -97,7 +99,7 @@ export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ brands, 
 
   const handleUnpublish = async (brandId: string, month: string, reportId: string) => {
     const key = `${brandId}|${month}`;
-    if (!window.confirm("Thu hồi report đã phát hành về bản nháp?")) return;
+    if (!(await confirm("Thu hồi report đã phát hành về bản nháp?"))) return;
     setRowError((e) => ({ ...e, [key]: "" }));
     setBusyKey(key);
     try {

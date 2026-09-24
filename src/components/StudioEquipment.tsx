@@ -3,6 +3,7 @@ import { Studio, Equipment, LiveSession } from "../types";
 import { Building2, Camera, QrCode, Plus, Edit3, Trash2, X, Search } from "lucide-react";
 import { getTodayDate } from "../lib/dateUtils";
 import { useToast } from "../hooks/useToast";
+import { useConfirm } from "../hooks/useConfirm";
 
 interface StudioEquipmentProps {
   studios: Studio[];
@@ -42,6 +43,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
   onDeleteEquipment
 }) => {
   const { showToast } = useToast();
+  const confirm = useConfirm();
   const [activeSubTab, setActiveSubTab] = useState<"studios" | "equipment">("studios");
   const [simulatedQrScan, setSimulatedQrScan] = useState<string | null>(null);
 
@@ -129,8 +131,8 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
     setIsStudioModalOpen(false);
   };
 
-  const handleDeleteStudio = (id: string, name: string) => {
-    if (window.confirm(`Bạn có chắc chắn muốn xóa Studio "${name}"?`)) {
+  const handleDeleteStudio = async (id: string, name: string) => {
+    if (await confirm(`Bạn có chắc chắn muốn xóa Studio "${name}"?`, { danger: true })) {
       if (onDeleteStudio) onDeleteStudio(id);
     }
   };
@@ -196,8 +198,8 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
     setIsEquipmentModalOpen(false);
   };
 
-  const handleDeleteEquipment = (id: string, name: string) => {
-    if (window.confirm(`Bạn có chắc muốn xóa thiết bị "${name}"?`)) {
+  const handleDeleteEquipment = async (id: string, name: string) => {
+    if (await confirm(`Bạn có chắc muốn xóa thiết bị "${name}"?`, { danger: true })) {
       if (onDeleteEquipment) onDeleteEquipment(id);
     }
   };

@@ -5,6 +5,7 @@ import App from './App.tsx';
 import { AuthProvider } from './hooks/useAuth';
 import { ThemeProvider } from './hooks/useTheme';
 import { ToastProvider } from './hooks/useToast';
+import { ConfirmProvider } from './hooks/useConfirm';
 import './index.css';
 
 // Error tracking (Phase 11) — no-op until VITE_SENTRY_DSN is set, same gated
@@ -21,9 +22,11 @@ createRoot(document.getElementById('root')!).render(
     <Sentry.ErrorBoundary fallback={<ErrorFallback />}>
       <ThemeProvider>
         <ToastProvider>
-          <AuthProvider>
-            <App />
-          </AuthProvider>
+          <ConfirmProvider>
+            <AuthProvider>
+              <App />
+            </AuthProvider>
+          </ConfirmProvider>
         </ToastProvider>
       </ThemeProvider>
     </Sentry.ErrorBoundary>

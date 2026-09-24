@@ -5,6 +5,7 @@ import { fetchDataRawImports, fetchDataRawRows, createOrReplaceDataRawImport, fi
 import { Database, Upload, FileSpreadsheet, AlertTriangle, Trash2, Search, ChevronDown, ChevronRight } from "lucide-react";
 import { BackfillFromRooms } from "./BackfillFromRooms";
 import { errorMessage } from "../../lib/errorMessage";
+import { useConfirm } from "../../hooks/useConfirm";
 
 interface BrandDataRawProps {
   brandId: string;
@@ -88,6 +89,7 @@ function formatPeriodShort(imp: BrandDataRawImport): string {
 const CAN_MANAGE: UserRole[] = ["ceo", "admin", "operations"];
 
 export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ brandId, brandName, currentRole, sessions, talents, onSessionsChanged }) => {
+  const confirm = useConfirm();
   const canManage = CAN_MANAGE.includes(currentRole);
   const [activeType, setActiveType] = useState<DataRawReportType>("shop_promotion");
   const [imports, setImports] = useState<BrandDataRawImport[]>([]);
@@ -160,7 +162,7 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ brandId, brandName, 
   };
 
   const handleDelete = async (importId: string) => {
-    if (!window.confirm("Xoá import này? Toàn bộ dòng dữ liệu đi kèm sẽ mất, không khôi phục được.")) return;
+    if (!(await confirm("Xoá import này? Toàn bộ dòng dữ liệu đi kèm sẽ mất, không khôi phục được.", { danger: true }))) return;
     try {
       await deleteDataRawImport(importId);
       setImports((prev) => prev.filter((i) => i.id !== importId));

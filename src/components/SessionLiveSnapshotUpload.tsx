@@ -8,6 +8,7 @@ import {
   fetchSessionSnapshot
 } from "../lib/db/sessionLiveSnapshots";
 import { errorMessage } from "../lib/errorMessage";
+import { useConfirm } from "../hooks/useConfirm";
 
 interface SessionLiveSnapshotUploadProps {
   session: LiveSession;
@@ -26,6 +27,7 @@ function fmtTime(iso?: string): string {
 // vào đúng ca đang trực. Số của ca = hiệu so với lần up gần nhất của cùng Room ID (migration
 // 0078) — nên up đúng lúc giao ca là bắt buộc với ca nối, không phải thủ tục cho có.
 export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSnapshotUploadProps) {
+  const confirm = useConfirm();
   const [snapshot, setSnapshot] = useState<SessionSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -58,7 +60,7 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
   }
 
   async function handleDelete() {
-    if (!window.confirm("Xoá file số liệu của ca này? Ca sẽ quay về số liệu trước khi up (kể cả bản host tự khai tay).")) return;
+    if (!(await confirm("Xoá file số liệu của ca này? Ca sẽ quay về số liệu trước khi up (kể cả bản host tự khai tay).", { danger: true }))) return;
     setBusy(true);
     setError(null);
     try {

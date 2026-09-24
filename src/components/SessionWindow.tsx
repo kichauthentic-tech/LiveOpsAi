@@ -23,6 +23,7 @@ import { BrandLogo } from "./ui/BrandLogo";
 import { SessionLiveSnapshotUpload } from "./SessionLiveSnapshotUpload";
 import { SessionReportForm } from "./SessionReportForm";
 import { useToast } from "../hooks/useToast";
+import { useConfirm } from "../hooks/useConfirm";
 
 // Cửa sổ Ca Live — MỘT cửa sổ chi tiết cho một ca, dùng chung cho mọi nơi click vào ca (Sổ Ca,
 // Lịch Vận Hành, Đăng Ký & Chốt Lịch, Sessions bên brand). Thay cho 3 "chi tiết ca" khác nhau
@@ -108,6 +109,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
   onLogAudit
 }) => {
   const { showToast } = useToast();
+  const confirm = useConfirm();
   const isBrandView = viewer.role === "brand";
   const isOps = OPS_ROLES.includes(viewer.role);
   const isMine = !!viewer.myTalentId && (viewer.myTalentId === s.hostId || viewer.myTalentId === s.coHostId);
@@ -216,7 +218,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
 
   const handleDelete = async () => {
     if (!onDeleteSession) return;
-    if (!window.confirm(`Xoá ca ${fmtDate(s.date)} ${s.startTime}–${s.endTime} (${s.brandName})? Không hoàn tác được.`)) return;
+    if (!(await confirm(`Xoá ca ${fmtDate(s.date)} ${s.startTime}–${s.endTime} (${s.brandName})? Không hoàn tác được.`, { danger: true }))) return;
     setDeleting(true);
     try {
       await onDeleteSession(s.id);
