@@ -2,14 +2,13 @@
 
 ## CẦN LÀM NGAY khi mở phiên mới (cập nhật 2026-09-24)
 
-> **VIỆC ĐANG TREO — bàn giao 2026-09-24 (đọc mục này trước 7 mục dưới).** Xếp theo thứ tự nên làm:
+> **VIỆC ĐANG TREO — bàn giao 2026-09-24, cập nhật lại cùng ngày sau khi merge (đọc mục này trước danh
+> sách dưới; mục 1 đã xong, còn 6 mục treo).** Xếp theo thứ tự nên làm:
 >
-> 1. **Merge nhánh về `main`.** `main` đang ở `f4e692e`, **chậm 3 commit**: `d45529d` (12 điểm đứt gãy),
->    `0b3a1fc` (Toàn Cảnh Agency Bước A), `8642c9b` (#5 ESLint + test) — tất cả nằm trên nhánh
->    `audit/workflow-12-diem-dut-gay`, đã push, CI chưa từng chạy trên nhánh này. Toàn bộ lịch sử repo
->    trước đó đi thẳng `main`; tách nhánh là quyết định của phiên 2026-09-24 vì đợt đó động vào view
->    `live_sessions_secure` + `publish_brand_monthly_report` (sai là brand mất sạch ca). Chưa mở PR.
->    `git merge --ff-only audit/workflow-12-diem-dut-gay` là gộp được ngay.
+> 1. ~~Merge nhánh về `main`~~ — **XONG 2026-09-24**: `git merge --ff-only audit/workflow-12-diem-dut-gay`
+>    rồi `git push origin main`, `main` giờ ở `45fe3af` (trước đó `f4e692e`, chậm 3 commit `d45529d` /
+>    `0b3a1fc` / `8642c9b`). Nhánh `audit/workflow-12-diem-dut-gay` đã xoá cả local lẫn remote (đã nằm
+>    trọn trong `main`, không mất gì). Từ nay làm việc thẳng trên `main`, không còn nhánh audit riêng.
 > 2. **Đ7 + Đ9 phía talent — CẦN USER, không làm hộ được.** `notifications` có RLS chỉ cho chính chủ
 >    đọc, mà Claude không tự nhập mật khẩu. Cần một lần đăng nhập bằng tài khoản talent để đi: chuông →
 >    "Có ca mới đang mở đăng ký" → Đăng Ký Ca; và nút "Tôi không đi được ca này" → thông báo về ops.
