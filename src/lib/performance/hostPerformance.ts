@@ -140,6 +140,13 @@ export function byHost(sessions: LiveSession[]): PerfRow[] {
   return groupBy(sessions, hostKey, (s) => ({ label: s.hostName || "Chưa gán host" }));
 }
 
+// Gộp theo BRAND — Toàn Cảnh Agency (2026-09-24) dùng để xếp hạng đóng góp. Đặt ở đây chứ không
+// tự cộng lại bên đó: cùng `addTo`/`finish` với byHost nên GMV/giờ của một brand không thể lệch
+// giữa hai màn.
+export function byBrand(sessions: LiveSession[]): PerfRow[] {
+  return groupBy(sessions, (s) => s.brandId, (s) => ({ label: s.brandName || "Chưa rõ brand" }));
+}
+
 export function byHostBrand(sessions: LiveSession[]): PerfRow[] {
   return groupBy(
     sessions,

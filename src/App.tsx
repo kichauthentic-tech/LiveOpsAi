@@ -59,6 +59,7 @@ import {
   Database,
   ClipboardCheck,
   TrendingUp,
+  Activity,
   Gauge,
   FileSignature,
   Radio,
@@ -104,6 +105,7 @@ import OpsSupport from "./components/OpsSupport";
 import { LiveReconciliation } from "./components/LiveReconciliation";
 import { HostPerformance } from "./components/HostPerformance";
 import { BrandsOverview } from "./components/BrandsOverview";
+import { AgencyOverview } from "./components/AgencyOverview";
 import { ReportPublishBoard } from "./components/ReportPublishBoard";
 import { BrandCommitment } from "./components/BrandCommitment";
 
@@ -1550,6 +1552,11 @@ export default function App() {
           {
             label: "Phân Tích",
             items: [
+              // Toàn Cảnh Agency (2026-09-24): nhịp của CẢ agency theo tuần/tháng, cho CEO. Đặt đầu
+              // nhóm vì là màn mở ra trước rồi mới khoan xuống 2 màn dưới. Không chồng lấn: màn này
+              // là CHIỀU THỜI GIAN xuyên brand, Toàn Cảnh Brand là trạng thái thủ tục của từng
+              // brand trong 1 tháng, Hiệu Suất Host là xếp hạng người để sắp lịch.
+              { id: "agency_overview", label: "Toàn Cảnh Agency", icon: Activity, perm: "manage_sessions" as PermissionKey },
               { id: "host_performance", label: "Hiệu Suất Host", icon: TrendingUp, perm: "manage_sessions" as PermissionKey },
               // Toàn Cảnh Brand (Đợt C/6, 2026-09-23): bảng trạng thái 4 brand cho 1 tháng — kế
               // hoạch/cam kết/report/rate đọc thẳng từ DB, không phải widget KPI dự phóng kiểu
@@ -2281,6 +2288,20 @@ export default function App() {
                   <LiveReconciliation
                     onApplied={handleReconciliationApplied}
                     onOpenSession={(id) => { setOpsView("board"); setActiveTab("calendar"); setNotifOpenSessionId(id); }}
+                  />
+                )}
+
+                {activeTab === "agency_overview" && (
+                  <AgencyOverview
+                    sessions={activeSessions}
+                    brands={activeBrands}
+                    talents={talents}
+                    brandPlatformRates={brandPlatformRates}
+                    currentRole={currentRole}
+                    onOpenSessions={() => setActiveTab("sessions")}
+                    onOpenHostPerformance={() => setActiveTab("host_performance")}
+                    onOpenRateCard={() => setActiveTab("crm")}
+                    onOpenTalents={() => setActiveTab("talents")}
                   />
                 )}
 

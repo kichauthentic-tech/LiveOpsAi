@@ -274,6 +274,68 @@ Ba phương án đã cân nhắc: (A) mượn nguyên ma trận agency — **lo�
 1. **`document.querySelector('input[type=date]')` bắt nhầm ô của MÀN NỀN, không phải của modal.** Lịch & Studio có sẵn một ô ngày riêng; modal mở ra là ô thứ hai. Tôi đọc/ghi ô thứ nhất rồi kết luận "banner không hiện ⇒ code sai", suýt đi sửa code đang đúng. **Luôn scope selector vào chính dialog** (`document.querySelector('.fixed.inset-0.z-50')` rồi query bên trong), hoặc đếm `querySelectorAll(...).length` trước khi tin `querySelector`.
 2. **React KHÔNG ghi lại `value` xuống DOM khi prop `value` không đổi giữa 2 lần render.** Nên "gán thẳng `input.value` rồi thấy giá trị còn nguyên sau một lần re-render" **không chứng minh** state đã đổi — tôi đã dùng đúng phép thử vô nghĩa đó. Muốn đổi state thật thì `nativeInputValueSetter.call(el, v)` + `dispatchEvent(new Event('input', {bubbles:true}))`, và kiểm bằng **hệ quả phái sinh** (banner hiện/mất) chứ không bằng `el.value`.
 
+## Toàn Cảnh Agency (dashboard CEO) — Bước A: CODE XONG, **CHƯA VERIFY TRÊN BROWSER** (2026-09-24)
+
+Yêu cầu user: "dashboard của agency cho CEO xem hằng ngày/tuần/tháng để tracking bức tranh toàn cảnh".
+
+**Nghiên cứu trước khi build — số thật đo trên production 2026-09-24** (đếm bằng service role, không suy đoán):
+
+| Nguồn | Thực tế | Dùng được cho dashboard? |
+|---|---|---|
+| `live_sessions` | 229 ca, **100% CROCS + 100% `is_backfill` + `tiktok_reconciled`**, T6–T9 | ✅ giàu nhất: GMV, đơn, view, impression, click, giờ live thật, host |
+| `brand_dataraw_rows` (shop_analytics) | 4 tháng CROCS theo NGÀY: GMV shop, Refunds, Seller LIVE GMV | ✅ (chưa dùng ở bước A) — cho tỷ trọng live/tổng shop + return rate thật |
+| `brand_platform_rates` | **1 dòng, rate 0đ/h** (JOCKEY) | ❌ không tính được doanh thu agency |
+| `talents.rate_per_hour/rate_per_session/commission_rate` | **0/33 talent có rate** | ❌ không tính được chi phí host |
+| `session_finance` / `brand_contracts` / `brand_monthly_commitments` | 0 / 0 / 0 | ❌ |
+| `profiles` | 3 (admin, operations, talent) — **chưa có tài khoản role `ceo`** | ⚠️ màn này làm cho CEO nhưng CEO chưa có account |
+
+**Kết luận đã chốt với user:** hôm nay **không thể** tính P&L/doanh thu/ROAS — mọi ô đó sẽ ra 0đ. Nhưng GMV/giờ/phễu/host có 4 tháng dữ liệu thật, đủ để dashboard có giá trị ngay. User chọn: **làm Bước A** (Tuần/Tháng trên số thật), khối tiền **hiện thẻ "còn thiếu gì"** chứ không hiện 0đ.
+
+**Đã build:**
+
+- [`src/lib/performance/agencyOverview.ts`](src/lib/performance/agencyOverview.ts) — toàn hàm thuần (không đụng Supabase, verify được bằng `tsx`): `periodOf`/`shiftPeriod`/`recentPeriods` (tuần ISO + tháng), `indexByDate`/`sessionsIn`, `totalsOf`, `comparableRange`, `delta`, `sharesOf`, `moneyReadiness`.
+- [`src/components/AgencyOverview.tsx`](src/components/AgencyOverview.tsx) — tab `agency_overview`, nhóm nav **Phân Tích** (đặt TRÊN Hiệu Suất Host), gate `manage_sessions`. Khối: dải 5 số + delta · xu hướng 8 tuần/6 tháng · đóng góp theo brand · con người · phễu · kỷ luật vận hành · khối tiền.
+- `byBrand()` thêm vào [`hostPerformance.ts`](src/lib/performance/hostPerformance.ts) — dùng lại `groupBy` nội bộ để GMV/giờ của một brand không thể lệch giữa hai màn.
+- **Không migration, không bảng mới, không fetch mới** — đọc nguyên state `activeSessions`/`activeBrands`/`talents`/`brandPlatformRates` đã có sẵn ở `App.tsx`.
+
+**Luật bắt buộc của màn này** (đã ghi trong đầu file lib, đừng tự nới):
+
+1. **Không có ô dự phóng cuối kỳ.** Muốn dự phóng thì sang Hỗ Trợ Vận Hành (có engine, đã verify). Đây là đúng lý do Dashboard cũ bị xoá hẳn 2026-09-13.
+2. **Kỳ đang chạy phải so với kỳ trước ĐÃ CẮT về đúng số ngày đã trôi** (`comparableRange`). Tháng 9 mới tới ngày 24 thì so với 24 ngày đầu tháng 8, không phải cả tháng 8 — thiếu bước này thì mọi kỳ đang chạy đều hiện ra như đang sụt thảm hại.
+3. **`Delta.pct` trả `null` khi kỳ trước = 0**, không trả 0 hay ∞ — UI hiện chữ "kỳ trước chưa có số".
+4. **Khối tiền không được render số nào khi chưa đủ điều kiện.** `computeSessionPnl` vẫn chạy khi rate = 0 và trả lợi nhuận 0đ; hiện con số đó lên dashboard CEO là nói dối. `moneyReadiness()` liệt kê đúng thứ còn thiếu + nút đi thẳng tới chỗ nhập.
+5. **`rateHidden` của Talent là "không được xem", KHÔNG phải "chưa đặt"** — `talents_secure` mask 4 cột lương. Gộp 2 cái này chính là lỗi audit 2026-09-21 (talent nhìn 0đ/live tưởng lương mình bằng 0).
+6. **Tỷ lệ luôn tính lại từ số đã cộng**, không trung bình tỷ lệ từng ca (quy ước tầng snapshot).
+7. **Dùng `hasHappened`/`isCountable`, KHÔNG dùng `rows.length`** — đúng bẫy Đ11 vừa vá ở Toàn Cảnh Brand.
+8. **Chart vẽ bằng div CSS, không dùng recharts** — `fill="var(--x)"` của SVG KHÔNG resolve biến CSS nên chart sẽ sai màu ở theme sáng/sand.
+
+**Không chồng lấn với màn đã có:** Toàn Cảnh Agency = CHIỀU THỜI GIAN xuyên brand · Toàn Cảnh Brand = trạng thái thủ tục từng brand trong 1 tháng · Hiệu Suất Host = xếp hạng người để sắp lịch. Có link chéo, không chép cột của nhau.
+
+**Đã verify:** `tsx` **34/34 check** hàm thuần (tuần ISO qua năm, tháng nhuận, cắt kỳ so sánh, pct null, countable/happened/scheduled/cancelled tách đúng, CTR/CTOR tính lại, kỳ rỗng không NaN, rate 0đ không tính là đã set, rate bị mask nói đúng chữ) · `tsc --noEmit` sạch · `vite build` pass.
+
+**CHƯA VERIFY:** chưa chạy trên browser thật — Claude không có mật khẩu admin (xem memory `liveops_test_login`), cần user đăng nhập hộ trong Browser pane. **Số kỳ vọng đã tính sẵn từ Supabase để đối chiếu (Tháng 9/2026, agency-wide):**
+
+| Ô | Phải ra |
+|---|---|
+| Giờ live | 177,8h · 47 ca có số |
+| GMV | 3,52 tỷ (3.516.674.216) |
+| GMV/giờ | 19,8 triệu (19.776.379) |
+| Đơn · AOV | 3.069 · 1,1 triệu |
+| Lượt xem | 496.448 |
+| So với kỳ trước | **Tháng 8 · 24 ngày đầu = 5,02 tỷ** — nếu hiện delta GMV −40,3% là đã so nhầm với T8 đủ tháng (5,89 tỷ); đúng phải là **−29,9%**, GMV/giờ **−28,4%** |
+| Phễu | 8.204.047 hiển thị · 260.296 click · CTR 3,17% · CTOR 1,18% |
+| Kỷ luật | 47 đã xếp · 47 đã diễn ra · 0 chưa có số · 0 huỷ · 47 đã đối soát |
+| Brand | CROCS 100% → phải bật cảnh báo tập trung (ngưỡng 60%) |
+| Host | 9 host xếp hạng (cao nhất 25,7tr/h, thấp nhất 14,8tr/h) + 12 ca chưa gán host tách riêng; Bùi Sỹ Hùng 47,1% số giờ → phải bật cảnh báo (ngưỡng 30%) |
+| Xu hướng 6 tháng | T4/T5 trống · T6 4,56 · T7 5,19 · T8 5,89 · T9 3,52 tỷ |
+| Khối tiền | KHÔNG có số nào; liệt kê 3 thứ thiếu (rate card 0/4 brand, rate talent 0/33, 47 ca đều là ca nạp bù nên Finance loại hết) |
+
+**Bước B và C — chưa làm, user chưa yêu cầu:**
+
+- **Bước B — chế độ NGÀY** ("hôm qua có gì bất thường"): dải số hôm qua + delta so với median 4 lần gần nhất **cùng thứ** (không so hôm trước — thứ 2 vs chủ nhật vô nghĩa); ca hôm nay chưa có host; việc tồn đọng (`missingSteps` đã có sẵn) bấm nhảy sang Sổ Ca đã lọc; danh sách bất thường có ngưỡng rõ ràng. **Chỉ sống thật khi ca đầu tiên đi qua vòng đời app** — hiện mọi ca đều nạp bù nên khối tồn đọng sẽ trống.
+- **Bước C — khối tiền thật + cam kết + dự kiến cuối tháng.** Chặn bởi dữ liệu, không phải bởi code: cần rate card, rate talent, `brand_contracts`, và ít nhất 1 Kế Hoạch Tháng đã chốt. Dự kiến cuối tháng phải tái dùng `trackMonth()` của Hỗ Trợ Vận Hành, không tự viết engine thứ hai.
+- Khối **"live trên tổng shop"** (% GMV live / GMV shop + return rate thật) từ `shop_analytics` — dữ liệu đã có sẵn 4 tháng CROCS, chỉ thiếu UI.
+
 ## Kiến trúc tổng quan
 
 App tách 2 lớp workspace, chuyển qua dropdown switcher trên Header (không dùng URL routing):
