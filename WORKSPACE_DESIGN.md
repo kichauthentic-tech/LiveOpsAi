@@ -129,20 +129,29 @@
 >    `@typescript-eslint/no-explicit-any` từ "warn" lên **"error"** (đã 0 vi phạm từ mục 5, đúng quy
 >    tắc "rule nào cây code đã xanh thì để error"). `tsc --noEmit` / `eslint .` (0 lỗi, 41 warning —
 >    đúng bằng `set-state-in-effect`) / `vitest` (38/38) đều xanh; app khởi động lại không lỗi console.
-> 7. **Phần 2 của audit code base — đang làm theo module.** Module 1/5 **Vận Hành Live XONG
->    2026-09-24**: 2 lỗi thật tìm thấy + sửa (dropout của "Ca Của Tôi" vẫn thiếu dây `onRequestDropout`
->    ở App.tsx; `LiveCalendar` dựng Date từ chuỗi kiểu lệch múi giờ ở 6 chỗ, dormant vì agency chỉ
->    dùng giờ VN). Module 2/5 **Lập kế hoạch XONG 2026-09-25**: đọc kỹ MonthPlan/suggestEngine/
->    planMonthSlots/BulkFinalizePanel/bulkFinalize + lib phụ trợ — **không tìm thấy lỗi**, không sửa
->    gì. Module 3/5 **Brand Workspace & Report XONG 2026-09-25**: 4 lỗi thật tìm thấy + sửa, tất cả
->    cùng họ "2 nơi tính 1 chỉ số ra 2 số khác nhau" (3 chỗ `missingDays` mark "đã phủ" trước khi biết
->    batch đọc được không, khiến dữ liệu thiếu bị đọc thành 0 mà không cảnh báo; `liveUnits.ts` đếm cả
->    ca chưa diễn ra vào Report Chuyên Sâu; CTOR ở `creatorLivePerfMetrics.ts` dùng sai `orders` thay vì
->    `skuOrders` khiến Report Tháng gửi brand và Report Chuyên Sâu nội bộ hiện 2 số CTOR khác nhau).
->    Module 4/5 **Tài chính & nhân sự XONG 2026-09-25**: 1 lỗi thật tìm thấy + sửa — `HostPerformance.tsx`
->    mặc định "đến ngày" bằng `new Date().toISOString().slice(0,10)`, đúng anti-pattern `dateUtils.ts` đã
->    cảnh báo tên riêng (UTC lùi 1 ngày lúc 00:00-07:00 giờ VN, không dormant vì chạy trên mọi múi giờ).
->    Còn 1 module: Hệ thống — chi tiết ở mục `## Audit toàn diện code base (2026-09-23)`.
+> 7. ~~Phần 2 của audit code base — theo module~~ — **XONG CẢ 5/5 MODULE, 2026-09-25.** Đi từng module
+>    (Vận Hành Live → Lập kế hoạch → Brand Workspace & Report → Tài chính & nhân sự → Hệ thống), mỗi
+>    module đọc code thật + fix + verify (`tsc`/`eslint`/`vitest`/browser smoke test) trước khi sang
+>    module kế. Tổng **8 lỗi thật tìm thấy + sửa**, 4/5 module có lỗi:
+>    - **Vận Hành Live**: dropout "Ca Của Tôi" thiếu dây `onRequestDropout` ở App.tsx; `LiveCalendar`
+>      dựng Date từ chuỗi kiểu lệch múi giờ ở 6 chỗ (dormant, agency chỉ dùng giờ VN).
+>    - **Lập kế hoạch**: không tìm thấy lỗi.
+>    - **Brand Workspace & Report** (4 lỗi, module lớn nhất — 2217 dòng `MonthlyReportTabs.tsx` là file
+>      lớn nhất dự án): 3 chỗ `missingDays` mark "đã phủ" trước khi biết batch đọc được cột hay không
+>      (dữ liệu thiếu bị đọc thành 0 mà không cảnh báo); `liveUnits.ts` đếm cả ca chưa diễn ra vào
+>      Report Chuyên Sâu (sai đúng ở tháng mặc định khi mở trang); CTOR ở `creatorLivePerfMetrics.ts`
+>      dùng `orders` thay vì đúng định nghĩa TikTok (`skuOrders`) khiến Report Tháng gửi brand và Report
+>      Chuyên Sâu nội bộ hiện 2 số CTOR khác nhau cho cùng một tháng.
+>    - **Tài chính & nhân sự**: `HostPerformance.tsx` mặc định "đến ngày" bằng
+>      `new Date().toISOString().slice(0,10)` — đúng anti-pattern `dateUtils.ts` đã cảnh báo tên riêng,
+>      KHÔNG dormant (chạy trên mọi múi giờ kể cả VN, khác bug LiveCalendar).
+>    - **Hệ thống**: không tìm thấy lỗi (đọc kỹ vì có bề mặt bảo mật — đổi mật khẩu, phân quyền).
+>
+>    Tất cả đã commit riêng từng module (`25536e8`/`28a4bc4`/`55d9af6`/`d52704f`), WORKSPACE_DESIGN.md
+>    đã cập nhật chi tiết ở mục `## Audit toàn diện code base (2026-09-23)` cho từng module — kể cả
+>    những chỗ đã soát kỹ và XÁC NHẬN ĐÚNG (không phải bug), không chỉ những chỗ có sửa. Một khoảng
+>    trống liên quan đã GHI LẠI nhưng CHƯA sửa (out of scope đợt này): `present` tracking trong
+>    `deepDiveSource.ts` cùng họ lỗi với `missingDays` nhưng đường sửa đúng tốn công hơn nhiều.
 
 
 1. ~~Chạy `0111_signup_role_and_null_role_guard.sql`~~ + ~~tắt "Allow new users to sign up"~~ — **XONG, verify 2026-09-23**: `GET /auth/v1/settings` → `disable_signup: true`; `POST /auth/v1/signup` (kèm `data:{"role":"ceo"}`) → `422 signup_disabled`, không tạo ra tài khoản nào. Cổng tự phong role đã đóng ở lớp ngoài cùng. Phần SQL (trigger + 11 policy) đã re-verify được bằng `pg_policy`/`pg_proc` qua Supabase SQL Editor (2026-09-23) — phát hiện 0111 vá SÓT 7/10 policy, đã vá tiếp bằng **0112**, verify lại ra 0 dòng hở. Xem đoạn "Verify lại phần SQL bằng pg_policy" trong mục `## BẢO MẬT — tự phong role`.
@@ -367,8 +376,28 @@ wiring props `TalentMatcher`/`BrandCommitment` đủ, không thiếu dây.
 Verify: `tsc`/`eslint` trên file đã sửa 0 lỗi, `vitest` 38/38 xanh, browser smoke test không lỗi console
 (chỉ nhiễu HMV WebSocket đã biết).
 
-**Phần 2 còn lại chưa audit** (theo module): Hệ thống (UserRoleSettings / AccountSettings / Header /
-notification / theme).
+**Phần 2 — module Hệ thống: XONG 2026-09-25**, đọc code `UserRoleSettings.tsx` (1100 dòng) /
+`AccountSettings.tsx` / `Header.tsx` / `NotificationBell.tsx` / `useNotifications.tsx` / `useTheme.tsx`
+/ `lib/brandTheme.ts` / `lib/db/notifications.ts`, kèm `hooks/useAuth.tsx` (không nằm trong 5 file gốc
+nhưng `AccountSettings.tsx` — đổi mật khẩu/reauthenticate — phụ thuộc trực tiếp, và đây là bề mặt bảo
+mật nên đọc kỹ). **Không tìm thấy lỗi** — module cuối cùng của Phần 2, không sửa gì.
+
+Điểm đã soát kỹ vì tính nhạy cảm bảo mật, xác nhận ĐÚNG: `UserRoleSettings.handleToggleUserPermissionOverride`
+chặn đúng user đang đăng nhập tự tắt `manage_users_permissions` của chính mình qua override (FIX L6,
+đã có từ trước); `useAuth.reauthenticate` xác minh lại mật khẩu hiện tại bằng `signInWithPassword` (không
+tạo phiên thứ hai) trước khi cho đổi mật khẩu mới; `AccountSettings` không lưu mật khẩu ở đâu ngoài state
+tạm hiện 1 lần (đúng model đã có ở TalentMatcher — mật khẩu ngẫu nhiên cho talent mới). Riêng
+`handleToggleRolePermission` (toggle Ma Trận ở CẤP ROLE, khác override CẤP USER) không có guard tương tự
+trong chính hàm — chỉ chặn ở UI (nút bị vô hiệu qua `isCEO` check, dòng 521/526) — nhưng xác nhận đây
+KHÔNG phải lỗ hổng quan sát được: hàm chỉ có đúng 1 nơi gọi (nút đó), nút đó thật sự bị khoá, nên không
+có đường nào trong UI khiến ceo/admin tự khoá quyền của role mình qua lối này; bất đối xứng so với
+guard-ở-handler của override cấp user là khác mức độ cẩn trọng, không phải hành vi sai.
+
+Khác: mọi chỗ dựng `Date` (relTime trong NotificationBell, v.v.) đều đọc từ ISO timestamp đầy đủ (có giờ
+thật từ Postgres, không phải chuỗi "YYYY-MM-DD" trần) nên không dính lớp lỗi UTC/local đã thấy ở các
+module trước; wiring props `App.tsx` → cả 4 component đều đủ.
+
+Verify: `tsc --noEmit` xanh, `npm test` 38/38 xanh (không sửa gì nên không cần chạy lại `eslint`).
 
 ## Chạy thử TOÀN BỘ workflow trên app thật (2026-09-24) — 12 điểm đứt gãy, ĐÃ SỬA CẢ 12
 
