@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { BrainCircuit, RefreshCw, RotateCcw, Save, ShieldAlert, CheckCircle2 } from "lucide-react";
 import { AiAgentPrompt } from "../types";
+import { errorMessage } from "../lib/errorMessage";
 
 interface AiTrainingCenterProps {
   prompts: AiAgentPrompt[];
@@ -43,8 +44,8 @@ export const AiTrainingCenter: React.FC<AiTrainingCenterProps> = ({ prompts, loa
       await onUpdate(agentKey, draft);
       setSavedKey(agentKey);
       setTimeout(() => setSavedKey((k) => (k === agentKey ? null : k)), 2000);
-    } catch (e: any) {
-      window.alert(`Không thể lưu system prompt: ${e.message ?? e}`);
+    } catch (e) {
+      window.alert(`Không thể lưu system prompt: ${errorMessage(e)}`);
     } finally {
       setSavingKey(null);
     }

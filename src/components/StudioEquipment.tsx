@@ -522,7 +522,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
                   <label className="font-bold text-[var(--text-muted)] block mb-1">Trạng Thái</label>
                   <select
                     value={studioStatus}
-                    onChange={(e) => setStudioStatus(e.target.value as any)}
+                    onChange={(e) => setStudioStatus(e.target.value as "Live Now" | "Booked" | "Available" | "Maintenance")}
                     className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
                   >
                     <option value="Available">Available (Trống)</option>
@@ -629,7 +629,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
                   <label className="font-bold text-[var(--text-muted)] block mb-1">Loại Thiết Bị</label>
                   <select
                     value={eqCategory}
-                    onChange={(e) => setEqCategory(e.target.value as any)}
+                    onChange={(e) => setEqCategory(e.target.value as "Camera" | "Lighting" | "Audio" | "PC/Switcher" | "Teleprompter")}
                     className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
                   >
                     <option value="Camera">Camera</option>
@@ -643,7 +643,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
                   <label className="font-bold text-[var(--text-muted)] block mb-1">Trạng Thái Kho</label>
                   <select
                     value={eqStatus}
-                    onChange={(e) => setEqStatus(e.target.value as any)}
+                    onChange={(e) => setEqStatus(e.target.value as "In Use" | "In Stock" | "Maintenance" | "Damaged")}
                     className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
                   >
                     <option value="In Stock">In Stock (Trong Kho)</option>

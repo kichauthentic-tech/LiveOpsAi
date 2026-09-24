@@ -15,6 +15,7 @@ import { getTodayMonth } from "../../lib/dateUtils";
 import { fetchMonthlyReport, upsertMonthlyReport, publishMonthlyReport, unpublishMonthlyReport } from "../../lib/db/monthlyReports";
 import { MonthlyReportTabs } from "./MonthlyReportTabs";
 import { BrandWeeklyReport } from "./BrandWeeklyReport";
+import { errorMessage } from "../../lib/errorMessage";
 
 // Report Tuần không còn là tab riêng ở menu (2026-08-23) — gộp làm chế độ xem "Tuần" ngay trong
 // Report Tháng qua toggle bên dưới, tái dùng nguyên BrandWeeklyReport.tsx (đã tự chặn quyền qua
@@ -107,12 +108,12 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
       const published = await publishMonthlyReport(row.id, unreconciledSessions.length > 0 && confirmForce);
       setReport(published);
       setConfirmForce(false);
-    } catch (e: any) {
-      const msg: string = e.message || "";
+    } catch (e) {
+      const msg = errorMessage(e, "Phát hành thất bại");
       if (msg.includes("unreconciled_sessions")) {
         setErrorMsg("Vẫn còn session chưa đối soát trong kỳ — tick xác nhận rủi ro để phát hành, hoặc đối soát trước.");
       } else {
-        setErrorMsg(msg || "Phát hành thất bại");
+        setErrorMsg(msg);
       }
     } finally {
       setPublishing(false);
@@ -127,8 +128,8 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
     try {
       const draft = await unpublishMonthlyReport(report.id);
       setReport(draft);
-    } catch (e: any) {
-      setErrorMsg(e.message || "Thu hồi thất bại");
+    } catch (e) {
+      setErrorMsg(errorMessage(e, "Thu hồi thất bại"));
     } finally {
       setPublishing(false);
     }

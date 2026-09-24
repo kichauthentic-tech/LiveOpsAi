@@ -3,6 +3,24 @@ import { Talent, Brand, UserRole, LiveSession } from "../types";
 import { Users, Sparkles, Award, Search, Plus, Edit3, Trash2, X, Phone, Loader2, AlertTriangle, KeyRound } from "lucide-react";
 import { authedFetch } from "../lib/authedFetch";
 import { computeTalentRealTotals } from "../lib/metrics/avgGmv";
+import { errorMessage } from "../lib/errorMessage";
+
+// Vài bản ghi talent cũ (trước khi field chuẩn hoá về `niches`/`avatar`/`ratePerSession`) có thể
+// còn lưu dưới tên cột cũ — đọc dự phòng, không phải lỗi kiểu dữ liệu.
+interface LegacyTalentAliases {
+  niche?: string[] | string;
+  avatarUrl?: string;
+  rateCardFee?: number;
+}
+const legacyTalentFields = (t: Talent): LegacyTalentAliases => t as unknown as LegacyTalentAliases;
+
+interface TalentMatchResult {
+  talentId: string;
+  name: string;
+  matchScore: number;
+  predictedGmv: string;
+  reasoning: string;
+}
 
 export interface NewTalentAccountPayload {
   name: string;
@@ -51,7 +69,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
   const canSeeRate = currentRole === "ceo" || currentRole === "admin";
   const [selectedBrandId, setSelectedBrandId] = useState("brand-1");
   const [targetCategory, setTargetCategory] = useState("Mỹ phẩm Skincare");
-  const [matchingResults, setMatchingResults] = useState<any[] | null>(null);
+  const [matchingResults, setMatchingResults] = useState<TalentMatchResult[] | null>(null);
   const [isMatching, setIsMatching] = useState(false);
   // FIX L1 (audit 2026-08-21): server trả isMock khi chưa cấu hình GEMINI_API_KEY, nhưng nhánh
   // thành công trước đây bỏ qua cờ này — hiện y hệt kết quả AI thật. Theo dõi riêng để hiện banner
@@ -130,7 +148,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
     setFormNickname(t.nickname ?? "");
     setFormRole(t.role || "Host");
     setFormGender(t.gender || "Nữ");
-    const nicheArr = t.niches || (t as any).niche || [];
+    const nicheArr = t.niches || legacyTalentFields(t).niche || [];
     setFormNiches(Array.isArray(nicheArr) ? nicheArr.join(", ") : String(nicheArr));
     // Không điền số demo thay cho 0 (bug thời mock: talent thật rate = 0 mở form là thấy 5tr/live,
     // 3.5% hoa hồng, GMV 150tr, điểm 90 — bấm Lưu là ghi thẳng vào DB). 0 là 0.
@@ -144,7 +162,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
     setFormCommission(t.commissionRate || 0);
     setFormScore(t.overallScore || 0);
     setFormPhone(t.phone || "");
-    setFormAvatar(t.avatar || (t as any).avatarUrl || "");
+    setFormAvatar(t.avatar || legacyTalentFields(t).avatarUrl || "");
     setFormStatus(t.availabilityStatus || "Available");
     setIsModalOpen(true);
   };
@@ -188,8 +206,9 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
       return;
     }
 
-    // Tạo mới — luôn kèm tạo account thật (mật khẩu mặc định 000000), không còn tạo hồ sơ
-    // Talent Pool đứng một mình nữa. Gọi server thật nên cần chờ + hiện lỗi nếu email trùng...
+    // Tạo mới — luôn kèm tạo account thật (server tự sinh mật khẩu ngẫu nhiên, xem
+    // handleCreateTalentAccount/App.tsx), không còn tạo hồ sơ Talent Pool đứng một mình nữa.
+    // Gọi server thật nên cần chờ + hiện lỗi nếu email trùng...
     if (!formEmail.trim()) return;
     setCreateAccountError(null);
     setIsCreatingAccount(true);
@@ -209,8 +228,8 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
         }
       }
       setIsModalOpen(false);
-    } catch (err: any) {
-      setCreateAccountError(err?.message ?? "Không thể tạo tài khoản Talent mới.");
+    } catch (err) {
+      setCreateAccountError(errorMessage(err, "Không thể tạo tài khoản Talent mới."));
     } finally {
       setIsCreatingAccount(false);
     }
@@ -249,7 +268,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
         // phải điểm "phù hợp với brand này" như AI thật tính, nhưng ít nhất là tín hiệu thật của
         // đúng talent đó, không phải thứ tự ngẫu nhiên từ API trả về.
         const matchScore = t.overallScore || 0;
-        const nicheArr = t.niches || (t as any).niche || [];
+        const nicheArr = t.niches || legacyTalentFields(t).niche || [];
         const nicheStr = Array.isArray(nicheArr) ? nicheArr.join(", ") : String(nicheArr || "Đa ngành");
         return {
           talentId: t.id,
@@ -400,10 +419,10 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
         {/* Talent Cards Grid */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredTalents.map((t) => {
-            const nicheArr = t.niches || (t as any).niche || [];
+            const nicheArr = t.niches || legacyTalentFields(t).niche || [];
             const nicheStr = Array.isArray(nicheArr) ? nicheArr.join(", ") : String(nicheArr || "Đa ngành");
-            const avatar = t.avatar || (t as any).avatarUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250";
-            const rate = t.ratePerSession || (t as any).rateCardFee || 0;
+            const avatar = t.avatar || legacyTalentFields(t).avatarUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250";
+            const rate = t.ratePerSession || legacyTalentFields(t).rateCardFee || 0;
             const real = computeTalentRealTotals(sessions, t.id);
 
             return (
@@ -560,7 +579,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                   <label className="font-bold text-[var(--text-muted)] block mb-1">Vai Trò</label>
                   <select
                     value={formRole}
-                    onChange={(e) => setFormRole(e.target.value as any)}
+                    onChange={(e) => setFormRole(e.target.value as Talent["role"])}
                     className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
                   >
                     <option value="Host">Host</option>
@@ -583,7 +602,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                   <label className="font-bold text-[var(--text-muted)] block mb-1">Trạng Thái</label>
                   <select
                     value={formStatus}
-                    onChange={(e) => setFormStatus(e.target.value as any)}
+                    onChange={(e) => setFormStatus(e.target.value as "Available" | "Busy" | "On Live")}
                     className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
                   >
                     <option value="Available">Sẵn Sàng (Available)</option>

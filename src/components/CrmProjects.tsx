@@ -304,7 +304,7 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
                   <label className="font-bold text-[var(--text-muted)] block mb-1">Trạng Thái Hợp Đồng</label>
                   <select
                     value={brandContractStatus}
-                    onChange={(e) => setBrandContractStatus(e.target.value as any)}
+                    onChange={(e) => setBrandContractStatus(e.target.value as "Active" | "Pending" | "Completed")}
                     className="w-full p-2.5 border border-[var(--border)] rounded-xl font-semibold bg-[var(--surface-base)] text-[var(--text)]"
                   >
                     <option value="Active">Active (Đang Chạy)</option>

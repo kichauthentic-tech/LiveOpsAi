@@ -514,7 +514,7 @@ export default function App() {
       setEngineParamsLoading(true);
       fetchEngineParams()
         .then((r) => { if (cancelled) return; setEngineParams(r.params); setEngineParamsUpdatedAt(r.updatedAt); setEngineParamsError(null); })
-        .catch((e) => { if (!cancelled) setEngineParamsError(`Không tải được tham số engine (dùng mặc định): ${e.message ?? e}`); })
+        .catch((e) => { if (!cancelled) setEngineParamsError(`Không tải được tham số engine (dùng mặc định): ${errorMessage(e)}`); })
         .finally(() => { if (!cancelled) setEngineParamsLoading(false); });
     }
     Promise.all([fetchBrandPlatformRates(), fetchShiftSlots(), fetchShiftRegistrations(), fetchRecurringShiftTemplates(), fetchLockedPlanTargets().catch(() => ({ bySlotId: new Map<string, number>(), monthTotals: new Map<string, number>() })), fetchBrandStudios().catch(() => [] as BrandStudio[])])
@@ -672,8 +672,8 @@ export default function App() {
         const others = prev.filter((f) => f.sessionId !== sessionId);
         return [...others, updated];
       });
-    } catch (e: any) {
-      window.alert(`Không thể cập nhật Finance & HR: ${e.message ?? e}`);
+    } catch (e) {
+      window.alert(`Không thể cập nhật Finance & HR: ${errorMessage(e)}`);
     }
   }
 
@@ -684,8 +684,8 @@ export default function App() {
         const others = prev.filter((f) => f.sessionId !== sessionId);
         return [...others, updated];
       });
-    } catch (e: any) {
-      window.alert(`Không thể cập nhật trạng thái duyệt: ${e.message ?? e}`);
+    } catch (e) {
+      window.alert(`Không thể cập nhật trạng thái duyệt: ${errorMessage(e)}`);
     }
   }
 
@@ -924,8 +924,8 @@ export default function App() {
         details: `Thay đổi cấu hình quyền truy cập tính năng cho các vai trò trong hệ thống.`,
         category: "Permission Change"
       });
-    } catch (e: any) {
-      window.alert(`Không thể lưu Ma Trận Phân Quyền: ${e.message ?? e}`);
+    } catch (e) {
+      window.alert(`Không thể lưu Ma Trận Phân Quyền: ${errorMessage(e)}`);
     }
   };
 
@@ -939,8 +939,8 @@ export default function App() {
         details: `Đã gửi lời mời tạo tài khoản ${newUser.name} (${newUser.email}) với role ${newUser.role.toUpperCase()}`,
         category: "User Status"
       });
-    } catch (e: any) {
-      window.alert(`Không thể tạo tài khoản: ${e.message ?? e}`);
+    } catch (e) {
+      window.alert(`Không thể tạo tài khoản: ${errorMessage(e)}`);
       throw e;
     }
   };
@@ -954,8 +954,8 @@ export default function App() {
         details: `Chỉnh sửa tài khoản ${updatedUser.name} (${updatedUser.email})`,
         category: "User Status"
       });
-    } catch (e: any) {
-      window.alert(`Không thể cập nhật tài khoản: ${e.message ?? e}`);
+    } catch (e) {
+      window.alert(`Không thể cập nhật tài khoản: ${errorMessage(e)}`);
       throw e;
     }
   };
@@ -972,8 +972,8 @@ export default function App() {
           category: "User Status"
         });
       }
-    } catch (e: any) {
-      window.alert(`Không thể xóa tài khoản: ${e.message ?? e}`);
+    } catch (e) {
+      window.alert(`Không thể xóa tài khoản: ${errorMessage(e)}`);
     }
   };
 
@@ -1026,8 +1026,8 @@ export default function App() {
       if (patch.ratePerSession !== undefined || patch.ratePerHour !== undefined || patch.assistantRatePerHour !== undefined || patch.commissionRate !== undefined) {
         setTalentRateHistory(await fetchTalentRateHistory());
       }
-    } catch (e: any) {
-      window.alert(`Không thể cập nhật Talent: ${e.message ?? e}`);
+    } catch (e) {
+      window.alert(`Không thể cập nhật Talent: ${errorMessage(e)}`);
     }
   };
   // Talent tự sửa hồ sơ của mình — cố ý KHÔNG bọc try/catch như handleUpdateTalent: lỗi phải
@@ -1040,8 +1040,8 @@ export default function App() {
     try {
       await deleteTalent(id);
       setTalents(prev => prev.filter(t => t.id !== id));
-    } catch (e: any) {
-      window.alert(`Không thể xóa Talent: ${e.message ?? e}`);
+    } catch (e) {
+      window.alert(`Không thể xóa Talent: ${errorMessage(e)}`);
     }
   };
 
@@ -1050,24 +1050,24 @@ export default function App() {
     try {
       const created = await createStudio(newStudio);
       setStudios(prev => [created, ...prev]);
-    } catch (e: any) {
-      window.alert(`Không thể tạo Studio: ${e.message ?? e}`);
+    } catch (e) {
+      window.alert(`Không thể tạo Studio: ${errorMessage(e)}`);
     }
   };
   const handleUpdateStudio = async (updatedStudio: Studio) => {
     try {
       const saved = await updateStudio(updatedStudio);
       setStudios(prev => prev.map(s => s.id === saved.id ? saved : s));
-    } catch (e: any) {
-      window.alert(`Không thể cập nhật Studio: ${e.message ?? e}`);
+    } catch (e) {
+      window.alert(`Không thể cập nhật Studio: ${errorMessage(e)}`);
     }
   };
   const handleDeleteStudio = async (id: string) => {
     try {
       await deleteStudio(id);
       setStudios(prev => prev.filter(s => s.id !== id));
-    } catch (e: any) {
-      window.alert(`Không thể xóa Studio: ${e.message ?? e}`);
+    } catch (e) {
+      window.alert(`Không thể xóa Studio: ${errorMessage(e)}`);
     }
   };
 
@@ -1076,14 +1076,14 @@ export default function App() {
     try {
       const created = await createEquipment(newEquipment);
       setEquipments(prev => [created, ...prev]);
-    } catch (e: any) {
+    } catch (e) {
       // Race hiếm: 2 người cùng thêm thiết bị trùng mã QR giữa lúc StudioEquipment đã kiểm tra
       // trùng ở state cục bộ và lúc insert thật chạy tới DB — DB vẫn là nguồn chặn trùng cuối
       // cùng (qr_code unique, 0001_init.sql). Dịch lỗi Postgres thô thành thông báo dễ hiểu (M7).
-      if (e?.code === "23505") {
+      if (typeof e === "object" && e !== null && "code" in e && (e as { code?: string }).code === "23505") {
         window.alert(`Mã QR "${newEquipment.qrCode}" vừa bị thiết bị khác dùng mất — vui lòng đổi mã khác rồi thử lại.`);
       } else {
-        window.alert(`Không thể tạo thiết bị: ${e.message ?? e}`);
+        window.alert(`Không thể tạo thiết bị: ${errorMessage(e)}`);
       }
     }
   };
@@ -1091,16 +1091,16 @@ export default function App() {
     try {
       const saved = await updateEquipment(updatedEquipment);
       setEquipments(prev => prev.map(e => e.id === saved.id ? saved : e));
-    } catch (e: any) {
-      window.alert(`Không thể cập nhật thiết bị: ${e.message ?? e}`);
+    } catch (e) {
+      window.alert(`Không thể cập nhật thiết bị: ${errorMessage(e)}`);
     }
   };
   const handleDeleteEquipment = async (id: string) => {
     try {
       await deleteEquipment(id);
       setEquipments(prev => prev.filter(e => e.id !== id));
-    } catch (e: any) {
-      window.alert(`Không thể xóa thiết bị: ${e.message ?? e}`);
+    } catch (e) {
+      window.alert(`Không thể xóa thiết bị: ${errorMessage(e)}`);
     }
   };
 
@@ -1109,24 +1109,24 @@ export default function App() {
     try {
       const created = await createBrand(newBrand);
       setBrands(prev => [created, ...prev]);
-    } catch (e: any) {
-      window.alert(`Không thể tạo Brand: ${e.message ?? e}`);
+    } catch (e) {
+      window.alert(`Không thể tạo Brand: ${errorMessage(e)}`);
     }
   };
   const handleUpdateBrand = async (updatedBrand: Brand) => {
     try {
       const saved = await updateBrand(updatedBrand);
       setBrands(prev => prev.map(b => b.id === saved.id ? saved : b));
-    } catch (e: any) {
-      window.alert(`Không thể cập nhật Brand: ${e.message ?? e}`);
+    } catch (e) {
+      window.alert(`Không thể cập nhật Brand: ${errorMessage(e)}`);
     }
   };
   const handleDeleteBrand = async (id: string) => {
     try {
       await deleteBrand(id);
       setBrands(prev => prev.filter(b => b.id !== id));
-    } catch (e: any) {
-      window.alert(`Không thể xóa Brand: ${e.message ?? e}`);
+    } catch (e) {
+      window.alert(`Không thể xóa Brand: ${errorMessage(e)}`);
     }
   };
 
@@ -1138,8 +1138,8 @@ export default function App() {
       const saved = await updateSession(updatedSession);
       setSessions(prev => prev.map(s => s.id === saved.id ? saved : s));
       return true;
-    } catch (e: any) {
-      window.alert(`Không thể cập nhật Live Session: ${e.message ?? e}`);
+    } catch (e) {
+      window.alert(`Không thể cập nhật Live Session: ${errorMessage(e)}`);
       return false;
     }
   };
@@ -1148,8 +1148,8 @@ export default function App() {
       const saved = await submitSessionReport(sessionId, input);
       setSessions((prev) => prev.map((s) => (s.id === saved.id ? saved : s)));
       return true;
-    } catch (e: any) {
-      window.alert(`Không thể lưu report ca live: ${e.message ?? e}`);
+    } catch (e) {
+      window.alert(`Không thể lưu report ca live: ${errorMessage(e)}`);
       return false;
     }
   };
@@ -1168,8 +1168,8 @@ export default function App() {
       setSessions((prev) => prev.filter((s) => s.id !== id));
       // 0097: trigger DB đã trả slot đã chốt về 'open' — đồng bộ lại state slot.
       setShiftSlots((prev) => prev.map((sl) => (sl.sessionId === id ? { ...sl, status: "open", sessionId: undefined } : sl)));
-    } catch (e: any) {
-      window.alert(`Không thể xóa Live Session: ${e.message ?? e}`);
+    } catch (e) {
+      window.alert(`Không thể xóa Live Session: ${errorMessage(e)}`);
     }
   };
   // Huỷ ca (0097): RPC đổi ca + slot trong 1 transaction; trigger 0083 tự báo host/trợ nếu ca chưa diễn ra.
@@ -1189,8 +1189,8 @@ export default function App() {
         )
       );
       return true;
-    } catch (e: any) {
-      window.alert(`Không huỷ được ca: ${e.message ?? e}`);
+    } catch (e) {
+      window.alert(`Không huỷ được ca: ${errorMessage(e)}`);
       return false;
     }
   };
@@ -1226,8 +1226,8 @@ export default function App() {
       const created = await createShiftSlot(slot);
       setShiftSlots((prev) => [...prev, created]);
       return true;
-    } catch (e: any) {
-      window.alert(`Không thể mở ca mới: ${e.message ?? e}`);
+    } catch (e) {
+      window.alert(`Không thể mở ca mới: ${errorMessage(e)}`);
       return false;
     }
   };
@@ -1237,8 +1237,8 @@ export default function App() {
       await deleteShiftSlot(id);
       setShiftSlots((prev) => prev.filter((s) => s.id !== id));
       setShiftRegistrations((prev) => prev.filter((r) => r.slotId !== id));
-    } catch (e: any) {
-      window.alert(`Không thể xoá ca: ${e.message ?? e}`);
+    } catch (e) {
+      window.alert(`Không thể xoá ca: ${errorMessage(e)}`);
     }
   };
 
@@ -1247,8 +1247,8 @@ export default function App() {
       const created = await createRecurringShiftTemplate(t);
       setRecurringShiftTemplates((prev) => [...prev, created]);
       return true;
-    } catch (e: any) {
-      window.alert(`Không thể tạo quy tắc lặp: ${e.message ?? e}`);
+    } catch (e) {
+      window.alert(`Không thể tạo quy tắc lặp: ${errorMessage(e)}`);
       return false;
     }
   };
@@ -1258,8 +1258,8 @@ export default function App() {
       const updated = await updateRecurringShiftTemplate({ ...t, active: !t.active });
       setRecurringShiftTemplates((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
       return true;
-    } catch (e: any) {
-      window.alert(`Không thể cập nhật quy tắc lặp: ${e.message ?? e}`);
+    } catch (e) {
+      window.alert(`Không thể cập nhật quy tắc lặp: ${errorMessage(e)}`);
       return false;
     }
   };
@@ -1268,8 +1268,8 @@ export default function App() {
     try {
       await deleteRecurringShiftTemplate(id);
       setRecurringShiftTemplates((prev) => prev.filter((t) => t.id !== id));
-    } catch (e: any) {
-      window.alert(`Không thể xoá quy tắc lặp: ${e.message ?? e}`);
+    } catch (e) {
+      window.alert(`Không thể xoá quy tắc lặp: ${errorMessage(e)}`);
     }
   };
 
@@ -1281,8 +1281,8 @@ export default function App() {
       setShiftSlots(slots);
       setPlanTargetsBySlotId(planTargets.bySlotId);
       setPlanMonthTotals(planTargets.monthTotals);
-    } catch (e: any) {
-      window.alert(`Không nạp lại được danh sách ca: ${e.message ?? e}`);
+    } catch (e) {
+      window.alert(`Không nạp lại được danh sách ca: ${errorMessage(e)}`);
     }
   };
 
@@ -1291,8 +1291,8 @@ export default function App() {
       const created = await registerForSlot(slotId, talentId);
       setShiftRegistrations((prev) => [...prev, created]);
       return true;
-    } catch (e: any) {
-      window.alert(`Không thể đăng ký ca: ${e.message ?? e}`);
+    } catch (e) {
+      window.alert(`Không thể đăng ký ca: ${errorMessage(e)}`);
       return false;
     }
   };
@@ -1302,8 +1302,8 @@ export default function App() {
       await unregisterFromSlot(slotId, talentId);
       setShiftRegistrations((prev) => prev.filter((r) => !(r.slotId === slotId && r.talentId === talentId)));
       return true;
-    } catch (e: any) {
-      window.alert(`Không thể huỷ đăng ký: ${e.message ?? e}`);
+    } catch (e) {
+      window.alert(`Không thể huỷ đăng ký: ${errorMessage(e)}`);
       return false;
     }
   };
@@ -1316,8 +1316,8 @@ export default function App() {
         return studioId ? [...next, { brandId, platform, studioId }] : next;
       });
       return true;
-    } catch (e: any) {
-      window.alert(`Không lưu được phòng mặc định: ${e.message ?? e}`);
+    } catch (e) {
+      window.alert(`Không lưu được phòng mặc định: ${errorMessage(e)}`);
       return false;
     }
   };
@@ -1339,8 +1339,8 @@ export default function App() {
       // tới khi F5 (audit H1).
       setBrandPlatformRateHistory(await fetchBrandPlatformRateHistory());
       return true;
-    } catch (e: any) {
-      window.alert(`Không thể lưu rate: ${e.message ?? e}`);
+    } catch (e) {
+      window.alert(`Không thể lưu rate: ${errorMessage(e)}`);
       return false;
     }
   };
@@ -1359,8 +1359,8 @@ export default function App() {
       // Cùng lý do với handleSaveBrandPlatformRate ở trên (audit H1).
       setBrandPlatformRateHistory(await fetchBrandPlatformRateHistory());
       return true;
-    } catch (e: any) {
-      window.alert(`Không thể lưu tỷ lệ hoàn hủy: ${e.message ?? e}`);
+    } catch (e) {
+      window.alert(`Không thể lưu tỷ lệ hoàn hủy: ${errorMessage(e)}`);
       return false;
     }
   };
@@ -1432,7 +1432,7 @@ export default function App() {
       setSessions((prev) => [created!, ...prev]);
       setShiftSlots((prev) => prev.map((s) => (s.id === updatedSlot.id ? updatedSlot : s)));
       return true;
-    } catch (e: any) {
+    } catch (e) {
       if (created) {
         try {
           await deleteSession(created.id);
@@ -1440,7 +1440,7 @@ export default function App() {
           // Rollback thất bại — session mồ côi vẫn còn trong DB, nhưng không nuốt lỗi gốc bên dưới.
         }
       }
-      window.alert(`Không thể chốt lịch: ${e.message ?? e}`);
+      window.alert(`Không thể chốt lịch: ${errorMessage(e)}`);
       return false;
     }
   };
@@ -1450,24 +1450,24 @@ export default function App() {
     try {
       const created = await createWorkflowRule(newRule);
       setWorkflowRules(prev => [created, ...prev]);
-    } catch (e: any) {
-      window.alert(`Không thể tạo Workflow Rule: ${e.message ?? e}`);
+    } catch (e) {
+      window.alert(`Không thể tạo Workflow Rule: ${errorMessage(e)}`);
     }
   };
   const handleUpdateWorkflowRule = async (updatedRule: WorkflowRule) => {
     try {
       const saved = await updateWorkflowRule(updatedRule);
       setWorkflowRules(prev => prev.map(r => r.id === saved.id ? saved : r));
-    } catch (e: any) {
-      window.alert(`Không thể cập nhật Workflow Rule: ${e.message ?? e}`);
+    } catch (e) {
+      window.alert(`Không thể cập nhật Workflow Rule: ${errorMessage(e)}`);
     }
   };
   const handleDeleteWorkflowRule = async (id: string) => {
     try {
       await deleteWorkflowRule(id);
       setWorkflowRules(prev => prev.filter(r => r.id !== id));
-    } catch (e: any) {
-      window.alert(`Không thể xóa Workflow Rule: ${e.message ?? e}`);
+    } catch (e) {
+      window.alert(`Không thể xóa Workflow Rule: ${errorMessage(e)}`);
     }
   };
 

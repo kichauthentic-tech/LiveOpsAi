@@ -5,6 +5,7 @@ import { User, Phone, Cake, Mail, Loader2, Lock, ShieldAlert, Award, Wallet, Che
 import { computeRealAvgGmvPerSession } from "../lib/metrics/avgGmv";
 import { computeTalentMonthlyIncome } from "../lib/pnl";
 import { todayVn } from "../lib/performance/brandCommitment";
+import { errorMessage } from "../lib/errorMessage";
 
 interface MyTalentProfileProps {
   activeUser: SystemUser;
@@ -87,8 +88,8 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
     try {
       await onSaveMyProfile({ phone, avatar, dateOfBirth: dateOfBirth || undefined });
       setProfileMessage({ type: "ok", text: "Đã cập nhật hồ sơ." });
-    } catch (e: any) {
-      setProfileMessage({ type: "err", text: e.message ?? "Không thể cập nhật hồ sơ." });
+    } catch (e) {
+      setProfileMessage({ type: "err", text: errorMessage(e, "Không thể cập nhật hồ sơ.") });
     } finally {
       setSavingProfile(false);
     }

@@ -6,6 +6,7 @@ import { buildHistory } from "../lib/scheduling/suggestEngine";
 import { buildCalibration, evaluatePlan } from "../lib/scheduling/planEvaluation";
 import { fetchBrandLockedPlanSlots, fetchCalendarEvents } from "../lib/db/monthPlans";
 import { todayVn } from "../lib/performance/brandCommitment";
+import { errorMessage } from "../lib/errorMessage";
 import { formatCurrencyAdaptive } from "../lib/formatCurrency";
 
 // AI Training Center — mục "Engine Kế Hoạch Tháng". Engine là thuật toán thuần, không phải LLM: không
@@ -80,8 +81,8 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
       await onSave(draft);
       setDirty(false);
       setMsg("Đã lưu — gợi ý lần sau dùng tham số này.");
-    } catch (e: any) {
-      setMsg(`Không lưu được: ${e.message ?? e}`);
+    } catch (e) {
+      setMsg(`Không lưu được: ${errorMessage(e)}`);
     } finally {
       setSaving(false);
     }

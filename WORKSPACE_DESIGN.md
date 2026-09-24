@@ -3,8 +3,8 @@
 ## CẦN LÀM NGAY khi mở phiên mới (cập nhật 2026-09-24)
 
 > **VIỆC ĐANG TREO — bàn giao 2026-09-24, cập nhật lại cùng ngày sau khi merge + verify Đ7/Đ9 + vá
-> ưu tiên #3 + gỡ dây nối CRUD chiến dịch chết ở LiveCalendar (đọc mục này trước danh sách dưới; mục
-> 1–4 đã xong, còn 3 mục treo).** Xếp theo thứ tự nên làm:
+> ưu tiên #3 + gỡ dây nối CRUD chiến dịch chết ở LiveCalendar + vá sạch 93 warning `no-explicit-any`
+> (đọc mục này trước danh sách dưới; mục 1–5 đã xong, còn 2 mục treo).** Xếp theo thứ tự nên làm:
 >
 > 1. ~~Merge nhánh về `main`~~ — **XONG 2026-09-24**: `git merge --ff-only audit/workflow-12-diem-dut-gay`
 >    rồi `git push origin main`, `main` giờ ở `45fe3af` (trước đó `f4e692e`, chậm 3 commit `d45529d` /
@@ -73,8 +73,37 @@
 >    không đụng tới, vẫn hoạt động như cũ. `tsc --noEmit` / `eslint` (93 warning cũ, 0 lỗi mới) /
 >    `vitest` (38/38) đều xanh; app khởi động lại bình thường trong Browser pane, không lỗi console
 >    ngoài WebSocket HMR đã biết.
-> 5. **93 warning `no-explicit-any`** (App.tsx 36, createApp.ts 18) — một đợt refactor riêng, chủ yếu
->    handler Express + payload Excel. Đang để `warn` nên không chặn CI.
+> 5. ~~93 warning `no-explicit-any`~~ — **XONG 2026-09-24.** `eslint .` giờ 0 lỗi/0 warning (trước:
+>    93, App.tsx 36 + createApp.ts 18 + 15 file khác 1–10 mỗi file). Không tắt rule/không nới
+>    `tsconfig` — sửa từng chỗ theo đúng shape thật:
+>    - **`catch (e: any) { ... e.message ?? e ... }`** (đa số, ~60 chỗ khắp App.tsx/createApp.ts/
+>      nhiều component brand-workspace): đổi `catch (e)` (mặc định `unknown` vì `strict: true` →
+>      `useUnknownInCatchVariables`), đọc message qua `errorMessage(e)` — hàm dùng chung đã có sẵn ở
+>      [errorMessage.ts](src/lib/errorMessage.ts) (đúng ý nghĩa comment đầu file: "Mọi chỗ bắt lỗi của
+>      tầng dữ liệu phải đi qua hàm này" — trước đó nhiều component tự viết lại `e.message ?? e` thay
+>      vì gọi hàm sẵn có). **Cẩn thận khi sed hàng loạt bằng regex**: lượt đầu ở `createApp.ts` lỡ khớp
+>      luôn 7 chỗ `error.message` KHÔNG liên quan (destructure `{ error }` từ Supabase, đã đúng kiểu,
+>      không phải `any`) — soát lại bằng `git diff` trước khi test mới bắt ra, revert đúng 7 chỗ đó,
+>      giữ lại 3 chỗ thật (`catch (error: any)` ba route Gemini AI).
+>    - **`(req as any).rawBody`** (`createApp.ts`): body-parser's `verify` callback gõ `req` là
+>      `http.IncomingMessage` (không phải `express.Request`) — `declare module "http" { interface
+>      IncomingMessage { rawBody?: Buffer } }`, không phải augment `Express.Request` (thử trước, sai,
+>      `tsc` báo `Property 'rawBody' does not exist`).
+>    - **`(t: any)` cho payload talent gửi AI** (`sanitizeTalentsForAi`, route match-talents/
+>      optimize-schedule): interface `AiTalentInput` mô tả đúng field thật dùng (id/name/niches/
+>      avgGmvPerSession/totalGmv/cvrAvg/ctrAvg/overallScore).
+>    - **`(t as any).niche/.avatarUrl/.rateCardFee`** (`TalentMatcher.tsx`, 3 chỗ): field bí danh kiểu
+>      cũ không còn trong `Talent` interface — `legacyTalentFields(t): LegacyTalentAliases` (cast
+>      `unknown` một lần, không rải `as any` khắp nơi).
+>    - **`(imp.summary as any).totals/.changePct`** (`BrandDataRaw.tsx`): `summary` là `Record<string,
+>      unknown>` ở tầng DB (đúng, vì khác nhau theo report type) — component đọc field cụ thể thì cast
+>      1 lần qua interface `DataRawImportSummary` khớp đúng shape `parseDataRawExcel` sinh ra.
+>    - **`select.onChange(e.target.value as any)`** (7 chỗ, nhiều form): đổi thành union type đúng của
+>      state đích (vd `Talent["role"]`, `"Available" | "Busy" | "On Live"`) thay vì `any`.
+>    - **`useState<any[] | null>`** (`TalentMatcher.tsx` matchingResults): interface `TalentMatchResult`
+>      khớp shape cả nhánh AI thật lẫn fallback công thức.
+>    `tsc --noEmit` / `eslint .` / `vitest` (38/38) xanh; app chạy lại trong Browser pane không lỗi
+>    console (ngoài WebSocket HMR đã biết).
 > 6. **Chưa bật bộ rule React Compiler** của eslint-plugin-react-hooks v7 (`purity`,
 >    `set-state-in-effect`, `static-components`, `immutability`, `preserve-manual-memoization`…) — bắt
 >    lớp lỗi sâu hơn hẳn `exhaustive-deps`. Đo số vi phạm trước rồi mới quyết mức.

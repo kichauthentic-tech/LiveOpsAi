@@ -938,7 +938,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                         />
                         <select
                           value={newTalentForm.role}
-                          onChange={(e) => setNewTalentForm({ ...newTalentForm, role: e.target.value as any })}
+                          onChange={(e) => setNewTalentForm({ ...newTalentForm, role: e.target.value as Talent["role"] })}
                           className="px-3 py-2 bg-[var(--surface-base)] rounded-xl border border-[var(--border)] text-[var(--text)] focus:outline-none focus:border-amber-500"
                         >
                           <option value="Host">Host</option>

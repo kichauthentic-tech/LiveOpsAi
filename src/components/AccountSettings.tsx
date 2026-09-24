@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { SystemUser } from "../types";
 import { useAuth } from "../hooks/useAuth";
 import { User, Lock, Mail, Loader2, CheckCircle2, KeyRound } from "lucide-react";
+import { errorMessage } from "../lib/errorMessage";
 
 interface AccountSettingsProps {
   activeUser: SystemUser;
@@ -29,8 +30,8 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ activeUser, on
       await onUpdateUser({ ...activeUser, name: trimmed });
       await refreshProfile();
       setNameMessage({ type: "ok", text: "Đã cập nhật tên hiển thị." });
-    } catch (e: any) {
-      setNameMessage({ type: "err", text: e.message ?? "Không thể cập nhật tên." });
+    } catch (e) {
+      setNameMessage({ type: "err", text: errorMessage(e, "Không thể cập nhật tên.") });
     } finally {
       setSavingName(false);
     }

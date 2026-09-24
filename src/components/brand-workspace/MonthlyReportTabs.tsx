@@ -45,6 +45,7 @@ import { fetchMonthlyReport, upsertMonthlyReport, MonthlyReportManualInput } fro
 import { fetchAffiliatePlans, replaceAffiliatePlans } from "../../lib/db/affiliatePlans";
 import { fetchAffiliateActuals, replaceAffiliateActuals } from "../../lib/db/affiliateActuals";
 import { MonthlyDeepDive } from "./deepdive/MonthlyDeepDive";
+import { errorMessage } from "../../lib/errorMessage";
 import { byHost, dataQuality, filterSessions, hostKey, splitUnassignedHost, DataQuality } from "../../lib/performance/hostPerformance";
 import {
   aggregateCreatorLivePerfRows,
@@ -552,8 +553,8 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
       setMonthlyReportRow(savedRow);
       const savedEntries = await replaceAffiliatePlans(brandId, `${nextMonth}-01`, planRows);
       setPlanRows(savedEntries.map((e) => ({ ...e, _key: newPlanRowKey() })));
-    } catch (e: any) {
-      setPlanErrorMsg(e.message || "Lưu Kế hoạch tháng sau thất bại");
+    } catch (e) {
+      setPlanErrorMsg(errorMessage(e, "Lưu Kế hoạch tháng sau thất bại"));
     } finally {
       setPlanSaving(false);
     }
@@ -588,8 +589,8 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
       };
       const savedRow = await upsertMonthlyReport(brandId, `${month}-01`, input);
       setMonthlyReportRow(savedRow);
-    } catch (e: any) {
-      setCampErrorMsg(e.message || "Lưu Khung Camp thất bại");
+    } catch (e) {
+      setCampErrorMsg(errorMessage(e, "Lưu Khung Camp thất bại"));
     } finally {
       setCampSaving(false);
     }
@@ -642,8 +643,8 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     try {
       const saved = await replaceAffiliateActuals(brandId, `${month}-01`, affiliateRows);
       setAffiliateRows(saved.map((e) => ({ ...e, _key: newAffiliateRowKey() })));
-    } catch (e: any) {
-      setAffiliateErrorMsg(e.message || "Lưu Affiliate thất bại");
+    } catch (e) {
+      setAffiliateErrorMsg(errorMessage(e, "Lưu Affiliate thất bại"));
     } finally {
       setAffiliateSaving(false);
     }

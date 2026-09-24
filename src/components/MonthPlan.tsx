@@ -164,7 +164,7 @@ export default function MonthPlan({
         setCompare(null);
         setHoursOverride(null); // override giờ là theo brand+tháng, không mang sang brand khác
       })
-      .catch((e) => alive && setMsg(`Không tải được kế hoạch: ${e.message ?? e}`))
+      .catch((e) => alive && setMsg(`Không tải được kế hoạch: ${errorMessage(e)}`))
       .finally(() => alive && setLoading(false));
     return () => { alive = false; };
   }, [brandId, month]);
@@ -385,8 +385,8 @@ export default function MonthPlan({
       setDirty(false);
       setMsg(`Đã lưu nháp: ${saved.length} ca.`);
       return p;
-    } catch (e: any) {
-      setMsg(`Không lưu được: ${e.message ?? e}`);
+    } catch (e) {
+      setMsg(`Không lưu được: ${errorMessage(e)}`);
       return null;
     } finally {
       setSaving(false);
@@ -424,8 +424,8 @@ export default function MonthPlan({
         `Đã chốt: mở ${r.created} ca mới${r.linked > 0 ? `, gắn ${r.linked} ca đã có sẵn` : ""}${r.cancelled > 0 ? `, huỷ ${r.cancelled} ca bị bỏ` : ""}` +
           `${r.kept_registered > 0 ? `, GIỮ ${r.kept_registered} ca bị bỏ nhưng đã có người đăng ký (xử lý ở Nhân sự ca)` : ""}${(r.skipped_past ?? 0) > 0 ? `, bỏ qua ${r.skipped_past} ca ngày đã qua` : ""} — ${r.total_slots} ca đang chờ đăng ký.`
       );
-    } catch (e: any) {
-      setMsg(`Không chốt được: ${e.message ?? e}`);
+    } catch (e) {
+      setMsg(`Không chốt được: ${errorMessage(e)}`);
     } finally {
       setSaving(false);
     }

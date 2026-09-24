@@ -9,6 +9,7 @@ import {
 } from "../../lib/backfill/roomsToSessions";
 import { vnParts } from "../../lib/dataraw/liveAnalysisRows";
 import { talentOptionLabel } from "../../lib/talentName";
+import { errorMessage } from "../../lib/errorMessage";
 
 // Nạp bù ca từ file Creator-Live-Performance (migration 0086) — 2 bước, nằm ngay dưới ô import
 // của tab "Creator Live Performance" trong Dữ Liệu Gốc:
@@ -64,7 +65,7 @@ export const BackfillFromRooms: React.FC<Props> = ({ brandId, brandName, months,
     const [start, end] = monthBounds(month);
     fetchCreatorLivePerfMonthSlice(brandId, start, end)
       .then((slice) => { if (alive) setRows(slice.rows); })
-      .catch((e: any) => { if (alive) setError(`Không đọc được batch tháng này: ${e.message ?? e}`); })
+      .catch((e) => { if (alive) setError(`Không đọc được batch tháng này: ${errorMessage(e)}`); })
       .finally(() => { if (alive) setLoadingRows(false); });
     return () => { alive = false; };
   }, [brandId, month]);
@@ -90,8 +91,8 @@ export const BackfillFromRooms: React.FC<Props> = ({ brandId, brandName, months,
       const r = await createBackfillSessions(brandId, plan.toCreate);
       await onSessionsChanged();
       setMessage(`Đã sinh ${r.inserted} ca${r.skipped_existing ? `, bỏ qua ${r.skipped_existing} room đã có ca` : ""}${r.skipped_invalid ? `, ${r.skipped_invalid} dòng thiếu giờ` : ""}.`);
-    } catch (e: any) {
-      setError(`Không sinh được ca: ${e.message ?? e}`);
+    } catch (e) {
+      setError(`Không sinh được ca: ${errorMessage(e)}`);
     } finally {
       setGenerating(false);
     }
@@ -113,8 +114,8 @@ export const BackfillFromRooms: React.FC<Props> = ({ brandId, brandName, months,
       await onSessionsChanged();
       setDraft({});
       setMessage(`Đã gán host cho ${n} ca.`);
-    } catch (e: any) {
-      setError(`Không lưu được: ${e.message ?? e}`);
+    } catch (e) {
+      setError(`Không lưu được: ${errorMessage(e)}`);
     } finally {
       setSaving(false);
     }
@@ -138,8 +139,8 @@ export const BackfillFromRooms: React.FC<Props> = ({ brandId, brandName, months,
       await splitBackfillSession(s.id, new Date(splitMs).toISOString());
       await onSessionsChanged();
       setMessage(`Đã tách ca ${s.date} tại ${input.trim()}.`);
-    } catch (e: any) {
-      setError(`Không tách được: ${e.message ?? e}`);
+    } catch (e) {
+      setError(`Không tách được: ${errorMessage(e)}`);
     } finally {
       setSplitting(null);
     }

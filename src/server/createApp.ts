@@ -4,8 +4,19 @@ import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 import * as Sentry from "@sentry/node";
+import { errorMessage } from "../lib/errorMessage";
 
 dotenv.config();
+
+// Raw request body bytes, captured by the express.json() verify hook below for HMAC webhook
+// signature verification (see the TikTok webhook route further down). body-parser's `verify`
+// callback types `req` as the raw `http.IncomingMessage`, not `express.Request` — augment that
+// (Express.Request extends it, so the property is visible there too).
+declare module "http" {
+  interface IncomingMessage {
+    rawBody?: Buffer;
+  }
+}
 
 // Error tracking (Phase 11) — no-op until SENTRY_DSN is set, same gated pattern as
 // GEMINI_API_KEY/TIKTOK_APP_KEY: code runs identically either way, just silently
@@ -48,7 +59,7 @@ export function createApp() {
   app.use(
     express.json({
       verify: (req, _res, buf) => {
-        (req as any).rawBody = buf;
+        req.rawBody = buf;
       }
     })
   );
@@ -272,7 +283,7 @@ export function createApp() {
         }
       }
       res.json({ success: true, id: data.user?.id, warning: assignmentWarning, generatedPassword: tempPassword });
-    } catch (err: any) {
+    } catch (err) {
       console.error("Invite user error:", err);
       res.status(500).json({ error: "Lỗi hệ thống khi tạo tài khoản mới." });
     }
@@ -298,7 +309,7 @@ export function createApp() {
         return res.status(400).json({ error: error.message });
       }
       res.json({ success: true });
-    } catch (err: any) {
+    } catch (err) {
       console.error("Delete user error:", err);
       res.status(500).json({ error: "Lỗi hệ thống khi xóa tài khoản." });
     }
@@ -323,7 +334,7 @@ export function createApp() {
         return res.status(500).json({ error: error.message });
       }
       res.json({ prompts: data || [] });
-    } catch (err: any) {
+    } catch (err) {
       console.error("Fetch AI agent prompts error:", err);
       res.status(500).json({ error: "Lỗi hệ thống khi tải AI Training Center." });
     }
@@ -354,7 +365,7 @@ export function createApp() {
         return res.status(500).json({ error: error.message });
       }
       res.json({ prompt: data });
-    } catch (err: any) {
+    } catch (err) {
       console.error("Update AI agent prompt error:", err);
       res.status(500).json({ error: "Lỗi hệ thống khi lưu system prompt." });
     }
@@ -447,7 +458,7 @@ export function createApp() {
       // TikTok Shop Partner Center authorization entry point (Shop API for Partners, v2).
       const url = `https://services.tiktokshop.com/open/authorize?service_id=${encodeURIComponent(TIKTOK_APP_KEY)}&state=${state}`;
       res.json({ url, state });
-    } catch (err: any) {
+    } catch (err) {
       console.error("TikTok oauth/authorize error:", err);
       res.status(500).json({ error: "Lỗi hệ thống khi tạo authorization URL." });
     }
@@ -473,7 +484,21 @@ export function createApp() {
       const tokenResp = await fetch(
         `https://auth.tiktok-shops.com/api/v2/token/get?app_key=${encodeURIComponent(TIKTOK_APP_KEY)}&app_secret=${encodeURIComponent(TIKTOK_APP_SECRET)}&auth_code=${encodeURIComponent(code)}&grant_type=authorized_code`
       );
-      const tokenJson: any = await tokenResp.json();
+      interface TikTokTokenFields {
+        code?: number;
+        message?: string;
+        seller_id?: string;
+        shop_id?: string;
+        open_id?: string;
+        seller_name?: string;
+        access_token?: string;
+        access_token_expire_in?: number;
+        refresh_token?: string;
+        refresh_token_expire_in?: number;
+        scope?: string[] | string;
+        data?: TikTokTokenFields;
+      }
+      const tokenJson: TikTokTokenFields = await tokenResp.json();
       if (!tokenResp.ok || tokenJson.code) {
         console.error("TikTok token exchange error:", tokenJson);
         return res.status(400).send(`Lỗi trao đổi token với TikTok: ${tokenJson.message || tokenResp.statusText}`);
@@ -496,7 +521,7 @@ export function createApp() {
         return res.status(500).send("Lưu kết nối TikTok thất bại.");
       }
       res.redirect("/?tiktok=connected");
-    } catch (err: any) {
+    } catch (err) {
       console.error("TikTok OAuth callback error:", err);
       res.status(500).send("Lỗi hệ thống khi xử lý callback TikTok.");
     }
@@ -555,7 +580,7 @@ export function createApp() {
         return res.status(500).json({ error: error.message });
       }
       res.json({ success: true });
-    } catch (err: any) {
+    } catch (err) {
       console.error("TikTok disconnect error:", err);
       res.status(500).json({ error: "Lỗi hệ thống khi ngắt kết nối TikTok." });
     }
@@ -584,7 +609,7 @@ export function createApp() {
     // documented default. Signs `rawBody` (captured in the express.json() verify hook above),
     // not a re-stringified req.body, since re-serialization can differ from what TikTok signed.
     const signature = String(req.headers["x-tts-signature"] || "");
-    const rawBody: Buffer = (req as any).rawBody || Buffer.from(JSON.stringify(req.body || {}));
+    const rawBody: Buffer = req.rawBody || Buffer.from(JSON.stringify(req.body || {}));
     const expected = crypto.createHmac("sha256", TIKTOK_WEBHOOK_SECRET).update(rawBody).digest("hex");
     const signatureBuf = Buffer.from(signature, "hex");
     const expectedBuf = Buffer.from(expected, "hex");
@@ -625,7 +650,7 @@ export function createApp() {
         const { error } = await supabaseAdmin.from("profiles").select("id", { count: "exact", head: true }).limit(1);
         if (error) throw error;
         databaseOk = true;
-      } catch (err: any) {
+      } catch (err) {
         console.error("Health check DB query failed:", err);
         databaseError = "Không kết nối được tới Supabase.";
       }
@@ -676,8 +701,18 @@ export function createApp() {
   // ratePerSession/ratePerHour/commissionRate (rate nội bộ, đã che khỏi mọi role trừ ceo/admin/
   // chính talent đó ở tầng UI/RLS — xem "Bảo Mật Rate/Finance") và phone (PII), dù AI chỉ cần
   // niches/CVR/GMV để chấm điểm phù hợp. Lọc chỉ giữ field thật sự cần trước khi gửi ra ngoài.
-  const sanitizeTalentsForAi = (talents: unknown): any[] =>
-    (Array.isArray(talents) ? talents : []).map((t: any) => ({
+  interface AiTalentInput {
+    id?: string;
+    name?: string;
+    niches?: string[];
+    avgGmvPerSession?: number;
+    totalGmv?: number;
+    cvrAvg?: number;
+    ctrAvg?: number;
+    overallScore?: number;
+  }
+  const sanitizeTalentsForAi = (talents: unknown): AiTalentInput[] =>
+    (Array.isArray(talents) ? (talents as AiTalentInput[]) : []).map((t) => ({
       id: t?.id,
       name: t?.name,
       niches: t?.niches,
@@ -721,9 +756,9 @@ export function createApp() {
       });
 
       return res.json({ success: true, isMock: false, reply: response.text });
-    } catch (error: any) {
+    } catch (error) {
       console.error("Agent Chat Error:", error);
-      res.status(500).json({ success: false, error: error.message });
+      res.status(500).json({ success: false, error: errorMessage(error) });
     }
   });
 
@@ -737,7 +772,7 @@ export function createApp() {
 
       if (!ai) {
         // Fallback: same shape as before Phase 10 (formula-based), used only when no API key is set.
-        const results = (talents || []).map((t: any, idx: number) => ({
+        const results = (talents || []).map((t: AiTalentInput, idx: number) => ({
           talentId: t.id,
           name: t.name,
           matchScore: Math.max(70, 96 - idx * 5),
@@ -776,9 +811,9 @@ Hãy chấm điểm mức độ phù hợp (matchScore, 0-100) cho MỖI talent 
 
       const data = JSON.parse(response.text || "{}");
       return res.json({ success: true, isMock: false, results: data.results || [] });
-    } catch (error: any) {
+    } catch (error) {
       console.error("Gemini Talent Matching Error:", error);
-      res.status(500).json({ success: false, error: error.message });
+      res.status(500).json({ success: false, error: errorMessage(error) });
     }
   });
 
@@ -804,7 +839,7 @@ Hãy chấm điểm mức độ phù hợp (matchScore, 0-100) cho MỖI talent 
           suggestedHostName = "Bích Ngọc";
           reason = "Gia dụng bếp phù hợp nghỉ trưa dân văn phòng.";
         }
-        const matchedHost = (talents || []).find((t: any) => t.name?.includes(suggestedHostName));
+        const matchedHost = (talents || []).find((t: AiTalentInput) => t.name?.includes(suggestedHostName));
         return {
           suggestedSlot,
           suggestedHostId: matchedHost?.id || null,
@@ -854,9 +889,9 @@ Hãy chọn MỘT khung giờ phù hợp nhất trong danh sách trên và MỘT
         return res.json({ success: true, isMock: true, ...fallback() });
       }
       return res.json({ success: true, isMock: false, ...data });
-    } catch (error: any) {
+    } catch (error) {
       console.error("Gemini Schedule Optimizer Error:", error);
-      res.status(500).json({ success: false, error: error.message });
+      res.status(500).json({ success: false, error: errorMessage(error) });
     }
   });
 

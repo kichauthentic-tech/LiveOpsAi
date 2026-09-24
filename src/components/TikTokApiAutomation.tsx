@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { TikTokConnectionStatus, TikTokWebhookEvent, WorkflowRule } from "../types";
 import { getTikTokAuthorizeUrl, disconnectTikTok } from "../lib/db/tiktokIntegration";
 import { Server, Zap, RefreshCw, ShieldCheck, ShieldAlert, ShieldX, Link2, Unlink, ArrowRight, Activity, Plus, Edit3, Trash2, X } from "lucide-react";
+import { errorMessage } from "../lib/errorMessage";
 
 interface TikTokApiAutomationProps {
   workflowRules: WorkflowRule[];
@@ -49,8 +50,8 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
     try {
       const url = await getTikTokAuthorizeUrl();
       window.location.href = url;
-    } catch (err: any) {
-      setActionError(err.message || "Không thể kết nối TikTok Shop.");
+    } catch (err) {
+      setActionError(errorMessage(err, "Không thể kết nối TikTok Shop."));
       setConnecting(false);
     }
   };
@@ -63,8 +64,8 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
     try {
       await disconnectTikTok(tiktokStatus.shopId);
       onRefreshTikTokStatus();
-    } catch (err: any) {
-      setActionError(err.message || "Không thể ngắt kết nối TikTok Shop.");
+    } catch (err) {
+      setActionError(errorMessage(err, "Không thể ngắt kết nối TikTok Shop."));
     } finally {
       setDisconnecting(false);
     }

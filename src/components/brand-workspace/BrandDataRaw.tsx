@@ -4,6 +4,7 @@ import { parseDataRawExcel, ParsedDataRawImport } from "../../lib/dataraw/parseD
 import { fetchDataRawImports, fetchDataRawRows, createOrReplaceDataRawImport, findExistingImportForMonth, deleteDataRawImport } from "../../lib/db/brandDataRaw";
 import { Database, Upload, FileSpreadsheet, AlertTriangle, Trash2, Search, ChevronDown, ChevronRight } from "lucide-react";
 import { BackfillFromRooms } from "./BackfillFromRooms";
+import { errorMessage } from "../../lib/errorMessage";
 
 interface BrandDataRawProps {
   brandId: string;
@@ -32,6 +33,13 @@ const REPORT_TABS: { id: DataRawReportType; label: string; hint: string }[] = [
 function fmtCell(v: unknown): string {
   if (v === null || v === undefined || v === "") return "—";
   return String(v);
+}
+
+// Shape sinh ra bởi parseDataRawExcel (lib/dataraw/parseDataRawExcel.ts:160-161), lưu nguyên vào
+// cột `summary` (Record<string, unknown> — kiểu rộng ở tầng DB vì summary khác nhau theo report type).
+interface DataRawImportSummary {
+  totals?: Record<string, unknown>;
+  changePct?: Record<string, unknown>;
 }
 
 // "YYYY-MM-DD" -> "YYYY-MM", dùng periodStart nếu có (đúng tháng report thật), fallback importedAt
@@ -108,13 +116,13 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ brandId, brandName, 
         // Mặc định chỉ mở nhóm tháng gần nhất — nhiều tháng/năm dữ liệu sẽ không bị tràn màn hình.
         setExpandedGroups(list.length > 0 ? new Set([groupMonthKey(list[0])]) : new Set());
       })
-      .catch((e) => setError(e.message));
+      .catch((e) => setError(errorMessage(e)));
   }, [brandId, activeType]);
 
   useEffect(() => {
     if (!expandedId) { setRows([]); return; }
     setLoading(true);
-    fetchDataRawRows(expandedId).then(setRows).catch((e) => setError(e.message)).finally(() => setLoading(false));
+    fetchDataRawRows(expandedId).then(setRows).catch((e) => setError(errorMessage(e))).finally(() => setLoading(false));
   }, [expandedId]);
 
   const handleFile = async (file: File) => {
@@ -125,8 +133,8 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ brandId, brandName, 
       if (parsed.rows.length === 0) throw new Error("Không đọc được dòng dữ liệu nào từ file.");
       setParsedPreview(parsed);
       setReplaceTarget(findExistingImportForMonth(imports, parsed.periodStart));
-    } catch (e: any) {
-      setError(e.message || "Không đọc được file.");
+    } catch (e) {
+      setError(errorMessage(e, "Không đọc được file."));
       setParsedPreview(null);
       setReplaceTarget(undefined);
     }
@@ -144,8 +152,8 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ brandId, brandName, 
       setReplaceTarget(undefined);
       setFileName("");
       setExpandedId(batch.id);
-    } catch (e: any) {
-      setError(e.message || "Không tạo được import.");
+    } catch (e) {
+      setError(errorMessage(e, "Không tạo được import."));
     } finally {
       setLoading(false);
     }
@@ -157,8 +165,8 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ brandId, brandName, 
       await deleteDataRawImport(importId);
       setImports((prev) => prev.filter((i) => i.id !== importId));
       if (expandedId === importId) setExpandedId(null);
-    } catch (e: any) {
-      setError(e.message || "Không xoá được import.");
+    } catch (e) {
+      setError(errorMessage(e, "Không xoá được import."));
     }
   };
 
@@ -338,22 +346,27 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ brandId, brandName, 
 
                         {expandedId === imp.id && (
                           <div className="pb-4 space-y-2">
-                            {imp.summary && (
+                            {imp.summary && (() => {
+                              const summary = imp.summary as DataRawImportSummary;
+                              const totals = summary.totals || {};
+                              const changePct = summary.changePct || {};
+                              return (
                               <div className="bg-[var(--surface-elevated)]/60 rounded-xl p-3 text-[11px] overflow-x-auto">
                                 <p className="font-bold text-[var(--text)] mb-1">Tổng Quan Dữ Liệu</p>
                                 <table className="text-[11px] whitespace-nowrap">
                                   <tbody>
-                                    {Object.keys((imp.summary as any).totals || {}).map((k) => (
+                                    {Object.keys(totals).map((k) => (
                                       <tr key={k} className="border-t border-[var(--border-muted)]">
                                         <td className="p-1.5 text-[var(--text-muted)]">{k}</td>
-                                        <td className="p-1.5 font-semibold text-[var(--text)]">{fmtCell((imp.summary as any).totals[k])}</td>
-                                        <td className="p-1.5 text-[var(--text-faint)]">{fmtCell((imp.summary as any).changePct?.[k])}</td>
+                                        <td className="p-1.5 font-semibold text-[var(--text)]">{fmtCell(totals[k])}</td>
+                                        <td className="p-1.5 text-[var(--text-faint)]">{fmtCell(changePct[k])}</td>
                                       </tr>
                                     ))}
                                   </tbody>
                                 </table>
                               </div>
-                            )}
+                              );
+                            })()}
 
                             <div className="relative">
                               <Search className="w-3.5 h-3.5 absolute left-2.5 top-2 text-[var(--text-faint)]" />

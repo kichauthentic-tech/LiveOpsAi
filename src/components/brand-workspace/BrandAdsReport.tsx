@@ -6,6 +6,7 @@ import { getTodayMonth } from "../../lib/dateUtils";
 import { getCanonicalAdsCost } from "../../lib/metrics/adsCost";
 import { isoWeekStart } from "../../lib/dataraw/weeklySlice";
 import { fetchMonthlyReport, upsertMonthlyReport, MonthlyReportManualInput } from "../../lib/db/monthlyReports";
+import { errorMessage } from "../../lib/errorMessage";
 
 // Nhập Ads & Ghi Chú (tách khỏi Report Tháng 2026-09-21 theo yêu cầu user): phần ops nhập tay
 // Ads Spend bổ sung / ROAS ghi đè / Promotion / Customer Insight / Account Health trước đây nằm
@@ -165,8 +166,8 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
       const saved = await upsertMonthlyReport(brandId, `${month}-01`, input);
       setReport(saved);
       setSavedAt(new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }));
-    } catch (e: any) {
-      setErrorMsg(e.message || "Lưu thất bại");
+    } catch (e) {
+      setErrorMsg(errorMessage(e, "Lưu thất bại"));
     } finally {
       setSaving(false);
     }
