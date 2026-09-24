@@ -139,8 +139,10 @@
 >    batch đọc được không, khiến dữ liệu thiếu bị đọc thành 0 mà không cảnh báo; `liveUnits.ts` đếm cả
 >    ca chưa diễn ra vào Report Chuyên Sâu; CTOR ở `creatorLivePerfMetrics.ts` dùng sai `orders` thay vì
 >    `skuOrders` khiến Report Tháng gửi brand và Report Chuyên Sâu nội bộ hiện 2 số CTOR khác nhau).
->    Còn 2 module: Tài chính & nhân sự · Hệ thống — chi tiết ở mục
->    `## Audit toàn diện code base (2026-09-23)`.
+>    Module 4/5 **Tài chính & nhân sự XONG 2026-09-25**: 1 lỗi thật tìm thấy + sửa — `HostPerformance.tsx`
+>    mặc định "đến ngày" bằng `new Date().toISOString().slice(0,10)`, đúng anti-pattern `dateUtils.ts` đã
+>    cảnh báo tên riêng (UTC lùi 1 ngày lúc 00:00-07:00 giờ VN, không dormant vì chạy trên mọi múi giờ).
+>    Còn 1 module: Hệ thống — chi tiết ở mục `## Audit toàn diện code base (2026-09-23)`.
 
 
 1. ~~Chạy `0111_signup_role_and_null_role_guard.sql`~~ + ~~tắt "Allow new users to sign up"~~ — **XONG, verify 2026-09-23**: `GET /auth/v1/settings` → `disable_signup: true`; `POST /auth/v1/signup` (kèm `data:{"role":"ceo"}`) → `422 signup_disabled`, không tạo ra tài khoản nào. Cổng tự phong role đã đóng ở lớp ngoài cùng. Phần SQL (trigger + 11 policy) đã re-verify được bằng `pg_policy`/`pg_proc` qua Supabase SQL Editor (2026-09-23) — phát hiện 0111 vá SÓT 7/10 policy, đã vá tiếp bằng **0112**, verify lại ra 0 dòng hở. Xem đoạn "Verify lại phần SQL bằng pg_policy" trong mục `## BẢO MẬT — tự phong role`.
@@ -339,9 +341,34 @@ smoke test (`preview_start` → `read_console_messages` → `preview_logs` → `
 console/server. Chưa đăng nhập thật để xem 2 tab Report Tháng/Report Chuyên Sâu trên dữ liệu CROCS —
 để dịp có ai đăng nhập hộ (Claude không tự nhập mật khẩu).
 
-**Phần 2 còn lại chưa audit** (theo module): Tài chính & nhân sự (FinanceHr / BrandCommitment /
-HostPerformance / TalentMatcher) · Hệ thống (UserRoleSettings / AccountSettings / Header / notification
-/ theme).
+**Phần 2 — module Tài chính & nhân sự: XONG 2026-09-25**, đọc code `FinanceHr.tsx` / `BrandCommitment.tsx`
+/ `HostPerformance.tsx` / `TalentMatcher.tsx`, kèm lib phụ trợ trực tiếp nuôi 4 file trên:
+`lib/performance/hostPerformance.ts` / `lib/performance/brandCommitment.ts` / `lib/pnl.ts` (250 dòng,
+tính P&L — không nằm trong 4 file gốc nhưng là lõi của FinanceHr) / `lib/metrics/avgGmv.ts` /
+`brand-workspace/BrandCommitmentView.tsx` (bản chỉ-đọc phía brand). **1 lỗi thật tìm thấy + sửa**:
+
+1. **`HostPerformance.tsx` mặc định "đến ngày" bằng `new Date().toISOString().slice(0, 10)`** — đúng
+   anti-pattern mà chính `dateUtils.ts` đã đặt tên và cảnh báo (`toISOString()` trả giờ UTC, 00:00–07:00
+   giờ VN bị lùi về NGÀY HÔM TRƯỚC). `filterSessions()` lọc theo `s.date` (ngày VN), nên ai mở màn
+   "Hiệu Suất Host" trong khung giờ đó sẽ có mặc định "đến ngày" là HÔM QUA, âm thầm bỏ sót ca hôm nay
+   khỏi cả bảng xếp hạng lẫn lưới host×thứ — cùng họ lỗi với `LiveCalendar.tsx` đã sửa ở module 1,
+   nhưng lần này KHÔNG dormant vì `new Date()` (không truyền giờ) luôn parse local nên bug này chạy
+   trên MỌI múi giờ kể cả VN, không cần máy ở múi giờ khác mới lộ ra. **ĐÃ SỬA**: `to` dùng
+   `getTodayDate()` (dateUtils.ts, giờ local — đúng quy ước cả app), `isoDaysAgo()` đổi từ
+   `.toISOString()` sang đọc local getters.
+
+Điểm đã soát và xác nhận KHÔNG phải bug: `hostPerformance.ts`/`brandCommitment.ts` là code thuần, mọi
+chỗ dựng `Date` còn lại đều nhất quán UTC-vào-UTC-ra hoặc local-vào-local-ra; `pnl.ts` đã qua nhiều đợt
+vá trước đó (FIX L7/L8, Đ3, Audit Module 3 2026-09-18) — đọc lại không thấy hồi quy; `App.tsx` truyền
+`talents`/`brands` KHÔNG lọc (không phải `activeTalents`/`activeBrands`) cho `FinanceHr` — kiểm tra kỹ
+xác nhận đây là CHỦ Ý (P&L của ca cũ vẫn cần tra được host/brand đã ngưng hoạt động) chứ không phải sót;
+wiring props `TalentMatcher`/`BrandCommitment` đủ, không thiếu dây.
+
+Verify: `tsc`/`eslint` trên file đã sửa 0 lỗi, `vitest` 38/38 xanh, browser smoke test không lỗi console
+(chỉ nhiễu HMV WebSocket đã biết).
+
+**Phần 2 còn lại chưa audit** (theo module): Hệ thống (UserRoleSettings / AccountSettings / Header /
+notification / theme).
 
 ## Chạy thử TOÀN BỘ workflow trên app thật (2026-09-24) — 12 điểm đứt gãy, ĐÃ SỬA CẢ 12
 

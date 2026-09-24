@@ -10,16 +10,22 @@ import {
   hostWeekdayGrid,
   splitUnassignedHost
 } from "../lib/performance/hostPerformance";
+import { getTodayDate } from "../lib/dateUtils";
 
 interface HostPerformanceProps {
   sessions: LiveSession[];
   brands: Brand[];
 }
 
+// FIX (audit module 4, 2026-09-25): trước đây dùng `new Date().toISOString().slice(0, 10)` — đúng
+// anti-pattern mà dateUtils.ts đã cảnh báo tên riêng (toISOString() trả giờ UTC, 00:00-07:00 giờ VN
+// bị lùi về NGÀY HÔM TRƯỚC). `s.date` lọc trong filterSessions() là ngày VN, nên mặc định "đến ngày"
+// mở màn lúc nửa đêm VN sẽ vô tình bỏ sót ca hôm nay. Dùng getTodayDate() (giờ LOCAL của máy, đúng
+// quy ước cả app đang dùng — xem dateUtils.ts) để nhất quán.
 function isoDaysAgo(days: number): string {
   const d = new Date();
   d.setDate(d.getDate() - days);
-  return d.toISOString().slice(0, 10);
+  return `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, "0")}-${`${d.getDate()}`.padStart(2, "0")}`;
 }
 
 function fmtVnd(n: number): string {
@@ -31,7 +37,7 @@ const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0]; // Thứ 2 → Chủ nhật
 
 export function HostPerformance({ sessions, brands }: HostPerformanceProps) {
   const [from, setFrom] = useState(() => isoDaysAgo(90));
-  const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [to, setTo] = useState(() => getTodayDate());
   const [brandId, setBrandId] = useState("");
 
   const scoped = useMemo(
