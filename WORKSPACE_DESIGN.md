@@ -2,8 +2,9 @@
 
 ## CẦN LÀM NGAY khi mở phiên mới (cập nhật 2026-09-24)
 
-> **VIỆC ĐANG TREO — bàn giao 2026-09-24, cập nhật lại cùng ngày sau khi merge + verify Đ7/Đ9 (đọc mục
-> này trước danh sách dưới; mục 1–2 đã xong phần chính, còn 6 mục treo).** Xếp theo thứ tự nên làm:
+> **VIỆC ĐANG TREO — bàn giao 2026-09-24, cập nhật lại cùng ngày sau khi merge + verify Đ7/Đ9 + vá
+> ưu tiên #3 (đọc mục này trước danh sách dưới; mục 1–3 đã xong phần chính, còn 5 mục treo).** Xếp
+> theo thứ tự nên làm:
 >
 > 1. ~~Merge nhánh về `main`~~ — **XONG 2026-09-24**: `git merge --ff-only audit/workflow-12-diem-dut-gay`
 >    rồi `git push origin main`, `main` giờ ở `45fe3af` (trước đó `f4e692e`, chậm 3 commit `d45529d` /
@@ -32,11 +33,37 @@
 >    **Dữ liệu test còn sót lại trên production** (đã Huỷ mềm qua `cancel_session`, chưa xoá cứng — xoá
 >    cứng bị chặn tự làm, đụng data production thật): script dọn sẵn ở
 >    `supabase/seed/2026-09-24e_cleanup_verify_D7_D9.sql`, cần chạy tay 1 lần trong SQL Editor.
-> 3. **Ưu tiên #3 (bảo mật) — user chưa yêu cầu làm.** `handleCreateTalentAccount` hardcode
->    `defaultPassword: "000000"` cho MỌI tài khoản talent tạo từ Talent Pool, không có cơ chế bắt đổi
->    mật khẩu lần đầu. Hiện 3 profile nên rủi ro nhỏ; cấp tài khoản cho 33 talent là 33 tài khoản chung
->    một mật khẩu đoán được. Đề xuất: sinh mật khẩu ngẫu nhiên hiện 1 lần cho ops + cờ
->    `must_change_password`. **Làm việc này TRƯỚC mục 2 thì phải đổi lại cách đăng nhập talent.**
+> 3. ~~Ưu tiên #3 (bảo mật)~~ — **XONG 2026-09-24, verify trên app thật.** `handleCreateTalentAccount`
+>    (App.tsx) trước đây hardcode `defaultPassword: "000000"` cho MỌI tài khoản talent tạo từ Talent
+>    Pool. Đã sửa: server tự sinh mật khẩu ngẫu nhiên 10 ký tự (`generateTempPassword()`,
+>    [createApp.ts](src/server/createApp.ts) — bỏ ký tự dễ nhầm 0/O/1/l/I), không tin client gửi mật
+>    khẩu lên nữa (đổi `defaultPassword: string` → `generatePassword: boolean`). Cột mới
+>    `profiles.must_change_password` (migration **0117**, đã chạy) được server set `true` ngay lúc
+>    tạo; [TalentMatcher.tsx](src/components/TalentMatcher.tsx) hiện modal "Giao Mật Khẩu Cho Talent"
+>    đúng 1 lần sau khi tạo (không lưu lại ở đâu khác); App.tsx chặn vào app chính bằng
+>    [ResetPasswordScreen.tsx](src/components/ResetPasswordScreen.tsx) (prop `forceChange`, tái dùng
+>    component recovery/invite có sẵn) cho tới khi tự đặt mật khẩu mới, xong tự tắt cờ qua RLS
+>    `profiles_update_self_or_ceo` sẵn có, **không** bắt đăng nhập lại (khác luồng recovery).
+>
+>    Verify trên app thật (2 vòng, browser pane, user tự đăng nhập/nhập mật khẩu — Claude không tự
+>    nhập bất kỳ mật khẩu nào ở bước nào, kể cả mật khẩu do chính mình sinh ra): vòng 1 tạo talent
+>    NGAY SAU khi chạy migration 0117 nhưng TRƯỚC khi reload PostgREST schema cache → cột
+>    `must_change_password` chưa vào cache, update set cờ thất bại ÂM THẦM (best-effort, không throw)
+>    — bắt được nhờ query trực tiếp `profiles` qua `javascript_tool` thấy cờ vẫn `false` và
+>    `custom_role_title` rỗng dù đã set. Chạy `NOTIFY pgrst, 'reload schema';` xong tạo lại vòng 2 →
+>    `must_change_password: true`, `custom_role_title: "Talent Host"` đúng ngay từ lúc tạo. Test gate:
+>    set tay cờ `true` cho tài khoản vòng 1, reload → đúng màn "BẮT BUỘC ĐỔI MẬT KHẨU LẦN ĐẦU" hiện ra
+>    thay vì app; đổi mật khẩu xong → cờ tự tắt, vào thẳng app không bị đăng xuất. **Bài học:** sau
+>    `alter table` phải `NOTIFY pgrst, 'reload schema'` (hoặc bấm Reload trong Dashboard) trước khi
+>    dùng cột mới — PostgREST cache không tự nhận DDL ngay; và các `update` best-effort không throw
+>    khi lỗi (đúng pattern đã dùng ở nơi khác trong route này) có thể che mất lỗi kiểu này, chỉ bắt
+>    được bằng cách query lại DB, không phải nhìn UI.
+>
+>    2 tài khoản test (`ZZZ TEST Password Flow`, `ZZZ TEST Password Flow 2`) đã xoá sạch — **nhưng
+>    KHÔNG qua nút "Xóa Talent" trong app**: nút đó gọi `window.confirm()`, mà Browser pane của Claude
+>    Code chặn hộp thoại confirm() gốc (tự trả `false`), nên xoá không chạy được kể cả khi user tự
+>    bấm — không phải lỗi app, là giới hạn môi trường test. Dọn bằng SQL thay thế, xem
+>    `supabase/seed/2026-09-24f_cleanup_talent_password_test.sql`.
 > 4. **Lỗ tính năng: lịch agency không có đường CRUD chiến dịch.** `App.tsx` truyền
 >    `onAddScheme/onUpdateScheme/onDeleteScheme` vào `LiveCalendar` ở 2 chỗ, component không dùng chỗ
 >    nào (chỉ `BrandCalendar` có UI). Hiện đang đổi tên `_onAddScheme`… để giữ dấu vết. **Quyết một

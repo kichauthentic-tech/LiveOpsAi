@@ -22,6 +22,17 @@ process.on("uncaughtException", (error) => {
   console.error("Uncaught Exception:", error);
 });
 
+// Sinh mật khẩu tạm ngẫu nhiên cho tài khoản talent mới (thay "000000" hardcode — audit
+// 2026-09-24). Bỏ ký tự dễ nhầm khi đọc/gõ tay (0/O, 1/l/I) vì ops sẽ đọc chuỗi này cho talent
+// qua điện thoại/chat, không phải paste — nhầm 1 ký tự là phải Reset Mật Khẩu lại từ đầu.
+function generateTempPassword(): string {
+  const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+  const bytes = crypto.randomBytes(10);
+  let out = "";
+  for (let i = 0; i < bytes.length; i++) out += chars[bytes[i] % chars.length];
+  return out;
+}
+
 // Builds the Express app with every API route registered, but no listen()/static
 // serving/Vite middleware — those differ between local dev (server.ts) and Vercel
 // serverless (api/index.ts), so callers attach what they need after createApp().
@@ -135,20 +146,24 @@ export function createApp() {
       if (!caller.userId) {
         return res.status(403).json({ error: `Chỉ tài khoản CEO/Admin mới được tạo tài khoản mới. (${caller.reason})` });
       }
-      const { name, email, role, customRoleTitle, assignedBrandId, assignedTalentId, newTalentProfile, defaultPassword } = req.body || {};
+      const { name, email, role, customRoleTitle, assignedBrandId, assignedTalentId, newTalentProfile, generatePassword } = req.body || {};
       if (!name || !email || !role) {
         return res.status(400).json({ error: "Thiếu name/email/role." });
       }
       // Mặc định: gửi email mời, người dùng tự đặt mật khẩu qua link (luồng "Tạo Tài Khoản
-      // Mới" ở Phân Quyền & Role). Khi có `defaultPassword` — dùng cho quick-add "Thêm Talent
-      // Mới" ở Talent Pool (ceo/admin) — tạo tài khoản với mật khẩu biết trước luôn, không gửi
-      // email mời, để ceo/admin có thể giao mật khẩu trực tiếp cho talent.
+      // Mới" ở Phân Quyền & Role). Khi `generatePassword` = true — dùng cho quick-add "Thêm
+      // Talent Mới" ở Talent Pool (ceo/admin) — tạo tài khoản với mật khẩu NGẪU NHIÊN do server
+      // tự sinh (không tin tưởng client gửi mật khẩu lên — audit 2026-09-24, trước đây hardcode
+      // "000000" cho mọi talent), không gửi email mời, để ceo/admin giao mật khẩu trực tiếp cho
+      // talent. `must_change_password` được set true ngay dưới, ép đổi mật khẩu lần đăng nhập đầu.
       let data: { user: { id: string } | null };
       let error: { message: string } | null;
-      if (defaultPassword) {
+      let tempPassword: string | null = null;
+      if (generatePassword) {
+        tempPassword = generateTempPassword();
         const result = await supabaseAdmin.auth.admin.createUser({
           email,
-          password: defaultPassword,
+          password: tempPassword,
           email_confirm: true,
           user_metadata: { name, role, custom_role_title: customRoleTitle || "" }
         });
@@ -180,7 +195,11 @@ export function createApp() {
       if (data.user) {
         const { error: roleError } = await supabaseAdmin
           .from("profiles")
-          .update({ role, custom_role_title: customRoleTitle || "" })
+          .update({
+            role,
+            custom_role_title: customRoleTitle || "",
+            ...(tempPassword ? { must_change_password: true } : {})
+          })
           .eq("id", data.user.id);
         if (roleError) {
           console.error("Cấp role sau khi tạo tài khoản thất bại:", roleError);
@@ -252,7 +271,7 @@ export function createApp() {
           console.error("Gán ngược talents.profile_id thất bại sau khi invite:", backLinkError);
         }
       }
-      res.json({ success: true, id: data.user?.id, warning: assignmentWarning });
+      res.json({ success: true, id: data.user?.id, warning: assignmentWarning, generatedPassword: tempPassword });
     } catch (err: any) {
       console.error("Invite user error:", err);
       res.status(500).json({ error: "Lỗi hệ thống khi tạo tài khoản mới." });

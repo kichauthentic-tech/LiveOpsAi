@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Talent, Brand, UserRole, LiveSession } from "../types";
-import { Users, Sparkles, Award, Search, Plus, Edit3, Trash2, X, Phone, Loader2, AlertTriangle } from "lucide-react";
+import { Users, Sparkles, Award, Search, Plus, Edit3, Trash2, X, Phone, Loader2, AlertTriangle, KeyRound } from "lucide-react";
 import { authedFetch } from "../lib/authedFetch";
 import { computeTalentRealTotals } from "../lib/metrics/avgGmv";
 
@@ -30,7 +30,7 @@ interface TalentMatcherProps {
   brands: Brand[];
   // Số GMV/số ca của talent cộng từ ca thật, thay cho cột nhập tay trên hồ sơ (audit 2026-09-21).
   sessions: LiveSession[];
-  onCreateTalentAccount?: (payload: NewTalentAccountPayload) => Promise<void>;
+  onCreateTalentAccount?: (payload: NewTalentAccountPayload) => Promise<string | undefined>;
   onUpdateTalent?: (id: string, patch: Partial<Talent>) => void;
   onDeleteTalent?: (id: string) => void;
 }
@@ -76,6 +76,10 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
   const [formEmail, setFormEmail] = useState("");
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
   const [createAccountError, setCreateAccountError] = useState<string | null>(null);
+  // Mật khẩu ngẫu nhiên server vừa sinh cho tài khoản talent mới — chỉ giữ trong state client
+  // (không lưu đâu khác), hiện 1 lần cho ops copy rồi đóng modal là mất, không xem lại được
+  // (audit 2026-09-24, thay "000000" hardcode).
+  const [revealCreds, setRevealCreds] = useState<{ email: string; password: string } | null>(null);
   const [formRole, setFormRole] = useState<Talent["role"]>("Host");
   const [formGender, setFormGender] = useState("Nữ");
   const [formNiches, setFormNiches] = useState("Mỹ phẩm, Skincare");
@@ -191,14 +195,18 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
     setIsCreatingAccount(true);
     try {
       if (onCreateTalentAccount) {
-        await onCreateTalentAccount({
+        const email = formEmail.trim();
+        const generatedPassword = await onCreateTalentAccount({
           ...basePayload,
-          email: formEmail.trim(),
+          email,
           ratePerSession: Number(formRate),
           ratePerHour: Number(formRateHour),
           assistantRatePerHour: Number(formAssistantRateHour),
           commissionRate: Number(formCommission)
         });
+        if (generatedPassword) {
+          setRevealCreds({ email, password: generatedPassword });
+        }
       }
       setIsModalOpen(false);
     } catch (err: any) {
@@ -528,8 +536,8 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
               </div>
 
               {/* Chỉ hiện khi tạo mới — tạo mới giờ luôn kèm tạo account đăng nhập thật, mật khẩu
-                  mặc định 000000, không gửi email mời (khác luồng "Tạo Tài Khoản Mới" ở Phân
-                  Quyền & Role). Sửa hồ sơ đã có account rồi thì không cần nhập lại email. */}
+                  NGẪU NHIÊN do server sinh (không gửi email mời, khác luồng "Tạo Tài Khoản Mới" ở
+                  Phân Quyền & Role). Sửa hồ sơ đã có account rồi thì không cần nhập lại email. */}
               {!editingTalent && (
                 <div>
                   <label className="font-bold text-[var(--text-muted)] block mb-1">Email Đăng Nhập *</label>
@@ -542,7 +550,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                     className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)] focus:ring-2 focus:ring-[var(--accent)]"
                   />
                   <p className="text-[10px] text-[var(--text-faint)] mt-1">
-                    Hệ thống tạo tài khoản đăng nhập với mật khẩu mặc định <strong>000000</strong> — báo talent đổi mật khẩu sau khi đăng nhập lần đầu.
+                    Hệ thống tự sinh mật khẩu ngẫu nhiên, hiện 1 lần ngay sau khi tạo xong — talent BẮT BUỘC phải đổi mật khẩu khi đăng nhập lần đầu.
                   </p>
                 </div>
               )}
@@ -718,6 +726,48 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Reveal mật khẩu 1 lần sau khi tạo tài khoản talent — server chỉ trả về đúng 1 lần trong
+          response tạo tài khoản (audit 2026-09-24), đóng modal này là mất, không xem lại được.
+          Talent sẽ bị bắt đổi mật khẩu ngay lần đăng nhập đầu (must_change_password). */}
+      {revealCreds && (
+        <div className="fixed inset-0 bg-[var(--surface)]/70 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <div className="bg-[var(--surface)] w-full max-w-sm rounded-2xl shadow-2xl border border-[var(--border)] overflow-hidden">
+            <div className="px-6 py-4 border-b border-[var(--border)]">
+              <h3 className="font-bold text-sm flex items-center gap-2">
+                <KeyRound className="w-4 h-4 text-[var(--accent-text)]" />
+                Tài Khoản Đã Tạo — Giao Mật Khẩu Cho Talent
+              </h3>
+            </div>
+            <div className="p-6 space-y-4 text-xs">
+              <div className="rounded-lg border border-amber-500/30 bg-amber-950/40 text-amber-200 px-3 py-2">
+                Mật khẩu này chỉ hiện <strong>đúng 1 lần</strong>, ngay tại đây — không lưu lại được
+                nữa. Copy/giao ngay cho talent trước khi đóng. Họ sẽ bị bắt đổi mật khẩu khi đăng
+                nhập lần đầu.
+              </div>
+              <div>
+                <label className="font-bold text-[var(--text-muted)] block mb-1">Email đăng nhập</label>
+                <div className="font-mono text-sm bg-[var(--surface-base)] border border-[var(--border)] rounded-xl px-3 py-2">
+                  {revealCreds.email}
+                </div>
+              </div>
+              <div>
+                <label className="font-bold text-[var(--text-muted)] block mb-1">Mật khẩu tạm</label>
+                <div className="font-mono text-base font-bold tracking-wide bg-[var(--surface-base)] border border-[var(--border)] rounded-xl px-3 py-2">
+                  {revealCreds.password}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRevealCreds(null)}
+                className="w-full py-2.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold rounded-xl transition-all"
+              >
+                Đã Giao Cho Talent — Đóng
+              </button>
+            </div>
           </div>
         </div>
       )}

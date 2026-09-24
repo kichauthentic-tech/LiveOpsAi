@@ -978,17 +978,19 @@ export default function App() {
   };
 
   // Handlers for Talents — persisted to Supabase
-  // Tạo talent mới giờ luôn kèm tạo account đăng nhập thật (mật khẩu mặc định 000000, xem
-  // TalentMatcher.tsx "Thêm Talent Mới") — đi qua endpoint invite thay vì insert `talents`
-  // trực tiếp, nên phải refetch cả talents lẫn users sau khi xong. Không catch+alert ở đây —
-  // để lỗi propagate lên cho TalentMatcher hiện inline trong modal (tránh double dialog).
-  const handleCreateTalentAccount = async (payload: NewTalentAccountPayload) => {
-    await inviteUser({
+  // Tạo talent mới giờ luôn kèm tạo account đăng nhập thật (mật khẩu NGẪU NHIÊN do server sinh,
+  // bắt đổi ngay lần đăng nhập đầu — audit 2026-09-24, xem TalentMatcher.tsx "Thêm Talent Mới")
+  // — đi qua endpoint invite thay vì insert `talents` trực tiếp, nên phải refetch cả talents lẫn
+  // users sau khi xong. Không catch+alert ở đây — để lỗi propagate lên cho TalentMatcher hiện
+  // inline trong modal (tránh double dialog). Trả lại mật khẩu vừa sinh để TalentMatcher hiện
+  // 1 lần cho ops (server không lưu lại ở đâu khác).
+  const handleCreateTalentAccount = async (payload: NewTalentAccountPayload): Promise<string | undefined> => {
+    const { generatedPassword } = await inviteUser({
       name: payload.name,
       email: payload.email,
       role: "talent",
       customRoleTitle: "Talent Host",
-      defaultPassword: "000000",
+      generatePassword: true,
       newTalentProfile: {
         name: payload.name,
         phone: payload.phone,
@@ -1011,6 +1013,7 @@ export default function App() {
     const [refreshedTalents, refreshedUsers] = await Promise.all([fetchTalents(), fetchUsers()]);
     setTalents(refreshedTalents);
     setUsers(refreshedUsers);
+    return generatedPassword;
   };
   const handleUpdateTalent = async (id: string, patch: Partial<Talent>) => {
     try {
@@ -1747,6 +1750,12 @@ export default function App() {
         )}
       </div>
     );
+  }
+
+  // Talent tạo mới từ Talent Pool nhận mật khẩu ngẫu nhiên do server sinh (audit 2026-09-24, thay
+  // "000000" hardcode) — bắt đổi mật khẩu ngay lần đăng nhập đầu trước khi cho vào app.
+  if (profile.must_change_password) {
+    return <ResetPasswordScreen forceChange />;
   }
 
   return (

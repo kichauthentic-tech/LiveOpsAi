@@ -15,6 +15,7 @@ export interface Profile {
   assigned_talent_id: string | null;
   last_login: string | null;
   custom_permission_overrides: Record<string, boolean> | null;
+  must_change_password: boolean;
 }
 
 interface AuthContextValue {

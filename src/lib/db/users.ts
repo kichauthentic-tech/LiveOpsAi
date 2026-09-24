@@ -90,10 +90,10 @@ export interface InviteUserPayload {
   // Tạo talent: gửi thông tin hồ sơ để server tự tạo Talent Pool row + link 2 chiều luôn
   // (không còn chọn link hồ sơ có sẵn — mọi talent mới đều đi qua đường này).
   newTalentProfile?: NewTalentProfilePayload;
-  // Có giá trị = quick-add "Thêm Talent Mới" ở Talent Pool (ceo/admin): tạo account với mật
-  // khẩu biết trước ngay, không gửi email mời. Không có = luồng "Tạo Tài Khoản Mới" thường
-  // (Phân Quyền & Role), gửi email mời như cũ.
-  defaultPassword?: string;
+  // true = quick-add "Thêm Talent Mới" ở Talent Pool (ceo/admin): server tự sinh mật khẩu ngẫu
+  // nhiên (không gửi email mời) và set must_change_password=true. Không có = luồng "Tạo Tài
+  // Khoản Mới" thường (Phân Quyền & Role), gửi email mời như cũ.
+  generatePassword?: boolean;
 }
 
 async function authedFetch(path: string, init: RequestInit): Promise<Response> {
@@ -112,16 +112,21 @@ async function authedFetch(path: string, init: RequestInit): Promise<Response> {
 // which must never be exposed to the browser — the request is proxied through our
 // own Express server (see server.ts `/api/admin/users/invite`), which verifies the
 // caller is a signed-in `ceo` before calling `auth.admin.inviteUserByEmail`.
-export async function inviteUser(payload: InviteUserPayload): Promise<void> {
+//
+// Trả `generatedPassword` khi `generatePassword: true` được gửi lên — server tự sinh, chỉ trả
+// về ĐÚNG 1 LẦN trong response này (không lưu lại đâu khác) để caller hiện cho ops copy/giao cho
+// talent (audit 2026-09-24, xem TalentMatcher.tsx).
+export async function inviteUser(payload: InviteUserPayload): Promise<{ generatedPassword?: string }> {
   const res = await authedFetch("/api/admin/users/invite", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)
   });
+  const body = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
     throw new Error(body.error || "Không thể tạo tài khoản mới.");
   }
+  return { generatedPassword: body.generatedPassword };
 }
 
 export async function deleteUserAccount(userId: string): Promise<void> {
