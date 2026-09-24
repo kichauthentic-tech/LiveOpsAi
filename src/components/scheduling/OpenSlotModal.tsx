@@ -3,6 +3,7 @@ import { Brand, BrandStudio, LiveSession, ShiftSlot, Studio } from "../../types"
 import { AlertTriangle, CalendarClock, X } from "lucide-react";
 import { dateTimeRangesOverlap, getTodayDate } from "../../lib/dateUtils";
 import { findBrandStudioId } from "../../lib/db/brandStudios";
+import { useToast } from "../../hooks/useToast";
 
 // Q2 (audit 2026-09-21): con đường DUY NHẤT tạo ca ngoài Kế Hoạch Tháng là "mở ca chờ đăng ký" —
 // ca đi vào Đăng Ký & Chốt Lịch như mọi ca khác (talent đăng ký, ops chốt host, target từ kế hoạch
@@ -45,6 +46,7 @@ export const OpenSlotModal: React.FC<OpenSlotModalProps> = ({
   onClose,
   onCreateSlot
 }) => {
+  const { showToast } = useToast();
   const [brandId, setBrandId] = useState(fixedBrand?.id ?? brands[0]?.id ?? "");
   const [studioId, setStudioId] = useState(initialStudioId || findBrandStudioId(brandStudios, fixedBrand?.id ?? brands[0]?.id ?? "") || "");
   const [date, setDate] = useState(initialDate);
@@ -92,11 +94,11 @@ export const OpenSlotModal: React.FC<OpenSlotModalProps> = ({
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (start === end) {
-      window.alert("Giờ bắt đầu và giờ kết thúc không được trùng nhau.");
+      showToast("Giờ bắt đầu và giờ kết thúc không được trùng nhau.");
       return;
     }
     if (!brandId) {
-      window.alert("Chọn brand cho ca.");
+      showToast("Chọn brand cho ca.");
       return;
     }
     if (studioClash && !window.confirm(`Phòng ${studio?.name ?? ""} đang trùng với ${studioClash}. Vẫn mở ca?`)) return;

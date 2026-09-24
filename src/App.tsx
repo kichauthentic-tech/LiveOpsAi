@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
+import * as Sentry from "@sentry/react";
 import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, WorkflowRule, Talent, Studio, Equipment, Brand, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, BrandStudio, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, TalentRateHistoryEntry, BrandPlatformRateHistoryEntry, BrandSku, PromoScheme, AppNotification, BrandMonthlyReport as BrandMonthlyReportRow } from "./types";
+import { TabErrorFallback } from "./components/common/TabErrorFallback";
 import { ALL_PERMISSION_DEFINITIONS } from "./data/mockData";
 import { fetchTalents, updateTalent, updateMyTalentProfile, deleteTalent } from "./lib/db/talents";
 import { fetchStudios, createStudio, updateStudio, deleteStudio } from "./lib/db/studios";
@@ -83,6 +85,7 @@ import { ResetPasswordScreen } from "./components/ResetPasswordScreen";
 import { AccountSettings } from "./components/AccountSettings";
 import { MyTalentProfile } from "./components/MyTalentProfile";
 import { useAuth } from "./hooks/useAuth";
+import { useToast } from "./hooks/useToast";
 import { useNotifications } from "./hooks/useNotifications";
 import { SessionLedger } from "./components/SessionLedger";
 import { LiveCalendar } from "./components/LiveCalendar";
@@ -167,6 +170,7 @@ function getDefaultTabForRole(role: UserRole): string {
 
 export default function App() {
   const { session, profile, profileError, loading: authLoading, signOut, passwordRecovery, refreshProfile } = useAuth();
+  const { showToast } = useToast();
 
   const currentRole: UserRole = profile?.role ?? "talent";
 
@@ -673,7 +677,7 @@ export default function App() {
         return [...others, updated];
       });
     } catch (e) {
-      window.alert(`Không thể cập nhật Finance & HR: ${errorMessage(e)}`);
+      showToast(`Không thể cập nhật Finance & HR: ${errorMessage(e)}`);
     }
   }
 
@@ -685,7 +689,7 @@ export default function App() {
         return [...others, updated];
       });
     } catch (e) {
-      window.alert(`Không thể cập nhật trạng thái duyệt: ${errorMessage(e)}`);
+      showToast(`Không thể cập nhật trạng thái duyệt: ${errorMessage(e)}`);
     }
   }
 
@@ -925,7 +929,7 @@ export default function App() {
         category: "Permission Change"
       });
     } catch (e) {
-      window.alert(`Không thể lưu Ma Trận Phân Quyền: ${errorMessage(e)}`);
+      showToast(`Không thể lưu Ma Trận Phân Quyền: ${errorMessage(e)}`);
     }
   };
 
@@ -940,7 +944,7 @@ export default function App() {
         category: "User Status"
       });
     } catch (e) {
-      window.alert(`Không thể tạo tài khoản: ${errorMessage(e)}`);
+      showToast(`Không thể tạo tài khoản: ${errorMessage(e)}`);
       throw e;
     }
   };
@@ -955,7 +959,7 @@ export default function App() {
         category: "User Status"
       });
     } catch (e) {
-      window.alert(`Không thể cập nhật tài khoản: ${errorMessage(e)}`);
+      showToast(`Không thể cập nhật tài khoản: ${errorMessage(e)}`);
       throw e;
     }
   };
@@ -973,7 +977,7 @@ export default function App() {
         });
       }
     } catch (e) {
-      window.alert(`Không thể xóa tài khoản: ${errorMessage(e)}`);
+      showToast(`Không thể xóa tài khoản: ${errorMessage(e)}`);
     }
   };
 
@@ -1027,7 +1031,7 @@ export default function App() {
         setTalentRateHistory(await fetchTalentRateHistory());
       }
     } catch (e) {
-      window.alert(`Không thể cập nhật Talent: ${errorMessage(e)}`);
+      showToast(`Không thể cập nhật Talent: ${errorMessage(e)}`);
     }
   };
   // Talent tự sửa hồ sơ của mình — cố ý KHÔNG bọc try/catch như handleUpdateTalent: lỗi phải
@@ -1041,7 +1045,7 @@ export default function App() {
       await deleteTalent(id);
       setTalents(prev => prev.filter(t => t.id !== id));
     } catch (e) {
-      window.alert(`Không thể xóa Talent: ${errorMessage(e)}`);
+      showToast(`Không thể xóa Talent: ${errorMessage(e)}`);
     }
   };
 
@@ -1051,7 +1055,7 @@ export default function App() {
       const created = await createStudio(newStudio);
       setStudios(prev => [created, ...prev]);
     } catch (e) {
-      window.alert(`Không thể tạo Studio: ${errorMessage(e)}`);
+      showToast(`Không thể tạo Studio: ${errorMessage(e)}`);
     }
   };
   const handleUpdateStudio = async (updatedStudio: Studio) => {
@@ -1059,7 +1063,7 @@ export default function App() {
       const saved = await updateStudio(updatedStudio);
       setStudios(prev => prev.map(s => s.id === saved.id ? saved : s));
     } catch (e) {
-      window.alert(`Không thể cập nhật Studio: ${errorMessage(e)}`);
+      showToast(`Không thể cập nhật Studio: ${errorMessage(e)}`);
     }
   };
   const handleDeleteStudio = async (id: string) => {
@@ -1067,7 +1071,7 @@ export default function App() {
       await deleteStudio(id);
       setStudios(prev => prev.filter(s => s.id !== id));
     } catch (e) {
-      window.alert(`Không thể xóa Studio: ${errorMessage(e)}`);
+      showToast(`Không thể xóa Studio: ${errorMessage(e)}`);
     }
   };
 
@@ -1081,9 +1085,9 @@ export default function App() {
       // trùng ở state cục bộ và lúc insert thật chạy tới DB — DB vẫn là nguồn chặn trùng cuối
       // cùng (qr_code unique, 0001_init.sql). Dịch lỗi Postgres thô thành thông báo dễ hiểu (M7).
       if (typeof e === "object" && e !== null && "code" in e && (e as { code?: string }).code === "23505") {
-        window.alert(`Mã QR "${newEquipment.qrCode}" vừa bị thiết bị khác dùng mất — vui lòng đổi mã khác rồi thử lại.`);
+        showToast(`Mã QR "${newEquipment.qrCode}" vừa bị thiết bị khác dùng mất — vui lòng đổi mã khác rồi thử lại.`);
       } else {
-        window.alert(`Không thể tạo thiết bị: ${errorMessage(e)}`);
+        showToast(`Không thể tạo thiết bị: ${errorMessage(e)}`);
       }
     }
   };
@@ -1092,7 +1096,7 @@ export default function App() {
       const saved = await updateEquipment(updatedEquipment);
       setEquipments(prev => prev.map(e => e.id === saved.id ? saved : e));
     } catch (e) {
-      window.alert(`Không thể cập nhật thiết bị: ${errorMessage(e)}`);
+      showToast(`Không thể cập nhật thiết bị: ${errorMessage(e)}`);
     }
   };
   const handleDeleteEquipment = async (id: string) => {
@@ -1100,7 +1104,7 @@ export default function App() {
       await deleteEquipment(id);
       setEquipments(prev => prev.filter(e => e.id !== id));
     } catch (e) {
-      window.alert(`Không thể xóa thiết bị: ${errorMessage(e)}`);
+      showToast(`Không thể xóa thiết bị: ${errorMessage(e)}`);
     }
   };
 
@@ -1110,7 +1114,7 @@ export default function App() {
       const created = await createBrand(newBrand);
       setBrands(prev => [created, ...prev]);
     } catch (e) {
-      window.alert(`Không thể tạo Brand: ${errorMessage(e)}`);
+      showToast(`Không thể tạo Brand: ${errorMessage(e)}`);
     }
   };
   const handleUpdateBrand = async (updatedBrand: Brand) => {
@@ -1118,7 +1122,7 @@ export default function App() {
       const saved = await updateBrand(updatedBrand);
       setBrands(prev => prev.map(b => b.id === saved.id ? saved : b));
     } catch (e) {
-      window.alert(`Không thể cập nhật Brand: ${errorMessage(e)}`);
+      showToast(`Không thể cập nhật Brand: ${errorMessage(e)}`);
     }
   };
   const handleDeleteBrand = async (id: string) => {
@@ -1126,7 +1130,7 @@ export default function App() {
       await deleteBrand(id);
       setBrands(prev => prev.filter(b => b.id !== id));
     } catch (e) {
-      window.alert(`Không thể xóa Brand: ${errorMessage(e)}`);
+      showToast(`Không thể xóa Brand: ${errorMessage(e)}`);
     }
   };
 
@@ -1139,7 +1143,7 @@ export default function App() {
       setSessions(prev => prev.map(s => s.id === saved.id ? saved : s));
       return true;
     } catch (e) {
-      window.alert(`Không thể cập nhật Live Session: ${errorMessage(e)}`);
+      showToast(`Không thể cập nhật Live Session: ${errorMessage(e)}`);
       return false;
     }
   };
@@ -1149,7 +1153,7 @@ export default function App() {
       setSessions((prev) => prev.map((s) => (s.id === saved.id ? saved : s)));
       return true;
     } catch (e) {
-      window.alert(`Không thể lưu report ca live: ${errorMessage(e)}`);
+      showToast(`Không thể lưu report ca live: ${errorMessage(e)}`);
       return false;
     }
   };
@@ -1169,7 +1173,7 @@ export default function App() {
       // 0097: trigger DB đã trả slot đã chốt về 'open' — đồng bộ lại state slot.
       setShiftSlots((prev) => prev.map((sl) => (sl.sessionId === id ? { ...sl, status: "open", sessionId: undefined } : sl)));
     } catch (e) {
-      window.alert(`Không thể xóa Live Session: ${errorMessage(e)}`);
+      showToast(`Không thể xóa Live Session: ${errorMessage(e)}`);
     }
   };
   // Huỷ ca (0097): RPC đổi ca + slot trong 1 transaction; trigger 0083 tự báo host/trợ nếu ca chưa diễn ra.
@@ -1190,7 +1194,7 @@ export default function App() {
       );
       return true;
     } catch (e) {
-      window.alert(`Không huỷ được ca: ${errorMessage(e)}`);
+      showToast(`Không huỷ được ca: ${errorMessage(e)}`);
       return false;
     }
   };
@@ -1203,7 +1207,7 @@ export default function App() {
       setSessions((prev) => prev.map((s) => (s.id === id ? updated : s)));
       return true;
     } catch (e: unknown) {
-      window.alert(`${excluded ? "Không loại được ca" : "Không đưa lại được ca"}: ${errorMessage(e)}`);
+      showToast(`${excluded ? "Không loại được ca" : "Không đưa lại được ca"}: ${errorMessage(e)}`);
       return false;
     }
   };
@@ -1215,7 +1219,7 @@ export default function App() {
       await requestShiftDropout(sessionId, reason);
       return true;
     } catch (e: unknown) {
-      window.alert(`Không gửi được: ${errorMessage(e)}`);
+      showToast(`Không gửi được: ${errorMessage(e)}`);
       return false;
     }
   };
@@ -1227,7 +1231,7 @@ export default function App() {
       setShiftSlots((prev) => [...prev, created]);
       return true;
     } catch (e) {
-      window.alert(`Không thể mở ca mới: ${errorMessage(e)}`);
+      showToast(`Không thể mở ca mới: ${errorMessage(e)}`);
       return false;
     }
   };
@@ -1238,7 +1242,7 @@ export default function App() {
       setShiftSlots((prev) => prev.filter((s) => s.id !== id));
       setShiftRegistrations((prev) => prev.filter((r) => r.slotId !== id));
     } catch (e) {
-      window.alert(`Không thể xoá ca: ${errorMessage(e)}`);
+      showToast(`Không thể xoá ca: ${errorMessage(e)}`);
     }
   };
 
@@ -1248,7 +1252,7 @@ export default function App() {
       setRecurringShiftTemplates((prev) => [...prev, created]);
       return true;
     } catch (e) {
-      window.alert(`Không thể tạo quy tắc lặp: ${errorMessage(e)}`);
+      showToast(`Không thể tạo quy tắc lặp: ${errorMessage(e)}`);
       return false;
     }
   };
@@ -1259,7 +1263,7 @@ export default function App() {
       setRecurringShiftTemplates((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
       return true;
     } catch (e) {
-      window.alert(`Không thể cập nhật quy tắc lặp: ${errorMessage(e)}`);
+      showToast(`Không thể cập nhật quy tắc lặp: ${errorMessage(e)}`);
       return false;
     }
   };
@@ -1269,7 +1273,7 @@ export default function App() {
       await deleteRecurringShiftTemplate(id);
       setRecurringShiftTemplates((prev) => prev.filter((t) => t.id !== id));
     } catch (e) {
-      window.alert(`Không thể xoá quy tắc lặp: ${errorMessage(e)}`);
+      showToast(`Không thể xoá quy tắc lặp: ${errorMessage(e)}`);
     }
   };
 
@@ -1282,7 +1286,7 @@ export default function App() {
       setPlanTargetsBySlotId(planTargets.bySlotId);
       setPlanMonthTotals(planTargets.monthTotals);
     } catch (e) {
-      window.alert(`Không nạp lại được danh sách ca: ${errorMessage(e)}`);
+      showToast(`Không nạp lại được danh sách ca: ${errorMessage(e)}`);
     }
   };
 
@@ -1292,7 +1296,7 @@ export default function App() {
       setShiftRegistrations((prev) => [...prev, created]);
       return true;
     } catch (e) {
-      window.alert(`Không thể đăng ký ca: ${errorMessage(e)}`);
+      showToast(`Không thể đăng ký ca: ${errorMessage(e)}`);
       return false;
     }
   };
@@ -1303,7 +1307,7 @@ export default function App() {
       setShiftRegistrations((prev) => prev.filter((r) => !(r.slotId === slotId && r.talentId === talentId)));
       return true;
     } catch (e) {
-      window.alert(`Không thể huỷ đăng ký: ${errorMessage(e)}`);
+      showToast(`Không thể huỷ đăng ký: ${errorMessage(e)}`);
       return false;
     }
   };
@@ -1317,7 +1321,7 @@ export default function App() {
       });
       return true;
     } catch (e) {
-      window.alert(`Không lưu được phòng mặc định: ${errorMessage(e)}`);
+      showToast(`Không lưu được phòng mặc định: ${errorMessage(e)}`);
       return false;
     }
   };
@@ -1340,7 +1344,7 @@ export default function App() {
       setBrandPlatformRateHistory(await fetchBrandPlatformRateHistory());
       return true;
     } catch (e) {
-      window.alert(`Không thể lưu rate: ${errorMessage(e)}`);
+      showToast(`Không thể lưu rate: ${errorMessage(e)}`);
       return false;
     }
   };
@@ -1360,7 +1364,7 @@ export default function App() {
       setBrandPlatformRateHistory(await fetchBrandPlatformRateHistory());
       return true;
     } catch (e) {
-      window.alert(`Không thể lưu tỷ lệ hoàn hủy: ${errorMessage(e)}`);
+      showToast(`Không thể lưu tỷ lệ hoàn hủy: ${errorMessage(e)}`);
       return false;
     }
   };
@@ -1440,7 +1444,7 @@ export default function App() {
           // Rollback thất bại — session mồ côi vẫn còn trong DB, nhưng không nuốt lỗi gốc bên dưới.
         }
       }
-      window.alert(`Không thể chốt lịch: ${errorMessage(e)}`);
+      showToast(`Không thể chốt lịch: ${errorMessage(e)}`);
       return false;
     }
   };
@@ -1451,7 +1455,7 @@ export default function App() {
       const created = await createWorkflowRule(newRule);
       setWorkflowRules(prev => [created, ...prev]);
     } catch (e) {
-      window.alert(`Không thể tạo Workflow Rule: ${errorMessage(e)}`);
+      showToast(`Không thể tạo Workflow Rule: ${errorMessage(e)}`);
     }
   };
   const handleUpdateWorkflowRule = async (updatedRule: WorkflowRule) => {
@@ -1459,7 +1463,7 @@ export default function App() {
       const saved = await updateWorkflowRule(updatedRule);
       setWorkflowRules(prev => prev.map(r => r.id === saved.id ? saved : r));
     } catch (e) {
-      window.alert(`Không thể cập nhật Workflow Rule: ${errorMessage(e)}`);
+      showToast(`Không thể cập nhật Workflow Rule: ${errorMessage(e)}`);
     }
   };
   const handleDeleteWorkflowRule = async (id: string) => {
@@ -1467,7 +1471,7 @@ export default function App() {
       await deleteWorkflowRule(id);
       setWorkflowRules(prev => prev.filter(r => r.id !== id));
     } catch (e) {
-      window.alert(`Không thể xóa Workflow Rule: ${errorMessage(e)}`);
+      showToast(`Không thể xóa Workflow Rule: ${errorMessage(e)}`);
     }
   };
 
@@ -2105,6 +2109,20 @@ export default function App() {
                 </div>
               </div>
             ) : (
+              // ErrorBoundary riêng cho khu vực nội dung tab (trước đây chỉ có 1 ErrorBoundary ở
+              // gốc, main.tsx — lỗi render ở BẤT KỲ tab nào làm trắng cả app, mất luôn sidebar/
+              // header). `key={activeTab}` mount lại ErrorBoundary từ đầu mỗi khi đổi tab, nên
+              // chuyển sang tab khác luôn thoát khỏi trạng thái lỗi mà không cần logic reset riêng.
+              <Sentry.ErrorBoundary
+                key={activeTab}
+                fallback={({ resetError }) => (
+                  <TabErrorFallback
+                    tabLabel={currentTabNavItem?.label ?? activeTab}
+                    onRetry={resetError}
+                    onGoHome={() => setActiveTab(firstAllowedTab ?? getDefaultTabForRole(currentRole))}
+                  />
+                )}
+              >
               <>
                 {activeTab === "sessions" && (
                   <SessionLedger
@@ -2585,6 +2603,7 @@ export default function App() {
                   <AccountSettings activeUser={activeUser} onUpdateUser={handleUpdateUser} />
                 )}
               </>
+              </Sentry.ErrorBoundary>
             )}
           </div>
         </main>

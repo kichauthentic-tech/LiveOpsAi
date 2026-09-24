@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Studio, Equipment, LiveSession } from "../types";
 import { Building2, Camera, QrCode, Plus, Edit3, Trash2, X, Search } from "lucide-react";
 import { getTodayDate } from "../lib/dateUtils";
+import { useToast } from "../hooks/useToast";
 
 interface StudioEquipmentProps {
   studios: Studio[];
@@ -40,6 +41,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
   onUpdateEquipment,
   onDeleteEquipment
 }) => {
+  const { showToast } = useToast();
   const [activeSubTab, setActiveSubTab] = useState<"studios" | "equipment">("studios");
   const [simulatedQrScan, setSimulatedQrScan] = useState<string | null>(null);
 
@@ -170,7 +172,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
       (eq) => eq.qrCode.toLowerCase() === trimmedQrCode.toLowerCase() && eq.id !== editingEquipment?.id
     );
     if (isDuplicateQrCode) {
-      window.alert(`Mã QR "${trimmedQrCode}" đã được dùng cho thiết bị khác — vui lòng đổi mã khác.`);
+      showToast(`Mã QR "${trimmedQrCode}" đã được dùng cho thiết bị khác — vui lòng đổi mã khác.`);
       return;
     }
 

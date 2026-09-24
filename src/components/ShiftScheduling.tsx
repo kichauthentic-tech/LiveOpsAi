@@ -43,6 +43,7 @@ import { SchedulingGap, computeSchedulingGaps } from "../lib/performance/brandCo
 import { FATIGUE_WEEK_HOURS, HostSuggestion, headlineFor, suggestHosts } from "../lib/performance/hostSuggestion";
 import { BulkFinalizePanel } from "./BulkFinalizePanel";
 import { eligibleSlots } from "../lib/performance/bulkFinalize";
+import { useToast } from "../hooks/useToast";
 
 interface ShiftSchedulingProps {
   currentRole: UserRole;
@@ -156,6 +157,7 @@ export default function ShiftScheduling({
   onSetSessionExcluded,
   onRequestDropout
 }: ShiftSchedulingProps) {
+  const { showToast } = useToast();
   const admin = isAdminRole(currentRole);
   const myTalentId = activeUser.assignedTalentId;
   const today = getTodayDateString();
@@ -335,7 +337,7 @@ export default function ShiftScheduling({
   const handleFinalize = async (slot: ShiftSlot) => {
     const pick = pickByLot[slot.id];
     if (!pick?.hostId) {
-      window.alert("Chọn Host trước khi chốt lịch.");
+      showToast("Chọn Host trước khi chốt lịch.");
       return;
     }
     setBusySlotId(slot.id);

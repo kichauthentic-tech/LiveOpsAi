@@ -22,6 +22,7 @@ import { DataSourceBadge } from "./common/DataSourceBadge";
 import { BrandLogo } from "./ui/BrandLogo";
 import { SessionLiveSnapshotUpload } from "./SessionLiveSnapshotUpload";
 import { SessionReportForm } from "./SessionReportForm";
+import { useToast } from "../hooks/useToast";
 
 // Cửa sổ Ca Live — MỘT cửa sổ chi tiết cho một ca, dùng chung cho mọi nơi click vào ca (Sổ Ca,
 // Lịch Vận Hành, Đăng Ký & Chốt Lịch, Sessions bên brand). Thay cho 3 "chi tiết ca" khác nhau
@@ -106,6 +107,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
   onRequestDropout,
   onLogAudit
 }) => {
+  const { showToast } = useToast();
   const isBrandView = viewer.role === "brand";
   const isOps = OPS_ROLES.includes(viewer.role);
   const isMine = !!viewer.myTalentId && (viewer.myTalentId === s.hostId || viewer.myTalentId === s.coHostId);
@@ -180,7 +182,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
 
   const saveEdit = async () => {
     if (!onUpdateSession) return;
-    if (edit.startTime === edit.endTime) { window.alert("Giờ bắt đầu và giờ kết thúc không được trùng nhau."); return; }
+    if (edit.startTime === edit.endTime) { showToast("Giờ bắt đầu và giờ kết thúc không được trùng nhau."); return; }
     const studioObj = studios?.find((x) => x.id === edit.studioId);
     const hostObj = talents?.find((t) => t.id === edit.hostId);
     const coObj = talents?.find((t) => t.id === edit.coHostId);

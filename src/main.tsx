@@ -4,6 +4,7 @@ import * as Sentry from '@sentry/react';
 import App from './App.tsx';
 import { AuthProvider } from './hooks/useAuth';
 import { ThemeProvider } from './hooks/useTheme';
+import { ToastProvider } from './hooks/useToast';
 import './index.css';
 
 // Error tracking (Phase 11) — no-op until VITE_SENTRY_DSN is set, same gated
@@ -19,9 +20,11 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <Sentry.ErrorBoundary fallback={<ErrorFallback />}>
       <ThemeProvider>
-        <AuthProvider>
-          <App />
-        </AuthProvider>
+        <ToastProvider>
+          <AuthProvider>
+            <App />
+          </AuthProvider>
+        </ToastProvider>
       </ThemeProvider>
     </Sentry.ErrorBoundary>
   </StrictMode>,

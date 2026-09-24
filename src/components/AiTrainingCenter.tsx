@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { BrainCircuit, RefreshCw, RotateCcw, Save, ShieldAlert, CheckCircle2 } from "lucide-react";
 import { AiAgentPrompt } from "../types";
 import { errorMessage } from "../lib/errorMessage";
+import { useToast } from "../hooks/useToast";
 
 interface AiTrainingCenterProps {
   prompts: AiAgentPrompt[];
@@ -11,6 +12,7 @@ interface AiTrainingCenterProps {
 }
 
 export const AiTrainingCenter: React.FC<AiTrainingCenterProps> = ({ prompts, loading, error, onUpdate }) => {
+  const { showToast } = useToast();
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [savedKey, setSavedKey] = useState<string | null>(null);
@@ -45,7 +47,7 @@ export const AiTrainingCenter: React.FC<AiTrainingCenterProps> = ({ prompts, loa
       setSavedKey(agentKey);
       setTimeout(() => setSavedKey((k) => (k === agentKey ? null : k)), 2000);
     } catch (e) {
-      window.alert(`Không thể lưu system prompt: ${errorMessage(e)}`);
+      showToast(`Không thể lưu system prompt: ${errorMessage(e)}`);
     } finally {
       setSavingKey(null);
     }

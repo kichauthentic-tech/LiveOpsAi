@@ -15,6 +15,7 @@ import { DataSourceBadge } from "./common/DataSourceBadge";
 import { dataQuality } from "../lib/performance/hostPerformance";
 import { errorMessage } from "../lib/errorMessage";
 import { todayVn } from "../lib/performance/brandCommitment";
+import { useToast } from "../hooks/useToast";
 
 interface FinanceHrProps {
   sessions: LiveSession[];
@@ -46,6 +47,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
   onUpdateFinance,
   onSetFinanceApproval
 }) => {
+  const { showToast } = useToast();
   const [savingId, setSavingId] = useState<string | null>(null);
 
   const financeBySessionId = useMemo(() => {
@@ -138,7 +140,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
     try {
       await onUpdateFinance(sessionId, { [field]: value });
     } catch (e) {
-      window.alert(errorMessage(e, "Không lưu được số liệu tài chính."));
+      showToast(errorMessage(e, "Không lưu được số liệu tài chính."));
     } finally {
       setSavingId(null);
     }
@@ -149,7 +151,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
     try {
       await onSetFinanceApproval(sessionId, status);
     } catch (e) {
-      window.alert(errorMessage(e, "Không cập nhật được trạng thái duyệt. Có thể bạn không có quyền CEO."));
+      showToast(errorMessage(e, "Không cập nhật được trạng thái duyệt. Có thể bạn không có quyền CEO."));
     } finally {
       setSavingId(null);
     }

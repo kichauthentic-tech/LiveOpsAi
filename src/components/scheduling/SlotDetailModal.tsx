@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { LiveSession, ShiftSlot, ShiftRegistration, Talent } from "../../types";
 import { X, Users, UserCheck, UserX, Check, AlertTriangle, Trash2 } from "lucide-react";
 import { dateTimeRangesOverlap } from "../../lib/dateUtils";
+import { useToast } from "../../hooks/useToast";
 
 interface SlotDetailModalProps {
   slot: ShiftSlot;
@@ -35,6 +36,7 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
   onFinalizeSlot,
   onDeleteSlot
 }) => {
+  const { showToast } = useToast();
   const [hostId, setHostId] = useState("");
   const [coHostId, setCoHostId] = useState("");
   const [busy, setBusy] = useState(false);
@@ -76,7 +78,7 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
 
   const handleFinalize = async () => {
     if (!hostId || !onFinalizeSlot) {
-      if (!hostId) window.alert("Chọn Host trước khi chốt lịch.");
+      if (!hostId) showToast("Chọn Host trước khi chốt lịch.");
       return;
     }
     setBusy(true);
