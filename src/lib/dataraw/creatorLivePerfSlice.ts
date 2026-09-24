@@ -198,21 +198,24 @@ export async function fetchCreatorLivePerfMonthSlice(brandId: string, monthStart
   const rows: CreatorLivePerfRow[] = [];
   const coveredDays = new Set<string>();
   for (const imp of overlapping) {
-    for (
-      const d of eachDay(
-        imp.period_start! > monthStart ? imp.period_start! : monthStart,
-        imp.period_end! < monthEnd ? imp.period_end! : monthEnd
-      )
-    ) {
-      coveredDays.add(d);
-    }
-
     const raws = rowsByImport.get(imp.id) ?? [];
     try {
-      for (const parsed of mapCreatorLivePerfRows(imp.columns, raws)) {
-        const date = vnDateOf(parsed.startTime);
+      const parsed = mapCreatorLivePerfRows(imp.columns, raws); // ném lỗi nếu thiếu cột "Start Time"
+      // Chỉ coi kỳ batch là "đã phủ" SAU KHI parse thành công — mark trước (bản cũ) làm một batch
+      // sai report type/TikTok đổi tên cột bị coveredDays "nuốt" mất, missingDays báo sai là đã
+      // có dữ liệu dù 0 dòng đọc được — đúng kiểu lỗi mà trường này sinh ra để tránh.
+      for (
+        const d of eachDay(
+          imp.period_start! > monthStart ? imp.period_start! : monthStart,
+          imp.period_end! < monthEnd ? imp.period_end! : monthEnd
+        )
+      ) {
+        coveredDays.add(d);
+      }
+      for (const p of parsed) {
+        const date = vnDateOf(p.startTime);
         if (date < monthStart || date > monthEnd) continue;
-        rows.push(parsed);
+        rows.push(p);
       }
     } catch {
       // Batch thiếu cột "Start Time" (sai report type lúc import) — bỏ qua batch này thay vì làm

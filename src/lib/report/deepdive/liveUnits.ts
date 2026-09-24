@@ -1,5 +1,6 @@
 import { LiveSession } from "../../../types";
 import { CreatorLivePerfRow, vnDateOf } from "../../dataraw/creatorLivePerfSlice";
+import { hasLiveNumbers } from "../sessionsLivePerf";
 
 // ---------------------------------------------------------------------------
 // THỐNG NHẤT NGUỒN SỐ CA (chốt với user 2026-09-23).
@@ -72,8 +73,13 @@ function hoursOfSession(s: LiveSession): number {
 }
 
 function fromSessions(sessions: LiveSession[]): LiveUnit[] {
+  // `hasLiveNumbers` (Completed + có số đối soát/snapshot/actualGmv) — CÙNG định nghĩa với Report
+  // Tháng (sessionsLivePerf.ts). Trước đây chỉ lọc "khác Cancelled" nên ca "Upcoming"/"Live Now"
+  // (chưa diễn ra, actualGmv=0 nhưng vẫn có giờ KẾ HOẠCH) lọt vào — pha loãng GMV/giờ LIVE và thổi
+  // phồng số phiên của THÁNG ĐANG XEM (mặc định trang mở ra), đúng kiểu lệch số 2 trang từng vá hồi
+  // 2026-09-23 (xem đầu file) chỉ khác đường gây ra.
   return sessions
-    .filter((s) => s.status !== "Cancelled")
+    .filter(hasLiveNumbers)
     .map((s) => ({
       key: s.id,
       title: s.title ?? "",

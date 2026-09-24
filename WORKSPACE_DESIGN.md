@@ -134,7 +134,12 @@
 >    ở App.tsx; `LiveCalendar` dựng Date từ chuỗi kiểu lệch múi giờ ở 6 chỗ, dormant vì agency chỉ
 >    dùng giờ VN). Module 2/5 **Lập kế hoạch XONG 2026-09-25**: đọc kỹ MonthPlan/suggestEngine/
 >    planMonthSlots/BulkFinalizePanel/bulkFinalize + lib phụ trợ — **không tìm thấy lỗi**, không sửa
->    gì. Còn 3 module: Brand Workspace & Report · Tài chính & nhân sự · Hệ thống — chi tiết ở mục
+>    gì. Module 3/5 **Brand Workspace & Report XONG 2026-09-25**: 4 lỗi thật tìm thấy + sửa, tất cả
+>    cùng họ "2 nơi tính 1 chỉ số ra 2 số khác nhau" (3 chỗ `missingDays` mark "đã phủ" trước khi biết
+>    batch đọc được không, khiến dữ liệu thiếu bị đọc thành 0 mà không cảnh báo; `liveUnits.ts` đếm cả
+>    ca chưa diễn ra vào Report Chuyên Sâu; CTOR ở `creatorLivePerfMetrics.ts` dùng sai `orders` thay vì
+>    `skuOrders` khiến Report Tháng gửi brand và Report Chuyên Sâu nội bộ hiện 2 số CTOR khác nhau).
+>    Còn 2 module: Tài chính & nhân sự · Hệ thống — chi tiết ở mục
 >    `## Audit toàn diện code base (2026-09-23)`.
 
 
@@ -276,9 +281,67 @@ Chưa có unit test riêng cho `bulkFinalize.ts`/`planMonthSlots.ts`/`monthPlanG
 `suggestEngineBorrowed.test.ts` cho nhánh Đ12 mượn lịch sử) — ghi nhận là khoảng trống, chưa phải việc
 được yêu cầu làm ở đợt audit này. `tsc --noEmit` xanh (không sửa gì nên không cần chạy lại `eslint`/`vitest`).
 
-**Phần 2 còn lại chưa audit** (theo module): Brand Workspace & Report (MonthlyReportTabs / MonthlyDeepDive /
-`dataraw/*` / `report/*`) · Tài chính & nhân sự (FinanceHr / BrandCommitment / HostPerformance /
-TalentMatcher) · Hệ thống (UserRoleSettings / AccountSettings / Header / notification / theme).
+**Phần 2 — module Brand Workspace & Report: XONG 2026-09-25**, đọc code `MonthlyReportTabs.tsx` (2217
+dòng, file lớn nhất dự án) / `deepdive/MonthlyDeepDive.tsx` + `deepdive/kit.tsx` / `lib/dataraw/*` (9
+file: parseDataRawExcel, liveAnalysisRows, creatorLivePerfSlice, creatorLivePerfMetrics,
+affiliateLiveSessionSlice, monthlyDailySlice, monthlyProductSlice, weeklySlice, deepDiveSource) /
+`lib/report/*` (sessionsLivePerf.ts, deepdive/liveUnits.ts, deepdive/metrics.ts — 685 dòng). **4 lỗi
+thật tìm thấy, cả 4 đã sửa**, tất cả cùng một họ lỗi: hai/nhiều nơi tính CÙNG một chỉ số theo CÔNG THỨC
+KHÁC NHAU hoặc theo BỘ LỌC KHÁC NHAU trên cùng dữ liệu nguồn — chính loại lỗi mà `liveUnits.ts` đã ghi
+nhận từng gây lệch 61,8 triệu đ một lần (2026-09-23) và cố tránh, nhưng chưa quét hết:
+
+1. **`missingDays` mark "đã phủ" TRƯỚC KHI biết batch đọc được hay không** — 3 file cùng một bug:
+   [creatorLivePerfSlice.ts](src/lib/dataraw/creatorLivePerfSlice.ts) (`fetchCreatorLivePerfMonthSlice`),
+   [monthlyDailySlice.ts](src/lib/dataraw/monthlyDailySlice.ts) (`fetchDailyRows`),
+   [weeklySlice.ts](src/lib/dataraw/weeklySlice.ts) (`fetchDataRawWeekSlice`). Cả 3 đánh dấu ngày của
+   một batch là "đã phủ" (`coveredDays.add`) dựa trên METADATA kỳ (`period_start`/`period_end`) TRƯỚC
+   khi thử dò cột mốc (Start Time/Thời gian/Ngày) của batch đó — nếu batch bị import sai report type,
+   hoặc TikTok đổi tên cột (đã xảy ra thật: `affiliateCreatorListSlice.ts` — "Affiliate video-attributed
+   GMV" → "Creator video-attributed GMV", bản export T9/2026, xem mục "Còn lại của audit"), toàn bộ
+   batch đọc ra 0 dòng nhưng ngày của nó VẪN được coi là "đã có dữ liệu" — cảnh báo "thiếu file N ngày"
+   (hiện ở cả Report Tuần lẫn Report Tháng Chuyên Sâu) không bao giờ bắn ra, dữ liệu thiếu bị đọc thành
+   0 âm thầm. **ĐÃ SỬA cả 3**: chỉ `coveredDays.add` SAU KHI xác nhận cột mốc/parse thành công (dò cột
+   trước rồi mới mark ở monthlyDailySlice; đưa `mark` vào trong `try` sau lệnh parse ở 2 file kia).
+2. **`liveUnits.ts` (`fromSessions`, Report Chuyên Sâu) đếm cả ca CHƯA DIỄN RA** — chỉ lọc
+   `status !== "Cancelled"`, nên ca "Upcoming"/"Live Now" (chưa có `actualGmv`, nhưng vẫn có giờ KẾ
+   HOẠCH qua nhánh fallback của `hoursOfSession`) lọt vào làm pha loãng GMV/giờ LIVE và thổi phồng số
+   phiên — đúng ngay THÁNG ĐANG XEM MẶC ĐỊNH khi mở trang (tháng hiện tại, luôn có ca chưa live). Trong
+   khi đó report song sinh (`sessionsLivePerf.ts`, Tab 01/02 của `MonthlyReportTabs.tsx`) đã lọc đúng
+   bằng `hasLiveNumbers` (chỉ `Completed` có số thật). **ĐÃ SỬA**: `fromSessions` giờ filter bằng chính
+   `hasLiveNumbers` import từ `sessionsLivePerf.ts` — 2 report dùng chung một định nghĩa "ca nào tính".
+3. **CTOR tính sai công thức ở `creatorLivePerfMetrics.ts`** (nuôi Tab 02 `MonthlyReportTabs.tsx`,
+   brand-facing) — dùng `orders / productClicks`, trong khi CTOR thật của TikTok là **SKU order**
+   (chính cột gốc TikTok đặt tên "CTOR (SKU order)", xem `deepDiveSource.ts:456`) — `metrics.ts` (Report
+   Chuyên Sâu, ops-only) đã dùng đúng `skuOrders / productClicks` từ đầu. `CreatorLivePerfRow` vốn đã có
+   sẵn field `skuOrders` riêng (khác `orders`), `aggregateCreatorLivePerfRows` chỉ đơn giản là chưa cộng
+   dồn nó. Kết quả: Report Tháng gửi brand và Report Chuyên Sâu nội bộ hiện HAI con số CTOR khác nhau
+   cho cùng một tháng. **ĐÃ SỬA**: thêm `skuOrders` vào accumulator + `CreatorLivePerfAgg`, đổi công
+   thức `ctor` sang `skuOrders / productClicks`.
+
+Điểm đã soát và xác nhận KHÔNG phải bug: mọi chỗ dựng `Date` trong cả module (kể cả các hàm VN-offset
+riêng ở `liveAnalysisRows.ts`/`creatorLivePerfSlice.ts`/`affiliateLiveSessionSlice.ts`) đều nhất quán
+UTC+giờ-đọc-UTC; wiring props `App.tsx` → `BrandMonthlyReport.tsx` → `MonthlyReportTabs.tsx` /
+`MonthlyDeepDive.tsx` đủ, không thiếu dây như Đ-dropout; toàn bộ logic tính toán của
+`MonthlyReportTabs.tsx` nằm gọn ở ~940 dòng đầu (đã đọc hết), phần còn lại là JSX thuần không có phép
+tính mới.
+
+**Khoảng trống đã thấy nhưng CHƯA sửa** (out of scope cho đợt này, ghi lại để không quên): `present`
+(brand đã upload loại report nào) trong `deepDiveSource.ts` cũng chỉ dựa vào METADATA kỳ của batch,
+không xác nhận cột mốc đọc được — cùng họ lỗi với mục 1 nhưng sửa đúng cách tốn hơn (cần dò cột ngay
+trong vòng lặp tính `present`, vốn cố tình KHÔNG fetch rows của mọi tháng để tiết kiệm băng thông — xem
+comment tại chỗ). Với `shop_analytics` có lưới an toàn phụ (`missingShopDays` tính từ dòng THỰC ĐỌC ĐƯỢC
+chứ không phải metadata) nên đỡ hơn; 4 report còn lại (`live_performance_core_stats`,
+`creator_live_performance`, `product_list`, `shop_promotion`) không có lưới đó — batch sai cột sẽ đọc
+ra rỗng mà cảnh báo "Thiếu file" trong `quality` của Report Chuyên Sâu không bắn.
+
+Verify: `npm run typecheck` xanh, `npx eslint` trên 5 file đã sửa 0 lỗi, `npm test` 38/38 xanh, browser
+smoke test (`preview_start` → `read_console_messages` → `preview_logs` → `preview_stop`) không lỗi
+console/server. Chưa đăng nhập thật để xem 2 tab Report Tháng/Report Chuyên Sâu trên dữ liệu CROCS —
+để dịp có ai đăng nhập hộ (Claude không tự nhập mật khẩu).
+
+**Phần 2 còn lại chưa audit** (theo module): Tài chính & nhân sự (FinanceHr / BrandCommitment /
+HostPerformance / TalentMatcher) · Hệ thống (UserRoleSettings / AccountSettings / Header / notification
+/ theme).
 
 ## Chạy thử TOÀN BỘ workflow trên app thật (2026-09-24) — 12 điểm đứt gãy, ĐÃ SỬA CẢ 12
 

@@ -115,10 +115,15 @@ export async function fetchDataRawWeekSlice(brandId: string, weekStart: string, 
     const rows = rowsByImport.get(imp.id) ?? [];
     // Ngày được phủ = giao của kỳ batch với tuần, tính theo METADATA kỳ chứ không theo dòng có
     // mặt: shop_analytics luôn có đủ dòng mọi ngày trong kỳ, còn live_analysis thì ngày không
-    // live sẽ không có dòng nào — không thể suy "thiếu file" từ "thiếu dòng".
-    for (const d of eachDay(imp.period_start! > weekStart ? imp.period_start! : weekStart, imp.period_end! < weekEnd ? imp.period_end! : weekEnd)) {
-      coveredDays.add(d);
-    }
+    // live sẽ không có dòng nào — không thể suy "thiếu file" từ "thiếu dòng". Nhưng CHỈ mark phủ
+    // SAU KHI xác nhận đọc được cột mốc của batch (date/startTime) — mark trước khi biết batch có
+    // đọc được không (bản cũ) làm một batch sai report type/TikTok đổi tên cột bị coveredDays
+    // "nuốt" mất dù 0 dòng đọc được, missingDays báo sai là đã có dữ liệu.
+    const markCovered = () => {
+      for (const d of eachDay(imp.period_start! > weekStart ? imp.period_start! : weekStart, imp.period_end! < weekEnd ? imp.period_end! : weekEnd)) {
+        coveredDays.add(d);
+      }
+    };
 
     if (imp.report_type === "shop_analytics") {
       // Shop Analytics xuất được cả tiếng Việt lẫn tiếng Anh (xem parseShopAnalytics) — cột lưu
@@ -138,6 +143,7 @@ export async function fetchDataRawWeekSlice(brandId: string, weekStart: string, 
         gmvLiveCreator: findCol(imp.columns, /^(?:GMV LIVE của nhà sáng tạo|Creator LIVE GMV)$/i)
       };
       if (!c.date) continue;
+      markCovered();
       for (const raw of rows) {
         const date = vnDateToIso(raw[c.date]);
         if (!date || date < weekStart || date > weekEnd) continue;
@@ -165,7 +171,9 @@ export async function fetchDataRawWeekSlice(brandId: string, weekStart: string, 
       // hỏng là chết cả trang Report Tuần — giờ bỏ qua đúng batch đó, như creatorLivePerfSlice.ts
       // vẫn làm.
       try {
-        for (const parsed of mapDataRawToImportRows(imp.columns, rows)) {
+        const parsedRows = mapDataRawToImportRows(imp.columns, rows); // ném lỗi nếu thiếu cột mốc
+        markCovered();
+        for (const parsed of parsedRows) {
           const vn = vnParts(parsed.startTime);
           if (vn.date < weekStart || vn.date > weekEnd) continue;
           live.push({

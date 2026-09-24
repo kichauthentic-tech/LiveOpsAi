@@ -9,6 +9,7 @@ export interface CreatorLivePerfAgg {
   gmv: number;
   itemsSold: number;
   orders: number;
+  skuOrders: number;
   hours: number;
   views: number;
   impressions: number;
@@ -23,7 +24,12 @@ export interface CreatorLivePerfAgg {
   gmvPerHour: number | null;
   viewsPerHour: number | null;
   ctr: number | null; // = productClicks / productImpressions — tính lại từ số đếm, KHÔNG lấy trung bình cột % có sẵn (sai lệch khi phiên to/nhỏ khác nhau)
-  ctor: number | null; // = orders / productClicks
+  // = skuOrders / productClicks. FIX (audit module 3, 2026-09-25): trước đây dùng `orders` (Attributed
+  // orders) — sai định nghĩa của chính TikTok, cột gốc là "CTOR (SKU order)" (xem deepDiveSource.ts /
+  // metrics.ts đã dùng đúng skuOrders từ đầu). Report Tháng Tab 02 (brand-facing, dùng agg này) và
+  // Report Chuyên Sâu Tab 05 (ops-only, dùng metrics.ts) vì vậy từng hiện 2 con số CTOR khác nhau cho
+  // cùng một tháng — đúng kiểu lệch số hai trang mà liveUnits.ts đã ghi nhận suýt vá hụt.
+  ctor: number | null;
   liveCtr: number | null; // = views / impressions
 }
 
@@ -31,6 +37,7 @@ export function aggregateCreatorLivePerfRows(rows: CreatorLivePerfRow[]): Creato
   let gmv = 0,
     itemsSold = 0,
     orders = 0,
+    skuOrders = 0,
     hours = 0,
     views = 0,
     impressions = 0,
@@ -44,6 +51,7 @@ export function aggregateCreatorLivePerfRows(rows: CreatorLivePerfRow[]): Creato
     gmv += r.gmv;
     itemsSold += r.itemsSold;
     orders += r.orders;
+    skuOrders += r.skuOrders;
     hours += r.hours;
     views += r.views;
     impressions += r.impressions;
@@ -59,6 +67,7 @@ export function aggregateCreatorLivePerfRows(rows: CreatorLivePerfRow[]): Creato
     gmv,
     itemsSold,
     orders,
+    skuOrders,
     hours,
     views,
     impressions,
@@ -73,7 +82,7 @@ export function aggregateCreatorLivePerfRows(rows: CreatorLivePerfRow[]): Creato
     gmvPerHour: hours > 0 ? gmv / hours : null,
     viewsPerHour: hours > 0 ? views / hours : null,
     ctr: productImpressions > 0 ? (productClicks / productImpressions) * 100 : null,
-    ctor: productClicks > 0 ? (orders / productClicks) * 100 : null,
+    ctor: productClicks > 0 ? (skuOrders / productClicks) * 100 : null,
     liveCtr: impressions > 0 ? (views / impressions) * 100 : null
   };
 }

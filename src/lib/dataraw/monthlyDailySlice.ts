@@ -65,6 +65,12 @@ async function fetchDailyRows(
   const raws: { date: string; raw: Record<string, unknown> }[] = [];
   const coveredDays = new Set<string>();
   for (const imp of overlapping) {
+    const dc = findCol(imp.columns, /^(?:Thời gian|Time)$/i);
+    // Không dò được cột ngày (import nhầm report type, hoặc TikTok đổi tên cột — đã xảy ra thật,
+    // xem affiliateCreatorListSlice trong WORKSPACE_DESIGN.md) -> KHÔNG coi kỳ batch là "đã phủ".
+    // Mark covered trước rồi mới check dc (bản cũ) làm missingDays im lặng báo sai "đã có dữ liệu"
+    // cho một batch 0 dòng đọc được — đúng kiểu lỗi mà trường này sinh ra để tránh.
+    if (!dc) continue;
     for (
       const d of eachDay(
         imp.period_start! > monthStart ? imp.period_start! : monthStart,
@@ -73,8 +79,6 @@ async function fetchDailyRows(
     ) {
       coveredDays.add(d);
     }
-    const dc = findCol(imp.columns, /^(?:Thời gian|Time)$/i);
-    if (!dc) continue;
     for (const raw of rowsByImport.get(imp.id) ?? []) {
       const date = String(raw[dc] ?? "").slice(0, 10);
       if (!date || date < monthStart || date > monthEnd) continue;
