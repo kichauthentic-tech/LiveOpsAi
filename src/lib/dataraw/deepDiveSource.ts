@@ -248,6 +248,34 @@ async function fetchRowsPaged(importIds: string[]): Promise<Map<string, Record<s
 }
 
 /**
+ * Batch có đọc được không, chỉ dựa vào `columns` (không cần tải `rows`) — dùng để tính `present`
+ * đúng thay vì chỉ theo metadata kỳ (xem comment ở chỗ gọi). Mỗi nhánh dùng ĐÚNG cột mốc mà hàm đọc
+ * dòng tương ứng bên dưới tự kiểm (`c.date`/`c.name`+`c.gmv`), cộng cột mốc "Start Time" của
+ * `mapCreatorLivePerfRows` (creatorLivePerfSlice.ts) — không tự tạo thêm quy tắc thứ hai.
+ * `live_analysis` không nằm trong danh sách "Thiếu file" của `quality` (metrics.ts) nên không ảnh
+ * hưởng cảnh báo gì — trả `true` để giữ nguyên hành vi cũ (present chỉ theo metadata) cho loại này.
+ */
+function canReadReportType(reportType: string, columns: DataRawColumn[]): boolean {
+  switch (reportType as DataRawReportType) {
+    case "shop_analytics":
+      return !!findCol(columns, /^(?:Ngày|Date)$/i);
+    case "live_performance_core_stats":
+      return !!findCol(columns, /^(?:Thời gian|Time)$/i);
+    case "creator_live_performance":
+      return !!findCol(columns, /^Start Time$/i);
+    case "product_list":
+      return !!(colAt(columns, 0, "Product Name") ?? colAt(columns, 0, "Tên")) && !!colAt(columns, 3, "GMV");
+    case "shop_promotion":
+      return !!findCol(columns, /^(?:Tên khuyến mãi|Promotion name)$/i);
+    case "live_analysis":
+      return true;
+    default:
+      // report_type lạ (dữ liệu cũ/hỏng) — không khớp key nào trong `present` nên không quan trọng.
+      return false;
+  }
+}
+
+/**
  * Nạp nguồn cho NHIỀU tháng trong một lần truy vấn. Report chuyên sâu luôn cần ít nhất tháng này +
  * tháng trước (MoM) và thường 4-6 tháng cho đường xu hướng; gọi từng tháng sẽ thành N×6 round-trip.
  *
@@ -315,7 +343,18 @@ export async function fetchDeepDiveSources(brandId: string, months: string[], op
   // present = "brand ĐÃ upload loại report này cho tháng đó", tính trên TOÀN BỘ batch chứ không
   // chỉ batch được nạp dòng — nếu không, tháng chỉ dùng cho đường xu hướng (không nạp product_list)
   // sẽ bị báo nhầm là "thiếu file".
+  //
+  // FIX (audit module 3, 2026-09-25): trước đây chỉ xét METADATA kỳ (period_start/period_end) —
+  // cùng họ lỗi với `missingDays` đã vá ở weeklySlice/monthlyDailySlice/creatorLivePerfSlice. Một
+  // batch bị import nhầm report type, hoặc TikTok đổi tên cột (đã xảy ra thật — xem
+  // affiliateCreatorListSlice trong WORKSPACE_DESIGN.md), sẽ đọc ra 0 dòng ở vòng lặp bên dưới
+  // (readShopDays/readLiveDays/... đều tự trả [] khi thiếu cột mốc) nhưng `present` vẫn báo "đã có
+  // file", nên cảnh báo "Thiếu file X" ở `quality` không bao giờ bắn — khối đó lặng lẽ hiện rỗng mà
+  // không ai biết vì sao. `canReadReportType` dùng ĐÚNG cột mốc mà từng hàm đọc dòng bên dưới tự
+  // kiểm, nhưng chỉ cần `b.columns` (đã có sẵn từ câu SELECT, không cần tải `rows`) nên vẫn tính
+  // được cho cả những tháng cố tình không nạp dòng (đường xu hướng, xem comment `needed` ở trên).
   for (const b of batches) {
+    if (!canReadReportType(b.report_type, b.columns)) continue;
     for (const s of spans) {
       if (!(b.period_start! <= s.end && b.period_end! >= s.start)) continue;
       if ((b.report_type === "product_list" || b.report_type === "shop_promotion") && b.period_start!.slice(0, 7) !== s.month) continue;

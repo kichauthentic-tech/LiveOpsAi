@@ -336,14 +336,16 @@ UTC+giờ-đọc-UTC; wiring props `App.tsx` → `BrandMonthlyReport.tsx` → `M
 `MonthlyReportTabs.tsx` nằm gọn ở ~940 dòng đầu (đã đọc hết), phần còn lại là JSX thuần không có phép
 tính mới.
 
-**Khoảng trống đã thấy nhưng CHƯA sửa** (out of scope cho đợt này, ghi lại để không quên): `present`
-(brand đã upload loại report nào) trong `deepDiveSource.ts` cũng chỉ dựa vào METADATA kỳ của batch,
-không xác nhận cột mốc đọc được — cùng họ lỗi với mục 1 nhưng sửa đúng cách tốn hơn (cần dò cột ngay
-trong vòng lặp tính `present`, vốn cố tình KHÔNG fetch rows của mọi tháng để tiết kiệm băng thông — xem
-comment tại chỗ). Với `shop_analytics` có lưới an toàn phụ (`missingShopDays` tính từ dòng THỰC ĐỌC ĐƯỢC
-chứ không phải metadata) nên đỡ hơn; 4 report còn lại (`live_performance_core_stats`,
-`creator_live_performance`, `product_list`, `shop_promotion`) không có lưới đó — batch sai cột sẽ đọc
-ra rỗng mà cảnh báo "Thiếu file" trong `quality` của Report Chuyên Sâu không bắn.
+**`present` (deepDiveSource.ts) — XONG 2026-09-25, vá nốt khoảng trống đã ghi ở đợt trước.** `present`
+(brand đã upload loại report nào cho tháng đó) trước đây chỉ dựa vào METADATA kỳ của batch, không xác
+nhận cột mốc đọc được — cùng họ lỗi với mục 1 (missingDays) nhưng khó vá hơn vì vòng lặp tính `present`
+cố tình KHÔNG fetch `rows` cho mọi tháng (tiết kiệm băng thông — tháng chỉ dùng cho đường xu hướng
+không cần chi tiết). Lối ra: `columns` (khác `rows`) đã có sẵn ngay từ câu SELECT đầu, không cần tải gì
+thêm — viết `canReadReportType(reportType, columns)` dò ĐÚNG cột mốc mà từng hàm đọc dòng
+(`readShopDays`/`readLiveDays`/`readProducts`/`readPromotions`/`mapCreatorLivePerfRows`) tự kiểm, gọi
+ngay trong vòng lặp `present` — không cần tải `rows`. Batch sai report type/TikTok đổi tên cột giờ làm
+`present` ở đúng false, "Thiếu file X" trong `quality` bắn đúng, thay vì lặng lẽ hiện khối rỗng không
+lý do. Verify: `tsc`/`eslint` 0 lỗi, `vitest` 38/38 xanh, browser smoke test sạch console (React).
 
 Verify: `npm run typecheck` xanh, `npx eslint` trên 5 file đã sửa 0 lỗi, `npm test` 38/38 xanh, browser
 smoke test (`preview_start` → `read_console_messages` → `preview_logs` → `preview_stop`) không lỗi
@@ -689,7 +691,7 @@ vẫn không đổi mtime ⇒ coi như đã xong; kiểm tab "Toàn Cảnh Agenc
 **đầu phiên, nếu `git status` bẩn mà không phải việc của mình, hoặc `ls -t ~/.claude/projects/<repo>/*.jsonl`
 cho thấy một transcript khác vừa ghi trong vài phút, thì hỏi user trước khi sửa file dùng chung.**
 
-## Toàn Cảnh Agency (dashboard CEO) — Bước A: CODE XONG, **CHƯA VERIFY TRÊN BROWSER** (2026-09-24)
+## Toàn Cảnh Agency (dashboard CEO) — Bước A: **XONG, ĐÃ VERIFY** (2026-09-24, verify 2026-09-25)
 
 Yêu cầu user: "dashboard của agency cho CEO xem hằng ngày/tuần/tháng để tracking bức tranh toàn cảnh".
 
@@ -728,22 +730,28 @@ Yêu cầu user: "dashboard của agency cho CEO xem hằng ngày/tuần/tháng 
 
 **Đã verify:** `tsx` **34/34 check** hàm thuần (tuần ISO qua năm, tháng nhuận, cắt kỳ so sánh, pct null, countable/happened/scheduled/cancelled tách đúng, CTR/CTOR tính lại, kỳ rỗng không NaN, rate 0đ không tính là đã set, rate bị mask nói đúng chữ) · `tsc --noEmit` sạch · `vite build` pass.
 
-**CHƯA VERIFY:** chưa chạy trên browser thật — Claude không có mật khẩu admin (xem memory `liveops_test_login`), cần user đăng nhập hộ trong Browser pane. **Số kỳ vọng đã tính sẵn từ Supabase để đối chiếu (Tháng 9/2026, agency-wide):**
+**ĐÃ VERIFY (2026-09-25), bằng phiên admin có sẵn (user đã đăng nhập từ trước trong Browser pane — Claude không nhập mật khẩu) trên app thật ở `localhost:3100`.** Đối chiếu từng ô UI với truy vấn độc lập chạy thẳng vào Supabase production bằng service role (script tsx tạm, không commit — cùng logic `isCountable`/`hasHappened`/`sessionHours` của `agencyOverview.ts`/`hostPerformance.ts`), **khớp 100%** cả 2 chế độ:
 
-| Ô | Phải ra |
-|---|---|
-| Giờ live | 177,8h · 47 ca có số |
-| GMV | 3,52 tỷ (3.516.674.216) |
-| GMV/giờ | 19,8 triệu (19.776.379) |
-| Đơn · AOV | 3.069 · 1,1 triệu |
-| Lượt xem | 496.448 |
-| So với kỳ trước | **Tháng 8 · 24 ngày đầu = 5,02 tỷ** — nếu hiện delta GMV −40,3% là đã so nhầm với T8 đủ tháng (5,89 tỷ); đúng phải là **−29,9%**, GMV/giờ **−28,4%** |
-| Phễu | 8.204.047 hiển thị · 260.296 click · CTR 3,17% · CTOR 1,18% |
-| Kỷ luật | 47 đã xếp · 47 đã diễn ra · 0 chưa có số · 0 huỷ · 47 đã đối soát |
-| Brand | CROCS 100% → phải bật cảnh báo tập trung (ngưỡng 60%) |
-| Host | 9 host xếp hạng (cao nhất 25,7tr/h, thấp nhất 14,8tr/h) + 12 ca chưa gán host tách riêng; Bùi Sỹ Hùng 47,1% số giờ → phải bật cảnh báo (ngưỡng 30%) |
-| Xu hướng 6 tháng | T4/T5 trống · T6 4,56 · T7 5,19 · T8 5,89 · T9 3,52 tỷ |
-| Khối tiền | KHÔNG có số nào; liệt kê 3 thứ thiếu (rate card 0/4 brand, rate talent 0/33, 47 ca đều là ca nạp bù nên Finance loại hết) |
+**Tháng (Tháng 9/2026, agency-wide)** — chú ý: bảng kỳ vọng cũ chốt ngày 24/9 (24 ngày đầu T8), verify chạy ngày 25/9 nên `comparableRange` tự trượt sang 25 ngày đầu T8 — đúng luật #2 của file này, không phải sai lệch:
+
+| Ô | Số trên UI | Đối chiếu Supabase |
+|---|---|---|
+| Giờ live | 177,8h · 47 ca có số | khớp |
+| GMV | 3,52 tỷ (3.516.674.216) | khớp |
+| GMV/giờ | 19,8 triệu (19.776.379) | khớp |
+| Đơn · AOV | 3.069 · 1,1 triệu (1.145.870) | khớp |
+| Lượt xem | 496.448 | khớp |
+| So với kỳ trước | Tháng 8 · **25 ngày đầu** = 5,295 tỷ; delta GMV **−33,6%**, GMV/giờ **−26,6%**, đơn **−36,6%**, lượt xem **−22,9%**, giờ live **−9,5%** | khớp |
+| Phễu | 8.204.047 hiển thị · 260.296 click · CTR 3,17% (+1,3%) · CTOR 1,18% (−11,8%) | khớp |
+| Kỷ luật | 47 đã xếp · 47 đã diễn ra · 0 chưa có số · 0 huỷ · 47 đã đối soát | khớp |
+| Brand | CROCS 100% GMV → cảnh báo tập trung đã bật | khớp |
+| Host | 9 host xếp hạng (cao nhất Bùi Sỹ Hùng 25,7tr/h, thấp nhất Trần Ngọc Bảo Thy 14,8tr/h) + 12 ca chưa gán host tách riêng; Bùi Sỹ Hùng 47,01% số giờ → cảnh báo tập trung người đã bật | khớp |
+| Xu hướng 6 tháng | T4/T5 trống · T6 4,56 · T7 5,19 · T8 5,89 · T9 3,52 tỷ | khớp |
+| Khối tiền | Không hiện số nào — liệt kê đúng 3 thứ thiếu (rate card 0/4 brand, rate talent 0/33, 47/47 ca kỳ này là ca nạp bù nên Finance loại hết) | khớp |
+
+**Tuần (Tuần 39/2026, 21–25/9, 5 ngày đầu vs Tuần 38 5 ngày đầu 14–18/9)** — đổi grain không lỗi console: giờ live 13,6h/4 ca (−69,2%) · GMV 253,1tr (−64,2%) · GMV/giờ 18,6tr (+16,0%) · đơn 225 (−64%) · lượt xem 44.088 (−57,5%) — đối chiếu Supabase khớp cả 5 ô.
+
+Không có lỗi console ở cả 2 chế độ. Bước A coi như đóng.
 
 **Bước B và C — chưa làm, user chưa yêu cầu:**
 
