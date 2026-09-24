@@ -39,9 +39,6 @@ interface LiveCalendarProps {
   currentUserId?: string;
   currentRole?: UserRole;
   schemes?: PromoScheme[];
-  onAddScheme?: (scheme: { title: string; description: string; startDate: string; endDate: string }) => Promise<void>;
-  onUpdateScheme?: (id: string, patch: Partial<Pick<PromoScheme, "title" | "description" | "startDate" | "endDate">>) => Promise<void>;
-  onDeleteScheme?: (id: string) => Promise<void>;
   // Cửa sổ Ca Live (2026-09-21): click ca → cùng một cửa sổ với Sổ Ca / Đăng Ký & Chốt Lịch.
   onSubmitSessionReport?: (sessionId: string, input: SessionReportInput) => Promise<boolean>;
   onSessionSnapshotApplied?: (session: LiveSession) => void;
@@ -83,13 +80,6 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   currentUserId,
   currentRole,
   schemes = [],
-  // PHÁT HIỆN 2026-09-24 (ESLint): App.tsx truyền 3 handler này vào (2 chỗ) nhưng LiveCalendar
-  // KHÔNG dùng chỗ nào — lịch agency không có đường thêm/sửa/xoá chiến dịch, chỉ BrandCalendar có.
-  // Giữ nguyên dây nối, đổi tên có tiền tố _ để ESLint thôi báo mà dấu vết không bị xoá: bù UI vào
-  // đây là THÊM TÍNH NĂNG, mà giai đoạn này chốt là không thêm. Ghi vào WORKSPACE_DESIGN.md.
-  onAddScheme: _onAddScheme,
-  onUpdateScheme: _onUpdateScheme,
-  onDeleteScheme: _onDeleteScheme,
   onSubmitSessionReport,
   onSessionSnapshotApplied,
   onDeleteSession,

@@ -2176,9 +2176,6 @@ export default function App() {
                     currentUserId={activeUser.id}
                     currentRole={currentRole}
                     schemes={promoSchemes}
-                    onAddScheme={handleAddPromoScheme}
-                    onUpdateScheme={handleUpdatePromoScheme}
-                    onDeleteScheme={handleDeletePromoScheme}
                     onSubmitSessionReport={handleSubmitSessionReport}
                     onSessionSnapshotApplied={handleSessionReconciled}
                     onDeleteSession={handleDeleteSession}

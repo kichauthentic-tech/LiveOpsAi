@@ -3,8 +3,8 @@
 ## CẦN LÀM NGAY khi mở phiên mới (cập nhật 2026-09-24)
 
 > **VIỆC ĐANG TREO — bàn giao 2026-09-24, cập nhật lại cùng ngày sau khi merge + verify Đ7/Đ9 + vá
-> ưu tiên #3 (đọc mục này trước danh sách dưới; mục 1–3 đã xong phần chính, còn 5 mục treo).** Xếp
-> theo thứ tự nên làm:
+> ưu tiên #3 + gỡ dây nối CRUD chiến dịch chết ở LiveCalendar (đọc mục này trước danh sách dưới; mục
+> 1–4 đã xong, còn 3 mục treo).** Xếp theo thứ tự nên làm:
 >
 > 1. ~~Merge nhánh về `main`~~ — **XONG 2026-09-24**: `git merge --ff-only audit/workflow-12-diem-dut-gay`
 >    rồi `git push origin main`, `main` giờ ở `45fe3af` (trước đó `f4e692e`, chậm 3 commit `d45529d` /
@@ -64,10 +64,15 @@
 >    Code chặn hộp thoại confirm() gốc (tự trả `false`), nên xoá không chạy được kể cả khi user tự
 >    bấm — không phải lỗi app, là giới hạn môi trường test. Dọn bằng SQL thay thế, xem
 >    `supabase/seed/2026-09-24f_cleanup_talent_password_test.sql`.
-> 4. **Lỗ tính năng: lịch agency không có đường CRUD chiến dịch.** `App.tsx` truyền
->    `onAddScheme/onUpdateScheme/onDeleteScheme` vào `LiveCalendar` ở 2 chỗ, component không dùng chỗ
->    nào (chỉ `BrandCalendar` có UI). Hiện đang đổi tên `_onAddScheme`… để giữ dấu vết. **Quyết một
->    trong hai: bù UI vào LiveCalendar, hoặc gỡ hẳn dây nối ở cả 2 đầu.** Đừng để nguyên trạng.
+> 4. ~~Lỗ tính năng: lịch agency không có đường CRUD chiến dịch~~ — **XONG 2026-09-24, chọn phương án
+>    gỡ dây nối** (không bù UI — lịch agency không quản chiến dịch theo thiết kế, chỉ `BrandCalendar`
+>    có; thêm UI ở đây là thêm tính năng ngoài scope). Gỡ hẳn `onAddScheme/onUpdateScheme/onDeleteScheme`
+>    khỏi `LiveCalendarProps` và lời gọi `<LiveCalendar>` duy nhất trong `App.tsx` (chỉ 1 chỗ, không
+>    phải 2 như ghi nhận lúc audit — call site còn lại truyền các prop này là `<BrandCalendar>`, nơi
+>    chúng thực sự được dùng, giữ nguyên). Prop `schemes` (hiển thị chip chiến dịch trên lịch, chỉ đọc)
+>    không đụng tới, vẫn hoạt động như cũ. `tsc --noEmit` / `eslint` (93 warning cũ, 0 lỗi mới) /
+>    `vitest` (38/38) đều xanh; app khởi động lại bình thường trong Browser pane, không lỗi console
+>    ngoài WebSocket HMR đã biết.
 > 5. **93 warning `no-explicit-any`** (App.tsx 36, createApp.ts 18) — một đợt refactor riêng, chủ yếu
 >    handler Express + payload Excel. Đang để `warn` nên không chặn CI.
 > 6. **Chưa bật bộ rule React Compiler** của eslint-plugin-react-hooks v7 (`purity`,
@@ -394,10 +399,12 @@ kiểm tra giữ nguyên từng chữ. Đã kiểm lại là **có răng** sau k
 ### 2 phát hiện phụ mà `no-unused-vars` lôi ra (đáng ghi, chưa sửa hết)
 
 1. **`LiveCalendar` nhận 3 handler CRUD chiến dịch rồi bỏ đi.** `App.tsx` truyền
-   `onAddScheme`/`onUpdateScheme`/`onDeleteScheme` vào ở **2 chỗ**, component **không dùng chỗ nào** ⇒
-   lịch agency không có đường thêm/sửa/xoá chiến dịch, chỉ `BrandCalendar` có. Bù UI vào là **thêm tính
-   năng**, mà giai đoạn này chốt là không thêm — nên đổi tên thành `_onAddScheme`… để giữ dấu vết
-   (quy ước mới: tiền tố `_` = "cố ý không dùng") và ghi lại ở đây. **Việc còn treo.**
+   `onAddScheme`/`onUpdateScheme`/`onDeleteScheme` vào, component **không dùng** ⇒ lịch agency không
+   có đường thêm/sửa/xoá chiến dịch, chỉ `BrandCalendar` có. **ĐÃ SỬA 2026-09-24 — chọn gỡ dây nối**
+   (bù UI vào đây là thêm tính năng ngoài scope): gỡ hẳn 3 prop khỏi `LiveCalendarProps` và khỏi lời
+   gọi `<LiveCalendar>` trong `App.tsx` (đúng ra chỉ có **1** call site truyền các prop này, không phải
+   2 như ghi lúc audit — nơi thứ hai từng thấy là `<BrandCalendar>`, chỗ chúng thực sự cần và vẫn giữ
+   nguyên). Không còn tiền tố `_onAddScheme` nữa.
 2. **`App.tsx` có 9 cờ `*Loading` được set nhưng KHÔNG màn nào đọc** (`phase3/4/5/7/14/19/B1/C3Loading`,
    `sessionsLoading`) ⇒ 9 cụm dữ liệu không hề có chỉ báo đang tải, và 18 lần `setState` vô ích mỗi lần
    mount. **ĐÃ XOÁ** (46 dòng: khai báo state + `setX(true)` + cả block `.finally` chỉ để tắt cờ + guard
