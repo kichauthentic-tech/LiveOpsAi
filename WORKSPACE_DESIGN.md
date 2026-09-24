@@ -2,6 +2,38 @@
 
 ## CẦN LÀM NGAY khi mở phiên mới (cập nhật 2026-09-24)
 
+> **VIỆC ĐANG TREO — bàn giao 2026-09-24 (đọc mục này trước 7 mục dưới).** Xếp theo thứ tự nên làm:
+>
+> 1. **Merge nhánh về `main`.** `main` đang ở `f4e692e`, **chậm 3 commit**: `d45529d` (12 điểm đứt gãy),
+>    `0b3a1fc` (Toàn Cảnh Agency Bước A), `8642c9b` (#5 ESLint + test) — tất cả nằm trên nhánh
+>    `audit/workflow-12-diem-dut-gay`, đã push, CI chưa từng chạy trên nhánh này. Toàn bộ lịch sử repo
+>    trước đó đi thẳng `main`; tách nhánh là quyết định của phiên 2026-09-24 vì đợt đó động vào view
+>    `live_sessions_secure` + `publish_brand_monthly_report` (sai là brand mất sạch ca). Chưa mở PR.
+>    `git merge --ff-only audit/workflow-12-diem-dut-gay` là gộp được ngay.
+> 2. **Đ7 + Đ9 phía talent — CẦN USER, không làm hộ được.** `notifications` có RLS chỉ cho chính chủ
+>    đọc, mà Claude không tự nhập mật khẩu. Cần một lần đăng nhập bằng tài khoản talent để đi: chuông →
+>    "Có ca mới đang mở đăng ký" → Đăng Ký Ca; và nút "Tôi không đi được ca này" → thông báo về ops.
+>    Logic DB đã verify gián tiếp (RPC đúng guard, trigger bắn được). Cùng lần đó verify nốt nửa luồng
+>    talent chưa ai xem: Ca Của Tôi, Hồ Sơ Của Tôi, Thu Nhập Tháng Này. Và role `brand` bằng JWT thật
+>    (mọi màn brand tới giờ đều xem bằng admin mở hộ, nên phần che số của 0107 chưa bị thử).
+> 3. **Ưu tiên #3 (bảo mật) — user chưa yêu cầu làm.** `handleCreateTalentAccount` hardcode
+>    `defaultPassword: "000000"` cho MỌI tài khoản talent tạo từ Talent Pool, không có cơ chế bắt đổi
+>    mật khẩu lần đầu. Hiện 3 profile nên rủi ro nhỏ; cấp tài khoản cho 33 talent là 33 tài khoản chung
+>    một mật khẩu đoán được. Đề xuất: sinh mật khẩu ngẫu nhiên hiện 1 lần cho ops + cờ
+>    `must_change_password`. **Làm việc này TRƯỚC mục 2 thì phải đổi lại cách đăng nhập talent.**
+> 4. **Lỗ tính năng: lịch agency không có đường CRUD chiến dịch.** `App.tsx` truyền
+>    `onAddScheme/onUpdateScheme/onDeleteScheme` vào `LiveCalendar` ở 2 chỗ, component không dùng chỗ
+>    nào (chỉ `BrandCalendar` có UI). Hiện đang đổi tên `_onAddScheme`… để giữ dấu vết. **Quyết một
+>    trong hai: bù UI vào LiveCalendar, hoặc gỡ hẳn dây nối ở cả 2 đầu.** Đừng để nguyên trạng.
+> 5. **93 warning `no-explicit-any`** (App.tsx 36, createApp.ts 18) — một đợt refactor riêng, chủ yếu
+>    handler Express + payload Excel. Đang để `warn` nên không chặn CI.
+> 6. **Chưa bật bộ rule React Compiler** của eslint-plugin-react-hooks v7 (`purity`,
+>    `set-state-in-effect`, `static-components`, `immutability`, `preserve-manual-memoization`…) — bắt
+>    lớp lỗi sâu hơn hẳn `exhaustive-deps`. Đo số vi phạm trước rồi mới quyết mức.
+> 7. **Phần 2 của audit code base chưa làm** (theo module) — danh sách ở cuối mục
+>    `## Audit toàn diện code base (2026-09-23)`.
+
+
 1. ~~Chạy `0111_signup_role_and_null_role_guard.sql`~~ + ~~tắt "Allow new users to sign up"~~ — **XONG, verify 2026-09-23**: `GET /auth/v1/settings` → `disable_signup: true`; `POST /auth/v1/signup` (kèm `data:{"role":"ceo"}`) → `422 signup_disabled`, không tạo ra tài khoản nào. Cổng tự phong role đã đóng ở lớp ngoài cùng. Phần SQL (trigger + 11 policy) đã re-verify được bằng `pg_policy`/`pg_proc` qua Supabase SQL Editor (2026-09-23) — phát hiện 0111 vá SÓT 7/10 policy, đã vá tiếp bằng **0112**, verify lại ra 0 dòng hở. Xem đoạn "Verify lại phần SQL bằng pg_policy" trong mục `## BẢO MẬT — tự phong role`.
 2. ~~Chạy `0113` + script dọn dữ liệu test~~ — **XONG, đo lại 2026-09-24**: `0113` đã chạy (RPC 3 tham số trả `P0001`, không phải `PGRST202`); dữ liệu test đã xoá sạch, đo bằng `count(*)`: VERA còn 0 ở cả 6 bảng, CROCS giữ nguyên 229 ca, đúng 1 lô đối soát, 1 plan (CROCS T10), 2 report nháp T8. Script dọn giữ lại ở `supabase/seed/2026-09-24_cleanup_workflow_test.sql` làm mẫu cho lần sau. **Bài học đánh vào mặt:** bản đầu của script lọc `brand_month_plans` bằng `period_month` và chết `42703` — bảng đó dùng cột `month`, còn `brand_monthly_reports`/`brand_monthly_commitments` mới là `period_month`. Đừng suy tên cột theo họ bảng, tra schema; và script dọn nên xoá theo `id` đã đọc từ DB thay vì theo điều kiện.
 3. ~~Chạy `supabase/seed/2026-09-24b_cleanup_D5_verify_plan.sql`~~ — **XONG, đo lại 2026-09-24**: VERA về 0 ở cả 6 bảng, CROCS giữ nguyên 229 ca / 1 plan T10 / 2 report nháp. Đã nhân đó verify luôn nhánh **fallback** của Đ5 trên data thật: brand không có kế hoạch chốt thì Toàn Cảnh Brand về "Chưa lập" và Report Tháng CROCS 09/2026 hiện `chưa có target (Lịch Vận Hành)` với Total GMV vẫn đúng 3,52 tỷ — tức bản sửa chỉ can thiệp khi CÓ kế hoạch đã chốt.
