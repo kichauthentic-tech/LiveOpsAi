@@ -1,6 +1,8 @@
 import { supabase } from "../supabaseClient";
 import { DataRawColumn, DataRawReportType } from "../../types";
-import { vnDateToIso } from "./weeklySlice";
+import { fetchRowsPaged } from "./fetchRowsPaged";
+import { readShopDays } from "./deepDiveSource";
+import { buildProductListAgg, cleanProductName, findCol, isCurrentProductAgg, num, PRODUCT_AGG_VERSION, ProductListAgg } from "./productListAgg";
 
 // Deep Dive Report Tháng — Top SKU (product_list) + Top khuyến mãi (shop_promotion). Cả 2 report
 // này KHÔNG có chiều ngày theo dòng (product_list là tổng cả kỳ/SKU, shop_promotion là tổng cả kỳ
@@ -8,47 +10,27 @@ import { vnDateToIso } from "./weeklySlice";
 // tháng được, chỉ lấy batch có period overlap với tháng đang xem (giống cách Report Tuần/Đối Soát
 // đã chấp nhận với 2 report loại "tổng hợp cả kỳ" này — xem comment trong weeklySlice.ts).
 
-// product_list ghi GMV/AOV dạng TEXT có dấu CHẤM phân cách nghìn kèm "₫" (vd "627.840.078₫" =
-// 627.840.828 đ, không phải 627,84) — khác live_analysis/shop_analytics/shop_promotion vốn ghi số
-// thô không định dạng. Coi mọi ký tự "," và "." đều là phân cách nghìn (an toàn vì GMV/đơn hàng
-// VNĐ trong các report này luôn là số nguyên, không có phần thập phân thật).
-export function num(v: unknown): number {
-  if (v === null || v === undefined || v === "" || v === "-") return 0;
-  if (typeof v === "number") return v;
-  const n = parseFloat(String(v).replace(/[,.₫%\s]/g, ""));
-  return Number.isNaN(n) ? 0 : n;
-}
-
-function findCol(columns: DataRawColumn[], pattern: RegExp): string | undefined {
-  return columns.find((c) => pattern.test(c.label.trim()))?.key;
-}
-
-// Brief Module 3: rút gọn tên sản phẩm để hiển thị gọn trong bảng/chart Top SKU — bỏ tag ngoặc
-// vuông kiểu marketing (vd "[SẢN PHẨM ĐỘC QUYỀN ONLINE]", áp dụng chung mọi brand vì TikTok Shop
-// hay chèn tag dạng này) và bỏ prefix danh mục lặp lại đầu tên riêng của Crocs (no-op với brand
-// khác, không match thì giữ nguyên tên gốc).
-function cleanProductName(raw: string): string {
-  return raw
-    .replace(/\[[^\]]*\]/g, " ")
-    .replace(/^Giày Clog (Nữ|Unisex)\s+Crocs\s*/i, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
+// num / findCol / cleanProductName sống ở productListAgg.ts (thuần, parser upload dùng chung) — re-export
+// `num` vì các slice khác vẫn import từ đây.
+export { num };
 
 interface DbImportLite {
   id: string;
   report_type: string;
   period_start: string | null;
   period_end: string | null;
-  columns: DataRawColumn[];
 }
 
 // Chọn batch "overlap nhiều nhất, không cộng dồn nhiều batch" cho report loại "tổng cả kỳ, không
 // có chiều ngày theo dòng" (product_list, shop_promotion).
-export async function fetchOverlappingBatchRows(brandId: string, reportType: DataRawReportType, monthStart: string, monthEnd: string) {
+//
+// Chọn batch trên danh sách KHÔNG kèm `columns` (product_list có 175 cột × mỗi batch) rồi mới đọc
+// `columns` của đúng 1 batch được chọn. Dòng đọc theo trang (fetchRowsPaged) — PostgREST cắt ở 1.000
+// dòng mà không báo lỗi.
+async function pickOverlappingBatch(brandId: string, reportType: DataRawReportType, monthStart: string, monthEnd: string): Promise<DbImportLite | null> {
   const { data: imports, error } = await supabase
     .from("brand_dataraw_imports")
-    .select("id, report_type, period_start, period_end, columns")
+    .select("id, report_type, period_start, period_end")
     .eq("brand_id", brandId)
     .eq("report_type", reportType);
   if (error) throw error;
@@ -58,17 +40,45 @@ export async function fetchOverlappingBatchRows(brandId: string, reportType: Dat
   const overlapping = ((imports as DbImportLite[]) ?? []).filter(
     (i) => i.period_start && i.period_end && i.period_start <= monthEnd && i.period_end >= monthStart
   );
-  if (overlapping.length === 0) return { rows: [] as Record<string, unknown>[], columns: [] as DataRawColumn[], hasAnyBatch: false };
+  if (overlapping.length === 0) return null;
+  return overlapping.sort((a, b) => (b.period_end! < a.period_end! ? -1 : 1))[0];
+}
 
-  const best = overlapping.sort((a, b) => (b.period_end! < a.period_end! ? -1 : 1))[0];
-  const { data: rowsData, error: rowsError } = await supabase
-    .from("brand_dataraw_rows")
-    .select("raw")
-    .eq("import_id", best.id)
-    .order("row_index", { ascending: true });
-  if (rowsError) throw rowsError;
+async function readBatch(batchId: string): Promise<{ rows: Record<string, unknown>[]; columns: DataRawColumn[] }> {
+  const [{ data: meta, error }, byImport] = await Promise.all([
+    supabase.from("brand_dataraw_imports").select("columns").eq("id", batchId).single(),
+    fetchRowsPaged([batchId])
+  ]);
+  if (error) throw error;
+  return { rows: byImport.get(batchId) ?? [], columns: ((meta as { columns: DataRawColumn[] | null }).columns ?? []) };
+}
 
-  return { rows: ((rowsData as { raw: Record<string, unknown> }[]) ?? []).map((r) => r.raw ?? {}), columns: best.columns, hasAnyBatch: true };
+export async function fetchOverlappingBatchRows(brandId: string, reportType: DataRawReportType, monthStart: string, monthEnd: string) {
+  const best = await pickOverlappingBatch(brandId, reportType, monthStart, monthEnd);
+  if (!best) return { rows: [] as Record<string, unknown>[], columns: [] as DataRawColumn[], hasAnyBatch: false };
+  const { rows, columns } = await readBatch(best.id);
+  return { rows, columns, hasAnyBatch: true };
+}
+
+// product_list của tháng ở dạng ĐÃ TỔNG HỢP (xem productListAgg.ts). Đọc `summary.productAgg` của batch
+// (vài chục KB) thay vì 1.000+ dòng × 175 cột (~5,3 MB). Batch cũ upload trước khi có bản tổng hợp,
+// hoặc lệch PRODUCT_AGG_VERSION, thì tính lại từ dòng gốc MỘT lần rồi ghi ngược vào `summary` — lần
+// sau về đường rẻ. Ghi ngược hỏng (vd role không có quyền ghi) thì bỏ qua, số trả về vẫn đúng.
+export async function fetchProductListAgg(brandId: string, monthStart: string, monthEnd: string): Promise<ProductListAgg | null> {
+  const best = await pickOverlappingBatch(brandId, "product_list", monthStart, monthEnd);
+  if (!best) return null;
+
+  const { data, error } = await supabase.from("brand_dataraw_imports").select("agg:summary->productAgg").eq("id", best.id).single();
+  if (error) throw error;
+  const stored = (data as { agg: unknown }).agg;
+  if (isCurrentProductAgg(stored)) return stored;
+
+  const { rows, columns } = await readBatch(best.id);
+  const agg = buildProductListAgg(columns, rows);
+  const { data: cur } = await supabase.from("brand_dataraw_imports").select("summary").eq("id", best.id).single();
+  const summary = ((cur as { summary: Record<string, unknown> | null } | null)?.summary ?? {}) as Record<string, unknown>;
+  await supabase.from("brand_dataraw_imports").update({ summary: { ...summary, productAgg: agg } }).eq("id", best.id);
+  return agg;
 }
 
 export interface TopSkuRow {
@@ -86,46 +96,21 @@ export interface TopSkuMonthSlice {
 // Gộp mọi dòng product_list của tháng theo TÊN đã làm sạch → 1 dòng GMV/dòng SKU. Dùng chung cho
 // Top SKU (xếp hạng, cắt limit) và SKU gắn hiệu suất (khớp theo tên với brand_skus, cần ĐỦ SKU
 // chứ không chỉ top N).
-async function fetchSkuPerfByName(brandId: string, monthStart: string, monthEnd: string): Promise<{ byName: Map<string, TopSkuRow>; hasAnyBatch: boolean }> {
-  const { rows, columns, hasAnyBatch } = await fetchOverlappingBatchRows(brandId, "product_list", monthStart, monthEnd);
-  if (!hasAnyBatch) return { byName: new Map(), hasAnyBatch: false };
-
-  const c = {
-    // Song ngữ — neo ^...$ vì "Seller LIVE GMV" ≠ "Seller LIVE-attributed GMV" ≠ "Seller LIVE
-    // indirect GMV", và "Orders" ≠ "SKU orders".
-    name: findCol(columns, /^(?:Tên|Product Name)$/i),
-    gmv: findCol(columns, /^GMV$/i),
-    gmvLive: findCol(columns, /^(?:GMV LIVE của người bán|Seller LIVE GMV)$/i),
-    orders: findCol(columns, /^(?:Đơn hàng|Orders)$/i)
-  };
-  if (!c.name || !c.gmv) return { byName: new Map(), hasAnyBatch: true };
-
-  // product_list có nhiều dòng trùng "Tên" (mỗi biến thể/ID sản phẩm tách dòng riêng dù cùng tên
-  // hiển thị) — PHẢI gộp theo tên rồi cộng dồn GMV trước khi xếp hạng, nếu không thứ hạng Top SKU
-  // sẽ sai (1 sản phẩm bán chạy bị chia lẻ GMV qua nhiều dòng, tụt hạng so với thực tế).
+export function skuPerfFromAgg(agg: ProductListAgg | null): { byName: Map<string, TopSkuRow>; hasAnyBatch: boolean } {
   const byName = new Map<string, TopSkuRow>();
-  for (const raw of rows) {
-    const name = cleanProductName(String(raw[c.name!] ?? ""));
-    if (!name) continue;
-    const existing = byName.get(name) ?? { name, gmv: 0, gmvLive: 0, orders: 0 };
-    existing.gmv += num(raw[c.gmv!]);
-    existing.gmvLive += num(c.gmvLive && raw[c.gmvLive]);
-    existing.orders += num(c.orders && raw[c.orders]);
-    byName.set(name, existing);
-  }
-
+  if (!agg) return { byName, hasAnyBatch: false };
+  for (const [name, gmv, gmvLive, orders] of agg.skus) byName.set(name, { name, gmv, gmvLive, orders });
   return { byName, hasAnyBatch: true };
 }
 
-export async function fetchTopSkuMonthSlice(brandId: string, monthStart: string, monthEnd: string, limit = 10): Promise<TopSkuMonthSlice> {
-  const { byName, hasAnyBatch } = await fetchSkuPerfByName(brandId, monthStart, monthEnd);
+export function topSkuFromAgg(agg: ProductListAgg | null, limit = 10): TopSkuMonthSlice {
+  const { byName, hasAnyBatch } = skuPerfFromAgg(agg);
   if (!hasAnyBatch) return { items: [], hasAnyBatch: false };
+  return { items: Array.from(byName.values()).sort((a, b) => b.gmv - a.gmv).slice(0, limit), hasAnyBatch: true };
+}
 
-  const items = Array.from(byName.values())
-    .sort((a, b) => b.gmv - a.gmv)
-    .slice(0, limit);
-
-  return { items, hasAnyBatch: true };
+export async function fetchTopSkuMonthSlice(brandId: string, monthStart: string, monthEnd: string, limit = 10): Promise<TopSkuMonthSlice> {
+  return topSkuFromAgg(await fetchProductListAgg(brandId, monthStart, monthEnd), limit);
 }
 
 // SKU gắn hiệu suất (Đợt C, 2026-09-23): khớp catalog `brand_skus` với GMV/đơn hàng tháng này của
@@ -143,7 +128,7 @@ export function normalizeSkuName(name: string): string {
 }
 
 export async function fetchSkuPerfMonthSlice(brandId: string, monthStart: string, monthEnd: string): Promise<SkuPerfSlice> {
-  const { byName, hasAnyBatch } = await fetchSkuPerfByName(brandId, monthStart, monthEnd);
+  const { byName, hasAnyBatch } = skuPerfFromAgg(await fetchProductListAgg(brandId, monthStart, monthEnd));
   const byNormalizedName = new Map<string, TopSkuRow>();
   for (const [name, row] of byName) byNormalizedName.set(name.toLowerCase(), row);
   return { byNormalizedName, hasAnyBatch };
@@ -223,47 +208,67 @@ export async function fetchTopPromotionsMonthSlice(brandId: string, monthStart: 
   };
 }
 
-// "Video GMV" + "Product Card GMV" của Report Tháng (dải so sánh kênh + biểu đồ tỷ trọng). Trước
-// đây 2 số này đọc từ report riêng "Product Card Traffic Stats" (migration 0064) nhưng loại report
-// đó CHƯA TỪNG có file thật nào được upload nên 2 dòng luôn hiện 0. Nay lấy từ 2 file ops vẫn
-// upload hằng tháng, khỏi phải export thêm loại report thứ 8:
-//   - Video GMV = shop_analytics: "GMV đến từ video liên kết" + "GMV nhờ video của tài khoản kết nối"
-//   - Card GMV  = product_list:   tổng cột "GMV thẻ sản phẩm của người bán" trên mọi SKU
-// Đã đối chiếu với file "Product Traffic — Shop [total]" của CROCS kỳ 01/06–22/09/2026:
-// video 1.431.260.521 vs 1.430.022.521 (lệch 0,09%), thẻ SP 5.293.989.509 vs 5.284.560.473 (0,18%)
-// — chênh do 2 file được tải lệch nhau vài tiếng trong ngày 22/9 vốn còn đang chạy.
-export interface ChannelGmvMonthSlice {
-  videoGmv: number;
-  cardGmv: number;
-  hasVideoBatch: boolean;
-  hasCardBatch: boolean;
+// ---------------------------------------------------------------------------------------------------
+// Toàn shop theo ngày + GMV thẻ sản phẩm — phần 3 "Toàn shop & kênh" và các so sánh cùng số ngày của
+// Report Tháng (2026-09-25). Shop Analytics tách GMV cả shop thành kênh: LIVE tài khoản shop / LIVE
+// creator (affiliate) / video; cộng thêm GMV thẻ SP từ product_list thì khớp 99,95–99,99% tổng shop
+// (đo CROCS T6–T9). Lưu gọn — chỉ các cột report dùng, không mang nguyên 28 cột vào bản chụp.
+
+export interface ShopDayLite {
+  date: string;
+  gmv: number;
+  refunds: number;
+  orders: number;
+  visitors: number;
+  /** "Linked account LIVE-attributed GMV" — LIVE của tài khoản shop/tài khoản kết nối (agency vận hành). */
+  liveLinked: number;
+  /** "Creator LIVE-attributed GMV" — LIVE của creator affiliate. */
+  affiliate: number;
+  /** Video: creator + tài khoản kết nối, đều "attributed". */
+  video: number;
 }
 
-export async function fetchChannelGmvMonthSlice(brandId: string, monthStart: string, monthEnd: string): Promise<ChannelGmvMonthSlice> {
-  const [video, card] = await Promise.all([
-    fetchOverlappingBatchRows(brandId, "shop_analytics", monthStart, monthEnd),
-    fetchOverlappingBatchRows(brandId, "product_list", monthStart, monthEnd)
-  ]);
+export interface ShopDaysMonthSlice {
+  days: ShopDayLite[];
+  hasAnyBatch: boolean;
+}
 
-  let videoGmv = 0;
-  if (video.hasAnyBatch) {
-    const dateCol = findCol(video.columns, /^(?:Ngày|Date)$/i);
-    const creatorVideo = findCol(video.columns, /^(?:GMV đến từ video liên kết|Creator video-attributed GMV)$/i);
-    const linkedVideo = findCol(video.columns, /^(?:GMV nhờ video của tài khoản kết nối|Linked account video-attributed GMV)$/i);
-    for (const raw of video.rows) {
-      // shop_analytics là bảng theo NGÀY nên phải lọc dòng về đúng tháng đang xem (batch có thể
-      // phủ rộng hơn 1 tháng) — khác product_list vốn đã là tổng cả kỳ, cộng thẳng mọi dòng.
-      const d = dateCol ? vnDateToIso(raw[dateCol]) : undefined;
-      if (!d || d < monthStart || d > monthEnd) continue;
-      videoGmv += num(creatorVideo && raw[creatorVideo]) + num(linkedVideo && raw[linkedVideo]);
-    }
-  }
+export async function fetchShopDaysMonthSlice(brandId: string, monthStart: string, monthEnd: string): Promise<ShopDaysMonthSlice> {
+  const { rows, columns, hasAnyBatch } = await fetchOverlappingBatchRows(brandId, "shop_analytics", monthStart, monthEnd);
+  if (!hasAnyBatch) return { days: [], hasAnyBatch: false };
+  const days = readShopDays(columns, rows, monthStart, monthEnd)
+    .map((d) => ({
+      date: d.date,
+      gmv: d.gmv,
+      refunds: d.refunds,
+      orders: d.orders,
+      visitors: d.visitors,
+      liveLinked: d.linkedLiveAttr,
+      affiliate: d.creatorLiveAttr,
+      video: d.creatorVideoAttr + d.linkedVideoAttr
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  return { days, hasAnyBatch: true };
+}
 
-  let cardGmv = 0;
-  if (card.hasAnyBatch) {
-    const cardCol = findCol(card.columns, /^(?:GMV thẻ sản phẩm của người bán|Seller product card GMV)$/i);
-    if (cardCol) for (const raw of card.rows) cardGmv += num(raw[cardCol]);
-  }
+export interface CardGmvMonthSlice {
+  cardGmv: number;
+  hasAnyBatch: boolean;
+}
 
-  return { videoGmv, cardGmv, hasVideoBatch: video.hasAnyBatch, hasCardBatch: card.hasAnyBatch };
+/** Chỉ đọc `summary.productAgg.cardGmv` (vài chục byte) — không kéo cả danh sách SKU như fetchProductListAgg.
+ *  Batch chưa có bản tổng hợp (upload trước 2026-09-25) thì rơi về fetchProductListAgg (tự ghi ngược). */
+export async function fetchCardGmvMonthSlice(brandId: string, monthStart: string, monthEnd: string): Promise<CardGmvMonthSlice> {
+  const best = await pickOverlappingBatch(brandId, "product_list", monthStart, monthEnd);
+  if (!best) return { cardGmv: 0, hasAnyBatch: false };
+  const { data, error } = await supabase
+    .from("brand_dataraw_imports")
+    .select("v:summary->productAgg->v, card:summary->productAgg->cardGmv")
+    .eq("id", best.id)
+    .single();
+  if (error) throw error;
+  const row = data as { v: unknown; card: unknown };
+  if (row.v === PRODUCT_AGG_VERSION && typeof row.card === "number") return { cardGmv: row.card, hasAnyBatch: true };
+  const agg = await fetchProductListAgg(brandId, monthStart, monthEnd);
+  return { cardGmv: agg?.cardGmv ?? 0, hasAnyBatch: !!agg };
 }

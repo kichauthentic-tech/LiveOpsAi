@@ -2332,6 +2332,8 @@ export default function App() {
                   <ReportPublishBoard
                     brands={activeBrands}
                     sessions={activeSessions}
+                    brandPlatformRates={brandPlatformRates}
+                    planMonthTotals={planMonthTotals}
                     monthlyReports={monthlyReports}
                     onReportsChanged={() => {
                       fetchAllMonthlyReports().then(setMonthlyReports).catch(() => {});

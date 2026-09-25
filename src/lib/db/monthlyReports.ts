@@ -31,6 +31,9 @@ interface DbMonthlyReport {
   camp_payday_start: string | null;
   camp_payday_end: string | null;
   camp_payday_target_gmv: number | null;
+  summary_text: string | null;
+  next_steps_text: string | null;
+  summary_saved_at: string | null;
   published_at: string | null;
   published_by: string | null;
   created_at: string;
@@ -64,6 +67,9 @@ function reportFromDb(row: DbMonthlyReport): BrandMonthlyReport {
     campPaydayStart: row.camp_payday_start ?? undefined,
     campPaydayEnd: row.camp_payday_end ?? undefined,
     campPaydayTargetGmv: row.camp_payday_target_gmv ?? undefined,
+    summaryText: row.summary_text ?? undefined,
+    nextStepsText: row.next_steps_text ?? undefined,
+    summarySavedAt: row.summary_saved_at ?? undefined,
     publishedAt: row.published_at ?? undefined,
     publishedBy: row.published_by ?? undefined,
     createdAt: row.created_at,
@@ -163,6 +169,34 @@ export async function upsertMonthlyReport(brandId: string, periodMonth: string, 
         camp_payday_start: input.campPaydayStart ?? null,
         camp_payday_end: input.campPaydayEnd ?? null,
         camp_payday_target_gmv: input.campPaydayTargetGmv ?? null
+      },
+      { onConflict: "brand_id,period_month" }
+    )
+    .select()
+    .single();
+  if (error) throw error;
+  return reportFromDb(data as DbMonthlyReport);
+}
+
+// Đoạn tóm tắt + việc tháng sau (0120) — đường ghi RIÊNG, không đi qua upsertMonthlyReport() (hàm đó
+// gửi đủ mọi cột nhập tay, ai gọi thiếu field là null hoá). Upsert ở đây chỉ mang 3 cột này nên dòng
+// đã có giữ nguyên Ads/kế hoạch/trạng thái; tháng chưa có dòng thì tạo dòng nháp. null = bỏ bản đã
+// sửa, quay về bản tự sinh.
+export async function saveMonthlyReportNarrative(
+  brandId: string,
+  periodMonth: string,
+  narrative: { summaryText: string | null; nextStepsText: string | null }
+): Promise<BrandMonthlyReport> {
+  const cleared = narrative.summaryText === null && narrative.nextStepsText === null;
+  const { data, error } = await supabase
+    .from("brand_monthly_reports")
+    .upsert(
+      {
+        brand_id: brandId,
+        period_month: periodMonth,
+        summary_text: narrative.summaryText,
+        next_steps_text: narrative.nextStepsText,
+        summary_saved_at: cleared ? null : new Date().toISOString()
       },
       { onConflict: "brand_id,period_month" }
     )

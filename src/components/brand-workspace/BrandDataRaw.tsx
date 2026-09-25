@@ -348,7 +348,9 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ brandId, brandName, 
 
                         {expandedId === imp.id && (
                           <div className="pb-4 space-y-2">
-                            {imp.summary && (() => {
+                            {/* Chỉ Shop Analytics có khối tổng quan (totals/changePct). summary của
+                                product_list là bản tổng hợp SKU cho Report Tháng — không hiện ở đây. */}
+                            {imp.summary?.totals != null && (() => {
                               const summary = imp.summary as DataRawImportSummary;
                               const totals = summary.totals || {};
                               const changePct = summary.changePct || {};

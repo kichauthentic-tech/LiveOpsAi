@@ -9,7 +9,9 @@ import {
   Loader2,
   Clock,
   CalendarRange,
-  Megaphone
+  Megaphone,
+  RefreshCw,
+  Database
 } from "lucide-react";
 import { getTodayMonth } from "../../lib/dateUtils";
 import { fetchMonthlyReport, upsertMonthlyReport, publishMonthlyReport, unpublishMonthlyReport } from "../../lib/db/monthlyReports";
@@ -17,6 +19,11 @@ import { MonthlyReportTabs } from "./MonthlyReportTabs";
 import { BrandWeeklyReport } from "./BrandWeeklyReport";
 import { errorMessage } from "../../lib/errorMessage";
 import { useConfirm } from "../../hooks/useConfirm";
+import { useToast } from "../../hooks/useToast";
+import { fetchMonthlyReportSnapshot, saveMonthlyReportSnapshot, StoredMonthlyReportSnapshot } from "../../lib/db/monthlyReportSnapshots";
+import { DataRawImportStamp, fetchDataRawImportStamps } from "../../lib/db/brandDataRaw";
+import { buildMonthlyReportSnapshot, snapshotFreshness, snapshotHeadline, SnapshotHeadline } from "../../lib/report/monthlySnapshot";
+import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
 
 // Report Tuần không còn là tab riêng ở menu (2026-08-23) — gộp làm chế độ xem "Tuần" ngay trong
 // Report Tháng qua toggle bên dưới, tái dùng nguyên BrandWeeklyReport.tsx (đã tự chặn quyền qua
@@ -49,12 +56,35 @@ function monthRange(month: string): { start: string; end: string } {
   return { start, end };
 }
 
+const fmtDayMonth = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+const fmtStamp = (iso: string) => {
+  const d = new Date(iso);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(d.getHours())}:${p(d.getMinutes())} ${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`;
+};
+
+function headlineDiff(before: SnapshotHeadline, after: SnapshotHeadline): string {
+  const money = (v: number) => formatCurrencyAdaptive(v);
+  const hours = (v: number) => `${v.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h`;
+  const line = (label: string, a: string, b: string) => `${label}: ${a === b ? a + " (không đổi)" : `${a} → ${b}`}`;
+  return [
+    line("GMV cả shop", money(before.shopGmv), money(after.shopGmv)),
+    line("GMV agency live", money(before.totalGmv), money(after.totalGmv)),
+    line("Ca có số", String(before.sessionsWithNumbers), String(after.sessionsWithNumbers)),
+    line("Giờ live", hours(before.liveHours), hours(after.liveHours)),
+    line("Video GMV", money(before.videoGmv), money(after.videoGmv)),
+    line("GMV thẻ sản phẩm", money(before.cardGmv), money(after.cardGmv)),
+    line("Top SKU #1", before.topSku ?? "—", after.topSku ?? "—")
+  ].join("\n");
+}
+
 // Phần nhập tay Ads/ROAS/Promotion/Customer Insight/Account Health + Ads Report Chi Tiết (TikTok)
 // đã tách sang tab riêng "Nhập Ads & Ghi Chú" (BrandAdsReport.tsx, 2026-09-21) — Report Tháng chỉ
 // còn tài liệu 6 tab + phát hành/thu hồi (tab 05 "Phân Tích Sâu" gộp vào 2026-09-23, ops-only).
 
 export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId, brandName, sessions, currentRole, brandPlatformRates, shiftSlots, onOpenAdsReport, planMonthTotals }) => {
   const confirm = useConfirm();
+  const { showToast } = useToast();
   const canManage = CAN_MANAGE_ROLES.includes(currentRole);
   const canViewWeekly = CAN_VIEW_WEEKLY_ROLES.includes(currentRole);
   const [viewMode, setViewMode] = useState<"month" | "week">("month");
@@ -64,6 +94,14 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
   const [publishing, setPublishing] = useState(false);
   const [confirmForce, setConfirmForce] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Bản chụp số liệu (0119) — Report Tháng chỉ đọc bản này. Chưa có thì ops bấm "Tạo report" (quyết
+  // định 2026-09-25: không tự dựng khi mở, ai bấm mới tốn tài nguyên).
+  const [stored, setStored] = useState<StoredMonthlyReportSnapshot | null>(null);
+  const [snapLoading, setSnapLoading] = useState(true);
+  const [building, setBuilding] = useState(false);
+  // Dấu batch Dữ Liệu Gốc hiện tại (vài trăm byte/batch) — chỉ ops, để biết bản chụp đã cũ chưa.
+  const [importStamps, setImportStamps] = useState<DataRawImportStamp[] | null>(null);
 
   const { start, end } = useMemo(() => monthRange(month), [month]);
 
@@ -100,10 +138,84 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
     };
   }, [brandId, month]);
 
+  useEffect(() => {
+    let cancelled = false;
+    setSnapLoading(true);
+    setStored(null);
+    fetchMonthlyReportSnapshot(brandId, month)
+      .then((r) => !cancelled && setStored(r))
+      .catch((e) => !cancelled && setErrorMsg(errorMessage(e, "Không tải được số liệu report")))
+      .finally(() => !cancelled && setSnapLoading(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [brandId, month]);
+
+  const refreshImportStamps = () =>
+    fetchDataRawImportStamps(brandId)
+      .then(setImportStamps)
+      .catch(() => setImportStamps(null));
+  useEffect(() => {
+    if (!canManage) return;
+    let cancelled = false;
+    fetchDataRawImportStamps(brandId)
+      .then((r) => !cancelled && setImportStamps(r))
+      .catch(() => !cancelled && setImportStamps(null));
+    return () => {
+      cancelled = true;
+    };
+  }, [brandId, canManage]);
+
+  // Ca sống đã có sẵn trong app (0 egress), dấu batch nhỏ ⇒ biết ngay bản chụp cũ tới đâu mà không tải
+  // lại file nào.
+  const freshness = useMemo(
+    () => (stored && importStamps ? snapshotFreshness(stored.snapshot, { sessions, planMonthTotals, brandPlatformRates, imports: importStamps }) : null),
+    [stored, importStamps, sessions, planMonthTotals, brandPlatformRates]
+  );
+
+  const buildSnapshot = () =>
+    buildMonthlyReportSnapshot({ brandId, month, sessions, planMonthTotals, brandPlatformRates, previous: stored?.snapshot ?? null });
+
+  const saveSnapshot = async (snapshot: Awaited<ReturnType<typeof buildSnapshot>>["snapshot"]) => {
+    const computedAt = await saveMonthlyReportSnapshot(brandId, month, snapshot);
+    setStored({ snapshot, computedAt });
+    await refreshImportStamps();
+  };
+
+  const handleCreateOrRefresh = async () => {
+    setErrorMsg(null);
+    if (stored && freshness?.upToDate) {
+      showToast("Số liệu đã mới nhất — không có ca hay file nào đổi từ lần chốt trước, không cần tải lại.", "info");
+      return;
+    }
+    setBuilding(true);
+    try {
+      const { snapshot, fetched, reused } = await buildSnapshot();
+      if (stored && isPublished) {
+        const ok = await confirm(
+          `Report ${month} ĐÃ PHÁT HÀNH — cập nhật xong brand thấy ngay số mới.\n\n${headlineDiff(snapshotHeadline(stored.snapshot), snapshotHeadline(snapshot))}\n\nCập nhật và phát hành lại?`,
+          { confirmLabel: "Cập nhật & phát hành lại" }
+        );
+        if (!ok) return;
+      }
+      await saveSnapshot(snapshot);
+      showToast(
+        `Đã chốt số liệu report ${month}` + (reused.length ? ` — tải ${fetched.length} phần, dùng lại ${reused.length} phần không đổi.` : "."),
+        "success"
+      );
+    } catch (e) {
+      setErrorMsg(errorMessage(e, "Không dựng được số liệu report"));
+    } finally {
+      setBuilding(false);
+    }
+  };
+
   const handlePublish = async () => {
     setPublishing(true);
     setErrorMsg(null);
     try {
+      // Phát hành mà chưa có bản chụp thì brand mở ra sẽ trống — dựng luôn ở đây.
+      if (!stored) await saveSnapshot((await buildSnapshot()).snapshot);
       // Tháng chưa có dòng brand_monthly_reports (chưa nhập Ads/kế hoạch gì) → tạo dòng nháp trống
       // ngay đây rồi phát hành, ops không phải đi vòng qua tab Nhập Ads chỉ để "Lưu" cho có dòng.
       const row = report ?? (await upsertMonthlyReport(brandId, `${month}-01`, {}));
@@ -208,8 +320,9 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
           </div>
         </div>
         <p className="text-[var(--text-muted)] text-xs">
-          Số liệu vận hành tính từ các ca có số trong tháng (Dữ Liệu Gốc chỉ dự phòng). Ads/ROAS, Promotion, Customer Insight,
-          Account Health nhập tay ở tab {adsReportLink}.
+          Số liệu vận hành tính từ các ca có số trong tháng (Dữ Liệu Gốc chỉ dự phòng) và được CHỐT tại một thời điểm — mở report
+          không tính lại; ops bấm "Cập nhật số liệu" khi muốn lấy số mới. Ads/ROAS, Promotion, Customer Insight, Account Health
+          nhập tay ở tab {adsReportLink}.
         </p>
       </div>
 
@@ -244,7 +357,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
         </div>
       )}
 
-      {loading ? (
+      {loading || snapLoading ? (
         <div className="flex items-center justify-center py-12 text-[var(--text-faint)] text-sm gap-2">
           <Loader2 className="w-4 h-4 animate-spin" /> Đang tải report...
         </div>
@@ -254,14 +367,83 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
               trạng thái report — trước đây brand mở tab là thấy số liệu vận hành ngay cả khi report
               còn là bản nháp chưa phát hành. Ops/CEO/Admin vẫn cần xem live để soát trước khi phát hành,
               chỉ chặn với brand cho tới khi report được phát hành chính thức. */}
-          {canManage || isPublished ? (
+          {canManage && !stored ? (
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-8 text-center space-y-3">
+              <Database className="w-8 h-8 mx-auto text-[var(--text-faint)]" />
+              <div className="text-sm font-bold text-[var(--text)]">Tháng {month} chưa tạo report</div>
+              <p className="text-xs text-[var(--text-muted)] max-w-xl mx-auto">
+                Bấm để tổng hợp số liệu từ ca có số và Dữ Liệu Gốc rồi chốt lại. Sau đó mở report chỉ đọc số đã chốt; khi có ca đối soát
+                thêm hay file mới, bấm "Cập nhật số liệu".
+              </p>
+              <button
+                onClick={handleCreateOrRefresh}
+                disabled={building}
+                className="px-5 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-60 text-white font-bold rounded-xl shadow inline-flex items-center gap-2"
+              >
+                {building ? <Loader2 className="w-4 h-4 animate-spin" /> : <Database className="w-4 h-4" />}
+                {building ? "Đang tổng hợp..." : "Tạo report"}
+              </button>
+            </div>
+          ) : (canManage || isPublished) && stored ? (
             <>
+          {/* Số liệu chốt tới đâu + (ops) còn mới không — nói rõ report đang là ảnh chụp lúc nào. */}
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
+            <span className="flex items-center gap-1.5 text-[var(--text)] font-semibold">
+              <Database className="w-3.5 h-3.5 text-[var(--accent-text)]" /> Số liệu chốt lúc {fmtStamp(stored.computedAt)}
+            </span>
+            <span className="text-[var(--text-muted)]">
+              {stored.snapshot.coverage.sessionsThrough ? `ca có số tới ${fmtDayMonth(stored.snapshot.coverage.sessionsThrough)}` : "chưa có ca nào có số"}
+              {" · "}
+              {(() => {
+                const ends = Object.values(stored.snapshot.coverage.datarawThrough).filter((d): d is string => !!d).sort();
+                return ends.length ? `Dữ Liệu Gốc tới ${fmtDayMonth(ends[0])}` : "chưa có file Dữ Liệu Gốc";
+              })()}
+            </span>
+            {canManage && (
+              <span className="ml-auto flex items-center gap-3">
+                {freshness &&
+                  (freshness.upToDate ? (
+                    <span className="text-emerald-400 font-semibold flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Đã mới nhất
+                    </span>
+                  ) : (
+                    <span className="text-amber-300 font-semibold">
+                      Có thay đổi từ lần chốt:{" "}
+                      {[
+                        freshness.changedSessions > 0 &&
+                          `${freshness.changedSessions} ca${freshness.changedSessionsThisMonth !== freshness.changedSessions ? ` (${freshness.changedSessionsThisMonth} trong tháng này)` : ""}`,
+                        freshness.changedFiles.length > 0 && `file ${freshness.changedFiles.join(", ")}`,
+                        freshness.configChanged && "target/rate/công thức"
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </span>
+                  ))}
+                <button
+                  onClick={handleCreateOrRefresh}
+                  disabled={building}
+                  className={`px-3 py-1.5 rounded-lg font-bold inline-flex items-center gap-1.5 disabled:opacity-60 ${
+                    freshness && !freshness.upToDate
+                      ? "bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white"
+                      : "border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-elevated)]"
+                  }`}
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${building ? "animate-spin" : ""}`} />
+                  {building ? "Đang cập nhật..." : isPublished ? "Cập nhật & phát hành lại" : "Cập nhật số liệu"}
+                </button>
+              </span>
+            )}
+          </div>
           {/* Report Tháng redesign (2026-08-22) — tabbed, skin đen-vàng cố định cho tài liệu gửi
               brand, thay toàn bộ khối Overview/Host Performance/Top SKU/Deep Dive cũ. Xem note thiết
               kế trong MonthlyReportTabs.tsx (nguồn dữ liệu từng tab, giới hạn phạm vi). */}
-          <MonthlyReportTabs brandId={brandId} brandName={brandName} month={month} sessions={sessions} canManage={canManage} brandPlatformRates={brandPlatformRates} planMonthTotals={planMonthTotals} />
+          <MonthlyReportTabs brandId={brandId} brandName={brandName} month={month} snapshot={stored.snapshot} liveSessions={sessions} canManage={canManage} />
 
             </>
+          ) : isPublished ? (
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-8 text-center text-[var(--text-faint)] text-sm">
+              Report tháng {month} đã phát hành nhưng chưa có số liệu chốt — liên hệ Ops để cập nhật.
+            </div>
           ) : (
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-8 text-center text-[var(--text-faint)] text-sm">
               Report tháng {month} chưa được phát hành. Số liệu vận hành sẽ hiển thị khi Ops/CEO/Admin phát hành report.
@@ -280,6 +462,13 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
               </p>
               {!isPublished ? (
                 <div className="space-y-3">
+                  {stored && freshness && !freshness.upToDate && (
+                    <p className="text-[11px] text-amber-300 font-semibold">
+                      Số liệu đã chốt lúc {fmtStamp(stored.computedAt)} và có thay đổi sau đó — phát hành bây giờ là gửi số đã chốt. Bấm
+                      "Cập nhật số liệu" ở trên trước nếu muốn gửi số mới nhất.
+                    </p>
+                  )}
+                  {!stored && <p className="text-[11px] text-[var(--text-faint)]">Chưa có số liệu chốt — phát hành sẽ tự tổng hợp số trước.</p>}
                   {unreconciledSessions.length > 0 && (
                     <label className="flex items-start gap-2 text-[11px] text-amber-300 font-semibold">
                       <input type="checkbox" checked={confirmForce} onChange={(e) => setConfirmForce(e.target.checked)} className="mt-0.5" />

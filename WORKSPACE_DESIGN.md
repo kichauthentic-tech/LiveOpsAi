@@ -2,6 +2,15 @@
 
 ## CẦN LÀM NGAY khi mở phiên mới (cập nhật 2026-09-24)
 
+> **MỚI 2026-09-25 (tối) — Report Tháng làm lại thành 1 trang cuộn 8 phần** (Tóm tắt → Mục tiêu → Toàn shop &
+> kênh → Vì sao → Người → Hàng → Bối cảnh → Tháng sau + Phụ lục). Migration **0120 đã chạy** (đoạn tóm tắt ops sửa được)
+> — xem mục `## Report Tháng 8 phần`. Bản chụp số liệu lên **v2** (thêm tổng shop theo ngày + GMV thẻ SP 4 tháng).
+
+> **MỚI 2026-09-25 — Report Tháng giờ là BẢN CHỤP số liệu, không tính lại mỗi lần mở.** Migration **0119**
+> đã chạy + verify trên browser (CROCS T8/T9 đã tạo report). Mở report ~37 KB/lần thay vì ~17 MB. Chi tiết +
+> quy ước ở mục `## Bản chụp số liệu Report Tháng` bên dưới. Việc treo: chưa verify góc nhìn role `brand` trên
+> browser (chỉ có SSR test + test RLS local) — cần ai đăng nhập hộ tài khoản brand.
+
 > **MỚI 2026-09-25 — Dashboard (Bản Tin CEO) đã thay Toàn Cảnh Agency, đứng đầu sidebar.** Migration **0118**
 > đã chạy. Việc treo: nhập % hoa hồng/lương để khối tiền có số. Chi tiết + luật số ở
 > mục `## Bản Tin CEO` bên dưới.
@@ -762,13 +771,16 @@ Ground truth luôn là `AGENCY_NAV_GROUPS`/`BRAND_NAV_GROUPS` ở [src/App.tsx](
 2. **Đối soát:** Talent tự nhập report ca (tạm tính, `data_source='manual'`) → Ops đối soát cuối kỳ bằng số đọc thẳng từ Dataraw, ghi đè thành `data_source='tiktok_reconciled'`. Nộp lại report sau khi đã đối soát **không tự xoá cờ** nếu số liệu đối soát (GMV/orders/views/CTR/watch-time) không đổi (migration 0075).
 
 2b. **Snapshot số liệu theo ca (migration 0078/0079, 2026-09-17) — nguồn sự thật MỚI, đang thay dần việc nhập tay.** Trợ live tải file `Creator-Live-Performance` (TikTok Creator Center, 1 dòng/Room ID) rồi up thẳng vào đúng ca đang trực; ca đã biết host/brand nên file không cần cột định danh. Bậc tin cậy thứ 3 `data_source='live_snapshot'` nằm giữa `manual` và `tiktok_reconciled`. Chi tiết cơ chế xem mục "Tầng dữ liệu gốc mới" bên dưới.
-3. **Report Tháng Brand Workspace** (5 tab: Tổng Quan/Livestream/Sản Phẩm & Khuyến Mãi/Affiliate/Kế Hoạch Tháng Sau) — đạt chuẩn brief thật Crocs x YFB, không số bịa. **Đổi nguồn số 2026-09-21 (user chọn "giữ 5 tab, đổi nguồn"):** Tab 01/02 (Livestream, Total/Live GMV, phễu, camp, top phiên, trend 4 tháng, diễn biến ngày) đọc từ **`live_sessions` có số** (đối soát/snapshot/nạp bù) qua `lib/report/sessionsLivePerf.ts` — ca được chiếu về đúng hình `CreatorLivePerfRow` nên Tab giữ nguyên công thức; file Dataraw Creator-Live-Performance chỉ còn là **dự phòng** cho tháng chưa có ca nào có số; file Live Performance Core Stats vẫn ưu tiên cho "diễn biến ngày" (có GMV gián tiếp), không có thì gộp ca theo ngày. Tab 02 có dải "Nguồn số: N ca — đã đối soát/số lúc giao ca/tự khai". Tab 01 thêm khối **run-rate** (`monthRunRate`: target kế hoạch đã đổ xuống ca, đã đạt, run-rate, dự kiến cuối tháng = còn lại × run-rate, thiếu/vượt) khi tháng có ca mang target. SKU/Khuyến mãi/Affiliate/Product card vẫn từ Dataraw. Verify CROCS 09/2026: 36 ca đối soát → Tab 02 2,95 tỷ · 142,2h · 20,7tr/h khớp Sổ Ca; run-rate test 3 ca target 80tr → 104%, vượt 8,4tr (target test đã trả 0). **Report Tuần làm lại 2026-09-21** (`BrandWeeklyReport.tsx`, toggle Tuần trong Report Tháng, ops-only, đọc-only): KPI tuần từ ca có số (GMV, target tuần + % đạt, giờ live thật, GMV/giờ, đơn/AOV, view, CVR/CTR live, run-rate tháng-tới-nay) kèm so tuần trước; bảng theo ngày T2–CN (ca xong/kế hoạch, giờ, GMV, target, đạt, GMV/giờ, đơn; cột "Shop (TikTok)" từ Dataraw chỉ khi có file); Top 5 ca; Host tuần (`byHost`); "Còn thiếu để chốt tuần" (`missingSteps`: chưa up file/report/đối soát); "Tuần tới" (ca đã chốt + target, ca mở chưa có người từ `shiftSlots` — App truyền qua BrandMonthlyReport). Verify CROCS tuần 38/2026: 12 ca đối soát, 662tr, 44,1h, 15tr/h, top ca Kiều Trang 15/09 133,9tr. Toggle Tháng/Tuần dùng chung 1 màn hình. **Tách phần nhập tay khỏi Report Tháng (2026-09-21, user: "đưa phần nhập report ads ra ngoài riêng"):** tab mới **Nhập Ads & Ghi Chú** (`BrandAdsReport.tsx`, id `brand_ads_report`, ẩn với role `brand` như Dữ Liệu Gốc) gồm khối "Ads Report Chi Tiết (TikTok)" (Ads Cost từ Report Ca, MoM, theo tuần) + form Ads Spend bổ sung / ROAS ghi đè / Promotion / Customer Insight / Account Health, nút **Lưu** (upsert cùng dòng `brand_monthly_reports`, spread `report` để pass-through kế hoạch tháng sau + mốc camp — form cũ trong Report Tháng từng thiếu `planTargetNmv`/`camp*` nên lưu là mất mốc camp). Report đã phát hành → form khoá, chỉ dẫn thu hồi ở Report Tháng. Report Tháng giờ chỉ còn 5 tab + khối **Phát Hành Report** (checkbox rủi ro chưa đối soát, Phát hành / Thu hồi); bỏ "Lưu Bản Nháp" — tháng chưa có dòng thì Phát hành tự tạo dòng trống rồi phát hành. Verify CROCS: lưu 1,5tr/3.2/ghi chú → DB đúng cột, "Đã lưu lúc"; Report Tháng không còn form; tháng 07 chưa có dòng → Phát hành tạo dòng + published, Thu hồi về draft; 2 dòng test đã xoá.
+3. **Report Tháng Brand Workspace** (5 tab: Tổng Quan/Livestream/Sản Phẩm & Khuyến Mãi/Affiliate/Kế Hoạch Tháng Sau) — đạt chuẩn brief thật Crocs x YFB, không số bịa. **Từ 2026-09-25 (0119) mọi con số tab 01–04 đọc từ BẢN CHỤP do ops bấm Tạo report/Cập nhật số liệu, không tính lại mỗi lần mở — xem mục `## Bản chụp số liệu Report Tháng`; phần mô tả nguồn số dưới đây là nguồn LÚC DỰNG bản chụp.** **Đổi nguồn số 2026-09-21 (user chọn "giữ 5 tab, đổi nguồn"):** Tab 01/02 (Livestream, Total/Live GMV, phễu, camp, top phiên, trend 4 tháng, diễn biến ngày) đọc từ **`live_sessions` có số** (đối soát/snapshot/nạp bù) qua `lib/report/sessionsLivePerf.ts` — ca được chiếu về đúng hình `CreatorLivePerfRow` nên Tab giữ nguyên công thức; file Dataraw Creator-Live-Performance chỉ còn là **dự phòng** cho tháng chưa có ca nào có số; file Live Performance Core Stats vẫn ưu tiên cho "diễn biến ngày" (có GMV gián tiếp), không có thì gộp ca theo ngày. Tab 02 có dải "Nguồn số: N ca — đã đối soát/số lúc giao ca/tự khai". Tab 01 thêm khối **run-rate** (`monthRunRate`: target kế hoạch đã đổ xuống ca, đã đạt, run-rate, dự kiến cuối tháng = còn lại × run-rate, thiếu/vượt) khi tháng có ca mang target. SKU/Khuyến mãi/Affiliate/Product card vẫn từ Dataraw. Verify CROCS 09/2026: 36 ca đối soát → Tab 02 2,95 tỷ · 142,2h · 20,7tr/h khớp Sổ Ca; run-rate test 3 ca target 80tr → 104%, vượt 8,4tr (target test đã trả 0). **Report Tuần làm lại 2026-09-21** (`BrandWeeklyReport.tsx`, toggle Tuần trong Report Tháng, ops-only, đọc-only): KPI tuần từ ca có số (GMV, target tuần + % đạt, giờ live thật, GMV/giờ, đơn/AOV, view, CVR/CTR live, run-rate tháng-tới-nay) kèm so tuần trước; bảng theo ngày T2–CN (ca xong/kế hoạch, giờ, GMV, target, đạt, GMV/giờ, đơn; cột "Shop (TikTok)" từ Dataraw chỉ khi có file); Top 5 ca; Host tuần (`byHost`); "Còn thiếu để chốt tuần" (`missingSteps`: chưa up file/report/đối soát); "Tuần tới" (ca đã chốt + target, ca mở chưa có người từ `shiftSlots` — App truyền qua BrandMonthlyReport). Verify CROCS tuần 38/2026: 12 ca đối soát, 662tr, 44,1h, 15tr/h, top ca Kiều Trang 15/09 133,9tr. Toggle Tháng/Tuần dùng chung 1 màn hình. **Tách phần nhập tay khỏi Report Tháng (2026-09-21, user: "đưa phần nhập report ads ra ngoài riêng"):** tab mới **Nhập Ads & Ghi Chú** (`BrandAdsReport.tsx`, id `brand_ads_report`, ẩn với role `brand` như Dữ Liệu Gốc) gồm khối "Ads Report Chi Tiết (TikTok)" (Ads Cost từ Report Ca, MoM, theo tuần) + form Ads Spend bổ sung / ROAS ghi đè / Promotion / Customer Insight / Account Health, nút **Lưu** (upsert cùng dòng `brand_monthly_reports`, spread `report` để pass-through kế hoạch tháng sau + mốc camp — form cũ trong Report Tháng từng thiếu `planTargetNmv`/`camp*` nên lưu là mất mốc camp). Report đã phát hành → form khoá, chỉ dẫn thu hồi ở Report Tháng. Report Tháng giờ chỉ còn 5 tab + khối **Phát Hành Report** (checkbox rủi ro chưa đối soát, Phát hành / Thu hồi); bỏ "Lưu Bản Nháp" — tháng chưa có dòng thì Phát hành tự tạo dòng trống rồi phát hành. Verify CROCS: lưu 1,5tr/3.2/ghi chú → DB đúng cột, "Đã lưu lúc"; Report Tháng không còn form; tháng 07 chưa có dòng → Phát hành tạo dòng + published, Thu hồi về draft; 2 dòng test đã xoá.
 4. **P&L** (`lib/pnl.ts`) tính trên NMV ước tính = `actualGmv × (1 − returnRate/100)`, giờ công thực tế = giờ ca + OT − off sớm, rate/giờ song song với rate/phiên cũ (data cũ không đổi).
 
 *(re-confirmed đúng qua audit module "Vận Hành Live" ngày 2026-09-13 — xem mục Giai đoạn tiếp theo)*
 
 ## Hạ tầng Supabase
 
+- **0120** — `0120_monthly_report_narrative.sql` — **ĐÃ CHẠY + verify** (2026-09-25): 3 cột tóm tắt/việc tháng sau, xem mục `## Report Tháng 8 phần`.
+- **0119** — `0119_monthly_report_snapshots.sql` — **ĐÃ CHẠY + verify** (2026-09-25): bảng
+  `brand_monthly_report_snapshots`, xem mục `## Bản chụp số liệu Report Tháng`.
 - **0118** — `0118_brand_commission_rate.sql` — **ĐÃ CHẠY** (2026-09-25): `commission_rate` cho `brand_platform_rates` + lịch sử, xem mục Bản Tin CEO.
 - Migration trước đó: **0116** — `0116_notifications_round_two.sql` — **ĐÃ CHẠY + verify (2026-09-24)**, Đ7/Đ8/Đ9: 2 `kind` mới (`shift_open`, `shift_dropout_request`), hàm `notify_ops()` (đường agency ← talent, 0083 chỉ có chiều ngược lại), viết lại `notify_session_changes` để `report_reconciled` bắt cả bậc `live_snapshot`, 2 trigger báo ca mở (`shift_slots` cho ca phát sinh + `brand_month_plans.locked_at` cho cả tháng), RPC `request_shift_dropout`. Constraint `kind` verify bằng phép thử chức năng chứ không bằng lời: tạo 1 shift_slot tương lai `plan_id null` → **tạo được**, tức trigger bắn và constraint nhận `'shift_open'` (constraint cũ còn sống thì cả lệnh INSERT chết `23514`). Cùng đợt và cũng **ĐÃ CHẠY**: **0115** (`0115_delete_month_plan.sql` — RPC `delete_month_plan`, đường xoá Kế Hoạch Tháng mà app chưa từng có; phải là RPC chứ không `.delete()` vì `shift_slots.plan_id` là `on delete set null` nên xoá thẳng sẽ để lại ca chờ đăng ký MỒ CÔI) và **0114** (`0114_exclude_session_from_reports.sql` — Đ10, cờ `excluded_from_reports`, RPC `set_session_excluded`, tạo lại view `live_sessions_secure`, vá `publish_brand_monthly_report`).
 
@@ -1344,6 +1356,129 @@ Quét lại toàn bộ `pg_policy` sau 0111: **0 policy** còn khuôn hở. Ch�
 - Trigger `handle_new_user`: **đúng** — `on_auth_user_created` enabled trên `auth.users`, định nghĩa hàm xác nhận không còn đọc `raw_user_meta_data->>'role'`, luôn insert `role = 'talent'`. Lỗ 1 coi như đã đóng.
 - 11 policy: **chỉ 3/10 được vá** (`brands_read_scoped`, `live_sessions_read_no_brand`, `session_skus_read_published`) — **7 policy vẫn hở y như trước**: `brand_skus_read_scoped`, `promo_schemes_read_scoped`, `recurring_shift_templates_read_scoped`, `shift_slots_read_scoped`, `live_session_reports_read_no_brand`, `session_checklist_items_read_no_brand`, `session_minute_metrics_read_no_brand`. Trớ trêu: `live_session_reports` chính là bảng 0111 dùng làm ví dụ đo được lỗ hổng trong comment của nó. Đã kiểm cả 7 đều khớp đúng điều kiện lọc mà vòng lặp DO của 0111 dùng (`polcmd='r'`, `polpermissive`, `polroles='{0}'`/`to public`) — **không rõ vì sao vòng lặp lại bỏ sót đúng 7 dòng này lúc chạy**, nghi liên quan sự cố đánh số/2 phiên song song mà chính 0111 đã ghi lại, nhưng không truy thêm vì không giúp gì cho việc vá. **Bài học: "đã chạy migration" không đồng nghĩa "migration làm đúng những gì comment nói" — vòng lặp DO quét theo text/thuộc tính rất dễ bỏ sót âm thầm không báo lỗi, phải tự `pg_policy` đếm lại sau khi chạy, không tin comment.**
 - **Migration 0112** (`0112_null_role_guard_missed_policies.sql`) vá trực tiếp đúng 7 policy còn hở bằng cách chỉ định rõ tên (không dùng lại bộ lọc quét theo text), giữ nguyên ý nghĩa gốc từng policy, chỉ bọc thêm `(select current_user_role()) is not null`. **ĐÃ CHẠY + verify 2026-09-23**: quét lại `pg_policy` toàn `public` tìm policy "is distinct from" thiếu "is not null" → **0 dòng**. Lỗ 2 coi như đã đóng thật.
+
+## Report Tháng 8 phần — XONG + VERIFY 2026-09-25 (migration 0120 ĐÃ CHẠY)
+
+**User chốt 3 điểm** (sau nghiên cứu https://claude.ai/artifact/XXYTmtJoNh1pQEbSWDozsD): số đứng đầu hiện CẢ HAI (GMV cả
+shop + GMV agency live); 1 trang cuộn thay 6 tab; tóm tắt app tự sinh rồi ops sửa trước khi phát hành.
+
+**Cấu trúc** ([MonthlyReportTabs.tsx](src/components/brand-workspace/MonthlyReportTabs.tsx) — giữ tên file, giờ là trang
+cuộn có mục lục dính trên đầu):
+1. **Tóm tắt** — 5 ô: GMV cả shop, GMV agency live (+ % tổng shop), NMV ước tính, giờ live, GMV/giờ; % đều là **cùng
+   kỳ** (`compareWindow`: tháng chưa hết so 1..N với 1..N tháng trước; tháng đủ so trọn tháng; tháng trước ngắn hơn thì
+   cắt ở ngày cuối). Đoạn gạch đầu dòng = `summary_text` nếu ops đã sửa, không thì `autoSummary()` từ bản chụp.
+2. **Mục tiêu** — target từ Kế Hoạch Tháng đã chốt (cách cũ `scheduledTargetGmv`), run-rate (khối cũ), luỹ kế GMV live
+   theo ngày 2 tháng cùng trục, Target vs Thực đạt 4 tháng.
+3. **Toàn shop & kênh** — MỚI: cơ cấu 100% 4 tháng (LIVE tài khoản shop / LIVE affiliate / Video / Thẻ SP) + bảng
+   (GMV cả shop, agency live, tỷ trọng, affiliate, video, thẻ SP, hoàn/GMV). Thay bảng "Chi tiết theo nguồn" +
+   donut cũ (Live+Affiliate từng ra 110%). Affiliate giờ TỰ ĐỘNG từ Shop Analytics, không phụ thuộc bảng nhập tay.
+4. **Vì sao** — MỚI: waterfall `driverBreakdown` (giờ × lượt xem/giờ × GMV/lượt xem, chia theo tỷ trọng log, 3 phần
+   cộng đúng ΔGMV), 5 ô xu hướng 4 tháng (lượt xem/giờ, CTR, CTOR, GMV/lượt xem, AOV), cảnh báo `trendSignal` (≥3
+   tháng cùng chiều & ≥10%), phễu + bảng MoM (giờ là cùng kỳ).
+5. **Người** — bảng host (bỏ biểu đồ trùng); cảnh báo đối soát + "N ca chưa gán host" chỉ ops, brand thấy 1 dòng trung tính.
+6. **Hàng** — Top SKU thêm cột "% qua live" (bỏ biểu đồ), khuyến mãi.
+7. **Bối cảnh** — khung camp (bỏ form), MỚI bảng khung giờ bắt đầu ca (GMV/giờ cùng kỳ), GMV/giờ và giờ live 4 tháng
+   TÁCH 2 biểu đồ (hết biểu đồ 2 trục), diễn biến theo ngày (bỏ trục GPM thứ 2), top 10 phiên.
+8. **Tháng sau** — target + số ca từ Kế Hoạch Tháng tháng sau (`fetchMonthPlan`), việc tháng sau (`next_steps_text`
+   hoặc `autoNextSteps()`), ghi chú agency (Khuyến mãi / Khách hàng / Sức khoẻ tài khoản từ Nhập Ads & Ghi Chú — trước
+   đây nhập mà KHÔNG hiện ở đâu trong report).
+- **Phụ lục** — bảng creator affiliate nhập tay; `<details>` "Công cụ nhập liệu (chỉ ops)": form khung camp + form kế
+  hoạch phân bổ/affiliate tháng sau (vẫn ghi `brand_monthly_reports.plan_*` — targetAllocation còn đọc); Phân tích sâu
+  (Tab 05 cũ) giờ chỉ mount khi bấm mở (nó tự tải ~11 MB).
+
+**Logic mới** ở [monthlyReportInsights.ts](src/lib/report/monthlyReportInsights.ts) (thuần, 6 test ở
+[tests/monthlyReportInsights.test.ts](tests/monthlyReportInsights.test.ts), số mẫu CROCS thật). Bản chụp **v2**: thêm
+piece `shopDays|tháng` (`fetchShopDaysMonthSlice` — đọc dòng Shop Analytics qua `readShopDays` song ngữ, lưu 8 cột) và
+`cardGmv|tháng` (`fetchCardGmvMonthSlice` — chỉ `summary->productAgg->cardGmv`) cho cả 4 tháng; bỏ piece `channelGmv`
+(và hàm `fetchChannelGmvMonthSlice`). Bản chụp v1 mở ra vẫn chạy, báo "Có thay đổi: file Shop Analytics, Sản Phẩm ·
+target/rate/công thức" + dải nhắc bấm Cập nhật.
+
+**0120**: `brand_monthly_reports.summary_text / next_steps_text / summary_saved_at`. Ghi qua `saveMonthlyReportNarrative`
+(upsert CHỈ 3 cột ⇒ không đè Ads/kế hoạch; `upsertMonthlyReport` không gửi 3 cột này ⇒ lưu Ads không xoá tóm tắt).
+"Dùng lại bản tự sinh" = ghi null. Đoạn đã sửa cũ hơn lần chốt số ⇒ nhắc ops đọc lại.
+
+**Verify:** tsc/eslint 0 lỗi, vitest 73/73, vite build; browser (admin) CROCS T9: bản chụp v1 bị báo cũ đúng, Cập nhật →
+"tải 8 phần, dùng lại 3", cả 8 phần đúng số đã đo ở nghiên cứu (shop 5,21 tỷ −22,8% cùng kỳ; agency 3,52 tỷ −18,4%,
+67,5%; NMV 2,97 tỷ; tách +571/−800/−564 tr; CTOR 4 tháng 1,99→1,25%; 4 kênh T6–T9; T10 5,5 tỷ/75 ca), console sạch.
+Sau khi chạy 0120: sửa tóm tắt → Lưu → DB có `summary_text`/`summary_saved_at`, tải lại trang vẫn giữ; "Dùng lại bản
+tự sinh" → 3 cột về null, report hiện lại bản tự sinh. Việc lưu này đã TẠO dòng `brand_monthly_reports` CROCS 09/2026
+(draft, mọi cột nhập tay trống) — vô hại, lúc phát hành cũng sẽ tạo. **Chưa verify:** góc nhìn brand trên browser;
+nhánh có target chốt; "Cập nhật & phát hành lại".
+
+## Bản chụp số liệu Report Tháng — XONG + VERIFY 2026-09-25 (migration 0119 ĐÃ CHẠY)
+
+**Vì sao:** Report Tháng từng tính lại TẤT CẢ mỗi lần mở. Đo thật CROCS T9: **~17 MB/lần mở** (~3 MB sau gzip) —
+file `product_list` 5,3 MB/tháng bị tải 3 lần (Top SKU + GMV thẻ SP tháng này + tháng trước, mỗi lần nguyên
+1.000 dòng × 175 cột), file Creator-Live-Performance tải 4 lần dù chỉ là nguồn dự phòng. Kèm theo: số đã phát
+hành vẫn tự đổi dưới chân brand khi có ca đối soát lại/file up đè; report tháng đang chạy không nói "số tính tới
+ngày nào". Brand còn không đọc được Dữ Liệu Gốc (RLS 0052 chỉ ceo/admin/ops) ⇒ Tab 03 phía brand luôn trống.
+
+**Đã làm (3 tầng):**
+1. **Tính sẵn lúc upload** — [productListAgg.ts](src/lib/dataraw/productListAgg.ts) (thuần, không import
+   supabase): parser `product_list` tính luôn `{v, skus: [tên, GMV, GMV LIVE, đơn][], cardGmv, …}` lưu vào
+   `brand_dataraw_imports.summary.productAgg` (file đang trong bộ nhớ trình duyệt ⇒ 0 egress). Đọc qua
+   `fetchProductListAgg` ([monthlyProductSlice.ts](src/lib/dataraw/monthlyProductSlice.ts)) bằng
+   `select agg:summary->productAgg` (~75 KB) thay vì 5,3 MB dòng gốc. Batch cũ/lệch `PRODUCT_AGG_VERSION` ⇒ tính
+   lại từ dòng gốc (theo trang) MỘT lần rồi ghi ngược vào `summary`. **CROCS T7/T8/T9 đã được ghi ngược 2026-09-25**
+   (đối chiếu: khớp 100% với tính lại từ toàn bộ dòng); T6 chưa, sẽ tự ghi lần đầu có report cần nó.
+   `fetchDataRawImports` (màn Dữ Liệu Gốc) không còn `select *` — chỉ lấy `summary->totals/changePct` của Shop
+   Analytics, không kéo `productAgg` về.
+2. **Bản chụp** — bảng `brand_monthly_report_snapshots(brand_id, period_month, snapshot jsonb, computed_at,
+   computed_by)`, bảng RIÊNG (không cột trên `brand_monthly_reports` vì bảng đó bị `select *` ở nhiều chỗ + 2
+   RPC phát hành trả nguyên dòng). RLS: ops all; brand chỉ SELECT dòng của brand mình khi
+   `brand_month_published()` (0107). Dựng ở [monthlySnapshot.ts](src/lib/report/monthlySnapshot.ts):
+   `buildMonthlyReportSnapshot` giữ **NGUYÊN LIỆU** (ca 4 tháng đã cắt còn các trường report đọc, target Kế Hoạch
+   Tháng, rate card, các slice Dữ Liệu Gốc) — KHÔNG giữ con số đã tính, nên [MonthlyReportTabs.tsx](src/components/brand-workspace/MonthlyReportTabs.tsx)
+   giữ nguyên mọi công thức, chỉ đổi chỗ lấy đầu vào (`snapshot` prop thay `sessions`/`brandPlatformRates`/
+   `planMonthTotals` + vòng fetch Dữ Liệu Gốc cũ). Tab 05 Phân Tích Sâu (ops-only) VẪN tính trực tiếp từ ca sống.
+3. **Chỉ tải phần đổi** — mỗi slice Dữ Liệu Gốc là 1 `piece` có `stamp` = `v{PIECE_VERSION}|loại=id@imported_at,…`.
+   Bấm cập nhật: stamp khớp ⇒ dùng lại; piece tháng trước (vd `channelGmv|2026-08`) lấy thẳng từ bản chụp tháng
+   trước (`select pieces:snapshot->pieces`). `product_list` 1 tháng đọc 1 lần cho cả Top SKU lẫn GMV thẻ SP.
+   Creator-Live-Performance chỉ tải cho tháng CHƯA có ca nào có số.
+
+**UI** ([BrandMonthlyReport.tsx](src/components/brand-workspace/BrandMonthlyReport.tsx)): tháng chưa có bản chụp
+⇒ ops thấy "Tháng X chưa tạo report" + nút **Tạo report** (user chốt (a): không tự dựng khi mở). Có bản chụp ⇒
+dải "Số liệu chốt lúc HH:mm · ca có số tới DD/MM · Dữ Liệu Gốc tới DD/MM" + (ops) độ mới tính TẠI CHỖ từ ca sống
+(0 egress) + dấu batch (~4 KB): "Đã mới nhất" hoặc "Có thay đổi từ lần chốt: N ca · file X · target/rate/công
+thức"; nút **Cập nhật số liệu** (không có gì đổi ⇒ toast "đã mới nhất", không tải gì). Report ĐÃ PHÁT HÀNH ⇒ nút
+thành "Cập nhật & phát hành lại", hiện confirm so trước/sau (Total GMV, ca có số, giờ live, Video/Card GMV, Top
+SKU #1). Phát hành khi chưa có bản chụp (cả ở Report Tháng lẫn [ReportPublishBoard.tsx](src/components/ReportPublishBoard.tsx))
+⇒ tự dựng trước. Brand: đọc bản chụp; tháng TRƯỚC trong cửa sổ mà chưa phát hành (cờ `monthPublished` của ca
+sống) thì bỏ ca + slice tháng đó khỏi cột so sánh/xu hướng — giữ đúng quyết định "brand không thấy số chưa phát
+hành". Việc phụ đi kèm: `fetchRowsPaged` tách ra [fetchRowsPaged.ts](src/lib/dataraw/fetchRowsPaged.ts), dùng
+thêm ở `creatorLivePerfSlice` + `fetchOverlappingBatchRows` (hết cắt 1.000 dòng).
+
+**Đo thật sau khi làm:** bản chụp CROCS T9 196 KB (**37 KB trên dây** gzip), T8 161 KB. Dựng T9 lần đầu 131 KB
+tải về; bấm cập nhật khi không đổi 4 KB. Số khớp trước/sau: T9 3,52 tỷ / 47 ca / 177,8h; T8 5.885.482.631 / 60 ca.
+**Sửa lại một nhận định sai:** lỗi cắt 1.000 dòng `product_list` KHÔNG làm sai Top SKU/GMV thẻ SP của CROCS — dòng
+bị cắt (15–60 SKU/tháng) đều bán 0đ; chỉ làm thiếu SKU ở SKU Showcase ("Chưa khớp" thay vì "0đ").
+
+**Verify:** 7 unit test mới ([tests/monthlySnapshot.test.ts](tests/monthlySnapshot.test.ts): đọc 1 lần/tháng, 0
+lần tải khi không đổi, up đè Sản Phẩm chỉ tải lại 2 piece dính product_list, tái dùng piece tháng trước, đếm ca
+đổi/mới/bị loại, bỏ qua trường không ảnh hưởng số, hydrate); chạy thử bộ dựng trên DB thật bằng service key
+(scratchpad); SSR render `MonthlyReportTabs` với bản chụp T9 thật cho cả ops lẫn brand (brand: T8 chưa phát hành
+⇒ cột 2026-08 = 0/"chưa có kỳ trước"); migration chạy trên Postgres 18 cô lập 2 lần (idempotent) + RLS: ops
+thấy 3, brand CROCS chỉ thấy T8 đã phát hành, update/insert của brand bị chặn, talent/role NULL thấy 0; browser
+thật (admin): Tạo report T9 + T8, mở lại đọc bản chụp, bấm cập nhật ⇒ "đã mới nhất", tab 01/02/03 đủ số, console
+sạch. **Chưa verify:** góc nhìn role `brand` trên browser; nhánh "Cập nhật & phát hành lại" (chưa phát hành report
+nào); nhánh fallback file Creator-Live-Performance (CROCS mọi tháng đều có ca).
+
+**Quy ước mới:**
+- **Đổi công thức của bất kỳ `fetch*Slice` nào mà bản chụp dùng ⇒ tăng `PIECE_VERSION`** ([monthlySnapshot.ts](src/lib/report/monthlySnapshot.ts));
+  đổi cách tổng hợp product_list ⇒ tăng `PRODUCT_AGG_VERSION`. Không tăng thì bản chụp cũ vẫn báo "Đã mới nhất"
+  với số tính theo công thức cũ.
+- **Report Tháng đọc trường mới của ca ⇒ thêm vào `SNAPSHOT_SESSION_FIELDS`** (và `SESSION_SIG_FIELDS` nếu trường
+  đó ảnh hưởng số) — không thêm thì ca hydrate ra 0/"" im lặng.
+- **jsonb không giữ thứ tự khoá** — đừng so `JSON.stringify` của object đọc lại từ DB với object vừa dựng (đã
+  vấp khi đối chiếu `productAgg`); so theo giá trị.
+- **Browser pane giữ log console qua các lần reload** — lỗi cũ (vd 404 lúc chưa chạy migration) vẫn hiện sau
+  reload. Muốn đọc console sạch thì mở TAB MỚI.
+
+**Nghiên cứu bố cục nội dung Report Tháng (2026-09-25, user hỏi, CHƯA làm):** đề xuất + bản chạy thử trên số CROCS thật ở https://claude.ai/artifact/XXYTmtJoNh1pQEbSWDozsD. Phát hiện đo được: (a) "Total GMV" Tab 01 thực ra là GMV ca live agency ⇒ Live+Affiliate = 110%; Shop Analytics có tổng shop + 4 kênh (Linked LIVE-attributed + Creator LIVE-attributed + video-attributed + thẻ SP từ product_list) cộng lại = 99,95–99,99% tổng shop T6–T9; (b) Affiliate T8 hiện 0 đ vì chỉ đọc bảng nhập tay, Shop Analytics ghi 1,00 tỷ (T9 lệch nhập tay 0,3%); (c) MoM tháng chưa hết −40,2% vs cùng số ngày −18,4%; (d) NMV = GMV trong khi Refunds/GMV thật 14,7–16,5%; (e) CTOR giảm 4 tháng 1,99→1,25%, T9 giờ +16% mà GMV/giờ −30% — report không có phần "vì sao"; (f) Tab 06 form riêng trống trong khi Kế Hoạch Tháng T10 có 5,5 tỷ. Đề xuất 1 trang cuộn 8 phần: Tóm tắt → Mục tiêu → Toàn shop & kênh → Vì sao (giờ × lượt xem/giờ × GMV/lượt xem) → Người → Hàng → Bối cảnh → Tháng sau (lấy từ Kế Hoạch Tháng). 3 câu chờ user: số đứng đầu (shop hay agency), trang cuộn hay tab, tóm tắt tự sinh hay tự viết.
+
+**Giai đoạn tiếp theo gợi ý (user chưa chọn):** (1) Tab 05 Phân Tích Sâu vẫn ~11 MB/lần mở (đọc nguyên
+product_list 2 tháng theo vị trí cột) — có thể chụp tương tự; (2) Report Tuần vẫn tính trực tiếp; (3) so MoM
+cùng số ngày khi tháng chưa hết (T9 22 ngày vs T8 31 ngày đang ra −40%) — đã nêu với user, chưa làm.
 
 ## Report Tháng Chuyên Sâu (form mẫu) — XONG 2026-09-23, ĐÃ GỘP vào Report Tháng
 

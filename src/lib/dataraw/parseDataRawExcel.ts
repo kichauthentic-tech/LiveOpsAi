@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import { DataRawColumn, DataRawReportType } from "../../types";
+import { buildProductListAgg } from "./productListAgg";
 
 // Parser cho module Dataraw Brand Workspace (migration 0052) — 4 report Excel export tay từ
 // TikTok Shop Seller Center, mỗi loại có layout khác nhau (xem sample thật đã xem trong phiên
@@ -104,12 +105,16 @@ function parseProductList(rows: unknown[][]): ParsedDataRawImport {
   }
   const header = trimTrailingEmpty(rows[headerIdx]);
   const columns = dedupeHeaders(header);
+  const dataRows = buildRows(rows, headerIdx + 1, columns);
   return {
     periodLabel: metaLine.replace(/^(?:Ngày phân tích|Analysis date):\s*/, "").trim() || undefined,
     periodStart: metaMatch ? vnDateToIso(metaMatch[1]) : undefined,
     periodEnd: metaMatch ? vnDateToIso(metaMatch[2]) : undefined,
     columns,
-    rows: buildRows(rows, headerIdx + 1, columns)
+    // Tính sẵn lúc upload (file đang trong bộ nhớ, 0 egress) — Report Tháng chỉ đọc phần này thay
+    // vì tải lại 1.000+ dòng × 175 cột. Xem lib/dataraw/productListAgg.ts.
+    summary: { productAgg: buildProductListAgg(columns, dataRows) },
+    rows: dataRows
   };
 }
 

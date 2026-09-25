@@ -343,6 +343,11 @@ export interface BrandMonthlyReport {
   campPaydayStart?: string;
   campPaydayEnd?: string;
   campPaydayTargetGmv?: number;
+  // Văn xuôi phần 1 "Tóm tắt" + phần 8 "Tháng sau" (0120) — undefined = chưa sửa, hiện bản tự sinh
+  // từ bản chụp số liệu. Mỗi dòng là 1 gạch đầu dòng.
+  summaryText?: string;
+  nextStepsText?: string;
+  summarySavedAt?: string;
   publishedAt?: string;
   publishedBy?: string;
   createdAt: string;
@@ -413,7 +418,7 @@ export type DataRawReportType =
 // Đã gỡ 2026-09-22 (quyết định của user):
 //   - "product_card_traffic_stats" (migration 0064): chưa từng có file thật nào được upload nên 2
 //     dòng Video/Product Card GMV của Report Tháng luôn bằng 0. Nay lấy từ shop_analytics +
-//     product_list — xem fetchChannelGmvMonthSlice() ở lib/dataraw/monthlyProductSlice.ts.
+//     product_list — xem fetchShopDaysMonthSlice()/fetchCardGmvMonthSlice() ở lib/dataraw/monthlyProductSlice.ts.
 //   - "transaction_analysis_creator_list" (migration 0074): agency chỉ theo dõi creator CÓ LIVE,
 //     mảng affiliate video/thẻ sản phẩm không quan tâm. Số liệu duy nhất chỉ loại này có là hoa
 //     hồng ước tính (~1% GMV) — user chốt không cần.

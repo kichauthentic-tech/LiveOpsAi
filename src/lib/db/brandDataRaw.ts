@@ -36,15 +36,27 @@ function importFromDb(row: DbImport): BrandDataRawImport {
   };
 }
 
+// Không `select *`: `summary` của product_list chứa bản tổng hợp SKU (~vài chục KB/batch, xem
+// lib/dataraw/productListAgg.ts) mà màn Dữ Liệu Gốc không dùng — chỉ lấy 2 khoá tổng quan của Shop
+// Analytics rồi ráp lại đúng hình `summary` cũ.
+const IMPORT_LIST_COLUMNS =
+  "id, brand_id, report_type, period_label, period_start, period_end, file_name, columns, row_count, imported_at, summary_totals:summary->totals, summary_change:summary->changePct";
+
 export async function fetchDataRawImports(brandId: string, reportType: DataRawReportType): Promise<BrandDataRawImport[]> {
   const { data, error } = await supabase
     .from("brand_dataraw_imports")
-    .select("*")
+    .select(IMPORT_LIST_COLUMNS)
     .eq("brand_id", brandId)
     .eq("report_type", reportType)
     .order("imported_at", { ascending: false });
   if (error) throw error;
-  return ((data as DbImport[]) ?? []).map(importFromDb);
+  type Listed = Omit<DbImport, "summary"> & { summary_totals: unknown; summary_change: unknown };
+  return ((data as unknown as Listed[]) ?? []).map(({ summary_totals, summary_change, ...row }) =>
+    importFromDb({
+      ...row,
+      summary: summary_totals != null || summary_change != null ? { totals: summary_totals, changePct: summary_change } : null
+    })
+  );
 }
 
 interface DbRow {
@@ -161,4 +173,29 @@ export async function deleteDataRawImport(importId: string): Promise<void> {
   const { data, error } = await supabase.from("brand_dataraw_imports").delete().eq("id", importId).select("id");
   if (error) throw error;
   assertAffected(data, "xoá import Dữ Liệu Gốc");
+}
+
+// Danh sách batch rút gọn tối đa (không `columns`/`summary`) — dùng làm "dấu" nhận biết file nào đã
+// up/ghi đè/xoá kể từ lần chốt số Report Tháng (lib/report/monthlySnapshot.ts). Vài trăm byte/batch.
+export interface DataRawImportStamp {
+  id: string;
+  reportType: DataRawReportType;
+  periodStart?: string;
+  periodEnd?: string;
+  importedAt: string;
+}
+
+export async function fetchDataRawImportStamps(brandId: string): Promise<DataRawImportStamp[]> {
+  const { data, error } = await supabase
+    .from("brand_dataraw_imports")
+    .select("id, report_type, period_start, period_end, imported_at")
+    .eq("brand_id", brandId);
+  if (error) throw error;
+  return ((data as { id: string; report_type: string; period_start: string | null; period_end: string | null; imported_at: string }[]) ?? []).map((r) => ({
+    id: r.id,
+    reportType: r.report_type as DataRawReportType,
+    periodStart: r.period_start ?? undefined,
+    periodEnd: r.period_end ?? undefined,
+    importedAt: r.imported_at
+  }));
 }

@@ -1,11 +1,13 @@
 import React, { useMemo, useState } from "react";
 import { Send, RotateCcw, AlertTriangle, CheckCircle2, Clock, Loader2 } from "lucide-react";
-import { Brand, BrandMonthlyReport, LiveSession } from "../types";
+import { Brand, BrandMonthlyReport, BrandPlatformRate, LiveSession } from "../types";
 import { upsertMonthlyReport, publishMonthlyReport, unpublishMonthlyReport } from "../lib/db/monthlyReports";
 import { errorMessage } from "../lib/errorMessage";
 import { getTodayMonth } from "../lib/dateUtils";
 import { BrandLogo } from "./ui/BrandLogo";
 import { useConfirm } from "../hooks/useConfirm";
+import { saveMonthlyReportSnapshot, snapshotExists } from "../lib/db/monthlyReportSnapshots";
+import { buildMonthlyReportSnapshot } from "../lib/report/monthlySnapshot";
 
 // Bảng điều phối phát hành report (còn lại của Đợt C, Audit Role × Workspace — xem
 // WORKSPACE_DESIGN.md) — ops coi trạng thái phát hành Report Tháng của TẤT CẢ brand × nhiều tháng
@@ -19,6 +21,10 @@ const MONTHS_BACK = 6;
 interface ReportPublishBoardProps {
   brands: Brand[];
   sessions: LiveSession[];
+  // Để tự tạo bản chụp số liệu (0119) khi phát hành tháng chưa có — không có bản chụp thì brand mở
+  // report ra trống.
+  brandPlatformRates: BrandPlatformRate[];
+  planMonthTotals?: Map<string, number>;
   monthlyReports: Map<string, BrandMonthlyReport>;
   // App giữ Map monthlyReports trung tâm (dùng để phân bổ target xuống ca) nhưng không tự refetch
   // sau khi nơi khác publish/unpublish (xem ghi chú trong App.tsx) — gọi lại sau mỗi hành động ở
@@ -41,7 +47,7 @@ const monthRange = (month: string): { start: string; end: string } => {
   return { start: `${month}-01`, end: `${month}-${String(lastDay).padStart(2, "0")}` };
 };
 
-export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ brands, sessions, monthlyReports, onReportsChanged }) => {
+export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ brands, sessions, brandPlatformRates, planMonthTotals, monthlyReports, onReportsChanged }) => {
   const confirm = useConfirm();
   const today = getTodayMonth();
   const [busyKey, setBusyKey] = useState<string | null>(null);
@@ -88,6 +94,12 @@ export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ brands, 
       // Tháng chưa có dòng brand_monthly_reports (chưa nhập Ads/kế hoạch gì) → tạo dòng nháp trống
       // rồi phát hành ngay, giống hành vi ở tab Report Tháng đơn brand.
       const row = existing ?? (await upsertMonthlyReport(brandId, `${month}-01`, {}));
+      // Tháng chưa từng bấm "Tạo report" → chốt số trước (cùng hành vi nút Phát hành ở Report Tháng).
+      // Đã có bản chụp thì giữ nguyên: phát hành là gửi đúng số ops đã chốt.
+      if (!(await snapshotExists(brandId, month))) {
+        const { snapshot } = await buildMonthlyReportSnapshot({ brandId, month, sessions, planMonthTotals, brandPlatformRates });
+        await saveMonthlyReportSnapshot(brandId, month, snapshot);
+      }
       await publishMonthlyReport(row.id, force);
       onReportsChanged();
     } catch (e) {

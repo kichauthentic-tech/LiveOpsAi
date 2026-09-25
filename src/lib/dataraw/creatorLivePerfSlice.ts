@@ -1,4 +1,5 @@
 import { supabase } from "../supabaseClient";
+import { fetchRowsPaged } from "./fetchRowsPaged";
 import { DataRawColumn } from "../../types";
 import { eachDay } from "./weeklySlice";
 
@@ -181,19 +182,9 @@ export async function fetchCreatorLivePerfMonthSlice(brandId: string, monthStart
     return { rows: [], missingDays: eachDay(monthStart, monthEnd), hasAnyBatch: false };
   }
 
-  const { data: rowsData, error: rowsError } = await supabase
-    .from("brand_dataraw_rows")
-    .select("import_id, raw")
-    .in("import_id", overlapping.map((i) => i.id))
-    .order("row_index", { ascending: true });
-  if (rowsError) throw rowsError;
-
-  const rowsByImport = new Map<string, Record<string, unknown>[]>();
-  for (const r of (rowsData as { import_id: string; raw: Record<string, unknown> }[]) ?? []) {
-    const list = rowsByImport.get(r.import_id) ?? [];
-    list.push(r.raw ?? {});
-    rowsByImport.set(r.import_id, list);
-  }
+  // Theo trang: file Creator-Live-Performance nạp bù cả năm vượt 1.000 dòng là chuyện thường
+  // (CROCS T6→T9 đã 228), PostgREST cắt im lặng ở 1.000.
+  const rowsByImport = await fetchRowsPaged(overlapping.map((i) => i.id));
 
   const rows: CreatorLivePerfRow[] = [];
   const coveredDays = new Set<string>();

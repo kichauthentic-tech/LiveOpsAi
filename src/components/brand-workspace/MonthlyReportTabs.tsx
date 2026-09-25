@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   ResponsiveContainer,
   ComposedChart,
+  LineChart,
+  ReferenceLine,
   BarChart,
   Bar,
   Line,
@@ -22,7 +24,6 @@ import {
   Megaphone,
   Loader2,
   AlertTriangle,
-  Radio,
   Handshake,
   CalendarClock,
   Plus,
@@ -37,11 +38,25 @@ import {
 import { LiveSession, BrandMonthlyReport as BrandMonthlyReportType, AffiliatePlanEntry, AffiliateActualEntry, BrandPlatformRate } from "../../types";
 import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
 import { downloadSheetsAsXlsx } from "../../lib/exportXlsx";
-import { fetchCreatorLivePerfMonthSlice } from "../../lib/dataraw/creatorLivePerfSlice";
 import { dailyFromSessions, monthRunRate, pickLivePerfSource } from "../../lib/report/sessionsLivePerf";
-import { fetchLivePerformanceCoreMonthSlice } from "../../lib/dataraw/monthlyDailySlice";
-import { fetchTopSkuMonthSlice, fetchTopPromotionsMonthSlice, fetchChannelGmvMonthSlice, ChannelGmvMonthSlice } from "../../lib/dataraw/monthlyProductSlice";
-import { fetchMonthlyReport, upsertMonthlyReport, MonthlyReportManualInput } from "../../lib/db/monthlyReports";
+import { hydrateSnapshotSessions, MonthlyReportSnapshot, reportWindow, snapshotView } from "../../lib/report/monthlySnapshot";
+import {
+  autoNextSteps,
+  autoSummary,
+  channelMix,
+  compareWindow,
+  DRIVER_LABEL,
+  driverBreakdown,
+  liveStatsFromRows,
+  LiveStats,
+  NarrativeInput,
+  pctChange,
+  shopTotals,
+  trendSignal
+} from "../../lib/report/monthlyReportInsights";
+import { CreatorLivePerfRow, vnDateOf } from "../../lib/dataraw/creatorLivePerfSlice";
+import { fetchMonthPlan } from "../../lib/db/monthPlans";
+import { fetchMonthlyReport, upsertMonthlyReport, MonthlyReportManualInput, saveMonthlyReportNarrative } from "../../lib/db/monthlyReports";
 import { fetchAffiliatePlans, replaceAffiliatePlans } from "../../lib/db/affiliatePlans";
 import { fetchAffiliateActuals, replaceAffiliateActuals } from "../../lib/db/affiliateActuals";
 import { MonthlyDeepDive } from "./deepdive/MonthlyDeepDive";
@@ -148,24 +163,6 @@ function roasOf(gmv: number | undefined, adsCost: number | undefined): number | 
 function runrateOf(gmv: number | undefined, target: number | undefined): number | null {
   return target && target > 0 ? ((gmv || 0) / target) * 100 : null;
 }
-function momPctLocal(current: number, previous: number): number | null {
-  if (!previous) return null;
-  return ((current - previous) / previous) * 100;
-}
-
-const MomBadge: React.FC<{ current: number; previous: number }> = ({ current, previous }) => {
-  const pct = momPctLocal(current, previous);
-  if (pct == null) return <span style={{ color: PAL.muted }}>chưa có kỳ trước</span>;
-  const up = pct >= 0;
-  return (
-    <span
-      className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full font-bold"
-      style={{ background: up ? `${PAL.green}22` : `${PAL.red}22`, color: up ? PAL.green : PAL.red }}
-    >
-      {up ? "▲" : "▼"} {Math.abs(pct).toFixed(1)}%
-    </span>
-  );
-};
 
 const ProgressBar: React.FC<{ pct: number | null }> = ({ pct }) => {
   const clamped = pct == null ? 0 : Math.max(0, Math.min(100, pct));
@@ -185,29 +182,14 @@ interface MonthlyReportTabsProps {
   brandId: string;
   brandName: string;
   month: string;
-  sessions: LiveSession[];
+  // Bản chụp số liệu (migration 0119, lib/report/monthlySnapshot.ts) — MỌI con số của tab 01–04 lấy
+  // từ đây: ca, target kế hoạch (Đ5, xem scheduledTargetGmv), rate card, slice Dữ Liệu Gốc. Không tự
+  // tải Dữ Liệu Gốc nữa.
+  snapshot: MonthlyReportSnapshot;
+  // Ca SỐNG của app — chỉ dùng cho (a) Tab 05 Phân Tích Sâu (ops-only, vẫn tính trực tiếp) và (b) biết
+  // tháng nào brand đã được phát hành (monthPublished) để che số tháng chưa phát hành khỏi cột so sánh.
+  liveSessions: LiveSession[];
   canManage: boolean;
-  brandPlatformRates: BrandPlatformRate[];
-  // "brandId|YYYY-MM" → tổng target của Kế Hoạch Tháng đã chốt (Đ5). Xem scheduledTargetGmv.
-  planMonthTotals?: Map<string, number>;
-}
-
-type TabId = "overview" | "livestream" | "products" | "affiliate" | "deepdive" | "plan";
-
-const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
-  { id: "overview", label: "01 · Tổng Quan", icon: <BarChart3 className="w-3.5 h-3.5" /> },
-  { id: "livestream", label: "02 · Livestream", icon: <Radio className="w-3.5 h-3.5" /> },
-  { id: "products", label: "03 · Sản Phẩm & Khuyến Mãi", icon: <ShoppingBag className="w-3.5 h-3.5" /> },
-  { id: "affiliate", label: "04 · Affiliate", icon: <Handshake className="w-3.5 h-3.5" /> },
-  // Tab 05 gộp từ trang "Phân Tích Chuyên Sâu" đứng riêng (2026-09-23) — ops-only, lọc ở TABS_FOR().
-  { id: "deepdive", label: "05 · Phân Tích Sâu", icon: <Activity className="w-3.5 h-3.5" /> },
-  { id: "plan", label: "06 · Kế Hoạch Tháng Sau", icon: <CalendarClock className="w-3.5 h-3.5" /> }
-];
-
-// Tab 05 phơi số chưa đối soát + cảnh báo chất lượng dữ liệu ("12/47 phiên chưa gắn host") — thứ
-// brand không cần và không nên thấy. 5 tab còn lại giữ nguyên cho cả brand lẫn ops.
-function tabsFor(canManage: boolean): typeof TABS {
-  return canManage ? TABS : TABS.filter((t) => t.id !== "deepdive");
 }
 
 const Panel: React.FC<{ title: string; icon: React.ReactNode; sub?: string; children: React.ReactNode }> = ({ title, icon, sub, children }) => (
@@ -234,22 +216,6 @@ const Panel: React.FC<{ title: string; icon: React.ReactNode; sub?: string; chil
   </div>
 );
 
-const KpiCard: React.FC<{ label: string; value: string; sub?: string }> = ({ label, value, sub }) => (
-  <div className="rounded-xl p-4" style={{ background: PAL.panel2, border: `1px solid ${PAL.line}` }}>
-    <div className="text-[10.5px] uppercase tracking-wider" style={{ color: PAL.muted }}>
-      {label}
-    </div>
-    <div className="font-mono text-xl font-bold mt-1.5" style={{ color: PAL.cream }}>
-      {value}
-    </div>
-    {sub && (
-      <div className="text-[11px] mt-1" style={{ color: PAL.muted }}>
-        {sub}
-      </div>
-    )}
-  </div>
-);
-
 const ReportTable: React.FC<{ head: string[]; children: React.ReactNode }> = ({ head, children }) => (
   <div className="overflow-x-auto -mx-1">
     <table className="w-full text-xs min-w-[520px]">
@@ -273,10 +239,200 @@ const ReportTable: React.FC<{ head: string[]; children: React.ReactNode }> = ({ 
 
 const chartTooltipStyle = { background: PAL.panel2, border: `1px solid ${PAL.line}`, borderRadius: 8, fontSize: 11, color: PAL.cream };
 
-export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, brandName, month, sessions, canManage, brandPlatformRates, planMonthTotals }) => {
-  const [tab, setTab] = useState<TabId>("overview");
-  const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+// ---------- Bố cục 8 phần (2026-09-25) ----------
+
+const SECTIONS: { id: string; label: string }[] = [
+  { id: "summary", label: "1 · Tóm tắt" },
+  { id: "target", label: "2 · Mục tiêu" },
+  { id: "shop", label: "3 · Toàn shop" },
+  { id: "why", label: "4 · Vì sao" },
+  { id: "people", label: "5 · Người" },
+  { id: "products", label: "6 · Hàng" },
+  { id: "context", label: "7 · Bối cảnh" },
+  { id: "next", label: "8 · Tháng sau" },
+  { id: "appendix", label: "Phụ lục" }
+];
+
+// 4 kênh — màu phân loại theo thứ tự cố định (blue/orange/aqua/yellow, bước tối của bảng màu đã kiểm
+// mù màu cho các cặp kề nhau). Kênh luôn giữ một màu, không đổi theo thứ hạng.
+const CHANNELS: { key: "liveLinked" | "affiliate" | "video" | "card"; label: string; color: string }[] = [
+  { key: "liveLinked", label: "LIVE tài khoản shop", color: "#3987e5" },
+  { key: "affiliate", label: "LIVE affiliate", color: "#d95926" },
+  { key: "video", label: "Video", color: "#199e70" },
+  { key: "card", label: "Thẻ sản phẩm", color: "#c98500" }
+];
+
+const FUNNEL_TILES: { key: string; label: string; get: (s: LiveStats) => number | null; format: (v: number) => string; goodWhenUp: boolean }[] = [
+  { key: "vph", label: "Lượt xem / giờ", get: (s) => s.viewsPerHour, format: (v) => fmtInt(v), goodWhenUp: true },
+  { key: "ctr", label: "CTR sản phẩm", get: (s) => s.ctr, format: (v) => fmtPct(v), goodWhenUp: true },
+  { key: "ctor", label: "CTOR (click → đơn)", get: (s) => s.ctor, format: (v) => fmtPct(v), goodWhenUp: true },
+  { key: "gpv", label: "GMV / lượt xem", get: (s) => s.gmvPerView, format: (v) => `${fmtInt(v)} đ`, goodWhenUp: true },
+  { key: "aov", label: "Giá trị đơn (AOV)", get: (s) => s.aov, format: (v) => `${fmtInt(v / 1000)}k đ`, goodWhenUp: true }
+];
+
+const SectionHead: React.FC<{ no: string; title: string; sub?: string }> = ({ no, title, sub }) => (
+  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 pb-2" style={{ borderBottom: `1px solid ${PAL.line}` }}>
+    <span className="font-mono text-xs font-bold" style={{ color: PAL.gold }}>
+      {no}
+    </span>
+    <h2 className="font-black text-lg" style={{ color: PAL.cream }}>
+      {title}
+    </h2>
+    {sub && (
+      <span className="text-[11px]" style={{ color: PAL.muted }}>
+        {sub}
+      </span>
+    )}
+  </div>
+);
+
+const KpiTile: React.FC<{ label: string; value: string; change?: number | null; note?: string }> = ({ label, value, change, note }) => (
+  <div className="rounded-xl p-4" style={{ background: PAL.panel2, border: `1px solid ${PAL.line}` }}>
+    <div className="text-[10.5px] uppercase tracking-wider" style={{ color: PAL.muted }}>
+      {label}
+    </div>
+    <div className="font-mono text-xl font-bold mt-1.5" style={{ color: PAL.cream }}>
+      {value}
+    </div>
+    {change != null && (
+      <div className="text-[11px] mt-1 font-bold" style={{ color: change >= 0 ? PAL.green : PAL.red }}>
+        {change >= 0 ? "▲" : "▼"} {Math.abs(change).toFixed(1)}% cùng kỳ
+      </div>
+    )}
+    {note && (
+      <div className="text-[10.5px] mt-1" style={{ color: PAL.muted }}>
+        {note}
+      </div>
+    )}
+  </div>
+);
+
+const ChartLegend: React.FC<{ items: [string, string][] }> = ({ items }) => (
+  <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-2">
+    {items.map(([label, color]) => (
+      <span key={label} className="flex items-center gap-1.5 text-[11px]" style={{ color: PAL.muted }}>
+        <span className="w-2.5 h-2.5 rounded-sm" style={{ background: color }} />
+        {label}
+      </span>
+    ))}
+  </div>
+);
+
+// Ô xu hướng 4 tháng: số tháng report + đường nhỏ (1 chuỗi, 1 trục), điểm cuối tô theo chiều tốt/xấu.
+const TrendTile: React.FC<{ label: string; points: { label: string; value: number | null }[]; format: (v: number) => string; goodWhenUp: boolean }> = ({ label, points, format, goodWhenUp }) => {
+  const last = points[points.length - 1]?.value ?? null;
+  const prev = points[points.length - 2]?.value ?? null;
+  const bad = last != null && prev != null && (goodWhenUp ? last < prev : last > prev);
+  return (
+    <div className="rounded-xl p-3" style={{ background: PAL.panel2, border: `1px solid ${PAL.line}` }}>
+      <div className="text-[10.5px] uppercase tracking-wider" style={{ color: PAL.muted }}>
+        {label}
+      </div>
+      <div className="font-mono text-lg font-bold mt-1" style={{ color: PAL.cream }}>
+        {last != null ? format(last) : "—"}
+      </div>
+      <div style={{ height: 36 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={points} margin={{ top: 4, bottom: 4, left: 4, right: 4 }}>
+            <YAxis hide domain={["dataMin", "dataMax"]} />
+            <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => format(chartNum(v))} labelFormatter={(l) => String(l)} />
+            <Line
+              type="monotone"
+              dataKey="value"
+              stroke={PAL.gold}
+              strokeWidth={2}
+              isAnimationActive={false}
+              dot={(p: { cx?: number; cy?: number; index?: number }) =>
+                p.index === points.length - 1 ? (
+                  <circle key="end" cx={p.cx} cy={p.cy} r={3.5} fill={bad ? PAL.red : PAL.green} stroke={PAL.panel2} strokeWidth={2} />
+                ) : (
+                  <g key={p.index} />
+                )
+              }
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="text-[10px] font-mono truncate" style={{ color: PAL.muted }} title={points.map((p) => `${p.label}: ${p.value != null ? format(p.value) : "—"}`).join(" · ")}>
+        {points.map((p) => (p.value != null ? format(p.value) : "—")).join(" → ")}
+      </div>
+    </div>
+  );
+};
+
+const NarrativeEditor: React.FC<{
+  summaryDraft: string;
+  nextDraft: string;
+  onSummary: (v: string) => void;
+  onNext: (v: string) => void;
+  saving: boolean;
+  error: string | null;
+  onSave: () => void;
+  onCancel: () => void;
+}> = ({ summaryDraft, nextDraft, onSummary, onNext, saving, error, onSave, onCancel }) => (
+  <div className="space-y-3">
+    <label className="block space-y-1">
+      <span className="text-[10.5px] uppercase tracking-wider" style={{ color: PAL.muted }}>
+        Tóm tắt (phần 1) — mỗi dòng một ý
+      </span>
+      <textarea
+        id="mr-summary-text"
+        value={summaryDraft}
+        onChange={(e) => onSummary(e.target.value)}
+        rows={6}
+        className="w-full p-3 rounded-lg text-[13px] leading-relaxed"
+        style={{ background: PAL.panel2, border: `1px solid ${PAL.line}`, color: PAL.cream }}
+      />
+    </label>
+    <label className="block space-y-1">
+      <span className="text-[10.5px] uppercase tracking-wider" style={{ color: PAL.muted }}>
+        Việc tháng sau (phần 8) — mỗi dòng một việc
+      </span>
+      <textarea
+        id="mr-next-text"
+        value={nextDraft}
+        onChange={(e) => onNext(e.target.value)}
+        rows={4}
+        className="w-full p-3 rounded-lg text-[13px] leading-relaxed"
+        style={{ background: PAL.panel2, border: `1px solid ${PAL.line}`, color: PAL.cream }}
+      />
+    </label>
+    {error && (
+      <p className="text-xs font-semibold" style={{ color: PAL.red }}>
+        {error}
+      </p>
+    )}
+    <div className="flex gap-2">
+      <button onClick={onSave} disabled={saving} className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold disabled:opacity-60" style={{ background: PAL.gold, color: "#1a1500" }}>
+        {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} Lưu
+      </button>
+      <button onClick={onCancel} disabled={saving} className="px-4 py-2 rounded-lg text-xs font-bold" style={{ background: PAL.panel2, border: `1px solid ${PAL.line}`, color: PAL.muted }}>
+        Huỷ
+      </button>
+    </div>
+  </div>
+);
+
+
+export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, brandName, month, snapshot, liveSessions, canManage }) => {
+
+  // Brand KHÔNG được thấy số của tháng chưa phát hành (quyết định 2026-09-22, 0107) — kể cả qua cột
+  // "tháng trước"/biểu đồ xu hướng của report tháng này. Bản chụp do ops dựng nên có đủ số 4 tháng;
+  // với brand, bỏ hẳn ca + slice của các tháng trong cửa sổ chưa phát hành (đọc cờ monthPublished của
+  // ca sống — nguồn sự thật hiện tại, không phải lúc chốt). Tháng report thì đã phát hành (brand đọc
+  // được bản chụp là nhờ vậy).
+  const hiddenMonths = useMemo(() => {
+    if (canManage) return new Set<string>();
+    const published = new Set(liveSessions.filter((s) => s.brandId === brandId && s.monthPublished).map((s) => s.date.slice(0, 7)));
+    return new Set(reportWindow(month).filter((m) => m !== month && !published.has(m)));
+  }, [canManage, liveSessions, brandId, month]);
+  const sessions = useMemo(
+    () => hydrateSnapshotSessions(snapshot).filter((s) => !hiddenMonths.has(s.date.slice(0, 7))),
+    [snapshot, hiddenMonths]
+  );
+  const brandPlatformRates: BrandPlatformRate[] = snapshot.rates;
+  const planMonthTotals = useMemo(() => new Map(Object.entries(snapshot.planMonthTotals)), [snapshot]);
+  const view = useMemo(() => snapshotView(snapshot), [snapshot]);
 
   // Tab 05 Kế hoạch tháng sau — fetch/lưu riêng, không chung vòng loading với 4 tab số liệu thật
   // ở trên (đây là dữ liệu nhập tay, độc lập Dataraw).
@@ -315,22 +471,6 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   // Transaction Analysis - Creator List, KHÔNG đụng targetGmv/durationHours/adsCost/liveDateLabel
   // (vẫn nhập tay, file không có các số này).
 
-  // Đổi nguồn số (2026-09-21): file Dataraw chỉ còn là DỰ PHÒNG — tháng nào có ca có số thì Tab 01/02
-  // đọc từ ca (lib/report/sessionsLivePerf.ts). *Raw = slice từ Dataraw; liveCurrent/livePrev = nguồn đã chọn.
-  const [liveCurrentRaw, setLiveCurrentRaw] = useState<Awaited<ReturnType<typeof fetchCreatorLivePerfMonthSlice>> | null>(null);
-  const [livePrevRaw, setLivePrevRaw] = useState<Awaited<ReturnType<typeof fetchCreatorLivePerfMonthSlice>> | null>(null);
-  // Chart "GMV/Giờ & Số Giờ Live" (Tab 02, brief Module 2) cần 4 tháng — liveCurrent/livePrev đã
-  // phủ 2 tháng gần nhất, chỉ cần fetch thêm 2 tháng cũ hơn (last4Months[0..1]), keyed theo "YYYY-MM".
-  const [liveOlderMonths, setLiveOlderMonths] = useState<Record<string, Awaited<ReturnType<typeof fetchCreatorLivePerfMonthSlice>>>>({});
-  const [dailyPerfRaw, setDailyPerfRaw] = useState<Awaited<ReturnType<typeof fetchLivePerformanceCoreMonthSlice>> | null>(null);
-  const [channelGmv, setChannelGmv] = useState<ChannelGmvMonthSlice | null>(null);
-  const [channelGmvPrev, setChannelGmvPrev] = useState<ChannelGmvMonthSlice | null>(null);
-  const [topSku, setTopSku] = useState<Awaited<ReturnType<typeof fetchTopSkuMonthSlice>> | null>(null);
-  const [topPromo, setTopPromo] = useState<Awaited<ReturnType<typeof fetchTopPromotionsMonthSlice>> | null>(null);
-  // Tab 01 Tổng Quan — Affiliate GMV tháng trước (chỉ cần tổng Direct GMV, không cần state editable
-  // như affiliateRows của tháng đang xem).
-  const [affiliateGmvPrevTotal, setAffiliateGmvPrevTotal] = useState(0);
-
   const { start, end } = useMemo(() => monthRangeLocal(month), [month]);
   const prevMonth = useMemo(() => prevMonthStrLocal(month), [month]);
   const { start: prevStart, end: prevEnd } = useMemo(() => monthRangeLocal(prevMonth), [prevMonth]);
@@ -344,45 +484,19 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     return out;
   }, [month]);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setErrorMsg(null);
-    const olderMonths = last4Months.slice(0, 2);
-    Promise.all([
-      fetchCreatorLivePerfMonthSlice(brandId, start, end),
-      fetchCreatorLivePerfMonthSlice(brandId, prevStart, prevEnd),
-      fetchLivePerformanceCoreMonthSlice(brandId, start, end),
-      fetchChannelGmvMonthSlice(brandId, start, end),
-      fetchChannelGmvMonthSlice(brandId, prevStart, prevEnd),
-      fetchTopSkuMonthSlice(brandId, start, end),
-      fetchTopPromotionsMonthSlice(brandId, start, end),
-      fetchAffiliateActuals(brandId, `${prevMonth}-01`),
-      Promise.all(
-        olderMonths.map((m) => {
-          const { start: s, end: e } = monthRangeLocal(m);
-          return fetchCreatorLivePerfMonthSlice(brandId, s, e).then((r) => [m, r] as const);
-        })
-      )
-    ])
-      .then(([lc, lp, dp, pc, pcPrev, sku, promo, affPrev, olderEntries]) => {
-        if (cancelled) return;
-        setLiveCurrentRaw(lc);
-        setLivePrevRaw(lp);
-        setDailyPerfRaw(dp);
-        setChannelGmv(pc);
-        setChannelGmvPrev(pcPrev);
-        setTopSku(sku);
-        setTopPromo(promo);
-        setAffiliateGmvPrevTotal(affPrev.reduce((sum, r) => sum + (r.directGmv || 0), 0));
-        setLiveOlderMonths(Object.fromEntries(olderEntries));
-      })
-      .catch((e) => !cancelled && setErrorMsg(e.message || "Không tải được dữ liệu Report Tháng"))
-      .finally(() => !cancelled && setLoading(false));
-    return () => {
-      cancelled = true;
-    };
-  }, [brandId, start, end, prevStart, prevEnd, prevMonth, last4Months]);
+  // Đổi nguồn số (2026-09-21): file Dataraw chỉ còn là DỰ PHÒNG — tháng nào có ca có số thì Tab 01/02
+  // đọc từ ca (lib/report/sessionsLivePerf.ts). *Raw = slice từ Dataraw (bản chụp chỉ giữ slice này
+  // cho tháng CHƯA có ca nào có số); liveCurrent/livePrev = nguồn đã chọn.
+  const hidden = (m: string) => hiddenMonths.has(m);
+  const liveCurrentRaw = view.liveRaw[month] ?? null;
+  const livePrevRaw = hidden(prevMonth) ? null : (view.liveRaw[prevMonth] ?? null);
+  const liveOlderMonths = useMemo(
+    () => Object.fromEntries(Object.entries(view.liveRaw).map(([m, v]) => [m, hiddenMonths.has(m) ? null : v])),
+    [view, hiddenMonths]
+  );
+  const dailyPerfRaw = view.dailyPerfRaw;
+  const topSku = view.topSku;
+  const topPromo = view.topPromo;
 
   const liveSource = useMemo(() => pickLivePerfSource(sessions, brandId, start, end, liveCurrentRaw), [sessions, brandId, start, end, liveCurrentRaw]);
   const livePrevSource = useMemo(() => pickLivePerfSource(sessions, brandId, prevStart, prevEnd, livePrevRaw), [sessions, brandId, prevStart, prevEnd, livePrevRaw]);
@@ -718,8 +832,6 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     () => splitUnassignedHost(byHost(filterSessions(completedInPeriod.filter((s) => s.platform === "TikTok"), {}))).unassigned,
     [completedInPeriod]
   );
-  const hostChartData = useMemo(() => hostPerformance.map((h) => ({ label: h.hostName, gmvHour: h.gmvPerHour ?? 0 })), [hostPerformance]);
-  const totalGmvCur = useMemo(() => completedInPeriod.reduce((sum, s) => sum + (s.actualGmv || 0), 0), [completedInPeriod]);
 
   // Target GMV/NMV (Tab 01 Tổng Quan) = target CAM KẾT của tháng.
   //
@@ -753,21 +865,6 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
       .reduce((sum, x) => sum + (x.targetGmv || 0), 0);
 
   const scheduledTargetGmv = (s: string, e: string) => plannedMonthTarget(s, e) ?? sumSessionTargets(s, e);
-  const scheduledTargetNmv = (s: string, e: string) => {
-    // Ca kế hoạch do lock_month_plan sinh ra đều là TikTok, nên quy target tháng về NMV bằng đúng
-    // returnRate TikTok của brand. Nhánh cũ (không có kế hoạch chốt) vẫn quy theo platform từng ca.
-    const planned = plannedMonthTarget(s, e);
-    if (planned !== null) {
-      const rate = brandPlatformRates.find((r) => r.brandId === brandId && r.platform === "TikTok")?.returnRate ?? 0;
-      return planned * (1 - rate / 100);
-    }
-    return sessions
-      .filter((x) => x.brandId === brandId && x.date >= s && x.date <= e && x.status !== "Cancelled")
-      .reduce((sum, x) => {
-        const rate = brandPlatformRates.find((r) => r.brandId === brandId && r.platform === x.platform)?.returnRate ?? 0;
-        return sum + (x.targetGmv || 0) * (1 - rate / 100);
-      }, 0);
-  };
 
   // Chart "Target vs Thực Đạt GMV" (brief Module 1) — Target = tổng target đã lên lịch (xem trên),
   // Actual = Total GMV thực tế.
@@ -787,97 +884,9 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessions, brandId, last4Months, brandPlatformRates]);
 
-  const completedPrevPeriod = useMemo(
-    () => sessions.filter((s) => s.brandId === brandId && s.date >= prevStart && s.date <= prevEnd && s.status === "Completed"),
-    [sessions, brandId, prevStart, prevEnd]
-  );
-
-  // Total NMV (brief Module 1) — ước tính = Total GMV × (1 − tỷ lệ hoàn hủy theo brand+platform,
-  // Rate Card). CHỈ dùng rate hiện tại (không tra lịch sử theo ngày như lib/pnl.ts) — đủ chính xác
-  // cho mức tổng hợp tháng, và Rate Card hiếm khi đổi trong tháng. Là số DỰ KIẾN, disclaimer ở UI.
-  const estimateNmv = (list: LiveSession[]) =>
-    list.reduce((sum, s) => {
-      const rate = brandPlatformRates.find((r) => r.brandId === brandId && r.platform === s.platform)?.returnRate ?? 0;
-      return sum + (s.actualGmv || 0) * (1 - rate / 100);
-    }, 0);
-  const totalNmvCur = estimateNmv(completedInPeriod);
-  const totalNmvPrev = estimateNmv(completedPrevPeriod);
   const hasReturnRateConfig = brandPlatformRates.some((r) => r.brandId === brandId);
-
-  // Affiliate GMV (Tab 04, nhập tay Direct GMV mỗi creator) + Video/Product card GMV (File 2, đã
-  // ingest sẵn) — 4 thành phần cơ cấu GMV theo brief, không có nguồn nào tách được GMV toàn shop
-  // theo kênh nên đều là proxy tốt nhất hiện có (xem note ở bảng chi tiết bên dưới).
-  const affiliateGmvCur = useMemo(() => affiliateRows.reduce((sum, r) => sum + (r.directGmv || 0), 0), [affiliateRows]);
-  const affiliateGmvPrev = affiliateGmvPrevTotal;
-  const liveGmvCur = currentAgg.gmv;
-  const liveGmvPrev = prevAgg.gmv;
-  const liveAffCur = liveGmvCur + affiliateGmvCur;
-  const liveAffPrev = liveGmvPrev + affiliateGmvPrev;
-  // Nguồn: shop_analytics (video) + product_list (thẻ SP) — xem fetchChannelGmvMonthSlice.
-  const videoGmvCur = channelGmv?.videoGmv ?? 0;
-  const videoGmvPrev = channelGmvPrev?.videoGmv ?? 0;
-  const productCardGmvCur = channelGmv?.cardGmv ?? 0;
-  const productCardGmvPrev = channelGmvPrev?.cardGmv ?? 0;
-
   const kpiTargetGmvCurRaw = scheduledTargetGmv(start, end);
-  const kpiTargetGmvPrevRaw = scheduledTargetGmv(prevStart, prevEnd);
   const kpiTargetGmvCur = kpiTargetGmvCurRaw > 0 ? kpiTargetGmvCurRaw : null;
-  const kpiTargetGmvPrev = kpiTargetGmvPrevRaw > 0 ? kpiTargetGmvPrevRaw : null;
-  const kpiTargetNmvCurRaw = scheduledTargetNmv(start, end);
-  const kpiTargetNmvPrevRaw = scheduledTargetNmv(prevStart, prevEnd);
-  const kpiTargetNmvCur = kpiTargetNmvCurRaw > 0 ? kpiTargetNmvCurRaw : null;
-  const kpiTargetNmvPrev = kpiTargetNmvPrevRaw > 0 ? kpiTargetNmvPrevRaw : null;
-
-  const totalGmvPrev = completedPrevPeriod.reduce((sum, s) => sum + (s.actualGmv || 0), 0);
-
-  const pctOfTotal = (v: number, total: number) => (total > 0 ? (v / total) * 100 : null);
-
-  // Bảng "Chi Tiết Theo Nguồn Doanh Thu" (14 dòng đúng brief: 4 nguồn không có dòng %
-  // + 5 nguồn có kèm dòng "% trên Total GMV" thụt lề).
-  const revenueSourceRows = useMemo(
-    () => [
-      { label: "Target GMV (Lịch Vận Hành)", cur: kpiTargetGmvCur, prev: kpiTargetGmvPrev, pct: false },
-      { label: "Target NMV (Lịch Vận Hành)", cur: kpiTargetNmvCur, prev: kpiTargetNmvPrev, pct: false },
-      { label: "Total GMV", cur: totalGmvCur, prev: totalGmvPrev, pct: false },
-      { label: "Total NMV", cur: totalNmvCur, prev: totalNmvPrev, pct: false },
-      { label: "Live + Affiliate GMV", cur: liveAffCur, prev: liveAffPrev, pct: true },
-      { label: "Live GMV", cur: liveGmvCur, prev: liveGmvPrev, pct: true },
-      { label: "Affiliate GMV", cur: affiliateGmvCur, prev: affiliateGmvPrev, pct: true },
-      { label: "Video GMV", cur: videoGmvCur, prev: videoGmvPrev, pct: true },
-      { label: "Product Card GMV", cur: productCardGmvCur, prev: productCardGmvPrev, pct: true }
-    ],
-    [
-      kpiTargetGmvCur,
-      kpiTargetGmvPrev,
-      kpiTargetNmvCur,
-      kpiTargetNmvPrev,
-      totalGmvCur,
-      totalGmvPrev,
-      totalNmvCur,
-      totalNmvPrev,
-      liveAffCur,
-      liveAffPrev,
-      liveGmvCur,
-      liveGmvPrev,
-      affiliateGmvCur,
-      affiliateGmvPrev,
-      videoGmvCur,
-      videoGmvPrev,
-      productCardGmvCur,
-      productCardGmvPrev
-    ]
-  );
-
-  const gmvCompositionDonutData = useMemo(
-    () => [
-      { label: "Live", value: liveGmvCur, color: PAL.gold },
-      { label: "Affiliate", value: affiliateGmvCur, color: PAL.green },
-      { label: "Video", value: videoGmvCur, color: PAL.blue },
-      { label: "Product Card", value: productCardGmvCur, color: `${PAL.cream}80` }
-    ],
-    [liveGmvCur, affiliateGmvCur, videoGmvCur, productCardGmvCur]
-  );
-  const gmvCompositionTotal = gmvCompositionDonutData.reduce((sum, d) => sum + d.value, 0);
 
   // "Diễn Biến GMV Theo Ngày" (brief Module 2) — 2 line: gmv_live_session (fill gold) + gmv_indirect
   // (dashed blue), cả 2 từ File 1. Giữ thêm GPM (đã build trước đó, không có trong brief nhưng vẫn
@@ -928,7 +937,217 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     [campDetailRows]
   );
 
-  const skuChartData = useMemo(() => (topSku?.items ?? []).slice(0, 8).map((s) => ({ label: s.name.slice(0, 24), gmv: s.gmv })), [topSku]);
+
+  // ============================ Bố cục 8 phần (2026-09-25) ============================
+  // Mọi phép tính mới nằm ở lib/report/monthlyReportInsights.ts (thuần, có test). Ở đây chỉ nối dây.
+
+  // So cùng số ngày: tháng report chưa có số tới ngày cuối thì so 1..N với 1..N tháng trước — so với
+  // trọn tháng trước từng ra −40% cho T9 CROCS trong khi cùng kỳ chỉ −18%.
+  const cmp = useMemo(() => compareWindow(month, snapshot.coverage.sessionsThrough), [month, snapshot]);
+  const liveCurStats = useMemo(() => liveStatsFromRows(liveCurrent?.rows ?? [], cmp.curStart, cmp.curEnd), [liveCurrent, cmp]);
+  const livePrevStats = useMemo(() => liveStatsFromRows(livePrev?.rows ?? [], cmp.prevStart, cmp.prevEnd), [livePrev, cmp]);
+  const prevAggWindow = useMemo(
+    () => aggregateCreatorLivePerfRows((livePrev?.rows ?? []).filter((r) => { const d = vnDateOf(r.startTime); return d >= cmp.prevStart && d <= cmp.prevEnd; })),
+    [livePrev, cmp]
+  );
+  const drivers = useMemo(() => driverBreakdown(livePrevStats, liveCurStats), [livePrevStats, liveCurStats]);
+
+  // 4 tháng (tháng report tính tới ngày có số) — cho ô xu hướng phễu + dấu hiệu "N tháng liên tiếp".
+  const monthlyStats = useMemo(
+    () =>
+      last4Months.map((m) => {
+        const { start: s, end: e } = monthRangeLocal(m);
+        const rows = m === month ? liveCurrent?.rows ?? [] : m === prevMonth ? livePrev?.rows ?? [] : pickLivePerfSource(sessions, brandId, s, e, liveOlderMonths[m] ?? null).slice.rows;
+        return { month: m, stats: liveStatsFromRows(rows, s, m === month ? cmp.curEnd : e) };
+      }),
+    [last4Months, month, prevMonth, liveCurrent, livePrev, sessions, brandId, liveOlderMonths, cmp]
+  );
+  const signals = useMemo(() => {
+    const has = monthlyStats.filter((x) => x.stats.sessions > 0).length === monthlyStats.length;
+    if (!has) return [];
+    return [
+      trendSignal("CTOR", monthlyStats.map((x) => x.stats.ctor)),
+      trendSignal("CTR", monthlyStats.map((x) => x.stats.ctr)),
+      trendSignal("Lượt xem mỗi giờ", monthlyStats.map((x) => x.stats.viewsPerHour)),
+      trendSignal("AOV", monthlyStats.map((x) => x.stats.aov))
+    ].filter((x): x is NonNullable<typeof x> => x !== null);
+  }, [monthlyStats]);
+
+  // Toàn shop (Shop Analytics theo ngày). Tháng bị che với brand thì slice null ⇒ không có số so sánh.
+  const shopDaysOf = (m: string) => (hiddenMonths.has(m) ? null : view.shopDays[m] ?? null);
+  const shopCur = useMemo(() => shopTotals(view.shopDays[month], cmp.curStart, cmp.curEnd), [view, month, cmp]);
+  const shopPrevSame = useMemo(() => shopTotals(hiddenMonths.has(prevMonth) ? null : view.shopDays[prevMonth], cmp.prevStart, cmp.prevEnd), [view, prevMonth, cmp, hiddenMonths]);
+  const channelMixes = useMemo(
+    () =>
+      last4Months.map((m) => {
+        const { start: s, end: e } = monthRangeLocal(m);
+        const card = hiddenMonths.has(m) ? null : view.cardGmv[m];
+        return channelMix(m, shopTotals(shopDaysOf(m), s, e), card?.hasAnyBatch ? card.cardGmv : null);
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [last4Months, view, hiddenMonths]
+  );
+  const channelChartData = useMemo(
+    () =>
+      channelMixes
+        .map((c, idx) => (c ? { label: `${last4Months[idx].slice(5)}/${last4Months[idx].slice(2, 4)}`, liveLinked: c.liveLinked, affiliate: c.affiliate, video: c.video, card: c.card ?? 0 } : null))
+        .filter((x): x is NonNullable<typeof x> => x !== null),
+    [channelMixes, last4Months]
+  );
+  const shopPiecesMissing = !Object.values(view.shopDays).some(Boolean) && !Object.values(view.cardGmv).some(Boolean);
+
+  // NMV: tỷ lệ hoàn ở Rate Card (điều khoản hợp đồng) nếu đã nhập, không thì tỷ lệ hoàn THỰC của cả shop
+  // trong kỳ (Shop Analytics) — ước tính, ghi rõ trên report.
+  const refundRateShop = shopCur && shopCur.gmv > 0 ? (shopCur.refunds / shopCur.gmv) * 100 : null;
+  const tiktokReturnRate = brandPlatformRates.find((r) => r.brandId === brandId && r.platform === "TikTok")?.returnRate;
+  const nmvRate = hasReturnRateConfig ? tiktokReturnRate ?? null : refundRateShop;
+  const nmvSource = hasReturnRateConfig ? "tỷ lệ hoàn ở Rate Card" : refundRateShop != null ? "tỷ lệ hoàn thực của cả shop trong kỳ" : null;
+
+  // Luỹ kế GMV live theo ngày — tháng report vs tháng trước (cùng trục ngày 1..31).
+  const cumulativeData = useMemo(() => {
+    const byDay = (rows: CreatorLivePerfRow[], m: string) => {
+      const arr = new Array(31).fill(0);
+      for (const r of rows) {
+        const d = vnDateOf(r.startTime);
+        if (d.startsWith(m)) arr[Number(d.slice(8, 10)) - 1] += r.gmv;
+      }
+      return arr;
+    };
+    const cur = byDay(liveCurrent?.rows ?? [], month);
+    const prev = byDay(livePrev?.rows ?? [], prevMonth);
+    const curLast = Number(cmp.curEnd.slice(8, 10));
+    const prevLast = Number(prevEnd.slice(8, 10));
+    const out: { day: number; cur: number | null; prev: number | null }[] = [];
+    let a = 0;
+    let b = 0;
+    for (let i = 0; i < 31; i++) {
+      a += cur[i];
+      b += prev[i];
+      out.push({ day: i + 1, cur: i + 1 <= curLast ? a : null, prev: i + 1 <= prevLast ? b : null });
+    }
+    return out;
+  }, [liveCurrent, livePrev, month, prevMonth, cmp, prevEnd]);
+
+  // Waterfall "vì sao": cột nền trong suốt + cột giá trị (recharts không có waterfall sẵn).
+  const waterfallData = useMemo(() => {
+    if (!drivers) return [];
+    const out: { label: string; base: number; value: number; kind: "total" | "up" | "down"; display: number }[] = [];
+    out.push({ label: cmp.partial ? `1–${Number(cmp.prevEnd.slice(8))}/${prevMonth.slice(5)}` : `Tháng ${prevMonth.slice(5)}`, base: 0, value: drivers.from, kind: "total", display: drivers.from });
+    let run = drivers.from;
+    for (const p of drivers.parts) {
+      const next = run + p.value;
+      out.push({ label: DRIVER_LABEL[p.key], base: Math.min(run, next), value: Math.abs(p.value), kind: p.value >= 0 ? "up" : "down", display: p.value });
+      run = next;
+    }
+    out.push({ label: cmp.partial ? `1–${Number(cmp.curEnd.slice(8))}/${month.slice(5)}` : `Tháng ${month.slice(5)}`, base: 0, value: drivers.to, kind: "total", display: drivers.to });
+    return out;
+  }, [drivers, cmp, month, prevMonth]);
+
+  // Khung giờ bắt đầu ca — GMV/giờ, cùng kỳ 2 tháng (phần 7 "Bối cảnh").
+  const slotRows = useMemo(() => {
+    const buckets = [
+      { key: "morning", label: "Sáng (trước 12h)", test: (h: number) => h < 12 },
+      { key: "afternoon", label: "Chiều (12h–17h)", test: (h: number) => h >= 12 && h < 17 },
+      { key: "evening", label: "Tối (từ 17h)", test: (h: number) => h >= 17 }
+    ];
+    const hourOf = (iso: string) => (new Date(iso).getUTCHours() + 7) % 24;
+    const agg = (rows: CreatorLivePerfRow[], s: string, e: string, test: (h: number) => boolean) => {
+      let n = 0, gmv = 0, hours = 0;
+      for (const r of rows) {
+        const d = vnDateOf(r.startTime);
+        if (d < s || d > e || !test(hourOf(r.startTime))) continue;
+        n++;
+        gmv += r.gmv;
+        hours += r.hours;
+      }
+      return { n, gmv, gmvPerHour: hours > 0 ? gmv / hours : null };
+    };
+    return buckets.map((b) => ({
+      ...b,
+      cur: agg(liveCurrent?.rows ?? [], cmp.curStart, cmp.curEnd, b.test),
+      prev: agg(livePrev?.rows ?? [], cmp.prevStart, cmp.prevEnd, b.test)
+    }));
+  }, [liveCurrent, livePrev, cmp]);
+
+  // Phần 8 — kế hoạch tháng sau lấy từ Kế Hoạch Tháng (nguồn duy nhất của target/lịch tháng sau).
+  const [nextPlan, setNextPlan] = useState<{ targetGmv: number; status: "draft" | "locked"; slotCount: number } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetchMonthPlan(brandId, nextMonth)
+      .then((r) => !cancelled && setNextPlan(r ? { targetGmv: r.plan.targetGmv, status: r.plan.status, slotCount: r.slots.length } : null))
+      .catch(() => !cancelled && setNextPlan(null));
+    return () => {
+      cancelled = true;
+    };
+  }, [brandId, nextMonth]);
+
+  const campBest = useMemo(() => {
+    const camps = campDetailRows.filter((r) => r.key !== "daily" && r.gmvPerHour != null && r.hours > 0).sort((a, b) => (b.gmvPerHour ?? 0) - (a.gmvPerHour ?? 0));
+    return camps[0] ? { label: camps[0].label, gmvPerHour: camps[0].gmvPerHour! } : null;
+  }, [campDetailRows]);
+  const dailyGmvPerHour = campDetailRows.find((r) => r.key === "daily")?.gmvPerHour ?? null;
+
+  const narrativeInput: NarrativeInput = {
+    month,
+    window: cmp,
+    shopCur,
+    shopPrev: shopPrevSame,
+    liveCur: liveCurStats,
+    livePrev: livePrevStats,
+    drivers,
+    signals,
+    targetGmv: kpiTargetGmvCur,
+    campBest,
+    dailyGmvPerHour,
+    nextMonth,
+    nextPlan
+  };
+  const autoSummaryLines = autoSummary(narrativeInput);
+  const autoNextLines = autoNextSteps(narrativeInput);
+  const splitLines = (t?: string) => (t ?? "").split("\n").map((l) => l.replace(/^[-•\s]+/, "").trim()).filter(Boolean);
+  const summaryLines = monthlyReportRow?.summaryText != null ? splitLines(monthlyReportRow.summaryText) : autoSummaryLines;
+  const nextLines = monthlyReportRow?.nextStepsText != null ? splitLines(monthlyReportRow.nextStepsText) : autoNextLines;
+  const narrativeEdited = monthlyReportRow?.summaryText != null || monthlyReportRow?.nextStepsText != null;
+  // Đoạn đã sửa viết theo bộ số CŨ hơn lần cập nhật số liệu gần nhất ⇒ nhắc ops đọc lại trước khi phát hành.
+  const narrativeStale = narrativeEdited && !!monthlyReportRow?.summarySavedAt && monthlyReportRow.summarySavedAt < snapshot.computedAt;
+
+  const [editingNarrative, setEditingNarrative] = useState(false);
+  const [summaryDraft, setSummaryDraft] = useState("");
+  const [nextDraft, setNextDraft] = useState("");
+  const [narrativeSaving, setNarrativeSaving] = useState(false);
+  const [narrativeError, setNarrativeError] = useState<string | null>(null);
+  const startEditNarrative = () => {
+    setSummaryDraft(summaryLines.join("\n"));
+    setNextDraft(nextLines.join("\n"));
+    setNarrativeError(null);
+    setEditingNarrative(true);
+  };
+  const saveNarrative = async (reset: boolean) => {
+    setNarrativeSaving(true);
+    setNarrativeError(null);
+    try {
+      const row = await saveMonthlyReportNarrative(
+        brandId,
+        `${month}-01`,
+        reset ? { summaryText: null, nextStepsText: null } : { summaryText: summaryDraft.trim() || null, nextStepsText: nextDraft.trim() || null }
+      );
+      setMonthlyReportRow(row);
+      setEditingNarrative(false);
+    } catch (e) {
+      setNarrativeError(errorMessage(e, "Lưu tóm tắt thất bại"));
+    } finally {
+      setNarrativeSaving(false);
+    }
+  };
+
+  const agencyNotes = [
+    ["Khuyến mãi", monthlyReportRow?.promotionNotes],
+    ["Khách hàng", monthlyReportRow?.customerInsightNotes],
+    ["Sức khoẻ tài khoản", monthlyReportRow?.accountHealthNotes]
+  ].filter((x): x is [string, string] => !!x[1]?.trim());
+
+  const [showDeepDive, setShowDeepDive] = useState(false);
+  const scrollTo = (id: string) => document.getElementById(`mr-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
 
   // Xuất Excel toàn bộ Report Tháng (Đợt "trung tâm report") — 1 file, mỗi bảng đang có trên các
   // tab (trừ 05 Phân Tích Sâu, ops-only, không thuộc tài liệu gửi brand) là 1 sheet, để không phải
@@ -938,11 +1157,41 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     downloadSheetsAsXlsx(
       [
         {
-          name: "01 Tong Quan",
-          rows: revenueSourceRows.map((r) => ({ "Chỉ Số": r.label, [prevMonth]: n(r.prev), [month]: n(r.cur) }))
+          name: "1 Tom Tat",
+          rows: [
+            ...summaryLines.map((l) => ({ "Phần": "Tóm tắt", "Nội dung": l })),
+            ...nextLines.map((l) => ({ "Phần": "Việc tháng sau", "Nội dung": l }))
+          ]
         },
         {
-          name: "02 Livestream - Camp",
+          name: "1 KPI",
+          rows: [
+            { "Chỉ Số": "GMV cả shop", "Kỳ trước": n(shopPrevSame?.gmv), "Kỳ này": n(shopCur?.gmv) },
+            { "Chỉ Số": "GMV agency live", "Kỳ trước": n(livePrevStats.gmv), "Kỳ này": n(liveCurStats.gmv) },
+            { "Chỉ Số": "Giờ live", "Kỳ trước": n(livePrevStats.hours), "Kỳ này": n(liveCurStats.hours) },
+            { "Chỉ Số": "GMV/giờ", "Kỳ trước": n(livePrevStats.gmvPerHour), "Kỳ này": n(liveCurStats.gmvPerHour) },
+            { "Chỉ Số": "Lượt xem/giờ", "Kỳ trước": n(livePrevStats.viewsPerHour), "Kỳ này": n(liveCurStats.viewsPerHour) },
+            { "Chỉ Số": "CTR (%)", "Kỳ trước": n(livePrevStats.ctr), "Kỳ này": n(liveCurStats.ctr) },
+            { "Chỉ Số": "CTOR (%)", "Kỳ trước": n(livePrevStats.ctor), "Kỳ này": n(liveCurStats.ctor) },
+            { "Chỉ Số": "Target GMV tháng", "Kỳ trước": "", "Kỳ này": n(kpiTargetGmvCur) },
+            { "Chỉ Số": `So sánh: ${cmp.label}`, "Kỳ trước": "", "Kỳ này": "" }
+          ]
+        },
+        {
+          name: "3 Toan Shop - Kenh",
+          rows: channelMixes.map((c, idx) => ({
+            "Tháng": last4Months[idx],
+            "GMV cả shop": n(c?.shopGmv),
+            "Agency live": n(monthlyStats[idx].stats.gmv),
+            "LIVE tài khoản shop": n(c?.liveLinked),
+            "LIVE affiliate": n(c?.affiliate),
+            "Video": n(c?.video),
+            "Thẻ SP": n(c?.card),
+            "Hoàn/GMV (%)": n(c?.refundRate)
+          }))
+        },
+        {
+          name: "7 Boi Canh - Camp",
           rows: campDetailRows.map((r) => ({
             "Khung": r.label,
             "Target GMV": n(r.target),
@@ -954,7 +1203,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
           }))
         },
         {
-          name: "02 Livestream - Top Ca",
+          name: "7 Boi Canh - Top Ca",
           rows: topSessions.map((s, idx) => ({
             "#": idx + 1,
             "Bắt Đầu": fmtSessionStart(s.startTime),
@@ -969,7 +1218,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
           }))
         },
         {
-          name: "02 Livestream - Host",
+          name: "5 Nguoi - Host",
           rows: hostPerformance.map((h) => ({
             "Host": h.hostName,
             "Số Phiên": h.sessionCount,
@@ -981,11 +1230,11 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
           }))
         },
         {
-          name: "03 San Pham - Top SKU",
+          name: "6 Hang - Top SKU",
           rows: (topSku?.items ?? []).map((s, idx) => ({ "#": idx + 1, "Sản Phẩm": s.name, "GMV": n(s.gmv), "GMV Live": n(s.gmvLive), "Đơn": n(s.orders) }))
         },
         {
-          name: "03 San Pham - Khuyen Mai",
+          name: "6 Hang - Khuyen Mai",
           rows: (topPromo?.items ?? []).map((p, idx) => ({
             "#": idx + 1,
             "Chương Trình": p.name,
@@ -996,7 +1245,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
           }))
         },
         {
-          name: "04 Affiliate",
+          name: "Phu Luc - Affiliate",
           rows: affiliateRows.map((a) => ({
             "Creator": a.creatorName,
             "Ngày Live": a.liveDateLabel ?? "",
@@ -1014,7 +1263,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
           }))
         },
         {
-          name: "06 Ke Hoach - Phan Bo",
+          name: "Phu Luc - Phan Bo",
           rows: planBucketRows.map((b) => ({
             "Khung": b.label,
             "Phân Bổ (%)": n(b.pct),
@@ -1024,7 +1273,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
           }))
         },
         {
-          name: "06 Ke Hoach - Affiliate",
+          name: "Phu Luc - KH Affiliate",
           rows: planRows.map((r) => ({
             "Lịch Live": r.scheduleLabel ?? "",
             "Creator": r.creatorName,
@@ -1042,45 +1291,120 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
 
   return (
     <div className="rounded-2xl overflow-hidden" style={{ background: PAL.bg, border: `1px solid ${PAL.line}` }}>
-      <div className="flex items-center gap-1 px-4 pt-3 overflow-x-auto" style={{ borderBottom: `1px solid ${PAL.line}` }}>
-        {tabsFor(canManage).map((t) => (
+      {/* Mục lục 8 phần — trang cuộn thay 6 tab (user chốt 2026-09-25): tab giấu nội dung, brand có thể không
+          bao giờ mở tới tab 04. */}
+      <div className="flex items-center gap-1 px-3 py-2 overflow-x-auto sticky top-0 z-10" style={{ background: PAL.bg, borderBottom: `1px solid ${PAL.line}` }}>
+        {SECTIONS.map((sec) => (
           <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className="flex items-center gap-1.5 px-3.5 py-2.5 text-[11px] font-bold uppercase tracking-wide whitespace-nowrap border-b-2 transition-colors"
-            style={{
-              color: tab === t.id ? PAL.gold : PAL.muted,
-              borderColor: tab === t.id ? PAL.gold : "transparent"
-            }}
+            key={sec.id}
+            onClick={() => scrollTo(sec.id)}
+            className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide whitespace-nowrap rounded-lg hover:opacity-100 focus-visible:outline focus-visible:outline-2"
+            style={{ color: PAL.muted }}
           >
-            {t.icon} {t.label}
+            {sec.label}
           </button>
         ))}
         <button
           onClick={handleExportAll}
-          disabled={loading}
-          title="Xuất toàn bộ Report Tháng (mọi tab, trừ Phân Tích Sâu) ra 1 file Excel nhiều sheet"
-          className="ml-auto mb-2 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap disabled:opacity-40 shrink-0"
+          title="Xuất toàn bộ Report Tháng ra 1 file Excel nhiều sheet"
+          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap shrink-0"
           style={{ background: PAL.panel2, border: `1px solid ${PAL.line}`, color: PAL.gold }}
         >
           <Download className="w-3.5 h-3.5" /> Xuất Excel
         </button>
       </div>
 
-      <div className="p-5 space-y-4">
-        {loading ? (
-          <div className="flex items-center justify-center py-16 gap-2 text-sm" style={{ color: PAL.muted }}>
-            <Loader2 className="w-4 h-4 animate-spin" /> Đang tổng hợp Report Tháng từ Dữ Liệu Gốc...
+      <div className="p-5 space-y-8">
+        {shopPiecesMissing && canManage && (
+          <div className="flex items-start gap-2 text-[11px] rounded-xl p-2.5" style={{ background: "#2a2410", border: `1px solid ${PAL.gold}55`, color: PAL.gold }}>
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+            Số liệu này chốt trước khi report có phần "Toàn shop &amp; kênh" — bấm "Cập nhật số liệu" ở trên để có đủ 8 phần.
           </div>
-        ) : errorMsg ? (
-          <div className="p-4 rounded-xl text-xs font-semibold" style={{ background: "#2a1414", border: `1px solid ${PAL.red}55`, color: PAL.red }}>
-            {errorMsg}
+        )}
+
+        {/* ===== 1. Tóm tắt ===== */}
+        <section id="mr-summary" className="space-y-4 scroll-mt-16">
+          <SectionHead no="1" title="Tóm tắt" sub={cmp.partial ? `Số tính tới ${cmp.curEnd.slice(8)}/${month.slice(5)} · % là cùng kỳ ${cmp.label}` : `Tháng ${month.slice(5)}/${month.slice(0, 4)} · % là ${cmp.label}`} />
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+            <KpiTile
+              label="GMV cả shop"
+              value={shopCur ? formatCurrencyAdaptive(shopCur.gmv) : "—"}
+              change={shopCur && shopPrevSame ? pctChange(shopPrevSame.gmv, shopCur.gmv) : null}
+              note={shopCur ? "Shop Analytics — mọi kênh" : "chưa có file Shop Analytics"}
+            />
+            <KpiTile
+              label="GMV do agency live"
+              value={formatCurrencyAdaptive(liveCurStats.gmv)}
+              change={pctChange(livePrevStats.gmv, liveCurStats.gmv)}
+              note={shopCur && shopCur.gmv > 0 ? `${fmtPct((liveCurStats.gmv / shopCur.gmv) * 100)} tổng shop · ${liveCurStats.sessions} ca` : `${liveCurStats.sessions} ca`}
+            />
+            <KpiTile
+              label="NMV ước tính"
+              value={nmvRate != null ? formatCurrencyAdaptive(liveCurStats.gmv * (1 - nmvRate / 100)) : "—"}
+              note={nmvRate != null ? `trừ ${fmtPct(nmvRate)} — ${nmvSource}` : "chưa có tỷ lệ hoàn (Rate Card / Shop Analytics)"}
+            />
+            <KpiTile label="Giờ live" value={fmtHours(liveCurStats.hours)} change={pctChange(livePrevStats.hours, liveCurStats.hours)} note={`${liveCurStats.sessions} ca có số`} />
+            <KpiTile label="GMV / giờ live" value={liveCurStats.gmvPerHour != null ? formatCurrencyAdaptive(liveCurStats.gmvPerHour) : "—"} change={pctChange(livePrevStats.gmvPerHour, liveCurStats.gmvPerHour)} />
           </div>
-        ) : (
-          <>
-            {tab === "overview" && (
-              <div className="space-y-4">
-                {runRate && runRate.doneCount > 0 && (
+
+          <div className="rounded-xl p-4 space-y-3" style={{ background: PAL.panel, border: `1px solid ${PAL.line}` }}>
+            {editingNarrative ? (
+              <NarrativeEditor
+                summaryDraft={summaryDraft}
+                nextDraft={nextDraft}
+                onSummary={setSummaryDraft}
+                onNext={setNextDraft}
+                saving={narrativeSaving}
+                error={narrativeError}
+                onSave={() => saveNarrative(false)}
+                onCancel={() => setEditingNarrative(false)}
+              />
+            ) : (
+              <>
+                <ul className="space-y-2 text-[13.5px] leading-relaxed list-disc pl-5" style={{ color: PAL.cream }}>
+                  {summaryLines.map((l, i) => (
+                    <li key={i}>{l}</li>
+                  ))}
+                </ul>
+                {canManage && (
+                  <div className="flex flex-wrap items-center gap-3 pt-2 text-[11px]" style={{ borderTop: `1px solid ${PAL.line}`, color: PAL.muted }}>
+                    <span>{narrativeEdited ? "Ops đã sửa đoạn này (tóm tắt + việc tháng sau)." : "Bản tự sinh từ số liệu — sửa trước khi phát hành nếu cần."}</span>
+                    {narrativeStale && <span style={{ color: PAL.gold }}>Số liệu đã cập nhật sau lần sửa — đọc lại cho khớp số mới.</span>}
+                    <button onClick={startEditNarrative} className="font-bold underline" style={{ color: PAL.gold }}>
+                      Sửa tóm tắt & việc tháng sau
+                    </button>
+                    {narrativeEdited && (
+                      <button onClick={() => saveNarrative(true)} disabled={narrativeSaving} className="font-bold underline disabled:opacity-50" style={{ color: PAL.muted }}>
+                        Dùng lại bản tự sinh
+                      </button>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </section>
+
+        {/* ===== 2. Mục tiêu & tiến độ ===== */}
+        <section id="mr-target" className="space-y-4 scroll-mt-16">
+          <SectionHead no="2" title="Mục tiêu & tiến độ" sub="Target lấy từ Kế Hoạch Tháng đã chốt; so luỹ kế cùng ngày với tháng trước" />
+          {kpiTargetGmvCur ? (
+            <div className="rounded-xl p-4 flex flex-wrap items-end gap-6" style={{ background: PAL.panel2, border: `1px solid ${PAL.line}` }}>
+              <div>
+                <div className="text-[10.5px] uppercase tracking-wider" style={{ color: PAL.muted }}>Target GMV tháng</div>
+                <div className="font-mono text-xl font-bold mt-1" style={{ color: PAL.cream }}>{formatCurrencyAdaptive(kpiTargetGmvCur)}</div>
+              </div>
+              <div className="flex-1 min-w-[200px]">
+                <ProgressBar pct={(liveCurStats.gmv / kpiTargetGmvCur) * 100} />
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-start gap-2 text-[11.5px] rounded-xl p-3" style={{ background: PAL.panel2, border: `1px solid ${PAL.line}`, color: PAL.muted }}>
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" style={{ color: PAL.gold }} />
+              Tháng {month.slice(5)} chưa có target chốt ở Kế Hoạch Tháng — phần này hiện % đạt, run-rate và dự kiến cuối tháng khi có. Bên dưới là so sánh cùng kỳ, luôn có.
+            </div>
+          )}
+          {runRate && runRate.doneCount > 0 && (
                   <div className="rounded-xl p-4 grid grid-cols-2 sm:grid-cols-5 gap-3" style={{ background: PAL.panel2, border: `1px solid ${PAL.line}` }}>
                     <div>
                       <div className="text-[10.5px] uppercase tracking-wider" style={{ color: PAL.muted }}>Target kế hoạch</div>
@@ -1111,65 +1435,23 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                     </div>
                   </div>
                 )}
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div className="rounded-xl p-4" style={{ background: PAL.panel2, border: `1px solid ${PAL.line}` }}>
-                    <div className="text-[10.5px] uppercase tracking-wider" style={{ color: PAL.muted }}>
-                      Total GMV
-                    </div>
-                    <div className="font-mono text-xl font-bold mt-1.5" style={{ color: PAL.cream }}>
-                      {formatCurrencyAdaptive(totalGmvCur)}
-                    </div>
-                    <div className="text-[11px] mt-1">
-                      <MomBadge current={totalGmvCur} previous={totalGmvPrev} />
-                    </div>
-                    <ProgressBar pct={pctOfTotal(totalGmvCur, kpiTargetGmvCur ?? 0)} />
-                  </div>
-                  <div className="rounded-xl p-4" style={{ background: PAL.panel2, border: `1px solid ${PAL.line}` }}>
-                    <div className="text-[10.5px] uppercase tracking-wider" style={{ color: PAL.muted }}>
-                      Total NMV
-                    </div>
-                    <div className="font-mono text-xl font-bold mt-1.5" style={{ color: PAL.cream }}>
-                      {formatCurrencyAdaptive(totalNmvCur)}
-                    </div>
-                    <div className="text-[11px] mt-1">
-                      <MomBadge current={totalNmvCur} previous={totalNmvPrev} />
-                    </div>
-                    <ProgressBar pct={pctOfTotal(totalNmvCur, kpiTargetNmvCur ?? 0)} />
-                    <div className="text-[9.5px] mt-1.5 italic" style={{ color: PAL.muted }}>
-                      {hasReturnRateConfig
-                        ? "* Dự kiến theo tỷ lệ hoàn hủy Rate Card, không phải số thực tế nghiệm thu."
-                        : "* Chưa cấu hình tỷ lệ hoàn hủy ở Rate Card — số này = Total GMV."}
-                    </div>
-                  </div>
-                  <div className="rounded-xl p-4" style={{ background: PAL.panel2, border: `1px solid ${PAL.line}` }}>
-                    <div className="text-[10.5px] uppercase tracking-wider" style={{ color: PAL.muted }}>
-                      Live + Affiliate GMV
-                    </div>
-                    <div className="font-mono text-xl font-bold mt-1.5" style={{ color: PAL.cream }}>
-                      {formatCurrencyAdaptive(liveAffCur)}
-                    </div>
-                    <div className="text-[11px] mt-1">
-                      <MomBadge current={liveAffCur} previous={liveAffPrev} />
-                    </div>
-                  </div>
-                  <div className="rounded-xl p-4" style={{ background: PAL.panel2, border: `1px solid ${PAL.line}` }}>
-                    <div className="text-[10.5px] uppercase tracking-wider" style={{ color: PAL.muted }}>
-                      Affiliate GMV
-                    </div>
-                    <div className="font-mono text-xl font-bold mt-1.5" style={{ color: PAL.cream }}>
-                      {formatCurrencyAdaptive(affiliateGmvCur)}
-                    </div>
-                    <div className="text-[11px] mt-1">
-                      <MomBadge current={affiliateGmvCur} previous={affiliateGmvPrev} />
-                    </div>
-                    <div className="text-[9.5px] mt-1.5 italic" style={{ color: PAL.muted }}>
-                      * Tổng Direct GMV nhập tay ở Tab 04, không phải số TikTok tách kênh chính thức.
-                    </div>
-                  </div>
-                </div>
-
-                <Panel
+          <Panel title="GMV live luỹ kế theo ngày" icon={<Activity className="w-4 h-4" />} sub={`Tháng ${month.slice(5)} so với tháng ${prevMonth.slice(5)} — cùng trục ngày`}>
+            <div style={{ height: 260 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={cumulativeData} margin={{ right: 12 }}>
+                  <CartesianGrid stroke={PAL.line} vertical={false} />
+                  <XAxis dataKey="day" stroke={PAL.muted} fontSize={10} interval={3} />
+                  <YAxis stroke={PAL.muted} fontSize={10} tickFormatter={(v) => formatCurrencyAdaptive(v)} width={70} />
+                  <Tooltip contentStyle={chartTooltipStyle} labelFormatter={(d) => `Ngày ${d}`} formatter={(v) => formatCurrencyAdaptive(chartNum(v))} />
+                  {cmp.partial && <ReferenceLine x={Number(cmp.curEnd.slice(8))} stroke={PAL.muted} strokeDasharray="3 3" />}
+                  <Line type="monotone" dataKey="prev" name={`Tháng ${prevMonth.slice(5)}`} stroke={PAL.blue} strokeWidth={2} dot={false} connectNulls={false} />
+                  <Line type="monotone" dataKey="cur" name={`Tháng ${month.slice(5)}`} stroke={PAL.gold} strokeWidth={2} dot={false} connectNulls={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            <ChartLegend items={[[`Tháng ${prevMonth.slice(5)}`, PAL.blue], [`Tháng ${month.slice(5)}`, PAL.gold]]} />
+          </Panel>
+          <Panel
                   title="Target vs Thực Đạt GMV — 4 tháng gần nhất"
                   icon={<BarChart3 className="w-4 h-4" />}
                   sub="Target: tổng target GMV đã lên lịch (Lịch Vận Hành) · Actual: Total GMV thực tế"
@@ -1187,179 +1469,130 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                     </ResponsiveContainer>
                   </div>
                 </Panel>
+        </section>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <Panel
-                    title="Chi Tiết Theo Nguồn Doanh Thu"
-                    icon={<ListOrdered className="w-4 h-4" />}
-                    sub={`So kỳ với ${prevMonth} · % tính trên Total GMV`}
-                  >
-                    <ReportTable head={["Nguồn", prevMonth, "Tháng Này", "MoM"]}>
-                      {revenueSourceRows.map((r) => (
-                        <React.Fragment key={r.label}>
-                          <tr style={{ borderBottom: `1px solid ${PAL.line}` }}>
-                            <td className="py-2 px-3 font-semibold" style={{ color: PAL.cream }}>
-                              {r.label}
-                            </td>
-                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
-                              {r.prev == null ? "—" : formatCurrencyAdaptive(r.prev)}
-                            </td>
-                            <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>
-                              {r.cur == null ? "—" : formatCurrencyAdaptive(r.cur)}
-                            </td>
-                            <td className="py-2 px-3 text-right">
-                              <MomBadge current={r.cur ?? 0} previous={r.prev ?? 0} />
-                            </td>
-                          </tr>
-                          {r.pct && (
-                            <tr style={{ borderBottom: `1px solid ${PAL.line}`, background: `${PAL.panel2}55` }}>
-                              <td className="py-1.5 px-3 pl-6 text-[10.5px] italic" style={{ color: PAL.muted }}>
-                                — % trên Total GMV
-                              </td>
-                              <td className="py-1.5 px-3 text-right font-mono text-[10.5px]" style={{ color: PAL.muted }}>
-                                {fmtPct(pctOfTotal(r.prev ?? 0, totalGmvPrev))}
-                              </td>
-                              <td className="py-1.5 px-3 text-right font-mono text-[10.5px]" style={{ color: PAL.muted }}>
-                                {fmtPct(pctOfTotal(r.cur ?? 0, totalGmvCur))}
-                              </td>
-                              <td className="py-1.5 px-3" />
-                            </tr>
-                          )}
-                        </React.Fragment>
+        {/* ===== 3. Toàn shop & kênh ===== */}
+        <section id="mr-shop" className="space-y-4 scroll-mt-16">
+          <SectionHead no="3" title="Toàn shop & kênh" sub="Shop Analytics: LIVE shop + LIVE affiliate + video, cộng thẻ sản phẩm (file Sản Phẩm) ≈ 100% GMV cả shop" />
+          {channelMixes.every((c) => !c) ? (
+            <p className="text-sm py-4" style={{ color: PAL.muted }}>Chưa có file Shop Analytics cho các tháng này ở Dữ Liệu Gốc.</p>
+          ) : (
+            <>
+              <Panel title="Cơ cấu GMV cả shop theo kênh" icon={<PieChartIcon className="w-4 h-4" />} sub="4 tháng gần nhất — tỷ trọng trên tổng shop">
+                <div style={{ height: 220 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={channelChartData} layout="vertical" stackOffset="expand" margin={{ left: 4, right: 12 }}>
+                      <CartesianGrid stroke={PAL.line} horizontal={false} />
+                      <XAxis type="number" stroke={PAL.muted} fontSize={10} tickFormatter={(v) => `${Math.round(v * 100)}%`} />
+                      <YAxis type="category" dataKey="label" stroke={PAL.muted} fontSize={11} width={52} />
+                      <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => formatCurrencyAdaptive(chartNum(v))} />
+                      {CHANNELS.map((c) => (
+                        <Bar key={c.key} dataKey={c.key} name={c.label} stackId="ch" fill={c.color} stroke={PAL.panel} strokeWidth={2} />
                       ))}
-                    </ReportTable>
-                  </Panel>
-
-                  <Panel title="Cơ Cấu GMV Theo Nguồn" icon={<PieChartIcon className="w-4 h-4" />} sub="Tháng hiện tại — Live/Affiliate/Video/Product card">
-                    {gmvCompositionTotal <= 0 ? (
-                      <p className="text-sm text-center py-10" style={{ color: PAL.muted }}>
-                        Chưa đủ dữ liệu để tính cơ cấu GMV tháng này.
-                      </p>
-                    ) : (
-                      <div style={{ height: 240 }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie data={gmvCompositionDonutData} dataKey="value" nameKey="label" innerRadius={62} outerRadius={92} paddingAngle={2}>
-                              {gmvCompositionDonutData.map((d) => (
-                                <Cell key={d.label} fill={d.color} />
-                              ))}
-                            </Pie>
-                            <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => formatCurrencyAdaptive(chartNum(v))} />
-                          </PieChart>
-                        </ResponsiveContainer>
-                      </div>
-                    )}
-                    <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-2 justify-center">
-                      {gmvCompositionDonutData.map((d) => (
-                        <div key={d.label} className="flex items-center gap-1.5 text-[11px]" style={{ color: PAL.muted }}>
-                          <span className="w-2.5 h-2.5 rounded-full" style={{ background: d.color }} />
-                          {d.label} · {fmtPct(pctOfTotal(d.value, gmvCompositionTotal))}
-                        </div>
-                      ))}
-                    </div>
-                  </Panel>
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
+                <ChartLegend items={CHANNELS.map((c) => [c.label, c.color])} />
+              </Panel>
+              <Panel title="Chi tiết theo tháng" icon={<ListOrdered className="w-4 h-4" />} sub={cmp.partial ? `Tháng ${month.slice(5)} tính tới ${cmp.curEnd.slice(8)}/${month.slice(5)}` : undefined}>
+                <ReportTable head={["Tháng", "GMV cả shop", "Agency live", "Tỷ trọng agency", "LIVE affiliate", "Video", "Thẻ SP", "Hoàn / GMV"]}>
+                  {channelMixes.map((c, idx) => {
+                    const m = last4Months[idx];
+                    const agencyLive = monthlyStats[idx].stats.gmv;
+                    return (
+                      <tr key={m} style={{ borderBottom: `1px solid ${PAL.line}`, background: idx % 2 ? `${PAL.panel2}55` : "transparent" }}>
+                        <td className="py-2 px-3 font-semibold" style={{ color: PAL.cream }}>{m.slice(5)}/{m.slice(2, 4)}</td>
+                        <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>{c ? formatCurrencyAdaptive(c.shopGmv) : "—"}</td>
+                        <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{agencyLive > 0 ? formatCurrencyAdaptive(agencyLive) : "—"}</td>
+                        <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.gold }}>{c && agencyLive > 0 ? fmtPct((agencyLive / c.shopGmv) * 100) : "—"}</td>
+                        <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{c ? formatCurrencyAdaptive(c.affiliate) : "—"}</td>
+                        <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{c ? formatCurrencyAdaptive(c.video) : "—"}</td>
+                        <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{c?.card != null ? formatCurrencyAdaptive(c.card) : "—"}</td>
+                        <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{c?.refundRate != null ? fmtPct(c.refundRate) : "—"}</td>
+                      </tr>
+                    );
+                  })}
+                </ReportTable>
+                <p className="text-[10.5px] mt-2" style={{ color: PAL.muted }}>
+                  Agency live = tổng các ca có số trong app; LIVE affiliate = GMV từ LIVE của creator affiliate (Shop Analytics). Hoàn / GMV là
+                  tỷ lệ hoàn của cả shop trong kỳ (tính theo ngày hoàn, không theo đơn của từng ca).
+                  {canManage && channelMixes.some((c) => c?.coverage != null && Math.abs(c.coverage - 100) > 2) && " Có tháng 4 kênh lệch tổng shop quá 2% — kiểm lại file Sản Phẩm / Shop Analytics của tháng đó."}
+                </p>
+              </Panel>
+            </>
+          )}
+        </section>
+
+        {/* ===== 4. Vì sao ===== */}
+        <section id="mr-why" className="space-y-4 scroll-mt-16">
+          <SectionHead no="4" title="Vì sao tăng / giảm" sub={`GMV live = giờ live × lượt xem mỗi giờ × GMV mỗi lượt xem · ${cmp.label}`} />
+          {waterfallData.length > 0 ? (
+            <Panel title="Tách thay đổi GMV live" icon={<BarChart3 className="w-4 h-4" />} sub="3 phần cộng đúng bằng mức thay đổi (chia theo tỷ trọng log)">
+              <div style={{ height: 260 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={waterfallData} margin={{ top: 18, right: 8 }}>
+                    <CartesianGrid stroke={PAL.line} vertical={false} />
+                    <XAxis dataKey="label" stroke={PAL.muted} fontSize={10.5} interval={0} />
+                    <YAxis stroke={PAL.muted} fontSize={10} tickFormatter={(v) => formatCurrencyAdaptive(v)} width={70} />
+                    <Tooltip contentStyle={chartTooltipStyle} formatter={(_v, _n, item) => formatCurrencyAdaptive(chartNum((item as { payload?: { display?: number } }).payload?.display))} />
+                    <Bar dataKey="base" stackId="w" fill="transparent" isAnimationActive={false} legendType="none" tooltipType="none" />
+                    <Bar dataKey="value" stackId="w" radius={[4, 4, 0, 0]} name="GMV">
+                      {waterfallData.map((d, i) => (
+                        <Cell key={i} fill={d.kind === "total" ? PAL.gold : d.kind === "up" ? PAL.green : PAL.red} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
-            )}
-
-            {tab === "livestream" && (
-              <div className="space-y-4">
-                {!liveCurrent?.hasAnyBatch ? (
-                  <Panel title="Livestream Channel" icon={<Radio className="w-4 h-4" />} sub="TikTok Creator Live Performance">
-                    <p className="text-sm text-center py-6" style={{ color: PAL.muted }}>
-                      Tháng này chưa có ca nào có số liệu (trợ live up file vào ca / đối soát / nạp bù) và cũng chưa có file "Creator-Live-Performance" ở Dữ Liệu Gốc.
-                    </p>
-                  </Panel>
-                ) : (
-                  <>
-                    <div className="flex items-center gap-2 text-[11px] rounded-xl px-2.5 py-2" style={{ background: PAL.panel2, border: `1px solid ${PAL.line}`, color: PAL.muted }}>
-                      <span className="uppercase tracking-wider text-[10px] font-bold" style={{ color: PAL.cream }}>Nguồn số</span>
-                      {liveSource.source === "sessions" ? (
-                        <span>
-                          {liveSource.sessionCount} ca có số — {liveSource.reconciled} đã đối soát
-                          {liveSource.snapshot > 0 ? `, ${liveSource.snapshot} số lúc giao ca` : ""}
-                          {liveSource.manual > 0 ? `, ${liveSource.manual} tự khai` : ""}
-                          {dailyPerfRaw?.hasAnyBatch ? " · diễn biến ngày từ file Live Performance Core Stats" : ""}
-                        </span>
-                      ) : (
-                        <span>file Creator-Live-Performance ở Dữ Liệu Gốc (tháng này chưa có ca nào có số)</span>
-                      )}
-                    </div>
-                    {(liveCurrent.missingDays.length > 0 || (dailyPerf?.missingDays.length ?? 0) > 0) && (
-                      <div
-                        className="flex items-start gap-2 text-[11px] rounded-xl p-2.5"
-                        style={{ background: "#2a2410", border: `1px solid ${PAL.gold}55`, color: PAL.gold }}
-                      >
-                        <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                        Còn thiếu batch Dữ Liệu Gốc cho một số ngày trong tháng — số liệu bên dưới chỉ tính trên phần đã import.
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                      <div className="rounded-xl p-4" style={{ background: PAL.panel2, border: `1px solid ${PAL.line}` }}>
-                        <div className="text-[10.5px] uppercase tracking-wider" style={{ color: PAL.muted }}>
-                          Actual GMV Livestream
-                        </div>
-                        <div className="font-mono text-xl font-bold mt-1.5" style={{ color: PAL.cream }}>
-                          {formatCurrencyAdaptive(currentAgg.gmv)}
-                        </div>
-                        <div className="text-[11px] mt-1">
-                          <MomBadge current={currentAgg.gmv} previous={prevAgg.gmv} />
-                        </div>
-                      </div>
-                      <div className="rounded-xl p-4" style={{ background: PAL.panel2, border: `1px solid ${PAL.line}` }}>
-                        <div className="text-[10.5px] uppercase tracking-wider" style={{ color: PAL.muted }}>
-                          GMV / Giờ
-                        </div>
-                        <div className="font-mono text-xl font-bold mt-1.5" style={{ color: PAL.cream }}>
-                          {formatCurrencyAdaptive(currentAgg.gmvPerHour ?? 0)}
-                        </div>
-                        <div className="text-[11px] mt-1">
-                          <MomBadge current={currentAgg.gmvPerHour ?? 0} previous={prevAgg.gmvPerHour ?? 0} />
-                        </div>
-                      </div>
-                      <div className="rounded-xl p-4" style={{ background: PAL.panel2, border: `1px solid ${PAL.line}` }}>
-                        <div className="text-[10.5px] uppercase tracking-wider" style={{ color: PAL.muted }}>
-                          Số Giờ Live
-                        </div>
-                        <div className="font-mono text-xl font-bold mt-1.5" style={{ color: PAL.cream }}>
-                          {fmtHours(currentAgg.hours)}
-                        </div>
-                        <div className="text-[11px] mt-1">
-                          <MomBadge current={currentAgg.hours} previous={prevAgg.hours} />
-                        </div>
-                      </div>
-                      <div className="rounded-xl p-4" style={{ background: PAL.panel2, border: `1px solid ${PAL.line}` }}>
-                        <div className="text-[10.5px] uppercase tracking-wider" style={{ color: PAL.muted }}>
-                          CTOR
-                        </div>
-                        <div className="font-mono text-xl font-bold mt-1.5" style={{ color: PAL.cream }}>
-                          {fmtPct(currentAgg.ctor)}
-                        </div>
-                        <div className="text-[11px] mt-1">
-                          <MomBadge current={currentAgg.ctor ?? 0} previous={prevAgg.ctor ?? 0} />
-                        </div>
-                      </div>
-                    </div>
-
-                    <Panel title="GMV/Giờ & Số Giờ Live" icon={<BarChart3 className="w-4 h-4" />} sub="4 tháng gần nhất — Nguồn: Creator Live Performance">
-                      <div style={{ height: 240 }}>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
+                {drivers!.parts.map((p) => (
+                  <div key={p.key} className="text-[11.5px] rounded-lg px-3 py-2" style={{ background: PAL.panel2, color: PAL.muted }}>
+                    <span style={{ color: PAL.cream }}>{DRIVER_LABEL[p.key]}</span> {p.change >= 0 ? "+" : "−"}{Math.abs(p.change).toFixed(1)}% ⇒{" "}
+                    <span className="font-mono" style={{ color: p.value >= 0 ? PAL.green : PAL.red }}>
+                      {p.value >= 0 ? "+" : "−"}{formatCurrencyAdaptive(Math.abs(p.value))}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </Panel>
+          ) : (
+            <p className="text-sm" style={{ color: PAL.muted }}>Chưa đủ số của cả 2 kỳ (giờ live, lượt xem) để tách nguyên nhân.</p>
+          )}
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+            {FUNNEL_TILES.map((t) => (
+              <TrendTile key={t.key} label={t.label} points={monthlyStats.map((x) => ({ label: `${x.month.slice(5)}/${x.month.slice(2, 4)}`, value: t.get(x.stats) }))} format={t.format} goodWhenUp={t.goodWhenUp} />
+            ))}
+          </div>
+          {signals.length > 0 && (
+            <div className="rounded-xl p-3 space-y-1 text-[12px]" style={{ background: "#2a2410", border: `1px solid ${PAL.gold}55`, color: PAL.gold }}>
+              {signals.map((s) => (
+                <div key={s.label} className="flex items-start gap-2">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  {s.label} {s.direction === "down" ? "giảm" : "tăng"} {s.streak} tháng liên tiếp ({s.totalChange >= 0 ? "+" : "−"}{Math.abs(s.totalChange).toFixed(0)}%).
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Panel title="Phễu Chuyển Đổi" icon={<Filter className="w-4 h-4" />} sub="Live Impressions → Views → Product Views → Clicks → Orders">
+                      <div style={{ height: 220 }}>
                         <ResponsiveContainer width="100%" height="100%">
-                          <ComposedChart data={gmvHourTrend}>
-                            <CartesianGrid stroke={PAL.line} vertical={false} />
-                            <XAxis dataKey="label" stroke={PAL.muted} fontSize={11} />
-                            <YAxis yAxisId="gmvHour" stroke={PAL.muted} fontSize={10} tickFormatter={(v) => formatCurrencyAdaptive(v)} width={70} />
-                            <YAxis yAxisId="hours" orientation="right" stroke={PAL.blue} fontSize={10} tickFormatter={(v) => fmtHours(v)} width={60} />
-                            <Tooltip contentStyle={chartTooltipStyle} />
-                            <Bar yAxisId="gmvHour" dataKey="gmvPerHour" name="GMV/Giờ" fill={PAL.gold} radius={[3, 3, 0, 0]} />
-                            <Line yAxisId="hours" type="monotone" dataKey="hours" name="Số Giờ Live" stroke={PAL.blue} strokeWidth={2} dot={{ r: 3 }} />
-                          </ComposedChart>
+                          <BarChart data={funnelStages} layout="vertical" margin={{ left: 10 }}>
+                            <CartesianGrid stroke={PAL.line} horizontal={false} />
+                            <XAxis type="number" stroke={PAL.muted} fontSize={10} tickFormatter={(v) => fmtInt(v)} />
+                            <YAxis type="category" dataKey="label" stroke={PAL.muted} fontSize={10} width={90} />
+                            <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => fmtInt(chartNum(v))} />
+                            <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                              {funnelStages.map((_, i) => (
+                                <Cell key={i} fill={[PAL.gold, PAL.goldDim, `${PAL.gold}88`, PAL.blue, PAL.green][i] ?? PAL.gold} />
+                              ))}
+                            </Bar>
+                          </BarChart>
                         </ResponsiveContainer>
                       </div>
                     </Panel>
-
-                    <Panel title="MoM Key Metrics" icon={<BarChart3 className="w-4 h-4" />} sub={`So kỳ với ${prevMonth}`}>
-                      <ReportTable head={["Chỉ Số", prevMonth, "Tháng Này"]}>
+            <Panel title="MoM Key Metrics" icon={<BarChart3 className="w-4 h-4" />} sub={cmp.partial ? `Cùng kỳ ${cmp.label}` : `So kỳ với ${prevMonth}`}>
+                      <ReportTable head={["Chỉ Số", cmp.partial ? `1–${Number(cmp.prevEnd.slice(8))}/${prevMonth.slice(5)}` : prevMonth, cmp.partial ? `1–${Number(cmp.curEnd.slice(8))}/${month.slice(5)}` : "Tháng Này"]}>
                         {(
                           [
                             ["GMV Thực Đạt (Live)", (a: CreatorLivePerfAgg) => formatCurrencyAdaptive(a.gmv)],
@@ -1377,7 +1610,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                               {label}
                             </td>
                             <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
-                              {get(prevAgg)}
+                              {get(prevAggWindow)}
                             </td>
                             <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>
                               {get(currentAgg)}
@@ -1386,257 +1619,14 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                         ))}
                       </ReportTable>
                     </Panel>
+          </div>
+        </section>
 
-                    {dailyPerf?.hasAnyBatch && dailyChartData.length > 0 && (
-                      <Panel title="Diễn Biến GMV Theo Ngày" icon={<BarChart3 className="w-4 h-4" />} sub="Nguồn: Live Performance Core Stats">
-                        <div style={{ height: 280 }}>
-                          <ResponsiveContainer width="100%" height="100%">
-                            <ComposedChart data={dailyChartData}>
-                              <CartesianGrid stroke={PAL.line} vertical={false} />
-                              <XAxis dataKey="label" stroke={PAL.muted} fontSize={10} interval={2} />
-                              <YAxis yAxisId="gmv" stroke={PAL.muted} fontSize={10} tickFormatter={(v) => formatCurrencyAdaptive(v)} width={70} />
-                              <YAxis yAxisId="gpm" orientation="right" stroke={PAL.green} fontSize={10} tickFormatter={(v) => formatCurrencyAdaptive(v)} width={70} />
-                              <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => formatCurrencyAdaptive(chartNum(v))} />
-                              <Area
-                                yAxisId="gmv"
-                                type="monotone"
-                                dataKey="gmvLiveSession"
-                                name="GMV Buổi LIVE"
-                                stroke={PAL.gold}
-                                fill={`${PAL.gold}33`}
-                                strokeWidth={2}
-                              />
-                              <Line
-                                yAxisId="gmv"
-                                type="monotone"
-                                dataKey="gmvIndirect"
-                                name="GMV Gián Tiếp"
-                                stroke={PAL.blue}
-                                strokeWidth={2}
-                                strokeDasharray="4 3"
-                                dot={false}
-                              />
-                              <Line yAxisId="gpm" type="monotone" dataKey="gpm" name="GPM" stroke={PAL.green} strokeWidth={1.5} dot={false} />
-                            </ComposedChart>
-                          </ResponsiveContainer>
-                        </div>
-                      </Panel>
-                    )}
-
-                    <Panel
-                      title="Khung Chiến Dịch (D-Day / Mid-Month / Pay-Day)"
-                      icon={<Flame className="w-4 h-4" />}
-                      sub="Target loại B — Actual: SUM(GMV Buổi LIVE) từ Live Performance Core Stats"
-                    >
-                      {canManage && (
-                        <div className="mb-4 space-y-2.5 pb-4" style={{ borderBottom: `1px solid ${PAL.line}` }}>
-                          {(
-                            [
-                              ["D-Day", campDdayStartInput, setCampDdayStartInput, campDdayEndInput, setCampDdayEndInput, campDdayTargetInput, setCampDdayTargetInput],
-                              [
-                                "Mid-Month",
-                                campMidmonthStartInput,
-                                setCampMidmonthStartInput,
-                                campMidmonthEndInput,
-                                setCampMidmonthEndInput,
-                                campMidmonthTargetInput,
-                                setCampMidmonthTargetInput
-                              ],
-                              [
-                                "Pay-Day",
-                                campPaydayStartInput,
-                                setCampPaydayStartInput,
-                                campPaydayEndInput,
-                                setCampPaydayEndInput,
-                                campPaydayTargetInput,
-                                setCampPaydayTargetInput
-                              ]
-                            ] as [string, string, (v: string) => void, string, (v: string) => void, string, (v: string) => void][]
-                          ).map(([label, startVal, setStart, endVal, setEnd, targetVal, setTarget]) => (
-                            <div key={label} className="grid grid-cols-2 sm:grid-cols-4 gap-2 items-center">
-                              <span className="text-xs font-bold" style={{ color: PAL.cream }}>
-                                {label}
-                              </span>
-                              <input
-                                type="date"
-                                value={startVal}
-                                onChange={(e) => setStart(e.target.value)}
-                                className="px-2.5 py-1.5 rounded-lg text-xs font-mono"
-                                style={{ background: PAL.panel2, border: `1px solid ${PAL.line}`, color: PAL.cream }}
-                              />
-                              <input
-                                type="date"
-                                value={endVal}
-                                onChange={(e) => setEnd(e.target.value)}
-                                className="px-2.5 py-1.5 rounded-lg text-xs font-mono"
-                                style={{ background: PAL.panel2, border: `1px solid ${PAL.line}`, color: PAL.cream }}
-                              />
-                              <input
-                                type="number"
-                                value={targetVal}
-                                onChange={(e) => setTarget(e.target.value)}
-                                placeholder="Target GMV"
-                                className="px-2.5 py-1.5 rounded-lg text-xs font-mono"
-                                style={{ background: PAL.panel2, border: `1px solid ${PAL.line}`, color: PAL.cream }}
-                              />
-                            </div>
-                          ))}
-                          <div className="flex items-center gap-2 pt-1">
-                            <button
-                              onClick={handleSaveCampConfig}
-                              disabled={campSaving}
-                              className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold"
-                              style={{ background: PAL.gold, color: "#1a1500" }}
-                            >
-                              {campSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} Lưu Khung Camp
-                            </button>
-                            {campErrorMsg && (
-                              <span className="text-xs font-semibold" style={{ color: PAL.red }}>
-                                {campErrorMsg}
-                              </span>
-                            )}
-                            <span className="text-[10.5px] italic" style={{ color: PAL.muted }}>
-                              Để trống thì dùng khung mặc định (Mid-Month 13-15, Pay-Day 23-25, D-Day theo ngày trùng lặp gần nhất). Đã nhập camp nào thì camp đó chỉ tính đúng khoảng nhập — khung mặc định của camp đó không còn áp dụng.
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                      <div style={{ height: 220 }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={campTargetVsActualData}>
-                            <CartesianGrid stroke={PAL.line} vertical={false} />
-                            <XAxis dataKey="label" stroke={PAL.muted} fontSize={11} />
-                            <YAxis stroke={PAL.muted} fontSize={10} tickFormatter={(v) => formatCurrencyAdaptive(v)} width={70} />
-                            <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => formatCurrencyAdaptive(chartNum(v))} />
-                            <Bar dataKey="target" name="Target" fill={`${PAL.gold}2e`} stroke={PAL.gold} radius={[4, 4, 0, 0]} />
-                            <Bar dataKey="actual" name="Actual" fill={PAL.gold} radius={[4, 4, 0, 0]} />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
-                      <ReportTable head={["Khung", "Target GMV", "Actual GMV", "Giờ Live", "GMV/Giờ", "CTR", "CTOR"]}>
-                        {campDetailRows.map((r, idx) => (
-                          <tr key={r.key} style={{ borderBottom: `1px solid ${PAL.line}`, background: idx % 2 ? `${PAL.panel2}55` : "transparent" }}>
-                            <td className="py-2 px-3 font-semibold" style={{ color: PAL.gold }}>
-                              {r.label}
-                            </td>
-                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
-                              {r.target != null ? formatCurrencyAdaptive(r.target) : "—"}
-                            </td>
-                            <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>
-                              {formatCurrencyAdaptive(r.actual)}
-                            </td>
-                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
-                              {fmtHours(r.hours)}
-                            </td>
-                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
-                              {r.gmvPerHour != null ? formatCurrencyAdaptive(r.gmvPerHour) : "—"}
-                            </td>
-                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
-                              {fmtPct(r.ctr)}
-                            </td>
-                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
-                              {fmtPct(r.ctor)}
-                            </td>
-                          </tr>
-                        ))}
-                      </ReportTable>
-                    </Panel>
-
-
-                    <Panel title="Phễu Chuyển Đổi" icon={<Filter className="w-4 h-4" />} sub="Live Impressions → Views → Product Views → Clicks → Orders">
-                      <div style={{ height: 220 }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={funnelStages} layout="vertical" margin={{ left: 10 }}>
-                            <CartesianGrid stroke={PAL.line} horizontal={false} />
-                            <XAxis type="number" stroke={PAL.muted} fontSize={10} tickFormatter={(v) => fmtInt(v)} />
-                            <YAxis type="category" dataKey="label" stroke={PAL.muted} fontSize={10} width={90} />
-                            <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => fmtInt(chartNum(v))} />
-                            <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                              {funnelStages.map((_, i) => (
-                                <Cell key={i} fill={[PAL.gold, PAL.goldDim, `${PAL.gold}88`, PAL.blue, PAL.green][i] ?? PAL.gold} />
-                              ))}
-                            </Bar>
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </Panel>
-
-                    <Panel title="Top 10 Phiên Live Hiệu Suất Cao Nhất" icon={<ListOrdered className="w-4 h-4" />} sub="Nguồn: Creator Live Performance">
-                      <ReportTable head={["#", "Bắt Đầu", "Thời Lượng", "GMV", "GMV/Giờ", "Đơn Hàng", "SP Bán", "Views", "CTR", "CTOR"]}>
-                        {topSessions.map((s, idx) => (
-                          <tr key={s.roomId ?? idx} style={{ borderBottom: `1px solid ${PAL.line}`, background: idx % 2 ? `${PAL.panel2}55` : "transparent" }}>
-                            <td className="py-2 px-3 font-mono" style={{ color: PAL.gold }}>
-                              {idx + 1}
-                            </td>
-                            <td className="py-2 px-3 font-mono" style={{ color: PAL.cream }}>
-                              {fmtSessionStart(s.startTime)}
-                            </td>
-                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
-                              {fmtHours(s.hours)}
-                            </td>
-                            <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>
-                              {formatCurrencyAdaptive(s.gmv)}
-                            </td>
-                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
-                              {formatCurrencyAdaptive(s.gmvPerHour)}
-                            </td>
-                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
-                              {fmtInt(s.orders)}
-                            </td>
-                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
-                              {fmtInt(s.itemsSold)}
-                            </td>
-                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
-                              {fmtInt(s.views)}
-                            </td>
-                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
-                              {fmtPct(s.ctr)}
-                            </td>
-                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
-                              {fmtPct(s.ctor)}
-                            </td>
-                          </tr>
-                        ))}
-                        {topSessions.length === 0 && (
-                          <tr>
-                            <td colSpan={10} className="py-6 text-center italic" style={{ color: PAL.muted }}>
-                              Chưa có phiên live nào trong tháng.
-                            </td>
-                          </tr>
-                        )}
-                      </ReportTable>
-                    </Panel>
-                  </>
-                )}
-
-                {/* Audit Module 3 (2026-09-18): 2 panel Host nằm NGOÀI điều kiện "đã có file
-                    Creator-Live-Performance trong Dataraw" — chúng tính từ session nội bộ, không
-                    dính gì tới file đó. Trước đây chưa up file Dataraw tháng nào là toàn bộ tab
-                    Livestream trống, kể cả phần vốn có số. */}
-                <Panel title="Host Performance" icon={<Users className="w-4 h-4" />} sub="GMV/giờ theo host — tổng hợp từ lịch vận hành nội bộ">
-                  {/* Audit 2026-09-21: khung cao cố định 220px + YAxis interval mặc định khiến recharts
-                      GIẤU bớt nhãn khi nhiều host (10 host → 5 nhãn), nhãn còn lại rơi lệch sang thanh
-                      bên cạnh nên người đọc tưởng host hạng 2 mới là cao nhất. Cao theo số host +
-                      interval={0} để mỗi thanh luôn có đúng nhãn của nó. */}
-                  <div style={{ height: Math.max(220, hostChartData.length * 28 + 40) }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={hostChartData} layout="vertical" margin={{ left: 10 }}>
-                        <CartesianGrid stroke={PAL.line} horizontal={false} />
-                        <XAxis type="number" stroke={PAL.muted} fontSize={10} tickFormatter={(v) => formatCurrencyAdaptive(v)} />
-                        <YAxis type="category" dataKey="label" stroke={PAL.muted} fontSize={11} width={110} interval={0} />
-                        <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => formatCurrencyAdaptive(chartNum(v))} />
-                        <Bar dataKey="gmvHour" radius={[0, 4, 4, 0]}>
-                          {hostChartData.map((_, i) => (
-                            <Cell key={i} fill={i === 0 ? PAL.gold : `${PAL.gold}55`} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </Panel>
-
-                <Panel title="Bảng Chi Tiết Host" icon={<Users className="w-4 h-4" />} sub="Cùng cách tính với tab Hiệu Suất Host của agency — giờ live thật khi có file, ca không có số không tính">
-                  {hostQuality.reconciled < hostQuality.total && (
+        {/* ===== 5. Người ===== */}
+        <section id="mr-people" className="space-y-4 scroll-mt-16">
+          <SectionHead no="5" title="Người" sub="Host — cùng cách tính với Hiệu Suất Host của agency" />
+          <Panel title="Bảng Chi Tiết Host" icon={<Users className="w-4 h-4" />} sub="Cùng cách tính với tab Hiệu Suất Host của agency — giờ live thật khi có file, ca không có số không tính">
+                  {canManage && hostQuality.reconciled < hostQuality.total && (
                     <div
                       className="flex items-start gap-2 text-[11px] rounded-xl p-2.5 mb-3"
                       style={{ background: "#2a2410", border: `1px solid ${PAL.gold}55`, color: PAL.gold }}
@@ -1650,7 +1640,12 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                       </span>
                     </div>
                   )}
-                  {unassignedHost && (
+                  {unassignedHost && !canManage && (
+                    <p className="text-[11px] mb-3" style={{ color: PAL.muted }}>
+                      {unassignedHost.sessionCount} ca ({formatCurrencyAdaptive(unassignedHost.gmv)}) chưa ghi nhận host nên không nằm trong bảng.
+                    </p>
+                  )}
+                  {unassignedHost && canManage && (
                     <div
                       className="flex items-start gap-2 text-[11px] rounded-xl p-2.5 mb-3"
                       style={{ background: "#2a2410", border: `1px solid ${PAL.gold}55`, color: PAL.gold }}
@@ -1698,41 +1693,19 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                     )}
                   </ReportTable>
                 </Panel>
-              </div>
-            )}
+        </section>
 
-            {tab === "products" && (
-              <div className="space-y-4">
-                {(channelGmv?.hasCardBatch || channelGmv?.hasVideoBatch) && (
-                  <div className="grid grid-cols-2 gap-3">
-                    <KpiCard label="GMV Từ Thẻ Sản Phẩm" value={formatCurrencyAdaptive(productCardGmvCur)} />
-                    <KpiCard label="GMV Từ Video" value={formatCurrencyAdaptive(videoGmvCur)} />
-                  </div>
-                )}
-
-                <Panel title="Top SKU Theo GMV" icon={<ShoppingBag className="w-4 h-4" />} sub="Nguồn: Product List">
+        {/* ===== 6. Hàng ===== */}
+        <section id="mr-products" className="space-y-4 scroll-mt-16">
+          <SectionHead no="6" title="Hàng" sub="SKU dẫn doanh số, phần bán qua live, khuyến mãi chạy trong tháng" />
+          <Panel title="Top SKU Theo GMV" icon={<ShoppingBag className="w-4 h-4" />} sub="Nguồn: file Sản Phẩm — GMV Live = GMV bán qua LIVE của tài khoản shop">
                   {!topSku?.hasAnyBatch ? (
                     <p className="text-sm text-center py-6" style={{ color: PAL.muted }}>
                       Chưa có file "Product List" nào được import trong Dữ Liệu Gốc cho tháng này.
                     </p>
                   ) : (
                     <div className="space-y-4">
-                      <div style={{ height: 260 }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={skuChartData} layout="vertical" margin={{ left: 10 }}>
-                            <CartesianGrid stroke={PAL.line} horizontal={false} />
-                            <XAxis type="number" stroke={PAL.muted} fontSize={10} tickFormatter={(v) => formatCurrencyAdaptive(v)} />
-                            <YAxis type="category" dataKey="label" stroke={PAL.muted} fontSize={10} width={160} />
-                            <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => formatCurrencyAdaptive(chartNum(v))} />
-                            <Bar dataKey="gmv" radius={[0, 4, 4, 0]}>
-                              {skuChartData.map((_, i) => (
-                                <Cell key={i} fill={i === 0 ? PAL.gold : `${PAL.gold}55`} />
-                              ))}
-                            </Bar>
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
-                      <ReportTable head={["#", "Sản Phẩm", "GMV", "GMV Live", "Đơn Hàng"]}>
+                      <ReportTable head={["#", "Sản Phẩm", "GMV", "GMV Live", "% Qua Live", "Đơn Hàng"]}>
                         {(topSku.items ?? []).map((s, idx) => (
                           <tr key={s.name} style={{ borderBottom: `1px solid ${PAL.line}`, background: idx % 2 ? `${PAL.panel2}55` : "transparent" }}>
                             <td className="py-2 px-3 font-mono" style={{ color: PAL.gold }}>
@@ -1748,6 +1721,9 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                               {formatCurrencyAdaptive(s.gmvLive)}
                             </td>
                             <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
+                              {s.gmv > 0 ? fmtPct((s.gmvLive / s.gmv) * 100) : "—"}
+                            </td>
+                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
                               {fmtInt(s.orders)}
                             </td>
                           </tr>
@@ -1756,8 +1732,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                     </div>
                   )}
                 </Panel>
-
-                <Panel
+          <Panel
                   title="Top Chương Trình Khuyến Mãi"
                   icon={<Megaphone className="w-4 h-4" />}
                   sub={`Nguồn: Shop Promotion List — chỉ xếp hạng chương trình chạy TRỌN trong tháng${topPromo?.excludedMultiMonth ? ` (đã loại ${topPromo.excludedMultiMonth} chương trình vắt qua tháng khác)` : ""}`}
@@ -1803,11 +1778,212 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                     </ReportTable>
                   )}
                 </Panel>
-              </div>
-            )}
+        </section>
 
-            {tab === "affiliate" && (
-              <div className="space-y-4">
+        {/* ===== 7. Bối cảnh ===== */}
+        <section id="mr-context" className="space-y-4 scroll-mt-16">
+          <SectionHead no="7" title="Bối cảnh" sub="Ngày camp, khung giờ, diễn biến theo ngày, phiên nổi bật" />
+          <Panel
+                      title="Khung Chiến Dịch (D-Day / Mid-Month / Pay-Day)"
+                      icon={<Flame className="w-4 h-4" />}
+                      sub="Target loại B — Actual: SUM(GMV Buổi LIVE) từ Live Performance Core Stats"
+                    >
+                      <div style={{ height: 220 }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={campTargetVsActualData}>
+                            <CartesianGrid stroke={PAL.line} vertical={false} />
+                            <XAxis dataKey="label" stroke={PAL.muted} fontSize={11} />
+                            <YAxis stroke={PAL.muted} fontSize={10} tickFormatter={(v) => formatCurrencyAdaptive(v)} width={70} />
+                            <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => formatCurrencyAdaptive(chartNum(v))} />
+                            <Bar dataKey="target" name="Target" fill={`${PAL.gold}2e`} stroke={PAL.gold} radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="actual" name="Actual" fill={PAL.gold} radius={[4, 4, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <ReportTable head={["Khung", "Target GMV", "Actual GMV", "Giờ Live", "GMV/Giờ", "CTR", "CTOR"]}>
+                        {campDetailRows.map((r, idx) => (
+                          <tr key={r.key} style={{ borderBottom: `1px solid ${PAL.line}`, background: idx % 2 ? `${PAL.panel2}55` : "transparent" }}>
+                            <td className="py-2 px-3 font-semibold" style={{ color: PAL.gold }}>
+                              {r.label}
+                            </td>
+                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
+                              {r.target != null ? formatCurrencyAdaptive(r.target) : "—"}
+                            </td>
+                            <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>
+                              {formatCurrencyAdaptive(r.actual)}
+                            </td>
+                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
+                              {fmtHours(r.hours)}
+                            </td>
+                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
+                              {r.gmvPerHour != null ? formatCurrencyAdaptive(r.gmvPerHour) : "—"}
+                            </td>
+                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
+                              {fmtPct(r.ctr)}
+                            </td>
+                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
+                              {fmtPct(r.ctor)}
+                            </td>
+                          </tr>
+                        ))}
+                      </ReportTable>
+                    </Panel>
+          <Panel title="Khung giờ bắt đầu ca" icon={<CalendarClock className="w-4 h-4" />} sub={`GMV mỗi giờ live · ${cmp.label}`}>
+            <ReportTable head={["Khung giờ", "Số ca (trước → nay)", "GMV/giờ kỳ trước", "GMV/giờ kỳ này", "Thay đổi"]}>
+              {slotRows.map((r, idx) => {
+                const chg = pctChange(r.prev.gmvPerHour, r.cur.gmvPerHour);
+                return (
+                  <tr key={r.key} style={{ borderBottom: `1px solid ${PAL.line}`, background: idx % 2 ? `${PAL.panel2}55` : "transparent" }}>
+                    <td className="py-2 px-3 font-semibold" style={{ color: PAL.gold }}>{r.label}</td>
+                    <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{r.prev.n} → {r.cur.n}</td>
+                    <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{r.prev.gmvPerHour != null ? formatCurrencyAdaptive(r.prev.gmvPerHour) : "—"}</td>
+                    <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>{r.cur.gmvPerHour != null ? formatCurrencyAdaptive(r.cur.gmvPerHour) : "—"}</td>
+                    <td className="py-2 px-3 text-right font-mono" style={{ color: chg == null ? PAL.muted : chg >= 0 ? PAL.green : PAL.red }}>{chg == null ? "—" : `${chg >= 0 ? "+" : "−"}${Math.abs(chg).toFixed(1)}%`}</td>
+                  </tr>
+                );
+              })}
+            </ReportTable>
+          </Panel>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Panel title="GMV mỗi giờ live — 4 tháng" icon={<BarChart3 className="w-4 h-4" />}>
+              <div style={{ height: 200 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={gmvHourTrend}>
+                    <CartesianGrid stroke={PAL.line} vertical={false} />
+                    <XAxis dataKey="label" stroke={PAL.muted} fontSize={11} />
+                    <YAxis stroke={PAL.muted} fontSize={10} tickFormatter={(v) => formatCurrencyAdaptive(v)} width={70} />
+                    <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => formatCurrencyAdaptive(chartNum(v))} />
+                    <Bar dataKey="gmvPerHour" name="GMV/giờ" fill={PAL.gold} radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </Panel>
+            <Panel title="Số giờ live — 4 tháng" icon={<BarChart3 className="w-4 h-4" />} sub={cmp.partial ? `Tháng ${month.slice(5)} tính tới ${cmp.curEnd.slice(8)}/${month.slice(5)}` : undefined}>
+              <div style={{ height: 200 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={gmvHourTrend}>
+                    <CartesianGrid stroke={PAL.line} vertical={false} />
+                    <XAxis dataKey="label" stroke={PAL.muted} fontSize={11} />
+                    <YAxis stroke={PAL.muted} fontSize={10} tickFormatter={(v) => fmtHours(v)} width={50} />
+                    <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => fmtHours(chartNum(v))} />
+                    <Bar dataKey="hours" name="Giờ live" fill={PAL.blue} radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </Panel>
+          </div>
+          {dailyPerf?.hasAnyBatch && dailyChartData.length > 0 && (
+                      <Panel title="Diễn Biến GMV Theo Ngày" icon={<BarChart3 className="w-4 h-4" />} sub="Nguồn: Live Performance Core Stats">
+                        <div style={{ height: 280 }}>
+                          <ResponsiveContainer width="100%" height="100%">
+                            <ComposedChart data={dailyChartData}>
+                              <CartesianGrid stroke={PAL.line} vertical={false} />
+                              <XAxis dataKey="label" stroke={PAL.muted} fontSize={10} interval={2} />
+                              <YAxis yAxisId="gmv" stroke={PAL.muted} fontSize={10} tickFormatter={(v) => formatCurrencyAdaptive(v)} width={70} />
+                              <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => formatCurrencyAdaptive(chartNum(v))} />
+                              <Area
+                                yAxisId="gmv"
+                                type="monotone"
+                                dataKey="gmvLiveSession"
+                                name="GMV Buổi LIVE"
+                                stroke={PAL.gold}
+                                fill={`${PAL.gold}33`}
+                                strokeWidth={2}
+                              />
+                              <Line
+                                yAxisId="gmv"
+                                type="monotone"
+                                dataKey="gmvIndirect"
+                                name="GMV Gián Tiếp"
+                                stroke={PAL.blue}
+                                strokeWidth={2}
+                                strokeDasharray="4 3"
+                                dot={false}
+                              />
+                            </ComposedChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </Panel>
+                    )}
+          <Panel title="Top 10 Phiên Live Hiệu Suất Cao Nhất" icon={<ListOrdered className="w-4 h-4" />} sub={liveSource.source === "sessions" ? "Nguồn: ca có số trong app" : "Nguồn: file Creator Live Performance"}>
+                      <ReportTable head={["#", "Bắt Đầu", "Thời Lượng", "GMV", "GMV/Giờ", "Đơn Hàng", "SP Bán", "Views", "CTR", "CTOR"]}>
+                        {topSessions.map((s, idx) => (
+                          <tr key={s.roomId ?? idx} style={{ borderBottom: `1px solid ${PAL.line}`, background: idx % 2 ? `${PAL.panel2}55` : "transparent" }}>
+                            <td className="py-2 px-3 font-mono" style={{ color: PAL.gold }}>
+                              {idx + 1}
+                            </td>
+                            <td className="py-2 px-3 font-mono" style={{ color: PAL.cream }}>
+                              {fmtSessionStart(s.startTime)}
+                            </td>
+                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
+                              {fmtHours(s.hours)}
+                            </td>
+                            <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>
+                              {formatCurrencyAdaptive(s.gmv)}
+                            </td>
+                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
+                              {formatCurrencyAdaptive(s.gmvPerHour)}
+                            </td>
+                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
+                              {fmtInt(s.orders)}
+                            </td>
+                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
+                              {fmtInt(s.itemsSold)}
+                            </td>
+                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
+                              {fmtInt(s.views)}
+                            </td>
+                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
+                              {fmtPct(s.ctr)}
+                            </td>
+                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
+                              {fmtPct(s.ctor)}
+                            </td>
+                          </tr>
+                        ))}
+                        {topSessions.length === 0 && (
+                          <tr>
+                            <td colSpan={10} className="py-6 text-center italic" style={{ color: PAL.muted }}>
+                              Chưa có phiên live nào trong tháng.
+                            </td>
+                          </tr>
+                        )}
+                      </ReportTable>
+                    </Panel>
+        </section>
+
+        {/* ===== 8. Tháng sau ===== */}
+        <section id="mr-next" className="space-y-4 scroll-mt-16">
+          <SectionHead no="8" title="Tháng sau" sub={`Kế hoạch tháng ${nextMonth.slice(5)} lấy từ Kế Hoạch Tháng`} />
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+            <KpiTile label={`Target tháng ${nextMonth.slice(5)}`} value={nextPlan && nextPlan.targetGmv > 0 ? formatCurrencyAdaptive(nextPlan.targetGmv) : "—"} note={nextPlan ? (nextPlan.status === "locked" ? "đã chốt" : "đang lên lịch") : "chưa lập kế hoạch"} />
+            <KpiTile label="Ca kế hoạch" value={nextPlan ? String(nextPlan.slotCount) : "—"} note={nextPlan ? "trong Kế Hoạch Tháng" : ""} />
+          </div>
+          <div className="rounded-xl p-4" style={{ background: PAL.panel, border: `1px solid ${PAL.line}` }}>
+            <div className="text-[10.5px] uppercase tracking-wider mb-2" style={{ color: PAL.muted }}>Việc agency làm tháng sau</div>
+            <ul className="space-y-2 text-[13.5px] leading-relaxed list-disc pl-5" style={{ color: PAL.cream }}>
+              {nextLines.map((l, i) => (
+                <li key={i}>{l}</li>
+              ))}
+            </ul>
+          </div>
+          {agencyNotes.length > 0 && (
+            <div className="rounded-xl p-4 space-y-2" style={{ background: PAL.panel, border: `1px solid ${PAL.line}` }}>
+              <div className="text-[10.5px] uppercase tracking-wider" style={{ color: PAL.muted }}>Ghi chú của agency</div>
+              {agencyNotes.map(([label, text]) => (
+                <p key={label} className="text-[13px] whitespace-pre-line" style={{ color: PAL.cream }}>
+                  <b style={{ color: PAL.gold }}>{label}:</b> {text}
+                </p>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* ===== Phụ lục ===== */}
+        <section id="mr-appendix" className="space-y-4 scroll-mt-16">
+          <SectionHead no="—" title="Phụ lục" sub="Chi tiết creator affiliate (nhập tay)" />
+          {(canManage || affiliateRows.length > 0) && (
+            <div className="space-y-4">
                 <div
                   className="flex items-start gap-2 text-[11px] rounded-xl p-2.5"
                   style={{ background: "#2a2410", border: `1px solid ${PAL.gold}55`, color: PAL.gold }}
@@ -1952,14 +2128,89 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                   </>
                 )}
               </div>
-            )}
-
-            {tab === "deepdive" && canManage && (
-              <MonthlyDeepDive brandId={brandId} sessions={sessions} canManage={canManage} month={month} embedded />
-            )}
-
-            {tab === "plan" && (
-              <div className="space-y-4">
+          )}
+          {canManage && (
+            <details className="rounded-xl" style={{ background: PAL.panel, border: `1px solid ${PAL.line}` }}>
+              <summary className="cursor-pointer px-4 py-3 text-xs font-bold" style={{ color: PAL.gold }}>
+                Công cụ nhập liệu (chỉ ops, brand không thấy) — khung camp, kế hoạch phân bổ &amp; affiliate tháng sau
+              </summary>
+              <div className="p-4 space-y-4">
+                <Panel title="Khung camp tháng này" icon={<Flame className="w-4 h-4" />} sub="Ghi đè khoảng ngày D-Day / Mid-Month / Pay-Day + target từng khung cho phần 7">
+                  {canManage && (
+                        <div className="mb-4 space-y-2.5 pb-4" style={{ borderBottom: `1px solid ${PAL.line}` }}>
+                          {(
+                            [
+                              ["D-Day", campDdayStartInput, setCampDdayStartInput, campDdayEndInput, setCampDdayEndInput, campDdayTargetInput, setCampDdayTargetInput],
+                              [
+                                "Mid-Month",
+                                campMidmonthStartInput,
+                                setCampMidmonthStartInput,
+                                campMidmonthEndInput,
+                                setCampMidmonthEndInput,
+                                campMidmonthTargetInput,
+                                setCampMidmonthTargetInput
+                              ],
+                              [
+                                "Pay-Day",
+                                campPaydayStartInput,
+                                setCampPaydayStartInput,
+                                campPaydayEndInput,
+                                setCampPaydayEndInput,
+                                campPaydayTargetInput,
+                                setCampPaydayTargetInput
+                              ]
+                            ] as [string, string, (v: string) => void, string, (v: string) => void, string, (v: string) => void][]
+                          ).map(([label, startVal, setStart, endVal, setEnd, targetVal, setTarget]) => (
+                            <div key={label} className="grid grid-cols-2 sm:grid-cols-4 gap-2 items-center">
+                              <span className="text-xs font-bold" style={{ color: PAL.cream }}>
+                                {label}
+                              </span>
+                              <input
+                                type="date"
+                                value={startVal}
+                                onChange={(e) => setStart(e.target.value)}
+                                className="px-2.5 py-1.5 rounded-lg text-xs font-mono"
+                                style={{ background: PAL.panel2, border: `1px solid ${PAL.line}`, color: PAL.cream }}
+                              />
+                              <input
+                                type="date"
+                                value={endVal}
+                                onChange={(e) => setEnd(e.target.value)}
+                                className="px-2.5 py-1.5 rounded-lg text-xs font-mono"
+                                style={{ background: PAL.panel2, border: `1px solid ${PAL.line}`, color: PAL.cream }}
+                              />
+                              <input
+                                type="number"
+                                value={targetVal}
+                                onChange={(e) => setTarget(e.target.value)}
+                                placeholder="Target GMV"
+                                className="px-2.5 py-1.5 rounded-lg text-xs font-mono"
+                                style={{ background: PAL.panel2, border: `1px solid ${PAL.line}`, color: PAL.cream }}
+                              />
+                            </div>
+                          ))}
+                          <div className="flex items-center gap-2 pt-1">
+                            <button
+                              onClick={handleSaveCampConfig}
+                              disabled={campSaving}
+                              className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold"
+                              style={{ background: PAL.gold, color: "#1a1500" }}
+                            >
+                              {campSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} Lưu Khung Camp
+                            </button>
+                            {campErrorMsg && (
+                              <span className="text-xs font-semibold" style={{ color: PAL.red }}>
+                                {campErrorMsg}
+                              </span>
+                            )}
+                            <span className="text-[10.5px] italic" style={{ color: PAL.muted }}>
+                              Để trống thì dùng khung mặc định (Mid-Month 13-15, Pay-Day 23-25, D-Day theo ngày trùng lặp gần nhất). Đã nhập camp nào thì camp đó chỉ tính đúng khoảng nhập — khung mặc định của camp đó không còn áp dụng.
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                </Panel>
+                <div className="space-y-4">
                 <div
                   className="flex items-start gap-2 text-[11px] rounded-xl p-2.5"
                   style={{ background: "#2a2410", border: `1px solid ${PAL.gold}55`, color: PAL.gold }}
@@ -2208,9 +2459,22 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                   </>
                 )}
               </div>
-            )}
-          </>
-        )}
+              </div>
+            </details>
+          )}
+          {canManage && (
+            <div className="rounded-xl" style={{ background: PAL.panel, border: `1px solid ${PAL.line}` }}>
+              <button onClick={() => setShowDeepDive((v) => !v)} className="w-full text-left px-4 py-3 text-xs font-bold" style={{ color: PAL.gold }}>
+                {showDeepDive ? "▾" : "▸"} Phân tích sâu (nội bộ ops) — tải thêm Dữ Liệu Gốc khi mở
+              </button>
+              {showDeepDive && (
+                <div className="p-4 pt-0">
+                  <MonthlyDeepDive brandId={brandId} sessions={liveSessions} canManage={canManage} month={month} embedded />
+                </div>
+              )}
+            </div>
+          )}
+        </section>
       </div>
     </div>
   );
