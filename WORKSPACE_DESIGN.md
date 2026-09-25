@@ -2,6 +2,10 @@
 
 ## CẦN LÀM NGAY khi mở phiên mới (cập nhật 2026-09-24)
 
+> **MỚI 2026-09-26 — Report Tháng thêm 4 góc nhìn lấy từ deck report tháng 8 của Crocs** (UPT/giỏ hàng, LIVE CTR,
+> camp so camp tháng trước + target từ Kế Hoạch Tháng, phân bổ tháng sau theo camp). Không migration, không đổi bản
+> chụp. Xem mục `### Bổ sung 2026-09-26 — góc nhìn từ deck Crocs` trong `## Report Tháng 8 phần`.
+
 > **MỚI 2026-09-25 (tối) — Report Tháng làm lại thành 1 trang cuộn 8 phần** (Tóm tắt → Mục tiêu → Toàn shop &
 > kênh → Vì sao → Người → Hàng → Bối cảnh → Tháng sau + Phụ lục). Migration **0120 đã chạy** (đoạn tóm tắt ops sửa được)
 > — xem mục `## Report Tháng 8 phần`. Bản chụp số liệu lên **v2** (thêm tổng shop theo ngày + GMV thẻ SP 4 tháng).
@@ -1404,6 +1408,48 @@ Sau khi chạy 0120: sửa tóm tắt → Lưu → DB có `summary_text`/`summar
 tự sinh" → 3 cột về null, report hiện lại bản tự sinh. Việc lưu này đã TẠO dòng `brand_monthly_reports` CROCS 09/2026
 (draft, mọi cột nhập tay trống) — vô hại, lúc phát hành cũng sẽ tạo. **Chưa verify:** góc nhìn brand trên browser;
 nhánh có target chốt; "Cập nhật & phát hành lại".
+
+### Bổ sung 2026-09-26 — góc nhìn từ deck Crocs (không migration)
+
+User đưa deck report tháng 8 do team Crocs tự làm (PPTX 22 slide), hỏi có gì nên thêm. Đối chiếu số trước: số của app
+khớp deck (Seller Live T8 5,885 vs 5,899 tỷ; 228,6h = 228,6h; views/impressions/CTR/CTOR khớp; D-Day 1,172 vs 1,17 tỷ)
+⇒ mọi góc nhìn dưới đây tính từ dữ liệu sẵn có. User bảo "làm đi" với 4 mục đề xuất ưu tiên:
+
+1. **Góc đơn hàng** — `basketBreakdown` (GMV = số đơn × SP/đơn × GMV/SP, cùng cách chia tỷ trọng log với
+   `driverBreakdown`, tách chung qua `logShareBreakdown`). Phần 4 giờ có 2 waterfall cạnh nhau (traffic + đơn hàng,
+   component `WaterfallPanel`, nhãn trục ngắn `DRIVER_SHORT`). **Bẫy đã tránh**: CROCS T7→T8 phần lớn nhất trong 3 phần
+   là GMV/SP (+1,19 tỷ) nhưng UPT (−1,03 tỷ) gần như triệt tiêu nó — deck Crocs đọc thành "GMV tăng nhờ giá". Câu tự
+   sinh (`basketLine`) vì vậy GỘP UPT + GMV/SP thành giá trị đơn rồi so với số đơn (+10% / +539tr vs AOV +3% / +160tr),
+   chỉ nêu UPT/giá khi lệch ≥10% và ngược chiều. Đừng đổi về "chọn thừa số lớn nhất".
+2. **UPT, GMV/SP, LIVE CTR** vào `LiveStats` (`upt` = items/orders, `pricePerItem` = GMV/items, `liveCtr` = click SP /
+   lượt xem — đúng cột "LIVE CTR" TikTok, deck T8 56,24% = app 56,28%). **Lưu ý**: `CreatorLivePerfAgg.liveCtr` và
+   `sessionToLivePerfRow().liveCtr` là views/impressions (~2%) — KHÁC nghĩa, chưa đổi vì còn chỗ khác đọc. 8 ô xu hướng
+   (GMV/SP trung tính: `goodWhenUp: null`), bảng MoM + sheet Excel thêm các dòng này, `trendSignal` thêm UPT + LIVE CTR.
+   Số thật: UPT CROCS 1,76 → 1,43 → 1,18 → 1,06 (T6–T9) ⇒ tóm tắt T9 tự báo + việc tháng sau gợi ý combo/ngưỡng đơn.
+3. **Camp so camp tháng trước** (phần 7) — `campCompare`: mỗi tháng phân loại ngày theo khoảng camp CỦA CHÍNH THÁNG ĐÓ
+   (trước đây `prevCampBuckets` dùng khoảng tháng này cho tháng trước ⇒ ngày camp tháng trước rơi vào "ngày thường"
+   khi khung đã bị ghi đè — đã sửa luôn). Cửa sổ = cùng kỳ `cmp` (không thì dòng ngày thường T9 tới 22/09 so trọn T8 ra
+   −38% giả; cùng kỳ −22,7%). Thực đạt giờ tính TỪ CA (trước: file Live Performance Core Stats, lệch ~15%, không so
+   được với tháng trước) — bỏ `sumDailyGmvByBucket` khỏi report. Target khung: Kế Hoạch Tháng **đã chốt** của tháng
+   (`planCampAllocation` cộng target ca theo khung) → không có thì target nhập tay ở report. Khoảng camp: nhập ở report
+   → `campRanges` của Kế Hoạch Tháng → lịch cố định (từng khung).
+4. **Phân bổ tháng sau theo khung** (phần 8) — từ ca Kế Hoạch Tháng sau: % target, target, số ca, giờ, GMV/giờ cần, đặt
+   cạnh GMV/giờ thực đạt cùng khung tháng này + cột "Cần tăng" (đỏ > 10%). CROCS T10 (nháp): 4 khung cộng 5,5 tỷ;
+   ngày thường cần 24,2tr/giờ vs T9 17,9tr/giờ (+35%).
+
+Kế Hoạch Tháng 3 tháng (trước/này/sau) đọc thẳng bằng `fetchMonthPlan` lúc mở report (như phần 8 vẫn làm), KHÔNG vào
+bản chụp. Code: [monthlyReportInsights.ts](src/lib/report/monthlyReportInsights.ts), [MonthlyReportTabs.tsx](src/components/brand-workspace/MonthlyReportTabs.tsx).
+
+**Verify:** tsc 0 lỗi, eslint không thêm cảnh báo (2 cảnh báo cũ), vitest 77/77 (4 test mới: tách giỏ hàng bằng số
+CROCS T7/T8 + câu tự sinh không được kết luận "nhờ GMV/SP", UPT 4 tháng, camp dùng khoảng của chính tháng, phân bổ
+kế hoạch có ca qua đêm), vite build; SSR bản chụp T8 + T9 thật; browser (admin) CROCS T9: phần 4/7/8 đúng số, console
+không lỗi mới. **Chưa verify trên data thật:** target khung từ kế hoạch ĐÃ CHỐT (DB chỉ có 1 kế hoạch — CROCS T10 nháp;
+chỉ unit test phủ); góc nhìn brand.
+
+**Chưa làm từ deck Crocs (đã nêu với user):** host tách ngày thường/camp (số per-host của deck lệch app — Hùng ngày
+thường deck 727tr/16h vs app 1,1 tỷ/31h, cần hỏi Crocs cách chia ca 2 host); Top SKU có hạng tháng trước + phễu từng SKU
+(file Sản Phẩm có cột "(LIVE)" impressions/clicks/CTR/thêm giỏ, cần mở rộng `productAgg` + tăng `PRODUCT_AGG_VERSION`);
+ô "Insight" cuối mỗi phần; KPI cả shop do brand đặt (deck: 8,4 tỷ) tách khỏi target live — cần trường mới.
 
 ## Bản chụp số liệu Report Tháng — XONG + VERIFY 2026-09-25 (migration 0119 ĐÃ CHẠY)
 

@@ -14,7 +14,8 @@ import {
   CartesianGrid,
   Cell,
   PieChart,
-  Pie
+  Pie,
+  Legend
 } from "recharts";
 import {
   BarChart3,
@@ -43,19 +44,27 @@ import { hydrateSnapshotSessions, MonthlyReportSnapshot, reportWindow, snapshotV
 import {
   autoNextSteps,
   autoSummary,
+  basketBreakdown,
+  campCompare,
   channelMix,
   compareWindow,
   DRIVER_LABEL,
   driverBreakdown,
+  DriverBreakdown,
+  DriverKey,
+  LIVE_CTR_LABEL,
   liveStatsFromRows,
   LiveStats,
   NarrativeInput,
   pctChange,
+  planCampAllocation,
   shopTotals,
-  trendSignal
+  trendSignal,
+  UPT_LABEL
 } from "../../lib/report/monthlyReportInsights";
 import { CreatorLivePerfRow, vnDateOf } from "../../lib/dataraw/creatorLivePerfSlice";
 import { fetchMonthPlan } from "../../lib/db/monthPlans";
+import type { BrandMonthPlan, BrandMonthPlanSlot } from "../../types";
 import { fetchMonthlyReport, upsertMonthlyReport, MonthlyReportManualInput, saveMonthlyReportNarrative } from "../../lib/db/monthlyReports";
 import { fetchAffiliatePlans, replaceAffiliatePlans } from "../../lib/db/affiliatePlans";
 import { fetchAffiliateActuals, replaceAffiliateActuals } from "../../lib/db/affiliateActuals";
@@ -65,7 +74,6 @@ import { byHost, dataQuality, filterSessions, hostKey, splitUnassignedHost, Data
 import {
   aggregateCreatorLivePerfRows,
   bucketByCampaignDay,
-  sumDailyGmvByBucket,
   buildFunnel,
   topSessionsByGmv,
   CAMP_DAY_BUCKET_ORDER,
@@ -262,13 +270,86 @@ const CHANNELS: { key: "liveLinked" | "affiliate" | "video" | "card"; label: str
   { key: "card", label: "Thẻ sản phẩm", color: "#c98500" }
 ];
 
-const FUNNEL_TILES: { key: string; label: string; get: (s: LiveStats) => number | null; format: (v: number) => string; goodWhenUp: boolean }[] = [
+const FUNNEL_TILES: { key: string; label: string; get: (s: LiveStats) => number | null; format: (v: number) => string; goodWhenUp: boolean | null }[] = [
   { key: "vph", label: "Lượt xem / giờ", get: (s) => s.viewsPerHour, format: (v) => fmtInt(v), goodWhenUp: true },
+  { key: "livectr", label: "LIVE CTR (click SP / lượt xem)", get: (s) => s.liveCtr, format: (v) => fmtPct(v), goodWhenUp: true },
   { key: "ctr", label: "CTR sản phẩm", get: (s) => s.ctr, format: (v) => fmtPct(v), goodWhenUp: true },
   { key: "ctor", label: "CTOR (click → đơn)", get: (s) => s.ctor, format: (v) => fmtPct(v), goodWhenUp: true },
   { key: "gpv", label: "GMV / lượt xem", get: (s) => s.gmvPerView, format: (v) => `${fmtInt(v)} đ`, goodWhenUp: true },
-  { key: "aov", label: "Giá trị đơn (AOV)", get: (s) => s.aov, format: (v) => `${fmtInt(v / 1000)}k đ`, goodWhenUp: true }
+  { key: "aov", label: "Giá trị đơn (AOV)", get: (s) => s.aov, format: (v) => `${fmtInt(v / 1000)}k đ`, goodWhenUp: true },
+  { key: "upt", label: "Sản phẩm mỗi đơn (UPT)", get: (s) => s.upt, format: (v) => v.toFixed(2), goodWhenUp: true },
+  // Đọc cùng UPT: UPT giảm thì GMV/SP tự tăng dù giá bán không đổi ⇒ trung tính, không tô xanh/đỏ.
+  { key: "ppi", label: "GMV mỗi sản phẩm", get: (s) => s.pricePerItem, format: (v) => `${fmtInt(v / 1000)}k đ`, goodWhenUp: null }
 ];
+
+interface WaterfallPoint {
+  label: string;
+  base: number;
+  value: number;
+  kind: "total" | "up" | "down";
+  display: number;
+}
+
+// Nhãn trục ngắn — 2 biểu đồ đứng cạnh nhau, nhãn đầy đủ (DRIVER_LABEL) dính vào nhau. Nhãn đầy đủ vẫn ở
+// các ô chú thích bên dưới biểu đồ.
+const DRIVER_SHORT: Record<DriverKey, string> = {
+  hours: "Giờ live",
+  viewsPerHour: "Xem/giờ",
+  gmvPerView: "GMV/lượt xem",
+  orders: "Số đơn",
+  upt: "SP/đơn",
+  pricePerItem: "GMV/SP"
+};
+
+function toWaterfall(b: DriverBreakdown | null, cmp: { partial: boolean; prevEnd: string; curEnd: string }, month: string, prevMonth: string): WaterfallPoint[] {
+  if (!b) return [];
+  const out: WaterfallPoint[] = [];
+  out.push({ label: cmp.partial ? `1–${Number(cmp.prevEnd.slice(8))}/${prevMonth.slice(5)}` : `Tháng ${prevMonth.slice(5)}`, base: 0, value: b.from, kind: "total", display: b.from });
+  let run = b.from;
+  for (const p of b.parts) {
+    const next = run + p.value;
+    out.push({ label: DRIVER_SHORT[p.key], base: Math.min(run, next), value: Math.abs(p.value), kind: p.value >= 0 ? "up" : "down", display: p.value });
+    run = next;
+  }
+  out.push({ label: cmp.partial ? `1–${Number(cmp.curEnd.slice(8))}/${month.slice(5)}` : `Tháng ${month.slice(5)}`, base: 0, value: b.to, kind: "total", display: b.to });
+  return out;
+}
+
+const WaterfallPanel: React.FC<{ title: string; sub: string; data: WaterfallPoint[]; breakdown: DriverBreakdown; note?: string }> = ({ title, sub, data, breakdown, note }) => (
+  <Panel title={title} icon={<BarChart3 className="w-4 h-4" />} sub={sub}>
+    <div style={{ height: 240 }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} margin={{ top: 18, right: 8 }}>
+          <CartesianGrid stroke={PAL.line} vertical={false} />
+          <XAxis dataKey="label" stroke={PAL.muted} fontSize={10.5} interval={0} />
+          <YAxis stroke={PAL.muted} fontSize={10} tickFormatter={(v) => formatCurrencyAdaptive(v)} width={70} />
+          <Tooltip contentStyle={chartTooltipStyle} formatter={(_v, _n, item) => formatCurrencyAdaptive(chartNum((item as { payload?: { display?: number } }).payload?.display))} />
+          <Bar dataKey="base" stackId="w" fill="transparent" isAnimationActive={false} legendType="none" tooltipType="none" />
+          <Bar dataKey="value" stackId="w" radius={[4, 4, 0, 0]} name="GMV">
+            {data.map((d, i) => (
+              <Cell key={i} fill={d.kind === "total" ? PAL.gold : d.kind === "up" ? PAL.green : PAL.red} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
+      {breakdown.parts.map((p) => (
+        <div key={p.key} className="text-[11.5px] rounded-lg px-3 py-2" style={{ background: PAL.panel2, color: PAL.muted }}>
+          <span style={{ color: PAL.cream }}>{DRIVER_LABEL[p.key]}</span> {p.change >= 0 ? "+" : "−"}{Math.abs(p.change).toFixed(1)}% ⇒{" "}
+          <span className="font-mono" style={{ color: p.value >= 0 ? PAL.green : PAL.red }}>
+            {p.value >= 0 ? "+" : "−"}{formatCurrencyAdaptive(Math.abs(p.value))}
+          </span>
+        </div>
+      ))}
+    </div>
+    {note && (
+      <p className="text-[11px] mt-2" style={{ color: PAL.muted }}>
+        {note}
+      </p>
+    )}
+  </Panel>
+);
 
 const SectionHead: React.FC<{ no: string; title: string; sub?: string }> = ({ no, title, sub }) => (
   <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 pb-2" style={{ borderBottom: `1px solid ${PAL.line}` }}>
@@ -319,10 +400,11 @@ const ChartLegend: React.FC<{ items: [string, string][] }> = ({ items }) => (
 );
 
 // Ô xu hướng 4 tháng: số tháng report + đường nhỏ (1 chuỗi, 1 trục), điểm cuối tô theo chiều tốt/xấu.
-const TrendTile: React.FC<{ label: string; points: { label: string; value: number | null }[]; format: (v: number) => string; goodWhenUp: boolean }> = ({ label, points, format, goodWhenUp }) => {
+// goodWhenUp null = chỉ số trung tính (vd GMV/SP — tăng có thể chỉ vì mỗi đơn ít SP hơn): chấm cuối màu vàng.
+const TrendTile: React.FC<{ label: string; points: { label: string; value: number | null }[]; format: (v: number) => string; goodWhenUp: boolean | null }> = ({ label, points, format, goodWhenUp }) => {
   const last = points[points.length - 1]?.value ?? null;
   const prev = points[points.length - 2]?.value ?? null;
-  const bad = last != null && prev != null && (goodWhenUp ? last < prev : last > prev);
+  const bad = goodWhenUp != null && last != null && prev != null && (goodWhenUp ? last < prev : last > prev);
   return (
     <div className="rounded-xl p-3" style={{ background: PAL.panel2, border: `1px solid ${PAL.line}` }}>
       <div className="text-[10.5px] uppercase tracking-wider" style={{ color: PAL.muted }}>
@@ -344,7 +426,7 @@ const TrendTile: React.FC<{ label: string; points: { label: string; value: numbe
               isAnimationActive={false}
               dot={(p: { cx?: number; cy?: number; index?: number }) =>
                 p.index === points.length - 1 ? (
-                  <circle key="end" cx={p.cx} cy={p.cy} r={3.5} fill={bad ? PAL.red : PAL.green} stroke={PAL.panel2} strokeWidth={2} />
+                  <circle key="end" cx={p.cx} cy={p.cy} r={3.5} fill={goodWhenUp == null ? PAL.gold : bad ? PAL.red : PAL.green} stroke={PAL.panel2} strokeWidth={2} />
                 ) : (
                   <g key={p.index} />
                 )
@@ -509,22 +591,40 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   const currentAgg = useMemo(() => aggregateCreatorLivePerfRows(liveCurrent?.rows ?? []), [liveCurrent]);
   const prevAgg = useMemo(() => aggregateCreatorLivePerfRows(livePrev?.rows ?? []), [livePrev]);
 
-  // Khung camp D-Day/Mid-Month/Pay-Day: override theo brand+tháng nếu đã cấu hình (migration 0071),
-  // fallback về khung cố định mặc định (lib/campaignDays.ts) khi chưa cấu hình.
+  // Kế Hoạch Tháng của tháng trước / tháng này / tháng sau — nguồn khoảng ngày camp + target từng khung
+  // (tháng này) và phân bổ tháng sau (phần 8). Bảng nhỏ (≤ ~100 ca/tháng), đọc thẳng như phần 8 vẫn làm
+  // từ trước, không đưa vào bản chụp.
+  const [plans, setPlans] = useState<Record<string, { plan: BrandMonthPlan; slots: BrandMonthPlanSlot[] } | null>>({});
+  const nextMonth = useMemo(() => nextMonthStrLocal(month), [month]);
+  useEffect(() => {
+    let cancelled = false;
+    const ms = [prevMonth, month, nextMonth];
+    Promise.all(ms.map((m) => fetchMonthPlan(brandId, m).catch(() => null))).then((rs) => {
+      if (!cancelled) setPlans(Object.fromEntries(ms.map((m, i) => [m, rs[i]])));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [brandId, prevMonth, month, nextMonth]);
+  const planCur = plans[month] ?? null;
+  const nextPlanFull = plans[nextMonth] ?? null;
+
+  // Khung camp D-Day/Mid-Month/Pay-Day, từng khung: khoảng nhập ở report (migration 0071) → khoảng của
+  // Kế Hoạch Tháng (0094) → lịch camp cố định (lib/campaignDays.ts).
   const campOverrides: CampOverrides = useMemo(() => {
-    const out: CampOverrides = {};
+    const out: CampOverrides = { ...(planCur?.plan.campRanges ?? {}) };
     if (monthlyReportRow?.campDdayStart && monthlyReportRow?.campDdayEnd) out.dday = { start: monthlyReportRow.campDdayStart, end: monthlyReportRow.campDdayEnd };
     if (monthlyReportRow?.campMidmonthStart && monthlyReportRow?.campMidmonthEnd)
       out.midmonth = { start: monthlyReportRow.campMidmonthStart, end: monthlyReportRow.campMidmonthEnd };
     if (monthlyReportRow?.campPaydayStart && monthlyReportRow?.campPaydayEnd) out.payday = { start: monthlyReportRow.campPaydayStart, end: monthlyReportRow.campPaydayEnd };
     return out;
-  }, [monthlyReportRow]);
+  }, [monthlyReportRow, planCur]);
+  // Tháng trước phân loại theo khoảng camp của CHÍNH tháng trước — đem khoảng của tháng này áp vào thì
+  // ngày camp tháng trước (vd D-Day 8/8) bị tính thành ngày thường vì khung đó đã bị ghi đè.
+  const prevCampOverrides: CampOverrides = useMemo(() => ({ ...(plans[prevMonth]?.plan.campRanges ?? {}) }), [plans, prevMonth]);
 
   const campBuckets = useMemo(() => bucketByCampaignDay(liveCurrent?.rows ?? [], campOverrides), [liveCurrent, campOverrides]);
-  const prevCampBuckets = useMemo(() => bucketByCampaignDay(livePrev?.rows ?? [], campOverrides), [livePrev, campOverrides]);
-  // Actual GMV theo khung camp cho chart Target vs Actual — SUM(gmv_live_session) từ File 1 đúng
-  // công thức brief (khác campBuckets ở trên vốn dùng File 3 cho bảng chi tiết giờ/CTR/CTOR).
-  const dailyGmvByBucket = useMemo(() => sumDailyGmvByBucket(dailyPerf?.daily ?? [], campOverrides), [dailyPerf, campOverrides]);
+  const prevCampBuckets = useMemo(() => bucketByCampaignDay(livePrev?.rows ?? [], prevCampOverrides), [livePrev, prevCampOverrides]);
   const funnelStages = useMemo(() => buildFunnel(liveCurrent?.rows ?? []), [liveCurrent]);
   const topSessions = useMemo(() => topSessionsByGmv(liveCurrent?.rows ?? [], 10), [liveCurrent]);
 
@@ -566,8 +666,6 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
       isFallback: false
     };
   }, [campBuckets, prevCampBuckets]);
-
-  const nextMonth = useMemo(() => nextMonthStrLocal(month), [month]);
 
   useEffect(() => {
     let cancelled = false;
@@ -902,38 +1000,44 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     [dailyPerf]
   );
 
-  // Bảng "Chi Tiết Theo Khung Camp" (brief Module 2) — Target loại B (nhập tay) + Actual từ File 1
-  // (dailyGmvByBucket) + giờ live/GMV per giờ/CTR/CTOR từ File 3 (campBuckets, đã dùng xuyên suốt
-  // Tab 02). Daily không có Target riêng (brief chỉ định Target cho 3 khung D-Day/Mid-Month/Pay-Day).
-  const campTargetByBucket: Record<CampDayBucket, number | null> = {
-    dday: monthlyReportRow?.campDdayTargetGmv ?? null,
-    midmonth: monthlyReportRow?.campMidmonthTargetGmv ?? null,
-    payday: monthlyReportRow?.campPaydayTargetGmv ?? null,
-    daily: null
-  };
-  const campDetailRows = useMemo(
-    () =>
-      CAMP_DAY_BUCKET_ORDER.map((b) => {
-        const agg = aggregateCreatorLivePerfRows(campBuckets[b]);
-        return {
-          key: b,
-          label: CAMP_DAY_BUCKET_LABEL[b],
-          target: campTargetByBucket[b],
-          actual: dailyGmvByBucket[b],
-          hours: agg.hours,
-          gmvPerHour: agg.gmvPerHour,
-          ctr: agg.ctr,
-          ctor: agg.ctor
-        };
-      }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [campBuckets, dailyGmvByBucket, monthlyReportRow]
-  );
+  // So cùng số ngày: tháng report chưa có số tới ngày cuối thì so 1..N với 1..N tháng trước — so với
+  // trọn tháng trước từng ra −40% cho T9 CROCS trong khi cùng kỳ chỉ −18%.
+  const cmp = useMemo(() => compareWindow(month, snapshot.coverage.sessionsThrough), [month, snapshot]);
+  // Bảng khung camp — MỖI khung so với CHÍNH khung đó tháng trước (deck report Crocs T8 làm tay từng
+  // camp). Thực đạt tính từ ca (cùng nguồn phần 1–4; D-Day CROCS T8 1,172 tỷ khớp deck 1,17 tỷ), không từ
+  // file Live Performance Core Stats như trước — hai nguồn lệch nhau ~15% nên không đặt cạnh nhau được.
+  // Target: Kế Hoạch Tháng ĐÃ CHỐT (cộng target ca theo khung) → không có thì target nhập tay ở report.
+  const planCampTargets = useMemo(() => {
+    if (!planCur || planCur.plan.status !== "locked" || planCur.slots.length === 0) return null;
+    return Object.fromEntries(planCampAllocation(planCur.slots, campOverrides).map((a) => [a.key, a.target > 0 ? a.target : null])) as Record<CampDayBucket, number | null>;
+  }, [planCur, campOverrides]);
+  const campTargetSource = planCampTargets ? "Kế Hoạch Tháng đã chốt" : "nhập tay ở report";
+  const prevColLabel = cmp.partial ? `1–${Number(cmp.prevEnd.slice(8))}/${prevMonth.slice(5)}` : `Tháng ${prevMonth.slice(5)}`;
+  const curColLabel = cmp.partial ? `1–${Number(cmp.curEnd.slice(8))}/${month.slice(5)}` : `Tháng ${month.slice(5)}`;
+  const campDetailRows = useMemo(() => {
+    const targets: Record<CampDayBucket, number | null> = planCampTargets ?? {
+      dday: monthlyReportRow?.campDdayTargetGmv ?? null,
+      midmonth: monthlyReportRow?.campMidmonthTargetGmv ?? null,
+      payday: monthlyReportRow?.campPaydayTargetGmv ?? null,
+      daily: null
+    };
+    // Cùng kỳ như phần 1–4: tháng chưa hết thì tháng trước cũng cắt ở cùng ngày — không thì dòng ngày
+    // thường của T9 (tới 22/09) bị so với trọn T8 và ra −38% giả.
+    return campCompare(liveCurrent?.rows ?? [], { start: cmp.curStart, end: cmp.curEnd, overrides: campOverrides }, livePrev?.rows ?? [], { start: cmp.prevStart, end: cmp.prevEnd, overrides: prevCampOverrides }, targets).map((r) => ({
+      ...r,
+      label: CAMP_DAY_BUCKET_LABEL[r.key],
+      actual: r.cur.gmv,
+      hours: r.cur.hours,
+      gmvPerHour: r.cur.gmvPerHour,
+      ctr: r.cur.ctr,
+      ctor: r.cur.ctor
+    }));
+  }, [liveCurrent, livePrev, cmp, campOverrides, prevCampOverrides, planCampTargets, monthlyReportRow]);
   const campTargetVsActualData = useMemo(
     () =>
       campDetailRows
         .filter((r) => r.key !== "daily")
-        .map((r) => ({ label: CAMP_DAY_BUCKET_LABEL[r.key].split(" ")[0], target: r.target ?? 0, actual: r.actual })),
+        .map((r) => ({ label: CAMP_DAY_BUCKET_LABEL[r.key].split(" ")[0], target: r.target ?? 0, actual: r.actual, prev: r.prev.gmv })),
     [campDetailRows]
   );
 
@@ -941,9 +1045,6 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   // ============================ Bố cục 8 phần (2026-09-25) ============================
   // Mọi phép tính mới nằm ở lib/report/monthlyReportInsights.ts (thuần, có test). Ở đây chỉ nối dây.
 
-  // So cùng số ngày: tháng report chưa có số tới ngày cuối thì so 1..N với 1..N tháng trước — so với
-  // trọn tháng trước từng ra −40% cho T9 CROCS trong khi cùng kỳ chỉ −18%.
-  const cmp = useMemo(() => compareWindow(month, snapshot.coverage.sessionsThrough), [month, snapshot]);
   const liveCurStats = useMemo(() => liveStatsFromRows(liveCurrent?.rows ?? [], cmp.curStart, cmp.curEnd), [liveCurrent, cmp]);
   const livePrevStats = useMemo(() => liveStatsFromRows(livePrev?.rows ?? [], cmp.prevStart, cmp.prevEnd), [livePrev, cmp]);
   const prevAggWindow = useMemo(
@@ -951,6 +1052,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     [livePrev, cmp]
   );
   const drivers = useMemo(() => driverBreakdown(livePrevStats, liveCurStats), [livePrevStats, liveCurStats]);
+  const basket = useMemo(() => basketBreakdown(livePrevStats, liveCurStats), [livePrevStats, liveCurStats]);
 
   // 4 tháng (tháng report tính tới ngày có số) — cho ô xu hướng phễu + dấu hiệu "N tháng liên tiếp".
   const monthlyStats = useMemo(
@@ -969,7 +1071,9 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
       trendSignal("CTOR", monthlyStats.map((x) => x.stats.ctor)),
       trendSignal("CTR", monthlyStats.map((x) => x.stats.ctr)),
       trendSignal("Lượt xem mỗi giờ", monthlyStats.map((x) => x.stats.viewsPerHour)),
-      trendSignal("AOV", monthlyStats.map((x) => x.stats.aov))
+      trendSignal("AOV", monthlyStats.map((x) => x.stats.aov)),
+      trendSignal(UPT_LABEL, monthlyStats.map((x) => x.stats.upt)),
+      trendSignal(LIVE_CTR_LABEL, monthlyStats.map((x) => x.stats.liveCtr))
     ].filter((x): x is NonNullable<typeof x> => x !== null);
   }, [monthlyStats]);
 
@@ -1029,19 +1133,8 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   }, [liveCurrent, livePrev, month, prevMonth, cmp, prevEnd]);
 
   // Waterfall "vì sao": cột nền trong suốt + cột giá trị (recharts không có waterfall sẵn).
-  const waterfallData = useMemo(() => {
-    if (!drivers) return [];
-    const out: { label: string; base: number; value: number; kind: "total" | "up" | "down"; display: number }[] = [];
-    out.push({ label: cmp.partial ? `1–${Number(cmp.prevEnd.slice(8))}/${prevMonth.slice(5)}` : `Tháng ${prevMonth.slice(5)}`, base: 0, value: drivers.from, kind: "total", display: drivers.from });
-    let run = drivers.from;
-    for (const p of drivers.parts) {
-      const next = run + p.value;
-      out.push({ label: DRIVER_LABEL[p.key], base: Math.min(run, next), value: Math.abs(p.value), kind: p.value >= 0 ? "up" : "down", display: p.value });
-      run = next;
-    }
-    out.push({ label: cmp.partial ? `1–${Number(cmp.curEnd.slice(8))}/${month.slice(5)}` : `Tháng ${month.slice(5)}`, base: 0, value: drivers.to, kind: "total", display: drivers.to });
-    return out;
-  }, [drivers, cmp, month, prevMonth]);
+  const waterfallData = useMemo(() => toWaterfall(drivers, cmp, month, prevMonth), [drivers, cmp, month, prevMonth]);
+  const basketWaterfall = useMemo(() => toWaterfall(basket, cmp, month, prevMonth), [basket, cmp, month, prevMonth]);
 
   // Khung giờ bắt đầu ca — GMV/giờ, cùng kỳ 2 tháng (phần 7 "Bối cảnh").
   const slotRows = useMemo(() => {
@@ -1070,16 +1163,13 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   }, [liveCurrent, livePrev, cmp]);
 
   // Phần 8 — kế hoạch tháng sau lấy từ Kế Hoạch Tháng (nguồn duy nhất của target/lịch tháng sau).
-  const [nextPlan, setNextPlan] = useState<{ targetGmv: number; status: "draft" | "locked"; slotCount: number } | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    fetchMonthPlan(brandId, nextMonth)
-      .then((r) => !cancelled && setNextPlan(r ? { targetGmv: r.plan.targetGmv, status: r.plan.status, slotCount: r.slots.length } : null))
-      .catch(() => !cancelled && setNextPlan(null));
-    return () => {
-      cancelled = true;
-    };
-  }, [brandId, nextMonth]);
+  const nextPlan = nextPlanFull ? { targetGmv: nextPlanFull.plan.targetGmv, status: nextPlanFull.plan.status, slotCount: nextPlanFull.slots.length } : null;
+  // Phân bổ tháng sau theo khung camp (% · target · giờ · GMV/giờ cần), đặt cạnh GMV/giờ thực đạt cùng
+  // khung tháng này — thấy ngay khung nào đang đặt target cao hơn sức bán hiện tại.
+  const nextAllocation = useMemo(
+    () => (nextPlanFull && nextPlanFull.slots.length > 0 ? planCampAllocation(nextPlanFull.slots, nextPlanFull.plan.campRanges) : null),
+    [nextPlanFull]
+  );
 
   const campBest = useMemo(() => {
     const camps = campDetailRows.filter((r) => r.key !== "daily" && r.gmvPerHour != null && r.hours > 0).sort((a, b) => (b.gmvPerHour ?? 0) - (a.gmvPerHour ?? 0));
@@ -1095,6 +1185,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     liveCur: liveCurStats,
     livePrev: livePrevStats,
     drivers,
+    basket,
     signals,
     targetGmv: kpiTargetGmvCur,
     campBest,
@@ -1173,6 +1264,11 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             { "Chỉ Số": "Lượt xem/giờ", "Kỳ trước": n(livePrevStats.viewsPerHour), "Kỳ này": n(liveCurStats.viewsPerHour) },
             { "Chỉ Số": "CTR (%)", "Kỳ trước": n(livePrevStats.ctr), "Kỳ này": n(liveCurStats.ctr) },
             { "Chỉ Số": "CTOR (%)", "Kỳ trước": n(livePrevStats.ctor), "Kỳ này": n(liveCurStats.ctor) },
+            { "Chỉ Số": "LIVE CTR (%)", "Kỳ trước": n(livePrevStats.liveCtr), "Kỳ này": n(liveCurStats.liveCtr) },
+            { "Chỉ Số": "Số đơn", "Kỳ trước": n(livePrevStats.orders), "Kỳ này": n(liveCurStats.orders) },
+            { "Chỉ Số": "Sản phẩm mỗi đơn", "Kỳ trước": n(livePrevStats.upt), "Kỳ này": n(liveCurStats.upt) },
+            { "Chỉ Số": "GMV mỗi sản phẩm", "Kỳ trước": n(livePrevStats.pricePerItem), "Kỳ này": n(liveCurStats.pricePerItem) },
+            { "Chỉ Số": "Giá trị đơn (AOV)", "Kỳ trước": n(livePrevStats.aov), "Kỳ này": n(liveCurStats.aov) },
             { "Chỉ Số": "Target GMV tháng", "Kỳ trước": "", "Kỳ này": n(kpiTargetGmvCur) },
             { "Chỉ Số": `So sánh: ${cmp.label}`, "Kỳ trước": "", "Kỳ này": "" }
           ]
@@ -1196,6 +1292,8 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             "Khung": r.label,
             "Target GMV": n(r.target),
             "Actual GMV": n(r.actual),
+            [`GMV cùng khung ${prevMonth}`]: n(r.prev.gmv),
+            "SP/Đơn": n(r.cur.upt),
             "Giờ Live": n(r.hours),
             "GMV/Giờ": n(r.gmvPerHour),
             "CTR": n(r.ctr),
@@ -1525,40 +1623,27 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
 
         {/* ===== 4. Vì sao ===== */}
         <section id="mr-why" className="space-y-4 scroll-mt-16">
-          <SectionHead no="4" title="Vì sao tăng / giảm" sub={`GMV live = giờ live × lượt xem mỗi giờ × GMV mỗi lượt xem · ${cmp.label}`} />
-          {waterfallData.length > 0 ? (
-            <Panel title="Tách thay đổi GMV live" icon={<BarChart3 className="w-4 h-4" />} sub="3 phần cộng đúng bằng mức thay đổi (chia theo tỷ trọng log)">
-              <div style={{ height: 260 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={waterfallData} margin={{ top: 18, right: 8 }}>
-                    <CartesianGrid stroke={PAL.line} vertical={false} />
-                    <XAxis dataKey="label" stroke={PAL.muted} fontSize={10.5} interval={0} />
-                    <YAxis stroke={PAL.muted} fontSize={10} tickFormatter={(v) => formatCurrencyAdaptive(v)} width={70} />
-                    <Tooltip contentStyle={chartTooltipStyle} formatter={(_v, _n, item) => formatCurrencyAdaptive(chartNum((item as { payload?: { display?: number } }).payload?.display))} />
-                    <Bar dataKey="base" stackId="w" fill="transparent" isAnimationActive={false} legendType="none" tooltipType="none" />
-                    <Bar dataKey="value" stackId="w" radius={[4, 4, 0, 0]} name="GMV">
-                      {waterfallData.map((d, i) => (
-                        <Cell key={i} fill={d.kind === "total" ? PAL.gold : d.kind === "up" ? PAL.green : PAL.red} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
-                {drivers!.parts.map((p) => (
-                  <div key={p.key} className="text-[11.5px] rounded-lg px-3 py-2" style={{ background: PAL.panel2, color: PAL.muted }}>
-                    <span style={{ color: PAL.cream }}>{DRIVER_LABEL[p.key]}</span> {p.change >= 0 ? "+" : "−"}{Math.abs(p.change).toFixed(1)}% ⇒{" "}
-                    <span className="font-mono" style={{ color: p.value >= 0 ? PAL.green : PAL.red }}>
-                      {p.value >= 0 ? "+" : "−"}{formatCurrencyAdaptive(Math.abs(p.value))}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </Panel>
+          <SectionHead no="4" title="Vì sao tăng / giảm" sub={`GMV live tách theo 2 góc: traffic (giờ × lượt xem mỗi giờ × GMV mỗi lượt xem) và đơn hàng (số đơn × sản phẩm mỗi đơn × GMV mỗi sản phẩm) · ${cmp.label}`} />
+          {drivers || basket ? (
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              {drivers && <WaterfallPanel title="Góc traffic" sub="Giờ live × lượt xem mỗi giờ × GMV mỗi lượt xem — 3 phần cộng đúng mức thay đổi" data={waterfallData} breakdown={drivers} />}
+              {basket && (
+                <WaterfallPanel
+                  title="Góc đơn hàng"
+                  sub="Số đơn × sản phẩm mỗi đơn × GMV mỗi sản phẩm — 3 phần cộng đúng mức thay đổi"
+                  data={basketWaterfall}
+                  breakdown={basket}
+                  note={(() => {
+                    const v = basket.parts.filter((p) => p.key !== "orders").reduce((a, p) => a + p.value, 0);
+                    return `Sản phẩm mỗi đơn + GMV mỗi sản phẩm = giá trị đơn (AOV): ${v >= 0 ? "+" : "−"}${formatCurrencyAdaptive(Math.abs(v))}. Hai phần này thường ngược chiều — mỗi đơn ít sản phẩm hơn thì GMV mỗi sản phẩm tự tăng dù giá bán không đổi, nên đọc cùng nhau.`;
+                  })()}
+                />
+              )}
+            </div>
           ) : (
-            <p className="text-sm" style={{ color: PAL.muted }}>Chưa đủ số của cả 2 kỳ (giờ live, lượt xem) để tách nguyên nhân.</p>
+            <p className="text-sm" style={{ color: PAL.muted }}>Chưa đủ số của cả 2 kỳ (giờ live, lượt xem, đơn, sản phẩm) để tách nguyên nhân.</p>
           )}
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {FUNNEL_TILES.map((t) => (
               <TrendTile key={t.key} label={t.label} points={monthlyStats.map((x) => ({ label: `${x.month.slice(5)}/${x.month.slice(2, 4)}`, value: t.get(x.stats) }))} format={t.format} goodWhenUp={t.goodWhenUp} />
             ))}
@@ -1601,6 +1686,10 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                             ["Đơn Hàng", (a: CreatorLivePerfAgg) => fmtInt(a.orders)],
                             ["Giờ Live", (a: CreatorLivePerfAgg) => fmtHours(a.hours)],
                             ["GMV / Giờ", (a: CreatorLivePerfAgg) => formatCurrencyAdaptive(a.gmvPerHour ?? 0)],
+                            ["Sản Phẩm Mỗi Đơn (UPT)", (a: CreatorLivePerfAgg) => (a.upt != null ? a.upt.toFixed(2) : "—")],
+                            ["GMV Mỗi Sản Phẩm", (a: CreatorLivePerfAgg) => (a.avgPrice != null ? `${fmtInt(a.avgPrice / 1000)}k đ` : "—")],
+                            ["Giá Trị Đơn (AOV)", (a: CreatorLivePerfAgg) => (a.orders > 0 ? formatCurrencyAdaptive(a.gmv / a.orders) : "—")],
+                            ["LIVE CTR (click SP / lượt xem)", (a: CreatorLivePerfAgg) => fmtPct(a.views > 0 ? (a.productClicks / a.views) * 100 : null)],
                             ["CTR", (a: CreatorLivePerfAgg) => fmtPct(a.ctr)],
                             ["CTOR", (a: CreatorLivePerfAgg) => fmtPct(a.ctor)]
                           ] as [string, (a: CreatorLivePerfAgg) => string][]
@@ -1784,50 +1873,65 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         <section id="mr-context" className="space-y-4 scroll-mt-16">
           <SectionHead no="7" title="Bối cảnh" sub="Ngày camp, khung giờ, diễn biến theo ngày, phiên nổi bật" />
           <Panel
-                      title="Khung Chiến Dịch (D-Day / Mid-Month / Pay-Day)"
-                      icon={<Flame className="w-4 h-4" />}
-                      sub="Target loại B — Actual: SUM(GMV Buổi LIVE) từ Live Performance Core Stats"
-                    >
-                      <div style={{ height: 220 }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={campTargetVsActualData}>
-                            <CartesianGrid stroke={PAL.line} vertical={false} />
-                            <XAxis dataKey="label" stroke={PAL.muted} fontSize={11} />
-                            <YAxis stroke={PAL.muted} fontSize={10} tickFormatter={(v) => formatCurrencyAdaptive(v)} width={70} />
-                            <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => formatCurrencyAdaptive(chartNum(v))} />
-                            <Bar dataKey="target" name="Target" fill={`${PAL.gold}2e`} stroke={PAL.gold} radius={[4, 4, 0, 0]} />
-                            <Bar dataKey="actual" name="Actual" fill={PAL.gold} radius={[4, 4, 0, 0]} />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
-                      <ReportTable head={["Khung", "Target GMV", "Actual GMV", "Giờ Live", "GMV/Giờ", "CTR", "CTOR"]}>
-                        {campDetailRows.map((r, idx) => (
-                          <tr key={r.key} style={{ borderBottom: `1px solid ${PAL.line}`, background: idx % 2 ? `${PAL.panel2}55` : "transparent" }}>
-                            <td className="py-2 px-3 font-semibold" style={{ color: PAL.gold }}>
-                              {r.label}
-                            </td>
-                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
-                              {r.target != null ? formatCurrencyAdaptive(r.target) : "—"}
-                            </td>
-                            <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>
-                              {formatCurrencyAdaptive(r.actual)}
-                            </td>
-                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
-                              {fmtHours(r.hours)}
-                            </td>
-                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
-                              {r.gmvPerHour != null ? formatCurrencyAdaptive(r.gmvPerHour) : "—"}
-                            </td>
-                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
-                              {fmtPct(r.ctr)}
-                            </td>
-                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
-                              {fmtPct(r.ctor)}
-                            </td>
-                          </tr>
-                        ))}
-                      </ReportTable>
-                    </Panel>
+            title="Khung Chiến Dịch — so với cùng khung tháng trước"
+            icon={<Flame className="w-4 h-4" />}
+            sub={`Thực đạt tính từ ca · target: ${campTargetSource} · ${cmp.label} · mỗi tháng dùng khoảng ngày camp của chính tháng đó`}
+          >
+            <div style={{ height: 220 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={campTargetVsActualData}>
+                  <CartesianGrid stroke={PAL.line} vertical={false} />
+                  <XAxis dataKey="label" stroke={PAL.muted} fontSize={11} />
+                  <YAxis stroke={PAL.muted} fontSize={10} tickFormatter={(v) => formatCurrencyAdaptive(v)} width={70} />
+                  <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => formatCurrencyAdaptive(chartNum(v))} />
+                  <Legend wrapperStyle={{ fontSize: 11, color: PAL.muted }} />
+                  <Bar dataKey="prev" name={prevColLabel} fill={PAL.line} radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="target" name="Target" fill={`${PAL.gold}2e`} stroke={PAL.gold} radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="actual" name={curColLabel} fill={PAL.gold} radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <ReportTable head={["Khung", "Target", "Thực đạt", "% Target", prevColLabel, "± GMV", "GMV/Giờ", "± GMV/Giờ", "SP/Đơn", "CTOR"]}>
+              {campDetailRows.map((r, idx) => {
+                const none = r.cur.sessions === 0;
+                const gChg = none ? null : pctChange(r.prev.gmv, r.cur.gmv);
+                const hChg = none ? null : pctChange(r.prev.gmvPerHour, r.cur.gmvPerHour);
+                const chg = (v: number | null) =>
+                  v == null ? <span style={{ color: PAL.muted }}>—</span> : <span style={{ color: v >= 0 ? PAL.green : PAL.red }}>{v >= 0 ? "+" : "−"}{Math.abs(v).toFixed(1)}%</span>;
+                return (
+                  <tr key={r.key} style={{ borderBottom: `1px solid ${PAL.line}`, background: idx % 2 ? `${PAL.panel2}55` : "transparent" }}>
+                    <td className="py-2 px-3 font-semibold" style={{ color: PAL.gold }}>
+                      {r.label}
+                    </td>
+                    <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
+                      {r.target != null ? formatCurrencyAdaptive(r.target) : "—"}
+                    </td>
+                    <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>
+                      {none ? <span style={{ color: PAL.muted, fontWeight: 400 }}>chưa có ca</span> : formatCurrencyAdaptive(r.cur.gmv)}
+                    </td>
+                    <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.cream }}>
+                      {!none && r.target ? fmtPct((r.cur.gmv / r.target) * 100) : "—"}
+                    </td>
+                    <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
+                      {r.prev.sessions > 0 ? formatCurrencyAdaptive(r.prev.gmv) : "—"}
+                    </td>
+                    <td className="py-2 px-3 text-right font-mono">{chg(gChg)}</td>
+                    <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
+                      {r.cur.gmvPerHour != null ? formatCurrencyAdaptive(r.cur.gmvPerHour) : "—"}
+                    </td>
+                    <td className="py-2 px-3 text-right font-mono">{chg(hChg)}</td>
+                    <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
+                      {r.cur.upt != null ? r.cur.upt.toFixed(2) : "—"}
+                      {r.cur.upt != null && r.prev.upt != null && <span className="ml-1 text-[10px]">({r.prev.upt.toFixed(2)})</span>}
+                    </td>
+                    <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
+                      {fmtPct(r.cur.ctor)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </ReportTable>
+          </Panel>
           <Panel title="Khung giờ bắt đầu ca" icon={<CalendarClock className="w-4 h-4" />} sub={`GMV mỗi giờ live · ${cmp.label}`}>
             <ReportTable head={["Khung giờ", "Số ca (trước → nay)", "GMV/giờ kỳ trước", "GMV/giờ kỳ này", "Thay đổi"]}>
               {slotRows.map((r, idx) => {
@@ -1959,6 +2063,51 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             <KpiTile label={`Target tháng ${nextMonth.slice(5)}`} value={nextPlan && nextPlan.targetGmv > 0 ? formatCurrencyAdaptive(nextPlan.targetGmv) : "—"} note={nextPlan ? (nextPlan.status === "locked" ? "đã chốt" : "đang lên lịch") : "chưa lập kế hoạch"} />
             <KpiTile label="Ca kế hoạch" value={nextPlan ? String(nextPlan.slotCount) : "—"} note={nextPlan ? "trong Kế Hoạch Tháng" : ""} />
           </div>
+          {nextAllocation && (
+            <Panel
+              title={`Phân bổ target tháng ${nextMonth.slice(5)} theo khung`}
+              icon={<Flame className="w-4 h-4" />}
+              sub={`Cộng từ ca trong Kế Hoạch Tháng ${nextMonth.slice(5)} · so GMV/giờ cần đạt với GMV/giờ thực đạt cùng khung tháng ${month.slice(5)}`}
+            >
+              <ReportTable head={["Khung", "% Target", "Target", "Số ca", "Giờ live", "GMV/Giờ cần", `GMV/Giờ T${Number(month.slice(5))}`, "Cần tăng"]}>
+                {nextAllocation.map((a, idx) => {
+                  const actual = campDetailRows.find((r) => r.key === a.key)?.cur.gmvPerHour ?? null;
+                  const gap = a.requiredGmvPerHour != null && actual != null && actual > 0 ? ((a.requiredGmvPerHour - actual) / actual) * 100 : null;
+                  return (
+                    <tr key={a.key} style={{ borderBottom: `1px solid ${PAL.line}`, background: idx % 2 ? `${PAL.panel2}55` : "transparent" }}>
+                      <td className="py-2 px-3 font-semibold" style={{ color: PAL.gold }}>
+                        {CAMP_DAY_BUCKET_LABEL[a.key]}
+                      </td>
+                      <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.cream }}>
+                        {fmtPct(a.share)}
+                      </td>
+                      <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>
+                        {a.target > 0 ? formatCurrencyAdaptive(a.target) : "—"}
+                      </td>
+                      <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
+                        {a.slots}
+                      </td>
+                      <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
+                        {fmtHours(a.hours)}
+                      </td>
+                      <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.cream }}>
+                        {a.requiredGmvPerHour != null ? formatCurrencyAdaptive(a.requiredGmvPerHour) : "—"}
+                      </td>
+                      <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
+                        {actual != null ? formatCurrencyAdaptive(actual) : "—"}
+                      </td>
+                      <td className="py-2 px-3 text-right font-mono" style={{ color: gap == null ? PAL.muted : gap > 10 ? PAL.red : gap > 0 ? PAL.gold : PAL.green }}>
+                        {gap == null ? "—" : `${gap >= 0 ? "+" : "−"}${Math.abs(gap).toFixed(0)}%`}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </ReportTable>
+              <p className="text-[11px] mt-2" style={{ color: PAL.muted }}>
+                "Cần tăng" = GMV/giờ phải đạt so với GMV/giờ thực đạt cùng khung tháng này{cmp.partial ? ` (tính tới ${Number(cmp.curEnd.slice(8))}/${month.slice(5)})` : ""}. Đỏ: cần tăng hơn 10%.
+              </p>
+            </Panel>
+          )}
           <div className="rounded-xl p-4" style={{ background: PAL.panel, border: `1px solid ${PAL.line}` }}>
             <div className="text-[10.5px] uppercase tracking-wider mb-2" style={{ color: PAL.muted }}>Việc agency làm tháng sau</div>
             <ul className="space-y-2 text-[13.5px] leading-relaxed list-disc pl-5" style={{ color: PAL.cream }}>

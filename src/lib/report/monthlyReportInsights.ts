@@ -1,3 +1,5 @@
+import type { BrandMonthPlanSlot } from "../../types";
+import { CAMP_DAY_BUCKET_ORDER, resolveCampBucketType, type CampDayBucket, type CampOverrides } from "../campaignDays";
 import type { CreatorLivePerfRow } from "../dataraw/creatorLivePerfSlice";
 import type { ShopDaysMonthSlice } from "../dataraw/monthlyProductSlice";
 import { vnDateOf } from "../dataraw/vnDate";
@@ -60,6 +62,7 @@ export interface LiveStats {
   views: number;
   orders: number;
   skuOrders: number;
+  itemsSold: number;
   productImpressions: number;
   productClicks: number;
   gmvPerHour: number | null;
@@ -68,10 +71,16 @@ export interface LiveStats {
   ctr: number | null;
   ctor: number | null;
   aov: number | null;
+  /** Sản phẩm mỗi đơn = itemsSold / orders (cùng công thức `upt` của creatorLivePerfMetrics). */
+  upt: number | null;
+  /** GMV mỗi sản phẩm = GMV / itemsSold. Đọc CÙNG với UPT: UPT giảm thì số này tự tăng dù giá bán không đổi. */
+  pricePerItem: number | null;
+  /** Click sản phẩm / lượt xem — cột "LIVE CTR" của TikTok (khớp deck report Crocs: T8 56,2%). */
+  liveCtr: number | null;
 }
 
 export function liveStatsFromRows(rows: CreatorLivePerfRow[], start: string, end: string): LiveStats {
-  let sessions = 0, gmv = 0, hours = 0, views = 0, orders = 0, skuOrders = 0, productImpressions = 0, productClicks = 0;
+  let sessions = 0, gmv = 0, hours = 0, views = 0, orders = 0, skuOrders = 0, itemsSold = 0, productImpressions = 0, productClicks = 0;
   for (const r of rows) {
     const d = vnDateOf(r.startTime);
     if (d < start || d > end) continue;
@@ -81,18 +90,22 @@ export function liveStatsFromRows(rows: CreatorLivePerfRow[], start: string, end
     views += r.views;
     orders += r.orders;
     skuOrders += r.skuOrders;
+    itemsSold += r.itemsSold;
     productImpressions += r.productImpressions;
     productClicks += r.productClicks;
   }
   const div = (a: number, b: number) => (b > 0 ? a / b : null);
   return {
-    sessions, gmv, hours, views, orders, skuOrders, productImpressions, productClicks,
+    sessions, gmv, hours, views, orders, skuOrders, itemsSold, productImpressions, productClicks,
     gmvPerHour: div(gmv, hours),
     viewsPerHour: div(views, hours),
     gmvPerView: div(gmv, views),
     ctr: productImpressions > 0 ? (productClicks / productImpressions) * 100 : null,
     ctor: productClicks > 0 ? (skuOrders / productClicks) * 100 : null,
-    aov: div(gmv, orders)
+    aov: div(gmv, orders),
+    upt: div(itemsSold, orders),
+    pricePerItem: div(gmv, itemsSold),
+    liveCtr: views > 0 ? (productClicks / views) * 100 : null
   };
 }
 
@@ -103,11 +116,14 @@ export function pctChange(from: number | null | undefined, to: number | null | u
 
 // ---------- tách nguyên nhân ----------
 
-export type DriverKey = "hours" | "viewsPerHour" | "gmvPerView";
+export type DriverKey = "hours" | "viewsPerHour" | "gmvPerView" | "orders" | "upt" | "pricePerItem";
 export const DRIVER_LABEL: Record<DriverKey, string> = {
   hours: "Giờ live",
   viewsPerHour: "Lượt xem mỗi giờ",
-  gmvPerView: "GMV mỗi lượt xem"
+  gmvPerView: "GMV mỗi lượt xem",
+  orders: "Số đơn",
+  upt: "Sản phẩm mỗi đơn",
+  pricePerItem: "GMV mỗi sản phẩm"
 };
 
 export interface DriverBreakdown {
@@ -117,25 +133,115 @@ export interface DriverBreakdown {
   parts: { key: DriverKey; value: number; change: number }[];
 }
 
-/** GMV = giờ × (lượt xem / giờ) × (GMV / lượt xem). Chia ΔGMV theo tỷ trọng log của từng thừa số — 3
- *  phần cộng đúng bằng ΔGMV, không phụ thuộc thứ tự như cách "đổi lần lượt từng biến". Thiếu dữ liệu
- *  lượt xem/giờ ở một bên ⇒ null (không bịa phần tách). */
-export function driverBreakdown(a: LiveStats, b: LiveStats): DriverBreakdown | null {
-  const factors: [DriverKey, number, number][] = [
-    ["hours", a.hours, b.hours],
-    ["viewsPerHour", a.viewsPerHour ?? 0, b.viewsPerHour ?? 0],
-    ["gmvPerView", a.gmvPerView ?? 0, b.gmvPerView ?? 0]
-  ];
-  if (a.gmv <= 0 || b.gmv <= 0 || factors.some(([, x, y]) => !(x > 0) || !(y > 0))) return null;
-  const delta = b.gmv - a.gmv;
-  const total = Math.log(b.gmv / a.gmv);
+/** GMV = tích các thừa số. Chia ΔGMV theo tỷ trọng log của từng thừa số — các phần cộng đúng bằng ΔGMV,
+ *  không phụ thuộc thứ tự như cách "đổi lần lượt từng biến". Thiếu thừa số ở một bên ⇒ null (không bịa). */
+function logShareBreakdown(fromGmv: number, toGmv: number, factors: [DriverKey, number, number][]): DriverBreakdown | null {
+  if (fromGmv <= 0 || toGmv <= 0 || factors.some(([, x, y]) => !(x > 0) || !(y > 0))) return null;
+  const delta = toGmv - fromGmv;
+  const total = Math.log(toGmv / fromGmv);
   const parts = factors.map(([key, x, y]) => {
     const l = Math.log(y / x);
     // ΔGMV ≈ 0 thì tỷ trọng log vô nghĩa (chia cho ~0) — dùng xấp xỉ bậc nhất quanh GMV đầu kỳ.
-    const value = Math.abs(total) < 1e-9 ? a.gmv * l : (delta * l) / total;
+    const value = Math.abs(total) < 1e-9 ? fromGmv * l : (delta * l) / total;
     return { key, value, change: ((y - x) / x) * 100 };
   });
-  return { from: a.gmv, to: b.gmv, delta, parts };
+  return { from: fromGmv, to: toGmv, delta, parts };
+}
+
+/** Phía traffic: GMV = giờ × (lượt xem / giờ) × (GMV / lượt xem). */
+export function driverBreakdown(a: LiveStats, b: LiveStats): DriverBreakdown | null {
+  return logShareBreakdown(a.gmv, b.gmv, [
+    ["hours", a.hours, b.hours],
+    ["viewsPerHour", a.viewsPerHour ?? 0, b.viewsPerHour ?? 0],
+    ["gmvPerView", a.gmvPerView ?? 0, b.gmvPerView ?? 0]
+  ]);
+}
+
+/** Phía giỏ hàng: GMV = số đơn × (SP / đơn) × (GMV / SP). Bổ sung cho driverBreakdown: deck report Crocs
+ *  T8 đọc "giá/SP +24%" thành "GMV tăng nhờ giá" — tách đủ 3 thừa số thì thấy phần lớn là số đơn +10%,
+ *  giá/SP tăng chủ yếu vì mỗi đơn ít SP hơn (UPT 1,43 → 1,18). */
+export function basketBreakdown(a: LiveStats, b: LiveStats): DriverBreakdown | null {
+  return logShareBreakdown(a.gmv, b.gmv, [
+    ["orders", a.orders, b.orders],
+    ["upt", a.upt ?? 0, b.upt ?? 0],
+    ["pricePerItem", a.pricePerItem ?? 0, b.pricePerItem ?? 0]
+  ]);
+}
+
+// ---------- khung camp ----------
+
+export interface CampCompareRow {
+  key: CampDayBucket;
+  cur: LiveStats;
+  /** Cùng khung đó của tháng trước (trọn khung — camp là ngày cố định, không cắt theo cùng kỳ). */
+  prev: LiveStats;
+  target: number | null;
+}
+
+/** So từng khung camp với CHÍNH khung đó tháng trước. Mỗi tháng phân loại ngày theo khoảng camp của
+ *  tháng đó — dùng khoảng của tháng này cho tháng trước thì ngày camp tháng trước bị tính là ngày thường. */
+export function campCompare(
+  curRows: CreatorLivePerfRow[],
+  cur: { start: string; end: string; overrides?: CampOverrides },
+  prevRows: CreatorLivePerfRow[],
+  prev: { start: string; end: string; overrides?: CampOverrides },
+  targets: Partial<Record<CampDayBucket, number | null>>
+): CampCompareRow[] {
+  const split = (rows: CreatorLivePerfRow[], overrides?: CampOverrides) => {
+    const out: Record<CampDayBucket, CreatorLivePerfRow[]> = { dday: [], midmonth: [], payday: [], daily: [] };
+    for (const r of rows) out[resolveCampBucketType(vnDateOf(r.startTime), overrides)].push(r);
+    return out;
+  };
+  const c = split(curRows, cur.overrides);
+  const p = split(prevRows, prev.overrides);
+  return CAMP_DAY_BUCKET_ORDER.map((key) => ({
+    key,
+    cur: liveStatsFromRows(c[key], cur.start, cur.end),
+    prev: liveStatsFromRows(p[key], prev.start, prev.end),
+    target: targets[key] ?? null
+  }));
+}
+
+export interface PlanCampAllocation {
+  key: CampDayBucket;
+  target: number;
+  hours: number;
+  slots: number;
+  /** % của tổng target kế hoạch. */
+  share: number | null;
+  /** GMV mỗi giờ cần đạt để về đích khung này. */
+  requiredGmvPerHour: number | null;
+}
+
+function slotHours(start: string, end: string): number {
+  const [sh, sm] = start.split(":").map(Number);
+  const [eh, em] = end.split(":").map(Number);
+  let m = eh * 60 + em - (sh * 60 + sm);
+  if (m <= 0) m += 24 * 60;
+  return m / 60;
+}
+
+/** Cộng target + giờ của ca Kế Hoạch Tháng theo khung camp (khoảng camp của chính kế hoạch đó). */
+export function planCampAllocation(slots: Pick<BrandMonthPlanSlot, "date" | "startTime" | "endTime" | "targetGmv">[], overrides?: CampOverrides): PlanCampAllocation[] {
+  const acc: Record<CampDayBucket, { target: number; hours: number; slots: number }> = {
+    dday: { target: 0, hours: 0, slots: 0 },
+    midmonth: { target: 0, hours: 0, slots: 0 },
+    payday: { target: 0, hours: 0, slots: 0 },
+    daily: { target: 0, hours: 0, slots: 0 }
+  };
+  for (const s of slots) {
+    const a = acc[resolveCampBucketType(s.date, overrides)];
+    a.target += s.targetGmv || 0;
+    a.hours += slotHours(s.startTime, s.endTime);
+    a.slots += 1;
+  }
+  const total = CAMP_DAY_BUCKET_ORDER.reduce((x, k) => x + acc[k].target, 0);
+  return CAMP_DAY_BUCKET_ORDER.map((key) => ({
+    key,
+    ...acc[key],
+    share: total > 0 ? (acc[key].target / total) * 100 : null,
+    requiredGmvPerHour: acc[key].hours > 0 && acc[key].target > 0 ? acc[key].target / acc[key].hours : null
+  }));
 }
 
 // ---------- toàn shop ----------
@@ -237,6 +343,7 @@ export interface NarrativeInput {
   liveCur: LiveStats;
   livePrev: LiveStats;
   drivers: DriverBreakdown | null;
+  basket: DriverBreakdown | null;
   signals: TrendSignal[];
   targetGmv: number | null;
   /** Khung camp tốt nhất vs ngày thường (GMV/giờ), nếu có. */
@@ -251,9 +358,21 @@ const pctTxt = (v: number, digits = 1) => `${v.toLocaleString("vi-VN", { minimum
 const signed = (v: number, digits = 1) => `${v >= 0 ? "+" : "−"}${pctTxt(Math.abs(v), digits)}`;
 const dayMonth = (iso: string) => `${Number(iso.slice(8, 10))}/${iso.slice(5, 7)}`;
 
+// "GMV mỗi lượt xem" giữ nguyên chữ GMV — toLowerCase() cả chuỗi từng ra "gmv mỗi lượt xem".
+const lowerFirst = (t: string) => (/^[A-Z]{2}/.test(t) ? t : t.charAt(0).toLowerCase() + t.slice(1));
+
+export const UPT_LABEL = "Sản phẩm mỗi đơn";
+export const LIVE_CTR_LABEL = "LIVE CTR";
+
 function signalText(s: TrendSignal): string {
   const fmt = (x: number) =>
-    s.label === "CTOR" || s.label === "CTR" ? pctTxt(x, 2) : s.label === "AOV" ? `${Math.round(x / 1000).toLocaleString("vi-VN")}k đ` : Math.round(x).toLocaleString("vi-VN");
+    s.label === "CTOR" || s.label === "CTR" || s.label === LIVE_CTR_LABEL
+      ? pctTxt(x, s.label === LIVE_CTR_LABEL ? 1 : 2)
+      : s.label === "AOV"
+        ? `${Math.round(x / 1000).toLocaleString("vi-VN")}k đ`
+        : s.label === UPT_LABEL
+          ? x.toLocaleString("vi-VN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+          : Math.round(x).toLocaleString("vi-VN");
   return `${s.label} ${s.direction === "down" ? "giảm" : "tăng"} ${s.streak} tháng liên tiếp: ${s.values.map(fmt).join(" → ")}`;
 }
 
@@ -284,11 +403,14 @@ export function autoSummary(i: NarrativeInput): string[] {
       const verb = i.drivers.delta < 0 ? "mức giảm" : "mức tăng";
       const offset = i.drivers.parts.find((p) => Math.sign(p.value) !== Math.sign(i.drivers!.delta) && Math.abs(p.value) > Math.abs(i.drivers!.delta) * 0.2);
       out.push(
-        `Phần lớn ${verb} đến từ ${DRIVER_LABEL[main.key].toLowerCase()} (${signed(main.change, 0)}, ${main.value >= 0 ? "+" : "−"}${money(Math.abs(main.value))})` +
-          (offset ? `; ${DRIVER_LABEL[offset.key].toLowerCase()} ${signed(offset.change, 0)} bù lại ${money(Math.abs(offset.value))}.` : ".")
+        `Phần lớn ${verb} đến từ ${lowerFirst(DRIVER_LABEL[main.key])} (${signed(main.change, 0)}, ${main.value >= 0 ? "+" : "−"}${money(Math.abs(main.value))})` +
+          (offset ? `; ${lowerFirst(DRIVER_LABEL[offset.key])} ${signed(offset.change, 0)} bù lại ${money(Math.abs(offset.value))}.` : ".")
       );
     }
   }
+
+  const basket = basketLine(i);
+  if (basket) out.push(basket);
 
   if (i.signals.length > 0) out.push(i.signals.map(signalText).join("; ") + ".");
 
@@ -298,8 +420,33 @@ export function autoSummary(i: NarrativeInput): string[] {
   return out;
 }
 
+/** Một câu về giỏ hàng. Không chọn "thừa số lớn nhất" trong 3 phần: SP mỗi đơn và GMV mỗi SP thường đi
+ *  NGƯỢC chiều và bù nhau (CROCS T7→T8: −1,03 tỷ vs +1,19 tỷ) — chọn phần lớn nhất sẽ ra "GMV tăng nhờ
+ *  giá/SP", đúng cách đọc sai của deck report Crocs. Gộp 2 phần đó thành giá trị đơn (AOV = UPT × GMV/SP)
+ *  rồi so với số đơn; UPT/giá chỉ nêu khi chúng thật sự lệch nhau. */
+function basketLine(i: NarrativeInput): string | null {
+  const b = i.basket;
+  if (!b || Math.abs(b.delta) <= 0) return null;
+  const part = (k: DriverKey) => b.parts.find((p) => p.key === k)!;
+  const orders = part("orders"), upt = part("upt"), price = part("pricePerItem");
+  const aovValue = upt.value + price.value;
+  const aovChg = pctChange(i.livePrev.aov, i.liveCur.aov);
+  if (aovChg == null) return null;
+  const amt = (v: number) => `${v >= 0 ? "+" : "−"}${money(Math.abs(v))}`;
+  let txt = `Phía đơn hàng: số đơn ${signed(orders.change, 0)} (${amt(orders.value)}), giá trị đơn ${signed(aovChg, 0)} (${amt(aovValue)}).`;
+  if (Math.abs(upt.change) >= 10 && Math.sign(upt.change) !== Math.sign(price.change)) {
+    const uptTxt = (v: number | null) => (v ?? 0).toLocaleString("vi-VN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    txt += ` Trong giá trị đơn, sản phẩm mỗi đơn ${uptTxt(i.livePrev.upt)} → ${uptTxt(i.liveCur.upt)} (${signed(upt.change, 0)}) và GMV mỗi sản phẩm ${signed(price.change, 0)} gần như bù nhau — GMV mỗi sản phẩm ${price.change > 0 ? "tăng" : "giảm"} chủ yếu vì mỗi đơn ${upt.change < 0 ? "ít" : "nhiều"} sản phẩm hơn, không hẳn vì giá bán.`;
+  }
+  return txt;
+}
+
 export function autoNextSteps(i: NarrativeInput): string[] {
   const out: string[] = [];
+  const upt = i.signals.find((s) => s.label === UPT_LABEL && s.direction === "down");
+  if (upt) {
+    out.push(`Sản phẩm mỗi đơn giảm ${upt.streak} tháng liền — thử ưu đãi theo ngưỡng giá trị đơn hoặc combo 2 sản phẩm trên live để kéo số sản phẩm mỗi đơn lên lại.`);
+  }
   const ctor = i.signals.find((s) => s.label === "CTOR" && s.direction === "down");
   if (ctor) {
     out.push(`Tỷ lệ chốt đơn (CTOR) giảm ${ctor.streak} tháng liền — rà giá, voucher và cách chốt của nhóm SKU chủ lực khi lên live${i.liveCur.ctr != null ? ` (người xem vẫn bấm sản phẩm, CTR ${pctTxt(i.liveCur.ctr, 2)})` : ""}.`);
