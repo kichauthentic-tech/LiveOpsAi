@@ -2,6 +2,10 @@
 
 ## CẦN LÀM NGAY khi mở phiên mới (cập nhật 2026-09-24)
 
+> **MỚI 2026-09-25 — Dashboard (Bản Tin CEO) đã thay Toàn Cảnh Agency, đứng đầu sidebar.** Migration **0118**
+> đã chạy. Việc treo: nhập % hoa hồng/lương để khối tiền có số. Chi tiết + luật số ở
+> mục `## Bản Tin CEO` bên dưới.
+
 > **VIỆC ĐANG TREO — bàn giao 2026-09-24, cập nhật lại cùng ngày sau khi merge + verify Đ7/Đ9 + vá
 > ưu tiên #3 + gỡ dây nối CRUD chiến dịch chết ở LiveCalendar + vá sạch 93 warning `no-explicit-any` +
 > bật bộ rule React Compiler (đọc mục này trước danh sách dưới; mục 1–6 đã xong, còn 1 mục treo).**
@@ -703,73 +707,37 @@ vẫn không đổi mtime ⇒ coi như đã xong; kiểm tab "Toàn Cảnh Agenc
 **đầu phiên, nếu `git status` bẩn mà không phải việc của mình, hoặc `ls -t ~/.claude/projects/<repo>/*.jsonl`
 cho thấy một transcript khác vừa ghi trong vài phút, thì hỏi user trước khi sửa file dùng chung.**
 
-## Toàn Cảnh Agency (dashboard CEO) — Bước A: **XONG, ĐÃ VERIFY** (2026-09-24, verify 2026-09-25)
+## Bản Tin CEO / Dashboard (thay Toàn Cảnh Agency) — XONG + VERIFY TRÊN BROWSER (2026-09-25), migration 0118 ĐÃ CHẠY
 
-Yêu cầu user: "dashboard của agency cho CEO xem hằng ngày/tuần/tháng để tracking bức tranh toàn cảnh".
-
-**Nghiên cứu trước khi build — số thật đo trên production 2026-09-24** (đếm bằng service role, không suy đoán):
-
-| Nguồn | Thực tế | Dùng được cho dashboard? |
-|---|---|---|
-| `live_sessions` | 229 ca, **100% CROCS + 100% `is_backfill` + `tiktok_reconciled`**, T6–T9 | ✅ giàu nhất: GMV, đơn, view, impression, click, giờ live thật, host |
-| `brand_dataraw_rows` (shop_analytics) | 4 tháng CROCS theo NGÀY: GMV shop, Refunds, Seller LIVE GMV | ✅ (chưa dùng ở bước A) — cho tỷ trọng live/tổng shop + return rate thật |
-| `brand_platform_rates` | **1 dòng, rate 0đ/h** (JOCKEY) | ❌ không tính được doanh thu agency |
-| `talents.rate_per_hour/rate_per_session/commission_rate` | **0/33 talent có rate** | ❌ không tính được chi phí host |
-| `session_finance` / `brand_contracts` / `brand_monthly_commitments` | 0 / 0 / 0 | ❌ |
-| `profiles` | 3 (admin, operations, talent) — **chưa có tài khoản role `ceo`** | ⚠️ màn này làm cho CEO nhưng CEO chưa có account |
-
-**Kết luận đã chốt với user:** hôm nay **không thể** tính P&L/doanh thu/ROAS — mọi ô đó sẽ ra 0đ. Nhưng GMV/giờ/phễu/host có 4 tháng dữ liệu thật, đủ để dashboard có giá trị ngay. User chọn: **làm Bước A** (Tuần/Tháng trên số thật), khối tiền **hiện thẻ "còn thiếu gì"** chứ không hiện 0đ.
+Yêu cầu user (2026-09-25): một màn để CEO nắm toàn cảnh agency lẫn từng tài khoản mà không phải hỏi nhân viên — performance các account, key metric tháng qua tháng, run-rate theo target, run-rate ngày campaign theo brand, hiệu suất host + trợ live, **dự phóng cả tháng tự cập nhật khi lịch brand thay đổi**, tài chính theo brand (doanh thu agency, % phiên lãi, % ngày lãi, tỷ trọng lãi), lọc ngày/tuần/tháng/tuỳ chọn. Đề xuất qua 3 vòng (artifact https://claude.ai/artifact/KjUxhC524M4fQ7RPDoLh6s — bản 3 có bản mẫu chạy trên 229 ca thật + tab phân tích), user duyệt "làm đi".
 
 **Đã build:**
 
-- [`src/lib/performance/agencyOverview.ts`](src/lib/performance/agencyOverview.ts) — toàn hàm thuần (không đụng Supabase, verify được bằng `tsx`): `periodOf`/`shiftPeriod`/`recentPeriods` (tuần ISO + tháng), `indexByDate`/`sessionsIn`, `totalsOf`, `comparableRange`, `delta`, `sharesOf`, `moneyReadiness`.
-- [`src/components/AgencyOverview.tsx`](src/components/AgencyOverview.tsx) — tab `agency_overview`, nhóm nav **Phân Tích** (đặt TRÊN Hiệu Suất Host), gate `manage_sessions`. Khối: dải 5 số + delta · xu hướng 8 tuần/6 tháng · đóng góp theo brand · con người · phễu · kỷ luật vận hành · khối tiền.
-- `byBrand()` thêm vào [`hostPerformance.ts`](src/lib/performance/hostPerformance.ts) — dùng lại `groupBy` nội bộ để GMV/giờ của một brand không thể lệch giữa hai màn.
-- **Không migration, không bảng mới, không fetch mới** — đọc nguyên state `activeSessions`/`activeBrands`/`talents`/`brandPlatformRates` đã có sẵn ở `App.tsx`.
+- [`src/lib/performance/ceoBrief.ts`](src/lib/performance/ceoBrief.ts) — toàn hàm thuần: `periodFor` (kỳ + kỳ so sánh), `lastDataDate`, `totalsOf`, `financeOf`, `change`, `monthTargetOf`, `projectionRates`, `monthOutlook`, `combineOutlooks`, `hostRows`/`assistantRows`/`pairRows`, `monthColumns`, `buildIssues`. Test: [`tests/ceoBrief.test.ts`](tests/ceoBrief.test.ts) (22 test).
+- [`src/components/CeoBrief.tsx`](src/components/CeoBrief.tsx) — tab `agency_overview` (giữ id cũ để localStorage không gãy), nhãn sidebar **"Dashboard"** — mục riêng trên cùng sidebar agency, không có tiêu đề nhóm (nhóm `label: ""` thì sidebar không in dòng tiêu đề), gate `manage_sessions`. Trong tài liệu vẫn gọi là "Bản Tin CEO". Khối: đầu trang + bộ lọc + chip "số liệu đến dd/mm" · Tổng quan 9 ô + sparkline + "Cần chú ý" (tự sinh, có nút nhảy tab) · bảng Các tài khoản (bấm dòng = lọc brand) · Tháng qua tháng (cột chồng theo brand + bảng 7 chỉ số) · Target & dự phóng (đường cộng dồn thực tế / dự phóng ±8% / tiến độ target, 6 ô số) · Ngày campaign (4 thẻ khung + lịch nhiệt) · Nhân sự (host, trợ live, cặp host+trợ ≥3 ca) · Tài chính (chỉ ceo/admin).
+- Đã xoá `AgencyOverview.tsx`, `lib/performance/agencyOverview.ts`, `byBrand()` trong hostPerformance.ts (không còn ai dùng).
+- **% hoa hồng theo brand — migration `0118_brand_commission_rate.sql` (ĐÃ CHẠY 2026-09-25)**: cột `commission_rate` (NULL = chưa đặt) ở `brand_platform_rates` + `brand_platform_rate_history`, trigger lịch sử theo dõi thêm cột này. `lib/pnl.ts`: thứ tự % hoa hồng = `session_finance` của ca (ops chốt tay) > % brand tại ngày ca > mặc định 15% (báo thiếu `commission_default`). Rate Card (CRM + Brand Workspace chỉ đọc) có ô nhập "% hoa hồng agency (% NMV)"; prop mới `onSaveCommissionRate` đi App → CrmProjects → BrandRateCard (đếm host: App 2, CrmProjects 1). Verify sau khi chạy: cột có ở cả 2 bảng (mọi dòng NULL = "Chưa đặt"), check 0–100 chặn thật (ghi 150 → `23514`), Rate Card hiện ô nhập. **Trigger lịch sử chưa verify bằng một lần ghi thật** — kiểm ở lần đầu user nhập % thật.
+- **Hỗ Trợ Vận Hành**: ô "Dự kiến cuối tháng" + thiếu/vượt + uplift giờ dùng `monthOutlook` (cùng cách Bản Tin CEO). Engine × k VẪN dùng cho phương án bù (`suggestFill`) và cột dự báo từng ca — cố ý, xem luật 2.
 
-**Luật bắt buộc của màn này** (đã ghi trong đầu file lib, đừng tự nới):
+**Luật của màn này (đã ghi đầu file lib, đừng nới):**
 
-1. **Không có ô dự phóng cuối kỳ.** Muốn dự phóng thì sang Hỗ Trợ Vận Hành (có engine, đã verify). Đây là đúng lý do Dashboard cũ bị xoá hẳn 2026-09-13.
-2. **Kỳ đang chạy phải so với kỳ trước ĐÃ CẮT về đúng số ngày đã trôi** (`comparableRange`). Tháng 9 mới tới ngày 24 thì so với 24 ngày đầu tháng 8, không phải cả tháng 8 — thiếu bước này thì mọi kỳ đang chạy đều hiện ra như đang sụt thảm hại.
-3. **`Delta.pct` trả `null` khi kỳ trước = 0**, không trả 0 hay ∞ — UI hiện chữ "kỳ trước chưa có số".
-4. **Khối tiền không được render số nào khi chưa đủ điều kiện.** `computeSessionPnl` vẫn chạy khi rate = 0 và trả lợi nhuận 0đ; hiện con số đó lên dashboard CEO là nói dối. `moneyReadiness()` liệt kê đúng thứ còn thiếu + nút đi thẳng tới chỗ nhập.
-5. **`rateHidden` của Talent là "không được xem", KHÔNG phải "chưa đặt"** — `talents_secure` mask 4 cột lương. Gộp 2 cái này chính là lỗi audit 2026-09-21 (talent nhìn 0đ/live tưởng lương mình bằng 0).
-6. **Tỷ lệ luôn tính lại từ số đã cộng**, không trung bình tỷ lệ từng ca (quy ước tầng snapshot).
-7. **Dùng `hasHappened`/`isCountable`, KHÔNG dùng `rows.length`** — đúng bẫy Đ11 vừa vá ở Toàn Cảnh Brand.
-8. **Chart vẽ bằng div CSS, không dùng recharts** — `fill="var(--x)"` của SVG KHÔNG resolve biến CSS nên chart sẽ sai màu ở theme sáng/sand.
+1. **So sánh cắt theo ngày cuối có số**, không theo lịch: số về trễ 3 ngày mà cắt theo lịch thì 3 ngày đó đọc thành "không bán được" (màn cũ báo −33,6%, đúng là −18,4%). Chip đầu trang + dòng "kỳ cắt tới dd/mm" nói rõ.
+2. **Dự phóng = đã có + giờ các ca còn trong lịch × doanh số/giờ 28 ngày gần nhất (tách ngày camp / ngày thường)**, dải ±8%. "Còn trong lịch" = ca chưa có số (sắp tới + đã qua mà chưa có số) + ca mở chưa có người (`shift_slots` open, chưa gắn session, từ hôm nay) — **gồm cả ca ngoài Kế Hoạch Tháng**, nên tăng cường lịch là dự phóng tăng ngay. Backtest trên số thật (đứng ở ngày 8/15/22 của T7, T8): cách này lệch −7%…+8%; engine × k của trackMonth lệch **+9%…+47%**, chia đều theo ngày lệch tới +43% — không dùng engine cho số tổng.
+3. **Tiến độ target theo target TỪNG NGÀY**, không chia đều: 9 ngày camp mang ~50% doanh số tháng (CROCS: 48% T6, 53% T7, 52% T8). Nguồn target y hệt `applyAllocatedTargets`: Kế Hoạch Tháng đã chốt (`planMonthTotals` + target từng ca kế hoạch rơi vào đúng ngày) > Report Tháng tab 05 (4 khung chia đều ngày trong khung) > không có target (không bịa).
+4. **Tiền chỉ cộng ca ĐỦ dữ liệu** (`missingInputs` rỗng) và luôn ghi "tính được X/Y ca" + danh sách thiếu gì, bấm được sang chỗ nhập. Ngày còn ca thiếu dữ liệu thì không kết luận ngày đó lãi/lỗ. Ca nạp bù ĐƯỢC tính (khác Finance & P&L loại chúng) — màn CEO cần thấy cả lịch sử. "Lãi" = lãi gộp trực tiếp (host + trợ + phòng + ads), chưa trừ chi phí cố định.
+5. **Tỷ trọng giờ của host tính trên TỔNG giờ live của kỳ** (kể cả ca chưa gán host) — Bùi Sỹ Hùng T9 = 37% (66h/178h). Màn cũ ra 47% vì chỉ chia cho giờ đã gán host.
+6. Màu brand trong biểu đồ qua `getBrandTheme`, nhưng màu gần đen (JOCKEY, Franklin) đổi sang xám sáng để không chìm trên nền tối. SVG tô bằng `style={{ fill: "var(--x)" }}` (không dùng thuộc tính `fill=`), lịch nhiệt dùng một màu + độ đậm nên đọc đúng cả theme tối lẫn sand.
 
-**Không chồng lấn với màn đã có:** Toàn Cảnh Agency = CHIỀU THỜI GIAN xuyên brand · Toàn Cảnh Brand = trạng thái thủ tục từng brand trong 1 tháng · Hiệu Suất Host = xếp hạng người để sắp lịch. Có link chéo, không chép cột của nhau.
+**Đã verify (2026-09-25):** `tsc --noEmit` sạch · ESLint 0 cảnh báo trên file mới · `vitest` 60/60 · `vite build` pass · browser thật (phiên admin có sẵn, không nhập mật khẩu), 0 lỗi console. Số khớp truy vấn độc lập vào Supabase: T9 (1–22/09) 3,52 tỷ −18% so với 1–22/08, 177,8h +16%, 19,8 tr/h −30%, 3.069 đơn −23%; ngày 22/09 = 104 tr (−56% so với 15/09); tuần 21–22/09 = 253,1 tr (−48%); T8 = 5,89 tỷ (+13% so với T7); D-Day T9 968 tr = 323 tr/ngày (−17% so với 391 tr/ngày T8); Mid-Month 791 tr. Theme midnight + sand đều đọc được.
 
-**Đã verify:** `tsx` **34/34 check** hàm thuần (tuần ISO qua năm, tháng nhuận, cắt kỳ so sánh, pct null, countable/happened/scheduled/cancelled tách đúng, CTR/CTOR tính lại, kỳ rỗng không NaN, rate 0đ không tính là đã set, rate bị mask nói đúng chữ) · `tsc --noEmit` sạch · `vite build` pass.
+**Chưa verify:** nhánh có target (chưa có Kế Hoạch Tháng nào chốt, cũng chưa có Report Tháng tab 05 cho T9) — run-rate/target khung mới chỉ có unit test. Khối tiền có số (0/47 ca đủ dữ liệu vì 0/33 lương, 0 hoa hồng). Hỗ Trợ Vận Hành với plan đã chốt.
 
-**ĐÃ VERIFY (2026-09-25), bằng phiên admin có sẵn (user đã đăng nhập từ trước trong Browser pane — Claude không nhập mật khẩu) trên app thật ở `localhost:3100`.** Đối chiếu từng ô UI với truy vấn độc lập chạy thẳng vào Supabase production bằng service role (script tsx tạm, không commit — cùng logic `isCountable`/`hasHappened`/`sessionHours` của `agencyOverview.ts`/`hostPerformance.ts`), **khớp 100%** cả 2 chế độ:
+**Việc tiếp theo:**
 
-**Tháng (Tháng 9/2026, agency-wide)** — chú ý: bảng kỳ vọng cũ chốt ngày 24/9 (24 ngày đầu T8), verify chạy ngày 25/9 nên `comparableRange` tự trượt sang 25 ngày đầu T8 — đúng luật #2 của file này, không phải sai lệch:
-
-| Ô | Số trên UI | Đối chiếu Supabase |
-|---|---|---|
-| Giờ live | 177,8h · 47 ca có số | khớp |
-| GMV | 3,52 tỷ (3.516.674.216) | khớp |
-| GMV/giờ | 19,8 triệu (19.776.379) | khớp |
-| Đơn · AOV | 3.069 · 1,1 triệu (1.145.870) | khớp |
-| Lượt xem | 496.448 | khớp |
-| So với kỳ trước | Tháng 8 · **25 ngày đầu** = 5,295 tỷ; delta GMV **−33,6%**, GMV/giờ **−26,6%**, đơn **−36,6%**, lượt xem **−22,9%**, giờ live **−9,5%** | khớp |
-| Phễu | 8.204.047 hiển thị · 260.296 click · CTR 3,17% (+1,3%) · CTOR 1,18% (−11,8%) | khớp |
-| Kỷ luật | 47 đã xếp · 47 đã diễn ra · 0 chưa có số · 0 huỷ · 47 đã đối soát | khớp |
-| Brand | CROCS 100% GMV → cảnh báo tập trung đã bật | khớp |
-| Host | 9 host xếp hạng (cao nhất Bùi Sỹ Hùng 25,7tr/h, thấp nhất Trần Ngọc Bảo Thy 14,8tr/h) + 12 ca chưa gán host tách riêng; Bùi Sỹ Hùng 47,01% số giờ → cảnh báo tập trung người đã bật | khớp |
-| Xu hướng 6 tháng | T4/T5 trống · T6 4,56 · T7 5,19 · T8 5,89 · T9 3,52 tỷ | khớp |
-| Khối tiền | Không hiện số nào — liệt kê đúng 3 thứ thiếu (rate card 0/4 brand, rate talent 0/33, 47/47 ca kỳ này là ca nạp bù nên Finance loại hết) | khớp |
-
-**Tuần (Tuần 39/2026, 21–25/9, 5 ngày đầu vs Tuần 38 5 ngày đầu 14–18/9)** — đổi grain không lỗi console: giờ live 13,6h/4 ca (−69,2%) · GMV 253,1tr (−64,2%) · GMV/giờ 18,6tr (+16,0%) · đơn 225 (−64%) · lượt xem 44.088 (−57,5%) — đối chiếu Supabase khớp cả 5 ô.
-
-Không có lỗi console ở cả 2 chế độ. Bước A coi như đóng.
-
-**Bước B và C — chưa làm, user chưa yêu cầu:**
-
-- **Bước B — chế độ NGÀY** ("hôm qua có gì bất thường"): dải số hôm qua + delta so với median 4 lần gần nhất **cùng thứ** (không so hôm trước — thứ 2 vs chủ nhật vô nghĩa); ca hôm nay chưa có host; việc tồn đọng (`missingSteps` đã có sẵn) bấm nhảy sang Sổ Ca đã lọc; danh sách bất thường có ngưỡng rõ ràng. **Chỉ sống thật khi ca đầu tiên đi qua vòng đời app** — hiện mọi ca đều nạp bù nên khối tồn đọng sẽ trống.
-- **Bước C — khối tiền thật + cam kết + dự kiến cuối tháng.** Chặn bởi dữ liệu, không phải bởi code: cần rate card, rate talent, `brand_contracts`, và ít nhất 1 Kế Hoạch Tháng đã chốt. Dự kiến cuối tháng phải tái dùng `trackMonth()` của Hỗ Trợ Vận Hành, không tự viết engine thứ hai.
-- Khối **"live trên tổng shop"** (% GMV live / GMV shop + return rate thật) từ `shop_analytics` — dữ liệu đã có sẵn 4 tháng CROCS, chỉ thiếu UI.
+1. Lần đầu có người nhập % hoa hồng thật: kiểm `brand_platform_rate_history` có dòng mới mang `commission_rate` (trigger 0118).
+2. Nhập dữ liệu để khối tiền sống: % hoa hồng + % hoàn cho CROCS/JOCKEY/VERA, giá/giờ Franklin (CRM → Rate Card), lương host/trợ live (Talent Pool). Chi phí phòng hiện chỉ nhập được từng ca ở Finance — chưa có chỗ đặt theo phòng (chưa làm, user chưa yêu cầu).
+3. Chốt Kế Hoạch Tháng 10 để run-rate/target khung bắt đầu chạy trên số thật; lúc đó verify lại Bản Tin CEO + Hỗ Trợ Vận Hành.
+4. Chưa làm (chờ user brief): cảnh báo đẩy qua Zalo/chuông cho CEO; chi phí cố định tháng để ra lãi thật của công ty; khối "live chiếm bao nhiêu % doanh số cửa hàng" (số file cửa hàng và số agency đang đếm lệch định nghĩa — T8: 4,17 tỷ vs 5,89 tỷ, phải chốt cách tính trước).
 
 ## Kiến trúc tổng quan
 
@@ -780,7 +748,7 @@ App tách 2 lớp workspace, chuyển qua dropdown switcher trên Header (không
 
 Ground truth luôn là `AGENCY_NAV_GROUPS`/`BRAND_NAV_GROUPS` ở [src/App.tsx](src/App.tsx) — danh sách dưới đây chỉ là ảnh chụp, lệch thì tin code.
 
-**Agency:** Sổ Ca · Lịch Vận Hành · Đăng Ký & Chốt Lịch · Talent Pool · Studios & Gear · CRM (gồm Rate Card từng brand) · TikTok API · Finance & P&L · Hội Đồng AI · Phân Quyền & Role · AI Training Center · Hiệu Suất Host · **Toàn Cảnh Brand** (bảng trạng thái 4 brand/tháng, Đợt C/6).
+**Agency:** Sổ Ca · Lịch Vận Hành · Đăng Ký & Chốt Lịch · Talent Pool · Studios & Gear · CRM (gồm Rate Card từng brand) · TikTok API · Finance & P&L · Hội Đồng AI · Phân Quyền & Role · AI Training Center · Hiệu Suất Host · **Toàn Cảnh Brand** (bảng trạng thái 4 brand/tháng, Đợt C/6) · **Dashboard** (= Bản Tin CEO, 2026-09-25, thay Toàn Cảnh Agency, đứng đầu sidebar).
 
 **Brand:** Lịch Vận Hành · Sổ Ca · SKU Showcase · Report Tháng (có toggle chế độ xem Tháng/Tuần) · Cam Kết Hợp Đồng (read-only, Đợt C/1) · Kế Hoạch Tháng Sau (read-only + nút xác nhận, Đợt C/2) · Rate Card (read-only, Đợt C/3) · Affiliate · Nhập Ads & Ghi Chú (ops-only) · Dữ Liệu Gốc (Dataraw — ẩn với role `brand`, chỉ ceo/admin/operations).
 
@@ -801,7 +769,8 @@ Ground truth luôn là `AGENCY_NAV_GROUPS`/`BRAND_NAV_GROUPS` ở [src/App.tsx](
 
 ## Hạ tầng Supabase
 
-- Migration mới nhất: **0116** — `0116_notifications_round_two.sql` — **ĐÃ CHẠY + verify (2026-09-24)**, Đ7/Đ8/Đ9: 2 `kind` mới (`shift_open`, `shift_dropout_request`), hàm `notify_ops()` (đường agency ← talent, 0083 chỉ có chiều ngược lại), viết lại `notify_session_changes` để `report_reconciled` bắt cả bậc `live_snapshot`, 2 trigger báo ca mở (`shift_slots` cho ca phát sinh + `brand_month_plans.locked_at` cho cả tháng), RPC `request_shift_dropout`. Constraint `kind` verify bằng phép thử chức năng chứ không bằng lời: tạo 1 shift_slot tương lai `plan_id null` → **tạo được**, tức trigger bắn và constraint nhận `'shift_open'` (constraint cũ còn sống thì cả lệnh INSERT chết `23514`). Cùng đợt và cũng **ĐÃ CHẠY**: **0115** (`0115_delete_month_plan.sql` — RPC `delete_month_plan`, đường xoá Kế Hoạch Tháng mà app chưa từng có; phải là RPC chứ không `.delete()` vì `shift_slots.plan_id` là `on delete set null` nên xoá thẳng sẽ để lại ca chờ đăng ký MỒ CÔI) và **0114** (`0114_exclude_session_from_reports.sql` — Đ10, cờ `excluded_from_reports`, RPC `set_session_excluded`, tạo lại view `live_sessions_secure`, vá `publish_brand_monthly_report`).
+- **0118** — `0118_brand_commission_rate.sql` — **ĐÃ CHẠY** (2026-09-25): `commission_rate` cho `brand_platform_rates` + lịch sử, xem mục Bản Tin CEO.
+- Migration trước đó: **0116** — `0116_notifications_round_two.sql` — **ĐÃ CHẠY + verify (2026-09-24)**, Đ7/Đ8/Đ9: 2 `kind` mới (`shift_open`, `shift_dropout_request`), hàm `notify_ops()` (đường agency ← talent, 0083 chỉ có chiều ngược lại), viết lại `notify_session_changes` để `report_reconciled` bắt cả bậc `live_snapshot`, 2 trigger báo ca mở (`shift_slots` cho ca phát sinh + `brand_month_plans.locked_at` cho cả tháng), RPC `request_shift_dropout`. Constraint `kind` verify bằng phép thử chức năng chứ không bằng lời: tạo 1 shift_slot tương lai `plan_id null` → **tạo được**, tức trigger bắn và constraint nhận `'shift_open'` (constraint cũ còn sống thì cả lệnh INSERT chết `23514`). Cùng đợt và cũng **ĐÃ CHẠY**: **0115** (`0115_delete_month_plan.sql` — RPC `delete_month_plan`, đường xoá Kế Hoạch Tháng mà app chưa từng có; phải là RPC chứ không `.delete()` vì `shift_slots.plan_id` là `on delete set null` nên xoá thẳng sẽ để lại ca chờ đăng ký MỒ CÔI) và **0114** (`0114_exclude_session_from_reports.sql` — Đ10, cờ `excluded_from_reports`, RPC `set_session_excluded`, tạo lại view `live_sessions_secure`, vá `publish_brand_monthly_report`).
 
   **Hai bẫy đã sập trong lúc viết đợt này, ghi lại để đừng đi lại:** (a) `0116` bản đầu lọc người nhận bằng `join talents t ... and t.status = 'Active'` — bảng `talents` **KHÔNG CÓ** cột `status` (chỉ `availability_status`, nghĩa là Available/Busy/On Live). Đúng bài học `brand_month_plans.month` vs `period_month`: **dump cột thật trước khi viết**, đừng suy theo họ bảng. (b) `0116` bản đầu gọi `alter table notifications drop constraint if exists notifications_kind_check` — tên đó là tên Postgres TỰ sinh, đoán sai thì `if exists` im lặng không làm gì, constraint CŨ còn nguyên và mình thêm cái mới bên cạnh ⇒ insert kind mới vẫn bị chặn, **hỏng lúc chạy chứ không phải lúc migrate**. Đã đổi sang loop qua `pg_constraint`. Quy ước: `drop constraint if exists` theo tên đoán là sai nguy hiểm hơn là sai vô hại.
 

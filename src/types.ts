@@ -465,6 +465,8 @@ export interface BrandPlatformRate {
   // Tỷ lệ hoàn hủy (0-100), dùng để ước tính NMV = GMV × (1 - returnRate/100) cho brand
   // charge theo NMV thay vì GMV thô. Riêng theo platform (TikTok/Shopee có policy đổi trả khác nhau).
   returnRate: number;
+  // % hoa hồng agency trên NMV (0118). undefined = chưa đặt — khác 0% ("không thu hoa hồng").
+  commissionRate?: number;
 }
 
 // Phòng live mặc định theo brand × nền tảng (0098): chốt Kế Hoạch Tháng ghi phòng này vào ca sinh ra;
@@ -532,6 +534,7 @@ export interface BrandPlatformRateHistoryEntry {
   platform: "TikTok" | "Shopee";
   ratePerHour: number;
   returnRate: number;
+  commissionRate?: number;
   effectiveFrom: string;
   effectiveTo?: string;
 }

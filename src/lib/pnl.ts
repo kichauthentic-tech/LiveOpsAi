@@ -125,7 +125,13 @@ export function computeSessionPnl(
   talentRateHistory: TalentRateHistoryEntry[],
   brandPlatformRateHistory: BrandPlatformRateHistoryEntry[]
 ): SessionPnl {
-  const finance = financeBySessionId[session.id] ?? { sessionId: session.id, ...DEFAULT_FINANCE };
+  const brandRateAtDate = findBrandRateAsOf(brandPlatformRateHistory, session.brandId, session.platform, session.date);
+  const currentBrandRate = brandPlatformRates.find((r) => r.brandId === session.brandId && r.platform === session.platform);
+  // % hoa hồng theo brand (0118) — chỉ thay mặc định 15% khi ca CHƯA có dòng session_finance; ops đã
+  // chốt tay ở Finance thì số của ca thắng.
+  const brandCommission = brandRateAtDate?.commissionRate ?? currentBrandRate?.commissionRate;
+  const financeRow = financeBySessionId[session.id];
+  const finance = financeRow ?? { sessionId: session.id, ...DEFAULT_FINANCE, agencyCommissionRate: brandCommission ?? DEFAULT_FINANCE.agencyCommissionRate };
   const talent = talentById[session.hostId];
   const brand = brandById[session.brandId];
   const talentRateAtDate = talent ? findTalentRateAsOf(talentRateHistory, talent.id, session.date) : undefined;
@@ -142,15 +148,8 @@ export function computeSessionPnl(
     ? talentHourRate * billableHours
     : finance.hostFixRateOverride ?? talentRateAtDate?.ratePerSession ?? talent?.ratePerSession ?? 0;
   const isHourly = brand?.billingModel === "hourly";
-  const brandRateAtDate = findBrandRateAsOf(brandPlatformRateHistory, session.brandId, session.platform, session.date);
-  const hourlyRate =
-    brandRateAtDate?.ratePerHour ??
-    brandPlatformRates.find((r) => r.brandId === session.brandId && r.platform === session.platform)?.ratePerHour ??
-    0;
-  const returnRate =
-    brandRateAtDate?.returnRate ??
-    brandPlatformRates.find((r) => r.brandId === session.brandId && r.platform === session.platform)?.returnRate ??
-    0;
+  const hourlyRate = brandRateAtDate?.ratePerHour ?? currentBrandRate?.ratePerHour ?? 0;
+  const returnRate = brandRateAtDate?.returnRate ?? currentBrandRate?.returnRate ?? 0;
   const estimatedNmv = session.actualGmv * (1 - returnRate / 100);
   const grossAgencyRev = isHourly
     ? sessionDurationHours(session.startTime, session.endTime) * hourlyRate
@@ -184,9 +183,9 @@ export function computeSessionPnl(
   if (hostFixRate <= 0 && hostCommRate <= 0) missingInputs.push("host_rate");
   if (coHost && coHostFixRate <= 0 && coHostCommRate <= 0) missingInputs.push("cohost_rate");
   if (isHourly && hourlyRate <= 0) missingInputs.push("brand_rate");
-  // Chỉ là "mặc định" khi KHÔNG có dòng session_finance nào cho ca này — ops đã vào sửa thì con số
-  // 15% là do họ chọn giữ, không phải app tự bịa.
-  if (!isHourly && !financeBySessionId[session.id]) missingInputs.push("commission_default");
+  // Chỉ là "mặc định" khi KHÔNG có dòng session_finance cho ca này VÀ brand chưa đặt % hoa hồng (0118) —
+  // ops đã vào sửa thì con số 15% là do họ chọn giữ, không phải app tự bịa.
+  if (!isHourly && !financeRow && brandCommission == null) missingInputs.push("commission_default");
 
   return {
     missingInputs,

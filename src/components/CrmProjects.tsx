@@ -17,6 +17,7 @@ interface CrmProjectsProps {
   sessions: LiveSession[];
   onSaveRate: (brandId: string, platform: "TikTok" | "Shopee", ratePerHour: number) => Promise<boolean>;
   onSaveReturnRate: (brandId: string, platform: "TikTok" | "Shopee", returnRate: number) => Promise<boolean>;
+  onSaveCommissionRate: (brandId: string, platform: "TikTok" | "Shopee", commissionRate: number) => Promise<boolean>;
 }
 
 export const CrmProjects: React.FC<CrmProjectsProps> = ({
@@ -30,7 +31,8 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
   brandPlatformRateHistory,
   sessions,
   onSaveRate,
-  onSaveReturnRate
+  onSaveReturnRate,
+  onSaveCommissionRate
 }) => {
   const confirm = useConfirm();
   // Internal agency staff eligible to be KAM owners
@@ -248,6 +250,7 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
             sessions={sessions}
             onSaveRate={onSaveRate}
             onSaveReturnRate={onSaveReturnRate}
+            onSaveCommissionRate={onSaveCommissionRate}
           />
         </div>
       )}

@@ -16,7 +16,7 @@ import { fetchRolePermissions, updateRolePermissions } from "./lib/db/rolePermis
 import { fetchSessionFinances, upsertSessionFinance, setSessionFinanceApproval } from "./lib/db/finance";
 import { fetchTikTokStatus, fetchTikTokWebhookEvents } from "./lib/db/tiktokIntegration";
 import { fetchAiAgentPrompts, updateAiAgentPrompt } from "./lib/db/aiAgentPrompts";
-import { fetchBrandPlatformRates, upsertBrandPlatformRate, upsertBrandPlatformReturnRate } from "./lib/db/brandPlatformRates";
+import { fetchBrandPlatformRates, upsertBrandPlatformCommissionRate, upsertBrandPlatformRate, upsertBrandPlatformReturnRate } from "./lib/db/brandPlatformRates";
 import { fetchBrandStudios, setBrandStudio } from "./lib/db/brandStudios";
 import { fetchShiftSlots, createShiftSlot, updateShiftSlot, deleteShiftSlot } from "./lib/db/shiftSlots";
 import { fetchShiftRegistrations, registerForSlot, unregisterFromSlot } from "./lib/db/shiftRegistrations";
@@ -60,7 +60,7 @@ import {
   Database,
   ClipboardCheck,
   TrendingUp,
-  Activity,
+  LayoutDashboard,
   Gauge,
   FileSignature,
   Radio,
@@ -107,7 +107,7 @@ import OpsSupport from "./components/OpsSupport";
 import { LiveReconciliation } from "./components/LiveReconciliation";
 import { HostPerformance } from "./components/HostPerformance";
 import { BrandsOverview } from "./components/BrandsOverview";
-import { AgencyOverview } from "./components/AgencyOverview";
+import CeoBrief from "./components/CeoBrief";
 import { ReportPublishBoard } from "./components/ReportPublishBoard";
 import { BrandCommitment } from "./components/BrandCommitment";
 
@@ -1369,6 +1369,22 @@ export default function App() {
     }
   };
 
+  const handleSaveBrandPlatformCommissionRate = async (
+    brandId: string,
+    platform: "TikTok" | "Shopee",
+    commissionRate: number
+  ): Promise<boolean> => {
+    try {
+      const saved = await upsertBrandPlatformCommissionRate(brandId, platform, commissionRate);
+      setBrandPlatformRates((prev) => [...prev.filter((r) => !(r.brandId === brandId && r.platform === platform)), saved]);
+      setBrandPlatformRateHistory(await fetchBrandPlatformRateHistory());
+      return true;
+    } catch (e) {
+      showToast(`Không thể lưu % hoa hồng: ${errorMessage(e)}`);
+      return false;
+    }
+  };
+
   // Chốt lịch: sinh 1 live_session thật từ slot đã đăng ký, rồi đánh dấu slot "finalized"
   // và lưu lại session_id để tra ngược — cả 2 bước cần thành công thì mới coi là xong.
   //
@@ -1497,6 +1513,12 @@ export default function App() {
         ]
       : [
           {
+            // Dashboard (Bản Tin CEO, 2026-09-25) đứng riêng trên cùng, không tiêu đề nhóm. Giữ id
+            // "agency_overview" cũ để activeTab trong localStorage không gãy.
+            label: "",
+            items: [{ id: "agency_overview", label: "Dashboard", icon: LayoutDashboard, perm: "manage_sessions" as PermissionKey }]
+          },
+          {
             label: "Lập Kế Hoạch",
             items: [
               // Kế Hoạch Tháng (0090) — lập lưới ca + target trước khi mở đăng ký; chốt là ca đổ xuống
@@ -1521,11 +1543,6 @@ export default function App() {
           {
             label: "Phân Tích",
             items: [
-              // Toàn Cảnh Agency (2026-09-24): nhịp của CẢ agency theo tuần/tháng, cho CEO. Đặt đầu
-              // nhóm vì là màn mở ra trước rồi mới khoan xuống 2 màn dưới. Không chồng lấn: màn này
-              // là CHIỀU THỜI GIAN xuyên brand, Toàn Cảnh Brand là trạng thái thủ tục của từng
-              // brand trong 1 tháng, Hiệu Suất Host là xếp hạng người để sắp lịch.
-              { id: "agency_overview", label: "Toàn Cảnh Agency", icon: Activity, perm: "manage_sessions" as PermissionKey },
               { id: "host_performance", label: "Hiệu Suất Host", icon: TrendingUp, perm: "manage_sessions" as PermissionKey },
               // Toàn Cảnh Brand (Đợt C/6, 2026-09-23): bảng trạng thái 4 brand cho 1 tháng — kế
               // hoạch/cam kết/report/rate đọc thẳng từ DB, không phải widget KPI dự phóng kiểu
@@ -1821,13 +1838,15 @@ export default function App() {
 
             return (
               <div key={group.label} className="space-y-1">
-                <p
-                  className={`px-3 text-[10px] font-bold uppercase tracking-widest text-[var(--text-faint)] ${
-                    sidebarCollapsed ? "md:hidden" : ""
-                  }`}
-                >
-                  {group.label}
-                </p>
+                {group.label && (
+                  <p
+                    className={`px-3 text-[10px] font-bold uppercase tracking-widest text-[var(--text-faint)] ${
+                      sidebarCollapsed ? "md:hidden" : ""
+                    }`}
+                  >
+                    {group.label}
+                  </p>
+                )}
                 {/* Ở chế độ thu gọn, nhóm nav chỉ còn được phân tách bằng 1 gạch mảnh. */}
                 {sidebarCollapsed && <div className="hidden md:block mx-2 border-t border-[var(--border)]" />}
                 {visibleItems.map((item) => {
@@ -2279,16 +2298,20 @@ export default function App() {
                 )}
 
                 {activeTab === "agency_overview" && (
-                  <AgencyOverview
+                  <CeoBrief
                     sessions={activeSessions}
                     brands={activeBrands}
                     talents={talents}
+                    shiftSlots={shiftSlots}
+                    planTargetsBySlotId={planTargetsBySlotId}
+                    planMonthTotals={planMonthTotals}
+                    monthlyReports={monthlyReports}
+                    financeRecords={financeRecords}
                     brandPlatformRates={brandPlatformRates}
+                    brandPlatformRateHistory={brandPlatformRateHistory}
+                    talentRateHistory={talentRateHistory}
                     currentRole={currentRole}
-                    onOpenSessions={() => setActiveTab("sessions")}
-                    onOpenHostPerformance={() => setActiveTab("host_performance")}
-                    onOpenRateCard={() => setActiveTab("crm")}
-                    onOpenTalents={() => setActiveTab("talents")}
+                    onNavigate={setActiveTab}
                   />
                 )}
 
@@ -2431,6 +2454,7 @@ export default function App() {
                     sessions={activeSessions}
                     onSaveRate={handleSaveBrandPlatformRate}
                     onSaveReturnRate={handleSaveBrandPlatformReturnRate}
+                    onSaveCommissionRate={handleSaveBrandPlatformCommissionRate}
                     readOnly
                   />
                 )}
@@ -2518,6 +2542,7 @@ export default function App() {
                     sessions={activeSessions}
                     onSaveRate={handleSaveBrandPlatformRate}
                     onSaveReturnRate={handleSaveBrandPlatformReturnRate}
+                    onSaveCommissionRate={handleSaveBrandPlatformCommissionRate}
                   />
                 )}
 

@@ -10,6 +10,7 @@ interface BrandRateCardProps {
   sessions: LiveSession[];
   onSaveRate: (brandId: string, platform: "TikTok" | "Shopee", ratePerHour: number) => Promise<boolean>;
   onSaveReturnRate: (brandId: string, platform: "TikTok" | "Shopee", returnRate: number) => Promise<boolean>;
+  onSaveCommissionRate: (brandId: string, platform: "TikTok" | "Shopee", commissionRate: number) => Promise<boolean>;
   // Đợt C/3: Brand Workspace nhúng lại đúng component này cho brand xem rate của chính mình —
   // CHỈ ĐỌC dù người đang xem là ops (mở hộ khách). Sửa rate vẫn làm ở CRM bên Agency như cũ.
   readOnly?: boolean;
@@ -25,6 +26,7 @@ export const BrandRateCard: React.FC<BrandRateCardProps> = ({
   sessions,
   onSaveRate,
   onSaveReturnRate,
+  onSaveCommissionRate,
   readOnly = false
 }) => {
   const canEdit = !readOnly && (currentRole === "ceo" || currentRole === "admin" || currentRole === "operations");
@@ -32,6 +34,8 @@ export const BrandRateCard: React.FC<BrandRateCardProps> = ({
   const [busy, setBusy] = useState<"TikTok" | "Shopee" | null>(null);
   const [returnDrafts, setReturnDrafts] = useState<Partial<Record<"TikTok" | "Shopee", string>>>({});
   const [returnBusy, setReturnBusy] = useState<"TikTok" | "Shopee" | null>(null);
+  const [commDrafts, setCommDrafts] = useState<Partial<Record<"TikTok" | "Shopee", string>>>({});
+  const [commBusy, setCommBusy] = useState<"TikTok" | "Shopee" | null>(null);
 
   const rateByPlatform = useMemo(() => {
     const map: Partial<Record<"TikTok" | "Shopee", BrandPlatformRate>> = {};
@@ -43,7 +47,7 @@ export const BrandRateCard: React.FC<BrandRateCardProps> = ({
 
   // GMV thực nhận đã cộng dồn theo platform (mọi session của brand này có actualGmv > 0) —
   // dùng để ước tính NMV = GMV × (1 - tỷ lệ hoàn hủy). Chỉ mang tính tham khảo, KHÔNG feed
-  // vào lib/pnl.ts — P&L thật vẫn dùng finance.agencyCommissionRate ở FinanceHr.tsx như cũ.
+  // vào lib/pnl.ts — P&L dùng % hoa hồng của ca (Finance) hoặc của brand (ô bên dưới, 0118).
   const gmvByPlatform = useMemo(() => {
     const map: Record<"TikTok" | "Shopee", number> = { TikTok: 0, Shopee: 0 };
     for (const s of sessions) {
@@ -83,6 +87,17 @@ export const BrandRateCard: React.FC<BrandRateCardProps> = ({
     if (ok) setReturnDrafts((d) => ({ ...d, [platform]: undefined }));
   };
 
+  const handleSaveCommissionRate = async (platform: "TikTok" | "Shopee") => {
+    const raw = commDrafts[platform];
+    if (raw === undefined) return;
+    const value = Number(raw);
+    if (!Number.isFinite(value) || value < 0 || value > 100) return;
+    setCommBusy(platform);
+    const ok = await onSaveCommissionRate(brandId, platform, value);
+    setCommBusy(null);
+    if (ok) setCommDrafts((d) => ({ ...d, [platform]: undefined }));
+  };
+
   return (
     <div className="space-y-5">
       <h2 className="text-lg font-bold text-[var(--text)] flex items-center gap-2">
@@ -94,6 +109,7 @@ export const BrandRateCard: React.FC<BrandRateCardProps> = ({
           const current = rateByPlatform[platform];
           const draft = drafts[platform];
           const returnDraft = returnDrafts[platform];
+          const commDraft = commDrafts[platform];
           const returnRate = current?.returnRate ?? 0;
           const gmv = gmvByPlatform[platform];
           const estimatedNmv = gmv * (1 - returnRate / 100);
@@ -150,6 +166,32 @@ export const BrandRateCard: React.FC<BrandRateCardProps> = ({
                     </button>
                   </div>
                 )}
+                <div className="flex items-center justify-between pt-2">
+                  <span className="text-[10px] text-[var(--text-faint)] uppercase font-bold">Hoa hồng agency (% NMV)</span>
+                  <span className="text-sm font-bold text-[var(--accent-text)]">{current?.commissionRate != null ? `${current.commissionRate}%` : "Chưa đặt"}</span>
+                </div>
+                <p className="text-[10px] text-[var(--text-faint)] leading-snug">Chỉ dùng cho brand tính phí theo % doanh số. Ca đã có % riêng ở Finance &amp; P&amp;L thì % của ca thắng.</p>
+                {canEdit && (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={0.1}
+                      placeholder="% hoa hồng"
+                      value={commDraft ?? ""}
+                      onChange={(e) => setCommDrafts((d) => ({ ...d, [platform]: e.target.value }))}
+                      className="flex-1 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] text-xs focus:outline-none focus:border-[var(--accent)]"
+                    />
+                    <button
+                      onClick={() => handleSaveCommissionRate(platform)}
+                      disabled={commBusy !== null || commDraft === undefined || commDraft === ""}
+                      className="px-3 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-colors"
+                    >
+                      {commBusy === platform ? "..." : "Lưu"}
+                    </button>
+                  </div>
+                )}
                 <div className="flex items-center justify-between text-[11px] pt-1">
                   <span className="text-[var(--text-faint)]">
                     NMV ước tính (GMV {gmv.toLocaleString("vi-VN")}đ × {(100 - returnRate)}%)
@@ -181,6 +223,7 @@ export const BrandRateCard: React.FC<BrandRateCardProps> = ({
                     <span className="text-[var(--text)] font-bold">
                       {h.ratePerHour.toLocaleString("vi-VN")}đ
                       <span className="text-amber-400 font-normal ml-2">· hoàn hủy {h.returnRate}%</span>
+                      {h.commissionRate != null && <span className="text-[var(--accent-text)] font-normal ml-2">· hoa hồng {h.commissionRate}%</span>}
                     </span>
                   </div>
                 ))}

@@ -8,6 +8,7 @@ interface DbBrandPlatformRate {
   platform: BrandPlatformRate["platform"];
   rate_per_hour: number;
   return_rate: number;
+  commission_rate?: number | null;
 }
 
 function fromDb(row: DbBrandPlatformRate): BrandPlatformRate {
@@ -16,7 +17,8 @@ function fromDb(row: DbBrandPlatformRate): BrandPlatformRate {
     brandId: row.brand_id,
     platform: row.platform,
     ratePerHour: row.rate_per_hour,
-    returnRate: row.return_rate
+    returnRate: row.return_rate,
+    commissionRate: row.commission_rate ?? undefined
   };
 }
 
@@ -52,6 +54,22 @@ export async function upsertBrandPlatformReturnRate(
   const { data, error } = await supabase
     .from("brand_platform_rates")
     .upsert({ brand_id: brandId, platform, return_rate: returnRate }, { onConflict: "brand_id,platform" })
+    .select()
+    .single();
+  if (error) throw error;
+  return fromDb(data as DbBrandPlatformRate);
+}
+
+// % hoa hồng agency (0118). Cùng cách tách field như return_rate: payload chỉ có commission_rate nên
+// on-conflict-update không đụng rate_per_hour/return_rate đang có.
+export async function upsertBrandPlatformCommissionRate(
+  brandId: string,
+  platform: BrandPlatformRate["platform"],
+  commissionRate: number
+): Promise<BrandPlatformRate> {
+  const { data, error } = await supabase
+    .from("brand_platform_rates")
+    .upsert({ brand_id: brandId, platform, commission_rate: commissionRate }, { onConflict: "brand_id,platform" })
     .select()
     .single();
   if (error) throw error;

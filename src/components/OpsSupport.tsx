@@ -5,7 +5,8 @@ import { EngineParams } from "../lib/scheduling/engineParams";
 import { buildHistory } from "../lib/scheduling/suggestEngine";
 import { buildCalibration, evaluatePlan } from "../lib/scheduling/planEvaluation";
 import { fetchBrandLockedPlanSlots, fetchCalendarEvents, fetchMonthPlan } from "../lib/db/monthPlans";
-import { EstimateCtx, benchmarkForWindow, suggestFill, trackMonth } from "../lib/opsSupport";
+import { EstimateCtx, MonthTracking, benchmarkForWindow, suggestFill, trackMonth } from "../lib/opsSupport";
+import { monthOutlook } from "../lib/performance/ceoBrief";
 import { elapsedFractionOf, todayVn } from "../lib/performance/brandCommitment";
 import { formatCurrencyAdaptive } from "../lib/formatCurrency";
 import { SESSION_STATUS_CLS, SESSION_STATUS_LABEL_VI } from "../lib/sessionStatusUi";
@@ -104,10 +105,29 @@ export default function OpsSupport({ brands, sessions, shiftSlots, promoSchemes,
   // hoạch (ops mở tay, ca thay thế sau khi huỷ, ca nạp bù). Không lọc theo tháng thì tiền của tháng
   // khác sẽ chảy nhầm vào run-rate tháng này.
   const brandMonthSessions = useMemo(() => brandSessions.filter((s) => s.date.startsWith(month)), [brandSessions, month]);
-  const tracking = useMemo(
+  const engineTracking = useMemo(
     () => (locked && plan ? trackMonth(plan.slots, shiftSlots, sessions, history, ctx, brandMonthSessions) : null),
     [locked, plan, shiftSlots, sessions, history, ctx, brandMonthSessions]
   );
+  // Dự kiến cuối tháng dùng CHUNG cách tính với Bản Tin CEO (lib/performance/ceoBrief.ts): số đã có +
+  // giờ mọi ca còn trong lịch (kể cả ca ngoài kế hoạch, ca mở chưa có người) × doanh số/giờ 28 ngày gần
+  // nhất. Backtest T7–T8/2026: engine × k lệch +9…+47%, cách này −7…+8%. Engine vẫn dùng cho phương án bù
+  // và cột dự báo từng ca — chỉ con số tổng và thiếu/vượt là đổi, để hai màn không nói hai số.
+  const tracking = useMemo<MonthTracking | null>(() => {
+    if (!engineTracking) return null;
+    const open = shiftSlots.filter((sl) => sl.brandId === brandId && sl.status === "open" && !sl.sessionId);
+    const o = monthOutlook(month, today, brandSessions, open, null, plan?.plan.campRanges);
+    const futureForecast = o.projected - o.actual;
+    const gap = engineTracking.targetTotal - o.projected;
+    const remaining = Math.max(0, engineTracking.targetTotal - engineTracking.actualAll);
+    return {
+      ...engineTracking,
+      projected: o.projected,
+      gap,
+      gapPct: engineTracking.targetTotal > 0 ? gap / engineTracking.targetTotal : 0,
+      upliftPct: o.pending.length > 0 && futureForecast > 0 ? (remaining - futureForecast) / futureForecast : null
+    };
+  }, [engineTracking, shiftSlots, brandId, month, today, brandSessions, plan]);
   const fill = useMemo(
     () => (tracking && plan && tracking.gapPct > engineParams.targetGapWarnPct ? suggestFill(tracking, history, plan.plan, month, today, ctx, engineParams) : null),
     [tracking, plan, history, month, today, ctx, engineParams]
@@ -193,7 +213,7 @@ export default function OpsSupport({ brands, sessions, shiftSlots, promoSchemes,
               <Stat
                 label="Dự kiến cuối tháng"
                 value={formatCurrencyAdaptive(tracking.projected)}
-                hint={tracking.realityFactor !== null ? `còn lại theo engine × k=${tracking.realityFactor.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} (thực tế/dự báo)` : tracking.runRate !== null ? "còn lại = target × run-rate (chưa đủ ca để hiệu chỉnh engine)" : "còn lại = target (chưa có ca xong)"}
+                hint="đã có + giờ các ca còn trong lịch × doanh số/giờ 28 ngày gần nhất (cùng cách Bản Tin CEO) · ±8%"
               />
               <Stat
                 label={tracking.gap > 0 ? "Thiếu" : "Vượt"}
