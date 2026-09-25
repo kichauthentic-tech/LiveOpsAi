@@ -1,5 +1,6 @@
-import { CreatorLivePerfRow, vnDateOf } from "../dataraw/creatorLivePerfSlice";
-import { ShopDaysMonthSlice } from "../dataraw/monthlyProductSlice";
+import type { CreatorLivePerfRow } from "../dataraw/creatorLivePerfSlice";
+import type { ShopDaysMonthSlice } from "../dataraw/monthlyProductSlice";
+import { vnDateOf } from "../dataraw/vnDate";
 import { formatCurrencyAdaptive } from "../formatCurrency";
 
 // Report Tháng 8 phần (user chốt 2026-09-25) — các phép tính MỚI của bố cục mới, tách khỏi component

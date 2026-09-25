@@ -1,5 +1,6 @@
 import { supabase } from "../supabaseClient";
 import { fetchRowsPaged } from "./fetchRowsPaged";
+import { vnDateOf } from "./vnDate";
 import { DataRawColumn } from "../../types";
 import { eachDay } from "./weeklySlice";
 
@@ -68,11 +69,8 @@ function parseVnDateTime(v: unknown): string | undefined {
   return new Date(Date.UTC(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi), Number(se)) - VN_OFFSET_MS).toISOString();
 }
 
-export function vnDateOf(iso: string): string {
-  const shifted = new Date(new Date(iso).getTime() + VN_OFFSET_MS);
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${shifted.getUTCFullYear()}-${p(shifted.getUTCMonth() + 1)}-${p(shifted.getUTCDate())}`;
-}
+// Giữ export cũ cho các nơi đang import từ đây; định nghĩa nằm ở vnDate.ts (thuần, không kéo supabase).
+export { vnDateOf };
 
 export interface CreatorLivePerfRow {
   roomId?: string;
