@@ -1445,9 +1445,11 @@ khớp deck (Seller Live T8 5,885 vs 5,899 tỷ; 228,6h = 228,6h; views/impressi
    không cắt ngày được — T9 22 ngày vs T8 31 ngày; deck Crocs dính đúng lỗi này). Tóm tắt thêm câu SKU dẫn đầu + SKU lên
    hạng mạnh nhất. Bản chụp cũ thiếu `skuRank` ⇒ bảng cũ + nhắc ops bấm Cập nhật (freshness báo "file Sản Phẩm").
    Khác deck có chủ đích: app gộp các Product ID trùng tên (Baya Platform Winter White T8 = 2 ID, 1,02 tỷ; deck 1 ID 486tr).
-   **VIỆC PHẢI LÀM SAU KHI DEPLOY**: ghi sẵn bản tổng hợp v2 vào `brand_dataraw_imports.summary.productAgg` cho mọi batch
-   product_list (không thì mỗi lần mở SKU Showcase/Cập nhật report phải tải lại ~5 MB dòng gốc/tháng, và role brand
-   không ghi ngược được nên tải mãi). KHÔNG ghi trước khi deploy — code cũ trên production thấy v≠1 sẽ tính lại và ghi đè v1.
+   **Đã ghi sẵn v2 (2026-09-26, sau deploy fa31d9e)** cho cả 5 batch product_list (CROCS T6–T9 + 1 batch pickleball) bằng
+   service role, merge vào `summary` cũ. Verify trình duyệt: CROCS T9 bấm Cập nhật số liệu → bảng Top SKU có hạng T8
+   (Bayaband White 20 → 9, +78% GMV/ngày), không request `brand_dataraw_rows`. **Quy ước khi nâng PRODUCT_AGG_VERSION lần
+   sau**: push → chờ deploy xong → mới ghi sẵn bản mới cho mọi batch (ghi trước thì code cũ trên production thấy lệch
+   version sẽ tính lại và ghi đè về bản cũ); không ghi sẵn thì role brand không ghi ngược được, tải lại ~5 MB/tháng mãi.
 
 Kế Hoạch Tháng 3 tháng (trước/này/sau) đọc thẳng bằng `fetchMonthPlan` lúc mở report (như phần 8 vẫn làm), KHÔNG vào
 bản chụp. Code: [monthlyReportInsights.ts](src/lib/report/monthlyReportInsights.ts), [MonthlyReportTabs.tsx](src/components/brand-workspace/MonthlyReportTabs.tsx).
