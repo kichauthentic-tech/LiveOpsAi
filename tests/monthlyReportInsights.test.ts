@@ -14,6 +14,7 @@ import {
   LiveStats,
   planCampAllocation,
   shopTotals,
+  skuMoves,
   trendSignal,
   UPT_LABEL
 } from "../src/lib/report/monthlyReportInsights";
@@ -209,4 +210,30 @@ test("phân bổ Kế Hoạch Tháng theo camp: target, giờ (ca qua đêm), % 
   expect(by.dday).toMatchObject({ target: 200, hours: 5, slots: 1, share: 25, requiredGmvPerHour: 40 });
   expect(by.daily).toMatchObject({ target: 600, hours: 4, share: 75, requiredGmvPerHour: 150 });
   expect(by.payday).toMatchObject({ target: 0, share: 0, requiredGmvPerHour: null });
+});
+
+test("hạng SKU: so hạng thẳng, % GMV tính MỖI NGÀY khi 2 file phủ số ngày khác nhau; SKU ngoài top tháng trước không bịa %", () => {
+  const sku = (name: string, rank: number, gmv: number, extra = {}) => ({ name, rank, gmv, gmvLive: 0, orders: 10, ...extra });
+  const prev = { items: [sku("Baya Platform", 1, 3_100), sku("Classic Bone", 2, 2_000), sku("Baya White", 8, 500)], sellingSkus: 40, limit: 30, hasAnyBatch: true, periodStart: "2026-08-01", periodEnd: "2026-08-31" };
+  const cur = {
+    items: [sku("Baya Platform", 1, 2_200, { skuOrders: 417, clicks: 32_503, impressions: 1_181_278 }), sku("Baya White", 2, 1_100), sku("Mới", 3, 900)],
+    sellingSkus: 35, limit: 30, hasAnyBatch: true, periodStart: "2026-09-01", periodEnd: "2026-09-22"
+  };
+  const m = skuMoves(cur, prev)!;
+  expect(m).toMatchObject({ perDay: true, curDays: 22, prevDays: 31, prevLimit: 30 });
+  // 2.200/22 = 100/ngày vs 3.100/31 = 100/ngày ⇒ 0%, KHÔNG phải −29%.
+  expect(m.rows[0].gmvChange).toBeCloseTo(0, 5);
+  expect(m.rows[0].ctr).toBeCloseTo(2.75, 2);
+  expect(m.rows[0].ctor).toBeCloseTo(1.28, 2);
+  expect(m.rows[1]).toMatchObject({ rank: 2, prevRank: 8 });
+  expect(m.rows[2]).toMatchObject({ prevRank: null, gmvChange: null });
+  // Cùng số ngày ⇒ so GMV thẳng.
+  expect(skuMoves({ ...cur, periodEnd: "2026-09-30" }, { ...prev, periodEnd: "2026-08-30" })!.perDay).toBe(false);
+
+  const text = autoSummary({
+    month: "2026-09", window: compareWindow("2026-09", "2026-09-22"), shopCur: null, shopPrev: null, liveCur: t9, livePrev: t8,
+    drivers: null, basket: null, signals: [], targetGmv: null, campBest: null, dailyGmvPerHour: null, nextMonth: "2026-10", nextPlan: null, skus: m
+  }).join("\n");
+  expect(text).toContain("SKU dẫn đầu: Baya Platform (giữ hạng 1, GMV mỗi ngày +0%)");
+  expect(text).toContain("Lên hạng mạnh nhất: Baya White (8 → 2");
 });

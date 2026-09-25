@@ -10,11 +10,14 @@ import { DataRawColumn } from "../../types";
 // Đổi công thức/cách làm sạch tên ở đây ⇒ TĂNG PRODUCT_AGG_VERSION: bản tổng hợp cũ lệch version sẽ
 // bị bỏ qua và tính lại từ dòng gốc (monthlyProductSlice.fetchProductListAgg).
 
-export const PRODUCT_AGG_VERSION = 1;
+// v2 (2026-09-26): thêm đơn SKU, số món bán, lượt hiển thị + lượt click sản phẩm (phễu TỔNG của SKU — khối
+// cột đầu tiên, đúng số deck report Crocs dùng: 32.503 / 1.181.278 = CTR 2,75%) cho bảng Top SKU có phễu.
+export const PRODUCT_AGG_VERSION = 2;
 
-/** [tên đã làm sạch, GMV, GMV LIVE của người bán, đơn hàng] — mảng thay vì object cho gọn JSON
- *  (vài trăm SKU × 4 khoá lặp lại là phần lớn dung lượng). */
-export type ProductAggSku = [string, number, number, number];
+/** [tên đã làm sạch, GMV, GMV LIVE của người bán, đơn hàng, đơn SKU, số món bán, lượt hiển thị SP, lượt
+ *  click SP] — mảng thay vì object cho gọn JSON (vài trăm SKU × 8 khoá lặp lại là phần lớn dung lượng).
+ *  Thêm cột thì NỐI VÀO CUỐI — chỗ khác destructure 4 phần tử đầu. */
+export type ProductAggSku = [string, number, number, number, number, number, number, number];
 
 export interface ProductListAgg {
   v: number;
@@ -61,6 +64,12 @@ export function buildProductListAgg(columns: DataRawColumn[], rows: Record<strin
     gmv: findCol(columns, /^GMV$/i),
     gmvLive: findCol(columns, /^(?:GMV LIVE của người bán|Seller LIVE GMV)$/i),
     orders: findCol(columns, /^(?:Đơn hàng|Orders)$/i),
+    // Tên cột lặp lại theo từng khối (tổng / LIVE người bán / video / nhà sáng tạo / thẻ SP) — findCol lấy
+    // cột ĐẦU TIÊN = khối tổng của SKU.
+    skuOrders: findCol(columns, /^(?:Đơn hàng SKU|SKU orders)$/i),
+    itemsSold: findCol(columns, /^(?:Số món bán ra|Items sold)$/i),
+    impressions: findCol(columns, /^(?:Lượt hiển thị sản phẩm|Product impressions)$/i),
+    clicks: findCol(columns, /^(?:Lượt nhấp vào sản phẩm|Product clicks)$/i),
     card: findCol(columns, /^(?:GMV thẻ sản phẩm của người bán|Seller product card GMV)$/i)
   };
 
@@ -75,10 +84,14 @@ export function buildProductListAgg(columns: DataRawColumn[], rows: Record<strin
     for (const raw of rows) {
       const name = cleanProductName(String(raw[c.name] ?? ""));
       if (!name) continue;
-      const cur = byName.get(name) ?? [name, 0, 0, 0];
+      const cur = byName.get(name) ?? [name, 0, 0, 0, 0, 0, 0, 0];
       cur[1] += num(raw[c.gmv]);
       cur[2] += num(c.gmvLive && raw[c.gmvLive]);
       cur[3] += num(c.orders && raw[c.orders]);
+      cur[4] += num(c.skuOrders && raw[c.skuOrders]);
+      cur[5] += num(c.itemsSold && raw[c.itemsSold]);
+      cur[6] += num(c.impressions && raw[c.impressions]);
+      cur[7] += num(c.clicks && raw[c.clicks]);
       byName.set(name, cur);
     }
   }

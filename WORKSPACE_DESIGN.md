@@ -1437,19 +1437,33 @@ khớp deck (Seller Live T8 5,885 vs 5,899 tỷ; 228,6h = 228,6h; views/impressi
    cạnh GMV/giờ thực đạt cùng khung tháng này + cột "Cần tăng" (đỏ > 10%). CROCS T10 (nháp): 4 khung cộng 5,5 tỷ;
    ngày thường cần 24,2tr/giờ vs T9 17,9tr/giờ (+35%).
 
+5. **Top SKU có hạng tháng trước + phễu** (phần 6, làm tiếp cùng ngày) — `PRODUCT_AGG_VERSION` 1 → **2**: tuple SKU
+   thêm đơn SKU, số món bán, lượt hiển thị SP, lượt click SP (khối cột TỔNG — cột đầu tiên cùng tên; khớp deck: 32.503 /
+   1.181.278 = CTR 2,75%, 417/32.503 = CTOR 1,28%). Piece bản chụp mới **`skuRank`** (top 30 có hạng + kỳ file phủ) cho
+   tháng report VÀ tháng trước; `topSku` + `skuRank` cùng tháng dùng chung 1 lần đọc bản tổng hợp (`AggMemo`). Hàm thuần
+   `skuMoves`: hạng so thẳng; % GMV so **GMV mỗi ngày** khi 2 file phủ số ngày khác nhau (file Sản Phẩm là tổng cả kỳ,
+   không cắt ngày được — T9 22 ngày vs T8 31 ngày; deck Crocs dính đúng lỗi này). Tóm tắt thêm câu SKU dẫn đầu + SKU lên
+   hạng mạnh nhất. Bản chụp cũ thiếu `skuRank` ⇒ bảng cũ + nhắc ops bấm Cập nhật (freshness báo "file Sản Phẩm").
+   Khác deck có chủ đích: app gộp các Product ID trùng tên (Baya Platform Winter White T8 = 2 ID, 1,02 tỷ; deck 1 ID 486tr).
+   **VIỆC PHẢI LÀM SAU KHI DEPLOY**: ghi sẵn bản tổng hợp v2 vào `brand_dataraw_imports.summary.productAgg` cho mọi batch
+   product_list (không thì mỗi lần mở SKU Showcase/Cập nhật report phải tải lại ~5 MB dòng gốc/tháng, và role brand
+   không ghi ngược được nên tải mãi). KHÔNG ghi trước khi deploy — code cũ trên production thấy v≠1 sẽ tính lại và ghi đè v1.
+
 Kế Hoạch Tháng 3 tháng (trước/này/sau) đọc thẳng bằng `fetchMonthPlan` lúc mở report (như phần 8 vẫn làm), KHÔNG vào
 bản chụp. Code: [monthlyReportInsights.ts](src/lib/report/monthlyReportInsights.ts), [MonthlyReportTabs.tsx](src/components/brand-workspace/MonthlyReportTabs.tsx).
 
-**Verify:** tsc 0 lỗi, eslint không thêm cảnh báo (2 cảnh báo cũ), vitest 77/77 (4 test mới: tách giỏ hàng bằng số
+**Verify mục 5:** vitest 79/79 (+ tổng hợp v2 lấy khối cột tổng, + hạng SKU/GMV mỗi ngày); SSR bản chụp T8/T9 thật
+gắn `skuRank` tính read-only từ dòng gốc file Sản Phẩm T7/T8/T9 (không ghi DB): hạng T7 khớp deck (Atmosphere 6, Baya White
+8, Bella 4). **Chưa verify trên browser** (cần bấm Cập nhật số liệu — ghi bản chụp + bản tổng hợp v2 lên DB, làm sau deploy).
+
+**Verify mục 1–4:** tsc 0 lỗi, eslint không thêm cảnh báo (2 cảnh báo cũ), vitest 77/77 (4 test mới: tách giỏ hàng bằng số
 CROCS T7/T8 + câu tự sinh không được kết luận "nhờ GMV/SP", UPT 4 tháng, camp dùng khoảng của chính tháng, phân bổ
 kế hoạch có ca qua đêm), vite build; SSR bản chụp T8 + T9 thật; browser (admin) CROCS T9: phần 4/7/8 đúng số, console
 không lỗi mới. **Chưa verify trên data thật:** target khung từ kế hoạch ĐÃ CHỐT (DB chỉ có 1 kế hoạch — CROCS T10 nháp;
 chỉ unit test phủ); góc nhìn brand.
 
 **Chưa làm từ deck Crocs (đã nêu với user):** host tách ngày thường/camp (số per-host của deck lệch app — Hùng ngày
-thường deck 727tr/16h vs app 1,1 tỷ/31h, cần hỏi Crocs cách chia ca 2 host); Top SKU có hạng tháng trước + phễu từng SKU
-(file Sản Phẩm có cột "(LIVE)" impressions/clicks/CTR/thêm giỏ, cần mở rộng `productAgg` + tăng `PRODUCT_AGG_VERSION`);
-ô "Insight" cuối mỗi phần; KPI cả shop do brand đặt (deck: 8,4 tỷ) tách khỏi target live — cần trường mới.
+thường deck 727tr/16h vs app 1,1 tỷ/31h, cần hỏi Crocs cách chia ca 2 host); ô "Insight" cuối mỗi phần; KPI cả shop do brand đặt (deck: 8,4 tỷ) tách khỏi target live — cần trường mới.
 
 ## Bản chụp số liệu Report Tháng — XONG + VERIFY 2026-09-25 (migration 0119 ĐÃ CHẠY)
 

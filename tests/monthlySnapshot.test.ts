@@ -20,11 +20,14 @@ vi.mock("../src/lib/dataraw/monthlyDailySlice", () => ({
   fetchLivePerformanceCoreMonthSlice: async (_b: string, s: string) => (calls.push(`dailyPerf ${s}`), { daily: [], missingDays: [], hasAnyBatch: true })
 }));
 vi.mock("../src/lib/dataraw/monthlyProductSlice", () => ({
-  fetchProductListAgg: async (_b: string, s: string) => (calls.push(`productAgg ${s}`), { v: 1, skus: [["Clog", 100, 60, 2]], cardGmv: 40, hasSkuCols: true, hasCardCol: true, rowCount: 1 }),
+  fetchProductListAggWithPeriod: async (_b: string, s: string, e: string) => (
+    calls.push(`productAgg ${s}`), { agg: { v: 2, skus: [["Clog", 100, 60, 2, 2, 3, 1000, 50]], cardGmv: 40, hasSkuCols: true, hasCardCol: true, rowCount: 1 }, periodStart: s, periodEnd: e }
+  ),
   fetchShopDaysMonthSlice: async (_b: string, s: string) => (calls.push(`shopDays ${s}`), { days: [{ date: s, gmv: 300, refunds: 30, orders: 3, visitors: 10, liveLinked: 150, affiliate: 50, video: 7 }], hasAnyBatch: true }),
   fetchCardGmvMonthSlice: async (_b: string, s: string) => (calls.push(`card ${s}`), { cardGmv: 40, hasAnyBatch: true }),
   fetchTopPromotionsMonthSlice: async (_b: string, s: string) => (calls.push(`promo ${s}`), { items: [], hasAnyBatch: true, excludedMultiMonth: 0 }),
-  topSkuFromAgg: (agg: { skus: [string, number, number, number][] }) => ({ items: agg.skus.map(([name, gmv, gmvLive, orders]) => ({ name, gmv, gmvLive, orders })), hasAnyBatch: true })
+  topSkuFromAgg: (agg: { skus: [string, number, number, number][] }) => ({ items: agg.skus.map(([name, gmv, gmvLive, orders]) => ({ name, gmv, gmvLive, orders })), hasAnyBatch: true }),
+  skuRankFromAgg: (src: { agg: { skus: [string, number][] } } | null) => ({ items: (src?.agg.skus ?? []).map(([name, gmv], i) => ({ name, gmv, rank: i + 1 })), sellingSkus: 1, limit: 30, hasAnyBatch: !!src })
 }));
 
 const { buildMonthlyReportSnapshot, hydrateSnapshotSessions, snapshotFreshness, snapshotHeadline } = await import("../src/lib/report/monthlySnapshot");
@@ -73,13 +76,14 @@ beforeEach(() => {
   prevMonthPieces = null;
 });
 
-test("dựng lần đầu: bản tổng hợp SKU chỉ đọc 1 lần cho tháng report, shop + thẻ SP cho đủ 4 tháng, không tải file dự phòng khi đã có ca", async () => {
+test("dựng lần đầu: bản tổng hợp SKU chỉ đọc 1 lần mỗi tháng (Top SKU + xếp hạng dùng chung), shop + thẻ SP cho đủ 4 tháng, không tải file dự phòng khi đã có ca", async () => {
   const { snapshot, fetched, reused } = await buildMonthlyReportSnapshot({ brandId: B, month: M, sessions, brandPlatformRates: [] });
   expect(calls.filter((c) => c === "productAgg 2026-09-01")).toHaveLength(1);
+  expect(calls.filter((c) => c === "productAgg 2026-08-01")).toHaveLength(1);
   expect(calls.some((c) => c.startsWith("creatorLive"))).toBe(false);
   expect(reused).toEqual([]);
   expect(fetched.sort()).toEqual(
-    ["cardGmv|2026-06", "cardGmv|2026-07", "cardGmv|2026-08", "cardGmv|2026-09", "dailyPerf|2026-09", "shopDays|2026-06", "shopDays|2026-07", "shopDays|2026-08", "shopDays|2026-09", "topPromo|2026-09", "topSku|2026-09"]
+    ["cardGmv|2026-06", "cardGmv|2026-07", "cardGmv|2026-08", "cardGmv|2026-09", "dailyPerf|2026-09", "shopDays|2026-06", "shopDays|2026-07", "shopDays|2026-08", "shopDays|2026-09", "skuRank|2026-08", "skuRank|2026-09", "topPromo|2026-09", "topSku|2026-09"]
   );
   // Chỉ ca của brand, trong cửa sổ 4 tháng, trừ ca huỷ; không mang theo aiAnalysis.
   expect(snapshot.sessions.map((s) => s.id).sort()).toEqual(["aug", "jul", "jun", "sep1", "sep2"]);
@@ -108,7 +112,7 @@ test("up đè file Sản Phẩm T9: chỉ tải lại phần dính product_list 
   expect(f.changedSessions).toBe(0);
   calls.length = 0;
   const again = await buildMonthlyReportSnapshot({ brandId: B, month: M, sessions, brandPlatformRates: [], previous: first.snapshot });
-  expect(again.fetched.sort()).toEqual(["cardGmv|2026-09", "topSku|2026-09"]);
+  expect(again.fetched.sort()).toEqual(["cardGmv|2026-09", "skuRank|2026-09", "topSku|2026-09"]);
   expect(calls).toEqual(expect.arrayContaining(["productAgg 2026-09-01"]));
   expect(calls).not.toContain("promo 2026-09-01");
 });
@@ -119,7 +123,9 @@ test("tháng trước lấy từ bản chụp tháng trước (cùng stamp) thay
   calls.length = 0;
   const sep = await buildMonthlyReportSnapshot({ brandId: B, month: M, sessions, brandPlatformRates: [] });
   // Cửa sổ T9 = T6..T9; bản chụp T8 (T5..T8) đã có shop + thẻ SP của T6, T7, T8.
-  expect(sep.reused.sort()).toEqual(["cardGmv|2026-06", "cardGmv|2026-07", "cardGmv|2026-08", "shopDays|2026-06", "shopDays|2026-07", "shopDays|2026-08"]);
+  // skuRank|2026-08 = piece tháng report của bản chụp T8 ⇒ hạng tháng trước không phải đọc lại file T8.
+  expect(sep.reused.sort()).toEqual(["cardGmv|2026-06", "cardGmv|2026-07", "cardGmv|2026-08", "shopDays|2026-06", "shopDays|2026-07", "shopDays|2026-08", "skuRank|2026-08"]);
+  expect(calls).not.toContain("productAgg 2026-08-01");
   expect(calls).not.toContain("shopDays 2026-08-01");
   expect(calls).toContain("shopDays 2026-09-01");
 });
@@ -163,7 +169,7 @@ test("tổng hợp product_list: gộp dòng trùng tên sau khi làm sạch, c�
     { "Tên": "[SẢN PHẨM ĐỘC QUYỀN ONLINE] Baya", GMV: "500₫", "GMV LIVE của người bán": "0", "Đơn hàng": 1, "GMV thẻ sản phẩm của người bán": "100₫" },
     { "Tên": "Ế", GMV: "0", "GMV LIVE của người bán": "0", "Đơn hàng": 0, "GMV thẻ sản phẩm của người bán": "0" }
   ]);
-  expect(agg.skus).toEqual([["Baya", 1500, 600, 3], ["Ế", 0, 0, 0]]);
+  expect(agg.skus).toEqual([["Baya", 1500, 600, 3, 0, 0, 0, 0], ["Ế", 0, 0, 0, 0, 0, 0, 0]]);
   expect(agg.cardGmv).toBe(400);
   expect(isCurrentProductAgg(JSON.parse(JSON.stringify(agg)))).toBe(true);
   expect(isCurrentProductAgg({ ...agg, v: 0 })).toBe(false);
@@ -171,8 +177,29 @@ test("tổng hợp product_list: gộp dòng trùng tên sau khi làm sạch, c�
   const en = buildProductListAgg([{ key: "Product Name", label: "Product Name" }, { key: "GMV", label: "GMV" }, { key: "Seller product card GMV", label: "Seller product card GMV" }], [
     { "Product Name": "Echo", GMV: 10, "Seller product card GMV": 4 }
   ]);
-  expect(en.skus).toEqual([["Echo", 10, 0, 0]]);
+  expect(en.skus).toEqual([["Echo", 10, 0, 0, 0, 0, 0, 0]]);
   expect(en.cardGmv).toBe(4);
   // Sai loại file: không có cột tên/GMV — phân biệt với "0 SKU".
   expect(buildProductListAgg([{ key: "X", label: "X" }], [{ X: 1 }]).hasSkuCols).toBe(false);
+});
+
+test("tổng hợp v2: phễu SKU lấy khối cột TỔNG (cột đầu tiên), không lấy khối LIVE/video lặp tên", () => {
+  // Nhãn trùng ở các khối sau được parser đặt key khác (vd "Product impressions__2") — khớp số deck Crocs.
+  const cols = [
+    { key: "Product Name", label: "Product Name" },
+    { key: "GMV", label: "GMV" },
+    { key: "SKU orders", label: "SKU orders" },
+    { key: "Items sold", label: "Items sold" },
+    { key: "Product impressions", label: "Product impressions" },
+    { key: "Product clicks", label: "Product clicks" },
+    { key: "Product impressions__2", label: "Product impressions" },
+    { key: "Product clicks__2", label: "Product clicks" }
+  ];
+  const agg = buildProductListAgg(cols, [
+    { "Product Name": "Baya Platform - Winter White", GMV: "486.186.999₫", "SKU orders": 417, "Items sold": 421, "Product impressions": 1181278, "Product clicks": 32503, "Product impressions__2": 5, "Product clicks__2": 1 }
+  ]);
+  const [, , , , skuOrders, items, imp, clk] = agg.skus[0];
+  expect([skuOrders, items, imp, clk]).toEqual([417, 421, 1181278, 32503]);
+  expect(((clk / imp) * 100).toFixed(2)).toBe("2.75");
+  expect(((skuOrders / clk) * 100).toFixed(2)).toBe("1.28");
 });

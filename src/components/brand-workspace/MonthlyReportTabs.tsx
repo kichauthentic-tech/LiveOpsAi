@@ -59,6 +59,7 @@ import {
   pctChange,
   planCampAllocation,
   shopTotals,
+  skuMoves,
   trendSignal,
   UPT_LABEL
 } from "../../lib/report/monthlyReportInsights";
@@ -1171,6 +1172,13 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     [nextPlanFull]
   );
 
+  // Top SKU: hạng tháng trước → tháng này + phễu (piece skuRank, bản chụp từ 2026-09-26). Tháng trước bị
+  // che với brand (chưa phát hành) thì không có hạng/so sánh.
+  const skuMoveData = useMemo(
+    () => skuMoves(view.skuRank?.[month] ?? null, hiddenMonths.has(prevMonth) ? null : (view.skuRank?.[prevMonth] ?? null)),
+    [view, month, prevMonth, hiddenMonths]
+  );
+
   const campBest = useMemo(() => {
     const camps = campDetailRows.filter((r) => r.key !== "daily" && r.gmvPerHour != null && r.hours > 0).sort((a, b) => (b.gmvPerHour ?? 0) - (a.gmvPerHour ?? 0));
     return camps[0] ? { label: camps[0].label, gmvPerHour: camps[0].gmvPerHour! } : null;
@@ -1193,7 +1201,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     nextMonth,
     nextPlan
   };
-  const autoSummaryLines = autoSummary(narrativeInput);
+  const autoSummaryLines = autoSummary({ ...narrativeInput, skus: skuMoveData });
   const autoNextLines = autoNextSteps(narrativeInput);
   const splitLines = (t?: string) => (t ?? "").split("\n").map((l) => l.replace(/^[-•\s]+/, "").trim()).filter(Boolean);
   const summaryLines = monthlyReportRow?.summaryText != null ? splitLines(monthlyReportRow.summaryText) : autoSummaryLines;
@@ -1329,7 +1337,20 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         },
         {
           name: "6 Hang - Top SKU",
-          rows: (topSku?.items ?? []).map((s, idx) => ({ "#": idx + 1, "Sản Phẩm": s.name, "GMV": n(s.gmv), "GMV Live": n(s.gmvLive), "Đơn": n(s.orders) }))
+          rows: skuMoveData
+            ? skuMoveData.rows.map((r) => ({
+                "Hạng": r.rank,
+                [`Hạng ${prevMonth}`]: r.prevRank ?? "",
+                "Sản Phẩm": r.name,
+                "GMV": n(r.gmv),
+                [skuMoveData.perDay ? "± GMV/ngày (%)" : "± GMV (%)"]: n(r.gmvChange),
+                "GMV Live": n(r.gmvLive),
+                "Đơn": n(r.orders),
+                "SP bán": n(r.itemsSold),
+                "CTR (%)": n(r.ctr),
+                "CTOR (%)": n(r.ctor)
+              }))
+            : (topSku?.items ?? []).map((s, idx) => ({ "#": idx + 1, "Sản Phẩm": s.name, "GMV": n(s.gmv), "GMV Live": n(s.gmvLive), "Đơn": n(s.orders) }))
         },
         {
           name: "6 Hang - Khuyen Mai",
@@ -1787,40 +1808,99 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         {/* ===== 6. Hàng ===== */}
         <section id="mr-products" className="space-y-4 scroll-mt-16">
           <SectionHead no="6" title="Hàng" sub="SKU dẫn doanh số, phần bán qua live, khuyến mãi chạy trong tháng" />
-          <Panel title="Top SKU Theo GMV" icon={<ShoppingBag className="w-4 h-4" />} sub="Nguồn: file Sản Phẩm — GMV Live = GMV bán qua LIVE của tài khoản shop">
-                  {!topSku?.hasAnyBatch ? (
-                    <p className="text-sm text-center py-6" style={{ color: PAL.muted }}>
-                      Chưa có file "Product List" nào được import trong Dữ Liệu Gốc cho tháng này.
-                    </p>
-                  ) : (
-                    <div className="space-y-4">
-                      <ReportTable head={["#", "Sản Phẩm", "GMV", "GMV Live", "% Qua Live", "Đơn Hàng"]}>
-                        {(topSku.items ?? []).map((s, idx) => (
-                          <tr key={s.name} style={{ borderBottom: `1px solid ${PAL.line}`, background: idx % 2 ? `${PAL.panel2}55` : "transparent" }}>
-                            <td className="py-2 px-3 font-mono" style={{ color: PAL.gold }}>
-                              {idx + 1}
-                            </td>
-                            <td className="py-2 px-3" style={{ color: PAL.cream }}>
-                              {s.name}
-                            </td>
-                            <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>
-                              {formatCurrencyAdaptive(s.gmv)}
-                            </td>
-                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
-                              {formatCurrencyAdaptive(s.gmvLive)}
-                            </td>
-                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
-                              {s.gmv > 0 ? fmtPct((s.gmvLive / s.gmv) * 100) : "—"}
-                            </td>
-                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
-                              {fmtInt(s.orders)}
-                            </td>
-                          </tr>
-                        ))}
-                      </ReportTable>
-                    </div>
-                  )}
-                </Panel>
+          <Panel
+            title="Top SKU Theo GMV"
+            icon={<ShoppingBag className="w-4 h-4" />}
+            sub={
+              skuMoveData
+                ? `Nguồn: file Sản Phẩm${skuMoveData.curDays ? ` (${skuMoveData.curDays} ngày)` : ""} · hạng so với tháng ${prevMonth.slice(5)}${skuMoveData.perDay ? ` (${skuMoveData.prevDays} ngày) — % GMV tính trên GMV mỗi ngày vì 2 file phủ số ngày khác nhau` : ""} · CTR/CTOR là phễu tổng của sản phẩm (mọi kênh)`
+                : "Nguồn: file Sản Phẩm — GMV Live = GMV bán qua LIVE của tài khoản shop"
+            }
+          >
+            {!topSku?.hasAnyBatch ? (
+              <p className="text-sm text-center py-6" style={{ color: PAL.muted }}>
+                Chưa có file "Product List" nào được import trong Dữ Liệu Gốc cho tháng này.
+              </p>
+            ) : skuMoveData ? (
+              <ReportTable head={["Hạng", "Sản Phẩm", "GMV", skuMoveData.perDay ? "± GMV/ngày" : "± GMV", "% Qua Live", "Đơn", "SP Bán", "CTR", "CTOR"]}>
+                {skuMoveData.rows.map((r, idx) => {
+                  const moved = r.prevRank == null ? null : r.prevRank - r.rank;
+                  return (
+                    <tr key={r.name} style={{ borderBottom: `1px solid ${PAL.line}`, background: idx % 2 ? `${PAL.panel2}55` : "transparent" }}>
+                      <td className="py-2 px-3 font-mono whitespace-nowrap" style={{ color: PAL.gold }}>
+                        {r.rank}
+                        <span className="ml-1.5 text-[10px]" style={{ color: moved == null ? PAL.muted : moved > 0 ? PAL.green : moved < 0 ? PAL.red : PAL.muted }}>
+                          {r.prevRank == null
+                            ? skuMoveData.prevLimit != null
+                              ? `(ngoài top ${skuMoveData.prevLimit})`
+                              : ""
+                            : moved === 0
+                              ? "(=)"
+                              : `(${r.prevRank} ${moved! > 0 ? "▲" : "▼"})`}
+                        </span>
+                      </td>
+                      <td className="py-2 px-3" style={{ color: PAL.cream }}>
+                        {r.name}
+                      </td>
+                      <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>
+                        {formatCurrencyAdaptive(r.gmv)}
+                      </td>
+                      <td className="py-2 px-3 text-right font-mono" style={{ color: r.gmvChange == null ? PAL.muted : r.gmvChange >= 0 ? PAL.green : PAL.red }}>
+                        {r.gmvChange == null ? "—" : `${r.gmvChange >= 0 ? "+" : "−"}${Math.abs(r.gmvChange).toFixed(1)}%`}
+                      </td>
+                      <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
+                        {r.gmv > 0 ? fmtPct((r.gmvLive / r.gmv) * 100) : "—"}
+                      </td>
+                      <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
+                        {fmtInt(r.orders)}
+                      </td>
+                      <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
+                        {r.itemsSold != null ? fmtInt(r.itemsSold) : "—"}
+                      </td>
+                      <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
+                        {fmtPct(r.ctr)}
+                      </td>
+                      <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
+                        {fmtPct(r.ctor)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </ReportTable>
+            ) : (
+              <div className="space-y-2">
+                {canManage && (
+                  <p className="text-[11px]" style={{ color: PAL.gold }}>
+                    Bấm "Cập nhật số liệu" để có hạng so với tháng trước và phễu từng SKU.
+                  </p>
+                )}
+                <ReportTable head={["#", "Sản Phẩm", "GMV", "GMV Live", "% Qua Live", "Đơn Hàng"]}>
+                  {(topSku.items ?? []).map((s, idx) => (
+                    <tr key={s.name} style={{ borderBottom: `1px solid ${PAL.line}`, background: idx % 2 ? `${PAL.panel2}55` : "transparent" }}>
+                      <td className="py-2 px-3 font-mono" style={{ color: PAL.gold }}>
+                        {idx + 1}
+                      </td>
+                      <td className="py-2 px-3" style={{ color: PAL.cream }}>
+                        {s.name}
+                      </td>
+                      <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>
+                        {formatCurrencyAdaptive(s.gmv)}
+                      </td>
+                      <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
+                        {formatCurrencyAdaptive(s.gmvLive)}
+                      </td>
+                      <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
+                        {s.gmv > 0 ? fmtPct((s.gmvLive / s.gmv) * 100) : "—"}
+                      </td>
+                      <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
+                        {fmtInt(s.orders)}
+                      </td>
+                    </tr>
+                  ))}
+                </ReportTable>
+              </div>
+            )}
+          </Panel>
           <Panel
                   title="Top Chương Trình Khuyến Mãi"
                   icon={<Megaphone className="w-4 h-4" />}

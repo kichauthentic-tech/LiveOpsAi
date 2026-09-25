@@ -65,20 +65,34 @@ export async function fetchOverlappingBatchRows(brandId: string, reportType: Dat
 // hoặc lệch PRODUCT_AGG_VERSION, thì tính lại từ dòng gốc MỘT lần rồi ghi ngược vào `summary` — lần
 // sau về đường rẻ. Ghi ngược hỏng (vd role không có quyền ghi) thì bỏ qua, số trả về vẫn đúng.
 export async function fetchProductListAgg(brandId: string, monthStart: string, monthEnd: string): Promise<ProductListAgg | null> {
+  return (await fetchProductListAggWithPeriod(brandId, monthStart, monthEnd))?.agg ?? null;
+}
+
+/** Như fetchProductListAgg, kèm kỳ của batch đã chọn (cắt về trong tháng) — file Sản Phẩm là tổng cả kỳ,
+ *  không cắt theo ngày được, nên so 2 tháng phải biết mỗi bên phủ bao nhiêu ngày. */
+export async function fetchProductListAggWithPeriod(
+  brandId: string,
+  monthStart: string,
+  monthEnd: string
+): Promise<{ agg: ProductListAgg; periodStart: string; periodEnd: string } | null> {
   const best = await pickOverlappingBatch(brandId, "product_list", monthStart, monthEnd);
   if (!best) return null;
+  const period = {
+    periodStart: best.period_start! < monthStart ? monthStart : best.period_start!,
+    periodEnd: best.period_end! > monthEnd ? monthEnd : best.period_end!
+  };
 
   const { data, error } = await supabase.from("brand_dataraw_imports").select("agg:summary->productAgg").eq("id", best.id).single();
   if (error) throw error;
   const stored = (data as { agg: unknown }).agg;
-  if (isCurrentProductAgg(stored)) return stored;
+  if (isCurrentProductAgg(stored)) return { agg: stored, ...period };
 
   const { rows, columns } = await readBatch(best.id);
   const agg = buildProductListAgg(columns, rows);
   const { data: cur } = await supabase.from("brand_dataraw_imports").select("summary").eq("id", best.id).single();
   const summary = ((cur as { summary: Record<string, unknown> | null } | null)?.summary ?? {}) as Record<string, unknown>;
   await supabase.from("brand_dataraw_imports").update({ summary: { ...summary, productAgg: agg } }).eq("id", best.id);
-  return agg;
+  return { agg, ...period };
 }
 
 export interface TopSkuRow {
@@ -86,6 +100,11 @@ export interface TopSkuRow {
   gmv: number;
   gmvLive: number;
   orders: number;
+  /** Từ bản tổng hợp v2 — bản chụp cũ (v1) không có ⇒ undefined. */
+  skuOrders?: number;
+  itemsSold?: number;
+  impressions?: number;
+  clicks?: number;
 }
 
 export interface TopSkuMonthSlice {
@@ -99,7 +118,8 @@ export interface TopSkuMonthSlice {
 export function skuPerfFromAgg(agg: ProductListAgg | null): { byName: Map<string, TopSkuRow>; hasAnyBatch: boolean } {
   const byName = new Map<string, TopSkuRow>();
   if (!agg) return { byName, hasAnyBatch: false };
-  for (const [name, gmv, gmvLive, orders] of agg.skus) byName.set(name, { name, gmv, gmvLive, orders });
+  for (const [name, gmv, gmvLive, orders, skuOrders, itemsSold, impressions, clicks] of agg.skus)
+    byName.set(name, { name, gmv, gmvLive, orders, skuOrders, itemsSold, impressions, clicks });
   return { byName, hasAnyBatch: true };
 }
 
@@ -107,6 +127,32 @@ export function topSkuFromAgg(agg: ProductListAgg | null, limit = 10): TopSkuMon
   const { byName, hasAnyBatch } = skuPerfFromAgg(agg);
   if (!hasAnyBatch) return { items: [], hasAnyBatch: false };
   return { items: Array.from(byName.values()).sort((a, b) => b.gmv - a.gmv).slice(0, limit), hasAnyBatch: true };
+}
+
+/** Xếp hạng SKU của 1 tháng (Report Tháng "Hàng": hạng tháng trước → tháng này + phễu từng SKU). Giữ top
+ *  `limit` theo GMV kèm hạng; SKU tháng này nằm ngoài top `limit` tháng trước thì hiện "ngoài top N". */
+export interface SkuRankSlice {
+  items: (TopSkuRow & { rank: number })[];
+  /** Số SKU có GMV > 0 trong tháng. */
+  sellingSkus: number;
+  limit: number;
+  hasAnyBatch: boolean;
+  /** Kỳ file phủ trong tháng (vd 2026-09-01..2026-09-22). */
+  periodStart?: string;
+  periodEnd?: string;
+}
+
+export function skuRankFromAgg(src: { agg: ProductListAgg; periodStart: string; periodEnd: string } | null, limit = 30): SkuRankSlice {
+  const { byName, hasAnyBatch } = skuPerfFromAgg(src?.agg ?? null);
+  const selling = Array.from(byName.values()).filter((r) => r.gmv > 0).sort((a, b) => b.gmv - a.gmv);
+  return {
+    items: selling.slice(0, limit).map((r, i) => ({ ...r, rank: i + 1 })),
+    sellingSkus: selling.length,
+    limit,
+    hasAnyBatch,
+    periodStart: src?.periodStart,
+    periodEnd: src?.periodEnd
+  };
 }
 
 export async function fetchTopSkuMonthSlice(brandId: string, monthStart: string, monthEnd: string, limit = 10): Promise<TopSkuMonthSlice> {

@@ -1,6 +1,7 @@
 import type { BrandMonthPlanSlot } from "../../types";
 import { CAMP_DAY_BUCKET_ORDER, resolveCampBucketType, type CampDayBucket, type CampOverrides } from "../campaignDays";
 import type { CreatorLivePerfRow } from "../dataraw/creatorLivePerfSlice";
+import type { SkuRankSlice } from "../dataraw/monthlyProductSlice";
 import type { ShopDaysMonthSlice } from "../dataraw/monthlyProductSlice";
 import { vnDateOf } from "../dataraw/vnDate";
 import { formatCurrencyAdaptive } from "../formatCurrency";
@@ -244,6 +245,65 @@ export function planCampAllocation(slots: Pick<BrandMonthPlanSlot, "date" | "sta
   }));
 }
 
+// ---------- SKU: hạng tháng trước → tháng này ----------
+
+export interface SkuMove {
+  name: string;
+  rank: number;
+  /** null = ngoài top `limit` tháng trước (hoặc tháng trước không có file). */
+  prevRank: number | null;
+  gmv: number;
+  prevGmv: number | null;
+  /** % đổi GMV — theo GMV MỖI NGÀY khi 2 file phủ số ngày khác nhau (xem `perDay`). */
+  gmvChange: number | null;
+  gmvLive: number;
+  orders: number;
+  itemsSold: number | null;
+  ctr: number | null;
+  ctor: number | null;
+}
+
+export interface SkuMoves {
+  rows: SkuMove[];
+  /** File tháng này và tháng trước phủ số ngày khác nhau ⇒ % đổi GMV tính trên GMV mỗi ngày. */
+  perDay: boolean;
+  curDays: number | null;
+  prevDays: number | null;
+  prevLimit: number | null;
+}
+
+const daysIn = (a?: string, b?: string) => (a && b ? Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000) + 1 : null);
+
+/** File Sản Phẩm là tổng cả kỳ, không cắt theo ngày được. Tháng này mới có file tới 22/09 mà tháng trước
+ *  đủ 31 ngày thì so thẳng GMV là so 22 ngày với 31 ngày (deck Crocs T8 dính đúng lỗi này: "dữ liệu T8
+ *  mới tính đến 27/08") ⇒ so GMV mỗi ngày. Hạng thì so thẳng được. */
+export function skuMoves(cur: SkuRankSlice | null, prev: SkuRankSlice | null, top = 10): SkuMoves | null {
+  if (!cur?.hasAnyBatch || cur.items.length === 0) return null;
+  const curDays = daysIn(cur.periodStart, cur.periodEnd);
+  const prevDays = prev?.hasAnyBatch ? daysIn(prev.periodStart, prev.periodEnd) : null;
+  const perDay = curDays != null && prevDays != null && curDays !== prevDays;
+  const prevBy = new Map((prev?.hasAnyBatch ? prev.items : []).map((r) => [r.name, r]));
+  const rows = cur.items.slice(0, top).map((r) => {
+    const p = prevBy.get(r.name) ?? null;
+    const gmvChange = !p ? null : perDay ? pctChange(p.gmv / prevDays!, r.gmv / curDays!) : pctChange(p.gmv, r.gmv);
+    return {
+      name: r.name,
+      rank: r.rank,
+      prevRank: p?.rank ?? null,
+      gmv: r.gmv,
+      prevGmv: p?.gmv ?? null,
+      gmvChange,
+      gmvLive: r.gmvLive,
+      orders: r.orders,
+      itemsSold: r.itemsSold ?? null,
+      ctr: r.impressions && r.clicks != null ? (r.clicks / r.impressions) * 100 : null,
+      // CTOR = đơn SKU / click — cùng định nghĩa cột "CTOR (SKU order)" của TikTok.
+      ctor: r.clicks && r.skuOrders != null ? (r.skuOrders / r.clicks) * 100 : null
+    };
+  });
+  return { rows, perDay, curDays, prevDays, prevLimit: prev?.hasAnyBatch ? prev.limit : null };
+}
+
 // ---------- toàn shop ----------
 
 export interface ShopTotals {
@@ -351,6 +411,7 @@ export interface NarrativeInput {
   dailyGmvPerHour: number | null;
   nextMonth: string;
   nextPlan: { targetGmv: number; status: "draft" | "locked"; slotCount: number } | null;
+  skus?: SkuMoves | null;
 }
 
 const money = (v: number) => formatCurrencyAdaptive(v);
@@ -414,10 +475,27 @@ export function autoSummary(i: NarrativeInput): string[] {
 
   if (i.signals.length > 0) out.push(i.signals.map(signalText).join("; ") + ".");
 
+  const sku = skuLine(i.skus ?? null);
+  if (sku) out.push(sku);
+
   if (i.campBest && i.dailyGmvPerHour && i.campBest.gmvPerHour > i.dailyGmvPerHour) {
     out.push(`${i.campBest.label} bán ${money(i.campBest.gmvPerHour)}/giờ, gấp ${(i.campBest.gmvPerHour / i.dailyGmvPerHour).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} lần ngày thường (${money(i.dailyGmvPerHour)}/giờ).`);
   }
   return out;
+}
+
+/** SKU #1 + SKU tăng hạng mạnh nhất trong top (đã có hạng tháng trước). */
+function skuLine(m: SkuMoves | null): string | null {
+  if (!m || m.rows.length === 0) return null;
+  const lead = m.rows[0];
+  const chg = (r: SkuMove) => (r.gmvChange != null ? `GMV${m.perDay ? " mỗi ngày" : ""} ${signed(r.gmvChange, 0)}` : null);
+  const leadRank = lead.prevRank == null ? "mới vào top" : lead.prevRank === 1 ? "giữ hạng 1" : `từ hạng ${lead.prevRank} lên hạng 1`;
+  let txt = `SKU dẫn đầu: ${lead.name} (${[leadRank, chg(lead)].filter(Boolean).join(", ")}).`;
+  const riser = m.rows
+    .filter((r) => r.prevRank != null && r.prevRank - r.rank >= 2)
+    .sort((a, b) => b.prevRank! - b.rank - (a.prevRank! - a.rank))[0];
+  if (riser) txt += ` Lên hạng mạnh nhất: ${riser.name} (${riser.prevRank} → ${riser.rank}${chg(riser) ? `, ${chg(riser)}` : ""}).`;
+  return txt;
 }
 
 /** Một câu về giỏ hàng. Không chọn "thừa số lớn nhất" trong 3 phần: SP mỗi đơn và GMV mỗi SP thường đi

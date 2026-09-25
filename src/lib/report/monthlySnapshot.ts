@@ -6,12 +6,15 @@ import {
   fetchCardGmvMonthSlice,
   fetchShopDaysMonthSlice,
   ShopDaysMonthSlice,
-  fetchProductListAgg,
+  fetchProductListAggWithPeriod,
   fetchTopPromotionsMonthSlice,
   PromotionMonthSlice,
+  SkuRankSlice,
+  skuRankFromAgg,
   topSkuFromAgg,
   TopSkuMonthSlice
 } from "../dataraw/monthlyProductSlice";
+import type { ProductListAgg } from "../dataraw/productListAgg";
 import { DataRawImportStamp, fetchDataRawImportStamps } from "../db/brandDataRaw";
 import { fetchSnapshotPieces } from "../db/monthlyReportSnapshots";
 import { hasLiveNumbers, sessionsInRange } from "./sessionsLivePerf";
@@ -96,7 +99,9 @@ export function reportWindow(month: string): string[] {
 
 // ---------- piece ----------
 
-type PieceKind = "creatorLive" | "dailyPerf" | "topSku" | "topPromo" | "shopDays" | "cardGmv";
+// skuRank (2026-09-26): top 30 SKU có hạng + phễu, cho tháng report VÀ tháng trước (hạng T-1 → T). Piece
+// mới nên bản chụp cũ thiếu nó ⇒ báo "file Sản Phẩm" có thay đổi, bấm Cập nhật là có.
+type PieceKind = "creatorLive" | "dailyPerf" | "topSku" | "topPromo" | "shopDays" | "cardGmv" | "skuRank";
 
 const PIECE_SOURCES: Record<PieceKind, DataRawReportType[]> = {
   creatorLive: ["creator_live_performance"],
@@ -104,7 +109,8 @@ const PIECE_SOURCES: Record<PieceKind, DataRawReportType[]> = {
   topSku: ["product_list"],
   topPromo: ["shop_promotion"],
   shopDays: ["shop_analytics"],
-  cardGmv: ["product_list"]
+  cardGmv: ["product_list"],
+  skuRank: ["product_list"]
 };
 
 // Nhãn cho thông báo "file nào mới up" — cùng tên ops thấy ở Dữ Liệu Gốc.
@@ -151,7 +157,9 @@ function requiredPieces(month: string, sessions: LiveSession[] | SnapshotSession
   const out: { kind: PieceKind; month: string }[] = [
     { kind: "dailyPerf", month },
     { kind: "topSku", month },
-    { kind: "topPromo", month }
+    { kind: "topPromo", month },
+    { kind: "skuRank", month },
+    { kind: "skuRank", month: shiftMonth(month, -1) }
   ];
   for (const m of reportWindow(month)) {
     out.push({ kind: "shopDays", month: m }, { kind: "cardGmv", month: m });
@@ -229,15 +237,24 @@ function coverageOf(sessions: LiveSession[], imports: DataRawImportStamp[], bran
   return { sessionsThrough, datarawThrough };
 }
 
-async function fetchPiece(kind: PieceKind, brandId: string, month: string): Promise<unknown> {
+// topSku và skuRank cùng đọc bản tổng hợp product_list của 1 tháng — trong 1 lần dựng chỉ đọc 1 lần.
+type AggMemo = Map<string, Promise<{ agg: ProductListAgg; periodStart: string; periodEnd: string } | null>>;
+
+async function fetchPiece(kind: PieceKind, brandId: string, month: string, aggMemo: AggMemo): Promise<unknown> {
   const { start, end } = monthBounds(month);
+  const agg = () => {
+    if (!aggMemo.has(month)) aggMemo.set(month, fetchProductListAggWithPeriod(brandId, start, end));
+    return aggMemo.get(month)!;
+  };
   switch (kind) {
     case "creatorLive":
       return fetchCreatorLivePerfMonthSlice(brandId, start, end);
     case "dailyPerf":
       return fetchLivePerformanceCoreMonthSlice(brandId, start, end);
     case "topSku":
-      return topSkuFromAgg(await fetchProductListAgg(brandId, start, end));
+      return topSkuFromAgg((await agg())?.agg ?? null);
+    case "skuRank":
+      return skuRankFromAgg(await agg());
     case "topPromo":
       return fetchTopPromotionsMonthSlice(brandId, start, end);
     case "shopDays":
@@ -260,6 +277,7 @@ export async function buildMonthlyReportSnapshot(input: BuildSnapshotInput): Pro
   const cache: SnapshotPieces = { ...(prevMonthPieces ?? {}), ...(input.previous?.pieces ?? {}) };
 
   const pieces: SnapshotPieces = {};
+  const aggMemo: AggMemo = new Map();
   const fetched: string[] = [];
   const reused: string[] = [];
   await Promise.all(
@@ -272,7 +290,7 @@ export async function buildMonthlyReportSnapshot(input: BuildSnapshotInput): Pro
         reused.push(key);
         return;
       }
-      pieces[key] = { stamp, data: await fetchPiece(kind, brandId, m) };
+      pieces[key] = { stamp, data: await fetchPiece(kind, brandId, m, aggMemo) };
       fetched.push(key);
     })
   );
@@ -304,6 +322,8 @@ export interface SnapshotView {
   /** Theo tháng trong cửa sổ — null = bản chụp cũ chưa có phần này (v1) hoặc tháng bị che với brand. */
   shopDays: Record<string, ShopDaysMonthSlice | null>;
   cardGmv: Record<string, CardGmvMonthSlice | null>;
+  /** Tháng report + tháng trước. null = bản chụp cũ chưa có (trước 2026-09-26). */
+  skuRank: Record<string, SkuRankSlice | null>;
 }
 
 export function snapshotView(s: MonthlyReportSnapshot): SnapshotView {
@@ -316,9 +336,12 @@ export function snapshotView(s: MonthlyReportSnapshot): SnapshotView {
     shopDays[m] = get<ShopDaysMonthSlice>("shopDays", m);
     cardGmv[m] = get<CardGmvMonthSlice>("cardGmv", m);
   }
+  const skuRank: SnapshotView["skuRank"] = {};
+  for (const m of [shiftMonth(s.month, -1), s.month]) skuRank[m] = get<SkuRankSlice>("skuRank", m);
   return {
     shopDays,
     cardGmv,
+    skuRank,
     liveRaw,
     dailyPerfRaw: get<LivePerformanceMonthSlice>("dailyPerf", s.month),
     topSku: get<TopSkuMonthSlice>("topSku", s.month),
