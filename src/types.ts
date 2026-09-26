@@ -348,6 +348,8 @@ export interface BrandMonthlyReport {
   summaryText?: string;
   nextStepsText?: string;
   summarySavedAt?: string;
+  /** Insight từng phần ops đã sửa (0121): khoá = shop | why | people | products | context. */
+  sectionNotes?: Record<string, { text: string; savedAt: string }>;
   publishedAt?: string;
   publishedBy?: string;
   createdAt: string;
@@ -749,6 +751,8 @@ export interface BrandMonthPlan {
   blackoutDates: string[]; // ngày brand cấm live (0091)
   targetGmv: number; // target GMV tháng của kế hoạch (0094) — riêng, không đọc Report Tháng
   campRanges: PlanCampRanges; // khoảng ngày camp riêng (0094); thiếu khoá = lịch camp cố định
+  /** KPI GMV CẢ SHOP brand giao (0122) — mọi kênh, khác targetGmv (phần live); 0 = chưa giao. Không dùng để xếp ca. */
+  shopTargetGmv: number;
   lockedAt?: string;
   /** Brand đã bấm "xác nhận đã xem lịch" (migration 0110). Tự rớt về undefined nếu ops sửa tham số
    *  kế hoạch hoặc ca kế hoạch SAU khi brand đã xác nhận — xem trigger ở migration, đừng set tay. */

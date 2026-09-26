@@ -18,6 +18,7 @@ interface DbPlan {
   blackout_dates: string[] | null;
   target_gmv: number | null;
   camp_ranges: PlanCampRanges | null;
+  shop_target_gmv: number | null;
   locked_at: string | null;
   brand_confirmed_at: string | null;
 }
@@ -49,6 +50,7 @@ const planFromDb = (r: DbPlan): BrandMonthPlan => ({
   blackoutDates: r.blackout_dates ?? [],
   targetGmv: Number(r.target_gmv ?? 0),
   campRanges: r.camp_ranges ?? {},
+  shopTargetGmv: Number(r.shop_target_gmv ?? 0),
   lockedAt: r.locked_at ?? undefined,
   brandConfirmedAt: r.brand_confirmed_at ?? undefined
 });
@@ -91,7 +93,7 @@ export async function fetchPlanStatuses(month: string): Promise<Map<string, Bran
   return new Map((data as DbPlan[]).map((r) => [r.brand_id, planFromDb(r)]));
 }
 
-export type PlanSettings = Pick<BrandMonthPlan, "defaultSlotHours" | "liveWindowStart" | "liveWindowEnd" | "maxSlotsPerDay" | "notes" | "blackoutDates" | "targetGmv" | "campRanges">;
+export type PlanSettings = Pick<BrandMonthPlan, "defaultSlotHours" | "liveWindowStart" | "liveWindowEnd" | "maxSlotsPerDay" | "notes" | "blackoutDates" | "targetGmv" | "campRanges" | "shopTargetGmv">;
 
 export async function upsertMonthPlan(brandId: string, month: string, settings: PlanSettings): Promise<BrandMonthPlan> {
   const { data, error } = await supabase
@@ -107,7 +109,8 @@ export async function upsertMonthPlan(brandId: string, month: string, settings: 
         notes: settings.notes,
         blackout_dates: settings.blackoutDates,
         target_gmv: settings.targetGmv,
-        camp_ranges: settings.campRanges
+        camp_ranges: settings.campRanges,
+        shop_target_gmv: settings.shopTargetGmv > 0 ? settings.shopTargetGmv : null
       },
       { onConflict: "brand_id,month" }
     )

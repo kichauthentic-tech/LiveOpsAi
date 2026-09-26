@@ -149,6 +149,9 @@ export const BrandNextMonthPlan: React.FC<BrandNextMonthPlanProps> = ({ brandId,
               {plan.targetGmv > 0 && (
                 <span className="text-xs text-[var(--text-muted)]">Target: {formatCurrencyAdaptive(plan.targetGmv, "")}</span>
               )}
+              {plan.shopTargetGmv > 0 && (
+                <span className="text-xs text-[var(--text-muted)]">KPI cả shop: {formatCurrencyAdaptive(plan.shopTargetGmv, "")}</span>
+              )}
             </div>
 
             {plan.brandConfirmedAt ? (

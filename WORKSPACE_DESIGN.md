@@ -2,9 +2,10 @@
 
 ## CẦN LÀM NGAY khi mở phiên mới (cập nhật 2026-09-24)
 
-> **MỚI 2026-09-26 — Report Tháng thêm 4 góc nhìn lấy từ deck report tháng 8 của Crocs** (UPT/giỏ hàng, LIVE CTR,
-> camp so camp tháng trước + target từ Kế Hoạch Tháng, phân bổ tháng sau theo camp). Không migration, không đổi bản
-> chụp. Xem mục `### Bổ sung 2026-09-26 — góc nhìn từ deck Crocs` trong `## Report Tháng 8 phần`.
+> **MỚI 2026-09-26 — Report Tháng thêm các góc nhìn lấy từ deck report tháng 8 của Crocs** (UPT/giỏ hàng, LIVE CTR,
+> camp so camp tháng trước + target từ Kế Hoạch Tháng, phân bổ tháng sau theo camp, Top SKU có hạng + phễu, khung
+> Insight đầu phần 3–7, migration **0121 đã chạy + verify**, KPI GMV cả shop ở Kế Hoạch Tháng — migration **0122 đã chạy + verify**). Code
+> 2026-09-26 sau commit fa31d9e/7021093 **chưa commit** (user: "commit sau"). Xem mục `### Bổ sung 2026-09-26 — góc nhìn từ deck Crocs` trong `## Report Tháng 8 phần`.
 
 > **MỚI 2026-09-25 (tối) — Report Tháng làm lại thành 1 trang cuộn 8 phần** (Tóm tắt → Mục tiêu → Toàn shop &
 > kênh → Vì sao → Người → Hàng → Bối cảnh → Tháng sau + Phụ lục). Migration **0120 đã chạy** (đoạn tóm tắt ops sửa được)
@@ -782,6 +783,8 @@ Ground truth luôn là `AGENCY_NAV_GROUPS`/`BRAND_NAV_GROUPS` ở [src/App.tsx](
 
 ## Hạ tầng Supabase
 
+- **0122** — `0122_month_plan_shop_target.sql` — **ĐÃ CHẠY + verify** (2026-09-26): `brand_month_plans.shop_target_gmv` (KPI GMV cả shop) + thêm cột vào trigger 0110. Phải chạy TRƯỚC deploy. Xem `## Report Tháng 8 phần` → Bổ sung 2026-09-26 mục 7.
+- **0121** — `0121_monthly_report_section_notes.sql` — **ĐÃ CHẠY + verify** (2026-09-26): cột `section_notes jsonb` cho khung Insight ops sửa, xem mục `## Report Tháng 8 phần` → Bổ sung 2026-09-26 mục 6.
 - **0120** — `0120_monthly_report_narrative.sql` — **ĐÃ CHẠY + verify** (2026-09-25): 3 cột tóm tắt/việc tháng sau, xem mục `## Report Tháng 8 phần`.
 - **0119** — `0119_monthly_report_snapshots.sql` — **ĐÃ CHẠY + verify** (2026-09-25): bảng
   `brand_monthly_report_snapshots`, xem mục `## Bản chụp số liệu Report Tháng`.
@@ -1456,7 +1459,7 @@ bản chụp. Code: [monthlyReportInsights.ts](src/lib/report/monthlyReportInsig
 
 **Verify mục 5:** vitest 79/79 (+ tổng hợp v2 lấy khối cột tổng, + hạng SKU/GMV mỗi ngày); SSR bản chụp T8/T9 thật
 gắn `skuRank` tính read-only từ dòng gốc file Sản Phẩm T7/T8/T9 (không ghi DB): hạng T7 khớp deck (Atmosphere 6, Baya White
-8, Bella 4). **Chưa verify trên browser** (cần bấm Cập nhật số liệu — ghi bản chụp + bản tổng hợp v2 lên DB, làm sau deploy).
+8, Bella 4). Browser verify sau deploy: xem đoạn "Đã ghi sẵn v2" ở trên.
 
 **Verify mục 1–4:** tsc 0 lỗi, eslint không thêm cảnh báo (2 cảnh báo cũ), vitest 77/77 (4 test mới: tách giỏ hàng bằng số
 CROCS T7/T8 + câu tự sinh không được kết luận "nhờ GMV/SP", UPT 4 tháng, camp dùng khoảng của chính tháng, phân bổ
@@ -1464,8 +1467,53 @@ kế hoạch có ca qua đêm), vite build; SSR bản chụp T8 + T9 thật; bro
 không lỗi mới. **Chưa verify trên data thật:** target khung từ kế hoạch ĐÃ CHỐT (DB chỉ có 1 kế hoạch — CROCS T10 nháp;
 chỉ unit test phủ); góc nhìn brand.
 
-**Chưa làm từ deck Crocs (đã nêu với user):** host tách ngày thường/camp (số per-host của deck lệch app — Hùng ngày
-thường deck 727tr/16h vs app 1,1 tỷ/31h, cần hỏi Crocs cách chia ca 2 host); ô "Insight" cuối mỗi phần; KPI cả shop do brand đặt (deck: 8,4 tỷ) tách khỏi target live — cần trường mới.
+6. **Khung Insight đầu phần 3–7** (làm tiếp cùng ngày, migration **0121 ĐÃ CHẠY + verify**) — học
+   từ deck Crocs (mỗi slide: 1 câu kết luận + 3–4 số + 1 việc cần làm). Hàm thuần ở
+   [sectionInsights.ts](src/lib/report/sectionInsights.ts), 8 test ở [tests/sectionInsights.test.ts](tests/sectionInsights.test.ts):
+   - `shopInsight` — tỷ trọng kênh tháng này vs tháng trước (so TỶ TRỌNG nên tháng chưa hết vẫn so được), kênh lệch
+     ≥ 1 điểm, hoàn/GMV. CROCS T9: LIVE affiliate 11,0% → 6,8% ⇒ việc cần làm về affiliate.
+   - `whyInsight` — GMV/giờ = lượt xem/giờ × GMV/lượt xem (đúng tích) ⇒ nói traffic hay chuyển đổi kéo; đi dọc phễu
+     (LIVE CTR → CTOR → UPT → AOV), bước giảm ≥ 5% mạnh nhất thành việc cần làm. T9: nghẽn chốt đơn (CTOR −22%).
+   - `peopleInsight` + `hostVsPeer` — **So mặt bằng cùng loại ngày**: GMV host ÷ GMV nhóm sẽ bán ở ĐÚNG các khung
+     camp/ngày thường host đó live (GMV/giờ thô thiên vị host được xếp ca D-Day). Cột mới "So Mặt Bằng" ở bảng host +
+     Excel. Host nêu tên chọn theo tiền hụt/hơn (không theo %), để cùng −21% thì host 20h được nêu trước host 7h.
+     Mặt bằng gồm cả host dẫn đầu (T9 Hùng 57% GMV) nên đa số host khác sẽ âm — đúng nghĩa "so với trung bình nhóm".
+   - `productsInsight` — SKU dẫn đầu (không lặp ở dòng "Đi xuống" nhưng vẫn làm việc cần làm nếu giảm mạnh nhất), lên/
+     xuống hạng, SKU "bấm nhiều chốt ít" (CTR ≥ trung vị, CTOR ≤ 85% trung vị top 10), khuyến mãi số 1. `shortSku` bỏ mã hàng.
+   - `contextInsight` — ngày thường cùng kỳ + đếm khung camp tăng/giảm, mỗi khung đã chạy 1 dòng, khung giờ tốt/kém nhất.
+   Hiển thị: component `InsightBox` (nền vàng đậm) ngay dưới tiêu đề phần. Ops bấm **Sửa Insight** → textarea dạng
+   văn bản (dòng đầu = kết luận, dòng "→" = việc cần làm) → lưu `brand_monthly_reports.section_notes`
+   (`{ key: { text, savedAt } }`, ghi qua `saveMonthlyReportSectionNote` — đọc cột rồi ghi đè ĐÚNG 1 khoá); "Dùng lại bản
+   tự sinh" = xoá khoá. Bản sửa cũ hơn lần cập nhật số ⇒ nhắc đọc lại. Excel sheet "1 Tom Tat" thêm các dòng Insight.
+   Thiếu cột (DB chưa chạy 0121) ⇒ Lưu báo "Chưa có cột section_notes — cần chạy migration 0121", hiển thị bản tự sinh vẫn chạy.
+   **Verify:** vitest 87/87, tsc, eslint (2 cảnh báo cũ), vite build; SSR bản chụp thật CROCS T8 + T9; browser (admin) CROCS
+   T9: đủ 5 khung, cột So Mặt Bằng, lỗi thiếu cột hiện đúng (trước 0121). Sau khi user chạy 0121: sửa Insight phần Hàng
+   (thêm dòng "ZZZ TEST") → Lưu → "Ops đã sửa" → tải lại vẫn giữ; DB chỉ có khoá `products`, `summary_text` không bị
+   đụng → "Dùng lại bản tự sinh" → `section_notes` về null, 5 khung về bản tự sinh; console sạch. **Chưa verify:** góc nhìn brand.
+
+7. **KPI GMV cả shop** (migration **0122 ĐÃ CHẠY + verify**; user chọn nhập ở **Kế Hoạch Tháng**, không ở report). Cột
+   `brand_month_plans.shop_target_gmv` (brand giao cho CẢ SHOP — mọi kênh; khác `target_gmv` là phần live dùng xếp ca;
+   KHÔNG trùng lý do 0073 bỏ ô KPI nhập tay vì 0073 là KPI live). 0122 thêm cột vào trigger rớt xác nhận của brand
+   (0110). Form Kế Hoạch Tháng → Tham số: ô "KPI GMV cả shop" (hiện "target live = x% KPI cả shop"). Report: hàm
+   thuần `shopKpiProgress` — tháng dở dự kiến cuối tháng theo **nhịp cùng kỳ tháng trước** (GMV tới ngày N ÷ tỷ trọng
+   1..N của tháng trước, chỉ khi tháng trước đủ số cả tháng; không có thì chia đều theo ngày — chia đều bỏ qua camp
+   còn phía trước). Hiện ở: ô "GMV cả shop" phần 1 (% KPI · dự kiến %), khối KPI cả shop phần 2 (target, đã đạt, dự
+   kiến, thanh tiến độ; ops thấy nhắc nhập khi chưa có), câu đầu tóm tắt tự sinh, ô "KPI cả shop tháng sau" phần 8,
+   sheet Excel KPI; trang brand "Kế Hoạch Tháng Sau" (`BrandNextMonthPlan`) hiện "KPI cả shop" cạnh Target. Kế hoạch tháng nháp cũng tính (KPI là brand giao, không cần chốt lịch). **Tháng không có Kế Hoạch
+   Tháng thì không có KPI** (CROCS T9 hiện không có kế hoạch). **Thứ tự bắt buộc: chạy 0122 TRƯỚC khi deploy** —
+   `upsertMonthPlan` luôn gửi `shop_target_gmv`, thiếu cột thì lưu Kế Hoạch Tháng hỏng.
+   **Verify:** vitest 88/88 (test KPI: T8 9,1/8,4 tỷ = 108% "vượt 700 triệu"; T9 dự kiến 7,02 tỷ theo nhịp T8), tsc,
+   eslint (không thêm cảnh báo), vite build. Browser (admin) sau khi chạy 0122: Kế Hoạch Tháng CROCS T10 (nháp thật)
+   nhập KPI 8 tỷ → hint "target live = 69% KPI cả shop" → Lưu nháp → DB chỉ đổi `shop_target_gmv` + `updated_at`, 75 ca
+   y hệt (so trước/sau bằng service role) → mở lại form vẫn 8 tỷ → Report T9 phần 8 "KPI cả shop tháng 10: 8 tỷ · target
+   live = 68.75% KPI", phần 2 T9 hiện nhắc nhập (T9 không có kế hoạch) → trang brand hiện "KPI cả shop: 8 tỷ" → xoá ô,
+   Lưu nháp → DB về null, 75 ca y hệt (dữ liệu thật trả nguyên, chỉ `updated_at` đổi). Không có request lỗi.
+   **Chưa verify trên browser:** khối KPI tháng hiện tại ở phần 1/2 với số thật (tháng có kế hoạch mới có — CROCS T10
+   chưa có số; logic đã có unit test).
+
+**Chưa làm từ deck Crocs (đã nêu với user):** host tách ngày thường/camp theo đúng cách deck (số per-host của deck lệch app — Hùng ngày
+thường deck 727tr/16h vs app 1,1 tỷ/31h, cần hỏi Crocs cách chia ca 2 host; cột "So Mặt Bằng" đã khử phần thiên vị camp) — user
+xác nhận 2026-09-26 là chưa hỏi được Crocs, để sau.
 
 ## Bản chụp số liệu Report Tháng — XONG + VERIFY 2026-09-25 (migration 0119 ĐÃ CHẠY)
 

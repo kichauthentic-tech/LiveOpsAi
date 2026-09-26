@@ -34,6 +34,7 @@ interface DbMonthlyReport {
   summary_text: string | null;
   next_steps_text: string | null;
   summary_saved_at: string | null;
+  section_notes?: Record<string, { text: string; savedAt: string }> | null;
   published_at: string | null;
   published_by: string | null;
   created_at: string;
@@ -70,6 +71,7 @@ function reportFromDb(row: DbMonthlyReport): BrandMonthlyReport {
     summaryText: row.summary_text ?? undefined,
     nextStepsText: row.next_steps_text ?? undefined,
     summarySavedAt: row.summary_saved_at ?? undefined,
+    sectionNotes: row.section_notes ?? undefined,
     publishedAt: row.published_at ?? undefined,
     publishedBy: row.published_by ?? undefined,
     createdAt: row.created_at,
@@ -200,6 +202,28 @@ export async function saveMonthlyReportNarrative(
       },
       { onConflict: "brand_id,period_month" }
     )
+    .select()
+    .single();
+  if (error) throw error;
+  return reportFromDb(data as DbMonthlyReport);
+}
+
+// Insight từng phần (0121) — cũng đi đường riêng như tóm tắt. Đọc lại cột hiện có rồi ghi đè ĐÚNG 1 khoá,
+// để sửa phần "Người" không xoá mất bản đã sửa của phần "Hàng". text null = bỏ bản đã sửa của phần đó.
+export async function saveMonthlyReportSectionNote(brandId: string, periodMonth: string, section: string, text: string | null): Promise<BrandMonthlyReport> {
+  const { data: cur, error: readErr } = await supabase
+    .from("brand_monthly_reports")
+    .select("section_notes")
+    .eq("brand_id", brandId)
+    .eq("period_month", periodMonth)
+    .maybeSingle();
+  if (readErr) throw readErr;
+  const notes = { ...(((cur as { section_notes: DbMonthlyReport["section_notes"] } | null)?.section_notes ?? {}) as Record<string, { text: string; savedAt: string }>) };
+  if (text == null) delete notes[section];
+  else notes[section] = { text, savedAt: new Date().toISOString() };
+  const { data, error } = await supabase
+    .from("brand_monthly_reports")
+    .upsert({ brand_id: brandId, period_month: periodMonth, section_notes: Object.keys(notes).length ? notes : null }, { onConflict: "brand_id,period_month" })
     .select()
     .single();
   if (error) throw error;

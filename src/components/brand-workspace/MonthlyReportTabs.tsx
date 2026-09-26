@@ -34,7 +34,8 @@ import {
   Users,
   PieChart as PieChartIcon,
   Activity,
-  Download
+  Download,
+  Lightbulb
 } from "lucide-react";
 import { LiveSession, BrandMonthlyReport as BrandMonthlyReportType, AffiliatePlanEntry, AffiliateActualEntry, BrandPlatformRate } from "../../types";
 import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
@@ -58,6 +59,7 @@ import {
   NarrativeInput,
   pctChange,
   planCampAllocation,
+  shopKpiProgress,
   shopTotals,
   skuMoves,
   trendSignal,
@@ -66,7 +68,21 @@ import {
 import { CreatorLivePerfRow, vnDateOf } from "../../lib/dataraw/creatorLivePerfSlice";
 import { fetchMonthPlan } from "../../lib/db/monthPlans";
 import type { BrandMonthPlan, BrandMonthPlanSlot } from "../../types";
-import { fetchMonthlyReport, upsertMonthlyReport, MonthlyReportManualInput, saveMonthlyReportNarrative } from "../../lib/db/monthlyReports";
+import { fetchMonthlyReport, upsertMonthlyReport, MonthlyReportManualInput, saveMonthlyReportNarrative, saveMonthlyReportSectionNote } from "../../lib/db/monthlyReports";
+import {
+  contextInsight,
+  HostInsightRow,
+  hostVsPeer,
+  InsightSection,
+  insightToText,
+  parseInsightText,
+  peopleInsight,
+  productsInsight,
+  SectionInsight,
+  shopInsight,
+  whyInsight
+} from "../../lib/report/sectionInsights";
+import { resolveCampBucketType } from "../../lib/campaignDays";
 import { fetchAffiliatePlans, replaceAffiliatePlans } from "../../lib/db/affiliatePlans";
 import { fetchAffiliateActuals, replaceAffiliateActuals } from "../../lib/db/affiliateActuals";
 import { MonthlyDeepDive } from "./deepdive/MonthlyDeepDive";
@@ -173,7 +189,9 @@ function runrateOf(gmv: number | undefined, target: number | undefined): number 
   return target && target > 0 ? ((gmv || 0) / target) * 100 : null;
 }
 
-const ProgressBar: React.FC<{ pct: number | null }> = ({ pct }) => {
+const dayMonthLabel = (iso?: string | null) => (iso ? `${Number(iso.slice(8, 10))}/${iso.slice(5, 7)}` : "");
+
+const ProgressBar: React.FC<{ pct: number | null; label?: string }> = ({ pct, label = "target Lịch Vận Hành" }) => {
   const clamped = pct == null ? 0 : Math.max(0, Math.min(100, pct));
   return (
     <div className="mt-2">
@@ -181,7 +199,7 @@ const ProgressBar: React.FC<{ pct: number | null }> = ({ pct }) => {
         <div className="h-full rounded-full" style={{ width: `${clamped}%`, background: PAL.gold }} />
       </div>
       <div className="text-[10px] mt-1 font-mono" style={{ color: PAL.muted }}>
-        {pct == null ? "chưa có target (Lịch Vận Hành)" : `${pct.toFixed(1)}% target Lịch Vận Hành`}
+        {pct == null ? "chưa có target (Lịch Vận Hành)" : `${pct.toFixed(1)}% ${label}`}
       </div>
     </div>
   );
@@ -367,6 +385,113 @@ const SectionHead: React.FC<{ no: string; title: string; sub?: string }> = ({ no
     )}
   </div>
 );
+
+// Khung Insight đầu phần 3–7 (2026-09-26, học từ deck report Crocs): kết luận → số chứng minh → việc cần
+// làm. Bản tự sinh từ bản chụp; ops sửa được (0121) — bản đã sửa hiện cho brand thay bản tự sinh.
+const InsightBox: React.FC<{
+  auto: SectionInsight | null;
+  note?: { text: string; savedAt: string };
+  computedAt: string;
+  canManage: boolean;
+  onSave: (text: string | null) => Promise<void>;
+}> = ({ auto, note, computedAt, canManage, onSave }) => {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const shown = note ? parseInsightText(note.text) : auto;
+  if (!shown && !canManage) return null;
+  const save = async (text: string | null) => {
+    setSaving(true);
+    setError(null);
+    try {
+      await onSave(text);
+      setEditing(false);
+    } catch (e) {
+      const msg = errorMessage(e, "Lưu Insight thất bại");
+      setError(/section_notes/.test(msg) ? "Chưa có cột section_notes — cần chạy migration 0121 trong SQL Editor." : msg);
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <div className="rounded-xl p-4 space-y-2" style={{ background: "#1f1b10", border: `1px solid ${PAL.gold}44` }}>
+      <div className="flex items-center gap-2 text-[10.5px] font-bold uppercase tracking-wider" style={{ color: PAL.gold }}>
+        <Lightbulb className="w-3.5 h-3.5" /> Insight
+      </div>
+      {editing ? (
+        <div className="space-y-2">
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            rows={Math.max(6, draft.split("\n").reduce((n, l) => n + Math.max(1, Math.ceil(l.length / 70)), 1))}
+            className="w-full rounded-lg p-2.5 text-[13px] leading-relaxed font-sans"
+            style={{ background: PAL.panel, border: `1px solid ${PAL.line}`, color: PAL.cream }}
+          />
+          <p className="text-[10.5px]" style={{ color: PAL.muted }}>
+            Dòng đầu = kết luận · mỗi dòng sau = 1 gạch đầu dòng · dòng bắt đầu bằng "→" = việc cần làm.
+          </p>
+          {error && <p className="text-[11px]" style={{ color: PAL.red }}>{error}</p>}
+          <div className="flex gap-3 text-[11px] font-bold">
+            <button onClick={() => save(draft.trim() || null)} disabled={saving} className="underline disabled:opacity-50" style={{ color: PAL.gold }}>
+              {saving ? "Đang lưu…" : "Lưu"}
+            </button>
+            <button onClick={() => setEditing(false)} disabled={saving} className="underline" style={{ color: PAL.muted }}>
+              Huỷ
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          {shown ? (
+            <>
+              <p className="text-[13.5px] font-bold leading-relaxed" style={{ color: PAL.cream }}>
+                {shown.headline}
+              </p>
+              {shown.points.length > 0 && (
+                <ul className="space-y-1 text-[12.5px] leading-relaxed list-disc pl-5" style={{ color: PAL.cream }}>
+                  {shown.points.map((l, i) => (
+                    <li key={i}>{l}</li>
+                  ))}
+                </ul>
+              )}
+              {shown.action && (
+                <p className="text-[12.5px] font-semibold" style={{ color: PAL.gold }}>
+                  → {shown.action}
+                </p>
+              )}
+            </>
+          ) : (
+            <p className="text-[12px]" style={{ color: PAL.muted }}>Chưa đủ số để tự sinh Insight cho phần này.</p>
+          )}
+          {canManage && (
+            <div className="flex flex-wrap items-center gap-3 pt-2 text-[11px]" style={{ borderTop: `1px solid ${PAL.line}`, color: PAL.muted }}>
+              <span>{note ? "Ops đã sửa." : "Bản tự sinh từ số liệu."}</span>
+              {note && note.savedAt < computedAt && <span style={{ color: PAL.gold }}>Số liệu đã cập nhật sau lần sửa — đọc lại cho khớp.</span>}
+              <button
+                onClick={() => {
+                  setDraft(note?.text ?? (auto ? insightToText(auto) : ""));
+                  setError(null);
+                  setEditing(true);
+                }}
+                className="font-bold underline"
+                style={{ color: PAL.gold }}
+              >
+                Sửa Insight
+              </button>
+              {note && (
+                <button onClick={() => save(null)} disabled={saving} className="font-bold underline disabled:opacity-50" style={{ color: PAL.muted }}>
+                  Dùng lại bản tự sinh
+                </button>
+              )}
+              {error && <span style={{ color: PAL.red }}>{error}</span>}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+};
 
 const KpiTile: React.FC<{ label: string; value: string; change?: number | null; note?: string }> = ({ label, value, change, note }) => (
   <div className="rounded-xl p-4" style={{ background: PAL.panel2, border: `1px solid ${PAL.line}` }}>
@@ -1101,6 +1226,21 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   );
   const shopPiecesMissing = !Object.values(view.shopDays).some(Boolean) && !Object.values(view.cardGmv).some(Boolean);
 
+  // KPI GMV cả shop brand giao (Kế Hoạch Tháng, 0122) — mọi kênh, khác target live. Tháng chưa hết thì dự
+  // kiến theo nhịp cùng kỳ tháng trước (chỉ khi tháng trước có đủ số cả tháng).
+  const shopKpi = useMemo(() => {
+    const target = planCur?.plan.shopTargetGmv ?? 0;
+    if (!target || !shopCur) return null;
+    const lastDay = Number(monthRangeLocal(month).end.slice(8));
+    const throughDay = shopCur.through ? Number(shopCur.through.slice(8, 10)) : lastDay;
+    const { start: ps, end: pe } = monthRangeLocal(prevMonth);
+    const prevSlice = hiddenMonths.has(prevMonth) ? null : view.shopDays[prevMonth];
+    const toDay = shopTotals(prevSlice, ps, `${prevMonth}-${String(Math.min(throughDay, Number(pe.slice(8)))).padStart(2, "0")}`);
+    const total = shopTotals(prevSlice, ps, pe);
+    const prevShape = toDay && total && total.through === pe ? { toDay: toDay.gmv, total: total.gmv } : null;
+    return shopKpiProgress(target, shopCur, lastDay, prevShape);
+  }, [planCur, shopCur, month, prevMonth, hiddenMonths, view]);
+
   // NMV: tỷ lệ hoàn ở Rate Card (điều khoản hợp đồng) nếu đã nhập, không thì tỷ lệ hoàn THỰC của cả shop
   // trong kỳ (Shop Analytics) — ước tính, ghi rõ trên report.
   const refundRateShop = shopCur && shopCur.gmv > 0 ? (shopCur.refunds / shopCur.gmv) * 100 : null;
@@ -1185,6 +1325,49 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   }, [campDetailRows]);
   const dailyGmvPerHour = campDetailRows.find((r) => r.key === "daily")?.gmvPerHour ?? null;
 
+  // Phần 5 — host so với mặt bằng CÙNG LOẠI NGÀY: mỗi host tách theo khung camp/ngày thường (cùng cách
+  // tính giờ/GMV với bảng host), vì host được xếp nhiều ca camp tự nhiên có GMV/giờ cao hơn.
+  const hostInsight = useMemo(() => {
+    const tiktok = filterSessions(completedInPeriod.filter((s) => s.platform === "TikTok"), {});
+    const rows = new Map<string, HostInsightRow>();
+    for (const b of CAMP_DAY_BUCKET_ORDER) {
+      const part = tiktok.filter((s) => resolveCampBucketType(s.date, campOverrides) === b);
+      for (const r of splitUnassignedHost(byHost(part)).ranked) {
+        const cur = rows.get(r.key) ?? { name: r.label, gmv: 0, hours: 0, byBucket: {} };
+        cur.gmv += r.gmv;
+        cur.hours += r.hours;
+        cur.byBucket[b] = { gmv: r.gmv, hours: r.hours };
+        rows.set(r.key, cur);
+      }
+    }
+    const keys = [...rows.keys()];
+    const list = [...rows.values()];
+    const peer = hostVsPeer(list);
+    return { rows: list, vsPeer: new Map(keys.map((k, idx) => [k, peer[idx].vsPeer])) };
+  }, [completedInPeriod, campOverrides]);
+
+  // Khung Insight phần 3–7 — tự sinh từ đúng các số phần đó đang hiện (lib/report/sectionInsights.ts).
+  const sectionInsight: Record<InsightSection, SectionInsight | null> = {
+    shop: shopInsight({ months: last4Months, mixes: channelMixes, agencyGmv: monthlyStats.map((x) => x.stats.gmv), shopCur, shopPrev: shopPrevSame, windowLabel: cmp.label }),
+    why: whyInsight(livePrevStats, liveCurStats),
+    people: peopleInsight(hostInsight.rows),
+    products: productsInsight(skuMoveData, topPromo?.items?.[0] ?? null),
+    context: contextInsight(campDetailRows, slotRows)
+  };
+  const shownInsight = (key: InsightSection) => {
+    const note = monthlyReportRow?.sectionNotes?.[key];
+    return note ? parseInsightText(note.text) : sectionInsight[key];
+  };
+  const insightBox = (key: InsightSection) => (
+    <InsightBox
+      auto={sectionInsight[key]}
+      note={monthlyReportRow?.sectionNotes?.[key]}
+      computedAt={snapshot.computedAt}
+      canManage={canManage}
+      onSave={async (text) => setMonthlyReportRow(await saveMonthlyReportSectionNote(brandId, `${month}-01`, key, text))}
+    />
+  );
+
   const narrativeInput: NarrativeInput = {
     month,
     window: cmp,
@@ -1199,7 +1382,8 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     campBest,
     dailyGmvPerHour,
     nextMonth,
-    nextPlan
+    nextPlan,
+    shopKpi
   };
   const autoSummaryLines = autoSummary({ ...narrativeInput, skus: skuMoveData });
   const autoNextLines = autoNextSteps(narrativeInput);
@@ -1259,7 +1443,19 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
           name: "1 Tom Tat",
           rows: [
             ...summaryLines.map((l) => ({ "Phần": "Tóm tắt", "Nội dung": l })),
-            ...nextLines.map((l) => ({ "Phần": "Việc tháng sau", "Nội dung": l }))
+            ...nextLines.map((l) => ({ "Phần": "Việc tháng sau", "Nội dung": l })),
+            ...(
+              [
+                ["shop", "Insight · Toàn shop & kênh"],
+                ["why", "Insight · Vì sao"],
+                ["people", "Insight · Người"],
+                ["products", "Insight · Hàng"],
+                ["context", "Insight · Bối cảnh"]
+              ] as [InsightSection, string][]
+            ).flatMap(([key, label]) => {
+              const ins = shownInsight(key);
+              return ins ? insightToText(ins).split("\n").map((l) => ({ "Phần": label, "Nội dung": l })) : [];
+            })
           ]
         },
         {
@@ -1278,6 +1474,8 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             { "Chỉ Số": "GMV mỗi sản phẩm", "Kỳ trước": n(livePrevStats.pricePerItem), "Kỳ này": n(liveCurStats.pricePerItem) },
             { "Chỉ Số": "Giá trị đơn (AOV)", "Kỳ trước": n(livePrevStats.aov), "Kỳ này": n(liveCurStats.aov) },
             { "Chỉ Số": "Target GMV tháng", "Kỳ trước": "", "Kỳ này": n(kpiTargetGmvCur) },
+            { "Chỉ Số": "KPI GMV cả shop", "Kỳ trước": "", "Kỳ này": n(shopKpi?.target) },
+            { "Chỉ Số": "GMV cả shop dự kiến cuối tháng", "Kỳ trước": "", "Kỳ này": n(shopKpi?.projected) },
             { "Chỉ Số": `So sánh: ${cmp.label}`, "Kỳ trước": "", "Kỳ này": "" }
           ]
         },
@@ -1331,6 +1529,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             "GMV": n(h.gmv),
             "Giờ": n(h.hours),
             "GMV/Giờ": n(h.gmvPerHour),
+            "So mặt bằng cùng loại ngày (%)": n(hostInsight.vsPeer.get(h.key)),
             "Đơn": n(h.orders),
             "CTR": n(h.ctr)
           }))
@@ -1449,7 +1648,13 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
               label="GMV cả shop"
               value={shopCur ? formatCurrencyAdaptive(shopCur.gmv) : "—"}
               change={shopCur && shopPrevSame ? pctChange(shopPrevSame.gmv, shopCur.gmv) : null}
-              note={shopCur ? "Shop Analytics — mọi kênh" : "chưa có file Shop Analytics"}
+              note={
+                shopKpi
+                  ? `${fmtPct(shopKpi.pct)} KPI ${formatCurrencyAdaptive(shopKpi.target)}${shopKpi.partial ? ` · dự kiến ${fmtPct(shopKpi.projectedPct)}` : ""}`
+                  : shopCur
+                    ? "Shop Analytics — mọi kênh"
+                    : "chưa có file Shop Analytics"
+              }
             />
             <KpiTile
               label="GMV do agency live"
@@ -1523,6 +1728,38 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
               Tháng {month.slice(5)} chưa có target chốt ở Kế Hoạch Tháng — phần này hiện % đạt, run-rate và dự kiến cuối tháng khi có. Bên dưới là so sánh cùng kỳ, luôn có.
             </div>
           )}
+          {shopKpi ? (
+            <div className="rounded-xl p-4 flex flex-wrap items-end gap-6" style={{ background: PAL.panel2, border: `1px solid ${PAL.line}` }}>
+              <div>
+                <div className="text-[10.5px] uppercase tracking-wider" style={{ color: PAL.muted }}>KPI GMV cả shop</div>
+                <div className="font-mono text-xl font-bold mt-1" style={{ color: PAL.cream }}>{formatCurrencyAdaptive(shopKpi.target)}</div>
+                <div className="text-[10px]" style={{ color: PAL.muted }}>brand giao · mọi kênh · Kế Hoạch Tháng</div>
+              </div>
+              <div>
+                <div className="text-[10.5px] uppercase tracking-wider" style={{ color: PAL.muted }}>{shopKpi.partial ? `Đã đạt tới ${dayMonthLabel(shopCur?.through)}` : "Thực đạt"}</div>
+                <div className="font-mono text-xl font-bold mt-1" style={{ color: PAL.cream }}>{formatCurrencyAdaptive(shopKpi.actual)}</div>
+              </div>
+              {shopKpi.partial && (
+                <div>
+                  <div className="text-[10.5px] uppercase tracking-wider" style={{ color: PAL.muted }}>Dự kiến cuối tháng</div>
+                  <div className="font-mono text-xl font-bold mt-1" style={{ color: shopKpi.projectedPct >= 100 ? PAL.green : shopKpi.projectedPct >= 90 ? PAL.gold : PAL.red }}>
+                    {formatCurrencyAdaptive(shopKpi.projected)} · {fmtPct(shopKpi.projectedPct)}
+                  </div>
+                  <div className="text-[10px]" style={{ color: PAL.muted }}>{shopKpi.method === "prev" ? "theo nhịp cùng kỳ tháng trước" : "chia đều theo ngày"}</div>
+                </div>
+              )}
+              <div className="flex-1 min-w-[200px]">
+                <ProgressBar pct={shopKpi.pct} label="KPI cả shop" />
+              </div>
+            </div>
+          ) : (
+            canManage &&
+            shopCur && (
+              <p className="text-[11px]" style={{ color: PAL.muted }}>
+                Chưa có KPI GMV cả shop cho tháng {month.slice(5)} — nhập ở Kế Hoạch Tháng (ô "KPI GMV cả shop") nếu brand có giao.
+              </p>
+            )
+          )}
           {runRate && runRate.doneCount > 0 && (
                   <div className="rounded-xl p-4 grid grid-cols-2 sm:grid-cols-5 gap-3" style={{ background: PAL.panel2, border: `1px solid ${PAL.line}` }}>
                     <div>
@@ -1593,6 +1830,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         {/* ===== 3. Toàn shop & kênh ===== */}
         <section id="mr-shop" className="space-y-4 scroll-mt-16">
           <SectionHead no="3" title="Toàn shop & kênh" sub="Shop Analytics: LIVE shop + LIVE affiliate + video, cộng thẻ sản phẩm (file Sản Phẩm) ≈ 100% GMV cả shop" />
+          {insightBox("shop")}
           {channelMixes.every((c) => !c) ? (
             <p className="text-sm py-4" style={{ color: PAL.muted }}>Chưa có file Shop Analytics cho các tháng này ở Dữ Liệu Gốc.</p>
           ) : (
@@ -1645,6 +1883,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         {/* ===== 4. Vì sao ===== */}
         <section id="mr-why" className="space-y-4 scroll-mt-16">
           <SectionHead no="4" title="Vì sao tăng / giảm" sub={`GMV live tách theo 2 góc: traffic (giờ × lượt xem mỗi giờ × GMV mỗi lượt xem) và đơn hàng (số đơn × sản phẩm mỗi đơn × GMV mỗi sản phẩm) · ${cmp.label}`} />
+          {insightBox("why")}
           {drivers || basket ? (
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
               {drivers && <WaterfallPanel title="Góc traffic" sub="Giờ live × lượt xem mỗi giờ × GMV mỗi lượt xem — 3 phần cộng đúng mức thay đổi" data={waterfallData} breakdown={drivers} />}
@@ -1734,7 +1973,8 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
 
         {/* ===== 5. Người ===== */}
         <section id="mr-people" className="space-y-4 scroll-mt-16">
-          <SectionHead no="5" title="Người" sub="Host — cùng cách tính với Hiệu Suất Host của agency" />
+          <SectionHead no="5" title="Người" sub="Host — cùng cách tính với Hiệu Suất Host của agency · So mặt bằng = GMV của host so với GMV nhóm bán được ở đúng các ngày camp/ngày thường host đó live" />
+          {insightBox("people")}
           <Panel title="Bảng Chi Tiết Host" icon={<Users className="w-4 h-4" />} sub="Cùng cách tính với tab Hiệu Suất Host của agency — giờ live thật khi có file, ca không có số không tính">
                   {canManage && hostQuality.reconciled < hostQuality.total && (
                     <div
@@ -1767,7 +2007,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                       </span>
                     </div>
                   )}
-                  <ReportTable head={["Host", "Số Phiên", "GMV", "Giờ", "GMV/Giờ", "Đơn Hàng", "CTR"]}>
+                  <ReportTable head={["Host", "Số Phiên", "GMV", "Giờ", "GMV/Giờ", "So Mặt Bằng", "Đơn Hàng", "CTR"]}>
                     {hostPerformance.map((h, idx) => (
                       <tr key={h.key} style={{ borderBottom: `1px solid ${PAL.line}`, background: idx % 2 ? `${PAL.panel2}55` : "transparent" }}>
                         <td className="py-2 px-3 font-semibold" style={{ color: PAL.gold }}>
@@ -1786,6 +2026,12 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                         <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
                           {h.gmvPerHour != null ? formatCurrencyAdaptive(h.gmvPerHour) : "—"}
                         </td>
+                        <td className="py-2 px-3 text-right font-mono">
+                          {(() => {
+                            const v = hostInsight.vsPeer.get(h.key);
+                            return v == null ? <span style={{ color: PAL.muted }}>—</span> : <span style={{ color: v >= 0 ? PAL.green : PAL.red }}>{v >= 0 ? "+" : "−"}{Math.abs(v).toFixed(0)}%</span>;
+                          })()}
+                        </td>
                         <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
                           {fmtInt(h.orders)}
                         </td>
@@ -1796,7 +2042,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                     ))}
                     {hostPerformance.length === 0 && (
                       <tr>
-                        <td colSpan={7} className="py-6 text-center italic" style={{ color: PAL.muted }}>
+                        <td colSpan={8} className="py-6 text-center italic" style={{ color: PAL.muted }}>
                           Chưa có phiên TikTok nào có số liệu trong tháng.
                         </td>
                       </tr>
@@ -1808,6 +2054,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         {/* ===== 6. Hàng ===== */}
         <section id="mr-products" className="space-y-4 scroll-mt-16">
           <SectionHead no="6" title="Hàng" sub="SKU dẫn doanh số, phần bán qua live, khuyến mãi chạy trong tháng" />
+          {insightBox("products")}
           <Panel
             title="Top SKU Theo GMV"
             icon={<ShoppingBag className="w-4 h-4" />}
@@ -1952,6 +2199,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         {/* ===== 7. Bối cảnh ===== */}
         <section id="mr-context" className="space-y-4 scroll-mt-16">
           <SectionHead no="7" title="Bối cảnh" sub="Ngày camp, khung giờ, diễn biến theo ngày, phiên nổi bật" />
+          {insightBox("context")}
           <Panel
             title="Khung Chiến Dịch — so với cùng khung tháng trước"
             icon={<Flame className="w-4 h-4" />}
@@ -2142,6 +2390,13 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
             <KpiTile label={`Target tháng ${nextMonth.slice(5)}`} value={nextPlan && nextPlan.targetGmv > 0 ? formatCurrencyAdaptive(nextPlan.targetGmv) : "—"} note={nextPlan ? (nextPlan.status === "locked" ? "đã chốt" : "đang lên lịch") : "chưa lập kế hoạch"} />
             <KpiTile label="Ca kế hoạch" value={nextPlan ? String(nextPlan.slotCount) : "—"} note={nextPlan ? "trong Kế Hoạch Tháng" : ""} />
+            {nextPlanFull && nextPlanFull.plan.shopTargetGmv > 0 && (
+              <KpiTile
+                label={`KPI cả shop tháng ${nextMonth.slice(5)}`}
+                value={formatCurrencyAdaptive(nextPlanFull.plan.shopTargetGmv)}
+                note={nextPlan && nextPlan.targetGmv > 0 ? `target live = ${fmtPct((nextPlan.targetGmv / nextPlanFull.plan.shopTargetGmv) * 100)} KPI` : "brand giao · mọi kênh"}
+              />
+            )}
           </div>
           {nextAllocation && (
             <Panel

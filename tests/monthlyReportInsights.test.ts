@@ -13,6 +13,7 @@ import {
   liveStatsFromRows,
   LiveStats,
   planCampAllocation,
+  shopKpiProgress,
   shopTotals,
   skuMoves,
   trendSignal,
@@ -236,4 +237,31 @@ test("hạng SKU: so hạng thẳng, % GMV tính MỖI NGÀY khi 2 file phủ s�
   }).join("\n");
   expect(text).toContain("SKU dẫn đầu: Baya Platform (giữ hạng 1, GMV mỗi ngày +0%)");
   expect(text).toContain("Lên hạng mạnh nhất: Baya White (8 → 2");
+});
+
+test("KPI cả shop: tháng đủ so thẳng (deck Crocs T8 9,1 tỷ vs KPI 8,4 tỷ); tháng dở dự kiến theo nhịp cùng kỳ tháng trước", () => {
+  const shop = (gmv: number, through: string) => ({ gmv, refunds: 0, orders: 0, visitors: 0, liveLinked: 0, affiliate: 0, video: 0, days: 1, through });
+  const full = shopKpiProgress(8_400_000_000, shop(9_100_000_000, "2026-08-31"), 31, null)!;
+  expect(full.partial).toBe(false);
+  expect(full.pct).toBeCloseTo(108.33, 1);
+  expect(full.projected).toBe(9_100_000_000);
+  // T9 tới 22/09 = 5,21 tỷ; T8 1–22 = 6,75 tỷ trên cả tháng 9,1 tỷ ⇒ còn ~26% GMV nằm ở 9 ngày cuối (có Pay-Day).
+  const sep = shopKpiProgress(8_000_000_000, shop(5_210_000_000, "2026-09-22"), 30, { toDay: 6_750_000_000, total: 9_100_000_000 })!;
+  expect(sep.partial).toBe(true);
+  expect(sep.method).toBe("prev");
+  expect(sep.projected).toBeCloseTo(7_023_852_000, -6);
+  // Không có tháng trước ⇒ chia đều theo ngày.
+  const lin = shopKpiProgress(8_000_000_000, shop(5_210_000_000, "2026-09-22"), 30, null)!;
+  expect(lin.method).toBe("linear");
+  expect(lin.projected).toBeCloseTo((5_210_000_000 / 22) * 30, -3);
+  expect(shopKpiProgress(0, shop(1, "2026-09-22"), 30, null)).toBeNull();
+  expect(shopKpiProgress(8_000_000_000, null, 30, null)).toBeNull();
+
+  const base = {
+    month: "2026-08", window: compareWindow("2026-08", "2026-08-31"), shopCur: shop(9_100_000_000, "2026-08-31"), shopPrev: null,
+    liveCur: t9, livePrev: t8, drivers: null, basket: null, signals: [], targetGmv: null, campBest: null, dailyGmvPerHour: null,
+    nextMonth: "2026-09", nextPlan: null
+  };
+  expect(autoSummary({ ...base, shopKpi: full })[0]).toContain("Cả shop đạt 108% KPI 8,4 tỷ đ (vượt 700 triệu đ).");
+  expect(autoSummary({ ...base, shopKpi: sep })[0]).toMatch(/Cả shop đạt 65% KPI 8 tỷ đ; theo nhịp cùng kỳ tháng trước, dự kiến cuối tháng ~7,02 tỷ đ \(88% KPI\)\./);
 });

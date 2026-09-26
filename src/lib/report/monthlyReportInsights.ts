@@ -363,6 +363,47 @@ export function channelMix(month: string, shop: ShopTotals | null, card: number 
   };
 }
 
+// ---------- KPI cả shop (0122) ----------
+
+export interface ShopKpiProgress {
+  target: number;
+  actual: number;
+  /** % KPI đã đạt tới ngày có số. */
+  pct: number;
+  /** Tháng chưa hết ⇒ dự kiến cả tháng; tháng đủ ⇒ = actual. */
+  projected: number;
+  projectedPct: number;
+  partial: boolean;
+  /** "prev" = theo nhịp cùng kỳ tháng trước (tỷ trọng các ngày còn lại của tháng trước), "linear" = chia đều theo ngày. */
+  method: "prev" | "linear" | null;
+}
+
+/** KPI GMV cả shop brand giao (Kế Hoạch Tháng) vs GMV cả shop Shop Analytics. Tháng chưa hết thì dự kiến
+ *  theo NHỊP CÙNG KỲ tháng trước (GMV tới ngày N ÷ tỷ trọng 1..N của tháng trước) — chia đều theo ngày bỏ
+ *  qua camp còn ở phía trước (Pay-Day 23–25); không có tháng trước mới chia đều. */
+export function shopKpiProgress(
+  target: number | null | undefined,
+  cur: ShopTotals | null,
+  lastDay: number,
+  prevShape: { toDay: number; total: number } | null
+): ShopKpiProgress | null {
+  if (!target || target <= 0 || !cur || cur.gmv <= 0) return null;
+  const throughDay = cur.through ? Number(cur.through.slice(8, 10)) : lastDay;
+  const partial = throughDay < lastDay;
+  let projected = cur.gmv;
+  let method: ShopKpiProgress["method"] = null;
+  if (partial) {
+    if (prevShape && prevShape.toDay > 0 && prevShape.total > prevShape.toDay) {
+      projected = (cur.gmv * prevShape.total) / prevShape.toDay;
+      method = "prev";
+    } else {
+      projected = (cur.gmv / throughDay) * lastDay;
+      method = "linear";
+    }
+  }
+  return { target, actual: cur.gmv, pct: (cur.gmv / target) * 100, projected, projectedPct: (projected / target) * 100, partial, method };
+}
+
 // ---------- dấu hiệu xu hướng ----------
 
 export interface TrendSignal {
@@ -412,11 +453,12 @@ export interface NarrativeInput {
   nextMonth: string;
   nextPlan: { targetGmv: number; status: "draft" | "locked"; slotCount: number } | null;
   skus?: SkuMoves | null;
+  shopKpi?: ShopKpiProgress | null;
 }
 
 const money = (v: number) => formatCurrencyAdaptive(v);
-const pctTxt = (v: number, digits = 1) => `${v.toLocaleString("vi-VN", { minimumFractionDigits: digits, maximumFractionDigits: digits })}%`;
-const signed = (v: number, digits = 1) => `${v >= 0 ? "+" : "−"}${pctTxt(Math.abs(v), digits)}`;
+export const pctTxt = (v: number, digits = 1) => `${v.toLocaleString("vi-VN", { minimumFractionDigits: digits, maximumFractionDigits: digits })}%`;
+export const signed = (v: number, digits = 1) => `${v >= 0 ? "+" : "−"}${pctTxt(Math.abs(v), digits)}`;
 const dayMonth = (iso: string) => `${Number(iso.slice(8, 10))}/${iso.slice(5, 7)}`;
 
 // "GMV mỗi lượt xem" giữ nguyên chữ GMV — toLowerCase() cả chuỗi từng ra "gmv mỗi lượt xem".
@@ -446,7 +488,13 @@ export function autoSummary(i: NarrativeInput): string[] {
     ? `Tới ${dayMonth(through)}, shop đạt ${money(i.shopCur.gmv)} GMV; live do agency vận hành mang về ${money(i.liveCur.gmv)}${liveShare != null ? ` (${pctTxt(liveShare)} tổng shop)` : ""}.`
     : `Tới ${dayMonth(through)}, live do agency vận hành đạt ${money(i.liveCur.gmv)} GMV qua ${i.liveCur.sessions} ca.`;
   const target = i.targetGmv && i.targetGmv > 0 ? ` Đạt ${pctTxt((i.liveCur.gmv / i.targetGmv) * 100, 0)} target tháng (${money(i.targetGmv)}).` : "";
-  out.push(head + target);
+  const k = i.shopKpi;
+  const kpi = k
+    ? k.partial
+      ? ` Cả shop đạt ${pctTxt(k.pct, 0)} KPI ${money(k.target)}; ${k.method === "prev" ? "theo nhịp cùng kỳ tháng trước" : "chia đều theo ngày"}, dự kiến cuối tháng ~${money(k.projected)} (${pctTxt(k.projectedPct, 0)} KPI).`
+      : ` Cả shop đạt ${pctTxt(k.pct, 0)} KPI ${money(k.target)}${k.pct >= 100 ? ` (vượt ${money(k.actual - k.target)})` : ` (thiếu ${money(k.target - k.actual)})`}.`
+    : "";
+  out.push(head + target + kpi);
 
   const gmvChg = pctChange(i.livePrev.gmv, i.liveCur.gmv);
   if (gmvChg != null) {

@@ -49,7 +49,7 @@ interface MonthPlanProps {
 
 const WEEKDAY_LABELS = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
 const fmtH = (n: number) => n.toLocaleString("vi-VN", { maximumFractionDigits: 1 });
-const DEFAULT_SETTINGS: PlanSettings = { defaultSlotHours: 3, liveWindowStart: "09:00", liveWindowEnd: "23:00", maxSlotsPerDay: 3, notes: "", blackoutDates: [], targetGmv: 0, campRanges: {} };
+const DEFAULT_SETTINGS: PlanSettings = { defaultSlotHours: 3, liveWindowStart: "09:00", liveWindowEnd: "23:00", maxSlotsPerDay: 3, notes: "", blackoutDates: [], targetGmv: 0, campRanges: {}, shopTargetGmv: 0 };
 const CAMP_RANGE_LABEL: Record<keyof PlanCampRanges, string> = { dday: "D-Day", midmonth: "Mid-Month", payday: "Pay-Day" };
 
 const nextMonthOf = (month: string, delta: number) => {
@@ -154,7 +154,7 @@ export default function MonthPlan({
         if (!alive) return;
         if (r) {
           setPlan(r.plan);
-          setSettings({ defaultSlotHours: r.plan.defaultSlotHours, liveWindowStart: r.plan.liveWindowStart, liveWindowEnd: r.plan.liveWindowEnd, maxSlotsPerDay: r.plan.maxSlotsPerDay, notes: r.plan.notes, blackoutDates: r.plan.blackoutDates, targetGmv: r.plan.targetGmv, campRanges: r.plan.campRanges });
+          setSettings({ defaultSlotHours: r.plan.defaultSlotHours, liveWindowStart: r.plan.liveWindowStart, liveWindowEnd: r.plan.liveWindowEnd, maxSlotsPerDay: r.plan.maxSlotsPerDay, notes: r.plan.notes, blackoutDates: r.plan.blackoutDates, targetGmv: r.plan.targetGmv, campRanges: r.plan.campRanges, shopTargetGmv: r.plan.shopTargetGmv });
           setDrafts(draftsFromSaved(r.slots));
         } else {
           setPlan(null);
@@ -534,6 +534,11 @@ export default function MonthPlan({
             <span className="font-bold text-[var(--text-muted)] block mb-1">Target GMV tháng (đ)</span>
             <input type="number" min="0" step="1000000" disabled={!editable} value={settings.targetGmv || ""} placeholder="0 = chưa đặt" onChange={(e) => { const t = Number(e.target.value) || 0; setSettings((s) => ({ ...s, targetGmv: t })); if (!locked && t > 0) setDrafts((prev) => withForecast(prev, t)); setDirty(true); }} className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] font-mono disabled:opacity-60" />
             {targetTotal > 0 && <span className="text-[10px] text-[var(--text-faint)]">{formatCurrencyAdaptive(targetTotal)}</span>}
+          </label>
+          <label className="block text-xs">
+            <span className="font-bold text-[var(--text-muted)] block mb-1">KPI GMV cả shop (đ) <span className="font-normal text-[var(--text-faint)]">— brand giao, mọi kênh; chỉ để Report Tháng so, không dùng xếp ca</span></span>
+            <input type="number" min="0" step="1000000" disabled={!editable} value={settings.shopTargetGmv || ""} placeholder="0 = brand chưa giao" onChange={(e) => { setSettings((s) => ({ ...s, shopTargetGmv: Number(e.target.value) || 0 })); setDirty(true); }} className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] font-mono disabled:opacity-60" />
+            {settings.shopTargetGmv > 0 && <span className="text-[10px] text-[var(--text-faint)]">{formatCurrencyAdaptive(settings.shopTargetGmv)}{targetTotal > 0 ? ` · target live = ${Math.round((targetTotal / settings.shopTargetGmv) * 100)}% KPI cả shop` : ""}</span>}
           </label>
           <div className="text-xs space-y-1">
             <span className="font-bold text-[var(--text-muted)] block">Khoảng ngày camp <span className="font-normal text-[var(--text-faint)]">(trống = lịch cố định)</span></span>
