@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test } from "vitest";
 import { brandSlug, findBrandBySlug, parsePath, routeToPath, slugify } from "../src/lib/routes";
+import { AGENCY_TAB_LABELS, BRAND_TAB_LABELS, TALENT_TAB_LABELS } from "../src/lib/tabLabels";
 
 const brands = [
   { id: "b-crocs", name: "CROCS" },
@@ -43,4 +44,14 @@ test("mọi tab trong menu App.tsx đều có link", () => {
     (id) => routeToPath({ type: "agency" }, id, brands) === null && routeToPath({ type: "brand", brandId: "b-crocs" }, id, brands) === null
   );
   expect(missing).toEqual([]);
+});
+
+test("tên tab trong src/lib/tabLabels.ts khớp nhãn menu App.tsx", () => {
+  const app = readFileSync(join(__dirname, "..", "src", "App.tsx"), "utf8");
+  const items = [...app.matchAll(/\{ id: "([a-z_]+)", label: "([^"]+)"/g)].map((m) => ({ id: m[1], label: m[2] }));
+  const all = { ...AGENCY_TAB_LABELS, ...BRAND_TAB_LABELS };
+  const wrong = items.filter(
+    ({ id, label }) => all[id] !== label && TALENT_TAB_LABELS[id] !== label && BRAND_TAB_LABELS[id] !== label
+  );
+  expect(wrong).toEqual([]);
 });

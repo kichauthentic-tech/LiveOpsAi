@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from "react";
 import { UserRole, PermissionKey, PermissionDefinition, RolePermissionsMap, SystemUser, AuditLogEntry, Brand, Talent, LiveSession } from "../types";
-import { ShieldCheck, UserPlus, Users, Key, Lock, Unlock, Check, X, Search, Sliders, History, Sparkles, Trash2, Edit2, Radio, Building2, Zap } from "lucide-react";
+import { ShieldCheck, UserPlus, Users, Key, Lock, Unlock, Check, X, Search, Sliders, History, Sparkles, Trash2, Edit2, Radio, Building2, Zap, BarChart3 } from "lucide-react";
 import { useConfirm } from "../hooks/useConfirm";
 import { PageIntro } from "./common/PageIntro";
+import { TabUsagePanel } from "./TabUsagePanel";
 
 export interface NewUserPayload {
   name: string;
@@ -42,9 +43,11 @@ interface UserRoleSettingsProps {
 // thẻ trong khi nhãn tab ghi "Ma Trận Role (6)". Nguồn sự thật cho MÀN HÌNH là danh sách này.
 const MATRIX_ROLES: UserRole[] = ["admin", "ceo", "operations", "brand", "talent"];
 
-// currentRole + sessions nằm trong props type và App.tsx vẫn truyền, nhưng màn này không đọc tới
-// (ESLint 2026-09-24). Không bỏ khỏi type vì đó là sửa cả chỗ gọi — chỉ thôi nhận ở đây.
+// sessions nằm trong props type và App.tsx vẫn truyền, nhưng màn này không đọc tới (ESLint 2026-09-24).
+// Không bỏ khỏi type vì đó là sửa cả chỗ gọi — chỉ thôi nhận ở đây. currentRole dùng lại từ 2026-09-26
+// để hiện tab "Lượt Mở Tab" cho ceo/admin.
 export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
+  currentRole,
   currentUserId,
   rolePermissions,
   onUpdateRolePermissions,
@@ -58,7 +61,8 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
   talents
 }) => {
   const confirm = useConfirm();
-  const [activeTab, setActiveTab] = useState<"roles" | "users" | "audit">("roles");
+  const [activeTab, setActiveTab] = useState<"roles" | "users" | "audit" | "usage">("roles");
+  const canSeeUsage = currentRole === "ceo" || currentRole === "admin";
   const [selectedRole, setSelectedRole] = useState<UserRole>("operations");
   const [userSearch, setUserSearch] = useState("");
   const [userRoleFilter, setUserRoleFilter] = useState<string>("all");
@@ -351,8 +355,8 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
   return (
     <div className="space-y-6">
       {/* Top Banner */}
-      <div className="bg-[var(--surface)] border border-[var(--border)] p-6 rounded-2xl shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 text-[var(--text)]">
-        <div className="flex items-center gap-3">
+      <div className="bg-[var(--surface)] border border-[var(--border)] p-6 rounded-2xl shadow-xl flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 text-[var(--text)]">
+        <div className="flex items-center gap-3 min-w-0">
           <div className="p-3 bg-[var(--accent)]/20 text-[var(--accent-text)] border border-[var(--accent)]/30 rounded-2xl">
             <ShieldCheck className="w-7 h-7 animate-pulse" />
           </div>
@@ -372,7 +376,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex items-center bg-[var(--surface-base)] p-1.5 rounded-xl border border-[var(--border)] text-xs font-bold gap-1">
+        <div className="flex items-center bg-[var(--surface-base)] p-1.5 rounded-xl border border-[var(--border)] text-xs font-bold gap-1 max-w-full overflow-x-auto whitespace-nowrap shrink-0">
           <button
             onClick={() => setActiveTab("roles")}
             className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 ${
@@ -408,6 +412,20 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
             <History className="w-4 h-4" />
             <span>Audit Logs ({auditLogs.length})</span>
           </button>
+
+          {canSeeUsage && (
+            <button
+              onClick={() => setActiveTab("usage")}
+              className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 ${
+                activeTab === "usage"
+                  ? "bg-[var(--accent)] text-white shadow-lg shadow-[var(--accent)]/30 font-black"
+                  : "text-[var(--text-muted)] hover:text-[var(--text)]"
+              }`}
+            >
+              <BarChart3 className="w-4 h-4" />
+              <span>Lượt Mở Tab</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -746,6 +764,8 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
       )}
 
       {/* TAB 3: AUDIT LOGS */}
+      {activeTab === "usage" && canSeeUsage && <TabUsagePanel />}
+
       {activeTab === "audit" && (
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-6 text-[var(--text)] space-y-4 shadow-xl">
           <div className="flex justify-between items-center pb-3 border-b border-[var(--border)]">

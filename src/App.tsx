@@ -79,6 +79,7 @@ import { useToast } from "./hooks/useToast";
 import { useNotifications } from "./hooks/useNotifications";
 import type { NewTalentAccountPayload } from "./components/TalentMatcher";
 import { fetchEngineParams, saveEngineParams } from "./lib/db/engineParams";
+import { logTabView } from "./lib/db/tabViews";
 import { DEFAULT_ENGINE_PARAMS, EngineParams } from "./lib/scheduling/engineParams";
 import { findBrandBySlug, parsePath, routeToPath } from "./lib/routes";
 import { lazyNamed } from "./lib/lazyNamed";
@@ -1790,6 +1791,18 @@ export default function App() {
     if (!firstAllowedTab) return;
     setActiveTab(firstAllowedTab);
   }, [phase6Loading, isTabAllowed, activeTab, currentRole, firstAllowedTab]);
+
+  // Đếm lượt mở tab (0123) — chỉ khi tab thật sự hiện nội dung (có quyền, brand đã đối chiếu xong), mỗi lần
+  // đổi tab/brand ghi 1 dòng. Bỏ lượt trùng liền kề (StrictMode chạy effect 2 lần ở dev, nạp lại quyền).
+  const lastTabViewRef = useRef("");
+  useEffect(() => {
+    if (!session || !profile || profile.must_change_password || pendingBrandSlug || !isTabAllowed) return;
+    const brandId = effectiveWorkspace.type === "brand" ? effectiveWorkspace.brandId : null;
+    const key = `${session.user.id}|${effectiveWorkspace.type}|${brandId ?? ""}|${activeTab}`;
+    if (key === lastTabViewRef.current) return;
+    lastTabViewRef.current = key;
+    logTabView(effectiveWorkspace.type, activeTab, brandId);
+  }, [session, profile, pendingBrandSlug, isTabAllowed, effectiveWorkspace, activeTab]);
 
   if (authLoading) {
     return (
