@@ -284,11 +284,11 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-1.5 mt-2">
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${STATUS_CLS[s.status]}`}>{STATUS_LABEL[s.status]}</span>
+              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${STATUS_CLS[s.status]}`}>{STATUS_LABEL[s.status]}</span>
               {/* Nhãn tin cậy nói "số này chốt tới đâu" — vô nghĩa khi chưa được thấy số nào. */}
               {isBrandView ? (
                 hideMetrics ? (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-[var(--surface-elevated)] text-[var(--text-faint)] border-[var(--border)]">
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full border bg-[var(--surface-elevated)] text-[var(--text-faint)] border-[var(--border)]">
                     chưa phát hành
                   </span>
                 ) : (
@@ -298,11 +298,11 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                 <DataSourceBadge dataSource={s.dataSource} />
               )}
               {!isBrandView && s.isBackfill && (
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-[var(--surface-elevated)] text-[var(--text-faint)] border-[var(--border)]">nạp bù từ file</span>
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full border bg-[var(--surface-elevated)] text-[var(--text-faint)] border-[var(--border)]">nạp bù từ file</span>
               )}
               {/* RPC snapshot (0078) cũng ghi reconciled_at — chỉ gọi là "đối soát" khi nguồn số thật sự là tiktok_reconciled. */}
-              {s.reconciledAt && s.dataSource === "tiktok_reconciled" && <span className="text-[10px] text-[var(--text-faint)]">đối soát {new Date(s.reconciledAt).toLocaleDateString("vi-VN")}</span>}
-              {isMine && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-sky-950 text-sky-300 border-sky-800">ca của tôi</span>}
+              {s.reconciledAt && s.dataSource === "tiktok_reconciled" && <span className="text-[11px] text-[var(--text-faint)]">đối soát {new Date(s.reconciledAt).toLocaleDateString("vi-VN")}</span>}
+              {isMine && <span className="text-[11px] font-bold px-2 py-0.5 rounded-full border bg-sky-950 text-sky-300 border-sky-800">ca của tôi</span>}
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
@@ -375,7 +375,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                   <input type="text" value={changeReason} onChange={(e) => setChangeReason(e.target.value)} placeholder="Vd: Host báo bận đột xuất" className={inputCls} />
                 </label>
               )}
-              <p className="text-[10px] text-[var(--text-faint)]">Target GMV của ca lấy từ Kế Hoạch Tháng đã chốt — không sửa ở đây.</p>
+              <p className="text-[11px] text-[var(--text-faint)]">Target GMV của ca lấy từ Kế Hoạch Tháng đã chốt — không sửa ở đây.</p>
               <div className="flex justify-end gap-2 pt-1">
                 <button onClick={() => setEditing(false)} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] text-[var(--text-muted)] font-bold text-[11px]">Huỷ</button>
                 <button onClick={saveEdit} disabled={saving} className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-60 text-white font-bold text-[11px]">{saving ? "Đang lưu..." : "Lưu thay đổi"}</button>
@@ -466,7 +466,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                   <div className="flex flex-wrap gap-1">
                     {incidents.length === 0 && <span className="text-xs text-emerald-300">Không có sự cố</span>}
                     {incidents.map((i) => (
-                      <span key={i.key} className="text-[10px] font-bold px-1.5 py-0.5 rounded border bg-rose-950/60 text-rose-300 border-rose-800">{i.label}</span>
+                      <span key={i.key} className="text-[11px] font-bold px-1.5 py-0.5 rounded border bg-rose-950/60 text-rose-300 border-rose-800">{i.label}</span>
                     ))}
                   </div>
                   {s.report.statusNote && <p className="text-xs text-[var(--text)] whitespace-pre-wrap">{s.report.statusNote}</p>}
@@ -477,7 +477,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                     </div>
                   )}
                   {s.report.submittedAt && (
-                    <p className="text-[10px] text-[var(--text-faint)]">Nhập lúc {new Date(s.report.submittedAt).toLocaleString("vi-VN")}{s.report.submittedByRole ? ` · ${s.report.submittedByRole}` : ""}</p>
+                    <p className="text-[11px] text-[var(--text-faint)]">Nhập lúc {new Date(s.report.submittedAt).toLocaleString("vi-VN")}{s.report.submittedByRole ? ` · ${s.report.submittedByRole}` : ""}</p>
                   )}
                 </div>
               ) : (
@@ -516,7 +516,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                     <KV label="Show GPM" value={formatCurrencyAdaptive(ratios.showGpm)} />
                   </div>
                 )}
-                <p className="text-[10px] text-[var(--text-faint)] mt-2">Tỷ lệ tính lại từ số đã tách theo ca, không lấy cột tỷ lệ cộng dồn của file.</p>
+                <p className="text-[11px] text-[var(--text-faint)] mt-2">Tỷ lệ tính lại từ số đã tách theo ca, không lấy cột tỷ lệ cộng dồn của file.</p>
               </>
             ) : s.actualGmv || s.totalOrders || s.totalViews ? (
               <>
@@ -525,7 +525,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                   <KV label="Views" value={fmtInt(s.totalViews)} />
                   <KV label="PCU" value={fmtInt(s.peakViewers)} />
                 </div>
-                <p className="text-[10px] text-amber-300 mt-2">Số tự khai tay — chưa có file nên không tính được tỷ lệ.</p>
+                <p className="text-[11px] text-amber-300 mt-2">Số tự khai tay — chưa có file nên không tính được tỷ lệ.</p>
               </>
             ) : (
               <p className="text-xs text-[var(--text-faint)] italic">Chưa có số liệu.</p>
@@ -663,7 +663,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                   <button onClick={handleDelete} disabled={deleting} className="inline-flex items-center gap-1.5 text-[11px] text-[var(--text-faint)] hover:text-rose-400 disabled:opacity-40 transition-colors">
                     <Trash2 className="w-3.5 h-3.5" /> {deleting ? "Đang xoá..." : "Xoá hẳn ca này"}
                   </button>
-                  <span className="text-[10px] text-[var(--text-faint)] ml-2">— ca mở đang gắn sẽ về "mở" để chốt người khác; ca đã có số liệu không xoá được.</span>
+                  <span className="text-[11px] text-[var(--text-faint)] ml-2">— ca mở đang gắn sẽ về "mở" để chốt người khác; ca đã có số liệu không xoá được.</span>
                 </div>
               )}
             </div>
@@ -675,7 +675,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
 };
 
 const StepPill: React.FC<{ n: number; label: string; done: boolean }> = ({ n, label, done }) => (
-  <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded border ${done ? "bg-emerald-950 text-emerald-300 border-emerald-800" : "bg-[var(--surface-base)] text-[var(--text-faint)] border-[var(--border)]"}`}>
+  <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-1.5 py-0.5 rounded border ${done ? "bg-emerald-950 text-emerald-300 border-emerald-800" : "bg-[var(--surface-base)] text-[var(--text-faint)] border-[var(--border)]"}`}>
     {done ? <CheckCircle2 className="w-3 h-3" /> : <Circle className="w-3 h-3" />} {n} · {label}
   </span>
 );
@@ -684,7 +684,7 @@ const TrustBadge: React.FC<{ session: LiveSession }> = ({ session }) => {
   const label = brandTrustLabel(session);
   const done = label === "Đã chốt";
   return (
-    <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${done ? "bg-emerald-950 text-emerald-300 border-emerald-800" : "bg-amber-950 text-amber-300 border-amber-800"}`} title={done ? "Số đã đối soát với báo cáo TikTok cuối kỳ" : "Số ghi nhận lúc giao ca / tự khai, TikTok còn cập nhật"}>
+    <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${done ? "bg-emerald-950 text-emerald-300 border-emerald-800" : "bg-amber-950 text-amber-300 border-amber-800"}`} title={done ? "Số đã đối soát với báo cáo TikTok cuối kỳ" : "Số ghi nhận lúc giao ca / tự khai, TikTok còn cập nhật"}>
       {done ? <CheckCircle2 className="w-3 h-3" /> : <Circle className="w-3 h-3" />} {label}
     </span>
   );
@@ -692,7 +692,7 @@ const TrustBadge: React.FC<{ session: LiveSession }> = ({ session }) => {
 
 const KV: React.FC<{ label: string; value: string; muted?: boolean; accent?: boolean }> = ({ label, value, muted, accent }) => (
   <div className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2.5 py-2">
-    <p className="text-[10px] text-[var(--text-faint)]" title={metricHint(label)}>{label}</p>
+    <p className="text-[11px] text-[var(--text-faint)]" title={metricHint(label)}>{label}</p>
     <p className={`text-xs font-bold ${accent ? "text-[var(--success)]" : muted ? "text-[var(--text-faint)] font-normal italic" : "text-[var(--text)]"}`}>{value}</p>
   </div>
 );

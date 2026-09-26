@@ -16,12 +16,16 @@
   --surface-muted: rgba(30, 41, 59, 0.6);
   --text: #f1f5f9;
   --text-muted: #cbd5e1;
-  --text-faint: #64748b;
+  /* slate-400: #64748b cũ chỉ 3.1–3.8:1 trên surface/elevated (audit UX 2026-09-26) — nhãn cột/KPI mờ. */
+  --text-faint: #94a3b8;
   --border: #334155;
   --border-muted: rgba(51, 65, 85, 0.6);
-  --accent: #3b82f6;
-  --accent-hover: #60a5fa;
+  /* blue-600: chữ trắng trên #3b82f6 cũ chỉ 3.7:1. accent-hover chỉ dùng làm nền nút (hover:bg-…)
+     nên đậm hơn chứ không nhạt hơn — nhạt hơn thì chữ trắng lại tụt dưới 4.5:1. */
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
   --accent-text: #93c5fd;
+  --accent-contrast: #ffffff;
   --success: #10b981;
   --warning: #f59e0b;
   --danger: #ef4444;
@@ -38,9 +42,11 @@
   --text-faint: #5f9ea8;
   --border: #1c4550;
   --border-muted: rgba(28, 69, 80, 0.6);
-  --accent: #06b6d4;
-  --accent-hover: #22d3ee;
+  /* cyan-700: chữ trắng trên #06b6d4 cũ chỉ 2.4:1. */
+  --accent: #0e7490;
+  --accent-hover: #155e75;
   --accent-text: #67e8f9;
+  --accent-contrast: #ffffff;
   --success: #14b8a6;
   --warning: #f59e0b;
   --danger: #f43f5e;
@@ -55,12 +61,14 @@
   --surface-muted: rgba(29, 29, 34, 0.6);
   --text: #f4f1e8;
   --text-muted: #93939c;
-  --text-faint: #5f5f66;
+  --text-faint: #8a8a93; /* #5f5f66 cũ 2.6–2.8:1 */
   --border: #2a2a30;
   --border-muted: rgba(42, 42, 48, 0.6);
   --accent: #f2c94c;
   --accent-hover: #f7d873;
   --accent-text: #a9873a;
+  /* Nền vàng thì chữ phải đen (trắng trên vàng 1.6:1) — xem luật .theme-yfb .text-white bên dưới. */
+  --accent-contrast: #0b0b0d;
   --success: #6fcf97;
   --warning: #f2c94c;
   --danger: #eb6b6b;
@@ -75,15 +83,36 @@
   --text: #292524;
   --text-muted: #57534e;
   /* stone-500: #a8a29e cũ chỉ 2.5:1 trên nền trắng — chữ phụ (nhãn cột, ghi chú) không đọc được. */
-  --text-faint: #78716c;
+  --text-faint: #6b645f; /* #78716c chỉ 4.2:1 trên surface-elevated */
   --border: #e7e0d6;
   --border-muted: rgba(231, 224, 214, 0.7);
-  --accent: #d97706;
-  --accent-hover: #b45309;
-  --accent-text: #b45309;
+  /* amber-700: chữ trắng trên #d97706 cũ chỉ 3.2:1. */
+  --accent: #b45309;
+  --accent-hover: #92400e;
+  --accent-text: #92400e; /* #b45309 chỉ 4.4:1 trên surface-elevated */
+  --accent-contrast: #ffffff;
   --success: #059669;
   --warning: #d97706;
   --danger: #dc2626;
+}
+
+/*
+  Nút nền accent đặc (bg-[var(--accent)]) gần như đều viết text-white (74 chỗ). Theme YFB có accent vàng
+  nên chữ trắng chỉ 1.6:1 — đổi sang --accent-contrast (đen) ở đúng các phần tử có CẢ HAI class, không
+  sửa 74 call site. Nằm ngoài @layer nên thắng utility của Tailwind. Chỉ khớp token đúng nguyên văn
+  `bg-[var(--accent)]` — nền mờ kiểu `bg-[var(--accent)]/20` không bị đụng.
+*/
+.theme-yfb .text-white[class~="bg-[var(--accent)]"] { color: var(--accent-contrast); }
+
+/*
+  Ô nhập chữ < 16px làm iOS Safari tự phóng to cả trang khi chạm vào (252/252 ô nhập của app,
+  audit UX 2026-09-26). Chỉ áp ở màn hẹp — desktop giữ cỡ chữ dày đặc như cũ. Ngoài @layer nên
+  thắng text-xs/text-sm của Tailwind mà không cần !important.
+*/
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  select,
+  textarea { font-size: 16px; }
 }
 
 /*

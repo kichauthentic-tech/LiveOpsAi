@@ -180,7 +180,7 @@ export const BrandNextMonthPlan: React.FC<BrandNextMonthPlanProps> = ({ brandId,
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)] uppercase text-[10px] tracking-wider">
+                  <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)] uppercase text-[11px] tracking-wider">
                     <th className="py-2.5 px-3">Ngày</th>
                     <th className="py-2.5 px-2">Giờ live</th>
                     <th className="py-2.5 px-2 text-right">Target GMV</th>

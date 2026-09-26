@@ -72,14 +72,14 @@ export const EventPill: React.FC<EventPillProps> = ({
     <div
       onClick={onClick}
       title={title}
-      className={`flex items-center gap-1.5 pl-1.5 pr-2.5 py-1.5 text-[10px] sm:text-[11px] font-extrabold tracking-tight leading-none truncate whitespace-nowrap shadow-md ${colorClasses} ${
+      className={`flex items-center gap-1.5 pl-1.5 pr-2.5 py-1.5 text-[11px] sm:text-[11px] font-extrabold tracking-tight leading-none truncate whitespace-nowrap shadow-md ${colorClasses} ${
         onClick ? "cursor-pointer hover:opacity-85 hover:shadow-lg active:scale-[0.98] transition-all" : ""
       } ${className}`}
     >
       {brand ? (
         <BrandLogo brand={brand} size="xs" className="rounded-full bg-white" />
       ) : emoji ? (
-        <span className="shrink-0 w-4 h-4 rounded-full bg-white flex items-center justify-center text-[9px] leading-none">{emoji}</span>
+        <span className="shrink-0 w-4 h-4 rounded-full bg-white flex items-center justify-center text-[11px] leading-none">{emoji}</span>
       ) : (
         Icon && (
           <span

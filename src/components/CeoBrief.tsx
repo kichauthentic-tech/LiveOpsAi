@@ -469,7 +469,7 @@ const AccountsTable: React.FC<{
     const cur = period.has ? inRange(bs, period.start, period.end) : [];
     return { b, t: totalsOf(cur), p: totalsOf(inRange(bs, period.prevStart, period.prevEnd)), f: pnl ? financeOf(cur, pnl) : null, o: outlooks.get(b.id), last: lastDataDate(bs, today) };
   }).sort((a, z) => z.t.gmv - a.t.gmv || (z.o?.actual ?? 0) - (a.o?.actual ?? 0));
-  const th = "px-3 py-2 text-[10px] uppercase tracking-wider font-bold text-[var(--text-faint)] text-right whitespace-nowrap";
+  const th = "px-3 py-2 text-[11px] uppercase tracking-wider font-bold text-[var(--text-faint)] text-right whitespace-nowrap";
   const td = "px-3 py-2.5 text-right whitespace-nowrap";
   return (
     <section className="space-y-3">
@@ -502,7 +502,7 @@ const AccountsTable: React.FC<{
                 <td className="px-3 py-2.5">
                   <span className="flex items-center gap-2 font-bold text-[var(--text)] whitespace-nowrap">
                     <BrandLogo brand={b} size="xs" /> {b.name}
-                    <span className="text-[10px] font-normal text-[var(--text-faint)]">{b.billingModel === "hourly" ? "theo giờ" : "theo %"}</span>
+                    <span className="text-[11px] font-normal text-[var(--text-faint)]">{b.billingModel === "hourly" ? "theo giờ" : "theo %"}</span>
                   </span>
                 </td>
                 <td className={`${td} font-bold text-[var(--text)]`}>{t.sessions ? money(t.gmv) : "—"}</td>
@@ -606,9 +606,9 @@ const MonthOverMonth: React.FC<{ sessions: LiveSession[]; brands: Brand[]; lastM
           <table className="w-full text-sm">
             <thead className="border-b border-[var(--border)]">
               <tr>
-                <th className="px-3 py-2 text-left text-[10px] uppercase tracking-wider font-bold text-[var(--text-faint)]">Chỉ số</th>
-                {cols.map((c) => <th key={c.month} className="px-3 py-2 text-right text-[10px] uppercase tracking-wider font-bold text-[var(--text-faint)]">T{Number(c.month.slice(5))}{c.partial ? "*" : ""}</th>)}
-                <th className="px-3 py-2 text-right text-[10px] uppercase tracking-wider font-bold text-[var(--text-faint)] whitespace-nowrap">vs cùng kỳ</th>
+                <th className="px-3 py-2 text-left text-[11px] uppercase tracking-wider font-bold text-[var(--text-faint)]">Chỉ số</th>
+                {cols.map((c) => <th key={c.month} className="px-3 py-2 text-right text-[11px] uppercase tracking-wider font-bold text-[var(--text-faint)]">T{Number(c.month.slice(5))}{c.partial ? "*" : ""}</th>)}
+                <th className="px-3 py-2 text-right text-[11px] uppercase tracking-wider font-bold text-[var(--text-faint)] whitespace-nowrap">vs cùng kỳ</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border)]">
@@ -674,7 +674,7 @@ const TargetSection: React.FC<{ outlook: MonthOutlook; month: string; single: bo
   const sourceLabel = o.target ? (o.target.source === "locked_plan" ? "Kế Hoạch Tháng đã chốt" : "Report Tháng (tab Kế Hoạch Tháng Sau)") : null;
   const stat = (label: string, value: React.ReactNode, sub?: React.ReactNode) => (
     <div className="bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3">
-      <p className="text-[10px] uppercase tracking-wider font-bold text-[var(--text-faint)]">{label}</p>
+      <p className="text-[11px] uppercase tracking-wider font-bold text-[var(--text-faint)]">{label}</p>
       <p className="text-lg font-black text-[var(--text)] mt-0.5">{value}</p>
       {sub && <p className="text-[11px] text-[var(--text-faint)] mt-0.5 leading-snug">{sub}</p>}
     </div>
@@ -742,7 +742,7 @@ const CampaignSection: React.FC<{ outlook: MonthOutlook; month: string; sessions
       <Card key={b.bucket} className="!p-4 space-y-1.5 border-t-4" style={{ borderTopColor: BUCKET_COLOR[b.bucket] }}>
         <div className="flex items-center justify-between gap-2">
           <h4 className="font-black text-[var(--text)]">{BUCKET_LABEL[b.bucket]}</h4>
-          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${cls}`}>{lbl}</span>
+          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${cls}`}>{lbl}</span>
         </div>
         <p className="text-xs text-[var(--text-faint)]">{range}</p>
         <p className="text-xl font-black text-[var(--text)]">{main}</p>
@@ -778,7 +778,7 @@ const CampaignSection: React.FC<{ outlook: MonthOutlook; month: string; sessions
           <span className="text-[11px] text-[var(--text-faint)] inline-flex items-center gap-1">Ít {shade.map((c) => <i key={c} className="w-4 h-2.5 rounded-sm inline-block" style={{ background: c }} />)} Nhiều · ◆ ngày camp · sọc = còn trong lịch</span>
         </div>
         <div className="grid grid-cols-7 gap-1">
-          {WEEKDAY.map((w) => <div key={w} className="text-[10px] text-center text-[var(--text-faint)] font-bold">{w}</div>)}
+          {WEEKDAY.map((w) => <div key={w} className="text-[11px] text-center text-[var(--text-faint)] font-bold">{w}</div>)}
           {Array.from({ length: weekdayIdx(m0) }).map((_, i) => <div key={`e${i}`} />)}
           {o.days.map((d) => {
             const g = o.actualByDate.get(d) ?? 0;
@@ -790,7 +790,7 @@ const CampaignSection: React.FC<{ outlook: MonthOutlook; month: string; sessions
             return (
               <div
                 key={d}
-                className={`rounded-lg p-1.5 min-h-[52px] flex flex-col justify-between text-[10px] ${k < 0 && !f ? "bg-[var(--surface-base)] text-[var(--text-faint)]" : ""} ${camp ? "ring-1 ring-inset ring-[var(--text-muted)]" : ""}`}
+                className={`rounded-lg p-1.5 min-h-[52px] flex flex-col justify-between text-[11px] ${k < 0 && !f ? "bg-[var(--surface-base)] text-[var(--text-faint)]" : ""} ${camp ? "ring-1 ring-inset ring-[var(--text-muted)]" : ""}`}
                 style={style}
                 data-tip={`${ddmm(d)} (${WEEKDAY[weekdayIdx(d)]})${camp ? ` · ${BUCKET_LABEL[camp]}` : ""}\n${g ? `GMV ${money(g)}\n${t.sessions} ca · ${hrs(t.hours)} · ${money(t.gmvPerHour)}/giờ` : f ? `Dự phóng ${money(f)}` : "Không có ca"}`}
               >
@@ -817,7 +817,7 @@ const StaffList: React.FC<{ title: string; data: ReturnType<typeof hostRows>; un
         <p className="text-sm text-[var(--text-faint)]">Không có ca nào trong kỳ.</p>
       ) : (
         <div className="text-xs">
-          <div className="grid grid-cols-[minmax(90px,1.3fr)_32px_44px_minmax(60px,1.6fr)_52px_64px] gap-2 pb-1 text-[10px] uppercase tracking-wider font-bold text-[var(--text-faint)]">
+          <div className="grid grid-cols-[minmax(90px,1.3fr)_32px_44px_minmax(60px,1.6fr)_52px_64px] gap-2 pb-1 text-[11px] uppercase tracking-wider font-bold text-[var(--text-faint)]">
             <span>Tên</span><span className="text-right">Sessions</span><span className="text-right">Giờ live</span><span>GMV/giờ</span><span /><span className="text-right">Kỳ trước</span>
           </div>
           {data.rows.map((r) => {
@@ -825,7 +825,7 @@ const StaffList: React.FC<{ title: string; data: ReturnType<typeof hostRows>; un
             return (
               <div key={r.key} className="grid grid-cols-[minmax(90px,1.3fr)_32px_44px_minmax(60px,1.6fr)_52px_64px] gap-2 items-center py-1.5 border-t border-[var(--border)]"
                 data-tip={`${r.name}\n${r.totals.sessions} ca · ${hrs(r.totals.hours)} (${pct(r.hoursShare)} giờ kỳ)\nGMV ${money(r.totals.gmv)} · ${money(g)}/giờ\nTrung bình: ${money(avg)}/giờ`}>
-                <span className="truncate text-[var(--text)] font-bold">{r.name}{r.hoursShare > 0.3 && <span className="ml-1 text-amber-300 text-[10px]">! {pct(r.hoursShare)} giờ</span>}</span>
+                <span className="truncate text-[var(--text)] font-bold">{r.name}{r.hoursShare > 0.3 && <span className="ml-1 text-amber-300 text-[11px]">! {pct(r.hoursShare)} giờ</span>}</span>
                 <span className="text-right text-[var(--text-muted)]">{r.totals.sessions}</span>
                 <span className="text-right text-[var(--text-muted)]">{Math.round(r.totals.hours)}h</span>
                 <span className="relative h-4">
@@ -959,7 +959,7 @@ const FinanceSection: React.FC<{ fin: FinanceTotals; finPrev: FinanceTotals | nu
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="border-b border-[var(--border)]">
-                <tr>{["Brand", "Doanh thu", "Chi phí", "Lãi gộp", "Tỷ trọng lãi", "Phiên lãi", "Ngày lãi"].map((h, i) => <th key={h} className={`px-2 py-1.5 text-[10px] uppercase tracking-wider font-bold text-[var(--text-faint)] whitespace-nowrap ${i ? "text-right" : "text-left"}`}>{h}</th>)}</tr>
+                <tr>{["Brand", "Doanh thu", "Chi phí", "Lãi gộp", "Tỷ trọng lãi", "Phiên lãi", "Ngày lãi"].map((h, i) => <th key={h} className={`px-2 py-1.5 text-[11px] uppercase tracking-wider font-bold text-[var(--text-faint)] whitespace-nowrap ${i ? "text-right" : "text-left"}`}>{h}</th>)}</tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
                 {byBrand.length === 0 && <tr><td colSpan={7} className="px-2 py-3 text-[var(--text-faint)]">Không có ca nào trong kỳ.</td></tr>}

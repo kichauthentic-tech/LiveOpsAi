@@ -6,6 +6,7 @@ import { errorMessage } from "../lib/errorMessage";
 import { PlanSettings, deleteMonthPlan, fetchBrandLockedPlanSlots, fetchCalendarEvents, fetchMonthPlan, fetchPlanStatuses, lockMonthPlan, replacePlanSlots, upsertMonthPlan } from "../lib/db/monthPlans";
 import { PlanEvaluation, buildCalibration, evaluatePlan } from "../lib/scheduling/planEvaluation";
 import { todayVn } from "../lib/performance/brandCommitment";
+import { useDefaultBrand } from "../hooks/useDefaultBrand";
 import { CAMPAIGN_DAY_STYLES, resolveCampBucketType } from "../lib/campaignDays";
 import {
   PlanDraftSlot,
@@ -78,7 +79,7 @@ export default function MonthPlan({
 }: MonthPlanProps) {
   const confirm = useConfirm();
   const today = todayVn();
-  const [brandId, setBrandId] = useState(brands[0]?.id ?? "");
+  const [brandId, setBrandId] = useDefaultBrand(brands, sessions, today);
   const [month, setMonth] = useState(nextMonthOf(today.slice(0, 7), 1));
   const [plan, setPlan] = useState<BrandMonthPlan | null>(null);
   const [settings, setSettings] = useState<PlanSettings>(DEFAULT_SETTINGS);
@@ -102,11 +103,6 @@ export default function MonthPlan({
   const [lockedSlots, setLockedSlots] = useState<BrandMonthPlanSlot[]>([]);
   const [lockedSlotsTick, setLockedSlotsTick] = useState(0);
 
-  // brands nạp async từ Supabase — mở thẳng tab này lúc chưa có brand thì brandId rỗng dù select
-  // đang hiện brand đầu; đồng bộ lại khi brands tới.
-  useEffect(() => {
-    if (!brandId && brands.length > 0) setBrandId(brands[0].id);
-  }, [brands, brandId]);
   const brand = brands.find((b) => b.id === brandId);
   const brandStudioId = findBrandStudioId(brandStudios, brandId);
   const brandStudio = studios.find((s) => s.id === brandStudioId);
@@ -533,12 +529,12 @@ export default function MonthPlan({
           <label className="block text-xs">
             <span className="font-bold text-[var(--text-muted)] block mb-1">Target GMV tháng (đ)</span>
             <input type="number" min="0" step="1000000" disabled={!editable} value={settings.targetGmv || ""} placeholder="0 = chưa đặt" onChange={(e) => { const t = Number(e.target.value) || 0; setSettings((s) => ({ ...s, targetGmv: t })); if (!locked && t > 0) setDrafts((prev) => withForecast(prev, t)); setDirty(true); }} className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] font-mono disabled:opacity-60" />
-            {targetTotal > 0 && <span className="text-[10px] text-[var(--text-faint)]">{formatCurrencyAdaptive(targetTotal)}</span>}
+            {targetTotal > 0 && <span className="text-[11px] text-[var(--text-faint)]">{formatCurrencyAdaptive(targetTotal)}</span>}
           </label>
           <label className="block text-xs">
             <span className="font-bold text-[var(--text-muted)] block mb-1">KPI GMV (đ) <span className="font-normal text-[var(--text-faint)]">— brand giao, mọi kênh; chỉ để Report Tháng so, không dùng xếp ca</span></span>
             <input type="number" min="0" step="1000000" disabled={!editable} value={settings.shopTargetGmv || ""} placeholder="0 = brand chưa giao" onChange={(e) => { setSettings((s) => ({ ...s, shopTargetGmv: Number(e.target.value) || 0 })); setDirty(true); }} className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] font-mono disabled:opacity-60" />
-            {settings.shopTargetGmv > 0 && <span className="text-[10px] text-[var(--text-faint)]">{formatCurrencyAdaptive(settings.shopTargetGmv)}{targetTotal > 0 ? ` · Target GMV live = ${Math.round((targetTotal / settings.shopTargetGmv) * 100)}% KPI GMV` : ""}</span>}
+            {settings.shopTargetGmv > 0 && <span className="text-[11px] text-[var(--text-faint)]">{formatCurrencyAdaptive(settings.shopTargetGmv)}{targetTotal > 0 ? ` · Target GMV live = ${Math.round((targetTotal / settings.shopTargetGmv) * 100)}% KPI GMV` : ""}</span>}
           </label>
           <div className="text-xs space-y-1">
             <span className="font-bold text-[var(--text-muted)] block">Khoảng ngày camp <span className="font-normal text-[var(--text-faint)]">(trống = lịch cố định)</span></span>
@@ -581,15 +577,15 @@ export default function MonthPlan({
               <input type="number" min="0" step="1" disabled={!editable} value={planHours || ""} placeholder="= cam kết" onChange={(e) => setHoursOverride(e.target.value === "" ? null : Number(e.target.value))} className="w-24 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1 text-right font-mono text-[var(--text)] disabled:opacity-60" />
             </div>
             <div className="flex justify-between gap-2"><span className="text-[var(--text-muted)]">Target GMV tháng</span><b className="text-[var(--text)]">{targetTotal > 0 ? formatCurrencyAdaptive(targetTotal) : "chưa đặt"}</b></div>
-            <p className="text-[10px] text-[var(--text-faint)] leading-relaxed">Giờ cam kết lấy từ hợp đồng; target đặt ngay trong kế hoạch này. "Gợi ý phân bổ" xếp đủ giờ; "Xếp theo target" xếp tới khi dự báo chạm target và cho biết cần bao nhiêu giờ.</p>
+            <p className="text-[11px] text-[var(--text-faint)] leading-relaxed">Giờ cam kết lấy từ hợp đồng; target đặt ngay trong kế hoạch này. "Gợi ý phân bổ" xếp đủ giờ; "Xếp theo target" xếp tới khi dự báo chạm target và cho biết cần bao nhiêu giờ.</p>
           </div>
         </div>
 
         <div className={`rounded-2xl p-4 border space-y-2 ${errors.length > 0 ? "bg-rose-950/25 border-rose-900" : "bg-[var(--surface)] border-[var(--border)]"}`}>
           <h3 className="text-sm font-bold text-[var(--text)] flex items-center gap-2">
             Lưới hiện tại
-            {locked && <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 font-bold flex items-center gap-1"><Lock className="w-3 h-3" /> Đã chốt</span>}
-            {dirty && <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-950/60 text-amber-300 font-bold">chưa lưu</span>}
+            {locked && <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 font-bold flex items-center gap-1"><Lock className="w-3 h-3" /> Đã chốt</span>}
+            {dirty && <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-950/60 text-amber-300 font-bold">chưa lưu</span>}
           </h3>
           <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
             <span className="text-[var(--text-muted)]">Số ca / ngày có ca</span><b className="text-[var(--text)] text-right">{totals.slots} / {totals.days}</b>
@@ -714,7 +710,7 @@ export default function MonthPlan({
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 overflow-x-auto">
         <div className="grid grid-cols-7 gap-1.5 min-w-[980px]">
           {WEEKDAY_LABELS.map((w, i) => (
-            <div key={w} className={`text-center text-[10px] font-black uppercase tracking-wide py-1 rounded-lg ${i === 0 || i === 6 ? "text-rose-300 bg-rose-950/30" : "text-[var(--text-faint)] bg-[var(--surface-base)]"}`}>{w}</div>
+            <div key={w} className={`text-center text-[11px] font-black uppercase tracking-wide py-1 rounded-lg ${i === 0 || i === 6 ? "text-rose-300 bg-rose-950/30" : "text-[var(--text-faint)] bg-[var(--surface-base)]"}`}>{w}</div>
           ))}
           {cells.map((day, idx) => {
             if (!day) return <div key={`e${idx}`} className="min-h-[96px] rounded-xl bg-[var(--surface-base)]/40" />;
@@ -730,35 +726,35 @@ export default function MonthPlan({
               <div key={day} className={`min-h-[96px] rounded-xl border p-1.5 flex flex-col gap-1 ${isBlackout ? "bg-[var(--surface-base)] border-dashed border-rose-800 opacity-70" : style ? style.cell : "bg-[var(--surface-base)] border-[var(--border)]"} ${past ? "opacity-50" : ""}`}>
                 <div className="flex items-center justify-between gap-1">
                   <span className={`text-xs font-black ${style ? style.text : "text-[var(--text)]"}`}>{Number(day.slice(-2))}{style ? ` · ${BUCKET_LABEL[bucket]}` : ""}</span>
-                  <span className="text-[9px] text-[var(--text-faint)] flex items-center gap-1">
+                  <span className="text-[11px] text-[var(--text-faint)] flex items-center gap-1">
                     {list.length > 0 ? `${list.length} ca · ${fmtH(dayHours)}h` : ""}
                     {!past && <button onClick={() => toggleBlackout(day)} className={`${isBlackout ? "text-rose-400" : "text-[var(--text-faint)] hover:text-rose-400"}`} title={isBlackout ? "Bỏ cấm live ngày này" : "Cấm live ngày này (engine bỏ qua)"}><Ban className="w-3 h-3" /></button>}
                   </span>
                 </div>
-                {(ev || sch) && <div className="text-[9px] text-[var(--accent-text)] truncate" title={[ev?.label, sch?.label].filter(Boolean).join(" · ")}>{ev?.label}{ev && sch ? " · " : ""}{sch ? `KM: ${sch.label}` : ""}</div>}
-                {isBlackout && <div className="text-[9px] text-rose-400 font-bold">cấm live</div>}
+                {(ev || sch) && <div className="text-[11px] text-[var(--accent-text)] truncate" title={[ev?.label, sch?.label].filter(Boolean).join(" · ")}>{ev?.label}{ev && sch ? " · " : ""}{sch ? `KM: ${sch.label}` : ""}</div>}
+                {isBlackout && <div className="text-[11px] text-rose-400 font-bold">cấm live</div>}
                 {list.map((d) => (
-                  <div key={d.key} className={`rounded-lg border px-1.5 py-1 text-[10px] space-y-1 ${d.slotId ? "border-emerald-900 bg-emerald-950/30" : "border-[var(--border)] bg-[var(--surface)]"}`}>
+                  <div key={d.key} className={`rounded-lg border px-1.5 py-1 text-[11px] space-y-1 ${d.slotId ? "border-emerald-900 bg-emerald-950/30" : "border-[var(--border)] bg-[var(--surface)]"}`}>
                     <div className="flex items-center gap-1">
-                      <input type="time" disabled={!editable} value={d.startTime} onChange={(e) => update(d.key, { startTime: e.target.value })} className="w-[62px] bg-transparent font-mono text-[10px] text-[var(--text)] disabled:opacity-70" />
+                      <input type="time" disabled={!editable} value={d.startTime} onChange={(e) => update(d.key, { startTime: e.target.value })} className="w-[62px] bg-transparent font-mono text-[11px] text-[var(--text)] disabled:opacity-70" />
                       <span className="text-[var(--text-faint)]">–</span>
-                      <input type="time" disabled={!editable} value={d.endTime} onChange={(e) => update(d.key, { endTime: e.target.value })} className="w-[62px] bg-transparent font-mono text-[10px] text-[var(--text)] disabled:opacity-70" />
+                      <input type="time" disabled={!editable} value={d.endTime} onChange={(e) => update(d.key, { endTime: e.target.value })} className="w-[62px] bg-transparent font-mono text-[11px] text-[var(--text)] disabled:opacity-70" />
                       {editable && <button onClick={() => remove(d.key)} className="ml-auto text-rose-400 hover:text-rose-300" title="Bỏ ca"><X className="w-3 h-3" /></button>}
                     </div>
                     <div className="flex items-center gap-1">
                       <span className="text-[var(--text-faint)] shrink-0">target</span>
-                      <input type="number" disabled={!editable} value={d.targetGmv} onChange={(e) => update(d.key, { targetGmv: Number(e.target.value) })} className="w-full min-w-0 bg-[var(--surface-base)] border border-[var(--border)] rounded px-1 py-0.5 font-mono text-[10px] text-[var(--text)] disabled:opacity-70" />
+                      <input type="number" disabled={!editable} value={d.targetGmv} onChange={(e) => update(d.key, { targetGmv: Number(e.target.value) })} className="w-full min-w-0 bg-[var(--surface-base)] border border-[var(--border)] rounded px-1 py-0.5 font-mono text-[11px] text-[var(--text)] disabled:opacity-70" />
                     </div>
                     {d.expectedGmv !== undefined && (
-                      <div className={`text-[9px] font-bold ${d.highExpectation ? "text-amber-400" : "text-[var(--text-faint)]"}`} title={d.reason}>
+                      <div className={`text-[11px] font-bold ${d.highExpectation ? "text-amber-400" : "text-[var(--text-faint)]"}`} title={d.reason}>
                         dự báo {formatCurrencyAdaptive(d.expectedGmv)}{d.highExpectation ? " · target cao" : ""}
                       </div>
                     )}
-                    {d.slotId && <div className="text-[9px] text-emerald-400 font-bold">đã mở ca</div>}
+                    {d.slotId && <div className="text-[11px] text-emerald-400 font-bold">đã mở ca</div>}
                   </div>
                 ))}
                 {editable && !past && !isBlackout && list.length < settings.maxSlotsPerDay && (
-                  <button onClick={() => addForDay(day)} className="mt-auto text-[10px] font-bold text-[var(--text-faint)] hover:text-[var(--accent-text)] flex items-center justify-center gap-1 py-1 border border-dashed border-[var(--border)] rounded-lg"><Plus className="w-3 h-3" /> ca</button>
+                  <button onClick={() => addForDay(day)} className="mt-auto text-[11px] font-bold text-[var(--text-faint)] hover:text-[var(--accent-text)] flex items-center justify-center gap-1 py-1 border border-dashed border-[var(--border)] rounded-lg"><Plus className="w-3 h-3" /> ca</button>
                 )}
               </div>
             );
@@ -804,7 +800,7 @@ function SuggestionPanel({ history: h, result: r, committedHours, targetTotal, c
       {compare && (
         <div className="overflow-x-auto">
           <table className="w-full text-[11px]">
-            <thead><tr className="text-[10px] uppercase tracking-wide text-[var(--text-faint)]"><th className="text-left py-1 pr-3">Phương án</th><th className="text-right py-1 pr-3">Ca</th><th className="text-right py-1 pr-3">Ngày</th><th className="text-right py-1 pr-3">Giờ</th><th className="text-right py-1 pr-3">Dự báo</th><th className="py-1"></th></tr></thead>
+            <thead><tr className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]"><th className="text-left py-1 pr-3">Phương án</th><th className="text-right py-1 pr-3">Ca</th><th className="text-right py-1 pr-3">Ngày</th><th className="text-right py-1 pr-3">Giờ</th><th className="text-right py-1 pr-3">Dự báo</th><th className="py-1"></th></tr></thead>
             <tbody>
               {(Object.keys(STRATEGY_LABEL) as SuggestStrategy[]).map((k) => {
                 const x = compare[k];
@@ -816,7 +812,7 @@ function SuggestionPanel({ history: h, result: r, committedHours, targetTotal, c
                     <td className="py-1 pr-3 text-right text-[var(--text)]">{days}</td>
                     <td className="py-1 pr-3 text-right text-[var(--text)]">{fmtH(x.totalHours)}h</td>
                     <td className="py-1 pr-3 text-right font-bold text-[var(--text)]">{formatCurrencyAdaptive(x.forecastGmv)}</td>
-                    <td className="py-1 text-right">{k === current ? <span className="text-[10px] text-emerald-400 font-bold">đang dùng</span> : <button onClick={() => onPick(k)} className="text-[10px] font-bold text-[var(--accent-text)]">Dùng</button>}</td>
+                    <td className="py-1 text-right">{k === current ? <span className="text-[11px] text-emerald-400 font-bold">đang dùng</span> : <button onClick={() => onPick(k)} className="text-[11px] font-bold text-[var(--accent-text)]">Dùng</button>}</td>
                   </tr>
                 );
               })}
@@ -825,7 +821,7 @@ function SuggestionPanel({ history: h, result: r, committedHours, targetTotal, c
         </div>
       )}
       {(h.eventLearned.holiday || h.eventLearned.event || h.eventLearned.mega_sale || h.schemeLearned) && (
-        <p className="text-[10px] text-[var(--text-faint)]">
+        <p className="text-[11px] text-[var(--text-faint)]">
           Học được từ lịch sử: {h.eventLearned.holiday ? `ngày lễ ×${h.eventMultipliers.holiday.toFixed(2)} · ` : ""}{h.eventLearned.mega_sale ? `mega sale ×${h.eventMultipliers.mega_sale.toFixed(2)} · ` : ""}{h.eventLearned.event ? `sự kiện ×${h.eventMultipliers.event.toFixed(2)} · ` : ""}{h.schemeLearned ? `ngày có scheme KM ×${h.schemeMultiplier.toFixed(2)}` : ""}
         </p>
       )}
@@ -835,12 +831,12 @@ function SuggestionPanel({ history: h, result: r, committedHours, targetTotal, c
           {top.map((c) => (
             <div key={`${c.weekday}-${c.block}`} className="flex justify-between gap-2"><span className="text-[var(--text)]">{WD[c.weekday]} {c.block * 2}–{c.block * 2 + 2}h <span className="text-[var(--text-faint)]">({c.n} ca)</span></span><b className={c.tag === "strong" ? "text-emerald-400" : "text-[var(--text)]"}>{formatCurrencyAdaptive(c.gmvPerHour)}/h</b></div>
           ))}
-          {weak.length > 0 && <p className="mt-1 text-[10px] text-[var(--text-faint)]">Yếu: {weak.map((c) => `${WD[c.weekday]} ${c.block * 2}h`).join(", ")}</p>}
+          {weak.length > 0 && <p className="mt-1 text-[11px] text-[var(--text-faint)]">Yếu: {weak.map((c) => `${WD[c.weekday]} ${c.block * 2}h`).join(", ")}</p>}
         </div>
         <div>
           <p className="font-bold text-[var(--text-muted)] mb-1">Hệ số học từ lịch sử</p>
           {(["dday", "midmonth", "payday"] as const).map((b) => (
-            <div key={b} className="flex justify-between gap-2"><span className="text-[var(--text)]">{BUCKET_LABEL[b]}</span><b className="text-[var(--text)]">×{h.campMultipliers[b].toFixed(2)} <span className="text-[10px] font-normal text-[var(--text-faint)]">{h.campLearned[b] ? "học được" : "mặc định"}</span></b></div>
+            <div key={b} className="flex justify-between gap-2"><span className="text-[var(--text)]">{BUCKET_LABEL[b]}</span><b className="text-[var(--text)]">×{h.campMultipliers[b].toFixed(2)} <span className="text-[11px] font-normal text-[var(--text-faint)]">{h.campLearned[b] ? "học được" : "mặc định"}</span></b></div>
           ))}
           <div className="flex justify-between gap-2 mt-1"><span className="text-[var(--text)]">Giờ/ngày lịch sử</span><b className="text-[var(--text)]">{(["daily", "dday", "midmonth", "payday"] as const).map((b) => h.campHoursLearned[b] ? `${b === "daily" ? "thường" : BUCKET_LABEL[b]} ${h.campHoursPerDay[b].toFixed(1)}h` : "").filter(Boolean).join(" · ") || "chưa học được"}</b></div>
           <div className="flex justify-between gap-2 mt-1"><span className="text-[var(--text)]">Ca thứ 2/3 trong ngày</span><b className="text-[var(--text)]">×{h.diminishing[1].toFixed(2)} / ×{h.diminishing[2].toFixed(2)}</b></div>
@@ -850,7 +846,7 @@ function SuggestionPanel({ history: h, result: r, committedHours, targetTotal, c
           {curve.map((p) => (
             <div key={p.hours} className="flex justify-between gap-2"><span className="text-[var(--text)]">{fmtH(p.hours)}h</span><b className="text-[var(--text)]">{formatCurrencyAdaptive(p.gmv)}</b></div>
           ))}
-          <p className="mt-1 text-[10px] text-[var(--text-faint)]">
+          <p className="mt-1 text-[11px] text-[var(--text-faint)]">
             {committedHours > 0 ? `Cam kết ${fmtH(committedHours)}h → dự báo ${formatCurrencyAdaptive(r.forecastGmv)}` : ""}
             {targetTotal > 0 ? ` · target ${formatCurrencyAdaptive(targetTotal)}${r.hoursToHitTarget !== null ? ` cần ~${Math.ceil(r.hoursToHitTarget)}h` : " (không chạm được trong khung)"}` : ""}
           </p>
@@ -878,13 +874,13 @@ function EvaluationPanel({ ev, calibration }: { ev: PlanEvaluation; calibration:
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-1.5">
           {worst.map((r) => (
             <div key={`${r.date}${r.startTime}`} className="rounded-lg border border-[var(--border)] bg-[var(--surface-base)] px-2 py-1">
-              <div className="font-mono text-[10px] text-[var(--text-muted)]">{r.date.slice(5)} {r.startTime}–{r.endTime}</div>
+              <div className="font-mono text-[11px] text-[var(--text-muted)]">{r.date.slice(5)} {r.startTime}–{r.endTime}</div>
               <div className="text-[var(--text)]">{formatCurrencyAdaptive(r.actualGmv ?? 0)} <span className="text-[var(--text-faint)]">vs dự báo {formatCurrencyAdaptive(r.expectedGmv)}</span> <b className={r.errorPct! >= 0 ? "text-emerald-400" : "text-rose-400"}>{pct(r.errorPct)}</b></div>
             </div>
           ))}
         </div>
       )}
-      <p className="text-[10px] text-[var(--text-faint)]">
+      <p className="text-[11px] text-[var(--text-faint)]">
         {calibration ? `Engine tháng này đã hiệu chỉnh từ ${calibration.observations} ca kế hoạch có thực tế ở các tháng khác (lệch chung ${pct(calibration.overallBias)}).` : "Chưa có tháng nào khác đã chốt kế hoạch và có thực tế — engine chưa hiệu chỉnh."}
         {" "}Ca ops đặt tay (không có dự báo) không tham gia hiệu chỉnh.
       </p>

@@ -86,7 +86,7 @@ const inputCls =
 const LockedCell: React.FC = () => (
   <span
     title="Số liệu tháng này sẽ hiện sau khi Report Tháng được phát hành."
-    className="text-[10px] text-[var(--text-faint)] font-normal italic"
+    className="text-[11px] text-[var(--text-faint)] font-normal italic"
   >
     chưa phát hành
   </span>
@@ -308,7 +308,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
           <Stat label="Orders" value={fmtInt(summary.orders)} />
           <Stat label="GMV/giờ" value={formatCurrencyAdaptive(summary.gmvPerHour, "")} />
           <div className="bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-2.5">
-            <p className="text-[10px] uppercase tracking-wider text-[var(--text-faint)]">Nguồn số liệu</p>
+            <p className="text-[11px] uppercase tracking-wider text-[var(--text-faint)]">Nguồn số liệu</p>
             {summary.countable === 0 ? (
               <p className="text-xs text-[var(--text-faint)] mt-1">—</p>
             ) : isBrandView ? (
@@ -332,7 +332,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)] uppercase text-[10px] tracking-wider">
+              <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)] uppercase text-[11px] tracking-wider">
                 <th className="py-2.5 px-4">Giờ</th>
                 {!isBrandView && <th className="py-2.5 px-2">Brand</th>}
                 <th className="py-2.5 px-2">Host</th>
@@ -376,7 +376,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
                         <td className="py-2.5 px-4 font-mono text-[var(--text)] whitespace-nowrap">
                           {s.startTime}–{s.endTime}
                           {s.actualStartAt && (
-                            <span className="block text-[10px] text-[var(--text-faint)] font-sans">
+                            <span className="block text-[11px] text-[var(--text-faint)] font-sans">
                               thật {fmtTime(s.actualStartAt)}–{fmtTime(s.actualEndAt)}
                             </span>
                           )}
@@ -392,15 +392,15 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
                         <td className="py-2.5 px-2 text-[var(--text)]">
                           {s.hostName || <span className="text-[var(--text-faint)] italic">{isBrandView ? "—" : "chưa gán"}</span>}
                           {!isBrandView && s.coHostName && (
-                            <span className="block text-[10px] text-[var(--text-faint)]">+ {s.coHostName}</span>
+                            <span className="block text-[11px] text-[var(--text-faint)]">+ {s.coHostName}</span>
                           )}
                         </td>
                         <td className="py-2.5 px-2">
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${STATUS_CLS[s.status]}`}>
+                          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${STATUS_CLS[s.status]}`}>
                             {STATUS_LABEL[s.status]}
                           </span>
                           {!isBrandView && s.isBackfill && (
-                            <span className="block text-[10px] text-[var(--text-faint)] mt-0.5">nạp bù</span>
+                            <span className="block text-[11px] text-[var(--text-faint)] mt-0.5">nạp bù</span>
                           )}
                         </td>
                         <td className="py-2.5 px-2 text-right text-[var(--text-muted)] whitespace-nowrap">
@@ -434,7 +434,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
                         <td className="py-2.5 px-2">
                           {isBrandView ? (
                             hideMetrics ? (
-                              <span className="text-[10px] text-[var(--text-faint)]">chờ phát hành</span>
+                              <span className="text-[11px] text-[var(--text-faint)]">chờ phát hành</span>
                             ) : s.status === "Completed" || s.actualGmv ? (
                               <TrustBadge session={s} />
                             ) : (
@@ -444,7 +444,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
                             <PipelineDots session={s} today={today} />
                           )}
                           {!isBrandView && missing.length > 0 && (
-                            <span className="block text-[10px] text-amber-300 mt-0.5">{missing.map((m) => MISSING_LABEL[m]).join(" · ")}</span>
+                            <span className="block text-[11px] text-amber-300 mt-0.5">{missing.map((m) => MISSING_LABEL[m]).join(" · ")}</span>
                           )}
                         </td>
                         <td className="py-2.5 px-2">
@@ -452,7 +452,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
                             {incidents.map((i) => (
                               <span
                                 key={i.key}
-                                className="text-[10px] font-bold px-1.5 py-0.5 rounded border bg-rose-950/60 text-rose-300 border-rose-800 whitespace-nowrap"
+                                className="text-[11px] font-bold px-1.5 py-0.5 rounded border bg-rose-950/60 text-rose-300 border-rose-800 whitespace-nowrap"
                               >
                                 {i.label}
                               </span>
@@ -460,7 +460,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
                             {linked.has(s.id) && (
                               <span
                                 title="Ca nối — dùng chung Room ID với ca khác"
-                                className="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded border bg-sky-950/60 text-sky-300 border-sky-800"
+                                className="inline-flex items-center gap-0.5 text-[11px] font-bold px-1.5 py-0.5 rounded border bg-sky-950/60 text-sky-300 border-sky-800"
                               >
                                 <Link2 className="w-3 h-3" /> nối
                               </span>
@@ -539,9 +539,9 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
 
 const Stat: React.FC<{ label: string; value: string; sub?: string; accent?: boolean }> = ({ label, value, sub, accent }) => (
   <div className="bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-2.5">
-    <p className="text-[10px] uppercase tracking-wider text-[var(--text-faint)]">{label}</p>
+    <p className="text-[11px] uppercase tracking-wider text-[var(--text-faint)]">{label}</p>
     <p className={`text-base font-black mt-0.5 ${accent ? "text-[var(--success)]" : "text-[var(--text)]"}`}>{value}</p>
-    {sub && <p className="text-[10px] text-[var(--text-faint)]">{sub}</p>}
+    {sub && <p className="text-[11px] text-[var(--text-faint)]">{sub}</p>}
   </div>
 );
 
@@ -550,7 +550,7 @@ const TrustBadge: React.FC<{ session: LiveSession }> = ({ session }) => {
   const done = label === "Đã chốt";
   return (
     <span
-      className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${
+      className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${
         done ? "bg-emerald-950 text-emerald-300 border-emerald-800" : "bg-amber-950 text-amber-300 border-amber-800"
       }`}
       title={done ? "Số đã đối soát với báo cáo TikTok cuối kỳ" : "Số ghi nhận lúc giao ca / tự khai, TikTok còn cập nhật"}
@@ -574,7 +574,7 @@ const PipelineDots: React.FC<{ session: LiveSession; today: string }> = ({ sessi
       {steps.map((s) => (
         <span
           key={s.label}
-          className={`inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+          className={`inline-flex items-center gap-0.5 text-[11px] font-bold px-1.5 py-0.5 rounded border ${
             s.done
               ? "bg-emerald-950 text-emerald-300 border-emerald-800"
               : relevant

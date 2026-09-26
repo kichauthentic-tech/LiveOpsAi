@@ -362,7 +362,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                     </span>
                   </div>
                   <p className="text-[var(--text-muted)] text-[11px] leading-relaxed">{r.reasoning}</p>
-                  <div className="text-right text-[10px] text-emerald-400 font-mono font-bold">
+                  <div className="text-right text-[11px] text-emerald-400 font-mono font-bold">
                     Dự đoán GMV: {r.predictedGmv}
                   </div>
                 </div>
@@ -443,12 +443,12 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                           {t.name}
                           {t.nickname && <span className="font-normal text-[var(--text-muted)]"> · {t.nickname}</span>}
                         </h4>
-                        <span className="bg-[var(--accent)]/50 text-[var(--accent-text)] text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0">
+                        <span className="bg-[var(--accent)]/50 text-[var(--accent-text)] text-[11px] font-bold px-1.5 py-0.5 rounded shrink-0">
                           {t.role === "Assistant" ? "Trợ live" : t.role || "Host"}
                         </span>
                       </div>
-                      <p className="text-[10px] text-[var(--accent-text)] font-medium truncate">{nicheStr}</p>
-                      <span className="text-[10px] text-[var(--text-muted)] block truncate whitespace-nowrap">
+                      <p className="text-[11px] text-[var(--accent-text)] font-medium truncate">{nicheStr}</p>
+                      <span className="text-[11px] text-[var(--text-muted)] block truncate whitespace-nowrap">
                         {real.sessionCount > 0 ? `GMV tích lũy ${(real.totalGmv / 1000000).toFixed(0)}M đ · ${real.sessionCount} ca` : "Chưa có ca nào có số"}
                       </span>
                     </div>
@@ -479,7 +479,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 text-[10px] text-[var(--text-muted)] bg-[var(--surface-base)]/40 p-2.5 rounded-xl border border-[var(--border)] font-medium">
+                <div className="grid grid-cols-2 gap-2 text-[11px] text-[var(--text-muted)] bg-[var(--surface-base)]/40 p-2.5 rounded-xl border border-[var(--border)] font-medium">
                   <div>GMV/session: <strong className="text-emerald-400 block text-xs font-bold">{real.avgGmvPerSession > 0 ? `${(real.avgGmvPerSession / 1000000).toFixed(0)}M đ` : "—"}</strong></div>
                   <div>CVR TB: <strong className="text-[var(--accent-text)] block text-xs font-bold">{t.cvrAvg > 0 ? `${t.cvrAvg}%` : "—"}</strong></div>
                   {canSeeRate && (
@@ -491,10 +491,10 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                 </div>
 
                 <div className="flex justify-between items-center text-xs pt-1">
-                  <span className="text-[10px] font-bold text-[var(--text-muted)] flex items-center gap-1">
+                  <span className="text-[11px] font-bold text-[var(--text-muted)] flex items-center gap-1">
                     <Phone className="w-3 h-3 text-[var(--text-muted)]" /> {t.phone || "N/A"}
                   </span>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                  <span className={`text-[11px] font-bold px-2 py-0.5 rounded ${
                     t.availabilityStatus === "On Live" ? "bg-red-900/80 text-red-300 animate-pulse" :
                     t.availabilityStatus === "Busy" ? "bg-amber-900/80 text-amber-300" : "bg-emerald-900/80 text-emerald-300"
                   }`}>
@@ -570,7 +570,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                     placeholder="host@liveops.ai"
                     className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)] focus:ring-2 focus:ring-[var(--accent)]"
                   />
-                  <p className="text-[10px] text-[var(--text-faint)] mt-1">
+                  <p className="text-[11px] text-[var(--text-faint)] mt-1">
                     Hệ thống tự sinh mật khẩu ngẫu nhiên, hiện 1 lần ngay sau khi tạo xong — talent BẮT BUỘC phải đổi mật khẩu khi đăng nhập lần đầu.
                   </p>
                 </div>
@@ -680,7 +680,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                         onChange={(e) => setFormRateHour(Number(e.target.value))}
                         className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
                       />
-                      <p className="text-[10px] text-[var(--text-faint)] mt-1">
+                      <p className="text-[11px] text-[var(--text-faint)] mt-1">
                         {Number(formRateHour) > 0 ? "Đang tính lương theo giờ — bỏ qua rate/live." : "Để 0 = tính theo rate/live."}
                       </p>
                     </div>
@@ -694,7 +694,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                         onChange={(e) => setFormAssistantRateHour(Number(e.target.value))}
                         className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
                       />
-                      <p className="text-[10px] text-[var(--text-faint)] mt-1">
+                      <p className="text-[11px] text-[var(--text-faint)] mt-1">
                         {Number(formAssistantRateHour) > 0 ? "Ca làm trợ live tính theo rate này × giờ." : "Để 0 = ca làm trợ tính theo rate host ở trên."}
                       </p>
                     </div>
@@ -817,7 +817,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5">
                     <h4 className="font-bold text-[var(--text)] text-sm truncate">{detailTalent.name}</h4>
-                    <span className="bg-[var(--accent)]/50 text-[var(--accent-text)] text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0">
+                    <span className="bg-[var(--accent)]/50 text-[var(--accent-text)] text-[11px] font-bold px-1.5 py-0.5 rounded shrink-0">
                       {detailTalent.role || "Host"}
                     </span>
                   </div>

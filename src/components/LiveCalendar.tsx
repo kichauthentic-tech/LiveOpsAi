@@ -593,7 +593,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
             <GripVertical className="w-5 h-5 text-amber-300 shrink-0" />
             <span>Đang kéo — thả để đổi lịch</span>
           </div>
-          <span className="text-[10px] bg-black/40 px-2.5 py-1 rounded-lg font-mono font-bold shrink-0">
+          <span className="text-[11px] bg-black/40 px-2.5 py-1 rounded-lg font-mono font-bold shrink-0">
             Giữ &amp; Di Chuột Để Thả
           </span>
         </div>
@@ -694,14 +694,14 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   <span
                     key={name}
                     style={{ background: theme.primary, color: theme.onPrimary, borderColor: theme.secondary }}
-                    className="inline-flex items-center gap-1 px-2 py-1 rounded-full border text-[10px] font-black uppercase tracking-tight shadow-sm"
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-full border text-[11px] font-black uppercase tracking-tight shadow-sm"
                   >
                     <BrandLogo brand={brandByName.get(name)} size="xs" className="rounded bg-white" />
                     {name}
                   </span>
                 );
               })}
-              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full border-2 border-dashed border-[var(--border)] text-[var(--text-muted)] text-[10px] font-black uppercase">
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full border-2 border-dashed border-[var(--border)] text-[var(--text-muted)] text-[11px] font-black uppercase">
                 Viền đứt = ca chờ ĐK
               </span>
             </div>
@@ -768,7 +768,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   {isToday && (
                     // z-30 > z-20 của CampaignDayRibbon — ngày "hôm nay" rơi vào dải camp (D-Day/
                     // Mid-Month/Pay Day) vẫn phải đọc được chữ "HÔM NAY", không bị dải banner đè lên.
-                    <span className="absolute -top-2 right-1.5 shrink-0 text-[8px] sm:text-[9px] font-black px-2 py-0.5 rounded-full bg-orange-500 text-white leading-none shadow-md z-30 tracking-wide">
+                    <span className="absolute -top-2 right-1.5 shrink-0 text-[11px] sm:text-[11px] font-black px-2 py-0.5 rounded-full bg-orange-500 text-white leading-none shadow-md z-30 tracking-wide">
                       HÔM NAY
                     </span>
                   )}
@@ -798,13 +798,13 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                       {daySchemes.length > 0 && (
                         <span
                           title={daySchemes.map((s) => `${s.title}${s.description ? ` — ${s.description}` : ""}`).join("\n")}
-                          className="text-[10px] leading-none"
+                          className="text-[11px] leading-none"
                         >
                           <Tag className="w-2.5 h-2.5" />
                         </span>
                       )}
                       {hasLiveNow && (
-                        <span className="text-[8px] sm:text-[9px] font-black px-1.5 py-0.5 rounded-full bg-rose-600 text-white animate-pulse tracking-wide">
+                        <span className="text-[11px] sm:text-[11px] font-black px-1.5 py-0.5 rounded-full bg-rose-600 text-white animate-pulse tracking-wide">
                           LIVE
                         </span>
                       )}
@@ -869,11 +869,11 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
 
                   {/* Day total GMV */}
                   {totalGmvTarget > 0 ? (
-                    <div className="text-[9px] font-mono font-bold text-[var(--success)] pt-1 border-t border-[var(--border-muted)] truncate">
+                    <div className="text-[11px] font-mono font-bold text-[var(--success)] pt-1 border-t border-[var(--border-muted)] truncate">
                       Target: {(totalGmvTarget / 1000000).toFixed(0)}M
                     </div>
                   ) : (
-                    <div className="text-[9px] text-[var(--text-faint)] italic">Trống lịch</div>
+                    <div className="text-[11px] text-[var(--text-faint)] italic">Trống lịch</div>
                   )}
                 </div>
               );
@@ -942,7 +942,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                     className="flex justify-between items-center border-b border-[var(--border-muted)] pb-2 cursor-pointer"
                   >
                     <div>
-                      <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase flex items-center gap-1">
+                      <span className="text-[11px] font-bold text-[var(--text-muted)] uppercase flex items-center gap-1">
                         {wDay.dayName}
                         {daySchemes.length > 0 && (
                           <span title={daySchemes.map((s) => `${s.title}${s.description ? ` — ${s.description}` : ""}`).join("\n")}>
@@ -955,11 +955,11 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                       </strong>
                     </div>
                     <div className="flex items-center gap-1">
-                      <span className="text-[10px] bg-[var(--surface-elevated)] text-[var(--text-muted)] font-bold px-2 py-0.5 rounded-full">
+                      <span className="text-[11px] bg-[var(--surface-elevated)] text-[var(--text-muted)] font-bold px-2 py-0.5 rounded-full">
                         {daySessions.length}
                       </span>
                       {daySlots.length > 0 && (
-                        <span className="text-[10px] bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700/50 font-bold px-2 py-0.5 rounded-full">
+                        <span className="text-[11px] bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700/50 font-bold px-2 py-0.5 rounded-full">
                           {daySlots.length} chờ ĐK
                         </span>
                       )}
@@ -1021,7 +1021,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                         }`}
                       >
                         <Plus className="w-4 h-4" />
-                        <span className="text-[10px] font-semibold">
+                        <span className="text-[11px] font-semibold">
                           {isWeekHovered ? "Thả vào đây" : "Trống"}
                         </span>
                       </div>
@@ -1077,7 +1077,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
           <div className="overflow-x-auto rounded-xl border border-[var(--border)]/80 scrollbar-thin">
             <div className="min-w-[860px]">
               {/* Trục giờ */}
-              <div className="flex border-b border-[var(--border)] bg-[var(--surface-base)] text-[10px] font-mono text-[var(--text-muted)]">
+              <div className="flex border-b border-[var(--border)] bg-[var(--surface-base)] text-[11px] font-mono text-[var(--text-muted)]">
                 <div className="w-44 shrink-0 p-2 font-bold uppercase tracking-wider border-r border-[var(--border)] sticky left-0 bg-[var(--surface-base)] z-10">Phòng</div>
                 <div className="relative flex-1 h-8">
                   {hours.map((m) => (
@@ -1097,7 +1097,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                         <span className="p-1.5 rounded-lg bg-[var(--surface-elevated)] border border-[var(--border)] text-[var(--accent-text)] shrink-0"><Building2 className="w-3.5 h-3.5" /></span>
                         <div className="min-w-0">
                           <p className="text-xs sm:text-sm font-bold text-[var(--text)] truncate">{std.name}</p>
-                          <p className="text-[10px] text-[var(--text-muted)] font-mono">{std.roomNumber}</p>
+                          <p className="text-[11px] text-[var(--text-muted)] font-mono">{std.roomNumber}</p>
                         </div>
                       </div>
                     </div>
@@ -1165,7 +1165,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                 <div className="flex border-t border-amber-900/60 bg-amber-950/20">
                   <div className="w-44 shrink-0 p-3 border-r border-[var(--border)] sticky left-0 bg-[var(--surface)] z-10">
                     <p className="text-xs font-bold text-amber-300">Chưa gán phòng</p>
-                    <p className="text-[10px] text-[var(--text-muted)]">mở ca → sửa phòng</p>
+                    <p className="text-[11px] text-[var(--text-muted)]">mở ca → sửa phòng</p>
                   </div>
                   <div className="relative flex-1 h-[132px]">
                     {noRoomSlots.map((sl) => (
@@ -1227,7 +1227,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                       </div>
                     </div>
                     <span
-                      className={`text-[10px] font-bold px-2.5 py-1 rounded-full shrink-0 ${
+                      className={`text-[11px] font-bold px-2.5 py-1 rounded-full shrink-0 ${
                         isOverloaded
                           ? "bg-rose-950 text-rose-300 border border-rose-800"
                           : totalHoursToday > 0
@@ -1253,12 +1253,12 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   </div>
 
                   <div className="space-y-1.5 pt-2 border-t border-[var(--border)]">
-                    <span className="text-[10px] font-bold text-[var(--text-faint)] uppercase block">Phiên Được Phân Bổ:</span>
+                    <span className="text-[11px] font-bold text-[var(--text-faint)] uppercase block">Phiên Được Phân Bổ:</span>
                     {hostSessions.length > 0 ? (
                       hostSessions.map((hs) => (
                         <div key={hs.id} className="p-2 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-xs flex justify-between items-center gap-2">
                           <span className="font-bold text-[var(--text)] truncate">{hs.title}</span>
-                          <span className="font-mono text-[10px] text-[var(--accent-text)] shrink-0">{hs.startTime}-{hs.endTime}</span>
+                          <span className="font-mono text-[11px] text-[var(--accent-text)] shrink-0">{hs.startTime}-{hs.endTime}</span>
                         </div>
                       ))
                     ) : (

@@ -23,6 +23,75 @@ type ConfirmFn = (message: string, options?: ConfirmOptions) => Promise<boolean>
 
 const ConfirmContext = createContext<ConfirmFn | undefined>(undefined);
 
+// Thay window.prompt() (2 chỗ cuối cùng, audit UX 2026-09-26) — cùng lý do như confirm ở trên, thêm:
+// prompt() chỉ nhận chữ tự do nên ô "tháng"/"giờ" phải gõ tay đúng định dạng; ở đây dùng được
+// input type="month"/"time" có sẵn bộ chọn của trình duyệt.
+interface PromptOptions {
+  defaultValue?: string;
+  inputType?: "text" | "month" | "time";
+  placeholder?: string;
+  confirmLabel?: string;
+}
+
+interface PromptState extends PromptOptions {
+  message: string;
+  resolve: (value: string | null) => void;
+}
+
+type PromptFn = (message: string, options?: PromptOptions) => Promise<string | null>;
+
+const PromptContext = createContext<PromptFn | undefined>(undefined);
+
+const PromptDialog: React.FC<{ state: PromptState; onSubmit: (value: string) => void; onCancel: () => void }> = ({
+  state,
+  onSubmit,
+  onCancel
+}) => {
+  const [value, setValue] = useState(state.defaultValue ?? "");
+  return (
+    <div className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={onCancel}>
+      <form
+        role="dialog"
+        aria-modal="true"
+        className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={(e) => {
+          e.preventDefault();
+          onSubmit(value);
+        }}
+      >
+        <label className="block space-y-2">
+          <span className="block text-xs text-[var(--text)] leading-relaxed whitespace-pre-line">{state.message}</span>
+          <input
+            autoFocus
+            type={state.inputType ?? "text"}
+            value={value}
+            placeholder={state.placeholder}
+            onChange={(e) => setValue(e.target.value)}
+            className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)]"
+          />
+        </label>
+        <div className="flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-4 py-2 rounded-xl text-xs font-bold bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--text-muted)] transition-colors"
+          >
+            Huỷ
+          </button>
+          <button
+            type="submit"
+            disabled={!value.trim()}
+            className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 transition-colors"
+          >
+            {state.confirmLabel ?? "OK"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+};
+
 const ConfirmDialog: React.FC<{ state: ConfirmState; onConfirm: () => void; onCancel: () => void }> = ({
   state,
   onConfirm,
@@ -87,10 +156,26 @@ export const ConfirmProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setState(null);
   };
 
+  const [promptState, setPromptState] = useState<PromptState | null>(null);
+  const prompt = useCallback<PromptFn>((message, options = {}) => {
+    return new Promise<string | null>((resolve) => {
+      setPromptState({ message, resolve, ...options });
+    });
+  }, []);
+  const settlePrompt = (value: string | null) => {
+    promptState?.resolve(value);
+    setPromptState(null);
+  };
+
   return (
     <ConfirmContext.Provider value={confirm}>
-      {children}
-      {state && <ConfirmDialog state={state} onConfirm={() => settle(true)} onCancel={() => settle(false)} />}
+      <PromptContext.Provider value={prompt}>
+        {children}
+        {state && <ConfirmDialog state={state} onConfirm={() => settle(true)} onCancel={() => settle(false)} />}
+        {promptState && (
+          <PromptDialog state={promptState} onSubmit={(v) => settlePrompt(v)} onCancel={() => settlePrompt(null)} />
+        )}
+      </PromptContext.Provider>
     </ConfirmContext.Provider>
   );
 };
@@ -99,5 +184,12 @@ export const ConfirmProvider: React.FC<{ children: React.ReactNode }> = ({ child
 export function useConfirm(): ConfirmFn {
   const ctx = useContext(ConfirmContext);
   if (!ctx) throw new Error("useConfirm must be used within a ConfirmProvider");
+  return ctx;
+}
+
+/** Trả về hàm prompt(message, options?) => Promise<string | null> — thay window.prompt(), null = huỷ. */
+export function usePrompt(): PromptFn {
+  const ctx = useContext(PromptContext);
+  if (!ctx) throw new Error("usePrompt must be used within a ConfirmProvider");
   return ctx;
 }

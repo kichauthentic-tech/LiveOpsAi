@@ -173,7 +173,7 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
                 </div>
 
                 <div className="flex items-center gap-1.5">
-                  <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
+                  <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${
                     b.contractStatus === "Active" ? "bg-emerald-900/85 text-emerald-300" :
                     b.contractStatus === "Pending" ? "bg-amber-900/85 text-amber-300" : "bg-[var(--surface-hover)] text-[var(--text-muted)]"
                   }`}>
@@ -209,7 +209,7 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
               </div>
 
               <div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[var(--surface-elevated)] text-[var(--text-muted)] border border-[var(--border)] inline-flex items-center gap-1">
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-[var(--surface-elevated)] text-[var(--text-muted)] border border-[var(--border)] inline-flex items-center gap-1">
                   {b.billingModel === "hourly" ? (
                     <>
                       <DollarSign className="w-3 h-3" /> Thu Phí Theo Giờ Live
@@ -329,7 +329,7 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
                   <option value="gmv_commission">Theo % GMV (Commission)</option>
                   <option value="hourly">Theo Giờ Live (Rate/Giờ)</option>
                 </select>
-                <p className="text-[10px] text-[var(--text-faint)] mt-1">
+                <p className="text-[11px] text-[var(--text-faint)] mt-1">
                   Quyết định công thức tính Doanh Thu Agency ở tab Finance & HR. "Theo Giờ Live" dùng đơn giá cấu hình ở tab Đăng Ký &amp; Chốt Lịch Host.
                 </p>
               </div>

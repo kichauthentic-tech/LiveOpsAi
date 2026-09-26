@@ -2,6 +2,11 @@
 
 ## CẦN LÀM NGAY khi mở phiên mới (cập nhật 2026-09-24)
 
+> **MỚI 2026-09-26 (tối) — Audit UX/UI toàn app + gói P0 ĐÃ LÀM + VERIFY trên browser (chưa commit, không migration).**
+> Màu 4 theme đạt WCAG, sàn chữ 11px, ô nhập 16px trên điện thoại, brand mặc định = brand có ca gần nhất (nhớ lựa chọn),
+> `usePrompt` thay 2 `window.prompt`. Test canh mới: `tests/uiReadability.test.ts`, `tests/defaultBrand.test.ts`.
+> P1/P2 chưa làm. Chi tiết ở mục `## Audit UX/UI (2026-09-26)`.
+
 > **MỚI 2026-09-26 (chiều) — Chuẩn hoá tên chỉ số toàn app theo deck report + TikTok** (không migration, đã commit + push lên `main`
 > 2026-09-26). Một chỉ số một tên ở mọi report/chart: từ điển `src/lib/metricGlossary.ts` + test canh
 > `tests/metricGlossary.test.ts` chặn tên cũ quay lại. Sửa 3 chỗ tên sai nghĩa (Report Tuần "CTR live" thực là ERR; form ca
@@ -198,6 +203,65 @@
 > File này được viết lại gọn ngày 2026-09-08 — bản cũ (1459 dòng, đã vượt giới hạn đọc 1 lần của Claude Code) vẫn còn nguyên trong Git (`git log -- WORKSPACE_DESIGN.md`), tra lại lịch sử chi tiết từng bug/migration bằng lệnh đó thay vì mở file này. Từ nay giữ nguyên tắc: file này chỉ ghi **trạng thái hiện tại**, không tường thuật quá trình.
 
 > **Cập nhật 2026-09-13:** Các phần dưới đây được viết ở các thời điểm khác nhau và nghiệp vụ/code đã đổi khá nhiều kể từ đó. Từ nay **không coi nội dung cũ trong file này là ground truth mặc định** — mọi mục (kiến trúc, luồng dữ liệu, quy ước kỹ thuật...) cần được re-verify bằng đọc code hiện tại trước khi dựa vào để quyết định, đặc biệt là mục nào chưa có ghi chú "đã audit lại". Đang làm 1 vòng rà soát UX/workflow theo từng module (xem "Giai đoạn tiếp theo") — mỗi module audit xong sẽ cập nhật lại đúng phần liên quan trong file.
+
+## Audit UX/UI (2026-09-26) — P0 XONG + VERIFY, P1/P2 chưa làm
+
+Cách đo (dùng lại được): script JS chạy trong Browser pane, bấm lần lượt từng mục sidebar rồi đếm trên phần tử có chữ trong
+`<main>`: % chữ < 11px / < 12px, % chữ không đạt tương phản WCAG 1.4.3 (4.5:1, chữ lớn 3:1, trộn nền rgba theo cha),
+nút < 24px (WCAG 2.5.8), chiều cao trang (số màn), tràn ngang ở 375px. Theme khác midnight chỉ tính bằng token trong `index.css`.
+
+Số đo chính (theme midnight):
+- **Tương phản:** `--text-faint` #64748b = 3.8:1 trên `--surface`, 3.1:1 trên `--surface-elevated` (425 chỗ dùng); chữ trắng trên
+  `--accent` #3b82f6 = 3.7:1 (nút đang chọn). % chữ không đạt: Toàn Cảnh Brand 67%, Điều Phối 58%, Kế Hoạch Tháng 38%, Dashboard 34%,
+  Sổ Ca 30%. Theme YFB `--text-faint` 2.8:1; Sand `--accent` 3.2:1.
+- **Cỡ chữ:** 378 class `text-[8–10.5px]` ở 48 file. % chữ < 11px: Talent Pool 70%, Toàn Cảnh Brand 64%, AI Training 47%, Sổ Ca 44%.
+  Material 3 và Apple HIG đều lấy 11 làm cỡ nhỏ nhất.
+- **Thử sửa tại chỗ** (tiêm CSS: faint→#94a3b8, accent→#2563eb, sàn 11px): % chữ kém tương phản về 0–2% ở 8/9 màn (AI Training còn 32%
+  vì màu hardcode); chữ < 11px về 0%. Giá: Sổ Ca dài thêm 11% (5583→6201px), các màn khác ±2%.
+- **Ô nhập trên iPhone:** 252/252 ô nhập chữ < 16px, không có CSS toàn cục bù ⇒ iOS Safari tự zoom khi chạm (SessionReportForm 27 ô).
+- **Brand mặc định:** MonthPlan/OpsSupport/EngineTrainingPanel/OpenSlotModal lấy `brands[0]` = Franklin (0 ca) ⇒ mở ra là màn trống.
+- **Không có URL routing:** URL luôn `/`, không deep link/back/bookmark. Đổi workspace reset về tab đầu (`handleWorkspaceChange`).
+- **Header trang:** đáy thẻ tiêu đề ở y=191–483px trên màn 900px (Cam Kết 483, Bảng Vận Hành 450, Toàn Cảnh Brand 439).
+- **Định dạng số:** 71 hàm format* ở 31 file (fmtHours ×8, fmtPct ×6, fmtInt ×6); thực tế hiện "3,52 tỷ" / "5,21 tỷ đ" / "53.733.488đ".
+- **Bundle:** 1 chunk JS 2,58 MB (720 KB gzip), 0 `React.lazy` — vượt ngân sách 0,62 MiB (Alex Russell 2026, 3s trên máy p75).
+- **Mobile:** 0 màn tràn ngang trang (bảng đã bọc scroller — tốt). Report Tháng = 24 màn điện thoại (13,8 màn desktop);
+  KPI đầu tiên Report ở y≈735px (dưới mép 812). Switcher "Agency (Toàn cảnh)" xuống 3 dòng ở 375px.
+- **Còn 2 `window.prompt`:** BrandCommitment.tsx:237, BackfillFromRooms.tsx:132.
+- Ở bề ngang ~800px (chia đôi màn laptop) sidebar mở 256px ⇒ nội dung còn ~535px, bảng Toàn Cảnh Brand bị cắt.
+
+Chưa đo được: màn talent (Ca Của Tôi/Đăng Ký Ca) và role brand bằng tài khoản thật; chưa có số liệu dùng thật (màn nào mở nhiều).
+
+### P0 — ĐÃ LÀM 2026-09-26 (user chọn), verify trên browser
+- `src/index.css`: midnight `--text-faint` #94a3b8, `--accent` #2563eb/hover #1d4ed8; ocean `--accent` #0e7490/#155e75;
+  yfb `--text-faint` #8a8a93 + luật `.theme-yfb .text-white[class~="bg-[var(--accent)]"]` đổi chữ nút vàng sang đen;
+  sand `--text-faint` #6b645f, `--accent` #b45309/#92400e, `--accent-text` #92400e. Token mới `--accent-contrast` ở cả 4
+  theme (trước đây 3 chỗ dùng mà chưa định nghĩa). `accent-hover` giờ ĐẬM hơn accent (chỉ dùng làm nền nút).
+  Media query < 768px: input/select/textarea 16px (desktop giữ nguyên).
+- 378 class `text-[8–10.5px]` → `text-[11px]` (48 file). Cỡ chữ trục biểu đồ recharts (`fontSize={10}`) CHƯA đổi — script đo
+  không đếm chữ SVG.
+- `src/lib/defaultBrand.ts` + `src/hooks/useDefaultBrand.ts`: thứ tự brand nhớ lần trước (localStorage
+  `liveops_os_v2_lastBrandId`, dùng chung mọi màn) → brand có ca gần nhất tới hôm nay (bỏ ca huỷ/tương lai) → brands[0].
+  Áp cho MonthPlan, OpsSupport, EngineTrainingPanel, OpenSlotModal. Là giá trị suy ra (không setState trong effect) —
+  eslint set-state-in-effect giảm 41 → 38.
+- `usePrompt()` trong `src/hooks/useConfirm.tsx` (cùng provider), input type month/time; thay BrandCommitment "Sinh cam kết"
+  (tháng) và BackfillFromRooms "tách ca" (giờ).
+- Test canh: `tests/uiReadability.test.ts` (tương phản token 4 theme ≥ 4.5 kể cả chữ trên accent/accent-hover; cấm
+  `text-[<11px]`; cấm `window.alert/confirm/prompt` và `alert(` trần) — test này bắt thêm sand `--accent-text` 4.39:1 lúc
+  làm, đã sửa. `tests/defaultBrand.test.ts` 5 ca.
+- Verify: tsc 0 lỗi, eslint 0 lỗi/38 warning, vitest 102/102. Đo lại không tiêm CSS: % chữ kém tương phản về 0% ở 12/15 màn
+  agency (Hiệu Suất Host 1%, AI Training Center 23% — màu hardcode, ngoài P0); % chữ < 11px 0% mọi màn. Kế Hoạch Tháng / Hỗ Trợ
+  Vận Hành mở ra CROCS; đổi sang JOCKEY ở màn này thì màn kia cũng JOCKEY. Hộp "tách ca" mở đúng ô chọn giờ, Huỷ không đổi dữ
+  liệu. 4 theme: chữ nút accent trắng (midnight/ocean/sand), đen trên vàng (yfb). Mobile 375px: 98/98 ô nhập 16px, không tràn
+  ngang. Lịch Tháng: thẻ ca 98→103px, số ô ngày phải cuộn không đổi (14/36).
+- Phát hiện phụ chưa sửa: `bg-[var(--surface-card)]` (14 chỗ ở BrandCommitment, HostPerformance, LiveReconciliation) dùng token không tồn tại (nền trong suốt).
+
+Phương án còn lại:
+- ~~**P0 (1–2 ngày):** sửa token tương phản 4 theme; sàn cỡ chữ 11px (thay 378 class); ô nhập 16px trên mobile; brand mặc định =
+  brand có ca gần nhất (nhớ lựa chọn cuối); thay 2 `window.prompt`.~~ XONG (ở trên).
+- **P1 (~1 tuần):** URL routing (`/agency/so-ca`, `/brand/crocs/report-thang/2026-09`); thu gọn header trang (mô tả vào nút "?");
+  `src/lib/format.ts` + test canh như metricGlossary; sidebar tự thu gọn < 1280px; header mobile gọn.
+- **P2 (lớn):** gộp IA — một hub "Nhập dữ liệu" (hiện 3 chỗ upload ở 2 workspace), brand là bộ lọc cho ops thay vì đổi workspace;
+  tách bundle theo tab/role; bản Report Tháng rút gọn cho điện thoại; gắn đo lượt mở từng tab trước khi gộp menu.
 
 ## Audit toàn diện code base (2026-09-23) — Phần 1 XONG, 4 bản vá đã verify
 

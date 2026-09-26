@@ -195,7 +195,7 @@ export const SchemeWeekStrip: React.FC<SchemeWeekStripProps> = ({ brandId, weekD
                         onChange={(e) => setDraft((d) => ({ ...d, category: e.target.value }))}
                         list="scheme-categories"
                         placeholder="Hạng mục"
-                        className={`w-full bg-[var(--surface-elevated)] rounded px-1 py-0.5 text-[9px] font-black uppercase tracking-wide ${color.text} focus:outline-none focus:ring-1 focus:ring-amber-500`}
+                        className={`w-full bg-[var(--surface-elevated)] rounded px-1 py-0.5 text-[11px] font-black uppercase tracking-wide ${color.text} focus:outline-none focus:ring-1 focus:ring-amber-500`}
                       />
                       <textarea
                         autoFocus
@@ -209,19 +209,19 @@ export const SchemeWeekStrip: React.FC<SchemeWeekStripProps> = ({ brandId, weekD
                           type="date"
                           value={draft.startDate}
                           onChange={(e) => setDraft((d) => ({ ...d, startDate: e.target.value }))}
-                          className="bg-[var(--surface-elevated)] rounded px-1 py-0.5 text-[10px]"
+                          className="bg-[var(--surface-elevated)] rounded px-1 py-0.5 text-[11px]"
                         />
                         <span className="text-[var(--text-faint)]">→</span>
                         <input
                           type="date"
                           value={draft.endDate}
                           onChange={(e) => setDraft((d) => ({ ...d, endDate: e.target.value }))}
-                          className="bg-[var(--surface-elevated)] rounded px-1 py-0.5 text-[10px]"
+                          className="bg-[var(--surface-elevated)] rounded px-1 py-0.5 text-[11px]"
                         />
                         <button
                           disabled={busy}
                           onClick={saveEdit}
-                          className="ml-auto px-1.5 py-0.5 rounded bg-amber-600 text-white text-[10px] font-bold disabled:opacity-50"
+                          className="ml-auto px-1.5 py-0.5 rounded bg-amber-600 text-white text-[11px] font-bold disabled:opacity-50"
                         >
                           Lưu
                         </button>
@@ -236,7 +236,7 @@ export const SchemeWeekStrip: React.FC<SchemeWeekStripProps> = ({ brandId, weekD
                     </div>
                   ) : (
                     <>
-                      <p className={`flex items-center gap-1 text-[9px] font-black uppercase tracking-wide ${color.text} opacity-80`}>
+                      <p className={`flex items-center gap-1 text-[11px] font-black uppercase tracking-wide ${color.text} opacity-80`}>
                         <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${color.dot}`} />
                         {seg.scheme.category}
                       </p>
@@ -281,14 +281,14 @@ export const SchemeWeekStrip: React.FC<SchemeWeekStripProps> = ({ brandId, weekD
                     type="date"
                     value={newRow.startDate}
                     onChange={(e) => setNewRow((d) => ({ ...d, startDate: e.target.value }))}
-                    className="bg-[var(--surface-elevated)] rounded px-1.5 py-1 text-[10px]"
+                    className="bg-[var(--surface-elevated)] rounded px-1.5 py-1 text-[11px]"
                   />
                   <span className="text-[var(--text-faint)]">→</span>
                   <input
                     type="date"
                     value={newRow.endDate}
                     onChange={(e) => setNewRow((d) => ({ ...d, endDate: e.target.value }))}
-                    className="bg-[var(--surface-elevated)] rounded px-1.5 py-1 text-[10px]"
+                    className="bg-[var(--surface-elevated)] rounded px-1.5 py-1 text-[11px]"
                   />
                   <button
                     disabled={busy || !newRow.category.trim() || !newRow.content.trim()}

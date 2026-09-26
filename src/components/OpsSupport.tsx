@@ -8,6 +8,7 @@ import { fetchBrandLockedPlanSlots, fetchCalendarEvents, fetchMonthPlan } from "
 import { EstimateCtx, MonthTracking, benchmarkForWindow, suggestFill, trackMonth } from "../lib/opsSupport";
 import { monthOutlook } from "../lib/performance/ceoBrief";
 import { elapsedFractionOf, todayVn } from "../lib/performance/brandCommitment";
+import { useDefaultBrand } from "../hooks/useDefaultBrand";
 import { formatCurrencyAdaptive } from "../lib/formatCurrency";
 import { SESSION_STATUS_CLS, SESSION_STATUS_LABEL_VI } from "../lib/sessionStatusUi";
 import { metricHint } from "../lib/metricGlossary";
@@ -40,24 +41,21 @@ const addDays = (d: string, n: number) => {
 
 const Stat: React.FC<{ label: string; value: string; hint?: string; tone?: "good" | "bad" | "warn" | "muted" }> = ({ label, value, hint, tone }) => (
   <div className="bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3">
-    <p className="text-[10px] uppercase tracking-wider font-bold text-[var(--text-faint)]" title={metricHint(label)}>{label}</p>
+    <p className="text-[11px] uppercase tracking-wider font-bold text-[var(--text-faint)]" title={metricHint(label)}>{label}</p>
     <p className={`text-lg font-black mt-0.5 ${tone === "good" ? "text-emerald-400" : tone === "bad" ? "text-rose-400" : tone === "warn" ? "text-amber-300" : tone === "muted" ? "text-[var(--text-faint)]" : "text-[var(--text)]"}`}>{value}</p>
-    {hint && <p className="text-[10px] text-[var(--text-faint)] mt-0.5 leading-snug">{hint}</p>}
+    {hint && <p className="text-[11px] text-[var(--text-faint)] mt-0.5 leading-snug">{hint}</p>}
   </div>
 );
 
 export default function OpsSupport({ brands, sessions, shiftSlots, promoSchemes, engineParams, onOpenMonthPlan, onOpenSession }: OpsSupportProps) {
   const today = todayVn();
-  const [brandId, setBrandId] = useState(brands[0]?.id ?? "");
+  const [brandId, setBrandId] = useDefaultBrand(brands, sessions, today);
   const [month, setMonth] = useState(today.slice(0, 7));
   const [plan, setPlan] = useState<{ plan: BrandMonthPlan; slots: BrandMonthPlanSlot[] } | null>(null);
   const [lockedSlots, setLockedSlots] = useState<BrandMonthPlanSlot[]>([]);
   const [events, setEvents] = useState<CalendarEventRow[]>([]);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (!brandId && brands.length > 0) setBrandId(brands[0].id);
-  }, [brands, brandId]);
   useEffect(() => {
     fetchCalendarEvents().then(setEvents).catch(() => setEvents([]));
   }, []);
@@ -231,7 +229,7 @@ export default function OpsSupport({ brands, sessions, shiftSlots, promoSchemes,
                 <div className="absolute inset-y-0 left-0 bg-[var(--accent)]/25" style={{ width: `${Math.min(100, (tracking.projected / Math.max(1, tracking.targetTotal)) * 100)}%` }} />
                 <div className="absolute inset-y-0 w-0.5 bg-[var(--text)]" style={{ left: `${Math.min(100, elapsed * 100)}%` }} title={`Đã trôi ${fmtPct(elapsed)} tháng`} />
               </div>
-              <div className="flex justify-between text-[10px] text-[var(--text-faint)] mt-1">
+              <div className="flex justify-between text-[11px] text-[var(--text-faint)] mt-1">
                 <span>Thực tế {fmtPct(tracking.targetTotal > 0 ? tracking.actualAll / tracking.targetTotal : 0)} · dự kiến {fmtPct(tracking.targetTotal > 0 ? tracking.projected / tracking.targetTotal : 0)}</span>
                 <span>vạch = {fmtPct(elapsed)} tháng đã trôi</span>
               </div>
@@ -293,7 +291,7 @@ export default function OpsSupport({ brands, sessions, shiftSlots, promoSchemes,
                         <button onClick={onOpenMonthPlan} className="mt-1 inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white">
                           <CalendarRange className="w-3.5 h-3.5" /> Thêm ca ở Kế Hoạch Tháng
                         </button>
-                        <p className="text-[10px] text-[var(--text-faint)]">Ca thêm sau chốt mang target riêng theo dự báo; target các ca đã chốt không đổi.</p>
+                        <p className="text-[11px] text-[var(--text-faint)]">Ca thêm sau chốt mang target riêng theo dự báo; target các ca đã chốt không đổi.</p>
                       </>
                     ) : (
                       <p className="text-[var(--text-muted)]">Không còn chỗ trong khung giờ/ngày của kế hoạch (hoặc chưa đủ lịch sử để engine xếp) — cân nhắc nới khung live hoặc phương án B.</p>
@@ -344,7 +342,7 @@ export default function OpsSupport({ brands, sessions, shiftSlots, promoSchemes,
                           {t.session ? <button onClick={() => onOpenSession(t.session!.id)} className="hover:text-[var(--accent-text)] underline decoration-dotted">{fmtDate(t.planSlot.date)} {t.planSlot.startTime}–{t.planSlot.endTime}</button> : <>{fmtDate(t.planSlot.date)} {t.planSlot.startTime}–{t.planSlot.endTime}</>}
                         </td>
                         <td className="py-1 pr-3">
-                          <span className={`px-1.5 py-0.5 rounded border text-[10px] font-bold ${t.state === "done" ? SESSION_STATUS_CLS.Completed : t.state === "cancelled" ? SESSION_STATUS_CLS.Cancelled : t.state === "no_data" ? "bg-amber-950 text-amber-300 border-amber-800" : SESSION_STATUS_CLS.Upcoming}`}>
+                          <span className={`px-1.5 py-0.5 rounded border text-[11px] font-bold ${t.state === "done" ? SESSION_STATUS_CLS.Completed : t.state === "cancelled" ? SESSION_STATUS_CLS.Cancelled : t.state === "no_data" ? "bg-amber-950 text-amber-300 border-amber-800" : SESSION_STATUS_CLS.Upcoming}`}>
                             {t.state === "done" ? "Đã xong" : t.state === "cancelled" ? "Huỷ" : t.state === "no_data" ? "Chưa có số" : t.session ? SESSION_STATUS_LABEL_VI[t.session.status] : t.slot ? "Chờ đăng ký" : "—"}
                           </span>
                         </td>
@@ -390,9 +388,9 @@ export default function OpsSupport({ brands, sessions, shiftSlots, promoSchemes,
                       </p>
                     </div>
                     {u.session ? (
-                      <button onClick={() => onOpenSession(u.session!.id)} className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${SESSION_STATUS_CLS[u.session.status]}`}>{SESSION_STATUS_LABEL_VI[u.session.status]}</button>
+                      <button onClick={() => onOpenSession(u.session!.id)} className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${SESSION_STATUS_CLS[u.session.status]}`}>{SESSION_STATUS_LABEL_VI[u.session.status]}</button>
                     ) : (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-blue-950 text-blue-300 border-blue-800">Mở</span>
+                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full border bg-blue-950 text-blue-300 border-blue-800">Mở</span>
                     )}
                   </div>
                   {!b ? (
@@ -400,20 +398,20 @@ export default function OpsSupport({ brands, sessions, shiftSlots, promoSchemes,
                   ) : (
                     <>
                       <div className="grid grid-cols-3 gap-x-2 gap-y-1.5 text-[11px]">
-                        <div><p className="text-[9px] uppercase font-bold text-[var(--text-faint)]">GMV kỳ vọng</p><p className="font-bold text-[var(--text)]">{formatCurrencyAdaptive(b.expectedGmv * k)}</p></div>
-                        <div><p className="text-[9px] uppercase font-bold text-[var(--text-faint)]">GMV/giờ</p><p className="font-bold text-[var(--text)]">{formatCurrencyAdaptive(b.gmvPerHour * k)}</p></div>
-                        <div><p className="text-[9px] uppercase font-bold text-[var(--text-faint)]">Target GMV ca</p><p className={`font-bold ${target > 0 && target > b.expectedGmv * k * engineParams.highExpectationRatio ? "text-amber-300" : "text-[var(--text)]"}`}>{target > 0 ? formatCurrencyAdaptive(target) : "—"}</p></div>
-                        <div><p className="text-[9px] uppercase font-bold text-[var(--text-faint)]">Views/giờ</p><p className="font-mono text-[var(--text)]">{fmtN(b.viewsPerHour)}</p></div>
-                        <div><p className="text-[9px] uppercase font-bold text-[var(--text-faint)]">Tổng view</p><p className="font-mono text-[var(--text)]">{fmtN(b.expectedViews)}</p></div>
-                        <div><p className="text-[9px] uppercase font-bold text-[var(--text-faint)]">Orders kỳ vọng</p><p className="font-mono text-[var(--text)]">{fmtN(b.expectedOrders)}</p></div>
-                        <div><p className="text-[9px] uppercase font-bold text-[var(--text-faint)]">CVR</p><p className="font-mono text-[var(--text)]">{fmtPct(b.conversion, 2)}</p></div>
-                        <div><p className="text-[9px] uppercase font-bold text-[var(--text-faint)]">LIVE CTR</p><p className="font-mono text-[var(--text)]">{b.liveCtr === null ? "—" : `${b.liveCtr.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%`}</p></div>
-                        <div><p className="text-[9px] uppercase font-bold text-[var(--text-faint)]">AOV</p><p className="font-mono text-[var(--text)]">{b.aov > 0 ? formatCurrencyAdaptive(b.aov) : "—"}</p></div>
-                        <div><p className="text-[9px] uppercase font-bold text-[var(--text-faint)]">Ads / giờ</p><p className="font-mono text-[var(--text)]">{b.adsPerHour === null ? "chưa có report" : formatCurrencyAdaptive(b.adsPerHour)}</p></div>
-                        <div className="col-span-2"><p className="text-[9px] uppercase font-bold text-[var(--text-faint)]">Hệ số ngày</p><p className="font-mono text-[var(--text)]">×{b.dayFactor.toLocaleString("vi-VN", { maximumFractionDigits: 2 })}{b.dayFactor > 1.05 ? " (camp/lễ/scheme)" : ""}</p></div>
+                        <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">GMV kỳ vọng</p><p className="font-bold text-[var(--text)]">{formatCurrencyAdaptive(b.expectedGmv * k)}</p></div>
+                        <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">GMV/giờ</p><p className="font-bold text-[var(--text)]">{formatCurrencyAdaptive(b.gmvPerHour * k)}</p></div>
+                        <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">Target GMV ca</p><p className={`font-bold ${target > 0 && target > b.expectedGmv * k * engineParams.highExpectationRatio ? "text-amber-300" : "text-[var(--text)]"}`}>{target > 0 ? formatCurrencyAdaptive(target) : "—"}</p></div>
+                        <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">Views/giờ</p><p className="font-mono text-[var(--text)]">{fmtN(b.viewsPerHour)}</p></div>
+                        <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">Tổng view</p><p className="font-mono text-[var(--text)]">{fmtN(b.expectedViews)}</p></div>
+                        <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">Orders kỳ vọng</p><p className="font-mono text-[var(--text)]">{fmtN(b.expectedOrders)}</p></div>
+                        <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">CVR</p><p className="font-mono text-[var(--text)]">{fmtPct(b.conversion, 2)}</p></div>
+                        <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">LIVE CTR</p><p className="font-mono text-[var(--text)]">{b.liveCtr === null ? "—" : `${b.liveCtr.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%`}</p></div>
+                        <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">AOV</p><p className="font-mono text-[var(--text)]">{b.aov > 0 ? formatCurrencyAdaptive(b.aov) : "—"}</p></div>
+                        <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">Ads / giờ</p><p className="font-mono text-[var(--text)]">{b.adsPerHour === null ? "chưa có report" : formatCurrencyAdaptive(b.adsPerHour)}</p></div>
+                        <div className="col-span-2"><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">Hệ số ngày</p><p className="font-mono text-[var(--text)]">×{b.dayFactor.toLocaleString("vi-VN", { maximumFractionDigits: 2 })}{b.dayFactor > 1.05 ? " (camp/lễ/scheme)" : ""}</p></div>
                       </div>
                       {(b.thin || b.cellTags.includes("weak") || b.cellTags.includes("traffic_low_cvr")) && (
-                        <p className="text-[10px] text-amber-300">
+                        <p className="text-[11px] text-amber-300">
                           {b.thin ? "Ít dữ liệu ở khung này — chỉ tham khảo. " : ""}
                           {b.cellTags.includes("traffic_low_cvr") ? "Khung này lịch sử view khá nhưng CVR thấp — ưu tiên deal chốt đơn. " : ""}
                           {b.cellTags.includes("weak") ? "Khung yếu trong lịch sử." : ""}

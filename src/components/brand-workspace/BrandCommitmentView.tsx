@@ -82,7 +82,7 @@ const Bar: React.FC<{ done: number; scheduled: number; committed: number }> = ({
 
 const KV: React.FC<{ label: string; value: React.ReactNode; strong?: boolean }> = ({ label, value, strong }) => (
   <div>
-    <div className="text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-bold">{label}</div>
+    <div className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-bold">{label}</div>
     <div className={`mt-0.5 ${strong ? "text-base font-black text-[var(--text)]" : "text-sm font-bold text-[var(--text-muted)]"}`}>
       {value}
     </div>
@@ -268,7 +268,7 @@ export const BrandCommitmentView: React.FC<BrandCommitmentViewProps> = ({
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)] uppercase text-[10px] tracking-wider">
+                <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)] uppercase text-[11px] tracking-wider">
                   <th className="py-2.5 px-4">Tháng</th>
                   <th className="py-2.5 px-2 text-right">Cam kết</th>
                   <th className="py-2.5 px-2 text-right">Đã chạy</th>
@@ -300,7 +300,7 @@ export const BrandCommitmentView: React.FC<BrandCommitmentViewProps> = ({
                         {/* Tháng chưa phát hành Report Tháng thì cột tiền chưa được mở (Đợt B).
                             Nói rõ lý do, đừng hiện 0 — "0 đ" đọc thành "không bán được gì". */}
                         {gmvHidden ? (
-                          <span className="text-[10px] italic text-[var(--text-faint)]">chưa phát hành</span>
+                          <span className="text-[11px] italic text-[var(--text-faint)]">chưa phát hành</span>
                         ) : p.deliveredGmv > 0 ? (
                           formatCurrencyAdaptive(p.deliveredGmv, "")
                         ) : (
@@ -308,7 +308,7 @@ export const BrandCommitmentView: React.FC<BrandCommitmentViewProps> = ({
                         )}
                       </td>
                       <td className="py-2.5 px-2">
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${STATUS_CLS[p.status]}`}>
+                        <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${STATUS_CLS[p.status]}`}>
                           {STATUS_LABEL[p.status]}
                         </span>
                       </td>

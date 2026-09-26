@@ -6,6 +6,7 @@ import { buildHistory } from "../lib/scheduling/suggestEngine";
 import { buildCalibration, evaluatePlan } from "../lib/scheduling/planEvaluation";
 import { fetchBrandLockedPlanSlots, fetchCalendarEvents } from "../lib/db/monthPlans";
 import { todayVn } from "../lib/performance/brandCommitment";
+import { useDefaultBrand } from "../hooks/useDefaultBrand";
 import { errorMessage } from "../lib/errorMessage";
 import { formatCurrencyAdaptive } from "../lib/formatCurrency";
 
@@ -35,18 +36,15 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
-  const [brandId, setBrandId] = useState("");
   const [events, setEvents] = useState<CalendarEventRow[]>([]);
   const [lockedSlots, setLockedSlots] = useState<BrandMonthPlanSlot[]>([]);
   const today = todayVn();
+  const [brandId, setBrandId] = useDefaultBrand(brands, sessions, today);
 
   // Tham số từ DB tới sau khi mount (hoặc lưu xong) → đồng bộ nháp nếu admin chưa sửa gì.
   useEffect(() => {
     if (!dirty) setDraft(params);
   }, [params, dirty]);
-  useEffect(() => {
-    if (!brandId && brands.length > 0) setBrandId(brands[0].id);
-  }, [brands, brandId]);
   useEffect(() => {
     fetchCalendarEvents().then(setEvents).catch(() => setEvents([]));
   }, []);
@@ -104,7 +102,7 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
         </div>
         <div className="flex-shrink-0 bg-sky-950/60 border border-sky-500/40 rounded-xl px-3.5 py-2 text-right">
           <div className="text-xs font-bold text-sky-300">{changed} tham số khác mặc định</div>
-          <p className="text-[10px] text-sky-400">{updatedAt ? `Lưu lần cuối ${new Date(updatedAt).toLocaleString("vi-VN")}` : "Đang dùng mặc định"}</p>
+          <p className="text-[11px] text-sky-400">{updatedAt ? `Lưu lần cuối ${new Date(updatedAt).toLocaleString("vi-VN")}` : "Đang dùng mặc định"}</p>
         </div>
       </div>
 
@@ -135,7 +133,7 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
                   {(["dday", "midmonth", "payday"] as const).map((b) => (
                     <div key={b} className="flex justify-between gap-2">
                       <span className="text-[var(--text)]">{{ dday: "D-Day", midmonth: "Mid-Month", payday: "Pay Day" }[b]}</span>
-                      <span className="text-[var(--text)]">GMV/giờ <b>×{history.campMultipliers[b].toFixed(2)}</b> <span className="text-[10px] text-[var(--text-faint)]">{history.campLearned[b] ? "học" : "mặc định"}</span>{history.campHoursLearned[b] ? <> · <b>{history.campHoursPerDay[b].toFixed(1)}h</b>/ngày</> : ""}</span>
+                      <span className="text-[var(--text)]">GMV/giờ <b>×{history.campMultipliers[b].toFixed(2)}</b> <span className="text-[11px] text-[var(--text-faint)]">{history.campLearned[b] ? "học" : "mặc định"}</span>{history.campHoursLearned[b] ? <> · <b>{history.campHoursPerDay[b].toFixed(1)}h</b>/ngày</> : ""}</span>
                     </div>
                   ))}
                   <div className="flex justify-between gap-2"><span className="text-[var(--text)]">Ngày thường</span><span className="text-[var(--text)]">{history.campHoursLearned.daily ? <><b>{history.campHoursPerDay.daily.toFixed(1)}h</b>/ngày</> : "—"}</span></div>
@@ -144,17 +142,17 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
                 <div>
                   <p className="font-bold text-[var(--text-muted)] mb-1">Lễ / sự kiện / khuyến mãi</p>
                   {(["holiday", "mega_sale", "event"] as const).map((k) => (
-                    <div key={k} className="flex justify-between gap-2"><span className="text-[var(--text)]">{{ holiday: "Ngày lễ", mega_sale: "Mega sale", event: "Sự kiện" }[k]}</span><b className="text-[var(--text)]">×{history.eventMultipliers[k].toFixed(2)} <span className="text-[10px] font-normal text-[var(--text-faint)]">{history.eventLearned[k] ? "học" : "chưa đủ ca"}</span></b></div>
+                    <div key={k} className="flex justify-between gap-2"><span className="text-[var(--text)]">{{ holiday: "Ngày lễ", mega_sale: "Mega sale", event: "Sự kiện" }[k]}</span><b className="text-[var(--text)]">×{history.eventMultipliers[k].toFixed(2)} <span className="text-[11px] font-normal text-[var(--text-faint)]">{history.eventLearned[k] ? "học" : "chưa đủ ca"}</span></b></div>
                   ))}
-                  <div className="flex justify-between gap-2"><span className="text-[var(--text)]">Ngày trùng scheme KM</span><b className="text-[var(--text)]">×{history.schemeMultiplier.toFixed(2)} <span className="text-[10px] font-normal text-[var(--text-faint)]">{history.schemeLearned ? "học" : "chưa đủ ca"}</span></b></div>
+                  <div className="flex justify-between gap-2"><span className="text-[var(--text)]">Ngày trùng scheme KM</span><b className="text-[var(--text)]">×{history.schemeMultiplier.toFixed(2)} <span className="text-[11px] font-normal text-[var(--text-faint)]">{history.schemeLearned ? "học" : "chưa đủ ca"}</span></b></div>
                 </div>
                 <div>
                   <p className="font-bold text-[var(--text-muted)] mb-1">Khung giờ mạnh (thứ × khối 2h)</p>
                   {strong.length === 0 && <p className="text-[var(--text-faint)]">chưa ô nào có ≥ 2 ca</p>}
                   {strong.map((c) => (
-                    <div key={`${c.weekday}|${c.block}`} className="flex justify-between gap-2"><span className="text-[var(--text)]">{WD[c.weekday]} {c.block * 2}–{c.block * 2 + 2}h <span className="text-[10px] text-[var(--text-faint)]">({c.n} ca)</span></span><b className="text-emerald-400">{fmtM(c.gmvPerHour)}/h</b></div>
+                    <div key={`${c.weekday}|${c.block}`} className="flex justify-between gap-2"><span className="text-[var(--text)]">{WD[c.weekday]} {c.block * 2}–{c.block * 2 + 2}h <span className="text-[11px] text-[var(--text-faint)]">({c.n} ca)</span></span><b className="text-emerald-400">{fmtM(c.gmvPerHour)}/h</b></div>
                   ))}
-                  {weak.length > 0 && <p className="mt-1 text-[10px] text-[var(--text-faint)]">Yếu: {weak.map((c) => `${WD[c.weekday]} ${c.block * 2}h`).join(", ")}</p>}
+                  {weak.length > 0 && <p className="mt-1 text-[11px] text-[var(--text-faint)]">Yếu: {weak.map((c) => `${WD[c.weekday]} ${c.block * 2}h`).join(", ")}</p>}
                 </div>
               </div>
             )}
@@ -191,7 +189,7 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
           </div>
           {GROUPS.map((g) => (
             <div key={g}>
-              <p className="text-[10px] font-black uppercase tracking-wider text-[var(--text-faint)] mb-1.5">{ENGINE_GROUP_LABEL[g]}</p>
+              <p className="text-[11px] font-black uppercase tracking-wider text-[var(--text-faint)] mb-1.5">{ENGINE_GROUP_LABEL[g]}</p>
               <div className="divide-y divide-[var(--border)] border border-[var(--border)] rounded-xl overflow-hidden">
                 {ENGINE_PARAM_META.filter((m) => m.group === g).map((m) => {
                   const v = draft[m.key];
@@ -201,7 +199,7 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
                     <div key={m.key} className={`flex items-center gap-3 px-3 py-2 text-xs ${isDef ? "" : "bg-sky-950/20"}`}>
                       <div className="flex-1 min-w-0">
                         <div className="font-bold text-[var(--text)]">{m.label}</div>
-                        {m.help && <div className="text-[10px] text-[var(--text-muted)] leading-snug">{m.help}</div>}
+                        {m.help && <div className="text-[11px] text-[var(--text-muted)] leading-snug">{m.help}</div>}
                       </div>
                       {m.kind === "boolean" ? (
                         <label className="flex items-center gap-1.5 text-[var(--text)]">
@@ -211,7 +209,7 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
                       ) : (
                         <input type="number" value={Number(v)} min={m.min} max={m.max} step={m.step} onChange={(e) => { const n = Number(e.target.value); if (Number.isFinite(n)) set(m.key, n); }} className="w-24 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1 text-right font-mono text-[var(--text)]" />
                       )}
-                      <button onClick={() => set(m.key, def)} disabled={isDef} title={`Mặc định: ${String(def)}`} className="w-16 text-[10px] text-[var(--text-faint)] hover:text-[var(--text)] disabled:opacity-30 text-right">↺ {String(def)}</button>
+                      <button onClick={() => set(m.key, def)} disabled={isDef} title={`Mặc định: ${String(def)}`} className="w-16 text-[11px] text-[var(--text-faint)] hover:text-[var(--text)] disabled:opacity-30 text-right">↺ {String(def)}</button>
                     </div>
                   );
                 })}

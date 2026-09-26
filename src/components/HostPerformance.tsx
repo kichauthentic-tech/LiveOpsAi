@@ -179,7 +179,7 @@ export function HostPerformance({ sessions, brands }: HostPerformanceProps) {
                           <td key={wd} className="py-1 px-1 text-center">
                             {c ? (
                               <div
-                                className="rounded-md py-1.5 text-[10px] font-bold text-[var(--text)]"
+                                className="rounded-md py-1.5 text-[11px] font-bold text-[var(--text)]"
                                 style={{ backgroundColor: `rgba(16, 185, 129, ${0.12 + ratio * 0.6})` }}
                                 title={`${c.sessionCount} ca`}
                               >
@@ -206,9 +206,9 @@ export function HostPerformance({ sessions, brands }: HostPerformanceProps) {
             <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
               {weekdays.map((w) => (
                 <div key={w.key} className="bg-[var(--surface-base)] rounded-xl p-2.5 text-center">
-                  <p className="text-[10px] text-[var(--text-faint)]">{w.label}</p>
+                  <p className="text-[11px] text-[var(--text-faint)]">{w.label}</p>
                   <p className="text-sm font-black text-emerald-400 mt-1">{fmtVnd(w.gmvPerHour)}</p>
-                  <p className="text-[10px] text-[var(--text-faint)] mt-0.5">GMV/giờ · {w.sessionCount} ca</p>
+                  <p className="text-[11px] text-[var(--text-faint)] mt-0.5">GMV/giờ · {w.sessionCount} ca</p>
                 </div>
               ))}
             </div>

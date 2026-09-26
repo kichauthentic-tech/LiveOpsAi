@@ -189,7 +189,7 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
                   <ShieldAlert className="w-4 h-4" /> CHƯA KẾT NỐI
                 </div>
               )}
-              <span className="text-[10px] text-[var(--text-muted)] block">
+              <span className="text-[11px] text-[var(--text-muted)] block">
                 {tiktokStatus?.connected ? `Shop: ${tiktokStatus.shopName || tiktokStatus.shopId}` : "Không có shop nào đang kết nối"}
               </span>
               {isCeo && (
@@ -220,7 +220,7 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
               <div className="text-sm font-bold text-[var(--accent-text)] flex items-center gap-1.5">
                 <Activity className="w-4 h-4" /> /api/tiktok/webhook
               </div>
-              <span className="text-[10px] text-[var(--text-muted)]">
+              <span className="text-[11px] text-[var(--text-muted)]">
                 Đăng ký URL này trong TikTok Shop Partner Center để nhận sự kiện live/order thật
               </span>
             </div>
@@ -230,7 +230,7 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
               <div className="text-sm font-bold text-[var(--text)]">
                 {tiktokStatus?.accessTokenExpiresAt ? new Date(tiktokStatus.accessTokenExpiresAt).toLocaleString("vi-VN") : "—"}
               </div>
-              <span className="text-[10px] text-[var(--text-muted)]">
+              <span className="text-[11px] text-[var(--text-muted)]">
                 {tiktokStatus?.scope ? `Scope: ${tiktokStatus.scope}` : "Chưa có phiên OAuth nào"}
               </span>
             </div>
@@ -290,9 +290,9 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
                   <h4 className="font-bold text-[var(--text)] text-sm flex items-center gap-2">
                     {rule.name}
                     {rule.enabled ? (
-                      <span className="bg-emerald-100 text-emerald-800 text-[9px] font-bold px-2 py-0.5 rounded">Active</span>
+                      <span className="bg-emerald-100 text-emerald-800 text-[11px] font-bold px-2 py-0.5 rounded">Active</span>
                     ) : (
-                      <span className="bg-[var(--surface-hover)] text-[var(--text-muted)] text-[9px] font-bold px-2 py-0.5 rounded">Off</span>
+                      <span className="bg-[var(--surface-hover)] text-[var(--text-muted)] text-[11px] font-bold px-2 py-0.5 rounded">Off</span>
                     )}
                   </h4>
                   <div className="text-xs text-[var(--text-muted)] flex flex-wrap items-center gap-2 font-mono">
@@ -303,7 +303,7 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
                 </div>
 
                 <div className="flex items-center space-x-2">
-                  <span className="text-[10px] text-[var(--text-muted)] mr-2">Đã chạy: {rule.executionsCount} lần</span>
+                  <span className="text-[11px] text-[var(--text-muted)] mr-2">Đã chạy: {rule.executionsCount} lần</span>
                   <button
                     onClick={() => handleToggleRule(rule)}
                     className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${

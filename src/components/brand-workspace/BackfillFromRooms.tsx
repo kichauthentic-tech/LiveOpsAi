@@ -11,7 +11,7 @@ import { vnParts } from "../../lib/dataraw/liveAnalysisRows";
 import { talentOptionLabel } from "../../lib/talentName";
 import { errorMessage } from "../../lib/errorMessage";
 import { useToast } from "../../hooks/useToast";
-import { useConfirm } from "../../hooks/useConfirm";
+import { useConfirm, usePrompt } from "../../hooks/useConfirm";
 
 // Nạp bù ca từ file Creator-Live-Performance (migration 0086) — 2 bước, nằm ngay dưới ô import
 // của tab "Creator Live Performance" trong Dữ Liệu Gốc:
@@ -41,6 +41,7 @@ function monthBounds(m: string): [string, string] {
 export const BackfillFromRooms: React.FC<Props> = ({ brandId, brandName, months, sessions, talents, onSessionsChanged }) => {
   const { showToast } = useToast();
   const confirm = useConfirm();
+  const prompt = usePrompt();
   const [month, setMonth] = useState<string>(months[0] ?? "");
   const [rows, setRows] = useState<CreatorLivePerfRow[]>([]);
   const [loadingRows, setLoadingRows] = useState(false);
@@ -129,7 +130,10 @@ export const BackfillFromRooms: React.FC<Props> = ({ brandId, brandName, months,
     if (!s.actualStartAt || !s.actualEndAt) return;
     const startVn = vnParts(s.actualStartAt).time;
     const endVn = vnParts(s.actualEndAt).time;
-    const input = window.prompt(`Tách ca ${s.date} (${startVn} → ${endVn}) tại mốc giờ nào? (HH:MM, giờ VN)`);
+    const input = await prompt(`Tách ca ${s.date} (${startVn} → ${endVn}) tại mốc giờ nào? (giờ VN)`, {
+      inputType: "time",
+      confirmLabel: "Tách ca"
+    });
     if (!input) return;
     const m = /^(\d{1,2}):(\d{2})$/.exec(input.trim());
     if (!m) { showToast("Nhập dạng HH:MM, ví dụ 22:00"); return; }

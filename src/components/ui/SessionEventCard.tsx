@@ -132,13 +132,13 @@ export const SessionEventCard: React.FC<SessionEventCardProps> = ({
         {/* Tay cầm kéo-thả chiếm chỗ quý ở ô hẹp — chỉ hiện từ xl (cả card vẫn kéo được ở mọi khổ). */}
         {draggable && <GripVertical className={`w-3 h-3 shrink-0 opacity-60 ${compact ? "hidden xl:block" : ""}`} />}
         <BrandLogo brand={brand ?? { name: brandName, logo: "" }} size="xs" className="rounded-md bg-white shadow-sm" />
-        <span className={`font-black uppercase tracking-tight truncate min-w-0 ${compact ? "text-[9px] xl:text-[10px]" : "text-[11px]"}`}>
+        <span className={`font-black uppercase tracking-tight truncate min-w-0 ${compact ? "text-[11px] xl:text-[11px]" : "text-[11px]"}`}>
           {brandName}
         </span>
         {!!targetGmv && (
           <span
             title={`Target GMV: ${targetGmv.toLocaleString("vi-VN")}đ`}
-            className="ml-auto shrink-0 text-emerald-400 font-mono font-bold leading-none text-[9px] xl:text-[10px]"
+            className="ml-auto shrink-0 text-emerald-400 font-mono font-bold leading-none text-[11px] xl:text-[11px]"
           >
             {compactGmv(targetGmv)}
           </span>
@@ -160,7 +160,7 @@ export const SessionEventCard: React.FC<SessionEventCardProps> = ({
         {statusLabel && (
           <span
             style={{ background: overlay }}
-            className="ml-auto shrink-0 text-[8px] font-black uppercase tracking-wide px-1 xl:px-1.5 py-0.5 rounded-full leading-none"
+            className="ml-auto shrink-0 text-[11px] font-black uppercase tracking-wide px-1 xl:px-1.5 py-0.5 rounded-full leading-none"
           >
             {statusLabel}
           </span>
@@ -168,7 +168,7 @@ export const SessionEventCard: React.FC<SessionEventCardProps> = ({
       </div>
 
       {title && (
-        <div className={`truncate opacity-90 font-semibold ${compact ? "text-[9px]" : "text-[10px] mt-0.5"}`}>{title}</div>
+        <div className={`truncate opacity-90 font-semibold ${compact ? "text-[11px]" : "text-[11px] mt-0.5"}`}>{title}</div>
       )}
 
       {/* Hàng 3: chip thông tin mở rộng — brand/giờ đã ở hàng 1-2, chip này luôn hiện (mọi khổ
@@ -182,14 +182,14 @@ export const SessionEventCard: React.FC<SessionEventCardProps> = ({
               key={i}
               title={m.title ?? m.label}
               style={{ background: overlay }}
-              className="inline-flex items-center gap-1 max-w-full px-1.5 py-0.5 rounded-md text-[9px] font-bold leading-none"
+              className="inline-flex items-center gap-1 max-w-full px-1.5 py-0.5 rounded-md text-[11px] font-bold leading-none"
             >
               {m.icon && <m.icon className="w-2.5 h-2.5 shrink-0 opacity-80" />}
               <span className="truncate">{m.label}</span>
             </span>
           ))}
           {hidden > 0 && (
-            <span style={{ background: overlay }} className="px-1.5 py-0.5 rounded-md text-[9px] font-bold leading-none">
+            <span style={{ background: overlay }} className="px-1.5 py-0.5 rounded-md text-[11px] font-bold leading-none">
               +{hidden}
             </span>
           )}

@@ -571,7 +571,7 @@ export default function ShiftScheduling({
                 >
                   <div className="flex items-baseline justify-between gap-2">
                     <span className="text-xs font-bold text-[var(--text)] truncate">{g.brandName}</span>
-                    <span className="text-[10px] text-[var(--text-faint)] shrink-0">
+                    <span className="text-[11px] text-[var(--text-faint)] shrink-0">
                       cam kết {g.committedHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h
                     </span>
                   </div>
@@ -580,7 +580,7 @@ export default function ShiftScheduling({
                       ? "Đã mở đủ"
                       : `Cần mở thêm ${g.hoursStillToOpen.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h`}
                   </p>
-                  <p className="text-[10px] text-[var(--text-muted)] mt-1 leading-relaxed">
+                  <p className="text-[11px] text-[var(--text-muted)] mt-1 leading-relaxed">
                     Đã live {g.deliveredHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h · đã chốt chưa live{" "}
                     {g.scheduledHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h · đang mở chờ chốt{" "}
                     {g.openSlotHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h ({g.openSlotCount} ca)
@@ -589,7 +589,7 @@ export default function ShiftScheduling({
               );
             })}
           </div>
-          <p className="text-[10px] text-[var(--text-faint)] mt-2">
+          <p className="text-[11px] text-[var(--text-faint)] mt-2">
             Giờ ca theo lịch, cùng loại giờ dùng để tính tiền brand. Brand chưa đặt cam kết không hiện ở đây — nhập ở tab Cam Kết Hợp Đồng.
           </p>
         </div>
@@ -633,7 +633,7 @@ export default function ShiftScheduling({
         </h3>
         <div className="overflow-x-auto -mx-1 px-1 pb-1">
           <div className="min-w-[760px] xl:min-w-0">
-            <div className="grid grid-cols-7 gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-black uppercase tracking-wide mb-2">
+            <div className="grid grid-cols-7 gap-1.5 sm:gap-2 text-[11px] sm:text-xs font-black uppercase tracking-wide mb-2">
               {WEEKDAY_LABELS.map((label, idx) => (
                 <div
                   key={label}
@@ -816,17 +816,17 @@ export default function ShiftScheduling({
                         {dayLabel(slot.date)} {slot.date} · {slot.startTime}-{slot.endTime}
                       </span>
                       <span className="text-[var(--text-muted)]">{slot.brandName}</span>
-                      <span className="text-[10px] bg-[var(--surface-elevated)] text-[var(--text-muted)] px-2 py-0.5 rounded-full font-bold">{slot.platform}</span>
+                      <span className="text-[11px] bg-[var(--surface-elevated)] text-[var(--text-muted)] px-2 py-0.5 rounded-full font-bold">{slot.platform}</span>
                       {slot.studioName && <span className="text-[var(--text-faint)] text-xs">{slot.studioName}</span>}
                       {slot.templateId ? (
-                        <span className="flex items-center gap-1 text-[10px] text-[var(--accent-text)]" title="Tự động sinh từ quy tắc lặp">
+                        <span className="flex items-center gap-1 text-[11px] text-[var(--accent-text)]" title="Tự động sinh từ quy tắc lặp">
                           <Zap className="w-3 h-3" /> Tự động
                         </span>
                       ) : (
-                        <span className="text-[10px] text-[var(--text-faint)]">Phát sinh</span>
+                        <span className="text-[11px] text-[var(--text-faint)]">Phát sinh</span>
                       )}
                       <span
-                        className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                        className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
                           slot.status === "finalized"
                             ? "bg-emerald-950 text-emerald-300 border border-emerald-800"
                             : slot.status === "cancelled"
@@ -838,7 +838,7 @@ export default function ShiftScheduling({
                       </span>
                       {slot.status === "open" && slot.date >= today && (
                         <span
-                          className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${
+                          className={`text-[11px] px-2 py-0.5 rounded-full font-bold border ${
                             regs.length === 0
                               ? "bg-rose-950 text-rose-300 border-rose-800"
                               : regs.length === 1
@@ -851,7 +851,7 @@ export default function ShiftScheduling({
                       )}
                       {studioConflicts.length > 0 && slot.status !== "cancelled" && (
                         <span
-                          className="flex items-center gap-1 text-[10px] text-rose-300"
+                          className="flex items-center gap-1 text-[11px] text-rose-300"
                           title={`Ưu tiên hoá: ${studioConflicts.map((c) => `${c.brandName} (${c.startTime}-${c.endTime})`).join(", ")}`}
                         >
                           <Flame className="w-3 h-3" /> Trùng studio {studioConflicts.length} brand khác
@@ -971,7 +971,7 @@ export default function ShiftScheduling({
                         <div className="w-full pt-2 mt-1 border-t border-[var(--border)]/60">
                           <div className="flex items-center gap-1.5 mb-1.5">
                             <TrendingUp className="w-3 h-3 text-[var(--text-faint)]" />
-                            <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wide">
+                            <span className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wide">
                               Hiệu suất 90 ngày gần nhất
                             </span>
                           </div>
@@ -999,23 +999,23 @@ export default function ShiftScheduling({
                                     {s.name}
                                   </span>
                                   {s.brandSessions > 0 ? (
-                                    <span className="text-[10px] text-emerald-400">
+                                    <span className="text-[11px] text-emerald-400">
                                       {fmtPerHour(s.brandGmvPerHour)} với brand này ({s.brandSessions} ca)
                                     </span>
                                   ) : s.overallSessions > 0 ? (
-                                    <span className="text-[10px] text-[var(--text-muted)]">
+                                    <span className="text-[11px] text-[var(--text-muted)]">
                                       chưa live brand này · {fmtPerHour(s.overallGmvPerHour)} chung ({s.overallSessions} ca)
                                     </span>
                                   ) : (
-                                    <span className="text-[10px] text-[var(--text-faint)]">chưa có ca nào có số liệu</span>
+                                    <span className="text-[11px] text-[var(--text-faint)]">chưa có ca nào có số liệu</span>
                                   )}
                                   {s.weekdaySessions > 0 && (
-                                    <span className="text-[10px] text-sky-400">
+                                    <span className="text-[11px] text-sky-400">
                                       {fmtPerHour(s.weekdayGmvPerHour)} vào {dayLabel(slot.date)} ({s.weekdaySessions} ca)
                                     </span>
                                   )}
                                   {s.confidence === "low" && (
-                                    <span className="text-[10px] text-amber-400">ít dữ liệu, chỉ tham khảo</span>
+                                    <span className="text-[11px] text-amber-400">ít dữ liệu, chỉ tham khảo</span>
                                   )}
                                 </button>
                               );

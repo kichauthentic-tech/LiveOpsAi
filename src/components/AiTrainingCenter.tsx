@@ -74,7 +74,7 @@ export const AiTrainingCenter: React.FC<AiTrainingCenterProps> = ({ prompts, loa
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
             <span>{prompts.length} Agent</span>
           </div>
-          <p className="text-[10px] text-rose-400">Thay đổi có hiệu lực ngay ở lần gọi AI tiếp theo</p>
+          <p className="text-[11px] text-rose-400">Thay đổi có hiệu lực ngay ở lần gọi AI tiếp theo</p>
         </div>
       </div>
 
@@ -156,7 +156,7 @@ export const AiTrainingCenter: React.FC<AiTrainingCenterProps> = ({ prompts, loa
                       </button>
                     </div>
                     {p.updatedAt && (
-                      <p className="text-[10px] text-[var(--text-muted)]">Sửa lần cuối: {new Date(p.updatedAt).toLocaleString("vi-VN")}</p>
+                      <p className="text-[11px] text-[var(--text-muted)]">Sửa lần cuối: {new Date(p.updatedAt).toLocaleString("vi-VN")}</p>
                     )}
                   </div>
                 );

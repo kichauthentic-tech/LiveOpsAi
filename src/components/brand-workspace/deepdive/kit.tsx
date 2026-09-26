@@ -80,7 +80,7 @@ export const Section: React.FC<{
       </span>
       <div className="min-w-0 flex-1">
         <h3 className="font-black text-sm" style={{ color: PAL.cream }}>{title}</h3>
-        {sub && <p className="text-[10px] leading-snug" style={{ color: PAL.muted }}>{sub}</p>}
+        {sub && <p className="text-[11px] leading-snug" style={{ color: PAL.muted }}>{sub}</p>}
       </div>
       {right}
     </div>
@@ -107,9 +107,9 @@ export const StatCard: React.FC<{
   prevLabel?: string;
 }> = ({ label, value, delta, higherIsBetter = true, hint, prevLabel }) => (
   <div className="rounded-xl p-3.5" style={{ background: PAL.panel2, border: `1px solid ${PAL.line}` }} title={hint}>
-    <div className="text-[10px] uppercase tracking-wider truncate" style={{ color: PAL.muted }}>{label}</div>
+    <div className="text-[11px] uppercase tracking-wider truncate" style={{ color: PAL.muted }}>{label}</div>
     <div className="font-mono text-lg font-bold mt-1" style={{ color: PAL.cream }}>{value}</div>
-    <div className="text-[10.5px] mt-1 flex items-center gap-1.5">
+    <div className="text-[11px] mt-1 flex items-center gap-1.5">
       <Delta value={delta} higherIsBetter={higherIsBetter} />
       {prevLabel && <span style={{ color: PAL.faint }}>· {prevLabel}</span>}
     </div>
@@ -122,7 +122,7 @@ export const BarCell: React.FC<{ value: number; max: number; color?: string; lab
     <div className="h-1.5 rounded-full flex-1 min-w-[40px]" style={{ background: PAL.panel3 }}>
       <div className="h-1.5 rounded-full" style={{ width: `${max > 0 ? Math.max(2, (value / max) * 100) : 0}%`, background: color }} />
     </div>
-    {label && <span className="font-mono text-[10.5px] shrink-0" style={{ color: PAL.muted }}>{label}</span>}
+    {label && <span className="font-mono text-[11px] shrink-0" style={{ color: PAL.muted }}>{label}</span>}
   </div>
 );
 

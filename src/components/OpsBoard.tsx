@@ -176,10 +176,10 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
           {s.studioName ? ` · ${s.studioName}` : ""}
         </span>
         <span className="ml-auto flex flex-wrap items-center gap-1">
-          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${STATUS_CLS[s.status]}`}>{STATUS_LABEL[s.status]}</span>
+          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${STATUS_CLS[s.status]}`}>{STATUS_LABEL[s.status]}</span>
           {s.actualGmv ? <span className="text-[11px] font-bold text-emerald-300">{formatCurrencyAdaptive(s.actualGmv)}</span> : null}
           {actionable.map((m) => (
-            <span key={m} className="text-[10px] font-bold px-1.5 py-0.5 rounded border bg-amber-950/60 text-amber-300 border-amber-800">{MISSING_LABEL[m]}</span>
+            <span key={m} className="text-[11px] font-bold px-1.5 py-0.5 rounded border bg-amber-950/60 text-amber-300 border-amber-800">{MISSING_LABEL[m]}</span>
           ))}
           {missing.length === 0 && s.status === "Completed" && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />}
         </span>
@@ -270,7 +270,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
           <section className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 sm:p-4 space-y-2">
             <h3 className="text-sm font-black text-[var(--text)] flex items-center gap-2">
               Cần nộp số liệu
-              {mineDue.length > 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-800">{mineDue.length}</span>}
+              {mineDue.length > 0 && <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-800">{mineDue.length}</span>}
             </h3>
             {mineDue.length === 0 ? <p className="text-xs text-[var(--text-faint)] italic">Không còn ca nào thiếu file/report.</p> : mineDue.map((s) => <SessionRow key={s.id} s={s} />)}
           </section>
@@ -312,7 +312,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
 
 const Stat: React.FC<{ label: string; value: string; tone?: "ok" | "warn" }> = ({ label, value, tone }) => (
   <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3">
-    <p className="text-[10px] uppercase tracking-wider text-[var(--text-faint)]">{label}</p>
+    <p className="text-[11px] uppercase tracking-wider text-[var(--text-faint)]">{label}</p>
     <p className={`text-lg font-black mt-0.5 ${tone === "warn" ? "text-amber-300" : tone === "ok" ? "text-emerald-300" : "text-[var(--text)]"}`}>{value}</p>
   </div>
 );

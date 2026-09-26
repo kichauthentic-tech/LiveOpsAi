@@ -270,7 +270,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
                     </div>
 
                     <div className="flex items-center gap-1.5">
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                      <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${
                         s.status === "Live Now" ? "bg-red-500/20 text-red-300 animate-pulse" :
                         s.status === "Booked" ? "bg-amber-500/20 text-amber-300" :
                         s.status === "Maintenance" ? "bg-[var(--surface-hover)] text-[var(--text-muted)]" : "bg-emerald-500/20 text-emerald-300"
@@ -338,7 +338,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
                       <p className="text-[var(--text-muted)]">{s.brandName} (Host {s.hostName})</p>
                     </div>
                     <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                      className={`text-[11px] font-bold px-2 py-0.5 rounded ${
                         s.status === "Live Now"
                           ? "bg-red-500/20 text-red-300 animate-pulse"
                           : "bg-amber-500/20 text-amber-300"
@@ -420,11 +420,11 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
               {filteredEquipments.map((eq) => (
                 <div key={eq.id} className="p-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-elevated)]/40 space-y-3 hover:border-[var(--accent)] transition-all relative group">
                   <div className="flex justify-between items-start">
-                    <span className="bg-[var(--accent)]/30 text-[var(--accent-text)] font-mono text-[10px] font-bold px-2 py-0.5 rounded">
+                    <span className="bg-[var(--accent)]/30 text-[var(--accent-text)] font-mono text-[11px] font-bold px-2 py-0.5 rounded">
                       {eq.qrCode}
                     </span>
                     <div className="flex items-center gap-1">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                      <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
                         eq.status === "In Use" ? "bg-[var(--accent)]/20 text-[var(--accent-text)]" :
                         eq.status === "Maintenance" ? "bg-amber-500/20 text-amber-300" :
                         eq.status === "Damaged" ? "bg-red-500/20 text-red-300" : "bg-emerald-500/20 text-emerald-300"
@@ -449,12 +449,12 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
                   </div>
                   <div>
                     <h4 className="font-bold text-[var(--text)] text-xs">{eq.name}</h4>
-                    <p className="text-[10px] text-[var(--text-muted)] mt-0.5">{eq.model}</p>
-                    <span className="text-[9px] text-[var(--accent-text)] font-semibold bg-[var(--accent)]/30 px-1.5 py-0.5 rounded mt-1 inline-block">
+                    <p className="text-[11px] text-[var(--text-muted)] mt-0.5">{eq.model}</p>
+                    <span className="text-[11px] text-[var(--accent-text)] font-semibold bg-[var(--accent)]/30 px-1.5 py-0.5 rounded mt-1 inline-block">
                       {eq.category}
                     </span>
                   </div>
-                  <div className="text-[10px] text-[var(--text-muted)] border-t border-[var(--border)] pt-2 flex justify-between items-center">
+                  <div className="text-[11px] text-[var(--text-muted)] border-t border-[var(--border)] pt-2 flex justify-between items-center">
                     <span>Kiểm tra: {eq.lastCheckDate}</span>
                     <button
                       onClick={() => handleScanQr(eq.qrCode)}
@@ -565,7 +565,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
                   onChange={(e) => setStudioDailyHours(Number(e.target.value))}
                   className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
                 />
-                <p className="text-[10px] text-[var(--text-faint)] mt-1">Dùng làm mẫu số tính tỷ lệ lấp đầy (Studio Utilization) — mặc định 16h/ngày (8:00-24:00)</p>
+                <p className="text-[11px] text-[var(--text-faint)] mt-1">Dùng làm mẫu số tính tỷ lệ lấp đầy (Studio Utilization) — mặc định 16h/ngày (8:00-24:00)</p>
               </div>
 
               <div className="pt-4 border-t border-[var(--border)] flex justify-end gap-3">

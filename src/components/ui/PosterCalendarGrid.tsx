@@ -51,7 +51,7 @@ export const PosterCalendarGrid: React.FC<PosterCalendarGridProps> = ({
   <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 sm:p-5 shadow-xl">
     <div className="overflow-x-auto -mx-1 px-1 pb-1">
       <div className={minWidthClassName}>
-        <div className="grid grid-cols-7 gap-2 text-[10px] sm:text-xs font-black uppercase tracking-wide mb-3">
+        <div className="grid grid-cols-7 gap-2 text-[11px] sm:text-xs font-black uppercase tracking-wide mb-3">
           {weekdayLabels.map((w, i) => (
             <div
               key={w}
@@ -116,7 +116,7 @@ export const PosterDayCell: React.FC<PosterDayCellProps> = ({
       {isToday && (
         // z-30 > z-20 của CampaignDayRibbon — ngày "hôm nay" rơi vào dải camp (D-Day/Mid-Month/
         // Pay Day) vẫn phải đọc được chữ "HÔM NAY", không bị dải banner đè lên.
-        <span className="absolute -top-2 right-1.5 shrink-0 text-[8px] sm:text-[9px] font-black px-2 py-0.5 rounded-full bg-orange-500 text-white leading-none shadow-md z-30 tracking-wide">
+        <span className="absolute -top-2 right-1.5 shrink-0 text-[11px] sm:text-[11px] font-black px-2 py-0.5 rounded-full bg-orange-500 text-white leading-none shadow-md z-30 tracking-wide">
           HÔM NAY
         </span>
       )}
@@ -134,7 +134,7 @@ export const PosterDayCell: React.FC<PosterDayCellProps> = ({
         {children}
       </div>
       {footer && (
-        <div className="text-right text-[9px] font-semibold text-[var(--text-faint)] pt-0.5">{footer}</div>
+        <div className="text-right text-[11px] font-semibold text-[var(--text-faint)] pt-0.5">{footer}</div>
       )}
     </div>
   );

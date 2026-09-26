@@ -305,7 +305,7 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
               <div className="font-bold text-[var(--text)] mt-0.5">{(myTalent.ratePerSession || 0).toLocaleString()} đ<span className="text-amber-300/80 font-semibold">/live</span></div>
             )}
             {!myTalent.rateHidden && (myTalent.assistantRatePerHour || 0) > 0 && (
-              <div className="text-[10px] text-amber-300/80 mt-0.5">Trợ live: {(myTalent.assistantRatePerHour || 0).toLocaleString()} đ/giờ</div>
+              <div className="text-[11px] text-amber-300/80 mt-0.5">Trợ live: {(myTalent.assistantRatePerHour || 0).toLocaleString()} đ/giờ</div>
             )}
           </div>
           <div>
@@ -315,7 +315,7 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
             </div>
           </div>
         </div>
-        <p className="text-[10px] text-[var(--text-faint)]">
+        <p className="text-[11px] text-[var(--text-faint)]">
           {myTalent.rateHidden
             ? "Tài khoản của bạn chưa được liên kết đúng hồ sơ Talent nên chưa xem được Rate Card/Hoa hồng — báo Admin gán lại giúp."
             : "Rate Card/Hoa hồng chỉ hiện cho chính bạn và CEO/Admin."}
@@ -365,7 +365,7 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
               <div className="overflow-x-auto -mx-1">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)] uppercase text-[10px] tracking-wider">
+                    <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)] uppercase text-[11px] tracking-wider">
                       <th className="py-1.5 px-1">Ngày</th>
                       <th className="py-1.5 px-1">Brand</th>
                       <th className="py-1.5 px-1">Vai trò</th>
@@ -387,7 +387,7 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
                 </table>
               </div>
             )}
-            <p className="text-[10px] text-[var(--text-faint)]">
+            <p className="text-[11px] text-[var(--text-faint)]">
               Tính tự động từ các ca Completed trong tháng theo rate card hiện tại — số tạm tính, có thể đổi nếu ca chưa
               đối soát xong hoặc Rate Card của bạn vừa được cập nhật.
             </p>

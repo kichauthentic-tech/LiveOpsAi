@@ -3,6 +3,7 @@ import { Brand, BrandStudio, LiveSession, ShiftSlot, Studio } from "../../types"
 import { AlertTriangle, CalendarClock, X } from "lucide-react";
 import { dateTimeRangesOverlap, getTodayDate } from "../../lib/dateUtils";
 import { findBrandStudioId } from "../../lib/db/brandStudios";
+import { loadRememberedBrandId, pickDefaultBrandId, rememberBrandId } from "../../lib/defaultBrand";
 import { useToast } from "../../hooks/useToast";
 import { useConfirm } from "../../hooks/useConfirm";
 
@@ -49,8 +50,11 @@ export const OpenSlotModal: React.FC<OpenSlotModalProps> = ({
 }) => {
   const { showToast } = useToast();
   const confirm = useConfirm();
-  const [brandId, setBrandId] = useState(fixedBrand?.id ?? brands[0]?.id ?? "");
-  const [studioId, setStudioId] = useState(initialStudioId || findBrandStudioId(brandStudios, fixedBrand?.id ?? brands[0]?.id ?? "") || "");
+  // Modal mở khi sessions đã nạp xong nên tính 1 lần lúc mount là đủ (không cần useDefaultBrand).
+  const [brandId, setBrandId] = useState(
+    () => fixedBrand?.id ?? pickDefaultBrandId(brands, sessions, loadRememberedBrandId(), getTodayDate())
+  );
+  const [studioId, setStudioId] = useState(initialStudioId || findBrandStudioId(brandStudios, brandId) || "");
   const [date, setDate] = useState(initialDate);
   const [start, setStart] = useState(initialStart ?? "19:00");
   const [end, setEnd] = useState(initialEnd ?? (initialStart ? addHours(initialStart, 3) : "22:00"));
@@ -151,6 +155,7 @@ export const OpenSlotModal: React.FC<OpenSlotModalProps> = ({
                   value={brandId}
                   onChange={(e) => {
                     setBrandId(e.target.value);
+                    rememberBrandId(e.target.value);
                     const def = findBrandStudioId(brandStudios, e.target.value);
                     if (def) setStudioId(def);
                   }}

@@ -100,7 +100,7 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl max-w-lg w-full p-4 sm:p-6 space-y-4 shadow-2xl">
         <div className="flex justify-between items-start border-b border-[var(--border)] pb-3">
           <div>
-            <span className="text-[10px] font-bold text-amber-400 uppercase font-mono">{slot.brandName}</span>
+            <span className="text-[11px] font-bold text-amber-400 uppercase font-mono">{slot.brandName}</span>
             <h3 className="font-bold text-[var(--text)] text-base sm:text-lg">Ca Chờ Đăng Ký</h3>
           </div>
           <div className="flex items-center gap-2 shrink-0">

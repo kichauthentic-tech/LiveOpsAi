@@ -346,12 +346,12 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
           </p>
           <div className="flex flex-wrap gap-1.5">
             {unreconciledSessions.slice(0, 12).map((s) => (
-              <span key={s.id} className="text-[10px] font-mono bg-amber-900/60 text-amber-200 px-2 py-0.5 rounded border border-amber-800/50">
+              <span key={s.id} className="text-[11px] font-mono bg-amber-900/60 text-amber-200 px-2 py-0.5 rounded border border-amber-800/50">
                 {s.date} · {s.hostName}
               </span>
             ))}
             {unreconciledSessions.length > 12 && (
-              <span className="text-[10px] text-amber-300">+{unreconciledSessions.length - 12} khác</span>
+              <span className="text-[11px] text-amber-300">+{unreconciledSessions.length - 12} khác</span>
             )}
           </div>
         </div>

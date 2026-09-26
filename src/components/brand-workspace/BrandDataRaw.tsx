@@ -296,7 +296,7 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ brandId, brandName, 
                   ))}
                 </tbody>
               </table>
-              {parsedPreview.rows.length > 20 && <p className="text-[10px] text-[var(--text-faint)] p-2">...và {parsedPreview.rows.length - 20} dòng khác</p>}
+              {parsedPreview.rows.length > 20 && <p className="text-[11px] text-[var(--text-faint)] p-2">...và {parsedPreview.rows.length - 20} dòng khác</p>}
             </div>
             <div className="flex gap-2">
               <button onClick={handleConfirmImport} disabled={loading} className="bg-[var(--accent)] text-[var(--accent-text)] font-bold px-4 py-2 rounded-xl text-xs disabled:opacity-50">
@@ -325,7 +325,7 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ brandId, brandName, 
                 >
                   {expandedGroups.has(monthKey) ? <ChevronDown className="w-3.5 h-3.5 shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 shrink-0" />}
                   <span className="text-xs font-bold text-[var(--text)]">{formatMonthLabel(monthKey)}</span>
-                  <span className="text-[10px] text-[var(--text-faint)]">· {groupImports.length} batch</span>
+                  <span className="text-[11px] text-[var(--text-faint)]">· {groupImports.length} batch</span>
                 </button>
 
                 {expandedGroups.has(monthKey) && (

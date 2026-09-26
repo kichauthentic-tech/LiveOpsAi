@@ -80,12 +80,12 @@ function momPct(current: number, previous: number): number | null {
 }
 
 const MomChip: React.FC<{ current: number | null; previous: number | null }> = ({ current, previous }) => {
-  if (current == null || previous == null) return <div className="text-[10px] text-[var(--text-faint)] mt-0.5">MoM —</div>;
+  if (current == null || previous == null) return <div className="text-[11px] text-[var(--text-faint)] mt-0.5">MoM —</div>;
   const pct = momPct(current, previous);
-  if (pct == null) return <div className="text-[10px] text-[var(--text-faint)] mt-0.5">MoM —</div>;
+  if (pct == null) return <div className="text-[11px] text-[var(--text-faint)] mt-0.5">MoM —</div>;
   const positive = pct >= 0;
   return (
-    <div className={`text-[10px] font-bold mt-0.5 ${positive ? "text-emerald-400" : "text-red-400"}`}>
+    <div className={`text-[11px] font-bold mt-0.5 ${positive ? "text-emerald-400" : "text-red-400"}`}>
       MoM {positive ? "+" : ""}
       {pct.toFixed(1)}%
     </div>
@@ -278,7 +278,7 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
             </tbody>
           </table>
         </div>
-        <p className="text-[10px] text-[var(--text-faint)]">
+        <p className="text-[11px] text-[var(--text-faint)]">
           Shopee chưa theo dõi Ads cost theo phiên (không có field này trong Excel gốc) — dùng ô "Ads cost bổ sung" bên dưới nếu
           cần cộng thêm chi phí Ads ngoài TikTok livestream.
         </p>
@@ -296,7 +296,7 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="font-bold text-[var(--text-muted)] block mb-1">Ads cost bổ sung (VNĐ)</label>
-              <p className="text-[10px] text-[var(--text-faint)] mb-1">
+              <p className="text-[11px] text-[var(--text-faint)] mb-1">
                 Chi phí Ads Shopee hoặc ads ngoài livestream, không tính được từ Report Ca (xem Ads Report Chi Tiết ở trên).
               </p>
               <input type="number" value={adsSpend} onChange={(e) => setAdsSpend(e.target.value)} disabled={readOnly} className={inputCls} />

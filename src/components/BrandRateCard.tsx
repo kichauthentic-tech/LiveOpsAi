@@ -117,7 +117,7 @@ export const BrandRateCard: React.FC<BrandRateCardProps> = ({
             <div key={platform} className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 space-y-3 shadow-xl">
               <div className="flex items-center justify-between">
                 <span className="font-bold text-[var(--text)]">{platform}</span>
-                <span className="text-[10px] text-[var(--text-faint)] uppercase font-bold">đ / giờ live</span>
+                <span className="text-[11px] text-[var(--text-faint)] uppercase font-bold">đ / giờ live</span>
               </div>
               <p className="text-2xl font-black text-emerald-400">
                 {current ? current.ratePerHour.toLocaleString("vi-VN") : "—"}đ
@@ -143,7 +143,7 @@ export const BrandRateCard: React.FC<BrandRateCardProps> = ({
 
               <div className="pt-3 border-t border-[var(--border)] space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-[var(--text-faint)] uppercase font-bold">Tỷ lệ hoàn hủy</span>
+                  <span className="text-[11px] text-[var(--text-faint)] uppercase font-bold">Tỷ lệ hoàn hủy</span>
                   <span className="text-sm font-bold text-amber-400">{returnRate}%</span>
                 </div>
                 {canEdit && (
@@ -167,10 +167,10 @@ export const BrandRateCard: React.FC<BrandRateCardProps> = ({
                   </div>
                 )}
                 <div className="flex items-center justify-between pt-2">
-                  <span className="text-[10px] text-[var(--text-faint)] uppercase font-bold">Hoa hồng agency (% NMV)</span>
+                  <span className="text-[11px] text-[var(--text-faint)] uppercase font-bold">Hoa hồng agency (% NMV)</span>
                   <span className="text-sm font-bold text-[var(--accent-text)]">{current?.commissionRate != null ? `${current.commissionRate}%` : "Chưa đặt"}</span>
                 </div>
-                <p className="text-[10px] text-[var(--text-faint)] leading-snug">Chỉ dùng cho brand tính phí theo % doanh số. Ca đã có % riêng ở Finance &amp; P&amp;L thì % của ca thắng.</p>
+                <p className="text-[11px] text-[var(--text-faint)] leading-snug">Chỉ dùng cho brand tính phí theo % doanh số. Ca đã có % riêng ở Finance &amp; P&amp;L thì % của ca thắng.</p>
                 {canEdit && (
                   <div className="flex items-center gap-2">
                     <input

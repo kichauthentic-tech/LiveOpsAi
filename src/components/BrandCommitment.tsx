@@ -20,7 +20,7 @@ import {
   monthKeyOf,
   todayVn
 } from "../lib/performance/brandCommitment";
-import { useConfirm } from "../hooks/useConfirm";
+import { useConfirm, usePrompt } from "../hooks/useConfirm";
 
 interface BrandCommitmentProps {
   sessions: LiveSession[];
@@ -100,6 +100,7 @@ function emptyDraft(brandId: string, today: string): ContractDraft {
 
 export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
   const confirm = useConfirm();
+  const prompt = usePrompt();
   const today = todayVn();
   const [view, setView] = useState<"runrate" | "contracts">("runrate");
   const [periodMonth, setPeriodMonth] = useState(() => monthKeyOf(today));
@@ -230,14 +231,15 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
     });
   }
 
-  function generate(c: BrandContract) {
+  async function generate(c: BrandContract) {
     // Hợp đồng chưa có tháng kết thúc thì phải có mốc dừng, nếu không DB không biết sinh tới đâu.
     let through: string | undefined;
     if (!c.endMonth) {
-      const answer = window.prompt(
-        "Hợp đồng này chưa có tháng kết thúc. Sinh cam kết tới tháng nào? (định dạng YYYY-MM)",
-        periodMonth.slice(0, 7)
-      );
+      const answer = await prompt("Hợp đồng này chưa có tháng kết thúc. Sinh cam kết tới tháng nào?", {
+        defaultValue: periodMonth.slice(0, 7),
+        inputType: "month",
+        confirmLabel: "Sinh cam kết"
+      });
       if (!answer) return;
       if (!/^\d{4}-\d{2}$/.test(answer.trim())) {
         setError("Tháng phải theo định dạng YYYY-MM, ví dụ 2026-12.");
@@ -313,7 +315,7 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
                 { label: "Còn phải xếp thêm", value: fmtHours(totals.gap), tone: totals.gap > 0 ? "text-rose-400" : "text-emerald-400" }
               ].map((c) => (
                 <div key={c.label} className="bg-[var(--surface-base)] rounded-xl p-3">
-                  <p className="text-[10px] text-[var(--text-faint)]">{c.label}</p>
+                  <p className="text-[11px] text-[var(--text-faint)]">{c.label}</p>
                   <p className={`text-base font-black mt-0.5 ${c.tone}`}>{c.value}</p>
                 </div>
               ))}
@@ -365,7 +367,7 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
                           <td className="py-2 pr-3 font-bold text-[var(--text)]">
                             {r.brandName}
                             {r.isOverride && (
-                              <span className="ml-1.5 text-[9px] font-bold text-amber-400" title="Ops đã sửa tay tháng này — sinh lại từ hợp đồng sẽ không ghi đè">
+                              <span className="ml-1.5 text-[11px] font-bold text-amber-400" title="Ops đã sửa tay tháng này — sinh lại từ hợp đồng sẽ không ghi đè">
                                 SỬA TAY
                               </span>
                             )}
@@ -373,9 +375,9 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
                           {editing ? (
                             <td className="py-2 pr-3" colSpan={6}>
                               <div className="flex flex-wrap items-center gap-2">
-                                <label className="text-[10px] text-[var(--text-faint)]">Giờ</label>
+                                <label className="text-[11px] text-[var(--text-faint)]">Giờ</label>
                                 <input value={monthHours} onChange={(e) => setMonthHours(e.target.value)} className={`${inputCls} w-24`} />
-                                <label className="text-[10px] text-[var(--text-faint)]">GMV (để trống nếu không cam kết)</label>
+                                <label className="text-[11px] text-[var(--text-faint)]">GMV (để trống nếu không cam kết)</label>
                                 <input value={monthGmv} onChange={(e) => setMonthGmv(e.target.value)} className={`${inputCls} w-40`} />
                                 <button
                                   onClick={() => saveMonth(r.brandId)}
@@ -397,11 +399,11 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
                               <td className="py-2 pr-3 text-right font-bold text-[var(--text)]">{fmtHours(r.committedHours)}</td>
                               <td className="py-2 pr-3 text-right text-emerald-400">
                                 {fmtHours(r.deliveredHours)}
-                                <span className="text-[var(--text-faint)] text-[10px]"> · {r.deliveredSessions} ca</span>
+                                <span className="text-[var(--text-faint)] text-[11px]"> · {r.deliveredSessions} ca</span>
                               </td>
                               <td className="py-2 pr-3 text-right text-sky-400">
                                 {fmtHours(r.scheduledHours)}
-                                <span className="text-[var(--text-faint)] text-[10px]"> · {r.scheduledSessions} ca</span>
+                                <span className="text-[var(--text-faint)] text-[11px]"> · {r.scheduledSessions} ca</span>
                               </td>
                               <td className="py-2 pr-3 text-right text-[var(--text-muted)]">{fmtHours(r.plannedTotalHours)}</td>
                               <td className={`py-2 pr-3 text-right font-bold ${r.gapHours > 0 ? "text-rose-400" : "text-emerald-400"}`}>
@@ -411,7 +413,7 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
                                 {r.sessionsWithRealHours > 0 ? (
                                   <span title={`${r.sessionsWithRealHours}/${r.deliveredSessions} ca đã có file snapshot`}>
                                     {fmtHours(r.actualLiveHours)}
-                                    <span className="text-[var(--text-faint)] text-[10px]">
+                                    <span className="text-[var(--text-faint)] text-[11px]">
                                       {" "}· {r.sessionsWithRealHours}/{r.deliveredSessions}
                                     </span>
                                   </span>
@@ -424,7 +426,7 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
                             </>
                           )}
                           <td className="py-2 pr-3">
-                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${STATUS_TONE[r.status]}`}>
+                            <span className={`px-2 py-0.5 rounded-md text-[11px] font-bold ${STATUS_TONE[r.status]}`}>
                               {STATUS_LABEL[r.status]}
                             </span>
                           </td>
@@ -455,11 +457,11 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
                     .filter((r) => r.committedGmv !== undefined)
                     .map((r) => (
                       <div key={r.brandId} className="bg-[var(--surface-base)] rounded-xl p-2.5">
-                        <p className="text-[10px] text-[var(--text-faint)]">{r.brandName}</p>
+                        <p className="text-[11px] text-[var(--text-faint)]">{r.brandName}</p>
                         <p className="text-xs font-bold text-[var(--text)] mt-0.5">
                           {fmtVnd(r.deliveredGmv)} / {fmtVnd(r.committedGmv ?? 0)}
                         </p>
-                        <p className={`text-[10px] mt-0.5 ${(r.gmvGap ?? 0) > 0 ? "text-rose-400" : "text-emerald-400"}`}>
+                        <p className={`text-[11px] mt-0.5 ${(r.gmvGap ?? 0) > 0 ? "text-rose-400" : "text-emerald-400"}`}>
                           {(r.gmvGap ?? 0) > 0 ? `còn thiếu ${fmtVnd(r.gmvGap ?? 0)}` : "đã đạt"}
                         </p>
                       </div>
@@ -488,7 +490,7 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
             <div className="mt-3 bg-[var(--surface-base)] rounded-xl p-3 space-y-2">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                 <label className="flex flex-col gap-1">
-                  <span className="text-[10px] text-[var(--text-faint)]">Brand</span>
+                  <span className="text-[11px] text-[var(--text-faint)]">Brand</span>
                   <select
                     value={draft.brandId}
                     disabled={!!draft.id}
@@ -501,11 +503,11 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
                   </select>
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-[10px] text-[var(--text-faint)]">Mã hợp đồng</span>
+                  <span className="text-[11px] text-[var(--text-faint)]">Mã hợp đồng</span>
                   <input value={draft.contractCode} onChange={(e) => setDraft({ ...draft, contractCode: e.target.value })} className={inputCls} />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-[10px] text-[var(--text-faint)]">Từ tháng</span>
+                  <span className="text-[11px] text-[var(--text-faint)]">Từ tháng</span>
                   <input
                     type="month"
                     value={draft.startMonth.slice(0, 7)}
@@ -514,7 +516,7 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
                   />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-[10px] text-[var(--text-faint)]">Đến tháng (trống = chưa chốt)</span>
+                  <span className="text-[11px] text-[var(--text-faint)]">Đến tháng (trống = chưa chốt)</span>
                   <input
                     type="month"
                     value={draft.endMonth ? draft.endMonth.slice(0, 7) : ""}
@@ -523,15 +525,15 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
                   />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-[10px] text-[var(--text-faint)]">Giờ cam kết / tháng</span>
+                  <span className="text-[11px] text-[var(--text-faint)]">Giờ cam kết / tháng</span>
                   <input value={draft.monthlyHours} onChange={(e) => setDraft({ ...draft, monthlyHours: e.target.value })} className={inputCls} />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-[10px] text-[var(--text-faint)]">GMV cam kết / tháng (tuỳ chọn)</span>
+                  <span className="text-[11px] text-[var(--text-faint)]">GMV cam kết / tháng (tuỳ chọn)</span>
                   <input value={draft.monthlyGmv} onChange={(e) => setDraft({ ...draft, monthlyGmv: e.target.value })} className={inputCls} />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-[10px] text-[var(--text-faint)]">Trạng thái</span>
+                  <span className="text-[11px] text-[var(--text-faint)]">Trạng thái</span>
                   <select
                     value={draft.status}
                     onChange={(e) => setDraft({ ...draft, status: e.target.value as BrandContract["status"] })}
@@ -543,7 +545,7 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
                   </select>
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-[10px] text-[var(--text-faint)]">Ghi chú</span>
+                  <span className="text-[11px] text-[var(--text-faint)]">Ghi chú</span>
                   <input value={draft.note} onChange={(e) => setDraft({ ...draft, note: e.target.value })} className={inputCls} />
                 </label>
               </div>
@@ -585,7 +587,7 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
                     {" · "}
                     {c.status === "active" ? "đang hiệu lực" : c.status === "draft" ? "nháp" : "đã kết thúc"}
                   </p>
-                  {c.note && <p className="text-[10px] text-[var(--text-faint)] mt-0.5">{c.note}</p>}
+                  {c.note && <p className="text-[11px] text-[var(--text-faint)] mt-0.5">{c.note}</p>}
                 </div>
                 <div className="flex items-center gap-1.5">
                   <button
@@ -666,7 +668,7 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
                         <td className="py-1.5 pr-3 text-right text-[var(--text-muted)]">
                           {m.committedGmv === undefined ? "—" : fmtVnd(m.committedGmv)}
                         </td>
-                        <td className="py-1.5 pr-3 text-[10px]">
+                        <td className="py-1.5 pr-3 text-[11px]">
                           {m.isOverride ? (
                             <span className="text-amber-400 font-bold">sửa tay</span>
                           ) : m.contractId ? (

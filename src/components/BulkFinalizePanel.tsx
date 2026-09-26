@@ -138,7 +138,7 @@ export function BulkFinalizePanel({
                 <li key={f} className="text-[11px] text-rose-300">· {f}</li>
               ))}
             </ul>
-            <p className="text-[10px] text-[var(--text-faint)] mt-1">
+            <p className="text-[11px] text-[var(--text-faint)] mt-1">
               Các ca này vẫn đang mở, chốt lại từng ca ở danh sách bên dưới để xem lỗi cụ thể.
             </p>
           </div>
@@ -221,7 +221,7 @@ export function BulkFinalizePanel({
                       </td>
                       <td className="py-2 pr-3 align-top whitespace-nowrap text-[var(--text)]">
                         {r.date}
-                        <div className="text-[10px] text-[var(--text-faint)]">
+                        <div className="text-[11px] text-[var(--text-faint)]">
                           {r.startTime}–{r.endTime}
                           {r.studioName && ` · ${r.studioName}`}
                         </div>
@@ -240,18 +240,18 @@ export function BulkFinalizePanel({
                           ))}
                         </select>
                         {h && h.scope !== "none" && (
-                          <div className="text-[10px] text-emerald-400 mt-0.5">
+                          <div className="text-[11px] text-emerald-400 mt-0.5">
                             {fmtPerHour(h.value)} ({h.scope === "brand" ? "brand này" : "chung"}, {h.sessions} ca)
                           </div>
                         )}
                         {r.noFreeCandidate && (
-                          <div className="text-[10px] text-amber-400 mt-0.5 flex items-start gap-1">
+                          <div className="text-[11px] text-amber-400 mt-0.5 flex items-start gap-1">
                             <AlertTriangle className="w-3 h-3 shrink-0 mt-px" />
                             Cả {r.candidates.length} người đăng ký đều đã bận khung này
                           </div>
                         )}
                         {conflict && (
-                          <div className="text-[10px] text-rose-400 mt-0.5 flex items-start gap-1">
+                          <div className="text-[11px] text-rose-400 mt-0.5 flex items-start gap-1">
                             <AlertTriangle className="w-3 h-3 shrink-0 mt-px" />
                             {conflict}
                           </div>

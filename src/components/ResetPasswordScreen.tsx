@@ -60,7 +60,7 @@ export const ResetPasswordScreen: React.FC<ResetPasswordScreenProps> = ({ forceC
       <div className="w-full max-w-sm bg-[var(--surface)]/80 border border-[var(--border)] rounded-2xl p-8 shadow-2xl">
         <div className="mb-6 text-center">
           <h1 className="text-xl font-bold tracking-tighter text-[var(--accent-text)]">LIVEOPS AI</h1>
-          <p className="text-[10px] uppercase tracking-widest text-[var(--text-faint)] font-semibold">
+          <p className="text-[11px] uppercase tracking-widest text-[var(--text-faint)] font-semibold">
             {forceChange ? "Bắt buộc đổi mật khẩu lần đầu" : isInvite ? "Đặt mật khẩu cho tài khoản" : "Đặt lại mật khẩu"}
           </p>
         </div>

@@ -200,7 +200,7 @@ const ProgressBar: React.FC<{ pct: number | null; label?: string }> = ({ pct, la
       <div className="h-1.5 rounded-full overflow-hidden" style={{ background: PAL.line }}>
         <div className="h-full rounded-full" style={{ width: `${clamped}%`, background: PAL.gold }} />
       </div>
-      <div className="text-[10px] mt-1 font-mono" style={{ color: PAL.muted }}>
+      <div className="text-[11px] mt-1 font-mono" style={{ color: PAL.muted }}>
         {pct == null ? "chưa có target (Lịch Vận Hành)" : `${pct.toFixed(1)}% ${label}`}
       </div>
     </div>
@@ -235,7 +235,7 @@ const Panel: React.FC<{ title: string; icon: React.ReactNode; sub?: string; chil
           {title}
         </h3>
         {sub && (
-          <p className="text-[10px]" style={{ color: PAL.muted }}>
+          <p className="text-[11px]" style={{ color: PAL.muted }}>
             {sub}
           </p>
         )}
@@ -253,7 +253,7 @@ const ReportTable: React.FC<{ head: string[]; children: React.ReactNode }> = ({ 
           {head.map((h, i) => (
             <th
               key={i}
-              className={`py-2 px-3 text-left text-[10.5px] uppercase tracking-wider ${i > 0 ? "text-right" : ""}`}
+              className={`py-2 px-3 text-left text-[11px] uppercase tracking-wider ${i > 0 ? "text-right" : ""}`}
               style={{ color: PAL.muted }}
               title={metricHint(h)}
             >
@@ -419,7 +419,7 @@ const InsightBox: React.FC<{
   };
   return (
     <div className="rounded-xl p-4 space-y-2" style={{ background: "#1f1b10", border: `1px solid ${PAL.gold}44` }}>
-      <div className="flex items-center gap-2 text-[10.5px] font-bold uppercase tracking-wider" style={{ color: PAL.gold }}>
+      <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider" style={{ color: PAL.gold }}>
         <Lightbulb className="w-3.5 h-3.5" /> Insight
       </div>
       {editing ? (
@@ -431,7 +431,7 @@ const InsightBox: React.FC<{
             className="w-full rounded-lg p-2.5 text-[13px] leading-relaxed font-sans"
             style={{ background: PAL.panel, border: `1px solid ${PAL.line}`, color: PAL.cream }}
           />
-          <p className="text-[10.5px]" style={{ color: PAL.muted }}>
+          <p className="text-[11px]" style={{ color: PAL.muted }}>
             Dòng đầu = kết luận · mỗi dòng sau = 1 gạch đầu dòng · dòng bắt đầu bằng "→" = việc cần làm.
           </p>
           {error && <p className="text-[11px]" style={{ color: PAL.red }}>{error}</p>}
@@ -498,7 +498,7 @@ const InsightBox: React.FC<{
 
 const KpiTile: React.FC<{ label: string; value: string; change?: number | null; note?: string }> = ({ label, value, change, note }) => (
   <div className="rounded-xl p-4" style={{ background: PAL.panel2, border: `1px solid ${PAL.line}` }}>
-    <div className="text-[10.5px] uppercase tracking-wider" style={{ color: PAL.muted }} title={metricHint(label)}>
+    <div className="text-[11px] uppercase tracking-wider" style={{ color: PAL.muted }} title={metricHint(label)}>
       {label}
     </div>
     <div className="font-mono text-xl font-bold mt-1.5" style={{ color: PAL.cream }}>
@@ -510,7 +510,7 @@ const KpiTile: React.FC<{ label: string; value: string; change?: number | null; 
       </div>
     )}
     {note && (
-      <div className="text-[10.5px] mt-1" style={{ color: PAL.muted }}>
+      <div className="text-[11px] mt-1" style={{ color: PAL.muted }}>
         {note}
       </div>
     )}
@@ -536,7 +536,7 @@ const TrendTile: React.FC<{ label: string; points: { label: string; value: numbe
   const bad = goodWhenUp != null && last != null && prev != null && (goodWhenUp ? last < prev : last > prev);
   return (
     <div className="rounded-xl p-3" style={{ background: PAL.panel2, border: `1px solid ${PAL.line}` }}>
-      <div className="text-[10.5px] uppercase tracking-wider" style={{ color: PAL.muted }} title={metricHint(label)}>
+      <div className="text-[11px] uppercase tracking-wider" style={{ color: PAL.muted }} title={metricHint(label)}>
         {label}
       </div>
       <div className="font-mono text-lg font-bold mt-1" style={{ color: PAL.cream }}>
@@ -564,7 +564,7 @@ const TrendTile: React.FC<{ label: string; points: { label: string; value: numbe
           </LineChart>
         </ResponsiveContainer>
       </div>
-      <div className="text-[10px] font-mono truncate" style={{ color: PAL.muted }} title={points.map((p) => `${p.label}: ${p.value != null ? format(p.value) : "—"}`).join(" · ")}>
+      <div className="text-[11px] font-mono truncate" style={{ color: PAL.muted }} title={points.map((p) => `${p.label}: ${p.value != null ? format(p.value) : "—"}`).join(" · ")}>
         {points.map((p) => (p.value != null ? format(p.value) : "—")).join(" → ")}
       </div>
     </div>
@@ -583,7 +583,7 @@ const NarrativeEditor: React.FC<{
 }> = ({ summaryDraft, nextDraft, onSummary, onNext, saving, error, onSave, onCancel }) => (
   <div className="space-y-3">
     <label className="block space-y-1">
-      <span className="text-[10.5px] uppercase tracking-wider" style={{ color: PAL.muted }}>
+      <span className="text-[11px] uppercase tracking-wider" style={{ color: PAL.muted }}>
         Tóm tắt (phần 1) — mỗi dòng một ý
       </span>
       <textarea
@@ -596,7 +596,7 @@ const NarrativeEditor: React.FC<{
       />
     </label>
     <label className="block space-y-1">
-      <span className="text-[10.5px] uppercase tracking-wider" style={{ color: PAL.muted }}>
+      <span className="text-[11px] uppercase tracking-wider" style={{ color: PAL.muted }}>
         Việc tháng sau (phần 8) — mỗi dòng một việc
       </span>
       <textarea
@@ -1746,7 +1746,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
           {kpiTargetGmvCur ? (
             <div className="rounded-xl p-4 flex flex-wrap items-end gap-6" style={{ background: PAL.panel2, border: `1px solid ${PAL.line}` }}>
               <div>
-                <div className="text-[10.5px] uppercase tracking-wider" style={{ color: PAL.muted }}>Target GMV</div>
+                <div className="text-[11px] uppercase tracking-wider" style={{ color: PAL.muted }}>Target GMV</div>
                 <div className="font-mono text-xl font-bold mt-1" style={{ color: PAL.cream }}>{formatCurrencyAdaptive(kpiTargetGmvCur)}</div>
               </div>
               <div className="flex-1 min-w-[200px]">
@@ -1762,21 +1762,21 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
           {shopKpi ? (
             <div className="rounded-xl p-4 flex flex-wrap items-end gap-6" style={{ background: PAL.panel2, border: `1px solid ${PAL.line}` }}>
               <div>
-                <div className="text-[10.5px] uppercase tracking-wider" style={{ color: PAL.muted }}>KPI GMV</div>
+                <div className="text-[11px] uppercase tracking-wider" style={{ color: PAL.muted }}>KPI GMV</div>
                 <div className="font-mono text-xl font-bold mt-1" style={{ color: PAL.cream }}>{formatCurrencyAdaptive(shopKpi.target)}</div>
-                <div className="text-[10px]" style={{ color: PAL.muted }}>brand giao · mọi kênh · Kế Hoạch Tháng</div>
+                <div className="text-[11px]" style={{ color: PAL.muted }}>brand giao · mọi kênh · Kế Hoạch Tháng</div>
               </div>
               <div>
-                <div className="text-[10.5px] uppercase tracking-wider" style={{ color: PAL.muted }}>{shopKpi.partial ? `Đã đạt tới ${dayMonthLabel(shopCur?.through)}` : "Thực đạt"}</div>
+                <div className="text-[11px] uppercase tracking-wider" style={{ color: PAL.muted }}>{shopKpi.partial ? `Đã đạt tới ${dayMonthLabel(shopCur?.through)}` : "Thực đạt"}</div>
                 <div className="font-mono text-xl font-bold mt-1" style={{ color: PAL.cream }}>{formatCurrencyAdaptive(shopKpi.actual)}</div>
               </div>
               {shopKpi.partial && (
                 <div>
-                  <div className="text-[10.5px] uppercase tracking-wider" style={{ color: PAL.muted }}>Dự kiến cuối tháng</div>
+                  <div className="text-[11px] uppercase tracking-wider" style={{ color: PAL.muted }}>Dự kiến cuối tháng</div>
                   <div className="font-mono text-xl font-bold mt-1" style={{ color: shopKpi.projectedPct >= 100 ? PAL.green : shopKpi.projectedPct >= 90 ? PAL.gold : PAL.red }}>
                     {formatCurrencyAdaptive(shopKpi.projected)} · {fmtPct(shopKpi.projectedPct)}
                   </div>
-                  <div className="text-[10px]" style={{ color: PAL.muted }}>{shopKpi.method === "prev" ? "theo nhịp cùng kỳ tháng trước" : "chia đều theo ngày"}</div>
+                  <div className="text-[11px]" style={{ color: PAL.muted }}>{shopKpi.method === "prev" ? "theo nhịp cùng kỳ tháng trước" : "chia đều theo ngày"}</div>
                 </div>
               )}
               <div className="flex-1 min-w-[200px]">
@@ -1794,31 +1794,31 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
           {runRate && runRate.doneCount > 0 && (
                   <div className="rounded-xl p-4 grid grid-cols-2 sm:grid-cols-5 gap-3" style={{ background: PAL.panel2, border: `1px solid ${PAL.line}` }}>
                     <div>
-                      <div className="text-[10.5px] uppercase tracking-wider" style={{ color: PAL.muted }}>Target kế hoạch</div>
+                      <div className="text-[11px] uppercase tracking-wider" style={{ color: PAL.muted }}>Target kế hoạch</div>
                       <div className="font-mono text-lg font-bold mt-1" style={{ color: PAL.cream }}>{formatCurrencyAdaptive(runRate.targetTotal)}</div>
-                      <div className="text-[10px]" style={{ color: PAL.muted }}>{runRate.doneCount} ca xong · {runRate.pendingCount} còn lại</div>
+                      <div className="text-[11px]" style={{ color: PAL.muted }}>{runRate.doneCount} ca xong · {runRate.pendingCount} còn lại</div>
                     </div>
                     <div>
-                      <div className="text-[10.5px] uppercase tracking-wider" style={{ color: PAL.muted }}>Đã đạt</div>
+                      <div className="text-[11px] uppercase tracking-wider" style={{ color: PAL.muted }}>Đã đạt</div>
                       <div className="font-mono text-lg font-bold mt-1" style={{ color: PAL.green }}>{formatCurrencyAdaptive(runRate.actualDone)}</div>
-                      <div className="text-[10px]" style={{ color: PAL.muted }}>{runRate.targetTotal > 0 ? `${((runRate.actualDone / runRate.targetTotal) * 100).toFixed(0)}% target` : ""}</div>
+                      <div className="text-[11px]" style={{ color: PAL.muted }}>{runRate.targetTotal > 0 ? `${((runRate.actualDone / runRate.targetTotal) * 100).toFixed(0)}% target` : ""}</div>
                     </div>
                     <div>
-                      <div className="text-[10.5px] uppercase tracking-wider" style={{ color: PAL.muted }}>Run-rate</div>
+                      <div className="text-[11px] uppercase tracking-wider" style={{ color: PAL.muted }}>Run-rate</div>
                       <div className="font-mono text-lg font-bold mt-1" style={{ color: runRate.runRate === null ? PAL.muted : runRate.runRate >= 1 ? PAL.green : runRate.runRate >= 0.9 ? PAL.gold : PAL.red }}>
                         {runRate.runRate === null ? "—" : `${(runRate.runRate * 100).toFixed(0)}%`}
                       </div>
-                      <div className="text-[10px]" style={{ color: PAL.muted }}>thực tế ÷ target ca đã xong</div>
+                      <div className="text-[11px]" style={{ color: PAL.muted }}>thực tế ÷ target ca đã xong</div>
                     </div>
                     <div>
-                      <div className="text-[10.5px] uppercase tracking-wider" style={{ color: PAL.muted }}>Dự kiến cuối tháng</div>
+                      <div className="text-[11px] uppercase tracking-wider" style={{ color: PAL.muted }}>Dự kiến cuối tháng</div>
                       <div className="font-mono text-lg font-bold mt-1" style={{ color: PAL.cream }}>{formatCurrencyAdaptive(runRate.projected)}</div>
-                      <div className="text-[10px]" style={{ color: PAL.muted }}>còn lại = target × run-rate</div>
+                      <div className="text-[11px]" style={{ color: PAL.muted }}>còn lại = target × run-rate</div>
                     </div>
                     <div>
-                      <div className="text-[10.5px] uppercase tracking-wider" style={{ color: PAL.muted }}>{runRate.gap > 0 ? "Thiếu" : "Vượt"}</div>
+                      <div className="text-[11px] uppercase tracking-wider" style={{ color: PAL.muted }}>{runRate.gap > 0 ? "Thiếu" : "Vượt"}</div>
                       <div className="font-mono text-lg font-bold mt-1" style={{ color: runRate.gap > 0 ? PAL.red : PAL.green }}>{formatCurrencyAdaptive(Math.abs(runRate.gap))}</div>
-                      <div className="text-[10px]" style={{ color: PAL.muted }}>{runRate.targetTotal > 0 ? `${((Math.abs(runRate.gap) / runRate.targetTotal) * 100).toFixed(1)}% target` : ""}</div>
+                      <div className="text-[11px]" style={{ color: PAL.muted }}>{runRate.targetTotal > 0 ? `${((Math.abs(runRate.gap) / runRate.targetTotal) * 100).toFixed(1)}% target` : ""}</div>
                     </div>
                   </div>
                 )}
@@ -1901,7 +1901,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                     );
                   })}
                 </ReportTable>
-                <p className="text-[10.5px] mt-2" style={{ color: PAL.muted }}>
+                <p className="text-[11px] mt-2" style={{ color: PAL.muted }}>
                   LIVE GMV (agency) = tổng các ca có số trong app; Affiliate LIVE = GMV từ LIVE của creator affiliate (Shop Analytics). Refund rate = Refunds ÷ GMV,
                   của cả shop trong kỳ (tính theo ngày hoàn, không theo đơn của từng ca).
                   {canManage && channelMixes.some((c) => c?.coverage != null && Math.abs(c.coverage - 100) > 2) && " Có tháng 4 kênh lệch tổng shop quá 2% — kiểm lại file Sản Phẩm / Shop Analytics của tháng đó."}
@@ -2157,7 +2157,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                     <tr key={r.name} style={{ borderBottom: `1px solid ${PAL.line}`, background: idx % 2 ? `${PAL.panel2}55` : "transparent" }}>
                       <td className="py-2 px-3 font-mono whitespace-nowrap" style={{ color: PAL.gold }}>
                         {r.rank}
-                        <span className="ml-1.5 text-[10px]" style={{ color: moved == null ? PAL.muted : moved > 0 ? PAL.green : moved < 0 ? PAL.red : PAL.muted }}>
+                        <span className="ml-1.5 text-[11px]" style={{ color: moved == null ? PAL.muted : moved > 0 ? PAL.green : moved < 0 ? PAL.red : PAL.muted }}>
                           {r.prevRank == null
                             ? skuMoveData.prevLimit != null
                               ? `(ngoài top ${skuMoveData.prevLimit})`
@@ -2255,7 +2255,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                           </td>
                           <td className="py-2 px-3 text-right">
                             <span
-                              className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                              className="text-[11px] font-bold px-2 py-0.5 rounded-full"
                               style={{ background: `${promoStatusLabel(p.status).color}22`, color: promoStatusLabel(p.status).color }}
                             >
                               {promoStatusLabel(p.status).label}
@@ -2331,7 +2331,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                     <td className="py-2 px-3 text-right font-mono">{chg(hChg)}</td>
                     <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
                       {r.cur.upt != null ? r.cur.upt.toFixed(2) : "—"}
-                      {r.cur.upt != null && r.prev.upt != null && <span className="ml-1 text-[10px]">({r.prev.upt.toFixed(2)})</span>}
+                      {r.cur.upt != null && r.prev.upt != null && <span className="ml-1 text-[11px]">({r.prev.upt.toFixed(2)})</span>}
                     </td>
                     <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>
                       {fmtPct(r.cur.ctor)}
@@ -2525,7 +2525,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             </Panel>
           )}
           <div className="rounded-xl p-4" style={{ background: PAL.panel, border: `1px solid ${PAL.line}` }}>
-            <div className="text-[10.5px] uppercase tracking-wider mb-2" style={{ color: PAL.muted }}>Việc agency làm tháng sau</div>
+            <div className="text-[11px] uppercase tracking-wider mb-2" style={{ color: PAL.muted }}>Việc agency làm tháng sau</div>
             <ul className="space-y-2 text-[13.5px] leading-relaxed list-disc pl-5" style={{ color: PAL.cream }}>
               {nextLines.map((l, i) => (
                 <li key={i}>{l}</li>
@@ -2534,7 +2534,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
           </div>
           {agencyNotes.length > 0 && (
             <div className="rounded-xl p-4 space-y-2" style={{ background: PAL.panel, border: `1px solid ${PAL.line}` }}>
-              <div className="text-[10.5px] uppercase tracking-wider" style={{ color: PAL.muted }}>Ghi chú của agency</div>
+              <div className="text-[11px] uppercase tracking-wider" style={{ color: PAL.muted }}>Ghi chú của agency</div>
               {agencyNotes.map(([label, text]) => (
                 <p key={label} className="text-[13px] whitespace-pre-line" style={{ color: PAL.cream }}>
                   <b style={{ color: PAL.gold }}>{label}:</b> {text}
@@ -2583,7 +2583,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                             placeholder?: string
                           ) => (
                             <div>
-                              <label className="text-[10.5px] uppercase tracking-wider block mb-1" style={{ color: PAL.muted }}>
+                              <label className="text-[11px] uppercase tracking-wider block mb-1" style={{ color: PAL.muted }}>
                                 {label}
                               </label>
                               <input
@@ -2613,12 +2613,12 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                                 />
                                 <div className="flex items-center gap-2">
                                   <span
-                                    className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                                    className="text-[11px] font-bold px-2 py-0.5 rounded-full"
                                     style={{ background: runrate != null && runrate >= 100 ? `${PAL.green}22` : `${PAL.red}22`, color: runrate != null && runrate >= 100 ? PAL.green : PAL.red }}
                                   >
                                     % Target {runrate != null ? `${runrate.toFixed(2)}%` : "—"}
                                   </span>
-                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: `${PAL.blue}22`, color: PAL.blue }}>
+                                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: `${PAL.blue}22`, color: PAL.blue }}>
                                     ROAS {fmtRoas(roas)}
                                   </span>
                                   {canManage && (
@@ -2768,7 +2768,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                                 {campErrorMsg}
                               </span>
                             )}
-                            <span className="text-[10.5px] italic" style={{ color: PAL.muted }}>
+                            <span className="text-[11px] italic" style={{ color: PAL.muted }}>
                               Để trống thì dùng khung mặc định (Mid-Month 13-15, Pay Day 23-25, D-Day theo ngày trùng lặp gần nhất). Đã nhập camp nào thì camp đó chỉ tính đúng khoảng nhập — khung mặc định của camp đó không còn áp dụng.
                             </span>
                           </div>
@@ -2800,7 +2800,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                     <Panel title={`Kế Hoạch Phân Bổ Target — Tháng ${nextMonth}`} icon={<CalendarClock className="w-4 h-4" />}>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
                         <div>
-                          <label className="text-[10.5px] uppercase tracking-wider block mb-1" style={{ color: PAL.muted }}>
+                          <label className="text-[11px] uppercase tracking-wider block mb-1" style={{ color: PAL.muted }}>
                             Target GMV (LIVE)
                           </label>
                           <input
@@ -2813,7 +2813,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                           />
                         </div>
                         <div>
-                          <label className="text-[10.5px] uppercase tracking-wider block mb-1" style={{ color: PAL.muted }}>
+                          <label className="text-[11px] uppercase tracking-wider block mb-1" style={{ color: PAL.muted }}>
                             Target NMV Tổng
                           </label>
                           <input
@@ -2826,7 +2826,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                           />
                         </div>
                         <div>
-                          <label className="text-[10.5px] uppercase tracking-wider block mb-1" style={{ color: PAL.muted }}>
+                          <label className="text-[11px] uppercase tracking-wider block mb-1" style={{ color: PAL.muted }}>
                             Tổng Giờ Live Kế Hoạch
                           </label>
                           <input
@@ -2886,7 +2886,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                               );
                             })}
                           </ReportTable>
-                          <p className="text-[10.5px] mt-2 text-right" style={{ color: Math.abs(planPctTotal - 100) > 0.5 ? PAL.red : PAL.muted }}>
+                          <p className="text-[11px] mt-2 text-right" style={{ color: Math.abs(planPctTotal - 100) > 0.5 ? PAL.red : PAL.muted }}>
                             Tổng phân bổ: {planPctTotal.toFixed(1)}% {Math.abs(planPctTotal - 100) > 0.5 ? "(nên bằng 100%)" : ""}
                           </p>
                         </div>
@@ -2899,7 +2899,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                           <thead>
                             <tr style={{ borderBottom: `1px solid ${PAL.line}` }}>
                               {["Lịch live", "Creator", "Camp", "Timeline", "Giờ live", "Target GMV", "GMV/giờ kỳ vọng", "Budget Ads", ""].map((h) => (
-                                <th key={h} className="py-2 px-2 text-left text-[10.5px] uppercase tracking-wider" style={{ color: PAL.muted }}>
+                                <th key={h} className="py-2 px-2 text-left text-[11px] uppercase tracking-wider" style={{ color: PAL.muted }}>
                                   {h}
                                 </th>
                               ))}

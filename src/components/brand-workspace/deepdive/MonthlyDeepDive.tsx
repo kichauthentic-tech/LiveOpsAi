@@ -136,7 +136,7 @@ export const MonthlyDeepDive: React.FC<Props> = ({ brandId, brandName = "", canM
         {!embedded && (
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-[10px] uppercase tracking-[0.18em] font-bold" style={{ color: PAL.gold }}>Report Tháng — Phân Tích Chuyên Sâu</p>
+            <p className="text-[11px] uppercase tracking-[0.18em] font-bold" style={{ color: PAL.gold }}>Report Tháng — Phân Tích Chuyên Sâu</p>
             <h2 className="text-2xl font-black mt-1">{brandName} — {monthLabel(month)}</h2>
             <p className="text-[11px] mt-1.5 max-w-3xl" style={{ color: PAL.muted }}>
               Không có ô nhập tay — tháng sau upload đủ file là báo cáo tự dựng lại theo đúng bố cục này.
@@ -377,7 +377,7 @@ const Daily: React.FC<{ dd: DeepDive }> = ({ dd }) => {
             <p className="text-[11px] font-bold mb-2" style={{ color: PAL.muted }}>Lưới lịch — đậm = GMV cao</p>
             <div className="grid grid-cols-7 gap-1 max-w-xl">
               {["T2", "T3", "T4", "T5", "T6", "T7", "CN"].map((w) => (
-                <div key={w} className="text-[9.5px] text-center font-bold" style={{ color: PAL.faint }}>{w}</div>
+                <div key={w} className="text-[11px] text-center font-bold" style={{ color: PAL.faint }}>{w}</div>
               ))}
               {weeks.flat().map((d, i) => {
                 if (!d) return <div key={i} />;
@@ -389,8 +389,8 @@ const Daily: React.FC<{ dd: DeepDive }> = ({ dd }) => {
                     style={{ background: `rgba(242,201,76,${0.08 + intensity * 0.82})`, border: `1px solid ${PAL.line}` }}
                     title={`${d.date} · ${fmtMoney(d.gmv)} · ${d.sessions} phiên${d.campaign ? ` · ${d.campaign}` : ""}`}
                   >
-                    <div className="text-[10px] font-bold" style={{ color: intensity > 0.5 ? "#1a1500" : PAL.cream }}>{d.day}</div>
-                    <div className="text-[8.5px] font-mono" style={{ color: intensity > 0.5 ? "#1a150099" : PAL.muted }}>{fmtMoneyShort(d.gmv)}</div>
+                    <div className="text-[11px] font-bold" style={{ color: intensity > 0.5 ? "#1a1500" : PAL.cream }}>{d.day}</div>
+                    <div className="text-[11px] font-mono" style={{ color: intensity > 0.5 ? "#1a150099" : PAL.muted }}>{fmtMoneyShort(d.gmv)}</div>
                   </div>
                 );
               })}
@@ -505,14 +505,14 @@ const Funnel: React.FC<{ dd: DeepDive }> = ({ dd }) => {
                   style={{ width: s.key === "gmv" ? "100%" : `${Math.max(3, (s.value / maxV) * 100)}%`, background: s.key === "gmv" ? PAL.gold : `${PAL.blue}cc` }}
                 >
                   {s.prev != null && (
-                    <span className="text-[9.5px] font-mono" style={{ color: "#0b0b0d" }}>
+                    <span className="text-[11px] font-mono" style={{ color: "#0b0b0d" }}>
                       MoM {s.prev > 0 ? `${s.value >= s.prev ? "+" : ""}${fmtDec(((s.value - s.prev) / s.prev) * 100, 0)}%` : "—"}
                     </span>
                   )}
                 </div>
               </div>
               {conv != null && (
-                <div className="text-[10.5px] mt-1 flex items-center gap-2" style={{ color: PAL.muted }}>
+                <div className="text-[11px] mt-1 flex items-center gap-2" style={{ color: PAL.muted }}>
                   <span>
                     {isRatio ? `×${fmtDec(conv / 100, 1)} lần / view` : `chuyển đổi ${fmtPct(conv, 2)}`}
                   </span>
@@ -672,7 +672,7 @@ const Campaigns: React.FC<{ dd: DeepDive }> = ({ dd }) => {
                 ? ((c.gmvPerHour - base.gmvPerHour) / base.gmvPerHour) * 100 : null;
               return (
                 <tr key={c.name} style={{ borderBottom: `1px solid ${PAL.line}55` }}>
-                  <Td>{c.name}{lift != null && <span className="ml-2 text-[10px]" style={{ color: lift >= 0 ? PAL.green : PAL.red }}>{lift >= 0 ? "+" : ""}{fmtDec(lift, 0)}% vs Thường</span>}</Td>
+                  <Td>{c.name}{lift != null && <span className="ml-2 text-[11px]" style={{ color: lift >= 0 ? PAL.green : PAL.red }}>{lift >= 0 ? "+" : ""}{fmtDec(lift, 0)}% vs Thường</span>}</Td>
                   <Td align="right" mono>{c.sessions}</Td>
                   <Td align="right" mono>{c.days}</Td>
                   <Td align="right" mono>{fmtDec(c.hours, 0)}</Td>

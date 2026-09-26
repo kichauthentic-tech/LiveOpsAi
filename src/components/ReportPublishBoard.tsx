@@ -141,7 +141,7 @@ export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ brands, 
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)] uppercase text-[10px] tracking-wider">
+              <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)] uppercase text-[11px] tracking-wider">
                 <th className="py-2.5 px-4">Tháng</th>
                 <th className="py-2.5 px-2">Brand</th>
                 <th className="py-2.5 px-2">Trạng thái</th>
@@ -168,7 +168,7 @@ export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ brands, 
                       </td>
                       <td className="py-2.5 px-2">
                         <span
-                          className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${
+                          className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${
                             isPublished
                               ? "bg-emerald-950 text-emerald-300 border-emerald-800"
                               : report
@@ -180,18 +180,18 @@ export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ brands, 
                           {isPublished ? "Đã phát hành" : report ? "Nháp" : "Chưa có dòng"}
                         </span>
                         {isPublished && report?.publishedAt && (
-                          <span className="block text-[10px] text-[var(--text-faint)] mt-1">
+                          <span className="block text-[11px] text-[var(--text-faint)] mt-1">
                             {new Date(report.publishedAt).toLocaleDateString("vi-VN")}
                           </span>
                         )}
                       </td>
                       <td className="py-2.5 px-2">
                         {unreconciled > 0 ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-300 whitespace-nowrap">
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-300 whitespace-nowrap">
                             <AlertTriangle className="w-3 h-3" /> {unreconciled} ca
                           </span>
                         ) : (
-                          <span className="text-[10px] text-[var(--text-faint)]">—</span>
+                          <span className="text-[11px] text-[var(--text-faint)]">—</span>
                         )}
                       </td>
                       <td className="py-2.5 px-2 text-right">
@@ -212,7 +212,7 @@ export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ brands, 
                             {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />} Phát hành
                           </button>
                         )}
-                        {err && <div className="text-[10px] text-red-300 font-semibold mt-1 max-w-[220px] whitespace-normal">{err}</div>}
+                        {err && <div className="text-[11px] text-red-300 font-semibold mt-1 max-w-[220px] whitespace-normal">{err}</div>}
                       </td>
                     </tr>
                   );

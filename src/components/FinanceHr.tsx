@@ -255,7 +255,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                       <div className="font-bold text-[var(--text)] flex items-center gap-1.5 flex-wrap">
                         {s.title}
                         {missingInputs.map((m) => (
-                          <span key={m} className="text-[9px] font-bold bg-rose-950 text-rose-300 border border-rose-800 px-1.5 py-0.5 rounded-full" title={PNL_MISSING_LABEL[m]}>
+                          <span key={m} className="text-[11px] font-bold bg-rose-950 text-rose-300 border border-rose-800 px-1.5 py-0.5 rounded-full" title={PNL_MISSING_LABEL[m]}>
                             {PNL_MISSING_LABEL[m]}
                           </span>
                         ))}
@@ -269,7 +269,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                     <td className="py-2 pr-3">
                       {isHourly ? (
                         <div>
-                          <span className="text-[9px] font-bold bg-blue-950 text-blue-300 border border-blue-800 px-1.5 py-0.5 rounded-full">
+                          <span className="text-[11px] font-bold bg-blue-950 text-blue-300 border border-blue-800 px-1.5 py-0.5 rounded-full">
                             Theo giờ live
                           </span>
                           <div className="font-bold text-[var(--text)] mt-0.5">{money(grossAgencyRev)} đ</div>
@@ -304,7 +304,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                         onBlur={(e) => handleFieldChange(s.id, "adsCost", Number(e.target.value))}
                         className="w-24 p-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface-base)] text-[var(--text)] font-bold disabled:opacity-40"
                       />
-                      <div className="text-[9px] text-[var(--text-faint)] mt-0.5">
+                      <div className="text-[11px] text-[var(--text-faint)] mt-0.5">
                         Trợ live báo cáo: {money(s.report?.adsCost ?? 0)} đ
                       </div>
                     </td>
@@ -313,7 +313,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                     <td className="py-2 pr-3">
                       <div className="text-amber-400 font-bold">{money(hostPayout)} đ</div>
                       {hostPaidHourly && (
-                        <div className="text-[9px] text-[var(--text-muted)] mt-0.5">
+                        <div className="text-[11px] text-[var(--text-muted)] mt-0.5">
                           {billableHours.toFixed(2)}h × rate/giờ
                           {otMinutes > 0 && <span className="text-emerald-400 font-bold"> · OT +{otMinutes}p</span>}
                           {earlyLeaveMinutes > 0 && <span className="text-amber-400 font-bold"> · off sớm −{earlyLeaveMinutes}p</span>}
@@ -323,12 +323,12 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                           Profit trừ những ai. Ca có co_host_id nhưng talent đã bị xoá thì không
                           tính được, phải nói ra chứ không im lặng ra 0. */}
                       {coHost ? (
-                        <div className="text-[10px] text-amber-300/80 mt-1">
+                        <div className="text-[11px] text-amber-300/80 mt-1">
                           Trợ live {coHost.name}: <b>{money(coHostPayout)} đ</b>
                           {coHostPaidHourly && <span className="text-[var(--text-muted)]"> ({billableHours.toFixed(2)}h × {coHostUsesAssistantRate ? "rate trợ/giờ" : "rate host/giờ — chưa đặt rate trợ"})</span>}
                         </div>
                       ) : s.coHostId ? (
-                        <div className="text-[10px] text-red-300 mt-1">Trợ live {s.coHostName || "—"} không còn hồ sơ talent — chưa tính công</div>
+                        <div className="text-[11px] text-red-300 mt-1">Trợ live {s.coHostName || "—"} không còn hồ sơ talent — chưa tính công</div>
                       ) : null}
                     </td>
                     <td className={`py-2 pr-3 font-black ${netProfit >= 0 ? "text-emerald-400" : "text-red-400"}`}>

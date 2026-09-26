@@ -137,7 +137,7 @@ export const AiMultiAgent: React.FC = () => {
             <span className="font-bold flex items-center gap-1.5 text-sm">
               <Briefcase className="w-4 h-4" /> CEO Strategic Advisor
             </span>
-            <p className="text-[10px] text-[var(--text-muted)]">Tư vấn P&L, dòng tiền, tối ưu công suất Studio</p>
+            <p className="text-[11px] text-[var(--text-muted)]">Tư vấn P&L, dòng tiền, tối ưu công suất Studio</p>
           </button>
 
           <button
@@ -151,7 +151,7 @@ export const AiMultiAgent: React.FC = () => {
             <span className="font-bold flex items-center gap-1.5 text-sm">
               <LineChart className="w-4 h-4" /> TikTok Data Analyst AI
             </span>
-            <p className="text-[10px] text-[var(--text-muted)]">Giải mã retention curve & thuật toán TikTok Live</p>
+            <p className="text-[11px] text-[var(--text-muted)]">Giải mã retention curve & thuật toán TikTok Live</p>
           </button>
         </div>
 
@@ -175,12 +175,12 @@ export const AiMultiAgent: React.FC = () => {
                     : "bg-[var(--surface-elevated)] text-[var(--text)] rounded-tl-none border border-[var(--border)]"
                 }`}>
                   {msg.isMock && (
-                    <span className="inline-block text-[9px] font-bold uppercase tracking-wide text-amber-400 bg-amber-950/40 border border-amber-500/40 rounded px-1.5 py-0.5">
+                    <span className="inline-block text-[11px] font-bold uppercase tracking-wide text-amber-400 bg-amber-950/40 border border-amber-500/40 rounded px-1.5 py-0.5">
                       Chưa cấu hình Gemini API key — câu trả lời mẫu
                     </span>
                   )}
                   <p className="whitespace-pre-line">{msg.text}</p>
-                  <span className={`text-[9px] block text-right font-mono ${
+                  <span className={`text-[11px] block text-right font-mono ${
                     msg.sender === "user" ? "text-[var(--accent-text)]" : "text-[var(--text-muted)]"
                   }`}>
                     {msg.time}

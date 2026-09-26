@@ -160,7 +160,7 @@ export function SessionReportForm({ session, onSubmit, onCancel, canOverrideMetr
         <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-base)]/60 p-3 space-y-2">
           <div className="flex items-baseline justify-between gap-2 flex-wrap">
             <p className="font-bold text-[var(--text)] text-xs">Số máy đã biết — từ file, không nhập lại</p>
-            <span className="text-[10px] text-[var(--text-faint)]">tỷ lệ tính lại từ số đếm của riêng ca này</span>
+            <span className="text-[11px] text-[var(--text-faint)]">tỷ lệ tính lại từ số đếm của riêng ca này</span>
           </div>
           <div className="grid grid-cols-3 sm:grid-cols-5 gap-x-3 gap-y-1.5 text-[11px]">
             {[
@@ -179,7 +179,7 @@ export function SessionReportForm({ session, onSubmit, onCancel, canOverrideMetr
                 : [["GPM", derived.gpm.toLocaleString("vi-VN")]])
             ].map(([k, v]) => (
               <div key={k as string} className="min-w-0">
-                <p className="text-[var(--text-faint)] font-bold uppercase tracking-wide text-[9px]">{k}</p>
+                <p className="text-[var(--text-faint)] font-bold uppercase tracking-wide text-[11px]">{k}</p>
                 <p className="font-mono font-bold text-[var(--text)] truncate">{v}</p>
               </div>
             ))}

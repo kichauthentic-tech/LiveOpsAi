@@ -1794,7 +1794,7 @@ export default function App() {
         >
           <div className={sidebarCollapsed ? "md:hidden" : ""}>
             <h1 className="text-xl font-bold tracking-tighter text-[var(--accent-text)]">LIVEOPS AI</h1>
-            <p className="text-[10px] uppercase tracking-widest text-[var(--text-faint)] font-semibold">
+            <p className="text-[11px] uppercase tracking-widest text-[var(--text-faint)] font-semibold">
               Agency Operating System
             </p>
           </div>
@@ -1840,7 +1840,7 @@ export default function App() {
               <div key={group.label} className="space-y-1">
                 {group.label && (
                   <p
-                    className={`px-3 text-[10px] font-bold uppercase tracking-widest text-[var(--text-faint)] ${
+                    className={`px-3 text-[11px] font-bold uppercase tracking-widest text-[var(--text-faint)] ${
                       sidebarCollapsed ? "md:hidden" : ""
                     }`}
                   >
@@ -1884,7 +1884,7 @@ export default function App() {
 
                       <div className={`flex items-center gap-1.5 shrink-0 ${sidebarCollapsed ? "md:hidden" : ""}`}>
                         {item.badge && (
-                          <span className="bg-rose-600/20 text-rose-400 border border-rose-500/30 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase">
+                          <span className="bg-rose-600/20 text-rose-400 border border-rose-500/30 text-[11px] font-bold px-1.5 py-0.5 rounded uppercase">
                             {item.badge}
                           </span>
                         )}
@@ -1927,7 +1927,7 @@ export default function App() {
               <p className="font-bold text-[var(--text)] truncate">{activeUser.name}</p>
               {/* Chức danh đã chứa role ("Quản Trị Viên Hệ Thống (Admin)") — in thêm role phía trước là
                   lặp "ADMIN • ... (ADMIN)". Chỉ rơi về tên role khi chưa đặt chức danh. */}
-              <p className="text-[var(--accent-text)] text-[10px] uppercase font-extrabold truncate">
+              <p className="text-[var(--accent-text)] text-[11px] uppercase font-extrabold truncate">
                 {activeUser.customRoleTitle || currentRole}
               </p>
             </div>
@@ -2093,7 +2093,7 @@ export default function App() {
                 </div>
 
                 <div className="p-4 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl text-left text-xs font-mono space-y-1 text-[var(--text-muted)]">
-                  <div className="text-[var(--text-faint)] font-sans text-[10px] uppercase font-bold">Chi tiết yêu cầu an ninh:</div>
+                  <div className="text-[var(--text-faint)] font-sans text-[11px] uppercase font-bold">Chi tiết yêu cầu an ninh:</div>
                   {/* Tab không có nav item cho role này thì không có perm key nào để in — nói thẳng là do role,
                       thay vì in "undefined". */}
                   <div>• Permission Required: <span className="text-blue-400">{currentTabNavItem?.perm ?? "không khả dụng cho role này"}</span></div>

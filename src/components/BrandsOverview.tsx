@@ -149,7 +149,7 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ brands, sessions
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)] uppercase text-[10px] tracking-wider">
+              <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)] uppercase text-[11px] tracking-wider">
                 <th className="py-2.5 px-4">Brand</th>
                 <th className="py-2.5 px-2">Kế hoạch tháng</th>
                 <th className="py-2.5 px-2">Cam kết</th>
@@ -178,24 +178,24 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ brands, sessions
                       </span>
                     </td>
                     <td className="py-2.5 px-2">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${PLAN_STATUS_CLS[planStatus]}`}>
+                      <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${PLAN_STATUS_CLS[planStatus]}`}>
                         {PLAN_STATUS_LABEL[planStatus]}
                       </span>
                       {plan?.brandConfirmedAt && (
-                        <span className="block text-[10px] text-emerald-400 mt-1">✓ brand đã xác nhận</span>
+                        <span className="block text-[11px] text-emerald-400 mt-1">✓ brand đã xác nhận</span>
                       )}
                       {plan && plan.targetGmv > 0 && (
-                        <span className="block text-[10px] text-[var(--text-faint)] mt-0.5">
+                        <span className="block text-[11px] text-[var(--text-faint)] mt-0.5">
                           Target {formatCurrencyAdaptive(plan.targetGmv, "")}
                         </span>
                       )}
                     </td>
                     <td className="py-2.5 px-2">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${COMMIT_STATUS_CLS[commitStatus]}`}>
+                      <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${COMMIT_STATUS_CLS[commitStatus]}`}>
                         {COMMIT_STATUS_LABEL[commitStatus]}
                       </span>
                       {progress && (
-                        <span className="block text-[10px] text-[var(--text-faint)] mt-1">
+                        <span className="block text-[11px] text-[var(--text-faint)] mt-1">
                           {fmtHours(progress.plannedTotalHours)}/{fmtHours(progress.committedHours)}
                           {progress.gapHours > 0 && <span className="text-amber-300"> · thiếu {fmtHours(progress.gapHours)}</span>}
                         </span>
@@ -205,24 +205,24 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ brands, sessions
                       {s.countable > 0 ? fmtHours(s.hours) : <span className="text-[var(--text-faint)] font-normal">—</span>}
                       {/* Đ11: `happened` chứ không phải `total` — bảng này tự nhận chỉ hiện số đã xảy ra,
                           nên ca sắp tới tách ra thành dòng riêng thay vì cộng chung vào "N ca". */}
-                      <span className="block text-[10px] text-[var(--text-faint)] font-normal">{s.happened} ca</span>
+                      <span className="block text-[11px] text-[var(--text-faint)] font-normal">{s.happened} ca</span>
                       {s.upcoming > 0 && (
-                        <span className="block text-[10px] text-[var(--text-muted)] font-normal">+{s.upcoming} ca sắp tới</span>
+                        <span className="block text-[11px] text-[var(--text-muted)] font-normal">+{s.upcoming} ca sắp tới</span>
                       )}
                     </td>
                     <td className="py-2.5 px-2 text-right font-bold text-[var(--success)] whitespace-nowrap">
                       {s.gmv > 0 ? formatCurrencyAdaptive(s.gmv, "") : <span className="text-[var(--text-faint)] font-normal">—</span>}
                     </td>
                     <td className="py-2.5 px-2">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${REPORT_STATUS_CLS[reportStatus]}`}>
+                      <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${REPORT_STATUS_CLS[reportStatus]}`}>
                         {REPORT_STATUS_LABEL[reportStatus]}
                       </span>
                     </td>
                     <td className="py-2.5 px-2">
                       {rates && rates.size > 0 ? (
-                        <span className="text-[10px] text-[var(--text-muted)]">{[...rates].join(", ")}</span>
+                        <span className="text-[11px] text-[var(--text-muted)]">{[...rates].join(", ")}</span>
                       ) : (
-                        <span className="text-[10px] text-rose-300 font-bold">Chưa set</span>
+                        <span className="text-[11px] text-rose-300 font-bold">Chưa set</span>
                       )}
                     </td>
                   </tr>

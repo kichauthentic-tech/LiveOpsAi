@@ -438,7 +438,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                 >
                   <div className="flex justify-between items-start">
                     <span
-                      className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-lg border ${getRoleBadgeStyle(
+                      className={`text-[11px] font-black uppercase px-2.5 py-1 rounded-lg border ${getRoleBadgeStyle(
                         roleKey
                       )}`}
                     >
@@ -541,7 +541,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                               )}
                               <span className="font-bold text-xs text-[var(--text)]">{def.label}</span>
                             </div>
-                            <p className="text-[10px] text-[var(--text-muted)] line-clamp-2 leading-relaxed">
+                            <p className="text-[11px] text-[var(--text-muted)] line-clamp-2 leading-relaxed">
                               {def.description}
                             </p>
                           </div>
@@ -611,7 +611,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-xl text-[var(--text)]">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-[var(--surface-base)]/80 text-[var(--text-muted)] font-extrabold uppercase border-b border-[var(--border)] text-[10px]">
+                <thead className="bg-[var(--surface-base)]/80 text-[var(--text-muted)] font-extrabold uppercase border-b border-[var(--border)] text-[11px]">
                   <tr>
                     <th className="p-4">Người Dùng System</th>
                     <th className="p-4">Role Phân Quyền</th>
@@ -646,7 +646,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                               <div className="font-bold text-[var(--text)] text-sm flex items-center gap-2">
                                 <span>{u.name}</span>
                                 {customOverridesCount > 0 && (
-                                  <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[9px] font-black px-1.5 py-0.5 rounded inline-flex items-center gap-0.5">
+                                  <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[11px] font-black px-1.5 py-0.5 rounded inline-flex items-center gap-0.5">
                                     <Zap className="w-2.5 h-2.5" /> {customOverridesCount} Override
                                   </span>
                                 )}
@@ -658,7 +658,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
 
                         <td className="p-4">
                           <span
-                            className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border ${getRoleBadgeStyle(
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-black uppercase border ${getRoleBadgeStyle(
                               u.role
                             )}`}
                           >
@@ -685,7 +685,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
 
                         <td className="p-4">
                           <span
-                            className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            className={`px-2 py-0.5 rounded text-[11px] font-bold ${
                               u.status === "Active"
                                 ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
                                 : "bg-red-500/20 text-red-400 border border-red-500/30"
@@ -706,7 +706,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                               title="Override quyền riêng cho người dùng này"
                             >
                               <Key className="w-3.5 h-3.5" />
-                              <span className="hidden lg:inline text-[10px] font-bold">Custom Extra</span>
+                              <span className="hidden lg:inline text-[11px] font-bold">Custom Extra</span>
                             </button>
 
                             {/* Edit Button */}
@@ -767,7 +767,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-[var(--text)]">{log.action}</span>
                     <span
-                      className={`px-2 py-0.5 rounded text-[9px] font-black ${
+                      className={`px-2 py-0.5 rounded text-[11px] font-black ${
                         log.category === "Permission Change"
                           ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
                           : log.category === "Security Alert"
@@ -779,7 +779,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                     </span>
                   </div>
                   <p className="text-[var(--text-muted)] text-[11px]">{log.details}</p>
-                  <p className="text-[var(--text-faint)] text-[10px]">Thực hiện bởi: {log.performedBy}</p>
+                  <p className="text-[var(--text-faint)] text-[11px]">Thực hiện bởi: {log.performedBy}</p>
                 </div>
                 <span className="text-[var(--text-faint)] text-[11px] font-mono shrink-0">{log.timestamp}</span>
               </div>
@@ -830,12 +830,12 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                   className="w-full px-3 py-2 bg-[var(--surface-base)] rounded-xl border border-[var(--border)] text-[var(--text)] focus:outline-none focus:border-[var(--accent)] disabled:opacity-50 disabled:cursor-not-allowed"
                 />
                 {editingUser && (
-                  <p className="text-[10px] text-[var(--text-faint)]">
+                  <p className="text-[11px] text-[var(--text-faint)]">
                     Không thể đổi email đăng nhập tại đây — email gắn với tài khoản Supabase Auth thật.
                   </p>
                 )}
                 {!editingUser && (
-                  <p className="text-[10px] text-[var(--text-faint)]">
+                  <p className="text-[11px] text-[var(--text-faint)]">
                     Hệ thống sẽ gửi email mời tạo mật khẩu đến địa chỉ này.
                   </p>
                 )}
@@ -927,7 +927,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      <p className="text-[10px] text-amber-300/80">
+                      <p className="text-[11px] text-amber-300/80">
                         Tên hồ sơ Talent Pool = Tên hiển thị ở trên ({formData.name || "chưa nhập"}). Hệ thống tự tạo + link tài khoản này ngay sau khi tạo.
                       </p>
                       <div className="grid grid-cols-2 gap-2">
@@ -1050,13 +1050,13 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-[var(--text)] text-xs">{def.label}</span>
                         {isOverridden && (
-                          <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[9px] font-black px-1.5 py-0.5 rounded">
+                          <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[11px] font-black px-1.5 py-0.5 rounded">
                             OVERRIDDEN
                           </span>
                         )}
                       </div>
-                      <p className="text-[10px] text-[var(--text-muted)]">{def.description}</p>
-                      <span className="text-[10px] text-[var(--text-faint)] font-mono">
+                      <p className="text-[11px] text-[var(--text-muted)]">{def.description}</p>
+                      <span className="text-[11px] text-[var(--text-faint)] font-mono">
                         Quyền mặc định của Role: {roleDefault ? "ALLOWED" : "DENIED"}
                       </span>
                     </div>

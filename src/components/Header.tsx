@@ -68,7 +68,7 @@ const WorkspaceSwitcher: React.FC<{
               {workspace.type === "agency" && <Check className="w-3.5 h-3.5 text-blue-400" />}
             </button>
             <div className="border-t border-[var(--border)] my-1.5" />
-            <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-widest text-[var(--text-faint)]">Brand</p>
+            <p className="px-3 pb-1 text-[11px] font-bold uppercase tracking-widest text-[var(--text-faint)]">Brand</p>
             {brands.length === 0 && <p className="px-3 py-2 text-[11px] text-[var(--text-faint)]">Chưa có Brand nào.</p>}
             {brands.map((b) => (
               <button
@@ -154,7 +154,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Logged-in user identity (real auth — role comes from the account, not a switcher) */}
         <div className="hidden md:flex flex-col items-end leading-tight px-2">
           <span className="text-xs font-bold text-[var(--text)]">{activeUserName}</span>
-          <span className="text-[10px] text-[var(--accent-text)] font-semibold uppercase">
+          <span className="text-[11px] text-[var(--accent-text)] font-semibold uppercase">
             {activeUserTitle || currentRole}
           </span>
         </div>

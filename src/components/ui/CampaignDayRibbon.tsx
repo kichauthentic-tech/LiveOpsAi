@@ -33,7 +33,7 @@ const RIBBON_PRESETS: Record<
     wrapper: "-mx-1.5 sm:-mx-2.5 -mt-1.5 sm:-mt-2.5 [--camp-gap:8px]",
     height: "h-[19px] sm:h-[23px]",
     ribbonHeight: "h-[25px] sm:h-[33px]",
-    text: "text-[9px] sm:text-[10px]",
+    text: "text-[11px] sm:text-[11px]",
     iconSize: "w-3 h-3",
     capStart: "rounded-tl-2xl",
     capEnd: "rounded-tr-2xl"
@@ -43,7 +43,7 @@ const RIBBON_PRESETS: Record<
     wrapper: "-mx-1 sm:-mx-2.5 -mt-1 sm:-mt-2.5 [--camp-gap:4px] sm:[--camp-gap:8px]",
     height: "h-[19px] sm:h-[23px]",
     ribbonHeight: "h-[23px] sm:h-[33px]",
-    text: "text-[9px] sm:text-[10px]",
+    text: "text-[11px] sm:text-[11px]",
     iconSize: "w-3 h-3",
     capStart: "rounded-tl-2xl",
     capEnd: "rounded-tr-2xl"
@@ -54,7 +54,7 @@ const RIBBON_PRESETS: Record<
     wrapper: "-mx-3 -mt-3 [--camp-gap:12px]",
     height: "h-[27px]",
     ribbonHeight: "h-[31px]",
-    text: "text-[10px]",
+    text: "text-[11px]",
     iconSize: "w-3 h-3",
     capStart: "rounded-tl-2xl",
     capEnd: "rounded-tr-2xl"
@@ -152,7 +152,7 @@ export const CampaignDayBanner: React.FC<{ info: CampaignDayInfo; className?: st
       <span className="relative shrink-0 w-4 h-4 rounded-full bg-white/25 flex items-center justify-center">
         <Icon className="w-3 h-3 text-white" />
       </span>
-      <span className="relative truncate text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-white">{info.bannerLabel}</span>
+      <span className="relative truncate text-[11px] sm:text-[11px] font-black uppercase tracking-wider text-white">{info.bannerLabel}</span>
     </div>
   );
 };

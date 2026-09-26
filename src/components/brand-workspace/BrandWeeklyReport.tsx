@@ -32,14 +32,14 @@ const MISSING_LABEL: Record<MissingStep, string> = { snapshot: "chưa up file", 
 // unmount/remount toàn bộ 8 ô KPI thay vì chỉ update props.
 const Kpi: React.FC<{ label: string; value: string; delta?: number | null; hint?: string; tone?: "good" | "bad" | "warn" }> = ({ label, value, delta, hint, tone }) => (
   <div className="bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3">
-    <p className="text-[10px] uppercase tracking-wider font-bold text-[var(--text-faint)]" title={metricHint(label)}>{label}</p>
+    <p className="text-[11px] uppercase tracking-wider font-bold text-[var(--text-faint)]" title={metricHint(label)}>{label}</p>
     <p className={`text-lg font-black mt-0.5 ${tone === "good" ? "text-emerald-400" : tone === "bad" ? "text-rose-400" : tone === "warn" ? "text-amber-300" : "text-[var(--text)]"}`}>{value}</p>
     {delta !== undefined && (
-      <p className={`text-[10px] font-bold mt-0.5 flex items-center gap-1 ${delta === null ? "text-[var(--text-faint)]" : delta >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+      <p className={`text-[11px] font-bold mt-0.5 flex items-center gap-1 ${delta === null ? "text-[var(--text-faint)]" : delta >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
         {delta === null ? "tuần trước chưa có số" : <>{delta >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />} {fmtPct(Math.abs(delta))} so tuần trước</>}
       </p>
     )}
-    {hint && <p className="text-[10px] text-[var(--text-faint)] mt-0.5">{hint}</p>}
+    {hint && <p className="text-[11px] text-[var(--text-faint)] mt-0.5">{hint}</p>}
   </div>
 );
 
@@ -193,7 +193,7 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
       <div className="bg-[var(--surface)] p-4 rounded-2xl border border-[var(--border)] shadow-sm space-y-2">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
-            <p className="text-[10px] font-bold text-[var(--text-faint)] uppercase tracking-wider">Report Tuần · vận hành nội bộ</p>
+            <p className="text-[11px] font-bold text-[var(--text-faint)] uppercase tracking-wider">Report Tuần · vận hành nội bộ</p>
             <h3 className="font-bold text-[var(--text)] text-lg flex items-center gap-2">
               <CalendarRange className="w-5 h-5 text-emerald-500" /> {brandName} — Tuần {week}/{year}
               <span className="text-sm font-normal text-[var(--text-muted)]">({fmtDay(weekStart)} → {fmtDay(weekEnd)})</span>
@@ -253,7 +253,7 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
         <div className="overflow-x-auto">
           <table className="w-full text-xs min-w-[640px]">
             <thead>
-              <tr className="text-[var(--text-faint)] text-left text-[10px] uppercase tracking-wider">
+              <tr className="text-[var(--text-faint)] text-left text-[11px] uppercase tracking-wider">
                 <th className="py-1.5 pr-2">Ngày</th>
                 <th className="py-1.5 pr-2 text-right">Sessions</th>
                 <th className="py-1.5 pr-2 text-right">Giờ live</th>
@@ -298,14 +298,14 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
           </table>
         </div>
         {loading ? (
-          <p className="text-[10px] text-[var(--text-faint)] flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Đang đọc Dữ Liệu Gốc…</p>
+          <p className="text-[11px] text-[var(--text-faint)] flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Đang đọc Dữ Liệu Gốc…</p>
         ) : slice?.hasAnyBatch ? (
-          <p className="text-[10px] text-[var(--text-faint)] flex items-center gap-1">
+          <p className="text-[11px] text-[var(--text-faint)] flex items-center gap-1">
             <Database className="w-3 h-3" /> Cột "Total GMV (TikTok)" = GMV mọi kênh của shop theo file Dữ Liệu Gốc, để thấy live chiếm bao nhiêu
             {slice.missingDays.length > 0 && <> · thiếu file {slice.missingDays.length} ngày ({slice.missingDays.map(fmtDay).join(", ")})</>}.
           </p>
         ) : (
-          <p className="text-[10px] text-[var(--text-faint)]">Chưa có file Dữ Liệu Gốc tuần này — chỉ có số từ ca.</p>
+          <p className="text-[11px] text-[var(--text-faint)]">Chưa có file Dữ Liệu Gốc tuần này — chỉ có số từ ca.</p>
         )}
       </div>
 
@@ -326,7 +326,7 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
                   </div>
                   <div className="text-right shrink-0">
                     <p className="font-bold text-emerald-400">{formatCurrencyAdaptive(s.actualGmv)}</p>
-                    <p className="text-[10px] text-[var(--text-faint)]">{formatCurrencyAdaptive(s.actualGmv / Math.max(0.5, sessionHours(s)))}/h{s.targetGmv > 0 ? ` · ${fmtPct(s.actualGmv / s.targetGmv)} target` : ""}</p>
+                    <p className="text-[11px] text-[var(--text-faint)]">{formatCurrencyAdaptive(s.actualGmv / Math.max(0.5, sessionHours(s)))}/h{s.targetGmv > 0 ? ` · ${fmtPct(s.actualGmv / s.targetGmv)} target` : ""}</p>
                   </div>
                 </li>
               ))}
@@ -338,7 +338,7 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
         <div className="bg-[var(--surface)] rounded-2xl border border-[var(--border)] p-4 space-y-2">
           <h4 className="font-bold text-[var(--text)] text-sm flex items-center gap-2"><Users className="w-4 h-4 text-[var(--accent-text)]" /> Host tuần này</h4>
           {unassignedHost && (
-            <p className="text-[10px] text-amber-300">
+            <p className="text-[11px] text-amber-300">
               {unassignedHost.sessionCount} ca chưa gán host ({formatCurrencyAdaptive(unassignedHost.gmv)}) không tính vào bảng này.
             </p>
           )}
@@ -347,7 +347,7 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
           ) : (
             <table className="w-full text-xs">
               <thead>
-                <tr className="text-[var(--text-faint)] text-left text-[10px] uppercase tracking-wider">
+                <tr className="text-[var(--text-faint)] text-left text-[11px] uppercase tracking-wider">
                   <th className="py-1">Host</th>
                   <th className="py-1 text-right">Sessions</th>
                   <th className="py-1 text-right">Giờ live</th>
@@ -374,7 +374,7 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Việc còn thiếu */}
         <div className="bg-[var(--surface)] rounded-2xl border border-[var(--border)] p-4 space-y-2">
-          <h4 className="font-bold text-[var(--text)] text-sm flex items-center gap-2"><ClipboardList className="w-4 h-4 text-amber-400" /> Còn thiếu để chốt tuần {todo.length > 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-800">{todo.length}</span>}</h4>
+          <h4 className="font-bold text-[var(--text)] text-sm flex items-center gap-2"><ClipboardList className="w-4 h-4 text-amber-400" /> Còn thiếu để chốt tuần {todo.length > 0 && <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-800">{todo.length}</span>}</h4>
           {todo.length === 0 ? (
             <p className="text-xs text-emerald-400">Mọi ca đã qua đều đủ file · report · đối soát.</p>
           ) : (
@@ -385,7 +385,7 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
                   <span className="text-[var(--text-muted)]">{s.hostName || "chưa gán"}</span>
                   <DataSourceBadge dataSource={s.dataSource} />
                   {missing.map((m) => (
-                    <span key={m} className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${m === "reconcile" ? "bg-sky-950 text-sky-300 border-sky-800" : "bg-amber-950 text-amber-300 border-amber-800"}`}>{MISSING_LABEL[m]}</span>
+                    <span key={m} className={`text-[11px] font-bold px-1.5 py-0.5 rounded border ${m === "reconcile" ? "bg-sky-950 text-sky-300 border-sky-800" : "bg-amber-950 text-amber-300 border-amber-800"}`}>{MISSING_LABEL[m]}</span>
                   ))}
                 </li>
               ))}
