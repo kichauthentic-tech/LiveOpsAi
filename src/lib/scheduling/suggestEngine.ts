@@ -694,7 +694,7 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
   {
     const raised = (["dday", "midmonth", "payday"] as CampDayBucket[]).filter((b) => dayCapOf(b) > maxPerDay);
     if (raised.length > 0) {
-      const label: Record<CampDayBucket, string> = { daily: "ngày thường", dday: "D-Day", midmonth: "Mid-Month", payday: "Pay-Day" };
+      const label: Record<CampDayBucket, string> = { daily: "ngày thường", dday: "D-Day", midmonth: "Mid-Month", payday: "Pay Day" };
       notes.push(`Khuôn ngày camp học từ lịch sử: ${raised.map((b) => `${label[b]} ~${history.campHoursPerDay[b].toFixed(0)}h/ngày`).join(", ")} → lấp đủ giờ ngày camp trước (tới ${raised.map((b) => `${dayCapOf(b)} ca`).join("/")}), phần còn lại mới chia cho ngày thường (tối đa ${maxPerDay} ca); tối đa ca/ngày của kế hoạch được nâng theo khi áp gợi ý.`);
     }
   }
@@ -722,7 +722,7 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
     const reasonParts = [
       `GMV/giờ kỳ vọng ${fmtM(s.baseGph)} (${top ? `${top.n} ca lịch sử` : "ô chưa có lịch sử"}, ${history.months} tháng)`,
       brandGph > 0 ? `${s.baseGph >= brandGph ? "+" : "−"}${Math.abs(Math.round((s.baseGph / brandGph - 1) * 100))}% vs TB brand` : "",
-      s.bucket !== "daily" ? `${s.bucket === "dday" ? "D-Day" : s.bucket === "midmonth" ? "Mid-Month" : "Pay-Day"} ×${history.campMultipliers[s.bucket].toFixed(2)}${history.campLearned[s.bucket] ? "" : " (mặc định)"}` : "",
+      s.bucket !== "daily" ? `${s.bucket === "dday" ? "D-Day" : s.bucket === "midmonth" ? "Mid-Month" : "Pay Day"} ×${history.campMultipliers[s.bucket].toFixed(2)}${history.campLearned[s.bucket] ? "" : " (mặc định)"}` : "",
       top?.tag === "traffic_low_cvr" ? "nhiều người xem, chuyển đổi yếu — ca kéo follow/giới thiệu SP" : "",
       eventByDate.get(s.date) ? `${eventByDate.get(s.date)!.label} ×${history.eventMultipliers[eventByDate.get(s.date)!.kind].toFixed(2)}${history.eventLearned[eventByDate.get(s.date)!.kind] ? "" : " (chưa có lịch sử, chỉ ghi nhãn)"}` : "",
       schemeOf(s.date) ? `trùng KM ×${history.schemeMultiplier.toFixed(2)}${history.schemeLearned ? "" : " (chưa học được)"}` : "",

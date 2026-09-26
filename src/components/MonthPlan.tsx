@@ -50,7 +50,7 @@ interface MonthPlanProps {
 const WEEKDAY_LABELS = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
 const fmtH = (n: number) => n.toLocaleString("vi-VN", { maximumFractionDigits: 1 });
 const DEFAULT_SETTINGS: PlanSettings = { defaultSlotHours: 3, liveWindowStart: "09:00", liveWindowEnd: "23:00", maxSlotsPerDay: 3, notes: "", blackoutDates: [], targetGmv: 0, campRanges: {}, shopTargetGmv: 0 };
-const CAMP_RANGE_LABEL: Record<keyof PlanCampRanges, string> = { dday: "D-Day", midmonth: "Mid-Month", payday: "Pay-Day" };
+const CAMP_RANGE_LABEL: Record<keyof PlanCampRanges, string> = { dday: "D-Day", midmonth: "Mid-Month", payday: "Pay Day" };
 
 const nextMonthOf = (month: string, delta: number) => {
   const [y, m] = month.split("-").map(Number);
@@ -536,9 +536,9 @@ export default function MonthPlan({
             {targetTotal > 0 && <span className="text-[10px] text-[var(--text-faint)]">{formatCurrencyAdaptive(targetTotal)}</span>}
           </label>
           <label className="block text-xs">
-            <span className="font-bold text-[var(--text-muted)] block mb-1">KPI GMV cả shop (đ) <span className="font-normal text-[var(--text-faint)]">— brand giao, mọi kênh; chỉ để Report Tháng so, không dùng xếp ca</span></span>
+            <span className="font-bold text-[var(--text-muted)] block mb-1">KPI GMV (đ) <span className="font-normal text-[var(--text-faint)]">— brand giao, mọi kênh; chỉ để Report Tháng so, không dùng xếp ca</span></span>
             <input type="number" min="0" step="1000000" disabled={!editable} value={settings.shopTargetGmv || ""} placeholder="0 = brand chưa giao" onChange={(e) => { setSettings((s) => ({ ...s, shopTargetGmv: Number(e.target.value) || 0 })); setDirty(true); }} className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] font-mono disabled:opacity-60" />
-            {settings.shopTargetGmv > 0 && <span className="text-[10px] text-[var(--text-faint)]">{formatCurrencyAdaptive(settings.shopTargetGmv)}{targetTotal > 0 ? ` · target live = ${Math.round((targetTotal / settings.shopTargetGmv) * 100)}% KPI cả shop` : ""}</span>}
+            {settings.shopTargetGmv > 0 && <span className="text-[10px] text-[var(--text-faint)]">{formatCurrencyAdaptive(settings.shopTargetGmv)}{targetTotal > 0 ? ` · Target GMV live = ${Math.round((targetTotal / settings.shopTargetGmv) * 100)}% KPI GMV` : ""}</span>}
           </label>
           <div className="text-xs space-y-1">
             <span className="font-bold text-[var(--text-muted)] block">Khoảng ngày camp <span className="font-normal text-[var(--text-faint)]">(trống = lịch cố định)</span></span>
@@ -776,7 +776,7 @@ export default function MonthPlan({
 }
 
 const WD = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
-const BUCKET_LABEL: Record<string, string> = { daily: "Ngày thường", dday: "D-Day", midmonth: "Mid-Month", payday: "Pay-Day" };
+const BUCKET_LABEL: Record<string, string> = { daily: "Daily", dday: "D-Day", midmonth: "Mid-Month", payday: "Pay Day" };
 const CONF_LABEL: Record<SuggestResult["confidence"], string> = { none: "không có lịch sử", low: "thấp", medium: "vừa", high: "cao" };
 
 // Lớp 4 — giải thích gợi ý: lịch sử dùng, hệ số học được, ô giờ mạnh/yếu, đường cong biên, khả thi target.

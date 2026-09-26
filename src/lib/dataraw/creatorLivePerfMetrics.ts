@@ -30,7 +30,8 @@ export interface CreatorLivePerfAgg {
   // Report Chuyên Sâu Tab 05 (ops-only, dùng metrics.ts) vì vậy từng hiện 2 con số CTOR khác nhau cho
   // cùng một tháng — đúng kiểu lệch số hai trang mà liveUnits.ts đã ghi nhận suýt vá hụt.
   ctor: number | null;
-  liveCtr: number | null; // = views / impressions
+  err: number | null; // ERR = Views ÷ LIVE impressions (TikTok "Tap-through rate") — KHÔNG phải LIVE CTR
+  liveCtr: number | null; // LIVE CTR = Product clicks ÷ Views (cột "LIVE CTR" của TikTok)
 }
 
 export function aggregateCreatorLivePerfRows(rows: CreatorLivePerfRow[]): CreatorLivePerfAgg {
@@ -83,7 +84,8 @@ export function aggregateCreatorLivePerfRows(rows: CreatorLivePerfRow[]): Creato
     viewsPerHour: hours > 0 ? views / hours : null,
     ctr: productImpressions > 0 ? (productClicks / productImpressions) * 100 : null,
     ctor: productClicks > 0 ? (skuOrders / productClicks) * 100 : null,
-    liveCtr: impressions > 0 ? (views / impressions) * 100 : null
+    err: impressions > 0 ? (views / impressions) * 100 : null,
+    liveCtr: views > 0 ? (productClicks / views) * 100 : null
   };
 }
 
@@ -123,10 +125,10 @@ export interface FunnelStage {
 export function buildFunnel(rows: CreatorLivePerfRow[]): FunnelStage[] {
   const agg = aggregateCreatorLivePerfRows(rows);
   return [
-    { label: "Live Impressions", value: agg.impressions },
+    { label: "LIVE impressions", value: agg.impressions },
     { label: "Views", value: agg.views },
-    { label: "Product Views", value: agg.productImpressions },
-    { label: "Product Clicks", value: agg.productClicks },
+    { label: "Product impressions", value: agg.productImpressions },
+    { label: "Product clicks", value: agg.productClicks },
     { label: "Orders", value: agg.orders }
   ];
 }

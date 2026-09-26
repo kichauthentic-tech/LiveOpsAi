@@ -30,9 +30,9 @@ test("Vì sao — CROCS 1–22/09 vs 1–22/08: cả traffic lẫn chuyển đ�
   const t8 = stats(4_309_000_000, 153.6, 526_400, { liveCtr: 56.0, ctor: 1.6, upt: 1.2, aov: 1_084_000 });
   const t9 = stats(3_517_000_000, 177.8, 496_400, { liveCtr: 52.4, ctor: 1.25, upt: 1.06, aov: 1_146_000 });
   const w = whyInsight(t8, t9)!;
-  expect(w.headline).toMatch(/^GMV mỗi giờ −29%: lượt xem mỗi giờ −19%, GMV mỗi lượt xem −13%/);
+  expect(w.headline).toMatch(/^GMV\/giờ −29%: Views\/giờ −19%, GMV\/View −13%/);
   expect(w.headline).toContain("cả traffic lẫn chuyển đổi cùng giảm");
-  expect(w.points).toContain("Chốt đơn (CTOR): 1,60% → 1,25% (−22%).");
+  expect(w.points).toContain("CTOR: 1,60% → 1,25% (−22%).");
   expect(w.action).toMatch(/chốt đơn/);
 });
 
@@ -120,8 +120,8 @@ test("Toàn shop — CROCS T9: tỷ trọng LIVE affiliate 11,0% → 6,8% ⇒ vi
     windowLabel: "1–22/09 so với 1–22/08"
   })!;
   expect(i.headline).toContain("agency live chiếm 67,5% (tháng 08: 64,7%)");
-  expect(i.points).toContain("LIVE affiliate: 11,0% → 6,8% tổng shop (−4,2 điểm).");
-  expect(i.action).toMatch(/LIVE affiliate/);
+  expect(i.points).toContain("Affiliate LIVE: 11,0% → 6,8% tổng shop (−4,2 điểm).");
+  expect(i.action).toMatch(/Affiliate LIVE/);
 });
 
 test("Bối cảnh — đếm khung camp tăng/giảm cùng khung tháng trước, bỏ khung chưa chạy; việc cần làm là khung tụt GMV/giờ mạnh nhất", () => {
@@ -138,7 +138,7 @@ test("Bối cảnh — đếm khung camp tăng/giảm cùng khung tháng trướ
       { label: "Tối (từ 17h)", cur: { n: 22, gmvPerHour: 20_500_000 }, prev: { n: 23, gmvPerHour: 28_100_000 } }
     ]
   )!;
-  expect(i.headline).toBe("Ngày thường −22,5% GMV so với cùng kỳ tháng trước; 0/2 khung camp đã chạy tăng GMV so với cùng khung tháng trước.");
-  expect(i.points.some((l) => l.startsWith("Pay-Day"))).toBe(false);
-  expect(i.action).toMatch(/^Xem lại cách chạy ngày thường: GMV mỗi giờ −37%/);
+  expect(i.headline).toBe("Daily −22,5% GMV so với cùng kỳ tháng trước; 0/2 khung Campaign đã chạy tăng GMV so với cùng khung tháng trước.");
+  expect(i.points.some((l) => l.startsWith("Pay Day"))).toBe(false);
+  expect(i.action).toMatch(/^Xem lại cách chạy Daily: GMV\/giờ −37%/);
 });

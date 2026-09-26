@@ -134,7 +134,7 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
                   <p className="font-bold text-[var(--text-muted)] mb-1">Ngày camp</p>
                   {(["dday", "midmonth", "payday"] as const).map((b) => (
                     <div key={b} className="flex justify-between gap-2">
-                      <span className="text-[var(--text)]">{{ dday: "D-Day", midmonth: "Mid-Month", payday: "Pay-Day" }[b]}</span>
+                      <span className="text-[var(--text)]">{{ dday: "D-Day", midmonth: "Mid-Month", payday: "Pay Day" }[b]}</span>
                       <span className="text-[var(--text)]">GMV/giờ <b>×{history.campMultipliers[b].toFixed(2)}</b> <span className="text-[10px] text-[var(--text-faint)]">{history.campLearned[b] ? "học" : "mặc định"}</span>{history.campHoursLearned[b] ? <> · <b>{history.campHoursPerDay[b].toFixed(1)}h</b>/ngày</> : ""}</span>
                     </div>
                   ))}

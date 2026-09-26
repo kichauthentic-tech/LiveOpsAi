@@ -109,7 +109,7 @@ export function HostPerformance({ sessions, brands }: HostPerformanceProps) {
         <>
           <div className="bg-[var(--surface-card)] border border-[var(--border)] rounded-2xl p-4 sm:p-5">
             <h3 className="text-xs font-black text-[var(--text)] flex items-center gap-1.5">
-              <TrendingUp className="w-3.5 h-3.5" /> Xếp Hạng Host Theo GMV/Giờ
+              <TrendingUp className="w-3.5 h-3.5" /> Xếp hạng host theo GMV/giờ
             </h3>
             <p className="text-[11px] text-[var(--text-faint)] mt-0.5">
               GMV/giờ là thước đo dùng để phân bổ ca — đo hiệu quả trên mỗi giờ nhân lực bỏ ra, không thiên vị host được xếp nhiều ca dài.
@@ -129,11 +129,11 @@ export function HostPerformance({ sessions, brands }: HostPerformanceProps) {
                   <tr className="text-[var(--text-faint)] text-left text-[11px]">
                     <th className="font-bold pb-2 pr-3">Host</th>
                     <th className="font-bold pb-2 pr-3 text-right">GMV/giờ</th>
-                    <th className="font-bold pb-2 pr-3 text-right">Tổng GMV</th>
-                    <th className="font-bold pb-2 pr-3 text-right">Số ca</th>
-                    <th className="font-bold pb-2 pr-3 text-right">Tổng giờ</th>
-                    <th className="font-bold pb-2 pr-3 text-right">GMV/ca</th>
-                    <th className="font-bold pb-2 text-right">CTR</th>
+                    <th className="font-bold pb-2 pr-3 text-right">GMV</th>
+                    <th className="font-bold pb-2 pr-3 text-right">Sessions</th>
+                    <th className="font-bold pb-2 pr-3 text-right">Giờ live</th>
+                    <th className="font-bold pb-2 pr-3 text-right">GMV/session</th>
+                    <th className="font-bold pb-2 text-right">Product CTR</th>
                   </tr>
                 </thead>
                 <tbody>

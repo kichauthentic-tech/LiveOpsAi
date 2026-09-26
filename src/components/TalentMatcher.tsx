@@ -379,7 +379,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
             <h3 className="font-bold text-[var(--text)] text-base">
               Danh Sách Đội Ngũ Talent & Host Agency ({filteredTalents.length}/{talents.length} Talent)
             </h3>
-            <p className="text-xs text-[var(--text-muted)]">Quản lý danh sách Host / Trợ live, theo dõi doanh thu TB và cập nhật thông tin</p>
+            <p className="text-xs text-[var(--text-muted)]">Quản lý danh sách Host / Trợ live, theo dõi GMV/session và cập nhật thông tin</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
@@ -480,7 +480,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 text-[10px] text-[var(--text-muted)] bg-[var(--surface-base)]/40 p-2.5 rounded-xl border border-[var(--border)] font-medium">
-                  <div>GMV TB: <strong className="text-emerald-400 block text-xs font-bold">{real.avgGmvPerSession > 0 ? `${(real.avgGmvPerSession / 1000000).toFixed(0)}M đ` : "—"}</strong></div>
+                  <div>GMV/session: <strong className="text-emerald-400 block text-xs font-bold">{real.avgGmvPerSession > 0 ? `${(real.avgGmvPerSession / 1000000).toFixed(0)}M đ` : "—"}</strong></div>
                   <div>CVR TB: <strong className="text-[var(--accent-text)] block text-xs font-bold">{t.cvrAvg > 0 ? `${t.cvrAvg}%` : "—"}</strong></div>
                   {canSeeRate && (
                     <>
@@ -627,7 +627,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="font-bold text-[var(--text-muted)] block mb-1">GMV TB Mỗi Phiên (VND)</label>
+                  <label className="font-bold text-[var(--text-muted)] block mb-1">GMV/session (VND)</label>
                   <input
                     type="number"
                     value={formGmv}
@@ -636,7 +636,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-[var(--text-muted)] block mb-1">GMV Tích Lũy (VND)</label>
+                  <label className="font-bold text-[var(--text-muted)] block mb-1">GMV lũy kế (VND)</label>
                   <input
                     type="number"
                     value={formTotalGmv}
@@ -648,7 +648,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
 
               <div className={`grid grid-cols-1 gap-3 ${canSeeRate ? "sm:grid-cols-4" : "sm:grid-cols-1"}`}>
                 <div>
-                  <label className="font-bold text-[var(--text-muted)] block mb-1">CVR Trung Bình (%)</label>
+                  <label className="font-bold text-[var(--text-muted)] block mb-1">CVR TB (%)</label>
                   <input
                     type="number"
                     step="0.1"
@@ -829,9 +829,9 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
               </div>
 
               <div className="grid grid-cols-2 gap-2 bg-[var(--surface-base)]/40 p-3 rounded-xl border border-[var(--border)]">
-                <div>GMV Tích Lũy: <strong className="text-[var(--text)] block text-sm font-bold">{(computeTalentRealTotals(sessions, detailTalent.id).totalGmv / 1000000).toFixed(0)}M đ</strong></div>
+                <div>GMV lũy kế: <strong className="text-[var(--text)] block text-sm font-bold">{(computeTalentRealTotals(sessions, detailTalent.id).totalGmv / 1000000).toFixed(0)}M đ</strong></div>
                 <div>Số Ca Có Số: <strong className="text-[var(--text)] block text-sm font-bold">{computeTalentRealTotals(sessions, detailTalent.id).sessionCount}</strong></div>
-                <div>GMV TB / Phiên: <strong className="text-emerald-400 block text-sm font-bold">{(computeTalentRealTotals(sessions, detailTalent.id).avgGmvPerSession / 1000000).toFixed(0)}M đ</strong></div>
+                <div>GMV/session: <strong className="text-emerald-400 block text-sm font-bold">{(computeTalentRealTotals(sessions, detailTalent.id).avgGmvPerSession / 1000000).toFixed(0)}M đ</strong></div>
                 <div>CVR TB: <strong className="text-[var(--accent-text)] block text-sm font-bold">{detailTalent.cvrAvg || 0}%</strong></div>
                 <div>CTR TB: <strong className="text-[var(--accent-text)] block text-sm font-bold">{detailTalent.ctrAvg || 0}%</strong></div>
                 <div>Trạng Thái: <strong className="text-[var(--text)] block text-sm font-bold">{detailTalent.availabilityStatus || "Available"}</strong></div>

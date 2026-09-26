@@ -68,12 +68,12 @@ function headlineDiff(before: SnapshotHeadline, after: SnapshotHeadline): string
   const hours = (v: number) => `${v.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h`;
   const line = (label: string, a: string, b: string) => `${label}: ${a === b ? a + " (không đổi)" : `${a} → ${b}`}`;
   return [
-    line("GMV cả shop", money(before.shopGmv), money(after.shopGmv)),
-    line("GMV agency live", money(before.totalGmv), money(after.totalGmv)),
+    line("Total GMV", money(before.shopGmv), money(after.shopGmv)),
+    line("LIVE GMV (agency)", money(before.totalGmv), money(after.totalGmv)),
     line("Ca có số", String(before.sessionsWithNumbers), String(after.sessionsWithNumbers)),
     line("Giờ live", hours(before.liveHours), hours(after.liveHours)),
     line("Video GMV", money(before.videoGmv), money(after.videoGmv)),
-    line("GMV thẻ sản phẩm", money(before.cardGmv), money(after.cardGmv)),
+    line("Product card GMV", money(before.cardGmv), money(after.cardGmv)),
     line("Top SKU #1", before.topSku ?? "—", after.topSku ?? "—")
   ].join("\n");
 }
@@ -457,7 +457,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
                 <Send className="w-4 h-4 text-[var(--accent-text)]" /> Phát Hành Report
               </h3>
               <p className="text-[11px] text-[var(--text-faint)] flex items-center gap-1.5">
-                <Megaphone className="w-3.5 h-3.5" /> Ads Spend bổ sung, ROAS, Promotion, Customer Insight, Account Health nhập ở tab
+                <Megaphone className="w-3.5 h-3.5" /> Ads cost bổ sung, ROAS, Promotion, Customer Insight, Account Health nhập ở tab
                 {adsReportLink} — phát hành xong thì phần đó khoá theo report.
               </p>
               {!isPublished ? (

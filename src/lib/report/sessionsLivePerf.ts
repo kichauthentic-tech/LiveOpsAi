@@ -43,7 +43,8 @@ export function sessionToLivePerfRow(s: LiveSession): CreatorLivePerfRow {
     impressions,
     gmvPerHour: hours > 0 ? gmv / hours : 0,
     avgViewDurationSec: s.avgWatchTimeSeconds ?? 0,
-    liveCtr: impressions > 0 ? (views / impressions) * 100 : 0,
+    // Cùng nghĩa cột "LIVE CTR" của file TikTok (Product clicks ÷ Views), không phải Views ÷ impressions (= ERR).
+    liveCtr: views > 0 ? (productClicks / views) * 100 : 0,
     productImpressions,
     productClicks,
     ctr: productImpressions > 0 ? (productClicks / productImpressions) * 100 : 0,

@@ -173,7 +173,7 @@ describe("buildIssues", () => {
     });
     const titles = issues.map((i) => i.title);
     expect(titles).toContain("CROCS: 1 ca đã chạy chưa có số");
-    expect(titles).toContain("100% doanh số tháng đến từ một khách: CROCS");
+    expect(titles).toContain("100% GMV tháng đến từ một khách: CROCS");
     expect(titles).toContain("VERA chưa có ca nào tháng 9");
     expect(titles.some((t) => t.startsWith("Tháng sau chưa chốt kế hoạch: CROCS (nháp), VERA"))).toBe(true);
     expect(issues[0].level).toBe("bad");

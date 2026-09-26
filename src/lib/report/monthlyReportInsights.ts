@@ -1,3 +1,4 @@
+import { METRIC } from "../metricGlossary";
 import type { BrandMonthPlanSlot } from "../../types";
 import { CAMP_DAY_BUCKET_ORDER, resolveCampBucketType, type CampDayBucket, type CampOverrides } from "../campaignDays";
 import type { CreatorLivePerfRow } from "../dataraw/creatorLivePerfSlice";
@@ -119,12 +120,12 @@ export function pctChange(from: number | null | undefined, to: number | null | u
 
 export type DriverKey = "hours" | "viewsPerHour" | "gmvPerView" | "orders" | "upt" | "pricePerItem";
 export const DRIVER_LABEL: Record<DriverKey, string> = {
-  hours: "Giờ live",
-  viewsPerHour: "Lượt xem mỗi giờ",
-  gmvPerView: "GMV mỗi lượt xem",
-  orders: "Số đơn",
-  upt: "Sản phẩm mỗi đơn",
-  pricePerItem: "GMV mỗi sản phẩm"
+  hours: METRIC.liveHours,
+  viewsPerHour: METRIC.viewsPerHour,
+  gmvPerView: METRIC.gmvPerView,
+  orders: METRIC.orders,
+  upt: METRIC.upt,
+  pricePerItem: METRIC.avgPrice
 };
 
 export interface DriverBreakdown {
@@ -380,7 +381,7 @@ export interface ShopKpiProgress {
 
 /** KPI GMV cả shop brand giao (Kế Hoạch Tháng) vs GMV cả shop Shop Analytics. Tháng chưa hết thì dự kiến
  *  theo NHỊP CÙNG KỲ tháng trước (GMV tới ngày N ÷ tỷ trọng 1..N của tháng trước) — chia đều theo ngày bỏ
- *  qua camp còn ở phía trước (Pay-Day 23–25); không có tháng trước mới chia đều. */
+ *  qua camp còn ở phía trước (Pay Day 23–25); không có tháng trước mới chia đều. */
 export function shopKpiProgress(
   target: number | null | undefined,
   cur: ShopTotals | null,
@@ -461,17 +462,18 @@ export const pctTxt = (v: number, digits = 1) => `${v.toLocaleString("vi-VN", { 
 export const signed = (v: number, digits = 1) => `${v >= 0 ? "+" : "−"}${pctTxt(Math.abs(v), digits)}`;
 const dayMonth = (iso: string) => `${Number(iso.slice(8, 10))}/${iso.slice(5, 7)}`;
 
-// "GMV mỗi lượt xem" giữ nguyên chữ GMV — toLowerCase() cả chuỗi từng ra "gmv mỗi lượt xem".
-const lowerFirst = (t: string) => (/^[A-Z]{2}/.test(t) ? t : t.charAt(0).toLowerCase() + t.slice(1));
+// Tên chỉ số chuẩn (Views/giờ, UPT, Avg. price…) giữ nguyên hoa/thường giữa câu; chỉ "Giờ live" là chữ Việt.
+const lowerFirst = (t: string) => (t === METRIC.liveHours ? "giờ live" : t);
 
-export const UPT_LABEL = "Sản phẩm mỗi đơn";
-export const LIVE_CTR_LABEL = "LIVE CTR";
+export const UPT_LABEL = METRIC.upt;
+export const LIVE_CTR_LABEL = METRIC.liveCtr;
+export const PRODUCT_CTR_LABEL = METRIC.productCtr;
 
 function signalText(s: TrendSignal): string {
   const fmt = (x: number) =>
-    s.label === "CTOR" || s.label === "CTR" || s.label === LIVE_CTR_LABEL
+    s.label === METRIC.ctor || s.label === PRODUCT_CTR_LABEL || s.label === LIVE_CTR_LABEL
       ? pctTxt(x, s.label === LIVE_CTR_LABEL ? 1 : 2)
-      : s.label === "AOV"
+      : s.label === METRIC.aov
         ? `${Math.round(x / 1000).toLocaleString("vi-VN")}k đ`
         : s.label === UPT_LABEL
           ? x.toLocaleString("vi-VN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -500,9 +502,9 @@ export function autoSummary(i: NarrativeInput): string[] {
   if (gmvChg != null) {
     const hChg = pctChange(i.livePrev.hours, i.liveCur.hours);
     const ghChg = pctChange(i.livePrev.gmvPerHour, i.liveCur.gmvPerHour);
-    const parts = [hChg != null ? `giờ live ${signed(hChg)}` : null, ghChg != null ? `GMV mỗi giờ ${signed(ghChg)}` : null].filter(Boolean).join(", ");
+    const parts = [hChg != null ? `giờ live ${signed(hChg)}` : null, ghChg != null ? `GMV/giờ ${signed(ghChg)}` : null].filter(Boolean).join(", ");
     const lbl = i.window.label.charAt(0).toUpperCase() + i.window.label.slice(1);
-    out.push(`${lbl}: GMV live ${signed(gmvChg)}${parts ? ` (${parts})` : ""}.`);
+    out.push(`${lbl}: LIVE GMV ${signed(gmvChg)}${parts ? ` (${parts})` : ""}.`);
   }
 
   if (i.drivers && Math.abs(i.drivers.delta) > 0) {
@@ -527,7 +529,7 @@ export function autoSummary(i: NarrativeInput): string[] {
   if (sku) out.push(sku);
 
   if (i.campBest && i.dailyGmvPerHour && i.campBest.gmvPerHour > i.dailyGmvPerHour) {
-    out.push(`${i.campBest.label} bán ${money(i.campBest.gmvPerHour)}/giờ, gấp ${(i.campBest.gmvPerHour / i.dailyGmvPerHour).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} lần ngày thường (${money(i.dailyGmvPerHour)}/giờ).`);
+    out.push(`${i.campBest.label} bán ${money(i.campBest.gmvPerHour)}/giờ, gấp ${(i.campBest.gmvPerHour / i.dailyGmvPerHour).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} lần Daily (${money(i.dailyGmvPerHour)}/giờ).`);
   }
   return out;
 }
@@ -559,10 +561,10 @@ function basketLine(i: NarrativeInput): string | null {
   const aovChg = pctChange(i.livePrev.aov, i.liveCur.aov);
   if (aovChg == null) return null;
   const amt = (v: number) => `${v >= 0 ? "+" : "−"}${money(Math.abs(v))}`;
-  let txt = `Phía đơn hàng: số đơn ${signed(orders.change, 0)} (${amt(orders.value)}), giá trị đơn ${signed(aovChg, 0)} (${amt(aovValue)}).`;
+  let txt = `Phía đơn hàng: Orders ${signed(orders.change, 0)} (${amt(orders.value)}), AOV ${signed(aovChg, 0)} (${amt(aovValue)}).`;
   if (Math.abs(upt.change) >= 10 && Math.sign(upt.change) !== Math.sign(price.change)) {
     const uptTxt = (v: number | null) => (v ?? 0).toLocaleString("vi-VN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    txt += ` Trong giá trị đơn, sản phẩm mỗi đơn ${uptTxt(i.livePrev.upt)} → ${uptTxt(i.liveCur.upt)} (${signed(upt.change, 0)}) và GMV mỗi sản phẩm ${signed(price.change, 0)} gần như bù nhau — GMV mỗi sản phẩm ${price.change > 0 ? "tăng" : "giảm"} chủ yếu vì mỗi đơn ${upt.change < 0 ? "ít" : "nhiều"} sản phẩm hơn, không hẳn vì giá bán.`;
+    txt += ` Trong AOV, UPT ${uptTxt(i.livePrev.upt)} → ${uptTxt(i.liveCur.upt)} (${signed(upt.change, 0)}) và Avg. price ${signed(price.change, 0)} gần như bù nhau — Avg. price ${price.change > 0 ? "tăng" : "giảm"} chủ yếu vì mỗi đơn ${upt.change < 0 ? "ít" : "nhiều"} sản phẩm hơn, không hẳn vì giá bán.`;
   }
   return txt;
 }
@@ -571,17 +573,17 @@ export function autoNextSteps(i: NarrativeInput): string[] {
   const out: string[] = [];
   const upt = i.signals.find((s) => s.label === UPT_LABEL && s.direction === "down");
   if (upt) {
-    out.push(`Sản phẩm mỗi đơn giảm ${upt.streak} tháng liền — thử ưu đãi theo ngưỡng giá trị đơn hoặc combo 2 sản phẩm trên live để kéo số sản phẩm mỗi đơn lên lại.`);
+    out.push(`UPT giảm ${upt.streak} tháng liền — thử ưu đãi theo ngưỡng giá trị đơn hoặc combo 2 sản phẩm trên live để kéo UPT lên lại.`);
   }
-  const ctor = i.signals.find((s) => s.label === "CTOR" && s.direction === "down");
+  const ctor = i.signals.find((s) => s.label === METRIC.ctor && s.direction === "down");
   if (ctor) {
-    out.push(`Tỷ lệ chốt đơn (CTOR) giảm ${ctor.streak} tháng liền — rà giá, voucher và cách chốt của nhóm SKU chủ lực khi lên live${i.liveCur.ctr != null ? ` (người xem vẫn bấm sản phẩm, CTR ${pctTxt(i.liveCur.ctr, 2)})` : ""}.`);
+    out.push(`CTOR giảm ${ctor.streak} tháng liền — rà giá, voucher và cách chốt của nhóm SKU chủ lực khi lên live${i.liveCur.ctr != null ? ` (người xem vẫn bấm sản phẩm, Product CTR ${pctTxt(i.liveCur.ctr, 2)})` : ""}.`);
   }
   const vph = pctChange(i.livePrev.viewsPerHour, i.liveCur.viewsPerHour);
-  if (vph != null && vph <= -10) out.push(`Lượt xem mỗi giờ ${signed(vph, 0)} — rà lại khung giờ live và nguồn traffic trước khi chốt lịch tháng ${i.nextMonth.slice(5)}.`);
+  if (vph != null && vph <= -10) out.push(`Views/giờ ${signed(vph, 0)} — rà lại khung giờ live và nguồn traffic trước khi chốt lịch tháng ${i.nextMonth.slice(5)}.`);
   const hChg = pctChange(i.livePrev.hours, i.liveCur.hours);
   const ghChg = pctChange(i.livePrev.gmvPerHour, i.liveCur.gmvPerHour);
-  if (hChg != null && ghChg != null && hChg > 5 && ghChg <= -10) out.push(`Tăng giờ live nhưng GMV mỗi giờ giảm — ưu tiên dồn giờ vào khung giờ và ngày camp có GMV/giờ cao nhất thay vì kéo dài ca.`);
+  if (hChg != null && ghChg != null && hChg > 5 && ghChg <= -10) out.push(`Tăng giờ live nhưng GMV/giờ giảm — ưu tiên dồn giờ vào khung giờ và ngày Campaign có GMV/giờ cao nhất thay vì kéo dài ca.`);
   if (i.nextPlan) {
     out.push(`Tháng ${i.nextMonth.slice(5)}: target ${money(i.nextPlan.targetGmv)} với ${i.nextPlan.slotCount} ca kế hoạch${i.nextPlan.status === "locked" ? " (đã chốt)" : " (đang lên lịch)"}.`);
   } else {

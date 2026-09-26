@@ -153,8 +153,8 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ brands, sessions
                 <th className="py-2.5 px-4">Brand</th>
                 <th className="py-2.5 px-2">Kế hoạch tháng</th>
                 <th className="py-2.5 px-2">Cam kết</th>
-                <th className="py-2.5 px-2 text-right">Giờ live thật</th>
-                <th className="py-2.5 px-2 text-right">GMV thật</th>
+                <th className="py-2.5 px-2 text-right">Giờ live</th>
+                <th className="py-2.5 px-2 text-right">GMV</th>
                 <th className="py-2.5 px-2">Report Tháng</th>
                 <th className="py-2.5 px-2">Rate Card</th>
               </tr>

@@ -646,7 +646,7 @@ export function buildIssues(x: IssueInput): Issue[] {
     const top = [...withSales].sort((a, b) => b.outlook.actual - a.outlook.actual)[0];
     if (top && total > 0 && top.outlook.actual / total > CLIENT_CONCENTRATION_WARN) {
       const share = top.outlook.actual / total;
-      out.push({ level: share > 0.5 ? "bad" : "warn", title: `${pct(share)} doanh số tháng đến từ một khách: ${top.name}`, detail: "Mốc an toàn phổ biến của agency dịch vụ: không khách nào quá 20–25% doanh thu." });
+      out.push({ level: share > 0.5 ? "bad" : "warn", title: `${pct(share)} GMV tháng đến từ một khách: ${top.name}`, detail: "Mốc an toàn phổ biến của agency dịch vụ: không khách nào quá 20–25% doanh thu." });
     }
     const idle = x.brands.filter((b) => !b.outlook.actual && !b.outlook.pending.length).map((b) => b.name);
     if (idle.length) out.push({ level: "warn", title: `${idle.join(", ")} chưa có ca nào tháng ${Number(month.slice(5))}`, detail: "Tài khoản đang có trên hệ thống nhưng tháng này chưa chạy, cũng chưa có ca trong lịch.", action: "month_plan" });
@@ -678,7 +678,7 @@ export function buildIssues(x: IssueInput): Issue[] {
   }
   const noHost = cur.filter((s) => hostKeyOf(s) === UNASSIGNED);
   if (noHost.length) {
-    out.push({ level: "info", title: `${noHost.length} ca chưa ghi host`, detail: `${x.fmt(noHost.reduce((a, s) => a + (s.actualGmv ?? 0), 0))} doanh số chưa biết của ai, không xếp hạng được.`, action: "sessions" });
+    out.push({ level: "info", title: `${noHost.length} ca chưa ghi host`, detail: `${x.fmt(noHost.reduce((a, s) => a + (s.actualGmv ?? 0), 0))} GMV chưa biết của ai, không xếp hạng được.`, action: "sessions" });
   }
 
   const rank: Record<IssueLevel, number> = { bad: 0, warn: 1, info: 2 };

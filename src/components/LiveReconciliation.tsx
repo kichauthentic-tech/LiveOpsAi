@@ -207,7 +207,7 @@ export function LiveReconciliation({ onApplied, onOpenSession }: LiveReconciliat
                         <th className="font-bold pb-1.5 pr-3">Phiên live</th>
                         <th className="font-bold pb-1.5 pr-3">Thời gian</th>
                         <th className="font-bold pb-1.5 pr-3 text-right">GMV</th>
-                        <th className="font-bold pb-1.5 pr-3 text-right">Đơn</th>
+                        <th className="font-bold pb-1.5 pr-3 text-right">Orders</th>
                         <th className="font-bold pb-1.5 text-right">Số ca khớp</th>
                       </tr>
                     </thead>

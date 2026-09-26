@@ -200,7 +200,7 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
           </div>
         </div>
         <p className="text-[var(--text-muted)] text-xs">
-          Ads Spend/ROAS tính máy từ Report Ca ở trên; phần bổ sung và ghi chú nhập tay ở dưới (không có API TikTok Shop cho các
+          Ads cost/ROAS tính máy từ Report Ca ở trên; phần bổ sung và ghi chú nhập tay ở dưới (không có API TikTok Shop cho các
           phần này). Số lưu ở đây đi cùng Report Tháng {month} — khi report đã phát hành thì khoá, muốn sửa phải thu hồi ở Report Tháng.
         </p>
       </div>
@@ -216,17 +216,17 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
           <Target className="w-4 h-4 text-[var(--accent-text)]" /> Ads Report Chi Tiết (TikTok)
         </h3>
         <p className="text-[11px] text-[var(--text-faint)]">
-          Tính từ Ads Cost host/ops nhập trong Report Ca của các phiên TikTok Completed trong tháng, đối chiếu GMV cùng phiên để
+          Tính từ Ads cost host/ops nhập trong Report Ca của các phiên TikTok Completed trong tháng, đối chiếu GMV cùng phiên để
           ra ROAS. So sánh MoM với tháng {prevMonthStr(month)}.
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl p-3">
-            <div className="text-[11px] text-[var(--text-faint)]">Tổng Ads Spend</div>
+            <div className="text-[11px] text-[var(--text-faint)]">Tổng Ads cost</div>
             <div className="text-base font-black text-[var(--text)]">{formatCurrencyAdaptive(adsReport.totalAdsSpend)}</div>
             <MomChip current={adsReport.totalAdsSpend} previous={prevAdsReport.totalAdsSpend} />
           </div>
           <div className="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl p-3">
-            <div className="text-[11px] text-[var(--text-faint)]">GMV Các Phiên Có Ads</div>
+            <div className="text-[11px] text-[var(--text-faint)]">GMV các phiên có Ads</div>
             <div className="text-base font-black text-[var(--text)]">{formatCurrencyAdaptive(adsReport.totalGmv)}</div>
             <MomChip current={adsReport.totalGmv} previous={prevAdsReport.totalGmv} />
           </div>
@@ -236,7 +236,7 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
             <MomChip current={adsRoas} previous={prevAdsRoas} />
           </div>
           <div className="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl p-3">
-            <div className="text-[11px] text-[var(--text-faint)]">% Ads / GMV</div>
+            <div className="text-[11px] text-[var(--text-faint)]">Ads cost / GMV</div>
             <div className="text-base font-black text-[var(--text)]">{adsPctGmv != null ? `${adsPctGmv.toFixed(1)}%` : "—"}</div>
           </div>
         </div>
@@ -244,7 +244,7 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
         {adsReport.missingCount > 0 && (
           <div className="flex items-start gap-2 text-[11px] text-amber-300 bg-amber-950/60 border border-amber-800/50 rounded-xl p-2.5">
             <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
-            {adsReport.missingCount} phiên TikTok Completed trong tháng chưa nộp Report Ca (không có Ads Cost) — số Ads Spend/ROAS
+            {adsReport.missingCount} phiên TikTok Completed trong tháng chưa nộp Report Ca (không có Ads cost) — số Ads cost/ROAS
             phía trên đang thấp hơn thực tế tương ứng.
           </div>
         )}
@@ -254,7 +254,7 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
             <thead>
               <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)]">
                 <th className="py-2 px-2">Tuần (bắt đầu Thứ Hai)</th>
-                <th className="py-2 px-2 text-right">Ads Spend</th>
+                <th className="py-2 px-2 text-right">Ads cost</th>
                 <th className="py-2 px-2 text-right">GMV</th>
                 <th className="py-2 px-2 text-right">ROAS</th>
               </tr>
@@ -279,7 +279,7 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
           </table>
         </div>
         <p className="text-[10px] text-[var(--text-faint)]">
-          Shopee chưa theo dõi Ads Cost theo phiên (không có field này trong Excel gốc) — dùng ô "Ads Spend Bổ Sung" bên dưới nếu
+          Shopee chưa theo dõi Ads cost theo phiên (không có field này trong Excel gốc) — dùng ô "Ads cost bổ sung" bên dưới nếu
           cần cộng thêm chi phí Ads ngoài TikTok livestream.
         </p>
       </div>
@@ -295,14 +295,14 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="font-bold text-[var(--text-muted)] block mb-1">Ads Spend Bổ Sung (VNĐ)</label>
+              <label className="font-bold text-[var(--text-muted)] block mb-1">Ads cost bổ sung (VNĐ)</label>
               <p className="text-[10px] text-[var(--text-faint)] mb-1">
                 Chi phí Ads Shopee hoặc ads ngoài livestream, không tính được từ Report Ca (xem Ads Report Chi Tiết ở trên).
               </p>
               <input type="number" value={adsSpend} onChange={(e) => setAdsSpend(e.target.value)} disabled={readOnly} className={inputCls} />
             </div>
             <div>
-              <label className="font-bold text-[var(--text-muted)] block mb-1">ROAS (Ghi Đè Tổng, Nếu Cần)</label>
+              <label className="font-bold text-[var(--text-muted)] block mb-1">ROAS (ghi đè tổng, nếu cần)</label>
               <input type="number" step="0.1" value={roas} onChange={(e) => setRoas(e.target.value)} disabled={readOnly} className={inputCls} />
             </div>
           </div>

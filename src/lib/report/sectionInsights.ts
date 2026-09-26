@@ -1,3 +1,4 @@
+import { CHANNEL, DAY_TYPE, METRIC } from "../metricGlossary";
 import { CAMP_DAY_BUCKET_ORDER, type CampDayBucket } from "../campaignDays";
 import { formatCurrencyAdaptive } from "../formatCurrency";
 import { pctChange, pctTxt, signed, type CampCompareRow, type ChannelMix, type LiveStats, type ShopTotals, type SkuMove, type SkuMoves } from "./monthlyReportInsights";
@@ -40,10 +41,10 @@ const median = (xs: number[]) => {
 // ---------- 3. Toàn shop & kênh ----------
 
 const CHANNELS: { key: "liveLinked" | "affiliate" | "video" | "card"; label: string }[] = [
-  { key: "liveLinked", label: "LIVE tài khoản shop" },
-  { key: "affiliate", label: "LIVE affiliate" },
-  { key: "video", label: "Video" },
-  { key: "card", label: "Thẻ sản phẩm" }
+  { key: "liveLinked", label: CHANNEL.sellerLive },
+  { key: "affiliate", label: CHANNEL.affiliateLive },
+  { key: "video", label: CHANNEL.video },
+  { key: "card", label: CHANNEL.productCard }
 ];
 
 export interface ShopInsightInput {
@@ -70,7 +71,7 @@ export function shopInsight(i: ShopInsightInput): SectionInsight | null {
   const aPrev = n > 1 ? agencyShare(n - 2) : null;
   const shopChg = i.shopPrev ? pctChange(i.shopPrev.gmv, i.shopCur.gmv) : null;
   const headline =
-    `GMV cả shop ${money(i.shopCur.gmv)}${shopChg != null ? ` (${signed(shopChg)}, ${i.windowLabel})` : ""}` +
+    `Total GMV ${money(i.shopCur.gmv)}${shopChg != null ? ` (${signed(shopChg)}, ${i.windowLabel})` : ""}` +
     (aCur != null ? `; agency live chiếm ${pctTxt(aCur)}${aPrev != null ? ` (${prevLabel}: ${pctTxt(aPrev)})` : ""}.` : ".");
 
   const points: string[] = [];
@@ -90,14 +91,14 @@ export function shopInsight(i: ShopInsightInput): SectionInsight | null {
   }
   const refundDelta = prev?.refundRate != null && cur.refundRate != null ? cur.refundRate - prev.refundRate : null;
   if (cur.refundRate != null && (cur.refundRate >= 15 || (refundDelta != null && Math.abs(refundDelta) >= 2))) {
-    points.push(`Hoàn / GMV ${pctTxt(cur.refundRate)}${prev?.refundRate != null ? ` (${prevLabel}: ${pctTxt(prev.refundRate)})` : ""}.`);
+    points.push(`Refund rate ${pctTxt(cur.refundRate)}${prev?.refundRate != null ? ` (${prevLabel}: ${pctTxt(prev.refundRate)})` : ""}.`);
   }
 
   const action =
     affiliateDelta != null && affiliateDelta <= -1
-      ? "Tỷ trọng LIVE affiliate giảm — rà lịch creator và gói hỗ trợ affiliate cho tháng sau."
+      ? "Tỷ trọng Affiliate LIVE giảm — rà lịch creator và gói hỗ trợ affiliate cho tháng sau."
       : refundDelta != null && refundDelta >= 2
-        ? "Tỷ lệ hoàn tăng — kiểm lý do hoàn của nhóm SKU chủ lực trước khi đẩy thêm traffic."
+        ? "Refund rate tăng — kiểm lý do hoàn của nhóm SKU chủ lực trước khi đẩy thêm traffic."
         : null;
   return { headline, points, action };
 }
@@ -109,7 +110,7 @@ const STAGE_ACTION: Record<Stage, string> = {
   viewsPerHour: "Điểm nghẽn ở traffic — rà khung giờ live, ảnh bìa/tiêu đề phiên và ngân sách đẩy live.",
   liveCtr: "Điểm nghẽn ở bước bấm sản phẩm — ghim sản phẩm và nhắc bấm giỏ thường xuyên hơn trong live.",
   ctor: "Điểm nghẽn ở bước chốt đơn — rà giá, voucher và cách chốt của nhóm SKU chủ lực.",
-  upt: "Điểm nghẽn ở giỏ hàng — thử combo hoặc ưu đãi theo ngưỡng giá trị đơn để kéo số sản phẩm mỗi đơn."
+  upt: "Điểm nghẽn ở giỏ hàng — thử combo hoặc ưu đãi theo ngưỡng giá trị đơn để kéo UPT lên."
 };
 
 /** GMV/giờ = lượt xem/giờ × GMV/lượt xem (đúng tích) ⇒ tách được phần traffic và phần chuyển đổi; rồi
@@ -128,17 +129,17 @@ export function whyInsight(prev: LiveStats, cur: LiveStats): SectionInsight | nu
       : Math.abs(lv) >= Math.abs(lg)
         ? `traffic kéo ${dir}, chuyển đổi bù một phần`
         : `chuyển đổi kéo ${dir}, traffic bù một phần`;
-  const headline = `GMV mỗi giờ ${signed(gh, 0)}: lượt xem mỗi giờ ${signed(vph, 0)}, GMV mỗi lượt xem ${signed(gpv, 0)} — ${verdict}.`;
+  const headline = `GMV/giờ ${signed(gh, 0)}: Views/giờ ${signed(vph, 0)}, GMV/View ${signed(gpv, 0)} — ${verdict}.`;
 
   const points: string[] = [];
   const stage = (label: string, a: number | null, b: number | null, fmt: (v: number) => string) => {
     const c = pctChange(a, b);
     if (a != null && b != null && c != null) points.push(`${label}: ${fmt(a)} → ${fmt(b)} (${signed(c, 0)}).`);
   };
-  stage("Bấm sản phẩm (LIVE CTR)", prev.liveCtr, cur.liveCtr, (v) => pctTxt(v));
-  stage("Chốt đơn (CTOR)", prev.ctor, cur.ctor, (v) => pctTxt(v, 2));
-  stage("Sản phẩm mỗi đơn", prev.upt, cur.upt, dec2);
-  stage("Giá trị đơn (AOV)", prev.aov, cur.aov, (v) => `${Math.round(v / 1000).toLocaleString("vi-VN")}k đ`);
+  stage(METRIC.liveCtr, prev.liveCtr, cur.liveCtr, (v) => pctTxt(v));
+  stage(METRIC.ctor, prev.ctor, cur.ctor, (v) => pctTxt(v, 2));
+  stage(METRIC.upt, prev.upt, cur.upt, dec2);
+  stage(METRIC.aov, prev.aov, cur.aov, (v) => `${Math.round(v / 1000).toLocaleString("vi-VN")}k đ`);
 
   const changes: [Stage, number | null][] = [
     ["viewsPerHour", vph],
@@ -226,7 +227,7 @@ export function peopleInsight(hosts: HostInsightRow[], minHours = 6): SectionIns
   const action = under
     ? `Cân nhắc thêm ca cho ${under.name} (${signed(peer.get(under.name)!.vsPeer!, 0)} so với mặt bằng, mới live ${under.hours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h).`
     : worst && worstGap <= -15
-      ? `Xem lại khung ca và nhóm SKU của ${worst.name} — GMV mỗi giờ thấp hơn mặt bằng cùng loại ngày ${pctTxt(Math.abs(worstGap), 0)}.`
+      ? `Xem lại khung ca và nhóm SKU của ${worst.name} — GMV/giờ thấp hơn mặt bằng cùng loại ngày ${pctTxt(Math.abs(worstGap), 0)}.`
       : null;
   return { headline, points, action };
 }
@@ -268,8 +269,8 @@ export function productsInsight(skus: SkuMoves | null, promo: { name: string; gm
     withFunnel.length >= 5 && mCtr != null && mCtor != null
       ? withFunnel.filter((r) => r.ctr! >= mCtr && r.ctor! <= mCtor * 0.85).sort((a, b) => a.ctor! - b.ctor!)[0]
       : undefined;
-  if (leaky) points.push(`${shortSku(leaky.name)} được bấm nhiều (CTR ${pctTxt(leaky.ctr!, 2)}) nhưng chốt thấp (CTOR ${pctTxt(leaky.ctor!, 2)}, trung vị top ${skus.rows.length}: ${pctTxt(mCtor!, 2)}).`);
-  if (promo && promo.gmv > 0) points.push(`Khuyến mãi mang GMV cao nhất: ${promo.name} (${money(promo.gmv)}, ${promo.orders.toLocaleString("vi-VN")} đơn).`);
+  if (leaky) points.push(`${shortSku(leaky.name)} được bấm nhiều (Product CTR ${pctTxt(leaky.ctr!, 2)}) nhưng chốt thấp (CTOR ${pctTxt(leaky.ctor!, 2)}, trung vị top ${skus.rows.length}: ${pctTxt(mCtor!, 2)}).`);
+  if (promo && promo.gmv > 0) points.push(`Khuyến mãi mang GMV cao nhất: ${promo.name} (${money(promo.gmv)}, ${promo.orders.toLocaleString("vi-VN")} orders).`);
 
   const f = fallersAll[0];
   const action = f
@@ -284,7 +285,7 @@ export function productsInsight(skus: SkuMoves | null, promo: { name: string; gm
 
 // ---------- 7. Bối cảnh ----------
 
-const CAMP_SHORT: Record<CampDayBucket, string> = { dday: "D-Day", midmonth: "Mid-Month", payday: "Pay-Day", daily: "Ngày thường" };
+const CAMP_SHORT: Record<CampDayBucket, string> = { dday: "D-Day", midmonth: "Mid-Month", payday: "Pay Day", daily: DAY_TYPE.daily };
 
 export interface SlotInsightRow {
   label: string;
@@ -302,8 +303,8 @@ export function contextInsight(camps: CampCompareRow[], slots: SlotInsightRow[])
   const dChg = daily ? pctChange(daily.prev.gmv, daily.cur.gmv) : null;
   const headline =
     [
-      dChg != null ? `Ngày thường ${signed(dChg)} GMV so với cùng kỳ tháng trước` : null,
-      withPrev.length ? `${up}/${withPrev.length} khung camp đã chạy tăng GMV so với cùng khung tháng trước` : null
+      dChg != null ? `Daily ${signed(dChg)} GMV so với cùng kỳ tháng trước` : null,
+      withPrev.length ? `${up}/${withPrev.length} khung Campaign đã chạy tăng GMV so với cùng khung tháng trước` : null
     ]
       .filter(Boolean)
       .join("; ") + ".";
@@ -331,7 +332,7 @@ export function contextInsight(camps: CampCompareRow[], slots: SlotInsightRow[])
     .filter((x): x is { r: CampCompareRow; h: number } => x.h != null && x.h <= -10)
     .sort((a, b) => a.h - b.h)[0];
   const action = worstCamp
-    ? `Xem lại cách chạy ${worstCamp.r.key === "daily" ? "ngày thường" : CAMP_SHORT[worstCamp.r.key]}: GMV mỗi giờ ${signed(worstCamp.h, 0)} so với cùng ${worstCamp.r.key === "daily" ? "kỳ" : "khung"} tháng trước.`
+    ? `Xem lại cách chạy ${worstCamp.r.key === "daily" ? DAY_TYPE.daily : CAMP_SHORT[worstCamp.r.key]}: GMV/giờ ${signed(worstCamp.h, 0)} so với cùng ${worstCamp.r.key === "daily" ? "kỳ" : "khung"} tháng trước.`
     : bestSlot && worstSlot && bestSlot !== worstSlot && worstSlot.cur.gmvPerHour! <= bestSlot.cur.gmvPerHour! * 0.8
       ? `Cân nhắc dời bớt ca ${worstSlot.label.toLowerCase()} sang ${bestSlot.label.toLowerCase()}.`
       : null;

@@ -238,8 +238,8 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
               <thead>
                 <tr className="text-left text-[var(--text-muted)] border-b border-[var(--border)]">
                   <th className="py-2 pr-3">Phiên</th>
-                  <th className="py-2 pr-3">GMV Thật</th>
-                  <th className="py-2 pr-3">Doanh Thu Agency</th>
+                  <th className="py-2 pr-3">GMV</th>
+                  <th className="py-2 pr-3">Doanh thu agency</th>
                   <th className="py-2 pr-3">Chi Phí Studio</th>
                   <th className="py-2 pr-3">Chi Phí Ads (điều chỉnh — để 0 nếu dùng số trợ live báo cáo)</th>
                   <th className="py-2 pr-3">Trả Host / Trợ Live</th>

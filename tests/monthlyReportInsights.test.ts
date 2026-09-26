@@ -123,7 +123,7 @@ test("bản nháp tóm tắt + việc tháng sau nêu đúng số và đúng ngu
   expect(summary).toContain("67,5% tổng shop");
   expect(summary).toContain("1–22/09 so với 1–22/08");
   expect(summary).toContain("−18,4%");
-  expect(summary).toMatch(/Phần lớn mức giảm đến từ lượt xem mỗi giờ/);
+  expect(summary).toMatch(/Phần lớn mức giảm đến từ Views\/giờ/);
   expect(summary).toContain("CTOR giảm 4 tháng liên tiếp");
   expect(summary).toContain("D-Day");
   const next = autoNextSteps(input).join("\n");
@@ -165,12 +165,12 @@ test("tách phía giỏ hàng: 3 phần cộng đúng ΔGMV; CROCS T8 tăng ch�
     nextMonth: "2026-09",
     nextPlan: null
   }).join("\n");
-  expect(summary).toContain("số đơn +10%");
-  expect(summary).toContain("giá trị đơn +3%");
-  expect(summary).toContain("sản phẩm mỗi đơn 1,43 → 1,18 (−17%)");
+  expect(summary).toContain("Orders +10%");
+  expect(summary).toContain("AOV +3%");
+  expect(summary).toContain("UPT 1,43 → 1,18 (−17%)");
   expect(summary).toContain("gần như bù nhau");
-  // Không được kết luận "GMV tăng nhờ GMV mỗi sản phẩm" dù đó là phần lớn nhất trong 3 phần.
-  expect(summary).not.toMatch(/GMV mỗi sản phẩm là phần/);
+  // Không được kết luận "GMV tăng nhờ Avg. price" dù đó là phần lớn nhất trong 3 phần.
+  expect(summary).not.toMatch(/Avg\. price là phần/);
 });
 
 test("UPT CROCS giảm 4 tháng liền ⇒ báo xu hướng + gợi ý việc tháng sau", () => {
@@ -180,7 +180,7 @@ test("UPT CROCS giảm 4 tháng liền ⇒ báo xu hướng + gợi ý việc th
     month: "2026-09", window: compareWindow("2026-09", "2026-09-22"), shopCur: null, shopPrev: null, liveCur: t9, livePrev: t8,
     drivers: null, basket: null, signals: [upt], targetGmv: null, campBest: null, dailyGmvPerHour: null, nextMonth: "2026-10", nextPlan: null
   };
-  expect(autoSummary(input).join("\n")).toContain("Sản phẩm mỗi đơn giảm 4 tháng liên tiếp: 1,76 → 1,43 → 1,18 → 1,06");
+  expect(autoSummary(input).join("\n")).toContain("UPT giảm 4 tháng liên tiếp: 1,76 → 1,43 → 1,18 → 1,06");
   expect(autoNextSteps(input).join("\n")).toContain("combo 2 sản phẩm");
 });
 
@@ -245,7 +245,7 @@ test("KPI cả shop: tháng đủ so thẳng (deck Crocs T8 9,1 tỷ vs KPI 8,4 
   expect(full.partial).toBe(false);
   expect(full.pct).toBeCloseTo(108.33, 1);
   expect(full.projected).toBe(9_100_000_000);
-  // T9 tới 22/09 = 5,21 tỷ; T8 1–22 = 6,75 tỷ trên cả tháng 9,1 tỷ ⇒ còn ~26% GMV nằm ở 9 ngày cuối (có Pay-Day).
+  // T9 tới 22/09 = 5,21 tỷ; T8 1–22 = 6,75 tỷ trên cả tháng 9,1 tỷ ⇒ còn ~26% GMV nằm ở 9 ngày cuối (có Pay Day).
   const sep = shopKpiProgress(8_000_000_000, shop(5_210_000_000, "2026-09-22"), 30, { toDay: 6_750_000_000, total: 9_100_000_000 })!;
   expect(sep.partial).toBe(true);
   expect(sep.method).toBe("prev");

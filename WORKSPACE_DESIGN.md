@@ -2,6 +2,11 @@
 
 ## CẦN LÀM NGAY khi mở phiên mới (cập nhật 2026-09-24)
 
+> **MỚI 2026-09-26 (chiều) — Chuẩn hoá tên chỉ số toàn app theo deck report + TikTok** (không migration, đã commit + push lên `main`
+> 2026-09-26). Một chỉ số một tên ở mọi report/chart: từ điển `src/lib/metricGlossary.ts` + test canh
+> `tests/metricGlossary.test.ts` chặn tên cũ quay lại. Sửa 3 chỗ tên sai nghĩa (Report Tuần "CTR live" thực là ERR; form ca
+> "AVG.price" thực là AOV; "GPM" thực là Watch GPM). Xem mục `## Chuẩn hoá tên chỉ số`.
+
 > **MỚI 2026-09-26 — Report Tháng thêm các góc nhìn lấy từ deck report tháng 8 của Crocs** (UPT/giỏ hàng, LIVE CTR,
 > camp so camp tháng trước + target từ Kế Hoạch Tháng, phân bổ tháng sau theo camp, Top SKU có hạng + phễu, khung
 > Insight đầu phần 3–7, migration **0121 đã chạy + verify**, KPI GMV cả shop ở Kế Hoạch Tháng — migration **0122 đã chạy + verify**). Code
@@ -861,6 +866,8 @@ Bảng/hàm: `session_live_snapshots` + `session_live_snapshot_rows`, RPC `apply
 - **Lỗi từ supabase-js KHÔNG phải `instanceof Error`** — `PostgrestError` là object thường `{message, details, hint, code}`, nên `e instanceof Error ? e.message : String(e)` rơi vào `String()` và hiện đúng chữ `[object Object]` trên màn hình, nuốt mất thông tin chẩn đoán duy nhất. Mọi chỗ bắt lỗi của tầng dữ liệu phải đi qua `errorMessage()` ([src/lib/errorMessage.ts](src/lib/errorMessage.ts)).
 - **`brand_dataraw_imports` chỉ được 1 batch/`brand_id`+`report_type`+tháng của `period_start`** (unique index `idx_brand_dataraw_imports_brand_type_month`, migration 0077 — khớp `monthKey()`/`findExistingImportForMonth()` trong `lib/db/brandDataRaw.ts`). **Lịch sử đáng nhớ:** bản 0077 commit 2026-09-17 viết câu tạo index không ép kiểu nên không chạy được (xem quy ước `date_trunc` ở trên); chạy lại bản đã sửa trên Supabase thật ngày 2026-09-18 trả về `CREATE INDEX` — tức là **từ 2026-09-08 tới 2026-09-18 index này chưa từng tồn tại**, chống-trùng-batch Dataraw chỉ có ở tầng app suốt thời gian đó. Từ giờ mới có hàng rào DB thật.
 
+- **Tên chỉ số trên report/chart/bảng/Excel lấy từ `src/lib/metricGlossary.ts` (`METRIC`, `CHANNEL`, `DAY_TYPE`) — không tự đặt tên mới.** Chỉ số chưa có trong từ điển thì thêm vào đó trước (kèm `METRIC_HINT` công thức), rồi mới dùng. Nhãn hiển thị gắn `title={metricHint(label)}` để di chuột thấy công thức. Regex khớp cột file TikTok (`findCol`/`colAt`/`key: /^...$/`) giữ nguyên chữ gốc TikTok, không đổi theo từ điển. `tests/metricGlossary.test.ts` quét `src/` — thêm tên cũ mới phát hiện vào `BANNED`.
+
 ## Rà soát UX/workflow theo module (bắt đầu 2026-09-13)
 
 Mục tiêu: app hiện đúng chức năng nhưng chưa tiện lợi cho vận hành thật — rà từng cụm module (theo nhóm nav), audit hiện trạng bằng đọc code thật, tìm điểm nghẽn, rồi sửa dần. Không đợi tái cấu trúc data ở trên xong mới làm — 2 việc độc lập.
@@ -1364,6 +1371,45 @@ Quét lại toàn bộ `pg_policy` sau 0111: **0 policy** còn khuôn hở. Ch�
 - Trigger `handle_new_user`: **đúng** — `on_auth_user_created` enabled trên `auth.users`, định nghĩa hàm xác nhận không còn đọc `raw_user_meta_data->>'role'`, luôn insert `role = 'talent'`. Lỗ 1 coi như đã đóng.
 - 11 policy: **chỉ 3/10 được vá** (`brands_read_scoped`, `live_sessions_read_no_brand`, `session_skus_read_published`) — **7 policy vẫn hở y như trước**: `brand_skus_read_scoped`, `promo_schemes_read_scoped`, `recurring_shift_templates_read_scoped`, `shift_slots_read_scoped`, `live_session_reports_read_no_brand`, `session_checklist_items_read_no_brand`, `session_minute_metrics_read_no_brand`. Trớ trêu: `live_session_reports` chính là bảng 0111 dùng làm ví dụ đo được lỗ hổng trong comment của nó. Đã kiểm cả 7 đều khớp đúng điều kiện lọc mà vòng lặp DO của 0111 dùng (`polcmd='r'`, `polpermissive`, `polroles='{0}'`/`to public`) — **không rõ vì sao vòng lặp lại bỏ sót đúng 7 dòng này lúc chạy**, nghi liên quan sự cố đánh số/2 phiên song song mà chính 0111 đã ghi lại, nhưng không truy thêm vì không giúp gì cho việc vá. **Bài học: "đã chạy migration" không đồng nghĩa "migration làm đúng những gì comment nói" — vòng lặp DO quét theo text/thuộc tính rất dễ bỏ sót âm thầm không báo lỗi, phải tự `pg_policy` đếm lại sau khi chạy, không tin comment.**
 - **Migration 0112** (`0112_null_role_guard_missed_policies.sql`) vá trực tiếp đúng 7 policy còn hở bằng cách chỉ định rõ tên (không dùng lại bộ lọc quét theo text), giữ nguyên ý nghĩa gốc từng policy, chỉ bọc thêm `(select current_user_role()) is not null`. **ĐÃ CHẠY + verify 2026-09-23**: quét lại `pg_policy` toàn `public` tìm policy "is distinct from" thiếu "is not null" → **0 dòng**. Lỗ 2 coi như đã đóng thật.
+
+## Chuẩn hoá tên chỉ số — XONG + VERIFY 2026-09-26 (không migration)
+
+User yêu cầu: đưa từ ngữ/tên chỉ số trên app về thuật ngữ chuyên ngành, tham khảo các report đã có. **User chốt:** (1) tên chỉ số
+giữ tiếng Anh như deck/TikTok, tiêu đề phần + insight + chú thích tiếng Việt; (2) áp dụng TOÀN app (cả Bản Tin CEO, Sổ Ca,
+cửa sổ ca, Hiệu Suất Host, Hỗ Trợ Vận Hành…); (3) Views ÷ LIVE impressions gọi là **ERR**; (4) thực đạt ÷ target luôn là
+**% Target**, "Run-rate" chỉ dùng cho nhịp tiến độ dùng để dự phóng (Report Tháng/Tuần, Hỗ Trợ Vận Hành, Bản Tin CEO).
+
+**Nguồn chuẩn:** deck T8 Crocs/Jockey/Franklin/VERA (`~/Downloads/*Report Monthly*`) + header gốc file TikTok. Định nghĩa đã đối
+chiếu bằng số thật (file Creator-Live-Performance CROCS 08, ca 01/08): Tap-through rate 1,77% = Views 7.396 ÷ Impressions
+417.199; LIVE CTR 48,15% = Product clicks 3.561 ÷ Views; CTR 2,77% = clicks ÷ Product impressions; CTOR = Orders ÷ clicks.
+Deck Crocs T8: LIVE CTR 55,89% ≈ clicks/views, ERR 2,37% = views/impr → sau khi sửa, MoM Key Metrics app ra 55,98% / 2,40%.
+
+**Bảng tên chuẩn** (`METRIC` trong `metricGlossary.ts`): GMV · Total GMV (cả shop) · LIVE GMV (agency) · Direct/Indirect/
+Attributed GMV · KPI GMV (shop, brand giao) · Target GMV (live) · % Target · NMV · Orders · SKU orders · Items sold ·
+Sessions · Giờ live · GMV/giờ · Views · Views/giờ · LIVE impressions · Product impressions · Product clicks · AOV (GMV÷Orders)
+· UPT (Items÷Orders) · Avg. price (GMV÷Items) · ERR · LIVE CTR · Product CTR · CTOR · CVR (Orders÷Views) · GMV/View · Show
+GPM · Watch GPM · Refund rate (Refunds÷GMV thực) · Tỷ lệ hoàn hủy (giả định Rate Card) · ROAS · Ads cost. Kênh: Seller LIVE ·
+Affiliate LIVE · Video · Product card. Loại ngày: Daily · Campaign (D-Day, Mid-Month, **Pay Day** — bỏ "Pay-Day").
+Mục lục Report Tháng: Tóm tắt · Target & tiến độ · Sales Channel · Key Metrics · Host Performance · Sản phẩm · Campaign & khung
+giờ · Target Plan tháng sau (sheet Excel đổi tên theo).
+
+**Lỗi tên-sai-nghĩa đã sửa (không chỉ đổi chữ):**
+- Report Tuần: ô "CTR live" tính Views ÷ impressions (~2,4%) → giờ hiện `ERR 2,35% · LIVE CTR 58,7% · Product CTR 3,52%`.
+- `creatorLivePerfMetrics.ts` agg `liveCtr` = views/impr → tách `err` + `liveCtr` (= clicks/views); `sessionsLivePerf.ts` row
+  `liveCtr` đổi về clicks/views cho cùng nghĩa cột file TikTok. MoM Key Metrics thêm dòng ERR.
+- Form ca (`SessionReportForm`): "AVG.price" là GMV÷Orders → nhãn **AOV**; "GPM" tính GMV/1000 views → **Watch GPM**.
+- Affiliate (trang + phụ lục Report Tháng): ô "CTR" nhập tay đang lưu 44–62% (DB `brand_affiliate_actuals` T9) = **LIVE CTR** như
+  deck Crocs → đổi nhãn, không phải Product CTR.
+- Hỗ Trợ Vận Hành: công thức "GMV = view × CTR × CVR × AOV" sai → "GMV = Views × CVR × AOV (CVR = LIVE CTR × CTOR)".
+- Report Tháng "Top 10 phiên" ghi theo GMV/giờ nhưng sắp theo GMV → tiêu đề "theo GMV".
+
+**Verify:** `tsc` sạch · ESLint 41 cảnh báo = đúng mức trước khi sửa · `vitest` 93/93 (cập nhật chữ kỳ vọng ở 3 file test
+insight + test mới) · `vite build` pass · browser thật (dev server cổng 3100, phiên admin sẵn có): Report Tháng CROCS T9 đủ 8
+phần + phụ lục, Report Tuần, Affiliate (tooltip công thức hiện đúng), Bản Tin CEO — 0 lỗi console. `summary_text`/`section_notes`
+trong DB đang rỗng nên mọi câu insight tự sinh ra chữ mới ngay; đoạn ops sửa tay về sau giữ nguyên chữ họ viết.
+
+**Còn lại / chưa đụng:** màn thao tác nội bộ giữ từ vận hành tiếng Việt khi không phải tên chỉ số ("Ca", "Giờ" = khung giờ, "Số
+Ca" ở lịch/đăng ký, engine AI Training); Talent Pool trường cũ `cvrAvg`/`ctrAvg` (nhập tay, chưa rõ định nghĩa) chỉ đổi nhãn nhẹ.
 
 ## Report Tháng 8 phần — XONG + VERIFY 2026-09-25 (migration 0120 ĐÃ CHẠY)
 

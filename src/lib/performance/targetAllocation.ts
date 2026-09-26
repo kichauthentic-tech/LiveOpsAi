@@ -11,7 +11,7 @@ import { CampDayBucket, CampOverrides, CAMP_DAY_BUCKET_ORDER, resolveCampBucketT
 //
 // Mô hình đúng (đã có sẵn ở Tab 05 "Kế Hoạch Tháng Sau", chỉ chưa nối xuống từng ca):
 //   1. Tháng có 1 tổng target GMV.
-//   2. Tổng chia cho 4 khung: Daily / D-Day / Mid-Month / Pay-Day theo % — % gợi ý từ lịch sử
+//   2. Tổng chia cho 4 khung: Daily / D-Day / Mid-Month / Pay Day theo % — % gợi ý từ lịch sử
 //      ("ngày 13-15 các tháng trước thường kiếm bao nhiêu % tháng đó"), ops sửa được rồi lưu.
 //   3. Target của mỗi khung chia cho các ca CHƯA HUỶ trong khung, theo giờ ca kế hoạch.
 //

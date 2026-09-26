@@ -5,6 +5,7 @@ import { AffiliateLiveSessionRow, fetchAffiliateLiveSessions } from "../../lib/d
 import { errorMessage } from "../../lib/errorMessage";
 import { downloadRowsAsXlsx } from "../../lib/exportXlsx";
 import { Database, Download, Loader2, Plus, Save, Trash2, Users } from "lucide-react";
+import { metricHint } from "../../lib/metricGlossary";
 
 // Trang Affiliate (2026-09-22) — tách RIÊNG khỏi form Report Tháng theo yêu cầu ops. Bảng dựng
 // theo đúng file phân tích ops đang dùng: mỗi PHIÊN LIVE là 1 CỘT, mỗi chỉ số là 1 DÒNG, các cột
@@ -192,20 +193,20 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
         "Campaign Type": e.campaignType ?? "",
         "Ngày Live": e.liveDateLabel ?? "",
         "Timeline": e.timelineLabel ?? "",
-        "Target": e.targetGmv ?? "",
+        "Target GMV": e.targetGmv ?? "",
         "Direct GMV": e.directGmv ?? "",
-        "Duration (h)": e.durationHours ?? "",
-        "GMV/Giờ": e.directGmv && e.durationHours ? Math.round(e.directGmv / e.durationHours) : "",
+        "Giờ live": e.durationHours ?? "",
+        "GMV/giờ": e.directGmv && e.durationHours ? Math.round(e.directGmv / e.durationHours) : "",
         "% Target": e.directGmv && e.targetGmv ? Math.round((e.directGmv / e.targetGmv) * 10000) / 100 : "",
-        "Live Impressions": e.liveImpressions ?? "",
-        "CTR": e.ctr ?? "",
+        "LIVE impressions": e.liveImpressions ?? "",
+        "LIVE CTR": e.ctr ?? "",
         "CTOR": e.ctor ?? "",
-        "Ads Cost": e.adsCost ?? "",
+        "Ads cost": e.adsCost ?? "",
         "ROAS": e.directGmv && e.adsCost ? Math.round((e.directGmv / e.adsCost) * 10) / 10 : "",
-        "Đơn": e.orders ?? "",
-        "SP Bán": e.itemsSold ?? "",
-        "Giá TB": e.avgPrice ?? "",
-        "Viewer": e.viewer ?? ""
+        "Orders": e.orders ?? "",
+        "Items sold": e.itemsSold ?? "",
+        "Avg. price": e.avgPrice ?? "",
+        "Viewers": e.viewer ?? ""
       })),
       `Affiliate_${brandName}_${fromMonth}_${toMonth}.xlsx`.replace(/\s+/g, "_")
     );
@@ -341,7 +342,9 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
   // luôn ký tự sau. Gọi như hàm thì JSX nội tuyến vào cây cha, DOM giữ nguyên qua các lần render.
   const metricRow = (label: string, render: (e: Row, label: string) => React.ReactNode, className?: string) => (
     <tr key={label} className={`border-t border-[var(--border)] ${className ?? ""}`}>
-      <td className={labelCls}>{label}</td>
+      <td className={labelCls} title={metricHint(label)}>
+        {label}
+      </td>
       {flatColumns.map((e) => (
         <td key={e._key} className={cellCls}>
           {render(e, label)}
@@ -499,24 +502,24 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
               {metricRow("Creator", (e, label) => textInput(e, label, "creatorName"), "font-bold")}
               {metricRow("Day", (e, label) => textInput(e, label, "liveDateLabel"), "bg-emerald-50/60 font-semibold")}
               {metricRow("Timeline", (e, label) => textInput(e, label, "timelineLabel"))}
-              {metricRow("Target", (e, label) => numInput(e, label, "targetGmv", fmtInt), "bg-[var(--surface-elevated)] font-bold")}
+              {metricRow("Target GMV", (e, label) => numInput(e, label, "targetGmv", fmtInt), "bg-[var(--surface-elevated)] font-bold")}
               {metricRow("Direct GMV", (e, label) => numInput(e, label, "directGmv", fmtInt), "text-red-600 font-bold")}
-              {metricRow("Duration", (e, label) => numInput(e, label, "durationHours", (n) => fmtNum(n, 1)))}
-              {metricRow("GMV per hour", (e) => <span>{e.directGmv && e.durationHours ? fmtInt(e.directGmv / e.durationHours) : "—"}</span>)}
+              {metricRow("Giờ live", (e, label) => numInput(e, label, "durationHours", (n) => fmtNum(n, 1)))}
+              {metricRow("GMV/giờ", (e) => <span>{e.directGmv && e.durationHours ? fmtInt(e.directGmv / e.durationHours) : "—"}</span>)}
               {metricRow(
-                "Target Completion %",
+                "% Target",
                 (e) => <span>{e.directGmv && e.targetGmv ? fmtPct((e.directGmv / e.targetGmv) * 100) : "—"}</span>,
                 "bg-emerald-600/90 text-white font-bold"
               )}
-              {metricRow("Live impressions", (e, label) => numInput(e, label, "liveImpressions", fmtInt))}
-              {metricRow("CTR", (e, label) => numInput(e, label, "ctr", (n) => fmtPct(n)))}
+              {metricRow("LIVE impressions", (e, label) => numInput(e, label, "liveImpressions", fmtInt))}
+              {metricRow("LIVE CTR", (e, label) => numInput(e, label, "ctr", (n) => fmtPct(n)))}
               {metricRow("CTOR", (e, label) => numInput(e, label, "ctor", (n) => fmtPct(n)))}
               {metricRow("Ads cost", (e, label) => numInput(e, label, "adsCost", fmtInt))}
               {metricRow("ROAS", (e) => <span>{e.directGmv && e.adsCost ? fmtNum(e.directGmv / e.adsCost, 1) : "—"}</span>)}
-              {metricRow("Order", (e, label) => numInput(e, label, "orders", fmtInt))}
-              {metricRow("Item sold", (e, label) => numInput(e, label, "itemsSold", fmtInt))}
-              {metricRow("AVG.price", (e, label) => numInput(e, label, "avgPrice", fmtInt))}
-              {metricRow("Viewer", (e, label) => numInput(e, label, "viewer", fmtInt))}
+              {metricRow("Orders", (e, label) => numInput(e, label, "orders", fmtInt))}
+              {metricRow("Items sold", (e, label) => numInput(e, label, "itemsSold", fmtInt))}
+              {metricRow("Avg. price", (e, label) => numInput(e, label, "avgPrice", fmtInt))}
+              {metricRow("Viewers", (e, label) => numInput(e, label, "viewer", fmtInt))}
               {canManage && (
                 <tr className="border-t border-[var(--border)]">
                   <td className={labelCls} />

@@ -108,11 +108,11 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
               <p className="text-xs font-bold text-emerald-300">{fmtVnd(session.actualGmv ?? 0)}</p>
             </div>
             <div className="bg-[var(--surface-base)] rounded-lg py-1.5">
-              <p className="text-[10px] text-[var(--text-faint)]">Đơn</p>
+              <p className="text-[10px] text-[var(--text-faint)]">Orders</p>
               <p className="text-xs font-bold text-[var(--text)]">{(session.totalOrders ?? 0).toLocaleString("vi-VN")}</p>
             </div>
             <div className="bg-[var(--surface-base)] rounded-lg py-1.5">
-              <p className="text-[10px] text-[var(--text-faint)]">Lượt xem</p>
+              <p className="text-[10px] text-[var(--text-faint)]">Views</p>
               <p className="text-xs font-bold text-[var(--text)]">{(session.totalViews ?? 0).toLocaleString("vi-VN")}</p>
             </div>
           </div>

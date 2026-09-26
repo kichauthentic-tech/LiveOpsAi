@@ -293,7 +293,7 @@ export interface LiveSessionReport {
   adsCost?: number;
   enterRoomRate?: number; // ERR (%)
   ctor?: number; // CTOR (%)
-  avgOrderValue?: number; // AVG.price
+  avgOrderValue?: number; // AOV = GMV ÷ Orders (form cũ ghi nhầm "AVG.price")
   // Shopee
   atcCount?: number;
   gpm?: number;
@@ -321,7 +321,7 @@ export interface BrandMonthlyReport {
   customerInsightNotes?: string;
   accountHealthNotes?: string;
   // Kế hoạch tháng sau (migration 0065, Tab 05 Report Tháng) — target GMV/giờ tổng + % phân bổ
-  // theo khung camp (Daily/D-Day/Mid-Month/Pay-Day), nhập tay bởi ops (client gợi ý % mặc định
+  // theo khung camp (Daily/D-Day/Mid-Month/Pay Day), nhập tay bởi ops (client gợi ý % mặc định
   // theo lịch sử nhưng KHÔNG lưu công thức, chỉ lưu giá trị cuối ops đã chốt).
   planTargetGmv?: number;
   planTargetNmv?: number;
@@ -330,7 +330,7 @@ export interface BrandMonthlyReport {
   planPctDday?: number;
   planPctMidmonth?: number;
   planPctPayday?: number;
-  // Khung camp D-Day/Mid-Month/Pay-Day của THÁNG ĐANG XEM (migration 0071, Tab 02 Livestream) —
+  // Khung camp D-Day/Mid-Month/Pay Day của THÁNG ĐANG XEM (migration 0071, Tab 02 Livestream) —
   // ghi đè khoảng ngày mặc định (lib/campaignDays.ts) + Target GMV mỗi khung riêng cho Report
   // Tháng, KHÔNG ảnh hưởng Calendar/Ribbon toàn hệ thống. Để trống thì UI tự fallback về khung mặc
   // định của tháng đang xem.

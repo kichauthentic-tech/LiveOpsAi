@@ -42,6 +42,7 @@ import {
   totalsOf
 } from "../lib/performance/ceoBrief";
 import { buildMonthTargetPlan } from "../lib/performance/targetAllocation";
+import { metricHint } from "../lib/metricGlossary";
 import { todayVn } from "../lib/performance/brandCommitment";
 import { PNL_MISSING_LABEL, PnlMissingInput, computeSessionPnl } from "../lib/pnl";
 import { fetchPlanStatuses } from "../lib/db/monthPlans";
@@ -79,7 +80,7 @@ const ACTION_TAB: Record<IssueAction, { tab: string; label: string }> = {
   rate_card: { tab: "crm", label: "Mở Rate Card" },
   host_performance: { tab: "host_performance", label: "Mở Hiệu Suất Host" }
 };
-const BUCKET_LABEL: Record<CampDayBucket, string> = { dday: "D-Day", midmonth: "Mid-Month", payday: "Pay-Day", daily: "Ngày thường" };
+const BUCKET_LABEL: Record<CampDayBucket, string> = { dday: "D-Day", midmonth: "Mid-Month", payday: "Pay Day", daily: "Daily" };
 const BUCKET_COLOR: Record<CampDayBucket, string> = { dday: "var(--accent)", midmonth: "var(--success)", payday: "var(--warning)", daily: "var(--text-faint)" };
 const WEEKDAY = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
 
@@ -147,7 +148,7 @@ const Sparkline: React.FC<{ values: number[] }> = ({ values }) => {
 
 const Kpi: React.FC<{ label: string; value: string; cur: number | null; prev: number | null; goodWhenUp?: boolean; extra?: string; series?: number[]; locked?: boolean }> = ({ label, value, cur, prev, goodWhenUp, extra, series, locked }) => (
   <Card className="!p-3.5 flex flex-col gap-0.5 min-w-0">
-    <span className="text-[11px] font-bold text-[var(--text-faint)] flex items-center gap-1">
+    <span className="text-[11px] font-bold text-[var(--text-faint)] flex items-center gap-1" title={metricHint(label)}>
       {label}
       {locked && <Lock className="w-3 h-3" aria-label="Chỉ CEO/admin" />}
     </span>
@@ -309,7 +310,7 @@ export default function CeoBrief(props: CeoBriefProps) {
               <LayoutDashboard className="w-6 h-6 text-[var(--accent-text)]" /> Dashboard
             </h2>
             <p className="text-sm text-[var(--text-muted)] mt-1 max-w-3xl">
-              Toàn cảnh agency và từng tài khoản: doanh số, target, dự phóng cuối tháng, ngày campaign, nhân sự{canSeeMoney ? " và tiền" : ""}. So sánh luôn cắt về cùng số ngày có số liệu.
+              Toàn cảnh agency và từng tài khoản: GMV, target, dự phóng cuối tháng, ngày campaign, nhân sự{canSeeMoney ? " và tiền" : ""}. So sánh luôn cắt về cùng số ngày có số liệu.
             </p>
           </div>
           <span
@@ -364,17 +365,17 @@ export default function CeoBrief(props: CeoBriefProps) {
         <SectionTitle title="Tổng quan" />
         <div className="grid grid-cols-1 xl:grid-cols-[1.25fr_1fr] gap-4 items-start">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            <Kpi label="Doanh số live" value={money(cur.gmv)} cur={cur.gmv} prev={prev.gmv} extra={`${num(cur.sessions)} ca`} series={series((t) => t.gmv)} />
+            <Kpi label="LIVE GMV" value={money(cur.gmv)} cur={cur.gmv} prev={prev.gmv} extra={`${num(cur.sessions)} ca`} series={series((t) => t.gmv)} />
             <Kpi label="Giờ live" value={hrs(cur.hours)} cur={cur.hours} prev={prev.hours} series={series((t) => t.hours)} />
-            <Kpi label="Doanh số mỗi giờ" value={money(cur.gmvPerHour)} cur={cur.gmvPerHour} prev={prev.gmvPerHour} series={series((t) => t.gmvPerHour)} />
-            <Kpi label="Đơn hàng" value={num(cur.orders)} cur={cur.orders} prev={prev.orders} extra={cur.aov ? `TB ${money(cur.aov)}/đơn` : undefined} series={series((t) => t.orders)} />
-            <Kpi label="Tỷ lệ mua / lượt xem" value={pct(cur.buyRate, 2)} cur={cur.buyRate} prev={prev.buyRate} series={series((t) => t.buyRate)} />
-            <Kpi label="Tỷ lệ bấm sản phẩm" value={pct(cur.ctr, 2)} cur={cur.ctr} prev={prev.ctr} series={series((t) => t.ctr)} />
+            <Kpi label="GMV/giờ" value={money(cur.gmvPerHour)} cur={cur.gmvPerHour} prev={prev.gmvPerHour} series={series((t) => t.gmvPerHour)} />
+            <Kpi label="Orders" value={num(cur.orders)} cur={cur.orders} prev={prev.orders} extra={cur.aov ? `AOV ${money(cur.aov)}` : undefined} series={series((t) => t.orders)} />
+            <Kpi label="CVR" value={pct(cur.buyRate, 2)} cur={cur.buyRate} prev={prev.buyRate} series={series((t) => t.buyRate)} />
+            <Kpi label="Product CTR" value={pct(cur.ctr, 2)} cur={cur.ctr} prev={prev.ctr} series={series((t) => t.ctr)} />
             {canSeeMoney && fin && (
               <>
                 <Kpi label="Doanh thu agency" value={fin.priced ? money(fin.revenue) : "Chưa tính được"} cur={fin.priced ? fin.revenue : null} prev={finPrev?.priced ? finPrev.revenue : null} extra={fin.sessions ? `${fin.priced}/${fin.sessions} ca đủ dữ liệu` : undefined} locked />
                 <Kpi label="Lãi gộp" value={fin.priced ? money(fin.profit) : "Chưa tính được"} cur={fin.priced ? fin.profit : null} prev={finPrev?.priced ? finPrev.profit : null} extra={fin.margin != null ? `biên ${pct(fin.margin)}` : undefined} locked />
-                <Kpi label="Lượt xem" value={num(cur.views)} cur={cur.views} prev={prev.views} series={series((t) => t.views)} />
+                <Kpi label="Views" value={num(cur.views)} cur={cur.views} prev={prev.views} series={series((t) => t.views)} />
               </>
             )}
           </div>
@@ -478,10 +479,10 @@ const AccountsTable: React.FC<{
           <thead className="border-b border-[var(--border)]">
             <tr>
               <th className={`${th} text-left`}>Tài khoản</th>
-              <th className={th}>Doanh số kỳ</th>
+              <th className={th}>GMV kỳ</th>
               <th className={th}>So kỳ trước</th>
-              <th className={th}>Doanh số/giờ</th>
-              <th className={th}>Target tháng</th>
+              <th className={th}>GMV/giờ</th>
+              <th className={th}>Target GMV tháng</th>
               <th className={th}>Run-rate</th>
               <th className={th}>Dự phóng tháng</th>
               {pnl && <><th className={th}>Doanh thu</th><th className={th}>Lãi gộp</th><th className={th}>Phiên lãi</th></>}
@@ -550,21 +551,21 @@ const MonthOverMonth: React.FC<{ sessions: LiveSession[]; brands: Brand[]; lastM
   const y = (v: number) => T + (H - T - B) * (1 - v / nice);
 
   const rows: { label: string; get: (t: Totals) => number | null; fmt: (v: number | null) => string }[] = [
-    { label: "Doanh số", get: (t) => t.gmv, fmt: money },
+    { label: "GMV", get: (t) => t.gmv, fmt: money },
     { label: "Giờ live", get: (t) => t.hours, fmt: (v) => (v == null ? "—" : `${Math.round(v)}h`) },
-    { label: "Doanh số/giờ", get: (t) => t.gmvPerHour, fmt: money },
-    { label: "Đơn hàng", get: (t) => t.orders, fmt: (v) => (v == null ? "—" : num(v)) },
-    { label: "TB mỗi đơn", get: (t) => t.aov, fmt: money },
-    { label: "Tỷ lệ mua", get: (t) => t.buyRate, fmt: (v) => pct(v, 2) },
-    { label: "Tỷ lệ bấm SP", get: (t) => t.ctr, fmt: (v) => pct(v, 2) }
+    { label: "GMV/giờ", get: (t) => t.gmvPerHour, fmt: money },
+    { label: "Orders", get: (t) => t.orders, fmt: (v) => (v == null ? "—" : num(v)) },
+    { label: "AOV", get: (t) => t.aov, fmt: money },
+    { label: "CVR", get: (t) => t.buyRate, fmt: (v) => pct(v, 2) },
+    { label: "Product CTR", get: (t) => t.ctr, fmt: (v) => pct(v, 2) }
   ];
   return (
     <section className="space-y-3">
       <SectionTitle title="Tháng qua tháng" note={`Tháng đang chạy so với cùng ${days} ngày đầu tháng trước`} />
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_1.1fr] gap-4">
         <Card>
-          <h4 className="font-black text-[var(--text)] mb-2 text-sm">Doanh số theo tháng</h4>
-          <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="Doanh số theo tháng, chia theo brand">
+          <h4 className="font-black text-[var(--text)] mb-2 text-sm">GMV theo tháng</h4>
+          <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="GMV theo tháng, chia theo brand">
             {[0, 0.25, 0.5, 0.75, 1].map((f) => (
               <g key={f}>
                 <line x1={L} x2={W - R} y1={y(nice * f)} y2={y(nice * f)} style={{ stroke: "var(--border)", strokeWidth: 1, opacity: 0.6 }} />
@@ -684,7 +685,7 @@ const TargetSection: React.FC<{ outlook: MonthOutlook; month: string; single: bo
       <SectionTitle title="Target & dự phóng cả tháng" note={`Tháng ${Number(month.slice(5))} · ${sourceLabel ? `target từ ${sourceLabel}` : "chưa có target"}`} />
       <div className="grid grid-cols-1 xl:grid-cols-[1.6fr_1fr] gap-4">
         <Card>
-          <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="Doanh số cộng dồn so với target và dự phóng">
+          <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="GMV cộng dồn so với target và dự phóng">
             {campIdx.map((i) => <rect key={i} x={x(i) - colW / 2} y={T} width={colW} height={H - T - B} style={{ fill: "var(--accent)", opacity: 0.07 }} />)}
             {[0, 0.25, 0.5, 0.75, 1].map((f) => (
               <g key={f}>
@@ -712,14 +713,14 @@ const TargetSection: React.FC<{ outlook: MonthOutlook; month: string; single: bo
           </div>
         </Card>
         <div className="grid grid-cols-2 gap-3 content-start">
-          {stat("Target tháng", o.target ? money(o.target.total) : "—", o.target ? sourceLabel : <button onClick={() => onNavigate("month_plan")} className="text-[var(--accent-text)] font-bold hover:underline">Chốt Kế Hoạch Tháng →</button>)}
-          {stat("Đã đạt", money(o.actual), o.target ? `${pct(o.actual / o.target.total)} target${o.through ? ` · số đến ${ddmm(o.through)}` : ""}` : o.through ? `số đến ${ddmm(o.through)}` : undefined)}
+          {stat("Target GMV tháng", o.target ? money(o.target.total) : "—", o.target ? sourceLabel : <button onClick={() => onNavigate("month_plan")} className="text-[var(--accent-text)] font-bold hover:underline">Chốt Kế Hoạch Tháng →</button>)}
+          {stat("Đã đạt", money(o.actual), o.target ? `${pct(o.actual / o.target.total)} Target${o.through ? ` · số đến ${ddmm(o.through)}` : ""}` : o.through ? `số đến ${ddmm(o.through)}` : undefined)}
           {stat("Run-rate", <span className={o.runRate == null ? "" : o.runRate >= 1 ? "text-emerald-400" : o.runRate >= 0.9 ? "text-amber-300" : "text-rose-400"}>{pct(o.runRate)}</span>, o.expectedToDate != null ? `kỳ vọng tới ngày có số: ${money(o.expectedToDate)}` : "cần target")}
           {stat("Dự phóng cuối tháng", money(o.projected), `±${Math.round(PROJECTION_ERROR_BAND * 100)}% · ${o.pending.length} ca còn trong lịch${o.pending.some((p) => p.kind === "open_slot") ? ` (${o.pending.filter((p) => p.kind === "open_slot").length} ca mở)` : ""}`)}
           {stat(gap == null ? "So với target" : gap >= 0 ? "Dự kiến vượt" : "Dự kiến thiếu", gap == null ? "—" : <span className={gap >= 0 ? "text-emerald-400" : "text-rose-400"}>{money(Math.abs(gap))}</span>, gap != null && o.target ? `${pct(Math.abs(gap) / o.target.total)} target` : undefined)}
           {stat("Cần mỗi ngày còn lại", money(o.needPerRemainingDay), o.remainingDays > 0 ? `${o.remainingDays} ngày còn lại` : "tháng đã hết")}
           <p className="col-span-2 text-[11px] text-[var(--text-faint)] leading-snug">
-            Dự phóng = số đã có + giờ các ca còn trong lịch (kể cả ca mở chưa có người) × doanh số/giờ 28 ngày gần nhất{single ? "" : " của từng brand"}, tách ngày camp và ngày thường. Thêm ca trên lịch là số này tăng theo. Thử lại trên T7–T8/2026: lệch −7% đến +8%.
+            Dự phóng = số đã có + giờ các ca còn trong lịch (kể cả ca mở chưa có người) × GMV/giờ 28 ngày gần nhất{single ? "" : " của từng brand"}, tách ngày camp và ngày thường. Thêm ca trên lịch là số này tăng theo. Thử lại trên T7–T8/2026: lệch −7% đến +8%.
           </p>
         </div>
       </div>
@@ -755,7 +756,7 @@ const CampaignSection: React.FC<{ outlook: MonthOutlook; month: string; sessions
           <div className="flex justify-between gap-2"><dt className="text-[var(--text-faint)]">Target khung</dt><dd className="text-[var(--text)] font-bold">{b.target ? money(b.target) : "—"}{vsTarget != null && !upcoming ? ` · ${pct(vsTarget)}` : ""}</dd></div>
           <div className="flex justify-between gap-2"><dt className="text-[var(--text-faint)]">Mỗi ngày</dt><dd className="text-[var(--text)]">{money(b.perDay)}</dd></div>
           <div className="flex justify-between gap-2"><dt className="text-[var(--text-faint)]">Tháng trước/ngày</dt><dd className="text-[var(--text)] flex items-center gap-1">{money(b.prevPerDay)}{b.perDay != null && b.prevPerDay != null && <Delta cur={b.perDay} prev={b.prevPerDay} />}</dd></div>
-          <div className="flex justify-between gap-2"><dt className="text-[var(--text-faint)]">Doanh số/giờ</dt><dd className="text-[var(--text)]">{money(b.actual.gmvPerHour)}</dd></div>
+          <div className="flex justify-between gap-2"><dt className="text-[var(--text-faint)]">GMV/giờ</dt><dd className="text-[var(--text)]">{money(b.actual.gmvPerHour)}</dd></div>
         </dl>
       </Card>
     );
@@ -769,11 +770,11 @@ const CampaignSection: React.FC<{ outlook: MonthOutlook; month: string; sessions
   const campOf = (d: string) => o.buckets.find((b) => b.bucket !== "daily" && b.days.includes(d))?.bucket;
   return (
     <section className="space-y-3">
-      <SectionTitle title="Ngày campaign" note="Target khung = tổng target các ngày của khung · mỗi ngày = doanh số ÷ số ngày của khung đã qua" />
+      <SectionTitle title="Ngày campaign" note="Target khung = tổng target các ngày của khung · mỗi ngày = GMV ÷ số ngày của khung đã qua" />
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">{o.buckets.map(card)}</div>
       <Card>
         <div className="flex flex-wrap items-baseline justify-between gap-2 mb-3">
-          <h4 className="font-black text-[var(--text)] text-sm">Doanh số từng ngày · tháng {Number(month.slice(5))}</h4>
+          <h4 className="font-black text-[var(--text)] text-sm">GMV từng ngày · tháng {Number(month.slice(5))}</h4>
           <span className="text-[11px] text-[var(--text-faint)] inline-flex items-center gap-1">Ít {shade.map((c) => <i key={c} className="w-4 h-2.5 rounded-sm inline-block" style={{ background: c }} />)} Nhiều · ◆ ngày camp · sọc = còn trong lịch</span>
         </div>
         <div className="grid grid-cols-7 gap-1">
@@ -791,7 +792,7 @@ const CampaignSection: React.FC<{ outlook: MonthOutlook; month: string; sessions
                 key={d}
                 className={`rounded-lg p-1.5 min-h-[52px] flex flex-col justify-between text-[10px] ${k < 0 && !f ? "bg-[var(--surface-base)] text-[var(--text-faint)]" : ""} ${camp ? "ring-1 ring-inset ring-[var(--text-muted)]" : ""}`}
                 style={style}
-                data-tip={`${ddmm(d)} (${WEEKDAY[weekdayIdx(d)]})${camp ? ` · ${BUCKET_LABEL[camp]}` : ""}\n${g ? `Doanh số ${money(g)}\n${t.sessions} ca · ${hrs(t.hours)} · ${money(t.gmvPerHour)}/giờ` : f ? `Dự phóng ${money(f)}` : "Không có ca"}`}
+                data-tip={`${ddmm(d)} (${WEEKDAY[weekdayIdx(d)]})${camp ? ` · ${BUCKET_LABEL[camp]}` : ""}\n${g ? `GMV ${money(g)}\n${t.sessions} ca · ${hrs(t.hours)} · ${money(t.gmvPerHour)}/giờ` : f ? `Dự phóng ${money(f)}` : "Không có ca"}`}
               >
                 <span className="font-bold">{Number(d.slice(8))}{camp ? " ◆" : ""}</span>
                 <span className="font-bold truncate hidden sm:block">{g ? moneyShort(g) : f ? `~${moneyShort(f)}` : ""}</span>
@@ -817,13 +818,13 @@ const StaffList: React.FC<{ title: string; data: ReturnType<typeof hostRows>; un
       ) : (
         <div className="text-xs">
           <div className="grid grid-cols-[minmax(90px,1.3fr)_32px_44px_minmax(60px,1.6fr)_52px_64px] gap-2 pb-1 text-[10px] uppercase tracking-wider font-bold text-[var(--text-faint)]">
-            <span>Tên</span><span className="text-right">Ca</span><span className="text-right">Giờ</span><span>Doanh số/giờ</span><span /><span className="text-right">Kỳ trước</span>
+            <span>Tên</span><span className="text-right">Sessions</span><span className="text-right">Giờ live</span><span>GMV/giờ</span><span /><span className="text-right">Kỳ trước</span>
           </div>
           {data.rows.map((r) => {
             const g = r.totals.gmvPerHour ?? 0;
             return (
               <div key={r.key} className="grid grid-cols-[minmax(90px,1.3fr)_32px_44px_minmax(60px,1.6fr)_52px_64px] gap-2 items-center py-1.5 border-t border-[var(--border)]"
-                data-tip={`${r.name}\n${r.totals.sessions} ca · ${hrs(r.totals.hours)} (${pct(r.hoursShare)} giờ kỳ)\nDoanh số ${money(r.totals.gmv)} · ${money(g)}/giờ\nTrung bình: ${money(avg)}/giờ`}>
+                data-tip={`${r.name}\n${r.totals.sessions} ca · ${hrs(r.totals.hours)} (${pct(r.hoursShare)} giờ kỳ)\nGMV ${money(r.totals.gmv)} · ${money(g)}/giờ\nTrung bình: ${money(avg)}/giờ`}>
                 <span className="truncate text-[var(--text)] font-bold">{r.name}{r.hoursShare > 0.3 && <span className="ml-1 text-amber-300 text-[10px]">! {pct(r.hoursShare)} giờ</span>}</span>
                 <span className="text-right text-[var(--text-muted)]">{r.totals.sessions}</span>
                 <span className="text-right text-[var(--text-muted)]">{Math.round(r.totals.hours)}h</span>
@@ -851,7 +852,7 @@ const StaffSection: React.FC<{ cur: LiveSession[]; prev: LiveSession[] }> = ({ c
   const pairs = pairRows(cur).slice(0, 5);
   return (
     <section className="space-y-3">
-      <SectionTitle title="Hiệu suất nhân sự" note="Doanh số mỗi giờ trong kỳ · vạch đứng = trung bình · so với kỳ trước cùng độ dài" />
+      <SectionTitle title="Hiệu suất nhân sự" note="GMV/giờ trong kỳ · vạch đứng = trung bình · so với kỳ trước cùng độ dài" />
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         <StaffList title="Host" data={hostRows(cur, prev)} unassignedLabel="Chưa ghi host" />
         <StaffList title="Trợ live" data={assistantRows(cur, prev)} unassignedLabel="Không có trợ live" />
@@ -977,7 +978,7 @@ const FinanceSection: React.FC<{ fin: FinanceTotals; finPrev: FinanceTotals | nu
             </table>
           </div>
           <p className="text-[11px] text-[var(--text-faint)] leading-snug">
-            Doanh thu = doanh số × (1 − % hoàn) × % hoa hồng (brand tính theo %), hoặc giờ × giá/giờ (brand tính theo giờ). Chi phí = lương host + trợ live + phòng + quảng cáo của ca. Chưa trừ chi phí cố định (mặt bằng, lương văn phòng).
+            Doanh thu = GMV × (1 − tỷ lệ hoàn hủy) × % hoa hồng (brand tính theo %), hoặc giờ × giá/giờ (brand tính theo giờ). Chi phí = lương host + trợ live + phòng + quảng cáo của ca. Chưa trừ chi phí cố định (mặt bằng, lương văn phòng).
           </p>
         </Card>
       </div>

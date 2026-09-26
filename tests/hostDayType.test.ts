@@ -17,7 +17,7 @@ test("GMV trọn cho host, trợ live chỉ có giờ — không cộng vào gi�
       ca("2026-08-01", "Hùng", "Toàn", 117_000_000, 372), // ngày thường
       ca("2026-08-08", "Hùng", "Toàn", 486_000_000, 900), // D-Day
       ca("2026-08-12", "Toàn", "Hùng", 80_000_000, 180), // Hùng làm trợ
-      ca("2026-08-25", "Loan", "", 57_000_000, 252) // Pay-Day, không có trợ
+      ca("2026-08-25", "Loan", "", 57_000_000, 252) // Pay Day, không có trợ
     ],
     isCamp
   );

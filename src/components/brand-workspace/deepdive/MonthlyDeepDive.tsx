@@ -271,9 +271,9 @@ const Channels: React.FC<{ dd: DeepDive }> = ({ dd }) => {
   return (
     <Section
       id="channels"
-      title="Cơ Cấu GMV Theo Kênh"
+      title="Cơ cấu GMV theo kênh"
       icon={<Layers className="w-4 h-4" />}
-      sub='"Đóng góp tăng trưởng" = phần kênh đó cộng/trừ vào mức tăng GMV toàn shop so tháng trước, tính bằng điểm phần trăm trên nền GMV tháng trước — cộng lại đúng bằng % tăng tổng.'
+      sub='"Đóng góp tăng trưởng" = phần kênh đó cộng/trừ vào mức tăng Total GMV so tháng trước, tính bằng điểm phần trăm trên nền GMV tháng trước — cộng lại đúng bằng % tăng tổng.'
     >
       {data.length === 0 ? <Empty>Chưa có dữ liệu kênh — cần file Shop Analytics.</Empty> : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -354,7 +354,7 @@ const Daily: React.FC<{ dd: DeepDive }> = ({ dd }) => {
       id="daily"
       title="Diễn Biến Theo Ngày"
       icon={<CalendarDays className="w-4 h-4" />}
-      sub="Cột = GMV ngày · đường vàng = trung bình trượt 7 ngày (làm phẳng nhiễu cuối tuần/campaign) · vùng tím = GMV từ LIVE."
+      sub="Cột = GMV ngày · đường vàng = trung bình trượt 7 ngày (làm phẳng nhiễu cuối tuần/campaign) · vùng tím = Seller LIVE GMV."
     >
       {data.length === 0 ? <Empty>Chưa có file Shop Analytics cho tháng này.</Empty> : (
         <>
@@ -367,7 +367,7 @@ const Daily: React.FC<{ dd: DeepDive }> = ({ dd }) => {
                 <Tooltip contentStyle={chartTooltipStyle} formatter={(v, n) => [fmtMoney(chartNum(v)), String(n)]} labelFormatter={(l) => `Ngày ${l}`} />
                 <Legend wrapperStyle={{ fontSize: 10.5 }} />
                 <Bar dataKey="gmv" name="GMV" fill={`${PAL.gold}cc`} radius={[3, 3, 0, 0]} />
-                <Bar dataKey="liveGmv" name="GMV từ LIVE" fill={`${PAL.violet}99`} radius={[3, 3, 0, 0]} />
+                <Bar dataKey="liveGmv" name="Seller LIVE GMV" fill={`${PAL.violet}99`} radius={[3, 3, 0, 0]} />
                 <Line type="monotone" dataKey="ma7" name="TB trượt 7 ngày" stroke={PAL.cream} strokeWidth={2} dot={false} />
               </ComposedChart>
             </ResponsiveContainer>
@@ -475,7 +475,7 @@ const Funnel: React.FC<{ dd: DeepDive }> = ({ dd }) => {
   const maxV = Math.max(1, ...f.filter((s) => s.key !== "gmv").map((s) => s.value));
   if (f.every((s) => s.value === 0)) {
     return (
-      <Section id="funnel" title="Phễu Chuyển Đổi LIVE" icon={<Filter className="w-4 h-4" />}>
+      <Section id="funnel" title="Phễu chuyển đổi LIVE" icon={<Filter className="w-4 h-4" />}>
         <Empty>Chưa có file Creator Live Performance cho tháng này.</Empty>
       </Section>
     );
@@ -483,9 +483,9 @@ const Funnel: React.FC<{ dd: DeepDive }> = ({ dd }) => {
   return (
     <Section
       id="funnel"
-      title="Phễu Chuyển Đổi LIVE"
+      title="Phễu chuyển đổi LIVE"
       icon={<Filter className="w-4 h-4" />}
-      sub="Bậc “Hiển thị sản phẩm / Lượt xem” là SỐ LẦN, không phải tỷ lệ — một người xem thấy sản phẩm nhiều lần trong phiên. Các bậc sau là tỷ lệ chuyển đổi thật."
+      sub="Bậc “Product impressions / Views” là SỐ LẦN, không phải tỷ lệ — một người xem thấy sản phẩm nhiều lần trong phiên. Các bậc sau là tỷ lệ chuyển đổi thật."
     >
       <div className="space-y-2.5">
         {f.map((s) => {
@@ -514,7 +514,7 @@ const Funnel: React.FC<{ dd: DeepDive }> = ({ dd }) => {
               {conv != null && (
                 <div className="text-[10.5px] mt-1 flex items-center gap-2" style={{ color: PAL.muted }}>
                   <span>
-                    {isRatio ? `×${fmtDec(conv / 100, 1)} lần / lượt xem` : `chuyển đổi ${fmtPct(conv, 2)}`}
+                    {isRatio ? `×${fmtDec(conv / 100, 1)} lần / view` : `chuyển đổi ${fmtPct(conv, 2)}`}
                   </span>
                   {prevConv != null && (
                     <>
@@ -619,7 +619,7 @@ const Sessions: React.FC<{ dd: DeepDive }> = ({ dd }) => {
             <div className="overflow-x-auto">
               <table className="w-full text-[11px]">
                 <thead><tr style={{ borderBottom: `1px solid ${PAL.line}` }}>
-                  <Th>Ngày</Th><Th>Phiên</Th><Th align="right">Giờ</Th><Th align="right">GMV</Th><Th align="right" w="34%">GMV/giờ</Th>
+                  <Th>Ngày</Th><Th>Phiên</Th><Th align="right">Giờ live</Th><Th align="right">GMV</Th><Th align="right" w="34%">GMV/giờ</Th>
                 </tr></thead>
                 <tbody>
                   {blk.rows.map((r) => (
@@ -662,8 +662,8 @@ const Campaigns: React.FC<{ dd: DeepDive }> = ({ dd }) => {
       <div className="overflow-x-auto">
         <table className="w-full text-[11.5px]">
           <thead><tr style={{ borderBottom: `1px solid ${PAL.line}` }}>
-            <Th>Campaign</Th><Th align="right">Phiên</Th><Th align="right">Ngày</Th><Th align="right">Giờ</Th>
-            <Th align="right">GMV</Th><Th align="right">GMV/ngày</Th><Th align="right">CTOR TB</Th><Th align="right" w="26%">GMV/giờ</Th>
+            <Th>Campaign</Th><Th align="right">Sessions</Th><Th align="right">Ngày</Th><Th align="right">Giờ live</Th>
+            <Th align="right">GMV</Th><Th align="right">GMV/ngày</Th><Th align="right">CTOR</Th><Th align="right" w="26%">GMV/giờ</Th>
           </tr></thead>
           <tbody>
             {dd.campaigns.map((c) => {
@@ -735,9 +735,9 @@ const Hosts: React.FC<{ dd: DeepDive }> = ({ dd }) => {
       <div className="overflow-x-auto">
         <table className="w-full text-[11.5px]">
           <thead><tr style={{ borderBottom: `1px solid ${PAL.line}` }}>
-            <Th>Host</Th><Th align="right">Ca</Th><Th align="right">Giờ</Th><Th align="right">GMV</Th>
-            <Th align="right">GMV/giờ</Th><Th align="right">AOV</Th><Th align="right">CTR</Th><Th align="right">CTOR</Th>
-            <Th align="right">Follower mới</Th><Th align="right">MoM</Th><Th align="right" w="18%">Tỷ trọng</Th>
+            <Th>Host</Th><Th align="right">Sessions</Th><Th align="right">Giờ live</Th><Th align="right">GMV</Th>
+            <Th align="right">GMV/giờ</Th><Th align="right">AOV</Th><Th align="right">Product CTR</Th><Th align="right">CTOR</Th>
+            <Th align="right">New followers</Th><Th align="right">MoM</Th><Th align="right" w="18%">Tỷ trọng</Th>
           </tr></thead>
           <tbody>
             {rows.map((h) => (
@@ -789,7 +789,7 @@ const Products: React.FC<{ dd: DeepDive; loading: boolean }> = ({ dd, loading })
       id="products"
       title="Phân Tích Sản Phẩm"
       icon={<Package className="w-4 h-4" />}
-      sub={`${fmtInt(p.totalSkusWithSales)} SKU có doanh thu · ${p.skusFor80Pct ?? "—"} SKU đầu bảng đã tạo 80% GMV. Cột "LIVE %" cho biết SKU đó sống nhờ live hay nhờ kênh khác.`}
+      sub={`${fmtInt(p.totalSkusWithSales)} SKU có doanh thu · ${p.skusFor80Pct ?? "—"} SKU đầu bảng đã tạo 80% GMV. Cột "Tỷ trọng LIVE" cho biết SKU đó sống nhờ live hay nhờ kênh khác.`}
     >
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
         <div className="h-[240px]">
@@ -827,7 +827,7 @@ const Products: React.FC<{ dd: DeepDive; loading: boolean }> = ({ dd, loading })
         <table className="w-full text-[11px]">
           <thead><tr style={{ borderBottom: `1px solid ${PAL.line}` }}>
             <Th>#</Th><Th>Sản phẩm</Th><Th align="right">GMV</Th><Th align="right">Tỷ trọng</Th><Th align="right">Luỹ kế</Th>
-            <Th align="right">Đơn SKU</Th><Th align="right">CTR</Th><Th align="right">CTOR</Th><Th align="right">LIVE %</Th><Th align="right">MoM</Th><Th align="right" w="14%"></Th>
+            <Th align="right">SKU orders</Th><Th align="right">Product CTR</Th><Th align="right">CTOR</Th><Th align="right">Tỷ trọng LIVE</Th><Th align="right">MoM</Th><Th align="right" w="14%"></Th>
           </tr></thead>
           <tbody>
             {p.top.map((x, i) => (
@@ -905,7 +905,7 @@ const Promotions: React.FC<{ dd: DeepDive }> = ({ dd }) => {
         <table className="w-full text-[11px]">
           <thead><tr style={{ borderBottom: `1px solid ${PAL.line}` }}>
             <Th>Chương trình</Th><Th>Kỳ chạy</Th><Th align="right">GMV</Th><Th align="right">% GMV tháng</Th>
-            <Th align="right">Đơn</Th><Th align="right">AOV</Th><Th align="right">Giảm giá</Th><Th align="right">ROI</Th><Th align="right" w="14%"></Th>
+            <Th align="right">Orders</Th><Th align="right">AOV</Th><Th align="right">Giảm giá</Th><Th align="right">ROI</Th><Th align="right" w="14%"></Th>
           </tr></thead>
           <tbody>
             {p.insideMonth.slice(0, 15).map((x) => (
@@ -958,7 +958,7 @@ const Trend: React.FC<{ dd: DeepDive }> = ({ dd }) => {
       id="trend"
       title={`Xu Hướng ${data.length} Tháng`}
       icon={<TrendingUp className="w-4 h-4" />}
-      sub="GMV/giờ LIVE là chỉ số quan trọng nhất của mảng vận hành: GMV tăng vì live nhiều giờ hơn hay vì mỗi giờ live hiệu quả hơn — đường này tách bạch hai chuyện đó."
+      sub="GMV/giờ là chỉ số quan trọng nhất của mảng vận hành: GMV tăng vì live nhiều giờ hơn hay vì mỗi giờ live hiệu quả hơn — đường này tách bạch hai chuyện đó."
     >
       <div className="h-[280px]">
         <ResponsiveContainer width="100%" height="100%">
@@ -969,18 +969,18 @@ const Trend: React.FC<{ dd: DeepDive }> = ({ dd }) => {
             <YAxis yAxisId="r" orientation="right" stroke={PAL.muted} fontSize={10} tickFormatter={(v) => fmtMoneyShort(v)} width={62} />
             <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => fmtMoney(chartNum(v))} />
             <Legend wrapperStyle={{ fontSize: 10.5 }} />
-            <Bar yAxisId="l" dataKey="gmv" name="GMV toàn shop" fill={`${PAL.gold}aa`} radius={[4, 4, 0, 0]} />
-            <Bar yAxisId="l" dataKey="liveGmv" name="GMV từ LIVE" fill={`${PAL.violet}99`} radius={[4, 4, 0, 0]} />
-            <Line yAxisId="r" type="monotone" dataKey="gmvPerLiveHour" name="GMV/giờ LIVE" stroke={PAL.teal} strokeWidth={2.5} dot={{ r: 3 }} />
+            <Bar yAxisId="l" dataKey="gmv" name="Total GMV" fill={`${PAL.gold}aa`} radius={[4, 4, 0, 0]} />
+            <Bar yAxisId="l" dataKey="liveGmv" name="Seller LIVE GMV" fill={`${PAL.violet}99`} radius={[4, 4, 0, 0]} />
+            <Line yAxisId="r" type="monotone" dataKey="gmvPerLiveHour" name="GMV/giờ" stroke={PAL.teal} strokeWidth={2.5} dot={{ r: 3 }} />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
       <div className="overflow-x-auto mt-4">
         <table className="w-full text-[11.5px]">
           <thead><tr style={{ borderBottom: `1px solid ${PAL.line}` }}>
-            <Th>Tháng</Th><Th align="right">GMV</Th><Th align="right">GMV LIVE</Th><Th align="right">Tỷ trọng LIVE</Th>
-            <Th align="right">Đơn</Th><Th align="right">AOV</Th><Th align="right">CVR</Th>
-            <Th align="right">Phiên</Th><Th align="right">Giờ LIVE</Th><Th align="right">GMV/giờ</Th>
+            <Th>Tháng</Th><Th align="right">Total GMV</Th><Th align="right">Seller LIVE GMV</Th><Th align="right">Tỷ trọng LIVE</Th>
+            <Th align="right">Orders</Th><Th align="right">AOV</Th><Th align="right">Conversion rate</Th>
+            <Th align="right">Sessions</Th><Th align="right">Giờ live</Th><Th align="right">GMV/giờ</Th>
           </tr></thead>
           <tbody>
             {data.map((t) => (

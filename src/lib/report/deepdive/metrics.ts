@@ -310,32 +310,32 @@ export function buildDeepDive(
   // --- KPI -----------------------------------------------------------------
   const kpis: Kpi[] = [
     { key: "gmv", label: "GMV", value: cur.gmv, prev: prev ? pre.gmv : null, deltaPct: pctChange(cur.gmv, pre.gmv), format: "money", higherIsBetter: true },
-    { key: "orders", label: "Đơn hàng", value: cur.orders, prev: prev ? pre.orders : null, deltaPct: pctChange(cur.orders, pre.orders), format: "int", higherIsBetter: true },
+    { key: "orders", label: "Orders", value: cur.orders, prev: prev ? pre.orders : null, deltaPct: pctChange(cur.orders, pre.orders), format: "int", higherIsBetter: true },
     { key: "aov", label: "AOV", value: div(cur.gmv, cur.orders) ?? 0, prev: prev ? div(pre.gmv, pre.orders) : null, deltaPct: pctChange(div(cur.gmv, cur.orders) ?? 0, div(pre.gmv, pre.orders) ?? 0), format: "money", higherIsBetter: true },
-    { key: "customers", label: "Khách hàng", value: cur.customers, prev: prev ? pre.customers : null, deltaPct: pctChange(cur.customers, pre.customers), format: "int", higherIsBetter: true },
-    { key: "itemsSold", label: "Sản phẩm bán ra", value: cur.itemsSold, prev: prev ? pre.itemsSold : null, deltaPct: pctChange(cur.itemsSold, pre.itemsSold), format: "int", higherIsBetter: true },
-    { key: "visitors", label: "Khách truy cập", value: cur.visitors, prev: prev ? pre.visitors : null, deltaPct: pctChange(cur.visitors, pre.visitors), format: "int", higherIsBetter: true },
+    { key: "customers", label: "Customers", value: cur.customers, prev: prev ? pre.customers : null, deltaPct: pctChange(cur.customers, pre.customers), format: "int", higherIsBetter: true },
+    { key: "itemsSold", label: "Items sold", value: cur.itemsSold, prev: prev ? pre.itemsSold : null, deltaPct: pctChange(cur.itemsSold, pre.itemsSold), format: "int", higherIsBetter: true },
+    { key: "visitors", label: "Visitors", value: cur.visitors, prev: prev ? pre.visitors : null, deltaPct: pctChange(cur.visitors, pre.visitors), format: "int", higherIsBetter: true },
     {
-      key: "cvr", label: "Tỷ lệ chuyển đổi", value: (div(cur.skuOrders, cur.visitors) ?? 0) * 100,
+      key: "cvr", label: "Conversion rate", value: (div(cur.skuOrders, cur.visitors) ?? 0) * 100,
       prev: prev ? (div(pre.skuOrders, pre.visitors) ?? 0) * 100 : null,
       deltaPct: pctChange((div(cur.skuOrders, cur.visitors) ?? 0) * 100, (div(pre.skuOrders, pre.visitors) ?? 0) * 100),
-      format: "pct", higherIsBetter: true, hint: "Đơn SKU ÷ khách truy cập"
+      format: "pct", higherIsBetter: true, hint: "SKU orders ÷ Visitors (toàn shop)"
     },
     {
-      key: "refundRate", label: "Tỷ lệ hoàn", value: (div(cur.refunds, cur.gmv) ?? 0) * 100,
+      key: "refundRate", label: "Refund rate", value: (div(cur.refunds, cur.gmv) ?? 0) * 100,
       prev: prev ? (div(pre.refunds, pre.gmv) ?? 0) * 100 : null,
       deltaPct: pctChange((div(cur.refunds, cur.gmv) ?? 0) * 100, (div(pre.refunds, pre.gmv) ?? 0) * 100),
-      format: "pct", higherIsBetter: false, hint: "Hoàn tiền ÷ GMV"
+      format: "pct", higherIsBetter: false, hint: "Refunds ÷ GMV"
     },
-    { key: "liveGmv", label: "GMV từ LIVE", value: cur.liveAttr, prev: prev ? pre.liveAttr : null, deltaPct: pctChange(cur.liveAttr, pre.liveAttr), format: "money", higherIsBetter: true },
-    { key: "liveHours", label: "Giờ LIVE", value: cur.sessionHours, prev: prev ? pre.sessionHours : null, deltaPct: pctChange(cur.sessionHours, pre.sessionHours), format: "decimal", higherIsBetter: true },
+    { key: "liveGmv", label: "Seller LIVE GMV", value: cur.liveAttr, prev: prev ? pre.liveAttr : null, deltaPct: pctChange(cur.liveAttr, pre.liveAttr), format: "money", higherIsBetter: true },
+    { key: "liveHours", label: "Giờ live", value: cur.sessionHours, prev: prev ? pre.sessionHours : null, deltaPct: pctChange(cur.sessionHours, pre.sessionHours), format: "decimal", higherIsBetter: true },
     {
-      key: "gmvPerHour", label: "GMV/giờ LIVE", value: div(cur.sessionGmv, cur.sessionHours) ?? 0,
+      key: "gmvPerHour", label: "GMV/giờ", value: div(cur.sessionGmv, cur.sessionHours) ?? 0,
       prev: prev ? div(pre.sessionGmv, pre.sessionHours) : null,
       deltaPct: pctChange(div(cur.sessionGmv, cur.sessionHours) ?? 0, div(pre.sessionGmv, pre.sessionHours) ?? 0),
       format: "money", higherIsBetter: true, hint: "Hiệu suất thật của mảng vận hành live"
     },
-    { key: "sessions", label: "Số phiên LIVE", value: cur.sessionCount, prev: prev ? pre.sessionCount : null, deltaPct: pctChange(cur.sessionCount, pre.sessionCount), format: "int", higherIsBetter: true }
+    { key: "sessions", label: "Sessions", value: cur.sessionCount, prev: prev ? pre.sessionCount : null, deltaPct: pctChange(cur.sessionCount, pre.sessionCount), format: "int", higherIsBetter: true }
   ];
 
   // --- Kênh ----------------------------------------------------------------
@@ -360,9 +360,9 @@ export function buildDeepDive(
     contributionToGrowthPct: growthDenom > 0 ? ((gmv - prevGmv) / growthDenom) * 100 : null
   });
   const channels: ChannelSlice[] = [
-    mkChannel("shopLive", "LIVE của shop", c0.shopLive, p0.shopLive),
-    mkChannel("creatorLive", "LIVE của creator (affiliate)", c0.creatorLive, p0.creatorLive),
-    mkChannel("card", "Thẻ sản phẩm", cardCur, cardPrev),
+    mkChannel("shopLive", "Seller LIVE", c0.shopLive, p0.shopLive),
+    mkChannel("creatorLive", "Affiliate LIVE", c0.creatorLive, p0.creatorLive),
+    mkChannel("card", "Product card", cardCur, cardPrev),
     mkChannel("video", "Video", c0.video, p0.video),
     mkChannel("other", "Khác (tìm kiếm, đề xuất…)", otherCur, otherPrev)
   ].sort((a, b) => b.gmv - a.gmv);
@@ -442,10 +442,10 @@ export function buildDeepDive(
   const fc = funnelOf(units);
   const fp = funnelOf(prevLive.units);
   const liveFunnel: FunnelStage[] = [
-    { key: "views", label: "Lượt xem", value: fc.views, prev: prev ? fp.views : null, convFromPrev: null, prevConvFromPrev: null },
-    { key: "impressions", label: "Hiển thị sản phẩm", value: fc.impressions, prev: prev ? fp.impressions : null, convFromPrev: div(fc.impressions, fc.views) !== null ? (fc.impressions / fc.views) * 100 : null, prevConvFromPrev: fp.views > 0 ? (fp.impressions / fp.views) * 100 : null },
-    { key: "clicks", label: "Nhấp sản phẩm", value: fc.clicks, prev: prev ? fp.clicks : null, convFromPrev: fc.impressions > 0 ? (fc.clicks / fc.impressions) * 100 : null, prevConvFromPrev: fp.impressions > 0 ? (fp.clicks / fp.impressions) * 100 : null },
-    { key: "skuOrders", label: "Đơn SKU", value: fc.skuOrders, prev: prev ? fp.skuOrders : null, convFromPrev: fc.clicks > 0 ? (fc.skuOrders / fc.clicks) * 100 : null, prevConvFromPrev: fp.clicks > 0 ? (fp.skuOrders / fp.clicks) * 100 : null },
+    { key: "views", label: "Views", value: fc.views, prev: prev ? fp.views : null, convFromPrev: null, prevConvFromPrev: null },
+    { key: "impressions", label: "Product impressions", value: fc.impressions, prev: prev ? fp.impressions : null, convFromPrev: div(fc.impressions, fc.views) !== null ? (fc.impressions / fc.views) * 100 : null, prevConvFromPrev: fp.views > 0 ? (fp.impressions / fp.views) * 100 : null },
+    { key: "clicks", label: "Product clicks", value: fc.clicks, prev: prev ? fp.clicks : null, convFromPrev: fc.impressions > 0 ? (fc.clicks / fc.impressions) * 100 : null, prevConvFromPrev: fp.impressions > 0 ? (fp.clicks / fp.impressions) * 100 : null },
+    { key: "skuOrders", label: "SKU orders", value: fc.skuOrders, prev: prev ? fp.skuOrders : null, convFromPrev: fc.clicks > 0 ? (fc.skuOrders / fc.clicks) * 100 : null, prevConvFromPrev: fp.clicks > 0 ? (fp.skuOrders / fp.clicks) * 100 : null },
     { key: "gmv", label: "GMV", value: fc.gmv, prev: prev ? fp.gmv : null, convFromPrev: null, prevConvFromPrev: null }
   ];
 
@@ -550,11 +550,11 @@ export function buildDeepDive(
     fallers: [...movers].sort((a, b) => (a.gmv - (a.prevGmv ?? 0)) - (b.gmv - (b.prevGmv ?? 0))).slice(0, 8),
     channelSplit: (() => {
       const parts = [
-        { key: "sellerLive", label: "LIVE shop", gmv: sum(prods, (p) => p.sellerLiveGmv) },
-        { key: "creatorLive", label: "LIVE creator", gmv: sum(prods, (p) => p.creatorLiveGmv) },
-        { key: "card", label: "Thẻ sản phẩm", gmv: sum(prods, (p) => p.cardGmv) },
-        { key: "sellerVideo", label: "Video shop", gmv: sum(prods, (p) => p.sellerVideoGmv) },
-        { key: "creatorVideo", label: "Video creator", gmv: sum(prods, (p) => p.creatorVideoGmv) }
+        { key: "sellerLive", label: "Seller LIVE", gmv: sum(prods, (p) => p.sellerLiveGmv) },
+        { key: "creatorLive", label: "Affiliate LIVE", gmv: sum(prods, (p) => p.creatorLiveGmv) },
+        { key: "card", label: "Product card", gmv: sum(prods, (p) => p.cardGmv) },
+        { key: "sellerVideo", label: "Seller video", gmv: sum(prods, (p) => p.sellerVideoGmv) },
+        { key: "creatorVideo", label: "Affiliate video", gmv: sum(prods, (p) => p.creatorVideoGmv) }
       ];
       const t = sum(parts, (p) => p.gmv);
       return parts.map((p) => ({ ...p, share: t > 0 ? (p.gmv / t) * 100 : 0 })).sort((a, b) => b.gmv - a.gmv);

@@ -1,6 +1,6 @@
 // Lịch camp cố định, áp dụng cho mọi brand/mọi tháng — không phụ thuộc dữ liệu, không đổi theo thời gian.
 // D-Day: ngày double-day (1-1, 2-2, ..., 12-12), kéo dài 3 ngày là D-Day, D-Day-1, D-Day-2.
-// Mid-Month: 13-14-15 hàng tháng. Pay-Day: 23-24-25 hàng tháng.
+// Mid-Month: 13-14-15 hàng tháng. Pay Day: 23-24-25 hàng tháng.
 export type CampaignDayType = "dday" | "midmonth" | "payday";
 
 export interface CampaignDayInfo {
@@ -37,8 +37,8 @@ export function getCampaignDayInfo(dateStr: string): CampaignDayInfo | null {
   if (d >= 23 && d <= 25) {
     return {
       type: "payday",
-      label: "Pay-Day Sale (23-25)",
-      shortLabel: "Pay-Day",
+      label: "Pay Day Sale (23-25)",
+      shortLabel: "Pay Day",
       bannerLabel: "PAY-DAY SALE · 23-25",
       spanIndex: d - 23,
       spanLength: CAMP_SPAN_DAYS
@@ -111,7 +111,7 @@ export const CAMP_DAY_BUCKET_ORDER: CampDayBucket[] = ["dday", "midmonth", "payd
 export const CAMP_DAY_BUCKET_LABEL: Record<CampDayBucket, string> = {
   dday: "D-Day (double-day)",
   midmonth: "Mid-Month (13-15)",
-  payday: "Pay-Day (23-25)",
+  payday: "Pay Day (23-25)",
   daily: "Daily (ngày thường)"
 };
 

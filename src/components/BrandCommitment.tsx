@@ -352,7 +352,7 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
                       <th className="font-bold pb-2 pr-3 text-right">Đang xếp</th>
                       <th className="font-bold pb-2 pr-3 text-right">Tổng có</th>
                       <th className="font-bold pb-2 pr-3 text-right">Thiếu</th>
-                      <th className="font-bold pb-2 pr-3 text-right">Giờ live thật</th>
+                      <th className="font-bold pb-2 pr-3 text-right">Giờ live</th>
                       <th className="font-bold pb-2 pr-3">Trạng thái</th>
                       <th className="font-bold pb-2 text-right">Sửa</th>
                     </tr>

@@ -3,7 +3,7 @@ import { Flame, Sparkles, Wallet } from "lucide-react";
 import { CAMPAIGN_DAY_STYLES, CampaignDayInfo, CampaignDayType } from "../../lib/campaignDays";
 
 // Poster Calendar Design System — dải banner camp bao trùm cả 3 ngày của một đợt camp
-// (D-Day / Mid-Month / Pay-Day) thay cho badge nhỏ lẻ trên từng ô ngày.
+// (D-Day / Mid-Month / Pay Day) thay cho badge nhỏ lẻ trên từng ô ngày.
 //
 // Cách hoạt động: MỌI ô ngày thuộc dải đều render component này để chừa cùng một khoảng
 // chiều cao ở đầu ô (layout bên dưới không bị lệch), nhưng chỉ ô "đầu dải trong hàng đó"

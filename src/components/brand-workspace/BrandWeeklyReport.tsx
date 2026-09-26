@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { LiveSession, ShiftSlot, UserRole } from "../../types";
 import { AlertTriangle, CalendarRange, ChevronLeft, ChevronRight, ClipboardList, Database, Download, Loader2, Radio, TrendingDown, TrendingUp, Users } from "lucide-react";
 import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
+import { metricHint } from "../../lib/metricGlossary";
 import { downloadSheetsAsXlsx } from "../../lib/exportXlsx";
 import { DataRawWeekSlice, addDays, eachDay, fetchDataRawWeekSlice, isoWeekNumber, isoWeekStart } from "../../lib/dataraw/weeklySlice";
 import { getTodayDate } from "../../lib/dateUtils";
@@ -31,7 +32,7 @@ const MISSING_LABEL: Record<MissingStep, string> = { snapshot: "chưa up file", 
 // unmount/remount toàn bộ 8 ô KPI thay vì chỉ update props.
 const Kpi: React.FC<{ label: string; value: string; delta?: number | null; hint?: string; tone?: "good" | "bad" | "warn" }> = ({ label, value, delta, hint, tone }) => (
   <div className="bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3">
-    <p className="text-[10px] uppercase tracking-wider font-bold text-[var(--text-faint)]">{label}</p>
+    <p className="text-[10px] uppercase tracking-wider font-bold text-[var(--text-faint)]" title={metricHint(label)}>{label}</p>
     <p className={`text-lg font-black mt-0.5 ${tone === "good" ? "text-emerald-400" : tone === "bad" ? "text-rose-400" : tone === "warn" ? "text-amber-300" : "text-[var(--text)]"}`}>{value}</p>
     {delta !== undefined && (
       <p className={`text-[10px] font-bold mt-0.5 flex items-center gap-1 ${delta === null ? "text-[var(--text-faint)]" : delta >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
@@ -102,7 +103,10 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
       aov: orders > 0 ? gmv / orders : 0,
       views,
       cvr: views > 0 ? orders / views : null,
-      liveCtr: impressions > 0 ? views / impressions : null,
+      // ERR = Views ÷ LIVE impressions (TikTok "Tap-through rate"); LIVE CTR = Product clicks ÷ Views.
+      // Trước 2026-09-26 ô này ghi "CTR live" nhưng tính Views ÷ impressions — sai tên so với deck/TikTok.
+      err: impressions > 0 ? views / impressions : null,
+      liveCtr: views > 0 ? clicks / views : null,
       productCtr: productImpressions > 0 ? clicks / productImpressions : null,
       target,
       targetDone,
@@ -155,23 +159,23 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
           rows: dailyRows.map((r) => ({
             "Ngày": `${r.dow} ${r.date}`,
             "Ca": r.planned > 0 ? `${r.done}/${r.planned}` : "",
-            "Giờ": Math.round(r.hours * 100) / 100,
-            "GMV Live": Math.round(r.gmv),
-            "Target": Math.round(r.target),
-            "Đạt": r.achieved == null ? "" : Math.round(r.achieved * 10000) / 100,
-            "GMV/Giờ": Math.round(r.gmvPerHour),
-            "Đơn": r.orders,
-            ...(slice?.hasAnyBatch ? { "Shop (TikTok)": r.shopGmv ?? "" } : {})
+            "Giờ live": Math.round(r.hours * 100) / 100,
+            "LIVE GMV": Math.round(r.gmv),
+            "Target GMV": Math.round(r.target),
+            "% Target": r.achieved == null ? "" : Math.round(r.achieved * 10000) / 100,
+            "GMV/giờ": Math.round(r.gmvPerHour),
+            "Orders": r.orders,
+            ...(slice?.hasAnyBatch ? { "Total GMV (TikTok)": r.shopGmv ?? "" } : {})
           }))
         },
         {
           name: "Host Tuan Nay",
           rows: hosts.map((h) => ({
             "Host": h.label,
-            "Ca": h.sessionCount,
-            "Giờ": Math.round(h.hours * 100) / 100,
+            "Sessions": h.sessionCount,
+            "Giờ live": Math.round(h.hours * 100) / 100,
             "GMV": Math.round(h.gmv),
-            "GMV/Giờ": Math.round(h.gmvPerHour)
+            "GMV/giờ": Math.round(h.gmvPerHour)
           }))
         }
       ],
@@ -218,18 +222,19 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
 
       {/* KPI tuần */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Kpi label="GMV tuần" value={formatCurrencyAdaptive(cur.gmv)} delta={wow(cur.gmv, prev.gmv)} tone={cur.gmv > 0 ? "good" : undefined} />
-        <Kpi label="Target tuần" value={cur.target > 0 ? formatCurrencyAdaptive(cur.target) : "—"} hint={cur.achieved !== null ? `đạt ${fmtPct(cur.achieved)} trên ca đã xong` : cur.target > 0 ? "chưa có ca xong" : "chưa có kế hoạch đã chốt"} tone={cur.achieved === null ? undefined : cur.achieved >= 1 ? "good" : cur.achieved >= 0.9 ? "warn" : "bad"} />
-        <Kpi label="Giờ live thật" value={fmtH(cur.hours)} delta={wow(cur.hours, prev.hours)} hint={`${cur.done} ca`} />
-        <Kpi label="GMV / giờ" value={formatCurrencyAdaptive(cur.gmvPerHour)} delta={wow(cur.gmvPerHour, prev.gmvPerHour)} />
-        <Kpi label="Đơn" value={fmtInt(cur.orders)} delta={wow(cur.orders, prev.orders)} hint={cur.aov > 0 ? `AOV ${formatCurrencyAdaptive(cur.aov)}` : undefined} />
-        <Kpi label="View" value={fmtInt(cur.views)} delta={wow(cur.views, prev.views)} />
+        <Kpi label="LIVE GMV tuần" value={formatCurrencyAdaptive(cur.gmv)} delta={wow(cur.gmv, prev.gmv)} tone={cur.gmv > 0 ? "good" : undefined} />
+        <Kpi label="Target GMV tuần" value={cur.target > 0 ? formatCurrencyAdaptive(cur.target) : "—"} hint={cur.achieved !== null ? `${fmtPct(cur.achieved)} Target trên ca đã xong` : cur.target > 0 ? "chưa có ca xong" : "chưa có kế hoạch đã chốt"} tone={cur.achieved === null ? undefined : cur.achieved >= 1 ? "good" : cur.achieved >= 0.9 ? "warn" : "bad"} />
+        <Kpi label="Giờ live" value={fmtH(cur.hours)} delta={wow(cur.hours, prev.hours)} hint={`${cur.done} ca`} />
+        <Kpi label="GMV/giờ" value={formatCurrencyAdaptive(cur.gmvPerHour)} delta={wow(cur.gmvPerHour, prev.gmvPerHour)} />
+        <Kpi label="Orders" value={fmtInt(cur.orders)} delta={wow(cur.orders, prev.orders)} hint={cur.aov > 0 ? `AOV ${formatCurrencyAdaptive(cur.aov)}` : undefined} />
+        <Kpi label="Views" value={fmtInt(cur.views)} delta={wow(cur.views, prev.views)} />
         <Kpi
-          label="CVR (đơn/view)"
+          label="CVR"
           value={fmtPct(cur.cvr, 2)}
           hint={[
-            cur.liveCtr !== null ? `CTR live ${fmtPct(cur.liveCtr, 1)}` : null,
-            cur.productCtr !== null ? `CTR sản phẩm ${fmtPct(cur.productCtr, 2)}` : null
+            cur.err !== null ? `ERR ${fmtPct(cur.err, 2)}` : null,
+            cur.liveCtr !== null ? `LIVE CTR ${fmtPct(cur.liveCtr, 1)}` : null,
+            cur.productCtr !== null ? `Product CTR ${fmtPct(cur.productCtr, 2)}` : null
           ]
             .filter(Boolean)
             .join(" · ") || undefined}
@@ -250,14 +255,14 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
             <thead>
               <tr className="text-[var(--text-faint)] text-left text-[10px] uppercase tracking-wider">
                 <th className="py-1.5 pr-2">Ngày</th>
-                <th className="py-1.5 pr-2 text-right">Ca</th>
-                <th className="py-1.5 pr-2 text-right">Giờ</th>
-                <th className="py-1.5 pr-2 text-right">GMV live</th>
-                <th className="py-1.5 pr-2 text-right">Target</th>
-                <th className="py-1.5 pr-2 text-right">Đạt</th>
+                <th className="py-1.5 pr-2 text-right">Sessions</th>
+                <th className="py-1.5 pr-2 text-right">Giờ live</th>
+                <th className="py-1.5 pr-2 text-right">LIVE GMV</th>
+                <th className="py-1.5 pr-2 text-right">Target GMV</th>
+                <th className="py-1.5 pr-2 text-right">% Target</th>
                 <th className="py-1.5 pr-2 text-right">GMV/giờ</th>
-                <th className="py-1.5 pr-2 text-right">Đơn</th>
-                {slice?.hasAnyBatch && <th className="py-1.5 text-right" title="GMV toàn shop theo TikTok (Dữ Liệu Gốc)">Shop (TikTok)</th>}
+                <th className="py-1.5 pr-2 text-right">Orders</th>
+                {slice?.hasAnyBatch && <th className="py-1.5 text-right" title="Total GMV theo TikTok (Dữ Liệu Gốc)">Total GMV (TikTok)</th>}
               </tr>
             </thead>
             <tbody>
@@ -272,7 +277,7 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
                   <td className="py-1.5 pr-2 text-right text-[var(--text-muted)]">{r.gmvPerHour > 0 ? formatCurrencyAdaptive(r.gmvPerHour) : "—"}</td>
                   <td className="py-1.5 pr-2 text-right text-[var(--text-muted)]">{r.orders > 0 ? fmtInt(r.orders) : "—"}</td>
                   {slice?.hasAnyBatch && (
-                    <td className="py-1.5 text-right text-[var(--text-faint)]" title={r.shopFromLive !== null ? `GMV từ live theo TikTok: ${formatCurrencyAdaptive(r.shopFromLive)}` : undefined}>
+                    <td className="py-1.5 text-right text-[var(--text-faint)]" title={r.shopFromLive !== null ? `Seller LIVE GMV theo TikTok: ${formatCurrencyAdaptive(r.shopFromLive)}` : undefined}>
                       {r.shopGmv !== null ? formatCurrencyAdaptive(r.shopGmv) : "thiếu file"}
                     </td>
                   )}
@@ -296,7 +301,7 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
           <p className="text-[10px] text-[var(--text-faint)] flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Đang đọc Dữ Liệu Gốc…</p>
         ) : slice?.hasAnyBatch ? (
           <p className="text-[10px] text-[var(--text-faint)] flex items-center gap-1">
-            <Database className="w-3 h-3" /> Cột "Shop (TikTok)" = GMV toàn shop theo file Dữ Liệu Gốc, để thấy live chiếm bao nhiêu
+            <Database className="w-3 h-3" /> Cột "Total GMV (TikTok)" = GMV mọi kênh của shop theo file Dữ Liệu Gốc, để thấy live chiếm bao nhiêu
             {slice.missingDays.length > 0 && <> · thiếu file {slice.missingDays.length} ngày ({slice.missingDays.map(fmtDay).join(", ")})</>}.
           </p>
         ) : (
@@ -344,8 +349,8 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
               <thead>
                 <tr className="text-[var(--text-faint)] text-left text-[10px] uppercase tracking-wider">
                   <th className="py-1">Host</th>
-                  <th className="py-1 text-right">Ca</th>
-                  <th className="py-1 text-right">Giờ</th>
+                  <th className="py-1 text-right">Sessions</th>
+                  <th className="py-1 text-right">Giờ live</th>
                   <th className="py-1 text-right">GMV</th>
                   <th className="py-1 text-right">GMV/giờ</th>
                 </tr>

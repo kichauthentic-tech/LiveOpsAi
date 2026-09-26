@@ -124,7 +124,7 @@ export const ENGINE_PARAM_META: EngineParamMeta[] = [
   { key: "minCampSessions", group: "history", label: "Ca tối thiểu để học hệ số camp", help: "Không đủ thì dùng hệ số mặc định bên dưới.", kind: "number", min: 1, max: 50, step: 1 },
   { key: "campDefaultDday", group: "history", label: "Hệ số D-Day mặc định", help: "Dùng khi brand chưa đủ ca D-Day để học.", kind: "number", min: 0.5, max: 3, step: 0.05 },
   { key: "campDefaultMidmonth", group: "history", label: "Hệ số Mid-Month mặc định", help: "", kind: "number", min: 0.5, max: 3, step: 0.05 },
-  { key: "campDefaultPayday", group: "history", label: "Hệ số Pay-Day mặc định", help: "", kind: "number", min: 0.5, max: 3, step: 0.05 },
+  { key: "campDefaultPayday", group: "history", label: "Hệ số Pay Day mặc định", help: "", kind: "number", min: 0.5, max: 3, step: 0.05 },
   { key: "campMultMin", group: "history", label: "Hệ số camp học được — sàn", help: "Kẹp hệ số học từ lịch sử trong [sàn, trần].", kind: "number", min: 0.1, max: 2, step: 0.05 },
   { key: "campMultMax", group: "history", label: "Hệ số camp học được — trần", help: "", kind: "number", min: 1, max: 10, step: 0.1 },
   { key: "minEventSessions", group: "history", label: "Ca tối thiểu để học lễ/sự kiện & scheme", help: "Không đủ → ×1.0 và chỉ ghi nhãn trên lưới.", kind: "number", min: 1, max: 50, step: 1 },

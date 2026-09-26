@@ -164,17 +164,17 @@ export function SessionReportForm({ session, onSubmit, onCancel, canOverrideMetr
           </div>
           <div className="grid grid-cols-3 sm:grid-cols-5 gap-x-3 gap-y-1.5 text-[11px]">
             {[
-              ["GMV Live", `${Math.round(session.actualGmv).toLocaleString("vi-VN")}đ`],
-              ["Đơn", session.totalOrders.toLocaleString("vi-VN")],
-              ["View", session.totalViews.toLocaleString("vi-VN")],
-              ["AVG.view", `${session.avgWatchTimeSeconds}s`],
-              [isTikTok ? "CTR LIVE" : "CTR", `${(Math.round(session.ctrAvg * 100) / 100).toLocaleString("vi-VN")}%`],
+              ["LIVE GMV", `${Math.round(session.actualGmv).toLocaleString("vi-VN")}đ`],
+              ["Orders", session.totalOrders.toLocaleString("vi-VN")],
+              ["Views", session.totalViews.toLocaleString("vi-VN")],
+              ["Avg. view (s)", `${session.avgWatchTimeSeconds}s`],
+              [isTikTok ? "LIVE CTR" : "CTR", `${(Math.round(session.ctrAvg * 100) / 100).toLocaleString("vi-VN")}%`],
               ...(isTikTok
                 ? [
-                    ["Impression", derived.impressionCount.toLocaleString("vi-VN")],
+                    ["LIVE impressions", derived.impressionCount.toLocaleString("vi-VN")],
                     ["ERR", `${derived.enterRoomRate}%`],
                     ["CTOR", `${derived.ctor}%`],
-                    ["AVG.price", `${derived.avgOrderValue.toLocaleString("vi-VN")}đ`]
+                    ["AOV", `${derived.avgOrderValue.toLocaleString("vi-VN")}đ`]
                   ]
                 : [["GPM", derived.gpm.toLocaleString("vi-VN")]])
             ].map(([k, v]) => (
@@ -186,12 +186,12 @@ export function SessionReportForm({ session, onSubmit, onCancel, canOverrideMetr
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
             <div>
-              <label className={labelClass}>GMV Tổng (VNĐ) <span className="font-normal text-[var(--text-faint)]">— nếu khác GMV Live</span></label>
+              <label className={labelClass}>Total GMV (VNĐ) <span className="font-normal text-[var(--text-faint)]">— nếu khác LIVE GMV</span></label>
               <input type="number" value={gmvTotal} onChange={(e) => setGmvTotal(Number(e.target.value))} className={inputClass} />
             </div>
             {isTikTok ? (
               <div>
-                <label className={labelClass}>ADS Cost (VNĐ)</label>
+                <label className={labelClass}>Ads cost (VNĐ)</label>
                 <input type="number" value={adsCost} onChange={(e) => setAdsCost(Number(e.target.value))} className={inputClass} />
               </div>
             ) : (
@@ -216,23 +216,23 @@ export function SessionReportForm({ session, onSubmit, onCancel, canOverrideMetr
         <>
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <div>
-          <label className={labelClass}>GMV Live (VNĐ)</label>
+          <label className={labelClass}>LIVE GMV (VNĐ)</label>
           <input type="number" value={actualGmv} onChange={(e) => setActualGmv(Number(e.target.value))} className={metricClass} disabled={metricsLocked} />
         </div>
         <div>
-          <label className={labelClass}>Đơn Hàng</label>
+          <label className={labelClass}>Orders</label>
           <input type="number" min={0} value={totalOrders} onChange={(e) => setTotalOrders(Math.max(0, Number(e.target.value)))} className={metricClass} disabled={metricsLocked} />
         </div>
         <div>
-          <label className={labelClass}>GMV Tổng (VNĐ)</label>
+          <label className={labelClass}>Total GMV (VNĐ)</label>
           <input type="number" value={gmvTotal} onChange={(e) => setGmvTotal(Number(e.target.value))} className={inputClass} />
         </div>
         <div>
-          <label className={labelClass}>View</label>
+          <label className={labelClass}>Views</label>
           <input type="number" value={totalViews} onChange={(e) => setTotalViews(Number(e.target.value))} className={metricClass} disabled={metricsLocked} />
         </div>
         <div>
-          <label className={labelClass}>AVG.view (giây)</label>
+          <label className={labelClass}>Avg. view (giây)</label>
           <input
             type="number"
             value={avgWatchTimeSeconds}
@@ -246,11 +246,11 @@ export function SessionReportForm({ session, onSubmit, onCancel, canOverrideMetr
       {isTikTok ? (
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           <div>
-            <label className={labelClass}>Impression</label>
+            <label className={labelClass}>LIVE impressions</label>
             <input type="number" value={impressionCount} onChange={(e) => setImpressionCount(Number(e.target.value))} className={inputClass} />
           </div>
           <div>
-            <label className={labelClass}>ADS Cost</label>
+            <label className={labelClass}>Ads cost</label>
             <input type="number" value={adsCost} onChange={(e) => setAdsCost(Number(e.target.value))} className={inputClass} />
           </div>
           <div>
@@ -258,7 +258,7 @@ export function SessionReportForm({ session, onSubmit, onCancel, canOverrideMetr
             <input type="number" step="0.01" value={enterRoomRate} onChange={(e) => setEnterRoomRate(Number(e.target.value))} className={inputClass} />
           </div>
           <div>
-            <label className={labelClass}>CTR LIVE (%)</label>
+            <label className={labelClass}>LIVE CTR (%)</label>
             <input type="number" step="0.01" value={ctrAvg} onChange={(e) => setCtrAvg(Number(e.target.value))} className={metricClass} disabled={metricsLocked} />
           </div>
           <div>
@@ -266,7 +266,7 @@ export function SessionReportForm({ session, onSubmit, onCancel, canOverrideMetr
             <input type="number" step="0.01" value={ctor} onChange={(e) => setCtor(Number(e.target.value))} className={inputClass} />
           </div>
           <div>
-            <label className={labelClass}>AVG.price (VNĐ)</label>
+            <label className={labelClass}>AOV (VNĐ)</label>
             <input type="number" value={avgOrderValue} onChange={(e) => setAvgOrderValue(Number(e.target.value))} className={inputClass} />
           </div>
         </div>
@@ -281,7 +281,7 @@ export function SessionReportForm({ session, onSubmit, onCancel, canOverrideMetr
             <input type="number" step="0.01" value={ctrAvg} onChange={(e) => setCtrAvg(Number(e.target.value))} className={metricClass} disabled={metricsLocked} />
           </div>
           <div>
-            <label className={labelClass}>GPM</label>
+            <label className={labelClass}>Watch GPM</label>
             <input type="number" value={gpm} onChange={(e) => setGpm(Number(e.target.value))} className={inputClass} />
           </div>
           <div>

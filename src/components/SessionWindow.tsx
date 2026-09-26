@@ -24,6 +24,7 @@ import { SessionLiveSnapshotUpload } from "./SessionLiveSnapshotUpload";
 import { SessionReportForm } from "./SessionReportForm";
 import { useToast } from "../hooks/useToast";
 import { useConfirm } from "../hooks/useConfirm";
+import { metricHint } from "../lib/metricGlossary";
 
 // Cửa sổ Ca Live — MỘT cửa sổ chi tiết cho một ca, dùng chung cho mọi nơi click vào ca (Sổ Ca,
 // Lịch Vận Hành, Đăng Ký & Chốt Lịch, Sessions bên brand). Thay cho 3 "chi tiết ca" khác nhau
@@ -389,17 +390,17 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
               <KV label="Giờ kế hoạch" value={`${s.startTime}–${s.endTime} (${fmtHours(planHours)})`} />
               {hideMetrics ? (
                 <>
-                  <KV label="Giờ live thật" value="chưa phát hành" muted />
-                  <KV label="GMV thực tế" value="chưa phát hành" muted />
-                  <KV label="GMV / giờ" value="chưa phát hành" muted />
+                  <KV label="Giờ live" value="chưa phát hành" muted />
+                  <KV label="GMV" value="chưa phát hành" muted />
+                  <KV label="GMV/giờ" value="chưa phát hành" muted />
                 </>
               ) : (
                 <>
-                  <KV label="Giờ live thật" value={s.actualStartAt ? `${fmtTime(s.actualStartAt)}–${fmtTime(s.actualEndAt)} (${fmtHours(liveHours)})` : "chưa có file"} muted={!s.actualStartAt} />
+                  <KV label="Giờ live" value={s.actualStartAt ? `${fmtTime(s.actualStartAt)}–${fmtTime(s.actualEndAt)} (${fmtHours(liveHours)})` : "chưa có file"} muted={!s.actualStartAt} />
                   {!isBrandView && <KV label="Target GMV" value={s.targetGmv ? formatCurrencyAdaptive(s.targetGmv) : "chưa có target"} muted={!s.targetGmv} />}
-                  <KV label="GMV thực tế" value={s.actualGmv ? formatCurrencyAdaptive(s.actualGmv) : "—"} accent={!!s.actualGmv} />
-                  {!isBrandView && s.targetGmv > 0 && <KV label="Đạt target" value={fmtPct(((s.actualGmv ?? 0) / s.targetGmv) * 100)} />}
-                  <KV label="GMV / giờ" value={gmvPerHour > 0 ? formatCurrencyAdaptive(gmvPerHour) : "—"} />
+                  <KV label="GMV" value={s.actualGmv ? formatCurrencyAdaptive(s.actualGmv) : "—"} accent={!!s.actualGmv} />
+                  {!isBrandView && s.targetGmv > 0 && <KV label="% Target" value={fmtPct(((s.actualGmv ?? 0) / s.targetGmv) * 100)} />}
+                  <KV label="GMV/giờ" value={gmvPerHour > 0 ? formatCurrencyAdaptive(gmvPerHour) : "—"} />
                 </>
               )}
             </div>
@@ -491,25 +492,26 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
             {counters ? (
               <>
                 <div className="grid grid-cols-3 gap-2">
-                  <KV label="Đơn" value={fmtInt(counters.orders)} />
-                  <KV label="Sản phẩm bán" value={fmtInt(counters.itemsSold)} />
-                  <KV label="Đơn SKU" value={fmtInt(counters.skuOrders)} />
-                  <KV label="Lượt xem" value={fmtInt(counters.views)} />
-                  <KV label="Hiển thị" value={fmtInt(counters.impressions)} />
-                  <KV label="Hiển thị SP" value={fmtInt(counters.productImpressions)} />
-                  <KV label="Click SP" value={fmtInt(counters.productClicks)} />
-                  <KV label="Follow mới" value={fmtInt(counters.newFollowers)} />
-                  <KV label="Bình luận" value={fmtInt(counters.comments)} />
-                  <KV label="Chia sẻ" value={fmtInt(counters.shares)} />
-                  <KV label="Thích" value={fmtInt(counters.likes)} />
-                  <KV label="Peak viewers" value={fmtInt(s.peakViewers)} />
+                  <KV label="Orders" value={fmtInt(counters.orders)} />
+                  <KV label="Items sold" value={fmtInt(counters.itemsSold)} />
+                  <KV label="SKU orders" value={fmtInt(counters.skuOrders)} />
+                  <KV label="Views" value={fmtInt(counters.views)} />
+                  <KV label="LIVE impressions" value={fmtInt(counters.impressions)} />
+                  <KV label="Product impressions" value={fmtInt(counters.productImpressions)} />
+                  <KV label="Product clicks" value={fmtInt(counters.productClicks)} />
+                  <KV label="New followers" value={fmtInt(counters.newFollowers)} />
+                  <KV label="Comments" value={fmtInt(counters.comments)} />
+                  <KV label="Shares" value={fmtInt(counters.shares)} />
+                  <KV label="Likes" value={fmtInt(counters.likes)} />
+                  <KV label="PCU" value={fmtInt(s.peakViewers)} />
                 </div>
                 {ratios && (
                   <div className="grid grid-cols-3 gap-2 mt-2">
                     <KV label="AOV" value={formatCurrencyAdaptive(ratios.aov)} />
-                    <KV label="CTR" value={fmtPct(ratios.ctr)} />
-                    <KV label="CTOR" value={fmtPct(ratios.ctor)} />
+                    <KV label="ERR" value={fmtPct(ratios.tapThroughRate)} />
                     <KV label="LIVE CTR" value={fmtPct(ratios.liveCtr)} />
+                    <KV label="Product CTR" value={fmtPct(ratios.ctr)} />
+                    <KV label="CTOR" value={fmtPct(ratios.ctor)} />
                     <KV label="SKU order rate" value={fmtPct(ratios.skuOrderRate)} />
                     <KV label="Show GPM" value={formatCurrencyAdaptive(ratios.showGpm)} />
                   </div>
@@ -519,9 +521,9 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
             ) : s.actualGmv || s.totalOrders || s.totalViews ? (
               <>
                 <div className="grid grid-cols-3 gap-2">
-                  <KV label="Đơn" value={fmtInt(s.totalOrders)} />
-                  <KV label="Lượt xem" value={fmtInt(s.totalViews)} />
-                  <KV label="Peak viewers" value={fmtInt(s.peakViewers)} />
+                  <KV label="Orders" value={fmtInt(s.totalOrders)} />
+                  <KV label="Views" value={fmtInt(s.totalViews)} />
+                  <KV label="PCU" value={fmtInt(s.peakViewers)} />
                 </div>
                 <p className="text-[10px] text-amber-300 mt-2">Số tự khai tay — chưa có file nên không tính được tỷ lệ.</p>
               </>
@@ -690,7 +692,7 @@ const TrustBadge: React.FC<{ session: LiveSession }> = ({ session }) => {
 
 const KV: React.FC<{ label: string; value: string; muted?: boolean; accent?: boolean }> = ({ label, value, muted, accent }) => (
   <div className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2.5 py-2">
-    <p className="text-[10px] text-[var(--text-faint)]">{label}</p>
+    <p className="text-[10px] text-[var(--text-faint)]" title={metricHint(label)}>{label}</p>
     <p className={`text-xs font-bold ${accent ? "text-[var(--success)]" : muted ? "text-[var(--text-faint)] font-normal italic" : "text-[var(--text)]"}`}>{value}</p>
   </div>
 );

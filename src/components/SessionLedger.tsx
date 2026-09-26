@@ -178,10 +178,10 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
       if (!isBrandView) row["Trợ live"] = s.coHostName || "";
       row["Trạng thái"] = STATUS_LABEL[s.status];
       row["Giờ live"] = s.liveDurationMinutes ? Number((s.liveDurationMinutes / 60).toFixed(2)) : Number(hours.toFixed(2));
-      if (!isBrandView) row["Target"] = s.targetGmv || 0;
+      if (!isBrandView) row["Target GMV"] = s.targetGmv || 0;
       row["GMV"] = hideMetrics ? "Chưa phát hành" : s.actualGmv || 0;
-      row["Đơn"] = hideMetrics ? "Chưa phát hành" : s.totalOrders || 0;
-      if (isBrandView) row["Lượt xem"] = hideMetrics ? "Chưa phát hành" : s.totalViews || 0;
+      row["Orders"] = hideMetrics ? "Chưa phát hành" : s.totalOrders || 0;
+      if (isBrandView) row["Views"] = hideMetrics ? "Chưa phát hành" : s.totalViews || 0;
       row["GMV/giờ"] = hideMetrics ? "Chưa phát hành" : Math.round(gmvPerHour);
       row[isBrandView ? "Số liệu" : "Dữ liệu"] = isBrandView
         ? hideMetrics
@@ -302,11 +302,11 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
 
         {/* Dải tổng hợp theo bộ lọc */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-          <Stat label="Số ca" value={String(summary.total)} sub={summary.countable < summary.total ? `${summary.countable} ca có số` : undefined} />
+          <Stat label="Sessions" value={String(summary.total)} sub={summary.countable < summary.total ? `${summary.countable} ca có số` : undefined} />
           <Stat label="Giờ live" value={fmtHours(summary.hours)} sub="giờ thật, thiếu thì lấy giờ kế hoạch" />
           <Stat label="GMV" value={formatCurrencyAdaptive(summary.gmv, "")} accent />
-          <Stat label="Đơn" value={fmtInt(summary.orders)} />
-          <Stat label="GMV / giờ" value={formatCurrencyAdaptive(summary.gmvPerHour, "")} />
+          <Stat label="Orders" value={fmtInt(summary.orders)} />
+          <Stat label="GMV/giờ" value={formatCurrencyAdaptive(summary.gmvPerHour, "")} />
           <div className="bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-2.5">
             <p className="text-[10px] uppercase tracking-wider text-[var(--text-faint)]">Nguồn số liệu</p>
             {summary.countable === 0 ? (
@@ -338,10 +338,10 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
                 <th className="py-2.5 px-2">Host</th>
                 <th className="py-2.5 px-2">Trạng thái</th>
                 <th className="py-2.5 px-2 text-right">Giờ live</th>
-                {!isBrandView && <th className="py-2.5 px-2 text-right">Target</th>}
+                {!isBrandView && <th className="py-2.5 px-2 text-right">Target GMV</th>}
                 <th className="py-2.5 px-2 text-right">GMV</th>
-                <th className="py-2.5 px-2 text-right">Đơn</th>
-                {isBrandView && <th className="py-2.5 px-2 text-right">Lượt xem</th>}
+                <th className="py-2.5 px-2 text-right">Orders</th>
+                {isBrandView && <th className="py-2.5 px-2 text-right">Views</th>}
                 <th className="py-2.5 px-2 text-right">GMV/giờ</th>
                 <th className="py-2.5 px-2">{isBrandView ? "Số liệu" : "Dữ liệu"}</th>
                 <th className="py-2.5 px-2">Sự cố</th>
