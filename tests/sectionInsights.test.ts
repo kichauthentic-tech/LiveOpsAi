@@ -26,23 +26,29 @@ test("văn bản Insight: dòng đầu kết luận, dòng '→' là việc cầ
   expect(parseInsightText("  \n ")).toBeNull();
 });
 
-test("Vì sao — CROCS 1–22/09 vs 1–22/08: cả traffic lẫn chuyển đổi cùng giảm, nghẽn nặng nhất ở chốt đơn", () => {
-  const t8 = stats(4_309_000_000, 153.6, 526_400, { liveCtr: 56.0, ctor: 1.6, upt: 1.2, aov: 1_084_000 });
-  const t9 = stats(3_517_000_000, 177.8, 496_400, { liveCtr: 52.4, ctor: 1.25, upt: 1.06, aov: 1_146_000 });
-  const w = whyInsight(t8, t9)!;
-  expect(w.headline).toMatch(/^GMV\/giờ −29%: Views\/giờ −19%, GMV\/View −13%/);
-  expect(w.headline).toContain("cả traffic lẫn chuyển đổi cùng giảm");
-  expect(w.points).toContain("CTOR: 1,60% → 1,25% (−22%).");
-  expect(w.action).toMatch(/chốt đơn/);
+test("Vì sao — CROCS 1–22/09 vs 1–22/08: 4 thừa số GMV/giờ, ngày thường tụt gấp đôi camp, không phải do lịch camp", () => {
+  const t8 = stats(4_309_000_000, 153.6, 526_400, { liveCtr: 55.98, ctor: 1.35, upt: 1.2, aov: 1_084_000 });
+  const t9 = stats(3_517_000_000, 177.8, 496_400, { liveCtr: 52.43, ctor: 1.18, upt: 1.06, aov: 1_146_000 });
+  const g = (key: "daily" | "camp", a: number, b: number) => ({ key, prev: stats(a * 10, 10, 1000), cur: stats(b * 10, 10, 1000) });
+  const w = whyInsight(t8, t9, {
+    groups: [g("daily", 28_800_000, 17_900_000), g("camp", 27_300_000, 22_100_000)],
+    mixRate: { delta: -8_300_000, mix: -100_000, rate: -8_200_000 },
+    giftLine: "Quà tặng … UPT giảm chủ yếu vì vậy."
+  })!;
+  expect(w.headline).toBe("GMV/giờ −29%: Views/giờ −19%, LIVE CTR −6%, CTOR −13%, AOV +6% — cả traffic lẫn chuyển đổi cùng giảm.");
+  expect(w.points[0]).toBe("Ngày thường: 28,8 triệu đ → 17,9 triệu đ/giờ (−38%); ngày camp: 27,3 triệu đ → 22,1 triệu đ/giờ (−19%).");
+  expect(w.points[1]).toMatch(/^Không phải do lịch camp: cơ cấu giờ live giữa các loại ngày chỉ giải thích −100\.000 đ\/giờ, hiệu suất trong từng loại ngày −8,2 triệu đ\/giờ\.$/);
+  expect(w.points).toContain("Quà tặng … UPT giảm chủ yếu vì vậy.");
+  // Bước yếu nhất theo %: Views/giờ −19% ⇒ traffic (không còn "giỏ hàng/UPT" — UPT đổi theo quà tặng).
+  expect(w.action).toMatch(/traffic/);
 });
 
-test("Vì sao — CROCS T8 vs T7: chuyển đổi kéo lên, nghẽn ở giỏ hàng (UPT −17%)", () => {
-  const t7 = stats(5_187_000_000, 213.6, 724_500, { liveCtr: 54.16, ctor: 1.73, upt: 1.43 });
-  const t8 = stats(5_885_000_000, 228.6, 725_100, { liveCtr: 56.28, ctor: 1.54, upt: 1.18 });
+test("Vì sao — CROCS T8 vs T7: chuyển đổi kéo lên, traffic bù một phần; thiếu Views ⇒ không bịa", () => {
+  const t7 = stats(5_187_000_000, 213.6, 724_500, { liveCtr: 54.16, ctor: 1.23, aov: 1_072_000 });
+  const t8 = stats(5_885_000_000, 228.6, 725_100, { liveCtr: 56.28, ctor: 1.31, aov: 1_104_000 });
   const w = whyInsight(t7, t8)!;
   expect(w.headline).toContain("chuyển đổi kéo lên, traffic bù một phần");
-  expect(w.action).toMatch(/giỏ hàng/);
-  // Thiếu lượt xem ⇒ không bịa.
+  expect(w.points).toEqual([]);
   expect(whyInsight(t7, { ...t8, viewsPerHour: null, gmvPerView: null })).toBeNull();
 });
 
@@ -59,15 +65,27 @@ test("Người — so mặt bằng cùng loại ngày: host bán ngày thường
   expect(p["Thường 2"].gap).toBeCloseTo(-50);
 });
 
-test("Người — cùng −21% thì nêu tên host hụt nhiều tiền hơn (live 20h), không phải host live 7h (CROCS T8)", () => {
+test("Người — chỉ nêu tên khi so mặt bằng 4 tháng chắc chắn; còn lại ghi 'chưa đủ ca để kết luận'", () => {
   const mk = (name: string, gmv: number, hours: number) => ({ name, gmv, hours, byBucket: { daily: { gmv, hours } } });
-  const avg = 26_000_000;
-  const hosts = [mk("Hùng", 72 * avg * 1.2, 72), mk("Nhật", 20 * avg * 0.79, 20), mk("Linh", 7.2 * avg * 0.79, 7.2), mk("An", 21 * avg, 21)];
-  const i = peopleInsight(hosts)!;
-  expect(i.headline).toMatch(/^Hùng dẫn đầu GMV/);
-  const weak = i.points.find((l) => l.includes("hụt"))!;
-  expect(weak).toMatch(/^Nhật:/);
-  expect(i.action).toMatch(/Nhật/);
+  const hosts = [mk("Hùng", 1_710_000_000, 66.5), mk("Thy", 170_000_000, 11.3), mk("Phú", 300_000_000, 15), mk("An", 90_000_000, 5)];
+  // Số thật CROCS T6–T9 (đo 2026-09-26): Hùng 59 ca, khoảng 1,02–1,23; Thy tháng này −24% nhưng 4 tháng cắt qua 1.
+  const rel = [
+    { key: "h", name: "Hùng", sessions: 59, ratio: 1.11, lo: 1.02, hi: 1.23, verdict: "above" as const },
+    { key: "t", name: "Thy", sessions: 7, ratio: 1.02, lo: 0.84, hi: 1.2, verdict: "unclear" as const },
+    { key: "p", name: "Phú", sessions: 18, ratio: 0.95, lo: 0.86, hi: 1.04, verdict: "unclear" as const },
+    { key: "a", name: "An", sessions: 2, ratio: 0.83, lo: null, hi: null, verdict: "unclear" as const }
+  ];
+  const i = peopleInsight(hosts, rel)!;
+  expect(i.headline).toBe("Hùng dẫn đầu GMV (1,71 tỷ đ, 75% tổng host); là host duy nhất vượt mặt bằng với khoảng tin cậy 95% nằm hẳn trên mặt bằng (59 ca): +11% (+2% … +23%).");
+  // Cận dưới sát mặt bằng ⇒ nói rõ là kết luận yếu (số thật CROCS sau khi dùng phân phối t: +0,0% … +23%).
+  expect(peopleInsight(hosts, [{ ...rel[0], lo: 1.0003 }, ...rel.slice(1)])!.headline).toMatch(/\+11% \(\+0,0% … \+23%\) — sát ngưỡng, cần thêm tháng để chắc\.$/);
+  expect(i.points).toEqual(["3 host còn lại: khoảng tin cậy còn cắt qua mặt bằng — chưa đủ ca để kết luận hơn hay kém."]);
+  expect(i.points.join(" ")).not.toContain("Thy");
+  expect(i.action).toBeNull(); // Hùng live nhiều giờ nhất ⇒ không gợi ý thêm ca
+  // Host dưới mặt bằng chắc chắn ⇒ nêu tên + việc cần làm.
+  const j = peopleInsight(hosts, [...rel.slice(0, 1), { ...rel[2], lo: 0.8, hi: 0.93, ratio: 0.86, verdict: "below" as const }])!;
+  expect(j.points[0]).toBe("Phú: dưới mặt bằng −14% (−20% … −7%) qua 18 ca.");
+  expect(j.action).toMatch(/^Xem lại khung ca và nhóm SKU của Phú/);
   expect(peopleInsight([mk("Một mình", 100, 5)])).toBeNull();
 });
 

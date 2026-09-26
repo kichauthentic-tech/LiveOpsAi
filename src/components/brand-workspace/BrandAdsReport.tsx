@@ -7,6 +7,7 @@ import { getCanonicalAdsCost } from "../../lib/metrics/adsCost";
 import { isoWeekStart } from "../../lib/dataraw/weeklySlice";
 import { fetchMonthlyReport, upsertMonthlyReport, MonthlyReportManualInput } from "../../lib/db/monthlyReports";
 import { errorMessage } from "../../lib/errorMessage";
+import { ReportPlanningInputs } from "./ReportPlanningInputs";
 
 import { fmtFixed } from "../../lib/format";
 // Nhập Ads & Ghi Chú (tách khỏi Report Tháng 2026-09-21 theo yêu cầu user): phần ops nhập tay
@@ -338,6 +339,12 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
             </p>
           )}
         </div>
+      )}
+
+      {/* Công cụ nhập liệu của Report Tháng (khung camp, phân bổ + affiliate tháng sau) — chuyển từ Phụ lục của
+          report sang đây 2026-09-26; dùng chung `report` với form trên để hai form không ghi đè số của nhau. */}
+      {!loading && canManage && (
+        <ReportPlanningInputs key={`${month}|${report?.id ?? "none"}`} brandId={brandId} month={month} sessions={sessions} report={report} onSaved={setReport} readOnly={readOnly} />
       )}
     </div>
   );

@@ -2,6 +2,12 @@
 
 ## CẦN LÀM NGAY khi mở phiên mới (cập nhật 2026-09-24)
 
+> **MỚI 2026-09-26 (khuya) — Report Tháng chuyên sâu: 7 phần kết luận trước + 4 phép phân tích mới (không migration, CHƯA
+> commit).** User yêu cầu "tối ưu report Tháng theo hướng chuyên nghiệp, phân tích chuyên sâu"; đề xuất đo trên số thật CROCS:
+> https://claude.ai/artifact/SmokGAGp1J9dPzmyj788Lt — user chọn làm cả 4 mục. **Việc ops phải làm:** mọi report tháng (brand/tháng
+> khác CROCS T9) bấm "Cập nhật số liệu" để có piece `gifts` (report nhắc bằng dải vàng). CROCS T9 đã cập nhật. Xem mục
+> `## Report Tháng chuyên sâu`.
+
 > **MỚI 2026-09-26 (tối) — Audit UX/UI: P0 + P1 ĐÃ LÀM + VERIFY + ĐÃ DEPLOY (không migration).** P0 73acafc, P1 cda0a31 + 5e2f67a.
 > P1: link riêng cho từng trang (`/so-ca`, `/brand/crocs/report-thang`, Back/Forward chạy), tiêu đề trang 1 dòng + "Chi tiết",
 > sidebar tự thu gọn < 1280px, header mobile gọn, số kiểu Việt (2,18%) qua `src/lib/format.ts`. `vercel.json` rewrite SPA đã
@@ -1562,6 +1568,69 @@ trong DB đang rỗng nên mọi câu insight tự sinh ra chữ mới ngay; đo
 **Còn lại / chưa đụng:** màn thao tác nội bộ giữ từ vận hành tiếng Việt khi không phải tên chỉ số ("Ca", "Giờ" = khung giờ, "Số
 Ca" ở lịch/đăng ký, engine AI Training); Talent Pool trường cũ `cvrAvg`/`ctrAvg` (nhập tay, chưa rõ định nghĩa) chỉ đổi nhãn nhẹ.
 
+## Report Tháng chuyên sâu — XONG + VERIFY 2026-09-26 (khuya, KHÔNG migration, CHƯA commit)
+
+**Vì sao làm.** User: "tối ưu report Tháng theo hướng chuyên nghiệp, phân tích chuyên sâu, mang lại giá trị". Đo report cũ (CROCS
+T9, 1440px): 12.091px = 14,5 màn, 20 biểu đồ, 11 bảng; Tóm tắt lặp 5/7 câu của Insight; phần 4 nói cùng chỉ số 4 lần; xu hướng 4
+tháng rải 5 chỗ; Phụ lục (công cụ nhập) 16% trang; CTOR tháng 8 có 3 con số (1,60 / 1,54 / 1,31%). Phân tích 229 ca thật + Shop
+Analytics + file Sản Phẩm ra 4 phát hiện (đề xuất + nguồn: https://claude.ai/artifact/SmokGAGp1J9dPzmyj788Lt):
+1. **Quà tặng làm méo UPT/CTOR.** Jibbitz 0–3k/món (SKU order > số lượt bấm) là quà tặng kèm đơn giày, giảm dần T6→T9. Bỏ quà (< 20k/món) thì
+   UPT cả shop 1,09 / 1,10 / 1,11 / 1,08 (đi ngang); CTOR theo Orders 1,13 → 1,23 → 1,31 → 1,18% (không "giảm 4 tháng"); CTOR giày
+   ≥ 800k còn tăng 0,78 → 0,90%. Shift-share CTOR T6→T9: phần "cùng SKU chuyển đổi kém đi" −0,006 điểm ≈ 0.
+2. **Xếp hạng host theo tháng ≈ nhiễu.** So mặt bằng tháng M không dự báo tháng M+1 (Spearman −0,04, 20 cặp; gộp 3 tháng dự báo tháng
+   giữ ra −0,11, 27 cặp). Mỗi ca lệch mặt bằng ~26% (CV) ⇒ 3 ca sai số ~15%.
+3. **Nhóm đối chứng.** 1–22/09 vs 1–22/08, ngày thường: live agency −19%, phần còn lại của shop +1%, lượt vào shop −4% ⇒ hụt do vận
+   hành; ngày camp: agency −11% vs phần còn lại −69% ⇒ thị trường giảm, agency giữ tốt.
+4. **Cơ cấu lịch vs hiệu suất.** ΔGMV/giờ −8,3tr: cơ cấu giờ giữa các loại ngày −0,1tr, hiệu suất trong từng loại ngày −8,2tr.
+
+**Đã làm (user chọn cả 4):**
+- **CTOR = Orders ÷ Product clicks ở MỌI chỗ của Report Tháng** (`liveStatsFromRows`, `aggregateCreatorLivePerfRows`, `skuMoves`)
+  — đóng điểm lệch CTOR đang treo. Phân Tích Sâu (ops, `deepdive/metrics.ts`) vẫn có cột SKU order riêng, không đổi.
+- **Logic mới** [deepAnalysis.ts](src/lib/report/deepAnalysis.ts) (thuần, 5 test ở [tests/deepAnalysis.test.ts](tests/deepAnalysis.test.ts), số CROCS thật):
+  `giftSliceFromAgg`/`giftStats`/`giftLine` (ngưỡng `GIFT_MAX_PRICE` 20k — đo: bắt 4.125/2.900/1.090/0 món T6–T9, không dính SKU giá
+  thật), `dayGroupStats` + `mixRateSplit` (mix + rate = Δ đúng), `controlGroup`/`controlVerdict`/`controlLine` (live tài khoản shop vs
+  gmv − liveLinked của Shop Analytics, lệch ≥ 10 điểm mới gọi là khác thị trường), `hostReliability` (tỷ số GMV ÷ GMV kỳ vọng theo
+  tháng × loại ngày × buổi ngày/tối, khoảng tin cậy delta-method với **phân phối t** `t95(n−1)` — lần đầu dùng 1,96 đã "kết luận" Linh
+  dưới mặt bằng từ 3 ca; tất định, không bootstrap), `dailyGapLine` (cơ hội ngày thường quy ra tiền).
+- `driverBreakdown` giờ **5 thừa số** Giờ live × Views/giờ × LIVE CTR × CTOR × AOV (thay 2 waterfall traffic + giỏ hàng; `basketBreakdown`
+  đã XOÁ — UPT/Avg. price đổi theo quà). `logShareBreakdown` chia theo tổng log của chính các thừa số ⇒ các phần luôn cộng đúng ΔGMV.
+- `autoSummary` = **kết luận trước** tối đa 5 câu: kết quả (+target/KPI) → nguyên nhân quy ra tiền (2 thừa số lớn nhất + phần bù) → nhóm
+  đối chứng → cơ hội lớn nhất (ngày thường về GMV/giờ kỳ trước hoặc thừa số tụt nhiều tiền nhất) → quà tặng. Bỏ câu SKU/camp/"N tháng liên
+  tiếp" (đã ở Insight từng phần). `autoNextSteps` theo thừa số tụt mạnh nhất + nhóm đối chứng + quà tặng. `whyInsight(prev, cur, {groups,
+  mixRate, giftLine})`, `peopleInsight(hosts, reliability)` (chỉ nêu tên khi khoảng tin cậy nằm hẳn một phía, cận sát 1 (< 2 điểm) thì ghi
+  "sát ngưỡng, cần thêm tháng để chắc"), `shopInsight({..., control})` (kết luận = thị trường hay vận hành), `productsInsight(..., giftNote)`.
+- **Bản chụp:** piece mới `gifts|YYYY-MM` cho 4 tháng (nguồn product_list, dùng chung `AggMemo`). Không tăng `SNAPSHOT_VERSION`/
+  `PIECE_VERSION` — thiếu piece ⇒ freshness báo "file Sản Phẩm" + dải vàng "bấm Cập nhật số liệu"; report vẫn chạy (dòng quà trống).
+- **UI** [MonthlyReportTabs.tsx](src/components/brand-workspace/MonthlyReportTabs.tsx) — 7 phần: 1 Kết luận (5 ô KPI + kết luận đánh
+  số + target/KPI/run-rate gọn + luỹ kế; bỏ "Target vs GMV 4 tháng") · 2 Thị trường hay vận hành (bảng đối chứng + cơ cấu kênh, bảng
+  theo tháng gập trong `<details>`) · 3 Vì sao (1 waterfall 5 thừa số, bảng ngày thường vs camp + câu mix/rate, **bảng xu hướng 4 tháng
+  cắt cùng số ngày** thay 8 ô xu hướng + MoM + phễu + 2 biểu đồ 4 tháng; có dòng Quà tặng mỗi đơn + UPT bỏ quà) · 4 Sản phẩm (+ dòng
+  quà tặng) · 5 Host (dòng **"So mặt bằng N tháng"** in đậm, chỉ tô màu khi chắc; "So mặt bằng tháng này" chữ mờ; tab loại ngày ghi rõ
+  "để hiểu thừa số, không xếp hạng") · 6 Campaign & khung giờ (bỏ biểu đồ trùng bảng; GMV theo ngày + Top 10 phiên gập) · 7 Tháng sau
+  ("Việc agency làm" đưa lên đầu, luôn mở). Headline Insight chữ lớn hơn (kết luận là tiêu đề thật). Excel: sheet mới "2 Thi truong -
+  Van hanh", "3 Vi sao - Thua so/Loai ngay", "3 Xu huong 4 thang", "4 Qua tang", host thêm cột N tháng + khoảng tin cậy; bỏ sheet Phụ lục.
+- **Công cụ nhập liệu ra khỏi report:** khung camp + phân bổ + affiliate tháng sau → [ReportPlanningInputs.tsx](src/components/brand-workspace/ReportPlanningInputs.tsx)
+  trong tab **Nhập Ads & Ghi Chú** (dùng CHUNG `report` với form Ads — upsert ghi đè mọi cột, hai form tự tải riêng sẽ đè số của
+  nhau; `key` = tháng|id dòng để dựng lại thay vì setState trong effect; báo `onSaved` sau cùng). Bảng creator affiliate nhập tay bỏ khỏi
+  report (trang **Affiliate** đã sửa được cùng bảng `brand_affiliate_actuals`) ⇒ brand không còn thấy bảng này trong report.
+
+**Verify:** vitest 122/122 (test mới/sửa: CTOR theo Orders, 5 thừa số cộng đúng, kết luận trước, why 4 thừa số + mix + quà, host chỉ nêu
+tên khi chắc + sát ngưỡng, gifts piece trong bản chụp, 5 test deepAnalysis), tsc, eslint 0 lỗi (35 cảnh báo, không thêm), vite build.
+Browser (admin, dev) CROCS T9: bản chụp cũ báo "file Sản Phẩm" + dải quà → Cập nhật số liệu → "Đã mới nhất"; mọi số khớp đo tay (đối
+chứng −19/+1/−4, camp −11/−69/−23; cơ hội ngày thường 1,07 tỷ; quà/đơn 0,66/0,39/0,13/0; UPT bỏ quà 1,09/1,10/1,11/1,08; mix −101k/giờ,
+rate −8,2tr/giờ). Trang **14,5 → 9,8 màn** (8.162px), biểu đồ 20 → 4. Điện thoại 375px: 8,3 màn (trước 7,5 — Kết luận 5 câu + Việc tháng
+sau luôn mở), không tràn ngang. Host: Hùng +12% (+0,0% … +23%) qua 59 ca = "sát ngưỡng" (đề xuất ghi 1,02–1,23 theo bootstrap — phương
+pháp t chặt hơn); 8 host còn lại "chưa đủ ca". Bấm 5 tab Host + mở mọi `<details>`: không lỗi console. Tab Nhập Ads & Ghi Chú hiện đủ 3
+khối, % gợi ý 22,8/17,6/10,5/49,2. **Chưa verify:** bấm Lưu ở ReportPlanningInputs (sẽ ghi % gợi ý vào `plan_pct_*` thật — đang null,
+đổi phân bổ target xuống ca); góc nhìn brand.
+
+**Quy ước mới:**
+- Report Tháng: **CTOR = Orders ÷ Product clicks**; không dùng UPT/Avg. price làm nguyên nhân khi quà tặng đổi (xem dòng UPT bỏ quà).
+- Kết luận về người (host) phải có khoảng tin cậy nhiều tháng; mẫu nhỏ dùng phân phối t, không 1,96. Số một tháng chỉ để tham khảo.
+- Mọi so sánh chuỗi tháng khi tháng report chưa hết: cắt mọi tháng cùng số ngày (`trendStats`), không đặt tháng trọn cạnh tháng dở.
+- "Thị trường hay vận hành" luôn so với phần còn lại của shop cùng nguồn Shop Analytics (không so LIVE GMV từ ca với số Shop Analytics).
+- Report chỉ để đọc: form nhập của ops ở Nhập Ads & Ghi Chú / Affiliate / Kế Hoạch Tháng.
+
 ## Report Tháng 8 phần — XONG + VERIFY 2026-09-25 (migration 0120 ĐÃ CHẠY)
 
 **User chốt 3 điểm** (sau nghiên cứu https://claude.ai/artifact/XXYTmtJoNh1pQEbSWDozsD): số đứng đầu hiện CẢ HAI (GMV cả
@@ -1726,6 +1795,42 @@ chỉ unit test phủ); góc nhìn brand.
    (cả 2 nháp, chưa phát hành) ⇒ bản chụp v3, nhắc biến mất, cột Giờ Trợ Live có số — T8 Toàn 88,1h/21 ca, Loan 45,1h/11
    ca, Thịnh 37h/11 ca… khớp từng người với tính trực tiếp từ `live_sessions` (service role, chỉ đọc); console sạch.
    Report tháng khác (brand khác / tháng khác) vẫn là v2 tới khi ops bấm cập nhật — hiện nhắc, không hỏng.
+   **Cập nhật 2026-09-26 (tối, không migration, không đổi bản chụp):** user yêu cầu tách **Daily + D-Day + Mid-Month +
+   Pay Day riêng** để so sánh (trước gộp 3 camp thành 1 cột "Campaign"). `byHostDayType(sessions, bucketOf)` giờ nhận
+   hàm trả `CampDayBucket` và trả `byBucket: Record<CampDayBucket, DayTypePart>`; thứ tự cột `HOST_DAY_TYPE_ORDER`
+   (daily trước làm mốc). Thêm `dayTypeTeamTotals` → dòng **"Cả team"** cuối bảng; GMV/giờ từng host tô xanh/đỏ so với
+   Cả team CÙNG loại ngày (so chéo loại ngày thì camp luôn thắng). Mỗi ô: GMV / GMV/giờ / giờ · số ca; tiêu đề cột ghi
+   ngày camp của tháng theo khoảng report đang dùng ("D-Day · 6–8/8"). Excel sheet "5 Host Daily-Campaign": 4 nhóm cột
+   × (Sessions, GMV, Giờ live, GMV/giờ) + dòng Cả team. **Verify:** vitest 117/117 (+1 test 3 camp tách + Cả team), tsc,
+   eslint (2 cảnh báo cũ), vite build; browser (admin) CROCS T8: Cả team 2,81 tỷ + 1,17 + 863tr + 943tr + 100,6tr ca
+   chưa gán host = 5,885 tỷ (khớp tổng); D-Day 1,17 tỷ / 31,2tr/giờ và Mid-Month 863tr / 23,3tr/giờ khớp phần 7. CROCS T9
+   tương tự (35 ca + 12 ca chưa gán host = 47 ca / 3,52 tỷ). Console sạch.
+   **Tiếp theo cùng tối — "Chỉ Số Host Theo Loại Ngày"** (user đưa lại deck T8 Crocs, hỏi cách so key metric chứ không
+   chỉ GMV; chọn qua AskUserQuestion: **kiểu deck + tab** và **CTOR = Orders ÷ Product clicks**). Panel mới ngay dưới
+   bảng tổng quan phần 5 (component `HostDayTypeMetricsPanel` trong MonthlyReportTabs.tsx): tab Daily / D-Day / Mid-Month
+   / Pay Day (tab không có ca bị khoá), bảng chỉ số theo hàng × host theo cột (tên gọi chữ cuối, như deck) + cột Cả
+   team. Dòng: GMV, Giờ live · ca, **GMV/giờ**, rồi 4 thừa số thụt vào Views/giờ · LIVE CTR · CTOR · AOV (nhân ra ĐÚNG
+   GMV/giờ — lý do chọn CTOR theo Orders), UPT, Avg. view (bình quân theo Views; tên mới `METRIC.avgView`). ▲▼ khi lệch
+   ≥ 5% so với Cả team cùng loại ngày, host < 2 ca không so và ghi "· 1 ca" trên tên cột (ban đầu làm mờ cả cột — user thấy cột đậm/nhạt khó hiểu nên bỏ; mọi cột cùng độ đậm, chỉ dòng GMV/giờ in đậm). Cột **Cả team đứng ngay sau "Chỉ số"** (mốc so sánh — để cuối thì bị khuất khi bảng cuộn ngang, user hỏi "sao GMV tô xanh đỏ") + dòng chú thích màu ngay trên bảng (đo: 8/13 ô host×camp T8 và 6/11 ô T9 chỉ có 1 ca).
+   Dưới bảng tối đa 2 câu "vì sao" (`dayTypeDriverLines`: chọn host theo tiền hụt/hơn, tách thừa số cùng chiều / bù).
+   Logic thuần ở hostPerformance.ts (`DayTypePart` thêm views/clicks/orders/items/watchSecViews, `dayTypeMetrics`,
+   `vsTeam`, `dayTypeDriverLines`). Excel thêm sheet "5 Host chi so theo ngay". AOV hiện nghìn đồng (1.005k) — làm
+   tròn triệu che mất chênh 5–10%. **Đo trước khi làm:** 60/60 ca T8 và 47/47 ca T9 đủ views/impressions/clicks/
+   orders/items/watch time; D-Day T8 team khớp deck (1,17 tỷ, 37,5h, 31,25tr/giờ, UPT 1,48, CTOR 1,40%).
+   **Lệch này ĐÃ ĐÓNG 2026-09-26 (khuya) — xem `## Report Tháng chuyên sâu`: cả report dùng CTOR = Orders ÷ clicks.** Ghi chép cũ: CTOR ở phần 4 + các chỗ khác của report vẫn = SKU orders ÷ clicks (T8
+   1,54%) trong khi deck + từ điển chỉ số ghi Orders ÷ clicks (T8 1,31%, deck 1,30%) ⇒ cùng report có 2 số CTOR.
+   **Verify:** vitest 119/119 (+2: 4 thừa số nhân ra GMV/giờ, câu vì sao bỏ host 1 ca), tsc, eslint (0 lỗi), vite
+   build; browser (admin) CROCS T8 4 tab khớp số tính thẳng từ bản chụp bằng service role (chỉ đọc); T9 tab Pay Day
+   khoá đúng; console sạch.
+   **GỘP 3 bảng host thành 1 (cùng tối, user: "bảng trên rồi bảng dưới nữa… tùm lum quá").** Phần 5 giờ chỉ còn panel
+   **"Host PFM"** (`HostPerformancePanel`): tab **Cả tháng** (mặc định) | Daily | D-Day | Mid-Month | Pay Day, cùng một
+   dạng bảng deck. Tab Cả tháng = cộng 4 loại ngày (`sumDayTypeParts`), thêm dòng **So mặt bằng** (`hostInsight.vsPeer`)
+   thay cho ▲▼ (so thẳng team cả tháng thì host xếp ca D-Day luôn thắng), dòng Giờ trợ live chỉ hiện khi có host từng
+   làm trợ, người chỉ làm trợ gom 1 dòng dưới bảng. Cảnh báo đối soát / ca chưa gán host / bản chụp v2 truyền vào panel
+   làm children. ĐÃ BỎ: bảng "Host PFM Overview" (mất cột Orders, Product CTR và "(n đã đối soát)" từng host trên màn —
+   Excel sheet "5 Host Performance" vẫn giữ, thêm cột trợ live) và bảng tổng quan "Host Theo Loại Ngày" + sheet Excel
+   "5 Host Daily-Campaign" (sheet "5 Host chi so theo ngay" thay). Verify browser CROCS T8: section còn đúng 1 bảng, Cả
+   tháng 5,78 tỷ + 100,6tr chưa gán host = 5,885 tỷ, tab Daily như trên; console sạch.
 
 ## Bản chụp số liệu Report Tháng — XONG + VERIFY 2026-09-25 (migration 0119 ĐÃ CHẠY)
 

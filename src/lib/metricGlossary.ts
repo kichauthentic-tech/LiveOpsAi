@@ -32,6 +32,7 @@ export const METRIC = {
   liveHours: "Giờ live",
   gmvPerHour: "GMV/giờ",
   views: "Views",
+  avgView: "Avg. view", // thời gian xem trung bình (giây) — đúng tên dòng "AVG. view" ở bảng host deck Crocs
   viewsPerHour: "Views/giờ",
   liveImpressions: "LIVE impressions",
   productImpressions: "Product impressions",
@@ -90,6 +91,7 @@ export const METRIC_HINT: Record<string, string> = {
   [METRIC.liveHours]: "Tổng thời lượng live (giờ)",
   [METRIC.gmvPerHour]: "GMV ÷ Giờ live",
   [METRIC.views]: "Lượt xem phiên live",
+  [METRIC.avgView]: "Thời gian xem trung bình mỗi lượt xem (giây), bình quân theo Views",
   [METRIC.viewsPerHour]: "Views ÷ Giờ live",
   [METRIC.liveImpressions]: "Lượt hiển thị phiên live trên feed/đề xuất",
   [METRIC.productImpressions]: "Lượt hiển thị sản phẩm trong phiên",

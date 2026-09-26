@@ -83,7 +83,7 @@ test("dựng lần đầu: bản tổng hợp SKU chỉ đọc 1 lần mỗi th�
   expect(calls.some((c) => c.startsWith("creatorLive"))).toBe(false);
   expect(reused).toEqual([]);
   expect(fetched.sort()).toEqual(
-    ["cardGmv|2026-06", "cardGmv|2026-07", "cardGmv|2026-08", "cardGmv|2026-09", "dailyPerf|2026-09", "shopDays|2026-06", "shopDays|2026-07", "shopDays|2026-08", "shopDays|2026-09", "skuRank|2026-08", "skuRank|2026-09", "topPromo|2026-09", "topSku|2026-09"]
+    ["cardGmv|2026-06", "cardGmv|2026-07", "cardGmv|2026-08", "cardGmv|2026-09", "dailyPerf|2026-09", "gifts|2026-06", "gifts|2026-07", "gifts|2026-08", "gifts|2026-09", "shopDays|2026-06", "shopDays|2026-07", "shopDays|2026-08", "shopDays|2026-09", "skuRank|2026-08", "skuRank|2026-09", "topPromo|2026-09", "topSku|2026-09"]
   );
   // Chỉ ca của brand, trong cửa sổ 4 tháng, trừ ca huỷ; không mang theo aiAnalysis.
   expect(snapshot.sessions.map((s) => s.id).sort()).toEqual(["aug", "jul", "jun", "sep1", "sep2"]);
@@ -112,7 +112,7 @@ test("up đè file Sản Phẩm T9: chỉ tải lại phần dính product_list 
   expect(f.changedSessions).toBe(0);
   calls.length = 0;
   const again = await buildMonthlyReportSnapshot({ brandId: B, month: M, sessions, brandPlatformRates: [], previous: first.snapshot });
-  expect(again.fetched.sort()).toEqual(["cardGmv|2026-09", "skuRank|2026-09", "topSku|2026-09"]);
+  expect(again.fetched.sort()).toEqual(["cardGmv|2026-09", "gifts|2026-09", "skuRank|2026-09", "topSku|2026-09"]);
   expect(calls).toEqual(expect.arrayContaining(["productAgg 2026-09-01"]));
   expect(calls).not.toContain("promo 2026-09-01");
 });
@@ -124,7 +124,7 @@ test("tháng trước lấy từ bản chụp tháng trước (cùng stamp) thay
   const sep = await buildMonthlyReportSnapshot({ brandId: B, month: M, sessions, brandPlatformRates: [] });
   // Cửa sổ T9 = T6..T9; bản chụp T8 (T5..T8) đã có shop + thẻ SP của T6, T7, T8.
   // skuRank|2026-08 = piece tháng report của bản chụp T8 ⇒ hạng tháng trước không phải đọc lại file T8.
-  expect(sep.reused.sort()).toEqual(["cardGmv|2026-06", "cardGmv|2026-07", "cardGmv|2026-08", "shopDays|2026-06", "shopDays|2026-07", "shopDays|2026-08", "skuRank|2026-08"]);
+  expect(sep.reused.sort()).toEqual(["cardGmv|2026-06", "cardGmv|2026-07", "cardGmv|2026-08", "gifts|2026-06", "gifts|2026-07", "gifts|2026-08", "shopDays|2026-06", "shopDays|2026-07", "shopDays|2026-08", "skuRank|2026-08"]);
   expect(calls).not.toContain("productAgg 2026-08-01");
   expect(calls).not.toContain("shopDays 2026-08-01");
   expect(calls).toContain("shopDays 2026-09-01");

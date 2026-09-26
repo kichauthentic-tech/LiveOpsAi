@@ -5,7 +5,6 @@ import { expect, test } from "vitest";
 import {
   autoNextSteps,
   autoSummary,
-  basketBreakdown,
   campCompare,
   channelMix,
   compareWindow,
@@ -16,8 +15,7 @@ import {
   shopKpiProgress,
   shopTotals,
   skuMoves,
-  trendSignal,
-  UPT_LABEL
+  trendSignal
 } from "../src/lib/report/monthlyReportInsights";
 import type { CreatorLivePerfRow } from "../src/lib/dataraw/creatorLivePerfSlice";
 
@@ -49,27 +47,36 @@ test("chỉ số theo cửa sổ lọc theo NGÀY GIỜ VN của giờ bắt đ�
   expect(s.gmvPerView).toBe(1);
 });
 
+test("CTOR = Orders ÷ Product clicks, không đếm SKU order (quà tặng kèm làm SKU order > số đơn)", () => {
+  // CROCS T6: đơn giày kèm Jibbitz 0đ ⇒ SKU order gần gấp đôi Orders; CTOR theo SKU order ra 1,99%, theo Orders 1,13%.
+  const s = liveStatsFromRows([row("2026-06-10T03:00:00.000Z", 100, { orders: 113, skuOrders: 199, productClicks: 10_000 })], "2026-06-01", "2026-06-30");
+  expect(s.ctor).toBeCloseTo(1.13, 5);
+});
+
 const stats = (gmv: number, hours: number, views: number, extra: Partial<LiveStats> = {}): LiveStats => ({
   sessions: 1, gmv, hours, views, orders: 1, skuOrders: 1, itemsSold: 1, productImpressions: 1, productClicks: 1,
   gmvPerHour: gmv / hours, viewsPerHour: views / hours, gmvPerView: gmv / views, ctr: null, ctor: null, aov: null,
   upt: null, pricePerItem: null, liveCtr: null, ...extra
 });
-// CROCS thật: 1–22/08 vs 1–22/09.
-const t8 = stats(4_309_000_000, 153.6, 526_400);
-const t9 = stats(3_517_000_000, 177.8, 496_400);
+// CROCS thật: 1–22/08 vs 1–22/09 (đo 2026-09-26 từ live_sessions, CTOR = Orders ÷ clicks).
+const t8 = stats(4_309_000_000, 153.6, 526_400, { liveCtr: 55.98, ctor: 1.35, aov: 1_084_000 });
+const t9 = stats(3_517_000_000, 177.8, 496_400, { liveCtr: 52.43, ctor: 1.18, aov: 1_146_000 });
 
-test("tách nguyên nhân: 3 phần cộng đúng ΔGMV, chiều đúng như số thật CROCS", () => {
+test("tách nguyên nhân: GMV = Giờ live × Views/giờ × LIVE CTR × CTOR × AOV, 5 phần cộng đúng ΔGMV, chiều đúng như CROCS", () => {
   const d = driverBreakdown(t8, t9)!;
   const sum = d.parts.reduce((a, p) => a + p.value, 0);
   expect(Math.abs(sum - d.delta)).toBeLessThan(1);
   const by = Object.fromEntries(d.parts.map((p) => [p.key, p.value]));
   expect(by.hours).toBeGreaterThan(0); // giờ live tăng
-  expect(by.viewsPerHour).toBeLessThan(0); // lượt xem mỗi giờ giảm
-  expect(by.gmvPerView).toBeLessThan(0); // mỗi lượt xem ra ít tiền hơn
-  // Thiếu lượt xem ở một bên ⇒ không bịa phần tách.
-  expect(driverBreakdown(t8, { ...t9, views: 0, viewsPerHour: null, gmvPerView: null })).toBeNull();
+  expect(by.viewsPerHour).toBeLessThan(0); // traffic mỗi giờ giảm — phần lớn nhất
+  expect(by.liveCtr).toBeLessThan(0);
+  expect(by.ctor).toBeLessThan(0);
+  expect(by.aov).toBeGreaterThan(0); // AOV tăng bù lại
+  expect(Math.abs(by.viewsPerHour)).toBeGreaterThan(Math.abs(by.ctor));
+  // Thiếu một thừa số ở một bên ⇒ không bịa phần tách.
+  expect(driverBreakdown(t8, { ...t9, ctor: null })).toBeNull();
   // GMV không đổi ⇒ không chia cho 0.
-  const flat = driverBreakdown(t8, stats(4_309_000_000, 170, 526_400))!;
+  const flat = driverBreakdown(t8, stats(4_309_000_000, 170, 526_400, { liveCtr: 55, ctor: 1.3, aov: 1_100_000 }))!;
   expect(flat.parts.every((p) => Number.isFinite(p.value))).toBe(true);
 });
 
@@ -100,7 +107,7 @@ test("toàn shop: cộng theo ngày trong cửa sổ; 4 kênh ÷ tổng để ki
   expect(channelMix("2026-09", t, null)!.coverage).toBeNull();
 });
 
-test("bản nháp tóm tắt + việc tháng sau nêu đúng số và đúng nguyên nhân chính", () => {
+test("kết luận trước: kết quả, nguyên nhân quy ra tiền, thị trường hay vận hành, cơ hội lớn nhất, lưu ý quà tặng", () => {
   const window = compareWindow("2026-09", "2026-09-22");
   const input = {
     month: "2026-09",
@@ -110,78 +117,40 @@ test("bản nháp tóm tắt + việc tháng sau nêu đúng số và đúng ngu
     liveCur: { ...t9, ctr: 3.17 },
     livePrev: t8,
     drivers: driverBreakdown(t8, t9),
-    basket: null,
-    signals: [trendSignal("CTOR", [1.99, 1.73, 1.54, 1.25])!],
     targetGmv: null,
-    campBest: { label: "D-Day (double-day)", gmvPerHour: 26_500_000 },
-    dailyGmvPerHour: 17_900_000,
     nextMonth: "2026-10",
-    nextPlan: { targetGmv: 5_500_000_000, status: "draft" as const, slotCount: 75 }
+    nextPlan: { targetGmv: 5_500_000_000, status: "draft" as const, slotCount: 75 },
+    controlLine: "So với phần còn lại của shop (ngày thường): live agency −19%, phần còn lại +1%, lượt vào shop −4% ⇒ khoảng hụt nằm ở vận hành live.",
+    controlOpsGroup: "daily" as const,
+    dailyGap: { line: "Nếu ngày thường giữ GMV/giờ kỳ trước (28,8 triệu đ/giờ, nay 17,9 triệu đ/giờ) với 98,2 giờ live đã chạy, LIVE GMV có thêm ~1,07 tỷ đ.", value: 1_070_000_000 },
+    giftLine: "Quà tặng (hàng dưới 20k/món) giảm từ 0,13 xuống 0,00 món mỗi đơn cả shop (T8 → nay) — UPT giảm chủ yếu vì vậy; tính trên hàng bán thật, UPT cả shop 1,11 → 1,08."
   };
-  const summary = autoSummary(input).join("\n");
-  expect(summary).toContain("5,21 tỷ");
-  expect(summary).toContain("67,5% tổng shop");
-  expect(summary).toContain("1–22/09 so với 1–22/08");
-  expect(summary).toContain("−18,4%");
-  expect(summary).toMatch(/Phần lớn mức giảm đến từ Views\/giờ/);
-  expect(summary).toContain("CTOR giảm 4 tháng liên tiếp");
-  expect(summary).toContain("D-Day");
+  const lines = autoSummary(input);
+  const summary = lines.join("\n");
+  expect(lines[0]).toContain("5,21 tỷ");
+  expect(lines[0]).toContain("67,5% tổng shop");
+  expect(lines[1]).toContain("1–22/09 so với 1–22/08");
+  expect(lines[1]).toContain("−18,4%");
+  expect(lines[1]).toMatch(/GMV\/giờ giảm chủ yếu do Views\/giờ \(−19%, −[\d,]+ triệu đ\) và CTOR \(−13%/);
+  expect(lines[1]).toContain("AOV +6% bù lại");
+  expect(summary).toContain("khoảng hụt nằm ở vận hành live");
+  // Cơ hội ngày thường (1,07 tỷ) lớn hơn đưa Views/giờ về mức cũ (~800tr) ⇒ chọn ngày thường.
+  expect(summary).toContain("Cơ hội lớn nhất: nếu ngày thường giữ GMV/giờ kỳ trước");
+  expect(summary).toContain("Quà tặng");
+  // Không còn các câu dựa trên UPT/CTOR "giảm N tháng liên tiếp" (bị quà tặng làm méo).
+  expect(summary).not.toMatch(/tháng liên tiếp/);
+  expect(lines.length).toBeLessThanOrEqual(5);
+
   const next = autoNextSteps(input).join("\n");
-  expect(next).toContain("CTOR");
+  expect(next).toContain("Views/giờ −19% so với cùng kỳ. Điểm nghẽn ở traffic");
+  expect(next).toContain("Ngày thường là chỗ hụt của riêng live");
+  expect(next).toContain("Hỏi brand về chương trình quà tặng");
   expect(next).toContain("5,5 tỷ");
   expect(next).toContain("75 ca");
-});
 
-// CROCS thật, trọn tháng 7 vs 8 (đo 2026-09-26 từ live_sessions; khớp deck report tháng 8 của Crocs:
-// đơn 5.291 / SP 6.270 / UPT 1,19 / giá/SP 930.641).
-const basketStats = (gmv: number, orders: number, itemsSold: number): LiveStats =>
-  stats(gmv, 200, 700_000, { orders, itemsSold, aov: gmv / orders, upt: itemsSold / orders, pricePerItem: gmv / itemsSold });
-const b7 = basketStats(5_187_000_000, 4838, 6902);
-const b8 = basketStats(5_885_000_000, 5333, 6319);
-
-test("tách phía giỏ hàng: 3 phần cộng đúng ΔGMV; CROCS T8 tăng chủ yếu nhờ số đơn, không phải giá", () => {
-  const b = basketBreakdown(b7, b8)!;
-  expect(Math.abs(b.parts.reduce((a, p) => a + p.value, 0) - b.delta)).toBeLessThan(1);
-  const by = Object.fromEntries(b.parts.map((p) => [p.key, p]));
-  expect(by.upt.value).toBeLessThan(0); // mỗi đơn ít SP hơn
-  expect(by.pricePerItem.value).toBeGreaterThan(0); // GMV/SP tăng — hệ quả của UPT giảm
-  expect(by.orders.change).toBeCloseTo(10.2, 1);
-  // Thiếu số SP ở một bên ⇒ không bịa.
-  expect(basketBreakdown(b7, { ...b8, itemsSold: 0, upt: null, pricePerItem: null })).toBeNull();
-
-  const summary = autoSummary({
-    month: "2026-08",
-    window: compareWindow("2026-08", "2026-08-31"),
-    shopCur: null,
-    shopPrev: null,
-    liveCur: b8,
-    livePrev: b7,
-    drivers: null,
-    basket: b,
-    signals: [],
-    targetGmv: null,
-    campBest: null,
-    dailyGmvPerHour: null,
-    nextMonth: "2026-09",
-    nextPlan: null
-  }).join("\n");
-  expect(summary).toContain("Orders +10%");
-  expect(summary).toContain("AOV +3%");
-  expect(summary).toContain("UPT 1,43 → 1,18 (−17%)");
-  expect(summary).toContain("gần như bù nhau");
-  // Không được kết luận "GMV tăng nhờ Avg. price" dù đó là phần lớn nhất trong 3 phần.
-  expect(summary).not.toMatch(/Avg\. price là phần/);
-});
-
-test("UPT CROCS giảm 4 tháng liền ⇒ báo xu hướng + gợi ý việc tháng sau", () => {
-  const upt = trendSignal(UPT_LABEL, [1.76, 1.43, 1.18, 1.06])!;
-  expect(upt).toMatchObject({ direction: "down", streak: 4 });
-  const input = {
-    month: "2026-09", window: compareWindow("2026-09", "2026-09-22"), shopCur: null, shopPrev: null, liveCur: t9, livePrev: t8,
-    drivers: null, basket: null, signals: [upt], targetGmv: null, campBest: null, dailyGmvPerHour: null, nextMonth: "2026-10", nextPlan: null
-  };
-  expect(autoSummary(input).join("\n")).toContain("UPT giảm 4 tháng liên tiếp: 1,76 → 1,43 → 1,18 → 1,06");
-  expect(autoNextSteps(input).join("\n")).toContain("combo 2 sản phẩm");
+  // Không có cơ hội ngày thường ⇒ chọn thừa số tụt nhiều tiền nhất.
+  const alt = autoSummary({ ...input, dailyGap: null, controlLine: null, giftLine: null }).join("\n");
+  expect(alt).toMatch(/Cơ hội lớn nhất: đưa Views\/giờ về mức kỳ trước \(3\.427, nay 2\.792\)/);
 });
 
 test("so camp với camp tháng trước: mỗi tháng dùng khoảng camp của chính nó", () => {
@@ -217,7 +186,7 @@ test("hạng SKU: so hạng thẳng, % GMV tính MỖI NGÀY khi 2 file phủ s�
   const sku = (name: string, rank: number, gmv: number, extra = {}) => ({ name, rank, gmv, gmvLive: 0, orders: 10, ...extra });
   const prev = { items: [sku("Baya Platform", 1, 3_100), sku("Classic Bone", 2, 2_000), sku("Baya White", 8, 500)], sellingSkus: 40, limit: 30, hasAnyBatch: true, periodStart: "2026-08-01", periodEnd: "2026-08-31" };
   const cur = {
-    items: [sku("Baya Platform", 1, 2_200, { skuOrders: 417, clicks: 32_503, impressions: 1_181_278 }), sku("Baya White", 2, 1_100), sku("Mới", 3, 900)],
+    items: [sku("Baya Platform", 1, 2_200, { orders: 417, skuOrders: 430, clicks: 32_503, impressions: 1_181_278 }), sku("Baya White", 2, 1_100), sku("Mới", 3, 900)],
     sellingSkus: 35, limit: 30, hasAnyBatch: true, periodStart: "2026-09-01", periodEnd: "2026-09-22"
   };
   const m = skuMoves(cur, prev)!;
@@ -225,18 +194,11 @@ test("hạng SKU: so hạng thẳng, % GMV tính MỖI NGÀY khi 2 file phủ s�
   // 2.200/22 = 100/ngày vs 3.100/31 = 100/ngày ⇒ 0%, KHÔNG phải −29%.
   expect(m.rows[0].gmvChange).toBeCloseTo(0, 5);
   expect(m.rows[0].ctr).toBeCloseTo(2.75, 2);
-  expect(m.rows[0].ctor).toBeCloseTo(1.28, 2);
+  expect(m.rows[0].ctor).toBeCloseTo(1.28, 2); // Orders 417 ÷ clicks 32.503 (deck Crocs), không phải SKU order
   expect(m.rows[1]).toMatchObject({ rank: 2, prevRank: 8 });
   expect(m.rows[2]).toMatchObject({ prevRank: null, gmvChange: null });
   // Cùng số ngày ⇒ so GMV thẳng.
   expect(skuMoves({ ...cur, periodEnd: "2026-09-30" }, { ...prev, periodEnd: "2026-08-30" })!.perDay).toBe(false);
-
-  const text = autoSummary({
-    month: "2026-09", window: compareWindow("2026-09", "2026-09-22"), shopCur: null, shopPrev: null, liveCur: t9, livePrev: t8,
-    drivers: null, basket: null, signals: [], targetGmv: null, campBest: null, dailyGmvPerHour: null, nextMonth: "2026-10", nextPlan: null, skus: m
-  }).join("\n");
-  expect(text).toContain("SKU dẫn đầu: Baya Platform (giữ hạng 1, GMV mỗi ngày +0%)");
-  expect(text).toContain("Lên hạng mạnh nhất: Baya White (8 → 2");
 });
 
 test("KPI cả shop: tháng đủ so thẳng (deck Crocs T8 9,1 tỷ vs KPI 8,4 tỷ); tháng dở dự kiến theo nhịp cùng kỳ tháng trước", () => {
@@ -259,8 +221,7 @@ test("KPI cả shop: tháng đủ so thẳng (deck Crocs T8 9,1 tỷ vs KPI 8,4 
 
   const base = {
     month: "2026-08", window: compareWindow("2026-08", "2026-08-31"), shopCur: shop(9_100_000_000, "2026-08-31"), shopPrev: null,
-    liveCur: t9, livePrev: t8, drivers: null, basket: null, signals: [], targetGmv: null, campBest: null, dailyGmvPerHour: null,
-    nextMonth: "2026-09", nextPlan: null
+    liveCur: t9, livePrev: t8, drivers: null, targetGmv: null, nextMonth: "2026-09", nextPlan: null
   };
   expect(autoSummary({ ...base, shopKpi: full })[0]).toContain("Cả shop đạt 108% KPI 8,4 tỷ đ (vượt 700 triệu đ).");
   expect(autoSummary({ ...base, shopKpi: sep })[0]).toMatch(/Cả shop đạt 65% KPI 8 tỷ đ; theo nhịp cùng kỳ tháng trước, dự kiến cuối tháng ~7,02 tỷ đ \(88% KPI\)\./);

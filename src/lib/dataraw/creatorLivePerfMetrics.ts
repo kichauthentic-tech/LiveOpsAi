@@ -24,11 +24,11 @@ export interface CreatorLivePerfAgg {
   gmvPerHour: number | null;
   viewsPerHour: number | null;
   ctr: number | null; // = productClicks / productImpressions — tính lại từ số đếm, KHÔNG lấy trung bình cột % có sẵn (sai lệch khi phiên to/nhỏ khác nhau)
-  // = skuOrders / productClicks. FIX (audit module 3, 2026-09-25): trước đây dùng `orders` (Attributed
-  // orders) — sai định nghĩa của chính TikTok, cột gốc là "CTOR (SKU order)" (xem deepDiveSource.ts /
-  // metrics.ts đã dùng đúng skuOrders từ đầu). Report Tháng Tab 02 (brand-facing, dùng agg này) và
-  // Report Chuyên Sâu Tab 05 (ops-only, dùng metrics.ts) vì vậy từng hiện 2 con số CTOR khác nhau cho
-  // cùng một tháng — đúng kiểu lệch số hai trang mà liveUnits.ts đã ghi nhận suýt vá hụt.
+  // = orders / productClicks (user chốt 2026-09-26, như deck Crocs + từ điển chỉ số). Audit 2026-09-25 từng
+  // đổi sang skuOrders theo cột "CTOR (SKU order)" của TikTok, nhưng SKU order đếm cả quà tặng kèm 0đ (CROCS T6:
+  // Jibbitz 0–3k, CTOR > 100%) ⇒ CTOR "giảm 4 tháng liên tiếp" 1,99 → 1,25% chỉ vì hết quà, trong khi theo
+  // Orders là 1,13 → 1,23 → 1,31 → 1,18%. Agg này chỉ Report Tháng dùng; Phân Tích Sâu (ops, metrics.ts) vẫn
+  // hiện cả hai cột SKU order.
   ctor: number | null;
   err: number | null; // ERR = Views ÷ LIVE impressions (TikTok "Tap-through rate") — KHÔNG phải LIVE CTR
   liveCtr: number | null; // LIVE CTR = Product clicks ÷ Views (cột "LIVE CTR" của TikTok)
@@ -83,7 +83,7 @@ export function aggregateCreatorLivePerfRows(rows: CreatorLivePerfRow[]): Creato
     gmvPerHour: hours > 0 ? gmv / hours : null,
     viewsPerHour: hours > 0 ? views / hours : null,
     ctr: productImpressions > 0 ? (productClicks / productImpressions) * 100 : null,
-    ctor: productClicks > 0 ? (skuOrders / productClicks) * 100 : null,
+    ctor: productClicks > 0 ? (orders / productClicks) * 100 : null,
     err: impressions > 0 ? (views / impressions) * 100 : null,
     liveCtr: views > 0 ? (productClicks / views) * 100 : null
   };
