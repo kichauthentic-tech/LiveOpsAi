@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import * as Sentry from "@sentry/react";
 import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, WorkflowRule, Talent, Studio, Equipment, Brand, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, BrandStudio, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, TalentRateHistoryEntry, BrandPlatformRateHistoryEntry, BrandSku, PromoScheme, AppNotification, BrandMonthlyReport as BrandMonthlyReportRow } from "./types";
 import { TabErrorFallback } from "./components/common/TabErrorFallback";
@@ -111,6 +111,7 @@ import { BrandsOverview } from "./components/BrandsOverview";
 import CeoBrief from "./components/CeoBrief";
 import { ReportPublishBoard } from "./components/ReportPublishBoard";
 import { BrandCommitment } from "./components/BrandCommitment";
+import { findBrandBySlug, parsePath, routeToPath } from "./lib/routes";
 
 const STORAGE_PREFIX = "liveops_os_v2_";
 
@@ -190,7 +191,12 @@ export default function App() {
   const notifications = useNotifications(!!profile);
   // "shift_scheduling" chỉ là fallback cho lần đầu mở app khi chưa biết role (localStorage rỗng);
   // role thật được set lại ngay bằng getDefaultTabForRole() khi profile load xong (bên dưới).
-  const [activeTab, setActiveTab] = useState<string>(() => loadStorage("activeTab", "shift_scheduling"));
+  // Link riêng cho từng trang (lib/routes.ts, audit UX 2026-09-26): mở app bằng một link cụ thể thì link
+  // thắng localStorage. Brand chỉ biết slug lúc này — đối chiếu khi danh sách brand nạp xong (bên dưới).
+  const [initialRoute] = useState(() => parsePath(window.location.pathname));
+  const [activeTab, setActiveTab] = useState<string>(() =>
+    initialRoute ? initialRoute.tab ?? "brand_calendar" : loadStorage("activeTab", "shift_scheduling")
+  );
   // Bảng Vận Hành (2026-09-21): "board" = hôm nay/tuần + việc còn thiếu; "calendar" = Lịch & Studio cũ.
   const [opsView, setOpsView] = useState<"board" | "calendar">(() => loadStorage("opsView", "board"));
   // Q4: ca cần mở sau khi bấm thông báo (OpsBoard tiêu thụ rồi xoá).
@@ -247,7 +253,10 @@ export default function App() {
   // ceo/admin/operations (những role được phép nhìn xuyên brand); role "brand" tự khoá vào
   // đúng 1 brand của họ ở effectiveWorkspace bên dưới, không dùng state raw này.
   const [workspace, setWorkspace] = useState<WorkspaceContext>(() =>
-    loadStorage<WorkspaceContext>("workspace", { type: "agency" })
+    initialRoute?.type === "agency" ? { type: "agency" } : loadStorage<WorkspaceContext>("workspace", { type: "agency" })
+  );
+  const [pendingBrandSlug, setPendingBrandSlug] = useState<string | null>(() =>
+    initialRoute?.type === "brand" ? initialRoute.brandSlug : null
   );
   useEffect(() => saveStorage("workspace", workspace), [workspace]);
 
@@ -286,7 +295,6 @@ export default function App() {
   const [talents, setTalents] = useState<Talent[]>([]);
   const [studios, setStudios] = useState<Studio[]>([]);
   const [equipments, setEquipments] = useState<Equipment[]>([]);
-  const [phase1Loading, setPhase1Loading] = useState(true);
   const [phase1Error, setPhase1Error] = useState<string | null>(null);
 
   // Live Sessions — real data from Supabase (Phase 2), no mock fallback
@@ -340,6 +348,8 @@ export default function App() {
 
   // Brands — real data from Supabase (Phase 3), no mock fallback
   const [brands, setBrands] = useState<Brand[]>([]);
+  // Brand nạp ở effect riêng, không cùng đợt talent/studio/thiết bị — hai đợt về lệch nhau, đừng lấy đợt kia làm cờ.
+  const [brandsLoaded, setBrandsLoaded] = useState(false);
   const [phase3Error, setPhase3Error] = useState<string | null>(null);
 
   // Đăng ký & Chốt Lịch Host — real data from Supabase `brand_platform_rates`/`shift_slots`/
@@ -385,7 +395,6 @@ export default function App() {
   useEffect(() => {
     if (!authUserId) return;
     let cancelled = false;
-    setPhase1Loading(true);
     Promise.all([fetchTalents(), fetchStudios(), fetchEquipments()])
       .then(([t, s, e]) => {
         if (cancelled) return;
@@ -397,9 +406,6 @@ export default function App() {
       .catch((err) => {
         if (cancelled) return;
         setPhase1Error(err.message ?? "Không tải được dữ liệu Talent/Studio/Equipment từ Supabase.");
-      })
-      .finally(() => {
-        if (!cancelled) setPhase1Loading(false);
       });
     return () => {
       cancelled = true;
@@ -440,6 +446,9 @@ export default function App() {
       .catch((err) => {
         if (cancelled) return;
         setPhase3Error(err.message ?? "Không tải được dữ liệu Brand từ Supabase.");
+      })
+      .finally(() => {
+        if (!cancelled) setBrandsLoaded(true);
       });
     return () => {
       cancelled = true;
@@ -754,9 +763,10 @@ export default function App() {
     if (!profile?.id) return;
     if (loadStorage<string | null>("uiStateOwner", null) === profile.id) return;
     saveStorage("uiStateOwner", profile.id);
-    setActiveTab(getDefaultTabForRole(profile.role));
-    setWorkspace({ type: "agency" });
-  }, [profile?.id, profile?.role]);
+    // Mở bằng link cụ thể thì giữ đúng trang của link (quyền vẫn do isTabAllowed/effectiveWorkspace chặn).
+    setActiveTab(initialRoute?.tab ?? getDefaultTabForRole(profile.role));
+    if (initialRoute?.type !== "brand") setWorkspace({ type: "agency" });
+  }, [profile?.id, profile?.role, initialRoute]);
 
   // Live Sessions are real Supabase data now (Phase 2) — no mock filtering applies
   const rawActiveSessions = sessions;
@@ -887,14 +897,62 @@ export default function App() {
       // rỗng và không có cách nào thoát ngoài mở switcher. Brand đã nạp xong mà không có id đó
       // thì về Agency. Chỉ xét sau khi brands nạp xong, nếu không lần mở đầu (brands = []) sẽ
       // luôn văng về Agency dù workspace hợp lệ.
-      if (workspace.type === "brand" && !phase1Loading && !brands.some((b) => b.id === workspace.brandId)) {
+      if (workspace.type === "brand" && brandsLoaded && !brands.some((b) => b.id === workspace.brandId)) {
         return { type: "agency" };
       }
       return workspace;
     }
     return { type: "agency" };
-  }, [currentRole, workspace, activeUser.assignedBrandId, phase1Loading, brands]);
+  }, [currentRole, workspace, activeUser.assignedBrandId, brandsLoaded, brands]);
   const currentBrandId = effectiveWorkspace.type === "brand" ? effectiveWorkspace.brandId : undefined;
+
+  // Link /brand/<slug>/… mở lúc brand chưa nạp: đối chiếu slug một lần khi đã nạp xong. Điều chỉnh
+  // state ngay trong render (không qua effect) để lần vẽ đầu sau khi nạp đã đúng brand, không nháy Agency.
+  if (pendingBrandSlug && brandsLoaded) {
+    const b = findBrandBySlug(brands, pendingBrandSlug);
+    setPendingBrandSlug(null);
+    if (b) setWorkspace({ type: "brand", brandId: b.id });
+    else {
+      // Link tới brand đã xoá/gõ sai: về trang mặc định thay vì kẹt ở màn "không có quyền".
+      setWorkspace({ type: "agency" });
+      setActiveTab(getDefaultTabForRole(currentRole));
+    }
+  }
+
+  // State → URL. Lần đầu dùng replaceState (không đẻ thêm một bước Back vô nghĩa), sau đó mỗi lần đổi
+  // tab/brand là một bước trong lịch sử trình duyệt. Chưa dựng được link (brand chưa nạp, tab không có
+  // slug) thì giữ nguyên URL.
+  const routeSyncedRef = useRef(false);
+  useEffect(() => {
+    if (pendingBrandSlug) return;
+    const path = routeToPath(effectiveWorkspace, activeTab, brands);
+    if (!path) return;
+    if (path !== window.location.pathname) {
+      const url = path + window.location.search + window.location.hash;
+      if (routeSyncedRef.current) window.history.pushState(null, "", url);
+      else window.history.replaceState(null, "", url);
+    }
+    routeSyncedRef.current = true;
+  }, [effectiveWorkspace, activeTab, brands, pendingBrandSlug]);
+
+  // URL → state khi bấm Back/Forward.
+  useEffect(() => {
+    const onPop = () => {
+      const r = parsePath(window.location.pathname);
+      if (!r) return;
+      if (r.type === "agency") {
+        setWorkspace({ type: "agency" });
+        setActiveTab(r.tab);
+        return;
+      }
+      const b = findBrandBySlug(brands, r.brandSlug);
+      if (!b) return;
+      setWorkspace({ type: "brand", brandId: b.id });
+      setActiveTab(r.tab ?? "brand_calendar");
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [brands]);
 
   // Helper to check permission for a specific key under current role/user
   const checkPermission = (permKey: PermissionKey): boolean => {
@@ -2035,8 +2093,10 @@ export default function App() {
         {/* Dynamic View Content */}
         <main className="flex-1 overflow-y-auto p-3 sm:p-6 scrollbar-thin">
           <div className={`mx-auto space-y-6 ${isCalendarModule ? "max-w-none" : "max-w-7xl"}`}>
-            {!isTabAllowed && phase6Loading ? (
-              /* Ma Trận Phân Quyền CHƯA về — `rolePermissions` còn là {} nên checkPermission()
+            {!isTabAllowed && (phase6Loading || pendingBrandSlug) ? (
+              /* Mở bằng link /brand/<slug>/… mà brand chưa nạp: tab là của Brand Workspace nhưng workspace
+                 chưa đổi — cũng là "chưa biết", chờ như dưới.
+                 Ma Trận Phân Quyền CHƯA về — `rolePermissions` còn là {} nên checkPermission()
                  nào cũng false và isTabAllowed false theo. Trước bản vá này người dùng đập thẳng
                  vào màn "Access Restricted ... Status: DENIED" mỗi lần tải trang, kéo dài đúng
                  bằng RTT tới Supabase (đo được ~580ms trên localhost, tệ hơn nhiều trên 4G của

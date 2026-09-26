@@ -2,10 +2,11 @@
 
 ## CẦN LÀM NGAY khi mở phiên mới (cập nhật 2026-09-24)
 
-> **MỚI 2026-09-26 (tối) — Audit UX/UI toàn app + gói P0 ĐÃ LÀM + VERIFY trên browser (chưa commit, không migration).**
-> Màu 4 theme đạt WCAG, sàn chữ 11px, ô nhập 16px trên điện thoại, brand mặc định = brand có ca gần nhất (nhớ lựa chọn),
-> `usePrompt` thay 2 `window.prompt`. Test canh mới: `tests/uiReadability.test.ts`, `tests/defaultBrand.test.ts`.
-> P1/P2 chưa làm. Chi tiết ở mục `## Audit UX/UI (2026-09-26)`.
+> **MỚI 2026-09-26 (tối) — Audit UX/UI: P0 + P1 ĐÃ LÀM + VERIFY trên browser (không migration).** P0 commit 73acafc đã push.
+> P1: link riêng cho từng trang (`/so-ca`, `/brand/crocs/report-thang`, Back/Forward chạy), tiêu đề trang 1 dòng + "Chi tiết",
+> sidebar tự thu gọn < 1280px, header mobile gọn, số kiểu Việt (2,18%) qua `src/lib/format.ts`. `vercel.json` thêm rewrite SPA —
+> **sau khi deploy phải mở thử 1 link sâu trên live-ops-ai.vercel.app** (chưa test được trên Vercel). P2 chưa làm.
+> Chi tiết ở mục `## Audit UX/UI (2026-09-26)`.
 
 > **MỚI 2026-09-26 (chiều) — Chuẩn hoá tên chỉ số toàn app theo deck report + TikTok** (không migration, đã commit + push lên `main`
 > 2026-09-26). Một chỉ số một tên ở mọi report/chart: từ điển `src/lib/metricGlossary.ts` + test canh
@@ -204,7 +205,7 @@
 
 > **Cập nhật 2026-09-13:** Các phần dưới đây được viết ở các thời điểm khác nhau và nghiệp vụ/code đã đổi khá nhiều kể từ đó. Từ nay **không coi nội dung cũ trong file này là ground truth mặc định** — mọi mục (kiến trúc, luồng dữ liệu, quy ước kỹ thuật...) cần được re-verify bằng đọc code hiện tại trước khi dựa vào để quyết định, đặc biệt là mục nào chưa có ghi chú "đã audit lại". Đang làm 1 vòng rà soát UX/workflow theo từng module (xem "Giai đoạn tiếp theo") — mỗi module audit xong sẽ cập nhật lại đúng phần liên quan trong file.
 
-## Audit UX/UI (2026-09-26) — P0 XONG + VERIFY, P1/P2 chưa làm
+## Audit UX/UI (2026-09-26) — P0 + P1 XONG + VERIFY, P2 chưa làm
 
 Cách đo (dùng lại được): script JS chạy trong Browser pane, bấm lần lượt từng mục sidebar rồi đếm trên phần tử có chữ trong
 `<main>`: % chữ < 11px / < 12px, % chữ không đạt tương phản WCAG 1.4.3 (4.5:1, chữ lớn 3:1, trộn nền rgba theo cha),
@@ -255,10 +256,36 @@ Chưa đo được: màn talent (Ca Của Tôi/Đăng Ký Ca) và role brand b�
   ngang. Lịch Tháng: thẻ ca 98→103px, số ô ngày phải cuộn không đổi (14/36).
 - Phát hiện phụ chưa sửa: `bg-[var(--surface-card)]` (14 chỗ ở BrandCommitment, HostPerformance, LiveReconciliation) dùng token không tồn tại (nền trong suốt).
 
+### P1 — ĐÃ LÀM 2026-09-26, verify trên browser
+- **Link riêng từng trang** — `src/lib/routes.ts` (slug cố định theo id tab, không theo nhãn menu; brand theo `slugify(name)`),
+  nối ở App.tsx: `initialRoute` đọc pathname lúc mở (link thắng localStorage); link brand chỉ biết slug nên chờ brand nạp xong
+  rồi đối chiếu ngay trong render (`pendingBrandSlug`), brand không tồn tại → về trang mặc định; state → URL bằng
+  `replaceState` lần đầu, `pushState` các lần sau; `popstate` → state. Trong lúc chờ đối chiếu, màn hiện "Đang kiểm tra quyền"
+  thay vì "không có quyền". Tháng/bộ lọc CHƯA nằm trong link (Report Tháng mở tháng mặc định).
+  `vercel.json`: rewrite `/((?!api/).*)` → `/index.html` (dev đã có `appType: "spa"`, prod Express đã có `get("*")`).
+  Verify: mở thẳng `/brand/crocs/report-thang`, `/brand/jockey/so-ca`, `/ke-hoach-thang` đúng trang; Back/Forward qua lại
+  giữa tab và giữa agency ↔ brand đúng; link rác `/khong-co-trang-nay` giữ trang cũ; brand sai → `/bang-van-hanh`; 18/18 tab
+  agency có link. Test: `tests/routes.test.ts` (kể cả "mọi tab trong menu đều có link").
+- **Lỗi cũ sửa kèm:** `effectiveWorkspace` dùng `phase1Loading` (talent/studio/thiết bị) làm cờ "brand đã nạp" — sai, brand
+  nạp ở effect riêng. Giờ có `brandsLoaded`; `phase1Loading` không còn ai đọc nên đã bỏ hẳn.
+- **Tiêu đề trang:** `src/components/common/PageIntro.tsx` — đoạn giải thích 1 dòng, nút "Chi tiết" chỉ hiện khi bị cắt
+  (ResizeObserver). Áp 14 màn.
+- **Sidebar:** `src/hooks/useMediaQuery.ts`; < 1280px tự thu gọn như module lịch (mở tay chỉ tạm thời). Ở 769px bảng Toàn
+  Cảnh Brand hiện đủ cột (trước bị cắt).
+- **Header mobile:** "Agency" thay "Agency (Toàn cảnh)" dưới 640px, bớt padding — 1 dòng ở 375px.
+- **Số:** `src/lib/format.ts` (`fmtFixed`, `fmtNum`, `fmtPctValue`, `fmtVndFull`). 66 chỗ `toFixed` trong chữ hiển thị → vi-VN;
+  "₫" → "đ"; "12M đ" → `formatCurrencyAdaptive` (Talent Pool, Hồ Sơ, Lịch, AI fallback server + ví dụ prompt Gemini). Report
+  Tháng CROCS: 0 số kiểu "2.18%", 154 số kiểu "2,18%". `toFixed` chỉ còn ở toạ độ SVG, cột Excel, giá trị điền sẵn vào input.
+  CHƯA thống nhất: "tr" vs "triệu", có/không hậu tố "đ" ở số rút gọn — chờ user chọn; các hàm fmt* cục bộ (đã vi-VN) vẫn để nguyên.
+- `--surface-card` (token không tồn tại, 14 chỗ nền trong suốt) → `--surface`/`--surface-elevated`/`--surface-hover`.
+- Test canh thêm (trong `tests/uiReadability.test.ts`): mọi `var(--x)` phải được khai báo; cấm `toFixed` trong chữ hiển thị
+  (có danh sách ngoại lệ); cấm "₫" / "M đ". `tests/format.test.ts`.
+- tsc 0 lỗi, eslint 0 lỗi/37 warning, vitest 112/112, `vite build` OK.
+
 Phương án còn lại:
 - ~~**P0 (1–2 ngày):** sửa token tương phản 4 theme; sàn cỡ chữ 11px (thay 378 class); ô nhập 16px trên mobile; brand mặc định =
   brand có ca gần nhất (nhớ lựa chọn cuối); thay 2 `window.prompt`.~~ XONG (ở trên).
-- **P1 (~1 tuần):** URL routing (`/agency/so-ca`, `/brand/crocs/report-thang/2026-09`); thu gọn header trang (mô tả vào nút "?");
+- ~~**P1 (~1 tuần):**~~ XONG (ở trên). URL routing (`/agency/so-ca`, `/brand/crocs/report-thang/2026-09`); thu gọn header trang (mô tả vào nút "?");
   `src/lib/format.ts` + test canh như metricGlossary; sidebar tự thu gọn < 1280px; header mobile gọn.
 - **P2 (lớn):** gộp IA — một hub "Nhập dữ liệu" (hiện 3 chỗ upload ở 2 workspace), brand là bộ lọc cho ops thay vì đổi workspace;
   tách bundle theo tab/role; bản Report Tháng rút gọn cho điện thoại; gắn đo lượt mở từng tab trước khi gộp menu.
