@@ -8,6 +8,7 @@ import { isoWeekStart } from "../../lib/dataraw/weeklySlice";
 import { fetchMonthlyReport, upsertMonthlyReport, MonthlyReportManualInput } from "../../lib/db/monthlyReports";
 import { errorMessage } from "../../lib/errorMessage";
 
+import { fmtFixed } from "../../lib/format";
 // Nhập Ads & Ghi Chú (tách khỏi Report Tháng 2026-09-21 theo yêu cầu user): phần ops nhập tay
 // Ads Spend bổ sung / ROAS ghi đè / Promotion / Customer Insight / Account Health trước đây nằm
 // cuối Report Tháng, lẫn với tài liệu gửi brand. Giờ là tab riêng trong Brand Workspace, chỉ
@@ -87,7 +88,7 @@ const MomChip: React.FC<{ current: number | null; previous: number | null }> = (
   return (
     <div className={`text-[11px] font-bold mt-0.5 ${positive ? "text-emerald-400" : "text-red-400"}`}>
       MoM {positive ? "+" : ""}
-      {pct.toFixed(1)}%
+      {fmtFixed(pct, 1)}%
     </div>
   );
 };
@@ -232,12 +233,12 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
           </div>
           <div className="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl p-3">
             <div className="text-[11px] text-[var(--text-faint)]">ROAS</div>
-            <div className="text-base font-black text-[var(--text)]">{adsRoas != null ? `${adsRoas.toFixed(1)}x` : "—"}</div>
+            <div className="text-base font-black text-[var(--text)]">{adsRoas != null ? `${fmtFixed(adsRoas, 1)}x` : "—"}</div>
             <MomChip current={adsRoas} previous={prevAdsRoas} />
           </div>
           <div className="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl p-3">
             <div className="text-[11px] text-[var(--text-faint)]">Ads cost / GMV</div>
-            <div className="text-base font-black text-[var(--text)]">{adsPctGmv != null ? `${adsPctGmv.toFixed(1)}%` : "—"}</div>
+            <div className="text-base font-black text-[var(--text)]">{adsPctGmv != null ? `${fmtFixed(adsPctGmv, 1)}%` : "—"}</div>
           </div>
         </div>
 
@@ -265,7 +266,7 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
                   <td className="py-2 px-2 text-[var(--text)] font-semibold">{new Date(`${w.weekStart}T00:00:00`).toLocaleDateString("vi-VN")}</td>
                   <td className="py-2 px-2 text-right text-[var(--text-muted)]">{formatCurrencyAdaptive(w.adsSpend)}</td>
                   <td className="py-2 px-2 text-right text-emerald-400 font-bold">{formatCurrencyAdaptive(w.gmv)}</td>
-                  <td className="py-2 px-2 text-right text-[var(--text-muted)]">{w.adsSpend > 0 ? `${(w.gmv / w.adsSpend).toFixed(1)}x` : "—"}</td>
+                  <td className="py-2 px-2 text-right text-[var(--text-muted)]">{w.adsSpend > 0 ? `${fmtFixed((w.gmv / w.adsSpend), 1)}x` : "—"}</td>
                 </tr>
               ))}
               {adsReport.weekly.length === 0 && (

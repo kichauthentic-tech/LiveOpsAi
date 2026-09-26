@@ -7,6 +7,7 @@ import { downloadRowsAsXlsx } from "../../lib/exportXlsx";
 import { Database, Download, Loader2, Plus, Save, Trash2, Users } from "lucide-react";
 import { metricHint } from "../../lib/metricGlossary";
 
+import { fmtFixed } from "../../lib/format";
 // Trang Affiliate (2026-09-22) — tách RIÊNG khỏi form Report Tháng theo yêu cầu ops. Bảng dựng
 // theo đúng file phân tích ops đang dùng: mỗi PHIÊN LIVE là 1 CỘT, mỗi chỉ số là 1 DÒNG, các cột
 // gom theo tháng bằng một dải tiêu đề ở trên.
@@ -73,8 +74,8 @@ function addMonths(month: string, delta: number): string {
 }
 
 const fmtInt = (n?: number | null) => (n == null || Number.isNaN(n) ? "—" : Math.round(n).toLocaleString("vi-VN"));
-const fmtPct = (n?: number | null, d = 2) => (n == null || Number.isNaN(n) ? "—" : `${n.toFixed(d)}%`);
-const fmtNum = (n?: number | null, d = 1) => (n == null || Number.isNaN(n) ? "—" : n.toFixed(d));
+const fmtPct = (n?: number | null, d = 2) => (n == null || Number.isNaN(n) ? "—" : `${fmtFixed(n, d)}%`);
+const fmtNum = (n?: number | null, d = 1) => (n == null || Number.isNaN(n) ? "—" : fmtFixed(n, d));
 
 // "2026-09-03" -> "3/9/2026" (đúng dạng dòng "Day" trong file ops).
 function dayLabel(iso: string): string {

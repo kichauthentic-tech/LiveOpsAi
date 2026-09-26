@@ -6,6 +6,7 @@ import { computeTalentRealTotals } from "../lib/metrics/avgGmv";
 import { errorMessage } from "../lib/errorMessage";
 import { useConfirm } from "../hooks/useConfirm";
 
+import { formatCurrencyAdaptive } from "../lib/formatCurrency";
 // Vài bản ghi talent cũ (trước khi field chuẩn hoá về `niches`/`avatar`/`ratePerSession`) có thể
 // còn lưu dưới tên cột cũ — đọc dự phòng, không phải lỗi kiểu dữ liệu.
 interface LegacyTalentAliases {
@@ -276,8 +277,8 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
           talentId: t.id,
           name: t.name,
           matchScore,
-          predictedGmv: t.avgGmvPerSession > 0 ? `${(t.avgGmvPerSession / 1000000).toFixed(0)}M - ${((t.avgGmvPerSession * 1.25) / 1000000).toFixed(0)}M đ` : "chưa có dữ liệu",
-          reasoning: `Thế mạnh ngành ${nicheStr}, CVR trung bình ${t.cvrAvg}%, GMV tích lũy ${((t.totalGmv || 0) / 1000000).toFixed(0)}M đ. Rất phù hợp với ${activeBrand?.name || "Brand"}.`
+          predictedGmv: t.avgGmvPerSession > 0 ? `${formatCurrencyAdaptive(Math.round(t.avgGmvPerSession), "")} – ${formatCurrencyAdaptive(Math.round(t.avgGmvPerSession * 1.25))}` : "chưa có dữ liệu",
+          reasoning: `Thế mạnh ngành ${nicheStr}, CVR trung bình ${t.cvrAvg}%, GMV tích lũy ${formatCurrencyAdaptive(t.totalGmv || 0)}. Rất phù hợp với ${activeBrand?.name || "Brand"}.`
         };
       });
       setMatchingResults(results);
@@ -449,7 +450,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                       </div>
                       <p className="text-[11px] text-[var(--accent-text)] font-medium truncate">{nicheStr}</p>
                       <span className="text-[11px] text-[var(--text-muted)] block truncate whitespace-nowrap">
-                        {real.sessionCount > 0 ? `GMV tích lũy ${(real.totalGmv / 1000000).toFixed(0)}M đ · ${real.sessionCount} ca` : "Chưa có ca nào có số"}
+                        {real.sessionCount > 0 ? `GMV tích lũy ${formatCurrencyAdaptive(real.totalGmv)} · ${real.sessionCount} ca` : "Chưa có ca nào có số"}
                       </span>
                     </div>
                   </div>
@@ -480,7 +481,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 text-[11px] text-[var(--text-muted)] bg-[var(--surface-base)]/40 p-2.5 rounded-xl border border-[var(--border)] font-medium">
-                  <div>GMV/session: <strong className="text-emerald-400 block text-xs font-bold">{real.avgGmvPerSession > 0 ? `${(real.avgGmvPerSession / 1000000).toFixed(0)}M đ` : "—"}</strong></div>
+                  <div>GMV/session: <strong className="text-emerald-400 block text-xs font-bold">{real.avgGmvPerSession > 0 ? formatCurrencyAdaptive(Math.round(real.avgGmvPerSession)) : "—"}</strong></div>
                   <div>CVR TB: <strong className="text-[var(--accent-text)] block text-xs font-bold">{t.cvrAvg > 0 ? `${t.cvrAvg}%` : "—"}</strong></div>
                   {canSeeRate && (
                     <>
@@ -829,9 +830,9 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
               </div>
 
               <div className="grid grid-cols-2 gap-2 bg-[var(--surface-base)]/40 p-3 rounded-xl border border-[var(--border)]">
-                <div>GMV lũy kế: <strong className="text-[var(--text)] block text-sm font-bold">{(computeTalentRealTotals(sessions, detailTalent.id).totalGmv / 1000000).toFixed(0)}M đ</strong></div>
+                <div>GMV lũy kế: <strong className="text-[var(--text)] block text-sm font-bold">{formatCurrencyAdaptive(computeTalentRealTotals(sessions, detailTalent.id).totalGmv)}</strong></div>
                 <div>Số Ca Có Số: <strong className="text-[var(--text)] block text-sm font-bold">{computeTalentRealTotals(sessions, detailTalent.id).sessionCount}</strong></div>
-                <div>GMV/session: <strong className="text-emerald-400 block text-sm font-bold">{(computeTalentRealTotals(sessions, detailTalent.id).avgGmvPerSession / 1000000).toFixed(0)}M đ</strong></div>
+                <div>GMV/session: <strong className="text-emerald-400 block text-sm font-bold">{formatCurrencyAdaptive(Math.round(computeTalentRealTotals(sessions, detailTalent.id).avgGmvPerSession))}</strong></div>
                 <div>CVR TB: <strong className="text-[var(--accent-text)] block text-sm font-bold">{detailTalent.cvrAvg || 0}%</strong></div>
                 <div>CTR TB: <strong className="text-[var(--accent-text)] block text-sm font-bold">{detailTalent.ctrAvg || 0}%</strong></div>
                 <div>Trạng Thái: <strong className="text-[var(--text)] block text-sm font-bold">{detailTalent.availabilityStatus || "Available"}</strong></div>

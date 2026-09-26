@@ -24,6 +24,7 @@ import { fetchMonthlyReportSnapshot, saveMonthlyReportSnapshot, StoredMonthlyRep
 import { DataRawImportStamp, fetchDataRawImportStamps } from "../../lib/db/brandDataRaw";
 import { buildMonthlyReportSnapshot, snapshotFreshness, snapshotHeadline, SnapshotHeadline } from "../../lib/report/monthlySnapshot";
 import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
+import { PageIntro } from "../common/PageIntro";
 
 // Report Tuần không còn là tab riêng ở menu (2026-08-23) — gộp làm chế độ xem "Tuần" ngay trong
 // Report Tháng qua toggle bên dưới, tái dùng nguyên BrandWeeklyReport.tsx (đã tự chặn quyền qua
@@ -319,11 +320,11 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
             )}
           </div>
         </div>
-        <p className="text-[var(--text-muted)] text-xs">
+        <PageIntro>
           Số liệu vận hành tính từ các ca có số trong tháng (Dữ Liệu Gốc chỉ dự phòng) và được CHỐT tại một thời điểm — mở report
           không tính lại; ops bấm "Cập nhật số liệu" khi muốn lấy số mới. Ads/ROAS, Promotion, Customer Insight, Account Health
           nhập tay ở tab {adsReportLink}.
-        </p>
+        </PageIntro>
       </div>
 
       {errorMsg && (

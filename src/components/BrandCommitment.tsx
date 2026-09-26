@@ -21,6 +21,7 @@ import {
   todayVn
 } from "../lib/performance/brandCommitment";
 import { useConfirm, usePrompt } from "../hooks/useConfirm";
+import { PageIntro } from "./common/PageIntro";
 
 interface BrandCommitmentProps {
   sessions: LiveSession[];
@@ -259,14 +260,14 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
 
   return (
     <div className="space-y-4">
-      <div className="bg-[var(--surface-card)] border border-[var(--border)] rounded-2xl p-4 sm:p-5">
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-base font-black text-[var(--text)]">Cam Kết Hợp Đồng</h2>
-            <p className="text-xs text-[var(--text-muted)] mt-1 max-w-3xl">
+            <PageIntro>
               Brand cam kết bao nhiêu giờ live mỗi tháng, và tới giờ đã giao được bao nhiêu. Đây là câu trả lời cho việc sắp lịch:
               còn thiếu bao nhiêu giờ phải xếp thêm, cho brand nào, trước khi hết tháng.
-            </p>
+            </PageIntro>
           </div>
           <div className="flex items-center gap-2">
             {(["runrate", "contracts"] as const).map((v) => (
@@ -295,7 +296,7 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
 
       {view === "runrate" ? (
         <>
-          <div className="bg-[var(--surface-card)] border border-[var(--border)] rounded-2xl p-4 sm:p-5">
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h3 className="text-xs font-black text-[var(--text)] flex items-center gap-1.5">
                 <CalendarRange className="w-3.5 h-3.5" /> {monthLabel(periodMonth)}
@@ -337,7 +338,7 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
             )}
           </div>
 
-          <div className="bg-[var(--surface-card)] border border-[var(--border)] rounded-2xl p-4 sm:p-5">
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5">
             {rows.length === 0 ? (
               <p className="text-xs text-[var(--text-faint)]">
                 Chưa có cam kết nào cho {monthLabel(periodMonth).toLowerCase()}. Tạo hợp đồng ở tab “Hợp đồng” rồi bấm “Sinh cam kết theo
@@ -472,7 +473,7 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
           </div>
         </>
       ) : (
-        <div className="bg-[var(--surface-card)] border border-[var(--border)] rounded-2xl p-4 sm:p-5">
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h3 className="text-xs font-black text-[var(--text)] flex items-center gap-1.5">
               <FileSignature className="w-3.5 h-3.5" /> Hợp đồng đã ký ({contracts.length})
@@ -559,7 +560,7 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
                 </button>
                 <button
                   onClick={() => setDraft(null)}
-                  className="px-3 py-1.5 rounded-lg bg-[var(--surface-card)] text-[var(--text-muted)] text-xs font-bold"
+                  className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] text-[var(--text-muted)] text-xs font-bold"
                 >
                   Huỷ
                 </button>
@@ -593,7 +594,7 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
                   <button
                     onClick={() => generate(c)}
                     disabled={busy}
-                    className="px-2.5 py-1.5 rounded-lg bg-[var(--surface-card)] border border-[var(--border)] text-[11px] font-bold text-[var(--text-muted)] hover:text-[var(--text)] flex items-center gap-1.5 disabled:opacity-50"
+                    className="px-2.5 py-1.5 rounded-lg bg-[var(--surface-elevated)] border border-[var(--border)] text-[11px] font-bold text-[var(--text-muted)] hover:text-[var(--text)] flex items-center gap-1.5 disabled:opacity-50"
                     title="Đổ giờ cam kết của hợp đồng ra từng tháng. Tháng nào ops đã sửa tay sẽ được giữ nguyên."
                   >
                     <RefreshCw className="w-3 h-3" /> Sinh cam kết theo tháng
@@ -612,7 +613,7 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
                         note: c.note ?? ""
                       })
                     }
-                    className="p-1.5 rounded-lg hover:bg-[var(--surface-card)] text-[var(--text-faint)] hover:text-[var(--text)]"
+                    className="p-1.5 rounded-lg hover:bg-[var(--surface-hover)] text-[var(--text-faint)] hover:text-[var(--text)]"
                     title="Sửa hợp đồng"
                   >
                     <Pencil className="w-3.5 h-3.5" />

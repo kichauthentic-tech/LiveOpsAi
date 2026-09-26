@@ -48,7 +48,16 @@ const WorkspaceSwitcher: React.FC<{
         ) : (
           <BrandLogo brand={currentBrand} size="xs" />
         )}
-        <span className="text-xs font-bold text-[var(--text)]">{label}</span>
+        {/* Màn điện thoại: "Agency (Toàn cảnh)" từng xuống 3 dòng (audit UX 2026-09-26) — rút còn "Agency". */}
+        <span className="text-xs font-bold text-[var(--text)] whitespace-nowrap truncate max-w-[9rem] sm:max-w-none">
+          {workspace.type === "agency" ? (
+            <>
+              Agency<span className="hidden sm:inline"> (Toàn cảnh)</span>
+            </>
+          ) : (
+            label
+          )}
+        </span>
         <ChevronDown className="w-3.5 h-3.5 text-[var(--text-muted)]" />
       </button>
 
@@ -141,16 +150,16 @@ export const Header: React.FC<HeaderProps> = ({
   notifications
 }) => {
   return (
-    <header className="h-16 border-b border-[var(--border)]/80 px-6 flex items-center justify-between bg-[var(--surface)]/40 backdrop-blur-md sticky top-0 z-40 text-[var(--text)] gap-4">
+    <header className="h-16 border-b border-[var(--border)]/80 px-2 sm:px-6 flex items-center justify-between bg-[var(--surface)]/40 backdrop-blur-md sticky top-0 z-40 text-[var(--text)] gap-4">
       {/* Active Region & Live Status */}
-      <div className="flex items-center gap-6">
+      <div className="flex items-center gap-6 min-w-0">
         {workspace && onWorkspaceChange && (
           <WorkspaceSwitcher workspace={workspace} brands={brands} onChange={onWorkspaceChange} />
         )}
       </div>
 
       {/* Role Switcher, Settings & User Profile */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
         {/* Logged-in user identity (real auth — role comes from the account, not a switcher) */}
         <div className="hidden md:flex flex-col items-end leading-tight px-2">
           <span className="text-xs font-bold text-[var(--text)]">{activeUserName}</span>

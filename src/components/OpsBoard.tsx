@@ -8,6 +8,7 @@ import { SessionReportInput } from "../lib/db/sessionReports";
 import { MissingStep, missingSteps } from "../lib/sessionLedger";
 import { BrandLogo } from "./ui/BrandLogo";
 import { SessionWindow } from "./SessionWindow";
+import { PageIntro } from "./common/PageIntro";
 
 // Bảng Vận Hành — màn của NHỊP HẰNG NGÀY (tái cấu trúc 2026-09-21): hôm nay / ngày / tuần này có
 // ca nào, ai trực, phòng nào, và mỗi ca còn thiếu gì (chưa có người · chưa up file · chưa report ·
@@ -213,9 +214,9 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
             <Radio className="w-5 h-5 text-red-400" />
             {mode === "mine" ? "Ca Của Tôi" : "Bảng Vận Hành"}
           </h2>
-          <p className="text-[var(--text-muted)] text-sm mt-1">
+          <PageIntro>
             {mode === "mine" ? "Ca bạn trực: nộp file số liệu + report ngay khi hết ca. Bấm vào ca để mở." : "Hôm nay có ca nào, ai trực, còn thiếu gì. Bấm vào ca để mở cửa sổ ca."}
-          </p>
+          </PageIntro>
         </div>
         {mode === "ops" && (
           <div className="flex flex-wrap items-center gap-2">

@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import { UserRole, PermissionKey, PermissionDefinition, RolePermissionsMap, SystemUser, AuditLogEntry, Brand, Talent, LiveSession } from "../types";
 import { ShieldCheck, UserPlus, Users, Key, Lock, Unlock, Check, X, Search, Sliders, History, Sparkles, Trash2, Edit2, Radio, Building2, Zap } from "lucide-react";
 import { useConfirm } from "../hooks/useConfirm";
+import { PageIntro } from "./common/PageIntro";
 
 export interface NewUserPayload {
   name: string;
@@ -364,9 +365,9 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
             <h2 className="text-2xl font-black text-[var(--text)] mt-0.5">
               Phân Quyền & Role
             </h2>
-            <p className="text-xs text-[var(--text-muted)] mt-1">
+            <PageIntro>
               Cấu hình Ma trận phân quyền chi tiết cho {MATRIX_ROLES.length} Role tiêu chuẩn, override quyền từng cá nhân & audit nhật ký an ninh.
-            </p>
+            </PageIntro>
           </div>
         </div>
 

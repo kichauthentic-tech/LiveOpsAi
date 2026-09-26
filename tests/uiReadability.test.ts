@@ -97,3 +97,53 @@ test("không dùng alert/confirm/prompt gốc của trình duyệt — dùng use
   }
   expect(hits).toEqual([]);
 });
+
+test("mọi var(--token) dùng trong src/ đều được khai báo (index.css hoặc class [--token:…])", () => {
+  const css = readFileSync(join(SRC, "index.css"), "utf8");
+  const declared = new Set([...css.matchAll(/(--[a-z0-9-]+)\s*:/g)].map((m) => m[1]));
+  const used = new Map<string, string>();
+  for (const file of sourceFiles(SRC)) {
+    const text = readFileSync(file, "utf8");
+    for (const m of text.matchAll(/\[(--[a-z0-9-]+):/g)) declared.add(m[1]);
+    for (const m of text.matchAll(/var\((--[a-z0-9-]+)\s*([,)])/g)) {
+      // var(--x, fallback) có fallback nên không vỡ — vẫn nên khai báo, nhưng không chặn.
+      if (m[2] === ")" && !used.has(m[1])) used.set(m[1], file.split("/src/")[1]);
+    }
+  }
+  const missing = [...used].filter(([v]) => !declared.has(v)).map(([v, f]) => `${v} (${f})`);
+  expect(missing).toEqual([]);
+});
+
+// toFixed cho "2.18" kiểu Mỹ — chữ hiển thị phải qua src/lib/format.ts (vi-VN: "2,18"). Chỉ các chỗ máy đọc
+// được giữ toFixed: toạ độ SVG, cột số file Excel, giá trị điền sẵn vào ô input (parseFloat đọc dấu chấm).
+const TOFIXED_ALLOWED: [string, RegExp][] = [
+  ["lib/format.ts", /./],
+  ["components/CeoBrief.tsx", /\bx\(|\by\(/],
+  ["components/SessionLedger.tsx", /row\["Giờ live"\]/],
+  ["components/brand-workspace/MonthlyReportTabs.tsx", /setPct(Daily|Dday|Midmonth|Payday)\(/]
+];
+
+test("không dùng toFixed cho chữ hiển thị (dấu thập phân phải là phẩy)", () => {
+  const hits: string[] = [];
+  for (const file of sourceFiles(SRC)) {
+    const rel = file.split("/src/")[1];
+    for (const { line, n } of codeLines(file)) {
+      if (!/\.toFixed\(/.test(line.replace(/\/\/.*$/, ""))) continue;
+      if (TOFIXED_ALLOWED.some(([f, re]) => f === rel && re.test(line))) continue;
+      hits.push(`${rel}:${n} ${line.trim().slice(0, 100)}`);
+    }
+  }
+  expect(hits).toEqual([]);
+});
+
+test("tiền không dùng ký hiệu ₫ hay đơn vị M — dùng đ / triệu / tỷ", () => {
+  const hits: string[] = [];
+  for (const file of sourceFiles(SRC)) {
+    for (const { line, n } of codeLines(file)) {
+      // Bỏ qua bộ đọc file TikTok: nó phải gỡ ký hiệu ₫ khỏi số trong file gốc.
+      if (/\.replace\(/.test(line)) continue;
+      if (/₫|\dM đ|\}M đ|\)M đ/.test(line)) hits.push(`${file.split("/src/")[1]}:${n} ${line.trim().slice(0, 100)}`);
+    }
+  }
+  expect(hits).toEqual([]);
+});

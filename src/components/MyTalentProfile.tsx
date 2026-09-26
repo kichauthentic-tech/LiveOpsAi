@@ -7,6 +7,8 @@ import { computeTalentMonthlyIncome } from "../lib/pnl";
 import { todayVn } from "../lib/performance/brandCommitment";
 import { errorMessage } from "../lib/errorMessage";
 
+import { fmtFixed } from "../lib/format";
+import { formatCurrencyAdaptive } from "../lib/formatCurrency";
 interface MyTalentProfileProps {
   activeUser: SystemUser;
   talents: Talent[];
@@ -278,11 +280,11 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
           </div>
           <div className="bg-[var(--surface-base)]/40 border border-[var(--border)] rounded-xl p-3">
             <div className="text-[var(--text-muted)]">GMV lũy kế</div>
-            <div className="font-bold text-emerald-400 mt-0.5">{((myTalent.totalGmv || 0) / 1000000).toFixed(0)}M đ</div>
+            <div className="font-bold text-emerald-400 mt-0.5">{formatCurrencyAdaptive(myTalent.totalGmv || 0)}</div>
           </div>
           <div className="bg-[var(--surface-base)]/40 border border-[var(--border)] rounded-xl p-3">
             <div className="text-[var(--text-muted)]">GMV/session</div>
-            <div className="font-bold text-emerald-400 mt-0.5">{(computeRealAvgGmvPerSession(sessions, myTalent.id) / 1000000).toFixed(0)}M đ</div>
+            <div className="font-bold text-emerald-400 mt-0.5">{formatCurrencyAdaptive(Math.round(computeRealAvgGmvPerSession(sessions, myTalent.id)))}</div>
           </div>
           <div className="bg-[var(--surface-base)]/40 border border-[var(--border)] rounded-xl p-3">
             <div className="text-[var(--text-muted)]">CVR TB</div>
@@ -379,7 +381,7 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
                         <td className="py-1.5 px-1 whitespace-nowrap">{r.session.date}</td>
                         <td className="py-1.5 px-1 whitespace-nowrap">{r.session.brandName}</td>
                         <td className="py-1.5 px-1 whitespace-nowrap">{ROLE_LABEL[r.role]}</td>
-                        <td className="py-1.5 px-1 text-right whitespace-nowrap">{r.billableHours.toFixed(1)}h</td>
+                        <td className="py-1.5 px-1 text-right whitespace-nowrap">{fmtFixed(r.billableHours, 1)}h</td>
                         <td className="py-1.5 px-1 text-right font-bold text-[var(--text)] whitespace-nowrap">{money(r.payout)} đ</td>
                       </tr>
                     ))}

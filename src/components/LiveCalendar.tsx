@@ -21,6 +21,7 @@ import { SessionWindow } from "./SessionWindow";
 import { SessionReportInput } from "../lib/db/sessionReports";
 import { Calendar as CalendarIcon, Building2, User, Plus, AlertTriangle, CheckCircle2, Search, X, ChevronLeft, ChevronRight, Tag, GripVertical } from "lucide-react";
 
+import { formatCurrencyAdaptive } from "../lib/formatCurrency";
 interface LiveCalendarProps {
   sessions: LiveSession[];
   shiftSlots?: ShiftSlot[];
@@ -870,7 +871,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   {/* Day total GMV */}
                   {totalGmvTarget > 0 ? (
                     <div className="text-[11px] font-mono font-bold text-[var(--success)] pt-1 border-t border-[var(--border-muted)] truncate">
-                      Target: {(totalGmvTarget / 1000000).toFixed(0)}M
+                      Target: {formatCurrencyAdaptive(totalGmvTarget)}
                     </div>
                   ) : (
                     <div className="text-[11px] text-[var(--text-faint)] italic">Trống lịch</div>

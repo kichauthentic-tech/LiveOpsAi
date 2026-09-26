@@ -26,7 +26,9 @@ import { formatCurrencyAdaptive } from "../lib/formatCurrency";
 import { EngineParams } from "../lib/scheduling/engineParams";
 import { findBrandStudioId } from "../lib/db/brandStudios";
 import { useConfirm } from "../hooks/useConfirm";
+import { PageIntro } from "./common/PageIntro";
 
+import { fmtFixed } from "../lib/format";
 interface MonthPlanProps {
   brands: Brand[];
   studios: Studio[];
@@ -483,9 +485,9 @@ export default function MonthPlan({
             <CalendarRange className="w-5 h-5 text-blue-400" />
             Kế Hoạch Tháng
           </h2>
-          <p className="text-sm text-[var(--text-muted)] mt-1">
+          <PageIntro>
             Lập lưới ca cho brand trước khi mở đăng ký: giờ theo cam kết, target đặt ngay trong kế hoạch, chốt là ca đổ xuống Nhân sự ca chờ talent đăng ký.
-          </p>
+          </PageIntro>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           <select value={brandId} onChange={(e) => setBrandId(e.target.value)} className="bg-[var(--surface-base)] border border-[var(--border)] rounded-xl px-3 py-2 text-[var(--text)] text-sm font-bold">
@@ -675,7 +677,7 @@ export default function MonthPlan({
           <div className="flex-1 min-w-[240px] space-y-0.5">
             <p>
               <b>Lưới này dự báo {formatCurrencyAdaptive(targetGap.forecast)}, thiếu {formatCurrencyAdaptive(targetGap.gap)} ({Math.round(targetGap.pct * 100)}%) so với target {formatCurrencyAdaptive(targetTotal)}</b>
-              {" "}— target/ca đang cao hơn dự báo ×{(targetTotal / Math.max(1, targetGap.forecast)).toFixed(2)}.
+              {" "}— target/ca đang cao hơn dự báo ×{fmtFixed((targetTotal / Math.max(1, targetGap.forecast)), 2)}.
             </p>
             <p className="text-amber-300/90">
               {targetGap.fill
@@ -822,7 +824,7 @@ function SuggestionPanel({ history: h, result: r, committedHours, targetTotal, c
       )}
       {(h.eventLearned.holiday || h.eventLearned.event || h.eventLearned.mega_sale || h.schemeLearned) && (
         <p className="text-[11px] text-[var(--text-faint)]">
-          Học được từ lịch sử: {h.eventLearned.holiday ? `ngày lễ ×${h.eventMultipliers.holiday.toFixed(2)} · ` : ""}{h.eventLearned.mega_sale ? `mega sale ×${h.eventMultipliers.mega_sale.toFixed(2)} · ` : ""}{h.eventLearned.event ? `sự kiện ×${h.eventMultipliers.event.toFixed(2)} · ` : ""}{h.schemeLearned ? `ngày có scheme KM ×${h.schemeMultiplier.toFixed(2)}` : ""}
+          Học được từ lịch sử: {h.eventLearned.holiday ? `ngày lễ ×${fmtFixed(h.eventMultipliers.holiday, 2)} · ` : ""}{h.eventLearned.mega_sale ? `mega sale ×${fmtFixed(h.eventMultipliers.mega_sale, 2)} · ` : ""}{h.eventLearned.event ? `sự kiện ×${fmtFixed(h.eventMultipliers.event, 2)} · ` : ""}{h.schemeLearned ? `ngày có scheme KM ×${fmtFixed(h.schemeMultiplier, 2)}` : ""}
         </p>
       )}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -836,10 +838,10 @@ function SuggestionPanel({ history: h, result: r, committedHours, targetTotal, c
         <div>
           <p className="font-bold text-[var(--text-muted)] mb-1">Hệ số học từ lịch sử</p>
           {(["dday", "midmonth", "payday"] as const).map((b) => (
-            <div key={b} className="flex justify-between gap-2"><span className="text-[var(--text)]">{BUCKET_LABEL[b]}</span><b className="text-[var(--text)]">×{h.campMultipliers[b].toFixed(2)} <span className="text-[11px] font-normal text-[var(--text-faint)]">{h.campLearned[b] ? "học được" : "mặc định"}</span></b></div>
+            <div key={b} className="flex justify-between gap-2"><span className="text-[var(--text)]">{BUCKET_LABEL[b]}</span><b className="text-[var(--text)]">×{fmtFixed(h.campMultipliers[b], 2)} <span className="text-[11px] font-normal text-[var(--text-faint)]">{h.campLearned[b] ? "học được" : "mặc định"}</span></b></div>
           ))}
-          <div className="flex justify-between gap-2 mt-1"><span className="text-[var(--text)]">Giờ/ngày lịch sử</span><b className="text-[var(--text)]">{(["daily", "dday", "midmonth", "payday"] as const).map((b) => h.campHoursLearned[b] ? `${b === "daily" ? "thường" : BUCKET_LABEL[b]} ${h.campHoursPerDay[b].toFixed(1)}h` : "").filter(Boolean).join(" · ") || "chưa học được"}</b></div>
-          <div className="flex justify-between gap-2 mt-1"><span className="text-[var(--text)]">Ca thứ 2/3 trong ngày</span><b className="text-[var(--text)]">×{h.diminishing[1].toFixed(2)} / ×{h.diminishing[2].toFixed(2)}</b></div>
+          <div className="flex justify-between gap-2 mt-1"><span className="text-[var(--text)]">Giờ/ngày lịch sử</span><b className="text-[var(--text)]">{(["daily", "dday", "midmonth", "payday"] as const).map((b) => h.campHoursLearned[b] ? `${b === "daily" ? "thường" : BUCKET_LABEL[b]} ${fmtFixed(h.campHoursPerDay[b], 1)}h` : "").filter(Boolean).join(" · ") || "chưa học được"}</b></div>
+          <div className="flex justify-between gap-2 mt-1"><span className="text-[var(--text)]">Ca thứ 2/3 trong ngày</span><b className="text-[var(--text)]">×{fmtFixed(h.diminishing[1], 2)} / ×{fmtFixed(h.diminishing[2], 2)}</b></div>
         </div>
         <div>
           <p className="font-bold text-[var(--text-muted)] mb-1">Đường cong biên (giờ luỹ kế → GMV dự báo)</p>

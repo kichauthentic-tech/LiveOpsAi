@@ -13,6 +13,7 @@ import {
 } from "../lib/db/liveReconciliation";
 import { errorMessage } from "../lib/errorMessage";
 import { useConfirm } from "../hooks/useConfirm";
+import { PageIntro } from "./common/PageIntro";
 
 interface LiveReconciliationProps {
   onApplied: () => Promise<void> | void;
@@ -44,7 +45,7 @@ const BUCKET_TONE: Record<ReconciliationBucket, string> = {
 const ORDER: ReconciliationBucket[] = ["agency", "review", "unassigned", "inhouse"];
 
 function fmtVnd(n: number): string {
-  return n.toLocaleString("vi-VN", { maximumFractionDigits: 0 }) + "₫";
+  return n.toLocaleString("vi-VN", { maximumFractionDigits: 0 }) + "đ";
 }
 
 function fmtTime(iso?: string): string {
@@ -94,14 +95,14 @@ export function LiveReconciliation({ onApplied, onOpenSession }: LiveReconciliat
 
   return (
     <div className="space-y-4">
-      <div className="bg-[var(--surface-card)] border border-[var(--border)] rounded-2xl p-4 sm:p-5">
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-base font-black text-[var(--text)]">Đối Soát Số Liệu</h2>
-            <p className="text-xs text-[var(--text-muted)] mt-1 max-w-2xl">
+            <PageIntro>
               TikTok còn cập nhật GMV nhiều giờ sau khi tắt live, nên số chốt lúc giao ca chỉ là tạm tính. Tải lại file{" "}
               <span className="font-bold">Creator-Live-Performance</span> cho cả ngày/tuần/tháng rồi up một lần để chỉnh lại toàn bộ ca trong kỳ.
-            </p>
+            </PageIntro>
           </div>
           <label className="shrink-0">
             <input
@@ -154,7 +155,7 @@ export function LiveReconciliation({ onApplied, onOpenSession }: LiveReconciliat
       </div>
 
       {!active && !busy && (
-        <div className="bg-[var(--surface-card)] border border-dashed border-[var(--border)] rounded-2xl p-8 text-center">
+        <div className="bg-[var(--surface)] border border-dashed border-[var(--border)] rounded-2xl p-8 text-center">
           <FileSpreadsheet className="w-6 h-6 text-[var(--text-faint)] mx-auto mb-2" />
           <p className="text-xs text-[var(--text-muted)]">Chưa có lần đối soát nào. Up file để bắt đầu.</p>
         </div>
@@ -243,7 +244,7 @@ export function LiveReconciliation({ onApplied, onOpenSession }: LiveReconciliat
             );
           })}
 
-          <div className="bg-[var(--surface-card)] border border-[var(--border)] rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
             <p className="text-[11px] text-[var(--text-muted)] max-w-xl">
               Áp dụng sẽ ghi đè số liệu của các ca thuộc rổ "khớp ca agency" và "cần xem lại", đổi nguồn dữ liệu thành{" "}
               <span className="font-bold">đã đối soát</span>. Chạy lại nhiều lần được — mỗi lần tính lại từ đầu theo file này.

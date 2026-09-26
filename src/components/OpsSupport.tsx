@@ -12,6 +12,7 @@ import { useDefaultBrand } from "../hooks/useDefaultBrand";
 import { formatCurrencyAdaptive } from "../lib/formatCurrency";
 import { SESSION_STATUS_CLS, SESSION_STATUS_LABEL_VI } from "../lib/sessionStatusUi";
 import { metricHint } from "../lib/metricGlossary";
+import { PageIntro } from "./common/PageIntro";
 
 // Hỗ Trợ Vận Hành (user chốt 2026-09-21): tầng "target vận hành" — KHÔNG đụng target cam kết đã chốt,
 // không ghi DB, không đọc số realtime. (1) Run-rate & dự kiến cuối tháng + phương án bù (đề xuất; ops
@@ -154,9 +155,9 @@ export default function OpsSupport({ brands, sessions, shiftSlots, promoSchemes,
           <h2 className="text-xl sm:text-2xl font-black text-[var(--text)] flex items-center gap-2">
             <Gauge className="w-6 h-6 text-[var(--accent-text)]" /> Hỗ Trợ Vận Hành
           </h2>
-          <p className="text-sm text-[var(--text-muted)] mt-1">
+          <PageIntro>
             Run-rate so với target đã chốt, dự kiến cuối tháng và phương án bù; benchmark cho ca sắp live để đối chiếu với dashboard TikTok trong phiên. Không đổi target cam kết.
-          </p>
+          </PageIntro>
         </div>
         <div className="flex items-center gap-2">
           <select value={brandId} onChange={(e) => setBrandId(e.target.value)} className={inputCls}>

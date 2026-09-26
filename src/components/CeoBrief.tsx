@@ -51,6 +51,7 @@ import { CampDayBucket, CampOverrides } from "../lib/campaignDays";
 import { getBrandTheme } from "../lib/brandTheme";
 import { formatCurrencyAdaptive } from "../lib/formatCurrency";
 import { BrandLogo } from "./ui/BrandLogo";
+import { PageIntro } from "./common/PageIntro";
 
 // Bản Tin CEO (2026-09-25) — thay Toàn Cảnh Agency. Mọi luật số nằm ở lib/performance/ceoBrief.ts;
 // file này chỉ trình bày. Khối tiền chỉ ceo/admin thấy, và chỉ cộng ca ĐỦ dữ liệu để tính tiền
@@ -309,9 +310,9 @@ export default function CeoBrief(props: CeoBriefProps) {
             <h2 className="text-xl sm:text-2xl font-black text-[var(--text)] flex items-center gap-2">
               <LayoutDashboard className="w-6 h-6 text-[var(--accent-text)]" /> Dashboard
             </h2>
-            <p className="text-sm text-[var(--text-muted)] mt-1 max-w-3xl">
+            <PageIntro>
               Toàn cảnh agency và từng tài khoản: GMV, target, dự phóng cuối tháng, ngày campaign, nhân sự{canSeeMoney ? " và tiền" : ""}. So sánh luôn cắt về cùng số ngày có số liệu.
-            </p>
+            </PageIntro>
           </div>
           <span
             className={`self-start shrink-0 text-xs font-bold px-3 py-1.5 rounded-full ${stale ? "bg-amber-500/15 text-amber-300" : "bg-emerald-500/15 text-emerald-300"}`}

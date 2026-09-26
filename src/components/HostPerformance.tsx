@@ -11,7 +11,9 @@ import {
   splitUnassignedHost
 } from "../lib/performance/hostPerformance";
 import { getTodayDate } from "../lib/dateUtils";
+import { PageIntro } from "./common/PageIntro";
 
+import { fmtFixed } from "../lib/format";
 interface HostPerformanceProps {
   sessions: LiveSession[];
   brands: Brand[];
@@ -60,14 +62,14 @@ export function HostPerformance({ sessions, brands }: HostPerformanceProps) {
 
   return (
     <div className="space-y-4">
-      <div className="bg-[var(--surface-card)] border border-[var(--border)] rounded-2xl p-4 sm:p-5">
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-base font-black text-[var(--text)]">Hiệu Suất Host</h2>
-            <p className="text-xs text-[var(--text-muted)] mt-1 max-w-2xl">
+            <PageIntro>
               Đọc từ số liệu ca đã có, để trả lời câu hỏi khi sắp lịch: host nào hiệu quả nhất với brand nào, và mạnh nhất vào thứ mấy.
               Đây là số liệu tham khảo cho ops tự quyết, app không tự xếp lịch.
-            </p>
+            </PageIntro>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={inputCls} />
@@ -107,7 +109,7 @@ export function HostPerformance({ sessions, brands }: HostPerformanceProps) {
 
       {quality.total > 0 && (
         <>
-          <div className="bg-[var(--surface-card)] border border-[var(--border)] rounded-2xl p-4 sm:p-5">
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5">
             <h3 className="text-xs font-black text-[var(--text)] flex items-center gap-1.5">
               <TrendingUp className="w-3.5 h-3.5" /> Xếp hạng host theo GMV/giờ
             </h3>
@@ -118,7 +120,7 @@ export function HostPerformance({ sessions, brands }: HostPerformanceProps) {
               <div className="mt-2 flex items-start gap-2 text-[11px] rounded-xl p-2.5 bg-amber-500/10 border border-amber-500/30 text-amber-300">
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                 <span>
-                  {unassignedHost.sessionCount} ca chưa gán host ({fmtVnd(unassignedHost.gmv)} GMV · {unassignedHost.hours.toFixed(1)}h) không được tính
+                  {unassignedHost.sessionCount} ca chưa gán host ({fmtVnd(unassignedHost.gmv)} GMV · {fmtFixed(unassignedHost.hours, 1)}h) không được tính
                   vào xếp hạng — gán host cho ca ở "Dữ Liệu Gốc → nạp bù" hoặc Cửa sổ Ca Live để số này về đúng người.
                 </span>
               </div>
@@ -143,9 +145,9 @@ export function HostPerformance({ sessions, brands }: HostPerformanceProps) {
                       <td className="py-2 pr-3 text-right font-bold text-emerald-400">{fmtVnd(h.gmvPerHour)}</td>
                       <td className="py-2 pr-3 text-right text-[var(--text-muted)]">{fmtVnd(h.gmv)}</td>
                       <td className="py-2 pr-3 text-right text-[var(--text-muted)]">{h.sessionCount}</td>
-                      <td className="py-2 pr-3 text-right text-[var(--text-muted)]">{h.hours.toFixed(1)}h</td>
+                      <td className="py-2 pr-3 text-right text-[var(--text-muted)]">{fmtFixed(h.hours, 1)}h</td>
                       <td className="py-2 pr-3 text-right text-[var(--text-muted)]">{fmtVnd(h.gmvPerSession)}</td>
-                      <td className="py-2 text-right text-[var(--text-muted)]">{h.ctr.toFixed(2)}%</td>
+                      <td className="py-2 text-right text-[var(--text-muted)]">{fmtFixed(h.ctr, 2)}%</td>
                     </tr>
                   ))}
                 </tbody>
@@ -153,7 +155,7 @@ export function HostPerformance({ sessions, brands }: HostPerformanceProps) {
             </div>
           </div>
 
-          <div className="bg-[var(--surface-card)] border border-[var(--border)] rounded-2xl p-4 sm:p-5">
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5">
             <h3 className="text-xs font-black text-[var(--text)]">Host Mạnh Nhất Vào Thứ Mấy</h3>
             <p className="text-[11px] text-[var(--text-faint)] mt-0.5">
               Đậm hơn = GMV/giờ cao hơn. Ô trống nghĩa là host chưa từng live thứ đó trong khoảng đã chọn, không phải hiệu suất bằng 0.
@@ -198,7 +200,7 @@ export function HostPerformance({ sessions, brands }: HostPerformanceProps) {
             </div>
           </div>
 
-          <div className="bg-[var(--surface-card)] border border-[var(--border)] rounded-2xl p-4 sm:p-5">
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5">
             <h3 className="text-xs font-black text-[var(--text)]">Hiệu Suất Chung Theo Thứ</h3>
             <p className="text-[11px] text-[var(--text-faint)] mt-0.5">
               Dùng để quyết định nên mở nhiều ca vào thứ nào, tách khỏi chuyện host nào trực.

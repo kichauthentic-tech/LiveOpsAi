@@ -16,7 +16,9 @@ import { dataQuality } from "../lib/performance/hostPerformance";
 import { errorMessage } from "../lib/errorMessage";
 import { todayVn } from "../lib/performance/brandCommitment";
 import { useToast } from "../hooks/useToast";
+import { PageIntro } from "./common/PageIntro";
 
+import { fmtFixed } from "../lib/format";
 interface FinanceHrProps {
   sessions: LiveSession[];
   talents: Talent[];
@@ -115,7 +117,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
       ),
     [rows]
   );
-  const totalMargin = totals.grossAgencyRev > 0 ? ((totals.netProfit / totals.grossAgencyRev) * 100).toFixed(1) : "0";
+  const totalMargin = totals.grossAgencyRev > 0 ? fmtFixed(((totals.netProfit / totals.grossAgencyRev) * 100), 1) : "0";
 
   // Đ3: phiên nào đang được tính bằng rate = 0 / % mặc định. Số 0 vì "chưa nhập rate" và số 0 vì
   // "thật sự không tốn tiền" cho ra cùng một Net Profit, nên màn tiền phải tự nói ra — chứ không
@@ -173,9 +175,9 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
             <h3 className="font-bold text-[var(--text)] text-base flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-[var(--accent-text)]" /> Báo Cáo P&L Thật Theo Phiên Live
             </h3>
-            <p className="text-xs text-[var(--text-muted)]">
+            <PageIntro>
               GMV & Host lấy từ dữ liệu phiên/talent thật trên Supabase. Commission Agency, chi phí Studio/Ads nhập & lưu thật, chỉ CEO mới duyệt được.
-            </p>
+            </PageIntro>
           </div>
           <div className="flex items-center gap-1 text-xs">
             <button onClick={() => shiftMonth(-1)} className="px-2 py-1 rounded-lg border border-[var(--border)] hover:bg-[var(--surface-elevated)]">‹</button>
@@ -314,7 +316,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                       <div className="text-amber-400 font-bold">{money(hostPayout)} đ</div>
                       {hostPaidHourly && (
                         <div className="text-[11px] text-[var(--text-muted)] mt-0.5">
-                          {billableHours.toFixed(2)}h × rate/giờ
+                          {fmtFixed(billableHours, 2)}h × rate/giờ
                           {otMinutes > 0 && <span className="text-emerald-400 font-bold"> · OT +{otMinutes}p</span>}
                           {earlyLeaveMinutes > 0 && <span className="text-amber-400 font-bold"> · off sớm −{earlyLeaveMinutes}p</span>}
                         </div>
@@ -325,7 +327,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                       {coHost ? (
                         <div className="text-[11px] text-amber-300/80 mt-1">
                           Trợ live {coHost.name}: <b>{money(coHostPayout)} đ</b>
-                          {coHostPaidHourly && <span className="text-[var(--text-muted)]"> ({billableHours.toFixed(2)}h × {coHostUsesAssistantRate ? "rate trợ/giờ" : "rate host/giờ — chưa đặt rate trợ"})</span>}
+                          {coHostPaidHourly && <span className="text-[var(--text-muted)]"> ({fmtFixed(billableHours, 2)}h × {coHostUsesAssistantRate ? "rate trợ/giờ" : "rate host/giờ — chưa đặt rate trợ"})</span>}
                         </div>
                       ) : s.coHostId ? (
                         <div className="text-[11px] text-red-300 mt-1">Trợ live {s.coHostName || "—"} không còn hồ sơ talent — chưa tính công</div>

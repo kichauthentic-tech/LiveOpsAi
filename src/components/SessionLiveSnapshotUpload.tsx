@@ -16,7 +16,7 @@ interface SessionLiveSnapshotUploadProps {
 }
 
 function fmtVnd(n: number): string {
-  return n.toLocaleString("vi-VN", { maximumFractionDigits: 0 }) + "₫";
+  return n.toLocaleString("vi-VN", { maximumFractionDigits: 0 }) + "đ";
 }
 
 function fmtTime(iso?: string): string {

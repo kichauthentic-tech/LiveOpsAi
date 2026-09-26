@@ -8,6 +8,7 @@ import { BrandLogo } from "./ui/BrandLogo";
 import { useConfirm } from "../hooks/useConfirm";
 import { saveMonthlyReportSnapshot, snapshotExists } from "../lib/db/monthlyReportSnapshots";
 import { buildMonthlyReportSnapshot } from "../lib/report/monthlySnapshot";
+import { PageIntro } from "./common/PageIntro";
 
 // Bảng điều phối phát hành report (còn lại của Đợt C, Audit Role × Workspace — xem
 // WORKSPACE_DESIGN.md) — ops coi trạng thái phát hành Report Tháng của TẤT CẢ brand × nhiều tháng
@@ -130,11 +131,11 @@ export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ brands, 
         <h2 className="text-lg font-black text-[var(--text)] flex items-center gap-2">
           <Send className="w-5 h-5 text-[var(--accent-text)]" /> Điều Phối Phát Hành Report
         </h2>
-        <p className="text-xs text-[var(--text-muted)] max-w-3xl">
+        <PageIntro>
           Trạng thái phát hành Report Tháng của mọi brand, {MONTHS_BACK} tháng gần nhất — phát hành/thu hồi thẳng từ đây
           thay vì mở lần lượt từng Brand Workspace. Report Tuần đọc theo Report Tháng (không publish riêng); Cam Kết Hợp
           Đồng và Affiliate không có trạng thái phát hành nên không hiện ở đây.
-        </p>
+        </PageIntro>
       </div>
 
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-xl">

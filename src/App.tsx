@@ -85,6 +85,7 @@ import { ResetPasswordScreen } from "./components/ResetPasswordScreen";
 import { AccountSettings } from "./components/AccountSettings";
 import { MyTalentProfile } from "./components/MyTalentProfile";
 import { useAuth } from "./hooks/useAuth";
+import { useMediaQuery } from "./hooks/useMediaQuery";
 import { useToast } from "./hooks/useToast";
 import { useNotifications } from "./hooks/useNotifications";
 import { SessionLedger } from "./components/SessionLedger";
@@ -207,24 +208,28 @@ export default function App() {
   useEffect(() => saveStorage("sidebarCollapsed", sidebarPref), [sidebarPref]);
 
   const isCalendarModule = CALENDAR_TABS.has(activeTab);
+  // Màn 768–1279px (laptop nhỏ, chia đôi màn hình): sidebar mở 256px ăn ~1/3 bề ngang, bảng bị cắt
+  // (audit UX 2026-09-26: ở ~800px nội dung còn ~535px). Tự thu gọn như module lịch.
+  const isWideScreen = useMediaQuery("(min-width: 1280px)");
+  const autoCollapse = isCalendarModule || !isWideScreen;
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(sidebarPref);
-  // Vào module có lịch → tự thu gọn; rời đi → trả lại đúng lựa chọn tay của user.
-  // Nếu user tự mở lại sidebar khi đang ở trong module lịch thì effect này không chạy
-  // (deps không đổi) nên tôn trọng thao tác đó cho tới lần chuyển module kế tiếp.
+  // Vào module có lịch (hoặc màn hẹp) → tự thu gọn; rời đi → trả lại đúng lựa chọn tay của user.
+  // Nếu user tự mở lại sidebar khi đang tự thu gọn thì effect này không chạy
+  // (deps không đổi) nên tôn trọng thao tác đó cho tới lần chuyển module/cỡ màn kế tiếp.
   useEffect(() => {
-    setSidebarCollapsed(isCalendarModule ? true : sidebarPref);
-  }, [isCalendarModule, sidebarPref]);
+    setSidebarCollapsed(autoCollapse ? true : sidebarPref);
+  }, [autoCollapse, sidebarPref]);
 
   const toggleSidebar = React.useCallback(() => {
     setSidebarCollapsed((v) => {
       const next = !v;
-      // Chỉ ghi đè lựa chọn mặc định khi đang ở module không có lịch — thao tác tay
-      // trong module lịch chỉ có tác dụng tạm thời, không đổi mặc định của user.
-      if (!isCalendarModule) setSidebarPref(next);
+      // Chỉ ghi đè lựa chọn mặc định khi không ở chế độ tự thu gọn — thao tác tay trong
+      // module lịch / màn hẹp chỉ có tác dụng tạm thời, không đổi mặc định của user.
+      if (!autoCollapse) setSidebarPref(next);
       return next;
     });
-  }, [isCalendarModule]);
+  }, [autoCollapse]);
 
   // Phím tắt Cmd/Ctrl + B — chuẩn quen thuộc của các app có sidebar (VSCode, Notion...).
   useEffect(() => {

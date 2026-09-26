@@ -44,7 +44,9 @@ import { FATIGUE_WEEK_HOURS, HostSuggestion, headlineFor, suggestHosts } from ".
 import { BulkFinalizePanel } from "./BulkFinalizePanel";
 import { eligibleSlots } from "../lib/performance/bulkFinalize";
 import { useToast } from "../hooks/useToast";
+import { PageIntro } from "./common/PageIntro";
 
+import { fmtFixed } from "../lib/format";
 interface ShiftSchedulingProps {
   currentRole: UserRole;
   activeUser: SystemUser;
@@ -126,7 +128,7 @@ const suggestionLabel = (s: HostSuggestion, fatigueAt: number) => {
   const extras = [
     s.blockSessions >= 2 ? `khung này ${fmtPerHour(s.blockGmvPerHour)}` : "",
     s.monthSessions > 0 ? `${s.monthSessions} ca tháng này` : "",
-    s.weekHours > fatigueAt ? `⚠ ${s.weekHours.toFixed(0)}h tuần này` : ""
+    s.weekHours > fatigueAt ? `⚠ ${fmtFixed(s.weekHours, 0)}h tuần này` : ""
   ].filter(Boolean);
   const tail = extras.length > 0 ? ` · ${extras.join(" · ")}` : "";
   if (h.scope === "none") return `${s.name} · chưa có dữ liệu${tail}`;
@@ -471,11 +473,11 @@ export default function ShiftScheduling({
             <CalendarIcon className="w-5 h-5 text-blue-400" />
             {admin ? "Nhân sự ca" : "Đăng Ký Ca"}
           </h2>
-          <p className="text-sm text-[var(--text-muted)] mt-1">
+          <PageIntro>
             {admin
               ? "Chốt Host + Trợ live cho từng ca trước tháng. Đổi người, số liệu, report của ca đã chốt: mở ca (Cửa sổ Ca Live)."
               : "Đăng ký các ca bạn rảnh — Operations sẽ chốt lịch từ danh sách đã đăng ký."}
-          </p>
+          </PageIntro>
         </div>
         <div className="flex items-center gap-1.5">
           <button
@@ -1095,7 +1097,7 @@ export default function ShiftScheduling({
                   <tr key={row.talentId} className="border-b border-[var(--border)]/60 last:border-0">
                     <td className="py-2 text-[var(--text)] font-medium">{row.name || talentsById.get(row.talentId)?.name}</td>
                     <td className="py-2 text-right font-mono text-[var(--text-muted)]">{row.shifts}</td>
-                    <td className="py-2 text-right font-mono text-[var(--text-muted)]">{row.hours.toFixed(1)}h</td>
+                    <td className="py-2 text-right font-mono text-[var(--text-muted)]">{fmtFixed(row.hours, 1)}h</td>
                   </tr>
                 ))}
               </tbody>

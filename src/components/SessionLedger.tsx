@@ -11,6 +11,7 @@ import { LedgerFilter, MissingStep, brandTrustLabel, filterLedger, groupByDate, 
 
 import { BrandLogo } from "./ui/BrandLogo";
 import { SessionWindow } from "./SessionWindow";
+import { PageIntro } from "./common/PageIntro";
 
 // Sổ Ca — một component, hai biến thể (cùng cách SessionEventCard dùng chung cho 2 lịch):
 //  - agency: mọi brand, thấy target/studio/trợ live, 3 ô tiến trình dữ liệu, mọi sự cố, hành động.
@@ -213,11 +214,11 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
             <h2 className="text-lg font-black text-[var(--text)] flex items-center gap-2">
               <BookOpen className="w-5 h-5 text-[var(--accent-text)]" /> Sổ Ca
             </h2>
-            <p className="text-xs text-[var(--text-muted)] mt-1 max-w-2xl">
+            <PageIntro>
               {isBrandView
                 ? "Từng ca live đã chạy cho brand: giờ live thật, GMV, đơn, lượt xem. Số “Tạm tính” còn chờ TikTok cập nhật, “Đã chốt” là số đối soát cuối kỳ."
                 : "Từng ca đã/đang chạy: số thật của ca, số đó tin được tới đâu, và còn thiếu bước nào (snapshot → report → đối soát) để chốt tháng."}
-            </p>
+            </PageIntro>
             {hiddenCount > 0 && (
               <p className="text-[11px] text-amber-300 mt-1.5 max-w-2xl">
                 {hiddenCount}/{rows.length} ca thuộc tháng chưa phát hành Report Tháng — số liệu của các ca đó chưa hiển thị,

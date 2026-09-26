@@ -10,6 +10,7 @@ import { useDefaultBrand } from "../hooks/useDefaultBrand";
 import { errorMessage } from "../lib/errorMessage";
 import { formatCurrencyAdaptive } from "../lib/formatCurrency";
 
+import { fmtFixed } from "../lib/format";
 // AI Training Center — mục "Engine Kế Hoạch Tháng". Engine là thuật toán thuần, không phải LLM: không
 // có prompt để sửa, chỉ có tham số để vặn và kết quả học để nhìn. Hai nửa của panel đi cùng nhau: đổi
 // tham số bên trái → nửa "engine đã học gì" tính lại ngay (chưa cần lưu), để admin thấy nút vặn ảnh
@@ -133,18 +134,18 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
                   {(["dday", "midmonth", "payday"] as const).map((b) => (
                     <div key={b} className="flex justify-between gap-2">
                       <span className="text-[var(--text)]">{{ dday: "D-Day", midmonth: "Mid-Month", payday: "Pay Day" }[b]}</span>
-                      <span className="text-[var(--text)]">GMV/giờ <b>×{history.campMultipliers[b].toFixed(2)}</b> <span className="text-[11px] text-[var(--text-faint)]">{history.campLearned[b] ? "học" : "mặc định"}</span>{history.campHoursLearned[b] ? <> · <b>{history.campHoursPerDay[b].toFixed(1)}h</b>/ngày</> : ""}</span>
+                      <span className="text-[var(--text)]">GMV/giờ <b>×{fmtFixed(history.campMultipliers[b], 2)}</b> <span className="text-[11px] text-[var(--text-faint)]">{history.campLearned[b] ? "học" : "mặc định"}</span>{history.campHoursLearned[b] ? <> · <b>{fmtFixed(history.campHoursPerDay[b], 1)}h</b>/ngày</> : ""}</span>
                     </div>
                   ))}
-                  <div className="flex justify-between gap-2"><span className="text-[var(--text)]">Ngày thường</span><span className="text-[var(--text)]">{history.campHoursLearned.daily ? <><b>{history.campHoursPerDay.daily.toFixed(1)}h</b>/ngày</> : "—"}</span></div>
-                  <div className="flex justify-between gap-2 mt-1"><span className="text-[var(--text)]">Ca thứ 2/3/4 trong ngày</span><b className="text-[var(--text)]">×{history.diminishing[1].toFixed(2)} / ×{history.diminishing[2].toFixed(2)} / ×{history.diminishing[3].toFixed(2)}</b></div>
+                  <div className="flex justify-between gap-2"><span className="text-[var(--text)]">Ngày thường</span><span className="text-[var(--text)]">{history.campHoursLearned.daily ? <><b>{fmtFixed(history.campHoursPerDay.daily, 1)}h</b>/ngày</> : "—"}</span></div>
+                  <div className="flex justify-between gap-2 mt-1"><span className="text-[var(--text)]">Ca thứ 2/3/4 trong ngày</span><b className="text-[var(--text)]">×{fmtFixed(history.diminishing[1], 2)} / ×{fmtFixed(history.diminishing[2], 2)} / ×{fmtFixed(history.diminishing[3], 2)}</b></div>
                 </div>
                 <div>
                   <p className="font-bold text-[var(--text-muted)] mb-1">Lễ / sự kiện / khuyến mãi</p>
                   {(["holiday", "mega_sale", "event"] as const).map((k) => (
-                    <div key={k} className="flex justify-between gap-2"><span className="text-[var(--text)]">{{ holiday: "Ngày lễ", mega_sale: "Mega sale", event: "Sự kiện" }[k]}</span><b className="text-[var(--text)]">×{history.eventMultipliers[k].toFixed(2)} <span className="text-[11px] font-normal text-[var(--text-faint)]">{history.eventLearned[k] ? "học" : "chưa đủ ca"}</span></b></div>
+                    <div key={k} className="flex justify-between gap-2"><span className="text-[var(--text)]">{{ holiday: "Ngày lễ", mega_sale: "Mega sale", event: "Sự kiện" }[k]}</span><b className="text-[var(--text)]">×{fmtFixed(history.eventMultipliers[k], 2)} <span className="text-[11px] font-normal text-[var(--text-faint)]">{history.eventLearned[k] ? "học" : "chưa đủ ca"}</span></b></div>
                   ))}
-                  <div className="flex justify-between gap-2"><span className="text-[var(--text)]">Ngày trùng scheme KM</span><b className="text-[var(--text)]">×{history.schemeMultiplier.toFixed(2)} <span className="text-[11px] font-normal text-[var(--text-faint)]">{history.schemeLearned ? "học" : "chưa đủ ca"}</span></b></div>
+                  <div className="flex justify-between gap-2"><span className="text-[var(--text)]">Ngày trùng scheme KM</span><b className="text-[var(--text)]">×{fmtFixed(history.schemeMultiplier, 2)} <span className="text-[11px] font-normal text-[var(--text-faint)]">{history.schemeLearned ? "học" : "chưa đủ ca"}</span></b></div>
                 </div>
                 <div>
                   <p className="font-bold text-[var(--text-muted)] mb-1">Khung giờ mạnh (thứ × khối 2h)</p>

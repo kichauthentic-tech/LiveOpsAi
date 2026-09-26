@@ -8,6 +8,7 @@ import { filterLedger, summarize } from "../lib/sessionLedger";
 import { formatCurrencyAdaptive } from "../lib/formatCurrency";
 import { errorMessage } from "../lib/errorMessage";
 import { BrandLogo } from "./ui/BrandLogo";
+import { PageIntro } from "./common/PageIntro";
 
 // Màn toàn cảnh 4 brand cho agency (Đợt C/6, 2026-09-23) — BẢNG trạng thái từng brand cho MỘT
 // tháng đang xem, không phải widget KPI kiểu Dashboard cũ (xoá 2026-09-13 vì số tính live/dự phóng
@@ -135,10 +136,10 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ brands, sessions
             </button>
           </div>
         </div>
-        <p className="text-xs text-[var(--text-muted)] max-w-3xl">
+        <PageIntro>
           Trạng thái từng brand cho tháng đang xem — số thật đã xảy ra và trạng thái đọc thẳng từ DB, không có ô nào là dự
           phóng.
-        </p>
+        </PageIntro>
       </div>
 
       {errorMsg && (
