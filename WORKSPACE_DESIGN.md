@@ -2,10 +2,12 @@
 
 ## CẦN LÀM NGAY khi mở phiên mới (cập nhật 2026-09-24)
 
-> **MỚI 2026-09-26 (tối) — Audit UX/UI: P0 + P1 ĐÃ LÀM + VERIFY trên browser (không migration).** P0 commit 73acafc đã push.
+> **MỚI 2026-09-26 (tối) — Audit UX/UI: P0 + P1 ĐÃ LÀM + VERIFY + ĐÃ DEPLOY (không migration).** P0 73acafc, P1 cda0a31 + 5e2f67a.
 > P1: link riêng cho từng trang (`/so-ca`, `/brand/crocs/report-thang`, Back/Forward chạy), tiêu đề trang 1 dòng + "Chi tiết",
-> sidebar tự thu gọn < 1280px, header mobile gọn, số kiểu Việt (2,18%) qua `src/lib/format.ts`. `vercel.json` thêm rewrite SPA —
-> **sau khi deploy phải mở thử 1 link sâu trên live-ops-ai.vercel.app** (chưa test được trên Vercel). P2 chưa làm.
+> sidebar tự thu gọn < 1280px, header mobile gọn, số kiểu Việt (2,18%) qua `src/lib/format.ts`. `vercel.json` rewrite SPA đã
+> kiểm trên production: link sâu trả index.html, JS/CSS 200, URL giữ nguyên. P2 chưa làm.
+> **Kèm vá sự cố: mọi `/api/*` production chết (FUNCTION_INVOCATION_FAILED) từ 9dcf719 (24/09) tới 5ecb7c8 (26/09)** —
+> import tương đối thiếu đuôi `.js` trong `src/server/createApp.ts`. Xem quy ước "Server import phải có đuôi .js".
 > Chi tiết ở mục `## Audit UX/UI (2026-09-26)`.
 
 > **MỚI 2026-09-26 (chiều) — Chuẩn hoá tên chỉ số toàn app theo deck report + TikTok** (không migration, đã commit + push lên `main`
@@ -205,7 +207,7 @@
 
 > **Cập nhật 2026-09-13:** Các phần dưới đây được viết ở các thời điểm khác nhau và nghiệp vụ/code đã đổi khá nhiều kể từ đó. Từ nay **không coi nội dung cũ trong file này là ground truth mặc định** — mọi mục (kiến trúc, luồng dữ liệu, quy ước kỹ thuật...) cần được re-verify bằng đọc code hiện tại trước khi dựa vào để quyết định, đặc biệt là mục nào chưa có ghi chú "đã audit lại". Đang làm 1 vòng rà soát UX/workflow theo từng module (xem "Giai đoạn tiếp theo") — mỗi module audit xong sẽ cập nhật lại đúng phần liên quan trong file.
 
-## Audit UX/UI (2026-09-26) — P0 + P1 XONG + VERIFY, P2 chưa làm
+## Audit UX/UI (2026-09-26) — P0 + P1 XONG + VERIFY + DEPLOY, P2 chưa làm
 
 Cách đo (dùng lại được): script JS chạy trong Browser pane, bấm lần lượt từng mục sidebar rồi đếm trên phần tử có chữ trong
 `<main>`: % chữ < 11px / < 12px, % chữ không đạt tương phản WCAG 1.4.3 (4.5:1, chữ lớn 3:1, trộn nền rgba theo cha),
@@ -930,6 +932,12 @@ Bảng/hàm: `session_live_snapshots` + `session_live_snapshot_rows`, RPC `apply
 
 *(chưa re-audit theo đợt 2026-09-13 — các mục dưới vẫn là quy ước hợp lệ trừ khi đọc code thấy khác, nhưng coi là "cần xác nhận lại" chứ không mặc định đúng 100%)*
 
+- **Server import phải có đuôi `.js`** (2026-09-26). Vercel chạy `api/index.ts` bằng Node ESM từng file (`"type": "module"`, không
+  bundle), nên `import … from "../lib/x"` chạy được ở máy (tsx đoán đuôi) nhưng trên Vercel mọi `/api/*` trả
+  FUNCTION_INVOCATION_FAILED. Viết `"../lib/x.js"` (tsconfig `bundler` tự hiểu ra `.ts`). `tests/serverImports.test.ts` duyệt đồ thị
+  import từ `api/index.ts` và chặn. Mô phỏng Vercel ở máy: `npx tsc api/index.ts --outDir <tmp> --module nodenext
+  --moduleResolution nodenext --noCheck --skipLibCheck --rootDir .` rồi `import()` file ra bằng node. Sau deploy nên
+  `curl https://live-ops-ai.vercel.app/api/health` (phải 200). Ghi chú thêm: production báo `sentryConfigured:false`.
 - **Brand workspace nav item**: `perm: undefined` (không gate `PermissionKey` — role `brand` không có key agency-wide). **Agency Workspace module mới**: ngược lại, tái dùng `PermissionKey` sẵn có, chỉ tạo key mới nếu module không liên quan permission nào đã có.
 - **`effectiveWorkspace`** (không phải `workspace` raw state) là nguồn sự thật duy nhất cho brandId hiện tại.
 - **Màu brand** luôn qua `getBrandTheme(brandName)` (`src/lib/brandTheme.ts`) — không hash id ra màu, không hardcode hex. **Logo brand** luôn qua `<BrandLogo>` (`src/components/ui/BrandLogo.tsx`) — brand chưa có ảnh tự rơi về emoji.
