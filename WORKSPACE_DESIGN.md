@@ -7,7 +7,7 @@
 > sidebar tự thu gọn < 1280px, header mobile gọn, số kiểu Việt (2,18%) qua `src/lib/format.ts`. `vercel.json` rewrite SPA đã
 > kiểm trên production: link sâu trả index.html, JS/CSS 200, URL giữ nguyên.
 > **P2a tách bundle XONG:** file JS chính 2.580 → 665 KB, mỗi tab tải khi mở, thư viện Excel tải khi bấm (mục P2a).
-> **P2b đếm lượt mở tab: code xong, migration 0123 CHƯA CHẠY** (Phân Quyền → Lượt Mở Tab). P2 còn lại (gộp menu — chờ số liệu,
+> **P2b đếm lượt mở tab: XONG, 0123 đã chạy, đếm từ 26/09/2026** (Phân Quyền → Lượt Mở Tab). P2 còn lại (gộp menu — chờ số liệu,
 > Report Tháng cho điện thoại) chưa làm.
 > **Kèm vá sự cố: mọi `/api/*` production chết (FUNCTION_INVOCATION_FAILED) từ 9dcf719 (24/09) tới 5ecb7c8 (26/09)** —
 > import tương đối thiếu đuôi `.js` trong `src/server/createApp.ts`. Xem quy ước "Server import phải có đuôi .js".
@@ -307,7 +307,7 @@ Chưa đo được: màn talent (Ca Của Tôi/Đăng Ký Ca) và role brand b�
 - Test canh `tests/bundleSplit.test.ts`: cấm `import … from "xlsx"` tĩnh; App.tsx không import tĩnh component tab (danh sách
   ngoại lệ). Đã thử trên code cũ: test đỏ đúng.
 
-### P2b — Đếm lượt mở tab — CODE XONG 2026-09-26, migration 0123 CHƯA CHẠY
+### P2b — Đếm lượt mở tab — XONG 2026-09-26, migration 0123 ĐÃ CHẠY + verify (bắt đầu đếm 26/09/2026)
 - Vì sao: trước khi gộp/bỏ mục menu (18 tab agency + 10 tab brand) cần số người dùng thật — chưa có số nào.
 - `supabase/migrations/0123_ui_tab_views.sql`: bảng `ui_tab_views(user_id, role, workspace, brand_id, tab, viewed_at)`;
   trigger BEFORE INSERT ghi đè `user_id = auth.uid()`, `role` từ `profiles`, `viewed_at = now()` (client không khai được, chưa có
@@ -922,7 +922,7 @@ Ground truth luôn là `AGENCY_NAV_GROUPS`/`BRAND_NAV_GROUPS` ở [src/App.tsx](
 
 ## Hạ tầng Supabase
 
-- **0123** — `0123_ui_tab_views.sql` — **CHƯA CHẠY** (viết 2026-09-26, chờ user dán): bảng `ui_tab_views` đếm lượt mở tab + RPC `tab_usage_summary(p_days)`. App deploy trước migration vẫn an toàn (ghi lỗi 404 bị bỏ qua im lặng). Xem `## Audit UX/UI` → P2b.
+- **0123** — `0123_ui_tab_views.sql` — **ĐÃ CHẠY + verify** (2026-09-26; mở 3 tab trên app → 4 insert 201, panel Lượt Mở Tab hiện đúng 4 lượt admin; 4 dòng này là của lúc verify): bảng `ui_tab_views` đếm lượt mở tab + RPC `tab_usage_summary(p_days)`. App deploy trước migration vẫn an toàn (ghi lỗi 404 bị bỏ qua im lặng). Xem `## Audit UX/UI` → P2b.
 - **0122** — `0122_month_plan_shop_target.sql` — **ĐÃ CHẠY + verify** (2026-09-26): `brand_month_plans.shop_target_gmv` (KPI GMV cả shop) + thêm cột vào trigger 0110. Phải chạy TRƯỚC deploy. Xem `## Report Tháng 8 phần` → Bổ sung 2026-09-26 mục 7.
 - **0121** — `0121_monthly_report_section_notes.sql` — **ĐÃ CHẠY + verify** (2026-09-26): cột `section_notes jsonb` cho khung Insight ops sửa, xem mục `## Report Tháng 8 phần` → Bổ sung 2026-09-26 mục 6.
 - **0120** — `0120_monthly_report_narrative.sql` — **ĐÃ CHẠY + verify** (2026-09-25): 3 cột tóm tắt/việc tháng sau, xem mục `## Report Tháng 8 phần`.
