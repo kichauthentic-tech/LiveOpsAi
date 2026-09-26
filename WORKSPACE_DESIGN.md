@@ -6,7 +6,7 @@
 > camp so camp tháng trước + target từ Kế Hoạch Tháng, phân bổ tháng sau theo camp, Top SKU có hạng + phễu, khung
 > Insight đầu phần 3–7, migration **0121 đã chạy + verify**, KPI GMV cả shop ở Kế Hoạch Tháng — migration **0122 đã chạy + verify**). Code
 > 2026-09-26: commit 5096f7b (Insight + KPI cả shop), đã deploy Vercel (bundle live-ops-ai.vercel.app có code mới). Sau đó: bảng
-> "Host Theo Loại Ngày" + bản chụp v3 (lưu trợ live) — **chưa commit**; sau deploy cần bấm Cập nhật số liệu CROCS T8/T9 (mục 8). Xem mục `### Bổ sung 2026-09-26 — góc nhìn từ deck Crocs` trong `## Report Tháng 8 phần`.
+> "Host Theo Loại Ngày" + bản chụp v3 (lưu trợ live) — commit f5f7d6e, đã deploy, CROCS T8/T9 đã cập nhật lên v3 (mục 8). Xem mục `### Bổ sung 2026-09-26 — góc nhìn từ deck Crocs` trong `## Report Tháng 8 phần`.
 
 > **MỚI 2026-09-25 (tối) — Report Tháng làm lại thành 1 trang cuộn 8 phần** (Tóm tắt → Mục tiêu → Toàn shop &
 > kênh → Vì sao → Người → Hàng → Bối cảnh → Tháng sau + Phụ lục). Migration **0120 đã chạy** (đoạn tóm tắt ops sửa được)
@@ -1512,7 +1512,7 @@ chỉ unit test phủ); góc nhìn brand.
    **Chưa verify trên browser:** khối KPI tháng hiện tại ở phần 1/2 với số thật (tháng có kế hoạch mới có — CROCS T10
    chưa có số; logic đã có unit test).
 
-8. **Host Theo Loại Ngày** (phần 5, không migration, **CHƯA COMMIT**) — user chốt luật chia 2026-09-26: **GMV của ca
+8. **Host Theo Loại Ngày** (phần 5, không migration, commit f5f7d6e, đã deploy) — user chốt luật chia 2026-09-26: **GMV của ca
    tính trọn cho host; trợ live không nhận GMV, chỉ ghi giờ live** (= cách app vốn tính GMV). Hàm thuần `byHostDayType`
    ([hostPerformance.ts](src/lib/performance/hostPerformance.ts)): mỗi người = ngày thường (GMV · giờ host · số ca) +
    ngày camp (D-Day/Mid-Month/Pay-Day gộp, theo `resolveCampBucketType` + khoảng camp của report) + giờ trợ live để
@@ -1525,8 +1525,10 @@ chỉ unit test phủ); góc nhìn brand.
    host từng ca, hoặc nguồn GMV), không phải luật chia. Chia đôi thì giờ khớp (15,5h) mà GMV không (553tr).
    **Verify:** vitest 91/91 (2 test luật chia + 1 test bản chụp v3 giữ trợ live / v2 bị báo cũ), tsc, eslint (2 cảnh báo
    cũ); browser (admin, dev) CROCS T8: bảng hiện Hùng ngày thường 1,1 tỷ · 31,1h · 9 ca / camp 1,23 tỷ · 40,6h · 7 ca,
-   nhắc cập nhật hiện đúng, console sạch. **Chưa verify:** cột Giờ Trợ Live với số thật — cần bấm Cập nhật số liệu (ghi
-   bản chụp v3) SAU khi deploy, theo đúng quy ước "push → deploy → mới ghi".
+   nhắc cập nhật hiện đúng, console sạch. Sau deploy f5f7d6e: bấm Cập nhật số liệu CROCS T9 + T8
+   (cả 2 nháp, chưa phát hành) ⇒ bản chụp v3, nhắc biến mất, cột Giờ Trợ Live có số — T8 Toàn 88,1h/21 ca, Loan 45,1h/11
+   ca, Thịnh 37h/11 ca… khớp từng người với tính trực tiếp từ `live_sessions` (service role, chỉ đọc); console sạch.
+   Report tháng khác (brand khác / tháng khác) vẫn là v2 tới khi ops bấm cập nhật — hiện nhắc, không hỏng.
 
 ## Bản chụp số liệu Report Tháng — XONG + VERIFY 2026-09-25 (migration 0119 ĐÃ CHẠY)
 
