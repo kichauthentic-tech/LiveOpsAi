@@ -4,9 +4,9 @@ import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 import * as Sentry from "@sentry/node";
-import { errorMessage } from "../lib/errorMessage";
+import { errorMessage } from "../lib/errorMessage.js";
 
-import { formatCurrencyAdaptive } from "../lib/formatCurrency";
+import { formatCurrencyAdaptive } from "../lib/formatCurrency.js";
 dotenv.config();
 
 // Raw request body bytes, captured by the express.json() verify hook below for HMAC webhook
