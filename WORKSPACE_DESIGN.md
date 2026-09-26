@@ -2,8 +2,8 @@
 
 ## CẦN LÀM NGAY khi mở phiên mới (cập nhật 2026-09-24)
 
-> **MỚI 2026-09-26 (khuya) — Report Tháng chuyên sâu: 7 phần kết luận trước + 4 phép phân tích mới (không migration, CHƯA
-> commit).** User yêu cầu "tối ưu report Tháng theo hướng chuyên nghiệp, phân tích chuyên sâu"; đề xuất đo trên số thật CROCS:
+> **MỚI 2026-09-26 (khuya) — Report Tháng chuyên sâu: 7 phần kết luận trước + 4 phép phân tích mới (không migration, commit fbfeab0 đã push
+> ).** User yêu cầu "tối ưu report Tháng theo hướng chuyên nghiệp, phân tích chuyên sâu"; đề xuất đo trên số thật CROCS:
 > https://claude.ai/artifact/SmokGAGp1J9dPzmyj788Lt — user chọn làm cả 4 mục. **Việc ops phải làm:** mọi report tháng (brand/tháng
 > khác CROCS T9) bấm "Cập nhật số liệu" để có piece `gifts` (report nhắc bằng dải vàng). CROCS T9 đã cập nhật. Xem mục
 > `## Report Tháng chuyên sâu`.
@@ -1568,7 +1568,7 @@ trong DB đang rỗng nên mọi câu insight tự sinh ra chữ mới ngay; đo
 **Còn lại / chưa đụng:** màn thao tác nội bộ giữ từ vận hành tiếng Việt khi không phải tên chỉ số ("Ca", "Giờ" = khung giờ, "Số
 Ca" ở lịch/đăng ký, engine AI Training); Talent Pool trường cũ `cvrAvg`/`ctrAvg` (nhập tay, chưa rõ định nghĩa) chỉ đổi nhãn nhẹ.
 
-## Report Tháng chuyên sâu — XONG + VERIFY 2026-09-26 (khuya, KHÔNG migration, CHƯA commit)
+## Report Tháng chuyên sâu — XONG + VERIFY 2026-09-26 (khuya, KHÔNG migration, commit fbfeab0 đã push main)
 
 **Vì sao làm.** User: "tối ưu report Tháng theo hướng chuyên nghiệp, phân tích chuyên sâu, mang lại giá trị". Đo report cũ (CROCS
 T9, 1440px): 12.091px = 14,5 màn, 20 biểu đồ, 11 bảng; Tóm tắt lặp 5/7 câu của Insight; phần 4 nói cùng chỉ số 4 lần; xu hướng 4
