@@ -5,7 +5,7 @@
 > **MỚI 2026-09-26 — Report Tháng thêm các góc nhìn lấy từ deck report tháng 8 của Crocs** (UPT/giỏ hàng, LIVE CTR,
 > camp so camp tháng trước + target từ Kế Hoạch Tháng, phân bổ tháng sau theo camp, Top SKU có hạng + phễu, khung
 > Insight đầu phần 3–7, migration **0121 đã chạy + verify**, KPI GMV cả shop ở Kế Hoạch Tháng — migration **0122 đã chạy + verify**). Code
-> 2026-09-26 sau commit fa31d9e/7021093 **chưa commit** (user: "commit sau"). Xem mục `### Bổ sung 2026-09-26 — góc nhìn từ deck Crocs` trong `## Report Tháng 8 phần`.
+> 2026-09-26: commit 5096f7b (Insight + KPI cả shop), đã deploy Vercel (bundle live-ops-ai.vercel.app có code mới). Xem mục `### Bổ sung 2026-09-26 — góc nhìn từ deck Crocs` trong `## Report Tháng 8 phần`.
 
 > **MỚI 2026-09-25 (tối) — Report Tháng làm lại thành 1 trang cuộn 8 phần** (Tóm tắt → Mục tiêu → Toàn shop &
 > kênh → Vì sao → Người → Hàng → Bối cảnh → Tháng sau + Phụ lục). Migration **0120 đã chạy** (đoạn tóm tắt ops sửa được)
