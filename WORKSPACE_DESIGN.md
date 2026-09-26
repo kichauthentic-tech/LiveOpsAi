@@ -7,8 +7,8 @@
 > sidebar tự thu gọn < 1280px, header mobile gọn, số kiểu Việt (2,18%) qua `src/lib/format.ts`. `vercel.json` rewrite SPA đã
 > kiểm trên production: link sâu trả index.html, JS/CSS 200, URL giữ nguyên.
 > **P2a tách bundle XONG:** file JS chính 2.580 → 665 KB, mỗi tab tải khi mở, thư viện Excel tải khi bấm (mục P2a).
-> **P2b đếm lượt mở tab: XONG, 0123 đã chạy, đếm từ 26/09/2026** (Phân Quyền → Lượt Mở Tab). P2 còn lại (gộp menu — chờ số liệu,
-> Report Tháng cho điện thoại → P2c XONG: 24,7 → 7,5 màn 375px, phần 3–8 gập sau Insight). Còn: gộp menu (chờ số liệu).
+> **P2b đếm lượt mở tab: XONG, 0123 đã chạy, đếm từ 26/09/2026** (Phân Quyền → Lượt Mở Tab).
+> **P2c Report Tháng trên điện thoại XONG:** 24,7 → 7,5 màn 375px, phần 3–8 gập sau Insight. P2 còn: gộp menu (chờ 2–4 tuần số liệu).
 > **Kèm vá sự cố: mọi `/api/*` production chết (FUNCTION_INVOCATION_FAILED) từ 9dcf719 (24/09) tới 5ecb7c8 (26/09)** —
 > import tương đối thiếu đuôi `.js` trong `src/server/createApp.ts`. Xem quy ước "Server import phải có đuôi .js".
 > Chi tiết ở mục `## Audit UX/UI (2026-09-26)`.
