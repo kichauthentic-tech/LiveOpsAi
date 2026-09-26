@@ -4,6 +4,8 @@ import { AlertTriangle, CalendarRange, ChevronLeft, ChevronRight, ClipboardList,
 import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
 import { metricHint } from "../../lib/metricGlossary";
 import { downloadSheetsAsXlsx } from "../../lib/exportXlsx";
+import { useToast } from "../../hooks/useToast";
+import { errorMessage } from "../../lib/errorMessage";
 import { DataRawWeekSlice, addDays, eachDay, fetchDataRawWeekSlice, isoWeekNumber, isoWeekStart } from "../../lib/dataraw/weeklySlice";
 import { getTodayDate } from "../../lib/dateUtils";
 import { byHost, filterSessions, sessionHours, splitUnassignedHost } from "../../lib/performance/hostPerformance";
@@ -151,6 +153,7 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
   const nextTarget = nextSessions.reduce((a, s) => a + (s.targetGmv ?? 0), 0);
 
   // Xuất Excel — đúng 2 bảng đang hiện trên màn (Theo ngày + Host tuần này), không tính số mới.
+  const { showToast } = useToast();
   const handleExport = () => {
     downloadSheetsAsXlsx(
       [
@@ -180,7 +183,7 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
         }
       ],
       `ReportTuan_${brandName}_tuan${week}-${year}.xlsx`.replace(/\s+/g, "_")
-    );
+    ).catch((e) => showToast(`Không tải được file Excel: ${errorMessage(e)}`));
   };
 
   if (!CAN_VIEW_ROLES.includes(currentRole)) {

@@ -1,4 +1,3 @@
-import * as XLSX from "xlsx";
 import { DataRawColumn, DataRawReportType } from "../../types";
 import { buildProductListAgg } from "./productListAgg";
 
@@ -55,7 +54,9 @@ function buildRows(rows: unknown[][], startIdx: number, columns: DataRawColumn[]
   return out;
 }
 
-function readSheetRows(file: ArrayBuffer): unknown[][] {
+// xlsx tải động — chỉ cần lúc nhập file (xem src/lib/exportXlsx.ts).
+async function readSheetRows(file: ArrayBuffer): Promise<unknown[][]> {
+  const XLSX = await import("xlsx");
   const wb = XLSX.read(file, { type: "array" });
   const sheet = wb.Sheets[wb.SheetNames[0]];
   return XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: true, defval: null });
@@ -246,7 +247,7 @@ function parseCreatorLivePerformance(rows: unknown[][]): ParsedDataRawImport {
 
 export async function parseDataRawExcel(file: File, reportType: DataRawReportType): Promise<ParsedDataRawImport> {
   const buf = await file.arrayBuffer();
-  const rows = readSheetRows(buf);
+  const rows = await readSheetRows(buf);
   switch (reportType) {
     case "shop_promotion": return parseShopPromotion(rows);
     case "product_list": return parseProductList(rows);

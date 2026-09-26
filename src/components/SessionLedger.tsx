@@ -7,6 +7,8 @@ import { formatCurrencyAdaptive } from "../lib/formatCurrency";
 import { sessionHours } from "../lib/performance/hostPerformance";
 import { SessionReportInput } from "../lib/db/sessionReports";
 import { downloadRowsAsXlsx } from "../lib/exportXlsx";
+import { useToast } from "../hooks/useToast";
+import { errorMessage } from "../lib/errorMessage";
 import { LedgerFilter, MissingStep, brandTrustLabel, filterLedger, groupByDate, hasReport, hasSnapshot, isReconciled, needsClosing, metricsHiddenFor, ledgerHosts, ledgerMonths, linkedSessions, missingSteps, sessionIncidents, summarize } from "../lib/sessionLedger";
 
 import { BrandLogo } from "./ui/BrandLogo";
@@ -164,6 +166,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
   // Xuất Excel (Đợt C/4) — đúng những dòng/cột đang hiện trên bảng bên dưới, kể cả phần bị che.
   // Không đọc thêm gì ngoài `rows` (đã lọc + đã che theo role từ chính state đang render), nên
   // không thể lộ hơn những gì màn hình đang cho xem.
+  const { showToast } = useToast();
   const handleExport = () => {
     const exportRows = rows.map((s) => {
       const hours = sessionHours(s);
@@ -202,7 +205,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
     });
     const monthLabel = filter.month || "moi-thang";
     const scopeLabel = isBrandView ? (brandsById.get(brandId ?? "")?.name ?? "brand") : (filter.brandId ? brandsById.get(filter.brandId)?.name ?? "brand" : "tat-ca-brand");
-    downloadRowsAsXlsx("So Ca", exportRows, `SoCa_${scopeLabel}_${monthLabel}.xlsx`.replace(/\s+/g, "_"));
+    downloadRowsAsXlsx("So Ca", exportRows, `SoCa_${scopeLabel}_${monthLabel}.xlsx`.replace(/\s+/g, "_")).catch((e) => showToast(`Không tải được file Excel: ${errorMessage(e)}`));
   };
 
   return (

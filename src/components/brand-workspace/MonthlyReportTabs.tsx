@@ -42,6 +42,7 @@ import { LiveSession, BrandMonthlyReport as BrandMonthlyReportType, AffiliatePla
 import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
 import { CHANNEL, METRIC, metricHint } from "../../lib/metricGlossary";
 import { downloadSheetsAsXlsx } from "../../lib/exportXlsx";
+import { useToast } from "../../hooks/useToast";
 import { dailyFromSessions, monthRunRate, pickLivePerfSource } from "../../lib/report/sessionsLivePerf";
 import { hydrateSnapshotSessions, MonthlyReportSnapshot, reportWindow, snapshotView } from "../../lib/report/monthlySnapshot";
 import {
@@ -1450,6 +1451,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   // Xuất Excel toàn bộ Report Tháng (Đợt "trung tâm report") — 1 file, mỗi bảng đang có trên các
   // tab (trừ 05 Phân Tích Sâu, ops-only, không thuộc tài liệu gửi brand) là 1 sheet, để không phải
   // bấm xuất từng tab. Chỉ đọc lại đúng các mảng đã tính cho phần hiển thị — không tính số mới.
+  const { showToast } = useToast();
   const handleExportAll = () => {
     const n = (v: number | null | undefined) => (v == null ? "" : Math.round(v * 100) / 100);
     downloadSheetsAsXlsx(
@@ -1636,7 +1638,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         }
       ],
       `ReportThang_${brandName}_${month}.xlsx`.replace(/\s+/g, "_")
-    );
+    ).catch((e) => showToast(`Không tải được file Excel: ${errorMessage(e)}`));
   };
 
   return (

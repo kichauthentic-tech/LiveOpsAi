@@ -4,6 +4,7 @@ import { fetchAffiliateActuals, replaceAffiliateActuals } from "../../lib/db/aff
 import { AffiliateLiveSessionRow, fetchAffiliateLiveSessions } from "../../lib/dataraw/affiliateLiveSessionSlice";
 import { errorMessage } from "../../lib/errorMessage";
 import { downloadRowsAsXlsx } from "../../lib/exportXlsx";
+import { useToast } from "../../hooks/useToast";
 import { Database, Download, Loader2, Plus, Save, Trash2, Users } from "lucide-react";
 import { metricHint } from "../../lib/metricGlossary";
 
@@ -185,6 +186,7 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
   // Xuất Excel — mỗi cột (1 phiên/creator) đang hiện trên bảng thành 1 dòng, đúng dải tháng đang
   // lọc. Bảng UI xoay ngang (chỉ số theo dòng, phiên theo cột) chỉ để đọc trên màn; ra Excel thì
   // trả về chiều thường (mỗi dòng 1 phiên) cho dễ lọc/pivot tiếp.
+  const { showToast } = useToast();
   const handleExport = () => {
     downloadRowsAsXlsx(
       "Affiliate",
@@ -210,7 +212,7 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
         "Viewers": e.viewer ?? ""
       })),
       `Affiliate_${brandName}_${fromMonth}_${toMonth}.xlsx`.replace(/\s+/g, "_")
-    );
+    ).catch((e) => showToast(`Không tải được file Excel: ${errorMessage(e)}`));
   };
 
   const update = (entry: Row, patch: Partial<AffiliateActualEntry>) => {

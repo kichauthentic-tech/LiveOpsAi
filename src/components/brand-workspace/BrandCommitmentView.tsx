@@ -12,6 +12,7 @@ import { errorMessage } from "../../lib/errorMessage";
 import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
 import { metricsHiddenFor } from "../../lib/sessionLedger";
 import { downloadRowsAsXlsx } from "../../lib/exportXlsx";
+import { useToast } from "../../hooks/useToast";
 
 // Cam Kết Hợp Đồng — bản CHỈ ĐỌC cho Brand Workspace (Đợt C/1, migration 0108).
 //
@@ -162,6 +163,7 @@ export const BrandCommitmentView: React.FC<BrandCommitmentViewProps> = ({
 
   // Xuất Excel — đúng bảng "Lịch sử theo tháng" bên dưới, kể cả cột GMV bị che tháng chưa phát
   // hành (giữ nguyên chữ "chưa phát hành" như trên màn, không tự đoán số).
+  const { showToast } = useToast();
   const handleExport = () => {
     downloadRowsAsXlsx(
       "Cam Ket Hop Dong",
@@ -178,7 +180,7 @@ export const BrandCommitmentView: React.FC<BrandCommitmentViewProps> = ({
         };
       }),
       `CamKetHopDong_${brandName}.xlsx`.replace(/\s+/g, "_")
-    );
+    ).catch((e) => showToast(`Không tải được file Excel: ${errorMessage(e)}`));
   };
 
   if (loading) {

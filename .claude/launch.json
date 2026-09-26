@@ -13,6 +13,19 @@
       "env": {
         "PORT": "3100"
       }
+    },
+    {
+      "name": "liveops-prod",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "tsx",
+        "server.ts"
+      ],
+      "port": 3100,
+      "env": {
+        "PORT": "3100",
+        "NODE_ENV": "production"
+      }
     }
   ]
 }

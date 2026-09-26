@@ -7,6 +7,9 @@ import { ThemeProvider } from './hooks/useTheme';
 import { ToastProvider } from './hooks/useToast';
 import { ConfirmProvider } from './hooks/useConfirm';
 import './index.css';
+import { installStaleChunkReload } from './lib/lazyNamed';
+
+installStaleChunkReload();
 
 // Error tracking (Phase 11) — no-op until VITE_SENTRY_DSN is set, same gated
 // pattern as VITE_SUPABASE_URL: app behaves identically either way.

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
 import * as Sentry from "@sentry/react";
 import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, WorkflowRule, Talent, Studio, Equipment, Brand, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, BrandStudio, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, TalentRateHistoryEntry, BrandPlatformRateHistoryEntry, BrandSku, PromoScheme, AppNotification, BrandMonthlyReport as BrandMonthlyReportRow } from "./types";
 import { TabErrorFallback } from "./components/common/TabErrorFallback";
@@ -71,47 +71,51 @@ import {
   Send
 } from "lucide-react";
 import { Header, WorkspaceContext } from "./components/Header";
-import { BrandCalendar } from "./components/brand-workspace/BrandCalendar";
-import { BrandSkuShowcase } from "./components/brand-workspace/BrandSkuShowcase";
-import { BrandMonthlyReport } from "./components/brand-workspace/BrandMonthlyReport";
-import { BrandAdsReport } from "./components/brand-workspace/BrandAdsReport";
-import { BrandCommitmentView } from "./components/brand-workspace/BrandCommitmentView";
-import { BrandAffiliateTable } from "./components/brand-workspace/BrandAffiliateTable";
-import { BrandNextMonthPlan } from "./components/brand-workspace/BrandNextMonthPlan";
-import { BrandRateCard } from "./components/BrandRateCard";
-import { BrandDataRaw } from "./components/brand-workspace/BrandDataRaw";
 import { Login } from "./components/Login";
 import { ResetPasswordScreen } from "./components/ResetPasswordScreen";
-import { AccountSettings } from "./components/AccountSettings";
-import { MyTalentProfile } from "./components/MyTalentProfile";
 import { useAuth } from "./hooks/useAuth";
 import { useMediaQuery } from "./hooks/useMediaQuery";
 import { useToast } from "./hooks/useToast";
 import { useNotifications } from "./hooks/useNotifications";
-import { SessionLedger } from "./components/SessionLedger";
-import { LiveCalendar } from "./components/LiveCalendar";
-import { TalentMatcher, NewTalentAccountPayload } from "./components/TalentMatcher";
-import { StudioEquipment } from "./components/StudioEquipment";
-import { CrmProjects } from "./components/CrmProjects";
-import { TikTokApiAutomation } from "./components/TikTokApiAutomation";
-import { FinanceHr } from "./components/FinanceHr";
-import { AiMultiAgent } from "./components/AiMultiAgent";
-import { UserRoleSettings } from "./components/UserRoleSettings";
-import { AiTrainingCenter } from "./components/AiTrainingCenter";
-import { EngineTrainingPanel } from "./components/EngineTrainingPanel";
-import { OpsBoard } from "./components/OpsBoard";
+import type { NewTalentAccountPayload } from "./components/TalentMatcher";
 import { fetchEngineParams, saveEngineParams } from "./lib/db/engineParams";
 import { DEFAULT_ENGINE_PARAMS, EngineParams } from "./lib/scheduling/engineParams";
-import ShiftScheduling from "./components/ShiftScheduling";
-import MonthPlan from "./components/MonthPlan";
-import OpsSupport from "./components/OpsSupport";
-import { LiveReconciliation } from "./components/LiveReconciliation";
-import { HostPerformance } from "./components/HostPerformance";
-import { BrandsOverview } from "./components/BrandsOverview";
-import CeoBrief from "./components/CeoBrief";
-import { ReportPublishBoard } from "./components/ReportPublishBoard";
-import { BrandCommitment } from "./components/BrandCommitment";
 import { findBrandBySlug, parsePath, routeToPath } from "./lib/routes";
+import { lazyNamed } from "./lib/lazyNamed";
+
+// Mỗi tab một chunk riêng, tải khi mở tab (xem src/lib/lazyNamed.ts). Chỉ dùng bên trong <Suspense> của khu nội dung tab.
+const BrandCalendar = lazyNamed(() => import("./components/brand-workspace/BrandCalendar"), "BrandCalendar");
+const BrandSkuShowcase = lazyNamed(() => import("./components/brand-workspace/BrandSkuShowcase"), "BrandSkuShowcase");
+const BrandMonthlyReport = lazyNamed(() => import("./components/brand-workspace/BrandMonthlyReport"), "BrandMonthlyReport");
+const BrandAdsReport = lazyNamed(() => import("./components/brand-workspace/BrandAdsReport"), "BrandAdsReport");
+const BrandCommitmentView = lazyNamed(() => import("./components/brand-workspace/BrandCommitmentView"), "BrandCommitmentView");
+const BrandAffiliateTable = lazyNamed(() => import("./components/brand-workspace/BrandAffiliateTable"), "BrandAffiliateTable");
+const BrandNextMonthPlan = lazyNamed(() => import("./components/brand-workspace/BrandNextMonthPlan"), "BrandNextMonthPlan");
+const BrandRateCard = lazyNamed(() => import("./components/BrandRateCard"), "BrandRateCard");
+const BrandDataRaw = lazyNamed(() => import("./components/brand-workspace/BrandDataRaw"), "BrandDataRaw");
+const AccountSettings = lazyNamed(() => import("./components/AccountSettings"), "AccountSettings");
+const MyTalentProfile = lazyNamed(() => import("./components/MyTalentProfile"), "MyTalentProfile");
+const SessionLedger = lazyNamed(() => import("./components/SessionLedger"), "SessionLedger");
+const LiveCalendar = lazyNamed(() => import("./components/LiveCalendar"), "LiveCalendar");
+const TalentMatcher = lazyNamed(() => import("./components/TalentMatcher"), "TalentMatcher");
+const StudioEquipment = lazyNamed(() => import("./components/StudioEquipment"), "StudioEquipment");
+const CrmProjects = lazyNamed(() => import("./components/CrmProjects"), "CrmProjects");
+const TikTokApiAutomation = lazyNamed(() => import("./components/TikTokApiAutomation"), "TikTokApiAutomation");
+const FinanceHr = lazyNamed(() => import("./components/FinanceHr"), "FinanceHr");
+const AiMultiAgent = lazyNamed(() => import("./components/AiMultiAgent"), "AiMultiAgent");
+const UserRoleSettings = lazyNamed(() => import("./components/UserRoleSettings"), "UserRoleSettings");
+const AiTrainingCenter = lazyNamed(() => import("./components/AiTrainingCenter"), "AiTrainingCenter");
+const EngineTrainingPanel = lazyNamed(() => import("./components/EngineTrainingPanel"), "EngineTrainingPanel");
+const OpsBoard = lazyNamed(() => import("./components/OpsBoard"), "OpsBoard");
+const LiveReconciliation = lazyNamed(() => import("./components/LiveReconciliation"), "LiveReconciliation");
+const HostPerformance = lazyNamed(() => import("./components/HostPerformance"), "HostPerformance");
+const BrandsOverview = lazyNamed(() => import("./components/BrandsOverview"), "BrandsOverview");
+const ReportPublishBoard = lazyNamed(() => import("./components/ReportPublishBoard"), "ReportPublishBoard");
+const BrandCommitment = lazyNamed(() => import("./components/BrandCommitment"), "BrandCommitment");
+const ShiftScheduling = lazy(() => import("./components/ShiftScheduling"));
+const MonthPlan = lazy(() => import("./components/MonthPlan"));
+const OpsSupport = lazy(() => import("./components/OpsSupport"));
+const CeoBrief = lazy(() => import("./components/CeoBrief"));
 
 const STORAGE_PREFIX = "liveops_os_v2_";
 
@@ -2207,7 +2211,7 @@ export default function App() {
                   />
                 )}
               >
-              <>
+              <Suspense fallback={<TabLoading />}>
                 {activeTab === "sessions" && (
                   <SessionLedger
                     variant="agency"
@@ -2694,7 +2698,7 @@ export default function App() {
                 {activeTab === "account_settings" && (
                   <AccountSettings activeUser={activeUser} onUpdateUser={handleUpdateUser} />
                 )}
-              </>
+              </Suspense>
               </Sentry.ErrorBoundary>
             )}
           </div>
@@ -2704,3 +2708,13 @@ export default function App() {
   );
 }
 
+
+// Khung chờ trong lúc tải chunk của tab (lần đầu mở tab; lần sau trình duyệt đã có sẵn).
+function TabLoading() {
+  return (
+    <div className="max-w-5xl mx-auto my-6 space-y-4" aria-busy="true">
+      <div className="h-8 w-1/3 rounded-xl bg-[var(--surface-elevated)]/60 animate-pulse" />
+      <div className="h-64 rounded-2xl bg-[var(--surface-elevated)]/60 animate-pulse" />
+    </div>
+  );
+}

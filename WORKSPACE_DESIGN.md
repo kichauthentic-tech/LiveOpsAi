@@ -5,7 +5,9 @@
 > **MỚI 2026-09-26 (tối) — Audit UX/UI: P0 + P1 ĐÃ LÀM + VERIFY + ĐÃ DEPLOY (không migration).** P0 73acafc, P1 cda0a31 + 5e2f67a.
 > P1: link riêng cho từng trang (`/so-ca`, `/brand/crocs/report-thang`, Back/Forward chạy), tiêu đề trang 1 dòng + "Chi tiết",
 > sidebar tự thu gọn < 1280px, header mobile gọn, số kiểu Việt (2,18%) qua `src/lib/format.ts`. `vercel.json` rewrite SPA đã
-> kiểm trên production: link sâu trả index.html, JS/CSS 200, URL giữ nguyên. P2 chưa làm.
+> kiểm trên production: link sâu trả index.html, JS/CSS 200, URL giữ nguyên.
+> **P2a tách bundle XONG:** file JS chính 2.580 → 665 KB, mỗi tab tải khi mở, thư viện Excel tải khi bấm (mục P2a).
+> P2 còn lại (gộp menu, Report Tháng cho điện thoại, đo lượt mở tab) chưa làm.
 > **Kèm vá sự cố: mọi `/api/*` production chết (FUNCTION_INVOCATION_FAILED) từ 9dcf719 (24/09) tới 5ecb7c8 (26/09)** —
 > import tương đối thiếu đuôi `.js` trong `src/server/createApp.ts`. Xem quy ước "Server import phải có đuôi .js".
 > Chi tiết ở mục `## Audit UX/UI (2026-09-26)`.
@@ -207,7 +209,7 @@
 
 > **Cập nhật 2026-09-13:** Các phần dưới đây được viết ở các thời điểm khác nhau và nghiệp vụ/code đã đổi khá nhiều kể từ đó. Từ nay **không coi nội dung cũ trong file này là ground truth mặc định** — mọi mục (kiến trúc, luồng dữ liệu, quy ước kỹ thuật...) cần được re-verify bằng đọc code hiện tại trước khi dựa vào để quyết định, đặc biệt là mục nào chưa có ghi chú "đã audit lại". Đang làm 1 vòng rà soát UX/workflow theo từng module (xem "Giai đoạn tiếp theo") — mỗi module audit xong sẽ cập nhật lại đúng phần liên quan trong file.
 
-## Audit UX/UI (2026-09-26) — P0 + P1 XONG + VERIFY + DEPLOY, P2 chưa làm
+## Audit UX/UI (2026-09-26) — P0 + P1 XONG + DEPLOY; P2: tách bundle XONG, phần còn lại chưa làm
 
 Cách đo (dùng lại được): script JS chạy trong Browser pane, bấm lần lượt từng mục sidebar rồi đếm trên phần tử có chữ trong
 `<main>`: % chữ < 11px / < 12px, % chữ không đạt tương phản WCAG 1.4.3 (4.5:1, chữ lớn 3:1, trộn nền rgba theo cha),
@@ -284,13 +286,33 @@ Chưa đo được: màn talent (Ca Của Tôi/Đăng Ký Ca) và role brand b�
   (có danh sách ngoại lệ); cấm "₫" / "M đ". `tests/format.test.ts`.
 - tsc 0 lỗi, eslint 0 lỗi/37 warning, vitest 112/112, `vite build` OK.
 
+### P2a — Tách bundle — ĐÃ LÀM 2026-09-26, verify trên bản build production ở máy
+- Đo trước (sourcemap): xlsx ~984 KB mã nguồn, recharts ~958 KB, react-dom 533 KB, supabase ~800 KB, sentry ~580 KB — xlsx
+  chỉ dùng lúc nhập/xuất Excel, recharts chỉ ở Report Tháng.
+- `src/lib/lazyNamed.ts`: `lazyNamed(() => import(...), "TênComponent")` (React.lazy cho named export, giữ kiểu props).
+  App.tsx: 32 component tab → lazy, khu nội dung tab bọc `<Suspense fallback={<TabLoading />}>` (bên trong ErrorBoundary tab).
+  Chỉ Header / Login / ResetPasswordScreen / TabErrorFallback còn import tĩnh.
+- xlsx tải động: `downloadRowsAsXlsx`/`downloadSheetsAsXlsx` (src/lib/exportXlsx.ts) và `readSheetRows` (parseDataRawExcel)
+  thành async; 5 màn gọi xuất Excel (Sổ Ca, Affiliate, Cam Kết brand, Report Tháng, Report Tuần) `.catch` → toast.
+- Chunk cũ sau deploy: `installStaleChunkReload()` (main.tsx) nghe `vite:preloadError` → tải lại trang 1 lần / 30 giây
+  (sessionStorage `liveops_chunk_reload_at`); lần 2 vẫn lỗi thì hiện TabErrorFallback, không reload vô hạn.
+  `vercel.json` rewrite SPA loại `assets/` → chunk thiếu trả 404 thật thay vì index.html.
+- Kết quả: file JS chính 2.580 KB (gzip 721) → **665 KB (gzip 193)**; mở Dashboard tải 719 KB JS tổng. Chunk lớn còn lại:
+  BrandMonthlyReport 662 KB (có recharts, chỉ khi mở Report Tháng), xlsx 500 KB (chỉ khi bấm Excel).
+- Verify (launch config `liveops-prod` = `NODE_ENV=production tsx server.ts` trên cổng 3100, dùng lại phiên đăng nhập của dev):
+  bấm 18/18 tab agency + 10/10 tab brand CROCS đều hiện nội dung (0,16–0,51 s kể cả tải chunk), 0 lỗi console; mở hết 28 tab
+  xlsx vẫn chưa tải; bấm "Xuất Excel" ở Sổ Ca → tải xlsx rồi tạo `SoCa_CROCS_2026-09.xlsx` (chặn click tải để không ghi file);
+  Report Tháng 23 biểu đồ; giấu tạm 1 chunk trong dist → trang tự tải lại đúng 1 lần rồi dừng ở màn lỗi của tab.
+- Test canh `tests/bundleSplit.test.ts`: cấm `import … from "xlsx"` tĩnh; App.tsx không import tĩnh component tab (danh sách
+  ngoại lệ). Đã thử trên code cũ: test đỏ đúng.
+
 Phương án còn lại:
 - ~~**P0 (1–2 ngày):** sửa token tương phản 4 theme; sàn cỡ chữ 11px (thay 378 class); ô nhập 16px trên mobile; brand mặc định =
   brand có ca gần nhất (nhớ lựa chọn cuối); thay 2 `window.prompt`.~~ XONG (ở trên).
 - ~~**P1 (~1 tuần):**~~ XONG (ở trên). URL routing (`/agency/so-ca`, `/brand/crocs/report-thang/2026-09`); thu gọn header trang (mô tả vào nút "?");
   `src/lib/format.ts` + test canh như metricGlossary; sidebar tự thu gọn < 1280px; header mobile gọn.
-- **P2 (lớn):** gộp IA — một hub "Nhập dữ liệu" (hiện 3 chỗ upload ở 2 workspace), brand là bộ lọc cho ops thay vì đổi workspace;
-  tách bundle theo tab/role; bản Report Tháng rút gọn cho điện thoại; gắn đo lượt mở từng tab trước khi gộp menu.
+- **P2 (lớn):** ~~tách bundle theo tab/role~~ XONG (P2a ở trên). Còn: gộp IA — một hub "Nhập dữ liệu" (hiện 3 chỗ upload ở 2 workspace), brand là bộ lọc cho ops thay vì đổi workspace;
+  bản Report Tháng rút gọn cho điện thoại; gắn đo lượt mở từng tab trước khi gộp menu.
 
 ## Audit toàn diện code base (2026-09-23) — Phần 1 XONG, 4 bản vá đã verify
 
