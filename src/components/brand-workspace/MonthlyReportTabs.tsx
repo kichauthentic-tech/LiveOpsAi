@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -36,7 +37,8 @@ import {
   Activity,
   Download,
   Lightbulb,
-  CalendarDays
+  CalendarDays,
+  ChevronDown
 } from "lucide-react";
 import { LiveSession, BrandMonthlyReport as BrandMonthlyReportType, AffiliatePlanEntry, AffiliateActualEntry, BrandPlatformRate } from "../../types";
 import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
@@ -374,6 +376,21 @@ const WaterfallPanel: React.FC<{ title: string; sub: string; data: WaterfallPoin
     )}
   </Panel>
 );
+
+// Phần chi tiết của một mục Report Tháng — trên điện thoại gập lại sau Insight (xem isNarrow trong MonthlyReportTabs).
+const SectionDetail: React.FC<{ open: boolean; onOpen: () => void; children: React.ReactNode }> = ({ open, onOpen, children }) =>
+  open ? (
+    <>{children}</>
+  ) : (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="w-full flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-bold"
+      style={{ background: PAL.panel2, border: `1px solid ${PAL.line}`, color: PAL.gold }}
+    >
+      Xem chi tiết (biểu đồ, bảng) <ChevronDown className="w-3.5 h-3.5" />
+    </button>
+  );
 
 const SectionHead: React.FC<{ no: string; title: string; sub?: string }> = ({ no, title, sub }) => (
   <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 pb-2" style={{ borderBottom: `1px solid ${PAL.line}` }}>
@@ -1446,7 +1463,27 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   ].filter((x): x is [string, string] => !!x[1]?.trim());
 
   const [showDeepDive, setShowDeepDive] = useState(false);
-  const scrollTo = (id: string) => document.getElementById(`mr-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  // Điện thoại (audit UX 2026-09-26, P2): trang 24,7 màn 375px, phần 4–7 chiếm 56%. Dưới 768px phần 3–8 + Phụ
+  // lục chỉ hiện tiêu đề + Insight (kết luận), biểu đồ/bảng mở khi bấm; Tóm tắt + Target luôn mở. Desktop không đổi.
+  const isNarrow = !useMediaQuery("(min-width: 768px)");
+  const [openDetails, setOpenDetails] = useState<Set<string>>(() => new Set());
+  const detailOpen = (id: string) => !isNarrow || openDetails.has(id);
+  const openDetail = (id: string) => setOpenDetails((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
+  // Bấm mục lục tới phần đang gập: mở ra rồi mới cuộn — phải chờ React vẽ xong phần vừa mở (effect dưới),
+  // cuộn ngay thì vị trí đích còn là của bản gập.
+  const pendingScrollRef = useRef<string | null>(null);
+  const scrollNow = (id: string) => document.getElementById(`mr-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const scrollTo = (id: string) => {
+    if (detailOpen(id)) return scrollNow(id);
+    pendingScrollRef.current = id;
+    openDetail(id);
+  };
+  useEffect(() => {
+    const id = pendingScrollRef.current;
+    if (!id || !openDetails.has(id)) return;
+    pendingScrollRef.current = null;
+    scrollNow(id);
+  }, [openDetails]);
 
   // Xuất Excel toàn bộ Report Tháng (Đợt "trung tâm report") — 1 file, mỗi bảng đang có trên các
   // tab (trừ 05 Phân Tích Sâu, ops-only, không thuộc tài liệu gửi brand) là 1 sheet, để không phải
@@ -1865,6 +1902,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         <section id="mr-shop" className="space-y-4 scroll-mt-16">
           <SectionHead no="3" title="Sales Channel" sub="Shop Analytics: Seller LIVE + Affiliate LIVE + Video, cộng Product card (file Sản Phẩm) ≈ 100% Total GMV" />
           {insightBox("shop")}
+          <SectionDetail open={detailOpen("shop")} onOpen={() => openDetail("shop")}>
           {channelMixes.every((c) => !c) ? (
             <p className="text-sm py-4" style={{ color: PAL.muted }}>Chưa có file Shop Analytics cho các tháng này ở Dữ Liệu Gốc.</p>
           ) : (
@@ -1912,12 +1950,14 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
               </Panel>
             </>
           )}
+          </SectionDetail>
         </section>
 
         {/* ===== 4. Vì sao ===== */}
         <section id="mr-why" className="space-y-4 scroll-mt-16">
           <SectionHead no="4" title="Key Metrics — vì sao tăng / giảm" sub={`LIVE GMV tách theo 2 góc: traffic (Giờ live × Views/giờ × GMV/View) và đơn hàng (Orders × UPT × Avg. price) · ${cmp.label}`} />
           {insightBox("why")}
+          <SectionDetail open={detailOpen("why")} onOpen={() => openDetail("why")}>
           {drivers || basket ? (
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
               {drivers && <WaterfallPanel title="Góc traffic" sub="Giờ live × Views/giờ × GMV/View — 3 phần cộng đúng mức thay đổi" data={waterfallData} breakdown={drivers} />}
@@ -2004,12 +2044,14 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                       </ReportTable>
                     </Panel>
           </div>
+          </SectionDetail>
         </section>
 
         {/* ===== 5. Người ===== */}
         <section id="mr-people" className="space-y-4 scroll-mt-16">
           <SectionHead no="5" title="Host Performance" sub="Cùng cách tính với Hiệu Suất Host của agency · So mặt bằng = GMV/giờ của host so với mặt bằng nhóm ở đúng các ngày Daily/Campaign host đó live" />
           {insightBox("people")}
+          <SectionDetail open={detailOpen("people")} onOpen={() => openDetail("people")}>
           <Panel title="Host PFM Overview" icon={<Users className="w-4 h-4" />} sub="Cùng cách tính với tab Hiệu Suất Host của agency — giờ live thật khi có file, ca không có số không tính">
                   {canManage && hostQuality.reconciled < hostQuality.total && (
                     <div
@@ -2133,12 +2175,14 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
               )}
             </ReportTable>
           </Panel>
+          </SectionDetail>
         </section>
 
         {/* ===== 6. Hàng ===== */}
         <section id="mr-products" className="space-y-4 scroll-mt-16">
           <SectionHead no="6" title="Sản phẩm" sub="Top SKU theo GMV, phần bán qua Seller LIVE, khuyến mãi chạy trong tháng" />
           {insightBox("products")}
+          <SectionDetail open={detailOpen("products")} onOpen={() => openDetail("products")}>
           <Panel
             title="Top SKU theo GMV"
             icon={<ShoppingBag className="w-4 h-4" />}
@@ -2278,12 +2322,14 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                     </ReportTable>
                   )}
                 </Panel>
+          </SectionDetail>
         </section>
 
         {/* ===== 7. Bối cảnh ===== */}
         <section id="mr-context" className="space-y-4 scroll-mt-16">
           <SectionHead no="7" title="Campaign & khung giờ" sub="Ngày Campaign, khung giờ, diễn biến theo ngày, phiên nổi bật" />
           {insightBox("context")}
+          <SectionDetail open={detailOpen("context")} onOpen={() => openDetail("context")}>
           <Panel
             title="Campaign — so với cùng khung tháng trước"
             icon={<Flame className="w-4 h-4" />}
@@ -2466,11 +2512,13 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                         )}
                       </ReportTable>
                     </Panel>
+          </SectionDetail>
         </section>
 
         {/* ===== 8. Tháng sau ===== */}
         <section id="mr-next" className="space-y-4 scroll-mt-16">
           <SectionHead no="8" title="Target Plan tháng sau" sub={`Kế hoạch tháng ${nextMonth.slice(5)} lấy từ Kế Hoạch Tháng`} />
+          <SectionDetail open={detailOpen("next")} onOpen={() => openDetail("next")}>
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
             <KpiTile label={`Target GMV tháng ${nextMonth.slice(5)}`} value={nextPlan && nextPlan.targetGmv > 0 ? formatCurrencyAdaptive(nextPlan.targetGmv) : "—"} note={nextPlan ? (nextPlan.status === "locked" ? "đã chốt" : "đang lên lịch") : "chưa lập kế hoạch"} />
             <KpiTile label="Sessions kế hoạch" value={nextPlan ? String(nextPlan.slotCount) : "—"} note={nextPlan ? "trong Kế Hoạch Tháng" : ""} />
@@ -2545,11 +2593,13 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
               ))}
             </div>
           )}
+          </SectionDetail>
         </section>
 
         {/* ===== Phụ lục ===== */}
         <section id="mr-appendix" className="space-y-4 scroll-mt-16">
           <SectionHead no="—" title="Phụ lục" sub="Chi tiết creator affiliate (nhập tay)" />
+          <SectionDetail open={detailOpen("appendix")} onOpen={() => openDetail("appendix")}>
           {(canManage || affiliateRows.length > 0) && (
             <div className="space-y-4">
                 <div
@@ -3042,6 +3092,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
               )}
             </div>
           )}
+          </SectionDetail>
         </section>
       </div>
     </div>

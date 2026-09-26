@@ -8,7 +8,7 @@
 > kiểm trên production: link sâu trả index.html, JS/CSS 200, URL giữ nguyên.
 > **P2a tách bundle XONG:** file JS chính 2.580 → 665 KB, mỗi tab tải khi mở, thư viện Excel tải khi bấm (mục P2a).
 > **P2b đếm lượt mở tab: XONG, 0123 đã chạy, đếm từ 26/09/2026** (Phân Quyền → Lượt Mở Tab). P2 còn lại (gộp menu — chờ số liệu,
-> Report Tháng cho điện thoại) chưa làm.
+> Report Tháng cho điện thoại → P2c XONG: 24,7 → 7,5 màn 375px, phần 3–8 gập sau Insight). Còn: gộp menu (chờ số liệu).
 > **Kèm vá sự cố: mọi `/api/*` production chết (FUNCTION_INVOCATION_FAILED) từ 9dcf719 (24/09) tới 5ecb7c8 (26/09)** —
 > import tương đối thiếu đuôi `.js` trong `src/server/createApp.ts`. Xem quy ước "Server import phải có đuôi .js".
 > Chi tiết ở mục `## Audit UX/UI (2026-09-26)`.
@@ -324,13 +324,24 @@ Chưa đo được: màn talent (Ca Của Tôi/Đăng Ký Ca) và role brand b�
 - Verify trước migration: mở tab → insert 404 bị bỏ qua, app chạy bình thường, chỉ 1 lần ghi; panel báo rõ "migration 0123 chưa chạy".
 - Sau khi user chạy 0123: mở vài tab → xem panel có số. Để ~2–4 tuần rồi mới dùng số để gộp menu.
 
+### P2c — Report Tháng trên điện thoại — XONG 2026-09-26, verify trên browser
+- Đo trước (375×812, CROCS 09/2026): trang 20.039px = **24,7 màn**; phần 4 Vì sao 3.084px, 5 Host 2.542, 6 Sản phẩm 2.347,
+  7 Campaign 3.333 (cộng 56% trang); 13 bảng rộng 520–860px phải vuốt ngang. KPI đầu tiên đã lên y≈620 nhờ PageIntro (P1).
+- `MonthlyReportTabs.tsx`: dưới 768px (`useMediaQuery`) phần 3–7 chỉ hiện tiêu đề + **Insight** (kết luận, số, việc cần làm) +
+  nút "Xem chi tiết (biểu đồ, bảng)"; phần 8 Target Plan tháng sau + Phụ lục chỉ còn tiêu đề + nút. Tóm tắt + Target & tiến độ
+  luôn mở. Component `SectionDetail` (không render phần gập → không vẽ biểu đồ ẩn). Bấm mục lục tới phần đang gập: mở trước, cuộn
+  trong effect sau khi vẽ (`pendingScrollRef`) — cuộn ngay thì đích còn là vị trí của bản gập. Desktop ≥ 768px không đổi.
+- Sau: **7,5 màn** (6.080px); mở từng phần bằng nút hoặc mục lục; ≥ 768px vẫn 23 biểu đồ, 0 nút gập.
+- Lưu ý verify: khung Browser pane ẩn (`visibilityState: hidden`) làm cuộn `smooth` chạy dở → đo bằng cách bọc
+  `Element.prototype.scrollIntoView` ghi lại id + chiều cao phần lúc được gọi, không đo bằng scrollTop sau vài giây.
+- Chưa làm: bảng rộng vẫn vuốt ngang khi mở chi tiết; Tóm tắt vẫn 1,6 màn (5 thẻ KPI + đoạn tóm tắt).
+
 Phương án còn lại:
 - ~~**P0 (1–2 ngày):** sửa token tương phản 4 theme; sàn cỡ chữ 11px (thay 378 class); ô nhập 16px trên mobile; brand mặc định =
   brand có ca gần nhất (nhớ lựa chọn cuối); thay 2 `window.prompt`.~~ XONG (ở trên).
 - ~~**P1 (~1 tuần):**~~ XONG (ở trên). URL routing (`/agency/so-ca`, `/brand/crocs/report-thang/2026-09`); thu gọn header trang (mô tả vào nút "?");
   `src/lib/format.ts` + test canh như metricGlossary; sidebar tự thu gọn < 1280px; header mobile gọn.
-- **P2 (lớn):** ~~tách bundle theo tab/role~~ XONG (P2a ở trên). ~~đo lượt mở tab~~ P2b. Còn: gộp IA — một hub "Nhập dữ liệu" (hiện 3 chỗ upload ở 2 workspace), brand là bộ lọc cho ops thay vì đổi workspace;
-  bản Report Tháng rút gọn cho điện thoại.
+- **P2 (lớn):** ~~tách bundle theo tab/role~~ XONG (P2a ở trên). ~~đo lượt mở tab~~ P2b. Còn: gộp IA — một hub "Nhập dữ liệu" (hiện 3 chỗ upload ở 2 workspace), brand là bộ lọc cho ops thay vì đổi workspace (chờ 2–4 tuần số Lượt Mở Tab); ~~Report Tháng cho điện thoại~~ P2c.
 
 ## Audit toàn diện code base (2026-09-23) — Phần 1 XONG, 4 bản vá đã verify
 
