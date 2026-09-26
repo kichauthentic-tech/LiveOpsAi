@@ -5,7 +5,8 @@
 > **MỚI 2026-09-26 — Report Tháng thêm các góc nhìn lấy từ deck report tháng 8 của Crocs** (UPT/giỏ hàng, LIVE CTR,
 > camp so camp tháng trước + target từ Kế Hoạch Tháng, phân bổ tháng sau theo camp, Top SKU có hạng + phễu, khung
 > Insight đầu phần 3–7, migration **0121 đã chạy + verify**, KPI GMV cả shop ở Kế Hoạch Tháng — migration **0122 đã chạy + verify**). Code
-> 2026-09-26: commit 5096f7b (Insight + KPI cả shop), đã deploy Vercel (bundle live-ops-ai.vercel.app có code mới). Xem mục `### Bổ sung 2026-09-26 — góc nhìn từ deck Crocs` trong `## Report Tháng 8 phần`.
+> 2026-09-26: commit 5096f7b (Insight + KPI cả shop), đã deploy Vercel (bundle live-ops-ai.vercel.app có code mới). Sau đó: bảng
+> "Host Theo Loại Ngày" + bản chụp v3 (lưu trợ live) — **chưa commit**; sau deploy cần bấm Cập nhật số liệu CROCS T8/T9 (mục 8). Xem mục `### Bổ sung 2026-09-26 — góc nhìn từ deck Crocs` trong `## Report Tháng 8 phần`.
 
 > **MỚI 2026-09-25 (tối) — Report Tháng làm lại thành 1 trang cuộn 8 phần** (Tóm tắt → Mục tiêu → Toàn shop &
 > kênh → Vì sao → Người → Hàng → Bối cảnh → Tháng sau + Phụ lục). Migration **0120 đã chạy** (đoạn tóm tắt ops sửa được)
@@ -1511,9 +1512,21 @@ chỉ unit test phủ); góc nhìn brand.
    **Chưa verify trên browser:** khối KPI tháng hiện tại ở phần 1/2 với số thật (tháng có kế hoạch mới có — CROCS T10
    chưa có số; logic đã có unit test).
 
-**Chưa làm từ deck Crocs (đã nêu với user):** host tách ngày thường/camp theo đúng cách deck (số per-host của deck lệch app — Hùng ngày
-thường deck 727tr/16h vs app 1,1 tỷ/31h, cần hỏi Crocs cách chia ca 2 host; cột "So Mặt Bằng" đã khử phần thiên vị camp) — user
-xác nhận 2026-09-26 là chưa hỏi được Crocs, để sau.
+8. **Host Theo Loại Ngày** (phần 5, không migration, **CHƯA COMMIT**) — user chốt luật chia 2026-09-26: **GMV của ca
+   tính trọn cho host; trợ live không nhận GMV, chỉ ghi giờ live** (= cách app vốn tính GMV). Hàm thuần `byHostDayType`
+   ([hostPerformance.ts](src/lib/performance/hostPerformance.ts)): mỗi người = ngày thường (GMV · giờ host · số ca) +
+   ngày camp (D-Day/Mid-Month/Pay-Day gộp, theo `resolveCampBucketType` + khoảng camp của report) + giờ trợ live để
+   RIÊNG (không cộng vào giờ host — cộng vào kéo tụt GMV/giờ); người chỉ làm trợ vẫn có dòng. Bảng + sheet Excel
+   "5 Nguoi - Ngay thuong-camp". **Bản chụp lên v3** (`SNAPSHOT_VERSION` 3): ca lưu thêm `coHostId`/`coHostName` (cả
+   `SESSION_SIG_FIELDS`); bản chụp v2 thiếu trợ live ⇒ report nhắc "bấm Cập nhật số liệu" và freshness báo cần cập nhật.
+   Kèm sửa `ReportTable` dùng key theo vị trí cột (tiêu đề trùng "Giờ" báo lỗi key React).
+   **Số vẫn lệch deck sau khi chốt luật**: DB T8 Hùng là host cả 9 ca ngày thường (ca nào cũng có trợ) ⇒ app 1,1 tỷ /
+   31,1h, deck 727tr / 16h; không tập con ca nào ra đúng 727/16 ⇒ lệch nằm ở dữ liệu nguồn của Crocs (ai được ghi là
+   host từng ca, hoặc nguồn GMV), không phải luật chia. Chia đôi thì giờ khớp (15,5h) mà GMV không (553tr).
+   **Verify:** vitest 91/91 (2 test luật chia + 1 test bản chụp v3 giữ trợ live / v2 bị báo cũ), tsc, eslint (2 cảnh báo
+   cũ); browser (admin, dev) CROCS T8: bảng hiện Hùng ngày thường 1,1 tỷ · 31,1h · 9 ca / camp 1,23 tỷ · 40,6h · 7 ca,
+   nhắc cập nhật hiện đúng, console sạch. **Chưa verify:** cột Giờ Trợ Live với số thật — cần bấm Cập nhật số liệu (ghi
+   bản chụp v3) SAU khi deploy, theo đúng quy ước "push → deploy → mới ghi".
 
 ## Bản chụp số liệu Report Tháng — XONG + VERIFY 2026-09-25 (migration 0119 ĐÃ CHẠY)
 

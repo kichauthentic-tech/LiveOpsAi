@@ -35,7 +35,9 @@ import { hasLiveNumbers, sessionsInRange } from "./sessionsLivePerf";
 // theo công thức cũ vẫn được coi là "còn mới".
 // v2 (2026-09-25): thêm piece shopDays + cardGmv cho 4 tháng (Report Tháng 8 phần — "Toàn shop & kênh",
 // so cùng số ngày). Bản chụp v1 vẫn đọc được; phần thiếu hiện "bấm Cập nhật số liệu".
-export const SNAPSHOT_VERSION = 2;
+// v3 (2026-09-26): ca lưu thêm coHostId/coHostName — bảng "Host Theo Loại Ngày" ghi giờ trợ live.
+// Bản chụp v2 không có trợ live ⇒ cột đó trống, report nhắc bấm cập nhật.
+export const SNAPSHOT_VERSION = 3;
 const PIECE_VERSION = 1;
 
 export interface SnapshotPiece<T = unknown> {
@@ -54,7 +56,7 @@ const SNAPSHOT_SESSION_FIELDS = [
   "targetGmv", "actualGmv", "totalOrders", "totalViews", "avgWatchTimeSeconds", "dataSource", "monthPublished",
   "liveDurationMinutes", "actualStartAt", "actualEndAt", "attributedItemsSold", "attributedSkuOrders",
   "impressions", "productImpressions", "productClicks", "newFollowers", "commentsCount", "sharesCount", "likesCount",
-  "liveRoomIds"
+  "liveRoomIds", "coHostId", "coHostName"
 ] as const satisfies readonly (keyof LiveSession)[];
 export type SnapshotSession = Partial<Pick<LiveSession, (typeof SNAPSHOT_SESSION_FIELDS)[number]>> & Pick<LiveSession, "id" | "date" | "status">;
 
@@ -358,7 +360,7 @@ const SESSION_SIG_FIELDS: (keyof LiveSession)[] = [
   "targetGmv", "actualGmv", "totalOrders", "totalViews", "avgWatchTimeSeconds", "dataSource",
   "liveDurationMinutes", "actualStartAt", "actualEndAt", "attributedItemsSold", "attributedSkuOrders",
   "impressions", "productImpressions", "productClicks", "newFollowers", "commentsCount", "sharesCount", "likesCount",
-  "liveRoomIds"
+  "liveRoomIds", "coHostId", "coHostName"
 ];
 function sessionSig(s: SnapshotSession | LiveSession): string {
   // "" / undefined / null coi như nhau — bản chụp đã bỏ trường trống (trimSession).

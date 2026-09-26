@@ -35,7 +35,8 @@ import {
   PieChart as PieChartIcon,
   Activity,
   Download,
-  Lightbulb
+  Lightbulb,
+  CalendarDays
 } from "lucide-react";
 import { LiveSession, BrandMonthlyReport as BrandMonthlyReportType, AffiliatePlanEntry, AffiliateActualEntry, BrandPlatformRate } from "../../types";
 import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
@@ -87,7 +88,7 @@ import { fetchAffiliatePlans, replaceAffiliatePlans } from "../../lib/db/affilia
 import { fetchAffiliateActuals, replaceAffiliateActuals } from "../../lib/db/affiliateActuals";
 import { MonthlyDeepDive } from "./deepdive/MonthlyDeepDive";
 import { errorMessage } from "../../lib/errorMessage";
-import { byHost, dataQuality, filterSessions, hostKey, splitUnassignedHost, DataQuality } from "../../lib/performance/hostPerformance";
+import { byHost, byHostDayType, dataQuality, filterSessions, hostKey, splitUnassignedHost, DataQuality } from "../../lib/performance/hostPerformance";
 import {
   aggregateCreatorLivePerfRows,
   bucketByCampaignDay,
@@ -250,7 +251,7 @@ const ReportTable: React.FC<{ head: string[]; children: React.ReactNode }> = ({ 
         <tr style={{ borderBottom: `1px solid ${PAL.line}` }}>
           {head.map((h, i) => (
             <th
-              key={h}
+              key={i}
               className={`py-2 px-3 text-left text-[10.5px] uppercase tracking-wider ${i > 0 ? "text-right" : ""}`}
               style={{ color: PAL.muted }}
             >
@@ -1346,6 +1347,17 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     return { rows: list, vsPeer: new Map(keys.map((k, idx) => [k, peer[idx].vsPeer])) };
   }, [completedInPeriod, campOverrides]);
 
+  // Phần 5 — host tách ngày thường / ngày camp (Pay-Day, Mid-Month, D-Day gộp). Luật chia: GMV trọn
+  // cho host, trợ live chỉ ghi giờ (xem byHostDayType).
+  const hostDayType = useMemo(
+    () =>
+      byHostDayType(
+        filterSessions(completedInPeriod.filter((s) => s.platform === "TikTok"), {}),
+        (date) => resolveCampBucketType(date, campOverrides) !== "daily"
+      ),
+    [completedInPeriod, campOverrides]
+  );
+
   // Khung Insight phần 3–7 — tự sinh từ đúng các số phần đó đang hiện (lib/report/sectionInsights.ts).
   const sectionInsight: Record<InsightSection, SectionInsight | null> = {
     shop: shopInsight({ months: last4Months, mixes: channelMixes, agencyGmv: monthlyStats.map((x) => x.stats.gmv), shopCur, shopPrev: shopPrevSame, windowLabel: cmp.label }),
@@ -1532,6 +1544,22 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             "So mặt bằng cùng loại ngày (%)": n(hostInsight.vsPeer.get(h.key)),
             "Đơn": n(h.orders),
             "CTR": n(h.ctr)
+          }))
+        },
+        {
+          name: "5 Nguoi - Ngay thuong-camp",
+          rows: hostDayType.map((h) => ({
+            "Người": h.name,
+            "Ca host ngày thường": h.daily.sessions,
+            "GMV ngày thường": n(h.daily.gmv),
+            "Giờ host ngày thường": n(h.daily.hours),
+            "GMV/Giờ ngày thường": n(h.daily.hours > 0 ? h.daily.gmv / h.daily.hours : null),
+            "Ca host ngày camp": h.camp.sessions,
+            "GMV ngày camp": n(h.camp.gmv),
+            "Giờ host ngày camp": n(h.camp.hours),
+            "GMV/Giờ ngày camp": n(h.camp.hours > 0 ? h.camp.gmv / h.camp.hours : null),
+            "Ca trợ live": h.assist.sessions,
+            "Giờ trợ live": n(h.assist.hours)
           }))
         },
         {
@@ -2049,6 +2077,55 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                     )}
                   </ReportTable>
                 </Panel>
+          <Panel
+            title="Host Theo Loại Ngày"
+            icon={<CalendarDays className="w-4 h-4" />}
+            sub="Ngày camp = D-Day, Mid-Month, Pay-Day. GMV của ca tính trọn cho host; trợ live không nhận GMV, chỉ ghi giờ trợ live (không cộng vào giờ host)"
+          >
+            {snapshot.version < 3 && canManage && (
+              <div className="flex items-start gap-2 text-[11px] rounded-xl p-2.5 mb-3" style={{ background: "#2a2410", border: `1px solid ${PAL.gold}55`, color: PAL.gold }}>
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                Số liệu này chốt trước khi report lưu trợ live — cột "Giờ Trợ Live" đang trống. Bấm "Cập nhật số liệu" ở trên để có.
+              </div>
+            )}
+            <ReportTable head={["Người", "GMV Ngày Thường", "Giờ", "GMV/Giờ", "GMV Ngày Camp", "Giờ", "GMV/Giờ", "Giờ Trợ Live"]}>
+              {hostDayType.map((h, idx) => {
+                const cells = (p: { sessions: number; gmv: number; hours: number }) =>
+                  p.sessions === 0
+                    ? [<td key="g" className="py-2 px-3 text-right" style={{ color: PAL.muted }}>—</td>, <td key="h" />, <td key="r" />]
+                    : [
+                        <td key="g" className="py-2 px-3 text-right font-mono whitespace-nowrap font-bold" style={{ color: PAL.cream }}>
+                          {formatCurrencyAdaptive(p.gmv)}
+                        </td>,
+                        <td key="h" className="py-2 px-3 text-right font-mono whitespace-nowrap" style={{ color: PAL.muted }}>
+                          {fmtHours(p.hours)} · {p.sessions} ca
+                        </td>,
+                        <td key="r" className="py-2 px-3 text-right font-mono whitespace-nowrap" style={{ color: PAL.muted }}>
+                          {p.hours > 0 ? formatCurrencyAdaptive(p.gmv / p.hours) : "—"}
+                        </td>
+                      ];
+                return (
+                  <tr key={h.key} style={{ borderBottom: `1px solid ${PAL.line}`, background: idx % 2 ? `${PAL.panel2}55` : "transparent" }}>
+                    <td className="py-2 px-3 font-semibold" style={{ color: PAL.gold }}>
+                      {h.name}
+                    </td>
+                    {cells(h.daily)}
+                    {cells(h.camp)}
+                    <td className="py-2 px-3 text-right font-mono whitespace-nowrap" style={{ color: PAL.muted }}>
+                      {h.assist.sessions > 0 ? `${fmtHours(h.assist.hours)} · ${h.assist.sessions} ca` : "—"}
+                    </td>
+                  </tr>
+                );
+              })}
+              {hostDayType.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="py-6 text-center italic" style={{ color: PAL.muted }}>
+                    Chưa có phiên TikTok nào có số liệu trong tháng.
+                  </td>
+                </tr>
+              )}
+            </ReportTable>
+          </Panel>
         </section>
 
         {/* ===== 6. Hàng ===== */}

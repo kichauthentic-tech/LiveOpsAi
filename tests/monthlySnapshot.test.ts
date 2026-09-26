@@ -203,3 +203,19 @@ test("tổng hợp v2: phễu SKU lấy khối cột TỔNG (cột đầu tiên)
   expect(((clk / imp) * 100).toFixed(2)).toBe("2.75");
   expect(((skuOrders / clk) * 100).toFixed(2)).toBe("1.28");
 });
+
+test("v3: bản chụp giữ trợ live của ca (bảng Host Theo Loại Ngày ghi giờ trợ); bản chụp v2 bị báo cần cập nhật", async () => {
+  const withCo = sessions.map((s) => (s.id === "sep1" ? { ...s, coHostId: "t-toan", coHostName: "Toàn" } : s));
+  const { snapshot } = await buildMonthlyReportSnapshot({ brandId: B, month: M, sessions: withCo, brandPlatformRates: [] });
+  const round = JSON.parse(JSON.stringify(snapshot));
+  const h = hydrateSnapshotSessions(round).find((s) => s.id === "sep1")!;
+  expect(h.coHostId).toBe("t-toan");
+  expect(h.coHostName).toBe("Toàn");
+  expect(hydrateSnapshotSessions(round).find((s) => s.id === "sep2")!.coHostName).toBe("");
+  expect(snapshotFreshness(round, live({ sessions: withCo })).upToDate).toBe(true);
+  // Bản chụp dựng trước v3: không có trợ live ⇒ phải hiện "cần cập nhật".
+  const v2 = { ...round, version: 2, sessions: round.sessions.map(({ coHostId: _i, coHostName: _n, ...s }: Record<string, unknown>) => s) };
+  const f = snapshotFreshness(v2, live({ sessions: withCo }));
+  expect(f.configChanged).toBe(true);
+  expect(f.changedSessions).toBe(1);
+});

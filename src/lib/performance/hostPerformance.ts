@@ -195,3 +195,57 @@ export function hostWeekdayGrid(sessions: LiveSession[]): HostWeekdayCell[] {
     };
   });
 }
+
+// Host tách ngày thường / ngày camp (report tháng, theo deck Crocs). Luật chia đã chốt với user
+// 2026-09-26: GMV của ca tính TRỌN cho host; trợ live không nhận GMV, chỉ được ghi giờ live — nên
+// giờ trợ để riêng một cột, không cộng vào giờ host (cộng vào sẽ kéo tụt GMV/giờ của người đó).
+export interface DayTypePart {
+  sessions: number;
+  gmv: number;
+  hours: number;
+}
+
+export interface HostDayTypeRow {
+  key: string;
+  name: string;
+  daily: DayTypePart;
+  camp: DayTypePart;
+  assist: DayTypePart; // gmv luôn 0
+}
+
+const emptyPart = (): DayTypePart => ({ sessions: 0, gmv: 0, hours: 0 });
+
+export function coHostKey(s: LiveSession): string | null {
+  if (s.coHostId) return s.coHostId;
+  const name = s.coHostName?.trim();
+  return name ? `ten:${name}` : null;
+}
+
+export function byHostDayType(sessions: LiveSession[], isCampDay: (date: string) => boolean): HostDayTypeRow[] {
+  const rows = new Map<string, HostDayTypeRow>();
+  const rowOf = (key: string, name: string) => {
+    const cur = rows.get(key) ?? { key, name, daily: emptyPart(), camp: emptyPart(), assist: emptyPart() };
+    if (!cur.name && name) cur.name = name;
+    rows.set(key, cur);
+    return cur;
+  };
+  for (const s of sessions) {
+    const h = sessionHours(s);
+    const hk = hostKey(s);
+    if (hk !== UNASSIGNED_HOST_KEY) {
+      const part = rowOf(hk, s.hostName)[isCampDay(s.date) ? "camp" : "daily"];
+      part.sessions += 1;
+      part.gmv += s.actualGmv ?? 0;
+      part.hours += h;
+    }
+    const ck = coHostKey(s);
+    if (ck && ck !== hk) {
+      const part = rowOf(ck, s.coHostName).assist;
+      part.sessions += 1;
+      part.hours += h;
+    }
+  }
+  return [...rows.values()].sort(
+    (a, b) => b.daily.gmv + b.camp.gmv - (a.daily.gmv + a.camp.gmv) || b.assist.hours - a.assist.hours
+  );
+}
