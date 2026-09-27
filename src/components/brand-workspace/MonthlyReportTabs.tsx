@@ -6,7 +6,9 @@ import { LiveSession, BrandMonthlyReport as BrandMonthlyReportType, BrandPlatfor
 import { CHANNEL, METRIC, metricHint } from "../../lib/metricGlossary";
 import { downloadSheetsAsXlsx } from "../../lib/exportXlsx";
 import { useToast } from "../../hooks/useToast";
-import { dailyFromSessions, monthRunRate, pickLivePerfSource } from "../../lib/report/sessionsLivePerf";
+import { dailyFromSessions, monthRunRate, monthRunRateFromPlan, pickLivePerfSource } from "../../lib/report/sessionsLivePerf";
+import { planRunRate } from "../../lib/performance/planRunRate";
+import { todayVn } from "../../lib/performance/brandCommitment";
 import { hydrateSnapshotSessions, MonthlyReportSnapshot, reportWindow, snapshotView } from "../../lib/report/monthlySnapshot";
 import {
   autoNextSteps,
@@ -789,12 +791,17 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   const livePrev = livePrevSource.slice;
   // Diễn biến theo ngày: file Live Performance Core Stats có GMV gián tiếp — ưu tiên khi có; không có thì gộp ca theo ngày.
   const dailyPerf = useMemo(() => (dailyPerfRaw?.hasAnyBatch ? dailyPerfRaw : dailyFromSessions(sessions, brandId, start, end)), [dailyPerfRaw, sessions, brandId, start, end]);
-  const runRate = useMemo(() => monthRunRate(sessions, brandId, start, end), [sessions, brandId, start, end]);
 
   // Kế Hoạch Tháng của tháng trước / tháng này / tháng sau — nguồn khoảng ngày camp + target từng khung (tháng này)
   // và phân bổ tháng sau (phần 7). Bảng nhỏ, đọc thẳng, không đưa vào bản chụp.
   const [plans, setPlans] = useState<Record<string, { plan: BrandMonthPlan; slots: BrandMonthPlanSlot[] } | null>>({});
   const nextMonth = useMemo(() => nextMonthStrLocal(month), [month]);
+  // Run-rate: tháng có Kế Hoạch Tháng đã chốt ⇒ theo plan ban đầu (planRunRate — cùng số với Dashboard brand).
+  const runRate = useMemo(() => {
+    const p = plans[month];
+    if (p?.plan.status === "locked") return monthRunRateFromPlan(planRunRate(month, p.slots, [], sessions.filter((s) => s.brandId === brandId), todayVn(), p.plan.campRanges));
+    return monthRunRate(sessions, brandId, start, end);
+  }, [plans, month, sessions, brandId, start, end]);
   useEffect(() => {
     let cancelled = false;
     const ms = [prevMonth, month, nextMonth];
@@ -1653,7 +1660,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
               {kpiTargetGmvCur && runRate && runRate.doneCount > 0 && runRate.targetTotal > 0 && (
                 <div className="flex-1 min-w-[220px] text-[12px] space-y-0.5" style={{ color: PAL.muted }}>
                   <div>
-                    Run-rate ca đã xong:{" "}
+                    Run-rate:{" "}
                     <b style={{ color: runRate.runRate == null ? PAL.muted : runRate.runRate >= 1 ? PAL.green : runRate.runRate >= 0.9 ? PAL.gold : PAL.red }}>
                       {runRate.runRate == null ? "—" : `${fmtFixed(runRate.runRate * 100, 0)}%`}
                     </b>{" "}

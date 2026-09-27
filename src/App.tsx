@@ -61,7 +61,6 @@ import {
   ClipboardCheck,
   TrendingUp,
   LayoutDashboard,
-  Gauge,
   FileSignature,
   Radio,
   Megaphone,
@@ -88,6 +87,7 @@ import { lazyNamed } from "./lib/lazyNamed";
 const BrandCalendar = lazyNamed(() => import("./components/brand-workspace/BrandCalendar"), "BrandCalendar");
 const BrandSkuShowcase = lazyNamed(() => import("./components/brand-workspace/BrandSkuShowcase"), "BrandSkuShowcase");
 const BrandMonthlyReport = lazyNamed(() => import("./components/brand-workspace/BrandMonthlyReport"), "BrandMonthlyReport");
+const BrandDashboard = lazy(() => import("./components/brand-workspace/BrandDashboard"));
 const BrandAdsReport = lazyNamed(() => import("./components/brand-workspace/BrandAdsReport"), "BrandAdsReport");
 const BrandCommitmentView = lazyNamed(() => import("./components/brand-workspace/BrandCommitmentView"), "BrandCommitmentView");
 const BrandAffiliateTable = lazyNamed(() => import("./components/brand-workspace/BrandAffiliateTable"), "BrandAffiliateTable");
@@ -115,7 +115,6 @@ const ReportPublishBoard = lazyNamed(() => import("./components/ReportPublishBoa
 const BrandCommitment = lazyNamed(() => import("./components/BrandCommitment"), "BrandCommitment");
 const ShiftScheduling = lazy(() => import("./components/ShiftScheduling"));
 const MonthPlan = lazy(() => import("./components/MonthPlan"));
-const OpsSupport = lazy(() => import("./components/OpsSupport"));
 const CeoBrief = lazy(() => import("./components/CeoBrief"));
 
 const STORAGE_PREFIX = "liveops_os_v2_";
@@ -1603,9 +1602,8 @@ export default function App() {
               // (hôm nay/tuần, việc còn thiếu) + chế độ xem Lịch & Studio (LiveCalendar cũ).
               { id: "calendar", label: "Bảng Vận Hành", icon: CalendarIcon, perm: "manage_calendar" as PermissionKey },
               { id: "sessions", label: "Sổ Ca", icon: BookOpen, perm: "manage_sessions" as PermissionKey },
-              { id: "live_reconciliation", label: "Đối Soát Số Liệu", icon: ClipboardCheck, perm: "manage_sessions" as PermissionKey },
-              // Hỗ Trợ Vận Hành (2026-09-21): run-rate vs target đã chốt + benchmark ca sắp live; không đụng target cam kết.
-              { id: "ops_support", label: "Hỗ Trợ Vận Hành", icon: Gauge, perm: "manage_sessions" as PermissionKey }
+              { id: "live_reconciliation", label: "Đối Soát Số Liệu", icon: ClipboardCheck, perm: "manage_sessions" as PermissionKey }
+              // Hỗ Trợ Vận Hành (2026-09-21) đã GỘP vào Dashboard của từng Brand Workspace (user chốt 2026-09-28).
             ]
           },
           {
@@ -1692,6 +1690,9 @@ export default function App() {
     {
       label: "Brand Workspace",
       items: [
+        // Dashboard brand (2026-09-28): trong tháng — run-rate theo plan, vì sao, đề xuất, soát kế hoạch, phương
+        // án bù + benchmark (gộp Hỗ Trợ Vận Hành). Role brand thấy bản rút gọn (component tự ẩn phần ops).
+        { id: "brand_dashboard", label: "Dashboard", icon: LayoutDashboard, perm: undefined },
         { id: "brand_calendar", label: "Lịch Vận Hành", icon: CalendarIcon, perm: undefined },
         { id: "brand_sessions", label: "Sổ Ca", icon: BookOpen, perm: undefined },
         { id: "brand_skus", label: "SKU Showcase", icon: Package, perm: undefined },
@@ -2423,17 +2424,6 @@ export default function App() {
                   />
                 )}
 
-                {activeTab === "ops_support" && (
-                  <OpsSupport
-                    brands={activeBrands}
-                    sessions={activeSessions}
-                    shiftSlots={shiftSlots}
-                    promoSchemes={promoSchemes}
-                    engineParams={engineParams}
-                    onOpenMonthPlan={() => setActiveTab("month_plan")}
-                    onOpenSession={(id) => { setOpsView("board"); setActiveTab("calendar"); setNotifOpenSessionId(id); }}
-                  />
-                )}
 
                 {activeTab === "brand_commitment" && (
                   <BrandCommitment sessions={activeSessions} brands={activeBrands} />
@@ -2442,6 +2432,21 @@ export default function App() {
                 {/* Brand Workspace (Giai đoạn A) — mọi tab dưới đây chỉ render khi effectiveWorkspace
                     đang scope theo đúng 1 brand; component con nhận thẳng brandId + data đã lọc sẵn
                     (giữ nguyên pattern fetch-1-lần-ở-App/filter-bằng-useMemo hiện có). */}
+                {activeTab === "brand_dashboard" && effectiveWorkspace.type === "brand" && (
+                  <BrandDashboard
+                    brandId={currentBrandId!}
+                    brandName={activeBrands.find((b) => b.id === currentBrandId)?.name || "Brand"}
+                    sessions={activeSessions}
+                    shiftSlots={shiftSlots}
+                    promoSchemes={promoSchemes}
+                    engineParams={engineParams}
+                    currentRole={currentRole}
+                    onOpenMonthPlan={() => { setWorkspace({ type: "agency" }); setActiveTab("month_plan"); }}
+                    onOpenSession={(id) => { setWorkspace({ type: "agency" }); setOpsView("board"); setActiveTab("calendar"); setNotifOpenSessionId(id); }}
+                    onOpenSessions={() => setActiveTab("brand_sessions")}
+                  />
+                )}
+
                 {activeTab === "brand_calendar" && effectiveWorkspace.type === "brand" && (
                   <BrandCalendar
                     brandId={currentBrandId!}

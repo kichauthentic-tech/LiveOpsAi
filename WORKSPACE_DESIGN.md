@@ -2,6 +2,41 @@
 
 ## CẦN LÀM NGAY khi mở phiên mới (cập nhật 2026-09-24)
 
+> **MỚI 2026-09-28 — Dashboard trong từng Brand Workspace: ĐÃ BUILD + VERIFY (không migration, CHƯA commit).** Tab đầu Brand
+> Workspace (`/brand/<slug>/dashboard`). Một hàm run-rate chung theo **plan ban đầu** (`planRunRate` — ca huỷ giữ target, ca ngoài plan
+> target = 0) cho Dashboard + Report Tháng + Report Tuần. **Hỗ Trợ Vận Hành đã gộp vào Dashboard** (tab agency `ops_support` bỏ).
+> Kế Hoạch Tháng chia target ca theo **chỉ số khung giờ + vị trí ngày camp** (nút "Chia lại target"). Xem `## Dashboard trong Brand Workspace`.
+
+> **MỚI 2026-09-28 — Check E2E vòng đời 1 ca live trên production (VERA T9, ca ZZZ TEST): chuỗi chạy thông, 7 lỗi mới, CHƯA sửa.**
+> Đã đi: Cam Kết Hợp Đồng → Kế Hoạch Tháng (2 ca, target 100M) → Chốt → Nhân sự ca chốt người → ca tự sang Completed lúc
+> mở app sau giờ kết thúc → up file Creator-Live-Performance (15M) → Nhập report → Đối Soát (18,2M, `tiktok_reconciled`) →
+> Sổ Ca / Toàn Cảnh Brand / Hiệu Suất Host (39,4M/giờ = 18,2M ÷ 27,7 phút) / Report Tháng → Phát hành → Điều Phối Phát Hành.
+> Nhánh huỷ ca (Cancelled + lý do, ca chờ đăng ký mở lại) và xoá ca chờ đăng ký cũng chạy đúng. Lỗi, xếp theo độ nặng:
+> 1. **NẶNG — xoá ca kế hoạch ở Nhân sự ca làm target tháng tụt âm thầm.** `shift_slots` bị xoá ⇒ `brand_month_plan_slots.slot_id`
+>    về null (FK set null) ⇒ `fetchPlanTargets` ([monthPlans.ts:202](src/lib/db/monthPlans.ts:202)) lọc `slot_id is not null` bỏ luôn
+>    target của ca đó ⇒ Report Tháng + Dashboard: target 100M → 14,7M, "Đạt 124%". Toàn Cảnh Brand / Hỗ Trợ Vận Hành đọc thẳng kế
+>    hoạch nên vẫn 100M ⇒ 3 màn 3 số. Cùng họ với Đ5 (2026-09-24) nhưng qua đường xoá ca, Đ5 chỉ vá đường "chưa xếp người".
+> 2. **VỪA — Dashboard "Target & dự phóng cả tháng" chia target của brand có kế hoạch chốt cho GMV của MỌI brand**: VERA có kế
+>    hoạch, CROCS không ⇒ "Đã đạt 3,53B · 24.103% Target". Sẽ gặp thật ngay khi chốt kế hoạch T10 cho một phần brand.
+> 3. **VỪA — Avg. view không bao giờ được ghi cho ca chạy trong app.** RPC file giao ca (0078/0082) và đối soát (0080) không set
+>    `avg_watch_time_seconds` ⇒ mọi ca mới = 0s (229 ca CROCS nạp bù thì có số từ 0086). Form report lại ghi "AVG.view lấy từ file".
+>    Hiệu Suất Host cộng `avgWatch × views` ([hostPerformance.ts:238](src/lib/performance/hostPerformance.ts:238)) ⇒ ca mới kéo tụt
+>    Avg. view của host. Số gốc có trong file (cột "Avg. viewing duration") và trong `raw` của snapshot row.
+> 4. **VỪA — Hỗ Trợ Vận Hành với brand chưa có lịch sử 28 ngày**: "Dự kiến cuối tháng 0 · Thiếu 100M (100%)", và phương án B ghi
+>    "Không còn ca nào phía trước" ngay dưới dòng "cần 50M/ca cho 2 ca còn lại" — nhánh else ở
+>    [OpsSupport.tsx:314](src/components/OpsSupport.tsx:314) gộp "hết ca" với "không có dự báo" (`monthOutlook` ra 0 khi GMV/giờ = 0).
+> 5. NHẸ — Nhân sự ca gắn nhãn "Phát sinh" cho ca sinh từ Kế Hoạch Tháng: `ShiftSlot` không map `plan_id`, UI chỉ phân biệt
+>    `templateId` ([ShiftScheduling.tsx:824](src/components/ShiftScheduling.tsx:824)).
+> 6. NHẸ — "Phát Hành Report" (đường gửi cho brand) bấm là phát hành ngay, không hỏi; "Thu hồi" thì có hỏi — ngược chiều rủi ro.
+> 7. NHẸ — Kế Hoạch Tháng: đổi brand/tháng thì lưới cũ còn hiện ~1–2s và "Lưu nháp" chỉ khoá theo `!dirty`, không theo `loading`
+>    ([MonthPlan.tsx:623](src/components/MonthPlan.tsx:623)) ⇒ sửa dở brand A, đổi sang B, bấm Lưu kịp lúc đang tải = lưu lưới A vào B.
+> Chưa verify được: thông báo `shift_assigned` / "Số đối soát khác số ghi lúc giao ca" (+21%) tới Nguyễn Quốc Việt — RLS chỉ chính
+> chủ đọc, cần đăng nhập tài khoản talent. **Dọn dữ liệu:** hợp đồng/cam kết, lô đối soát, ca chờ 30/09 đã xoá qua UI; ca 28/09 đã
+> "loại khỏi báo cáo" (số CROCS/agency trên app đã về mốc 177,8h · 47 ca · 3,52B); còn lại chạy tay 1 lần
+> `supabase/seed/2026-09-28_cleanup_e2e_test.sql` (2 ca VERA, 1 shift_slot, plan VERA T9, report nháp VERA T9 + bản chụp,
+> thông báo shift_open). Cách nạp file test vào `<input type=file>` từ Browser pane: đặt file trong repo, `fetch('/@fs/<đường dẫn
+> tuyệt đối>')` → `DataTransfer` → dispatch `change`; xoá thư mục tạm sau khi test.
+
 > **MỚI 2026-09-27 — Gộp "Phân tích sâu (nội bộ ops)" vào Report Tháng: còn MỘT report (không migration, đã commit + push `main`).**
 > User hỏi phần đó có trùng không → đo CROCS T9: 4 khối trùng nhưng RA SỐ KHÁC report (GMV −42,8% vs −22,8% cùng kỳ vì so
 > 22 ngày với trọn T8; campaign đoán từ tiêu đề phòng vs lịch camp; Seller LIVE 6,9B vs LIVE agency 5,89B; SKU #1 462,9M vs 490,9M
@@ -1047,7 +1082,12 @@ Bảng/hàm: `session_live_snapshots` + `session_live_snapshot_rows`, RPC `apply
   `.replace(` của bộ đọc file TikTok, bỏ tên voucher kiểu "Voucher 50k"). "đ%" ở Report Tháng là "điểm %", không phải tiền.
   Prompt Gemini (`src/server/createApp.ts`) ví dụ `predictedGmv` cũng theo kiểu "150M – 190M".
 
-- **Report Tháng là nơi DUY NHẤT nói về số một tháng của brand (2026-09-27).** Phân tích mới cho tháng thì thêm vào
+- **Run-rate chỉ tính bằng `planRunRate` (2026-09-28, user chốt).** Target = Σ target ca của Kế Hoạch Tháng đã chốt (plan ban đầu,
+  không chia lại khi lịch đổi); ca kế hoạch huỷ/mất shift_slot GIỮ target; ca ngoài plan cộng thực đạt, target = 0. Màn mới cần run-rate
+  gọi hàm này (hoặc `monthRunRateFromPlan`), không tự cộng target ca.
+
+- **Report Tháng là nơi DUY NHẤT nói về số một tháng của brand SAU khi hết tháng (2026-09-27; sửa 2026-09-28: Dashboard brand là màn
+  TRONG tháng, dùng chung hàm với report).** Phân tích mới cho tháng thì thêm vào
   1 trong 7 phần của `MonthlyReportTabs`, đọc từ bản chụp (thêm piece/trường + tăng `PIECE_VERSION` nếu cần) và so cùng kỳ
   `cmp` — không dựng khối/trang riêng tự tải Dữ Liệu Gốc với nguồn/kỳ so riêng (Phân tích sâu cũ ra GMV −42,8% ngay dưới
   report ghi −22,8%).
@@ -1935,6 +1975,77 @@ nào); nhánh fallback file Creator-Live-Performance (CROCS mọi tháng đều 
 **Giai đoạn tiếp theo gợi ý (user chưa chọn):** (1) ~~Tab 05 Phân Tích Sâu vẫn ~11 MB/lần mở~~ — đã gộp vào
 report và xoá 2026-09-27, phần giữ lại đọc từ bản chụp; (2) Report Tuần vẫn tính trực tiếp; (3) so MoM
 cùng số ngày khi tháng chưa hết (T9 22 ngày vs T8 31 ngày đang ra −40%) — đã nêu với user, chưa làm.
+
+## Dashboard trong Brand Workspace — BUILD + VERIFY 2026-09-28 (không migration, CHƯA commit)
+
+User yêu cầu: mỗi brand ws có 1 module dashboard — tổng quan hiệu suất tháng + phân tích + đề xuất tối ưu vận hành; sau đó thêm
+run-rate (tháng / 3 loại campaign / từng ca). Đề xuất + bản mẫu số thật: https://claude.ai/artifact/5PxKjwfidrdigw6Xxkcuhe.
+
+**Định vị:** Dashboard = TRONG tháng, cho ops (tháng này tới đâu, vì sao, tuần tới/tháng sau sửa gì). Report Tháng vẫn = bản chụp SAU
+tháng gửi brand. Hai màn dùng CHUNG hàm (`compareWindow`, `driverBreakdown`, `controlGroup` tách ngày thường/camp, `hostReliability`,
+`planRunRate`) — quy ước "Report Tháng là nơi DUY NHẤT…" đã sửa theo (xem Quy ước kỹ thuật).
+
+**Đã build:**
+- [`src/lib/performance/planRunRate.ts`](src/lib/performance/planRunRate.ts) — run-rate DUY NHẤT theo luật dưới; trả tháng / 4 khung /
+  từng ca kế hoạch / ca ngoài plan / target & thực đạt theo ngày. Nối ca kế hoạch → ca thật qua shift_slot; ca kế hoạch mất shift_slot
+  (slot_id null — lỗi E2E #1) vẫn giữ target và khớp lại ca thật theo ngày + giờ. Test [`tests/planRunRate.test.ts`](tests/planRunRate.test.ts)
+  (7, gồm đúng ví dụ user duyệt 400/270/80 ⇒ 88% và khớp `monthOutlook` của Bản Tin CEO).
+- [`src/lib/performance/slotInsights.ts`](src/lib/performance/slotInsights.ts) — `slotBlock`/`slotIndex` (bootstrap hạt giống cố định),
+  `walkForward`, `slotRuleReliable`, `campWindows`/`campPositions`/`campRuleReliable`, `weeklySeries` (cảnh báo tuần), `targetWeightModel`/
+  `targetWeights` (chia target ca), `planCheck` (soát kế hoạch). Test [`tests/slotInsights.test.ts`](tests/slotInsights.test.ts) (11).
+- [`src/components/brand-workspace/BrandDashboard.tsx`](src/components/brand-workspace/BrandDashboard.tsx) — tab `brand_dashboard` (đầu
+  BRAND_NAV_GROUPS, slug `dashboard`). Khối: độ tươi dữ liệu (ops) · KPI 8 chỉ số so cùng kỳ · run-rate 3 tầng (4 ô, đường luỹ kế thực
+  đạt vs target plan, bảng khung, bảng từng ca lọc được) · vì sao + nhóm đối chứng (ops) · GMV/giờ theo tuần · đề xuất (ops) · soát kế
+  hoạch tháng sau (ops, chỉ cảnh báo) · host có CI (ops) · phương án bù + benchmark ca sắp live (ops, chỉ tháng hiện tại).
+  **Role brand = bản rút gọn:** KPI, run-rate, nhịp tuần; tháng CHƯA phát hành bị che số (0107) ⇒ màn nói "số hiện khi ops phát hành"
+  và mặc định mở tháng đã phát hành gần nhất.
+- **Gộp Hỗ Trợ Vận Hành:** [`OpsSupport.tsx`](src/components/OpsSupport.tsx) giờ là panel nhúng (props brandId/month cố định), chỉ còn
+  phương án bù + benchmark; bỏ tab agency `ops_support` + slug `/ho-tro-van-hanh` (tên vẫn giữ ở `tabLabels` cho Lượt Mở Tab cũ). Vá lỗi
+  E2E #4: phương án B tách "hết ca" khỏi "chưa có GMV/giờ để dự báo".
+- **Report Tháng + Report Tuần:** tháng có Kế Hoạch Tháng đã chốt ⇒ `monthRunRateFromPlan(planRunRate(...))`
+  ([sessionsLivePerf.ts](src/lib/report/sessionsLivePerf.ts)); chưa chốt thì rơi về `monthRunRate` cũ. Nhãn "Run-rate ca đã xong" → "Run-rate".
+- **Kế Hoạch Tháng:** `allocateDraftTargets(drafts, total, weights, forecasts)` — trọng số = `targetWeights` (giờ × GMV/giờ loại ngày 3
+  tháng gần nhất × chỉ số khung giờ ngày thường × vị trí ngày Mid-Month/Pay Day, mỗi phần chỉ bật khi qua ngưỡng tin cậy); brand < 2
+  tháng lịch sử ⇒ dự báo engine như cũ. `expectedGmv` ("dự báo", cờ "target cao") vẫn là của engine. Nút đổi tên "Chia lại target".
+- `METRIC.runRate = "Run-rate"` + hint trong [metricGlossary.ts](src/lib/metricGlossary.ts).
+
+**Verify 2026-09-28:** tsc sạch · eslint 0 lỗi · vitest 145/145 · vite build (chunk BrandDashboard 53 KB) · browser dev (admin, không
+nhập mật khẩu): CROCS Dashboard ra đúng số bản mẫu (GMV −18,4%, 11–13h 0,79 [0,74–0,85], 19–20h 1,09, walk-forward −29%, ngày 1 camp
+1,38× 7/7, T10 nháp 4,52B −17,7%, 2 đợt ngược target, tuần 14/09 −38% đỏ); VERA (plan test T9 đã chốt): ca huỷ giữ 85,3M trong target
+100M; Kế Hoạch Tháng CROCS T10 bấm "Chia lại target" (KHÔNG lưu): tổng 5,5B, ca 11h 55,2M vs 20h 76,2M, MM ngày 1 90,1M vs ngày 3
+53,9M/ca; Report Tháng CROCS mở bình thường, 0 request lỗi từ các màn mới. Lỗi bắt được lúc verify và đã sửa: tuần đầu biểu đồ tô đỏ
+sai (điều kiện "thấp nhất từ trước" khi chưa đủ 8 tuần) + test chặn.
+
+**Chưa verify:** góc nhìn role `brand` bằng tài khoản thật (chưa có account brand) · run-rate trên plan chốt có số thật (chưa brand nào
+chốt plan tháng có ca chạy) · lưu một plan chia theo cách mới.
+
+**Còn liên quan, chưa sửa:** Bản Tin CEO (`monthTargetOf`/`fetchLockedPlanTargets`) vẫn lọc `slot_id is not null` ⇒ lỗi E2E #1 còn ở
+màn CEO (Dashboard brand/Report đã đúng); lỗi E2E #2/#3/#5/#6/#7 chưa đụng.
+
+**LUẬT RUN-RATE — USER ĐÃ CHỐT 2026-09-28 (đừng đổi):**
+- Target = **tổng target các ca đã phân bổ trong plan ban đầu** (Kế Hoạch Tháng đã chốt, `brand_month_plan_slots.target_gmv`), không
+  chia lại theo khung, không phân bổ lại khi lịch đổi.
+- Target tới nay = Σ target ca kế hoạch có ngày ≤ ngày cuối có số. Run-rate = Σ thực đạt ÷ target tới nay. Cùng luật cho tháng,
+  từng khung (D-Day / Mid-Month / Pay Day / ngày thường — Σ target plan của ca thuộc khung) và từng ca (thực đạt ÷ target ca trong plan).
+- **Ca kế hoạch bị huỷ: GIỮ target trong mẫu số** (bỏ đi thì huỷ ca làm run-rate đẹp lên).
+- **Ca mở thêm ngoài plan: cộng thực đạt, target = 0**, hiện nhãn "ngoài kế hoạch" (cho target mới thì thêm ca bù lại làm run-rate xấu đi).
+- Tên theo glossary: "Run-rate" = tiến độ tới ngày có số; ca đã xong hiển thị "% Target ca". Ngưỡng 95% / 85% như `RUN_RATE_WARN/BAD`.
+- **Hệ quả phải sửa khi code:** `trackMonth` (lib/opsSupport.ts, Hỗ Trợ Vận Hành) hiện BỎ target ca `cancelled` khỏi mẫu số → sửa theo
+  luật trên. Kiểm lại `monthTargetOf` (locked_plan) và `applyAllocatedTargets` (ca huỷ dồn target sang ca khác — đó là target hiển
+  thị của ca, KHÔNG dùng làm mẫu số run-rate) để các màn không nói hai số.
+
+**Số đo 28/09 (CROCS, kiểm lại trước khi dùng):** walk-forward khung giờ giảm sai số 30% (11–13h = 0,79 [0,74–0,85] 4/4 tháng; 19–20h =
+1,09 [1,01–1,20]); ngày 1 đợt Mid-Month/Pay Day = 1,38× (7/7), ngày 3 = 0,82× (7/7); thứ trong tuần TRƯỢT (+8% sai số); hạng host
+theo tháng TRƯỢT (Spearman −0,04); dự phóng không cần lịch (giờ/ngày × GMV/giờ 28 ngày) lệch −7,7%…+6,7%. Bản nháp KH T10 CROCS:
+5,5B/225h cần 24,4M/giờ vs 19,6M/giờ 28 ngày ⇒ ≈4,52B (−18%); target ngày 1 MM/PD < ngày 3 (ngược lịch sử); target ngày thường gần
+đều theo giờ mọi khung (23,6–24,8M/giờ) ⇒ ca 11–13h dễ đỏ vì khung (T9: 7/7 ca dưới 85%); chia theo chỉ số khung thu hẹp chênh
+11–13h vs 19–20h: T7 35→14, T8 66→38, T9 21→0 điểm. Nhóm đối chứng PHẢI tách ngày thường/camp (gộp ra kết luận ngược: shop −36%
+vì D-Day T8 phi-live rất lớn).
+
+**User chốt thêm 2026-09-28:** (1) người xem = **ops bản đầy đủ + brand bản rút gọn** (brand không thấy đề xuất nội bộ, soát kế
+hoạch, nhóm đối chứng từ Dữ Liệu Gốc, độ tươi dữ liệu); (2) khối soát kế hoạch **chỉ cảnh báo** + nút mở Kế Hoạch Tháng, không ghi;
+(3) target ca khi lập Kế Hoạch Tháng **chia theo chỉ số khung** (tổng giữ nguyên) — đổi cách chia nháp; (4) **gộp Hỗ Trợ Vận Hành vào
+Dashboard brand ngay** (bỏ tab agency `ops_support`).
 
 ## Gộp Phân tích sâu vào Report Tháng — XONG + VERIFY 2026-09-27 (không migration, đã commit + push `main`)
 

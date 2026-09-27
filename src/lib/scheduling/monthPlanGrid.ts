@@ -76,9 +76,12 @@ export function mergeFromTemplates(
   return { next: [...drafts, ...added], added: added.length };
 }
 
-// Chia target tổng xuống từng ca theo trọng số (dự báo engine; không có lịch sử thì theo giờ) — một
-// công thức duy nhất cho cả lưới ops tự vẽ lẫn lưới engine gợi ý. Ca cuối nhận phần dư làm tròn.
-export function allocateDraftTargets(drafts: PlanDraftSlot[], targetTotal: number, weights: number[]): PlanDraftSlot[] {
+// Chia target tổng xuống từng ca theo trọng số — một công thức duy nhất cho cả lưới ops tự vẽ lẫn lưới
+// engine gợi ý. Ca cuối nhận phần dư làm tròn. Trọng số từ 2026-09-28 (user chốt): giờ × GMV/giờ loại
+// ngày × chỉ số khung giờ / vị trí ngày camp (`targetWeights`, slotInsights.ts) khi brand đủ 2 tháng
+// lịch sử; chưa đủ thì dự báo engine; không có gì thì theo giờ. `forecasts` (dự báo engine) chỉ để
+// ghi `expectedGmv` — cột "dự báo" và cờ "target cao" của từng ca vẫn là của engine.
+export function allocateDraftTargets(drafts: PlanDraftSlot[], targetTotal: number, weights: number[], forecasts: number[] = weights): PlanDraftSlot[] {
   const w = weights.some((x) => x > 0) ? weights : drafts.map(slotHours);
   const sum = w.reduce((a, b) => a + b, 0);
   if (sum <= 0 || targetTotal <= 0) return drafts.map((d) => ({ ...d, targetGmv: 0 }));
@@ -86,7 +89,7 @@ export function allocateDraftTargets(drafts: PlanDraftSlot[], targetTotal: numbe
   return drafts.map((d, i) => {
     const t = i === drafts.length - 1 ? Math.round(targetTotal - assigned) : Math.round((targetTotal * w[i]) / sum);
     assigned += t;
-    return { ...d, targetGmv: t, expectedGmv: weights[i] > 0 ? Math.round(weights[i]) : d.expectedGmv };
+    return { ...d, targetGmv: t, expectedGmv: forecasts[i] > 0 ? Math.round(forecasts[i]) : d.expectedGmv };
   });
 }
 

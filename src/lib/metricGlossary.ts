@@ -23,6 +23,7 @@ export const METRIC = {
   kpiGmv: "KPI GMV", // KPI cả shop brand giao
   targetGmv: "Target GMV", // target GMV live
   pctTarget: "% Target",
+  runRate: "Run-rate", // tiến độ: thực đạt ÷ target plan tới ngày có số (planRunRate)
   nmv: "NMV",
   orders: "Orders",
   skuOrders: "SKU orders",
@@ -84,6 +85,7 @@ export const METRIC_HINT: Record<string, string> = {
   [METRIC.kpiGmv]: "KPI GMV cả shop brand giao trong tháng",
   [METRIC.targetGmv]: "GMV mục tiêu của live trong kỳ/phiên (Kế Hoạch Tháng; affiliate: target theo creator)",
   [METRIC.pctTarget]: "Thực đạt ÷ Target",
+  [METRIC.runRate]: "Thực đạt ÷ target các ca kế hoạch có ngày ≤ ngày cuối có số (ca huỷ vẫn giữ target, ca ngoài plan target = 0)",
   [METRIC.nmv]: "Net Merchandise Value ước tính = GMV × (1 − tỷ lệ hoàn hủy)",
   [METRIC.orders]: "Số đơn hàng",
   [METRIC.skuOrders]: "Số đơn tính theo SKU (1 đơn nhiều SKU đếm nhiều lần)",

@@ -15,7 +15,6 @@ const AGENCY_TAB_SLUGS: Record<string, string> = {
   calendar: "bang-van-hanh",
   sessions: "so-ca",
   live_reconciliation: "doi-soat",
-  ops_support: "ho-tro-van-hanh",
   host_performance: "hieu-suat-host",
   brands_overview: "toan-canh-brand",
   report_publish_board: "phat-hanh-report",
@@ -34,6 +33,7 @@ const AGENCY_TAB_SLUGS: Record<string, string> = {
 };
 
 const BRAND_TAB_SLUGS: Record<string, string> = {
+  brand_dashboard: "dashboard",
   brand_calendar: "lich",
   brand_sessions: "so-ca",
   brand_skus: "sku",

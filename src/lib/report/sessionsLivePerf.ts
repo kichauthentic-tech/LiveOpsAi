@@ -1,4 +1,5 @@
 import { LiveSession } from "../../types";
+import type { PlanRunRate } from "../performance/planRunRate";
 import { CreatorLivePerfMonthSlice, CreatorLivePerfRow } from "../dataraw/creatorLivePerfSlice";
 import { DailyLivePerformance, LivePerformanceMonthSlice } from "../dataraw/monthlyDailySlice";
 
@@ -135,6 +136,28 @@ export interface MonthRunRate {
   runRate: number | null;
   projected: number;
   gap: number;
+}
+
+/**
+ * Tháng có Kế Hoạch Tháng ĐÃ CHỐT ⇒ run-rate theo plan ban đầu (planRunRate, luật user chốt 2026-09-28:
+ * ca huỷ giữ target, ca ngoài plan target = 0) — cùng một số với Dashboard brand. Chỉ tháng chưa có
+ * kế hoạch chốt mới rơi về `monthRunRate` (target đã đổ xuống ca từ Report Tháng tab 05).
+ */
+export function monthRunRateFromPlan(r: PlanRunRate): MonthRunRate | null {
+  if (r.total.target <= 0) return null;
+  const done = r.slots.filter((t) => t.state === "done").length + r.offPlan.length;
+  const projected = r.total.keepPace ?? r.total.actual;
+  return {
+    targetTotal: r.total.target,
+    doneCount: done,
+    pendingCount: r.slots.filter((t) => t.state === "pending").length,
+    actualDone: r.total.actual,
+    targetDone: r.total.targetToDate,
+    targetPending: r.total.target - r.total.targetToDate,
+    runRate: r.total.runRate,
+    projected,
+    gap: r.total.target - projected
+  };
 }
 
 export function monthRunRate(sessions: LiveSession[], brandId: string, start: string, end: string): MonthRunRate | null {

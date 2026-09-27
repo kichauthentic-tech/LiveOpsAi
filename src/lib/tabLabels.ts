@@ -9,7 +9,7 @@ export const AGENCY_TAB_LABELS: Record<string, string> = {
   calendar: "Bảng Vận Hành",
   sessions: "Sổ Ca",
   live_reconciliation: "Đối Soát Số Liệu",
-  ops_support: "Hỗ Trợ Vận Hành",
+  ops_support: "Hỗ Trợ Vận Hành", // tab đã gộp vào Dashboard brand (2026-09-28) — giữ tên để "Lượt Mở Tab" đọc được lượt cũ
   host_performance: "Hiệu Suất Host",
   brands_overview: "Toàn Cảnh Brand",
   report_publish_board: "Điều Phối Phát Hành",
@@ -32,6 +32,7 @@ export const TALENT_TAB_LABELS: Record<string, string> = {
 };
 
 export const BRAND_TAB_LABELS: Record<string, string> = {
+  brand_dashboard: "Dashboard",
   brand_calendar: "Lịch Vận Hành",
   brand_sessions: "Sổ Ca",
   brand_skus: "SKU Showcase",

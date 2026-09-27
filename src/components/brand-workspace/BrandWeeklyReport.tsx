@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { LiveSession, ShiftSlot, UserRole } from "../../types";
+import { BrandMonthPlan, BrandMonthPlanSlot, LiveSession, ShiftSlot, UserRole } from "../../types";
 import { AlertTriangle, CalendarRange, ChevronLeft, ChevronRight, ClipboardList, Database, Download, Loader2, Radio, TrendingDown, TrendingUp, Users } from "lucide-react";
 import { fmtVndShort } from "../../lib/format";
 import { metricHint } from "../../lib/metricGlossary";
@@ -9,7 +9,9 @@ import { errorMessage } from "../../lib/errorMessage";
 import { DataRawWeekSlice, addDays, eachDay, fetchDataRawWeekSlice, isoWeekNumber, isoWeekStart } from "../../lib/dataraw/weeklySlice";
 import { getTodayDate } from "../../lib/dateUtils";
 import { byHost, filterSessions, sessionHours, splitUnassignedHost } from "../../lib/performance/hostPerformance";
-import { hasLiveNumbers, monthRunRate } from "../../lib/report/sessionsLivePerf";
+import { hasLiveNumbers, monthRunRate, monthRunRateFromPlan } from "../../lib/report/sessionsLivePerf";
+import { planRunRate } from "../../lib/performance/planRunRate";
+import { fetchMonthPlan } from "../../lib/db/monthPlans";
 import { MissingStep, missingSteps } from "../../lib/sessionLedger";
 import { DataSourceBadge } from "../common/DataSourceBadge";
 
@@ -123,12 +125,26 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
   const wow = (a: number, b: number) => (b > 0 ? a / b - 1 : null);
 
   // Run-rate tháng-tới-nay của tháng chứa cuối tuần đang xem.
+  // Tháng có Kế Hoạch Tháng đã chốt ⇒ theo plan ban đầu (planRunRate, cùng số với Dashboard brand).
   const monthKey = weekEnd.slice(0, 7);
+  const [monthPlan, setMonthPlan] = useState<{ plan: BrandMonthPlan; slots: BrandMonthPlanSlot[] } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetchMonthPlan(brandId, monthKey)
+      .then((p) => alive && setMonthPlan(p))
+      .catch(() => alive && setMonthPlan(null));
+    return () => {
+      alive = false;
+    };
+  }, [brandId, monthKey]);
   const monthRr = useMemo(() => {
+    if (monthPlan?.plan.status === "locked" && monthPlan.plan.month === monthKey) {
+      return monthRunRateFromPlan(planRunRate(monthKey, monthPlan.slots, shiftSlots ?? [], sessions.filter((s) => s.brandId === brandId), getTodayDate(), monthPlan.plan.campRanges));
+    }
     const [y, m] = monthKey.split("-").map(Number);
     const last = new Date(y, m, 0).getDate();
     return monthRunRate(sessions, brandId, `${monthKey}-01`, `${monthKey}-${String(last).padStart(2, "0")}`);
-  }, [sessions, brandId, monthKey]);
+  }, [monthPlan, sessions, brandId, monthKey, shiftSlots]);
 
   const days = useMemo(() => eachDay(weekStart, weekEnd), [weekStart, weekEnd]);
   const dailyRows = useMemo(

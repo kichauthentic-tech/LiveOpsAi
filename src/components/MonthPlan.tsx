@@ -8,6 +8,7 @@ import { PlanEvaluation, buildCalibration, evaluatePlan } from "../lib/schedulin
 import { todayVn } from "../lib/performance/brandCommitment";
 import { useDefaultBrand } from "../hooks/useDefaultBrand";
 import { CAMPAIGN_DAY_STYLES, resolveCampBucketType } from "../lib/campaignDays";
+import { targetWeightModel, targetWeights } from "../lib/performance/slotInsights";
 import {
   PlanDraftSlot,
   allocateDraftTargets,
@@ -210,6 +211,15 @@ export default function MonthPlan({
   const engineHistory = coldStart && borrowedHistory ? borrowedHistory : history;
 
   const estimateCtx = useMemo(() => ({ camp: campRanges, events, schemes: brandSchemes, calibration: calibration?.factors }), [campRanges, events, brandSchemes, calibration]);
+  // Chia target ca theo chỉ số khung giờ + vị trí ngày camp (user chốt 2026-09-28): ca 11–13h lịch sử
+  // chỉ đạt ~0,8 lần mặt bằng mà nhận target ngang ca 19–20h thì % Target đỏ vì KHUNG, không vì host.
+  // null khi brand chưa đủ 2 tháng lịch sử ⇒ vẫn chia theo dự báo engine như trước.
+  const weightModel = useMemo(
+    () => targetWeightModel(sessions.filter((s) => s.brandId === brandId), month, (d) => resolveCampBucketType(d, campRanges)),
+    [sessions, brandId, month, campRanges]
+  );
+  const allocationWeights = (next: PlanDraftSlot[], forecasts: number[]) =>
+    weightModel ? targetWeights(next, weightModel, (d) => resolveCampBucketType(d, campRanges)) : forecasts;
   // Target đi theo lưới (user chốt 2026-09-21): ở giai đoạn NHÁP, mọi thay đổi cấu trúc (thêm/bỏ/dời
   // ca, đổi giờ, cấm ngày, nạp quy tắc) → chia lại target tháng theo dự báo mới của cả lưới, không
   // chờ bấm "Chia target theo dự báo". Sau khi CHỐT, target/ca là số cam kết với brand/host — không
@@ -219,7 +229,7 @@ export default function MonthPlan({
     if (next.length === 0) return next;
     const w = estimateSlots(engineHistory, next, ctx);
     const flag = (d: PlanDraftSlot) => ({ ...d, highExpectation: d.expectedGmv ? d.targetGmv > d.expectedGmv * engineParams.highExpectationRatio : d.highExpectation });
-    if (!locked && target > 0) return allocateDraftTargets(next, target, w).map(flag);
+    if (!locked && target > 0) return allocateDraftTargets(next, target, allocationWeights(next, w), w).map(flag);
     return next.map((d, i) => flag({
       ...d,
       expectedGmv: w[i] > 0 ? Math.round(w[i]) : d.expectedGmv,
@@ -287,9 +297,15 @@ export default function MonthPlan({
     }
     const weights = estimateSlots(engineHistory, drafts, estimateCtx);
     const byForecast = weights.some((w) => w > 0);
-    setDrafts(allocateDraftTargets(drafts, targetTotal, weights));
+    setDrafts(allocateDraftTargets(drafts, targetTotal, allocationWeights(drafts, weights), weights));
     setDirty(true);
-    setMsg(byForecast ? `Đã chia ${fmtVndShort(targetTotal)} theo dự báo từng ca (${history.sessions} ca lịch sử).` : `Brand chưa có lịch sử đối soát — đã chia ${fmtVndShort(targetTotal)} đều theo giờ.`);
+    setMsg(
+      weightModel
+        ? `Đã chia ${fmtVndShort(targetTotal)} theo giờ × GMV/giờ từng loại ngày${weightModel.useSlot ? " × chỉ số khung giờ" : ""}${weightModel.useCamp ? " × vị trí ngày trong đợt Mid-Month/Pay Day" : ""} (lịch sử các tháng trước).`
+        : byForecast
+          ? `Đã chia ${fmtVndShort(targetTotal)} theo dự báo từng ca (${history.sessions} ca lịch sử).`
+          : `Brand chưa có lịch sử đối soát — đã chia ${fmtVndShort(targetTotal)} đều theo giờ.`
+    );
   };
   // Đổ gợi ý vào lưới. Ngày camp có thể nhiều ca hơn trần ops đặt (engine nới theo giờ/ngày lịch sử) —
   // nâng trần kế hoạch theo, không thì validateDrafts chặn lưu chính cái gợi ý vừa áp.
@@ -614,7 +630,7 @@ export default function MonthPlan({
             <button onClick={() => suggest("hours")} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] border border-[var(--accent)]/60 text-xs font-bold text-[var(--accent-text)] flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" /> Gợi ý phân bổ</button>
             <button onClick={() => suggest("target")} disabled={targetTotal <= 0} title={targetTotal <= 0 ? "Nhập Target GMV tháng trước" : "Xếp tới khi dự báo chạm target"} className="px-3 py-1.5 rounded-lg border border-[var(--accent)]/40 text-xs font-bold text-[var(--accent-text)] disabled:opacity-40 flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" /> Xếp theo target</button>
             <button onClick={loadTemplates} className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-xs font-bold text-[var(--text)] hover:border-[var(--accent)]">Nạp từ quy tắc</button>
-            <button onClick={allocate} className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-xs font-bold text-[var(--text)] hover:border-[var(--accent)] flex items-center gap-1.5"><Wand2 className="w-3.5 h-3.5" /> Chia target theo dự báo</button>
+            <button onClick={allocate} className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-xs font-bold text-[var(--text)] hover:border-[var(--accent)] flex items-center gap-1.5"><Wand2 className="w-3.5 h-3.5" /> Chia lại target</button>
             <button onClick={clearAll} disabled={drafts.length === 0} className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-xs font-bold text-rose-400 disabled:opacity-40">Xoá hết</button>
           </>
         )}
