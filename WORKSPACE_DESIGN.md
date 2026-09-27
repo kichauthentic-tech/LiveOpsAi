@@ -45,8 +45,8 @@
 > mở app sau giờ kết thúc → up file Creator-Live-Performance (15M) → Nhập report → Đối Soát (18,2M, `tiktok_reconciled`) →
 > Sổ Ca / Toàn Cảnh Brand / Hiệu Suất Host (39,4M/giờ = 18,2M ÷ 27,7 phút) / Report Tháng → Phát hành → Điều Phối Phát Hành.
 > Nhánh huỷ ca (Cancelled + lý do, ca chờ đăng ký mở lại) và xoá ca chờ đăng ký cũng chạy đúng. Lỗi, xếp theo độ nặng:
-> 1. ~~**NẶNG — xoá ca kế hoạch ở Nhân sự ca làm target tháng tụt âm thầm.**~~ **ĐÃ SỬA 2026-09-28 (sau Dashboard brand, chưa
->    commit):** `fetchLockedPlanTargets` bỏ lọc `slot_id is not null`, phần gộp tách ra hàm thuần `lockedPlanTargetsFromRows`
+> 1. ~~**NẶNG — xoá ca kế hoạch ở Nhân sự ca làm target tháng tụt âm thầm.**~~ **ĐÃ SỬA 2026-09-28 (commit f46fddb,
+>    đã push `main`):** `fetchLockedPlanTargets` bỏ lọc `slot_id is not null`, phần gộp tách ra hàm thuần `lockedPlanTargetsFromRows`
 >    ([lockedPlanTargets.ts](src/lib/scheduling/lockedPlanTargets.ts)) + `slotTargets` theo ngày cho Bản Tin CEO (thôi suy qua
 >    shift_slots đang tồn tại); `fetchBrandLockedPlanSlots` cũng bỏ lọc (evaluatePlan xếp ca mất liên kết vào "unlinked"). Test
 >    `tests/lockedPlanTargets.test.ts` dựng đúng ca VERA T9 (100M, 1 ca mất slot) ⇒ tổng 100M, % đạt trên 100M. Dữ liệu dọn E2E đã
