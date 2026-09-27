@@ -62,7 +62,8 @@ interface CeoBriefProps {
   brands: Brand[];
   talents: Talent[];
   shiftSlots: ShiftSlot[];
-  planTargetsBySlotId: Map<string, number>;
+  /** "brandId|YYYY-MM" → target từng ca của Kế Hoạch Tháng đã chốt, gồm cả ca đã mất shift_slot (lỗi E2E #1). */
+  planSlotTargets: Map<string, { date: string; target: number }[]>;
   planMonthTotals: Map<string, number>;
   monthlyReports: Map<string, BrandMonthlyReport>;
   financeRecords: SessionFinance[];
@@ -176,7 +177,7 @@ function useTooltip() {
 }
 
 export default function CeoBrief(props: CeoBriefProps) {
-  const { sessions, brands, talents, shiftSlots, planTargetsBySlotId, planMonthTotals, monthlyReports, financeRecords, brandPlatformRates, brandPlatformRateHistory, talentRateHistory, currentRole, onNavigate } = props;
+  const { sessions, brands, talents, shiftSlots, planSlotTargets, planMonthTotals, monthlyReports, financeRecords, brandPlatformRates, brandPlatformRateHistory, talentRateHistory, currentRole, onNavigate } = props;
   const today = todayVn();
   const canSeeMoney = currentRole === "ceo" || currentRole === "admin";
   const [grain, setGrain] = useState<Grain>("month");
@@ -242,16 +243,14 @@ export default function CeoBrief(props: CeoBriefProps) {
       const plan = plans.get(b.id);
       const reportPlan = buildMonthTargetPlan(b.id, month, monthlyReports);
       const camp: CampOverrides | undefined = plan && Object.keys(plan.campRanges ?? {}).length > 0 ? plan.campRanges : reportPlan?.camp;
-      const lockedSlotTargets = shiftSlots
-        .filter((sl) => sl.brandId === b.id && sl.date.startsWith(month) && planTargetsBySlotId.has(sl.id))
-        .map((sl) => ({ date: sl.date, target: planTargetsBySlotId.get(sl.id)! }));
+      const lockedSlotTargets = planSlotTargets.get(`${b.id}|${month}`) ?? [];
       const target = monthTargetOf(month, planMonthTotals.get(`${b.id}|${month}`), lockedSlotTargets, reportPlan, camp);
       const brandSessions = sessions.filter((s) => s.brandId === b.id);
       const open = shiftSlots.filter((sl) => sl.brandId === b.id && sl.status === "open" && !sl.sessionId);
       out.set(b.id, monthOutlook(month, today, brandSessions, open, target, camp));
     }
     return out;
-  }, [brands, plans, month, monthlyReports, shiftSlots, planTargetsBySlotId, planMonthTotals, sessions, today]);
+  }, [brands, plans, month, monthlyReports, shiftSlots, planSlotTargets, planMonthTotals, sessions, today]);
   const scopeOutlook = useMemo(() => combineOutlooks(month, today, scopeIds.map((id) => outlooks.get(id)!).filter(Boolean)), [month, today, scopeIds, outlooks]);
 
   const issues = useMemo(

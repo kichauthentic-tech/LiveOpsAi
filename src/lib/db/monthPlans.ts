@@ -1,4 +1,5 @@
 import { supabase } from "../supabaseClient";
+import { LockedPlanRow, LockedPlanTargets, lockedPlanTargetsFromRows } from "../scheduling/lockedPlanTargets";
 import { BrandMonthPlan, BrandMonthPlanSlot, CalendarEventRow, PlanCampRanges } from "../../types";
 
 // Kế Hoạch Tháng (0090). Bảng nhỏ (1 dòng plan + ≤ ~100 ca/brand/tháng) — đọc theo brand+tháng,
@@ -182,39 +183,18 @@ export async function lockMonthPlan(planId: string): Promise<LockPlanResult> {
   return data as LockPlanResult;
 }
 
-export interface LockedPlanTargets {
-  // shift_slot id → target/ca. App nối shift_slots.session_id → live_sessions để đổ xuống ca thật.
-  bySlotId: Map<string, number>;
-  // "brandId|YYYY-MM" → TỔNG target đã chốt của tháng đó (Σ mọi ca kế hoạch, kể cả ca CHƯA chốt
-  // người nên chưa có live_session). Đ5 (2026-09-24): thiếu con số này thì mọi chỗ hỏi "target
-  // tháng bao nhiêu" phải cộng ngược từ các ca đang tồn tại, và tổng đó TỤT mỗi khi còn ca kế
-  // hoạch chưa xếp người — Report Tháng vì thế báo 145% target trong khi thực tế mới đạt 72,5%.
-  monthTotals: Map<string, number>;
-}
+export type { LockedPlanTargets };
 
 // Target/ca của mọi kế hoạch ĐÃ CHỐT. Bảng nhỏ, đọc 1 lần + sau mỗi lần chốt.
 // RLS lọc sẵn theo brand với role `brand` (0105), nên map trả về của họ chỉ có brand của họ.
+// KHÔNG lọc `slot_id is not null` — xem lỗi E2E #1 ở lib/scheduling/lockedPlanTargets.ts.
 export async function fetchLockedPlanTargets(): Promise<LockedPlanTargets> {
   const { data, error } = await supabase
     .from("brand_month_plan_slots")
     .select("slot_id,target_gmv,date,plan:brand_month_plans!inner(status,brand_id)")
-    .eq("plan.status", "locked")
-    .not("slot_id", "is", null);
+    .eq("plan.status", "locked");
   if (error) throw error;
-  const bySlotId = new Map<string, number>();
-  const monthTotals = new Map<string, number>();
-  type Row = { slot_id: string | null; target_gmv: number; date: string; plan: { brand_id: string } | { brand_id: string }[] };
-  for (const r of (data as Row[]) ?? []) {
-    const target = Number(r.target_gmv) || 0;
-    if (r.slot_id) bySlotId.set(r.slot_id, target);
-    // PostgREST trả quan hệ !inner ra object hay mảng 1 phần tử tuỳ cách suy khoá — nhận cả hai
-    // thay vì cược vào một dạng (đoán sai thì brand_id ra undefined và tổng tháng âm thầm về 0).
-    const brandId = Array.isArray(r.plan) ? r.plan[0]?.brand_id : r.plan?.brand_id;
-    if (!brandId || !r.date) continue;
-    const key = `${brandId}|${r.date.slice(0, 7)}`;
-    monthTotals.set(key, (monthTotals.get(key) ?? 0) + target);
-  }
-  return { bySlotId, monthTotals };
+  return lockedPlanTargetsFromRows((data as LockedPlanRow[]) ?? []);
 }
 
 export interface DeletePlanResult {
@@ -251,13 +231,14 @@ export async function confirmMonthPlan(planId: string): Promise<BrandMonthPlan> 
   return planFromDb(data as DbPlan);
 }
 
+// Mọi ca kế hoạch của các plan ĐÃ CHỐT của brand — gồm cả ca đã mất shift_slot (lỗi E2E #1): evaluatePlan
+// xếp chúng vào "unlinked" thay vì để target biến khỏi bảng "Kế hoạch vs thực tế".
 export async function fetchBrandLockedPlanSlots(brandId: string): Promise<BrandMonthPlanSlot[]> {
   const { data, error } = await supabase
     .from("brand_month_plan_slots")
     .select("*,plan:brand_month_plans!inner(status,brand_id)")
     .eq("plan.status", "locked")
     .eq("plan.brand_id", brandId)
-    .not("slot_id", "is", null)
     .order("date");
   if (error) throw error;
   return ((data as DbPlanSlot[]) ?? []).map(slotFromDb);

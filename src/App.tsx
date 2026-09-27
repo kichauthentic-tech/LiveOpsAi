@@ -317,6 +317,7 @@ export default function App() {
   // cam kết bao nhiêu", KHÔNG cộng ngược từ targetGmv của các ca đang tồn tại — ca kế hoạch chưa
   // chốt người thì chưa có live_session, cộng ngược sẽ ra thiếu.
   const [planMonthTotals, setPlanMonthTotals] = useState<Map<string, number>>(new Map());
+  const [planSlotTargets, setPlanSlotTargets] = useState<Map<string, { date: string; target: number }[]>>(new Map());
   // Tham số engine Kế Hoạch Tháng (0095) — nạp cùng Phase 14; lỗi thì dùng mặc định, không chặn app.
   const [engineParams, setEngineParams] = useState<EngineParams>(DEFAULT_ENGINE_PARAMS);
   const [engineParamsUpdatedAt, setEngineParamsUpdatedAt] = useState<string | null>(null);
@@ -539,7 +540,7 @@ export default function App() {
         .catch((e) => { if (!cancelled) setEngineParamsError(`Không tải được tham số engine (dùng mặc định): ${errorMessage(e)}`); })
         .finally(() => { if (!cancelled) setEngineParamsLoading(false); });
     }
-    Promise.all([fetchBrandPlatformRates(), fetchShiftSlots(), fetchShiftRegistrations(), fetchRecurringShiftTemplates(), fetchLockedPlanTargets().catch(() => ({ bySlotId: new Map<string, number>(), monthTotals: new Map<string, number>() })), fetchBrandStudios().catch(() => [] as BrandStudio[])])
+    Promise.all([fetchBrandPlatformRates(), fetchShiftSlots(), fetchShiftRegistrations(), fetchRecurringShiftTemplates(), fetchLockedPlanTargets().catch(() => ({ bySlotId: new Map<string, number>(), monthTotals: new Map<string, number>(), slotTargets: new Map<string, { date: string; target: number }[]>() })), fetchBrandStudios().catch(() => [] as BrandStudio[])])
       .then(([rates, slots, regs, templates, planTargets, bStudios]) => {
         if (cancelled) return;
         setBrandPlatformRates(rates);
@@ -549,6 +550,7 @@ export default function App() {
         setRecurringShiftTemplates(templates);
         setPlanTargetsBySlotId(planTargets.bySlotId);
         setPlanMonthTotals(planTargets.monthTotals);
+        setPlanSlotTargets(planTargets.slotTargets);
         setPhase14Error(null);
       })
       .catch((err) => {
@@ -1352,6 +1354,7 @@ export default function App() {
       setShiftSlots(slots);
       setPlanTargetsBySlotId(planTargets.bySlotId);
       setPlanMonthTotals(planTargets.monthTotals);
+      setPlanSlotTargets(planTargets.slotTargets);
     } catch (e) {
       showToast(`Không nạp lại được danh sách ca: ${errorMessage(e)}`);
     }
@@ -2386,7 +2389,7 @@ export default function App() {
                     brands={activeBrands}
                     talents={talents}
                     shiftSlots={shiftSlots}
-                    planTargetsBySlotId={planTargetsBySlotId}
+                    planSlotTargets={planSlotTargets}
                     planMonthTotals={planMonthTotals}
                     monthlyReports={monthlyReports}
                     financeRecords={financeRecords}

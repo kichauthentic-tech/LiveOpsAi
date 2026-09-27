@@ -2,6 +2,39 @@
 
 ## CẦN LÀM NGAY khi mở phiên mới (cập nhật 2026-09-24)
 
+> **MỚI 2026-09-28 (tối) — Audit "module cùng loại, logic khác nhau": 9 nhóm lệch, CHƯA sửa (user chỉ yêu cầu tìm).** Đo trên DB
+> thật (231 ca: 229 CROCS nạp bù + 1 VERA test; chưa có kế hoạch nào chốt — chỉ CROCS T10 nháp 5,5B/75 ca) + browser (admin).
+> Số tổng T9 CROCS KHỚP ở Bản Tin CEO / Toàn Cảnh Brand / Dashboard brand (3,52B · 47 ca · 177,8h · 19,8M/giờ). Lệch:
+> 1. **ĐANG LỘ — tiền:** Finance & Thu nhập talent lọc `Completed && !isBackfill` ([FinanceHr.tsx:93](src/components/FinanceHr.tsx:93),
+>    [pnl.ts:233](src/lib/pnl.ts:233)); Bản Tin CEO `financeOf` lọc `isCountable` (có ca nạp bù). T9: CEO "0/47 ca đủ dữ liệu", Finance
+>    "Không có phiên Completed nào" (câu sai — 47 ca Completed đều là nạp bù). Nhập rate xong ⇒ CEO ra tiền, Finance vẫn 0.
+> 2. **Target tháng: Σ ca kế hoạch vs ô header `plan.target_gmv`.** Bản vá E2E #1 của phiên song song (bỏ lọc `slot_id`, chưa
+>    commit lúc audit) cũng vá luôn đường "chốt kế hoạch khi tháng đã bắt đầu" (0099 bỏ ca ngày đã qua ⇒ `slot_id` null). Còn lại:
+>    header dùng ở Toàn Cảnh Brand, Kế Hoạch Tháng Sau phía brand, Report phần 7; Σ ca dùng ở Dashboard/run-rate/CEO. Sửa target
+>    từng ca / thêm ca sau chốt ([MonthPlan.tsx:236](src/components/MonthPlan.tsx:236)) ⇒ Σ ca ≠ header, MonthPlan chỉ báo "thiếu/vượt".
+> 3. **Dự phóng cuối tháng 2 công thức trên cùng trang Dashboard brand:** "Nếu giữ run-rate" = keepPace; khối Hỗ Trợ Vận Hành "Dự kiến
+>    cuối tháng" = giờ còn lại × GMV/giờ 28 ngày (`monthOutlook`, = Bản Tin CEO). "Còn N ca" của khối đó đi `trackMonth`
+>    ([opsSupport.ts:63](src/lib/opsSupport.ts:63), [:84](src/lib/opsSupport.ts:84)) — `isDone` riêng, ca kế hoạch mất shift_slot = "huỷ".
+> 4. **Report Tuần** vẫn % target kiểu cũ (GMV ÷ target ca đã có số, ca huỷ rơi khỏi mẫu số — [BrandWeeklyReport.tsx:96](src/components/brand-workspace/BrandWeeklyReport.tsx:96));
+>    bảng tuần tới ghi target 0 cho ca chờ đăng ký ([:426](src/components/brand-workspace/BrandWeeklyReport.tsx:426), tổng [:169](src/components/brand-workspace/BrandWeeklyReport.tsx:169)).
+> 5. **Report Tháng gọi `planRunRate(..., [], ...)`** ([MonthlyReportTabs.tsx:802](src/components/brand-workspace/MonthlyReportTabs.tsx:802)) — không truyền
+>    shiftSlots ⇒ đếm ca huỷ/chưa diễn ra/ngoài plan khác Dashboard (tổng tiền giống).
+> 6. **"Ca nào được tính" có 6 định nghĩa:** `hasLiveNumbers` (Report, KPI Dashboard) · `isCountable` (Host Perf, Sổ Ca, CEO,
+>    planRunRate) · `isDone` (Hỗ Trợ VH) · `Completed` (Talent Pool, Nhập Ads, Finance) · `isDelivered` (Cam kết) · planEvaluation.
+>    Khác nhau ở ca Completed có snapshot mà GMV=0/views=0 và ca Live Now có số tạm. DB thật hiện 0 ca rơi vào khe ⇒ nổ từ T10.
+>    Trong cùng 1 trang: Dashboard brand ([:88](src/components/brand-workspace/BrandDashboard.tsx:88) vs [:194](src/components/brand-workspace/BrandDashboard.tsx:194)), Report Tuần (tổng vs bảng host).
+> 7. **Giờ trong GMV/giờ:** dự phóng CEO/Hỗ Trợ VH dùng giờ KẾ HOẠCH ([ceoBrief.ts:322](src/lib/performance/ceoBrief.ts:322)), còn lại giờ live. Ca nạp bù
+>    2 giờ bằng nhau nên chưa lộ. `start==end`: pnl ra 0h, `hoursOf` ([sessionsLivePerf.ts:61](src/lib/report/sessionsLivePerf.ts:61)) /
+>    `slotHours` ([monthlyReportInsights.ts:214](src/lib/report/monthlyReportInsights.ts:214)) vẫn ra 24h (FIX L8 chưa lan).
+> 8. **Kiểm trùng lịch 4 luật, DB không chặn:** Nhân sự ca + chốt hàng loạt xét host & trợ live; popup ca chờ
+>    ([SlotDetailModal.tsx:51](src/components/scheduling/SlotDetailModal.tsx:51)) không xét trợ live; sửa ca
+>    ([SessionWindow.tsx:174](src/components/SessionWindow.tsx:174)) chỉ so `hostId`↔`hostId`, không xét trợ live, không xét ca chờ giữ
+>    phòng; kéo đổi phòng ([LiveCalendar.tsx:176](src/components/LiveCalendar.tsx:176)) không xét ca chờ giữ phòng.
+> 9. **Lịch Vận Hành phía brand, chế độ Tháng (mặc định)** ([BrandCalendar.tsx:480](src/components/brand-workspace/BrandCalendar.tsx:480)) in Studio + GMV
+>    ("0" khi tháng chưa phát hành) cho role brand, hiện cả ca huỷ nhãn "Cancelled" — các màn khác đều giấu.
+> Đề xuất thứ tự sửa: 1 → 2 (một nguồn target: Σ ca kế hoạch, header chỉ là ô nhập) → 3/4/5 (mọi màn đi `planRunRate` + 1 công thức dự
+> phóng) → 6 (một hàm "ca có số") → 8 → 9 → 7.
+
 > **MỚI 2026-09-28 — Dashboard trong từng Brand Workspace: ĐÃ BUILD + VERIFY (không migration, commit 79ac6c7 đã push `main`).** Tab đầu Brand
 > Workspace (`/brand/<slug>/dashboard`). Một hàm run-rate chung theo **plan ban đầu** (`planRunRate` — ca huỷ giữ target, ca ngoài plan
 > target = 0) cho Dashboard + Report Tháng + Report Tuần. **Hỗ Trợ Vận Hành đã gộp vào Dashboard** (tab agency `ops_support` bỏ).
@@ -12,7 +45,13 @@
 > mở app sau giờ kết thúc → up file Creator-Live-Performance (15M) → Nhập report → Đối Soát (18,2M, `tiktok_reconciled`) →
 > Sổ Ca / Toàn Cảnh Brand / Hiệu Suất Host (39,4M/giờ = 18,2M ÷ 27,7 phút) / Report Tháng → Phát hành → Điều Phối Phát Hành.
 > Nhánh huỷ ca (Cancelled + lý do, ca chờ đăng ký mở lại) và xoá ca chờ đăng ký cũng chạy đúng. Lỗi, xếp theo độ nặng:
-> 1. **NẶNG — xoá ca kế hoạch ở Nhân sự ca làm target tháng tụt âm thầm.** `shift_slots` bị xoá ⇒ `brand_month_plan_slots.slot_id`
+> 1. ~~**NẶNG — xoá ca kế hoạch ở Nhân sự ca làm target tháng tụt âm thầm.**~~ **ĐÃ SỬA 2026-09-28 (sau Dashboard brand, chưa
+>    commit):** `fetchLockedPlanTargets` bỏ lọc `slot_id is not null`, phần gộp tách ra hàm thuần `lockedPlanTargetsFromRows`
+>    ([lockedPlanTargets.ts](src/lib/scheduling/lockedPlanTargets.ts)) + `slotTargets` theo ngày cho Bản Tin CEO (thôi suy qua
+>    shift_slots đang tồn tại); `fetchBrandLockedPlanSlots` cũng bỏ lọc (evaluatePlan xếp ca mất liên kết vào "unlinked"). Test
+>    `tests/lockedPlanTargets.test.ts` dựng đúng ca VERA T9 (100M, 1 ca mất slot) ⇒ tổng 100M, % đạt trên 100M. Dữ liệu dọn E2E đã
+>    chạy + kiểm 28/09 (VERA 0 ca/0 slot/0 plan/0 report/0 bản chụp/0 thông báo shift_open; CROCS 229 ca; 1 lô đối soát).
+>    Lỗi gốc (để tra lại): `shift_slots` bị xoá ⇒ `brand_month_plan_slots.slot_id`
 >    về null (FK set null) ⇒ `fetchPlanTargets` ([monthPlans.ts:202](src/lib/db/monthPlans.ts:202)) lọc `slot_id is not null` bỏ luôn
 >    target của ca đó ⇒ Report Tháng + Dashboard: target 100M → 14,7M, "Đạt 124%". Toàn Cảnh Brand / Hỗ Trợ Vận Hành đọc thẳng kế
 >    hoạch nên vẫn 100M ⇒ 3 màn 3 số. Cùng họ với Đ5 (2026-09-24) nhưng qua đường xoá ca, Đ5 chỉ vá đường "chưa xếp người".
@@ -2019,8 +2058,7 @@ sai (điều kiện "thấp nhất từ trước" khi chưa đủ 8 tuần) + te
 **Chưa verify:** góc nhìn role `brand` bằng tài khoản thật (chưa có account brand) · run-rate trên plan chốt có số thật (chưa brand nào
 chốt plan tháng có ca chạy) · lưu một plan chia theo cách mới.
 
-**Còn liên quan, chưa sửa:** Bản Tin CEO (`monthTargetOf`/`fetchLockedPlanTargets`) vẫn lọc `slot_id is not null` ⇒ lỗi E2E #1 còn ở
-màn CEO (Dashboard brand/Report đã đúng); lỗi E2E #2/#3/#5/#6/#7 chưa đụng.
+**Còn liên quan:** lỗi E2E #1 đã sửa cho cả Bản Tin CEO + Report Tháng (xem ghi chú E2E đầu file); lỗi E2E #2/#3/#5/#6/#7 chưa đụng.
 
 **LUẬT RUN-RATE — USER ĐÃ CHỐT 2026-09-28 (đừng đổi):**
 - Target = **tổng target các ca đã phân bổ trong plan ban đầu** (Kế Hoạch Tháng đã chốt, `brand_month_plan_slots.target_gmv`), không
