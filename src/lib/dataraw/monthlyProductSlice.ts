@@ -1,7 +1,7 @@
 import { supabase } from "../supabaseClient";
 import { DataRawColumn, DataRawReportType } from "../../types";
 import { fetchRowsPaged } from "./fetchRowsPaged";
-import { readShopDays } from "./deepDiveSource";
+import { readShopDays } from "./shopAnalyticsDays";
 import { buildProductListAgg, cleanProductName, findCol, isCurrentProductAgg, num, PRODUCT_AGG_VERSION, ProductListAgg } from "./productListAgg";
 
 // Deep Dive Report Tháng — Top SKU (product_list) + Top khuyến mãi (shop_promotion). Cả 2 report
@@ -135,6 +135,8 @@ export interface SkuRankSlice {
   items: (TopSkuRow & { rank: number })[];
   /** Số SKU có GMV > 0 trong tháng. */
   sellingSkus: number;
+  /** Bao nhiêu SKU đầu bảng cộng lại đủ 80% GMV của mọi SKU (độ tập trung). undefined = bản chụp trước 2026-09-27. */
+  skusFor80Pct?: number | null;
   limit: number;
   hasAnyBatch: boolean;
   /** Kỳ file phủ trong tháng (vd 2026-09-01..2026-09-22). */
@@ -145,9 +147,20 @@ export interface SkuRankSlice {
 export function skuRankFromAgg(src: { agg: ProductListAgg; periodStart: string; periodEnd: string } | null, limit = 30): SkuRankSlice {
   const { byName, hasAnyBatch } = skuPerfFromAgg(src?.agg ?? null);
   const selling = Array.from(byName.values()).filter((r) => r.gmv > 0).sort((a, b) => b.gmv - a.gmv);
+  const total = selling.reduce((a, r) => a + r.gmv, 0);
+  let acc = 0;
+  let skusFor80Pct: number | null = null;
+  for (let i = 0; i < selling.length && total > 0; i++) {
+    acc += selling[i].gmv;
+    if (acc / total >= 0.8) {
+      skusFor80Pct = i + 1;
+      break;
+    }
+  }
   return {
     items: selling.slice(0, limit).map((r, i) => ({ ...r, rank: i + 1 })),
     sellingSkus: selling.length,
+    skusFor80Pct,
     limit,
     hasAnyBatch,
     periodStart: src?.periodStart,
@@ -188,6 +201,9 @@ export interface PromotionRow {
   orders: number;
   aov: number;
   itemsSold: number;
+  /** "Discount amount" và "ROI" của TikTok — undefined ở bản chụp trước 2026-09-27. */
+  discount?: number;
+  roi?: number;
 }
 
 export interface PromotionMonthSlice {
@@ -196,6 +212,10 @@ export interface PromotionMonthSlice {
   /** Số chương trình bị loại vì kỳ chạy vắt qua tháng khác — UI phải nói ra, nếu không ops tưởng
    *  tháng đó chỉ có bấy nhiêu chương trình. */
   excludedMultiMonth: number;
+  /** Tổng "Discount amount" của các chương trình chạy trọn trong tháng (không chỉ top). */
+  totalDiscount?: number;
+  /** Top chương trình vắt qua nhiều tháng theo GMV LUỸ KẾ — không xếp hạng cùng bảng chính vì không cắt được theo tháng. */
+  longTerm?: PromotionRow[];
 }
 
 /** "2026-06-08 09:22 - 2026-07-05 23:58" -> {start,end}. */
@@ -216,9 +236,17 @@ export async function fetchTopPromotionsMonthSlice(brandId: string, monthStart: 
     gmv: findCol(columns, /^GMV/i),
     orders: findCol(columns, /^(?:Đơn hàng|Orders)$/i),
     aov: findCol(columns, /^(?:Giá trị trung bình đơn|Avg\. order value)/i),
-    itemsSold: findCol(columns, /^(?:Số món bán ra|Items sold)$/i)
+    itemsSold: findCol(columns, /^(?:Số món bán ra|Items sold)$/i),
+    discount: findCol(columns, /^(?:Số tiền giảm giá|Discount amount)/i),
+    roi: findCol(columns, /^(?:Tỉ suất lợi nhuận|ROI)$/i)
   };
   if (!c.name || !c.gmv) return { items: [], hasAnyBatch: true, excludedMultiMonth: 0 };
+  // ROI là số thập phân kiểu "7.02" — `num` bỏ cả dấu chấm (nghìn) nên đọc riêng.
+  const decimal = (v: unknown) => {
+    if (typeof v === "number") return v;
+    const n = parseFloat(String(v ?? "").replace(/[,%\s]/g, ""));
+    return Number.isNaN(n) ? 0 : n;
+  };
 
   const parsed = rows
     .map((raw) => ({
@@ -228,7 +256,9 @@ export async function fetchTopPromotionsMonthSlice(brandId: string, monthStart: 
       gmv: num(raw[c.gmv!]),
       orders: num(c.orders && raw[c.orders]),
       aov: num(c.aov && raw[c.aov]),
-      itemsSold: num(c.itemsSold && raw[c.itemsSold])
+      itemsSold: num(c.itemsSold && raw[c.itemsSold]),
+      discount: num(c.discount && raw[c.discount]),
+      roi: c.roi ? decimal(raw[c.roi]) : undefined
     }))
     .filter((r) => r.name && r.gmv > 0);
 
@@ -247,10 +277,13 @@ export async function fetchTopPromotionsMonthSlice(brandId: string, monthStart: 
     return !!start && !!end && start >= monthStart && end <= monthEnd;
   });
 
+  const inside = new Set(insideMonth);
   return {
     items: insideMonth.sort((a, b) => b.gmv - a.gmv).slice(0, limit),
     hasAnyBatch: true,
-    excludedMultiMonth: parsed.length - insideMonth.length
+    excludedMultiMonth: parsed.length - insideMonth.length,
+    totalDiscount: insideMonth.reduce((a, r) => a + (r.discount ?? 0), 0),
+    longTerm: parsed.filter((r) => !inside.has(r)).sort((a, b) => b.gmv - a.gmv).slice(0, 5)
   };
 }
 

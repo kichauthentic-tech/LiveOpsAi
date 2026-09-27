@@ -39,7 +39,10 @@ import { hasLiveNumbers, sessionsInRange } from "./sessionsLivePerf";
 // v3 (2026-09-26): ca lưu thêm coHostId/coHostName — bảng "Host Theo Loại Ngày" ghi giờ trợ live.
 // Bản chụp v2 không có trợ live ⇒ cột đó trống, report nhắc bấm cập nhật.
 export const SNAPSHOT_VERSION = 3;
-const PIECE_VERSION = 1;
+// Piece v2 (2026-09-27, gộp Phân tích sâu vào Report Tháng): skuRank thêm skusFor80Pct; topPromo thêm
+// discount/ROI từng chương trình, tổng giảm giá, top chương trình dài hạn. Bản chụp piece v1 báo "công thức
+// đổi" ⇒ bấm Cập nhật số liệu là có; trước đó các cột mới hiện "—".
+const PIECE_VERSION = 2;
 
 export interface SnapshotPiece<T = unknown> {
   stamp: string;

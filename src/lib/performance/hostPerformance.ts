@@ -211,6 +211,7 @@ export interface DayTypePart {
   orders: number;
   itemsSold: number;
   watchSecViews: number; // Σ(Avg. view × Views) — chia Views ra Avg. view bình quân theo lượt xem
+  newFollowers: number;
 }
 
 // Thứ tự cột của bảng: ngày thường trước làm mốc, rồi 3 camp.
@@ -223,7 +224,7 @@ export interface HostDayTypeRow {
   assist: DayTypePart; // gmv luôn 0
 }
 
-const emptyPart = (): DayTypePart => ({ sessions: 0, gmv: 0, hours: 0, views: 0, productClicks: 0, orders: 0, itemsSold: 0, watchSecViews: 0 });
+const emptyPart = (): DayTypePart => ({ sessions: 0, gmv: 0, hours: 0, views: 0, productClicks: 0, orders: 0, itemsSold: 0, watchSecViews: 0, newFollowers: 0 });
 
 function addPart(p: DayTypePart, s: LiveSession, hours: number) {
   const views = s.totalViews ?? 0;
@@ -235,6 +236,7 @@ function addPart(p: DayTypePart, s: LiveSession, hours: number) {
   p.orders += s.totalOrders ?? 0;
   p.itemsSold += s.attributedItemsSold ?? 0;
   p.watchSecViews += (s.avgWatchTimeSeconds ?? 0) * views;
+  p.newFollowers += s.newFollowers ?? 0;
 }
 const emptyBuckets = (): Record<CampDayBucket, DayTypePart> => ({
   daily: emptyPart(),
@@ -311,6 +313,7 @@ export interface DayTypeMetrics {
   aov: number | null;
   upt: number | null;
   avgViewSec: number | null;
+  newFollowers: number;
 }
 
 const ratio = (a: number, b: number) => (b > 0 ? a / b : null);
@@ -327,7 +330,8 @@ export function dayTypeMetrics(p: DayTypePart): DayTypeMetrics {
     ctor: pct(p.orders, p.productClicks),
     aov: ratio(p.gmv, p.orders),
     upt: ratio(p.itemsSold, p.orders),
-    avgViewSec: ratio(p.watchSecViews, p.views)
+    avgViewSec: ratio(p.watchSecViews, p.views),
+    newFollowers: p.newFollowers
   };
 }
 

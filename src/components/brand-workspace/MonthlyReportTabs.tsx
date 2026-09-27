@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
-import { ResponsiveContainer, ComposedChart, LineChart, ReferenceLine, BarChart, Bar, Line, Area, XAxis, YAxis, Tooltip, CartesianGrid, Cell } from "recharts";
+import { ResponsiveContainer, ComposedChart, LineChart, ReferenceLine, BarChart, Bar, Line, Area, XAxis, YAxis, Tooltip, CartesianGrid, Cell, ScatterChart, Scatter } from "recharts";
 import { BarChart3, Flame, ListOrdered, ShoppingBag, Megaphone, AlertTriangle, CalendarClock, Users, PieChart as PieChartIcon, Activity, Download, Lightbulb, ChevronDown, Scale, Loader2, Save } from "lucide-react";
 import { LiveSession, BrandMonthlyReport as BrandMonthlyReportType, BrandPlatformRate } from "../../types";
 import { CHANNEL, METRIC, metricHint } from "../../lib/metricGlossary";
@@ -66,7 +66,7 @@ import {
   whyInsight
 } from "../../lib/report/sectionInsights";
 import { resolveCampBucketType } from "../../lib/campaignDays";
-import { MonthlyDeepDive } from "./deepdive/MonthlyDeepDive";
+import { dailyRhythm, liveFunnel, sessionSpread } from "../../lib/report/rhythm";
 import { errorMessage } from "../../lib/errorMessage";
 import { byHost, byHostDayType, dayTypeTeamTotals, dayTypeMetrics, dayTypeDriverLines, sumDayTypeParts, vsTeam, HOST_DAY_TYPE_ORDER, MIN_SESSIONS_TO_COMPARE, DAY_TYPE_DIFF_THRESHOLD, HostDayTypeRow, DayTypePart, DayTypeMetrics, dataQuality, filterSessions, hostKey, splitUnassignedHost, DataQuality } from "../../lib/performance/hostPerformance";
 import { topSessionsByGmv, CAMP_DAY_BUCKET_ORDER, CAMP_DAY_BUCKET_LABEL, CampDayBucket, CampOverrides } from "../../lib/dataraw/creatorLivePerfMetrics";
@@ -161,6 +161,7 @@ const HostPerformancePanel: React.FC<{
     { label: METRIC.aov, value: (m) => fmtVndShort(m.aov), cmp: "aov", indent: true },
     { label: METRIC.upt, value: (m) => (m.upt != null ? fmtFixed(m.upt, 2) : "—") },
     { label: METRIC.avgView, value: (m) => (m.avgViewSec != null ? `${Math.round(m.avgViewSec)}s` : "—") },
+    { label: METRIC.newFollowers, value: (m) => (m.sessions > 0 ? fmtInt(m.newFollowers) : "—") },
     { label: "Giờ trợ live", onlyAll: true, value: (_m, h) => (h && h.assist.sessions > 0 ? `${fmtHours(h.assist.hours)} · ${h.assist.sessions}` : "—") }
   ];
   // Dòng "Giờ trợ live" chỉ hiện khi có host trong bảng từng làm trợ (người chỉ làm trợ đã có dòng riêng dưới bảng).
@@ -1001,6 +1002,10 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   const shopDaysOf = (m: string) => (hiddenMonths.has(m) ? null : view.shopDays[m] ?? null);
   const shopCur = useMemo(() => shopTotals(view.shopDays[month], cmp.curStart, cmp.curEnd), [view, month, cmp]);
   const shopPrevSame = useMemo(() => shopTotals(hiddenMonths.has(prevMonth) ? null : view.shopDays[prevMonth], cmp.prevStart, cmp.prevEnd), [view, prevMonth, cmp, hiddenMonths]);
+  // Ba khối chuyển từ "Phân tích sâu (nội bộ ops)" khi gộp vào report (2026-09-27) — cùng đầu vào bản chụp, cùng kỳ `cmp`.
+  const rhythm = useMemo(() => dailyRhythm(view.shopDays[month]?.days, liveCurrent?.rows ?? [], cmp.curStart, cmp.curEnd), [view, month, liveCurrent, cmp]);
+  const funnel = useMemo(() => liveFunnel(livePrev?.rows ?? [], liveCurrent?.rows ?? [], cmp), [livePrev, liveCurrent, cmp]);
+  const spread = useMemo(() => sessionSpread(liveCurrent?.rows ?? [], cmp.curStart, cmp.curEnd), [liveCurrent, cmp]);
   const channelMixes = useMemo(
     () =>
       last4Months.map((m) => {
@@ -1108,6 +1113,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   );
 
   // Top SKU: hạng tháng trước → tháng này + phễu. Tháng trước bị che với brand thì không có hạng/so sánh.
+  const skuRankCur = view.skuRank?.[month] ?? null;
   const skuMoveData = useMemo(
     () => skuMoves(view.skuRank?.[month] ?? null, hiddenMonths.has(prevMonth) ? null : (view.skuRank?.[prevMonth] ?? null)),
     [view, month, prevMonth, hiddenMonths]
@@ -1269,7 +1275,6 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   ];
   const trendValues = (r: TrendRow) => trendStats.map((x, i) => r.get(x.stats, giftByMonth[i]));
 
-  const [showDeepDive, setShowDeepDive] = useState(false);
   // Điện thoại (audit UX 2026-09-26, P2c): dưới 768px phần 2–7 chỉ hiện tiêu đề + Insight (kết luận), biểu đồ/bảng mở
   // khi bấm; Kết luận luôn mở. Desktop không đổi.
   const isNarrow = !useMediaQuery("(min-width: 768px)");
@@ -1727,6 +1732,49 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                 </p>
               </Panel>
             )}
+            {rhythm && (
+              <Panel
+                title="Nhịp bán theo ngày"
+                icon={<Activity className="w-4 h-4" />}
+                sub={`${METRIC.totalGmv} cả shop mỗi ngày (Shop Analytics) · đường vàng = trung bình 7 ngày · đường xanh = ${METRIC.liveGmv} agency · ${rhythm.points.length} ngày có số`}
+              >
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+                  <KpiTile label="5 ngày cao nhất chiếm" value={rhythm.top5Pct != null ? fmtPct(rhythm.top5Pct) : "—"} note={`${METRIC.totalGmv} của kỳ`} />
+                  <KpiTile label="Số ngày tạo 80% GMV" value={rhythm.daysFor80 != null ? `${rhythm.daysFor80}/${rhythm.points.length}` : "—"} note="càng ít ngày càng dồn vào camp" />
+                  <KpiTile label="Ngày cao nhất" value={rhythm.best ? fmtVndShort(rhythm.best.gmv) : "—"} note={rhythm.best?.label} />
+                  <KpiTile label="Ngày thấp nhất" value={rhythm.worst ? fmtVndShort(rhythm.worst.gmv) : "—"} note={rhythm.worst?.label} />
+                </div>
+                <div style={{ height: 240 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={rhythm.points}>
+                      <CartesianGrid stroke={PAL.line} vertical={false} />
+                      <XAxis dataKey="label" stroke={PAL.muted} fontSize={10} interval={2} />
+                      <YAxis stroke={PAL.muted} fontSize={10} tickFormatter={(v) => fmtVndShort(v)} width={56} />
+                      <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => fmtVndShort(chartNum(v))} />
+                      <Bar dataKey="gmv" name={METRIC.totalGmv} fill={`${PAL.goldDim}88`} radius={[3, 3, 0, 0]} />
+                      <Line type="monotone" dataKey="ma7" name="Trung bình 7 ngày" stroke={PAL.gold} strokeWidth={2} dot={false} connectNulls={false} />
+                      <Line type="monotone" dataKey="live" name={METRIC.liveGmv} stroke={PAL.blue} strokeWidth={2} dot={false} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+                <ChartLegend items={[[METRIC.totalGmv, PAL.goldDim], ["Trung bình 7 ngày", PAL.gold], [METRIC.liveGmv, PAL.blue]]} />
+                <div className="mt-3">
+                  <ReportTable head={["Thứ", ...rhythm.weekday.map((w) => w.label)]}>
+                    <tr style={rowStyle(0)}>
+                      <td className="py-2 px-3 font-semibold whitespace-nowrap" style={{ color: PAL.gold }}>Chỉ số (100 = ngày TB)</td>
+                      {rhythm.weekday.map((w) => (
+                        <td key={w.label} className="py-2 px-3 text-right font-mono" style={{ color: w.index == null ? PAL.muted : w.index >= 110 ? PAL.green : w.index <= 90 ? PAL.red : PAL.cream }} title={`${w.days} ngày · TB ${fmtVndShort(w.avgGmv)}/ngày`}>
+                          {w.index != null ? fmtInt(w.index) : "—"}
+                        </td>
+                      ))}
+                    </tr>
+                  </ReportTable>
+                  <p className="text-[11px] mt-2" style={{ color: PAL.muted }}>
+                    Chỉ số theo thứ lẫn cả camp rơi vào thứ đó — tháng ngắn thì mỗi thứ chỉ có 3–4 ngày, đọc như gợi ý chứ không phải quy luật.
+                  </p>
+                </div>
+              </Panel>
+            )}
             {channelMixes.every((c) => !c) ? (
               <p className="text-sm py-4" style={{ color: PAL.muted }}>Chưa có file Shop Analytics cho các tháng này ở Dữ Liệu Gốc.</p>
             ) : (
@@ -1813,6 +1861,28 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                     ngày {signedMoney(mixRate.rate)}.
                   </p>
                 )}
+              </Panel>
+            )}
+            {funnel && (
+              <Panel title="Phễu LIVE" icon={<Activity className="w-4 h-4" />} sub={`Số đếm cộng từ các ca · ${cmp.label} · tỷ lệ là chuyển từ bậc trên xuống`}>
+                <ReportTable head={["Bậc", "Kỳ trước", "Kỳ này", "±", "Tỷ lệ", "Kỳ trước", "Kỳ này"]}>
+                  {funnel.map((s, idx) => (
+                    <tr key={s.label} style={rowStyle(idx)}>
+                      <td className="py-2 px-3 font-semibold whitespace-nowrap" style={{ color: PAL.cream }} title={metricHint(s.label)}>{s.label}</td>
+                      <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{fmtInt(s.prev)}</td>
+                      <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>{fmtInt(s.cur)}</td>
+                      <td className="py-2 px-3 text-right font-mono">{chgCell(pctChange(s.prev, s.cur))}</td>
+                      <td className="py-2 px-3 font-semibold" style={{ color: PAL.gold }} title={s.rateLabel ? metricHint(s.rateLabel) : undefined}>{s.rateLabel ?? ""}</td>
+                      <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{s.rateLabel ? fmtPct(s.ratePrev) : ""}</td>
+                      <td className="py-2 px-3 text-right font-mono" style={{ color: s.ratePrev != null && s.rateCur != null ? (s.rateCur >= s.ratePrev ? PAL.green : PAL.red) : PAL.cream }}>
+                        {s.rateLabel ? fmtPct(s.rateCur) : ""}
+                      </td>
+                    </tr>
+                  ))}
+                </ReportTable>
+                <p className="text-[11px] mt-2" style={{ color: PAL.muted }}>
+                  {METRIC.productImpressions} là số LẦN sản phẩm hiện ra (một người xem thấy nhiều sản phẩm), nên không có tỷ lệ chuyển từ {METRIC.views}. {METRIC.ctor} = {METRIC.orders} ÷ {METRIC.productClicks}, cùng định nghĩa với bảng trên.
+                </p>
               </Panel>
             )}
             <Panel
@@ -1915,6 +1985,12 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                   </ReportTable>
                 </div>
               )}
+              {skuRankCur?.skusFor80Pct != null && (
+                <p className="text-[11px] mt-2" style={{ color: PAL.muted }}>
+                  Độ tập trung: {fmtInt(skuRankCur.sellingSkus)} SKU có doanh thu, {fmtInt(skuRankCur.skusFor80Pct)} SKU đầu bảng đã tạo 80% GMV
+                  {skuRankCur.sellingSkus > 0 ? ` (${fmtFixed((skuRankCur.skusFor80Pct / skuRankCur.sellingSkus) * 100, 0)}% số SKU)` : ""}.
+                </p>
+              )}
               {giftSliceCur?.hasAnyBatch && giftSliceCur.giftItems > 0 && (
                 <p className="text-[11px] mt-2" style={{ color: PAL.muted }}>
                   Quà tặng (hàng dưới {fmtVndShort(GIFT_MAX_PRICE)}/món) tháng này: {fmtInt(giftSliceCur.giftItems)} món ở {giftSliceCur.giftSkus} SKU —{" "}
@@ -1936,7 +2012,8 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                   Không có chương trình nào chạy trọn trong tháng này. Chương trình vắt qua nhiều tháng bị loại vì cột GMV trong file TikTok là luỹ kế cả chương trình.
                 </p>
               ) : (
-                <ReportTable head={["#", "Chương trình", "Trạng thái", "GMV", "Orders", "AOV"]}>
+                <>
+                <ReportTable head={["#", "Chương trình", "Trạng thái", "GMV", "Orders", "AOV", "Giảm giá", "ROI"]}>
                   {(topPromo.items ?? []).map((p, idx) => (
                     <tr key={p.name + idx} style={rowStyle(idx)}>
                       <td className="py-2 px-3 font-mono" style={{ color: PAL.gold }}>{idx + 1}</td>
@@ -1949,9 +2026,36 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                       <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>{fmtVndShort(p.gmv)}</td>
                       <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{fmtInt(p.orders)}</td>
                       <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{fmtVndShort(p.aov)}</td>
+                      <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{p.discount != null ? fmtVndShort(p.discount) : "—"}</td>
+                      <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{p.roi != null && p.roi > 0 ? fmtFixed(p.roi, 2) : "—"}</td>
                     </tr>
                   ))}
                 </ReportTable>
+                <p className="text-[11px] mt-2" style={{ color: PAL.muted }}>
+                  {topPromo.totalDiscount != null && topPromo.totalDiscount > 0 && <>Tổng tiền giảm giá của các chương trình chạy trọn trong tháng: {fmtVndShort(topPromo.totalDiscount)}. </>}
+                  ROI = GMV ÷ tiền giảm giá (cột ROI của TikTok).
+                  {topPromo.items[0]?.discount === undefined && canManage && " Cột Giảm giá/ROI trống vì số liệu chốt trước khi report có 2 cột này — bấm \"Cập nhật số liệu\"."}
+                </p>
+                </>
+              )}
+              {(topPromo?.longTerm?.length ?? 0) > 0 && (
+                <details className="mt-3">
+                  <summary className="cursor-pointer text-[11px] font-bold" style={{ color: PAL.gold }}>
+                    Chương trình dài hạn (vắt qua nhiều tháng) — GMV luỹ kế, không xếp hạng cùng bảng trên
+                  </summary>
+                  <div className="mt-2">
+                    <ReportTable head={["Chương trình", "Kỳ chạy", "GMV luỹ kế", "Giảm giá luỹ kế"]}>
+                      {topPromo!.longTerm!.map((p, idx) => (
+                        <tr key={p.name + idx} style={rowStyle(idx)}>
+                          <td className="py-2 px-3" style={{ color: PAL.cream }}>{p.name}</td>
+                          <td className="py-2 px-3 font-mono whitespace-nowrap" style={{ color: PAL.muted }}>{p.period.replace(/ \d{2}:\d{2}/g, "")}</td>
+                          <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.cream }}>{fmtVndShort(p.gmv)}</td>
+                          <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{p.discount != null ? fmtVndShort(p.discount) : "—"}</td>
+                        </tr>
+                      ))}
+                    </ReportTable>
+                  </div>
+                </details>
               )}
             </Panel>
           </SectionDetail>
@@ -2037,7 +2141,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             </Panel>
             <details className="rounded-xl" style={{ background: PAL.panel, border: `1px solid ${PAL.line}` }}>
               <summary className="cursor-pointer px-4 py-3 text-xs font-bold" style={{ color: PAL.gold }}>
-                Diễn biến theo ngày & Top 10 phiên live
+                Diễn biến theo ngày, phân bố GMV/giờ & Top 10 phiên live
               </summary>
               <div className="p-4 pt-0 space-y-4">
                 {dailyPerf?.hasAnyBatch && dailyChartData.length > 0 && (
@@ -2055,6 +2159,34 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                       </ResponsiveContainer>
                     </div>
                     <ChartLegend items={[["Direct GMV", PAL.gold], ["Indirect GMV", PAL.blue]]} />
+                  </Panel>
+                )}
+                {spread && (
+                  <Panel title="Phân bố GMV/giờ từng phiên" icon={<Activity className="w-4 h-4" />} sub={`${spread.count} phiên · ${cmp.label.split(" so với")[0]} · mỗi chấm là một phiên (bỏ phiên dưới 6 phút)`}>
+                    <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 mb-3">
+                      {([["Thấp nhất", spread.worst], ["Phân vị 25", spread.p25], ["Trung vị", spread.median], ["Phân vị 75", spread.p75], ["Cao nhất", spread.best]] as const).map(([label, v]) => (
+                        <KpiTile key={label} label={label} value={fmtVndShort(v)} />
+                      ))}
+                    </div>
+                    <div style={{ height: 240 }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <ScatterChart margin={{ left: 4, right: 12 }}>
+                          <CartesianGrid stroke={PAL.line} />
+                          <XAxis type="number" dataKey="hours" name={METRIC.liveHours} stroke={PAL.muted} fontSize={10} tickFormatter={(v) => fmtHours(v)} />
+                          <YAxis type="number" dataKey="gmvPerHour" name={METRIC.gmvPerHour} stroke={PAL.muted} fontSize={10} tickFormatter={(v) => fmtVndShort(v)} width={56} />
+                          <ReferenceLine y={spread.median} stroke={PAL.gold} strokeDasharray="4 3" />
+                          <Tooltip
+                            contentStyle={chartTooltipStyle}
+                            formatter={(v, name) => (name === METRIC.liveHours ? fmtHours(chartNum(v)) : fmtVndShort(chartNum(v)))}
+                            labelFormatter={() => ""}
+                          />
+                          <Scatter data={spread.points} fill={PAL.blue} fillOpacity={0.75} />
+                        </ScatterChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <p className="text-[11px] mt-2" style={{ color: PAL.muted }}>
+                      Đường vàng = trung vị. Nửa giữa các phiên nằm trong {fmtVndShort(spread.p25)}–{fmtVndShort(spread.p75)}/giờ; phiên dưới phân vị 25 là chỗ nên xem lại host, khung giờ hoặc hàng lên sóng.
+                    </p>
                   </Panel>
                 )}
                 <Panel title="Top 10 phiên live theo GMV" icon={<ListOrdered className="w-4 h-4" />} sub={liveSource.source === "sessions" ? "Nguồn: ca có số trong app" : "Nguồn: file Creator Live Performance"}>
@@ -2154,23 +2286,11 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
           </SectionDetail>
         </section>
 
-        {/* Nội bộ ops — không phải một phần của report gửi brand. */}
+        {/* Chỉ là chỉ đường cho ops — report gửi brand là 7 phần ở trên (Phân tích sâu đã gộp vào, 2026-09-27). */}
         {canManage && (
-          <div className="space-y-2 pt-2" style={{ borderTop: `1px solid ${PAL.line}` }}>
-            <p className="text-[11px]" style={{ color: PAL.muted }}>
-              Chỉ ops thấy: khung camp, kế hoạch phân bổ và affiliate tháng sau nhập ở tab <b>Nhập Ads & Ghi Chú</b>; bảng creator affiliate theo tháng ở trang <b>Affiliate</b>.
-            </p>
-            <div className="rounded-xl" style={{ background: PAL.panel, border: `1px solid ${PAL.line}` }}>
-              <button onClick={() => setShowDeepDive((v) => !v)} className="w-full text-left px-4 py-3 text-xs font-bold" style={{ color: PAL.gold }}>
-                {showDeepDive ? "▾" : "▸"} Phân tích sâu (nội bộ ops) — tải thêm Dữ Liệu Gốc khi mở
-              </button>
-              {showDeepDive && (
-                <div className="p-4 pt-0">
-                  <MonthlyDeepDive brandId={brandId} sessions={liveSessions} canManage={canManage} month={month} embedded />
-                </div>
-              )}
-            </div>
-          </div>
+          <p className="text-[11px] pt-3" style={{ color: PAL.muted, borderTop: `1px solid ${PAL.line}` }}>
+            Chỉ ops thấy: khung camp, kế hoạch phân bổ và affiliate tháng sau nhập ở tab <b>Nhập Ads & Ghi Chú</b>; bảng creator affiliate theo tháng ở trang <b>Affiliate</b>.
+          </p>
         )}
       </div>
     </div>

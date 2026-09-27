@@ -2,6 +2,14 @@
 
 ## CẦN LÀM NGAY khi mở phiên mới (cập nhật 2026-09-24)
 
+> **MỚI 2026-09-27 — Gộp "Phân tích sâu (nội bộ ops)" vào Report Tháng: còn MỘT report (không migration, đã commit + push `main`).**
+> User hỏi phần đó có trùng không → đo CROCS T9: 4 khối trùng nhưng RA SỐ KHÁC report (GMV −42,8% vs −22,8% cùng kỳ vì so
+> 22 ngày với trọn T8; campaign đoán từ tiêu đề phòng vs lịch camp; Seller LIVE 6,9B vs LIVE agency 5,89B; SKU #1 462,9M vs 490,9M
+> khác nguồn), 2 khối trùng y hệt. User: "gộp cả 2 thành 1". Phần riêng đã chuyển vào report, phần trùng bỏ, `deepdive/` +
+> `deepDiveSource.ts` xoá. **Việc ops:** piece bản chụp lên v2 ⇒ mọi report khác CROCS T9 báo "Có thay đổi… công thức",
+> bấm "Cập nhật số liệu" (report đã phát hành: "Cập nhật & phát hành lại") để có cột Giảm giá/ROI + độ tập trung SKU.
+> CROCS T9 (bản nháp) đã cập nhật. Xem `## Gộp Phân tích sâu vào Report Tháng`.
+
 > **MỚI 2026-09-27 — Đơn vị tiền thống nhất toàn app (không migration, đã commit + push `main`).** User chốt: bỏ hẳn "đ"/"VNĐ"; chỗ chật
 > dùng `fmtVndShort` → "50M" / "1,2B" / "500K", chỗ cần số chính xác dùng `fmtVndFull` → "53.733.488" (cả hai ở
 > `src/lib/format.ts`). `src/lib/formatCurrency.ts` (`formatCurrencyAdaptive`, "triệu"/"tỷ") đã xoá; ~10 hàm format tiền cục bộ
@@ -1039,6 +1047,11 @@ Bảng/hàm: `session_live_snapshots` + `session_live_snapshot_rows`, RPC `apply
   `.replace(` của bộ đọc file TikTok, bỏ tên voucher kiểu "Voucher 50k"). "đ%" ở Report Tháng là "điểm %", không phải tiền.
   Prompt Gemini (`src/server/createApp.ts`) ví dụ `predictedGmv` cũng theo kiểu "150M – 190M".
 
+- **Report Tháng là nơi DUY NHẤT nói về số một tháng của brand (2026-09-27).** Phân tích mới cho tháng thì thêm vào
+  1 trong 7 phần của `MonthlyReportTabs`, đọc từ bản chụp (thêm piece/trường + tăng `PIECE_VERSION` nếu cần) và so cùng kỳ
+  `cmp` — không dựng khối/trang riêng tự tải Dữ Liệu Gốc với nguồn/kỳ so riêng (Phân tích sâu cũ ra GMV −42,8% ngay dưới
+  report ghi −22,8%).
+
 - **Tên chỉ số trên report/chart/bảng/Excel lấy từ `src/lib/metricGlossary.ts` (`METRIC`, `CHANNEL`, `DAY_TYPE`) — không tự đặt tên mới.** Chỉ số chưa có trong từ điển thì thêm vào đó trước (kèm `METRIC_HINT` công thức), rồi mới dùng. Nhãn hiển thị gắn `title={metricHint(label)}` để di chuột thấy công thức. Regex khớp cột file TikTok (`findCol`/`colAt`/`key: /^...$/`) giữ nguyên chữ gốc TikTok, không đổi theo từ điển. `tests/metricGlossary.test.ts` quét `src/` — thêm tên cũ mới phát hiện vào `BANNED`.
 
 ## Rà soát UX/workflow theo module (bắt đầu 2026-09-13)
@@ -1919,11 +1932,45 @@ nào); nhánh fallback file Creator-Live-Performance (CROCS mọi tháng đều 
 
 **Nghiên cứu bố cục nội dung Report Tháng (2026-09-25, user hỏi, CHƯA làm):** đề xuất + bản chạy thử trên số CROCS thật ở https://claude.ai/artifact/XXYTmtJoNh1pQEbSWDozsD. Phát hiện đo được: (a) "Total GMV" Tab 01 thực ra là GMV ca live agency ⇒ Live+Affiliate = 110%; Shop Analytics có tổng shop + 4 kênh (Linked LIVE-attributed + Creator LIVE-attributed + video-attributed + thẻ SP từ product_list) cộng lại = 99,95–99,99% tổng shop T6–T9; (b) Affiliate T8 hiện 0 đ vì chỉ đọc bảng nhập tay, Shop Analytics ghi 1,00 tỷ (T9 lệch nhập tay 0,3%); (c) MoM tháng chưa hết −40,2% vs cùng số ngày −18,4%; (d) NMV = GMV trong khi Refunds/GMV thật 14,7–16,5%; (e) CTOR giảm 4 tháng 1,99→1,25%, T9 giờ +16% mà GMV/giờ −30% — report không có phần "vì sao"; (f) Tab 06 form riêng trống trong khi Kế Hoạch Tháng T10 có 5,5 tỷ. Đề xuất 1 trang cuộn 8 phần: Tóm tắt → Mục tiêu → Toàn shop & kênh → Vì sao (giờ × lượt xem/giờ × GMV/lượt xem) → Người → Hàng → Bối cảnh → Tháng sau (lấy từ Kế Hoạch Tháng). 3 câu chờ user: số đứng đầu (shop hay agency), trang cuộn hay tab, tóm tắt tự sinh hay tự viết.
 
-**Giai đoạn tiếp theo gợi ý (user chưa chọn):** (1) Tab 05 Phân Tích Sâu vẫn ~11 MB/lần mở (đọc nguyên
-product_list 2 tháng theo vị trí cột) — có thể chụp tương tự; (2) Report Tuần vẫn tính trực tiếp; (3) so MoM
+**Giai đoạn tiếp theo gợi ý (user chưa chọn):** (1) ~~Tab 05 Phân Tích Sâu vẫn ~11 MB/lần mở~~ — đã gộp vào
+report và xoá 2026-09-27, phần giữ lại đọc từ bản chụp; (2) Report Tuần vẫn tính trực tiếp; (3) so MoM
 cùng số ngày khi tháng chưa hết (T9 22 ngày vs T8 31 ngày đang ra −40%) — đã nêu với user, chưa làm.
 
-## Report Tháng Chuyên Sâu (form mẫu) — XONG 2026-09-23, ĐÃ GỘP vào Report Tháng
+## Gộp Phân tích sâu vào Report Tháng — XONG + VERIFY 2026-09-27 (không migration, đã commit + push `main`)
+
+**Vì sao.** Khối "Phân tích sâu (nội bộ ops)" cuối Report Tháng (bản kế thừa Tab 05, mục dưới) tự tải Dữ Liệu Gốc
+(~11 MB/lần mở), tự chọn nguồn + kỳ so riêng. Đo CROCS T9 cạnh report: Tổng quan GMV −42,8% / giờ live −22,2% (22 ngày T9
+so TRỌN T8) vs report −22,8% / +15,8% cùng kỳ; Campaign theo từ khoá tiêu đề phòng (Ngày đôi 773M / Giữa tháng 1,22B) vs
+lịch camp (D-Day 968M / Mid-Month 791M); Xu hướng Seller LIVE GMV (6,9B, 75,8%) vs LIVE agency (5,89B, 64,67%); SKU #1
+462,9M (file theo product ID) vs 490,9M (gộp theo tên); CTOR theo SKU orders vs Orders. Host + Khuyến mãi trùng y hệt.
+
+**Chuyển vào report (tính từ bản chụp, cùng kỳ `cmp` như phần còn lại):**
+- Phần 2 — "Nhịp bán theo ngày": Total GMV/ngày (shopDays) + TB trượt 7 ngày + LIVE GMV agency/ngày (dòng ca), 5 ngày cao
+  nhất chiếm %, số ngày tạo 80% GMV, ngày cao/thấp nhất, chỉ số theo thứ (100 = ngày TB). CROCS T9: 39,63%, 15/22 ngày.
+- Phần 3 — "Phễu LIVE": LIVE impressions → Views (ERR) → Product impressions → Product clicks (Product CTR) → Orders
+  (CTOR = Orders ÷ Product clicks, cùng định nghĩa report). CROCS T9: CTOR 1,35% → 1,18%.
+- Phần 4 — độ tập trung SKU ("327 SKU có doanh thu, 32 SKU tạo 80% GMV") + cột Giảm giá/ROI ở Top khuyến mãi + tổng
+  giảm giá (175,8M) + bảng gập "Chương trình dài hạn" (GMV luỹ kế, không xếp hạng).
+- Phần 5 — dòng `New followers` trong bảng host (`DayTypePart.newFollowers`, `METRIC.newFollowers`).
+- Phần 6 — "Phân bố GMV/giờ từng phiên": thấp nhất/P25/trung vị/P75/cao nhất + scatter giờ live × GMV/giờ (bỏ phiên
+  < 6 phút). CROCS T9: 47 phiên, trung vị 17,7M, P25–P75 12,9M–22,9M.
+- **Bỏ** (trùng/lệch): Tổng quan 12 KPI, Cơ cấu kênh + đóng góp tăng trưởng, Campaign theo tiêu đề, bảng Host riêng,
+  Xu hướng, Top SKU/SKU tăng-giảm riêng, lưới heatmap lịch. Customers/Visitors toàn shop không đưa lại (report đã có
+  lượt vào shop + CVR shop ở bảng đối chứng).
+
+**Code:** logic thuần [rhythm.ts](src/lib/report/rhythm.ts) (`dailyRhythm`, `liveFunnel`, `sessionSpread`; 4 test ở
+[tests/rhythm.test.ts](tests/rhythm.test.ts)). `skuRankFromAgg` thêm `skusFor80Pct`; `fetchTopPromotionsMonthSlice`
+thêm `discount`/`roi` từng dòng + `totalDiscount` + `longTerm` (ROI đọc số thập phân riêng — `num` bỏ dấu chấm). `PIECE_VERSION`
+1 → 2. `readShopDays` tách sang [shopAnalyticsDays.ts](src/lib/dataraw/shopAnalyticsDays.ts); xoá `deepDiveSource.ts`,
+`components/brand-workspace/deepdive/`, `lib/report/deepdive/`. Brand giờ thấy các khối mới (trước chỉ ops) — cùng dữ liệu
+brand vốn đọc được qua bản chụp. Bundle BrandMonthlyReport 627,5 KB → 549,5 KB.
+
+**Verify:** tsc 0 lỗi, eslint 0 lỗi (33 cảnh báo, giảm 2), vitest 127/127, `vite build` OK. Browser (admin) CROCS T9: trước
+cập nhật 3 khối từ ca/shopDays có số, dải báo "công thức" đổi; bấm "Cập nhật số liệu" ⇒ "Đã mới nhất", Giảm giá/ROI khớp
+Phân tích sâu cũ (81,2M · 7,02), New followers có số, biểu đồ vẽ đủ (22 cột ngày, 47 chấm phiên); số Kết luận không đổi
+(5,21B / 3,52B / 177,8h / 19,8M). Chưa verify: góc nhìn role `brand`, report đã phát hành (T8).
+
+## Report Tháng Chuyên Sâu (form mẫu) — XONG 2026-09-23, ĐÃ GỘP vào Report Tháng, **ĐÃ XOÁ 2026-09-27** (xem mục trên)
 
 **Bố cục cuối: Report Tháng có 6 tab** — 01 Tổng Quan · 02 Livestream · 03 Sản Phẩm & Khuyến Mãi · 04 Affiliate · **05 Phân Tích Sâu** · 06 Kế Hoạch Tháng Sau. Tab 05 là toàn bộ báo cáo chuyên sâu, **ops-only**: lọc khỏi thanh tab bằng `tabsFor(canManage)` VÀ chặn lần nữa ở chỗ render (`tab === "deepdive" && canManage`) — hai lớp vì thanh tab là UI, ai sửa state cũng không được lọt. Brand vẫn thấy đúng 5 tab như cũ.
 
