@@ -49,7 +49,7 @@ import { fetchPlanStatuses } from "../lib/db/monthPlans";
 import { addDays, eachDay } from "../lib/dateUtils";
 import { CampDayBucket, CampOverrides } from "../lib/campaignDays";
 import { getBrandTheme } from "../lib/brandTheme";
-import { formatCurrencyAdaptive } from "../lib/formatCurrency";
+import { fmtVndShort } from "../lib/format";
 import { BrandLogo } from "./ui/BrandLogo";
 import { PageIntro } from "./common/PageIntro";
 
@@ -85,13 +85,7 @@ const BUCKET_LABEL: Record<CampDayBucket, string> = { dday: "D-Day", midmonth: "
 const BUCKET_COLOR: Record<CampDayBucket, string> = { dday: "var(--accent)", midmonth: "var(--success)", payday: "var(--warning)", daily: "var(--text-faint)" };
 const WEEKDAY = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
 
-const money = (v: number | null | undefined) => (v == null || !isFinite(v) ? "—" : formatCurrencyAdaptive(v, ""));
-const moneyShort = (v: number) => {
-  const a = Math.abs(v);
-  if (a >= 1e9) return `${(v / 1e9).toLocaleString("vi-VN", { maximumFractionDigits: 1 })}tỷ`;
-  if (a >= 1e6) return `${Math.round(v / 1e6).toLocaleString("vi-VN")}tr`;
-  return v ? `${Math.round(v / 1e3).toLocaleString("vi-VN")}k` : "0";
-};
+const money = (v: number | null | undefined) => (v == null || !isFinite(v) ? "—" : fmtVndShort(v));
 const pct = (v: number | null | undefined, d = 0) => (v == null || !isFinite(v) ? "—" : `${(v * 100).toLocaleString("vi-VN", { maximumFractionDigits: d })}%`);
 const num = (v: number) => Math.round(v).toLocaleString("vi-VN");
 const hrs = (v: number) => `${v.toLocaleString("vi-VN", { maximumFractionDigits: 1 })} giờ`;
@@ -570,7 +564,7 @@ const MonthOverMonth: React.FC<{ sessions: LiveSession[]; brands: Brand[]; lastM
             {[0, 0.25, 0.5, 0.75, 1].map((f) => (
               <g key={f}>
                 <line x1={L} x2={W - R} y1={y(nice * f)} y2={y(nice * f)} style={{ stroke: "var(--border)", strokeWidth: 1, opacity: 0.6 }} />
-                <text x={L - 6} y={y(nice * f) + 4} textAnchor="end" style={{ fill: "var(--text-faint)", fontSize: 10 }}>{f ? moneyShort(nice * f) : "0"}</text>
+                <text x={L - 6} y={y(nice * f) + 4} textAnchor="end" style={{ fill: "var(--text-faint)", fontSize: 10 }}>{f ? fmtVndShort(nice * f) : "0"}</text>
               </g>
             ))}
             {perBrand.map(({ c, by }, i) => {
@@ -590,7 +584,7 @@ const MonthOverMonth: React.FC<{ sessions: LiveSession[]; brands: Brand[]; lastM
                         data-tip={`${x.b.name} · T${Number(c.month.slice(5))}\n${money(x.gmv)}${c.partial ? ` (đến ${ddmm(c.through)})` : ""}`} />
                     );
                   })}
-                  {total > 0 && <text x={cx} y={y(total) - 6} textAnchor="middle" style={{ fill: "var(--text)", fontSize: 11, fontWeight: 700 }}>{moneyShort(total)}</text>}
+                  {total > 0 && <text x={cx} y={y(total) - 6} textAnchor="middle" style={{ fill: "var(--text)", fontSize: 11, fontWeight: 700 }}>{fmtVndShort(total)}</text>}
                   <text x={cx} y={H - 8} textAnchor="middle" style={{ fill: "var(--text-faint)", fontSize: 10 }}>T{Number(c.month.slice(5))}{c.partial ? "*" : ""}</text>
                 </g>
               );
@@ -691,7 +685,7 @@ const TargetSection: React.FC<{ outlook: MonthOutlook; month: string; single: bo
             {[0, 0.25, 0.5, 0.75, 1].map((f) => (
               <g key={f}>
                 <line x1={L} x2={W - R} y1={y(max * f)} y2={y(max * f)} style={{ stroke: "var(--border)", strokeWidth: 1, opacity: 0.6 }} />
-                <text x={L - 6} y={y(max * f) + 4} textAnchor="end" style={{ fill: "var(--text-faint)", fontSize: 10 }}>{f ? moneyShort(max * f) : "0"}</text>
+                <text x={L - 6} y={y(max * f) + 4} textAnchor="end" style={{ fill: "var(--text-faint)", fontSize: 10 }}>{f ? fmtVndShort(max * f) : "0"}</text>
               </g>
             ))}
             {[1, 8, 15, 22, 29].filter((d) => d <= n).map((d) => <text key={d} x={x(d - 1)} y={H - 8} textAnchor="middle" style={{ fill: "var(--text-faint)", fontSize: 10 }}>{String(d).padStart(2, "0")}/{month.slice(5)}</text>)}
@@ -700,7 +694,7 @@ const TargetSection: React.FC<{ outlook: MonthOutlook; month: string; single: bo
             {hasProjection && projPts.length > 1 && <path d={path(projPts)} style={{ fill: "none", stroke: "var(--accent)", strokeWidth: 2, strokeDasharray: "6 4" }} />}
             {actualPts.length > 0 && <path d={path(actualPts)} style={{ fill: "none", stroke: "var(--accent)", strokeWidth: 2.5, strokeLinejoin: "round" }} />}
             {actualPts.length > 0 && <circle cx={x(throughIdx)} cy={y(ca)} r={4.5} style={{ fill: "var(--accent)", stroke: "var(--surface)", strokeWidth: 2 }} />}
-            {hasProjection && projPts.length > 1 && <text x={x(n - 1) - 4} y={y(cp) - 10} textAnchor="end" style={{ fill: "var(--text)", fontSize: 11, fontWeight: 700 }}>{moneyShort(cp)}</text>}
+            {hasProjection && projPts.length > 1 && <text x={x(n - 1) - 4} y={y(cp) - 10} textAnchor="end" style={{ fill: "var(--text)", fontSize: 11, fontWeight: 700 }}>{fmtVndShort(cp)}</text>}
             {o.days.map((d, i) => (
               <rect key={d} x={x(i) - colW / 2} y={T} width={colW} height={H - T - B} style={{ fill: "transparent" }}
                 data-tip={`${ddmm(d)} (${WEEKDAY[weekdayIdx(d)]})\n${i <= throughIdx ? `Thực tế cộng dồn: ${money(actualPts[i]?.[1] ?? 0)}` : `Dự phóng cộng dồn: ${money(projPts.find((p) => p[0] === i)?.[1] ?? cp)}`}${o.target ? `\nTarget tới ngày này: ${money(targetPts[i][1])}` : ""}`} />
@@ -796,7 +790,7 @@ const CampaignSection: React.FC<{ outlook: MonthOutlook; month: string; sessions
                 data-tip={`${ddmm(d)} (${WEEKDAY[weekdayIdx(d)]})${camp ? ` · ${BUCKET_LABEL[camp]}` : ""}\n${g ? `GMV ${money(g)}\n${t.sessions} ca · ${hrs(t.hours)} · ${money(t.gmvPerHour)}/giờ` : f ? `Dự phóng ${money(f)}` : "Không có ca"}`}
               >
                 <span className="font-bold">{Number(d.slice(8))}{camp ? " ◆" : ""}</span>
-                <span className="font-bold truncate hidden sm:block">{g ? moneyShort(g) : f ? `~${moneyShort(f)}` : ""}</span>
+                <span className="font-bold truncate hidden sm:block">{g ? fmtVndShort(g) : f ? `~${fmtVndShort(f)}` : ""}</span>
               </div>
             );
           })}
@@ -833,7 +827,7 @@ const StaffList: React.FC<{ title: string; data: ReturnType<typeof hostRows>; un
                   <span className="absolute left-0 top-[3px] h-2.5 rounded-r" style={{ width: `${(g / max) * 100}%`, background: g >= avg ? "var(--accent)" : "var(--text-faint)" }} />
                   <span className="absolute top-0 bottom-0 w-px bg-[var(--text-muted)]" style={{ left: `${(avg / max) * 100}%` }} />
                 </span>
-                <span className="text-right font-bold text-[var(--text)]">{moneyShort(g)}</span>
+                <span className="text-right font-bold text-[var(--text)]">{fmtVndShort(g)}</span>
                 <span className="text-right">{r.prevGmvPerHour != null ? <Delta cur={g} prev={r.prevGmvPerHour} /> : <span className="text-[var(--text-faint)]">mới</span>}</span>
               </div>
             );
@@ -931,7 +925,7 @@ const FinanceSection: React.FC<{ fin: FinanceTotals; finPrev: FinanceTotals | nu
               {(hasNeg ? [-1, -0.5, 0, 0.5, 1] : [0, 0.25, 0.5, 0.75, 1]).map((f) => (
                 <g key={f}>
                   <line x1={L} x2={W - R} y1={zero - f * vmax * scale} y2={zero - f * vmax * scale} style={{ stroke: "var(--border)", strokeWidth: 1, opacity: 0.6 }} />
-                  <text x={L - 6} y={zero - f * vmax * scale + 4} textAnchor="end" style={{ fill: "var(--text-faint)", fontSize: 10 }}>{f ? moneyShort(f * vmax) : "0"}</text>
+                  <text x={L - 6} y={zero - f * vmax * scale + 4} textAnchor="end" style={{ fill: "var(--text-faint)", fontSize: 10 }}>{f ? fmtVndShort(f * vmax) : "0"}</text>
                 </g>
               ))}
               {days.map((d, i) => {

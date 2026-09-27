@@ -4,6 +4,7 @@ import { Brand, LiveSession, ShiftSlot, Talent } from "../../types";
 import { talentShortName } from "../../lib/talentName";
 import { BrandTheme, brandGradient } from "../../lib/brandTheme";
 import { BrandLogo } from "./BrandLogo";
+import { fmtVndShort, fmtVndFull } from "../../lib/format";
 
 // Badge session/ca trên các view lịch — bản "to, rõ" thay cho pill 1 dòng cũ.
 //
@@ -58,16 +59,6 @@ interface SessionEventCardProps {
   onDragEnd?: (e: React.DragEvent) => void;
   className?: string;
 }
-
-// Target GMV rút gọn cho vừa 1 badge nhỏ (50.000.000đ → 50M, 1.200.000.000đ → 1.2B) — ký hiệu quốc
-// tế M/B thay vì "tr"/"tỷ" cho ngắn gọn, bản đầy đủ vào `title` để hover xem chính xác.
-const compactGmv = (amount: number): string => {
-  const abs = Math.abs(amount);
-  if (abs >= 1_000_000_000) return `${(amount / 1_000_000_000).toLocaleString("vi-VN", { maximumFractionDigits: 1 })}B`;
-  if (abs >= 1_000_000) return `${(amount / 1_000_000).toLocaleString("vi-VN", { maximumFractionDigits: 1 })}M`;
-  if (abs >= 1_000) return `${(amount / 1_000).toLocaleString("vi-VN", { maximumFractionDigits: 0 })}K`;
-  return `${amount}`;
-};
 
 const TONE_RING: Record<SessionCardTone, string> = {
   live: "ring-2 ring-rose-400 ring-offset-1 ring-offset-white dark:ring-offset-slate-950",
@@ -137,10 +128,10 @@ export const SessionEventCard: React.FC<SessionEventCardProps> = ({
         </span>
         {!!targetGmv && (
           <span
-            title={`Target GMV: ${targetGmv.toLocaleString("vi-VN")}đ`}
+            title={`Target GMV: ${fmtVndFull(targetGmv)}`}
             className="ml-auto shrink-0 text-emerald-400 font-mono font-bold leading-none text-[11px] xl:text-[11px]"
           >
-            {compactGmv(targetGmv)}
+            {fmtVndShort(targetGmv)}
           </span>
         )}
       </div>

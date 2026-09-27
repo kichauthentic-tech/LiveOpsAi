@@ -12,6 +12,7 @@ import { talentOptionLabel } from "../../lib/talentName";
 import { errorMessage } from "../../lib/errorMessage";
 import { useToast } from "../../hooks/useToast";
 import { useConfirm, usePrompt } from "../../hooks/useConfirm";
+import { fmtVndFull } from "../../lib/format";
 
 // Nạp bù ca từ file Creator-Live-Performance (migration 0086) — 2 bước, nằm ngay dưới ô import
 // của tab "Creator Live Performance" trong Dữ Liệu Gốc:
@@ -30,7 +31,7 @@ interface Props {
 }
 
 const WEEKDAY_SHORT = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
-const fmtMoney = (n: number) => `${Math.round(n).toLocaleString("vi-VN")} đ`;
+const fmtMoney = fmtVndFull;
 const monthLabel = (m: string) => `Tháng ${parseInt(m.slice(5), 10)}/${m.slice(0, 4)}`;
 function monthBounds(m: string): [string, string] {
   const [y, mm] = m.split("-").map(Number);

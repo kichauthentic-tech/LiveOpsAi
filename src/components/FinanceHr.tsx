@@ -197,7 +197,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
               )}
             </div>
             <div className={`text-lg font-black ${totals.netProfit >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-              {money(totals.netProfit)} đ <span className="text-xs font-bold text-[var(--text-muted)]">({totalMargin}%)</span>
+              {money(totals.netProfit)} <span className="text-xs font-bold text-[var(--text-muted)]">({totalMargin}%)</span>
             </div>
           </div>
         </div>
@@ -209,7 +209,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
           <div className="text-[11px] rounded-xl px-3 py-2 border border-rose-800/60 bg-rose-950/40 text-rose-200 space-y-1">
             <p>
               <b>{missingSummary.rowsAffected}/{rows.length} phiên đang tính bằng rate chưa nhập</b> — Net Profit ở trên KHÔNG phải số thật,
-              nó đang coi phần chưa nhập là 0đ (hoặc dùng % mặc định trong code).
+              nó đang coi phần chưa nhập là 0 (hoặc dùng % mặc định trong code).
             </p>
             <p className="text-rose-300/90">
               {missingSummary.byKind.map(([kind, n], i) => (
@@ -265,7 +265,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                       <div className="text-[var(--text-muted)]">{s.brandName} · {s.date} · Host {talent?.name ?? s.hostName}</div>
                     </td>
                     <td className="py-2 pr-3">
-                      <div className="font-bold text-[var(--text-muted)]">{money(s.actualGmv)} đ</div>
+                      <div className="font-bold text-[var(--text-muted)]">{money(s.actualGmv)}</div>
                       <DataSourceBadge dataSource={s.dataSource} className="mt-0.5" />
                     </td>
                     <td className="py-2 pr-3">
@@ -274,7 +274,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                           <span className="text-[11px] font-bold bg-blue-950 text-blue-300 border border-blue-800 px-1.5 py-0.5 rounded-full">
                             Theo giờ live
                           </span>
-                          <div className="font-bold text-[var(--text)] mt-0.5">{money(grossAgencyRev)} đ</div>
+                          <div className="font-bold text-[var(--text)] mt-0.5">{money(grossAgencyRev)}</div>
                         </div>
                       ) : (
                         <div className="flex items-center gap-1">
@@ -307,13 +307,13 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                         className="w-24 p-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface-base)] text-[var(--text)] font-bold disabled:opacity-40"
                       />
                       <div className="text-[11px] text-[var(--text-faint)] mt-0.5">
-                        Trợ live báo cáo: {money(s.report?.adsCost ?? 0)} đ
+                        Trợ live báo cáo: {money(s.report?.adsCost ?? 0)}
                       </div>
                     </td>
                     {/* Giai đoạn 3 — nói rõ con số ra từ đâu: talent ăn theo giờ thì hiện giờ
                         công thực tế + phần OT/off sớm host đã khai, để ops đối chiếu khi duyệt. */}
                     <td className="py-2 pr-3">
-                      <div className="text-amber-400 font-bold">{money(hostPayout)} đ</div>
+                      <div className="text-amber-400 font-bold">{money(hostPayout)}</div>
                       {hostPaidHourly && (
                         <div className="text-[11px] text-[var(--text-muted)] mt-0.5">
                           {fmtFixed(billableHours, 2)}h × rate/giờ
@@ -326,7 +326,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                           tính được, phải nói ra chứ không im lặng ra 0. */}
                       {coHost ? (
                         <div className="text-[11px] text-amber-300/80 mt-1">
-                          Trợ live {coHost.name}: <b>{money(coHostPayout)} đ</b>
+                          Trợ live {coHost.name}: <b>{money(coHostPayout)}</b>
                           {coHostPaidHourly && <span className="text-[var(--text-muted)]"> ({fmtFixed(billableHours, 2)}h × {coHostUsesAssistantRate ? "rate trợ/giờ" : "rate host/giờ — chưa đặt rate trợ"})</span>}
                         </div>
                       ) : s.coHostId ? (
@@ -334,7 +334,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                       ) : null}
                     </td>
                     <td className={`py-2 pr-3 font-black ${netProfit >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                      {money(netProfit)} đ
+                      {money(netProfit)}
                     </td>
                     <td className="py-2 pr-3">
                       {finance.approvalStatus === "approved" ? (

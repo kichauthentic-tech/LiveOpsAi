@@ -1,6 +1,6 @@
 import { CHANNEL, DAY_TYPE } from "../metricGlossary";
 import { CAMP_DAY_BUCKET_ORDER, type CampDayBucket } from "../campaignDays";
-import { formatCurrencyAdaptive } from "../formatCurrency";
+import { fmtVndShort } from "../format";
 import {
   DRIVER_LABEL,
   FACTOR_ACTION,
@@ -57,7 +57,7 @@ export function parseInsightText(text: string): SectionInsight | null {
   return { headline, points: rest.filter((l) => !l.startsWith("→")), action: actions.length ? actions.join(" ") : null };
 }
 
-const money = (v: number) => formatCurrencyAdaptive(v);
+const money = (v: number) => fmtVndShort(v);
 const pp = (v: number) => `${v >= 0 ? "+" : "−"}${Math.abs(v).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} điểm`;
 const median = (xs: number[]) => {
   const s = [...xs].sort((a, b) => a - b);

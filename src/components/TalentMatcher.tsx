@@ -6,7 +6,7 @@ import { computeTalentRealTotals } from "../lib/metrics/avgGmv";
 import { errorMessage } from "../lib/errorMessage";
 import { useConfirm } from "../hooks/useConfirm";
 
-import { formatCurrencyAdaptive } from "../lib/formatCurrency";
+import { fmtVndShort, fmtVndFull } from "../lib/format";
 // Vài bản ghi talent cũ (trước khi field chuẩn hoá về `niches`/`avatar`/`ratePerSession`) có thể
 // còn lưu dưới tên cột cũ — đọc dự phòng, không phải lỗi kiểu dữ liệu.
 interface LegacyTalentAliases {
@@ -277,8 +277,8 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
           talentId: t.id,
           name: t.name,
           matchScore,
-          predictedGmv: t.avgGmvPerSession > 0 ? `${formatCurrencyAdaptive(Math.round(t.avgGmvPerSession), "")} – ${formatCurrencyAdaptive(Math.round(t.avgGmvPerSession * 1.25))}` : "chưa có dữ liệu",
-          reasoning: `Thế mạnh ngành ${nicheStr}, CVR trung bình ${t.cvrAvg}%, GMV tích lũy ${formatCurrencyAdaptive(t.totalGmv || 0)}. Rất phù hợp với ${activeBrand?.name || "Brand"}.`
+          predictedGmv: t.avgGmvPerSession > 0 ? `${fmtVndShort(Math.round(t.avgGmvPerSession))} – ${fmtVndShort(Math.round(t.avgGmvPerSession * 1.25))}` : "chưa có dữ liệu",
+          reasoning: `Thế mạnh ngành ${nicheStr}, CVR trung bình ${t.cvrAvg}%, GMV tích lũy ${fmtVndShort(t.totalGmv || 0)}. Rất phù hợp với ${activeBrand?.name || "Brand"}.`
         };
       });
       setMatchingResults(results);
@@ -450,7 +450,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                       </div>
                       <p className="text-[11px] text-[var(--accent-text)] font-medium truncate">{nicheStr}</p>
                       <span className="text-[11px] text-[var(--text-muted)] block truncate whitespace-nowrap">
-                        {real.sessionCount > 0 ? `GMV tích lũy ${formatCurrencyAdaptive(real.totalGmv)} · ${real.sessionCount} ca` : "Chưa có ca nào có số"}
+                        {real.sessionCount > 0 ? `GMV tích lũy ${fmtVndShort(real.totalGmv)} · ${real.sessionCount} ca` : "Chưa có ca nào có số"}
                       </span>
                     </div>
                   </div>
@@ -481,11 +481,11 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 text-[11px] text-[var(--text-muted)] bg-[var(--surface-base)]/40 p-2.5 rounded-xl border border-[var(--border)] font-medium">
-                  <div>GMV/session: <strong className="text-emerald-400 block text-xs font-bold">{real.avgGmvPerSession > 0 ? formatCurrencyAdaptive(Math.round(real.avgGmvPerSession)) : "—"}</strong></div>
+                  <div>GMV/session: <strong className="text-emerald-400 block text-xs font-bold">{real.avgGmvPerSession > 0 ? fmtVndShort(Math.round(real.avgGmvPerSession)) : "—"}</strong></div>
                   <div>CVR TB: <strong className="text-[var(--accent-text)] block text-xs font-bold">{t.cvrAvg > 0 ? `${t.cvrAvg}%` : "—"}</strong></div>
                   {canSeeRate && (
                     <>
-                      <div>Rate Card: <strong className="text-[var(--text)] block font-bold">{t.rateHidden ? "ẩn" : `${rate.toLocaleString()} đ`}</strong></div>
+                      <div>Rate Card: <strong className="text-[var(--text)] block font-bold">{t.rateHidden ? "ẩn" : fmtVndFull(rate)}</strong></div>
                       <div>Hoa hồng: <strong className="text-[var(--accent-text)] block font-bold">{t.rateHidden ? "ẩn" : `${t.commissionRate || 0}%`}</strong></div>
                     </>
                   )}
@@ -628,7 +628,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="font-bold text-[var(--text-muted)] block mb-1">GMV/session (VND)</label>
+                  <label className="font-bold text-[var(--text-muted)] block mb-1">GMV/session</label>
                   <input
                     type="number"
                     value={formGmv}
@@ -637,7 +637,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-[var(--text-muted)] block mb-1">GMV lũy kế (VND)</label>
+                  <label className="font-bold text-[var(--text-muted)] block mb-1">GMV lũy kế</label>
                   <input
                     type="number"
                     value={formTotalGmv}
@@ -662,7 +662,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                 {canSeeRate && (
                   <>
                     <div>
-                      <label className="font-bold text-[var(--text-muted)] block mb-1">Rate Card (VND/Live)</label>
+                      <label className="font-bold text-[var(--text-muted)] block mb-1">Rate Card (/live)</label>
                       <input
                         type="number"
                         value={formRate}
@@ -674,7 +674,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                       {/* Giai đoạn 3 — rate theo GIỜ, song song rate/phiên ở trên. Đặt > 0 thì
                           lương ca tính theo giờ công thực tế (giờ ca + OT − off sớm, xem
                           billableSessionHours ở lib/pnl.ts); để 0 thì giữ nguyên rate/phiên. */}
-                      <label className="font-bold text-[var(--text-muted)] block mb-1">Rate Card (VND/Giờ)</label>
+                      <label className="font-bold text-[var(--text-muted)] block mb-1">Rate Card (/giờ)</label>
                       <input
                         type="number"
                         value={formRateHour}
@@ -688,7 +688,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                     <div>
                       {/* 0089 — rate khi làm TRỢ LIVE, tách khỏi rate host: cùng người hôm nay host mai trợ
                           ăn 2 mức khác nhau. Để 0 thì ca làm trợ vẫn tính theo rate host như cũ. */}
-                      <label className="font-bold text-[var(--text-muted)] block mb-1">Rate Trợ Live (VND/Giờ)</label>
+                      <label className="font-bold text-[var(--text-muted)] block mb-1">Rate Trợ Live (/giờ)</label>
                       <input
                         type="number"
                         value={formAssistantRateHour}
@@ -830,9 +830,9 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
               </div>
 
               <div className="grid grid-cols-2 gap-2 bg-[var(--surface-base)]/40 p-3 rounded-xl border border-[var(--border)]">
-                <div>GMV lũy kế: <strong className="text-[var(--text)] block text-sm font-bold">{formatCurrencyAdaptive(computeTalentRealTotals(sessions, detailTalent.id).totalGmv)}</strong></div>
+                <div>GMV lũy kế: <strong className="text-[var(--text)] block text-sm font-bold">{fmtVndShort(computeTalentRealTotals(sessions, detailTalent.id).totalGmv)}</strong></div>
                 <div>Số Ca Có Số: <strong className="text-[var(--text)] block text-sm font-bold">{computeTalentRealTotals(sessions, detailTalent.id).sessionCount}</strong></div>
-                <div>GMV/session: <strong className="text-emerald-400 block text-sm font-bold">{formatCurrencyAdaptive(Math.round(computeTalentRealTotals(sessions, detailTalent.id).avgGmvPerSession))}</strong></div>
+                <div>GMV/session: <strong className="text-emerald-400 block text-sm font-bold">{fmtVndShort(Math.round(computeTalentRealTotals(sessions, detailTalent.id).avgGmvPerSession))}</strong></div>
                 <div>CVR TB: <strong className="text-[var(--accent-text)] block text-sm font-bold">{detailTalent.cvrAvg || 0}%</strong></div>
                 <div>CTR TB: <strong className="text-[var(--accent-text)] block text-sm font-bold">{detailTalent.ctrAvg || 0}%</strong></div>
                 <div>Trạng Thái: <strong className="text-[var(--text)] block text-sm font-bold">{detailTalent.availabilityStatus || "Available"}</strong></div>
@@ -840,7 +840,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
 
               {canSeeRate && (
                 <div className="grid grid-cols-2 gap-2 bg-amber-950/30 p-3 rounded-xl border border-amber-500/30">
-                  <div>Rate Card: <strong className="text-[var(--text)] block text-sm font-bold">{detailTalent.rateHidden ? "ẩn" : `${(detailTalent.ratePerSession || 0).toLocaleString()} đ`}</strong></div>
+                  <div>Rate Card: <strong className="text-[var(--text)] block text-sm font-bold">{detailTalent.rateHidden ? "ẩn" : fmtVndFull(detailTalent.ratePerSession || 0)}</strong></div>
                   <div>Hoa Hồng: <strong className="text-[var(--accent-text)] block text-sm font-bold">{detailTalent.rateHidden ? "ẩn" : `${detailTalent.commissionRate || 0}%`}</strong></div>
                 </div>
               )}

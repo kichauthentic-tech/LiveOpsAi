@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { LiveSession, ShiftSlot, UserRole } from "../../types";
 import { AlertTriangle, CalendarRange, ChevronLeft, ChevronRight, ClipboardList, Database, Download, Loader2, Radio, TrendingDown, TrendingUp, Users } from "lucide-react";
-import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
+import { fmtVndShort } from "../../lib/format";
 import { metricHint } from "../../lib/metricGlossary";
 import { downloadSheetsAsXlsx } from "../../lib/exportXlsx";
 import { useToast } from "../../hooks/useToast";
@@ -225,11 +225,11 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
 
       {/* KPI tuần */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Kpi label="LIVE GMV tuần" value={formatCurrencyAdaptive(cur.gmv)} delta={wow(cur.gmv, prev.gmv)} tone={cur.gmv > 0 ? "good" : undefined} />
-        <Kpi label="Target GMV tuần" value={cur.target > 0 ? formatCurrencyAdaptive(cur.target) : "—"} hint={cur.achieved !== null ? `${fmtPct(cur.achieved)} Target trên ca đã xong` : cur.target > 0 ? "chưa có ca xong" : "chưa có kế hoạch đã chốt"} tone={cur.achieved === null ? undefined : cur.achieved >= 1 ? "good" : cur.achieved >= 0.9 ? "warn" : "bad"} />
+        <Kpi label="LIVE GMV tuần" value={fmtVndShort(cur.gmv)} delta={wow(cur.gmv, prev.gmv)} tone={cur.gmv > 0 ? "good" : undefined} />
+        <Kpi label="Target GMV tuần" value={cur.target > 0 ? fmtVndShort(cur.target) : "—"} hint={cur.achieved !== null ? `${fmtPct(cur.achieved)} Target trên ca đã xong` : cur.target > 0 ? "chưa có ca xong" : "chưa có kế hoạch đã chốt"} tone={cur.achieved === null ? undefined : cur.achieved >= 1 ? "good" : cur.achieved >= 0.9 ? "warn" : "bad"} />
         <Kpi label="Giờ live" value={fmtH(cur.hours)} delta={wow(cur.hours, prev.hours)} hint={`${cur.done} ca`} />
-        <Kpi label="GMV/giờ" value={formatCurrencyAdaptive(cur.gmvPerHour)} delta={wow(cur.gmvPerHour, prev.gmvPerHour)} />
-        <Kpi label="Orders" value={fmtInt(cur.orders)} delta={wow(cur.orders, prev.orders)} hint={cur.aov > 0 ? `AOV ${formatCurrencyAdaptive(cur.aov)}` : undefined} />
+        <Kpi label="GMV/giờ" value={fmtVndShort(cur.gmvPerHour)} delta={wow(cur.gmvPerHour, prev.gmvPerHour)} />
+        <Kpi label="Orders" value={fmtInt(cur.orders)} delta={wow(cur.orders, prev.orders)} hint={cur.aov > 0 ? `AOV ${fmtVndShort(cur.aov)}` : undefined} />
         <Kpi label="Views" value={fmtInt(cur.views)} delta={wow(cur.views, prev.views)} />
         <Kpi
           label="CVR"
@@ -245,7 +245,7 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
         <Kpi
           label={`Run-rate tháng ${monthKey.slice(5, 7)}`}
           value={monthRr?.runRate === null || monthRr?.runRate === undefined ? "—" : fmtPct(monthRr.runRate)}
-          hint={monthRr ? `${formatCurrencyAdaptive(monthRr.actualDone)} / ${formatCurrencyAdaptive(monthRr.targetTotal)} · dự kiến ${formatCurrencyAdaptive(monthRr.projected)}` : "tháng chưa có target"}
+          hint={monthRr ? `${fmtVndShort(monthRr.actualDone)} / ${fmtVndShort(monthRr.targetTotal)} · dự kiến ${fmtVndShort(monthRr.projected)}` : "tháng chưa có target"}
           tone={monthRr?.runRate == null ? undefined : monthRr.runRate >= 1 ? "good" : monthRr.runRate >= 0.9 ? "warn" : "bad"}
         />
       </div>
@@ -274,14 +274,14 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
                   <td className="py-1.5 pr-2 font-mono text-[var(--text)]">{r.dow} {fmtDay(r.date)}</td>
                   <td className="py-1.5 pr-2 text-right text-[var(--text-muted)]">{r.planned > 0 ? `${r.done}/${r.planned}` : "—"}</td>
                   <td className="py-1.5 pr-2 text-right text-[var(--text-muted)]">{r.hours > 0 ? fmtH(r.hours) : "—"}</td>
-                  <td className="py-1.5 pr-2 text-right font-bold text-[var(--text)]">{r.gmv > 0 ? formatCurrencyAdaptive(r.gmv) : "—"}</td>
-                  <td className="py-1.5 pr-2 text-right text-[var(--text-faint)]">{r.target > 0 ? formatCurrencyAdaptive(r.target) : "—"}</td>
+                  <td className="py-1.5 pr-2 text-right font-bold text-[var(--text)]">{r.gmv > 0 ? fmtVndShort(r.gmv) : "—"}</td>
+                  <td className="py-1.5 pr-2 text-right text-[var(--text-faint)]">{r.target > 0 ? fmtVndShort(r.target) : "—"}</td>
                   <td className={`py-1.5 pr-2 text-right font-bold ${r.achieved === null ? "text-[var(--text-faint)]" : r.achieved >= 1 ? "text-emerald-400" : "text-rose-400"}`}>{fmtPct(r.achieved)}</td>
-                  <td className="py-1.5 pr-2 text-right text-[var(--text-muted)]">{r.gmvPerHour > 0 ? formatCurrencyAdaptive(r.gmvPerHour) : "—"}</td>
+                  <td className="py-1.5 pr-2 text-right text-[var(--text-muted)]">{r.gmvPerHour > 0 ? fmtVndShort(r.gmvPerHour) : "—"}</td>
                   <td className="py-1.5 pr-2 text-right text-[var(--text-muted)]">{r.orders > 0 ? fmtInt(r.orders) : "—"}</td>
                   {slice?.hasAnyBatch && (
-                    <td className="py-1.5 text-right text-[var(--text-faint)]" title={r.shopFromLive !== null ? `Seller LIVE GMV theo TikTok: ${formatCurrencyAdaptive(r.shopFromLive)}` : undefined}>
-                      {r.shopGmv !== null ? formatCurrencyAdaptive(r.shopGmv) : "thiếu file"}
+                    <td className="py-1.5 text-right text-[var(--text-faint)]" title={r.shopFromLive !== null ? `Seller LIVE GMV theo TikTok: ${fmtVndShort(r.shopFromLive)}` : undefined}>
+                      {r.shopGmv !== null ? fmtVndShort(r.shopGmv) : "thiếu file"}
                     </td>
                   )}
                 </tr>
@@ -290,12 +290,12 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
                 <td className="py-1.5 pr-2 text-[var(--text)]">Tuần</td>
                 <td className="py-1.5 pr-2 text-right text-[var(--text-muted)]">{cur.done}/{weekSessions.filter((s) => s.status !== "Cancelled").length}</td>
                 <td className="py-1.5 pr-2 text-right text-[var(--text-muted)]">{fmtH(cur.hours)}</td>
-                <td className="py-1.5 pr-2 text-right text-[var(--text)]">{formatCurrencyAdaptive(cur.gmv)}</td>
-                <td className="py-1.5 pr-2 text-right text-[var(--text-faint)]">{cur.target > 0 ? formatCurrencyAdaptive(cur.target) : "—"}</td>
+                <td className="py-1.5 pr-2 text-right text-[var(--text)]">{fmtVndShort(cur.gmv)}</td>
+                <td className="py-1.5 pr-2 text-right text-[var(--text-faint)]">{cur.target > 0 ? fmtVndShort(cur.target) : "—"}</td>
                 <td className={`py-1.5 pr-2 text-right ${cur.achieved === null ? "text-[var(--text-faint)]" : cur.achieved >= 1 ? "text-emerald-400" : "text-rose-400"}`}>{fmtPct(cur.achieved)}</td>
-                <td className="py-1.5 pr-2 text-right text-[var(--text-muted)]">{formatCurrencyAdaptive(cur.gmvPerHour)}</td>
+                <td className="py-1.5 pr-2 text-right text-[var(--text-muted)]">{fmtVndShort(cur.gmvPerHour)}</td>
                 <td className="py-1.5 pr-2 text-right text-[var(--text-muted)]">{fmtInt(cur.orders)}</td>
-                {slice?.hasAnyBatch && <td className="py-1.5 text-right text-[var(--text-faint)]">{formatCurrencyAdaptive(slice.daily.reduce((a, x) => a + x.gmv, 0))}</td>}
+                {slice?.hasAnyBatch && <td className="py-1.5 text-right text-[var(--text-faint)]">{fmtVndShort(slice.daily.reduce((a, x) => a + x.gmv, 0))}</td>}
               </tr>
             </tbody>
           </table>
@@ -328,8 +328,8 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
                     <p className="text-[11px] text-[var(--text-muted)] truncate">{s.hostName || "chưa gán"}{s.coHostName ? ` · trợ ${s.coHostName}` : ""} · {fmtH(sessionHours(s))} · {fmtInt(s.totalOrders ?? 0)} đơn</p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="font-bold text-emerald-400">{formatCurrencyAdaptive(s.actualGmv)}</p>
-                    <p className="text-[11px] text-[var(--text-faint)]">{formatCurrencyAdaptive(s.actualGmv / Math.max(0.5, sessionHours(s)))}/h{s.targetGmv > 0 ? ` · ${fmtPct(s.actualGmv / s.targetGmv)} target` : ""}</p>
+                    <p className="font-bold text-emerald-400">{fmtVndShort(s.actualGmv)}</p>
+                    <p className="text-[11px] text-[var(--text-faint)]">{fmtVndShort(s.actualGmv / Math.max(0.5, sessionHours(s)))}/h{s.targetGmv > 0 ? ` · ${fmtPct(s.actualGmv / s.targetGmv)} target` : ""}</p>
                   </div>
                 </li>
               ))}
@@ -342,7 +342,7 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
           <h4 className="font-bold text-[var(--text)] text-sm flex items-center gap-2"><Users className="w-4 h-4 text-[var(--accent-text)]" /> Host tuần này</h4>
           {unassignedHost && (
             <p className="text-[11px] text-amber-300">
-              {unassignedHost.sessionCount} ca chưa gán host ({formatCurrencyAdaptive(unassignedHost.gmv)}) không tính vào bảng này.
+              {unassignedHost.sessionCount} ca chưa gán host ({fmtVndShort(unassignedHost.gmv)}) không tính vào bảng này.
             </p>
           )}
           {hosts.length === 0 ? (
@@ -364,8 +364,8 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
                     <td className="py-1.5 text-[var(--text)] font-medium">{h.label}</td>
                     <td className="py-1.5 text-right text-[var(--text-muted)]">{h.sessionCount}</td>
                     <td className="py-1.5 text-right text-[var(--text-muted)]">{fmtH(h.hours)}</td>
-                    <td className="py-1.5 text-right font-bold text-[var(--text)]">{formatCurrencyAdaptive(h.gmv)}</td>
-                    <td className="py-1.5 text-right text-[var(--text-muted)]">{formatCurrencyAdaptive(h.gmvPerHour)}</td>
+                    <td className="py-1.5 text-right font-bold text-[var(--text)]">{fmtVndShort(h.gmv)}</td>
+                    <td className="py-1.5 text-right text-[var(--text-muted)]">{fmtVndShort(h.gmvPerHour)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -400,7 +400,7 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
         <div className="bg-[var(--surface)] rounded-2xl border border-[var(--border)] p-4 space-y-2">
           <h4 className="font-bold text-[var(--text)] text-sm">Tuần tới ({fmtDay(nextStart)} → {fmtDay(nextEnd)})</h4>
           <p className="text-[11px] text-[var(--text-muted)]">
-            {nextSessions.length} ca đã chốt{nextTarget > 0 ? ` · target ${formatCurrencyAdaptive(nextTarget)}` : ""}
+            {nextSessions.length} ca đã chốt{nextTarget > 0 ? ` · target ${fmtVndShort(nextTarget)}` : ""}
             {nextOpenSlots.length > 0 && <> · <span className="text-rose-300 font-bold">{nextOpenSlots.length} ca chưa có người</span></>}
           </p>
           {nextSessions.length === 0 && nextOpenSlots.length === 0 ? (
@@ -413,7 +413,7 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
                   <li key={r.key} className="flex items-center gap-2 text-xs">
                     <span className="font-mono text-[var(--text)]">{fmtDay(r.date)} {r.time}</span>
                     <span className={r.open ? "text-rose-300 font-bold" : "text-[var(--text-muted)]"}>{r.who}</span>
-                    {r.target > 0 && <span className="ml-auto text-[var(--text-faint)]">{formatCurrencyAdaptive(r.target)}</span>}
+                    {r.target > 0 && <span className="ml-auto text-[var(--text-faint)]">{fmtVndShort(r.target)}</span>}
                   </li>
                 ))}
             </ul>

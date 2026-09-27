@@ -36,8 +36,8 @@ test("Vì sao — CROCS 1–22/09 vs 1–22/08: 4 thừa số GMV/giờ, ngày t
     giftLine: "Quà tặng … UPT giảm chủ yếu vì vậy."
   })!;
   expect(w.headline).toBe("GMV/giờ −29%: Views/giờ −19%, LIVE CTR −6%, CTOR −13%, AOV +6% — cả traffic lẫn chuyển đổi cùng giảm.");
-  expect(w.points[0]).toBe("Ngày thường: 28,8 triệu đ → 17,9 triệu đ/giờ (−38%); ngày camp: 27,3 triệu đ → 22,1 triệu đ/giờ (−19%).");
-  expect(w.points[1]).toMatch(/^Không phải do lịch camp: cơ cấu giờ live giữa các loại ngày chỉ giải thích −100\.000 đ\/giờ, hiệu suất trong từng loại ngày −8,2 triệu đ\/giờ\.$/);
+  expect(w.points[0]).toBe("Ngày thường: 28,8M → 17,9M/giờ (−38%); ngày camp: 27,3M → 22,1M/giờ (−19%).");
+  expect(w.points[1]).toMatch(/^Không phải do lịch camp: cơ cấu giờ live giữa các loại ngày chỉ giải thích −100K\/giờ, hiệu suất trong từng loại ngày −8,2M\/giờ\.$/);
   expect(w.points).toContain("Quà tặng … UPT giảm chủ yếu vì vậy.");
   // Bước yếu nhất theo %: Views/giờ −19% ⇒ traffic (không còn "giỏ hàng/UPT" — UPT đổi theo quà tặng).
   expect(w.action).toMatch(/traffic/);
@@ -76,7 +76,7 @@ test("Người — chỉ nêu tên khi so mặt bằng 4 tháng chắc chắn; c
     { key: "a", name: "An", sessions: 2, ratio: 0.83, lo: null, hi: null, verdict: "unclear" as const }
   ];
   const i = peopleInsight(hosts, rel)!;
-  expect(i.headline).toBe("Hùng dẫn đầu GMV (1,71 tỷ đ, 75% tổng host); là host duy nhất vượt mặt bằng với khoảng tin cậy 95% nằm hẳn trên mặt bằng (59 ca): +11% (+2% … +23%).");
+  expect(i.headline).toBe("Hùng dẫn đầu GMV (1,71B, 75% tổng host); là host duy nhất vượt mặt bằng với khoảng tin cậy 95% nằm hẳn trên mặt bằng (59 ca): +11% (+2% … +23%).");
   // Cận dưới sát mặt bằng ⇒ nói rõ là kết luận yếu (số thật CROCS sau khi dùng phân phối t: +0,0% … +23%).
   expect(peopleInsight(hosts, [{ ...rel[0], lo: 1.0003 }, ...rel.slice(1)])!.headline).toMatch(/\+11% \(\+0,0% … \+23%\) — sát ngưỡng, cần thêm tháng để chắc\.$/);
   expect(i.points).toEqual(["3 host còn lại: khoảng tin cậy còn cắt qua mặt bằng — chưa đủ ca để kết luận hơn hay kém."]);

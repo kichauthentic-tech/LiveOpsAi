@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { BrandPlatformRate, BrandPlatformRateHistoryEntry, LiveSession, UserRole } from "../types";
 import { Tag, History } from "lucide-react";
+import { fmtVndFull } from "../lib/format";
 
 interface BrandRateCardProps {
   brandId: string;
@@ -117,10 +118,10 @@ export const BrandRateCard: React.FC<BrandRateCardProps> = ({
             <div key={platform} className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 space-y-3 shadow-xl">
               <div className="flex items-center justify-between">
                 <span className="font-bold text-[var(--text)]">{platform}</span>
-                <span className="text-[11px] text-[var(--text-faint)] uppercase font-bold">đ / giờ live</span>
+                <span className="text-[11px] text-[var(--text-faint)] uppercase font-bold">/ giờ live</span>
               </div>
               <p className="text-2xl font-black text-emerald-400">
-                {current ? current.ratePerHour.toLocaleString("vi-VN") : "—"}đ
+                {current ? fmtVndFull(current.ratePerHour) : "—"}
               </p>
               {canEdit && (
                 <div className="flex items-center gap-2">
@@ -194,9 +195,9 @@ export const BrandRateCard: React.FC<BrandRateCardProps> = ({
                 )}
                 <div className="flex items-center justify-between text-[11px] pt-1">
                   <span className="text-[var(--text-faint)]">
-                    NMV ước tính (GMV {gmv.toLocaleString("vi-VN")}đ × {(100 - returnRate)}%)
+                    NMV ước tính (GMV {fmtVndFull(gmv)} × {(100 - returnRate)}%)
                   </span>
-                  <span className="font-bold text-[var(--text)]">{Math.round(estimatedNmv).toLocaleString("vi-VN")}đ</span>
+                  <span className="font-bold text-[var(--text)]">{fmtVndFull(estimatedNmv)}</span>
                 </div>
               </div>
             </div>
@@ -221,7 +222,7 @@ export const BrandRateCard: React.FC<BrandRateCardProps> = ({
                       {h.effectiveFrom} → {h.effectiveTo ?? "hiện tại"}
                     </span>
                     <span className="text-[var(--text)] font-bold">
-                      {h.ratePerHour.toLocaleString("vi-VN")}đ
+                      {fmtVndFull(h.ratePerHour)}
                       <span className="text-amber-400 font-normal ml-2">· hoàn hủy {h.returnRate}%</span>
                       {h.commissionRate != null && <span className="text-[var(--accent-text)] font-normal ml-2">· hoa hồng {h.commissionRate}%</span>}
                     </span>

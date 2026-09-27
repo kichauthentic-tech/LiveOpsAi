@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { LiveSession, UserRole, BrandMonthlyReport as BrandMonthlyReportType } from "../../types";
 import { AlertTriangle, Loader2, Lock, Megaphone, Save, Target, TrendingUp } from "lucide-react";
-import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
 import { getTodayMonth } from "../../lib/dateUtils";
 import { getCanonicalAdsCost } from "../../lib/metrics/adsCost";
 import { isoWeekStart } from "../../lib/dataraw/weeklySlice";
@@ -9,7 +8,7 @@ import { fetchMonthlyReport, upsertMonthlyReport, MonthlyReportManualInput } fro
 import { errorMessage } from "../../lib/errorMessage";
 import { ReportPlanningInputs } from "./ReportPlanningInputs";
 
-import { fmtFixed } from "../../lib/format";
+import { fmtFixed, fmtVndShort } from "../../lib/format";
 // Nhập Ads & Ghi Chú (tách khỏi Report Tháng 2026-09-21 theo yêu cầu user): phần ops nhập tay
 // Ads Spend bổ sung / ROAS ghi đè / Promotion / Customer Insight / Account Health trước đây nằm
 // cuối Report Tháng, lẫn với tài liệu gửi brand. Giờ là tab riêng trong Brand Workspace, chỉ
@@ -224,12 +223,12 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl p-3">
             <div className="text-[11px] text-[var(--text-faint)]">Tổng Ads cost</div>
-            <div className="text-base font-black text-[var(--text)]">{formatCurrencyAdaptive(adsReport.totalAdsSpend)}</div>
+            <div className="text-base font-black text-[var(--text)]">{fmtVndShort(adsReport.totalAdsSpend)}</div>
             <MomChip current={adsReport.totalAdsSpend} previous={prevAdsReport.totalAdsSpend} />
           </div>
           <div className="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl p-3">
             <div className="text-[11px] text-[var(--text-faint)]">GMV các phiên có Ads</div>
-            <div className="text-base font-black text-[var(--text)]">{formatCurrencyAdaptive(adsReport.totalGmv)}</div>
+            <div className="text-base font-black text-[var(--text)]">{fmtVndShort(adsReport.totalGmv)}</div>
             <MomChip current={adsReport.totalGmv} previous={prevAdsReport.totalGmv} />
           </div>
           <div className="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl p-3">
@@ -265,8 +264,8 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
               {adsReport.weekly.map((w) => (
                 <tr key={w.weekStart} className="border-b border-[var(--border-muted)]">
                   <td className="py-2 px-2 text-[var(--text)] font-semibold">{new Date(`${w.weekStart}T00:00:00`).toLocaleDateString("vi-VN")}</td>
-                  <td className="py-2 px-2 text-right text-[var(--text-muted)]">{formatCurrencyAdaptive(w.adsSpend)}</td>
-                  <td className="py-2 px-2 text-right text-emerald-400 font-bold">{formatCurrencyAdaptive(w.gmv)}</td>
+                  <td className="py-2 px-2 text-right text-[var(--text-muted)]">{fmtVndShort(w.adsSpend)}</td>
+                  <td className="py-2 px-2 text-right text-emerald-400 font-bold">{fmtVndShort(w.gmv)}</td>
                   <td className="py-2 px-2 text-right text-[var(--text-muted)]">{w.adsSpend > 0 ? `${fmtFixed((w.gmv / w.adsSpend), 1)}x` : "—"}</td>
                 </tr>
               ))}
@@ -297,7 +296,7 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="font-bold text-[var(--text-muted)] block mb-1">Ads cost bổ sung (VNĐ)</label>
+              <label className="font-bold text-[var(--text-muted)] block mb-1">Ads cost bổ sung</label>
               <p className="text-[11px] text-[var(--text-faint)] mb-1">
                 Chi phí Ads Shopee hoặc ads ngoài livestream, không tính được từ Report Ca (xem Ads Report Chi Tiết ở trên).
               </p>

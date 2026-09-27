@@ -3,7 +3,7 @@ import type { CreatorLivePerfRow } from "../dataraw/creatorLivePerfSlice";
 import type { ShopDayLite, ShopDaysMonthSlice } from "../dataraw/monthlyProductSlice";
 import type { ProductListAgg } from "../dataraw/productListAgg";
 import { vnDateOf } from "../dataraw/vnDate";
-import { formatCurrencyAdaptive } from "../formatCurrency";
+import { fmtVndShort } from "../format";
 import { hostKey, sessionHours, UNASSIGNED_HOST_KEY } from "../performance/hostPerformance";
 import type { LiveSession } from "../../types";
 import { liveStatsFromRows, pctChange, signed, type CompareWindow, type LiveStats } from "./monthlyReportInsights";
@@ -20,7 +20,7 @@ import { liveStatsFromRows, pctChange, signed, type CompareWindow, type LiveStat
 //     3–4 tháng, kèm khoảng tin cậy, chỉ kết luận khi khoảng đó nằm hẳn một phía.
 // Mọi hàm thuần, không đọc DB.
 
-const money = (v: number) => formatCurrencyAdaptive(v);
+const money = (v: number) => fmtVndShort(v);
 
 // ---------- 1. Quà tặng ----------
 
@@ -93,7 +93,7 @@ export function giftLine(prev: GiftStats | null, cur: GiftStats | null, prevLabe
   const down = cur.giftPerOrder < prev.giftPerOrder;
   const dir = down ? "giảm" : "tăng";
   return (
-    `Quà tặng (hàng dưới ${GIFT_MAX_PRICE / 1000}k/món) ${dir} từ ${dec2(prev.giftPerOrder)} ${down ? "xuống" : "lên"} ${dec2(cur.giftPerOrder)} món mỗi đơn cả shop (${prevLabel} → nay)` +
+    `Quà tặng (hàng dưới ${fmtVndShort(GIFT_MAX_PRICE)}/món) ${dir} từ ${dec2(prev.giftPerOrder)} ${down ? "xuống" : "lên"} ${dec2(cur.giftPerOrder)} món mỗi đơn cả shop (${prevLabel} → nay)` +
     ` — UPT ${dir} chủ yếu vì vậy; tính trên hàng bán thật, UPT cả shop ${dec2(prev.uptExGift)} → ${dec2(cur.uptExGift)}.`
   );
 }

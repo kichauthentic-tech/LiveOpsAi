@@ -46,7 +46,7 @@ import { eligibleSlots } from "../lib/performance/bulkFinalize";
 import { useToast } from "../hooks/useToast";
 import { PageIntro } from "./common/PageIntro";
 
-import { fmtFixed } from "../lib/format";
+import { fmtFixed, fmtVndShort } from "../lib/format";
 interface ShiftSchedulingProps {
   currentRole: UserRole;
   activeUser: SystemUser;
@@ -114,11 +114,7 @@ const isAdminRole = (role: UserRole) => role === "ceo" || role === "operations" 
 
 // GMV/giờ gọn để nhét cạnh tên host trong dropdown — chỗ này chỉ còn vài ký tự, số đầy đủ xem ở
 // tab Hiệu Suất Host.
-const fmtPerHour = (n: number) => {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toLocaleString("vi-VN", { maximumFractionDigits: 1 })}tr/h`;
-  if (n >= 1_000) return `${Math.round(n / 1_000)}k/h`;
-  return `${Math.round(n)}đ/h`;
-};
+const fmtPerHour = (n: number) => `${fmtVndShort(n)}/h`;
 
 // Nhãn cho 1 ứng viên: luôn nói rõ số đang hiện là của brand này hay số chung. Ops tưởng số chung
 // là số của brand rồi xếp nhầm là kiểu sai nguy hiểm nhất mà màn này có thể gây ra.

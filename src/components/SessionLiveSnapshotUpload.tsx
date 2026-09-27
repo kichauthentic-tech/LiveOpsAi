@@ -9,14 +9,11 @@ import {
 } from "../lib/db/sessionLiveSnapshots";
 import { errorMessage } from "../lib/errorMessage";
 import { useConfirm } from "../hooks/useConfirm";
+import { fmtVndFull } from "../lib/format";
 
 interface SessionLiveSnapshotUploadProps {
   session: LiveSession;
   onApplied: (session: LiveSession) => void;
-}
-
-function fmtVnd(n: number): string {
-  return n.toLocaleString("vi-VN", { maximumFractionDigits: 0 }) + "đ";
 }
 
 function fmtTime(iso?: string): string {
@@ -105,7 +102,7 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
           <div className="grid grid-cols-3 gap-2 text-center">
             <div className="bg-[var(--surface-base)] rounded-lg py-1.5">
               <p className="text-[11px] text-[var(--text-faint)]">GMV ca này</p>
-              <p className="text-xs font-bold text-emerald-300">{fmtVnd(session.actualGmv ?? 0)}</p>
+              <p className="text-xs font-bold text-emerald-300">{fmtVndFull(session.actualGmv ?? 0)}</p>
             </div>
             <div className="bg-[var(--surface-base)] rounded-lg py-1.5">
               <p className="text-[11px] text-[var(--text-faint)]">Orders</p>

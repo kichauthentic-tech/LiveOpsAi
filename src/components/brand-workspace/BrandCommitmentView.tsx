@@ -9,7 +9,7 @@ import {
   todayVn
 } from "../../lib/performance/brandCommitment";
 import { errorMessage } from "../../lib/errorMessage";
-import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
+import { fmtVndShort } from "../../lib/format";
 import { metricsHiddenFor } from "../../lib/sessionLedger";
 import { downloadRowsAsXlsx } from "../../lib/exportXlsx";
 import { useToast } from "../../hooks/useToast";
@@ -304,7 +304,7 @@ export const BrandCommitmentView: React.FC<BrandCommitmentViewProps> = ({
                         {gmvHidden ? (
                           <span className="text-[11px] italic text-[var(--text-faint)]">chưa phát hành</span>
                         ) : p.deliveredGmv > 0 ? (
-                          formatCurrencyAdaptive(p.deliveredGmv, "")
+                          fmtVndShort(p.deliveredGmv)
                         ) : (
                           "—"
                         )}

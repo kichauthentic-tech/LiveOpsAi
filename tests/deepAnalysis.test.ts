@@ -57,7 +57,7 @@ test("quà tặng: SKU dưới 20k/món là quà; UPT tính trên hàng bán th�
   expect(g9.uptExGift).toBeCloseTo(1.08, 2);
 
   expect(giftLine(g6, g9, "T6")).toBe(
-    "Quà tặng (hàng dưới 20k/món) giảm từ 0,66 xuống 0,00 món mỗi đơn cả shop (T6 → nay) — UPT giảm chủ yếu vì vậy; tính trên hàng bán thật, UPT cả shop 1,09 → 1,08."
+    "Quà tặng (hàng dưới 20K/món) giảm từ 0,66 xuống 0,00 món mỗi đơn cả shop (T6 → nay) — UPT giảm chủ yếu vì vậy; tính trên hàng bán thật, UPT cả shop 1,09 → 1,08."
   );
   expect(giftLine(g9, { ...g9, giftPerOrder: 0.05 }, "T8")).toBeNull();
   expect(giftStats(null, days("2026-09", 30, 1))).toBeNull();
@@ -89,7 +89,7 @@ test("cơ cấu lịch vs hiệu suất: mix + rate = ΔGMV/giờ; giữ nguyên
     ["camp", 31.2, 26.5]
   ]);
   expect(dailyGapLine(groups[0])).toBe(
-    "Nếu ngày thường giữ GMV/giờ kỳ trước (28,8 triệu đ/giờ, nay 17,9 triệu đ/giờ) với 100 giờ live đã chạy, LIVE GMV có thêm ~1,09 tỷ đ."
+    "Nếu ngày thường giữ GMV/giờ kỳ trước (28,8M/giờ, nay 17,9M/giờ) với 100 giờ live đã chạy, LIVE GMV có thêm ~1,09B."
   );
 });
 

@@ -23,7 +23,7 @@ import { useToast } from "../../hooks/useToast";
 import { fetchMonthlyReportSnapshot, saveMonthlyReportSnapshot, StoredMonthlyReportSnapshot } from "../../lib/db/monthlyReportSnapshots";
 import { DataRawImportStamp, fetchDataRawImportStamps } from "../../lib/db/brandDataRaw";
 import { buildMonthlyReportSnapshot, snapshotFreshness, snapshotHeadline, SnapshotHeadline } from "../../lib/report/monthlySnapshot";
-import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
+import { fmtVndShort } from "../../lib/format";
 import { PageIntro } from "../common/PageIntro";
 
 // Report Tuần không còn là tab riêng ở menu (2026-08-23) — gộp làm chế độ xem "Tuần" ngay trong
@@ -65,7 +65,7 @@ const fmtStamp = (iso: string) => {
 };
 
 function headlineDiff(before: SnapshotHeadline, after: SnapshotHeadline): string {
-  const money = (v: number) => formatCurrencyAdaptive(v);
+  const money = (v: number) => fmtVndShort(v);
   const hours = (v: number) => `${v.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h`;
   const line = (label: string, a: string, b: string) => `${label}: ${a === b ? a + " (không đổi)" : `${a} → ${b}`}`;
   return [

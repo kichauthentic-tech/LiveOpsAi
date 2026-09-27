@@ -10,6 +10,7 @@ import {
 } from "../lib/performance/bulkFinalize";
 import { headlineFor } from "../lib/performance/hostSuggestion";
 import { useConfirm } from "../hooks/useConfirm";
+import { fmtVndShort } from "../lib/format";
 
 interface BulkFinalizePanelProps {
   slots: ShiftSlot[];
@@ -29,11 +30,7 @@ type RunState =
   | { phase: "running"; done: number; total: number }
   | { phase: "done"; ok: string[]; failed: string[] };
 
-const fmtPerHour = (n: number) => {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toLocaleString("vi-VN", { maximumFractionDigits: 1 })}tr/h`;
-  if (n >= 1_000) return `${Math.round(n / 1_000)}k/h`;
-  return `${Math.round(n)}đ/h`;
-};
+const fmtPerHour = (n: number) => `${fmtVndShort(n)}/h`;
 
 function conflictText(r: BulkPlanRow): string | null {
   const c = r.conflicts;

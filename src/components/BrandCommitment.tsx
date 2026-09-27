@@ -22,6 +22,7 @@ import {
 } from "../lib/performance/brandCommitment";
 import { useConfirm, usePrompt } from "../hooks/useConfirm";
 import { PageIntro } from "./common/PageIntro";
+import { fmtVndShort } from "../lib/format";
 
 interface BrandCommitmentProps {
   sessions: LiveSession[];
@@ -46,12 +47,6 @@ const STATUS_TONE: Record<CommitmentStatus, string> = {
 
 function fmtHours(n: number): string {
   return n.toLocaleString("vi-VN", { maximumFractionDigits: 1 }) + "h";
-}
-
-function fmtVnd(n: number): string {
-  if (Math.abs(n) >= 1_000_000_000) return (n / 1_000_000_000).toLocaleString("vi-VN", { maximumFractionDigits: 2 }) + " tỷ";
-  if (Math.abs(n) >= 1_000_000) return (n / 1_000_000).toLocaleString("vi-VN", { maximumFractionDigits: 1 }) + "tr";
-  return n.toLocaleString("vi-VN", { maximumFractionDigits: 0 });
 }
 
 function monthLabel(periodMonth: string): string {
@@ -460,10 +455,10 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
                       <div key={r.brandId} className="bg-[var(--surface-base)] rounded-xl p-2.5">
                         <p className="text-[11px] text-[var(--text-faint)]">{r.brandName}</p>
                         <p className="text-xs font-bold text-[var(--text)] mt-0.5">
-                          {fmtVnd(r.deliveredGmv)} / {fmtVnd(r.committedGmv ?? 0)}
+                          {fmtVndShort(r.deliveredGmv)} / {fmtVndShort(r.committedGmv ?? 0)}
                         </p>
                         <p className={`text-[11px] mt-0.5 ${(r.gmvGap ?? 0) > 0 ? "text-rose-400" : "text-emerald-400"}`}>
-                          {(r.gmvGap ?? 0) > 0 ? `còn thiếu ${fmtVnd(r.gmvGap ?? 0)}` : "đã đạt"}
+                          {(r.gmvGap ?? 0) > 0 ? `còn thiếu ${fmtVndShort(r.gmvGap ?? 0)}` : "đã đạt"}
                         </p>
                       </div>
                     ))}
@@ -584,7 +579,7 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
                   </p>
                   <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
                     {monthLabel(c.startMonth)} → {c.endMonth ? monthLabel(c.endMonth) : "chưa chốt"} · {fmtHours(c.monthlyHours)}/tháng
-                    {c.monthlyGmv !== undefined && ` · ${fmtVnd(c.monthlyGmv)} GMV/tháng`}
+                    {c.monthlyGmv !== undefined && ` · ${fmtVndShort(c.monthlyGmv)} GMV/tháng`}
                     {" · "}
                     {c.status === "active" ? "đang hiệu lực" : c.status === "draft" ? "nháp" : "đã kết thúc"}
                   </p>
@@ -667,7 +662,7 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
                         <td className="py-1.5 pr-3 text-[var(--text-muted)]">{monthLabel(m.periodMonth)}</td>
                         <td className="py-1.5 pr-3 text-right text-[var(--text)]">{fmtHours(m.committedHours)}</td>
                         <td className="py-1.5 pr-3 text-right text-[var(--text-muted)]">
-                          {m.committedGmv === undefined ? "—" : fmtVnd(m.committedGmv)}
+                          {m.committedGmv === undefined ? "—" : fmtVndShort(m.committedGmv)}
                         </td>
                         <td className="py-1.5 pr-3 text-[11px]">
                           {m.isOverride ? (

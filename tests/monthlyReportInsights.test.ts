@@ -122,16 +122,16 @@ test("kết luận trước: kết quả, nguyên nhân quy ra tiền, thị tr�
     nextPlan: { targetGmv: 5_500_000_000, status: "draft" as const, slotCount: 75 },
     controlLine: "So với phần còn lại của shop (ngày thường): live agency −19%, phần còn lại +1%, lượt vào shop −4% ⇒ khoảng hụt nằm ở vận hành live.",
     controlOpsGroup: "daily" as const,
-    dailyGap: { line: "Nếu ngày thường giữ GMV/giờ kỳ trước (28,8 triệu đ/giờ, nay 17,9 triệu đ/giờ) với 98,2 giờ live đã chạy, LIVE GMV có thêm ~1,07 tỷ đ.", value: 1_070_000_000 },
-    giftLine: "Quà tặng (hàng dưới 20k/món) giảm từ 0,13 xuống 0,00 món mỗi đơn cả shop (T8 → nay) — UPT giảm chủ yếu vì vậy; tính trên hàng bán thật, UPT cả shop 1,11 → 1,08."
+    dailyGap: { line: "Nếu ngày thường giữ GMV/giờ kỳ trước (28,8M/giờ, nay 17,9M/giờ) với 98,2 giờ live đã chạy, LIVE GMV có thêm ~1,07B.", value: 1_070_000_000 },
+    giftLine: "Quà tặng (hàng dưới 20K/món) giảm từ 0,13 xuống 0,00 món mỗi đơn cả shop (T8 → nay) — UPT giảm chủ yếu vì vậy; tính trên hàng bán thật, UPT cả shop 1,11 → 1,08."
   };
   const lines = autoSummary(input);
   const summary = lines.join("\n");
-  expect(lines[0]).toContain("5,21 tỷ");
+  expect(lines[0]).toContain("5,21B");
   expect(lines[0]).toContain("67,5% tổng shop");
   expect(lines[1]).toContain("1–22/09 so với 1–22/08");
   expect(lines[1]).toContain("−18,4%");
-  expect(lines[1]).toMatch(/GMV\/giờ giảm chủ yếu do Views\/giờ \(−19%, −[\d,]+ triệu đ\) và CTOR \(−13%/);
+  expect(lines[1]).toMatch(/GMV\/giờ giảm chủ yếu do Views\/giờ \(−19%, −[\d,]+M\) và CTOR \(−13%/);
   expect(lines[1]).toContain("AOV +6% bù lại");
   expect(summary).toContain("khoảng hụt nằm ở vận hành live");
   // Cơ hội ngày thường (1,07 tỷ) lớn hơn đưa Views/giờ về mức cũ (~800tr) ⇒ chọn ngày thường.
@@ -145,7 +145,7 @@ test("kết luận trước: kết quả, nguyên nhân quy ra tiền, thị tr�
   expect(next).toContain("Views/giờ −19% so với cùng kỳ. Điểm nghẽn ở traffic");
   expect(next).toContain("Ngày thường là chỗ hụt của riêng live");
   expect(next).toContain("Hỏi brand về chương trình quà tặng");
-  expect(next).toContain("5,5 tỷ");
+  expect(next).toContain("5,5B");
   expect(next).toContain("75 ca");
 
   // Không có cơ hội ngày thường ⇒ chọn thừa số tụt nhiều tiền nhất.
@@ -223,6 +223,6 @@ test("KPI cả shop: tháng đủ so thẳng (deck Crocs T8 9,1 tỷ vs KPI 8,4 
     month: "2026-08", window: compareWindow("2026-08", "2026-08-31"), shopCur: shop(9_100_000_000, "2026-08-31"), shopPrev: null,
     liveCur: t9, livePrev: t8, drivers: null, targetGmv: null, nextMonth: "2026-09", nextPlan: null
   };
-  expect(autoSummary({ ...base, shopKpi: full })[0]).toContain("Cả shop đạt 108% KPI 8,4 tỷ đ (vượt 700 triệu đ).");
-  expect(autoSummary({ ...base, shopKpi: sep })[0]).toMatch(/Cả shop đạt 65% KPI 8 tỷ đ; theo nhịp cùng kỳ tháng trước, dự kiến cuối tháng ~7,02 tỷ đ \(88% KPI\)\./);
+  expect(autoSummary({ ...base, shopKpi: full })[0]).toContain("Cả shop đạt 108% KPI 8,4B (vượt 700M).");
+  expect(autoSummary({ ...base, shopKpi: sep })[0]).toMatch(/Cả shop đạt 65% KPI 8B; theo nhịp cùng kỳ tháng trước, dự kiến cuối tháng ~7,02B \(88% KPI\)\./);
 });

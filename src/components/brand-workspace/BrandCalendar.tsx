@@ -3,7 +3,7 @@ import { Brand, LiveSession, PromoScheme, ShiftSlot, ShiftRegistration, Studio, 
 import { SessionWindow } from "../SessionWindow";
 import { SessionReportInput } from "../../lib/db/sessionReports";
 import { CalendarIcon, ChevronLeft, ChevronRight, Plus, Tag } from "lucide-react";
-import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
+import { fmtVndShort } from "../../lib/format";
 import { schemesForDate } from "../../lib/schemeUtils";
 import { CAMPAIGN_DAY_STYLES, getCampaignDayInfo } from "../../lib/campaignDays";
 import { OpenSlotModal } from "../scheduling/OpenSlotModal";
@@ -490,7 +490,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
                   <span>Host: {s.hostName}</span>
                   {s.coHostName && <span>Trợ live: {s.coHostName}</span>}
                   <span>Studio: {s.studioName}</span>
-                  <span className="ml-auto font-bold text-[var(--success)]">{formatCurrencyAdaptive(s.actualGmv || 0)}</span>
+                  <span className="ml-auto font-bold text-[var(--success)]">{fmtVndShort(s.actualGmv || 0)}</span>
                 </div>
               ))}
             </div>

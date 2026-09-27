@@ -136,14 +136,25 @@ test("không dùng toFixed cho chữ hiển thị (dấu thập phân phải là
   expect(hits).toEqual([]);
 });
 
-test("tiền không dùng ký hiệu ₫ hay đơn vị M — dùng đ / triệu / tỷ", () => {
+// Quy ước tiền (user chốt 2026-09-27): không "đ"/"₫"/"VNĐ"; rút gọn là 50M / 1,2B / 500K qua fmtVndShort,
+// đầy đủ là 53.733.488 qua fmtVndFull — component không tự ghép "tr"/"triệu"/"tỷ"/"k".
+function codeWithoutComments(file: string): string[] {
+  return readFileSync(file, "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ""))
+    .split("\n")
+    .map((line) => line.replace(/(^|[^:])\/\/.*$/, "$1"));
+}
+
+test("tiền không có đơn vị đ / ₫ / VNĐ, không tự ghép tr / triệu / tỷ / k", () => {
   const hits: string[] = [];
   for (const file of sourceFiles(SRC)) {
-    for (const { line, n } of codeLines(file)) {
-      // Bỏ qua bộ đọc file TikTok: nó phải gỡ ký hiệu ₫ khỏi số trong file gốc.
-      if (/\.replace\(/.test(line)) continue;
-      if (/₫|\dM đ|\}M đ|\)M đ/.test(line)) hits.push(`${file.split("/src/")[1]}:${n} ${line.trim().slice(0, 100)}`);
-    }
+    codeWithoutComments(file).forEach((line, i) => {
+      // Bỏ qua bộ đọc file TikTok (gỡ ₫ khỏi số trong file gốc) và hàm bỏ dấu (đ → d).
+      if (/\.replace\(/.test(line)) return;
+      const unit = /(?<![\p{L}])đ(?![\p{L}%])|₫|VNĐ|\bVND\b/u.test(line);
+      const shortUnit = /[\d})]\s?(triệu|tr|tỷ|k)(?![\p{L}\d])/u.test(line) && !/Voucher/i.test(line);
+      if (unit || shortUnit) hits.push(`${file.split("/src/")[1]}:${i + 1} ${line.trim().slice(0, 100)}`);
+    });
   }
   expect(hits).toEqual([]);
 });

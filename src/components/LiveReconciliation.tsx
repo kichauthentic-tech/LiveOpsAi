@@ -14,6 +14,7 @@ import {
 import { errorMessage } from "../lib/errorMessage";
 import { useConfirm } from "../hooks/useConfirm";
 import { PageIntro } from "./common/PageIntro";
+import { fmtVndFull } from "../lib/format";
 
 interface LiveReconciliationProps {
   onApplied: () => Promise<void> | void;
@@ -43,10 +44,6 @@ const BUCKET_TONE: Record<ReconciliationBucket, string> = {
 };
 
 const ORDER: ReconciliationBucket[] = ["agency", "review", "unassigned", "inhouse"];
-
-function fmtVnd(n: number): string {
-  return n.toLocaleString("vi-VN", { maximumFractionDigits: 0 }) + "đ";
-}
 
 function fmtTime(iso?: string): string {
   return iso ? new Date(iso).toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—";
@@ -170,7 +167,7 @@ export function LiveReconciliation({ onApplied, onOpenSession }: LiveReconciliat
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
                     <p className="text-xs font-black text-[var(--text)]">
-                      {BUCKET_LABEL[bucket]} · {items.length} phiên · {fmtVnd(totalGmv)}
+                      {BUCKET_LABEL[bucket]} · {items.length} phiên · {fmtVndFull(totalGmv)}
                     </p>
                     <p className="text-[11px] text-[var(--text-muted)] mt-0.5 max-w-2xl">{BUCKET_HINT[bucket]}</p>
                   </div>
@@ -219,7 +216,7 @@ export function LiveReconciliation({ onApplied, onOpenSession }: LiveReconciliat
                           <td className="py-1.5 pr-3 text-[var(--text-faint)] whitespace-nowrap">
                             {fmtTime(r.startedAt)} → {fmtTime(r.endedAt)}
                           </td>
-                          <td className="py-1.5 pr-3 text-right font-bold text-[var(--text)]">{fmtVnd(r.gmv)}</td>
+                          <td className="py-1.5 pr-3 text-right font-bold text-[var(--text)]">{fmtVndFull(r.gmv)}</td>
                           <td className="py-1.5 pr-3 text-right text-[var(--text-muted)]">{r.orders}</td>
                           <td className="py-1.5 text-right text-[var(--text-muted)]">
                             {r.matchedSessionIds.length === 0 ? "—" : onOpenSession ? (

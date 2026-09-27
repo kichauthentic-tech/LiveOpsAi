@@ -22,13 +22,12 @@ import {
 } from "../lib/scheduling/monthPlanGrid";
 import { RecurringRulesPanel } from "./scheduling/RecurringRulesPanel";
 import { HistorySummary, STRATEGY_LABEL, SuggestResult, SuggestStrategy, buildBorrowedHistory, buildHistory, estimateSlots, suggestMonthPlan } from "../lib/scheduling/suggestEngine";
-import { formatCurrencyAdaptive } from "../lib/formatCurrency";
 import { EngineParams } from "../lib/scheduling/engineParams";
 import { findBrandStudioId } from "../lib/db/brandStudios";
 import { useConfirm } from "../hooks/useConfirm";
 import { PageIntro } from "./common/PageIntro";
 
-import { fmtFixed } from "../lib/format";
+import { fmtFixed, fmtVndShort, fmtVndFull } from "../lib/format";
 interface MonthPlanProps {
   brands: Brand[];
   studios: Studio[];
@@ -290,7 +289,7 @@ export default function MonthPlan({
     const byForecast = weights.some((w) => w > 0);
     setDrafts(allocateDraftTargets(drafts, targetTotal, weights));
     setDirty(true);
-    setMsg(byForecast ? `Đã chia ${formatCurrencyAdaptive(targetTotal)} theo dự báo từng ca (${history.sessions} ca lịch sử).` : `Brand chưa có lịch sử đối soát — đã chia ${formatCurrencyAdaptive(targetTotal)} đều theo giờ.`);
+    setMsg(byForecast ? `Đã chia ${fmtVndShort(targetTotal)} theo dự báo từng ca (${history.sessions} ca lịch sử).` : `Brand chưa có lịch sử đối soát — đã chia ${fmtVndShort(targetTotal)} đều theo giờ.`);
   };
   // Đổ gợi ý vào lưới. Ngày camp có thể nhiều ca hơn trần ops đặt (engine nới theo giờ/ngày lịch sử) —
   // nâng trần kế hoạch theo, không thì validateDrafts chặn lưu chính cái gợi ý vừa áp.
@@ -362,7 +361,7 @@ export default function MonthPlan({
       return;
     }
     applySuggestion(drafts, result);
-    setMsg(`${mode === "target" ? "Xếp theo target" : "Gợi ý"} ${result.slots.length} ca · ${fmtH(result.totalHours)}h · dự báo ${formatCurrencyAdaptive(result.forecastGmv)}${targetTotal > 0 ? ` / target ${formatCurrencyAdaptive(targetTotal)}` : ""}${drafts.length > 0 ? ` (giữ ${drafts.length} ca đang có)` : ""}.`);
+    setMsg(`${mode === "target" ? "Xếp theo target" : "Gợi ý"} ${result.slots.length} ca · ${fmtH(result.totalHours)}h · dự báo ${fmtVndShort(result.forecastGmv)}${targetTotal > 0 ? ` / target ${fmtVndShort(targetTotal)}` : ""}${drafts.length > 0 ? ` (giữ ${drafts.length} ca đang có)` : ""}.`);
   };
 
   const clearAll = async () => {
@@ -402,7 +401,7 @@ export default function MonthPlan({
     const gap = planHours - totals.hours;
     const warn = planHours > 0 && Math.abs(gap) > 0.01 ? `\n\nGiờ kế hoạch ${fmtH(totals.hours)}h ${gap > 0 ? "THIẾU" : "VƯỢT"} ${fmtH(Math.abs(gap))}h so với ${fmtH(planHours)}h cần xếp.` : "";
     const relockNote = locked ? "\n\nChốt lại sẽ mở thêm ca mới và HUỶ ca đang mở đã bị bỏ khỏi kế hoạch (trừ ca đã có người đăng ký)." : "";
-    const targetWarn = targetGap && targetGap.pct > engineParams.targetGapWarnPct ? `\n\nDự báo lưới ${formatCurrencyAdaptive(targetGap.forecast)} THIẾU ${formatCurrencyAdaptive(targetGap.gap)} (${Math.round(targetGap.pct * 100)}%) so với target ${formatCurrencyAdaptive(targetTotal)}${targetGap.fill ? ` — cần bù ~${fmtH(targetGap.extraHours)}h.` : " — thêm giờ trong khung cũng không chạm."} Sau khi chốt, target/ca KHÔNG chia lại nữa.` : "";
+    const targetWarn = targetGap && targetGap.pct > engineParams.targetGapWarnPct ? `\n\nDự báo lưới ${fmtVndShort(targetGap.forecast)} THIẾU ${fmtVndShort(targetGap.gap)} (${Math.round(targetGap.pct * 100)}%) so với target ${fmtVndShort(targetTotal)}${targetGap.fill ? ` — cần bù ~${fmtH(targetGap.extraHours)}h.` : " — thêm giờ trong khung cũng không chạm."} Sau khi chốt, target/ca KHÔNG chia lại nữa.` : "";
     const pastCount = drafts.filter((d) => d.date < today).length;
     const pastNote = pastCount > 0 ? `\n\n${pastCount} ca ở ngày đã qua sẽ KHÔNG mở chờ đăng ký (chỉ giữ trong kế hoạch để đối chiếu).` : "";
     const studioNote = brandStudio ? `\n\nCa sinh ra gắn phòng ${brandStudio.name} (${brandStudio.roomNumber}).` : "\n\nBrand CHƯA có phòng live mặc định — ca sinh ra sẽ không có phòng (không kiểm được trùng phòng). Chọn ở Tham số → Phòng live trước nếu cần.";
@@ -529,14 +528,14 @@ export default function MonthPlan({
             </label>
           </div>
           <label className="block text-xs">
-            <span className="font-bold text-[var(--text-muted)] block mb-1">Target GMV tháng (đ)</span>
+            <span className="font-bold text-[var(--text-muted)] block mb-1">Target GMV tháng</span>
             <input type="number" min="0" step="1000000" disabled={!editable} value={settings.targetGmv || ""} placeholder="0 = chưa đặt" onChange={(e) => { const t = Number(e.target.value) || 0; setSettings((s) => ({ ...s, targetGmv: t })); if (!locked && t > 0) setDrafts((prev) => withForecast(prev, t)); setDirty(true); }} className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] font-mono disabled:opacity-60" />
-            {targetTotal > 0 && <span className="text-[11px] text-[var(--text-faint)]">{formatCurrencyAdaptive(targetTotal)}</span>}
+            {targetTotal > 0 && <span className="text-[11px] text-[var(--text-faint)]">{fmtVndShort(targetTotal)}</span>}
           </label>
           <label className="block text-xs">
-            <span className="font-bold text-[var(--text-muted)] block mb-1">KPI GMV (đ) <span className="font-normal text-[var(--text-faint)]">— brand giao, mọi kênh; chỉ để Report Tháng so, không dùng xếp ca</span></span>
+            <span className="font-bold text-[var(--text-muted)] block mb-1">KPI GMV <span className="font-normal text-[var(--text-faint)]">— brand giao, mọi kênh; chỉ để Report Tháng so, không dùng xếp ca</span></span>
             <input type="number" min="0" step="1000000" disabled={!editable} value={settings.shopTargetGmv || ""} placeholder="0 = brand chưa giao" onChange={(e) => { setSettings((s) => ({ ...s, shopTargetGmv: Number(e.target.value) || 0 })); setDirty(true); }} className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] font-mono disabled:opacity-60" />
-            {settings.shopTargetGmv > 0 && <span className="text-[11px] text-[var(--text-faint)]">{formatCurrencyAdaptive(settings.shopTargetGmv)}{targetTotal > 0 ? ` · Target GMV live = ${Math.round((targetTotal / settings.shopTargetGmv) * 100)}% KPI GMV` : ""}</span>}
+            {settings.shopTargetGmv > 0 && <span className="text-[11px] text-[var(--text-faint)]">{fmtVndShort(settings.shopTargetGmv)}{targetTotal > 0 ? ` · Target GMV live = ${Math.round((targetTotal / settings.shopTargetGmv) * 100)}% KPI GMV` : ""}</span>}
           </label>
           <div className="text-xs space-y-1">
             <span className="font-bold text-[var(--text-muted)] block">Khoảng ngày camp <span className="font-normal text-[var(--text-faint)]">(trống = lịch cố định)</span></span>
@@ -578,7 +577,7 @@ export default function MonthPlan({
             <div className="flex justify-between items-center gap-2"><span className="text-[var(--text-muted)]">Giờ cần xếp tháng này</span>
               <input type="number" min="0" step="1" disabled={!editable} value={planHours || ""} placeholder="= cam kết" onChange={(e) => setHoursOverride(e.target.value === "" ? null : Number(e.target.value))} className="w-24 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1 text-right font-mono text-[var(--text)] disabled:opacity-60" />
             </div>
-            <div className="flex justify-between gap-2"><span className="text-[var(--text-muted)]">Target GMV tháng</span><b className="text-[var(--text)]">{targetTotal > 0 ? formatCurrencyAdaptive(targetTotal) : "chưa đặt"}</b></div>
+            <div className="flex justify-between gap-2"><span className="text-[var(--text-muted)]">Target GMV tháng</span><b className="text-[var(--text)]">{targetTotal > 0 ? fmtVndShort(targetTotal) : "chưa đặt"}</b></div>
             <p className="text-[11px] text-[var(--text-faint)] leading-relaxed">Giờ cam kết lấy từ hợp đồng; target đặt ngay trong kế hoạch này. "Gợi ý phân bổ" xếp đủ giờ; "Xếp theo target" xếp tới khi dự báo chạm target và cho biết cần bao nhiêu giờ.</p>
           </div>
         </div>
@@ -597,7 +596,7 @@ export default function MonthPlan({
             </b>
             <span className="text-[var(--text-muted)]">Tổng target</span>
             <b className={`text-right ${targetDelta === null ? "text-[var(--text)]" : Math.abs(targetDelta) < 1 ? "text-emerald-400" : "text-amber-400"}`}>
-              {formatCurrencyAdaptive(totals.target)}{targetDelta !== null && Math.abs(targetDelta) >= 1 ? ` (${targetDelta < 0 ? "thiếu" : "vượt"} ${formatCurrencyAdaptive(Math.abs(targetDelta))})` : ""}
+              {fmtVndShort(totals.target)}{targetDelta !== null && Math.abs(targetDelta) >= 1 ? ` (${targetDelta < 0 ? "thiếu" : "vượt"} ${fmtVndShort(Math.abs(targetDelta))})` : ""}
             </b>
           </div>
           {errors.length > 0 && <p className="text-[11px] text-rose-300">{errors[0]}{errors.length > 1 ? ` · +${errors.length - 1} lỗi` : ""}</p>}
@@ -652,7 +651,7 @@ export default function MonthPlan({
             />
             <span className="text-[11px] text-[var(--text-faint)]">
               {borrowLevel > 0
-                ? <>đang dùng <b className="text-sky-300">{Math.round(borrowLevel).toLocaleString("vi-VN")} đ/giờ</b> {borrowLevelSource}</>
+                ? <>đang dùng <b className="text-sky-300">{fmtVndFull(borrowLevel)}/giờ</b> {borrowLevelSource}</>
                 : <span className="text-amber-300">Chưa có mức — nhập Target GMV tháng + giờ cần xếp ở Tham số, hoặc gõ thẳng vào đây.</span>}
             </span>
             {levelOverride > 0 && (
@@ -676,7 +675,7 @@ export default function MonthPlan({
           <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
           <div className="flex-1 min-w-[240px] space-y-0.5">
             <p>
-              <b>Lưới này dự báo {formatCurrencyAdaptive(targetGap.forecast)}, thiếu {formatCurrencyAdaptive(targetGap.gap)} ({Math.round(targetGap.pct * 100)}%) so với target {formatCurrencyAdaptive(targetTotal)}</b>
+              <b>Lưới này dự báo {fmtVndShort(targetGap.forecast)}, thiếu {fmtVndShort(targetGap.gap)} ({Math.round(targetGap.pct * 100)}%) so với target {fmtVndShort(targetTotal)}</b>
               {" "}— target/ca đang cao hơn dự báo ×{fmtFixed((targetTotal / Math.max(1, targetGap.forecast)), 2)}.
             </p>
             <p className="text-amber-300/90">
@@ -693,7 +692,7 @@ export default function MonthPlan({
         </div>
       )}
       {targetGap && targetGap.pct < -engineParams.targetGapWarnPct && (
-        <p className="text-[11px] text-emerald-400 px-1">Lưới này dự báo {formatCurrencyAdaptive(targetGap.forecast)} — vượt target {Math.round(-targetGap.pct * 100)}%; target/ca đang thấp hơn dự báo.</p>
+        <p className="text-[11px] text-emerald-400 px-1">Lưới này dự báo {fmtVndShort(targetGap.forecast)} — vượt target {Math.round(-targetGap.pct * 100)}%; target/ca đang thấp hơn dự báo.</p>
       )}
 
       {rulesOpen && brand && (
@@ -749,7 +748,7 @@ export default function MonthPlan({
                     </div>
                     {d.expectedGmv !== undefined && (
                       <div className={`text-[11px] font-bold ${d.highExpectation ? "text-amber-400" : "text-[var(--text-faint)]"}`} title={d.reason}>
-                        dự báo {formatCurrencyAdaptive(d.expectedGmv)}{d.highExpectation ? " · target cao" : ""}
+                        dự báo {fmtVndShort(d.expectedGmv)}{d.highExpectation ? " · target cao" : ""}
                       </div>
                     )}
                     {d.slotId && <div className="text-[11px] text-emerald-400 font-bold">đã mở ca</div>}
@@ -792,10 +791,10 @@ function SuggestionPanel({ history: h, result: r, committedHours, targetTotal, c
         {h.borrowedFrom ? (
           <span className="text-sky-300">
             Độ tin cậy: <b>{CONF_LABEL[r.confidence]}</b> · <b>lịch sử MƯỢN</b> của {h.borrowedFrom.brands} brand khác
-            ({h.borrowedFrom.sessions} ca / {h.borrowedFrom.months} tháng) · mức {formatCurrencyAdaptive(h.brandGmvPerHour)}/giờ {h.borrowedFrom.levelSource}
+            ({h.borrowedFrom.sessions} ca / {h.borrowedFrom.months} tháng) · mức {fmtVndShort(h.brandGmvPerHour)}/giờ {h.borrowedFrom.levelSource}
           </span>
         ) : (
-          <span className="text-[var(--text-muted)]">Độ tin cậy: <b className="text-[var(--text)]">{CONF_LABEL[r.confidence]}</b> · {h.sessions} ca đối soát / {h.months} tháng{h.firstDate ? ` (${h.firstDate} → ${h.lastDate})` : ""} · GMV/giờ TB {formatCurrencyAdaptive(h.brandGmvPerHour)}</span>
+          <span className="text-[var(--text-muted)]">Độ tin cậy: <b className="text-[var(--text)]">{CONF_LABEL[r.confidence]}</b> · {h.sessions} ca đối soát / {h.months} tháng{h.firstDate ? ` (${h.firstDate} → ${h.lastDate})` : ""} · GMV/giờ TB {fmtVndShort(h.brandGmvPerHour)}</span>
         )}
       </div>
       {r.notes.map((n, i) => <p key={i} className="text-[11px] text-amber-300">{n}</p>)}
@@ -813,7 +812,7 @@ function SuggestionPanel({ history: h, result: r, committedHours, targetTotal, c
                     <td className="py-1 pr-3 text-right text-[var(--text)]">{x.slots.length}</td>
                     <td className="py-1 pr-3 text-right text-[var(--text)]">{days}</td>
                     <td className="py-1 pr-3 text-right text-[var(--text)]">{fmtH(x.totalHours)}h</td>
-                    <td className="py-1 pr-3 text-right font-bold text-[var(--text)]">{formatCurrencyAdaptive(x.forecastGmv)}</td>
+                    <td className="py-1 pr-3 text-right font-bold text-[var(--text)]">{fmtVndShort(x.forecastGmv)}</td>
                     <td className="py-1 text-right">{k === current ? <span className="text-[11px] text-emerald-400 font-bold">đang dùng</span> : <button onClick={() => onPick(k)} className="text-[11px] font-bold text-[var(--accent-text)]">Dùng</button>}</td>
                   </tr>
                 );
@@ -831,7 +830,7 @@ function SuggestionPanel({ history: h, result: r, committedHours, targetTotal, c
         <div>
           <p className="font-bold text-[var(--text-muted)] mb-1">Khung giờ mạnh nhất (thứ × khối 2h)</p>
           {top.map((c) => (
-            <div key={`${c.weekday}-${c.block}`} className="flex justify-between gap-2"><span className="text-[var(--text)]">{WD[c.weekday]} {c.block * 2}–{c.block * 2 + 2}h <span className="text-[var(--text-faint)]">({c.n} ca)</span></span><b className={c.tag === "strong" ? "text-emerald-400" : "text-[var(--text)]"}>{formatCurrencyAdaptive(c.gmvPerHour)}/h</b></div>
+            <div key={`${c.weekday}-${c.block}`} className="flex justify-between gap-2"><span className="text-[var(--text)]">{WD[c.weekday]} {c.block * 2}–{c.block * 2 + 2}h <span className="text-[var(--text-faint)]">({c.n} ca)</span></span><b className={c.tag === "strong" ? "text-emerald-400" : "text-[var(--text)]"}>{fmtVndShort(c.gmvPerHour)}/h</b></div>
           ))}
           {weak.length > 0 && <p className="mt-1 text-[11px] text-[var(--text-faint)]">Yếu: {weak.map((c) => `${WD[c.weekday]} ${c.block * 2}h`).join(", ")}</p>}
         </div>
@@ -846,11 +845,11 @@ function SuggestionPanel({ history: h, result: r, committedHours, targetTotal, c
         <div>
           <p className="font-bold text-[var(--text-muted)] mb-1">Đường cong biên (giờ luỹ kế → GMV dự báo)</p>
           {curve.map((p) => (
-            <div key={p.hours} className="flex justify-between gap-2"><span className="text-[var(--text)]">{fmtH(p.hours)}h</span><b className="text-[var(--text)]">{formatCurrencyAdaptive(p.gmv)}</b></div>
+            <div key={p.hours} className="flex justify-between gap-2"><span className="text-[var(--text)]">{fmtH(p.hours)}h</span><b className="text-[var(--text)]">{fmtVndShort(p.gmv)}</b></div>
           ))}
           <p className="mt-1 text-[11px] text-[var(--text-faint)]">
-            {committedHours > 0 ? `Cam kết ${fmtH(committedHours)}h → dự báo ${formatCurrencyAdaptive(r.forecastGmv)}` : ""}
-            {targetTotal > 0 ? ` · target ${formatCurrencyAdaptive(targetTotal)}${r.hoursToHitTarget !== null ? ` cần ~${Math.ceil(r.hoursToHitTarget)}h` : " (không chạm được trong khung)"}` : ""}
+            {committedHours > 0 ? `Cam kết ${fmtH(committedHours)}h → dự báo ${fmtVndShort(r.forecastGmv)}` : ""}
+            {targetTotal > 0 ? ` · target ${fmtVndShort(targetTotal)}${r.hoursToHitTarget !== null ? ` cần ~${Math.ceil(r.hoursToHitTarget)}h` : " (không chạm được trong khung)"}` : ""}
           </p>
         </div>
       </div>
@@ -869,7 +868,7 @@ function EvaluationPanel({ ev, calibration }: { ev: PlanEvaluation; calibration:
         <h3 className="text-sm font-bold text-[var(--text)]">Kế hoạch vs thực tế</h3>
         <span className="text-[var(--text-muted)]">{ev.doneCount} ca đã có số · {pending} ca chưa diễn ra</span>
         {ev.doneCount > 0 && (
-          <span className="text-[var(--text-muted)]">Dự báo {formatCurrencyAdaptive(ev.expectedDone)} · target {formatCurrencyAdaptive(ev.targetDone)} · <b className="text-[var(--text)]">thực tế {formatCurrencyAdaptive(ev.actualDone)}</b>{ev.bias !== null ? ` · lệch ${pct(ev.bias)}` : ""}{ev.mape !== null ? ` · sai số TB/ca ${Math.round(ev.mape * 100)}%` : ""}</span>
+          <span className="text-[var(--text-muted)]">Dự báo {fmtVndShort(ev.expectedDone)} · target {fmtVndShort(ev.targetDone)} · <b className="text-[var(--text)]">thực tế {fmtVndShort(ev.actualDone)}</b>{ev.bias !== null ? ` · lệch ${pct(ev.bias)}` : ""}{ev.mape !== null ? ` · sai số TB/ca ${Math.round(ev.mape * 100)}%` : ""}</span>
         )}
       </div>
       {worst.length > 0 && (
@@ -877,7 +876,7 @@ function EvaluationPanel({ ev, calibration }: { ev: PlanEvaluation; calibration:
           {worst.map((r) => (
             <div key={`${r.date}${r.startTime}`} className="rounded-lg border border-[var(--border)] bg-[var(--surface-base)] px-2 py-1">
               <div className="font-mono text-[11px] text-[var(--text-muted)]">{r.date.slice(5)} {r.startTime}–{r.endTime}</div>
-              <div className="text-[var(--text)]">{formatCurrencyAdaptive(r.actualGmv ?? 0)} <span className="text-[var(--text-faint)]">vs dự báo {formatCurrencyAdaptive(r.expectedGmv)}</span> <b className={r.errorPct! >= 0 ? "text-emerald-400" : "text-rose-400"}>{pct(r.errorPct)}</b></div>
+              <div className="text-[var(--text)]">{fmtVndShort(r.actualGmv ?? 0)} <span className="text-[var(--text-faint)]">vs dự báo {fmtVndShort(r.expectedGmv)}</span> <b className={r.errorPct! >= 0 ? "text-emerald-400" : "text-rose-400"}>{pct(r.errorPct)}</b></div>
             </div>
           ))}
         </div>

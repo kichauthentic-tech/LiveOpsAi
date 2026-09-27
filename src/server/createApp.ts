@@ -6,7 +6,7 @@ import dotenv from "dotenv";
 import * as Sentry from "@sentry/node";
 import { errorMessage } from "../lib/errorMessage.js";
 
-import { formatCurrencyAdaptive } from "../lib/formatCurrency.js";
+import { fmtVndShort } from "../lib/format.js";
 dotenv.config();
 
 // Raw request body bytes, captured by the express.json() verify hook below for HMAC webhook
@@ -777,8 +777,8 @@ export function createApp() {
           talentId: t.id,
           name: t.name,
           matchScore: Math.max(70, 96 - idx * 5),
-          predictedGmv: `${formatCurrencyAdaptive(Math.round(t.avgGmvPerSession || 100000000), "")} – ${formatCurrencyAdaptive(Math.round((t.avgGmvPerSession || 100000000) * 1.25))}`,
-          reasoning: `Thế mạnh ngành ${(t.niches || []).join(", ") || "Đa ngành"}, CVR trung bình ${t.cvrAvg}%, GMV tích lũy ${formatCurrencyAdaptive(t.totalGmv || 0)}. Rất phù hợp với ${brand?.name || "Brand"}.`
+          predictedGmv: `${fmtVndShort(Math.round(t.avgGmvPerSession || 100000000))} – ${fmtVndShort(Math.round((t.avgGmvPerSession || 100000000) * 1.25))}`,
+          reasoning: `Thế mạnh ngành ${(t.niches || []).join(", ") || "Đa ngành"}, CVR trung bình ${t.cvrAvg}%, GMV tích lũy ${fmtVndShort(t.totalGmv || 0)}. Rất phù hợp với ${brand?.name || "Brand"}.`
         }));
         return res.json({ success: true, isMock: true, results });
       }
@@ -800,7 +800,7 @@ Hãy chấm điểm mức độ phù hợp (matchScore, 0-100) cho MỖI talent 
 Định dạng JSON trả về (mảng, giữ nguyên thứ tự talentId đầu vào):
 {
   "results": [
-    { "talentId": "...", "name": "...", "matchScore": 92, "predictedGmv": "150 – 190 triệu đ", "reasoning": "..." }
+    { "talentId": "...", "name": "...", "matchScore": 92, "predictedGmv": "150M – 190M", "reasoning": "..." }
   ]
 }`;
 

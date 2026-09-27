@@ -3,6 +3,7 @@ import { LiveSession } from "../types";
 import { SessionReportInput } from "../lib/db/sessionReports";
 import { sessionDurationHours } from "../lib/pnl";
 import { DataSourceBadge } from "./common/DataSourceBadge";
+import { fmtVndFull } from "../lib/format";
 
 interface SessionReportFormProps {
   session: LiveSession;
@@ -164,7 +165,7 @@ export function SessionReportForm({ session, onSubmit, onCancel, canOverrideMetr
           </div>
           <div className="grid grid-cols-3 sm:grid-cols-5 gap-x-3 gap-y-1.5 text-[11px]">
             {[
-              ["LIVE GMV", `${Math.round(session.actualGmv).toLocaleString("vi-VN")}đ`],
+              ["LIVE GMV", fmtVndFull(session.actualGmv)],
               ["Orders", session.totalOrders.toLocaleString("vi-VN")],
               ["Views", session.totalViews.toLocaleString("vi-VN")],
               ["Avg. view (s)", `${session.avgWatchTimeSeconds}s`],
@@ -174,7 +175,7 @@ export function SessionReportForm({ session, onSubmit, onCancel, canOverrideMetr
                     ["LIVE impressions", derived.impressionCount.toLocaleString("vi-VN")],
                     ["ERR", `${derived.enterRoomRate}%`],
                     ["CTOR", `${derived.ctor}%`],
-                    ["AOV", `${derived.avgOrderValue.toLocaleString("vi-VN")}đ`]
+                    ["AOV", fmtVndFull(derived.avgOrderValue)]
                   ]
                 : [["GPM", derived.gpm.toLocaleString("vi-VN")]])
             ].map(([k, v]) => (
@@ -186,12 +187,12 @@ export function SessionReportForm({ session, onSubmit, onCancel, canOverrideMetr
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
             <div>
-              <label className={labelClass}>Total GMV (VNĐ) <span className="font-normal text-[var(--text-faint)]">— nếu khác LIVE GMV</span></label>
+              <label className={labelClass}>Total GMV <span className="font-normal text-[var(--text-faint)]">— nếu khác LIVE GMV</span></label>
               <input type="number" value={gmvTotal} onChange={(e) => setGmvTotal(Number(e.target.value))} className={inputClass} />
             </div>
             {isTikTok ? (
               <div>
-                <label className={labelClass}>Ads cost (VNĐ)</label>
+                <label className={labelClass}>Ads cost</label>
                 <input type="number" value={adsCost} onChange={(e) => setAdsCost(Number(e.target.value))} className={inputClass} />
               </div>
             ) : (
@@ -216,7 +217,7 @@ export function SessionReportForm({ session, onSubmit, onCancel, canOverrideMetr
         <>
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <div>
-          <label className={labelClass}>LIVE GMV (VNĐ)</label>
+          <label className={labelClass}>LIVE GMV</label>
           <input type="number" value={actualGmv} onChange={(e) => setActualGmv(Number(e.target.value))} className={metricClass} disabled={metricsLocked} />
         </div>
         <div>
@@ -224,7 +225,7 @@ export function SessionReportForm({ session, onSubmit, onCancel, canOverrideMetr
           <input type="number" min={0} value={totalOrders} onChange={(e) => setTotalOrders(Math.max(0, Number(e.target.value)))} className={metricClass} disabled={metricsLocked} />
         </div>
         <div>
-          <label className={labelClass}>Total GMV (VNĐ)</label>
+          <label className={labelClass}>Total GMV</label>
           <input type="number" value={gmvTotal} onChange={(e) => setGmvTotal(Number(e.target.value))} className={inputClass} />
         </div>
         <div>
@@ -266,7 +267,7 @@ export function SessionReportForm({ session, onSubmit, onCancel, canOverrideMetr
             <input type="number" step="0.01" value={ctor} onChange={(e) => setCtor(Number(e.target.value))} className={inputClass} />
           </div>
           <div>
-            <label className={labelClass}>AOV (VNĐ)</label>
+            <label className={labelClass}>AOV</label>
             <input type="number" value={avgOrderValue} onChange={(e) => setAvgOrderValue(Number(e.target.value))} className={inputClass} />
           </div>
         </div>

@@ -8,9 +8,8 @@ import { fetchBrandLockedPlanSlots, fetchCalendarEvents } from "../lib/db/monthP
 import { todayVn } from "../lib/performance/brandCommitment";
 import { useDefaultBrand } from "../hooks/useDefaultBrand";
 import { errorMessage } from "../lib/errorMessage";
-import { formatCurrencyAdaptive } from "../lib/formatCurrency";
 
-import { fmtFixed } from "../lib/format";
+import { fmtFixed, fmtVndShort } from "../lib/format";
 // AI Training Center — mục "Engine Kế Hoạch Tháng". Engine là thuật toán thuần, không phải LLM: không
 // có prompt để sửa, chỉ có tham số để vặn và kết quả học để nhìn. Hai nửa của panel đi cùng nhau: đổi
 // tham số bên trái → nửa "engine đã học gì" tính lại ngay (chưa cần lưu), để admin thấy nút vặn ảnh
@@ -30,7 +29,7 @@ interface Props {
 
 const WD = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
 const GROUPS: EngineParamGroup[] = ["history", "camp", "schedule", "target", "calibration", "host"];
-const fmtM = (v: number) => formatCurrencyAdaptive(Math.round(v));
+const fmtM = (v: number) => fmtVndShort(Math.round(v));
 
 export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSlots, promoSchemes, params, updatedAt, loading, error, onSave }) => {
   const [draft, setDraft] = useState<EngineParams>(params);

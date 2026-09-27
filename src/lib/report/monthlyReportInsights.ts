@@ -5,7 +5,7 @@ import type { CreatorLivePerfRow } from "../dataraw/creatorLivePerfSlice";
 import type { SkuRankSlice } from "../dataraw/monthlyProductSlice";
 import type { ShopDaysMonthSlice } from "../dataraw/monthlyProductSlice";
 import { vnDateOf } from "../dataraw/vnDate";
-import { formatCurrencyAdaptive } from "../formatCurrency";
+import { fmtVndShort } from "../format";
 
 // Report Tháng 8 phần (user chốt 2026-09-25) — các phép tính MỚI của bố cục mới, tách khỏi component
 // để test được: so cùng số ngày, tách nguyên nhân GMV thay đổi, tổng shop theo kênh, dấu hiệu xu hướng
@@ -457,7 +457,7 @@ export interface NarrativeInput {
   giftLine?: string | null;
 }
 
-const money = (v: number) => formatCurrencyAdaptive(v);
+const money = (v: number) => fmtVndShort(v);
 export const pctTxt = (v: number, digits = 1) => `${v.toLocaleString("vi-VN", { minimumFractionDigits: digits, maximumFractionDigits: digits })}%`;
 export const signed = (v: number, digits = 1) => `${v >= 0 ? "+" : "−"}${pctTxt(Math.abs(v), digits)}`;
 const dayMonth = (iso: string) => `${Number(iso.slice(8, 10))}/${iso.slice(5, 7)}`;
@@ -479,7 +479,7 @@ export function factorValueText(key: RateFactor, s: LiveStats): string {
   if (key === "viewsPerHour") return Math.round(v).toLocaleString("vi-VN");
   if (key === "liveCtr") return pctTxt(v);
   if (key === "ctor") return pctTxt(v, 2);
-  return `${Math.round(v / 1000).toLocaleString("vi-VN")}k đ`;
+  return fmtVndShort(v);
 }
 
 export const FACTOR_ACTION: Record<RateFactor, string> = {

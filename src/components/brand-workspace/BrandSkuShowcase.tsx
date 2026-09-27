@@ -3,7 +3,7 @@ import { BrandSku, UserRole } from "../../types";
 import { Package, Plus, Trash2, Star, TrendingUp } from "lucide-react";
 import { fetchSkuPerfMonthSlice, normalizeSkuName, TopSkuRow } from "../../lib/dataraw/monthlyProductSlice";
 import { todayVn } from "../../lib/performance/brandCommitment";
-import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
+import { fmtVndShort, fmtVndFull } from "../../lib/format";
 import { errorMessage } from "../../lib/errorMessage";
 
 interface BrandSkuShowcaseProps {
@@ -230,7 +230,7 @@ export const BrandSkuShowcase: React.FC<BrandSkuShowcaseProps> = ({ brandId, cur
                           <div className="flex items-center gap-1 text-emerald-400 font-bold">
                             <TrendingUp className="w-3 h-3" />
                             <span>
-                              {formatCurrencyAdaptive(perf.gmv, "")} · {perf.orders.toLocaleString("vi-VN")} đơn
+                              {fmtVndShort(perf.gmv)} · {perf.orders.toLocaleString("vi-VN")} đơn
                             </span>
                           </div>
                         );
@@ -246,7 +246,7 @@ export const BrandSkuShowcase: React.FC<BrandSkuShowcaseProps> = ({ brandId, cur
                         className="w-28 p-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface-base)] text-[var(--text)] font-bold text-right"
                       />
                     ) : (
-                      <span className="text-[var(--success)] font-bold">{s.flashPrice.toLocaleString("vi-VN")}đ</span>
+                      <span className="text-[var(--success)] font-bold">{fmtVndFull(s.flashPrice)}</span>
                     )}
                   </td>
                   <td className="py-2.5 px-2 text-right">
@@ -258,7 +258,7 @@ export const BrandSkuShowcase: React.FC<BrandSkuShowcaseProps> = ({ brandId, cur
                         className="w-28 p-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface-base)] text-[var(--text)] font-bold text-right"
                       />
                     ) : (
-                      <span className="text-[var(--text-muted)] line-through">{s.originalPrice.toLocaleString("vi-VN")}đ</span>
+                      <span className="text-[var(--text-muted)] line-through">{fmtVndFull(s.originalPrice)}</span>
                     )}
                   </td>
                   <td className="py-2.5 px-2 text-right">

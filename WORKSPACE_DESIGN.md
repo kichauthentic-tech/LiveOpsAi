@@ -2,6 +2,14 @@
 
 ## CẦN LÀM NGAY khi mở phiên mới (cập nhật 2026-09-24)
 
+> **MỚI 2026-09-27 — Đơn vị tiền thống nhất toàn app (không migration, đã commit + push `main`).** User chốt: bỏ hẳn "đ"/"VNĐ"; chỗ chật
+> dùng `fmtVndShort` → "50M" / "1,2B" / "500K", chỗ cần số chính xác dùng `fmtVndFull` → "53.733.488" (cả hai ở
+> `src/lib/format.ts`). `src/lib/formatCurrency.ts` (`formatCurrencyAdaptive`, "triệu"/"tỷ") đã xoá; ~10 hàm format tiền cục bộ
+> ("tr", "tỷ", "k", "đ/h") đã thay bằng 2 hàm chung. Câu insight Report Tháng giờ ra "28,8M/giờ", "KPI 8,4B (vượt 700M)". Xem
+> quy ước "Tiền: fmtVndShort / fmtVndFull". tsc/eslint 0 lỗi, vitest 123/123; verify trên browser (admin): quét chữ 11 màn
+> (Dashboard, Sổ Ca, Hiệu Suất Host, Toàn Cảnh Brand, Cam kết, Talent Pool, Kế Hoạch Tháng, Nhân sự ca, CROCS Lịch/SKU/Rate
+> Card/Report Tháng — Report 202 số kiểu M/B/K) không còn "đ"/"triệu"/"tỷ"/"tr"; Finance chưa có ca Completed nên chưa thấy số.
+
 > **MỚI 2026-09-26 (khuya) — Report Tháng chuyên sâu: 7 phần kết luận trước + 4 phép phân tích mới (không migration, commit fbfeab0 đã push
 > ).** User yêu cầu "tối ưu report Tháng theo hướng chuyên nghiệp, phân tích chuyên sâu"; đề xuất đo trên số thật CROCS:
 > https://claude.ai/artifact/SmokGAGp1J9dPzmyj788Lt — user chọn làm cả 4 mục. **Việc ops phải làm:** mọi report tháng (brand/tháng
@@ -287,7 +295,7 @@ Chưa đo được: màn talent (Ca Của Tôi/Đăng Ký Ca) và role brand b�
 - **Số:** `src/lib/format.ts` (`fmtFixed`, `fmtNum`, `fmtPctValue`, `fmtVndFull`). 66 chỗ `toFixed` trong chữ hiển thị → vi-VN;
   "₫" → "đ"; "12M đ" → `formatCurrencyAdaptive` (Talent Pool, Hồ Sơ, Lịch, AI fallback server + ví dụ prompt Gemini). Report
   Tháng CROCS: 0 số kiểu "2.18%", 154 số kiểu "2,18%". `toFixed` chỉ còn ở toạ độ SVG, cột Excel, giá trị điền sẵn vào input.
-  CHƯA thống nhất: "tr" vs "triệu", có/không hậu tố "đ" ở số rút gọn — chờ user chọn; các hàm fmt* cục bộ (đã vi-VN) vẫn để nguyên.
+  → Đã thống nhất 2026-09-27: không "đ", rút gọn M/B/K — xem quy ước "Tiền: fmtVndShort / fmtVndFull".
 - `--surface-card` (token không tồn tại, 14 chỗ nền trong suốt) → `--surface`/`--surface-elevated`/`--surface-hover`.
 - Test canh thêm (trong `tests/uiReadability.test.ts`): mọi `var(--x)` phải được khai báo; cấm `toFixed` trong chữ hiển thị
   (có danh sách ngoại lệ); cấm "₫" / "M đ". `tests/format.test.ts`.
@@ -1022,6 +1030,14 @@ Bảng/hàm: `session_live_snapshots` + `session_live_snapshot_rows`, RPC `apply
 - **`"strict": true` đã bật (2026-09-17)** — gồm cả `strictNullChecks`/`strictFunctionTypes`/`noImplicitAny`. Chỉ có 10 lỗi phải sửa, không phải hàng trăm như lo ban đầu. **Đừng tắt lại.** Hai bẫy đã gặp, code mới nên tránh lặp: (1) viết KIỂU bằng `typeof x.y` khi `x` có thể null vẫn lỗi dù thân hàm đã guard `x?.y` — dùng `NonNullable<typeof x>["y"]`; (2) formatter của `<Tooltip>` recharts nhận `ValueType | undefined` (string | number | mảng) chứ không phải `number` — đi qua `chartNum()` trong `MonthlyReportTabs.tsx`, đừng khai `(v: number)` rồi ép kiểu.
 - **Lỗi từ supabase-js KHÔNG phải `instanceof Error`** — `PostgrestError` là object thường `{message, details, hint, code}`, nên `e instanceof Error ? e.message : String(e)` rơi vào `String()` và hiện đúng chữ `[object Object]` trên màn hình, nuốt mất thông tin chẩn đoán duy nhất. Mọi chỗ bắt lỗi của tầng dữ liệu phải đi qua `errorMessage()` ([src/lib/errorMessage.ts](src/lib/errorMessage.ts)).
 - **`brand_dataraw_imports` chỉ được 1 batch/`brand_id`+`report_type`+tháng của `period_start`** (unique index `idx_brand_dataraw_imports_brand_type_month`, migration 0077 — khớp `monthKey()`/`findExistingImportForMonth()` trong `lib/db/brandDataRaw.ts`). **Lịch sử đáng nhớ:** bản 0077 commit 2026-09-17 viết câu tạo index không ép kiểu nên không chạy được (xem quy ước `date_trunc` ở trên); chạy lại bản đã sửa trên Supabase thật ngày 2026-09-18 trả về `CREATE INDEX` — tức là **từ 2026-09-08 tới 2026-09-18 index này chưa từng tồn tại**, chống-trùng-batch Dataraw chỉ có ở tầng app suốt thời gian đó. Từ giờ mới có hàng rào DB thật.
+
+- **Tiền: `fmtVndShort` / `fmtVndFull` (`src/lib/format.ts`), không có "đ" (user chốt 2026-09-27).** Chỗ chật (thẻ KPI, ô bảng
+  tổng hợp, trục/nhãn biểu đồ, badge lịch, câu insight) → `fmtVndShort`: "50M", "1,23B", "500K" (B tối đa 2 số lẻ, M 1, K 0;
+  999.960.000 tự lên "1B"). Chỗ cần con số chính xác (lương/rate talent, P&L từng ca, giá SKU, đối soát, tooltip `title`) →
+  `fmtVndFull`: "53.733.488". Đơn vị theo thời gian ghép sau: `${fmtVndShort(x)}/giờ`. Nhãn ô nhập không ghi "(VNĐ)"/"(đ)".
+  Không tự ghép "tr"/"triệu"/"tỷ"/"k"/"đ" trong component — `tests/uiReadability.test.ts` quét `src/` (bỏ comment, bỏ dòng
+  `.replace(` của bộ đọc file TikTok, bỏ tên voucher kiểu "Voucher 50k"). "đ%" ở Report Tháng là "điểm %", không phải tiền.
+  Prompt Gemini (`src/server/createApp.ts`) ví dụ `predictedGmv` cũng theo kiểu "150M – 190M".
 
 - **Tên chỉ số trên report/chart/bảng/Excel lấy từ `src/lib/metricGlossary.ts` (`METRIC`, `CHANNEL`, `DAY_TYPE`) — không tự đặt tên mới.** Chỉ số chưa có trong từ điển thì thêm vào đó trước (kèm `METRIC_HINT` công thức), rồi mới dùng. Nhãn hiển thị gắn `title={metricHint(label)}` để di chuột thấy công thức. Regex khớp cột file TikTok (`findCol`/`colAt`/`key: /^...$/`) giữ nguyên chữ gốc TikTok, không đổi theo từ điển. `tests/metricGlossary.test.ts` quét `src/` — thêm tên cũ mới phát hiện vào `BANNED`.
 

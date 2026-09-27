@@ -3,7 +3,7 @@ import { SESSION_STATUS_CLS, SESSION_STATUS_LABEL_VI } from "../lib/sessionStatu
 import { AlertTriangle, Ban, CheckCircle2, Circle, EyeOff, Hand, Link2, Pencil, RotateCcw, Trash2, X } from "lucide-react";
 import { AuditLogEntry, Brand, LiveSession, Studio, Talent, UserRole } from "../types";
 import { dateTimeRangesOverlap } from "../lib/dateUtils";
-import { formatCurrencyAdaptive } from "../lib/formatCurrency";
+import { fmtVndShort } from "../lib/format";
 import { sessionHours } from "../lib/performance/hostPerformance";
 import { SessionReportInput } from "../lib/db/sessionReports";
 import {
@@ -397,10 +397,10 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
               ) : (
                 <>
                   <KV label="Giờ live" value={s.actualStartAt ? `${fmtTime(s.actualStartAt)}–${fmtTime(s.actualEndAt)} (${fmtHours(liveHours)})` : "chưa có file"} muted={!s.actualStartAt} />
-                  {!isBrandView && <KV label="Target GMV" value={s.targetGmv ? formatCurrencyAdaptive(s.targetGmv) : "chưa có target"} muted={!s.targetGmv} />}
-                  <KV label="GMV" value={s.actualGmv ? formatCurrencyAdaptive(s.actualGmv) : "—"} accent={!!s.actualGmv} />
+                  {!isBrandView && <KV label="Target GMV" value={s.targetGmv ? fmtVndShort(s.targetGmv) : "chưa có target"} muted={!s.targetGmv} />}
+                  <KV label="GMV" value={s.actualGmv ? fmtVndShort(s.actualGmv) : "—"} accent={!!s.actualGmv} />
                   {!isBrandView && s.targetGmv > 0 && <KV label="% Target" value={fmtPct(((s.actualGmv ?? 0) / s.targetGmv) * 100)} />}
-                  <KV label="GMV/giờ" value={gmvPerHour > 0 ? formatCurrencyAdaptive(gmvPerHour) : "—"} />
+                  <KV label="GMV/giờ" value={gmvPerHour > 0 ? fmtVndShort(gmvPerHour) : "—"} />
                 </>
               )}
             </div>
@@ -507,13 +507,13 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                 </div>
                 {ratios && (
                   <div className="grid grid-cols-3 gap-2 mt-2">
-                    <KV label="AOV" value={formatCurrencyAdaptive(ratios.aov)} />
+                    <KV label="AOV" value={fmtVndShort(ratios.aov)} />
                     <KV label="ERR" value={fmtPct(ratios.tapThroughRate)} />
                     <KV label="LIVE CTR" value={fmtPct(ratios.liveCtr)} />
                     <KV label="Product CTR" value={fmtPct(ratios.ctr)} />
                     <KV label="CTOR" value={fmtPct(ratios.ctor)} />
                     <KV label="SKU order rate" value={fmtPct(ratios.skuOrderRate)} />
-                    <KV label="Show GPM" value={formatCurrencyAdaptive(ratios.showGpm)} />
+                    <KV label="Show GPM" value={fmtVndShort(ratios.showGpm)} />
                   </div>
                 )}
                 <p className="text-[11px] text-[var(--text-faint)] mt-2">Tỷ lệ tính lại từ số đã tách theo ca, không lấy cột tỷ lệ cộng dồn của file.</p>

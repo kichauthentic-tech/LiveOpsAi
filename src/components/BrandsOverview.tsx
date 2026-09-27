@@ -5,7 +5,7 @@ import { fetchPlanStatuses } from "../lib/db/monthPlans";
 import { fetchBrandMonthlyCommitments } from "../lib/db/brandContracts";
 import { CommitmentProgress, CommitmentStatus, computeAllProgress, todayVn } from "../lib/performance/brandCommitment";
 import { filterLedger, summarize } from "../lib/sessionLedger";
-import { formatCurrencyAdaptive } from "../lib/formatCurrency";
+import { fmtVndShort } from "../lib/format";
 import { errorMessage } from "../lib/errorMessage";
 import { BrandLogo } from "./ui/BrandLogo";
 import { PageIntro } from "./common/PageIntro";
@@ -187,7 +187,7 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ brands, sessions
                       )}
                       {plan && plan.targetGmv > 0 && (
                         <span className="block text-[11px] text-[var(--text-faint)] mt-0.5">
-                          Target {formatCurrencyAdaptive(plan.targetGmv, "")}
+                          Target {fmtVndShort(plan.targetGmv)}
                         </span>
                       )}
                     </td>
@@ -212,7 +212,7 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ brands, sessions
                       )}
                     </td>
                     <td className="py-2.5 px-2 text-right font-bold text-[var(--success)] whitespace-nowrap">
-                      {s.gmv > 0 ? formatCurrencyAdaptive(s.gmv, "") : <span className="text-[var(--text-faint)] font-normal">—</span>}
+                      {s.gmv > 0 ? fmtVndShort(s.gmv) : <span className="text-[var(--text-faint)] font-normal">—</span>}
                     </td>
                     <td className="py-2.5 px-2">
                       <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${REPORT_STATUS_CLS[reportStatus]}`}>

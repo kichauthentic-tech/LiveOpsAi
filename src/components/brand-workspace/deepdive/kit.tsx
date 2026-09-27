@@ -1,4 +1,5 @@
 import React from "react";
+import { fmtVndShort, fmtVndFull } from "../../../lib/format";
 
 // Bộ UI dùng chung cho Report Tháng Chuyên Sâu. Khai riêng thay vì import từ MonthlyReportTabs.tsx
 // để 2 report không kéo nhau khi sửa — bảng màu cố ý trùng để nhìn liền mạch một hệ thống.
@@ -51,16 +52,10 @@ export const fmtInt = (n?: number | null): string => (n == null || Number.isNaN(
 export const fmtDec = (n?: number | null, d = 1): string => (n == null || Number.isNaN(n) ? "—" : n.toLocaleString("vi-VN", { maximumFractionDigits: d, minimumFractionDigits: d }));
 export const fmtPct = (n?: number | null, d = 1): string => (n == null || Number.isNaN(n) ? "—" : `${n.toLocaleString("vi-VN", { maximumFractionDigits: d, minimumFractionDigits: d })}%`);
 
-/** 9.100.358.401 -> "9,10 tỷ" — trục biểu đồ và thẻ KPI không đọc nổi số đầy đủ. */
-export function fmtMoneyShort(n?: number | null): string {
-  if (n == null || Number.isNaN(n)) return "—";
-  const a = Math.abs(n);
-  if (a >= 1e9) return `${(n / 1e9).toLocaleString("vi-VN", { maximumFractionDigits: 2 })} tỷ`;
-  if (a >= 1e6) return `${(n / 1e6).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} tr`;
-  if (a >= 1e3) return `${(n / 1e3).toLocaleString("vi-VN", { maximumFractionDigits: 0 })}k`;
-  return Math.round(n).toLocaleString("vi-VN");
-}
-export const fmtMoney = (n?: number | null): string => (n == null || Number.isNaN(n) ? "—" : `${Math.round(n).toLocaleString("vi-VN")}đ`);
+/** 9.100.358.401 -> "9,1B" — trục biểu đồ và thẻ KPI không đọc nổi số đầy đủ. Quy ước ở src/lib/format.ts. */
+export const fmtMoneyShort = fmtVndShort;
+/** 9.100.358.401 -> "9.100.358.401" — bảng, tooltip. */
+export const fmtMoney = fmtVndFull;
 
 export const Section: React.FC<{
   id?: string;

@@ -15,7 +15,7 @@ import { CampDayBucket, CampOverrides, resolveCampBucketType } from "../campaign
 import { DEFAULT_ENGINE_PARAMS, EngineParams } from "./engineParams";
 import { sessionDurationHours } from "../pnl";
 
-import { fmtFixed } from "../format";
+import { fmtFixed, fmtVndShort, fmtVndFull } from "../format";
 export const BLOCK_HOURS = 2; // khối giờ 2h → 12 khối/ngày
 // Các hằng số học/xếp nằm ở engineParams.ts (admin vặn được trong AI Training Center).
 
@@ -428,7 +428,7 @@ interface Candidate {
   cellRefs: HistoryCell[];
 }
 
-const fmtM = (v: number) => `${(v / 1_000_000).toLocaleString("vi-VN", { maximumFractionDigits: 1 })}tr`;
+const fmtM = fmtVndShort;
 
 function cellLookup(h: HistorySummary) {
   const m = new Map<string, HistoryCell>();
@@ -527,7 +527,7 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
       `Brand chưa có ca đối soát nào. Đang mượn HÌNH DẠNG lịch sử toàn agency (${b.sessions} ca · ${b.brands} brand · ${b.months} tháng): khung giờ/thứ nào tốt hơn, hệ số D-Day/lễ/khuyến mãi, lợi suất giảm dần.`
     );
     notes.push(
-      `MỨC thì không mượn được — đang dùng ${Math.round(history.brandGmvPerHour).toLocaleString("vi-VN")} đ/giờ ${b.levelSource}. Toàn bộ số tiền dưới đây tỷ lệ thuận với con số đó: nó là GIẢ ĐỊNH của bạn, không phải dự báo engine học được.`
+      `MỨC thì không mượn được — đang dùng ${fmtVndFull(history.brandGmvPerHour)}/giờ ${b.levelSource}. Toàn bộ số tiền dưới đây tỷ lệ thuận với con số đó: nó là GIẢ ĐỊNH của bạn, không phải dự báo engine học được.`
     );
   } else if (!history.enough) {
     notes.push(

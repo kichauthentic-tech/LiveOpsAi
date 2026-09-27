@@ -384,7 +384,7 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
                   )}
                 </div>
                 <div>
-                  <label className="font-bold text-[var(--text-muted)] block mb-1">Tổng Doanh Thu Tích Lũy (VNĐ)</label>
+                  <label className="font-bold text-[var(--text-muted)] block mb-1">Tổng Doanh Thu Tích Lũy</label>
                   <input
                     type="number"
                     value={brandTotalGmv}

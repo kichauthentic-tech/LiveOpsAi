@@ -3,7 +3,7 @@ import { SESSION_STATUS_CLS, SESSION_STATUS_LABEL_VI } from "../lib/sessionStatu
 import { AlertTriangle, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, Radio, UserX } from "lucide-react";
 import { Brand, LiveSession, ShiftRegistration, ShiftSlot, Studio, Talent, UserRole, AuditLogEntry } from "../types";
 import { getTodayDate } from "../lib/dateUtils";
-import { formatCurrencyAdaptive } from "../lib/formatCurrency";
+import { fmtVndShort } from "../lib/format";
 import { SessionReportInput } from "../lib/db/sessionReports";
 import { MissingStep, missingSteps } from "../lib/sessionLedger";
 import { BrandLogo } from "./ui/BrandLogo";
@@ -178,7 +178,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
         </span>
         <span className="ml-auto flex flex-wrap items-center gap-1">
           <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${STATUS_CLS[s.status]}`}>{STATUS_LABEL[s.status]}</span>
-          {s.actualGmv ? <span className="text-[11px] font-bold text-emerald-300">{formatCurrencyAdaptive(s.actualGmv)}</span> : null}
+          {s.actualGmv ? <span className="text-[11px] font-bold text-emerald-300">{fmtVndShort(s.actualGmv)}</span> : null}
           {actionable.map((m) => (
             <span key={m} className="text-[11px] font-bold px-1.5 py-0.5 rounded border bg-amber-950/60 text-amber-300 border-amber-800">{MISSING_LABEL[m]}</span>
           ))}
@@ -242,7 +242,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
             <Stat label={range === "week" ? "Ca trong tuần" : "Ca trong ngày"} value={String(summary.total)} />
             <Stat label="Chưa có người" value={String(summary.noHost)} tone={summary.noHost > 0 ? "warn" : "ok"} />
             <Stat label="Chưa nộp số liệu" value={String(summary.pending)} tone={summary.pending > 0 ? "warn" : "ok"} />
-            <Stat label="GMV đã ghi nhận" value={summary.gmv > 0 ? formatCurrencyAdaptive(summary.gmv) : "—"} />
+            <Stat label="GMV đã ghi nhận" value={summary.gmv > 0 ? fmtVndShort(summary.gmv) : "—"} />
           </div>
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 sm:p-4 space-y-4">
             {rows.length === 0 && (

@@ -3,7 +3,6 @@ import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { ResponsiveContainer, ComposedChart, LineChart, ReferenceLine, BarChart, Bar, Line, Area, XAxis, YAxis, Tooltip, CartesianGrid, Cell } from "recharts";
 import { BarChart3, Flame, ListOrdered, ShoppingBag, Megaphone, AlertTriangle, CalendarClock, Users, PieChart as PieChartIcon, Activity, Download, Lightbulb, ChevronDown, Scale, Loader2, Save } from "lucide-react";
 import { LiveSession, BrandMonthlyReport as BrandMonthlyReportType, BrandPlatformRate } from "../../types";
-import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
 import { CHANNEL, METRIC, metricHint } from "../../lib/metricGlossary";
 import { downloadSheetsAsXlsx } from "../../lib/exportXlsx";
 import { useToast } from "../../hooks/useToast";
@@ -72,7 +71,7 @@ import { errorMessage } from "../../lib/errorMessage";
 import { byHost, byHostDayType, dayTypeTeamTotals, dayTypeMetrics, dayTypeDriverLines, sumDayTypeParts, vsTeam, HOST_DAY_TYPE_ORDER, MIN_SESSIONS_TO_COMPARE, DAY_TYPE_DIFF_THRESHOLD, HostDayTypeRow, DayTypePart, DayTypeMetrics, dataQuality, filterSessions, hostKey, splitUnassignedHost, DataQuality } from "../../lib/performance/hostPerformance";
 import { topSessionsByGmv, CAMP_DAY_BUCKET_ORDER, CAMP_DAY_BUCKET_LABEL, CampDayBucket, CampOverrides } from "../../lib/dataraw/creatorLivePerfMetrics";
 
-import { fmtFixed } from "../../lib/format";
+import { fmtFixed, fmtVndShort } from "../../lib/format";
 // Report Tháng — skin đen-vàng CỐ ĐỊNH riêng cho tab này (khác theme sáng/tối/sand nội bộ app):
 // đây là tài liệu gửi thẳng cho brand để pitching, nhận diện thương hiệu phải nhất quán bất kể Ops
 // đang chọn theme nội bộ nào. Không dùng var(--accent)/var(--surface) như phần còn lại của app.
@@ -125,9 +124,9 @@ const HostPerformancePanel: React.FC<{
   type H = (typeof hosts)[number];
   type Row = { label: string; value: (m: DayTypeMetrics, h?: H) => React.ReactNode; cmp?: "gmvPerHour" | "viewsPerHour" | "liveCtr" | "ctor" | "aov"; indent?: boolean; bold?: boolean; onlyAll?: boolean };
   const metricRows: Row[] = [
-    { label: METRIC.gmv, value: (m) => formatCurrencyAdaptive(m.gmv) },
+    { label: METRIC.gmv, value: (m) => fmtVndShort(m.gmv) },
     { label: `${METRIC.liveHours} · ca`, value: (m) => `${fmtHours(m.hours)} · ${m.sessions}` },
-    { label: METRIC.gmvPerHour, value: (m) => (m.gmvPerHour != null ? formatCurrencyAdaptive(m.gmvPerHour) : "—"), cmp: "gmvPerHour", bold: true },
+    { label: METRIC.gmvPerHour, value: (m) => (m.gmvPerHour != null ? fmtVndShort(m.gmvPerHour) : "—"), cmp: "gmvPerHour", bold: true },
     {
       // Cột chính để so host (Report Tháng chuyên sâu 2026-09-26): backtest CROCS — so mặt bằng từng tháng không
       // dự báo được tháng sau (Spearman −0,04) ⇒ gộp nhiều tháng, chỉ tô màu khi khoảng tin cậy nằm hẳn một phía.
@@ -159,7 +158,7 @@ const HostPerformancePanel: React.FC<{
     { label: METRIC.liveCtr, value: (m) => (m.liveCtr != null ? `${fmtFixed(m.liveCtr, 1)}%` : "—"), cmp: "liveCtr", indent: true },
     { label: METRIC.ctor, value: (m) => fmtPct(m.ctor), cmp: "ctor", indent: true },
     // AOV hiện nghìn đồng — làm tròn "1,1 triệu" sẽ che mất chênh 5–10% giữa các host.
-    { label: METRIC.aov, value: (m) => (m.aov != null ? `${fmtInt(m.aov / 1000)}k` : "—"), cmp: "aov", indent: true },
+    { label: METRIC.aov, value: (m) => fmtVndShort(m.aov), cmp: "aov", indent: true },
     { label: METRIC.upt, value: (m) => (m.upt != null ? fmtFixed(m.upt, 2) : "—") },
     { label: METRIC.avgView, value: (m) => (m.avgViewSec != null ? `${Math.round(m.avgViewSec)}s` : "—") },
     { label: "Giờ trợ live", onlyAll: true, value: (_m, h) => (h && h.assist.sessions > 0 ? `${fmtHours(h.assist.hours)} · ${h.assist.sessions}` : "—") }
@@ -470,8 +469,8 @@ const WaterfallPanel: React.FC<{ title: string; sub: string; data: WaterfallPoin
         <BarChart data={data} margin={{ top: 18, right: 8 }}>
           <CartesianGrid stroke={PAL.line} vertical={false} />
           <XAxis dataKey="label" stroke={PAL.muted} fontSize={10.5} interval={0} />
-          <YAxis stroke={PAL.muted} fontSize={10} tickFormatter={(v) => formatCurrencyAdaptive(v)} width={70} />
-          <Tooltip contentStyle={chartTooltipStyle} formatter={(_v, _n, item) => formatCurrencyAdaptive(chartNum((item as { payload?: { display?: number } }).payload?.display))} />
+          <YAxis stroke={PAL.muted} fontSize={10} tickFormatter={(v) => fmtVndShort(v)} width={70} />
+          <Tooltip contentStyle={chartTooltipStyle} formatter={(_v, _n, item) => fmtVndShort(chartNum((item as { payload?: { display?: number } }).payload?.display))} />
           <Bar dataKey="base" stackId="w" fill="transparent" isAnimationActive={false} legendType="none" tooltipType="none" />
           <Bar dataKey="value" stackId="w" radius={[4, 4, 0, 0]} name="GMV">
             {data.map((d, i) => (
@@ -486,7 +485,7 @@ const WaterfallPanel: React.FC<{ title: string; sub: string; data: WaterfallPoin
         <div key={p.key} className="text-[11.5px] rounded-lg px-3 py-2" style={{ background: PAL.panel2, color: PAL.muted }}>
           <span style={{ color: PAL.cream }}>{DRIVER_LABEL[p.key]}</span> {p.change >= 0 ? "+" : "−"}{fmtFixed(Math.abs(p.change), 1)}% ⇒{" "}
           <span className="font-mono" style={{ color: p.value >= 0 ? PAL.green : PAL.red }}>
-            {p.value >= 0 ? "+" : "−"}{formatCurrencyAdaptive(Math.abs(p.value))}
+            {p.value >= 0 ? "+" : "−"}{fmtVndShort(Math.abs(p.value))}
           </span>
         </div>
       ))}
@@ -985,9 +984,9 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   const giftsMissing = canManage && !view.gifts?.[month];
   const giftNote = giftSliceCur?.hasAnyBatch
     ? giftSliceCur.giftItems > 0
-      ? `Quà tặng (dưới ${GIFT_MAX_PRICE / 1000}k/món): ${fmtInt(giftSliceCur.giftItems)} món ở ${giftSliceCur.giftSkus} SKU${giftSliceCur.top[0] ? `, nhiều nhất ${shortSku(giftSliceCur.top[0][0])}` : ""} — không tính vào UPT hàng bán thật.`
+      ? `Quà tặng (dưới ${fmtVndShort(GIFT_MAX_PRICE)}/món): ${fmtInt(giftSliceCur.giftItems)} món ở ${giftSliceCur.giftSkus} SKU${giftSliceCur.top[0] ? `, nhiều nhất ${shortSku(giftSliceCur.top[0][0])}` : ""} — không tính vào UPT hàng bán thật.`
       : giftPrev && giftPrev.giftItems > 0
-        ? `Tháng này không còn hàng quà tặng dưới ${GIFT_MAX_PRICE / 1000}k/món (tháng ${prevMonth.slice(5)}: ${fmtInt(giftPrev.giftItems)} món).`
+        ? `Tháng này không còn hàng quà tặng dưới ${fmtVndShort(GIFT_MAX_PRICE)}/món (tháng ${prevMonth.slice(5)}: ${fmtInt(giftPrev.giftItems)} món).`
         : null
     : null;
 
@@ -1256,13 +1255,13 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   // goodWhenUp null = trung tính (không tô). UPT live đổi theo quà tặng ⇒ trung tính; UPT bỏ quà mới là cách bán.
   type TrendRow = { label: string; get: (s: LiveStats, g: GiftStats | null) => number | null; fmt: (v: number) => string; goodWhenUp: boolean | null; indent?: boolean };
   const trendRows: TrendRow[] = [
-    { label: METRIC.liveGmv, get: (s) => (s.sessions > 0 ? s.gmv : null), fmt: (v) => formatCurrencyAdaptive(v), goodWhenUp: true },
+    { label: METRIC.liveGmv, get: (s) => (s.sessions > 0 ? s.gmv : null), fmt: (v) => fmtVndShort(v), goodWhenUp: true },
     { label: METRIC.liveHours, get: (s) => (s.sessions > 0 ? s.hours : null), fmt: fmtHours, goodWhenUp: null },
-    { label: METRIC.gmvPerHour, get: (s) => s.gmvPerHour, fmt: (v) => formatCurrencyAdaptive(v), goodWhenUp: true },
+    { label: METRIC.gmvPerHour, get: (s) => s.gmvPerHour, fmt: (v) => fmtVndShort(v), goodWhenUp: true },
     { label: METRIC.viewsPerHour, get: (s) => s.viewsPerHour, fmt: fmtInt, goodWhenUp: true, indent: true },
     { label: METRIC.liveCtr, get: (s) => s.liveCtr, fmt: (v) => `${fmtFixed(v, 1)}%`, goodWhenUp: true, indent: true },
     { label: METRIC.ctor, get: (s) => s.ctor, fmt: (v) => fmtPct(v), goodWhenUp: true, indent: true },
-    { label: METRIC.aov, get: (s) => s.aov, fmt: (v) => `${fmtInt(v / 1000)}k đ`, goodWhenUp: true, indent: true },
+    { label: METRIC.aov, get: (s) => s.aov, fmt: (v) => fmtVndShort(v), goodWhenUp: true, indent: true },
     { label: METRIC.productCtr, get: (s) => s.ctr, fmt: (v) => fmtPct(v), goodWhenUp: true },
     { label: `${METRIC.upt} live`, get: (s) => s.upt, fmt: (v) => fmtFixed(v, 2), goodWhenUp: null },
     { label: "Quà tặng mỗi đơn (cả shop)", get: (_s, g) => g?.giftPerOrder ?? null, fmt: (v) => fmtFixed(v, 2), goodWhenUp: null },
@@ -1371,7 +1370,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         },
         {
           name: "3 Vi sao - Thua so",
-          rows: (drivers?.parts ?? []).map((p) => ({ "Thừa số": DRIVER_LABEL[p.key], "± (%)": n(p.change), "Góp vào ± LIVE GMV (đ)": n(p.value) }))
+          rows: (drivers?.parts ?? []).map((p) => ({ "Thừa số": DRIVER_LABEL[p.key], "± (%)": n(p.change), "Góp vào ± LIVE GMV": n(p.value) }))
         },
         {
           name: "3 Vi sao - Loai ngay",
@@ -1515,8 +1514,8 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         {fmtFixed(Math.abs(v), digits)}%
       </span>
     );
-  // Dấu trừ chuẩn "−" và làm tròn nghìn đồng cho số tiền nhỏ trong câu (formatCurrencyAdaptive in "-" và 2 số lẻ).
-  const signedMoney = (v: number) => `${v >= 0 ? "+" : "−"}${formatCurrencyAdaptive(Math.round(Math.abs(v) / 1000) * 1000)}`;
+  // Dấu trừ chuẩn "−" và làm tròn nghìn đồng cho số tiền nhỏ trong câu (fmtVndShort in "-").
+  const signedMoney = (v: number) => `${v >= 0 ? "+" : "−"}${fmtVndShort(Math.round(Math.abs(v) / 1000) * 1000)}`;
   const rowStyle = (idx: number) => ({ borderBottom: `1px solid ${PAL.line}`, background: idx % 2 ? `${PAL.panel2}55` : "transparent" });
   const warnBox = (children: React.ReactNode) => (
     <div className="flex items-start gap-2 text-[11px] rounded-xl p-2.5" style={{ background: "#2a2410", border: `1px solid ${PAL.gold}55`, color: PAL.gold }}>
@@ -1559,11 +1558,11 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
             <KpiTile
               label="Total GMV"
-              value={shopCur ? formatCurrencyAdaptive(shopCur.gmv) : "—"}
+              value={shopCur ? fmtVndShort(shopCur.gmv) : "—"}
               change={shopCur && shopPrevSame ? pctChange(shopPrevSame.gmv, shopCur.gmv) : null}
               note={
                 shopKpi
-                  ? `${fmtPct(shopKpi.pct)} KPI ${formatCurrencyAdaptive(shopKpi.target)}${shopKpi.partial ? ` · dự kiến ${fmtPct(shopKpi.projectedPct)}` : ""}`
+                  ? `${fmtPct(shopKpi.pct)} KPI ${fmtVndShort(shopKpi.target)}${shopKpi.partial ? ` · dự kiến ${fmtPct(shopKpi.projectedPct)}` : ""}`
                   : shopCur
                     ? "Shop Analytics — mọi kênh"
                     : "chưa có file Shop Analytics"
@@ -1571,17 +1570,17 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             />
             <KpiTile
               label="LIVE GMV (agency)"
-              value={formatCurrencyAdaptive(liveCurStats.gmv)}
+              value={fmtVndShort(liveCurStats.gmv)}
               change={pctChange(livePrevStats.gmv, liveCurStats.gmv)}
               note={shopCur && shopCur.gmv > 0 ? `${fmtPct((liveCurStats.gmv / shopCur.gmv) * 100)} tổng shop · ${liveCurStats.sessions} ca` : `${liveCurStats.sessions} ca`}
             />
             <KpiTile
               label="NMV (ước tính)"
-              value={nmvRate != null ? formatCurrencyAdaptive(liveCurStats.gmv * (1 - nmvRate / 100)) : "—"}
+              value={nmvRate != null ? fmtVndShort(liveCurStats.gmv * (1 - nmvRate / 100)) : "—"}
               note={nmvRate != null ? `trừ ${fmtPct(nmvRate)} — ${nmvSource}` : "chưa có tỷ lệ hoàn hủy (Rate Card) / Refund rate (Shop Analytics)"}
             />
             <KpiTile label="Giờ live" value={fmtHours(liveCurStats.hours)} change={pctChange(livePrevStats.hours, liveCurStats.hours)} note={`${liveCurStats.sessions} ca có số`} />
-            <KpiTile label="GMV/giờ" value={liveCurStats.gmvPerHour != null ? formatCurrencyAdaptive(liveCurStats.gmvPerHour) : "—"} change={pctChange(livePrevStats.gmvPerHour, liveCurStats.gmvPerHour)} />
+            <KpiTile label="GMV/giờ" value={liveCurStats.gmvPerHour != null ? fmtVndShort(liveCurStats.gmvPerHour) : "—"} change={pctChange(livePrevStats.gmvPerHour, liveCurStats.gmvPerHour)} />
           </div>
 
           <div className="rounded-xl p-4 space-y-3" style={{ background: PAL.panel, border: `1px solid ${PAL.gold}44` }}>
@@ -1628,7 +1627,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
               {kpiTargetGmvCur && (
                 <div className="flex-1 min-w-[220px]">
                   <div className="text-[11px] uppercase tracking-wider" style={{ color: PAL.muted }}>Target GMV (live)</div>
-                  <div className="font-mono text-xl font-bold mt-1" style={{ color: PAL.cream }}>{formatCurrencyAdaptive(kpiTargetGmvCur)}</div>
+                  <div className="font-mono text-xl font-bold mt-1" style={{ color: PAL.cream }}>{fmtVndShort(kpiTargetGmvCur)}</div>
                   <ProgressBar pct={(liveCurStats.gmv / kpiTargetGmvCur) * 100} />
                 </div>
               )}
@@ -1636,12 +1635,12 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                 <div className="flex-1 min-w-[220px]">
                   <div className="text-[11px] uppercase tracking-wider" style={{ color: PAL.muted }}>KPI GMV (brand giao · mọi kênh)</div>
                   <div className="font-mono text-xl font-bold mt-1" style={{ color: PAL.cream }}>
-                    {formatCurrencyAdaptive(shopKpi.actual)} / {formatCurrencyAdaptive(shopKpi.target)}
+                    {fmtVndShort(shopKpi.actual)} / {fmtVndShort(shopKpi.target)}
                   </div>
                   <ProgressBar pct={shopKpi.pct} label="KPI GMV" />
                   {shopKpi.partial && (
                     <div className="text-[11px] mt-1 font-mono" style={{ color: shopKpi.projectedPct >= 100 ? PAL.green : shopKpi.projectedPct >= 90 ? PAL.gold : PAL.red }}>
-                      Dự kiến cuối tháng {formatCurrencyAdaptive(shopKpi.projected)} · {fmtPct(shopKpi.projectedPct)} ({shopKpi.method === "prev" ? "theo nhịp cùng kỳ tháng trước" : "chia đều theo ngày"})
+                      Dự kiến cuối tháng {fmtVndShort(shopKpi.projected)} · {fmtPct(shopKpi.projectedPct)} ({shopKpi.method === "prev" ? "theo nhịp cùng kỳ tháng trước" : "chia đều theo ngày"})
                     </div>
                   )}
                 </div>
@@ -1656,8 +1655,8 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                     ({runRate.doneCount} ca xong · {runRate.pendingCount} còn lại)
                   </div>
                   <div>
-                    Dự kiến cuối tháng <b style={{ color: PAL.cream }}>{formatCurrencyAdaptive(runRate.projected)}</b> — {runRate.gap > 0 ? "thiếu" : "vượt"}{" "}
-                    <b style={{ color: runRate.gap > 0 ? PAL.red : PAL.green }}>{formatCurrencyAdaptive(Math.abs(runRate.gap))}</b>
+                    Dự kiến cuối tháng <b style={{ color: PAL.cream }}>{fmtVndShort(runRate.projected)}</b> — {runRate.gap > 0 ? "thiếu" : "vượt"}{" "}
+                    <b style={{ color: runRate.gap > 0 ? PAL.red : PAL.green }}>{fmtVndShort(Math.abs(runRate.gap))}</b>
                   </div>
                 </div>
               )}
@@ -1674,8 +1673,8 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                 <LineChart data={cumulativeData} margin={{ right: 12 }}>
                   <CartesianGrid stroke={PAL.line} vertical={false} />
                   <XAxis dataKey="day" stroke={PAL.muted} fontSize={10} interval={3} />
-                  <YAxis stroke={PAL.muted} fontSize={10} tickFormatter={(v) => formatCurrencyAdaptive(v)} width={70} />
-                  <Tooltip contentStyle={chartTooltipStyle} labelFormatter={(d) => `Ngày ${d}`} formatter={(v) => formatCurrencyAdaptive(chartNum(v))} />
+                  <YAxis stroke={PAL.muted} fontSize={10} tickFormatter={(v) => fmtVndShort(v)} width={70} />
+                  <Tooltip contentStyle={chartTooltipStyle} labelFormatter={(d) => `Ngày ${d}`} formatter={(v) => fmtVndShort(chartNum(v))} />
                   {cmp.partial && <ReferenceLine x={Number(cmp.curEnd.slice(8))} stroke={PAL.muted} strokeDasharray="3 3" />}
                   <Line type="monotone" dataKey="prev" name={`Tháng ${prevMonth.slice(5)}`} stroke={PAL.blue} strokeWidth={2} dot={false} connectNulls={false} />
                   <Line type="monotone" dataKey="cur" name={`Tháng ${month.slice(5)}`} stroke={PAL.gold} strokeWidth={2} dot={false} connectNulls={false} />
@@ -1705,10 +1704,10 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                         <td className={`py-2 px-3 ${r.key === "all" ? "font-black" : "font-semibold"}`} style={{ color: PAL.gold }}>
                           {controlLabel(r.key)} <span className="font-normal text-[11px]" style={{ color: PAL.muted }}>· {r.days} ngày</span>
                         </td>
-                        <td className="py-2 px-3 text-right font-mono" title={`${formatCurrencyAdaptive(r.livePrev)} → ${formatCurrencyAdaptive(r.liveCur)}`}>
+                        <td className="py-2 px-3 text-right font-mono" title={`${fmtVndShort(r.livePrev)} → ${fmtVndShort(r.liveCur)}`}>
                           {chgCell(r.liveChg)}
                         </td>
-                        <td className="py-2 px-3 text-right font-mono" title={`${formatCurrencyAdaptive(r.restPrev)} → ${formatCurrencyAdaptive(r.restCur)}`}>
+                        <td className="py-2 px-3 text-right font-mono" title={`${fmtVndShort(r.restPrev)} → ${fmtVndShort(r.restCur)}`}>
                           {chgCell(r.restChg)}
                         </td>
                         <td className="py-2 px-3 text-right font-mono">{chgCell(r.visitorsChg)}</td>
@@ -1738,7 +1737,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                       <CartesianGrid stroke={PAL.line} horizontal={false} />
                       <XAxis type="number" stroke={PAL.muted} fontSize={10} tickFormatter={(v) => `${Math.round(v * 100)}%`} />
                       <YAxis type="category" dataKey="label" stroke={PAL.muted} fontSize={11} width={52} />
-                      <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => formatCurrencyAdaptive(chartNum(v))} />
+                      <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => fmtVndShort(chartNum(v))} />
                       {CHANNELS.map((c) => (
                         <Bar key={c.key} dataKey={c.key} name={c.label} stackId="ch" fill={c.color} stroke={PAL.panel} strokeWidth={2} />
                       ))}
@@ -1758,12 +1757,12 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                         return (
                           <tr key={m} style={rowStyle(idx)}>
                             <td className="py-2 px-3 font-semibold" style={{ color: PAL.cream }}>{m.slice(5)}/{m.slice(2, 4)}</td>
-                            <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>{c ? formatCurrencyAdaptive(c.shopGmv) : "—"}</td>
-                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{agencyLive > 0 ? formatCurrencyAdaptive(agencyLive) : "—"}</td>
+                            <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>{c ? fmtVndShort(c.shopGmv) : "—"}</td>
+                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{agencyLive > 0 ? fmtVndShort(agencyLive) : "—"}</td>
                             <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.gold }}>{c && agencyLive > 0 ? fmtPct((agencyLive / c.shopGmv) * 100) : "—"}</td>
-                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{c ? formatCurrencyAdaptive(c.affiliate) : "—"}</td>
-                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{c ? formatCurrencyAdaptive(c.video) : "—"}</td>
-                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{c?.card != null ? formatCurrencyAdaptive(c.card) : "—"}</td>
+                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{c ? fmtVndShort(c.affiliate) : "—"}</td>
+                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{c ? fmtVndShort(c.video) : "—"}</td>
+                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{c?.card != null ? fmtVndShort(c.card) : "—"}</td>
                             <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{c?.refundRate != null ? fmtPct(c.refundRate) : "—"}</td>
                           </tr>
                         );
@@ -1799,7 +1798,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                       <td className="py-2 px-3 font-semibold" style={{ color: PAL.gold }}>{controlLabel(g.key)}</td>
                       <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{fmtHours(g.prev.hours)} → {fmtHours(g.cur.hours)}</td>
                       <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.cream }}>
-                        {g.prev.gmvPerHour != null ? formatCurrencyAdaptive(g.prev.gmvPerHour) : "—"} → <b>{g.cur.gmvPerHour != null ? formatCurrencyAdaptive(g.cur.gmvPerHour) : "—"}</b>
+                        {g.prev.gmvPerHour != null ? fmtVndShort(g.prev.gmvPerHour) : "—"} → <b>{g.cur.gmvPerHour != null ? fmtVndShort(g.cur.gmvPerHour) : "—"}</b>
                       </td>
                       <td className="py-2 px-3 text-right font-mono font-bold">{chgCell(pctChange(g.prev.gmvPerHour, g.cur.gmvPerHour))}</td>
                       {RATE_FACTORS.map((k) => (
@@ -1846,7 +1845,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                 })}
               </ReportTable>
               <p className="text-[11px] mt-2" style={{ color: PAL.muted }}>
-                Dòng thụt vào là 4 thừa số nhân ra GMV/giờ. CTOR = Orders ÷ Product clicks. UPT live đổi theo quà tặng kèm (hàng dưới {GIFT_MAX_PRICE / 1000}k/món, đếm từ file
+                Dòng thụt vào là 4 thừa số nhân ra GMV/giờ. CTOR = Orders ÷ Product clicks. UPT live đổi theo quà tặng kèm (hàng dưới {fmtVndShort(GIFT_MAX_PRICE)}/món, đếm từ file
                 Sản Phẩm) nên để trung tính; UPT bỏ quà mới phản ánh cách bán. "↓ N tháng" = N tháng liên tiếp cùng chiều, tổng lệch ≥ 10%.
               </p>
             </Panel>
@@ -1884,7 +1883,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                           </span>
                         </td>
                         <td className="py-2 px-3" style={{ color: PAL.cream }}>{r.name}</td>
-                        <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>{formatCurrencyAdaptive(r.gmv)}</td>
+                        <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>{fmtVndShort(r.gmv)}</td>
                         <td className="py-2 px-3 text-right font-mono">{chgCell(r.gmvChange, true, 1)}</td>
                         <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{r.gmv > 0 ? fmtPct((r.gmvLive / r.gmv) * 100) : "—"}</td>
                         <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{fmtInt(r.orders)}</td>
@@ -1907,8 +1906,8 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                       <tr key={s.name} style={rowStyle(idx)}>
                         <td className="py-2 px-3 font-mono" style={{ color: PAL.gold }}>{idx + 1}</td>
                         <td className="py-2 px-3" style={{ color: PAL.cream }}>{s.name}</td>
-                        <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>{formatCurrencyAdaptive(s.gmv)}</td>
-                        <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{formatCurrencyAdaptive(s.gmvLive)}</td>
+                        <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>{fmtVndShort(s.gmv)}</td>
+                        <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{fmtVndShort(s.gmvLive)}</td>
                         <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{s.gmv > 0 ? fmtPct((s.gmvLive / s.gmv) * 100) : "—"}</td>
                         <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{fmtInt(s.orders)}</td>
                       </tr>
@@ -1918,8 +1917,8 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
               )}
               {giftSliceCur?.hasAnyBatch && giftSliceCur.giftItems > 0 && (
                 <p className="text-[11px] mt-2" style={{ color: PAL.muted }}>
-                  Quà tặng (hàng dưới {GIFT_MAX_PRICE / 1000}k/món) tháng này: {fmtInt(giftSliceCur.giftItems)} món ở {giftSliceCur.giftSkus} SKU —{" "}
-                  {giftSliceCur.top.map(([name, items, price]) => `${shortSku(name)} ${fmtInt(items)} món ~${fmtInt(price / 1000)}k`).join("; ")}.
+                  Quà tặng (hàng dưới {fmtVndShort(GIFT_MAX_PRICE)}/món) tháng này: {fmtInt(giftSliceCur.giftItems)} món ở {giftSliceCur.giftSkus} SKU —{" "}
+                  {giftSliceCur.top.map(([name, items, price]) => `${shortSku(name)} ${fmtInt(items)} món ~${fmtVndShort(price)}`).join("; ")}.
                 </p>
               )}
             </Panel>
@@ -1947,9 +1946,9 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                           {promoStatusLabel(p.status).label}
                         </span>
                       </td>
-                      <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>{formatCurrencyAdaptive(p.gmv)}</td>
+                      <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>{fmtVndShort(p.gmv)}</td>
                       <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{fmtInt(p.orders)}</td>
-                      <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{formatCurrencyAdaptive(p.aov)}</td>
+                      <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{fmtVndShort(p.aov)}</td>
                     </tr>
                   ))}
                 </ReportTable>
@@ -1977,14 +1976,14 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
               )}
               {unassignedHost && !canManage && (
                 <p className="text-[11px] mb-3" style={{ color: PAL.muted }}>
-                  {unassignedHost.sessionCount} ca ({formatCurrencyAdaptive(unassignedHost.gmv)}) chưa ghi nhận host nên không nằm trong bảng.
+                  {unassignedHost.sessionCount} ca ({fmtVndShort(unassignedHost.gmv)}) chưa ghi nhận host nên không nằm trong bảng.
                 </p>
               )}
               {unassignedHost && canManage && (
                 <div className="mb-3">
                   {warnBox(
                     <>
-                      {unassignedHost.sessionCount} ca chưa gán host ({formatCurrencyAdaptive(unassignedHost.gmv)} · {fmtFixed(unassignedHost.hours, 1)}h) không nằm trong bảng này — gán host cho ca để số về đúng người.
+                      {unassignedHost.sessionCount} ca chưa gán host ({fmtVndShort(unassignedHost.gmv)} · {fmtFixed(unassignedHost.hours, 1)}h) không nằm trong bảng này — gán host cho ca để số về đúng người.
                     </>
                   )}
                 </div>
@@ -2008,14 +2007,14 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                   return (
                     <tr key={r.key} style={rowStyle(idx)}>
                       <td className="py-2 px-3 font-semibold" style={{ color: PAL.gold }}>{r.label}</td>
-                      <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{r.target != null ? formatCurrencyAdaptive(r.target) : "—"}</td>
+                      <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{r.target != null ? fmtVndShort(r.target) : "—"}</td>
                       <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>
-                        {none ? <span style={{ color: PAL.muted, fontWeight: 400 }}>chưa có ca</span> : formatCurrencyAdaptive(r.cur.gmv)}
+                        {none ? <span style={{ color: PAL.muted, fontWeight: 400 }}>chưa có ca</span> : fmtVndShort(r.cur.gmv)}
                       </td>
                       <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.cream }}>{!none && r.target ? fmtPct((r.cur.gmv / r.target) * 100) : "—"}</td>
-                      <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{r.prev.sessions > 0 ? formatCurrencyAdaptive(r.prev.gmv) : "—"}</td>
+                      <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{r.prev.sessions > 0 ? fmtVndShort(r.prev.gmv) : "—"}</td>
                       <td className="py-2 px-3 text-right font-mono">{chgCell(none ? null : pctChange(r.prev.gmv, r.cur.gmv), true, 1)}</td>
-                      <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{r.cur.gmvPerHour != null ? formatCurrencyAdaptive(r.cur.gmvPerHour) : "—"}</td>
+                      <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{r.cur.gmvPerHour != null ? fmtVndShort(r.cur.gmvPerHour) : "—"}</td>
                       <td className="py-2 px-3 text-right font-mono">{chgCell(none ? null : pctChange(r.prev.gmvPerHour, r.cur.gmvPerHour), true, 1)}</td>
                       <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{fmtPct(r.cur.ctor)}</td>
                     </tr>
@@ -2029,8 +2028,8 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                   <tr key={r.key} style={rowStyle(idx)}>
                     <td className="py-2 px-3 font-semibold" style={{ color: PAL.gold }}>{r.label}</td>
                     <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{r.prev.n} → {r.cur.n}</td>
-                    <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{r.prev.gmvPerHour != null ? formatCurrencyAdaptive(r.prev.gmvPerHour) : "—"}</td>
-                    <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>{r.cur.gmvPerHour != null ? formatCurrencyAdaptive(r.cur.gmvPerHour) : "—"}</td>
+                    <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{r.prev.gmvPerHour != null ? fmtVndShort(r.prev.gmvPerHour) : "—"}</td>
+                    <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>{r.cur.gmvPerHour != null ? fmtVndShort(r.cur.gmvPerHour) : "—"}</td>
                     <td className="py-2 px-3 text-right font-mono">{chgCell(pctChange(r.prev.gmvPerHour, r.cur.gmvPerHour), true, 1)}</td>
                   </tr>
                 ))}
@@ -2048,8 +2047,8 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                         <ComposedChart data={dailyChartData}>
                           <CartesianGrid stroke={PAL.line} vertical={false} />
                           <XAxis dataKey="label" stroke={PAL.muted} fontSize={10} interval={2} />
-                          <YAxis stroke={PAL.muted} fontSize={10} tickFormatter={(v) => formatCurrencyAdaptive(v)} width={70} />
-                          <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => formatCurrencyAdaptive(chartNum(v))} />
+                          <YAxis stroke={PAL.muted} fontSize={10} tickFormatter={(v) => fmtVndShort(v)} width={70} />
+                          <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => fmtVndShort(chartNum(v))} />
                           <Area type="monotone" dataKey="gmvLiveSession" name="Direct GMV" stroke={PAL.gold} fill={`${PAL.gold}33`} strokeWidth={2} />
                           <Line type="monotone" dataKey="gmvIndirect" name="Indirect GMV" stroke={PAL.blue} strokeWidth={2} strokeDasharray="4 3" dot={false} />
                         </ComposedChart>
@@ -2065,8 +2064,8 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                         <td className="py-2 px-3 font-mono" style={{ color: PAL.gold }}>{idx + 1}</td>
                         <td className="py-2 px-3 font-mono" style={{ color: PAL.cream }}>{fmtSessionStart(s.startTime)}</td>
                         <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{fmtHours(s.hours)}</td>
-                        <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>{formatCurrencyAdaptive(s.gmv)}</td>
-                        <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{formatCurrencyAdaptive(s.gmvPerHour)}</td>
+                        <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>{fmtVndShort(s.gmv)}</td>
+                        <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{fmtVndShort(s.gmvPerHour)}</td>
                         <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{fmtInt(s.orders)}</td>
                         <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{fmtInt(s.itemsSold)}</td>
                         <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{fmtInt(s.views)}</td>
@@ -2101,12 +2100,12 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
           </div>
           <SectionDetail open={detailOpen("next")} onOpen={() => openDetail("next")}>
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-              <KpiTile label={`Target GMV tháng ${nextMonth.slice(5)}`} value={nextPlan && nextPlan.targetGmv > 0 ? formatCurrencyAdaptive(nextPlan.targetGmv) : "—"} note={nextPlan ? (nextPlan.status === "locked" ? "đã chốt" : "đang lên lịch") : "chưa lập kế hoạch"} />
+              <KpiTile label={`Target GMV tháng ${nextMonth.slice(5)}`} value={nextPlan && nextPlan.targetGmv > 0 ? fmtVndShort(nextPlan.targetGmv) : "—"} note={nextPlan ? (nextPlan.status === "locked" ? "đã chốt" : "đang lên lịch") : "chưa lập kế hoạch"} />
               <KpiTile label="Sessions kế hoạch" value={nextPlan ? String(nextPlan.slotCount) : "—"} note={nextPlan ? "trong Kế Hoạch Tháng" : ""} />
               {nextPlanFull && nextPlanFull.plan.shopTargetGmv > 0 && (
                 <KpiTile
                   label={`KPI GMV tháng ${nextMonth.slice(5)}`}
-                  value={formatCurrencyAdaptive(nextPlanFull.plan.shopTargetGmv)}
+                  value={fmtVndShort(nextPlanFull.plan.shopTargetGmv)}
                   note={nextPlan && nextPlan.targetGmv > 0 ? `Target GMV live = ${fmtPct((nextPlan.targetGmv / nextPlanFull.plan.shopTargetGmv) * 100)} KPI GMV` : "brand giao · mọi kênh"}
                 />
               )}
@@ -2125,11 +2124,11 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                       <tr key={a.key} style={rowStyle(idx)}>
                         <td className="py-2 px-3 font-semibold" style={{ color: PAL.gold }}>{CAMP_DAY_BUCKET_LABEL[a.key]}</td>
                         <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.cream }}>{fmtPct(a.share)}</td>
-                        <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>{a.target > 0 ? formatCurrencyAdaptive(a.target) : "—"}</td>
+                        <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>{a.target > 0 ? fmtVndShort(a.target) : "—"}</td>
                         <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{a.slots}</td>
                         <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{fmtHours(a.hours)}</td>
-                        <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.cream }}>{a.requiredGmvPerHour != null ? formatCurrencyAdaptive(a.requiredGmvPerHour) : "—"}</td>
-                        <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{actual != null ? formatCurrencyAdaptive(actual) : "—"}</td>
+                        <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.cream }}>{a.requiredGmvPerHour != null ? fmtVndShort(a.requiredGmvPerHour) : "—"}</td>
+                        <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{actual != null ? fmtVndShort(actual) : "—"}</td>
                         <td className="py-2 px-3 text-right font-mono" style={{ color: gap == null ? PAL.muted : gap > 10 ? PAL.red : gap > 0 ? PAL.gold : PAL.green }}>
                           {gap == null ? "—" : `${gap >= 0 ? "+" : "−"}${fmtFixed(Math.abs(gap), 0)}%`}
                         </td>

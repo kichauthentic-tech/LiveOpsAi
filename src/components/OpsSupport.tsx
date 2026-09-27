@@ -9,7 +9,7 @@ import { EstimateCtx, MonthTracking, benchmarkForWindow, suggestFill, trackMonth
 import { monthOutlook } from "../lib/performance/ceoBrief";
 import { elapsedFractionOf, todayVn } from "../lib/performance/brandCommitment";
 import { useDefaultBrand } from "../hooks/useDefaultBrand";
-import { formatCurrencyAdaptive } from "../lib/formatCurrency";
+import { fmtVndShort } from "../lib/format";
 import { SESSION_STATUS_CLS, SESSION_STATUS_LABEL_VI } from "../lib/sessionStatusUi";
 import { metricHint } from "../lib/metricGlossary";
 import { PageIntro } from "./common/PageIntro";
@@ -175,7 +175,7 @@ export default function OpsSupport({ brands, sessions, shiftSlots, promoSchemes,
             <span className="text-[11px] text-[var(--text-faint)]">
               {tracking.doneCount} ca xong · {tracking.pendingCount} còn lại
               {tracking.noDataCount > 0 && <> · <span className="text-amber-300">{tracking.noDataCount} đã qua giờ chưa có số</span></>}
-              {tracking.cancelledCount > 0 && <> · <span className="text-rose-300">{tracking.cancelledCount} huỷ (mất {formatCurrencyAdaptive(tracking.targetLost)})</span></>}
+              {tracking.cancelledCount > 0 && <> · <span className="text-rose-300">{tracking.cancelledCount} huỷ (mất {fmtVndShort(tracking.targetLost)})</span></>}
             </span>
           )}
         </div>
@@ -193,31 +193,31 @@ export default function OpsSupport({ brands, sessions, shiftSlots, promoSchemes,
         ) : tracking && (
           <>
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-              <Stat label="Target GMV đã chốt" value={formatCurrencyAdaptive(tracking.targetTotal)} hint={`${tracking.slots.length} ca kế hoạch`} />
+              <Stat label="Target GMV đã chốt" value={fmtVndShort(tracking.targetTotal)} hint={`${tracking.slots.length} ca kế hoạch`} />
               <Stat
                 label="GMV"
-                value={formatCurrencyAdaptive(tracking.actualAll)}
+                value={fmtVndShort(tracking.actualAll)}
                 hint={
                   tracking.offPlanCount > 0
-                    ? `${tracking.doneCount} ca kế hoạch + ${tracking.offPlanCount} ca ngoài kế hoạch (${formatCurrencyAdaptive(tracking.offPlanActual)})`
-                    : `${tracking.doneCount} ca có số · TB ${formatCurrencyAdaptive(tracking.avgActualDone)}/ca`
+                    ? `${tracking.doneCount} ca kế hoạch + ${tracking.offPlanCount} ca ngoài kế hoạch (${fmtVndShort(tracking.offPlanActual)})`
+                    : `${tracking.doneCount} ca có số · TB ${fmtVndShort(tracking.avgActualDone)}/ca`
                 }
                 tone={tracking.actualAll > 0 ? "good" : "muted"}
               />
               <Stat
                 label="Run-rate"
                 value={tracking.runRate === null ? "—" : fmtPct(tracking.runRate)}
-                hint={tracking.runRate === null ? "chưa có ca xong" : `thực tế ÷ target của ca KẾ HOẠCH đã xong (${formatCurrencyAdaptive(tracking.targetDone)})`}
+                hint={tracking.runRate === null ? "chưa có ca xong" : `thực tế ÷ target của ca KẾ HOẠCH đã xong (${fmtVndShort(tracking.targetDone)})`}
                 tone={tracking.runRate === null ? "muted" : tracking.runRate >= 1 ? "good" : tracking.runRate >= 0.9 ? "warn" : "bad"}
               />
               <Stat
                 label="Dự kiến cuối tháng"
-                value={formatCurrencyAdaptive(tracking.projected)}
+                value={fmtVndShort(tracking.projected)}
                 hint="đã có + giờ các ca còn trong lịch × GMV/giờ 28 ngày gần nhất (cùng cách Bản Tin CEO) · ±8%"
               />
               <Stat
                 label={tracking.gap > 0 ? "Thiếu" : "Vượt"}
-                value={formatCurrencyAdaptive(Math.abs(tracking.gap))}
+                value={fmtVndShort(Math.abs(tracking.gap))}
                 hint={`${fmtPct(Math.abs(tracking.gapPct), 1)} target · ngưỡng cảnh báo ${fmtPct(engineParams.targetGapWarnPct)}`}
                 tone={tracking.gap > 0 ? (tracking.gapPct > engineParams.targetGapWarnPct ? "bad" : "warn") : "good"}
               />
@@ -242,7 +242,7 @@ export default function OpsSupport({ brands, sessions, shiftSlots, promoSchemes,
             {tracking.offPlanCount > 0 && (
               <div className="rounded-xl border border-sky-800/70 bg-sky-950/25 p-3 text-xs space-y-1.5">
                 <p className="font-bold text-sky-200">
-                  {tracking.offPlanCount} ca có số ngoài kế hoạch · {formatCurrencyAdaptive(tracking.offPlanActual)}
+                  {tracking.offPlanCount} ca có số ngoài kế hoạch · {fmtVndShort(tracking.offPlanActual)}
                 </p>
                 <p className="text-[var(--text-muted)]">
                   Ca mở tay ở Lịch &amp; Studio, ca thay thế sau khi huỷ, hoặc ca nạp bù. Đã cộng vào <b className="text-[var(--text)]">Thực tế</b> và <b className="text-[var(--text)]">Dự kiến cuối tháng</b>; cố ý KHÔNG tính vào Run-rate vì chúng không mang target nào.
@@ -255,7 +255,7 @@ export default function OpsSupport({ brands, sessions, shiftSlots, promoSchemes,
                         {s.hostName ? ` · ${s.hostName}` : ""}
                         {s.isBackfill ? " · nạp bù" : ""}
                       </button>
-                      <span className="font-bold text-[var(--text)] shrink-0">{formatCurrencyAdaptive(s.actualGmv ?? 0)}</span>
+                      <span className="font-bold text-[var(--text)] shrink-0">{fmtVndShort(s.actualGmv ?? 0)}</span>
                     </li>
                   ))}
                 </ul>
@@ -264,15 +264,15 @@ export default function OpsSupport({ brands, sessions, shiftSlots, promoSchemes,
 
             {tracking.pendingCount > 0 && (
               <p className="text-xs text-[var(--text-muted)]">
-                Về đích cần <b className="text-[var(--text)]">{formatCurrencyAdaptive(tracking.requiredPerPending)}/ca</b> cho {tracking.pendingCount + tracking.noDataCount} ca còn lại
-                {tracking.avgActualDone > 0 && <> — so với TB đang đạt {formatCurrencyAdaptive(tracking.avgActualDone)}/ca ({tracking.requiredPerPending > tracking.avgActualDone ? <span className="text-rose-300">cao hơn {fmtPct(tracking.requiredPerPending / tracking.avgActualDone - 1)}</span> : <span className="text-emerald-300">thấp hơn {fmtPct(1 - tracking.requiredPerPending / tracking.avgActualDone)}</span>})</>}.
+                Về đích cần <b className="text-[var(--text)]">{fmtVndShort(tracking.requiredPerPending)}/ca</b> cho {tracking.pendingCount + tracking.noDataCount} ca còn lại
+                {tracking.avgActualDone > 0 && <> — so với TB đang đạt {fmtVndShort(tracking.avgActualDone)}/ca ({tracking.requiredPerPending > tracking.avgActualDone ? <span className="text-rose-300">cao hơn {fmtPct(tracking.requiredPerPending / tracking.avgActualDone - 1)}</span> : <span className="text-emerald-300">thấp hơn {fmtPct(1 - tracking.requiredPerPending / tracking.avgActualDone)}</span>})</>}.
               </p>
             )}
 
             {/* Phương án bù */}
             {tracking.gap > 0 && tracking.gapPct > engineParams.targetGapWarnPct && (
               <div className="rounded-xl border border-amber-800 bg-amber-950/30 p-3 sm:p-4 space-y-3">
-                <p className="text-sm font-bold text-amber-200 flex items-center gap-2"><TrendingDown className="w-4 h-4" /> Dự kiến thiếu {formatCurrencyAdaptive(tracking.gap)} ({fmtPct(tracking.gapPct, 1)}) — phương án bù</p>
+                <p className="text-sm font-bold text-amber-200 flex items-center gap-2"><TrendingDown className="w-4 h-4" /> Dự kiến thiếu {fmtVndShort(tracking.gap)} ({fmtPct(tracking.gapPct, 1)}) — phương án bù</p>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 text-xs">
                   <div className="bg-[var(--surface-base)]/70 border border-[var(--border)] rounded-xl p-3 space-y-2">
                     <p className="font-bold text-[var(--text)]">A · Thêm giờ live</p>
@@ -285,7 +285,7 @@ export default function OpsSupport({ brands, sessions, shiftSlots, promoSchemes,
                           {fill.extraSlots.map((sl) => (
                             <li key={`${sl.date}${sl.startTime}`} className="flex justify-between gap-2">
                               <span className="font-mono text-[var(--text)]">{fmtDate(sl.date)} {sl.startTime}–{sl.endTime}</span>
-                              <span className="text-[var(--text-faint)]">≈ {formatCurrencyAdaptive(sl.expectedGmv * (tracking.realityFactor ?? 1))}{sl.dayLabel ? ` · ${sl.dayLabel}` : ""}</span>
+                              <span className="text-[var(--text-faint)]">≈ {fmtVndShort(sl.expectedGmv * (tracking.realityFactor ?? 1))}{sl.dayLabel ? ` · ${sl.dayLabel}` : ""}</span>
                             </li>
                           ))}
                         </ul>
@@ -318,7 +318,7 @@ export default function OpsSupport({ brands, sessions, shiftSlots, promoSchemes,
               </div>
             )}
             {tracking.gap <= 0 && tracking.doneCount > 0 && (
-              <p className="text-xs text-emerald-300 flex items-center gap-1.5"><TrendingUp className="w-3.5 h-3.5" /> Đang đi đúng nhịp — dự kiến vượt target {formatCurrencyAdaptive(-tracking.gap)}.</p>
+              <p className="text-xs text-emerald-300 flex items-center gap-1.5"><TrendingUp className="w-3.5 h-3.5" /> Đang đi đúng nhịp — dự kiến vượt target {fmtVndShort(-tracking.gap)}.</p>
             )}
 
             {/* Chi tiết ca kế hoạch */}
@@ -347,9 +347,9 @@ export default function OpsSupport({ brands, sessions, shiftSlots, promoSchemes,
                             {t.state === "done" ? "Đã xong" : t.state === "cancelled" ? "Huỷ" : t.state === "no_data" ? "Chưa có số" : t.session ? SESSION_STATUS_LABEL_VI[t.session.status] : t.slot ? "Chờ đăng ký" : "—"}
                           </span>
                         </td>
-                        <td className="py-1 pr-3 text-right text-[var(--text-muted)]">{formatCurrencyAdaptive(t.target)}</td>
-                        <td className="py-1 pr-3 text-right text-[var(--text-faint)]">{t.forecast > 0 ? formatCurrencyAdaptive(t.forecast * (tracking.realityFactor ?? 1)) : "—"}</td>
-                        <td className="py-1 pr-3 text-right font-bold text-[var(--text)]">{t.state === "done" ? formatCurrencyAdaptive(t.actual) : "—"}</td>
+                        <td className="py-1 pr-3 text-right text-[var(--text-muted)]">{fmtVndShort(t.target)}</td>
+                        <td className="py-1 pr-3 text-right text-[var(--text-faint)]">{t.forecast > 0 ? fmtVndShort(t.forecast * (tracking.realityFactor ?? 1)) : "—"}</td>
+                        <td className="py-1 pr-3 text-right font-bold text-[var(--text)]">{t.state === "done" ? fmtVndShort(t.actual) : "—"}</td>
                         <td className={`py-1 text-right font-bold ${t.state !== "done" ? "text-[var(--text-faint)]" : t.actual >= t.target ? "text-emerald-400" : "text-rose-400"}`}>{t.state === "done" && t.target > 0 ? fmtPct(t.actual / t.target) : "—"}</td>
                       </tr>
                     ))}
@@ -399,16 +399,16 @@ export default function OpsSupport({ brands, sessions, shiftSlots, promoSchemes,
                   ) : (
                     <>
                       <div className="grid grid-cols-3 gap-x-2 gap-y-1.5 text-[11px]">
-                        <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">GMV kỳ vọng</p><p className="font-bold text-[var(--text)]">{formatCurrencyAdaptive(b.expectedGmv * k)}</p></div>
-                        <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">GMV/giờ</p><p className="font-bold text-[var(--text)]">{formatCurrencyAdaptive(b.gmvPerHour * k)}</p></div>
-                        <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">Target GMV ca</p><p className={`font-bold ${target > 0 && target > b.expectedGmv * k * engineParams.highExpectationRatio ? "text-amber-300" : "text-[var(--text)]"}`}>{target > 0 ? formatCurrencyAdaptive(target) : "—"}</p></div>
+                        <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">GMV kỳ vọng</p><p className="font-bold text-[var(--text)]">{fmtVndShort(b.expectedGmv * k)}</p></div>
+                        <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">GMV/giờ</p><p className="font-bold text-[var(--text)]">{fmtVndShort(b.gmvPerHour * k)}</p></div>
+                        <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">Target GMV ca</p><p className={`font-bold ${target > 0 && target > b.expectedGmv * k * engineParams.highExpectationRatio ? "text-amber-300" : "text-[var(--text)]"}`}>{target > 0 ? fmtVndShort(target) : "—"}</p></div>
                         <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">Views/giờ</p><p className="font-mono text-[var(--text)]">{fmtN(b.viewsPerHour)}</p></div>
                         <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">Tổng view</p><p className="font-mono text-[var(--text)]">{fmtN(b.expectedViews)}</p></div>
                         <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">Orders kỳ vọng</p><p className="font-mono text-[var(--text)]">{fmtN(b.expectedOrders)}</p></div>
                         <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">CVR</p><p className="font-mono text-[var(--text)]">{fmtPct(b.conversion, 2)}</p></div>
                         <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">LIVE CTR</p><p className="font-mono text-[var(--text)]">{b.liveCtr === null ? "—" : `${b.liveCtr.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%`}</p></div>
-                        <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">AOV</p><p className="font-mono text-[var(--text)]">{b.aov > 0 ? formatCurrencyAdaptive(b.aov) : "—"}</p></div>
-                        <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">Ads / giờ</p><p className="font-mono text-[var(--text)]">{b.adsPerHour === null ? "chưa có report" : formatCurrencyAdaptive(b.adsPerHour)}</p></div>
+                        <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">AOV</p><p className="font-mono text-[var(--text)]">{b.aov > 0 ? fmtVndShort(b.aov) : "—"}</p></div>
+                        <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">Ads / giờ</p><p className="font-mono text-[var(--text)]">{b.adsPerHour === null ? "chưa có report" : fmtVndShort(b.adsPerHour)}</p></div>
                         <div className="col-span-2"><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">Hệ số ngày</p><p className="font-mono text-[var(--text)]">×{b.dayFactor.toLocaleString("vi-VN", { maximumFractionDigits: 2 })}{b.dayFactor > 1.05 ? " (camp/lễ/scheme)" : ""}</p></div>
                       </div>
                       {(b.thin || b.cellTags.includes("weak") || b.cellTags.includes("traffic_low_cvr")) && (

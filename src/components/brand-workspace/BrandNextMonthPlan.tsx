@@ -5,7 +5,7 @@ import { confirmMonthPlan, fetchMonthPlan } from "../../lib/db/monthPlans";
 import { sessionDurationHours } from "../../lib/pnl";
 import { todayVn } from "../../lib/performance/brandCommitment";
 import { errorMessage } from "../../lib/errorMessage";
-import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
+import { fmtVndShort } from "../../lib/format";
 
 // Kế hoạch tháng sau cho Brand Workspace — bản CHỈ ĐỌC + một nút "xác nhận đã xem" (Đợt C/2,
 // migration 0110). Khác hẳn "Kế Hoạch Tháng" bên Agency (MonthPlan.tsx): bên đó ops dựng lưới,
@@ -147,10 +147,10 @@ export const BrandNextMonthPlan: React.FC<BrandNextMonthPlanProps> = ({ brandId,
                 <Clock className="w-3.5 h-3.5" /> {fmtHours(totalHours)} · {slots.length} ca
               </span>
               {plan.targetGmv > 0 && (
-                <span className="text-xs text-[var(--text-muted)]">Target GMV: {formatCurrencyAdaptive(plan.targetGmv, "")}</span>
+                <span className="text-xs text-[var(--text-muted)]">Target GMV: {fmtVndShort(plan.targetGmv)}</span>
               )}
               {plan.shopTargetGmv > 0 && (
-                <span className="text-xs text-[var(--text-muted)]">KPI GMV (cả shop): {formatCurrencyAdaptive(plan.shopTargetGmv, "")}</span>
+                <span className="text-xs text-[var(--text-muted)]">KPI GMV (cả shop): {fmtVndShort(plan.shopTargetGmv)}</span>
               )}
             </div>
 
@@ -195,7 +195,7 @@ export const BrandNextMonthPlan: React.FC<BrandNextMonthPlanProps> = ({ brandId,
                         {s.startTime}–{s.endTime}
                       </td>
                       <td className="py-2 px-2 text-right text-[var(--text-muted)] whitespace-nowrap">
-                        {s.targetGmv > 0 ? formatCurrencyAdaptive(s.targetGmv, "") : "—"}
+                        {s.targetGmv > 0 ? fmtVndShort(s.targetGmv) : "—"}
                       </td>
                       <td className="py-2 px-3 text-[var(--text-faint)]">{s.note || "—"}</td>
                     </tr>

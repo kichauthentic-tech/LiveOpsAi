@@ -3,7 +3,7 @@ import { SESSION_STATUS_CLS, SESSION_STATUS_LABEL_VI } from "../lib/sessionStatu
 import { BookOpen, CheckCircle2, ChevronRight, Circle, Download, EyeOff, Link2 } from "lucide-react";
 import { Brand, LiveSession, Studio, Talent, UserRole, AuditLogEntry } from "../types";
 import { getTodayDate } from "../lib/dateUtils";
-import { formatCurrencyAdaptive } from "../lib/formatCurrency";
+import { fmtVndShort } from "../lib/format";
 import { sessionHours } from "../lib/performance/hostPerformance";
 import { SessionReportInput } from "../lib/db/sessionReports";
 import { downloadRowsAsXlsx } from "../lib/exportXlsx";
@@ -308,9 +308,9 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
           <Stat label="Sessions" value={String(summary.total)} sub={summary.countable < summary.total ? `${summary.countable} ca có số` : undefined} />
           <Stat label="Giờ live" value={fmtHours(summary.hours)} sub="giờ thật, thiếu thì lấy giờ kế hoạch" />
-          <Stat label="GMV" value={formatCurrencyAdaptive(summary.gmv, "")} accent />
+          <Stat label="GMV" value={fmtVndShort(summary.gmv)} accent />
           <Stat label="Orders" value={fmtInt(summary.orders)} />
-          <Stat label="GMV/giờ" value={formatCurrencyAdaptive(summary.gmvPerHour, "")} />
+          <Stat label="GMV/giờ" value={fmtVndShort(summary.gmvPerHour)} />
           <div className="bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-2.5">
             <p className="text-[11px] uppercase tracking-wider text-[var(--text-faint)]">Nguồn số liệu</p>
             {summary.countable === 0 ? (
@@ -412,14 +412,14 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
                         </td>
                         {!isBrandView && (
                           <td className="py-2.5 px-2 text-right text-[var(--text-muted)] whitespace-nowrap">
-                            {s.targetGmv ? formatCurrencyAdaptive(s.targetGmv, "") : "—"}
+                            {s.targetGmv ? fmtVndShort(s.targetGmv) : "—"}
                           </td>
                         )}
                         <td className="py-2.5 px-2 text-right font-bold text-[var(--success)] whitespace-nowrap">
                           {hideMetrics ? (
                             <LockedCell />
                           ) : s.actualGmv ? (
-                            formatCurrencyAdaptive(s.actualGmv, "")
+                            fmtVndShort(s.actualGmv)
                           ) : (
                             <span className="text-[var(--text-faint)] font-normal">—</span>
                           )}
@@ -433,7 +433,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
                           </td>
                         )}
                         <td className="py-2.5 px-2 text-right text-[var(--text-muted)] whitespace-nowrap">
-                          {hideMetrics ? <LockedCell /> : gmvPerHour > 0 ? formatCurrencyAdaptive(gmvPerHour, "") : "—"}
+                          {hideMetrics ? <LockedCell /> : gmvPerHour > 0 ? fmtVndShort(gmvPerHour) : "—"}
                         </td>
                         <td className="py-2.5 px-2">
                           {isBrandView ? (
@@ -508,7 +508,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
                   <span className="font-mono text-[11px] text-[var(--text-muted)]">{s.date} {s.startTime}–{s.endTime}</span>
                   <span className="text-xs font-bold text-[var(--text)]">{s.brandName}</span>
                   <span className="text-[11px] text-[var(--text-muted)]">{s.hostName || "—"}</span>
-                  <span className="text-[11px] font-bold text-violet-300">{formatCurrencyAdaptive(s.actualGmv ?? 0, "")}</span>
+                  <span className="text-[11px] font-bold text-violet-300">{fmtVndShort(s.actualGmv ?? 0)}</span>
                   {s.excludedReason && <span className="text-[11px] text-[var(--text-faint)] italic">— {s.excludedReason}</span>}
                 </button>
               </li>

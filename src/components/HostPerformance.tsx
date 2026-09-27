@@ -13,7 +13,7 @@ import {
 import { getTodayDate } from "../lib/dateUtils";
 import { PageIntro } from "./common/PageIntro";
 
-import { fmtFixed } from "../lib/format";
+import { fmtFixed, fmtVndShort } from "../lib/format";
 interface HostPerformanceProps {
   sessions: LiveSession[];
   brands: Brand[];
@@ -28,11 +28,6 @@ function isoDaysAgo(days: number): string {
   const d = new Date();
   d.setDate(d.getDate() - days);
   return `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, "0")}-${`${d.getDate()}`.padStart(2, "0")}`;
-}
-
-function fmtVnd(n: number): string {
-  if (n >= 1_000_000) return (n / 1_000_000).toLocaleString("vi-VN", { maximumFractionDigits: 1 }) + "tr";
-  return n.toLocaleString("vi-VN", { maximumFractionDigits: 0 });
 }
 
 const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0]; // Thứ 2 → Chủ nhật
@@ -120,7 +115,7 @@ export function HostPerformance({ sessions, brands }: HostPerformanceProps) {
               <div className="mt-2 flex items-start gap-2 text-[11px] rounded-xl p-2.5 bg-amber-500/10 border border-amber-500/30 text-amber-300">
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                 <span>
-                  {unassignedHost.sessionCount} ca chưa gán host ({fmtVnd(unassignedHost.gmv)} GMV · {fmtFixed(unassignedHost.hours, 1)}h) không được tính
+                  {unassignedHost.sessionCount} ca chưa gán host ({fmtVndShort(unassignedHost.gmv)} GMV · {fmtFixed(unassignedHost.hours, 1)}h) không được tính
                   vào xếp hạng — gán host cho ca ở "Dữ Liệu Gốc → nạp bù" hoặc Cửa sổ Ca Live để số này về đúng người.
                 </span>
               </div>
@@ -142,11 +137,11 @@ export function HostPerformance({ sessions, brands }: HostPerformanceProps) {
                   {hosts.map((h) => (
                     <tr key={h.key} className="border-t border-[var(--border)]/60">
                       <td className="py-2 pr-3 font-bold text-[var(--text)]">{h.label}</td>
-                      <td className="py-2 pr-3 text-right font-bold text-emerald-400">{fmtVnd(h.gmvPerHour)}</td>
-                      <td className="py-2 pr-3 text-right text-[var(--text-muted)]">{fmtVnd(h.gmv)}</td>
+                      <td className="py-2 pr-3 text-right font-bold text-emerald-400">{fmtVndShort(h.gmvPerHour)}</td>
+                      <td className="py-2 pr-3 text-right text-[var(--text-muted)]">{fmtVndShort(h.gmv)}</td>
                       <td className="py-2 pr-3 text-right text-[var(--text-muted)]">{h.sessionCount}</td>
                       <td className="py-2 pr-3 text-right text-[var(--text-muted)]">{fmtFixed(h.hours, 1)}h</td>
-                      <td className="py-2 pr-3 text-right text-[var(--text-muted)]">{fmtVnd(h.gmvPerSession)}</td>
+                      <td className="py-2 pr-3 text-right text-[var(--text-muted)]">{fmtVndShort(h.gmvPerSession)}</td>
                       <td className="py-2 text-right text-[var(--text-muted)]">{fmtFixed(h.ctr, 2)}%</td>
                     </tr>
                   ))}
@@ -185,7 +180,7 @@ export function HostPerformance({ sessions, brands }: HostPerformanceProps) {
                                 style={{ backgroundColor: `rgba(16, 185, 129, ${0.12 + ratio * 0.6})` }}
                                 title={`${c.sessionCount} ca`}
                               >
-                                {fmtVnd(c.gmvPerHour)}
+                                {fmtVndShort(c.gmvPerHour)}
                               </div>
                             ) : (
                               <span className="text-[var(--text-faint)]">—</span>
@@ -209,7 +204,7 @@ export function HostPerformance({ sessions, brands }: HostPerformanceProps) {
               {weekdays.map((w) => (
                 <div key={w.key} className="bg-[var(--surface-base)] rounded-xl p-2.5 text-center">
                   <p className="text-[11px] text-[var(--text-faint)]">{w.label}</p>
-                  <p className="text-sm font-black text-emerald-400 mt-1">{fmtVnd(w.gmvPerHour)}</p>
+                  <p className="text-sm font-black text-emerald-400 mt-1">{fmtVndShort(w.gmvPerHour)}</p>
                   <p className="text-[11px] text-[var(--text-faint)] mt-0.5">GMV/giờ · {w.sessionCount} ca</p>
                 </div>
               ))}

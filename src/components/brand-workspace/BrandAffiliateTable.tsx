@@ -8,7 +8,7 @@ import { useToast } from "../../hooks/useToast";
 import { Database, Download, Loader2, Plus, Save, Trash2, Users } from "lucide-react";
 import { metricHint } from "../../lib/metricGlossary";
 
-import { fmtFixed } from "../../lib/format";
+import { fmtFixed, fmtVndFull } from "../../lib/format";
 // Trang Affiliate (2026-09-22) — tách RIÊNG khỏi form Report Tháng theo yêu cầu ops. Bảng dựng
 // theo đúng file phân tích ops đang dùng: mỗi PHIÊN LIVE là 1 CỘT, mỗi chỉ số là 1 DÒNG, các cột
 // gom theo tháng bằng một dải tiêu đề ở trên.
@@ -430,7 +430,7 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
                   <span className="font-mono">{dayLabel(r.date)}</span>
                   <span className="font-semibold">{r.creatorName}</span>
                   <span className="text-[var(--text-faint)]">
-                    {r.timelineLabel} · {fmtInt(r.directGmv)}đ · {fmtInt(r.viewer)} viewer · {fmtInt(r.liveImpressions)} hiển thị
+                    {r.timelineLabel} · {fmtVndFull(r.directGmv)} · {fmtInt(r.viewer)} viewer · {fmtInt(r.liveImpressions)} hiển thị
                   </span>
                   {r.isShopAccount && <span className="px-1.5 rounded bg-slate-200 text-slate-700">tài khoản shop</span>}
                   {r.noBrandActivity && (

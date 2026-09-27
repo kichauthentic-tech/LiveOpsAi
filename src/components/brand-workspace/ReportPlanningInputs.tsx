@@ -5,8 +5,7 @@ import { CAMP_DAY_BUCKET_ORDER, resolveCampBucketType, type CampDayBucket, type 
 import { fetchAffiliatePlans, replaceAffiliatePlans } from "../../lib/db/affiliatePlans";
 import { MonthlyReportManualInput, upsertMonthlyReport } from "../../lib/db/monthlyReports";
 import { errorMessage } from "../../lib/errorMessage";
-import { fmtFixed } from "../../lib/format";
-import { formatCurrencyAdaptive } from "../../lib/formatCurrency";
+import { fmtFixed, fmtVndShort } from "../../lib/format";
 
 // Công cụ nhập liệu của Report Tháng (khung camp tháng này, kế hoạch phân bổ + affiliate tháng sau) — chuyển từ
 // Phụ lục của Report Tháng sang tab Nhập Ads & Ghi Chú (Report Tháng chuyên sâu, 2026-09-26): report chỉ còn
@@ -232,9 +231,9 @@ export const ReportPlanningInputs: React.FC<Props> = ({ brandId, month, sessions
                     <td className="py-2 px-2 text-right">
                       <input id={`plan-pct-${k}`} type="number" value={plan[k] ?? ""} onChange={(e) => setPlan((x) => ({ ...x, [k]: e.target.value }))} disabled={readOnly} className={`${inputCls} w-20 text-right`} />
                     </td>
-                    <td className="py-2 px-2 text-right font-bold text-[var(--text)]">{formatCurrencyAdaptive(g)}</td>
+                    <td className="py-2 px-2 text-right font-bold text-[var(--text)]">{fmtVndShort(g)}</td>
                     <td className="py-2 px-2 text-right text-[var(--text-muted)]">{fmtFixed(h, 1)}h</td>
-                    <td className="py-2 px-2 text-right text-[var(--text-muted)]">{h > 0 ? formatCurrencyAdaptive(g / h) : "—"}</td>
+                    <td className="py-2 px-2 text-right text-[var(--text-muted)]">{h > 0 ? fmtVndShort(g / h) : "—"}</td>
                   </tr>
                 );
               })}
@@ -290,7 +289,7 @@ export const ReportPlanningInputs: React.FC<Props> = ({ brandId, month, sessions
                         />
                       </td>
                     ))}
-                    <td className="py-1.5 px-2 text-right text-[var(--text-muted)]">{r.targetGmv && r.durationHours ? formatCurrencyAdaptive(r.targetGmv / r.durationHours) : "—"}</td>
+                    <td className="py-1.5 px-2 text-right text-[var(--text-muted)]">{r.targetGmv && r.durationHours ? fmtVndShort(r.targetGmv / r.durationHours) : "—"}</td>
                     <td className="py-1.5 px-2">
                       <input
                         type="number"

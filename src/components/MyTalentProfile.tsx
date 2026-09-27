@@ -7,8 +7,7 @@ import { computeTalentMonthlyIncome } from "../lib/pnl";
 import { todayVn } from "../lib/performance/brandCommitment";
 import { errorMessage } from "../lib/errorMessage";
 
-import { fmtFixed } from "../lib/format";
-import { formatCurrencyAdaptive } from "../lib/formatCurrency";
+import { fmtFixed, fmtVndShort, fmtVndFull } from "../lib/format";
 interface MyTalentProfileProps {
   activeUser: SystemUser;
   talents: Talent[];
@@ -280,11 +279,11 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
           </div>
           <div className="bg-[var(--surface-base)]/40 border border-[var(--border)] rounded-xl p-3">
             <div className="text-[var(--text-muted)]">GMV lũy kế</div>
-            <div className="font-bold text-emerald-400 mt-0.5">{formatCurrencyAdaptive(myTalent.totalGmv || 0)}</div>
+            <div className="font-bold text-emerald-400 mt-0.5">{fmtVndShort(myTalent.totalGmv || 0)}</div>
           </div>
           <div className="bg-[var(--surface-base)]/40 border border-[var(--border)] rounded-xl p-3">
             <div className="text-[var(--text-muted)]">GMV/session</div>
-            <div className="font-bold text-emerald-400 mt-0.5">{formatCurrencyAdaptive(Math.round(computeRealAvgGmvPerSession(sessions, myTalent.id)))}</div>
+            <div className="font-bold text-emerald-400 mt-0.5">{fmtVndShort(Math.round(computeRealAvgGmvPerSession(sessions, myTalent.id)))}</div>
           </div>
           <div className="bg-[var(--surface-base)]/40 border border-[var(--border)] rounded-xl p-3">
             <div className="text-[var(--text-muted)]">CVR TB</div>
@@ -302,12 +301,12 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
             {myTalent.rateHidden ? (
               <div className="font-bold text-[var(--text-muted)] mt-0.5">chưa xem được</div>
             ) : (myTalent.ratePerHour || 0) > 0 ? (
-              <div className="font-bold text-[var(--text)] mt-0.5">{(myTalent.ratePerHour || 0).toLocaleString()} đ<span className="text-amber-300/80 font-semibold">/giờ</span></div>
+              <div className="font-bold text-[var(--text)] mt-0.5">{fmtVndFull(myTalent.ratePerHour || 0)}<span className="text-amber-300/80 font-semibold">/giờ</span></div>
             ) : (
-              <div className="font-bold text-[var(--text)] mt-0.5">{(myTalent.ratePerSession || 0).toLocaleString()} đ<span className="text-amber-300/80 font-semibold">/live</span></div>
+              <div className="font-bold text-[var(--text)] mt-0.5">{fmtVndFull(myTalent.ratePerSession || 0)}<span className="text-amber-300/80 font-semibold">/live</span></div>
             )}
             {!myTalent.rateHidden && (myTalent.assistantRatePerHour || 0) > 0 && (
-              <div className="text-[11px] text-amber-300/80 mt-0.5">Trợ live: {(myTalent.assistantRatePerHour || 0).toLocaleString()} đ/giờ</div>
+              <div className="text-[11px] text-amber-300/80 mt-0.5">Trợ live: {fmtVndFull(myTalent.assistantRatePerHour || 0)}/giờ</div>
             )}
           </div>
           <div>
@@ -350,7 +349,7 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
           <>
             <div className="bg-amber-950/30 border border-amber-500/30 rounded-xl p-4">
               <div className="text-amber-300/80 text-[11px]">Tổng thu nhập tạm tính</div>
-              <div className="font-black text-2xl text-[var(--text)] mt-0.5">{money(income.total)} đ</div>
+              <div className="font-black text-2xl text-[var(--text)] mt-0.5">{money(income.total)}</div>
             </div>
 
             {/* Đ3: rate chưa nhập ra payout 0đ, giống hệt "tháng này không có ca" — với người vừa
@@ -382,7 +381,7 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
                         <td className="py-1.5 px-1 whitespace-nowrap">{r.session.brandName}</td>
                         <td className="py-1.5 px-1 whitespace-nowrap">{ROLE_LABEL[r.role]}</td>
                         <td className="py-1.5 px-1 text-right whitespace-nowrap">{fmtFixed(r.billableHours, 1)}h</td>
-                        <td className="py-1.5 px-1 text-right font-bold text-[var(--text)] whitespace-nowrap">{money(r.payout)} đ</td>
+                        <td className="py-1.5 px-1 text-right font-bold text-[var(--text)] whitespace-nowrap">{money(r.payout)}</td>
                       </tr>
                     ))}
                   </tbody>
