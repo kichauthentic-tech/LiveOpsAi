@@ -2,7 +2,7 @@
 
 ## CẦN LÀM NGAY khi mở phiên mới (cập nhật 2026-09-24)
 
-> **MỚI 2026-09-28 — Dashboard trong từng Brand Workspace: ĐÃ BUILD + VERIFY (không migration, CHƯA commit).** Tab đầu Brand
+> **MỚI 2026-09-28 — Dashboard trong từng Brand Workspace: ĐÃ BUILD + VERIFY (không migration, commit 79ac6c7 đã push `main`).** Tab đầu Brand
 > Workspace (`/brand/<slug>/dashboard`). Một hàm run-rate chung theo **plan ban đầu** (`planRunRate` — ca huỷ giữ target, ca ngoài plan
 > target = 0) cho Dashboard + Report Tháng + Report Tuần. **Hỗ Trợ Vận Hành đã gộp vào Dashboard** (tab agency `ops_support` bỏ).
 > Kế Hoạch Tháng chia target ca theo **chỉ số khung giờ + vị trí ngày camp** (nút "Chia lại target"). Xem `## Dashboard trong Brand Workspace`.
@@ -1976,7 +1976,7 @@ nào); nhánh fallback file Creator-Live-Performance (CROCS mọi tháng đều 
 report và xoá 2026-09-27, phần giữ lại đọc từ bản chụp; (2) Report Tuần vẫn tính trực tiếp; (3) so MoM
 cùng số ngày khi tháng chưa hết (T9 22 ngày vs T8 31 ngày đang ra −40%) — đã nêu với user, chưa làm.
 
-## Dashboard trong Brand Workspace — BUILD + VERIFY 2026-09-28 (không migration, CHƯA commit)
+## Dashboard trong Brand Workspace — BUILD + VERIFY 2026-09-28 (không migration, commit 79ac6c7 đã push `main`)
 
 User yêu cầu: mỗi brand ws có 1 module dashboard — tổng quan hiệu suất tháng + phân tích + đề xuất tối ưu vận hành; sau đó thêm
 run-rate (tháng / 3 loại campaign / từng ca). Đề xuất + bản mẫu số thật: https://claude.ai/artifact/5PxKjwfidrdigw6Xxkcuhe.
