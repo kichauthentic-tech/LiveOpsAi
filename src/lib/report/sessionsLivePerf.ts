@@ -2,7 +2,6 @@ import { LiveSession } from "../../types";
 import type { MonthEndProjection, PlanRunRate } from "../performance/planRunRate";
 import { isCountable, sessionHours } from "../performance/hostPerformance";
 import { CreatorLivePerfMonthSlice, CreatorLivePerfRow } from "../dataraw/creatorLivePerfSlice";
-import { DailyLivePerformance, LivePerformanceMonthSlice } from "../dataraw/monthlyDailySlice";
 
 // Report Tháng — đổi nguồn số (user chốt 2026-09-21): phần Livestream/Tổng quan đọc từ `live_sessions`
 // đã có số (đối soát / snapshot / nạp bù) thay vì phụ thuộc file Creator-Live-Performance up ở Dữ
@@ -86,37 +85,6 @@ export function pickLivePerfSource(sessions: LiveSession[], brandId: string, sta
   }
   if (dataraw?.hasAnyBatch) return { slice: dataraw, source: "dataraw", sessionCount: 0, reconciled: 0, snapshot: 0, manual: 0 };
   return { slice: dataraw ?? { rows: [], missingDays: [], hasAnyBatch: false }, source: "none", sessionCount: 0, reconciled: 0, snapshot: 0, manual: 0 };
-}
-
-// "Diễn biến GMV theo ngày" khi không có file Live Performance Core Stats: gộp ca theo ngày. GMV gián
-// tiếp (đơn sau live) không có trong ca → 0; GPM = GMV / 1000 lượt hiển thị.
-export function dailyFromSessions(sessions: LiveSession[], brandId: string, start: string, end: string): LivePerformanceMonthSlice {
-  const ss = sessionsInRange(sessions, brandId, start, end);
-  if (ss.length === 0) return { daily: [], missingDays: [], hasAnyBatch: false };
-  const by = new Map<string, DailyLivePerformance>();
-  for (const s of ss) {
-    const d = by.get(s.date) ?? { date: s.date, gmvLiveSession: 0, gmvLive: 0, gmvIndirect: 0, gpm: 0, sessions: 0, itemsSoldLive: 0, ordersSkuLive: 0, views: 0, ctrLive: 0, ctorLive: 0 };
-    d.gmvLiveSession += s.actualGmv ?? 0;
-    d.gmvLive += s.actualGmv ?? 0;
-    d.sessions += 1;
-    d.itemsSoldLive += s.attributedItemsSold ?? 0;
-    d.ordersSkuLive += s.attributedSkuOrders ?? 0;
-    d.views += s.totalViews ?? 0;
-    by.set(s.date, d);
-  }
-  const daily = [...by.values()].sort((a, b) => a.date.localeCompare(b.date));
-  // GPM/CTR/CTOR theo ngày tính lại từ số đếm của các ca trong ngày.
-  for (const d of daily) {
-    const day = ss.filter((s) => s.date === d.date);
-    const imp = day.reduce((a, s) => a + (s.impressions ?? 0), 0);
-    const pImp = day.reduce((a, s) => a + (s.productImpressions ?? 0), 0);
-    const clicks = day.reduce((a, s) => a + (s.productClicks ?? 0), 0);
-    const orders = day.reduce((a, s) => a + (s.totalOrders ?? 0), 0);
-    d.gpm = imp > 0 ? d.gmvLiveSession / (imp / 1000) : 0;
-    d.ctrLive = pImp > 0 ? (clicks / pImp) * 100 : 0;
-    d.ctorLive = clicks > 0 ? (orders / clicks) * 100 : 0;
-  }
-  return { daily, missingDays: [], hasAnyBatch: true };
 }
 
 // Run-rate tháng theo target kế hoạch đã đổ xuống ca (applyAllocatedTargets): ca xong có số vs

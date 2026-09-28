@@ -22,7 +22,7 @@ import { useConfirm } from "../../hooks/useConfirm";
 import { useToast } from "../../hooks/useToast";
 import { fetchMonthlyReportSnapshot, saveMonthlyReportSnapshot, StoredMonthlyReportSnapshot } from "../../lib/db/monthlyReportSnapshots";
 import { DataRawImportStamp, fetchDataRawImportStamps } from "../../lib/db/brandDataRaw";
-import { buildMonthlyReportSnapshot, snapshotFreshness, snapshotHeadline, SnapshotHeadline } from "../../lib/report/monthlySnapshot";
+import { buildMonthlyReportSnapshot, COVERAGE_TYPES, snapshotFreshness, snapshotHeadline, SnapshotHeadline } from "../../lib/report/monthlySnapshot";
 import { fmtVndShort } from "../../lib/format";
 import { PageIntro } from "../common/PageIntro";
 
@@ -396,7 +396,8 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
               {stored.snapshot.coverage.sessionsThrough ? `ca có số tới ${fmtDayMonth(stored.snapshot.coverage.sessionsThrough)}` : "chưa có ca nào có số"}
               {" · "}
               {(() => {
-                const ends = Object.values(stored.snapshot.coverage.datarawThrough).filter((d): d is string => !!d).sort();
+                // Chỉ loại file report còn đọc — bản chụp cũ còn ghi Live Performance (21/09) làm mốc sai.
+                const ends = COVERAGE_TYPES.map((t) => stored.snapshot.coverage.datarawThrough[t]).filter((d): d is string => !!d).sort();
                 return ends.length ? `Dữ Liệu Gốc tới ${fmtDayMonth(ends[0])}` : "chưa có file Dữ Liệu Gốc";
               })()}
             </span>

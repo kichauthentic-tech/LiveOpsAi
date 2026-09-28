@@ -1,6 +1,5 @@
 import { BrandPlatformRate, DataRawReportType, LiveSession } from "../../types";
 import { CreatorLivePerfMonthSlice, fetchCreatorLivePerfMonthSlice } from "../dataraw/creatorLivePerfSlice";
-import { fetchLivePerformanceCoreMonthSlice, LivePerformanceMonthSlice } from "../dataraw/monthlyDailySlice";
 import {
   CardGmvMonthSlice,
   fetchCardGmvMonthSlice,
@@ -109,11 +108,13 @@ export function reportWindow(month: string): string[] {
 // mới nên bản chụp cũ thiếu nó ⇒ báo "file Sản Phẩm" có thay đổi, bấm Cập nhật là có.
 // gifts (2026-09-26, Report Tháng chuyên sâu): số món quà tặng (< 20k/món) + tổng món theo tháng, 4 tháng — tách UPT
 // hàng bán thật khỏi quà. Piece mới ⇒ bản chụp cũ báo "file Sản Phẩm" có thay đổi, bấm Cập nhật là có.
-type PieceKind = "creatorLive" | "dailyPerf" | "topSku" | "topPromo" | "shopDays" | "cardGmv" | "skuRank" | "gifts";
+// dailyPerf (file Live Performance Core Stats) BỎ 2026-09-29: file đó cộng cả live của creator affiliate (CROCS
+// 1–21/09: LIVE GMV = Seller LIVE + Creator LIVE của Shop Analytics, lệch 0đ mọi ngày) nên không phải số agency;
+// biểu đồ duy nhất dùng nó đã bỏ. Bản chụp cũ còn piece này trong JSON — không ai đọc, không tính vào độ mới.
+type PieceKind = "creatorLive" | "topSku" | "topPromo" | "shopDays" | "cardGmv" | "skuRank" | "gifts";
 
 const PIECE_SOURCES: Record<PieceKind, DataRawReportType[]> = {
   creatorLive: ["creator_live_performance"],
-  dailyPerf: ["live_performance_core_stats"],
   topSku: ["product_list"],
   topPromo: ["shop_promotion"],
   shopDays: ["shop_analytics"],
@@ -125,7 +126,6 @@ const PIECE_SOURCES: Record<PieceKind, DataRawReportType[]> = {
 // Nhãn cho thông báo "file nào mới up" — cùng tên ops thấy ở Dữ Liệu Gốc.
 export const REPORT_TYPE_LABEL: Partial<Record<DataRawReportType, string>> = {
   creator_live_performance: "Creator Live Performance",
-  live_performance_core_stats: "Live Performance",
   shop_analytics: "Shop Analytics",
   product_list: "Sản Phẩm",
   shop_promotion: "Khuyến Mãi"
@@ -164,7 +164,6 @@ function stampTypes(stamp: string): Map<string, string> {
 function requiredPieces(month: string, sessions: LiveSession[] | SnapshotSession[], brandId: string): { kind: PieceKind; month: string }[] {
   // v2: GMV video/thẻ SP đọc từ shopDays + cardGmv (4 tháng) — piece channelGmv cũ bỏ hẳn.
   const out: { kind: PieceKind; month: string }[] = [
-    { kind: "dailyPerf", month },
     { kind: "topSku", month },
     { kind: "topPromo", month },
     { kind: "skuRank", month },
@@ -234,12 +233,15 @@ function windowPlanTotals(planMonthTotals: Map<string, number> | undefined, bran
   return out;
 }
 
+/** Loại file Report Tháng đọc — dòng "Dữ Liệu Gốc tới …" lấy ngày sớm nhất trong các loại này. */
+export const COVERAGE_TYPES: DataRawReportType[] = ["product_list", "shop_analytics", "shop_promotion"];
+
 function coverageOf(sessions: LiveSession[], imports: DataRawImportStamp[], brandId: string, month: string): SnapshotCoverage {
   const { start, end } = monthBounds(month);
   const withNumbers = sessions.filter((s) => s.brandId === brandId && s.date >= start && s.date <= end && hasLiveNumbers(s));
   const sessionsThrough = withNumbers.reduce<string | null>((max, s) => (max === null || s.date > max ? s.date : max), null);
   const datarawThrough: SnapshotCoverage["datarawThrough"] = {};
-  for (const t of ["product_list", "shop_analytics", "shop_promotion", "live_performance_core_stats"] as DataRawReportType[]) {
+  for (const t of COVERAGE_TYPES) {
     const ends = overlapping(imports, [t], start, end).map((i) => (i.periodEnd! > end ? end : i.periodEnd!));
     datarawThrough[t] = ends.length ? ends.sort().at(-1)! : null;
   }
@@ -258,8 +260,6 @@ async function fetchPiece(kind: PieceKind, brandId: string, month: string, aggMe
   switch (kind) {
     case "creatorLive":
       return fetchCreatorLivePerfMonthSlice(brandId, start, end);
-    case "dailyPerf":
-      return fetchLivePerformanceCoreMonthSlice(brandId, start, end);
     case "topSku":
       return topSkuFromAgg((await agg())?.agg ?? null);
     case "skuRank":
@@ -327,7 +327,6 @@ export async function buildMonthlyReportSnapshot(input: BuildSnapshotInput): Pro
 
 export interface SnapshotView {
   liveRaw: Record<string, CreatorLivePerfMonthSlice | null>; // theo tháng trong cửa sổ
-  dailyPerfRaw: LivePerformanceMonthSlice | null;
   topSku: TopSkuMonthSlice | null;
   topPromo: PromotionMonthSlice | null;
   /** Theo tháng trong cửa sổ — null = bản chụp cũ chưa có phần này (v1) hoặc tháng bị che với brand. */
@@ -359,7 +358,6 @@ export function snapshotView(s: MonthlyReportSnapshot): SnapshotView {
     skuRank,
     gifts,
     liveRaw,
-    dailyPerfRaw: get<LivePerformanceMonthSlice>("dailyPerf", s.month),
     topSku: get<TopSkuMonthSlice>("topSku", s.month),
     topPromo: get<PromotionMonthSlice>("topPromo", s.month)
   };

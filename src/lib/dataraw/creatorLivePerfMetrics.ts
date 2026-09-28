@@ -104,17 +104,6 @@ export function bucketByCampaignDay(rows: CreatorLivePerfRow[], overrides?: Camp
   return out;
 }
 
-// Actual GMV theo khung camp cho chart "Target vs Actual" (brief Module 2: SUM(gmv_live_session)
-// từ File 1 "Live Performance Core Stats", KHÔNG phải File 3 dùng ở bucketByCampaignDay trên —
-// 2 file GMV lệch nhau ~15% do nguồn khác nhau, giữ đúng nguồn brief chỉ định cho phần này).
-export function sumDailyGmvByBucket(daily: { date: string; gmvLiveSession: number }[], overrides?: CampOverrides): Record<CampDayBucket, number> {
-  const out: Record<CampDayBucket, number> = { dday: 0, midmonth: 0, payday: 0, daily: 0 };
-  for (const d of daily) {
-    out[resolveCampBucketType(d.date, overrides)] += d.gmvLiveSession;
-  }
-  return out;
-}
-
 // Phễu chuyển đổi Module 2 (brief): Live Impressions -> Views -> Product Views -> Product Clicks
 // -> Orders, cộng dồn cả tháng.
 export interface FunnelStage {

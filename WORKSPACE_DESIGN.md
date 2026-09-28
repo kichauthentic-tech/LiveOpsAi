@@ -6,8 +6,8 @@
 > Đo CROCS T9: câu đối chứng lặp 5 chỗ, câu quà tặng 4 chỗ, "live agency giảm" có 2 số (−18,4% phần 1 / −15% phần 2), bảng 4 tháng
 > phần 2 đặt T8 trọn tháng cạnh T9 22 ngày, biểu đồ "GMV theo ngày" phần 6 dùng nguồn thứ ba (Core Stats 3,87B vs ca 3,41B, 1–21/09).
 > Bảng đối chứng giờ lấy cột live TỪ CA (Report + Dashboard brand), cơ cấu kênh cắt 1..N, việc cần làm gom về phần 7. **Report T8 đã
-> phát hành sẽ đổi số phần 2 khi mở lại** (tính lúc hiển thị). Việc treo: ngày **03/09 Core Stats 382M vs ca 174M / Shop Analytics
-> 160M** — nghi file trùng, chưa kiểm. Xem `## Report Tháng bỏ trùng lặp`.
+> phát hành sẽ đổi số phần 2 khi mở lại** (tính lúc hiển thị). **03/09 đã kiểm (không trùng):** Core Stats cộng cả live creator
+> affiliate — bản chụp thôi đọc file này. Xem `## Report Tháng bỏ trùng lặp`.
 
 > **MỚI 2026-09-28 (khuya) — Audit "module cùng loại, logic khác nhau": 9 nhóm lệch ĐÃ SỬA CẢ 9 (không migration, commit 5496297 đã push `main`).**
 > Đo trên DB thật (231 ca: 229 CROCS nạp bù + 1 VERA test; chưa kế hoạch nào chốt — CROCS T10 nháp 5,5B/75 ca). tsc 0 lỗi, eslint
@@ -1728,10 +1728,24 @@ chỉ câu khung giờ, `sectionNextSteps`, autoNextSteps bỏ dòng target + kh
 đọc toàn trang: đúng các câu/số trên, phần 7 có 5 việc, không lỗi console mới. **Chưa verify:** góc nhìn role `brand`, file Excel tải
 thật, report T8 đã phát hành.
 
+**Bổ sung 2026-09-29 — ngày 03/09 "Core Stats 382M" không phải file trùng; bản chụp thôi đọc Core Stats.** Tháng 9 chỉ 1 file Core
+Stats (1–21/09), mỗi ngày 1 dòng. 03/09: app 2 ca (92,2M + 81,5M, khớp từng phòng với Creator Live Performance); Core Stats ghi 3
+phiên — "LIVE GMV" 324,6M = Seller LIVE 120,5M + **Creator LIVE (affiliate) 204,1M** của Shop Analytics, "LIVE-attributed" 382,4M
+= Linked account 159,6M + Creator attributed 222,9M. Cả 21 ngày lệch 0đ ⇒ Core Stats = mọi live bán hàng của shop (gồm creator), không
+phải số agency. Code cũ còn đọc nhầm: `gmvLiveSession` lấy cột LIVE-attributed nhưng biểu đồ ghi "Direct" và vẽ thêm Indirect (đếm
+đơn sau live 2 lần). **Dọn:** bỏ piece `dailyPerf` (PieceKind/PIECE_SOURCES/requiredPieces/fetchPiece/`SnapshotView.dailyPerfRaw`),
+xoá `lib/dataraw/monthlyDailySlice.ts`, `dailyFromSessions`, `sumDailyGmvByBucket` (không còn ai gọi). `COVERAGE_TYPES` (Sản Phẩm / Shop
+Analytics / Khuyến Mãi) cho dòng "Dữ Liệu Gốc tới …" — BrandMonthlyReport lọc theo list này nên bản chụp cũ (còn mốc Core Stats 21/09)
+giờ hiện đúng 22/09. Bản chụp cũ giữ piece `dailyPerf` trong JSON — vô hại. Upload "Live Performance" ở Dữ Liệu Gốc vẫn còn (hint ghi
+report không dùng). Không đổi `PIECE_VERSION` (stamp các piece khác giữ nguyên ⇒ không bắt bấm Cập nhật). Verify: vitest 174/174 (test
+mới: up file Core Stats mới không làm bản chụp cũ, không tải, không vào coverage), tsc, eslint 0 lỗi/33 cảnh báo, build; browser CROCS
+T9 "Dữ Liệu Gốc tới 22/09 · Đã mới nhất", dựng thử bản chụp (không lưu) 0 piece tải lại, không có `dailyPerf`.
+
 **Quy ước mới:**
 - Kết luận nói mỗi ý một lần; tiêu đề Insight từng phần là điều Kết luận chưa nói; "→ việc" chỉ ở "Việc agency làm tháng sau".
 - Mọi con số "live agency" trong report/Dashboard lấy từ ca; Shop Analytics Linked account chỉ dùng cho vế "phần còn lại" và cơ cấu kênh.
 - Mọi so sánh nhiều tháng trong Report Tháng (kể cả tỷ trọng kênh) cắt cùng 1..N khi tháng report chưa hết.
+- File Live Performance Core Stats = mọi live bán hàng của shop (tài khoản shop + creator affiliate) — không dùng làm số agency.
 
 ## Report Tháng chuyên sâu — XONG + VERIFY 2026-09-26 (khuya, KHÔNG migration, commit fbfeab0 đã push main)
 

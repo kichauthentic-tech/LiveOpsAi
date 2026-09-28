@@ -28,7 +28,7 @@ const REPORT_TABS: { id: DataRawReportType; label: string; hint: string }[] = [
   },
   { id: "live_analysis", label: "Live Analysis", hint: 'Export "Live Analysis" từ TikTok Shop Seller Center ở chế độ xem "linked accounts" (chế độ mặc định chỉ có tài khoản shop, không có creator affiliate nào) — nguồn cho trang Affiliate và cột đối chiếu của Report Tuần.' },
   { id: "shop_analytics", label: "Shop Analytics", hint: 'Export "Shop Analytics — Key metrics" từ TikTok Shop Seller Center.' },
-  { id: "live_performance_core_stats", label: "Live Performance", hint: 'Export "Live Performance Core Stats" từ TikTok Shop Seller Center — GMV LIVE theo ngày, dùng cho biểu đồ xu hướng ngày trong Report Tháng.' }
+  { id: "live_performance_core_stats", label: "Live Performance", hint: 'Export "Live Performance Core Stats" từ TikTok Shop Seller Center — GMV LIVE theo ngày. Report Tháng KHÔNG dùng (từ 2026-09-29): file này cộng cả live của creator affiliate nên không phải số agency; chỉ lưu để tra cứu.' }
 ];
 
 function fmtCell(v: unknown): string {

@@ -16,9 +16,6 @@ vi.mock("../src/lib/db/monthlyReportSnapshots", () => ({ fetchSnapshotPieces: as
 vi.mock("../src/lib/dataraw/creatorLivePerfSlice", () => ({
   fetchCreatorLivePerfMonthSlice: async (_b: string, s: string) => (calls.push(`creatorLive ${s}`), { rows: [], missingDays: [], hasAnyBatch: false })
 }));
-vi.mock("../src/lib/dataraw/monthlyDailySlice", () => ({
-  fetchLivePerformanceCoreMonthSlice: async (_b: string, s: string) => (calls.push(`dailyPerf ${s}`), { daily: [], missingDays: [], hasAnyBatch: true })
-}));
 vi.mock("../src/lib/dataraw/monthlyProductSlice", () => ({
   fetchProductListAggWithPeriod: async (_b: string, s: string, e: string) => (
     calls.push(`productAgg ${s}`), { agg: { v: 2, skus: [["Clog", 100, 60, 2, 2, 3, 1000, 50]], cardGmv: 40, hasSkuCols: true, hasCardCol: true, rowCount: 1 }, periodStart: s, periodEnd: e }
@@ -83,14 +80,14 @@ test("dựng lần đầu: bản tổng hợp SKU chỉ đọc 1 lần mỗi th�
   expect(calls.some((c) => c.startsWith("creatorLive"))).toBe(false);
   expect(reused).toEqual([]);
   expect(fetched.sort()).toEqual(
-    ["cardGmv|2026-06", "cardGmv|2026-07", "cardGmv|2026-08", "cardGmv|2026-09", "dailyPerf|2026-09", "gifts|2026-06", "gifts|2026-07", "gifts|2026-08", "gifts|2026-09", "shopDays|2026-06", "shopDays|2026-07", "shopDays|2026-08", "shopDays|2026-09", "skuRank|2026-08", "skuRank|2026-09", "topPromo|2026-09", "topSku|2026-09"]
+    ["cardGmv|2026-06", "cardGmv|2026-07", "cardGmv|2026-08", "cardGmv|2026-09", "gifts|2026-06", "gifts|2026-07", "gifts|2026-08", "gifts|2026-09", "shopDays|2026-06", "shopDays|2026-07", "shopDays|2026-08", "shopDays|2026-09", "skuRank|2026-08", "skuRank|2026-09", "topPromo|2026-09", "topSku|2026-09"]
   );
   // Chỉ ca của brand, trong cửa sổ 4 tháng, trừ ca huỷ; không mang theo aiAnalysis.
   expect(snapshot.sessions.map((s) => s.id).sort()).toEqual(["aug", "jul", "jun", "sep1", "sep2"]);
   expect(JSON.stringify(snapshot.sessions)).not.toContain("overallRating");
   expect(snapshot.coverage).toEqual({
     sessionsThrough: "2026-09-20",
-    datarawThrough: { product_list: "2026-09-22", shop_analytics: "2026-09-22", shop_promotion: "2026-09-22", live_performance_core_stats: "2026-09-21" }
+    datarawThrough: { product_list: "2026-09-22", shop_analytics: "2026-09-22", shop_promotion: "2026-09-22" }
   });
 });
 
@@ -115,6 +112,18 @@ test("up đè file Sản Phẩm T9: chỉ tải lại phần dính product_list 
   expect(again.fetched.sort()).toEqual(["cardGmv|2026-09", "gifts|2026-09", "skuRank|2026-09", "topSku|2026-09"]);
   expect(calls).toEqual(expect.arrayContaining(["productAgg 2026-09-01"]));
   expect(calls).not.toContain("promo 2026-09-01");
+});
+
+test("file Live Performance (Core Stats) không còn là nguồn của report: up mới không làm bản chụp cũ, không tải, không làm mốc Dữ Liệu Gốc", async () => {
+  const first = await buildMonthlyReportSnapshot({ brandId: B, month: M, sessions, brandPlatformRates: [] });
+  expect(Object.keys(first.snapshot.pieces).some((k) => k.startsWith("dailyPerf"))).toBe(false);
+  expect(first.snapshot.coverage.datarawThrough).not.toHaveProperty("live_performance_core_stats");
+  imports = [...baseImports.filter((i) => i.id !== "lp-sep"), imp("lp-sep2", "live_performance_core_stats", "2026-09-01", "2026-09-22")];
+  expect(snapshotFreshness(first.snapshot, live()).upToDate).toBe(true);
+  calls.length = 0;
+  const again = await buildMonthlyReportSnapshot({ brandId: B, month: M, sessions, brandPlatformRates: [], previous: first.snapshot });
+  expect(again.fetched).toEqual([]);
+  expect(calls).toEqual([]);
 });
 
 test("tháng trước lấy từ bản chụp tháng trước (cùng stamp) thay vì đọc lại file", async () => {
