@@ -391,7 +391,13 @@ export default function CeoBrief(props: CeoBriefProps) {
 
       <MonthOverMonth sessions={scopeSessions} brands={brands.filter((b) => scopeIds.includes(b.id))} lastMonth={dataEnd && dataEnd.slice(0, 7) < today.slice(0, 7) ? dataEnd.slice(0, 7) : today.slice(0, 7)} dataEnd={dataEnd} pnl={canSeeMoney ? pnl : null} />
 
-      <TargetSection outlook={scopeOutlook} month={month} single={scopeIds.length === 1} onNavigate={onNavigate} />
+      <TargetSection
+        outlook={scopeOutlook}
+        month={month}
+        single={scopeIds.length === 1}
+        targetBrandNames={scopeIds.filter((id) => outlooks.get(id)?.target).map((id) => brands.find((b) => b.id === id)?.name ?? id)}
+        onNavigate={onNavigate}
+      />
 
       <CampaignSection outlook={scopeOutlook} month={month} sessions={scopeSessions} />
 
@@ -638,7 +644,11 @@ function niceMax(v: number): number {
 
 // ---------------------------------------------------------------------------
 
-const TargetSection: React.FC<{ outlook: MonthOutlook; month: string; single: boolean; onNavigate: (tab: string) => void }> = ({ outlook: o, month, single, onNavigate }) => {
+const TargetSection: React.FC<{ outlook: MonthOutlook; month: string; single: boolean; targetBrandNames: string[]; onNavigate: (tab: string) => void }> = ({ outlook: full, month, single, targetBrandNames, onNavigate }) => {
+  // Lỗi E2E #2 (2026-09-28): chỉ một phần brand có target ⇒ khối này so target với ĐÚNG các brand đó (thực tế,
+  // dự phóng, đường cộng dồn). Trước đây lấy GMV mọi brand chia target của một brand: "Đã đạt 24.103% Target".
+  const sc = full.targetScope;
+  const o: MonthOutlook = sc ? { ...full, actual: sc.actual, actualByDate: sc.actualByDate, forecastByDate: sc.forecastByDate, projected: sc.projected, pending: sc.pending, projectionMethod: sc.projectionMethod } : full;
   const n = o.days.length;
   const W = 640, H = 260, L = 50, R = 14, T = 16, B = 26;
   const throughIdx = o.through ? o.days.indexOf(o.through) : -1;
@@ -677,7 +687,10 @@ const TargetSection: React.FC<{ outlook: MonthOutlook; month: string; single: bo
   const gap = o.gap;
   return (
     <section className="space-y-3">
-      <SectionTitle title="Target & dự phóng cả tháng" note={`Tháng ${Number(month.slice(5))} · ${sourceLabel ? `target từ ${sourceLabel}` : "chưa có target"}`} />
+      <SectionTitle
+        title="Target & dự phóng cả tháng"
+        note={`Tháng ${Number(month.slice(5))} · ${sourceLabel ? `target từ ${sourceLabel}` : "chưa có target"}${sc ? ` · chỉ tính ${sc.brands}/${sc.of} brand có target (${targetBrandNames.join(", ")}) — GMV của brand chưa có target không cộng vào đây` : ""}`}
+      />
       <div className="grid grid-cols-1 xl:grid-cols-[1.6fr_1fr] gap-4">
         <Card>
           <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="GMV cộng dồn so với target và dự phóng">
@@ -732,7 +745,9 @@ const CampaignSection: React.FC<{ outlook: MonthOutlook; month: string; sessions
     const range = b.bucket === "daily" ? `${b.days.length} ngày` : b.days.length ? `${ddmm(b.days[0])}–${ddmm(b.days[b.days.length - 1])}` : "";
     const upcoming = b.status === "next";
     const main = upcoming ? (b.pendingCount ? money(b.forecast) : "Chưa có ca") : b.actual.sessions ? money(b.actual.gmv) : b.pendingCount ? `~${money(b.forecast)}` : "Chưa có số";
-    const vsTarget = b.target ? (upcoming ? b.forecast / b.target : b.targetToDate ? b.actual.gmv / b.targetToDate : null) : null;
+    // So target với GMV/dự báo của đúng các brand có target (lỗi E2E #2) — `targetScope` chỉ có khi gộp nhiều brand.
+    const tGmv = b.targetScope?.gmv ?? b.actual.gmv, tForecast = b.targetScope?.forecast ?? b.forecast;
+    const vsTarget = b.target ? (upcoming ? tForecast / b.target : b.targetToDate ? tGmv / b.targetToDate : null) : null;
     return (
       <Card key={b.bucket} className="!p-4 space-y-1.5 border-t-4" style={{ borderTopColor: BUCKET_COLOR[b.bucket] }}>
         <div className="flex items-center justify-between gap-2">
@@ -744,7 +759,7 @@ const CampaignSection: React.FC<{ outlook: MonthOutlook; month: string; sessions
         <p className="text-[11px] text-[var(--text-faint)]">{upcoming ? (b.pendingCount ? `dự phóng từ ${b.pendingCount} ca trong lịch` : "chưa có ca nào trong lịch") : `${b.actual.sessions} ca · ${b.daysWithData}/${b.days.length} ngày có số`}</p>
         {b.target != null && b.target > 0 && (
           <div className="h-1.5 rounded-full bg-[var(--surface-elevated)] overflow-hidden" title="So với target của khung">
-            <div className="h-full rounded-full" style={{ width: `${Math.min(100, ((upcoming ? b.forecast : b.actual.gmv) / b.target) * 100)}%`, background: BUCKET_COLOR[b.bucket] }} />
+            <div className="h-full rounded-full" style={{ width: `${Math.min(100, ((upcoming ? tForecast : tGmv) / b.target) * 100)}%`, background: BUCKET_COLOR[b.bucket] }} />
           </div>
         )}
         <dl className="text-xs space-y-1 pt-1">

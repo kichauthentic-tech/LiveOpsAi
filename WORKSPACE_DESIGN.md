@@ -63,7 +63,12 @@
 >    về null (FK set null) ⇒ `fetchPlanTargets` ([monthPlans.ts:202](src/lib/db/monthPlans.ts:202)) lọc `slot_id is not null` bỏ luôn
 >    target của ca đó ⇒ Report Tháng + Dashboard: target 100M → 14,7M, "Đạt 124%". Toàn Cảnh Brand / Hỗ Trợ Vận Hành đọc thẳng kế
 >    hoạch nên vẫn 100M ⇒ 3 màn 3 số. Cùng họ với Đ5 (2026-09-24) nhưng qua đường xoá ca, Đ5 chỉ vá đường "chưa xếp người".
-> 2. **VỪA — Dashboard "Target & dự phóng cả tháng" chia target của brand có kế hoạch chốt cho GMV của MỌI brand**: VERA có kế
+> 2. ~~**VỪA — Dashboard "Target & dự phóng cả tháng" chia target của brand có kế hoạch chốt cho GMV của MỌI brand**~~ **ĐÃ SỬA
+>    2026-09-28 (chưa commit):** `combineOutlooks` thêm `targetScope` (GMV/dự
+>    phóng/đường cộng dồn của RIÊNG các brand có target, cả ở từng khung camp) khi chỉ một phần brand có target; khối Target +
+>    thẻ ngày campaign của Bản Tin CEO so target với phần đó và ghi "chỉ tính N/M brand có target (tên)"; `gap` chỉ xét brand có
+>    target. Tổng agency ở các khối khác không đổi. Test `tests/combineOutlooks.test.ts` (18,2M ÷ 100M chứ không 3,55B ÷ 100M).
+>    Lỗi gốc:: VERA có kế
 >    hoạch, CROCS không ⇒ "Đã đạt 3,53B · 24.103% Target". Sẽ gặp thật ngay khi chốt kế hoạch T10 cho một phần brand.
 > 3. **VỪA — Avg. view không bao giờ được ghi cho ca chạy trong app.** RPC file giao ca (0078/0082) và đối soát (0080) không set
 >    `avg_watch_time_seconds` ⇒ mọi ca mới = 0s (229 ca CROCS nạp bù thì có số từ 0086). Form report lại ghi "AVG.view lấy từ file".

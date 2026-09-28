@@ -293,6 +293,9 @@ export interface BucketOutlook {
   targetToDate: number | null;
   forecast: number;
   pendingCount: number;
+  /** Chỉ ở outlook gộp khi một phần brand có target (lỗi E2E #2): GMV / dự báo của RIÊNG các brand có target,
+   *  để so với `target`/`targetToDate` — `actual.gmv`/`forecast` vẫn là của mọi brand. */
+  targetScope?: { gmv: number; forecast: number };
 }
 
 export interface MonthOutlook {
@@ -318,6 +321,22 @@ export interface MonthOutlook {
   actualByDate: Map<string, number>;
   forecastByDate: Map<string, number>;
   buckets: BucketOutlook[];
+  /**
+   * Chỉ có ở outlook GỘP khi CHỈ MỘT PHẦN brand có target (lỗi E2E #2, 2026-09-28): target là của các brand
+   * có kế hoạch, còn `actual`/`actualByDate`/`projected` là của MỌI brand — đem chia cho nhau ra "Đã đạt
+   * 24.103% Target" (VERA có plan 14,7M, CROCS không có plan mà bán 3,53B). Khối Target phải so target
+   * với đúng phần này; phần còn lại của outlook vẫn là tổng agency.
+   */
+  targetScope?: {
+    brands: number;
+    of: number;
+    actual: number;
+    actualByDate: Map<string, number>;
+    forecastByDate: Map<string, number>;
+    projected: number;
+    pending: PendingItem[];
+    projectionMethod: MonthOutlook["projectionMethod"];
+  };
 }
 
 /** Doanh số/giờ (theo giờ ca kế hoạch — cùng đơn vị với ca sắp tới) trong 28 ngày tới `through`. */
@@ -467,8 +486,10 @@ export function combineOutlooks(month: string, today: string, list: MonthOutlook
   const expected = withTarget.reduce((a, o) => a + (o.expectedToDate ?? 0), 0);
   const projectedT = withTarget.reduce((a, o) => a + o.projected, 0);
   const remainingDays = list[0]?.remainingDays ?? 0;
+  const partialTarget = withTarget.length > 0 && withTarget.length < list.length;
   const bucketMerge = (b: CampDayBucket): BucketOutlook => {
     const xs = list.map((o) => o.buckets.find((x) => x.bucket === b)!).filter(Boolean);
+    const xt = withTarget.map((o) => o.buckets.find((x) => x.bucket === b)!).filter(Boolean);
     const first = xs[0];
     const gmv = xs.reduce((a, x) => a + x.actual.gmv, 0);
     const hours = xs.reduce((a, x) => a + x.actual.hours, 0);
@@ -485,7 +506,8 @@ export function combineOutlooks(month: string, today: string, list: MonthOutlook
       target: xs.some((x) => x.target != null) ? xs.reduce((a, x) => a + (x.target ?? 0), 0) : null,
       targetToDate: xs.some((x) => x.targetToDate != null) ? xs.reduce((a, x) => a + (x.targetToDate ?? 0), 0) : null,
       forecast: xs.reduce((a, x) => a + x.forecast, 0),
-      pendingCount: xs.reduce((a, x) => a + x.pendingCount, 0)
+      pendingCount: xs.reduce((a, x) => a + x.pendingCount, 0),
+      targetScope: partialTarget ? { gmv: xt.reduce((a, x) => a + x.actual.gmv, 0), forecast: xt.reduce((a, x) => a + x.forecast, 0) } : undefined
     };
   };
   return {
@@ -502,12 +524,25 @@ export function combineOutlooks(month: string, today: string, list: MonthOutlook
     rates: null,
     // Gộp: một brand không chiếu được thì tổng agency cũng không phải dự phóng trọn vẹn.
     projectionMethod: list.some((o) => o.projectionMethod === "none") ? "none" : list.some((o) => o.projectionMethod === "run_rate") ? "run_rate" : "gmv_per_hour",
-    gap: target && !list.some((o) => o.projectionMethod === "none") ? projectedT - target.total : null,
+    // Thiếu/vượt chỉ xét các brand CÓ target (lỗi E2E #2) — brand không target không chiếu được thì không liên quan.
+    gap: target && !withTarget.some((o) => o.projectionMethod === "none") ? projectedT - target.total : null,
     remainingDays,
     needPerRemainingDay: target && remainingDays > 0 ? Math.max(0, target.total - actualT) / remainingDays : null,
     actualByDate: sumMap((o) => o.actualByDate),
     forecastByDate: sumMap((o) => o.forecastByDate),
-    buckets: CAMP_DAY_BUCKET_ORDER.map(bucketMerge)
+    buckets: CAMP_DAY_BUCKET_ORDER.map(bucketMerge),
+    targetScope: partialTarget
+      ? {
+          brands: withTarget.length,
+          of: list.length,
+          actual: actualT,
+          actualByDate: sumMap((o) => (o.target ? o.actualByDate : new Map())),
+          forecastByDate: sumMap((o) => (o.target ? o.forecastByDate : new Map())),
+          projected: projectedT,
+          pending: withTarget.flatMap((o) => o.pending),
+          projectionMethod: withTarget.some((o) => o.projectionMethod === "none") ? "none" : withTarget.some((o) => o.projectionMethod === "run_rate") ? "run_rate" : "gmv_per_hour"
+        }
+      : undefined
   };
 }
 
