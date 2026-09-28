@@ -145,8 +145,13 @@ test("kết luận trước: kết quả, nguyên nhân quy ra tiền, thị tr�
   expect(next).toContain("Views/giờ −19% so với cùng kỳ. Điểm nghẽn ở traffic");
   expect(next).toContain("Ngày thường là chỗ hụt của riêng live");
   expect(next).toContain("Hỏi brand về chương trình quà tặng");
-  expect(next).toContain("5,5B");
-  expect(next).toContain("75 ca");
+  // Target + số ca tháng sau đã ở 2 ô ngay dưới danh sách — không viết lại thành 1 việc.
+  expect(next).not.toContain("5,5B");
+  expect(autoNextSteps({ ...input, nextPlan: null }).join("\n")).toContain("Chốt target và lịch live tháng 10.");
+  // Việc của các phần (đã bỏ trùng) nối sau, không lặp.
+  const sku = "Rà Baya Platform - Winter White: tồn kho, giá và thời lượng giới thiệu trên live (GMV mỗi ngày −32%).";
+  const withSteps = autoNextSteps({ ...input, sectionSteps: [sku, sku] });
+  expect(withSteps.filter((l) => l === sku)).toHaveLength(1);
 
   // Không có cơ hội ngày thường ⇒ chọn thừa số tụt nhiều tiền nhất.
   const alt = autoSummary({ ...input, dailyGap: null, controlLine: null, giftLine: null }).join("\n");

@@ -15,7 +15,7 @@ import { liveStatsFromRows, pctChange, signed, type CompareWindow, type LiveStat
 //  2. Tách theo loại ngày + cơ cấu/hiệu suất: GMV/giờ T9 −30% cùng kỳ không phải do lịch camp (cơ cấu giờ giữa
 //     các loại ngày giải thích −0,1tr/giờ, hiệu suất trong từng loại ngày −8,2tr/giờ).
 //  3. Nhóm đối chứng: phần shop KHÔNG do agency vận hành cùng chịu một thị trường ⇒ tách "thị trường giảm" với
-//     "vận hành giảm" (T9 ngày thường: live agency −19%, phần còn lại +1%).
+//     "vận hành giảm" (T9 ngày thường: live agency −23% theo ca, phần còn lại +1%).
 //  4. Độ tin cậy host: so mặt bằng theo tháng không dự báo được tháng sau (Spearman −0,04, 20 cặp) ⇒ gộp
 //     3–4 tháng, kèm khoảng tin cậy, chỉ kết luận khi khoảng đó nằm hẳn một phía.
 // Mọi hàm thuần, không đọc DB.
@@ -176,9 +176,13 @@ export function mixRateSplit(
 export interface ControlRow {
   key: DayGroup | "all";
   days: number;
-  /** "Linked account LIVE-attributed GMV" — live tài khoản shop (agency vận hành), cùng nguồn với phần còn lại. */
+  /** Live agency: GMV các ca trong app theo ngày (khi truyền `agencyLive`), không thì "Linked account
+   *  LIVE-attributed GMV" của Shop Analytics. */
   liveCur: number;
   livePrev: number;
+  /** "Linked account LIVE-attributed GMV" — MỌI live trên tài khoản shop (gồm cả phiên không phải ca agency). */
+  shopLiveCur: number;
+  shopLivePrev: number;
   /** Mọi GMV không phải live tài khoản shop: affiliate, video, thẻ sản phẩm. */
   restCur: number;
   restPrev: number;
@@ -196,21 +200,38 @@ export type ControlVerdict = "ops" | "agency_better" | "market";
 /** Cách nhau ≥ 10 điểm % mới coi là khác thị trường. */
 export const CONTROL_GAP = 10;
 
+/** GMV live theo ngày (giờ VN của lúc bắt đầu ca) — đầu vào `agencyLive` của controlGroup. */
+export function liveGmvByDate(rows: CreatorLivePerfRow[]): Map<string, number> {
+  const m = new Map<string, number>();
+  for (const r of rows) {
+    const d = vnDateOf(r.startTime);
+    m.set(d, (m.get(d) ?? 0) + r.gmv);
+  }
+  return m;
+}
+
+/** Cột live lấy từ CA (`agencyLive`, 2026-09-29): "Linked account" của Shop Analytics đếm mọi live trên tài khoản
+ *  shop — CROCS 1–22/09 cao hơn ca agency 108M (02/09 không có ca nào vẫn ghi 24M) ⇒ report từng ghi "live agency
+ *  −19%" ở phần 2 cạnh "−22,7%" ở phần 6. Phần còn lại VẪN là Total GMV − Linked account (cùng nguồn Shop
+ *  Analytics), nên phần live ngoài ca không rơi vào vế nào. Đo CROCS T9: lệch do nguồn 3–4 điểm < ngưỡng 10, cả
+ *  3 dòng giữ nguyên kết luận. Chỉ cộng ca ở những ngày Shop Analytics có số (hai vế cùng tập ngày). */
 export function controlGroup(
   prevDays: ShopDayLite[] | null | undefined,
   curDays: ShopDayLite[] | null | undefined,
   win: CompareWindow,
   bucketPrev: (date: string) => CampDayBucket,
-  bucketCur: (date: string) => CampDayBucket
+  bucketCur: (date: string) => CampDayBucket,
+  agencyLive?: { prev: Map<string, number>; cur: Map<string, number> }
 ): ControlRow[] {
   if (!prevDays?.length || !curDays?.length) return [];
-  const sum = (days: ShopDayLite[], s: string, e: string, keep: (d: string) => boolean) => {
-    const x = { days: 0, gmv: 0, live: 0, visitors: 0, orders: 0 };
+  const sum = (days: ShopDayLite[], s: string, e: string, keep: (d: string) => boolean, agency: Map<string, number> | undefined) => {
+    const x = { days: 0, gmv: 0, live: 0, shopLive: 0, visitors: 0, orders: 0 };
     for (const d of days) {
       if (d.date < s || d.date > e || !keep(d.date)) continue;
       x.days++;
       x.gmv += d.gmv;
-      x.live += d.liveLinked;
+      x.shopLive += d.liveLinked;
+      x.live += agency ? agency.get(d.date) ?? 0 : d.liveLinked;
       x.visitors += d.visitors;
       x.orders += d.orders;
     }
@@ -223,21 +244,23 @@ export function controlGroup(
   ];
   return groups
     .map(({ key, test }) => {
-      const a = sum(prevDays, win.prevStart, win.prevEnd, test(bucketPrev));
-      const b = sum(curDays, win.curStart, win.curEnd, test(bucketCur));
+      const a = sum(prevDays, win.prevStart, win.prevEnd, test(bucketPrev), agencyLive?.prev);
+      const b = sum(curDays, win.curStart, win.curEnd, test(bucketCur), agencyLive?.cur);
       return {
         key,
         days: b.days,
         liveCur: b.live,
         livePrev: a.live,
-        restCur: b.gmv - b.live,
-        restPrev: a.gmv - a.live,
+        shopLiveCur: b.shopLive,
+        shopLivePrev: a.shopLive,
+        restCur: b.gmv - b.shopLive,
+        restPrev: a.gmv - a.shopLive,
         visitorsCur: b.visitors,
         visitorsPrev: a.visitors,
         cvrCur: b.visitors > 0 ? (b.orders / b.visitors) * 100 : null,
         cvrPrev: a.visitors > 0 ? (a.orders / a.visitors) * 100 : null,
         liveChg: pctChange(a.live, b.live),
-        restChg: pctChange(a.gmv - a.live, b.gmv - b.live),
+        restChg: pctChange(a.gmv - a.shopLive, b.gmv - b.shopLive),
         visitorsChg: pctChange(a.visitors, b.visitors)
       };
     })

@@ -24,7 +24,7 @@ import {
 } from "../../lib/performance/slotInsights";
 import { compareWindow, driverBreakdown, DRIVER_LABEL, liveStatsFromRows, LiveStats } from "../../lib/report/monthlyReportInsights";
 import { hasLiveNumbers, sessionToLivePerfRow } from "../../lib/report/sessionsLivePerf";
-import { controlGroup, controlLabel, controlVerdict, hostReliability, isBorderline, reliabilityText, VERDICT_TEXT } from "../../lib/report/deepAnalysis";
+import { controlGroup, controlLabel, liveGmvByDate, controlVerdict, hostReliability, isBorderline, reliabilityText, VERDICT_TEXT } from "../../lib/report/deepAnalysis";
 import { isCountable, sessionHours } from "../../lib/performance/hostPerformance";
 import { sessionDurationHours } from "../../lib/pnl";
 import { fmtVndShort } from "../../lib/format";
@@ -158,7 +158,15 @@ export default function BrandDashboard({ brandId, brandName, sessions, shiftSlot
       alive = false;
     };
   }, [isOps, brandId, month, mStart, mEnd]);
-  const control = useMemo(() => (shop ? controlGroup(shop.prev.days, shop.cur.days, win, (d) => resolveCampBucketType(d), bucketOf) : []), [shop, win, bucketOf]);
+  // Cột live = ca agency, như Report Tháng phần 2 (Linked account của Shop Analytics đếm cả live ngoài ca).
+  const agencyLive = useMemo(() => {
+    const rows = liveGmvByDate(brandSessions.filter(hasLiveNumbers).map(sessionToLivePerfRow));
+    return { prev: rows, cur: rows };
+  }, [brandSessions]);
+  const control = useMemo(
+    () => (shop ? controlGroup(shop.prev.days, shop.cur.days, win, (d) => resolveCampBucketType(d), bucketOf, agencyLive) : []),
+    [shop, win, bucketOf, agencyLive]
+  );
 
   // ---- Nhịp tuần, đề xuất, soát kế hoạch, host
   const weeks = useMemo(() => weeklySeries(brandSessions, through, 16), [brandSessions, through]);
@@ -429,7 +437,7 @@ export default function BrandDashboard({ brandId, brandName, sessions, shiftSlot
               <DriverBars parts={drivers.parts.map((p) => ({ label: DRIVER_LABEL[p.key], change: p.change / 100 }))} total={cur.gmv / (prev.gmv || 1) - 1} />
               {control.length > 0 ? (
                 <ul className="text-xs text-[var(--text-muted)] space-y-1">
-                  <li className="text-[var(--text-faint)]">Nhóm đối chứng — phần còn lại của shop (Total GMV trừ {`Seller LIVE`}), cùng cách tính với Report Tháng:</li>
+                  <li className="text-[var(--text-faint)]">Nhóm đối chứng — live = ca agency, phần còn lại của shop = Total GMV trừ {`Seller LIVE`}; cùng cách tính với Report Tháng:</li>
                   {control.map((r) => {
                     const v = controlVerdict(r);
                     return (

@@ -36,6 +36,10 @@ import {
 //
 // Dạng văn bản 1 khung: dòng đầu = kết luận, dòng bắt đầu "→" = việc cần làm, còn lại = gạch đầu dòng.
 // Bản ops sửa lưu đúng dạng này (brand_monthly_reports.section_notes, 0121) nên hiển thị chung 1 đường.
+//
+// Chống lặp (2026-09-29, đo CROCS T9: câu đối chứng xuất hiện 5 chỗ, câu quà tặng 4 chỗ): câu nào đã nằm ở Kết
+// luận (autoSummary) thì không làm tiêu đề phần; việc cần làm (`action`) KHÔNG hiện trong khung tự sinh mà gom về
+// "Việc agency làm tháng sau" qua sectionNextSteps — mỗi việc nói một lần.
 
 export type InsightSection = "shop" | "why" | "people" | "products" | "context";
 
@@ -82,17 +86,20 @@ export interface ShopInsightInput {
   shopCur: ShopTotals | null;
   shopPrev: ShopTotals | null;
   windowLabel: string;
+  /** Nhãn kỳ của từng tháng (vd "1–22/08" khi mọi tháng cắt cùng số ngày). Mặc định "tháng MM". */
+  labels?: string[];
   /** Nhóm đối chứng (deepAnalysis.controlGroup) — có thì kết luận của phần là "thị trường hay vận hành". */
   control?: ControlRow[];
 }
 
-/** Tỷ trọng kênh so được giữa tháng chưa hết và tháng đủ (đều là tỷ lệ); số tuyệt đối thì chỉ so cùng kỳ. */
+/** `mixes`/`agencyGmv` phải cùng kỳ với nhau và giữa các tháng (Report Tháng cắt mọi tháng 1..N khi tháng report
+ *  chưa hết): đo CROCS T9, so tỷ trọng với T8 TRỌN tháng ra Affiliate LIVE −4,2 điểm, cùng kỳ 1–22 là −6,0 điểm. */
 export function shopInsight(i: ShopInsightInput): SectionInsight | null {
   const n = i.mixes.length;
   const cur = i.mixes[n - 1];
   const prev = n > 1 ? i.mixes[n - 2] : null;
   if (!cur || !i.shopCur) return null;
-  const prevLabel = n > 1 ? `tháng ${i.months[n - 2].slice(5)}` : "";
+  const prevLabel = n > 1 ? i.labels?.[n - 2] ?? `tháng ${i.months[n - 2].slice(5)}` : "";
 
   const agencyShare = (idx: number) => (i.mixes[idx] && i.mixes[idx]!.shopGmv > 0 && i.agencyGmv[idx] > 0 ? (i.agencyGmv[idx] / i.mixes[idx]!.shopGmv) * 100 : null);
   const aCur = agencyShare(n - 1);
@@ -102,19 +109,22 @@ export function shopInsight(i: ShopInsightInput): SectionInsight | null {
     `Total GMV ${money(i.shopCur.gmv)}${shopChg != null ? ` (${signed(shopChg)}, ${i.windowLabel})` : ""}` +
     (aCur != null ? `; agency live chiếm ${pctTxt(aCur)}${aPrev != null ? ` (${prevLabel}: ${pctTxt(aPrev)})` : ""}.` : ".");
 
-  // Có nhóm đối chứng ⇒ kết luận là câu brand hỏi đầu tiên (thị trường hay vận hành), Total GMV lùi xuống số chứng minh.
+  // controlLine đã là 1 câu của Kết luận ⇒ tiêu đề phần là nhóm ngày Kết luận CHƯA nói (CROCS T9: ngày camp —
+  // thị trường −69%, agency −14%); không còn nhóm nào thì Total GMV. Bảng đối chứng ngay dưới vẫn có đủ 3 dòng.
   const control = i.control ?? [];
   const cLine = controlLine(control);
-  const headline = cLine ?? totalLine;
-  const points: string[] = cLine ? [totalLine] : [];
+  const groupLines: string[] = [];
   for (const r of control) {
     const v = controlVerdict(r);
     if (!v || r.key === "all" || cLine?.includes(`(${controlLabel(r.key).toLowerCase()})`)) continue;
-    points.push(`${controlLabel(r.key)}: live agency ${signed(r.liveChg!, 0)}, phần còn lại ${signed(r.restChg!, 0)} ⇒ ${VERDICT_TEXT[v]}.`);
+    groupLines.push(`${controlLabel(r.key)}: live agency ${signed(r.liveChg!, 0)}, phần còn lại ${signed(r.restChg!, 0)} ⇒ ${VERDICT_TEXT[v]}.`);
   }
+  const [headline, ...points] = [...groupLines, totalLine];
   let affiliateDelta: number | null = null;
   if (prev) {
-    const moves = CHANNELS.map((c) => {
+    // Seller LIVE (Linked account) là MỌI live trên tài khoản shop — nói cạnh "agency live chiếm X%" ở câu trên
+    // thành hai tỷ trọng live trong một khung (CROCS T9: 67,5% vs 69,6%). Biểu đồ cơ cấu kênh vẫn có đủ 4 kênh.
+    const moves = CHANNELS.filter((c) => c.key !== "liveLinked").map((c) => {
       const a = prev[c.key], b = cur[c.key];
       if (a == null || b == null || prev.shopGmv <= 0 || cur.shopGmv <= 0) return null;
       const from = (a / prev.shopGmv) * 100, to = (b / cur.shopGmv) * 100;
@@ -149,7 +159,6 @@ export interface WhyExtras {
   groups?: DayGroupStats[];
   /** Tách ΔGMV/giờ thành cơ cấu lịch vs hiệu suất (deepAnalysis.mixRateSplit). */
   mixRate?: MixRateSplit | null;
-  giftLine?: string | null;
 }
 
 /** GMV/giờ = Views/giờ × LIVE CTR × CTOR × AOV (đúng tích) ⇒ tách traffic (Views/giờ) với chuyển đổi (3 thừa số
@@ -170,17 +179,32 @@ export function whyInsight(prev: LiveStats, cur: LiveStats, x: WhyExtras = {}): 
         ? `traffic kéo ${dir}, chuyển đổi bù một phần`
         : `chuyển đổi kéo ${dir}, traffic bù một phần`;
   const parts = RATE_FACTORS.filter((k) => ch[k] != null).map((k) => `${DRIVER_LABEL[k]} ${signed(ch[k]!, 0)}`);
-  const headline = `GMV/giờ ${signed(gh, 0)}: ${parts.join(", ")} — ${verdict}.`;
+  const factorLine = `GMV/giờ ${signed(gh, 0)}: ${parts.join(", ")} — ${verdict}.`;
 
-  const points: string[] = [];
+  // Thừa số quy ra tiền đã là câu 2 của Kết luận ⇒ khi ngày thường và ngày camp lệch nhau rõ (≥ 10 điểm), tiêu đề
+  // là nhóm ngày kéo kết quả (Kết luận chưa nói), dòng thừa số lùi xuống số chứng minh.
   const g = (k: DayGroup) => x.groups?.find((r) => r.key === k);
-  const groupTxt = (k: DayGroup, label: string) => {
+  const chgOf = (k: DayGroup) => {
     const r = g(k);
-    const c = r ? pctChange(r.prev.gmvPerHour, r.cur.gmvPerHour) : null;
-    return r && c != null ? `${label}: ${money(r.prev.gmvPerHour!)} → ${money(r.cur.gmvPerHour!)}/giờ (${signed(c, 0)})` : null;
+    return r ? pctChange(r.prev.gmvPerHour, r.cur.gmvPerHour) : null;
   };
-  const groups = [groupTxt("daily", "Ngày thường"), groupTxt("camp", "ngày camp")].filter(Boolean);
-  if (groups.length) points.push(groups.join("; ") + ".");
+  const dChg = chgOf("daily");
+  const cChg = chgOf("camp");
+  let headline = factorLine;
+  const points: string[] = [];
+  if (dChg != null && cChg != null && Math.abs(dChg - cChg) >= 10) {
+    const lead = gh < 0 ? (dChg < cChg ? "ngày thường" : "ngày camp") : dChg > cChg ? "ngày thường" : "ngày camp";
+    headline = `${gh < 0 ? "Hụt dồn vào" : "Tăng chủ yếu nhờ"} ${lead}: GMV/giờ ngày thường ${signed(dChg, 0)}, ngày camp ${signed(cChg, 0)}.`;
+    points.push(factorLine);
+  } else {
+    const groupTxt = (k: DayGroup, label: string) => {
+      const r = g(k);
+      const c = chgOf(k);
+      return r && c != null ? `${label}: ${money(r.prev.gmvPerHour!)} → ${money(r.cur.gmvPerHour!)}/giờ (${signed(c, 0)})` : null;
+    };
+    const groups = [groupTxt("daily", "Ngày thường"), groupTxt("camp", "ngày camp")].filter(Boolean);
+    if (groups.length) points.push(groups.join("; ") + ".");
+  }
   const mr = x.mixRate;
   if (mr && Math.abs(mr.delta) > 0) {
     // Làm tròn nghìn đồng — "−101.092,04 đ/giờ" chỉ làm rối câu.
@@ -191,7 +215,7 @@ export function whyInsight(prev: LiveStats, cur: LiveStats, x: WhyExtras = {}): 
         : `Một phần do lịch: cơ cấu giờ live giữa các loại ngày ${m(mr.mix)}, hiệu suất trong từng loại ngày ${m(mr.rate)}.`
     );
   }
-  if (x.giftLine) points.push(x.giftLine);
+  // Quà tặng: đã ở Kết luận + 2 dòng bảng Xu hướng 4 tháng — không nhắc lần thứ ba ở đây.
 
   const worst = RATE_FACTORS.filter((k) => ch[k] != null && ch[k]! <= -5).sort((a, b) => ch[a]! - ch[b]!)[0];
   return { headline, points, action: worst ? FACTOR_ACTION[worst] : null };
@@ -354,15 +378,8 @@ export function contextInsight(camps: CampCompareRow[], slots: SlotInsightRow[])
       .join("; ") + ".";
   if (headline === ".") return null;
 
-  const points = campRan.map((r) => {
-    const g = pctChange(r.prev.gmv, r.cur.gmv), h = pctChange(r.prev.gmvPerHour, r.cur.gmvPerHour);
-    return (
-      `${CAMP_SHORT[r.key]}: ${money(r.cur.gmv)}${r.target ? ` (${pctTxt((r.cur.gmv / r.target) * 100, 0)} target)` : ""}` +
-      (g != null ? `, ${signed(g, 0)} so với cùng khung` : "") +
-      (r.cur.gmvPerHour != null ? `; ${money(r.cur.gmvPerHour)}/giờ${h != null ? ` (${signed(h, 0)})` : ""}` : "") +
-      "."
-    );
-  });
+  // Không đọc lại từng dòng bảng Campaign ngay bên dưới (GMV, % target, GMV/giờ từng khung) — chỉ câu tổng.
+  const points: string[] = [];
 
   const usable = slots.filter((s) => s.cur.n >= 3 && s.cur.gmvPerHour != null);
   const sorted = [...usable].sort((a, b) => b.cur.gmvPerHour! - a.cur.gmvPerHour!);
@@ -381,4 +398,25 @@ export function contextInsight(camps: CampCompareRow[], slots: SlotInsightRow[])
       ? `Cân nhắc dời bớt ca ${worstSlot.label.toLowerCase()} sang ${bestSlot.label.toLowerCase()}.`
       : null;
   return { headline, points, action };
+}
+
+// ---------- Gom việc cần làm về phần 7 ----------
+
+/** Việc cần làm của khung Insight phần 2–6 → "Việc agency làm tháng sau" (sau autoNextSteps). Bỏ những việc
+ *  autoNextSteps đã nói: Vì sao (cùng quy tắc thừa số tụt ≥ 5% mạnh nhất ⇒ cùng FACTOR_ACTION), "hụt vì vận hành"
+ *  của phần 2 (= dòng controlOpsGroup), "Xem lại cách chạy Daily" khi ngày thường đã là chỗ hụt do vận hành. */
+export function sectionNextSteps(
+  ins: Partial<Record<InsightSection, SectionInsight | null>>,
+  controlOpsGroup: "daily" | "camp" | null | undefined
+): string[] {
+  const out: string[] = [];
+  const add = (t: string | null | undefined) => {
+    if (t && !out.includes(t)) out.push(t);
+  };
+  add(ins.products?.action);
+  add(ins.people?.action);
+  const ctx = ins.context?.action;
+  if (!(ctx && controlOpsGroup === "daily" && ctx.startsWith(`Xem lại cách chạy ${DAY_TYPE.daily}:`))) add(ctx);
+  if (!controlOpsGroup) add(ins.shop?.action);
+  return out;
 }

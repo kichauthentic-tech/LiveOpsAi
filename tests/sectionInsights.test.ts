@@ -8,6 +8,7 @@ import {
   parseInsightText,
   peopleInsight,
   productsInsight,
+  sectionNextSteps,
   shopInsight,
   shortSku,
   whyInsight
@@ -26,19 +27,19 @@ test("văn bản Insight: dòng đầu kết luận, dòng '→' là việc cầ
   expect(parseInsightText("  \n ")).toBeNull();
 });
 
-test("Vì sao — CROCS 1–22/09 vs 1–22/08: 4 thừa số GMV/giờ, ngày thường tụt gấp đôi camp, không phải do lịch camp", () => {
+test("Vì sao — CROCS 1–22/09 vs 1–22/08: tiêu đề là nhóm ngày kéo kết quả (thừa số đã ở Kết luận), không phải do lịch camp", () => {
   const t8 = stats(4_309_000_000, 153.6, 526_400, { liveCtr: 55.98, ctor: 1.35, upt: 1.2, aov: 1_084_000 });
   const t9 = stats(3_517_000_000, 177.8, 496_400, { liveCtr: 52.43, ctor: 1.18, upt: 1.06, aov: 1_146_000 });
   const g = (key: "daily" | "camp", a: number, b: number) => ({ key, prev: stats(a * 10, 10, 1000), cur: stats(b * 10, 10, 1000) });
   const w = whyInsight(t8, t9, {
     groups: [g("daily", 28_800_000, 17_900_000), g("camp", 27_300_000, 22_100_000)],
-    mixRate: { delta: -8_300_000, mix: -100_000, rate: -8_200_000 },
-    giftLine: "Quà tặng … UPT giảm chủ yếu vì vậy."
+    mixRate: { delta: -8_300_000, mix: -100_000, rate: -8_200_000 }
   })!;
-  expect(w.headline).toBe("GMV/giờ −29%: Views/giờ −19%, LIVE CTR −6%, CTOR −13%, AOV +6% — cả traffic lẫn chuyển đổi cùng giảm.");
-  expect(w.points[0]).toBe("Ngày thường: 28,8M → 17,9M/giờ (−38%); ngày camp: 27,3M → 22,1M/giờ (−19%).");
+  expect(w.headline).toBe("Hụt dồn vào ngày thường: GMV/giờ ngày thường −38%, ngày camp −19%.");
+  expect(w.points[0]).toBe("GMV/giờ −29%: Views/giờ −19%, LIVE CTR −6%, CTOR −13%, AOV +6% — cả traffic lẫn chuyển đổi cùng giảm.");
   expect(w.points[1]).toMatch(/^Không phải do lịch camp: cơ cấu giờ live giữa các loại ngày chỉ giải thích −100K\/giờ, hiệu suất trong từng loại ngày −8,2M\/giờ\.$/);
-  expect(w.points).toContain("Quà tặng … UPT giảm chủ yếu vì vậy.");
+  // Quà tặng đã ở Kết luận + bảng Xu hướng — không nhắc lần ba.
+  expect(w.points.join("\n")).not.toMatch(/Quà tặng/);
   // Bước yếu nhất theo %: Views/giờ −19% ⇒ traffic (không còn "giỏ hàng/UPT" — UPT đổi theo quà tặng).
   expect(w.action).toMatch(/traffic/);
 });
@@ -48,6 +49,11 @@ test("Vì sao — CROCS T8 vs T7: chuyển đổi kéo lên, traffic bù một p
   const t8 = stats(5_885_000_000, 228.6, 725_100, { liveCtr: 56.28, ctor: 1.31, aov: 1_104_000 });
   const w = whyInsight(t7, t8)!;
   expect(w.headline).toContain("chuyển đổi kéo lên, traffic bù một phần");
+  // Hai nhóm ngày lệch < 10 điểm ⇒ tiêu đề vẫn là dòng thừa số, nhóm ngày xuống gạch đầu dòng.
+  const g = (key: "daily" | "camp", a: number, b: number) => ({ key, prev: stats(a * 10, 10, 1000), cur: stats(b * 10, 10, 1000) });
+  const close = whyInsight(t7, t8, { groups: [g("daily", 24_000_000, 25_000_000), g("camp", 26_000_000, 27_500_000)] })!;
+  expect(close.headline).toBe(w.headline);
+  expect(close.points[0]).toMatch(/^Ngày thường: 24M → 25M\/giờ/);
   expect(w.points).toEqual([]);
   expect(whyInsight(t7, { ...t8, viewsPerHour: null, gmvPerView: null })).toBeNull();
 });
@@ -124,22 +130,37 @@ test("Hàng — SKU dẫn đầu giảm mạnh: nêu ở kết luận, không l�
   expect(shortSku("Túi vải")).toBe("Túi vải");
 });
 
-test("Toàn shop — CROCS T9: tỷ trọng LIVE affiliate 11,0% → 6,8% ⇒ việc cần làm về affiliate", () => {
-  const mix = (month: string, shopGmv: number, liveLinked: number, affiliate: number, video: number, card: number, refundRate: number): ChannelMix => ({
-    month, shopGmv, liveLinked, affiliate, video, card, coverage: null, refundRate
+test("Toàn shop — CROCS 1–22/09 vs cùng kỳ 1–22/08: tỷ trọng cùng kỳ, không nêu Seller LIVE cạnh tỷ trọng agency", () => {
+  const mix = (month: string, shopGmv: number, liveLinked: number, affiliate: number, video: number, refunds: number): ChannelMix => ({
+    month, shopGmv, liveLinked, affiliate, video, card: shopGmv - liveLinked - affiliate - video, coverage: 100, refundRate: (refunds / shopGmv) * 100
   });
   const shop = (gmv: number) => ({ gmv, refunds: 0, orders: 0, visitors: 0, liveLinked: 0, affiliate: 0, video: 0, days: 22, through: null });
-  const i = shopInsight({
+  // Shop Analytics thật cắt 1–22 (bản chụp CROCS T9, đo 2026-09-29) + LIVE GMV từ ca cùng kỳ.
+  const input = {
     months: ["2026-08", "2026-09"],
-    mixes: [mix("2026-08", 9_100_000_000, 5_898_000_000, 999_900_000, 534_500_000, 1_660_000_000, 16.51), mix("2026-09", 5_210_000_000, 3_626_000_000, 354_200_000, 289_100_000, 936_800_000, 15.62)],
-    agencyGmv: [5_885_000_000, 3_517_000_000],
-    shopCur: shop(5_210_000_000),
-    shopPrev: shop(6_750_000_000),
+    mixes: [mix("2026-08", 6_748_363_789, 4_272_482_378, 863_731_259, 384_126_606, 1_003_838_438), mix("2026-09", 5_207_099_451, 3_624_809_178, 354_174_072, 289_099_841, 813_125_407)],
+    agencyGmv: [4_309_000_000, 3_517_000_000],
+    labels: ["1–22/08", "1–22/09"],
+    shopCur: shop(5_207_099_451),
+    shopPrev: shop(6_748_363_789),
     windowLabel: "1–22/09 so với 1–22/08"
-  })!;
-  expect(i.headline).toContain("agency live chiếm 67,5% (tháng 08: 64,7%)");
-  expect(i.points).toContain("Affiliate LIVE: 11,0% → 6,8% tổng shop (−4,2 điểm).");
+  };
+  const i = shopInsight(input)!;
+  expect(i.headline).toContain("agency live chiếm 67,5% (1–22/08: 63,9%)");
+  // Trước đây so với T8 TRỌN tháng: −4,2 điểm.
+  expect(i.points).toContain("Affiliate LIVE: 12,8% → 6,8% tổng shop (−6 điểm).");
+  expect(i.points.join("\n")).not.toMatch(/Seller LIVE/);
   expect(i.action).toMatch(/Affiliate LIVE/);
+
+  // Có nhóm đối chứng: câu ngày thường đã ở Kết luận ⇒ tiêu đề là ngày camp, Total GMV lùi xuống.
+  const row = (key: "daily" | "camp" | "all", liveChg: number, restChg: number) => ({
+    key, days: 1, liveCur: 1, livePrev: 1, shopLiveCur: 1, shopLivePrev: 1, restCur: 1, restPrev: 1, visitorsCur: 1, visitorsPrev: 1,
+    cvrCur: null, cvrPrev: null, liveChg, restChg, visitorsChg: -4
+  });
+  const c = shopInsight({ ...input, control: [row("daily", -22.7, 1), row("camp", -13.6, -69), row("all", -18.4, -36)] })!;
+  expect(c.headline).toBe("Ngày camp: live agency −14%, phần còn lại −69% ⇒ thị trường giảm mạnh hơn, agency giữ tốt hơn.");
+  expect(c.headline).not.toMatch(/ngày thường/i);
+  expect(c.points[0]).toMatch(/^Total GMV 5,21B/);
 });
 
 test("Bối cảnh — đếm khung camp tăng/giảm cùng khung tháng trước, bỏ khung chưa chạy; việc cần làm là khung tụt GMV/giờ mạnh nhất", () => {
@@ -157,6 +178,24 @@ test("Bối cảnh — đếm khung camp tăng/giảm cùng khung tháng trướ
     ]
   )!;
   expect(i.headline).toBe("Daily −22,5% GMV so với cùng kỳ tháng trước; 0/2 khung Campaign đã chạy tăng GMV so với cùng khung tháng trước.");
-  expect(i.points.some((l) => l.startsWith("Pay Day"))).toBe(false);
+  // Không đọc lại từng dòng bảng Campaign — chỉ còn câu khung giờ.
+  expect(i.points).toEqual(["Khung giờ bắt đầu ca: tối (từ 17h) bán tốt nhất (20,5M/giờ), sáng (trước 12h) thấp nhất (19,5M/giờ, 18 ca)."]);
   expect(i.action).toMatch(/^Xem lại cách chạy Daily: GMV\/giờ −37%/);
+});
+
+test("Việc cần làm của các phần gom về phần 7, bỏ việc autoNextSteps đã nói", () => {
+  const ins = (action: string | null) => ({ headline: "x", points: [], action });
+  const all = {
+    shop: ins("Ngày thường hụt vì vận hành live, không phải thị trường — xem phần Vì sao để biết thừa số nào tụt và sửa ở lịch tháng sau."),
+    why: ins("Điểm nghẽn ở traffic — rà khung giờ live, ảnh bìa/tiêu đề phiên và ngân sách đẩy live."),
+    products: ins("Rà Baya Platform - Winter White: tồn kho, giá và thời lượng giới thiệu trên live (GMV mỗi ngày −32%)."),
+    people: ins(null),
+    context: ins("Xem lại cách chạy Daily: GMV/giờ −38% so với cùng kỳ tháng trước.")
+  };
+  // CROCS T9: ngày thường hụt do vận hành ⇒ chỉ còn việc về SKU.
+  expect(sectionNextSteps(all, "daily")).toEqual(["Rà Baya Platform - Winter White: tồn kho, giá và thời lượng giới thiệu trên live (GMV mỗi ngày −32%)."]);
+  // Không có nhóm hụt do vận hành ⇒ việc Daily + việc của phần 2 (vd affiliate) là việc mới.
+  const noOps = sectionNextSteps({ ...all, shop: ins("Tỷ trọng Affiliate LIVE giảm — rà lịch creator và gói hỗ trợ affiliate cho tháng sau.") }, null);
+  expect(noOps).toHaveLength(3);
+  expect(noOps.join("\n")).not.toMatch(/traffic/);
 });

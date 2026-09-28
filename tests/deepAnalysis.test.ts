@@ -114,6 +114,20 @@ test("nhóm đối chứng CROCS 1–22/09: ngày thường hụt do vận hành
   // Cùng chiều, lệch < 10 điểm ⇒ đi cùng thị trường; không có ngày nào ⇒ không có dòng.
   expect(controlVerdict({ ...by.all, liveChg: -12, restChg: -8 })).toBe("market");
   expect(controlGroup(null, cur, win, bucket([8]), bucket([9]))).toEqual([]);
+
+  // Cột live lấy từ ca (2026-09-29): Linked account đếm cả live ngoài ca agency. Phần còn lại KHÔNG đổi
+  // (vẫn Total − Linked account); chỉ cộng ca ở ngày Shop Analytics có số.
+  const agency = {
+    prev: new Map([["2026-08-03", 2274.5e6], ["2026-08-08", 2035e6], ["2026-08-31", 999e6]]),
+    cur: new Map([["2026-09-03", 1757.6e6], ["2026-09-09", 1759.1e6]])
+  };
+  const fromCa = Object.fromEntries(controlGroup(prev, cur, win, bucket([8]), bucket([9]), agency).map((r) => [r.key, r]));
+  expect(Math.round(fromCa.daily.liveChg! * 10) / 10).toBe(-22.7);
+  expect(Math.round(fromCa.daily.restChg!)).toBe(1);
+  expect(fromCa.daily.shopLiveCur).toBe(1855e6);
+  expect(Math.round(fromCa.all.liveChg! * 10) / 10).toBe(-18.4);
+  expect(controlVerdict(fromCa.daily)).toBe("ops");
+  expect(controlVerdict(fromCa.camp)).toBe("agency_better");
 });
 
 test("độ tin cậy host: chỉ kết luận khi khoảng tin cậy nằm hẳn một phía; mặt bằng theo tháng × loại ngày × buổi; tất định", () => {

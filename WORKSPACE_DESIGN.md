@@ -2,6 +2,13 @@
 
 ## CẦN LÀM NGAY khi mở phiên mới (cập nhật 2026-09-24)
 
+> **MỚI 2026-09-29 — Report Tháng bỏ trùng lặp: 11 mục (A1–A4, B1–B6, C2) theo đề xuất user duyệt (không migration, CHƯA commit).**
+> Đo CROCS T9: câu đối chứng lặp 5 chỗ, câu quà tặng 4 chỗ, "live agency giảm" có 2 số (−18,4% phần 1 / −15% phần 2), bảng 4 tháng
+> phần 2 đặt T8 trọn tháng cạnh T9 22 ngày, biểu đồ "GMV theo ngày" phần 6 dùng nguồn thứ ba (Core Stats 3,87B vs ca 3,41B, 1–21/09).
+> Bảng đối chứng giờ lấy cột live TỪ CA (Report + Dashboard brand), cơ cấu kênh cắt 1..N, việc cần làm gom về phần 7. **Report T8 đã
+> phát hành sẽ đổi số phần 2 khi mở lại** (tính lúc hiển thị). Việc treo: ngày **03/09 Core Stats 382M vs ca 174M / Shop Analytics
+> 160M** — nghi file trùng, chưa kiểm. Xem `## Report Tháng bỏ trùng lặp`.
+
 > **MỚI 2026-09-28 (khuya) — Audit "module cùng loại, logic khác nhau": 9 nhóm lệch ĐÃ SỬA CẢ 9 (không migration, commit 5496297 đã push `main`).**
 > Đo trên DB thật (231 ca: 229 CROCS nạp bù + 1 VERA test; chưa kế hoạch nào chốt — CROCS T10 nháp 5,5B/75 ca). tsc 0 lỗi, eslint
 > 0 lỗi/33 warning (= baseline), vitest 169/169 (+5 file test: `pnlSessions`, `monthProjection`, `countable`, `conflicts`,
@@ -1685,6 +1692,47 @@ trong DB đang rỗng nên mọi câu insight tự sinh ra chữ mới ngay; đo
 **Còn lại / chưa đụng:** màn thao tác nội bộ giữ từ vận hành tiếng Việt khi không phải tên chỉ số ("Ca", "Giờ" = khung giờ, "Số
 Ca" ở lịch/đăng ký, engine AI Training); Talent Pool trường cũ `cvrAvg`/`ctrAvg` (nhập tay, chưa rõ định nghĩa) chỉ đổi nhãn nhẹ.
 
+## Report Tháng bỏ trùng lặp — XONG + VERIFY 2026-09-29 (không migration, CHƯA commit)
+
+**Vì sao.** User hỏi "có bị trùng gì không" → đọc toàn bộ report CROCS T9 trên browser + đo bản chụp: 4 chỗ cùng câu hỏi ra số khác
+nhau, 6 câu chép nguyên văn. User duyệt "làm hết theo đề xuất".
+
+**Đã làm:**
+- **A1 — cột live của bảng đối chứng = ca agency.** `controlGroup(..., agencyLive?)` + `liveGmvByDate` ([deepAnalysis.ts](src/lib/report/deepAnalysis.ts)):
+  live cộng GMV ca theo ngày (chỉ ngày Shop Analytics có số); phần còn lại VẪN là Total − Linked account; `ControlRow` thêm
+  `shopLiveCur/Prev`. Lý do: Linked account đếm mọi live trên tài khoản shop (CROCS 1–22/09 hơn ca 108M; 02/09 không ca nào vẫn 24M).
+  Đo: ngày thường −22,7% (ca) vs −18,8% (SA), camp −13,6% vs −11%, cả kỳ −18,4% vs −15,2% — lệch nguồn < ngưỡng 10 điểm, 3 kết
+  luận giữ nguyên. Chú thích dưới bảng ghi "Live trên tài khoản shop ngoài ca agency: 108,1M". **Dashboard brand** dùng cùng cách
+  (live từ `brandSessions` có số) — browser: −23/−14/−18 khớp report.
+- **A2 — bỏ dòng "Seller LIVE X% → Y%" khỏi Insight phần 2** (cạnh "agency live chiếm 67,5%" thành 2 tỷ trọng live); biểu đồ đổi nhãn
+  "Seller LIVE (cả tài khoản shop)".
+- **A3 — cơ cấu kênh (biểu đồ + bảng + Insight phần 2) cắt 1..N** như Xu hướng 4 tháng (`cutEndOf`, dùng chung `trendStats`). Product
+  card chỉ có tổng tháng ⇒ khi cắt = Total − 3 kênh Shop Analytics (1–22/09: 939M vs file 936,8M). Bỏ cột LIVE GMV (agency) khỏi bảng
+  (còn tỷ trọng, số tiền ở Xu hướng). Insight: Affiliate LIVE 12,8% → 6,8% (−6 điểm) thay vì −4,2 (T8 trọn tháng); agency 63,9% → 67,5%.
+- **A4 — bỏ biểu đồ "GMV theo ngày" (Core Stats) phần 6** + `dailyChartData`/`dailyPerf`. Piece `dailyPerf` trong bản chụp VẪN dựng
+  (không đụng snapshot) — freshness có thể còn nhắc file Live Performance dù report không dùng; dọn khi đụng snapshot lần tới.
+- **B1** tiêu đề Insight phần 2 = nhóm ngày Kết luận chưa nói (T9: "Ngày camp: live agency −14%, phần còn lại −69%…"). **B2** quà tặng
+  bỏ khỏi Insight phần 3 (`WhyExtras.giftLine` xoá); phần 4 chỉ ghi chú quà khi tháng CÓ quà. **B3** bỏ dòng cơ cấu/hiệu suất lặp dưới
+  bảng ngày thường vs camp. **B4** khung Insight tự sinh không hiện "→ việc"; `sectionNextSteps` ([sectionInsights.ts](src/lib/report/sectionInsights.ts))
+  gom việc của phần 4/5/6 (+ phần 2 khi không có nhóm "vận hành") vào `NarrativeInput.sectionSteps`, bỏ việc autoNextSteps đã nói (Vì
+  sao = cùng quy tắc thừa số; "Daily" khi ngày thường là nhóm vận hành). T9 phần 7 thêm "Rà Baya Platform - Winter White…". **B5** bỏ
+  dòng "Tháng 10: target 5,5B với 75 ca" (2 ô KPI ngay dưới); không có kế hoạch thì vẫn "Chốt target và lịch…". **B6** Insight phần 6
+  bỏ các dòng đọc lại bảng Campaign.
+- **C2** tiêu đề Insight phần 3 = nhóm ngày kéo kết quả khi ngày thường/camp lệch ≥ 10 điểm ("Hụt dồn vào ngày thường: GMV/giờ ngày
+  thường −38%, ngày camp −19%."), dòng 4 thừa số xuống gạch đầu dòng; lệch < 10 điểm giữ tiêu đề thừa số như cũ.
+- Excel: sheet đối chứng thêm cột Live tài khoản shop; sheet kênh theo kỳ cắt + cột "Product card (phần còn lại)".
+
+**Verify:** tsc 0 lỗi, eslint 0 lỗi (33 cảnh báo = baseline), vitest 173/173 (sửa/thêm: đối chứng từ ca −22,7/−18,4 + phần còn lại
+không đổi, shopInsight cùng kỳ + tiêu đề ngày camp + không Seller LIVE, whyInsight tiêu đề nhóm ngày + nhánh < 10 điểm, contextInsight
+chỉ câu khung giờ, `sectionNextSteps`, autoNextSteps bỏ dòng target + không lặp), `vite build` OK. Browser (admin, dev) CROCS T9
+đọc toàn trang: đúng các câu/số trên, phần 7 có 5 việc, không lỗi console mới. **Chưa verify:** góc nhìn role `brand`, file Excel tải
+thật, report T8 đã phát hành.
+
+**Quy ước mới:**
+- Kết luận nói mỗi ý một lần; tiêu đề Insight từng phần là điều Kết luận chưa nói; "→ việc" chỉ ở "Việc agency làm tháng sau".
+- Mọi con số "live agency" trong report/Dashboard lấy từ ca; Shop Analytics Linked account chỉ dùng cho vế "phần còn lại" và cơ cấu kênh.
+- Mọi so sánh nhiều tháng trong Report Tháng (kể cả tỷ trọng kênh) cắt cùng 1..N khi tháng report chưa hết.
+
 ## Report Tháng chuyên sâu — XONG + VERIFY 2026-09-26 (khuya, KHÔNG migration, commit fbfeab0 đã push main)
 
 **Vì sao làm.** User: "tối ưu report Tháng theo hướng chuyên nghiệp, phân tích chuyên sâu, mang lại giá trị". Đo report cũ (CROCS
@@ -1745,7 +1793,7 @@ khối, % gợi ý 22,8/17,6/10,5/49,2. **Chưa verify:** bấm Lưu ở ReportP
 - Report Tháng: **CTOR = Orders ÷ Product clicks**; không dùng UPT/Avg. price làm nguyên nhân khi quà tặng đổi (xem dòng UPT bỏ quà).
 - Kết luận về người (host) phải có khoảng tin cậy nhiều tháng; mẫu nhỏ dùng phân phối t, không 1,96. Số một tháng chỉ để tham khảo.
 - Mọi so sánh chuỗi tháng khi tháng report chưa hết: cắt mọi tháng cùng số ngày (`trendStats`), không đặt tháng trọn cạnh tháng dở.
-- "Thị trường hay vận hành" luôn so với phần còn lại của shop cùng nguồn Shop Analytics (không so LIVE GMV từ ca với số Shop Analytics).
+- "Thị trường hay vận hành": phần còn lại = Total GMV − Linked account (Shop Analytics). **Cột live lấy từ ca từ 2026-09-29** (xem `## Report Tháng bỏ trùng lặp`) — trước đó dùng Linked account.
 - Report chỉ để đọc: form nhập của ops ở Nhập Ads & Ghi Chú / Affiliate / Kế Hoạch Tháng.
 
 ## Report Tháng 8 phần — XONG + VERIFY 2026-09-25 (migration 0120 ĐÃ CHẠY)

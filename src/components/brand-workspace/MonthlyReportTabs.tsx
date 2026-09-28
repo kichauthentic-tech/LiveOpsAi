@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
-import { ResponsiveContainer, ComposedChart, LineChart, ReferenceLine, BarChart, Bar, Line, Area, XAxis, YAxis, Tooltip, CartesianGrid, Cell, ScatterChart, Scatter } from "recharts";
+import { ResponsiveContainer, ComposedChart, LineChart, ReferenceLine, BarChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid, Cell, ScatterChart, Scatter } from "recharts";
 import { BarChart3, Flame, ListOrdered, ShoppingBag, Megaphone, AlertTriangle, CalendarClock, Users, PieChart as PieChartIcon, Activity, Download, Lightbulb, ChevronDown, Scale, Loader2, Save } from "lucide-react";
 import { LiveSession, BrandMonthlyReport as BrandMonthlyReportType, BrandPlatformRate, ShiftSlot } from "../../types";
 import { CHANNEL, METRIC, metricHint } from "../../lib/metricGlossary";
 import { downloadSheetsAsXlsx } from "../../lib/exportXlsx";
 import { useToast } from "../../hooks/useToast";
-import { dailyFromSessions, monthRunRate, monthRunRateFromPlan, pickLivePerfSource } from "../../lib/report/sessionsLivePerf";
+import { monthRunRate, monthRunRateFromPlan, pickLivePerfSource } from "../../lib/report/sessionsLivePerf";
 import { planRunRate, projectMonthEnd } from "../../lib/performance/planRunRate";
 import { monthOutlook } from "../../lib/performance/ceoBrief";
 import { todayVn } from "../../lib/performance/brandCommitment";
@@ -34,6 +34,7 @@ import {
 } from "../../lib/report/monthlyReportInsights";
 import {
   controlGroup,
+  liveGmvByDate,
   controlLabel,
   controlLine,
   controlVerdict,
@@ -63,6 +64,7 @@ import {
   parseInsightText,
   peopleInsight,
   productsInsight,
+  sectionNextSteps,
   SectionInsight,
   shopInsight,
   shortSku,
@@ -431,7 +433,8 @@ const SECTIONS: { id: string; label: string }[] = [
 // 4 kênh — màu phân loại theo thứ tự cố định (blue/orange/aqua/yellow, bước tối của bảng màu đã kiểm
 // mù màu cho các cặp kề nhau). Kênh luôn giữ một màu, không đổi theo thứ hạng.
 const CHANNELS: { key: "liveLinked" | "affiliate" | "video" | "card"; label: string; color: string }[] = [
-  { key: "liveLinked", label: CHANNEL.sellerLive, color: "#3987e5" },
+  // "Linked account" = MỌI live trên tài khoản shop, không chỉ ca agency (tỷ trọng agency ở bảng chi tiết).
+  { key: "liveLinked", label: `${CHANNEL.sellerLive} (cả tài khoản shop)`, color: "#3987e5" },
   { key: "affiliate", label: CHANNEL.affiliateLive, color: "#d95926" },
   { key: "video", label: CHANNEL.video, color: "#199e70" },
   { key: "card", label: CHANNEL.productCard, color: "#c98500" }
@@ -785,7 +788,6 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     () => Object.fromEntries(Object.entries(view.liveRaw).map(([m, v]) => [m, hiddenMonths.has(m) ? null : v])),
     [view, hiddenMonths]
   );
-  const dailyPerfRaw = view.dailyPerfRaw;
   const topSku = view.topSku;
   const topPromo = view.topPromo;
 
@@ -793,8 +795,6 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   const livePrevSource = useMemo(() => pickLivePerfSource(sessions, brandId, prevStart, prevEnd, livePrevRaw), [sessions, brandId, prevStart, prevEnd, livePrevRaw]);
   const liveCurrent = liveSource.slice;
   const livePrev = livePrevSource.slice;
-  // Diễn biến theo ngày: file Live Performance Core Stats có GMV gián tiếp — ưu tiên khi có; không có thì gộp ca theo ngày.
-  const dailyPerf = useMemo(() => (dailyPerfRaw?.hasAnyBatch ? dailyPerfRaw : dailyFromSessions(sessions, brandId, start, end)), [dailyPerfRaw, sessions, brandId, start, end]);
 
   // Kế Hoạch Tháng của tháng trước / tháng này / tháng sau — nguồn khoảng ngày camp + target từng khung (tháng này)
   // và phân bổ tháng sau (phần 7). Bảng nhỏ, đọc thẳng, không đưa vào bản chụp.
@@ -920,16 +920,6 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   const kpiTargetGmvCurRaw = scheduledTargetGmv(start, end);
   const kpiTargetGmvCur = kpiTargetGmvCurRaw > 0 ? kpiTargetGmvCurRaw : null;
 
-  const dailyChartData = useMemo(
-    () =>
-      (dailyPerf?.daily ?? []).map((d) => ({
-        label: d.date.slice(8, 10) + "/" + d.date.slice(5, 7),
-        gmvLiveSession: d.gmvLiveSession,
-        gmvIndirect: d.gmvIndirect
-      })),
-    [dailyPerf]
-  );
-
   // So cùng số ngày: tháng report chưa có số tới ngày cuối thì so 1..N với 1..N tháng trước — so với trọn tháng
   // trước từng ra −40% cho T9 CROCS trong khi cùng kỳ chỉ −18%.
   const cmp = useMemo(() => compareWindow(month, snapshot.coverage.sessionsThrough), [month, snapshot]);
@@ -971,22 +961,15 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     const { start: s, end: e } = monthRangeLocal(m);
     return m === month ? liveCurrent?.rows ?? [] : m === prevMonth ? livePrev?.rows ?? [] : pickLivePerfSource(sessions, brandId, s, e, liveOlderMonths[m] ?? null).slice.rows;
   };
-  // Trọn từng tháng (tháng report tới ngày có số) — cột "LIVE GMV (agency)" cạnh cơ cấu kênh cả tháng của Shop Analytics.
-  const monthlyStats = useMemo(
-    () => last4Months.map((m) => ({ month: m, stats: liveStatsFromRows(rowsOf(m), monthRangeLocal(m).start, m === month ? cmp.curEnd : monthRangeLocal(m).end) })),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [last4Months, month, prevMonth, liveCurrent, livePrev, sessions, brandId, liveOlderMonths, cmp]
-  );
   // Xu hướng 4 tháng CÙNG SỐ NGÀY (tháng chưa hết thì mọi tháng cắt 1..N): đặt 3 tháng trọn cạnh tháng mới 22 ngày
-  // từng sinh câu "giảm 4 tháng liên tiếp" so lệch kỳ.
+  // từng sinh câu "giảm 4 tháng liên tiếp" so lệch kỳ. Cơ cấu kênh phần 2 dùng chung cách cắt này (2026-09-29).
   const trendDay = cmp.partial ? Number(cmp.curEnd.slice(8)) : null;
+  const cutEndOf = (m: string) => {
+    const e = monthRangeLocal(m).end;
+    return trendDay ? `${m}-${String(Math.min(trendDay, Number(e.slice(8)))).padStart(2, "0")}` : e;
+  };
   const trendStats = useMemo(
-    () =>
-      last4Months.map((m) => {
-        const { start: s, end: e } = monthRangeLocal(m);
-        const cut = trendDay ? `${m}-${String(Math.min(trendDay, Number(e.slice(8)))).padStart(2, "0")}` : e;
-        return { month: m, stats: liveStatsFromRows(rowsOf(m), s, cut) };
-      }),
+    () => last4Months.map((m) => ({ month: m, stats: liveStatsFromRows(rowsOf(m), monthRangeLocal(m).start, cutEndOf(m)) })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [last4Months, month, prevMonth, liveCurrent, livePrev, sessions, brandId, liveOlderMonths, trendDay]
   );
@@ -999,13 +982,11 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   const giftLineText = giftLine(giftPrev, giftCur, `T${Number(prevMonth.slice(5))}`);
   const giftSliceCur = view.gifts?.[month] ?? null;
   const giftsMissing = canManage && !view.gifts?.[month];
-  const giftNote = giftSliceCur?.hasAnyBatch
-    ? giftSliceCur.giftItems > 0
+  // Chỉ nêu khi tháng CÓ quà (SKU nào, bao nhiêu món). "Quà giảm/hết" đã ở Kết luận + bảng Xu hướng 4 tháng.
+  const giftNote =
+    giftSliceCur?.hasAnyBatch && giftSliceCur.giftItems > 0
       ? `Quà tặng (dưới ${fmtVndShort(GIFT_MAX_PRICE)}/món): ${fmtInt(giftSliceCur.giftItems)} món ở ${giftSliceCur.giftSkus} SKU${giftSliceCur.top[0] ? `, nhiều nhất ${shortSku(giftSliceCur.top[0][0])}` : ""} — không tính vào UPT hàng bán thật.`
-      : giftPrev && giftPrev.giftItems > 0
-        ? `Tháng này không còn hàng quà tặng dưới ${fmtVndShort(GIFT_MAX_PRICE)}/món (tháng ${prevMonth.slice(5)}: ${fmtInt(giftPrev.giftItems)} món).`
-        : null
-    : null;
+      : null;
 
   // Ngày thường vs ngày camp, cơ cấu lịch vs hiệu suất.
   const dayGroups = useMemo(() => dayGroupStats(livePrev?.rows ?? [], liveCurrent?.rows ?? [], cmp, bucketPrev, bucketCur), [livePrev, liveCurrent, cmp, bucketPrev, bucketCur]);
@@ -1022,31 +1003,40 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   const rhythm = useMemo(() => dailyRhythm(view.shopDays[month]?.days, liveCurrent?.rows ?? [], cmp.curStart, cmp.curEnd), [view, month, liveCurrent, cmp]);
   const funnel = useMemo(() => liveFunnel(livePrev?.rows ?? [], liveCurrent?.rows ?? [], cmp), [livePrev, liveCurrent, cmp]);
   const spread = useMemo(() => sessionSpread(liveCurrent?.rows ?? [], cmp.curStart, cmp.curEnd), [liveCurrent, cmp]);
+  // Cơ cấu kênh cắt cùng kỳ với Xu hướng 4 tháng: đặt T8 trọn tháng cạnh T9 22 ngày từng ghi Affiliate LIVE −4,2 điểm
+  // (cùng kỳ: −6,0) và Total GMV 9,1B cạnh 5,21B. Product card chỉ có tổng cả tháng (file Sản Phẩm) ⇒ khi cắt thì
+  // lấy phần còn lại của Total GMV sau 3 kênh Shop Analytics (đo CROCS 1–22/09: 939M, file 936,8M).
   const channelMixes = useMemo(
     () =>
       last4Months.map((m) => {
-        const { start: s, end: e } = monthRangeLocal(m);
+        const shop = shopTotals(shopDaysOf(m), monthRangeLocal(m).start, cutEndOf(m));
+        if (trendDay) return channelMix(m, shop, shop ? Math.max(0, shop.gmv - shop.liveLinked - shop.affiliate - shop.video) : null);
         const card = hiddenMonths.has(m) ? null : view.cardGmv[m];
-        return channelMix(m, shopTotals(shopDaysOf(m), s, e), card?.hasAnyBatch ? card.cardGmv : null);
+        return channelMix(m, shop, card?.hasAnyBatch ? card.cardGmv : null);
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [last4Months, view, hiddenMonths]
+    [last4Months, view, hiddenMonths, trendDay]
   );
   const channelChartData = useMemo(
     () =>
       channelMixes
-        .map((c, idx) => (c ? { label: `${last4Months[idx].slice(5)}/${last4Months[idx].slice(2, 4)}`, liveLinked: c.liveLinked, affiliate: c.affiliate, video: c.video, card: c.card ?? 0 } : null))
+        .map((c, idx) => (c ? { label: trendColLabel(last4Months[idx]), liveLinked: c.liveLinked, affiliate: c.affiliate, video: c.video, card: c.card ?? 0 } : null))
         .filter((x): x is NonNullable<typeof x> => x !== null),
-    [channelMixes, last4Months]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [channelMixes, last4Months, trendDay]
   );
   const shopPiecesMissing = !Object.values(view.shopDays).some(Boolean) && !Object.values(view.cardGmv).some(Boolean);
 
   // Nhóm đối chứng: live tài khoản shop vs phần còn lại của shop, theo ngày thường / ngày camp.
+  // Cột live = ca agency (cùng số ô KPI phần 1 và bảng Campaign phần 6); phần còn lại vẫn từ Shop Analytics.
+  const agencyLiveByDate = useMemo(() => ({ prev: liveGmvByDate(livePrev?.rows ?? []), cur: liveGmvByDate(liveCurrent?.rows ?? []) }), [livePrev, liveCurrent]);
   const control = useMemo(
-    () => controlGroup(shopDaysOf(prevMonth)?.days, view.shopDays[month]?.days, cmp, bucketPrev, bucketCur),
+    () => controlGroup(shopDaysOf(prevMonth)?.days, view.shopDays[month]?.days, cmp, bucketPrev, bucketCur, agencyLiveByDate),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [view, prevMonth, month, cmp, bucketPrev, bucketCur, hiddenMonths]
+    [view, prevMonth, month, cmp, bucketPrev, bucketCur, hiddenMonths, agencyLiveByDate]
   );
+  const controlAll = control.find((r) => r.key === "all");
+  const liveOutsideAgency = controlAll ? controlAll.shopLiveCur - controlAll.liveCur : null;
   const controlOps = control.find((r) => r.key !== "all" && controlVerdict(r) === "ops");
 
   // KPI GMV cả shop brand giao (Kế Hoạch Tháng, 0122) — mọi kênh, khác target live. Tháng chưa hết thì dự kiến theo
@@ -1191,13 +1181,28 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   }, [month, campOverrides]);
 
   // Khung Insight phần 2–6 — tự sinh từ đúng các số phần đó đang hiện (lib/report/sectionInsights.ts).
-  const sectionInsight: Record<InsightSection, SectionInsight | null> = {
-    shop: shopInsight({ months: last4Months, mixes: channelMixes, agencyGmv: monthlyStats.map((x) => x.stats.gmv), shopCur, shopPrev: shopPrevSame, windowLabel: cmp.label, control }),
-    why: whyInsight(livePrevStats, liveCurStats, { groups: dayGroups, mixRate, giftLine: giftLineText }),
+  const sectionInsightRaw: Record<InsightSection, SectionInsight | null> = {
+    shop: shopInsight({
+      months: last4Months,
+      mixes: channelMixes,
+      agencyGmv: trendStats.map((x) => x.stats.gmv),
+      labels: trendDay ? last4Months.map(trendColLabel) : undefined,
+      shopCur,
+      shopPrev: shopPrevSame,
+      windowLabel: cmp.label,
+      control
+    }),
+    why: whyInsight(livePrevStats, liveCurStats, { groups: dayGroups, mixRate }),
     people: peopleInsight(hostInsight.rows, reliability),
     products: productsInsight(skuMoveData, topPromo?.items?.[0] ?? null, giftNote),
     context: contextInsight(campDetailRows, slotRows)
   };
+  // Việc cần làm của từng phần gom về "Việc agency làm tháng sau" — khung Insight tự sinh không nói lại.
+  const controlOpsGroup = controlOps ? (controlOps.key as "daily" | "camp") : null;
+  const sectionSteps = sectionNextSteps(sectionInsightRaw, controlOpsGroup);
+  const sectionInsight = Object.fromEntries(
+    Object.entries(sectionInsightRaw).map(([k, v]) => [k, v ? { ...v, action: null } : null])
+  ) as Record<InsightSection, SectionInsight | null>;
   const shownInsight = (key: InsightSection) => {
     const note = monthlyReportRow?.sectionNotes?.[key];
     return note ? parseInsightText(note.text) : sectionInsight[key];
@@ -1225,9 +1230,10 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     nextPlan,
     shopKpi,
     controlLine: controlLine(control),
-    controlOpsGroup: controlOps ? (controlOps.key as "daily" | "camp") : null,
+    controlOpsGroup,
     dailyGap: dailyGapValue != null && dailyGapText ? { line: dailyGapText, value: dailyGapValue } : null,
-    giftLine: giftLineText
+    giftLine: giftLineText,
+    sectionSteps
   };
   const autoSummaryLines = autoSummary(narrativeInput);
   const autoNextLines = autoNextSteps(narrativeInput);
@@ -1364,9 +1370,11 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
           rows: control.map((r) => ({
             "Nhóm ngày": controlLabel(r.key),
             "Số ngày": r.days,
-            "LIVE GMV agency kỳ trước": n(r.livePrev),
-            "LIVE GMV agency kỳ này": n(r.liveCur),
+            "LIVE GMV agency (ca) kỳ trước": n(r.livePrev),
+            "LIVE GMV agency (ca) kỳ này": n(r.liveCur),
             "± Live agency (%)": n(r.liveChg),
+            "Live tài khoản shop (Shop Analytics) kỳ trước": n(r.shopLivePrev),
+            "Live tài khoản shop (Shop Analytics) kỳ này": n(r.shopLiveCur),
             "Phần còn lại kỳ trước": n(r.restPrev),
             "Phần còn lại kỳ này": n(r.restCur),
             "± Phần còn lại (%)": n(r.restChg),
@@ -1379,13 +1387,13 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         {
           name: "2 Sales Channel",
           rows: channelMixes.map((c, idx) => ({
-            "Tháng": last4Months[idx],
+            "Kỳ": trendColLabel(last4Months[idx]),
             "Total GMV": n(c?.shopGmv),
-            "LIVE GMV (agency)": n(monthlyStats[idx].stats.gmv),
-            "Seller LIVE": n(c?.liveLinked),
+            "LIVE GMV (agency)": n(trendStats[idx].stats.gmv),
+            "Seller LIVE (cả tài khoản shop)": n(c?.liveLinked),
             "Affiliate LIVE": n(c?.affiliate),
             "Video": n(c?.video),
-            "Product card": n(c?.card),
+            [trendDay ? "Product card (phần còn lại)" : "Product card"]: n(c?.card),
             "Refund rate (%)": n(c?.refundRate)
           }))
         },
@@ -1536,7 +1544,6 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
       </span>
     );
   // Dấu trừ chuẩn "−" và làm tròn nghìn đồng cho số tiền nhỏ trong câu (fmtVndShort in "-").
-  const signedMoney = (v: number) => `${v >= 0 ? "+" : "−"}${fmtVndShort(Math.round(Math.abs(v) / 1000) * 1000)}`;
   const rowStyle = (idx: number) => ({ borderBottom: `1px solid ${PAL.line}`, background: idx % 2 ? `${PAL.panel2}55` : "transparent" });
   const warnBox = (children: React.ReactNode) => (
     <div className="flex items-start gap-2 text-[11px] rounded-xl p-2.5" style={{ background: "#2a2410", border: `1px solid ${PAL.gold}55`, color: PAL.gold }}>
@@ -1743,8 +1750,13 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                   })}
                 </ReportTable>
                 <p className="text-[11px] mt-2" style={{ color: PAL.muted }}>
-                  Live agency ở bảng này là cột "Linked account LIVE-attributed GMV" của Shop Analytics — cùng nguồn với phần còn lại để so công bằng
-                  (lệch nhẹ với LIVE GMV tính từ ca). Rê chuột lên % để xem số tiền. CVR shop = Orders ÷ lượt vào shop.
+                  Live agency = GMV các ca có số trong app (cùng số với phần 1 và phần 6). Phần còn lại = {METRIC.totalGmv} − mọi live trên tài khoản shop
+                  ("Linked account LIVE-attributed GMV" của Shop Analytics).
+                  {liveOutsideAgency != null && Math.abs(liveOutsideAgency) >= 1_000_000 &&
+                    (liveOutsideAgency > 0
+                      ? ` Live trên tài khoản shop ngoài ca agency kỳ này: ${fmtVndShort(liveOutsideAgency)} — không tính vào vế nào.`
+                      : ` Shop Analytics ghi live tài khoản shop thấp hơn ca agency ${fmtVndShort(-liveOutsideAgency)} kỳ này.`)}{" "}
+                  Rê chuột lên % để xem số tiền. CVR shop = Orders ÷ lượt vào shop.
                 </p>
               </Panel>
             )}
@@ -1794,13 +1806,17 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             {channelMixes.every((c) => !c) ? (
               <p className="text-sm py-4" style={{ color: PAL.muted }}>Chưa có file Shop Analytics cho các tháng này ở Dữ Liệu Gốc.</p>
             ) : (
-              <Panel title="Cơ cấu Total GMV theo kênh" icon={<PieChartIcon className="w-4 h-4" />} sub="4 tháng gần nhất — tỷ trọng trên tổng shop">
+              <Panel
+                title="Cơ cấu Total GMV theo kênh"
+                icon={<PieChartIcon className="w-4 h-4" />}
+                sub={`4 tháng gần nhất — tỷ trọng trên tổng shop${trendDay ? ` · mọi tháng cắt 1–${trendDay} để so cùng số ngày` : ""}`}
+              >
                 <div style={{ height: 200 }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={channelChartData} layout="vertical" stackOffset="expand" margin={{ left: 4, right: 12 }}>
                       <CartesianGrid stroke={PAL.line} horizontal={false} />
                       <XAxis type="number" stroke={PAL.muted} fontSize={10} tickFormatter={(v) => `${Math.round(v * 100)}%`} />
-                      <YAxis type="category" dataKey="label" stroke={PAL.muted} fontSize={11} width={52} />
+                      <YAxis type="category" dataKey="label" stroke={PAL.muted} fontSize={11} width={trendDay ? 64 : 52} />
                       <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => fmtVndShort(chartNum(v))} />
                       {CHANNELS.map((c) => (
                         <Bar key={c.key} dataKey={c.key} name={c.label} stackId="ch" fill={c.color} stroke={PAL.panel} strokeWidth={2} />
@@ -1811,19 +1827,20 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                 <ChartLegend items={CHANNELS.map((c) => [c.label, c.color])} />
                 <details className="mt-3">
                   <summary className="cursor-pointer text-[11px] font-bold" style={{ color: PAL.gold }}>
-                    Chi tiết theo tháng{cmp.partial ? ` (tháng ${month.slice(5)} tính tới ${cmp.curEnd.slice(8)}/${month.slice(5)})` : ""}
+                    Chi tiết theo tháng{trendDay ? ` (mọi tháng cắt 1–${trendDay})` : ""}
                   </summary>
                   <div className="mt-2">
-                    <ReportTable head={["Tháng", "Total GMV", "LIVE GMV (agency)", "Tỷ trọng agency", "Affiliate LIVE", "Video", "Product card", "Refund rate"]}>
+                    <ReportTable head={[trendDay ? "Kỳ" : "Tháng", "Total GMV", "Tỷ trọng agency", "Affiliate LIVE", "Video", "Product card", "Refund rate"]}>
                       {channelMixes.map((c, idx) => {
                         const m = last4Months[idx];
-                        const agencyLive = monthlyStats[idx].stats.gmv;
+                        const agencyLive = trendStats[idx].stats.gmv;
                         return (
                           <tr key={m} style={rowStyle(idx)}>
-                            <td className="py-2 px-3 font-semibold" style={{ color: PAL.cream }}>{m.slice(5)}/{m.slice(2, 4)}</td>
+                            <td className="py-2 px-3 font-semibold whitespace-nowrap" style={{ color: PAL.cream }}>{trendColLabel(m)}</td>
                             <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>{c ? fmtVndShort(c.shopGmv) : "—"}</td>
-                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{agencyLive > 0 ? fmtVndShort(agencyLive) : "—"}</td>
-                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.gold }}>{c && agencyLive > 0 ? fmtPct((agencyLive / c.shopGmv) * 100) : "—"}</td>
+                            <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.gold }} title={agencyLive > 0 ? `${METRIC.liveGmv} agency ${fmtVndShort(agencyLive)}` : undefined}>
+                              {c && agencyLive > 0 ? fmtPct((agencyLive / c.shopGmv) * 100) : "—"}
+                            </td>
                             <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{c ? fmtVndShort(c.affiliate) : "—"}</td>
                             <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{c ? fmtVndShort(c.video) : "—"}</td>
                             <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{c?.card != null ? fmtVndShort(c.card) : "—"}</td>
@@ -1833,8 +1850,9 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                       })}
                     </ReportTable>
                     <p className="text-[11px] mt-2" style={{ color: PAL.muted }}>
-                      LIVE GMV (agency) = tổng các ca có số trong app; Affiliate LIVE = GMV từ LIVE của creator affiliate (Shop Analytics). Refund rate = Refunds ÷ GMV
-                      của cả shop trong kỳ.
+                      Tỷ trọng agency = LIVE GMV các ca có số trong app ÷ Total GMV (số tiền ở bảng Xu hướng 4 tháng, phần 3); Affiliate LIVE = GMV từ LIVE của
+                      creator affiliate (Shop Analytics). Refund rate = Refunds ÷ GMV của cả shop trong kỳ.
+                      {trendDay && " Product card chỉ có tổng cả tháng trong file Sản Phẩm nên khi cắt kỳ là phần còn lại của Total GMV sau 3 kênh Shop Analytics."}
                       {canManage && channelMixes.some((c) => c?.coverage != null && Math.abs(c.coverage - 100) > 2) && " Có tháng 4 kênh lệch tổng shop quá 2% — kiểm lại file Sản Phẩm / Shop Analytics của tháng đó."}
                     </p>
                   </div>
@@ -1871,12 +1889,6 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                     </tr>
                   ))}
                 </ReportTable>
-                {mixRate && (
-                  <p className="text-[11px] mt-2" style={{ color: PAL.muted }}>
-                    Tách ΔGMV/giờ ({signedMoney(mixRate.delta)}): do cơ cấu giờ live giữa các loại ngày {signedMoney(mixRate.mix)}, do hiệu suất trong từng loại
-                    ngày {signedMoney(mixRate.rate)}.
-                  </p>
-                )}
               </Panel>
             )}
             {funnel && (
@@ -2157,26 +2169,9 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             </Panel>
             <details className="rounded-xl" style={{ background: PAL.panel, border: `1px solid ${PAL.line}` }}>
               <summary className="cursor-pointer px-4 py-3 text-xs font-bold" style={{ color: PAL.gold }}>
-                Diễn biến theo ngày, phân bố GMV/giờ & Top 10 phiên live
+                Phân bố GMV/giờ từng phiên & Top 10 phiên live
               </summary>
               <div className="p-4 pt-0 space-y-4">
-                {dailyPerf?.hasAnyBatch && dailyChartData.length > 0 && (
-                  <Panel title="GMV theo ngày" icon={<BarChart3 className="w-4 h-4" />} sub="Nguồn: Live Performance Core Stats">
-                    <div style={{ height: 240 }}>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart data={dailyChartData}>
-                          <CartesianGrid stroke={PAL.line} vertical={false} />
-                          <XAxis dataKey="label" stroke={PAL.muted} fontSize={10} interval={2} />
-                          <YAxis stroke={PAL.muted} fontSize={10} tickFormatter={(v) => fmtVndShort(v)} width={70} />
-                          <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => fmtVndShort(chartNum(v))} />
-                          <Area type="monotone" dataKey="gmvLiveSession" name="Direct GMV" stroke={PAL.gold} fill={`${PAL.gold}33`} strokeWidth={2} />
-                          <Line type="monotone" dataKey="gmvIndirect" name="Indirect GMV" stroke={PAL.blue} strokeWidth={2} strokeDasharray="4 3" dot={false} />
-                        </ComposedChart>
-                      </ResponsiveContainer>
-                    </div>
-                    <ChartLegend items={[["Direct GMV", PAL.gold], ["Indirect GMV", PAL.blue]]} />
-                  </Panel>
-                )}
                 {spread && (
                   <Panel title="Phân bố GMV/giờ từng phiên" icon={<Activity className="w-4 h-4" />} sub={`${spread.count} phiên · ${cmp.label.split(" so với")[0]} · mỗi chấm là một phiên (bỏ phiên dưới 6 phút)`}>
                     <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 mb-3">

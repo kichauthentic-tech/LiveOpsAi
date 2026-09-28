@@ -451,6 +451,8 @@ export interface NarrativeInput {
   dailyGap?: { line: string; value: number } | null;
   /** Câu quà tặng (deepAnalysis.giftLine). */
   giftLine?: string | null;
+  /** Việc cần làm của khung Insight phần 2–6 đã bỏ trùng (sectionInsights.sectionNextSteps). */
+  sectionSteps?: string[];
 }
 
 const money = (v: number) => fmtVndShort(v);
@@ -553,10 +555,8 @@ export function autoNextSteps(i: NarrativeInput): string[] {
   const hChg = pctChange(i.livePrev.hours, i.liveCur.hours);
   const ghChg = pctChange(i.livePrev.gmvPerHour, i.liveCur.gmvPerHour);
   if (hChg != null && ghChg != null && hChg > 5 && ghChg <= -10) out.push(`Tăng giờ live nhưng GMV/giờ giảm — ưu tiên dồn giờ vào khung giờ và ngày Campaign có GMV/giờ cao nhất thay vì kéo dài ca.`);
-  if (i.nextPlan) {
-    out.push(`Tháng ${i.nextMonth.slice(5)}: target ${money(i.nextPlan.targetGmv)} với ${i.nextPlan.slotCount} ca kế hoạch${i.nextPlan.status === "locked" ? " (đã chốt)" : " (đang lên lịch)"}.`);
-  } else {
-    out.push(`Chốt target và lịch live tháng ${i.nextMonth.slice(5)}.`);
-  }
+  for (const t of i.sectionSteps ?? []) if (!out.includes(t)) out.push(t);
+  // Có kế hoạch thì target + số ca đã ở 2 ô ngay dưới danh sách — không viết lại thành 1 việc.
+  if (!i.nextPlan) out.push(`Chốt target và lịch live tháng ${i.nextMonth.slice(5)}.`);
   return out;
 }
