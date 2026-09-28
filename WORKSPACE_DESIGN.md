@@ -2,7 +2,7 @@
 
 ## CẦN LÀM NGAY khi mở phiên mới (cập nhật 2026-09-24)
 
-> **MỚI 2026-09-29 — Key Metrics 18 chỉ số trên MỌI report (không migration, CHƯA commit).** Một module
+> **MỚI 2026-09-29 — Key Metrics 18 chỉ số trên MỌI report (không migration, commit 7996080 đã push `main`).** Một module
 > [keyMetrics.ts](src/lib/report/keyMetrics.ts) (bộ đếm + công thức + danh sách `KEY_METRICS` + định dạng + cột Excel) thay 5 bản
 > cộng số riêng. Áp cho Report Tháng (Xu hướng 4 tháng, bảng Host, sheet Excel), Report Tuần, Dashboard brand, cửa sổ ca, Hiệu Suất
 > Host, Bản Tin CEO. Xem `## Key Metrics 18 chỉ số`.
@@ -1702,7 +1702,7 @@ trong DB đang rỗng nên mọi câu insight tự sinh ra chữ mới ngay; đo
 **Còn lại / chưa đụng:** màn thao tác nội bộ giữ từ vận hành tiếng Việt khi không phải tên chỉ số ("Ca", "Giờ" = khung giờ, "Số
 Ca" ở lịch/đăng ký, engine AI Training); Talent Pool trường cũ `cvrAvg`/`ctrAvg` (nhập tay, chưa rõ định nghĩa) chỉ đổi nhãn nhẹ.
 
-## Key Metrics 18 chỉ số — XONG 2026-09-29 (không migration, chưa commit)
+## Key Metrics 18 chỉ số — XONG + VERIFY 2026-09-29 (không migration, commit 7996080 đã push `main`)
 
 **User chốt 2026-09-29:** report nào có bộ chỉ số live đều phải đủ 18 chỉ số, đúng thứ tự: GMV · Items sold · Orders · UPT · ERR ·
 Avg. price · Product impressions · Product clicks · Product CTR · LIVE CTR · CTOR · Avg. view · Views · LIVE impressions · Giờ live ·
