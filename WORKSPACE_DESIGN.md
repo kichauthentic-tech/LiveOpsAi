@@ -2,7 +2,7 @@
 
 ## CẦN LÀM NGAY khi mở phiên mới (cập nhật 2026-09-24)
 
-> **MỚI 2026-09-29 — Report Tháng bỏ trùng lặp: 11 mục (A1–A4, B1–B6, C2) theo đề xuất user duyệt (không migration, CHƯA commit).**
+> **MỚI 2026-09-29 — Report Tháng bỏ trùng lặp: 11 mục (A1–A4, B1–B6, C2) theo đề xuất user duyệt (không migration, commit 40187b5 đã push `main`).**
 > Đo CROCS T9: câu đối chứng lặp 5 chỗ, câu quà tặng 4 chỗ, "live agency giảm" có 2 số (−18,4% phần 1 / −15% phần 2), bảng 4 tháng
 > phần 2 đặt T8 trọn tháng cạnh T9 22 ngày, biểu đồ "GMV theo ngày" phần 6 dùng nguồn thứ ba (Core Stats 3,87B vs ca 3,41B, 1–21/09).
 > Bảng đối chứng giờ lấy cột live TỪ CA (Report + Dashboard brand), cơ cấu kênh cắt 1..N, việc cần làm gom về phần 7. **Report T8 đã
@@ -1692,7 +1692,7 @@ trong DB đang rỗng nên mọi câu insight tự sinh ra chữ mới ngay; đo
 **Còn lại / chưa đụng:** màn thao tác nội bộ giữ từ vận hành tiếng Việt khi không phải tên chỉ số ("Ca", "Giờ" = khung giờ, "Số
 Ca" ở lịch/đăng ký, engine AI Training); Talent Pool trường cũ `cvrAvg`/`ctrAvg` (nhập tay, chưa rõ định nghĩa) chỉ đổi nhãn nhẹ.
 
-## Report Tháng bỏ trùng lặp — XONG + VERIFY 2026-09-29 (không migration, CHƯA commit)
+## Report Tháng bỏ trùng lặp — XONG + VERIFY 2026-09-29 (không migration, commit 40187b5 đã push `main`)
 
 **Vì sao.** User hỏi "có bị trùng gì không" → đọc toàn bộ report CROCS T9 trên browser + đo bản chụp: 4 chỗ cùng câu hỏi ra số khác
 nhau, 6 câu chép nguyên văn. User duyệt "làm hết theo đề xuất".
