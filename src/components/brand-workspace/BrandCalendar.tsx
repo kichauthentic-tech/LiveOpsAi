@@ -21,6 +21,8 @@ import {
   buildSlotMeta
 } from "../ui/SessionEventCard";
 import { getBrandTheme } from "../../lib/brandTheme";
+import { SESSION_STATUS_LABEL_VI } from "../../lib/sessionStatusUi";
+import { metricsHiddenFor } from "../../lib/sessionLedger";
 
 interface BrandCalendarProps {
   brandId: string;
@@ -483,14 +485,20 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
                   onClick={() => setOpenSessionId(s.id)}
                   className={`flex flex-wrap items-center gap-2 text-[11px] text-[var(--text-faint)] cursor-pointer hover:text-[var(--text)]`}
                 >
-                  <EventPill tier={STATUS_TIER[s.status]} label={s.status} />
+                  <EventPill tier={STATUS_TIER[s.status]} label={SESSION_STATUS_LABEL_VI[s.status]} />
                   <span>
                     {s.startTime}-{s.endTime}
                   </span>
                   <span>Host: {s.hostName}</span>
                   {s.coHostName && <span>Trợ live: {s.coHostName}</span>}
-                  <span>Studio: {s.studioName}</span>
-                  <span className="ml-auto font-bold text-[var(--success)]">{fmtVndShort(s.actualGmv || 0)}</span>
+                  {/* Audit 2026-09-28 mục 9: chế độ Tháng (mặc định) từng in Studio + GMV cho role brand, GMV tháng chưa
+                      phát hành bị view 0107 che thành 0 nên hiện "0" — thẻ tuần/ngày, Cửa sổ ca, Sổ Ca đều giấu. */}
+                  {!brandViewer && s.studioName && <span>Studio: {s.studioName}</span>}
+                  {s.status === "Completed" && (
+                    <span className="ml-auto font-bold text-[var(--success)]">
+                      {metricsHiddenFor(s, currentRole ?? "brand") ? <span className="font-normal text-[var(--text-faint)]">chưa phát hành</span> : fmtVndShort(s.actualGmv || 0)}
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
@@ -598,6 +606,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
           allSessions={sessions}
           studios={canManage ? studios : undefined}
           talents={canManage ? talents : undefined}
+          shiftSlots={shiftSlots}
           onClose={() => setOpenSessionId(null)}
           onSubmitSessionReport={onSubmitSessionReport}
           onSessionSnapshotApplied={onSessionSnapshotApplied}

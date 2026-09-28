@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { LiveSession, ShiftSlot, ShiftRegistration, Studio, Talent, Brand, PromoScheme, UserRole, BrandStudio, AuditLogEntry } from "../types";
 import { schemesForDate } from "../lib/schemeUtils";
 
-import { dateTimeRangesOverlap } from "../lib/dateUtils";
+import { studioClash, studioClashLabel } from "../lib/scheduling/conflicts";
 import { CAMPAIGN_DAY_STYLES, getCampaignDayInfo } from "../lib/campaignDays";
 import { BrandLogo } from "./ui/BrandLogo";
 import { getBrandTheme } from "../lib/brandTheme";
@@ -173,15 +173,10 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
       setDraggedSessionId(null);
       return;
     }
-    const conflict = sessions.find(
-      (s) =>
-        s.id !== sessionId &&
-        s.studioId === targetStudio.id &&
-        dateTimeRangesOverlap(s, session) &&
-        s.status !== "Cancelled"
-    );
+    // Luật chung (lib/scheduling/conflicts.ts): ca chờ đăng ký còn mở cũng giữ phòng (audit 2026-09-28 mục 8).
+    const conflict = studioClash(sessions, shiftSlots, { ...session, studioId: targetStudio.id }, { excludeSessionId: sessionId });
     if (conflict) {
-      showToast(`Không thể chuyển! Phòng ${targetStudio.name} đã có "${conflict.brandName}" ${conflict.startTime}–${conflict.endTime}.`, "warning");
+      showToast(`Không thể chuyển! Phòng ${targetStudio.name} đã có ${studioClashLabel(conflict)}.`, "warning");
       setDraggedSessionId(null);
       return;
     }
@@ -1300,6 +1295,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
           allSessions={sessions}
           studios={studios}
           talents={talents}
+          shiftSlots={shiftSlots}
           onClose={() => setSelectedSessionDetail(null)}
           onSubmitSessionReport={onSubmitSessionReport}
           onSessionSnapshotApplied={onSessionSnapshotApplied}

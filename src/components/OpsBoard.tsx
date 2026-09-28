@@ -296,6 +296,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
           allSessions={sessions}
           studios={mode === "ops" ? studios : undefined}
           talents={mode === "ops" ? talents : undefined}
+          shiftSlots={shiftSlots}
           onClose={() => setOpenId(null)}
           onSubmitSessionReport={onSubmitSessionReport}
           onSessionSnapshotApplied={onSessionSnapshotApplied}

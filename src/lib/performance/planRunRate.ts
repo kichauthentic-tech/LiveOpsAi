@@ -2,7 +2,7 @@ import { BrandMonthPlanSlot, LiveSession, ShiftSlot } from "../../types";
 import { addDays, eachDay } from "../dateUtils";
 import { CampDayBucket, CampOverrides, CAMP_DAY_BUCKET_ORDER, resolveCampBucketType } from "../campaignDays";
 import { isCountable } from "./hostPerformance";
-import { lastDataDate, monthEndOf } from "./ceoBrief";
+import { lastDataDate, monthEndOf, MonthOutlook } from "./ceoBrief";
 
 // Run-rate theo PLAN BAN ĐẦU — luật user chốt 2026-09-28, MỘT hàm cho mọi màn (Dashboard brand, Report
 // Tháng/Tuần, Hỗ Trợ Vận Hành cũ). Trước đó có 4 cách tính khác nhau và ra 4 số khác nhau.
@@ -167,3 +167,28 @@ export function planRunRate(
     actualByDate
   };
 }
+
+export interface MonthEndProjection {
+  value: number | null;
+  /** gmv_per_hour = giờ ca còn trong lịch × GMV/giờ 28 ngày (cách Bản Tin CEO, backtest T7–T8 lệch −7…+8%);
+   *  run_rate = brand chưa có ca nào trong 28 ngày ⇒ phần target còn lại × run-rate hiện tại; none = chưa có gì để chiếu. */
+  method: "gmv_per_hour" | "run_rate" | "none";
+}
+
+/**
+ * Dự kiến cuối tháng — MỘT công thức cho Dashboard brand, khối Hỗ Trợ Vận Hành, Report Tháng/Tuần và Bản Tin CEO
+ * (audit 2026-09-28 mục 3: cùng trang Dashboard từng hiện "Nếu giữ run-rate" và "Dự kiến cuối tháng" ra hai số).
+ * `outlook` = monthOutlook của đúng brand + tháng. Không có GMV/giờ 28 ngày thì monthOutlook chỉ còn "số đã có"
+ * (lỗi E2E #4: "Dự kiến 0 · Thiếu 100%") — khi đó rơi về giữ run-rate, và nói rõ đang dùng cách nào.
+ */
+export function projectMonthEnd(rr: PlanRunRate | null, outlook: Pick<MonthOutlook, "projected" | "projectionMethod"> | null): MonthEndProjection {
+  if (outlook && outlook.projectionMethod === "gmv_per_hour") return { value: outlook.projected, method: "gmv_per_hour" };
+  if (rr?.total.keepPace != null) return { value: rr.total.keepPace, method: "run_rate" };
+  return { value: null, method: "none" };
+}
+
+export const PROJECTION_METHOD_LABEL: Record<MonthEndProjection["method"], string> = {
+  gmv_per_hour: "giờ các ca còn trong lịch × GMV/giờ 28 ngày gần nhất (cùng cách Bản Tin CEO)",
+  run_rate: "chưa có GMV/giờ 28 ngày ⇒ phần target còn lại × run-rate hiện tại",
+  none: "chưa có số để chiếu"
+};

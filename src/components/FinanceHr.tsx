@@ -10,7 +10,7 @@ import {
   BrandPlatformRateHistoryEntry
 } from "../types";
 import { DollarSign, TrendingUp, CheckCircle2, XCircle, Clock } from "lucide-react";
-import { PNL_MISSING_LABEL, PnlMissingInput, computeSessionPnl } from "../lib/pnl";
+import { PNL_MISSING_LABEL, PnlMissingInput, computeSessionPnl, isPnlSession } from "../lib/pnl";
 import { DataSourceBadge } from "./common/DataSourceBadge";
 import { dataQuality } from "../lib/performance/hostPerformance";
 import { errorMessage } from "../lib/errorMessage";
@@ -90,8 +90,14 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
   const completedSessions = useMemo(
     () =>
       sessions
-        .filter((s) => s.status === "Completed" && !s.isBackfill && s.date.startsWith(month))
+        .filter((s) => isPnlSession(s, { includeBackfill: false }) && s.date.startsWith(month))
         .sort((a, b) => (a.date < b.date ? 1 : -1)),
+    [sessions, month]
+  );
+  // Ca nạp bù cùng tháng: không tính ở đây nhưng PHẢI nói ra — trước audit 2026-09-28 tháng 9 (47 ca, toàn nạp bù)
+  // hiện "Không có phiên Completed nào" trong khi Bản Tin CEO (có tính ca nạp bù) báo 47 ca.
+  const backfillCount = useMemo(
+    () => sessions.filter((s) => isPnlSession(s, { includeBackfill: true }) && s.isBackfill && s.date.startsWith(month)).length,
     [sessions, month]
   );
   // Độ tin cậy của con số tiền: tổng P&L cộng từ GMV, mà GMV thì có 3 bậc nguồn. Màn tiền phải
@@ -191,7 +197,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
           </div>
           <div className="text-right text-xs bg-[var(--surface-elevated)]/50 border border-[var(--border)] rounded-xl px-4 py-2">
             <div className="text-[var(--text-muted)]">
-              Tổng {rows.length} phiên · Net Profit
+              Tổng {rows.length} phiên{backfillCount > 0 && rows.length > 0 ? ` (không tính ${backfillCount} ca nạp bù)` : ""} · Net Profit
               {missingSummary.rowsAffected > 0 && (
                 <span className="text-amber-300 font-bold"> · {rows.length - missingSummary.rowsAffected}/{rows.length} phiên đủ rate</span>
               )}
@@ -233,7 +239,11 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
         )}
 
         {rows.length === 0 ? (
-          <p className="text-xs text-[var(--text-muted)] italic py-6 text-center">Không có phiên "Completed" nào trong tháng {month} để tính P&L.</p>
+          <p className="text-xs text-[var(--text-muted)] italic py-6 text-center">
+            {backfillCount > 0
+              ? `Tháng ${month} chỉ có ${backfillCount} ca nạp bù từ file — Finance & P&L không tính ca nạp bù (rate card tháng đó không chuẩn). Bản Tin CEO có tính các ca này.`
+              : `Không có phiên "Completed" nào trong tháng ${month} để tính P&L.`}
+          </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs">

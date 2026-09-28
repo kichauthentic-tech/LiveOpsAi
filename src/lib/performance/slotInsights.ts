@@ -333,12 +333,15 @@ export function planCheck(plan: Pick<BrandMonthPlanSlot, "date" | "startTime" | 
   if (through) {
     const from = addDays(through, -27);
     const recent = sessions.filter((s) => valid(s) && s.date >= from && s.date <= through);
-    const h = recent.reduce((a, s) => a + sessionHours(s), 0);
+    // GMV trên GIỜ KẾ HOẠCH — vì nó được nhân với giờ kế hoạch của lưới tháng sau (audit 2026-09-28 mục 7). Chia cho
+    // giờ live thật rồi nhân giờ kế hoạch là trộn hai đơn vị: ca live ngắn hơn lịch ⇒ dự kiến bị thổi lên.
+    // Cùng cách với dự phóng Bản Tin CEO (projectionRates).
+    const h = recent.reduce((a, s) => a + sessionDurationHours(s.startTime, s.endTime), 0);
     recentPerHour = h > 0 ? recent.reduce((a, s) => a + s.actualGmv, 0) / h : null;
     if (model && recentPerHour) {
       const rate = (camp: boolean) => {
         const xs = recent.filter((s) => (bucketOf(s.date) === "daily") !== camp);
-        const hh = xs.reduce((a, s) => a + sessionHours(s), 0);
+        const hh = xs.reduce((a, s) => a + sessionDurationHours(s.startTime, s.endTime), 0);
         return hh > 0 ? xs.reduce((a, s) => a + s.actualGmv, 0) / hh : recentPerHour!;
       };
       const m = { ...model, bucketRate: { daily: rate(false), dday: rate(true), midmonth: rate(true), payday: rate(true) } };

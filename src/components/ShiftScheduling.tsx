@@ -31,6 +31,7 @@ import {
 import { talentShortName } from "../lib/talentName";
 import { CAMPAIGN_DAY_STYLES, getCampaignDayInfo } from "../lib/campaignDays";
 import { dateTimeRangesOverlap } from "../lib/dateUtils";
+import { personClash, studioClash } from "../lib/scheduling/conflicts";
 import { CampaignDayRibbon } from "./ui/CampaignDayRibbon";
 import { PosterDayCell } from "./ui/PosterCalendarGrid";
 import { getBrandTheme } from "../lib/brandTheme";
@@ -312,14 +313,11 @@ export default function ShiftScheduling({
     let studioConflict = false;
     let hostConflict = false;
     // Chỉ ngày liền kề — xem ghi chú ở findStudioConflicts phía trên.
-    for (const day of neighborDates(date)) {
-      for (const s of sessionsByDate.get(day) ?? []) {
-        if (s.status === "Cancelled") continue;
-        if (!dateTimeRangesOverlap(s, { date, startTime: start, endTime: end })) continue;
-        if (studioId && s.studioId === studioId) studioConflict = true;
-        if (s.hostId === talentId || s.coHostId === talentId) hostConflict = true;
-      }
-    }
+    // Luật trùng chung (lib/scheduling/conflicts.ts), chạy trên ca của ngày liền kề.
+    const near = neighborDates(date).flatMap((day) => sessionsByDate.get(day) ?? []);
+    const want = { date, startTime: start, endTime: end, studioId };
+    if (studioClash(near, [], want)) studioConflict = true;
+    if (personClash(near, want, talentId || undefined)) hostConflict = true;
     return { studioConflict, hostConflict };
   };
 
@@ -1113,6 +1111,7 @@ export default function ShiftScheduling({
             allSessions={sessions}
             studios={admin ? studios : undefined}
             talents={admin ? talents : undefined}
+            shiftSlots={shiftSlots}
             onClose={() => setOpenSessionId(null)}
             onSubmitSessionReport={onSubmitSessionReport}
             onSessionSnapshotApplied={onSessionSnapshotApplied}

@@ -10,7 +10,8 @@ import { DataRawWeekSlice, addDays, eachDay, fetchDataRawWeekSlice, isoWeekNumbe
 import { getTodayDate } from "../../lib/dateUtils";
 import { byHost, filterSessions, sessionHours, splitUnassignedHost } from "../../lib/performance/hostPerformance";
 import { hasLiveNumbers, monthRunRate, monthRunRateFromPlan } from "../../lib/report/sessionsLivePerf";
-import { planRunRate } from "../../lib/performance/planRunRate";
+import { planRunRate, projectMonthEnd } from "../../lib/performance/planRunRate";
+import { lastDataDate, monthOutlook } from "../../lib/performance/ceoBrief";
 import { fetchMonthPlan } from "../../lib/db/monthPlans";
 import { MissingStep, missingSteps } from "../../lib/sessionLedger";
 import { DataSourceBadge } from "../common/DataSourceBadge";
@@ -81,7 +82,41 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
   const prevSessions = useMemo(() => inRange(prevStart, prevEnd), [sessions, brandId, prevStart, prevEnd]); // eslint-disable-line react-hooks/exhaustive-deps
   const nextSessions = useMemo(() => inRange(nextStart, nextEnd).filter((s) => s.status !== "Cancelled"), [sessions, brandId, nextStart, nextEnd]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const totals = (list: LiveSession[]) => {
+  // Run-rate tháng-tới-nay của tháng chứa cuối tuần đang xem.
+  // Tháng có Kế Hoạch Tháng đã chốt ⇒ theo plan ban đầu (planRunRate, cùng số với Dashboard brand).
+  const monthKey = weekEnd.slice(0, 7);
+  // Kế hoạch của mọi tháng mà tuần trước / tuần này / tuần tới chạm vào — target tuần và target ca chờ đăng ký
+  // lấy từ ca kế hoạch đã chốt (audit 2026-09-28 mục 4), không cộng ngược từ target các ca đang tồn tại.
+  const planMonths = useMemo(() => [...new Set([prevStart, weekStart, weekEnd, nextEnd].map((d) => d.slice(0, 7)))], [prevStart, weekStart, weekEnd, nextEnd]);
+  const [plans, setPlans] = useState<Map<string, { plan: BrandMonthPlan; slots: BrandMonthPlanSlot[] } | null>>(new Map());
+  useEffect(() => {
+    let alive = true;
+    Promise.all(planMonths.map((m) => fetchMonthPlan(brandId, m).catch(() => null))).then((rs) => {
+      if (alive) setPlans(new Map(planMonths.map((m, i) => [m, rs[i]])));
+    });
+    return () => {
+      alive = false;
+    };
+  }, [brandId, planMonths]);
+  const monthPlan = plans.get(monthKey) ?? null;
+  const lockedPlanSlots = useMemo(
+    () => [...plans.values()].flatMap((p) => (p?.plan.status === "locked" ? p.slots : [])),
+    [plans]
+  );
+  const lockedMonths = useMemo(() => new Set([...plans.entries()].filter(([, p]) => p?.plan.status === "locked").map(([m]) => m)), [plans]);
+  const planTargetByDate = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const ps of lockedPlanSlots) m.set(ps.date, (m.get(ps.date) ?? 0) + Math.max(0, ps.targetGmv || 0));
+    return m;
+  }, [lockedPlanSlots]);
+  const planTargetBySlotId = useMemo(() => new Map(lockedPlanSlots.filter((ps) => ps.slotId).map((ps) => [ps.slotId!, Math.max(0, ps.targetGmv || 0)])), [lockedPlanSlots]);
+  const through = useMemo(() => lastDataDate(sessions.filter((s) => s.brandId === brandId), today), [sessions, brandId, today]);
+  // Target một ngày: tháng có kế hoạch chốt ⇒ Σ target ca kế hoạch của ngày đó (ca huỷ GIỮ target — luật planRunRate);
+  // tháng chưa chốt ⇒ như trước, Σ target các ca chưa huỷ.
+  const targetOfDay = (d: string, daySessions: LiveSession[]) =>
+    lockedMonths.has(d.slice(0, 7)) ? planTargetByDate.get(d) ?? 0 : daySessions.filter((s) => s.status !== "Cancelled").reduce((a, s) => a + (s.targetGmv ?? 0), 0);
+
+  const totals = (list: LiveSession[], from: string, to: string) => {
     const done = list.filter(hasLiveNumbers);
     const gmv = done.reduce((a, s) => a + (s.actualGmv ?? 0), 0);
     const hours = done.reduce((a, s) => a + sessionHours(s), 0);
@@ -93,8 +128,11 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
     // (tuần 38: 50,6% ở đây vs 3,2% ở Tab 02) — audit 2026-09-21.
     const impressions = done.reduce((a, s) => a + (s.impressions ?? 0), 0);
     const productImpressions = done.reduce((a, s) => a + (s.productImpressions ?? 0), 0);
-    const target = list.filter((s) => s.status !== "Cancelled").reduce((a, s) => a + (s.targetGmv ?? 0), 0);
-    const targetDone = done.reduce((a, s) => a + (s.targetGmv ?? 0), 0);
+    // % Target = GMV ÷ target các ngày đã có số (≤ ngày cuối có số) — cùng luật run-rate tháng. Bản cũ chia cho
+    // target của riêng các ca đã có số nên ca huỷ / ca chưa có file rơi khỏi mẫu số và % đẹp hơn thực tế.
+    const days = eachDay(from, to);
+    const target = days.reduce((a, d) => a + targetOfDay(d, list.filter((s) => s.date === d)), 0);
+    const targetDone = days.filter((d) => through != null && d <= through).reduce((a, d) => a + targetOfDay(d, list.filter((s) => s.date === d)), 0);
     return {
       done: done.length,
       cancelled: list.filter((s) => s.status === "Cancelled").length,
@@ -120,26 +158,16 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
       manual: done.filter((s) => s.dataSource === "manual").length
     };
   };
-  const cur = useMemo(() => totals(weekSessions), [weekSessions]);
-  const prev = useMemo(() => totals(prevSessions), [prevSessions]);
+  const cur = useMemo(() => totals(weekSessions, weekStart, weekEnd), [weekSessions, weekStart, weekEnd, planTargetByDate, lockedMonths, through]); // eslint-disable-line react-hooks/exhaustive-deps
+  const prev = useMemo(() => totals(prevSessions, prevStart, prevEnd), [prevSessions, prevStart, prevEnd, planTargetByDate, lockedMonths, through]); // eslint-disable-line react-hooks/exhaustive-deps
   const wow = (a: number, b: number) => (b > 0 ? a / b - 1 : null);
 
-  // Run-rate tháng-tới-nay của tháng chứa cuối tuần đang xem.
-  // Tháng có Kế Hoạch Tháng đã chốt ⇒ theo plan ban đầu (planRunRate, cùng số với Dashboard brand).
-  const monthKey = weekEnd.slice(0, 7);
-  const [monthPlan, setMonthPlan] = useState<{ plan: BrandMonthPlan; slots: BrandMonthPlanSlot[] } | null>(null);
-  useEffect(() => {
-    let alive = true;
-    fetchMonthPlan(brandId, monthKey)
-      .then((p) => alive && setMonthPlan(p))
-      .catch(() => alive && setMonthPlan(null));
-    return () => {
-      alive = false;
-    };
-  }, [brandId, monthKey]);
   const monthRr = useMemo(() => {
     if (monthPlan?.plan.status === "locked" && monthPlan.plan.month === monthKey) {
-      return monthRunRateFromPlan(planRunRate(monthKey, monthPlan.slots, shiftSlots ?? [], sessions.filter((s) => s.brandId === brandId), getTodayDate(), monthPlan.plan.campRanges));
+      const bs = sessions.filter((s) => s.brandId === brandId);
+      const rr = planRunRate(monthKey, monthPlan.slots, shiftSlots ?? [], bs, getTodayDate(), monthPlan.plan.campRanges);
+      const open = (shiftSlots ?? []).filter((sl) => sl.brandId === brandId && sl.status === "open" && !sl.sessionId);
+      return monthRunRateFromPlan(rr, projectMonthEnd(rr, monthOutlook(monthKey, getTodayDate(), bs, open, null, monthPlan.plan.campRanges)));
     }
     const [y, m] = monthKey.split("-").map(Number);
     const last = new Date(y, m, 0).getDate();
@@ -151,11 +179,11 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
     () =>
       days.map((d, i) => {
         const list = weekSessions.filter((s) => s.date === d);
-        const t = totals(list);
+        const t = totals(list, d, d);
         const shop = slice?.daily.find((x) => x.date === d);
         return { date: d, dow: DOW[i], planned: list.filter((s) => s.status !== "Cancelled").length, ...t, shopGmv: shop?.gmv ?? null, shopFromLive: shop?.gmvFromLive ?? null };
       }),
-    [days, weekSessions, slice]
+    [days, weekSessions, slice, planTargetByDate, lockedMonths, through] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const topSessions = useMemo(() => weekSessions.filter(hasLiveNumbers).sort((a, b) => (b.actualGmv ?? 0) - (a.actualGmv ?? 0)).slice(0, 5), [weekSessions]);
@@ -166,7 +194,8 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
   );
   const todo = useMemo(() => weekSessions.map((s) => ({ s, missing: missingSteps(s, today) })).filter((x) => x.missing.length > 0).sort((a, b) => a.s.date.localeCompare(b.s.date)), [weekSessions, today]);
   const nextOpenSlots = useMemo(() => shiftSlots.filter((sl) => sl.brandId === brandId && sl.status === "open" && sl.date >= nextStart && sl.date <= nextEnd), [shiftSlots, brandId, nextStart, nextEnd]);
-  const nextTarget = nextSessions.reduce((a, s) => a + (s.targetGmv ?? 0), 0);
+  // Target tuần tới: cùng luật targetOfDay — ca kế hoạch chưa có người (ca chờ đăng ký) vẫn mang target của nó.
+  const nextTarget = eachDay(nextStart, nextEnd).reduce((a, d) => a + targetOfDay(d, nextSessions.filter((s) => s.date === d)), 0);
 
   // Xuất Excel — đúng 2 bảng đang hiện trên màn (Theo ngày + Host tuần này), không tính số mới.
   const { showToast } = useToast();
@@ -242,7 +271,7 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
       {/* KPI tuần */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Kpi label="LIVE GMV tuần" value={fmtVndShort(cur.gmv)} delta={wow(cur.gmv, prev.gmv)} tone={cur.gmv > 0 ? "good" : undefined} />
-        <Kpi label="Target GMV tuần" value={cur.target > 0 ? fmtVndShort(cur.target) : "—"} hint={cur.achieved !== null ? `${fmtPct(cur.achieved)} Target trên ca đã xong` : cur.target > 0 ? "chưa có ca xong" : "chưa có kế hoạch đã chốt"} tone={cur.achieved === null ? undefined : cur.achieved >= 1 ? "good" : cur.achieved >= 0.9 ? "warn" : "bad"} />
+        <Kpi label="Target GMV tuần" value={cur.target > 0 ? fmtVndShort(cur.target) : "—"} hint={cur.achieved !== null ? `${fmtPct(cur.achieved)} Target tới ngày có số${through && through < weekEnd && through >= weekStart ? ` (${fmtDay(through)})` : ""}` : cur.target > 0 ? "chưa có ca xong" : "chưa có kế hoạch đã chốt"} tone={cur.achieved === null ? undefined : cur.achieved >= 1 ? "good" : cur.achieved >= 0.9 ? "warn" : "bad"} />
         <Kpi label="Giờ live" value={fmtH(cur.hours)} delta={wow(cur.hours, prev.hours)} hint={`${cur.done} ca`} />
         <Kpi label="GMV/giờ" value={fmtVndShort(cur.gmvPerHour)} delta={wow(cur.gmvPerHour, prev.gmvPerHour)} />
         <Kpi label="Orders" value={fmtInt(cur.orders)} delta={wow(cur.orders, prev.orders)} hint={cur.aov > 0 ? `AOV ${fmtVndShort(cur.aov)}` : undefined} />
@@ -416,14 +445,14 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
         <div className="bg-[var(--surface)] rounded-2xl border border-[var(--border)] p-4 space-y-2">
           <h4 className="font-bold text-[var(--text)] text-sm">Tuần tới ({fmtDay(nextStart)} → {fmtDay(nextEnd)})</h4>
           <p className="text-[11px] text-[var(--text-muted)]">
-            {nextSessions.length} ca đã chốt{nextTarget > 0 ? ` · target ${fmtVndShort(nextTarget)}` : ""}
+            {nextSessions.length} ca đã chốt{nextTarget > 0 ? ` · target tuần ${fmtVndShort(nextTarget)}` : ""}
             {nextOpenSlots.length > 0 && <> · <span className="text-rose-300 font-bold">{nextOpenSlots.length} ca chưa có người</span></>}
           </p>
           {nextSessions.length === 0 && nextOpenSlots.length === 0 ? (
             <p className="text-xs text-[var(--text-faint)] italic flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" /> Chưa có ca nào — chốt Kế Hoạch Tháng hoặc mở ca chờ đăng ký.</p>
           ) : (
             <ul className="space-y-1 max-h-56 overflow-y-auto">
-              {[...nextSessions.map((s) => ({ key: s.id, date: s.date, time: `${s.startTime}–${s.endTime}`, who: s.hostName || "chưa gán", open: false, target: s.targetGmv ?? 0 })), ...nextOpenSlots.map((sl) => ({ key: sl.id, date: sl.date, time: `${sl.startTime}–${sl.endTime}`, who: "chờ đăng ký", open: true, target: 0 }))]
+              {[...nextSessions.map((s) => ({ key: s.id, date: s.date, time: `${s.startTime}–${s.endTime}`, who: s.hostName || "chưa gán", open: false, target: s.targetGmv ?? 0 })), ...nextOpenSlots.map((sl) => ({ key: sl.id, date: sl.date, time: `${sl.startTime}–${sl.endTime}`, who: "chờ đăng ký", open: true, target: planTargetBySlotId.get(sl.id) ?? 0 }))]
                 .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time))
                 .map((r) => (
                   <li key={r.key} className="flex items-center gap-2 text-xs">

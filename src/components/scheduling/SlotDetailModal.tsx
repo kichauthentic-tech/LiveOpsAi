@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { LiveSession, ShiftSlot, ShiftRegistration, Talent } from "../../types";
 import { X, Users, UserCheck, UserX, Check, AlertTriangle, Trash2 } from "lucide-react";
 import { dateTimeRangesOverlap } from "../../lib/dateUtils";
+import { personClash } from "../../lib/scheduling/conflicts";
 import { useToast } from "../../hooks/useToast";
 
 interface SlotDetailModalProps {
@@ -48,14 +49,9 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
   const others = talents.filter((t) => !regIds.has(t.id)).sort((a, b) => a.name.localeCompare(b.name, "vi"));
   const iAmRegistered = myTalentId ? regs.some((r) => r.talentId === myTalentId) : false;
 
-  const hostConflict =
-    !!hostId &&
-    sessions.some(
-      (s) =>
-        s.status !== "Cancelled" &&
-        dateTimeRangesOverlap(s, slot) &&
-        (s.hostId === hostId || s.coHostId === hostId)
-    );
+  // Luật trùng lịch chung (lib/scheduling/conflicts.ts) — kiểm cả Trợ live (audit 2026-09-28 mục 8: bản cũ chỉ kiểm Host).
+  const hostConflict = personClash(sessions, slot, hostId || undefined);
+  const coHostConflict = personClash(sessions, slot, coHostId || undefined);
 
   const studioConflicts = slot.studioId
     ? shiftSlots.filter(
@@ -209,7 +205,12 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
 
             {hostConflict && (
               <p className="text-[11px] text-rose-400 flex items-center gap-1">
-                <AlertTriangle className="w-3 h-3 shrink-0" /> Host đã chọn trùng lịch với 1 phiên khác cùng ngày.
+                <AlertTriangle className="w-3 h-3 shrink-0" /> Host đã chọn đang {hostConflict.hostId === hostId ? "làm Host" : "làm Trợ live"} ca {hostConflict.brandName} {hostConflict.startTime}–{hostConflict.endTime} trùng giờ.
+              </p>
+            )}
+            {coHostConflict && (
+              <p className="text-[11px] text-rose-400 flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3 shrink-0" /> Trợ live đã chọn đang {coHostConflict.hostId === coHostId ? "làm Host" : "làm Trợ live"} ca {coHostConflict.brandName} {coHostConflict.startTime}–{coHostConflict.endTime} trùng giờ.
               </p>
             )}
 

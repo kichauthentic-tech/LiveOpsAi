@@ -44,10 +44,17 @@ export function sessionHours(s: LiveSession): number {
   return sessionDurationHours(s.startTime, s.endTime);
 }
 
-// Ca chưa diễn ra hoặc bị huỷ không phản ánh hiệu suất gì.
+// "Ca có số" — MỘT định nghĩa cho mọi màn cộng hiệu suất (audit 2026-09-28 mục 6; `hasLiveNumbers` của Report là
+// bí danh của hàm này). Trước đây có 3 bản: Report đếm ca Completed đã up file dù GMV/view = 0, Hiệu Suất Host /
+// Sổ Ca / Bản Tin CEO đếm cả ca "Live Now" đang có số tạm nhưng bỏ ca đã up file mà bán 0, khối Hỗ Trợ Vận Hành
+// có luật thứ ba ⇒ cùng một tháng ra số ca, giờ, GMV/giờ khác nhau.
+//   - Chỉ ca ĐÃ XONG: ca đang live có số dở dang, cộng vào là pha GMV/giờ bằng một ca chưa hết giờ.
+//   - Có số = đã đối soát, đã up file lúc giao ca, hoặc có GMV / view. Ca đã up file mà bán 0 là kết quả thật
+//     (0), không phải "chưa có số".
+// Không dùng cho tiền (isPnlSession — ca GMV 0 chưa up file vẫn trả lương) hay giờ đã giao cho brand (isDelivered).
 export function isCountable(s: LiveSession): boolean {
-  if (s.status === "Cancelled" || s.status === "Upcoming") return false;
-  return (s.actualGmv ?? 0) > 0 || (s.totalViews ?? 0) > 0;
+  if (s.status !== "Completed") return false;
+  return s.dataSource === "tiktok_reconciled" || s.dataSource === "live_snapshot" || (s.actualGmv ?? 0) > 0 || (s.totalViews ?? 0) > 0;
 }
 
 function addTo(acc: PerfTotals, s: LiveSession): PerfTotals {

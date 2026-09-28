@@ -3,6 +3,7 @@ import { EngineParams } from "./scheduling/engineParams";
 import { CalendarEvent, DateRange, HistorySummary, SuggestResult, SuggestedSlot, cellsForWindow, estimateSlots, suggestMonthPlan } from "./scheduling/suggestEngine";
 import { sessionHours } from "./performance/hostPerformance";
 import { sessionDurationHours } from "./pnl";
+import type { PlanRunRate } from "./performance/planRunRate";
 
 // Module hỗ trợ vận hành (2026-09-21, user chốt): tầng "target vận hành" TÁCH khỏi target cam kết của
 // Kế Hoạch Tháng đã chốt. Không ghi gì vào DB, không đọc số realtime — chỉ tính từ ca đã xong + kế
@@ -60,32 +61,13 @@ export interface MonthTracking {
   upliftPct: number | null; // phần còn lại phải nhỉnh hơn dự kiến bao nhiêu % (null = không có ca còn lại)
 }
 
-const isDone = (s?: LiveSession) => !!s && s.status === "Completed" && (s.actualGmv > 0 || s.dataSource !== "manual");
-
-export function trackMonth(
-  planSlots: BrandMonthPlanSlot[],
-  shiftSlots: ShiftSlot[],
-  sessions: LiveSession[],
-  history: HistorySummary,
-  ctx: EstimateCtx,
-  // Toàn bộ ca của ĐÚNG brand + ĐÚNG tháng đang xem. Dùng để tìm ca có số nằm ngoài lưới kế hoạch:
-  // đường `plan_slot → shift_slot.session_id → live_session` không bao giờ thấy chúng, nên trước
-  // bản này màn Hỗ Trợ Vận Hành báo "thực tế 0đ" cho tháng đã chạy ra tiền và đề xuất thêm ca để
-  // bù khoản đã bù xong. Bỏ trống = giữ hành vi cũ (chỉ đếm ca trong kế hoạch).
-  brandMonthSessions: LiveSession[] = []
-): MonthTracking {
-  const slotById = new Map(shiftSlots.map((sl) => [sl.id, sl]));
-  const sessionById = new Map(sessions.map((s) => [s.id, s]));
+// Trạng thái từng ca kế hoạch lấy THẲNG từ planRunRate (audit 2026-09-28 mục 3). Trước đây hàm này tự nối
+// plan → shift_slot → ca với định nghĩa "xong" riêng (`isDone`) và coi ca kế hoạch mất shift_slot là "huỷ", trong
+// khi planRunRate khớp ngày + giờ — cùng trang Dashboard ra hai con số "còn N ca".
+export function trackMonth(rr: PlanRunRate, history: HistorySummary, ctx: EstimateCtx): MonthTracking {
+  const planSlots = rr.slots.map((t) => t.planSlot);
   const forecasts = history.brandGmvPerHour > 0 ? estimateSlots(history, planSlots, ctx) : planSlots.map((ps) => ps.expectedGmv ?? 0);
-  const slots: TrackedSlot[] = planSlots.map((ps, i) => {
-    const slot = ps.slotId ? slotById.get(ps.slotId) : undefined;
-    const session = slot?.sessionId ? sessionById.get(slot.sessionId) : undefined;
-    let state: TrackedSlotState = "pending";
-    if (!slot || slot.status === "cancelled" || session?.status === "Cancelled") state = "cancelled";
-    else if (isDone(session)) state = "done";
-    else if (session?.status === "Completed") state = "no_data";
-    return { planSlot: ps, slot, session, state, target: ps.targetGmv, forecast: forecasts[i] ?? 0, actual: session?.actualGmv ?? 0 };
-  });
+  const slots: TrackedSlot[] = rr.slots.map((t, i) => ({ planSlot: t.planSlot, session: t.session, state: t.state, target: t.target, forecast: forecasts[i] ?? 0, actual: t.actual }));
   const by = (st: TrackedSlotState) => slots.filter((t) => t.state === st);
   const done = by("done");
   const pending = [...by("pending"), ...by("no_data")];
@@ -102,11 +84,9 @@ export function trackMonth(
   // báo × k. k chỉ tin khi đã ≥ 3 ca xong.
   const forecastPending = forecastPendingRaw > 0 ? forecastPendingRaw * (realityFactor ?? 1) : targetPending * (runRate ?? 1);
 
-  // Ca ngoài kế hoạch: có số, không huỷ, và không phải ca mà một dòng kế hoạch nào đang trỏ tới.
-  // Khoá theo session id chứ không theo ngày/giờ — ca thay thế sau khi huỷ thường lệch giờ.
-  const plannedSessionIds = new Set(slots.map((t) => t.session?.id).filter((id): id is string => !!id));
-  const offPlanSessions = brandMonthSessions.filter((s) => !plannedSessionIds.has(s.id) && isDone(s));
-  const offPlanActual = offPlanSessions.reduce((a, s) => a + (s.actualGmv ?? 0), 0);
+  // Ca ngoài kế hoạch: planRunRate đã tách (ca có số, không huỷ, không khớp dòng kế hoạch nào).
+  const offPlanSessions = rr.offPlan.map((x) => x.session);
+  const offPlanActual = rr.offPlanActual;
 
   const actualAll = actualDone + offPlanActual;
   const projected = actualAll + forecastPending;

@@ -2,12 +2,13 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { ResponsiveContainer, ComposedChart, LineChart, ReferenceLine, BarChart, Bar, Line, Area, XAxis, YAxis, Tooltip, CartesianGrid, Cell, ScatterChart, Scatter } from "recharts";
 import { BarChart3, Flame, ListOrdered, ShoppingBag, Megaphone, AlertTriangle, CalendarClock, Users, PieChart as PieChartIcon, Activity, Download, Lightbulb, ChevronDown, Scale, Loader2, Save } from "lucide-react";
-import { LiveSession, BrandMonthlyReport as BrandMonthlyReportType, BrandPlatformRate } from "../../types";
+import { LiveSession, BrandMonthlyReport as BrandMonthlyReportType, BrandPlatformRate, ShiftSlot } from "../../types";
 import { CHANNEL, METRIC, metricHint } from "../../lib/metricGlossary";
 import { downloadSheetsAsXlsx } from "../../lib/exportXlsx";
 import { useToast } from "../../hooks/useToast";
 import { dailyFromSessions, monthRunRate, monthRunRateFromPlan, pickLivePerfSource } from "../../lib/report/sessionsLivePerf";
-import { planRunRate } from "../../lib/performance/planRunRate";
+import { planRunRate, projectMonthEnd } from "../../lib/performance/planRunRate";
+import { monthOutlook } from "../../lib/performance/ceoBrief";
 import { todayVn } from "../../lib/performance/brandCommitment";
 import { hydrateSnapshotSessions, MonthlyReportSnapshot, reportWindow, snapshotView } from "../../lib/report/monthlySnapshot";
 import {
@@ -358,6 +359,9 @@ interface MonthlyReportTabsProps {
   // Ca SỐNG của app — chỉ dùng cho (a) Tab 05 Phân Tích Sâu (ops-only, vẫn tính trực tiếp) và (b) biết
   // tháng nào brand đã được phát hành (monthPublished) để che số tháng chưa phát hành khỏi cột so sánh.
   liveSessions: LiveSession[];
+  // Ca chờ đăng ký (shift_slots) SỐNG — chỉ để run-rate nối ca kế hoạch → ca thật đúng đường Dashboard brand
+  // (audit 2026-09-28 mục 5: truyền [] thì ca chờ đã huỷ thành "chưa diễn ra", ca dời giờ thành "ngoài kế hoạch").
+  shiftSlots?: ShiftSlot[];
   canManage: boolean;
 }
 
@@ -725,7 +729,7 @@ const NarrativeEditor: React.FC<{
 );
 
 
-export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, brandName, month, snapshot, liveSessions, canManage }) => {
+export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, brandName, month, snapshot, liveSessions, shiftSlots = [], canManage }) => {
 
   // Brand KHÔNG được thấy số của tháng chưa phát hành (quyết định 2026-09-22, 0107) — kể cả qua cột
   // "tháng trước"/biểu đồ xu hướng của report tháng này. Bản chụp do ops dựng nên có đủ số 4 tháng;
@@ -799,9 +803,14 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   // Run-rate: tháng có Kế Hoạch Tháng đã chốt ⇒ theo plan ban đầu (planRunRate — cùng số với Dashboard brand).
   const runRate = useMemo(() => {
     const p = plans[month];
-    if (p?.plan.status === "locked") return monthRunRateFromPlan(planRunRate(month, p.slots, [], sessions.filter((s) => s.brandId === brandId), todayVn(), p.plan.campRanges));
+    if (p?.plan.status === "locked") {
+      const bs = sessions.filter((s) => s.brandId === brandId);
+      const rr = planRunRate(month, p.slots, shiftSlots, bs, todayVn(), p.plan.campRanges);
+      const open = shiftSlots.filter((sl) => sl.brandId === brandId && sl.status === "open" && !sl.sessionId);
+      return monthRunRateFromPlan(rr, projectMonthEnd(rr, monthOutlook(month, todayVn(), bs, open, null, p.plan.campRanges)));
+    }
     return monthRunRate(sessions, brandId, start, end);
-  }, [plans, month, sessions, brandId, start, end]);
+  }, [plans, month, sessions, brandId, start, end, shiftSlots]);
   useEffect(() => {
     let cancelled = false;
     const ms = [prevMonth, month, nextMonth];

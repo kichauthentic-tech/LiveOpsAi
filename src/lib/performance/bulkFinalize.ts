@@ -1,3 +1,4 @@
+import { personClash, studioClash } from "../scheduling/conflicts";
 import { LiveSession, ShiftRegistration, ShiftSlot } from "../../types";
 import { dateTimeRangesOverlap } from "../dateUtils";
 import { FATIGUE_WEEK_HOURS, HostSuggestion, mondayOf, suggestHosts } from "./hostSuggestion";
@@ -73,14 +74,10 @@ function conflictsWithExisting(
   slot: TimeWindow,
   talentId: string
 ): { host: boolean; studio: boolean } {
-  let host = false;
-  let studio = false;
-  for (const s of sessions) {
-    if (s.status === "Cancelled") continue;
-    if (!dateTimeRangesOverlap(s, slot)) continue;
-    if (slot.studioId && s.studioId === slot.studioId) studio = true;
-    if (talentId && (s.hostId === talentId || s.coHostId === talentId)) host = true;
-  }
+  // Luật trùng chung (lib/scheduling/conflicts.ts). Phòng chỉ xét ca đã chốt: ca chờ đăng ký cùng phòng là
+  // chính các ca đang chốt trong mẻ, sổ BatchLedger lo phần đó.
+  const host = !!personClash(sessions, slot, talentId || undefined);
+  const studio = !!studioClash(sessions, [], slot);
   return { host, studio };
 }
 

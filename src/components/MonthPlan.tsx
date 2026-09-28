@@ -386,14 +386,20 @@ export default function MonthPlan({
     setDirty(true);
   };
 
-  const save = async (): Promise<BrandMonthPlan | null> => {
+  // Audit 2026-09-28 mục 2: kế hoạch ĐÃ CHỐT (hoặc đang chốt) thì "Target GMV tháng" = Σ target các ca. Ô này là
+  // cái Toàn Cảnh Brand, Kế Hoạch Tháng Sau (brand) và Report Tháng phần 7 đọc; Dashboard/run-rate/Bản Tin CEO
+  // cộng target từng ca. Sửa tay target một ca hay thêm ca sau chốt mà không đồng bộ ô này ⇒ hai số cho một tháng.
+  // Giai đoạn nháp giữ nguyên: ô tháng là con số ops nhập để chia xuống lưới.
+  const save = async (opts?: { committing?: boolean }): Promise<BrandMonthPlan | null> => {
     if (errors.length > 0) {
       setMsg(`Sửa lỗi trước khi lưu: ${errors[0]}${errors.length > 1 ? ` (+${errors.length - 1})` : ""}`);
       return null;
     }
     setSaving(true);
     try {
-      const p = await upsertMonthPlan(brandId, month, settings);
+      const toSave = locked || opts?.committing ? { ...settings, targetGmv: Math.round(totals.target) } : settings;
+      if (toSave !== settings) setSettings(toSave);
+      const p = await upsertMonthPlan(brandId, month, toSave);
       const saved = await replacePlanSlots(p.id, drafts.map((d) => ({ id: d.id, date: d.date, startTime: d.startTime, endTime: d.endTime, targetGmv: d.targetGmv, expectedGmv: d.expectedGmv, note: d.note })));
       setPlan(p);
       setDrafts(draftsFromSaved(saved));
@@ -418,11 +424,15 @@ export default function MonthPlan({
     const warn = planHours > 0 && Math.abs(gap) > 0.01 ? `\n\nGiờ kế hoạch ${fmtH(totals.hours)}h ${gap > 0 ? "THIẾU" : "VƯỢT"} ${fmtH(Math.abs(gap))}h so với ${fmtH(planHours)}h cần xếp.` : "";
     const relockNote = locked ? "\n\nChốt lại sẽ mở thêm ca mới và HUỶ ca đang mở đã bị bỏ khỏi kế hoạch (trừ ca đã có người đăng ký)." : "";
     const targetWarn = targetGap && targetGap.pct > engineParams.targetGapWarnPct ? `\n\nDự báo lưới ${fmtVndShort(targetGap.forecast)} THIẾU ${fmtVndShort(targetGap.gap)} (${Math.round(targetGap.pct * 100)}%) so với target ${fmtVndShort(targetTotal)}${targetGap.fill ? ` — cần bù ~${fmtH(targetGap.extraHours)}h.` : " — thêm giờ trong khung cũng không chạm."} Sau khi chốt, target/ca KHÔNG chia lại nữa.` : "";
+    const sumDelta = Math.round(totals.target) - targetTotal;
+    const sumNote = Math.abs(sumDelta) >= 1
+      ? `\n\nTarget các ca cộng lại ${fmtVndShort(totals.target)} ${sumDelta > 0 ? "VƯỢT" : "THIẾU"} ${fmtVndShort(Math.abs(sumDelta))} so với ô Target GMV tháng ${fmtVndShort(targetTotal)}. Sau khi chốt, target tháng = tổng các ca (${fmtVndShort(totals.target)}) ở mọi màn.`
+      : "";
     const pastCount = drafts.filter((d) => d.date < today).length;
     const pastNote = pastCount > 0 ? `\n\n${pastCount} ca ở ngày đã qua sẽ KHÔNG mở chờ đăng ký (chỉ giữ trong kế hoạch để đối chiếu).` : "";
     const studioNote = brandStudio ? `\n\nCa sinh ra gắn phòng ${brandStudio.name} (${brandStudio.roomNumber}).` : "\n\nBrand CHƯA có phòng live mặc định — ca sinh ra sẽ không có phòng (không kiểm được trùng phòng). Chọn ở Tham số → Phòng live trước nếu cần.";
-    if (!(await confirm(`${locked ? "Chốt lại" : "Chốt"} kế hoạch ${brand?.name} tháng ${month}: ${drafts.length} ca chờ đăng ký?${warn}${targetWarn}${relockNote}${studioNote}${pastNote}`))) return;
-    const p = await save();
+    if (!(await confirm(`${locked ? "Chốt lại" : "Chốt"} kế hoạch ${brand?.name} tháng ${month}: ${drafts.length} ca chờ đăng ký?${warn}${targetWarn}${sumNote}${relockNote}${studioNote}${pastNote}`))) return;
+    const p = await save({ committing: true });
     if (!p) return;
     setSaving(true);
     try {
@@ -545,8 +555,12 @@ export default function MonthPlan({
           </div>
           <label className="block text-xs">
             <span className="font-bold text-[var(--text-muted)] block mb-1">Target GMV tháng</span>
-            <input type="number" min="0" step="1000000" disabled={!editable} value={settings.targetGmv || ""} placeholder="0 = chưa đặt" onChange={(e) => { const t = Number(e.target.value) || 0; setSettings((s) => ({ ...s, targetGmv: t })); if (!locked && t > 0) setDrafts((prev) => withForecast(prev, t)); setDirty(true); }} className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] font-mono disabled:opacity-60" />
-            {targetTotal > 0 && <span className="text-[11px] text-[var(--text-faint)]">{fmtVndShort(targetTotal)}</span>}
+            <input type="number" min="0" step="1000000" disabled={!editable || locked} title={locked ? "Kế hoạch đã chốt: target tháng = tổng target các ca, sửa target từng ca trong lưới" : undefined} value={settings.targetGmv || ""} placeholder="0 = chưa đặt" onChange={(e) => { const t = Number(e.target.value) || 0; setSettings((s) => ({ ...s, targetGmv: t })); if (!locked && t > 0) setDrafts((prev) => withForecast(prev, t)); setDirty(true); }} className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] font-mono disabled:opacity-60" />
+            {locked ? (
+              <span className="text-[11px] text-[var(--text-faint)]">Đã chốt — lưu sẽ ghi = tổng target các ca ({fmtVndShort(totals.target)})</span>
+            ) : (
+              targetTotal > 0 && <span className="text-[11px] text-[var(--text-faint)]">{fmtVndShort(targetTotal)}</span>
+            )}
           </label>
           <label className="block text-xs">
             <span className="font-bold text-[var(--text-muted)] block mb-1">KPI GMV <span className="font-normal text-[var(--text-faint)]">— brand giao, mọi kênh; chỉ để Report Tháng so, không dùng xếp ca</span></span>
@@ -636,7 +650,7 @@ export default function MonthPlan({
         )}
         <span className="flex-1 text-[11px] text-[var(--text-muted)] min-w-[160px]">{loading ? "Đang tải…" : msg ?? (locked ? `Đã chốt lúc ${plan?.lockedAt ? new Date(plan.lockedAt).toLocaleString("vi-VN") : ""}. Chốt lại chỉ mở thêm ca chưa có.` : "")}</span>
         {editable && (
-          <button onClick={save} disabled={saving || !dirty} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] border border-[var(--border)] text-xs font-bold text-[var(--text)] disabled:opacity-40 flex items-center gap-1.5"><Save className="w-3.5 h-3.5" /> Lưu nháp</button>
+          <button onClick={() => save()} disabled={saving || !dirty} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] border border-[var(--border)] text-xs font-bold text-[var(--text)] disabled:opacity-40 flex items-center gap-1.5"><Save className="w-3.5 h-3.5" /> Lưu nháp</button>
         )}
         <button onClick={lock} disabled={saving || loading || errors.length > 0} className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-bold disabled:opacity-40 flex items-center gap-1.5"><Lock className="w-3.5 h-3.5" /> {locked ? `Chốt lại (đồng bộ ca)` : `Chốt kế hoạch`}</button>
         {editable && plan && (

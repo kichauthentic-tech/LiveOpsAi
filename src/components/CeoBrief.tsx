@@ -504,7 +504,7 @@ const AccountsTable: React.FC<{
                 <td className={`${td} text-[var(--text-muted)]`}>{money(t.gmvPerHour)}</td>
                 <td className={`${td} text-[var(--text-muted)]`}>{o?.target ? money(o.target.total) : "—"}</td>
                 <td className={`${td} font-bold ${o?.runRate == null ? "text-[var(--text-faint)]" : o.runRate >= 1 ? "text-emerald-400" : o.runRate >= 0.9 ? "text-amber-300" : "text-rose-400"}`}>{pct(o?.runRate)}</td>
-                <td className={`${td} text-[var(--text-muted)]`}>{o && (o.actual || o.pending.length) ? money(o.projected) : "—"}</td>
+                <td className={`${td} text-[var(--text-muted)]`}>{o && (o.actual || o.pending.length) && o.projectionMethod !== "none" ? money(o.projected) : "—"}</td>
                 {pnl && (
                   <>
                     <td className={`${td} text-[var(--text-muted)]`}>{f?.priced ? money(f.revenue) : f?.sessions ? <span className="text-[var(--text-faint)]">thiếu dữ liệu</span> : "—"}</td>
@@ -651,7 +651,8 @@ const TargetSection: React.FC<{ outlook: MonthOutlook; month: string; single: bo
   });
   let cp = ca;
   const startIdx = Math.max(0, throughIdx);
-  const hasProjection = o.pending.length > 0;
+  // Đường dự phóng vẽ từ dự báo từng ngày (giờ × GMV/giờ) — chỉ có khi chiếu theo giờ.
+  const hasProjection = o.pending.length > 0 && o.projectionMethod === "gmv_per_hour";
   projPts.push([startIdx, ca]);
   o.days.forEach((d, i) => { if (i > throughIdx) { cp += o.forecastByDate.get(d) ?? 0; projPts.push([i, cp]); } });
   // Ca đã qua mà chưa có số (ngày ≤ through) được chiếu vào đúng ngày của nó — cộng dồn vào điểm cuối.
@@ -710,7 +711,7 @@ const TargetSection: React.FC<{ outlook: MonthOutlook; month: string; single: bo
           {stat("Target GMV tháng", o.target ? money(o.target.total) : "—", o.target ? sourceLabel : <button onClick={() => onNavigate("month_plan")} className="text-[var(--accent-text)] font-bold hover:underline">Chốt Kế Hoạch Tháng →</button>)}
           {stat("Đã đạt", money(o.actual), o.target ? `${pct(o.actual / o.target.total)} Target${o.through ? ` · số đến ${ddmm(o.through)}` : ""}` : o.through ? `số đến ${ddmm(o.through)}` : undefined)}
           {stat("Run-rate", <span className={o.runRate == null ? "" : o.runRate >= 1 ? "text-emerald-400" : o.runRate >= 0.9 ? "text-amber-300" : "text-rose-400"}>{pct(o.runRate)}</span>, o.expectedToDate != null ? `kỳ vọng tới ngày có số: ${money(o.expectedToDate)}` : "cần target")}
-          {stat("Dự phóng cuối tháng", money(o.projected), `±${Math.round(PROJECTION_ERROR_BAND * 100)}% · ${o.pending.length} ca còn trong lịch${o.pending.some((p) => p.kind === "open_slot") ? ` (${o.pending.filter((p) => p.kind === "open_slot").length} ca mở)` : ""}`)}
+          {stat("Dự phóng cuối tháng", o.projectionMethod === "none" ? "—" : money(o.projected), o.projectionMethod === "none" ? "chưa có GMV/giờ 28 ngày hay run-rate để chiếu" : `${o.projectionMethod === "run_rate" ? "theo run-rate (chưa có GMV/giờ 28 ngày)" : `±${Math.round(PROJECTION_ERROR_BAND * 100)}%`} · ${o.pending.length} ca còn trong lịch${o.pending.some((p) => p.kind === "open_slot") ? ` (${o.pending.filter((p) => p.kind === "open_slot").length} ca mở)` : ""}`)}
           {stat(gap == null ? "So với target" : gap >= 0 ? "Dự kiến vượt" : "Dự kiến thiếu", gap == null ? "—" : <span className={gap >= 0 ? "text-emerald-400" : "text-rose-400"}>{money(Math.abs(gap))}</span>, gap != null && o.target ? `${pct(Math.abs(gap) / o.target.total)} target` : undefined)}
           {stat("Cần mỗi ngày còn lại", money(o.needPerRemainingDay), o.remainingDays > 0 ? `${o.remainingDays} ngày còn lại` : "tháng đã hết")}
           <p className="col-span-2 text-[11px] text-[var(--text-faint)] leading-snug">
@@ -891,7 +892,7 @@ const FinanceSection: React.FC<{ fin: FinanceTotals; finPrev: FinanceTotals | nu
   const missingTab: Record<string, string> = { host_rate: "talents", cohost_rate: "talents", brand_rate: "crm", commission_default: "crm" };
   return (
     <section className="space-y-3">
-      <SectionTitle title="Tài chính" note={<span className="inline-flex items-center gap-1"><Lock className="w-3 h-3" /> Chỉ CEO/admin · chỉ cộng ca đủ dữ liệu, gồm cả ca nạp bù</span>} />
+      <SectionTitle title="Tài chính" note={<span className="inline-flex items-center gap-1"><Lock className="w-3 h-3" /> Chỉ CEO/admin · chỉ cộng ca đủ dữ liệu{fin.backfill > 0 ? ` · gồm ${fin.backfill} ca nạp bù (Finance & P&L không tính loại ca này)` : ""}</span>} />
       {missing.length > 0 && (
         <Card className="!p-4 border-amber-500/40">
           <p className="text-sm font-bold text-amber-300 flex items-center gap-2"><AlertTriangle className="w-4 h-4" />Tính được tiền cho {fin.priced}/{fin.sessions} ca trong kỳ. Các ca còn lại đang thiếu:</p>

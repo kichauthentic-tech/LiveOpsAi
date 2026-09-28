@@ -1,6 +1,6 @@
 import { LiveSession, ShiftSlot } from "../../types";
 import { addDays, eachDay, isoWeekStart } from "../dateUtils";
-import { sessionDurationHours } from "../pnl";
+import { isPnlSession, sessionDurationHours } from "../pnl";
 import { CampDayBucket, CampOverrides, CAMP_DAY_BUCKET_ORDER, resolveCampBucketType } from "../campaignDays";
 import { MonthTargetPlan } from "./targetAllocation";
 import { isCountable, sessionHours } from "./hostPerformance";
@@ -159,8 +159,10 @@ export function totalsOf(sessions: LiveSession[]): Totals {
 }
 
 export interface FinanceTotals {
-  /** Ca có số trong phạm vi. */
+  /** Ca đã chạy (Completed) trong phạm vi — cùng luật isPnlSession với Finance & P&L, cộng thêm ca nạp bù. */
   sessions: number;
+  /** Trong `sessions`, bao nhiêu ca là nạp bù — Finance & P&L không tính những ca này. */
+  backfill: number;
   /** Ca đủ dữ liệu để tính tiền — mọi con số tiền bên dưới CHỈ cộng từ những ca này. */
   priced: number;
   revenue: number;
@@ -176,11 +178,14 @@ export interface FinanceTotals {
 }
 
 export function financeOf(sessions: LiveSession[], pnl: PnlFn): FinanceTotals {
-  const f: FinanceTotals = { sessions: 0, priced: 0, revenue: 0, cost: 0, profit: 0, margin: null, profitableSessions: 0, days: 0, profitableDays: 0, missing: new Map(), byDay: new Map() };
+  const f: FinanceTotals = { sessions: 0, backfill: 0, priced: 0, revenue: 0, cost: 0, profit: 0, margin: null, profitableSessions: 0, days: 0, profitableDays: 0, missing: new Map(), byDay: new Map() };
   const unpricedDays = new Set<string>();
   for (const s of sessions) {
-    if (!isCountable(s)) continue;
+    // Cùng luật với Finance & P&L (isPnlSession) — ca đã chạy mà GMV = 0 vẫn có chi phí host/phòng. Khác Finance
+    // đúng một điểm có chủ ý: ca nạp bù được tính, màn CEO cần thấy cả lịch sử.
+    if (!isPnlSession(s, { includeBackfill: true })) continue;
     f.sessions++;
+    if (s.isBackfill) f.backfill++;
     const r = pnl(s);
     if (r.missing.length > 0) {
       for (const m of r.missing) f.missing.set(m, (f.missing.get(m) ?? 0) + 1);
@@ -304,6 +309,9 @@ export interface MonthOutlook {
   projected: number;
   /** Doanh số/giờ dùng để chiếu — null khi 28 ngày gần nhất không có ca nào. */
   rates: { camp: number; daily: number } | null;
+  /** Cách ra `projected` — xem projectMonthEnd (planRunRate.ts). "none" = không có gì để chiếu phần còn lại,
+   *  `projected` khi đó chỉ là số đã có, UI không được in nó như dự phóng (lỗi E2E #4: "Dự kiến 0 · Thiếu 100%"). */
+  projectionMethod: "gmv_per_hour" | "run_rate" | "none";
   gap: number | null;
   remainingDays: number;
   needPerRemainingDay: number | null;
@@ -368,11 +376,21 @@ export function monthOutlook(
   for (const p of pending) forecastByDate.set(p.date, (forecastByDate.get(p.date) ?? 0) + p.forecast);
 
   const actual = done.reduce((a, s) => a + (s.actualGmv ?? 0), 0);
-  const projected = actual + pending.reduce((a, p) => a + p.forecast, 0);
   let expectedToDate: number | null = null;
   if (target && through) {
     expectedToDate = 0;
     for (const [d, v] of target.byDate) if (d <= through) expectedToDate += v;
+  }
+  // Có GMV/giờ 28 ngày (hoặc không còn ca nào) ⇒ chiếu theo giờ. Không có ⇒ phần target còn lại × run-rate nếu đã có
+  // run-rate; không có nốt ⇒ không chiếu (audit 2026-09-28 mục 3, cùng luật projectMonthEnd).
+  const runRateNow = expectedToDate && expectedToDate > 0 ? actual / expectedToDate : null;
+  let projectionMethod: MonthOutlook["projectionMethod"] = "gmv_per_hour";
+  let projected = actual + pending.reduce((a, p) => a + p.forecast, 0);
+  if (!rates && pending.length > 0) {
+    if (target && runRateNow != null && expectedToDate != null) {
+      projectionMethod = "run_rate";
+      projected = actual + (target.total - expectedToDate) * runRateNow;
+    } else projectionMethod = "none";
   }
   // Hôm nay tính là ngày còn lại — số của hôm nay chưa vào.
   const remainingDays = today > mEnd ? 0 : today < mStart ? days.length : dayDiff(today, mEnd) + 1;
@@ -415,11 +433,12 @@ export function monthOutlook(
     actual,
     target,
     expectedToDate,
-    runRate: expectedToDate && expectedToDate > 0 ? actual / expectedToDate : null,
+    runRate: runRateNow,
     pending,
     projected,
     rates,
-    gap: target ? projected - target.total : null,
+    projectionMethod,
+    gap: target && projectionMethod !== "none" ? projected - target.total : null,
     remainingDays,
     needPerRemainingDay: target && remainingDays > 0 ? Math.max(0, target.total - actual) / remainingDays : null,
     actualByDate,
@@ -481,7 +500,9 @@ export function combineOutlooks(month: string, today: string, list: MonthOutlook
     pending: list.flatMap((o) => o.pending),
     projected,
     rates: null,
-    gap: target ? projectedT - target.total : null,
+    // Gộp: một brand không chiếu được thì tổng agency cũng không phải dự phóng trọn vẹn.
+    projectionMethod: list.some((o) => o.projectionMethod === "none") ? "none" : list.some((o) => o.projectionMethod === "run_rate") ? "run_rate" : "gmv_per_hour",
+    gap: target && !list.some((o) => o.projectionMethod === "none") ? projectedT - target.total : null,
     remainingDays,
     needPerRemainingDay: target && remainingDays > 0 ? Math.max(0, target.total - actualT) / remainingDays : null,
     actualByDate: sumMap((o) => o.actualByDate),
@@ -629,7 +650,7 @@ export function buildIssues(x: IssueInput): Issue[] {
       out.push({ level: o.runRate < RUN_RATE_BAD ? "bad" : "warn", title: `${b.name} chậm tiến độ: đạt ${pct(o.runRate)} kỳ vọng`, detail: `Đã có ${x.fmt(o.actual)}, kỳ vọng tới ngày có số là ${x.fmt(o.expectedToDate ?? 0)} (theo target từng ngày).`, action: "month_plan" });
     }
     if (o.target && o.gap != null && o.gap < 0) {
-      out.push({ level: "bad", title: `${b.name} dự phóng thiếu ${x.fmt(-o.gap)} so với target`, detail: `Dự phóng cuối tháng ${x.fmt(o.projected)} (±${Math.round(PROJECTION_ERROR_BAND * 100)}%) với lịch đang có. Cần thêm ca hoặc tăng doanh số/giờ.`, action: "month_plan" });
+      out.push({ level: "bad", title: `${b.name} dự phóng thiếu ${x.fmt(-o.gap)} so với target`, detail: `Dự phóng cuối tháng ${x.fmt(o.projected)} (${o.projectionMethod === "run_rate" ? "theo run-rate — chưa có GMV/giờ 28 ngày" : `±${Math.round(PROJECTION_ERROR_BAND * 100)}%`}) với lịch đang có. Cần thêm ca hoặc tăng doanh số/giờ.`, action: "month_plan" });
     }
     if (o.remainingDays > 0 && o.pending.filter((p) => p.date >= x.today).length === 0 && o.actual > 0) {
       out.push({ level: "bad", title: `${b.name}: chưa có ca nào trong lịch cho ${o.remainingDays} ngày còn lại`, detail: "Dự phóng chỉ bằng số đã có. Kiểm tra lịch và Kế Hoạch Tháng.", action: "month_plan" });

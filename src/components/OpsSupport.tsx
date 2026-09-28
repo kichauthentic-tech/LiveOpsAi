@@ -6,7 +6,7 @@ import { buildHistory } from "../lib/scheduling/suggestEngine";
 import { buildCalibration, evaluatePlan } from "../lib/scheduling/planEvaluation";
 import { fetchBrandLockedPlanSlots, fetchCalendarEvents, fetchMonthPlan } from "../lib/db/monthPlans";
 import { EstimateCtx, MonthTracking, benchmarkForWindow, suggestFill, trackMonth } from "../lib/opsSupport";
-import { monthOutlook } from "../lib/performance/ceoBrief";
+import { MonthEndProjection, PlanRunRate, PROJECTION_METHOD_LABEL } from "../lib/performance/planRunRate";
 import { todayVn } from "../lib/performance/brandCommitment";
 import { fmtVndShort } from "../lib/format";
 import { SESSION_STATUS_CLS, SESSION_STATUS_LABEL_VI } from "../lib/sessionStatusUi";
@@ -19,6 +19,9 @@ import { SESSION_STATUS_CLS, SESSION_STATUS_LABEL_VI } from "../lib/sessionStatu
 // Dashboard (planRunRate — luật plan ban đầu), không lặp ở đây.
 
 interface OpsSupportProps {
+  /** planRunRate của Dashboard — null khi tháng chưa có kế hoạch chốt. */
+  rr: PlanRunRate | null;
+  projection: MonthEndProjection;
   brandId: string;
   brandName: string;
   month: string; // "YYYY-MM"
@@ -41,7 +44,7 @@ const addDays = (d: string, n: number) => {
   return `${x.getFullYear()}-${`${x.getMonth() + 1}`.padStart(2, "0")}-${`${x.getDate()}`.padStart(2, "0")}`;
 };
 
-export default function OpsSupport({ brandId, brandName, month, sessions, shiftSlots, promoSchemes, engineParams, onOpenMonthPlan, onOpenSession }: OpsSupportProps) {
+export default function OpsSupport({ rr, projection, brandId, brandName, month, sessions, shiftSlots, promoSchemes, engineParams, onOpenMonthPlan, onOpenSession }: OpsSupportProps) {
   const today = todayVn();
   const [plan, setPlan] = useState<{ plan: BrandMonthPlan; slots: BrandMonthPlanSlot[] } | null>(null);
   const [lockedSlots, setLockedSlots] = useState<BrandMonthPlanSlot[]>([]);
@@ -90,34 +93,24 @@ export default function OpsSupport({ brandId, brandName, month, sessions, shiftS
   }, [lockedSlots, month, shiftSlots, sessions, engineParams]);
   const ctx = useMemo<EstimateCtx>(() => ({ camp: plan?.plan.campRanges, events, schemes: brandSchemes, calibration }), [plan, events, brandSchemes, calibration]);
 
-  const locked = plan?.plan.status === "locked";
-  // Ca của brand trong ĐÚNG tháng đang xem — trackMonth cần để nhận ra ca có số nằm ngoài lưới kế
-  // hoạch (ops mở tay, ca thay thế sau khi huỷ, ca nạp bù). Không lọc theo tháng thì tiền của tháng
-  // khác sẽ chảy nhầm vào run-rate tháng này.
-  const brandMonthSessions = useMemo(() => brandSessions.filter((s) => s.date.startsWith(month)), [brandSessions, month]);
-  const engineTracking = useMemo(
-    () => (locked && plan ? trackMonth(plan.slots, shiftSlots, sessions, history, ctx, brandMonthSessions) : null),
-    [locked, plan, shiftSlots, sessions, history, ctx, brandMonthSessions]
-  );
-  // Dự kiến cuối tháng dùng CHUNG cách tính với Bản Tin CEO (lib/performance/ceoBrief.ts): số đã có +
-  // giờ mọi ca còn trong lịch (kể cả ca ngoài kế hoạch, ca mở chưa có người) × doanh số/giờ 28 ngày gần
-  // nhất. Backtest T7–T8/2026: engine × k lệch +9…+47%, cách này −7…+8%. Engine vẫn dùng cho phương án bù
-  // và cột dự báo từng ca — chỉ con số tổng và thiếu/vượt là đổi, để hai màn không nói hai số.
+  // Trạng thái ca + dự kiến cuối tháng nhận từ Dashboard (planRunRate + projectMonthEnd) — cùng một số với thẻ
+  // run-rate phía trên và Bản Tin CEO (audit 2026-09-28 mục 3). Engine chỉ còn lo dự báo từng ca, k và phương án bù.
+  const engineTracking = useMemo(() => (rr ? trackMonth(rr, history, ctx) : null), [rr, history, ctx]);
   const tracking = useMemo<MonthTracking | null>(() => {
-    if (!engineTracking) return null;
-    const open = shiftSlots.filter((sl) => sl.brandId === brandId && sl.status === "open" && !sl.sessionId);
-    const o = monthOutlook(month, today, brandSessions, open, null, plan?.plan.campRanges);
-    const futureForecast = o.projected - o.actual;
-    const gap = engineTracking.targetTotal - o.projected;
+    if (!engineTracking || projection.value == null) return null;
+    const projected = projection.value;
+    const futureForecast = projected - engineTracking.actualAll;
+    const gap = engineTracking.targetTotal - projected;
     const remaining = Math.max(0, engineTracking.targetTotal - engineTracking.actualAll);
+    const pendingCount = engineTracking.pendingCount + engineTracking.noDataCount;
     return {
       ...engineTracking,
-      projected: o.projected,
+      projected,
       gap,
       gapPct: engineTracking.targetTotal > 0 ? gap / engineTracking.targetTotal : 0,
-      upliftPct: o.pending.length > 0 && futureForecast > 0 ? (remaining - futureForecast) / futureForecast : null
+      upliftPct: pendingCount > 0 && futureForecast > 0 ? (remaining - futureForecast) / futureForecast : null
     };
-  }, [engineTracking, shiftSlots, brandId, month, today, brandSessions, plan]);
+  }, [engineTracking, projection]);
   const fill = useMemo(
     () => (tracking && plan && tracking.gapPct > engineParams.targetGapWarnPct ? suggestFill(tracking, history, plan.plan, month, today, ctx, engineParams) : null),
     [tracking, plan, history, month, today, ctx, engineParams]
@@ -145,7 +138,7 @@ export default function OpsSupport({ brandId, brandName, month, sessions, shiftS
             <TrendingDown className="w-4 h-4 text-amber-300" /> Dự kiến thiếu {fmtVndShort(tracking.gap)} ({fmtPct(tracking.gapPct, 1)} target) — phương án bù
           </h3>
           <p className="text-xs text-[var(--text-muted)]">
-            Dự kiến cuối tháng {fmtVndShort(tracking.projected)} = đã có + giờ các ca còn trong lịch × GMV/giờ 28 ngày gần nhất (±8%, cùng cách Bản Tin CEO).
+            Dự kiến cuối tháng {fmtVndShort(tracking.projected)} = đã có + {PROJECTION_METHOD_LABEL[projection.method]}.
             {remainingCount > 0 && <> Về đích cần <b className="text-[var(--text)]">{fmtVndShort(tracking.requiredPerPending)}/ca</b> cho {remainingCount} ca kế hoạch còn lại.</>}
           </p>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 text-xs">

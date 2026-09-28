@@ -2233,6 +2233,7 @@ export default function App() {
                   <SessionLedger
                     variant="agency"
                     sessions={activeSessions}
+                    shiftSlots={shiftSlots}
                     excludedSessions={excludedSessions}
                     brands={activeBrands}
                     currentRole={currentRole}
@@ -2489,6 +2490,7 @@ export default function App() {
                     variant="brand"
                     brandId={currentBrandId!}
                     sessions={activeSessions}
+                    shiftSlots={shiftSlots}
                     brands={activeBrands}
                     currentRole={currentRole}
                     onSubmitSessionReport={handleSubmitSessionReport}

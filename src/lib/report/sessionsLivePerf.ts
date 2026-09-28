@@ -1,5 +1,6 @@
 import { LiveSession } from "../../types";
-import type { PlanRunRate } from "../performance/planRunRate";
+import type { MonthEndProjection, PlanRunRate } from "../performance/planRunRate";
+import { isCountable, sessionHours } from "../performance/hostPerformance";
 import { CreatorLivePerfMonthSlice, CreatorLivePerfRow } from "../dataraw/creatorLivePerfSlice";
 import { DailyLivePerformance, LivePerformanceMonthSlice } from "../dataraw/monthlyDailySlice";
 
@@ -13,15 +14,17 @@ import { DailyLivePerformance, LivePerformanceMonthSlice } from "../dataraw/mont
 const VN_OFFSET_MS = 7 * 60 * 60 * 1000;
 const vnIso = (date: string, hhmm: string) => new Date(new Date(`${date}T${hhmm}:00Z`).getTime() - VN_OFFSET_MS).toISOString();
 
-export const hasLiveNumbers = (s: LiveSession) =>
-  s.status === "Completed" && (s.dataSource === "tiktok_reconciled" || s.dataSource === "live_snapshot" || s.actualGmv > 0);
+// Bí danh của isCountable (hostPerformance.ts) — một định nghĩa "ca có số" cho Report và mọi màn khác (audit 2026-09-28 mục 6).
+export const hasLiveNumbers = isCountable;
 
 export function sessionsInRange(sessions: LiveSession[], brandId: string, start: string, end: string): LiveSession[] {
   return sessions.filter((s) => s.brandId === brandId && s.date >= start && s.date <= end && hasLiveNumbers(s));
 }
 
 export function sessionToLivePerfRow(s: LiveSession): CreatorLivePerfRow {
-  const hours = s.liveDurationMinutes && s.liveDurationMinutes > 0 ? s.liveDurationMinutes / 60 : hoursOf(s.startTime, s.endTime);
+  // Cùng hàm giờ với Hiệu Suất Host / Sổ Ca / Bản Tin CEO (audit 2026-09-28 mục 7: bản riêng ở đây coi giờ bắt đầu =
+  // giờ kết thúc là 24 giờ, pnl.sessionDurationHours coi là 0).
+  const hours = sessionHours(s);
   const views = s.totalViews ?? 0;
   const impressions = s.impressions ?? 0;
   const productImpressions = s.productImpressions ?? 0;
@@ -56,14 +59,6 @@ export function sessionToLivePerfRow(s: LiveSession): CreatorLivePerfRow {
     likes: s.likesCount ?? 0,
     sourceRow: { sessionId: s.id, dataSource: s.dataSource, hostName: s.hostName }
   };
-}
-
-function hoursOf(start: string, end: string): number {
-  const [sh, sm] = start.split(":").map(Number);
-  const [eh, em] = end.split(":").map(Number);
-  let m = eh * 60 + em - (sh * 60 + sm);
-  if (m <= 0) m += 24 * 60;
-  return m / 60;
 }
 
 export interface LivePerfSource {
@@ -143,10 +138,11 @@ export interface MonthRunRate {
  * ca huỷ giữ target, ca ngoài plan target = 0) — cùng một số với Dashboard brand. Chỉ tháng chưa có
  * kế hoạch chốt mới rơi về `monthRunRate` (target đã đổ xuống ca từ Report Tháng tab 05).
  */
-export function monthRunRateFromPlan(r: PlanRunRate): MonthRunRate | null {
+export function monthRunRateFromPlan(r: PlanRunRate, projection?: MonthEndProjection): MonthRunRate | null {
   if (r.total.target <= 0) return null;
   const done = r.slots.filter((t) => t.state === "done").length + r.offPlan.length;
-  const projected = r.total.keepPace ?? r.total.actual;
+  // Dự kiến cuối tháng: projectMonthEnd (cùng số Dashboard brand + Bản Tin CEO — audit 2026-09-28 mục 3).
+  const projected = projection?.value ?? r.total.keepPace ?? r.total.actual;
   return {
     targetTotal: r.total.target,
     doneCount: done,

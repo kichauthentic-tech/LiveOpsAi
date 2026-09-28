@@ -217,6 +217,14 @@ export interface TalentIncomeRow {
 // Lọc giống computeSessionPnl đang được gọi ở FinanceHr.tsx: chỉ ca Completed, không phải ca
 // backfill (rate card tháng đó không chuẩn), đúng tháng đang xem — một talent có thể vừa là
 // host vừa là trợ live của 2 ca khác nhau trong cùng tháng nên trả về DANH SÁCH, không phải 1 số.
+// Ca nào vào phép tính TIỀN — một luật cho Finance & P&L, Thu nhập talent và Bản Tin CEO (audit 2026-09-28:
+// Finance lọc `Completed`, Bản Tin CEO lọc "ca có số" nên ca đã chạy mà GMV = 0 — host vẫn nhận lương — rơi
+// khỏi chi phí của CEO). Khác nhau DUY NHẤT ở ca nạp bù, và đó là quyết định có chủ ý: Finance/lương loại
+// chúng (rate card tháng đó không chuẩn, lương tháng cũ đã trả ngoài app), Bản Tin CEO tính để thấy cả lịch sử.
+export function isPnlSession(s: LiveSession, opts: { includeBackfill: boolean }): boolean {
+  return s.status === "Completed" && (opts.includeBackfill || !s.isBackfill);
+}
+
 export function computeTalentMonthlyIncome(
   sessions: LiveSession[],
   talentId: string,
@@ -230,7 +238,7 @@ export function computeTalentMonthlyIncome(
   // "tháng này không có ca". Trả cờ ra để màn hồ sơ nói "chưa có rate" thay vì in số 0.
   let missingRate = false;
   for (const session of sessions) {
-    if (session.status !== "Completed" || session.isBackfill || !session.date.startsWith(month)) continue;
+    if (!isPnlSession(session, { includeBackfill: false }) || !session.date.startsWith(month)) continue;
     const isHost = session.hostId === talentId;
     const isCoHost = session.coHostId === talentId;
     if (!isHost && !isCoHost) continue;

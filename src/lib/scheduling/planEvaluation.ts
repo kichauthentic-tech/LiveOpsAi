@@ -9,6 +9,7 @@
 import { BrandMonthPlanSlot, LiveSession, ShiftSlot } from "../../types";
 import { BLOCK_HOURS } from "./suggestEngine";
 import { DEFAULT_ENGINE_PARAMS, EngineParams } from "./engineParams";
+import { isCountable } from "../performance/hostPerformance";
 
 export interface PlanEvalRow {
   date: string;
@@ -41,7 +42,8 @@ export function evaluatePlan(planSlots: BrandMonthPlanSlot[], shiftSlots: ShiftS
     if (slot.status === "cancelled") return { ...base, actualGmv: null, status: "cancelled", errorPct: null };
     const session = slot.sessionId ? sessionById.get(slot.sessionId) : undefined;
     if (!session || session.status === "Cancelled") return { ...base, actualGmv: null, status: session ? "cancelled" : "pending", errorPct: null };
-    if (session.status !== "Completed" || !(session.actualGmv > 0)) return { ...base, actualGmv: null, status: "pending", errorPct: null };
+    // Cùng định nghĩa "ca có số" với mọi màn (isCountable) — ca đã up file mà bán 0 là kết quả thật, không phải "chờ".
+    if (!isCountable(session)) return { ...base, actualGmv: null, status: "pending", errorPct: null };
     const err = ps.expectedGmv > 0 ? (session.actualGmv - ps.expectedGmv) / ps.expectedGmv : null;
     return { ...base, actualGmv: session.actualGmv, status: "done", errorPct: err };
   });

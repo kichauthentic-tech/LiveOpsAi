@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { SESSION_STATUS_CLS, SESSION_STATUS_LABEL_VI } from "../lib/sessionStatusUi";
 import { BookOpen, CheckCircle2, ChevronRight, Circle, Download, EyeOff, Link2 } from "lucide-react";
-import { Brand, LiveSession, Studio, Talent, UserRole, AuditLogEntry } from "../types";
+import { Brand, LiveSession, ShiftSlot, Studio, Talent, UserRole, AuditLogEntry } from "../types";
 import { getTodayDate } from "../lib/dateUtils";
 import { fmtVndShort } from "../lib/format";
 import { sessionHours } from "../lib/performance/hostPerformance";
@@ -31,6 +31,7 @@ interface SessionLedgerProps {
   // Cho Cửa sổ Ca Live: ops sửa giờ/studio/người ngay trong cửa sổ (agency).
   studios?: Studio[];
   talents?: Talent[];
+  shiftSlots?: ShiftSlot[]; // chỉ để Cửa sổ ca cảnh báo trùng phòng với ca chờ đăng ký
   onSubmitSessionReport: (sessionId: string, input: SessionReportInput) => Promise<boolean>;
   onSessionSnapshotApplied: (session: LiveSession) => void;
   onUpdateSession?: (session: LiveSession) => Promise<boolean>;
@@ -104,6 +105,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
   myTalentId,
   studios,
   talents,
+  shiftSlots = [],
   onSubmitSessionReport,
   onSessionSnapshotApplied,
   onUpdateSession,
@@ -526,6 +528,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
           allSessions={sessions}
           studios={isBrandView ? undefined : studios}
           talents={isBrandView ? undefined : talents}
+          shiftSlots={shiftSlots}
           onClose={() => setOpenId(null)}
           onSubmitSessionReport={onSubmitSessionReport}
           onSessionSnapshotApplied={onSessionSnapshotApplied}

@@ -2,38 +2,39 @@
 
 ## CẦN LÀM NGAY khi mở phiên mới (cập nhật 2026-09-24)
 
-> **MỚI 2026-09-28 (tối) — Audit "module cùng loại, logic khác nhau": 9 nhóm lệch, CHƯA sửa (user chỉ yêu cầu tìm).** Đo trên DB
-> thật (231 ca: 229 CROCS nạp bù + 1 VERA test; chưa có kế hoạch nào chốt — chỉ CROCS T10 nháp 5,5B/75 ca) + browser (admin).
-> Số tổng T9 CROCS KHỚP ở Bản Tin CEO / Toàn Cảnh Brand / Dashboard brand (3,52B · 47 ca · 177,8h · 19,8M/giờ). Lệch:
-> 1. **ĐANG LỘ — tiền:** Finance & Thu nhập talent lọc `Completed && !isBackfill` ([FinanceHr.tsx:93](src/components/FinanceHr.tsx:93),
->    [pnl.ts:233](src/lib/pnl.ts:233)); Bản Tin CEO `financeOf` lọc `isCountable` (có ca nạp bù). T9: CEO "0/47 ca đủ dữ liệu", Finance
->    "Không có phiên Completed nào" (câu sai — 47 ca Completed đều là nạp bù). Nhập rate xong ⇒ CEO ra tiền, Finance vẫn 0.
-> 2. **Target tháng: Σ ca kế hoạch vs ô header `plan.target_gmv`.** Bản vá E2E #1 của phiên song song (bỏ lọc `slot_id`, chưa
->    commit lúc audit) cũng vá luôn đường "chốt kế hoạch khi tháng đã bắt đầu" (0099 bỏ ca ngày đã qua ⇒ `slot_id` null). Còn lại:
->    header dùng ở Toàn Cảnh Brand, Kế Hoạch Tháng Sau phía brand, Report phần 7; Σ ca dùng ở Dashboard/run-rate/CEO. Sửa target
->    từng ca / thêm ca sau chốt ([MonthPlan.tsx:236](src/components/MonthPlan.tsx:236)) ⇒ Σ ca ≠ header, MonthPlan chỉ báo "thiếu/vượt".
-> 3. **Dự phóng cuối tháng 2 công thức trên cùng trang Dashboard brand:** "Nếu giữ run-rate" = keepPace; khối Hỗ Trợ Vận Hành "Dự kiến
->    cuối tháng" = giờ còn lại × GMV/giờ 28 ngày (`monthOutlook`, = Bản Tin CEO). "Còn N ca" của khối đó đi `trackMonth`
->    ([opsSupport.ts:63](src/lib/opsSupport.ts:63), [:84](src/lib/opsSupport.ts:84)) — `isDone` riêng, ca kế hoạch mất shift_slot = "huỷ".
-> 4. **Report Tuần** vẫn % target kiểu cũ (GMV ÷ target ca đã có số, ca huỷ rơi khỏi mẫu số — [BrandWeeklyReport.tsx:96](src/components/brand-workspace/BrandWeeklyReport.tsx:96));
->    bảng tuần tới ghi target 0 cho ca chờ đăng ký ([:426](src/components/brand-workspace/BrandWeeklyReport.tsx:426), tổng [:169](src/components/brand-workspace/BrandWeeklyReport.tsx:169)).
-> 5. **Report Tháng gọi `planRunRate(..., [], ...)`** ([MonthlyReportTabs.tsx:802](src/components/brand-workspace/MonthlyReportTabs.tsx:802)) — không truyền
->    shiftSlots ⇒ đếm ca huỷ/chưa diễn ra/ngoài plan khác Dashboard (tổng tiền giống).
-> 6. **"Ca nào được tính" có 6 định nghĩa:** `hasLiveNumbers` (Report, KPI Dashboard) · `isCountable` (Host Perf, Sổ Ca, CEO,
->    planRunRate) · `isDone` (Hỗ Trợ VH) · `Completed` (Talent Pool, Nhập Ads, Finance) · `isDelivered` (Cam kết) · planEvaluation.
->    Khác nhau ở ca Completed có snapshot mà GMV=0/views=0 và ca Live Now có số tạm. DB thật hiện 0 ca rơi vào khe ⇒ nổ từ T10.
->    Trong cùng 1 trang: Dashboard brand ([:88](src/components/brand-workspace/BrandDashboard.tsx:88) vs [:194](src/components/brand-workspace/BrandDashboard.tsx:194)), Report Tuần (tổng vs bảng host).
-> 7. **Giờ trong GMV/giờ:** dự phóng CEO/Hỗ Trợ VH dùng giờ KẾ HOẠCH ([ceoBrief.ts:322](src/lib/performance/ceoBrief.ts:322)), còn lại giờ live. Ca nạp bù
->    2 giờ bằng nhau nên chưa lộ. `start==end`: pnl ra 0h, `hoursOf` ([sessionsLivePerf.ts:61](src/lib/report/sessionsLivePerf.ts:61)) /
->    `slotHours` ([monthlyReportInsights.ts:214](src/lib/report/monthlyReportInsights.ts:214)) vẫn ra 24h (FIX L8 chưa lan).
-> 8. **Kiểm trùng lịch 4 luật, DB không chặn:** Nhân sự ca + chốt hàng loạt xét host & trợ live; popup ca chờ
->    ([SlotDetailModal.tsx:51](src/components/scheduling/SlotDetailModal.tsx:51)) không xét trợ live; sửa ca
->    ([SessionWindow.tsx:174](src/components/SessionWindow.tsx:174)) chỉ so `hostId`↔`hostId`, không xét trợ live, không xét ca chờ giữ
->    phòng; kéo đổi phòng ([LiveCalendar.tsx:176](src/components/LiveCalendar.tsx:176)) không xét ca chờ giữ phòng.
-> 9. **Lịch Vận Hành phía brand, chế độ Tháng (mặc định)** ([BrandCalendar.tsx:480](src/components/brand-workspace/BrandCalendar.tsx:480)) in Studio + GMV
->    ("0" khi tháng chưa phát hành) cho role brand, hiện cả ca huỷ nhãn "Cancelled" — các màn khác đều giấu.
-> Đề xuất thứ tự sửa: 1 → 2 (một nguồn target: Σ ca kế hoạch, header chỉ là ô nhập) → 3/4/5 (mọi màn đi `planRunRate` + 1 công thức dự
-> phóng) → 6 (một hàm "ca có số") → 8 → 9 → 7.
+> **MỚI 2026-09-28 (khuya) — Audit "module cùng loại, logic khác nhau": 9 nhóm lệch ĐÃ SỬA CẢ 9 (không migration, CHƯA commit).**
+> Đo trên DB thật (231 ca: 229 CROCS nạp bù + 1 VERA test; chưa kế hoạch nào chốt — CROCS T10 nháp 5,5B/75 ca). tsc 0 lỗi, eslint
+> 0 lỗi/33 warning (= baseline), vitest 169/169 (+5 file test: `pnlSessions`, `monthProjection`, `countable`, `conflicts`,
+> `hoursBasis`). Browser (admin, dev local): số thật mọi màn GIỮ NGUYÊN (CEO 3,52B/47 ca, Hiệu Suất Host 168 ca, Talent Pool
+> Bùi Sỹ Hùng 7,31B/59 ca) vì ca nạp bù đều đã đối soát + giờ kế hoạch = giờ live; không lỗi console.
+> 1. **Tiền** — `isPnlSession(s, {includeBackfill})` ([pnl.ts](src/lib/pnl.ts)) cho Finance, Thu nhập talent, Bản Tin CEO. GIỮ quyết định cũ
+>    "CEO tính ca nạp bù, Finance không" nhưng hai màn nói ra: Finance T9 "chỉ có 47 ca nạp bù… Bản Tin CEO có tính", CEO "gồm 47 ca
+>    nạp bù (Finance & P&L không tính)". CEO trước lọc "ca có số" nên bỏ ca GMV 0 (host vẫn nhận lương) — nay lọc Completed.
+> 2. **Target tháng** — kế hoạch đã chốt/đang chốt: lưu ghi ô "Target GMV tháng" = Σ target các ca (ô khoá sau chốt); hộp chốt báo
+>    lệch trước. Toàn Cảnh Brand / Kế Hoạch Tháng Sau / Report phần 7 (đọc ô này) giờ cùng số Dashboard/CEO. **Chưa verify nhánh
+>    chốt thật** (chốt = sinh ca + bắn thông báo 34 talent). **User chốt 2026-09-28:** ca thêm vào lưới SAU khi chốt vẫn tự nhận
+>    target = dự báo (MonthPlan.tsx `withForecast`) ⇒ tổng target tháng (và ô header) tăng theo — khác ca mở NGOÀI kế hoạch (target 0).
+> 3. **Dự phóng cuối tháng** — `projectMonthEnd` ([planRunRate.ts](src/lib/performance/planRunRate.ts)) + `MonthOutlook.projectionMethod`:
+>    giờ ca còn lại × GMV/giờ 28 ngày (cách CEO); không có GMV/giờ ⇒ run-rate; không có nốt ⇒ "—" (vá lỗi E2E #4 "Dự kiến 0 ·
+>    Thiếu 100%"). Dashboard brand (thẻ "Dự kiến cuối tháng" thay "Nếu giữ run-rate"), khối phương án bù, Report Tháng/Tuần, CEO
+>    dùng chung. `trackMonth(rr, history, ctx)` giờ đọc trạng thái ca từ `planRunRate` (bỏ `isDone`); OpsSupport nhận `rr` +
+>    `projection` từ Dashboard.
+> 4. **Report Tuần** — target ngày = Σ ca kế hoạch đã chốt (ca huỷ giữ target), % = GMV ÷ target các ngày ≤ ngày cuối có số; ca
+>    chờ đăng ký tuần tới mang target kế hoạch. Tháng chưa chốt: như cũ.
+> 5. **Report Tháng** nhận `shiftSlots` sống cho `planRunRate` (trước truyền `[]`).
+> 6. **"Ca có số" = `isCountable`** ([hostPerformance.ts](src/lib/performance/hostPerformance.ts)): Completed + (đối soát | up file | GMV>0 |
+>    view>0). `hasLiveNumbers` = bí danh. Bỏ ca "Live Now" (số dở dang); ca up file mà bán 0 = kết quả thật. Áp cho Talent Pool
+>    (`avgGmv.ts`), đánh giá kế hoạch (`planEvaluation.ts`), `hostReliability`. Cố ý KHÔNG đổi: engine học lịch sử (chỉ ca đối
+>    soát), báo cáo Ads (mọi ca Completed), cam kết giờ (`isDelivered`), tiền (`isPnlSession`).
+> 7. **Giờ** — tỷ lệ nào nhân với giờ KẾ HOẠCH thì tính trên giờ kế hoạch: `planCheck.recentPerHour` + "Dời 1 giờ…" ở Dashboard (trước
+>    chia giờ live rồi nhân giờ lịch ⇒ thổi phồng khi ca live ngắn). GMV/giờ báo cáo vẫn theo giờ live. `start==end` ra 0h ở
+>    Report như Finance (`hoursOf`/`slotHours` riêng đã bỏ).
+> 8. **Kiểm trùng lịch** — [lib/scheduling/conflicts.ts](src/lib/scheduling/conflicts.ts) `personClash` (Host HOẶC Trợ live ca khác) +
+>    `studioClash` (ca chốt + ca chờ còn mở giữ phòng). Dùng ở Cửa sổ ca (thêm Trợ live, thêm ca chờ — `shiftSlots` truyền đủ 5
+>    host kể cả Sổ Ca), popup ca chờ (thêm Trợ live), kéo đổi phòng, Nhân sự ca, chốt hàng loạt. Verify: sửa ca (không lưu) đặt
+>    trùng giờ ca Lê Minh Nhật → "Trùng Trợ live: Lê Minh Nhật đang làm Host ca … 09:00–10:37".
+> 9. **Lịch brand, chế độ Tháng** — role brand không thấy Studio; GMV chỉ ở ca Đã xong, tháng chưa phát hành ghi "chưa phát hành";
+>    nhãn trạng thái tiếng Việt. Chưa verify role brand thật (chưa có tài khoản).
 
 > **MỚI 2026-09-28 — Dashboard trong từng Brand Workspace: ĐÃ BUILD + VERIFY (không migration, commit 79ac6c7 đã push `main`).** Tab đầu Brand
 > Workspace (`/brand/<slug>/dashboard`). Một hàm run-rate chung theo **plan ban đầu** (`planRunRate` — ca huỷ giữ target, ca ngoài plan
@@ -1124,6 +1125,14 @@ Bảng/hàm: `session_live_snapshots` + `session_live_snapshot_rows`, RPC `apply
 - **Run-rate chỉ tính bằng `planRunRate` (2026-09-28, user chốt).** Target = Σ target ca của Kế Hoạch Tháng đã chốt (plan ban đầu,
   không chia lại khi lịch đổi); ca kế hoạch huỷ/mất shift_slot GIỮ target; ca ngoài plan cộng thực đạt, target = 0. Màn mới cần run-rate
   gọi hàm này (hoặc `monthRunRateFromPlan`), không tự cộng target ca.
+
+- **Một khái niệm — một hàm (audit 2026-09-28).** Màn mới KHÔNG tự viết lại các luật sau:
+  "ca có số" = `isCountable` (hostPerformance.ts; `hasLiveNumbers` là bí danh) · ca tính tiền = `isPnlSession` (pnl.ts) ·
+  dự kiến cuối tháng = `projectMonthEnd` / `MonthOutlook.projectionMethod` · trùng lịch = `personClash`/`studioClash`
+  (lib/scheduling/conflicts.ts) · giờ kế hoạch = `sessionDurationHours`, giờ live = `sessionHours`. GMV/giờ đem NHÂN với giờ
+  lịch (dự phóng, "thêm/dời N giờ") phải chia trên giờ kế hoạch; GMV/giờ BÁO CÁO chia trên giờ live. Kế hoạch đã chốt: ô
+  "Target GMV tháng" = Σ target ca (MonthPlan tự ghi khi lưu/chốt). Ca thêm vào LƯỚI kế hoạch sau khi chốt nhận target = dự
+  báo (user chốt 2026-09-28); chỉ ca mở ngoài kế hoạch mới target 0.
 
 - **Report Tháng là nơi DUY NHẤT nói về số một tháng của brand SAU khi hết tháng (2026-09-27; sửa 2026-09-28: Dashboard brand là màn
   TRONG tháng, dùng chung hàm với report).** Phân tích mới cho tháng thì thêm vào

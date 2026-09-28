@@ -4,7 +4,7 @@ import type { ShopDayLite, ShopDaysMonthSlice } from "../dataraw/monthlyProductS
 import type { ProductListAgg } from "../dataraw/productListAgg";
 import { vnDateOf } from "../dataraw/vnDate";
 import { fmtVndShort } from "../format";
-import { hostKey, sessionHours, UNASSIGNED_HOST_KEY } from "../performance/hostPerformance";
+import { hostKey, isCountable, sessionHours, UNASSIGNED_HOST_KEY } from "../performance/hostPerformance";
 import type { LiveSession } from "../../types";
 import { liveStatsFromRows, pctChange, signed, type CompareWindow, type LiveStats } from "./monthlyReportInsights";
 
@@ -309,7 +309,8 @@ const partOf = (s: LiveSession) => (Number((s.startTime || "00:00").slice(0, 2))
  * không lấy mẫu ngẫu nhiên nên report mở lại vẫn ra đúng số. Chỉ kết luận trên/dưới khi khoảng nằm hẳn một phía 1.
  */
 export function hostReliability(sessions: LiveSession[], bucketOf: (date: string) => CampDayBucket): HostReliability[] {
-  const valid = sessions.filter((s) => (s.actualGmv ?? 0) > 0 && sessionHours(s) > 0);
+  // isCountable: bỏ ca đang live có số dở dang (audit 2026-09-28 mục 6).
+  const valid = sessions.filter((s) => isCountable(s) && (s.actualGmv ?? 0) > 0 && sessionHours(s) > 0);
   const cell = (s: LiveSession) => `${s.date.slice(0, 7)}|${bucketOf(s.date)}|${partOf(s)}`;
   const rate = new Map<string, { g: number; h: number }>();
   for (const s of valid) {

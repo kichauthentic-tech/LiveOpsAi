@@ -6,6 +6,7 @@ import type { SkuRankSlice } from "../dataraw/monthlyProductSlice";
 import type { ShopDaysMonthSlice } from "../dataraw/monthlyProductSlice";
 import { vnDateOf } from "../dataraw/vnDate";
 import { fmtVndShort } from "../format";
+import { sessionDurationHours } from "../pnl";
 
 // Report Tháng 8 phần (user chốt 2026-09-25) — các phép tính MỚI của bố cục mới, tách khỏi component
 // để test được: so cùng số ngày, tách nguyên nhân GMV thay đổi, tổng shop theo kênh, dấu hiệu xu hướng
@@ -211,13 +212,8 @@ export interface PlanCampAllocation {
   requiredGmvPerHour: number | null;
 }
 
-function slotHours(start: string, end: string): number {
-  const [sh, sm] = start.split(":").map(Number);
-  const [eh, em] = end.split(":").map(Number);
-  let m = eh * 60 + em - (sh * 60 + sm);
-  if (m <= 0) m += 24 * 60;
-  return m / 60;
-}
+// Giờ kế hoạch của ca — dùng chung pnl.sessionDurationHours (giờ bắt đầu = giờ kết thúc ra 0, không phải 24 giờ).
+const slotHours = sessionDurationHours;
 
 /** Cộng target + giờ của ca Kế Hoạch Tháng theo khung camp (khoảng camp của chính kế hoạch đó). */
 export function planCampAllocation(slots: Pick<BrandMonthPlanSlot, "date" | "startTime" | "endTime" | "targetGmv">[], overrides?: CampOverrides): PlanCampAllocation[] {

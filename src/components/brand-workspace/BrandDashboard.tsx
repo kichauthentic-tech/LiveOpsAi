@@ -6,8 +6,8 @@ import { fetchMonthPlan } from "../../lib/db/monthPlans";
 import { fetchShopDaysMonthSlice, ShopDaysMonthSlice } from "../../lib/dataraw/monthlyProductSlice";
 import { CAMP_DAY_BUCKET_LABEL, CampDayBucket, resolveCampBucketType } from "../../lib/campaignDays";
 import { todayVn } from "../../lib/performance/brandCommitment";
-import { lastDataDate, monthEndOf, prevMonthOf, nextMonthOf, RUN_RATE_BAD, RUN_RATE_WARN } from "../../lib/performance/ceoBrief";
-import { planRunRate, PlanRunRateSlot } from "../../lib/performance/planRunRate";
+import { lastDataDate, monthEndOf, monthOutlook, prevMonthOf, nextMonthOf, RUN_RATE_BAD, RUN_RATE_WARN } from "../../lib/performance/ceoBrief";
+import { planRunRate, PlanRunRateSlot, projectMonthEnd, PROJECTION_METHOD_LABEL } from "../../lib/performance/planRunRate";
 import {
   SLOT_BLOCKS,
   SLOT_BLOCK_LABEL,
@@ -26,6 +26,7 @@ import { compareWindow, driverBreakdown, DRIVER_LABEL, liveStatsFromRows, LiveSt
 import { hasLiveNumbers, sessionToLivePerfRow } from "../../lib/report/sessionsLivePerf";
 import { controlGroup, controlLabel, controlVerdict, hostReliability, isBorderline, reliabilityText, VERDICT_TEXT } from "../../lib/report/deepAnalysis";
 import { isCountable, sessionHours } from "../../lib/performance/hostPerformance";
+import { sessionDurationHours } from "../../lib/pnl";
 import { fmtVndShort } from "../../lib/format";
 import { METRIC, metricHint } from "../../lib/metricGlossary";
 import { PageIntro } from "../common/PageIntro";
@@ -136,6 +137,13 @@ export default function BrandDashboard({ brandId, brandName, sessions, shiftSlot
   // ---- Run-rate theo plan ban đầu
   const locked = !planLoading && plan?.plan.status === "locked";
   const rr = useMemo(() => (locked && plan ? planRunRate(month, plan.slots, shiftSlots, brandSessions, today, camp) : null), [locked, plan, month, shiftSlots, brandSessions, today, camp]);
+  // Dự kiến cuối tháng — MỘT số cho cả trang (thẻ run-rate + khối phương án bù) và trùng Bản Tin CEO.
+  const outlook = useMemo(() => {
+    if (!rr) return null;
+    const open = shiftSlots.filter((sl) => sl.brandId === brandId && sl.status === "open" && !sl.sessionId);
+    return monthOutlook(month, today, brandSessions, open, null, camp);
+  }, [rr, shiftSlots, brandId, month, today, brandSessions, camp]);
+  const projection = useMemo(() => projectMonthEnd(rr, outlook), [rr, outlook]);
 
   // ---- Nhóm đối chứng (ops — Dữ Liệu Gốc)
   const [shop, setShop] = useState<{ cur: ShopDaysMonthSlice; prev: ShopDaysMonthSlice } | null>(null);
@@ -182,9 +190,10 @@ export default function BrandDashboard({ brandId, brandName, sessions, shiftSlot
     from.setDate(from.getDate() - 27);
     const f = `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, "0")}-${String(from.getDate()).padStart(2, "0")}`;
     const xs = brandSessions.filter((s) => isCountable(s) && s.date >= f && s.date <= through);
+    // Theo GIỜ KẾ HOẠCH: số này nhân với "dời/thêm N giờ lịch" (audit 2026-09-28 mục 7), cùng cách dự phóng Bản Tin CEO.
     const byCamp = (camp: boolean) => {
       const x = xs.filter((s) => (bucketOf(s.date) !== "daily") === camp);
-      const h = x.reduce((a, s) => a + sessionHours(s), 0);
+      const h = x.reduce((a, s) => a + sessionDurationHours(s.startTime, s.endTime), 0);
       return h > 0 ? x.reduce((a, s) => a + (s.actualGmv ?? 0), 0) / h : null;
     };
     return { daily: byCamp(false), camp: byCamp(true) };
@@ -316,7 +325,7 @@ export default function BrandDashboard({ brandId, brandName, sessions, shiftSlot
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                   <Stat label={METRIC.runRate} value={pct(rr.total.runRate, 1)} tone={rrTone(rr.total.runRate)} hint={`đạt ${fmtVndShort(rr.total.actual)} / target tới ${rr.through ? dm(rr.through) : "—"} ${fmtVndShort(rr.total.targetToDate)}`} />
                   <Stat label={METRIC.pctTarget} value={pct(rr.total.pctTarget, 1)} hint={`${fmtVndShort(rr.total.actual)} / ${fmtVndShort(rr.total.target)} · ${rr.slots.length} ca kế hoạch`} />
-                  <Stat label="Nếu giữ run-rate" value={fmtVndShort(rr.total.keepPace)} tone={rr.total.keepPace != null && rr.total.keepPace >= rr.total.target ? "text-emerald-400" : "text-rose-400"} hint={`${signed(rr.total.keepPace != null ? rr.total.keepPace / rr.total.target - 1 : null)} so với target`} />
+                  <Stat label="Dự kiến cuối tháng" value={projection.value != null ? fmtVndShort(projection.value) : "—"} tone={projection.value == null ? undefined : projection.value >= rr.total.target ? "text-emerald-400" : "text-rose-400"} hint={`${signed(projection.value != null ? projection.value / rr.total.target - 1 : null)} so với target · ${PROJECTION_METHOD_LABEL[projection.method]}`} />
                   <Stat label="Cần mỗi ngày còn lại" value={rr.total.needPerRemainingDay != null ? fmtVndShort(rr.total.needPerRemainingDay) : "—"} hint={`${rr.total.remainingDays} ngày còn lại`} />
                 </div>
                 <CumulativeChart month={month} targetByDate={rr.targetByDate} actualByDate={rr.actualByDate} through={rr.through} runRate={rr.total.runRate} bucketOf={bucketOf} />
@@ -602,6 +611,8 @@ export default function BrandDashboard({ brandId, brandName, sessions, shiftSlot
       {/* 08 · Phương án bù + benchmark ca sắp live (gộp từ Hỗ Trợ Vận Hành) */}
       {isOps && month === today.slice(0, 7) && (
         <OpsSupport
+          rr={rr}
+          projection={projection}
           brandId={brandId}
           brandName={brandName}
           month={month}

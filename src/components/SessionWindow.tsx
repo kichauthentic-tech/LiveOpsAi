@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { SESSION_STATUS_CLS, SESSION_STATUS_LABEL_VI } from "../lib/sessionStatusUi";
 import { AlertTriangle, Ban, CheckCircle2, Circle, EyeOff, Hand, Link2, Pencil, RotateCcw, Trash2, X } from "lucide-react";
-import { AuditLogEntry, Brand, LiveSession, Studio, Talent, UserRole } from "../types";
-import { dateTimeRangesOverlap } from "../lib/dateUtils";
+import { AuditLogEntry, Brand, LiveSession, ShiftSlot, Studio, Talent, UserRole } from "../types";
+import { personClash, studioClash, studioClashLabel } from "../lib/scheduling/conflicts";
 import { fmtVndShort } from "../lib/format";
 import { sessionHours } from "../lib/performance/hostPerformance";
 import { SessionReportInput } from "../lib/db/sessionReports";
@@ -51,6 +51,8 @@ export interface SessionWindowProps {
   // Chỉ cần khi ops được sửa ca (Lịch Vận Hành / Sổ Ca agency); thiếu thì ẩn nút Sửa.
   studios?: Studio[];
   talents?: Talent[];
+  // Ca chờ đăng ký — để cảnh báo trùng phòng khi sửa ca (ca chờ còn mở cũng giữ phòng). Thiếu = chỉ xét ca đã chốt.
+  shiftSlots?: ShiftSlot[];
   onClose: () => void;
   onSubmitSessionReport?: (sessionId: string, input: SessionReportInput) => Promise<boolean>;
   onSessionSnapshotApplied?: (session: LiveSession) => void;
@@ -98,6 +100,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
   today,
   allSessions,
   studios,
+  shiftSlots = [],
   talents,
   onClose,
   onSubmitSessionReport,
@@ -170,18 +173,21 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
     .filter((x): x is LiveSession => !!x)
     .map((x) => `${fmtDate(x.date)} ${x.startTime}–${x.endTime} (${x.hostName || "chưa gán"})`);
 
-  // Trùng studio / host — xét cả ca qua đêm của ngày trước (Q6).
+  // Trùng studio / host / trợ live — luật chung lib/scheduling/conflicts.ts (audit 2026-09-28 mục 8): người bận nếu
+  // đang là Host HOẶC Trợ live ca khác chồng giờ; phòng bận cả khi ca chờ đăng ký còn mở giữ phòng. Xét cả ca qua
+  // đêm của ngày trước (Q6).
   const conflicts = useMemo(() => {
-    const out = { studio: "", host: "" };
+    const out = { studio: "", host: "", coHost: "" };
     if (!editing) return out;
-    for (const x of allSessions) {
-      if (x.id === s.id || x.status === "Cancelled") continue;
-      if (!dateTimeRangesOverlap(x, edit)) continue;
-      if (x.studioId === edit.studioId && !out.studio) out.studio = x.title || `${x.brandName} ${x.startTime}–${x.endTime}`;
-      if (x.hostId === edit.hostId && !out.host) out.host = `${x.hostName} (${x.title || x.brandName})`;
-    }
+    const who = (x: LiveSession) => `${x.title || x.brandName} ${x.startTime}–${x.endTime}`;
+    const st = studioClash(allSessions, shiftSlots, { ...edit, studioId: edit.studioId }, { excludeSessionId: s.id });
+    if (st) out.studio = studioClashLabel(st);
+    const h = personClash(allSessions, edit, edit.hostId, s.id);
+    if (h) out.host = `${talents?.find((t) => t.id === edit.hostId)?.name ?? "Host"} đang ${h.hostId === edit.hostId ? "làm Host" : "làm Trợ live"} ca ${who(h)}`;
+    const c = personClash(allSessions, edit, edit.coHostId || undefined, s.id);
+    if (c) out.coHost = `${talents?.find((t) => t.id === edit.coHostId)?.name ?? "Trợ live"} đang ${c.hostId === edit.coHostId ? "làm Host" : "làm Trợ live"} ca ${who(c)}`;
     return out;
-  }, [editing, edit, allSessions, s.id]);
+  }, [editing, edit, allSessions, shiftSlots, talents, s.id]);
 
   const saveEdit = async () => {
     if (!onUpdateSession) return;
@@ -340,10 +346,11 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
           {/* Sửa ca (ops) */}
           {editing && canEdit && (
             <section className="space-y-3 text-xs bg-[var(--surface-base)] p-3 rounded-xl border border-[var(--border)]">
-              {(conflicts.studio || conflicts.host) && (
+              {(conflicts.studio || conflicts.host || conflicts.coHost) && (
                 <div className="p-2.5 bg-rose-950/80 border border-rose-700/80 rounded-xl text-[11px] space-y-1 text-rose-200 font-medium">
                   {conflicts.studio && <p>• Trùng Studio: "{conflicts.studio}"</p>}
-                  {conflicts.host && <p>• Trùng Host: "{conflicts.host}"</p>}
+                  {conflicts.host && <p>• Trùng Host: {conflicts.host}</p>}
+                  {conflicts.coHost && <p>• Trùng Trợ live: {conflicts.coHost}</p>}
                 </div>
               )}
               <div className="grid grid-cols-3 gap-2">
