@@ -64,7 +64,7 @@
 >    target của ca đó ⇒ Report Tháng + Dashboard: target 100M → 14,7M, "Đạt 124%". Toàn Cảnh Brand / Hỗ Trợ Vận Hành đọc thẳng kế
 >    hoạch nên vẫn 100M ⇒ 3 màn 3 số. Cùng họ với Đ5 (2026-09-24) nhưng qua đường xoá ca, Đ5 chỉ vá đường "chưa xếp người".
 > 2. ~~**VỪA — Dashboard "Target & dự phóng cả tháng" chia target của brand có kế hoạch chốt cho GMV của MỌI brand**~~ **ĐÃ SỬA
->    2026-09-28 (chưa commit):** `combineOutlooks` thêm `targetScope` (GMV/dự
+>    2026-09-28, commit 87076c2 đã push `main`:** `combineOutlooks` thêm `targetScope` (GMV/dự
 >    phóng/đường cộng dồn của RIÊNG các brand có target, cả ở từng khung camp) khi chỉ một phần brand có target; khối Target +
 >    thẻ ngày campaign của Bản Tin CEO so target với phần đó và ghi "chỉ tính N/M brand có target (tên)"; `gap` chỉ xét brand có
 >    target. Tổng agency ở các khối khác không đổi. Test `tests/combineOutlooks.test.ts` (18,2M ÷ 100M chứ không 3,55B ÷ 100M).
