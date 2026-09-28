@@ -50,6 +50,7 @@ import { addDays, eachDay } from "../lib/dateUtils";
 import { CampDayBucket, CampOverrides } from "../lib/campaignDays";
 import { getBrandTheme } from "../lib/brandTheme";
 import { fmtVndShort } from "../lib/format";
+import { fmtKeyMetric, KEY_METRICS, keyMetricValue } from "../lib/report/keyMetrics";
 import { BrandLogo } from "./ui/BrandLogo";
 import { PageIntro } from "./common/PageIntro";
 
@@ -363,13 +364,12 @@ export default function CeoBrief(props: CeoBriefProps) {
             <Kpi label="Giờ live" value={hrs(cur.hours)} cur={cur.hours} prev={prev.hours} series={series((t) => t.hours)} />
             <Kpi label="GMV/giờ" value={money(cur.gmvPerHour)} cur={cur.gmvPerHour} prev={prev.gmvPerHour} series={series((t) => t.gmvPerHour)} />
             <Kpi label="Orders" value={num(cur.orders)} cur={cur.orders} prev={prev.orders} extra={cur.aov ? `AOV ${money(cur.aov)}` : undefined} series={series((t) => t.orders)} />
-            <Kpi label="CVR" value={pct(cur.buyRate, 2)} cur={cur.buyRate} prev={prev.buyRate} series={series((t) => t.buyRate)} />
-            <Kpi label="Product CTR" value={pct(cur.ctr, 2)} cur={cur.ctr} prev={prev.ctr} series={series((t) => t.ctr)} />
+            <Kpi label="Views" value={num(cur.views)} cur={cur.views} prev={prev.views} series={series((t) => t.views)} />
+            <Kpi label="Product CTR" value={fmtKeyMetric("pct2", cur.ctr)} cur={cur.ctr} prev={prev.ctr} series={series((t) => t.ctr)} />
             {canSeeMoney && fin && (
               <>
                 <Kpi label="Doanh thu agency" value={fin.priced ? money(fin.revenue) : "Chưa tính được"} cur={fin.priced ? fin.revenue : null} prev={finPrev?.priced ? finPrev.revenue : null} extra={fin.sessions ? `${fin.priced}/${fin.sessions} ca đủ dữ liệu` : undefined} locked />
                 <Kpi label="Lãi gộp" value={fin.priced ? money(fin.profit) : "Chưa tính được"} cur={fin.priced ? fin.profit : null} prev={finPrev?.priced ? finPrev.profit : null} extra={fin.margin != null ? `biên ${pct(fin.margin)}` : undefined} locked />
-                <Kpi label="Views" value={num(cur.views)} cur={cur.views} prev={prev.views} series={series((t) => t.views)} />
               </>
             )}
           </div>
@@ -550,15 +550,12 @@ const MonthOverMonth: React.FC<{ sessions: LiveSession[]; brands: Brand[]; lastM
   const step = (W - L - R) / cols.length, bw = Math.min(56, step * 0.55);
   const y = (v: number) => T + (H - T - B) * (1 - v / nice);
 
-  const rows: { label: string; get: (t: Totals) => number | null; fmt: (v: number | null) => string }[] = [
-    { label: "GMV", get: (t) => t.gmv, fmt: money },
-    { label: "Giờ live", get: (t) => t.hours, fmt: (v) => (v == null ? "—" : `${Math.round(v)}h`) },
-    { label: "GMV/giờ", get: (t) => t.gmvPerHour, fmt: money },
-    { label: "Orders", get: (t) => t.orders, fmt: (v) => (v == null ? "—" : num(v)) },
-    { label: "AOV", get: (t) => t.aov, fmt: money },
-    { label: "CVR", get: (t) => t.buyRate, fmt: (v) => pct(v, 2) },
-    { label: "Product CTR", get: (t) => t.ctr, fmt: (v) => pct(v, 2) }
-  ];
+  // Key Metrics đủ 18 chỉ số + AOV (lib/report/keyMetrics.ts), cùng thứ tự mọi report.
+  const rows: { label: string; get: (t: Totals) => number | null; fmt: (v: number | null) => string }[] = KEY_METRICS.map((d) => ({
+    label: d.label,
+    get: (t: Totals) => keyMetricValue(t, d.key),
+    fmt: (v: number | null) => fmtKeyMetric(d, v)
+  }));
   return (
     <section className="space-y-3">
       <SectionTitle title="Tháng qua tháng" note={`Tháng đang chạy so với cùng ${days} ngày đầu tháng trước`} />

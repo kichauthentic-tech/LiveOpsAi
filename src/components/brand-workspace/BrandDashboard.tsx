@@ -24,6 +24,7 @@ import {
 } from "../../lib/performance/slotInsights";
 import { compareWindow, driverBreakdown, DRIVER_LABEL, liveStatsFromRows, LiveStats } from "../../lib/report/monthlyReportInsights";
 import { hasLiveNumbers, sessionToLivePerfRow } from "../../lib/report/sessionsLivePerf";
+import { fmtKeyMetric, KEY_METRICS, keyMetricValue } from "../../lib/report/keyMetrics";
 import { controlGroup, controlLabel, liveGmvByDate, controlVerdict, hostReliability, isBorderline, reliabilityText, VERDICT_TEXT } from "../../lib/report/deepAnalysis";
 import { isCountable, sessionHours } from "../../lib/performance/hostPerformance";
 import { sessionDurationHours } from "../../lib/pnl";
@@ -211,16 +212,6 @@ export default function BrandDashboard({ brandId, brandName, sessions, shiftSlot
   const noData = monthSessions.filter((s) => s.status === "Completed" && !isCountable(s)).length;
   const inputCls = "bg-[var(--surface-base)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-mono";
 
-  const kpis: [string, keyof LiveStats, (v: number | null) => string, number][] = [
-    [METRIC.gmv, "gmv", (v) => fmtVndShort(v), 1],
-    [METRIC.liveHours, "hours", (v) => `${num(v, 0)}h`, 1],
-    [METRIC.gmvPerHour, "gmvPerHour", (v) => fmtVndShort(v), 1],
-    [METRIC.orders, "orders", (v) => num(v), 1],
-    [METRIC.viewsPerHour, "viewsPerHour", (v) => num(v), 1],
-    [METRIC.liveCtr, "liveCtr", (v) => (v == null ? "—" : `${num(v, 1)}%`), 1],
-    [METRIC.ctor, "ctor", (v) => (v == null ? "—" : `${num(v, 2)}%`), 1],
-    [METRIC.aov, "aov", (v) => fmtVndShort(v), 1]
-  ];
 
   const caRows: { key: string; date: string; time: string; bucket: CampDayBucket; host: string; target: number | null; actual: number | null; pctTarget: number | null; state: PlanRunRateSlot["state"] | "offplan"; sessionId?: string }[] = rr
     ? [
@@ -303,11 +294,13 @@ export default function BrandDashboard({ brandId, brandName, sessions, shiftSlot
         <>
           {/* 02 · Tháng này tới đâu */}
           <Card title={`Tháng ${Number(month.slice(5))} tới ${through ? dm(through) : "—"}`} icon={<Activity className="w-4 h-4 text-[var(--accent-text)]" />} sub={`So với cùng kỳ: ${win.label}`}>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {kpis.map(([label, key, f]) => {
-                const a = prev[key] as number | null, b = cur[key] as number | null;
+            {/* Key Metrics đủ 18 chỉ số + AOV (lib/report/keyMetrics.ts); màu theo chiều tốt của từng chỉ số, trung tính thì không tô. */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3">
+              {KEY_METRICS.map((d) => {
+                const a = keyMetricValue(prev, d.key), b = keyMetricValue(cur, d.key);
                 const ch = a && b != null ? b / a - 1 : null;
-                return <Stat key={label} label={label} value={f(b)} hint={<span className={ch == null ? "" : Math.abs(ch) < 0.02 ? "" : ch > 0 ? "text-emerald-400" : "text-rose-400"}>{signed(ch)} <span className="text-[var(--text-faint)]">({f(a)})</span></span>} />;
+                const tone = ch == null || d.goodWhenUp == null || Math.abs(ch) < 0.02 ? "" : ch > 0 === d.goodWhenUp ? "text-emerald-400" : "text-rose-400";
+                return <Stat key={d.key} label={d.label} value={fmtKeyMetric(d, b)} hint={<span className={tone}>{signed(ch)} <span className="text-[var(--text-faint)]">({fmtKeyMetric(d, a)})</span></span>} />;
               })}
             </div>
           </Card>

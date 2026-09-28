@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { BrandMonthPlan, BrandMonthPlanSlot, LiveSession, ShiftSlot, UserRole } from "../../types";
 import { AlertTriangle, CalendarRange, ChevronLeft, ChevronRight, ClipboardList, Database, Download, Loader2, Radio, TrendingDown, TrendingUp, Users } from "lucide-react";
 import { fmtVndShort } from "../../lib/format";
+import { fmtKeyMetric, KEY_METRICS, keyMetricSheetColumns, keyMetricSheetLabel, keyMetricSheetValue, keyMetricsOfSessions, keyMetricValue } from "../../lib/report/keyMetrics";
 import { metricHint } from "../../lib/metricGlossary";
 import { downloadSheetsAsXlsx } from "../../lib/exportXlsx";
 import { useToast } from "../../hooks/useToast";
@@ -121,13 +122,6 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
     const gmv = done.reduce((a, s) => a + (s.actualGmv ?? 0), 0);
     const hours = done.reduce((a, s) => a + sessionHours(s), 0);
     const orders = done.reduce((a, s) => a + (s.totalOrders ?? 0), 0);
-    const views = done.reduce((a, s) => a + (s.totalViews ?? 0), 0);
-    const clicks = done.reduce((a, s) => a + (s.productClicks ?? 0), 0);
-    // "CTR live" phải cùng công thức với Report Tháng (lib/report/sessionsLivePerf.ts: views /
-    // impressions). Bản cũ lấy productClicks / views nên cùng một cái tên mà hai màn ra hai số
-    // (tuần 38: 50,6% ở đây vs 3,2% ở Tab 02) — audit 2026-09-21.
-    const impressions = done.reduce((a, s) => a + (s.impressions ?? 0), 0);
-    const productImpressions = done.reduce((a, s) => a + (s.productImpressions ?? 0), 0);
     // % Target = GMV ÷ target các ngày đã có số (≤ ngày cuối có số) — cùng luật run-rate tháng. Bản cũ chia cho
     // target của riêng các ca đã có số nên ca huỷ / ca chưa có file rơi khỏi mẫu số và % đẹp hơn thực tế.
     const days = eachDay(from, to);
@@ -142,14 +136,8 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
       hours,
       gmvPerHour: hours > 0 ? gmv / hours : 0,
       orders,
-      aov: orders > 0 ? gmv / orders : 0,
-      views,
-      cvr: views > 0 ? orders / views : null,
-      // ERR = Views ÷ LIVE impressions (TikTok "Tap-through rate"); LIVE CTR = Product clicks ÷ Views.
-      // Trước 2026-09-26 ô này ghi "CTR live" nhưng tính Views ÷ impressions — sai tên so với deck/TikTok.
-      err: impressions > 0 ? views / impressions : null,
-      liveCtr: views > 0 ? clicks / views : null,
-      productCtr: productImpressions > 0 ? clicks / productImpressions : null,
+      // Key Metrics đủ 18 chỉ số + AOV — cùng hàm với Report Tháng / Dashboard / Hiệu Suất Host (lib/report/keyMetrics.ts).
+      km: keyMetricsOfSessions(done, sessionHours),
       target,
       targetDone,
       achieved: targetDone > 0 ? gmv / targetDone : null,
@@ -197,7 +185,7 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
   // Target tuần tới: cùng luật targetOfDay — ca kế hoạch chưa có người (ca chờ đăng ký) vẫn mang target của nó.
   const nextTarget = eachDay(nextStart, nextEnd).reduce((a, d) => a + targetOfDay(d, nextSessions.filter((s) => s.date === d)), 0);
 
-  // Xuất Excel — đúng 2 bảng đang hiện trên màn (Theo ngày + Host tuần này), không tính số mới.
+  // Xuất Excel — đúng các bảng đang hiện trên màn (Theo ngày + Key Metrics tuần/host), không tính số mới.
   const { showToast } = useToast();
   const handleExport = () => {
     downloadSheetsAsXlsx(
@@ -217,13 +205,19 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
           }))
         },
         {
+          name: "Key Metrics",
+          rows: KEY_METRICS.map((d) => ({
+            "Chỉ số": keyMetricSheetLabel(d),
+            "Tuần này": keyMetricSheetValue(cur.km, d.key),
+            "Tuần trước": keyMetricSheetValue(prev.km, d.key)
+          }))
+        },
+        {
           name: "Host Tuan Nay",
           rows: hosts.map((h) => ({
             "Host": h.label,
             "Sessions": h.sessionCount,
-            "Giờ live": Math.round(h.hours * 100) / 100,
-            "GMV": Math.round(h.gmv),
-            "GMV/giờ": Math.round(h.gmvPerHour)
+            ...keyMetricSheetColumns(h)
           }))
         }
       ],
@@ -269,24 +263,11 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
       </div>
 
       {/* KPI tuần */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <Kpi label="LIVE GMV tuần" value={fmtVndShort(cur.gmv)} delta={wow(cur.gmv, prev.gmv)} tone={cur.gmv > 0 ? "good" : undefined} />
         <Kpi label="Target GMV tuần" value={cur.target > 0 ? fmtVndShort(cur.target) : "—"} hint={cur.achieved !== null ? `${fmtPct(cur.achieved)} Target tới ngày có số${through && through < weekEnd && through >= weekStart ? ` (${fmtDay(through)})` : ""}` : cur.target > 0 ? "chưa có ca xong" : "chưa có kế hoạch đã chốt"} tone={cur.achieved === null ? undefined : cur.achieved >= 1 ? "good" : cur.achieved >= 0.9 ? "warn" : "bad"} />
         <Kpi label="Giờ live" value={fmtH(cur.hours)} delta={wow(cur.hours, prev.hours)} hint={`${cur.done} ca`} />
         <Kpi label="GMV/giờ" value={fmtVndShort(cur.gmvPerHour)} delta={wow(cur.gmvPerHour, prev.gmvPerHour)} />
-        <Kpi label="Orders" value={fmtInt(cur.orders)} delta={wow(cur.orders, prev.orders)} hint={cur.aov > 0 ? `AOV ${fmtVndShort(cur.aov)}` : undefined} />
-        <Kpi label="Views" value={fmtInt(cur.views)} delta={wow(cur.views, prev.views)} />
-        <Kpi
-          label="CVR"
-          value={fmtPct(cur.cvr, 2)}
-          hint={[
-            cur.err !== null ? `ERR ${fmtPct(cur.err, 2)}` : null,
-            cur.liveCtr !== null ? `LIVE CTR ${fmtPct(cur.liveCtr, 1)}` : null,
-            cur.productCtr !== null ? `Product CTR ${fmtPct(cur.productCtr, 2)}` : null
-          ]
-            .filter(Boolean)
-            .join(" · ") || undefined}
-        />
         <Kpi
           label={`Run-rate tháng ${monthKey.slice(5, 7)}`}
           value={monthRr?.runRate === null || monthRr?.runRate === undefined ? "—" : fmtPct(monthRr.runRate)}
@@ -357,14 +338,14 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div>
         {/* Top ca */}
         <div className="bg-[var(--surface)] rounded-2xl border border-[var(--border)] p-4 space-y-2">
           <h4 className="font-bold text-[var(--text)] text-sm">Top ca tuần</h4>
           {topSessions.length === 0 ? (
             <p className="text-xs text-[var(--text-faint)] italic">Chưa có ca nào có số.</p>
           ) : (
-            <ul className="space-y-1.5">
+            <ul className="grid grid-cols-1 lg:grid-cols-2 gap-1.5">
               {topSessions.map((s, i) => (
                 <li key={s.id} className="flex items-center gap-2 text-xs bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2.5 py-1.5">
                   <span className="w-5 text-center font-black text-[var(--text-faint)]">{i + 1}</span>
@@ -382,41 +363,46 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
           )}
         </div>
 
-        {/* Host */}
-        <div className="bg-[var(--surface)] rounded-2xl border border-[var(--border)] p-4 space-y-2">
-          <h4 className="font-bold text-[var(--text)] text-sm flex items-center gap-2"><Users className="w-4 h-4 text-[var(--accent-text)]" /> Host tuần này</h4>
-          {unassignedHost && (
-            <p className="text-[11px] text-amber-300">
-              {unassignedHost.sessionCount} ca chưa gán host ({fmtVndShort(unassignedHost.gmv)}) không tính vào bảng này.
-            </p>
-          )}
-          {hosts.length === 0 ? (
-            <p className="text-xs text-[var(--text-faint)] italic">Chưa có ca nào có số.</p>
-          ) : (
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="text-[var(--text-faint)] text-left text-[11px] uppercase tracking-wider">
-                  <th className="py-1">Host</th>
-                  <th className="py-1 text-right">Sessions</th>
-                  <th className="py-1 text-right">Giờ live</th>
-                  <th className="py-1 text-right">GMV</th>
-                  <th className="py-1 text-right">GMV/giờ</th>
-                </tr>
-              </thead>
-              <tbody>
-                {hosts.map((h) => (
-                  <tr key={h.key} className="border-t border-[var(--border)]/60">
-                    <td className="py-1.5 text-[var(--text)] font-medium">{h.label}</td>
-                    <td className="py-1.5 text-right text-[var(--text-muted)]">{h.sessionCount}</td>
-                    <td className="py-1.5 text-right text-[var(--text-muted)]">{fmtH(h.hours)}</td>
-                    <td className="py-1.5 text-right font-bold text-[var(--text)]">{fmtVndShort(h.gmv)}</td>
-                    <td className="py-1.5 text-right text-[var(--text-muted)]">{fmtVndShort(h.gmvPerHour)}</td>
+      </div>
+
+      {/* Key Metrics tuần + từng host (thay bảng "Host tuần này" 4 cột) */}
+      <div className="bg-[var(--surface)] rounded-2xl border border-[var(--border)] p-4 space-y-2">
+        <h4 className="font-bold text-[var(--text)] text-sm flex items-center gap-2"><Users className="w-4 h-4 text-[var(--accent-text)]" /> Key Metrics · tuần & host</h4>
+        {unassignedHost && (
+          <p className="text-[11px] text-amber-300">
+            {unassignedHost.sessionCount} ca chưa gán host ({fmtVndShort(unassignedHost.gmv)}) có trong cột Tuần này nhưng không có cột host riêng.
+          </p>
+        )}
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-[var(--text-faint)] text-left text-[11px] uppercase tracking-wider">
+                <th className="py-1.5 pr-3">Chỉ số</th>
+                <th className="py-1.5 pr-3 text-right">Tuần này</th>
+                <th className="py-1.5 pr-3 text-right">Tuần trước</th>
+                <th className="py-1.5 pr-3 text-right border-r border-[var(--border)]">±</th>
+                {hosts.map((h) => <th key={h.key} className="py-1.5 px-2 text-right whitespace-nowrap normal-case">{h.label} · {h.sessionCount} ca</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {KEY_METRICS.map((d) => {
+                const a = keyMetricValue(cur.km, d.key), b = keyMetricValue(prev.km, d.key);
+                const chg = a != null && b != null && b !== 0 ? a / b - 1 : null;
+                const tone = chg == null || d.goodWhenUp == null || Math.abs(chg) < 0.005 ? "text-[var(--text-faint)]" : chg > 0 === d.goodWhenUp ? "text-emerald-400" : "text-rose-400";
+                return (
+                  <tr key={d.key} className="border-t border-[var(--border)]/60">
+                    <td className={`py-1.5 pr-3 whitespace-nowrap ${d.extra ? "text-[var(--text-faint)]" : "text-[var(--text)]"} font-medium`} title={metricHint(d.label)}>{d.label}</td>
+                    <td className="py-1.5 pr-3 text-right font-bold text-[var(--text)] whitespace-nowrap">{fmtKeyMetric(d, a)}</td>
+                    <td className="py-1.5 pr-3 text-right text-[var(--text-muted)] whitespace-nowrap">{fmtKeyMetric(d, b)}</td>
+                    <td className={`py-1.5 pr-3 text-right font-bold whitespace-nowrap border-r border-[var(--border)] ${tone}`}>{chg == null ? "—" : `${chg >= 0 ? "+" : "−"}${fmtPct(Math.abs(chg))}`}</td>
+                    {hosts.map((h) => <td key={h.key} className="py-1.5 px-2 text-right text-[var(--text-muted)] whitespace-nowrap">{fmtKeyMetric(d, keyMetricValue(h, d.key))}</td>)}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+                );
+              })}
+            </tbody>
+          </table>
         </div>
+        <p className="text-[11px] text-[var(--text-faint)]">± so tuần trước: xanh = tốt lên, đỏ = xấu đi, xám = trung tính (UPT, Avg. price, Giờ live). ERR, LIVE impressions/giờ, Avg. view chỉ tính các ca có số của trường đó.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

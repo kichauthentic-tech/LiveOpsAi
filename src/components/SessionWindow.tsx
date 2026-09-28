@@ -4,6 +4,7 @@ import { AlertTriangle, Ban, CheckCircle2, Circle, EyeOff, Hand, Link2, Pencil, 
 import { AuditLogEntry, Brand, LiveSession, ShiftSlot, Studio, Talent, UserRole } from "../types";
 import { personClash, studioClash, studioClashLabel } from "../lib/scheduling/conflicts";
 import { fmtVndShort } from "../lib/format";
+import { fmtKeyMetric, KEY_METRICS, keyMetricsOfSessions, keyMetricValue } from "../lib/report/keyMetrics";
 import { sessionHours } from "../lib/performance/hostPerformance";
 import { SessionReportInput } from "../lib/db/sessionReports";
 import {
@@ -167,6 +168,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
   const planHours = sessionHours({ ...s, liveDurationMinutes: undefined });
   const liveHours = s.liveDurationMinutes ? s.liveDurationMinutes / 60 : 0;
   const gmvPerHour = liveHours > 0 ? (s.actualGmv ?? 0) / liveHours : planHours > 0 ? (s.actualGmv ?? 0) / planHours : 0;
+  const km = keyMetricsOfSessions([s], () => (liveHours > 0 ? liveHours : planHours));
   const linked = useMemo(() => linkedSessions(allSessions).get(s.id) ?? [], [allSessions, s.id]);
   const linkedLabel = linked
     .map((id) => allSessions.find((x) => x.id === id))
@@ -498,31 +500,27 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
             <h4 className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-bold mb-2">Số liệu ca</h4>
             {counters ? (
               <>
+                {/* Key Metrics đủ 18 chỉ số + AOV, cùng hàm/thứ tự với mọi report (lib/report/keyMetrics.ts). */}
                 <div className="grid grid-cols-3 gap-2">
-                  <KV label="Orders" value={fmtInt(counters.orders)} />
-                  <KV label="Items sold" value={fmtInt(counters.itemsSold)} />
+                  {KEY_METRICS.map((d) => (
+                    <KV key={d.key} label={d.label} value={fmtKeyMetric(d, keyMetricValue(km, d.key))} />
+                  ))}
+                </div>
+                <p className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-bold mt-3 mb-2">Số khác</p>
+                <div className="grid grid-cols-3 gap-2">
                   <KV label="SKU orders" value={fmtInt(counters.skuOrders)} />
-                  <KV label="Views" value={fmtInt(counters.views)} />
-                  <KV label="LIVE impressions" value={fmtInt(counters.impressions)} />
-                  <KV label="Product impressions" value={fmtInt(counters.productImpressions)} />
-                  <KV label="Product clicks" value={fmtInt(counters.productClicks)} />
                   <KV label="New followers" value={fmtInt(counters.newFollowers)} />
                   <KV label="Comments" value={fmtInt(counters.comments)} />
                   <KV label="Shares" value={fmtInt(counters.shares)} />
                   <KV label="Likes" value={fmtInt(counters.likes)} />
                   <KV label="PCU" value={fmtInt(s.peakViewers)} />
+                  {ratios && (
+                    <>
+                      <KV label="SKU order rate" value={fmtPct(ratios.skuOrderRate)} />
+                      <KV label="Show GPM" value={fmtVndShort(ratios.showGpm)} />
+                    </>
+                  )}
                 </div>
-                {ratios && (
-                  <div className="grid grid-cols-3 gap-2 mt-2">
-                    <KV label="AOV" value={fmtVndShort(ratios.aov)} />
-                    <KV label="ERR" value={fmtPct(ratios.tapThroughRate)} />
-                    <KV label="LIVE CTR" value={fmtPct(ratios.liveCtr)} />
-                    <KV label="Product CTR" value={fmtPct(ratios.ctr)} />
-                    <KV label="CTOR" value={fmtPct(ratios.ctor)} />
-                    <KV label="SKU order rate" value={fmtPct(ratios.skuOrderRate)} />
-                    <KV label="Show GPM" value={fmtVndShort(ratios.showGpm)} />
-                  </div>
-                )}
                 <p className="text-[11px] text-[var(--text-faint)] mt-2">Tỷ lệ tính lại từ số đã tách theo ca, không lấy cột tỷ lệ cộng dồn của file.</p>
               </>
             ) : s.actualGmv || s.totalOrders || s.totalViews ? (

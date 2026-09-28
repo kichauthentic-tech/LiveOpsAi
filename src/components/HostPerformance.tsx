@@ -14,6 +14,8 @@ import { getTodayDate } from "../lib/dateUtils";
 import { PageIntro } from "./common/PageIntro";
 
 import { fmtFixed, fmtVndShort } from "../lib/format";
+import { METRIC, metricHint } from "../lib/metricGlossary";
+import { fmtKeyMetric, KEY_METRICS, keyMetricValue } from "../lib/report/keyMetrics";
 interface HostPerformanceProps {
   sessions: LiveSession[];
   brands: Brand[];
@@ -31,6 +33,7 @@ function isoDaysAgo(days: number): string {
 }
 
 const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0]; // Thứ 2 → Chủ nhật
+const RANK_COLS = KEY_METRICS.filter((d) => d.key !== "gmvPerHour");
 
 export function HostPerformance({ sessions, brands }: HostPerformanceProps) {
   const [from, setFrom] = useState(() => isoDaysAgo(90));
@@ -121,28 +124,28 @@ export function HostPerformance({ sessions, brands }: HostPerformanceProps) {
               </div>
             )}
             <div className="mt-3 overflow-x-auto">
-              <table className="w-full text-xs min-w-[560px]">
+              {/* Key Metrics đủ 18 chỉ số + AOV (lib/report/keyMetrics.ts). GMV/giờ là cột xếp hạng nên ghim ngay sau tên host,
+                  17 chỉ số còn lại theo đúng thứ tự chung. */}
+              <table className="w-full text-xs">
                 <thead>
                   <tr className="text-[var(--text-faint)] text-left text-[11px]">
-                    <th className="font-bold pb-2 pr-3">Host</th>
-                    <th className="font-bold pb-2 pr-3 text-right">GMV/giờ</th>
-                    <th className="font-bold pb-2 pr-3 text-right">GMV</th>
-                    <th className="font-bold pb-2 pr-3 text-right">Sessions</th>
-                    <th className="font-bold pb-2 pr-3 text-right">Giờ live</th>
-                    <th className="font-bold pb-2 pr-3 text-right">GMV/session</th>
-                    <th className="font-bold pb-2 text-right">Product CTR</th>
+                    <th className="font-bold pb-2 pr-3 sticky left-0 bg-[var(--surface)]">Host</th>
+                    <th className="font-bold pb-2 pr-3 text-right whitespace-nowrap" title={metricHint(METRIC.gmvPerHour)}>{METRIC.gmvPerHour}</th>
+                    {RANK_COLS.map((d) => (
+                      <th key={d.key} className="font-bold pb-2 pr-3 text-right whitespace-nowrap" title={metricHint(d.label)}>{d.label}</th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
                   {hosts.map((h) => (
                     <tr key={h.key} className="border-t border-[var(--border)]/60">
-                      <td className="py-2 pr-3 font-bold text-[var(--text)]">{h.label}</td>
-                      <td className="py-2 pr-3 text-right font-bold text-emerald-400">{fmtVndShort(h.gmvPerHour)}</td>
-                      <td className="py-2 pr-3 text-right text-[var(--text-muted)]">{fmtVndShort(h.gmv)}</td>
-                      <td className="py-2 pr-3 text-right text-[var(--text-muted)]">{h.sessionCount}</td>
-                      <td className="py-2 pr-3 text-right text-[var(--text-muted)]">{fmtFixed(h.hours, 1)}h</td>
-                      <td className="py-2 pr-3 text-right text-[var(--text-muted)]">{fmtVndShort(h.gmvPerSession)}</td>
-                      <td className="py-2 text-right text-[var(--text-muted)]">{fmtFixed(h.ctr, 2)}%</td>
+                      <td className="py-2 pr-3 font-bold text-[var(--text)] whitespace-nowrap sticky left-0 bg-[var(--surface)]">
+                        {h.label} <span className="font-normal text-[var(--text-faint)]">· {h.sessionCount} ca</span>
+                      </td>
+                      <td className="py-2 pr-3 text-right font-bold text-emerald-400 whitespace-nowrap">{fmtVndShort(h.gmvPerHour)}</td>
+                      {RANK_COLS.map((d) => (
+                        <td key={d.key} className="py-2 pr-3 text-right text-[var(--text-muted)] whitespace-nowrap">{fmtKeyMetric(d, keyMetricValue(h, d.key))}</td>
+                      ))}
                     </tr>
                   ))}
                 </tbody>

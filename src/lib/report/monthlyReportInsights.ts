@@ -7,6 +7,7 @@ import type { ShopDaysMonthSlice } from "../dataraw/monthlyProductSlice";
 import { vnDateOf } from "../dataraw/vnDate";
 import { fmtVndShort } from "../format";
 import { sessionDurationHours } from "../pnl";
+import { addKeyInput, emptyKeyCounts, keyInputFromRow, keyMetrics, type KeyMetrics } from "./keyMetrics";
 
 // Report Tháng 8 phần (user chốt 2026-09-25) — các phép tính MỚI của bố cục mới, tách khỏi component
 // để test được: so cùng số ngày, tách nguyên nhân GMV thay đổi, tổng shop theo kênh, dấu hiệu xu hướng
@@ -59,58 +60,22 @@ export function compareWindow(month: string, through: string | null): CompareWin
 
 // ---------- chỉ số live theo cửa sổ ----------
 
-export interface LiveStats {
-  sessions: number;
-  gmv: number;
-  hours: number;
-  views: number;
-  orders: number;
+/** Bộ Key Metrics (lib/report/keyMetrics.ts) + 2 số riêng của Report Tháng. Tỷ lệ là giá trị %. */
+export interface LiveStats extends KeyMetrics {
   skuOrders: number;
-  itemsSold: number;
-  productImpressions: number;
-  productClicks: number;
-  gmvPerHour: number | null;
-  viewsPerHour: number | null;
   gmvPerView: number | null;
-  ctr: number | null;
-  ctor: number | null;
-  aov: number | null;
-  /** Sản phẩm mỗi đơn = itemsSold / orders (cùng công thức `upt` của creatorLivePerfMetrics). */
-  upt: number | null;
-  /** GMV mỗi sản phẩm = GMV / itemsSold. Đọc CÙNG với UPT: UPT giảm thì số này tự tăng dù giá bán không đổi. */
-  pricePerItem: number | null;
-  /** Click sản phẩm / lượt xem — cột "LIVE CTR" của TikTok (khớp deck report Crocs: T8 56,2%). */
-  liveCtr: number | null;
 }
 
 export function liveStatsFromRows(rows: CreatorLivePerfRow[], start: string, end: string): LiveStats {
-  let sessions = 0, gmv = 0, hours = 0, views = 0, orders = 0, skuOrders = 0, itemsSold = 0, productImpressions = 0, productClicks = 0;
+  const c = emptyKeyCounts();
+  let skuOrders = 0;
   for (const r of rows) {
     const d = vnDateOf(r.startTime);
     if (d < start || d > end) continue;
-    sessions += 1;
-    gmv += r.gmv;
-    hours += r.hours;
-    views += r.views;
-    orders += r.orders;
+    addKeyInput(c, keyInputFromRow(r));
     skuOrders += r.skuOrders;
-    itemsSold += r.itemsSold;
-    productImpressions += r.productImpressions;
-    productClicks += r.productClicks;
   }
-  const div = (a: number, b: number) => (b > 0 ? a / b : null);
-  return {
-    sessions, gmv, hours, views, orders, skuOrders, itemsSold, productImpressions, productClicks,
-    gmvPerHour: div(gmv, hours),
-    viewsPerHour: div(views, hours),
-    gmvPerView: div(gmv, views),
-    ctr: productImpressions > 0 ? (productClicks / productImpressions) * 100 : null,
-    ctor: productClicks > 0 ? (orders / productClicks) * 100 : null,
-    aov: div(gmv, orders),
-    upt: div(itemsSold, orders),
-    pricePerItem: div(gmv, itemsSold),
-    liveCtr: views > 0 ? (productClicks / views) * 100 : null
-  };
+  return { ...keyMetrics(c), skuOrders, gmvPerView: c.views > 0 ? c.gmv / c.views : null };
 }
 
 export function pctChange(from: number | null | undefined, to: number | null | undefined): number | null {

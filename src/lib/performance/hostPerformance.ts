@@ -2,28 +2,22 @@ import { LiveSession } from "../../types";
 import { sessionDurationHours } from "../pnl";
 import type { CampDayBucket } from "../campaignDays";
 import { METRIC } from "../metricGlossary";
+import { addKeyInput, emptyKeyCounts, keyInputFromSession, keyMetrics, type KeyCounts, type KeyMetrics } from "../report/keyMetrics";
 
 // Giai đoạn 3 của tầng dữ liệu gốc mới: đọc ra hiệu suất thật để làm nền cho việc SẮP LỊCH.
 // Chỉ tổng hợp, không tự xếp lịch — ops vẫn là người quyết, đúng tinh thần đã chốt (tránh lặp lại
 // rủi ro "hiển thị số chưa đáng tin" của module Dashboard cũ đã xoá).
 
-export interface PerfTotals {
-  sessionCount: number;
-  hours: number;
-  gmv: number;
-  orders: number;
-  views: number;
-  productClicks: number;
-  productImpressions: number;
-}
+// Cộng số dùng đúng bộ đếm của Key Metrics (lib/report/keyMetrics.ts) — cùng công thức với Report Tháng/Tuần,
+// Dashboard, Bản Tin CEO.
+export type PerfTotals = KeyCounts;
 
-export interface PerfRow extends PerfTotals {
+export interface PerfRow extends KeyMetrics {
   key: string;
   label: string;
   subLabel?: string;
-  gmvPerHour: number;
+  sessionCount: number;
   gmvPerSession: number;
-  ctr: number;
 }
 
 export interface DataQuality {
@@ -32,10 +26,6 @@ export interface DataQuality {
   snapshot: number; // số thật lúc giao ca, TikTok còn cập nhật trễ
   manual: number; // host tự khai, chưa có gì bảo chứng
 }
-
-const EMPTY: PerfTotals = {
-  sessionCount: 0, hours: 0, gmv: 0, orders: 0, views: 0, productClicks: 0, productImpressions: 0
-};
 
 // Giờ live THỰC TẾ nếu có (đọc từ file), nếu chưa có thì tạm dùng giờ kế hoạch của ca. Dùng giờ
 // kế hoạch cho GMV/giờ sẽ hơi lệch, nhưng bỏ ca đó ra khỏi thống kê còn sai hơn.
@@ -58,26 +48,17 @@ export function isCountable(s: LiveSession): boolean {
 }
 
 function addTo(acc: PerfTotals, s: LiveSession): PerfTotals {
-  return {
-    sessionCount: acc.sessionCount + 1,
-    hours: acc.hours + sessionHours(s),
-    gmv: acc.gmv + (s.actualGmv ?? 0),
-    orders: acc.orders + (s.totalOrders ?? 0),
-    views: acc.views + (s.totalViews ?? 0),
-    productClicks: acc.productClicks + (s.productClicks ?? 0),
-    productImpressions: acc.productImpressions + (s.productImpressions ?? 0)
-  };
+  return addKeyInput(acc, keyInputFromSession(s, sessionHours(s)));
 }
 
 function finish(key: string, label: string, t: PerfTotals, subLabel?: string): PerfRow {
   return {
-    ...t,
+    ...keyMetrics(t),
     key,
     label,
     subLabel,
-    gmvPerHour: t.hours > 0 ? t.gmv / t.hours : 0,
-    gmvPerSession: t.sessionCount > 0 ? t.gmv / t.sessionCount : 0,
-    ctr: t.productImpressions > 0 ? (t.productClicks / t.productImpressions) * 100 : 0
+    sessionCount: t.sessions,
+    gmvPerSession: t.sessions > 0 ? t.gmv / t.sessions : 0
   };
 }
 
@@ -117,12 +98,12 @@ function groupBy(
   const acc = new Map<string, { t: PerfTotals; label: string; subLabel?: string }>();
   for (const s of sessions) {
     const k = keyOf(s);
-    const cur = acc.get(k) ?? { t: EMPTY, ...labelOf(s) };
+    const cur = acc.get(k) ?? { t: emptyKeyCounts(), ...labelOf(s) };
     acc.set(k, { ...cur, t: addTo(cur.t, s) });
   }
   return [...acc.entries()]
     .map(([k, v]) => finish(k, v.label, v.t, v.subLabel))
-    .sort((a, b) => b.gmvPerHour - a.gmvPerHour);
+    .sort((a, b) => (b.gmvPerHour ?? 0) - (a.gmvPerHour ?? 0));
 }
 
 export const UNASSIGNED_HOST_KEY = "chua-gan-host";
@@ -192,7 +173,7 @@ export function hostWeekdayGrid(sessions: LiveSession[]): HostWeekdayCell[] {
   for (const s of sessions) {
     // Cùng công thức khoá với byHost() để lưới khớp đúng dòng xếp hạng.
     const k = `${hostKey(s)}::${weekdayOf(s.date)}`;
-    acc.set(k, addTo(acc.get(k) ?? EMPTY, s));
+    acc.set(k, addTo(acc.get(k) ?? emptyKeyCounts(), s));
   }
   return [...acc.entries()].map(([k, t]) => {
     const [hostId, wd] = k.split("::");
@@ -200,7 +181,7 @@ export function hostWeekdayGrid(sessions: LiveSession[]): HostWeekdayCell[] {
       hostId,
       weekday: Number(wd),
       gmvPerHour: t.hours > 0 ? t.gmv / t.hours : 0,
-      sessionCount: t.sessionCount
+      sessionCount: t.sessions
     };
   });
 }
@@ -209,17 +190,7 @@ export function hostWeekdayGrid(sessions: LiveSession[]): HostWeekdayCell[] {
 // theo deck Crocs). Luật chia đã chốt với user 2026-09-26: GMV của ca tính TRỌN cho host; trợ live
 // không nhận GMV, chỉ được ghi giờ live — nên giờ trợ để riêng một cột, không cộng vào giờ host (cộng
 // vào sẽ kéo tụt GMV/giờ của người đó).
-export interface DayTypePart {
-  sessions: number;
-  gmv: number;
-  hours: number;
-  views: number;
-  productClicks: number;
-  orders: number;
-  itemsSold: number;
-  watchSecViews: number; // Σ(Avg. view × Views) — chia Views ra Avg. view bình quân theo lượt xem
-  newFollowers: number;
-}
+export type DayTypePart = KeyCounts;
 
 // Thứ tự cột của bảng: ngày thường trước làm mốc, rồi 3 camp.
 export const HOST_DAY_TYPE_ORDER: CampDayBucket[] = ["daily", "dday", "midmonth", "payday"];
@@ -231,19 +202,10 @@ export interface HostDayTypeRow {
   assist: DayTypePart; // gmv luôn 0
 }
 
-const emptyPart = (): DayTypePart => ({ sessions: 0, gmv: 0, hours: 0, views: 0, productClicks: 0, orders: 0, itemsSold: 0, watchSecViews: 0, newFollowers: 0 });
+const emptyPart = emptyKeyCounts;
 
 function addPart(p: DayTypePart, s: LiveSession, hours: number) {
-  const views = s.totalViews ?? 0;
-  p.sessions += 1;
-  p.gmv += s.actualGmv ?? 0;
-  p.hours += hours;
-  p.views += views;
-  p.productClicks += s.productClicks ?? 0;
-  p.orders += s.totalOrders ?? 0;
-  p.itemsSold += s.attributedItemsSold ?? 0;
-  p.watchSecViews += (s.avgWatchTimeSeconds ?? 0) * views;
-  p.newFollowers += s.newFollowers ?? 0;
+  addKeyInput(p, keyInputFromSession(s, hours));
 }
 const emptyBuckets = (): Record<CampDayBucket, DayTypePart> => ({
   daily: emptyPart(),
@@ -309,38 +271,9 @@ export function sumDayTypeParts(parts: Record<CampDayBucket, DayTypePart>): DayT
 // Chỉ số của một ô host × loại ngày, cùng bộ với bảng host của deck Crocs. CTOR ở đây = Orders ÷
 // Product clicks (user chốt 2026-09-26, khớp deck T8 1,30%) — chọn vậy để 4 thừa số nhân ra ĐÚNG
 // GMV/giờ: Views/giờ × LIVE CTR × CTOR × AOV = GMV/giờ. Phần 4 của report vẫn dùng CTOR theo SKU orders.
-export interface DayTypeMetrics {
-  sessions: number;
-  gmv: number;
-  hours: number;
-  gmvPerHour: number | null;
-  viewsPerHour: number | null;
-  liveCtr: number | null; // %
-  ctor: number | null; // %
-  aov: number | null;
-  upt: number | null;
-  avgViewSec: number | null;
-  newFollowers: number;
-}
+export type DayTypeMetrics = KeyMetrics;
 
-const ratio = (a: number, b: number) => (b > 0 ? a / b : null);
-
-export function dayTypeMetrics(p: DayTypePart): DayTypeMetrics {
-  const pct = (a: number, b: number) => (b > 0 ? (a / b) * 100 : null);
-  return {
-    sessions: p.sessions,
-    gmv: p.gmv,
-    hours: p.hours,
-    gmvPerHour: ratio(p.gmv, p.hours),
-    viewsPerHour: ratio(p.views, p.hours),
-    liveCtr: pct(p.productClicks, p.views),
-    ctor: pct(p.orders, p.productClicks),
-    aov: ratio(p.gmv, p.orders),
-    upt: ratio(p.itemsSold, p.orders),
-    avgViewSec: ratio(p.watchSecViews, p.views),
-    newFollowers: p.newFollowers
-  };
-}
+export const dayTypeMetrics = (p: DayTypePart): DayTypeMetrics => keyMetrics(p);
 
 // Dưới 2 ca thì một ca đẹp/xấu quyết định cả ô — không tô ▲▼, không nêu trong câu giải thích.
 export const MIN_SESSIONS_TO_COMPARE = 2;

@@ -2,6 +2,11 @@
 
 ## CẦN LÀM NGAY khi mở phiên mới (cập nhật 2026-09-24)
 
+> **MỚI 2026-09-29 — Key Metrics 18 chỉ số trên MỌI report (không migration, CHƯA commit).** Một module
+> [keyMetrics.ts](src/lib/report/keyMetrics.ts) (bộ đếm + công thức + danh sách `KEY_METRICS` + định dạng + cột Excel) thay 5 bản
+> cộng số riêng. Áp cho Report Tháng (Xu hướng 4 tháng, bảng Host, sheet Excel), Report Tuần, Dashboard brand, cửa sổ ca, Hiệu Suất
+> Host, Bản Tin CEO. Xem `## Key Metrics 18 chỉ số`.
+
 > **MỚI 2026-09-29 — Report Tháng bỏ trùng lặp: 11 mục (A1–A4, B1–B6, C2) theo đề xuất user duyệt (không migration, commit 40187b5 đã push `main`).**
 > Đo CROCS T9: câu đối chứng lặp 5 chỗ, câu quà tặng 4 chỗ, "live agency giảm" có 2 số (−18,4% phần 1 / −15% phần 2), bảng 4 tháng
 > phần 2 đặt T8 trọn tháng cạnh T9 22 ngày, biểu đồ "GMV theo ngày" phần 6 dùng nguồn thứ ba (Core Stats 3,87B vs ca 3,41B, 1–21/09).
@@ -1696,6 +1701,52 @@ trong DB đang rỗng nên mọi câu insight tự sinh ra chữ mới ngay; đo
 
 **Còn lại / chưa đụng:** màn thao tác nội bộ giữ từ vận hành tiếng Việt khi không phải tên chỉ số ("Ca", "Giờ" = khung giờ, "Số
 Ca" ở lịch/đăng ký, engine AI Training); Talent Pool trường cũ `cvrAvg`/`ctrAvg` (nhập tay, chưa rõ định nghĩa) chỉ đổi nhãn nhẹ.
+
+## Key Metrics 18 chỉ số — XONG 2026-09-29 (không migration, chưa commit)
+
+**User chốt 2026-09-29:** report nào có bộ chỉ số live đều phải đủ 18 chỉ số, đúng thứ tự: GMV · Items sold · Orders · UPT · ERR ·
+Avg. price · Product impressions · Product clicks · Product CTR · LIVE CTR · CTOR · Avg. view · Views · LIVE impressions · Giờ live ·
+Views/giờ · LIVE impressions/giờ · GMV/giờ. **Giữ tên chuẩn** metricGlossary (user đưa "Product views/CTR/CTR LIVE/… per hour" —
+đã hỏi, chốt giữ tên hiện tại; tên mới duy nhất `METRIC.impressionsPerHour` = "LIVE impressions/giờ"). **Giữ AOV** làm dòng bổ sung
+(`extra: true`) vì phần "Vì sao" tách GMV/giờ = Views/giờ × LIVE CTR × CTOR × AOV. CVR, New followers **bỏ khỏi các khối key metrics**
+(CVR ô KPI ở Report Tuần + Bản Tin CEO bỏ; New followers còn ở "Số khác" của cửa sổ ca). **Phạm vi: toàn bộ.**
+
+**Trước khi sửa (đo code):** Report Tháng xu hướng 8/18 (mất cả dòng ERR đã thêm 26/09 khi gộp bảng MoM), bảng Host 8/18, sheet
+"1 KPI" 9/18, Report Tuần 5/18 (+3 trong tooltip), Dashboard brand 7/18, cửa sổ ca 13/18, Hiệu Suất Host 6 cột, CEO 7 dòng. Không
+màn nào có Avg. price, LIVE impressions/giờ. 5 bản cộng số riêng (`LiveStats`, `DayTypePart/Metrics`, `PerfTotals`, `totals()`
+Report Tuần, `Totals` CEO); `aggregateCreatorLivePerfRows` không ai gọi.
+
+**Đã làm:**
+- [keyMetrics.ts](src/lib/report/keyMetrics.ts): `KeyCounts` + `addKeyInput` (từ `keyInputFromSession(s, hours)` hoặc
+  `keyInputFromRow(CreatorLivePerfRow)`) → `keyMetrics()`; `KEY_METRICS` (18 + AOV, `goodWhenUp`, `kind` định dạng); `fmtKeyMetric`,
+  `keyMetricValue` (kỳ 0 ca ⇒ null ⇒ "—"), `keyMetricSheetColumns/Label/Value` cho Excel. Tỷ lệ là giá trị %.
+- **Luật ca thiếu trường:** ERR, LIVE impressions/giờ, Avg. view chỉ tính trên ca CÓ số của trường đó (`errViews`,
+  `impressionHours`, `watchViews`). Vá hệ quả của lỗi E2E #3 (ca chạy trong app có Avg. view = 0 kéo tụt Avg. view host) —
+  gốc (RPC giao ca không ghi `avg_watch_time_seconds`) VẪN CHƯA sửa.
+- `LiveStats` = `KeyMetrics` + `skuOrders` + `gmvPerView` (`pricePerItem` → `avgPrice`); `DayTypePart` = `KeyCounts`,
+  `DayTypeMetrics` = `KeyMetrics`; `PerfRow` extends `KeyMetrics` (`gmvPerHour`/`ctr` giờ nullable); CEO `Totals` = `KeyMetrics`
+  (bỏ `buyRate`; `ctr` giờ là %, không còn là phân số).
+- Report Tháng: bảng "Xu hướng 4 tháng" = 19 dòng + 2 dòng quà tặng (bỏ thụt dòng); bảng Host = 2 dòng "So mặt bằng" + 19 dòng
+  (▲▼ vẫn chỉ 5 thừa số GMV/giờ); sheet "1 KPI", "5 Host Performance", "5 Host chi so theo ngay" đủ cột.
+- Report Tuần: 5 ô KPI (LIVE GMV, Target, Giờ live, GMV/giờ, Run-rate) + bảng **"Key Metrics · tuần & host"** (Tuần này / Tuần
+  trước / ± / từng host) thay bảng "Host tuần này" 4 cột; Excel thêm sheet "Key Metrics", sheet host đủ cột.
+- Dashboard brand: khối "Tháng N tới …" 19 ô (màu theo `goodWhenUp`). Cửa sổ ca: lưới 19 ô + "Số khác" (SKU orders, New
+  followers, Comments, Shares, Likes, PCU, SKU order rate, Show GPM). Hiệu Suất Host: bảng xếp hạng Host (ghim) · GMV/giờ · 17 chỉ
+  số còn lại + AOV. Bản Tin CEO: bảng "Tháng qua tháng" 19 dòng; ô CVR → Views.
+- Xoá `aggregateCreatorLivePerfRows`/`CreatorLivePerfAgg`/`buildFunnel` (dead code).
+- **Cố ý không đổi:** bảng có mục đích hẹp theo dòng = ca/SKU/khung (Sổ Ca, Top 10 phiên, Top SKU, Campaign & khung giờ, "Vì sao"
+  theo loại ngày, bảng nhân sự CEO), Affiliate (số nhập tay), Ads.
+
+**Verify:** `tsc` sạch · ESLint 0 lỗi/33 warning (= baseline) · vitest 180/180 (+`tests/keyMetrics.test.ts`: thứ tự 18+AOV, công
+thức khớp ca CROCS 01/08 — ERR 1,77%, LIVE CTR 48,15%, Product CTR 2,77% —, luật ca thiếu trường, 6 màn phải map từ `KEY_METRICS`)
+· `vite build` pass. **Browser (admin, dev 3100, CROCS):** Report Tháng T9 — bảng Xu hướng 4 tháng 19 dòng (ERR 1–22/08 = 2,40%
+như 26/09) + bảng Host 2+19 dòng; Report Tuần 38 — 5 ô KPI + bảng Key Metrics tuần/8 host; Dashboard T9 19 ô cùng số Report Tháng;
+Hiệu Suất Host 9 host × 20 cột; cửa sổ ca 21/09 17:58 đủ 19 ô; Bản Tin CEO "Tháng qua tháng" 19 dòng. 0 lỗi console. Đo DB: 229
+ca T6–T9 đều `tiktok_reconciled`, không ca nào có Views mà thiếu LIVE impressions/Avg. view ⇒ luật ca thiếu trường chưa đổi số nào
+hôm nay. Excel chưa bấm tải thử (chỉ kiểm bằng tsc). Hiệu Suất Host mở thẳng URL cần ~10 giây mới có số (nạp ca), không phải lỗi mới.
+
+**Quy ước mới:** màn nào hiện bộ chỉ số live thì map từ `KEY_METRICS` + `keyMetricValue` + `fmtKeyMetric`, cộng số qua
+`addKeyInput`/`keyMetricsOfSessions`/`keyMetricsOfRows` — không tự liệt kê chỉ số, không tự viết công thức tỷ lệ.
 
 ## Report Tháng bỏ trùng lặp — XONG + VERIFY 2026-09-29 (không migration, commit 40187b5 đã push `main`)
 

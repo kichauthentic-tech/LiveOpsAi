@@ -1,93 +1,7 @@
 import { CreatorLivePerfRow, vnDateOf } from "./creatorLivePerfSlice";
 
-// Report Tháng Tab 02 — lớp tính toán thuần JS trên nguồn Creator-Live-Performance (thay
-// live_analysis). Không nhóm theo host (không có cột tên host trong file) — chỉ tổng hợp theo
-// tháng/khung camp/từng phiên. Cùng convention "null khi mẫu số = 0" như monthlyLiveMetrics.ts.
-
-export interface CreatorLivePerfAgg {
-  sessionCount: number;
-  gmv: number;
-  itemsSold: number;
-  orders: number;
-  skuOrders: number;
-  hours: number;
-  views: number;
-  impressions: number;
-  productImpressions: number;
-  productClicks: number;
-  newFollowers: number;
-  comments: number;
-  shares: number;
-  likes: number;
-  upt: number | null;
-  avgPrice: number | null;
-  gmvPerHour: number | null;
-  viewsPerHour: number | null;
-  ctr: number | null; // = productClicks / productImpressions — tính lại từ số đếm, KHÔNG lấy trung bình cột % có sẵn (sai lệch khi phiên to/nhỏ khác nhau)
-  // = orders / productClicks (user chốt 2026-09-26, như deck Crocs + từ điển chỉ số). Audit 2026-09-25 từng
-  // đổi sang skuOrders theo cột "CTOR (SKU order)" của TikTok, nhưng SKU order đếm cả quà tặng kèm 0đ (CROCS T6:
-  // Jibbitz 0–3k, CTOR > 100%) ⇒ CTOR "giảm 4 tháng liên tiếp" 1,99 → 1,25% chỉ vì hết quà, trong khi theo
-  // Orders là 1,13 → 1,23 → 1,31 → 1,18%. Agg này chỉ Report Tháng dùng; Phân Tích Sâu (ops, metrics.ts) vẫn
-  // hiện cả hai cột SKU order.
-  ctor: number | null;
-  err: number | null; // ERR = Views ÷ LIVE impressions (TikTok "Tap-through rate") — KHÔNG phải LIVE CTR
-  liveCtr: number | null; // LIVE CTR = Product clicks ÷ Views (cột "LIVE CTR" của TikTok)
-}
-
-export function aggregateCreatorLivePerfRows(rows: CreatorLivePerfRow[]): CreatorLivePerfAgg {
-  let gmv = 0,
-    itemsSold = 0,
-    orders = 0,
-    skuOrders = 0,
-    hours = 0,
-    views = 0,
-    impressions = 0,
-    productImpressions = 0,
-    productClicks = 0,
-    newFollowers = 0,
-    comments = 0,
-    shares = 0,
-    likes = 0;
-  for (const r of rows) {
-    gmv += r.gmv;
-    itemsSold += r.itemsSold;
-    orders += r.orders;
-    skuOrders += r.skuOrders;
-    hours += r.hours;
-    views += r.views;
-    impressions += r.impressions;
-    productImpressions += r.productImpressions;
-    productClicks += r.productClicks;
-    newFollowers += r.newFollowers;
-    comments += r.comments;
-    shares += r.shares;
-    likes += r.likes;
-  }
-  return {
-    sessionCount: rows.length,
-    gmv,
-    itemsSold,
-    orders,
-    skuOrders,
-    hours,
-    views,
-    impressions,
-    productImpressions,
-    productClicks,
-    newFollowers,
-    comments,
-    shares,
-    likes,
-    upt: orders > 0 ? itemsSold / orders : null,
-    avgPrice: itemsSold > 0 ? gmv / itemsSold : null,
-    gmvPerHour: hours > 0 ? gmv / hours : null,
-    viewsPerHour: hours > 0 ? views / hours : null,
-    ctr: productImpressions > 0 ? (productClicks / productImpressions) * 100 : null,
-    ctor: productClicks > 0 ? (orders / productClicks) * 100 : null,
-    err: impressions > 0 ? (views / impressions) * 100 : null,
-    liveCtr: views > 0 ? (productClicks / views) * 100 : null
-  };
-}
+// Tiện ích trên nguồn Creator-Live-Performance. Cộng chỉ số (Key Metrics) nằm ở lib/report/keyMetrics.ts — bản cộng
+// riêng trước đây (aggregateCreatorLivePerfRows, không màn nào gọi) đã bỏ 2026-09-29.
 
 // CampDayBucket / CampOverrides / resolveCampBucketType đã chuyển sang lib/campaignDays.ts (thuần,
 // không kéo supabaseClient) để lib/performance/targetAllocation.ts dùng chung — re-export để các
@@ -102,24 +16,6 @@ export function bucketByCampaignDay(rows: CreatorLivePerfRow[], overrides?: Camp
     out[resolveCampBucketType(vnDateOf(r.startTime), overrides)].push(r);
   }
   return out;
-}
-
-// Phễu chuyển đổi Module 2 (brief): Live Impressions -> Views -> Product Views -> Product Clicks
-// -> Orders, cộng dồn cả tháng.
-export interface FunnelStage {
-  label: string;
-  value: number;
-}
-
-export function buildFunnel(rows: CreatorLivePerfRow[]): FunnelStage[] {
-  const agg = aggregateCreatorLivePerfRows(rows);
-  return [
-    { label: "LIVE impressions", value: agg.impressions },
-    { label: "Views", value: agg.views },
-    { label: "Product impressions", value: agg.productImpressions },
-    { label: "Product clicks", value: agg.productClicks },
-    { label: "Orders", value: agg.orders }
-  ];
 }
 
 export function topSessionsByGmv(rows: CreatorLivePerfRow[], limit = 10): CreatorLivePerfRow[] {

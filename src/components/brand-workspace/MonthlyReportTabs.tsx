@@ -73,6 +73,7 @@ import {
 import { resolveCampBucketType } from "../../lib/campaignDays";
 import { dailyRhythm, liveFunnel, sessionSpread } from "../../lib/report/rhythm";
 import { errorMessage } from "../../lib/errorMessage";
+import { fmtKeyMetric, KEY_METRICS, keyMetricSheetColumns, keyMetricSheetLabel, keyMetricSheetValue, keyMetricValue, type KeyMetrics } from "../../lib/report/keyMetrics";
 import { byHost, byHostDayType, dayTypeTeamTotals, dayTypeMetrics, dayTypeDriverLines, sumDayTypeParts, vsTeam, HOST_DAY_TYPE_ORDER, MIN_SESSIONS_TO_COMPARE, DAY_TYPE_DIFF_THRESHOLD, HostDayTypeRow, DayTypePart, DayTypeMetrics, dataQuality, filterSessions, hostKey, splitUnassignedHost, DataQuality } from "../../lib/performance/hostPerformance";
 import { topSessionsByGmv, CAMP_DAY_BUCKET_ORDER, CAMP_DAY_BUCKET_LABEL, CampDayBucket, CampOverrides } from "../../lib/dataraw/creatorLivePerfMetrics";
 
@@ -128,10 +129,17 @@ const HostPerformancePanel: React.FC<{
 
   type H = (typeof hosts)[number];
   type Row = { label: string; value: (m: DayTypeMetrics, h?: H) => React.ReactNode; cmp?: "gmvPerHour" | "viewsPerHour" | "liveCtr" | "ctor" | "aov"; indent?: boolean; bold?: boolean; onlyAll?: boolean };
+  // Key Metrics (lib/report/keyMetrics.ts): 18 chỉ số + AOV, cùng thứ tự mọi report. Hai dòng "So mặt bằng" (kết luận
+  // xếp hạng) đứng trên cùng; ▲▼ chỉ tô 5 thừa số của GMV/giờ.
+  const CMP_KEYS = new Set<string>(["gmvPerHour", "viewsPerHour", "liveCtr", "ctor", "aov"]);
+  const keyRows: Row[] = KEY_METRICS.map((d) => ({
+    label: d.label,
+    value: (m: DayTypeMetrics) =>
+      d.key === "hours" ? `${fmtHours(m.hours)} · ${m.sessions} ca` : fmtKeyMetric(d, keyMetricValue(m, d.key)),
+    cmp: CMP_KEYS.has(d.key) ? (d.key as Row["cmp"]) : undefined,
+    bold: d.key === "gmvPerHour" || d.key === "gmv"
+  }));
   const metricRows: Row[] = [
-    { label: METRIC.gmv, value: (m) => fmtVndShort(m.gmv) },
-    { label: `${METRIC.liveHours} · ca`, value: (m) => `${fmtHours(m.hours)} · ${m.sessions}` },
-    { label: METRIC.gmvPerHour, value: (m) => (m.gmvPerHour != null ? fmtVndShort(m.gmvPerHour) : "—"), cmp: "gmvPerHour", bold: true },
     {
       // Cột chính để so host (Report Tháng chuyên sâu 2026-09-26): backtest CROCS — so mặt bằng từng tháng không
       // dự báo được tháng sau (Spearman −0,04) ⇒ gộp nhiều tháng, chỉ tô màu khi khoảng tin cậy nằm hẳn một phía.
@@ -159,14 +167,7 @@ const HostPerformancePanel: React.FC<{
         return v == null ? "—" : <span style={{ color: PAL.muted }}>{v >= 0 ? "+" : "−"}{fmtFixed(Math.abs(v), 0)}%</span>;
       }
     },
-    { label: METRIC.viewsPerHour, value: (m) => (m.viewsPerHour != null ? fmtInt(m.viewsPerHour) : "—"), cmp: "viewsPerHour", indent: true },
-    { label: METRIC.liveCtr, value: (m) => (m.liveCtr != null ? `${fmtFixed(m.liveCtr, 1)}%` : "—"), cmp: "liveCtr", indent: true },
-    { label: METRIC.ctor, value: (m) => fmtPct(m.ctor), cmp: "ctor", indent: true },
-    // AOV hiện nghìn đồng — làm tròn "1,1 triệu" sẽ che mất chênh 5–10% giữa các host.
-    { label: METRIC.aov, value: (m) => fmtVndShort(m.aov), cmp: "aov", indent: true },
-    { label: METRIC.upt, value: (m) => (m.upt != null ? fmtFixed(m.upt, 2) : "—") },
-    { label: METRIC.avgView, value: (m) => (m.avgViewSec != null ? `${Math.round(m.avgViewSec)}s` : "—") },
-    { label: METRIC.newFollowers, value: (m) => (m.sessions > 0 ? fmtInt(m.newFollowers) : "—") },
+    ...keyRows,
     { label: "Giờ trợ live", onlyAll: true, value: (_m, h) => (h && h.assist.sessions > 0 ? `${fmtHours(h.assist.hours)} · ${h.assist.sessions}` : "—") }
   ];
   // Dòng "Giờ trợ live" chỉ hiện khi có host trong bảng từng làm trợ (người chỉ làm trợ đã có dòng riêng dưới bảng).
@@ -864,6 +865,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     hours: number;
     gmvPerHour: number | null;
     ctr: number | null;
+    m: KeyMetrics;
   }
   const hostPerformance = useMemo<HostPerfRow[]>(() => {
     const tiktokSessions = filterSessions(
@@ -889,7 +891,8 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         orders: r.orders,
         hours: r.hours,
         gmvPerHour: r.hours > 0 ? r.gmvPerHour : null,
-        ctr: r.productImpressions > 0 ? r.ctr : null
+        ctr: r.productImpressions > 0 ? r.ctr : null,
+        m: r
       }));
   }, [completedInPeriod]);
   const hostQuality = useMemo(() => dataQuality(filterSessions(completedInPeriod.filter((s) => s.platform === "TikTok"), {})), [completedInPeriod]);
@@ -1282,16 +1285,14 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   // Bảng xu hướng 4 tháng cùng số ngày (thay 8 ô xu hướng + bảng MoM + phễu + 2 biểu đồ 4 tháng — cùng số lặp 4 lần).
   // goodWhenUp null = trung tính (không tô). UPT live đổi theo quà tặng ⇒ trung tính; UPT bỏ quà mới là cách bán.
   type TrendRow = { label: string; get: (s: LiveStats, g: GiftStats | null) => number | null; fmt: (v: number) => string; goodWhenUp: boolean | null; indent?: boolean };
+  // Key Metrics đủ 18 chỉ số + AOV (lib/report/keyMetrics.ts), rồi 2 dòng quà tặng của riêng Report Tháng.
   const trendRows: TrendRow[] = [
-    { label: METRIC.liveGmv, get: (s) => (s.sessions > 0 ? s.gmv : null), fmt: (v) => fmtVndShort(v), goodWhenUp: true },
-    { label: METRIC.liveHours, get: (s) => (s.sessions > 0 ? s.hours : null), fmt: fmtHours, goodWhenUp: null },
-    { label: METRIC.gmvPerHour, get: (s) => s.gmvPerHour, fmt: (v) => fmtVndShort(v), goodWhenUp: true },
-    { label: METRIC.viewsPerHour, get: (s) => s.viewsPerHour, fmt: fmtInt, goodWhenUp: true, indent: true },
-    { label: METRIC.liveCtr, get: (s) => s.liveCtr, fmt: (v) => `${fmtFixed(v, 1)}%`, goodWhenUp: true, indent: true },
-    { label: METRIC.ctor, get: (s) => s.ctor, fmt: (v) => fmtPct(v), goodWhenUp: true, indent: true },
-    { label: METRIC.aov, get: (s) => s.aov, fmt: (v) => fmtVndShort(v), goodWhenUp: true, indent: true },
-    { label: METRIC.productCtr, get: (s) => s.ctr, fmt: (v) => fmtPct(v), goodWhenUp: true },
-    { label: `${METRIC.upt} live`, get: (s) => s.upt, fmt: (v) => fmtFixed(v, 2), goodWhenUp: null },
+    ...KEY_METRICS.map((d): TrendRow => ({
+      label: d.label,
+      get: (st) => keyMetricValue(st, d.key),
+      fmt: (v) => fmtKeyMetric(d, v),
+      goodWhenUp: d.goodWhenUp
+    })),
     { label: "Quà tặng mỗi đơn (cả shop)", get: (_s, g) => g?.giftPerOrder ?? null, fmt: (v) => fmtFixed(v, 2), goodWhenUp: null },
     { label: `${METRIC.upt} bỏ quà (cả shop)`, get: (_s, g) => g?.uptExGift ?? null, fmt: (v) => fmtFixed(v, 2), goodWhenUp: true }
   ];
@@ -1349,16 +1350,12 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
           name: "1 KPI",
           rows: [
             { "Chỉ Số": "Total GMV", "Kỳ trước": n(shopPrevSame?.gmv), "Kỳ này": n(shopCur?.gmv) },
-            { "Chỉ Số": "LIVE GMV (agency)", "Kỳ trước": n(livePrevStats.gmv), "Kỳ này": n(liveCurStats.gmv) },
-            { "Chỉ Số": "Giờ live", "Kỳ trước": n(livePrevStats.hours), "Kỳ này": n(liveCurStats.hours) },
-            { "Chỉ Số": "GMV/giờ", "Kỳ trước": n(livePrevStats.gmvPerHour), "Kỳ này": n(liveCurStats.gmvPerHour) },
-            { "Chỉ Số": "Views/giờ", "Kỳ trước": n(livePrevStats.viewsPerHour), "Kỳ này": n(liveCurStats.viewsPerHour) },
-            { "Chỉ Số": "LIVE CTR (%)", "Kỳ trước": n(livePrevStats.liveCtr), "Kỳ này": n(liveCurStats.liveCtr) },
-            { "Chỉ Số": "CTOR = Orders ÷ Product clicks (%)", "Kỳ trước": n(livePrevStats.ctor), "Kỳ này": n(liveCurStats.ctor) },
-            { "Chỉ Số": "AOV", "Kỳ trước": n(livePrevStats.aov), "Kỳ này": n(liveCurStats.aov) },
-            { "Chỉ Số": "Product CTR (%)", "Kỳ trước": n(livePrevStats.ctr), "Kỳ này": n(liveCurStats.ctr) },
-            { "Chỉ Số": "Orders", "Kỳ trước": n(livePrevStats.orders), "Kỳ này": n(liveCurStats.orders) },
-            { "Chỉ Số": "UPT live", "Kỳ trước": n(livePrevStats.upt), "Kỳ này": n(liveCurStats.upt) },
+            // Key Metrics đủ 18 chỉ số + AOV, cùng thứ tự màn hình (lib/report/keyMetrics.ts).
+            ...KEY_METRICS.map((d) => ({
+              "Chỉ Số": d.key === "gmv" ? "LIVE GMV (agency)" : keyMetricSheetLabel(d),
+              "Kỳ trước": keyMetricSheetValue(livePrevStats, d.key),
+              "Kỳ này": keyMetricSheetValue(liveCurStats, d.key)
+            })),
             { "Chỉ Số": "Target GMV", "Kỳ trước": "", "Kỳ này": n(kpiTargetGmvCur) },
             { "Chỉ Số": "KPI GMV", "Kỳ trước": "", "Kỳ này": n(shopKpi?.target) },
             { "Chỉ Số": "Total GMV dự kiến cuối tháng", "Kỳ trước": "", "Kỳ này": n(shopKpi?.projected) },
@@ -1463,16 +1460,12 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             return {
               "Host": h.hostName,
               "Sessions": h.sessionCount,
-              "GMV": n(h.gmv),
-              "Giờ live": n(h.hours),
-              "GMV/giờ": n(h.gmvPerHour),
               [`So mặt bằng ${relMonths} tháng (%)`]: n(r ? (r.ratio - 1) * 100 : null),
               "Khoảng tin cậy thấp (%)": n(r?.lo != null ? (r.lo - 1) * 100 : null),
               "Khoảng tin cậy cao (%)": n(r?.hi != null ? (r.hi - 1) * 100 : null),
               [`Sessions ${relMonths} tháng`]: r?.sessions ?? "",
               "So mặt bằng tháng này (%)": n(hostInsight.vsPeer.get(h.key)),
-              "Orders": n(h.orders),
-              "Product CTR": n(h.ctr),
+              ...keyMetricSheetColumns(h.m),
               "Sessions trợ live": hostDayType.find((x) => x.key === h.key)?.assist.sessions ?? 0,
               "Giờ trợ live": n(hostDayType.find((x) => x.key === h.key)?.assist.hours ?? 0)
             };
@@ -1487,15 +1480,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                 "Loại ngày": campDaysLabel[b] ? `${DAY_TYPE_SHORT[b]} ${campDaysLabel[b]}` : DAY_TYPE_SHORT[b],
                 "Host": name,
                 [METRIC.sessions]: m.sessions,
-                [METRIC.gmv]: n(m.gmv),
-                [METRIC.liveHours]: n(m.hours),
-                [METRIC.gmvPerHour]: n(m.gmvPerHour),
-                [METRIC.viewsPerHour]: n(m.viewsPerHour),
-                [`${METRIC.liveCtr} (%)`]: n(m.liveCtr),
-                ["CTOR = Orders ÷ Product clicks (%)"]: n(m.ctor),
-                [METRIC.aov]: n(m.aov),
-                [METRIC.upt]: n(m.upt),
-                [`${METRIC.avgView} (s)`]: n(m.avgViewSec)
+                ...keyMetricSheetColumns(m)
               };
             })
           )
@@ -1943,7 +1928,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                 })}
               </ReportTable>
               <p className="text-[11px] mt-2" style={{ color: PAL.muted }}>
-                Dòng thụt vào là 4 thừa số nhân ra GMV/giờ. CTOR = Orders ÷ Product clicks. UPT live đổi theo quà tặng kèm (hàng dưới {fmtVndShort(GIFT_MAX_PRICE)}/món, đếm từ file
+                GMV/giờ = Views/giờ × LIVE CTR × CTOR × AOV. CTOR = Orders ÷ Product clicks. ERR, LIVE impressions/giờ, Avg. view chỉ tính các ca có số của trường đó. UPT live đổi theo quà tặng kèm (hàng dưới {fmtVndShort(GIFT_MAX_PRICE)}/món, đếm từ file
                 Sản Phẩm) nên để trung tính; UPT bỏ quà mới phản ánh cách bán. "↓ N tháng" = N tháng liên tiếp cùng chiều, tổng lệch ≥ 10%.
               </p>
             </Panel>

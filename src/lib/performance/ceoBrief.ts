@@ -4,6 +4,7 @@ import { isPnlSession, sessionDurationHours } from "../pnl";
 import { CampDayBucket, CampOverrides, CAMP_DAY_BUCKET_ORDER, resolveCampBucketType } from "../campaignDays";
 import { MonthTargetPlan } from "./targetAllocation";
 import { isCountable, sessionHours } from "./hostPerformance";
+import { keyMetricsOfSessions, type KeyMetrics } from "../report/keyMetrics";
 
 // Bản Tin CEO (2026-09-25) — thay Toàn Cảnh Agency. File thuần: không đụng Supabase, test bằng vitest.
 //
@@ -120,42 +121,12 @@ export interface PnlResult {
 }
 export type PnlFn = (s: LiveSession) => PnlResult;
 
-export interface Totals {
-  sessions: number;
-  hours: number;
-  gmv: number;
-  orders: number;
-  views: number;
-  impressions: number;
-  clicks: number;
-  gmvPerHour: number | null;
-  aov: number | null;
-  /** Đơn ÷ lượt xem. */
-  buyRate: number | null;
-  /** Click sản phẩm ÷ hiển thị sản phẩm. */
-  ctr: number | null;
-}
+/** Key Metrics (lib/report/keyMetrics.ts) — cùng hàm với Report Tháng/Tuần, Dashboard, Hiệu Suất Host. Tỷ lệ là giá trị %. */
+export type Totals = KeyMetrics;
 
 /** Chỉ cộng ca có số — ca chưa diễn ra hoặc chưa có số không nói gì về hiệu suất. Tỷ lệ tính lại từ tổng. */
 export function totalsOf(sessions: LiveSession[]): Totals {
-  const t = { sessions: 0, hours: 0, gmv: 0, orders: 0, views: 0, impressions: 0, clicks: 0 };
-  for (const s of sessions) {
-    if (!isCountable(s)) continue;
-    t.sessions++;
-    t.hours += sessionHours(s);
-    t.gmv += s.actualGmv ?? 0;
-    t.orders += s.totalOrders ?? 0;
-    t.views += s.totalViews ?? 0;
-    t.impressions += s.productImpressions ?? 0;
-    t.clicks += s.productClicks ?? 0;
-  }
-  return {
-    ...t,
-    gmvPerHour: t.hours > 0 ? t.gmv / t.hours : null,
-    aov: t.orders > 0 ? t.gmv / t.orders : null,
-    buyRate: t.views > 0 ? t.orders / t.views : null,
-    ctr: t.impressions > 0 ? t.clicks / t.impressions : null
-  };
+  return keyMetricsOfSessions(sessions.filter(isCountable), sessionHours);
 }
 
 export interface FinanceTotals {

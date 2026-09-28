@@ -56,7 +56,8 @@ test("CTOR = Orders ÷ Product clicks, không đếm SKU order (quà tặng kèm
 const stats = (gmv: number, hours: number, views: number, extra: Partial<LiveStats> = {}): LiveStats => ({
   sessions: 1, gmv, hours, views, orders: 1, skuOrders: 1, itemsSold: 1, productImpressions: 1, productClicks: 1,
   gmvPerHour: gmv / hours, viewsPerHour: views / hours, gmvPerView: gmv / views, ctr: null, ctor: null, aov: null,
-  upt: null, pricePerItem: null, liveCtr: null, ...extra
+  upt: null, avgPrice: null, liveCtr: null, impressions: 0, errViews: 0, impressionHours: 0, watchSecViews: 0, watchViews: 0,
+  err: null, avgViewSec: null, impressionsPerHour: null, ...extra
 });
 // CROCS thật: 1–22/08 vs 1–22/09 (đo 2026-09-26 từ live_sessions, CTOR = Orders ÷ clicks).
 const t8 = stats(4_309_000_000, 153.6, 526_400, { liveCtr: 55.98, ctor: 1.35, aov: 1_084_000 });

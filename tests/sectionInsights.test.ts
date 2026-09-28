@@ -17,7 +17,8 @@ import {
 const stats = (gmv: number, hours: number, views: number, extra: Partial<LiveStats> = {}): LiveStats => ({
   sessions: 1, gmv, hours, views, orders: 1, skuOrders: 1, itemsSold: 1, productImpressions: 1, productClicks: 1,
   gmvPerHour: gmv / hours, viewsPerHour: views / hours, gmvPerView: gmv / views, ctr: null, ctor: null, aov: null,
-  upt: null, pricePerItem: null, liveCtr: null, ...extra
+  upt: null, avgPrice: null, liveCtr: null, impressions: 0, errViews: 0, impressionHours: 0, watchSecViews: 0, watchViews: 0,
+  err: null, avgViewSec: null, impressionsPerHour: null, ...extra
 });
 
 test("văn bản Insight: dòng đầu kết luận, dòng '→' là việc cần làm — đi 2 chiều không mất gì", () => {

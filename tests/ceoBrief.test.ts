@@ -65,7 +65,7 @@ describe("totalsOf / change", () => {
     expect(t.sessions).toBe(2);
     expect(t.gmv).toBe(40_000_000);
     expect(t.gmvPerHour).toBeCloseTo(40_000_000 / 6);
-    expect(t.buyRate).toBeCloseTo(40 / 10_000);
+    expect(t.aov).toBeCloseTo(40_000_000 / 40);
   });
   test("kỳ trước = 0 ⇒ null, không phải 0% hay ∞", () => {
     expect(change(5, 0)).toBeNull();
