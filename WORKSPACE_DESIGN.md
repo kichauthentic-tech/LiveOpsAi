@@ -2,7 +2,7 @@
 
 ## CẦN LÀM NGAY khi mở phiên mới (cập nhật 2026-09-24)
 
-> **MỚI 2026-09-28 (khuya) — Audit "module cùng loại, logic khác nhau": 9 nhóm lệch ĐÃ SỬA CẢ 9 (không migration, CHƯA commit).**
+> **MỚI 2026-09-28 (khuya) — Audit "module cùng loại, logic khác nhau": 9 nhóm lệch ĐÃ SỬA CẢ 9 (không migration, commit 5496297 đã push `main`).**
 > Đo trên DB thật (231 ca: 229 CROCS nạp bù + 1 VERA test; chưa kế hoạch nào chốt — CROCS T10 nháp 5,5B/75 ca). tsc 0 lỗi, eslint
 > 0 lỗi/33 warning (= baseline), vitest 169/169 (+5 file test: `pnlSessions`, `monthProjection`, `countable`, `conflicts`,
 > `hoursBasis`). Browser (admin, dev local): số thật mọi màn GIỮ NGUYÊN (CEO 3,52B/47 ca, Hiệu Suất Host 168 ca, Talent Pool
