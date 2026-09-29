@@ -9,7 +9,9 @@
 > trước KPI. M3: bảng "Các tài khoản" 12 → 7 cột (ẩn cột chưa brand nào có số, có ghi rõ ẩn gì), Tài chính 460 → 157px, chữ trục
 > biểu đồ 10 → 11px. M4: Lịch brand ở điện thoại 5,9 → 0,9 màn (mở thẳng màn Ngày), Sổ Ca bảng 972 → 664px, "Tải theo Host"
 > 1 cột kéo 1.086px → 3 cột × 341px. M5: 331 → 0 phần tử bấm dưới sàn 24px, sửa luôn lỗi thẻ ca tràn sang ô ngày bên cạnh.
-> Kế tiếp: M6 Talent Pool. Xem `## Audit UX/UI lần 2 (2026-09-29)`.
+> M6: 33 thẻ → bảng (3,7 → 2,4 màn desktop, 11,6 → 3,0 màn ở 375), bỏ ảnh stock dùng chung cho cả 33 người, **sửa lỗi Talent Pool
+> không đếm ca chạy vai trợ** (8 người bị báo "chưa có ca nào", trong đó 1 người 86 ca).
+> Kế tiếp: M7 nhóm màn còn lại. Xem `## Audit UX/UI lần 2 (2026-09-29)`.
 
 > **MỚI 2026-09-29 — Key Metrics 18 chỉ số trên MỌI report (không migration, commit 7996080 đã push `main`).** Một module
 > [keyMetrics.ts](src/lib/report/keyMetrics.ts) (bộ đếm + công thức + danh sách `KEY_METRICS` + định dạng + cột Excel) thay 5 bản
@@ -513,9 +515,38 @@ Dashboard agency 5,2 → 10,1; Lịch brand 5,2 → 6,4; Sổ Ca 4,4 → 8,3; AI
   Test canh thêm 1 ca (cấm `type="time"` hẹp hơn 63px; nút Bỏ ca có `p-1.5`; cấm `-mr-1` từng gây tràn; `min-w` lưới ≥ 1100) — đỏ trên
   code cũ. tsc 0, eslint 0 lỗi/33 cảnh báo (= baseline), vitest 196/196, build OK, console 0 lỗi.
   Còn lại: cột "Lưới hiện tại" trong form 3 cột vẫn ít nội dung hơn 2 cột kia — chưa động (không phải lỗi, chỉ là lệch khối lượng).
-- **M6 Talent Pool (ĐỢT KẾ TIẾP):** 33 thẻ lưới 3 cột, đa số thẻ toàn "—/0/N/A"; 72 nút (68 < 32px); khối AI Matcher mặc định "Franklin +
-  Mỹ phẩm Skincare" chiếm đầu trang. Hướng: bảng + ngăn chi tiết.
-- **M7 nhóm còn lại:** Điều Phối Phát Hành (24 nút "Phát hành" xanh, cả 18 dòng "Chưa có dòng"); Affiliate (kiểu bảng Excel nền
+- **M6 Talent Pool ([TalentMatcher.tsx](src/components/TalentMatcher.tsx)) — ĐÃ LÀM 2026-09-30, verify trên browser (admin, 33 talent thật).**
+  Đo trước: 33 thẻ × 224px, 3,67 màn desktop / **11,56 màn ở 375px** (8.636px). Đọc thẳng prop của component qua React fiber thì
+  thấy vì sao thẻ vô dụng: **4/6 ô dữ liệu của thẻ GIỐNG HỆT NHAU ở cả 33 người** — rate card 0/33 có số, hoa hồng 0/33, CVR 0/33,
+  SĐT 0/33, điểm đánh giá 0/33, niches 0/33 — và **avatar 0/33 có ảnh nên cả 33 thẻ hiện CHUNG một ảnh stock Unsplash của một người lạ**.
+  Chỉ tên/nickname/giới tính là thật.
+  **Lỗi số liệu tìm ra khi đối chiếu (không phải lỗi bày trí):** `computeTalentRealTotals` chỉ lọc `hostId`, trong khi 212/229 ca có
+  `coHostId`. Hậu quả: 8 người đã chạy ca thật bị Talent Pool báo "Chưa có ca nào có số" — nặng nhất là Huỳnh Thái Toàn **86 ca**,
+  rồi 32/30/29/11/10/10/4 ca. Khái niệm "ca trợ" đã có sẵn ở `hostPerformance.coHostKey` + bucket `assist`, riêng màn này bỏ quên.
+  Đã thêm `assistSessionCount` (đếm riêng, **không cộng vào `sessionCount`** — GMV của ca tính cho host, cộng sang trợ là đếm đôi;
+  ngăn chi tiết ghi rõ câu này cho người chỉ chạy vai trợ).
+  Đã làm: lưới thẻ → **bảng** cùng quy ước Sổ Ca (`SUB_COL = hidden sm:table-cell`); **ẩn cột chưa ai có dữ liệu** + một dòng nói ẩn
+  gì và điền ở đâu (đúng luật M3) ⇒ 5 cột CVR/Rate card/Hoa hồng/SĐT/Trạng thái biến mất, còn 6 cột; xếp theo TỔNG ca đã chạy giảm
+  dần (người trợ 86 ca đứng trên người host 3 ca), 16 hồ sơ chưa gắn ca nào dồn xuống cuối sau một dòng ngăn ghi rõ số lượng;
+  bỏ ảnh stock → `TalentAvatar` hiện chữ cái đầu khi không có ảnh; "Rate Card: 0đ"/"Hoa hồng: 0%"/"N/A" → "chưa đặt"/"—";
+  khối AI khớp nối 144px đầu trang → `<details>` **54px xếp sau bảng** (nó mặc định brand đầu danh sách = Franklin, 0 ca).
+  Ở < sm: tên `whitespace-nowrap` + ẩn nickname và nhãn vai trò (để tên vỡ 5 dòng thì dòng cao 150px; bỏ 2 thứ đó kéo bảng
+  457 → 398px nên cột "Ca trợ" lọt vào màn — với 8 người đó là con số DUY NHẤT họ có).
+  Sau: **3,67 → 2,39 màn desktop**; **11,56 → 2,97 màn ở 375px** (8.636 → 2.216px); dòng 47px, 12 người lọt màn đầu thay vì 3 thẻ;
+  0 phần tử bấm dưới 24px ở cả hai khổ; nút sửa 26×26, `elementFromPoint` 3 điểm đều trúng; bấm nút sửa chỉ mở form sửa,
+  KHÔNG mở kèm ngăn chi tiết (`stopPropagation` còn đúng sau khi đổi thẻ → dòng bảng).
+  Test canh thêm 5 ca (bảng thay lưới; ẩn cột theo dữ liệu + `colCount` tính thay vì gõ số; cấm URL ảnh stock, cấm in 0 thay cho
+  "chưa đặt"; đếm `coHostId`; khối AI trong `<details>` và đứng sau bảng) — cả 5 đỏ trên code cũ.
+  tsc 0, eslint 0 lỗi/33 cảnh báo (= baseline), vitest **201/201**, build OK, console tab mới 0 lỗi.
+  **Bẫy khi verify:** (1) `transition` CSS **không chạy hết trong tab Browser pane đang nền** — rAF bị bóp, nên đọc
+  `getComputedStyle` sau khi bật `<details open>` trả về giá trị ĐẦU của transition (0deg) và làm tưởng `group-open:rotate-180`
+  hỏng; đọc trong cùng một lượt JS sau vài mốc `setTimeout` ở tab đang hiện mới ra 180deg. (2) Tailwind v4 `rotate-180` đặt thuộc
+  tính **`rotate`**, không phải `transform` — dò `getComputedStyle(x).transform` sẽ luôn thấy "none". (3) Bấm bằng `ref` khi pane bị
+  thu nhỏ có thể lệch toạ độ; kiểm tương tác nên `dispatchEvent` tại tâm hộp lấy từ `getBoundingClientRect`.
+  Còn lại: ở 375px bảng vẫn cuộn ngang 1,26× trong khung riêng (cột GMV tích luỹ) — giữ, trang không tràn. Nút "Chi tiết" của
+  [PageIntro.tsx](src/components/common/PageIntro.tsx) cao 17px ở điện thoại (dưới sàn 24px) — **dùng chung 11 màn**, để sửa một
+  lượt chứ không sửa lẻ trong đợt theo màn. 6 ô nhập rate/điểm trong form sửa chưa động tới.
+- **M7 nhóm còn lại (ĐỢT KẾ TIẾP):** Điều Phối Phát Hành (24 nút "Phát hành" xanh, cả 18 dòng "Chưa có dòng"); Affiliate (kiểu bảng Excel nền
   đỏ/xanh, 68/73 phần tử < 32px); CRM, Studios, TikTok API, AI Training, Phân Quyền, Finance, SKU, Rate Card, Cam Kết — chỉ header + nhãn.
 
 Chưa đo được: màn talent (Ca Của Tôi/Đăng Ký Ca) và role brand — cần user đăng nhập tài khoản đó trong Browser pane.

@@ -18,6 +18,12 @@ export interface TalentRealTotals {
   sessionCount: number;
   totalGmv: number;
   avgGmvPerSession: number;
+  /**
+   * Ca người này chạy với vai TRỢ (`coHostId`). Tách riêng chứ không cộng vào `sessionCount`:
+   * GMV của ca tính cho host, cộng sang trợ là đếm đôi. Nhưng bỏ hẳn thì Talent Pool nói
+   * "chưa có ca nào có số" về người đã trợ 86 ca (audit UX lần 2 — M6).
+   */
+  assistSessionCount: number;
 }
 
 // Talent Pool trước đây đọc thẳng cột nhập tay `talents.total_gmv`/`avg_gmv_per_session` — trên DB
@@ -29,6 +35,7 @@ export function computeTalentRealTotals(sessions: LiveSession[], talentId: strin
   return {
     sessionCount: completed.length,
     totalGmv,
-    avgGmvPerSession: completed.length > 0 ? totalGmv / completed.length : 0
+    avgGmvPerSession: completed.length > 0 ? totalGmv / completed.length : 0,
+    assistSessionCount: sessions.filter((s) => s.coHostId === talentId && isCountable(s)).length
   };
 }

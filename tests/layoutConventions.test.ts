@@ -201,3 +201,56 @@ test("Kế Hoạch Tháng: ô/nút trong lưới ca đạt sàn 24px và hàng v
   expect(grid).not.toBeNull();
   expect(Number(grid![1])).toBeGreaterThanOrEqual(1100);
 });
+
+// ---- M6 Talent Pool (2026-09-30) ----
+
+test("Talent Pool: danh sách là bảng, không phải lưới 33 thẻ", () => {
+  const src = readFileSync(join(SRC, "components/TalentMatcher.tsx"), "utf8");
+  // Lưới thẻ cũ: 33 thẻ × 224px, trong đó 4/6 ô dữ liệu giống hệt nhau ở cả 33 người.
+  expect(src).not.toMatch(/grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4/);
+  expect(src).toMatch(/<table className="w-full text-xs">/);
+  // Cột phụ ẩn ở điện thoại như Sổ Ca (M4).
+  expect(src).toMatch(/const SUB_COL = "hidden sm:table-cell/);
+});
+
+test("Talent Pool: ẩn cột chưa ai có dữ liệu và nói chỗ điền", () => {
+  const src = readFileSync(join(SRC, "components/TalentMatcher.tsx"), "utf8");
+  expect(src).toMatch(/const hideableCols:/);
+  expect(src).toMatch(/const show = Object\.fromEntries\(hideableCols\.map/);
+  expect(src).toMatch(/hiddenCols\.length > 0 &&/);
+  // Đếm cột thay vì gõ số (M4 đã dính một lần colSpan lệch).
+  expect(src).toMatch(/const colCount = 2 \+ hideableCols\.filter/);
+  expect(src).toMatch(/colSpan=\{colCount\}/);
+  expect(src).not.toMatch(/colSpan=\{\d+\}/);
+});
+
+test("Talent Pool: không bịa mặt người, không hiện 0đ thay cho chưa đặt", () => {
+  const src = readFileSync(join(SRC, "components/TalentMatcher.tsx"), "utf8");
+  // Ảnh stock Unsplash từng dùng chung cho cả 33 hồ sơ — mặt người không được bịa.
+  expect(src).not.toMatch(/images\.unsplash\.com/);
+  expect(src).toMatch(/const TalentAvatar: React\.FC/);
+  // Rate/hoa hồng chưa nhập phải nói "chưa đặt", không in số 0 như một mức đã chốt.
+  expect(src).toMatch(/chưa đặt/);
+  expect(src).not.toMatch(/fmtVndFull\(detailTalent\.ratePerSession \|\| 0\)/);
+  expect(src).not.toMatch(/\{detailTalent\.phone \|\| "N\/A"\}/);
+});
+
+test("Talent Pool: đếm cả ca chạy vai trợ (coHostId), không chỉ ca host", () => {
+  const metric = readFileSync(join(SRC, "lib/metrics/avgGmv.ts"), "utf8");
+  expect(metric).toMatch(/assistSessionCount: sessions\.filter\(\(s\) => s\.coHostId === talentId && isCountable\(s\)\)\.length/);
+  const src = readFileSync(join(SRC, "components/TalentMatcher.tsx"), "utf8");
+  expect(src).toMatch(/real\.assistSessionCount/);
+  // Không cộng ca trợ vào sessionCount: GMV của ca tính cho host, cộng sang trợ là đếm đôi.
+  expect(metric).not.toMatch(/sessionCount: completed\.length \+ /);
+});
+
+test("Talent Pool: trình AI khớp nối gập lại và xếp sau danh sách", () => {
+  const src = readFileSync(join(SRC, "components/TalentMatcher.tsx"), "utf8");
+  expect(src).toMatch(/<details className="group/);
+  expect(src).toMatch(/group-open:rotate-180/);
+  // Bảng phải đứng trước khối AI trong cây JSX.
+  const table = src.indexOf('<table className="w-full text-xs">');
+  const details = src.indexOf('<details className="group');
+  expect(table).toBeGreaterThan(-1);
+  expect(details).toBeGreaterThan(table);
+});

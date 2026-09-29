@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Talent, Brand, UserRole, LiveSession } from "../types";
-import { Users, Sparkles, Award, Search, Plus, Edit3, Trash2, X, Phone, Loader2, AlertTriangle, KeyRound } from "lucide-react";
+import { Users, Sparkles, Award, Search, Plus, Edit3, Trash2, X, Phone, Loader2, AlertTriangle, KeyRound, ChevronDown } from "lucide-react";
 import { authedFetch } from "../lib/authedFetch";
 import { computeTalentRealTotals } from "../lib/metrics/avgGmv";
 import { errorMessage } from "../lib/errorMessage";
@@ -17,6 +17,29 @@ interface LegacyTalentAliases {
   rateCardFee?: number;
 }
 const legacyTalentFields = (t: Talent): LegacyTalentAliases => t as unknown as LegacyTalentAliases;
+
+// Cột phụ: ở điện thoại bảng 11 cột rộng gấp mấy lần màn hình — giữ 4 cột trả lời "ai, vai gì,
+// chạy bao nhiêu ca, ra bao nhiêu tiền", phần còn lại chỉ hiện từ sm (cùng cách Sổ Ca đã làm, M4).
+const SUB_COL = "hidden sm:table-cell py-2.5 px-2";
+
+const Dash: React.FC = () => <span className="text-[var(--text-faint)]">—</span>;
+
+// Ảnh đại diện: 0/33 hồ sơ thật có ảnh, nên trước đây cả 33 người hiện CHUNG một ảnh stock
+// Unsplash của một người lạ — mặt người là thứ dễ tin nhất trên thẻ, không được bịa. Không có ảnh
+// thì hiện chữ cái đầu của tên.
+const TalentAvatar: React.FC<{ talent: Talent; className?: string }> = ({ talent, className = "w-14 h-14" }) => {
+  const src = talent.avatar || legacyTalentFields(talent).avatarUrl || "";
+  if (src) return <img src={src} alt={talent.name} className={`${className} rounded-full object-cover border-2 border-[var(--accent)] shadow-sm shrink-0`} />;
+  const initials = talent.name.trim().split(/\s+/).slice(-2).map((w) => w[0]).join("").toUpperCase();
+  return (
+    <div
+      aria-hidden
+      className={`${className} rounded-full shrink-0 border-2 border-[var(--accent)] bg-[var(--surface-elevated)] text-[var(--accent-text)] font-bold flex items-center justify-center`}
+    >
+      {initials}
+    </div>
+  );
+};
 
 interface TalentMatchResult {
   talentId: string;
@@ -295,6 +318,48 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
     return matchesSearch && matchesRole;
   });
 
+  // Xếp người đã chạy ca lên trước: 16/33 hồ sơ chưa gắn với ca nào, để xen kẽ theo thứ tự DB thì
+  // phải lướt hết danh sách mới biết ai đang làm việc.
+  const rosterRows = filteredTalents
+    .map((t) => ({
+      t,
+      real: computeTalentRealTotals(sessions, t.id),
+      rate: t.ratePerSession || legacyTalentFields(t).rateCardFee || 0
+    }))
+    .sort((a, b) => {
+      // Tổng ca đã chạy trước (người trợ 86 ca làm việc nhiều hơn người host 3 ca), ca host là tiêu
+      // chí phụ vì đó mới là vai gánh GMV.
+      const total = (r: typeof a) => r.real.sessionCount + r.real.assistSessionCount;
+      return total(b) - total(a) || b.real.sessionCount - a.real.sessionCount || a.t.name.localeCompare(b.t.name, "vi");
+    });
+
+  // Cột nào KHÔNG dòng nào mang thông tin thì ẩn hẳn và nói chỗ điền — chỗ trống rộng bằng chỗ có
+  // số khiến người đọc tưởng đã nhập rồi mà bằng 0 (cùng luật với Dashboard agency, M3). Trạng thái
+  // tính là "có thông tin" khi khác mặc định Available: cột này sinh ra để báo ai đang bận/đang live.
+  const EDIT_HERE = "nút sửa ✏️ trên từng dòng";
+  const hideableCols: { label: string; has: (r: (typeof rosterRows)[number]) => boolean; fix?: string }[] = [
+    { label: "Ca trợ", has: (r) => r.real.assistSessionCount > 0 },
+    { label: "GMV tích luỹ", has: (r) => r.real.totalGmv > 0 },
+    { label: "GMV/ca", has: (r) => r.real.avgGmvPerSession > 0 },
+    { label: "CVR TB", has: (r) => r.t.cvrAvg > 0, fix: EDIT_HERE },
+    { label: "Rate card", has: (r) => canSeeRate && (!!r.t.rateHidden || r.rate > 0), fix: canSeeRate ? EDIT_HERE : undefined },
+    { label: "Hoa hồng", has: (r) => canSeeRate && (!!r.t.rateHidden || (r.t.commissionRate || 0) > 0), fix: canSeeRate ? EDIT_HERE : undefined },
+    { label: "SĐT", has: (r) => !!r.t.phone?.trim(), fix: EDIT_HERE },
+    { label: "Trạng thái", has: (r) => !!r.t.availabilityStatus && r.t.availabilityStatus !== "Available", fix: EDIT_HERE }
+  ];
+  const show = Object.fromEntries(hideableCols.map((c) => [c.label, rosterRows.some(c.has)])) as Record<string, boolean>;
+  const hiddenCols = hideableCols.filter((c) => !show[c.label] && (c.label !== "Rate card" || canSeeRate) && (c.label !== "Hoa hồng" || canSeeRate));
+  const colFixes = [...new Set(hiddenCols.map((c) => c.fix).filter((f): f is string => !!f))];
+  // Đếm cột thay vì gõ số: bảng này có 8 cột bật/tắt được (M4 đã dính 1 lần colSpan lệch).
+  const colCount = 2 + hideableCols.filter((c) => show[c.label]).length + 1;
+  // Số hồ sơ chưa gắn với ca nào — xếp cuối bảng, có dòng ngăn để mắt dừng lại thay vì lướt qua
+  // một dải "—" dài không biết bắt đầu từ đâu.
+  const idleCount = rosterRows.filter((r) => r.real.sessionCount + r.real.assistSessionCount === 0).length;
+  const activeCount = rosterRows.length - idleCount;
+
+  // id rỗng ⇒ trả về toàn 0, nên gọi được cả khi chưa mở ngăn chi tiết (tránh nhánh null trong JSX).
+  const detailReal = computeTalentRealTotals(sessions, detailTalent?.id ?? "");
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -303,84 +368,18 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
         description="Host và trợ live của agency: vai trò, số ca và GMV từ các ca đã chạy, rate card. Bấm vào thẻ để xem chi tiết từng người."
       />
 
-      {/* AI Matching Tool Banner */}
-      <div className="bg-gradient-to-r from-[var(--accent)]/25 to-[var(--surface)] text-[var(--text)] p-6 rounded-2xl border border-[var(--accent)]/50 shadow-lg space-y-4">
-        <div className="flex items-center gap-2 text-[var(--accent-text)] font-bold text-sm">
-          <Sparkles className="w-5 h-5 text-[var(--accent-text)]" /> Trình AI Khớp Nối Host Cho Chiến Dịch
-        </div>
-        <div className="grid md:grid-cols-3 gap-4 text-xs">
-          <div>
-            <label className="text-[var(--text-muted)] block mb-1 font-semibold">Chọn Thương Hiệu (Brand):</label>
-            <select
-              value={selectedBrandId}
-              onChange={(e) => setSelectedBrandId(e.target.value)}
-              className="w-full bg-[var(--surface-elevated)] text-[var(--text)] p-2.5 rounded-xl border border-[var(--border)] font-bold focus:ring-2 focus:ring-[var(--accent)]"
-            >
-              {brands.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name} ({b.industry})
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="text-[var(--text-muted)] block mb-1 font-semibold">Danh Mục Sản Phẩm SKU:</label>
-            <input
-              type="text"
-              value={targetCategory}
-              onChange={(e) => setTargetCategory(e.target.value)}
-              className="w-full bg-[var(--surface-elevated)] text-[var(--text)] p-2.5 rounded-xl border border-[var(--border)] font-bold focus:ring-2 focus:ring-[var(--accent)]"
-            />
-          </div>
-          <div className="flex items-end">
-            <button
-              onClick={handleRunMatching}
-              disabled={isMatching}
-              className="w-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold p-2.5 rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow"
-            >
-              <Sparkles className="w-4 h-4" /> {isMatching ? "Đang Phân Tích..." : "AI Tìm Top Host Phù Hợp"}
-            </button>
-          </div>
-        </div>
-
-        {/* AI Matching Output Results */}
-        {matchingResults && (
-          <div className="bg-[var(--surface-base)]/80 p-4 rounded-xl border border-[var(--accent)]/80 space-y-3 pt-4 text-xs">
-            <h4 className="font-bold text-[var(--accent-text)] text-sm">Gợi Ý Top Host Phù Hợp Nhất Cho Brand:</h4>
-            {matchingIsMock && (
-              <div className="flex items-center gap-2 text-[11px] text-amber-400 bg-amber-950/40 border border-amber-500/40 rounded-xl px-3 py-2">
-                <AlertTriangle className="w-4 h-4 shrink-0" />
-                Chưa cấu hình Gemini API key (hoặc AI đang lỗi) — điểm phù hợp bên dưới tính bằng công thức đơn giản, không phải phân tích AI thật.
-              </div>
-            )}
-            <div className="grid md:grid-cols-2 gap-4">
-              {matchingResults.map((r, i) => (
-                <div key={i} className="p-3.5 rounded-xl bg-[var(--surface)] border border-[var(--accent)]/40 space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="font-black text-sm text-[var(--text)]">{r.name}</span>
-                    <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded font-bold">
-                      Match Score: {r.matchScore}%
-                    </span>
-                  </div>
-                  <p className="text-[var(--text-muted)] text-[11px] leading-relaxed">{r.reasoning}</p>
-                  <div className="text-right text-[11px] text-emerald-400 font-mono font-bold">
-                    Dự đoán GMV: {r.predictedGmv}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Talent Roster Database Header & Action Controls */}
-      <div className="bg-[var(--surface)] p-6 rounded-2xl border border-[var(--border)] shadow-sm space-y-4">
+      {/* Danh sách talent — bảng, không phải lưới thẻ.
+          M6 (audit UX lần 2): 33 thẻ × 224px = 3,7 màn, nhưng đo trên DB thật thì 4/6 ô dữ liệu
+          của thẻ GIỐNG HỆT NHAU ở cả 33 người (rate 0, hoa hồng 0%, CVR —, SĐT N/A) và cả 33 dùng
+          CHUNG một ảnh stock. Thẻ chỉ đáng bằng chỗ nó chiếm khi các ô trong thẻ phân biệt được
+          người này với người kia. */}
+      <div className="bg-[var(--surface)] p-4 sm:p-6 rounded-2xl border border-[var(--border)] shadow-sm space-y-4">
         <div className="flex flex-wrap justify-between items-center gap-4">
           <div>
             <h3 className="font-bold text-[var(--text)] text-base">
-              Danh Sách Đội Ngũ Talent & Host Agency ({filteredTalents.length}/{talents.length} Talent)
+              Danh Sách Đội Ngũ Talent &amp; Host Agency ({filteredTalents.length}/{talents.length} Talent)
             </h3>
-            <p className="text-xs text-[var(--text-muted)]">Quản lý danh sách Host / Trợ live, theo dõi GMV/session và cập nhật thông tin</p>
+            <p className="text-xs text-[var(--text-muted)]">Xếp theo số ca đã chạy. Bấm vào dòng để xem chi tiết &amp; hiệu suất từng người.</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
@@ -404,7 +403,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
             >
               <option value="All">Tất cả vai trò</option>
               <option value="Host">Host</option>
-<option value="Assistant">Trợ live (Assistant)</option>
+              <option value="Assistant">Trợ live (Assistant)</option>
             </select>
 
             {/* Add New Talent Button — tạo mới giờ kèm tạo account thật nên chỉ ceo/admin */}
@@ -419,94 +418,209 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
           </div>
         </div>
 
-        {/* Talent Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredTalents.map((t) => {
-            const nicheArr = t.niches || legacyTalentFields(t).niche || [];
-            const nicheStr = Array.isArray(nicheArr) ? nicheArr.join(", ") : String(nicheArr || "Đa ngành");
-            const avatar = t.avatar || legacyTalentFields(t).avatarUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250";
-            const rate = t.ratePerSession || legacyTalentFields(t).rateCardFee || 0;
-            const real = computeTalentRealTotals(sessions, t.id);
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)] uppercase text-[11px] tracking-wider">
+                <th className="py-2.5 px-2">Tên</th>
+                <th className="py-2.5 px-2 text-right">Ca host</th>
+                {show["Ca trợ"] && <th className="py-2.5 px-2 text-right">Ca trợ</th>}
+                {show["GMV tích luỹ"] && <th className="py-2.5 px-2 text-right">GMV tích luỹ</th>}
+                {show["GMV/ca"] && <th className={`${SUB_COL} text-right`}>GMV/ca</th>}
+                {show["CVR TB"] && <th className={`${SUB_COL} text-right`}>CVR TB</th>}
+                {show["Rate card"] && <th className={`${SUB_COL} text-right`}>Rate card</th>}
+                {show["Hoa hồng"] && <th className={`${SUB_COL} text-right`}>Hoa hồng</th>}
+                {show["SĐT"] && <th className={SUB_COL}>SĐT</th>}
+                {show["Trạng thái"] && <th className={SUB_COL}>Trạng thái</th>}
+                <th className="py-2.5 px-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {rosterRows.length === 0 && (
+                <tr>
+                  <td colSpan={colCount} className="py-6 text-center text-[var(--text-faint)]">
+                    Không có talent nào khớp bộ lọc.
+                  </td>
+                </tr>
+              )}
+              {rosterRows.map(({ t, real, rate }, i) => (
+                <React.Fragment key={t.id}>
+                {i === activeCount && idleCount > 0 && (
+                  <tr className="bg-[var(--surface-elevated)]/50">
+                    <td colSpan={colCount} className="py-1.5 px-2 text-[11px] font-bold text-[var(--text-muted)]">
+                      {idleCount} hồ sơ chưa gắn với ca nào
+                      <span className="text-[var(--text-faint)] font-normal"> — tài khoản mới hoặc chưa được xếp ca</span>
+                    </td>
+                  </tr>
+                )}
+                <tr
+                  onClick={() => setDetailTalent(t)}
+                  className="border-b border-[var(--border-muted)] cursor-pointer hover:bg-[var(--surface-elevated)]/40 transition-colors"
+                  title="Xem chi tiết & hiệu suất"
+                >
+                  {/* Tên không xuống dòng (ở 375px "Huỳnh Thái Toàn · Thái Toàn" vỡ thành 5 dòng, dòng cao
+                      150px) và vai trò nằm ngay cạnh tên thay vì thành một cột riêng — bỏ được ~70px bề ngang
+                      để cột "Ca trợ" lọt vào màn điện thoại, vì với 8 người thì đó là con số DUY NHẤT họ có. Ở < sm còn ẩn
+                      nốt nhãn vai trò: cột nào có số đã nói người đó chạy vai gì, ngăn chi tiết vẫn ghi đủ. */}
+                  <td className="py-2.5 px-2 text-[var(--text)] font-bold whitespace-nowrap">
+                    {t.name}
+                    {t.nickname && <span className="hidden sm:inline font-normal text-[var(--text-muted)]"> · {t.nickname}</span>}
+                    <span className="hidden sm:inline ml-1.5 bg-[var(--accent)]/50 text-[var(--accent-text)] text-[11px] font-bold px-1.5 py-0.5 rounded">
+                      {t.role === "Assistant" ? "Trợ live" : t.role || "Host"}
+                    </span>
+                  </td>
+                  <td className="py-2.5 px-2 text-right font-mono text-[var(--text)]">{real.sessionCount || <Dash />}</td>
+                  {show["Ca trợ"] && <td className="py-2.5 px-2 text-right font-mono text-[var(--text-muted)]">{real.assistSessionCount || <Dash />}</td>}
+                  {show["GMV tích luỹ"] && (
+                    <td className="py-2.5 px-2 text-right font-mono font-bold text-[var(--text)]">
+                      {real.totalGmv > 0 ? fmtVndShort(real.totalGmv) : <Dash />}
+                    </td>
+                  )}
+                  {show["GMV/ca"] && (
+                    <td className={`${SUB_COL} text-right font-mono text-emerald-400`}>
+                      {real.avgGmvPerSession > 0 ? fmtVndShort(Math.round(real.avgGmvPerSession)) : <Dash />}
+                    </td>
+                  )}
+                  {show["CVR TB"] && (
+                    <td className={`${SUB_COL} text-right font-mono text-[var(--accent-text)]`}>{t.cvrAvg > 0 ? `${t.cvrAvg}%` : <Dash />}</td>
+                  )}
+                  {show["Rate card"] && (
+                    <td className={`${SUB_COL} text-right font-mono text-[var(--text)]`}>
+                      {t.rateHidden ? "ẩn" : rate > 0 ? fmtVndFull(rate) : <Dash />}
+                    </td>
+                  )}
+                  {show["Hoa hồng"] && (
+                    <td className={`${SUB_COL} text-right font-mono text-[var(--accent-text)]`}>
+                      {t.rateHidden ? "ẩn" : t.commissionRate > 0 ? `${t.commissionRate}%` : <Dash />}
+                    </td>
+                  )}
+                  {show["SĐT"] && <td className={`${SUB_COL} font-mono text-[var(--text-muted)]`}>{t.phone || <Dash />}</td>}
+                  {show["Trạng thái"] && (
+                    <td className={SUB_COL}>
+                      <span
+                        className={`text-[11px] font-bold px-2 py-0.5 rounded whitespace-nowrap ${
+                          t.availabilityStatus === "On Live"
+                            ? "bg-red-900/80 text-red-300"
+                            : t.availabilityStatus === "Busy"
+                              ? "bg-amber-900/80 text-amber-300"
+                              : "bg-emerald-900/80 text-emerald-300"
+                        }`}
+                      >
+                        {statusLabel(t.availabilityStatus || "Available")}
+                      </span>
+                    </td>
+                  )}
+                  <td className="py-2.5 px-2">
+                    <div className="flex items-center justify-end gap-1">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openEditModal(t);
+                        }}
+                        className="p-1.5 text-[var(--text-muted)] hover:text-[var(--accent-text)] hover:bg-[var(--accent-hover)]/40 rounded-lg transition-all"
+                        title="Chỉnh sửa Talent"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(t.id, t.name);
+                        }}
+                        className="p-1.5 text-[var(--text-muted)] hover:text-red-400 hover:bg-red-950/80 rounded-lg transition-all"
+                        title="Xóa Talent"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+                </React.Fragment>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
-            return (
-              <div
-                key={t.id}
-                onClick={() => setDetailTalent(t)}
-                className="p-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-elevated)]/40 space-y-3 hover:border-[var(--accent)] transition-all relative group cursor-pointer"
-                title="Xem chi tiết & hiệu suất"
+        {hiddenCols.length > 0 && (
+          <p className="text-[11px] text-[var(--text-faint)] leading-relaxed">
+            Ẩn {hiddenCols.length} cột vì chưa người nào có dữ liệu: <span className="text-[var(--text-muted)]">{hiddenCols.map((c) => c.label).join(", ")}</span>.
+            {colFixes.length > 0 && ` Điền ở ${colFixes.join("; ")}.`}
+          </p>
+        )}
+      </div>
+
+      {/* Trình AI khớp nối — công cụ phụ, xếp sau danh sách và gập lại.
+          Trước đây chiếm 144px đầu trang, mặc định brand đầu danh sách (Franklin, 0 ca). */}
+      <details className="group bg-gradient-to-r from-[var(--accent)]/25 to-[var(--surface)] text-[var(--text)] rounded-2xl border border-[var(--accent)]/50 shadow-lg">
+        <summary className="list-none cursor-pointer px-6 py-4 flex items-center gap-2 text-[var(--accent-text)] font-bold text-sm">
+          <Sparkles className="w-5 h-5 text-[var(--accent-text)] shrink-0" />
+          Trình AI Khớp Nối Host Cho Chiến Dịch
+          <ChevronDown className="w-4 h-4 ml-auto shrink-0 transition-transform group-open:rotate-180" />
+        </summary>
+        <div className="px-6 pb-6 space-y-4">
+          <div className="grid md:grid-cols-3 gap-4 text-xs">
+            <div>
+              <label className="text-[var(--text-muted)] block mb-1 font-semibold">Chọn Thương Hiệu (Brand):</label>
+              <select
+                value={selectedBrandId}
+                onChange={(e) => setSelectedBrandId(e.target.value)}
+                className="w-full bg-[var(--surface-elevated)] text-[var(--text)] p-2.5 rounded-xl border border-[var(--border)] font-bold focus:ring-2 focus:ring-[var(--accent)]"
               >
-                <div className="flex justify-between items-start">
-                  <div className="flex items-center space-x-3 min-w-0 flex-1">
-                    <img src={avatar} alt={t.name} className="w-12 h-12 rounded-full object-cover border-2 border-[var(--accent)] shadow-sm shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 whitespace-nowrap">
-                        <h4 className="font-bold text-[var(--text)] text-xs truncate">
-                          {t.name}
-                          {t.nickname && <span className="font-normal text-[var(--text-muted)]"> · {t.nickname}</span>}
-                        </h4>
-                        <span className="bg-[var(--accent)]/50 text-[var(--accent-text)] text-[11px] font-bold px-1.5 py-0.5 rounded shrink-0">
-                          {t.role === "Assistant" ? "Trợ live" : t.role || "Host"}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-[var(--accent-text)] font-medium truncate">{nicheStr}</p>
-                      <span className="text-[11px] text-[var(--text-muted)] block truncate whitespace-nowrap">
-                        {real.sessionCount > 0 ? `GMV tích lũy ${fmtVndShort(real.totalGmv)} · ${real.sessionCount} ca` : "Chưa có ca nào có số"}
+                {brands.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name} ({b.industry})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-[var(--text-muted)] block mb-1 font-semibold">Danh Mục Sản Phẩm SKU:</label>
+              <input
+                type="text"
+                value={targetCategory}
+                onChange={(e) => setTargetCategory(e.target.value)}
+                className="w-full bg-[var(--surface-elevated)] text-[var(--text)] p-2.5 rounded-xl border border-[var(--border)] font-bold focus:ring-2 focus:ring-[var(--accent)]"
+              />
+            </div>
+            <div className="flex items-end">
+              <button
+                onClick={handleRunMatching}
+                disabled={isMatching}
+                className="w-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold p-2.5 rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow"
+              >
+                <Sparkles className="w-4 h-4" /> {isMatching ? "Đang Phân Tích..." : "AI Tìm Top Host Phù Hợp"}
+              </button>
+            </div>
+          </div>
+
+          {/* AI Matching Output Results */}
+          {matchingResults && (
+            <div className="bg-[var(--surface-base)]/80 p-4 rounded-xl border border-[var(--accent)]/80 space-y-3 pt-4 text-xs">
+              <h4 className="font-bold text-[var(--accent-text)] text-sm">Gợi Ý Top Host Phù Hợp Nhất Cho Brand:</h4>
+              {matchingIsMock && (
+                <div className="flex items-center gap-2 text-[11px] text-amber-400 bg-amber-950/40 border border-amber-500/40 rounded-xl px-3 py-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  Chưa cấu hình Gemini API key (hoặc AI đang lỗi) — điểm phù hợp bên dưới tính bằng công thức đơn giản, không phải phân tích AI thật.
+                </div>
+              )}
+              <div className="grid md:grid-cols-2 gap-4">
+                {matchingResults.map((r, i) => (
+                  <div key={i} className="p-3.5 rounded-xl bg-[var(--surface)] border border-[var(--accent)]/40 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="font-black text-sm text-[var(--text)]">{r.name}</span>
+                      <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded font-bold">
+                        Match Score: {r.matchScore}%
                       </span>
                     </div>
+                    <p className="text-[var(--text-muted)] text-[11px] leading-relaxed">{r.reasoning}</p>
+                    <div className="text-right text-[11px] text-emerald-400 font-mono font-bold">Dự đoán GMV: {r.predictedGmv}</div>
                   </div>
-
-                  {/* Edit & Delete Action Buttons */}
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openEditModal(t);
-                      }}
-                      className="p-1.5 text-[var(--text-muted)] hover:text-[var(--accent-text)] hover:bg-[var(--accent-hover)]/40 rounded-lg transition-all"
-                      title="Chỉnh sửa Talent"
-                    >
-                      <Edit3 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(t.id, t.name);
-                      }}
-                      className="p-1.5 text-[var(--text-muted)] hover:text-red-400 hover:bg-red-950/80 rounded-lg transition-all"
-                      title="Xóa Talent"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 text-[11px] text-[var(--text-muted)] bg-[var(--surface-base)]/40 p-2.5 rounded-xl border border-[var(--border)] font-medium">
-                  <div>GMV/session: <strong className="text-emerald-400 block text-xs font-bold">{real.avgGmvPerSession > 0 ? fmtVndShort(Math.round(real.avgGmvPerSession)) : "—"}</strong></div>
-                  <div>CVR TB: <strong className="text-[var(--accent-text)] block text-xs font-bold">{t.cvrAvg > 0 ? `${t.cvrAvg}%` : "—"}</strong></div>
-                  {canSeeRate && (
-                    <>
-                      <div>Rate Card: <strong className="text-[var(--text)] block font-bold">{t.rateHidden ? "ẩn" : fmtVndFull(rate)}</strong></div>
-                      <div>Hoa hồng: <strong className="text-[var(--accent-text)] block font-bold">{t.rateHidden ? "ẩn" : `${t.commissionRate || 0}%`}</strong></div>
-                    </>
-                  )}
-                </div>
-
-                <div className="flex justify-between items-center text-xs pt-1">
-                  <span className="text-[11px] font-bold text-[var(--text-muted)] flex items-center gap-1">
-                    <Phone className="w-3 h-3 text-[var(--text-muted)]" /> {t.phone || "N/A"}
-                  </span>
-                  <span className={`text-[11px] font-bold px-2 py-0.5 rounded ${
-                    t.availabilityStatus === "On Live" ? "bg-red-900/80 text-red-300 animate-pulse" :
-                    t.availabilityStatus === "Busy" ? "bg-amber-900/80 text-amber-300" : "bg-emerald-900/80 text-emerald-300"
-                  }`}>
-                    {statusLabel(t.availabilityStatus || "Available")}
-                  </span>
-                </div>
+                ))}
               </div>
-            );
-          })}
+            </div>
+          )}
         </div>
-      </div>
+      </details>
 
       {/* Talent Form Modal (Add / Edit) */}
       {isModalOpen && (
@@ -810,38 +924,42 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
 
             <div className="p-6 space-y-4 text-xs overflow-y-auto">
               <div className="flex items-center gap-3">
-                <img
-                  src={detailTalent.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250"}
-                  alt={detailTalent.name}
-                  className="w-14 h-14 rounded-full object-cover border-2 border-[var(--accent)] shadow-sm shrink-0"
-                />
+                <TalentAvatar talent={detailTalent} />
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5">
                     <h4 className="font-bold text-[var(--text)] text-sm truncate">{detailTalent.name}</h4>
                     <span className="bg-[var(--accent)]/50 text-[var(--accent-text)] text-[11px] font-bold px-1.5 py-0.5 rounded shrink-0">
-                      {detailTalent.role || "Host"}
+                      {detailTalent.role === "Assistant" ? "Trợ live" : detailTalent.role || "Host"}
                     </span>
                   </div>
-                  <p className="text-[var(--text-muted)]">{detailTalent.gender} • {(detailTalent.niches || []).join(", ") || "Đa ngành"}</p>
+                  <p className="text-[var(--text-muted)]">
+                    {[detailTalent.gender, (detailTalent.niches || []).join(", ")].filter(Boolean).join(" • ") || <Dash />}
+                  </p>
                   <p className="text-[var(--text-muted)] flex items-center gap-1 mt-0.5">
-                    <Phone className="w-3 h-3" /> {detailTalent.phone || "N/A"}
+                    <Phone className="w-3 h-3" /> {detailTalent.phone || <Dash />}
                   </p>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-2 bg-[var(--surface-base)]/40 p-3 rounded-xl border border-[var(--border)]">
-                <div>GMV lũy kế: <strong className="text-[var(--text)] block text-sm font-bold">{fmtVndShort(computeTalentRealTotals(sessions, detailTalent.id).totalGmv)}</strong></div>
-                <div>Số Ca Có Số: <strong className="text-[var(--text)] block text-sm font-bold">{computeTalentRealTotals(sessions, detailTalent.id).sessionCount}</strong></div>
-                <div>GMV/session: <strong className="text-emerald-400 block text-sm font-bold">{fmtVndShort(Math.round(computeTalentRealTotals(sessions, detailTalent.id).avgGmvPerSession))}</strong></div>
-                <div>CVR TB: <strong className="text-[var(--accent-text)] block text-sm font-bold">{detailTalent.cvrAvg || 0}%</strong></div>
-                <div>CTR TB: <strong className="text-[var(--accent-text)] block text-sm font-bold">{detailTalent.ctrAvg || 0}%</strong></div>
+                <div>Ca host (có số): <strong className="text-[var(--text)] block text-sm font-bold">{detailReal.sessionCount}</strong></div>
+                <div>Ca trợ (có số): <strong className="text-[var(--text)] block text-sm font-bold">{detailReal.assistSessionCount}</strong></div>
+                <div>GMV lũy kế: <strong className="text-[var(--text)] block text-sm font-bold">{detailReal.totalGmv > 0 ? fmtVndShort(detailReal.totalGmv) : <Dash />}</strong></div>
+                <div>GMV/ca: <strong className="text-emerald-400 block text-sm font-bold">{detailReal.avgGmvPerSession > 0 ? fmtVndShort(Math.round(detailReal.avgGmvPerSession)) : <Dash />}</strong></div>
+                <div>CVR TB: <strong className="text-[var(--accent-text)] block text-sm font-bold">{detailTalent.cvrAvg > 0 ? `${detailTalent.cvrAvg}%` : <Dash />}</strong></div>
+                <div>CTR TB: <strong className="text-[var(--accent-text)] block text-sm font-bold">{detailTalent.ctrAvg > 0 ? `${detailTalent.ctrAvg}%` : <Dash />}</strong></div>
                 <div>Trạng Thái: <strong className="text-[var(--text)] block text-sm font-bold">{statusLabel(detailTalent.availabilityStatus || "Available")}</strong></div>
               </div>
+              {detailReal.sessionCount === 0 && detailReal.assistSessionCount > 0 && (
+                <p className="text-[11px] text-[var(--text-faint)]">
+                  GMV của ca tính cho host, nên người chỉ chạy vai trợ không có GMV lũy kế — không phải chưa làm ca nào.
+                </p>
+              )}
 
               {canSeeRate && (
                 <div className="grid grid-cols-2 gap-2 bg-amber-950/30 p-3 rounded-xl border border-amber-500/30">
-                  <div>Rate Card: <strong className="text-[var(--text)] block text-sm font-bold">{detailTalent.rateHidden ? "ẩn" : fmtVndFull(detailTalent.ratePerSession || 0)}</strong></div>
-                  <div>Hoa Hồng: <strong className="text-[var(--accent-text)] block text-sm font-bold">{detailTalent.rateHidden ? "ẩn" : `${detailTalent.commissionRate || 0}%`}</strong></div>
+                  <div>Rate Card: <strong className="text-[var(--text)] block text-sm font-bold">{detailTalent.rateHidden ? "ẩn" : detailTalent.ratePerSession > 0 ? fmtVndFull(detailTalent.ratePerSession) : <span className="text-[var(--text-faint)] font-normal">chưa đặt</span>}</strong></div>
+                  <div>Hoa Hồng: <strong className="text-[var(--accent-text)] block text-sm font-bold">{detailTalent.rateHidden ? "ẩn" : (detailTalent.commissionRate || 0) > 0 ? `${detailTalent.commissionRate}%` : <span className="text-[var(--text-faint)] font-normal">chưa đặt</span>}</strong></div>
                 </div>
               )}
             </div>
