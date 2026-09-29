@@ -586,7 +586,7 @@ export default function MonthPlan({
                   <input type="date" disabled={!editable} value={r?.start ?? ""} onChange={(e) => setRange(e.target.value, r?.end ?? e.target.value)} className="flex-1 min-w-0 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-1.5 py-1 text-[11px] text-[var(--text)] font-mono disabled:opacity-60" />
                   <span className="text-[var(--text-faint)]">→</span>
                   <input type="date" disabled={!editable} value={r?.end ?? ""} onChange={(e) => setRange(r?.start ?? e.target.value, e.target.value)} className="flex-1 min-w-0 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-1.5 py-1 text-[11px] text-[var(--text)] font-mono disabled:opacity-60" />
-                  {r && editable && <button onClick={() => setRange("", "")} className="text-[var(--text-faint)] hover:text-rose-400" title="Bỏ, dùng lịch cố định"><X className="w-3 h-3" /></button>}
+                  {r && editable && <button onClick={() => setRange("", "")} className="-m-1.5 p-1.5 text-[var(--text-faint)] hover:text-rose-400" title="Bỏ, dùng lịch cố định"><X className="w-3 h-3" /></button>}
                 </div>
               );
             })}
@@ -740,7 +740,7 @@ export default function MonthPlan({
 
       {/* Lưới ngày × ca */}
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 overflow-x-auto">
-        <div className="grid grid-cols-7 gap-1.5 min-w-[980px]">
+        <div className="grid grid-cols-7 gap-1.5 min-w-[1100px]">
           {WEEKDAY_LABELS.map((w, i) => (
             <div key={w} className={`text-center text-[11px] font-black uppercase tracking-wide py-1 rounded-lg ${i === 0 || i === 6 ? "text-rose-300 bg-rose-950/30" : "text-[var(--text-faint)] bg-[var(--surface-base)]"}`}>{w}</div>
           ))}
@@ -760,26 +760,47 @@ export default function MonthPlan({
                   <span className={`text-xs font-black ${style ? style.text : "text-[var(--text)]"}`}>{Number(day.slice(-2))}{style ? ` · ${BUCKET_LABEL[bucket]}` : ""}</span>
                   <span className="text-[11px] text-[var(--text-faint)] flex items-center gap-1">
                     {list.length > 0 ? `${list.length} ca · ${fmtH(dayHours)}h` : ""}
-                    {!past && <button onClick={() => toggleBlackout(day)} className={`${isBlackout ? "text-rose-400" : "text-[var(--text-faint)] hover:text-rose-400"}`} title={isBlackout ? "Bỏ cấm live ngày này" : "Cấm live ngày này (engine bỏ qua)"}><Ban className="w-3 h-3" /></button>}
+                    {/* -m-1.5 p-1.5: vùng bấm 24×24 (sàn WCAG 2.5.8) nhưng không đẩy cao dòng ngày — M5. */}
+                    {!past && <button onClick={() => toggleBlackout(day)} className={`-m-1.5 p-1.5 ${isBlackout ? "text-rose-400" : "text-[var(--text-faint)] hover:text-rose-400"}`} title={isBlackout ? "Bỏ cấm live ngày này" : "Cấm live ngày này (engine bỏ qua)"}><Ban className="w-3 h-3" /></button>}
                   </span>
                 </div>
                 {(ev || sch) && <div className="text-[11px] text-[var(--accent-text)] truncate" title={[ev?.label, sch?.label].filter(Boolean).join(" · ")}>{ev?.label}{ev && sch ? " · " : ""}{sch ? `KM: ${sch.label}` : ""}</div>}
                 {isBlackout && <div className="text-[11px] text-rose-400 font-bold">cấm live</div>}
                 {list.map((d) => (
-                  <div key={d.key} className={`rounded-lg border px-1.5 py-1 text-[11px] space-y-1 ${d.slotId ? "border-emerald-900 bg-emerald-950/30" : "border-[var(--border)] bg-[var(--surface)]"}`}>
-                    <div className="flex items-center gap-1">
-                      <input type="time" disabled={!editable} value={d.startTime} onChange={(e) => update(d.key, { startTime: e.target.value })} className="w-[62px] bg-transparent font-mono text-[11px] text-[var(--text)] disabled:opacity-70" />
-                      <span className="text-[var(--text-faint)]">–</span>
-                      <input type="time" disabled={!editable} value={d.endTime} onChange={(e) => update(d.key, { endTime: e.target.value })} className="w-[62px] bg-transparent font-mono text-[11px] text-[var(--text)] disabled:opacity-70" />
-                      {editable && <button onClick={() => remove(d.key)} className="ml-auto text-rose-400 hover:text-rose-300" title="Bỏ ca"><X className="w-3 h-3" /></button>}
+                  // Audit UX lần 2 — M5. Đo 29/09: 331/383 phần tử bấm của màn này thấp hơn sàn 24px (WCAG
+                  // 2.5.8) — 150 ô giờ cao 18px, 75 nút "Bỏ ca" 12×12, 75 ô target 23px, 31 nút cấm live 12×12.
+                  // Khi nâng lên 24px mới lộ ra lỗi nằm sẵn từ trước: hàng giờ CẦN nhiều hơn chỗ nó có. Ô ngày
+                  // rộng 153px ⇒ thẻ ca chỉ còn 125px, mà riêng 2 ô `input[type=time]` của Chrome đã cần 2×63px
+                  // (đo bằng width:auto — 62px cũ đã thiếu 1px), cộng dấu "–" và nút xoá là 166px. Phần thừa
+                  // tràn sang ô ngày BÊN CẠNH và bị ô đó phủ lên: elementsFromPoint cho thấy bấm vào giữa icon
+                  // "Bỏ ca" không ăn. Nay xếp lại cho vừa thật: padding px-1 (thẻ còn 129px), hàng 1 chỉ 2 ô giờ
+                  // (63+2+63 = 128), nút xoá xuống hàng 2 cạnh ô target, dạng rút gọn của target gộp vào dòng
+                  // "dự báo" sẵn có nên không tốn thêm chiều cao.
+                  <div key={d.key} className={`rounded-lg border px-1 py-1 text-[11px] space-y-1 ${d.slotId ? "border-emerald-900 bg-emerald-950/30" : "border-[var(--border)] bg-[var(--surface)]"}`}>
+                    <div className="flex items-center gap-0.5">
+                      <input type="time" aria-label="Giờ bắt đầu" disabled={!editable} value={d.startTime} onChange={(e) => update(d.key, { startTime: e.target.value })} className="w-[63px] min-h-6 shrink-0 bg-transparent font-mono text-[11px] text-[var(--text)] disabled:opacity-70" />
+                      <input type="time" aria-label="Giờ kết thúc" disabled={!editable} value={d.endTime} onChange={(e) => update(d.key, { endTime: e.target.value })} className="w-[63px] min-h-6 shrink-0 bg-transparent font-mono text-[11px] text-[var(--text)] disabled:opacity-70" />
                     </div>
                     <div className="flex items-center gap-1">
-                      <span className="text-[var(--text-faint)] shrink-0">target</span>
-                      <input type="number" disabled={!editable} value={d.targetGmv} onChange={(e) => update(d.key, { targetGmv: Number(e.target.value) })} className="w-full min-w-0 bg-[var(--surface-base)] border border-[var(--border)] rounded px-1 py-0.5 font-mono text-[11px] text-[var(--text)] disabled:opacity-70" />
+                      <input
+                        type="number"
+                        disabled={!editable}
+                        value={d.targetGmv}
+                        onChange={(e) => update(d.key, { targetGmv: Number(e.target.value) })}
+                        aria-label="Target GMV của ca"
+                        title="Target GMV của ca"
+                        className="w-full min-w-0 min-h-6 bg-[var(--surface-base)] border border-[var(--border)] rounded px-1 py-0.5 font-mono text-[11px] text-[var(--text)] disabled:opacity-70"
+                      />
+                      {editable && <button onClick={() => remove(d.key)} className="shrink-0 p-1.5 text-rose-400 hover:text-rose-300" title="Bỏ ca"><X className="w-3 h-3" /></button>}
                     </div>
-                    {d.expectedGmv !== undefined && (
+                    {/* Số thô 8 chữ số gõ tay rất dễ thừa/thiếu một số 0 — dạng rút gọn đặt ngay dưới để thấy
+                        sai bậc, gộp cùng dòng "dự báo" sẵn có nên thẻ ca không cao thêm. */}
+                    {(d.targetGmv > 0 || d.expectedGmv !== undefined) && (
                       <div className={`text-[11px] font-bold ${d.highExpectation ? "text-amber-400" : "text-[var(--text-faint)]"}`} title={d.reason}>
-                        dự báo {fmtVndShort(d.expectedGmv)}{d.highExpectation ? " · target cao" : ""}
+                        {d.targetGmv > 0 ? fmtVndShort(d.targetGmv) : ""}
+                        {d.targetGmv > 0 && d.expectedGmv !== undefined ? " · " : ""}
+                        {d.expectedGmv !== undefined ? `dự báo ${fmtVndShort(d.expectedGmv)}` : ""}
+                        {d.highExpectation ? " · target cao" : ""}
                       </div>
                     )}
                     {d.slotId && <div className="text-[11px] text-emerald-400 font-bold">đã mở ca</div>}

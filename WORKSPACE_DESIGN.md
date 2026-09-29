@@ -8,7 +8,8 @@
 > đọc, 11 → 6 cỡ chữ, nút ≥ 27px. M2: 19 ô KPI phẳng → 5 ô "Kết quả" 20px + 3 nhóm phễu 14px, cả 19 ô lọt màn đầu; Run-rate lên
 > trước KPI. M3: bảng "Các tài khoản" 12 → 7 cột (ẩn cột chưa brand nào có số, có ghi rõ ẩn gì), Tài chính 460 → 157px, chữ trục
 > biểu đồ 10 → 11px. M4: Lịch brand ở điện thoại 5,9 → 0,9 màn (mở thẳng màn Ngày), Sổ Ca bảng 972 → 664px, "Tải theo Host"
-> 1 cột kéo 1.086px → 3 cột × 341px. Kế tiếp: M5 Kế Hoạch Tháng. Xem `## Audit UX/UI lần 2 (2026-09-29)`.
+> 1 cột kéo 1.086px → 3 cột × 341px. M5: 331 → 0 phần tử bấm dưới sàn 24px, sửa luôn lỗi thẻ ca tràn sang ô ngày bên cạnh.
+> Kế tiếp: M6 Talent Pool. Xem `## Audit UX/UI lần 2 (2026-09-29)`.
 
 > **MỚI 2026-09-29 — Key Metrics 18 chỉ số trên MỌI report (không migration, commit 7996080 đã push `main`).** Một module
 > [keyMetrics.ts](src/lib/report/keyMetrics.ts) (bộ đếm + công thức + danh sách `KEY_METRICS` + định dạng + cột Excel) thay 5 bản
@@ -488,8 +489,31 @@ Dashboard agency 5,2 → 10,1; Lịch brand 5,2 → 6,4; Sổ Ca 4,4 → 8,3; AI
   `?t=<timestamp cũ>`) và reload thường KHÔNG xoá — mở **tab mới** rồi đọc console mới kết luận được (tab mới: 0 lỗi).
   Còn lại: Sổ Ca ở 375 vẫn cuộn ngang 1,9× (cột "Dữ liệu" rộng 243px — giữ vì là thứ nói còn thiếu bước nào); Bảng Vận Hành chưa sửa
   (0,9 màn, 4 ô KPI đều 0 vì hôm nay không có ca).
-- **M5 Kế Hoạch Tháng (ĐỢT KẾ TIẾP):** 384 phần tử bấm, 372 cao < 32px; form 3 cột, cột "Lưới hiện tại" gần trống; Target GMV gõ số thô 10 chữ số.
-- **M6 Talent Pool:** 33 thẻ lưới 3 cột, đa số thẻ toàn "—/0/N/A"; 72 nút (68 < 32px); khối AI Matcher mặc định "Franklin +
+- **M5 Kế Hoạch Tháng ([MonthPlan.tsx](src/components/MonthPlan.tsx)) — ĐÃ LÀM 2026-09-29, verify trên browser (admin, CROCS T10 nháp).**
+  Đo trước (1440×900): 383 phần tử bấm, 371 cao < 32px và **331 dưới 24px — sàn WCAG 2.5.8**: 150 ô giờ cao 18px, 75 nút "Bỏ ca"
+  12×12, 75 ô target 23px, 31 nút "Cấm live" 12×12. Trang 3,1 màn desktop / 5,1 màn ở 375.
+  **Lỗi nặng hơn, chỉ lộ ra khi nâng vùng bấm:** hàng giờ của thẻ ca CẦN nhiều hơn chỗ nó có. Ô ngày rộng 153px ⇒ thẻ ca chỉ còn
+  125px, mà riêng 2 `input[type=time]` của Chrome đã cần **2×63px** (đo bằng `width:auto`; 62px cũ đã thiếu 1px), cộng dấu "–" và
+  nút xoá là **166px**. Phần thừa tràn sang ô ngày BÊN CẠNH và bị ô đó phủ lên — `elementsFromPoint` cho thấy bấm vào **giữa icon
+  "Bỏ ca" không ăn** (chỉ góc trên trái ăn). Lỗi này có sẵn từ trước, không phải do đợt này.
+  Đã làm: thẻ ca `px-1.5` → `px-1` (thẻ còn 129px); hàng 1 chỉ còn 2 ô giờ `w-[63px] min-h-6` (63+2+63 = 128 ≤ 129), bỏ dấu "–";
+  nút "Bỏ ca" xuống hàng 2 cạnh ô target, `p-1.5` quanh icon 12px ⇒ 24×24; ô target `min-h-6`, rộng 101px (đủ 8 chữ số — đo cần 63px);
+  nút "Cấm live" + nút bỏ khoảng ngày camp dùng `-m-1.5 p-1.5` (24×24, không đẩy cao dòng ngày); dạng rút gọn của target
+  (`73,9M`) gộp vào dòng "dự báo" sẵn có nên thẻ ca **không cao thêm** — số thô 8 chữ số gõ tay rất dễ thừa/thiếu một số 0.
+  Lưới `min-w-[980px]` → **`min-w-[1100px]`**: ở bề rộng tối thiểu cũ ô ngày chỉ 135px, hàng 128px vẫn tràn (lỗi này hiện ở MỌI màn
+  dưới ~1100px, không riêng điện thoại).
+  Sau: **331 → 0** phần tử dưới 24px (đo ở cả 1440 và 375); hàng 1 và hàng 2 vừa khít (cần 129 / có 129 ở desktop, 128/128 ở 375);
+  `elementFromPoint` ở 3 điểm (góc trên trái, giữa, góc dưới phải) của nút Bỏ ca / Cấm live / ô target / 2 ô giờ đều trúng đúng phần tử,
+  ở cả hai khổ. Trang 3,1 → 3,3 màn desktop (+143px — giá phải trả để 150 ô giờ đạt 24px, nói thẳng là có dài thêm);
+  375: 5,1 → 4,7 màn, 0 tràn ngang trang.
+  **Bẫy khi verify:** số đo hình học KHÔNG bắt được lỗi này. `scrollWidth === clientWidth` trên `input[type=time]` kể cả khi chữ bị cắt
+  (shadow DOM đóng), và canvas `measureText("11:00")` chỉ ra 33px nên 46px "trông như" đủ — **ảnh chụp mới thấy ô hiện "11:" cụt phút**.
+  Bề rộng tối thiểu thật phải đo bằng cách nhân bản input rồi đặt `width:auto` → 63px. Vùng bấm bị phủ thì phải dùng `elementsFromPoint`
+  (số nhiều) để thấy cả chồng phần tử, `getBoundingClientRect` chỉ nói hộp to bao nhiêu chứ không nói có bấm được không.
+  Test canh thêm 1 ca (cấm `type="time"` hẹp hơn 63px; nút Bỏ ca có `p-1.5`; cấm `-mr-1` từng gây tràn; `min-w` lưới ≥ 1100) — đỏ trên
+  code cũ. tsc 0, eslint 0 lỗi/33 cảnh báo (= baseline), vitest 196/196, build OK, console 0 lỗi.
+  Còn lại: cột "Lưới hiện tại" trong form 3 cột vẫn ít nội dung hơn 2 cột kia — chưa động (không phải lỗi, chỉ là lệch khối lượng).
+- **M6 Talent Pool (ĐỢT KẾ TIẾP):** 33 thẻ lưới 3 cột, đa số thẻ toàn "—/0/N/A"; 72 nút (68 < 32px); khối AI Matcher mặc định "Franklin +
   Mỹ phẩm Skincare" chiếm đầu trang. Hướng: bảng + ngăn chi tiết.
 - **M7 nhóm còn lại:** Điều Phối Phát Hành (24 nút "Phát hành" xanh, cả 18 dòng "Chưa có dòng"); Affiliate (kiểu bảng Excel nền
   đỏ/xanh, 68/73 phần tử < 32px); CRM, Studios, TikTok API, AI Training, Phân Quyền, Finance, SKU, Rate Card, Cam Kết — chỉ header + nhãn.

@@ -182,3 +182,22 @@ test('Nhân sự ca: "Tải theo Host" không còn là bảng w-full bị kéo n
   expect(src).not.toMatch(/<table className="w-full text-sm min-w-\[420px\]">/);
   expect(src).toMatch(/sm:columns-2 xl:columns-3/);
 });
+
+// ---- M5 Kế Hoạch Tháng (2026-09-29) ----
+
+test("Kế Hoạch Tháng: ô/nút trong lưới ca đạt sàn 24px và hàng vừa bề ngang ô ngày", () => {
+  const src = readFileSync(join(SRC, "components/MonthPlan.tsx"), "utf8");
+  // input[type=time] của Chrome cần tối thiểu 63px (đo bằng width:auto) — hẹp hơn là cắt mất phút.
+  expect(src).not.toMatch(/type="time"[^>]*w-\[(?:[0-5]?\d|6[0-2])px\]/);
+  // Hai ô giờ 63px + gap là đã kín hàng: không được nhét thêm gì vào hàng đó nữa.
+  expect(src).toMatch(/w-\[63px\] min-h-6 shrink-0/);
+  // Nút xoá ca và ô target phải cao ≥ 24px (p-1.5 quanh icon 12px / min-h-6).
+  expect(src).toMatch(/p-1\.5 text-rose-400[^"]*" title="Bỏ ca"/);
+  expect(src).toMatch(/aria-label="Target GMV của ca"/);
+  // Margin âm từng làm nút tràn sang ô ngày bên cạnh rồi bị ô đó phủ lên — không quay lại.
+  expect(src).not.toMatch(/ml-auto p-1\.5 -mr-1/);
+  // Lưới phải đủ rộng để ô ngày chứa nổi hàng 128px, nếu không lại tràn ở màn hẹp.
+  const grid = src.match(/grid grid-cols-7 gap-1\.5 min-w-\[(\d+)px\]/);
+  expect(grid).not.toBeNull();
+  expect(Number(grid![1])).toBeGreaterThanOrEqual(1100);
+});
