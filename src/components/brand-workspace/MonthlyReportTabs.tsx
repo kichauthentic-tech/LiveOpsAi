@@ -397,9 +397,13 @@ const Panel: React.FC<{ title: string; icon: React.ReactNode; sub?: string; chil
   </div>
 );
 
+// Cột đầu (tên chỉ số) dính trái khi bảng cuộn ngang. Bảng host ở Phần 5 rộng 1.260px trong khung
+// 1.060px ngay cả trên màn 1440 (9 host × cột), cuộn sang phải là mất luôn tên chỉ số nên không còn
+// biết đang đọc dòng nào — ý định này đã ghi trong comment của bảng host từ 2026-09-26 nhưng chưa
+// được cài (audit UX lần 2 — M7). Nền đặc PAL.panel để chữ dòng dưới không lộ qua khi cuộn.
 const ReportTable: React.FC<{ head: string[]; children: React.ReactNode }> = ({ head, children }) => (
   <div className="overflow-x-auto -mx-1">
-    <table className="w-full text-xs min-w-[520px]">
+    <table className="w-full text-xs min-w-[520px] [&_th:first-child]:sticky [&_th:first-child]:left-0 [&_th:first-child]:z-10 [&_td:first-child]:sticky [&_td:first-child]:left-0 [&_td:first-child]:z-10 [&_th:first-child]:bg-[#17171b] [&_td:first-child]:bg-[#17171b]">
       <thead>
         <tr style={{ borderBottom: `1px solid ${PAL.line}` }}>
           {head.map((h, i) => (

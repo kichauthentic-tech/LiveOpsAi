@@ -280,14 +280,14 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
 
                       <button
                         onClick={() => openEditStudioModal(s)}
-                        className="p-1 text-[var(--text-muted)] hover:text-[var(--accent-text)] hover:bg-[var(--surface-hover)] rounded transition-all"
+                        className="p-1.5 text-[var(--text-muted)] hover:text-[var(--accent-text)] hover:bg-[var(--surface-hover)] rounded transition-all"
                         title="Chỉnh sửa Studio"
                       >
                         <Edit3 className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={() => handleDeleteStudio(s.id, s.name)}
-                        className="p-1 text-[var(--text-muted)] hover:text-red-400 hover:bg-[var(--surface-hover)] rounded transition-all"
+                        className="p-1.5 text-[var(--text-muted)] hover:text-red-400 hover:bg-[var(--surface-hover)] rounded transition-all"
                         title="Xóa Studio"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -433,14 +433,14 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
                       </span>
                       <button
                         onClick={() => openEditEquipmentModal(eq)}
-                        className="p-1 text-[var(--text-muted)] hover:text-[var(--accent-text)] rounded transition-all"
+                        className="p-1.5 text-[var(--text-muted)] hover:text-[var(--accent-text)] rounded transition-all"
                         title="Chỉnh sửa thiết bị"
                       >
                         <Edit3 className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={() => handleDeleteEquipment(eq.id, eq.name)}
-                        className="p-1 text-[var(--text-muted)] hover:text-red-400 rounded transition-all"
+                        className="p-1.5 text-[var(--text-muted)] hover:text-red-400 rounded transition-all"
                         title="Xóa thiết bị"
                       >
                         <Trash2 className="w-3.5 h-3.5" />

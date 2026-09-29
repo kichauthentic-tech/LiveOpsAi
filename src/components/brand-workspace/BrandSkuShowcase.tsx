@@ -280,7 +280,7 @@ export const BrandSkuShowcase: React.FC<BrandSkuShowcaseProps> = ({ brandId, cur
                       onClick={() => canEdit && handlePatch(s.id, { isHero: !s.isHero })}
                       disabled={!canEdit}
                       title={canEdit ? "Đặt/bỏ Hero SKU" : undefined}
-                      className={`p-1 rounded-lg ${s.isHero ? "text-[var(--warning)]" : "text-[var(--text-faint)]"} ${canEdit ? "hover:bg-[var(--surface-elevated)]" : ""}`}
+                      className={`p-1.5 rounded-lg ${s.isHero ? "text-[var(--warning)]" : "text-[var(--text-faint)]"} ${canEdit ? "hover:bg-[var(--surface-elevated)]" : ""}`}
                     >
                       <Star className="w-4 h-4" fill={s.isHero ? "currentColor" : "none"} />
                     </button>
@@ -304,7 +304,7 @@ export const BrandSkuShowcase: React.FC<BrandSkuShowcaseProps> = ({ brandId, cur
                   </td>
                   {canEdit && (
                     <td className="py-2.5 px-4">
-                      <button onClick={() => onDeleteSku(s.id)} className="text-[var(--danger)] hover:bg-red-950/80 p-1 rounded-lg" title="Xoá SKU">
+                      <button onClick={() => onDeleteSku(s.id)} className="text-[var(--danger)] hover:bg-red-950/80 p-1.5 rounded-lg" title="Xoá SKU">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </td>

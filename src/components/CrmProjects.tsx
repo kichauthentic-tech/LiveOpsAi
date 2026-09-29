@@ -182,21 +182,21 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
                   </span>
                   <button
                     onClick={() => setExpandedRateCardBrandId((cur) => (cur === b.id ? null : b.id))}
-                    className={`p-1 rounded transition-all ${expandedRateCardBrandId === b.id ? "text-blue-400" : "text-[var(--text-muted)] hover:text-blue-400"}`}
+                    className={`p-1.5 rounded transition-all ${expandedRateCardBrandId === b.id ? "text-blue-400" : "text-[var(--text-muted)] hover:text-blue-400"}`}
                     title="Rate Card"
                   >
                     <Tag className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => openEditBrandModal(b)}
-                    className="p-1 text-[var(--text-muted)] hover:text-[var(--accent-text)] rounded transition-all"
+                    className="p-1.5 text-[var(--text-muted)] hover:text-[var(--accent-text)] rounded transition-all"
                     title="Chỉnh sửa Brand"
                   >
                     <Edit3 className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => handleDeleteBrand(b.id, b.name)}
-                    className="p-1 text-[var(--text-muted)] hover:text-red-400 rounded transition-all"
+                    className="p-1.5 text-[var(--text-muted)] hover:text-red-400 rounded transition-all"
                     title="Xóa Brand"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -237,7 +237,7 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
             </h3>
             <button
               onClick={() => setExpandedRateCardBrandId(null)}
-              className="p-1 text-[var(--text-muted)] hover:text-[var(--text)] rounded transition-all"
+              className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text)] rounded transition-all"
               title="Đóng"
             >
               <X className="w-4 h-4" />

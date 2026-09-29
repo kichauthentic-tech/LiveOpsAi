@@ -238,12 +238,17 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
 
       {mode === "ops" && (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <Stat label={range === "week" ? "Ca trong tuần" : "Ca trong ngày"} value={String(summary.total)} />
-            <Stat label="Chưa có người" value={String(summary.noHost)} tone={summary.noHost > 0 ? "warn" : "ok"} />
-            <Stat label="Chưa nộp số liệu" value={String(summary.pending)} tone={summary.pending > 0 ? "warn" : "ok"} />
-            <Stat label="GMV đã ghi nhận" value={summary.gmv > 0 ? fmtVndShort(summary.gmv) : "—"} />
-          </div>
+          {/* Không có ca nào thì 4 ô "0 / 0 / 0 / —" không nói gì mà câu trạng thái ngay dưới đã nói đủ
+              (kèm chỗ mở ca) — bỏ luôn hàng ô thay vì bày 4 số 0 (audit UX lần 2 — M7, cùng luật với
+              Run-rate ở Dashboard brand M2). */}
+          {rows.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <Stat label={range === "week" ? "Ca trong tuần" : "Ca trong ngày"} value={String(summary.total)} />
+              <Stat label="Chưa có người" value={String(summary.noHost)} tone={summary.noHost > 0 ? "warn" : "ok"} />
+              <Stat label="Chưa nộp số liệu" value={String(summary.pending)} tone={summary.pending > 0 ? "warn" : "ok"} />
+              <Stat label="GMV đã ghi nhận" value={summary.gmv > 0 ? fmtVndShort(summary.gmv) : "—"} />
+            </div>
+          )}
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 sm:p-4 space-y-4">
             {rows.length === 0 && (
               <p className="text-sm text-[var(--text-faint)] italic py-6 text-center">

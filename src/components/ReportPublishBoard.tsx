@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { Send, RotateCcw, AlertTriangle, CheckCircle2, Clock, Loader2 } from "lucide-react";
+import { Send, RotateCcw, AlertTriangle, CheckCircle2, Clock, Loader2, Ban } from "lucide-react";
 import { Brand, BrandMonthlyReport, BrandPlatformRate, LiveSession } from "../types";
 import { upsertMonthlyReport, publishMonthlyReport, unpublishMonthlyReport } from "../lib/db/monthlyReports";
 import { errorMessage } from "../lib/errorMessage";
@@ -18,6 +18,8 @@ import { PageIntro } from "./common/PageIntro";
 // xem đọc-only của Report Tháng (không publish riêng); Cam Kết Hợp Đồng và Affiliate không có cột
 // status draft/published nào — không có gì để điều phối, nên không xuất hiện ở bảng này.
 const MONTHS_BACK = 6;
+// Đếm cột thay vì gõ số ở mỗi colSpan (M4 của audit lần 2 đã dính một lần lệch).
+const COL_COUNT = 5;
 
 interface ReportPublishBoardProps {
   brands: Brand[];
@@ -65,6 +67,14 @@ export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ brands, 
   }, [today, monthlyReports]);
 
   const sortedBrands = useMemo(() => brands.slice().sort((a, b) => a.name.localeCompare(b.name)), [brands]);
+
+  // Số ca của brand trong tháng — thứ quyết định report có gì để gửi hay không. Trước đây màn này
+  // KHÔNG hiện con số đó ở đâu cả: 24 dòng đều một nút "Phát hành" xanh như nhau, trong khi chỉ 4
+  // dòng (CROCS T6–T9) có ca thật; 20 dòng còn lại bấm vào là gửi cho brand một report rỗng.
+  const sessionCountFor = (brandId: string, month: string) => {
+    const { start, end } = monthRange(month);
+    return sessions.filter((s) => s.brandId === brandId && s.date >= start && s.date <= end).length;
+  };
 
   const unreconciledCountFor = (brandId: string, month: string) => {
     const { start, end } = monthRange(month);
@@ -143,29 +153,53 @@ export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ brands, 
           <table className="w-full text-xs">
             <thead>
               <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)] uppercase text-[11px] tracking-wider">
-                <th className="py-2.5 px-4">Tháng</th>
-                <th className="py-2.5 px-2">Brand</th>
+                <th className="py-2.5 px-4">Brand</th>
+                <th className="py-2.5 px-2 text-right">Ca trong tháng</th>
                 <th className="py-2.5 px-2">Trạng thái</th>
                 <th className="py-2.5 px-2">Chưa đối soát</th>
                 <th className="py-2.5 px-2 text-right">Hành động</th>
               </tr>
             </thead>
             <tbody>
-              {months.map((month) =>
-                sortedBrands.map((b) => {
+              {months.map((month) => (
+                <React.Fragment key={month}>
+                  <tr className="bg-[var(--surface-elevated)]/50">
+                    <td colSpan={COL_COUNT} className="py-1.5 px-4 text-[11px] font-bold text-[var(--text-muted)]">
+                      {fmtMonthLabel(month)}
+                      {(() => {
+                        const live = sortedBrands.filter((b) => sessionCountFor(b.id, month) > 0).length;
+                        return (
+                          <span className="text-[var(--text-faint)] font-normal">
+                            {" · "}
+                            {live === 0 ? "không brand nào có ca" : `${live}/${sortedBrands.length} brand có ca`}
+                          </span>
+                        );
+                      })()}
+                    </td>
+                  </tr>
+                  {sortedBrands.map((b) => {
                   const key = `${b.id}|${month}`;
                   const report = monthlyReports.get(key);
                   const isPublished = report?.status === "published";
                   const unreconciled = unreconciledCountFor(b.id, month);
+                  const sessionCount = sessionCountFor(b.id, month);
+                  // Không có ca nào VÀ chưa ai tạo dòng report (nhập Ads tay) ⇒ không có gì để gửi.
+                  const nothingToPublish = sessionCount === 0 && !report;
                   const busy = busyKey === key;
                   const err = rowError[key];
                   return (
                     <tr key={key} className="border-b border-[var(--border-muted)] align-top">
-                      <td className="py-2.5 px-4 font-bold text-[var(--text)] whitespace-nowrap">{fmtMonthLabel(month)}</td>
-                      <td className="py-2.5 px-2">
+                      <td className="py-2.5 px-4">
                         <span className="inline-flex items-center gap-1.5 font-semibold text-[var(--text)] whitespace-nowrap">
                           <BrandLogo brand={b} size="xs" /> {b.name}
                         </span>
+                      </td>
+                      <td className="py-2.5 px-2 text-right font-mono whitespace-nowrap">
+                        {sessionCount > 0 ? (
+                          <span className="text-[var(--text)] font-bold">{sessionCount}</span>
+                        ) : (
+                          <span className="text-[var(--text-faint)]">0</span>
+                        )}
                       </td>
                       <td className="py-2.5 px-2">
                         <span
@@ -204,6 +238,14 @@ export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ brands, 
                           >
                             {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />} Thu hồi
                           </button>
+                        ) : nothingToPublish ? (
+                          // Nút xanh y hệt dòng có 47 ca là mời ops gửi cho brand một report rỗng.
+                          <span
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[var(--text-faint)] text-[11px] font-semibold whitespace-nowrap"
+                            title="Tháng này brand chưa có ca nào và cũng chưa ai tạo dòng report — không có số gì để gửi."
+                          >
+                            <Ban className="w-3.5 h-3.5 shrink-0" /> Không có gì để phát hành
+                          </span>
                         ) : (
                           <button
                             onClick={() => handlePublish(b.id, month, report)}
@@ -217,11 +259,12 @@ export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ brands, 
                       </td>
                     </tr>
                   );
-                })
-              )}
+                  })}
+                </React.Fragment>
+              ))}
               {sortedBrands.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="py-8 text-center text-[var(--text-faint)] italic">
+                  <td colSpan={COL_COUNT} className="py-8 text-center text-[var(--text-faint)] italic">
                     Chưa có brand nào.
                   </td>
                 </tr>

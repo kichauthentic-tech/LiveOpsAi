@@ -487,7 +487,7 @@ export default function ShiftScheduling({
         <div className="bg-amber-950/40 border border-amber-900 rounded-xl px-4 py-2.5 text-xs text-amber-200 flex flex-wrap items-center gap-2">
           <AlertTriangle className="w-4 h-4 shrink-0" />
           <span>Tháng sau chưa chốt kế hoạch ca: <b>{planMissing.join(", ")}</b>.</span>
-          {onOpenMonthPlan && <button onClick={onOpenMonthPlan} className="ml-auto text-[11px] font-bold text-amber-100 underline underline-offset-2">Mở Kế Hoạch Tháng →</button>}
+          {onOpenMonthPlan && <button onClick={onOpenMonthPlan} className="ml-auto min-h-6 -mx-1 px-1 rounded inline-flex items-center text-[11px] font-bold text-amber-100 underline underline-offset-2">Mở Kế Hoạch Tháng →</button>}
         </div>
       )}
 
@@ -593,7 +593,7 @@ export default function ShiftScheduling({
         </div>
         {view === "list" && !selectedDate && (
           <label className="text-xs text-[var(--text-muted)] flex items-center gap-1.5 cursor-pointer">
-            <input type="checkbox" checked={showPast} onChange={(e) => setShowPast(e.target.checked)} /> gồm ca đã qua
+            <input type="checkbox" checked={showPast} onChange={(e) => setShowPast(e.target.checked)} className="w-6 h-6 accent-[var(--accent)]" /> gồm ca đã qua
           </label>
         )}
       </div>

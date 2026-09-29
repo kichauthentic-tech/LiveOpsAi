@@ -432,7 +432,7 @@ const IssueList: React.FC<{ issues: Issue[]; onNavigate: (tab: string) => void }
                 <p className="text-sm font-bold text-[var(--text)]">{it.title}</p>
                 <p className="text-xs text-[var(--text-faint)] leading-snug">{it.detail}</p>
                 {it.action && (
-                  <button onClick={() => onNavigate(ACTION_TAB[it.action!].tab)} className="text-xs font-bold text-[var(--accent-text)] hover:underline mt-0.5">
+                  <button onClick={() => onNavigate(ACTION_TAB[it.action!].tab)} className="min-h-6 -mx-1 px-1 rounded inline-flex items-center text-xs font-bold text-[var(--accent-text)] hover:underline mt-0.5">
                     {ACTION_TAB[it.action].label} →
                   </button>
                 )}
@@ -555,7 +555,7 @@ const AccountsTable: React.FC<{
             <> Hiện lại bằng cách {fixes.map((fx, i) => (
               <React.Fragment key={fx.label}>
                 {i > 0 && " hoặc "}
-                <button onClick={() => onNavigate(fx.tab)} className="text-[var(--accent-text)] font-bold hover:underline">{fx.label} →</button>
+                <button onClick={() => onNavigate(fx.tab)} className="min-h-6 -mx-1 px-1 rounded inline-flex items-center text-[var(--accent-text)] font-bold hover:underline">{fx.label} →</button>
               </React.Fragment>
             ))}.</>
           )}
@@ -754,7 +754,7 @@ const TargetSection: React.FC<{ outlook: MonthOutlook; month: string; single: bo
           </div>
         </Card>
         <div className="grid grid-cols-2 gap-3 content-start">
-          {stat("Target GMV tháng", o.target ? money(o.target.total) : "—", o.target ? sourceLabel : <button onClick={() => onNavigate("month_plan")} className="text-[var(--accent-text)] font-bold hover:underline">Chốt Kế Hoạch Tháng →</button>)}
+          {stat("Target GMV tháng", o.target ? money(o.target.total) : "—", o.target ? sourceLabel : <button onClick={() => onNavigate("month_plan")} className="min-h-6 -mx-1 px-1 rounded inline-flex items-center text-[var(--accent-text)] font-bold hover:underline">Chốt Kế Hoạch Tháng →</button>)}
           {stat("Đã đạt", money(o.actual), o.target ? `${pct(o.actual / o.target.total)} Target${o.through ? ` · số đến ${ddmm(o.through)}` : ""}` : o.through ? `số đến ${ddmm(o.through)}` : undefined)}
           {/* M3: 3 ô dưới chỉ có số khi đã có target. Chưa có thì bỏ hẳn — ô "—" chiếm chỗ ngang với ô có số
               làm người đọc phải quét hết mới biết cái nào dùng được; ô "Target GMV tháng" ở trên đã có nút đi chốt. */}

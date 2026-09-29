@@ -335,13 +335,13 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ brandId, brandName, 
                         <div className="flex items-center justify-between py-2 gap-2">
                           <button
                             onClick={() => setExpandedId(expandedId === imp.id ? null : imp.id)}
-                            className="flex items-center gap-2 text-xs font-semibold text-[var(--text)] hover:text-[var(--accent)] flex-1 text-left min-w-0"
+                            className="flex items-center gap-2 min-h-6 text-xs font-semibold text-[var(--text)] hover:text-[var(--accent)] flex-1 text-left min-w-0"
                           >
                             {expandedId === imp.id ? <ChevronDown className="w-3.5 h-3.5 shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 shrink-0" />}
                             <span className="truncate">{formatPeriodShort(imp)}</span>
                             <span className="text-[var(--text-faint)] font-normal shrink-0">· {imp.rowCount} dòng · cập nhật {new Date(imp.importedAt).toLocaleDateString("vi-VN")}</span>
                           </button>
-                          <button onClick={() => handleDelete(imp.id)} className="text-red-500/70 hover:text-red-500 shrink-0 p-1">
+                          <button onClick={() => handleDelete(imp.id)} className="text-red-500/70 hover:text-red-500 shrink-0 p-1.5 rounded">
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>

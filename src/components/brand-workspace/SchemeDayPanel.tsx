@@ -148,7 +148,7 @@ export const SchemeDayPanel: React.FC<SchemeDayPanelProps> = ({ brandId, date, s
                     <button
                       disabled={busy}
                       onClick={() => onDelete && (onDelete(scheme.id), setEditingId(null))}
-                      className="p-0.5 rounded text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40"
+                      className="p-1.5 rounded text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>

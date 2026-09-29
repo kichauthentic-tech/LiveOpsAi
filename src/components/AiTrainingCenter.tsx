@@ -128,7 +128,7 @@ export const AiTrainingCenter: React.FC<AiTrainingCenterProps> = ({ prompts, loa
                       <button
                         onClick={() => handleResetDraft(p)}
                         disabled={isDefault}
-                        className="text-[11px] font-bold text-[var(--text-muted)] hover:text-[var(--text)] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
+                        className="min-h-6 -mx-1.5 px-1.5 rounded text-[11px] font-bold text-[var(--text-muted)] hover:text-[var(--text)] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
                       >
                         <RotateCcw className="w-3.5 h-3.5" /> Khôi Phục Mặc Định
                       </button>

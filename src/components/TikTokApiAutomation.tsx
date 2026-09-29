@@ -198,7 +198,7 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
                     <button
                       onClick={handleDisconnect}
                       disabled={disconnecting}
-                      className="text-[11px] font-bold text-red-600 hover:text-red-700 flex items-center gap-1"
+                      className="min-h-6 -mx-1.5 px-1.5 rounded text-[11px] font-bold text-red-600 hover:text-red-700 flex items-center gap-1"
                     >
                       <Unlink className="w-3.5 h-3.5" /> {disconnecting ? "Đang ngắt..." : "Ngắt Kết Nối"}
                     </button>
@@ -206,7 +206,7 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
                     <button
                       onClick={handleConnect}
                       disabled={connecting || !tiktokStatus?.configured}
-                      className="text-[11px] font-bold text-[var(--accent-text)] hover:opacity-80 flex items-center gap-1 disabled:text-[var(--text-muted)]"
+                      className="min-h-6 -mx-1.5 px-1.5 rounded text-[11px] font-bold text-[var(--accent-text)] hover:opacity-80 flex items-center gap-1 disabled:text-[var(--text-muted)]"
                     >
                       <Link2 className="w-3.5 h-3.5" /> {connecting ? "Đang chuyển hướng..." : "Kết Nối TikTok Shop"}
                     </button>

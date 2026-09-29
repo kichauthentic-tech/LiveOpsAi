@@ -222,7 +222,7 @@ export function LiveReconciliation({ onApplied, onOpenSession }: LiveReconciliat
                             {r.matchedSessionIds.length === 0 ? "—" : onOpenSession ? (
                               <span className="inline-flex gap-1 justify-end flex-wrap">
                                 {r.matchedSessionIds.map((id, i) => (
-                                  <button key={id} onClick={() => onOpenSession(id)} className="px-1.5 py-0.5 rounded border border-sky-800 text-sky-300 hover:bg-sky-950 font-bold" title="Mở ca">
+                                  <button key={id} onClick={() => onOpenSession(id)} className="inline-flex items-center min-h-6 px-1.5 py-0.5 rounded border border-sky-800 text-sky-300 hover:bg-sky-950 font-bold" title="Mở ca">
                                     ca {i + 1}
                                   </button>
                                 ))}
@@ -269,7 +269,7 @@ export function LiveReconciliation({ onApplied, onOpenSession }: LiveReconciliat
                   await reloadBatches();
                 })}
                 disabled={busy}
-                className="text-[var(--text-faint)] hover:text-rose-400 disabled:opacity-40 transition-colors"
+                className="p-1.5 -m-1.5 rounded text-[var(--text-faint)] hover:text-rose-400 disabled:opacity-40 transition-colors"
                 title="Xoá lần đối soát này"
               >
                 <Trash2 className="w-4 h-4" />

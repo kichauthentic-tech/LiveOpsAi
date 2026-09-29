@@ -11,7 +11,9 @@
 > 1 cột kéo 1.086px → 3 cột × 341px. M5: 331 → 0 phần tử bấm dưới sàn 24px, sửa luôn lỗi thẻ ca tràn sang ô ngày bên cạnh.
 > M6: 33 thẻ → bảng (3,7 → 2,4 màn desktop, 11,6 → 3,0 màn ở 375), bỏ ảnh stock dùng chung cho cả 33 người, **sửa lỗi Talent Pool
 > không đếm ca chạy vai trợ** (8 người bị báo "chưa có ca nào", trong đó 1 người 86 ca).
-> Kế tiếp: M7 nhóm màn còn lại. Xem `## Audit UX/UI lần 2 (2026-09-29)`.
+> M7 (đợt cuối): Điều Phối Phát Hành 24 → 5 nút "Phát hành" (20/24 dòng không có ca nào để gửi), và **quét cả app: 142 → 0 phần tử
+> bấm dưới sàn 24px** ở 1440 lẫn 375, trên 17 màn agency + 11 màn brand.
+> **Audit UX/UI lần 2 XONG.** Xem `## Audit UX/UI lần 2 (2026-09-29)`.
 
 > **MỚI 2026-09-29 — Key Metrics 18 chỉ số trên MỌI report (không migration, commit 7996080 đã push `main`).** Một module
 > [keyMetrics.ts](src/lib/report/keyMetrics.ts) (bộ đếm + công thức + danh sách `KEY_METRICS` + định dạng + cột Excel) thay 5 bản
@@ -546,8 +548,36 @@ Dashboard agency 5,2 → 10,1; Lịch brand 5,2 → 6,4; Sổ Ca 4,4 → 8,3; AI
   Còn lại: ở 375px bảng vẫn cuộn ngang 1,26× trong khung riêng (cột GMV tích luỹ) — giữ, trang không tràn. Nút "Chi tiết" của
   [PageIntro.tsx](src/components/common/PageIntro.tsx) cao 17px ở điện thoại (dưới sàn 24px) — **dùng chung 11 màn**, để sửa một
   lượt chứ không sửa lẻ trong đợt theo màn. 6 ô nhập rate/điểm trong form sửa chưa động tới.
-- **M7 nhóm còn lại (ĐỢT KẾ TIẾP):** Điều Phối Phát Hành (24 nút "Phát hành" xanh, cả 18 dòng "Chưa có dòng"); Affiliate (kiểu bảng Excel nền
-  đỏ/xanh, 68/73 phần tử < 32px); CRM, Studios, TikTok API, AI Training, Phân Quyền, Finance, SKU, Rate Card, Cam Kết — chỉ header + nhãn.
+- **M7 nhóm màn còn lại — ĐÃ LÀM 2026-09-30, verify trên browser (admin).** Quét 17 màn agency + 11 màn brand ở 1440×900 rồi mới sửa,
+  thay vì đoán màn nào nặng.
+  **(1) Điều Phối Phát Hành ([ReportPublishBoard.tsx](src/components/ReportPublishBoard.tsx)) — nút mời làm việc sai.** 24 dòng đều
+  một nút "Phát hành" xanh như nhau, nhưng đếm ca thật thì **chỉ CROCS T6–T9 có ca; 20 dòng còn lại 0 ca** ⇒ bấm là gửi cho brand một
+  report rỗng (nút không chết: nó tự tạo dòng nháp + bản chụp rồi publish). Màn cũng KHÔNG hiện số ca ở đâu — thứ duy nhất quyết định
+  report có gì để gửi. Đã thêm cột "Ca trong tháng"; dòng `sessionCount === 0 && !report` đổi nút xanh thành chữ xám "Không có gì để
+  phát hành" + `title` nói lý do (còn dòng đã có người nhập Ads tay thì vẫn phát hành được, vd Franklin T8 0 ca nhưng có nháp);
+  gộp theo tháng bằng dòng ngăn ghi "1/4 brand có ca" nên bỏ được 24 lần lặp nhãn tháng. Kết quả **24 → 5 nút xanh**, 1,61 → 1,80 màn.
+  Giữ cột "Chưa đối soát" dù cả 24 dòng đều "—": đây là số TÍNH ĐƯỢC và bằng 0 (khác cột rỗng vì chưa ai nhập ở M3/M6), và là bước
+  kiểm trước một hành động gửi ra ngoài.
+  **(2) Vùng bấm dưới sàn 24px — 142 → 0 trên toàn app.** Affiliate brand 64 (56 ô nhập cao 20px, 4 select 20px, 4 nút xoá 14×14);
+  AI Training 44 (38 nút "↺ mặc định" 64×15, 5 nút "Khôi Phục Mặc Định" 129×17, 1 checkbox 13×13); CRM 12 + Studios 10 (nút icon
+  `p-1` quanh icon 14px = 22px); Bản Tin CEO 8 + Nhân sự ca 2 + Đối soát 37 + Dữ Liệu Gốc 2 + TikTok API 1; và
+  [PageIntro.tsx](src/components/common/PageIntro.tsx) — nút "Chi tiết" 40×17 **dùng chung 11 màn**.
+  Cách sửa: ô nhập/nút chữ dùng `min-h-6` (+ `-mx-1.5 px-1.5` khi không được đẩy dòng); nút icon `p-1`/`p-0.5` → `p-1.5`.
+  Ba nút trong đó **do chính M3 thêm vào** ("Mở Sổ Ca →", "Mở Kế Hoạch Tháng →", "Mở Hiệu Suất Host →" ở Bản Tin CEO) — đợt trước
+  không đo lại nhóm link chữ sau khi thêm.
+  **(3) Report Tháng — cột tên chỉ số giờ dính trái.** Bảng host Phần 5 rộng 1.260px trong khung 1.060px ngay trên màn 1440 (9 host),
+  cuộn sang phải là mất tên chỉ số. `ReportTable` ([MonthlyReportTabs.tsx](src/components/brand-workspace/MonthlyReportTabs.tsx)) thêm
+  `[&_td:first-child]:sticky left-0` + nền đặc. Ý định này đã ghi trong comment từ 2026-09-26 nhưng chưa được cài.
+  **(4) Bảng Vận Hành ([OpsBoard.tsx](src/components/OpsBoard.tsx))** — hôm nay không có ca thì 4 ô KPI "0 / 0 / 0 / —" không nói gì
+  mà câu trạng thái ngay dưới đã nói đủ (kèm chỗ mở ca). Ẩn hàng ô khi `rows.length === 0`. An toàn vì `summary` tính HOÀN TOÀN từ
+  `rows` (`total: rows.length`) nên điều kiện này đúng bằng "cả 4 ô đều 0" — không giấu nhầm được hàng đang có số.
+  Sau: **0 phần tử dưới 24px và 0 tràn ngang trang** trên cả 17 màn agency lẫn 11 màn brand, đo ở cả 1440×900 và 375×812.
+  Test canh thêm 6 ca, cả 6 đỏ trên code cũ. tsc 0, eslint 0 lỗi/33 cảnh báo (= baseline), vitest **207/207**, build OK, console tab mới 0 lỗi.
+  **Bẫy khi verify:** (1) `elementFromPoint` chỉ đúng với toạ độ ĐANG trong viewport — nút nằm dưới mép màn trả về "không bấm được"
+  dù không có gì che; phải `scrollIntoView` trước. (2) Đo trên browser chỉ thấy nút ĐANG render: 9 nút nằm trong modal/ngăn phải mở mới
+  thấy (cửa sổ ca, ngăn ca trống, duyệt lương, xoá SKU, thiết bị studio) lọt hết qua lượt quét — bắt được nhờ **ca test quét mã nguồn
+  cả repo**, tính `cỡ icon + 2 × padding ≥ 24`. Lần viết đầu ca test đó chỉ khớp `p-1` ở ĐẦU chuỗi class nên vẫn sót
+  `... shrink-0 p-1`; phải khớp ở mọi vị trí.
 
 Chưa đo được: màn talent (Ca Của Tôi/Đăng Ký Ca) và role brand — cần user đăng nhập tài khoản đó trong Browser pane.
 

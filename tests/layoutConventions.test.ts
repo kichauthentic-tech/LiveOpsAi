@@ -254,3 +254,79 @@ test("Talent Pool: trình AI khớp nối gập lại và xếp sau danh sách",
   expect(table).toBeGreaterThan(-1);
   expect(details).toBeGreaterThan(table);
 });
+
+// ---- M7 nhóm màn còn lại (2026-09-30) ----
+
+test("Điều Phối Phát Hành: không mời phát hành tháng không có gì để gửi", () => {
+  const src = readFileSync(join(SRC, "components/ReportPublishBoard.tsx"), "utf8");
+  // Số ca trong tháng là thứ quyết định report có gì để gửi — phải hiện trên bảng.
+  expect(src).toMatch(/const sessionCountFor = /);
+  expect(src).toMatch(/Ca trong tháng/);
+  // Tháng không có ca và chưa ai tạo dòng report ⇒ không có nút xanh.
+  expect(src).toMatch(/const nothingToPublish = sessionCount === 0 && !report/);
+  expect(src).toMatch(/Không có gì để phát hành/);
+  // colSpan đếm được, không gõ số.
+  expect(src).toMatch(/colSpan=\{COL_COUNT\}/);
+  expect(src).not.toMatch(/colSpan=\{\d+\}/);
+});
+
+test("PageIntro: nút Chi tiết đạt sàn 24px (dùng chung 11 màn)", () => {
+  const src = readFileSync(join(SRC, "components/common/PageIntro.tsx"), "utf8");
+  expect(src).toMatch(/shrink-0 -m-1\.5 p-1\.5 text-\[11px\]/);
+});
+
+test("Vùng bấm ≥ 24px ở nhóm màn M7", () => {
+  const affiliate = readFileSync(join(SRC, "components/brand-workspace/BrandAffiliateTable.tsx"), "utf8");
+  // 56 ô nhập của bảng affiliate cao 20px trước M7.
+  expect(affiliate).toMatch(/const inputCls = "w-full min-h-6 bg-transparent/);
+  expect(affiliate).not.toMatch(/title="Xoá cột" className="text-red-500/);
+
+  const engine = readFileSync(join(SRC, "components/EngineTrainingPanel.tsx"), "utf8");
+  expect(engine).toMatch(/className="w-16 min-h-6 inline-flex/);
+  expect(engine).toMatch(/type="checkbox"[\s\S]{0,160}className="w-6 h-6 accent-/);
+
+  const aiCenter = readFileSync(join(SRC, "components/AiTrainingCenter.tsx"), "utf8");
+  expect(aiCenter).toMatch(/className="min-h-6 -mx-1\.5 px-1\.5 rounded text-\[11px\] font-bold text-\[var\(--text-muted\)\]/);
+
+  const tiktok = readFileSync(join(SRC, "components/TikTokApiAutomation.tsx"), "utf8");
+  expect(tiktok).not.toMatch(/className="text-\[11px\] font-bold text-red-600 hover:text-red-700 flex/);
+  expect(tiktok).not.toMatch(/className="text-\[11px\] font-bold text-\[var\(--accent-text\)\] hover:opacity-80 flex/);
+});
+
+test("Nút icon: padding phải đủ để vùng bấm đạt 24px", () => {
+  // Quét cả repo thay vì liệt kê từng file: đo trên browser chỉ thấy nút ĐANG render — riêng M7 bỏ sót
+  // 9 nút nằm trong modal/ngăn phải mở mới thấy (cửa sổ ca, ngăn ca trống, duyệt lương, xoá SKU...).
+  // Sàn: bề rộng = cỡ icon + 2×padding ≥ 24. p-0.5 = 2px, p-1 = 4px, p-1.5 = 6px mỗi bên.
+  const PAD: Record<string, number> = { "0.5": 2, "1": 4, "1.5": 6, "2": 8 };
+  const ICON: Record<string, number> = { "3": 12, "3.5": 14, "4": 16, "5": 20, "6": 24 };
+  const hits: string[] = [];
+  for (const file of sourceFiles(SRC)) {
+    const src = readFileSync(file, "utf8");
+    for (const m of src.matchAll(/<button[\s\S]{0,900}?<\/button>/g)) {
+      const el = m[0];
+      const pad = el.match(/className=(?:"|\{`)[^"`]*?(?<![\w.-])p-(0\.5|1|1\.5|2)(?![\w.])/);
+      const icon = el.match(/className="w-(3\.5|3|4|5|6) h-\1/);
+      if (!pad || !icon) continue;
+      const size = ICON[icon[1]] + 2 * PAD[pad[1]];
+      if (size < 24) hits.push(`${rel(file)} :: icon w-${icon[1]} + p-${pad[1]} = ${size}px`);
+    }
+  }
+  expect(hits, hits.join("\n")).toEqual([]);
+});
+
+test("Bảng Vận Hành: không bày 4 ô 0 khi không có ca nào", () => {
+  const src = readFileSync(join(SRC, "components/OpsBoard.tsx"), "utf8");
+  // `summary` tính hoàn toàn từ `rows` (summary.total === rows.length) nên điều kiện này đúng bằng
+  // "cả 4 ô đều 0" — không thể giấu nhầm hàng ô đang có số.
+  expect(src).toMatch(/const summary = useMemo\(\(\) => \{\s*const ss = rows\.filter/);
+  expect(src).toMatch(/total: rows\.length/);
+  expect(src).toMatch(/\{rows\.length > 0 && \(\s*<div className="grid grid-cols-2 sm:grid-cols-4 gap-2">/);
+});
+
+test("Report Tháng: cột tên chỉ số dính trái khi bảng cuộn ngang", () => {
+  const src = readFileSync(join(SRC, "components/brand-workspace/MonthlyReportTabs.tsx"), "utf8");
+  expect(src).toMatch(/\[&_td:first-child\]:sticky/);
+  expect(src).toMatch(/\[&_th:first-child\]:sticky/);
+  // Nền phải đặc, nếu không chữ cột sau lộ qua khi cuộn.
+  expect(src).toMatch(/\[&_td:first-child\]:bg-\[#17171b\]/);
+});

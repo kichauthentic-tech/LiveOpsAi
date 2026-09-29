@@ -689,7 +689,7 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
                                 setNote("Đã xoá cam kết tháng.");
                               });
                             }}
-                            className="p-1 rounded hover:bg-rose-950/40 text-[var(--text-faint)] hover:text-rose-400"
+                            className="p-1.5 rounded hover:bg-rose-950/40 text-[var(--text-faint)] hover:text-rose-400"
                           >
                             <Trash2 className="w-3 h-3" />
                           </button>

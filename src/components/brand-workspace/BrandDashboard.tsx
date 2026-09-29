@@ -310,7 +310,7 @@ export default function BrandDashboard({ brandId, brandName, sessions, shiftSlot
               <AlertTriangle className="w-4 h-4 text-amber-300 shrink-0 mt-0.5" />
               <span>
                 {plan ? `Kế hoạch tháng ${Number(month.slice(5))} còn là nháp` : `Tháng ${Number(month.slice(5))} chưa có Kế Hoạch Tháng`} — chưa có target plan để tính run-rate.
-                {isOps && <> <button onClick={onOpenMonthPlan} className="font-bold text-[var(--accent-text)] underline">Mở Kế Hoạch Tháng</button></>}
+                {isOps && <> <button onClick={onOpenMonthPlan} className="min-h-6 -mx-1 px-1 rounded inline-flex items-center font-bold text-[var(--accent-text)] underline">Mở Kế Hoạch Tháng</button></>}
               </span>
             </div>
           ) : (

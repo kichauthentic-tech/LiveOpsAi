@@ -203,13 +203,15 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
                       </div>
                       {m.kind === "boolean" ? (
                         <label className="flex items-center gap-1.5 text-[var(--text)]">
-                          <input type="checkbox" checked={Boolean(v)} onChange={(e) => set(m.key, e.target.checked)} />
+                          <input type="checkbox" checked={Boolean(v)} onChange={(e) => set(m.key, e.target.checked)} className="w-6 h-6 accent-[var(--accent)]" />
                           {v ? "bật" : "tắt"}
                         </label>
                       ) : (
                         <input type="number" value={Number(v)} min={m.min} max={m.max} step={m.step} onChange={(e) => { const n = Number(e.target.value); if (Number.isFinite(n)) set(m.key, n); }} className="w-24 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1 text-right font-mono text-[var(--text)]" />
                       )}
-                      <button onClick={() => set(m.key, def)} disabled={isDef} title={`Mặc định: ${String(def)}`} className="w-16 text-[11px] text-[var(--text-faint)] hover:text-[var(--text)] disabled:opacity-30 text-right">↺ {String(def)}</button>
+                      {/* 38 nút này cao 15px — dưới sàn 24px của WCAG 2.5.8 (audit UX lần 2 — M7).
+                          `min-h-6` + padding ngang, dòng vốn đã cao 32px nên không dài thêm. */}
+                      <button onClick={() => set(m.key, def)} disabled={isDef} title={`Mặc định: ${String(def)}`} className="w-16 min-h-6 inline-flex items-center justify-end px-1 rounded text-[11px] text-[var(--text-faint)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)] disabled:opacity-30 disabled:hover:bg-transparent">↺ {String(def)}</button>
                     </div>
                   );
                 })}

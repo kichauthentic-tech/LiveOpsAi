@@ -302,7 +302,9 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
   const readOnly = !canManage;
   const cellCls = "px-2 py-1.5 border-r border-[var(--border)] text-center whitespace-nowrap";
   const labelCls = "px-3 py-1.5 border-r border-[var(--border)] text-left font-semibold text-[var(--text-faint)] sticky left-0 bg-[var(--surface-base)] z-10 whitespace-nowrap";
-  const inputCls = "w-full bg-transparent text-center outline-none focus:bg-[var(--surface-hover)] rounded px-1";
+  // `min-h-6` = 24px, sàn vùng bấm WCAG 2.5.8: 56 ô nhập của bảng này trước đây cao 20px
+  // (audit UX lần 2 — M7). Ô nằm trong `td` có `py-1.5` nên dòng chỉ cao thêm 4px.
+  const inputCls = "w-full min-h-6 bg-transparent text-center outline-none focus:bg-[var(--surface-hover)] rounded px-1";
 
   // Ô số: khi KHÔNG focus thì hiện bản đã format ("225.248.394", "52,76%") cho dễ đọc; lúc focus
   // đổi về số thô để ops gõ/sửa không phải né dấu phân cách. Không format-while-typing vì con trỏ
@@ -494,7 +496,7 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
                     aria-label={cellLabel(e, label)}
                     value={e.campaignType ?? ""}
                     onChange={(ev) => update(e, { campaignType: ev.target.value || undefined })}
-                    className={`rounded px-1.5 py-0.5 text-xs font-semibold outline-none ${CAMPAIGN_STYLE[e.campaignType ?? ""] ?? "bg-[var(--surface-elevated)]"}`}
+                    className={`min-h-6 rounded px-1.5 py-0.5 text-xs font-semibold outline-none ${CAMPAIGN_STYLE[e.campaignType ?? ""] ?? "bg-[var(--surface-elevated)]"}`}
                   >
                     <option value="">—</option>
                     {CAMPAIGN_TYPES.map((t) => (
@@ -529,8 +531,12 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
                   <td className={labelCls} />
                   {flatColumns.map((e) => (
                     <td key={e._key} className={cellCls}>
-                      <button onClick={() => removeEntry(e)} title="Xoá cột" className="text-red-500 hover:text-red-700">
-                        <Trash2 className="w-3.5 h-3.5 mx-auto" />
+                      <button
+                        onClick={() => removeEntry(e)}
+                        title="Xoá cột"
+                        className="inline-flex items-center justify-center p-1.5 rounded text-red-500 hover:text-red-700 hover:bg-red-950/40"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </td>
                   ))}

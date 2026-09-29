@@ -266,7 +266,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
   // bằng chữ như trước, không phải nút bấm rồi đập vào Access Restricted.
   const adsReportLink =
     canManage && onOpenAdsReport ? (
-      <button onClick={onOpenAdsReport} className="font-semibold underline text-[var(--accent-text)] hover:opacity-80">
+      <button onClick={onOpenAdsReport} className="min-h-6 -mx-1 px-1 rounded font-semibold underline text-[var(--accent-text)] hover:opacity-80">
         Nhập Ads & Ghi Chú
       </button>
     ) : (
