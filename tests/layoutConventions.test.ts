@@ -32,9 +32,8 @@ test('không dùng <input type="month"> — Safari/Firefox desktop biến thành
 });
 
 test("tiêu đề trang không dùng kiểu cũ text-2xl (dùng PageHeader) — trừ các chỗ chưa tới lượt", () => {
-  // Report Tháng: cụm đầu trang (tab Tháng/Tuần + thẻ tiêu đề + thanh bản chụp + mục lục) sẽ gộp ở đợt M1.
   // AiMultiAgent: tab ẩn khỏi menu từ 2026-09-18.
-  const PENDING = new Set(["components/brand-workspace/BrandMonthlyReport.tsx", "components/AiMultiAgent.tsx"]);
+  const PENDING = new Set(["components/AiMultiAgent.tsx"]);
   const hits: string[] = [];
   for (const file of sourceFiles(SRC)) {
     if (PENDING.has(rel(file))) continue;
@@ -59,6 +58,28 @@ test("tiêu đề trang (h2 đầu tiên của mỗi component màn) cùng cỡ 
       .forEach((line, i) => {
         if (/<h2 className="text-(xl|base) font-(black|bold) text-\[var\(--text\)\]("| flex items-center gap-2")>/.test(line))
           hits.push(`${rel(file)}:${i + 1}`);
+      });
+  }
+  expect(hits).toEqual([]);
+});
+
+test("Report Tháng: mục lục dính được (khung ngoài không overflow-hidden) và có đánh dấu phần đang đọc", () => {
+  const src = readFileSync(join(SRC, "components/brand-workspace/MonthlyReportTabs.tsx"), "utf8");
+  // Khung ngoài của report (nền PAL.bg) — overflow-hidden làm `sticky` của mục lục vô tác dụng (đo 2026-09-29).
+  const outer = src.split("\n").find((l) => /<div className="rounded-2xl[^"]*" style=\{\{ background: PAL\.bg, border:/.test(l)) ?? "";
+  expect(outer).not.toBe("");
+  expect(outer).not.toMatch(/overflow-hidden/);
+  expect(src).toMatch(/sticky -top-3 sm:-top-6/);
+  expect(src).toMatch(/aria-current=\{activeSec === sec\.id/);
+});
+
+test("chữ biểu đồ recharts không nhỏ hơn 11px (sàn cỡ chữ của audit 26/09)", () => {
+  const hits: string[] = [];
+  for (const file of sourceFiles(SRC)) {
+    readFileSync(file, "utf8")
+      .split("\n")
+      .forEach((line, i) => {
+        for (const m of line.matchAll(/fontSize=\{(\d+(?:\.\d+)?)\}/g)) if (Number(m[1]) < 11) hits.push(`${rel(file)}:${i + 1} ${m[0]}`);
       });
   }
   expect(hits).toEqual([]);

@@ -81,6 +81,11 @@ import { fmtFixed, fmtVndShort } from "../../lib/format";
 // Report Tháng — skin đen-vàng CỐ ĐỊNH riêng cho tab này (khác theme sáng/tối/sand nội bộ app):
 // đây là tài liệu gửi thẳng cho brand để pitching, nhận diện thương hiệu phải nhất quán bất kể Ops
 // đang chọn theme nội bộ nào. Không dùng var(--accent)/var(--surface) như phần còn lại của app.
+// Nút dạng chữ gạch chân trong report (Sửa Insight, Lưu, Huỷ…) — trước chỉ cao 17px (dòng chữ 11px), dưới
+// ngưỡng 24px của WCAG 2.5.8; min-h-7 = 28px, giữ dáng link (audit UX 2026-09-29, M1).
+const LINK_BTN =
+  "inline-flex items-center min-h-7 px-2 -mx-1 rounded-lg font-bold underline underline-offset-2 hover:bg-white/5 disabled:opacity-50";
+
 const PAL = {
   bg: "#0b0b0d",
   panel: "#17171b",
@@ -479,8 +484,8 @@ const WaterfallPanel: React.FC<{ title: string; sub: string; data: WaterfallPoin
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} margin={{ top: 18, right: 8 }}>
           <CartesianGrid stroke={PAL.line} vertical={false} />
-          <XAxis dataKey="label" stroke={PAL.muted} fontSize={10.5} interval={0} />
-          <YAxis stroke={PAL.muted} fontSize={10} tickFormatter={(v) => fmtVndShort(v)} width={70} />
+          <XAxis dataKey="label" stroke={PAL.muted} fontSize={11} interval={0} />
+          <YAxis stroke={PAL.muted} fontSize={11} tickFormatter={(v) => fmtVndShort(v)} width={70} />
           <Tooltip contentStyle={chartTooltipStyle} formatter={(_v, _n, item) => fmtVndShort(chartNum((item as { payload?: { display?: number } }).payload?.display))} />
           <Bar dataKey="base" stackId="w" fill="transparent" isAnimationActive={false} legendType="none" tooltipType="none" />
           <Bar dataKey="value" stackId="w" radius={[4, 4, 0, 0]} name="GMV">
@@ -493,7 +498,7 @@ const WaterfallPanel: React.FC<{ title: string; sub: string; data: WaterfallPoin
     </div>
     <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 mt-2">
       {breakdown.parts.map((p) => (
-        <div key={p.key} className="text-[11.5px] rounded-lg px-3 py-2" style={{ background: PAL.panel2, color: PAL.muted }}>
+        <div key={p.key} className="text-xs rounded-lg px-3 py-2" style={{ background: PAL.panel2, color: PAL.muted }}>
           <span style={{ color: PAL.cream }}>{DRIVER_LABEL[p.key]}</span> {p.change >= 0 ? "+" : "−"}{fmtFixed(Math.abs(p.change), 1)}% ⇒{" "}
           <span className="font-mono" style={{ color: p.value >= 0 ? PAL.green : PAL.red }}>
             {p.value >= 0 ? "+" : "−"}{fmtVndShort(Math.abs(p.value))}
@@ -587,10 +592,10 @@ const InsightBox: React.FC<{
           </p>
           {error && <p className="text-[11px]" style={{ color: PAL.red }}>{error}</p>}
           <div className="flex gap-3 text-[11px] font-bold">
-            <button onClick={() => save(draft.trim() || null)} disabled={saving} className="underline disabled:opacity-50" style={{ color: PAL.gold }}>
+            <button onClick={() => save(draft.trim() || null)} disabled={saving} className={LINK_BTN} style={{ color: PAL.gold }}>
               {saving ? "Đang lưu…" : "Lưu"}
             </button>
-            <button onClick={() => setEditing(false)} disabled={saving} className="underline" style={{ color: PAL.muted }}>
+            <button onClick={() => setEditing(false)} disabled={saving} className={LINK_BTN} style={{ color: PAL.muted }}>
               Huỷ
             </button>
           </div>
@@ -599,18 +604,18 @@ const InsightBox: React.FC<{
         <>
           {shown ? (
             <>
-              <p className="text-[15px] font-black leading-snug" style={{ color: PAL.cream }}>
+              <p className="text-base font-black leading-snug" style={{ color: PAL.cream }}>
                 {shown.headline}
               </p>
               {shown.points.length > 0 && (
-                <ul className="space-y-1 text-[12.5px] leading-relaxed list-disc pl-5" style={{ color: PAL.cream }}>
+                <ul className="space-y-1 text-sm leading-relaxed list-disc pl-5" style={{ color: PAL.cream }}>
                   {shown.points.map((l, i) => (
                     <li key={i}>{l}</li>
                   ))}
                 </ul>
               )}
               {shown.action && (
-                <p className="text-[12.5px] font-semibold" style={{ color: PAL.gold }}>
+                <p className="text-sm font-semibold" style={{ color: PAL.gold }}>
                   → {shown.action}
                 </p>
               )}
@@ -628,13 +633,13 @@ const InsightBox: React.FC<{
                   setError(null);
                   setEditing(true);
                 }}
-                className="font-bold underline"
+                className={LINK_BTN}
                 style={{ color: PAL.gold }}
               >
                 Sửa Insight
               </button>
               {note && (
-                <button onClick={() => save(null)} disabled={saving} className="font-bold underline disabled:opacity-50" style={{ color: PAL.muted }}>
+                <button onClick={() => save(null)} disabled={saving} className={LINK_BTN} style={{ color: PAL.muted }}>
                   Dùng lại bản tự sinh
                 </button>
               )}
@@ -1320,6 +1325,36 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     scrollNow(id);
   }, [openDetails]);
 
+  // Phần đang đọc — tô trên mục lục (audit UX 2026-09-29, M1): phần CUỐI CÙNG có mép trên đã qua vạch 30% chiều cao màn;
+  // chưa phần nào qua thì là phần 1. Tính lại ở mỗi sự kiện cuộn (trình duyệt đã gộp theo frame; 7 lần đo vị trí là nhẹ).
+  // Nghe `scroll` ở pha capture của document vì vùng cuộn là <main> của App (sự kiện scroll không nổi bọt). Không dùng
+  // IntersectionObserver: nhảy thẳng từ phần 3 về đầu trang thì không phần nào cắt qua dải quan sát ⇒ dấu cũ kẹt lại.
+  const [activeSec, setActiveSec] = useState(SECTIONS[0].id);
+  useEffect(() => {
+    const pick = () => {
+      const line = window.innerHeight * 0.3;
+      let cur = SECTIONS[0].id;
+      for (const sec of SECTIONS) {
+        const el = document.getElementById(`mr-${sec.id}`);
+        if (el && el.getBoundingClientRect().top <= line) cur = sec.id;
+      }
+      setActiveSec(cur);
+    };
+    document.addEventListener("scroll", pick, { capture: true, passive: true });
+    return () => document.removeEventListener("scroll", pick, { capture: true });
+  }, []);
+  // Mục lục cuộn ngang (điện thoại chỉ thấy ~2 mục) — kéo mục đang đọc vào tầm nhìn, chỉ đổi scrollLeft của chính thanh
+  // mục lục (scrollIntoView sẽ kéo luôn cả trang theo chiều dọc).
+  const tocRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const bar = tocRef.current;
+    const btn = bar?.querySelector<HTMLElement>('[aria-current="true"]');
+    if (!bar || !btn) return;
+    if (btn.offsetLeft < bar.scrollLeft || btn.offsetLeft + btn.offsetWidth > bar.scrollLeft + bar.clientWidth) {
+      bar.scrollTo({ left: Math.max(0, btn.offsetLeft - 12), behavior: "smooth" });
+    }
+  }, [activeSec]);
+
   // Xuất Excel toàn bộ Report Tháng — 1 file, mỗi bảng đang hiện là 1 sheet (trừ Phân Tích Sâu, ops-only). Chỉ đọc
   // lại đúng các mảng đã tính cho phần hiển thị — không tính số mới.
   const { showToast } = useToast();
@@ -1538,15 +1573,19 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   );
 
   return (
-    <div className="rounded-2xl overflow-hidden" style={{ background: PAL.bg, border: `1px solid ${PAL.line}` }}>
+    // KHÔNG overflow-hidden ở khung ngoài: nó biến khung thành vùng cuộn riêng nên mục lục `sticky` trôi mất theo trang
+    // (đo 2026-09-29: cuộn 4.000px thì mục lục ở y=−3.691). Bo góc trên giao cho chính mục lục. `-top-3 sm:-top-6` = trừ
+    // đúng padding của <main> (p-3 sm:p-6) để mục lục dính sát mép, không chừa khe cho nội dung lọt qua phía trên.
+    <div className="rounded-2xl" style={{ background: PAL.bg, border: `1px solid ${PAL.line}` }}>
       {/* Mục lục 7 phần — trang cuộn (user chốt 2026-09-25): tab giấu nội dung, brand có thể không bao giờ mở tới. */}
-      <div className="flex items-center gap-1 px-3 py-2 overflow-x-auto sticky top-0 z-10" style={{ background: PAL.bg, borderBottom: `1px solid ${PAL.line}` }}>
+      <div ref={tocRef} className="flex items-center gap-1 px-3 py-2 overflow-x-auto sticky -top-3 sm:-top-6 z-10 rounded-t-2xl" style={{ background: PAL.bg, borderBottom: `1px solid ${PAL.line}` }}>
         {SECTIONS.map((sec) => (
           <button
             key={sec.id}
             onClick={() => scrollTo(sec.id)}
+            aria-current={activeSec === sec.id ? "true" : undefined}
             className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide whitespace-nowrap rounded-lg hover:opacity-100 focus-visible:outline focus-visible:outline-2"
-            style={{ color: PAL.muted }}
+            style={activeSec === sec.id ? { color: PAL.gold, background: PAL.panel2 } : { color: PAL.muted }}
           >
             {sec.label}
           </button>
@@ -1621,11 +1660,11 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                   <div className="flex flex-wrap items-center gap-3 pt-2 text-[11px]" style={{ borderTop: `1px solid ${PAL.line}`, color: PAL.muted }}>
                     <span>{narrativeEdited ? "Ops đã sửa đoạn này (kết luận + việc tháng sau)." : "Bản tự sinh từ số liệu — sửa trước khi phát hành nếu cần."}</span>
                     {narrativeStale && <span style={{ color: PAL.gold }}>Số liệu đã cập nhật sau lần sửa — đọc lại cho khớp số mới.</span>}
-                    <button onClick={startEditNarrative} className="font-bold underline" style={{ color: PAL.gold }}>
+                    <button onClick={startEditNarrative} className={LINK_BTN} style={{ color: PAL.gold }}>
                       Sửa kết luận & việc tháng sau
                     </button>
                     {narrativeEdited && (
-                      <button onClick={() => saveNarrative(true)} disabled={narrativeSaving} className="font-bold underline disabled:opacity-50" style={{ color: PAL.muted }}>
+                      <button onClick={() => saveNarrative(true)} disabled={narrativeSaving} className={LINK_BTN} style={{ color: PAL.muted }}>
                         Dùng lại bản tự sinh
                       </button>
                     )}
@@ -1685,8 +1724,8 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={cumulativeData} margin={{ right: 12 }}>
                   <CartesianGrid stroke={PAL.line} vertical={false} />
-                  <XAxis dataKey="day" stroke={PAL.muted} fontSize={10} interval={3} />
-                  <YAxis stroke={PAL.muted} fontSize={10} tickFormatter={(v) => fmtVndShort(v)} width={70} />
+                  <XAxis dataKey="day" stroke={PAL.muted} fontSize={11} interval={3} />
+                  <YAxis stroke={PAL.muted} fontSize={11} tickFormatter={(v) => fmtVndShort(v)} width={70} />
                   <Tooltip contentStyle={chartTooltipStyle} labelFormatter={(d) => `Ngày ${d}`} formatter={(v) => fmtVndShort(chartNum(v))} />
                   {cmp.partial && <ReferenceLine x={Number(cmp.curEnd.slice(8))} stroke={PAL.muted} strokeDasharray="3 3" />}
                   <Line type="monotone" dataKey="prev" name={`Tháng ${prevMonth.slice(5)}`} stroke={PAL.blue} strokeWidth={2} dot={false} connectNulls={false} />
@@ -1761,8 +1800,8 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                   <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart data={rhythm.points}>
                       <CartesianGrid stroke={PAL.line} vertical={false} />
-                      <XAxis dataKey="label" stroke={PAL.muted} fontSize={10} interval={2} />
-                      <YAxis stroke={PAL.muted} fontSize={10} tickFormatter={(v) => fmtVndShort(v)} width={56} />
+                      <XAxis dataKey="label" stroke={PAL.muted} fontSize={11} interval={2} />
+                      <YAxis stroke={PAL.muted} fontSize={11} tickFormatter={(v) => fmtVndShort(v)} width={56} />
                       <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => fmtVndShort(chartNum(v))} />
                       <Bar dataKey="gmv" name={METRIC.totalGmv} fill={`${PAL.goldDim}88`} radius={[3, 3, 0, 0]} />
                       <Line type="monotone" dataKey="ma7" name="Trung bình 7 ngày" stroke={PAL.gold} strokeWidth={2} dot={false} connectNulls={false} />
@@ -1800,7 +1839,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={channelChartData} layout="vertical" stackOffset="expand" margin={{ left: 4, right: 12 }}>
                       <CartesianGrid stroke={PAL.line} horizontal={false} />
-                      <XAxis type="number" stroke={PAL.muted} fontSize={10} tickFormatter={(v) => `${Math.round(v * 100)}%`} />
+                      <XAxis type="number" stroke={PAL.muted} fontSize={11} tickFormatter={(v) => `${Math.round(v * 100)}%`} />
                       <YAxis type="category" dataKey="label" stroke={PAL.muted} fontSize={11} width={trendDay ? 64 : 52} />
                       <Tooltip contentStyle={chartTooltipStyle} formatter={(v) => fmtVndShort(chartNum(v))} />
                       {CHANNELS.map((c) => (
@@ -2168,8 +2207,8 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                       <ResponsiveContainer width="100%" height="100%">
                         <ScatterChart margin={{ left: 4, right: 12 }}>
                           <CartesianGrid stroke={PAL.line} />
-                          <XAxis type="number" dataKey="hours" name={METRIC.liveHours} stroke={PAL.muted} fontSize={10} tickFormatter={(v) => fmtHours(v)} />
-                          <YAxis type="number" dataKey="gmvPerHour" name={METRIC.gmvPerHour} stroke={PAL.muted} fontSize={10} tickFormatter={(v) => fmtVndShort(v)} width={56} />
+                          <XAxis type="number" dataKey="hours" name={METRIC.liveHours} stroke={PAL.muted} fontSize={11} tickFormatter={(v) => fmtHours(v)} />
+                          <YAxis type="number" dataKey="gmvPerHour" name={METRIC.gmvPerHour} stroke={PAL.muted} fontSize={11} tickFormatter={(v) => fmtVndShort(v)} width={56} />
                           <ReferenceLine y={spread.median} stroke={PAL.gold} strokeDasharray="4 3" />
                           <Tooltip
                             contentStyle={chartTooltipStyle}
@@ -2220,7 +2259,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
           <SectionHead no="7" title="Tháng sau" sub={`Việc agency làm + kế hoạch tháng ${nextMonth.slice(5)} từ Kế Hoạch Tháng`} />
           <div className="rounded-xl p-4" style={{ background: PAL.panel, border: `1px solid ${PAL.gold}44` }}>
             <div className="text-[11px] uppercase tracking-wider mb-2 font-bold" style={{ color: PAL.gold }}>Việc agency làm tháng sau</div>
-            <ol className="space-y-2 text-[13.5px] leading-relaxed list-decimal pl-5" style={{ color: PAL.cream }}>
+            <ol className="space-y-2 text-sm leading-relaxed list-decimal pl-5" style={{ color: PAL.cream }}>
               {nextLines.map((l, i) => (
                 <li key={i}>{l}</li>
               ))}

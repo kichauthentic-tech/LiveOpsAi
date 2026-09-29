@@ -2,9 +2,10 @@
 
 ## CẦN LÀM NGAY khi mở phiên mới (cập nhật 2026-09-24)
 
-> **MỚI 2026-09-29 — Audit UX/UI lần 2: Đợt 0 (6 lỗi chung) XONG + VERIFY trên browser (không migration, CHƯA commit).**
-> Hết "0 ca / Chưa có…" giả lúc tải, 0/28 màn tràn ngang ở 375px, sidebar không nhảy theo tab, 1 bộ chọn tháng `MonthPicker`,
-> 1 khung đầu trang `PageHeader`, nhãn trạng thái tiếng Việt. Kế tiếp: M1 Report Tháng. Xem `## Audit UX/UI lần 2 (2026-09-29)`.
+> **MỚI 2026-09-29 — Audit UX/UI lần 2: Đợt 0 XONG (commit 4cf62b7) + M1 Report Tháng XONG (không migration, đã push `main`).**
+> Đợt 0: hết "0 ca / Chưa có…" giả lúc tải, 0/28 màn tràn ngang 375px, sidebar không nhảy theo tab, `MonthPicker`, `PageHeader`,
+> nhãn trạng thái tiếng Việt. M1: đầu Report Tháng gộp 1 thẻ (nút Phát hành y=9.206 → 112px), mục lục dính thật + tô phần đang
+> đọc, 11 → 6 cỡ chữ, nút ≥ 27px. Kế tiếp: M2 Dashboard brand. Xem `## Audit UX/UI lần 2 (2026-09-29)`.
 
 > **MỚI 2026-09-29 — Key Metrics 18 chỉ số trên MỌI report (không migration, commit 7996080 đã push `main`).** Một module
 > [keyMetrics.ts](src/lib/report/keyMetrics.ts) (bộ đếm + công thức + danh sách `KEY_METRICS` + định dạng + cột Excel) thay 5 bản
@@ -328,7 +329,7 @@
 
 > **Cập nhật 2026-09-13:** Các phần dưới đây được viết ở các thời điểm khác nhau và nghiệp vụ/code đã đổi khá nhiều kể từ đó. Từ nay **không coi nội dung cũ trong file này là ground truth mặc định** — mọi mục (kiến trúc, luồng dữ liệu, quy ước kỹ thuật...) cần được re-verify bằng đọc code hiện tại trước khi dựa vào để quyết định, đặc biệt là mục nào chưa có ghi chú "đã audit lại". Đang làm 1 vòng rà soát UX/workflow theo từng module (xem "Giai đoạn tiếp theo") — mỗi module audit xong sẽ cập nhật lại đúng phần liên quan trong file.
 
-## Audit UX/UI lần 2 (2026-09-29) — bố cục theo từng màn; Đợt 0 XONG + VERIFY, M1–M7 chưa làm
+## Audit UX/UI lần 2 (2026-09-29) — bố cục theo từng màn; Đợt 0 + M1 XONG + VERIFY, M2–M7 chưa làm
 
 Cách đo: dev server cổng 3100 (phiên admin sẵn), `history.pushState` + `popstate` để đổi màn không tải lại, chờ `main` ổn định
 rồi đếm trong `<main>`: số màn cuộn, số cỡ chữ, số chiều cao nút, phần tử bấm được (< 32px), bảng, biểu đồ, số chữ; ở 375px thêm
@@ -396,9 +397,28 @@ Dashboard agency 5,2 → 10,1; Lịch brand 5,2 → 6,4; Sổ Ca 4,4 → 8,3; AI
 - Chưa verify: màn talent (Ca Của Tôi, Đăng Ký Ca, Hồ Sơ Của Tôi) và role brand — cần đăng nhập tài khoản đó.
 
 ### Theo module (thứ tự đề xuất = lượt mở × mức lỗi)
-- **M1 Report Tháng (ĐỢT KẾ TIẾP):** 4 tầng trước nội dung (tab Tháng/Tuần → thẻ tiêu đề → thanh bản chụp → mục lục); 11,2 màn;
-  13 cỡ chữ; tiêu đề 24px chưa theo PageHeader.
-- **M2 Dashboard brand:** 18 ô KPI cùng cỡ (5 cột × 4 hàng) chiếm hết màn đầu; Run-rate so target plan (câu hỏi chính) nằm dưới
+- **M1 Report Tháng — ĐÃ LÀM 2026-09-29, verify trên browser (CROCS T9, admin).** Chỉ bố cục, không đổi số/nội dung phân tích.
+  Đo trước (1440×900): mục lục y=309, KPI đầu y=429, nút Phát hành ở CUỐI trang y=9.206/9.351; mục lục `sticky` nhưng khung ngoài
+  `overflow-hidden` ⇒ cuộn 4.000px thì mục lục ở y=−3.691 (trôi mất); 11 cỡ chữ (lẻ 11,5/12,5/13,5/15px; trục biểu đồ 10px < sàn 11);
+  6 nút "Sửa Insight/kết luận" cao 17px (< 24px WCAG 2.5.8); bảng Host "Chỉ số" 1.260px trong khung 1.060 (vẫn cuộn ngang — chưa sửa).
+  Đã làm: (1) [BrandMonthlyReport.tsx](src/components/brand-workspace/BrandMonthlyReport.tsx) gộp thanh Tháng/Tuần + thẻ tiêu đề + thanh
+  "Số liệu chốt lúc…" thành 1 `PageHeader` ("Report Tháng 9/2026 · CROCS"; actions: Tháng/Tuần, MonthPicker, trạng thái, **Phát hành /
+  Thu hồi về nháp**; hàng phụ: bản chụp + độ mới + Cập nhật số liệu). Khối "Phát Hành Report" cuối trang + ô tick `confirmForce` BỎ —
+  bấm Phát hành luôn hỏi `confirm()` (ghi rõ số đã cũ / chưa có bản chụp / N ca chưa đối soát), đồng ý ⇒ force khi còn ca chưa đối soát.
+  Report Tuần nhận nút Tháng/Tuần qua prop `headerExtra` ([BrandWeeklyReport.tsx](src/components/brand-workspace/BrandWeeklyReport.tsx)).
+  (2) [MonthlyReportTabs.tsx](src/components/brand-workspace/MonthlyReportTabs.tsx): khung ngoài bỏ `overflow-hidden`, mục lục
+  `sticky -top-3 sm:-top-6 rounded-t-2xl` (trừ đúng padding `<main>`); `activeSec` = phần CUỐI có mép trên ≤ 30% chiều cao màn, tính ở
+  `scroll` capture của document (KHÔNG IntersectionObserver — nhảy thẳng về đầu trang thì dấu cũ kẹt; KHÔNG rAF — không chạy khi trang
+  ẩn); mục đang đọc tự cuộn ngang vào tầm nhìn (điện thoại). `LINK_BTN` (min-h-7) cho 6 nút dạng link. Cỡ chữ 11,5→12, 12,5/13,5→14,
+  15→16; recharts `fontSize` 10/10,5 → 11.
+  Sau (1440×900): mục lục y=244, KPI y=364, nút Phát hành y=112; mục lục dính ở y=0 suốt 7 phần, tô đúng 8/8 vị trí cuộn thử (kể cả
+  nhảy về đầu); bấm "5 · Host" → phần 5 nằm ngay dưới mục lục (64px); 6 cỡ chữ (11/12/14/16/18/20); nút thấp nhất 27px. Điện thoại
+  375: mục lục dính y=0, KPI y=499 (26/09 ≈ 620), 7,5 màn (không đổi), 0 tràn ngang. Hộp Phát hành mở rồi **Huỷ** (không phát hành
+  thật) — report giữ Bản Nháp. Test canh thêm 2 ca (mục lục dính + `aria-current`; `fontSize={<11}`), bỏ ngoại lệ Report Tháng ở
+  ca tiêu đề `text-2xl` — cả 3 đỏ trên code cũ. tsc 0, eslint 0 lỗi/33 cảnh báo (= baseline), vitest 189/189, build OK, console 0 lỗi.
+  Còn lại của Report Tháng: bảng Host "Chỉ số" cuộn ngang ở 1440; trang vẫn 11,1 màn desktop (nội dung — user chốt trang cuộn);
+  chưa xem bằng role brand (không có nút, chỉ đọc).
+- **M2 Dashboard brand (ĐỢT KẾ TIẾP):** 18 ô KPI cùng cỡ (5 cột × 4 hàng) chiếm hết màn đầu; Run-rate so target plan (câu hỏi chính) nằm dưới
   màn đầu. Giữ đủ 18 chỉ số (user chốt 29/09) nhưng phân tầng/nhóm.
 - **M3 Dashboard agency:** 5,2 màn desktop, 10,1 màn điện thoại, tràn ngang (Đợt 0 #2).
 - **M4 Vận hành (Bảng Vận Hành, Lịch brand, Sổ Ca, Nhân sự ca):** sidebar nhảy (Đợt 0 #3); Sổ Ca: 316px lọc + 6 ô trước bảng;

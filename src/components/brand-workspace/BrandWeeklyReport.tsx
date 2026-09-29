@@ -23,6 +23,8 @@ interface BrandWeeklyReportProps {
   sessions: LiveSession[];
   currentRole: UserRole;
   shiftSlots?: ShiftSlot[]; // ca mở chưa có người tuần tới
+  // Nút chuyển Tháng/Tuần của Report Tháng — đặt trong thẻ đầu trang này thay vì thành khối riêng phía trên (audit UX 2026-09-29).
+  headerExtra?: React.ReactNode;
 }
 
 const CAN_VIEW_ROLES: UserRole[] = ["ceo", "operations", "admin"];
@@ -53,7 +55,7 @@ const Kpi: React.FC<{ label: string; value: string; delta?: number | null; hint?
 // Tháng mới là bản giao brand). Nguồn: `live_sessions` (ca có số: đối soát/snapshot/nạp bù) + target
 // kế hoạch đã đổ xuống ca + shift_slots cho tuần tới. Dataraw (số TikTok toàn shop theo ngày) chỉ
 // đặt cạnh để ops thấy GMV live chiếm bao nhiêu trong shop — không còn là nguồn chính.
-export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, brandName, sessions, currentRole, shiftSlots = [] }) => {
+export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, brandName, sessions, currentRole, shiftSlots = [], headerExtra }) => {
   const today = getTodayDate();
   const [weekStart, setWeekStart] = useState(() => isoWeekStart(today));
   const [slice, setSlice] = useState<DataRawWeekSlice | null>(null);
@@ -241,7 +243,8 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
               <span className="text-sm font-normal text-[var(--text-muted)]">({fmtDay(weekStart)} → {fmtDay(weekEnd)})</span>
             </h3>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {headerExtra}
             <button onClick={() => setWeekStart(addDays(weekStart, -7))} className="p-2 rounded-xl bg-[var(--surface-base)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]" title="Tuần trước"><ChevronLeft className="w-4 h-4" /></button>
             <button onClick={() => setWeekStart(isoWeekStart(today))} className="px-3 py-2 rounded-xl bg-[var(--surface-base)] border border-[var(--border)] text-xs font-bold text-[var(--text-muted)] hover:text-[var(--text)]">Tuần này</button>
             <button onClick={() => setWeekStart(addDays(weekStart, 7))} className="p-2 rounded-xl bg-[var(--surface-base)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]" title="Tuần sau"><ChevronRight className="w-4 h-4" /></button>
