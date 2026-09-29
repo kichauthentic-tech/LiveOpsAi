@@ -388,6 +388,7 @@ export default function CeoBrief(props: CeoBriefProps) {
         selected={brandId}
         onSelect={(id) => setBrandId(brandId === id ? "all" : id)}
         month={month}
+        onNavigate={onNavigate}
       />
 
       <MonthOverMonth sessions={scopeSessions} brands={brands.filter((b) => scopeIds.includes(b.id))} lastMonth={dataEnd && dataEnd.slice(0, 7) < today.slice(0, 7) ? dataEnd.slice(0, 7) : today.slice(0, 7)} dataEnd={dataEnd} pnl={canSeeMoney ? pnl : null} />
@@ -464,7 +465,8 @@ const AccountsTable: React.FC<{
   selected: string;
   onSelect: (id: string) => void;
   month: string;
-}> = ({ brands, sessions, period, outlooks, today, pnl, selected, onSelect, month }) => {
+  onNavigate: (tab: string) => void;
+}> = ({ brands, sessions, period, outlooks, today, pnl, selected, onSelect, month, onNavigate }) => {
   const rows = brands.map((b) => {
     const bs = sessions.filter((s) => s.brandId === b.id);
     const cur = period.has ? inRange(bs, period.start, period.end) : [];
@@ -472,6 +474,20 @@ const AccountsTable: React.FC<{
   }).sort((a, z) => z.t.gmv - a.t.gmv || (z.o?.actual ?? 0) - (a.o?.actual ?? 0));
   const th = "px-3 py-2 text-[11px] uppercase tracking-wider font-bold text-[var(--text-faint)] text-right whitespace-nowrap";
   const td = "px-3 py-2.5 text-right whitespace-nowrap";
+  // Audit UX lần 2 — M3: đo 29/09 thấy 34/60 ô của bảng này là "—" (Franklin/JOCKEY/VERA rỗng 10/12 cột) vì chưa
+  // brand nào chốt Kế Hoạch Tháng và chưa có rate. Cột mà KHÔNG brand nào có số thì không dành chỗ ngang bằng cho
+  // nó — ẩn đi và ghi rõ đã ẩn cột nào + bấm đi đâu để hiện lại, thay vì bắt người đọc quét một bảng toàn gạch ngang.
+  const hideable: { label: string; has: (r: (typeof rows)[number]) => boolean; fix?: { tab: string; label: string } }[] = [
+    { label: "Target GMV tháng", has: (r) => !!r.o?.target, fix: { tab: "month_plan", label: "chốt Kế Hoạch Tháng" } },
+    { label: "Run-rate", has: (r) => r.o?.runRate != null, fix: { tab: "month_plan", label: "chốt Kế Hoạch Tháng" } },
+    { label: "Dự phóng tháng", has: (r) => !!(r.o && (r.o.actual || r.o.pending.length) && r.o.projectionMethod !== "none") },
+    { label: "Doanh thu", has: (r) => !!r.f?.priced, fix: { tab: "talents", label: "đặt rate host / % hoa hồng" } },
+    { label: "Lãi gộp", has: (r) => !!r.f?.priced, fix: { tab: "talents", label: "đặt rate host / % hoa hồng" } },
+    { label: "Phiên lãi", has: (r) => !!r.f?.priced, fix: { tab: "talents", label: "đặt rate host / % hoa hồng" } }
+  ];
+  const show = Object.fromEntries(hideable.map((c) => [c.label, rows.some(c.has)])) as Record<string, boolean>;
+  const hidden = hideable.filter((c) => !show[c.label]);
+  const fixes = [...new Map(hidden.filter((c) => c.fix).map((c) => [c.fix!.label, c.fix!])).values()];
   return (
     <section className="space-y-3">
       <SectionTitle title="Các tài khoản" note={`Bấm một dòng để xem riêng brand đó · target, run-rate, dự phóng là của tháng ${Number(month.slice(5))}`} />
@@ -483,10 +499,16 @@ const AccountsTable: React.FC<{
               <th className={th}>GMV kỳ</th>
               <th className={th}>So kỳ trước</th>
               <th className={th}>GMV/giờ</th>
-              <th className={th}>Target GMV tháng</th>
-              <th className={th}>Run-rate</th>
-              <th className={th}>Dự phóng tháng</th>
-              {pnl && <><th className={th}>Doanh thu</th><th className={th}>Lãi gộp</th><th className={th}>Phiên lãi</th></>}
+              {show["Target GMV tháng"] && <th className={th}>Target GMV tháng</th>}
+              {show["Run-rate"] && <th className={th}>Run-rate</th>}
+              {show["Dự phóng tháng"] && <th className={th}>Dự phóng tháng</th>}
+              {pnl && (
+                <>
+                  {show["Doanh thu"] && <th className={th}>Doanh thu</th>}
+                  {show["Lãi gộp"] && <th className={th}>Lãi gộp</th>}
+                  {show["Phiên lãi"] && <th className={th}>Phiên lãi</th>}
+                </>
+              )}
               <th className={th}>Số đến</th>
               <th className={`${th} text-left`}>Trạng thái</th>
             </tr>
@@ -509,14 +531,14 @@ const AccountsTable: React.FC<{
                 <td className={`${td} font-bold text-[var(--text)]`}>{t.sessions ? money(t.gmv) : "—"}</td>
                 <td className={td}>{t.sessions ? <Delta cur={t.gmv} prev={p.gmv} /> : "—"}</td>
                 <td className={`${td} text-[var(--text-muted)]`}>{money(t.gmvPerHour)}</td>
-                <td className={`${td} text-[var(--text-muted)]`}>{o?.target ? money(o.target.total) : "—"}</td>
-                <td className={`${td} font-bold ${o?.runRate == null ? "text-[var(--text-faint)]" : o.runRate >= 1 ? "text-emerald-400" : o.runRate >= 0.9 ? "text-amber-300" : "text-rose-400"}`}>{pct(o?.runRate)}</td>
-                <td className={`${td} text-[var(--text-muted)]`}>{o && (o.actual || o.pending.length) && o.projectionMethod !== "none" ? money(o.projected) : "—"}</td>
+                {show["Target GMV tháng"] && <td className={`${td} text-[var(--text-muted)]`}>{o?.target ? money(o.target.total) : "—"}</td>}
+                {show["Run-rate"] && <td className={`${td} font-bold ${o?.runRate == null ? "text-[var(--text-faint)]" : o.runRate >= 1 ? "text-emerald-400" : o.runRate >= 0.9 ? "text-amber-300" : "text-rose-400"}`}>{pct(o?.runRate)}</td>}
+                {show["Dự phóng tháng"] && <td className={`${td} text-[var(--text-muted)]`}>{o && (o.actual || o.pending.length) && o.projectionMethod !== "none" ? money(o.projected) : "—"}</td>}
                 {pnl && (
                   <>
-                    <td className={`${td} text-[var(--text-muted)]`}>{f?.priced ? money(f.revenue) : f?.sessions ? <span className="text-[var(--text-faint)]">thiếu dữ liệu</span> : "—"}</td>
-                    <td className={`${td} ${f && f.profit < 0 ? "text-rose-400" : "text-[var(--text-muted)]"}`}>{f?.priced ? money(f.profit) : "—"}</td>
-                    <td className={`${td} text-[var(--text-muted)]`}>{f?.priced ? pct(f.profitableSessions / f.priced) : "—"}</td>
+                    {show["Doanh thu"] && <td className={`${td} text-[var(--text-muted)]`}>{f?.priced ? money(f.revenue) : f?.sessions ? <span className="text-[var(--text-faint)]">thiếu dữ liệu</span> : "—"}</td>}
+                    {show["Lãi gộp"] && <td className={`${td} ${f && f.profit < 0 ? "text-rose-400" : "text-[var(--text-muted)]"}`}>{f?.priced ? money(f.profit) : "—"}</td>}
+                    {show["Phiên lãi"] && <td className={`${td} text-[var(--text-muted)]`}>{f?.priced ? pct(f.profitableSessions / f.priced) : "—"}</td>}
                   </>
                 )}
                 <td className={`${td} text-[var(--text-faint)] font-mono text-xs`}>{last ? ddmm(last) : "—"}</td>
@@ -526,6 +548,19 @@ const AccountsTable: React.FC<{
           </tbody>
         </table>
       </Card>
+      {hidden.length > 0 && (
+        <p className="text-[11px] text-[var(--text-faint)] leading-snug">
+          Ẩn {hidden.length} cột chưa brand nào có số: {hidden.map((c) => c.label).join(", ")}.
+          {fixes.length > 0 && (
+            <> Hiện lại bằng cách {fixes.map((fx, i) => (
+              <React.Fragment key={fx.label}>
+                {i > 0 && " hoặc "}
+                <button onClick={() => onNavigate(fx.tab)} className="text-[var(--accent-text)] font-bold hover:underline">{fx.label} →</button>
+              </React.Fragment>
+            ))}.</>
+          )}
+        </p>
+      )}
     </section>
   );
 };
@@ -567,7 +602,7 @@ const MonthOverMonth: React.FC<{ sessions: LiveSession[]; brands: Brand[]; lastM
             {[0, 0.25, 0.5, 0.75, 1].map((f) => (
               <g key={f}>
                 <line x1={L} x2={W - R} y1={y(nice * f)} y2={y(nice * f)} style={{ stroke: "var(--border)", strokeWidth: 1, opacity: 0.6 }} />
-                <text x={L - 6} y={y(nice * f) + 4} textAnchor="end" style={{ fill: "var(--text-faint)", fontSize: 10 }}>{f ? fmtVndShort(nice * f) : "0"}</text>
+                <text x={L - 6} y={y(nice * f) + 4} textAnchor="end" style={{ fill: "var(--text-faint)", fontSize: 11 }}>{f ? fmtVndShort(nice * f) : "0"}</text>
               </g>
             ))}
             {perBrand.map(({ c, by }, i) => {
@@ -588,7 +623,7 @@ const MonthOverMonth: React.FC<{ sessions: LiveSession[]; brands: Brand[]; lastM
                     );
                   })}
                   {total > 0 && <text x={cx} y={y(total) - 6} textAnchor="middle" style={{ fill: "var(--text)", fontSize: 11, fontWeight: 700 }}>{fmtVndShort(total)}</text>}
-                  <text x={cx} y={H - 8} textAnchor="middle" style={{ fill: "var(--text-faint)", fontSize: 10 }}>T{Number(c.month.slice(5))}{c.partial ? "*" : ""}</text>
+                  <text x={cx} y={H - 8} textAnchor="middle" style={{ fill: "var(--text-faint)", fontSize: 11 }}>T{Number(c.month.slice(5))}{c.partial ? "*" : ""}</text>
                 </g>
               );
             })}
@@ -696,10 +731,10 @@ const TargetSection: React.FC<{ outlook: MonthOutlook; month: string; single: bo
             {[0, 0.25, 0.5, 0.75, 1].map((f) => (
               <g key={f}>
                 <line x1={L} x2={W - R} y1={y(max * f)} y2={y(max * f)} style={{ stroke: "var(--border)", strokeWidth: 1, opacity: 0.6 }} />
-                <text x={L - 6} y={y(max * f) + 4} textAnchor="end" style={{ fill: "var(--text-faint)", fontSize: 10 }}>{f ? fmtVndShort(max * f) : "0"}</text>
+                <text x={L - 6} y={y(max * f) + 4} textAnchor="end" style={{ fill: "var(--text-faint)", fontSize: 11 }}>{f ? fmtVndShort(max * f) : "0"}</text>
               </g>
             ))}
-            {[1, 8, 15, 22, 29].filter((d) => d <= n).map((d) => <text key={d} x={x(d - 1)} y={H - 8} textAnchor="middle" style={{ fill: "var(--text-faint)", fontSize: 10 }}>{String(d).padStart(2, "0")}/{month.slice(5)}</text>)}
+            {[1, 8, 15, 22, 29].filter((d) => d <= n).map((d) => <text key={d} x={x(d - 1)} y={H - 8} textAnchor="middle" style={{ fill: "var(--text-faint)", fontSize: 11 }}>{String(d).padStart(2, "0")}/{month.slice(5)}</text>)}
             {hasProjection && projPts.length > 1 && <path d={`${path(band(1))} ${band(-1).reverse().map(([i, v]) => `L${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ")} Z`} style={{ fill: "var(--accent)", opacity: 0.12 }} />}
             {o.target && <path d={path(targetPts)} style={{ fill: "none", stroke: "var(--text-faint)", strokeWidth: 2, strokeDasharray: "2 4", strokeLinecap: "round" }} />}
             {hasProjection && projPts.length > 1 && <path d={path(projPts)} style={{ fill: "none", stroke: "var(--accent)", strokeWidth: 2, strokeDasharray: "6 4" }} />}
@@ -721,10 +756,12 @@ const TargetSection: React.FC<{ outlook: MonthOutlook; month: string; single: bo
         <div className="grid grid-cols-2 gap-3 content-start">
           {stat("Target GMV tháng", o.target ? money(o.target.total) : "—", o.target ? sourceLabel : <button onClick={() => onNavigate("month_plan")} className="text-[var(--accent-text)] font-bold hover:underline">Chốt Kế Hoạch Tháng →</button>)}
           {stat("Đã đạt", money(o.actual), o.target ? `${pct(o.actual / o.target.total)} Target${o.through ? ` · số đến ${ddmm(o.through)}` : ""}` : o.through ? `số đến ${ddmm(o.through)}` : undefined)}
-          {stat("Run-rate", <span className={o.runRate == null ? "" : o.runRate >= 1 ? "text-emerald-400" : o.runRate >= 0.9 ? "text-amber-300" : "text-rose-400"}>{pct(o.runRate)}</span>, o.expectedToDate != null ? `kỳ vọng tới ngày có số: ${money(o.expectedToDate)}` : "cần target")}
+          {/* M3: 3 ô dưới chỉ có số khi đã có target. Chưa có thì bỏ hẳn — ô "—" chiếm chỗ ngang với ô có số
+              làm người đọc phải quét hết mới biết cái nào dùng được; ô "Target GMV tháng" ở trên đã có nút đi chốt. */}
+          {o.target && stat("Run-rate", <span className={o.runRate == null ? "" : o.runRate >= 1 ? "text-emerald-400" : o.runRate >= 0.9 ? "text-amber-300" : "text-rose-400"}>{pct(o.runRate)}</span>, o.expectedToDate != null ? `kỳ vọng tới ngày có số: ${money(o.expectedToDate)}` : "cần target")}
           {stat("Dự phóng cuối tháng", o.projectionMethod === "none" ? "—" : money(o.projected), o.projectionMethod === "none" ? "chưa có GMV/giờ 28 ngày hay run-rate để chiếu" : `${o.projectionMethod === "run_rate" ? "theo run-rate (chưa có GMV/giờ 28 ngày)" : `±${Math.round(PROJECTION_ERROR_BAND * 100)}%`} · ${o.pending.length} ca còn trong lịch${o.pending.some((p) => p.kind === "open_slot") ? ` (${o.pending.filter((p) => p.kind === "open_slot").length} ca mở)` : ""}`)}
-          {stat(gap == null ? "So với target" : gap >= 0 ? "Dự kiến vượt" : "Dự kiến thiếu", gap == null ? "—" : <span className={gap >= 0 ? "text-emerald-400" : "text-rose-400"}>{money(Math.abs(gap))}</span>, gap != null && o.target ? `${pct(Math.abs(gap) / o.target.total)} target` : undefined)}
-          {stat("Cần mỗi ngày còn lại", money(o.needPerRemainingDay), o.remainingDays > 0 ? `${o.remainingDays} ngày còn lại` : "tháng đã hết")}
+          {o.target && stat(gap == null ? "So với target" : gap >= 0 ? "Dự kiến vượt" : "Dự kiến thiếu", gap == null ? "—" : <span className={gap >= 0 ? "text-emerald-400" : "text-rose-400"}>{money(Math.abs(gap))}</span>, gap != null && o.target ? `${pct(Math.abs(gap) / o.target.total)} target` : undefined)}
+          {o.target && stat("Cần mỗi ngày còn lại", money(o.needPerRemainingDay), o.remainingDays > 0 ? `${o.remainingDays} ngày còn lại` : "tháng đã hết")}
           <p className="col-span-2 text-[11px] text-[var(--text-faint)] leading-snug">
             Dự phóng = số đã có + giờ các ca còn trong lịch (kể cả ca mở chưa có người) × GMV/giờ 28 ngày gần nhất{single ? "" : " của từng brand"}, tách ngày camp và ngày thường. Thêm ca trên lịch là số này tăng theo. Thử lại trên T7–T8/2026: lệch −7% đến +8%.
           </p>
@@ -926,6 +963,15 @@ const FinanceSection: React.FC<{ fin: FinanceTotals; finPrev: FinanceTotals | nu
           </ul>
         </Card>
       )}
+      {/* M3: `priced === 0` ⇒ 6 ô KPI, biểu đồ lãi/lỗ và bảng theo brand đều rỗng (đo 29/09: 460px desktop,
+          964px điện thoại chỉ để nói "chưa có rate"). Giữ đúng phần làm được việc — cảnh báo + chip đi đặt rate. */}
+      {fin.priced === 0 ? (
+        <p className="text-xs text-[var(--text-faint)] leading-snug">
+          Chưa ca nào đủ dữ liệu để tính tiền, nên chưa hiện doanh thu / lãi gộp / biểu đồ lãi lỗ từng ngày / bảng theo brand.
+          Đặt xong rate ở các nút trên là các khối này hiện lại.
+        </p>
+      ) : (
+        <>
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
         <Kpi label="Doanh thu agency" value={fin.priced ? money(fin.revenue) : "—"} cur={fin.priced ? fin.revenue : null} prev={finPrev?.priced ? finPrev.revenue : null} />
         <Kpi label="Chi phí trực tiếp" value={fin.priced ? money(fin.cost) : "—"} cur={fin.priced ? fin.cost : null} prev={finPrev?.priced ? finPrev.cost : null} goodWhenUp={false} />
@@ -944,7 +990,7 @@ const FinanceSection: React.FC<{ fin: FinanceTotals; finPrev: FinanceTotals | nu
               {(hasNeg ? [-1, -0.5, 0, 0.5, 1] : [0, 0.25, 0.5, 0.75, 1]).map((f) => (
                 <g key={f}>
                   <line x1={L} x2={W - R} y1={zero - f * vmax * scale} y2={zero - f * vmax * scale} style={{ stroke: "var(--border)", strokeWidth: 1, opacity: 0.6 }} />
-                  <text x={L - 6} y={zero - f * vmax * scale + 4} textAnchor="end" style={{ fill: "var(--text-faint)", fontSize: 10 }}>{f ? fmtVndShort(f * vmax) : "0"}</text>
+                  <text x={L - 6} y={zero - f * vmax * scale + 4} textAnchor="end" style={{ fill: "var(--text-faint)", fontSize: 11 }}>{f ? fmtVndShort(f * vmax) : "0"}</text>
                 </g>
               ))}
               {days.map((d, i) => {
@@ -958,7 +1004,7 @@ const FinanceSection: React.FC<{ fin: FinanceTotals; finPrev: FinanceTotals | nu
                   </g>
                 );
               })}
-              {[0, Math.floor(days.length / 2), days.length - 1].filter((i, k, a) => a.indexOf(i) === k).map((i) => <text key={i} x={L + step * i + step / 2} y={H - 6} textAnchor="middle" style={{ fill: "var(--text-faint)", fontSize: 10 }}>{ddmm(days[i])}</text>)}
+              {[0, Math.floor(days.length / 2), days.length - 1].filter((i, k, a) => a.indexOf(i) === k).map((i) => <text key={i} x={L + step * i + step / 2} y={H - 6} textAnchor="middle" style={{ fill: "var(--text-faint)", fontSize: 11 }}>{ddmm(days[i])}</text>)}
               <line x1={L} x2={W - R} y1={zero} y2={zero} style={{ stroke: "var(--text-faint)", strokeWidth: 1 }} />
             </svg>
           )}
@@ -996,6 +1042,8 @@ const FinanceSection: React.FC<{ fin: FinanceTotals; finPrev: FinanceTotals | nu
           </p>
         </Card>
       </div>
+        </>
+      )}
     </section>
   );
 };

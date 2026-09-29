@@ -6,7 +6,8 @@
 > Đợt 0: hết "0 ca / Chưa có…" giả lúc tải, 0/28 màn tràn ngang 375px, sidebar không nhảy theo tab, `MonthPicker`, `PageHeader`,
 > nhãn trạng thái tiếng Việt. M1: đầu Report Tháng gộp 1 thẻ (nút Phát hành y=9.206 → 112px), mục lục dính thật + tô phần đang
 > đọc, 11 → 6 cỡ chữ, nút ≥ 27px. M2: 19 ô KPI phẳng → 5 ô "Kết quả" 20px + 3 nhóm phễu 14px, cả 19 ô lọt màn đầu; Run-rate lên
-> trước KPI. Kế tiếp: M3 Dashboard agency. Xem `## Audit UX/UI lần 2 (2026-09-29)`.
+> trước KPI. M3: bảng "Các tài khoản" 12 → 7 cột (ẩn cột chưa brand nào có số, có ghi rõ ẩn gì), Tài chính 460 → 157px, chữ trục
+> biểu đồ 10 → 11px. Kế tiếp: M4 Vận hành. Xem `## Audit UX/UI lần 2 (2026-09-29)`.
 
 > **MỚI 2026-09-29 — Key Metrics 18 chỉ số trên MỌI report (không migration, commit 7996080 đã push `main`).** Một module
 > [keyMetrics.ts](src/lib/report/keyMetrics.ts) (bộ đếm + công thức + danh sách `KEY_METRICS` + định dạng + cột Excel) thay 5 bản
@@ -442,8 +443,29 @@ Dashboard agency 5,2 → 10,1; Lịch brand 5,2 → 6,4; Sổ Ca 4,4 → 8,3; AI
   `KEY_METRICS.map` phẳng) — cả 2 đỏ trên code cũ. tsc 0, eslint 0 lỗi/33 cảnh báo (= baseline), vitest 191/191, build OK, console 0 lỗi.
   Còn lại: chưa xem bằng role brand; thứ tự trong nhóm "Lưu lượng" theo thứ tự gốc `KEY_METRICS` (ERR, Avg. view đứng trước Views) —
   giữ nguyên để không lệch thứ tự chuẩn user chốt.
-- **M3 Dashboard agency (ĐỢT KẾ TIẾP):** 5,2 màn desktop, 10,1 màn điện thoại, tràn ngang (Đợt 0 #2).
-- **M4 Vận hành (Bảng Vận Hành, Lịch brand, Sổ Ca, Nhân sự ca):** sidebar nhảy (Đợt 0 #3); Sổ Ca: 316px lọc + 6 ô trước bảng;
+- **M3 Dashboard agency ([CeoBrief.tsx](src/components/CeoBrief.tsx)) — ĐÃ LÀM 2026-09-29, verify trên browser (admin, Tất cả brand, T9).**
+  Đo trước (1440×900, sau Đợt 0): 4,8 màn desktop / 9,2 màn điện thoại, 7 section, 0 tràn ngang. Lỗi đo được: **34/60 ô bảng "Các tài
+  khoản" là "—"** (Franklin/JOCKEY/VERA rỗng 10/12 cột, CROCS 4/12) — vì chưa brand nào chốt Kế Hoạch Tháng và chưa đặt rate;
+  **19 nút chữ ở 10px** trong 2 biểu đồ SVG tự vẽ (dưới sàn 11px chốt ở M1); Tài chính 460px desktop / 964px điện thoại mà 6 ô KPI +
+  biểu đồ + bảng theo brand đều rỗng; Target & dự phóng 3/6 ô luôn "—" khi chưa có target.
+  **Nguyên tắc áp dụng (nối tiếp M2): khối/cột không tính được thì KHÔNG chiếm chỗ ngang bằng ô có số — thu lại và ghi rõ bấm đâu để hiện.**
+  Đã làm: (1) bảng "Các tài khoản" dựng `hideable` (Target GMV tháng, Run-rate, Dự phóng tháng, Doanh thu, Lãi gộp, Phiên lãi) — cột nào
+  KHÔNG brand nào có số thì ẩn, dưới bảng ghi "Ẩn N cột chưa brand nào có số: …" kèm nút đi chốt Kế Hoạch Tháng / đặt rate (`onNavigate`).
+  (2) Target & dự phóng: 3 ô phụ thuộc target (Run-rate, So với target, Cần mỗi ngày còn lại) chỉ dựng khi `o.target`. (3) Tài chính:
+  `fin.priced === 0` ⇒ giữ cảnh báo + 3 chip đi đặt rate, bỏ 6 ô KPI + biểu đồ lãi/lỗ + bảng theo brand, thay bằng 1 dòng nói khối nào
+  sẽ hiện lại. (4) 6 chỗ `style={{ fontSize: 10 }}` → 11.
+  Sau (1440×900): bảng 12 → **7 cột**, ô "—" 34/60 → **15/35** (15 còn lại là 3 brand thật sự không có ca trong kỳ — đúng nghĩa);
+  Tài chính 460 → **157px**; Target & dự phóng 405 → 369px; trang 4,8 → **4,4 màn**; **0 chữ dưới 11px** (trước 19).
+  375: bảng 1.221 → **720px** (vẫn cuộn ngang trong khung riêng, nhưng 2,1× bề ngang máy thay vì 3,6×), trang 9,2 → **8,4 màn**,
+  0 tràn ngang trang, 0 chữ dưới 11px. Bấm thử nút "chốt Kế Hoạch Tháng →" dưới bảng: sang đúng `/ke-hoach-thang`.
+  **Lỗi test canh phát hiện ở M3:** ca canh cỡ chữ của M1 chỉ bắt `fontSize={N}` (prop recharts) nên 6 chỗ `style={{ fontSize: 10 }}`
+  trong SVG tự vẽ của CeoBrief lọt suốt từ M1 — nay bắt cả hai dạng. Thêm 1 ca canh cho M3 (ẩn cột + ghi rõ đã ẩn; 3 ô target có điều
+  kiện; nhánh `fin.priced === 0`). Cả 2 ca đỏ đúng trên code cũ. tsc 0, eslint 0 lỗi/33 cảnh báo (= baseline), vitest 192/192, build OK,
+  console 0 lỗi.
+  Còn lại: nhánh "có đủ số" của các cột bị ẩn chỉ verify được gián tiếp — cột "Dự phóng tháng" hiện đúng vì CROCS có số, chứng minh
+  cơ chế bật/tắt theo từng cột chạy đúng; 5 cột kia cần có plan chốt + rate mới xem thật được. "Tổng quan" (1.308px), "Ngày campaign"
+  (1.426px) và "Hiệu suất nhân sự" (1.221px) ở 375px vẫn dài — chưa động tới, để đợt sau nếu cần.
+- **M4 Vận hành (ĐỢT KẾ TIẾP — Bảng Vận Hành, Lịch brand, Sổ Ca, Nhân sự ca):** sidebar nhảy (Đợt 0 #3); Sổ Ca: 316px lọc + 6 ô trước bảng;
   Nhân sự ca: bảng 3 cột kéo 1.184px.
 - **M5 Kế Hoạch Tháng:** 384 phần tử bấm, 372 cao < 32px; form 3 cột, cột "Lưới hiện tại" gần trống; Target GMV gõ số thô 10 chữ số.
 - **M6 Talent Pool:** 33 thẻ lưới 3 cột, đa số thẻ toàn "—/0/N/A"; 72 nút (68 < 32px); khối AI Matcher mặc định "Franklin +

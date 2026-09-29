@@ -74,13 +74,16 @@ test("Report Tháng: mục lục dính được (khung ngoài không overflow-hi
   expect(src).toMatch(/aria-current=\{activeSec === sec\.id/);
 });
 
-test("chữ biểu đồ recharts không nhỏ hơn 11px (sàn cỡ chữ của audit 26/09)", () => {
+// M3 (29/09): bản đầu chỉ bắt dạng prop `fontSize={10}` của recharts, nên 6 chỗ `style={{ fontSize: 10 }}` trong
+// SVG tự vẽ của CeoBrief lọt qua suốt từ M1. Nay bắt cả hai dạng.
+test("chữ biểu đồ không nhỏ hơn 11px (sàn cỡ chữ của audit 26/09) — cả prop recharts lẫn style SVG tự vẽ", () => {
   const hits: string[] = [];
   for (const file of sourceFiles(SRC)) {
     readFileSync(file, "utf8")
       .split("\n")
       .forEach((line, i) => {
         for (const m of line.matchAll(/fontSize=\{(\d+(?:\.\d+)?)\}/g)) if (Number(m[1]) < 11) hits.push(`${rel(file)}:${i + 1} ${m[0]}`);
+        for (const m of line.matchAll(/fontSize:\s*(\d+(?:\.\d+)?)/g)) if (Number(m[1]) < 11) hits.push(`${rel(file)}:${i + 1} ${m[0]}`);
       });
   }
   expect(hits).toEqual([]);
@@ -139,4 +142,16 @@ test("Dashboard brand: Run-rate so target đứng TRƯỚC lưới Key Metrics",
   expect(runRate).toBeLessThan(keyMetrics);
   // Không quay lại lưới phẳng 19 ô cùng cỡ.
   expect(src).not.toMatch(/\{KEY_METRICS\.map\(/);
+});
+
+test("Dashboard agency: khối không tính được thì không chiếm chỗ ngang bằng ô có số", () => {
+  const src = readFileSync(join(SRC, "components/CeoBrief.tsx"), "utf8");
+  // Bảng "Các tài khoản": cột nào không brand nào có số thì ẩn, và phải nói đã ẩn cột nào.
+  expect(src).toMatch(/const hidden = hideable\.filter/);
+  expect(src).toMatch(/Ẩn \{hidden\.length\} cột chưa brand nào có số/);
+  // Target & dự phóng: 3 ô phụ thuộc target chỉ dựng khi có target.
+  expect(src).toMatch(/\{o\.target && stat\("Run-rate"/);
+  expect(src).toMatch(/\{o\.target && stat\("Cần mỗi ngày còn lại"/);
+  // Tài chính: chưa tính được ca nào thì không dựng 6 ô KPI + 2 biểu đồ/bảng rỗng.
+  expect(src).toMatch(/\{fin\.priced === 0 \? \(/);
 });
