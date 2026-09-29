@@ -120,7 +120,13 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
 }) => {
   const today = new Date();
   const [month, setMonth] = useState(`${today.getFullYear()}-${`${today.getMonth() + 1}`.padStart(2, "0")}`);
-  const [viewMode, setViewMode] = useState<"month" | "week" | "day">("month");
+  // Audit UX lần 2 — M4: lưới tháng cố ý giữ 1.080px (ô hẹp hơn ~150px thì card ca không đọc được —
+  // xem PosterCalendarGrid), nên ở 375px phải cuộn ngang 3,1× bề ngang máy mới xem hết một tuần. Màn
+  // "Ngày" vốn đã vừa khít (0,9 màn, không cuộn ngang) nhưng không ai tới vì mặc định luôn mở "Tháng".
+  // Trên điện thoại mở thẳng "Ngày"; từ 640px trở lên giữ nguyên "Tháng". Ba nút Tháng/Tuần/Ngày không đổi.
+  const [viewMode, setViewMode] = useState<"month" | "week" | "day">(() =>
+    typeof window !== "undefined" && window.matchMedia("(max-width: 639px)").matches ? "day" : "month"
+  );
   const [selectedDate, setSelectedDate] = useState(getTodayDateString());
   const [modalState, setModalState] = useState<{ open: boolean; session: LiveSession | null; initialDate?: string }>({
     open: false,

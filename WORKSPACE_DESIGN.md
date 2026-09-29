@@ -7,7 +7,8 @@
 > nhãn trạng thái tiếng Việt. M1: đầu Report Tháng gộp 1 thẻ (nút Phát hành y=9.206 → 112px), mục lục dính thật + tô phần đang
 > đọc, 11 → 6 cỡ chữ, nút ≥ 27px. M2: 19 ô KPI phẳng → 5 ô "Kết quả" 20px + 3 nhóm phễu 14px, cả 19 ô lọt màn đầu; Run-rate lên
 > trước KPI. M3: bảng "Các tài khoản" 12 → 7 cột (ẩn cột chưa brand nào có số, có ghi rõ ẩn gì), Tài chính 460 → 157px, chữ trục
-> biểu đồ 10 → 11px. Kế tiếp: M4 Vận hành. Xem `## Audit UX/UI lần 2 (2026-09-29)`.
+> biểu đồ 10 → 11px. M4: Lịch brand ở điện thoại 5,9 → 0,9 màn (mở thẳng màn Ngày), Sổ Ca bảng 972 → 664px, "Tải theo Host"
+> 1 cột kéo 1.086px → 3 cột × 341px. Kế tiếp: M5 Kế Hoạch Tháng. Xem `## Audit UX/UI lần 2 (2026-09-29)`.
 
 > **MỚI 2026-09-29 — Key Metrics 18 chỉ số trên MỌI report (không migration, commit 7996080 đã push `main`).** Một module
 > [keyMetrics.ts](src/lib/report/keyMetrics.ts) (bộ đếm + công thức + danh sách `KEY_METRICS` + định dạng + cột Excel) thay 5 bản
@@ -465,9 +466,29 @@ Dashboard agency 5,2 → 10,1; Lịch brand 5,2 → 6,4; Sổ Ca 4,4 → 8,3; AI
   Còn lại: nhánh "có đủ số" của các cột bị ẩn chỉ verify được gián tiếp — cột "Dự phóng tháng" hiện đúng vì CROCS có số, chứng minh
   cơ chế bật/tắt theo từng cột chạy đúng; 5 cột kia cần có plan chốt + rate mới xem thật được. "Tổng quan" (1.308px), "Ngày campaign"
   (1.426px) và "Hiệu suất nhân sự" (1.221px) ở 375px vẫn dài — chưa động tới, để đợt sau nếu cần.
-- **M4 Vận hành (ĐỢT KẾ TIẾP — Bảng Vận Hành, Lịch brand, Sổ Ca, Nhân sự ca):** sidebar nhảy (Đợt 0 #3); Sổ Ca: 316px lọc + 6 ô trước bảng;
-  Nhân sự ca: bảng 3 cột kéo 1.184px.
-- **M5 Kế Hoạch Tháng:** 384 phần tử bấm, 372 cao < 32px; form 3 cột, cột "Lưới hiện tại" gần trống; Target GMV gõ số thô 10 chữ số.
+- **M4 Vận hành — ĐÃ LÀM 2026-09-29, verify trên browser (admin, T9).** Đo trước (1440×900 → 375×812, số màn cuộn):
+  Sổ Ca 4,1 → 7,7 (bảng 12 cột, 972px ở 375 = 2,8× bề ngang máy; bảng bắt đầu ở y=333; 3 chip "Còn thiếu" đều **(0)**;
+  cột Target GMV **47/47 dòng rỗng**); Lịch brand 4,8 → **5,9** (lưới tháng `min-w-[1080px]` ⇒ cuộn ngang 3,1× bề ngang máy);
+  Nhân sự ca 1,3 → 1,5 (bảng 3 cột `w-full` bị kéo **1.086px**, tên host cách số ca gần một màn); Bảng Vận Hành 0,9 → 0,9 (không sửa).
+  Đã làm: (1) [SessionLedger.tsx](src/components/SessionLedger.tsx) — `SUB_COL = "hidden sm:table-cell …"` cho 5 cột phụ (Giờ live,
+  Target GMV, Orders, Views, GMV/giờ, Sự cố), ở điện thoại còn 6 cột trả lời "ca nào, ai chạy, ra bao nhiêu"; `showTargetCol` ẩn cột
+  Target GMV khi không ca nào có target (cùng luật M3); cả 3 bước đều 0 ⇒ thay hàng nút bằng 1 câu "Không còn ca nào thiếu…";
+  **sửa lỗi cũ `colSpan={13}` ở 2 chỗ trong khi bảng chỉ 12 cột** → `colCount` tính theo cột thật.
+  (2) [BrandCalendar.tsx](src/components/brand-workspace/BrandCalendar.tsx) — `viewMode` khởi tạo theo `matchMedia("(max-width: 639px)")`:
+  điện thoại mở thẳng **Ngày**, từ 640px giữ **Tháng**. KHÔNG bóp lưới tháng: quyết định "ô hẹp hơn ~150px thì card ca hết đọc được,
+  cho cuộn ngang" của PosterCalendarGrid vẫn giữ — chỉ không còn bắt người dùng điện thoại hạ cánh vào màn đó.
+  (3) [ShiftScheduling.tsx](src/components/ShiftScheduling.tsx) — "Tải Theo Host": `<table w-full>` → `<ul sm:columns-2 xl:columns-3>`.
+  Sau: Sổ Ca 12 → **11 cột**, 3,9 màn desktop, bảng ở 375 **972 → 664px** (2,8× → 1,9×), 7,7 → 7,6 màn; Lịch brand ở 375
+  **5,9 → 0,9 màn**, phần tử rộng nhất 1.080 → **351px** (bấm "Tháng" vẫn xem được, cuộn ngang trong khung riêng, trang không tràn);
+  desktop vẫn mặc định "Tháng"; Nhân sự ca 15 host xếp **3 cột × 341px/dòng**, 1,3 → 0,9 màn desktop, ở 375 rộng nhất 351px.
+  Test canh thêm 3 ca (SUB_COL + showTargetCol + hết `colSpan={13}` + `noMissing`; mặc định Ngày ở điện thoại; hết bảng `w-full`
+  của Tải Theo Host) — cả 3 đỏ trên code cũ. **Chính ca canh bắt được 1 chỗ `colSpan={13}` còn sót ở dòng trạng thái rỗng.**
+  tsc 0, eslint 0 lỗi/33 cảnh báo (= baseline), vitest 195/195, build OK.
+  **Bẫy khi verify:** `read_console_messages` giữ cả lỗi HMR từ lúc đang sửa file (stack đi qua `performReactRefresh`, URL còn
+  `?t=<timestamp cũ>`) và reload thường KHÔNG xoá — mở **tab mới** rồi đọc console mới kết luận được (tab mới: 0 lỗi).
+  Còn lại: Sổ Ca ở 375 vẫn cuộn ngang 1,9× (cột "Dữ liệu" rộng 243px — giữ vì là thứ nói còn thiếu bước nào); Bảng Vận Hành chưa sửa
+  (0,9 màn, 4 ô KPI đều 0 vì hôm nay không có ca).
+- **M5 Kế Hoạch Tháng (ĐỢT KẾ TIẾP):** 384 phần tử bấm, 372 cao < 32px; form 3 cột, cột "Lưới hiện tại" gần trống; Target GMV gõ số thô 10 chữ số.
 - **M6 Talent Pool:** 33 thẻ lưới 3 cột, đa số thẻ toàn "—/0/N/A"; 72 nút (68 < 32px); khối AI Matcher mặc định "Franklin +
   Mỹ phẩm Skincare" chiếm đầu trang. Hướng: bảng + ngăn chi tiết.
 - **M7 nhóm còn lại:** Điều Phối Phát Hành (24 nút "Phát hành" xanh, cả 18 dòng "Chưa có dòng"); Affiliate (kiểu bảng Excel nền

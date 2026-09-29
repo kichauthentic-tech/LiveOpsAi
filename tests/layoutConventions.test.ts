@@ -155,3 +155,30 @@ test("Dashboard agency: khối không tính được thì không chiếm chỗ n
   // Tài chính: chưa tính được ca nào thì không dựng 6 ô KPI + 2 biểu đồ/bảng rỗng.
   expect(src).toMatch(/\{fin\.priced === 0 \? \(/);
 });
+
+// ---- M4 Vận hành (2026-09-29) ----
+
+test("Sổ Ca: cột phụ ẩn ở điện thoại, cột Target GMV chỉ dựng khi có ca có target, colSpan theo số cột thật", () => {
+  const src = readFileSync(join(SRC, "components/SessionLedger.tsx"), "utf8");
+  expect(src).toMatch(/const SUB_COL = "hidden sm:table-cell/);
+  expect(src).toMatch(/const showTargetCol = !isBrandView && rows\.some/);
+  expect(src).toMatch(/\{showTargetCol && <th/);
+  // colSpan cứng 13 trên bảng 12 cột là lỗi cũ — không quay lại.
+  expect(src).not.toMatch(/colSpan=\{13\}/);
+  expect(src).toMatch(/colSpan=\{colCount\}/);
+  // Hết việc thì nói một câu, không dựng 3 nút lọc đều (0).
+  expect(src).toMatch(/const noMissing = /);
+});
+
+test("Lịch brand mở thẳng màn Ngày ở điện thoại (lưới tháng cố ý rộng 1.080px)", () => {
+  const src = readFileSync(join(SRC, "components/brand-workspace/BrandCalendar.tsx"), "utf8");
+  const line = src.split("\n").find((l) => /useState<"month" \| "week" \| "day">/.test(l)) ?? "";
+  expect(line).not.toBe("");
+  expect(src).toMatch(/matchMedia\("\(max-width: 639px\)"\)\.matches \? "day" : "month"/);
+});
+
+test('Nhân sự ca: "Tải theo Host" không còn là bảng w-full bị kéo ngang', () => {
+  const src = readFileSync(join(SRC, "components/ShiftScheduling.tsx"), "utf8");
+  expect(src).not.toMatch(/<table className="w-full text-sm min-w-\[420px\]">/);
+  expect(src).toMatch(/sm:columns-2 xl:columns-3/);
+});

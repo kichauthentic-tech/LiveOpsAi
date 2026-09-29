@@ -1053,26 +1053,19 @@ export default function ShiftScheduling({
         {loadByTalent.length === 0 ? (
           <p className="text-sm text-[var(--text-faint)]">Chưa có ca nào đã chốt trong tháng này.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[420px]">
-              <thead>
-                <tr className="text-left text-[var(--text-faint)] text-xs uppercase border-b border-[var(--border)]">
-                  <th className="pb-2">Host</th>
-                  <th className="pb-2 text-right">Số Ca</th>
-                  <th className="pb-2 text-right">Tổng Giờ</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loadByTalent.map((row) => (
-                  <tr key={row.talentId} className="border-b border-[var(--border)]/60 last:border-0">
-                    <td className="py-2 text-[var(--text)] font-medium">{row.name || talentsById.get(row.talentId)?.name}</td>
-                    <td className="py-2 text-right font-mono text-[var(--text-muted)]">{row.shifts}</td>
-                    <td className="py-2 text-right font-mono text-[var(--text-muted)]">{fmtFixed(row.hours, 1)}h</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          // Audit UX lần 2 — M4: trước là <table w-full> 3 cột, ở 1440 bị kéo rộng 1.086px nên tên host
+          // và số ca nằm cách nhau gần một màn. Nay là danh sách chảy theo cột (CSS columns): mỗi dòng
+          // rộng ~350px, số nằm ngay cạnh tên; 15 host xếp 3 cột thay vì 15 dòng kéo dài.
+          <ul className="sm:columns-2 xl:columns-3 gap-x-8">
+            {loadByTalent.map((row) => (
+              <li key={row.talentId} className="break-inside-avoid flex items-baseline justify-between gap-3 py-2 border-b border-[var(--border)]/60 text-sm">
+                <span className="text-[var(--text)] font-medium truncate">{row.name || talentsById.get(row.talentId)?.name}</span>
+                <span className="shrink-0 font-mono text-[var(--text-muted)]">
+                  {row.shifts} ca · {fmtFixed(row.hours, 1)}h
+                </span>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
 

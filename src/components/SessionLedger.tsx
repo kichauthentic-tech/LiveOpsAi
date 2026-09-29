@@ -51,6 +51,9 @@ const STATUS_LABEL = SESSION_STATUS_LABEL_VI;
 
 const STATUS_CLS = SESSION_STATUS_CLS;
 
+// Cột phụ của bảng Sổ Ca: ẩn dưới 640px để bảng vừa màn điện thoại (M4).
+const SUB_COL = "hidden sm:table-cell py-2.5 px-2";
+
 const MISSING_LABEL: Record<MissingStep, string> = {
   snapshot: "Chưa up snapshot",
   report: "Chưa có report",
@@ -142,6 +145,14 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
   const rows = useMemo(() => filterLedger(scoped, filter, today), [scoped, filter, today]);
   const days = useMemo(() => groupByDate(rows), [rows]);
   const summary = useMemo(() => summarize(rows, today), [rows, today]);
+  const noMissing = (["snapshot", "report", "reconcile"] as MissingStep[]).every((m) => summary.missing[m] === 0);
+  // M4, cùng luật với M3 (Dashboard agency): cột không ca nào có số thì không dành chỗ cho nó. Target GMV
+  // của ca chỉ có khi đã chốt Kế Hoạch Tháng — chưa chốt thì cả cột là "—" (đo 29/09: 47/47 dòng).
+  const showTargetCol = !isBrandView && rows.some((s) => !!s.targetGmv);
+  // Trước hai chỗ cứng colSpan 13 trong khi bảng chỉ có 12 cột; nay đếm theo đúng các cột đang dựng:
+  // 10 cột luôn có (Giờ, Host, Trạng thái, Giờ live, GMV, Orders, GMV/giờ, Dữ liệu, Sự cố, nút)
+  // + 1 cột đổi theo view (Brand cho ops / Views cho brand) + Target GMV nếu có ca nào có target.
+  const colCount = 11 + (showTargetCol ? 1 : 0);
 
   // Số ca trong bộ lọc hiện tại mà người đang xem KHÔNG được thấy số (brand + tháng chưa phát
   // hành). Các ca đó đóng góp 0 vào mọi ô KPI ở dải tổng bên dưới, nên phải nói ra: không thì
@@ -281,8 +292,15 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
           </div>
         </div>
 
-        {/* Bộ lọc "còn thiếu" — thứ biến sổ thành việc phải làm. Brand không cần thấy quy trình nội bộ. */}
-        {!isBrandView && (
+        {/* Bộ lọc "còn thiếu" — thứ biến sổ thành việc phải làm. Brand không cần thấy quy trình nội bộ.
+            M4: cả 3 bước đều 0 thì hàng nút không còn việc gì để bấm — nói thẳng một câu, ngắn hơn và rõ
+            hơn 3 nút xám mà người đọc phải quét từng cái mới biết là (0). */}
+        {!isBrandView && noMissing && (
+          <p className="text-[11px] text-[var(--text-faint)]">
+            Không còn ca nào thiếu snapshot, report hay đối soát trong phạm vi đang lọc.
+          </p>
+        )}
+        {!isBrandView && !noMissing && (
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-[11px] text-[var(--text-faint)] mr-1">Còn thiếu:</span>
             {(["snapshot", "report", "reconcile"] as MissingStep[]).map((m) => {
@@ -343,14 +361,16 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
                 {!isBrandView && <th className="py-2.5 px-2">Brand</th>}
                 <th className="py-2.5 px-2">Host</th>
                 <th className="py-2.5 px-2">Trạng thái</th>
-                <th className="py-2.5 px-2 text-right">Giờ live</th>
-                {!isBrandView && <th className="py-2.5 px-2 text-right">Target GMV</th>}
+                {/* M4: ở điện thoại bảng rộng 972px (2,8× bề ngang máy). Giữ 6 cột trả lời "ca nào, ai chạy,
+                    ra bao nhiêu"; 5 cột phụ chỉ hiện từ sm trở lên — cùng cách Đợt 0 đã làm cho CeoBrief. */}
+                <th className={`${SUB_COL} text-right`}>Giờ live</th>
+                {showTargetCol && <th className={`${SUB_COL} text-right`}>Target GMV</th>}
                 <th className="py-2.5 px-2 text-right">GMV</th>
-                <th className="py-2.5 px-2 text-right">Orders</th>
-                {isBrandView && <th className="py-2.5 px-2 text-right">Views</th>}
-                <th className="py-2.5 px-2 text-right">GMV/giờ</th>
+                <th className={`${SUB_COL} text-right`}>Orders</th>
+                {isBrandView && <th className={`${SUB_COL} text-right`}>Views</th>}
+                <th className={`${SUB_COL} text-right`}>GMV/giờ</th>
                 <th className="py-2.5 px-2">{isBrandView ? "Số liệu" : "Dữ liệu"}</th>
-                <th className="py-2.5 px-2">Sự cố</th>
+                <th className={SUB_COL}>Sự cố</th>
                 <th className="py-2.5 px-2" />
               </tr>
             </thead>
@@ -358,7 +378,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
               {days.map((day) => (
                 <React.Fragment key={day.date}>
                   <tr className="bg-[var(--surface-elevated)]/50">
-                    <td colSpan={13} className="py-1.5 px-4 text-[11px] font-bold text-[var(--text-muted)]">
+                    <td colSpan={colCount} className="py-1.5 px-4 text-[11px] font-bold text-[var(--text-muted)]">
                       {fmtDate(day.date)}
                       <span className="text-[var(--text-faint)] font-normal"> · {day.sessions.length} ca</span>
                     </td>
@@ -409,11 +429,11 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
                             <span className="block text-[11px] text-[var(--text-faint)] mt-0.5">nạp bù</span>
                           )}
                         </td>
-                        <td className="py-2.5 px-2 text-right text-[var(--text-muted)] whitespace-nowrap">
+                        <td className={`${SUB_COL} text-right text-[var(--text-muted)] whitespace-nowrap`}>
                           {s.liveDurationMinutes ? fmtHours(s.liveDurationMinutes / 60) : <span className="text-[var(--text-faint)]">({fmtHours(hours)})</span>}
                         </td>
-                        {!isBrandView && (
-                          <td className="py-2.5 px-2 text-right text-[var(--text-muted)] whitespace-nowrap">
+                        {showTargetCol && (
+                          <td className={`${SUB_COL} text-right text-[var(--text-muted)] whitespace-nowrap`}>
                             {s.targetGmv ? fmtVndShort(s.targetGmv) : "—"}
                           </td>
                         )}
@@ -426,15 +446,15 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
                             <span className="text-[var(--text-faint)] font-normal">—</span>
                           )}
                         </td>
-                        <td className="py-2.5 px-2 text-right text-[var(--text-muted)]">
+                        <td className={`${SUB_COL} text-right text-[var(--text-muted)]`}>
                           {hideMetrics ? <LockedCell /> : s.totalOrders ? fmtInt(s.totalOrders) : "—"}
                         </td>
                         {isBrandView && (
-                          <td className="py-2.5 px-2 text-right text-[var(--text-muted)]">
+                          <td className={`${SUB_COL} text-right text-[var(--text-muted)]`}>
                             {hideMetrics ? <LockedCell /> : s.totalViews ? fmtInt(s.totalViews) : "—"}
                           </td>
                         )}
-                        <td className="py-2.5 px-2 text-right text-[var(--text-muted)] whitespace-nowrap">
+                        <td className={`${SUB_COL} text-right text-[var(--text-muted)] whitespace-nowrap`}>
                           {hideMetrics ? <LockedCell /> : gmvPerHour > 0 ? fmtVndShort(gmvPerHour) : "—"}
                         </td>
                         <td className="py-2.5 px-2">
@@ -453,7 +473,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
                             <span className="block text-[11px] text-amber-300 mt-0.5">{missing.map((m) => MISSING_LABEL[m]).join(" · ")}</span>
                           )}
                         </td>
-                        <td className="py-2.5 px-2">
+                        <td className={SUB_COL}>
                           <div className="flex flex-wrap gap-1">
                             {incidents.map((i) => (
                               <span
@@ -483,7 +503,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
               ))}
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={13} className="py-10 text-center text-[var(--text-faint)] italic">
+                  <td colSpan={colCount} className="py-10 text-center text-[var(--text-faint)] italic">
                     {scoped.length === 0 ? "Chưa có ca nào." : "Không có ca nào khớp bộ lọc."}
                   </td>
                 </tr>
