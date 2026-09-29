@@ -4,6 +4,7 @@ import { ShieldCheck, UserPlus, Users, Key, Lock, Unlock, Check, X, Search, Slid
 import { useConfirm } from "../hooks/useConfirm";
 import { PageIntro } from "./common/PageIntro";
 import { TabUsagePanel } from "./TabUsagePanel";
+import { accountStatusLabel } from "../lib/statusLabels";
 
 export interface NewUserPayload {
   name: string;
@@ -356,18 +357,10 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
     <div className="space-y-6">
       {/* Top Banner */}
       <div className="bg-[var(--surface)] border border-[var(--border)] p-6 rounded-2xl shadow-xl flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 text-[var(--text)]">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="p-3 bg-[var(--accent)]/20 text-[var(--accent-text)] border border-[var(--accent)]/30 rounded-2xl">
-            <ShieldCheck className="w-7 h-7 animate-pulse" />
-          </div>
+        <div className="min-w-0">
           <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-[var(--accent-text)] uppercase tracking-widest">
-                Hệ Thống
-              </span>
-            </div>
-            <h2 className="text-2xl font-black text-[var(--text)] mt-0.5">
-              Phân Quyền & Role
+            <h2 className="text-lg font-black text-[var(--text)] flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-[var(--accent-text)] shrink-0" /> Phân Quyền & Role
             </h2>
             <PageIntro>
               Cấu hình Ma trận phân quyền chi tiết cho {MATRIX_ROLES.length} Role tiêu chuẩn, override quyền từng cá nhân & audit nhật ký an ninh.
@@ -464,7 +457,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                       {roleKey.toUpperCase()}
                     </span>
                     <span className="text-xs font-mono font-bold text-[var(--text-muted)]">
-                      {enabledCount}/{totalCount} Permissions
+                      {enabledCount}/{totalCount} quyền
                     </span>
                   </div>
 
@@ -710,7 +703,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                                 : "bg-red-500/20 text-red-400 border border-red-500/30"
                             }`}
                           >
-                            {u.status}
+                            {accountStatusLabel(u.status)}
                           </span>
                         </td>
 
@@ -887,8 +880,8 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                     }
                     className="w-full px-3 py-2 bg-[var(--surface-base)] rounded-xl border border-[var(--border)] text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-bold"
                   >
-                    <option value="Active">Active (Hoạt động)</option>
-                    <option value="Inactive">Inactive (Tạm khóa)</option>
+                    <option value="Active">Hoạt động</option>
+                    <option value="Inactive">Tạm khoá</option>
                   </select>
                 </div>
               </div>

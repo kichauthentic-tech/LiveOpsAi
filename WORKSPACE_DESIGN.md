@@ -2,6 +2,10 @@
 
 ## CẦN LÀM NGAY khi mở phiên mới (cập nhật 2026-09-24)
 
+> **MỚI 2026-09-29 — Audit UX/UI lần 2: Đợt 0 (6 lỗi chung) XONG + VERIFY trên browser (không migration, CHƯA commit).**
+> Hết "0 ca / Chưa có…" giả lúc tải, 0/28 màn tràn ngang ở 375px, sidebar không nhảy theo tab, 1 bộ chọn tháng `MonthPicker`,
+> 1 khung đầu trang `PageHeader`, nhãn trạng thái tiếng Việt. Kế tiếp: M1 Report Tháng. Xem `## Audit UX/UI lần 2 (2026-09-29)`.
+
 > **MỚI 2026-09-29 — Key Metrics 18 chỉ số trên MỌI report (không migration, commit 7996080 đã push `main`).** Một module
 > [keyMetrics.ts](src/lib/report/keyMetrics.ts) (bộ đếm + công thức + danh sách `KEY_METRICS` + định dạng + cột Excel) thay 5 bản
 > cộng số riêng. Áp cho Report Tháng (Xu hướng 4 tháng, bảng Host, sheet Excel), Report Tuần, Dashboard brand, cửa sổ ca, Hiệu Suất
@@ -324,6 +328,89 @@
 
 > **Cập nhật 2026-09-13:** Các phần dưới đây được viết ở các thời điểm khác nhau và nghiệp vụ/code đã đổi khá nhiều kể từ đó. Từ nay **không coi nội dung cũ trong file này là ground truth mặc định** — mọi mục (kiến trúc, luồng dữ liệu, quy ước kỹ thuật...) cần được re-verify bằng đọc code hiện tại trước khi dựa vào để quyết định, đặc biệt là mục nào chưa có ghi chú "đã audit lại". Đang làm 1 vòng rà soát UX/workflow theo từng module (xem "Giai đoạn tiếp theo") — mỗi module audit xong sẽ cập nhật lại đúng phần liên quan trong file.
 
+## Audit UX/UI lần 2 (2026-09-29) — bố cục theo từng màn; Đợt 0 XONG + VERIFY, M1–M7 chưa làm
+
+Cách đo: dev server cổng 3100 (phiên admin sẵn), `history.pushState` + `popstate` để đổi màn không tải lại, chờ `main` ổn định
+rồi đếm trong `<main>`: số màn cuộn, số cỡ chữ, số chiều cao nút, phần tử bấm được (< 32px), bảng, biểu đồ, số chữ; ở 375px thêm
+tràn ngang cả trang; "trạng thái rỗng giả" = lấy mẫu `main.innerText` mỗi 100 ms trong 3 s sau khi đổi màn, tìm chữ "Chưa có…"/số 0
+không còn ở bản cuối. **Bẫy:** Browser pane bị ẩn thì ảnh chụp là ảnh cũ — luôn đối chiếu bằng `innerText`, hoặc `navigate` thật.
+
+**Lượt Mở Tab (26–29/09):** chỉ 1 người dùng (admin, gồm cả các lần Claude tự verify) — CHƯA dùng làm tín hiệu được. Thứ tự:
+Report Tháng 101, Dashboard agency 39, Dashboard brand 17, Lịch brand 13, Sổ Ca 9+6, Nhân sự ca 7, Cam Kết 7+5, còn lại ≤ 6.
+
+Số đo chính (1440×900 → 375×812, số màn cuộn): Report Tháng 11,2 → 7,4 (14 bảng, 5 biểu đồ, 3.192 chữ, 13 cỡ chữ, 8 chiều cao nút);
+Dashboard agency 5,2 → 10,1; Lịch brand 5,2 → 6,4; Sổ Ca 4,4 → 8,3; AI Training 4,4 → 9,3; Talent Pool 3,7 → 11,6; Dashboard brand 3,8 → 5,8.
+
+### Đợt 0 — lỗi chung — số đo LÚC AUDIT (đã sửa, xem "Đợt 0 — ĐÃ LÀM" ngay dưới)
+1. **Số 0 / "Chưa có…" giả lúc đang tải.** App.tsx `rawSessions` khởi tạo `[]`, không có cờ "đã nạp"; `completePastSessions()` chạy
+   XONG mới `fetchSessions()` ⇒ mọi màn đọc ca hiện 0 trong lúc tải. Đo được: Talent Pool 2,9 s "Chưa có ca nào có số" trên cả 33
+   thẻ; Cam Kết brand 2,1 s "Chưa có cam kết"; Điều Phối Phát Hành 1,8 s "Chưa có dòng"; Report Tháng số 0 trong 1,1 s; Kế Hoạch
+   Tháng 0,6 s; Sổ Ca brand lần tải đầu hiện "SESSIONS 0" + "Chưa có ca nào". Hướng: cờ `sessionsLoaded` truyền xuống, skeleton.
+2. **Tràn ngang cả trang ở 375px — 3 màn (26/09 là 0):** Dashboard agency +36px (cột `text-right w-16` "Kỳ trước"), Kế Hoạch Tháng
+   +31px (ô ngày camp `flex-1` 156px ×2), Talent Pool +106px (thẻ talent 444px). Hướng: sửa 3 chỗ + đưa kiểm "tràn ngang" vào test canh.
+3. **Sidebar nhảy 256↔64px giữa các tab** (`CALENDAR_TABS` = Nhân sự ca, Bảng Vận Hành, Lịch brand tự thu gọn): đi Kế Hoạch Tháng →
+   Nhân sự ca → Bảng Vận Hành → Sổ Ca thì nội dung đổi 1.184 ↔ 1.376px và chữ menu biến mất/hiện lại. Menu agency ở 900px cao cần
+   cuộn (930/712px) — nhóm Hệ Thống bị che.
+4. **3 kiểu chọn tháng:** `<input type="month">` 12 chỗ/10 file (hiện "September 2026" theo ngôn ngữ trình duyệt), "‹ Tháng 9/2026 ›"
+   tự viết 9 file, ô khoảng ngày ở Đối Soát. Hướng: 1 component `MonthPicker`.
+5. **2 kiểu đầu trang:** PageIntro 14 màn; kiểu cũ (dòng nhỏ + tiêu đề to, không mô tả, cao ~130px) 13 file: TalentMatcher,
+   StudioEquipment, CrmProjects, TikTokApiAutomation, AiTrainingCenter, BrandRateCard, BrandNextMonthPlan, BrandAdsReport,
+   BrandCommitmentView, LiveCalendar, MyTalentProfile, EngineTrainingPanel, AiMultiAgent.
+6. **Nhãn giao diện tiếng Anh lẫn** (KHÔNG tính tên chỉ số TikTok của keyMetrics — cố ý): "SESSIONS" (Sổ Ca), "7/7 Permissions"
+   (Phân Quyền, bị cắt chữ), "Available" (Talent Pool, Studios), "Active" (CRM).
+
+### Đợt 0 — ĐÃ LÀM 2026-09-29 (user chọn), verify trên browser (dev 3100, admin)
+1. **Chờ nạp thay vì số giả** — App.tsx: `talentsLoadedFor` / `sessionsLoadedFor` / `reportsLoadedFor` (khoá theo user id, không
+   setState trong effect) → `coreDataReady`; tab nào không nằm trong `TABS_WITHOUT_CORE_DATA` (chỉ `account_settings`, `tiktok_api`
+   — gần như tab nào cũng nhận `sessions`) hiện `<TabLoading />` tới khi nạp xong. Ca nạp NGAY, song song RPC `complete_past_sessions`;
+   RPC đóng được ca (n > 0) thì nạp lại, `seq` chặn lượt cũ ghi đè. Verify bằng iframe cùng origin lấy mẫu 50 ms: Talent Pool /
+   Sổ Ca brand / Điều Phối Phát Hành / Dashboard / Kế Hoạch Tháng đi thẳng skeleton → số thật (2,1–3,0 s), 0 lần hiện rỗng giả.
+2. **Tràn ngang 375px: 3 → 0/28 màn.** CeoBrief `STAFF_COLS` (điện thoại bỏ cột thanh, tiêu đề cột không viết hoa — "SESSIONS"
+   hoa đè cột bên, phát hiện lúc verify); MonthPlan ô ngày camp `min-w-0` + nhãn xuống dòng; TalentMatcher lưới `grid-cols-1`.
+3. **Sidebar chỉ theo bề ngang** — `autoCollapse = !(min-width: 1440px)`, bỏ tự thu theo `CALENDAR_TABS` (nay chỉ còn dùng cho
+   `max-w-none`). 1440: nội dung 1.184px ở MỌI tab (trước nhảy 1.184 ↔ 1.376), ô lịch tháng 149px, không cuộn ngang; 1300: menu thu
+   ở mọi tab (1.236px). Menu gọn hơn: mục `py-2`, nhóm `space-y-3`, đầu sidebar `h-16` (= thanh trên 64px), chân `p-3` → cuộn thừa
+   ở màn cao 900px 218 → 49px (phần còn lại chờ gộp menu). **Kèm theo:** thẻ ca (`SessionEventCard`) cho nhãn trạng thái xuống dòng
+   khi thiếu chỗ — trước đây giờ bị cắt "20:00 ..." ở 47/47 thẻ Lịch brand; nay 0/47, không ô ngày nào phải cuộn.
+4. **`src/components/common/MonthPicker.tsx`** ("YYYY-MM", ‹ Tháng 9/2026 › + bảng 12 tháng; `arrows`, `min`/`max`,
+   `allowEmpty`+`emptyLabel`, `align`, `size`). Thay 12 `<input type="month">` (MonthPlan, CeoBrief, BrandCommitment ×2,
+   ShiftScheduling, FinanceHr, BrandAffiliateTable ×2, BrandMonthlyReport, BrandAdsReport, BrandCalendar, BrandDashboard) + 2 bộ tự
+   viết (BrandsOverview, MyTalentProfile — trước hiện "2026-09" thô) + `usePrompt({inputType:"month"})`. Lý do: MDN — chỉ
+   Chrome/Edge desktop có bộ chọn tháng dùng được, Safari/Firefox thành ô gõ chữ. Verify: chọn T10 → "Tháng 10/2026", ‹ quay lại,
+   Esc đóng, form hợp đồng "Đến tháng" trống = "Chưa chốt" và khoá tháng < "Từ tháng". Bộ ngày/tuần (OpsBoard, LiveCalendar) giữ nguyên.
+5. **`src/components/common/PageHeader.tsx`** (icon + tiêu đề text-lg + PageIntro + `actions` + `children`). Áp 11 màn: Talent Pool,
+   Studios, CRM, TikTok API, AI Training, Finance, Rate Card, Kế Hoạch Tháng Sau, Nhập Ads, Cam Kết brand, Lịch (LiveCalendar),
+   Hồ Sơ Của Tôi; Phân Quyền sửa tại chỗ. Màn chưa có câu giải thích thì thêm 1 câu. Mọi tiêu đề trang đo được = 18px (trước lẫn
+   16/18/20/24) — trừ Report Tháng 24px, để cho M1.
+6. **`src/lib/statusLabels.ts`** — `statusLabel()` / `accountStatusLabel()`: giá trị DB tiếng Anh giữ nguyên, hiển thị tiếng Việt
+   (Available→Sẵn sàng, In Stock→Trong kho, Active→Đang chạy / Hoạt động (tài khoản)…); "x/y Permissions" → "x/y quyền". Áp
+   TalentMatcher, CrmProjects, StudioEquipment, UserRoleSettings, TikTokApiAutomation. **"Sessions" KHÔNG đổi** — là tên chỉ số chuẩn
+   trong `metricGlossary.ts` (audit ghi nhầm).
+- Test canh: `tests/layoutConventions.test.ts` (7 ca: cấm `type="month"`; cấm tiêu đề `h2 text-2xl/3xl` (ngoại lệ Report Tháng,
+  AiMultiAgent); cấm tiêu đề trang `text-xl/text-base` kiểu cũ (đã chạy thử trên bản HEAD: bắt đủ 5 file cũ); `autoCollapse` không
+  đọc tab; cổng `coreDataReady` + ca không nối đuôi RPC; `shiftMonthStr`; `statusLabel`). tsc 0 lỗi, eslint 0 lỗi, vitest 187/187.
+  Console + server 0 lỗi.
+- **Bẫy khi verify:** (1) ảnh chụp cũ sau `pushState` / khi pane ẩn — đối chiếu bằng `innerText` hoặc `navigate` thật; (2) khi đang
+  giả lập kích thước (resize_window 1440×900), click của công cụ rơi SAI toạ độ (log sự kiện: click ở x=2406 trên khung 1440) — test
+  thao tác chuột ở preset `desktop`; (3) bắt khoảnh khắc đang tải: mở app trong `<iframe>` cùng origin rồi lấy mẫu `contentDocument`.
+- Chưa verify: màn talent (Ca Của Tôi, Đăng Ký Ca, Hồ Sơ Của Tôi) và role brand — cần đăng nhập tài khoản đó.
+
+### Theo module (thứ tự đề xuất = lượt mở × mức lỗi)
+- **M1 Report Tháng (ĐỢT KẾ TIẾP):** 4 tầng trước nội dung (tab Tháng/Tuần → thẻ tiêu đề → thanh bản chụp → mục lục); 11,2 màn;
+  13 cỡ chữ; tiêu đề 24px chưa theo PageHeader.
+- **M2 Dashboard brand:** 18 ô KPI cùng cỡ (5 cột × 4 hàng) chiếm hết màn đầu; Run-rate so target plan (câu hỏi chính) nằm dưới
+  màn đầu. Giữ đủ 18 chỉ số (user chốt 29/09) nhưng phân tầng/nhóm.
+- **M3 Dashboard agency:** 5,2 màn desktop, 10,1 màn điện thoại, tràn ngang (Đợt 0 #2).
+- **M4 Vận hành (Bảng Vận Hành, Lịch brand, Sổ Ca, Nhân sự ca):** sidebar nhảy (Đợt 0 #3); Sổ Ca: 316px lọc + 6 ô trước bảng;
+  Nhân sự ca: bảng 3 cột kéo 1.184px.
+- **M5 Kế Hoạch Tháng:** 384 phần tử bấm, 372 cao < 32px; form 3 cột, cột "Lưới hiện tại" gần trống; Target GMV gõ số thô 10 chữ số.
+- **M6 Talent Pool:** 33 thẻ lưới 3 cột, đa số thẻ toàn "—/0/N/A"; 72 nút (68 < 32px); khối AI Matcher mặc định "Franklin +
+  Mỹ phẩm Skincare" chiếm đầu trang. Hướng: bảng + ngăn chi tiết.
+- **M7 nhóm còn lại:** Điều Phối Phát Hành (24 nút "Phát hành" xanh, cả 18 dòng "Chưa có dòng"); Affiliate (kiểu bảng Excel nền
+  đỏ/xanh, 68/73 phần tử < 32px); CRM, Studios, TikTok API, AI Training, Phân Quyền, Finance, SKU, Rate Card, Cam Kết — chỉ header + nhãn.
+
+Chưa đo được: màn talent (Ca Của Tôi/Đăng Ký Ca) và role brand — cần user đăng nhập tài khoản đó trong Browser pane.
+
 ## Audit UX/UI (2026-09-26) — P0 + P1 XONG + DEPLOY; P2: tách bundle XONG, phần còn lại chưa làm
 
 Cách đo (dùng lại được): script JS chạy trong Browser pane, bấm lần lượt từng mục sidebar rồi đếm trên phần tử có chữ trong
@@ -389,7 +476,7 @@ Chưa đo được: màn talent (Ca Của Tôi/Đăng Ký Ca) và role brand b�
   nạp ở effect riêng. Giờ có `brandsLoaded`; `phase1Loading` không còn ai đọc nên đã bỏ hẳn.
 - **Tiêu đề trang:** `src/components/common/PageIntro.tsx` — đoạn giải thích 1 dòng, nút "Chi tiết" chỉ hiện khi bị cắt
   (ResizeObserver). Áp 14 màn.
-- **Sidebar:** `src/hooks/useMediaQuery.ts`; < 1280px tự thu gọn như module lịch (mở tay chỉ tạm thời). Ở 769px bảng Toàn
+- **Sidebar:** `src/hooks/useMediaQuery.ts`; < 1280px tự thu gọn như module lịch (mở tay chỉ tạm thời). **→ Đổi 2026-09-29: ngưỡng 1440px, bỏ tự thu theo tab lịch (Audit lần 2, Đợt 0 #3).** Ở 769px bảng Toàn
   Cảnh Brand hiện đủ cột (trước bị cắt).
 - **Header mobile:** "Agency" thay "Agency (Toàn cảnh)" dưới 640px, bớt padding — 1 dòng ở 375px.
 - **Số:** `src/lib/format.ts` (`fmtFixed`, `fmtNum`, `fmtPctValue`, `fmtVndFull`). 66 chỗ `toFixed` trong chữ hiển thị → vi-VN;
@@ -1098,6 +1185,10 @@ Bảng/hàm: `session_live_snapshots` + `session_live_snapshot_rows`, RPC `apply
 
 *(chưa re-audit theo đợt 2026-09-13 — các mục dưới vẫn là quy ước hợp lệ trừ khi đọc code thấy khác, nhưng coi là "cần xác nhận lại" chứ không mặc định đúng 100%)*
 
+- **Giao diện chung (2026-09-29, `tests/layoutConventions.test.ts` canh):** đầu trang mới dùng `PageHeader` (tiêu đề 18px +
+  1 câu giải thích); chọn tháng dùng `MonthPicker`, KHÔNG `<input type="month">`; giá trị trạng thái DB hiển thị qua
+  `statusLabel()`; tab mới đọc ca/talent/report tháng tự được cổng `coreDataReady` che — tab thật sự không cần thì thêm vào
+  `TABS_WITHOUT_CORE_DATA`; sidebar chỉ thu gọn theo bề ngang (< 1440px), không theo tab.
 - **Server import phải có đuôi `.js`** (2026-09-26). Vercel chạy `api/index.ts` bằng Node ESM từng file (`"type": "module"`, không
   bundle), nên `import … from "../lib/x"` chạy được ở máy (tsx đoán đuôi) nhưng trên Vercel mọi `/api/*` trả
   FUNCTION_INVOCATION_FAILED. Viết `"../lib/x.js"` (tsconfig `bundler` tự hiểu ra `.ts`). `tests/serverImports.test.ts` duyệt đồ thị

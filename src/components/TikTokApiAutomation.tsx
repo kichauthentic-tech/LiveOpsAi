@@ -4,6 +4,7 @@ import { getTikTokAuthorizeUrl, disconnectTikTok } from "../lib/db/tiktokIntegra
 import { Server, Zap, RefreshCw, ShieldCheck, ShieldAlert, ShieldX, Link2, Unlink, ArrowRight, Activity, Plus, Edit3, Trash2, X } from "lucide-react";
 import { errorMessage } from "../lib/errorMessage";
 import { useConfirm } from "../hooks/useConfirm";
+import { PageHeader } from "./common/PageHeader";
 
 interface TikTokApiAutomationProps {
   workflowRules: WorkflowRule[];
@@ -128,12 +129,11 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
 
   return (
     <div className="space-y-6">
-      <div className="bg-[var(--surface)] text-[var(--text)] p-6 rounded-2xl border border-[var(--border)] shadow-xl space-y-2">
-        <span className="text-[var(--accent-text)] font-semibold text-xs uppercase tracking-wider block flex items-center gap-1.5">
-          <Server className="w-4 h-4 text-[var(--accent-text)]" /> Kinh Doanh
-        </span>
-        <h2 className="text-2xl font-black">TikTok API</h2>
-      </div>
+      <PageHeader
+        icon={Server}
+        title="TikTok API"
+        description="Trạng thái kết nối TikTok Shop API và các luật tự động chạy trên dữ liệu đồng bộ về."
+      />
 
       {/* Sub Tabs */}
       <div className="flex space-x-2 text-xs font-bold border-b border-[var(--border)] pb-2">
@@ -290,9 +290,9 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
                   <h4 className="font-bold text-[var(--text)] text-sm flex items-center gap-2">
                     {rule.name}
                     {rule.enabled ? (
-                      <span className="bg-emerald-100 text-emerald-800 text-[11px] font-bold px-2 py-0.5 rounded">Active</span>
+                      <span className="bg-emerald-100 text-emerald-800 text-[11px] font-bold px-2 py-0.5 rounded">Đang bật</span>
                     ) : (
-                      <span className="bg-[var(--surface-hover)] text-[var(--text-muted)] text-[11px] font-bold px-2 py-0.5 rounded">Off</span>
+                      <span className="bg-[var(--surface-hover)] text-[var(--text-muted)] text-[11px] font-bold px-2 py-0.5 rounded">Tắt</span>
                     )}
                   </h4>
                   <div className="text-xs text-[var(--text-muted)] flex flex-wrap items-center gap-2 font-mono">

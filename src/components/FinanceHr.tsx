@@ -19,6 +19,8 @@ import { useToast } from "../hooks/useToast";
 import { PageIntro } from "./common/PageIntro";
 
 import { fmtFixed } from "../lib/format";
+import { MonthPicker } from "./common/MonthPicker";
+import { PageHeader } from "./common/PageHeader";
 interface FinanceHrProps {
   sessions: LiveSession[];
   talents: Talent[];
@@ -79,11 +81,6 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
   // Audit Module 3 (2026-09-18): trước đây là MỘT danh sách mọi ca Completed từ đầu tới giờ, tổng
   // cộng dồn cả đời — vài tháng nữa là vô nghĩa. Lọc theo tháng, mặc định tháng hiện tại (VN).
   const [month, setMonth] = useState(() => todayVn().slice(0, 7));
-  const shiftMonth = (delta: number) => {
-    const [y, m] = month.split("-").map(Number);
-    const d = new Date(y, m - 1 + delta, 1);
-    setMonth(`${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, "0")}`);
-  };
 
   // Real P&L is only meaningful for sessions that actually ran and closed with real GMV/orders.
   // Ca backfill (sinh từ file để nạp bù tháng cũ, 0086) bỏ ra: rate card tháng đó không chuẩn.
@@ -167,12 +164,11 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
 
   return (
     <div className="space-y-6">
-      <div className="bg-[var(--surface)] text-[var(--text)] p-6 rounded-2xl border border-[var(--border)] shadow-xl space-y-2">
-        <span className="text-[var(--accent-text)] font-semibold text-xs uppercase tracking-wider block flex items-center gap-1.5">
-          <DollarSign className="w-4 h-4 text-[var(--accent-text)]" /> Tài Chính
-        </span>
-        <h2 className="text-2xl font-black">Finance & P&L</h2>
-      </div>
+      <PageHeader
+        icon={DollarSign}
+        title="Finance & P&L"
+        description="Lãi/lỗ theo từng ca đã chạy xong trong tháng: GMV, hoa hồng agency, chi phí host, studio và ads."
+      />
 
       {/* Real P&L report per completed session */}
       <div className="bg-[var(--surface)] p-6 rounded-2xl border border-[var(--border)] shadow-sm space-y-4">
@@ -186,14 +182,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
             </PageIntro>
           </div>
           <div className="flex items-center gap-1 text-xs">
-            <button onClick={() => shiftMonth(-1)} className="px-2 py-1 rounded-lg border border-[var(--border)] hover:bg-[var(--surface-elevated)]">‹</button>
-            <input
-              type="month"
-              value={month}
-              onChange={(e) => e.target.value && setMonth(e.target.value)}
-              className="px-2 py-1 rounded-lg border border-[var(--border)] bg-[var(--surface-base)] text-[var(--text)] font-bold"
-            />
-            <button onClick={() => shiftMonth(1)} className="px-2 py-1 rounded-lg border border-[var(--border)] hover:bg-[var(--surface-elevated)]">›</button>
+            <MonthPicker value={month} onChange={setMonth} size="sm" />
           </div>
           <div className="text-right text-xs bg-[var(--surface-elevated)]/50 border border-[var(--border)] rounded-xl px-4 py-2">
             <div className="text-[var(--text-muted)]">

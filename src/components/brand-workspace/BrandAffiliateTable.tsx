@@ -9,6 +9,7 @@ import { Database, Download, Loader2, Plus, Save, Trash2, Users } from "lucide-r
 import { metricHint } from "../../lib/metricGlossary";
 
 import { fmtFixed, fmtVndFull } from "../../lib/format";
+import { MonthPicker } from "../common/MonthPicker";
 // Trang Affiliate (2026-09-22) — tách RIÊNG khỏi form Report Tháng theo yêu cầu ops. Bảng dựng
 // theo đúng file phân tích ops đang dùng: mỗi PHIÊN LIVE là 1 CỘT, mỗi chỉ số là 1 DÒNG, các cột
 // gom theo tháng bằng một dải tiêu đề ở trên.
@@ -360,7 +361,7 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
         <div>
-          <h2 className="text-xl font-bold text-[var(--text)] flex items-center gap-2">
+          <h2 className="text-lg font-black text-[var(--text)] flex items-center gap-2">
             <Users className="w-5 h-5 text-emerald-600" /> Affiliate — {brandName}
           </h2>
           <p className="text-xs text-[var(--text-faint)] mt-0.5">
@@ -369,9 +370,9 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
           </p>
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          <input type="month" value={fromMonth} max={toMonth} onChange={(e) => setFromMonth(e.target.value)} className="p-2 border border-[var(--border)] rounded-lg bg-[var(--surface-base)] text-sm" />
+          <MonthPicker value={fromMonth} max={toMonth} onChange={setFromMonth} arrows={false} ariaLabel="Từ tháng" />
           <span className="text-[var(--text-faint)]">→</span>
-          <input type="month" value={toMonth} min={fromMonth} onChange={(e) => setToMonth(e.target.value)} className="p-2 border border-[var(--border)] rounded-lg bg-[var(--surface-base)] text-sm" />
+          <MonthPicker value={toMonth} min={fromMonth} onChange={setToMonth} arrows={false} ariaLabel="Đến tháng" />
           <button
             onClick={handleExport}
             disabled={flatColumns.length === 0}

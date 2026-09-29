@@ -4,6 +4,8 @@ import { Building2, Plus, Edit3, Trash2, X, Tag, DollarSign, Percent } from "luc
 import { BrandLogo } from "./ui/BrandLogo";
 import { BrandRateCard } from "./BrandRateCard";
 import { useConfirm } from "../hooks/useConfirm";
+import { statusLabel } from "../lib/statusLabels";
+import { PageHeader } from "./common/PageHeader";
 
 interface CrmProjectsProps {
   brands: Brand[];
@@ -139,12 +141,11 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
 
   return (
     <div className="space-y-6">
-      <div className="bg-[var(--surface)] text-[var(--text)] p-6 rounded-2xl border border-[var(--border)] shadow-xl space-y-2">
-        <span className="text-[var(--accent-text)] font-semibold text-xs uppercase tracking-wider block flex items-center gap-1.5">
-          <Building2 className="w-4 h-4 text-[var(--accent-text)]" /> Kinh Doanh
-        </span>
-        <h2 className="text-2xl font-black">CRM</h2>
-      </div>
+      <PageHeader
+        icon={Building2}
+        title="CRM"
+        description="Brand đang hợp tác: người liên hệ phía brand, KAM phụ trách và cách tính phí (theo giờ live hay % GMV)."
+      />
 
       {/* Brand CRM Section */}
       <div className="bg-[var(--surface)] p-6 rounded-2xl border border-[var(--border)] shadow-sm space-y-4">
@@ -177,7 +178,7 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
                     b.contractStatus === "Active" ? "bg-emerald-900/85 text-emerald-300" :
                     b.contractStatus === "Pending" ? "bg-amber-900/85 text-amber-300" : "bg-[var(--surface-hover)] text-[var(--text-muted)]"
                   }`}>
-                    {b.contractStatus}
+                    {statusLabel(b.contractStatus)}
                   </span>
                   <button
                     onClick={() => setExpandedRateCardBrandId((cur) => (cur === b.id ? null : b.id))}
@@ -312,9 +313,9 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
                     onChange={(e) => setBrandContractStatus(e.target.value as "Active" | "Pending" | "Completed")}
                     className="w-full p-2.5 border border-[var(--border)] rounded-xl font-semibold bg-[var(--surface-base)] text-[var(--text)]"
                   >
-                    <option value="Active">Active (Đang Chạy)</option>
-                    <option value="Pending">Pending (Đang Đàm Đạo)</option>
-                    <option value="Completed">Completed (Đã Hoàn Thành)</option>
+                    <option value="Active">Đang chạy</option>
+                    <option value="Pending">Đang đàm phán</option>
+                    <option value="Completed">Đã xong</option>
                   </select>
                 </div>
               </div>

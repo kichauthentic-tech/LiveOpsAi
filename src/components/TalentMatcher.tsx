@@ -7,6 +7,8 @@ import { errorMessage } from "../lib/errorMessage";
 import { useConfirm } from "../hooks/useConfirm";
 
 import { fmtVndShort, fmtVndFull } from "../lib/format";
+import { statusLabel } from "../lib/statusLabels";
+import { PageHeader } from "./common/PageHeader";
 // Vài bản ghi talent cũ (trước khi field chuẩn hoá về `niches`/`avatar`/`ratePerSession`) có thể
 // còn lưu dưới tên cột cũ — đọc dự phòng, không phải lỗi kiểu dữ liệu.
 interface LegacyTalentAliases {
@@ -295,13 +297,11 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Top Banner */}
-      <div className="bg-[var(--surface)] text-[var(--text)] p-6 rounded-2xl border border-[var(--border)] shadow-xl space-y-2">
-        <span className="text-[var(--accent-text)] font-semibold text-xs uppercase tracking-wider block flex items-center gap-1.5">
-          <Users className="w-4 h-4 text-[var(--accent-text)]" /> Tài Nguyên Chung
-        </span>
-        <h2 className="text-2xl font-black">Talent Pool</h2>
-      </div>
+      <PageHeader
+        icon={Users}
+        title="Talent Pool"
+        description="Host và trợ live của agency: vai trò, số ca và GMV từ các ca đã chạy, rate card. Bấm vào thẻ để xem chi tiết từng người."
+      />
 
       {/* AI Matching Tool Banner */}
       <div className="bg-gradient-to-r from-[var(--accent)]/25 to-[var(--surface)] text-[var(--text)] p-6 rounded-2xl border border-[var(--accent)]/50 shadow-lg space-y-4">
@@ -420,7 +420,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
         </div>
 
         {/* Talent Cards Grid */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredTalents.map((t) => {
             const nicheArr = t.niches || legacyTalentFields(t).niche || [];
             const nicheStr = Array.isArray(nicheArr) ? nicheArr.join(", ") : String(nicheArr || "Đa ngành");
@@ -499,7 +499,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                     t.availabilityStatus === "On Live" ? "bg-red-900/80 text-red-300 animate-pulse" :
                     t.availabilityStatus === "Busy" ? "bg-amber-900/80 text-amber-300" : "bg-emerald-900/80 text-emerald-300"
                   }`}>
-                    {t.availabilityStatus || "Available"}
+                    {statusLabel(t.availabilityStatus || "Available")}
                   </span>
                 </div>
               </div>
@@ -608,9 +608,9 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                     onChange={(e) => setFormStatus(e.target.value as "Available" | "Busy" | "On Live")}
                     className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
                   >
-                    <option value="Available">Sẵn Sàng (Available)</option>
-                    <option value="Busy">Đã Bận (Busy)</option>
-                    <option value="On Live">Đang Live (On Live)</option>
+                    <option value="Available">Sẵn sàng</option>
+                    <option value="Busy">Đang bận</option>
+                    <option value="On Live">Đang live</option>
                   </select>
                 </div>
               </div>
@@ -835,7 +835,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                 <div>GMV/session: <strong className="text-emerald-400 block text-sm font-bold">{fmtVndShort(Math.round(computeTalentRealTotals(sessions, detailTalent.id).avgGmvPerSession))}</strong></div>
                 <div>CVR TB: <strong className="text-[var(--accent-text)] block text-sm font-bold">{detailTalent.cvrAvg || 0}%</strong></div>
                 <div>CTR TB: <strong className="text-[var(--accent-text)] block text-sm font-bold">{detailTalent.ctrAvg || 0}%</strong></div>
-                <div>Trạng Thái: <strong className="text-[var(--text)] block text-sm font-bold">{detailTalent.availabilityStatus || "Available"}</strong></div>
+                <div>Trạng Thái: <strong className="text-[var(--text)] block text-sm font-bold">{statusLabel(detailTalent.availabilityStatus || "Available")}</strong></div>
               </div>
 
               {canSeeRate && (

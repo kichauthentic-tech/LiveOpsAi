@@ -138,8 +138,9 @@ export const SessionEventCard: React.FC<SessionEventCardProps> = ({
 
       {/* Hàng 2: giờ (thông tin quan trọng nhất, để to nhất) + nhãn trạng thái. Nhãn nằm ở đây chứ
           không ở hàng brand vì hàng giờ luôn ngắn — để tên brand không bị cắt oan ở ô hẹp.
-          Ô hẹp (<xl) chỉ đủ chỗ cho giờ bắt đầu. */}
-      <div className="flex items-center gap-1 mt-0.5 min-w-0">
+          Ô hẹp (<xl) chỉ đủ chỗ cho giờ bắt đầu. Không đủ chỗ cho cả giờ lẫn nhãn thì NHÃN xuống dòng
+          (flex-wrap) — trước đây giờ bị cắt thành "20:00 ..." ở cả 47/47 thẻ Lịch brand 1440px (audit UX 2026-09-29). */}
+      <div className="flex flex-wrap items-center gap-x-1 gap-y-0.5 mt-0.5 min-w-0">
         <span
           className={`font-black tabular-nums leading-tight whitespace-nowrap truncate ${
             compact ? "text-[11px] xl:text-[12px]" : "text-sm"

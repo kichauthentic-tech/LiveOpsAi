@@ -23,6 +23,7 @@ import {
 import { useConfirm, usePrompt } from "../hooks/useConfirm";
 import { PageIntro } from "./common/PageIntro";
 import { fmtVndShort } from "../lib/format";
+import { MonthPicker } from "./common/MonthPicker";
 
 interface BrandCommitmentProps {
   sessions: LiveSession[];
@@ -258,7 +259,7 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-base font-black text-[var(--text)]">Cam Kết Hợp Đồng</h2>
+            <h2 className="text-lg font-black text-[var(--text)]">Cam Kết Hợp Đồng</h2>
             <PageIntro>
               Brand cam kết bao nhiêu giờ live mỗi tháng, và tới giờ đã giao được bao nhiêu. Đây là câu trả lời cho việc sắp lịch:
               còn thiếu bao nhiêu giờ phải xếp thêm, cho brand nào, trước khi hết tháng.
@@ -504,20 +505,25 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
                 </label>
                 <label className="flex flex-col gap-1">
                   <span className="text-[11px] text-[var(--text-faint)]">Từ tháng</span>
-                  <input
-                    type="month"
+                  <MonthPicker
                     value={draft.startMonth.slice(0, 7)}
-                    onChange={(e) => setDraft({ ...draft, startMonth: `${e.target.value}-01` })}
-                    className={inputCls}
+                    onChange={(m) => setDraft({ ...draft, startMonth: `${m}-01` })}
+                    arrows={false}
+                    align="left"
+                    ariaLabel="Từ tháng"
                   />
                 </label>
                 <label className="flex flex-col gap-1">
                   <span className="text-[11px] text-[var(--text-faint)]">Đến tháng (trống = chưa chốt)</span>
-                  <input
-                    type="month"
+                  <MonthPicker
                     value={draft.endMonth ? draft.endMonth.slice(0, 7) : ""}
-                    onChange={(e) => setDraft({ ...draft, endMonth: e.target.value ? `${e.target.value}-01` : "" })}
-                    className={inputCls}
+                    onChange={(m) => setDraft({ ...draft, endMonth: m ? `${m}-01` : "" })}
+                    min={draft.startMonth.slice(0, 7) || undefined}
+                    arrows={false}
+                    allowEmpty
+                    emptyLabel="Chưa chốt"
+                    align="left"
+                    ariaLabel="Đến tháng"
                   />
                 </label>
                 <label className="flex flex-col gap-1">

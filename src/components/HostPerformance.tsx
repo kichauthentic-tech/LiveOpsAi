@@ -63,7 +63,7 @@ export function HostPerformance({ sessions, brands }: HostPerformanceProps) {
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-base font-black text-[var(--text)]">Hiệu Suất Host</h2>
+            <h2 className="text-lg font-black text-[var(--text)]">Hiệu Suất Host</h2>
             <PageIntro>
               Đọc từ số liệu ca đã có, để trả lời câu hỏi khi sắp lịch: host nào hiệu quả nhất với brand nào, và mạnh nhất vào thứ mấy.
               Đây là số liệu tham khảo cho ops tự quyết, app không tự xếp lịch.

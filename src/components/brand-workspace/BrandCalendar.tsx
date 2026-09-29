@@ -23,6 +23,7 @@ import {
 import { getBrandTheme } from "../../lib/brandTheme";
 import { SESSION_STATUS_LABEL_VI } from "../../lib/sessionStatusUi";
 import { metricsHiddenFor } from "../../lib/sessionLedger";
+import { MonthPicker } from "../common/MonthPicker";
 
 interface BrandCalendarProps {
   brandId: string;
@@ -72,12 +73,6 @@ const STATUS_TIER: Record<LiveSession["status"], EventPillTier> = {
   Upcoming: "teal_gradient",
   Completed: "green_flag",
   Cancelled: "white_box"
-};
-
-const shiftMonth = (month: string, delta: number) => {
-  const [y, m] = month.split("-").map(Number);
-  const d = new Date(y, m - 1 + delta, 1);
-  return `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, "0")}`;
 };
 
 const shiftDay = (dateStr: string, delta: number) => {
@@ -345,24 +340,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
             </div>
             {viewMode === "month" ? (
               <>
-                <button
-                  onClick={() => setMonth((mo) => shiftMonth(mo, -1))}
-                  className="p-2 rounded-xl bg-[var(--surface-base)]/60 border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] hover:border-[var(--text-faint)] transition-colors"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <input
-                  type="month"
-                  value={month}
-                  onChange={(e) => setMonth(e.target.value)}
-                  className="bg-[var(--surface-base)]/60 border border-[var(--border)] rounded-xl px-3 py-2 text-[var(--text)] font-mono text-sm focus:outline-none focus:border-[var(--accent)]"
-                />
-                <button
-                  onClick={() => setMonth((mo) => shiftMonth(mo, 1))}
-                  className="p-2 rounded-xl bg-[var(--surface-base)]/60 border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] hover:border-[var(--text-faint)] transition-colors"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
+                <MonthPicker value={month} onChange={setMonth} />
               </>
             ) : (
               <>

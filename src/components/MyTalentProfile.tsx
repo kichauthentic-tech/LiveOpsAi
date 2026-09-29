@@ -1,13 +1,15 @@
 import React, { useMemo, useState } from "react";
 import { SystemUser, Talent, LiveSession, SessionFinance, TalentRateHistoryEntry } from "../types";
 import { useAuth } from "../hooks/useAuth";
-import { User, Phone, Cake, Mail, Loader2, Lock, ShieldAlert, Award, Wallet, ChevronLeft, ChevronRight } from "lucide-react";
+import { User, Phone, Cake, Mail, Loader2, Lock, ShieldAlert, Award, Wallet } from "lucide-react";
 import { computeRealAvgGmvPerSession } from "../lib/metrics/avgGmv";
 import { computeTalentMonthlyIncome } from "../lib/pnl";
 import { todayVn } from "../lib/performance/brandCommitment";
 import { errorMessage } from "../lib/errorMessage";
 
 import { fmtFixed, fmtVndShort, fmtVndFull } from "../lib/format";
+import { MonthPicker } from "./common/MonthPicker";
+import { PageHeader } from "./common/PageHeader";
 interface MyTalentProfileProps {
   activeUser: SystemUser;
   talents: Talent[];
@@ -35,11 +37,6 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
   const myTalent = talents.find((t) => t.id === activeUser.assignedTalentId);
 
   const [incomeMonth, setIncomeMonth] = useState(() => todayVn().slice(0, 7));
-  const shiftIncomeMonth = (delta: number) => {
-    const [y, m] = incomeMonth.split("-").map(Number);
-    const d = new Date(y, m - 1 + delta, 1);
-    setIncomeMonth(`${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, "0")}`);
-  };
 
   const financeBySessionId = useMemo(() => {
     const map: Record<string, SessionFinance> = {};
@@ -125,10 +122,7 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
 
   return (
     <div className="space-y-6 max-w-2xl">
-      <div>
-        <h1 className="text-xl font-black text-[var(--text)]">Hồ Sơ Của Tôi</h1>
-        <p className="text-xs text-[var(--text-faint)] mt-1">Xem hiệu suất, thù lao của bạn và tự cập nhật thông tin liên hệ.</p>
-      </div>
+      <PageHeader icon={User} title="Hồ Sơ Của Tôi" description="Xem hiệu suất, thù lao của bạn và tự cập nhật thông tin liên hệ." />
 
       {/* Thông tin tự sửa */}
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-6 space-y-4">
@@ -332,15 +326,7 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
             <Wallet className="w-4 h-4 text-[var(--accent-text)]" />
             Thu Nhập Tháng Này
           </div>
-          <div className="flex items-center gap-1">
-            <button onClick={() => shiftIncomeMonth(-1)} className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--surface-elevated)]">
-              <ChevronLeft className="w-3.5 h-3.5" />
-            </button>
-            <span className="text-xs font-bold text-[var(--text)] w-20 text-center">{incomeMonth}</span>
-            <button onClick={() => shiftIncomeMonth(1)} className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--surface-elevated)]">
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          <MonthPicker value={incomeMonth} onChange={setIncomeMonth} size="sm" />
         </div>
 
         {myTalent.rateHidden ? (

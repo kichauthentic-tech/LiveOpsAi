@@ -4,6 +4,8 @@ import { Building2, Camera, QrCode, Plus, Edit3, Trash2, X, Search } from "lucid
 import { getTodayDate } from "../lib/dateUtils";
 import { useToast } from "../hooks/useToast";
 import { useConfirm } from "../hooks/useConfirm";
+import { statusLabel } from "../lib/statusLabels";
+import { PageHeader } from "./common/PageHeader";
 
 interface StudioEquipmentProps {
   studios: Studio[];
@@ -215,13 +217,11 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Top Banner */}
-      <div className="bg-[var(--surface)] text-[var(--text)] p-6 rounded-2xl border border-[var(--border)] shadow-xl space-y-2">
-        <span className="text-[var(--accent-text)] font-semibold text-xs uppercase tracking-wider block flex items-center gap-1.5">
-          <Building2 className="w-4 h-4 text-[var(--accent-text)]" /> Tài Nguyên Chung
-        </span>
-        <h2 className="text-2xl font-black">Studios & Gear</h2>
-      </div>
+      <PageHeader
+        icon={Building2}
+        title="Studios & Gear"
+        description="Phòng live và thiết bị của agency: trạng thái phòng, sức chứa, giờ hoạt động và thiết bị đang gắn vào từng phòng."
+      />
 
       {/* Sub Tabs */}
       <div className="flex space-x-2 text-xs font-bold border-b border-[var(--border)] pb-2">
@@ -275,7 +275,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
                         s.status === "Booked" ? "bg-amber-500/20 text-amber-300" :
                         s.status === "Maintenance" ? "bg-[var(--surface-hover)] text-[var(--text-muted)]" : "bg-emerald-500/20 text-emerald-300"
                       }`}>
-                        {s.status}
+                        {statusLabel(s.status)}
                       </span>
 
                       <button
@@ -429,7 +429,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
                         eq.status === "Maintenance" ? "bg-amber-500/20 text-amber-300" :
                         eq.status === "Damaged" ? "bg-red-500/20 text-red-300" : "bg-emerald-500/20 text-emerald-300"
                       }`}>
-                        {eq.status}
+                        {statusLabel(eq.status)}
                       </span>
                       <button
                         onClick={() => openEditEquipmentModal(eq)}
@@ -529,10 +529,10 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
                     onChange={(e) => setStudioStatus(e.target.value as "Live Now" | "Booked" | "Available" | "Maintenance")}
                     className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
                   >
-                    <option value="Available">Available (Trống)</option>
-                    <option value="Booked">Booked (Đã Đặt)</option>
-                    <option value="Live Now">Live Now (Đang Phát)</option>
-                    <option value="Maintenance">Maintenance (Bảo Trì)</option>
+                    <option value="Available">Sẵn sàng</option>
+                    <option value="Booked">Đã đặt</option>
+                    <option value="Live Now">Đang live</option>
+                    <option value="Maintenance">Bảo trì</option>
                   </select>
                 </div>
                 <div>
@@ -650,10 +650,10 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
                     onChange={(e) => setEqStatus(e.target.value as "In Use" | "In Stock" | "Maintenance" | "Damaged")}
                     className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
                   >
-                    <option value="In Stock">In Stock (Trong Kho)</option>
-                    <option value="In Use">In Use (Đang Sử Dụng)</option>
-                    <option value="Maintenance">Maintenance (Đang Bảo Trì)</option>
-                    <option value="Damaged">Damaged (Báo Hỏng)</option>
+                    <option value="In Stock">Trong kho</option>
+                    <option value="In Use">Đang dùng</option>
+                    <option value="Maintenance">Bảo trì</option>
+                    <option value="Damaged">Hỏng</option>
                   </select>
                 </div>
               </div>

@@ -22,6 +22,7 @@ import { SessionReportInput } from "../lib/db/sessionReports";
 import { Calendar as CalendarIcon, Building2, User, Plus, AlertTriangle, CheckCircle2, Search, X, ChevronLeft, ChevronRight, Tag, GripVertical } from "lucide-react";
 
 import { fmtVndShort } from "../lib/format";
+import { PageHeader } from "./common/PageHeader";
 interface LiveCalendarProps {
   sessions: LiveSession[];
   shiftSlots?: ShiftSlot[];
@@ -459,26 +460,19 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* Top Banner */}
-      <div className="bg-[var(--surface)] border border-[var(--border)] p-4 sm:p-6 rounded-2xl shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div className="space-y-1">
-          <span className="text-[var(--accent-text)] font-semibold text-[11px] sm:text-xs uppercase tracking-wider flex items-center gap-1.5">
-            <CalendarIcon className="w-4 h-4 text-[var(--accent-text)] shrink-0" /> Vận Hành Live
-          </span>
-          <h2 className="text-xl sm:text-2xl font-black text-[var(--text)] tracking-tight">
-            Lịch Vận Hành
-          </h2>
-        </div>
-
-        <div className="flex items-center gap-3">
+      <PageHeader
+        icon={CalendarIcon}
+        title="Lịch Vận Hành"
+        description="Ca live theo tháng, tuần, phòng studio và host — mở ca chờ đăng ký, kéo thả thẻ ca để đổi giờ hoặc đổi phòng."
+        actions={
           <button
             onClick={() => setSlotModal({ date: selectedDate })}
             className="w-full sm:w-auto bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-[var(--accent)]/20 transition-all active:scale-95"
           >
             <Plus className="w-4 h-4" /> Mở ca chờ đăng ký
           </button>
-        </div>
-      </div>
+        }
+      />
 
       {/* Primary Navigation & Date View Control Bar */}
       <div className="bg-[var(--surface)]/90 border border-[var(--border)] p-3 sm:p-4 rounded-2xl flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">

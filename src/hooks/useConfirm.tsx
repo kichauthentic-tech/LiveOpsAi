@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useState } from "react";
 import { AlertTriangle } from "lucide-react";
+import { MonthPicker } from "../components/common/MonthPicker";
 
 // Thay window.confirm() (đợt dọn nợ kỹ thuật, tiếp theo useToast.tsx). window.confirm() là dialog
 // CHẶN — không test/automation được (Browser pane tự nuốt, trả về false ngay), không style được
@@ -25,7 +26,7 @@ const ConfirmContext = createContext<ConfirmFn | undefined>(undefined);
 
 // Thay window.prompt() (2 chỗ cuối cùng, audit UX 2026-09-26) — cùng lý do như confirm ở trên, thêm:
 // prompt() chỉ nhận chữ tự do nên ô "tháng"/"giờ" phải gõ tay đúng định dạng; ở đây dùng được
-// input type="month"/"time" có sẵn bộ chọn của trình duyệt.
+// bộ chọn tháng (MonthPicker) / ô giờ của trình duyệt.
 interface PromptOptions {
   defaultValue?: string;
   inputType?: "text" | "month" | "time";
@@ -62,14 +63,19 @@ const PromptDialog: React.FC<{ state: PromptState; onSubmit: (value: string) => 
       >
         <label className="block space-y-2">
           <span className="block text-xs text-[var(--text)] leading-relaxed whitespace-pre-line">{state.message}</span>
-          <input
-            autoFocus
-            type={state.inputType ?? "text"}
-            value={value}
-            placeholder={state.placeholder}
-            onChange={(e) => setValue(e.target.value)}
-            className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)]"
-          />
+          {/* Tháng: bộ chọn tự vẽ — ô type="month" của trình duyệt là ô gõ chữ trên Safari/Firefox (audit UX 2026-09-29). */}
+          {state.inputType === "month" ? (
+            <MonthPicker value={value} onChange={setValue} align="left" />
+          ) : (
+            <input
+              autoFocus
+              type={state.inputType ?? "text"}
+              value={value}
+              placeholder={state.placeholder}
+              onChange={(e) => setValue(e.target.value)}
+              className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)]"
+            />
+          )}
         </label>
         <div className="flex items-center justify-end gap-2">
           <button

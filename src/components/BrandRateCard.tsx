@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { BrandPlatformRate, BrandPlatformRateHistoryEntry, LiveSession, UserRole } from "../types";
 import { Tag, History } from "lucide-react";
 import { fmtVndFull } from "../lib/format";
+import { PageHeader } from "./common/PageHeader";
 
 interface BrandRateCardProps {
   brandId: string;
@@ -101,9 +102,11 @@ export const BrandRateCard: React.FC<BrandRateCardProps> = ({
 
   return (
     <div className="space-y-5">
-      <h2 className="text-lg font-bold text-[var(--text)] flex items-center gap-2">
-        <Tag className="w-5 h-5 text-[var(--accent-text)]" /> Rate Card
-      </h2>
+      <PageHeader
+        icon={Tag}
+        title="Rate Card"
+        description="Đơn giá agency tính cho brand theo từng nền tảng: phí mỗi giờ live, tỉ lệ hoàn hủy dùng để ước NMV, và % hoa hồng."
+      />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {PLATFORMS.map((platform) => {

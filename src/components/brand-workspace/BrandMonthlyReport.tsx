@@ -25,6 +25,7 @@ import { DataRawImportStamp, fetchDataRawImportStamps } from "../../lib/db/brand
 import { buildMonthlyReportSnapshot, COVERAGE_TYPES, snapshotFreshness, snapshotHeadline, SnapshotHeadline } from "../../lib/report/monthlySnapshot";
 import { fmtVndShort } from "../../lib/format";
 import { PageIntro } from "../common/PageIntro";
+import { MonthPicker } from "../common/MonthPicker";
 
 // Report Tuần không còn là tab riêng ở menu (2026-08-23) — gộp làm chế độ xem "Tuần" ngay trong
 // Report Tháng qua toggle bên dưới, tái dùng nguyên BrandWeeklyReport.tsx (đã tự chặn quyền qua
@@ -300,12 +301,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
             <h2 className="text-2xl font-black">Báo Cáo {brandName} — {month}</h2>
           </div>
           <div className="flex items-center gap-2">
-            <input
-              type="month"
-              value={month}
-              onChange={(e) => setMonth(e.target.value)}
-              className="p-2 border border-[var(--border)] rounded-xl font-semibold text-[var(--text)] bg-[var(--surface-base)]"
-            />
+            <MonthPicker value={month} onChange={setMonth} />
             {report && (
               <span
                 className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full border ${

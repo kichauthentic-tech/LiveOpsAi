@@ -13,6 +13,7 @@ import { fmtVndShort } from "../../lib/format";
 import { metricsHiddenFor } from "../../lib/sessionLedger";
 import { downloadRowsAsXlsx } from "../../lib/exportXlsx";
 import { useToast } from "../../hooks/useToast";
+import { PageHeader } from "../common/PageHeader";
 
 // Cam Kết Hợp Đồng — bản CHỈ ĐỌC cho Brand Workspace (Đợt C/1, migration 0108).
 //
@@ -193,31 +194,31 @@ export const BrandCommitmentView: React.FC<BrandCommitmentViewProps> = ({
 
   return (
     <div className="space-y-5">
-      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 sm:p-6 shadow-xl space-y-2">
-        <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div>
-            <span className="text-[var(--accent-text)] font-semibold text-xs uppercase tracking-wider flex items-center gap-1.5">
-              <FileSignature className="w-4 h-4" /> Cam Kết Hợp Đồng
-            </span>
-            <h2 className="text-2xl font-black text-[var(--text)]">
-              {brandName}
-              {contractCode && <span className="ml-2 text-sm font-bold text-[var(--text-faint)]">· {contractCode}</span>}
-            </h2>
-          </div>
-          {progress.length > 0 && (
+      <PageHeader
+        icon={FileSignature}
+        title={
+          <>
+            Cam Kết Hợp Đồng · {brandName}
+            {contractCode && <span className="ml-2 text-sm font-bold text-[var(--text-faint)]">· {contractCode}</span>}
+          </>
+        }
+        description={
+          <>
+            Số giờ lên sóng cam kết mỗi tháng và tiến độ thực hiện. Giờ tính theo <b>khung giờ ca đã chốt</b> — cùng loại giờ
+            dùng để đối chiếu hợp đồng.
+          </>
+        }
+        actions={
+          progress.length > 0 && (
             <button
               onClick={handleExport}
               className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface-base)] text-[var(--text-muted)] hover:text-[var(--text)] hover:border-[var(--accent)] transition-colors"
             >
               <Download className="w-3.5 h-3.5" /> Xuất Excel
             </button>
-          )}
-        </div>
-        <p className="text-xs text-[var(--text-muted)] max-w-3xl">
-          Số giờ lên sóng cam kết mỗi tháng và tiến độ thực hiện. Giờ tính theo <b>khung giờ ca đã chốt</b> — cùng loại giờ
-          dùng để đối chiếu hợp đồng.
-        </p>
-      </div>
+          )
+        }
+      />
 
       {errorMsg && (
         <div className="p-3 bg-red-950/80 border border-red-800/50 rounded-xl text-red-300 text-xs font-semibold">{errorMsg}</div>

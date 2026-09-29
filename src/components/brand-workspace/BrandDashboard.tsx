@@ -32,6 +32,7 @@ import { fmtVndShort } from "../../lib/format";
 import { METRIC, metricHint } from "../../lib/metricGlossary";
 import { PageIntro } from "../common/PageIntro";
 import OpsSupport from "../OpsSupport";
+import { MonthPicker } from "../common/MonthPicker";
 
 // Dashboard brand (2026-09-28) — màn TRONG tháng cho ops: tháng này tới đâu, vì sao, tuần tới / tháng sau
 // sửa gì. Report Tháng vẫn là bản chụp SAU tháng gửi brand; hai màn dùng CHUNG hàm (compareWindow,
@@ -210,7 +211,6 @@ export default function BrandDashboard({ brandId, brandName, sessions, shiftSlot
 
   const noHost = monthSessions.filter((s) => isCountable(s) && !s.hostName).length;
   const noData = monthSessions.filter((s) => s.status === "Completed" && !isCountable(s)).length;
-  const inputCls = "bg-[var(--surface-base)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-mono";
 
 
   const caRows: { key: string; date: string; time: string; bucket: CampDayBucket; host: string; target: number | null; actual: number | null; pctTarget: number | null; state: PlanRunRateSlot["state"] | "offplan"; sessionId?: string }[] = rr
@@ -250,8 +250,8 @@ export default function BrandDashboard({ brandId, brandName, sessions, shiftSlot
     <div className="space-y-4 sm:space-y-6">
       <div className="bg-[var(--surface)] border border-[var(--border)] p-4 sm:p-6 rounded-2xl shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl sm:text-2xl font-black text-[var(--text)] flex items-center gap-2">
-            <LayoutDashboard className="w-6 h-6 text-[var(--accent-text)]" /> Dashboard · {brandName}
+          <h2 className="text-lg font-black text-[var(--text)] flex items-center gap-2">
+            <LayoutDashboard className="w-5 h-5 text-[var(--accent-text)]" /> Dashboard · {brandName}
           </h2>
           <PageIntro>
             Tháng này tới đâu so với target plan, vì sao, và {isOps ? "tuần tới / tháng sau nên sửa gì. Đề xuất chỉ dùng quy tắc đã qua backtest trên lịch sử của chính brand." : "nhịp theo tuần. Số của tháng hiện ra khi ops phát hành Report Tháng."}
@@ -263,7 +263,7 @@ export default function BrandDashboard({ brandId, brandName, sessions, shiftSlot
               Số liệu tới {dm(through)}{lagDays > 0 ? ` · trễ ${lagDays} ngày` : ""}
             </span>
           )}
-          <input type="month" value={month} onChange={(e) => e.target.value && setPickedMonth(e.target.value)} className={inputCls} aria-label="Tháng" />
+          <MonthPicker value={month} onChange={setPickedMonth} ariaLabel="Tháng" />
         </div>
       </div>
 

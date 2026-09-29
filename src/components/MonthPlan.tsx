@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Brand, BrandMonthPlan, BrandMonthPlanSlot, BrandMonthlyCommitment, BrandStudio, CalendarEventRow, LiveSession, PlanCampRanges, PromoScheme, RecurringShiftTemplate, ShiftSlot, Studio } from "../types";
-import { AlertTriangle, Ban, CalendarRange, ChevronLeft, ChevronRight, Lock, Plus, Repeat, Save, Sparkles, Trash2, Wand2, X } from "lucide-react";
+import { AlertTriangle, Ban, CalendarRange, Lock, Plus, Repeat, Save, Sparkles, Trash2, Wand2, X } from "lucide-react";
 import { fetchBrandMonthlyCommitments } from "../lib/db/brandContracts";
 import { errorMessage } from "../lib/errorMessage";
 import { PlanSettings, deleteMonthPlan, fetchBrandLockedPlanSlots, fetchCalendarEvents, fetchMonthPlan, fetchPlanStatuses, lockMonthPlan, replacePlanSlots, upsertMonthPlan } from "../lib/db/monthPlans";
@@ -29,6 +29,7 @@ import { useConfirm } from "../hooks/useConfirm";
 import { PageIntro } from "./common/PageIntro";
 
 import { fmtFixed, fmtVndShort, fmtVndFull } from "../lib/format";
+import { MonthPicker } from "./common/MonthPicker";
 interface MonthPlanProps {
   brands: Brand[];
   studios: Studio[];
@@ -506,7 +507,7 @@ export default function MonthPlan({
     <div className="space-y-6">
       <div className="bg-[var(--surface)] border border-[var(--border)] p-4 sm:p-6 rounded-2xl shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-[var(--text)] flex items-center gap-2">
+          <h2 className="text-lg font-black text-[var(--text)] flex items-center gap-2">
             <CalendarRange className="w-5 h-5 text-blue-400" />
             Kế Hoạch Tháng
           </h2>
@@ -518,9 +519,7 @@ export default function MonthPlan({
           <select value={brandId} onChange={(e) => setBrandId(e.target.value)} className="bg-[var(--surface-base)] border border-[var(--border)] rounded-xl px-3 py-2 text-[var(--text)] text-sm font-bold">
             {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
-          <button onClick={() => setMonth((m) => nextMonthOf(m, -1))} className="p-2 rounded-xl bg-[var(--surface-base)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]" title="Tháng trước"><ChevronLeft className="w-4 h-4" /></button>
-          <input type="month" value={month} onChange={(e) => e.target.value && setMonth(e.target.value)} className="bg-[var(--surface-base)] border border-[var(--border)] rounded-xl px-3 py-2 text-[var(--text)] font-mono text-sm" />
-          <button onClick={() => setMonth((m) => nextMonthOf(m, 1))} className="p-2 rounded-xl bg-[var(--surface-base)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]" title="Tháng sau"><ChevronRight className="w-4 h-4" /></button>
+          <MonthPicker value={month} onChange={setMonth} />
         </div>
       </div>
 
@@ -580,11 +579,13 @@ export default function MonthPlan({
                 setDirty(true);
               };
               return (
-                <div key={k} className="flex items-center gap-1.5">
-                  <span className="w-20 text-[var(--text)]">{CAMP_RANGE_LABEL[k]}</span>
-                  <input type="date" disabled={!editable} value={r?.start ?? ""} onChange={(e) => setRange(e.target.value, r?.end ?? e.target.value)} className="flex-1 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-1.5 py-1 text-[11px] text-[var(--text)] font-mono disabled:opacity-60" />
+                // Điện thoại: nhãn lên dòng riêng + ô ngày được co (min-w-0) — 2 ô date giữ bề rộng tự nhiên
+                // 156px làm cả trang tràn ngang 31px ở 375px (audit UX 2026-09-29).
+                <div key={k} className="flex flex-wrap sm:flex-nowrap items-center gap-1.5">
+                  <span className="w-full sm:w-20 text-[var(--text)]">{CAMP_RANGE_LABEL[k]}</span>
+                  <input type="date" disabled={!editable} value={r?.start ?? ""} onChange={(e) => setRange(e.target.value, r?.end ?? e.target.value)} className="flex-1 min-w-0 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-1.5 py-1 text-[11px] text-[var(--text)] font-mono disabled:opacity-60" />
                   <span className="text-[var(--text-faint)]">→</span>
-                  <input type="date" disabled={!editable} value={r?.end ?? ""} onChange={(e) => setRange(r?.start ?? e.target.value, e.target.value)} className="flex-1 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-1.5 py-1 text-[11px] text-[var(--text)] font-mono disabled:opacity-60" />
+                  <input type="date" disabled={!editable} value={r?.end ?? ""} onChange={(e) => setRange(r?.start ?? e.target.value, e.target.value)} className="flex-1 min-w-0 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-1.5 py-1 text-[11px] text-[var(--text)] font-mono disabled:opacity-60" />
                   {r && editable && <button onClick={() => setRange("", "")} className="text-[var(--text-faint)] hover:text-rose-400" title="Bỏ, dùng lịch cố định"><X className="w-3 h-3" /></button>}
                 </div>
               );

@@ -95,7 +95,7 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
       <div className="bg-[var(--surface)] text-[var(--text)] p-6 rounded-2xl border border-[var(--border)] shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <span className="text-sky-400 font-semibold text-xs uppercase tracking-wider flex items-center gap-1.5"><Sparkles className="w-4 h-4" /> Không phải LLM — thuật toán thuần</span>
-          <h2 className="text-2xl font-black">Engine Kế Hoạch Tháng</h2>
+          <h2 className="text-lg font-black">Engine Kế Hoạch Tháng</h2>
           <p className="text-xs text-[var(--text-muted)] mt-1 max-w-2xl">
             Engine gợi ý lịch học từ ca đã đối soát rồi xếp ca theo tham số bên dưới. Không có prompt để sửa: "huấn luyện" = xem engine học được gì theo brand, vặn tham số, thấy kết quả đổi ngay, rồi lưu. Kết quả lặp lại được và giải thích được — cần thế khi chốt lịch cho host.
           </p>

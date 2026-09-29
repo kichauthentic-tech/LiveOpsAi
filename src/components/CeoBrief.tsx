@@ -53,6 +53,7 @@ import { fmtVndShort } from "../lib/format";
 import { fmtKeyMetric, KEY_METRICS, keyMetricValue } from "../lib/report/keyMetrics";
 import { BrandLogo } from "./ui/BrandLogo";
 import { PageIntro } from "./common/PageIntro";
+import { MonthPicker } from "./common/MonthPicker";
 
 // Bản Tin CEO (2026-09-25) — thay Toàn Cảnh Agency. Mọi luật số nằm ở lib/performance/ceoBrief.ts;
 // file này chỉ trình bày. Khối tiền chỉ ceo/admin thấy, và chỉ cộng ca ĐỦ dữ liệu để tính tiền
@@ -301,8 +302,8 @@ export default function CeoBrief(props: CeoBriefProps) {
       <Card className="!p-4 sm:!p-6 space-y-4">
         <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-3">
           <div>
-            <h2 className="text-xl sm:text-2xl font-black text-[var(--text)] flex items-center gap-2">
-              <LayoutDashboard className="w-6 h-6 text-[var(--accent-text)]" /> Dashboard
+            <h2 className="text-lg font-black text-[var(--text)] flex items-center gap-2">
+              <LayoutDashboard className="w-5 h-5 text-[var(--accent-text)]" /> Dashboard
             </h2>
             <PageIntro>
               Toàn cảnh agency và từng tài khoản: GMV, target, dự phóng cuối tháng, ngày campaign, nhân sự{canSeeMoney ? " và tiền" : ""}. So sánh luôn cắt về cùng số ngày có số liệu.
@@ -332,7 +333,7 @@ export default function CeoBrief(props: CeoBriefProps) {
             <div className="inline-flex items-center gap-1">
               <button onClick={() => shift(-1)} className="p-2 rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]" aria-label="Kỳ trước"><ChevronLeft className="w-4 h-4" /></button>
               {grain === "day" && <input type="date" value={anchor} max={today} onChange={(e) => e.target.value && setAnchor(e.target.value)} className={`${inputCls} font-mono`} aria-label="Ngày" />}
-              {grain === "month" && <input type="month" value={anchor.slice(0, 7)} max={today.slice(0, 7)} onChange={(e) => e.target.value && setAnchor(`${e.target.value}-01`)} className={`${inputCls} font-mono`} aria-label="Tháng" />}
+              {grain === "month" && <MonthPicker value={anchor.slice(0, 7)} max={today.slice(0, 7)} onChange={(m) => setAnchor(`${m}-01`)} arrows={false} ariaLabel="Tháng" />}
               {grain === "week" && <span className="px-2 text-sm font-bold text-[var(--text)]">{ddmm(period.start)} – {ddmm(period.calendarEnd)}</span>}
               <button onClick={() => shift(1)} disabled={!canNext} className="p-2 rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] disabled:opacity-30" aria-label="Kỳ sau"><ChevronRight className="w-4 h-4" /></button>
             </div>
@@ -814,6 +815,12 @@ const CampaignSection: React.FC<{ outlook: MonthOutlook; month: string; sessions
 
 // ---------------------------------------------------------------------------
 
+// Cột bảng xếp hạng nhân sự. < sm (điện thoại) bỏ cột thanh GMV/giờ: 6 cột tối thiểu cộng 382px, rộng hơn
+// thẻ ở 375px ⇒ cả trang tràn ngang 36px (audit UX 2026-09-29). Tiêu đề cột trên điện thoại không viết hoa
+// giãn chữ — "SESSIONS" viết hoa rộng ~56px, đè sang cột bên cạnh.
+const STAFF_COLS =
+  "grid-cols-[minmax(0,1fr)_52px_40px_52px_44px] gap-1.5 sm:gap-2 sm:grid-cols-[minmax(90px,1.3fr)_32px_44px_minmax(60px,1.6fr)_52px_64px]";
+
 const StaffList: React.FC<{ title: string; data: ReturnType<typeof hostRows>; unassignedLabel: string }> = ({ title, data, unassignedLabel }) => {
   const max = niceMax(Math.max(data.average ?? 0, ...data.rows.map((r) => r.totals.gmvPerHour ?? 0)));
   const avg = data.average ?? 0;
@@ -824,18 +831,18 @@ const StaffList: React.FC<{ title: string; data: ReturnType<typeof hostRows>; un
         <p className="text-sm text-[var(--text-faint)]">Không có ca nào trong kỳ.</p>
       ) : (
         <div className="text-xs">
-          <div className="grid grid-cols-[minmax(90px,1.3fr)_32px_44px_minmax(60px,1.6fr)_52px_64px] gap-2 pb-1 text-[11px] uppercase tracking-wider font-bold text-[var(--text-faint)]">
-            <span>Tên</span><span className="text-right">Sessions</span><span className="text-right">Giờ live</span><span>GMV/giờ</span><span /><span className="text-right">Kỳ trước</span>
+          <div className={`grid ${STAFF_COLS} pb-1 text-[11px] sm:uppercase sm:tracking-wider font-bold text-[var(--text-faint)]`}>
+            <span>Tên</span><span className="text-right">Sessions</span><span className="text-right">Giờ live</span><span className="hidden sm:block">GMV/giờ</span><span className="text-right sm:invisible">GMV/giờ</span><span className="text-right">Kỳ trước</span>
           </div>
           {data.rows.map((r) => {
             const g = r.totals.gmvPerHour ?? 0;
             return (
-              <div key={r.key} className="grid grid-cols-[minmax(90px,1.3fr)_32px_44px_minmax(60px,1.6fr)_52px_64px] gap-2 items-center py-1.5 border-t border-[var(--border)]"
+              <div key={r.key} className={`grid ${STAFF_COLS} items-center py-1.5 border-t border-[var(--border)]`}
                 data-tip={`${r.name}\n${r.totals.sessions} ca · ${hrs(r.totals.hours)} (${pct(r.hoursShare)} giờ kỳ)\nGMV ${money(r.totals.gmv)} · ${money(g)}/giờ\nTrung bình: ${money(avg)}/giờ`}>
                 <span className="truncate text-[var(--text)] font-bold">{r.name}{r.hoursShare > 0.3 && <span className="ml-1 text-amber-300 text-[11px]">! {pct(r.hoursShare)} giờ</span>}</span>
                 <span className="text-right text-[var(--text-muted)]">{r.totals.sessions}</span>
                 <span className="text-right text-[var(--text-muted)]">{Math.round(r.totals.hours)}h</span>
-                <span className="relative h-4">
+                <span className="relative h-4 hidden sm:block">
                   <span className="absolute left-0 top-[3px] h-2.5 rounded-r" style={{ width: `${(g / max) * 100}%`, background: g >= avg ? "var(--accent)" : "var(--text-faint)" }} />
                   <span className="absolute top-0 bottom-0 w-px bg-[var(--text-muted)]" style={{ left: `${(avg / max) * 100}%` }} />
                 </span>

@@ -9,6 +9,8 @@ import { errorMessage } from "../../lib/errorMessage";
 import { ReportPlanningInputs } from "./ReportPlanningInputs";
 
 import { fmtFixed, fmtVndShort } from "../../lib/format";
+import { MonthPicker } from "../common/MonthPicker";
+import { PageHeader } from "../common/PageHeader";
 // Nhập Ads & Ghi Chú (tách khỏi Report Tháng 2026-09-21 theo yêu cầu user): phần ops nhập tay
 // Ads Spend bổ sung / ROAS ghi đè / Promotion / Customer Insight / Account Health trước đây nằm
 // cuối Report Tháng, lẫn với tài liệu gửi brand. Giờ là tab riêng trong Brand Workspace, chỉ
@@ -178,33 +180,21 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
 
   return (
     <div className="space-y-5">
-      <div className="bg-[var(--surface)] text-[var(--text)] p-6 rounded-2xl border border-[var(--border)] shadow-xl space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <span className="text-[var(--accent-text)] font-semibold text-xs uppercase tracking-wider block flex items-center gap-1.5">
-              <Megaphone className="w-4 h-4 text-[var(--accent-text)]" /> Nhập Ads & Ghi Chú
-            </span>
-            <h2 className="text-2xl font-black">{brandName} — {month}</h2>
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="month"
-              value={month}
-              onChange={(e) => setMonth(e.target.value)}
-              className="p-2 border border-[var(--border)] rounded-xl font-semibold text-[var(--text)] bg-[var(--surface-base)]"
-            />
+      <PageHeader
+        icon={Megaphone}
+        title={`Nhập Ads & Ghi Chú · ${brandName}`}
+        description={`Ads cost/ROAS tính máy từ Report Ca ở trên; phần bổ sung và ghi chú nhập tay ở dưới (không có API TikTok Shop cho các phần này). Số lưu ở đây đi cùng Report Tháng ${month} — khi report đã phát hành thì khoá, muốn sửa phải thu hồi ở Report Tháng.`}
+        actions={
+          <>
+            <MonthPicker value={month} onChange={setMonth} />
             {isPublished && (
               <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full border bg-emerald-950 text-emerald-300 border-emerald-800">
                 <Lock className="w-3.5 h-3.5" /> Report tháng đã phát hành
               </span>
             )}
-          </div>
-        </div>
-        <p className="text-[var(--text-muted)] text-xs">
-          Ads cost/ROAS tính máy từ Report Ca ở trên; phần bổ sung và ghi chú nhập tay ở dưới (không có API TikTok Shop cho các
-          phần này). Số lưu ở đây đi cùng Report Tháng {month} — khi report đã phát hành thì khoá, muốn sửa phải thu hồi ở Report Tháng.
-        </p>
-      </div>
+          </>
+        }
+      />
 
       {errorMsg && (
         <div className="p-3 bg-red-950/80 border border-red-800/50 rounded-xl text-red-300 text-xs font-semibold">{errorMsg}</div>

@@ -21,8 +21,6 @@ import {
   Radio,
   Check,
   Zap,
-  ChevronLeft,
-  ChevronRight,
   Flame,
   Target,
   TrendingUp,
@@ -48,6 +46,7 @@ import { useToast } from "../hooks/useToast";
 import { PageIntro } from "./common/PageIntro";
 
 import { fmtFixed, fmtVndShort } from "../lib/format";
+import { MonthPicker } from "./common/MonthPicker";
 interface ShiftSchedulingProps {
   currentRole: UserRole;
   activeUser: SystemUser;
@@ -297,13 +296,6 @@ export default function ShiftScheduling({
     [selectedDate, slotsByDate, monthSlots, showPast, today, admin]
   );
 
-  const shiftMonth = (delta: number) => {
-    const [y, m] = selectedMonth.split("-").map(Number);
-    const d = new Date(y, m - 1 + delta, 1);
-    setSelectedMonth(`${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, "0")}`);
-    setSelectedDate(null);
-  };
-
   // FIX L9 (audit 2026-08-21): trước đây gộp trùng studio VÀ trùng host vào chung 1 boolean, nhưng
   // thông báo hiển thị luôn cố định là "Host đã chọn trùng lịch" — khi thực tế chỉ trùng phòng
   // studio (host rảnh), ops đọc sai nguyên nhân và đi đổi host thay vì đổi phòng. Trả về riêng
@@ -463,7 +455,7 @@ export default function ShiftScheduling({
     <div className="space-y-6">
       <div className="bg-[var(--surface)] border border-[var(--border)] p-4 sm:p-6 rounded-2xl shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-[var(--text)] flex items-center gap-2">
+          <h2 className="text-lg font-black text-[var(--text)] flex items-center gap-2">
             <CalendarIcon className="w-5 h-5 text-blue-400" />
             {admin ? "Nhân sự ca" : "Đăng Ký Ca"}
           </h2>
@@ -474,29 +466,13 @@ export default function ShiftScheduling({
           </PageIntro>
         </div>
         <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => shiftMonth(-1)}
-            className="p-2 rounded-xl bg-[var(--surface-base)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] hover:border-[var(--border)] transition-colors"
-            title="Tháng trước"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <input
-            type="month"
+          <MonthPicker
             value={selectedMonth}
-            onChange={(e) => {
-              setSelectedMonth(e.target.value);
+            onChange={(m) => {
+              setSelectedMonth(m);
               setSelectedDate(null);
             }}
-            className="bg-[var(--surface-base)] border border-[var(--border)] rounded-xl px-3 py-2 text-[var(--text)] font-mono text-sm focus:outline-none focus:border-blue-500"
           />
-          <button
-            onClick={() => shiftMonth(1)}
-            className="p-2 rounded-xl bg-[var(--surface-base)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] hover:border-[var(--border)] transition-colors"
-            title="Tháng sau"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
         </div>
       </div>
 

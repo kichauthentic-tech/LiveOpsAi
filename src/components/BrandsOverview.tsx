@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { LayoutGrid, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { LayoutGrid, Loader2 } from "lucide-react";
 import { Brand, BrandMonthlyReport, BrandMonthPlan, BrandPlatformRate, LiveSession } from "../types";
 import { fetchPlanStatuses } from "../lib/db/monthPlans";
 import { fetchBrandMonthlyCommitments } from "../lib/db/brandContracts";
@@ -9,6 +9,7 @@ import { fmtVndShort } from "../lib/format";
 import { errorMessage } from "../lib/errorMessage";
 import { BrandLogo } from "./ui/BrandLogo";
 import { PageIntro } from "./common/PageIntro";
+import { MonthPicker } from "./common/MonthPicker";
 
 // Màn toàn cảnh 4 brand cho agency (Đợt C/6, 2026-09-23) — BẢNG trạng thái từng brand cho MỘT
 // tháng đang xem, không phải widget KPI kiểu Dashboard cũ (xoá 2026-09-13 vì số tính live/dự phóng
@@ -66,15 +67,6 @@ const COMMIT_STATUS_CLS: Record<CommitmentStatus, string> = {
 };
 
 const fmtHours = (h: number) => `${h.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h`;
-const fmtMonthLabel = (m: string) => {
-  const [y, mm] = m.split("-");
-  return `Tháng ${Number(mm)}/${y}`;
-};
-const addMonths = (month: string, delta: number) => {
-  const [y, m] = month.split("-").map(Number);
-  const d = new Date(y, m - 1 + delta, 1);
-  return `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, "0")}`;
-};
 
 export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ brands, sessions, brandPlatformRates, monthlyReports }) => {
   const today = todayVn();
@@ -126,15 +118,7 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ brands, sessions
           <h2 className="text-lg font-black text-[var(--text)] flex items-center gap-2">
             <LayoutGrid className="w-5 h-5 text-[var(--accent-text)]" /> Toàn Cảnh Brand
           </h2>
-          <div className="flex items-center gap-1">
-            <button onClick={() => setMonth((m) => addMonths(m, -1))} className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--surface-elevated)]">
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <span className="text-sm font-bold text-[var(--text)] w-28 text-center">{fmtMonthLabel(month)}</span>
-            <button onClick={() => setMonth((m) => addMonths(m, 1))} className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--surface-elevated)]">
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
+          <MonthPicker value={month} onChange={setMonth} />
         </div>
         <PageIntro>
           Trạng thái từng brand cho tháng đang xem — số thật đã xảy ra và trạng thái đọc thẳng từ DB, không có ô nào là dự

@@ -6,6 +6,7 @@ import { sessionDurationHours } from "../../lib/pnl";
 import { todayVn } from "../../lib/performance/brandCommitment";
 import { errorMessage } from "../../lib/errorMessage";
 import { fmtVndShort } from "../../lib/format";
+import { PageHeader } from "../common/PageHeader";
 
 // Kế hoạch tháng sau cho Brand Workspace — bản CHỈ ĐỌC + một nút "xác nhận đã xem" (Đợt C/2,
 // migration 0110). Khác hẳn "Kế Hoạch Tháng" bên Agency (MonthPlan.tsx): bên đó ops dựng lưới,
@@ -107,18 +108,11 @@ export const BrandNextMonthPlan: React.FC<BrandNextMonthPlanProps> = ({ brandId,
 
   return (
     <div className="space-y-5">
-      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 sm:p-6 shadow-xl space-y-2">
-        <span className="text-[var(--accent-text)] font-semibold text-xs uppercase tracking-wider flex items-center gap-1.5">
-          <CalendarCheck2 className="w-4 h-4" /> Kế Hoạch Tháng Sau
-        </span>
-        <h2 className="text-2xl font-black text-[var(--text)]">
-          {brandName} · {fmtMonthLabel(nextMonth)}
-        </h2>
-        <p className="text-xs text-[var(--text-muted)] max-w-3xl">
-          Lịch lên sóng agency dự kiến xếp cho tháng sau. Xem qua rồi bấm xác nhận — nếu agency đổi gì sau đó, mục xác nhận
-          sẽ tự mất để bạn biết lịch đã khác.
-        </p>
-      </div>
+      <PageHeader
+        icon={CalendarCheck2}
+        title={`Kế Hoạch ${fmtMonthLabel(nextMonth)} · ${brandName}`}
+        description="Lịch lên sóng agency dự kiến xếp cho tháng sau. Xem qua rồi bấm xác nhận — nếu agency đổi gì sau đó, mục xác nhận sẽ tự mất để bạn biết lịch đã khác."
+      />
 
       {errorMsg && (
         <div className="p-3 bg-red-950/80 border border-red-800/50 rounded-xl text-red-300 text-xs font-semibold">{errorMsg}</div>

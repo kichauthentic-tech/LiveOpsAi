@@ -119,9 +119,15 @@ const CeoBrief = lazy(() => import("./components/CeoBrief"));
 
 const STORAGE_PREFIX = "liveops_os_v2_";
 
-// Các tab mà nội dung chính là lưới lịch — vào là tự thu gọn sidebar để lấy chiều ngang
-// (lưới 7 cột / ma trận 5 khung giờ cần ~150px mỗi ô, xem WORKSPACE_DESIGN.md).
+// Các tab mà nội dung chính là lưới lịch — bỏ giới hạn max-w-7xl để lấy hết chiều ngang
+// (lưới 7 cột / ma trận 5 khung giờ cần ~150px mỗi ô, xem WORKSPACE_DESIGN.md). Không còn tự thu
+// gọn sidebar theo tab — xem `autoCollapse`.
 const CALENDAR_TABS = new Set(["calendar", "brand_calendar", "shift_scheduling"]);
+
+// Tab không đọc ca / talent / report tháng — không phải chờ đợt nạp đầu (coreDataReady). Mọi tab khác
+// hiện khung chờ tới khi nạp xong, thay vì vẽ "0 ca" / "Chưa có…" giả (audit UX 2026-09-29).
+// (Gần như tab nào cũng nhận `sessions` — kể cả CRM/Studios/Rate Card — nên danh sách này cố ý ngắn.)
+const TABS_WITHOUT_CORE_DATA = new Set(["account_settings", "tiktok_api"]);
 
 // Tab render được nhưng cố ý KHÔNG nằm trong sidebar (vào từ menu user ở Header). Phải khai
 // báo ở đây vì isTabAllowed coi "không có nav item" là không được phép.
@@ -207,26 +213,28 @@ export default function App() {
   const [notifOpenSessionId, setNotifOpenSessionId] = useState<string | null>(null);
   useEffect(() => saveStorage("opsView", opsView), [opsView]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  // Thu gọn sidebar thành thanh icon (w-16) để nhường không gian ngang cho calendar.
+  // Thu gọn sidebar thành thanh icon (w-16) để nhường không gian ngang cho nội dung.
   // Chỉ áp dụng từ breakpoint md trở lên — dưới md sidebar vẫn là drawer trượt như cũ.
   //
   // 3 mảnh state:
-  //  - `sidebarPref`: lựa chọn tay của user cho các module KHÔNG có lịch (persist).
-  //  - `sidebarCollapsed`: trạng thái thật đang render = tự thu gọn trong module có lịch,
-  //    ngoài ra trả về đúng `sidebarPref`.
+  //  - `sidebarPref`: lựa chọn tay của user ở màn rộng (persist).
+  //  - `sidebarCollapsed`: trạng thái thật đang render = tự thu gọn ở màn hẹp, ngoài ra đúng `sidebarPref`.
+  //
+  // Quy tắc CHỈ theo bề ngang màn, KHÔNG theo tab (audit UX 2026-09-29, Đợt 0 #3): trước đây Nhân sự
+  // ca / Bảng Vận Hành / Lịch brand tự thu gọn còn tab khác thì không ⇒ đi Kế Hoạch Tháng → Nhân sự
+  // ca → Bảng Vận Hành → Sổ Ca thì nội dung nhảy 1.184 ↔ 1.376px và chữ menu mất/hiện liên tục.
+  // Ngưỡng 1440px: từ đó lịch còn ≥ 1.136px khi menu mở (đủ 7 cột tháng / lưới phòng theo giờ).
   const [sidebarPref, setSidebarPref] = useState<boolean>(() => loadStorage("sidebarCollapsed", false));
   useEffect(() => saveStorage("sidebarCollapsed", sidebarPref), [sidebarPref]);
 
   const isCalendarModule = CALENDAR_TABS.has(activeTab);
-  // Màn 768–1279px (laptop nhỏ, chia đôi màn hình): sidebar mở 256px ăn ~1/3 bề ngang, bảng bị cắt
-  // (audit UX 2026-09-26: ở ~800px nội dung còn ~535px). Tự thu gọn như module lịch.
-  const isWideScreen = useMediaQuery("(min-width: 1280px)");
-  const autoCollapse = isCalendarModule || !isWideScreen;
+  const isWideScreen = useMediaQuery("(min-width: 1440px)");
+  const autoCollapse = !isWideScreen;
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(sidebarPref);
-  // Vào module có lịch (hoặc màn hẹp) → tự thu gọn; rời đi → trả lại đúng lựa chọn tay của user.
+  // Màn hẹp → tự thu gọn; rộng ra → trả lại đúng lựa chọn tay của user.
   // Nếu user tự mở lại sidebar khi đang tự thu gọn thì effect này không chạy
-  // (deps không đổi) nên tôn trọng thao tác đó cho tới lần chuyển module/cỡ màn kế tiếp.
+  // (deps không đổi) nên tôn trọng thao tác đó cho tới lần đổi cỡ màn kế tiếp.
   useEffect(() => {
     setSidebarCollapsed(autoCollapse ? true : sidebarPref);
   }, [autoCollapse, sidebarPref]);
@@ -234,8 +242,8 @@ export default function App() {
   const toggleSidebar = React.useCallback(() => {
     setSidebarCollapsed((v) => {
       const next = !v;
-      // Chỉ ghi đè lựa chọn mặc định khi không ở chế độ tự thu gọn — thao tác tay trong
-      // module lịch / màn hẹp chỉ có tác dụng tạm thời, không đổi mặc định của user.
+      // Chỉ ghi đè lựa chọn mặc định khi không ở chế độ tự thu gọn — thao tác tay ở màn hẹp
+      // chỉ có tác dụng tạm thời, không đổi mặc định của user.
       if (!autoCollapse) setSidebarPref(next);
       return next;
     });
@@ -397,6 +405,19 @@ export default function App() {
   // — `authUserId` truthy đúng khi và chỉ khi có session kèm user.
   const authUserId = session?.user?.id;
 
+  // Đã nạp xong lần đầu cho user nào (audit UX 2026-09-29, Đợt 0 #1). Trước đây state bắt đầu bằng
+  // [] / Map rỗng mà không có cờ ⇒ 1–3 s đầu mọi màn hiện "0 ca", "Chưa có ca nào có số" (Talent Pool
+  // 2,9 s), "Chưa có dòng" (Điều Phối Phát Hành 1,8 s) như thể mất dữ liệu. Lưu theo user id thay vì
+  // boolean để đăng nhập tài khoản khác tự về "chưa nạp" mà không cần setState trong effect.
+  const [talentsLoadedFor, setTalentsLoadedFor] = useState<string | null>(null);
+  const [sessionsLoadedFor, setSessionsLoadedFor] = useState<string | null>(null);
+  const [reportsLoadedFor, setReportsLoadedFor] = useState<string | null>(null);
+  const coreDataReady =
+    !!authUserId &&
+    talentsLoadedFor === authUserId &&
+    sessionsLoadedFor === authUserId &&
+    reportsLoadedFor === authUserId;
+
   useEffect(() => {
     if (!authUserId) return;
     let cancelled = false;
@@ -411,6 +432,9 @@ export default function App() {
       .catch((err) => {
         if (cancelled) return;
         setPhase1Error(err.message ?? "Không tải được dữ liệu Talent/Studio/Equipment từ Supabase.");
+      })
+      .finally(() => {
+        if (!cancelled) setTalentsLoadedFor(authUserId);
       });
     return () => {
       cancelled = true;
@@ -420,20 +444,31 @@ export default function App() {
   useEffect(() => {
     if (!authUserId) return;
     let cancelled = false;
-    fetchAllMonthlyReports().then((m) => { if (!cancelled) setMonthlyReports(m); }).catch(() => {});
-    // 0096: đóng ca đã qua giờ trước khi nạp — không chặn nếu RPC lỗi.
-    completePastSessions()
-      .catch(() => 0)
-      .then(() => fetchSessions())
-      .then((s) => {
-        if (cancelled) return;
+    fetchAllMonthlyReports()
+      .then((m) => { if (!cancelled) setMonthlyReports(m); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setReportsLoadedFor(authUserId); });
+    // Nạp ca NGAY, song song với RPC đóng ca đã qua giờ (0096) — trước đây chờ RPC xong mới nạp, cộng
+    // dồn hai lượt mạng vào thời gian màn trống. Hiển thị không phụ thuộc RPC: withEffectiveStatus đã
+    // suy "Đã xong" theo giờ. RPC có đóng ca nào (n > 0) thì nạp lại để khớp DB. `seq` chặn lượt nạp
+    // cũ về sau ghi đè lượt mới.
+    let latestApplied = 0;
+    const load = (seq: number) =>
+      fetchSessions().then((s) => {
+        if (cancelled || seq < latestApplied) return;
+        latestApplied = seq;
         setSessions(s);
         setSessionsError(null);
-      })
+      });
+    load(1)
       .catch((err) => {
         if (cancelled) return;
         setSessionsError(err.message ?? "Không tải được dữ liệu Live Sessions từ Supabase.");
-      });
+      })
+      .finally(() => { if (!cancelled) setSessionsLoadedFor(authUserId); });
+    completePastSessions()
+      .then((n) => (n > 0 && !cancelled ? load(2) : undefined))
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -1873,7 +1908,7 @@ export default function App() {
       >
         <div
           className={`border-b border-[var(--border)] flex items-center justify-between ${
-            sidebarCollapsed ? "p-6 md:px-0 md:py-4 md:justify-center" : "p-6"
+            sidebarCollapsed ? "h-16 shrink-0 px-6 md:px-0 md:justify-center" : "h-16 shrink-0 px-6"
           }`}
         >
           <div className={sidebarCollapsed ? "md:hidden" : ""}>
@@ -1899,7 +1934,7 @@ export default function App() {
         </div>
 
         <nav
-          className={`flex-1 py-3 space-y-4 overflow-y-auto scrollbar-thin ${
+          className={`flex-1 py-3 space-y-3 overflow-y-auto scrollbar-thin ${
             sidebarCollapsed ? "px-3 md:px-2" : "px-3"
           }`}
         >
@@ -1921,7 +1956,7 @@ export default function App() {
             if (visibleItems.length === 0) return null;
 
             return (
-              <div key={group.label} className="space-y-1">
+              <div key={group.label} className="space-y-0.5">
                 {group.label && (
                   <p
                     className={`px-3 text-[11px] font-bold uppercase tracking-widest text-[var(--text-faint)] ${
@@ -1945,7 +1980,7 @@ export default function App() {
                         setMobileMenuOpen(false);
                       }}
                       title={item.label}
-                      className={`w-full flex items-center justify-between gap-2 py-2.5 rounded-xl transition-colors text-xs font-medium ${
+                      className={`w-full flex items-center justify-between gap-2 py-2 rounded-xl transition-colors text-xs font-medium ${
                         sidebarCollapsed ? "px-3 md:px-0 md:justify-center" : "px-3"
                       } ${
                         isActive
@@ -1982,7 +2017,7 @@ export default function App() {
         </nav>
 
         {/* User Card — bấm để mở Tài Khoản Của Tôi (thay cho mục nav riêng đã bỏ) */}
-        <div className={`mt-auto border-t border-[var(--border)] ${sidebarCollapsed ? "p-4 md:p-2" : "p-4"}`}>
+        <div className={`mt-auto border-t border-[var(--border)] ${sidebarCollapsed ? "p-3 md:p-2" : "p-3"}`}>
           <button
             type="button"
             onClick={() => {
@@ -1994,7 +2029,7 @@ export default function App() {
               activeTab === "account_settings"
                 ? "bg-[var(--accent)]/10 border-[var(--accent)]/20"
                 : "bg-[var(--surface-elevated)]/50 border-[var(--border)]/50 hover:bg-[var(--surface-elevated)] hover:border-[var(--text-faint)]"
-            } ${sidebarCollapsed ? "p-3 md:p-2 md:justify-center" : "p-3"}`}
+            } ${sidebarCollapsed ? "p-2.5 md:p-2 md:justify-center" : "p-2.5"}`}
           >
             {activeUser.avatar ? (
               <img
@@ -2041,10 +2076,10 @@ export default function App() {
             className="hidden md:flex p-2 ml-3 rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)]/80 hover:bg-[var(--surface-hover)] text-[var(--text-muted)] hover:text-[var(--text)] transition-all"
             title={
               sidebarCollapsed
-                ? isCalendarModule
-                  ? "Mở rộng menu (Ctrl/Cmd + B) — menu tự thu gọn ở module có lịch"
+                ? autoCollapse
+                  ? "Mở rộng menu (Ctrl/Cmd + B) — menu tự thu gọn khi cửa sổ hẹp hơn 1440px"
                   : "Mở rộng menu (Ctrl/Cmd + B)"
-                : "Thu gọn menu để rộng chỗ cho lịch (Ctrl/Cmd + B)"
+                : "Thu gọn menu cho rộng chỗ nội dung (Ctrl/Cmd + B)"
             }
             aria-label={sidebarCollapsed ? "Mở rộng menu" : "Thu gọn menu"}
             aria-expanded={!sidebarCollapsed}
@@ -2229,6 +2264,10 @@ export default function App() {
                 )}
               >
               <Suspense fallback={<TabLoading />}>
+                {!coreDataReady && !TABS_WITHOUT_CORE_DATA.has(activeTab) ? (
+                  <TabLoading />
+                ) : (
+                <>
                 {activeTab === "sessions" && (
                   <SessionLedger
                     variant="agency"
@@ -2720,6 +2759,8 @@ export default function App() {
 
                 {activeTab === "account_settings" && (
                   <AccountSettings activeUser={activeUser} onUpdateUser={handleUpdateUser} />
+                )}
+                </>
                 )}
               </Suspense>
               </Sentry.ErrorBoundary>

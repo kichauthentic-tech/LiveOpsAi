@@ -95,7 +95,7 @@ export function LiveReconciliation({ onApplied, onOpenSession }: LiveReconciliat
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-base font-black text-[var(--text)]">Đối Soát Số Liệu</h2>
+            <h2 className="text-lg font-black text-[var(--text)]">Đối Soát Số Liệu</h2>
             <PageIntro>
               TikTok còn cập nhật GMV nhiều giờ sau khi tắt live, nên số chốt lúc giao ca chỉ là tạm tính. Tải lại file{" "}
               <span className="font-bold">Creator-Live-Performance</span> cho cả ngày/tuần/tháng rồi up một lần để chỉnh lại toàn bộ ca trong kỳ.

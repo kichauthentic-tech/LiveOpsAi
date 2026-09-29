@@ -3,6 +3,7 @@ import { BrainCircuit, RefreshCw, RotateCcw, Save, ShieldAlert, CheckCircle2 } f
 import { AiAgentPrompt } from "../types";
 import { errorMessage } from "../lib/errorMessage";
 import { useToast } from "../hooks/useToast";
+import { PageHeader } from "./common/PageHeader";
 
 interface AiTrainingCenterProps {
   prompts: AiAgentPrompt[];
@@ -59,24 +60,20 @@ export const AiTrainingCenter: React.FC<AiTrainingCenterProps> = ({ prompts, loa
 
   return (
     <div className="space-y-6">
-      <div className="bg-[var(--surface)] text-[var(--text)] p-6 rounded-2xl border border-[var(--border)] shadow-xl space-y-2 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <span className="text-rose-400 font-semibold text-xs uppercase tracking-wider block flex items-center gap-1.5">
-            <BrainCircuit className="w-4 h-4 text-rose-400" /> Độc Quyền Admin
-          </span>
-          <h2 className="text-2xl font-black">AI Training Center</h2>
-          <p className="text-xs text-[var(--text-muted)] mt-1">
-            Cấu hình system prompt riêng cho từng AI Agent thật đang chạy trong hệ thống. Chỉ tài khoản Admin thấy và sửa được tab này.
-          </p>
-        </div>
-        <div className="flex-shrink-0 bg-rose-950/85 border border-rose-500/40 rounded-xl px-3.5 py-2 text-right">
-          <div className="flex items-center gap-2 text-xs font-bold text-rose-300">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span>{prompts.length} Agent</span>
+      <PageHeader
+        icon={BrainCircuit}
+        title="AI Training Center"
+        description="Cấu hình system prompt riêng cho từng AI Agent thật đang chạy trong hệ thống. Chỉ tài khoản Admin thấy và sửa được tab này."
+        actions={
+          <div className="bg-rose-950/85 border border-rose-500/40 rounded-xl px-3.5 py-2 text-right">
+            <div className="flex items-center justify-end gap-2 text-xs font-bold text-rose-300">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span>{prompts.length} Agent</span>
+            </div>
+            <p className="text-[11px] text-rose-400">Thay đổi có hiệu lực ngay ở lần gọi AI tiếp theo</p>
           </div>
-          <p className="text-[11px] text-rose-400">Thay đổi có hiệu lực ngay ở lần gọi AI tiếp theo</p>
-        </div>
-      </div>
+        }
+      />
 
       {loading && (
         <div className="bg-[var(--surface)] p-8 rounded-2xl border border-[var(--border)] text-center text-[var(--text-muted)] text-sm flex items-center justify-center gap-2">

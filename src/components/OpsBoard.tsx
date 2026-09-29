@@ -210,7 +210,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
     <div className="space-y-4">
       <div className="bg-[var(--surface)] border border-[var(--border)] p-4 sm:p-6 rounded-2xl shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-[var(--text)] flex items-center gap-2">
+          <h2 className="text-lg font-black text-[var(--text)] flex items-center gap-2">
             <Radio className="w-5 h-5 text-red-400" />
             {mode === "mine" ? "Ca Của Tôi" : "Bảng Vận Hành"}
           </h2>
