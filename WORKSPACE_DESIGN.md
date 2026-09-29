@@ -2,10 +2,11 @@
 
 ## CẦN LÀM NGAY khi mở phiên mới (cập nhật 2026-09-24)
 
-> **MỚI 2026-09-29 — Audit UX/UI lần 2: Đợt 0 XONG (commit 4cf62b7) + M1 Report Tháng XONG (không migration, đã push `main`).**
+> **MỚI 2026-09-29 — Audit UX/UI lần 2: Đợt 0 (4cf62b7) + M1 Report Tháng (d8ddd1e) + M2 Dashboard brand XONG (không migration).**
 > Đợt 0: hết "0 ca / Chưa có…" giả lúc tải, 0/28 màn tràn ngang 375px, sidebar không nhảy theo tab, `MonthPicker`, `PageHeader`,
 > nhãn trạng thái tiếng Việt. M1: đầu Report Tháng gộp 1 thẻ (nút Phát hành y=9.206 → 112px), mục lục dính thật + tô phần đang
-> đọc, 11 → 6 cỡ chữ, nút ≥ 27px. Kế tiếp: M2 Dashboard brand. Xem `## Audit UX/UI lần 2 (2026-09-29)`.
+> đọc, 11 → 6 cỡ chữ, nút ≥ 27px. M2: 19 ô KPI phẳng → 5 ô "Kết quả" 20px + 3 nhóm phễu 14px, cả 19 ô lọt màn đầu; Run-rate lên
+> trước KPI. Kế tiếp: M3 Dashboard agency. Xem `## Audit UX/UI lần 2 (2026-09-29)`.
 
 > **MỚI 2026-09-29 — Key Metrics 18 chỉ số trên MỌI report (không migration, commit 7996080 đã push `main`).** Một module
 > [keyMetrics.ts](src/lib/report/keyMetrics.ts) (bộ đếm + công thức + danh sách `KEY_METRICS` + định dạng + cột Excel) thay 5 bản
@@ -418,9 +419,30 @@ Dashboard agency 5,2 → 10,1; Lịch brand 5,2 → 6,4; Sổ Ca 4,4 → 8,3; AI
   ca tiêu đề `text-2xl` — cả 3 đỏ trên code cũ. tsc 0, eslint 0 lỗi/33 cảnh báo (= baseline), vitest 189/189, build OK, console 0 lỗi.
   Còn lại của Report Tháng: bảng Host "Chỉ số" cuộn ngang ở 1440; trang vẫn 11,1 màn desktop (nội dung — user chốt trang cuộn);
   chưa xem bằng role brand (không có nút, chỉ đọc).
-- **M2 Dashboard brand (ĐỢT KẾ TIẾP):** 18 ô KPI cùng cỡ (5 cột × 4 hàng) chiếm hết màn đầu; Run-rate so target plan (câu hỏi chính) nằm dưới
-  màn đầu. Giữ đủ 18 chỉ số (user chốt 29/09) nhưng phân tầng/nhóm.
-- **M3 Dashboard agency:** 5,2 màn desktop, 10,1 màn điện thoại, tràn ngang (Đợt 0 #2).
+- **M2 Dashboard brand — ĐÃ LÀM 2026-09-29, verify trên browser (CROCS T9, admin).** User chốt hướng "phân tầng + Run-rate lên đầu".
+  Đo trước (1440×900): 19 ô KPI (18 + AOV) cùng cỡ 18px, lưới `xl:grid-cols-5` 4 hàng chiếm hết màn đầu; Run-rate so target nằm dưới.
+  Đã làm: (1) [keyMetrics.ts](src/lib/report/keyMetrics.ts) thêm `group` cho từng chỉ số + `KEY_METRIC_GROUPS` — **không đổi thứ tự,
+  không bớt chỉ số**, nên Report Tháng/Tuần, Hiệu Suất Host, Bản Tin CEO, cửa sổ ca vẫn `KEY_METRICS.map` phẳng như cũ. Nhóm:
+  `result` (GMV, Items sold, Orders, Giờ live, GMV/giờ) · `traffic` (Views, LIVE impressions, Views/giờ, LIVE impressions/giờ, ERR,
+  Avg. view) · `conversion` (LIVE CTR, Product impressions, Product clicks, Product CTR, CTOR) · `basket` (UPT, Giá bán TB, AOV).
+  (2) [BrandDashboard.tsx](src/components/brand-workspace/BrandDashboard.tsx): `Stat` thêm `size` — "lg" 20px cho 5 ô Kết quả,
+  "sm" 14px cho 14 ô trong 3 nhóm, vẫn nằm trong 6 cỡ chữ chuẩn hoá ở M1. Đầu trang dùng `PageHeader`; 4 chip độ tươi dữ liệu
+  thành hàng phụ TRONG thẻ đầu (trước là khối rời). Bảng "Theo từng ca" (~420px, cuộn riêng) gấp vào `<details>` đóng sẵn — 3 con
+  số đếm (≥95% / 85–95% / <85%) nằm ngay trên dòng mở/đóng nên không mở vẫn biết có ca nào tụt; bảng "Theo loại ngày campaign" giữ mở.
+  Sau (1440×900): 5 ô 20px + 14 ô 14px, **cả 19 ô lọt trong màn đầu** (trước phải cuộn); đầu KPI y=355; trang 3,4 màn (audit 3,8).
+  375: 0 tràn ngang, 5,3 màn (audit 5,8). `<details>` 28px đóng → 124px mở → 28px; `group-open:hidden`/`group-open:inline` của
+  Tailwind v4 sinh đúng (`display: none` / `inline` khi `details[open]`) — đã thử bằng phần tử dựng tạm trên chính trang.
+  **Bẫy phát hiện lúc verify — QUAN TRỌNG:** cả DB **chưa có kế hoạch tháng nào đã chốt** (duy nhất CROCS T10 trạng thái `draft`),
+  nên `rr = null` là trạng thái THƯỜNG NGÀY, không phải ngoại lệ. Đưa thẻ Run-rate lên đầu lúc đầu làm màn XẤU đi: thẻ rỗng chiếm
+  192px đẩy số thật xuống. Sửa: `!rr` không dựng `<Card>` nữa mà chỉ 1 dòng nhắc (38px) — phần `sub` giải thích công thức run-rate
+  chỉ có nghĩa khi thật sự có run-rate, và đầu trang đã có chip "Kế hoạch T9: chưa có" bấm được. Thẻ Run-rate đầy đủ (854px, 4 ô +
+  biểu đồ luỹ kế) chỉ dựng khi có plan đã chốt, lúc đó KPI tụt xuống y=1171 — đánh đổi user đã chọn.
+  Nhánh có plan chốt KHÔNG verify được bằng dữ liệu thật ⇒ dựng `rr` giả **tại máy, không ghi DB**, chụp xong gỡ (file đã về bản thật,
+  `grep rrStub` = 0). Test canh thêm 2 ca (đủ 19 chỉ số + không chỉ số/nhóm mồ côi; Run-rate đứng trước lưới KPI + cấm quay lại
+  `KEY_METRICS.map` phẳng) — cả 2 đỏ trên code cũ. tsc 0, eslint 0 lỗi/33 cảnh báo (= baseline), vitest 191/191, build OK, console 0 lỗi.
+  Còn lại: chưa xem bằng role brand; thứ tự trong nhóm "Lưu lượng" theo thứ tự gốc `KEY_METRICS` (ERR, Avg. view đứng trước Views) —
+  giữ nguyên để không lệch thứ tự chuẩn user chốt.
+- **M3 Dashboard agency (ĐỢT KẾ TIẾP):** 5,2 màn desktop, 10,1 màn điện thoại, tràn ngang (Đợt 0 #2).
 - **M4 Vận hành (Bảng Vận Hành, Lịch brand, Sổ Ca, Nhân sự ca):** sidebar nhảy (Đợt 0 #3); Sổ Ca: 316px lọc + 6 ô trước bảng;
   Nhân sự ca: bảng 3 cột kéo 1.184px.
 - **M5 Kế Hoạch Tháng:** 384 phần tử bấm, 372 cao < 32px; form 3 cột, cột "Lưới hiện tại" gần trống; Target GMV gõ số thô 10 chữ số.

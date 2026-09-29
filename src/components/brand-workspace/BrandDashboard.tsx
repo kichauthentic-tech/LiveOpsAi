@@ -24,13 +24,13 @@ import {
 } from "../../lib/performance/slotInsights";
 import { compareWindow, driverBreakdown, DRIVER_LABEL, liveStatsFromRows, LiveStats } from "../../lib/report/monthlyReportInsights";
 import { hasLiveNumbers, sessionToLivePerfRow } from "../../lib/report/sessionsLivePerf";
-import { fmtKeyMetric, KEY_METRICS, keyMetricValue } from "../../lib/report/keyMetrics";
+import { fmtKeyMetric, KEY_METRICS, KEY_METRIC_GROUPS, KeyMetricDef, keyMetricValue } from "../../lib/report/keyMetrics";
 import { controlGroup, controlLabel, liveGmvByDate, controlVerdict, hostReliability, isBorderline, reliabilityText, VERDICT_TEXT } from "../../lib/report/deepAnalysis";
 import { isCountable, sessionHours } from "../../lib/performance/hostPerformance";
 import { sessionDurationHours } from "../../lib/pnl";
 import { fmtVndShort } from "../../lib/format";
 import { METRIC, metricHint } from "../../lib/metricGlossary";
-import { PageIntro } from "../common/PageIntro";
+import { PageHeader } from "../common/PageHeader";
 import OpsSupport from "../OpsSupport";
 import { MonthPicker } from "../common/MonthPicker";
 
@@ -79,10 +79,12 @@ const Card: React.FC<{ title: string; icon: React.ReactNode; sub?: React.ReactNo
   </section>
 );
 
-const Stat: React.FC<{ label: string; value: string; hint?: React.ReactNode; tone?: string }> = ({ label, value, hint, tone }) => (
-  <div className="bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3">
+// size: "lg" = 5 ô kết quả đọc trước (20px), mặc định 18px, "sm" = ô trong 3 nhóm phễu (14px).
+// Giữ trong 6 cỡ chữ đã chuẩn hoá ở M1 (11/12/14/16/18/20) — không thêm cỡ mới.
+const Stat: React.FC<{ label: string; value: string; hint?: React.ReactNode; tone?: string; size?: "lg" | "sm" }> = ({ label, value, hint, tone, size }) => (
+  <div className={`bg-[var(--surface-base)] border border-[var(--border)] rounded-xl min-w-0 ${size === "sm" ? "p-2.5" : "p-3"}`}>
     <p className="text-[11px] uppercase tracking-wider font-bold text-[var(--text-faint)]" title={metricHint(label)}>{label}</p>
-    <p className={`text-lg font-black mt-0.5 font-mono ${tone ?? "text-[var(--text)]"}`}>{value}</p>
+    <p className={`font-black mt-0.5 font-mono ${size === "lg" ? "text-xl" : size === "sm" ? "text-sm" : "text-lg"} ${tone ?? "text-[var(--text)]"}`}>{value}</p>
     {hint && <div className="text-[11px] text-[var(--text-faint)] mt-0.5 leading-snug">{hint}</div>}
   </div>
 );
@@ -246,44 +248,49 @@ export default function BrandDashboard({ brandId, brandName, sessions, shiftSlot
   );
   const STATE_LABEL: Record<string, string> = { done: "Đã xong", no_data: "Chưa có số", pending: "Sắp tới", cancelled: "Huỷ (giữ target)", offplan: "Ngoài kế hoạch" };
 
+  /** Một ô Key Metrics: giá trị kỳ này + % đổi so với cùng kỳ (giá trị kỳ trước trong ngoặc). */
+  const metricCell = (d: KeyMetricDef, size?: "lg" | "sm") => {
+    const a = keyMetricValue(prev, d.key), b = keyMetricValue(cur, d.key);
+    const ch = a && b != null ? b / a - 1 : null;
+    const tone = ch == null || d.goodWhenUp == null || Math.abs(ch) < 0.02 ? "" : ch > 0 === d.goodWhenUp ? "text-emerald-400" : "text-rose-400";
+    return <Stat key={d.key} size={size} label={d.label} value={fmtKeyMetric(d, b)} hint={<span className={tone}>{signed(ch)} <span className="text-[var(--text-faint)]">({fmtKeyMetric(d, a)})</span></span>} />;
+  };
+
   return (
     <div className="space-y-4 sm:space-y-6">
-      <div className="bg-[var(--surface)] border border-[var(--border)] p-4 sm:p-6 rounded-2xl shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-black text-[var(--text)] flex items-center gap-2">
-            <LayoutDashboard className="w-5 h-5 text-[var(--accent-text)]" /> Dashboard · {brandName}
-          </h2>
-          <PageIntro>
-            Tháng này tới đâu so với target plan, vì sao, và {isOps ? "tuần tới / tháng sau nên sửa gì. Đề xuất chỉ dùng quy tắc đã qua backtest trên lịch sử của chính brand." : "nhịp theo tuần. Số của tháng hiện ra khi ops phát hành Report Tháng."}
-          </PageIntro>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          {through && (
-            <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${lagDays > 2 ? "bg-rose-500/15 text-rose-400" : "bg-emerald-500/15 text-emerald-400"}`}>
-              Số liệu tới {dm(through)}{lagDays > 0 ? ` · trễ ${lagDays} ngày` : ""}
-            </span>
-          )}
-          <MonthPicker value={month} onChange={setPickedMonth} ariaLabel="Tháng" />
-        </div>
-      </div>
-
-      {/* 01 · Độ tươi dữ liệu (ops) */}
-      {isOps && (
-        <div className="flex flex-wrap gap-2 text-[11px] font-bold">
-          {noHost > 0 && <button onClick={onOpenSessions} className="px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-300">{noHost}/{monthSessions.filter(isCountable).length} ca chưa gán host</button>}
-          {noData > 0 && <button onClick={onOpenSessions} className="px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-300">{noData} ca đã xong chưa có số</button>}
-          {!planLoading && (
-            <button onClick={onOpenMonthPlan} className={`px-2.5 py-1 rounded-full ${locked ? "bg-emerald-500/15 text-emerald-400" : "bg-amber-500/15 text-amber-300"}`}>
-              Kế hoạch T{Number(month.slice(5))}: {locked ? "đã chốt" : plan ? "nháp, chưa chốt" : "chưa có"}
-            </button>
-          )}
-          {!planLoading && (
-            <button onClick={onOpenMonthPlan} className={`px-2.5 py-1 rounded-full ${nextPlan?.plan.status === "locked" ? "bg-emerald-500/15 text-emerald-400" : "bg-[var(--surface-elevated)] text-[var(--text-muted)]"}`}>
-              Kế hoạch T{Number(nextMonthOf(month).slice(5))}: {nextPlan?.plan.status === "locked" ? "đã chốt" : nextPlan ? "nháp" : "chưa có"}
-            </button>
-          )}
-        </div>
-      )}
+      <PageHeader
+        icon={LayoutDashboard}
+        title={`Dashboard · ${brandName}`}
+        description={`Tháng này tới đâu so với target plan, vì sao, và ${isOps ? "tuần tới / tháng sau nên sửa gì. Đề xuất chỉ dùng quy tắc đã qua backtest trên lịch sử của chính brand." : "nhịp theo tuần. Số của tháng hiện ra khi ops phát hành Report Tháng."}`}
+        actions={
+          <>
+            {through && (
+              <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${lagDays > 2 ? "bg-rose-500/15 text-rose-400" : "bg-emerald-500/15 text-emerald-400"}`}>
+                Số liệu tới {dm(through)}{lagDays > 0 ? ` · trễ ${lagDays} ngày` : ""}
+              </span>
+            )}
+            <MonthPicker value={month} onChange={setPickedMonth} ariaLabel="Tháng" />
+          </>
+        }
+      >
+        {/* 01 · Độ tươi dữ liệu (ops) — hàng phụ của đầu trang, không còn là khối rời */}
+        {isOps && (
+          <div className="flex flex-wrap gap-2 text-[11px] font-bold">
+            {noHost > 0 && <button onClick={onOpenSessions} className="px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-300">{noHost}/{monthSessions.filter(isCountable).length} ca chưa gán host</button>}
+            {noData > 0 && <button onClick={onOpenSessions} className="px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-300">{noData} ca đã xong chưa có số</button>}
+            {!planLoading && (
+              <button onClick={onOpenMonthPlan} className={`px-2.5 py-1 rounded-full ${locked ? "bg-emerald-500/15 text-emerald-400" : "bg-amber-500/15 text-amber-300"}`}>
+                Kế hoạch T{Number(month.slice(5))}: {locked ? "đã chốt" : plan ? "nháp, chưa chốt" : "chưa có"}
+              </button>
+            )}
+            {!planLoading && (
+              <button onClick={onOpenMonthPlan} className={`px-2.5 py-1 rounded-full ${nextPlan?.plan.status === "locked" ? "bg-emerald-500/15 text-emerald-400" : "bg-[var(--surface-elevated)] text-[var(--text-muted)]"}`}>
+                Kế hoạch T{Number(nextMonthOf(month).slice(5))}: {nextPlan?.plan.status === "locked" ? "đã chốt" : nextPlan ? "nháp" : "chưa có"}
+              </button>
+            )}
+          </div>
+        )}
+      </PageHeader>
 
       {hidden ? (
         <div className="text-sm text-[var(--text-muted)] bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-6 flex items-start gap-2">
@@ -292,36 +299,26 @@ export default function BrandDashboard({ brandId, brandName, sessions, shiftSlot
         </div>
       ) : (
         <>
-          {/* 02 · Tháng này tới đâu */}
-          <Card title={`Tháng ${Number(month.slice(5))} tới ${through ? dm(through) : "—"}`} icon={<Activity className="w-4 h-4 text-[var(--accent-text)]" />} sub={`So với cùng kỳ: ${win.label}`}>
-            {/* Key Metrics đủ 18 chỉ số + AOV (lib/report/keyMetrics.ts); màu theo chiều tốt của từng chỉ số, trung tính thì không tô. */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3">
-              {KEY_METRICS.map((d) => {
-                const a = keyMetricValue(prev, d.key), b = keyMetricValue(cur, d.key);
-                const ch = a && b != null ? b / a - 1 : null;
-                const tone = ch == null || d.goodWhenUp == null || Math.abs(ch) < 0.02 ? "" : ch > 0 === d.goodWhenUp ? "text-emerald-400" : "text-rose-400";
-                return <Stat key={d.key} label={d.label} value={fmtKeyMetric(d, b)} hint={<span className={tone}>{signed(ch)} <span className="text-[var(--text-faint)]">({fmtKeyMetric(d, a)})</span></span>} />;
-              })}
+          {/* 02 · Run-rate theo plan ban đầu — câu hỏi chính "tháng này có về đích không", nên đứng trên KPI (M2).
+              CHƯA có plan đã chốt thì KHÔNG dựng cả thẻ: đo 29/09 thấy thẻ rỗng vẫn chiếm 192px và đẩy số thật
+              xuống dưới, trong khi hiện chưa brand/tháng nào có plan chốt ⇒ đó là trạng thái thường ngày, không
+              phải ngoại lệ. Thay bằng 1 dòng, vì đầu trang đã có chip "Kế hoạch T9: chưa có" bấm được rồi. */}
+          {planLoading ? (
+            <p className="text-xs text-[var(--text-faint)]">Đang tải kế hoạch…</p>
+          ) : !rr ? (
+            <div className="text-sm text-[var(--text-muted)] bg-amber-950/40 border border-amber-800/60 rounded-xl px-3 py-2 flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-300 shrink-0 mt-0.5" />
+              <span>
+                {plan ? `Kế hoạch tháng ${Number(month.slice(5))} còn là nháp` : `Tháng ${Number(month.slice(5))} chưa có Kế Hoạch Tháng`} — chưa có target plan để tính run-rate.
+                {isOps && <> <button onClick={onOpenMonthPlan} className="font-bold text-[var(--accent-text)] underline">Mở Kế Hoạch Tháng</button></>}
+              </span>
             </div>
-          </Card>
-
-          {/* 02b · Run-rate theo plan ban đầu */}
-          <Card
-            title="Run-rate so với target plan"
-            icon={<Gauge className="w-4 h-4 text-[var(--accent-text)]" />}
-            sub="Target = tổng target các ca của Kế Hoạch Tháng đã chốt. Run-rate = thực đạt ÷ target các ca có ngày ≤ ngày cuối có số. Ca huỷ vẫn giữ target; ca mở thêm ngoài plan được cộng thực đạt, target = 0."
-          >
-            {planLoading ? (
-              <p className="text-xs text-[var(--text-faint)]">Đang tải kế hoạch…</p>
-            ) : !rr ? (
-              <div className="text-sm text-[var(--text-muted)] bg-amber-950/40 border border-amber-800/60 rounded-xl p-3 flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 text-amber-300 shrink-0 mt-0.5" />
-                <span>
-                  {plan ? `Kế hoạch tháng ${Number(month.slice(5))} còn là nháp` : `Tháng ${Number(month.slice(5))} chưa có Kế Hoạch Tháng`} — chưa có target plan để tính run-rate.
-                  {isOps && <> <button onClick={onOpenMonthPlan} className="font-bold text-[var(--accent-text)] underline">Mở Kế Hoạch Tháng</button></>}
-                </span>
-              </div>
-            ) : (
+          ) : (
+            <Card
+              title="Run-rate so với target plan"
+              icon={<Gauge className="w-4 h-4 text-[var(--accent-text)]" />}
+              sub="Target = tổng target các ca của Kế Hoạch Tháng đã chốt. Run-rate = thực đạt ÷ target các ca có ngày ≤ ngày cuối có số. Ca huỷ vẫn giữ target; ca mở thêm ngoài plan được cộng thực đạt, target = 0."
+            >
               <>
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                   <Stat label={METRIC.runRate} value={pct(rr.total.runRate, 1)} tone={rrTone(rr.total.runRate)} hint={`đạt ${fmtVndShort(rr.total.actual)} / target tới ${rr.through ? dm(rr.through) : "—"} ${fmtVndShort(rr.total.targetToDate)}`} />
@@ -372,12 +369,20 @@ export default function BrandDashboard({ brandId, brandName, sessions, shiftSlot
                   </div>
                 </div>
 
-                <div>
-                  <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+                {/* Bảng từng ca dài ~420px; gấp lại để màn đầu là câu trả lời (run-rate + biểu đồ luỹ kế).
+                    Ba con số đếm nằm ngay trên dòng mở/đóng nên không phải mở mới biết có ca nào tụt. */}
+                <details className="group">
+                  <summary className="cursor-pointer list-none flex items-center justify-between gap-2 flex-wrap min-h-[28px]">
                     <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">
                       Theo từng ca · {caRows.filter((r) => r.pctTarget != null && r.pctTarget >= RUN_RATE_WARN).length} ca ≥ 95% · {caRows.filter((r) => r.pctTarget != null && r.pctTarget >= RUN_RATE_BAD && r.pctTarget < RUN_RATE_WARN).length} ca 85–95% ·{" "}
                       {caRows.filter((r) => r.pctTarget != null && r.pctTarget < RUN_RATE_BAD).length} ca dưới 85%
                     </p>
+                    <span className="text-xs font-bold text-[var(--accent-text)]">
+                      <span className="group-open:hidden">Xem {caRows.length} ca ▾</span>
+                      <span className="hidden group-open:inline">Thu gọn ▴</span>
+                    </span>
+                  </summary>
+                  <div className="flex justify-end mt-2 mb-2">
                     <select value={caFilter} onChange={(e) => setCaFilter(e.target.value as typeof caFilter)} className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1 text-xs text-[var(--text)]" aria-label="Lọc ca">
                       <option value="all">Tất cả ca</option>
                       <option value="bad">Chỉ ca dưới 85%</option>
@@ -419,9 +424,26 @@ export default function BrandDashboard({ brandId, brandName, sessions, shiftSlot
                     </table>
                     {shownCa.length === 0 && <p className="text-xs text-[var(--text-faint)] italic py-2">Không có ca nào khớp bộ lọc.</p>}
                   </div>
-                </div>
+                </details>
               </>
-            )}
+            </Card>
+          )}
+
+          {/* 02b · Key Metrics — vẫn đủ 18 chỉ số + AOV (lib/report/keyMetrics.ts), nhưng phân tầng (M2):
+              5 ô "Kết quả" đọc trước, 14 ô còn lại gom theo phễu live. Màu theo chiều tốt của từng chỉ số,
+              trung tính thì không tô. */}
+          <Card title={`Tháng ${Number(month.slice(5))} tới ${through ? dm(through) : "—"}`} icon={<Activity className="w-4 h-4 text-[var(--accent-text)]" />} sub={`So với cùng kỳ: ${win.label}`}>
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+              {KEY_METRICS.filter((d) => d.group === "result").map((d) => metricCell(d, "lg"))}
+            </div>
+            {KEY_METRIC_GROUPS.filter((g) => g.group !== "result").map((g) => (
+              <div key={g.group}>
+                <p className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2" title={g.hint}>{g.label}</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                  {KEY_METRICS.filter((d) => d.group === g.group).map((d) => metricCell(d, "sm"))}
+                </div>
+              </div>
+            ))}
           </Card>
 
           {/* 03 · Vì sao (ops) */}

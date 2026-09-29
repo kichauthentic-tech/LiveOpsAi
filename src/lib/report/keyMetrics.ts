@@ -155,38 +155,54 @@ export type KeyMetricKey =
 
 type Kind = "money" | "int" | "dec2" | "pct1" | "pct2" | "sec" | "hours";
 
+/**
+ * Nhóm để PHÂN TẦNG khi hiển thị (audit UX lần 2 — M2 Dashboard brand). Không đổi thứ tự hay số lượng
+ * chỉ số: màn nào muốn lưới phẳng 19 ô vẫn `KEY_METRICS.map` như cũ, màn nào cần bớt nặng thì đọc `group`.
+ * `result` = 5 ô kết quả (đọc trước), 3 nhóm còn lại theo phễu live: kéo người vào → bấm mua → giá trị giỏ.
+ */
+export type KeyMetricGroup = "result" | "traffic" | "conversion" | "basket";
+
+export const KEY_METRIC_GROUPS: { group: KeyMetricGroup; label: string; hint: string }[] = [
+  { group: "result", label: "Kết quả", hint: "Tiền và sản lượng thu được trên số giờ đã chạy." },
+  { group: "traffic", label: "Lưu lượng", hint: "TikTok đẩy phiên ra bao nhiêu người và giữ họ ở lại bao lâu." },
+  { group: "conversion", label: "Chuyển đổi", hint: "Người xem thấy giỏ hàng, bấm vào, rồi chốt đơn." },
+  { group: "basket", label: "Giỏ hàng", hint: "Một đơn gồm mấy sản phẩm, giá bao nhiêu." }
+];
+
 export interface KeyMetricDef {
   key: KeyMetricKey;
   label: string;
   kind: Kind;
   /** true = tăng là tốt; null = trung tính (không tô màu). */
   goodWhenUp: boolean | null;
+  /** Nhóm phân tầng khi hiển thị (xem KEY_METRIC_GROUPS). */
+  group: KeyMetricGroup;
   /** Dòng bổ sung ngoài 18 chỉ số (AOV). */
   extra?: boolean;
 }
 
 /** 18 chỉ số đúng thứ tự user chốt 2026-09-29, rồi AOV (bổ sung). */
 export const KEY_METRICS: KeyMetricDef[] = [
-  { key: "gmv", label: METRIC.gmv, kind: "money", goodWhenUp: true },
-  { key: "itemsSold", label: METRIC.itemsSold, kind: "int", goodWhenUp: true },
-  { key: "orders", label: METRIC.orders, kind: "int", goodWhenUp: true },
+  { key: "gmv", label: METRIC.gmv, kind: "money", goodWhenUp: true, group: "result" },
+  { key: "itemsSold", label: METRIC.itemsSold, kind: "int", goodWhenUp: true, group: "result" },
+  { key: "orders", label: METRIC.orders, kind: "int", goodWhenUp: true, group: "result" },
   // UPT live đổi theo quà tặng kèm ⇒ trung tính (Report Tháng có thêm dòng UPT bỏ quà).
-  { key: "upt", label: METRIC.upt, kind: "dec2", goodWhenUp: null },
-  { key: "err", label: METRIC.err, kind: "pct2", goodWhenUp: true },
-  { key: "avgPrice", label: METRIC.avgPrice, kind: "money", goodWhenUp: null },
-  { key: "productImpressions", label: METRIC.productImpressions, kind: "int", goodWhenUp: true },
-  { key: "productClicks", label: METRIC.productClicks, kind: "int", goodWhenUp: true },
-  { key: "ctr", label: METRIC.productCtr, kind: "pct2", goodWhenUp: true },
-  { key: "liveCtr", label: METRIC.liveCtr, kind: "pct1", goodWhenUp: true },
-  { key: "ctor", label: METRIC.ctor, kind: "pct2", goodWhenUp: true },
-  { key: "avgViewSec", label: METRIC.avgView, kind: "sec", goodWhenUp: true },
-  { key: "views", label: METRIC.views, kind: "int", goodWhenUp: true },
-  { key: "impressions", label: METRIC.liveImpressions, kind: "int", goodWhenUp: true },
-  { key: "hours", label: METRIC.liveHours, kind: "hours", goodWhenUp: null },
-  { key: "viewsPerHour", label: METRIC.viewsPerHour, kind: "int", goodWhenUp: true },
-  { key: "impressionsPerHour", label: METRIC.impressionsPerHour, kind: "int", goodWhenUp: true },
-  { key: "gmvPerHour", label: METRIC.gmvPerHour, kind: "money", goodWhenUp: true },
-  { key: "aov", label: METRIC.aov, kind: "money", goodWhenUp: true, extra: true }
+  { key: "upt", label: METRIC.upt, kind: "dec2", goodWhenUp: null, group: "basket" },
+  { key: "err", label: METRIC.err, kind: "pct2", goodWhenUp: true, group: "traffic" },
+  { key: "avgPrice", label: METRIC.avgPrice, kind: "money", goodWhenUp: null, group: "basket" },
+  { key: "productImpressions", label: METRIC.productImpressions, kind: "int", goodWhenUp: true, group: "conversion" },
+  { key: "productClicks", label: METRIC.productClicks, kind: "int", goodWhenUp: true, group: "conversion" },
+  { key: "ctr", label: METRIC.productCtr, kind: "pct2", goodWhenUp: true, group: "conversion" },
+  { key: "liveCtr", label: METRIC.liveCtr, kind: "pct1", goodWhenUp: true, group: "conversion" },
+  { key: "ctor", label: METRIC.ctor, kind: "pct2", goodWhenUp: true, group: "conversion" },
+  { key: "avgViewSec", label: METRIC.avgView, kind: "sec", goodWhenUp: true, group: "traffic" },
+  { key: "views", label: METRIC.views, kind: "int", goodWhenUp: true, group: "traffic" },
+  { key: "impressions", label: METRIC.liveImpressions, kind: "int", goodWhenUp: true, group: "traffic" },
+  { key: "hours", label: METRIC.liveHours, kind: "hours", goodWhenUp: null, group: "result" },
+  { key: "viewsPerHour", label: METRIC.viewsPerHour, kind: "int", goodWhenUp: true, group: "traffic" },
+  { key: "impressionsPerHour", label: METRIC.impressionsPerHour, kind: "int", goodWhenUp: true, group: "traffic" },
+  { key: "gmvPerHour", label: METRIC.gmvPerHour, kind: "money", goodWhenUp: true, group: "result" },
+  { key: "aov", label: METRIC.aov, kind: "money", goodWhenUp: true, group: "basket", extra: true }
 ];
 
 export const keyMetricDef = (key: KeyMetricKey): KeyMetricDef => KEY_METRICS.find((d) => d.key === key)!;

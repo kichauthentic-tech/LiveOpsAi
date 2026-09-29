@@ -3,6 +3,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test } from "vitest";
 import { monthPickerLabel, shiftMonthStr } from "../src/components/common/MonthPicker";
+import { KEY_METRICS, KEY_METRIC_GROUPS } from "../src/lib/report/keyMetrics";
 import { accountStatusLabel, statusLabel } from "../src/lib/statusLabels";
 
 const SRC = join(__dirname, "..", "src");
@@ -114,4 +115,28 @@ test("nhãn trạng thái: giá trị DB tiếng Anh hiện tiếng Việt, giá
   expect(accountStatusLabel("Inactive")).toBe("Tạm khoá");
   expect(statusLabel("Xyz")).toBe("Xyz");
   expect(statusLabel(undefined)).toBe("");
+});
+
+// ---- M2 Dashboard brand (2026-09-29) ----
+
+test("Key Metrics: đủ 19 chỉ số (18 + AOV), chỉ số nào cũng có nhóm, nhóm nào cũng có chỉ số", () => {
+  expect(KEY_METRICS).toHaveLength(19);
+  expect(KEY_METRICS.filter((d) => d.extra)).toHaveLength(1); // AOV
+  const groups = new Set(KEY_METRIC_GROUPS.map((g) => g.group));
+  // Chỉ số mới thêm mà quên gắn nhóm ⇒ biến mất khỏi Dashboard brand (chỉ render theo nhóm).
+  expect(KEY_METRICS.filter((d) => !groups.has(d.group)).map((d) => d.key)).toEqual([]);
+  expect(KEY_METRIC_GROUPS.filter((g) => !KEY_METRICS.some((d) => d.group === g.group)).map((g) => g.group)).toEqual([]);
+  // "Kết quả" là tầng ô to đọc trước — giữ 5 ô, quá tay thì hết tác dụng phân tầng.
+  expect(KEY_METRICS.filter((d) => d.group === "result")).toHaveLength(5);
+});
+
+test("Dashboard brand: Run-rate so target đứng TRƯỚC lưới Key Metrics", () => {
+  const src = readFileSync(join(SRC, "components/brand-workspace/BrandDashboard.tsx"), "utf8");
+  const runRate = src.indexOf('title="Run-rate so với target plan"');
+  const keyMetrics = src.indexOf('KEY_METRICS.filter((d) => d.group === "result")');
+  expect(runRate).toBeGreaterThan(-1);
+  expect(keyMetrics).toBeGreaterThan(-1);
+  expect(runRate).toBeLessThan(keyMetrics);
+  // Không quay lại lưới phẳng 19 ô cùng cỡ.
+  expect(src).not.toMatch(/\{KEY_METRICS\.map\(/);
 });
