@@ -20,7 +20,7 @@
 > M9 (2026-09-30, role brand — 9 màn Brand Workspace): **không có tài khoản brand nào trên DB**, nên đo bằng harness props-only
 > + tự tái hiện phép che cột của 0107. Bố cục sạch cả 9 màn; 1 lỗi: Sổ Ca in "GMV 0" ngay dưới băng-rôn nói số chưa được tính vào
 > ô tổng. **Bẫy:** harness không đi qua RLS — số của các màn đọc bảng khác (Affiliate/SKU) là số của admin, không phải của brand.
-> **Chờ user chốt:** brand có được thấy Target GMV từng ca ở Kế Hoạch Tháng Sau không (0107 nói không, màn đó đang hiện).
+> User chốt 2026-10-01: Target GMV từng ca ở Kế Hoạch Tháng Sau GIỮ NGUYÊN cho brand xem (khác target ca đã chạy — xem M9).
 > **Audit UX/UI lần 2 XONG (Đợt 0 + M1–M9).** Xem `## Audit UX/UI lần 2 (2026-09-29)`.
 
 > **MỚI 2026-09-30 — Rà lại E2E #4–#7: #4 đã tự hết từ 28/09, #5/#6/#7 sửa nốt (không migration).** #6 nặng hơn mô tả cũ (nút
@@ -712,11 +712,12 @@ tháng chưa phát hành — số liệu của các ca đó chưa hiển thị, 
 bản Excel đã nói "chưa phát hành" từ trước, chỉ dải KPI bị sót. Nay khi MỌI ca trong bộ lọc đều bị che thì 3 ô đó nói "chưa phát
 hành"; che một phần thì vẫn hiện số thật của phần đã phát hành (băng-rôn đã giải thích). `Stat` thêm prop `muted`.
 
-**Một câu hỏi cho user, KHÔNG tự quyết:** Kế Hoạch Tháng Sau hiện **Target GMV của từng ca** cho brand (75 dòng, tổng 5,5B), trong
-khi 0107 xếp `target_gmv` vào nhóm "NỘI BỘ AGENCY — brand KHÔNG BAO GIỜ thấy, bất kể publish" và view che nó ở `live_sessions`.
-Hai luật ngược nhau cho cùng một khái niệm, chỉ khác bảng: `brand_month_plan_slots` không có policy che cột nào. Có thể là CỐ Ý
-(target tháng sau chính là lời đề nghị đưa cho brand xem để xác nhận) — nhưng nếu vậy thì chú thích của 0107 nói quá tuyệt đối.
-Cần user chốt: brand có được thấy target GMV từng ca của kế hoạch tháng sau không?
+**Target GMV ở Kế Hoạch Tháng Sau — USER CHỐT 2026-10-01: GIỮ NGUYÊN, brand ĐƯỢC thấy.** Đừng nêu lại.
+Màn này hiện target GMV của từng ca cho brand (75 dòng, tổng 5,5B), trong khi 0107 xếp `target_gmv` vào nhóm "NỘI BỘ AGENCY —
+brand KHÔNG BAO GIỜ thấy, bất kể publish" và view che đúng cột đó ở `live_sessions`. Hai luật ngược nhau cho cùng một khái niệm,
+chỉ khác bảng (`brand_month_plan_slots` không có policy che cột nào) — và đó là CÓ CHỦ Ý: target của tháng SAU chính là lời đề
+nghị đưa cho brand xem để xác nhận, khác hẳn target của ca ĐÃ CHẠY vốn là số nội bộ để soát hiệu suất. Câu "KHÔNG BAO GIỜ thấy"
+trong chú thích 0107 chỉ đúng trong phạm vi `live_sessions`, không phải luật toàn app.
 
 Đã kiểm và KHÔNG phải lỗi: hiện kế hoạch trạng thái "Đang soạn" cho brand là có chủ ý — 0105 cho brand đọc cả draft, 0110 có
 trigger `trg_brand_month_plan_slots_reset_confirm` tự xoá xác nhận khi ops sửa, đúng như dòng mô tả trên màn.
