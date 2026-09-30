@@ -90,6 +90,8 @@ const inputCls =
 
 // Ô số bị khoá vì tháng chưa phát hành. Cố ý KHÔNG dùng dấu "—" như ô rỗng: brand phải phân biệt
 // được "ca này chưa có số" với "có số rồi nhưng chưa tới lượt bạn xem".
+const LOCKED = "chưa phát hành";
+
 const LockedCell: React.FC = () => (
   <span
     title="Số liệu tháng này sẽ hiện sau khi Report Tháng được phát hành."
@@ -162,6 +164,11 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
     () => rows.filter((s) => metricsHiddenFor(s, currentRole)).length,
     [rows, currentRole]
   );
+  // MỌI ca trong bộ lọc đều bị che ⇒ các ô tiền/đơn cộng ra đúng 0, mà "0" ở màn của brand đọc
+  // thành "agency bán được 0 đồng" — đúng cái bẫy `sessionFromDb` đã cảnh báo, và mâu thuẫn ngay
+  // với dòng băng-rôn phía trên ("chưa được tính vào các ô tổng"). Còn che MỘT PHẦN thì tổng vẫn
+  // là số thật của phần đã phát hành, băng-rôn đã nói rõ, nên vẫn hiện số.
+  const allHidden = rows.length > 0 && hiddenCount === rows.length;
 
   const [openId, setOpenId] = useState<string | null>(null);
   const openSession = openId ? sessions.find((s) => s.id === openId) ?? excludedSessions.find((s) => s.id === openId) ?? null : null;
@@ -328,9 +335,9 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
           <Stat label="Sessions" value={String(summary.total)} sub={summary.countable < summary.total ? `${summary.countable} ca có số` : undefined} />
           <Stat label="Giờ live" value={fmtHours(summary.hours)} sub="giờ thật, thiếu thì lấy giờ kế hoạch" />
-          <Stat label="GMV" value={fmtVndShort(summary.gmv)} accent />
-          <Stat label="Orders" value={fmtInt(summary.orders)} />
-          <Stat label="GMV/giờ" value={fmtVndShort(summary.gmvPerHour)} />
+          <Stat label="GMV" value={allHidden ? LOCKED : fmtVndShort(summary.gmv)} accent={!allHidden} muted={allHidden} />
+          <Stat label="Orders" value={allHidden ? LOCKED : fmtInt(summary.orders)} muted={allHidden} />
+          <Stat label="GMV/giờ" value={allHidden ? LOCKED : fmtVndShort(summary.gmvPerHour)} muted={allHidden} />
           <div className="bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-2.5">
             <p className="text-[11px] uppercase tracking-wider text-[var(--text-faint)]">Nguồn số liệu</p>
             {summary.countable === 0 ? (
@@ -564,10 +571,19 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
   );
 };
 
-const Stat: React.FC<{ label: string; value: string; sub?: string; accent?: boolean }> = ({ label, value, sub, accent }) => (
+const Stat: React.FC<{ label: string; value: string; sub?: string; accent?: boolean; muted?: boolean }> = ({ label, value, sub, accent, muted }) => (
   <div className="bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-2.5">
     <p className="text-[11px] uppercase tracking-wider text-[var(--text-faint)]">{label}</p>
-    <p className={`text-base font-black mt-0.5 ${accent ? "text-[var(--success)]" : "text-[var(--text)]"}`}>{value}</p>
+    <p
+      title={muted ? "Số liệu tháng này sẽ hiện sau khi Report Tháng được phát hành." : undefined}
+      className={
+        muted
+          ? "text-xs font-normal italic mt-0.5 text-[var(--text-faint)]"
+          : `text-base font-black mt-0.5 ${accent ? "text-[var(--success)]" : "text-[var(--text)]"}`
+      }
+    >
+      {value}
+    </p>
     {sub && <p className="text-[11px] text-[var(--text-faint)]">{sub}</p>}
   </div>
 );

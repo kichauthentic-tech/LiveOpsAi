@@ -17,7 +17,11 @@
 > 0 tràn ngang) nhưng **mọi con số về chính người đang xem đều là 0** — GMV lũy kế đọc cột nhập tay (0 ở 33/33 talent) thay vì cộng
 > từ ca (7,31 tỷ), rate/hoa hồng/CVR in "0" thay vì "ops chưa nhập", ô lương in "0" cho mọi talent mọi tháng, **Ca Của Tôi trắng
 > trơn với 100% talent** (thêm khối "Ca đã chạy"), và talent thấy bảng tải của cả 15 đồng nghiệp trên màn Đăng Ký Ca.
-> **Audit UX/UI lần 2 XONG (Đợt 0 + M1–M8).** Xem `## Audit UX/UI lần 2 (2026-09-29)`.
+> M9 (2026-09-30, role brand — 9 màn Brand Workspace): **không có tài khoản brand nào trên DB**, nên đo bằng harness props-only
+> + tự tái hiện phép che cột của 0107. Bố cục sạch cả 9 màn; 1 lỗi: Sổ Ca in "GMV 0" ngay dưới băng-rôn nói số chưa được tính vào
+> ô tổng. **Bẫy:** harness không đi qua RLS — số của các màn đọc bảng khác (Affiliate/SKU) là số của admin, không phải của brand.
+> **Chờ user chốt:** brand có được thấy Target GMV từng ca ở Kế Hoạch Tháng Sau không (0107 nói không, màn đó đang hiện).
+> **Audit UX/UI lần 2 XONG (Đợt 0 + M1–M9).** Xem `## Audit UX/UI lần 2 (2026-09-29)`.
 
 > **MỚI 2026-09-30 — Rà lại E2E #4–#7: #4 đã tự hết từ 28/09, #5/#6/#7 sửa nốt (không migration).** #6 nặng hơn mô tả cũ (nút
 > Phát hành CÓ hỏi nhưng chỉ khi còn ca chưa đối soát, tức đường thường vẫn phát ngay), #7 cũng vậy (không chỉ xấu UI — `save()`
@@ -424,7 +428,7 @@ Dashboard agency 5,2 → 10,1; Lịch brand 5,2 → 6,4; Sổ Ca 4,4 → 8,3; AI
 - **Bẫy khi verify:** (1) ảnh chụp cũ sau `pushState` / khi pane ẩn — đối chiếu bằng `innerText` hoặc `navigate` thật; (2) khi đang
   giả lập kích thước (resize_window 1440×900), click của công cụ rơi SAI toạ độ (log sự kiện: click ở x=2406 trên khung 1440) — test
   thao tác chuột ở preset `desktop`; (3) bắt khoảnh khắc đang tải: mở app trong `<iframe>` cùng origin rồi lấy mẫu `contentDocument`.
-- Chưa verify: role brand — cần đăng nhập tài khoản đó. (Màn talent đã đo 2026-09-30, xem "M8 — màn talent".)
+- Màn talent + role brand đều đã đo 2026-09-30 bằng harness props-only — xem "M8 — màn talent" và "M9 — role brand". Role brand CHƯA có tài khoản thật nào trên DB.
 
 ### Theo module (thứ tự đề xuất = lượt mở × mức lỗi)
 - **M1 Report Tháng — ĐÃ LÀM 2026-09-29, verify trên browser (CROCS T9, admin).** Chỉ bố cục, không đổi số/nội dung phân tích.
@@ -680,6 +684,44 @@ người vì `overallScore` cũng là cột nhập tay = 0 — đặt lại các
 Chưa đo được: **role brand** — cần user đăng nhập tài khoản đó trong Browser pane (không dựng harness được vì màn brand lấy
 `assignedBrandId` từ chính profile). Cột Rate card/Hoa hồng/SĐT/CVR ở Talent Pool vẫn tự ẩn vì 0/33 hồ sơ có dữ liệu — đó là việc
 nhập liệu, không phải việc code.
+
+## M9 — role brand, 9 màn Brand Workspace (2026-09-30) — XONG + VERIFY, không migration
+
+**KHÔNG CÓ TÀI KHOẢN BRAND NÀO trên DB** (4 profile: ceo/admin/talent/operations, 0 role `brand`). Nên ghi chú cũ "cần user đăng
+nhập tài khoản brand" là bất khả thi, không phải chờ ai. Đo bằng harness props-only như M8: mọi màn brand nhận `currentRole` qua
+**prop**, và App truyền cùng handler cho mọi role — chỉ `canEdit` của BrandCalendar là khác theo role. Gating nằm TRONG component.
+
+**Bẫy lớn nhất của cách đo này, phải đọc trước khi tin bất cứ số nào:** harness chạy bằng session admin nên **không đi qua RLS**.
+Lần chạy đầu Dashboard hiện GMV 3,52B của tháng CHƯA phát hành — đúng thứ 0107 sinh ra để chặn — và suýt bị ghi thành lỗi. Thực ra
+là ảo giác của harness. Phải tự tái hiện phép che của view `live_sessions_secure` (0107) trong harness mới đo được đúng; sau khi
+che, Dashboard nói "Số liệu tháng 09/2026 sẽ hiện khi ops phát hành Report Tháng" như thiết kế.
+Che được `live_sessions` thì vẫn CÒN các bảng khác có RLS **theo dòng** mà harness không tái hiện nổi:
+`brand_affiliate_actuals` (policy `..._brand_read_when_published`), `session_skus`, `brand_monthly_reports`. Với những màn đó
+harness đo được **bố cục**, KHÔNG đo được **brand thấy dữ liệu gì** — số hiện ra trong harness là số của admin.
+(Affiliate lúc đầu tưởng rò số tháng chưa phát hành; kiểm policy thì thấy đã bị chặn theo dòng từ 0107. Không phải lỗi.)
+
+Bối cảnh dữ liệu lúc đo: **0/3 report được phát hành**, nên với brand thật lúc này MỌI tháng đều "chưa phát hành". Harness có cờ
+`?published=1` để đo cả trạng thái đã phát hành mà không phải phát hành thật report nào.
+
+**Bố cục sạch** ở cả 1440×900 và 375×812: 0 phần tử bấm dưới 24px, 0 tràn ngang trang trên cả 9 màn. Số màn cuộn (1440 → 375):
+Dashboard 1,0 · Report Tháng 1,0 · Sổ Ca 2,93 → 5,63 · Kế Hoạch Tháng Sau 3,07 → 3,47 · Lịch Vận Hành 4,57. Chỗ cuộn ngang duy
+nhất là bảng Sổ Ca trong hộp riêng, 1,24× ở 375px (cùng mức Talent Pool 1,26×, chấp nhận được).
+
+**Lỗi tìm được — 1 cái, ĐÃ SỬA:** Sổ Ca của brand in `GMV 0` · `ORDERS 0` · `GMV/GIỜ 0` ngay dưới băng-rôn nói "47/47 ca thuộc
+tháng chưa phát hành — số liệu của các ca đó chưa hiển thị, **và chưa được tính vào các ô tổng bên dưới**". Từng dòng trong bảng và
+bản Excel đã nói "chưa phát hành" từ trước, chỉ dải KPI bị sót. Nay khi MỌI ca trong bộ lọc đều bị che thì 3 ô đó nói "chưa phát
+hành"; che một phần thì vẫn hiện số thật của phần đã phát hành (băng-rôn đã giải thích). `Stat` thêm prop `muted`.
+
+**Một câu hỏi cho user, KHÔNG tự quyết:** Kế Hoạch Tháng Sau hiện **Target GMV của từng ca** cho brand (75 dòng, tổng 5,5B), trong
+khi 0107 xếp `target_gmv` vào nhóm "NỘI BỘ AGENCY — brand KHÔNG BAO GIỜ thấy, bất kể publish" và view che nó ở `live_sessions`.
+Hai luật ngược nhau cho cùng một khái niệm, chỉ khác bảng: `brand_month_plan_slots` không có policy che cột nào. Có thể là CỐ Ý
+(target tháng sau chính là lời đề nghị đưa cho brand xem để xác nhận) — nhưng nếu vậy thì chú thích của 0107 nói quá tuyệt đối.
+Cần user chốt: brand có được thấy target GMV từng ca của kế hoạch tháng sau không?
+
+Đã kiểm và KHÔNG phải lỗi: hiện kế hoạch trạng thái "Đang soạn" cho brand là có chủ ý — 0105 cho brand đọc cả draft, 0110 có
+trigger `trg_brand_month_plan_slots_reset_confirm` tự xoá xác nhận khi ops sửa, đúng như dòng mô tả trên màn.
+
+1 ca test canh mới, đỏ trên code cũ. tsc 0, eslint 0 lỗi/33 cảnh báo (= baseline), vitest **220/220**, build OK.
 
 ## Rà lại E2E #4–#7 (2026-09-30) — XONG + VERIFY, không migration
 

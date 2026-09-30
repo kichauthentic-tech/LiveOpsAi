@@ -480,3 +480,20 @@ test("Kế Hoạch Tháng: 'Lưu nháp' khoá cả lúc đang tải brand/tháng
   expect(src, "setDirty(false) vẫn nằm trong .then() — nếu đổi chỗ thì xem lại ca test này")
     .toMatch(/\.then\(\(r\) => \{[\s\S]*?setDirty\(false\);/);
 });
+
+// ── Audit UX/UI lần 2 — M9: role brand (2026-09-30) ─────────────────────────────────────────────
+
+test("Sổ Ca của brand: tháng chưa phát hành thì ô tổng nói lý do, không in số 0", () => {
+  // View `live_sessions_secure` (0107) trả null cho các cột số khi brand xem tháng chưa phát hành,
+  // client ép về 0 ⇒ dải KPI cộng ra đúng 0. "GMV 0" ở màn của brand đọc thành "agency bán được 0
+  // đồng", và mâu thuẫn thẳng với băng-rôn ngay phía trên ("chưa được tính vào các ô tổng").
+  // Từng dòng trong bảng và bản Excel đã nói "chưa phát hành" từ trước; chỉ dải tổng bị sót.
+  const src = readFileSync(join(SRC, "components/SessionLedger.tsx"), "utf8");
+  expect(src).toMatch(/const allHidden = rows\.length > 0 && hiddenCount === rows\.length;/);
+  for (const label of ["GMV", "Orders", "GMV/giờ"]) {
+    const tile = src.slice(src.indexOf(`<Stat label="${label}"`));
+    expect(tile.slice(0, 200), `ô "${label}" phải xét allHidden`).toMatch(/allHidden \? LOCKED/);
+  }
+  // Che MỘT PHẦN thì vẫn hiện số thật của phần đã phát hành — băng-rôn đã giải thích.
+  expect(src).toMatch(/hiddenCount > 0 && \(/);
+});
