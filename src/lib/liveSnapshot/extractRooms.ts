@@ -2,8 +2,10 @@ import { parseDataRawExcel } from "../dataraw/parseDataRawExcel";
 import { mapCreatorLivePerfRows } from "../dataraw/creatorLivePerfSlice";
 
 // Một dòng room đã chuẩn hoá, sẵn sàng đẩy vào RPC apply_session_live_snapshot (migration 0078).
-// Chỉ 13 trường ĐẾM ĐƯỢC được tách riêng — mọi tỷ lệ (AOV, GPM, CTR, CTOR, *_rate) nằm trong
+// Chỉ các trường ĐẾM ĐƯỢC được tách riêng — mọi tỷ lệ (AOV, GPM, CTR, CTOR, *_rate) nằm trong
 // `raw` để tra cứu/kiểm chứng chứ không bao giờ đem trừ, vì hiệu của 2 tỷ lệ cộng dồn vô nghĩa.
+// `watchSeconds` là trường thứ 14, thêm 2026-09-30 (migration 0124): Avg. view là tỷ lệ nên phải
+// quy về đại lượng cộng được trước khi trừ — xem chú thích của chính trường đó.
 export interface SnapshotRoomRow {
   roomId: string;
   roomTitle?: string;
@@ -22,6 +24,20 @@ export interface SnapshotRoomRow {
   comments: number;
   shares: number;
   likes: number;
+  /**
+   * Tổng GIÂY XEM của room = "Avg. viewing duration" × Views.
+   *
+   * File chỉ có số trung bình, mà trung bình là TỶ LỆ — không được đem trừ giữa 2 lần up như 13
+   * cột đếm được kia (xem chú thích bảng `session_live_snapshot_rows`, migration 0078). Nhân
+   * ngược lên thành đại lượng CỘNG ĐƯỢC rồi mới trừ/cộng, cuối cùng chia lại cho Views: đúng
+   * trung bình có trọng số mà `keyMetrics.ts` (`watchSecViews`/`watchViews`) đang dùng để gộp
+   * Avg. view của nhiều ca — hai chỗ phải ra cùng một số.
+   *
+   * Mẫu số là Views, xác nhận bằng chính file: bản export có 2 cột trùng y hệt giá trị,
+   * "Avg. viewing duration" và "Avg. viewing duration per view" (đo trên 228 dòng đối soát thật
+   * 2026-09-30: 26,74 / 41,62 / 37,47 giây).
+   */
+  watchSeconds: number;
   raw: Record<string, unknown>;
 }
 
@@ -30,6 +46,13 @@ export interface ParsedSnapshotFile {
   periodStart?: string;
   periodEnd?: string;
   rows: SnapshotRoomRow[];
+}
+
+/** Giây xem cộng dồn của room. Xem chú thích `SnapshotRoomRow.watchSeconds` cho lý do nhân ngược. */
+export function watchSecondsOf(avgViewDurationSec: number, views: number): number {
+  if (!Number.isFinite(avgViewDurationSec) || !Number.isFinite(views)) return 0;
+  if (avgViewDurationSec <= 0 || views <= 0) return 0;
+  return Math.round(avgViewDurationSec * views);
 }
 
 // Cột "Duration" trong file làm tròn xuống phút ("0h50m" cho phiên dài 50m17s), dùng nó thì
@@ -70,6 +93,7 @@ export async function parseSnapshotFile(file: File): Promise<ParsedSnapshotFile>
       comments: r.comments,
       shares: r.shares,
       likes: r.likes,
+      watchSeconds: watchSecondsOf(r.avgViewDurationSec, r.views),
       raw: r.sourceRow
     });
   }

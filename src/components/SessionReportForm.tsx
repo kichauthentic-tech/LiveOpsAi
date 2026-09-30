@@ -168,7 +168,9 @@ export function SessionReportForm({ session, onSubmit, onCancel, canOverrideMetr
               ["LIVE GMV", fmtVndFull(session.actualGmv)],
               ["Orders", session.totalOrders.toLocaleString("vi-VN")],
               ["Views", session.totalViews.toLocaleString("vi-VN")],
-              ["Avg. view (s)", `${session.avgWatchTimeSeconds}s`],
+              // File up trước migration 0124 không mang theo Avg. view ⇒ cột này = 0. Khối đang
+              // khẳng định "số máy đã biết — từ file", in "0s" ở đó là nói sai: máy KHÔNG biết.
+              ["Avg. view (s)", session.avgWatchTimeSeconds > 0 ? `${session.avgWatchTimeSeconds}s` : "—"],
               [isTikTok ? "LIVE CTR" : "CTR", `${(Math.round(session.ctrAvg * 100) / 100).toLocaleString("vi-VN")}%`],
               ...(isTikTok
                 ? [

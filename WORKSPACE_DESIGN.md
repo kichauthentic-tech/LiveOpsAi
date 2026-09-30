@@ -19,6 +19,12 @@
 > trơn với 100% talent** (thêm khối "Ca đã chạy"), và talent thấy bảng tải của cả 15 đồng nghiệp trên màn Đăng Ký Ca.
 > **Audit UX/UI lần 2 XONG (Đợt 0 + M1–M8).** Xem `## Audit UX/UI lần 2 (2026-09-29)`.
 
+> **MỚI 2026-09-30 — Avg. view không bao giờ được ghi cho ca chạy trong app (E2E #3): ĐÃ SỬA, nhưng migration `0124` CHƯA CHẠY.**
+> 0084 khoá 5 cột "số đọc từ file" không cho talent sửa, mà đường đọc file chỉ ghi 4/5 — `avg_watch_time_seconds` kẹt ở 0 vĩnh viễn
+> cho mọi ca chạy trong app (229/229 ca hiện tại là ca nạp bù nên chưa lộ). Sửa bằng cách lưu `watch_seconds = avg × views` rồi
+> chia lại, không bê thẳng số trung bình của file. **Việc của ops: chạy `0124_avg_view_duration_from_file.sql`.**
+> Xem `## Avg. view đọc từ file (0124)`.
+
 > **MỚI 2026-09-29 — Key Metrics 18 chỉ số trên MỌI report (không migration, commit 7996080 đã push `main`).** Một module
 > [keyMetrics.ts](src/lib/report/keyMetrics.ts) (bộ đếm + công thức + danh sách `KEY_METRICS` + định dạng + cột Excel) thay 5 bản
 > cộng số riêng. Áp cho Report Tháng (Xu hướng 4 tháng, bảng Host, sheet Excel), Report Tuần, Dashboard brand, cửa sổ ca, Hiệu Suất
@@ -92,10 +98,10 @@
 >    target. Tổng agency ở các khối khác không đổi. Test `tests/combineOutlooks.test.ts` (18,2M ÷ 100M chứ không 3,55B ÷ 100M).
 >    Lỗi gốc:: VERA có kế
 >    hoạch, CROCS không ⇒ "Đã đạt 3,53B · 24.103% Target". Sẽ gặp thật ngay khi chốt kế hoạch T10 cho một phần brand.
-> 3. **VỪA — Avg. view không bao giờ được ghi cho ca chạy trong app.** RPC file giao ca (0078/0082) và đối soát (0080) không set
->    `avg_watch_time_seconds` ⇒ mọi ca mới = 0s (229 ca CROCS nạp bù thì có số từ 0086). Form report lại ghi "AVG.view lấy từ file".
->    Hiệu Suất Host cộng `avgWatch × views` ([hostPerformance.ts:238](src/lib/performance/hostPerformance.ts:238)) ⇒ ca mới kéo tụt
->    Avg. view của host. Số gốc có trong file (cột "Avg. viewing duration") và trong `raw` của snapshot row.
+> 3. ~~**VỪA — Avg. view không bao giờ được ghi cho ca chạy trong app.**~~ **ĐÃ SỬA 2026-09-30 — migration `0124` CHƯA CHẠY, xem
+>    `## Avg. view đọc từ file (0124)`.** Hai chi tiết trong mô tả cũ đã lỗi thời: `hostPerformance.ts` không còn đụng `avgWatch`
+>    (viết lại trong đợt Key Metrics 29/09), và hệ quả không phải "kéo tụt" mà là MẤT chỉ số — `keyMetrics.ts` bỏ qua ca có
+>    `avgViewSec = 0` nên cả tháng toàn ca chạy trong app thì Avg. view ra "—".
 > 4. **VỪA — Hỗ Trợ Vận Hành với brand chưa có lịch sử 28 ngày**: "Dự kiến cuối tháng 0 · Thiếu 100M (100%)", và phương án B ghi
 >    "Không còn ca nào phía trước" ngay dưới dòng "cần 50M/ca cho 2 ca còn lại" — nhánh else ở
 >    [OpsSupport.tsx:314](src/components/OpsSupport.tsx:314) gộp "hết ca" với "không có dự báo" (`monthOutlook` ra 0 khi GMV/giờ = 0).
@@ -662,6 +668,48 @@ người vì `overallScore` cũng là cột nhập tay = 0 — đặt lại các
 Chưa đo được: **role brand** — cần user đăng nhập tài khoản đó trong Browser pane (không dựng harness được vì màn brand lấy
 `assignedBrandId` từ chính profile). Cột Rate card/Hoa hồng/SĐT/CVR ở Talent Pool vẫn tự ẩn vì 0/33 hồ sơ có dữ liệu — đó là việc
 nhập liệu, không phải việc code.
+
+## Avg. view đọc từ file (0124) — XONG code + kiểm trên Postgres thật, **migration CHƯA CHẠY trên DB thật**
+
+**Việc của ops: chạy `supabase/migrations/0124_avg_view_duration_from_file.sql` trên project thật.** Chạy được bất cứ lúc nào
+(không khoá bảng lâu, không đổi dữ liệu đang đúng); trước khi chạy thì ca chạy trong app vẫn có Avg. view = 0.
+
+**Lỗi:** 0084 coi 5 cột `actual_gmv / total_orders / total_views / ctr_avg / avg_watch_time_seconds` là "số đọc từ file TikTok" và
+khoá không cho talent sửa tay khi ca đã có snapshot/đối soát — nhưng chỉ **4 trong 5** cột đó thật sự được đường đọc file ghi.
+`recompute_session_from_snapshot` (0080) và `apply_live_reconciliation` (0082) không hề đụng `avg_watch_time_seconds`. Cột bị khoá
+ở giá trị lúc up file (ca mới = 0) và ô "Avg. view (giây)" trong form report thì `disabled` ⇒ không có đường nào sửa.
+Chưa ai thấy vì **229/229 ca trên DB là ca nạp bù**, đi đường 0086 (đường đó CÓ ghi cột này). Ca đầu tiên chạy thật trong app là lộ.
+
+**Vì sao không bê thẳng cột "Avg. viewing duration" vào:** nó là TỶ LỆ (giây/lượt xem), mà quy tắc bảng
+`session_live_snapshot_rows` (0078) cấm tách cột tỷ lệ ra để trừ — hiệu của 2 tỷ lệ cộng dồn là số vô nghĩa, trong khi trừ giữa 2
+lần up chính là cơ chế sống còn của bảng (2 ca nối nhau chung room). Nên lưu **`watch_seconds = avg × views`** (đại lượng cộng
+được), trừ/cộng/chia tỷ lệ trên nó, cuối cùng mới chia lại cho views. Đúng bằng trung bình có trọng số mà
+[keyMetrics.ts](src/lib/report/keyMetrics.ts) (`watchSecViews`/`watchViews`) đang dùng để gộp Avg. view nhiều ca — hai chỗ phải ra
+cùng một số. Số cụ thể: 2 ca nối nhau, room cộng dồn 1.000 view/30s rồi 2.500 view/40s ⇒ ca sau đúng là **47s**
+((100.000−30.000)/1.500), bê thẳng số file ra **40s**.
+
+**Mẫu số là Views — đo trên file thật, không suy đoán.** `live_reconciliation_rows.raw` còn nguyên 35 cột của 228 dòng đã nạp: bản
+export TikTok có **2 cột giá trị trùng y hệt**, `"Avg. viewing duration"` và `"Avg. viewing duration per view"` (26,74 / 41,62 /
+37,47 giây ở 3 dòng đầu). Chính chỗ lặp đó nói ra mẫu số — chú thích cũ ở [metrics.ts](src/lib/liveSnapshot/metrics.ts) coi cặp
+lặp này là thứ làm "không đối chiếu xác minh được", thực ra nó là bằng chứng. Dải giá trị cũng khớp 229 ca nạp bù (p25–p75 32–40s,
+trung vị 36s), nên cột này tin được.
+
+**Đã sửa:** [extractRooms.ts](src/lib/liveSnapshot/extractRooms.ts) thêm trường thứ 14 `watchSeconds` (cả 2 đường nạp file —
+snapshot lúc giao ca và đối soát cuối kỳ — dùng chung `parseSnapshotFile` nên chỉ 1 chỗ); migration 0124 thêm cột `watch_seconds`
+cho 2 bảng dòng-theo-room (**nạp bù được ngay cho 228 dòng đối soát cũ từ `raw`** — giữ nguyên trạng cả 35 cột chính là để dùng
+được lúc này), thêm vào view `session_room_deltas` và 5 hàm RPC. Ô "Avg. view (s)" trong khối "Số máy đã biết — từ file" của form
+report hiện `—` thay vì `0s` khi chưa có số. **Hai lỗi phụ bắt được lúc sửa:** `previous_values` lúc up snapshot lần đầu không chụp
+`avg_watch_time_seconds` nên xoá snapshot không khôi phục lại được số host khai tay; và cả 2 hàm ghi đều phải `else giữ nguyên số
+đang có` thay vì ghi 0, nếu không file up trước 0124 (watch_seconds = 0) sẽ xoá sạch số đang đúng.
+
+**Cách kiểm SQL từ nay (quy ước mới):** dự án không có Supabase CLI/DB local, nhưng `postgres`/`psql` có sẵn trên máy (Homebrew) —
+dựng cluster tạm rồi chạy fixture + migration + bộ kiểm là đủ bắt cả lỗi cú pháp lẫn lỗi logic, **không cần đụng DB thật**. Công
+thức + bẫy (`export LC_ALL=C`, nếu không postmaster chết "became multithreaded during startup"; đường dẫn socket tối đa 103 ký tự
+nên không để trong thư mục scratchpad) ghi ở [supabase/tests/README.md](supabase/tests/README.md).
+Kiểm 0124: 9 mục, chạy trên Postgres 18.4 — **đỏ trên bản chưa nạp migration** (`A avg_watch : got 0, want 30`), xanh sau khi nạp.
+Phủ: 1 ca 1 room · 2 ca chung room (phép trừ) · file cũ không watch_seconds (không ghi đè) · xoá snapshot (khôi phục) · đối soát
+(chia theo tỷ lệ đóng góp). Phía TS có `tests/watchSeconds.test.ts` (5 ca, 4 đỏ trên code cũ).
+tsc 0, eslint 0 lỗi/33 cảnh báo (= baseline), vitest **216/216**, build OK.
 
 ## Audit UX/UI (2026-09-26) — P0 + P1 XONG + DEPLOY; P2: tách bundle XONG, phần còn lại chưa làm
 
