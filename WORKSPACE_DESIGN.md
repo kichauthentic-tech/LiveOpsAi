@@ -164,6 +164,8 @@
 > cho realtime/storage supabase không dùng tới; chunk tab Report Tháng 534 → 39 KB (recharts chỉ tải khi tháng có report). Mục `### P2a-2`.
 > **P2a-3 đợt fetch lúc đăng nhập 2026-10-01:** 46 → **28 request**; hết cụm 6 fetch gọi 2 lần và hết vòng lặp
 > nạp `profiles` vô hạn mỗi lần tab được hiện lại (GoTrue phát lại `SIGNED_IN`). Mục `### P2a-3`.
+> **P2a-4 2026-10-01:** chuông không poll khi tab ẩn; và **PostgREST chặn 1.000 dòng không báo lỗi** — `brand_dataraw_rows`
+> ĐANG mất dòng thật (đợt nhập 1.080 dòng chỉ đọc được 1.000). 8 hàm chuyển sang cuộn trang. Mục `### P2a-4`.
 > **P2b đếm lượt mở tab: XONG, 0123 đã chạy, đếm từ 26/09/2026** (Phân Quyền → Lượt Mở Tab).
 > **P2c Report Tháng trên điện thoại XONG:** 24,7 → 7,5 màn 375px, phần 3–8 gập sau Insight. P2 còn: gộp menu (chờ 2–4 tuần số liệu).
 > **Kèm vá sự cố: mọi `/api/*` production chết (FUNCTION_INVOCATION_FAILED) từ 9dcf719 (24/09) tới 5ecb7c8 (26/09)** —
@@ -1006,8 +1008,9 @@ Chưa đo được: màn talent (Ca Của Tôi/Đăng Ký Ca) và role brand b�
   lặp và request chạy mãi, không phải "chia nhỏ payload". Ghi lại để phiên sau đừng tối ưu nhầm hướng.
 - **Chưa làm:** chưa đo được đợt fetch của role talent/brand (không có tài khoản brand; tài khoản talent có nhưng Claude không
   gõ mật khẩu). Gating hiện tại theo màn nên talent/brand tự nhiên nạp ít hơn, nhưng con số thật thì chưa có.
-  `live_sessions_secure?select=*` và `audit_logs?select=*` vẫn **không có `limit`** — hôm nay 229 và 14 dòng nên không sao,
-  nhưng cả hai chỉ tăng.
+  ~~`live_sessions_secure?select=*` và `audit_logs?select=*` vẫn không có `limit`~~ — ĐÍNH CHÍNH 01/10: `live_sessions_secure`
+  **đã tự cuộn trang** từ trước (`fetchAllSessionRows`, `.range()` theo lô 1.000), không hề thiếu dòng. `audit_logs` thì đúng là
+  không chặn — và còn 7 bảng khác cùng lỗi, trong đó một bảng ĐANG mất dòng thật. Xem `### P2a-4`.
 - Verify (bản build thật, cổng 3100): mở `/so-ca` → 28 request, 0 lặp, xong ở 751 ms, 0 lỗi console, Sổ Ca hiện đủ số
   (47 ca · 177,8h · 3,52B). Mở Phân Quyền → "Danh Sách Account (4)" + "Audit Logs (14)" nạp đúng lúc. Bấm sang Tự Động Hoá
   TikTok **trong app** (không reload) → đúng 3 request `/api/tiktok/status` + `tiktok_webhook_events` + `workflow_rules`.
@@ -1020,6 +1023,64 @@ Chưa đo được: màn talent (Ca Của Tôi/Đăng Ký Ca) và role brand b�
   Bẫy đã dính: neo test theo tên hàm `fetchUsers()` khớp nhầm dòng `import` — neo theo tên hằng số `TABS_NEED_*` (mỗi bộ một
   hằng số riêng, xuất hiện đúng 1 lần trong thân effect) mới đúng.
 - `tsc` 0 lỗi · `eslint` 0 lỗi / 33 warning (baseline) · `vitest` **233/233** · `npm run build` OK.
+
+### P2a-4 — Chuông theo trạng thái tab + trần 1.000 dòng của PostgREST — XONG + VERIFY 2026-10-01 (không migration)
+
+**A. Chuông không poll khi tab đang ẩn.** `useNotifications` gọi lại mỗi 45 giây kể cả khi người dùng đang ở tab khác hoặc
+đã thu nhỏ cửa sổ — trình duyệt có bóp nhịp timer của tab ẩn nhưng KHÔNG dừng hẳn. Nay nhịp poll bỏ qua khi
+`document.visibilityState === "hidden"`, và quay lại thì nạp NGAY thay vì đợi tới nhịp kế (tối đa 45 giây).
+- Phải nghe **cả hai** sự kiện: đổi tab trong cùng cửa sổ chỉ phát `visibilitychange` (cửa sổ không hề mất focus), còn chuyển
+  sang app khác rồi quay lại thì phát `focus`.
+- Chặn nạp trùng bằng biến `last` cục bộ của effect (`Date.now() - last < POLL_MS`). **Cần thật**: đo trong Browser pane thấy
+  `visibilitychange` có thể dội liên tục mỗi ~6 giây (chính thứ đã gây vòng lặp nạp hồ sơ ở `### P2a-3`) — không chặn thì bản
+  "sửa" này hoá ra poll dày hơn bản cũ. Dùng biến cục bộ chứ không `useRef` vì React Compiler cấm sửa ref ngoài effect.
+
+**B. PostgREST chặn 1.000 dòng và KHÔNG báo lỗi.** Đây mới là phần nghiêm trọng. Query đọc cả bảng mà không cuộn trang thì
+nhận về đúng 1.000 dòng đầu rồi im lặng — không lỗi, không cảnh báo, số tính từ đó sai mà không ai biết.
+
+> **Đang hỏng thật, không phải rủi ro tương lai.** `brand_dataraw_rows` có **5.333 dòng**; 4/24 đợt nhập đã vượt trần
+> (1.181 · 1.176 · 1.164 · 1.080). Đo trực tiếp trên DB thật: query CŨ của `fetchDataRawRows` trả về **1.000** dòng cho đợt
+> nhập có **1.080** — màn Dữ Liệu Gốc của CROCS đang **mất 80 dòng**, âm thầm, từ lúc file đó được up.
+
+- [src/lib/db/fetchAllPages.ts](src/lib/db/fetchAllPages.ts) — helper cuộn trang dùng chung (`PAGE_SIZE = 1000`, gọi tiếp tới
+  khi gặp trang ngắn hơn `PAGE_SIZE`). `fetchAllSessionRows` của Sổ Ca đã tự cuộn đúng cách này từ trước; helper chỉ gom lại
+  một chỗ để chỗ mới không phải nghĩ lại.
+- **Luật từ nay:** đọc CẢ BẢNG ở bảng lớn dần theo ca / theo tháng / theo dòng dữ liệu ⇒ phải đi qua `fetchAllPages` kèm
+  `.order(...)` **ổn định** (có cột phá hoà, thường là `id`) — thiếu thứ tự xác định thì Postgres được phép trả cùng một dòng
+  ở hai trang và bỏ sót dòng khác. Bảng chặn có chủ ý (nhật ký) ⇒ phải khai `.limit(` rõ ràng.
+- Đã chuyển sang cuộn trang (8 hàm): `fetchDataRawRows` · `fetchShiftSlots` · `fetchShiftRegistrations` ·
+  `fetchSessionFinances` · `fetchLockedPlanTargets` · `fetchTalentRateHistory` · `fetchBrandPlatformRateHistory` ·
+  `fetchAllMonthlyReports`.
+- `fetchAuditLogs` **không** cuộn hết mà chặn `AUDIT_LOG_LIMIT = 500` — có chủ ý: nhật ký chỉ ghi thêm và không bao giờ dừng,
+  còn màn Phân Quyền render thẳng `auditLogs.map(...)` không phân trang, cuộn hết là vừa tải vừa vẽ vô hạn. Nhãn tab đổi thành
+  "500 gần nhất" khi chạm trần để người xem biết mình đang nhìn bao nhiêu — **đừng bỏ nhãn đó đi**, nó là thứ duy nhất phân
+  biệt "đủ" với "bị cắt".
+- **Cố ý KHÔNG đổi:** bảng bị chặn bởi thực thể nghiệp vụ chứ không theo thời gian (`brands` 4 · `studios` 5 · `talents` 33 ·
+  `profiles` 4 · `role_permissions` · `brand_platform_rates` · `brand_studios` · `recurring_shift_templates` · `promo_schemes`)
+  — không có đường nào chạm 1.000. Chuyển hết là churn vô ích.
+- **Không phải lo:** `ui_tab_views` đã 867 dòng nhưng đọc qua RPC `tab_usage_summary` gộp sẵn ở DB, trả về một dòng mỗi
+  (workspace, tab, role) — không dính trần. `live_session_reports` chia lô theo 50 session id nên mỗi lô ≤50 dòng.
+
+| Bảng | Dòng (01/10) | Nhịp tăng | Xử lý |
+|---|---|---|---|
+| `brand_dataraw_rows` | 5.333 | mỗi file Excel up lên | **đang mất dòng** → cuộn trang |
+| `brand_month_plan_slots` | 75 | ~75/tháng → chạm trần trong ~1 năm | cuộn trang |
+| `session_finance` · `shift_slots` · `session_availability` | theo ca | ~50/tháng | cuộn trang |
+| `talent_rate_history` | 34 | mỗi lần đổi rate | cuộn trang |
+| `audit_logs` | 14 | mỗi thao tác | chặn 500, nói rõ trên nhãn |
+| `ui_tab_views` | 867 | mỗi lượt mở tab | không dính (RPC gộp sẵn) |
+
+- Verify (bản build thật): mở Dữ Liệu Gốc CROCS → Sản Phẩm → bung batch 09/2026 (1.080 dòng) → đúng **2 request**
+  (`offset=0` và `offset=1000`), bảng render **1.080 dòng** khớp `row_count`. Query cũ chạy tay trên cùng import: **1.000**.
+  Chuông: ép `visibilityState = "hidden"` 80 giây (> 1 nhịp 45 s) → **0 request**; bật lại `visible` → đúng **1** lần nạp ngay;
+  dội 10 sự kiện `visibilitychange` liên tiếp → vẫn **1**. Phân Quyền hiện "Audit Logs (14)". 0 lỗi console.
+- Test canh `tests/pagedQueries.test.ts` (9 test). 5 test là logic thật của `fetchAllPages` chạy với pager giả — gồm cái bẫy
+  kinh điển: **trang đầy ĐÚNG bằng tổng số dòng vẫn phải hỏi thêm một trang**, dừng sớm là mất sạch từ dòng 1.001. 4 test canh
+  nguồn: 8 hàm phải qua `fetchAllPages` + `.range(from, to)` + `.order(`; `fetchAllSessionRows` không bị gỡ mất vòng cuộn;
+  nhật ký phải có `.limit(` và nhãn "gần nhất"; chuông phải kiểm `visibilityState`, nghe `visibilitychange`, có chặn trùng, và
+  gỡ listener khi unmount. Thử trên code cũ: 3/4 test canh nguồn đỏ đúng (test `fetchAllSessionRows` xanh cả hai bên vì nó canh
+  hồi quy phần vốn đã đúng).
+- `tsc` 0 lỗi · `eslint` 0 lỗi / 33 warning (baseline) · `vitest` **242/242** · `npm run build` OK.
 
 ### P2b — Đếm lượt mở tab — XONG 2026-09-26, migration 0123 ĐÃ CHẠY + verify (bắt đầu đếm 26/09/2026)
 - Vì sao: trước khi gộp/bỏ mục menu (18 tab agency + 10 tab brand) cần số người dùng thật — chưa có số nào.
@@ -1125,7 +1186,7 @@ Kèm theo, `ShiftScheduling.tsx` — mỗi dòng ca trong `visibleSlots.map()` t
 4. **Thay `window.alert()` bằng toast — XONG (49/49).** [useToast.tsx](src/hooks/useToast.tsx): `ToastProvider` + `useToast()` (context, không chặn UI, tự biến mất sau 8s, có nút đóng tay) mount ở `main.tsx` trên `AuthProvider`. Thay cơ học `window.alert(X)` → `showToast(X)` ở 9 file (App.tsx 39 chỗ — gần như toàn bộ là `catch (e) { window.alert(errorMessage(e)) }` — + 8 file khác 10 chỗ: OpenSlotModal/FinanceHr/SlotDetailModal/BackfillFromRooms/StudioEquipment/ShiftScheduling/SessionWindow/AiTrainingCenter). An toàn vì `alert()` không gate luồng gì phía sau (fire-and-forget), không cần đổi hàm bao quanh thành async.
 5. **`window.confirm()` → modal riêng — XONG (25/25), đợt 2.** [useConfirm.tsx](src/hooks/useConfirm.tsx): `ConfirmProvider` + `useConfirm()` — trả `Promise<boolean>` (khác `useToast` — mỗi `confirm()` cũ đang GATE code chạy tiếp nên không thay cơ học được), dialog card giữa màn khớp theme app (không phải native), `whitespace-pre-line` giữ đúng xuống dòng của các cảnh báo nhiều đoạn ghép bằng `\n\n` (MonthPlan.tsx có confirm dài nhất — 4 đoạn cảnh báo trước khi chốt kế hoạch), option `danger` tô nút xác nhận đỏ cho hành động phá huỷ (xoá/huỷ — set ở tất cả các chỗ `window.confirm` cũ có ý "xoá"/"huỷ"/"ngắt kết nối" không hoàn tác được). 16 file, 25 chỗ: MonthPlan (4) · OpenSlotModal/TikTokApiAutomation/StudioEquipment/ReportPublishBoard/LiveReconciliation/BrandCommitment (2 mỗi file) · BrandMonthlyReport/BrandDataRaw/BackfillFromRooms/UserRoleSettings/TalentMatcher/SessionWindow/SessionLiveSnapshotUpload/CrmProjects/BulkFinalizePanel (1 mỗi file). Mỗi chỗ: hàm bao quanh đổi thành `async` (hầu hết ĐÃ SẴN async vì gọi RPC ngay sau), `if (!window.confirm(X)) return;` → `if (!(await confirm(X))) return;`. Không có chỗ nào gọi hàm này từ context KHÔNG async-hoá được (mọi call site đều là onClick hoặc callback đã async).
 
-Còn lại chưa đụng (không nằm trong danh sách user chọn): ~~bundle **2.4 MB một mảnh**, không code-split~~ — ĐÃ XỬ LÝ, xem `### P2a` (26/09, tách theo tab) và `### P2a-2` (01/10, entry còn 495 KB); ~~≈13 cụm fetch nổ cùng lúc lúc đăng nhập cho mọi role~~ — ĐÃ XỬ LÝ, xem `### P2a-3` (01/10: 46 → 28 request, hết request lặp); `useNotifications` poll 45s không kiểm `document.visibilityState`; `App.tsx` 2600+ dòng / `MonthlyReportTabs.tsx` 2217 dòng; `/api/gemini/*` vẫn trả `isMock: true` kèm reply bịa khi thiếu `GEMINI_API_KEY`.
+Còn lại chưa đụng (không nằm trong danh sách user chọn): ~~bundle **2.4 MB một mảnh**, không code-split~~ — ĐÃ XỬ LÝ, xem `### P2a` (26/09, tách theo tab) và `### P2a-2` (01/10, entry còn 495 KB); ~~≈13 cụm fetch nổ cùng lúc lúc đăng nhập cho mọi role~~ — ĐÃ XỬ LÝ, xem `### P2a-3` (01/10: 46 → 28 request, hết request lặp); ~~`useNotifications` poll 45s không kiểm `document.visibilityState`~~ — ĐÃ XỬ LÝ, xem `### P2a-4` (kèm trần 1.000 dòng của PostgREST); `App.tsx` 2600+ dòng / `MonthlyReportTabs.tsx` 2217 dòng; `/api/gemini/*` vẫn trả `isMock: true` kèm reply bịa khi thiếu `GEMINI_API_KEY`.
 
 Verify đợt 2: `tsc --noEmit` xanh (xác nhận mọi hàm chứa `await confirm(...)` đã đúng `async`), `eslint .` 0 lỗi/41 warning (đúng baseline, không phát sinh mới), `vitest` 38/38 xanh, browser smoke test không lỗi console (React).
 

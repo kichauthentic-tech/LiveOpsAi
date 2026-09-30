@@ -1,4 +1,5 @@
 import { supabase } from "../supabaseClient";
+import { fetchAllPages } from "./fetchAllPages";
 import { BrandPlatformRateHistoryEntry } from "../../types";
 
 interface DbBrandPlatformRateHistoryEntry {
@@ -28,10 +29,14 @@ function fromDb(row: DbBrandPlatformRateHistoryEntry): BrandPlatformRateHistoryE
 // Read-only from the client — same reasoning as talentRateHistory.ts: written exclusively by
 // the DB trigger (migration 0018) whenever brand_platform_rates.rate_per_hour changes.
 export async function fetchBrandPlatformRateHistory(): Promise<BrandPlatformRateHistoryEntry[]> {
-  const { data, error } = await supabase
-    .from("brand_platform_rate_history")
-    .select("*")
-    .order("effective_from", { ascending: true });
-  if (error) throw error;
-  return (data as DbBrandPlatformRateHistoryEntry[]).map(fromDb);
+  // Bảng chỉ ghi thêm (trigger DB ghi mỗi lần đổi rate). Xem src/lib/db/fetchAllPages.ts.
+  const rows = await fetchAllPages<DbBrandPlatformRateHistoryEntry>((from, to) =>
+    supabase
+      .from("brand_platform_rate_history")
+      .select("*")
+      .order("effective_from", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to)
+  );
+  return rows.map(fromDb);
 }

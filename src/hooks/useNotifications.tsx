@@ -34,14 +34,38 @@ export function useNotifications(enabled: boolean) {
       setItems([]);
       return;
     }
-    void reload();
-    const timer = window.setInterval(() => void reload(), POLL_MS);
-    const onFocus = () => void reload();
-    window.addEventListener("focus", onFocus);
+    // `last` là biến cục bộ của effect, KHÔNG phải ref: ref bị React Compiler cấm sửa ngoài effect
+    // và ở đây cũng không cần sống lâu hơn một lần đăng ký listener.
+    let last = 0;
+    const run = () => {
+      last = Date.now();
+      void reload();
+    };
+    run();
+    const timer = window.setInterval(() => {
+      // Tab đang ẩn thì bỏ nhịp: trước đây vẫn gọi mỗi 45 giây dù người dùng đang ở tab khác hoặc
+      // đã thu nhỏ cửa sổ — mạng và pin trả giá cho dữ liệu không ai nhìn. Trình duyệt có bóp nhịp
+      // timer của tab ẩn nhưng KHÔNG dừng hẳn, nên vẫn phải tự chặn ở đây.
+      if (document.visibilityState === "hidden") return;
+      run();
+    }, POLL_MS);
+    // Quay lại thì nạp NGAY thay vì đợi tới nhịp kế tiếp (tối đa 45 giây). Cần cả hai sự kiện:
+    // đổi tab trong cùng cửa sổ chỉ phát `visibilitychange` (cửa sổ không hề mất focus), còn
+    // chuyển sang app khác rồi quay lại thì phát `focus`. Chặn nạp trùng bằng `last` — đo 2026-10-01
+    // trong Browser pane thấy `visibilitychange` có thể dội liên tục (mỗi ~6 giây), không chặn thì
+    // hoá ra poll dày hơn cả trước khi sửa.
+    const onBack = () => {
+      if (document.visibilityState !== "visible") return;
+      if (Date.now() - last < POLL_MS) return;
+      run();
+    };
+    window.addEventListener("focus", onBack);
+    document.addEventListener("visibilitychange", onBack);
     return () => {
       alive.current = false;
       window.clearInterval(timer);
-      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("focus", onBack);
+      document.removeEventListener("visibilitychange", onBack);
     };
   }, [enabled, reload]);
 

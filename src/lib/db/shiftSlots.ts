@@ -1,4 +1,5 @@
 import { supabase } from "../supabaseClient";
+import { fetchAllPages } from "./fetchAllPages";
 import { assertAffected } from "./assertAffected";
 import { ShiftSlot } from "../../types";
 
@@ -64,13 +65,18 @@ function toDb(s: ShiftSlot) {
 }
 
 export async function fetchShiftSlots(): Promise<ShiftSlot[]> {
-  const { data, error } = await supabase
-    .from("shift_slots")
-    .select("*")
-    .order("date", { ascending: true })
-    .order("start_time", { ascending: true });
-  if (error) throw error;
-  return (data as DbShiftSlot[]).map(fromDb);
+  // Một dòng cho mỗi ca đã xếp — chỉ tăng. Cuộn trang để không âm thầm mất ca khi qua 1.000
+  // (xem src/lib/db/fetchAllPages.ts). Xếp ASC nên trần cắt mất đúng các ca MỚI nhất.
+  const rows = await fetchAllPages<DbShiftSlot>((from, to) =>
+    supabase
+      .from("shift_slots")
+      .select("*")
+      .order("date", { ascending: true })
+      .order("start_time", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to)
+  );
+  return rows.map(fromDb);
 }
 
 // Index idx_shift_slots_natural_key (0088): cùng brand + ngày + giờ + nền tảng đã có ca chưa huỷ.

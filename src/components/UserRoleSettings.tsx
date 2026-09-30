@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { AUDIT_LOG_LIMIT } from "../lib/db/auditLogs";
 import { UserRole, PermissionKey, PermissionDefinition, RolePermissionsMap, SystemUser, AuditLogEntry, Brand, Talent, LiveSession } from "../types";
 import { ShieldCheck, UserPlus, Users, Key, Lock, Unlock, Check, X, Search, Sliders, History, Sparkles, Trash2, Edit2, Radio, Building2, Zap, BarChart3 } from "lucide-react";
 import { useConfirm } from "../hooks/useConfirm";
@@ -403,7 +404,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
             }`}
           >
             <History className="w-4 h-4" />
-            <span>Audit Logs ({auditLogs.length})</span>
+            <span>Audit Logs ({auditLogs.length >= AUDIT_LOG_LIMIT ? `${AUDIT_LOG_LIMIT} gần nhất` : auditLogs.length})</span>
           </button>
 
           {canSeeUsage && (

@@ -1,4 +1,5 @@
 import { supabase } from "../supabaseClient";
+import { fetchAllPages } from "./fetchAllPages";
 import { LockedPlanRow, LockedPlanTargets, lockedPlanTargetsFromRows } from "../scheduling/lockedPlanTargets";
 import { BrandMonthPlan, BrandMonthPlanSlot, CalendarEventRow, PlanCampRanges } from "../../types";
 
@@ -189,12 +190,18 @@ export type { LockedPlanTargets };
 // RLS lọc sẵn theo brand với role `brand` (0105), nên map trả về của họ chỉ có brand của họ.
 // KHÔNG lọc `slot_id is not null` — xem lỗi E2E #1 ở lib/scheduling/lockedPlanTargets.ts.
 export async function fetchLockedPlanTargets(): Promise<LockedPlanTargets> {
-  const { data, error } = await supabase
-    .from("brand_month_plan_slots")
-    .select("slot_id,target_gmv,date,plan:brand_month_plans!inner(status,brand_id)")
-    .eq("plan.status", "locked");
-  if (error) throw error;
-  return lockedPlanTargetsFromRows((data as LockedPlanRow[]) ?? []);
+  // Đọc target của MỌI kế hoạch đã chốt, cộng dồn qua từng tháng — bảng tăng nhanh nhất nhóm này
+  // (đo 2026-10-01: 75 dòng cho 1 tháng, tức chạm trần 1.000 của PostgREST trong khoảng một năm).
+  // Mất dòng ở đây là target của ca sai mà không có dấu hiệu gì. Xem src/lib/db/fetchAllPages.ts.
+  const data = await fetchAllPages<LockedPlanRow>((from, to) =>
+    supabase
+      .from("brand_month_plan_slots")
+      .select("slot_id,target_gmv,date,plan:brand_month_plans!inner(status,brand_id)")
+      .eq("plan.status", "locked")
+      .order("slot_id", { ascending: true })
+      .range(from, to)
+  );
+  return lockedPlanTargetsFromRows(data);
 }
 
 export interface DeletePlanResult {

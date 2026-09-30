@@ -1,4 +1,5 @@
 import { supabase } from "../supabaseClient";
+import { fetchAllPages } from "./fetchAllPages";
 import { TalentRateHistoryEntry } from "../../types";
 
 interface DbTalentRateHistoryEntry {
@@ -29,10 +30,14 @@ function fromDb(row: DbTalentRateHistoryEntry): TalentRateHistoryEntry {
 // (migration 0018) whenever talents.rate_per_session/rate_per_hour/commission_rate changes —
 // including manual SQL edits, not just app writes via talents.ts.
 export async function fetchTalentRateHistory(): Promise<TalentRateHistoryEntry[]> {
-  const { data, error } = await supabase
-    .from("talent_rate_history")
-    .select("*")
-    .order("effective_from", { ascending: true });
-  if (error) throw error;
-  return (data as DbTalentRateHistoryEntry[]).map(fromDb);
+  // Bảng chỉ ghi thêm (trigger DB ghi mỗi lần đổi rate). Xem src/lib/db/fetchAllPages.ts.
+  const rows = await fetchAllPages<DbTalentRateHistoryEntry>((from, to) =>
+    supabase
+      .from("talent_rate_history")
+      .select("*")
+      .order("effective_from", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to)
+  );
+  return rows.map(fromDb);
 }

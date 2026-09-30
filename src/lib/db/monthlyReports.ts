@@ -1,4 +1,5 @@
 import { supabase } from "../supabaseClient";
+import { fetchAllPages } from "./fetchAllPages";
 import { BrandMonthlyReport } from "../../types";
 
 // Report tháng Brand Workspace (migration 0051) — số liệu vận hành (GMV/Host/SKU) không lưu ở
@@ -106,10 +107,12 @@ export interface MonthlyReportManualInput {
 // Mọi dòng report (RLS tự cắt theo brand cho role brand) — App dùng để phân bổ target xuống từng
 // ca (lib/performance/targetAllocation.ts). Khoá map là "brandId|YYYY-MM".
 export async function fetchAllMonthlyReports(): Promise<Map<string, BrandMonthlyReport>> {
-  const { data, error } = await supabase.from("brand_monthly_reports").select("*");
-  if (error) throw error;
+  // 1 dòng / brand / tháng — tăng chậm nhưng không bao giờ giảm. Xem src/lib/db/fetchAllPages.ts.
+  const data = await fetchAllPages<DbMonthlyReport>((from, to) =>
+    supabase.from("brand_monthly_reports").select("*").order("id", { ascending: true }).range(from, to)
+  );
   const out = new Map<string, BrandMonthlyReport>();
-  for (const row of (data as DbMonthlyReport[]) ?? []) {
+  for (const row of data) {
     const r = reportFromDb(row);
     out.set(`${r.brandId}|${r.periodMonth.slice(0, 7)}`, r);
   }

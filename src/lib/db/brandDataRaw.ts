@@ -1,4 +1,5 @@
 import { supabase } from "../supabaseClient";
+import { fetchAllPages } from "./fetchAllPages";
 import { assertAffected } from "./assertAffected";
 import { BrandDataRawImport, BrandDataRawRow, DataRawReportType } from "../../types";
 import { ParsedDataRawImport } from "../dataraw/parseDataRawExcel";
@@ -67,13 +68,18 @@ interface DbRow {
 }
 
 export async function fetchDataRawRows(importId: string): Promise<BrandDataRawRow[]> {
-  const { data, error } = await supabase
-    .from("brand_dataraw_rows")
-    .select("*")
-    .eq("import_id", importId)
-    .order("row_index", { ascending: true });
-  if (error) throw error;
-  return ((data as DbRow[]) ?? []).map((r) => ({ id: r.id, importId: r.import_id, rowIndex: r.row_index, raw: r.raw ?? {} }));
+  // Một đợt nhập thường hơn 1.000 dòng (đo 2026-10-01: 4/24 đợt ở mức 1.080–1.181), mà PostgREST
+  // cắt ở 1.000 và KHÔNG báo lỗi — phải cuộn trang, xem src/lib/db/fetchAllPages.ts.
+  const rows = await fetchAllPages<DbRow>((from, to) =>
+    supabase
+      .from("brand_dataraw_rows")
+      .select("*")
+      .eq("import_id", importId)
+      .order("row_index", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to)
+  );
+  return rows.map((r) => ({ id: r.id, importId: r.import_id, rowIndex: r.row_index, raw: r.raw ?? {} }));
 }
 
 const ROW_INSERT_CHUNK = 500;

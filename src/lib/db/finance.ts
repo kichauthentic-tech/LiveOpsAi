@@ -1,4 +1,5 @@
 import { supabase } from "../supabaseClient";
+import { fetchAllPages } from "./fetchAllPages";
 import { SessionFinance } from "../../types";
 
 interface DbSessionFinance {
@@ -32,9 +33,12 @@ function fromDb(row: DbSessionFinance): SessionFinance {
 // session_finance is a sidecar 1-row-per-session table (like rolePermissions' 1-row-per-role) —
 // rows are upserted, never freely created/deleted independent of their live_session.
 export async function fetchSessionFinances(): Promise<SessionFinance[]> {
-  const { data, error } = await supabase.from("session_finance").select("*");
-  if (error) throw error;
-  return (data as DbSessionFinance[]).map(fromDb);
+  // Một dòng cho mỗi ca có số — nền cho toàn bộ P&L, mất dòng là số sai mà không ai biết.
+  // Xem src/lib/db/fetchAllPages.ts.
+  const rows = await fetchAllPages<DbSessionFinance>((from, to) =>
+    supabase.from("session_finance").select("*").order("session_id", { ascending: true }).range(from, to)
+  );
+  return rows.map(fromDb);
 }
 
 export async function upsertSessionFinance(

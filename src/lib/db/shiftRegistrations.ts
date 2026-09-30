@@ -1,4 +1,5 @@
 import { supabase } from "../supabaseClient";
+import { fetchAllPages } from "./fetchAllPages";
 import { assertAffected } from "./assertAffected";
 import { ShiftRegistration } from "../../types";
 
@@ -21,9 +22,11 @@ function fromDb(row: DbShiftRegistration): ShiftRegistration {
 // Presence/absence of a row is the whole model — no update, only insert
 // ("đăng ký") and delete ("hủy đăng ký"), same shape as auditLogs.ts.
 export async function fetchShiftRegistrations(): Promise<ShiftRegistration[]> {
-  const { data, error } = await supabase.from("session_availability").select("*");
-  if (error) throw error;
-  return (data as DbShiftRegistration[]).map(fromDb);
+  // Một dòng cho mỗi lượt talent đăng ký ca — tăng theo số ca. Xem src/lib/db/fetchAllPages.ts.
+  const rows = await fetchAllPages<DbShiftRegistration>((from, to) =>
+    supabase.from("session_availability").select("*").order("id", { ascending: true }).range(from, to)
+  );
+  return rows.map(fromDb);
 }
 
 export async function registerForSlot(slotId: string, talentId: string): Promise<ShiftRegistration> {
