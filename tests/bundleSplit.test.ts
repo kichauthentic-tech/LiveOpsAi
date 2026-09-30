@@ -32,3 +32,85 @@ test("App.tsx không import tĩnh component tab — dùng lazyNamed/lazy", () =>
   const staticImports = [...app.matchAll(/^import\s+(?!type\b)[^;]*from\s+"(\.\/components\/[^"]+)";/gm)].map((m) => m[1]);
   expect(staticImports.filter((p) => !APP_STATIC_COMPONENTS.includes(p))).toEqual([]);
 });
+
+// ── Tách bundle đợt 2 (2026-10-01) ────────────────────────────────────────────────────────────────
+// Sau đợt 1 file chính còn 671 KB, trong đó 3 khối app KHÔNG cần để vẽ màn đăng nhập:
+// Sentry 91 KB, @supabase/realtime-js + phoenix 57 KB, @supabase/storage-js 22 KB. Còn chunk tab
+// Report Tháng 534 KB thì 364 KB là recharts/d3, chỉ dùng khi tháng đã có report chốt.
+// Kết quả: entry 671 → 495 KB (gzip 195 → 141), chunk Report Tháng 534 → 39 KB.
+
+test("Sentry chỉ được tải động — không import tĩnh ở bất kỳ file client nào", () => {
+  const hits: string[] = [];
+  for (const file of sourceFiles(SRC)) {
+    if (file.includes("/src/server/")) continue; // bản server do esbuild dựng, không có chunk entry
+    if (/^import\s[^;]*from\s+["']@sentry\/react["']/m.test(readFileSync(file, "utf8"))) hits.push(file.split("/src/")[1]);
+  }
+  expect(hits).toEqual([]);
+});
+
+test("import() Sentry phải destructure, không nhận cả namespace", () => {
+  // `.then((Sentry) => Sentry.init(...))` làm Rollup giữ mọi integration (tracing/replay/feedback):
+  // đo 2026-10-01 là 494 KB thay vì 90 KB. Lấy đúng hàm cần dùng thì tree-shaking chạy lại được.
+  const src = readFileSync(join(SRC, "lib/errorReporting.tsx"), "utf8");
+  const call = src.slice(src.indexOf('import("@sentry/react")'));
+  expect(call.slice(0, 200)).toMatch(/\.then\(\s*\(?\s*\{/);
+});
+
+test("Report Tháng: MonthlyReportTabs (recharts) chỉ được tải động", () => {
+  const src = readFileSync(join(SRC, "components/brand-workspace/BrandMonthlyReport.tsx"), "utf8");
+  expect(src).not.toMatch(/^import\s[^;]*from\s+["']\.\/MonthlyReportTabs["']/m);
+  expect(src).toContain('lazyNamed(() => import("./MonthlyReportTabs"), "MonthlyReportTabs")');
+});
+
+test("recharts không rò sang file nào khác ngoài MonthlyReportTabs", () => {
+  const hits: string[] = [];
+  for (const file of sourceFiles(SRC)) {
+    if (/^import\s[^;]*from\s+["']recharts["']/m.test(readFileSync(file, "utf8"))) hits.push(file.split("/src/")[1]);
+  }
+  expect(hits).toEqual(["components/brand-workspace/MonthlyReportTabs.tsx"]);
+});
+
+// ── Shim @supabase/realtime-js + storage-js (src/shims/README.md) ─────────────────────────────────
+// App không dùng realtime/storage nhưng supabase-js import tĩnh cả hai. Alias trong vite.config.ts
+// thay bằng shim rỗng. 3 test dưới đây là thứ bắt lỗi khi NÂNG VERSION supabase-js: shim thiếu
+// method thì đỏ ở đây, thay vì TypeError lúc chạy thật.
+const SUPABASE_DIST = join(__dirname, "..", "node_modules/@supabase/supabase-js/dist/index.mjs");
+
+function shimNames(file: string): Set<string> {
+  const src = readFileSync(join(SRC, "shims", file), "utf8");
+  return new Set([
+    ...[...src.matchAll(/^export class (\w+)/gm)].map((m) => m[1]),
+    ...[...src.matchAll(/^ {2}(?:\w+ )?(\w+)\s*[(<]/gm)].map((m) => m[1])
+  ]);
+}
+
+test("shim export đủ mọi tên supabase-js import từ 2 gói bị thay", () => {
+  const dist = readFileSync(SUPABASE_DIST, "utf8");
+  for (const [pkg, file] of [["realtime-js", "supabase-realtime.ts"], ["storage-js", "supabase-storage.ts"]] as const) {
+    const m = dist.match(new RegExp(`import \\{([^}]*)\\} from "@supabase/${pkg}"`));
+    expect(m, `supabase-js không còn import từ @supabase/${pkg} — kiểm tra lại alias có còn cần không`).toBeTruthy();
+    const imported = m![1].split(",").map((s) => s.trim()).filter(Boolean);
+    const have = shimNames(file);
+    expect(imported.filter((n) => !have.has(n)), `shim ${file} thiếu export`).toEqual([]);
+  }
+});
+
+test("shim realtime có đủ method supabase-js gọi ngầm", () => {
+  const dist = readFileSync(SUPABASE_DIST, "utf8");
+  const called = [...new Set([...dist.matchAll(/\bthis\.realtime\.(\w+)\s*\(/g)].map((m) => m[1]))];
+  expect(called.length, "không thấy lời gọi realtime nào — regex hỏng hoặc supabase-js đã đổi cấu trúc").toBeGreaterThan(0);
+  const have = shimNames("supabase-realtime.ts");
+  expect(called.filter((n) => !have.has(n)), "shim realtime thiếu method").toEqual([]);
+});
+
+test("shim vẫn hợp lệ: app không dùng realtime/storage ở đâu cả", () => {
+  // Ngày nào thêm tính năng realtime/upload thì gỡ alias trong vite.config.ts trước — nếu không,
+  // shim sẽ ném lỗi đúng lúc người dùng bấm. Test này bắt trước ở CI.
+  const hits: string[] = [];
+  for (const file of sourceFiles(SRC)) {
+    if (file.includes("/src/shims/") || file.includes("/src/server/")) continue;
+    const src = readFileSync(file, "utf8");
+    if (/supabase\s*\.\s*(channel|storage)\b|\.removeAllChannels\(|postgres_changes/.test(src)) hits.push(file.split("/src/")[1]);
+  }
+  expect(hits).toEqual([]);
+});

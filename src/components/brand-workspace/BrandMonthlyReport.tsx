@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { Suspense, useEffect, useMemo, useState } from "react";
 import { LiveSession, ShiftSlot, UserRole, BrandMonthlyReport as BrandMonthlyReportType, BrandPlatformRate } from "../../types";
 import {
   FileText,
@@ -14,7 +14,6 @@ import {
 } from "lucide-react";
 import { getTodayMonth } from "../../lib/dateUtils";
 import { fetchMonthlyReport, upsertMonthlyReport, publishMonthlyReport, unpublishMonthlyReport } from "../../lib/db/monthlyReports";
-import { MonthlyReportTabs } from "./MonthlyReportTabs";
 import { BrandWeeklyReport } from "./BrandWeeklyReport";
 import { errorMessage } from "../../lib/errorMessage";
 import { useConfirm } from "../../hooks/useConfirm";
@@ -23,6 +22,15 @@ import { fetchMonthlyReportSnapshot, saveMonthlyReportSnapshot, StoredMonthlyRep
 import { DataRawImportStamp, fetchDataRawImportStamps } from "../../lib/db/brandDataRaw";
 import { buildMonthlyReportSnapshot, COVERAGE_TYPES, snapshotFreshness, snapshotHeadline, SnapshotHeadline } from "../../lib/report/monthlySnapshot";
 import { fmtVndShort } from "../../lib/format";
+import { lazyNamed } from "../../lib/lazyNamed";
+
+// 7 phần của Report Tháng kéo theo recharts + d3 + redux = 364 KB, chiếm 2/3 chunk của tab này (đo
+// 2026-10-01: chunk BrandMonthlyReport 534 KB, riêng thư viện biểu đồ 364 KB). Phần đó chỉ render khi
+// tháng ĐÃ có report chốt và người xem được phép đọc — mọi trạng thái còn lại (chưa tạo report, brand
+// chưa được phát hành, đang tải) không dùng tới một biểu đồ nào. Tách ra thì các trạng thái đó vẽ ngay
+// thay vì đợi tải hết thư viện biểu đồ. `Suspense` phải đặt ngay đây: không có nó thì lazy này rơi lên
+// `Suspense` của App.tsx và làm trắng cả khu vực tab, mất luôn phần đầu trang đã vẽ xong.
+const MonthlyReportTabs = lazyNamed(() => import("./MonthlyReportTabs"), "MonthlyReportTabs");
 import { MonthPicker } from "../common/MonthPicker";
 import { PageHeader } from "../common/PageHeader";
 
@@ -464,7 +472,16 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
           {/* Report Tháng redesign (2026-08-22) — tabbed, skin đen-vàng cố định cho tài liệu gửi
               brand, thay toàn bộ khối Overview/Host Performance/Top SKU/Deep Dive cũ. Xem note thiết
               kế trong MonthlyReportTabs.tsx (nguồn dữ liệu từng tab, giới hạn phạm vi). */}
-          <MonthlyReportTabs brandId={brandId} brandName={brandName} month={month} snapshot={stored.snapshot} liveSessions={sessions} shiftSlots={shiftSlots} canManage={canManage} />
+          <Suspense
+            fallback={
+              <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-12 flex items-center justify-center gap-3 text-[var(--text-muted)]">
+                <Loader2 className="w-5 h-5 animate-spin" />
+                <span className="text-xs font-bold">Đang tải biểu đồ báo cáo...</span>
+              </div>
+            }
+          >
+            <MonthlyReportTabs brandId={brandId} brandName={brandName} month={month} snapshot={stored.snapshot} liveSessions={sessions} shiftSlots={shiftSlots} canManage={canManage} />
+          </Suspense>
 
             </>
           ) : isPublished ? (

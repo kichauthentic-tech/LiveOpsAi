@@ -9,6 +9,12 @@ export default defineConfig(() => {
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
+        // supabase-js import tĩnh RealtimeClient + StorageClient, nên 78 KB thư viện app không dùng
+        // nằm trong chunk entry mà mọi người dùng phải tải trước khi thấy màn đăng nhập.
+        // Chỉ ảnh hưởng bundle client; bản server (esbuild server.ts) không đi qua alias này.
+        // Luật sửa + guard test: src/shims/README.md, tests/supabaseShims.test.ts.
+        '@supabase/realtime-js': path.resolve(__dirname, 'src/shims/supabase-realtime.ts'),
+        '@supabase/storage-js': path.resolve(__dirname, 'src/shims/supabase-storage.ts'),
       },
     },
     server: {

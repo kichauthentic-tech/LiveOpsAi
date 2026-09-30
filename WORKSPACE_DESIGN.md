@@ -160,6 +160,8 @@
 > sidebar tự thu gọn < 1280px, header mobile gọn, số kiểu Việt (2,18%) qua `src/lib/format.ts`. `vercel.json` rewrite SPA đã
 > kiểm trên production: link sâu trả index.html, JS/CSS 200, URL giữ nguyên.
 > **P2a tách bundle XONG:** file JS chính 2.580 → 665 KB, mỗi tab tải khi mở, thư viện Excel tải khi bấm (mục P2a).
+> **P2a-2 tách tiếp 2026-10-01:** entry 671 → **495 KB** (gzip 195 → 141) — Sentry tải sau khi paint, shim rỗng
+> cho realtime/storage supabase không dùng tới; chunk tab Report Tháng 534 → 39 KB (recharts chỉ tải khi tháng có report). Mục `### P2a-2`.
 > **P2b đếm lượt mở tab: XONG, 0123 đã chạy, đếm từ 26/09/2026** (Phân Quyền → Lượt Mở Tab).
 > **P2c Report Tháng trên điện thoại XONG:** 24,7 → 7,5 màn 375px, phần 3–8 gập sau Insight. P2 còn: gộp menu (chờ 2–4 tuần số liệu).
 > **Kèm vá sự cố: mọi `/api/*` production chết (FUNCTION_INVOCATION_FAILED) từ 9dcf719 (24/09) tới 5ecb7c8 (26/09)** —
@@ -903,6 +905,55 @@ Chưa đo được: màn talent (Ca Của Tôi/Đăng Ký Ca) và role brand b�
 - Test canh `tests/bundleSplit.test.ts`: cấm `import … from "xlsx"` tĩnh; App.tsx không import tĩnh component tab (danh sách
   ngoại lệ). Đã thử trên code cũ: test đỏ đúng.
 
+### P2a-2 — Tách tiếp chunk entry — XONG + VERIFY 2026-10-01 (không migration)
+- Vì sao làm tiếp: P2a đã tách theo tab, nhưng chunk entry vẫn 671 KB (gzip 195) và **3 khối trong đó không vẽ một pixel nào**
+  của màn đăng nhập. Đo bằng cách quy từng byte của bundle về file nguồn qua sourcemap (script dùng một lần, không commit):
+
+  | Trong `index.js` cũ | KB | Xử lý |
+  |---|---|---|
+  | `react-dom` | 177,0 | giữ — cần để vẽ |
+  | `@supabase/auth-js` | 97,4 | giữ — cần để khôi phục phiên |
+  | `@sentry/*` | 91,0 | **tải động sau khi trang paint** |
+  | `src/App.tsx` | 46,1 | giữ |
+  | `src/lib/db/` | 36,3 | giữ |
+  | `@supabase/realtime-js` + `phoenix` | 56,6 | **shim rỗng** (app không dùng realtime) |
+  | `@supabase/storage-js` | 21,9 | **shim rỗng** (app không dùng storage) |
+
+- **Sentry tải động** — [src/lib/errorReporting.tsx](src/lib/errorReporting.tsx) thay `Sentry.ErrorBoundary` bằng ErrorBoundary
+  React thuần + hàng đợi lỗi; `initErrorReporting()` gắn listener `error`/`unhandledrejection` NGAY từ đầu, rồi `import("@sentry/react")`
+  lúc idle sau sự kiện `load`. Nạp xong thì `init`, **gỡ listener của mình** (Sentry có listener riêng — không gỡ là báo trùng 2 lần)
+  rồi xả hàng đợi. Không có `VITE_SENTRY_DSN` thì không tải gì, y như cũ.
+  - **Bẫy đã dính:** `.then((Sentry) => Sentry.init(...))` nhận cả namespace → Rollup không biết dùng export nào nên giữ mọi
+    integration: chunk ra **494 KB** thay vì 90 KB. Phải destructure `.then(({ init, captureException }) => ...)`. Có test canh.
+- **Shim realtime/storage** — [src/shims/](src/shims/README.md) + alias trong `vite.config.ts`. Chỉ áp cho bundle client; bản server
+  (`esbuild server.ts`) và TypeScript không đi qua alias nên kiểu vẫn là kiểu thật. Luật: method supabase-js gọi NGẦM (`setAuth`,
+  dọn kênh) là no-op im lặng; cửa vào tính năng thật (`channel`, `storage.from`) **ném lỗi rõ ràng** để ai thêm realtime/upload
+  sau này vỡ ngay lúc dev thay vì im lặng trên production.
+- **recharts ra khỏi lúc mở tab Report Tháng** — `BrandMonthlyReport` `lazyNamed(() => import("./MonthlyReportTabs"))` + `Suspense`
+  đặt NGAY trong file đó (không có nó thì lazy rơi lên `Suspense` của `App.tsx` và làm trắng cả khu vực tab). 7 phần báo cáo là
+  một trang cuộn (user chốt 25/09) nên không tách nhỏ hơn được — nhưng mọi trạng thái *chưa có report / brand chưa được phát hành*
+  không còn tải 497 KB biểu đồ.
+
+| | Trước | Sau |
+|---|---|---|
+| Chunk entry | 671,2 KB · gzip 194,9 | **495,4 KB · gzip 140,9** |
+| Chunk tab Report Tháng | 534,2 KB | **38,6 KB** (+ 497,6 KB chỉ khi tháng có report) |
+| Sentry | trong entry | chunk 89,8 KB, nạp lúc idle |
+
+- Verify (`liveops-prod` = bản build thật, cổng 3100, phiên admin có sẵn): entry `index-DYD7HJam.js` nạp trước, chunk Sentry
+  `index-D3MzBGQQ.js` nạp **cuối cùng** sau khi trang đã vẽ; `window.__SENTRY__` = 10.68.0 (init từ chunk lazy); trong entry có
+  chuỗi shim, **không** có `phoenix` và **không** có `__SENTRY_DEBUG__`; phiên Supabase khôi phục được và Kế Hoạch Tháng nạp đủ
+  4 brand + 5 phòng live (tức auth-js + postgrest chạy bình thường qua shim). CROCS 10/2026 chưa có report → chunk biểu đồ KHÔNG
+  tải; lùi sang 9/2026 (có bản nháp) → `MonthlyReportTabs-*.js` tải đúng lúc, 7 phần render, biểu đồ đường + waterfall vẽ đúng,
+  mục lục nhảy đúng, **0 lỗi console** trong tab sạch.
+- Test canh (`tests/bundleSplit.test.ts`, 2 → 9 test): cấm import tĩnh `@sentry/react`; bắt buộc destructure trong `import()`;
+  `MonthlyReportTabs` phải lazy; `recharts` không rò sang file khác; shim phải export đủ tên supabase-js import và đủ method
+  supabase-js gọi ngầm (**đọc thẳng `node_modules/@supabase/supabase-js/dist/index.mjs` — nâng version supabase mà shim thiếu
+  method thì đỏ ở CI, không phải TypeError lúc chạy**); và app vẫn không dùng realtime/storage ở đâu cả.
+  Thử trên code cũ: 2 test đỏ đúng (Sentry tĩnh, MonthlyReportTabs tĩnh). 4 test shim/destructure không chứng minh đỏ được bằng
+  `git stash` vì file mới chưa được track — chúng canh hồi quy về sau, không canh code cũ.
+- `tsc` 0 lỗi · `eslint` 0 lỗi / 33 warning (đúng baseline) · `vitest` **227/227** · `npm run build` OK (kèm bản server).
+
 ### P2b — Đếm lượt mở tab — XONG 2026-09-26, migration 0123 ĐÃ CHẠY + verify (bắt đầu đếm 26/09/2026)
 - Vì sao: trước khi gộp/bỏ mục menu (18 tab agency + 10 tab brand) cần số người dùng thật — chưa có số nào.
 - `supabase/migrations/0123_ui_tab_views.sql`: bảng `ui_tab_views(user_id, role, workspace, brand_id, tab, viewed_at)`;
@@ -1007,7 +1058,7 @@ Kèm theo, `ShiftScheduling.tsx` — mỗi dòng ca trong `visibleSlots.map()` t
 4. **Thay `window.alert()` bằng toast — XONG (49/49).** [useToast.tsx](src/hooks/useToast.tsx): `ToastProvider` + `useToast()` (context, không chặn UI, tự biến mất sau 8s, có nút đóng tay) mount ở `main.tsx` trên `AuthProvider`. Thay cơ học `window.alert(X)` → `showToast(X)` ở 9 file (App.tsx 39 chỗ — gần như toàn bộ là `catch (e) { window.alert(errorMessage(e)) }` — + 8 file khác 10 chỗ: OpenSlotModal/FinanceHr/SlotDetailModal/BackfillFromRooms/StudioEquipment/ShiftScheduling/SessionWindow/AiTrainingCenter). An toàn vì `alert()` không gate luồng gì phía sau (fire-and-forget), không cần đổi hàm bao quanh thành async.
 5. **`window.confirm()` → modal riêng — XONG (25/25), đợt 2.** [useConfirm.tsx](src/hooks/useConfirm.tsx): `ConfirmProvider` + `useConfirm()` — trả `Promise<boolean>` (khác `useToast` — mỗi `confirm()` cũ đang GATE code chạy tiếp nên không thay cơ học được), dialog card giữa màn khớp theme app (không phải native), `whitespace-pre-line` giữ đúng xuống dòng của các cảnh báo nhiều đoạn ghép bằng `\n\n` (MonthPlan.tsx có confirm dài nhất — 4 đoạn cảnh báo trước khi chốt kế hoạch), option `danger` tô nút xác nhận đỏ cho hành động phá huỷ (xoá/huỷ — set ở tất cả các chỗ `window.confirm` cũ có ý "xoá"/"huỷ"/"ngắt kết nối" không hoàn tác được). 16 file, 25 chỗ: MonthPlan (4) · OpenSlotModal/TikTokApiAutomation/StudioEquipment/ReportPublishBoard/LiveReconciliation/BrandCommitment (2 mỗi file) · BrandMonthlyReport/BrandDataRaw/BackfillFromRooms/UserRoleSettings/TalentMatcher/SessionWindow/SessionLiveSnapshotUpload/CrmProjects/BulkFinalizePanel (1 mỗi file). Mỗi chỗ: hàm bao quanh đổi thành `async` (hầu hết ĐÃ SẴN async vì gọi RPC ngay sau), `if (!window.confirm(X)) return;` → `if (!(await confirm(X))) return;`. Không có chỗ nào gọi hàm này từ context KHÔNG async-hoá được (mọi call site đều là onClick hoặc callback đã async).
 
-Còn lại chưa đụng (không nằm trong danh sách user chọn): bundle **2.4 MB một mảnh**, không code-split; ~13 cụm fetch nổ cùng lúc lúc đăng nhập cho mọi role; `useNotifications` poll 45s không kiểm `document.visibilityState`; `App.tsx` 2600+ dòng / `MonthlyReportTabs.tsx` 2217 dòng; `/api/gemini/*` vẫn trả `isMock: true` kèm reply bịa khi thiếu `GEMINI_API_KEY`.
+Còn lại chưa đụng (không nằm trong danh sách user chọn): ~~bundle **2.4 MB một mảnh**, không code-split~~ — ĐÃ XỬ LÝ, xem `### P2a` (26/09, tách theo tab) và `### P2a-2` (01/10, entry còn 495 KB); ~13 cụm fetch nổ cùng lúc lúc đăng nhập cho mọi role; `useNotifications` poll 45s không kiểm `document.visibilityState`; `App.tsx` 2600+ dòng / `MonthlyReportTabs.tsx` 2217 dòng; `/api/gemini/*` vẫn trả `isMock: true` kèm reply bịa khi thiếu `GEMINI_API_KEY`.
 
 Verify đợt 2: `tsc --noEmit` xanh (xác nhận mọi hàm chứa `await confirm(...)` đã đúng `async`), `eslint .` 0 lỗi/41 warning (đúng baseline, không phát sinh mới), `vitest` 38/38 xanh, browser smoke test không lỗi console (React).
 

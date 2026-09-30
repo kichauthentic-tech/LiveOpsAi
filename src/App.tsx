@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
-import * as Sentry from "@sentry/react";
 import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, WorkflowRule, Talent, Studio, Equipment, Brand, SessionFinance, TikTokConnectionStatus, TikTokWebhookEvent, AiAgentPrompt, BrandPlatformRate, BrandStudio, ShiftSlot, ShiftRegistration, RecurringShiftTemplate, TalentRateHistoryEntry, BrandPlatformRateHistoryEntry, BrandSku, PromoScheme, AppNotification, BrandMonthlyReport as BrandMonthlyReportRow } from "./types";
 import { TabErrorFallback } from "./components/common/TabErrorFallback";
+import { ErrorBoundary } from "./lib/errorReporting";
 import { ALL_PERMISSION_DEFINITIONS } from "./data/mockData";
 import { fetchTalents, updateTalent, updateMyTalentProfile, deleteTalent } from "./lib/db/talents";
 import { fetchStudios, createStudio, updateStudio, deleteStudio } from "./lib/db/studios";
@@ -2253,7 +2253,7 @@ export default function App() {
               // gốc, main.tsx — lỗi render ở BẤT KỲ tab nào làm trắng cả app, mất luôn sidebar/
               // header). `key={activeTab}` mount lại ErrorBoundary từ đầu mỗi khi đổi tab, nên
               // chuyển sang tab khác luôn thoát khỏi trạng thái lỗi mà không cần logic reset riêng.
-              <Sentry.ErrorBoundary
+              <ErrorBoundary
                 key={activeTab}
                 fallback={({ resetError }) => (
                   <TabErrorFallback
@@ -2763,7 +2763,7 @@ export default function App() {
                 </>
                 )}
               </Suspense>
-              </Sentry.ErrorBoundary>
+              </ErrorBoundary>
             )}
           </div>
         </main>
