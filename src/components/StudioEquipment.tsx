@@ -479,7 +479,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
                 <Building2 className="w-4 h-4 text-[var(--accent-text)]" />
                 {editingStudio ? `Chỉnh Sửa Studio: ${editingStudio.name}` : "Thêm Studio Livestream Mới"}
               </h3>
-              <button onClick={() => setIsStudioModalOpen(false)} className="text-[var(--text-muted)] hover:text-[var(--text)]">
+              <button onClick={() => setIsStudioModalOpen(false)} className="p-1.5 -m-1.5 rounded text-[var(--text-muted)] hover:text-[var(--text)]">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -597,7 +597,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
                 <Camera className="w-4 h-4 text-[var(--accent-text)]" />
                 {editingEquipment ? `Chỉnh Sửa Thiết Bị: ${editingEquipment.name}` : "Thêm Thiết Bị Mới Vào Kho"}
               </h3>
-              <button onClick={() => setIsEquipmentModalOpen(false)} className="text-[var(--text-muted)] hover:text-[var(--text)]">
+              <button onClick={() => setIsEquipmentModalOpen(false)} className="p-1.5 -m-1.5 rounded text-[var(--text-muted)] hover:text-[var(--text)]">
                 <X className="w-5 h-5" />
               </button>
             </div>

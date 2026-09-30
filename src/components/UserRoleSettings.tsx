@@ -813,7 +813,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
               </h3>
               <button
                 onClick={() => setIsUserModalOpen(false)}
-                className="text-[var(--text-muted)] hover:text-[var(--text)]"
+                className="p-1.5 -m-1.5 rounded text-[var(--text-muted)] hover:text-[var(--text)]"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1036,7 +1036,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
               </div>
               <button
                 onClick={() => setPermissionOverrideUser(null)}
-                className="text-[var(--text-muted)] hover:text-[var(--text)]"
+                className="p-1.5 -m-1.5 rounded text-[var(--text-muted)] hover:text-[var(--text)]"
               >
                 <X className="w-5 h-5" />
               </button>

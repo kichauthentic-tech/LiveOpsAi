@@ -1927,7 +1927,7 @@ export default function App() {
           )}
           <button
             onClick={() => setMobileMenuOpen(false)}
-            className="md:hidden text-[var(--text-muted)] hover:text-[var(--text)]"
+            className="p-1.5 -m-1.5 rounded md:hidden text-[var(--text-muted)] hover:text-[var(--text)]"
           >
             <X className="w-5 h-5" />
           </button>

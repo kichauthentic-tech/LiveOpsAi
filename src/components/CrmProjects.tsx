@@ -265,7 +265,7 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
                 <Building2 className="w-4 h-4 text-[var(--accent-text)]" />
                 {editingBrand ? `Chỉnh Sửa Thương Hiệu: ${editingBrand.name}` : "Thêm Thương Hiệu Đối Tác Mới"}
               </h3>
-              <button onClick={() => setIsBrandModalOpen(false)} className="text-[var(--text-muted)] hover:text-[var(--text)]">
+              <button onClick={() => setIsBrandModalOpen(false)} className="p-1.5 -m-1.5 rounded text-[var(--text-muted)] hover:text-[var(--text)]">
                 <X className="w-5 h-5" />
               </button>
             </div>

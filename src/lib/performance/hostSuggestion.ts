@@ -59,7 +59,8 @@ const rangesOverlap = (aS: string, aE: string, bS: string, bE: string) => {
 };
 
 // Dưới 3 ca thì trung bình GMV/giờ bị 1 phiên bùng nổ (hoặc 1 phiên chết) kéo lệch hoàn toàn.
-const MIN_SESSIONS_FOR_CONFIDENCE = 3;
+// Export để Talent Pool dùng chung đúng một ngưỡng — hai màn không được nói "đủ mẫu" ở mốc khác nhau.
+export const MIN_SESSIONS_FOR_CONFIDENCE = 3;
 
 interface Acc {
   gmv: number;

@@ -240,13 +240,21 @@ test("Talent Pool: đếm cả ca chạy vai trợ (coHostId), không chỉ ca h
   expect(metric).toMatch(/assistSessionCount: sessions\.filter\(\(s\) => s\.coHostId === talentId && isCountable\(s\)\)\.length/);
   const src = readFileSync(join(SRC, "components/TalentMatcher.tsx"), "utf8");
   expect(src).toMatch(/real\.assistSessionCount/);
-  // Hiệu suất đo bằng GMV/giờ, không phải GMV/ca: ca 5 giờ và ca 2 giờ không cùng cỡ. Cùng tên chuẩn
-  // (METRIC.gmvPerHour) với Hiệu Suất Host / Report Tháng để 3 màn không gọi khác nhau.
+  // Hiệu suất đo theo GIỜ, không theo ca: ca 5 giờ và ca 2 giờ không cùng cỡ.
   expect(metric).toMatch(/gmvPerHour: hours > 0 \? totalGmv \/ hours : 0/);
-  expect(src).toMatch(/show\[METRIC\.gmvPerHour\]/);
   expect(src).not.toMatch(/GMV\/ca/);
+  // ...nhưng KHÔNG có số GMV/giờ gộp mọi brand ở bảng lẫn hồ sơ talent: chỉ số này phụ thuộc ngành
+  // hàng/giá bán của brand hơn là người chạy. Đo 2026-09-30: chênh lệch giữa host 1,40×, trong khi
+  // cùng một host dao động giữa các tháng 1,55× — nhiễu bối cảnh đã lớn hơn tín hiệu năng lực.
+  expect(src).toMatch(/computeTalentBrandPerf/);
+  expect(src).not.toMatch(/show\[METRIC\.gmvPerHour\]/);
+  expect(src).not.toMatch(/real\.gmvPerHour/);
+  expect(metric).toMatch(/export function computeTalentBrandPerf/);
+  // Ngưỡng "đủ mẫu" phải dùng chung với hostSuggestion, không gõ lại số 3.
+  expect(metric).toMatch(/MIN_SESSIONS_FOR_CONFIDENCE/);
+  expect(metric).not.toMatch(/rows\.length < 3/);
   const profile = readFileSync(join(SRC, "components/MyTalentProfile.tsx"), "utf8");
-  expect(profile).toMatch(/myReal\.gmvPerHour/);
+  expect(profile).not.toMatch(/myReal\.gmvPerHour/);
   expect(profile).not.toMatch(/GMV\/session/);
   // Không cộng ca trợ vào sessionCount: GMV của ca tính cho host, cộng sang trợ là đếm đôi.
   expect(metric).not.toMatch(/sessionCount: completed\.length \+ /);
@@ -305,18 +313,29 @@ test("Nút icon: padding phải đủ để vùng bấm đạt 24px", () => {
   // Quét cả repo thay vì liệt kê từng file: đo trên browser chỉ thấy nút ĐANG render — riêng M7 bỏ sót
   // 9 nút nằm trong modal/ngăn phải mở mới thấy (cửa sổ ca, ngăn ca trống, duyệt lương, xoá SKU...).
   // Sàn: bề rộng = cỡ icon + 2×padding ≥ 24. p-0.5 = 2px, p-1 = 4px, p-1.5 = 6px mỗi bên.
-  const PAD: Record<string, number> = { "0.5": 2, "1": 4, "1.5": 6, "2": 8 };
+  const PAD: Record<string, number> = { "0.5": 2, "1": 4, "1.5": 6, "2": 8, "2.5": 10, "3": 12 };
   const ICON: Record<string, number> = { "3": 12, "3.5": 14, "4": 16, "5": 20, "6": 24 };
+  // Cách định cỡ khác (py-, min-h-, h-…) hoặc class dựng từ biến `${...}` thì không suy ra được bề
+  // cao từ mã nguồn — để lượt đo trên browser lo, ở đây bỏ qua để khỏi báo nhầm (vd MonthPicker
+  // dùng hằng `box`/`iconBtn`).
+  const OTHER_SIZE = /(?<![\w.-])(p|px|py|pt|pb|pl|pr|min-h|h|size)-(?!\[)[\w.]+/;
   const hits: string[] = [];
   for (const file of sourceFiles(SRC)) {
     const src = readFileSync(file, "utf8");
     for (const m of src.matchAll(/<button[\s\S]{0,900}?<\/button>/g)) {
       const el = m[0];
-      const pad = el.match(/className=(?:"|\{`)[^"`]*?(?<![\w.-])p-(0\.5|1|1\.5|2)(?![\w.])/);
-      const icon = el.match(/className="w-(3\.5|3|4|5|6) h-\1/);
-      if (!pad || !icon) continue;
-      const size = ICON[icon[1]] + 2 * PAD[pad[1]];
-      if (size < 24) hits.push(`${rel(file)} :: icon w-${icon[1]} + p-${pad[1]} = ${size}px`);
+      const cls = el.match(/className="([^"]*)"/);
+      if (!cls) continue;
+      let body = el.slice(cls.index! + cls[0].length).trimStart();
+      if (body.startsWith(">")) body = body.slice(1);
+      const icon = body.match(/className="w-(3\.5|3|4|5|6) h-\1/);
+      // Chỉ xét nút CHỈ có icon: nút có chữ thì bề cao do line-height + py quyết định, phải đo thật.
+      const text = body.replace(/<[^>]*\/?>/g, "").replace("</button>", "").trim();
+      if (!icon || text) continue;
+      const pad = cls[1].match(/(?<![\w.-])p-(0\.5|1|1\.5|2|2\.5|3)(?![\w.])/);
+      if (!pad && OTHER_SIZE.test(cls[1])) continue;
+      const size = ICON[icon[1]] + 2 * (pad ? PAD[pad[1]] : 0);
+      if (size < 24) hits.push(`${rel(file)} :: icon w-${icon[1]} + p-${pad ? pad[1] : "0"} = ${size}px`);
     }
   }
   expect(hits, hits.join("\n")).toEqual([]);

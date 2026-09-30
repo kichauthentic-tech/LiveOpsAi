@@ -3,7 +3,6 @@ import { SystemUser, Talent, LiveSession, SessionFinance, TalentRateHistoryEntry
 import { useAuth } from "../hooks/useAuth";
 import { User, Phone, Cake, Mail, Loader2, Lock, ShieldAlert, Award, Wallet } from "lucide-react";
 import { computeTalentRealTotals } from "../lib/metrics/avgGmv";
-import { METRIC, metricHint } from "../lib/metricGlossary";
 import { computeTalentMonthlyIncome } from "../lib/pnl";
 import { todayVn } from "../lib/performance/brandCommitment";
 import { errorMessage } from "../lib/errorMessage";
@@ -280,10 +279,11 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
             <div className="font-bold text-emerald-400 mt-0.5">{fmtVndShort(myTalent.totalGmv || 0)}</div>
           </div>
           <div className="bg-[var(--surface-base)]/40 border border-[var(--border)] rounded-xl p-3">
-            {/* GMV/giờ chứ không phải GMV/ca: ca 5 giờ và ca 2 giờ không cùng cỡ nên GMV/ca phụ thuộc
-                độ dài ca hơn là người chạy. Cùng số với Talent Pool và Hiệu Suất Host. */}
-            <div className="text-[var(--text-muted)]" title={metricHint(METRIC.gmvPerHour)}>{METRIC.gmvPerHour}</div>
-            <div className="font-bold text-emerald-400 mt-0.5">{myReal.gmvPerHour > 0 ? fmtVndShort(Math.round(myReal.gmvPerHour)) : "—"}</div>
+            {/* Giờ live chứ không phải GMV/giờ gộp: GMV/giờ phụ thuộc ngành hàng của brand hơn là người
+                chạy, gộp mọi brand thành một số là số không so được với ai (xem computeTalentBrandPerf).
+                Talent Pool cũng bỏ số gộp — hai màn phải nói cùng một thứ về cùng một người. */}
+            <div className="text-[var(--text-muted)]">Giờ live</div>
+            <div className="font-bold text-[var(--text)] mt-0.5">{myReal.hours > 0 ? `${fmtFixed(myReal.hours, 1)}h` : "—"}</div>
           </div>
           <div className="bg-[var(--surface-base)]/40 border border-[var(--border)] rounded-xl p-3">
             <div className="text-[var(--text-muted)]">CVR TB</div>

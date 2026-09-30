@@ -93,7 +93,7 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
               onClick={handleDelete}
               disabled={busy}
               title="Xoá nếu up nhầm ca"
-              className="shrink-0 text-[var(--text-faint)] hover:text-rose-400 disabled:opacity-40 transition-colors"
+              className="p-1.5 -m-1.5 rounded shrink-0 text-[var(--text-faint)] hover:text-rose-400 disabled:opacity-40 transition-colors"
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>

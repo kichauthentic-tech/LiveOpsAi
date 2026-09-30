@@ -1,5 +1,6 @@
 import { LiveSession } from "../../types";
 import { isCountable, sessionHours } from "../performance/hostPerformance";
+import { MIN_SESSIONS_FOR_CONFIDENCE } from "../performance/hostSuggestion";
 
 // Ca tính vào GMV/ca của talent = "ca có số" (isCountable) như Hiệu Suất Host — trước audit 2026-09-28 mục 6 là
 // mọi ca Completed, nên ca đã xong mà chưa có file kéo GMV/ca xuống và số ca lệch Hiệu Suất Host.
@@ -49,4 +50,44 @@ export function computeTalentRealTotals(sessions: LiveSession[], talentId: strin
     hours,
     gmvPerHour: hours > 0 ? totalGmv / hours : 0
   };
+}
+
+export interface TalentBrandPerf {
+  brandId: string;
+  sessions: number;
+  hours: number;
+  gmv: number;
+  gmvPerHour: number;
+  /** "ok" = đủ mẫu; "low" = có ca nhưng dưới ngưỡng, số chỉ để tham khảo; "none" = chưa chạy ca nào. */
+  confidence: "none" | "low" | "ok";
+}
+
+/**
+ * GMV/giờ của một talent TÁCH THEO BRAND.
+ *
+ * Không có bản "gộp mọi brand": GMV/giờ phụ thuộc ngành hàng và giá bán của brand nhiều hơn phụ
+ * thuộc người chạy, nên cộng chung rồi xếp hạng là so host bán giày với host bán đồ lót. Đo trên
+ * dữ liệu thật (2026-09-30, toàn bộ 229 ca đều CROCS nên dùng tháng làm đại diện cho "bối cảnh"):
+ * chênh lệch GIỮA các host là 1,40×, trong khi CÙNG MỘT host dao động giữa các tháng tới 1,55×
+ * (trung vị) — nhiễu bối cảnh đã lớn hơn tín hiệu năng lực ngay cả khi chỉ có một brand.
+ * Ngưỡng "đủ mẫu" dùng chung `MIN_SESSIONS_FOR_CONFIDENCE` với hostSuggestion.
+ */
+export function computeTalentBrandPerf(sessions: LiveSession[], talentId: string, brandIds: string[]): TalentBrandPerf[] {
+  const mine = sessions.filter((s) => s.hostId === talentId && isCountable(s));
+  // Brand có ca đứng trước, brand chưa chạy dồn xuống cuối — cùng luật với thứ tự dòng ở Talent Pool.
+  return brandIds
+    .map((brandId): TalentBrandPerf => {
+      const rows = mine.filter((s) => s.brandId === brandId);
+      const gmv = rows.reduce((sum, s) => sum + (s.actualGmv || 0), 0);
+      const hours = rows.reduce((sum, s) => sum + sessionHours(s), 0);
+      return {
+        brandId,
+        sessions: rows.length,
+        hours,
+        gmv,
+        gmvPerHour: hours > 0 ? gmv / hours : 0,
+        confidence: rows.length === 0 ? "none" : rows.length < MIN_SESSIONS_FOR_CONFIDENCE ? "low" : "ok"
+      };
+    })
+    .sort((a, b) => b.sessions - a.sessions);
 }

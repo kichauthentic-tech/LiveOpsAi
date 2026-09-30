@@ -549,8 +549,22 @@ Dashboard agency 5,2 → 10,1; Lịch brand 5,2 → 6,4; Sổ Ca 4,4 → 8,3; AI
   Report Tháng). Lý do: ca 5 giờ và ca 2 giờ không cùng cỡ nên GMV/ca phụ thuộc độ dài ca hơn là người chạy — chính Hiệu Suất Host
   đã ghi "GMV/giờ là thước đo dùng để phân bổ ca". `computeTalentRealTotals` thêm `hours` + `gmvPerHour` (dùng `sessionHours`, cùng
   nguồn giờ với Hiệu Suất Host); ngăn chi tiết thêm dòng "Giờ live" và ô GMV/giờ trên bảng có `title` ghi phép chia.
-  Áp luôn cho [MyTalentProfile.tsx](src/components/MyTalentProfile.tsx) ("GMV/session" → "GMV/giờ") để hồ sơ talent và Talent Pool
-  không nói hai số khác nhau về cùng một người. **Đối chiếu Hiệu Suất Host:** Sỹ Hùng ở Talent Pool 7,31B ÷ 267,7h = 27,3M/giờ, ở
+  Áp luôn cho [MyTalentProfile.tsx](src/components/MyTalentProfile.tsx) để hồ sơ talent và Talent Pool không nói hai số khác nhau
+  về cùng một người.
+  **Sửa tiếp cùng ngày (user chỉ ra: chỉ số giữa các brand không so được):** ĐÚNG, và số đo còn nói mạnh hơn thế. Đo trên dữ liệu
+  thật — lưu ý **229/229 ca hiện đều là CROCS** nên không backtest trực tiếp được ảnh hưởng của brand; dùng THÁNG làm đại diện cho
+  "bối cảnh": chênh lệch GMV/giờ **giữa các host là 1,40×** (27,3M ↔ 19,5M), trong khi **cùng MỘT host dao động giữa các tháng
+  1,25×–1,76× (trung vị 1,55×)**; GMV/giờ cả team theo tháng đi từ 19,8M (T9) tới 25,7M (T8). **Nhiễu bối cảnh đã lớn hơn tín hiệu
+  năng lực ngay khi chỉ có một brand** ⇒ cột GMV/giờ gộp đang xếp hạng "ai được xếp nhiều ca vào tháng tốt".
+  Đã thử phương án chuẩn hoá (chỉ số 100 = mặt bằng brand+tháng, loại chính ca đó khỏi mốc): nhiễu 1,55× → **1,35×**, tín hiệu giữ
+  (1,40× → 1,43×) — có ăn thua nhưng **nhiễu vẫn ≈ tín hiệu**, chỉ tách được Sỹ Hùng (120) khỏi nhóm 84–96. Không dùng.
+  **Chốt (user chọn): bỏ số GMV/giờ gộp, tách theo brand ở ngăn chi tiết.** Bảng chỉ giữ thứ cộng dồn được qua brand — Ca host,
+  Ca trợ, GMV tích luỹ, **Giờ live**. Ngăn chi tiết có khối "GMV/giờ theo brand": mỗi brand một dòng `27,3M/giờ · 59 ca · 267,7h ·
+  đủ mẫu`, brand chưa chạy ghi "chưa chạy ca nào", brand có ca xếp trước. Ngưỡng "đủ mẫu" **dùng chung `MIN_SESSIONS_FOR_CONFIDENCE`
+  (3 ca) với [hostSuggestion.ts](src/lib/performance/hostSuggestion.ts)** — export ra thay vì gõ lại số 3, để hai màn không nói
+  "đủ mẫu" ở mốc khác nhau. Helper mới `computeTalentBrandPerf`. MyTalentProfile bỏ ô GMV/giờ gộp, thay bằng "Giờ live".
+  Lưu ý cho đợt sau: `hostSuggestion.ts` đã tính sẵn `brandGmvPerHour` / `weekdayGmvPerHour` / `blockGmvPerHour` + `confidence` cho
+  đúng ca đang chốt — nếu cần xếp hạng host thì dùng lại nguồn đó, đừng tự cộng lần nữa. **Đối chiếu Hiệu Suất Host:** Sỹ Hùng ở Talent Pool 7,31B ÷ 267,7h = 27,3M/giờ, ở
   Hiệu Suất Host 5,77B ÷ 205h = 28,2M/giờ — KHÁC nhau vì Hiệu Suất Host mặc định lọc 90 ngày gần nhất (2026-07-02 → 09-30, 164 ca)
   còn Talent Pool cộng toàn bộ lịch sử; cả hai đều tự nhất quán. Đã ghi câu này vào mô tả đầu trang Talent Pool để không ai tưởng lệch số.
   Còn lại: ở 375px bảng vẫn cuộn ngang 1,26× trong khung riêng (cột GMV tích luỹ) — giữ, trang không tràn. Nút "Chi tiết" của
