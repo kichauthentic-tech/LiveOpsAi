@@ -240,6 +240,14 @@ test("Talent Pool: đếm cả ca chạy vai trợ (coHostId), không chỉ ca h
   expect(metric).toMatch(/assistSessionCount: sessions\.filter\(\(s\) => s\.coHostId === talentId && isCountable\(s\)\)\.length/);
   const src = readFileSync(join(SRC, "components/TalentMatcher.tsx"), "utf8");
   expect(src).toMatch(/real\.assistSessionCount/);
+  // Hiệu suất đo bằng GMV/giờ, không phải GMV/ca: ca 5 giờ và ca 2 giờ không cùng cỡ. Cùng tên chuẩn
+  // (METRIC.gmvPerHour) với Hiệu Suất Host / Report Tháng để 3 màn không gọi khác nhau.
+  expect(metric).toMatch(/gmvPerHour: hours > 0 \? totalGmv \/ hours : 0/);
+  expect(src).toMatch(/show\[METRIC\.gmvPerHour\]/);
+  expect(src).not.toMatch(/GMV\/ca/);
+  const profile = readFileSync(join(SRC, "components/MyTalentProfile.tsx"), "utf8");
+  expect(profile).toMatch(/myReal\.gmvPerHour/);
+  expect(profile).not.toMatch(/GMV\/session/);
   // Không cộng ca trợ vào sessionCount: GMV của ca tính cho host, cộng sang trợ là đếm đôi.
   expect(metric).not.toMatch(/sessionCount: completed\.length \+ /);
 });

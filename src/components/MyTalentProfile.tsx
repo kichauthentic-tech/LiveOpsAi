@@ -2,7 +2,8 @@ import React, { useMemo, useState } from "react";
 import { SystemUser, Talent, LiveSession, SessionFinance, TalentRateHistoryEntry } from "../types";
 import { useAuth } from "../hooks/useAuth";
 import { User, Phone, Cake, Mail, Loader2, Lock, ShieldAlert, Award, Wallet } from "lucide-react";
-import { computeRealAvgGmvPerSession } from "../lib/metrics/avgGmv";
+import { computeTalentRealTotals } from "../lib/metrics/avgGmv";
+import { METRIC, metricHint } from "../lib/metricGlossary";
 import { computeTalentMonthlyIncome } from "../lib/pnl";
 import { todayVn } from "../lib/performance/brandCommitment";
 import { errorMessage } from "../lib/errorMessage";
@@ -56,6 +57,9 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
     if (!myTalent || myTalent.rateHidden) return { rows: [], total: 0, missingRate: false };
     return computeTalentMonthlyIncome(sessions, myTalent.id, incomeMonth, financeBySessionId, talentById, talentRateHistory);
   }, [sessions, myTalent, incomeMonth, financeBySessionId, talentById, talentRateHistory]);
+
+  // id rỗng ⇒ trả về toàn 0, gọi được cả khi chưa gắn hồ sơ talent (tránh nhánh null trong JSX).
+  const myReal = useMemo(() => computeTalentRealTotals(sessions, myTalent?.id ?? ""), [sessions, myTalent]);
 
   const [phone, setPhone] = useState(myTalent?.phone ?? "");
   const [avatar, setAvatar] = useState(myTalent?.avatar ?? "");
@@ -276,8 +280,10 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
             <div className="font-bold text-emerald-400 mt-0.5">{fmtVndShort(myTalent.totalGmv || 0)}</div>
           </div>
           <div className="bg-[var(--surface-base)]/40 border border-[var(--border)] rounded-xl p-3">
-            <div className="text-[var(--text-muted)]">GMV/session</div>
-            <div className="font-bold text-emerald-400 mt-0.5">{fmtVndShort(Math.round(computeRealAvgGmvPerSession(sessions, myTalent.id)))}</div>
+            {/* GMV/giờ chứ không phải GMV/ca: ca 5 giờ và ca 2 giờ không cùng cỡ nên GMV/ca phụ thuộc
+                độ dài ca hơn là người chạy. Cùng số với Talent Pool và Hiệu Suất Host. */}
+            <div className="text-[var(--text-muted)]" title={metricHint(METRIC.gmvPerHour)}>{METRIC.gmvPerHour}</div>
+            <div className="font-bold text-emerald-400 mt-0.5">{myReal.gmvPerHour > 0 ? fmtVndShort(Math.round(myReal.gmvPerHour)) : "—"}</div>
           </div>
           <div className="bg-[var(--surface-base)]/40 border border-[var(--border)] rounded-xl p-3">
             <div className="text-[var(--text-muted)]">CVR TB</div>

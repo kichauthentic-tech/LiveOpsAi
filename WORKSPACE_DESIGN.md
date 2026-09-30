@@ -545,6 +545,14 @@ Dashboard agency 5,2 → 10,1; Lịch brand 5,2 → 6,4; Sổ Ca 4,4 → 8,3; AI
   hỏng; đọc trong cùng một lượt JS sau vài mốc `setTimeout` ở tab đang hiện mới ra 180deg. (2) Tailwind v4 `rotate-180` đặt thuộc
   tính **`rotate`**, không phải `transform` — dò `getComputedStyle(x).transform` sẽ luôn thấy "none". (3) Bấm bằng `ref` khi pane bị
   thu nhỏ có thể lệch toạ độ; kiểm tương tác nên `dispatchEvent` tại tâm hộp lấy từ `getBoundingClientRect`.
+  **Bổ sung 2026-09-30 (user yêu cầu):** cột "GMV/ca" → **"GMV/giờ"** (`METRIC.gmvPerHour`, cùng tên chuẩn với Hiệu Suất Host /
+  Report Tháng). Lý do: ca 5 giờ và ca 2 giờ không cùng cỡ nên GMV/ca phụ thuộc độ dài ca hơn là người chạy — chính Hiệu Suất Host
+  đã ghi "GMV/giờ là thước đo dùng để phân bổ ca". `computeTalentRealTotals` thêm `hours` + `gmvPerHour` (dùng `sessionHours`, cùng
+  nguồn giờ với Hiệu Suất Host); ngăn chi tiết thêm dòng "Giờ live" và ô GMV/giờ trên bảng có `title` ghi phép chia.
+  Áp luôn cho [MyTalentProfile.tsx](src/components/MyTalentProfile.tsx) ("GMV/session" → "GMV/giờ") để hồ sơ talent và Talent Pool
+  không nói hai số khác nhau về cùng một người. **Đối chiếu Hiệu Suất Host:** Sỹ Hùng ở Talent Pool 7,31B ÷ 267,7h = 27,3M/giờ, ở
+  Hiệu Suất Host 5,77B ÷ 205h = 28,2M/giờ — KHÁC nhau vì Hiệu Suất Host mặc định lọc 90 ngày gần nhất (2026-07-02 → 09-30, 164 ca)
+  còn Talent Pool cộng toàn bộ lịch sử; cả hai đều tự nhất quán. Đã ghi câu này vào mô tả đầu trang Talent Pool để không ai tưởng lệch số.
   Còn lại: ở 375px bảng vẫn cuộn ngang 1,26× trong khung riêng (cột GMV tích luỹ) — giữ, trang không tràn. Nút "Chi tiết" của
   [PageIntro.tsx](src/components/common/PageIntro.tsx) cao 17px ở điện thoại (dưới sàn 24px) — **dùng chung 11 màn**, để sửa một
   lượt chứ không sửa lẻ trong đợt theo màn. 6 ô nhập rate/điểm trong form sửa chưa động tới.

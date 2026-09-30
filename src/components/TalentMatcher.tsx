@@ -6,8 +6,9 @@ import { computeTalentRealTotals } from "../lib/metrics/avgGmv";
 import { errorMessage } from "../lib/errorMessage";
 import { useConfirm } from "../hooks/useConfirm";
 
-import { fmtVndShort, fmtVndFull } from "../lib/format";
+import { fmtVndShort, fmtVndFull, fmtFixed } from "../lib/format";
 import { statusLabel } from "../lib/statusLabels";
+import { METRIC, metricHint } from "../lib/metricGlossary";
 import { PageHeader } from "./common/PageHeader";
 // Vài bản ghi talent cũ (trước khi field chuẩn hoá về `niches`/`avatar`/`ratePerSession`) có thể
 // còn lưu dưới tên cột cũ — đọc dự phòng, không phải lỗi kiểu dữ liệu.
@@ -340,7 +341,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
   const hideableCols: { label: string; has: (r: (typeof rosterRows)[number]) => boolean; fix?: string }[] = [
     { label: "Ca trợ", has: (r) => r.real.assistSessionCount > 0 },
     { label: "GMV tích luỹ", has: (r) => r.real.totalGmv > 0 },
-    { label: "GMV/ca", has: (r) => r.real.avgGmvPerSession > 0 },
+    { label: METRIC.gmvPerHour, has: (r) => r.real.gmvPerHour > 0 },
     { label: "CVR TB", has: (r) => r.t.cvrAvg > 0, fix: EDIT_HERE },
     { label: "Rate card", has: (r) => canSeeRate && (!!r.t.rateHidden || r.rate > 0), fix: canSeeRate ? EDIT_HERE : undefined },
     { label: "Hoa hồng", has: (r) => canSeeRate && (!!r.t.rateHidden || (r.t.commissionRate || 0) > 0), fix: canSeeRate ? EDIT_HERE : undefined },
@@ -365,7 +366,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
       <PageHeader
         icon={Users}
         title="Talent Pool"
-        description="Host và trợ live của agency: vai trò, số ca và GMV từ các ca đã chạy, rate card. Bấm vào thẻ để xem chi tiết từng người."
+        description="Host và trợ live của agency: vai trò, số ca và GMV/giờ từ các ca đã chạy, rate card. Bấm vào dòng để xem chi tiết từng người. Số ở đây cộng TOÀN BỘ ca đã chạy — Hiệu Suất Host mặc định chỉ 90 ngày gần nhất nên số bên đó nhỏ hơn, không phải lệch."
       />
 
       {/* Danh sách talent — bảng, không phải lưới thẻ.
@@ -426,7 +427,11 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                 <th className="py-2.5 px-2 text-right">Ca host</th>
                 {show["Ca trợ"] && <th className="py-2.5 px-2 text-right">Ca trợ</th>}
                 {show["GMV tích luỹ"] && <th className="py-2.5 px-2 text-right">GMV tích luỹ</th>}
-                {show["GMV/ca"] && <th className={`${SUB_COL} text-right`}>GMV/ca</th>}
+                {show[METRIC.gmvPerHour] && (
+                  <th className={`${SUB_COL} text-right`} title={metricHint(METRIC.gmvPerHour)}>
+                    {METRIC.gmvPerHour}
+                  </th>
+                )}
                 {show["CVR TB"] && <th className={`${SUB_COL} text-right`}>CVR TB</th>}
                 {show["Rate card"] && <th className={`${SUB_COL} text-right`}>Rate card</th>}
                 {show["Hoa hồng"] && <th className={`${SUB_COL} text-right`}>Hoa hồng</th>}
@@ -476,9 +481,9 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                       {real.totalGmv > 0 ? fmtVndShort(real.totalGmv) : <Dash />}
                     </td>
                   )}
-                  {show["GMV/ca"] && (
-                    <td className={`${SUB_COL} text-right font-mono text-emerald-400`}>
-                      {real.avgGmvPerSession > 0 ? fmtVndShort(Math.round(real.avgGmvPerSession)) : <Dash />}
+                  {show[METRIC.gmvPerHour] && (
+                    <td className={`${SUB_COL} text-right font-mono text-emerald-400`} title={real.hours > 0 ? `${fmtVndShort(real.totalGmv)} ÷ ${fmtFixed(real.hours, 1)} giờ live` : undefined}>
+                      {real.gmvPerHour > 0 ? fmtVndShort(Math.round(real.gmvPerHour)) : <Dash />}
                     </td>
                   )}
                   {show["CVR TB"] && (
@@ -945,7 +950,8 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                 <div>Ca host (có số): <strong className="text-[var(--text)] block text-sm font-bold">{detailReal.sessionCount}</strong></div>
                 <div>Ca trợ (có số): <strong className="text-[var(--text)] block text-sm font-bold">{detailReal.assistSessionCount}</strong></div>
                 <div>GMV lũy kế: <strong className="text-[var(--text)] block text-sm font-bold">{detailReal.totalGmv > 0 ? fmtVndShort(detailReal.totalGmv) : <Dash />}</strong></div>
-                <div>GMV/ca: <strong className="text-emerald-400 block text-sm font-bold">{detailReal.avgGmvPerSession > 0 ? fmtVndShort(Math.round(detailReal.avgGmvPerSession)) : <Dash />}</strong></div>
+                <div title={metricHint(METRIC.gmvPerHour)}>{METRIC.gmvPerHour}: <strong className="text-emerald-400 block text-sm font-bold">{detailReal.gmvPerHour > 0 ? fmtVndShort(Math.round(detailReal.gmvPerHour)) : <Dash />}</strong></div>
+                <div>Giờ live: <strong className="text-[var(--text)] block text-sm font-bold">{detailReal.hours > 0 ? `${fmtFixed(detailReal.hours, 1)}h` : <Dash />}</strong></div>
                 <div>CVR TB: <strong className="text-[var(--accent-text)] block text-sm font-bold">{detailTalent.cvrAvg > 0 ? `${detailTalent.cvrAvg}%` : <Dash />}</strong></div>
                 <div>CTR TB: <strong className="text-[var(--accent-text)] block text-sm font-bold">{detailTalent.ctrAvg > 0 ? `${detailTalent.ctrAvg}%` : <Dash />}</strong></div>
                 <div>Trạng Thái: <strong className="text-[var(--text)] block text-sm font-bold">{statusLabel(detailTalent.availabilityStatus || "Available")}</strong></div>
