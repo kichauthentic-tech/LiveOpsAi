@@ -563,6 +563,10 @@ Dashboard agency 5,2 → 10,1; Lịch brand 5,2 → 6,4; Sổ Ca 4,4 → 8,3; AI
   đủ mẫu`, brand chưa chạy ghi "chưa chạy ca nào", brand có ca xếp trước. Ngưỡng "đủ mẫu" **dùng chung `MIN_SESSIONS_FOR_CONFIDENCE`
   (3 ca) với [hostSuggestion.ts](src/lib/performance/hostSuggestion.ts)** — export ra thay vì gõ lại số 3, để hai màn không nói
   "đủ mẫu" ở mốc khác nhau. Helper mới `computeTalentBrandPerf`. MyTalentProfile bỏ ô GMV/giờ gộp, thay bằng "Giờ live".
+  **Sửa tiếp khi mở ngăn chi tiết ra xem:** người chạy 86 ca TRỢ hiện "Giờ live —" — đọc như làm 0 giờ, đúng loại lỗi đã sửa ở M6
+  cho số ca. `hours` chỉ cộng ca host (vì là mẫu số của GMV/giờ), nên thêm `assistHours` tách riêng. Bảng: cột "Giờ live" → **"Giờ
+  host" + "Giờ trợ"** (mỗi cột tự ẩn nếu không ai có). Thái Toàn: 0 ca host / 86 ca trợ / **360,1h giờ trợ**. Hồ sơ talent hiện tổng
+  giờ kèm dòng tách "Xh host · Yh trợ".
   Lưu ý cho đợt sau: `hostSuggestion.ts` đã tính sẵn `brandGmvPerHour` / `weekdayGmvPerHour` / `blockGmvPerHour` + `confidence` cho
   đúng ca đang chốt — nếu cần xếp hạng host thì dùng lại nguồn đó, đừng tự cộng lần nữa. **Đối chiếu Hiệu Suất Host:** Sỹ Hùng ở Talent Pool 7,31B ÷ 267,7h = 27,3M/giờ, ở
   Hiệu Suất Host 5,77B ÷ 205h = 28,2M/giờ — KHÁC nhau vì Hiệu Suất Host mặc định lọc 90 ngày gần nhất (2026-07-02 → 09-30, 164 ca)

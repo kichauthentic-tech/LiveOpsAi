@@ -25,8 +25,11 @@ export interface TalentRealTotals {
    * "chưa có ca nào có số" về người đã trợ 86 ca (audit UX lần 2 — M6).
    */
   assistSessionCount: number;
-  /** Giờ live thật của các ca host có số (`liveDurationMinutes` nếu có, không thì giờ theo lịch). */
+  /** Giờ live thật của các ca làm HOST (`liveDurationMinutes` nếu có, không thì giờ theo lịch). */
   hours: number;
+  /** Giờ live của các ca làm TRỢ — tách riêng như `assistSessionCount`, không cộng vào `hours`
+   *  (vì `hours` là mẫu số của GMV/giờ, mà GMV của ca tính cho host). */
+  assistHours: number;
   /**
    * GMV ÷ Giờ live. Đây mới là thước đo so được giữa các host: ca dài 5 giờ và ca 2 giờ không
    * cùng cỡ, nên GMV/ca phụ thuộc độ dài ca hơn là năng lực người chạy. Cùng định nghĩa với
@@ -42,11 +45,13 @@ export function computeTalentRealTotals(sessions: LiveSession[], talentId: strin
   const completed = sessions.filter((s) => s.hostId === talentId && isCountable(s));
   const totalGmv = completed.reduce((sum, s) => sum + (s.actualGmv || 0), 0);
   const hours = completed.reduce((sum, s) => sum + sessionHours(s), 0);
+  const assisted = sessions.filter((s) => s.coHostId === talentId && isCountable(s));
   return {
     sessionCount: completed.length,
     totalGmv,
     avgGmvPerSession: completed.length > 0 ? totalGmv / completed.length : 0,
-    assistSessionCount: sessions.filter((s) => s.coHostId === talentId && isCountable(s)).length,
+    assistSessionCount: assisted.length,
+    assistHours: assisted.reduce((sum, s) => sum + sessionHours(s), 0),
     hours,
     gmvPerHour: hours > 0 ? totalGmv / hours : 0
   };

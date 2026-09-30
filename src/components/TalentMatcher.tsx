@@ -343,7 +343,8 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
     { label: "GMV tích luỹ", has: (r) => r.real.totalGmv > 0 },
     // KHÔNG có cột GMV/giờ gộp mọi brand ở bảng: xem `computeTalentBrandPerf`. Bảng chỉ giữ thứ
     // cộng dồn được qua brand (ca, giờ, GMV); so hiệu suất thì mở ngăn chi tiết (tách theo brand).
-    { label: "Giờ live", has: (r) => r.real.hours > 0 },
+    { label: "Giờ host", has: (r) => r.real.hours > 0 },
+    { label: "Giờ trợ", has: (r) => r.real.assistHours > 0 },
     { label: "CVR TB", has: (r) => r.t.cvrAvg > 0, fix: EDIT_HERE },
     { label: "Rate card", has: (r) => canSeeRate && (!!r.t.rateHidden || r.rate > 0), fix: canSeeRate ? EDIT_HERE : undefined },
     { label: "Hoa hồng", has: (r) => canSeeRate && (!!r.t.rateHidden || (r.t.commissionRate || 0) > 0), fix: canSeeRate ? EDIT_HERE : undefined },
@@ -430,7 +431,8 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                 <th className="py-2.5 px-2 text-right">Ca host</th>
                 {show["Ca trợ"] && <th className="py-2.5 px-2 text-right">Ca trợ</th>}
                 {show["GMV tích luỹ"] && <th className="py-2.5 px-2 text-right">GMV tích luỹ</th>}
-                {show["Giờ live"] && <th className={`${SUB_COL} text-right`}>Giờ live</th>}
+                {show["Giờ host"] && <th className={`${SUB_COL} text-right`}>Giờ host</th>}
+                {show["Giờ trợ"] && <th className={`${SUB_COL} text-right`}>Giờ trợ</th>}
                 {show["CVR TB"] && <th className={`${SUB_COL} text-right`}>CVR TB</th>}
                 {show["Rate card"] && <th className={`${SUB_COL} text-right`}>Rate card</th>}
                 {show["Hoa hồng"] && <th className={`${SUB_COL} text-right`}>Hoa hồng</th>}
@@ -480,9 +482,14 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                       {real.totalGmv > 0 ? fmtVndShort(real.totalGmv) : <Dash />}
                     </td>
                   )}
-                  {show["Giờ live"] && (
+                  {show["Giờ host"] && (
                     <td className={`${SUB_COL} text-right font-mono text-[var(--text-muted)]`}>
                       {real.hours > 0 ? `${fmtFixed(real.hours, 1)}h` : <Dash />}
+                    </td>
+                  )}
+                  {show["Giờ trợ"] && (
+                    <td className={`${SUB_COL} text-right font-mono text-[var(--text-muted)]`}>
+                      {real.assistHours > 0 ? `${fmtFixed(real.assistHours, 1)}h` : <Dash />}
                     </td>
                   )}
                   {show["CVR TB"] && (
@@ -949,7 +956,8 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                 <div>Ca host (có số): <strong className="text-[var(--text)] block text-sm font-bold">{detailReal.sessionCount}</strong></div>
                 <div>Ca trợ (có số): <strong className="text-[var(--text)] block text-sm font-bold">{detailReal.assistSessionCount}</strong></div>
                 <div>GMV lũy kế: <strong className="text-[var(--text)] block text-sm font-bold">{detailReal.totalGmv > 0 ? fmtVndShort(detailReal.totalGmv) : <Dash />}</strong></div>
-                <div>Giờ live: <strong className="text-[var(--text)] block text-sm font-bold">{detailReal.hours > 0 ? `${fmtFixed(detailReal.hours, 1)}h` : <Dash />}</strong></div>
+                <div>Giờ host: <strong className="text-[var(--text)] block text-sm font-bold">{detailReal.hours > 0 ? `${fmtFixed(detailReal.hours, 1)}h` : <Dash />}</strong></div>
+                <div>Giờ trợ: <strong className="text-[var(--text)] block text-sm font-bold">{detailReal.assistHours > 0 ? `${fmtFixed(detailReal.assistHours, 1)}h` : <Dash />}</strong></div>
                 <div>CVR TB: <strong className="text-[var(--accent-text)] block text-sm font-bold">{detailTalent.cvrAvg > 0 ? `${detailTalent.cvrAvg}%` : <Dash />}</strong></div>
                 <div>CTR TB: <strong className="text-[var(--accent-text)] block text-sm font-bold">{detailTalent.ctrAvg > 0 ? `${detailTalent.ctrAvg}%` : <Dash />}</strong></div>
                 <div>Trạng Thái: <strong className="text-[var(--text)] block text-sm font-bold">{statusLabel(detailTalent.availabilityStatus || "Available")}</strong></div>

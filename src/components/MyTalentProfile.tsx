@@ -283,7 +283,14 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
                 chạy, gộp mọi brand thành một số là số không so được với ai (xem computeTalentBrandPerf).
                 Talent Pool cũng bỏ số gộp — hai màn phải nói cùng một thứ về cùng một người. */}
             <div className="text-[var(--text-muted)]">Giờ live</div>
-            <div className="font-bold text-[var(--text)] mt-0.5">{myReal.hours > 0 ? `${fmtFixed(myReal.hours, 1)}h` : "—"}</div>
+            <div className="font-bold text-[var(--text)] mt-0.5">
+              {myReal.hours + myReal.assistHours > 0 ? `${fmtFixed(myReal.hours + myReal.assistHours, 1)}h` : "—"}
+              {myReal.assistHours > 0 && (
+                <span className="block text-[11px] font-normal text-[var(--text-faint)]">
+                  {fmtFixed(myReal.hours, 1)}h host · {fmtFixed(myReal.assistHours, 1)}h trợ
+                </span>
+              )}
+            </div>
           </div>
           <div className="bg-[var(--surface-base)]/40 border border-[var(--border)] rounded-xl p-3">
             <div className="text-[var(--text-muted)]">CVR TB</div>

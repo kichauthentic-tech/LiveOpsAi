@@ -237,7 +237,8 @@ test("Talent Pool: không bịa mặt người, không hiện 0đ thay cho chưa
 
 test("Talent Pool: đếm cả ca chạy vai trợ (coHostId), không chỉ ca host", () => {
   const metric = readFileSync(join(SRC, "lib/metrics/avgGmv.ts"), "utf8");
-  expect(metric).toMatch(/assistSessionCount: sessions\.filter\(\(s\) => s\.coHostId === talentId && isCountable\(s\)\)\.length/);
+  expect(metric).toMatch(/const assisted = sessions\.filter\(\(s\) => s\.coHostId === talentId && isCountable\(s\)\)/);
+  expect(metric).toMatch(/assistSessionCount: assisted\.length/);
   const src = readFileSync(join(SRC, "components/TalentMatcher.tsx"), "utf8");
   expect(src).toMatch(/real\.assistSessionCount/);
   // Hiệu suất đo theo GIỜ, không theo ca: ca 5 giờ và ca 2 giờ không cùng cỡ.
@@ -253,6 +254,11 @@ test("Talent Pool: đếm cả ca chạy vai trợ (coHostId), không chỉ ca h
   // Ngưỡng "đủ mẫu" phải dùng chung với hostSuggestion, không gõ lại số 3.
   expect(metric).toMatch(/MIN_SESSIONS_FOR_CONFIDENCE/);
   expect(metric).not.toMatch(/rows\.length < 3/);
+  // Giờ làm vai TRỢ phải đếm riêng chứ không để trống: người trợ 86 ca mà hiện "Giờ live —" đọc
+  // như làm 0 giờ. Không cộng vào `hours` vì `hours` là mẫu số của GMV/giờ (GMV tính cho host).
+  expect(metric).toMatch(/assistHours: assisted\.reduce/);
+  expect(src).toMatch(/real\.assistHours/);
+  expect(src).not.toMatch(/Giờ live/);
   const profile = readFileSync(join(SRC, "components/MyTalentProfile.tsx"), "utf8");
   expect(profile).not.toMatch(/myReal\.gmvPerHour/);
   expect(profile).not.toMatch(/GMV\/session/);
