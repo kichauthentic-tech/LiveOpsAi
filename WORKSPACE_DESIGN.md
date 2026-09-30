@@ -166,6 +166,8 @@
 > nạp `profiles` vô hạn mỗi lần tab được hiện lại (GoTrue phát lại `SIGNED_IN`). Mục `### P2a-3`.
 > **P2a-4 2026-10-01:** chuông không poll khi tab ẩn; và **PostgREST chặn 1.000 dòng không báo lỗi** — `brand_dataraw_rows`
 > ĐANG mất dòng thật (đợt nhập 1.080 dòng chỉ đọc được 1.000). 8 hàm chuyển sang cuộn trang. Mục `### P2a-4`.
+> **P2a-5 2026-10-01:** `App.tsx` 2.867 → **2.054** dòng — tách `useWorkspaceData` (711), `appNav` (225),
+> `AppSidebar` (185). Refactor thuần: 51 handler / 122 state / 28 useEffect khớp tuyệt đối trước–sau. Mục `### P2a-5`.
 > **P2b đếm lượt mở tab: XONG, 0123 đã chạy, đếm từ 26/09/2026** (Phân Quyền → Lượt Mở Tab).
 > **P2c Report Tháng trên điện thoại XONG:** 24,7 → 7,5 màn 375px, phần 3–8 gập sau Insight. P2 còn: gộp menu (chờ 2–4 tuần số liệu).
 > **Kèm vá sự cố: mọi `/api/*` production chết (FUNCTION_INVOCATION_FAILED) từ 9dcf719 (24/09) tới 5ecb7c8 (26/09)** —
@@ -1082,6 +1084,43 @@ nhận về đúng 1.000 dòng đầu rồi im lặng — không lỗi, không c
   hồi quy phần vốn đã đúng).
 - `tsc` 0 lỗi · `eslint` 0 lỗi / 33 warning (baseline) · `vitest` **242/242** · `npm run build` OK.
 
+### P2a-5 — Tách App.tsx — XONG + VERIFY 2026-10-01 (refactor thuần, không đổi hành vi)
+- Vì sao: `App.tsx` 2.867 dòng, trong đó hơn 500 dòng đầu chỉ là khai state + `useEffect` nạp dữ liệu,
+  đẩy phần thật sự của màn hình (handler + JSX) xuống quá tầm đọc. Sửa một nhãn menu cũng phải cuộn
+  qua 1.700 dòng state/effect.
+
+| Tách ra | Dòng | Vì sao đứng riêng được |
+|---|---|---|
+| [src/hooks/useWorkspaceData.ts](src/hooks/useWorkspaceData.ts) | 711 | state + mọi đợt nạp + 2 giá trị dẫn xuất bám sát chúng; chỉ nhận `session`/`currentRole`/`isOpsRole`/`activeTab` |
+| [src/lib/appNav.ts](src/lib/appNav.ts) | 225 | cấu hình sidebar là DỮ LIỆU thuần, chỉ phụ thuộc `currentRole` |
+| [src/components/AppSidebar.tsx](src/components/AppSidebar.tsx) | 185 | 155 dòng JSX trình bày, không giữ state của riêng nó (10 prop) |
+| **`App.tsx` còn lại** | **2.054** | 116 import/registry · 1.194 handler + dẫn xuất · 743 JSX |
+
+- `useWorkspaceData` trả state **kèm setter** (75 giá trị App thật sự dùng) vì các handler ghi lạc quan
+  vào state ngay sau khi RPC trả về, không nạp lại cả bảng. Thứ tự khai báo, dep của từng effect và các
+  cờ `*LoadedFor`/`*LoadedRef` giữ nguyên từng dòng — vì sao từng dep như vậy thì đọc chú thích tại chỗ
+  (nhất là luật "khoá theo `authUserId` chứ không theo object `session`" ở `### P2a-3`).
+- **Cố ý DỪNG ở đây.** Hai khối còn lại đều không tách được mà không làm code tệ hơn:
+  - *JSX chuyển tab* (~500 dòng) — component con sẽ cần ~70 prop. Luồn 70 prop không giảm độ phức tạp,
+    chỉ dời nó sang chỗ khác và thêm một lớp gián tiếp.
+  - *51 handler* (~570 dòng) — bám vào ~50 setter + `showToast` + `confirm` + `pushAuditLog`. Tách thì
+    hoặc luồn 50 tham số, hoặc viết lại toàn bộ thân hàm thành `data.setX(...)` — đổi 570 dòng để đổi
+    lấy code ồn hơn.
+- **Cách verify một refactor thuần** (giữ lại làm mẫu): so sánh TẬP TÊN giữa `HEAD` và các file mới —
+  `handle*` **51 → 51**, tên state **122 → 122**, số `useEffect` **28 → 28**, không mất không thêm cái nào.
+  Đây là thứ bắt được lỗi "đánh rơi một hàm khi cắt dán" mà `tsc` không bắt (hàm mồ côi vẫn biên dịch).
+- Verify trên bản build thật: đợt fetch lúc đăng nhập vẫn **28 request, 0 lặp** (y hệt trước refactor);
+  duyệt **17 tab agency + 11 tab brand** đều render đủ nội dung, **0 lỗi console**; sidebar mở rộng ở
+  1440px giống hệt bản cũ (đủ 7 nhóm, tô đúng mục đang mở); bấm nav → đúng route + đúng tô đậm; bấm thẻ
+  người dùng → `/tai-khoan`.
+- Test đi theo code (không phải nới lỏng test): `routes.test.ts` và `loginFetch.test.ts` đọc sang file
+  mới; `bundleSplit.test.ts` thêm `AppSidebar` vào danh sách được import TĨNH — nó là khung app, luôn
+  hiện, lazy nó chỉ làm sidebar nhấp nháy lúc mở.
+- Bẫy đã dính: dùng một regex `import \{\n.*?\} from "lucide-react"` để dọn import — `.*?` vẫn nuốt
+  trọn 10 câu lệnh import phía trên và làm hỏng file. Dọn import phải cắt theo TỪNG câu lệnh, không
+  bắt regex vắt qua nhiều câu lệnh.
+- `tsc` 0 lỗi · `eslint` 0 lỗi / 33 warning (baseline) · `vitest` **242/242** · `npm run build` OK.
+
 ### P2b — Đếm lượt mở tab — XONG 2026-09-26, migration 0123 ĐÃ CHẠY + verify (bắt đầu đếm 26/09/2026)
 - Vì sao: trước khi gộp/bỏ mục menu (18 tab agency + 10 tab brand) cần số người dùng thật — chưa có số nào.
 - `supabase/migrations/0123_ui_tab_views.sql`: bảng `ui_tab_views(user_id, role, workspace, brand_id, tab, viewed_at)`;
@@ -1186,7 +1225,7 @@ Kèm theo, `ShiftScheduling.tsx` — mỗi dòng ca trong `visibleSlots.map()` t
 4. **Thay `window.alert()` bằng toast — XONG (49/49).** [useToast.tsx](src/hooks/useToast.tsx): `ToastProvider` + `useToast()` (context, không chặn UI, tự biến mất sau 8s, có nút đóng tay) mount ở `main.tsx` trên `AuthProvider`. Thay cơ học `window.alert(X)` → `showToast(X)` ở 9 file (App.tsx 39 chỗ — gần như toàn bộ là `catch (e) { window.alert(errorMessage(e)) }` — + 8 file khác 10 chỗ: OpenSlotModal/FinanceHr/SlotDetailModal/BackfillFromRooms/StudioEquipment/ShiftScheduling/SessionWindow/AiTrainingCenter). An toàn vì `alert()` không gate luồng gì phía sau (fire-and-forget), không cần đổi hàm bao quanh thành async.
 5. **`window.confirm()` → modal riêng — XONG (25/25), đợt 2.** [useConfirm.tsx](src/hooks/useConfirm.tsx): `ConfirmProvider` + `useConfirm()` — trả `Promise<boolean>` (khác `useToast` — mỗi `confirm()` cũ đang GATE code chạy tiếp nên không thay cơ học được), dialog card giữa màn khớp theme app (không phải native), `whitespace-pre-line` giữ đúng xuống dòng của các cảnh báo nhiều đoạn ghép bằng `\n\n` (MonthPlan.tsx có confirm dài nhất — 4 đoạn cảnh báo trước khi chốt kế hoạch), option `danger` tô nút xác nhận đỏ cho hành động phá huỷ (xoá/huỷ — set ở tất cả các chỗ `window.confirm` cũ có ý "xoá"/"huỷ"/"ngắt kết nối" không hoàn tác được). 16 file, 25 chỗ: MonthPlan (4) · OpenSlotModal/TikTokApiAutomation/StudioEquipment/ReportPublishBoard/LiveReconciliation/BrandCommitment (2 mỗi file) · BrandMonthlyReport/BrandDataRaw/BackfillFromRooms/UserRoleSettings/TalentMatcher/SessionWindow/SessionLiveSnapshotUpload/CrmProjects/BulkFinalizePanel (1 mỗi file). Mỗi chỗ: hàm bao quanh đổi thành `async` (hầu hết ĐÃ SẴN async vì gọi RPC ngay sau), `if (!window.confirm(X)) return;` → `if (!(await confirm(X))) return;`. Không có chỗ nào gọi hàm này từ context KHÔNG async-hoá được (mọi call site đều là onClick hoặc callback đã async).
 
-Còn lại chưa đụng (không nằm trong danh sách user chọn): ~~bundle **2.4 MB một mảnh**, không code-split~~ — ĐÃ XỬ LÝ, xem `### P2a` (26/09, tách theo tab) và `### P2a-2` (01/10, entry còn 495 KB); ~~≈13 cụm fetch nổ cùng lúc lúc đăng nhập cho mọi role~~ — ĐÃ XỬ LÝ, xem `### P2a-3` (01/10: 46 → 28 request, hết request lặp); ~~`useNotifications` poll 45s không kiểm `document.visibilityState`~~ — ĐÃ XỬ LÝ, xem `### P2a-4` (kèm trần 1.000 dòng của PostgREST); `App.tsx` 2600+ dòng / `MonthlyReportTabs.tsx` 2217 dòng; `/api/gemini/*` vẫn trả `isMock: true` kèm reply bịa khi thiếu `GEMINI_API_KEY`.
+Còn lại chưa đụng (không nằm trong danh sách user chọn): ~~bundle **2.4 MB một mảnh**, không code-split~~ — ĐÃ XỬ LÝ, xem `### P2a` (26/09, tách theo tab) và `### P2a-2` (01/10, entry còn 495 KB); ~~≈13 cụm fetch nổ cùng lúc lúc đăng nhập cho mọi role~~ — ĐÃ XỬ LÝ, xem `### P2a-3` (01/10: 46 → 28 request, hết request lặp); ~~`useNotifications` poll 45s không kiểm `document.visibilityState`~~ — ĐÃ XỬ LÝ, xem `### P2a-4` (kèm trần 1.000 dòng của PostgREST); ~~`App.tsx` 2600+ dòng~~ — ĐÃ TÁCH còn 2.054, xem `### P2a-5` (phần còn lại là handler + JSX theo tab, cố ý không tách tiếp); `MonthlyReportTabs.tsx` 2.337 dòng; `/api/gemini/*` vẫn trả `isMock: true` kèm reply bịa khi thiếu `GEMINI_API_KEY`.
 
 Verify đợt 2: `tsc --noEmit` xanh (xác nhận mọi hàm chứa `await confirm(...)` đã đúng `async`), `eslint .` 0 lỗi/41 warning (đúng baseline, không phát sinh mới), `vitest` 38/38 xanh, browser smoke test không lỗi console (React).
 

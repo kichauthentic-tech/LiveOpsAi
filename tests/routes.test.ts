@@ -36,8 +36,9 @@ test("slug bỏ dấu tiếng Việt", () => {
   expect(brandSlug({ id: "x", name: "  " })).toBe("x");
 });
 
-test("mọi tab trong menu App.tsx đều có link", () => {
-  const app = readFileSync(join(__dirname, "..", "src", "App.tsx"), "utf8");
+test("mọi tab trong menu đều có link", () => {
+  // Cấu hình menu đã tách khỏi App.tsx sang src/lib/appNav.ts (2026-10-01).
+  const app = readFileSync(join(__dirname, "..", "src", "lib", "appNav.ts"), "utf8");
   const ids = [...app.matchAll(/\{ id: "([a-z_]+)", label:/g)].map((m) => m[1]);
   expect(ids.length).toBeGreaterThan(20);
   const missing = ids.filter(
@@ -46,8 +47,8 @@ test("mọi tab trong menu App.tsx đều có link", () => {
   expect(missing).toEqual([]);
 });
 
-test("tên tab trong src/lib/tabLabels.ts khớp nhãn menu App.tsx", () => {
-  const app = readFileSync(join(__dirname, "..", "src", "App.tsx"), "utf8");
+test("tên tab trong src/lib/tabLabels.ts khớp nhãn menu", () => {
+  const app = readFileSync(join(__dirname, "..", "src", "lib", "appNav.ts"), "utf8");
   const items = [...app.matchAll(/\{ id: "([a-z_]+)", label: "([^"]+)"/g)].map((m) => ({ id: m[1], label: m[2] }));
   const all = { ...AGENCY_TAB_LABELS, ...BRAND_TAB_LABELS };
   const wrong = items.filter(

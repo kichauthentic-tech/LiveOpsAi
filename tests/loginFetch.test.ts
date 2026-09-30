@@ -14,7 +14,8 @@ import { join } from "node:path";
 import { expect, test } from "vitest";
 
 const SRC = join(__dirname, "..", "src");
-const APP = readFileSync(join(SRC, "App.tsx"), "utf8");
+// Các đợt nạp đã tách khỏi App.tsx sang hook riêng (2026-10-01) — test đi theo code.
+const APP = readFileSync(join(SRC, "hooks/useWorkspaceData.ts"), "utf8");
 const USE_AUTH = readFileSync(join(SRC, "hooks/useAuth.tsx"), "utf8");
 
 /** Khối useEffect bao quanh `needle`, từ `useEffect(` tới hết mảng dep. */
@@ -70,7 +71,9 @@ test("mỗi bộ dữ liệu hoãn phải nạp đúng MỘT lần cho mỗi ng�
   for (const ref of ["usersLoadedRef", "auditLogsLoadedRef", "workflowRulesLoadedRef", "aiPromptsLoadedRef"]) {
     expect(APP, `${ref} phải mở khoá lại khi fetch hỏng`).toContain(`${ref}.current = null`);
   }
-  expect(APP, "màn TikTok phải có đường bấm lại tay vì khoá không tự mở").toContain("onRefreshTikTokStatus={refreshTikTokStatus}");
+  // Nút bấm lại nằm ở JSX của App.tsx, không ở hook.
+  const appTsx = readFileSync(join(SRC, "App.tsx"), "utf8");
+  expect(appTsx, "màn TikTok phải có đường bấm lại tay vì khoá không tự mở").toContain("onRefreshTikTokStatus={refreshTikTokStatus}");
 });
 
 test("Report Tháng: chỉ nạp lại khi RỜI màn có thể sửa report/kế hoạch", () => {

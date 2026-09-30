@@ -25,7 +25,13 @@ test("xlsx chỉ được tải động (await import(\"xlsx\"))", () => {
 });
 
 // Component App.tsx được phép import tĩnh: khung app (header, màn đăng nhập) — hiện ra trước mọi tab.
-const APP_STATIC_COMPONENTS = ["./components/Header", "./components/Login", "./components/ResetPasswordScreen", "./components/common/TabErrorFallback"];
+const APP_STATIC_COMPONENTS = [
+  "./components/Header",
+  "./components/AppSidebar", // khung app, luôn hiện — lazy nó chỉ làm sidebar nhấp nháy lúc mở
+  "./components/Login",
+  "./components/ResetPasswordScreen",
+  "./components/common/TabErrorFallback"
+];
 
 test("App.tsx không import tĩnh component tab — dùng lazyNamed/lazy", () => {
   const app = readFileSync(join(SRC, "App.tsx"), "utf8");
