@@ -168,6 +168,8 @@
 > ĐANG mất dòng thật (đợt nhập 1.080 dòng chỉ đọc được 1.000). 8 hàm chuyển sang cuộn trang. Mục `### P2a-4`.
 > **P2a-5 2026-10-01:** `App.tsx` 2.867 → **2.054** dòng — tách `useWorkspaceData` (711), `appNav` (225),
 > `AppSidebar` (185). Refactor thuần: 51 handler / 122 state / 28 useEffect khớp tuyệt đối trước–sau. Mục `### P2a-5`.
+> **P2a-6 2026-10-01:** `MonthlyReportTabs.tsx` 2.337 → **1.642** dòng (tách bộ component trình bày sang
+> `report/`). Giá của cả 2 đợt tách: entry +1,6 KB gzip. Mục `### P2a-6`.
 > **P2b đếm lượt mở tab: XONG, 0123 đã chạy, đếm từ 26/09/2026** (Phân Quyền → Lượt Mở Tab).
 > **P2c Report Tháng trên điện thoại XONG:** 24,7 → 7,5 màn 375px, phần 3–8 gập sau Insight. P2 còn: gộp menu (chờ 2–4 tuần số liệu).
 > **Kèm vá sự cố: mọi `/api/*` production chết (FUNCTION_INVOCATION_FAILED) từ 9dcf719 (24/09) tới 5ecb7c8 (26/09)** —
@@ -1121,6 +1123,36 @@ nhận về đúng 1.000 dòng đầu rồi im lặng — không lỗi, không c
   bắt regex vắt qua nhiều câu lệnh.
 - `tsc` 0 lỗi · `eslint` 0 lỗi / 33 warning (baseline) · `vitest` **242/242** · `npm run build` OK.
 
+### P2a-6 — Tách MonthlyReportTabs.tsx — XONG + VERIFY 2026-10-01 (refactor thuần)
+- File 2.337 dòng, nhưng khác `App.tsx`: 660 dòng đầu đã sẵn là hằng số + component TRÌNH BÀY ở mức
+  module, hoàn toàn tự chứa (không đọc state nào của màn). Nằm chung chỉ khiến phần TÍNH SỐ của report
+  bị đẩy xuống quá tầm đọc.
+
+| Tách ra (`src/components/brand-workspace/report/`) | Dòng | Nội dung |
+|---|---|---|
+| `ui.tsx` | 360 | Panel · ReportTable · KpiTile · InsightBox · WaterfallPanel · SectionHead/Detail · ChartLegend · ProgressBar · NarrativeEditor |
+| `HostPerformancePanel.tsx` | 205 | bảng Host PFM (phần 5) — riêng file vì có state cục bộ của chính nó (tab loại ngày) |
+| `theme.ts` | 70 | skin đen-vàng cố định + SECTIONS/CHANNELS/DRIVER_SHORT/DAY_TYPE_SHORT |
+| `format.ts` | 64 | định dạng + mốc tháng riêng của report (đuôi `Local` để phân biệt với `lib/format.ts`) |
+| **`MonthlyReportTabs.tsx` còn lại** | **1.642** | phần tính số + JSX 7 phần |
+
+- **Cách cắt**: dò khối khai báo ở MỨC MODULE bằng script (tên + khoảng dòng, chú thích `//` ngay trên
+  được gắn vào khối phía dưới nó), rồi gán từng khối vào module đích — KHÔNG cắt theo số dòng cứng.
+- `recharts` giờ nằm ở 2 file, nhưng `ui.tsx` chỉ được `MonthlyReportTabs` import nên vẫn cùng một chunk
+  lazy: chunk Report Tháng **497,58 KB trước và sau, không đổi một byte**. Test `bundleSplit` đổi từ
+  "chỉ 1 file được import recharts" sang "chỉ nhánh Report Tháng" — thêm file thứ 3 ngoài nhánh vẫn đỏ.
+- Verify tương đương: khai báo mức module **32 → 32** (không mất không thêm), `useState` **14 → 14**,
+  `useMemo` **55 → 55**, `useEffect` **5 → 5**. Trên bản build thật (CROCS 9/2026): mọi con số khớp từng
+  chữ số với lần đo trước (5,21B · 3,52B · 2,97B · 177,8h · 19,8M), 7 phần + 14 bảng render đủ, biểu đồ
+  thác giữ nguyên cả 5 thừa số, Host PFM giữ đủ tab loại ngày và cột dính trái, **0 lỗi console**.
+- Test đi theo code: `layoutConventions` đọc `report/ui.tsx` cho luật cột dính (ReportTable đã chuyển).
+
+**Giá phải trả của cả hai đợt tách (P2a-5 + P2a-6), đo thật:** chunk entry **497,07 → 501,20 KB**
+(gzip 141,93 → **143,52**, tức **+1,6 KB gzip**) — Rollup không nội tuyến/mangle qua ranh giới module
+được như khi mọi thứ nằm trong một file. Chunk Report Tháng không đổi. Đổi 1,6 KB gzip lấy `App.tsx`
+−28% và `MonthlyReportTabs` −30% là đáng, nhưng đừng tách nhỏ tiếp chỉ vì thích gọn: mỗi file mới
+đều có phí này.
+
 ### P2b — Đếm lượt mở tab — XONG 2026-09-26, migration 0123 ĐÃ CHẠY + verify (bắt đầu đếm 26/09/2026)
 - Vì sao: trước khi gộp/bỏ mục menu (18 tab agency + 10 tab brand) cần số người dùng thật — chưa có số nào.
 - `supabase/migrations/0123_ui_tab_views.sql`: bảng `ui_tab_views(user_id, role, workspace, brand_id, tab, viewed_at)`;
@@ -1225,7 +1257,7 @@ Kèm theo, `ShiftScheduling.tsx` — mỗi dòng ca trong `visibleSlots.map()` t
 4. **Thay `window.alert()` bằng toast — XONG (49/49).** [useToast.tsx](src/hooks/useToast.tsx): `ToastProvider` + `useToast()` (context, không chặn UI, tự biến mất sau 8s, có nút đóng tay) mount ở `main.tsx` trên `AuthProvider`. Thay cơ học `window.alert(X)` → `showToast(X)` ở 9 file (App.tsx 39 chỗ — gần như toàn bộ là `catch (e) { window.alert(errorMessage(e)) }` — + 8 file khác 10 chỗ: OpenSlotModal/FinanceHr/SlotDetailModal/BackfillFromRooms/StudioEquipment/ShiftScheduling/SessionWindow/AiTrainingCenter). An toàn vì `alert()` không gate luồng gì phía sau (fire-and-forget), không cần đổi hàm bao quanh thành async.
 5. **`window.confirm()` → modal riêng — XONG (25/25), đợt 2.** [useConfirm.tsx](src/hooks/useConfirm.tsx): `ConfirmProvider` + `useConfirm()` — trả `Promise<boolean>` (khác `useToast` — mỗi `confirm()` cũ đang GATE code chạy tiếp nên không thay cơ học được), dialog card giữa màn khớp theme app (không phải native), `whitespace-pre-line` giữ đúng xuống dòng của các cảnh báo nhiều đoạn ghép bằng `\n\n` (MonthPlan.tsx có confirm dài nhất — 4 đoạn cảnh báo trước khi chốt kế hoạch), option `danger` tô nút xác nhận đỏ cho hành động phá huỷ (xoá/huỷ — set ở tất cả các chỗ `window.confirm` cũ có ý "xoá"/"huỷ"/"ngắt kết nối" không hoàn tác được). 16 file, 25 chỗ: MonthPlan (4) · OpenSlotModal/TikTokApiAutomation/StudioEquipment/ReportPublishBoard/LiveReconciliation/BrandCommitment (2 mỗi file) · BrandMonthlyReport/BrandDataRaw/BackfillFromRooms/UserRoleSettings/TalentMatcher/SessionWindow/SessionLiveSnapshotUpload/CrmProjects/BulkFinalizePanel (1 mỗi file). Mỗi chỗ: hàm bao quanh đổi thành `async` (hầu hết ĐÃ SẴN async vì gọi RPC ngay sau), `if (!window.confirm(X)) return;` → `if (!(await confirm(X))) return;`. Không có chỗ nào gọi hàm này từ context KHÔNG async-hoá được (mọi call site đều là onClick hoặc callback đã async).
 
-Còn lại chưa đụng (không nằm trong danh sách user chọn): ~~bundle **2.4 MB một mảnh**, không code-split~~ — ĐÃ XỬ LÝ, xem `### P2a` (26/09, tách theo tab) và `### P2a-2` (01/10, entry còn 495 KB); ~~≈13 cụm fetch nổ cùng lúc lúc đăng nhập cho mọi role~~ — ĐÃ XỬ LÝ, xem `### P2a-3` (01/10: 46 → 28 request, hết request lặp); ~~`useNotifications` poll 45s không kiểm `document.visibilityState`~~ — ĐÃ XỬ LÝ, xem `### P2a-4` (kèm trần 1.000 dòng của PostgREST); ~~`App.tsx` 2600+ dòng~~ — ĐÃ TÁCH còn 2.054, xem `### P2a-5` (phần còn lại là handler + JSX theo tab, cố ý không tách tiếp); `MonthlyReportTabs.tsx` 2.337 dòng; `/api/gemini/*` vẫn trả `isMock: true` kèm reply bịa khi thiếu `GEMINI_API_KEY`.
+Còn lại chưa đụng (không nằm trong danh sách user chọn): ~~bundle **2.4 MB một mảnh**, không code-split~~ — ĐÃ XỬ LÝ, xem `### P2a` (26/09, tách theo tab) và `### P2a-2` (01/10, entry còn 495 KB); ~~≈13 cụm fetch nổ cùng lúc lúc đăng nhập cho mọi role~~ — ĐÃ XỬ LÝ, xem `### P2a-3` (01/10: 46 → 28 request, hết request lặp); ~~`useNotifications` poll 45s không kiểm `document.visibilityState`~~ — ĐÃ XỬ LÝ, xem `### P2a-4` (kèm trần 1.000 dòng của PostgREST); ~~`App.tsx` 2600+ dòng~~ — ĐÃ TÁCH còn 2.054, xem `### P2a-5` (phần còn lại là handler + JSX theo tab, cố ý không tách tiếp); ~~`MonthlyReportTabs.tsx` 2.337 dòng~~ — ĐÃ TÁCH còn 1.642, xem `### P2a-6`; `/api/gemini/*` vẫn trả `isMock: true` kèm reply bịa khi thiếu `GEMINI_API_KEY`.
 
 Verify đợt 2: `tsc --noEmit` xanh (xác nhận mọi hàm chứa `await confirm(...)` đã đúng `async`), `eslint .` 0 lỗi/41 warning (đúng baseline, không phát sinh mới), `vitest` 38/38 xanh, browser smoke test không lỗi console (React).
 

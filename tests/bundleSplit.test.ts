@@ -68,12 +68,20 @@ test("Report Tháng: MonthlyReportTabs (recharts) chỉ được tải động",
   expect(src).toContain('lazyNamed(() => import("./MonthlyReportTabs"), "MonthlyReportTabs")');
 });
 
-test("recharts không rò sang file nào khác ngoài MonthlyReportTabs", () => {
+// Cả 2 file đều nằm trong chunk lazy của Report Tháng (ui.tsx chỉ được MonthlyReportTabs import),
+// nên recharts vẫn chỉ tải khi mở đúng tab đó. Thêm file thứ 3 ở ngoài nhánh này là 364 KB biểu đồ
+// rơi sang chunk khác — đó mới là thứ test này canh.
+const RECHARTS_FILES = [
+  "components/brand-workspace/MonthlyReportTabs.tsx",
+  "components/brand-workspace/report/ui.tsx"
+];
+
+test("recharts không rò ra ngoài nhánh Report Tháng", () => {
   const hits: string[] = [];
   for (const file of sourceFiles(SRC)) {
     if (/^import\s[^;]*from\s+["']recharts["']/m.test(readFileSync(file, "utf8"))) hits.push(file.split("/src/")[1]);
   }
-  expect(hits).toEqual(["components/brand-workspace/MonthlyReportTabs.tsx"]);
+  expect(hits.sort()).toEqual([...RECHARTS_FILES].sort());
 });
 
 // ── Shim @supabase/realtime-js + storage-js (src/shims/README.md) ─────────────────────────────────

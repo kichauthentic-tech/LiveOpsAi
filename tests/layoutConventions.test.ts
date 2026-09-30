@@ -357,7 +357,8 @@ test("Bảng Vận Hành: không bày 4 ô 0 khi không có ca nào", () => {
 });
 
 test("Report Tháng: cột tên chỉ số dính trái khi bảng cuộn ngang", () => {
-  const src = readFileSync(join(SRC, "components/brand-workspace/MonthlyReportTabs.tsx"), "utf8");
+  // `ReportTable` đã tách sang report/ui.tsx (2026-10-01) — test đi theo code.
+  const src = readFileSync(join(SRC, "components/brand-workspace/report/ui.tsx"), "utf8");
   expect(src).toMatch(/\[&_td:first-child\]:sticky/);
   expect(src).toMatch(/\[&_th:first-child\]:sticky/);
   // Nền phải đặc, nếu không chữ cột sau lộ qua khi cuộn.
