@@ -83,6 +83,28 @@ import { DEFAULT_ENGINE_PARAMS, EngineParams } from "./lib/scheduling/enginePara
 import { findBrandBySlug, parsePath, routeToPath } from "./lib/routes";
 import { lazyNamed } from "./lib/lazyNamed";
 
+// Dữ liệu chỉ vài màn đọc tới thì nạp khi MỞ màn đó, không nạp lúc đăng nhập. Đo 2026-10-01 trên bản
+// build thật (role admin): đăng nhập bắn 44 request, trong đó 5 request dưới đây phục vụ đúng 3 tab mà
+// phần lớn phiên làm việc không mở tới. Nạp MỘT LẦN cho mỗi người dùng — mở lại tab không gọi lại; các
+// handler sửa dữ liệu vẫn tự gọi `fetchUsers()` lại như cũ nên danh sách không bị cũ.
+const TABS_NEED_USERS = new Set(["user_settings", "crm", "finance"]);
+const TABS_NEED_AUDIT_LOGS = new Set(["user_settings"]);
+const TABS_NEED_TIKTOK = new Set(["tiktok_api"]);
+// Luật tự động hiện trong chính màn Tự Động Hoá TikTok — hằng số riêng để mỗi bộ dữ liệu hoãn có đúng
+// một cửa vào, đổi màn nào không kéo theo màn kia.
+const TABS_NEED_WORKFLOW_RULES = new Set(["tiktok_api"]);
+const TABS_NEED_AI_PROMPTS = new Set(["ai_training"]);
+
+// Màn có thể sửa report tháng / kế hoạch tháng. Rời một trong các màn này mới cần nạp lại
+// `brand_monthly_reports`; trước đây nạp lại ở MỌI lần đổi tab (18 tab agency + 10 tab brand).
+const TABS_MAY_CHANGE_REPORTS = new Set([
+  "brand_monthly_report",
+  "brand_next_month_plan",
+  "month_plan",
+  "report_publish_board",
+  "live_reconciliation"
+]);
+
 // Mỗi tab một chunk riêng, tải khi mở tab (xem src/lib/lazyNamed.ts). Chỉ dùng bên trong <Suspense> của khu nội dung tab.
 const BrandCalendar = lazyNamed(() => import("./components/brand-workspace/BrandCalendar"), "BrandCalendar");
 const BrandSkuShowcase = lazyNamed(() => import("./components/brand-workspace/BrandSkuShowcase"), "BrandSkuShowcase");
@@ -351,8 +373,14 @@ export default function App() {
   );
   // Kế hoạch tháng được sửa ở Report Tháng (Tab 05) mà App không nhận callback — nạp lại mỗi khi
   // đổi tab là đủ, bảng nhỏ và target chỉ cần đúng khi người dùng nhìn sang màn khác.
+  const prevTabRef = useRef<string | null>(null);
   useEffect(() => {
+    const leaving = prevTabRef.current;
+    prevTabRef.current = activeTab;
     if (!session) return;
+    // Chỉ nạp lại khi vừa RỜI một màn có thể đã sửa report/kế hoạch. Trước đây mọi lần đổi tab đều
+    // gọi lại `brand_monthly_reports` — 28 tab, phần lớn không đụng gì tới report.
+    if (leaving === null || !TABS_MAY_CHANGE_REPORTS.has(leaving)) return;
     fetchAllMonthlyReports().then(setMonthlyReports).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
@@ -495,10 +523,13 @@ export default function App() {
     };
   }, [authUserId]);
 
+  // Chỉ 3 màn đọc danh sách này — Phân Quyền & Role, CRM, Tài Chính — cả ba đều gate ở ops.
+  const usersLoadedRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!authUserId) return;
-    // Chỉ 2 màn đọc danh sách này — Phân Quyền & Role và CRM — và cả hai đều gate ở ops.
-    if (!isOpsRole) return;
+    if (!authUserId || !isOpsRole) return;
+    if (!TABS_NEED_USERS.has(activeTab)) return;
+    if (usersLoadedRef.current === authUserId) return;
+    usersLoadedRef.current = authUserId;
     let cancelled = false;
     fetchUsers()
       .then((u) => {
@@ -507,34 +538,63 @@ export default function App() {
         setPhase4Error(null);
       })
       .catch((err) => {
+        usersLoadedRef.current = null; // hỏng thì mở khoá để lần mở tab sau thử lại
         if (cancelled) return;
         setPhase4Error(err.message ?? "Không tải được danh sách tài khoản người dùng từ Supabase.");
       });
     return () => {
       cancelled = true;
     };
-  }, [authUserId, isOpsRole]);
+  }, [authUserId, isOpsRole, activeTab]);
 
+  // Cả 2 bảng đã khoá ở ceo/operations/admin trong migration 0105. Tách đôi vì chúng phục vụ HAI màn
+  // khác nhau (workflow rules → Tự Động Hoá TikTok, audit logs → Phân Quyền & Role), trước đây gộp một
+  // `Promise.all` nên mở màn nào cũng kéo cả hai.
+  const workflowRulesLoadedRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!authUserId) return;
-    // Cả 2 bảng đã khoá ở ceo/operations/admin trong migration 0105.
-    if (!isOpsRole) return;
+    if (!authUserId || !isOpsRole) return;
+    if (!TABS_NEED_WORKFLOW_RULES.has(activeTab)) return;
+    if (workflowRulesLoadedRef.current === authUserId) return;
+    workflowRulesLoadedRef.current = authUserId;
     let cancelled = false;
-    Promise.all([fetchWorkflowRules(), fetchAuditLogs()])
-      .then(([w, a]) => {
+    fetchWorkflowRules()
+      .then((w) => {
         if (cancelled) return;
         setWorkflowRules(w);
-        setAuditLogs(a);
         setPhase5Error(null);
       })
       .catch((err) => {
+        workflowRulesLoadedRef.current = null;
         if (cancelled) return;
-        setPhase5Error(err.message ?? "Không tải được Workflow Rules/Audit Logs từ Supabase.");
+        setPhase5Error(err.message ?? "Không tải được Workflow Rules từ Supabase.");
       });
     return () => {
       cancelled = true;
     };
-  }, [authUserId, isOpsRole]);
+  }, [authUserId, isOpsRole, activeTab]);
+
+  const auditLogsLoadedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!authUserId || !isOpsRole) return;
+    if (!TABS_NEED_AUDIT_LOGS.has(activeTab)) return;
+    if (auditLogsLoadedRef.current === authUserId) return;
+    auditLogsLoadedRef.current = authUserId;
+    let cancelled = false;
+    fetchAuditLogs()
+      .then((a) => {
+        if (cancelled) return;
+        setAuditLogs(a);
+        setPhase5Error(null);
+      })
+      .catch((err) => {
+        auditLogsLoadedRef.current = null;
+        if (cancelled) return;
+        setPhase5Error(err.message ?? "Không tải được Audit Logs từ Supabase.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [authUserId, isOpsRole, activeTab]);
 
   // Ma Trận Phân Quyền là thứ DUY NHẤT quyết định tab nào mở được, nên fetch hỏng ở đây không
   // được để người dùng kẹt: `permissionsNonce` cho nút "Thử lại" chạy lại đúng effect này mà
@@ -566,15 +626,6 @@ export default function App() {
   useEffect(() => {
     if (!authUserId) return;
     let cancelled = false;
-    // Tham số engine gợi ý lịch — chỉ màn Kế Hoạch Tháng / Hỗ Trợ Vận Hành dùng (ops). Khoá ở
-    // ceo/operations/admin trong 0105, nên role khác gọi cũng chỉ nhận về rỗng.
-    if (isOpsRole) {
-      setEngineParamsLoading(true);
-      fetchEngineParams()
-        .then((r) => { if (cancelled) return; setEngineParams(r.params); setEngineParamsUpdatedAt(r.updatedAt); setEngineParamsError(null); })
-        .catch((e) => { if (!cancelled) setEngineParamsError(`Không tải được tham số engine (dùng mặc định): ${errorMessage(e)}`); })
-        .finally(() => { if (!cancelled) setEngineParamsLoading(false); });
-    }
     Promise.all([fetchBrandPlatformRates(), fetchShiftSlots(), fetchShiftRegistrations(), fetchRecurringShiftTemplates(), fetchLockedPlanTargets().catch(() => ({ bySlotId: new Map<string, number>(), monthTotals: new Map<string, number>(), slotTargets: new Map<string, { date: string; target: number }[]>() })), fetchBrandStudios().catch(() => [] as BrandStudio[])])
       .then(([rates, slots, regs, templates, planTargets, bStudios]) => {
         if (cancelled) return;
@@ -592,6 +643,26 @@ export default function App() {
         if (cancelled) return;
         setPhase14Error(err.message ?? "Không tải được dữ liệu Đăng Ký & Chốt Lịch Host từ Supabase.");
       });
+    return () => {
+      cancelled = true;
+    };
+    // KHÔNG thêm `isOpsRole` vào dep: 6 fetch trên không phụ thuộc role, mà `isOpsRole` lật false→true
+    // khi hồ sơ về (`currentRole` mặc định "talent" trước đó) ⇒ cả cụm chạy LẠI lần hai. Đo 2026-10-01:
+    // brand_platform_rates/shift_slots/session_availability/recurring_shift_templates/
+    // brand_month_plan_slots/brand_studios đều được gọi 2 lần, cách nhau ~156 ms. Tham số engine (chỉ
+    // ops dùng) đã tách xuống effect riêng bên dưới đúng vì lý do đó.
+  }, [authUserId]);
+
+  // Tham số engine gợi ý lịch — chỉ màn Kế Hoạch Tháng / Hỗ Trợ Vận Hành dùng (ops). Khoá ở
+  // ceo/operations/admin trong 0105, nên role khác gọi cũng chỉ nhận về rỗng.
+  useEffect(() => {
+    if (!authUserId || !isOpsRole) return;
+    let cancelled = false;
+    setEngineParamsLoading(true);
+    fetchEngineParams()
+      .then((r) => { if (cancelled) return; setEngineParams(r.params); setEngineParamsUpdatedAt(r.updatedAt); setEngineParamsError(null); })
+      .catch((e) => { if (!cancelled) setEngineParamsError(`Không tải được tham số engine (dùng mặc định): ${errorMessage(e)}`); })
+      .finally(() => { if (!cancelled) setEngineParamsLoading(false); });
     return () => {
       cancelled = true;
     };
@@ -670,11 +741,16 @@ export default function App() {
     };
   }, [authUserId]);
 
+  // Đi qua `/api/admin/ai-agent-prompts` của server.ts — request CHẬM NHẤT cả đợt đăng nhập
+  // (đo 2026-10-01: 1.345 ms, trong khi 3 cụm dữ liệu lõi xong ở 346 ms) mà chỉ màn AI Training đọc.
+  const aiPromptsLoadedRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!authUserId || currentRole !== "admin") {
+    if (!authUserId || currentRole !== "admin" || !TABS_NEED_AI_PROMPTS.has(activeTab)) {
       setAiAgentPromptsLoading(false);
       return;
     }
+    if (aiPromptsLoadedRef.current === authUserId) return;
+    aiPromptsLoadedRef.current = authUserId;
     let cancelled = false;
     setAiAgentPromptsLoading(true);
     fetchAiAgentPrompts()
@@ -684,6 +760,7 @@ export default function App() {
         setAiAgentPromptsError(null);
       })
       .catch((err) => {
+        aiPromptsLoadedRef.current = null;
         if (cancelled) return;
         setAiAgentPromptsError(err.message ?? "Không tải được AI Training Center từ Supabase.");
       })
@@ -693,7 +770,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [authUserId, currentRole]);
+  }, [authUserId, currentRole, activeTab]);
 
   async function handleUpdateAiAgentPrompt(agentKey: string, systemPrompt: string) {
     const updated = await updateAiAgentPrompt(agentKey, systemPrompt);
@@ -715,11 +792,17 @@ export default function App() {
       .finally(() => setTiktokStatusLoading(false));
   };
 
+  // `fetchTikTokStatus` đi qua `/api/tiktok/status` của server.ts và server GỌI TIẾP sang TikTok — nạp
+  // lúc đăng nhập là bắt mọi role trả một lượt gọi API bên thứ ba cho màn mà chỉ ops mở tới.
+  const tiktokLoadedRef = useRef<string | null>(null);
   useEffect(() => {
     if (!authUserId) return;
+    if (!TABS_NEED_TIKTOK.has(activeTab)) return;
+    if (tiktokLoadedRef.current === authUserId) return;
+    tiktokLoadedRef.current = authUserId;
     refreshTikTokStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authUserId]);
+  }, [authUserId, activeTab]);
 
   async function handleUpdateSessionFinance(
     sessionId: string,

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabaseClient";
 import { UserRole } from "../types";
@@ -50,7 +50,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // (profile === null nhưng session vẫn có) kẹt vĩnh viễn ở màn "Đang tải hồ sơ người dùng...",
   // không thông báo, không nút thử lại, không cả nút đăng xuất để thoát. Ghi lại lỗi vào
   // profileError để App.tsx hiện được UI thoát hiểm (Thử lại / Đăng xuất) thay vì màn hình chết.
-  const loadProfile = async (userId: string) => {
+  const loadProfile = useCallback(async (userId: string) => {
     setProfileError(null);
     const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).single();
     if (error) {
@@ -58,7 +58,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } else if (data) {
       setProfile(data as Profile);
     }
-  };
+  }, []);
+
+  // Nạp hồ sơ khoá theo ID người đăng nhập, KHÔNG theo object `session` và KHÔNG gọi thẳng trong
+  // listener auth. Lý do (đo 2026-10-01 trên bản build thật): GoTrue phát lại `SIGNED_IN` với CÙNG
+  // một phiên mỗi lần tab được hiện lại (`visibilitychange` → `_recoverAndRefresh` →
+  // `_notifyAllSubscribers`) và mỗi lần làm mới token. Gọi `loadProfile` trong listener nghĩa là mỗi
+  // sự kiện đó thành một request `profiles` mới VÀ một object `profile` mới ⇒ re-render cả cây app;
+  // đo được lặp vô hạn, không bao giờ dừng. `authUserId` là chuỗi nên phiên mới cùng người dùng không
+  // làm effect chạy lại. Cách này cũng dập luôn cặp trùng lúc mở app: trước đây `getSession()` và
+  // `INITIAL_SESSION` cùng đòi nạp, ra 2 request `profiles` giống hệt nhau.
+  // `profileNonce` là đường ép nạp lại (cùng kiểu `permissionsNonce` ở App.tsx) cho `USER_UPDATED`.
+  const [profileNonce, setProfileNonce] = useState(0);
+  const authUserId = session?.user?.id ?? null;
+  useEffect(() => {
+    if (!authUserId) return;
+    void loadProfile(authUserId);
+  }, [authUserId, profileNonce, loadProfile]);
 
   useEffect(() => {
     // Fallback for the Supabase recovery/invite-link hash (#access_token=...&type=recovery|invite).
@@ -91,7 +107,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } else {
       supabase.auth.getSession().then(({ data }) => {
         setSession(data.session);
-        if (data.session) loadProfile(data.session.user.id);
         setLoading(false);
       });
     }
@@ -100,7 +115,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(newSession);
       if (event === "PASSWORD_RECOVERY") setPasswordRecovery(true);
       if (newSession) {
-        loadProfile(newSession.user.id);
+        // Hồ sơ do effect trên nạp theo `authUserId`. Riêng `USER_UPDATED` (đổi email) thì cùng một
+        // user mà `profiles.email` vừa được trigger đồng bộ — ép nạp lại bằng nonce.
+        if (event === "USER_UPDATED") setProfileNonce((n) => n + 1);
       } else {
         setProfile(null);
         setProfileError(null);

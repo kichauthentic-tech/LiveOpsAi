@@ -162,6 +162,8 @@
 > **P2a tách bundle XONG:** file JS chính 2.580 → 665 KB, mỗi tab tải khi mở, thư viện Excel tải khi bấm (mục P2a).
 > **P2a-2 tách tiếp 2026-10-01:** entry 671 → **495 KB** (gzip 195 → 141) — Sentry tải sau khi paint, shim rỗng
 > cho realtime/storage supabase không dùng tới; chunk tab Report Tháng 534 → 39 KB (recharts chỉ tải khi tháng có report). Mục `### P2a-2`.
+> **P2a-3 đợt fetch lúc đăng nhập 2026-10-01:** 46 → **28 request**; hết cụm 6 fetch gọi 2 lần và hết vòng lặp
+> nạp `profiles` vô hạn mỗi lần tab được hiện lại (GoTrue phát lại `SIGNED_IN`). Mục `### P2a-3`.
 > **P2b đếm lượt mở tab: XONG, 0123 đã chạy, đếm từ 26/09/2026** (Phân Quyền → Lượt Mở Tab).
 > **P2c Report Tháng trên điện thoại XONG:** 24,7 → 7,5 màn 375px, phần 3–8 gập sau Insight. P2 còn: gộp menu (chờ 2–4 tuần số liệu).
 > **Kèm vá sự cố: mọi `/api/*` production chết (FUNCTION_INVOCATION_FAILED) từ 9dcf719 (24/09) tới 5ecb7c8 (26/09)** —
@@ -954,6 +956,71 @@ Chưa đo được: màn talent (Ca Của Tôi/Đăng Ký Ca) và role brand b�
   `git stash` vì file mới chưa được track — chúng canh hồi quy về sau, không canh code cũ.
 - `tsc` 0 lỗi · `eslint` 0 lỗi / 33 warning (đúng baseline) · `vitest` **227/227** · `npm run build` OK (kèm bản server).
 
+### P2a-3 — Đợt fetch lúc đăng nhập — XONG + VERIFY 2026-10-01 (không migration)
+- Đo trước (bản build thật, role admin, vào thẳng `/so-ca`): **46 request** lúc mở app. Ba nhóm sai, không phải "nhiều cụm dữ
+  liệu quá" như ghi chú cũ nghĩ:
+
+  | | Thừa | Nguyên nhân |
+  |---|---|---|
+  | 6 fetch dùng chung gọi **2 lần** | 6 | effect khai `isOpsRole` trong dep, mà `currentRole` mặc định `"talent"` cho tới khi hồ sơ về ⇒ false→true ⇒ chạy lại cả cụm (đo: cách nhau ~156 ms) |
+  | `profiles` của chính mình lặp **vô hạn** | ∞ | `useAuth` nạp hồ sơ ngay trong listener auth |
+  | 5 fetch phục vụ đúng 1 màn | 5 | vẫn nạp lúc đăng nhập cho mọi phiên |
+
+- **Lặp vô hạn — nguồn thật.** GoTrue phát lại `SIGNED_IN` với CÙNG một phiên mỗi lần tab được hiện lại
+  (`visibilitychange` → `_recoverAndRefresh` → `_notifyAllSubscribers`) và mỗi lần làm mới token. Listener gọi thẳng
+  `loadProfile` ⇒ mỗi sự kiện là một request `profiles` mới VÀ một object `profile` mới, tức **re-render cả cây app**.
+  Trong Browser pane đo được đúng 1 request / 6 000 ms, chạy mãi không dừng; trên máy thật là mỗi lần người dùng alt-tab
+  quay lại. Cách bắt: bẫy `window.fetch` ghi `new Error().stack`, rồi thêm log tạm vào `loadProfile` + listener và đọc stack
+  trên bản build thật — stack trỏ thẳng `_onVisibilityChanged`.
+- **Sửa:** [useAuth.tsx](src/hooks/useAuth.tsx) nạp hồ sơ ở effect riêng khoá theo `authUserId = session?.user?.id ?? null`
+  (chuỗi, nên phiên mới cùng người dùng không làm effect chạy lại), listener không gọi `loadProfile` nữa. `profileNonce` là
+  đường ép nạp lại cho `USER_UPDATED` (đổi email) — cùng kiểu `permissionsNonce` đã có ở `App.tsx`. Việc này cũng dập luôn cặp
+  trùng lúc mở app: trước đây `getSession()` và `INITIAL_SESSION` cùng đòi nạp, ra 2 request giống hệt nhau.
+  - Không dùng `useRef` để khoá: React Compiler cấm sửa ref ngoài effect (`react-hooks/immutability`), mà `refreshProfile`
+    nằm ngoài. Khoá bằng chính dep của effect là cách hợp lệ và ngắn hơn.
+- **Sửa cụm gọi 2 lần:** tách `fetchEngineParams` (chỉ ops) ra effect riêng; cụm 6 fetch dùng chung về dep `[authUserId]`.
+- **Hoãn 5 fetch tới lúc mở màn** — hằng số `TABS_NEED_*` ở đầu `App.tsx`, mỗi bộ dữ liệu một hằng số riêng + một
+  `*LoadedRef` để nạp đúng một lần cho mỗi người dùng (mở lại tab không gọi lại), fetch hỏng thì mở khoá cho lần sau:
+
+  | Dữ liệu | Màn cần | Ghi chú |
+  |---|---|---|
+  | `profiles` (danh sách) | Phân Quyền · CRM · Tài Chính | |
+  | `audit_logs` | Phân Quyền | tách khỏi `Promise.all` chung với workflow rules — hai màn khác nhau |
+  | `workflow_rules` | Tự Động Hoá TikTok | |
+  | `/api/tiktok/status` + `tiktok_webhook_events` | Tự Động Hoá TikTok | server gọi tiếp sang TikTok |
+  | `/api/admin/ai-agent-prompts` | AI Training | **request chậm nhất cả đợt: 1.345 ms** |
+
+- **`brand_monthly_reports` nạp lại mỗi lần đổi tab** → chỉ nạp lại khi vừa RỜI một màn trong `TABS_MAY_CHANGE_REPORTS`
+  (Report Tháng, Kế Hoạch Tháng, Kế Hoạch Tháng Sau, Điều Phối Phát Hành, Đối Soát). Cơ chế chống số cũ giữ nguyên.
+
+| | Trước | Sau |
+|---|---|---|
+| Request lúc đăng nhập | 46 | **28** |
+| Request lặp y hệt | 6 + `profiles` vô hạn | **0** (còn 5 lượt `live_session_reports` là chia lô có chủ ý) |
+| `profiles` của chính mình | 7 và tăng mãi | **1** |
+| Dữ liệu lõi sẵn sàng | ~530 ms | 346–531 ms |
+| Đổi tab qua lại 3 lần | 3 × `brand_monthly_reports` | **0 request** (chỉ `ui_tab_views` đếm lượt mở) |
+
+- **Dữ liệu hiện rất nhỏ** — 229 ca, 33 talent, 75 dòng kế hoạch, 34 dòng lịch sử rate, 14 audit log, còn lại ≤5 dòng hoặc
+  rỗng (đếm bằng `Prefer: count=exact`). Nên đợt fetch này **chưa bao giờ là nút thắt băng thông**; cái đáng sửa là request
+  lặp và request chạy mãi, không phải "chia nhỏ payload". Ghi lại để phiên sau đừng tối ưu nhầm hướng.
+- **Chưa làm:** chưa đo được đợt fetch của role talent/brand (không có tài khoản brand; tài khoản talent có nhưng Claude không
+  gõ mật khẩu). Gating hiện tại theo màn nên talent/brand tự nhiên nạp ít hơn, nhưng con số thật thì chưa có.
+  `live_sessions_secure?select=*` và `audit_logs?select=*` vẫn **không có `limit`** — hôm nay 229 và 14 dòng nên không sao,
+  nhưng cả hai chỉ tăng.
+- Verify (bản build thật, cổng 3100): mở `/so-ca` → 28 request, 0 lặp, xong ở 751 ms, 0 lỗi console, Sổ Ca hiện đủ số
+  (47 ca · 177,8h · 3,52B). Mở Phân Quyền → "Danh Sách Account (4)" + "Audit Logs (14)" nạp đúng lúc. Bấm sang Tự Động Hoá
+  TikTok **trong app** (không reload) → đúng 3 request `/api/tiktok/status` + `tiktok_webhook_events` + `workflow_rules`.
+  Mở AI Training → `/api/admin/ai-agent-prompts`, hiện 5 agent. Đổi tab qua lại 3 lần → chỉ 3 `ui_tab_views`. Ngồi yên 25 s →
+  **0 request `profiles`** (trước là ~4). Rời Kế Hoạch Tháng → `brand_monthly_reports` vẫn nạp lại đúng như thiết kế.
+- Test canh `tests/loginFetch.test.ts` (6 test, đã thử trên code cũ: **6/6 đỏ đúng**): cụm dùng chung không được khai
+  `isOpsRole`; mỗi bộ dữ liệu hoãn phải gate `TABS_NEED_*.has(activeTab)` + khai `activeTab` trong dep; phải có khoá
+  `*LoadedRef` và phải mở khoá khi hỏng; Report Tháng phải gate `TABS_MAY_CHANGE_REPORTS.has(leaving)`; listener auth không
+  được gọi `loadProfile`; effect nạp hồ sơ phải khoá theo `authUserId`.
+  Bẫy đã dính: neo test theo tên hàm `fetchUsers()` khớp nhầm dòng `import` — neo theo tên hằng số `TABS_NEED_*` (mỗi bộ một
+  hằng số riêng, xuất hiện đúng 1 lần trong thân effect) mới đúng.
+- `tsc` 0 lỗi · `eslint` 0 lỗi / 33 warning (baseline) · `vitest` **233/233** · `npm run build` OK.
+
 ### P2b — Đếm lượt mở tab — XONG 2026-09-26, migration 0123 ĐÃ CHẠY + verify (bắt đầu đếm 26/09/2026)
 - Vì sao: trước khi gộp/bỏ mục menu (18 tab agency + 10 tab brand) cần số người dùng thật — chưa có số nào.
 - `supabase/migrations/0123_ui_tab_views.sql`: bảng `ui_tab_views(user_id, role, workspace, brand_id, tab, viewed_at)`;
@@ -1058,7 +1125,7 @@ Kèm theo, `ShiftScheduling.tsx` — mỗi dòng ca trong `visibleSlots.map()` t
 4. **Thay `window.alert()` bằng toast — XONG (49/49).** [useToast.tsx](src/hooks/useToast.tsx): `ToastProvider` + `useToast()` (context, không chặn UI, tự biến mất sau 8s, có nút đóng tay) mount ở `main.tsx` trên `AuthProvider`. Thay cơ học `window.alert(X)` → `showToast(X)` ở 9 file (App.tsx 39 chỗ — gần như toàn bộ là `catch (e) { window.alert(errorMessage(e)) }` — + 8 file khác 10 chỗ: OpenSlotModal/FinanceHr/SlotDetailModal/BackfillFromRooms/StudioEquipment/ShiftScheduling/SessionWindow/AiTrainingCenter). An toàn vì `alert()` không gate luồng gì phía sau (fire-and-forget), không cần đổi hàm bao quanh thành async.
 5. **`window.confirm()` → modal riêng — XONG (25/25), đợt 2.** [useConfirm.tsx](src/hooks/useConfirm.tsx): `ConfirmProvider` + `useConfirm()` — trả `Promise<boolean>` (khác `useToast` — mỗi `confirm()` cũ đang GATE code chạy tiếp nên không thay cơ học được), dialog card giữa màn khớp theme app (không phải native), `whitespace-pre-line` giữ đúng xuống dòng của các cảnh báo nhiều đoạn ghép bằng `\n\n` (MonthPlan.tsx có confirm dài nhất — 4 đoạn cảnh báo trước khi chốt kế hoạch), option `danger` tô nút xác nhận đỏ cho hành động phá huỷ (xoá/huỷ — set ở tất cả các chỗ `window.confirm` cũ có ý "xoá"/"huỷ"/"ngắt kết nối" không hoàn tác được). 16 file, 25 chỗ: MonthPlan (4) · OpenSlotModal/TikTokApiAutomation/StudioEquipment/ReportPublishBoard/LiveReconciliation/BrandCommitment (2 mỗi file) · BrandMonthlyReport/BrandDataRaw/BackfillFromRooms/UserRoleSettings/TalentMatcher/SessionWindow/SessionLiveSnapshotUpload/CrmProjects/BulkFinalizePanel (1 mỗi file). Mỗi chỗ: hàm bao quanh đổi thành `async` (hầu hết ĐÃ SẴN async vì gọi RPC ngay sau), `if (!window.confirm(X)) return;` → `if (!(await confirm(X))) return;`. Không có chỗ nào gọi hàm này từ context KHÔNG async-hoá được (mọi call site đều là onClick hoặc callback đã async).
 
-Còn lại chưa đụng (không nằm trong danh sách user chọn): ~~bundle **2.4 MB một mảnh**, không code-split~~ — ĐÃ XỬ LÝ, xem `### P2a` (26/09, tách theo tab) và `### P2a-2` (01/10, entry còn 495 KB); ~13 cụm fetch nổ cùng lúc lúc đăng nhập cho mọi role; `useNotifications` poll 45s không kiểm `document.visibilityState`; `App.tsx` 2600+ dòng / `MonthlyReportTabs.tsx` 2217 dòng; `/api/gemini/*` vẫn trả `isMock: true` kèm reply bịa khi thiếu `GEMINI_API_KEY`.
+Còn lại chưa đụng (không nằm trong danh sách user chọn): ~~bundle **2.4 MB một mảnh**, không code-split~~ — ĐÃ XỬ LÝ, xem `### P2a` (26/09, tách theo tab) và `### P2a-2` (01/10, entry còn 495 KB); ~~≈13 cụm fetch nổ cùng lúc lúc đăng nhập cho mọi role~~ — ĐÃ XỬ LÝ, xem `### P2a-3` (01/10: 46 → 28 request, hết request lặp); `useNotifications` poll 45s không kiểm `document.visibilityState`; `App.tsx` 2600+ dòng / `MonthlyReportTabs.tsx` 2217 dòng; `/api/gemini/*` vẫn trả `isMock: true` kèm reply bịa khi thiếu `GEMINI_API_KEY`.
 
 Verify đợt 2: `tsc --noEmit` xanh (xác nhận mọi hàm chứa `await confirm(...)` đã đúng `async`), `eslint .` 0 lỗi/41 warning (đúng baseline, không phát sinh mới), `vitest` 38/38 xanh, browser smoke test không lỗi console (React).
 
