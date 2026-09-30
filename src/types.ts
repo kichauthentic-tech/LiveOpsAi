@@ -579,6 +579,13 @@ export interface ShiftSlot {
   sessionId?: string;
   createdBy?: string;
   templateId?: string;
+  /**
+   * Kế hoạch tháng đã sinh ra ca này (`shift_slots.plan_id`, có từ migration 0091 —
+   * `lock_month_plan` ghi cho mọi ca nó tạo). Client bỏ quên cột này nên Nhân sự ca chỉ phân biệt
+   * được `templateId` và gắn nhãn "Phát sinh" cho ca sinh từ Kế Hoạch Tháng — tức gọi thứ được lập
+   * kế hoạch kỹ nhất là ca chữa cháy (lỗi E2E 28/09 #5).
+   */
+  planId?: string;
 }
 
 // Quy tắc lặp theo thứ trong tuần — sinh hàng loạt ShiftSlot cho 1 tháng

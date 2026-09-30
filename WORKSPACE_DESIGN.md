@@ -19,6 +19,10 @@
 > trơn với 100% talent** (thêm khối "Ca đã chạy"), và talent thấy bảng tải của cả 15 đồng nghiệp trên màn Đăng Ký Ca.
 > **Audit UX/UI lần 2 XONG (Đợt 0 + M1–M8).** Xem `## Audit UX/UI lần 2 (2026-09-29)`.
 
+> **MỚI 2026-09-30 — Rà lại E2E #4–#7: #4 đã tự hết từ 28/09, #5/#6/#7 sửa nốt (không migration).** #6 nặng hơn mô tả cũ (nút
+> Phát hành CÓ hỏi nhưng chỉ khi còn ca chưa đối soát, tức đường thường vẫn phát ngay), #7 cũng vậy (không chỉ xấu UI — `save()`
+> lúc đang tải ghi lưới brand A vào brand B và `replacePlanSlots` XOÁ ca của B). Xem `## Rà lại E2E #4–#7`.
+
 > **MỚI 2026-09-30 — Avg. view không bao giờ được ghi cho ca chạy trong app (E2E #3): ĐÃ SỬA, migration `0124` ĐÃ CHẠY + verify.**
 > 0084 khoá 5 cột "số đọc từ file" không cho talent sửa, mà đường đọc file chỉ ghi 4/5 — `avg_watch_time_seconds` kẹt ở 0 vĩnh viễn
 > cho mọi ca chạy trong app (229/229 ca hiện tại là ca nạp bù nên chưa lộ). Sửa bằng cách lưu `watch_seconds = avg × views` rồi
@@ -101,14 +105,23 @@
 >    `## Avg. view đọc từ file (0124)`.** Hai chi tiết trong mô tả cũ đã lỗi thời: `hostPerformance.ts` không còn đụng `avgWatch`
 >    (viết lại trong đợt Key Metrics 29/09), và hệ quả không phải "kéo tụt" mà là MẤT chỉ số — `keyMetrics.ts` bỏ qua ca có
 >    `avgViewSec = 0` nên cả tháng toàn ca chạy trong app thì Avg. view ra "—".
-> 4. **VỪA — Hỗ Trợ Vận Hành với brand chưa có lịch sử 28 ngày**: "Dự kiến cuối tháng 0 · Thiếu 100M (100%)", và phương án B ghi
->    "Không còn ca nào phía trước" ngay dưới dòng "cần 50M/ca cho 2 ca còn lại" — nhánh else ở
->    [OpsSupport.tsx:314](src/components/OpsSupport.tsx:314) gộp "hết ca" với "không có dự báo" (`monthOutlook` ra 0 khi GMV/giờ = 0).
-> 5. NHẸ — Nhân sự ca gắn nhãn "Phát sinh" cho ca sinh từ Kế Hoạch Tháng: `ShiftSlot` không map `plan_id`, UI chỉ phân biệt
->    `templateId` ([ShiftScheduling.tsx:824](src/components/ShiftScheduling.tsx:824)).
-> 6. NHẸ — "Phát Hành Report" (đường gửi cho brand) bấm là phát hành ngay, không hỏi; "Thu hồi" thì có hỏi — ngược chiều rủi ro.
-> 7. NHẸ — Kế Hoạch Tháng: đổi brand/tháng thì lưới cũ còn hiện ~1–2s và "Lưu nháp" chỉ khoá theo `!dirty`, không theo `loading`
->    ([MonthPlan.tsx:623](src/components/MonthPlan.tsx:623)) ⇒ sửa dở brand A, đổi sang B, bấm Lưu kịp lúc đang tải = lưu lưới A vào B.
+> **#4–#7 rà lại 2026-09-30: #4 hoá ra đã sửa từ 28/09, #5/#6/#7 còn nguyên và ĐÃ SỬA nốt (không migration).**
+> 4. ~~**VỪA — Hỗ Trợ Vận Hành với brand chưa có lịch sử 28 ngày.**~~ **Đã sửa 2026-09-28 cùng đợt "module cùng loại" nhưng quên
+>    đánh dấu ở đây.** `projectMonthEnd` vá phần "Dự kiến 0 · Thiếu 100%"; [OpsSupport.tsx](src/components/OpsSupport.tsx) tách
+>    nhánh `remainingCount === 0` ("không còn ca") khỏi nhánh "chưa có GMV/giờ 28 ngày để dự báo" — mỗi nhánh một câu riêng.
+>    OpsSupport giờ render trong [BrandDashboard.tsx](src/components/brand-workspace/BrandDashboard.tsx), không còn tab agency.
+> 5. ~~NHẸ — Nhân sự ca gắn nhãn "Phát sinh" cho ca sinh từ Kế Hoạch Tháng.~~ **ĐÃ SỬA 2026-09-30.** `shift_slots.plan_id` đã có
+>    sẵn trên DB từ migration 0091 (`lock_month_plan` ghi cho mọi ca nó tạo, và backfill cho ca nó nhận nuôi) — client chỉ quên
+>    map. Thêm `planId` vào `ShiftSlot` + `fromDb`/`toDb`, UI tách ba nguồn gốc: "Tự động" (quy tắc lặp) · **"Kế hoạch tháng"** ·
+>    "Phát sinh" (mở tay ngoài kế hoạch). Không cần migration.
+> 6. ~~NHẸ — "Phát Hành Report" bấm là phát hành ngay, không hỏi.~~ **ĐÃ SỬA 2026-09-30 — và nặng hơn mô tả cũ.** `confirm` có
+>    tồn tại nhưng nằm TRONG `if (unreconciled > 0)`, nên đường thường (đối soát xong hết — đúng cái ta muốn ops làm) là bấm phát
+>    ngay không hỏi; còn "Thu hồi", việc chỉ ảnh hưởng nội bộ và hoàn tác được, thì luôn hỏi. Nay luôn hỏi, câu hỏi nặng thêm khi
+>    còn ca chưa đối soát.
+> 7. ~~NHẸ~~ **VỪA (nặng hơn nhãn cũ) — Kế Hoạch Tháng ghi lưới brand A vào brand B. ĐÃ SỬA 2026-09-30.** Effect nạp chỉ
+>    `setDirty(false)` TRONG `.then()`, nên suốt lúc fetch thì `dirty` và `drafts` vẫn của brand cũ trong khi `brandId` đã là brand
+>    mới; `save()` gọi `upsertMonthPlan(brandId, …)` + `replacePlanSlots`, mà hàm sau **XOÁ** các ca của B không khớp lưới A — mất
+>    dữ liệu chứ không chỉ xấu UI. Thêm `loading` vào điều kiện khoá, đúng như 2 nút Chốt/Xoá bên cạnh vẫn làm.
 > Chưa verify được: thông báo `shift_assigned` / "Số đối soát khác số ghi lúc giao ca" (+21%) tới Nguyễn Quốc Việt — RLS chỉ chính
 > chủ đọc, cần đăng nhập tài khoản talent. **Dọn dữ liệu:** hợp đồng/cam kết, lô đối soát, ca chờ 30/09 đã xoá qua UI; ca 28/09 đã
 > "loại khỏi báo cáo" (số CROCS/agency trên app đã về mốc 177,8h · 47 ca · 3,52B); còn lại chạy tay 1 lần
@@ -667,6 +680,31 @@ người vì `overallScore` cũng là cột nhập tay = 0 — đặt lại các
 Chưa đo được: **role brand** — cần user đăng nhập tài khoản đó trong Browser pane (không dựng harness được vì màn brand lấy
 `assignedBrandId` từ chính profile). Cột Rate card/Hoa hồng/SĐT/CVR ở Talent Pool vẫn tự ẩn vì 0/33 hồ sơ có dữ liệu — đó là việc
 nhập liệu, không phải việc code.
+
+## Rà lại E2E #4–#7 (2026-09-30) — XONG + VERIFY, không migration
+
+Cách rà: đối chiếu từng mục với code HIỆN TẠI trước khi sửa, vì doc có thể đã lỗi thời sau các đợt gộp màn. Kết quả: **#4 đã tự
+hết** (sửa 28/09, chỉ quên đánh dấu), **#6 thì ngược lại — tưởng đã sửa mà chưa**: grep thấy `await confirm(` trong
+`handlePublish` nên thoạt nhìn là xong, đọc kỹ mới thấy nó nằm trong `if (unreconciled > 0)`. **Bài học: grep thấy TÊN hàm không
+bằng đọc nhánh nó nằm trong.**
+
+Số đo / bằng chứng từng mục:
+- **#5** — `shift_slots` hiện 0 dòng nên nhãn mới **chưa render được để xem tận mắt**; verify ở tầng dữ liệu (`plan_id` có thật
+  trên DB từ 0091, `lock_month_plan` ghi ở cả nhánh tạo mới lẫn nhánh nhận nuôi ca sẵn có) + ca test canh mã nguồn. Sẽ thấy ngay
+  lần đầu ops chốt một Kế Hoạch Tháng.
+- **#6** — bấm "Phát hành" trên dòng CROCS T9 (47 ca, đã đối soát hết ⇒ đúng nhánh trước đây KHÔNG hỏi): hộp thoại hiện
+  "Phát hành report Tháng 9/2026 cho CROCS? Brand sẽ thấy report này ngay." → bấm **Huỷ** → 0 report được phát hành, clean state.
+- **#7** — A/B trên app thật, cùng một probe, chỉ khác đúng một token. Làm lưới CROCS T10 "bẩn" bằng "Chia lại target" (chỉ đổi
+  state cục bộ, không ghi DB), đổi sang Franklin rồi lấy mẫu nút mỗi 25ms; làm chậm `window.fetch` thêm 700ms để cửa sổ đủ rộng
+  (chỉ thêm độ trễ, không đụng logic app). Bản cũ `disabled={saving || !dirty}`: **`false` trong cửa sổ đang tải — bấm được**.
+  Bản mới `disabled={saving || loading || !dirty}`: `true` suốt. Sau đó gỡ patch fetch, kiểm lại DB: CROCS T10 vẫn 75 ca chưa
+  chốt, 0 `shift_slots`, 0 report phát hành — không ghi gì.
+
+3 ca test canh mới, cả 3 đỏ trên code cũ. tsc 0, eslint 0 lỗi/33 cảnh báo (= baseline), vitest **219/219**, build OK.
+
+**Bẫy lặp lại lần thứ hai khi viết test canh** (lần đầu ở M8): neo `indexOf("<nhãn tiếng Việt>")` để so thứ tự khối sẽ bắt trúng
+**comment giải thích** mình vừa viết ngay trên đoạn JSX đó, vì comment cũng chứa nhãn ấy. Luôn neo vào chuỗi JSX đủ đặc trưng
+(`">Phát sinh</span>"`, `">Tổng thu nhập tạm tính</div>"`), đừng neo vào nhãn trần.
 
 ## Avg. view đọc từ file (0124) — XONG + VERIFY, migration **ĐÃ CHẠY** trên DB thật 2026-09-30
 

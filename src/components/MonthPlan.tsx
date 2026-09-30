@@ -650,8 +650,13 @@ export default function MonthPlan({
           </>
         )}
         <span className="flex-1 text-[11px] text-[var(--text-muted)] min-w-[160px]">{loading ? "Đang tải…" : msg ?? (locked ? `Đã chốt lúc ${plan?.lockedAt ? new Date(plan.lockedAt).toLocaleString("vi-VN") : ""}. Chốt lại chỉ mở thêm ca chưa có.` : "")}</span>
+        {/* Phải khoá cả khi `loading` như nút Chốt/Xoá bên cạnh, không chỉ theo `dirty`: effect nạp
+            brand/tháng mới chỉ `setDirty(false)` TRONG .then(), nên suốt 1–2s chờ fetch thì `dirty`
+            vẫn là của brand cũ và `drafts` vẫn là lưới brand cũ — bấm kịp lúc đó là `save()` ghi
+            lưới brand A vào kế hoạch brand B, mà `replacePlanSlots` còn XOÁ các ca của B không
+            khớp. Lỗi E2E 28/09 #7. */}
         {editable && (
-          <button onClick={() => save()} disabled={saving || !dirty} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] border border-[var(--border)] text-xs font-bold text-[var(--text)] disabled:opacity-40 flex items-center gap-1.5"><Save className="w-3.5 h-3.5" /> Lưu nháp</button>
+          <button onClick={() => save()} disabled={saving || loading || !dirty} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] border border-[var(--border)] text-xs font-bold text-[var(--text)] disabled:opacity-40 flex items-center gap-1.5"><Save className="w-3.5 h-3.5" /> Lưu nháp</button>
         )}
         <button onClick={lock} disabled={saving || loading || errors.length > 0} className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-bold disabled:opacity-40 flex items-center gap-1.5"><Lock className="w-3.5 h-3.5" /> {locked ? `Chốt lại (đồng bộ ca)` : `Chốt kế hoạch`}</button>
         {editable && plan && (

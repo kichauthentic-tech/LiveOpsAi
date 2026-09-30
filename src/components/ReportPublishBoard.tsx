@@ -92,14 +92,19 @@ export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ brands, 
     const key = `${brandId}|${month}`;
     setRowError((e) => ({ ...e, [key]: "" }));
     const unreconciled = unreconciledCountFor(brandId, month);
-    let force = false;
-    if (unreconciled > 0) {
-      const ok = await confirm(
-        `Còn ${unreconciled} phiên live Completed trong ${fmtMonthLabel(month)} chưa đối soát với TikTok. Vẫn muốn phát hành report này?`
-      );
-      if (!ok) return;
-      force = true;
-    }
+    // Phát hành = brand NHÌN THẤY report, tức hành động hướng ra ngoài và không rút lại được trong
+    // mắt người nhận. Trước đây chỉ hỏi khi còn ca chưa đối soát, nên đường thường (đối soát xong
+    // hết — đúng cái ta muốn ops làm) là bấm phát ngay; trong khi "Thu hồi", việc chỉ ảnh hưởng nội
+    // bộ và hoàn tác được, thì lại luôn hỏi. Ngược chiều rủi ro (lỗi E2E 28/09 #6). Nay luôn hỏi,
+    // câu hỏi nặng thêm khi còn ca chưa đối soát.
+    const brandName = brands.find((b) => b.id === brandId)?.name ?? "brand này";
+    const ok = await confirm(
+      unreconciled > 0
+        ? `Còn ${unreconciled} phiên live Completed trong ${fmtMonthLabel(month)} chưa đối soát với TikTok — số trong report có thể còn đổi.\n\nVẫn phát hành ${fmtMonthLabel(month)} cho ${brandName}?`
+        : `Phát hành report ${fmtMonthLabel(month)} cho ${brandName}? Brand sẽ thấy report này ngay.`
+    );
+    if (!ok) return;
+    const force = unreconciled > 0;
     setBusyKey(key);
     try {
       // Tháng chưa có dòng brand_monthly_reports (chưa nhập Ads/kế hoạch gì) → tạo dòng nháp trống

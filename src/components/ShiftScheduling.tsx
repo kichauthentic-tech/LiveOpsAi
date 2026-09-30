@@ -13,6 +13,7 @@ import {
 } from "../types";
 import {
   Calendar as CalendarIcon,
+  CalendarRange,
   Trash2,
   UserCheck,
   UserX,
@@ -790,12 +791,20 @@ export default function ShiftScheduling({
                       <span className="text-[var(--text-muted)]">{slot.brandName}</span>
                       <span className="text-[11px] bg-[var(--surface-elevated)] text-[var(--text-muted)] px-2 py-0.5 rounded-full font-bold">{slot.platform}</span>
                       {slot.studioName && <span className="text-[var(--text-faint)] text-xs">{slot.studioName}</span>}
+                      {/* Ba nguồn gốc khác hẳn nhau, trước đây chỉ phân biệt được 2: ca sinh từ Kế Hoạch
+                          Tháng không có `templateId` nên rơi vào nhánh "Phát sinh" — gọi thứ được lập kế
+                          hoạch kỹ nhất là ca chữa cháy (lỗi E2E 28/09 #5). `plan_id` đã có sẵn trên DB từ
+                          0091, chỉ là client không map. */}
                       {slot.templateId ? (
                         <span className="flex items-center gap-1 text-[11px] text-[var(--accent-text)]" title="Tự động sinh từ quy tắc lặp">
                           <Zap className="w-3 h-3" /> Tự động
                         </span>
+                      ) : slot.planId ? (
+                        <span className="flex items-center gap-1 text-[11px] text-[var(--accent-text)]" title="Sinh ra khi chốt Kế Hoạch Tháng">
+                          <CalendarRange className="w-3 h-3" /> Kế hoạch tháng
+                        </span>
                       ) : (
-                        <span className="text-[11px] text-[var(--text-faint)]">Phát sinh</span>
+                        <span className="text-[11px] text-[var(--text-faint)]" title="Ca mở tay ngoài kế hoạch">Phát sinh</span>
                       )}
                       <span
                         className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${

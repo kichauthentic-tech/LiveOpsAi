@@ -441,3 +441,42 @@ test("Đăng Ký Ca: talent không thấy bảng tải của cả đội", () =>
   // Giữa rào và khối không được có `)}` đóng rào lại.
   expect(src.slice(gate + 11, block)).not.toContain(")}");
 });
+
+// ── Rà lại E2E 2026-09-28, mục #5 / #6 / #7 (sửa 2026-09-30) ────────────────────────────────────
+
+test("Nhân sự ca: ca sinh từ Kế Hoạch Tháng không bị gọi là 'Phát sinh'", () => {
+  // `shift_slots.plan_id` đã có từ migration 0091 (`lock_month_plan` ghi cho mọi ca nó tạo), nhưng
+  // client không map nên UI chỉ phân biệt được `templateId` ⇒ ca có kế hoạch kỹ nhất mang nhãn của
+  // ca chữa cháy. Ba nguồn gốc phải ra ba nhãn.
+  const db = readFileSync(join(SRC, "lib/db/shiftSlots.ts"), "utf8");
+  expect(db, "fromDb phải đọc plan_id").toMatch(/planId: row\.plan_id/);
+  expect(db, "toDb phải ghi lại plan_id, nếu không mỗi lần sửa ca là xoá mất").toMatch(/plan_id: orNull\(s\.planId\)/);
+  expect(readFileSync(join(SRC, "types.ts"), "utf8")).toMatch(/planId\?: string;/);
+
+  const ui = readFileSync(join(SRC, "components/ShiftScheduling.tsx"), "utf8");
+  // Neo vào chuỗi JSX (`>Phát sinh</span>`), không vào nhãn trần: nhãn trần còn nằm trong comment
+  // giải thích phía trên, indexOf() sẽ bắt vào comment và cắt ra lát rỗng.
+  const label = ui.slice(ui.indexOf("slot.templateId ?"), ui.indexOf(">Phát sinh</span>"));
+  expect(label, "phải có nhánh slot.planId giữa 'Tự động' và 'Phát sinh'").toMatch(/slot\.planId \?/);
+});
+
+test("Điều Phối Phát Hành: phát hành LUÔN hỏi, không chỉ khi còn ca chưa đối soát", () => {
+  // Phát hành là hành động hướng ra ngoài (brand nhìn thấy report) và không rút lại được trong mắt
+  // người nhận; "Thu hồi" thì chỉ nội bộ và hoàn tác được. Trước đây chỉ phát hành mới KHÔNG hỏi.
+  const src = readFileSync(join(SRC, "components/ReportPublishBoard.tsx"), "utf8");
+  const body = src.slice(src.indexOf("const handlePublish"), src.indexOf("const handleUnpublish"));
+  expect(body, "handlePublish phải await confirm").toMatch(/await confirm\(/);
+  // Lời hỏi không được nằm trong nhánh `if (unreconciled > 0)`.
+  expect(body, "confirm không được bị rào sau if (unreconciled > 0)").not.toMatch(/if \(unreconciled > 0\) \{[\s\S]*?await confirm\(/);
+  expect(body).toMatch(/if \(!ok\) return;/);
+});
+
+test("Kế Hoạch Tháng: 'Lưu nháp' khoá cả lúc đang tải brand/tháng khác", () => {
+  const src = readFileSync(join(SRC, "components/MonthPlan.tsx"), "utf8");
+  // effect nạp chỉ setDirty(false) TRONG .then() ⇒ suốt lúc fetch, `dirty` và `drafts` vẫn là của
+  // brand cũ. Bấm kịp lúc đó là ghi lưới brand A vào kế hoạch brand B (replacePlanSlots còn XOÁ ca
+  // của B không khớp). Ba nút cạnh nhau phải cùng luật.
+  expect(src).toMatch(/onClick=\{\(\) => save\(\)\} disabled=\{saving \|\| loading \|\| !dirty\}/);
+  expect(src, "setDirty(false) vẫn nằm trong .then() — nếu đổi chỗ thì xem lại ca test này")
+    .toMatch(/\.then\(\(r\) => \{[\s\S]*?setDirty\(false\);/);
+});
