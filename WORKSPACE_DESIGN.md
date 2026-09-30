@@ -19,11 +19,10 @@
 > trơn với 100% talent** (thêm khối "Ca đã chạy"), và talent thấy bảng tải của cả 15 đồng nghiệp trên màn Đăng Ký Ca.
 > **Audit UX/UI lần 2 XONG (Đợt 0 + M1–M8).** Xem `## Audit UX/UI lần 2 (2026-09-29)`.
 
-> **MỚI 2026-09-30 — Avg. view không bao giờ được ghi cho ca chạy trong app (E2E #3): ĐÃ SỬA, nhưng migration `0124` CHƯA CHẠY.**
+> **MỚI 2026-09-30 — Avg. view không bao giờ được ghi cho ca chạy trong app (E2E #3): ĐÃ SỬA, migration `0124` ĐÃ CHẠY + verify.**
 > 0084 khoá 5 cột "số đọc từ file" không cho talent sửa, mà đường đọc file chỉ ghi 4/5 — `avg_watch_time_seconds` kẹt ở 0 vĩnh viễn
 > cho mọi ca chạy trong app (229/229 ca hiện tại là ca nạp bù nên chưa lộ). Sửa bằng cách lưu `watch_seconds = avg × views` rồi
-> chia lại, không bê thẳng số trung bình của file. **Việc của ops: chạy `0124_avg_view_duration_from_file.sql`.**
-> Xem `## Avg. view đọc từ file (0124)`.
+> chia lại, không bê thẳng số trung bình của file. Xem `## Avg. view đọc từ file (0124)`.
 
 > **MỚI 2026-09-29 — Key Metrics 18 chỉ số trên MỌI report (không migration, commit 7996080 đã push `main`).** Một module
 > [keyMetrics.ts](src/lib/report/keyMetrics.ts) (bộ đếm + công thức + danh sách `KEY_METRICS` + định dạng + cột Excel) thay 5 bản
@@ -98,7 +97,7 @@
 >    target. Tổng agency ở các khối khác không đổi. Test `tests/combineOutlooks.test.ts` (18,2M ÷ 100M chứ không 3,55B ÷ 100M).
 >    Lỗi gốc:: VERA có kế
 >    hoạch, CROCS không ⇒ "Đã đạt 3,53B · 24.103% Target". Sẽ gặp thật ngay khi chốt kế hoạch T10 cho một phần brand.
-> 3. ~~**VỪA — Avg. view không bao giờ được ghi cho ca chạy trong app.**~~ **ĐÃ SỬA 2026-09-30 — migration `0124` CHƯA CHẠY, xem
+> 3. ~~**VỪA — Avg. view không bao giờ được ghi cho ca chạy trong app.**~~ **ĐÃ SỬA 2026-09-30, migration `0124` ĐÃ CHẠY, xem
 >    `## Avg. view đọc từ file (0124)`.** Hai chi tiết trong mô tả cũ đã lỗi thời: `hostPerformance.ts` không còn đụng `avgWatch`
 >    (viết lại trong đợt Key Metrics 29/09), và hệ quả không phải "kéo tụt" mà là MẤT chỉ số — `keyMetrics.ts` bỏ qua ca có
 >    `avgViewSec = 0` nên cả tháng toàn ca chạy trong app thì Avg. view ra "—".
@@ -669,10 +668,25 @@ Chưa đo được: **role brand** — cần user đăng nhập tài khoản đ�
 `assignedBrandId` từ chính profile). Cột Rate card/Hoa hồng/SĐT/CVR ở Talent Pool vẫn tự ẩn vì 0/33 hồ sơ có dữ liệu — đó là việc
 nhập liệu, không phải việc code.
 
-## Avg. view đọc từ file (0124) — XONG code + kiểm trên Postgres thật, **migration CHƯA CHẠY trên DB thật**
+## Avg. view đọc từ file (0124) — XONG + VERIFY, migration **ĐÃ CHẠY** trên DB thật 2026-09-30
 
-**Việc của ops: chạy `supabase/migrations/0124_avg_view_duration_from_file.sql` trên project thật.** Chạy được bất cứ lúc nào
-(không khoá bảng lâu, không đổi dữ liệu đang đúng); trước khi chạy thì ca chạy trong app vẫn có Avg. view = 0.
+Migration đã chạy trên project thật 2026-09-30. Verify ngay sau đó, chỉ đọc, không đụng dữ liệu: cả 2 bảng dòng-theo-room đã có
+cột `watch_seconds`; **228/228 dòng đối soát cũ được nạp bù từ `raw`**, và đối chiếu ngược `watch_seconds ÷ views` tái tạo lại đúng
+cột gốc trong file, **lệch tối đa 0,0029 giây** (đúng bằng sai số của `round()`); view `session_room_deltas` có cột mới (0 dòng —
+chưa ca nào có snapshot, đúng); 229 ca cũ không xê dịch: vẫn 229/229 có Avg. view, **trung vị 36s — khớp y hệt số đo TRƯỚC khi
+chạy migration**. `recompute_session_from_snapshot` vẫn trả `permission denied` khi gọi từ client, tức hàng rào quyền của 0082 còn
+nguyên sau khi thay thân hàm.
+
+Thân 5 hàm RPC thì **không kiểm được từ app** — PostgREST không cho đọc `pg_proc`. Hành vi đã chứng minh trên Postgres ở máy bằng
+đúng file SQL này; muốn xác nhận đúng bản mới đang nằm trên DB thì chạy tay trong SQL Editor (cả 5 dòng phải `true`):
+
+```sql
+select p.proname, (p.prosrc like '%watch_seconds%' or p.prosrc like '%avg_watch_time_seconds%') as ban_moi
+from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public' and p.proname in (
+  'recompute_session_from_snapshot','apply_session_live_snapshot','delete_session_live_snapshot',
+  'import_live_reconciliation','apply_live_reconciliation') order by 1;
+```
 
 **Lỗi:** 0084 coi 5 cột `actual_gmv / total_orders / total_views / ctr_avg / avg_watch_time_seconds` là "số đọc từ file TikTok" và
 khoá không cho talent sửa tay khi ca đã có snapshot/đối soát — nhưng chỉ **4 trong 5** cột đó thật sự được đường đọc file ghi.
