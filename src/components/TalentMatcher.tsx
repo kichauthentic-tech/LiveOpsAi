@@ -299,12 +299,29 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
         const matchScore = t.overallScore || 0;
         const nicheArr = t.niches || legacyTalentFields(t).niche || [];
         const nicheStr = Array.isArray(nicheArr) ? nicheArr.join(", ") : String(nicheArr || "Đa ngành");
+        // Chỉ ghép những dữ kiện CÓ THẬT vào câu lý do. Trước đây câu này in thẳng `t.cvrAvg` và
+        // `t.totalGmv` — hai cột nhập tay đều = 0 ở 33/33 talent trên DB thật — nên lý do đọc ra là
+        // "CVR trung bình 0%, GMV tích lũy 0. Rất phù hợp với CROCS." GMV lấy từ ca như cả màn này.
+        const real = computeTalentRealTotals(sessions, t.id);
+        const facts = [
+          // `[].join(", ")` ra chuỗi rỗng nên fallback "Đa ngành" ở trên không bắt được mảng niches
+          // rỗng — câu lý do thành "Thế mạnh ngành , GMV…". Không biết ngành thì bỏ hẳn vế này.
+          nicheStr.trim() ? `Thế mạnh ngành ${nicheStr}` : null,
+          t.cvrAvg > 0 ? `CVR trung bình ${t.cvrAvg}%` : null,
+          real.totalGmv > 0 ? `GMV tích lũy ${fmtVndShort(real.totalGmv)}` : null,
+          real.sessionCount > 0 ? `${real.sessionCount} ca đã chạy` : null
+        ].filter(Boolean).join(", ");
         return {
           talentId: t.id,
           name: t.name,
           matchScore,
           predictedGmv: t.avgGmvPerSession > 0 ? `${fmtVndShort(Math.round(t.avgGmvPerSession))} – ${fmtVndShort(Math.round(t.avgGmvPerSession * 1.25))}` : "chưa có dữ liệu",
-          reasoning: `Thế mạnh ngành ${nicheStr}, CVR trung bình ${t.cvrAvg}%, GMV tích lũy ${fmtVndShort(t.totalGmv || 0)}. Rất phù hợp với ${activeBrand?.name || "Brand"}.`
+          // Không có dữ kiện nào thì KHÔNG khẳng định "rất phù hợp" — câu đó là câu duy nhất người dùng
+          // đọc để tin vào gợi ý, nói suông trên 0 dữ liệu còn tệ hơn không nói. (Trên DB thật
+          // 2026-09-30, 14/33 talent chưa chạy ca nào và không talent nào có niches.)
+          reasoning: facts
+            ? `${facts}. Rất phù hợp với ${activeBrand?.name || "Brand"}.`
+            : `Chưa có ca nào có số và chưa nhập ngành hàng cho ${t.name} — chưa đánh giá được độ phù hợp.`
         };
       });
       setMatchingResults(results);

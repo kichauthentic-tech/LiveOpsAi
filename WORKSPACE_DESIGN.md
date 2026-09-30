@@ -13,7 +13,11 @@
 > không đếm ca chạy vai trợ** (8 người bị báo "chưa có ca nào", trong đó 1 người 86 ca).
 > M7 (đợt cuối): Điều Phối Phát Hành 24 → 5 nút "Phát hành" (20/24 dòng không có ca nào để gửi), và **quét cả app: 142 → 0 phần tử
 > bấm dưới sàn 24px** ở 1440 lẫn 375, trên 17 màn agency + 11 màn brand.
-> **Audit UX/UI lần 2 XONG.** Xem `## Audit UX/UI lần 2 (2026-09-29)`.
+> M8 (2026-09-30, màn talent — đo bằng harness props-only, không cần tài khoản talent): bố cục sạch sẵn (0 phần tử dưới 24px,
+> 0 tràn ngang) nhưng **mọi con số về chính người đang xem đều là 0** — GMV lũy kế đọc cột nhập tay (0 ở 33/33 talent) thay vì cộng
+> từ ca (7,31 tỷ), rate/hoa hồng/CVR in "0" thay vì "ops chưa nhập", ô lương in "0" cho mọi talent mọi tháng, **Ca Của Tôi trắng
+> trơn với 100% talent** (thêm khối "Ca đã chạy"), và talent thấy bảng tải của cả 15 đồng nghiệp trên màn Đăng Ký Ca.
+> **Audit UX/UI lần 2 XONG (Đợt 0 + M1–M8).** Xem `## Audit UX/UI lần 2 (2026-09-29)`.
 
 > **MỚI 2026-09-29 — Key Metrics 18 chỉ số trên MỌI report (không migration, commit 7996080 đã push `main`).** Một module
 > [keyMetrics.ts](src/lib/report/keyMetrics.ts) (bộ đếm + công thức + danh sách `KEY_METRICS` + định dạng + cột Excel) thay 5 bản
@@ -402,7 +406,7 @@ Dashboard agency 5,2 → 10,1; Lịch brand 5,2 → 6,4; Sổ Ca 4,4 → 8,3; AI
 - **Bẫy khi verify:** (1) ảnh chụp cũ sau `pushState` / khi pane ẩn — đối chiếu bằng `innerText` hoặc `navigate` thật; (2) khi đang
   giả lập kích thước (resize_window 1440×900), click của công cụ rơi SAI toạ độ (log sự kiện: click ở x=2406 trên khung 1440) — test
   thao tác chuột ở preset `desktop`; (3) bắt khoảnh khắc đang tải: mở app trong `<iframe>` cùng origin rồi lấy mẫu `contentDocument`.
-- Chưa verify: màn talent (Ca Của Tôi, Đăng Ký Ca, Hồ Sơ Của Tôi) và role brand — cần đăng nhập tài khoản đó.
+- Chưa verify: role brand — cần đăng nhập tài khoản đó. (Màn talent đã đo 2026-09-30, xem "M8 — màn talent".)
 
 ### Theo module (thứ tự đề xuất = lượt mở × mức lỗi)
 - **M1 Report Tháng — ĐÃ LÀM 2026-09-29, verify trên browser (CROCS T9, admin).** Chỉ bố cục, không đổi số/nội dung phân tích.
@@ -605,7 +609,59 @@ Dashboard agency 5,2 → 10,1; Lịch brand 5,2 → 6,4; Sổ Ca 4,4 → 8,3; AI
   cả repo**, tính `cỡ icon + 2 × padding ≥ 24`. Lần viết đầu ca test đó chỉ khớp `p-1` ở ĐẦU chuỗi class nên vẫn sót
   `... shrink-0 p-1`; phải khớp ở mọi vị trí.
 
-Chưa đo được: màn talent (Ca Của Tôi/Đăng Ký Ca) và role brand — cần user đăng nhập tài khoản đó trong Browser pane.
+### M8 — màn talent (2026-09-30) — XONG + VERIFY
+
+Ba màn của role talent (**Ca Của Tôi** = `OpsBoard mode="mine"`, **Đăng Ký Ca** = `ShiftScheduling currentRole="talent"`,
+**Hồ Sơ Của Tôi** = `MyTalentProfile`) trước đây ghi "chưa đo được vì không có tài khoản talent gắn hồ sơ".
+
+**Cách đo (dùng lại được, KHÔNG cần đăng nhập tài khoản khác):** cả ba màn nhận vai trò + talent qua **props**, không đọc
+context auth (chỉ `MyTalentProfile` gọi `useAuth` cho form đổi email). Nên dựng một entry Vite tạm (`measure.html` +
+`src/__measure.tsx`, đã xoá sau khi đo) mount thẳng component với `currentRole="talent"` / `assignedTalentId=<id thật>` và dữ
+liệu thật lấy bằng chính các `fetchX()` của app, mọi callback ghi là no-op. Không đụng auth, không ghi DB.
+> Cách KHÔNG dùng: vá `profile` trong state của `AuthProvider` để đổi role lúc chạy — bị chặn (đọc như bypass phân quyền), và
+> đúng là không nên: nó còn gán `assigned_talent_id` của người khác để xem lương người ta.
+
+**Bố cục thì sạch** (1440×900 và 375×812): 0 phần tử bấm dưới 24px, 0 tràn ngang trang, Hồ Sơ 1,5 → 1,9 màn,
+Đăng Ký Ca 1,0 → 1,33 màn, Ca Của Tôi 0,2 màn. **Lỗi nằm ở NỘI DUNG — mọi con số về chính người đang xem đều là 0:**
+
+1. **Hồ Sơ: `GMV lũy kế` đọc cột nhập tay `talents.total_gmv`** (= 0 ở **33/33** talent trên DB thật) trong khi cộng từ
+   `live_sessions` ra **7,31 tỷ** cho Bùi Sỹ Hùng (59 ca) và 2,83 tỷ cho Ngô Thị Kiều Trang. Talent Pool đã bỏ cột nhập tay từ
+   audit 2026-09-21; màn hồ sơ bị bỏ sót ⇒ hai màn nói hai số về cùng một người. Sửa: `computeTalentRealTotals`.
+2. **`CVR TB` in "0%", `Rate Card` in "0/live", `Hoa Hồng` in "0%"** — cả ba là cột nhập tay, 33/33 talent = 0. Chính file này đã
+   có luật "không in 0, phải nói lý do" cho `rateHidden` từ 2026-09-21 nhưng chưa áp cho trường hợp **ops chưa nhập**. Sửa: hiện
+   "ops chưa nhập" + câu nhắc nhờ ops nhập ở Talent Pool.
+3. **`Thu Nhập Tháng`: ô "Tổng thu nhập tạm tính: 0" luôn hiện.** `computeTalentMonthlyIncome` dùng `isPnlSession({includeBackfill:
+   false})` mà **229/229 ca trên DB đều là ca nạp bù** ⇒ mọi talent, mọi tháng đều ra 0 dòng. Sửa: hết dòng thì bỏ hẳn ô số 0, nói
+   thẳng "ca nạp bù không vào bảng lương — lương tháng đó đã chốt ngoài app".
+4. **Thứ tự khối sai:** hai form GHI (đổi SĐT, đổi email đăng nhập) chiếm **507/900px** màn đầu desktop và **trọn** màn đầu 812px ở
+   375px — hiệu suất bắt đầu ở y=721, lương ở y=1.099. Sửa: Hiệu Suất → Thu Nhập → Thông Tin Liên Hệ → Đổi Email. Bỏ ô "Giới tính"
+   (tự xem hồ sơ mình), thêm ô "Ca đã chạy" (86 ca / 59 ca — số cơ bản nhất mà trước đó không có ở đâu). Khối Rate Card khai
+   `grid-cols-3` nhưng chỉ có 2 ô ⇒ ở 375px mỗi ô còn 1/3 bề ngang, chữ xuống 2 dòng; đổi `grid-cols-2`.
+5. **Ca Của Tôi trắng trơn với 100% talent.** Hai khối đang có đều là VIỆC-CẦN-LÀM: `mineDue` lọc `missingSteps` mà `needsClosing`
+   loại ca nạp bù (229/229), `mineUpcoming` đòi `date >= today` mà ca mới nhất là 22/09 ⇒ **0 và 0 cho cả 17 talent có ca**, kể cả
+   host 59 ca / 267,7h / 7,31 tỷ. Thêm `<details>` "Ca đã chạy" (ngày · brand · vai · giờ · GMV; GMV chỉ ở ca làm host để khỏi đếm
+   đôi), hộp `max-h-96` cuộn trong — đóng lại thì không tốn chỗ. Và "Không còn ca nào thiếu file/report" (khẳng định đã làm xong)
+   đổi thành "Bạn chưa có ca nào trong hệ thống" khi thật sự chưa có ca nào.
+6. **Đăng Ký Ca: talent thấy bảng tải của cả đội.** Khối "Tải Theo Host — Tháng X" (số ca + số giờ của 15 đồng nghiệp) render vô
+   điều kiện — là khối DUY NHẤT có nội dung trên màn đó, chiếm 2/3 trang, trong khi phần việc của họ đang rỗng. Gate `{admin && …}`.
+7. **Trình AI Khớp Nối (nhánh fallback, chính là nhánh đang chạy vì chưa có Gemini key)** in câu lý do
+   "Thế mạnh ngành , CVR trung bình 0%, GMV tích lũy 0. Rất phù hợp với Franklin." — cùng hai cột nhập tay. Sửa ở cả
+   `TalentMatcher.tsx` lẫn `server/createApp.ts`: chỉ ghép dữ kiện có thật (GMV cộng từ ca + số ca), `niches` rỗng thì bỏ vế đó,
+   và **không còn dữ kiện nào thì không khẳng định "rất phù hợp"** mà nói "chưa đánh giá được độ phù hợp".
+
+Kiểm: tsc 0, eslint 0 lỗi/33 cảnh báo (= baseline), vitest **211/211**, build OK. 4 ca test canh mới, cả 4 đỏ trên code cũ.
+**Bẫy khi viết test canh:** ca test neo bằng `indexOf("<nhãn>")` để so thứ tự khối sẽ bắt trúng **comment giải thích** đặt ngay trên
+đoạn JSX ấy (comment cũng chứa nhãn) ⇒ luôn báo sai thứ tự. Neo vào chuỗi JSX đủ đặc trưng (`">Tổng thu nhập tạm tính</div>"`,
+`"Tải Theo Host — Tháng {selectedMonth}"`). Tương tự, quét `fmtVndShort(x.totalGmv)` cả repo phải giới hạn `x` là biến cầm talent,
+nếu không sẽ báo nhầm `adsReport.totalGmv` (GMV của brand).
+
+**Chưa sửa, cố ý:** "Vai trò" vẫn đọc `talents.role` nhập tay nên Huỳnh Thái Toàn hiện "Host" dù 86/86 ca đều chạy vai trợ (Talent
+Pool cũng vậy — sửa thì phải sửa cả hai, và phải chốt luật suy vai trò từ ca). "Match Score" của trình khớp nối vẫn 0% cho cả 33
+người vì `overallScore` cũng là cột nhập tay = 0 — đặt lại cách chấm là quyết định nghiệp vụ, không phải lỗi bố cục.
+
+Chưa đo được: **role brand** — cần user đăng nhập tài khoản đó trong Browser pane (không dựng harness được vì màn brand lấy
+`assignedBrandId` từ chính profile). Cột Rate card/Hoa hồng/SĐT/CVR ở Talent Pool vẫn tự ẩn vì 0/33 hồ sơ có dữ liệu — đó là việc
+nhập liệu, không phải việc code.
 
 ## Audit UX/UI (2026-09-26) — P0 + P1 XONG + DEPLOY; P2: tách bundle XONG, phần còn lại chưa làm
 

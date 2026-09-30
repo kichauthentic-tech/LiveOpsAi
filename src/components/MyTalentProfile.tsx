@@ -25,6 +25,15 @@ interface MyTalentProfileProps {
 const money = (n: number) => Math.round(n).toLocaleString("vi-VN");
 const ROLE_LABEL: Record<"host" | "co_host", string> = { host: "Host", co_host: "Trợ live" };
 
+const TILE = "bg-[var(--surface-base)]/40 border border-[var(--border)] rounded-xl p-3";
+
+// Ô trống phải nói VÌ SAO trống, không in số 0. Số 0 ở màn hồ sơ của chính mình đọc như
+// "GMV của bạn bằng 0" / "lương của bạn bằng 0" — file này đã áp luật đó cho `rateHidden` từ
+// audit 2026-09-21, nhưng chưa áp cho trường hợp ops CHƯA NHẬP (rate/CVR = 0 ở 33/33 talent).
+const Empty: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <span className="font-normal text-[var(--text-faint)]">{children}</span>
+);
+
 export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
   activeUser,
   talents,
@@ -127,6 +136,203 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
     <div className="space-y-6 max-w-2xl">
       <PageHeader icon={User} title="Hồ Sơ Của Tôi" description="Xem hiệu suất, thù lao của bạn và tự cập nhật thông tin liên hệ." />
 
+      {/* Thứ tự khối (audit UX lần 2 — màn talent, 2026-09-30): SỐ trước, FORM sau. Trước đây hai form
+          ghi (đổi SĐT, đổi email đăng nhập) chiếm 507/900px màn đầu ở desktop và TRỌN màn đầu 812px ở
+          375px — talent mở "Hồ Sơ Của Tôi" trên điện thoại chỉ thấy ô nhập số điện thoại, còn hiệu suất
+          và lương nằm ngoài màn. Người ta vào đây để XEM số của mình; sửa SĐT là việc vài tháng một lần. */}
+      {/* Hiệu suất & thông tin chỉ xem */}
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-6 space-y-4">
+        <div className="flex items-center gap-2 text-sm font-bold text-[var(--text)]">
+          <Award className="w-4 h-4 text-[var(--accent-text)]" />
+          Hiệu Suất & Thù Lao
+        </div>
+        <p className="text-[11px] text-[var(--text-faint)] -mt-2">
+          Số liệu hiệu suất được tính tự động từ báo cáo phiên live, không thể tự sửa ở đây.
+        </p>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+          <div className={TILE}>
+            <div className="text-[var(--text-muted)]">Ca đã chạy</div>
+            <div className="font-bold text-[var(--text)] mt-0.5">
+              {myReal.sessionCount + myReal.assistSessionCount > 0 ? (
+                `${myReal.sessionCount + myReal.assistSessionCount} ca`
+              ) : (
+                <Empty>chưa có ca nào</Empty>
+              )}
+              {myReal.sessionCount > 0 && myReal.assistSessionCount > 0 && (
+                <span className="block text-[11px] font-normal text-[var(--text-faint)]">
+                  {myReal.sessionCount} host · {myReal.assistSessionCount} trợ
+                </span>
+              )}
+            </div>
+          </div>
+          <div className={TILE}>
+            {/* GMV lũy kế cộng từ live_sessions, KHÔNG đọc cột nhập tay `talents.total_gmv`: trên DB
+                thật 33/33 talent đều = 0, nên host đã chạy 59 ca (7,31 tỷ) mở hồ sơ ra thấy "0". Talent
+                Pool đã bỏ cột nhập tay từ audit 2026-09-21 — hai màn phải nói cùng một số về cùng một
+                người (xem đầu file src/lib/metrics/avgGmv.ts). */}
+            <div className="text-[var(--text-muted)]">GMV lũy kế</div>
+            <div className="font-bold text-emerald-400 mt-0.5">
+              {myReal.totalGmv > 0 ? (
+                fmtVndShort(myReal.totalGmv)
+              ) : myReal.assistSessionCount > 0 ? (
+                <Empty>GMV ca trợ tính cho host</Empty>
+              ) : (
+                <Empty>chưa có</Empty>
+              )}
+            </div>
+          </div>
+          <div className={TILE}>
+            {/* Giờ live chứ không phải GMV/giờ gộp: GMV/giờ phụ thuộc ngành hàng của brand hơn là người
+                chạy, gộp mọi brand thành một số là số không so được với ai (xem computeTalentBrandPerf).
+                Talent Pool cũng bỏ số gộp — hai màn phải nói cùng một thứ về cùng một người. */}
+            <div className="text-[var(--text-muted)]">Giờ live</div>
+            <div className="font-bold text-[var(--text)] mt-0.5">
+              {myReal.hours + myReal.assistHours > 0 ? `${fmtFixed(myReal.hours + myReal.assistHours, 1)}h` : <Empty>chưa có</Empty>}
+              {/* Chỉ tách khi làm CẢ HAI vai — người chỉ chạy vai trợ thì dòng "0,0h host · 360,1h trợ"
+                  chỉ lặp lại con số ở trên kèm một số 0 vô nghĩa. */}
+              {myReal.hours > 0 && myReal.assistHours > 0 && (
+                <span className="block text-[11px] font-normal text-[var(--text-faint)]">
+                  {fmtFixed(myReal.hours, 1)}h host · {fmtFixed(myReal.assistHours, 1)}h trợ
+                </span>
+              )}
+            </div>
+          </div>
+          <div className={TILE}>
+            <div className="text-[var(--text-muted)]">CVR TB</div>
+            <div className="font-bold text-[var(--accent-text)] mt-0.5">
+              {(myTalent.cvrAvg || 0) > 0 ? `${myTalent.cvrAvg}%` : <Empty>ops chưa nhập</Empty>}
+            </div>
+          </div>
+          <div className={TILE}>
+            <div className="text-[var(--text-muted)]">Vai trò</div>
+            <div className="font-bold text-[var(--text)] mt-0.5">{myTalent.role === "Assistant" ? "Trợ live" : myTalent.role || "Host"}</div>
+          </div>
+          <div className={TILE}>
+            <div className="text-[var(--text-muted)]">Trạng thái</div>
+            <div className="font-bold text-[var(--text)] mt-0.5">{myTalent.availabilityStatus}</div>
+          </div>
+        </div>
+
+        <div className="bg-amber-950/30 border border-amber-500/30 rounded-xl p-3 grid grid-cols-2 gap-3 text-xs">
+          <div>
+            <div className="text-amber-300/80">Rate Card</div>
+            {/* rateHidden = view `talents_secure` mask cột lương với người đang đăng nhập. Phải hiện
+                "chưa xem được" chứ KHÔNG hiện 0 đ — số 0 đọc như "lương của bạn bằng 0"
+                (audit 2026-09-21). Talent đặt rate/giờ > 0 thì lương ca tính theo giờ công thực tế
+                (giờ ca + OT − off sớm) — hiện đúng loại rate đang áp dụng. */}
+            {myTalent.rateHidden ? (
+              <div className="font-bold text-[var(--text-muted)] mt-0.5">chưa xem được</div>
+            ) : (myTalent.ratePerHour || 0) > 0 ? (
+              <div className="font-bold text-[var(--text)] mt-0.5">{fmtVndFull(myTalent.ratePerHour || 0)}<span className="text-amber-300/80 font-semibold">/giờ</span></div>
+            ) : (myTalent.ratePerSession || 0) > 0 ? (
+              <div className="font-bold text-[var(--text)] mt-0.5">{fmtVndFull(myTalent.ratePerSession || 0)}<span className="text-amber-300/80 font-semibold">/live</span></div>
+            ) : (
+              // Cả hai rate = 0 nghĩa là ops CHƯA NHẬP (33/33 talent trên DB thật, 2026-09-30) chứ không
+              // phải "lương bằng 0" — in "0 đ/live" ở đây là câu trả lời sai cho người vừa chạy 59 ca.
+              <div className="font-bold mt-0.5"><Empty>ops chưa nhập</Empty></div>
+            )}
+            {!myTalent.rateHidden && (myTalent.assistantRatePerHour || 0) > 0 && (
+              <div className="text-[11px] text-amber-300/80 mt-0.5">Trợ live: {fmtVndFull(myTalent.assistantRatePerHour || 0)}/giờ</div>
+            )}
+          </div>
+          <div>
+            <div className="text-amber-300/80">Hoa Hồng</div>
+            <div className="font-bold text-[var(--accent-text)] mt-0.5">
+              {myTalent.rateHidden ? (
+                <span className="text-[var(--text-muted)]">chưa xem được</span>
+              ) : (myTalent.commissionRate || 0) > 0 ? (
+                `${myTalent.commissionRate}%`
+              ) : (
+                <Empty>ops chưa nhập</Empty>
+              )}
+            </div>
+          </div>
+        </div>
+        <p className="text-[11px] text-[var(--text-faint)]">
+          {myTalent.rateHidden
+            ? "Tài khoản của bạn chưa được liên kết đúng hồ sơ Talent nên chưa xem được Rate Card/Hoa hồng — báo Admin gán lại giúp."
+            : (myTalent.ratePerHour || 0) === 0 && (myTalent.ratePerSession || 0) === 0
+              ? "Rate Card của bạn chưa được nhập nên chưa tính được lương — nhờ ops nhập ở Talent Pool."
+              : "Rate Card/Hoa hồng chỉ hiện cho chính bạn và CEO/Admin."}
+        </p>
+      </div>
+
+      {/* Thu nhập tháng — tái dùng đúng công thức hostPayout/coHostPayout của Finance & P&L
+          (computeTalentMonthlyIncome trong lib/pnl.ts) để không bao giờ ra 2 số khác nhau cho
+          cùng 1 ca giữa màn của talent và màn của ops. */}
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-6 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-sm font-bold text-[var(--text)]">
+            <Wallet className="w-4 h-4 text-[var(--accent-text)]" />
+            Thu Nhập Tháng Này
+          </div>
+          <MonthPicker value={incomeMonth} onChange={setIncomeMonth} size="sm" />
+        </div>
+
+        {myTalent.rateHidden ? (
+          <p className="text-xs text-[var(--text-muted)]">Chưa xem được — tài khoản của bạn chưa được liên kết đúng hồ sơ Talent.</p>
+        ) : (
+          <>
+            {/* Không có dòng nào thì KHÔNG in ô "Tổng thu nhập tạm tính: 0" — số 0 to đùng ở màn lương
+                của chính mình đọc như "tháng này bạn không được trả đồng nào", trong khi lý do thật là
+                ca nạp bù không vào bảng lương (isPnlSession includeBackfill:false). Trên DB thật
+                2026-09-30 cả 229 ca đều là ca nạp bù, nên mọi talent đều rơi vào nhánh này. */}
+            {income.rows.length === 0 ? (
+              <p className="text-xs text-[var(--text-faint)]">
+                Chưa có ca nào tính lương trong tháng này. Ca nạp bù từ file của tháng cũ không vào bảng
+                lương ở đây — lương những tháng đó đã chốt ngoài app.
+              </p>
+            ) : (
+              <>
+            <div className="bg-amber-950/30 border border-amber-500/30 rounded-xl p-4">
+              <div className="text-amber-300/80 text-[11px]">Tổng thu nhập tạm tính</div>
+              <div className="font-black text-2xl text-[var(--text)] mt-0.5">{money(income.total)}</div>
+            </div>
+
+            {/* Đ3: rate chưa nhập ra payout 0đ, giống hệt "tháng này không có ca" — với người vừa
+                chạy ca thật thì đó là câu trả lời sai. Nói thẳng là thiếu rate, đừng in số 0. */}
+            {income.missingRate && (
+              <div className="text-xs rounded-xl px-3 py-2 border border-rose-800/60 bg-rose-950/40 text-rose-200">
+                Có ca trong tháng chưa được đặt rate, nên số trên đang thiếu phần của những ca đó. Nhờ ops nhập rate ở Talent Pool.
+              </div>
+            )}
+
+            {(
+              <div className="overflow-x-auto -mx-1">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)] uppercase text-[11px] tracking-wider">
+                      <th className="py-1.5 px-1">Ngày</th>
+                      <th className="py-1.5 px-1">Brand</th>
+                      <th className="py-1.5 px-1">Vai trò</th>
+                      <th className="py-1.5 px-1 text-right">Giờ công</th>
+                      <th className="py-1.5 px-1 text-right">Thành tiền</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {income.rows.map((r) => (
+                      <tr key={`${r.session.id}:${r.role}`} className="border-b border-[var(--border-muted)]">
+                        <td className="py-1.5 px-1 whitespace-nowrap">{r.session.date}</td>
+                        <td className="py-1.5 px-1 whitespace-nowrap">{r.session.brandName}</td>
+                        <td className="py-1.5 px-1 whitespace-nowrap">{ROLE_LABEL[r.role]}</td>
+                        <td className="py-1.5 px-1 text-right whitespace-nowrap">{fmtFixed(r.billableHours, 1)}h</td>
+                        <td className="py-1.5 px-1 text-right font-bold text-[var(--text)] whitespace-nowrap">{money(r.payout)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <p className="text-[11px] text-[var(--text-faint)]">
+              Tính tự động từ các ca Completed trong tháng theo rate card hiện tại — số tạm tính, có thể đổi nếu ca chưa
+              đối soát xong hoặc Rate Card của bạn vừa được cập nhật.
+            </p>
+              </>
+            )}
+          </>
+        )}
+      </div>
       {/* Thông tin tự sửa */}
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-6 space-y-4">
         <div className="flex items-center gap-2 text-sm font-bold text-[var(--text)]">
@@ -251,149 +457,6 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
         </form>
       </div>
 
-      {/* Hiệu suất & thông tin chỉ xem */}
-      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-6 space-y-4">
-        <div className="flex items-center gap-2 text-sm font-bold text-[var(--text)]">
-          <Award className="w-4 h-4 text-[var(--accent-text)]" />
-          Hiệu Suất & Thù Lao
-        </div>
-        <p className="text-[11px] text-[var(--text-faint)] -mt-2">
-          Số liệu hiệu suất được tính tự động từ báo cáo phiên live, không thể tự sửa ở đây.
-        </p>
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
-          <div className="bg-[var(--surface-base)]/40 border border-[var(--border)] rounded-xl p-3">
-            <div className="text-[var(--text-muted)]">Vai trò</div>
-            <div className="font-bold text-[var(--text)] mt-0.5">{myTalent.role}</div>
-          </div>
-          <div className="bg-[var(--surface-base)]/40 border border-[var(--border)] rounded-xl p-3">
-            <div className="text-[var(--text-muted)]">Giới tính</div>
-            <div className="font-bold text-[var(--text)] mt-0.5">{myTalent.gender || "—"}</div>
-          </div>
-          <div className="bg-[var(--surface-base)]/40 border border-[var(--border)] rounded-xl p-3">
-            <div className="text-[var(--text-muted)]">Trạng thái</div>
-            <div className="font-bold text-[var(--text)] mt-0.5">{myTalent.availabilityStatus}</div>
-          </div>
-          <div className="bg-[var(--surface-base)]/40 border border-[var(--border)] rounded-xl p-3">
-            <div className="text-[var(--text-muted)]">GMV lũy kế</div>
-            <div className="font-bold text-emerald-400 mt-0.5">{fmtVndShort(myTalent.totalGmv || 0)}</div>
-          </div>
-          <div className="bg-[var(--surface-base)]/40 border border-[var(--border)] rounded-xl p-3">
-            {/* Giờ live chứ không phải GMV/giờ gộp: GMV/giờ phụ thuộc ngành hàng của brand hơn là người
-                chạy, gộp mọi brand thành một số là số không so được với ai (xem computeTalentBrandPerf).
-                Talent Pool cũng bỏ số gộp — hai màn phải nói cùng một thứ về cùng một người. */}
-            <div className="text-[var(--text-muted)]">Giờ live</div>
-            <div className="font-bold text-[var(--text)] mt-0.5">
-              {myReal.hours + myReal.assistHours > 0 ? `${fmtFixed(myReal.hours + myReal.assistHours, 1)}h` : "—"}
-              {myReal.assistHours > 0 && (
-                <span className="block text-[11px] font-normal text-[var(--text-faint)]">
-                  {fmtFixed(myReal.hours, 1)}h host · {fmtFixed(myReal.assistHours, 1)}h trợ
-                </span>
-              )}
-            </div>
-          </div>
-          <div className="bg-[var(--surface-base)]/40 border border-[var(--border)] rounded-xl p-3">
-            <div className="text-[var(--text-muted)]">CVR TB</div>
-            <div className="font-bold text-[var(--accent-text)] mt-0.5">{myTalent.cvrAvg || 0}%</div>
-          </div>
-        </div>
-
-        <div className="bg-amber-950/30 border border-amber-500/30 rounded-xl p-3 grid grid-cols-3 gap-3 text-xs">
-          <div>
-            <div className="text-amber-300/80">Rate Card</div>
-            {/* rateHidden = view `talents_secure` mask cột lương với người đang đăng nhập. Phải hiện
-                "chưa xem được" chứ KHÔNG hiện 0 đ — số 0 đọc như "lương của bạn bằng 0"
-                (audit 2026-09-21). Talent đặt rate/giờ > 0 thì lương ca tính theo giờ công thực tế
-                (giờ ca + OT − off sớm) — hiện đúng loại rate đang áp dụng. */}
-            {myTalent.rateHidden ? (
-              <div className="font-bold text-[var(--text-muted)] mt-0.5">chưa xem được</div>
-            ) : (myTalent.ratePerHour || 0) > 0 ? (
-              <div className="font-bold text-[var(--text)] mt-0.5">{fmtVndFull(myTalent.ratePerHour || 0)}<span className="text-amber-300/80 font-semibold">/giờ</span></div>
-            ) : (
-              <div className="font-bold text-[var(--text)] mt-0.5">{fmtVndFull(myTalent.ratePerSession || 0)}<span className="text-amber-300/80 font-semibold">/live</span></div>
-            )}
-            {!myTalent.rateHidden && (myTalent.assistantRatePerHour || 0) > 0 && (
-              <div className="text-[11px] text-amber-300/80 mt-0.5">Trợ live: {fmtVndFull(myTalent.assistantRatePerHour || 0)}/giờ</div>
-            )}
-          </div>
-          <div>
-            <div className="text-amber-300/80">Hoa Hồng</div>
-            <div className="font-bold text-[var(--accent-text)] mt-0.5">
-              {myTalent.rateHidden ? <span className="text-[var(--text-muted)]">chưa xem được</span> : `${myTalent.commissionRate || 0}%`}
-            </div>
-          </div>
-        </div>
-        <p className="text-[11px] text-[var(--text-faint)]">
-          {myTalent.rateHidden
-            ? "Tài khoản của bạn chưa được liên kết đúng hồ sơ Talent nên chưa xem được Rate Card/Hoa hồng — báo Admin gán lại giúp."
-            : "Rate Card/Hoa hồng chỉ hiện cho chính bạn và CEO/Admin."}
-        </p>
-      </div>
-
-      {/* Thu nhập tháng — tái dùng đúng công thức hostPayout/coHostPayout của Finance & P&L
-          (computeTalentMonthlyIncome trong lib/pnl.ts) để không bao giờ ra 2 số khác nhau cho
-          cùng 1 ca giữa màn của talent và màn của ops. */}
-      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-6 space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-sm font-bold text-[var(--text)]">
-            <Wallet className="w-4 h-4 text-[var(--accent-text)]" />
-            Thu Nhập Tháng Này
-          </div>
-          <MonthPicker value={incomeMonth} onChange={setIncomeMonth} size="sm" />
-        </div>
-
-        {myTalent.rateHidden ? (
-          <p className="text-xs text-[var(--text-muted)]">Chưa xem được — tài khoản của bạn chưa được liên kết đúng hồ sơ Talent.</p>
-        ) : (
-          <>
-            <div className="bg-amber-950/30 border border-amber-500/30 rounded-xl p-4">
-              <div className="text-amber-300/80 text-[11px]">Tổng thu nhập tạm tính</div>
-              <div className="font-black text-2xl text-[var(--text)] mt-0.5">{money(income.total)}</div>
-            </div>
-
-            {/* Đ3: rate chưa nhập ra payout 0đ, giống hệt "tháng này không có ca" — với người vừa
-                chạy ca thật thì đó là câu trả lời sai. Nói thẳng là thiếu rate, đừng in số 0. */}
-            {income.missingRate && (
-              <div className="text-xs rounded-xl px-3 py-2 border border-rose-800/60 bg-rose-950/40 text-rose-200">
-                Có ca trong tháng chưa được đặt rate, nên số trên đang thiếu phần của những ca đó. Nhờ ops nhập rate ở Talent Pool.
-              </div>
-            )}
-
-            {income.rows.length === 0 ? (
-              <p className="text-xs text-[var(--text-faint)] italic">Chưa có ca nào tính lương trong tháng này.</p>
-            ) : (
-              <div className="overflow-x-auto -mx-1">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)] uppercase text-[11px] tracking-wider">
-                      <th className="py-1.5 px-1">Ngày</th>
-                      <th className="py-1.5 px-1">Brand</th>
-                      <th className="py-1.5 px-1">Vai trò</th>
-                      <th className="py-1.5 px-1 text-right">Giờ công</th>
-                      <th className="py-1.5 px-1 text-right">Thành tiền</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {income.rows.map((r) => (
-                      <tr key={`${r.session.id}:${r.role}`} className="border-b border-[var(--border-muted)]">
-                        <td className="py-1.5 px-1 whitespace-nowrap">{r.session.date}</td>
-                        <td className="py-1.5 px-1 whitespace-nowrap">{r.session.brandName}</td>
-                        <td className="py-1.5 px-1 whitespace-nowrap">{ROLE_LABEL[r.role]}</td>
-                        <td className="py-1.5 px-1 text-right whitespace-nowrap">{fmtFixed(r.billableHours, 1)}h</td>
-                        <td className="py-1.5 px-1 text-right font-bold text-[var(--text)] whitespace-nowrap">{money(r.payout)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-            <p className="text-[11px] text-[var(--text-faint)]">
-              Tính tự động từ các ca Completed trong tháng theo rate card hiện tại — số tạm tính, có thể đổi nếu ca chưa
-              đối soát xong hoặc Rate Card của bạn vừa được cập nhật.
-            </p>
-          </>
-        )}
-      </div>
     </div>
   );
 };

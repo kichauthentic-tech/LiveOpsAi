@@ -1046,6 +1046,11 @@ export default function ShiftScheduling({
       </div>
       )}
 
+      {/* Tải Theo Host là công cụ CÂN TẢI của ops, không phải việc của talent — trước đây khối này không
+          gate role nên talent mở "Đăng Ký Ca" thấy nguyên bảng xếp hạng số ca + số giờ của 15 đồng
+          nghiệp (đo 2026-09-30: khối duy nhất có nội dung trên màn đó, chiếm 2/3 trang, trong khi phần
+          việc của họ — danh sách ca để đăng ký — đang rỗng). Ai làm bao nhiêu ca là chuyện nội bộ ops. */}
+      {admin && (
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-6 shadow-xl">
         <h3 className="font-bold text-[var(--text)] flex items-center gap-2 mb-4">
           <Users className="w-4 h-4 text-[var(--accent-text)]" /> Tải Theo Host — Tháng {selectedMonth}
@@ -1068,6 +1073,7 @@ export default function ShiftScheduling({
           </ul>
         )}
       </div>
+      )}
 
       {openSessionId && (() => {
         const os = sessions.find((x) => x.id === openSessionId);

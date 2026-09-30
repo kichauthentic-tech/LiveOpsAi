@@ -363,3 +363,81 @@ test("Report Tháng: cột tên chỉ số dính trái khi bảng cuộn ngang",
   // Nền phải đặc, nếu không chữ cột sau lộ qua khi cuộn.
   expect(src).toMatch(/\[&_td:first-child\]:bg-\[#17171b\]/);
 });
+
+// ── Audit UX lần 2 — màn talent (2026-09-30) ────────────────────────────────────────────────────
+// Ba màn của role talent (Ca Của Tôi / Đăng Ký Ca / Hồ Sơ Của Tôi) chưa từng được đo vì không có
+// tài khoản talent gắn hồ sơ. Đo bằng harness props-only trên dữ liệu thật: bố cục sạch (0 phần tử
+// dưới 24px, 0 tràn ngang), nhưng NỘI DUNG sai — mọi con số về chính người đang xem đều là 0.
+
+test("Talent: không màn nào in số 0 từ cột nhập tay talents.total_gmv / cvr_avg", () => {
+  // cvr_avg và total_gmv là cột nhập tay, = 0 ở 33/33 talent trên DB thật (2026-09-30). In thẳng ra
+  // thì host đã chạy 59 ca / 7,31 tỷ mở hồ sơ thấy "GMV lũy kế 0", "CVR TB 0%". GMV phải cộng từ
+  // live_sessions (computeTalentRealTotals) như Talent Pool; CVR chưa có nguồn tính nên phải nói
+  // "chưa nhập" thay vì in 0.
+  const hits: string[] = [];
+  for (const file of sourceFiles(SRC)) {
+    const src = readFileSync(file, "utf8");
+    for (const m of src.matchAll(/fmtVndShort\((\w+)\.totalGmv[^)]*\)|\$\{(\w+)\.cvrAvg\}%/g)) {
+      const owner = m[1] ?? m[2];
+      // Chỉ xét biến ĐANG CẦM MỘT TALENT. `real`/`detailReal`/`myReal` là kết quả
+      // computeTalentRealTotals (số cộng từ ca, được phép); `adsReport.totalGmv` là GMV của brand.
+      if (!/^(t|talent|myTalent|detailTalent)$/.test(owner)) continue;
+      const line = src.slice(0, m.index).split("\n").length;
+      // Được phép nếu ngay trước đó có rào "> 0" cho đúng biến ấy.
+      const near = src.slice(Math.max(0, m.index! - 240), m.index!);
+      if (new RegExp(`${owner}\\.(totalGmv|cvrAvg)[^\\n]*\\|\\| 0\\) > 0|${owner}\\.(totalGmv|cvrAvg) > 0`).test(near)) continue;
+      hits.push(`${rel(file)}:${line} :: ${m[0]}`);
+    }
+  }
+  expect(hits, hits.join("\n")).toEqual([]);
+
+  // Câu lý do của Trình AI Khớp Nối (nhánh fallback khi chưa có Gemini key — nhánh người dùng thật
+  // sự thấy) ghép dữ kiện bằng .filter(Boolean): hết dữ kiện thì chuỗi rỗng và câu thành
+  // ". Rất phù hợp với Franklin." — khẳng định suông trên 0 dữ liệu. Phải có nhánh nói chưa đánh giá được.
+  for (const f of ["components/TalentMatcher.tsx", "server/createApp.ts"]) {
+    const src = readFileSync(join(SRC, f), "utf8");
+    expect(src, `${f}: thiếu nhánh "chưa đánh giá được"`).toMatch(/chưa đánh giá được độ phù hợp/);
+  }
+});
+
+test("Hồ Sơ Của Tôi: số đứng trước form, và ô trống nói lý do thay vì in 0", () => {
+  const src = readFileSync(join(SRC, "components/MyTalentProfile.tsx"), "utf8");
+  // Thứ tự khối: Hiệu Suất → Thu Nhập → Thông Tin Liên Hệ → Đổi Email. Trước đây hai form ghi chiếm
+  // trọn màn đầu 812px ở 375px, đẩy hiệu suất và lương ra ngoài màn.
+  const order = ["Hiệu suất & thông tin chỉ xem", "Thu nhập tháng", "Thông tin tự sửa", "Đổi email đăng nhập"]
+    .map((c) => src.indexOf(`{/* ${c}`));
+  expect(order.every((i) => i >= 0), `thiếu comment mốc khối: ${order}`).toBe(true);
+  expect(order, `thứ tự khối sai: ${order}`).toEqual([...order].sort((a, b) => a - b));
+  // Rate/hoa hồng/CVR chưa nhập phải nói "ops chưa nhập", không in "0/live" hay "0%".
+  expect(src).toContain("ops chưa nhập");
+  expect(src).toMatch(/\(myTalent\.ratePerSession \|\| 0\) > 0/);
+  expect(src).toMatch(/\(myTalent\.commissionRate \|\| 0\) > 0/);
+  // Không có dòng lương nào thì không in ô "Tổng thu nhập tạm tính: 0".
+  // Neo vào ĐÚNG chuỗi JSX, không vào nhãn trần: nhãn ấy còn nằm trong comment giải thích ngay
+  // phía trên nhánh rào, nên indexOf() thường sẽ bắt vào comment và luôn báo sai thứ tự.
+  const zeroTile = src.indexOf(">Tổng thu nhập tạm tính</div>");
+  const guard = src.indexOf("{income.rows.length === 0 ? (");
+  expect(guard >= 0 && guard < zeroTile, "ô tổng thu nhập phải nằm trong nhánh rows.length > 0").toBe(true);
+});
+
+test("Ca Của Tôi: có lịch sử ca đã chạy, và không nói 'không còn ca nào' với người chưa có ca", () => {
+  const src = readFileSync(join(SRC, "components/OpsBoard.tsx"), "utf8");
+  // Hai khối cũ chỉ là việc-cần-làm; trên dữ liệu thật cả hai đều rỗng với 100% talent (229/229 ca là
+  // ca nạp bù nên `needsClosing` loại, và không ca nào ở tương lai) — màn trắng với cả host 59 ca.
+  expect(src).toMatch(/const mineDone = useMemo\(/);
+  expect(src).toMatch(/mine\(s\) && s\.status === "Completed"/);
+  expect(src).toMatch(/\{mineDone\.length > 0 && \(/);
+  expect(src).toMatch(/mineDone\.length === 0 \? "Bạn chưa có ca nào trong hệ thống\."/);
+});
+
+test("Đăng Ký Ca: talent không thấy bảng tải của cả đội", () => {
+  const src = readFileSync(join(SRC, "components/ShiftScheduling.tsx"), "utf8");
+  // "Tải Theo Host" là công cụ cân tải của ops (số ca + số giờ của từng đồng nghiệp) — trước đây
+  // render vô điều kiện nên là khối DUY NHẤT có nội dung trên màn Đăng Ký Ca của talent.
+  const block = src.indexOf("Tải Theo Host — Tháng {selectedMonth}"); // chuỗi JSX, không phải comment
+  // Rào gần nhất TRƯỚC khối, không phải rào `{admin && (` đầu tiên trong file.
+  const gate = src.lastIndexOf("{admin && (", block);
+  expect(gate >= 0, "không tìm thấy rào {admin && ( nào trước khối Tải Theo Host").toBe(true);
+  // Giữa rào và khối không được có `)}` đóng rào lại.
+  expect(src.slice(gate + 11, block)).not.toContain(")}");
+});

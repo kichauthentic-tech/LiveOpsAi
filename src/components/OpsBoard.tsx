@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { SESSION_STATUS_CLS, SESSION_STATUS_LABEL_VI } from "../lib/sessionStatusUi";
-import { AlertTriangle, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, Radio, UserX } from "lucide-react";
+import { AlertTriangle, CalendarClock, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Radio, UserX } from "lucide-react";
 import { Brand, LiveSession, ShiftRegistration, ShiftSlot, Studio, Talent, UserRole, AuditLogEntry } from "../types";
 import { getTodayDate } from "../lib/dateUtils";
-import { fmtVndShort } from "../lib/format";
+import { fmtFixed, fmtVndShort } from "../lib/format";
+import { sessionHours } from "../lib/performance/hostPerformance";
 import { SessionReportInput } from "../lib/db/sessionReports";
 import { MissingStep, missingSteps } from "../lib/sessionLedger";
 import { BrandLogo } from "./ui/BrandLogo";
@@ -148,6 +149,20 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
     [mode, sessions, mine, today, mineDue]
   );
 
+  // Hai khối trên chỉ là VIỆC CẦN LÀM. Trên dữ liệu thật (2026-09-30) 229/229 ca đều là ca nạp bù
+  // (`needsClosing` loại) và không ca nào ở tương lai, nên "Ca Của Tôi" rỗng hoàn toàn với 100% talent
+  // — kể cả host đã chạy 59 ca, 267,7h, 7,31 tỷ GMV. Ca đã chạy là thứ duy nhất họ thật sự có, nên
+  // liệt kê ở đây; để trong <details> để không chiếm chỗ của phần việc khi có việc.
+  const mineDone = useMemo(
+    () =>
+      mode === "mine"
+        ? sessions
+            .filter((s) => mine(s) && s.status === "Completed")
+            .sort((a, b) => b.date.localeCompare(a.date) || b.startTime.localeCompare(a.startTime))
+        : [],
+    [mode, sessions, mine]
+  );
+
   const summary = useMemo(() => {
     const ss = rows.filter((r): r is Extract<Row, { kind: "session" }> => r.kind === "session").map((r) => r.session);
     return {
@@ -278,7 +293,14 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
               Cần nộp số liệu
               {mineDue.length > 0 && <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-800">{mineDue.length}</span>}
             </h3>
-            {mineDue.length === 0 ? <p className="text-xs text-[var(--text-faint)] italic">Không còn ca nào thiếu file/report.</p> : mineDue.map((s) => <SessionRow key={s.id} s={s} />)}
+            {mineDue.length === 0 ? (
+              // "Không còn ca nào" khẳng định là đã làm xong — sai với người chưa từng có ca nào.
+              <p className="text-xs text-[var(--text-faint)] italic">
+                {mineDone.length === 0 ? "Bạn chưa có ca nào trong hệ thống." : "Không còn ca nào thiếu file/report."}
+              </p>
+            ) : (
+              mineDue.map((s) => <SessionRow key={s.id} s={s} />)
+            )}
           </section>
           <section className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 sm:p-4 space-y-2">
             <div className="flex items-center justify-between gap-2">
@@ -289,6 +311,33 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
             </div>
             {mineUpcoming.length === 0 ? <p className="text-xs text-[var(--text-faint)] italic">Chưa có ca nào được chốt cho bạn. Đăng ký ca mở ở tab Đăng Ký Ca.</p> : mineUpcoming.map((s) => <SessionRow key={s.id} s={s} />)}
           </section>
+          {mineDone.length > 0 && (
+            <details className="group bg-[var(--surface)] border border-[var(--border)] rounded-2xl">
+              <summary className="list-none cursor-pointer p-3 sm:p-4 flex items-center gap-2 text-sm font-black text-[var(--text)]">
+                Ca đã chạy
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-[var(--surface-base)] text-[var(--text-muted)] border border-[var(--border)]">{mineDone.length}</span>
+                <ChevronDown className="w-4 h-4 ml-auto shrink-0 text-[var(--text-muted)] transition-transform group-open:rotate-180" />
+              </summary>
+              <div className="px-3 sm:px-4 pb-3 sm:pb-4 max-h-96 overflow-y-auto">
+                {mineDone.map((s) => {
+                  const asHost = s.hostId === myTalentId;
+                  return (
+                    <div key={s.id} className="flex items-baseline gap-2 sm:gap-3 text-xs py-1.5 border-b border-[var(--border-muted)] last:border-0">
+                      <span className="font-mono text-[var(--text-muted)] shrink-0">{s.date.slice(5)}</span>
+                      <span className="font-bold text-[var(--text)] truncate">{s.brandName}</span>
+                      <span className="text-[11px] text-[var(--text-faint)] shrink-0">{asHost ? "host" : "trợ"}</span>
+                      <span className="ml-auto shrink-0 text-[var(--text-muted)] tabular-nums">{fmtFixed(sessionHours(s), 1)}h</span>
+                      {/* GMV chỉ hiện ở ca mình làm HOST: GMV của ca tính cho host, in cả ở dòng ca trợ là
+                          đếm đôi — cùng luật với `assistSessionCount` ở Talent Pool. */}
+                      <span className="w-[62px] shrink-0 text-right font-bold text-emerald-300 tabular-nums">
+                        {asHost && s.actualGmv ? fmtVndShort(s.actualGmv) : ""}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </details>
+          )}
         </>
       )}
 

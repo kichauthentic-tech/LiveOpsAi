@@ -778,7 +778,20 @@ export function createApp() {
           name: t.name,
           matchScore: Math.max(70, 96 - idx * 5),
           predictedGmv: `${fmtVndShort(Math.round(t.avgGmvPerSession || 100000000))} – ${fmtVndShort(Math.round((t.avgGmvPerSession || 100000000) * 1.25))}`,
-          reasoning: `Thế mạnh ngành ${(t.niches || []).join(", ") || "Đa ngành"}, CVR trung bình ${t.cvrAvg}%, GMV tích lũy ${fmtVndShort(t.totalGmv || 0)}. Rất phù hợp với ${brand?.name || "Brand"}.`
+          // Chỉ ghép dữ kiện CÓ THẬT — cvr_avg/total_gmv là cột nhập tay, = 0 ở 33/33 talent trên DB
+          // thật, nên câu cũ luôn ra "CVR trung bình 0%, GMV tích lũy 0. Rất phù hợp với ...".
+          reasoning: ((facts: string) =>
+            facts
+              ? `${facts}. Rất phù hợp với ${brand?.name || "Brand"}.`
+              : `Chưa có dữ liệu hiệu suất và ngành hàng cho ${t.name} — chưa đánh giá được độ phù hợp.`)(
+            [
+              (t.niches || []).length > 0 ? `Thế mạnh ngành ${(t.niches || []).join(", ")}` : null,
+              (t.cvrAvg || 0) > 0 ? `CVR trung bình ${t.cvrAvg}%` : null,
+              (t.totalGmv || 0) > 0 ? `GMV tích lũy ${fmtVndShort(t.totalGmv || 0)}` : null
+            ]
+              .filter(Boolean)
+              .join(", ")
+          )
         }));
         return res.json({ success: true, isMock: true, results });
       }
