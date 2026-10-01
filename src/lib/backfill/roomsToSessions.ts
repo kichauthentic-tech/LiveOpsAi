@@ -112,6 +112,27 @@ export interface HostGrid {
   columns: number;
 }
 
+const VN_OFFSET_MS = 7 * 60 * 60 * 1000;
+
+// Mốc bắt đầu của ca, quy về MỘT thang đo duy nhất (ms): giờ live thật nếu đã có, không thì giờ kế
+// hoạch hiểu theo giờ VN. Cùng cách `sessionsLivePerf.ts` đã dùng (`s.actualStartAt ?? vnIso(...)`).
+//
+// Vì sao không so thẳng `(actualStartAt ?? startTime)` như bản cũ: `actual_start_at` là `timestamptz`
+// nên PostgREST trả chuỗi ISO đầy đủ, còn `startTime` là "HH:MM" — đem so hai định dạng đó với nhau là
+// so ĐỊNH DẠNG chứ không so thời gian (đo 2026-10-01: mọi "HH:MM" đứng trước mọi chuỗi ISO, bất kể
+// giờ thật). Mà `actual_start_at` được ghi cho MỌI ca đã nạp snapshot/đối soát (0078/0080), không
+// riêng ca nạp bù, nên một ngày vừa có ca đã đối soát vừa có ca chưa là trạng thái bình thường giữa
+// tháng. Sai thứ tự ở đây ⇒ cột "Ca 1/Ca 2" lệch ⇒ "Điền theo thứ" và "Sao chép tháng trước" gán
+// người vào nhầm ca. So bằng SỐ chứ không bằng chuỗi: hai nguồn còn khác nhau cả ở đuôi ("+00:00" so
+// với "Z") nên so chuỗi vẫn sai ngay cả sau khi đã quy đổi.
+function startMsOf(s: LiveSession): number {
+  if (s.actualStartAt) {
+    const ms = Date.parse(s.actualStartAt);
+    if (Number.isFinite(ms)) return ms;
+  }
+  return Date.parse(`${s.date}T${s.startTime}:00Z`) - VN_OFFSET_MS;
+}
+
 export function buildHostGrid(sessions: LiveSession[], brandId: string, month: string): HostGrid {
   const byDate = new Map<string, LiveSession[]>();
   for (const s of sessions) {
@@ -123,7 +144,7 @@ export function buildHostGrid(sessions: LiveSession[], brandId: string, month: s
   let columns = 0;
   const rows: HostGridRow[] = [];
   for (const [date, list] of [...byDate.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
-    list.sort((a, b) => (a.actualStartAt ?? a.startTime).localeCompare(b.actualStartAt ?? b.startTime) || a.startTime.localeCompare(b.startTime));
+    list.sort((a, b) => startMsOf(a) - startMsOf(b) || a.startTime.localeCompare(b.startTime) || a.id.localeCompare(b.id));
     columns = Math.max(columns, list.length);
     const [y, m, d] = date.split("-").map(Number);
     rows.push({ date, weekday: new Date(y, m - 1, d).getDay(), cells: list.map((session, col) => ({ session, col })) });

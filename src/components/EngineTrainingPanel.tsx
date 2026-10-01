@@ -167,7 +167,9 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
                 {evaluation.evals.map(({ month, ev }) => (
                   <div key={month} className="flex justify-between gap-2">
                     <span className="text-[var(--text)]">{month}</span>
-                    <span className="text-[var(--text-muted)]">{ev.doneCount}/{ev.rows.length} ca có số{ev.doneCount > 0 ? <> · dự báo {fmtM(ev.expectedDone)} → thực tế <b className="text-[var(--text)]">{fmtM(ev.actualDone)}</b>{ev.mape !== null ? ` · sai số ${Math.round(ev.mape * 100)}%` : ""}</> : ""}</span>
+                    {/* Mũi tên "dự báo → thực tế" phải so CÙNG tập ca có dự báo (`actualForecast`),
+                        không phải tổng mọi ca đã xong — ca ops đặt tay không có dự báo nào để sai. */}
+                    <span className="text-[var(--text-muted)]">{ev.doneCount}/{ev.rows.length} ca có số{ev.forecastCount > 0 ? <> · dự báo {fmtM(ev.expectedDone)} → thực tế <b className="text-[var(--text)]">{fmtM(ev.actualForecast)}</b>{ev.forecastCount < ev.doneCount ? ` (${ev.forecastCount}/${ev.doneCount} ca có dự báo)` : ""}{ev.mape !== null ? ` · sai số ${Math.round(ev.mape * 100)}%` : ""}</> : ev.doneCount > 0 ? " · chưa ca nào có dự báo engine để so" : ""}</span>
                   </div>
                 ))}
                 <div className="flex justify-between gap-2 pt-1 border-t border-[var(--border)]">

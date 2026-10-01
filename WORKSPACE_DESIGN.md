@@ -11,7 +11,11 @@
 > 2 lỗi nữa: khối "cần mở thêm bao nhiêu giờ" **trừ cả ca chờ đăng ký ở ngày đã qua** (ca mà chính màn đó
 > không cho thấy, không cho chốt) ⇒ ops mở thiếu ca, brand nhận thiếu giờ hợp đồng — đo được 84h thay vì
 > 94h; và **ngày cuối tháng bị coi là tháng đã đóng** nên trạng thái cam kết lật từ `on_track` sang
-> `behind` đúng ngày ops/brand nhìn nhiều nhất. `vitest` 246 → **321**.
+> `behind` đúng ngày ops/brand nhìn nhiều nhất. Rồi `roomsToSessions.ts` + `planEvaluation.ts` (**P2a-10**)
+> ra 2 lỗi nữa: lưới gán host **xếp sai thứ tự ca** vì so `actualStartAt` (ISO) với `startTime` ("HH:MM")
+> trong cùng một phép so sánh — ngày trộn ca đã/chưa đối soát là trạng thái bình thường giữa tháng, và
+> lệch cột nghĩa là gán nhầm người vào nhầm ca; và dòng **"dự báo → thực tế" so hai tập ca khác nhau**
+> (brand chưa có lịch sử ra "dự báo 0 → thực tế 3,5 tỷ"). `vitest` 246 → **355**.
 >
 > **Còn lại trong file này đều KHÔNG phải việc code:** 24 file Dataraw CROCS T6–T9 chưa up (nhập liệu) ·
 > tích hợp TikTok API (chờ scope Developer/ISV) · lịch sử trước T7/2026 · 33 warning `set-state-in-effect`
@@ -1322,6 +1326,63 @@ tháng 10 khi hôm nay là 05/11: hiện "Tháng đã đóng · hụt 100h". Con
   `pacedProjection` trả 0 thay vì Infinity khi tháng chưa bắt đầu, `brandsMissingCommitment` bỏ brand chỉ
   có ca huỷ, brand bị xoá vẫn có nhãn.
 - `tsc` 0 lỗi · `eslint` 0 lỗi / 33 warning (baseline) · `vitest` **321/321** (301 → 321) · build OK.
+
+### P2a-10 — Nạp bù ca + chấm điểm kế hoạch: 2 lỗi nữa — XONG + VERIFY 2026-10-01 (không migration)
+
+Hai module cuối còn logic thuần chưa test nào chạm tới (user chọn):
+[roomsToSessions.ts](src/lib/backfill/roomsToSessions.ts) 219 dòng + [planEvaluation.ts](src/lib/scheduling/planEvaluation.ts)
+118 dòng. 34 test mới, **4 đỏ trên code cũ** (2 + 2). Tổng 321 → **355**.
+
+**Lỗi 1 (gán nhầm người vào nhầm ca) — `buildHostGrid` xếp thứ tự ca bằng cách trộn 2 định dạng giờ.**
+Comparator cũ: `(a.actualStartAt ?? a.startTime).localeCompare(b.actualStartAt ?? b.startTime)`. Nhưng
+`actual_start_at` là `timestamptz` nên PostgREST trả chuỗi ISO đầy đủ, còn `startTime` là `"HH:MM"` —
+đem so hai thứ đó là so ĐỊNH DẠNG chứ không so thời gian. Đo được: **mọi `"HH:MM"` đứng trước mọi chuỗi
+ISO, bất kể giờ thật.** Mà `actual_start_at` được ghi cho MỌI ca đã nạp snapshot/đối soát (0078/0080),
+không riêng ca nạp bù ⇒ một ngày vừa có ca đã đối soát vừa có ca chưa là **trạng thái bình thường giữa
+tháng**. Cột "Ca 1/Ca 2" lệch ⇒ "Điền theo thứ" và "Sao chép tháng trước" (khớp theo *thứ × cột*) gán
+người vào nhầm ca. Sửa: quy cả hai về MỘT thang ms (`startMsOf`), đúng cách
+[sessionsLivePerf.ts:36](src/lib/report/sessionsLivePerf.ts:36) đã làm (`actualStartAt ?? vnIso(...)`);
+so bằng SỐ chứ không bằng chuỗi vì hai nguồn còn khác nhau cả ở đuôi (`+00:00` so với `Z`).
+
+**Lỗi 2 (số hiển thị tự mâu thuẫn) — "dự báo → thực tế" so hai TẬP ca khác nhau.** `expectedDone` chỉ
+cộng ca có `expectedGmv > 0`, còn `actualDone`/`targetDone` cộng MỌI ca đã xong. Hai màn đặt chúng cạnh
+nhau bằng dấu mũi tên ([EngineTrainingPanel.tsx:170](src/components/EngineTrainingPanel.tsx:170),
+[MonthPlan.tsx:928](src/components/MonthPlan.tsx:928)) nên phần chênh bị đọc thành "engine dự sai" —
+trong khi phần lớn chênh lệch là ca **ops đặt tay** (`expectedGmv = 0`), vốn không có dự báo nào để mà
+sai. `bias`/`mape` thì lại tính ĐÚNG trên tập khớp, nên cùng một dòng vừa nói "200M → 1,02B" vừa nói
+"sai số 10%". Nặng nhất là brand chưa có lịch sử (Đ12 cold start, 3/4 brand): không ca nào có dự báo ⇒
+**"dự báo 0 → thực tế 3,5 tỷ"**. Sửa: thêm `actualForecast` (vế thực tế của đúng tập đã dự báo) +
+`forecastCount`; mũi tên dùng `actualForecast` và ghi rõ `(N/M ca có dự báo)` khi hai tập lệch; không ca
+nào có dự báo thì nói thẳng "chưa ca nào có dự báo engine để so". `actualDone` giữ nguyên nghĩa tổng.
+
+**Vá kèm (phòng thủ, không phải lỗ đang hở):** `buildCalibration` dùng `if (end <= cur) end += 24*60`,
+tức ca có giờ kết thúc = giờ bắt đầu bị coi là ca QUA ĐÊM DÀI 24H và rải hệ số hiệu chỉnh ra **13 ô, tràn
+sang cả thứ hôm sau** — một dòng hỏng bẻ engine của hai ngày. `validateDrafts` (monthPlanGrid) chặn ca
+kiểu đó nên hiện không lưu được, nhưng `<=` vẫn trái quy ước FIX L8 / `sessionDurationHours` của cả app
+(chỉ `mins < 0` mới cộng 24h). Đổi thành `end < cur`: ca 0 giờ không vào vòng lặp, vẫn được đếm vào
+`observations`/`overallBias`.
+
+**Verify bằng harness** (props-only + chặn `window.fetch`; `EngineTrainingPanel` đọc
+`fetchBrandLockedPlanSlots`, `BackfillFromRooms` đọc slice Dataraw. Không đăng nhập, không đọc/ghi
+Supabase thật; harness đã xoá). Ngày 10/09 có ca **06:00 đã đối soát** và ca **09:00 chưa**; 4 ca đã
+xong: 2 ca engine dự 100tr chạy ra 110tr + 2 ca ops đặt tay chạy ra 400tr.
+
+| | code cũ | sau khi sửa |
+|---|---|---|
+| Lưới gán host | Ca 1 = **09:00**, Ca 2 = **06:00** | Ca 1 = 06:00, Ca 2 = 09:00 |
+| AI Training Center | "dự báo 200M → **thực tế 1,02B** · sai số 10%" | "dự báo 200M → **thực tế 220M** (2/4 ca có dự báo) · sai số 10%" |
+
+**Hai chỗ tôi đoán sai, code đúng** (ghi lại để đừng ai đi lại): (1) tôi viết test đòi ca 2h nằm gọn 1 ô
+hiệu chỉnh — thực ra khối 2h chia theo giờ chẵn nên ca 09:00–11:00 **đúng là** vắt hai khối (4 và 5); đã
+đổi test sang ca 08:00–10:00 và thêm một test ghi nhận hành vi vắt khối là có chủ ý. (2) Ở P2a-8 tôi
+cũng từng đoán sai kiểu này với `slotHours`.
+
+- Test mới: `tests/roomsToSessions.test.ts` (19) — gồm cả phần vốn đúng: `duration` lấy hiệu End−Start
+  chứ không lấy cột Duration đã làm tròn, End ≤ Start rơi về cột `hours`, room trùng trong file chỉ sinh
+  1 ca, `diffAssignments` chỉ gửi ca thực sự đổi và gửi `null` khi xoá người, `prevMonthOf` lùi qua năm.
+  `tests/planEvaluation.test.ts` (15) — `unlinked` (lỗi E2E #1) tách khỏi `pending`, ca up file bán 0 là
+  kết quả thật, ca qua đêm đẩy phần sau nửa đêm sang thứ hôm sau, hệ số bị kẹp trong [min, max].
+- `tsc` 0 lỗi · `eslint` 0 lỗi / 33 warning (baseline) · `vitest` **355/355** · build OK.
 
 ### P2b — Đếm lượt mở tab — XONG 2026-09-26, migration 0123 ĐÃ CHẠY + verify (bắt đầu đếm 26/09/2026)
 - Vì sao: trước khi gộp/bỏ mục menu (18 tab agency + 10 tab brand) cần số người dùng thật — chưa có số nào.

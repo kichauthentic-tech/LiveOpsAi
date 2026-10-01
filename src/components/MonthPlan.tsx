@@ -924,8 +924,11 @@ function EvaluationPanel({ ev, calibration }: { ev: PlanEvaluation; calibration:
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
         <h3 className="text-sm font-bold text-[var(--text)]">Kế hoạch vs thực tế</h3>
         <span className="text-[var(--text-muted)]">{ev.doneCount} ca đã có số · {pending} ca chưa diễn ra</span>
+        {/* `target`/`thực tế` tính trên MỌI ca đã xong; `Dự báo` chỉ có ở ca qua engine, nên khi hai
+            tập lệch nhau phải nói rõ bao nhiêu ca có dự báo — nếu không, phần chênh bị đọc nhầm thành
+            engine dự sai (xem `actualForecast` ở planEvaluation.ts). */}
         {ev.doneCount > 0 && (
-          <span className="text-[var(--text-muted)]">Dự báo {fmtVndShort(ev.expectedDone)} · target {fmtVndShort(ev.targetDone)} · <b className="text-[var(--text)]">thực tế {fmtVndShort(ev.actualDone)}</b>{ev.bias !== null ? ` · lệch ${pct(ev.bias)}` : ""}{ev.mape !== null ? ` · sai số TB/ca ${Math.round(ev.mape * 100)}%` : ""}</span>
+          <span className="text-[var(--text-muted)]">{ev.forecastCount > 0 ? <>Dự báo {fmtVndShort(ev.expectedDone)}{ev.forecastCount < ev.doneCount ? ` (${ev.forecastCount}/${ev.doneCount} ca)` : ""} · </> : ""}target {fmtVndShort(ev.targetDone)} · <b className="text-[var(--text)]">thực tế {fmtVndShort(ev.actualDone)}</b>{ev.bias !== null ? ` · lệch ${pct(ev.bias)}` : ""}{ev.mape !== null ? ` · sai số TB/ca ${Math.round(ev.mape * 100)}%` : ""}</span>
         )}
       </div>
       {worst.length > 0 && (

@@ -25,7 +25,13 @@ export interface PlanEvalRow {
 export interface PlanEvaluation {
   rows: PlanEvalRow[];
   doneCount: number;
-  expectedDone: number; // Σ dự báo của ca đã có thực tế
+  expectedDone: number; // Σ dự báo của ca đã có thực tế VÀ có dự báo (expectedGmv > 0)
+  // Σ thực tế của ĐÚNG tập ca nói trên — vế so được với `expectedDone`. `actualDone` là tổng của MỌI
+  // ca đã xong nên lớn hơn, và đặt hai số đó cạnh nhau bằng dấu mũi tên là so hai tập khác nhau: phần
+  // chênh phần lớn là ca ops đặt tay (expectedGmv = 0), vốn không có dự báo nào để mà sai. Nặng nhất
+  // là brand chưa có lịch sử (Đ12 cold start): không ca nào có dự báo ⇒ "dự báo 0 → thực tế 3,5 tỷ".
+  actualForecast: number;
+  forecastCount: number; // số ca vừa đã có thực tế vừa có dự báo — mẫu số thật của `mape`/`bias`
   targetDone: number;
   actualDone: number;
   mape: number | null; // sai số tuyệt đối trung bình theo ca (chỉ ca có dự báo > 0)
@@ -55,6 +61,8 @@ export function evaluatePlan(planSlots: BrandMonthPlanSlot[], shiftSlots: ShiftS
     rows,
     doneCount: done.length,
     expectedDone,
+    actualForecast: actualForecastable,
+    forecastCount: withForecast.length,
     targetDone: done.reduce((a, r) => a + r.targetGmv, 0),
     actualDone: done.reduce((a, r) => a + (r.actualGmv ?? 0), 0),
     mape: withForecast.length > 0 ? withForecast.reduce((a, r) => a + Math.abs(r.errorPct ?? 0), 0) / withForecast.length : null,
@@ -88,7 +96,12 @@ export function buildCalibration(evals: PlanEvaluation[], params: EngineParams =
       const [eh, em] = r.endTime.split(":").map(Number);
       let cur = sh * 60 + sm;
       let end = eh * 60 + em;
-      if (end <= cur) end += 24 * 60;
+      // Chỉ ca QUA ĐÊM THẬT (end < start) mới cộng 24h — đúng quy ước FIX L8 / `sessionDurationHours`
+      // của cả app. Bản cũ dùng `end <= cur` nên ca có giờ kết thúc = giờ bắt đầu bị coi là ca dài 24h
+      // và rải hệ số hiệu chỉnh ra 13 ô, tràn sang cả thứ hôm sau. `validateDrafts` chặn ca kiểu đó ở
+      // lưới nên đây là phòng thủ, không phải lỗ đang hở — nhưng một dòng hỏng lọt vào thì nó bẻ engine
+      // của hai ngày, nên không để `<=`. Ca 0 giờ giờ không vào vòng lặp (cur < end sai ngay).
+      if (end < cur) end += 24 * 60;
       const total = end - cur;
       while (cur < end) {
         const blockEnd = (Math.floor(cur / (BLOCK_HOURS * 60)) + 1) * BLOCK_HOURS * 60;
