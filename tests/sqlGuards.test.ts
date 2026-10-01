@@ -180,3 +180,47 @@ test("0128 có drop bản public của cả 5 helper, và không dùng CASCADE",
   expect(sql, "phải cấp usage schema private cho authenticated").toMatch(/grant\s+usage\s+on\s+schema\s+private\s+to[^;]*authenticated/i);
   expect(/grant[^;]*\bprivate\b[^;]*\banon\b/i.test(sql), "không được cấp gì cho anon").toBe(false);
 });
+
+// ---------------------------------------------------------------------------
+// Helper không tham số trong policy phải bọc `(select ...)`
+// ---------------------------------------------------------------------------
+// 0129: `using (current_user_role() in (...))` gọi hàm MỖI DÒNG; bọc `(select ...)` thì planner hạ
+// xuống InitPlan, gọi đúng 1 lần. Đo trên Postgres 18.4 cô lập, 20.000 ca / 60.000 SKU:
+//   • policy chỉ dùng helper không tham số (live_sessions): 62,3ms → 2,4ms · 20.609 → 756 buffer;
+//   • policy còn gọi hàm NHẬN CỘT (session_skus): 606ms → 407ms — phần còn lại là 2 hàm
+//     `private.session_brand_id(session_id)` / `session_month_published(session_id)`, vốn KHÔNG
+//     hoist được vì phụ thuộc dòng.
+// An toàn vì cả 3 hàm là STABLE + không tham số ⇒ `(select f())` ≡ `f()` trong cùng một câu lệnh.
+const WRAP_IN_POLICY = ["current_user_role", "current_user_brand_id", "current_user_talent_id"];
+
+test("migration sau 0129 không được viết policy gọi helper mà chưa bọc (select ...)", () => {
+  const bad: string[] = [];
+  for (const file of FILES) {
+    if (file.localeCompare("0129_") <= 0) continue; // trước 0129 là lịch sử, chính 0129 đi vá
+    const sql = sqlOnly(readFileSync(join(DIR, file), "utf8"));
+    for (const m of sql.matchAll(/create\s+policy/gi)) {
+      const chunk = sql.slice(m.index!, m.index! + 1200);
+      for (const h of WRAP_IN_POLICY) {
+        const calls = [...chunk.matchAll(new RegExp(`${h}\\s*\\(\\s*\\)`, "gi"))];
+        for (const c of calls) {
+          const before = chunk.slice(Math.max(0, c.index! - 20), c.index!);
+          if (/\(\s*select\s+$/i.test(before)) continue;
+          bad.push(`${file}: ${h}() chưa bọc trong create policy`);
+        }
+      }
+    }
+  }
+  expect(bad).toEqual([]);
+});
+
+test("0129 idempotent và có chốt tự kiểm", () => {
+  const sql = readFileSync(join(DIR, FILES.find((f) => f.startsWith("0129_"))!), "utf8");
+  // MỞ bọc trước rồi bọc lại — thiếu bước mở thì chạy lần hai ra `(select (select ...))`.
+  expect(sql, "phải MỞ bọc đang có trước khi bọc lại").toMatch(/regexp_replace\([^)]*'\\\(\\s\*select/i);
+  // Không được coi "không làm gì" là thành công khi thật ra không khớp gì cả.
+  expect(sql, "phải phân biệt no-op với không-khớp-gì").toContain("touched = 0 and skipped = 0");
+  // Chốt cuối: sau khi viết lại thì không còn lượt gọi trần nào.
+  expect(sql, "phải tự kiểm 0 policy còn gọi trần").toMatch(/raise\s+exception\s+'0129 DỪNG: còn %/i);
+  // Policy đã bọc đúng sẵn thì không drop/tạo lại — drop/tạo policy phân quyền không cần thiết là rủi ro cho không.
+  expect(sql, "phải bỏ qua policy đã bọc sẵn").toContain("skipped := skipped + 1");
+});

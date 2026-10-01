@@ -40,7 +40,10 @@
 > qua `/rpc/` bởi mọi tài khoản đã đăng nhập** — đều `security definer`, không guard role, nhận ID dòng
 > của người khác, nên phá đúng bất biến brand isolation của 0059. **P2a-15 / `0128` (CHƯA CHẠY)** chuyển
 > cả 5 sang schema `private` bằng cách đọc `pg_policies`/`pg_get_viewdef` rồi chỉ thay tên hàm; 90 policy
-> trước/sau khác nhau ĐÚNG một tiền tố schema.
+> trước/sau khác nhau ĐÚNG một tiền tố schema. **P2a-16 / `0129` (CHƯA CHẠY)** bọc
+> `(select ...)` cho 3 helper trong **46/82 policy** — đo lại trên chuỗi thật cho khoảng **~1,5× tới
+> ~26×** (không phải "10×" như P2a-14 nêu từ micro-benchmark): lợi bao nhiêu tuỳ policy còn gọi hàm
+> nhận-cột hay không.
 >
 > **Còn lại trong file này đều KHÔNG phải việc code:** 24 file Dataraw CROCS T6–T9 chưa up (nhập liệu) ·
 > tích hợp TikTok API (chờ scope Developer/ISV) · lịch sử trước T7/2026 · 33 warning `set-state-in-effect`
@@ -1739,8 +1742,13 @@ brand sẽ trắng. **Quy ước: `drop function` trong migration không đượ
 
 **Verify (Postgres 18.4 cô lập + shim Supabase):**
 - replay `0001 → 0128`: **128/128 file sạch**; 4 policy + 1 view được viết lại đúng như dự đoán;
-- **ảnh 90 policy trước/sau, chuẩn hoá bỏ `private.` ⇒ diff TRỐNG** — thay đổi duy nhất trên cả 90
-  policy là tiền tố schema, không gì khác. Cùng phép đó cho view: trống;
+- **ảnh policy trước/sau, chuẩn hoá bỏ `private.` ⇒ diff TRỐNG** — thay đổi duy nhất là tiền tố
+  schema, không gì khác. Cùng phép đó cho view: trống;
+  > **Sửa số đã công bố:** tôi viết "90 policy" ở commit `40f4dee` — đó là đếm **dòng văn bản**
+  > (`wc -l`), không phải đếm policy: 3 policy có biểu thức nhiều dòng nên `pg_get_expr` trả về
+  > chuỗi có `\n`. Số policy thật là **82**. Kết luận diff vẫn đứng (so hai file giống nhau thì
+  > vẫn là phép so bằng hợp lệ), chỉ con số là sai. Từ 0129 trở đi mọi ảnh policy đều
+  > `replace(..., chr(10), ' ')` trước khi dump.
 - `pg_proc`: 5 hàm chỉ còn ở `private`, đều `{search_path=public}`, EXECUTE chỉ cấp `authenticated`;
 - 0 policy nào còn trỏ bản `public`;
 - **phép thử hành vi** (2 brand, T9 của A đã phát hành, của B thì chưa): brand A thấy đúng `SKU-A`,
@@ -1761,6 +1769,63 @@ brand sẽ trắng. **Quy ước: `drop function` trong migration không đượ
 `tests/sqlGuards.test.ts` +2 (386 tests) — một test canh không dựng lại helper ở `public` ở migration
 sau, một test canh 0128 drop đủ 5 hàm và không dùng `cascade`. Chỉ test thứ hai chứng minh được đỏ
 (bỏ 0128 ra ⇒ đỏ); test thứ nhất là canh về SAU nên hôm nay không có gì làm nó đỏ.
+
+
+### P2a-16 — Bọc `(select ...)` cho helper RLS trong 46 policy — XONG 2026-10-01
+
+**Việc đã hứa ở P2a-14.** Policy viết `using (current_user_role() in (...))` gọi hàm **mỗi dòng**;
+mỗi lượt gọi là một lượt đọc bảng `profiles`. Bọc `(select current_user_role())` thì biểu thức thành
+subquery vô hướng không tham chiếu dòng nào ⇒ planner hạ xuống **InitPlan**, gọi đúng **một lần**.
+
+**An toàn ngữ nghĩa:** `(select f())` ≡ `f()` khi f không nhận tham số và là STABLE — `pg_proc` trên
+replay xác nhận cả 3 hàm đều `STABLE · security definer`.
+
+**Số đo thật, và vì sao nó KHÁC con số tôi nêu ở P2a-14.** Ở P2a-14 tôi ghi "~10× nhanh hơn" từ một
+micro-benchmark mà policy chỉ có **một** điều kiện duy nhất là `current_user_role()`. Đo lại trên
+chính chuỗi migration thật (20.000 ca · 60.000 SKU, role `brand`, 3 lượt lấy min):
+
+| truy vấn | trước | sau | lợi |
+|---|---|---|---|
+| `live_sessions` — policy chỉ dùng helper không tham số | 62,3 ms · 20.609 buffer | **2,4 ms · 756 buffer** | **~26× · ~27× ít buffer** |
+| `session_skus` — policy CÒN gọi 2 hàm nhận cột | 606 ms · 361.448 | 407 ms · 301.593 | ~1,5× |
+| `talents` — bảng nhỏ | 0,003 ms · 309 | 0,005 ms · 162 | không đáng kể |
+
+Mức lợi phụ thuộc **hẳn** vào phần còn lại của policy: `session_skus` vẫn gọi
+`private.session_brand_id(session_id)` và `session_month_published(session_id)` **mỗi dòng**, và hai
+hàm đó **không hoist được** vì nhận một CỘT làm tham số — bọc chúng chỉ tạo subquery tương quan, không
+nhanh hơn. Nên khoảng thật là **~1,5× tới ~26×**, không phải một con số.
+
+> **Việc tiếp theo lộ ra từ đây:** phần 407 ms còn lại của `session_skus` gần như toàn bộ là 2 hàm
+> nhận cột đó. Cách đóng là bỏ hàm khỏi policy — thêm `brand_id` vào `session_skus` (denormalise, có
+> trigger giữ đồng bộ) để policy so cột với cột. To hơn 0129 và cần đo lại, chưa làm.
+
+**Phạm vi: đúng 3 hàm.** KHÔNG bọc `auth.uid()` / `auth.role()` (7 + 2 lượt chưa bọc, sẽ nâng 46 → 54
+policy): chúng là hàm của **Supabase**, định nghĩa không nằm trong repo, nên volatility của chúng trên
+production tôi **không đọc được** — mà lập luận an toàn dựa hẳn vào STABLE. Không sửa thứ mình không
+kiểm được. Chúng cũng chỉ đọc một GUC, rẻ hơn hẳn một lượt đọc bảng. KHÔNG đụng view: cả 3 view có gọi
+helper (`live_sessions_secure` 16 lượt · `talents_secure` 8 · `brand_commitment_progress` 4) **đã bọc
+sẵn 100%**.
+
+**Cách viết lại:** cùng khuôn 0128 — đọc `pg_policies`, chỉ thay lời gọi hàm, giữ nguyên
+permissive/cmd/roles/phần còn lại. **Chỉ đụng policy còn lượt gọi TRẦN**, xác định bằng cách bỏ hết
+bọc ra khỏi một bản sao rồi xem còn lời gọi nào không — bản nháp đầu thiếu bước này nên drop/tạo lại
+cả **73** policy kể cả 27 cái vốn đã đúng: ngữ nghĩa không đổi, nhưng là rủi ro cho không.
+
+**Verify (Postgres 18.4 cô lập):**
+- replay `0001 → 0129`: **129/129 file sạch**; `46 bọc lại · 27 bỏ qua (đã bọc sẵn)`;
+- **ảnh 82 policy trước/sau, chuẩn hoá bỏ bọc ở CẢ HAI bên ⇒ giống nhau tuyệt đối**; đúng **46/82**
+  dòng đổi văn bản — khớp số migration báo;
+- **chạy lần hai là no-op sạch** (`0 bọc lại · 73 bỏ qua`). Bản nháp đầu thì **lần hai BÁO LỖI**: chốt
+  `touched = 0` không phân biệt "không có gì phải làm" với "không khớp gì cả" — đã sửa thành
+  `touched = 0 and skipped = 0`;
+- chốt tự kiểm trong chính migration: sau khi viết lại, **0 policy** còn gọi helper chưa bọc;
+- số dòng brand đọc được **không đổi** trước/sau (30.000 SKU của brand A; `live_sessions` 0 dòng —
+  brand đọc qua `live_sessions_secure`, đúng thiết kế 0107/0109).
+
+**File:** `supabase/migrations/0129_wrap_rls_helpers_in_scalar_subquery.sql` (**CHƯA CHẠY**).
+**Test:** `tests/sqlGuards.test.ts` +2 (**388 tests**) — một canh migration sau 0129 không viết policy
+gọi helper chưa bọc, một canh 0129 giữ được tính idempotent + 2 chốt tự kiểm. Chỉ test thứ hai chứng
+minh được đỏ (bỏ 0129 ra ⇒ đỏ); test thứ nhất canh về sau nên hôm nay không có gì làm nó đỏ.
 
 ### P2b — Đếm lượt mở tab — XONG 2026-09-26, migration 0123 ĐÃ CHẠY + verify (bắt đầu đếm 26/09/2026)
 - Vì sao: trước khi gộp/bỏ mục menu (18 tab agency + 10 tab brand) cần số người dùng thật — chưa có số nào.
