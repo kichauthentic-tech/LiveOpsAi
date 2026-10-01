@@ -1,7 +1,10 @@
 -- 0126 — ĐỒNG BỘ CHUỖI MIGRATION VỚI PRODUCTION: bỏ 5 bảng production đã không còn.
 -- (Phát hiện 2026-10-01 khi đối chiếu schema thật qua PostgREST với chuỗi migration — xem P2a-11.)
 --
--- ⚠️ CHƯA CHẠY — cần user chạy tay như mọi migration khác.
+-- ✅ ĐÃ CHẠY trên production 2026-10-01 — no-op đúng thiết kế: KHÔNG nhánh `raise` nào bắn.
+--    Điều đó xác nhận luôn bằng chứng ban đầu: 5 bảng thật sự đã bị xoá tay, không phải bị
+--    PostgREST giấu vì thiếu grant. Đây là migration duy nhất trong ba cái verify được ĐẦY ĐỦ ở
+--    mức schema từ xa (48 bảng/view · 40 RPC không đổi, 8/8 bảng lõi còn đủ).
 --
 -- ============================================================================
 -- VẤN ĐỀ

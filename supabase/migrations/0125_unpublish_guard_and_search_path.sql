@@ -1,7 +1,10 @@
 -- 0125 — VÁ NỐT HÀM ANH EM BỊ BỎ SÓT: `unpublish_brand_monthly_report`.
 -- (Phát hiện 2026-10-01 khi đọc lại toàn bộ SQL + đối chiếu schema thật qua PostgREST.)
 --
--- ⚠️ CHƯA CHẠY — cần user chạy tay trên Supabase Dashboard như mọi migration khác.
+-- ✅ ĐÃ CHẠY trên production 2026-10-01.
+--    Verify đạt được: chỉ tới mức hàm còn tồn tại đúng chữ ký (PostgREST KHÔNG lộ thân hàm nên
+--    không đọc lại được guard `coalesce` từ xa). Mức verify đầy đủ chỉ có khi replay chuỗi
+--    migration trên Postgres cô lập — đã làm, xem P2a-12/P2a-14 trong WORKSPACE_DESIGN.md.
 --
 -- ============================================================================
 -- VÌ SAO

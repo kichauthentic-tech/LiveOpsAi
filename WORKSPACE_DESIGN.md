@@ -32,11 +32,13 @@
 > (`affiliateLiveSessionSlice`, `weeklySlice`) đang bị PostgREST **cắt 1.000 dòng âm thầm** — cổng canh
 > phân trang dựng sáng cùng ngày là danh sách khai tay và chỉ soi `src/lib/db/` nên không soi tới; nay
 > **quét cả `src/`**. Trang Affiliate còn gộp batch theo thứ tự tuỳ Postgres dù comment ghi rõ "bản nạp
-> sau thắng". P2a-14: **`0127` (CHƯA CHẠY)** pin `search_path` cho 3 hàm helper RLS — và bác lập luận
+> sau thắng". P2a-14: **`0127` (ĐÃ CHẠY)** pin `search_path` cho 3 hàm helper RLS — và bác lập luận
 > hoãn ở 0125 bằng số đo (`security definer` tự nó đã chặn inline, nên pin không mất gì). Cùng phép đo
 > cho ra **phát hiện lớn hơn**: bọc `(select current_user_role())` trong policy nhanh **~10×**, ít buffer
 > **~124×**, đổi từ Bitmap Heap Scan sang Index Only Scan — **việc tiếp theo đáng giá nhất**, cố ý chưa
-> làm vì phải sửa hàng trăm policy.
+> làm vì phải sửa hàng trăm policy. Đọc spec sau khi chạy 0127 còn lộ ra **`session_brand_id` gọi
+> được qua `/rpc/` bởi mọi tài khoản đã đăng nhập** — nó `security definer`, nhận session id bất kỳ,
+> nên phá đúng bất biến brand isolation của 0059; vá bằng cách chuyển sang schema không expose, 7 call site.
 >
 > **Còn lại trong file này đều KHÔNG phải việc code:** 24 file Dataraw CROCS T6–T9 chưa up (nhập liệu) ·
 > tích hợp TikTok API (chờ scope Developer/ISV) · lịch sử trước T7/2026 · 33 warning `set-state-in-effect`
@@ -1595,7 +1597,7 @@ Test quét gọi **đúng tên cả hai file** chứ không chỉ đỏ chung �
 phải chỉ phát hiện có sai. Phục hồi 2 file xong suite xanh lại 384/384.
 
 
-### P2a-14 — Pin `search_path` cho 3 hàm helper RLS; và lý do hoãn ở 0125 là SAI — XONG 2026-10-01
+### P2a-14 — Pin `search_path` cho 3 hàm helper RLS; và lý do hoãn ở 0125 là SAI — XONG 2026-10-01, migration **0127 ĐÃ CHẠY**
 
 **Tự bác một quyết định của chính mình.** Cuối 0125 tôi cố ý KHÔNG pin `current_user_role` /
 `current_user_brand_id` / `session_brand_id`, với lý do *"có đánh đổi thật chưa đo được: cả ba là
@@ -1623,7 +1625,7 @@ họ, cùng khuôn, cùng được gọi trong policy — **đã pin từ 0100**
    `alter function ... set search_path = public`: **kế hoạch giống nhau từng dòng**, buffers 9.561 so
    với 9.567 (chênh do cache).
 
-**File:** `supabase/migrations/0127_pin_search_path_rls_helpers.sql` (**CHƯA CHẠY** — dùng
+**File:** `supabase/migrations/0127_pin_search_path_rls_helpers.sql` (**ĐÃ CHẠY** 2026-10-01 — dùng
 `alter function`, không chép lại thân hàm: 3 hàm bị gọi **354 lượt** trong chuỗi migration nên
 `alter` là cách duy nhất không đụng policy nào). Thêm con trỏ ở cuối 0125 sang đây — không sửa phần
 trên của 0125 vì nó đã chạy trên production, để nguyên làm dấu vết.
@@ -1632,6 +1634,40 @@ trên của 0125 vì nó đã chạy trên production, để nguyên làm dấu 
 `pg_proc` cho thấy cả 4 hàm helper có `{search_path=public}`, và **0 hàm `security definer` nào còn
 thiếu `search_path`**. Cổng canh `tests/sqlGuards.test.ts` đã **bỏ hẳn `SEARCH_PATH_EXEMPT`** — không
 còn cửa xin miễn; chứng minh đỏ bằng cách tạm bỏ 0127 ra, test gọi đúng tên 3 hàm kèm file gốc.
+
+#### Sau khi chạy: mức verify thật sự đạt được, và một phát hiện mới
+
+Đọc lại schema production (GET OpenAPI, service role, không gọi RPC nào): **48 bảng/view · 40 RPC
+không đổi**, 8/8 bảng lõi còn đủ, 5 bảng đã drop ở 0126 vẫn vắng, **4/4 hàm helper còn tồn tại đúng
+chữ ký**. Nhưng **`proconfig` thì PostgREST không lộ** — "search_path đã pin thật" KHÔNG verify được
+từ xa, chỉ chứng minh được bằng replay trên Postgres cô lập (đã làm). Cùng mức giới hạn với 0125;
+riêng 0126 là cái duy nhất verify đầy đủ được ở mức schema.
+
+**PHÁT HIỆN MỚI khi đọc spec — `session_brand_id` lộ ra `/rpc/` và đó là lỗ brand isolation.**
+Cả 4 helper đều xuất hiện trong `/rpc/` của PostgREST, nhưng **chỉ một cái đáng lo**:
+
+| hàm | nhận gì | trả gì | lộ ra `/rpc/` có hại? |
+|---|---|---|---|
+| `current_user_role()` | — | role CỦA CHÍNH BẠN | không |
+| `current_user_brand_id()` | — | brand CỦA CHÍNH BẠN | không |
+| `current_user_talent_id()` | — | talent id CỦA CHÍNH BẠN | không |
+| `session_brand_id(uuid)` | **session id bất kỳ** | `brand_id` của ca đó | **CÓ** |
+
+`session_brand_id` là `security definer`, nhận tham số tuỳ ý, và **cố ý vượt RLS** (0059 tạo nó đúng
+để tránh RLS-trong-RLS). Về grant: 0109 chỉ `revoke ... from anon`, và chỉ `current_user_talent_id`
+được `revoke from public` riêng ở 0100 — nên **mọi tài khoản đã đăng nhập (kể cả `talent`, kể cả
+người của brand khác) gọi được** `POST /rest/v1/rpc/session_brand_id`, tra ra ca nào thuộc brand nào.
+Đúng thứ mà toàn bộ 0059 dựng lên để ngăn.
+
+**Vì sao KHÔNG vá được bằng grant:** policy RLS gọi hàm thì **chính người truy vấn** phải có EXECUTE
+trên hàm đó (đó là lý do 0100 phải `grant execute ... to authenticated` ngay sau khi revoke). Revoke
+khỏi `authenticated` là làm chết luôn 7 policy đang dùng nó. Cách đúng là **chuyển hàm sang schema
+KHÔNG expose** (PostgREST chỉ lộ hàm trong schema được expose) rồi sửa 7 lượt gọi — nhỏ và gọn, nhưng
+là một migration riêng.
+
+> Mức độ: cần biết trước một session uuid mà mình không được thấy (uuid v4, không enumerate được),
+> nên không phải lỗ mở toang. Nhưng nó phá đúng một bất biến mà 0059 dựng lên, và phần vá chỉ gói
+> trong 7 call site — tỉ lệ lợi/công cao.
 
 #### Phát hiện phụ, giá trị LỚN HƠN chính bản vá: bọc `(select ...)` trong policy
 

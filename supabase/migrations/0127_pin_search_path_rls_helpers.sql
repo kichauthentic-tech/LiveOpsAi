@@ -1,7 +1,11 @@
 -- 0127 — PIN `search_path` CHO 3 HÀM HELPER RLS CÒN LẠI.
 -- (2026-10-01. Đây là phần 0125 CỐ Ý BỎ LẠI, kèm lý do — và lý do đó SAI. Xem bên dưới.)
 --
--- ⚠️ CHƯA CHẠY — cần user chạy tay trên Supabase Dashboard như mọi migration khác.
+-- ✅ ĐÃ CHẠY trên production 2026-10-01.
+--    Verify đạt được: 4/4 hàm helper còn tồn tại đúng chữ ký (đều lộ ở `/rpc/` trong OpenAPI),
+--    48 bảng/view · 40 RPC không đổi. KHÔNG đọc lại được `proconfig` từ xa — PostgREST không lộ,
+--    nên "search_path đã pin thật" chỉ chứng minh được bằng replay trên Postgres cô lập (đã làm:
+--    127/127 file sạch, `pg_proc` cho 0 hàm `security definer` nào còn thiếu `search_path`).
 --
 -- ============================================================================
 -- 0125 ĐÃ VIẾT GÌ, VÀ SAI Ở ĐÂU
