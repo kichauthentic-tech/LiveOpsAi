@@ -67,15 +67,18 @@ test("có đọc được migration và nhận ra hàm security definer (canh ch
   expect(DEFINERS.length).toBeGreaterThan(20);
 });
 
-// Ba hàm helper `language sql` được MIỄN có chủ ý — pin search_path chặn Postgres inline chúng, mà
-// cả ba bị gọi trong hàng chục policy RLS. Lý do đầy đủ ghi ở cuối 0125. Muốn bỏ miễn thì phải kèm
-// số đo trước/sau, đừng xoá tên khỏi đây cho xanh test.
-const SEARCH_PATH_EXEMPT = new Set(["current_user_role", "current_user_brand_id", "session_brand_id"]);
-
+// KHÔNG CÒN DANH SÁCH MIỄN. 0125 miễn 3 hàm `current_user_role`/`current_user_brand_id`/
+// `session_brand_id` với lý do "pin search_path chặn Postgres inline chúng, mà cả ba bị gọi trong
+// hàng chục policy RLS" — lý do đó SAI và 0127 đã bác bằng số đo: cả ba là `security definer`, mà
+// `security definer` TỰ NÓ đã chặn inline rồi, nên pin không làm mất gì. Đo trên Postgres 18.4 cô
+// lập: hàm `language sql stable` chỉ-secdef KHÔNG được inline y như hàm chỉ-có-SET; và kế hoạch của
+// cùng một truy vấn dưới RLS giống nhau từng dòng trước/sau khi pin. Chi tiết ở đầu file 0127.
+//
+// Thêm hàm `security definer` mới mà không pin thì test này đỏ — không có cửa xin miễn nữa.
 test("mọi hàm SECURITY DEFINER còn sống đều pin search_path (lớp lỗ 0063)", () => {
-  const bad = DEFINERS.filter(
-    (f) => !/set\s+search_path/i.test(f.body) && !PINNED.has(f.name) && !SEARCH_PATH_EXEMPT.has(f.name)
-  ).map((f) => `${f.name} (${f.file})`);
+  const bad = DEFINERS.filter((f) => !/set\s+search_path/i.test(f.body) && !PINNED.has(f.name)).map(
+    (f) => `${f.name} (${f.file})`
+  );
   expect(bad).toEqual([]);
 });
 

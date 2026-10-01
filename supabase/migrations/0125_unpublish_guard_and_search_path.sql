@@ -88,3 +88,12 @@ alter function trg_brand_platform_rate_history() set search_path = public;
 -- Ghi lại để ai làm tiếp biết đây là quyết định có chủ ý, không phải bỏ sót:
 -- muốn pin thì pin kèm một lần đo thời gian truy vấn trước/sau trên các màn nặng RLS (Sổ Ca,
 -- Report Tháng), và cân nhắc bọc `(select current_user_role())` ở các policy còn chưa bọc.
+
+-- ---------------------------------------------------------------------------
+-- ĐÃ BỊ BÁC BỞI 0127 (2026-10-01, cùng ngày) — ĐỌC KHỐI TRÊN THÌ ĐỌC CẢ DÒNG NÀY
+-- ---------------------------------------------------------------------------
+-- Lập luận "pin search_path làm mất inline" ở khối ngay trên là SAI. Cả ba hàm đều là `security
+-- definer`, mà `security definer` tự nó đã chặn inline rồi — ba hàm này chưa bao giờ được inline,
+-- nên không có gì để mất. 0127 đã đo (hai phép đo trên Postgres 18.4 cô lập) và pin cả ba.
+-- Không sửa phần trên của file này vì nó ĐÃ CHẠY trên production; để nguyên làm dấu vết, và đây là
+-- con trỏ sang bản đúng.

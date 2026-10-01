@@ -1,0 +1,68 @@
+-- 0127 — PIN `search_path` CHO 3 HÀM HELPER RLS CÒN LẠI.
+-- (2026-10-01. Đây là phần 0125 CỐ Ý BỎ LẠI, kèm lý do — và lý do đó SAI. Xem bên dưới.)
+--
+-- ⚠️ CHƯA CHẠY — cần user chạy tay trên Supabase Dashboard như mọi migration khác.
+--
+-- ============================================================================
+-- 0125 ĐÃ VIẾT GÌ, VÀ SAI Ở ĐÂU
+-- ============================================================================
+-- Cuối file 0125 tôi ghi rằng KHÔNG pin 3 hàm này vì "có đánh đổi thật chưa đo được: cả ba là
+-- `language sql`, và Postgres KHÔNG INLINE được hàm SQL có mệnh đề SET. Ba hàm này bị gọi trong
+-- hàng chục policy RLS của gần như mọi bảng, nên mất inline là rủi ro hiệu năng trên toàn app".
+--
+-- Câu về mệnh đề SET thì đúng, nhưng nó KHÔNG áp dụng ở đây — vì cả ba hàm đã là `security
+-- definer`, và `security definer` TỰ NÓ đã chặn inline rồi (`inline_function()` trong
+-- optimizer/util/clauses.c loại thẳng khi `prosecdef`). Ba hàm này CHƯA BAO GIỜ được inline, nên
+-- pin search_path không làm mất gì cả. Đánh đổi tôi viện ra để hoãn việc không tồn tại.
+--
+-- ĐÃ ĐO, không suy luận (Postgres 18.4 cô lập, 2026-10-01):
+--
+--   1) `security definer` chặn inline, độc lập với mệnh đề SET —
+--      `explain (verbose) select g(v) from t` với hàm `language sql stable`:
+--        g_plain   (không secdef, không SET) → Output: (v * 2)      ⇒ ĐÃ inline
+--        g_secdef  (chỉ secdef)              → Output: g_secdef(v)  ⇒ KHÔNG inline
+--        g_setpath (chỉ SET)                 → Output: g_setpath(v) ⇒ KHÔNG inline
+--        g_both    (cả hai)                  → Output: g_both(v)    ⇒ KHÔNG inline
+--
+--   2) Dựng lại đúng hình dạng thật (profiles + auth.uid() + live_sessions 50.000 dòng + policy
+--      `using (current_user_role() in ('ceo','admin','operations'))`), chạy cùng một truy vấn dưới
+--      role `authenticated` TRƯỚC và SAU `alter function ... set search_path = public`:
+--      kế hoạch GIỐNG NHAU TỪNG DÒNG, cùng `Filter: (current_user_role() = ANY (...))`,
+--      buffers 9.561 so với 9.567 (chênh do cache, không do kế hoạch).
+--
+-- Thêm một bằng chứng có sẵn trong repo mà lẽ ra tôi phải thấy từ 0125: `current_user_talent_id()`
+-- — hàm thứ tư cùng họ, cùng khuôn `language sql stable security definer`, cùng được gọi trong
+-- policy — ĐÃ được pin từ 0100, và production chạy từ đó tới nay không ai báo chậm.
+--
+-- ============================================================================
+-- DÙNG `ALTER FUNCTION`, KHÔNG CHÉP LẠI THÂN HÀM
+-- ============================================================================
+-- Cùng lý do với `update_my_talent_profile` ở 0125: ít rủi ro hơn hẳn, và không phải đồng bộ lại
+-- kiểu trả về (`current_user_role` trả enum `user_role`) hay thân hàm với bản đang chạy.
+--
+-- 3 hàm này bị gọi 354 lượt trong chuỗi migration (current_user_role 301 · current_user_brand_id 46
+-- · session_brand_id 7) nên `alter` là cách duy nhất không đụng tới policy nào.
+
+alter function current_user_role() set search_path = public;
+alter function current_user_brand_id() set search_path = public;
+alter function session_brand_id(uuid) set search_path = public;
+
+-- ============================================================================
+-- VIỆC KHÁC, TO HƠN, CỐ Ý KHÔNG LÀM Ở ĐÂY: BỌC `(select ...)` TRONG POLICY
+-- ============================================================================
+-- Trong lúc đo phần trên, cùng harness cho ra một kết quả đáng giá hơn nhiều chính bản vá này.
+-- Policy viết `using (current_user_role() in (...))` khiến hàm được gọi MỖI DÒNG; bọc lại thành
+-- `using ((select current_user_role()) in (...))` thì Postgres hạ nó xuống InitPlan, gọi ĐÚNG 1 LẦN.
+--
+-- Đo trên bản sao 50.000 dòng, truy vấn đọc 4.676 dòng, 5 lượt mỗi bên (cache đã nóng):
+--
+--     không bọc : 6,93 – 7,06 ms   · Bitmap Heap Scan · buffers 9.561 · 209 heap block
+--     có bọc    : 0,66 – 0,72 ms   · Index Only Scan  · buffers    77 · 0 heap fetch
+--                 ⇒ nhanh ~10× , ít hơn ~124× số buffer
+--
+-- Kế hoạch đổi hẳn loại: gọi hàm theo dòng buộc phải chạm heap, nên index-only scan không dùng được.
+--
+-- KHÔNG gộp vào migration này vì đó là việc khác hẳn về quy mô và rủi ro: phải sửa thân của hàng
+-- trăm policy (chuỗi migration có 354 lượt gọi), mỗi policy sai một dấu ngoặc là một lỗ phân quyền.
+-- Đáng làm, nhưng phải làm thành một đợt riêng, chia theo bảng, và verify từng bảng bằng tài khoản
+-- thật của từng role — không phải phần phụ của một lệnh `alter`.

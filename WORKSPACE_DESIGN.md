@@ -28,6 +28,16 @@
 > no-op đúng thiết kế): replay `0001 → 0126` trên Postgres cô lập giờ ra đúng 48/48 object khớp tên với
 > production.**
 >
+> **MỚI 2026-10-01 (P2a-13/P2a-14) — hai đợt nữa cùng ngày.** P2a-13: hai chỗ đọc Dữ Liệu Gốc
+> (`affiliateLiveSessionSlice`, `weeklySlice`) đang bị PostgREST **cắt 1.000 dòng âm thầm** — cổng canh
+> phân trang dựng sáng cùng ngày là danh sách khai tay và chỉ soi `src/lib/db/` nên không soi tới; nay
+> **quét cả `src/`**. Trang Affiliate còn gộp batch theo thứ tự tuỳ Postgres dù comment ghi rõ "bản nạp
+> sau thắng". P2a-14: **`0127` (CHƯA CHẠY)** pin `search_path` cho 3 hàm helper RLS — và bác lập luận
+> hoãn ở 0125 bằng số đo (`security definer` tự nó đã chặn inline, nên pin không mất gì). Cùng phép đo
+> cho ra **phát hiện lớn hơn**: bọc `(select current_user_role())` trong policy nhanh **~10×**, ít buffer
+> **~124×**, đổi từ Bitmap Heap Scan sang Index Only Scan — **việc tiếp theo đáng giá nhất**, cố ý chưa
+> làm vì phải sửa hàng trăm policy.
+>
 > **Còn lại trong file này đều KHÔNG phải việc code:** 24 file Dataraw CROCS T6–T9 chưa up (nhập liệu) ·
 > tích hợp TikTok API (chờ scope Developer/ISV) · lịch sử trước T7/2026 · 33 warning `set-state-in-effect`
 > (đã đo, cố ý giữ `warn` — xem `eslint.config.js`). Hai thứ chưa verify được vì cần mật khẩu: nhánh
@@ -1583,6 +1593,64 @@ Tests  2 failed | 9 passed (11)
 
 Test quét gọi **đúng tên cả hai file** chứ không chỉ đỏ chung — tức nó chỉ được ra chỗ sai, không
 phải chỉ phát hiện có sai. Phục hồi 2 file xong suite xanh lại 384/384.
+
+
+### P2a-14 — Pin `search_path` cho 3 hàm helper RLS; và lý do hoãn ở 0125 là SAI — XONG 2026-10-01
+
+**Tự bác một quyết định của chính mình.** Cuối 0125 tôi cố ý KHÔNG pin `current_user_role` /
+`current_user_brand_id` / `session_brand_id`, với lý do *"có đánh đổi thật chưa đo được: cả ba là
+`language sql`, và Postgres KHÔNG INLINE được hàm SQL có mệnh đề SET"*. Câu về mệnh đề SET đúng
+nhưng **không áp dụng ở đây**: cả ba đã là `security definer`, và `security definer` **tự nó** đã
+chặn inline (`inline_function()` loại thẳng khi `prosecdef`). Ba hàm này **chưa bao giờ được inline**,
+nên pin không làm mất gì. Đánh đổi tôi viện ra để hoãn việc không tồn tại.
+
+Bằng chứng lẽ ra phải thấy từ 0125 mà không cần đo gì: `current_user_talent_id()` — hàm thứ tư cùng
+họ, cùng khuôn, cùng được gọi trong policy — **đã pin từ 0100**, production chạy từ đó không ai báo chậm.
+
+**Đo trên Postgres 18.4 cô lập (2026-10-01), không suy luận:**
+
+1. `explain (verbose) select g(v) from t` với hàm `language sql stable`:
+
+| hàm | mệnh đề | Output | inline? |
+|---|---|---|---|
+| `g_plain` | — | `(v * 2)` | **có** |
+| `g_secdef` | chỉ `security definer` | `g_secdef(v)` | không |
+| `g_setpath` | chỉ `set search_path` | `g_setpath(v)` | không |
+| `g_both` | cả hai | `g_both(v)` | không |
+
+2. Dựng đúng hình dạng thật (`profiles` + `auth.uid()` + `live_sessions` 50.000 dòng + policy
+   `using (current_user_role() in (...))`), chạy cùng truy vấn dưới role `authenticated` trước/sau
+   `alter function ... set search_path = public`: **kế hoạch giống nhau từng dòng**, buffers 9.561 so
+   với 9.567 (chênh do cache).
+
+**File:** `supabase/migrations/0127_pin_search_path_rls_helpers.sql` (**CHƯA CHẠY** — dùng
+`alter function`, không chép lại thân hàm: 3 hàm bị gọi **354 lượt** trong chuỗi migration nên
+`alter` là cách duy nhất không đụng policy nào). Thêm con trỏ ở cuối 0125 sang đây — không sửa phần
+trên của 0125 vì nó đã chạy trên production, để nguyên làm dấu vết.
+
+**Verify:** replay `0001 → 0127` trên Postgres trắng + shim Supabase — **127/127 file chạy sạch**;
+`pg_proc` cho thấy cả 4 hàm helper có `{search_path=public}`, và **0 hàm `security definer` nào còn
+thiếu `search_path`**. Cổng canh `tests/sqlGuards.test.ts` đã **bỏ hẳn `SEARCH_PATH_EXEMPT`** — không
+còn cửa xin miễn; chứng minh đỏ bằng cách tạm bỏ 0127 ra, test gọi đúng tên 3 hàm kèm file gốc.
+
+#### Phát hiện phụ, giá trị LỚN HƠN chính bản vá: bọc `(select ...)` trong policy
+
+Cùng harness cho ra kết quả này. Policy viết `using (current_user_role() in (...))` gọi hàm **mỗi
+dòng**; bọc thành `using ((select current_user_role()) in (...))` thì Postgres hạ xuống InitPlan,
+gọi **đúng 1 lần**. Bản sao 50.000 dòng, truy vấn đọc 4.676 dòng, 5 lượt mỗi bên, cache nóng:
+
+| | thời gian | kế hoạch | buffers |
+|---|---|---|---|
+| không bọc (app hiện nay) | 6,93 – 7,06 ms | Bitmap Heap Scan, 209 heap block | 9.561 |
+| có bọc | **0,66 – 0,72 ms** | **Index Only Scan**, 0 heap fetch | **77** |
+
+**~10× nhanh hơn, ~124× ít buffer** — và đổi hẳn loại kế hoạch: gọi hàm theo dòng buộc phải chạm
+heap nên index-only scan không dùng được.
+
+> **CỐ Ý CHƯA LÀM.** Khác hẳn về quy mô và rủi ro: phải sửa thân của hàng trăm policy (354 lượt gọi),
+> mỗi policy sai một dấu ngoặc là một lỗ phân quyền. Đáng làm, nhưng phải là một đợt riêng, chia theo
+> bảng, verify từng bảng bằng tài khoản thật của từng role. Đây là **việc tiếp theo đáng giá nhất**
+> đang nằm trên bàn.
 
 ### P2b — Đếm lượt mở tab — XONG 2026-09-26, migration 0123 ĐÃ CHẠY + verify (bắt đầu đếm 26/09/2026)
 - Vì sao: trước khi gộp/bỏ mục menu (18 tab agency + 10 tab brand) cần số người dùng thật — chưa có số nào.
