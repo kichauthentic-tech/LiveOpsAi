@@ -56,7 +56,15 @@
 > lồng trong nó cùng gọi `fetchMonthPlan`. Vá bằng `dedupeInFlight` (gộp lời gọi đang cùng bay, **không
 > cache** — cache sẽ làm Kế Hoạch Tháng hiện bản cũ sau khi lưu): **35 → 32 request**, màn hình giống
 > hệt từng ký tự. **Không công bố số "nhanh hơn"** cho mục này: mạng xấu dần trong lúc đo nên chênh
-> lệch wall-clock nằm trong nhiễu.
+> lệch wall-clock nằm trong nhiễu. **P2a-19** là mục ĐÍNH CHÍNH: phép đo wall-clock của chính tôi tính
+> cả việc không chặn render (`ui_tab_views` fire-and-forget, `rpc/complete_past_sessions` chạy song
+> song) nên là chặn trên; và **Browser pane bị ẩn làm mọi phép đo phía client vô giá trị** — đối chứng
+> tự chặn main thread 220ms mà `longtask` observer bắt được 0 entry — nên hai kết luận "2 giây là tính
+> toán client" và "0 long-task" đều **đã rút lại**. Việc làm được: chuông gate theo `session` thay vì
+> `profile` (`fetchMyNotifications` không dùng gì từ hồ sơ) ⇒ lượt đọc chuông lên **chặng 1**, xong
+> trước cả khi `profiles` về, 3/3 màn, số request không đổi. Quy ước mới: **lượt đọc không dùng dữ liệu
+> `profile` thì gate theo `session`**. Câu hỏi còn mở: thời gian render phía client — **cần hiện Browser
+> pane** mới đo được.
 >
 > **Còn lại trong file này đều KHÔNG phải việc code:** 24 file Dataraw CROCS T6–T9 chưa up (nhập liệu) ·
 > tích hợp TikTok API (chờ scope Developer/ISV) · lịch sử trước T7/2026 · 33 warning `set-state-in-effect`
@@ -1988,6 +1996,84 @@ là bộ test đúng. Có cả chốt nguồn: `brand_dataraw_imports` dạng li
 `performance.getEntriesByType('resource')` lọc `/rest/v1/`, chờ đến khi 1.500 ms không có request mới,
 rồi nhóm theo URL đã `decodeURIComponent` để tìm cặp trùng, và nhóm theo mốc khởi hành (cách nhau
 >150 ms là một "đợt") để thấy chuỗi phụ thuộc. Lưu script trong `localStorage` để nó sống qua F5.
+
+> ⚠️ **ĐÃ SỬA Ở P2a-19 — công thức trên có HAI lỗi, đọc mục đó trước khi dùng lại:** (a) `max(responseEnd)`
+> tính cả `ui_tab_views` (ghi fire-and-forget) và `rpc/complete_past_sessions` (chạy song song), mà cả
+> hai **không chặn render** ⇒ "wall-clock" bị phóng đại; (b) khi Browser pane bị ẩn, `setTimeout` bị
+> siết xuống ≥1000 ms nên bộ phát hiện "1.500 ms không có request mới" trở nên THÔ và có thể dừng sớm
+> — đó chính là lượt dị thường "29 request" đã thấy ở mục này.
+
+### P2a-19 — Sửa chính phép đo của mình, rút lại 2 kết luận, và bỏ 1 chặng khỏi đợt nạp — 2026-10-02
+
+Mục này phần lớn là **đính chính**. Ghi đầy đủ vì hai con số tôi đã nêu ở P2a-18 là sai, và vì cái
+bẫy môi trường bên dưới sẽ bắt bất cứ ai đo lại.
+
+**1. Phép đo "wall-clock" của tôi tính cả việc KHÔNG chặn render.** `max(responseEnd)` gộp luôn:
+`ui_tab_views` — `logTabView` là fire-and-forget tường minh (`void`, không chờ, không ném lỗi,
+`tabViews.ts`), và `rpc/complete_past_sessions` — chạy **song song** với lượt đọc chính, chỉ kích hoạt
+lượt đọc thứ hai nếu nó thật sự đóng được ca (`useWorkspaceData.ts:294`). Cả hai không làm người dùng
+phải chờ. ⇒ Mọi con số "wall-clock" ở P2a-17/P2a-18 là **chặn trên**, không phải thời gian cảm nhận.
+Phép đo đúng phải loại hai thứ này trước khi tính.
+
+**2. Browser pane BỊ ẨN làm mọi phép đo phía client vô giá trị — đã chứng minh bằng đối chứng.**
+Pane ẩn ⇒ `document.hidden = true` ⇒ trình duyệt siết `setTimeout` xuống ≥1000 ms và React hạ ưu tiên
+commit. Hệ quả đã gặp:
+- Vòng lặp poll 50 ms để đo "DOM ngừng đổi" vỡ hoàn toàn (báo `domChanges: 0`).
+- Bộ phát hiện "1.500 ms không có request mới" trở nên thô ⇒ giải thích lượt **29 request** dị thường ở P2a-18.
+- `PerformanceObserver({type:'longtask'})` **không báo gì cả**: tôi tự chặn main thread **220 ms** để
+  đối chứng và observer bắt được **0 entry**. `tabs_select` không gỡ được (cả pane bị thu ở UI app).
+
+**⇒ HAI KẾT LUẬN TÔI ĐÃ NÊU TRONG PHIÊN NÀY, NAY RÚT LẠI:**
+- ~~"Brand Dashboard: mạng xong ở 877 ms nhưng màn chỉ yên ở 2.942 ms ⇒ ~2 giây là tính toán client"~~
+  → **SAI.** Khoảng trống đó là **scheduler bị siết ở tab ẩn**, không phải công việc thật.
+- ~~"0 long-task trên mọi màn ⇒ app không có vấn đề CPU phía client"~~ → **VÔ GIÁ TRỊ**, vì đối chứng
+  cho thấy observer không hoạt động. Câu hỏi "màn nào tốn CPU client" hiện **CHƯA CÓ CÂU TRẢ LỜI**;
+  muốn trả lời phải **hiện Browser pane** rồi đo lại.
+
+**3. Quan sát lẻ không tái lập — KHÔNG phải lỗi.** Một lượt `/so-ca` cho **42 lượt đọc** (bình thường
+24) với `talents_secure` xuất hiện hai lần (59-131 và 1773-2240), trông như cả đợt nạp chạy lại.
+Tái lập **0/4 lượt** (đều đúng 24 request, 0 bảng gọi quá một lần, 0 khe trống). Không có lời gọi
+`/auth/v1/` nào nên **không phải** refresh token. Nhiều khả năng do tôi chuyển trang dồn dập.
+**Không coi là lỗi, không đi theo** — ghi lại để nếu ai gặp lại thì đã có mô tả.
+
+**4. Mạng hôm nay tệ hơn hẳn và rất không ổn định** — 10 lượt **tuần tự** cùng một truy vấn tra 1 dòng
+theo khoá chính, kết nối đã ấm: 354 · 379 · 412 · 465 · 496 · 517 · 601 · 858 · 1234 · 1660 ms (độ trải
+**1.306 ms**; sàn hôm qua là 257 ms). ⇒ **Không A/B được wall-clock**, nên con số của P2a-18 vẫn để
+ngỏ đúng như đã nói ở đó.
+
+**5. Giới hạn của đại lượng "độ sâu chuỗi"** (số RTT nối tiếp): nó tính theo *"request B khởi hành sau
+khi A kết thúc"*, nên chỉ là **chặn dưới của mức song song**, **không chứng minh** B phụ thuộc A. Dùng
+nó để KHOANH VÙNG, rồi phải đọc source để xác nhận.
+
+**6. Việc đã làm được, có bằng chứng từ SOURCE chứ không chỉ từ mốc thời gian.** `App.tsx` gate chuông
+bằng `useNotifications(!!profile)`. Nhưng `fetchMyNotifications` **không nhận tham số user** — chính
+`lib/db/notifications.ts` ghi *"RLS đã lọc theo auth.uid(), không cần truyền user"*. Trong khi `profile`
+chỉ có **sau một round-trip** (`useAuth.loadProfile`), còn `session` có ngay từ localStorage. Nên gate
+theo `profile` đẩy lượt đọc chuông xuống **chặng 2** của đợt nạp, ở mọi màn.
+
+Đổi thành `useNotifications(!!session)`. Đo lại trên bản build, **3/3 màn**:
+
+| màn | `notifications` | `profiles` |
+|---|---|---|
+| `/so-ca` | **38–250 ms** | 41–544 ms |
+| `/brand/crocs/dashboard` | **32–290 ms** | 34–504 ms |
+| `/ke-hoach-thang` | **29–612 ms** | 37–1019 ms |
+
+Chuông giờ khởi hành cùng đợt 1 và **xong trước cả khi `profiles` về**; tổng số request **không đổi**
+(24 · 32 · 29). Dữ liệu y nguyên: `SESSIONS 47 · 177,8h · 3,52B · 3.069 · 19,8M`, chuông render đúng
+(`aria-label="Thông báo"`).
+
+> **Phạm vi cái lợi — đừng phóng đại:** nó làm **CHUÔNG** hiện sớm hơn ~1 round-trip, **KHÔNG** làm nội
+> dung chính của màn ra sớm hơn, vì chuông không nằm trên đường găng của màn nào. An toàn vì lớp bảo vệ
+> là RLS phía server theo JWT — thời điểm client gọi không đổi được kết quả; phiên có mà hồ sơ chưa về
+> thì cùng lắm là một request vô ích, và hook đã tự chịu lỗi.
+
+**Quy ước rút ra (áp cho mọi đợt nạp sau):** *lượt đọc nào không dùng dữ liệu của `profile` thì không
+được gate theo `profile`* — gate theo `session`. Chốt bằng test trong `tests/loginFetch.test.ts` (file
+vốn đã dành riêng cho lớp lỗi "đợt fetch lúc đăng nhập"), **7 test**, chứng minh đỏ trên code cũ.
+
+**CẦN NGƯỜI DÙNG:** hiện Browser pane lên thì mới đo được thời gian render phía client (mục 2) — đó là
+câu hỏi lớn duy nhất còn mở của nhánh hiệu năng.
 
 ### P2b — Đếm lượt mở tab — XONG 2026-09-26, migration 0123 ĐÃ CHẠY + verify (bắt đầu đếm 26/09/2026)
 - Vì sao: trước khi gộp/bỏ mục menu (18 tab agency + 10 tab brand) cần số người dùng thật — chưa có số nào.

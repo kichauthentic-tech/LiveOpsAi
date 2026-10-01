@@ -130,9 +130,24 @@ export default function App() {
   // phải có `currentRole` trong mảng dependency để chạy lại khi profile nạp xong.
   const isOpsRole = currentRole === "ceo" || currentRole === "admin" || currentRole === "operations";
 
-  // Chuông thông báo (migration 0083) — chỉ poll khi đã có profile; đổi user thì hook tự nạp lại
-  // vì RLS lọc theo auth.uid() của phiên hiện tại.
-  const notifications = useNotifications(!!profile);
+  // Chuông thông báo (migration 0083) — gate theo PHIÊN, không theo `profile`; đổi user thì hook tự
+  // nạp lại vì RLS lọc theo auth.uid() của phiên hiện tại.
+  //
+  // Vì sao không phải `!!profile` (đổi 2026-10-02): `fetchMyNotifications` KHÔNG dùng gì từ hồ sơ —
+  // "RLS đã lọc theo auth.uid(), không cần truyền user" (lib/db/notifications.ts). Nhưng `profile`
+  // chỉ có sau một round-trip (`useAuth.loadProfile`), nên gate theo nó đẩy lượt đọc chuông xuống
+  // CHẶNG 2 của đợt nạp: đo 2026-10-02 trên bản build, `notifications` luôn khởi hành sau khi đợt 1
+  // xong, ở mọi màn. `session` thì có ngay từ localStorage, không cần mạng.
+  //
+  // Phạm vi đúng của cái lợi — đừng phóng đại: nó làm CHUÔNG hiện sớm hơn ~1 round-trip (sàn mạng
+  // đo được 2026-10-02 là 354–1.660 ms/request), KHÔNG làm nội dung chính của màn ra sớm hơn, vì
+  // chuông không nằm trên đường găng của màn nào.
+  //
+  // An toàn: lớp bảo vệ là RLS phía server theo JWT, nên thời điểm client gọi không thay đổi được
+  // kết quả. Phiên có mà hồ sơ chưa về (hoặc nạp lỗi) thì cùng lắm là một request vô ích, và hook đã
+  // tự chịu lỗi ("chuông hỏng không được làm hỏng app"). Đăng xuất ⇒ `session` null ⇒ hook xoá items
+  // như trước.
+  const notifications = useNotifications(!!session);
   // "shift_scheduling" chỉ là fallback cho lần đầu mở app khi chưa biết role (localStorage rỗng);
   // role thật được set lại ngay bằng getDefaultTabForRole() khi profile load xong (bên dưới).
   // Link riêng cho từng trang (lib/routes.ts, audit UX 2026-09-26): mở app bằng một link cụ thể thì link

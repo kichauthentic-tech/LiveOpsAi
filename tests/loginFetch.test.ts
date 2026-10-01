@@ -93,3 +93,16 @@ test("useAuth: nạp hồ sơ khoá theo authUserId, không theo object session"
   expect(USE_AUTH).toContain("const authUserId = session?.user?.id ?? null;");
   expect(depsOf(USE_AUTH, "void loadProfile(authUserId);")).toBe("authUserId, profileNonce, loadProfile");
 });
+
+// 2026-10-02: lượt đọc nào KHÔNG dùng dữ liệu của `profile` thì không được gate theo `profile` —
+// `profile` chỉ có sau một round-trip, nên gate theo nó đẩy lượt đọc xuống chặng 2 của đợt nạp.
+// Chuông là ca đã đo được: `fetchMyNotifications` không nhận tham số user (RLS lọc theo auth.uid()).
+test("chuông thông báo gate theo PHIÊN, không theo profile", () => {
+  const APP_TSX = readFileSync(join(SRC, "App.tsx"), "utf8");
+  expect(APP_TSX).toContain("useNotifications(!!session)");
+  expect(APP_TSX).not.toContain("useNotifications(!!profile)");
+  // Chốt tiền đề: nếu một ngày lượt đọc chuông cần user/role thì gate theo phiên là SAI, và test này
+  // phải đỏ để buộc đọc lại — nên khoá luôn chữ ký "không tham số".
+  const NOTIF = readFileSync(join(SRC, "lib/db/notifications.ts"), "utf8");
+  expect(NOTIF).toMatch(/export async function fetchMyNotifications\(limit = 50\)/);
+});
