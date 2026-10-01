@@ -1,6 +1,6 @@
 # LiveOps AI — Trạng thái Workspace (Agency ↔ Brand)
 
-## CẦN LÀM NGAY khi mở phiên mới (cập nhật 2026-10-01)
+## CẦN LÀM NGAY khi mở phiên mới (cập nhật 2026-10-02)
 
 > **MỚI 2026-10-01 — Danh sách nợ kỹ thuật ĐÃ HẾT** (P2a-2…P2a-7: tách bundle 671→495 KB · đợt fetch lúc
 > đăng nhập 46→28 request · chuông theo trạng thái tab + vá trần 1.000 dòng của PostgREST · App.tsx
@@ -21,8 +21,10 @@
 > CHẠY.** `unpublish_brand_monthly_report` bị bỏ sót suốt 74 migration: 0114 vá đúng lỗi này cho hàm
 > anh em `publish_...` và ghi rõ trong comment, nhưng không ai đụng hàm unpublish — nó vẫn là bản 0051,
 > thiếu `coalesce` (role NULL đi lọt nhánh raise) và thiếu `set search_path`. Vô danh không khai thác
-> được (0109 đã revoke execute khỏi `anon`); vector còn lại là phiên đã đăng nhập mà `profiles` không
-> còn dòng. Thêm `tests/sqlGuards.test.ts` quét toàn bộ migration để hết vá tay từng hàm. Cũng phát
+> được — nhưng **lý do nêu ở đây ("0109 đã revoke execute khỏi `anon`") là SAI về cơ chế**, đã đính chính
+> 2026-10-02: `create function` tự cấp EXECUTE cho PUBLIC mà anon thừa hưởng, nên 0109 không đóng được
+> đường gọi HÀM; cái chặn thật là guard `coalesce(...) not in (...)` trong thân hàm. Vector còn lại là
+> phiên đã đăng nhập mà `profiles` không còn dòng. Thêm `tests/sqlGuards.test.ts` quét toàn bộ migration để hết vá tay từng hàm. Cũng phát
 > hiện **5 bảng production không còn mà không migration nào drop** (4 cái chưa từng ghi lại) ⇒ chuỗi
 > migration không replay ra được production — **đã dọn ở P2a-12 bằng `0126` (ĐÃ CHẠY; trên production là
 > no-op đúng thiết kế): replay `0001 → 0126` trên Postgres cô lập giờ ra đúng 48/48 object khớp tên với
@@ -78,10 +80,35 @@
 > SOURCE, không bằng wall-clock — xem P2a-18/19/20). Phiên sau: **không chạy lại các phép đo ở
 > P2a-17→P2a-20**, trừ khi user yêu cầu rõ.
 >
-> **Còn lại trong file này đều KHÔNG phải việc code:** 24 file Dataraw CROCS T6–T9 chưa up (nhập liệu) ·
-> tích hợp TikTok API (chờ scope Developer/ISV) · lịch sử trước T7/2026 · 33 warning `set-state-in-effect`
-> (đã đo, cố ý giữ `warn` — xem `eslint.config.js`). Hai thứ chưa verify được vì cần mật khẩu: nhánh
-> `503 ai_not_configured` đầu-cuối, và đợt fetch lúc đăng nhập của role talent/brand.
+> **MỚI 2026-10-02 (P2a-21) — dọn nốt 3 việc còn treo trong file này; 1 lỗ bảo mật mới, migration `0130`
+> CHƯA CHẠY.**
+> (1) **Bảo mật:** việc "kiểm lại lỗ đọc-không-cần-đăng-nhập" bị auto-mode chặn (Production Reads) đã làm
+> được **mà không bắn request nào vào production** — dựng lại bức tranh quyền từ chuỗi migration, quét 49
+> bảng (49/49 bật RLS) · 101 policy (**0** cái lặp lại khuôn NULL-role của 0109) · 0 grant cho `anon` sau
+> 0109 · 54 hàm. Lòi ra lỗ thật: **`/rpc/session_boundary_at` gọi được bởi mọi tài khoản đã đăng nhập VÀ
+> bởi phiên vô danh** — `security definer`, không guard role, nhận ID ca của người khác, đọc
+> `live_sessions` vượt RLS. Nguyên nhân gốc là điều 0109 **không** làm được: `create function` tự cấp
+> EXECUTE cho **PUBLIC**, mà `anon` thừa hưởng quyền của PUBLIC — `revoke ... from anon` không chạm tới.
+> Repo đúng ở 15 hàm khác nhờ `revoke ... from public` viết tay từng hàm, và đúng lớp lỗi "vá tay rồi
+> sót" thì sót đúng hàm này từ 0078. `0130` vá bằng 1 dòng `revoke` (KHÔNG chuyển schema như 0128 — hàm
+> này không nằm trong policy nào nên revoke mới là đúng công cụ) + 4 chốt tự kiểm. `sqlGuards.test.ts`
+> 8 → **12 test**, trong đó test mới quét 30 hàm `/rpc/` definer và 101 policy. `vitest` 400 → **409**.
+> (2) **Trung tâm report + xuất file (Đợt C/4) — XONG:** thêm nút xuất cho **Hiệu Suất Host** (3 sheet) và
+> **Toàn Cảnh Brand**; chốt hướng "trung tâm" = MỘT MODULE dùng chung, **không** dựng tab riêng (gom 7 bộ
+> lọc của 7 màn vào một chỗ là tự tạo hai nguồn sự thật). `exportCenter.test.ts` (5 test) lần đầu **chạy
+> thật** module xuất — ghi file rồi đọc lại — và bắt được chuyện 2 sheet có tên cắt về 31 ký tự giống nhau
+> sẽ ghi đè nhau. Verify trên app thật: `/toan-canh-brand` T9 CROCS vẫn đúng mốc `177,8h · 47 ca · 3,52B`
+> sau refactor.
+> (3) **Luật run-rate — KIỂM XONG, không phải sửa code:** việc treo từ 28/09 ("`trackMonth` bỏ target ca
+> huỷ khỏi mẫu số") hoá ra đã tự hết, và `monthTargetOf` cũng đã đúng luật vì nó nhận Σ-target-từng-ca
+> chứ không nhận cột `target_gmv`. Chỉ đổi tên field bẫy `runRate` → `executionRate`. Chi tiết trong mục
+> Dashboard brand.
+>
+> **Còn lại trong file này đều KHÔNG phải việc code:** chạy `0130` trên DB thật (việc của user) · 24 file
+> Dataraw CROCS T6–T9 chưa up (nhập liệu) · tích hợp TikTok API (chờ scope Developer/ISV) · lịch sử trước
+> T7/2026 · 33 warning `set-state-in-effect` (đã đo, cố ý giữ `warn` — xem `eslint.config.js`). Hai thứ
+> chưa verify được vì cần mật khẩu: nhánh `503 ai_not_configured` đầu-cuối, và đợt fetch lúc đăng nhập
+> của role talent/brand.
 
 > **MỚI 2026-09-29 — Audit UX/UI lần 2: Đợt 0 (4cf62b7) + M1 Report Tháng (d8ddd1e) + M2 Dashboard brand XONG (không migration).**
 > Đợt 0: hết "0 ca / Chưa có…" giả lúc tải, 0/28 màn tràn ngang 375px, sidebar không nhảy theo tab, `MonthPicker`, `PageHeader`,
@@ -456,7 +483,7 @@
 
 > **Cập nhật 2026-09-13:** Các phần dưới đây được viết ở các thời điểm khác nhau và nghiệp vụ/code đã đổi khá nhiều kể từ đó. Từ nay **không coi nội dung cũ trong file này là ground truth mặc định** — mọi mục (kiến trúc, luồng dữ liệu, quy ước kỹ thuật...) cần được re-verify bằng đọc code hiện tại trước khi dựa vào để quyết định, đặc biệt là mục nào chưa có ghi chú "đã audit lại". Đang làm 1 vòng rà soát UX/workflow theo từng module (xem "Giai đoạn tiếp theo") — mỗi module audit xong sẽ cập nhật lại đúng phần liên quan trong file.
 
-## Audit UX/UI lần 2 (2026-09-29) — bố cục theo từng màn; Đợt 0 + M1 XONG + VERIFY, M2–M7 chưa làm
+## Audit UX/UI lần 2 (2026-09-29) — bố cục theo từng màn; **Đợt 0 + M1–M9 XONG + VERIFY** (hết đợt này)
 
 Cách đo: dev server cổng 3100 (phiên admin sẵn), `history.pushState` + `popstate` để đổi màn không tải lại, chờ `main` ổn định
 rồi đếm trong `<main>`: số màn cuộn, số cỡ chữ, số chiều cao nút, phần tử bấm được (< 32px), bảng, biểu đồ, số chữ; ở 375px thêm
@@ -899,7 +926,7 @@ Phủ: 1 ca 1 room · 2 ca chung room (phép trừ) · file cũ không watch_sec
 (chia theo tỷ lệ đóng góp). Phía TS có `tests/watchSeconds.test.ts` (5 ca, 4 đỏ trên code cũ).
 tsc 0, eslint 0 lỗi/33 cảnh báo (= baseline), vitest **216/216**, build OK.
 
-## Audit UX/UI (2026-09-26) — P0 + P1 XONG + DEPLOY; P2: tách bundle XONG, phần còn lại chưa làm
+## Audit UX/UI (2026-09-26) — P0 + P1 + P2 XONG (P2a-2…P2a-21 đi tiếp từ đó; nhánh đo tốc độ tải đã DỪNG theo yêu cầu user)
 
 Cách đo (dùng lại được): script JS chạy trong Browser pane, bấm lần lượt từng mục sidebar rồi đếm trên phần tử có chữ trong
 `<main>`: % chữ < 11px / < 12px, % chữ không đạt tương phản WCAG 1.4.3 (4.5:1, chữ lớn 3:1, trộn nền rgba theo cha),
@@ -1451,10 +1478,13 @@ Hướng khác hẳn 4 đợt trước (vốn là test module thuần). Lấy sc
 (`GET /rest/v1/` — endpoint này đòi service role key, có sẵn trong `.env`), rồi đối chiếu với chuỗi
 migration trong repo. **Chỉ GET, không gọi RPC nào** (RPC ở đây đều là hàm ghi).
 
-> **BỊ CHẶN, chưa làm được:** định bắn anon key (không token) vào 48 bảng để đếm số dòng, tức kiểm lại
-> xem lỗ "đọc không cần đăng nhập" (0109) trên production hôm nay còn kín không. Auto-mode chặn với lý
-> do **Production Reads**. Chưa làm lại bằng đường khác. Muốn chạy thì user phải cho phép rõ — đây là
-> phép thử đáng giá vì nó kiểm chính production chứ không kiểm repo.
+> **BỊ CHẶN → ĐÃ LÀM BẰNG ĐƯỜNG KHÁC (2026-10-02).** Ý định cũ: bắn anon key (không token) vào 48 bảng để
+> đếm dòng, kiểm lại lỗ "đọc không cần đăng nhập" (0109). Auto-mode chặn, lý do **Production Reads** —
+> **vẫn chưa được phép, và đã không chạy lại dưới bất kỳ dạng nào.** Thay vào đó dựng lại bức tranh quyền
+> từ chính chuỗi migration: quét 49 bảng · 101 policy · 54 hàm · 5 view trong một lượt. Yếu hơn ở chỗ nó
+> chứng minh "chuỗi migration sạch" chứ không phải "production sạch"; mạnh hơn ở chỗ phủ được TẤT CẢ thay
+> vì 48 lần GET — và nó tìm ra một lỗ mà phép GET kia **sẽ không thấy** (hàm `/rpc/`, không phải bảng).
+> Xem `## BẢO MẬT — /rpc/session_boundary_at`.
 
 **Khớp — không có drift:** 43 bảng + 24 RPC client gọi đều tồn tại trên production. Cột của mọi bảng
 khớp hoàn toàn với migration (lần quét đầu tôi báo 4 bảng "thừa cột" — **sai, do parser của tôi không
@@ -2510,7 +2540,7 @@ Nguyên nhân: `applyAllocatedTargets` ([lib/performance/targetAllocation.ts](sr
 
 **Verify trên app + DB thật:** kế hoạch VERA 09/2026 chốt 100tr / 2 ca × 50tr. (1) **0 ca có người** → Report Tháng hiện `Target GMV 100 triệu` (cách cũ ra 0 / "chưa có target"). (2) Chốt người **1/2 ca** → vẫn `100 triệu` (cách cũ tụt về 50tr). (3) Sổ Ca Agency vẫn hiện đúng `50 triệu` cho ca kế hoạch ⇒ phân bổ target/ca không bị bản sửa làm hỏng. Dọn sạch bằng UI; riêng dòng `brand_month_plans` phải xoá bằng SQL (`supabase/seed/2026-09-24b_cleanup_D5_verify_plan.sql`) vì **app không có đường xoá kế hoạch nào** — `monthPlans.ts` chỉ có upsert/lock.
 
-### Đ6 — VỪA. "Mở ca chờ đăng ký" cho mở ca ở ngày ĐÃ QUA, im lặng
+### Đ6 — ĐÃ SỬA. "Mở ca chờ đăng ký" cho mở ca ở ngày ĐÃ QUA, im lặng
 
 Verify: tạo được slot VERA ngày 23/09 (hôm qua) qua OpenSlotModal, không cảnh báo gì. Trong khi `lock_month_plan` (0099) **cố ý bỏ qua** ca kế hoạch ngày đã qua, đúng vì lý do "slot open quá khứ không ai chốt, đếm vào ca chưa có người". Hai cửa, hai luật.
 
@@ -2518,7 +2548,7 @@ Verify: tạo được slot VERA ngày 23/09 (hôm qua) qua OpenSlotModal, khôn
 
 Verify trên app thật: Lịch & Studio → Lịch Tháng → bấm ô ngày 18/09 → "Mở ca chờ đăng ký" ⇒ banner "**Ngày đã qua 6 ngày.**"; đổi ngày sang 05/10 ⇒ banner biến mất. Không submit nên không sinh dữ liệu test.
 
-### Đ7 — VỪA. Talent không có đường "báo bận" sau khi ca đã chốt
+### Đ7 — ĐÃ SỬA. Talent không có đường "báo bận" sau khi ca đã chốt
 
 Trước khi chốt: talent có "Tôi rảnh ca này" / huỷ đăng ký. Sau khi chốt: U2 (2026-09-21) đã chuyển "Báo bận / Tìm người thay" sang Cửa sổ Ca Live của **ops**, và `SessionWindow` chỉ mở sửa cho `isOps`. Nghĩa là talent bận thì phải nhắn ngoài app; ops mới vào sửa. Chuỗi thông báo hai chiều đang một chiều.
 
@@ -2526,13 +2556,13 @@ Trước khi chốt: talent có "Tôi rảnh ca này" / huỷ đăng ký. Sau kh
 
 **Cố ý KHÔNG tự đổi lịch / không tự nhả ca**: giữ nguyên quyết định U2 (2026-09-21) rằng đổi người là việc của ops. Hai người bận cùng lúc mà hệ thống tự nhả thì brand mất ca mà không ai biết. Đây cũng là lý do Đ7 dùng **RPC chứ không trigger**, ngược quy ước 0083: không có cột nào đổi nên không có sự kiện DB nào để trigger bám vào — đây là một lời nhắn, không phải hệ quả của một lần ghi.
 
-### Đ8 — NHẸ. Thông báo "số đối soát khác số bạn báo" gần như chết trong luồng chuẩn mới
+### Đ8 — ĐÃ SỬA. Thông báo "số đối soát khác số bạn báo" gần như chết trong luồng chuẩn mới
 
 Trigger 0083 chỉ bắn khi `old.data_source = 'manual'`. Luồng chuẩn bây giờ là trợ up file trước ⇒ ca ở bậc `live_snapshot`, nên **đối soát lệch bao nhiêu cũng không ai được báo**. Đo trên ca test: GMV 60tr → 72,5tr (+20,8%), 0 thông báo.
 
 **ĐÃ SỬA (2026-09-24).** `0116` mục 2 viết lại `notify_session_changes` với `old.data_source in ('manual','live_snapshot')`. Ngưỡng 5% giữ nguyên. Tiêu đề đổi theo bậc cũ — số ở bậc `live_snapshot` KHÔNG phải "số bạn báo" (trợ live up file, không phải host tự khai), nên dùng "Số đối soát khác số **ghi lúc giao ca**"; dán nhãn sai thì talent tưởng mình khai sai. Bậc `tiktok_reconciled` cũ vẫn không báo (đối soát lại số đã đối soát là chuyện nội bộ).
 
-### Đ9 — NHẸ. Mở ca chờ đăng ký không sinh thông báo nào cho talent
+### Đ9 — ĐÃ SỬA. Mở ca chờ đăng ký không sinh thông báo nào cho talent
 
 `notifications` chỉ có trigger trên `live_sessions`. Mở slot (`shift_slots`) không báo ai cả — talent phải tự nhớ mở app vào tab Đăng Ký Ca. Mắt xích "mở ca → có người đăng ký" hiện không có cú hích.
 
@@ -2547,7 +2577,7 @@ Vì sao không đặt cả hai trên `shift_slots`: 34 talent × 60 ca = **2.040
 
 Client: `shift_open` là kind DUY NHẤT không gắn `session_id`, nên `handleOpenNotification` ([App.tsx](src/App.tsx)) route riêng về tab `shift_scheduling` (Đăng Ký Ca) — route về "Ca Của Tôi" như mọi kind khác thì talent mở ra thấy trống.
 
-### Đ10 — NHẸ. Ca đã có số liệu không xoá/huỷ được từ UI, không có cả cách "loại khỏi report"
+### Đ10 — ĐÃ SỬA. Ca đã có số liệu không xoá/huỷ được từ UI, không có cả cách "loại khỏi report"
 
 Chủ ý đúng (số đã ghi là bằng chứng — `cancel_session` chặn `data_source <> 'manual' or actual_gmv > 0`, `SessionWindow` ẩn nút xoá khi `hasData`). Nhưng hệ quả: ca nhập nhầm/ca test kẹt vĩnh viễn trong mọi báo cáo, chỉ gỡ được bằng SQL tay — đúng tình huống phiên này gặp.
 
@@ -2565,7 +2595,7 @@ Chủ ý đúng (số đã ghi là bằng chứng — `cancel_session` chặn `d
 
 **Một điểm dễ hiểu nhầm khi tự đo:** đọc thẳng `live_sessions_secure` bằng tài khoản ops thì tổng **KHÔNG đổi** sau khi loại ca, và điều đó ĐÚNG — view chỉ ẩn dòng với role `brand`; ops vẫn phải thấy để còn bỏ cờ. Việc lọc cho ops nằm ở `activeSessions` phía client. Muốn đo tác dụng với ops thì phải đo trên UI, không phải bằng câu query.
 
-### Đ11 — NHẸ. Toàn Cảnh Brand đếm cả ca chưa diễn ra vào cột "số thật đã xảy ra"
+### Đ11 — ĐÃ SỬA. Toàn Cảnh Brand đếm cả ca chưa diễn ra vào cột "số thật đã xảy ra"
 
 Dòng VERA hiện "2,9h · **2 ca** · 72,5 triệu" trong khi chỉ 1 ca đã chạy; ca còn lại là ca 25/09 chưa diễn ra. Giờ và GMV đúng (chúng lọc qua `isCountable`), riêng số ca thì dùng `rows.length`. Bảng tự mô tả là "không có ô nào là dự phóng".
 
@@ -3366,6 +3396,75 @@ Cột `ceo` và `brand` **không đổi một ô nào** — vá không làm hỏ
 
 **Migration 0109 vá 3 lớp chồng nhau:** (1) thu hồi toàn bộ quyền của role `anon` trên schema public — đã kiểm luồng đăng ký đi qua schema `auth` + trigger security definer nên không ảnh hưởng; (2) thêm `is not null` vào 3 policy (`live_sessions`, `brands`, `session_skus`); (3) dựng lại view `live_sessions_secure` với WHERE siết — **bắt buộc làm riêng vì view chạy quyền OWNER nên policy bảng gốc không che nó** (xem ghi chú dài trong 0107).
 
+### KIỂM LẠI 2026-10-02 — không bắn request vào production, dựng lại bức tranh quyền từ chuỗi migration
+
+Việc tồn từ 2026-10-01 ("định bắn anon key vào 48 bảng để đếm dòng — BỊ CHẶN") làm được bằng đường khác: **đọc
+chính chuỗi migration**. Cách này yếu hơn ở một điểm phải nói rõ — nó chứng minh "chuỗi migration sạch", không
+chứng minh "production sạch", và dự án đã có 2 sự cố sửa tay thẳng trên production. Nhưng nó mạnh hơn ở chỗ quét
+được **toàn bộ** 49 bảng · 101 policy · 54 hàm · 5 view trong một lượt, thay vì 48 lần GET.
+
+**4 câu trả lời (script ở `/tmp` phiên này, logic đã chuyển thành test cố định — xem dưới):**
+
+1. **Bảng:** 49/49 bảng trong `public` đều `enable row level security`. 0 bảng hở.
+2. **Policy:** 101 policy còn sống, **0 cái** dùng khuôn phủ định trên role mà thiếu chốt NULL — tức lỗ 0109
+   không mọc lại ở đâu. (Policy do `0001` sinh bằng `execute format(...)` trong vòng lặp không đọc được bằng
+   regex, nhưng chúng dùng `auth.role() = 'authenticated'` — khuôn MIỄN NHIỄM với NULL-role.)
+3. **Grant:** 0 migration nào sau 0109 cấp lại quyền gì cho `anon`.
+4. **Hàm:** đây là chỗ **lòi ra một lỗ chưa ai đóng** — xem ngay dưới.
+
+## BẢO MẬT — `/rpc/session_boundary_at` gọi được không cần đăng nhập (phát hiện 2026-10-02, migration `0130` **CHƯA CHẠY**)
+
+**Điều 0109 KHÔNG làm được, và ghi chú ở P2a-11 nói thiếu.** `create function` của Postgres tự cấp EXECUTE cho
+**PUBLIC**, mà `anon` là thành viên của PUBLIC. 0109 chỉ `revoke all on all functions ... from anon` — thu hồi
+quyền **cấp riêng cho anon**, không chạm tới quyền anon thừa hưởng qua PUBLIC. Nên câu "0109 đã revoke execute
+khỏi `anon`" (P2a-11, dùng làm lý do kết luận `unpublish_brand_monthly_report` không khai thác được bởi vô danh)
+là **sai về cơ chế** — kết luận vẫn đúng, nhưng vì lý do khác: hàm đó có guard `coalesce(...) not in (...)` nên
+role NULL bị raise.
+
+Repo thật ra vẫn đúng ở 15 hàm nhạy cảm nhờ `revoke ... from public` **viết tay từng hàm** (0083/0096/0097/0100/
+0105/0106/0107/0110/0113/0114/0115/0116/0124) — và đúng như lớp lỗi "vá tay từng cái rồi lần sau sót" đã dính 3
+lần trước đó, **một hàm bị sót**.
+
+**`session_boundary_at(uuid)` — hàm thứ SÁU cùng lớp với 5 hàm 0128 chuyển sang `private`.** `security definer`,
+không guard role, **nhận ID dòng của người khác**, đọc `live_sessions` vượt RLS. 0128 soi `pg_depend` để tìm hàm
+được policy/view gọi nên không thấy nó: hàm này không nằm trong policy nào, chỉ được gọi từ trong thân 4 hàm
+definer khác.
+
+| ai gọi được | bằng gì | khai thác được gì |
+|---|---|---|
+| `authenticated` (kể cả role `brand`) | `grant execute ... to authenticated` ở 0078 | giờ kết thúc của ca BẤT KỲ brand nào ⇒ phá bất biến brand-isolation của 0059 |
+| `anon` (không đăng nhập) | quyền mặc định của PUBLIC | cùng vậy, nhưng phải biết trước UUID của ca |
+
+**Mức độ: thấp, không phải lỗ "đọc sạch bảng" như 0109** — trả MỘT `timestamptz` cho MỘT id, mà từ sau 0109 vô
+danh không còn đường liệt kê UUID. Vá vì 0128 đã chốt là không dựa vào "UUID khó đoán", và chi phí đúng 1 dòng.
+
+**Vá bằng `revoke`, KHÔNG chuyển schema — và đó là lựa chọn có lý do, không phải làm cho nhanh.** 5 hàm của 0128
+PHẢI chuyển schema vì **policy gọi chúng**, mà policy chạy dưới quyền người truy vấn ⇒ revoke là tự bắn vào chân
+(0128 ghi rõ). Hàm này chỉ được gọi từ trong thân `apply_session_live_snapshot` / `recompute_session_from_snapshot`
+/ `import_live_reconciliation` / `apply_live_reconciliation` — cả 4 là `security definer`, chạy quyền OWNER, mà
+OWNER giữ EXECUTE kể cả sau revoke. Đúng khuôn 0082/0124 đã dùng cho `recompute_session_from_snapshot`, và
+**không sửa thân hàm nào** (0 rủi ro hồi quy logic). Client không gọi: `grep -rn session_boundary_at src/` = 0.
+
+`0130` còn: chạy lại mục 1 của 0109 cho object sinh sau 0109 (idempotent — bắt cả bảng tạo tay từ Dashboard, vốn
+không hưởng `alter default privileges`), và **4 chốt tự kiểm** raise exception nếu anon còn quyền trên bảng nào /
+`session_boundary_at` còn gọi được / view `live_sessions_secure` mất vế `is not null` của 0109 / có bảng chưa bật RLS.
+
+**Cổng canh mới trong [`tests/sqlGuards.test.ts`](tests/sqlGuards.test.ts) (12 test, trước 8).** Đã chứng minh ĐỎ
+trên code cũ: bỏ 0130 ra thì test đầu báo đúng `session_boundary_at (0078_session_live_snapshots.sql)`.
+
+1. *mọi hàm `/rpc/` security definer đều có hàng rào cho phiên KHÔNG đăng nhập* — 30 hàm definer gọi được qua
+   `/rpc/` phải có `revoke ... from public`, HOẶC `raise exception` dựa trên danh tính người gọi (tự thân, hoặc uỷ
+   quyền cho `can_edit_session_snapshot` như 2 hàm snapshot), HOẶC nằm trong `RPC_SAFE_BY_SHAPE` — danh sách 3 hàm
+   an toàn do CẤU TRÚC, kèm lý do: `current_user_role`/`current_user_brand_id` (chỉ đọc hồ sơ của chính
+   `auth.uid()`, anon ⇒ NULL, và **không revoke được** vì policy cần EXECUTE) và `can_edit_session_snapshot`
+   (trả boolean về quyền của chính người gọi). Hàm `returns trigger` không tính — Postgres từ chối gọi trực tiếp.
+2. *0130 đóng `session_boundary_at` và không grant lại cho ai* — kể cả ở migration sau 0130.
+3. *không migration nào cấp quyền cho anon sau khi 0109 đóng.*
+4. *policy không được dùng so sánh PHỦ ĐỊNH trên role mà thiếu chốt NULL* — quét 101 policy còn sống, chính khuôn
+   đã tạo ra 0109. Trước đây chỉ canh khuôn này **trong thân hàm** (test 0111/0112), không canh trong policy.
+
+**CẦN LÀM:** chạy `0130` trên DB thật. Nó tự kiểm nên chạy sai sẽ raise, không âm thầm.
+
 ## BẢO MẬT — tự phong role khi đăng ký + 11 policy NULL-role (phát hiện 2026-09-23, migration 0111 + 0112 ĐÃ CHẠY + verify + đã tắt signup trên Dashboard)
 
 Quét tiếp sau khi 0109 đã chạy. Hai lỗ, cùng một gốc: **tin vào thứ client gửi lên**.
@@ -3933,9 +4032,21 @@ chốt plan tháng có ca chạy) · lưu một plan chia theo cách mới.
 - **Ca kế hoạch bị huỷ: GIỮ target trong mẫu số** (bỏ đi thì huỷ ca làm run-rate đẹp lên).
 - **Ca mở thêm ngoài plan: cộng thực đạt, target = 0**, hiện nhãn "ngoài kế hoạch" (cho target mới thì thêm ca bù lại làm run-rate xấu đi).
 - Tên theo glossary: "Run-rate" = tiến độ tới ngày có số; ca đã xong hiển thị "% Target ca". Ngưỡng 95% / 85% như `RUN_RATE_WARN/BAD`.
-- **Hệ quả phải sửa khi code:** `trackMonth` (lib/opsSupport.ts, Hỗ Trợ Vận Hành) hiện BỎ target ca `cancelled` khỏi mẫu số → sửa theo
-  luật trên. Kiểm lại `monthTargetOf` (locked_plan) và `applyAllocatedTargets` (ca huỷ dồn target sang ca khác — đó là target hiển
-  thị của ca, KHÔNG dùng làm mẫu số run-rate) để các màn không nói hai số.
+- ~~**Hệ quả phải sửa khi code:** `trackMonth` BỎ target ca `cancelled` khỏi mẫu số → sửa theo luật trên. Kiểm lại
+  `monthTargetOf` / `applyAllocatedTargets`~~ — **ĐÃ KIỂM XONG 2026-10-02, kết luận: KHÔNG phải sửa code.** Đọc lại
+  cả 3 đường và đây là bằng chứng, không phải suy đoán:
+  - `trackMonth` đã được viết lại ở đợt 28/09 để lấy trạng thái ca **thẳng từ `planRunRate`**, và con số tỉ lệ của
+    nó **không còn đi ra màn hình nào** (`grep` cả `src/` + `tests/`: chỉ `realityFactor` được `OpsSupport` đọc).
+    Mẫu số hẹp (chỉ ca đã xong) ở đây là **đúng cho công dụng khác**: nó là hệ số CHIẾU cho các ca còn lại, nên chỉ
+    được học từ ca thật sự đã chạy — cộng ca huỷ vào sẽ kéo hệ số xuống và chiếu thiếu. **Đã đổi tên field
+    `runRate` → `executionRate`** kèm comment "ĐỪNG hiện số này dưới nhãn Run-rate": một field tên `runRate` mà
+    không được hiện là "Run-rate" là cái bẫy đúng kiểu dự án này đã dính nhiều lần.
+  - `monthTargetOf` (nguồn "Run-rate" của Bản Tin CEO) **đã đúng luật** — vì `lockedTotal` nó nhận là
+    `monthTotals` của [`lockedPlanTargets.ts`](src/lib/scheduling/lockedPlanTargets.ts), mà map đó = **Σ target
+    từng ca kế hoạch** (kể cả ca huỷ và ca mất `slot_id`), KHÔNG phải cột `brand_month_plans.target_gmv`. Nên phần
+    "dư chia đều cả tháng" trong `monthTargetOf` luôn bằng 0 và `expectedToDate` ≡ `planRunRate.targetToDate`.
+  - Bất biến này đã có cổng canh sẵn: `tests/planRunRate.test.ts` → *"khớp Bản Tin CEO (monthOutlook) khi cùng kế
+    hoạch đã chốt"*. `applyAllocatedTargets` vẫn chỉ là target HIỂN THỊ của từng ca, không phải mẫu số.
 
 **Số đo 28/09 (CROCS, kiểm lại trước khi dùng):** walk-forward khung giờ giảm sai số 30% (11–13h = 0,79 [0,74–0,85] 4/4 tháng; 19–20h =
 1,09 [1,01–1,20]); ngày 1 đợt Mid-Month/Pay Day = 1,38× (7/7), ngày 3 = 0,82× (7/7); thứ trong tuần TRƯỢT (+8% sai số); hạng host
@@ -4023,7 +4134,7 @@ Trang đứng riêng `brand_deep_dive` đã **gỡ khỏi nav** (2026-09-23) —
 - **24 file Dataraw CROCS T6–T9 chưa up** (mới up 1 file Live Analysis T9 lúc verify). Danh sách đã chốt: 1 Creator Live Performance (file full T6→T9) · 4 Khuyến Mãi · 4 Sản Phẩm · 4 Shop Analytics · 4 Live Performance · 4 Affiliate Creator List (bản **tiếng Anh**) · 3 Live Analysis (EN, T7/T8/T9).
 - `Product Card Traffic Stats` vẫn chưa có file nào — khối traffic thẻ sản phẩm trong Report Tháng tự ẩn.
 
-## Audit Role × Workspace (2026-09-22) — Đợt A XONG, Đợt B đang chờ user quyết
+## Audit Role × Workspace (2026-09-22) — Đợt A + B + C XONG (C/1…C/8 + trung tâm xuất file, 2026-10-02)
 
 Audit toàn app theo trục **role × workspace** (yêu cầu user: "phần nào nên thêm ở ws brand, phần nào nên hiện ở ws agency, phần nào nên hiện cho từng role"). Khác các đợt audit trước ở chỗ mọi kết luận đều **đo trên Supabase production** bằng 2 tài khoản thật, không suy từ code.
 
@@ -4104,7 +4215,7 @@ UI đã sửa: `SessionLedger` (ô "chưa phát hành" + nhãn cột Số liệu
 
 **Verify:** brand đọc thẳng `live_sessions` → **0 dòng**; brand qua view → thấy đủ lịch, ca tháng đã publish có số, ca tháng chưa publish `NULL`, target/studio/trợ live/room `NULL` ở cả hai; ceo không đổi gì; `session_skus` brand chỉ thấy SKU của tháng đã publish; report/metric/checklist brand = 0. Chuỗi `0001 → 0107` chạy sạch trên DB trống. Admin trên app thật: 47 ca / 177,8h / 3,52 tỷ không đổi, không banner, không ô khoá.
 
-### Đợt C — ĐANG LÀM
+### Đợt C — XONG (C/1…C/8; mục "trung tâm report + xuất file" đóng 2026-10-02)
 
 **C/1 — Cam Kết Hợp Đồng bản read-only cho brand: XONG (2026-09-23, migration 0108).**
 
@@ -4154,7 +4265,35 @@ Gắn nút **"Xuất Excel"** vào [SessionLedger.tsx](src/components/SessionLed
 
 Verify: xuất từ Sổ Ca Agency (mọi brand, tháng 9/2026, 47 ca) và Sổ Ca Brand (CROCS) đều không lỗi console; test độc lập `xlsx.writeFile`/`readFile` ngoài app xác nhận cột trộn số/chữ ("Chưa phát hành" xen với số) ghi & đọc lại đúng nguyên văn.
 
-**Còn lại của "trung tâm report + xuất file":** export chỉ mới có ở Sổ Ca — Report Tháng (6 tab), Report Tuần, Cam Kết Hợp Đồng, Affiliate đều chưa có nút xuất. Chưa có "trung tâm" gom các export lại một chỗ (hiện mỗi màn tự có nút riêng nếu có).
+**"Trung tâm report + xuất file" — XONG 2026-10-02.** Dòng cũ ở đây ("export chỉ mới có ở Sổ Ca") đã lỗi thời từ
+các đợt sau: Report Tháng, Report Tuần, Cam Kết Hợp Đồng, Affiliate đều đã có nút xuất. Hôm nay bổ sung 2 màn
+agency còn thiếu — **Hiệu Suất Host** (3 bảng → 3 sheet: xếp hạng host 20 cột Key Metrics · lưới host × thứ kèm số
+ca từng ô · hiệu suất theo thứ) và **Toàn Cảnh Brand** (1 sheet 13 cột, tách giờ-cam-kết/giờ-đã-xếp/thiếu-giờ
+thành cột riêng thay vì một ô chữ).
+
+**Chốt hướng: KHÔNG dựng tab "trung tâm xuất file" riêng** — "trung tâm" là MỘT MODULE dùng chung
+([`src/lib/exportXlsx.ts`](src/lib/exportXlsx.ts)), không phải một màn hình. Lý do đo được: 7 màn báo cáo đều có bộ
+lọc riêng (tháng · brand · khoảng ngày · host) và module xuất ghi ra ĐÚNG hàng đang hiện sau bộ lọc; gom vào một
+tab thì phải dựng lại toàn bộ bộ lọc của 7 màn ở đó — đúng cách sinh ra hai nguồn sự thật.
+
+**Quy ước:** nút xuất phải đọc **cùng một mảng** mà bảng đang render. Vì vậy `BrandsOverview` đổi từ "tính trong
+thân map của JSX" sang `const rows = useMemo(...)` rồi cả bảng lẫn nút xuất đọc `rows` — tính lại lần hai cho file
+là cách chắc chắn sẽ lệch sau một lần sửa cột mà quên chỗ kia. Giá trị trong file để **dạng số thô** (không
+`fmtKeyMetric`) để Excel còn lọc/xếp/tính được; ô trống = không có dữ liệu, **không ghi 0** (0 là một con số thật).
+
+**Test mới [`tests/exportCenter.test.ts`](tests/exportCenter.test.ts) (5), đã chứng minh ĐỎ trên code cũ.** 4 test
+quét source (7 màn phải đi qua module chung · không màn nào tự dựng Blob/CSV hay `import` tĩnh `xlsx` — thư viện
+500 KB chỉ được nạp động khi bấm nút · bảng và nút xuất đọc cùng mảng) + **1 test CHẠY THẬT** module xuất: ghi
+file vào thư mục tạm rồi **đọc lại** bằng `XLSX.readFile` để đối chiếu. Test này lần đầu phủ được phần chống trùng
+tên sheet: 2 tên khác nhau mà cắt về 31 ký tự thì GIỐNG nhau — không lệch đi thì `book_append_sheet` **ghi đè** và
+người xem mất hẳn một bảng mà không có lỗi nào. **Bẫy khi viết test:** bản ESM của `xlsx` ngoài trình duyệt rơi vào
+nhánh "tải về" cần DOM, phải `XLSX.set_fs(fs)` trước (`import("xlsx")` trong hàm trả về CÙNG module instance, nên
+vẫn chạy đúng hàm production, không phải sửa nó cho test).
+
+**Verify trên app thật (bản build, admin, không nhập mật khẩu):** `/hieu-suat-host` 159 ca · 9 host · nút "Xuất
+Excel" hiện đủ; `/toan-canh-brand` T9 CROCS ra **đúng mốc cũ `177,8h · 47 ca · 3,52B`** sau khi refactor dòng
+render — đây là phép kiểm hồi quy của chính cái refactor. 0 lỗi console. **Chưa bấm nút tải file** (tải file cần
+người dùng cho phép) — phần nội dung file do test round-trip phủ.
 
 **C/5 — SKU gắn hiệu suất: XONG (2026-09-23, không cần migration).**
 

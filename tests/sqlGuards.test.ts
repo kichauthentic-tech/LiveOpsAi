@@ -224,3 +224,144 @@ test("0129 idempotent và có chốt tự kiểm", () => {
   // Policy đã bọc đúng sẵn thì không drop/tạo lại — drop/tạo policy phân quyền không cần thiết là rủi ro cho không.
   expect(sql, "phải bỏ qua policy đã bọc sẵn").toContain("skipped := skipped + 1");
 });
+
+// ---------------------------------------------------------------------------
+// Hàm gọi được qua /rpc/ phải có hàng rào cho người KHÔNG đăng nhập
+// ---------------------------------------------------------------------------
+// 0130. PostgREST biến MỌI hàm trong `public` thành `/rpc/<tên>`, và `create function` của Postgres
+// tự cấp EXECUTE cho **PUBLIC** — mà `anon` thừa hưởng quyền của PUBLIC. 0109 chỉ
+// `revoke ... from anon` (thu hồi quyền cấp RIÊNG cho anon) nên nó đóng được đường đọc BẢNG, KHÔNG
+// đóng đường gọi HÀM. Repo vẫn đúng ở 15 hàm nhờ `revoke ... from public` viết tay từng hàm — và
+// đúng kiểu lỗi đó, `session_boundary_at(uuid)` bị sót suốt từ 0078 tới 0130.
+//
+// Test này quét thay vì chờ ai nhớ. Một hàm `security definer` gọi được qua /rpc/ chỉ hợp lệ khi:
+//   (a) đã `revoke ... from public` — không ai ngoài owner gọi được; HOẶC
+//   (b) tự `raise exception` dựa trên danh tính người gọi (role / talent id / helper can_edit_*),
+//       nên phiên không có hồ sơ (role NULL) bị chặn ngay ở dòng đầu; HOẶC
+//   (c) nằm trong danh sách dưới — an toàn do CẤU TRÚC, kèm lý do.
+// Hàm `returns trigger` không tính: Postgres từ chối gọi trực tiếp ("can only be called as trigger").
+function publicFunctions(): Map<string, { file: string; body: string; definer: boolean; trigger: boolean }> {
+  // Tự đọc lại thay vì dùng currentFunctions(): ở đây phải xử lý ĐÚNG THỨ TỰ câu lệnh trong một
+  // file (rất nhiều migration `drop` rồi `create` lại cùng hàm ngay bên dưới), và phải loại hàm
+  // schema `private`.
+  const out = new Map<string, { file: string; body: string; definer: boolean; trigger: boolean }>();
+  for (const file of FILES) {
+    const sql = sqlOnly(readFileSync(join(DIR, file), "utf8"));
+    const ev: { at: number; kind: "c" | "d"; schema: string; name: string; body?: string }[] = [];
+    for (const m of sql.matchAll(/create\s+(?:or\s+replace\s+)?function\s+(private\.|public\.)?([a-z0-9_]+)\s*\(/gi)) {
+      const dq = sql.slice(m.index!).match(/(\$\$|\$function\$|\$body\$)/);
+      let end: number;
+      if (dq) {
+        const open = m.index! + dq.index! + dq[1].length;
+        const close = sql.indexOf(dq[1], open);
+        end = sql.indexOf(";", close < 0 ? open : close + dq[1].length);
+      } else end = sql.indexOf(";", m.index!);
+      ev.push({ at: m.index!, kind: "c", schema: (m[1] ?? "public.").slice(0, -1), name: m[2], body: sql.slice(m.index!, (end < 0 ? m.index! + 4000 : end) + 1) });
+    }
+    for (const m of sql.matchAll(/drop\s+function\s+(?:if\s+exists\s+)?(private\.|public\.)?([a-z0-9_]+)/gi))
+      ev.push({ at: m.index!, kind: "d", schema: (m[1] ?? "public.").slice(0, -1), name: m[2] });
+    ev.sort((a, b) => a.at - b.at);
+    for (const e of ev) {
+      if (e.schema !== "public") continue;
+      if (e.kind === "d") out.delete(e.name);
+      else out.set(e.name, { file, body: e.body!, definer: /security\s+definer/i.test(e.body!), trigger: /returns\s+trigger/i.test(e.body!) });
+    }
+  }
+  return out;
+}
+
+function revokedFromPublic(): Set<string> {
+  const out = new Set<string>();
+  for (const file of FILES) {
+    const sql = sqlOnly(readFileSync(join(DIR, file), "utf8"));
+    for (const m of sql.matchAll(/revoke\s+(?:all|execute)[^;]*?\bon\s+function\s+(?:public\.)?([a-z0-9_]+)[^;]*?\bfrom\s+([^;]*);/gi))
+      if (/\bpublic\b/i.test(m[2])) out.add(m[1]);
+  }
+  return out;
+}
+
+/** An toàn do cấu trúc, KHÔNG phải do quên. Thêm tên vào đây thì phải ghi lý do đo được. */
+const RPC_SAFE_BY_SHAPE: Record<string, string> = {
+  // Đọc hồ sơ của CHÍNH auth.uid(); phiên vô danh ⇒ auth.uid() null ⇒ trả NULL. Không revoke được:
+  // policy RLS gọi chúng, mà policy chạy dưới quyền người truy vấn (lý do dài ở đầu 0128).
+  current_user_role: "chỉ đọc profiles của auth.uid(); anon ⇒ NULL. Policy cần EXECUTE nên không revoke.",
+  current_user_brand_id: "như current_user_role.",
+  // Trả boolean về quan hệ của CHÍNH người gọi với ca; anon ⇒ false. Không rò dữ liệu ca nào.
+  can_edit_session_snapshot: "trả boolean quyền của chính người gọi; anon ⇒ false."
+};
+
+test("mọi hàm /rpc/ security definer đều có hàng rào cho phiên KHÔNG đăng nhập (lớp lỗ 0130)", () => {
+  const FNS_PUB = publicFunctions();
+  const REVOKED = revokedFromPublic();
+  const callable = [...FNS_PUB.entries()].filter(([, f]) => f.definer && !f.trigger);
+  // Canh chính test: phải thực sự nhận ra được tập hàm, không phải xanh vì quét ra rỗng.
+  expect(callable.length).toBeGreaterThan(20);
+
+  const bad: string[] = [];
+  for (const [name, f] of callable) {
+    if (REVOKED.has(name)) continue;
+    if (name in RPC_SAFE_BY_SHAPE) continue;
+    // Guard tự thân HOẶC uỷ quyền: phải có `raise exception` và một phép kiểm danh tính người gọi.
+    const guards = /raise\s+exception/i.test(f.body) && /current_user_role|current_user_talent_id|can_edit_session_snapshot/i.test(f.body);
+    if (guards) continue;
+    bad.push(`${name} (${f.file})`);
+  }
+  expect(bad).toEqual([]);
+});
+
+test("0130 đóng session_boundary_at và không grant lại cho ai", () => {
+  const f = FILES.find((x) => x.startsWith("0130_"));
+  expect(f, "thiếu migration 0130").toBeTruthy();
+  const sql = sqlOnly(readFileSync(join(DIR, f!), "utf8"));
+  expect(sql).toMatch(/revoke\s+all\s+on\s+function\s+session_boundary_at\(uuid\)\s+from\s+public,\s*anon,\s*authenticated/i);
+  expect(/grant[^;]*session_boundary_at/i.test(sql), "0130 không được grant lại").toBe(false);
+  // Hàng rào tự kiểm: migration phải tự báo đỏ chứ không để người đọc tin comment.
+  expect(sql).toMatch(/raise\s+exception\s+'0130 DỪNG/);
+  // Và không migration nào SAU 0130 được grant lại.
+  for (const later of FILES.filter((x) => x.localeCompare("0130_") > 0)) {
+    const s = sqlOnly(readFileSync(join(DIR, later), "utf8"));
+    expect(/grant[^;]*\bon\s+function\s+(?:public\.)?session_boundary_at/i.test(s), `${later} grant lại session_boundary_at`).toBe(false);
+  }
+});
+
+test("không migration nào cấp quyền cho anon sau khi 0109 đóng", () => {
+  const bad: string[] = [];
+  for (const file of FILES.filter((f) => f.localeCompare("0109_") > 0)) {
+    const sql = sqlOnly(readFileSync(join(DIR, file), "utf8"));
+    for (const m of sql.matchAll(/grant\s[^;]*;/gi)) if (/\banon\b/i.test(m[0])) bad.push(`${file}: ${m[0].replace(/\s+/g, " ").slice(0, 80)}`);
+  }
+  expect(bad).toEqual([]);
+});
+
+test("policy không được dùng so sánh PHỦ ĐỊNH trên role mà thiếu chốt NULL (lớp lỗ 0109)", () => {
+  // Đây là KHUÔN đã tạo ra lỗ hổng 0109: `current_user_role() is distinct from 'brand'` trả TRUE khi
+  // role NULL (phiên không đăng nhập, hoặc đã đăng nhập mà không có dòng profiles), nên ý định "loại
+  // brand ra" hoá thành "cho qua tất". Quét toàn bộ policy còn sống trong chuỗi migration.
+  const pol = new Map<string, { file: string; body: string }>();
+  for (const file of FILES) {
+    const sql = sqlOnly(readFileSync(join(DIR, file), "utf8"));
+    const ev: { at: number; kind: "c" | "d"; key: string; body?: string }[] = [];
+    for (const m of sql.matchAll(/create\s+policy\s+"([^"]+)"\s+on\s+(?:public\.)?([a-z0-9_]+)/gi)) {
+      const end = sql.indexOf(";", m.index!);
+      ev.push({ at: m.index!, kind: "c", key: `${m[2]}|${m[1]}`, body: sql.slice(m.index!, (end < 0 ? m.index! + 2000 : end) + 1) });
+    }
+    for (const m of sql.matchAll(/drop\s+policy\s+(?:if\s+exists\s+)?"([^"]+)"\s+on\s+(?:public\.)?([a-z0-9_]+)/gi))
+      ev.push({ at: m.index!, kind: "d", key: `${m[2]}|${m[1]}` });
+    ev.sort((a, b) => a.at - b.at);
+    for (const e of ev) {
+      if (e.kind === "c") pol.set(e.key, { file, body: e.body! });
+      else pol.delete(e.key);
+    }
+  }
+  expect(pol.size).toBeGreaterThan(80); // canh chính test
+  const bad: string[] = [];
+  for (const [k, p] of pol) {
+    const b = p.body.replace(/\s+/g, " ");
+    if (!/current_user_role/i.test(b)) continue;
+    const negated = /current_user_role\(\)\s*(?:is\s+distinct\s+from|<>|!=)/i.test(b) || /current_user_role\(\)[^)]*\bnot\s+in\b/i.test(b);
+    if (!negated) continue;
+    if (/is\s+not\s+null|coalesce/i.test(b)) continue;
+    bad.push(`${k} [${p.file}]`);
+  }
+  expect(bad).toEqual([]);
+});

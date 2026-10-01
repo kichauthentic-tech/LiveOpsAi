@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { AlertTriangle, TrendingUp } from "lucide-react";
+import { AlertTriangle, Download, TrendingUp } from "lucide-react";
 import { Brand, LiveSession } from "../types";
 import {
   WEEKDAY_LABELS,
@@ -11,6 +11,9 @@ import {
   splitUnassignedHost
 } from "../lib/performance/hostPerformance";
 import { getTodayDate } from "../lib/dateUtils";
+import { downloadSheetsAsXlsx } from "../lib/exportXlsx";
+import { useToast } from "../hooks/useToast";
+import { errorMessage } from "../lib/errorMessage";
 import { PageIntro } from "./common/PageIntro";
 
 import { fmtFixed, fmtVndShort } from "../lib/format";
@@ -36,6 +39,7 @@ const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0]; // Thứ 2 → Chủ nhật
 const RANK_COLS = KEY_METRICS.filter((d) => d.key !== "gmvPerHour");
 
 export function HostPerformance({ sessions, brands }: HostPerformanceProps) {
+  const { showToast } = useToast();
   const [from, setFrom] = useState(() => isoDaysAgo(90));
   const [to, setTo] = useState(() => getTodayDate());
   const [brandId, setBrandId] = useState("");
@@ -58,6 +62,39 @@ export function HostPerformance({ sessions, brands }: HostPerformanceProps) {
   const inputCls =
     "bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs text-[var(--text)] focus:outline-none focus:border-[var(--accent)]";
 
+  // Xuất đúng 3 bảng đang hiện, mỗi bảng 1 sheet. Giá trị để dạng SỐ THÔ (không `fmtKeyMetric`) để
+  // Excel còn lọc/xếp/tính được — đây là chỗ khác duy nhất so với màn hình, và là cả lý do xuất file.
+  // Ô trống = chỉ số không có dữ liệu, đúng chỗ màn hình in "—"; không ghi 0 vào, 0 là một con số thật.
+  const exportXlsx = () => {
+    const rank = hosts.map((h) => {
+      const row: Record<string, string | number> = { Host: h.label, "Số ca": h.sessionCount, [METRIC.gmvPerHour]: h.gmvPerHour ?? "" };
+      for (const d of RANK_COLS) {
+        const v = keyMetricValue(h, d.key);
+        row[d.label] = v == null || Number.isNaN(v) ? "" : v;
+      }
+      return row;
+    });
+    const gridRows = hosts.map((h) => {
+      const row: Record<string, string | number> = { Host: h.label };
+      for (const wd of WEEKDAY_ORDER) {
+        const c = cellOf(h.key, wd);
+        row[WEEKDAY_LABELS[wd]] = c ? c.gmvPerHour : "";
+        row[`${WEEKDAY_LABELS[wd]} — số ca`] = c ? c.sessionCount : "";
+      }
+      return row;
+    });
+    const wd: Record<string, string | number>[] = weekdays.map((w) => ({ Thứ: w.label, [METRIC.gmvPerHour]: w.gmvPerHour ?? "", "Số ca": w.sessionCount }));
+    const scope = brandId ? (brands.find((b) => b.id === brandId)?.name ?? "brand") : "tat-ca-brand";
+    downloadSheetsAsXlsx(
+      [
+        { name: "Xep hang host", rows: rank },
+        { name: "Host x Thu", rows: gridRows },
+        { name: "Hieu suat theo Thu", rows: wd }
+      ],
+      `HieuSuatHost_${scope}_${from}_${to}.xlsx`.replace(/\s+/g, "_")
+    ).catch((e) => showToast(`Không tải được file Excel: ${errorMessage(e)}`));
+  };
+
   return (
     <div className="space-y-4">
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5">
@@ -79,6 +116,14 @@ export function HostPerformance({ sessions, brands }: HostPerformanceProps) {
                 <option key={b.id} value={b.id}>{b.name}</option>
               ))}
             </select>
+            <button
+              onClick={exportXlsx}
+              disabled={hosts.length === 0}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-[var(--surface-elevated)] border border-[var(--border)] text-[var(--text)] hover:border-[var(--accent)] disabled:opacity-40"
+              title="Tải 3 bảng đang xem ra Excel (3 sheet)"
+            >
+              <Download className="w-3.5 h-3.5" /> Xuất Excel
+            </button>
           </div>
         </div>
 

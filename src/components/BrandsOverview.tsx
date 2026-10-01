@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { LayoutGrid, Loader2 } from "lucide-react";
+import { Download, LayoutGrid, Loader2 } from "lucide-react";
 import { Brand, BrandMonthlyReport, BrandMonthPlan, BrandPlatformRate, LiveSession } from "../types";
 import { fetchPlanStatuses } from "../lib/db/monthPlans";
 import { fetchBrandMonthlyCommitments } from "../lib/db/brandContracts";
 import { CommitmentProgress, CommitmentStatus, computeAllProgress, todayVn } from "../lib/performance/brandCommitment";
 import { filterLedger, summarize } from "../lib/sessionLedger";
 import { fmtVndShort } from "../lib/format";
+import { downloadRowsAsXlsx } from "../lib/exportXlsx";
+import { useToast } from "../hooks/useToast";
 import { errorMessage } from "../lib/errorMessage";
 import { BrandLogo } from "./ui/BrandLogo";
 import { PageIntro } from "./common/PageIntro";
@@ -69,6 +71,7 @@ const COMMIT_STATUS_CLS: Record<CommitmentStatus, string> = {
 const fmtHours = (h: number) => `${h.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h`;
 
 export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ brands, sessions, brandPlatformRates, monthlyReports }) => {
+  const { showToast } = useToast();
   const today = todayVn();
   const [month, setMonth] = useState(today.slice(0, 7));
   const [planStatuses, setPlanStatuses] = useState<Map<string, BrandMonthPlan>>(new Map());
@@ -109,7 +112,51 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ brands, sessions
     return map;
   }, [brandPlatformRates]);
 
-  const sortedBrands = useMemo(() => brands.slice().sort((a, b) => a.name.localeCompare(b.name)), [brands]);
+  // Dựng MỘT lần ở đây thay vì tính trong thân map của JSX (như bản 23/09): nút Xuất Excel phải ghi ra
+  // ĐÚNG những gì bảng đang hiện — tính lại lần hai cho file là cách chắc chắn sẽ lệch sau một lần sửa
+  // cột mà quên chỗ kia (đúng lớp lỗi "hai màn nói hai số" của dự án này).
+  const rows = useMemo(() => {
+    return brands
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((b) => {
+        const plan = planStatuses.get(b.id);
+        const progress = progressByBrand.get(b.id);
+        const s = summarize(filterLedger(sessions, { month, brandId: b.id }, today), today);
+        return {
+          brand: b,
+          plan,
+          planStatus: (plan?.status ?? "none") as BrandMonthPlan["status"] | "none",
+          progress,
+          commitStatus: (progress?.status ?? "no_commitment") as CommitmentStatus,
+          sum: s,
+          reportStatus: (monthlyReports.get(`${b.id}|${month}`)?.status ?? "none") as BrandMonthlyReport["status"] | "none",
+          rates: rateSetByBrand.get(b.id)
+        };
+      });
+  }, [brands, planStatuses, progressByBrand, sessions, month, today, monthlyReports, rateSetByBrand]);
+
+  const exportXlsx = () => {
+    const out = rows.map((r) => ({
+      Brand: r.brand.name,
+      "Kế hoạch tháng": PLAN_STATUS_LABEL[r.planStatus] + (r.plan?.brandConfirmedAt ? " · brand đã xác nhận" : ""),
+      "Target kế hoạch": r.plan && r.plan.targetGmv > 0 ? r.plan.targetGmv : "",
+      "Cam kết": COMMIT_STATUS_LABEL[r.commitStatus],
+      "Giờ đã xếp": r.progress ? r.progress.plannedTotalHours : "",
+      "Giờ cam kết": r.progress ? r.progress.committedHours : "",
+      "Thiếu giờ": r.progress && r.progress.gapHours > 0 ? r.progress.gapHours : "",
+      // Cột số để nguyên dạng số cho Excel tự tính được; cột trạng thái là chữ đúng như trên màn.
+      "Giờ live": r.sum.countable > 0 ? r.sum.hours : "",
+      "Ca đã diễn ra": r.sum.happened,
+      "Ca sắp tới": r.sum.upcoming,
+      GMV: r.sum.gmv > 0 ? r.sum.gmv : "",
+      "Report Tháng": REPORT_STATUS_LABEL[r.reportStatus],
+      "Rate Card": r.rates && r.rates.size > 0 ? [...r.rates].join(", ") : "Chưa set"
+    }));
+    downloadRowsAsXlsx("Toan Canh Brand", out, `ToanCanhBrand_${month}.xlsx`).catch((e) =>
+      showToast(`Không tải được file Excel: ${errorMessage(e)}`)
+    );
+  };
 
   return (
     <div className="space-y-4">
@@ -118,7 +165,17 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ brands, sessions
           <h2 className="text-lg font-black text-[var(--text)] flex items-center gap-2">
             <LayoutGrid className="w-5 h-5 text-[var(--accent-text)]" /> Toàn Cảnh Brand
           </h2>
-          <MonthPicker value={month} onChange={setMonth} />
+          <div className="flex items-center gap-2">
+            <MonthPicker value={month} onChange={setMonth} />
+            <button
+              onClick={exportXlsx}
+              disabled={rows.length === 0}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-[var(--surface-elevated)] border border-[var(--border)] text-[var(--text)] hover:border-[var(--accent)] disabled:opacity-40"
+              title="Tải bảng đang xem ra Excel"
+            >
+              <Download className="w-3.5 h-3.5" /> Xuất Excel
+            </button>
+          </div>
         </div>
         <PageIntro>
           Trạng thái từng brand cho tháng đang xem — số thật đã xảy ra và trạng thái đọc thẳng từ DB, không có ô nào là dự
@@ -145,16 +202,7 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ brands, sessions
               </tr>
             </thead>
             <tbody>
-              {sortedBrands.map((b) => {
-                const plan = planStatuses.get(b.id);
-                const planStatus = plan?.status ?? "none";
-                const progress = progressByBrand.get(b.id);
-                const commitStatus: CommitmentStatus = progress?.status ?? "no_commitment";
-                const rows = filterLedger(sessions, { month, brandId: b.id }, today);
-                const s = summarize(rows, today);
-                const report = monthlyReports.get(`${b.id}|${month}`);
-                const reportStatus = report?.status ?? "none";
-                const rates = rateSetByBrand.get(b.id);
+              {rows.map(({ brand: b, plan, planStatus, progress, commitStatus, sum: s, reportStatus, rates }) => {
                 return (
                   <tr key={b.id} className="border-b border-[var(--border-muted)] align-top">
                     <td className="py-2.5 px-4">
@@ -213,7 +261,7 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ brands, sessions
                   </tr>
                 );
               })}
-              {sortedBrands.length === 0 && (
+              {rows.length === 0 && (
                 <tr>
                   <td colSpan={7} className="py-8 text-center text-[var(--text-faint)] italic">
                     Chưa có brand nào.

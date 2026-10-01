@@ -43,11 +43,17 @@ export interface MonthTracking {
   targetPending: number;
   forecastPending: number;
   targetLost: number; // target của ca đã huỷ — mất hẳn, phải bù chỗ khác
-  runRate: number | null; // thực tế ÷ target của ca đã xong
+  // ĐỪNG hiện số này dưới nhãn "Run-rate". Mẫu số của nó là target các ca ĐÃ XONG, khác hẳn luật
+  // run-rate user chốt 2026-09-28 (mẫu số = target mọi ca kế hoạch có ngày ≤ ngày cuối có số, ca huỷ
+  // GIỮ target) — nguồn duy nhất cho con số hiện ra màn hình là `planRunRate().total.runRate`, và
+  // `tests/planRunRate.test.ts` chốt nó khớp `monthOutlook` của Bản Tin CEO. Ở đây cố ý dùng mẫu số
+  // hẹp hơn vì công dụng khác: nó là hệ số CHIẾU cho các ca còn lại, nên chỉ được học từ những ca
+  // thật sự đã chạy và có số — cộng ca huỷ vào mẫu số sẽ kéo hệ số xuống và chiếu thiếu.
+  executionRate: number | null; // thực tế ÷ target của ca đã xong — hệ số chiếu, KHÔNG phải run-rate
   realityFactor: number | null; // thực tế ÷ dự báo engine của ca đã xong (k) — dùng để chiếu phần còn lại
   // Ca CÓ SỐ của brand trong tháng nhưng KHÔNG nằm trong lưới kế hoạch (ops mở tay ở Lịch & Studio,
   // ca thay thế sau khi huỷ, ca nạp bù). Tiền của chúng là tiền thật đã vào, nên phải cộng vào
-  // `projected`/`gap`; nhưng chúng không mang target nào nên cố ý KHÔNG đụng vào runRate/k —
+  // `projected`/`gap`; nhưng chúng không mang target nào nên cố ý KHÔNG đụng vào executionRate/k —
   // hai số đó đo chất lượng THỰC THI KẾ HOẠCH, cộng doanh thu không có mẫu số vào là làm hỏng.
   offPlanSessions: LiveSession[];
   offPlanCount: number;
@@ -78,11 +84,11 @@ export function trackMonth(rr: PlanRunRate, history: HistorySummary, ctx: Estima
   const forecastDone = sum(done, (t) => t.forecast);
   const targetPending = sum(pending, (t) => t.target);
   const forecastPendingRaw = sum(pending, (t) => t.forecast);
-  const runRate = targetDone > 0 ? actualDone / targetDone : null;
+  const executionRate = targetDone > 0 ? actualDone / targetDone : null;
   const realityFactor = forecastDone > 0 && done.length >= 3 ? actualDone / forecastDone : null;
   // Không có dự báo (thiếu lịch sử) thì phần còn lại chiếu theo target × run-rate; có dự báo thì dự
   // báo × k. k chỉ tin khi đã ≥ 3 ca xong.
-  const forecastPending = forecastPendingRaw > 0 ? forecastPendingRaw * (realityFactor ?? 1) : targetPending * (runRate ?? 1);
+  const forecastPending = forecastPendingRaw > 0 ? forecastPendingRaw * (realityFactor ?? 1) : targetPending * (executionRate ?? 1);
 
   // Ca ngoài kế hoạch: planRunRate đã tách (ca có số, không huỷ, không khớp dòng kế hoạch nào).
   const offPlanSessions = rr.offPlan.map((x) => x.session);
@@ -106,7 +112,7 @@ export function trackMonth(rr: PlanRunRate, history: HistorySummary, ctx: Estima
     targetPending,
     forecastPending,
     targetLost: sum(by("cancelled"), (t) => t.target),
-    runRate,
+    executionRate,
     realityFactor,
     offPlanSessions,
     offPlanCount: offPlanSessions.length,
