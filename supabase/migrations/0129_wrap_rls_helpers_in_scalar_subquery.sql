@@ -1,7 +1,13 @@
 -- 0129 — BỌC 3 HÀM HELPER RLS TRONG `(select ...)` Ở MỌI POLICY.
 -- (Đo được 2026-10-01 trong lúc dựng 0127 — xem P2a-14/P2a-16.)
 --
--- ⚠️ CHƯA CHẠY — cần user chạy tay trên Supabase Dashboard như mọi migration khác.
+-- ✅ ĐÃ CHẠY trên production 2026-10-01.
+--    Verify đạt được: schema không đổi (48 bảng/view · 35 RPC, 17 bảng có policy bị viết lại còn đủ
+--    cả 17, 3 view không đụng tới còn nguyên). PostgREST KHÔNG lộ thân policy, nên "46 policy đã bọc
+--    đúng" KHÔNG kiểm được từ xa — bằng chứng là phép replay trên Postgres cô lập làm TRƯỚC khi chạy:
+--    ảnh 82 policy trước/sau, chuẩn hoá bỏ bọc hai bên ⇒ giống nhau tuyệt đối, đúng 46/82 dòng đổi.
+--    Mức lợi hiệu năng trên production cũng KHÔNG đo lại được: cần đăng nhập bằng tài khoản brand thật,
+--    và vế "trước" thì đã mất khi migration chạy.
 --
 -- ============================================================================
 -- VẤN ĐỀ: HÀM TRONG POLICY ĐƯỢC GỌI LẠI MỖI DÒNG

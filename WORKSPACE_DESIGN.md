@@ -40,7 +40,7 @@
 > qua `/rpc/` bởi mọi tài khoản đã đăng nhập** — đều `security definer`, không guard role, nhận ID dòng
 > của người khác, nên phá đúng bất biến brand isolation của 0059. **P2a-15 / `0128` (CHƯA CHẠY)** chuyển
 > cả 5 sang schema `private` bằng cách đọc `pg_policies`/`pg_get_viewdef` rồi chỉ thay tên hàm; 90 policy
-> trước/sau khác nhau ĐÚNG một tiền tố schema. **P2a-16 / `0129` (CHƯA CHẠY)** bọc
+> trước/sau khác nhau ĐÚNG một tiền tố schema. **P2a-16 / `0129` (ĐÃ CHẠY)** bọc
 > `(select ...)` cho 3 helper trong **46/82 policy** — đo lại trên chuỗi thật cho khoảng **~1,5× tới
 > ~26×** (không phải "10×" như P2a-14 nêu từ micro-benchmark): lợi bao nhiêu tuỳ policy còn gọi hàm
 > nhận-cột hay không.
@@ -1771,7 +1771,7 @@ sau, một test canh 0128 drop đủ 5 hàm và không dùng `cascade`. Chỉ te
 (bỏ 0128 ra ⇒ đỏ); test thứ nhất là canh về SAU nên hôm nay không có gì làm nó đỏ.
 
 
-### P2a-16 — Bọc `(select ...)` cho helper RLS trong 46 policy — XONG 2026-10-01
+### P2a-16 — Bọc `(select ...)` cho helper RLS trong 46 policy — XONG 2026-10-01, migration **0129 ĐÃ CHẠY**
 
 **Việc đã hứa ở P2a-14.** Policy viết `using (current_user_role() in (...))` gọi hàm **mỗi dòng**;
 mỗi lượt gọi là một lượt đọc bảng `profiles`. Bọc `(select current_user_role())` thì biểu thức thành
@@ -1822,7 +1822,16 @@ cả **73** policy kể cả 27 cái vốn đã đúng: ngữ nghĩa không đ�
 - số dòng brand đọc được **không đổi** trước/sau (30.000 SKU của brand A; `live_sessions` 0 dòng —
   brand đọc qua `live_sessions_secure`, đúng thiết kế 0107/0109).
 
-**File:** `supabase/migrations/0129_wrap_rls_helpers_in_scalar_subquery.sql` (**CHƯA CHẠY**).
+**File:** `supabase/migrations/0129_wrap_rls_helpers_in_scalar_subquery.sql` (**ĐÃ CHẠY** 2026-10-01).
+
+**Mức verify sau khi chạy — nói rõ cái KHÔNG đạt được.** Schema không đổi (48 bảng/view · 35 RPC · 17
+bảng có policy bị viết lại còn đủ cả 17 · 3 view không đụng còn nguyên · 5 hàm chuyển ở 0128 vẫn không
+lộ `/rpc/`). Nhưng PostgREST **không lộ thân policy**, nên "46 policy đã bọc đúng" **không kiểm được từ
+xa** — bằng chứng duy nhất là phép replay làm TRƯỚC khi chạy. Và **mức lợi hiệu năng trên production thì
+không còn đo lại được**: cần đăng nhập bằng tài khoản brand thật, mà vế "trước" đã mất ngay khi migration
+chạy. Đây là giới hạn thật, không phải việc còn làm dở.
+> Phụ: phép kiểm đầu tiên của tôi báo "thiếu `shift_registrations`" — tên tôi tự đoán, bảng thật tên
+> `session_availability`. Tổng 48 không đổi đã loại khả năng mất bảng ngay từ đầu.
 **Test:** `tests/sqlGuards.test.ts` +2 (**388 tests**) — một canh migration sau 0129 không viết policy
 gọi helper chưa bọc, một canh 0129 giữ được tính idempotent + 2 chốt tự kiểm. Chỉ test thứ hai chứng
 minh được đỏ (bỏ 0129 ra ⇒ đỏ); test thứ nhất canh về sau nên hôm nay không có gì làm nó đỏ.
