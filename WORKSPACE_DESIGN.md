@@ -1569,10 +1569,20 @@ DB), `weeklySlice.ts`. **Test:** `tests/affiliateLiveRows.test.ts` (23 — gồm
 NHẠY với thứ tự batch, tức thứ tự truyền vào là hợp đồng chứ không phải chi tiết nội bộ),
 `tests/pagedQueries.test.ts` +2. Suite **359 → 384**.
 
-> **CHƯA LÀM:** chưa chứng minh được 2 test canh mới đỏ trên code cũ bằng `git stash` (file mới chưa
-> `git add` nên stash từ chối cả lệnh). Lần sau chạy `git stash push -u -- <paths>`. Riêng test quét
-> thì logic tự nó cho thấy sẽ đỏ: trước bản vá có đúng 2 chỗ đọc không hề có helper phân trang nào
-> trong phạm vi quét.
+**ĐÃ chứng minh đỏ trên code cũ** (2026-10-01, `git checkout 021d013 -- <2 file nguồn>` rồi chạy lại
+test — cách này hơn `git stash` vì stash từ chối cả lệnh khi trong danh sách có file chưa `git add`):
+
+```
+× mọi chỗ đọc bảng theo DÒNG đều cuộn trang — quét cả src/, không khai tay
+  + "lib/dataraw/affiliateLiveSessionSlice.ts: đọc brand_dataraw_rows mà không cuộn trang",
+  + "lib/dataraw/weeklySlice.ts: đọc brand_dataraw_rows mà không cuộn trang",
+× trang Affiliate: thứ tự batch phải do imported_at quyết định, không do PostgREST
+  phải chọn cột imported_at: expected '...' to match /select\([^)]*imported_at/
+Tests  2 failed | 9 passed (11)
+```
+
+Test quét gọi **đúng tên cả hai file** chứ không chỉ đỏ chung — tức nó chỉ được ra chỗ sai, không
+phải chỉ phát hiện có sai. Phục hồi 2 file xong suite xanh lại 384/384.
 
 ### P2b — Đếm lượt mở tab — XONG 2026-09-26, migration 0123 ĐÃ CHẠY + verify (bắt đầu đếm 26/09/2026)
 - Vì sao: trước khi gộp/bỏ mục menu (18 tab agency + 10 tab brand) cần số người dùng thật — chưa có số nào.
