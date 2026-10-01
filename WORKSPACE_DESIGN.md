@@ -24,8 +24,9 @@
 > được (0109 đã revoke execute khỏi `anon`); vector còn lại là phiên đã đăng nhập mà `profiles` không
 > còn dòng. Thêm `tests/sqlGuards.test.ts` quét toàn bộ migration để hết vá tay từng hàm. Cũng phát
 > hiện **5 bảng production không còn mà không migration nào drop** (4 cái chưa từng ghi lại) ⇒ chuỗi
-> migration không replay ra được production — **đã dọn ở P2a-12 bằng `0126` (CHƯA CHẠY, trên production
-> là no-op): replay `0001 → 0126` trên Postgres cô lập giờ ra đúng 48/48 object khớp tên với production.**
+> migration không replay ra được production — **đã dọn ở P2a-12 bằng `0126` (ĐÃ CHẠY; trên production là
+> no-op đúng thiết kế): replay `0001 → 0126` trên Postgres cô lập giờ ra đúng 48/48 object khớp tên với
+> production.**
 >
 > **Còn lại trong file này đều KHÔNG phải việc code:** 24 file Dataraw CROCS T6–T9 chưa up (nhập liệu) ·
 > tích hợp TikTok API (chờ scope Developer/ISV) · lịch sử trước T7/2026 · 33 warning `set-state-in-effect`
@@ -1480,7 +1481,7 @@ làm nhánh raise bị bỏ qua; `= 'x'` gặp NULL chỉ là không vào nhánh
   string). Dự án đã có 2 sự cố sửa tay thẳng trên production, nên repo sạch ≠ production sạch.
 - `tsc` 0 lỗi · `eslint` 0 lỗi / 33 warning (baseline) · `vitest` **359/359** (355 → 359) · build OK.
 
-### P2a-12 — Chuỗi migration replay lại ĐÚNG production — 2026-10-01 (migration **0126 CHƯA CHẠY**)
+### P2a-12 — Chuỗi migration replay lại ĐÚNG production — XONG 2026-10-01, migration **0126 ĐÃ CHẠY**
 
 Dọn nốt phát hiện của P2a-11: 5 bảng migration tạo mà production không còn, không migration nào `drop`
 (`live_stream_incidents` 0026 · `product_samples` 0025 · `script_library` 0027 · `sku_platform_prices`
@@ -1523,8 +1524,15 @@ Từ nay dựng staging/harness bằng cách replay chuỗi là ra đúng produc
 > "command not found" — mà vòng lặp vẫn báo "không lỗi" vì chuỗi đó không chứa chữ ERROR. Lần đầu tôi
 > đã nhận đúng một kết quả xanh giả như vậy; dùng hàm shell thay vì biến.
 
-- **`0126_drop_tables_already_gone_from_production.sql` — CHƯA CHẠY.** Trên production nó là **no-op**
-  (cả 5 bảng đã không còn ⇒ đi nhánh "bỏ qua"); giá trị nằm ở chỗ chuỗi migration khớp lại với thực tế.
+- **`0126_drop_tables_already_gone_from_production.sql` — ĐÃ CHẠY** (user chạy tay, 2026-10-01). Trên
+  production nó là **no-op** như thiết kế: cả 5 bảng đã không còn nên đi hết nhánh "bỏ qua", không có
+  nhánh `raise` nào bắn ⇒ **xác nhận bằng chứng ban đầu đúng** (5 bảng thật sự đã bị xoá tay, không
+  phải bị PostgREST giấu vì thiếu grant). Giá trị nằm ở chỗ chuỗi migration khớp lại với thực tế.
+  **Verify sau khi chạy:** lấy lại `GET /rest/v1/` ⇒ vẫn **48 bảng/view · 40 RPC** y như trước, 8/8
+  bảng lõi (`live_sessions`, `brand_monthly_reports`, `brand_month_plans`, `shift_slots`, `profiles`,
+  `talents`, `brands`, `live_sessions_secure`) còn đủ, 5 bảng mục tiêu vẫn vắng ⇒ không có thiệt hại
+  kèm theo. Đây là mức verify đầy đủ cho migration này, khác 0125 (không đọc được thân hàm nên chỉ
+  verify được tới mức hình dạng).
 - `tsc` 0 lỗi · `eslint` 0 lỗi / 33 warning (baseline) · `vitest` 359/359 · build OK.
 
 ### P2b — Đếm lượt mở tab — XONG 2026-09-26, migration 0123 ĐÃ CHẠY + verify (bắt đầu đếm 26/09/2026)
