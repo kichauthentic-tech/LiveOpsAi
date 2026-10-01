@@ -15,7 +15,16 @@
 > ra 2 lỗi nữa: lưới gán host **xếp sai thứ tự ca** vì so `actualStartAt` (ISO) với `startTime` ("HH:MM")
 > trong cùng một phép so sánh — ngày trộn ca đã/chưa đối soát là trạng thái bình thường giữa tháng, và
 > lệch cột nghĩa là gán nhầm người vào nhầm ca; và dòng **"dự báo → thực tế" so hai tập ca khác nhau**
-> (brand chưa có lịch sử ra "dự báo 0 → thực tế 3,5 tỷ"). `vitest` 246 → **355**.
+> (brand chưa có lịch sử ra "dự báo 0 → thực tế 3,5 tỷ"). `vitest` 246 → **359**.
+>
+> **MỚI 2026-10-01 (P2a-11) — đọc SQL + đối chiếu schema production: 1 lỗ hổng, migration `0125` CHƯA
+> CHẠY.** `unpublish_brand_monthly_report` bị bỏ sót suốt 74 migration: 0114 vá đúng lỗi này cho hàm
+> anh em `publish_...` và ghi rõ trong comment, nhưng không ai đụng hàm unpublish — nó vẫn là bản 0051,
+> thiếu `coalesce` (role NULL đi lọt nhánh raise) và thiếu `set search_path`. Vô danh không khai thác
+> được (0109 đã revoke execute khỏi `anon`); vector còn lại là phiên đã đăng nhập mà `profiles` không
+> còn dòng. Thêm `tests/sqlGuards.test.ts` quét toàn bộ migration để hết vá tay từng hàm. Cũng phát
+> hiện **5 bảng production không còn mà không migration nào drop** (4 cái chưa từng ghi lại) ⇒ chuỗi
+> migration không replay ra được production.
 >
 > **Còn lại trong file này đều KHÔNG phải việc code:** 24 file Dataraw CROCS T6–T9 chưa up (nhập liệu) ·
 > tích hợp TikTok API (chờ scope Developer/ISV) · lịch sử trước T7/2026 · 33 warning `set-state-in-effect`
@@ -1383,6 +1392,85 @@ cũng từng đoán sai kiểu này với `slotHours`.
   `tests/planEvaluation.test.ts` (15) — `unlinked` (lỗi E2E #1) tách khỏi `pending`, ca up file bán 0 là
   kết quả thật, ca qua đêm đẩy phần sau nửa đêm sang thứ hôm sau, hệ số bị kẹp trong [min, max].
 - `tsc` 0 lỗi · `eslint` 0 lỗi / 33 warning (baseline) · `vitest` **355/355** · build OK.
+
+### P2a-11 — Đọc lại toàn bộ SQL + đối chiếu schema production — 2026-10-01 (migration **0125 CHƯA CHẠY**)
+
+Hướng khác hẳn 4 đợt trước (vốn là test module thuần). Lấy schema THẬT của production qua PostgREST
+(`GET /rest/v1/` — endpoint này đòi service role key, có sẵn trong `.env`), rồi đối chiếu với chuỗi
+migration trong repo. **Chỉ GET, không gọi RPC nào** (RPC ở đây đều là hàm ghi).
+
+> **BỊ CHẶN, chưa làm được:** định bắn anon key (không token) vào 48 bảng để đếm số dòng, tức kiểm lại
+> xem lỗ "đọc không cần đăng nhập" (0109) trên production hôm nay còn kín không. Auto-mode chặn với lý
+> do **Production Reads**. Chưa làm lại bằng đường khác. Muốn chạy thì user phải cho phép rõ — đây là
+> phép thử đáng giá vì nó kiểm chính production chứ không kiểm repo.
+
+**Khớp — không có drift:** 43 bảng + 24 RPC client gọi đều tồn tại trên production. Cột của mọi bảng
+khớp hoàn toàn với migration (lần quét đầu tôi báo 4 bảng "thừa cột" — **sai, do parser của tôi không
+đọc được `ALTER TABLE` nhiều mệnh đề**; sửa parser thì khớp hết).
+
+**5 bảng migration tạo mà production không còn**, không migration nào `drop`:
+`live_stream_incidents` · `product_samples` · `script_library` · `sku_platform_prices` ·
+`strategic_directives`. Cái cuối đã có trong "Sự cố vận hành đáng nhớ: bảng bị xoá tay" (23/09); **4
+cái kia chưa từng ghi**. Không bảng nào có code client dùng, và 0107 chỉ nhắc `live_stream_incidents`
+trong comment (cố ý không đụng) nên không có phụ thuộc runtime. Hệ quả thật: **chuỗi migration không
+còn replay ra được production** — dựng môi trường mới sẽ thừa 5 bảng.
+
+#### LỖ HỔNG — `unpublish_brand_monthly_report` bị bỏ sót suốt 74 migration
+
+`publish_` và `unpublish_brand_monthly_report` sinh ra cùng lúc trong 0051, cùng một khuôn. 0114 vá
+khuôn đó cho hàm PUBLISH và **ghi thẳng lỗi trong comment của chính nó**: *"guard thiếu `coalesce` nên
+role NULL cho `NULL not in (...)` = NULL = `if` không chạy"* + *"thiếu `set search_path = public` —
+đúng lỗ 0063"*. Nhưng hàm UNPUBLISH thì 0111, 0112, 0114 đều không nhắc (grep = 0), tới nay vẫn là bản
+0051 — còn nguyên **cả hai** lỗi, và nó là RPC **đang sống** trên production.
+
+Cơ chế: `current_user_role()` = `select role from profiles where id = auth.uid()`; không có dòng nào
+khớp thì trả NULL (cột `profiles.role` là `not null`, nên NULL ở đây = **không có hồ sơ**, không phải
+role rỗng). `NULL not in (...)` = NULL ⇒ `if` không chạy ⇒ raise bị bỏ qua ⇒ vì hàm là `security
+definer` nên UPDATE phía sau chạy luôn, vượt cả RLS.
+
+**Phạm vi thật — đã kiểm, không thổi phồng:** khách vô danh KHÔNG khai thác được, vì 0109 đã
+`revoke all on all functions in schema public from anon` kèm `alter default privileges`. Vector còn lại
+là một phiên **đã đăng nhập** mà `profiles` không còn dòng tương ứng (hồ sơ bị xoá trong lúc JWT còn
+hạn) — hẹp, nhưng đúng bằng lớp NULL-role mà 0111/0112 đã bỏ công đóng ở 11 policy khác. Role
+`brand`/`talent` không lọt (`'brand' not in (...)` = true ⇒ vẫn raise).
+
+#### Thiếu `set search_path` — 0063 chưa bao giờ là đợt quét toàn bộ
+
+0063 pin đúng **4** hàm (`sync_profile_email`, `trg_talent_rate_history`, `submit_live_session_report`,
+`apply_tiktok_reconciliation`). Còn lại 6 hàm definer chưa pin, trong đó 2 cái đã chết
+(`apply_tiktok_reconciliation*` — 0085 drop) và 4 cái còn sống.
+
+**0125 vá 3 cái** (`unpublish_brand_monthly_report` re-create theo đúng khuôn 0114;
+`update_my_talent_profile` + `trg_brand_platform_rate_history` chỉ `ALTER ... SET search_path` —
+an toàn hơn chép lại thân hàm).
+
+**CỐ Ý KHÔNG pin `current_user_role` / `current_user_brand_id` / `session_brand_id`.** Cả ba là
+`language sql`, và Postgres **không inline được hàm SQL có mệnh đề SET** — ba hàm này bị gọi trong hàng
+chục policy RLS của gần như mọi bảng, nên pin là rủi ro hiệu năng toàn app, phải đo trước. Mà đo thì
+cần đọc production (đang bị chặn). Mức nguy hiểm cũng thấp hơn vẻ ngoài: muốn khai thác phải tạo được
+object che tên `profiles` trong schema đứng trước `public`, mà `authenticated` trên Supabase không có
+CREATE schema lẫn CREATE trên `public`. Ba tên này nằm trong `SEARCH_PATH_EXEMPT` của test — **muốn bỏ
+miễn thì phải kèm số đo trước/sau, đừng xoá tên cho test xanh.**
+
+#### Cổng canh mới
+
+`tests/sqlGuards.test.ts` (4 test) quét TOÀN BỘ migration thay vì vá tay từng hàm: definer phải pin
+search_path · guard role phủ định phải `coalesce` · publish và unpublish phải cùng khuôn. Lấy định
+nghĩa **cuối cùng** của mỗi hàm theo thứ tự migration, bỏ hàm đã `drop function`, và bắt trọn câu lệnh
+tới dấu `;` — vì `security definer` có thể đứng **sau** thân hàm (0051 đặt ở cuối, bản nháp đầu của
+tôi bỏ sót đúng vì vậy). **Bỏ 0125 ra thì 3/4 test đỏ.**
+
+**Một false positive của chính test này, đã sửa:** bản đầu báo `submit_live_session_report`. Đọc kỹ thì
+đó là `if v_role = 'talent'` — nhánh ĐẦU của chuỗi if/elsif, nhánh `elsif` mới chặn quyền và đã
+`coalesce` sẵn. Luật đúng: chỉ **so sánh phủ định** (`not in`/`<>`/`not (...)`) mới nguy hiểm, vì NULL
+làm nhánh raise bị bỏ qua; `= 'x'` gặp NULL chỉ là không vào nhánh, rơi xuống nhánh sau.
+
+- **`0125_unpublish_guard_and_search_path.sql` — CHƯA CHẠY.** Cần user chạy tay trên Supabase Dashboard.
+  Không đụng dữ liệu, chỉ định nghĩa hàm.
+- **Giới hạn phải nói rõ:** tất cả kết luận về hàm là đọc CHUỖI MIGRATION, không đọc thân hàm trên DB
+  thật (đọc catalog cần kết nối Postgres trực tiếp — chỉ có JWT qua PostgREST, không có connection
+  string). Dự án đã có 2 sự cố sửa tay thẳng trên production, nên repo sạch ≠ production sạch.
+- `tsc` 0 lỗi · `eslint` 0 lỗi / 33 warning (baseline) · `vitest` **359/359** (355 → 359) · build OK.
 
 ### P2b — Đếm lượt mở tab — XONG 2026-09-26, migration 0123 ĐÃ CHẠY + verify (bắt đầu đếm 26/09/2026)
 - Vì sao: trước khi gộp/bỏ mục menu (18 tab agency + 10 tab brand) cần số người dùng thật — chưa có số nào.
