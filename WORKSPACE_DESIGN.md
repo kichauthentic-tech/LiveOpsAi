@@ -17,7 +17,7 @@
 > lệch cột nghĩa là gán nhầm người vào nhầm ca; và dòng **"dự báo → thực tế" so hai tập ca khác nhau**
 > (brand chưa có lịch sử ra "dự báo 0 → thực tế 3,5 tỷ"). `vitest` 246 → **359**.
 >
-> **MỚI 2026-10-01 (P2a-11) — đọc SQL + đối chiếu schema production: 1 lỗ hổng, migration `0125` CHƯA
+> **MỚI 2026-10-01 (P2a-11) — đọc SQL + đối chiếu schema production: 1 lỗ hổng, migration `0125` ĐÃ
 > CHẠY.** `unpublish_brand_monthly_report` bị bỏ sót suốt 74 migration: 0114 vá đúng lỗi này cho hàm
 > anh em `publish_...` và ghi rõ trong comment, nhưng không ai đụng hàm unpublish — nó vẫn là bản 0051,
 > thiếu `coalesce` (role NULL đi lọt nhánh raise) và thiếu `set search_path`. Vô danh không khai thác
@@ -1393,7 +1393,7 @@ cũng từng đoán sai kiểu này với `slotHours`.
   kết quả thật, ca qua đêm đẩy phần sau nửa đêm sang thứ hôm sau, hệ số bị kẹp trong [min, max].
 - `tsc` 0 lỗi · `eslint` 0 lỗi / 33 warning (baseline) · `vitest` **355/355** · build OK.
 
-### P2a-11 — Đọc lại toàn bộ SQL + đối chiếu schema production — 2026-10-01 (migration **0125 CHƯA CHẠY**)
+### P2a-11 — Đọc lại toàn bộ SQL + đối chiếu schema production — XONG 2026-10-01, migration **0125 ĐÃ CHẠY**
 
 Hướng khác hẳn 4 đợt trước (vốn là test module thuần). Lấy schema THẬT của production qua PostgREST
 (`GET /rest/v1/` — endpoint này đòi service role key, có sẵn trong `.env`), rồi đối chiếu với chuỗi
@@ -1465,8 +1465,15 @@ tôi bỏ sót đúng vì vậy). **Bỏ 0125 ra thì 3/4 test đỏ.**
 `coalesce` sẵn. Luật đúng: chỉ **so sánh phủ định** (`not in`/`<>`/`not (...)`) mới nguy hiểm, vì NULL
 làm nhánh raise bị bỏ qua; `= 'x'` gặp NULL chỉ là không vào nhánh, rơi xuống nhánh sau.
 
-- **`0125_unpublish_guard_and_search_path.sql` — CHƯA CHẠY.** Cần user chạy tay trên Supabase Dashboard.
+- **`0125_unpublish_guard_and_search_path.sql` — ĐÃ CHẠY** (user chạy tay trên Dashboard, 2026-10-01).
   Không đụng dữ liệu, chỉ định nghĩa hàm.
+  **Verify sau khi chạy (chỉ ở mức schema):** lấy lại `GET /rest/v1/` ⇒ vẫn **48 bảng/view · 40 RPC**
+  đúng như trước, `unpublish_brand_monthly_report` còn sống và chữ ký vẫn đúng 1 tham số `p_report_id`
+  ⇒ `create or replace` không đổi hình dạng hàm, không hàm nào biến mất.
+  **KHÔNG verify được thân hàm:** PostgREST không phơi định nghĩa hàm, và đọc `pg_proc` cần kết nối
+  Postgres trực tiếp (chỉ có JWT, không có connection string). Cách duy nhất chứng minh guard mới ăn là
+  GỌI hàm bằng một phiên role NULL — mà hàm này GHI (hạ report về nháp) nên không thử trên production.
+  Tức: chuỗi migration sạch + hàm còn nguyên hình dạng, **chưa phải** bằng chứng đầu-cuối.
 - **Giới hạn phải nói rõ:** tất cả kết luận về hàm là đọc CHUỖI MIGRATION, không đọc thân hàm trên DB
   thật (đọc catalog cần kết nối Postgres trực tiếp — chỉ có JWT qua PostgREST, không có connection
   string). Dự án đã có 2 sự cố sửa tay thẳng trên production, nên repo sạch ≠ production sạch.
