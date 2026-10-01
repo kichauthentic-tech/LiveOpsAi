@@ -1,7 +1,11 @@
 -- 0128 — CHUYỂN 5 HÀM HELPER RLS SANG SCHEMA KHÔNG EXPOSE (`private`).
 -- (Phát hiện 2026-10-01 khi đọc OpenAPI của PostgREST sau khi chạy 0127 — xem P2a-14.)
 --
--- ⚠️ CHƯA CHẠY — cần user chạy tay trên Supabase Dashboard như mọi migration khác.
+-- ✅ ĐÃ CHẠY trên production 2026-10-01.
+--    Đây là migration duy nhất trong 5 cái của ngày hôm nay mà verify được ĐÚNG TÍNH CHẤT BẢO MẬT
+--    từ xa, không phải kiểm bằng proxy: OpenAPI của PostgREST cho RPC 40 → 35, mất đúng 5 endpoint
+--    của 5 hàm này; `can_edit_session_snapshot` và 3 hàm `current_user_*` (cố ý giữ) vẫn còn; 48
+--    bảng/view và `live_sessions_secure` nguyên vẹn.
 --
 -- ============================================================================
 -- VẤN ĐỀ
