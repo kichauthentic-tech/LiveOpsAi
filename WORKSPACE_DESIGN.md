@@ -24,7 +24,8 @@
 > được (0109 đã revoke execute khỏi `anon`); vector còn lại là phiên đã đăng nhập mà `profiles` không
 > còn dòng. Thêm `tests/sqlGuards.test.ts` quét toàn bộ migration để hết vá tay từng hàm. Cũng phát
 > hiện **5 bảng production không còn mà không migration nào drop** (4 cái chưa từng ghi lại) ⇒ chuỗi
-> migration không replay ra được production.
+> migration không replay ra được production — **đã dọn ở P2a-12 bằng `0126` (CHƯA CHẠY, trên production
+> là no-op): replay `0001 → 0126` trên Postgres cô lập giờ ra đúng 48/48 object khớp tên với production.**
 >
 > **Còn lại trong file này đều KHÔNG phải việc code:** 24 file Dataraw CROCS T6–T9 chưa up (nhập liệu) ·
 > tích hợp TikTok API (chờ scope Developer/ISV) · lịch sử trước T7/2026 · 33 warning `set-state-in-effect`
@@ -1478,6 +1479,53 @@ làm nhánh raise bị bỏ qua; `= 'x'` gặp NULL chỉ là không vào nhánh
   thật (đọc catalog cần kết nối Postgres trực tiếp — chỉ có JWT qua PostgREST, không có connection
   string). Dự án đã có 2 sự cố sửa tay thẳng trên production, nên repo sạch ≠ production sạch.
 - `tsc` 0 lỗi · `eslint` 0 lỗi / 33 warning (baseline) · `vitest` **359/359** (355 → 359) · build OK.
+
+### P2a-12 — Chuỗi migration replay lại ĐÚNG production — 2026-10-01 (migration **0126 CHƯA CHẠY**)
+
+Dọn nốt phát hiện của P2a-11: 5 bảng migration tạo mà production không còn, không migration nào `drop`
+(`live_stream_incidents` 0026 · `product_samples` 0025 · `script_library` 0027 · `sku_platform_prices`
+0031 · `strategic_directives` 0001). Hệ quả thật: **chuỗi migration không replay ra được production** —
+đó chính là lý do lần verify 0110 phải "xoá `strategic_directives` trước 0105 để mô phỏng đúng
+production", một thao tác tay lẽ ra không ai phải nhớ.
+
+`0126_drop_tables_already_gone_from_production.sql` là migration **dọn sổ sách**, không phải quyết định
+bỏ tính năng — việc bỏ đã xảy ra rồi, file này chỉ chép lại cho đúng.
+
+**Kiểm trước khi viết:** 0 khoá ngoại trỏ tới 5 bảng · 0 hàm còn sống có thân đọc/ghi chúng (có thì nó
+đã hỏng sẵn trên production từ lâu) · 0 view · 0 call site trong `src/` · 0 file trong `supabase/seed`
+và `supabase/tests`. Policy của chúng tự rụng theo bảng. **Cố ý KHÔNG dùng `CASCADE`:** còn thứ gì phụ
+thuộc mà 5 phép kiểm trên bỏ sót thì muốn migration vỡ to, hơn là lặng lẽ kéo theo thứ khác xuống.
+
+**Chốt an toàn — không xoá bảng còn dữ liệu.** Bằng chứng "production không còn 5 bảng này" là chúng
+vắng mặt trong OpenAPI của PostgREST (gọi bằng service role) — suy luận mạnh, nhưng KHÔNG phải đọc
+thẳng `pg_catalog`. Sai ở dù chỉ một bảng thì một lệnh `drop` thẳng tay sẽ xoá dữ liệu thật. Nên vòng
+lặp phân ba nhánh: không tồn tại → bỏ qua · tồn tại & rỗng → drop · **tồn tại & CÓ DÒNG → `raise
+exception`, dừng cả migration, không xoá gì.**
+
+**Verify trên Postgres 18 cô lập** (initdb riêng, TCP 127.0.0.1:54399, shim `auth.uid()`/`auth.users`/
+4 role Supabase — đã dọn sạch sau khi đo):
+
+| Phép thử | Kết quả |
+|---|---|
+| Replay `0001 → 0126` trên DB trắng | **không một lỗi nào** |
+| Đối chiếu kết quả replay với production | **48/48 khớp tuyệt đối từng tên** (trước 0126 là 53 vs 48) |
+| Bảng tồn tại, có 1 dòng | `ERROR: 0126 DỪNG… còn 1 dòng dữ liệu`, **dữ liệu còn nguyên** |
+| Bảng tồn tại, rỗng | drop, notice "rỗng, đã drop" |
+| Bảng không tồn tại | bỏ qua, notice "đúng như production" |
+| Chạy lần 2 | "drop 0 bảng, bỏ qua 5 bảng" — **idempotent** |
+
+Từ nay dựng staging/harness bằng cách replay chuỗi là ra đúng production, không phải nhớ thao tác tay nào.
+
+> **Bẫy khi tự dựng Postgres tạm trên máy này (không phải lỗi gì cả):** `initdb` cần `LC_ALL=C LANG=C`
+> (locale mặc định của máy làm nó bỏ chạy); và đường dẫn scratchpad dài hơn 103 byte nên KHÔNG tạo được
+> unix socket — phải chạy `-c unix_socket_directories= -c listen_addresses=127.0.0.1` rồi nối qua TCP.
+> Ngoài ra zsh **không tự tách từ** biến không ngoặc kép, nên `PSQL="psql -h …"` rồi gọi `$PSQL` sẽ ra
+> "command not found" — mà vòng lặp vẫn báo "không lỗi" vì chuỗi đó không chứa chữ ERROR. Lần đầu tôi
+> đã nhận đúng một kết quả xanh giả như vậy; dùng hàm shell thay vì biến.
+
+- **`0126_drop_tables_already_gone_from_production.sql` — CHƯA CHẠY.** Trên production nó là **no-op**
+  (cả 5 bảng đã không còn ⇒ đi nhánh "bỏ qua"); giá trị nằm ở chỗ chuỗi migration khớp lại với thực tế.
+- `tsc` 0 lỗi · `eslint` 0 lỗi / 33 warning (baseline) · `vitest` 359/359 · build OK.
 
 ### P2b — Đếm lượt mở tab — XONG 2026-09-26, migration 0123 ĐÃ CHẠY + verify (bắt đầu đếm 26/09/2026)
 - Vì sao: trước khi gộp/bỏ mục menu (18 tab agency + 10 tab brand) cần số người dùng thật — chưa có số nào.
