@@ -19,9 +19,11 @@ import { sessionDurationHours } from "../pnl";
 export interface BulkConflicts {
   // Trùng với ca đã tồn tại trong hệ thống.
   hostExisting: boolean;
+  coHostExisting: boolean;
   studioExisting: boolean;
   // Trùng với một dòng khác trong chính mẻ này.
   hostInBatch: boolean;
+  coHostInBatch: boolean;
   studioInBatch: boolean;
 }
 
@@ -44,7 +46,7 @@ export interface BulkPlanRow {
 }
 
 export function hasAnyConflict(c: BulkConflicts): boolean {
-  return c.hostExisting || c.studioExisting || c.hostInBatch || c.studioInBatch;
+  return c.hostExisting || c.coHostExisting || c.studioExisting || c.hostInBatch || c.coHostInBatch || c.studioInBatch;
 }
 
 // Ca mở, chưa tới ngày, và có ít nhất 1 người đăng ký. Ca chưa ai đăng ký thì không có gì để chốt.
@@ -72,13 +74,18 @@ type TimeWindow = Pick<ShiftSlot, "date" | "startTime" | "endTime" | "studioId">
 function conflictsWithExisting(
   sessions: LiveSession[],
   slot: TimeWindow,
-  talentId: string
-): { host: boolean; studio: boolean } {
-  // Luật trùng chung (lib/scheduling/conflicts.ts). Phòng chỉ xét ca đã chốt: ca chờ đăng ký cùng phòng là
-  // chính các ca đang chốt trong mẻ, sổ BatchLedger lo phần đó.
-  const host = !!personClash(sessions, slot, talentId || undefined);
+  hostId: string,
+  coHostId: string
+): { host: boolean; coHost: boolean; studio: boolean } {
+  // Luật trùng chung (lib/scheduling/conflicts.ts) — áp cho CẢ HAI vai. Bản trước chỉ truyền host vào
+  // đây, đúng lỗi mà audit 2026-09-28 mục 8 đã vá cho popup ca chờ/Cửa sổ ca nhưng bỏ sót cửa này:
+  // `personClash` vốn đã xét cả vai Trợ live của ca bên kia, cái thiếu là không ai hỏi nó về Trợ live
+  // của ca BÊN NÀY. Phòng chỉ xét ca đã chốt: ca chờ đăng ký cùng phòng là chính các ca đang chốt
+  // trong mẻ, sổ BatchLedger lo phần đó.
+  const host = !!personClash(sessions, slot, hostId || undefined);
+  const coHost = !!personClash(sessions, slot, coHostId || undefined);
   const studio = !!studioClash(sessions, [], slot);
-  return { host, studio };
+  return { host, coHost, studio };
 }
 
 // Những gì mẻ này đã gán, để dòng sau không giẫm lên dòng trước.
@@ -157,7 +164,7 @@ export function planBulkFinalize(
     const ordered = [...candidates].sort((a, b) => Number(tired(a)) - Number(tired(b)));
     const free = ordered.find(
       (c) =>
-        !conflictsWithExisting(sessions, slot, c.talentId).host &&
+        !conflictsWithExisting(sessions, slot, c.talentId, "").host &&
         !busyInBatch(ledger.byTalent, c.talentId, slot)
     );
     const hostId = free?.talentId ?? "";
@@ -172,7 +179,9 @@ export function planBulkFinalize(
     const studioBusyInBatch = slot.studioId ? busyInBatch(ledger.byStudio, slot.studioId, slot) : false;
     if (slot.studioId) claim(ledger.byStudio, slot.studioId, slot);
 
-    const existing = conflictsWithExisting(sessions, slot, hostId);
+    // Planner không bao giờ tự gán Trợ live (`coHostId: ""`) — ops chọn tay, và `recheckPlan` chạy
+    // sau mỗi lần chọn mới là nơi kiểm. Ở đây 2 cờ coHost* luôn false, đúng trạng thái.
+    const existing = conflictsWithExisting(sessions, slot, hostId, "");
 
     rows.push({
       slotId: slot.id,
@@ -190,8 +199,10 @@ export function planBulkFinalize(
       include: hostId !== "" && !existing.host && !existing.studio && !studioBusyInBatch,
       conflicts: {
         hostExisting: existing.host,
+        coHostExisting: false,
         studioExisting: existing.studio,
         hostInBatch: false,
+        coHostInBatch: false,
         studioInBatch: studioBusyInBatch
       },
       noFreeCandidate: hostId === "" && candidates.length > 0
@@ -205,36 +216,60 @@ export function planBulkFinalize(
 // cả mẻ chứ không sửa cục bộ: đổi 1 dòng có thể giải phóng hoặc gây trùng ở dòng bất kỳ khác.
 // Chỉ các dòng ĐANG ĐƯỢC TICK mới tính vào trùng-trong-mẻ — dòng đã bỏ tick sẽ không được chốt
 // nên không chiếm chỗ của ai.
+//
+// Sổ trong mẻ khoá theo NGƯỜI, không theo vai: bản trước khoá theo `hostId` nên "An làm Host ca 9–11
+// và Trợ live ca 10–12" đi qua sạch cả hai cổng, trong khi luật chung của conflicts.ts nói rõ một
+// người bận nếu đang là Host HOẶC Trợ live của ca chồng giờ. Mỗi dòng gửi tối đa 2 lượt đặt chỗ
+// (Host + Trợ live) vào cùng một sổ, và cờ được gắn cho đúng vai của từng bên.
+type BatchRole = "host" | "coHost";
+
 export function recheckPlan(rows: BulkPlanRow[], sessions: LiveSession[]): BulkPlanRow[] {
-  const talentSeen = new Map<string, BulkPlanRow[]>();
+  const personSeen = new Map<string, { row: BulkPlanRow; role: BatchRole }[]>();
   const studioSeen = new Map<string, BulkPlanRow[]>();
 
   const out = rows.map((r) => {
-    const existing = conflictsWithExisting(sessions, r, r.hostId);
+    const existing = conflictsWithExisting(sessions, r, r.hostId, r.coHostId);
     return {
       ...r,
       conflicts: {
         hostExisting: existing.host,
+        coHostExisting: existing.coHost,
         studioExisting: existing.studio,
         hostInBatch: false,
+        coHostInBatch: false,
         studioInBatch: false
       }
     };
   });
 
+  const flag = (r: BulkPlanRow, role: BatchRole) => {
+    if (role === "host") r.conflicts.hostInBatch = true;
+    else r.conflicts.coHostInBatch = true;
+  };
+
   for (const r of out) {
     if (!r.include) continue;
-    if (r.hostId) {
-      const peers = talentSeen.get(r.hostId) ?? [];
+    // Một người không làm được 2 vai trong CÙNG một ca. Đo trên harness 2026-10-01: UI hiện ĐÃ chặn
+    // cả hai chiều (đổi Host trùng Trợ live thì onChange xoá Trợ live; dropdown Trợ live lọc bỏ đúng
+    // Host nên không chọn ngược lại được) ⇒ nhánh này là lớp phòng thủ cho người gọi khác, KHÔNG phải
+    // lỗ đang hở. Giữ vì `BulkPlanRow` cho phép dựng trạng thái đó và hàm này là nơi duy nhất gác.
+    if (r.hostId && r.hostId === r.coHostId) r.conflicts.coHostInBatch = true;
+
+    for (const role of ["host", "coHost"] as const) {
+      const talentId = role === "host" ? r.hostId : r.coHostId;
+      if (!talentId) continue;
+      const peers = personSeen.get(talentId) ?? [];
       for (const p of peers) {
-        if (dateTimeRangesOverlap(p, r)) {
-          r.conflicts.hostInBatch = true;
-          p.conflicts.hostInBatch = true;
+        if (p.row === r) continue; // hai vai của chính dòng này — đã xử ở trên
+        if (dateTimeRangesOverlap(p.row, r)) {
+          flag(r, role);
+          flag(p.row, p.role);
         }
       }
-      peers.push(r);
-      talentSeen.set(r.hostId, peers);
+      peers.push({ row: r, role });
+      personSeen.set(talentId, peers);
     }
+
     if (r.studioId) {
       const peers = studioSeen.get(r.studioId) ?? [];
       for (const p of peers) {

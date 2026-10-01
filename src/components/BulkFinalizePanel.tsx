@@ -37,6 +37,8 @@ function conflictText(r: BulkPlanRow): string | null {
   const parts: string[] = [];
   if (c.hostExisting) parts.push("host trùng ca đã có");
   if (c.hostInBatch) parts.push("host trùng ca khác trong mẻ này");
+  if (c.coHostExisting) parts.push("trợ live trùng ca đã có");
+  if (c.coHostInBatch) parts.push(r.hostId && r.hostId === r.coHostId ? "trợ live trùng chính host của ca này" : "trợ live trùng ca khác trong mẻ này");
   if (c.studioExisting) parts.push("studio trùng ca đã có");
   if (c.studioInBatch) parts.push("studio trùng ca khác trong mẻ này");
   return parts.length > 0 ? parts.join(" · ") : null;

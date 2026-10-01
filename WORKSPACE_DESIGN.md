@@ -1,6 +1,18 @@
 # LiveOps AI — Trạng thái Workspace (Agency ↔ Brand)
 
-## CẦN LÀM NGAY khi mở phiên mới (cập nhật 2026-09-24)
+## CẦN LÀM NGAY khi mở phiên mới (cập nhật 2026-10-01)
+
+> **MỚI 2026-10-01 — Danh sách nợ kỹ thuật ĐÃ HẾT** (P2a-2…P2a-7: tách bundle 671→495 KB · đợt fetch lúc
+> đăng nhập 46→28 request · chuông theo trạng thái tab + vá trần 1.000 dòng của PostgREST · App.tsx
+> 2.867→2.054 · MonthlyReportTabs 2.337→1.642 · bỏ nội dung AI bịa). Sau đó lấp nốt khoảng trống test cuối
+> cùng (**P2a-8**) và lòi ra 1 lỗi thật: **chốt hàng loạt không kiểm trùng lịch cho Trợ live** — một người
+> làm Host ca 9–11 và Trợ live ca 10–12 đi qua sạch, nút vẫn báo "Chốt 3 ca", DB không có hàng rào nào.
+> Đã sửa + đo bằng harness props-only. `vitest` 246 → **301**.
+>
+> **Còn lại trong file này đều KHÔNG phải việc code:** 24 file Dataraw CROCS T6–T9 chưa up (nhập liệu) ·
+> tích hợp TikTok API (chờ scope Developer/ISV) · lịch sử trước T7/2026 · 33 warning `set-state-in-effect`
+> (đã đo, cố ý giữ `warn` — xem `eslint.config.js`). Hai thứ chưa verify được vì cần mật khẩu: nhánh
+> `503 ai_not_configured` đầu-cuối, và đợt fetch lúc đăng nhập của role talent/brand.
 
 > **MỚI 2026-09-29 — Audit UX/UI lần 2: Đợt 0 (4cf62b7) + M1 Report Tháng (d8ddd1e) + M2 Dashboard brand XONG (không migration).**
 > Đợt 0: hết "0 ca / Chưa có…" giả lúc tải, 0/28 màn tràn ngang 375px, sidebar không nhảy theo tab, `MonthPicker`, `PageHeader`,
@@ -1199,6 +1211,65 @@ nhận về đúng 1.000 dòng đầu rồi im lặng — không lỗi, không c
   luật mạnh hơn: app **không được tự ghép câu "Rất phù hợp với …"** — câu đó chỉ được đến từ model thật.
 - `tsc` 0 lỗi · `eslint` 0 lỗi / 33 warning (baseline) · `vitest` **246/246** · `npm run build` OK.
 
+### P2a-8 — Lấp 3 module không có test, và lỗi lòi ra từ đó — XONG + VERIFY 2026-10-01 (không migration)
+
+Danh sách nợ kỹ thuật đã hết (P2a-2…P2a-7), nên đợt này lấy nốt khoảng trống duy nhất còn ghi trong file
+này: `bulkFinalize.ts` (257 dòng) / `planMonthSlots.ts` (112) / `monthPlanGrid.ts` (156) — 525 dòng logic
+thuần, **0 test chạm tới**, trong khi đó là đường GÁN NGƯỜI và đường CHIA TIỀN. 55 test mới, 301 tổng.
+
+**LỖI THẬT tìm được: chốt hàng loạt không kiểm trùng lịch cho Trợ live.**
+
+Audit 2026-09-28 mục 8 gom luật trùng về [conflicts.ts](src/lib/scheduling/conflicts.ts) và vá "popup ca
+chờ không kiểm Trợ live" ở `SlotDetailModal`/`SessionWindow`. **`bulkFinalize.ts` là cửa thứ 6 và bị bỏ
+sót.** `personClash` vốn đã xét cả vai Trợ live của ca BÊN KIA — cái thiếu là không ai hỏi nó về Trợ live
+của ca BÊN NÀY. Cụ thể bản cũ:
+- `conflictsWithExisting(sessions, slot, hostId)` chỉ nhận host ⇒ Trợ live không bao giờ được so với ca đã có;
+- sổ trong mẻ của `recheckPlan` khoá theo `hostId` ⇒ Trợ live không chiếm chỗ, và "An làm Host ca 9–11 +
+  Trợ live ca 10–12" đi qua sạch cả hai cổng.
+
+Mỉa mai là đó đúng cái bẫy ghi ở đầu chính file đó ("xét riêng lẻ thì cả 5 ca đều không trùng"), chỉ khác
+vai. Và `recheckPlan` tự nhận trong comment là tính lại "khi ops sửa tay (đổi host, bỏ tick, **đổi trợ
+live**)" trong khi không đọc `coHostId` một lần nào. Không có hàng rào nào phía sau:
+`handleFinalizeShiftSlot` ([App.tsx:1076](src/App.tsx:1076)) không kiểm trùng, DB cũng không.
+
+**Sửa:** `BulkConflicts` thêm `coHostExisting`/`coHostInBatch` (vào cả `hasAnyConflict`);
+`conflictsWithExisting` nhận cả 2 vai; sổ trong mẻ khoá theo **NGƯỜI, không theo vai** — mỗi dòng gửi tối
+đa 2 lượt đặt chỗ (Host + Trợ live) vào cùng một sổ, cờ gắn đúng vai của từng bên. `conflictText` của
+[BulkFinalizePanel.tsx](src/components/BulkFinalizePanel.tsx) thêm 2 câu — **bắt buộc**, không thì dòng
+lặng lẽ rơi khỏi "sẵn sàng" mà ops không biết vì sao, tệ hơn bug.
+
+**Verify bằng harness props-only** (cách của M8/M9 — `BulkFinalizePanel` nhận hết qua props, không đọc DB,
+không cần mật khẩu; harness đã xoá sau khi đo). Cùng một trạng thái: Bình là Host ca 06/10 10:00–12:00 và
+Trợ live ca 06/10 09:00–11:00 (chồng giờ):
+
+| | code cũ | sau khi sửa |
+|---|---|---|
+| Cảnh báo | **không có** | dòng Trợ live: "trợ live trùng ca khác trong mẻ này" · dòng Host: "host trùng ca khác trong mẻ này" |
+| Nút | **"Chốt 3 ca"** | "Chốt 1 ca" + "2 dòng đang tick nhưng vướng trùng lịch" |
+
+Cũng đo đúng trên UI: Trợ live trùng ca ĐÃ TỒN TẠI ⇒ "trợ live trùng ca đã có", sẵn sàng 3 → 2; Trợ live
+khác ngày KHÔNG bị gắn cờ oan. Console sạch.
+
+**Một chỗ tôi ghi sai rồi tự sửa:** ban đầu tôi viết "chọn Trợ live trùng đúng Host của chính dòng đó
+không có guard nào". Harness cho thấy UI **đã** chặn cả hai chiều (onChange của Host xoá Trợ live trùng;
+dropdown Trợ live lọc bỏ đúng Host). Nhánh `hostId === coHostId` trong `recheckPlan` vì thế là **phòng
+thủ, không phải lỗ đang hở** — đã sửa lại comment ở cả code lẫn test cho đúng.
+
+**Hai module kia: KHÔNG có lỗi.** `planMonthSlots.ts` 14 test xanh ngay (đáng chú ý: khoá chống trùng là
+khoá tự nhiên chứ không phải `templateId` — 2 quy tắc id khác nhau cùng brand|giờ chỉ sinh 1 ca; ca
+`cancelled` không chặn sinh lại; tháng 2 năm nhuận đếm 29). `monthPlanGrid.ts` 23 test, trong đó bất biến
+tiền: Σ target các ca **khớp đúng** target tháng kể cả 13 ca trọng số lệch 999:1 và target lẻ.
+
+**Một giả định của tôi sai, code đúng:** tôi viết test đòi `slotHours` ra 0 khi giờ kết thúc < bắt đầu.
+Thực tế `sessionDurationHours` **cộng 24h** (ca qua đêm là ca thật ở đường Finance) nên ra 22h, và
+`Math.max(…, 0)` trong `slotHours` là guard chết không bao giờ chạm tới. Thứ chặn ca nhập ngược giờ là
+`validateDrafts`, không phải hàm đó. Đã sửa test để ghi đúng hành vi thật thay vì ép code theo ý mình.
+
+- Test mới: `tests/bulkFinalize.test.ts` (18, **5 đỏ trên code cũ** — cả 5 đều là Trợ live, 13 cái còn lại
+  xanh ngay vì đường Host vốn đúng), `tests/planMonthSlots.test.ts` (14), `tests/monthPlanGrid.test.ts` (23).
+- `tsc` 0 lỗi · `eslint` 0 lỗi / 33 warning (baseline) · `vitest` **301/301** (246 → 301) · `npm run build` OK.
+- Không đụng DB: harness chạy bằng props bịa, không tạo/xoá bản ghi nào trên Supabase thật.
+
 ### P2b — Đếm lượt mở tab — XONG 2026-09-26, migration 0123 ĐÃ CHẠY + verify (bắt đầu đếm 26/09/2026)
 - Vì sao: trước khi gộp/bỏ mục menu (18 tab agency + 10 tab brand) cần số người dùng thật — chưa có số nào.
 - `supabase/migrations/0123_ui_tab_views.sql`: bảng `ui_tab_views(user_id, role, workspace, brand_id, tab, viewed_at)`;
@@ -1360,9 +1431,9 @@ chú ý đã soát kỹ và xác nhận ĐÚNG (không phải bug):
 - `suggestEngine.ts`/`planEvaluation.ts` là code thuần (không DB), mọi phép chia đều có guard `> 0`
   trước khi chia — không có chỗ chia cho 0 khi brand/ô lịch sử rỗng.
 
-Chưa có unit test riêng cho `bulkFinalize.ts`/`planMonthSlots.ts`/`monthPlanGrid.ts` (chỉ
-`suggestEngineBorrowed.test.ts` cho nhánh Đ12 mượn lịch sử) — ghi nhận là khoảng trống, chưa phải việc
-được yêu cầu làm ở đợt audit này. `tsc --noEmit` xanh (không sửa gì nên không cần chạy lại `eslint`/`vitest`).
+~~Chưa có unit test riêng cho `bulkFinalize.ts`/`planMonthSlots.ts`/`monthPlanGrid.ts`~~ — **ĐÃ LẤP
+2026-10-01, và lấp xong thì lòi ra 1 lỗi thật ở `bulkFinalize.ts`** (Trợ live không được kiểm trùng).
+Xem `### P2a-8`. `tsc --noEmit` xanh (không sửa gì nên không cần chạy lại `eslint`/`vitest`).
 
 **Phần 2 — module Brand Workspace & Report: XONG 2026-09-25**, đọc code `MonthlyReportTabs.tsx` (2217
 dòng, file lớn nhất dự án) / `deepdive/MonthlyDeepDive.tsx` + `deepdive/kit.tsx` / `lib/dataraw/*` (9
