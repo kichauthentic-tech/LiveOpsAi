@@ -549,9 +549,11 @@ export default function ShiftScheduling({
                     </span>
                   </div>
                   <p className={`text-lg font-black mt-0.5 ${done ? "text-emerald-400" : "text-rose-400"}`}>
-                    {done
-                      ? "Đã mở đủ"
-                      : `Cần mở thêm ${g.hoursStillToOpen.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h`}
+                    {g.monthClosed
+                      ? `Tháng đã đóng · hụt ${Math.max(g.gapHours, 0).toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h`
+                      : done
+                        ? "Đã mở đủ"
+                        : `Cần mở thêm ${g.hoursStillToOpen.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h`}
                   </p>
                   <p className="text-[11px] text-[var(--text-muted)] mt-1 leading-relaxed">
                     Đã live {g.deliveredHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h · đã chốt chưa live{" "}

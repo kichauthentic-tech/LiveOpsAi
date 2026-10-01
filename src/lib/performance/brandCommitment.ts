@@ -49,6 +49,9 @@ export interface CommitmentProgress {
   // Phần tháng đã trôi qua (0..1) và dự phóng theo nhịp hiện tại.
   elapsedFraction: number;
   pacedProjectionHours: number;
+  // Đã sang tháng sau — không mở/chốt thêm ca cho tháng này được nữa. KHÁC `elapsedFraction >= 1`,
+  // vốn đúng 1.0 ngay từ ngày CUỐI của tháng đang chạy (xem statusOf).
+  monthClosed: boolean;
 
   status: CommitmentStatus;
 }
@@ -96,11 +99,14 @@ export function elapsedFractionOf(periodMonth: string, today: string = todayVn()
   return Number(today.slice(8, 10)) / daysInMonth(periodMonth);
 }
 
-function statusOf(committed: number, delivered: number, plannedTotal: number, elapsed: number): CommitmentStatus {
+function statusOf(committed: number, delivered: number, plannedTotal: number, monthClosed: boolean): CommitmentStatus {
   if (committed <= 0) return "no_commitment";
   if (delivered >= committed) return "met";
-  // Tháng đã đóng: không xếp thêm được nữa, chỉ còn so cái đã giao.
-  if (elapsed >= 1) return "behind";
+  // Tháng đã đóng: không xếp thêm được nữa, chỉ còn so cái đã giao. Điều kiện này trước đây là
+  // `elapsedFraction >= 1`, mà phân số đó chạm đúng 1.0 ngay NGÀY CUỐI THÁNG — nên 31/10 lật từ
+  // "on_track" sang "behind" với y nguyên dữ liệu của 30/10, trong khi ca xếp cho chính ngày 31 còn
+  // chưa lên sóng. Tháng chỉ thật sự đóng khi đã sang tháng sau.
+  if (monthClosed) return "behind";
   if (plannedTotal >= committed) return "on_track";
   if (plannedTotal >= committed * 0.9) return "at_risk";
   return "behind";
@@ -137,6 +143,7 @@ export function computeCommitmentProgress(
 
   const plannedTotalHours = deliveredHours + scheduledHours;
   const elapsedFraction = elapsedFractionOf(commitment.periodMonth, today);
+  const monthClosed = commitment.periodMonth < monthKeyOf(today);
 
   return {
     brandId: commitment.brandId,
@@ -158,7 +165,8 @@ export function computeCommitmentProgress(
     elapsedFraction,
     // Chia cho 0 khi tháng chưa bắt đầu — không có nhịp nào để suy ra, trả 0 thay vì Infinity.
     pacedProjectionHours: elapsedFraction > 0 ? deliveredHours / elapsedFraction : 0,
-    status: statusOf(commitment.committedHours, deliveredHours, plannedTotalHours, elapsedFraction)
+    monthClosed,
+    status: statusOf(commitment.committedHours, deliveredHours, plannedTotalHours, monthClosed)
   };
 }
 
@@ -190,13 +198,25 @@ export interface SchedulingGap extends CommitmentProgress {
   hoursStillToOpen: number;
 }
 
-// Giờ của các ca đã mở trong tháng mà CHƯA chốt và chưa bị huỷ, gom theo brand.
-export function openSlotHoursByBrand(slots: ShiftSlot[], periodMonth: string): Map<string, { hours: number; count: number }> {
+// Giờ của các ca đã mở trong tháng mà CHƯA chốt, chưa bị huỷ, và CÒN MỞ ĐƯỢC (ngày chưa qua).
+//
+// Vì sao phải lọc theo ngày: con số này bị TRỪ khỏi "cần mở thêm", nên mỗi giờ đếm nhầm ở đây là một
+// giờ ops tưởng đã lo xong. Ca mở ở ngày đã qua thì talent không đăng ký được nữa, và chính màn Đăng
+// Ký & Chốt Lịch cũng không cho chốt nó: cả danh sách ca, số đếm trên ô lịch lẫn nút thao tác đều
+// dùng `openFutureSlots` = `status === "open" && date >= today` (ShiftScheduling.tsx). Hàm này là chỗ
+// duy nhất còn đếm cả ca quá khứ ⇒ ops mở thiếu ca, brand nhận thiếu giờ hợp đồng. Lấy `>= today` cho
+// khớp đúng ngưỡng của màn đó: ca mở trong ngày hôm nay vẫn chốt được.
+export function openSlotHoursByBrand(
+  slots: ShiftSlot[],
+  periodMonth: string,
+  today: string = todayVn()
+): Map<string, { hours: number; count: number }> {
   const out = new Map<string, { hours: number; count: number }>();
   for (const s of slots) {
     if (s.status !== "open") continue;
     if (!s.brandId) continue;
     if (monthKeyOf(s.date) !== periodMonth) continue;
+    if (s.date < today) continue;
     const cur = out.get(s.brandId) ?? { hours: 0, count: 0 };
     out.set(s.brandId, {
       hours: cur.hours + sessionDurationHours(s.startTime, s.endTime),
@@ -214,7 +234,7 @@ export function computeSchedulingGaps(
   periodMonth: string,
   today: string = todayVn()
 ): SchedulingGap[] {
-  const openBy = openSlotHoursByBrand(slots, periodMonth);
+  const openBy = openSlotHoursByBrand(slots, periodMonth, today);
   return computeAllProgress(commitments, brandNameById, sessions, periodMonth, today)
     .map((p) => {
       const open = openBy.get(p.brandId) ?? { hours: 0, count: 0 };

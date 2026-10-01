@@ -7,7 +7,11 @@
 > 2.867→2.054 · MonthlyReportTabs 2.337→1.642 · bỏ nội dung AI bịa). Sau đó lấp nốt khoảng trống test cuối
 > cùng (**P2a-8**) và lòi ra 1 lỗi thật: **chốt hàng loạt không kiểm trùng lịch cho Trợ live** — một người
 > làm Host ca 9–11 và Trợ live ca 10–12 đi qua sạch, nút vẫn báo "Chốt 3 ca", DB không có hàng rào nào.
-> Đã sửa + đo bằng harness props-only. `vitest` 246 → **301**.
+> Đã sửa + đo bằng harness props-only. Đi tiếp cùng cách đó sang `brandCommitment.ts` (**P2a-9**) thì ra
+> 2 lỗi nữa: khối "cần mở thêm bao nhiêu giờ" **trừ cả ca chờ đăng ký ở ngày đã qua** (ca mà chính màn đó
+> không cho thấy, không cho chốt) ⇒ ops mở thiếu ca, brand nhận thiếu giờ hợp đồng — đo được 84h thay vì
+> 94h; và **ngày cuối tháng bị coi là tháng đã đóng** nên trạng thái cam kết lật từ `on_track` sang
+> `behind` đúng ngày ops/brand nhìn nhiều nhất. `vitest` 246 → **321**.
 >
 > **Còn lại trong file này đều KHÔNG phải việc code:** 24 file Dataraw CROCS T6–T9 chưa up (nhập liệu) ·
 > tích hợp TikTok API (chờ scope Developer/ISV) · lịch sử trước T7/2026 · 33 warning `set-state-in-effect`
@@ -1269,6 +1273,55 @@ Thực tế `sessionDurationHours` **cộng 24h** (ca qua đêm là ca thật �
   xanh ngay vì đường Host vốn đúng), `tests/planMonthSlots.test.ts` (14), `tests/monthPlanGrid.test.ts` (23).
 - `tsc` 0 lỗi · `eslint` 0 lỗi / 33 warning (baseline) · `vitest` **301/301** (246 → 301) · `npm run build` OK.
 - Không đụng DB: harness chạy bằng props bịa, không tạo/xoá bản ghi nào trên Supabase thật.
+
+### P2a-9 — Cam kết hợp đồng: 2 lỗi về giờ giao cho brand — XONG + VERIFY 2026-10-01 (không migration)
+
+Tiếp cách của P2a-8: đo xem test chạm tới đâu (script tạm, 180 file `src/`, test chạm 51). Phần lớn chỗ
+chưa chạm là wrapper Supabase mỏng (logic nằm trong SQL, không đáng mock). Module thuần nhiều rủi ro
+nhất trong đó là [brandCommitment.ts](src/lib/performance/brandCommitment.ts) — 247 dòng, nuôi Cam Kết
+Hợp Đồng (agency) + bản chỉ-đọc của brand + cột "Cam kết" của Toàn Cảnh Brand + khối "cần mở thêm bao
+nhiêu giờ" của màn Đăng Ký & Chốt Lịch, và đếm **đúng loại giờ dùng để tính tiền brand**. 20 test mới,
+**2 đỏ trên code cũ**. 17 test còn lại xanh ngay — phần lõi của module vốn đúng.
+
+**Lỗi 1 (có hệ quả tiền) — "cần mở thêm bao nhiêu giờ" trừ cả ca chờ đăng ký ở NGÀY ĐÃ QUA.**
+`openSlotHoursByBrand` đếm mọi ca `status = "open"` trong tháng, không nhìn ngày. Con số đó bị TRỪ khỏi
+"cần mở thêm", nên mỗi giờ đếm nhầm là một giờ ops tưởng đã lo xong. Ca mở ở ngày đã qua thì talent
+không đăng ký được nữa và **chính màn đó cũng không cho chốt**: danh sách ca
+([ShiftScheduling.tsx:296](src/components/ShiftScheduling.tsx:296)), số đếm trên ô lịch (630/633) và nút
+thao tác (820) đều dùng `openFutureSlots` = `status === "open" && date >= today`. Hàm này là chỗ DUY NHẤT
+còn đếm cả ca quá khứ ⇒ ops mở thiếu ca ⇒ brand nhận thiếu giờ hợp đồng. Sửa: thêm tham số `today`, bỏ ca
+`date < today` (lấy `>= today` cho khớp đúng ngưỡng của màn đó — ca mở trong hôm nay vẫn chốt được).
+
+**Lỗi 2 (nhãn sai, lặp hằng tháng) — NGÀY CUỐI THÁNG bị coi là tháng đã đóng.** `statusOf` dùng
+`elapsedFraction >= 1` làm điều kiện "tháng đã đóng, không xếp thêm được nữa", mà phân số đó chạm đúng
+1.0 ngay **ngày cuối của tháng đang chạy** (31/31). Hệ quả: cùng một dữ liệu, 30/10 ra `on_track` thì
+31/10 lật sang `behind`, trong khi ca xếp cho chính ngày 31 còn chưa lên sóng. Lặp đúng vào ngày ops và
+brand nhìn cam kết nhiều nhất. Sửa: điều kiện đổi sang `periodMonth < monthKeyOf(today)` (đã sang tháng
+sau), phơi thành trường mới `CommitmentProgress.monthClosed` — **khác** `elapsedFraction >= 1`, đừng dùng
+lẫn. `elapsedFraction`/`pacedProjectionHours` giữ nguyên nghĩa cũ.
+
+Vì lỗi 1 làm "cần mở thêm" của THÁNG ĐÃ ĐÓNG tăng lên (ca mở quá khứ thôi được trừ), panel sẽ đòi ops làm
+một việc không thể làm — nên dùng luôn `monthClosed` để đổi nhãn: tháng đã đóng hiện **"Tháng đã đóng ·
+hụt Xh"** thay cho "Cần mở thêm Xh".
+
+**Verify bằng harness** (props-only + chặn `window.fetch` + giả lập đồng hồ — khối cam kết chỉ render khi
+có `commitments`, vốn đến từ fetch cần quyền ops; hôm nay là 01/10 nên trong tháng 10 không có ngày nào
+đã qua. Không đăng nhập, không đọc/ghi Supabase thật; harness đã xoá). Cam kết 100h · 0 ca đã chốt · 2 ca
+đang mở: 02/10 (10h) và 25/10 (6h) · hôm nay 20/10:
+
+| | code cũ | sau khi sửa |
+|---|---|---|
+| Khối cam kết | "Cần mở thêm **84h** · đang mở chờ chốt **16h (2 ca)**" | "Cần mở thêm **94h** · đang mở chờ chốt **6h (1 ca)**" |
+| Danh sách ca ngay dưới | **1 ca** (chỉ 25/10) | 1 ca — giờ đã khớp |
+
+Tức **10h hợp đồng bị xoá sổ âm thầm** bởi một ca mà màn đó không cho thấy và không cho chốt. Lùi về
+tháng 10 khi hôm nay là 05/11: hiện "Tháng đã đóng · hụt 100h". Console không lỗi mới.
+
+- Test mới: `tests/brandCommitment.test.ts` (20). Bao cả phần vốn đúng: giờ cam kết là giờ CA THEO LỊCH
+  (không phải giờ live thật — `actualLiveHours` chỉ để cảnh báo), ca huỷ không tính vào cả 2 vế,
+  `pacedProjection` trả 0 thay vì Infinity khi tháng chưa bắt đầu, `brandsMissingCommitment` bỏ brand chỉ
+  có ca huỷ, brand bị xoá vẫn có nhãn.
+- `tsc` 0 lỗi · `eslint` 0 lỗi / 33 warning (baseline) · `vitest` **321/321** (301 → 321) · build OK.
 
 ### P2b — Đếm lượt mở tab — XONG 2026-09-26, migration 0123 ĐÃ CHẠY + verify (bắt đầu đếm 26/09/2026)
 - Vì sao: trước khi gộp/bỏ mục menu (18 tab agency + 10 tab brand) cần số người dùng thật — chưa có số nào.
