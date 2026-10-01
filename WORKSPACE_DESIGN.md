@@ -47,7 +47,16 @@
 > RLS **không** phải nút thắt — sàn mạng 257ms, hầu hết request 258–494ms; điểm nghẽn duy nhất là Sổ Ca
 > tốn **1.528/1.920ms** nạp `live_session_reports` bằng 5 lô, mà bảng đó đang **RỖNG**. Sửa thành 1
 > request cuộn trang ⇒ **1.920ms → 440–638ms**. Việc denormalise `session_skus` ở P2a-16 là tối ưu sai
-> chỗ — đã bỏ.
+> chỗ — đã bỏ. **P2a-18** quét nốt **26 màn trên BẢN BUILD PRODUCTION** và rút ra hai điều phải nhớ:
+> (a) **đo trên dev server cho kết luận SAI** — StrictMode nhân đôi mọi request ở đợt cuối, thổi
+> `/ke-hoach-thang` từ 29 req/1.590ms thành 34 req/3.567ms; (b) **đừng thêm throttle vào lớp đọc** —
+> thí nghiệm phát lại 23 truy vấn cho thấy bắn hết cùng lúc (628ms) nhanh hơn 6 luồng (1.347ms) và 2
+> luồng (3.179ms), tức giới hạn luồng làm **chậm 2–5×**. 24/26 màn sạch; riêng **Brand Dashboard** có 3
+> cặp request trùng từng ký tự (tái lập 5/5 lượt, cả ở JOCKEY) do `BrandDashboard` và `<OpsSupport>`
+> lồng trong nó cùng gọi `fetchMonthPlan`. Vá bằng `dedupeInFlight` (gộp lời gọi đang cùng bay, **không
+> cache** — cache sẽ làm Kế Hoạch Tháng hiện bản cũ sau khi lưu): **35 → 32 request**, màn hình giống
+> hệt từng ký tự. **Không công bố số "nhanh hơn"** cho mục này: mạng xấu dần trong lúc đo nên chênh
+> lệch wall-clock nằm trong nhiễu.
 >
 > **Còn lại trong file này đều KHÔNG phải việc code:** 24 file Dataraw CROCS T6–T9 chưa up (nhập liệu) ·
 > tích hợp TikTok API (chờ scope Developer/ISV) · lịch sử trước T7/2026 · 33 warning `set-state-in-effect`
@@ -1899,6 +1908,86 @@ nên số dòng không bao giờ vượt số ca; cuộn trang lo phần tăng t
 > `session_live_snapshots`, `session_availability`, `shift_slots` đều **0 dòng** trên production hôm
 > nay; chỉ `live_sessions` (229) và `brand_monthly_reports` (3) có dữ liệu. Màn nào đang nạp mấy bảng
 > rỗng đó mỗi lần mở app đều là ứng viên cho đúng phép đo này.
+
+### P2a-18 — Quét 26 màn trên BẢN BUILD PRODUCTION: 3 request trùng lặp ở Brand Dashboard — XONG 2026-10-01
+
+Tiếp P2a-17, đo nốt các màn còn lại. **Bài học phương pháp quan trọng nhất của mục này: đo trên dev
+server cho ra kết luận SAI.** Mọi số dưới đây đo trên `npm run build` + `liveops-prod`, không phải dev.
+
+**Dev server thổi phồng số liệu ~2,2× và bịa ra lỗi không tồn tại.** Trên dev, `/ke-hoach-thang` cho
+34 request / 3.567 ms, trong đó *mọi* request ở đợt cuối bắn đúng **2 lần, cách nhau 1–2 ms, query
+giống từng ký tự*. Trông y như lỗi trùng lặp nghiêm trọng. Nhưng đó là **React StrictMode gọi effect
+2 lần ở chế độ dev** — codebase đã tự ghi nhận ở `App.tsx:1245` và `useAuth.tsx:82`. Trên bản build:
+29 request / 1.590 ms, các cặp trùng-từng-ký-tự **biến mất hoàn toàn**. ⇒ **Không bao giờ báo một con
+số hiệu năng đo từ dev server.**
+
+**Giả thuyết "bùng nổ 21 request song song là nút thắt" — ĐÃ BỊ THÍ NGHIỆM BÁC BỎ.** Mọi màn đều phát
+~21 request cùng lúc ở mốc ~45 ms, và request chậm nhất **đổi bảng mỗi lượt** (`profiles` 2.310 ms một
+lượt — mà đó là tra khoá chính 1 dòng, không thể tốn 2,3 s vì truy vấn). Nên tôi nghi xếp hàng ở
+PostgREST. Phát lại **đúng 23 truy vấn app tự gửi** (loại `rpc/complete_past_sessions` vì đó là lệnh
+GHI), chỉ đổi số luồng, thứ tự các mức đảo ở lượt sau để triệt tiêu trôi mạng:
+
+| luồng song song | wall-clock | median/request |
+|---|---|---|
+| **23 (tất cả cùng lúc)** | **628 · 825 ms** | 459 · 605 ms |
+| 6 | 1.347 · 1.564 ms | 272 · 395 ms |
+| 2 | 3.179 · 4.490 ms | 245 · 268 ms |
+
+⇒ Phát hết một lúc là **nhanh nhất**; giới hạn luồng sẽ làm **chậm 2–5×**. **Đừng bao giờ thêm
+semaphore/throttle vào lớp đọc.** Con `profiles` 2.310 ms kia không phải xếp hàng ở server: khi phát
+lại trên kết nối đã ấm, request chậm nhất chỉ 626–824 ms. Chênh lệch là do lúc tải trang thật cả 21
+request khởi hành **trước khi bắt tay TLS/HTTP2 tới Supabase xong**, nên tất cả cùng đợi một lần bắt tay.
+
+**Kết quả quét 26 màn** (bản build, mỗi màn ≥1 lượt): **sạch 24/26**, 24–28 request, wall 552–1.514 ms.
+Sổ Ca sau P2a-17 đã sát sàn mạng (min **456 ms**). Hai màn còn lại là Brand Dashboard của 2 brand.
+
+**Lỗi thật tìm được — Brand Dashboard, tái lập 5/5 lượt trên bản build, có cả ở JOCKEY:** 3 cặp
+request trùng nhau **từng ký tự**.
+
+| cặp trùng | nguyên nhân |
+|---|---|
+| `brand_month_plans?brand_id&month=<tháng này>` ×2 | `BrandDashboard` tự gọi `fetchMonthPlan`, **và** render `<OpsSupport>` (`:636`) mà OpsSupport cũng gọi `fetchMonthPlan` cùng (brand, tháng) — hai component độc lập, không ai biết ai |
+| `brand_month_plan_slots?plan_id` ×2 | hệ quả: `fetchMonthPlan` là chuỗi **2 bước** (plan rồi slots), nên 2 lời gọi thành 2 chuỗi |
+| `brand_dataraw_imports?...report_type=eq.shop_analytics` ×2 | `BrandDashboard:158` gọi `fetchShopDaysMonthSlice` cho tháng này + tháng trước; truy vấn danh sách batch **không có bộ lọc kỳ** (lọc kỳ làm ở JS) nên 2 tháng khác nhau ra đúng 1 URL |
+
+**Cách vá: `src/lib/db/dedupeInFlight.ts` — gộp lời gọi đang CÙNG BAY, KHÔNG cache.**
+
+- **Vì sao không cache:** `MonthPlan.tsx:442` sau khi lưu/chốt kế hoạch gọi lại `fetchMonthPlan` để lấy
+  bản mới. Cache có hạn dùng sẽ làm UI hiện lại **bản cũ ngay sau khi vừa lưu**. Gộp-khi-đang-bay
+  không có rủi ro đó: lời gọi sau khi request trước đã settle luôn đi mạng thật.
+- **Gộp ở mức TRUY VẤN, không ở mức hàm** — nhờ vậy mỗi caller vẫn tự `planFromDb`/`slotFromDb` ra đối
+  tượng riêng, chỉ dùng chung dòng JSON thô.
+- **Đã kiểm trước khi làm (không đoán):** dùng chung kết quả nghĩa là dùng chung tham chiếu LỒNG —
+  `planFromDb` trả `campRanges: r.camp_ranges ?? {}` và `blackoutDates: r.blackout_dates ?? []` trỏ
+  thẳng vào JSON gốc. Rà **31 chỗ dùng `campRanges` + 13 chỗ dùng `blackoutDates`**: mọi đường ghi đều
+  copy-on-write (`{ ...campRanges }`, `[...st.blackoutDates, day].sort()`), **0 chỗ sửa tại chỗ**. Nếu
+  sau này có chỗ sửa tại chỗ thì phải copy ở đó, **đừng bỏ lớp gộp**.
+
+**Kết quả — những gì đo được chắc chắn:**
+
+| | request | cặp trùng |
+|---|---|---|
+| trước | 35 | **3 cặp, 5/5 lượt** |
+| sau | **32** | **0, 5/5 lượt** |
+
+Nội dung màn hình **giống hệt từng ký tự** (2.291 ký tự, so sánh tự động trước/sau).
+
+> **KHÔNG công bố con số "nhanh hơn" cho mục này.** Mạng xấu dần trong lúc đo (các lượt "trước" trải
+> 1.389 → 4.762 ms), nên chênh lệch wall-clock **nằm trong nhiễu** và tôi không đo được tác động đáng
+> tin. Giá trị của bản vá là **xác định**: bỏ 3 truy vấn dư mỗi lần mở màn (mỗi truy vấn đều đi qua
+> RLS trên Postgres thật), có test chốt. Muốn số wall-clock thật thì đo lại khi mạng ổn định.
+
+**File:** `src/lib/db/dedupeInFlight.ts` (mới) · `src/lib/db/monthPlans.ts` (`fetchMonthPlan`) ·
+`src/lib/dataraw/monthlyProductSlice.ts` (tách `fetchImportsLite`).
+**Test:** `tests/dedupeInFlight.test.ts` — 10 test (**399 tests**). Chứng minh đỏ trên code cũ: đúng 3
+test đỏ với con số đúng ("expected 1 but got 2"); 7 test còn lại là test helper + test **phủ định**
+(gọi nối tiếp / khác tháng / khác brand thì **vẫn phải** là 2 request) nên xanh ở cả hai bên — đó mới
+là bộ test đúng. Có cả chốt nguồn: `brand_dataraw_imports` dạng lite chỉ được đọc qua `fetchImportsLite`.
+
+**Công cụ đo dùng lại được** (dán vào console tab preview, không cần cài gì): gom
+`performance.getEntriesByType('resource')` lọc `/rest/v1/`, chờ đến khi 1.500 ms không có request mới,
+rồi nhóm theo URL đã `decodeURIComponent` để tìm cặp trùng, và nhóm theo mốc khởi hành (cách nhau
+>150 ms là một "đợt") để thấy chuỗi phụ thuộc. Lưu script trong `localStorage` để nó sống qua F5.
 
 ### P2b — Đếm lượt mở tab — XONG 2026-09-26, migration 0123 ĐÃ CHẠY + verify (bắt đầu đếm 26/09/2026)
 - Vì sao: trước khi gộp/bỏ mục menu (18 tab agency + 10 tab brand) cần số người dùng thật — chưa có số nào.

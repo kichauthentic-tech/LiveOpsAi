@@ -1,5 +1,6 @@
 import { supabase } from "../supabaseClient";
 import { DataRawColumn, DataRawReportType } from "../../types";
+import { dedupeInFlight } from "../db/dedupeInFlight";
 import { fetchRowsPaged } from "./fetchRowsPaged";
 import { readShopDays } from "./shopAnalyticsDays";
 import { buildProductListAgg, cleanProductName, findCol, isCurrentProductAgg, num, PRODUCT_AGG_VERSION, ProductListAgg } from "./productListAgg";
@@ -27,17 +28,31 @@ interface DbImportLite {
 // Chọn batch trên danh sách KHÔNG kèm `columns` (product_list có 175 cột × mỗi batch) rồi mới đọc
 // `columns` của đúng 1 batch được chọn. Dòng đọc theo trang (fetchRowsPaged) — PostgREST cắt ở 1.000
 // dòng mà không báo lỗi.
+// Danh sách batch của (brand, loại report) — KHÔNG lọc theo kỳ (lọc kỳ làm ở JS bên dưới). Vì không
+// có bộ lọc kỳ, hai lần gọi cho hai THÁNG KHÁC NHAU sinh ra đúng một URL: BrandDashboard gọi
+// `fetchShopDaysMonthSlice` cho tháng này VÀ tháng trước, nên trước khi gộp thì mỗi lần mở màn tốn 2
+// request giống nhau từng ký tự (đo 2026-10-01 trên bản build production, tái lập 5/5 lượt).
+// `dedupeInFlight` chỉ gộp khi hai lời gọi còn CHỒNG NHAU về thời gian, không giữ cache — xem đầu file
+// dedupeInFlight.ts. Trả mảng dùng chung; bên dưới `.filter(...)` tạo mảng mới nên `.sort(...)` không
+// sửa vào mảng gốc.
+async function fetchImportsLite(brandId: string, reportType: DataRawReportType): Promise<DbImportLite[]> {
+  return dedupeInFlight(`brand_dataraw_imports.lite|${brandId}|${reportType}`, async () => {
+    const { data, error } = await supabase
+      .from("brand_dataraw_imports")
+      .select("id, report_type, period_start, period_end")
+      .eq("brand_id", brandId)
+      .eq("report_type", reportType);
+    if (error) throw error;
+    return ((data as DbImportLite[]) ?? []);
+  });
+}
+
 async function pickOverlappingBatch(brandId: string, reportType: DataRawReportType, monthStart: string, monthEnd: string): Promise<DbImportLite | null> {
-  const { data: imports, error } = await supabase
-    .from("brand_dataraw_imports")
-    .select("id, report_type, period_start, period_end")
-    .eq("brand_id", brandId)
-    .eq("report_type", reportType);
-  if (error) throw error;
+  const imports = await fetchImportsLite(brandId, reportType);
 
   // Chọn batch overlap NHIỀU NHẤT với tháng (không cộng dồn nhiều batch — mỗi batch đã là tổng cả
   // kỳ upload, cộng lại sẽ nhân đôi số).
-  const overlapping = ((imports as DbImportLite[]) ?? []).filter(
+  const overlapping = imports.filter(
     (i) => i.period_start && i.period_end && i.period_start <= monthEnd && i.period_end >= monthStart
   );
   if (overlapping.length === 0) return null;
