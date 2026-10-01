@@ -395,7 +395,8 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
 
   // Ma Trận Phân Quyền là thứ DUY NHẤT quyết định tab nào mở được, nên fetch hỏng ở đây không
   // được để người dùng kẹt: `permissionsNonce` cho nút "Thử lại" chạy lại đúng effect này mà
-  // không phải F5 (F5 sẽ kéo lại cả 54 request của lần tải trang).
+  // không phải F5 (F5 sẽ kéo lại cả đợt nạp của lần tải trang — đo 2026-10-02 trên bản build:
+  // 24–32 request tuỳ màn; con số "54" ghi ở đây trước kia đã cũ).
   const [permissionsNonce, setPermissionsNonce] = useState(0);
   const reloadRolePermissions = React.useCallback(() => setPermissionsNonce((n) => n + 1), []);
   useEffect(() => {

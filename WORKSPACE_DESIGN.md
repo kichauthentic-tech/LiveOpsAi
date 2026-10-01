@@ -72,6 +72,12 @@
 > handler bấm nút và dùng cả 3 kết quả ngay; 1 chỗ có `useMemo` + 2 lớp chốt) ⇒ **không sửa**. Mọi phép
 > khác ≤ 2,3 ms. Phần biến động còn lại là **mạng**, ngoài app.
 >
+> 🛑 **USER CHỐT 2026-10-02: DỪNG đo tốc độ tải — đừng mở lại nhánh này.** Lý do: mạng ở chỗ user đang
+> yếu và là biến trội, nên mọi phép đo wall-clock đều vô nghĩa (sàn đo được nhảy 257ms → 1.660ms chỉ
+> giữa hai ngày). Những gì ĐÃ sửa thì giữ nguyên và vẫn đúng (chúng được chứng minh bằng SỐ REQUEST và
+> SOURCE, không bằng wall-clock — xem P2a-18/19/20). Phiên sau: **không chạy lại các phép đo ở
+> P2a-17→P2a-20**, trừ khi user yêu cầu rõ.
+>
 > **Còn lại trong file này đều KHÔNG phải việc code:** 24 file Dataraw CROCS T6–T9 chưa up (nhập liệu) ·
 > tích hợp TikTok API (chờ scope Developer/ISV) · lịch sử trước T7/2026 · 33 warning `set-state-in-effect`
 > (đã đo, cố ý giữ `warn` — xem `eslint.config.js`). Hai thứ chưa verify được vì cần mật khẩu: nhánh
@@ -2137,6 +2143,12 @@ request trùng) và `098455d` (chuông gate theo `session`): mỗi màn **24–3
 chứng minh phát hết cùng lúc là nhanh nhất — P2a-18), **0 request trùng**, **1–2 chặng phụ thuộc thật**,
 và **0 phép tính client đáng kể ngoài Kế Hoạch Tháng**. Phần biến động còn lại là **mạng**, nằm ngoài
 app (sàn đo được dao động 257 ms → 1.660 ms giữa hai ngày).
+
+> 🛑 **DỪNG THEO YÊU CẦU USER (2026-10-02):** user chốt *"mạng đang yếu, bỏ qua mấy cái test về tốc độ
+> load đi"*. Nhánh đo tốc độ **đóng tại đây**. Preview đã tắt. Những bản vá đã làm vẫn giữ — chúng không
+> dựa vào wall-clock mà dựa vào **số request** (35→32, 0 cặp trùng) và **bằng chứng từ source** (chuông
+> không dùng dữ liệu `profile`), nên không phụ thuộc chất lượng mạng. Việc còn lại KHÔNG làm: debounce /
+> đẩy `suggestMonthPlan` sang worker (thiếu bằng chứng người dùng thấy vướng), và mọi phép đo lại.
 
 **Công cụ** (viết lại trong ~2 phút, không commit vào repo): probe worker như mô tả ở Đường 1 — **luôn
 chạy đối chứng chặn 220 ms trước khi tin số**; và script `npx tsx` import thẳng module trong `src/lib`,
