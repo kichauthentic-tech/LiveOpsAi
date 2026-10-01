@@ -36,9 +36,11 @@
 > hoãn ở 0125 bằng số đo (`security definer` tự nó đã chặn inline, nên pin không mất gì). Cùng phép đo
 > cho ra **phát hiện lớn hơn**: bọc `(select current_user_role())` trong policy nhanh **~10×**, ít buffer
 > **~124×**, đổi từ Bitmap Heap Scan sang Index Only Scan — **việc tiếp theo đáng giá nhất**, cố ý chưa
-> làm vì phải sửa hàng trăm policy. Đọc spec sau khi chạy 0127 còn lộ ra **`session_brand_id` gọi
-> được qua `/rpc/` bởi mọi tài khoản đã đăng nhập** — nó `security definer`, nhận session id bất kỳ,
-> nên phá đúng bất biến brand isolation của 0059; vá bằng cách chuyển sang schema không expose, 7 call site.
+> làm vì phải sửa hàng trăm policy. Đọc spec sau khi chạy 0127 còn lộ ra **5 hàm helper RLS gọi được
+> qua `/rpc/` bởi mọi tài khoản đã đăng nhập** — đều `security definer`, không guard role, nhận ID dòng
+> của người khác, nên phá đúng bất biến brand isolation của 0059. **P2a-15 / `0128` (CHƯA CHẠY)** chuyển
+> cả 5 sang schema `private` bằng cách đọc `pg_policies`/`pg_get_viewdef` rồi chỉ thay tên hàm; 90 policy
+> trước/sau khác nhau ĐÚNG một tiền tố schema.
 >
 > **Còn lại trong file này đều KHÔNG phải việc code:** 24 file Dataraw CROCS T6–T9 chưa up (nhập liệu) ·
 > tích hợp TikTok API (chờ scope Developer/ISV) · lịch sử trước T7/2026 · 33 warning `set-state-in-effect`
@@ -1687,6 +1689,78 @@ heap nên index-only scan không dùng được.
 > mỗi policy sai một dấu ngoặc là một lỗ phân quyền. Đáng làm, nhưng phải là một đợt riêng, chia theo
 > bảng, verify từng bảng bằng tài khoản thật của từng role. Đây là **việc tiếp theo đáng giá nhất**
 > đang nằm trên bàn.
+
+
+### P2a-15 — 5 hàm helper RLS gọi được qua `/rpc/`, chuyển sang schema `private` — XONG 2026-10-01
+
+**Lỗ.** PostgREST lộ **mọi** hàm trong schema được expose (`public`) thành `/rpc/<tên>`. Năm hàm dưới
+đây sinh ra CHỈ để gọi bên trong biểu thức policy, nên chúng là `security definer` (**cố ý vượt RLS** —
+0059 tạo chúng đúng để tránh RLS-trong-RLS), **không có guard role** trong thân, và **nhận ID dòng của
+người khác**. Ba tính chất đó cộng với việc lộ ra `/rpc/` thành một đường đọc vượt RLS:
+
+```
+POST /rest/v1/rpc/session_brand_id   {"p_session_id": "<uuid ca bất kỳ>"}
+→ brand_id của ca đó, bất kể người gọi là talent hay người của brand khác
+```
+
+**Không vá được bằng `revoke`** — policy gọi hàm thì *chính người truy vấn* phải có EXECUTE (lý do 0100
+phải `grant execute ... to authenticated` ngay sau khi revoke). Nên 4/5 hàm "đã revoke khỏi public" mà
+vẫn gọi được. Revoke khỏi `authenticated` là làm chết 4 policy + 1 view.
+
+**Phạm vi: 5 hàm, không phải 1.** Quét 31 hàm `security definer` có tham số, lằn ranh là ba câu hỏi —
+phải cả ba mới chuyển: *được gọi trong policy? · thân không có guard role? · `src/` không gọi?*
+
+| hàm | nơi dùng THẬT (đo sau replay) |
+|---|---|
+| `session_brand_id(uuid)` | `session_skus_read_published` |
+| `session_month_published(uuid)` | `session_skus_read_published` |
+| `snapshot_session_id(uuid)` | `session_live_snapshot_rows_read` |
+| `month_plan_brand_id(uuid)` | `brand_month_plan_slots_read_scoped` |
+| `brand_month_published(uuid, date)` | `brand_monthly_report_snapshots_brand_read_published` + **view `live_sessions_secure`** |
+
+Số trên là **đo trên DB sau replay**, không phải đếm grep — grep ra nhiều hơn vì tính cả bản policy đã
+bị migration sau thay thế (3 policy 0059 dùng `session_brand_id` đều đã bị 0105/0107/0109 viết lại thành
+bản không dùng nó). **GIỮ Ở `public`:** `can_edit_session_snapshot` (có guard role *và* `SessionWindow.tsx`
+gọi như RPC thật) · `session_boundary_at` (0 policy, là hàm nội bộ đường snapshot) · 26 RPC còn lại (đều
+có guard riêng) · 3 hàm `current_user_*` (không nhận tham số, chỉ trả dữ liệu của chính người gọi ⇒ lộ ra
+không rò gì; chuyển phải sửa 354 lượt gọi để đổi lấy số 0 về an toàn).
+
+**Cách viết lại: đọc `pg_policies`/`pg_get_viewdef`, KHÔNG chép tay.** Chỉ thay tên hàm, giữ nguyên
+permissive/cmd/roles/phần còn lại của biểu thức. Lý do: dự án đã 2 lần bị sửa tay trên production nên
+bản repo có thể không đúng bản đang chạy; và policy phân quyền chép tay sai một dấu ngoặc là một lỗ, không
+phải một lỗi cú pháp. Idempotent (chuẩn hoá bỏ cả `public.` lẫn `private.` trước khi gắn `private.`).
+
+**CHỐT AN TOÀN ĐÃ CỨU ĐÚNG MỘT LẦN.** Bản nháp đầu không có bước viết lại view và ghi trong comment
+*"0 view nào gọi 5 hàm này"* — **sai**, do regex quét view của tôi dừng ở dấu `;` đầu tiên nên cắt mất
+thân view. Replay vỡ ngay tại `drop function public.brand_month_published` với *"cannot drop … because
+other objects depend on it"*, `pg_depend` chỉ ra `live_sessions_secure`. Nếu lúc đó viết `cascade` cho
+nhanh thì view đó bị xoá âm thầm — view mà 0109 cấp `grant select ... to authenticated`, tức Sổ Ca của
+brand sẽ trắng. **Quy ước: `drop function` trong migration không được dùng `cascade`** (có test canh).
+
+**Verify (Postgres 18.4 cô lập + shim Supabase):**
+- replay `0001 → 0128`: **128/128 file sạch**; 4 policy + 1 view được viết lại đúng như dự đoán;
+- **ảnh 90 policy trước/sau, chuẩn hoá bỏ `private.` ⇒ diff TRỐNG** — thay đổi duy nhất trên cả 90
+  policy là tiền tố schema, không gì khác. Cùng phép đó cho view: trống;
+- `pg_proc`: 5 hàm chỉ còn ở `private`, đều `{search_path=public}`, EXECUTE chỉ cấp `authenticated`;
+- 0 policy nào còn trỏ bản `public`;
+- **phép thử hành vi** (2 brand, T9 của A đã phát hành, của B thì chưa): brand A thấy đúng `SKU-A`,
+  brand B **không thấy gì**, superuser thấy cả hai ⇒ cả hai cổng (`session_brand_id` cho isolation,
+  `session_month_published` cho phát hành) còn nguyên tác dụng;
+- đường cũ đã mất: `select public.session_brand_id(...)` → *function does not exist*; `anon` →
+  *permission denied for schema private*.
+
+> **NÓI CHÍNH XÁC, không nói quá:** cách này **không lấy lại quyền** — `authenticated` vẫn `execute`
+> được 5 hàm, buộc phải vậy nếu không policy chết. Nó **bỏ endpoint HTTP**. Đủ, vì client chỉ tới DB
+> qua PostgREST (anon/service key là JWT cho PostgREST; nối thẳng Postgres cần mật khẩu DB mà client
+> không có). Nên đây là thu hẹp **bề mặt API**, không phải thu hẹp quyền.
+>
+> ⚠️ **ĐIỀU KIỆN DUY TRÌ:** thêm `private` vào Exposed schemas (Settings → API) là **mở lại lỗ nguyên
+> vẹn**. Đừng thêm.
+
+**File:** `supabase/migrations/0128_rls_helpers_to_private_schema.sql` (**CHƯA CHẠY**). **Test:**
+`tests/sqlGuards.test.ts` +2 (386 tests) — một test canh không dựng lại helper ở `public` ở migration
+sau, một test canh 0128 drop đủ 5 hàm và không dùng `cascade`. Chỉ test thứ hai chứng minh được đỏ
+(bỏ 0128 ra ⇒ đỏ); test thứ nhất là canh về SAU nên hôm nay không có gì làm nó đỏ.
 
 ### P2b — Đếm lượt mở tab — XONG 2026-09-26, migration 0123 ĐÃ CHẠY + verify (bắt đầu đếm 26/09/2026)
 - Vì sao: trước khi gộp/bỏ mục menu (18 tab agency + 10 tab brand) cần số người dùng thật — chưa có số nào.

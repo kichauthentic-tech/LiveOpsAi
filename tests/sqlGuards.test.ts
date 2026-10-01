@@ -120,3 +120,63 @@ test("publish và unpublish report dùng CÙNG một khuôn guard", () => {
   expect(guard.test(pub!.body)).toBe(true);
   expect(guard.test(unpub!.body)).toBe(true);
 });
+
+// ---------------------------------------------------------------------------
+// Helper của policy phải ở schema KHÔNG expose
+// ---------------------------------------------------------------------------
+// 0128: PostgREST lộ MỌI hàm trong `public` thành `/rpc/<tên>`. Năm hàm dưới đây là `security
+// definer`, KHÔNG có guard role (guard là việc của policy gọi chúng), và nhận ID dòng của NGƯỜI
+// KHÁC — nên khi còn ở `public` thì bất kỳ tài khoản đã đăng nhập cũng gọi được để đọc vượt RLS.
+// Không vá được bằng `revoke`: policy gọi hàm thì chính người truy vấn phải có EXECUTE. Nên chúng
+// đã chuyển sang `private`, và test này chặn việc dựng lại ở `public`.
+const PRIVATE_ONLY_HELPERS = [
+  "session_brand_id",
+  "session_month_published",
+  "snapshot_session_id",
+  "month_plan_brand_id",
+  "brand_month_published"
+];
+
+test("helper của policy không được dựng lại ở schema public (lỗ /rpc/ của 0128)", () => {
+  const bad: string[] = [];
+  for (const file of FILES) {
+    if (file.startsWith("0128_")) continue; // chính nó drop bản public
+    const sql = readFileSync(join(DIR, file), "utf8");
+    for (const h of PRIVATE_ONLY_HELPERS) {
+      // Chỉ bắt `create function <tên>` KHÔNG có tiền tố schema, hoặc có `public.` tường minh.
+      const re = new RegExp(`create\\s+(?:or\\s+replace\\s+)?function\\s+(?:public\\.)?${h}\\s*\\(`, "gi");
+      for (const m of sql.matchAll(re)) {
+        // Bản `private.` là bản đúng — regex trên đã loại nó vì `private.` không khớp `(?:public\.)?`
+        // ngay trước tên, nhưng vẫn kiểm lại cho chắc.
+        if (/private\.\s*$/i.test(sql.slice(Math.max(0, m.index! - 9), m.index! + m[0].indexOf(h)))) continue;
+        bad.push(`${h} (${file})`);
+      }
+    }
+  }
+  // 0128 là migration CUỐI tạo chúng; mọi lần tạo trước đó đều ở `public` và đã bị 0128 drop — nên
+  // test này không soi quá khứ, nó soi migration MỚI. Chốt bằng cách chỉ xét file > 0128.
+  const afterMove = bad.filter((b) => {
+    const f = b.slice(b.indexOf("(") + 1, -1);
+    return f.localeCompare("0128_") > 0;
+  });
+  expect(afterMove).toEqual([]);
+});
+
+/** Bỏ comment SQL — khẳng định về LỆNH phải đọc lệnh, không đọc phần văn xuôi giải thích quanh nó
+ *  (bản nháp đầu của test dưới đây báo đỏ vì khớp đúng vào một đoạn comment nói về grant/anon). */
+function sqlOnly(src: string): string {
+  return src.replace(/--[^\n]*/g, "").replace(/\/\*[\s\S]*?\*\//g, "");
+}
+
+test("0128 có drop bản public của cả 5 helper, và không dùng CASCADE", () => {
+  const sql = sqlOnly(readFileSync(join(DIR, FILES.find((f) => f.startsWith("0128_"))!), "utf8"));
+  for (const h of PRIVATE_ONLY_HELPERS) {
+    expect(sql, `0128 phải tạo private.${h}`).toMatch(new RegExp(`create\\s+or\\s+replace\\s+function\\s+private\\.${h}\\s*\\(`, "i"));
+    expect(sql, `0128 phải drop public.${h}`).toMatch(new RegExp(`drop\\s+function\\s+public\\.${h}\\s*\\(`, "i"));
+  }
+  // `cascade` ở đây sẽ âm thầm kéo theo policy/view phụ thuộc — chính thứ đã cứu lúc dựng migration
+  // (view live_sessions_secure). Drop trần là chốt an toàn, đừng "sửa" cho nó chạy được.
+  expect(/drop\s+function[^;]*cascade/i.test(sql), "drop function không được dùng CASCADE").toBe(false);
+  expect(sql, "phải cấp usage schema private cho authenticated").toMatch(/grant\s+usage\s+on\s+schema\s+private\s+to[^;]*authenticated/i);
+  expect(/grant[^;]*\bprivate\b[^;]*\banon\b/i.test(sql), "không được cấp gì cho anon").toBe(false);
+});
