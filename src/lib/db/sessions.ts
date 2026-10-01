@@ -1,5 +1,6 @@
 import { supabase } from "../supabaseClient";
 import { assertAffected } from "./assertAffected";
+import { fetchAllPages } from "./fetchAllPages";
 import { LiveSession, ProductSKU, ChecklistItem, MinuteMetric, LiveSessionReport, UserRole } from "../../types";
 
 // brands/studios/talents are all real Supabase tables now (Phases 1/3) and every
@@ -371,21 +372,39 @@ async function replaceChildRows(sessionId: string, session: LiveSession) {
 // lại màn nào cần 3 bảng đó thì nạp riêng cho ĐÚNG ca đang mở, đừng kéo cả bảng lúc mở app.
 async function fetchChildRowsForSessions(sessionIds: string[]): Promise<{ reports: DbSessionReport[] }> {
   if (sessionIds.length === 0) return { reports: [] };
-  // .in() đi trên query string — hơn vài trăm uuid là vượt giới hạn URL của gateway, nên vẫn chia
-  // lô. Mỗi lô cũng chịu trần 1000 dòng của PostgREST (1 report/ca nên 50 ca là 50 dòng).
-  // Các lô chạy SONG SONG: chúng độc lập hoàn toàn, nối tiếp chỉ cộng dồn RTT vô ích.
-  const CHUNK = 50;
-  const chunks: string[][] = [];
-  for (let i = 0; i < sessionIds.length; i += CHUNK) chunks.push(sessionIds.slice(i, i + CHUNK));
-  const results = await Promise.all(
-    chunks.map((ids) => supabase.from("live_session_reports").select("*").in("session_id", ids))
+  // Đường MỞ MỘT CA (SessionWindow, sau khi lưu): lọc đúng ca đó. Danh sách luôn ngắn nên không
+  // cần chia lô — đường nạp cả Sổ Ca đã tách sang fetchAllReports() bên dưới.
+  const { data, error } = await supabase.from("live_session_reports").select("*").in("session_id", sessionIds);
+  if (error) throw error;
+  return { reports: (data as DbSessionReport[]) ?? [] };
+}
+
+// Đường NẠP CẢ SỔ CA — KHÔNG lọc theo session_id, chỉ cuộn trang.
+//
+// Đo trên production 2026-10-01 bằng chính phiên admin đang đăng nhập, máy rảnh, 3 lượt mỗi bên
+// (bỏ lượt đầu vì kết nối lạnh), 229 ca:
+//
+//     cách cũ — 5 lô `.in()` song song : 578 / 993 / 1405 ms
+//     cách này — 1 request cuộn trang  : 119 /  172 /  489 ms      ⇒ nhanh ~4,9× và ổn định hơn hẳn
+//
+// Trên lần nạp Sổ Ca thật, 5 lô đó chiếm 1.528ms của tổng 1.920ms wall-clock — tức gần như TOÀN BỘ
+// đường găng, và `live_session_reports` hôm nay còn đang RỖNG (0 dòng): y hệt thứ audit 2026-09-23
+// đã bắt được ở 3 bảng con kia ("gần 2 giây chỉ để nhận về 0 dòng"). Lần đó bỏ hẳn 3 bảng vì không
+// màn nào đọc; bảng này thì CÓ đọc thật (sessionIncidents trong lib/sessionLedger.ts, SessionWindow)
+// nên không bỏ được — chỉ bỏ cách chia lô.
+//
+// Vì sao bỏ bộ lọc mà vẫn ra đúng kết quả:
+//   • policy của bảng này là `live_session_reports_read_no_brand` (0112) — gate THEO ROLE, không
+//     theo ca: role không phải brand thấy tất, brand không thấy gì. Lọc theo session_id không thêm
+//     một lớp quyền nào.
+//   • `fetchSessions()` vốn nạp TOÀN BỘ ca (fetchAllSessionRows cuộn hết trang), và assembleSessions
+//     ghép bằng Map theo id — report của ca không nằm trong danh sách thì bị bỏ qua, không gây sai.
+//   • bảng là 1-1 với live_sessions (`session_id` là primary key) nên số dòng không bao giờ vượt
+//     số ca; cuộn trang lo phần tăng trưởng.
+async function fetchAllReports(): Promise<DbSessionReport[]> {
+  return fetchAllPages<DbSessionReport>((from, to) =>
+    supabase.from("live_session_reports").select("*").order("session_id", { ascending: true }).range(from, to)
   );
-  const reports: DbSessionReport[] = [];
-  for (const res of results) {
-    if (res.error) throw res.error;
-    reports.push(...((res.data as DbSessionReport[]) ?? []));
-  }
-  return { reports };
 }
 
 function assembleSessions(rows: DbLiveSession[], reports: DbSessionReport[]): LiveSession[] {
@@ -444,8 +463,8 @@ export async function completePastSessions(): Promise<number> {
 }
 
 export async function fetchSessions(): Promise<LiveSession[]> {
-  const rows = await fetchAllSessionRows();
-  const { reports } = await fetchChildRowsForSessions(rows.map((r) => r.id));
+  // Hai lượt đọc này độc lập nhau — nối tiếp chỉ cộng dồn RTT vô ích.
+  const [rows, reports] = await Promise.all([fetchAllSessionRows(), fetchAllReports()]);
   return assembleSessions(rows, reports);
 }
 

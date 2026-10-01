@@ -81,7 +81,8 @@ test("đọc cả bảng ở bảng lớn dần phải cuộn trang", () => {
     ["talentRateHistory.ts", "fetchTalentRateHistory"],
     ["brandPlatformRateHistory.ts", "fetchBrandPlatformRateHistory"],
     ["monthlyReports.ts", "fetchAllMonthlyReports"],
-    ["brandDataRaw.ts", "fetchDataRawRows"]
+    ["brandDataRaw.ts", "fetchDataRawRows"],
+    ["sessions.ts", "fetchAllReports"]
   ];
   for (const [file, fn] of paged) {
     const body = bodyOf(file, fn);
@@ -170,4 +171,20 @@ test("trang Affiliate: thứ tự batch phải do imported_at quyết định, k
   expect(src, "phải chọn cột imported_at").toMatch(/select\([^)]*imported_at/);
   expect(src, "phải xếp batch theo imported_at").toContain("a.imported_at.localeCompare(b.imported_at)");
   expect(src, "phải có cột phá hoà — 2 batch nạp cùng mili giây vẫn phải ra thứ tự ổn định").toContain("a.id.localeCompare(b.id)");
+});
+
+test("Sổ Ca nạp report bằng MỘT truy vấn cuộn trang, không chia lô theo session_id", () => {
+  // Đo trên production 2026-10-01 (229 ca, phiên admin thật): 5 lô `.in()` song song mất 578–1.405ms,
+  // một request cuộn trang mất 119–489ms — nhanh ~4,9×. Trên lần nạp Sổ Ca thật, 5 lô đó chiếm
+  // 1.528ms của 1.920ms wall-clock, tức gần như toàn bộ đường găng; sau khi sửa còn 440–638ms.
+  // Bỏ được bộ lọc vì policy của bảng gate THEO ROLE chứ không theo ca (0112), và fetchSessions vốn
+  // nạp toàn bộ ca rồi ghép bằng Map theo id.
+  const src = readFileSync(join(DB, "sessions.ts"), "utf8");
+  const listLoader = src.slice(src.indexOf("export async function fetchSessions("), src.indexOf("export async function createSession("));
+  expect(listLoader, "fetchSessions phải dùng fetchAllReports()").toContain("fetchAllReports()");
+  expect(listLoader, "không được chia lô theo session_id ở đường nạp danh sách").not.toMatch(/\.in\(/);
+  expect(listLoader, "hai lượt đọc độc lập phải chạy song song").toContain("Promise.all");
+  // Đường mở MỘT ca thì vẫn phải lọc — nạp cả bảng để lấy 1 dòng là đi ngược lại.
+  const one = bodyOf("sessions.ts", "fetchChildRowsForSessions");
+  expect(one, "đường mở một ca vẫn lọc theo session_id").toContain('.in("session_id"');
 });

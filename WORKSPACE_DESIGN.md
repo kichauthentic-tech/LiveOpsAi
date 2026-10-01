@@ -43,7 +43,11 @@
 > trước/sau khác nhau ĐÚNG một tiền tố schema. **P2a-16 / `0129` (ĐÃ CHẠY)** bọc
 > `(select ...)` cho 3 helper trong **46/82 policy** — đo lại trên chuỗi thật cho khoảng **~1,5× tới
 > ~26×** (không phải "10×" như P2a-14 nêu từ micro-benchmark): lợi bao nhiêu tuỳ policy còn gọi hàm
-> nhận-cột hay không.
+> nhận-cột hay không. **P2a-17** đo trên PRODUCTION THẬT (user đăng nhập, dev server trỏ Supabase thật):
+> RLS **không** phải nút thắt — sàn mạng 257ms, hầu hết request 258–494ms; điểm nghẽn duy nhất là Sổ Ca
+> tốn **1.528/1.920ms** nạp `live_session_reports` bằng 5 lô, mà bảng đó đang **RỖNG**. Sửa thành 1
+> request cuộn trang ⇒ **1.920ms → 440–638ms**. Việc denormalise `session_skus` ở P2a-16 là tối ưu sai
+> chỗ — đã bỏ.
 >
 > **Còn lại trong file này đều KHÔNG phải việc code:** 24 file Dataraw CROCS T6–T9 chưa up (nhập liệu) ·
 > tích hợp TikTok API (chờ scope Developer/ISV) · lịch sử trước T7/2026 · 33 warning `set-state-in-effect`
@@ -1835,6 +1839,66 @@ chạy. Đây là giới hạn thật, không phải việc còn làm dở.
 **Test:** `tests/sqlGuards.test.ts` +2 (**388 tests**) — một canh migration sau 0129 không viết policy
 gọi helper chưa bọc, một canh 0129 giữ được tính idempotent + 2 chốt tự kiểm. Chỉ test thứ hai chứng
 minh được đỏ (bỏ 0129 ra ⇒ đỏ); test thứ nhất canh về sau nên hôm nay không có gì làm nó đỏ.
+
+
+### P2a-17 — Đo trên PRODUCTION THẬT: Sổ Ca tốn 1,5s nạp một bảng RỖNG — XONG 2026-10-01
+
+**Lần đầu phiên này đo được app thật.** User mở preview và đăng nhập (phiên `admin` sẵn có, còn 59
+phút). Dev server trỏ thẳng Supabase production, nên mọi số dưới đây là số thật, không phải harness.
+
+**Câu hỏi mang vào: RLS có phải nút thắt không?** (để quyết có nên denormalise `brand_id` vào
+`session_skus` như P2a-16 gợi ý). **Trả lời: KHÔNG.** Đo `performance.getEntriesByType('resource')`
+trên lần nạp Sổ Ca: sàn mạng tới Supabase là **257 ms**, hầu hết request nằm 258–494 ms (tức 0–240 ms
+trên sàn). Điểm bất thường duy nhất là `live_session_reports`: **5 request, 577–1.528 ms**, chiếm
+**1.528 ms của 1.920 ms** wall-clock — gần như toàn bộ đường găng. `session_skus` **không hề xuất hiện**
+trên màn này. Nên việc denormalise kia là tối ưu sai chỗ — **bỏ, không làm**.
+
+**Hai giả thuyết của tôi đều SAI, và việc đo đã bác chúng:**
+1. *"Thiếu index trên `session_id`"* — sai: `session_id` là **primary key** (0046), đã có index.
+2. *"Over-fetch 229 ca trong khi màn hiện 47"* — sai: app cố ý nạp **toàn bộ** ca
+   (`limit 1000, offset 0`, không lọc ngày) rồi lọc phía client. Đó là thiết kế, không phải lỗi.
+
+**Nguyên nhân thật.** Dấu hiệu: 5 lô cùng khởi hành ở mốc 608 ms rồi kết thúc so le
+(577 → 1.225 → 1.286 → 1.528 → 1.528) — đó là **xếp hàng**, không phải truy vấn chậm. Và
+`live_session_reports` trên production **đang RỖNG (0 dòng)**. Tức app tốn 1,5 giây để nhận về con số
+không — **y hệt** thứ audit 2026-09-23 đã bắt ở 3 bảng con kia (*"gần 2 giây chỉ để nhận về 0 dòng"*).
+Lần đó bỏ hẳn 3 bảng vì không màn nào đọc; bảng này thì **có đọc thật** (`sessionIncidents()` trong
+`lib/sessionLedger.ts`, SessionWindow) nên không bỏ được — **chỉ bỏ cách chia lô**.
+
+**Đo công bằng** (máy rảnh, cùng phiên, 3 lượt mỗi bên sau khi bỏ lượt kết nối lạnh, 229 ca):
+
+| cách | các lượt | min |
+|---|---|---|
+| cũ — 5 lô `.in()` song song | 578 · 993 · 1.405 ms | **578 ms** |
+| mới — 1 request cuộn trang | 119 · 172 · 489 ms | **119 ms** |
+
+⇒ **~4,9× nhanh hơn**, và ổn định hơn hẳn.
+
+**Vì sao bỏ được bộ lọc mà kết quả không đổi:** policy `live_session_reports_read_no_brand` (0112)
+gate **theo ROLE chứ không theo ca** — role không phải brand thấy tất, brand không thấy gì; lọc theo
+`session_id` không thêm lớp quyền nào. `fetchSessions()` vốn nạp toàn bộ ca và `assembleSessions` ghép
+bằng Map theo id nên report thừa bị bỏ qua. Bảng là **1-1** với `live_sessions` (`session_id` là PK)
+nên số dòng không bao giờ vượt số ca; cuộn trang lo phần tăng trưởng.
+
+**Kết quả trên app thật** (nạp lại Sổ Ca, màn hình giống hệt: 47 ca · 177,8h · 3,52B · 3.069 · 19,8M):
+
+| | request | `live_session_reports` | wall-clock |
+|---|---|---|---|
+| trước | 28 | **5 request**, 577–1.528 ms | **1.920 ms** |
+| sau | 24 | **1 request** | **440 · 547 · 638 ms** |
+
+⇒ **Sổ Ca nạp nhanh ~3–4×.** Thêm `Promise.all` cho 2 lượt đọc độc lập (`fetchAllSessionRows` và
+`fetchAllReports`) vì nối tiếp chỉ cộng dồn RTT.
+
+**File:** `src/lib/db/sessions.ts` — `fetchChildRowsForSessions` giữ `.in()` cho đường **mở một ca**
+(nạp cả bảng để lấy 1 dòng là đi ngược lại); thêm `fetchAllReports()` cuộn trang qua `fetchAllPages`.
+**Test:** `tests/pagedQueries.test.ts` +1 và thêm `fetchAllReports` vào danh sách phải cuộn trang
+(**389 tests**) — chứng minh đỏ trên code cũ, cả 2 test đều đỏ và gọi đúng tên hàm.
+
+> **Ghi lại để không quên:** `live_session_reports`, `session_finance`, `session_skus`,
+> `session_live_snapshots`, `session_availability`, `shift_slots` đều **0 dòng** trên production hôm
+> nay; chỉ `live_sessions` (229) và `brand_monthly_reports` (3) có dữ liệu. Màn nào đang nạp mấy bảng
+> rỗng đó mỗi lần mở app đều là ứng viên cho đúng phép đo này.
 
 ### P2b — Đếm lượt mở tab — XONG 2026-09-26, migration 0123 ĐÃ CHẠY + verify (bắt đầu đếm 26/09/2026)
 - Vì sao: trước khi gộp/bỏ mục menu (18 tab agency + 10 tab brand) cần số người dùng thật — chưa có số nào.
