@@ -100,10 +100,12 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
   const [targetCategory, setTargetCategory] = useState("Mỹ phẩm Skincare");
   const [matchingResults, setMatchingResults] = useState<TalentMatchResult[] | null>(null);
   const [isMatching, setIsMatching] = useState(false);
-  // FIX L1 (audit 2026-08-21): server trả isMock khi chưa cấu hình GEMINI_API_KEY, nhưng nhánh
-  // thành công trước đây bỏ qua cờ này — hiện y hệt kết quả AI thật. Theo dõi riêng để hiện banner
-  // (cùng true khi rơi vào nhánh catch fallback công thức bên dưới).
-  const [matchingIsMock, setMatchingIsMock] = useState(false);
+  // 2026-10-01: bỏ hẳn bảng xếp hạng thay thế khi AI không chạy được. Hai bản trước đều là số bịa
+  // đội lốt "Match Score": server trả `96 − index×5` (tức VỊ TRÍ TRONG MẢNG) và client rơi về
+  // `overallScore` (điểm chung của talent, không phải độ hợp với brand này) — cả hai đều kèm
+  // predictedGmv = GMV trung bình × 1,25. Không có AI thì KHÔNG có xếp hạng độ phù hợp; nói thẳng
+  // là chưa bật, đừng hiện một bảng để người dùng xếp ca theo nó.
+  const [matchingError, setMatchingError] = useState<string | null>(null);
 
   // Search & Filter
   const [searchTerm, setSearchTerm] = useState("");
@@ -274,6 +276,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
     const activeBrand = brands.find((b) => b.id === selectedBrandId) || brands[0];
     const rawTalents = talents && talents.length > 0 ? talents : [];
     setIsMatching(true);
+    setMatchingError(null);
     try {
       const res = await authedFetch("/api/gemini/match-talents", {
         method: "POST",
@@ -283,53 +286,16 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
       const data = await res.json();
       if (data.success && Array.isArray(data.results) && data.results.length > 0) {
         setMatchingResults(data.results);
-        setMatchingIsMock(!!data.isMock);
         return;
       }
-      throw new Error(data.error || "Empty AI matching result");
+      throw new Error(data.error || "AI không trả về gợi ý nào.");
     } catch (e) {
-      console.error("AI Talent Matching failed, dùng fallback công thức:", e);
-      setMatchingIsMock(true);
-      const results = rawTalents.map((t) => {
-        // FIX L1 (audit 2026-08-21): fallback cũ = 96 − index×5 — xếp hạng theo VỊ TRÍ TRONG MẢNG,
-        // không phản ánh gì về talent, nhưng hiển thị y hệt điểm phù hợp AI thật khi API lỗi/không
-        // có key. Dùng overallScore (điểm đánh giá thật đã lưu ở Talent Pool, 0-100) — vẫn không
-        // phải điểm "phù hợp với brand này" như AI thật tính, nhưng ít nhất là tín hiệu thật của
-        // đúng talent đó, không phải thứ tự ngẫu nhiên từ API trả về.
-        const matchScore = t.overallScore || 0;
-        const nicheArr = t.niches || legacyTalentFields(t).niche || [];
-        const nicheStr = Array.isArray(nicheArr) ? nicheArr.join(", ") : String(nicheArr || "Đa ngành");
-        // Chỉ ghép những dữ kiện CÓ THẬT vào câu lý do. Trước đây câu này in thẳng `t.cvrAvg` và
-        // `t.totalGmv` — hai cột nhập tay đều = 0 ở 33/33 talent trên DB thật — nên lý do đọc ra là
-        // "CVR trung bình 0%, GMV tích lũy 0. Rất phù hợp với CROCS." GMV lấy từ ca như cả màn này.
-        const real = computeTalentRealTotals(sessions, t.id);
-        const facts = [
-          // `[].join(", ")` ra chuỗi rỗng nên fallback "Đa ngành" ở trên không bắt được mảng niches
-          // rỗng — câu lý do thành "Thế mạnh ngành , GMV…". Không biết ngành thì bỏ hẳn vế này.
-          nicheStr.trim() ? `Thế mạnh ngành ${nicheStr}` : null,
-          t.cvrAvg > 0 ? `CVR trung bình ${t.cvrAvg}%` : null,
-          real.totalGmv > 0 ? `GMV tích lũy ${fmtVndShort(real.totalGmv)}` : null,
-          real.sessionCount > 0 ? `${real.sessionCount} ca đã chạy` : null
-        ].filter(Boolean).join(", ");
-        return {
-          talentId: t.id,
-          name: t.name,
-          matchScore,
-          predictedGmv: t.avgGmvPerSession > 0 ? `${fmtVndShort(Math.round(t.avgGmvPerSession))} – ${fmtVndShort(Math.round(t.avgGmvPerSession * 1.25))}` : "chưa có dữ liệu",
-          // Không có dữ kiện nào thì KHÔNG khẳng định "rất phù hợp" — câu đó là câu duy nhất người dùng
-          // đọc để tin vào gợi ý, nói suông trên 0 dữ liệu còn tệ hơn không nói. (Trên DB thật
-          // 2026-09-30, 14/33 talent chưa chạy ca nào và không talent nào có niches.)
-          reasoning: facts
-            ? `${facts}. Rất phù hợp với ${activeBrand?.name || "Brand"}.`
-            : `Chưa có ca nào có số và chưa nhập ngành hàng cho ${t.name} — chưa đánh giá được độ phù hợp.`
-        };
-      });
-      setMatchingResults(results);
+      setMatchingResults(null);
+      setMatchingError(errorMessage(e, "Không gọi được AI ghép host."));
     } finally {
       setIsMatching(false);
     }
   };
-
   const filteredTalents = talents.filter((t) => {
     const matchesSearch = t.name.toLowerCase().includes(searchTerm.toLowerCase()) || (t.phone && t.phone.includes(searchTerm));
     const matchesRole = selectedRoleFilter === "All" || t.role === selectedRoleFilter;
@@ -621,16 +587,21 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
             </div>
           </div>
 
+          {matchingError && (
+            <div className="flex items-start gap-2 text-[11px] text-amber-400 bg-amber-950/40 border border-amber-500/40 rounded-xl px-3 py-2">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>
+                {matchingError}
+                <br />
+                Không có kết quả AI thì màn này không xếp hạng độ phù hợp — bảng Talent Pool bên dưới vẫn có GMV, số ca và giờ live thật của từng người.
+              </span>
+            </div>
+          )}
+
           {/* AI Matching Output Results */}
           {matchingResults && (
             <div className="bg-[var(--surface-base)]/80 p-4 rounded-xl border border-[var(--accent)]/80 space-y-3 pt-4 text-xs">
               <h4 className="font-bold text-[var(--accent-text)] text-sm">Gợi Ý Top Host Phù Hợp Nhất Cho Brand:</h4>
-              {matchingIsMock && (
-                <div className="flex items-center gap-2 text-[11px] text-amber-400 bg-amber-950/40 border border-amber-500/40 rounded-xl px-3 py-2">
-                  <AlertTriangle className="w-4 h-4 shrink-0" />
-                  Chưa cấu hình Gemini API key (hoặc AI đang lỗi) — điểm phù hợp bên dưới tính bằng công thức đơn giản, không phải phân tích AI thật.
-                </div>
-              )}
               <div className="grid md:grid-cols-2 gap-4">
                 {matchingResults.map((r, i) => (
                   <div key={i} className="p-3.5 rounded-xl bg-[var(--surface)] border border-[var(--accent)]/40 space-y-2">

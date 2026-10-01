@@ -392,12 +392,14 @@ test("Talent: không màn nào in số 0 từ cột nhập tay talents.total_gmv
   }
   expect(hits, hits.join("\n")).toEqual([]);
 
-  // Câu lý do của Trình AI Khớp Nối (nhánh fallback khi chưa có Gemini key — nhánh người dùng thật
-  // sự thấy) ghép dữ kiện bằng .filter(Boolean): hết dữ kiện thì chuỗi rỗng và câu thành
-  // ". Rất phù hợp với Franklin." — khẳng định suông trên 0 dữ liệu. Phải có nhánh nói chưa đánh giá được.
+  // Trước 2026-10-01, Trình AI Khớp Nối có một nhánh "fallback" tự viết câu lý do khi chưa có Gemini
+  // key — và vì key đang rỗng, ĐÓ CHÍNH LÀ nhánh người dùng thật sự thấy. Luật cũ ở đây chỉ bắt nó
+  // phải có câu "chưa đánh giá được" khi hết dữ kiện. Nay nhánh đó bị gỡ hẳn (xem `### P2a-7`), nên
+  // canh thẳng thứ không bao giờ được quay lại: app KHÔNG tự khẳng định độ phù hợp của ai với brand
+  // nào. Câu đó chỉ được đến từ model thật, không phải do client/server ghép chuỗi.
   for (const f of ["components/TalentMatcher.tsx", "server/createApp.ts"]) {
     const src = readFileSync(join(SRC, f), "utf8");
-    expect(src, `${f}: thiếu nhánh "chưa đánh giá được"`).toMatch(/chưa đánh giá được độ phù hợp/);
+    expect(src, `${f}: không được tự ghép câu khẳng định độ phù hợp`).not.toMatch(/Rất phù hợp với/);
   }
 });
 

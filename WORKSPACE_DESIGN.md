@@ -170,6 +170,8 @@
 > `AppSidebar` (185). Refactor thuần: 51 handler / 122 state / 28 useEffect khớp tuyệt đối trước–sau. Mục `### P2a-5`.
 > **P2a-6 2026-10-01:** `MonthlyReportTabs.tsx` 2.337 → **1.642** dòng (tách bộ component trình bày sang
 > `report/`). Giá của cả 2 đợt tách: entry +1,6 KB gzip. Mục `### P2a-6`.
+> **P2a-7 2026-10-01:** bỏ toàn bộ nội dung AI bịa (2 tầng: server + client), gỡ route chết
+> `optimize-schedule`. Luật: không có model trả lời thì nói chưa có, không tự viết thay. Mục `### P2a-7`.
 > **P2b đếm lượt mở tab: XONG, 0123 đã chạy, đếm từ 26/09/2026** (Phân Quyền → Lượt Mở Tab).
 > **P2c Report Tháng trên điện thoại XONG:** 24,7 → 7,5 màn 375px, phần 3–8 gập sau Insight. P2 còn: gộp menu (chờ 2–4 tuần số liệu).
 > **Kèm vá sự cố: mọi `/api/*` production chết (FUNCTION_INVOCATION_FAILED) từ 9dcf719 (24/09) tới 5ecb7c8 (26/09)** —
@@ -1153,6 +1155,50 @@ nhận về đúng 1.000 dòng đầu rồi im lặng — không lỗi, không c
 −28% và `MonthlyReportTabs` −30% là đáng, nhưng đừng tách nhỏ tiếp chỉ vì thích gọn: mỗi file mới
 đều có phí này.
 
+### P2a-7 — Bỏ nội dung AI bịa — XONG + VERIFY 2026-10-01 (không migration)
+- Luật mới: **app không bao giờ tự viết nội dung thay AI.** Không có model trả lời thì nói là chưa có,
+  không hiện gì thêm. Nhãn "câu trả lời mẫu" KHÔNG cứu được việc nội dung là bịa — người đọc vẫn ra
+  quyết định trên con số đó.
+- Có **hai tầng bịa**, không phải một:
+
+  | Ở đâu | Bịa cái gì |
+  |---|---|
+  | `/api/gemini/agent-chat` | lời khuyên CEO nhắc "Studio B đang trống 25% công suất", "Host Yến Nhi", "Brand La Roche-Posay" |
+  | `/api/gemini/match-talents` | "Match Score 96%" = **VỊ TRÍ TRONG MẢNG** (`96 − index×5`); `predictedGmv` = GMV TB × 1,25 |
+  | `/api/gemini/optimize-schedule` | khung giờ cứng + host cứng theo ngành + `predictedGmvLift: "+25%"` |
+  | `AiMultiAgent.tsx` (client) | tầng thứ HAI: tự viết đoạn tư vấn nhắc "Brand lớn như Cocoon hay Coolmate" |
+
+  > **"Yến Nhi" là talent CÓ THẬT trong hệ thống** (Phan Thị Yến Nhi). Lời khuyên bịa gọi đích danh một
+  > nhân sự thật, và `optimize-schedule` còn `talents.find(t => t.name.includes("Yến Nhi"))` để trả về
+  > đúng `talentId` của người đó. Đây là lý do mục này đáng sửa chứ không chỉ là "mock cho đẹp".
+
+- **ĐÍNH CHÍNH ghi chú cũ:** nhiều mục trước viết "`/api/gemini/*` trả reply bịa **khi thiếu**
+  `GEMINI_API_KEY`" kèm ngụ ý đó là trạng thái đang chạy. Sai — `GEMINI_API_KEY` **CÓ** cấu hình trên
+  `.env` thật. Nhưng bản vá vẫn cần, vì hai đường bịa KHÁC vẫn chạy dù có key:
+  1. Gemini lỗi/quá tải → server 500 → client `catch` → **bảng xếp hạng bịa**. Gặp đúng lúc verify:
+     Gemini trả `503 UNAVAILABLE "This model is currently experiencing high demand"`.
+  2. `optimize-schedule`: model trả JSON thiếu `suggestedSlot` → **âm thầm rơi về bản bịa**, gắn `isMock`.
+- **Đã làm:** cả 2 route còn lại trả `503 { code: "ai_not_configured" }` khi chưa có key; lỗi upstream
+  trả `502 { code: "ai_upstream_error" }` kèm MỘT câu đọc được (trước đây đẩy nguyên khối JSON của
+  Google ra UI), chi tiết thật giữ ở log server. Bỏ hẳn cờ `isMock` khỏi hợp đồng API. Client: bỏ tầng
+  bịa của `AiMultiAgent`, bỏ bảng xếp hạng thay thế của `TalentMatcher` (nói thẳng là không xếp hạng
+  được, và chỉ sang bảng Talent Pool vốn có GMV/số ca/giờ live THẬT).
+- **Gỡ hẳn `/api/gemini/optimize-schedule`** (77 dòng): màn gọi nó đã bị bỏ từ `53674f6`, nên route chỉ
+  còn tồn tại để phục vụ nội dung bịa. Cần lại thì dựng từ dữ liệu thật — đừng khôi phục bản cũ.
+- Verify: Talent Pool → "AI Tìm Top Host Phù Hợp" lúc Gemini đang quá tải → hiện đúng 2 câu
+  ("Gemini không trả lời được lúc này…" + "Không có kết quả AI thì màn này không xếp hạng độ phù hợp…"),
+  **không còn bảng Match Score giả**; log server giữ nguyên stack lỗi thật của Google. Dựng một server
+  phụ với `GEMINI_API_KEY` rỗng: `/api/health` báo `geminiConfigured: false` (dotenv KHÔNG ghi đè biến
+  đã set), `optimize-schedule` trả **404** (đã gỡ thật), `match-talents` không token trả **401** (vẫn gác
+  quyền). Nhánh 503 "chưa cấu hình" chưa thử được đầu-cuối vì route đòi bearer token của Supabase và
+  không nên moi token của người dùng ra — nó được canh bằng test đọc nguồn.
+- Test canh `tests/aiNoMock.test.ts` (4 test, **4/4 đỏ trên code cũ**): mọi route `/api/gemini/*` phải trả
+  503 + `ai_not_configured` ở nhánh `if (!ai)` và KHÔNG được `success: true`; không còn `isMock` nào trong
+  `src/`; không hardcode tên người/brand trong mã nguồn; client không tự dựng `reply`/`matchScore`/
+  `predictedGmv` ở nhánh lỗi. `layoutConventions` đổi luật cũ ("phải có nhánh chưa-đánh-giá-được") thành
+  luật mạnh hơn: app **không được tự ghép câu "Rất phù hợp với …"** — câu đó chỉ được đến từ model thật.
+- `tsc` 0 lỗi · `eslint` 0 lỗi / 33 warning (baseline) · `vitest` **246/246** · `npm run build` OK.
+
 ### P2b — Đếm lượt mở tab — XONG 2026-09-26, migration 0123 ĐÃ CHẠY + verify (bắt đầu đếm 26/09/2026)
 - Vì sao: trước khi gộp/bỏ mục menu (18 tab agency + 10 tab brand) cần số người dùng thật — chưa có số nào.
 - `supabase/migrations/0123_ui_tab_views.sql`: bảng `ui_tab_views(user_id, role, workspace, brand_id, tab, viewed_at)`;
@@ -1257,7 +1303,7 @@ Kèm theo, `ShiftScheduling.tsx` — mỗi dòng ca trong `visibleSlots.map()` t
 4. **Thay `window.alert()` bằng toast — XONG (49/49).** [useToast.tsx](src/hooks/useToast.tsx): `ToastProvider` + `useToast()` (context, không chặn UI, tự biến mất sau 8s, có nút đóng tay) mount ở `main.tsx` trên `AuthProvider`. Thay cơ học `window.alert(X)` → `showToast(X)` ở 9 file (App.tsx 39 chỗ — gần như toàn bộ là `catch (e) { window.alert(errorMessage(e)) }` — + 8 file khác 10 chỗ: OpenSlotModal/FinanceHr/SlotDetailModal/BackfillFromRooms/StudioEquipment/ShiftScheduling/SessionWindow/AiTrainingCenter). An toàn vì `alert()` không gate luồng gì phía sau (fire-and-forget), không cần đổi hàm bao quanh thành async.
 5. **`window.confirm()` → modal riêng — XONG (25/25), đợt 2.** [useConfirm.tsx](src/hooks/useConfirm.tsx): `ConfirmProvider` + `useConfirm()` — trả `Promise<boolean>` (khác `useToast` — mỗi `confirm()` cũ đang GATE code chạy tiếp nên không thay cơ học được), dialog card giữa màn khớp theme app (không phải native), `whitespace-pre-line` giữ đúng xuống dòng của các cảnh báo nhiều đoạn ghép bằng `\n\n` (MonthPlan.tsx có confirm dài nhất — 4 đoạn cảnh báo trước khi chốt kế hoạch), option `danger` tô nút xác nhận đỏ cho hành động phá huỷ (xoá/huỷ — set ở tất cả các chỗ `window.confirm` cũ có ý "xoá"/"huỷ"/"ngắt kết nối" không hoàn tác được). 16 file, 25 chỗ: MonthPlan (4) · OpenSlotModal/TikTokApiAutomation/StudioEquipment/ReportPublishBoard/LiveReconciliation/BrandCommitment (2 mỗi file) · BrandMonthlyReport/BrandDataRaw/BackfillFromRooms/UserRoleSettings/TalentMatcher/SessionWindow/SessionLiveSnapshotUpload/CrmProjects/BulkFinalizePanel (1 mỗi file). Mỗi chỗ: hàm bao quanh đổi thành `async` (hầu hết ĐÃ SẴN async vì gọi RPC ngay sau), `if (!window.confirm(X)) return;` → `if (!(await confirm(X))) return;`. Không có chỗ nào gọi hàm này từ context KHÔNG async-hoá được (mọi call site đều là onClick hoặc callback đã async).
 
-Còn lại chưa đụng (không nằm trong danh sách user chọn): ~~bundle **2.4 MB một mảnh**, không code-split~~ — ĐÃ XỬ LÝ, xem `### P2a` (26/09, tách theo tab) và `### P2a-2` (01/10, entry còn 495 KB); ~~≈13 cụm fetch nổ cùng lúc lúc đăng nhập cho mọi role~~ — ĐÃ XỬ LÝ, xem `### P2a-3` (01/10: 46 → 28 request, hết request lặp); ~~`useNotifications` poll 45s không kiểm `document.visibilityState`~~ — ĐÃ XỬ LÝ, xem `### P2a-4` (kèm trần 1.000 dòng của PostgREST); ~~`App.tsx` 2600+ dòng~~ — ĐÃ TÁCH còn 2.054, xem `### P2a-5` (phần còn lại là handler + JSX theo tab, cố ý không tách tiếp); ~~`MonthlyReportTabs.tsx` 2.337 dòng~~ — ĐÃ TÁCH còn 1.642, xem `### P2a-6`; `/api/gemini/*` vẫn trả `isMock: true` kèm reply bịa khi thiếu `GEMINI_API_KEY`.
+Còn lại chưa đụng (không nằm trong danh sách user chọn): ~~bundle **2.4 MB một mảnh**, không code-split~~ — ĐÃ XỬ LÝ, xem `### P2a` (26/09, tách theo tab) và `### P2a-2` (01/10, entry còn 495 KB); ~~≈13 cụm fetch nổ cùng lúc lúc đăng nhập cho mọi role~~ — ĐÃ XỬ LÝ, xem `### P2a-3` (01/10: 46 → 28 request, hết request lặp); ~~`useNotifications` poll 45s không kiểm `document.visibilityState`~~ — ĐÃ XỬ LÝ, xem `### P2a-4` (kèm trần 1.000 dòng của PostgREST); ~~`App.tsx` 2600+ dòng~~ — ĐÃ TÁCH còn 2.054, xem `### P2a-5` (phần còn lại là handler + JSX theo tab, cố ý không tách tiếp); ~~`MonthlyReportTabs.tsx` 2.337 dòng~~ — ĐÃ TÁCH còn 1.642, xem `### P2a-6`; ~~`/api/gemini/*` vẫn trả `isMock: true` kèm reply bịa khi thiếu `GEMINI_API_KEY`~~ — ĐÃ XỬ LÝ, xem `### P2a-7`. **Hết danh sách này.**
 
 Verify đợt 2: `tsc --noEmit` xanh (xác nhận mọi hàm chứa `await confirm(...)` đã đúng `async`), `eslint .` 0 lỗi/41 warning (đúng baseline, không phát sinh mới), `vitest` 38/38 xanh, browser smoke test không lỗi console (React).
 

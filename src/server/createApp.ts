@@ -4,9 +4,7 @@ import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 import * as Sentry from "@sentry/node";
-import { errorMessage } from "../lib/errorMessage.js";
 
-import { fmtVndShort } from "../lib/format.js";
 dotenv.config();
 
 // Raw request body bytes, captured by the express.json() verify hook below for HMAC webhook
@@ -724,6 +722,25 @@ export function createApp() {
       overallScore: t?.overallScore
     }));
 
+  // Chưa có GEMINI_API_KEY thì KHÔNG bịa câu trả lời.
+  //
+  // Trước 2026-10-01 cả 3 route /api/gemini/* đều trả `isMock: true` KÈM nội dung tự nghĩ ra. Và vì
+  // `GEMINI_API_KEY` đang RỖNG trên môi trường thật, đó chính là thứ người dùng nhận được mỗi lần
+  // bấm: lời khuyên CEO nhắc "Studio B đang trống 25% công suất", "Host Yến Nhi", "Brand
+  // La Roche-Posay" — không thực thể nào trong số đó tồn tại trong tài khoản này — và Match Score
+  // chính là VỊ TRÍ TRONG MẢNG (96 − index×5) in ra dưới dạng "% phù hợp".
+  //
+  // Một cái nhãn "câu trả lời mẫu" không cứu được việc nội dung là bịa: người đọc vẫn ra quyết định
+  // trên con số đó. Nay trả 503 kèm `code` để UI nói thẳng "chưa bật" và KHÔNG hiện gì thêm.
+  const AI_NOT_CONFIGURED =
+    "Chưa cấu hình GEMINI_API_KEY trên server — tính năng AI chưa bật. Đặt biến môi trường rồi khởi động lại server.";
+
+  // Gemini lỗi/quá tải: trả MỘT câu đọc được, chi tiết thật để ở log server. Trước đây đẩy thẳng
+  // `errorMessage(error)` ra UI nên người dùng nhận nguyên khối JSON của Google
+  // ({"error":{"code":503,"message":"This model is currently experiencing high demand"...}}).
+  // Đây cũng là đường hay gặp nhất trong thực tế — bắt gặp đúng lúc verify 2026-10-01.
+  const AI_UPSTREAM_ERROR = "Gemini không trả lời được lúc này (quá tải hoặc lỗi tạm thời) — thử lại sau ít phút.";
+
   // API Route: Multi-Agent AI Assistant
   app.post("/api/gemini/agent-chat", async (req, res) => {
     try {
@@ -732,15 +749,7 @@ export function createApp() {
       const { agentRole, userMessage } = req.body;
       const ai = getGeminiClient();
 
-      if (!ai) {
-        let reply = "";
-        if (agentRole === "ceo") {
-          reply = `[CEO Advisor AI]: Với vai trò CEO, tôi khuyên bạn nên tập trung tối ưu Margin trên từng phiên Live thay vì chạy theo GMV ròng. Tuần này Studio B đang trống 25% công suất, hãy đẩy nhanh việc khớp Host Yến Nhi với Brand La Roche-Posay để tối ưu dòng tiền.`;
-        } else {
-          reply = `[LiveOps Assistant AI]: Tôi đã nhận được yêu cầu: "${userMessage}". Dữ liệu agency hiện tại ổn định với 3/3 Studio đang vận hành đúng tiến độ.`;
-        }
-        return res.json({ success: true, isMock: true, reply });
-      }
+      if (!ai) return res.status(503).json({ success: false, code: "ai_not_configured", error: AI_NOT_CONFIGURED });
 
       const agentChatDefaults: Record<string, string> = {
         ceo: "Bạn là CEO AI Advisor cho TikTok Livestream Agency. Hãy trả lời ngắn gọn, tập trung vào P&L, tối ưu chi phí, dòng tiền, nhân sự và chiến lược tăng trưởng.",
@@ -756,10 +765,10 @@ export function createApp() {
         contents: prompt,
       });
 
-      return res.json({ success: true, isMock: false, reply: response.text });
+      return res.json({ success: true, reply: response.text });
     } catch (error) {
       console.error("Agent Chat Error:", error);
-      res.status(500).json({ success: false, error: errorMessage(error) });
+      res.status(502).json({ success: false, code: "ai_upstream_error", error: AI_UPSTREAM_ERROR });
     }
   });
 
@@ -771,30 +780,7 @@ export function createApp() {
       const { brand, targetCategory, talents } = req.body;
       const ai = getGeminiClient();
 
-      if (!ai) {
-        // Fallback: same shape as before Phase 10 (formula-based), used only when no API key is set.
-        const results = (talents || []).map((t: AiTalentInput, idx: number) => ({
-          talentId: t.id,
-          name: t.name,
-          matchScore: Math.max(70, 96 - idx * 5),
-          predictedGmv: `${fmtVndShort(Math.round(t.avgGmvPerSession || 100000000))} – ${fmtVndShort(Math.round((t.avgGmvPerSession || 100000000) * 1.25))}`,
-          // Chỉ ghép dữ kiện CÓ THẬT — cvr_avg/total_gmv là cột nhập tay, = 0 ở 33/33 talent trên DB
-          // thật, nên câu cũ luôn ra "CVR trung bình 0%, GMV tích lũy 0. Rất phù hợp với ...".
-          reasoning: ((facts: string) =>
-            facts
-              ? `${facts}. Rất phù hợp với ${brand?.name || "Brand"}.`
-              : `Chưa có dữ liệu hiệu suất và ngành hàng cho ${t.name} — chưa đánh giá được độ phù hợp.`)(
-            [
-              (t.niches || []).length > 0 ? `Thế mạnh ngành ${(t.niches || []).join(", ")}` : null,
-              (t.cvrAvg || 0) > 0 ? `CVR trung bình ${t.cvrAvg}%` : null,
-              (t.totalGmv || 0) > 0 ? `GMV tích lũy ${fmtVndShort(t.totalGmv || 0)}` : null
-            ]
-              .filter(Boolean)
-              .join(", ")
-          )
-        }));
-        return res.json({ success: true, isMock: true, results });
-      }
+      if (!ai) return res.status(503).json({ success: false, code: "ai_not_configured", error: AI_NOT_CONFIGURED });
 
       const systemPrompt = await getAgentPrompt(
         "talent_matcher",
@@ -824,90 +810,18 @@ Hãy chấm điểm mức độ phù hợp (matchScore, 0-100) cho MỖI talent 
       });
 
       const data = JSON.parse(response.text || "{}");
-      return res.json({ success: true, isMock: false, results: data.results || [] });
+      return res.json({ success: true, results: data.results || [] });
     } catch (error) {
       console.error("Gemini Talent Matching Error:", error);
-      res.status(500).json({ success: false, error: errorMessage(error) });
+      res.status(502).json({ success: false, code: "ai_upstream_error", error: AI_UPSTREAM_ERROR });
     }
   });
 
-  // API Route: AI Schedule Optimizer — recommends best time slot & host for a brand
-  app.post("/api/gemini/optimize-schedule", async (req, res) => {
-    try {
-      if (!(await requireAuthedCallerOrReject(req, res))) return;
-      if (rejectIfPayloadTooLarge(req, res)) return;
-      const { brand, timeSlots, talents } = req.body;
-      const ai = getGeminiClient();
-
-      const fallback = () => {
-        const industry = brand?.industry || "Thương mại điện tử";
-        let suggestedSlot = "20:00 - 23:00";
-        let suggestedHostName = "Yến Nhi";
-        let reason = "Ngành Beauty/Mỹ phẩm có CVR cao nhất vào khung giờ Tối Đêm Vàng.";
-        if (industry.includes("Thời trang") || industry.includes("Nam")) {
-          suggestedSlot = "14:00 - 17:00";
-          suggestedHostName = "Hoàng Nam";
-          reason = "Ngành Thời trang Nam đạt đòn bẩy đơn cao vào chiều trước giờ tan tầm.";
-        } else if (industry.includes("Gia dụng")) {
-          suggestedSlot = "11:00 - 14:00";
-          suggestedHostName = "Bích Ngọc";
-          reason = "Gia dụng bếp phù hợp nghỉ trưa dân văn phòng.";
-        }
-        const matchedHost = (talents || []).find((t: AiTalentInput) => t.name?.includes(suggestedHostName));
-        return {
-          suggestedSlot,
-          suggestedHostId: matchedHost?.id || null,
-          suggestedHostName: matchedHost?.name || suggestedHostName,
-          reason,
-          predictedGmvLift: "+25%"
-        };
-      };
-
-      if (!ai) {
-        return res.json({ success: true, isMock: true, ...fallback() });
-      }
-
-      const systemPrompt = await getAgentPrompt(
-        "schedule_optimizer",
-        "Bạn là AI Schedule Matching cho Agency Livestream TikTok Shop, chuyên đề xuất khung giờ live và Host phù hợp nhất cho một Brand dựa trên dữ liệu thật."
-      );
-      const prompt = `${systemPrompt}
-
-Thương hiệu cần lên lịch: ${brand?.name || "Brand"} (Ngành: ${brand?.industry || "N/A"})
-
-Các khung giờ live cố định có thể chọn:
-${JSON.stringify(timeSlots)}
-
-Danh sách Talent hiện có (dữ liệu thật từ hệ thống):
-${JSON.stringify(sanitizeTalentsForAi(talents))}
-
-Hãy chọn MỘT khung giờ phù hợp nhất trong danh sách trên và MỘT Host phù hợp nhất trong danh sách Talent, dựa trên ngành hàng của Brand, CVR, GMV trung bình mỗi phiên của Talent, và đặc điểm khung giờ. Đưa ra lý do (reason) ngắn gọn dựa trên số liệu thật đã cho — không bịa số liệu không có trong dữ liệu. Ước tính mức tăng GMV tiềm năng (predictedGmvLift) dạng phần trăm.
-
-Định dạng JSON trả về:
-{
-  "suggestedSlot": "20:00 - 23:00",
-  "suggestedHostId": "talent-id-tương-ứng",
-  "suggestedHostName": "Tên Host",
-  "reason": "...",
-  "predictedGmvLift": "+25%"
-}`;
-
-      const response = await ai.models.generateContent({
-        model: "gemini-flash-latest",
-        contents: prompt,
-        config: { responseMimeType: "application/json" },
-      });
-
-      const data = JSON.parse(response.text || "{}");
-      if (!data.suggestedSlot) {
-        return res.json({ success: true, isMock: true, ...fallback() });
-      }
-      return res.json({ success: true, isMock: false, ...data });
-    } catch (error) {
-      console.error("Gemini Schedule Optimizer Error:", error);
-      res.status(500).json({ success: false, error: errorMessage(error) });
-    }
-  });
+  // `/api/gemini/optimize-schedule` ĐÃ GỠ 2026-10-01. Màn gọi nó bị bỏ từ 53674f6 (Lịch & Studio chỉ
+  // còn "Mở ca chờ đăng ký"), nên route chỉ còn tồn tại để trả một gợi ý BỊA khi chưa có API key:
+  // khung giờ cứng theo ngành + tên host cứng ("Yến Nhi"/"Hoàng Nam"/"Bích Ngọc", không ai trong
+  // số đó có trong hệ thống) + predictedGmvLift "+25%". Nó còn rơi về đúng bản bịa đó cả khi ĐÃ có
+  // key mà model trả JSON thiếu trường. Cần lại thì dựng từ dữ liệu thật, đừng khôi phục bản này.
 
   if (process.env.SENTRY_DSN) {
     Sentry.setupExpressErrorHandler(app);

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Send, Bot, User, RefreshCw, Briefcase, LineChart } from "lucide-react";
 import { authedFetch } from "../lib/authedFetch";
+import { errorMessage } from "../lib/errorMessage";
 
 type AgentRole = "ceo" | "data_analyst";
 
@@ -8,10 +9,10 @@ interface Message {
   sender: "user" | "agent";
   text: string;
   time: string;
-  // FIX L1 (audit 2026-08-21): true khi câu trả lời là bản viết sẵn (server chưa cấu hình
-  // GEMINI_API_KEY, hoặc client fallback lúc API lỗi) — trước đây UI không phân biệt, hiện y hệt
-  // phản hồi Gemini thật. Cùng nguyên tắc isMock LiveCalendar đã làm đúng cho AI Schedule Optimizer.
-  isMock?: boolean;
+  // 2026-10-01: trước đây là cờ `isMock` — câu trả lời VIẾT SẴN vẫn được hiện, chỉ kèm nhãn. Nay
+  // không còn bản viết sẵn nào: server chưa cấu hình key thì trả 503 và chỗ này hiện đúng lời báo
+  // lỗi đó. Nhãn cảnh báo không cứu được nội dung bịa — người đọc vẫn ra quyết định trên nó.
+  isError?: boolean;
 }
 
 export const AiMultiAgent: React.FC = () => {
@@ -63,45 +64,40 @@ export const AiMultiAgent: React.FC = () => {
         })
       });
       const data = await res.json();
-      if (data.success) {
-        const agentMsg: Message = {
-          sender: "agent",
-          text: data.reply,
-          time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          isMock: !!data.isMock
-        };
+      if (data.success && data.reply) {
         setChatHistory((prev) => ({
           ...prev,
-          [selectedAgent]: [...prev[selectedAgent], agentMsg]
+          [selectedAgent]: [
+            ...prev[selectedAgent],
+            {
+              sender: "agent",
+              text: data.reply,
+              time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+            }
+          ]
         }));
-        setLoading(false);
         return;
       }
-    } catch {
-      console.log("Using client AI Agent fallback...");
-    }
-
-    // Role-based domain AI responses
-    let reply = "";
-    if (selectedAgent === "ceo") {
-      reply = `[CEO Advisor Response]: Dựa trên dữ liệu tài chính & công suất Agency:\n- Về vấn đề "${currentText}": Tôi khuyến nghị ưu tiên tối ưu tỷ lệ Net Margin từng phiên live (giữ mức 18-25%).\n- Với các Brand lớn như Cocoon hay Coolmate, hãy gộp kịch bản Flash Sale khung giờ vàng để nâng GMV trung bình trên mỗi phiên.`;
-    } else {
-      reply = `[TikTok Data Analyst Response]: Giải mã dữ liệu luồng live đối với "${currentText}":\n- Tỷ lệ đứt nhịp (Drop View) thường xảy ra ở phút thứ 12-15 nếu không đổi sản phẩm.\n- Khuyến nghị: Cứ mỗi 10 phút, kích hoạt 1 đợt đẩy Voucher TikTok Shop 30k để đẩy lượt comment & kéo retention curve vọt lên lại.`;
-    }
-
-    setTimeout(() => {
-      const agentMsg: Message = {
-        sender: "agent",
-        text: reply,
-        time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        isMock: true
-      };
+      throw new Error(data.error || "Không nhận được câu trả lời từ AI.");
+    } catch (e) {
+      // KHÔNG tự viết câu trả lời thay AI. Bản cũ ở đây bịa hẳn một đoạn tư vấn nhắc "Brand lớn như
+      // Cocoon hay Coolmate" (không brand nào trong hai cái đó tồn tại — brand thật là Franklin,
+      // JOCKEY, VERA, CROCS) kèm các con số tự nghĩ ra, rồi gắn nhãn "câu trả lời mẫu".
       setChatHistory((prev) => ({
         ...prev,
-        [selectedAgent]: [...prev[selectedAgent], agentMsg]
+        [selectedAgent]: [
+          ...prev[selectedAgent],
+          {
+            sender: "agent",
+            text: errorMessage(e, "Không gọi được AI."),
+            time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            isError: true
+          }
+        ]
       }));
+    } finally {
       setLoading(false);
-    }, 700);
+    }
   };
 
   return (
@@ -174,9 +170,9 @@ export const AiMultiAgent: React.FC = () => {
                     ? "bg-[var(--accent)] text-white rounded-tr-none"
                     : "bg-[var(--surface-elevated)] text-[var(--text)] rounded-tl-none border border-[var(--border)]"
                 }`}>
-                  {msg.isMock && (
+                  {msg.isError && (
                     <span className="inline-block text-[11px] font-bold uppercase tracking-wide text-amber-400 bg-amber-950/40 border border-amber-500/40 rounded px-1.5 py-0.5">
-                      Chưa cấu hình Gemini API key — câu trả lời mẫu
+                      Chưa có câu trả lời
                     </span>
                   )}
                   <p className="whitespace-pre-line">{msg.text}</p>
