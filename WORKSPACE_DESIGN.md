@@ -1535,6 +1535,45 @@ Từ nay dựng staging/harness bằng cách replay chuỗi là ra đúng produc
   verify được tới mức hình dạng).
 - `tsc` 0 lỗi · `eslint` 0 lỗi / 33 warning (baseline) · `vitest` 359/359 · build OK.
 
+
+### P2a-13 — Hai chỗ đọc Dữ Liệu Gốc đang bị PostgREST cắt 1.000 dòng — XONG 2026-10-01
+
+**Lỗ hổng của chính cổng canh.** `tests/pagedQueries.test.ts` (dựng 2026-10-01) canh "đọc cả bảng
+phải cuộn trang" bằng một **DANH SÁCH KHAI TAY** và chỉ soi `src/lib/db/`. Hai chỗ đọc
+`brand_dataraw_rows` nằm ở `src/lib/dataraw/` nên lọt hoàn toàn:
+
+| Chỗ đọc | Hệ quả |
+|---|---|
+| `affiliateLiveSessionSlice.fetchAffiliateLiveSessions` | Dải **mặc định của trang Affiliate là 4 THÁNG** (`addMonths(thisMonth(), -3)`) ⇒ đọc 4 batch Live Analysis không phân trang. Đúng hình dạng đã làm mất dữ liệu thật **2026-09-23** (4 tháng product_list: 4.601 dòng đọc ra 120 SKU). |
+| `weeklySlice.fetchDataRawWeekSlice` | Đọc **TRỌN** dòng của mọi batch phủ tuần rồi mới lọc ngày trong JS ⇒ tuần cần xem có thể nằm hẳn trong phần bị cắt. |
+
+Bằng chứng không phải suy đoán: `src/lib/db/fetchAllPages.ts` đã ghi số đo trên DB thật
+**2026-10-01 — `brand_dataraw_rows` 5.333 dòng, 4/24 đợt nhập vượt trần (1.181 · 1.176 · 1.164 ·
+1.080)**. Cả hai chỗ trên đã chuyển sang `fetchRowsPaged`.
+
+**Lỗi thứ hai, cùng file.** `fetchAffiliateLiveSessions` gộp phiên trùng giữa 2 batch theo
+last-write-wins, comment ghi rõ ý định *"giữ bản ĐỌC SAU CÙNG vì batch nạp sau thường là số đã cập
+nhật hoàn/huỷ"* — nhưng truy vấn batch **không có `.order(...)` nào**. Thứ tự là thứ tự tuỳ Postgres,
+nên bản đã trừ hoàn/huỷ có thể bị bản cũ ghi đè, **và kết quả đổi giữa hai lần mở trang**. Nay xếp
+theo `imported_at` (phá hoà bằng `id`). Hai batch chồng kỳ chỉ xảy ra khi một batch vắt qua 2 tháng —
+unique index 0077 đã chặn 2 batch cùng tháng — nên hẹp hơn comment cũ hàm ý, nhưng có thật.
+
+**Quy ước mới:** cổng canh phân trang giờ **QUÉT cả `src/`** thay vì khai tay — mọi `.from("<bảng
+theo dòng>")` có `.select(` đều phải thấy `fetchRowsPaged`/`fetchAllPages`/`.range(` trong phạm vi
+quanh nó, hoặc khai `.limit(` là chặn có chủ ý. Thêm bảng mới vào `ROW_TABLES` là xong, không phải
+nhớ tên từng hàm. Test có chốt an toàn cho chính nó (`readers >= 2`) để regex hỏng không ra màu xanh.
+
+**File:** `src/lib/dataraw/affiliateLiveRows.ts` (MỚI — phần thuần tách khỏi slice để test được,
+cùng quy ước `lib/backfill/roomsToSessions.ts`), `affiliateLiveSessionSlice.ts` (còn đúng đường đọc
+DB), `weeklySlice.ts`. **Test:** `tests/affiliateLiveRows.test.ts` (23 — gồm 2 test chứng minh hàm
+NHẠY với thứ tự batch, tức thứ tự truyền vào là hợp đồng chứ không phải chi tiết nội bộ),
+`tests/pagedQueries.test.ts` +2. Suite **359 → 384**.
+
+> **CHƯA LÀM:** chưa chứng minh được 2 test canh mới đỏ trên code cũ bằng `git stash` (file mới chưa
+> `git add` nên stash từ chối cả lệnh). Lần sau chạy `git stash push -u -- <paths>`. Riêng test quét
+> thì logic tự nó cho thấy sẽ đỏ: trước bản vá có đúng 2 chỗ đọc không hề có helper phân trang nào
+> trong phạm vi quét.
+
 ### P2b — Đếm lượt mở tab — XONG 2026-09-26, migration 0123 ĐÃ CHẠY + verify (bắt đầu đếm 26/09/2026)
 - Vì sao: trước khi gộp/bỏ mục menu (18 tab agency + 10 tab brand) cần số người dùng thật — chưa có số nào.
 - `supabase/migrations/0123_ui_tab_views.sql`: bảng `ui_tab_views(user_id, role, workspace, brand_id, tab, viewed_at)`;

@@ -1,6 +1,7 @@
 import { supabase } from "../supabaseClient";
 import { DataRawColumn } from "../../types";
 import { mapDataRawToImportRows, vnParts } from "./liveAnalysisRows";
+import { fetchRowsPaged } from "./fetchRowsPaged";
 
 // Giai đoạn 4 — Report Tuần lấy dữ liệu bằng cách LỌC từ batch tháng của Dataraw, không thêm
 // batch theo tuần (quyết định của user): TikTok export luôn cộng dồn từ đầu tháng nên batch
@@ -94,18 +95,11 @@ export async function fetchDataRawWeekSlice(brandId: string, weekStart: string, 
     return { daily: [], live: [], missingDays: eachDay(weekStart, weekEnd), hasAnyBatch: false };
   }
 
-  const { data: rowsData, error: rowsError } = await supabase
-    .from("brand_dataraw_rows")
-    .select("import_id, raw")
-    .in("import_id", overlapping.map((i) => i.id))
-    .order("row_index", { ascending: true });
-  if (rowsError) throw rowsError;
-  const rowsByImport = new Map<string, Record<string, unknown>[]>();
-  for (const r of (rowsData as { import_id: string; raw: Record<string, unknown> }[]) ?? []) {
-    const list = rowsByImport.get(r.import_id) ?? [];
-    list.push(r.raw ?? {});
-    rowsByImport.set(r.import_id, list);
-  }
+  // Phải cuộn trang: PostgREST cắt ở 1.000 dòng và KHÔNG báo lỗi (xem fetchRowsPaged.ts). Tuần chỉ
+  // là một lát NHỎ, nhưng truy vấn này đọc TRỌN dòng của mọi batch phủ tuần đó rồi mới lọc theo
+  // ngày trong JS — một batch live_analysis cả tháng vượt 1.000 dòng (đo 2026-10-01: 4/24 đợt nhập
+  // ở mức 1.080–1.181) là tuần cần xem có thể nằm hẳn trong phần bị cắt.
+  const rowsByImport = await fetchRowsPaged(overlapping.map((i) => i.id));
 
   const daily: DailyShopRow[] = [];
   const live: WeeklyLiveRow[] = [];
