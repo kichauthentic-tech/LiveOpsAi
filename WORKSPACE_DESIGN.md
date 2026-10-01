@@ -63,8 +63,14 @@
 > toán client" và "0 long-task" đều **đã rút lại**. Việc làm được: chuông gate theo `session` thay vì
 > `profile` (`fetchMyNotifications` không dùng gì từ hồ sơ) ⇒ lượt đọc chuông lên **chặng 1**, xong
 > trước cả khi `profiles` về, 3/3 màn, số request không đổi. Quy ước mới: **lượt đọc không dùng dữ liệu
-> `profile` thì gate theo `session`**. Câu hỏi còn mở: thời gian render phía client — **cần hiện Browser
-> pane** mới đo được.
+> `profile` thì gate theo `session`**. **P2a-20 ĐÓNG nhánh hiệu năng:** câu hỏi CPU phía client đã trả
+> lời được mà không cần pane — probe bằng Web Worker (timer worker không bị siết; đối chứng chặn 220ms
+> ⇒ báo 219ms) và benchmark trong Node. Màn bị nghi nặng nhất (`/hieu-suat-host`, có lượt 2.256ms
+> blocking) hoá ra tốn **0,96 ms** cho TOÀN BỘ phần tính của nó — con số kia là nhiễu môi trường, và nó
+> **không tái lập** (3 lượt sau: 441 · 0 · 345 ms). Cả app chỉ có **MỘT** phép tính đắt:
+> `suggestMonthPlan` ~105 ms (max 208), chỉ ở Kế Hoạch Tháng, và cả 2 chỗ gọi đều hợp lý (1 chỗ là
+> handler bấm nút và dùng cả 3 kết quả ngay; 1 chỗ có `useMemo` + 2 lớp chốt) ⇒ **không sửa**. Mọi phép
+> khác ≤ 2,3 ms. Phần biến động còn lại là **mạng**, ngoài app.
 >
 > **Còn lại trong file này đều KHÔNG phải việc code:** 24 file Dataraw CROCS T6–T9 chưa up (nhập liệu) ·
 > tích hợp TikTok API (chờ scope Developer/ISV) · lịch sử trước T7/2026 · 33 warning `set-state-in-effect`
@@ -2072,8 +2078,70 @@ Chuông giờ khởi hành cùng đợt 1 và **xong trước cả khi `profiles
 được gate theo `profile`* — gate theo `session`. Chốt bằng test trong `tests/loginFetch.test.ts` (file
 vốn đã dành riêng cho lớp lỗi "đợt fetch lúc đăng nhập"), **7 test**, chứng minh đỏ trên code cũ.
 
-**CẦN NGƯỜI DÙNG:** hiện Browser pane lên thì mới đo được thời gian render phía client (mục 2) — đó là
-câu hỏi lớn duy nhất còn mở của nhánh hiệu năng.
+**~~CẦN NGƯỜI DÙNG: hiện Browser pane~~ — ĐÃ GIẢI QUYẾT KHÔNG CẦN PANE, xem P2a-20:** probe bằng Web
+Worker đo được blocking trong pane ẩn (timer của worker không bị siết), và benchmark trong Node trả lời
+dứt điểm. Kết quả: cả app chỉ có MỘT phép tính đắt (`suggestMonthPlan` ~105 ms, chỉ ở Kế Hoạch Tháng);
+không màn nào có vấn đề CPU lúc tải.
+
+### P2a-20 — ĐÓNG câu hỏi CPU phía client: cả app chỉ có MỘT phép tính đắt — 2026-10-02
+
+P2a-19 để ngỏ *"thời gian render phía client — cần hiện Browser pane mới đo được"*. **Đã trả lời được
+mà không cần pane**, bằng hai đường độc lập. Kết luận: **không màn nào có vấn đề CPU lúc tải.**
+
+**Đường 1 — probe bằng Web Worker (đo được trong pane ẩn).** Worker ping main thread mỗi 16 ms, main
+thread trả lời ngay; main thread bị chặn thì câu trả lời về chậm đúng bằng thời gian bị chặn. Timer
+trong worker **KHÔNG** bị siết theo visibility của trang (đo được 117 mẫu/giây). **Đối chứng bắt buộc:**
+tự chặn main thread 220 ms ⇒ probe báo 219 ms. Đây là cách duy nhất tìm được để đo blocking khi pane ẩn
+(`PerformanceObserver` kiểu `longtask` im lặng hoàn toàn — xem P2a-19).
+
+Kết quả (lượt đầu mỗi màn): `/so-ca` 134 ms · `/brand/crocs/report-thang` 315 ms ·
+`/brand/crocs/dashboard` 326 ms · `/hieu-suat-host` **2.256 ms** (task đơn 644 ms).
+
+**Nhưng `/hieu-suat-host` KHÔNG tái lập:** 3 lượt sau cho **441 · 0 · 345 ms**. Có lượt **0 ms** hoàn
+toàn ⇒ tính toán không đắt một cách cố hữu. Lượt 2.256 ms trùng với lượt **mạng chậm nhất**
+(netEnd 3.328 ms so với 736–933 ms), khớp giả thuyết "dữ liệu về nhỏ giọt ⇒ nhiều lần tính lại". Thêm
+nữa, các block ở mốc 5.988/6.632/7.967 ms là **đặc thù Browser pane**: chính code đã ghi nhận
+`visibilitychange` *"có thể dội liên tục (mỗi ~6 giây)"* trong pane. ⇒ Probe dùng được, nhưng số của nó
+bị nhiễm bởi môi trường; **không dùng nó làm kết luận.**
+
+**Đường 2 — benchmark trong Node, sạch hoàn toàn.** Dữ liệu TỔNG HỢP theo quy mô production (195 ca ·
+34 host · 4 brand · 3 tháng; lịch sử riêng của 1 brand = 49 ca — xấp xỉ, không phải đúng 229 ca thật),
+20 lượt mỗi phép, bỏ lượt warm-up:
+
+| phép tính | min | trung vị | max |
+|---|---|---|---|
+| `dataQuality` | 0,01 ms | **0,01 ms** | 0,01 ms |
+| `byHost` / `byHostBrand` / `byWeekday` / `byDate` / `hostWeekdayGrid` | 0,15–0,23 ms | **0,18–0,24 ms** | 1,03 ms |
+| `buildHistory` (1 brand) | 0,54 ms | **0,62 ms** | 0,93 ms |
+| `buildHistory` (ALL_BRANDS) | 1,11 ms | **1,36 ms** | 2,29 ms |
+| **`suggestMonthPlan`** | **83 ms** | **105 ms** | **208 ms** |
+
+**Toàn bộ phần tính của màn Hiệu Suất Host, 1 lượt: 0,96 ms.** ⇒ Màn bị nghi nặng nhất hoá ra là màn
+nhẹ nhất; con số 2.256 ms kia **chắc chắn là nhiễu môi trường**, không phải lỗi app.
+
+**Cả app chỉ có MỘT phép tính đắt: `suggestMonthPlan` (~105 ms), và nó chỉ sống ở Kế Hoạch Tháng.**
+Hai chỗ gọi, cả hai đều **hợp lý, không sửa**:
+1. `suggest()` (`MonthPlan.tsx:369-371`) gọi **3 lần** (max/balanced/lean) ⇒ ~315 ms. Nhưng đó là
+   **handler bấm nút**, không phải lúc mở màn, và cả 3 phương án được hiện **ngay** cạnh nhau trong
+   `SuggestionPanel` (`:858`); bấm chọn phương án là áp tức thì từ kết quả đã tính. Tính 3 lần là đúng
+   thiết kế, **không có gì thừa**.
+2. `targetGap` useMemo (`:341`) gọi **1 lần trong lúc render**, tính lại khi `drafts` đổi (tức khi ops
+   sửa lưới ca). Đã kiểm `baseConstraints` **CÓ** `useMemo` (`:322`) nên **không** có chuyện tính lại
+   mỗi render. Và nó có 2 lớp chốt: trả `null` sớm nếu `locked`/không target/lưới rỗng/không có lịch sử,
+   rồi chỉ gọi engine khi mức hụt target **vượt ngưỡng cảnh báo**. Chi phí ~105 ms mỗi lần sửa lưới là
+   thật, nhưng phép tính đó **cần thiết về nghiệp vụ** — chưa có bằng chứng người dùng thấy vướng, nên
+   tối ưu (debounce / đẩy sang worker) sẽ là **suy diễn**, chưa làm.
+
+**Chốt cho nhánh hiệu năng:** đã hết việc có bằng chứng. Sau `63f0e2c` (bỏ chia lô), `8cb4bd7` (bỏ 3
+request trùng) và `098455d` (chuông gate theo `session`): mỗi màn **24–32 request, bắn một đợt** (đã
+chứng minh phát hết cùng lúc là nhanh nhất — P2a-18), **0 request trùng**, **1–2 chặng phụ thuộc thật**,
+và **0 phép tính client đáng kể ngoài Kế Hoạch Tháng**. Phần biến động còn lại là **mạng**, nằm ngoài
+app (sàn đo được dao động 257 ms → 1.660 ms giữa hai ngày).
+
+**Công cụ** (viết lại trong ~2 phút, không commit vào repo): probe worker như mô tả ở Đường 1 — **luôn
+chạy đối chứng chặn 220 ms trước khi tin số**; và script `npx tsx` import thẳng module trong `src/lib`,
+dựng dữ liệu tổng hợp đúng quy mô rồi `performance.now()` quanh 20 lượt. Đường 2 đáng tin hơn hẳn và
+nên là đường ĐẦU TIÊN khi hỏi "cái gì tốn CPU", chứ không phải đo trong trình duyệt.
 
 ### P2b — Đếm lượt mở tab — XONG 2026-09-26, migration 0123 ĐÃ CHẠY + verify (bắt đầu đếm 26/09/2026)
 - Vì sao: trước khi gộp/bỏ mục menu (18 tab agency + 10 tab brand) cần số người dùng thật — chưa có số nào.
