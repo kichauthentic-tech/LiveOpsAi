@@ -20,12 +20,6 @@ export function fmtNum(n: number | null | undefined, digits = 1): string {
   return n.toLocaleString("vi-VN", { maximumFractionDigits: digits });
 }
 
-/** Giá trị đã là phần trăm (2.18 → "2,18%"). */
-export function fmtPctValue(n: number | null | undefined, digits = 2): string {
-  if (n == null || Number.isNaN(n)) return "—";
-  return `${fmtFixed(n, digits)}%`;
-}
-
 /** Tiền đầy đủ, không đơn vị: 53733488 → "53.733.488". */
 export function fmtVndFull(n: number | null | undefined): string {
   if (n == null || Number.isNaN(n)) return "—";

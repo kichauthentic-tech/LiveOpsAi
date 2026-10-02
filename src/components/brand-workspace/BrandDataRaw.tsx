@@ -51,7 +51,7 @@ function groupMonthKey(imp: BrandDataRawImport): string {
 
 // Mọi tháng mà batch PHỦ, không chỉ tháng của periodStart. Cần cho panel "Nạp bù ca từ file":
 // từ 2026-09-22 ops upload Creator-Live-Performance bằng 1 file trải nhiều tháng (bản export theo
-// từng tháng hay rụng phiên ngày đầu tháng — xem WORKSPACE_DESIGN.md), nên gom theo periodStart sẽ
+// từng tháng hay rụng phiên ngày đầu tháng — xem docs/WORKSPACE_HISTORY.md), nên gom theo periodStart sẽ
 // chỉ cho chọn đúng tháng 6 và không nạp bù được ca của 7/8/9.
 function monthsCoveredBy(imports: BrandDataRawImport[]): string[] {
   const out = new Set<string>();

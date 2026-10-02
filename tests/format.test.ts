@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { fmtFixed, fmtNum, fmtPctValue, fmtVndFull, fmtVndShort } from "../src/lib/format";
+import { fmtFixed, fmtNum, fmtVndFull, fmtVndShort } from "../src/lib/format";
 
 test("dấu thập phân phẩy, nghìn chấm", () => {
   expect(fmtFixed(2.184, 2)).toBe("2,18");
@@ -9,9 +9,7 @@ test("dấu thập phân phẩy, nghìn chấm", () => {
   expect(fmtNum(null)).toBe("—");
 });
 
-test("phần trăm và tiền", () => {
-  expect(fmtPctValue(37.75)).toBe("37,75%");
-  expect(fmtPctValue(undefined)).toBe("—");
+test("tiền đầy đủ", () => {
   expect(fmtVndFull(53733488.4)).toBe("53.733.488");
   expect(fmtVndFull(null)).toBe("—");
 });

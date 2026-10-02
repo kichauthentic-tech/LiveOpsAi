@@ -9,7 +9,7 @@
 //
 // Lưu ý khi đọc kết quả: test đọc CHUỖI MIGRATION trong repo, không đọc DB thật. Hai thứ có thể lệch
 // (dự án đã có 2 sự cố sửa tay thẳng trên production — xem "Sự cố vận hành đáng nhớ" trong
-// WORKSPACE_DESIGN.md), nên xanh ở đây nghĩa là "chuỗi migration sạch", không phải "production sạch".
+// docs/WORKSPACE_HISTORY.md), nên xanh ở đây nghĩa là "chuỗi migration sạch", không phải "production sạch".
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test } from "vitest";
@@ -424,4 +424,12 @@ test("view dùng so sánh PHỦ ĐỊNH trên role phải có chốt NULL — ho
     bad.push(`${name} [${v.file}] — khuôn phủ định trên role mà thiếu vế is-not-null`);
   }
   expect(bad).toEqual([]);
+});
+
+test("migration không chứa ký tự kẻ khung (U+2500–U+257F)", () => {
+  // 0132 bản đầu có ┐ ├ ┘ trong comment: psql chạy sạch, Supabase SQL Editor báo 42601 "syntax error at
+  // end of input" và không áp gì. Bản chỉ đổi comment thì chạy được. Đó là khác biệt duy nhất so với
+  // 131 migration đã chạy được — chưa chứng minh là nguyên nhân, nhưng rẻ để chặn.
+  const hits = FILES.filter((f) => /[\u2500-\u257f]/.test(readFileSync(join(DIR, f), "utf8")));
+  expect(hits).toEqual([]);
 });

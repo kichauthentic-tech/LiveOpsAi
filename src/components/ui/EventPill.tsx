@@ -3,7 +3,7 @@ import { LucideIcon } from "lucide-react";
 import { Brand } from "../../types";
 import { BrandLogo } from "./BrandLogo";
 
-// Poster Calendar Design System — 6 tier badge, xem WORKSPACE_DESIGN.md "Quy ước kỹ thuật".
+// Poster Calendar Design System — 6 tier badge.
 // Mapping dữ liệu thật → tier là quyết định duy nhất cần sửa nếu muốn đổi cách hiển thị;
 // không sửa style trực tiếp ở LiveCalendar/BrandCalendar/GmvCalendar.
 export type EventPillTier =

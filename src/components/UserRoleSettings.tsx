@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { AUDIT_LOG_LIMIT } from "../lib/db/auditLogs";
-import { UserRole, PermissionKey, PermissionDefinition, RolePermissionsMap, SystemUser, AuditLogEntry, Brand, Talent, LiveSession } from "../types";
+import { UserRole, PermissionKey, PermissionDefinition, RolePermissionsMap, SystemUser, AuditLogEntry, Brand, Talent } from "../types";
+import { PERMISSION_DEFINITIONS as permissionDefinitions } from "../lib/permissionDefinitions";
 import { ShieldCheck, UserPlus, Users, Key, Lock, Unlock, Check, X, Search, Sliders, History, Sparkles, Trash2, Edit2, Radio, Building2, Zap, BarChart3 } from "lucide-react";
 import { useConfirm } from "../hooks/useConfirm";
 import { PageIntro } from "./common/PageIntro";
@@ -33,10 +34,8 @@ interface UserRoleSettingsProps {
   onUpdateUser: (updatedUser: SystemUser) => Promise<void>;
   onDeleteUser: (userId: string) => Promise<void>;
   auditLogs: AuditLogEntry[];
-  permissionDefinitions: PermissionDefinition[];
   brands: Brand[];
   talents: Talent[];
-  sessions: LiveSession[];
 }
 
 // Danh sách role app thật sự hiển thị trong Ma Trận. Cố ý KHÔNG suy từ Object.keys(rolePermissions)
@@ -45,9 +44,13 @@ interface UserRoleSettingsProps {
 // thẻ trong khi nhãn tab ghi "Ma Trận Role (6)". Nguồn sự thật cho MÀN HÌNH là danh sách này.
 const MATRIX_ROLES: UserRole[] = ["admin", "ceo", "operations", "brand", "talent"];
 
-// sessions nằm trong props type và App.tsx vẫn truyền, nhưng màn này không đọc tới (ESLint 2026-09-24).
-// Không bỏ khỏi type vì đó là sửa cả chỗ gọi — chỉ thôi nhận ở đây. currentRole dùng lại từ 2026-09-26
-// để hiện tab "Lượt Mở Tab" cho ceo/admin.
+// Group permissions by category. Không còn filter nào ở đây: từ 2026-09-22 mọi PermissionKey
+// đều gate đúng một nav item thật (xem bất biến ở types.ts), nên lưới Ma Trận hiện đúng bằng
+// danh sách key — trước đây view_financials/manage_finance_hr bị lọc khỏi lưới nhưng vẫn nằm
+// trong tổng số đếm ở dưới, làm nhãn ghi "x/12" trong khi chỉ vẽ 10 ô.
+const groupedPermissions: Record<string, PermissionDefinition[]> = {};
+for (const def of permissionDefinitions) (groupedPermissions[def.category] ??= []).push(def);
+
 export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
   currentRole,
   currentUserId,
@@ -58,7 +61,6 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
   onUpdateUser,
   onDeleteUser,
   auditLogs,
-  permissionDefinitions,
   brands,
   talents
 }) => {
@@ -116,21 +118,6 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
       return matchQuery && matchRole;
     });
   }, [users, userSearch, userRoleFilter]);
-
-  // Group permissions by category. Không còn filter nào ở đây: từ 2026-09-22 mọi PermissionKey
-  // đều gate đúng một nav item thật (xem bất biến ở types.ts), nên lưới Ma Trận hiện đúng bằng
-  // danh sách key — trước đây view_financials/manage_finance_hr bị lọc khỏi lưới nhưng vẫn nằm
-  // trong tổng số đếm ở dưới, làm nhãn ghi "x/12" trong khi chỉ vẽ 10 ô.
-  const groupedPermissions = useMemo(() => {
-    const groups: Record<string, PermissionDefinition[]> = {};
-    permissionDefinitions.forEach((def) => {
-      if (!groups[def.category]) {
-        groups[def.category] = [];
-      }
-      groups[def.category].push(def);
-    });
-    return groups;
-  }, [permissionDefinitions]);
 
   // Toggle single permission for a role
   const handleToggleRolePermission = (role: UserRole, permKey: PermissionKey) => {

@@ -80,9 +80,6 @@ function ses(id: string, date: string, startTime: string, extra: Partial<LiveSes
     totalViews: 0,
     ctrAvg: 0,
     cvrAvg: 0,
-    skus: [],
-    checklist: [],
-    minuteMetrics: [],
     ...extra
   } as LiveSession;
 }

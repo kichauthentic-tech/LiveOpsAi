@@ -16,5 +16,7 @@ Ngay sau khi hoàn thành và verify xong một giai đoạn trong roadmap (khô
 
 Giữ file này là **một file sống duy nhất** (không tạo file riêng theo từng giai đoạn) — ghi đè/cập nhật mục tương ứng, không append lặp lại toàn bộ lịch sử. Mục tiêu: một session Claude Code mới có thể đọc riêng file này là đủ để tiếp tục làm việc mà không cần thấy lại lịch sử chat trước đó.
 
+**Giới hạn kích thước: dưới ~500 dòng.** Trước 2026-10-02 file phình tới 4.600 dòng / 660 KB (không phiên nào đọc hết được) vì mỗi đợt chép thêm nhật ký dài. Phần lịch sử đó đã chuyển NGUYÊN VĂN sang **`docs/WORKSPACE_HISTORY.md`** (chỉ để grep tra cứu; không sửa phần cũ). Chi tiết dài của một đợt mới (số đo, phân tích) thì append một mục vào cuối file lịch sử và thêm một dòng vào mục lục của `WORKSPACE_DESIGN.md` — còn `WORKSPACE_DESIGN.md` chỉ giữ trạng thái hiện tại, việc còn treo và quy ước.
+
 ## Vì sao có quy ước này
 Người dùng thường mở session mới cho mỗi giai đoạn để tiết kiệm token (session dài tích lũy context tốn kém hơn). `WORKSPACE_DESIGN.md` là cầu nối ngữ cảnh giữa các session.

@@ -5,7 +5,8 @@
 //   · lời khuyên CEO nhắc "Studio B đang trống 25% công suất", "Host Yến Nhi", "Brand La Roche-Posay"
 //     — không thực thể nào trong số đó tồn tại trong tài khoản này;
 //   · "Match Score 96%" mà thật ra là VỊ TRÍ TRONG MẢNG (96 − index×5);
-//   · AiMultiAgent còn một tầng bịa THỨ HAI ở client, nhắc "Brand lớn như Cocoon hay Coolmate".
+//   · màn chat "Hội Đồng AI" còn một tầng bịa THỨ HAI ở client, nhắc "Brand lớn như Cocoon hay
+//     Coolmate" (màn đó đã gỡ hẳn 2026-10-02 — ẩn khỏi menu từ 18/09, không còn đường vào).
 // Mỗi chỗ đều có nhãn "câu trả lời mẫu" — nhãn không cứu được việc nội dung là bịa, người đọc vẫn
 // ra quyết định trên con số đó.
 import { readdirSync, readFileSync, statSync } from "node:fs";
@@ -60,11 +61,7 @@ test("không hardcode tên người/brand trong mã nguồn", () => {
 });
 
 test("client không tự viết câu trả lời thay AI khi gọi hỏng", () => {
-  const chat = readFileSync(join(SRC, "components/AiMultiAgent.tsx"), "utf8");
   const matcher = readFileSync(join(SRC, "components/TalentMatcher.tsx"), "utf8");
-  // Nhánh catch chỉ được hiện LỖI, không được dựng câu trả lời.
-  expect(chat).toContain("isError: true");
-  expect(chat, "AiMultiAgent không được tự gán `reply` trong nhánh lỗi").not.toMatch(/reply = `\[/);
   // Không có AI thì không có xếp hạng độ phù hợp — không được dựng bảng kết quả thay thế.
   // Cấm TÍNH điểm (khai báo kiểu và việc đọc `r.matchScore` của model thì được).
   expect(matcher, "TalentMatcher không được tự tính matchScore").not.toMatch(/const matchScore\s*=|matchScore:\s*(Math\.|\d)/);

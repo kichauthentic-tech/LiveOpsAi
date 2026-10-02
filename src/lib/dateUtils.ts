@@ -14,24 +14,6 @@ export const getTodayMonth = () => {
   return `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, "0")}`;
 };
 
-// So 2 khoảng "HH:MM"–"HH:MM" có chồng nhau không. Coi khoảng kết thúc <= bắt đầu là ca qua
-// nửa đêm (end sang ngày hôm sau, +1440 phút) — khớp với sessionDurationHours ở lib/pnl.ts.
-// So sánh chuỗi thô kiểu `aStart < bEnd && bStart < aEnd` sai với ca qua đêm vì "02:00" luôn
-// nhỏ hơn mọi giờ khác trong ngày, nên ca 22:00–02:00 không bao giờ bị coi là trùng lịch.
-export const timeRangesOverlap = (aStart: string, aEnd: string, bStart: string, bEnd: string): boolean => {
-  const toMinutes = (t: string) => {
-    const [h, m] = t.split(":").map(Number);
-    return h * 60 + m;
-  };
-  const aStartM = toMinutes(aStart);
-  let aEndM = toMinutes(aEnd);
-  if (aEndM <= aStartM) aEndM += 24 * 60;
-  const bStartM = toMinutes(bStart);
-  let bEndM = toMinutes(bEnd);
-  if (bEndM <= bStartM) bEndM += 24 * 60;
-  return aStartM < bEndM && bStartM < aEndM;
-};
-
 // Q6 (audit 2026-09-21): trùng lịch xét THEO NGÀY + GIỜ, kể cả ca qua đêm của ngày trước — ca
 // 21:00–00:30 hôm qua phải chặn ca 00:00–01:00 hôm nay. Lọc `date === date` rồi mới
 // timeRangesOverlap bỏ sót trường hợp đó. Quy mọi ca về phút tuyệt đối kể từ epoch ngày.
@@ -63,8 +45,7 @@ export const dateTimeRangesOverlap = (a: DateTimeRange, b: DateTimeRange): boole
 // ---------------------------------------------------------------------------
 // Tuần ISO (tuần bắt đầu THỨ HAI). Chuyển từ lib/dataraw/weeklySlice.ts về đây 2026-09-24 để
 // module thuần (không đụng Supabase) dùng được — weeklySlice import supabaseClient, mà file đó
-// đọc `import.meta.env` nên kéo theo là không chạy được dưới `tsx` khi verify. weeklySlice vẫn
-// re-export y nguyên 4 hàm này nên mọi nơi đang import từ đó không phải đổi.
+// đọc `import.meta.env` nên kéo theo là không chạy được dưới `tsx` khi verify.
 // ---------------------------------------------------------------------------
 
 /** Thứ Hai của tuần chứa `date`. */

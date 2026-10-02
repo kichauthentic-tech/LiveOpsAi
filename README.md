@@ -1,20 +1,35 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# LiveOps AI
 
-# Run and deploy your AI Studio app
+Hệ thống vận hành livestream cho agency: lập kế hoạch tháng, xếp và chốt ca host, đối soát số liệu
+TikTok, Report Tháng cho brand, P&L. React 19 + Vite (client), Express (API), Supabase (DB + Auth + RLS).
 
-This contains everything you need to run your app locally.
+Trạng thái dự án, quy ước kỹ thuật và việc còn lại: **[WORKSPACE_DESIGN.md](WORKSPACE_DESIGN.md)** — đọc
+trước khi sửa code. Lịch sử chi tiết từng đợt: [docs/WORKSPACE_HISTORY.md](docs/WORKSPACE_HISTORY.md).
 
-View your app in AI Studio: https://ai.studio/apps/3244e19f-9e1b-403b-9bc4-81e7dafff64b
+## Chạy ở máy
 
-## Run Locally
+```bash
+npm install
+cp .env.example .env   # điền VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY (+ các khoá server nếu cần)
+npm run dev            # Express + Vite dev middleware, http://localhost:3000
+```
 
-**Prerequisites:**  Node.js
+## Kiểm tra (CI chạy đúng 4 bước này)
 
+```bash
+npm run lint && npm run typecheck && npm test && npm run build
+npm run audit:dead   # tìm code chết (không nằm trong CI, ~20s)
+```
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## Cấu trúc
+
+| Thư mục | Nội dung |
+|---|---|
+| `src/components` | Màn hình (mỗi tab một chunk, lazy-load từ `App.tsx`) |
+| `src/lib` | Logic thuần + lớp đọc/ghi Supabase (`lib/db`) |
+| `src/server/createApp.ts` | API Express — dùng chung cho `server.ts` (dev / Node) và `api/index.ts` (Vercel) |
+| `supabase/migrations` | Migration SQL, chạy tay theo thứ tự trong Supabase SQL Editor |
+| `supabase/tests` | Bộ kiểm SQL chạy trên Postgres tạm trước khi đưa migration lên production |
+| `tests` | Vitest |
+
+Deploy: Vercel (`vercel.json`) — frontend tĩnh từ `dist/`, `/api/*` vào `api/index.ts`.

@@ -8,7 +8,6 @@ export default defineConfig(() => {
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, '.'),
         // supabase-js import tĩnh RealtimeClient + StorageClient, nên 78 KB thư viện app không dùng
         // nằm trong chunk entry mà mọi người dùng phải tải trước khi thấy màn đăng nhập.
         // Chỉ ảnh hưởng bundle client; bản server (esbuild server.ts) không đi qua alias này.
@@ -18,10 +17,8 @@ export default defineConfig(() => {
       },
     },
     server: {
-      // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
+      // DISABLE_HMR=true tắt HMR + theo dõi file (di sản AI Studio: tránh nháy trang khi agent đang sửa code).
       hmr: process.env.DISABLE_HMR !== 'true',
-      // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
     },
   };

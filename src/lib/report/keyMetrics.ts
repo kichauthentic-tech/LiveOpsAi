@@ -72,12 +72,6 @@ export function addKeyInput(c: KeyCounts, x: KeyInput): KeyCounts {
   return c;
 }
 
-export function sumKeyCounts(list: KeyCounts[]): KeyCounts {
-  const out = emptyKeyCounts();
-  for (const c of list) for (const k of Object.keys(out) as (keyof KeyCounts)[]) out[k] += c[k];
-  return out;
-}
-
 /** `hours` truyền vào để khỏi vòng import với hostPerformance (sessionHours). */
 export function keyInputFromSession(s: LiveSession, hours: number): KeyInput {
   return {
@@ -144,9 +138,6 @@ export function keyMetrics(c: KeyCounts): KeyMetrics {
 export const keyMetricsOfSessions = (sessions: LiveSession[], hoursOf: (s: LiveSession) => number): KeyMetrics =>
   keyMetrics(sessions.reduce((c, s) => addKeyInput(c, keyInputFromSession(s, hoursOf(s))), emptyKeyCounts()));
 
-export const keyMetricsOfRows = (rows: CreatorLivePerfRow[]): KeyMetrics =>
-  keyMetrics(rows.reduce((c, r) => addKeyInput(c, keyInputFromRow(r)), emptyKeyCounts()));
-
 // ---------- danh sách hiển thị ----------
 
 export type KeyMetricKey =
@@ -204,8 +195,6 @@ export const KEY_METRICS: KeyMetricDef[] = [
   { key: "gmvPerHour", label: METRIC.gmvPerHour, kind: "money", goodWhenUp: true, group: "result" },
   { key: "aov", label: METRIC.aov, kind: "money", goodWhenUp: true, group: "basket", extra: true }
 ];
-
-export const keyMetricDef = (key: KeyMetricKey): KeyMetricDef => KEY_METRICS.find((d) => d.key === key)!;
 
 /** Giá trị của một chỉ số; kỳ không có ca ⇒ null (không hiện "0" cho kỳ trống). */
 export function keyMetricValue(m: KeyMetrics, key: KeyMetricKey): number | null {

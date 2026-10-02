@@ -4,7 +4,7 @@ import { LucideIcon } from "lucide-react";
 // Poster Calendar Design System — khung lưới dùng chung cho LiveCalendar / BrandCalendar /
 // GmvCalendar. Chỉ chứa phần trình bày (header banner + lưới 7 cột + khung cell); logic
 // nghiệp vụ (tính ngày, drag-drop, click mở modal...) vẫn nằm nguyên ở từng calendar,
-// truyền vào qua props/children. Xem WORKSPACE_DESIGN.md "Quy ước kỹ thuật".
+// truyền vào qua props/children.
 
 interface PosterCalendarHeaderProps {
   icon?: LucideIcon;

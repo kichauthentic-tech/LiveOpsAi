@@ -20,7 +20,7 @@ export interface NavGroup {
 }
 
 // Các tab mà nội dung chính là lưới lịch — bỏ giới hạn max-w-7xl để lấy hết chiều ngang
-// (lưới 7 cột / ma trận 5 khung giờ cần ~150px mỗi ô, xem WORKSPACE_DESIGN.md). Không còn tự thu
+// (lưới 7 cột / ma trận 5 khung giờ cần ~150px mỗi ô). Không còn tự thu
 // gọn sidebar theo tab — xem `autoCollapse`.
 export const CALENDAR_TABS = new Set(["calendar", "brand_calendar", "shift_scheduling"]);
 
@@ -57,7 +57,7 @@ export function agencyNavGroups(currentRole: UserRole): NavGroup[] {
   // nhiều tháng, "SMART"/"LIVE" không mang thông tin; badge nào cũng có thì không badge nào được đọc.
   // Navigation Items mapped to permission keys, grouped theo luồng công việc — đây là
   // nhóm cho Agency Workspace (nhìn xuyên mọi Brand). Xem BRAND_NAV_GROUPS bên dưới cho
-  // Brand Workspace (Giai đoạn A, WORKSPACE_DESIGN.md).
+  // Brand Workspace (Giai đoạn A, docs/WORKSPACE_HISTORY.md).
   const AGENCY_NAV_GROUPS: NavGroup[] = [
     // Tái cấu trúc 2026-09-21: tách LẬP KẾ HOẠCH (trước tháng) khỏi VẬN HÀNH (hằng ngày).
     // Talent chỉ thấy: Ca Của Tôi (nơi nộp số liệu/report), Đăng Ký ca, Hồ Sơ.
@@ -147,9 +147,6 @@ export function agencyNavGroups(currentRole: UserRole): NavGroup[] {
     {
       label: "Hệ Thống",
       items: [
-        // "Hội Đồng AI & Simulator" (AiMultiAgent, mock) ẨN khỏi nav từ 2026-09-18 (user chốt) tới khi
-        // có bản thật. Component + nhánh render vẫn còn; isTabAllowed coi tab không có nav item là
-        // không được phép nên không mở lại được qua localStorage.
         { id: "user_settings", label: "Phân Quyền & Role", icon: ShieldCheck, perm: "manage_users_permissions" as PermissionKey },
         // Tài khoản cá nhân đã dời vào User Card cuối sidebar (bấm vào card để mở), không
         // còn là 1 mục nav riêng — tránh trùng lặp lối vào.

@@ -10,15 +10,6 @@ import { fmtVndShort, fmtVndFull, fmtFixed } from "../lib/format";
 import { statusLabel } from "../lib/statusLabels";
 import { METRIC, metricHint } from "../lib/metricGlossary";
 import { PageHeader } from "./common/PageHeader";
-// Vài bản ghi talent cũ (trước khi field chuẩn hoá về `niches`/`avatar`/`ratePerSession`) có thể
-// còn lưu dưới tên cột cũ — đọc dự phòng, không phải lỗi kiểu dữ liệu.
-interface LegacyTalentAliases {
-  niche?: string[] | string;
-  avatarUrl?: string;
-  rateCardFee?: number;
-}
-const legacyTalentFields = (t: Talent): LegacyTalentAliases => t as unknown as LegacyTalentAliases;
-
 // Cột phụ: ở điện thoại bảng 11 cột rộng gấp mấy lần màn hình — giữ 4 cột trả lời "ai, vai gì,
 // chạy bao nhiêu ca, ra bao nhiêu tiền", phần còn lại chỉ hiện từ sm (cùng cách Sổ Ca đã làm, M4).
 const SUB_COL = "hidden sm:table-cell py-2.5 px-2";
@@ -29,7 +20,7 @@ const Dash: React.FC = () => <span className="text-[var(--text-faint)]">—</spa
 // Unsplash của một người lạ — mặt người là thứ dễ tin nhất trên thẻ, không được bịa. Không có ảnh
 // thì hiện chữ cái đầu của tên.
 const TalentAvatar: React.FC<{ talent: Talent; className?: string }> = ({ talent, className = "w-14 h-14" }) => {
-  const src = talent.avatar || legacyTalentFields(talent).avatarUrl || "";
+  const src = talent.avatar || "";
   if (src) return <img src={src} alt={talent.name} className={`${className} rounded-full object-cover border-2 border-[var(--accent)] shadow-sm shrink-0`} />;
   const initials = talent.name.trim().split(/\s+/).slice(-2).map((w) => w[0]).join("").toUpperCase();
   return (
@@ -179,8 +170,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
     setFormNickname(t.nickname ?? "");
     setFormRole(t.role || "Host");
     setFormGender(t.gender || "Nữ");
-    const nicheArr = t.niches || legacyTalentFields(t).niche || [];
-    setFormNiches(Array.isArray(nicheArr) ? nicheArr.join(", ") : String(nicheArr));
+    setFormNiches((t.niches ?? []).join(", "));
     // Không điền số demo thay cho 0 (bug thời mock: talent thật rate = 0 mở form là thấy 5tr/live,
     // 3.5% hoa hồng, GMV 150tr, điểm 90 — bấm Lưu là ghi thẳng vào DB). 0 là 0.
     setFormGmv(t.avgGmvPerSession || 0);
@@ -193,7 +183,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
     setFormCommission(t.commissionRate || 0);
     setFormScore(t.overallScore || 0);
     setFormPhone(t.phone || "");
-    setFormAvatar(t.avatar || legacyTalentFields(t).avatarUrl || "");
+    setFormAvatar(t.avatar || "");
     setFormStatus(t.availabilityStatus || "Available");
     setIsModalOpen(true);
   };
@@ -308,7 +298,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
     .map((t) => ({
       t,
       real: computeTalentRealTotals(sessions, t.id),
-      rate: t.ratePerSession || legacyTalentFields(t).rateCardFee || 0
+      rate: t.ratePerSession || 0
     }))
     .sort((a, b) => {
       // Tổng ca đã chạy trước (người trợ 86 ca làm việc nhiều hơn người host 3 ca), ca host là tiêu

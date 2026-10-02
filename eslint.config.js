@@ -16,7 +16,7 @@ import globals from "globals";
 
 export default tseslint.config(
   {
-    ignores: ["dist/**", "node_modules/**", "supabase/**", "server.cjs", "*.config.js"]
+    ignores: ["dist/**", "node_modules/**", "supabase/**", "*.config.js"]
   },
 
   js.configs.recommended,
@@ -82,7 +82,7 @@ export default tseslint.config(
 
   // ---- Code chạy trong Node ----
   {
-    files: ["server.ts", "api/**/*.ts", "src/server/**/*.ts", "vite.config.ts"],
+    files: ["server.ts", "api/**/*.ts", "src/server/**/*.ts", "vite.config.ts", "scripts/**/*.mjs"],
     languageOptions: { globals: { ...globals.node } }
   },
 

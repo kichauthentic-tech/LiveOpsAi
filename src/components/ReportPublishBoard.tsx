@@ -11,7 +11,7 @@ import { buildMonthlyReportSnapshot } from "../lib/report/monthlySnapshot";
 import { PageIntro } from "./common/PageIntro";
 
 // Bảng điều phối phát hành report (còn lại của Đợt C, Audit Role × Workspace — xem
-// WORKSPACE_DESIGN.md) — ops coi trạng thái phát hành Report Tháng của TẤT CẢ brand × nhiều tháng
+// docs/WORKSPACE_HISTORY.md) — ops coi trạng thái phát hành Report Tháng của TẤT CẢ brand × nhiều tháng
 // cùng lúc, phát hành/thu hồi thẳng từ đây thay vì mở lần lượt 4 Brand Workspace.
 //
 // Chỉ Report Tháng (brand_monthly_reports) có khái niệm draft/published. Report Tuần là chế độ

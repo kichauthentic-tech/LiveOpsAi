@@ -428,10 +428,6 @@ const dayMonth = (iso: string) => `${Number(iso.slice(8, 10))}/${iso.slice(5, 7)
 // Tên chỉ số chuẩn (Views/giờ, UPT, Avg. price…) giữ nguyên hoa/thường giữa câu; chỉ "Giờ live" là chữ Việt.
 const lowerFirst = (t: string) => (t === METRIC.liveHours ? "giờ live" : t);
 
-export const UPT_LABEL = METRIC.upt;
-export const LIVE_CTR_LABEL = METRIC.liveCtr;
-export const PRODUCT_CTR_LABEL = METRIC.productCtr;
-
 /** 4 thừa số của GMV/giờ — phần agency điều khiển được (giờ live là quyết định lịch, không phải hiệu suất). */
 export const RATE_FACTORS = ["viewsPerHour", "liveCtr", "ctor", "aov"] as const;
 export type RateFactor = (typeof RATE_FACTORS)[number];

@@ -47,7 +47,6 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
   const { showToast } = useToast();
   const confirm = useConfirm();
   const [activeSubTab, setActiveSubTab] = useState<"studios" | "equipment">("studios");
-  const [simulatedQrScan, setSimulatedQrScan] = useState<string | null>(null);
 
   // Filters for Equipment
   const [equipmentSearch, setEquipmentSearch] = useState("");
@@ -71,13 +70,9 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
   const [eqCategory, setEqCategory] = useState<"Camera" | "Lighting" | "Audio" | "PC/Switcher" | "Teleprompter">("Camera");
   const [eqModel, setEqModel] = useState("");
   const [eqQrCode, setEqQrCode] = useState("");
-  const [eqAssignedStudioId, setEqAssignedStudioId] = useState("std-a");
+  const [eqAssignedStudioId, setEqAssignedStudioId] = useState("");
   const [eqStatus, setEqStatus] = useState<"In Use" | "In Stock" | "Maintenance" | "Damaged">("In Stock");
-  const [eqLastCheckDate, setEqLastCheckDate] = useState("2026-07-20");
-
-  const handleScanQr = (code: string) => {
-    setSimulatedQrScan(code);
-  };
+  const [eqLastCheckDate, setEqLastCheckDate] = useState("");
 
   const todayStr = getTodayDate();
   const todaysBookings = sessions
@@ -144,9 +139,9 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
     setEditingEquipment(null);
     setEqName("");
     setEqCategory("Camera");
-    setEqModel("Sony A7IV / Lens 24-70mm f2.8");
+    setEqModel("");
     setEqQrCode(generateUniqueQrCode(new Set(equipments.map((eq) => eq.qrCode))));
-    setEqAssignedStudioId(studios[0]?.id || "std-a");
+    setEqAssignedStudioId(studios[0]?.id ?? "");
     setEqStatus("In Stock");
     setEqLastCheckDate(getTodayDate());
     setIsEquipmentModalOpen(true);
@@ -158,7 +153,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
     setEqCategory(eq.category);
     setEqModel(eq.model);
     setEqQrCode(eq.qrCode);
-    setEqAssignedStudioId(eq.assignedStudioId || "std-a");
+    setEqAssignedStudioId(eq.assignedStudioId ?? "");
     setEqStatus(eq.status);
     setEqLastCheckDate(eq.lastCheckDate);
     setIsEquipmentModalOpen(true);
@@ -239,7 +234,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
             activeSubTab === "equipment" ? "bg-[var(--accent)] text-white shadow" : "bg-[var(--surface-elevated)] text-[var(--text-muted)] hover:bg-[var(--surface-hover)]"
           }`}
         >
-          <span className="inline-flex items-center gap-1.5"><Camera className="w-3.5 h-3.5" /> Kho Thiết Bị & Quét Mã QR Code ({equipments.length} Thiết bị)</span>
+          <span className="inline-flex items-center gap-1.5"><Camera className="w-3.5 h-3.5" /> Kho Thiết Bị ({equipments.length} Thiết bị)</span>
         </button>
       </div>
 
@@ -363,7 +358,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
                 <h3 className="font-bold text-[var(--text)] text-base flex items-center gap-2">
                   <QrCode className="w-5 h-5 text-[var(--accent-text)]" /> Quản Lý Thiết Bị Bằng Mã QR Code ({filteredEquipments.length} Thiết bị)
                 </h3>
-                <p className="text-xs text-[var(--text-muted)]">Quét QR Code trên thân máy để check-in, check-out hoặc gửi báo hỏng</p>
+                <p className="text-xs text-[var(--text-muted)]">Mỗi thiết bị một mã QR dán trên thân máy, kèm studio đang gán và tình trạng.</p>
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
@@ -401,20 +396,6 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
                 </button>
               </div>
             </div>
-
-            {simulatedQrScan && (
-              <div className="bg-[var(--accent)]/30 p-3 rounded-xl border border-[var(--accent)]/50 flex justify-between items-center text-xs">
-                <span className="text-[var(--accent-text)] font-medium">
-                  <span className="inline-flex items-center gap-1"><Search className="w-3 h-3" /> Đã quét mã QR:</span> <strong className="font-mono text-[var(--accent-text)]">{simulatedQrScan}</strong>
-                </span>
-                <button
-                  onClick={() => setSimulatedQrScan(null)}
-                  className="text-[var(--accent-text)] hover:underline font-bold"
-                >
-                  Xóa kết quả
-                </button>
-              </div>
-            )}
 
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
               {filteredEquipments.map((eq) => (
@@ -454,14 +435,8 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
                       {eq.category}
                     </span>
                   </div>
-                  <div className="text-[11px] text-[var(--text-muted)] border-t border-[var(--border)] pt-2 flex justify-between items-center">
-                    <span>Kiểm tra: {eq.lastCheckDate}</span>
-                    <button
-                      onClick={() => handleScanQr(eq.qrCode)}
-                      className="text-[var(--accent-text)] font-bold hover:underline"
-                    >
-                      Giả lập Quét QR
-                    </button>
+                  <div className="text-[11px] text-[var(--text-muted)] border-t border-[var(--border)] pt-2">
+                    Kiểm tra: {eq.lastCheckDate}
                   </div>
                 </div>
               ))}
@@ -677,6 +652,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
                     onChange={(e) => setEqAssignedStudioId(e.target.value)}
                     className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
                   >
+                    <option value="">— Chưa gán studio —</option>
                     {studios.map((s) => (
                       <option key={s.id} value={s.id}>
                         {s.name} ({s.roomNumber})

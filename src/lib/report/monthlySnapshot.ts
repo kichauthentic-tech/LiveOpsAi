@@ -210,7 +210,7 @@ const HYDRATE_DEFAULTS: Omit<LiveSession, "id" | "date" | "status" | "brandId"> 
   title: "", brandName: "", shopTikTokHandle: "", studioId: "", studioName: "", hostId: "", hostName: "",
   assistantName: "", coHostName: "", platform: "TikTok", startTime: "00:00", endTime: "00:00",
   targetGmv: 0, monthPublished: true, actualGmv: 0, totalOrders: 0, avgWatchTimeSeconds: 0, peakViewers: 0,
-  totalViews: 0, ctrAvg: 0, cvrAvg: 0, skus: [], checklist: [], minuteMetrics: []
+  totalViews: 0, ctrAvg: 0, cvrAvg: 0
 };
 
 export function hydrateSnapshotSessions(snapshot: MonthlyReportSnapshot): LiveSession[] {

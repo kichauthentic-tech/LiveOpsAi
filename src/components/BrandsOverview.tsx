@@ -15,7 +15,7 @@ import { MonthPicker } from "./common/MonthPicker";
 
 // Màn toàn cảnh 4 brand cho agency (Đợt C/6, 2026-09-23) — BẢNG trạng thái từng brand cho MỘT
 // tháng đang xem, không phải widget KPI kiểu Dashboard cũ (xoá 2026-09-13 vì số tính live/dự phóng
-// không đáng tin — xem WORKSPACE_DESIGN.md). Mọi cột ở đây đều là TRẠNG THÁI ĐỌC THẲNG TỪ DB
+// không đáng tin — xem docs/WORKSPACE_HISTORY.md). Mọi cột ở đây đều là TRẠNG THÁI ĐỌC THẲNG TỪ DB
 // (kế hoạch đã chốt chưa, report đã phát hành chưa, rate đã set chưa) hoặc SỐ THẬT đã xảy ra
 // (GMV/giờ live từ chính `live_sessions`) — không có ô nào là dự phóng/ước tính cuối tháng.
 //

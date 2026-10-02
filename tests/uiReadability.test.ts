@@ -1,4 +1,4 @@
-// Canh các sửa P0 của audit UX/UI 2026-09-26 (WORKSPACE_DESIGN.md `## Audit UX/UI`) không bị viết ngược lại:
+// Canh các sửa P0 của audit UX/UI 2026-09-26 (docs/WORKSPACE_HISTORY.md `## Audit UX/UI`) không bị viết ngược lại:
 // token màu của 4 theme đủ tương phản WCAG 1.4.3, không còn cỡ chữ < 11px, không còn hộp thoại gốc của
 // trình duyệt (alert/confirm/prompt — chặn cả tab, không test được, không theo theme).
 import { readdirSync, readFileSync, statSync } from "node:fs";

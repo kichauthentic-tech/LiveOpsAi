@@ -48,7 +48,6 @@ test("dữ liệu chỉ một màn đọc phải gate theo activeTab", () => {
   const gated: [string, string][] = [
     ["TABS_NEED_USERS", "fetchUsers()"],
     ["TABS_NEED_AUDIT_LOGS", "fetchAuditLogs()"],
-    ["TABS_NEED_WORKFLOW_RULES", "fetchWorkflowRules()"],
     ["TABS_NEED_AI_PROMPTS", "fetchAiAgentPrompts()"],
     ["TABS_NEED_TIKTOK", "refreshTikTokStatus();"]
   ];
@@ -62,13 +61,13 @@ test("dữ liệu chỉ một màn đọc phải gate theo activeTab", () => {
 
 test("mỗi bộ dữ liệu hoãn phải nạp đúng MỘT lần cho mỗi người dùng", () => {
   // Không có khoá thì effect chạy lại mỗi lần đổi tab qua lại giữa các màn trong cùng một nhóm.
-  for (const ref of ["usersLoadedRef", "auditLogsLoadedRef", "workflowRulesLoadedRef", "tiktokLoadedRef", "aiPromptsLoadedRef"]) {
+  for (const ref of ["usersLoadedRef", "auditLogsLoadedRef", "tiktokLoadedRef", "aiPromptsLoadedRef"]) {
     expect(APP, `thiếu khoá ${ref}`).toContain(`${ref}.current === authUserId`);
   }
   // Fetch hỏng thì phải mở khoá lại, nếu không mở tab lần sau sẽ không thử lại nữa. Trừ TikTok:
   // `refreshTikTokStatus` tự nuốt lỗi vào `tiktokStatusError`, và màn Tự Động Hoá có nút bấm lại
   // nối thẳng vào `onRefreshTikTokStatus` — người dùng thoát được mà không cần khoá tự mở.
-  for (const ref of ["usersLoadedRef", "auditLogsLoadedRef", "workflowRulesLoadedRef", "aiPromptsLoadedRef"]) {
+  for (const ref of ["usersLoadedRef", "auditLogsLoadedRef", "aiPromptsLoadedRef"]) {
     expect(APP, `${ref} phải mở khoá lại khi fetch hỏng`).toContain(`${ref}.current = null`);
   }
   // Nút bấm lại nằm ở JSX của App.tsx, không ở hook.

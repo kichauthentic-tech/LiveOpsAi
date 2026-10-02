@@ -39,7 +39,7 @@ function ca(id: string, date: string, extra: Partial<LiveSession> = {}): LiveSes
     studioId: "", studioName: "", hostId: "h1", hostName: "Host", assistantName: "", coHostName: "",
     platform: "TikTok", date, startTime: "09:00", endTime: "12:00", status: "Completed",
     targetGmv: 0, actualGmv: 0, totalOrders: 0, avgWatchTimeSeconds: 0, peakViewers: 0,
-    totalViews: 0, ctrAvg: 0, cvrAvg: 0, skus: [], checklist: [], minuteMetrics: [],
+    totalViews: 0, ctrAvg: 0, cvrAvg: 0,
     dataSource: "tiktok_reconciled", ...extra
   } as LiveSession;
 }
@@ -161,7 +161,7 @@ test("hydrate trả lại LiveSession đủ trường mặc định, số khớp
   const h = hydrateSnapshotSessions(round).find((s) => s.id === "sep1")!;
   expect(h.brandId).toBe(B);
   expect(h.actualGmv).toBe(40);
-  expect(h.skus).toEqual([]);
+  expect(h.platform).toBe("TikTok");
   expect(snapshotHeadline(round)).toMatchObject({ totalGmv: 90, shopGmv: 300, sessionsWithNumbers: 2, liveHours: 3, videoGmv: 7, cardGmv: 40, topSku: "Clog" });
 });
 

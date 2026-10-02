@@ -11,10 +11,6 @@ import { buildProductListAgg, cleanProductName, findCol, isCurrentProductAgg, nu
 // tháng được, chỉ lấy batch có period overlap với tháng đang xem (giống cách Report Tuần/Đối Soát
 // đã chấp nhận với 2 report loại "tổng hợp cả kỳ" này — xem comment trong weeklySlice.ts).
 
-// num / findCol / cleanProductName sống ở productListAgg.ts (thuần, parser upload dùng chung) — re-export
-// `num` vì các slice khác vẫn import từ đây.
-export { num };
-
 interface DbImportLite {
   id: string;
   report_type: string;
@@ -181,10 +177,6 @@ export function skuRankFromAgg(src: { agg: ProductListAgg; periodStart: string; 
     periodStart: src?.periodStart,
     periodEnd: src?.periodEnd
   };
-}
-
-export async function fetchTopSkuMonthSlice(brandId: string, monthStart: string, monthEnd: string, limit = 10): Promise<TopSkuMonthSlice> {
-  return topSkuFromAgg(await fetchProductListAgg(brandId, monthStart, monthEnd), limit);
 }
 
 // SKU gắn hiệu suất (Đợt C, 2026-09-23): khớp catalog `brand_skus` với GMV/đơn hàng tháng này của

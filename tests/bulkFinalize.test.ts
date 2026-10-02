@@ -75,9 +75,6 @@ function session(id: string, date: string, startTime: string, endTime: string, e
     totalViews: 0,
     ctrAvg: 0,
     cvrAvg: 0,
-    skus: [],
-    checklist: [],
-    minuteMetrics: [],
     ...extra
   } as LiveSession;
 }

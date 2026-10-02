@@ -27,7 +27,7 @@ function ca(date: string, startTime: string, hours: number, gmvPerHour: number):
     id: `s${seq}`, title: "", brandId: "b", brandName: "B", shopTikTokHandle: "", monthPublished: true, studioId: "", studioName: "",
     hostId: "", hostName: "", assistantName: "", coHostName: "", platform: "TikTok", date, startTime, endTime: `${String(h % 24).padStart(2, "0")}:00`,
     status: "Completed", targetGmv: 0, actualGmv: gmvPerHour * hours, totalOrders: 10, avgWatchTimeSeconds: 0, peakViewers: 0,
-    totalViews: 1000, ctrAvg: 0, cvrAvg: 0, liveDurationMinutes: hours * 60, skus: [], checklist: [], minuteMetrics: []
+    totalViews: 1000, ctrAvg: 0, cvrAvg: 0, liveDurationMinutes: hours * 60
   } as LiveSession;
 }
 

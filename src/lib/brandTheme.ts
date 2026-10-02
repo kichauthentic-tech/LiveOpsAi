@@ -1,5 +1,3 @@
-import { Brand } from "../types";
-
 // Màu nhận diện của từng brand, LẤY TỪ MÀU THẬT TRÊN FILE LOGO trong src/assets/brands/
 // (sample pixel màu chủ đạo), không phải màu random. Nhờ vậy badge session trên lịch đọc ra
 // đúng "màu của brand" như người vận hành quen nhìn — Crocs xanh lá, Vera hồng magenta...
@@ -66,12 +64,6 @@ const isLightColor = (hex: string): boolean => {
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.63;
 };
 
-/** Pha màu với alpha — dùng cho nền mềm (ô ngày, chip) mà vẫn giữ đúng sắc brand. */
-export const withAlpha = (hex: string, alpha: number): string => {
-  const [r, g, b] = hexToRgb(hex);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-};
-
 /** Gradient nền badge kiểu poster — luôn đi từ primary sang secondary. */
 export const brandGradient = (theme: BrandTheme): string =>
   `linear-gradient(135deg, ${theme.primary} 0%, ${theme.secondary} 100%)`;
@@ -91,5 +83,3 @@ export const getBrandTheme = (brandName: string | null | undefined): BrandTheme 
   return buildTheme(primary, primary);
 };
 
-export const getBrandThemeFor = (brand: Pick<Brand, "name"> | null | undefined): BrandTheme =>
-  getBrandTheme(brand?.name);

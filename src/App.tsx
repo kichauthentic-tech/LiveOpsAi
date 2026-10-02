@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
-import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, WorkflowRule, Talent, Studio, Equipment, Brand, SessionFinance, ShiftSlot, RecurringShiftTemplate, BrandSku, PromoScheme, AppNotification } from "./types";
+import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, Talent, Studio, Equipment, Brand, SessionFinance, ShiftSlot, RecurringShiftTemplate, BrandSku, PromoScheme, AppNotification } from "./types";
 import { TabErrorFallback } from "./components/common/TabErrorFallback";
 import { ErrorBoundary } from "./lib/errorReporting";
-import { ALL_PERMISSION_DEFINITIONS } from "./data/mockData";
 import { fetchTalents, updateTalent, updateMyTalentProfile, deleteTalent } from "./lib/db/talents";
 import { createStudio, updateStudio, deleteStudio } from "./lib/db/studios";
 import { createEquipment, updateEquipment, deleteEquipment } from "./lib/db/equipments";
@@ -10,7 +9,6 @@ import { fetchSessions, createSession, updateSession, deleteSession, cancelSessi
 import { submitSessionReport, SessionReportInput } from "./lib/db/sessionReports";
 import { createBrand, updateBrand, deleteBrand } from "./lib/db/brands";
 import { fetchUsers, updateUserProfile, inviteUser, deleteUserAccount, InviteUserPayload } from "./lib/db/users";
-import { createWorkflowRule, updateWorkflowRule, deleteWorkflowRule } from "./lib/db/workflowRules";
 import { createAuditLog } from "./lib/db/auditLogs";
 import { updateRolePermissions } from "./lib/db/rolePermissions";
 import { upsertSessionFinance, setSessionFinanceApproval } from "./lib/db/finance";
@@ -80,7 +78,6 @@ const StudioEquipment = lazyNamed(() => import("./components/StudioEquipment"), 
 const CrmProjects = lazyNamed(() => import("./components/CrmProjects"), "CrmProjects");
 const TikTokApiAutomation = lazyNamed(() => import("./components/TikTokApiAutomation"), "TikTokApiAutomation");
 const FinanceHr = lazyNamed(() => import("./components/FinanceHr"), "FinanceHr");
-const AiMultiAgent = lazyNamed(() => import("./components/AiMultiAgent"), "AiMultiAgent");
 const UserRoleSettings = lazyNamed(() => import("./components/UserRoleSettings"), "UserRoleSettings");
 const AiTrainingCenter = lazyNamed(() => import("./components/AiTrainingCenter"), "AiTrainingCenter");
 const EngineTrainingPanel = lazyNamed(() => import("./components/EngineTrainingPanel"), "EngineTrainingPanel");
@@ -210,7 +207,7 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [toggleSidebar]);
 
-  // Giai đoạn A — Workspace Agency ↔ Brand (xem WORKSPACE_DESIGN.md). Chỉ có ý nghĩa với
+  // Giai đoạn A — Workspace Agency ↔ Brand (xem docs/WORKSPACE_HISTORY.md). Chỉ có ý nghĩa với
   // ceo/admin/operations (những role được phép nhìn xuyên brand); role "brand" tự khoá vào
   // đúng 1 brand của họ ở effectiveWorkspace bên dưới, không dùng state raw này.
   const [workspace, setWorkspace] = useState<WorkspaceContext>(() =>
@@ -239,8 +236,6 @@ export default function App() {
     setAiAgentPrompts,
     aiAgentPromptsLoading,
     aiAgentPromptsError,
-    workflowRules,
-    setWorkflowRules,
     auditLogs,
     setAuditLogs,
     phase5Error,
@@ -397,23 +392,10 @@ export default function App() {
     if (initialRoute?.type !== "brand") setWorkspace({ type: "agency" });
   }, [profile?.id, profile?.role, initialRoute]);
 
-  // Live Sessions are real Supabase data now (Phase 2) — no mock filtering applies
-  const rawActiveSessions = sessions;
-  // Brands/Talents/Studios/Equipments are real Supabase data now — no mock filtering applies
-  const rawActiveBrands = brands;
-  const rawActiveTalents = talents;
-  const rawActiveStudios = studios;
-  const rawActiveEquipments = equipments;
-  // Workflow Rules/Audit Logs are real Supabase data now (Phase 5) — no mock filtering applies
-  const activeWorkflowRules = workflowRules;
-  const activeAuditLogs = auditLogs;
-  // Users are real Supabase data now (Phase 4) — no mock filtering applies
-  const activeUsers = users;
-
   // 2. DERIVED DATA: Studio equipment count calculated directly from equipment list assignments
   const activeStudios = useMemo(() => {
-    return rawActiveStudios.map((s) => {
-      const assignedEquips = rawActiveEquipments.filter(
+    return studios.map((s) => {
+      const assignedEquips = equipments.filter(
         (e) => e.assignedStudioId === s.id || e.assignedStudioName?.toLowerCase() === s.name?.toLowerCase()
       );
       return {
@@ -421,15 +403,15 @@ export default function App() {
         equipmentCount: assignedEquips.length
       };
     });
-  }, [rawActiveStudios, rawActiveEquipments]);
+  }, [studios, equipments]);
 
   // 3. DERIVED DATA: Talent availability status dynamically updated based on active live sessions
   const activeTalents = useMemo(() => {
-    return rawActiveTalents.map((t) => {
-      const isLiveNow = rawActiveSessions.some(
+    return talents.map((t) => {
+      const isLiveNow = sessions.some(
         (s) => (s.hostId === t.id || s.hostName?.toLowerCase() === t.name?.toLowerCase()) && s.status === "Live Now"
       );
-      const isUpcoming = rawActiveSessions.some(
+      const isUpcoming = sessions.some(
         (s) => (s.hostId === t.id || s.hostName?.toLowerCase() === t.name?.toLowerCase()) && s.status === "Upcoming"
       );
       let derivedStatus: "Available" | "Busy" | "On Live" = t.availabilityStatus || "Available";
@@ -443,17 +425,15 @@ export default function App() {
         availabilityStatus: derivedStatus
       };
     });
-  }, [rawActiveTalents, rawActiveSessions]);
+  }, [talents, sessions]);
 
   // Đ10/0114: ca đã "loại khỏi báo cáo" bị chặn ĐÚNG MỘT LẦN ở đây. Mọi màn cộng số (Report Tháng,
   // Hiệu Suất Host, cam kết giờ, P&L, Toàn Cảnh Brand…) nhận `activeSessions`, nên không màn nào
   // phải tự nhớ lọc — đúng loại lỗi sẽ quên ở màn thứ tư. Chỉ Sổ Ca nhận mảng thô (`sessions`) để
   // ops còn tìm lại và bỏ cờ; không có đường đó thì cờ là một chiều.
-  const activeSessions = useMemo(() => rawActiveSessions.filter((s) => !s.excludedFromReports), [rawActiveSessions]);
+  const activeSessions = useMemo(() => sessions.filter((s) => !s.excludedFromReports), [sessions]);
   // Chỉ Sổ Ca nhận danh sách này (prop riêng, không trộn vào `sessions`) — xem SessionLedger.
-  const excludedSessions = useMemo(() => rawActiveSessions.filter((s) => s.excludedFromReports), [rawActiveSessions]);
-  const activeBrands = rawActiveBrands;
-  const activeEquipments = rawActiveEquipments;
+  const excludedSessions = useMemo(() => sessions.filter((s) => s.excludedFromReports), [sessions]);
 
   const dataLoadErrors = useMemo(
     () =>
@@ -534,6 +514,7 @@ export default function App() {
     return { type: "agency" };
   }, [currentRole, workspace, activeUser.assignedBrandId, brandsLoaded, brands]);
   const currentBrandId = effectiveWorkspace.type === "brand" ? effectiveWorkspace.brandId : undefined;
+  const currentBrandName = brands.find((b) => b.id === currentBrandId)?.name || "Brand";
 
   // Link /brand/<slug>/… mở lúc brand chưa nạp: đối chiếu slug một lần khi đã nạp xong. Điều chỉnh
   // state ngay trong render (không qua effect) để lần vẽ đầu sau khi nạp đã đúng brand, không nháy Agency.
@@ -1132,10 +1113,7 @@ export default function App() {
       peakViewers: 0,
       totalViews: 0,
       ctrAvg: 0,
-      cvrAvg: 0,
-      skus: [],
-      checklist: [],
-      minuteMetrics: []
+      cvrAvg: 0
     };
 
     let created: LiveSession | undefined;
@@ -1155,32 +1133,6 @@ export default function App() {
       }
       showToast(`Không thể chốt lịch: ${errorMessage(e)}`);
       return false;
-    }
-  };
-
-  // Handlers for Workflow Rules — persisted to Supabase
-  const handleAddWorkflowRule = async (newRule: WorkflowRule) => {
-    try {
-      const created = await createWorkflowRule(newRule);
-      setWorkflowRules(prev => [created, ...prev]);
-    } catch (e) {
-      showToast(`Không thể tạo Workflow Rule: ${errorMessage(e)}`);
-    }
-  };
-  const handleUpdateWorkflowRule = async (updatedRule: WorkflowRule) => {
-    try {
-      const saved = await updateWorkflowRule(updatedRule);
-      setWorkflowRules(prev => prev.map(r => r.id === saved.id ? saved : r));
-    } catch (e) {
-      showToast(`Không thể cập nhật Workflow Rule: ${errorMessage(e)}`);
-    }
-  };
-  const handleDeleteWorkflowRule = async (id: string) => {
-    try {
-      await deleteWorkflowRule(id);
-      setWorkflowRules(prev => prev.filter(r => r.id !== id));
-    } catch (e) {
-      showToast(`Không thể xóa Workflow Rule: ${errorMessage(e)}`);
     }
   };
 
@@ -1392,7 +1344,7 @@ export default function App() {
                   ? handleWorkspaceChange
                   : undefined
               }
-              brands={activeBrands}
+              brands={brands}
               notifications={{
                 items: notifications.items,
                 unreadCount: notifications.unreadCount,
@@ -1559,7 +1511,7 @@ export default function App() {
                     sessions={activeSessions}
                     shiftSlots={shiftSlots}
                     excludedSessions={excludedSessions}
-                    brands={activeBrands}
+                    brands={brands}
                     currentRole={currentRole}
                     myTalentId={activeUser.assignedTalentId}
                     studios={activeStudios}
@@ -1587,7 +1539,7 @@ export default function App() {
                         sessions={activeSessions}
                         shiftSlots={shiftSlots}
                         shiftRegistrations={shiftRegistrations}
-                        brands={activeBrands}
+                        brands={brands}
                         studios={activeStudios}
                         talents={activeTalents}
                         currentRole={currentRole}
@@ -1612,7 +1564,7 @@ export default function App() {
                     shiftRegistrations={shiftRegistrations}
                     studios={activeStudios}
                     talents={activeTalents}
-                    brands={activeBrands}
+                    brands={brands}
                     brandStudios={brandStudios}
                     onUpdateSession={handleUpdateSession}
                     onCreateSlot={handleCreateShiftSlot}
@@ -1642,7 +1594,7 @@ export default function App() {
                     sessions={activeSessions}
                     shiftSlots={shiftSlots}
                     shiftRegistrations={shiftRegistrations}
-                    brands={activeBrands}
+                    brands={brands}
                     studios={activeStudios}
                     talents={activeTalents}
                     currentRole={currentRole}
@@ -1662,7 +1614,7 @@ export default function App() {
                     activeUser={activeUser}
                     sessions={activeSessions}
                     talents={activeTalents}
-                    brands={activeBrands}
+                    brands={brands}
                     studios={activeStudios}
                     shiftSlots={shiftSlots}
                     shiftRegistrations={shiftRegistrations}
@@ -1684,7 +1636,7 @@ export default function App() {
 
                 {activeTab === "month_plan" && (
                   <MonthPlan
-                    brands={activeBrands}
+                    brands={brands}
                     studios={activeStudios}
                     sessions={activeSessions}
                     shiftSlots={shiftSlots}
@@ -1711,7 +1663,7 @@ export default function App() {
                 {activeTab === "agency_overview" && (
                   <CeoBrief
                     sessions={activeSessions}
-                    brands={activeBrands}
+                    brands={brands}
                     talents={talents}
                     shiftSlots={shiftSlots}
                     planSlotTargets={planSlotTargets}
@@ -1727,12 +1679,12 @@ export default function App() {
                 )}
 
                 {activeTab === "host_performance" && (
-                  <HostPerformance sessions={activeSessions} brands={activeBrands} />
+                  <HostPerformance sessions={activeSessions} brands={brands} />
                 )}
 
                 {activeTab === "brands_overview" && (
                   <BrandsOverview
-                    brands={activeBrands}
+                    brands={brands}
                     sessions={activeSessions}
                     brandPlatformRates={brandPlatformRates}
                     monthlyReports={monthlyReports}
@@ -1741,7 +1693,7 @@ export default function App() {
 
                 {activeTab === "report_publish_board" && (
                   <ReportPublishBoard
-                    brands={activeBrands}
+                    brands={brands}
                     sessions={activeSessions}
                     brandPlatformRates={brandPlatformRates}
                     planMonthTotals={planMonthTotals}
@@ -1754,7 +1706,7 @@ export default function App() {
 
 
                 {activeTab === "brand_commitment" && (
-                  <BrandCommitment sessions={activeSessions} brands={activeBrands} />
+                  <BrandCommitment sessions={activeSessions} brands={brands} />
                 )}
 
                 {/* Brand Workspace (Giai đoạn A) — mọi tab dưới đây chỉ render khi effectiveWorkspace
@@ -1763,7 +1715,7 @@ export default function App() {
                 {activeTab === "brand_dashboard" && effectiveWorkspace.type === "brand" && (
                   <BrandDashboard
                     brandId={currentBrandId!}
-                    brandName={activeBrands.find((b) => b.id === currentBrandId)?.name || "Brand"}
+                    brandName={currentBrandName}
                     sessions={activeSessions}
                     shiftSlots={shiftSlots}
                     promoSchemes={promoSchemes}
@@ -1778,7 +1730,7 @@ export default function App() {
                 {activeTab === "brand_calendar" && effectiveWorkspace.type === "brand" && (
                   <BrandCalendar
                     brandId={currentBrandId!}
-                    brandName={activeBrands.find((b) => b.id === currentBrandId)?.name || "Brand"}
+                    brandName={currentBrandName}
                     sessions={activeSessions}
                     shiftSlots={shiftSlots}
                     shiftRegistrations={shiftRegistrations}
@@ -1815,7 +1767,7 @@ export default function App() {
                     brandId={currentBrandId!}
                     sessions={activeSessions}
                     shiftSlots={shiftSlots}
-                    brands={activeBrands}
+                    brands={brands}
                     currentRole={currentRole}
                     onSubmitSessionReport={handleSubmitSessionReport}
                     onSessionSnapshotApplied={handleSessionReconciled}
@@ -1836,7 +1788,7 @@ export default function App() {
                 {activeTab === "brand_monthly_report" && effectiveWorkspace.type === "brand" && (
                   <BrandMonthlyReport
                     brandId={currentBrandId!}
-                    brandName={activeBrands.find((b) => b.id === currentBrandId)?.name || "Brand"}
+                    brandName={currentBrandName}
                     sessions={activeSessions}
                     currentRole={currentRole}
                     brandPlatformRates={brandPlatformRates}
@@ -1849,7 +1801,7 @@ export default function App() {
                 {activeTab === "brand_commitment_view" && effectiveWorkspace.type === "brand" && (
                   <BrandCommitmentView
                     brandId={currentBrandId!}
-                    brandName={activeBrands.find((b) => b.id === currentBrandId)?.name || "Brand"}
+                    brandName={currentBrandName}
                     sessions={activeSessions}
                     currentRole={currentRole}
                   />
@@ -1858,7 +1810,7 @@ export default function App() {
                 {activeTab === "brand_next_month_plan" && effectiveWorkspace.type === "brand" && (
                   <BrandNextMonthPlan
                     brandId={currentBrandId!}
-                    brandName={activeBrands.find((b) => b.id === currentBrandId)?.name || "Brand"}
+                    brandName={currentBrandName}
                     currentRole={currentRole}
                   />
                 )}
@@ -1880,7 +1832,7 @@ export default function App() {
                 {activeTab === "brand_affiliate" && effectiveWorkspace.type === "brand" && (
                   <BrandAffiliateTable
                     brandId={currentBrandId!}
-                    brandName={activeBrands.find((b) => b.id === currentBrandId)?.name || "Brand"}
+                    brandName={currentBrandName}
                     sessions={activeSessions}
                     currentRole={currentRole}
                     onOpenDataRaw={() => setActiveTab("brand_dataraw")}
@@ -1890,7 +1842,7 @@ export default function App() {
                 {activeTab === "brand_ads_report" && effectiveWorkspace.type === "brand" && currentRole !== "brand" && (
                   <BrandAdsReport
                     brandId={currentBrandId!}
-                    brandName={activeBrands.find((b) => b.id === currentBrandId)?.name || "Brand"}
+                    brandName={currentBrandName}
                     sessions={activeSessions}
                     currentRole={currentRole}
                   />
@@ -1899,7 +1851,7 @@ export default function App() {
                 {activeTab === "brand_dataraw" && effectiveWorkspace.type === "brand" && (
                   <BrandDataRaw
                     brandId={currentBrandId!}
-                    brandName={activeBrands.find((b) => b.id === currentBrandId)?.name || "Brand"}
+                    brandName={currentBrandName}
                     currentRole={currentRole}
                     sessions={activeSessions}
                     talents={activeTalents}
@@ -1911,7 +1863,7 @@ export default function App() {
                   <TalentMatcher
                     currentRole={currentRole}
                     talents={activeTalents}
-                    brands={activeBrands}
+                    brands={brands}
                     sessions={activeSessions}
                     onCreateTalentAccount={handleCreateTalentAccount}
                     onUpdateTalent={handleUpdateTalent}
@@ -1936,7 +1888,7 @@ export default function App() {
                 {activeTab === "studios" && (
                   <StudioEquipment
                     studios={activeStudios}
-                    equipments={activeEquipments}
+                    equipments={equipments}
                     sessions={activeSessions}
                     onAddStudio={handleAddStudio}
                     onUpdateStudio={handleUpdateStudio}
@@ -1949,7 +1901,7 @@ export default function App() {
 
                 {activeTab === "crm" && (
                   <CrmProjects
-                    brands={activeBrands}
+                    brands={brands}
                     users={users}
                     onAddBrand={handleAddBrand}
                     onUpdateBrand={handleUpdateBrand}
@@ -1966,10 +1918,6 @@ export default function App() {
 
                 {activeTab === "tiktok_api" && (
                   <TikTokApiAutomation
-                    workflowRules={activeWorkflowRules}
-                    onAddWorkflowRule={handleAddWorkflowRule}
-                    onUpdateWorkflowRule={handleUpdateWorkflowRule}
-                    onDeleteWorkflowRule={handleDeleteWorkflowRule}
                     currentRole={currentRole}
                     tiktokStatus={tiktokStatus}
                     tiktokStatusLoading={tiktokStatusLoading}
@@ -1996,7 +1944,6 @@ export default function App() {
                   />
                 )}
 
-                {activeTab === "ai_agents" && <AiMultiAgent />}
 
                 {activeTab === "ai_training" && currentRole === "admin" && (
                   <div className="space-y-8">
@@ -2007,7 +1954,7 @@ export default function App() {
                       onUpdate={handleUpdateAiAgentPrompt}
                     />
                     <EngineTrainingPanel
-                      brands={activeBrands}
+                      brands={brands}
                       sessions={activeSessions}
                       shiftSlots={shiftSlots}
                       promoSchemes={promoSchemes}
@@ -2030,15 +1977,13 @@ export default function App() {
                     currentUserId={activeUser.id}
                     rolePermissions={rolePermissions}
                     onUpdateRolePermissions={handleUpdateRolePermissions}
-                    users={activeUsers}
+                    users={users}
                     onAddUser={handleAddUser}
                     onUpdateUser={handleUpdateUser}
                     onDeleteUser={handleDeleteUser}
-                    auditLogs={activeAuditLogs}
-                    permissionDefinitions={ALL_PERMISSION_DEFINITIONS}
-                    brands={activeBrands}
+                    auditLogs={auditLogs}
+                    brands={brands}
                     talents={activeTalents}
-                    sessions={activeSessions}
                   />
                 )}
 

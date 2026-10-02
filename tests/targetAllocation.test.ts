@@ -13,7 +13,7 @@ function ca(id: string, date: string, start: string, end: string, extra: Partial
     studioId: "", studioName: "", hostId: "h1", hostName: "Host", assistantName: "", coHostName: "",
     platform: "TikTok", date, startTime: start, endTime: end, status: "Upcoming",
     targetGmv: 0, actualGmv: 0, totalOrders: 0, avgWatchTimeSeconds: 0, peakViewers: 0,
-    totalViews: 0, ctrAvg: 0, cvrAvg: 0, skus: [], checklist: [], minuteMetrics: [], ...extra
+    totalViews: 0, ctrAvg: 0, cvrAvg: 0, ...extra
   } as LiveSession;
 }
 

@@ -145,43 +145,6 @@ export interface Equipment {
   isCustom?: boolean;
 }
 
-export interface ProductSKU {
-  id: string;
-  code: string;
-  name: string;
-  category: string;
-  originalPrice: number;
-  livePrice: number;
-  commission: number;
-  stock: number;
-  soldInSession: number;
-  clickCount: number;
-  ctr: number;
-  cvr: number;
-}
-
-export interface MinuteMetric {
-  minute: number; // 0 to 60 or 120
-  timeString: string; // e.g. "08:15"
-  viewers: number;
-  peakViewers: number;
-  gmvCumulative: number;
-  gmvPerMinute: number;
-  ctr: number;
-  cvr: number;
-  productClicks: number;
-  comments: number;
-  eventTrigger?: string; // e.g. "Ghim Voucher 50k", "Host thử test son", "Flash Sale Combo"
-}
-
-export interface ChecklistItem {
-  id: string;
-  task: string;
-  category: "Tech" | "Studio" | "Product" | "Host & Script" | "TikTok App";
-  completed: boolean;
-  assignedTo: string;
-}
-
 export interface LiveSession {
   id: string;
   title: string;
@@ -250,9 +213,6 @@ export interface LiveSession {
   // Ca sinh từ file Creator-Live-Performance để nạp bù tháng cũ (migration 0086). Số liệu là số
   // TikTok thật nhưng KHÔNG vào Finance & P&L (rate card tháng đó không chuẩn) — Finance lọc cờ này.
   isBackfill?: boolean;
-  skus: ProductSKU[];
-  checklist: ChecklistItem[];
-  minuteMetrics: MinuteMetric[];
   aiAnalysis?: {
     overallRating: string;
     gmvSummary: string;
@@ -414,7 +374,7 @@ export type DataRawReportType =
   | "live_performance_core_stats"
   // migration 0066 (2026-08-22) — thay thế live_analysis làm nguồn duy nhất cho Report Tháng
   // Tab 02/04 (quyết định của user, chấp nhận đánh đổi: mất tên host tự động, GMV đổi ~15% so với
-  // live_analysis vì khác hệ thống TikTok xuất — xem WORKSPACE_DESIGN.md). live_analysis vẫn giữ
+  // live_analysis vì khác hệ thống TikTok xuất — xem docs/WORKSPACE_HISTORY.md). live_analysis vẫn giữ
   // trong union vì dữ liệu cũ các brand đã upload trước đó không xoá, chỉ không dùng cho batch mới.
   | "creator_live_performance";
 // Đã gỡ 2026-09-22 (quyết định của user):
@@ -547,7 +507,7 @@ export interface BrandPlatformRateHistoryEntry {
 }
 
 // Giai đoạn B1 — SKU Showcase & Hero Product Catalog (Brand Workspace, xem
-// WORKSPACE_DESIGN.md#6). Danh sách SKU lên sóng của 1 brand, không dùng chung với module nào
+// docs/WORKSPACE_HISTORY.md). Danh sách SKU lên sóng của 1 brand, không dùng chung với module nào
 // khác.
 export interface BrandSku {
   id: string;
@@ -632,17 +592,6 @@ export interface TikTokWebhookEvent {
   receivedAt: string;
 }
 
-export interface WorkflowRule {
-  id: string;
-  name: string;
-  trigger: string;
-  action: string;
-  enabled: boolean;
-  lastRun?: string;
-  executionsCount: number;
-  isCustom?: boolean;
-}
-
 export interface AiAgentPrompt {
   agentKey: string;
   name: string;
@@ -652,54 +601,6 @@ export interface AiAgentPrompt {
   defaultPrompt: string;
   updatedBy?: string | null;
   updatedAt?: string | null;
-}
-
-export interface ScriptDialogueLine {
-  speaker: string; // vd "Host A", "Host B", hoặc tên MC cụ thể
-  line: string; // thoại đầy đủ, đọc gần như nguyên văn
-}
-
-export interface ScriptGiftTier {
-  tier: string; // vd "Tầng 1 - Quà tại chỗ"
-  condition: string; // điều kiện nhận (mua bao nhiêu / hóa đơn từ bao nhiêu)
-  gifts: string; // liệt kê quà tặng cụ thể
-}
-
-export interface ScriptMinigame {
-  name: string;
-  howToPlay: string; // các bước tham gia
-  hashtagSyntax: string; // cú pháp comment/hashtag cụ thể để hợp lệ
-  winCondition: string; // điều kiện thắng
-  prizeCount: string; // số lượng giải
-  prize: string; // phần thưởng
-}
-
-export interface ScriptFaqItem {
-  question: string; // câu hỏi/thắc mắc khán giả có thể đặt ra
-  answer: string; // câu trả lời mẫu Host có thể đọc gần như nguyên văn
-}
-
-export interface ScriptPart {
-  partName: string; // vd "Phần 1 - Giới thiệu CTKM"
-  timeCode: string; // vd "19:00 - 19:30"
-  durationMinutes: number;
-  keyActivities: string[]; // các hoạt động chính, đánh số theo trình tự
-  focusProduct: string;
-  usp: string; // USP/RTB (Reason To Believe) được nhấn mạnh trong phần này
-  giftTiers: ScriptGiftTier[]; // cấu trúc quà tặng theo tầng (nếu có push sale trong phần này)
-  dialogue: ScriptDialogueLine[]; // kịch bản thoại ĐẦY ĐỦ, dài, tự nhiên, luân phiên giữa các Host
-  minigame?: ScriptMinigame;
-  faqBank: ScriptFaqItem[]; // ngân hàng câu hỏi thường gặp + câu trả lời mẫu cho riêng phần này
-  urgencyPush: string; // câu tạo khan hiếm/countdown để chốt đơn
-  complianceNotes: string[]; // lưu ý Do & Don't cần tuân thủ khi đọc phần này
-}
-
-export interface GeneratedScript {
-  title: string;
-  campaignHeader: { channel: string; hostSetup: string; totalDuration: string };
-  opening: { time: string; hook: string; action: string; dialogue: ScriptDialogueLine[] };
-  parts: ScriptPart[];
-  closing: { time: string; strategy: string; callToAction: string; dialogue: ScriptDialogueLine[] };
 }
 
 // Giai đoạn C3 — Scheme (khuyến mãi/khung giờ vàng) tích hợp vào Lịch Vận Hành. Áp dụng
@@ -718,7 +619,6 @@ export interface PromoScheme {
   category: string;
   createdAt?: string;
 }
-
 
 // Thông báo trong app (migration 0083). Sinh bằng trigger trên live_sessions, người nhận chỉ
 // đọc + đánh dấu đã đọc. Đặt tên AppNotification để không đụng `Notification` của DOM.

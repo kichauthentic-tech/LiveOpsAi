@@ -1,7 +1,7 @@
 import { supabase } from "../supabaseClient";
 import { assertAffected } from "./assertAffected";
 import { fetchAllPages } from "./fetchAllPages";
-import { LiveSession, ProductSKU, ChecklistItem, MinuteMetric, LiveSessionReport, UserRole } from "../../types";
+import { LiveSession, LiveSessionReport, UserRole } from "../../types";
 
 // brands/studios/talents are all real Supabase tables now (Phases 1/3) and every
 // UI form selects these IDs from the real lists — no more free-text fallback, so
@@ -98,38 +98,6 @@ interface DbLiveSession {
   excluded_at?: string | null;
 }
 
-// DbSessionSku / DbChecklistItem / DbMinuteMetric KHÔNG còn được tham chiếu ở bất cứ đâu (ESLint
-// 2026-09-24 chỉ ra; comment cũ ghi "còn phục vụ đường ghi *ToDb" đã lạc hậu — đường ghi dựng row
-// thẳng tại chỗ). Giữ lại làm TÀI LIỆU hình dạng 3 bảng con `session_skus` / `session_checklist` /
-// `session_minute_metrics` mà `replace_session_children` vẫn ghi vào, để lần dựng lại đường đọc
-// không phải tra schema từ đầu — xem ghi chú dài ở fetchChildRowsForSessions().
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- giữ có chủ đích, lý do ngay trên
-interface DbSessionSku {
-  id: string;
-  session_id: string;
-  code: string;
-  name: string;
-  category: string;
-  original_price: number;
-  live_price: number;
-  commission: number;
-  stock: number;
-  sold_in_session: number;
-  click_count: number;
-  ctr: number;
-  cvr: number;
-}
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- tài liệu schema, xem DbSessionSku
-interface DbChecklistItem {
-  id: string;
-  session_id: string;
-  task: string;
-  category: ChecklistItem["category"];
-  completed: boolean;
-  assigned_to: string;
-}
-
 interface DbSessionReport {
   session_id: string;
   restart_count: number;
@@ -153,23 +121,6 @@ interface DbSessionReport {
   submitted_by_talent_id: string | null;
   submitted_by_role: UserRole | null;
   submitted_at: string | null;
-}
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- tài liệu schema, xem DbSessionSku
-interface DbMinuteMetric {
-  id: string;
-  session_id: string;
-  minute: number;
-  time_string: string;
-  viewers: number;
-  peak_viewers: number;
-  gmv_cumulative: number;
-  gmv_per_minute: number;
-  ctr: number;
-  cvr: number;
-  product_clicks: number;
-  comments: number;
-  event_trigger: string | null;
 }
 
 // Postgres `time` columns come back from PostgREST as "HH:MM:SS" (e.g. "17:00:00"), but every
@@ -206,7 +157,7 @@ function reportFromDb(row: DbSessionReport): LiveSessionReport {
   };
 }
 
-function sessionFromDb(row: DbLiveSession): Omit<LiveSession, "skus" | "checklist" | "minuteMetrics" | "report"> {
+function sessionFromDb(row: DbLiveSession): Omit<LiveSession, "report"> {
   return {
     id: row.id,
     title: row.title,
@@ -296,80 +247,8 @@ function sessionToDb(s: LiveSession) {
   };
 }
 
-function skuToDb(sessionId: string, sku: ProductSKU) {
-  return {
-    session_id: sessionId,
-    code: sku.code,
-    name: sku.name,
-    category: sku.category,
-    original_price: sku.originalPrice,
-    live_price: sku.livePrice,
-    commission: sku.commission,
-    stock: sku.stock,
-    sold_in_session: sku.soldInSession,
-    click_count: sku.clickCount,
-    ctr: sku.ctr,
-    cvr: sku.cvr
-  };
-}
-
-function checklistToDb(sessionId: string, item: ChecklistItem) {
-  return {
-    session_id: sessionId,
-    task: item.task,
-    category: item.category,
-    completed: item.completed,
-    assigned_to: item.assignedTo
-  };
-}
-
-function minuteMetricToDb(sessionId: string, m: MinuteMetric) {
-  return {
-    session_id: sessionId,
-    minute: m.minute,
-    time_string: m.timeString,
-    viewers: m.viewers,
-    peak_viewers: m.peakViewers,
-    gmv_cumulative: m.gmvCumulative,
-    gmv_per_minute: m.gmvPerMinute,
-    ctr: m.ctr,
-    cvr: m.cvr,
-    product_clicks: m.productClicks,
-    comments: m.comments,
-    event_trigger: m.eventTrigger ?? null
-  };
-}
-
-// Delete-then-reinsert of the 3 child tables used to run as separate client
-// calls — if an insert failed partway through, the preceding delete had
-// already committed, permanently losing that session's child data. Now
-// delegated to a single Postgres function (see migration 0006) so the whole
-// delete+insert set runs in one implicit transaction and rolls back together
-// on any failure.
-async function replaceChildRows(sessionId: string, session: LiveSession) {
-  const { error } = await supabase.rpc("replace_session_children", {
-    p_session_id: sessionId,
-    p_skus: (session.skus ?? []).map((sku) => skuToDb(sessionId, sku)),
-    p_checklist: (session.checklist ?? []).map((item) => checklistToDb(sessionId, item)),
-    p_metrics: (session.minuteMetrics ?? []).map((m) => minuteMetricToDb(sessionId, m))
-  });
-  if (error) throw error;
-}
-
-// CHỈ nạp `live_session_reports`. Ba bảng con còn lại (`session_skus`, `session_checklist_items`,
-// `session_minute_metrics`) CỐ Ý không nạp nữa — audit 2026-09-23:
-//
-//   - Không một màn hình nào đọc `session.skus` / `.checklist` / `.minuteMetrics`. Chúng là di
-//     sản của Live Sessions Hub (màn demo: chart phút / checklist / SKU / AI coach) đã xoá hẳn
-//     ngày 2026-09-13; grep toàn repo chỉ còn khai báo kiểu trong types.ts và literal `[]` lúc
-//     tạo ca ở App.tsx. Trên DB thật cả 3 bảng đang 0 dòng.
-//   - Chi phí thì có thật: 229 ca ÷ lô 50 = 5 lô × 4 bảng = 20 request MỖI LẦN TẢI TRANG, và
-//     vòng `for ... await` cũ làm các lô chạy NỐI TIẾP nhau — đo được 1078ms → 2955ms, tức gần
-//     2 giây chỉ để nhận về 0 dòng.
-//
-// Đường GHI (replace_session_children / update_session_with_children) giữ nguyên, kiểu LiveSession
-// giữ nguyên, 3 trường trả về mảng rỗng — đúng bằng thứ mọi consumer đang thấy hôm nay. Muốn dựng
-// lại màn nào cần 3 bảng đó thì nạp riêng cho ĐÚNG ca đang mở, đừng kéo cả bảng lúc mở app.
+// Report của từng ca. (Ba bảng con session_skus/checklist/minute_metrics — di sản Live Sessions Hub,
+// 0 dòng, không màn nào đọc — đã bỏ hẳn ở migration 0132.)
 async function fetchChildRowsForSessions(sessionIds: string[]): Promise<{ reports: DbSessionReport[] }> {
   if (sessionIds.length === 0) return { reports: [] };
   // Đường MỞ MỘT CA (SessionWindow, sau khi lưu): lọc đúng ca đó. Danh sách luôn ngắn nên không
@@ -415,9 +294,6 @@ function assembleSessions(rows: DbLiveSession[], reports: DbSessionReport[]): Li
     const report = reportBySessionId.get(row.id);
     return {
       ...sessionFromDb(row),
-      skus: [],
-      checklist: [],
-      minuteMetrics: [],
       report: report ? reportFromDb(report) : undefined
     };
   });
@@ -471,28 +347,16 @@ export async function fetchSessions(): Promise<LiveSession[]> {
 export async function createSession(session: LiveSession): Promise<LiveSession> {
   const { data, error } = await supabase.from("live_sessions").insert(sessionToDb(session)).select().single();
   if (error) throw error;
-  const row = data as DbLiveSession;
-  await replaceChildRows(row.id, session);
-  return {
-    ...sessionFromDb(row),
-    skus: session.skus ?? [],
-    checklist: session.checklist ?? [],
-    minuteMetrics: session.minuteMetrics ?? [],
-    report: undefined
-  };
+  return { ...sessionFromDb(data as DbLiveSession), report: undefined };
 }
 
 export async function updateSession(session: LiveSession): Promise<LiveSession> {
-  // Parent row update + child table replace used to be 2 separate calls — a
-  // failure in the child replace left the parent already committed with new
-  // values while children kept their old contents (see migration 0007).
-  // Now both run inside a single Postgres function call / transaction.
+  // RPC thay vì `.update()` thẳng: hàm tự raise khi RLS lọc còn 0 dòng (PostgREST thì im lặng trả 204)
+  // và giữ nguyên các cột chỉ đường đối soát được ghi (0056). Tên còn chữ "children" là di sản —
+  // 3 bảng con đã bỏ ở 0132, CHẠY 0132 TRƯỚC khi deploy bản client gọi 2 tham số này.
   const { data, error } = await supabase.rpc("update_session_with_children", {
     p_session_id: session.id,
-    p_session: sessionToDb(session),
-    p_skus: (session.skus ?? []).map((sku) => skuToDb(session.id, sku)),
-    p_checklist: (session.checklist ?? []).map((item) => checklistToDb(session.id, item)),
-    p_metrics: (session.minuteMetrics ?? []).map((m) => minuteMetricToDb(session.id, m))
+    p_session: sessionToDb(session)
   });
   if (error) throw error;
   const row = data as DbLiveSession;

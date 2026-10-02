@@ -7,33 +7,11 @@ export function schemesForDate(schemes: PromoScheme[], dateStr: string): PromoSc
   return schemes.filter((s) => dateStr >= s.startDate && dateStr <= s.endDate);
 }
 
-export function schemesByDate(schemes: PromoScheme[], month: string): Map<string, PromoScheme[]> {
-  const map = new Map<string, PromoScheme[]>();
-  const [y, m] = month.split("-").map(Number);
-  const daysInMonth = new Date(y, m, 0).getDate();
-  for (let day = 1; day <= daysInMonth; day++) {
-    const dateStr = `${month}-${`${day}`.padStart(2, "0")}`;
-    const active = schemesForDate(schemes, dateStr);
-    if (active.length > 0) map.set(dateStr, active);
-  }
-  return map;
-}
-
-/** Danh sách category (thứ tự xuất hiện đầu tiên) trong 1 tập scheme — dùng làm hàng của
- * bảng SchemeWeekStrip. Không sort alphabet để giữ đúng thứ tự người dùng nhập trước sau. */
-export function schemeCategoriesInOrder(schemes: PromoScheme[]): string[] {
-  const seen: string[] = [];
-  for (const s of schemes) {
-    if (!seen.includes(s.category)) seen.push(s.category);
-  }
-  return seen;
-}
-
 // Bảng màu cố định theo category (hash tên → index) — mỗi hạng mục khuyến mãi (Voucher,
 // Combo Deal, Free Gift...) luôn ra cùng 1 màu ở mọi tuần/tháng, giúp mắt nhận diện nhanh
 // khối nào thuộc scheme nào khi nhiều ô kéo dài (colSpan) nằm cạnh nhau. Không dùng
 // var(--accent) vì đây là nhóm màu phân biệt nhiều hạng mục cùng lúc (giống role badge/category
-// filter đã ghi trong WORKSPACE_DESIGN.md), không phải 1 CTA đơn lẻ.
+// filter), không phải 1 CTA đơn lẻ.
 const SCHEME_COLOR_PALETTE = [
   { bg: "bg-amber-100 dark:bg-amber-950/40", border: "border-amber-300 dark:border-amber-800", text: "text-amber-900 dark:text-amber-200", dot: "bg-amber-500" },
   { bg: "bg-sky-100 dark:bg-sky-950/40", border: "border-sky-300 dark:border-sky-800", text: "text-sky-900 dark:text-sky-200", dot: "bg-sky-500" },

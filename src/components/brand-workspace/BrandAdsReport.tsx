@@ -3,7 +3,7 @@ import { LiveSession, UserRole, BrandMonthlyReport as BrandMonthlyReportType } f
 import { AlertTriangle, Loader2, Lock, Megaphone, Save, Target, TrendingUp } from "lucide-react";
 import { getTodayMonth } from "../../lib/dateUtils";
 import { getCanonicalAdsCost } from "../../lib/metrics/adsCost";
-import { isoWeekStart } from "../../lib/dataraw/weeklySlice";
+import { isoWeekStart } from "../../lib/dateUtils";
 import { fetchMonthlyReport, upsertMonthlyReport, MonthlyReportManualInput } from "../../lib/db/monthlyReports";
 import { errorMessage } from "../../lib/errorMessage";
 import { ReportPlanningInputs } from "./ReportPlanningInputs";

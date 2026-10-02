@@ -18,12 +18,11 @@ import { fetchMonthPlan } from "../../lib/db/monthPlans";
 import type { BrandMonthPlan, BrandMonthPlanSlot } from "../../types";
 import { fetchMonthlyReport, saveMonthlyReportNarrative, saveMonthlyReportSectionNote } from "../../lib/db/monthlyReports";
 import { contextInsight, HostInsightRow, hostVsPeer, InsightSection, insightToText, parseInsightText, peopleInsight, productsInsight, sectionNextSteps, SectionInsight, shopInsight, shortSku, whyInsight } from "../../lib/report/sectionInsights";
-import { resolveCampBucketType } from "../../lib/campaignDays";
+import { CAMP_DAY_BUCKET_LABEL, CAMP_DAY_BUCKET_ORDER, resolveCampBucketType, type CampDayBucket, type CampOverrides } from "../../lib/campaignDays";
 import { dailyRhythm, liveFunnel, sessionSpread } from "../../lib/report/rhythm";
 import { errorMessage } from "../../lib/errorMessage";
 import { fmtKeyMetric, KEY_METRICS, keyMetricSheetColumns, keyMetricSheetLabel, keyMetricSheetValue, keyMetricValue, type KeyMetrics } from "../../lib/report/keyMetrics";
 import { byHost, byHostDayType, dayTypeTeamTotals, dayTypeMetrics, HOST_DAY_TYPE_ORDER, dataQuality, filterSessions, hostKey, splitUnassignedHost, DataQuality } from "../../lib/performance/hostPerformance";
-import { topSessionsByGmv, CAMP_DAY_BUCKET_ORDER, CAMP_DAY_BUCKET_LABEL, CampDayBucket, CampOverrides } from "../../lib/dataraw/creatorLivePerfMetrics";
 
 import { fmtFixed, fmtVndShort } from "../../lib/format";
 import { CHANNELS, DAY_TYPE_SHORT, LINK_BTN, PAL, SECTIONS, chartTooltipStyle } from "./report/theme";
@@ -160,7 +159,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     [month, prevMonth, bucketCur, bucketPrev]
   );
 
-  const topSessions = useMemo(() => topSessionsByGmv(liveCurrent?.rows ?? [], 10), [liveCurrent]);
+  const topSessions = useMemo(() => [...(liveCurrent?.rows ?? [])].sort((a, b) => b.gmv - a.gmv).slice(0, 10), [liveCurrent]);
 
   const completedInPeriod = useMemo(
     () => sessions.filter((s) => s.brandId === brandId && s.date >= start && s.date <= end && s.status === "Completed"),

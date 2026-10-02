@@ -1,4 +1,4 @@
-// Kế Hoạch Tháng — engine gợi ý phân bổ ca (giai đoạn B, thiết kế ở WORKSPACE_DESIGN "Engine gợi ý").
+// Kế Hoạch Tháng — engine gợi ý phân bổ ca (giai đoạn B, thiết kế ở docs/WORKSPACE_HISTORY.md, mục Kế Hoạch Tháng).
 // THUẦN: vào là lịch sử ca đã đối soát + ràng buộc, ra là danh sách ca kèm dự báo + lý do. Không DB,
 // không import.meta.env — chạy được trong unit test.
 //

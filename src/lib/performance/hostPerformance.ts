@@ -130,14 +130,6 @@ export function byHost(sessions: LiveSession[]): PerfRow[] {
   return groupBy(sessions, hostKey, (s) => ({ label: s.hostName || "Chưa gán host" }));
 }
 
-export function byHostBrand(sessions: LiveSession[]): PerfRow[] {
-  return groupBy(
-    sessions,
-    (s) => `${hostKey(s)}::${s.brandId}`,
-    (s) => ({ label: s.hostName || "Chưa gán host", subLabel: s.brandName })
-  );
-}
-
 export const WEEKDAY_LABELS = ["Chủ nhật", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"];
 
 // Thứ trong tuần theo giờ VN. s.date là chuỗi "YYYY-MM-DD" ngày VN sẵn rồi nên dựng Date ở UTC để
@@ -154,10 +146,6 @@ export function byWeekday(sessions: LiveSession[]): PerfRow[] {
     (s) => ({ label: WEEKDAY_LABELS[weekdayOf(s.date)] })
   );
   return rows.sort((a, b) => ((Number(a.key) + 6) % 7) - ((Number(b.key) + 6) % 7));
-}
-
-export function byDate(sessions: LiveSession[]): PerfRow[] {
-  return groupBy(sessions, (s) => s.date, (s) => ({ label: s.date })).sort((a, b) => a.key.localeCompare(b.key));
 }
 
 // Ô hiệu suất cho lưới host × thứ — thứ mà việc sắp lịch thật sự cần: "host này mạnh nhất vào thứ mấy".

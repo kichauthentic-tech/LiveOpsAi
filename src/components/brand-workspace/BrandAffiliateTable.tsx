@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { AffiliateActualEntry, LiveSession, UserRole } from "../../types";
 import { fetchAffiliateActuals, replaceAffiliateActuals } from "../../lib/db/affiliateActuals";
-import { AffiliateLiveSessionRow, fetchAffiliateLiveSessions } from "../../lib/dataraw/affiliateLiveSessionSlice";
+import { fetchAffiliateLiveSessions } from "../../lib/dataraw/affiliateLiveSessionSlice";
+import type { AffiliateLiveSessionRow } from "../../lib/dataraw/affiliateLiveRows";
 import { errorMessage } from "../../lib/errorMessage";
 import { downloadRowsAsXlsx } from "../../lib/exportXlsx";
 import { useToast } from "../../hooks/useToast";

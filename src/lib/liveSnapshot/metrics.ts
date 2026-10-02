@@ -71,23 +71,3 @@ export function computeSnapshotRatios(c: SnapshotCounters): SnapshotRatios {
   };
 }
 
-export function sumCounters(rows: SnapshotCounters[]): SnapshotCounters {
-  return rows.reduce<SnapshotCounters>(
-    (acc, r) => ({
-      gmv: acc.gmv + r.gmv,
-      itemsSold: acc.itemsSold + r.itemsSold,
-      orders: acc.orders + r.orders,
-      skuOrders: acc.skuOrders + r.skuOrders,
-      views: acc.views + r.views,
-      impressions: acc.impressions + r.impressions,
-      productImpressions: acc.productImpressions + r.productImpressions,
-      productClicks: acc.productClicks + r.productClicks,
-      newFollowers: acc.newFollowers + r.newFollowers,
-      comments: acc.comments + r.comments,
-      shares: acc.shares + r.shares,
-      likes: acc.likes + r.likes,
-      durationMinutes: acc.durationMinutes + r.durationMinutes
-    }),
-    { gmv: 0, itemsSold: 0, orders: 0, skuOrders: 0, views: 0, impressions: 0, productImpressions: 0, productClicks: 0, newFollowers: 0, comments: 0, shares: 0, likes: 0, durationMinutes: 0 }
-  );
-}

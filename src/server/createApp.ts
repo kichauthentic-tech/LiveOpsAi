@@ -84,47 +84,33 @@ export function createApp() {
 
   type CallerResult = { userId: string; reason?: undefined } | { userId?: undefined; reason: string };
 
-  // Verifies the caller's bearer token belongs to a signed-in `ceo` (or `admin` — Admin is
-  // a superset of CEO, see Giai đoạn 13/PROJECT_STATUS.md) profile. Returns the caller's
-  // user id on success, or a `reason` string on failure — the reason is surfaced in the
-  // 403 response so misconfigurations (wrong Supabase project, expired session, role not
-  // actually set) are diagnosable from the client without server log access.
-  const requireCeoCaller = async (req: express.Request): Promise<CallerResult> => {
+  // Bearer token → id tài khoản đã đăng nhập (mọi role). `reason` đi thẳng vào body 403 để lỗi cấu
+  // hình (sai project Supabase, phiên hết hạn, role chưa set) chẩn đoán được từ client, không cần log.
+  const authUserOf = async (req: express.Request): Promise<CallerResult> => {
     if (!supabaseAdmin) return { reason: "server_not_configured" };
     const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
     if (!token) return { reason: "no_token" };
-    const { data: userData, error: userErr } = await supabaseAdmin.auth.getUser(token);
-    if (userErr || !userData.user) return { reason: `invalid_token: ${userErr?.message || "unknown"}` };
-    const { data: profile, error: profileErr } = await supabaseAdmin
-      .from("profiles")
-      .select("role")
-      .eq("id", userData.user.id)
-      .single();
-    if (profileErr) return { reason: `profile_lookup_failed: ${profileErr.message}` };
-    if (!profile) return { reason: "profile_not_found" };
-    if (profile.role !== "ceo" && profile.role !== "admin") return { reason: `role_is_${profile.role}` };
-    return { userId: userData.user.id };
+    const { data, error } = await supabaseAdmin.auth.getUser(token);
+    if (error || !data.user) return { reason: `invalid_token: ${error?.message || "unknown"}` };
+    return { userId: data.user.id };
   };
 
-  // Verifies the caller's bearer token belongs to a signed-in `admin` profile — used
-  // exclusively for the AI Training Center (system prompt config), which is deliberately
-  // NOT accessible to `ceo` (see ai_agent_prompts RLS in 0012_admin_ai_training_setup.sql).
-  const requireAdminCaller = async (req: express.Request): Promise<CallerResult> => {
-    if (!supabaseAdmin) return { reason: "server_not_configured" };
-    const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
-    if (!token) return { reason: "no_token" };
-    const { data: userData, error: userErr } = await supabaseAdmin.auth.getUser(token);
-    if (userErr || !userData.user) return { reason: `invalid_token: ${userErr?.message || "unknown"}` };
-    const { data: profile, error: profileErr } = await supabaseAdmin
-      .from("profiles")
-      .select("role")
-      .eq("id", userData.user.id)
-      .single();
-    if (profileErr) return { reason: `profile_lookup_failed: ${profileErr.message}` };
+  // Như authUserOf, thêm điều kiện `profiles.role` thuộc `roles`.
+  const requireRoleCaller = async (req: express.Request, roles: readonly string[]): Promise<CallerResult> => {
+    const caller = await authUserOf(req);
+    if (!caller.userId || !supabaseAdmin) return caller;
+    const { data: profile, error } = await supabaseAdmin.from("profiles").select("role").eq("id", caller.userId).single();
+    if (error) return { reason: `profile_lookup_failed: ${error.message}` };
     if (!profile) return { reason: "profile_not_found" };
-    if (profile.role !== "admin") return { reason: `role_is_${profile.role}` };
-    return { userId: userData.user.id };
+    if (!roles.includes(profile.role)) return { reason: `role_is_${profile.role}` };
+    return caller;
   };
+
+  // ceo hoặc admin (Admin là tập cha của CEO) — quản lý tài khoản, kết nối TikTok Shop.
+  const requireCeoCaller = (req: express.Request) => requireRoleCaller(req, ["ceo", "admin"]);
+  // CHỈ admin — AI Training Center (system prompt), cố ý KHÔNG mở cho `ceo` (xem RLS
+  // ai_agent_prompts trong 0012_admin_ai_training_setup.sql).
+  const requireAdminCaller = (req: express.Request) => requireRoleCaller(req, ["admin"]);
 
   // Returns the admin-configured system prompt for an AI agent (`ai_agent_prompts.system_prompt`),
   // falling back to `hardcodedDefault` when the table is missing, unseeded, or the row's prompt
@@ -232,7 +218,7 @@ export function createApp() {
             niches: Array.isArray(newTalentProfile.niches) ? newTalentProfile.niches : [],
             avatar: newTalentProfile.avatar || "",
             // Hiệu suất (GMV/CTR/CVR/điểm) mặc định 0 nếu không truyền — sẽ tự tính từ
-            // báo cáo phiên live thật sau này, không nhập tay khi tạo mới (xem WORKSPACE_DESIGN.md).
+            // báo cáo phiên live thật sau này, không nhập tay khi tạo mới.
             avg_gmv_per_session: newTalentProfile.avgGmvPerSession || 0,
             total_gmv: newTalentProfile.totalGmv || 0,
             ctr_avg: newTalentProfile.ctrAvg || 0,
@@ -428,17 +414,6 @@ export function createApp() {
     next();
   };
 
-  // Verifies the caller's bearer token belongs to any signed-in profile (no role restriction) —
-  // used for read-only status/log endpoints that every logged-in user should be able to view.
-  const requireAnyCaller = async (req: express.Request): Promise<string | null> => {
-    if (!supabaseAdmin) return null;
-    const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
-    if (!token) return null;
-    const { data, error } = await supabaseAdmin.auth.getUser(token);
-    if (error || !data.user) return null;
-    return data.user.id;
-  };
-
   // API Route: returns a one-time-use TikTok authorization URL. The client redirects the
   // browser to it (window.location = url); TikTok then redirects the seller back to
   // TIKTOK_REDIRECT_URI with a `code` + `state` query param.
@@ -531,8 +506,7 @@ export function createApp() {
     if (!supabaseAdmin) {
       return res.json({ configured: false, connected: false });
     }
-    const callerId = await requireAnyCaller(req);
-    if (!callerId) {
+    if (!(await authUserOf(req)).userId) {
       return res.status(403).json({ error: "Cần đăng nhập để xem trạng thái kết nối." });
     }
     const { data, error } = await supabaseAdmin
@@ -638,7 +612,7 @@ export function createApp() {
   // API Routes
   // Monitoring (Phase 11) — actually checks DB reachability, not just "process is alive",
   // so an uptime monitor gets a real 503 when Supabase is unreachable, not a false "ok".
-  app.get("/api/health", async (req, res) => {
+  app.get("/api/health", async (_req, res) => {
     let databaseOk = false;
     // Public/unauthenticated endpoint — never echo raw Supabase error text (could leak
     // internal table/column names to anyone probing this URL). Log the detail server-side,
@@ -679,12 +653,12 @@ export function createApp() {
       res.status(503).json({ error: "Server chưa cấu hình Supabase Admin." });
       return null;
     }
-    const callerId = await requireAnyCaller(req);
-    if (!callerId) {
+    const { userId } = await authUserOf(req);
+    if (!userId) {
       res.status(401).json({ error: "Cần đăng nhập để dùng tính năng AI." });
       return null;
     }
-    return callerId;
+    return userId;
   };
   const MAX_AI_PAYLOAD_CHARS = 50_000;
   const rejectIfPayloadTooLarge = (req: express.Request, res: express.Response): boolean => {
@@ -740,37 +714,6 @@ export function createApp() {
   // ({"error":{"code":503,"message":"This model is currently experiencing high demand"...}}).
   // Đây cũng là đường hay gặp nhất trong thực tế — bắt gặp đúng lúc verify 2026-10-01.
   const AI_UPSTREAM_ERROR = "Gemini không trả lời được lúc này (quá tải hoặc lỗi tạm thời) — thử lại sau ít phút.";
-
-  // API Route: Multi-Agent AI Assistant
-  app.post("/api/gemini/agent-chat", async (req, res) => {
-    try {
-      if (!(await requireAuthedCallerOrReject(req, res))) return;
-      if (rejectIfPayloadTooLarge(req, res)) return;
-      const { agentRole, userMessage } = req.body;
-      const ai = getGeminiClient();
-
-      if (!ai) return res.status(503).json({ success: false, code: "ai_not_configured", error: AI_NOT_CONFIGURED });
-
-      const agentChatDefaults: Record<string, string> = {
-        ceo: "Bạn là CEO AI Advisor cho TikTok Livestream Agency. Hãy trả lời ngắn gọn, tập trung vào P&L, tối ưu chi phí, dòng tiền, nhân sự và chiến lược tăng trưởng.",
-        data_analyst: "Bạn là Data Analyst AI chuyên sâu về TikTok Shop Live Dashboard, thuật toán phân phối luồng, retention rate và GMV/min.",
-      };
-      const role = agentChatDefaults[agentRole] ? agentRole : "ceo";
-      const systemPrompt = await getAgentPrompt(`agent_chat_${role}`, agentChatDefaults[role]);
-
-      const prompt = `${systemPrompt}\n\nNgười dùng hỏi: ${userMessage}`;
-
-      const response = await ai.models.generateContent({
-        model: "gemini-flash-latest",
-        contents: prompt,
-      });
-
-      return res.json({ success: true, reply: response.text });
-    } catch (error) {
-      console.error("Agent Chat Error:", error);
-      res.status(502).json({ success: false, code: "ai_upstream_error", error: AI_UPSTREAM_ERROR });
-    }
-  });
 
   // API Route: AI Talent Matching — replaces the old client-side `96 - idx*5` formula.
   app.post("/api/gemini/match-talents", async (req, res) => {

@@ -29,7 +29,7 @@ import { metricHint } from "../lib/metricGlossary";
 
 // Cửa sổ Ca Live — MỘT cửa sổ chi tiết cho một ca, dùng chung cho mọi nơi click vào ca (Sổ Ca,
 // Lịch Vận Hành, Đăng Ký & Chốt Lịch, Sessions bên brand). Thay cho 3 "chi tiết ca" khác nhau
-// trước đây (tái cấu trúc 2026-09-21, xem WORKSPACE_DESIGN). Toàn màn hình trên điện thoại.
+// trước đây (tái cấu trúc 2026-09-21, xem docs/WORKSPACE_HISTORY.md). Toàn màn hình trên điện thoại.
 //
 // Phân quyền theo vai (UI chỉ giấu — RPC/RLS vẫn tự guard):
 //  - ops (ceo/admin/operations): thấy tất cả, sửa giờ/studio/người, up file, report (được hạ bậc

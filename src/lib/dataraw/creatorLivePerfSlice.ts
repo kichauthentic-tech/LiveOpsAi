@@ -2,7 +2,7 @@ import { supabase } from "../supabaseClient";
 import { fetchRowsPaged } from "./fetchRowsPaged";
 import { vnDateOf } from "./vnDate";
 import { DataRawColumn } from "../../types";
-import { eachDay } from "./weeklySlice";
+import { eachDay } from "../dateUtils";
 
 // Report Tháng Tab 02/04 (2026-08-22) — thay thế live_analysis bằng "Creator-Live-Performance"
 // (TikTok Creator Center, tiếng Anh, theo Room ID) làm nguồn duy nhất cho GMV/CTR/CTOR/phễu

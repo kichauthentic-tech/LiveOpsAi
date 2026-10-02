@@ -5,8 +5,6 @@ import { fetchRowsPaged } from "./fetchRowsPaged";
 
 // Đường ĐỌC DB cho trang Affiliate (migration 0102). Toàn bộ phần biến dòng thô thành phiên nằm ở
 // affiliateLiveRows.ts (thuần, có unit test); file này chỉ lo chọn batch + đọc dòng.
-export type { AffiliateLiveSessionRow } from "./affiliateLiveRows";
-
 export interface AffiliateLiveSessionSlice {
   rows: AffiliateLiveSessionRow[];
   /** Không có batch Live Analysis nào phủ dải ngày -> UI chỉ dẫn ops import file. */

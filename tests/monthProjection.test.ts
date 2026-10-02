@@ -15,7 +15,7 @@ function ca(date: string, gmv: number, extra: Partial<LiveSession> = {}): LiveSe
     studioId: "", studioName: "", hostId: "h1", hostName: "Host 1", assistantName: "", coHostName: "",
     platform: "TikTok", date, startTime: "20:00", endTime: "22:00", status: "Completed",
     targetGmv: 0, actualGmv: gmv, totalOrders: 10, avgWatchTimeSeconds: 0, peakViewers: 0,
-    totalViews: gmv > 0 ? 5_000 : 0, ctrAvg: 0, cvrAvg: 0, liveDurationMinutes: 120, skus: [], checklist: [], minuteMetrics: [], ...extra
+    totalViews: gmv > 0 ? 5_000 : 0, ctrAvg: 0, cvrAvg: 0, liveDurationMinutes: 120, ...extra
   } as LiveSession;
 }
 const planSlot = (id: string, date: string, target: number, slotId?: string): BrandMonthPlanSlot =>

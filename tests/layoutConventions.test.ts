@@ -1,4 +1,4 @@
-// Canh Đợt 0 của audit UX/UI lần 2 (2026-09-29, WORKSPACE_DESIGN.md `## Audit UX/UI lần 2`) không bị viết ngược lại.
+// Canh Đợt 0 của audit UX/UI lần 2 (2026-09-29, docs/WORKSPACE_HISTORY.md `## Audit UX/UI lần 2`) không bị viết ngược lại.
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test } from "vitest";
@@ -32,12 +32,9 @@ test('không dùng <input type="month"> — Safari/Firefox desktop biến thành
   expect(hits).toEqual([]);
 });
 
-test("tiêu đề trang không dùng kiểu cũ text-2xl (dùng PageHeader) — trừ các chỗ chưa tới lượt", () => {
-  // AiMultiAgent: tab ẩn khỏi menu từ 2026-09-18.
-  const PENDING = new Set(["components/AiMultiAgent.tsx"]);
+test("tiêu đề trang không dùng kiểu cũ text-2xl (dùng PageHeader)", () => {
   const hits: string[] = [];
   for (const file of sourceFiles(SRC)) {
-    if (PENDING.has(rel(file))) continue;
     readFileSync(file, "utf8")
       .split("\n")
       .forEach((line, i) => {

@@ -13,11 +13,7 @@ import { fetchRowsPaged } from "./fetchRowsPaged";
 // shop_promotion và product_list là số tổng hợp cả kỳ, không có cột ngày theo dòng → không thể
 // quy về tuần, nên Report Tuần không dùng 2 loại đó.
 
-// 4 hàm ngày thuần (isoWeekStart/addDays/isoWeekNumber/eachDay) đã chuyển về lib/dateUtils.ts
-// (2026-09-24) để module không đụng Supabase dùng lại được — file này import supabaseClient nên
-// không chạy được dưới `tsx`. Re-export nguyên tên để mọi nơi đang import từ đây không phải đổi.
-import { addDays, eachDay, isoWeekNumber, isoWeekStart } from "../dateUtils";
-export { addDays, eachDay, isoWeekNumber, isoWeekStart };
+import { eachDay } from "../dateUtils";
 
 function num(v: unknown): number {
   if (v === null || v === undefined || v === "" || v === "-") return 0;
@@ -26,9 +22,8 @@ function num(v: unknown): number {
   return Number.isNaN(n) ? 0 : n;
 }
 
-// "dd/mm/yyyy" -> "yyyy-mm-dd". Export để monthlyProductSlice.ts dùng lại cho bảng theo ngày của
-// shop_analytics.
-export function vnDateToIso(s: unknown): string | undefined {
+// "dd/mm/yyyy" -> "yyyy-mm-dd".
+function vnDateToIso(s: unknown): string | undefined {
   const m = String(s ?? "").match(/(\d{2})\/(\d{2})\/(\d{4})/);
   return m ? `${m[3]}-${m[2]}-${m[1]}` : undefined;
 }

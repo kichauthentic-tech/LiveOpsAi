@@ -1,6 +1,6 @@
 import { CHANNEL, METRIC } from "../../../lib/metricGlossary";
 import { DriverKey } from "../../../lib/report/monthlyReportInsights";
-import { CampDayBucket } from "../../../lib/dataraw/creatorLivePerfMetrics";
+import { CampDayBucket } from "../../../lib/campaignDays";
 
 
 // Skin đen-vàng CỐ ĐỊNH của Report Tháng + các bảng hằng số dùng chung. Tách khỏi MonthlyReportTabs.tsx

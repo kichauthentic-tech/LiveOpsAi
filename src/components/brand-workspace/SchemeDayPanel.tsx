@@ -7,7 +7,7 @@ import { schemeCategoryColor, schemesForDate } from "../../lib/schemeUtils";
 // gộp colSpan theo tuần (chỉ 1 ngày duy nhất), nên hiện các scheme active ngày đó thành 1 danh
 // sách khối màu dọc (cùng bảng màu `schemeCategoryColor` để nhất quán với SchemeWeekStrip ở
 // chế độ Tháng). Cùng quy ước: ẩn ngày bắt đầu/kết thúc ở chế độ xem thường, chỉ hiện khi bấm
-// vào để sửa (theo phản hồi user ở SchemeWeekStrip — xem WORKSPACE_DESIGN.md).
+// vào để sửa (theo phản hồi user ở SchemeWeekStrip).
 
 interface SchemeDayPanelProps {
   brandId: string;

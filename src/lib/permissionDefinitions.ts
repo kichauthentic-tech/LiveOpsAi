@@ -1,6 +1,8 @@
 import { PermissionDefinition } from "../types";
 
-export const ALL_PERMISSION_DEFINITIONS: PermissionDefinition[] = [
+// Nhãn + mô tả của từng PermissionKey cho lưới Ma Trận Phân Quyền. Dữ liệu tĩnh của app (trước
+// 2026-10-02 nằm ở src/data/mockData.ts dù chẳng có gì là mock). Bất biến key ↔ nav item: types.ts.
+export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   {
     key: "manage_sessions",
     label: "Quản Lý Phiên Livestream",
@@ -33,9 +35,9 @@ export const ALL_PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   },
   {
     key: "manage_tiktok_api",
-    label: "Cấu Hình TikTok API & Automation",
+    label: "Cấu Hình TikTok API",
     category: "Quản Trị System & Tài Chính",
-    description: "Quản lý OAuth token, Webhook đồng bộ đơn hàng real-time và thiết lập workflow quy trình."
+    description: "Kết nối/ngắt kết nối TikTok Shop (OAuth) và xem nhật ký webhook nhận về."
   },
   {
     key: "manage_users_permissions",

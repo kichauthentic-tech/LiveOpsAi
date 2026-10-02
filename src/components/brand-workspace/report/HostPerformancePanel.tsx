@@ -4,7 +4,7 @@ import { metricHint } from "../../../lib/metricGlossary";
 import { HostReliability, reliabilityText } from "../../../lib/report/deepAnalysis";
 import { fmtKeyMetric, KEY_METRICS, keyMetricValue } from "../../../lib/report/keyMetrics";
 import { dayTypeMetrics, dayTypeDriverLines, sumDayTypeParts, vsTeam, HOST_DAY_TYPE_ORDER, MIN_SESSIONS_TO_COMPARE, DAY_TYPE_DIFF_THRESHOLD, HostDayTypeRow, DayTypePart, DayTypeMetrics } from "../../../lib/performance/hostPerformance";
-import { CampDayBucket } from "../../../lib/dataraw/creatorLivePerfMetrics";
+import { CampDayBucket } from "../../../lib/campaignDays";
 
 import { fmtFixed } from "../../../lib/format";
 import { DAY_TYPE_SHORT, PAL } from "./theme";

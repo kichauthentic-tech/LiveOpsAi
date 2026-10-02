@@ -132,17 +132,6 @@ export async function fetchMonthlyReport(brandId: string, periodMonth: string): 
   return data ? reportFromDb(data as DbMonthlyReport) : null;
 }
 
-export async function fetchPublishedMonthlyReports(brandId: string): Promise<BrandMonthlyReport[]> {
-  const { data, error } = await supabase
-    .from("brand_monthly_reports")
-    .select("*")
-    .eq("brand_id", brandId)
-    .eq("status", "published")
-    .order("period_month", { ascending: false });
-  if (error) throw error;
-  return ((data as DbMonthlyReport[]) ?? []).map(reportFromDb);
-}
-
 export async function upsertMonthlyReport(brandId: string, periodMonth: string, input: MonthlyReportManualInput): Promise<BrandMonthlyReport> {
   const { data, error } = await supabase
     .from("brand_monthly_reports")

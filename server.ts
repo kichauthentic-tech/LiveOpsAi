@@ -1,5 +1,5 @@
 import path from "path";
-import { createServer as createViteServer } from "vite";
+import express from "express";
 import { createApp } from "./src/server/createApp";
 
 // Local dev / traditional Node hosting entrypoint — attaches Vite's dev middleware (or the
@@ -12,16 +12,17 @@ async function startServer() {
 
   // Vite middleware for dev or static serving for prod
   if (process.env.NODE_ENV !== "production") {
+    // import() động: vite là devDependency — bản production (`npm start`) không được cần tới nó.
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
   } else {
-    const express = (await import("express")).default;
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
-    app.get("*", (req, res) => {
+    app.get("*", (_req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
     });
   }

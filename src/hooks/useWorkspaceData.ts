@@ -23,8 +23,7 @@ import {
   TalentRateHistoryEntry,
   TikTokConnectionStatus,
   TikTokWebhookEvent,
-  UserRole,
-  WorkflowRule
+  UserRole
 } from "../types";
 import { fetchTalents } from "../lib/db/talents";
 import { fetchStudios } from "../lib/db/studios";
@@ -32,7 +31,6 @@ import { fetchEquipments } from "../lib/db/equipments";
 import { fetchSessions, completePastSessions } from "../lib/db/sessions";
 import { fetchBrands } from "../lib/db/brands";
 import { fetchUsers } from "../lib/db/users";
-import { fetchWorkflowRules } from "../lib/db/workflowRules";
 import { fetchAuditLogs } from "../lib/db/auditLogs";
 import { fetchRolePermissions } from "../lib/db/rolePermissions";
 import { fetchSessionFinances } from "../lib/db/finance";
@@ -71,9 +69,6 @@ import { errorMessage } from "../lib/errorMessage";
 const TABS_NEED_USERS = new Set(["user_settings", "crm", "finance"]);
 const TABS_NEED_AUDIT_LOGS = new Set(["user_settings"]);
 const TABS_NEED_TIKTOK = new Set(["tiktok_api"]);
-// Luật tự động hiện trong chính màn Tự Động Hoá TikTok — hằng số riêng để mỗi bộ dữ liệu hoãn có đúng
-// một cửa vào, đổi màn nào không kéo theo màn kia.
-const TABS_NEED_WORKFLOW_RULES = new Set(["tiktok_api"]);
 const TABS_NEED_AI_PROMPTS = new Set(["ai_training"]);
 
 // Màn có thể sửa report tháng / kế hoạch tháng. Rời một trong các màn này mới cần nạp lại
@@ -116,8 +111,7 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
   const [aiAgentPromptsLoading, setAiAgentPromptsLoading] = useState(true);
   const [aiAgentPromptsError, setAiAgentPromptsError] = useState<string | null>(null);
 
-  // Workflow Rules / Audit Logs — real data from Supabase (Phase 5), no mock fallback
-  const [workflowRules, setWorkflowRules] = useState<WorkflowRule[]>([]);
+  // Audit Logs — real data from Supabase (Phase 5), no mock fallback
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [phase5Error, setPhase5Error] = useState<string | null>(null);
 
@@ -211,7 +205,7 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
   const [phase19Error, setPhase19Error] = useState<string | null>(null);
 
   // Giai đoạn B1 — SKU Showcase & Hero Product Catalog (Brand Workspace, xem
-  // WORKSPACE_DESIGN.md#6). Fetch 1 lần ở agency-level, mỗi Brand Workspace
+  // docs/WORKSPACE_HISTORY.md). Fetch 1 lần ở agency-level, mỗi Brand Workspace
   // tự filter theo brandId.
   const [brandSkus, setBrandSkus] = useState<BrandSku[]>([]);
   const [phaseB1Error, setPhaseB1Error] = useState<string | null>(null);
@@ -344,32 +338,7 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
     };
   }, [authUserId, isOpsRole, activeTab]);
 
-  // Cả 2 bảng đã khoá ở ceo/operations/admin trong migration 0105. Tách đôi vì chúng phục vụ HAI màn
-  // khác nhau (workflow rules → Tự Động Hoá TikTok, audit logs → Phân Quyền & Role), trước đây gộp một
-  // `Promise.all` nên mở màn nào cũng kéo cả hai.
-  const workflowRulesLoadedRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!authUserId || !isOpsRole) return;
-    if (!TABS_NEED_WORKFLOW_RULES.has(activeTab)) return;
-    if (workflowRulesLoadedRef.current === authUserId) return;
-    workflowRulesLoadedRef.current = authUserId;
-    let cancelled = false;
-    fetchWorkflowRules()
-      .then((w) => {
-        if (cancelled) return;
-        setWorkflowRules(w);
-        setPhase5Error(null);
-      })
-      .catch((err) => {
-        workflowRulesLoadedRef.current = null;
-        if (cancelled) return;
-        setPhase5Error(err.message ?? "Không tải được Workflow Rules từ Supabase.");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [authUserId, isOpsRole, activeTab]);
-
+  // `audit_logs` khoá ở ceo/operations/admin (0105) — chỉ nạp khi mở Phân Quyền & Role.
   const auditLogsLoadedRef = useRef<string | null>(null);
   useEffect(() => {
     if (!authUserId || !isOpsRole) return;
@@ -622,8 +591,6 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
     setAiAgentPromptsLoading,
     aiAgentPromptsError,
     setAiAgentPromptsError,
-    workflowRules,
-    setWorkflowRules,
     auditLogs,
     setAuditLogs,
     phase5Error,

@@ -65,9 +65,6 @@ function ses(
     totalViews: 0,
     ctrAvg: 0,
     cvrAvg: 0,
-    skus: [],
-    checklist: [],
-    minuteMetrics: [],
     ...extra
   } as LiveSession;
 }

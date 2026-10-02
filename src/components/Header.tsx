@@ -5,7 +5,7 @@ import { LogOut, Building2, ChevronDown, Check, Palette } from "lucide-react";
 import { useTheme, THEME_OPTIONS } from "../hooks/useTheme";
 import { BrandLogo } from "./ui/BrandLogo";
 
-// Giai đoạn A (Workspace Agency ↔ Brand) — xem WORKSPACE_DESIGN.md.
+// Giai đoạn A (Workspace Agency ↔ Brand) — xem docs/WORKSPACE_HISTORY.md.
 export type WorkspaceContext = { type: "agency" } | { type: "brand"; brandId: string };
 
 interface HeaderProps {

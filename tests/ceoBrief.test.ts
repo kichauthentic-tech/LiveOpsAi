@@ -26,7 +26,7 @@ function ca(date: string, extra: Partial<LiveSession> = {}): LiveSession {
     platform: "TikTok", date, startTime: "20:00", endTime: "23:00", status: "Completed",
     targetGmv: 0, actualGmv: 30_000_000, totalOrders: 30, avgWatchTimeSeconds: 0, peakViewers: 0,
     totalViews: 5_000, ctrAvg: 0, cvrAvg: 0, productImpressions: 100_000, productClicks: 3_000,
-    liveDurationMinutes: 180, skus: [], checklist: [], minuteMetrics: [], ...extra
+    liveDurationMinutes: 180, ...extra
   } as LiveSession;
 }
 const slot = (date: string, extra: Partial<ShiftSlot> = {}): ShiftSlot =>
