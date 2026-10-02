@@ -80,7 +80,7 @@
 > SOURCE, không bằng wall-clock — xem P2a-18/19/20). Phiên sau: **không chạy lại các phép đo ở
 > P2a-17→P2a-20**, trừ khi user yêu cầu rõ.
 >
-> **MỚI 2026-10-02 (P2a-21) — dọn nốt 3 việc còn treo trong file này; 1 lỗ bảo mật mới, migration `0130`
+> **MỚI 2026-10-02 (P2a-21) — dọn nốt 3 việc còn treo trong file này; **2** lỗ bảo mật mới, migration `0130`
 > CHƯA CHẠY.**
 > (1) **Bảo mật:** việc "kiểm lại lỗ đọc-không-cần-đăng-nhập" bị auto-mode chặn (Production Reads) đã làm
 > được **mà không bắn request nào vào production** — dựng lại bức tranh quyền từ chuỗi migration, quét 49
@@ -91,8 +91,23 @@
 > EXECUTE cho **PUBLIC**, mà `anon` thừa hưởng quyền của PUBLIC — `revoke ... from anon` không chạm tới.
 > Repo đúng ở 15 hàm khác nhờ `revoke ... from public` viết tay từng hàm, và đúng lớp lỗi "vá tay rồi
 > sót" thì sót đúng hàm này từ 0078. `0130` vá bằng 1 dòng `revoke` (KHÔNG chuyển schema như 0128 — hàm
-> này không nằm trong policy nào nên revoke mới là đúng công cụ) + 4 chốt tự kiểm. `sqlGuards.test.ts`
-> 8 → **12 test**, trong đó test mới quét 30 hàm `/rpc/` definer và 101 policy. `vitest` 400 → **409**.
+> này không nằm trong policy nào nên revoke mới là đúng công cụ) + 5 chốt tự kiểm. `sqlGuards.test.ts`
+> 8 → **13 test**, trong đó test mới quét 30 hàm `/rpc/` definer · 101 policy · mọi view. `vitest` 400 → **410**.
+>
+> (1b) **Lỗ thứ hai, NẶNG HƠN, tìm ra bằng phép replay `0001 → 0130` chạy TRƯỚC khi đưa `0130` cho user:**
+> chốt tự kiểm số 3 của chính `0130` báo đỏ — và đúng. **`0114` (ĐÃ CHẠY trên production) đã xoá mất vế
+> `is not null` mà `0109` thêm vào view `live_sessions_secure`**: nó `drop view` + `create view` lại để thêm
+> `excluded_from_reports` và chép WHERE theo bản TRƯỚC 0109. Im lặng 16 migration, vì 0114 là migration về
+> TÍNH NĂNG — không ai đọc nó như thay đổi bảo mật. View không `security_invoker` ⇒ chạy quyền OWNER ⇒ RLS
+> bảng gốc không đỡ hộ. Đo A/B trên replay: phiên `authenticated` **không có dòng `profiles`** (role NULL)
+> đọc được **toàn bộ sổ ca của mọi brand kèm cột nội bộ agency**; có vế `is not null` thì 0 dòng. `anon`
+> không với tới (0109 mục 1 còn nguyên). `0130` vá bằng cách **bọc định nghĩa đang chạy** (đọc
+> `pg_get_viewdef`, không chép thân view) — `explain` cho thấy vế mới thành **One-Time Filter**, role NULL
+> thì bỏ hẳn phép quét bảng, nên giá phải trả là 0. Cùng lúc sửa **2 lỗi của `0130` bản đầu**: chốt 3 so
+> chuỗi phân biệt hoa/thường (mà `pg_get_viewdef` in từ khoá HOA ⇒ sẽ báo đỏ cả khi view lành), và một
+> comment nói sai cơ chế đúng theo lớp sai mà chính nó đi vá. Test thứ 13 canh **mặt thứ BA** của lớp lỗ
+> này (thân hàm → policy → **view**). Chi tiết: mục `## BẢO MẬT — /rpc/session_boundary_at + view
+> live_sessions_secure`.
 > (2) **Trung tâm report + xuất file (Đợt C/4) — XONG:** thêm nút xuất cho **Hiệu Suất Host** (3 sheet) và
 > **Toàn Cảnh Brand**; chốt hướng "trung tâm" = MỘT MODULE dùng chung, **không** dựng tab riêng (gom 7 bộ
 > lọc của 7 màn vào một chỗ là tự tạo hai nguồn sự thật). `exportCenter.test.ts` (5 test) lần đầu **chạy
@@ -104,7 +119,8 @@
 > chứ không nhận cột `target_gmv`. Chỉ đổi tên field bẫy `runRate` → `executionRate`. Chi tiết trong mục
 > Dashboard brand.
 >
-> **Còn lại trong file này đều KHÔNG phải việc code:** chạy `0130` trên DB thật (việc của user) · 24 file
+> **Còn lại trong file này đều KHÔNG phải việc code:** chạy `0128` + `0130` trên DB thật (việc của user —
+> `0128` còn treo từ 01/10; đã kiểm cả hai viết lại policy/view ĐỘNG nên thứ tự không làm lùi nhau) · 24 file
 > Dataraw CROCS T6–T9 chưa up (nhập liệu) · tích hợp TikTok API (chờ scope Developer/ISV) · lịch sử trước
 > T7/2026 · 33 warning `set-state-in-effect` (đã đo, cố ý giữ `warn` — xem `eslint.config.js`). Hai thứ
 > chưa verify được vì cần mật khẩu: nhánh `503 ai_not_configured` đầu-cuối, và đợt fetch lúc đăng nhập
@@ -3412,7 +3428,7 @@ chứng minh "production sạch", và dự án đã có 2 sự cố sửa tay th
 3. **Grant:** 0 migration nào sau 0109 cấp lại quyền gì cho `anon`.
 4. **Hàm:** đây là chỗ **lòi ra một lỗ chưa ai đóng** — xem ngay dưới.
 
-## BẢO MẬT — `/rpc/session_boundary_at` gọi được không cần đăng nhập (phát hiện 2026-10-02, migration `0130` **CHƯA CHẠY**)
+## BẢO MẬT — `/rpc/session_boundary_at` + view `live_sessions_secure` mất hàng rào NULL-role (phát hiện 2026-10-02, migration `0130` **CHƯA CHẠY**)
 
 **Điều 0109 KHÔNG làm được, và ghi chú ở P2a-11 nói thiếu.** `create function` của Postgres tự cấp EXECUTE cho
 **PUBLIC**, mà `anon` là thành viên của PUBLIC. 0109 chỉ `revoke all on all functions ... from anon` — thu hồi
@@ -3446,10 +3462,12 @@ OWNER giữ EXECUTE kể cả sau revoke. Đúng khuôn 0082/0124 đã dùng cho
 **không sửa thân hàm nào** (0 rủi ro hồi quy logic). Client không gọi: `grep -rn session_boundary_at src/` = 0.
 
 `0130` còn: chạy lại mục 1 của 0109 cho object sinh sau 0109 (idempotent — bắt cả bảng tạo tay từ Dashboard, vốn
-không hưởng `alter default privileges`), và **4 chốt tự kiểm** raise exception nếu anon còn quyền trên bảng nào /
+không hưởng `alter default privileges` — nhưng với HÀM thì phép quét này là no-op, xem đính chính ở dưới), vá
+lại vế `is not null` của view `live_sessions_secure` mà 0114 xoá mất, và **5 chốt tự kiểm** raise exception nếu
+anon còn quyền trên bảng nào /
 `session_boundary_at` còn gọi được / view `live_sessions_secure` mất vế `is not null` của 0109 / có bảng chưa bật RLS.
 
-**Cổng canh mới trong [`tests/sqlGuards.test.ts`](tests/sqlGuards.test.ts) (12 test, trước 8).** Đã chứng minh ĐỎ
+**Cổng canh mới trong [`tests/sqlGuards.test.ts`](tests/sqlGuards.test.ts) (13 test, trước 8).** Đã chứng minh ĐỎ
 trên code cũ: bỏ 0130 ra thì test đầu báo đúng `session_boundary_at (0078_session_live_snapshots.sql)`.
 
 1. *mọi hàm `/rpc/` security definer đều có hàng rào cho phiên KHÔNG đăng nhập* — 30 hàm definer gọi được qua
@@ -3462,8 +3480,77 @@ trên code cũ: bỏ 0130 ra thì test đầu báo đúng `session_boundary_at (
 3. *không migration nào cấp quyền cho anon sau khi 0109 đóng.*
 4. *policy không được dùng so sánh PHỦ ĐỊNH trên role mà thiếu chốt NULL* — quét 101 policy còn sống, chính khuôn
    đã tạo ra 0109. Trước đây chỉ canh khuôn này **trong thân hàm** (test 0111/0112), không canh trong policy.
+5. *view dùng so sánh phủ định trên role phải có chốt NULL* (thêm 2026-10-02, xem ngay dưới) — mặt thứ BA của cùng
+   lớp lỗ. `brand_commitment_progress` nằm trong `VIEW_SAFE_BY_SHAPE` kèm phép đo: khuôn phủ định của nó chỉ ở
+   điều kiện LEFT JOIN, WHERE lọc dòng dùng so sánh khẳng định ⇒ role NULL đọc được 0 dòng (đo trên replay).
 
-**CẦN LÀM:** chạy `0130` trên DB thật. Nó tự kiểm nên chạy sai sẽ raise, không âm thầm.
+### PHÁT HIỆN THÊM 2026-10-02 — `0114` đã XOÁ hàng rào `is not null` mà `0109` thêm vào view (nặng hơn lỗ trên)
+
+Tìm ra bằng cách **chạy thật phép replay `0001 → 0130`** trên Postgres cô lập trước khi đưa `0130` cho user —
+chốt tự kiểm số 3 của chính `0130` báo đỏ, và nó báo đỏ **đúng**.
+
+**Chuyện gì đã xảy ra.** 0109 mục 3 thêm `(select current_user_role()) is not null` vào WHERE của
+`live_sessions_secure`. `0114_exclude_session_from_reports.sql` (**ĐÃ CHẠY** trên production) `drop view` rồi
+`create view` lại để thêm vế `excluded_from_reports`, và chép WHERE theo bản **TRƯỚC** 0109 ⇒ vế chốt NULL biến
+mất, im lặng suốt 16 migration. Không ai thấy vì 0114 là migration về **tính năng** — không ai đọc nó như một
+thay đổi bảo mật. View không có `security_invoker` nên chạy bằng quyền OWNER: RLS của `live_sessions` **không đỡ
+hộ**, WHERE của chính view là hàng rào duy nhất.
+
+**Đo A/B trên chuỗi replay** (1 brand + 1 ca thật, `set role authenticated` mà không set JWT ⇒
+`current_user_role()` = NULL):
+
+| Khuôn WHERE | Phiên role = NULL đọc được |
+|---|---|
+| đúng bản `0114` đang chạy trên production | **1/1 ca — của MỌI brand, kèm cột nội bộ agency** |
+| có vế `is not null` (sau khi `0130` vá) | 0 |
+
+`anon` **không** với tới: `has_table_privilege('anon', 'live_sessions_secure', 'select')` = false (0109 mục 1 còn
+nguyên, và 0114 chỉ `grant select … to authenticated`). Nên đây là lỗ cho **tài khoản đã đăng nhập mà thiếu dòng
+`profiles`** — đúng "lỗ 2" của 0111/0112. 0111 đã bịt đường SINH ra tài khoản kiểu đó (bỏ `exception when others`
+trong `handle_new_user`), nhưng tài khoản sinh TRƯỚC 0111 thì vẫn còn, và `metrics_hidden` chỉ bật khi role =
+`'brand'` nên role NULL thấy đủ cả số liệu. **Nặng hơn lỗ `session_boundary_at`** mở đầu mục này (một
+`timestamptz` mỗi lần) — đây là toàn bộ sổ ca của mọi brand.
+
+**Cách vá (trong `0130`, không tạo migration mới).** Bọc định nghĩa **đang chạy** vào một lớp ngoài —
+`create or replace view … as select * from (<pg_get_viewdef hiện tại>) lss where (select current_user_role()) is
+not null` — **không chép lại thân view**. Thân view đã bị 0107/0108/0114 sửa và 0128/0129 viết lại (tiền tố
+`private.` + bọc `(select …)`); chép tay là chắc chắn lùi mất một trong các thay đổi đó. 52 cột giữ đúng tên/thứ
+tự nên `create or replace view` chấp nhận, `offset 0` (hàng rào tối ưu của 0107) vẫn nằm nguyên bên trong, và
+khối có phép kiểm đầu vào nên **chạy lại là no-op** (đã thử chạy `0130` hai lần).
+
+**Giá phải trả: không.** `explain` sau khi vá cho thấy vế mới thành **One-Time Filter trên InitPlan** — tính đúng
+một lần, và khi role NULL thì Postgres **bỏ hẳn** phép quét bảng. Subquery bị flatten, `date >= …` vẫn đẩy được
+xuống Seq Scan. View vốn đã **không** auto-updatable (các cột `CASE`), và app chỉ ĐỌC qua view
+([sessions.ts:18](src/lib/db/sessions.ts:18)), GHI thẳng vào `live_sessions` — không ảnh hưởng đường ghi.
+
+**Hai lỗi của chính `0130` bản đầu, tìm ra nhờ cùng phép replay:**
+1. **Chốt 3 so chuỗi phân biệt hoa/thường** — `position('is not null' in pg_get_viewdef(...))`, mà
+   `pg_get_viewdef` in từ khoá **HOA**. Nó sẽ báo đỏ cả khi view lành ⇒ `0130` không bao giờ chạy nổi. Đổi sang
+   `!~* 'current_user_role\(\)[^;]*is\s+not\s+null'`.
+2. **Comment nói sai cơ chế — đúng lớp sai mà migration này đi vá.** Bản đầu viết "`alter default privileges` của
+   0109 lo được object do `postgres` tạo qua migration". Đúng với **bảng/sequence**, nhưng với **hàm** thì sai:
+   0109 chỉ `revoke … from anon`, nên hàm sinh sau 0109 vẫn hưởng grant PUBLIC mặc định. Đã đính chính trong
+   file. **KHÔNG** thêm `alter default privileges … on functions from public` cho dứt điểm, vì đo được: 63 file
+   có `create function` nhưng chỉ 27 lượt `grant execute` viết tay ⇒ khoảng một nửa số hàm đang sống nhờ đúng
+   cái grant mặc định đó. Đặt default privileges ấy sẽ làm hàm tạo ở migration SAU chết lúc gọi (ồn ào, không
+   âm thầm) và bắt mọi migration về sau phải grant tay — đó là quyết định về **quy ước viết migration**, không
+   phải một phần của việc vá lỗ này. Để user chốt.
+
+**Cổng canh mới (test thứ 13):** *view dùng so sánh PHỦ ĐỊNH trên role phải có chốt NULL (lớp lỗ 0114)*. Nó canh
+điều đúng: **ai ghi định nghĩa view SAU CÙNG thì phải mang theo vế chốt NULL**. Chứng minh đỏ hai cách — (a) gỡ
+`0130` ra khỏi chuỗi ⇒ đỏ đúng `live_sessions_secure [0114_…]`; (b) dựng một `0131` giả `drop`+`create` lại view
+theo khuôn 0114 ⇒ đỏ đúng tên file đó. 0114 **không sửa** (đã chạy trên production — quy ước là để nguyên làm
+dấu vết, vá bằng migration sau, như đã làm với 0125).
+
+**Verify tổng:** replay `0001 → 0130` trên Postgres 18 trắng + shim Supabase (roles `anon`/`authenticated`/
+`service_role`, schema `auth` với `uid`/`role`/`jwt`) — **130/130 file sạch**, cả 5 chốt tự kiểm của `0130` xanh.
+Chốt 5 chứng minh đỏ được bằng cách tạo tay một hàm `security definer` không guard (`zzz_leak`) ⇒ `0130` raise
+đúng tên hàm. Đã dừng và xoá cluster tạm sau khi đo.
+
+**CẦN LÀM:** chạy `0130` trên DB thật. Nó tự kiểm nên chạy sai sẽ raise, không âm thầm. **Lưu ý thứ tự:** `0128`
+cũng còn **CHƯA CHẠY**; đã kiểm `0128` viết lại policy/view **động** (đọc `pg_policies`/`pg_get_viewdef` rồi chỉ
+thay tên hàm), nên chạy `0128` **sau** `0129`/`0130` không lùi mất phần bọc `(select …)` của 0129 cũng không lùi
+mất vế `is not null` của 0130 — replay chạy đúng thứ tự số và sạch.
 
 ## BẢO MẬT — tự phong role khi đăng ký + 11 policy NULL-role (phát hiện 2026-09-23, migration 0111 + 0112 ĐÃ CHẠY + verify + đã tắt signup trên Dashboard)
 

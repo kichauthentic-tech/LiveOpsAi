@@ -365,3 +365,63 @@ test("policy không được dùng so sánh PHỦ ĐỊNH trên role mà thiếu
   }
   expect(bad).toEqual([]);
 });
+
+// ---------------------------------------------------------------------------
+// VIEW — mặt thứ BA của cùng lớp lỗ, chưa ai canh (thêm 2026-10-02)
+// ---------------------------------------------------------------------------
+// Hai test trên canh khuôn phủ-định-role trong THÂN HÀM và trong POLICY. Còn VIEW thì không ai canh —
+// và đó đúng là chỗ lọt: 0109 mục 3 thêm vế `is not null` vào WHERE của `live_sessions_secure`, rồi
+// `0114` (một migration về TÍNH NĂNG, không ai đọc nó như thay đổi bảo mật) `drop view` + `create view`
+// lại để thêm `excluded_from_reports`, chép WHERE theo bản TRƯỚC 0109 ⇒ vế chốt NULL biến mất, im lặng
+// suốt 16 migration. View không có `security_invoker` chạy bằng quyền OWNER nên RLS của bảng gốc KHÔNG
+// đỡ hộ: WHERE của chính view là hàng rào duy nhất. Đo trên replay: phiên `authenticated` không có
+// dòng `profiles` (role = NULL) đọc được ca của MỌI brand qua view đó.
+
+/** View có khuôn phủ định nhưng KHÔNG hở — an toàn do cấu trúc. Thêm tên vào đây phải kèm phép ĐO. */
+const VIEW_SAFE_BY_SHAPE: Record<string, string> = {
+  brand_commitment_progress:
+    "Khuôn phủ định chỉ nằm ở điều kiện LEFT JOIN (chọn hợp đồng nào được nối), còn WHERE lọc DÒNG " +
+    "thì dùng so sánh KHẲNG ĐỊNH: role = any(ceo,operations,admin) hoặc role = 'brand' và đúng brand " +
+    "của mình. Role NULL ⇒ cả hai vế NULL/false ⇒ 0 dòng. Đo trên replay 0001→0130 (1 dòng cam kết " +
+    "thật, `set role authenticated` không set JWT): đọc được 0 dòng."
+};
+
+test("view dùng so sánh PHỦ ĐỊNH trên role phải có chốt NULL — hoặc được migration sau vá lại (lớp lỗ 0114)", () => {
+  const views = new Map<string, { file: string; body: string }>();
+  for (const file of FILES) {
+    const sql = sqlOnly(readFileSync(join(DIR, file), "utf8"));
+    const ev: { at: number; kind: "c" | "d"; name: string; body?: string }[] = [];
+    // Bắt mọi câu lệnh có TÊN VIEW viết thẳng, KỂ CẢ trong chuỗi `execute format(...)`. 0128/0129 viết
+    // lại view qua `%I` nên không có tên ⇒ không bị bắt (đúng: chúng đọc `pg_get_viewdef`, không chép
+    // định nghĩa). Riêng khối vá của 0130 ghi thẳng tên view kèm vế `is not null`, nên NÓ là người ghi
+    // CUỐI cho `live_sessions_secure` — và đó chính là lý do test này xanh dù 0114 vẫn sai: trạng thái
+    // cuối của chuỗi đã đúng. 0114 không sửa được nữa (đã chạy trên production, quy ước là để nguyên
+    // làm dấu vết). Điều test canh là: ai ghi định nghĩa view SAU CÙNG thì phải mang theo vế chốt NULL
+    // — đã thử bằng một migration 0131 giả dựng lại view theo khuôn 0114: test đỏ đúng tên file đó.
+    for (const m of sql.matchAll(/create\s+(?:or\s+replace\s+)?view\s+(?:public\.)?([a-z0-9_]+)\s+as\b/gi)) {
+      const end = sql.indexOf(";", m.index!);
+      ev.push({ at: m.index!, kind: "c", name: m[1], body: sql.slice(m.index!, end < 0 ? sql.length : end) });
+    }
+    for (const m of sql.matchAll(/drop\s+view\s+(?:if\s+exists\s+)?(?:public\.)?([a-z0-9_]+)/gi))
+      ev.push({ at: m.index!, kind: "d", name: m[1] });
+    ev.sort((a, b) => a.at - b.at);
+    for (const e of ev) {
+      // `drop` rồi `create` lại trong CÙNG file là khuôn của 0114 — xoá trước, ghi lại sau.
+      if (e.kind === "c") views.set(e.name, { file, body: e.body! });
+      else views.delete(e.name);
+    }
+  }
+  expect(views.size).toBeGreaterThan(3); // canh chính test: có đọc được view thật
+
+  const bad: string[] = [];
+  for (const [name, v] of views) {
+    const b = v.body.replace(/\s+/g, " ");
+    if (!/current_user_role/i.test(b)) continue;
+    const negated = /current_user_role\(\)\s*\)?\s*(?:is\s+distinct\s+from|<>|!=)/i.test(b) || /current_user_role\(\)[^)]*\bnot\s+in\b/i.test(b);
+    if (!negated) continue;
+    if (/is\s+not\s+null|coalesce/i.test(b)) continue;
+    if (name in VIEW_SAFE_BY_SHAPE) continue;
+    bad.push(`${name} [${v.file}] — khuôn phủ định trên role mà thiếu vế is-not-null`);
+  }
+  expect(bad).toEqual([]);
+});
