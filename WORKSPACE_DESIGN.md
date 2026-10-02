@@ -40,7 +40,7 @@
 > **~124×**, đổi từ Bitmap Heap Scan sang Index Only Scan — **việc tiếp theo đáng giá nhất**, cố ý chưa
 > làm vì phải sửa hàng trăm policy. Đọc spec sau khi chạy 0127 còn lộ ra **5 hàm helper RLS gọi được
 > qua `/rpc/` bởi mọi tài khoản đã đăng nhập** — đều `security definer`, không guard role, nhận ID dòng
-> của người khác, nên phá đúng bất biến brand isolation của 0059. **P2a-15 / `0128` (CHƯA CHẠY)** chuyển
+> của người khác, nên phá đúng bất biến brand isolation của 0059. **P2a-15 / `0128` (ĐÃ CHẠY 2026-10-02)** chuyển
 > cả 5 sang schema `private` bằng cách đọc `pg_policies`/`pg_get_viewdef` rồi chỉ thay tên hàm; 90 policy
 > trước/sau khác nhau ĐÚNG một tiền tố schema. **P2a-16 / `0129` (ĐÃ CHẠY)** bọc
 > `(select ...)` cho 3 helper trong **46/82 policy** — đo lại trên chuỗi thật cho khoảng **~1,5× tới
@@ -81,7 +81,7 @@
 > P2a-17→P2a-20**, trừ khi user yêu cầu rõ.
 >
 > **MỚI 2026-10-02 (P2a-21) — dọn nốt 3 việc còn treo trong file này; **2** lỗ bảo mật mới, migration `0130`
-> CHƯA CHẠY.**
+> ĐÃ CHẠY 2026-10-02 (cùng `0128`) — xem mục verify ở cuối khối này.**
 > (1) **Bảo mật:** việc "kiểm lại lỗ đọc-không-cần-đăng-nhập" bị auto-mode chặn (Production Reads) đã làm
 > được **mà không bắn request nào vào production** — dựng lại bức tranh quyền từ chuỗi migration, quét 49
 > bảng (49/49 bật RLS) · 101 policy (**0** cái lặp lại khuôn NULL-role của 0109) · 0 grant cho `anon` sau
@@ -119,8 +119,13 @@
 > chứ không nhận cột `target_gmv`. Chỉ đổi tên field bẫy `runRate` → `executionRate`. Chi tiết trong mục
 > Dashboard brand.
 >
-> **Còn lại trong file này đều KHÔNG phải việc code:** chạy `0128` + `0130` trên DB thật (việc của user —
-> `0128` còn treo từ 01/10; đã kiểm cả hai viết lại policy/view ĐỘNG nên thứ tự không làm lùi nhau) · 24 file
+> **`0128` + `0130` ĐÃ CHẠY trên DB thật 2026-10-02** — verify: RPC `public` 40 → 35 (đúng 5 helper rời đi),
+> 48 bảng/view không đổi, `0130` chạy sạch ⇒ 5 chốt tự kiểm của nó đều xanh TRÊN PRODUCTION (trong đó có
+> "view `live_sessions_secure` có vế `is not null`"), và 5 màn số liệu trên app thật vẫn đúng mốc cũ với 0
+> lỗi console. Rủi ro hồi quy duy nhất của `0130` đã đo trên replay: gọi thẳng `session_boundary_at` bằng
+> `authenticated` ⇒ permission denied, gọi từ trong hàm `security definer` ⇒ vẫn trả đúng số.
+>
+> **Còn lại trong file này đều KHÔNG phải việc code:** 24 file
 > Dataraw CROCS T6–T9 chưa up (nhập liệu) · tích hợp TikTok API (chờ scope Developer/ISV) · lịch sử trước
 > T7/2026 · 33 warning `set-state-in-effect` (đã đo, cố ý giữ `warn` — xem `eslint.config.js`). Hai thứ
 > chưa verify được vì cần mật khẩu: nhánh `503 ai_not_configured` đầu-cuối, và đợt fetch lúc đăng nhập
@@ -1844,7 +1849,7 @@ brand sẽ trắng. **Quy ước: `drop function` trong migration không đượ
 > ⚠️ **ĐIỀU KIỆN DUY TRÌ:** thêm `private` vào Exposed schemas (Settings → API) là **mở lại lỗ nguyên
 > vẹn**. Đừng thêm.
 
-**File:** `supabase/migrations/0128_rls_helpers_to_private_schema.sql` (**CHƯA CHẠY**). **Test:**
+**File:** `supabase/migrations/0128_rls_helpers_to_private_schema.sql` (**ĐÃ CHẠY 2026-10-02**; verify: spec PostgREST của production còn **48 bảng/view** nhưng RPC `public` tụt **40 → 35**, và đúng 5 helper `session_brand_id` · `session_month_published` · `snapshot_session_id` · `month_plan_brand_id` · `brand_month_published` đã rời khỏi `public`). **Test:**
 `tests/sqlGuards.test.ts` +2 (386 tests) — một test canh không dựng lại helper ở `public` ở migration
 sau, một test canh 0128 drop đủ 5 hàm và không dùng `cascade`. Chỉ test thứ hai chứng minh được đỏ
 (bỏ 0128 ra ⇒ đỏ); test thứ nhất là canh về SAU nên hôm nay không có gì làm nó đỏ.
@@ -3428,7 +3433,7 @@ chứng minh "production sạch", và dự án đã có 2 sự cố sửa tay th
 3. **Grant:** 0 migration nào sau 0109 cấp lại quyền gì cho `anon`.
 4. **Hàm:** đây là chỗ **lòi ra một lỗ chưa ai đóng** — xem ngay dưới.
 
-## BẢO MẬT — `/rpc/session_boundary_at` + view `live_sessions_secure` mất hàng rào NULL-role (phát hiện 2026-10-02, migration `0130` **CHƯA CHẠY**)
+## BẢO MẬT — `/rpc/session_boundary_at` + view `live_sessions_secure` mất hàng rào NULL-role (phát hiện 2026-10-02, migration `0130` **ĐÃ CHẠY 2026-10-02**)
 
 **Điều 0109 KHÔNG làm được, và ghi chú ở P2a-11 nói thiếu.** `create function` của Postgres tự cấp EXECUTE cho
 **PUBLIC**, mà `anon` là thành viên của PUBLIC. 0109 chỉ `revoke all on all functions ... from anon` — thu hồi
@@ -3547,10 +3552,54 @@ dấu vết, vá bằng migration sau, như đã làm với 0125).
 Chốt 5 chứng minh đỏ được bằng cách tạo tay một hàm `security definer` không guard (`zzz_leak`) ⇒ `0130` raise
 đúng tên hàm. Đã dừng và xoá cluster tạm sau khi đo.
 
-**CẦN LÀM:** chạy `0130` trên DB thật. Nó tự kiểm nên chạy sai sẽ raise, không âm thầm. **Lưu ý thứ tự:** `0128`
-cũng còn **CHƯA CHẠY**; đã kiểm `0128` viết lại policy/view **động** (đọc `pg_policies`/`pg_get_viewdef` rồi chỉ
-thay tên hàm), nên chạy `0128` **sau** `0129`/`0130` không lùi mất phần bọc `(select …)` của 0129 cũng không lùi
-mất vế `is not null` của 0130 — replay chạy đúng thứ tự số và sạch.
+### ĐÃ CHẠY 2026-10-02 — `0128` rồi `0130` trên DB thật, và phần verify đo được
+
+**`0130` chạy sạch = bằng chứng cho 5 điều cùng lúc**, vì nó raise exception thay vì trả về im lặng. Cụ thể:
+`anon` không còn quyền trên bảng/view nào · `session_boundary_at` không còn gọi được bởi `anon`/`authenticated` ·
+**view `live_sessions_secure` CÓ vế `is not null`** · 49/49 bảng bật RLS · không hàm `security definer` nào gọi
+được bởi phiên vô danh mà thiếu hàng rào. Chốt 3 nằm **sau** khối vá, nên chạy sạch nghĩa là hàng rào view đang
+có mặt trên production — bất kể nhánh nào của khối vá đã chạy.
+
+**`0128` verify từ xa được** (GET spec PostgREST bằng service role, **không gọi RPC nào**): **48 bảng/view** không
+đổi, RPC trong `public` **40 → 35**, và đúng 5 helper đã rời `public`. `session_boundary_at` vẫn hiện trong spec
+của **service_role** — đúng, vì `0130` chỉ revoke khỏi `public`/`anon`/`authenticated`.
+
+**Rủi ro hồi quy thật của `0130`, đã đo chứ không suy luận.** Lo ngại đúng chỗ: `session_boundary_at` bị revoke
+thì 3 hàm gọi nó từ bên trong có chết theo không. Đo trên replay `0001 → 0130` (Postgres cô lập, sau khi revoke):
+
+| Đường gọi | Kết quả |
+|---|---|
+| `set role authenticated` → gọi **thẳng** `session_boundary_at(id)` | `permission denied for function session_boundary_at` ✅ |
+| `set role authenticated` → gọi qua một hàm `security definer` (đúng đường mà 3 hàm thật đi) | trả về đúng mốc `2026-10-01 12:00:00+07` ✅ |
+
+Đếm lại bằng `pg_get_functiondef` trên DB sau replay (không bằng grep): đúng **3** hàm gọi nó —
+`apply_session_live_snapshot`, `import_live_reconciliation`, `apply_live_reconciliation`, cả 3 đều
+`security definer` và `authenticated` vẫn gọi được. Comment trong `0130` bản đầu ghi 4 và kể thêm
+`recompute_session_from_snapshot`, nhưng hàm đó **không** gọi tới — đã sửa (chỉ sửa COMMENT, **không** đụng câu
+lệnh nào, vì file đã chạy trên production).
+
+**Verify trên app thật** (dev server trỏ Supabase production, phiên admin sẵn có) — mục đích là bắt hồi quy do
+`0128` viết lại 90 policy + `0130` viết lại view:
+
+| Màn | Kết quả | Mốc đối chiếu |
+|---|---|---|
+| Sổ Ca (đọc qua `live_sessions_secure` vừa bị viết lại) | 47 ca · 177,8h · 3,52B · 3.069 orders · 19,8M/giờ | khớp mốc cũ |
+| Toàn Cảnh Brand T9 | CROCS 177,8h · 47 ca · 3,52B | khớp mốc cũ |
+| Hiệu Suất Host | 159 ca · 9 host · Bùi Sỹ Hùng 28,2M/giờ | khớp mốc cũ |
+| Report Tháng T9 CROCS (bản chụp) | 5,21B shop · 3,52B live · 177,8h · 19,8M/giờ | khớp mốc cũ |
+| Dashboard T10 | 0 ca (đúng — T10 chưa có dữ liệu) | — |
+
+Cột nội bộ agency (host, Trợ live, studio) vẫn hiện đủ cho role admin ⇒ lớp bọc mới của view **không** làm hỏng
+phần che cột theo role. **0 lỗi console** trên cả 5 màn.
+
+**Một việc treo tự đóng:** Toàn Cảnh Brand T9 cho thấy **VERA 0 ca · chưa lập kế hoạch · chưa có dòng report** ⇒
+`supabase/seed/2026-09-28_cleanup_e2e_test.sql` đã được chạy (phần nhìn thấy được qua app; `shift_slot` và thông
+báo `shift_open` thì không soi được từ app).
+
+**Chưa verify được, cần đúng một thứ:** góc nhìn phiên **đã đăng nhập mà thiếu dòng `profiles`** trên production
+— chính loại phiên mà lỗ 0114 nhắm tới. Trên replay thì đo rồi (0 dòng sau khi vá), trên production thì phải có
+một tài khoản như vậy mới đo được, và tạo ra một tài khoản như thế là đi ngược `0111`. Chốt 3 của `0130` đã là
+bằng chứng gián tiếp đủ mạnh: định nghĩa view trên production có vế `is not null`.
 
 ## BẢO MẬT — tự phong role khi đăng ký + 11 policy NULL-role (phát hiện 2026-09-23, migration 0111 + 0112 ĐÃ CHẠY + verify + đã tắt signup trên Dashboard)
 

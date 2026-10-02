@@ -31,11 +31,14 @@
 --
 -- CÁCH VÁ: `revoke`, KHÔNG chuyển schema. Khác 5 hàm của 0128 ở đúng một điểm quyết định mọi thứ:
 -- chúng được POLICY gọi, mà policy thì chạy dưới quyền người truy vấn ⇒ revoke là tự bắn vào chân
--- (0128 ghi rõ lý do này). Hàm này chỉ được gọi từ TRONG thân 4 hàm `security definer` khác
--- (`apply_session_live_snapshot`, `recompute_session_from_snapshot`, `import_live_reconciliation`,
--- `apply_live_reconciliation`) — chúng chạy dưới quyền OWNER, mà owner giữ EXECUTE kể cả sau khi
--- revoke khỏi public/authenticated. Đây đúng khuôn 0082/0124 đã dùng cho
--- `recompute_session_from_snapshot`, và nó không đụng tới thân hàm nào (0 rủi ro hồi quy logic).
+-- (0128 ghi rõ lý do này). Hàm này chỉ được gọi từ TRONG thân **3** hàm `security definer` khác —
+-- `apply_session_live_snapshot`, `import_live_reconciliation`, `apply_live_reconciliation` (đếm bằng
+-- `pg_get_functiondef` trên DB sau replay, không bằng grep; bản đầu của comment này ghi 4 và kể thêm
+-- `recompute_session_from_snapshot`, nhưng hàm đó KHÔNG gọi tới `session_boundary_at`). Cả 3 chạy
+-- dưới quyền OWNER, mà owner giữ EXECUTE kể cả sau khi revoke khỏi public/authenticated. Đã ĐO trên
+-- replay sau khi revoke: gọi THẲNG bằng role `authenticated` ⇒ `permission denied for function
+-- session_boundary_at`; gọi từ trong một hàm `security definer` ⇒ trả về đúng mốc thời gian. Đúng
+-- khuôn 0082/0124 đã dùng cho `recompute_session_from_snapshot`, và không đụng tới thân hàm nào.
 -- Client KHÔNG gọi hàm này: `grep -rn session_boundary_at src/` chỉ ra 0 kết quả.
 
 revoke all on function session_boundary_at(uuid) from public, anon, authenticated;
