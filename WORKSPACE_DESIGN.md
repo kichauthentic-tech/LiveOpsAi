@@ -27,26 +27,24 @@
 ## 2. Việc còn treo
 
 **Cần user làm:**
-1. **Commit + push đợt audit code chết (02/10)** — chưa commit. `0131` + `0132` đã chạy trên production nên deploy
-   client mới giờ an toàn (đã đo: hàm sửa ca nhận cả 2 lẫn 5 tham số).
-2. **24 file Dataraw CROCS T6–T9** chưa up (1 Creator Live Performance full T6→T9 · 4 Khuyến Mãi · 4 Sản Phẩm · 4 Shop
+1. **24 file Dataraw CROCS T6–T9** chưa up (1 Creator Live Performance full T6→T9 · 4 Khuyến Mãi · 4 Sản Phẩm · 4 Shop
    Analytics · 4 Live Performance · 4 Affiliate Creator List EN · 3 Live Analysis EN T7/T8/T9). `Product Card Traffic Stats`
    chưa có file nào (khối đó trong Report Tháng tự ẩn).
-3. **Nhập % hoa hồng/lương** (rate talent, commission brand) — khối tiền của Dashboard CEO và Finance mới có số.
-4. Gán host cho ca nạp bù CROCS còn thiếu (Dữ Liệu Gốc → lưới nạp bù).
+2. **Nhập % hoa hồng/lương** (rate talent, commission brand) — khối tiền của Dashboard CEO và Finance mới có số.
+3. Gán host cho ca nạp bù CROCS còn thiếu (Dữ Liệu Gốc → lưới nạp bù).
 
 **Cần tài khoản/mật khẩu mà Claude không có:**
-5. Góc nhìn role `brand` bằng JWT thật — DB chưa có tài khoản brand nào (M9 đã đo bằng harness props-only).
-6. Thông báo `shift_assigned` / "số đối soát khác số ghi lúc giao ca" tới talent — RLS chỉ chính chủ đọc; tài khoản talent
+4. Góc nhìn role `brand` bằng JWT thật — DB chưa có tài khoản brand nào (M9 đã đo bằng harness props-only).
+5. Thông báo `shift_assigned` / "số đối soát khác số ghi lúc giao ca" tới talent — RLS chỉ chính chủ đọc; tài khoản talent
    test không còn gắn hồ sơ talent sau đợt dọn mock.
-7. Phiên đã đăng nhập mà thiếu dòng `profiles` trên production (trên replay đã đo: 0 dòng sau `0130`).
-8. Nhánh `503 ai_not_configured` đầu-cuối; đợt fetch lúc đăng nhập của role talent/brand.
+6. Phiên đã đăng nhập mà thiếu dòng `profiles` trên production (trên replay đã đo: 0 dòng sau `0130`).
+7. Nhánh `503 ai_not_configured` đầu-cuối; đợt fetch lúc đăng nhập của role talent/brand.
 
 **Hoãn có chủ đích (có lý do, không phải quên):**
-9. Gộp menu / IA — chờ số liệu `ui_tab_views`.
-10. Tích hợp TikTok API tự động — chờ scope Developer/ISV ở Partner Center. Lịch sử trước T7/2026: không có nguồn.
-11. Zalo OA worker gửi `notifications` (cần user đăng ký OA doanh nghiệp; memory `liveops-zalo-notification-plan`).
-12. Module tạo ca P2/P3 (khung lịch tuần theo brand, hiệu lực theo hợp đồng) — đã phân tích 19/09, chưa chốt làm.
+8. Gộp menu / IA — chờ số liệu `ui_tab_views`.
+9. Tích hợp TikTok API tự động — chờ scope Developer/ISV ở Partner Center. Lịch sử trước T7/2026: không có nguồn.
+10. Zalo OA worker gửi `notifications` (cần user đăng ký OA doanh nghiệp; memory `liveops-zalo-notification-plan`).
+11. Module tạo ca P2/P3 (khung lịch tuần theo brand, hiệu lực theo hợp đồng) — đã phân tích 19/09, chưa chốt làm.
 
 **Bị auto-mode chặn, không đi đường vòng:** đọc vô danh hàng loạt bảng trên production ("Production Reads"); `git push`
 đôi khi bị chặn ("Out-of-Place Publication") — khi đó để user tự push.
