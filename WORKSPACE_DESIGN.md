@@ -125,11 +125,33 @@
 > lỗi console. Rủi ro hồi quy duy nhất của `0130` đã đo trên replay: gọi thẳng `session_boundary_at` bằng
 > `authenticated` ⇒ permission denied, gọi từ trong hàm `security definer` ⇒ vẫn trả đúng số.
 >
-> **Còn lại trong file này đều KHÔNG phải việc code:** 24 file
-> Dataraw CROCS T6–T9 chưa up (nhập liệu) · tích hợp TikTok API (chờ scope Developer/ISV) · lịch sử trước
-> T7/2026 · 33 warning `set-state-in-effect` (đã đo, cố ý giữ `warn` — xem `eslint.config.js`). Hai thứ
-> chưa verify được vì cần mật khẩu: nhánh `503 ai_not_configured` đầu-cuối, và đợt fetch lúc đăng nhập
-> của role talent/brand.
+> **CÒN TREO — bản đầy đủ, chốt lúc đóng phiên 2026-10-02. Không còn việc CODE nào đang treo.**
+>
+> *Cần user làm, đang chặn thứ khác:*
+> 1. **`git push`** — 3 commit đang nằm local (`d789fa2`, `9306f7f`, `6e87653`). Auto-mode chặn
+>    ("Out-of-Place Publication") nên Claude không đẩy được; đã không thử lại bằng đường khác.
+> 2. **24 file Dataraw CROCS T6–T9** chưa up (1 Creator Live Performance · 4 Khuyến Mãi · 4 Sản Phẩm ·
+>    4 Shop Analytics · 4 Live Performance · 4 Affiliate Creator List EN · 3 Live Analysis EN T7/T8/T9).
+> 3. **Nhập % hoa hồng/lương** để khối tiền của Bản Tin CEO có số (xem mục `## Bản Tin CEO`).
+>
+> *Cần mật khẩu hoặc một tài khoản chưa tồn tại — Claude không tự làm được:*
+> 4. Góc nhìn role **`brand`** bằng JWT thật — hệ thống chưa có account role brand.
+> 5. Thông báo `shift_assigned` / "Số đối soát khác số ghi lúc giao ca" tới Nguyễn Quốc Việt — RLS chỉ
+>    chính chủ đọc, cần đăng nhập tài khoản talent.
+> 6. Phiên **đã đăng nhập mà thiếu dòng `profiles`** trên production (loại phiên mà lỗ 0114 nhắm tới) —
+>    tạo một tài khoản như vậy là đi ngược `0111`; trên replay đã đo (0 dòng sau khi vá).
+> 7. Nhánh `503 ai_not_configured` đầu-cuối, và đợt fetch lúc đăng nhập của role talent/brand.
+>
+> *Hoãn có chủ đích, có lý do đo được — KHÔNG phải quên:*
+> 8. Bỏ 2 hàm nhận-cột khỏi policy `session_skus` (thêm `brand_id` + trigger) — to hơn `0129`, phải đo
+>    lại; xem cuối mục P2a-16.
+> 9. Gộp menu / IA — chờ 2–4 tuần số liệu `ui_tab_views`.
+> 10. 33 warning `set-state-in-effect` — đã đo, cố ý giữ `warn` (xem `eslint.config.js`).
+> 11. Tích hợp TikTok API — chờ scope Developer/ISV · lịch sử trước T7/2026 — không có nguồn.
+>
+> *Việc BỊ CHẶN bởi auto-mode, không được đi đường khác:* phép đọc vô danh 48 bảng trên production
+> (reason "Production Reads"). Đã trả lời được câu hỏi đó bằng đường khác (dựng lại quyền từ chuỗi
+> migration + replay trên Postgres cô lập) và chính đường khác đó tìm ra 2 lỗ `0130` vá.
 
 > **MỚI 2026-09-29 — Audit UX/UI lần 2: Đợt 0 (4cf62b7) + M1 Report Tháng (d8ddd1e) + M2 Dashboard brand XONG (không migration).**
 > Đợt 0: hết "0 ca / Chưa có…" giả lúc tải, 0/28 màn tràn ngang 375px, sidebar không nhảy theo tab, `MonthPicker`, `PageHeader`,
@@ -257,8 +279,9 @@
 >    dữ liệu chứ không chỉ xấu UI. Thêm `loading` vào điều kiện khoá, đúng như 2 nút Chốt/Xoá bên cạnh vẫn làm.
 > Chưa verify được: thông báo `shift_assigned` / "Số đối soát khác số ghi lúc giao ca" (+21%) tới Nguyễn Quốc Việt — RLS chỉ chính
 > chủ đọc, cần đăng nhập tài khoản talent. **Dọn dữ liệu:** hợp đồng/cam kết, lô đối soát, ca chờ 30/09 đã xoá qua UI; ca 28/09 đã
-> "loại khỏi báo cáo" (số CROCS/agency trên app đã về mốc 177,8h · 47 ca · 3,52B); còn lại chạy tay 1 lần
-> `supabase/seed/2026-09-28_cleanup_e2e_test.sql` (2 ca VERA, 1 shift_slot, plan VERA T9, report nháp VERA T9 + bản chụp,
+> "loại khỏi báo cáo" (số CROCS/agency trên app đã về mốc 177,8h · 47 ca · 3,52B); phần còn lại chạy tay 1 lần
+> `supabase/seed/2026-09-28_cleanup_e2e_test.sql` — **ĐÃ CHẠY (kiểm 2026-10-02: Toàn Cảnh Brand T9 cho thấy VERA 0 ca ·
+> chưa lập kế hoạch · chưa có dòng report; `shift_slot` và thông báo `shift_open` thì không soi được từ app)** (2 ca VERA, 1 shift_slot, plan VERA T9, report nháp VERA T9 + bản chụp,
 > thông báo shift_open). Cách nạp file test vào `<input type=file>` từ Browser pane: đặt file trong repo, `fetch('/@fs/<đường dẫn
 > tuyệt đối>')` → `DataTransfer` → dispatch `change`; xoá thư mục tạm sau khi test.
 
