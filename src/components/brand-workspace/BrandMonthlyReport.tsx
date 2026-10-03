@@ -22,6 +22,7 @@ import { fetchMonthlyReportSnapshot, saveMonthlyReportSnapshot, StoredMonthlyRep
 import { DataRawImportStamp, fetchDataRawImportStamps } from "../../lib/db/brandDataRaw";
 import { buildMonthlyReportSnapshot, COVERAGE_TYPES, snapshotFreshness, snapshotHeadline, SnapshotHeadline } from "../../lib/report/monthlySnapshot";
 import { fmtVndShort } from "../../lib/format";
+import { prefetchable, type TabPrefetchCtx } from "../../lib/db/prefetch";
 import { lazyNamed } from "../../lib/lazyNamed";
 
 // 7 phần của Report Tháng kéo theo recharts + d3 + redux = 364 KB, chiếm 2/3 chunk của tab này (đo
@@ -56,6 +57,19 @@ interface BrandMonthlyReportProps {
 }
 
 const CAN_MANAGE_ROLES: UserRole[] = ["ceo", "operations", "admin"];
+
+// Lượt đọc lúc mở màn — nạp trước trong lúc chờ đợt nạp chung (lib/db/prefetch.ts), cùng chunk biểu đồ.
+const reportRead = prefetchable("monthlyReport", fetchMonthlyReport);
+const snapshotRead = prefetchable("reportSnapshot", fetchMonthlyReportSnapshot);
+const importStampsRead = prefetchable("importStamps", fetchDataRawImportStamps);
+export function prefetchBrandMonthlyReport({ brandId, role }: TabPrefetchCtx): void {
+  if (!brandId) return;
+  const month = getTodayMonth();
+  reportRead.prefetch(brandId, `${month}-01`);
+  snapshotRead.prefetch(brandId, month);
+  MonthlyReportTabs.preload();
+  if (!role || CAN_MANAGE_ROLES.includes(role)) importStampsRead.prefetch(brandId);
+}
 
 function monthRange(month: string): { start: string; end: string } {
   const [y, m] = month.split("-").map(Number);
@@ -133,7 +147,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
     let cancelled = false;
     setLoading(true);
     setErrorMsg(null);
-    fetchMonthlyReport(brandId, `${month}-01`)
+    reportRead.take(brandId, `${month}-01`)
       .then((r) => {
         if (cancelled) return;
         setReport(r);
@@ -151,7 +165,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
     setStored(null);
     // Chunk biểu đồ tải cùng lúc với bản chụp, không đợi bản chụp về rồi mới bắt đầu (một vòng mạng nối tiếp).
     MonthlyReportTabs.preload();
-    fetchMonthlyReportSnapshot(brandId, month)
+    snapshotRead.take(brandId, month)
       .then((r) => !cancelled && setStored(r))
       .catch((e) => !cancelled && setErrorMsg(errorMessage(e, "Không tải được số liệu report")))
       .finally(() => !cancelled && setSnapLoading(false));
@@ -167,7 +181,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
   useEffect(() => {
     if (!canManage) return;
     let cancelled = false;
-    fetchDataRawImportStamps(brandId)
+    importStampsRead.take(brandId)
       .then((r) => !cancelled && setImportStamps(r))
       .catch(() => !cancelled && setImportStamps(null));
     return () => {

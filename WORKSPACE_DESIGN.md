@@ -17,7 +17,7 @@
   bù từ file Creator-Live-Performance (229 ca, còn ca chưa gán host). **Không đề xuất tính năng mới**; hỏi user chạy thử
   tới đâu, cái gì kêu, rồi sửa đúng chỗ đó. **Không seed mock lại.**
 - **Nợ kỹ thuật đã hết** (đợt P2a-2…P2a-21, 01–02/10) và **audit code chết đã xong** (02/10): `npm run audit:dead` báo 0,
-  ESLint 0 lỗi (33 warning `set-state-in-effect` = nợ đã đo, cố ý `warn`), vitest 410/410.
+  ESLint 0 lỗi (32 warning `set-state-in-effect` = nợ đã đo, cố ý `warn`), vitest 420/420 (03/10).
 - 🛑 **User chốt 02/10: DỪNG nhánh đo tốc độ tải.** Mạng chỗ user là biến trội nên wall-clock vô nghĩa. Không chạy lại
   các phép đo P2a-17→P2a-20 trừ khi user yêu cầu rõ. Những gì đã sửa thì giữ (chứng minh bằng SỐ REQUEST và source).
 - **03/10 user hỏi lại "app load chậm hơn" → audit theo SỐ VÒNG MẠNG NỐI TIẾP** (không theo wall-clock; mạng user dao động
@@ -26,9 +26,12 @@
   `max-age=0, must-revalidate`, mỗi lần mở app hỏi lại từng file — nay `max-age=31536000, immutable`; (2) chunk tab bị
   cổng `coreDataReady` giữ tới khi cả đợt dữ liệu về (Sổ Ca: chunk khởi hành 352 ms → **62 ms**) — nay `TAB_CHUNKS` +
   `preload()`; (3) Report Tháng: chunk biểu đồ 145 KB gzip đợi bản chụp về (665 ms → khởi hành cùng bản chụp 409 ms).
-  Thêm `<link rel="preconnect">` tới Supabase trong `index.html`. **Sau deploy phải kiểm:** `curl -sI
-  https://live-ops-ai.vercel.app/assets/<file>.js` có `immutable`. Còn lại (chưa làm, cần user chốt): màn tự nạp dữ liệu
-  riêng sau khi mount (CeoBrief, BrandDashboard, Report Tháng) vẫn là vòng thứ 3 nối sau đợt nạp chung.
+  Thêm `<link rel="preconnect">` tới Supabase trong `index.html`. **Đợt 2 cùng ngày:** (4) `fetchMonthPlan` 2 truy vấn
+  nối tiếp → 1 (nhúng `brand_month_plan_slots(*)`; lợi cho mọi màn đọc plan); (5) lượt đọc riêng của Bản Tin CEO,
+  Dashboard brand, Report Tháng được NẠP TRƯỚC trong lúc chờ đợt chung (`src/lib/db/prefetch.ts`): Report Tháng khởi hành
+  115 ms, xong trước cả đợt chung; Dashboard CROCS nội dung giống từng ký tự với trước khi sửa, 0 request trùng.
+  OpsSupport nhận `plan` qua prop từ BrandDashboard. **Sau deploy phải kiểm:** `curl -sI
+  https://live-ops-ai.vercel.app/assets/<file>.js` có `immutable`.
 - **Quyết định user đã chốt — đừng nêu lại:** luật run-rate (§5.6); Target GMV từng ca ở "Kế Hoạch Tháng Sau" brand ĐƯỢC
   thấy (01/10); tiền không có chữ "đ" (27/09); trung tâm xuất file = một module dùng chung, không dựng tab riêng (02/10);
   gộp menu/IA hoãn tới khi có 2–4 tuần số liệu `ui_tab_views` (bắt đầu đếm 26/09); chỉ ops tạo ca (brand không tự mở).
@@ -154,6 +157,10 @@
   (cổng canh quét cả `src/`). Bảng con không nạp cả kho lúc mở app; nạp theo ca đang mở.
 - **Lượt đọc không dùng dữ liệu `profile` thì gate theo `session`** (lên chặng 1 của đợt nạp). Đừng thêm throttle vào lớp
   đọc (bắn song song nhanh nhất; giới hạn luồng chậm 2–5×). Gộp lời gọi trùng đang bay bằng `dedupeInFlight` — KHÔNG cache.
+- **Nạp trước lượt đọc của màn** (`lib/db/prefetch.ts`, test `tests/prefetch.test.ts`): màn export `prefetchX(ctx)` khai
+  `prefetchable(name, fn)` và effect MOUNT gọi `.take(...)`; App gọi qua `TAB_DATA_PREFETCH` CHỈ khi `!coreDataReady`.
+  Giao đúng một lần, hết hạn 30 s, đổi tab là xoá — KHÔNG phải cache: đường đọc-sau-khi-ghi luôn gọi thẳng hàm db.
+  Hai component không được `take` cùng key — truyền dữ liệu xuống bằng prop.
 - **Mọi `.update()`/`.delete()` kèm `.select()` + `assertAffected`** — RLS lọc 0 dòng thì PostgREST trả 204 im lặng.
 - ĐỌC ca qua view `live_sessions_secure`, GHI vào bảng `live_sessions` (brand bị đóng bảng gốc từ 0107).
 - Mỗi loại file Dataraw một dialect số — KHÔNG dùng chung `num()` (product_list: chấm = nghìn; creator_live_performance:

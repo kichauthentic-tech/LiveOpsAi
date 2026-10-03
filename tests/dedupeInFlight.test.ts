@@ -2,7 +2,7 @@
 //
 // Lỗi được vá: màn Brand Dashboard, trên BẢN BUILD PRODUCTION (không phải StrictMode ở dev), 5/5 lượt
 // tải đều bắn 3 cặp request trùng nhau từng ký tự — vì `BrandDashboard` và `<OpsSupport>` lồng trong
-// nó cùng gọi `fetchMonthPlan(brandId, month)`, và `fetchShopDaysMonthSlice` được gọi 2 lần (tháng
+// nó cùng gọi `fetchMonthPlan(brandId, month)` (từ 2026-10-03 OpsSupport nhận plan qua prop), và `fetchShopDaysMonthSlice` được gọi 2 lần (tháng
 // này + tháng trước) cho một truy vấn danh sách batch không có bộ lọc kỳ.
 import { beforeEach, expect, test, vi } from "vitest";
 import { DataRawColumn } from "../src/types";
@@ -22,7 +22,11 @@ function chain(table: string) {
   const settle = async () => {
     sent.push(`${table}|${sel}|${filters.join(",")}`);
     await new Promise((r) => setTimeout(r, LATENCY_MS));
-    if (table === "brand_month_plans") return { data: planRow, error: null };
+    if (table === "brand_month_plans") {
+      // Từ 2026-10-03 fetchMonthPlan nhúng slots vào cùng request (`brand_month_plan_slots(*)`).
+      const embed = sel.includes("brand_month_plan_slots(");
+      return { data: planRow && embed ? { ...planRow, brand_month_plan_slots: slotRows } : planRow, error: null };
+    }
     if (table === "brand_month_plan_slots") return { data: slotRows, error: null };
     if (table === "brand_dataraw_imports") {
       return { data: sel.startsWith("columns") ? { columns: [] as DataRawColumn[] } : imports, error: null };
@@ -106,10 +110,10 @@ test("lỗi được chia cho cả hai caller, rồi key được nhả ra để
 
 // ---- Đúng ba cặp request đã đo được trên Brand Dashboard ------------------------------------------
 
-test("fetchMonthPlan gọi 2 lần song song (BrandDashboard + OpsSupport) chỉ còn 1 truy vấn mỗi bảng", async () => {
+test("fetchMonthPlan là MỘT request (slots nhúng), gọi 2 lần song song vẫn chỉ 1 request", async () => {
   const [a, b] = await Promise.all([fetchMonthPlan(B, "2026-10"), fetchMonthPlan(B, "2026-10")]);
   expect(sent.filter((s) => s.startsWith("brand_month_plans|"))).toHaveLength(1);
-  expect(sent.filter((s) => s.startsWith("brand_month_plan_slots|"))).toHaveLength(1);
+  expect(sent.filter((s) => s.startsWith("brand_month_plan_slots|"))).toHaveLength(0);
   // Mỗi caller vẫn tự dựng đối tượng riêng (gộp ở mức TRUY VẤN, không ở mức hàm).
   expect(a).not.toBe(b);
   expect(a!.plan.id).toBe(PLAN_ID);
@@ -122,7 +126,6 @@ test("fetchMonthPlan gọi NỐI TIẾP vẫn đi mạng 2 lần — không đư
   await fetchMonthPlan(B, "2026-10");
   await fetchMonthPlan(B, "2026-10");
   expect(sent.filter((s) => s.startsWith("brand_month_plans|"))).toHaveLength(2);
-  expect(sent.filter((s) => s.startsWith("brand_month_plan_slots|"))).toHaveLength(2);
 });
 
 test("fetchMonthPlan hai THÁNG khác nhau không gộp", async () => {
@@ -153,8 +156,7 @@ test("fetchShopDaysMonthSlice với brand khác nhau KHÔNG gộp", async () => 
 test("hai đường đọc đã đo được là trùng vẫn phải đi qua dedupeInFlight", async () => {
   const fs = await import("node:fs");
   const mp = fs.readFileSync("src/lib/db/monthPlans.ts", "utf8");
-  expect(mp).toMatch(/dedupeInFlight\(`brand_month_plans\|/);
-  expect(mp).toMatch(/dedupeInFlight\(`brand_month_plan_slots\|/);
+  expect(mp).toMatch(/dedupeInFlight\(`brand_month_plans\+slots\|/);
   const ps = fs.readFileSync("src/lib/dataraw/monthlyProductSlice.ts", "utf8");
   expect(ps).toMatch(/dedupeInFlight\(`brand_dataraw_imports\.lite\|/);
   // Danh sách batch chỉ được đọc qua fetchImportsLite — thêm một truy vấn thô nữa là mở lại lỗ cũ.

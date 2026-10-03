@@ -4,7 +4,8 @@ import { BrandMonthPlan, BrandMonthPlanSlot, CalendarEventRow, LiveSession, Prom
 import { EngineParams } from "../lib/scheduling/engineParams";
 import { buildHistory } from "../lib/scheduling/suggestEngine";
 import { buildCalibration, evaluatePlan } from "../lib/scheduling/planEvaluation";
-import { fetchBrandLockedPlanSlots, fetchCalendarEvents, fetchMonthPlan } from "../lib/db/monthPlans";
+import { fetchBrandLockedPlanSlots, fetchCalendarEvents } from "../lib/db/monthPlans";
+import { prefetchable } from "../lib/db/prefetch";
 import { EstimateCtx, MonthTracking, benchmarkForWindow, suggestFill, trackMonth } from "../lib/opsSupport";
 import { MonthEndProjection, PlanRunRate, PROJECTION_METHOD_LABEL } from "../lib/performance/planRunRate";
 import { todayVn } from "../lib/performance/brandCommitment";
@@ -25,6 +26,9 @@ interface OpsSupportProps {
   brandId: string;
   brandName: string;
   month: string; // "YYYY-MM"
+  /** Kế hoạch của `month` — Dashboard đã nạp (trước 2026-10-03 panel tự nạp lại đúng truy vấn đó). */
+  plan: { plan: BrandMonthPlan; slots: BrandMonthPlanSlot[] } | null;
+  planLoading: boolean;
   sessions: LiveSession[];
   shiftSlots: ShiftSlot[];
   promoSchemes: PromoScheme[];
@@ -44,36 +48,37 @@ const addDays = (d: string, n: number) => {
   return `${x.getFullYear()}-${`${x.getMonth() + 1}`.padStart(2, "0")}-${`${x.getDate()}`.padStart(2, "0")}`;
 };
 
-export default function OpsSupport({ rr, projection, brandId, brandName, month, sessions, shiftSlots, promoSchemes, engineParams, onOpenMonthPlan, onOpenSession }: OpsSupportProps) {
+// Nạp trước cùng Dashboard brand (lib/db/prefetch.ts) — panel chỉ hiện với ops ở tháng hiện tại.
+const calendarEventsRead = prefetchable("calendarEvents", fetchCalendarEvents);
+const lockedPlanSlotsRead = prefetchable("lockedPlanSlots", fetchBrandLockedPlanSlots);
+export function prefetchOpsSupport(brandId: string): void {
+  calendarEventsRead.prefetch();
+  lockedPlanSlotsRead.prefetch(brandId);
+}
+
+export default function OpsSupport({ rr, projection, brandId, brandName, month, plan, planLoading, sessions, shiftSlots, promoSchemes, engineParams, onOpenMonthPlan, onOpenSession }: OpsSupportProps) {
   const today = todayVn();
-  const [plan, setPlan] = useState<{ plan: BrandMonthPlan; slots: BrandMonthPlanSlot[] } | null>(null);
   const [lockedSlots, setLockedSlots] = useState<BrandMonthPlanSlot[]>([]);
   const [events, setEvents] = useState<CalendarEventRow[]>([]);
-  const [loading, setLoading] = useState(false);
+  // Khoá brand của lần nạp ca-đã-chốt gần nhất — khác brand đang xem nghĩa là đang tải.
+  const [lockedFor, setLockedFor] = useState<string | null>(null);
+  const loading = planLoading || lockedFor !== brandId;
 
   useEffect(() => {
-    fetchCalendarEvents().then(setEvents).catch(() => setEvents([]));
+    calendarEventsRead.take().then(setEvents).catch(() => setEvents([]));
   }, []);
   useEffect(() => {
     if (!brandId) return;
     let alive = true;
-    setLoading(true);
-    Promise.all([fetchMonthPlan(brandId, month), fetchBrandLockedPlanSlots(brandId)])
-      .then(([p, ls]) => {
-        if (!alive) return;
-        setPlan(p);
-        setLockedSlots(ls);
-      })
-      .catch(() => {
-        if (!alive) return;
-        setPlan(null);
-        setLockedSlots([]);
-      })
-      .finally(() => alive && setLoading(false));
+    lockedPlanSlotsRead
+      .take(brandId)
+      .then((ls) => alive && setLockedSlots(ls))
+      .catch(() => alive && setLockedSlots([]))
+      .finally(() => alive && setLockedFor(brandId));
     return () => {
       alive = false;
     };
-  }, [brandId, month]);
+  }, [brandId]);
 
   const brandSessions = useMemo(() => sessions.filter((s) => s.brandId === brandId), [sessions, brandId]);
   const brandSchemes = useMemo(() => promoSchemes.filter((sc) => sc.brandId === brandId).map((sc) => ({ start: sc.startDate, end: sc.endDate, label: sc.title })), [promoSchemes, brandId]);

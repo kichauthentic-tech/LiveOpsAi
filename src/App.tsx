@@ -47,6 +47,7 @@ import { saveEngineParams } from "./lib/db/engineParams";
 import { logTabView } from "./lib/db/tabViews";
 import { findBrandBySlug, parsePath, routeToPath } from "./lib/routes";
 import { lazyNamed } from "./lib/lazyNamed";
+import { dropPrefetched, type TabPrefetchCtx } from "./lib/db/prefetch";
 import { useWorkspaceData } from "./hooks/useWorkspaceData";
 import {
   CALENDAR_TABS,
@@ -124,6 +125,14 @@ const TAB_CHUNKS: Record<string, { preload: () => void }[]> = {
   ai_training: [AiTrainingCenter, EngineTrainingPanel],
   user_settings: [UserRoleSettings],
   account_settings: [AccountSettings]
+};
+
+// Màn có lượt đọc riêng lúc mount (sau cổng `coreDataReady`) — gọi hàm nạp trước của chính màn đó trong
+// lúc đợt nạp chung còn chạy (src/lib/db/prefetch.ts). import() trùng với chunk ở TAB_CHUNKS, không tải hai lần.
+const TAB_DATA_PREFETCH: Record<string, (ctx: TabPrefetchCtx) => Promise<void>> = {
+  agency_overview: (ctx) => import("./components/CeoBrief").then((m) => m.prefetchCeoBrief(ctx)),
+  brand_dashboard: (ctx) => import("./components/brand-workspace/BrandDashboard").then((m) => m.prefetchBrandDashboard(ctx)),
+  brand_monthly_report: (ctx) => import("./components/brand-workspace/BrandMonthlyReport").then((m) => m.prefetchBrandMonthlyReport(ctx))
 };
 
 const STORAGE_PREFIX = "liveops_os_v2_";
@@ -556,6 +565,24 @@ export default function App() {
   }, [currentRole, workspace, activeUser.assignedBrandId, brandsLoaded, brands]);
   const currentBrandId = effectiveWorkspace.type === "brand" ? effectiveWorkspace.brandId : undefined;
   const currentBrandName = brands.find((b) => b.id === currentBrandId)?.name || "Brand";
+
+  // Nạp trước lượt đọc riêng của tab đang mở — CHỈ trong lúc chờ đợt nạp chung (màn chưa mount nên chưa
+  // ai `take`; sau đó màn mount ngay và tự đọc, nạp trước chỉ đẻ request thừa). Không đợi `profile`: đo
+  // 2026-10-03, có lượt `profiles` về SAU cả đợt chung, chờ nó là mất luôn phần lợi. Chưa có profile thì
+  // role là "chưa biết" và brand lấy từ `workspace` thô (ops; role brand bị ép brand theo profile sau).
+  // Đổi tab thì bỏ mọi bản nạp trước chưa ai lấy.
+  const prefetchTabRef = useRef<string | null>(null);
+  const prefetchBrandId = profile ? currentBrandId : workspace.type === "brand" ? workspace.brandId : undefined;
+  useEffect(() => {
+    if (prefetchTabRef.current !== activeTab) {
+      prefetchTabRef.current = activeTab;
+      dropPrefetched();
+    }
+    if (!session || coreDataReady) return;
+    TAB_DATA_PREFETCH[activeTab]?.({ brandId: prefetchBrandId, role: profile ? currentRole : undefined }).catch(() => {});
+    // `session` chỉ cần có/không — object mới mỗi lần làm mới token không đổi gì ở đây.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, !!session, !!profile, coreDataReady, prefetchBrandId, currentRole]);
 
   // Link /brand/<slug>/… mở lúc brand chưa nạp: đối chiếu slug một lần khi đã nạp xong. Điều chỉnh
   // state ngay trong render (không qua effect) để lần vẽ đầu sau khi nạp đã đúng brand, không nháy Agency.

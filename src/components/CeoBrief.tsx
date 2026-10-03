@@ -54,6 +54,7 @@ import { fmtKeyMetric, KEY_METRICS, keyMetricValue } from "../lib/report/keyMetr
 import { BrandLogo } from "./ui/BrandLogo";
 import { PageIntro } from "./common/PageIntro";
 import { MonthPicker } from "./common/MonthPicker";
+import { prefetchable, type TabPrefetchCtx } from "../lib/db/prefetch";
 
 // Bản Tin CEO (2026-09-25) — thay Toàn Cảnh Agency. Mọi luật số nằm ở lib/performance/ceoBrief.ts;
 // file này chỉ trình bày. Khối tiền chỉ ceo/admin thấy, và chỉ cộng ca ĐỦ dữ liệu để tính tiền
@@ -178,6 +179,14 @@ function useTooltip() {
   return { onMove, onLeave: () => setTip(null), node };
 }
 
+// Trạng thái kế hoạch tháng này + tháng sau — nạp trước trong lúc chờ đợt nạp chung (lib/db/prefetch.ts).
+const planStatusesRead = prefetchable("planStatuses", fetchPlanStatuses);
+export function prefetchCeoBrief(_ctx: TabPrefetchCtx): void {
+  const month = todayVn().slice(0, 7);
+  planStatusesRead.prefetch(month);
+  planStatusesRead.prefetch(nextMonthOf(month));
+}
+
 export default function CeoBrief(props: CeoBriefProps) {
   const { sessions, brands, talents, shiftSlots, planSlotTargets, planMonthTotals, monthlyReports, financeRecords, brandPlatformRates, brandPlatformRateHistory, talentRateHistory, currentRole, onNavigate } = props;
   const today = todayVn();
@@ -198,12 +207,12 @@ export default function CeoBrief(props: CeoBriefProps) {
 
   useEffect(() => {
     let alive = true;
-    fetchPlanStatuses(month).then((m) => alive && setPlans(m)).catch(() => alive && setPlans(new Map()));
+    planStatusesRead.take(month).then((m) => alive && setPlans(m)).catch(() => alive && setPlans(new Map()));
     return () => { alive = false; };
   }, [month]);
   useEffect(() => {
     let alive = true;
-    fetchPlanStatuses(nextMonthOf(today.slice(0, 7))).then((m) => alive && setNextPlans(m)).catch(() => alive && setNextPlans(new Map()));
+    planStatusesRead.take(nextMonthOf(today.slice(0, 7))).then((m) => alive && setNextPlans(m)).catch(() => alive && setNextPlans(new Map()));
     return () => { alive = false; };
   }, [today]);
 

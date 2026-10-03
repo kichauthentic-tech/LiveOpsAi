@@ -71,38 +71,29 @@ const slotFromDb = (r: DbPlanSlot): BrandMonthPlanSlot => ({
 });
 
 /**
- * Hai truy vấn NỐI TIẾP (plan rồi slots theo plan.id) — không gộp được thành một.
+ * MỘT request: plan nhúng luôn các ca kế hoạch (PostgREST embed qua FK plan_id). Trước 2026-10-03 là hai
+ * truy vấn NỐI TIẾP (plan rồi slots theo plan.id) — đo trên Dashboard CROCS: thêm nguyên một vòng mạng
+ * (840 → 1.080 ms) mỗi lần mở màn. Thứ tự slot (date, start_time) đặt trên bảng nhúng.
  *
- * Mỗi truy vấn đi qua `dedupeInFlight`: màn Brand Dashboard có HAI component độc lập cùng gọi hàm này
- * với cùng (brand, tháng) — `BrandDashboard` và `<OpsSupport>` lồng bên trong nó — nên trước khi gộp,
- * mỗi lần mở màn tốn 4 request thay vì 2 (đo 2026-10-01 trên bản build production, tái lập 5/5 lượt).
- * Gộp ở mức TRUY VẤN chứ không ở mức hàm: nhờ vậy mỗi caller vẫn tự `planFromDb`/`slotFromDb` ra đối
+ * Đi qua `dedupeInFlight`: `BrandDashboard` gọi cùng (brand, tháng) với nơi khác có thể chồng thời gian
+ * (đo 2026-10-01: 4 request thay vì 2 trước khi gộp). Mỗi caller vẫn tự `planFromDb`/`slotFromDb` ra đối
  * tượng riêng, chỉ dùng chung dòng JSON thô. Xem đầu file dedupeInFlight.ts.
  */
 export async function fetchMonthPlan(brandId: string, month: string): Promise<{ plan: BrandMonthPlan; slots: BrandMonthPlanSlot[] } | null> {
-  const data = await dedupeInFlight(`brand_month_plans|${brandId}|${month}`, async () => {
+  const data = await dedupeInFlight(`brand_month_plans+slots|${brandId}|${month}`, async () => {
     const { data, error } = await supabase
       .from("brand_month_plans")
-      .select("*")
+      .select("*, brand_month_plan_slots(*)")
       .eq("brand_id", brandId)
       .eq("month", `${month}-01`)
+      .order("date", { referencedTable: "brand_month_plan_slots" })
+      .order("start_time", { referencedTable: "brand_month_plan_slots" })
       .maybeSingle();
     if (error) throw error;
-    return data as DbPlan | null;
+    return data as (DbPlan & { brand_month_plan_slots: DbPlanSlot[] }) | null;
   });
   if (!data) return null;
-  const plan = planFromDb(data);
-  const rows = await dedupeInFlight(`brand_month_plan_slots|${plan.id}`, async () => {
-    const { data: rows, error: e2 } = await supabase
-      .from("brand_month_plan_slots")
-      .select("*")
-      .eq("plan_id", plan.id)
-      .order("date")
-      .order("start_time");
-    if (e2) throw e2;
-    return rows as DbPlanSlot[];
-  });
-  return { plan, slots: rows.map(slotFromDb) };
+  return { plan: planFromDb(data), slots: (data.brand_month_plan_slots ?? []).map(slotFromDb) };
 }
 
 export async function fetchPlanStatuses(month: string): Promise<Map<string, BrandMonthPlan>> {

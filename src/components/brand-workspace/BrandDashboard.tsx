@@ -6,6 +6,7 @@ import { fetchMonthPlan } from "../../lib/db/monthPlans";
 import { fetchShopDaysMonthSlice, ShopDaysMonthSlice } from "../../lib/dataraw/monthlyProductSlice";
 import { CAMP_DAY_BUCKET_LABEL, CampDayBucket, resolveCampBucketType } from "../../lib/campaignDays";
 import { todayVn } from "../../lib/performance/brandCommitment";
+import { prefetchable, type TabPrefetchCtx } from "../../lib/db/prefetch";
 import { lastDataDate, monthEndOf, monthOutlook, prevMonthOf, nextMonthOf, RUN_RATE_BAD, RUN_RATE_WARN } from "../../lib/performance/ceoBrief";
 import { planRunRate, PlanRunRateSlot, projectMonthEnd, PROJECTION_METHOD_LABEL } from "../../lib/performance/planRunRate";
 import {
@@ -31,7 +32,7 @@ import { sessionDurationHours } from "../../lib/pnl";
 import { fmtVndShort } from "../../lib/format";
 import { METRIC, metricHint } from "../../lib/metricGlossary";
 import { PageHeader } from "../common/PageHeader";
-import OpsSupport from "../OpsSupport";
+import OpsSupport, { prefetchOpsSupport } from "../OpsSupport";
 import { MonthPicker } from "../common/MonthPicker";
 
 // Dashboard brand (2026-09-28) — màn TRONG tháng cho ops: tháng này tới đâu, vì sao, tuần tới / tháng sau
@@ -92,6 +93,21 @@ const Stat: React.FC<{ label: string; value: string; hint?: React.ReactNode; ton
 const statsOf = (sessions: LiveSession[], start: string, end: string): LiveStats =>
   liveStatsFromRows(sessions.filter((s) => s.date >= start && s.date <= end && hasLiveNumbers(s)).map(sessionToLivePerfRow), start, end);
 
+// Lượt đọc riêng của màn — nạp trước trong lúc chờ đợt nạp chung (lib/db/prefetch.ts). Chỉ ops (hoặc role chưa
+// biết): role brand mặc định xem tháng phát hành gần nhất, tính từ ca — chưa biết trước khi đợt chung về.
+const monthPlanRead = prefetchable("monthPlan", (brandId: string, month: string) => fetchMonthPlan(brandId, month).catch(() => null));
+const shopDaysRead = prefetchable("shopDays", fetchShopDaysMonthSlice);
+export function prefetchBrandDashboard({ brandId, role }: TabPrefetchCtx): void {
+  if (!brandId || (role && !OPS_ROLES.includes(role))) return;
+  const month = todayVn().slice(0, 7);
+  const pm = prevMonthOf(month);
+  monthPlanRead.prefetch(brandId, month);
+  monthPlanRead.prefetch(brandId, nextMonthOf(month));
+  shopDaysRead.prefetch(brandId, `${month}-01`, monthEndOf(`${month}-01`));
+  shopDaysRead.prefetch(brandId, `${pm}-01`, monthEndOf(`${pm}-01`));
+  prefetchOpsSupport(brandId);
+}
+
 export default function BrandDashboard({ brandId, brandName, sessions, shiftSlots, promoSchemes, engineParams, currentRole, onOpenMonthPlan, onOpenSession, onOpenSessions }: BrandDashboardProps) {
   const today = todayVn();
   const isOps = OPS_ROLES.includes(currentRole);
@@ -113,7 +129,7 @@ export default function BrandDashboard({ brandId, brandName, sessions, shiftSlot
   const planLoading = planKey !== `${brandId}|${month}`;
   useEffect(() => {
     let alive = true;
-    Promise.all([fetchMonthPlan(brandId, month).catch(() => null), fetchMonthPlan(brandId, nextMonthOf(month)).catch(() => null)]).then(([p, n]) => {
+    Promise.all([monthPlanRead.take(brandId, month), monthPlanRead.take(brandId, nextMonthOf(month))]).then(([p, n]) => {
       if (!alive) return;
       setPlan(p);
       setNextPlan(n);
@@ -155,7 +171,7 @@ export default function BrandDashboard({ brandId, brandName, sessions, shiftSlot
     if (!isOps) return;
     let alive = true;
     const pm = prevMonthOf(month);
-    Promise.all([fetchShopDaysMonthSlice(brandId, mStart, mEnd), fetchShopDaysMonthSlice(brandId, `${pm}-01`, monthEndOf(`${pm}-01`))])
+    Promise.all([shopDaysRead.take(brandId, mStart, mEnd), shopDaysRead.take(brandId, `${pm}-01`, monthEndOf(`${pm}-01`))])
       .then(([c, p]) => alive && setShop({ cur: c, prev: p }))
       .catch(() => alive && setShop(null));
     return () => {
@@ -639,6 +655,8 @@ export default function BrandDashboard({ brandId, brandName, sessions, shiftSlot
           brandId={brandId}
           brandName={brandName}
           month={month}
+          plan={plan}
+          planLoading={planLoading}
           sessions={sessions}
           shiftSlots={shiftSlots}
           promoSchemes={promoSchemes}
