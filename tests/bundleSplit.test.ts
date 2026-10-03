@@ -128,3 +128,15 @@ test("shim vẫn hợp lệ: app không dùng realtime/storage ở đâu cả", 
   }
   expect(hits).toEqual([]);
 });
+
+// Tải chunk tab song song với dữ liệu (2026-10-03): khối render tab nằm sau cổng `coreDataReady`, nên
+// tab nào thiếu trong TAB_CHUNKS thì chunk của nó lại xếp hàng SAU cả đợt nạp — chậm thêm một vòng mạng.
+test("mọi tab render trong App.tsx đều có trong TAB_CHUNKS", () => {
+  const app = readFileSync(join(SRC, "App.tsx"), "utf8");
+  const rendered = new Set([...app.matchAll(/\{activeTab === "([a-z_]+)" &&/g)].map((m) => m[1]));
+  const table = app.slice(app.indexOf("const TAB_CHUNKS"), app.indexOf("};", app.indexOf("const TAB_CHUNKS")));
+  const listed = new Set([...table.matchAll(/^\s+([a-z_]+):/gm)].map((m) => m[1]));
+  listed.add("calendar"); // chọn chunk theo opsView ở effect preload, không nằm trong bảng
+  expect(rendered.size).toBeGreaterThan(20);
+  expect([...rendered].filter((t) => !listed.has(t))).toEqual([]);
+});

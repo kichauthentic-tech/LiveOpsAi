@@ -11,7 +11,7 @@
 
 ---
 
-## 1. Giai đoạn hiện tại (cập nhật 2026-10-02)
+## 1. Giai đoạn hiện tại (cập nhật 2026-10-03)
 
 - **CHẠY THỬ THẬT trên dữ liệu thật** (từ 2026-09-18; mock đã xoá sạch 19/09). DB: 33 hồ sơ talent thật, CROCS T6–T9 nạp
   bù từ file Creator-Live-Performance (229 ca, còn ca chưa gán host). **Không đề xuất tính năng mới**; hỏi user chạy thử
@@ -20,6 +20,15 @@
   ESLint 0 lỗi (33 warning `set-state-in-effect` = nợ đã đo, cố ý `warn`), vitest 410/410.
 - 🛑 **User chốt 02/10: DỪNG nhánh đo tốc độ tải.** Mạng chỗ user là biến trội nên wall-clock vô nghĩa. Không chạy lại
   các phép đo P2a-17→P2a-20 trừ khi user yêu cầu rõ. Những gì đã sửa thì giữ (chứng minh bằng SỐ REQUEST và source).
+- **03/10 user hỏi lại "app load chậm hơn" → audit theo SỐ VÒNG MẠNG NỐI TIẾP** (không theo wall-clock; mạng user dao động
+  connect 50–415 ms tới cùng host). Bundle không phình (entry 496 KB), DB không đổi đáng kể, số request y nguyên (24 REST ở
+  Sổ Ca). Ba vòng nối tiếp đã cắt: (1) `vercel.json` thiếu header cache ⇒ `/assets/*` (tên có hash) bị trả
+  `max-age=0, must-revalidate`, mỗi lần mở app hỏi lại từng file — nay `max-age=31536000, immutable`; (2) chunk tab bị
+  cổng `coreDataReady` giữ tới khi cả đợt dữ liệu về (Sổ Ca: chunk khởi hành 352 ms → **62 ms**) — nay `TAB_CHUNKS` +
+  `preload()`; (3) Report Tháng: chunk biểu đồ 145 KB gzip đợi bản chụp về (665 ms → khởi hành cùng bản chụp 409 ms).
+  Thêm `<link rel="preconnect">` tới Supabase trong `index.html`. **Sau deploy phải kiểm:** `curl -sI
+  https://live-ops-ai.vercel.app/assets/<file>.js` có `immutable`. Còn lại (chưa làm, cần user chốt): màn tự nạp dữ liệu
+  riêng sau khi mount (CeoBrief, BrandDashboard, Report Tháng) vẫn là vòng thứ 3 nối sau đợt nạp chung.
 - **Quyết định user đã chốt — đừng nêu lại:** luật run-rate (§5.6); Target GMV từng ca ở "Kế Hoạch Tháng Sau" brand ĐƯỢC
   thấy (01/10); tiền không có chữ "đ" (27/09); trung tâm xuất file = một module dùng chung, không dựng tab riêng (02/10);
   gộp menu/IA hoãn tới khi có 2–4 tuần số liệu `ui_tab_views` (bắt đầu đếm 26/09); chỉ ops tạo ca (brand không tự mở).
@@ -114,6 +123,8 @@
 
 ### 5.2 Client (React / TS)
 - `strict` + `noUnusedLocals` bật; `@types/react*` phải có trong devDependencies (thiếu là JSX thành `any`, CI xanh giả).
+- **Tab mới phải vào `TAB_CHUNKS`** (App.tsx; `tests/bundleSplit.test.ts` canh) để chunk tải song song với dữ liệu. Component
+  lazy lồng trong tab mà chỉ hiện sau một lượt đọc ⇒ gọi `X.preload()` cùng lúc bắn lượt đọc (khuôn `MonthlyReportTabs`).
 - **Giao diện** (`tests/layoutConventions.test.ts` canh): đầu trang dùng `PageHeader`; chọn tháng dùng `MonthPicker`, không
   `<input type="month">`; trạng thái DB hiển thị qua `statusLabel()`; tab đọc ca/talent/report tự được cổng `coreDataReady`
   che (tab không cần thì thêm vào `TABS_WITHOUT_CORE_DATA`); phần tử bấm ≥ 24px; 0 tràn ngang ở 375px.

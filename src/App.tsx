@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
+import React, { useState, useEffect, useMemo, useRef, Suspense } from "react";
 import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, Talent, Studio, Equipment, Brand, SessionFinance, ShiftSlot, RecurringShiftTemplate, BrandSku, PromoScheme, AppNotification } from "./types";
 import { TabErrorFallback } from "./components/common/TabErrorFallback";
 import { ErrorBoundary } from "./lib/errorReporting";
@@ -62,7 +62,7 @@ import {
 const BrandCalendar = lazyNamed(() => import("./components/brand-workspace/BrandCalendar"), "BrandCalendar");
 const BrandSkuShowcase = lazyNamed(() => import("./components/brand-workspace/BrandSkuShowcase"), "BrandSkuShowcase");
 const BrandMonthlyReport = lazyNamed(() => import("./components/brand-workspace/BrandMonthlyReport"), "BrandMonthlyReport");
-const BrandDashboard = lazy(() => import("./components/brand-workspace/BrandDashboard"));
+const BrandDashboard = lazyNamed(() => import("./components/brand-workspace/BrandDashboard"), "default");
 const BrandAdsReport = lazyNamed(() => import("./components/brand-workspace/BrandAdsReport"), "BrandAdsReport");
 const BrandCommitmentView = lazyNamed(() => import("./components/brand-workspace/BrandCommitmentView"), "BrandCommitmentView");
 const BrandAffiliateTable = lazyNamed(() => import("./components/brand-workspace/BrandAffiliateTable"), "BrandAffiliateTable");
@@ -87,9 +87,44 @@ const HostPerformance = lazyNamed(() => import("./components/HostPerformance"), 
 const BrandsOverview = lazyNamed(() => import("./components/BrandsOverview"), "BrandsOverview");
 const ReportPublishBoard = lazyNamed(() => import("./components/ReportPublishBoard"), "ReportPublishBoard");
 const BrandCommitment = lazyNamed(() => import("./components/BrandCommitment"), "BrandCommitment");
-const ShiftScheduling = lazy(() => import("./components/ShiftScheduling"));
-const MonthPlan = lazy(() => import("./components/MonthPlan"));
-const CeoBrief = lazy(() => import("./components/CeoBrief"));
+const ShiftScheduling = lazyNamed(() => import("./components/ShiftScheduling"), "default");
+const MonthPlan = lazyNamed(() => import("./components/MonthPlan"), "default");
+const CeoBrief = lazyNamed(() => import("./components/CeoBrief"), "default");
+
+// Chunk của từng tab — để tải SONG SONG với đợt nạp dữ liệu (xem `preload` ở lib/lazyNamed.ts). Phải
+// khớp với khối render tab bên dưới; thiếu một tab thì tab đó chỉ chậm như trước, không hỏng.
+const TAB_CHUNKS: Record<string, { preload: () => void }[]> = {
+  sessions: [SessionLedger],
+  my_shifts: [OpsBoard],
+  shift_scheduling: [ShiftScheduling],
+  month_plan: [MonthPlan],
+  live_reconciliation: [LiveReconciliation],
+  agency_overview: [CeoBrief],
+  host_performance: [HostPerformance],
+  brands_overview: [BrandsOverview],
+  report_publish_board: [ReportPublishBoard],
+  brand_commitment: [BrandCommitment],
+  brand_dashboard: [BrandDashboard],
+  brand_calendar: [BrandCalendar],
+  brand_sessions: [SessionLedger],
+  brand_skus: [BrandSkuShowcase],
+  brand_monthly_report: [BrandMonthlyReport],
+  brand_commitment_view: [BrandCommitmentView],
+  brand_next_month_plan: [BrandNextMonthPlan],
+  brand_rate_card: [BrandRateCard],
+  brand_affiliate: [BrandAffiliateTable],
+  brand_ads_report: [BrandAdsReport],
+  brand_dataraw: [BrandDataRaw],
+  talents: [TalentMatcher],
+  my_talent_profile: [MyTalentProfile],
+  studios: [StudioEquipment],
+  crm: [CrmProjects],
+  tiktok_api: [TikTokApiAutomation],
+  finance: [FinanceHr],
+  ai_training: [AiTrainingCenter, EngineTrainingPanel],
+  user_settings: [UserRoleSettings],
+  account_settings: [AccountSettings]
+};
 
 const STORAGE_PREFIX = "liveops_os_v2_";
 
@@ -295,6 +330,12 @@ export default function App() {
     reloadRolePermissions,
     refreshTikTokStatus
   } = useWorkspaceData({ session, currentRole, isOpsRole, activeTab });
+  // Tải chunk tab ngay, không đợi cổng `coreDataReady` ở khối render (cổng đó giữ chunk lại tới khi
+  // đợt nạp dữ liệu về xong ⇒ thêm một vòng mạng nối tiếp mỗi lần mở app / đổi tab).
+  useEffect(() => {
+    const chunks = activeTab === "calendar" ? [opsView === "calendar" ? LiveCalendar : OpsBoard] : TAB_CHUNKS[activeTab];
+    chunks?.forEach((c) => c.preload());
+  }, [activeTab, opsView]);
   // Previously these fetch errors were only stored in state and never rendered anywhere — a
   // failed fetch left a tab silently empty forever with no indication anything went wrong.
   const [dismissedDataErrorSignature, setDismissedDataErrorSignature] = useState<string | null>(null);

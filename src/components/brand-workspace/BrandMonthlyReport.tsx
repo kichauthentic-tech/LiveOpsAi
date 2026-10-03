@@ -149,6 +149,8 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
     let cancelled = false;
     setSnapLoading(true);
     setStored(null);
+    // Chunk biểu đồ tải cùng lúc với bản chụp, không đợi bản chụp về rồi mới bắt đầu (một vòng mạng nối tiếp).
+    MonthlyReportTabs.preload();
     fetchMonthlyReportSnapshot(brandId, month)
       .then((r) => !cancelled && setStored(r))
       .catch((e) => !cancelled && setErrorMsg(errorMessage(e, "Không tải được số liệu report")))

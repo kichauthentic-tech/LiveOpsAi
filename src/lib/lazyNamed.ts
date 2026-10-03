@@ -5,9 +5,17 @@ import { lazy, type ComponentType } from "react";
 // React.lazy chỉ nhận default export, còn component trong repo là named export → helper này bọc lại.
 // `any` ở đây khớp đúng ràng buộc của chính React.lazy (`T extends ComponentType<any>`); kiểu props thật
 // của component vẫn giữ nguyên qua M[K].
+//
+// `preload()` bắt đầu tải chunk mà chưa render (đo 2026-10-03, bản build): tab chỉ được render sau
+// cổng `coreDataReady`, nên chunk của tab xếp hàng SAU cả đợt nạp dữ liệu — thêm một vòng mạng nối
+// tiếp mỗi lần mở app. Gọi preload ngay khi biết tab thì chunk tải song song với dữ liệu. import()
+// cùng module trả lại cùng promise, nên lazy() lúc render không tải lần hai.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function lazyNamed<K extends string, M extends Record<K, ComponentType<any>>>(load: () => Promise<M>, name: K) {
-  return lazy(() => load().then((m) => ({ default: m[name] })));
+  return Object.assign(
+    lazy(() => load().then((m) => ({ default: m[name] }))),
+    { preload: () => void load().catch(() => {}) }
+  );
 }
 
 // Sau mỗi lần deploy, file chunk cũ (hash cũ) không còn trên Vercel. Tab đang mở từ trước deploy bấm sang
