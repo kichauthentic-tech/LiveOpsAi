@@ -37,8 +37,9 @@ import { getBrandTheme } from "../lib/brandTheme";
 import { SessionEventCard, SessionCardTone, buildSlotMeta } from "./ui/SessionEventCard";
 import { SessionWindow } from "./SessionWindow";
 import { SessionReportInput } from "../lib/db/sessionReports";
-import { fetchBrandMonthlyCommitments } from "../lib/db/brandContracts";
-import { fetchPlanStatuses } from "../lib/db/monthPlans";
+import { commitmentsRead } from "../lib/db/brandContracts";
+import { planStatusesRead } from "../lib/db/monthPlans";
+import type { TabPrefetchCtx } from "../lib/db/prefetch";
 import { SchedulingGap, computeSchedulingGaps } from "../lib/performance/brandCommitment";
 import { FATIGUE_WEEK_HOURS, HostSuggestion, headlineFor, suggestHosts } from "../lib/performance/hostSuggestion";
 import { BulkFinalizePanel } from "./BulkFinalizePanel";
@@ -133,6 +134,20 @@ const suggestionLabel = (s: HostSuggestion, fatigueAt: number) => {
   return `${s.name} · ${fmtPerHour(h.value)} (${scope}, ${h.sessions} ca)${tail}`;
 };
 
+// "YYYY-MM" của tháng sau `today` (YYYY-MM-DD) — dùng chung cho effect và hàm nạp trước để key khớp.
+function nextMonthKey(today: string): string {
+  const [y, m] = today.slice(0, 7).split("-").map(Number);
+  const d = new Date(y, m, 1);
+  return `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, "0")}`;
+}
+
+// Lượt đọc lúc mở màn — nạp trước trong lúc chờ đợt nạp chung (lib/db/prefetch.ts). Role chưa biết thì coi như ops.
+export function prefetchShiftScheduling({ role }: TabPrefetchCtx): void {
+  if (role && !isAdminRole(role)) return;
+  commitmentsRead.prefetch();
+  planStatusesRead.prefetch(nextMonthKey(getTodayDateString()));
+}
+
 export default function ShiftScheduling({
   currentRole,
   activeUser,
@@ -182,7 +197,7 @@ export default function ShiftScheduling({
   useEffect(() => {
     if (!admin) return;
     let alive = true;
-    fetchBrandMonthlyCommitments()
+    commitmentsRead.take()
       .then((rows) => { if (alive) setCommitments(rows); })
       .catch(() => { if (alive) setCommitments([]); });
     return () => { alive = false; };
@@ -191,11 +206,9 @@ export default function ShiftScheduling({
   const [planMissing, setPlanMissing] = useState<string[]>([]);
   useEffect(() => {
     if (!admin) return;
-    const [y, m] = today.slice(0, 7).split("-").map(Number);
-    const d = new Date(y, m, 1);
-    const next = `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, "0")}`;
+    const next = nextMonthKey(today);
     let alive = true;
-    fetchPlanStatuses(next)
+    planStatusesRead.take(next)
       .then((map) => { if (alive) setPlanMissing(brands.filter((b) => map.get(b.id)?.status !== "locked").map((b) => b.name)); })
       .catch(() => { if (alive) setPlanMissing([]); });
     return () => { alive = false; };

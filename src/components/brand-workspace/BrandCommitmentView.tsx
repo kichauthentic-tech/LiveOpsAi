@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Download, FileSignature, Loader2, TrendingUp } from "lucide-react";
 import { LiveSession, UserRole } from "../../types";
-import { BrandCommitmentRow, fetchBrandCommitmentProgress } from "../../lib/db/brandContracts";
+import { BrandCommitmentRow, commitmentProgressRead } from "../../lib/db/brandContracts";
+import type { TabPrefetchCtx } from "../../lib/db/prefetch";
 import {
   CommitmentProgress,
   computeCommitmentProgress,
@@ -91,6 +92,11 @@ const KV: React.FC<{ label: string; value: React.ReactNode; strong?: boolean }> 
   </div>
 );
 
+// Lượt đọc lúc mở màn — nạp trước trong lúc chờ đợt nạp chung (lib/db/prefetch.ts).
+export function prefetchBrandCommitmentView({ brandId }: TabPrefetchCtx): void {
+  if (brandId) commitmentProgressRead.prefetch(brandId);
+}
+
 export const BrandCommitmentView: React.FC<BrandCommitmentViewProps> = ({
   brandId,
   brandName,
@@ -105,7 +111,7 @@ export const BrandCommitmentView: React.FC<BrandCommitmentViewProps> = ({
     let cancelled = false;
     setLoading(true);
     setErrorMsg(null);
-    fetchBrandCommitmentProgress(brandId)
+    commitmentProgressRead.take(brandId)
       .then((r) => !cancelled && setRows(r))
       .catch((e) => {
         if (cancelled) return;

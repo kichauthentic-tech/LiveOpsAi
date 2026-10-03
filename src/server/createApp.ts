@@ -310,11 +310,13 @@ export function createApp() {
       if (!supabaseAdmin) {
         return res.status(503).json({ error: "Server chưa cấu hình Supabase Admin." });
       }
-      const caller = await requireAdminCaller(req);
+      // Đọc prompts SONG SONG với bước xác thực (getUser → profiles): trước 2026-10-04 là 3 vòng nối tiếp,
+      // đo ~1 s. Kết quả chỉ được trả khi caller là admin — không phải admin thì bỏ đi, không lộ gì.
+      const promptsQuery = supabaseAdmin.from("ai_agent_prompts").select("*").order("category").order("agent_key");
+      const [caller, { data, error }] = await Promise.all([requireAdminCaller(req), promptsQuery]);
       if (!caller.userId) {
         return res.status(403).json({ error: `Chỉ tài khoản Admin mới được xem AI Training Center. (${caller.reason})` });
       }
-      const { data, error } = await supabaseAdmin.from("ai_agent_prompts").select("*").order("category").order("agent_key");
       if (error) {
         return res.status(500).json({ error: error.message });
       }

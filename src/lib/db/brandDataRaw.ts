@@ -3,6 +3,7 @@ import { fetchAllPages } from "./fetchAllPages";
 import { assertAffected } from "./assertAffected";
 import { BrandDataRawImport, BrandDataRawRow, DataRawReportType } from "../../types";
 import { ParsedDataRawImport } from "../dataraw/parseDataRawExcel";
+import { prefetchable } from "./prefetch";
 
 // Module Dataraw Brand Workspace (migration 0052) — xem lib/dataraw/parseDataRawExcel.ts cho
 // cách tách bảng dữ liệu từ 4 loại file Excel TikTok Shop. File chỉ lo CRUD import batch + rows.
@@ -205,3 +206,6 @@ export async function fetchDataRawImportStamps(brandId: string): Promise<DataRaw
     importedAt: r.imported_at
   }));
 }
+
+// Lượt đọc nạp-trước-được (lib/db/prefetch.ts) — màn Dữ Liệu Gốc.
+export const dataRawImportsRead = prefetchable("dataRawImports", fetchDataRawImports);

@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { BrandDataRawImport, BrandDataRawRow, DataRawReportType, UserRole, LiveSession, Talent } from "../../types";
 import { parseDataRawExcel, ParsedDataRawImport } from "../../lib/dataraw/parseDataRawExcel";
-import { fetchDataRawImports, fetchDataRawRows, createOrReplaceDataRawImport, findExistingImportForMonth, deleteDataRawImport } from "../../lib/db/brandDataRaw";
+import { dataRawImportsRead, fetchDataRawRows, createOrReplaceDataRawImport, findExistingImportForMonth, deleteDataRawImport } from "../../lib/db/brandDataRaw";
+import type { TabPrefetchCtx } from "../../lib/db/prefetch";
 import { Database, Upload, FileSpreadsheet, AlertTriangle, Trash2, Search, ChevronDown, ChevronRight } from "lucide-react";
 import { BackfillFromRooms } from "./BackfillFromRooms";
 import { errorMessage } from "../../lib/errorMessage";
@@ -88,10 +89,16 @@ function formatPeriodShort(imp: BrandDataRawImport): string {
 // này (theo quyết định thiết kế: report tháng chỉ export ra ngoài, không có brand-facing access).
 const CAN_MANAGE: UserRole[] = ["ceo", "admin", "operations"];
 
+// Danh sách batch của loại mặc định — nạp trước trong lúc chờ đợt nạp chung (lib/db/prefetch.ts).
+const DEFAULT_REPORT_TYPE: DataRawReportType = "shop_promotion";
+export function prefetchBrandDataRaw({ brandId }: TabPrefetchCtx): void {
+  if (brandId) dataRawImportsRead.prefetch(brandId, DEFAULT_REPORT_TYPE);
+}
+
 export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ brandId, brandName, currentRole, sessions, talents, onSessionsChanged }) => {
   const confirm = useConfirm();
   const canManage = CAN_MANAGE.includes(currentRole);
-  const [activeType, setActiveType] = useState<DataRawReportType>("shop_promotion");
+  const [activeType, setActiveType] = useState<DataRawReportType>(DEFAULT_REPORT_TYPE);
   const [imports, setImports] = useState<BrandDataRawImport[]>([]);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -112,7 +119,7 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ brandId, brandName, 
     setReplaceTarget(undefined);
     setFileName("");
     setError(null);
-    fetchDataRawImports(brandId, activeType)
+    dataRawImportsRead.take(brandId, activeType)
       .then((list) => {
         setImports(list);
         // Mặc định chỉ mở nhóm tháng gần nhất — nhiều tháng/năm dữ liệu sẽ không bị tràn màn hình.

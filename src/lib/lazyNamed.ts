@@ -1,4 +1,4 @@
-import { lazy, type ComponentType } from "react";
+import { createElement, lazy, useState, type ComponentProps, type ComponentType } from "react";
 
 // Tách bundle theo tab (audit UX 2026-09-26, P2). Trước đây cả app là 1 file JS 2,58 MB (721 KB gzip) —
 // talent mở "Ca Của Tôi" cũng phải tải thư viện Excel (xlsx) và biểu đồ (recharts) của Report Tháng.
@@ -8,14 +8,32 @@ import { lazy, type ComponentType } from "react";
 //
 // `preload()` bắt đầu tải chunk mà chưa render (đo 2026-10-03, bản build): tab chỉ được render sau
 // cổng `coreDataReady`, nên chunk của tab xếp hàng SAU cả đợt nạp dữ liệu — thêm một vòng mạng nối
-// tiếp mỗi lần mở app. Gọi preload ngay khi biết tab thì chunk tải song song với dữ liệu. import()
-// cùng module trả lại cùng promise, nên lazy() lúc render không tải lần hai.
+// tiếp mỗi lần mở app. Gọi preload ngay khi biết tab thì chunk tải song song với dữ liệu.
+//
+// Chunk ĐÃ tải xong thì render thẳng component, KHÔNG qua React.lazy (đo 2026-10-04): lazy chưa từng
+// render luôn treo một nhịp dù module đã có sẵn, mà React 19 giữ fallback của Suspense tối thiểu 300 ms
+// (`globalMostRecentFallbackTime + 300 - now()` trong react-dom) ⇒ mọi màn chậm thêm tới ~300 ms mỗi lần
+// mở app / đổi tab, không có request hay long task nào trong khoảng đó. Chọn MỘT LẦN mỗi lần mount
+// (useState) — đổi kiểu element giữa chừng là React unmount/mount lại, mất state của màn.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function lazyNamed<K extends string, M extends Record<K, ComponentType<any>>>(load: () => Promise<M>, name: K) {
-  return Object.assign(
-    lazy(() => load().then((m) => ({ default: m[name] }))),
-    { preload: () => void load().catch(() => {}) }
-  );
+  let loaded: M[K] | undefined;
+  let pending: Promise<M> | undefined;
+  const ensure = () =>
+    (pending ??= load().then(
+      (m) => ((loaded = m[name]), m),
+      (e) => {
+        pending = undefined; // lỗi mạng thì lần sau thử lại được
+        throw e;
+      }
+    ));
+  const Lazy = lazy(() => ensure().then((m) => ({ default: m[name] })));
+  function LazyNamed(props: ComponentProps<M[K]>) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [Impl] = useState<ComponentType<any>>(() => loaded ?? Lazy);
+    return createElement(Impl, props);
+  }
+  return Object.assign(LazyNamed, { preload: () => void ensure().catch(() => {}) });
 }
 
 // Sau mỗi lần deploy, file chunk cũ (hash cũ) không còn trên Vercel. Tab đang mở từ trước deploy bấm sang

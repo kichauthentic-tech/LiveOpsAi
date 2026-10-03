@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Download, LayoutGrid, Loader2 } from "lucide-react";
 import { Brand, BrandMonthlyReport, BrandMonthPlan, BrandPlatformRate, LiveSession } from "../types";
-import { fetchPlanStatuses } from "../lib/db/monthPlans";
-import { fetchBrandMonthlyCommitments } from "../lib/db/brandContracts";
+import { planStatusesRead } from "../lib/db/monthPlans";
+import { commitmentsRead, fetchBrandMonthlyCommitments } from "../lib/db/brandContracts";
+import type { TabPrefetchCtx } from "../lib/db/prefetch";
 import { CommitmentProgress, CommitmentStatus, computeAllProgress, todayVn } from "../lib/performance/brandCommitment";
 import { filterLedger, summarize } from "../lib/sessionLedger";
 import { fmtVndShort } from "../lib/format";
@@ -70,6 +71,12 @@ const COMMIT_STATUS_CLS: Record<CommitmentStatus, string> = {
 
 const fmtHours = (h: number) => `${h.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h`;
 
+// Lượt đọc lúc mở màn — nạp trước trong lúc chờ đợt nạp chung (lib/db/prefetch.ts).
+export function prefetchBrandsOverview(_ctx: TabPrefetchCtx): void {
+  planStatusesRead.prefetch(todayVn().slice(0, 7));
+  commitmentsRead.prefetch();
+}
+
 export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ brands, sessions, brandPlatformRates, monthlyReports }) => {
   const { showToast } = useToast();
   const today = todayVn();
@@ -83,7 +90,8 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ brands, sessions
     let cancelled = false;
     setLoading(true);
     setErrorMsg(null);
-    Promise.all([fetchPlanStatuses(month), fetchBrandMonthlyCommitments()])
+    // Lượt đầu (tháng mặc định) lấy bản nạp trước nếu có; đổi tháng thì `take` không khớp key ⇒ đọc mới.
+    Promise.all([planStatusesRead.take(month), commitmentsRead.take()])
       .then(([plans, commits]) => {
         if (cancelled) return;
         setPlanStatuses(plans);

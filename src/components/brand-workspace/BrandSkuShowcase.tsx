@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { BrandSku, UserRole } from "../../types";
 import { Package, Plus, Trash2, Star, TrendingUp } from "lucide-react";
 import { fetchSkuPerfMonthSlice, normalizeSkuName, TopSkuRow } from "../../lib/dataraw/monthlyProductSlice";
+import { prefetchable, type TabPrefetchCtx } from "../../lib/db/prefetch";
 import { todayVn } from "../../lib/performance/brandCommitment";
 import { fmtVndShort, fmtVndFull } from "../../lib/format";
 import { errorMessage } from "../../lib/errorMessage";
@@ -32,6 +33,14 @@ function monthBounds(month: string): { start: string; end: string } {
 }
 
 const fmtMonthShort = (month: string) => `T${Number(month.slice(5, 7))}`;
+
+// Hiệu suất SKU tháng này (chỉ ops — RLS Dữ Liệu Gốc) — nạp trước trong lúc chờ đợt nạp chung (lib/db/prefetch.ts).
+const skuPerfRead = prefetchable("skuPerfMonth", fetchSkuPerfMonthSlice);
+export function prefetchBrandSkuShowcase({ brandId, role }: TabPrefetchCtx): void {
+  if (!brandId || (role && role !== "ceo" && role !== "admin" && role !== "operations")) return;
+  const { start, end } = monthBounds(todayVn().slice(0, 7));
+  skuPerfRead.prefetch(brandId, start, end);
+}
 
 export const BrandSkuShowcase: React.FC<BrandSkuShowcaseProps> = ({ brandId, currentRole, brandSkus, onAddSku, onUpdateSku, onDeleteSku }) => {
   const canEdit = currentRole === "ceo" || currentRole === "admin" || currentRole === "operations";
@@ -67,7 +76,7 @@ export const BrandSkuShowcase: React.FC<BrandSkuShowcaseProps> = ({ brandId, cur
     if (!canEdit) return;
     let cancelled = false;
     const { start, end } = monthBounds(currentMonth);
-    fetchSkuPerfMonthSlice(brandId, start, end)
+    skuPerfRead.take(brandId, start, end)
       .then((r) => {
         if (cancelled) return;
         setPerfByName(r.byNormalizedName);

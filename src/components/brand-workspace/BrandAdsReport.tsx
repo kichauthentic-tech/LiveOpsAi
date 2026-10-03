@@ -4,9 +4,10 @@ import { AlertTriangle, Loader2, Lock, Megaphone, Save, Target, TrendingUp } fro
 import { getTodayMonth } from "../../lib/dateUtils";
 import { getCanonicalAdsCost } from "../../lib/metrics/adsCost";
 import { isoWeekStart } from "../../lib/dateUtils";
-import { fetchMonthlyReport, upsertMonthlyReport, MonthlyReportManualInput } from "../../lib/db/monthlyReports";
+import { monthlyReportRead, upsertMonthlyReport, MonthlyReportManualInput } from "../../lib/db/monthlyReports";
 import { errorMessage } from "../../lib/errorMessage";
-import { ReportPlanningInputs } from "./ReportPlanningInputs";
+import { ReportPlanningInputs, prefetchReportPlanningInputs } from "./ReportPlanningInputs";
+import type { TabPrefetchCtx } from "../../lib/db/prefetch";
 
 import { fmtFixed, fmtVndShort } from "../../lib/format";
 import { MonthPicker } from "../common/MonthPicker";
@@ -95,6 +96,14 @@ const MomChip: React.FC<{ current: number | null; previous: number | null }> = (
   );
 };
 
+// Lượt đọc lúc mở màn — nạp trước trong lúc chờ đợt nạp chung (lib/db/prefetch.ts).
+export function prefetchBrandAdsReport({ brandId, role }: TabPrefetchCtx): void {
+  if (!brandId || (role && !CAN_MANAGE_ROLES.includes(role))) return;
+  const month = getTodayMonth();
+  monthlyReportRead.prefetch(brandId, `${month}-01`);
+  prefetchReportPlanningInputs(brandId, month);
+}
+
 export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandName, sessions, currentRole }) => {
   const canManage = CAN_MANAGE_ROLES.includes(currentRole);
   const [month, setMonth] = useState(getTodayMonth());
@@ -132,7 +141,8 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
     setLoading(true);
     setErrorMsg(null);
     setSavedAt(null);
-    fetchMonthlyReport(brandId, `${month}-01`)
+    if (canManage) prefetchReportPlanningInputs(brandId, month);
+    monthlyReportRead.take(brandId, `${month}-01`)
       .then((r) => {
         if (cancelled) return;
         setReport(r);
@@ -147,7 +157,7 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
     return () => {
       cancelled = true;
     };
-  }, [brandId, month]);
+  }, [brandId, month, canManage]);
 
   const isPublished = report?.status === "published";
   const readOnly = !canManage || isPublished;

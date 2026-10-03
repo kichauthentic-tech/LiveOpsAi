@@ -67,3 +67,19 @@ test("OpsSupport không tự đọc plan tháng", () => {
   const src = readFileSync(join(__dirname, "..", "src/components/OpsSupport.tsx"), "utf8");
   expect(src).not.toMatch(/fetchMonthPlan/);
 });
+
+// Kho dùng chung MỘT Map theo key "<tên>|<tham số>": hai `prefetchable` cùng tên mà khác hàm thì `take`
+// của màn này có thể nhận kết quả của màn kia. Lượt đọc dùng chung định nghĩa một lần cạnh hàm db.
+test("tên prefetchable là duy nhất trong src/", async () => {
+  const { readdirSync, statSync } = await import("node:fs");
+  const walk = (d: string): string[] =>
+    readdirSync(d).flatMap((n) => {
+      const p = join(d, n);
+      return statSync(p).isDirectory() ? walk(p) : /\.tsx?$/.test(n) ? [p] : [];
+    });
+  const names = walk(join(__dirname, "..", "src")).flatMap((f) =>
+    [...readFileSync(f, "utf8").matchAll(/prefetchable\(\s*"([^"]+)"/g)].map((m) => m[1])
+  );
+  expect(names.length).toBeGreaterThan(8);
+  expect(names.filter((n, i) => names.indexOf(n) !== i)).toEqual([]);
+});

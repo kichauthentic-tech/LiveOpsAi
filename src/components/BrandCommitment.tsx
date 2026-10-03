@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CalendarRange, FileSignature, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { Brand, BrandContract, BrandMonthlyCommitment, LiveSession } from "../types";
 import {
+  commitmentsRead,
+  contractsRead,
   createBrandContract,
   deleteBrandContract,
   deleteMonthlyCommitment,
@@ -11,6 +13,7 @@ import {
   updateBrandContract,
   upsertMonthlyCommitment
 } from "../lib/db/brandContracts";
+import type { TabPrefetchCtx } from "../lib/db/prefetch";
 import { errorMessage } from "../lib/errorMessage";
 import {
   CommitmentProgress,
@@ -95,6 +98,12 @@ function emptyDraft(brandId: string, today: string): ContractDraft {
   };
 }
 
+// Lượt đọc lúc mở màn — nạp trước trong lúc chờ đợt nạp chung (lib/db/prefetch.ts).
+export function prefetchBrandCommitment(_ctx: TabPrefetchCtx): void {
+  contractsRead.prefetch();
+  commitmentsRead.prefetch();
+}
+
 export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
   const confirm = useConfirm();
   const prompt = usePrompt();
@@ -116,14 +125,17 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
     [brands]
   );
 
-  async function reload() {
-    const [c, m] = await Promise.all([fetchBrandContracts(), fetchBrandMonthlyCommitments()]);
+  // `initial` = lượt mount (lấy bản nạp trước nếu có); sau mỗi thao tác ghi thì luôn đọc mới.
+  async function reload(initial = false) {
+    const [c, m] = await Promise.all(
+      initial ? [contractsRead.take(), commitmentsRead.take()] : [fetchBrandContracts(), fetchBrandMonthlyCommitments()]
+    );
     setContracts(c);
     setCommitments(m);
   }
 
   useEffect(() => {
-    reload().catch((e) => setError(errorMessage(e)));
+    reload(true).catch((e) => setError(errorMessage(e)));
   }, []);
 
   async function run(fn: () => Promise<void>) {

@@ -13,7 +13,7 @@ import {
   Database
 } from "lucide-react";
 import { getTodayMonth } from "../../lib/dateUtils";
-import { fetchMonthlyReport, upsertMonthlyReport, publishMonthlyReport, unpublishMonthlyReport } from "../../lib/db/monthlyReports";
+import { monthlyReportRead, upsertMonthlyReport, publishMonthlyReport, unpublishMonthlyReport } from "../../lib/db/monthlyReports";
 import { BrandWeeklyReport } from "./BrandWeeklyReport";
 import { errorMessage } from "../../lib/errorMessage";
 import { useConfirm } from "../../hooks/useConfirm";
@@ -59,13 +59,12 @@ interface BrandMonthlyReportProps {
 const CAN_MANAGE_ROLES: UserRole[] = ["ceo", "operations", "admin"];
 
 // Lượt đọc lúc mở màn — nạp trước trong lúc chờ đợt nạp chung (lib/db/prefetch.ts), cùng chunk biểu đồ.
-const reportRead = prefetchable("monthlyReport", fetchMonthlyReport);
 const snapshotRead = prefetchable("reportSnapshot", fetchMonthlyReportSnapshot);
 const importStampsRead = prefetchable("importStamps", fetchDataRawImportStamps);
 export function prefetchBrandMonthlyReport({ brandId, role }: TabPrefetchCtx): void {
   if (!brandId) return;
   const month = getTodayMonth();
-  reportRead.prefetch(brandId, `${month}-01`);
+  monthlyReportRead.prefetch(brandId, `${month}-01`);
   snapshotRead.prefetch(brandId, month);
   MonthlyReportTabs.preload();
   if (!role || CAN_MANAGE_ROLES.includes(role)) importStampsRead.prefetch(brandId);
@@ -147,7 +146,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
     let cancelled = false;
     setLoading(true);
     setErrorMsg(null);
-    reportRead.take(brandId, `${month}-01`)
+    monthlyReportRead.take(brandId, `${month}-01`)
       .then((r) => {
         if (cancelled) return;
         setReport(r);

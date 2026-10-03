@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, Suspense } from "react";
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef, Suspense } from "react";
 import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, Talent, Studio, Equipment, Brand, SessionFinance, ShiftSlot, RecurringShiftTemplate, BrandSku, PromoScheme, AppNotification } from "./types";
 import { TabErrorFallback } from "./components/common/TabErrorFallback";
 import { ErrorBoundary } from "./lib/errorReporting";
@@ -132,7 +132,16 @@ const TAB_CHUNKS: Record<string, { preload: () => void }[]> = {
 const TAB_DATA_PREFETCH: Record<string, (ctx: TabPrefetchCtx) => Promise<void>> = {
   agency_overview: (ctx) => import("./components/CeoBrief").then((m) => m.prefetchCeoBrief(ctx)),
   brand_dashboard: (ctx) => import("./components/brand-workspace/BrandDashboard").then((m) => m.prefetchBrandDashboard(ctx)),
-  brand_monthly_report: (ctx) => import("./components/brand-workspace/BrandMonthlyReport").then((m) => m.prefetchBrandMonthlyReport(ctx))
+  brand_monthly_report: (ctx) => import("./components/brand-workspace/BrandMonthlyReport").then((m) => m.prefetchBrandMonthlyReport(ctx)),
+  brand_ads_report: (ctx) => import("./components/brand-workspace/BrandAdsReport").then((m) => m.prefetchBrandAdsReport(ctx)),
+  shift_scheduling: (ctx) => import("./components/ShiftScheduling").then((m) => m.prefetchShiftScheduling(ctx)),
+  month_plan: (ctx) => import("./components/MonthPlan").then((m) => m.prefetchMonthPlan(ctx)),
+  brands_overview: (ctx) => import("./components/BrandsOverview").then((m) => m.prefetchBrandsOverview(ctx)),
+  brand_commitment: (ctx) => import("./components/BrandCommitment").then((m) => m.prefetchBrandCommitment(ctx)),
+  brand_commitment_view: (ctx) => import("./components/brand-workspace/BrandCommitmentView").then((m) => m.prefetchBrandCommitmentView(ctx)),
+  brand_next_month_plan: (ctx) => import("./components/brand-workspace/BrandNextMonthPlan").then((m) => m.prefetchBrandNextMonthPlan(ctx)),
+  brand_skus: (ctx) => import("./components/brand-workspace/BrandSkuShowcase").then((m) => m.prefetchBrandSkuShowcase(ctx)),
+  brand_dataraw: (ctx) => import("./components/brand-workspace/BrandDataRaw").then((m) => m.prefetchBrandDataRaw(ctx))
 };
 
 const STORAGE_PREFIX = "liveops_os_v2_";
@@ -570,14 +579,14 @@ export default function App() {
   // ai `take`; sau đó màn mount ngay và tự đọc, nạp trước chỉ đẻ request thừa). Không đợi `profile`: đo
   // 2026-10-03, có lượt `profiles` về SAU cả đợt chung, chờ nó là mất luôn phần lợi. Chưa có profile thì
   // role là "chưa biết" và brand lấy từ `workspace` thô (ops; role brand bị ép brand theo profile sau).
-  // Đổi tab thì bỏ mọi bản nạp trước chưa ai lấy.
-  const prefetchTabRef = useRef<string | null>(null);
+  // Đổi tab thì bỏ mọi bản nạp trước chưa ai lấy — trong useLayoutEffect: React chạy effect của con TRƯỚC
+  // cha, nên xoá trong useEffect sẽ xoá luôn bản mà màn mới vừa nạp trước cho khối con của nó (đo
+  // 2026-10-04: Nhập Ads đọc brand_affiliate_plans 2 lần khi đổi tab). Layout effect chạy trước mọi effect thường.
+  useLayoutEffect(() => {
+    dropPrefetched();
+  }, [activeTab]);
   const prefetchBrandId = profile ? currentBrandId : workspace.type === "brand" ? workspace.brandId : undefined;
   useEffect(() => {
-    if (prefetchTabRef.current !== activeTab) {
-      prefetchTabRef.current = activeTab;
-      dropPrefetched();
-    }
     if (!session || coreDataReady) return;
     TAB_DATA_PREFETCH[activeTab]?.({ brandId: prefetchBrandId, role: profile ? currentRole : undefined }).catch(() => {});
     // `session` chỉ cần có/không — object mới mỗi lần làm mới token không đổi gì ở đây.
@@ -1264,6 +1273,28 @@ export default function App() {
   // Sửa hằng số chỉ vá được đúng role vừa phát hiện; CEO tắt `manage_calendar` của operations ở Ma
   // Trận là lỗi quay lại ngay. Nên vá bằng lưới an toàn tính từ chính navItems.
   const firstAllowedTab = navItems.find((n) => !n.perm || checkPermission(n.perm))?.id;
+
+  // Màn đầu đã hiện ⇒ lúc trình duyệt rảnh tải sẵn chunk của các tab được phép, để bấm menu không phải đợi
+  // tải chunk và không đi qua Suspense (fallback bị React giữ tối thiểu 300 ms — xem lib/lazyNamed.ts).
+  // Mỗi chunk chỉ tải một lần (import() trả cùng promise); file có hash + cache immutable nên lần sau lấy từ đĩa.
+  // Ops chuyển qua lại Agency ↔ Brand bằng switcher, nên tải sẵn cả màn của hai workspace.
+  const preloadNavItems = isOpsRole ? [...AGENCY_NAV_GROUPS, ...BRAND_NAV_GROUPS].flatMap((g) => g.items) : navItems;
+  const allowedTabsKey = phase6Loading ? "" : preloadNavItems.filter((n) => !n.perm || checkPermission(n.perm)).map((n) => n.id).join(",");
+  useEffect(() => {
+    if (!coreDataReady || !allowedTabsKey) return;
+    const run = () =>
+      allowedTabsKey.split(",").forEach((id) => {
+        if (id === "calendar") [OpsBoard, LiveCalendar].forEach((c) => c.preload());
+        else TAB_CHUNKS[id]?.forEach((c) => c.preload());
+      });
+    // Safari chưa có requestIdleCallback.
+    if (typeof window.requestIdleCallback === "function") {
+      const h = window.requestIdleCallback(run, { timeout: 5000 });
+      return () => window.cancelIdleCallback(h);
+    }
+    const t = setTimeout(run, 2000);
+    return () => clearTimeout(t);
+  }, [coreDataReady, allowedTabsKey]);
 
   // Chỉ tự chuyển khi người dùng CHƯA tự chọn tab nào — tức activeTab vẫn đúng bằng mặc định theo
   // role. Người dùng tự bấm vào một tab bị cấm (qua localStorage cũ, hoặc link) thì vẫn phải thấy

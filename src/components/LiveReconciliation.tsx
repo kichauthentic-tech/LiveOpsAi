@@ -8,6 +8,7 @@ import {
   deleteReconciliationBatch,
   fetchReconciliationBatches,
   fetchReconciliationRows,
+  fetchLatestReconciliationRows,
   importReconciliationFile,
   setReconciliationBucket
 } from "../lib/db/liveReconciliation";
@@ -66,9 +67,23 @@ export function LiveReconciliation({ onApplied, onOpenSession }: LiveReconciliat
     setRows(next ? await fetchReconciliationRows(next) : []);
   }
 
+  // Lúc mở màn: danh sách lô và lô mới nhất kèm dòng bắn SONG SONG (một vòng mạng thay vì hai). Có lô mới
+  // chen vào giữa hai request thì hai bên lệch id ⇒ đọc lại dòng theo đúng lô đầu danh sách.
   useEffect(() => {
-    reloadBatches().catch((e) => setError(errorMessage(e)));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    let alive = true;
+    Promise.all([fetchReconciliationBatches(), fetchLatestReconciliationRows()])
+      .then(async ([list, latest]) => {
+        if (!alive) return;
+        setBatches(list);
+        const first = list[0]?.id ?? null;
+        setActiveId(first);
+        const rs = !first ? [] : latest?.batchId === first ? latest.rows : await fetchReconciliationRows(first);
+        if (alive) setRows(rs);
+      })
+      .catch((e) => alive && setError(errorMessage(e)));
+    return () => {
+      alive = false;
+    };
   }, []);
 
   async function run(fn: () => Promise<void>) {

@@ -1,5 +1,6 @@
 import { supabase } from "../supabaseClient";
 import { dedupeInFlight } from "./dedupeInFlight";
+import { prefetchable } from "./prefetch";
 import { fetchAllPages } from "./fetchAllPages";
 import { LockedPlanRow, LockedPlanTargets, lockedPlanTargetsFromRows } from "../scheduling/lockedPlanTargets";
 import { BrandMonthPlan, BrandMonthPlanSlot, CalendarEventRow, PlanCampRanges } from "../../types";
@@ -257,3 +258,9 @@ export async function fetchBrandLockedPlanSlots(brandId: string): Promise<BrandM
   if (error) throw error;
   return ((data as DbPlanSlot[]) ?? []).map(slotFromDb);
 }
+
+// Lượt đọc nạp-trước-được (lib/db/prefetch.ts) — định nghĩa MỘT chỗ cạnh hàm db để mọi màn dùng chung đúng key.
+export const planStatusesRead = prefetchable("planStatuses", fetchPlanStatuses);
+export const monthPlanRead = prefetchable("monthPlan", fetchMonthPlan);
+export const calendarEventsRead = prefetchable("calendarEvents", fetchCalendarEvents);
+export const lockedPlanSlotsRead = prefetchable("lockedPlanSlots", fetchBrandLockedPlanSlots);

@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { CalendarCheck2, CheckCircle2, Clock, Loader2 } from "lucide-react";
 import { BrandMonthPlan, BrandMonthPlanSlot, UserRole } from "../../types";
-import { confirmMonthPlan, fetchMonthPlan } from "../../lib/db/monthPlans";
+import { confirmMonthPlan, monthPlanRead } from "../../lib/db/monthPlans";
+import type { TabPrefetchCtx } from "../../lib/db/prefetch";
 import { sessionDurationHours } from "../../lib/pnl";
 import { todayVn } from "../../lib/performance/brandCommitment";
 import { errorMessage } from "../../lib/errorMessage";
@@ -45,6 +46,11 @@ const fmtHours = (h: number) => `${h.toLocaleString("vi-VN", { maximumFractionDi
 const fmtDateTime = (iso: string) =>
   new Date(iso).toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 
+// Lượt đọc lúc mở màn — nạp trước trong lúc chờ đợt nạp chung (lib/db/prefetch.ts).
+export function prefetchBrandNextMonthPlan({ brandId }: TabPrefetchCtx): void {
+  if (brandId) monthPlanRead.prefetch(brandId, nextMonthOf(todayVn()));
+}
+
 export const BrandNextMonthPlan: React.FC<BrandNextMonthPlanProps> = ({ brandId, brandName, currentRole }) => {
   const nextMonth = useMemo(() => nextMonthOf(todayVn()), []);
   const [plan, setPlan] = useState<BrandMonthPlan | null>(null);
@@ -56,7 +62,7 @@ export const BrandNextMonthPlan: React.FC<BrandNextMonthPlanProps> = ({ brandId,
   const load = () => {
     setLoading(true);
     setErrorMsg(null);
-    fetchMonthPlan(brandId, nextMonth)
+    monthPlanRead.take(brandId, nextMonth)
       .then((r) => {
         setPlan(r?.plan ?? null);
         setSlots(r?.slots ?? []);

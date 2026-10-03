@@ -77,26 +77,47 @@ export async function fetchReconciliationBatches(limit = 10): Promise<Reconcilia
   return ((data ?? []) as DbBatch[]).map(batchFromDb);
 }
 
+const ROW_COLS = "id, room_id, room_title, started_at, ended_at, gmv, orders, views, duration_minutes, bucket, matched_session_ids";
+
+const rowFromDb = (r: DbRow): ReconciliationRow => ({
+  id: r.id,
+  roomId: r.room_id,
+  roomTitle: r.room_title ?? undefined,
+  startedAt: r.started_at ?? undefined,
+  endedAt: r.ended_at ?? undefined,
+  gmv: Number(r.gmv) || 0,
+  orders: Number(r.orders) || 0,
+  views: Number(r.views) || 0,
+  durationMinutes: Number(r.duration_minutes) || 0,
+  bucket: r.bucket,
+  matchedSessionIds: r.matched_session_ids ?? []
+});
+
 export async function fetchReconciliationRows(batchId: string): Promise<ReconciliationRow[]> {
   const { data, error } = await supabase
     .from("live_reconciliation_rows")
-    .select("id, room_id, room_title, started_at, ended_at, gmv, orders, views, duration_minutes, bucket, matched_session_ids")
+    .select(ROW_COLS)
     .eq("batch_id", batchId)
     .order("started_at", { ascending: true });
   if (error) throw error;
-  return ((data ?? []) as DbRow[]).map((r) => ({
-    id: r.id,
-    roomId: r.room_id,
-    roomTitle: r.room_title ?? undefined,
-    startedAt: r.started_at ?? undefined,
-    endedAt: r.ended_at ?? undefined,
-    gmv: Number(r.gmv) || 0,
-    orders: Number(r.orders) || 0,
-    views: Number(r.views) || 0,
-    durationMinutes: Number(r.duration_minutes) || 0,
-    bucket: r.bucket,
-    matchedSessionIds: r.matched_session_ids ?? []
-  }));
+  return ((data ?? []) as DbRow[]).map(rowFromDb);
+}
+
+/** Lô MỚI NHẤT kèm dòng của nó trong MỘT request (nhúng `live_reconciliation_rows`). Màn Đối Soát bắn nó
+ *  SONG SONG với `fetchReconciliationBatches` lúc mở — trước 2026-10-04 là hai vòng nối tiếp (danh sách lô
+ *  rồi mới tới dòng của lô đầu; đo: 524 → 869 → 1.201 ms). Cùng thứ tự `created_at desc` với danh sách. */
+export async function fetchLatestReconciliationRows(): Promise<{ batchId: string; rows: ReconciliationRow[] } | null> {
+  const { data, error } = await supabase
+    .from("live_reconciliation_batches")
+    .select(`id, live_reconciliation_rows(${ROW_COLS})`)
+    .order("created_at", { ascending: false })
+    .order("started_at", { referencedTable: "live_reconciliation_rows", ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  const row = data as { id: string; live_reconciliation_rows: DbRow[] | null };
+  return { batchId: row.id, rows: (row.live_reconciliation_rows ?? []).map(rowFromDb) };
 }
 
 // Chỉ nạp + tự khớp room với ca, CHƯA ghi gì vào live_sessions — ops xem rổ rồi mới bấm áp dụng.

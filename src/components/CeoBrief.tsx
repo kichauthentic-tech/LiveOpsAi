@@ -45,7 +45,7 @@ import { buildMonthTargetPlan } from "../lib/performance/targetAllocation";
 import { metricHint } from "../lib/metricGlossary";
 import { todayVn } from "../lib/performance/brandCommitment";
 import { PNL_MISSING_LABEL, PnlMissingInput, computeSessionPnl } from "../lib/pnl";
-import { fetchPlanStatuses } from "../lib/db/monthPlans";
+import { planStatusesRead } from "../lib/db/monthPlans";
 import { addDays, eachDay } from "../lib/dateUtils";
 import { CampDayBucket, CampOverrides } from "../lib/campaignDays";
 import { getBrandTheme } from "../lib/brandTheme";
@@ -54,7 +54,7 @@ import { fmtKeyMetric, KEY_METRICS, keyMetricValue } from "../lib/report/keyMetr
 import { BrandLogo } from "./ui/BrandLogo";
 import { PageIntro } from "./common/PageIntro";
 import { MonthPicker } from "./common/MonthPicker";
-import { prefetchable, type TabPrefetchCtx } from "../lib/db/prefetch";
+import type { TabPrefetchCtx } from "../lib/db/prefetch";
 
 // Bản Tin CEO (2026-09-25) — thay Toàn Cảnh Agency. Mọi luật số nằm ở lib/performance/ceoBrief.ts;
 // file này chỉ trình bày. Khối tiền chỉ ceo/admin thấy, và chỉ cộng ca ĐỦ dữ liệu để tính tiền
@@ -180,7 +180,6 @@ function useTooltip() {
 }
 
 // Trạng thái kế hoạch tháng này + tháng sau — nạp trước trong lúc chờ đợt nạp chung (lib/db/prefetch.ts).
-const planStatusesRead = prefetchable("planStatuses", fetchPlanStatuses);
 export function prefetchCeoBrief(_ctx: TabPrefetchCtx): void {
   const month = todayVn().slice(0, 7);
   planStatusesRead.prefetch(month);

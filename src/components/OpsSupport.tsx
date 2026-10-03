@@ -4,8 +4,7 @@ import { BrandMonthPlan, BrandMonthPlanSlot, CalendarEventRow, LiveSession, Prom
 import { EngineParams } from "../lib/scheduling/engineParams";
 import { buildHistory } from "../lib/scheduling/suggestEngine";
 import { buildCalibration, evaluatePlan } from "../lib/scheduling/planEvaluation";
-import { fetchBrandLockedPlanSlots, fetchCalendarEvents } from "../lib/db/monthPlans";
-import { prefetchable } from "../lib/db/prefetch";
+import { calendarEventsRead, lockedPlanSlotsRead } from "../lib/db/monthPlans";
 import { EstimateCtx, MonthTracking, benchmarkForWindow, suggestFill, trackMonth } from "../lib/opsSupport";
 import { MonthEndProjection, PlanRunRate, PROJECTION_METHOD_LABEL } from "../lib/performance/planRunRate";
 import { todayVn } from "../lib/performance/brandCommitment";
@@ -49,8 +48,6 @@ const addDays = (d: string, n: number) => {
 };
 
 // Nạp trước cùng Dashboard brand (lib/db/prefetch.ts) — panel chỉ hiện với ops ở tháng hiện tại.
-const calendarEventsRead = prefetchable("calendarEvents", fetchCalendarEvents);
-const lockedPlanSlotsRead = prefetchable("lockedPlanSlots", fetchBrandLockedPlanSlots);
 export function prefetchOpsSupport(brandId: string): void {
   calendarEventsRead.prefetch();
   lockedPlanSlotsRead.prefetch(brandId);

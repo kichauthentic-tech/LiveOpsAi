@@ -11,13 +11,13 @@
 
 ---
 
-## 1. Giai đoạn hiện tại (cập nhật 2026-10-03)
+## 1. Giai đoạn hiện tại (cập nhật 2026-10-04)
 
 - **CHẠY THỬ THẬT trên dữ liệu thật** (từ 2026-09-18; mock đã xoá sạch 19/09). DB: 33 hồ sơ talent thật, CROCS T6–T9 nạp
   bù từ file Creator-Live-Performance (229 ca, còn ca chưa gán host). **Không đề xuất tính năng mới**; hỏi user chạy thử
   tới đâu, cái gì kêu, rồi sửa đúng chỗ đó. **Không seed mock lại.**
 - **Nợ kỹ thuật đã hết** (đợt P2a-2…P2a-21, 01–02/10) và **audit code chết đã xong** (02/10): `npm run audit:dead` báo 0,
-  ESLint 0 lỗi (32 warning `set-state-in-effect` = nợ đã đo, cố ý `warn`), vitest 420/420 (03/10).
+  ESLint 0 lỗi (31 warning `set-state-in-effect` = nợ đã đo, cố ý `warn`), vitest 424/424 (04/10).
 - 🛑 **User chốt 02/10: DỪNG nhánh đo tốc độ tải.** Mạng chỗ user là biến trội nên wall-clock vô nghĩa. Không chạy lại
   các phép đo P2a-17→P2a-20 trừ khi user yêu cầu rõ. Những gì đã sửa thì giữ (chứng minh bằng SỐ REQUEST và source).
 - **03/10 user hỏi lại "app load chậm hơn" → audit theo SỐ VÒNG MẠNG NỐI TIẾP** (không theo wall-clock; mạng user dao động
@@ -30,7 +30,16 @@
   nối tiếp → 1 (nhúng `brand_month_plan_slots(*)`; lợi cho mọi màn đọc plan); (5) lượt đọc riêng của Bản Tin CEO,
   Dashboard brand, Report Tháng được NẠP TRƯỚC trong lúc chờ đợt chung (`src/lib/db/prefetch.ts`): Report Tháng khởi hành
   115 ms, xong trước cả đợt chung; Dashboard CROCS nội dung giống từng ký tự với trước khi sửa, 0 request trùng.
-  OpsSupport nhận `plan` qua prop từ BrandDashboard. **Sau deploy phải kiểm:** `curl -sI
+  OpsSupport nhận `plan` qua prop từ BrandDashboard. **Đợt 3 (04/10, quét lại 28 màn):** (6) React 19 giữ fallback
+  Suspense tối thiểu 300 ms và `React.lazy` luôn treo một nhịp kể cả khi chunk đã tải ⇒ mọi màn chậm thêm tới 300 ms
+  mỗi lần mở/đổi tab (đo: 308–330 ms không request, không long task). `lazyNamed` nay render thẳng khi chunk đã có +
+  App tải sẵn chunk các tab được phép lúc rảnh (ops: cả 2 workspace) ⇒ đổi tab bắt đầu đọc sau 6–35 ms. (7) Nhập Ads:
+  report → affiliate plans nối tiếp → song song (xong 128 ms thay vì 621–1.371). (8) Đối Soát: danh sách lô → dòng →
+  song song với "lô mới nhất kèm dòng" (1.201 → 649 ms). (9) `/api/admin/ai-agent-prompts` đọc prompts song song với
+  xác thực (1.241 → 765 ms). (10) Nạp trước thêm 8 màn (Nhân sự ca, Kế Hoạch Tháng, Toàn Cảnh Brand, Cam Kết HĐ, Cam
+  kết/KH Tháng Sau/SKU/Dữ Liệu Gốc của brand). Còn lại có chủ đích: Dashboard brand khối đối chứng (danh sách batch →
+  dòng, chỉ ops); Kế Hoạch Tháng phần theo brand khi máy chưa nhớ brand nào; Affiliate (đọc theo khoảng tháng do người
+  dùng chọn). **Sau deploy phải kiểm:** `curl -sI
   https://live-ops-ai.vercel.app/assets/<file>.js` có `immutable`.
 - **Quyết định user đã chốt — đừng nêu lại:** luật run-rate (§5.6); Target GMV từng ca ở "Kế Hoạch Tháng Sau" brand ĐƯỢC
   thấy (01/10); tiền không có chữ "đ" (27/09); trung tâm xuất file = một module dùng chung, không dựng tab riêng (02/10);
@@ -160,7 +169,12 @@
 - **Nạp trước lượt đọc của màn** (`lib/db/prefetch.ts`, test `tests/prefetch.test.ts`): màn export `prefetchX(ctx)` khai
   `prefetchable(name, fn)` và effect MOUNT gọi `.take(...)`; App gọi qua `TAB_DATA_PREFETCH` CHỈ khi `!coreDataReady`.
   Giao đúng một lần, hết hạn 30 s, đổi tab là xoá — KHÔNG phải cache: đường đọc-sau-khi-ghi luôn gọi thẳng hàm db.
-  Hai component không được `take` cùng key — truyền dữ liệu xuống bằng prop.
+  Hai component không được `take` cùng key — truyền dữ liệu xuống bằng prop. Lượt đọc DÙNG CHUNG nhiều màn định nghĩa
+  MỘT lần cạnh hàm db (`planStatusesRead`, `monthPlanRead`, `commitmentsRead`…) — test cấm trùng tên `prefetchable`.
+  Màn mount sau một lượt đọc của cha (khuôn `ReportPlanningInputs`) thì cha gọi `prefetchX` cùng lúc lượt đọc của nó.
+  App xoá kho trong `useLayoutEffect` khi đổi tab (effect thường của con chạy TRƯỚC cha ⇒ sẽ xoá nhầm).
+- **Tab lazy chỉ qua `lazyNamed`** (không `React.lazy` trực tiếp): chunk đã tải thì render thẳng, tránh fallback
+  Suspense bị React giữ 300 ms (`tests/lazyNamed.test.ts`, mutation đã thử).
 - **Mọi `.update()`/`.delete()` kèm `.select()` + `assertAffected`** — RLS lọc 0 dòng thì PostgREST trả 204 im lặng.
 - ĐỌC ca qua view `live_sessions_secure`, GHI vào bảng `live_sessions` (brand bị đóng bảng gốc từ 0107).
 - Mỗi loại file Dataraw một dialect số — KHÔNG dùng chung `num()` (product_list: chấm = nghìn; creator_live_performance:

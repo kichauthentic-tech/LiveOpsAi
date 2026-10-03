@@ -5,6 +5,7 @@ import { CAMP_DAY_BUCKET_ORDER, resolveCampBucketType, type CampDayBucket, type 
 import { fetchAffiliatePlans, replaceAffiliatePlans } from "../../lib/db/affiliatePlans";
 import { MonthlyReportManualInput, upsertMonthlyReport } from "../../lib/db/monthlyReports";
 import { errorMessage } from "../../lib/errorMessage";
+import { prefetchable } from "../../lib/db/prefetch";
 import { fmtFixed, fmtVndShort } from "../../lib/format";
 
 // Công cụ nhập liệu của Report Tháng (khung camp tháng này, kế hoạch phân bổ + affiliate tháng sau) — chuyển từ
@@ -29,6 +30,13 @@ function nextMonthOf(month: string): string {
   const [y, m] = month.split("-").map(Number);
   const d = new Date(y, m, 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+// Khối này chỉ mount SAU khi report tháng về (BrandAdsReport đợi `!loading`), nên tự đọc lúc mount là một
+// vòng mạng nối tiếp sau lượt đọc report. BrandAdsReport gọi hàm dưới CÙNG LÚC với lượt đọc report.
+const affiliatePlansRead = prefetchable("affiliatePlans", fetchAffiliatePlans);
+export function prefetchReportPlanningInputs(brandId: string, month: string): void {
+  affiliatePlansRead.prefetch(brandId, `${nextMonthOf(month)}-01`);
 }
 function prevMonthOf(month: string): string {
   const [y, m] = month.split("-").map(Number);
@@ -91,7 +99,7 @@ export const ReportPlanningInputs: React.FC<Props> = ({ brandId, month, sessions
 
   useEffect(() => {
     let cancelled = false;
-    fetchAffiliatePlans(brandId, `${nextMonth}-01`)
+    affiliatePlansRead.take(brandId, `${nextMonth}-01`)
       .then((entries) => !cancelled && setRows(entries.map((e) => ({ ...e, _key: nextKey() }))))
       .catch((e) => !cancelled && setError(errorMessage(e, "Không tải được kế hoạch affiliate")))
       .finally(() => !cancelled && setLoadingRows(false));

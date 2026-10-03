@@ -1,5 +1,6 @@
 import { supabase } from "../supabaseClient";
 import { BrandContract, BrandMonthlyCommitment, GenerateCommitmentsResult } from "../../types";
+import { prefetchable } from "./prefetch";
 
 // Lớp cam kết hợp đồng (migration 0081). RLS chỉ mở cho ceo/admin/operations — talent và role
 // brand query thẳng 2 bảng này sẽ ra rỗng chứ không ra lỗi, nên đừng dựa vào "fetch được = có
@@ -232,3 +233,8 @@ export async function fetchBrandCommitmentProgress(brandId: string): Promise<Bra
     contractEndMonth: r.contract_end_month ?? undefined
   }));
 }
+
+// Lượt đọc nạp-trước-được (lib/db/prefetch.ts) — định nghĩa MỘT chỗ cạnh hàm db để mọi màn dùng chung đúng key.
+export const contractsRead = prefetchable("brandContracts", fetchBrandContracts);
+export const commitmentsRead = prefetchable("monthlyCommitments", fetchBrandMonthlyCommitments);
+export const commitmentProgressRead = prefetchable("commitmentProgress", fetchBrandCommitmentProgress);

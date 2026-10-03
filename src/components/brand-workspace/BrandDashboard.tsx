@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Activity, AlertTriangle, CalendarRange, Gauge, LayoutDashboard, Lightbulb, TrendingUp, Users } from "lucide-react";
 import { BrandMonthPlan, BrandMonthPlanSlot, LiveSession, PromoScheme, ShiftSlot, UserRole } from "../../types";
 import { EngineParams } from "../../lib/scheduling/engineParams";
-import { fetchMonthPlan } from "../../lib/db/monthPlans";
+import { monthPlanRead } from "../../lib/db/monthPlans";
 import { fetchShopDaysMonthSlice, ShopDaysMonthSlice } from "../../lib/dataraw/monthlyProductSlice";
 import { CAMP_DAY_BUCKET_LABEL, CampDayBucket, resolveCampBucketType } from "../../lib/campaignDays";
 import { todayVn } from "../../lib/performance/brandCommitment";
@@ -95,7 +95,6 @@ const statsOf = (sessions: LiveSession[], start: string, end: string): LiveStats
 
 // Lượt đọc riêng của màn — nạp trước trong lúc chờ đợt nạp chung (lib/db/prefetch.ts). Chỉ ops (hoặc role chưa
 // biết): role brand mặc định xem tháng phát hành gần nhất, tính từ ca — chưa biết trước khi đợt chung về.
-const monthPlanRead = prefetchable("monthPlan", (brandId: string, month: string) => fetchMonthPlan(brandId, month).catch(() => null));
 const shopDaysRead = prefetchable("shopDays", fetchShopDaysMonthSlice);
 export function prefetchBrandDashboard({ brandId, role }: TabPrefetchCtx): void {
   if (!brandId || (role && !OPS_ROLES.includes(role))) return;
@@ -129,7 +128,7 @@ export default function BrandDashboard({ brandId, brandName, sessions, shiftSlot
   const planLoading = planKey !== `${brandId}|${month}`;
   useEffect(() => {
     let alive = true;
-    Promise.all([monthPlanRead.take(brandId, month), monthPlanRead.take(brandId, nextMonthOf(month))]).then(([p, n]) => {
+    Promise.all([monthPlanRead.take(brandId, month).catch(() => null), monthPlanRead.take(brandId, nextMonthOf(month)).catch(() => null)]).then(([p, n]) => {
       if (!alive) return;
       setPlan(p);
       setNextPlan(n);

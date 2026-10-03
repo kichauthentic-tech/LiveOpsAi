@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Brand, BrandMonthPlan, BrandMonthPlanSlot, BrandMonthlyCommitment, BrandStudio, CalendarEventRow, LiveSession, PlanCampRanges, PromoScheme, RecurringShiftTemplate, ShiftSlot, Studio } from "../types";
 import { AlertTriangle, Ban, CalendarRange, Lock, Plus, Repeat, Save, Sparkles, Trash2, Wand2, X } from "lucide-react";
-import { fetchBrandMonthlyCommitments } from "../lib/db/brandContracts";
+import { commitmentsRead } from "../lib/db/brandContracts";
+import type { TabPrefetchCtx } from "../lib/db/prefetch";
+import { loadRememberedBrandId } from "../lib/defaultBrand";
 import { errorMessage } from "../lib/errorMessage";
-import { PlanSettings, deleteMonthPlan, fetchBrandLockedPlanSlots, fetchCalendarEvents, fetchMonthPlan, fetchPlanStatuses, lockMonthPlan, replacePlanSlots, upsertMonthPlan } from "../lib/db/monthPlans";
+import { PlanSettings, calendarEventsRead, deleteMonthPlan, fetchBrandLockedPlanSlots, fetchMonthPlan, fetchPlanStatuses, lockMonthPlan, lockedPlanSlotsRead, monthPlanRead, planStatusesRead, replacePlanSlots, upsertMonthPlan } from "../lib/db/monthPlans";
 import { PlanEvaluation, buildCalibration, evaluatePlan } from "../lib/scheduling/planEvaluation";
 import { todayVn } from "../lib/performance/brandCommitment";
 import { useDefaultBrand } from "../hooks/useDefaultBrand";
@@ -64,6 +66,20 @@ const nextMonthOf = (month: string, delta: number) => {
 
 // Kế Hoạch Tháng — giai đoạn A (0090): lập lưới ngày × ca cho brand, nạp nhanh từ quy tắc lặp,
 // chia target theo khung camp của tab 05, chốt → sinh shift_slots. Gợi ý từ lịch sử là giai đoạn B.
+// Lượt đọc lúc mở màn — nạp trước trong lúc chờ đợt nạp chung (lib/db/prefetch.ts). Brand mặc định là brand
+// đã nhớ (useDefaultBrand ưu tiên nó); chưa nhớ brand nào thì phần theo brand đợi màn mount như cũ.
+export function prefetchMonthPlan(_ctx: TabPrefetchCtx): void {
+  const next = nextMonthOf(todayVn().slice(0, 7), 1);
+  commitmentsRead.prefetch();
+  calendarEventsRead.prefetch();
+  planStatusesRead.prefetch(next);
+  const remembered = loadRememberedBrandId();
+  if (remembered) {
+    monthPlanRead.prefetch(remembered, next);
+    lockedPlanSlotsRead.prefetch(remembered);
+  }
+}
+
 export default function MonthPlan({
   brands,
   studios,
@@ -112,20 +128,22 @@ export default function MonthPlan({
   const brandTemplates = useMemo(() => recurringShiftTemplates.filter((t) => t.brandId === brandId), [recurringShiftTemplates, brandId]);
 
   useEffect(() => {
-    fetchBrandMonthlyCommitments().then(setCommitments).catch(() => setCommitments([]));
-    fetchCalendarEvents().then(setEvents).catch(() => setEvents([]));
+    commitmentsRead.take().then(setCommitments).catch(() => setCommitments([]));
+    calendarEventsRead.take().then(setEvents).catch(() => setEvents([]));
   }, []);
   const nextMonth = nextMonthOf(today.slice(0, 7), 1);
-  const refreshMissing = () => {
-    fetchPlanStatuses(nextMonth)
+  // `initial` = lượt mount (lấy bản nạp trước nếu có); sau khi chốt/xoá kế hoạch thì luôn đọc mới.
+  const refreshMissing = (initial = false) => {
+    (initial ? planStatusesRead.take(nextMonth) : fetchPlanStatuses(nextMonth))
       .then((m) => setNextMonthMissing(brands.filter((b) => m.get(b.id)?.status !== "locked").map((b) => b.name)))
       .catch(() => setNextMonthMissing([]));
   };
-  useEffect(refreshMissing, [brands, nextMonth]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => refreshMissing(true), [brands, nextMonth]);
   useEffect(() => {
     if (!brandId) return;
     let alive = true;
-    fetchBrandLockedPlanSlots(brandId).then((r) => alive && setLockedSlots(r)).catch(() => alive && setLockedSlots([]));
+    (lockedSlotsTick === 0 ? lockedPlanSlotsRead.take(brandId) : fetchBrandLockedPlanSlots(brandId)).then((r) => alive && setLockedSlots(r)).catch(() => alive && setLockedSlots([]));
     return () => { alive = false; };
   }, [brandId, lockedSlotsTick]);
   // Kế hoạch vs thực tế của THÁNG ĐANG XEM (chỉ khi đã chốt và có ca gắn).
@@ -148,7 +166,7 @@ export default function MonthPlan({
     let alive = true;
     setLoading(true);
     setMsg(null);
-    fetchMonthPlan(brandId, month)
+    monthPlanRead.take(brandId, month)
       .then((r) => {
         if (!alive) return;
         if (r) {

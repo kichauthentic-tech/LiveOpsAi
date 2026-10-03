@@ -1,6 +1,7 @@
 import { supabase } from "../supabaseClient";
 import { fetchAllPages } from "./fetchAllPages";
 import { BrandMonthlyReport } from "../../types";
+import { prefetchable } from "./prefetch";
 
 // Report tháng Brand Workspace (migration 0051) — số liệu vận hành (GMV/Host/SKU) không lưu ở
 // đây, luôn tính live từ LiveSession[] phía component. Bảng chỉ giữ phần nhập tay + trạng thái
@@ -236,3 +237,6 @@ export async function unpublishMonthlyReport(reportId: string): Promise<BrandMon
   if (error) throw error;
   return reportFromDb(data as DbMonthlyReport);
 }
+
+// Lượt đọc nạp-trước-được (lib/db/prefetch.ts) — Report Tháng và Nhập Ads cùng đọc dòng này.
+export const monthlyReportRead = prefetchable("monthlyReport", fetchMonthlyReport);
