@@ -56,6 +56,10 @@
 ## 2. Việc còn treo
 
 **Cần user làm:**
+0. **Backup DB hằng ngày đang HỎNG** (GitHub Action `backup-supabase.yml` đỏ mỗi ngày, đo 04/10): secret
+   `SUPABASE_DB_URL` trỏ tới `aws-0-ap-southeast-1.pooler.supabase.com`, pooler báo `tenant/user
+   postgres.licqfomsrjkavipomplz not found` ⇒ sai host/region. Lấy lại chuỗi "Session pooler" ở Supabase Dashboard →
+   Connect, cập nhật secret, chạy tay workflow một lần để kiểm.
 1. **24 file Dataraw CROCS T6–T9** chưa up (1 Creator Live Performance full T6→T9 · 4 Khuyến Mãi · 4 Sản Phẩm · 4 Shop
    Analytics · 4 Live Performance · 4 Affiliate Creator List EN · 3 Live Analysis EN T7/T8/T9). `Product Card Traffic Stats`
    chưa có file nào (khối đó trong Report Tháng tự ẩn).
