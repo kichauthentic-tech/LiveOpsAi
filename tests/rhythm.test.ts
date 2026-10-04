@@ -1,5 +1,8 @@
 // Ba khối chuyển từ Phân tích sâu vào Report Tháng (2026-09-27) + độ tập trung SKU trong piece skuRank.
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
+// CI không có .env — supabaseClient ném lỗi ngay lúc import (chuỗi: module dataraw → supabaseClient). Test này chỉ
+// gọi hàm thuần, không chạm DB. Cùng khuôn với monthlySnapshot.test.ts.
+vi.mock("../src/lib/supabaseClient", () => ({ supabase: {} }));
 import type { CreatorLivePerfRow } from "../src/lib/dataraw/creatorLivePerfSlice";
 import { skuRankFromAgg, type ShopDayLite } from "../src/lib/dataraw/monthlyProductSlice";
 import type { ProductAggSku, ProductListAgg } from "../src/lib/dataraw/productListAgg";

@@ -1,4 +1,7 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
+// CI không có .env — supabaseClient ném lỗi ngay lúc import (chuỗi: module dataraw → supabaseClient). Test này chỉ
+// gọi hàm thuần, không chạm DB. Cùng khuôn với monthlySnapshot.test.ts.
+vi.mock("../src/lib/supabaseClient", () => ({ supabase: {} }));
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { watchSecondsOf } from "../src/lib/liveSnapshot/extractRooms";

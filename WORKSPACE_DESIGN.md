@@ -19,10 +19,13 @@
 - **Nợ kỹ thuật đã hết** (đợt P2a-2…P2a-21, 01–02/10) và **audit code chết đã xong** (02/10): `npm run audit:dead` báo 0,
   ESLint 0 lỗi (31 warning `set-state-in-effect` = nợ đã đo, cố ý `warn`), vitest 434/434 (04/10).
 - **04/10: audit LOGIC vòng đời** (hợp đồng → kế hoạch → ca → đăng ký → chốt → vận hành → đối soát → report) theo yêu
-  cầu user, user bảo "sửa hết": 14 điểm gãy đã sửa trong code + migration **`0133` (CHƯA CHẠY trên production — §2
-  mục 0)**. Chi tiết: mục `## Audit logic vòng đời (2026-10-04)` cuối file lịch sử. Verify: bộ kiểm SQL 34/34 trên bản
+  cầu user, user bảo "sửa hết": 14 điểm gãy đã sửa trong code + migration **`0133` (ĐÃ CHẠY trên production 04/10,
+  commit `b901273` đã push)**. Chi tiết: mục `## Audit logic vòng đời (2026-10-04)` cuối file lịch sử. Verify: bộ kiểm SQL 34/34 trên bản
   replay `0001→0133` (đỏ ngay khi thiếu 0133), vitest 434/434, đột biến rơi đúng test; UI đọc trên bản build local nối DB
-  production (chưa có 0133 nên KHÔNG bấm thao tác ghi nào đi qua RPC mới). **Chưa commit** — chờ user.
+  production. Sau khi user chạy 0133: 5 RPC gọi với id giả/thiếu brand đều vào tới thân hàm bản 0133
+  (`finalize_shift_slot` "Không thấy ca chờ đăng ký", import thiếu brand "Chọn brand của file"…), cột
+  `live_reconciliation_batches.brand_id` có. Chưa đo trên production: `apply` lô cũ bị từ chối (auto-mode chặn vì coi là
+  ghi — đã có test 3f trên replay); luồng chốt người/up đối soát thật (chờ ops dùng).
 - 🛑 **User chốt 02/10: DỪNG nhánh đo tốc độ tải.** Mạng chỗ user là biến trội nên wall-clock vô nghĩa. Không chạy lại
   các phép đo P2a-17→P2a-20 trừ khi user yêu cầu rõ. Những gì đã sửa thì giữ (chứng minh bằng SỐ REQUEST và source).
 - **03/10 user hỏi lại "app load chậm hơn" → audit theo SỐ VÒNG MẠNG NỐI TIẾP** (không theo wall-clock; mạng user dao động
@@ -53,12 +56,6 @@
 ## 2. Việc còn treo
 
 **Cần user làm:**
-0. **Chạy `0133_workflow_integrity.sql` TRƯỚC khi deploy client mới** (client mới gọi `finalize_shift_slot` và
-   `import_live_reconciliation(..., p_brand_id)`). Kiểm sau khi chạy: `finalize_shift_slot` với id giả ra "Không thấy ca
-   chờ đăng ký" (không phải `PGRST202`); up file đối soát bằng client CŨ ra "Chọn brand của file". Lô đối soát cũ (không
-   gắn brand) không áp dụng lại được — đo 04/10: lô 06–09/2026 chỉ khớp ca CROCS, chưa có số nào bị chia nhầm. Chưa tháng
-   nào đã phát hành ⇒ trigger đóng sổ không chặn dữ liệu hiện có; chưa kế hoạch nào đã chốt ⇒ trigger khoá ca kế hoạch
-   cũng vậy.
 1. **24 file Dataraw CROCS T6–T9** chưa up (1 Creator Live Performance full T6→T9 · 4 Khuyến Mãi · 4 Sản Phẩm · 4 Shop
    Analytics · 4 Live Performance · 4 Affiliate Creator List EN · 3 Live Analysis EN T7/T8/T9). `Product Card Traffic Stats`
    chưa có file nào (khối đó trong Report Tháng tự ẩn).
@@ -148,6 +145,10 @@
   Homebrew có `initdb`/`psql`; đường dẫn socket quá 103 byte ⇒ `-c unix_socket_directories='' -c listen_addresses=127.0.0.1`).
   Bẫy: `grant all on all tables … to authenticated` trên bản replay sẽ xoá grant theo cột của 0047/0048 — đừng dùng khi đo quyền cột.
 - **Trước khi đóng một đợt sửa:** `npm run lint && npm run typecheck && npm test && npm run build && npm run audit:dead`.
+  CI (GitHub Actions) chạy KHÔNG có `.env`: test nào import (kể cả gián tiếp) `supabaseClient` phải
+  `vi.mock("../src/lib/supabaseClient", () => ({ supabase: {} }))` — local có `.env` nên vẫn xanh. Thử như CI:
+  `VITE_SUPABASE_URL= VITE_SUPABASE_ANON_KEY= npx vitest run`. (CI đỏ liên tục từ trước 3ed3b30 tới b901273 vì
+  rhythm/watchSeconds thiếu mock — vá 04/10.)
 - **Không giữ code "phòng khi cần lại"** (màn ẩn, kiểu "làm tài liệu", re-export "để import cũ không đổi") — git giữ lịch sử.
   **Tính năng chỉ có UI mà không có phần chạy thật thì gỡ** — "Đã chạy N lần"/"Giả lập…" là hứa sai với người dùng.
 - **Trước khi tối ưu, đếm dòng thật trên production** — từng song song hoá một thứ lẽ ra nên xoá (3 bảng con 0 dòng).
@@ -263,7 +264,8 @@ live = `sessionHours`. GMV/giờ đem NHÂN với giờ lịch thì chia trên g
 ## 6. Hạ tầng Supabase
 
 - 133 migration (`supabase/migrations/`), chạy tay theo thứ tự — **tới `0132` đều ĐÃ CHẠY** (0131 + 0132 ngày 02/10);
-  **`0133` CHƯA CHẠY** (§2 mục 0). Replay `0001 → 0133`: sạch, chạy lần 2 không lỗi; bộ kiểm hành vi
+  **`0133` ĐÃ CHẠY 04/10** (verify ở §1). Lô đối soát cũ (06–09/2026, không gắn brand) không áp dụng lại được — đo
+  04/10 nó chỉ khớp ca CROCS nên chưa có số nào bị chia nhầm. Replay `0001 → 0133`: sạch, chạy lần 2 không lỗi; bộ kiểm hành vi
   `supabase/tests/0133_workflow_integrity.sql` chạy trên bản replay (in `OK ...`, 34 mục).
   Replay `0001 → 0132` trên Postgres cô lập: sạch.
 - `0132` bỏ: bảng `workflow_rules`, `session_skus`, `session_checklist_items`, `session_minute_metrics` (cả 4 đều 0 dòng trên
