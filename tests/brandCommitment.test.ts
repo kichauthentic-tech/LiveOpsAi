@@ -65,6 +65,9 @@ function ses(
     totalViews: 0,
     ctrAvg: 0,
     cvrAvg: 0,
+    // Ca "Completed" trong các test dưới là ca ĐÃ CHẠY (có số lúc giao ca). Ca quá giờ không bằng chứng gì là
+    // một loại khác — "chờ xác nhận" (audit workflow 2026-10-04 #5), có test riêng ở cuối file.
+    ...(status === "Completed" ? { dataSource: "live_snapshot" as const } : {}),
     ...extra
   } as LiveSession;
 }
@@ -292,4 +295,30 @@ test("monthClosed: chỉ true khi đã sang tháng sau, KHÔNG phải ngày cu�
   expect(p("2026-10-31")).toBe(false);
   expect(p("2026-11-01")).toBe(true);
   expect(p("2026-09-20")).toBe(false); // tháng chưa tới cũng chưa đóng
+});
+
+// ── Audit workflow 2026-10-04 #5: ca quá giờ KHÔNG có bằng chứng diễn ra ───────────────────────────────
+
+test("ca Completed không số/report/giờ live = chờ xác nhận: không vào đã giao, cũng không vào đã xếp", () => {
+  const sessions = [
+    ses("co-so", "2026-10-05", "09:00", "11:00", "Completed"),
+    ses("bo-ca", "2026-10-06", "09:00", "12:00", "Completed", { dataSource: "manual" }),
+    ses("co-report", "2026-10-07", "09:00", "11:00", "Completed", { dataSource: "manual", report: {} as LiveSession["report"] }),
+    ses("nap-bu", "2026-10-08", "09:00", "11:00", "Completed", { dataSource: "manual", isBackfill: true })
+  ];
+  const p = computeCommitmentProgress(commit(B1, 20), "CROCS", sessions, "2026-10-20");
+  expect(p.deliveredSessions).toBe(3);
+  expect(p.deliveredHours).toBe(6);
+  expect(p.unconfirmedSessions).toBe(1);
+  expect(p.unconfirmedHours).toBe(3);
+  // Không vào plannedTotal ⇒ còn thiếu tính cả 3h đó (ops xác nhận hoặc huỷ rồi mới biết có phải bù không).
+  expect(p.gapHours).toBe(14);
+});
+
+test("role brand ở tháng chưa phát hành (view che số) — không phân biệt được nên vẫn tính là đã giao như cũ", () => {
+  const hidden = ses("an", "2026-10-05", "09:00", "11:00", "Completed", { dataSource: "manual", monthPublished: false });
+  expect(isDelivered(hidden)).toBe(true);
+  const p = computeCommitmentProgress(commit(B1, 10), "CROCS", [hidden], "2026-10-20");
+  expect(p.unconfirmedSessions).toBe(0);
+  expect(p.deliveredHours).toBe(2);
 });

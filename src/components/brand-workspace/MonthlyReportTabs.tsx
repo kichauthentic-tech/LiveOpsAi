@@ -18,7 +18,7 @@ import { fetchMonthPlan } from "../../lib/db/monthPlans";
 import type { BrandMonthPlan, BrandMonthPlanSlot } from "../../types";
 import { fetchMonthlyReport, saveMonthlyReportNarrative, saveMonthlyReportSectionNote } from "../../lib/db/monthlyReports";
 import { contextInsight, HostInsightRow, hostVsPeer, InsightSection, insightToText, parseInsightText, peopleInsight, productsInsight, sectionNextSteps, SectionInsight, shopInsight, shortSku, whyInsight } from "../../lib/report/sectionInsights";
-import { CAMP_DAY_BUCKET_LABEL, CAMP_DAY_BUCKET_ORDER, resolveCampBucketType, type CampDayBucket, type CampOverrides } from "../../lib/campaignDays";
+import { CAMP_DAY_BUCKET_LABEL, CAMP_DAY_BUCKET_ORDER, effectiveCamp, resolveCampBucketType, type CampDayBucket, type CampOverrides } from "../../lib/campaignDays";
 import { dailyRhythm, liveFunnel, sessionSpread } from "../../lib/report/rhythm";
 import { errorMessage } from "../../lib/errorMessage";
 import { fmtKeyMetric, KEY_METRICS, keyMetricSheetColumns, keyMetricSheetLabel, keyMetricSheetValue, keyMetricValue, type KeyMetrics } from "../../lib/report/keyMetrics";
@@ -69,11 +69,16 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   // Dòng brand_monthly_reports của tháng: khoảng camp ops ghi đè, tóm tắt/việc tháng sau/Insight đã sửa, ghi chú
   // agency. Form nhập các cột kế hoạch nằm ở tab Nhập Ads & Ghi Chú (ReportPlanningInputs).
   const [monthlyReportRow, setMonthlyReportRow] = useState<BrandMonthlyReportType | null>(null);
+  // Dòng tháng TRƯỚC: chỉ để lấy khung camp hiệu lực của tháng trước (so cùng khung) — effectiveCamp.
+  const [prevReportRow, setPrevReportRow] = useState<BrandMonthlyReportType | null>(null);
   useEffect(() => {
     let cancelled = false;
     fetchMonthlyReport(brandId, `${month}-01`)
       .then((row) => !cancelled && setMonthlyReportRow(row))
       .catch(() => !cancelled && setMonthlyReportRow(null));
+    fetchMonthlyReport(brandId, `${prevMonthStrLocal(month)}-01`)
+      .then((row) => !cancelled && setPrevReportRow(row))
+      .catch(() => !cancelled && setPrevReportRow(null));
     return () => {
       cancelled = true;
     };
@@ -119,12 +124,15 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     const p = plans[month];
     if (p?.plan.status === "locked") {
       const bs = sessions.filter((s) => s.brandId === brandId);
-      const rr = planRunRate(month, p.slots, shiftSlots, bs, todayVn(), p.plan.campRanges);
+      // Cùng khung camp hiệu lực với phần còn lại của report (effectiveCamp — audit workflow #8); trước đây
+      // run-rate đọc khung Kế Hoạch Tháng còn bảng khung camp đọc khung đã ghi đè ⇒ hai khung trong một trang.
+      const camp = effectiveCamp(p.plan.campRanges, monthlyReportRow);
+      const rr = planRunRate(month, p.slots, shiftSlots, bs, todayVn(), camp);
       const open = shiftSlots.filter((sl) => sl.brandId === brandId && sl.status === "open" && !sl.sessionId);
-      return monthRunRateFromPlan(rr, projectMonthEnd(rr, monthOutlook(month, todayVn(), bs, open, null, p.plan.campRanges)));
+      return monthRunRateFromPlan(rr, projectMonthEnd(rr, monthOutlook(month, todayVn(), bs, open, null, camp)));
     }
     return monthRunRate(sessions, brandId, start, end);
-  }, [plans, month, sessions, brandId, start, end, shiftSlots]);
+  }, [plans, month, sessions, brandId, start, end, shiftSlots, monthlyReportRow]);
   useEffect(() => {
     let cancelled = false;
     const ms = [prevMonth, month, nextMonth];
@@ -140,17 +148,10 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
 
   // Khung camp D-Day/Mid-Month/Pay Day, từng khung: khoảng nhập ở Nhập Ads & Ghi Chú (0071) → khoảng của Kế Hoạch
   // Tháng (0094) → lịch camp cố định (lib/campaignDays.ts).
-  const campOverrides: CampOverrides = useMemo(() => {
-    const out: CampOverrides = { ...(planCur?.plan.campRanges ?? {}) };
-    if (monthlyReportRow?.campDdayStart && monthlyReportRow?.campDdayEnd) out.dday = { start: monthlyReportRow.campDdayStart, end: monthlyReportRow.campDdayEnd };
-    if (monthlyReportRow?.campMidmonthStart && monthlyReportRow?.campMidmonthEnd)
-      out.midmonth = { start: monthlyReportRow.campMidmonthStart, end: monthlyReportRow.campMidmonthEnd };
-    if (monthlyReportRow?.campPaydayStart && monthlyReportRow?.campPaydayEnd) out.payday = { start: monthlyReportRow.campPaydayStart, end: monthlyReportRow.campPaydayEnd };
-    return out;
-  }, [monthlyReportRow, planCur]);
+  const campOverrides: CampOverrides = useMemo(() => effectiveCamp(planCur?.plan.campRanges, monthlyReportRow), [monthlyReportRow, planCur]);
   // Tháng trước phân loại theo khoảng camp của CHÍNH tháng trước — đem khoảng của tháng này áp vào thì ngày camp
   // tháng trước (vd D-Day 8/8) bị tính thành ngày thường vì khung đó đã bị ghi đè.
-  const prevCampOverrides: CampOverrides = useMemo(() => ({ ...(plans[prevMonth]?.plan.campRanges ?? {}) }), [plans, prevMonth]);
+  const prevCampOverrides: CampOverrides = useMemo(() => effectiveCamp(plans[prevMonth]?.plan.campRanges, prevReportRow), [plans, prevMonth, prevReportRow]);
   const bucketCur = useMemo(() => (d: string) => resolveCampBucketType(d, campOverrides), [campOverrides]);
   const bucketPrev = useMemo(() => (d: string) => resolveCampBucketType(d, prevCampOverrides), [prevCampOverrides]);
   // Tháng cũ hơn chưa đọc Kế Hoạch Tháng ⇒ lịch camp mặc định.

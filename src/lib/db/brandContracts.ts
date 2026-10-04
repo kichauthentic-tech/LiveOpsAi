@@ -139,7 +139,8 @@ export async function generateContractCommitments(
     inserted: r.inserted ?? 0,
     updated: r.updated ?? 0,
     skippedOverride: r.skipped_override ?? 0,
-    skippedOtherContract: r.skipped_other_contract ?? 0
+    skippedOtherContract: r.skipped_other_contract ?? 0,
+    removed: r.removed ?? 0
   };
 }
 

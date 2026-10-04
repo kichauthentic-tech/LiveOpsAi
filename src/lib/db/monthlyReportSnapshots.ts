@@ -35,19 +35,6 @@ export async function fetchSnapshotPieces(brandId: string, month: string): Promi
   return ((data as { pieces: SnapshotPieces | null } | null)?.pieces ?? null) || null;
 }
 
-/** Tháng nào của brand đã có bản chụp (không tải nội dung) — Điều Phối Phát Hành cần biết để tự tạo
- *  trước khi phát hành. */
-export async function snapshotExists(brandId: string, month: string): Promise<boolean> {
-  const { data, error } = await supabase
-    .from("brand_monthly_report_snapshots")
-    .select("period_month")
-    .eq("brand_id", brandId)
-    .eq("period_month", `${month}-01`)
-    .maybeSingle();
-  if (error) throw error;
-  return !!data;
-}
-
 export async function saveMonthlyReportSnapshot(brandId: string, month: string, snapshot: MonthlyReportSnapshot): Promise<string> {
   const { data: auth } = await supabase.auth.getSession();
   const { data, error } = await supabase

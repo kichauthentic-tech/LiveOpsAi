@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Activity, AlertTriangle, CalendarRange, Gauge, LayoutDashboard, Lightbulb, TrendingUp, Users } from "lucide-react";
-import { BrandMonthPlan, BrandMonthPlanSlot, LiveSession, PromoScheme, ShiftSlot, UserRole } from "../../types";
+import { BrandMonthPlan, BrandMonthPlanSlot, BrandMonthlyReport, LiveSession, PromoScheme, ShiftSlot, UserRole } from "../../types";
 import { EngineParams } from "../../lib/scheduling/engineParams";
 import { monthPlanRead } from "../../lib/db/monthPlans";
 import { fetchShopDaysMonthSlice, ShopDaysMonthSlice } from "../../lib/dataraw/monthlyProductSlice";
-import { CAMP_DAY_BUCKET_LABEL, CampDayBucket, resolveCampBucketType } from "../../lib/campaignDays";
+import { CAMP_DAY_BUCKET_LABEL, CampDayBucket, effectiveCamp, resolveCampBucketType } from "../../lib/campaignDays";
 import { todayVn } from "../../lib/performance/brandCommitment";
 import { prefetchable, type TabPrefetchCtx } from "../../lib/db/prefetch";
 import { lastDataDate, monthEndOf, monthOutlook, prevMonthOf, nextMonthOf, RUN_RATE_BAD, RUN_RATE_WARN } from "../../lib/performance/ceoBrief";
@@ -50,6 +50,8 @@ interface BrandDashboardProps {
   promoSchemes: PromoScheme[];
   engineParams: EngineParams;
   currentRole: UserRole;
+  /** "brandId|YYYY-MM" → dòng Report Tháng (App nạp sẵn) — chỉ để lấy khung camp hiệu lực (effectiveCamp). */
+  monthlyReports?: Map<string, BrandMonthlyReport>;
   onOpenMonthPlan: () => void;
   onOpenSession: (sessionId: string) => void;
   onOpenSessions: () => void;
@@ -107,7 +109,7 @@ export function prefetchBrandDashboard({ brandId, role }: TabPrefetchCtx): void 
   prefetchOpsSupport(brandId);
 }
 
-export default function BrandDashboard({ brandId, brandName, sessions, shiftSlots, promoSchemes, engineParams, currentRole, onOpenMonthPlan, onOpenSession, onOpenSessions }: BrandDashboardProps) {
+export default function BrandDashboard({ brandId, brandName, sessions, shiftSlots, promoSchemes, engineParams, currentRole, monthlyReports, onOpenMonthPlan, onOpenSession, onOpenSessions }: BrandDashboardProps) {
   const today = todayVn();
   const isOps = OPS_ROLES.includes(currentRole);
   const brandSessions = useMemo(() => sessions.filter((s) => s.brandId === brandId), [sessions, brandId]);
@@ -139,7 +141,9 @@ export default function BrandDashboard({ brandId, brandName, sessions, shiftSlot
     };
   }, [brandId, month]);
 
-  const camp = plan?.plan.campRanges;
+  // Khung camp hiệu lực — cùng luật với Report Tháng / Bản Tin CEO (effectiveCamp, audit workflow #8).
+  const reportRow = monthlyReports?.get(`${brandId}|${month}`);
+  const camp = useMemo(() => effectiveCamp(plan?.plan.campRanges, reportRow), [plan, reportRow]);
   const bucketOf = useMemo(() => (d: string) => resolveCampBucketType(d, camp), [camp]);
   const mStart = `${month}-01`, mEnd = monthEndOf(mStart);
   const monthSessions = useMemo(() => brandSessions.filter((s) => s.date >= mStart && s.date <= mEnd), [brandSessions, mStart, mEnd]);
@@ -196,10 +200,12 @@ export default function BrandDashboard({ brandId, brandName, sessions, shiftSlot
   const cPos = useMemo(() => campPositions(campWindows(history, bucketOf)), [history, bucketOf]);
   const slotOk = slotRuleReliable(sIdx, wfSlot);
   const campOk = campRuleReliable(cPos);
-  const nextModel = useMemo(() => targetWeightModel(brandSessions, nextMonthOf(month), (d) => resolveCampBucketType(d, nextPlan?.plan.campRanges)), [brandSessions, month, nextPlan]);
+  const nextReportRow = monthlyReports?.get(`${brandId}|${nextMonthOf(month)}`);
+  const nextCamp = useMemo(() => effectiveCamp(nextPlan?.plan.campRanges, nextReportRow), [nextPlan, nextReportRow]);
+  const nextModel = useMemo(() => targetWeightModel(brandSessions, nextMonthOf(month), (d) => resolveCampBucketType(d, nextCamp)), [brandSessions, month, nextCamp]);
   const check = useMemo(
-    () => (nextPlan ? planCheck(nextPlan.slots, brandSessions, lastDataDate(brandSessions, today), (d) => resolveCampBucketType(d, nextPlan.plan.campRanges), nextModel) : null),
-    [nextPlan, brandSessions, today, nextModel]
+    () => (nextPlan ? planCheck(nextPlan.slots, brandSessions, lastDataDate(brandSessions, today), (d) => resolveCampBucketType(d, nextCamp), nextModel) : null),
+    [nextPlan, brandSessions, today, nextModel, nextCamp]
   );
   const hosts = useMemo(() => (isOps ? hostReliability(monthSessions.filter((s) => s.date <= win.curEnd), bucketOf) : []), [isOps, monthSessions, win, bucketOf]);
 
@@ -655,6 +661,7 @@ export default function BrandDashboard({ brandId, brandName, sessions, shiftSlot
           brandName={brandName}
           month={month}
           plan={plan}
+          camp={camp}
           planLoading={planLoading}
           sessions={sessions}
           shiftSlots={shiftSlots}

@@ -94,12 +94,6 @@ export async function createShiftSlot(s: ShiftSlot): Promise<ShiftSlot> {
 // Sinh ca hàng loạt: RPC generate_shift_slots (0088) vẫn tồn tại nhưng app không gọi từ 0090 —
 // Kế Hoạch Tháng chốt qua lock_month_plan (tự sinh shift_slots cùng khoá chống trùng).
 
-export async function updateShiftSlot(s: ShiftSlot): Promise<ShiftSlot> {
-  const { data, error } = await supabase.from("shift_slots").update(toDb(s)).eq("id", s.id).select().single();
-  if (error) throw error;
-  return fromDb(data as DbShiftSlot);
-}
-
 export async function deleteShiftSlot(id: string): Promise<void> {
   const { data, error } = await supabase.from("shift_slots").delete().eq("id", id).select("id");
   if (error) throw error;

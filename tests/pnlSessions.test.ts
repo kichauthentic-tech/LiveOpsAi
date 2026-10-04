@@ -10,7 +10,9 @@ const ca = (id: string, over: Partial<LiveSession>): LiveSession =>
 
 const sessions = [
   ca("co-so", { actualGmv: 50_000_000, totalViews: 9000 }),
-  ca("gmv-0", {}), // lên sóng nhưng không bán được — host vẫn nhận lương
+  ca("gmv-0", { dataSource: "live_snapshot" }), // lên sóng (có file lúc giao ca) nhưng không bán được — host vẫn nhận lương
+  // Audit workflow 2026-10-04 #5: quá giờ, KHÔNG số/report/giờ live — có thể không ai đi. Chưa vào tiền.
+  ca("khong-bang-chung", {}),
   ca("nap-bu", { actualGmv: 80_000_000, totalViews: 12000, isBackfill: true }),
   ca("dang-live", { status: "Live Now", actualGmv: 10_000_000, totalViews: 500 }),
   ca("huy", { status: "Cancelled" })

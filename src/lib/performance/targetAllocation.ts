@@ -173,6 +173,12 @@ export function applyAllocatedTargets(
       const remaining = hasLockedPlan ? 0 : p ? Math.max(0, monthTotalTarget(p) - linkedSum) : 0;
       const restHours = rest.reduce((a, x) => a + Math.max(sessionDurationHours(x.startTime, x.endTime), 0), 0);
       for (const x of rest) alloc.set(x.id, restHours > 0 ? (remaining * Math.max(sessionDurationHours(x.startTime, x.endTime), 0)) / restHours : 0);
+    } else if ((planMonthTotals?.get(key) ?? 0) > 0) {
+      // Audit workflow 2026-10-04 #7: tháng ĐÃ có Kế Hoạch Tháng chốt nhưng chưa ca nào của kế hoạch có người
+      // (chốt kế hoạch xong, đang chờ đăng ký) — trước đây rơi xuống nhánh dưới và ca mở lẻ trong tháng nhận
+      // target chia từ ô "Kế hoạch tháng sau" của Report (nguồn KHÁC). Có kế hoạch chốt thì nó là cam kết của
+      // tháng: ca ngoài kế hoạch target 0, giống nhánh trên.
+      planned.add(key);
     } else if (p) {
       planned.add(key);
       for (const [id, v] of allocateSessionTargets(sessions, p)) alloc.set(id, v);

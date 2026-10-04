@@ -1,6 +1,7 @@
 // Kế Hoạch Tháng — phần thuần cho lưới ngày × ca (giai đoạn A, 0090). Không gọi DB.
-import { BrandMonthPlan, BrandMonthPlanSlot, RecurringShiftTemplate } from "../../types";
+import { BrandMonthPlan, BrandMonthPlanSlot, LiveSession, RecurringShiftTemplate, ShiftSlot } from "../../types";
 import { sessionDurationHours } from "../pnl";
+import { dateTimeRangesOverlap } from "../dateUtils";
 import { planMonthSlots } from "./planMonthSlots";
 
 export interface PlanDraftSlot {
@@ -153,4 +154,47 @@ export function draftsFromSuggestion(
       highExpectation: s.highExpectation
     };
   });
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Kiểm chéo với BRAND KHÁC (audit workflow 2026-10-04 #12). Kế hoạch lập riêng từng brand, chốt thì mọi ca gắn
+// phòng mặc định của brand mà DB không kiểm phòng đó đang bị brand khác giữ, cũng không ai cộng nhu cầu cả
+// agency so với số phòng/người. Hàm này chỉ ĐỀ XUẤT cảnh báo, không chặn — ops quyết.
+// ---------------------------------------------------------------------------------------------------------
+
+export interface CrossBrandClash {
+  key: string; // PlanDraftSlot.key
+  date: string;
+  startTime: string;
+  endTime: string;
+  /** Ca của brand khác đang giữ đúng phòng mặc định của brand này trong khung giờ đó. */
+  roomTakenBy?: string;
+  /** Số ca chạy CÙNG LÚC toàn agency nếu thêm ca này (gồm chính nó). */
+  concurrent: number;
+}
+
+export function crossBrandCheck(
+  drafts: PlanDraftSlot[],
+  opts: { brandId: string; studioId?: string; sessions: LiveSession[]; shiftSlots: ShiftSlot[]; today: string }
+): { clashes: CrossBrandClash[]; peak: CrossBrandClash | null } {
+  // Ca chưa huỷ của brand khác + ca chờ đăng ký còn mở của brand khác (ca chờ đã gắn ca thật thì ca thật đại diện).
+  const others: { label: string; studioId?: string; date: string; startTime: string; endTime: string }[] = [
+    ...opts.sessions
+      .filter((s) => s.brandId !== opts.brandId && s.status !== "Cancelled" && s.date >= opts.today)
+      .map((s) => ({ label: `${s.brandName} ${s.startTime}–${s.endTime}`, studioId: s.studioId, date: s.date, startTime: s.startTime, endTime: s.endTime })),
+    ...opts.shiftSlots
+      .filter((sl) => sl.brandId !== opts.brandId && sl.status === "open" && !sl.sessionId && sl.date >= opts.today)
+      .map((sl) => ({ label: `${sl.brandName} ${sl.startTime}–${sl.endTime} (chờ đăng ký)`, studioId: sl.studioId, date: sl.date, startTime: sl.startTime, endTime: sl.endTime }))
+  ];
+  const clashes: CrossBrandClash[] = [];
+  let peak: CrossBrandClash | null = null;
+  for (const d of drafts) {
+    if (d.date < opts.today) continue;
+    const overlapping = others.filter((o) => dateTimeRangesOverlap(o, d));
+    const room = opts.studioId ? overlapping.find((o) => o.studioId === opts.studioId) : undefined;
+    const c: CrossBrandClash = { key: d.key, date: d.date, startTime: d.startTime, endTime: d.endTime, roomTakenBy: room?.label, concurrent: overlapping.length + 1 };
+    if (room) clashes.push(c);
+    if (!peak || c.concurrent > peak.concurrent) peak = c;
+  }
+  return { clashes, peak };
 }

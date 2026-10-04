@@ -9,6 +9,7 @@ import {
   BrandPlatformRateHistoryEntry
 } from "../types";
 import { getCanonicalAdsCost } from "./metrics/adsCost";
+import { hasLiveEvidence } from "./sessionStatus";
 
 export const DEFAULT_FINANCE: Omit<SessionFinance, "sessionId"> = {
   agencyCommissionRate: 15,
@@ -87,6 +88,10 @@ export interface SessionPnl {
   // DEFAULT_FINANCE, không một chữ nào nói là đang thiếu. Số 0 ở đây KHÔNG phải "miễn phí", nó là
   // "chưa biết", và hai thứ đó không được hiện giống nhau trên màn tiền.
   missingInputs: PnlMissingInput[];
+  // Ca đã "loại khỏi báo cáo" (0114): công người làm vẫn tính (ca đã diễn ra thật — audit workflow 2026-10-04
+  // #6), nhưng phần theo GMV (doanh thu agency, hoa hồng host/trợ) = 0, vì GMV của ca đó bị coi là không dùng
+  // được và brand không thấy ca đó trong số đã giao.
+  excluded: boolean;
 }
 
 export type PnlMissingInput =
@@ -125,6 +130,8 @@ export function computeSessionPnl(
   talentRateHistory: TalentRateHistoryEntry[],
   brandPlatformRateHistory: BrandPlatformRateHistoryEntry[]
 ): SessionPnl {
+  const excluded = !!session.excludedFromReports;
+  const gmv = excluded ? 0 : session.actualGmv;
   const brandRateAtDate = findBrandRateAsOf(brandPlatformRateHistory, session.brandId, session.platform, session.date);
   const currentBrandRate = brandPlatformRates.find((r) => r.brandId === session.brandId && r.platform === session.platform);
   // % hoa hồng theo brand (0118) — chỉ thay mặc định 15% khi ca CHƯA có dòng session_finance; ops đã
@@ -150,11 +157,13 @@ export function computeSessionPnl(
   const isHourly = brand?.billingModel === "hourly";
   const hourlyRate = brandRateAtDate?.ratePerHour ?? currentBrandRate?.ratePerHour ?? 0;
   const returnRate = brandRateAtDate?.returnRate ?? currentBrandRate?.returnRate ?? 0;
-  const estimatedNmv = session.actualGmv * (1 - returnRate / 100);
-  const grossAgencyRev = isHourly
-    ? sessionDurationHours(session.startTime, session.endTime) * hourlyRate
-    : (estimatedNmv * finance.agencyCommissionRate) / 100;
-  const hostPayout = hostFixRate + (session.actualGmv * hostCommRate) / 100;
+  const estimatedNmv = gmv * (1 - returnRate / 100);
+  const grossAgencyRev = excluded
+    ? 0
+    : isHourly
+      ? sessionDurationHours(session.startTime, session.endTime) * hourlyRate
+      : (estimatedNmv * finance.agencyCommissionRate) / 100;
+  const hostPayout = hostFixRate + (gmv * hostCommRate) / 100;
 
   // OT/off sớm khai theo CA (report là của ca, không phải của từng người) nên giờ tính lương của
   // trợ live = giờ tính lương của host trong cùng ca.
@@ -171,7 +180,7 @@ export function computeSessionPnl(
       : coHostRateAtDate?.ratePerSession ?? coHost.ratePerSession ?? 0
     : 0;
   const coHostCommRate = coHost ? coHostRateAtDate?.commissionRate ?? coHost.commissionRate ?? 0 : 0;
-  const coHostPayout = coHost ? coHostFixRate + (session.actualGmv * coHostCommRate) / 100 : 0;
+  const coHostPayout = coHost ? coHostFixRate + (gmv * coHostCommRate) / 100 : 0;
 
   const totalCost = hostPayout + coHostPayout + finance.studioCost + getCanonicalAdsCost(session, finance);
   const netProfit = grossAgencyRev - totalCost;
@@ -189,6 +198,7 @@ export function computeSessionPnl(
 
   return {
     missingInputs,
+    excluded,
     session, finance, talent, isHourly, grossAgencyRev, hostPayout, netProfit,
     hostPaidHourly,
     billableHours,
@@ -221,8 +231,12 @@ export interface TalentIncomeRow {
 // Finance lọc `Completed`, Bản Tin CEO lọc "ca có số" nên ca đã chạy mà GMV = 0 — host vẫn nhận lương — rơi
 // khỏi chi phí của CEO). Khác nhau DUY NHẤT ở ca nạp bù, và đó là quyết định có chủ ý: Finance/lương loại
 // chúng (rate card tháng đó không chuẩn, lương tháng cũ đã trả ngoài app), Bản Tin CEO tính để thấy cả lịch sử.
+//
+// Audit workflow 2026-10-04 #5: ca quá giờ tự sang Completed (0096) dù có ai live hay không. Chỉ ca có BẰNG
+// CHỨNG đã diễn ra (số / report / giờ live / nạp bù — `hasLiveEvidence`) mới vào tiền; ca còn lại là "chờ xác
+// nhận" (FinanceHr đếm và nói ra) — ops up số/nhập report nếu ca có chạy, hoặc huỷ ca nếu không.
 export function isPnlSession(s: LiveSession, opts: { includeBackfill: boolean }): boolean {
-  return s.status === "Completed" && (opts.includeBackfill || !s.isBackfill);
+  return s.status === "Completed" && hasLiveEvidence(s) && (opts.includeBackfill || !s.isBackfill);
 }
 
 export function computeTalentMonthlyIncome(

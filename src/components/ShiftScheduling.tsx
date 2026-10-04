@@ -572,6 +572,11 @@ export default function ShiftScheduling({
                     Đã live {g.deliveredHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h · đã chốt chưa live{" "}
                     {g.scheduledHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h · đang mở chờ chốt{" "}
                     {g.openSlotHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h ({g.openSlotCount} ca)
+                    {g.unconfirmedSessions > 0 && (
+                      <span className="text-amber-300">
+                        {" "}· {g.unconfirmedHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h ({g.unconfirmedSessions} ca) đã qua giờ chưa có số — xác nhận hoặc huỷ trước khi mở bù
+                      </span>
+                    )}
                   </p>
                 </div>
               );

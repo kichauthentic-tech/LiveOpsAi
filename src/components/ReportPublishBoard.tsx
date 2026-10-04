@@ -6,8 +6,9 @@ import { errorMessage } from "../lib/errorMessage";
 import { getTodayMonth } from "../lib/dateUtils";
 import { BrandLogo } from "./ui/BrandLogo";
 import { useConfirm } from "../hooks/useConfirm";
-import { saveMonthlyReportSnapshot, snapshotExists } from "../lib/db/monthlyReportSnapshots";
-import { buildMonthlyReportSnapshot } from "../lib/report/monthlySnapshot";
+import { fetchMonthlyReportSnapshot, saveMonthlyReportSnapshot } from "../lib/db/monthlyReportSnapshots";
+import { fetchDataRawImportStamps } from "../lib/db/brandDataRaw";
+import { buildMonthlyReportSnapshot, snapshotFreshness } from "../lib/report/monthlySnapshot";
 import { PageIntro } from "./common/PageIntro";
 
 // Bảng điều phối phát hành report (còn lại của Đợt C, Audit Role × Workspace — xem
@@ -98,10 +99,34 @@ export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ brands, 
     // bộ và hoàn tác được, thì lại luôn hỏi. Ngược chiều rủi ro (lỗi E2E 28/09 #6). Nay luôn hỏi,
     // câu hỏi nặng thêm khi còn ca chưa đối soát.
     const brandName = brands.find((b) => b.id === brandId)?.name ?? "brand này";
+    // Audit workflow 2026-10-04 #10: phát hành từ đây giữ nguyên bản chụp đã có — kể cả khi bản chụp đó chụp TRƯỚC
+    // lần đối soát/sửa ca gần nhất. Brand khi đó đọc Report một số, mở Sổ Ca thấy số khác. Kiểm độ mới trước.
+    let refresh = false;
+    let hasStored: boolean;
+    try {
+      const [stored, stamps] = await Promise.all([fetchMonthlyReportSnapshot(brandId, month), fetchDataRawImportStamps(brandId)]);
+      hasStored = !!stored;
+      if (stored) {
+        const f = snapshotFreshness(stored.snapshot, { sessions, planMonthTotals, brandPlatformRates, imports: stamps });
+        if (!f.upToDate) {
+          const why = [
+            f.changedSessionsThisMonth > 0 ? `${f.changedSessionsThisMonth} ca trong tháng đổi số/lịch` : "",
+            f.changedFiles.length > 0 ? `file mới: ${f.changedFiles.join(", ")}` : "",
+            f.configChanged ? "target/rate/công thức đổi" : ""
+          ].filter(Boolean).join(" · ");
+          if (!(await confirm(`Bản chụp số của ${fmtMonthLabel(month)} (${brandName}) đã cũ so với dữ liệu hiện tại${why ? `: ${why}` : ""}.\n\nĐồng ý = cập nhật bản chụp theo số mới rồi phát hành. Muốn xem lại số trước thì Huỷ và mở Report Tháng.`))) return;
+          refresh = true;
+        }
+      }
+    } catch (e) {
+      setRowError((prev) => ({ ...prev, [key]: errorMessage(e, "Không kiểm được độ mới của bản chụp") }));
+      return;
+    }
     const ok = await confirm(
-      unreconciled > 0
+      (unreconciled > 0
         ? `Còn ${unreconciled} phiên live Completed trong ${fmtMonthLabel(month)} chưa đối soát với TikTok — số trong report có thể còn đổi.\n\nVẫn phát hành ${fmtMonthLabel(month)} cho ${brandName}?`
-        : `Phát hành report ${fmtMonthLabel(month)} cho ${brandName}? Brand sẽ thấy report này ngay.`
+        : `Phát hành report ${fmtMonthLabel(month)} cho ${brandName}? Brand sẽ thấy report này ngay.`) +
+        `\n\nPhát hành = ĐÓNG SỔ tháng: sau đó không sửa/đối soát/loại/huỷ ca của ${brandName} trong tháng này được nữa cho tới khi thu hồi report.`
     );
     if (!ok) return;
     const force = unreconciled > 0;
@@ -112,7 +137,7 @@ export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ brands, 
       const row = existing ?? (await upsertMonthlyReport(brandId, `${month}-01`, {}));
       // Tháng chưa từng bấm "Tạo report" → chốt số trước (cùng hành vi nút Phát hành ở Report Tháng).
       // Đã có bản chụp thì giữ nguyên: phát hành là gửi đúng số ops đã chốt.
-      if (!(await snapshotExists(brandId, month))) {
+      if (refresh || !hasStored) {
         const { snapshot } = await buildMonthlyReportSnapshot({ brandId, month, sessions, planMonthTotals, brandPlatformRates });
         await saveMonthlyReportSnapshot(brandId, month, snapshot);
       }
@@ -243,6 +268,14 @@ export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ brands, 
                           >
                             {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />} Thu hồi
                           </button>
+                        ) : month >= today ? (
+                          // 0133: phát hành = đóng sổ, nên chỉ phát hành khi tháng đã hết (DB cũng chặn).
+                          <span
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[var(--text-faint)] text-[11px] font-semibold whitespace-nowrap"
+                            title="Phát hành là đóng sổ số của tháng — chỉ làm sau khi hết tháng."
+                          >
+                            <Clock className="w-3.5 h-3.5 shrink-0" /> Chờ hết tháng
+                          </span>
                         ) : nothingToPublish ? (
                           // Nút xanh y hệt dòng có 47 ca là mời ops gửi cho brand một report rỗng.
                           <span

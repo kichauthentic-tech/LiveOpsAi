@@ -41,3 +41,30 @@ export function withEffectiveStatus(sessions: LiveSession[], nowMs: number): Liv
   });
   return changed ? next : sessions;
 }
+
+/**
+ * Ca đã có số liệu ở DB — CÙNG vế `v_has_data` của `update_session_with_children` (0133): DB không cho dời
+ * ngày/giờ của ca này (ranh giới snapshot + đối soát tính theo giờ ca), form Sửa ca khoá sẵn ô ngày/giờ.
+ */
+export function hasSessionData(s: Pick<LiveSession, "dataSource" | "actualGmv" | "totalViews">): boolean {
+  return (s.dataSource ?? "manual") !== "manual" || (s.actualGmv ?? 0) > 0 || (s.totalViews ?? 0) > 0;
+}
+
+/**
+ * Có bằng chứng ca đã THẬT SỰ diễn ra: có số, có report của host, có giờ live thật, hoặc nạp bù từ file.
+ * Ca quá giờ tự sang "Completed" (0096) dù có ai live hay không — thiếu bằng chứng thì chưa được coi là đã
+ * giao giờ cho brand (Cam kết hợp đồng) hay đã làm công (P&L): đó là ca "chờ xác nhận" — ops up số/nhập
+ * report nếu ca có diễn ra, hoặc huỷ ca nếu không.
+ */
+export function hasLiveEvidence(s: LiveSession): boolean {
+  return hasSessionData(s) || !!s.report || (s.liveDurationMinutes ?? 0) > 0 || !!s.isBackfill;
+}
+
+/**
+ * Ca đã qua giờ (Completed), chưa huỷ, chưa có bằng chứng diễn ra — xem `hasLiveEvidence`. Role brand ở tháng
+ * chưa phát hành bị view che số (`monthPublished === false`) nên không phân biệt được — không bao giờ coi là
+ * "chờ xác nhận" ở phía đó.
+ */
+export function isUnconfirmedPast(s: LiveSession): boolean {
+  return s.status === "Completed" && s.monthPublished !== false && !hasLiveEvidence(s);
+}

@@ -344,16 +344,20 @@ export async function fetchSessions(): Promise<LiveSession[]> {
   return assembleSessions(rows, reports);
 }
 
-export async function createSession(session: LiveSession): Promise<LiveSession> {
-  const { data, error } = await supabase.from("live_sessions").insert(sessionToDb(session)).select().single();
+// Chốt người cho ca chờ đăng ký (0133): tạo ca + đánh dấu slot "finalized" trong MỘT transaction, khoá dòng
+// slot. Trước đây client ghi 2 bước (insert ca rồi update slot) không kiểm slot còn mở — hai người bấm chốt
+// cùng một ca là ra 2 ca, bước 2 lỗi thì phải tự xoá ca mồ côi.
+export async function finalizeShiftSlot(slotId: string, hostId: string, coHostId: string | null): Promise<LiveSession> {
+  const { data, error } = await supabase.rpc("finalize_shift_slot", { p_slot_id: slotId, p_host_id: hostId, p_co_host_id: coHostId });
   if (error) throw error;
   return { ...sessionFromDb(data as DbLiveSession), report: undefined };
 }
 
 export async function updateSession(session: LiveSession): Promise<LiveSession> {
-  // RPC thay vì `.update()` thẳng: hàm tự raise khi RLS lọc còn 0 dòng (PostgREST thì im lặng trả 204)
-  // và giữ nguyên các cột chỉ đường đối soát được ghi (0056). Tên còn chữ "children" là di sản —
-  // 3 bảng con đã bỏ ở 0132, CHẠY 0132 TRƯỚC khi deploy bản client gọi 2 tham số này.
+  // RPC thay vì `.update()` thẳng: hàm tự raise khi RLS lọc còn 0 dòng (PostgREST thì im lặng trả 204).
+  // Từ 0133 hàm CHỈ ghi cột lịch + người (ngày/giờ/phòng/host/trợ) — các cột số liệu trong payload bị bỏ qua,
+  // vì bản client có thể cũ hơn số trợ live vừa up (không có realtime). Trạng thái do DB tự suy; ca đã có số
+  // thì DB không cho dời ngày/giờ. Tên còn chữ "children" là di sản (3 bảng con đã bỏ ở 0132).
   const { data, error } = await supabase.rpc("update_session_with_children", {
     p_session_id: session.id,
     p_session: sessionToDb(session)

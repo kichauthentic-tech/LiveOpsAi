@@ -231,12 +231,29 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
       status: draft.status,
       note: draft.note
     };
+    const editingId = draft.id;
+    // Audit workflow 2026-10-04 #9: sửa điều khoản hợp đồng KHÔNG tự đổi cam kết các tháng đã sinh — trước đây im
+    // lặng, cam kết tháng (mẫu số run-rate) vẫn là số cũ. Hợp đồng đã có tháng sinh ra thì hỏi sinh lại ngay.
+    const hasMonths = !!editingId && commitments.some((m) => m.contractId === editingId);
     run(async () => {
-      if (draft.id) await updateBrandContract(draft.id, payload);
+      if (editingId) await updateBrandContract(editingId, payload);
       else await createBrandContract({ brandId: draft.brandId, ...payload });
       setDraft(null);
+      if (hasMonths && payload.status !== "draft" && payload.endMonth &&
+          (await confirm("Hợp đồng này đã có cam kết theo tháng. Sinh lại ngay để các tháng theo điều khoản mới?\n\nTháng đã sửa tay giữ nguyên; tháng nằm ngoài khung mới (chưa sửa tay) sẽ bị xoá."))) {
+        const r = await generateContractCommitments(editingId);
+        await reload();
+        setNote(`Đã lưu hợp đồng và sinh lại cam kết: thêm ${r.inserted}, cập nhật ${r.updated}${r.removed > 0 ? `, xoá ${r.removed} tháng ngoài khung` : ""}${r.skippedOverride > 0 ? `, giữ ${r.skippedOverride} tháng sửa tay` : ""}.`);
+        return;
+      }
       await reload();
-      setNote("Đã lưu hợp đồng. Bấm “Sinh cam kết theo tháng” để đổ số ra từng tháng.");
+      setNote(
+        hasMonths
+          ? "Đã lưu hợp đồng — cam kết các tháng CHƯA đổi theo. Bấm “Sinh cam kết theo tháng” để cập nhật."
+          : payload.status === "draft"
+            ? "Đã lưu hợp đồng nháp. Chuyển sang “Đang hiệu lực” rồi mới sinh cam kết theo tháng."
+            : "Đã lưu hợp đồng. Bấm “Sinh cam kết theo tháng” để đổ số ra từng tháng."
+      );
     });
   }
 
@@ -262,6 +279,7 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
       const parts = [`thêm mới ${r.inserted}`, `cập nhật ${r.updated}`];
       if (r.skippedOverride > 0) parts.push(`bỏ qua ${r.skippedOverride} tháng đã sửa tay`);
       if (r.skippedOtherContract > 0) parts.push(`bỏ qua ${r.skippedOtherContract} tháng thuộc hợp đồng khác`);
+      if (r.removed > 0) parts.push(`xoá ${r.removed} tháng nằm ngoài khung hợp đồng`);
       setNote(`Sinh cam kết xong: ${parts.join(", ")}.`);
     });
   }
@@ -409,6 +427,11 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
                               <td className="py-2 pr-3 text-right text-emerald-400">
                                 {fmtHours(r.deliveredHours)}
                                 <span className="text-[var(--text-faint)] text-[11px]"> · {r.deliveredSessions} ca</span>
+                                {r.unconfirmedSessions > 0 && (
+                                  <span className="block text-[11px] text-amber-300" title="Ca đã qua giờ nhưng không có số/report/giờ live — chưa tính là đã giao. Up số/nhập report nếu ca có chạy, huỷ ca nếu không.">
+                                    +{fmtHours(r.unconfirmedHours)} chờ xác nhận ({r.unconfirmedSessions} ca)
+                                  </span>
+                                )}
                               </td>
                               <td className="py-2 pr-3 text-right text-sky-400">
                                 {fmtHours(r.scheduledHours)}
@@ -606,9 +629,9 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
                 <div className="flex items-center gap-1.5">
                   <button
                     onClick={() => generate(c)}
-                    disabled={busy}
+                    disabled={busy || c.status === "draft"}
                     className="px-2.5 py-1.5 rounded-lg bg-[var(--surface-elevated)] border border-[var(--border)] text-[11px] font-bold text-[var(--text-muted)] hover:text-[var(--text)] flex items-center gap-1.5 disabled:opacity-50"
-                    title="Đổ giờ cam kết của hợp đồng ra từng tháng. Tháng nào ops đã sửa tay sẽ được giữ nguyên."
+                    title={c.status === "draft" ? "Hợp đồng nháp — chuyển sang Đang hiệu lực rồi mới sinh cam kết" : "Đổ giờ cam kết của hợp đồng ra từng tháng. Tháng nào ops đã sửa tay sẽ được giữ nguyên."}
                   >
                     <RefreshCw className="w-3 h-3" /> Sinh cam kết theo tháng
                   </button>

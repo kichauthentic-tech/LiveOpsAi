@@ -111,6 +111,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
   const canViewWeekly = CAN_VIEW_WEEKLY_ROLES.includes(currentRole);
   const [viewMode, setViewMode] = useState<"month" | "week">("month");
   const [month, setMonth] = useState(getTodayMonth());
+  const monthNowVn = getTodayMonth();
   const [report, setReport] = useState<BrandMonthlyReportType | null>(null);
   const [loading, setLoading] = useState(true);
   const [publishing, setPublishing] = useState(false);
@@ -245,7 +246,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
         : null
     ].filter(Boolean);
     const ok = await confirm(
-      `Phát hành Report Tháng ${Number(month.slice(5, 7))}/${month.slice(0, 4)} cho ${brandName}? Brand xem được ngay sau khi phát hành.${warnings.length ? `\n\n${warnings.join("\n")}` : ""}`,
+      `Phát hành Report Tháng ${Number(month.slice(5, 7))}/${month.slice(0, 4)} cho ${brandName}? Brand xem được ngay sau khi phát hành.${warnings.length ? `\n\n${warnings.join("\n")}` : ""}\n\nPhát hành = ĐÓNG SỔ tháng: sau đó không sửa/đối soát/loại/huỷ ca của tháng này được nữa cho tới khi thu hồi report.`,
       { confirmLabel: "Phát hành" }
     );
     if (!ok) return;
@@ -362,7 +363,9 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
               ) : (
                 <button
                   onClick={handlePublish}
-                  disabled={publishing || building}
+                  // 0133: phát hành = đóng sổ ⇒ chỉ sau khi hết tháng (DB cũng chặn).
+                  disabled={publishing || building || month >= monthNowVn}
+                  title={month >= monthNowVn ? "Phát hành là đóng sổ số của tháng — chỉ làm sau khi hết tháng." : undefined}
                   className="px-4 py-2 rounded-xl text-xs font-bold bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white shadow flex items-center gap-1.5 disabled:opacity-60"
                 >
                   <Send className="w-3.5 h-3.5" /> {publishing ? "Đang phát hành..." : "Phát hành"}

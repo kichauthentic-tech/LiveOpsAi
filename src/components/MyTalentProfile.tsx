@@ -14,6 +14,8 @@ interface MyTalentProfileProps {
   activeUser: SystemUser;
   talents: Talent[];
   sessions: LiveSession[];
+  /** Mảng cho Thu Nhập Tháng — cùng mảng Finance & P&L đọc (gồm ca đã loại khỏi báo cáo, vẫn tính công). */
+  payrollSessions: LiveSession[];
   financeRecords: SessionFinance[];
   talentRateHistory: TalentRateHistoryEntry[];
   // KHÔNG dùng chung handleUpdateTalent của App: handler đó tự nuốt lỗi bằng window.alert rồi
@@ -38,6 +40,7 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
   activeUser,
   talents,
   sessions,
+  payrollSessions,
   financeRecords,
   talentRateHistory,
   onSaveMyProfile
@@ -63,8 +66,8 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
   // ra số SAI (dùng rate đã bị zero-hoá) chứ không phải số đúng nhưng thiếu, nên bỏ tính hẳn.
   const income = useMemo(() => {
     if (!myTalent || myTalent.rateHidden) return { rows: [], total: 0, missingRate: false };
-    return computeTalentMonthlyIncome(sessions, myTalent.id, incomeMonth, financeBySessionId, talentById, talentRateHistory);
-  }, [sessions, myTalent, incomeMonth, financeBySessionId, talentById, talentRateHistory]);
+    return computeTalentMonthlyIncome(payrollSessions, myTalent.id, incomeMonth, financeBySessionId, talentById, talentRateHistory);
+  }, [payrollSessions, myTalent, incomeMonth, financeBySessionId, talentById, talentRateHistory]);
 
   // id rỗng ⇒ trả về toàn 0, gọi được cả khi chưa gắn hồ sơ talent (tránh nhánh null trong JSX).
   const myReal = useMemo(() => computeTalentRealTotals(sessions, myTalent?.id ?? ""), [sessions, myTalent]);

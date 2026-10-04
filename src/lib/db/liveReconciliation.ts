@@ -6,6 +6,8 @@ export type ReconciliationBucket = "agency" | "review" | "unassigned" | "inhouse
 
 export interface ReconciliationBatch {
   id: string;
+  /** Brand của tài khoản trong file (0133). Lô nạp trước 0133 không có ⇒ không áp dụng được nữa. */
+  brandId?: string;
   fileName?: string;
   periodLabel?: string;
   periodStart?: string;
@@ -31,6 +33,7 @@ export interface ReconciliationRow {
 
 interface DbBatch {
   id: string;
+  brand_id: string | null;
   file_name: string | null;
   period_label: string | null;
   period_start: string | null;
@@ -57,6 +60,7 @@ interface DbRow {
 function batchFromDb(b: DbBatch): ReconciliationBatch {
   return {
     id: b.id,
+    brandId: b.brand_id ?? undefined,
     fileName: b.file_name ?? undefined,
     periodLabel: b.period_label ?? undefined,
     periodStart: b.period_start ?? undefined,
@@ -121,14 +125,17 @@ export async function fetchLatestReconciliationRows(): Promise<{ batchId: string
 }
 
 // Chỉ nạp + tự khớp room với ca, CHƯA ghi gì vào live_sessions — ops xem rổ rồi mới bấm áp dụng.
-export async function importReconciliationFile(file: File): Promise<string> {
+// `brandId` bắt buộc (0133): file Creator-Live-Performance là của MỘT tài khoản; khớp theo giờ với mọi brand thì
+// phiên của CROCS rơi vào ca JOCKEY cùng giờ và GMV bị chia sang đó.
+export async function importReconciliationFile(file: File, brandId: string): Promise<string> {
   const parsed = await parseSnapshotFile(file);
   const { data, error } = await supabase.rpc("import_live_reconciliation", {
     p_file_name: file.name,
     p_period_label: parsed.periodLabel ?? null,
     p_period_start: parsed.periodStart ?? null,
     p_period_end: parsed.periodEnd ?? null,
-    p_rows: parsed.rows
+    p_rows: parsed.rows,
+    p_brand_id: brandId
   });
   if (error) throw error;
   return data as string;

@@ -17,7 +17,12 @@
   bù từ file Creator-Live-Performance (229 ca, còn ca chưa gán host). **Không đề xuất tính năng mới**; hỏi user chạy thử
   tới đâu, cái gì kêu, rồi sửa đúng chỗ đó. **Không seed mock lại.**
 - **Nợ kỹ thuật đã hết** (đợt P2a-2…P2a-21, 01–02/10) và **audit code chết đã xong** (02/10): `npm run audit:dead` báo 0,
-  ESLint 0 lỗi (31 warning `set-state-in-effect` = nợ đã đo, cố ý `warn`), vitest 424/424 (04/10).
+  ESLint 0 lỗi (31 warning `set-state-in-effect` = nợ đã đo, cố ý `warn`), vitest 434/434 (04/10).
+- **04/10: audit LOGIC vòng đời** (hợp đồng → kế hoạch → ca → đăng ký → chốt → vận hành → đối soát → report) theo yêu
+  cầu user, user bảo "sửa hết": 14 điểm gãy đã sửa trong code + migration **`0133` (CHƯA CHẠY trên production — §2
+  mục 0)**. Chi tiết: mục `## Audit logic vòng đời (2026-10-04)` cuối file lịch sử. Verify: bộ kiểm SQL 34/34 trên bản
+  replay `0001→0133` (đỏ ngay khi thiếu 0133), vitest 434/434, đột biến rơi đúng test; UI đọc trên bản build local nối DB
+  production (chưa có 0133 nên KHÔNG bấm thao tác ghi nào đi qua RPC mới). **Chưa commit** — chờ user.
 - 🛑 **User chốt 02/10: DỪNG nhánh đo tốc độ tải.** Mạng chỗ user là biến trội nên wall-clock vô nghĩa. Không chạy lại
   các phép đo P2a-17→P2a-20 trừ khi user yêu cầu rõ. Những gì đã sửa thì giữ (chứng minh bằng SỐ REQUEST và source).
 - **03/10 user hỏi lại "app load chậm hơn" → audit theo SỐ VÒNG MẠNG NỐI TIẾP** (không theo wall-clock; mạng user dao động
@@ -48,6 +53,12 @@
 ## 2. Việc còn treo
 
 **Cần user làm:**
+0. **Chạy `0133_workflow_integrity.sql` TRƯỚC khi deploy client mới** (client mới gọi `finalize_shift_slot` và
+   `import_live_reconciliation(..., p_brand_id)`). Kiểm sau khi chạy: `finalize_shift_slot` với id giả ra "Không thấy ca
+   chờ đăng ký" (không phải `PGRST202`); up file đối soát bằng client CŨ ra "Chọn brand của file". Lô đối soát cũ (không
+   gắn brand) không áp dụng lại được — đo 04/10: lô 06–09/2026 chỉ khớp ca CROCS, chưa có số nào bị chia nhầm. Chưa tháng
+   nào đã phát hành ⇒ trigger đóng sổ không chặn dữ liệu hiện có; chưa kế hoạch nào đã chốt ⇒ trigger khoá ca kế hoạch
+   cũng vậy.
 1. **24 file Dataraw CROCS T6–T9** chưa up (1 Creator Live Performance full T6→T9 · 4 Khuyến Mãi · 4 Sản Phẩm · 4 Shop
    Analytics · 4 Live Performance · 4 Affiliate Creator List EN · 3 Live Analysis EN T7/T8/T9). `Product Card Traffic Stats`
    chưa có file nào (khối đó trong Report Tháng tự ẩn).
@@ -98,7 +109,11 @@
 ## 4. Luồng dữ liệu
 
 1. **Kế Hoạch Tháng** (`brand_month_plans` + `_slots`): ops lập lưới ca + target từng ca → **Chốt** (`lock_month_plan`) sinh
-   `shift_slots` mở → talent đăng ký rảnh → ops chốt người (Nhân sự ca / chốt hàng loạt) ⇒ `live_sessions`.
+   `shift_slots` mở → talent đăng ký rảnh (RLS 0133: chỉ ca còn mở, chưa qua ngày) → ops chốt người qua RPC
+   `finalize_shift_slot` (0133: một transaction, khoá dòng slot, từ chối slot không còn mở) ⇒ `live_sessions`. Kế hoạch
+   đã chốt: ca đã chốt người không dời/bỏ trong lưới, ca ngày đã qua giữ giờ + target (trigger `trg_guard_locked_plan_slot`);
+   không còn "Lưu nháp"/"Gợi ý"/"Chia lại target"/"Xoá hết" — chỉ "Chốt lại". Lưới cảnh báo trùng phòng với brand khác +
+   số ca song song toàn agency (`crossBrandCheck`, chỉ đề xuất).
 2. **Số liệu ca — 3 bậc tin cậy** (`live_sessions.data_source`): `manual` (talent tự khai qua report ca) < `live_snapshot`
    (trợ live up file Creator-Live-Performance lúc giao ca, 0078) < `tiktok_reconciled` (ops đối soát cuối kỳ, 0080).
    Snapshot là thứ DUY NHẤT giữ ranh giới giữa 2 ca chung một Room ID (số cộng dồn) — luật ở §5.6.
@@ -106,7 +121,12 @@
    (1 batch / brand / loại / tháng, 0077). Dùng cho Report Tháng (phần shop), Affiliate, nạp bù ca.
 4. **Report Tháng** đọc **bản chụp** (`brand_monthly_report_snapshots`, 0119) do ops bấm Tạo/Cập nhật — mở report không tính
    lại. 7 phần: Kết luận · Thị trường hay vận hành · Vì sao · Sản phẩm · Host · Campaign & khung giờ · Tháng sau. Phát hành
-   cho brand qua RPC; brand chỉ thấy số của tháng đã phát hành (view `live_sessions_secure`, 0107).
+   cho brand qua RPC; brand chỉ thấy số của tháng đã phát hành (view `live_sessions_secure`, 0107). **Phát hành = đóng
+   sổ** (0133): chỉ phát hành tháng đã hết; tháng đã phát hành thì mọi ghi số/lịch/người/loại/huỷ/thêm/xoá ca của
+   brand-tháng đó bị trigger `trg_guard_published_month_sessions` chặn (trừ vòng đời Upcoming→Completed) — muốn sửa thì
+   thu hồi report. Điều Phối Phát Hành kiểm độ mới bản chụp trước khi phát hành (cũ ⇒ hỏi cập nhật rồi mới phát hành).
+   **Đối soát** (0133): mỗi lô gắn MỘT brand (chọn trước khi up), chỉ khớp ca của brand đó; dòng thiếu giờ không khớp ca
+   nào; lô cũ không gắn brand ⇒ `apply_live_reconciliation` từ chối.
 5. **P&L** (`lib/pnl.ts`): NMV ước tính = GMV × (1 − return rate); giờ tính lương = giờ ca + OT − off sớm; ca `is_backfill`
    không vào Finance. Tiền chỉ cộng ca đủ dữ liệu (`missingInputs` rỗng), luôn ghi "tính được X/Y ca".
 6. **Thông báo** (`notifications`, 0083/0116): trigger DB ghi, client poll 45s + khi focus; chuông gate theo `session`.
@@ -211,10 +231,13 @@
 - `date_trunc` trên cột `date` trong index phải ép `::timestamp`. Thông báo hàng loạt: đếm trước khi bắn (gom theo sự kiện lô).
 
 ### 5.5 Một khái niệm — một hàm (audit 28/09)
-"Ca có số" = `isCountable` (hostPerformance) · ca tính tiền = `isPnlSession` (pnl) · dự kiến cuối tháng = `projectMonthEnd` /
+"Ca có số" = `isCountable` (hostPerformance) · ca tính tiền = `isPnlSession` (pnl, từ 04/10 đòi `hasLiveEvidence`) · ca
+đã diễn ra thật = `hasLiveEvidence`, ca quá giờ chờ xác nhận = `isUnconfirmedPast`, ca có số ở DB (khoá dời giờ) =
+`hasSessionData` (cả ba ở sessionStatus) · khung camp hiệu lực = `effectiveCamp(planCamp, reportRow)` (campaignDays — MỌI
+màn; khoảng nhập ở Nhập Ads & Ghi Chú thắng Kế Hoạch Tháng) · dự kiến cuối tháng = `projectMonthEnd` /
 `MonthOutlook` · trùng lịch = `personClash`/`studioClash` (scheduling/conflicts) · giờ kế hoạch = `sessionDurationHours`, giờ
 live = `sessionHours`. GMV/giờ đem NHÂN với giờ lịch thì chia trên giờ kế hoạch; GMV/giờ BÁO CÁO chia trên giờ live. Thước
-đo xếp host là **GMV/giờ**, không phải GMV/ca. Cam kết hợp đồng đếm **giờ ca theo lịch** (kể cả ca GMV 0), chỉ loại ca huỷ.
+đo xếp host là **GMV/giờ**, không phải GMV/ca. Cam kết hợp đồng đếm **giờ ca theo lịch** (kể cả ca GMV 0 đã có bằng chứng diễn ra), loại ca huỷ và ca chờ xác nhận.
 
 ### 5.6 Luật nghiệp vụ đã chốt
 - **Run-rate chỉ tính bằng `planRunRate`** (28/09): target = Σ target ca của Kế Hoạch Tháng đã chốt (không chia lại khi lịch
@@ -224,6 +247,14 @@ live = `sessionHours`. GMV/giờ đem NHÂN với giờ lịch thì chia trên g
 - Số "live agency" lấy TỪ CA; Shop Analytics "Linked account" chỉ dùng cho vế "phần còn lại của shop". File Live Performance
   Core Stats gồm cả creator affiliate — không dùng làm số agency. CTOR = Orders ÷ Product clicks. Kết luận về host cần
   khoảng tin cậy nhiều tháng (phân phối t). So sánh cắt theo **ngày cuối có số**, không theo lịch.
+- **Luật vòng đời (04/10, audit logic):** ca quá giờ không bằng chứng (số/report/giờ live/nạp bù) KHÔNG tính là đã giao
+  giờ cam kết, KHÔNG vào lương/doanh thu — hiện "chờ xác nhận" ở Finance, Cam Kết, Nhân sự ca, Cửa sổ Ca Live; role brand
+  tháng chưa phát hành (view che số) vẫn tính như cũ. Ca "loại khỏi báo cáo": vẫn trả công theo giờ, bỏ doanh thu +
+  hoa hồng theo GMV (`SessionPnl.excluded`); Finance/Thu nhập talent đọc `sessions` (gồm ca loại), màn phân tích/brand
+  vẫn `activeSessions`. Tháng có Kế Hoạch Tháng chốt thì target KHÔNG lấy từ ô "Kế hoạch tháng sau" của Report. Sửa ca
+  (`update_session_with_children`) chỉ ghi cột lịch + người, trạng thái DB tự suy, ca có số không dời ngày/giờ. Kéo-thả ca
+  sang ngày khác kiểm trùng người/phòng, chặn ca có số và ngày đã qua. Hợp đồng nháp không sinh cam kết; sinh lại dọn
+  tháng ngoài khung (trừ tháng sửa tay).
 - Snapshot theo ca: chỉ 13 cột ĐẾM ĐƯỢC mới đem trừ, tỷ lệ tính lại lúc đọc; mốc ranh giới = **giờ kết thúc ca**
   (`session_boundary_at`); room thuộc ca khi khung giao nhau cả 2 đầu; up lại cho cùng ca = thay thế.
 - Talent không bao giờ ghi đè số đã có snapshot/đối soát (RPC chặn). Thông báo "số khác số bạn báo" chỉ khi số cũ là
@@ -231,7 +262,9 @@ live = `sessionHours`. GMV/giờ đem NHÂN với giờ lịch thì chia trên g
 
 ## 6. Hạ tầng Supabase
 
-- 132 migration (`supabase/migrations/`), chạy tay theo thứ tự — **tới `0132` đều ĐÃ CHẠY** (0131 + 0132 ngày 02/10).
+- 133 migration (`supabase/migrations/`), chạy tay theo thứ tự — **tới `0132` đều ĐÃ CHẠY** (0131 + 0132 ngày 02/10);
+  **`0133` CHƯA CHẠY** (§2 mục 0). Replay `0001 → 0133`: sạch, chạy lần 2 không lỗi; bộ kiểm hành vi
+  `supabase/tests/0133_workflow_integrity.sql` chạy trên bản replay (in `OK ...`, 34 mục).
   Replay `0001 → 0132` trên Postgres cô lập: sạch.
 - `0132` bỏ: bảng `workflow_rules`, `session_skus`, `session_checklist_items`, `session_minute_metrics` (cả 4 đều 0 dòng trên
   production, đếm 02/10); hàm `replace_session_children`, `private.session_brand_id`, `private.session_month_published`;
@@ -258,6 +291,7 @@ live = `sessionHours`. GMV/giờ đem NHÂN với giờ lịch thì chia trên g
 
 | Mục trong file lịch sử | Tóm tắt |
 |---|---|
+| `## Audit logic vòng đời (2026-10-04)` | 14 điểm gãy hợp đồng→report + cách sửa; 0133 (đối soát theo brand, chốt người 1 transaction, đóng sổ tháng, khoá ca kế hoạch đã chốt, đăng ký chỉ ca mở) |
 | `## Audit code chết (2026-10-02)` | gỡ Hội Đồng AI, Workflow Rules, quét QR giả, ~25 export chết, 3 bảng con khỏi client; lỗi `"std-a"` ở Studios; `audit:dead`; 0131 (viết trước 0132) |
 | `"Cần làm ngay" bản 2026-10-02` | nhật ký P2a-8…P2a-21: lỗi chốt hàng loạt trợ live, cam kết hợp đồng, nạp bù, 0125–0130 bảo mật, đo hiệu năng (đã dừng) |
 | `## BẢO MẬT — /rpc/session_boundary_at …` | 0130; 0114 từng xoá vế `is not null` của 0109; replay chứng minh |

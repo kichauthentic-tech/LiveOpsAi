@@ -9,6 +9,7 @@ import { EstimateCtx, MonthTracking, benchmarkForWindow, suggestFill, trackMonth
 import { MonthEndProjection, PlanRunRate, PROJECTION_METHOD_LABEL } from "../lib/performance/planRunRate";
 import { todayVn } from "../lib/performance/brandCommitment";
 import { fmtVndShort } from "../lib/format";
+import type { CampOverrides } from "../lib/campaignDays";
 import { SESSION_STATUS_CLS, SESSION_STATUS_LABEL_VI } from "../lib/sessionStatusUi";
 
 // Hỗ Trợ Vận Hành (user chốt 2026-09-21) — từ 2026-09-28 là MỘT PHẦN của Dashboard brand (user chốt gộp,
@@ -27,6 +28,8 @@ interface OpsSupportProps {
   month: string; // "YYYY-MM"
   /** Kế hoạch của `month` — Dashboard đã nạp (trước 2026-10-03 panel tự nạp lại đúng truy vấn đó). */
   plan: { plan: BrandMonthPlan; slots: BrandMonthPlanSlot[] } | null;
+  /** Khung camp hiệu lực Dashboard đã tính (effectiveCamp) — không đọc thẳng plan.campRanges. */
+  camp: CampOverrides;
   planLoading: boolean;
   sessions: LiveSession[];
   shiftSlots: ShiftSlot[];
@@ -53,7 +56,7 @@ export function prefetchOpsSupport(brandId: string): void {
   lockedPlanSlotsRead.prefetch(brandId);
 }
 
-export default function OpsSupport({ rr, projection, brandId, brandName, month, plan, planLoading, sessions, shiftSlots, promoSchemes, engineParams, onOpenMonthPlan, onOpenSession }: OpsSupportProps) {
+export default function OpsSupport({ rr, projection, brandId, brandName, month, plan, camp, planLoading, sessions, shiftSlots, promoSchemes, engineParams, onOpenMonthPlan, onOpenSession }: OpsSupportProps) {
   const today = todayVn();
   const [lockedSlots, setLockedSlots] = useState<BrandMonthPlanSlot[]>([]);
   const [events, setEvents] = useState<CalendarEventRow[]>([]);
@@ -93,7 +96,7 @@ export default function OpsSupport({ rr, projection, brandId, brandName, month, 
     const cal = buildCalibration([...byMonth.values()].map((l) => evaluatePlan(l, shiftSlots, sessions)), engineParams);
     return cal.observations > 0 ? cal.factors : undefined;
   }, [lockedSlots, month, shiftSlots, sessions, engineParams]);
-  const ctx = useMemo<EstimateCtx>(() => ({ camp: plan?.plan.campRanges, events, schemes: brandSchemes, calibration }), [plan, events, brandSchemes, calibration]);
+  const ctx = useMemo<EstimateCtx>(() => ({ camp, events, schemes: brandSchemes, calibration }), [camp, events, brandSchemes, calibration]);
 
   // Trạng thái ca + dự kiến cuối tháng nhận từ Dashboard (planRunRate + projectMonthEnd) — cùng một số với thẻ
   // run-rate phía trên và Bản Tin CEO (audit 2026-09-28 mục 3). Engine chỉ còn lo dự báo từng ca, k và phương án bù.

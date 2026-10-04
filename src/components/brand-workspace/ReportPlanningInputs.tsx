@@ -4,6 +4,8 @@ import { AffiliatePlanEntry, BrandMonthlyReport as BrandMonthlyReportType, LiveS
 import { CAMP_DAY_BUCKET_ORDER, resolveCampBucketType, type CampDayBucket, type CampOverrides } from "../../lib/campaignDays";
 import { fetchAffiliatePlans, replaceAffiliatePlans } from "../../lib/db/affiliatePlans";
 import { MonthlyReportManualInput, upsertMonthlyReport } from "../../lib/db/monthlyReports";
+import { fetchMonthPlan } from "../../lib/db/monthPlans";
+import { sessionDurationHours } from "../../lib/pnl";
 import { errorMessage } from "../../lib/errorMessage";
 import { prefetchable } from "../../lib/db/prefetch";
 import { fmtFixed, fmtVndShort } from "../../lib/format";
@@ -96,6 +98,27 @@ export const ReportPlanningInputs: React.FC<Props> = ({ brandId, month, sessions
   const [saving, setSaving] = useState<"camp" | "plan" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  // Kế Hoạch Tháng của tháng này (khung camp) và tháng sau (target) — audit workflow 2026-10-04 #7/#8: hai ô ở
+  // đây và Kế Hoạch Tháng nhập CÙNG một thứ; phải cho ops thấy số bên kia và số nào đang được dùng.
+  const [curPlanCamp, setCurPlanCamp] = useState<Record<string, { start: string; end: string }>>({});
+  const [nextLocked, setNextLocked] = useState<{ target: number; hours: number } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetchMonthPlan(brandId, month).then((r) => alive && setCurPlanCamp((r?.plan.campRanges ?? {}) as Record<string, { start: string; end: string }>)).catch(() => {});
+    fetchMonthPlan(brandId, nextMonth)
+      .then((r) => {
+        if (!alive) return;
+        if (!r || r.plan.status !== "locked") return setNextLocked(null);
+        setNextLocked({
+          target: r.slots.reduce((a, x) => a + x.targetGmv, 0),
+          hours: r.slots.reduce((a, x) => a + Math.max(sessionDurationHours(x.startTime, x.endTime), 0), 0)
+        });
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [brandId, month, nextMonth]);
 
   useEffect(() => {
     let cancelled = false;
@@ -167,7 +190,15 @@ export const ReportPlanningInputs: React.FC<Props> = ({ brandId, month, sessions
         <p className="text-[11px] text-[var(--text-faint)]">
           Ghi đè khoảng ngày D-Day / Mid-Month / Pay Day và target từng khung. Để trống thì dùng khoảng của Kế Hoạch Tháng, rồi tới
           lịch mặc định (Mid-Month 13–15, Pay Day 23–25, D-Day ngày trùng tháng). Đã nhập khung nào thì khung đó chỉ tính đúng khoảng nhập.
+          Khoảng nhập ở đây thắng ở MỌI màn (Report Tháng, Dashboard, run-rate, Bản Tin CEO) — không chỉ Report.
         </p>
+        {Object.keys(curPlanCamp).length > 0 && (
+          <p className="text-[11px] text-[var(--text-muted)]">
+            Kế Hoạch Tháng {month.slice(5)} đang đặt:{" "}
+            {CAMPS.filter((c) => curPlanCamp[c.key]).map((c) => `${BUCKET_LABEL[c.key]} ${curPlanCamp[c.key].start.slice(8)}–${curPlanCamp[c.key].end.slice(8)}`).join(" · ")}
+            {" "}— để trống ô tương ứng dưới đây là dùng khoảng đó.
+          </p>
+        )}
         {CAMPS.map((c) => (
           <div key={c.key} className="grid grid-cols-2 sm:grid-cols-4 gap-2 items-center">
             <span className="text-xs font-bold text-[var(--text)]">{BUCKET_LABEL[c.key]}</span>
@@ -204,6 +235,22 @@ export const ReportPlanningInputs: React.FC<Props> = ({ brandId, month, sessions
           Kế hoạch cho tháng chưa diễn ra, nhập tay (phân bổ target xuống ca đọc % ở đây). % đã điền sẵn theo tỷ trọng GMV thực đạt{" "}
           {suggested.fallback ? "— chưa có số lịch sử nên đang chia đều 25%" : "của tháng này và tháng trước"}; sửa tự do trước khi lưu.
         </p>
+        {nextLocked && (
+          <div className="text-[11px] rounded-xl px-3 py-2 border border-amber-800/60 bg-amber-950/40 text-amber-200 flex flex-wrap items-center gap-2">
+            <span className="flex-1 min-w-[200px]">
+              Tháng {nextMonth.slice(5)} đã có <b>Kế Hoạch Tháng chốt</b>: target {fmtVndShort(nextLocked.target)} · {fmtFixed(nextLocked.hours, 1)} giờ. Target
+              từng ca, run-rate và Report đều dùng số đó — ô Target GMV dưới đây chỉ còn là con số hiện cho brand đọc, nên để khớp.
+            </span>
+            {!readOnly && (Number(plan.targetGmv) || 0) !== Math.round(nextLocked.target) && (
+              <button
+                onClick={() => setPlan((x) => ({ ...x, targetGmv: String(Math.round(nextLocked.target)), targetHours: String(Math.round(nextLocked.hours * 10) / 10) }))}
+                className="px-2.5 py-1 rounded-lg border border-amber-700 text-amber-100 font-bold"
+              >
+                Lấy số từ Kế Hoạch Tháng
+              </button>
+            )}
+          </div>
+        )}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {(
             [

@@ -47,7 +47,7 @@ import { todayVn } from "../lib/performance/brandCommitment";
 import { PNL_MISSING_LABEL, PnlMissingInput, computeSessionPnl } from "../lib/pnl";
 import { planStatusesRead } from "../lib/db/monthPlans";
 import { addDays, eachDay } from "../lib/dateUtils";
-import { CampDayBucket, CampOverrides } from "../lib/campaignDays";
+import { CampDayBucket, CampOverrides, effectiveCamp } from "../lib/campaignDays";
 import { getBrandTheme } from "../lib/brandTheme";
 import { fmtVndShort } from "../lib/format";
 import { fmtKeyMetric, KEY_METRICS, keyMetricValue } from "../lib/report/keyMetrics";
@@ -252,7 +252,8 @@ export default function CeoBrief(props: CeoBriefProps) {
     for (const b of brands) {
       const plan = plans.get(b.id);
       const reportPlan = buildMonthTargetPlan(b.id, month, monthlyReports);
-      const camp: CampOverrides | undefined = plan && Object.keys(plan.campRanges ?? {}).length > 0 ? plan.campRanges : reportPlan?.camp;
+      // Cùng luật khung camp với mọi màn (effectiveCamp): khoảng nhập ở Nhập Ads & Ghi Chú thắng Kế Hoạch Tháng.
+      const camp: CampOverrides = effectiveCamp(plan?.campRanges, monthlyReports.get(`${b.id}|${month}`));
       const lockedSlotTargets = planSlotTargets.get(`${b.id}|${month}`) ?? [];
       const target = monthTargetOf(month, planMonthTotals.get(`${b.id}|${month}`), lockedSlotTargets, reportPlan, camp);
       const brandSessions = sessions.filter((s) => s.brandId === b.id);

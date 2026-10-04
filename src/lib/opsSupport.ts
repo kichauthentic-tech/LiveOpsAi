@@ -157,7 +157,8 @@ export function suggestFill(
     committedHours: 0,
     targetGmv: forecastFixed + tracking.gap / (k > 0 ? k : 1),
     mode: "target",
-    camp: plan.campRanges,
+    // Khung camp hiệu lực do caller tính (effectiveCamp) — không đọc thẳng plan.campRanges (audit workflow #8).
+    camp: ctx.camp ?? plan.campRanges,
     liveWindowStart: plan.liveWindowStart,
     liveWindowEnd: plan.liveWindowEnd,
     defaultSlotHours: plan.defaultSlotHours,

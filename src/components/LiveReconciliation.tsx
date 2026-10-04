@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, FileSpreadsheet, RefreshCw, Trash2, Upload } from "lucide-react";
 import {
   ReconciliationBatch,
@@ -16,8 +16,13 @@ import { errorMessage } from "../lib/errorMessage";
 import { useConfirm } from "../hooks/useConfirm";
 import { PageIntro } from "./common/PageIntro";
 import { fmtVndFull } from "../lib/format";
+import { Brand, LiveSession } from "../types";
 
 interface LiveReconciliationProps {
+  /** Brand của file — bắt buộc chọn trước khi up (0133). */
+  brands: Brand[];
+  /** Mọi ca (kể cả đã loại) — chỉ để gắn nhãn brand + giờ cho ca khớp với từng phiên. */
+  sessions: LiveSession[];
   onApplied: () => Promise<void> | void;
   // U7 (audit 2026-09-21): mở Cửa sổ Ca Live của ca khớp với phiên (xem số bị ghi đè ngay tại chỗ).
   onOpenSession?: (sessionId: string) => void;
@@ -50,8 +55,15 @@ function fmtTime(iso?: string): string {
   return iso ? new Date(iso).toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—";
 }
 
-export function LiveReconciliation({ onApplied, onOpenSession }: LiveReconciliationProps) {
+export function LiveReconciliation({ brands, sessions, onApplied, onOpenSession }: LiveReconciliationProps) {
   const confirm = useConfirm();
+  const [uploadBrandId, setUploadBrandId] = useState("");
+  const brandName = (id?: string) => (id ? brands.find((b) => b.id === id)?.name ?? "brand đã xoá" : undefined);
+  const sessionById = useMemo(() => new Map(sessions.map((s) => [s.id, s])), [sessions]);
+  const sessionLabel = (id: string) => {
+    const s = sessionById.get(id);
+    return s ? `${s.brandName} ${s.date.slice(8, 10)}/${s.date.slice(5, 7)} ${s.startTime}–${s.endTime}` : "ca";
+  };
   const [batches, setBatches] = useState<ReconciliationBatch[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [rows, setRows] = useState<ReconciliationRow[]>([]);
@@ -116,23 +128,36 @@ export function LiveReconciliation({ onApplied, onOpenSession }: LiveReconciliat
               <span className="font-bold">Creator-Live-Performance</span> cho cả ngày/tuần/tháng rồi up một lần để chỉnh lại toàn bộ ca trong kỳ.
             </PageIntro>
           </div>
-          <label className="shrink-0">
-            <input
-              type="file"
-              accept=".xlsx,.xls"
-              className="hidden"
-              disabled={busy}
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                e.target.value = "";
-                if (f) void run(async () => { const id = await importReconciliationFile(f); await reloadBatches(id); });
-              }}
-            />
-            <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--text)] cursor-pointer transition-colors">
-              <Upload className="w-3.5 h-3.5" />
-              {busy ? "Đang xử lý..." : "Up File Đối Soát"}
-            </span>
-          </label>
+          <div className="shrink-0 flex flex-wrap items-center gap-2">
+            <select
+              aria-label="Brand của file"
+              value={uploadBrandId}
+              onChange={(e) => setUploadBrandId(e.target.value)}
+              className="text-xs min-h-8 px-2 rounded-xl bg-[var(--surface-base)] border border-[var(--border)] text-[var(--text)]"
+            >
+              <option value="">Chọn brand của file…</option>
+              {brands.map((b) => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+            <label className={uploadBrandId ? "" : "opacity-40 pointer-events-none"} title={uploadBrandId ? undefined : "Chọn brand trước — file là của MỘT tài khoản, chỉ khớp với ca của brand đó"}>
+              <input
+                type="file"
+                accept=".xlsx,.xls"
+                className="hidden"
+                disabled={busy || !uploadBrandId}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = "";
+                  if (f && uploadBrandId) void run(async () => { const id = await importReconciliationFile(f, uploadBrandId); await reloadBatches(id); });
+                }}
+              />
+              <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--text)] cursor-pointer transition-colors">
+                <Upload className="w-3.5 h-3.5" />
+                {busy ? "Đang xử lý..." : "Up File Đối Soát"}
+              </span>
+            </label>
+          </div>
         </div>
 
         {batches.length > 0 && (
@@ -147,7 +172,7 @@ export function LiveReconciliation({ onApplied, onOpenSession }: LiveReconciliat
               >
                 <span className="font-bold text-[var(--text)] block truncate max-w-[220px]">{b.periodLabel ?? b.fileName ?? "Không rõ kỳ"}</span>
                 <span className="text-[11px] text-[var(--text-faint)]">
-                  {b.rowCount} phiên · {b.appliedAt ? `đã áp dụng ${fmtTime(b.appliedAt)}` : "chưa áp dụng"}
+                  {brandName(b.brandId) ?? "chưa gắn brand"} · {b.rowCount} phiên · {b.appliedAt ? `đã áp dụng ${fmtTime(b.appliedAt)}` : "chưa áp dụng"}
                 </span>
               </button>
             ))}
@@ -221,7 +246,7 @@ export function LiveReconciliation({ onApplied, onOpenSession }: LiveReconciliat
                         <th className="font-bold pb-1.5 pr-3">Thời gian</th>
                         <th className="font-bold pb-1.5 pr-3 text-right">GMV</th>
                         <th className="font-bold pb-1.5 pr-3 text-right">Orders</th>
-                        <th className="font-bold pb-1.5 text-right">Số ca khớp</th>
+                        <th className="font-bold pb-1.5 text-right">Ca khớp</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -236,9 +261,9 @@ export function LiveReconciliation({ onApplied, onOpenSession }: LiveReconciliat
                           <td className="py-1.5 text-right text-[var(--text-muted)]">
                             {r.matchedSessionIds.length === 0 ? "—" : onOpenSession ? (
                               <span className="inline-flex gap-1 justify-end flex-wrap">
-                                {r.matchedSessionIds.map((id, i) => (
-                                  <button key={id} onClick={() => onOpenSession(id)} className="inline-flex items-center min-h-6 px-1.5 py-0.5 rounded border border-sky-800 text-sky-300 hover:bg-sky-950 font-bold" title="Mở ca">
-                                    ca {i + 1}
+                                {r.matchedSessionIds.map((id) => (
+                                  <button key={id} onClick={() => onOpenSession(id)} className="inline-flex items-center min-h-6 px-1.5 py-0.5 rounded border border-sky-800 text-sky-300 hover:bg-sky-950 font-bold whitespace-nowrap" title="Mở ca">
+                                    {sessionLabel(id)}
                                   </button>
                                 ))}
                               </span>
@@ -258,8 +283,18 @@ export function LiveReconciliation({ onApplied, onOpenSession }: LiveReconciliat
 
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
             <p className="text-[11px] text-[var(--text-muted)] max-w-xl">
-              Áp dụng sẽ ghi đè số liệu của các ca thuộc rổ "khớp ca agency" và "cần xem lại", đổi nguồn dữ liệu thành{" "}
-              <span className="font-bold">đã đối soát</span>. Chạy lại nhiều lần được — mỗi lần tính lại từ đầu theo file này.
+              {active.brandId ? (
+                <>
+                  File của <span className="font-bold">{brandName(active.brandId)}</span> — chỉ khớp với ca của brand này. Áp dụng sẽ ghi đè số
+                  liệu của các ca thuộc rổ "khớp ca agency" và "cần xem lại", đổi nguồn dữ liệu thành <span className="font-bold">đã đối soát</span>.
+                  Chạy lại nhiều lần được — mỗi lần tính lại từ đầu theo file này.
+                </>
+              ) : (
+                <span className="text-amber-300">
+                  Lô này nạp khi đối soát còn khớp ca theo giờ với MỌI brand (có thể chia nhầm GMV sang brand khác cùng giờ) — không áp dụng
+                  được nữa. Xoá lô, chọn brand rồi up lại file.
+                </span>
+              )}
             </p>
             <div className="flex items-center gap-2">
               <button
@@ -270,7 +305,8 @@ export function LiveReconciliation({ onApplied, onOpenSession }: LiveReconciliat
                   await reloadBatches(active.id);
                   setNote(`Đã cập nhật ${n} ca theo số liệu đối soát.`);
                 })}
-                disabled={busy}
+                disabled={busy || !active.brandId}
+                title={active.brandId ? undefined : "Lô nạp trước khi đối soát gắn brand — xoá lô và up lại file, chọn đúng brand"}
                 className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white disabled:opacity-40 transition-colors"
               >
                 <RefreshCw className="w-3.5 h-3.5" />

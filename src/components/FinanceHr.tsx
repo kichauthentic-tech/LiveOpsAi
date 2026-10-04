@@ -17,6 +17,7 @@ import { errorMessage } from "../lib/errorMessage";
 import { todayVn } from "../lib/performance/brandCommitment";
 import { useToast } from "../hooks/useToast";
 import { PageIntro } from "./common/PageIntro";
+import { isUnconfirmedPast } from "../lib/sessionStatus";
 
 import { fmtFixed } from "../lib/format";
 import { MonthPicker } from "./common/MonthPicker";
@@ -97,6 +98,12 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
     () => sessions.filter((s) => isPnlSession(s, { includeBackfill: true }) && s.isBackfill && s.date.startsWith(month)).length,
     [sessions, month]
   );
+  // #5 (audit workflow 2026-10-04): ca quá giờ tự thành "đã xong" kể cả khi không ai live. Không có bằng chứng
+  // (số/report/giờ live) thì KHÔNG vào tiền — nhưng phải nói ra, không thì lương tháng thiếu mà không ai biết.
+  const unconfirmed = useMemo(
+    () => sessions.filter((s) => s.date.startsWith(month) && !s.isBackfill && isUnconfirmedPast(s)).sort((a, b) => (a.date < b.date ? -1 : 1)),
+    [sessions, month]
+  );
   // Độ tin cậy của con số tiền: tổng P&L cộng từ GMV, mà GMV thì có 3 bậc nguồn. Màn tiền phải
   // nói rõ bao nhiêu phần là số chốt — ký duyệt trên số tự khai và số đã đối soát là hai việc khác.
   const quality = useMemo(() => dataQuality(completedSessions), [completedSessions]);
@@ -111,7 +118,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
     () =>
       rows.reduce(
         (acc, r) => ({
-          gmv: acc.gmv + r.session.actualGmv,
+          gmv: acc.gmv + (r.excluded ? 0 : r.session.actualGmv),
           grossAgencyRev: acc.grossAgencyRev + r.grossAgencyRev,
           hostPayout: acc.hostPayout + r.hostPayout + r.coHostPayout,
           netProfit: acc.netProfit + r.netProfit
@@ -218,6 +225,19 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
           </div>
         )}
 
+        {unconfirmed.length > 0 && (
+          <div className="text-[11px] rounded-xl px-3 py-2 border border-amber-800/60 bg-amber-950/40 text-amber-200 space-y-1">
+            <p>
+              <b>{unconfirmed.length} ca đã qua giờ nhưng chưa có bằng chứng diễn ra</b> (không số, không report, không giờ live) — CHƯA tính
+              lương/doanh thu. Ca có chạy: up file hoặc nhập report ở Cửa sổ Ca Live. Ca không diễn ra: huỷ ca để khỏi tính vào giờ cam kết.
+            </p>
+            <p className="text-amber-300/90">
+              {unconfirmed.slice(0, 8).map((s) => `${s.brandName} ${s.date.slice(8)}/${s.date.slice(5, 7)} ${s.startTime} (${s.hostName || "chưa gán"})`).join(" · ")}
+              {unconfirmed.length > 8 ? ` · +${unconfirmed.length - 8} ca` : ""}
+            </p>
+          </div>
+        )}
+
         {rows.length > 0 && quality.reconciled < quality.total && (
           <div className="text-[11px] rounded-xl px-3 py-2 border border-amber-800/60 bg-amber-950/40 text-amber-200">
             Nguồn GMV của {quality.total} phiên: <b>{quality.reconciled}</b> đã đối soát
@@ -249,12 +269,17 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                 </tr>
               </thead>
               <tbody>
-                {rows.map(({ session: s, finance, talent, isHourly, grossAgencyRev, hostPayout, netProfit, hostPaidHourly, billableHours, otMinutes, earlyLeaveMinutes, coHost, coHostPayout, coHostPaidHourly, coHostUsesAssistantRate, missingInputs }) => {
+                {rows.map(({ session: s, finance, talent, isHourly, grossAgencyRev, hostPayout, netProfit, hostPaidHourly, billableHours, otMinutes, earlyLeaveMinutes, coHost, coHostPayout, coHostPaidHourly, coHostUsesAssistantRate, missingInputs, excluded }) => {
                   return (
                   <tr key={s.id} className="border-b border-[var(--border)]/60 align-middle">
                     <td className="py-2 pr-3">
                       <div className="font-bold text-[var(--text)] flex items-center gap-1.5 flex-wrap">
                         {s.title}
+                        {excluded && (
+                          <span className="text-[11px] font-bold bg-[var(--surface-elevated)] text-[var(--text-muted)] border border-[var(--border)] px-1.5 py-0.5 rounded-full" title={s.excludedReason ? `Lý do loại: ${s.excludedReason}` : undefined}>
+                            Đã loại khỏi báo cáo — chỉ tính công, không tính GMV/doanh thu
+                          </span>
+                        )}
                         {missingInputs.map((m) => (
                           <span key={m} className="text-[11px] font-bold bg-rose-950 text-rose-300 border border-rose-800 px-1.5 py-0.5 rounded-full" title={PNL_MISSING_LABEL[m]}>
                             {PNL_MISSING_LABEL[m]}
@@ -264,7 +289,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                       <div className="text-[var(--text-muted)]">{s.brandName} · {s.date} · Host {talent?.name ?? s.hostName}</div>
                     </td>
                     <td className="py-2 pr-3">
-                      <div className="font-bold text-[var(--text-muted)]">{money(s.actualGmv)}</div>
+                      <div className={`font-bold text-[var(--text-muted)] ${excluded ? "line-through" : ""}`}>{money(s.actualGmv)}</div>
                       <DataSourceBadge dataSource={s.dataSource} className="mt-0.5" />
                     </td>
                     <td className="py-2 pr-3">

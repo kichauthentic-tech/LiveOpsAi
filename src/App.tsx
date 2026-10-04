@@ -5,7 +5,7 @@ import { ErrorBoundary } from "./lib/errorReporting";
 import { fetchTalents, updateTalent, updateMyTalentProfile, deleteTalent } from "./lib/db/talents";
 import { createStudio, updateStudio, deleteStudio } from "./lib/db/studios";
 import { createEquipment, updateEquipment, deleteEquipment } from "./lib/db/equipments";
-import { fetchSessions, createSession, updateSession, deleteSession, cancelSession, setSessionExcluded } from "./lib/db/sessions";
+import { fetchSessions, finalizeShiftSlot, updateSession, deleteSession, cancelSession, setSessionExcluded } from "./lib/db/sessions";
 import { submitSessionReport, SessionReportInput } from "./lib/db/sessionReports";
 import { createBrand, updateBrand, deleteBrand } from "./lib/db/brands";
 import { fetchUsers, updateUserProfile, inviteUser, deleteUserAccount, InviteUserPayload } from "./lib/db/users";
@@ -15,7 +15,7 @@ import { upsertSessionFinance, setSessionFinanceApproval } from "./lib/db/financ
 import { updateAiAgentPrompt } from "./lib/db/aiAgentPrompts";
 import { upsertBrandPlatformCommissionRate, upsertBrandPlatformRate, upsertBrandPlatformReturnRate } from "./lib/db/brandPlatformRates";
 import { setBrandStudio } from "./lib/db/brandStudios";
-import { fetchShiftSlots, createShiftSlot, updateShiftSlot, deleteShiftSlot } from "./lib/db/shiftSlots";
+import { fetchShiftSlots, createShiftSlot, deleteShiftSlot } from "./lib/db/shiftSlots";
 import { registerForSlot, unregisterFromSlot } from "./lib/db/shiftRegistrations";
 import { createRecurringShiftTemplate, updateRecurringShiftTemplate, deleteRecurringShiftTemplate } from "./lib/db/recurringShiftTemplates";
 import { fetchTalentRateHistory } from "./lib/db/talentRateHistory";
@@ -1136,78 +1136,17 @@ export default function App() {
     }
   };
 
-  // Chốt lịch: sinh 1 live_session thật từ slot đã đăng ký, rồi đánh dấu slot "finalized"
-  // và lưu lại session_id để tra ngược — cả 2 bước cần thành công thì mới coi là xong.
-  //
-  // FIX M5 (audit 2026-08-21): 2 bước ghi vào 2 bảng khác nhau (live_sessions rồi shift_slots)
-  // không có transaction chung — nếu bước update slot lỗi sau khi session đã tạo xong, session
-  // đó mồ côi (không slot nào trỏ tới) và bấm chốt lại sẽ tạo thêm 1 session trùng. Sửa bằng
-  // compensating action: nếu update slot lỗi, xoá luôn session vừa tạo trước khi báo lỗi, để
-  // trạng thái DB quay lại y như trước khi bấm chốt — bấm lại sau đó không sinh trùng. Không dùng
-  // 1 RPC chung như update_session_with_children (0007) vì insert session cần replicate toàn bộ
-  // cột + child rows (skus/checklist/metrics) sang SQL, rủi ro lệch cao hơn lợi ích ở đây.
+  // Chốt lịch: RPC finalize_shift_slot (0133) tạo live_session + đánh dấu slot "finalized" trong một
+  // transaction và từ chối nếu slot không còn mở (người khác vừa chốt/huỷ) — trước đó là 2 bước ghi từ
+  // client kèm xoá bù khi bước 2 lỗi, và 2 người bấm cùng lúc sinh 2 ca. Target ghi 0: target đổ từ Kế
+  // Hoạch Tháng đã chốt xuống từng ca lúc đọc (applyAllocatedTargets), không gán theo phong độ host.
   const handleFinalizeShiftSlot = async (slot: ShiftSlot, hostId: string, coHostId: string | null): Promise<boolean> => {
-    const brand = brands.find((b) => b.id === slot.brandId);
-    const studio = studios.find((s) => s.id === slot.studioId);
-    const host = talents.find((t) => t.id === hostId);
-    const coHost = coHostId ? talents.find((t) => t.id === coHostId) : undefined;
-
-    const newSession: LiveSession = {
-      id: `session-${Date.now()}`,
-      title: `${brand?.name ?? slot.brandName} - ${slot.date} ${slot.startTime}`,
-      brandId: slot.brandId ?? "",
-      brandName: brand?.name ?? slot.brandName,
-      shopTikTokHandle: `@${(brand?.name ?? slot.brandName).toLowerCase().replace(/\s+/g, "") || "shop"}_official`,
-      // Ca mới chốt, chỉ ops mới tới được đây — cờ của view 0107 không áp dụng cho đường ghi.
-      monthPublished: true,
-      studioId: slot.studioId ?? "",
-      studioName: studio?.name ?? slot.studioName,
-      hostId,
-      hostName: host?.name ?? "",
-      assistantName: "",
-      // Caller diễn đạt "không có trợ live" bằng null, LiveSession.coHostId lại là optional
-      // (string | undefined) — quy về undefined để sessionToDb() ghi null đúng một đường.
-      coHostId: coHostId ?? undefined,
-      coHostName: coHost?.name ?? "",
-      platform: slot.platform,
-      date: slot.date,
-      startTime: slot.startTime,
-      endTime: slot.endTime,
-      status: "Upcoming",
-      // rate.ratePerHour ở đây là đơn giá AGENCY THU CỦA BRAND theo giờ (brand_platform_rates,
-      // dùng cho billingModel="hourly") — không phải mục tiêu doanh số GMV của phiên live, nên
-      // dùng nó làm target sai đơn vị: brand tính %GMV thì ratePerHour = 0 nên target luôn 0,
-      // brand tính theo giờ thì hiện ra đúng doanh thu agency chứ không phải GMV. Dùng GMV trung
-      // bình/phiên TÍNH THẬT từ live_sessions của host (Bước 1 tái cấu trúc data — không còn dùng
-      // talents.avgGmvPerSession, số nhập tay không đáng tin, xem src/lib/metrics/avgGmv.ts).
-      // Target không còn gán theo host lúc chốt (user chốt 2026-09-18): ghi 0, App phân bổ từ kế
-      // hoạch tháng của brand xuống từng ca lúc đọc (applyAllocatedTargets). Tháng chưa có kế
-      // hoạch thì ca đơn giản là chưa có target — không bịa số từ phong độ cũ của host.
-      targetGmv: 0,
-      actualGmv: 0,
-      totalOrders: 0,
-      avgWatchTimeSeconds: 0,
-      peakViewers: 0,
-      totalViews: 0,
-      ctrAvg: 0,
-      cvrAvg: 0
-    };
-
-    let created: LiveSession | undefined;
     try {
-      created = await createSession(newSession);
-      const updatedSlot = await updateShiftSlot({ ...slot, status: "finalized", sessionId: created.id });
-      setSessions((prev) => [created!, ...prev]);
-      setShiftSlots((prev) => prev.map((s) => (s.id === updatedSlot.id ? updatedSlot : s)));
+      const created = await finalizeShiftSlot(slot.id, hostId, coHostId);
+      setSessions((prev) => [created, ...prev]);
+      setShiftSlots((prev) => prev.map((s) => (s.id === slot.id ? { ...s, status: "finalized", sessionId: created.id } : s)));
       return true;
     } catch (e) {
-      if (created) {
-        try {
-          await deleteSession(created.id);
-        } catch {
-          // Rollback thất bại — session mồ côi vẫn còn trong DB, nhưng không nuốt lỗi gốc bên dưới.
-        }
-      }
       showToast(`Không thể chốt lịch: ${errorMessage(e)}`);
       return false;
     }
@@ -1749,11 +1688,14 @@ export default function App() {
                     engineParams={engineParams}
                     brandStudios={brandStudios}
                     onSetBrandStudio={handleSetBrandStudio}
+                    talents={talents}
                   />
                 )}
 
                 {activeTab === "live_reconciliation" && (
                   <LiveReconciliation
+                    brands={brands}
+                    sessions={sessions}
                     onApplied={handleReconciliationApplied}
                     onOpenSession={(id) => { setOpsView("board"); setActiveTab("calendar"); setNotifOpenSessionId(id); }}
                   />
@@ -1820,6 +1762,7 @@ export default function App() {
                     promoSchemes={promoSchemes}
                     engineParams={engineParams}
                     currentRole={currentRole}
+                    monthlyReports={monthlyReports}
                     onOpenMonthPlan={() => { setWorkspace({ type: "agency" }); setActiveTab("month_plan"); }}
                     onOpenSession={(id) => { setWorkspace({ type: "agency" }); setOpsView("board"); setActiveTab("calendar"); setNotifOpenSessionId(id); }}
                     onOpenSessions={() => setActiveTab("brand_sessions")}
@@ -1974,10 +1917,11 @@ export default function App() {
                   <MyTalentProfile
                     activeUser={activeUser}
                     talents={talents}
-                    sessions={activeSessions} /* 0114: KHÔNG phải `sessions`. Hai mảng này trước
-                      0114 là cùng một object nên chỗ này viết gì cũng như nhau; từ 0114 thì khác —
-                      ca đã loại khỏi báo cáo phải biến mất khỏi cả Thu Nhập Tháng Này, không thì
-                      talent đọc một con số mà P&L của ops (đã lọc) ra con số khác. */
+                    sessions={activeSessions}
+                    /* Thu nhập tháng: CÙNG mảng với Finance & P&L (`sessions`, gồm ca đã loại khỏi báo cáo — vẫn
+                       tính công, pnl.ts bỏ phần theo GMV) để hai màn không bao giờ ra hai số. Phần GMV/số ca lũy
+                       kế của hồ sơ vẫn đọc activeSessions. */
+                    payrollSessions={sessions}
                     financeRecords={financeRecords}
                     talentRateHistory={talentRateHistory}
                     onSaveMyProfile={handleSaveMyTalentProfile}
@@ -2030,7 +1974,9 @@ export default function App() {
                     thay vì chỉ dựa vào isTabAllowed, cùng khuôn với ai_training bên dưới. */}
                 {activeTab === "finance" && (currentRole === "ceo" || currentRole === "admin") && (
                   <FinanceHr
-                    sessions={activeSessions}
+                    // Audit workflow 2026-10-04 #6: ca "loại khỏi báo cáo" vẫn là ca đã làm — vào lương (pnl.ts tự
+                    // bỏ phần theo GMV của nó). Mọi màn phân tích/brand vẫn đọc activeSessions như cũ.
+                    sessions={sessions}
                     talents={talents}
                     financeRecords={financeRecords}
                     users={users}

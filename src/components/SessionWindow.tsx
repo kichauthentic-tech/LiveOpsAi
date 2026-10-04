@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { SESSION_STATUS_CLS, SESSION_STATUS_LABEL_VI } from "../lib/sessionStatusUi";
+import { hasSessionData, isUnconfirmedPast } from "../lib/sessionStatus";
 import { AlertTriangle, Ban, CheckCircle2, Circle, EyeOff, Hand, Link2, Pencil, RotateCcw, Trash2, X } from "lucide-react";
 import { AuditLogEntry, Brand, LiveSession, ShiftSlot, Studio, Talent, UserRole } from "../types";
 import { personClash, studioClash, studioClashLabel } from "../lib/scheduling/conflicts";
@@ -123,6 +124,8 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
   const canReport = !isBrandView && (isOps || isMine) && !s.isBackfill && !!onSubmitSessionReport;
   const canSnapshot = !isBrandView && (isOps || isMine) && !s.isBackfill && !!onSessionSnapshotApplied;
   const canEdit = isOps && !!onUpdateSession && !!studios && !!talents;
+  // 0133: DB không cho dời ngày/giờ ca đã có số (ranh giới snapshot/đối soát tính theo giờ ca).
+  const scheduleLocked = hasSessionData(s);
   // Brand + tháng chưa phát hành Report Tháng (0107): view đã che số về null/0, cửa sổ này phải
   // nói rõ lý do thay vì hiện "—" như ca chưa có số.
   const hideMetrics = metricsHiddenFor(s, viewer.role);
@@ -341,7 +344,14 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
           {missing.length > 0 && s.status !== "Cancelled" && !s.excludedFromReports && (
             <div className="rounded-xl border border-amber-800 bg-amber-950/50 p-3 text-xs text-amber-200 flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>Còn thiếu để chốt: {missing.map((m) => MISSING_LABEL[m]).join(" · ")}</span>
+              <span>
+                Còn thiếu để chốt: {missing.map((m) => MISSING_LABEL[m]).join(" · ")}
+                {isOps && isUnconfirmedPast(s) && (
+                  <span className="block mt-1 text-amber-300/90">
+                    Ca đã qua giờ mà chưa có bằng chứng diễn ra — chưa tính vào giờ cam kết và lương. Có chạy: up file / nhập report. Không diễn ra: huỷ ca ở cuối cửa sổ này.
+                  </span>
+                )}
+              </span>
             </div>
           )}
 
@@ -356,10 +366,15 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                 </div>
               )}
               <div className="grid grid-cols-3 gap-2">
-                <label className="block"><span className="font-bold text-[var(--text-muted)] block mb-1">Ngày</span><input type="date" value={edit.date} onChange={(e) => setEdit({ ...edit, date: e.target.value })} className={`${inputCls} font-mono`} /></label>
-                <label className="block"><span className="font-bold text-[var(--text-muted)] block mb-1">Bắt đầu</span><input type="time" value={edit.startTime} onChange={(e) => setEdit({ ...edit, startTime: e.target.value })} className={`${inputCls} font-mono`} /></label>
-                <label className="block"><span className="font-bold text-[var(--text-muted)] block mb-1">Kết thúc</span><input type="time" value={edit.endTime} onChange={(e) => setEdit({ ...edit, endTime: e.target.value })} className={`${inputCls} font-mono`} /></label>
+                <label className="block"><span className="font-bold text-[var(--text-muted)] block mb-1">Ngày</span><input type="date" disabled={scheduleLocked} value={edit.date} onChange={(e) => setEdit({ ...edit, date: e.target.value })} className={`${inputCls} font-mono disabled:opacity-60`} /></label>
+                <label className="block"><span className="font-bold text-[var(--text-muted)] block mb-1">Bắt đầu</span><input type="time" disabled={scheduleLocked} value={edit.startTime} onChange={(e) => setEdit({ ...edit, startTime: e.target.value })} className={`${inputCls} font-mono disabled:opacity-60`} /></label>
+                <label className="block"><span className="font-bold text-[var(--text-muted)] block mb-1">Kết thúc</span><input type="time" disabled={scheduleLocked} value={edit.endTime} onChange={(e) => setEdit({ ...edit, endTime: e.target.value })} className={`${inputCls} font-mono disabled:opacity-60`} /></label>
               </div>
+              {scheduleLocked && (
+                <p className="text-[11px] text-[var(--text-muted)]">
+                  Ca đã có số liệu nên không dời ngày/giờ được — ranh giới snapshot và đối soát tính theo giờ ca. Vẫn đổi được phòng, Host, Trợ live.
+                </p>
+              )}
               <label className="block"><span className="font-bold text-[var(--text-muted)] block mb-1">Phòng Studio</span>
                 <select value={edit.studioId} onChange={(e) => setEdit({ ...edit, studioId: e.target.value })} className={inputCls}>
                   {studios!.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}

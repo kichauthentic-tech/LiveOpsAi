@@ -1,5 +1,6 @@
 import { BrandMonthlyCommitment, LiveSession, ShiftSlot } from "../../types";
 import { sessionDurationHours } from "../pnl";
+import { isUnconfirmedPast } from "../sessionStatus";
 
 // Giai đoạn 4 của tầng dữ liệu gốc mới: đối chiếu CAM KẾT (brand ký bao nhiêu giờ/tháng) với
 // THỰC TẾ + ĐANG XẾP. Giai đoạn 3 trả lời "host nào làm tốt", tầng này trả lời câu đứng trước nó:
@@ -34,6 +35,11 @@ export interface CommitmentProgress {
   // Giờ ca theo lịch của ca CÒN CHƯA diễn ra trong tháng (Upcoming).
   scheduledHours: number;
   scheduledSessions: number;
+  // Ca đã qua giờ mà KHÔNG có bằng chứng diễn ra (không số/report/giờ live) — audit workflow 2026-10-04 #5.
+  // Không vào deliveredHours (ca không ai đi trước đây vẫn được tính là đã giao) và không vào plannedTotalHours;
+  // ops xác nhận (up số/nhập report) hoặc huỷ ca.
+  unconfirmedHours: number;
+  unconfirmedSessions: number;
   // Tổng đã cam chắc có: đã chạy + đã lên lịch. Đây là số để so với cam kết.
   plannedTotalHours: number;
   // > 0 = còn thiếu bấy nhiêu giờ PHẢI XẾP THÊM. <= 0 = đã đủ/vượt.
@@ -79,8 +85,11 @@ export function daysInMonth(periodMonth: string): number {
 // Ca bị huỷ không giao giờ nào cho brand và cũng không còn là kế hoạch — loại khỏi mọi phép đếm.
 // Khác `isCountable` của hostPerformance.ts: ở đó ca không có số liệu bị loại vì không nói lên
 // hiệu suất, còn ở đây ca lên sóng mà GMV = 0 VẪN giao đủ giờ cho brand nên vẫn phải đếm.
+//
+// Ca Completed chỉ là "đã giao" khi có bằng chứng diễn ra (`isUnconfirmedPast` = không có). Role brand ở tháng
+// chưa phát hành không thấy số (view che) nên với họ mọi ca Completed vẫn tính như cũ — xem isUnconfirmedPast.
 export function isDelivered(s: LiveSession): boolean {
-  return s.status === "Completed" || s.status === "Live Now";
+  return s.status === "Live Now" || (s.status === "Completed" && !isUnconfirmedPast(s));
 }
 
 export function isScheduled(s: LiveSession): boolean {
@@ -124,6 +133,7 @@ export function computeCommitmentProgress(
 
   let deliveredHours = 0, deliveredSessions = 0, deliveredGmv = 0;
   let scheduledHours = 0, scheduledSessions = 0;
+  let unconfirmedHours = 0, unconfirmedSessions = 0;
   let actualLiveHours = 0, sessionsWithRealHours = 0;
 
   for (const s of inScope) {
@@ -138,6 +148,9 @@ export function computeCommitmentProgress(
     } else if (isScheduled(s)) {
       scheduledHours += plannedHoursOf(s);
       scheduledSessions += 1;
+    } else if (isUnconfirmedPast(s)) {
+      unconfirmedHours += plannedHoursOf(s);
+      unconfirmedSessions += 1;
     }
   }
 
@@ -156,6 +169,8 @@ export function computeCommitmentProgress(
     deliveredSessions,
     scheduledHours,
     scheduledSessions,
+    unconfirmedHours,
+    unconfirmedSessions,
     plannedTotalHours,
     gapHours: commitment.committedHours - plannedTotalHours,
     actualLiveHours,

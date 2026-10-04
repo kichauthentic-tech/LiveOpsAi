@@ -478,6 +478,8 @@ export interface GenerateCommitmentsResult {
   updated: number;
   skippedOverride: number;
   skippedOtherContract: number;
+  // 0133: tháng sinh từ chính hợp đồng này mà nay nằm ngoài khung (dời tháng bắt đầu / rút tháng kết thúc), chưa sửa tay ⇒ đã xoá.
+  removed: number;
 }
 
 // Giai đoạn 19 — lịch sử rate theo thời gian, tự động ghi bởi DB trigger mỗi khi

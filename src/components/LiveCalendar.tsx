@@ -2,7 +2,8 @@ import React, { useState, useEffect } from "react";
 import { LiveSession, ShiftSlot, ShiftRegistration, Studio, Talent, Brand, PromoScheme, UserRole, BrandStudio, AuditLogEntry } from "../types";
 import { schemesForDate } from "../lib/schemeUtils";
 
-import { studioClash, studioClashLabel } from "../lib/scheduling/conflicts";
+import { personClash, studioClash, studioClashLabel } from "../lib/scheduling/conflicts";
+import { hasSessionData } from "../lib/sessionStatus";
 import { CAMPAIGN_DAY_STYLES, getCampaignDayInfo } from "../lib/campaignDays";
 import { BrandLogo } from "./ui/BrandLogo";
 import { getBrandTheme } from "../lib/brandTheme";
@@ -186,6 +187,22 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
     if (ok) showToast(`Đã chuyển "${session.brandName}" ${session.startTime}–${session.endTime} sang ${targetStudio.name}.`, "success");
   };
 
+  // Kéo ca sang NGÀY khác (audit workflow 2026-10-04 #13): trước đây không kiểm gì — trùng người/phòng ở ngày
+  // mới, ca đã có số, thả vào ngày đã qua đều lọt. Dùng cùng luật trùng với form Sửa ca (lib/scheduling/conflicts).
+  const blockedMove = (session: LiveSession, targetDateStr: string): string | null => {
+    if (session.status === "Cancelled") return "Ca đã huỷ — không dời được.";
+    if (hasSessionData(session)) return "Ca đã có số liệu — không dời ngày được (ranh giới snapshot/đối soát tính theo giờ ca).";
+    if (targetDateStr < getTodayDateString()) return "Không kéo ca vào ngày đã qua — ca sẽ thành \"đã xong\" mà không có số.";
+    const want = { ...session, date: targetDateStr };
+    const st = studioClash(sessions, shiftSlots, want, { excludeSessionId: session.id });
+    if (st) return `Phòng ${session.studioName || ""} ngày ${targetDateStr} đã có ${studioClashLabel(st)}.`;
+    for (const [id, role] of [[session.hostId, "Host"], [session.coHostId, "Trợ live"]] as const) {
+      const c = personClash(sessions, want, id || undefined, session.id);
+      if (c) return `${role} ${role === "Host" ? session.hostName : session.coHostName} đã có ca ${c.brandName} ${c.startTime}–${c.endTime} ngày ${targetDateStr}.`;
+    }
+    return null;
+  };
+
   const handleDropOnWeekDay = async (e: React.DragEvent, targetDateStr: string) => {
     e.preventDefault();
     setDragOverCellKey(null);
@@ -200,6 +217,12 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
       return;
     }
 
+    const blocked = blockedMove(session, targetDateStr);
+    if (blocked) {
+      showToast(`Không thể chuyển! ${blocked}`, "warning");
+      setDraggedSessionId(null);
+      return;
+    }
     const updatedSession: LiveSession = { ...session, date: targetDateStr };
     setDraggedSessionId(null);
     const ok = onUpdateSession ? await onUpdateSession(updatedSession) : true;
@@ -225,6 +248,12 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
       return;
     }
 
+    const blocked = blockedMove(session, targetDateStr);
+    if (blocked) {
+      showToast(`Không thể chuyển! ${blocked}`, "warning");
+      setDraggedSessionId(null);
+      return;
+    }
     const updatedSession: LiveSession = { ...session, date: targetDateStr };
     setDraggedSessionId(null);
     const ok = onUpdateSession ? await onUpdateSession(updatedSession) : true;
