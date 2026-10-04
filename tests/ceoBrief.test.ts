@@ -85,7 +85,7 @@ describe("monthTargetOf", () => {
     expect([...t.byDate.values()].reduce((a, b) => a + b, 0)).toBeCloseTo(300);
   });
   test("Report Tháng: target khung chia đều các ngày của khung", () => {
-    const t = monthTargetOf("2026-09", undefined, [], { brandId: "crocs", month: "2026-09", byBucket: { dday: 300, midmonth: 300, payday: 300, daily: 2100 }, camp: {}, source: "plan_pct" }, undefined)!;
+    const t = monthTargetOf("2026-09", undefined, [], { brandId: "crocs", month: "2026-09", byBucket: { dday: 300, midmonth: 300, payday: 300, daily: 2100 }, camp: {} }, undefined)!;
     expect(t.byDate.get("2026-09-08")).toBeCloseTo(100); // D-Day 7–9
     expect(t.byDate.get("2026-09-02")).toBeCloseTo(100); // 21 ngày thường
     expect(t.total).toBe(3000);

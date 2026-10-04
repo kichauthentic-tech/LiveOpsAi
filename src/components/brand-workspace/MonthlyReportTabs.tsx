@@ -1633,7 +1633,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         {/* Chỉ là chỉ đường cho ops — report gửi brand là 7 phần ở trên (Phân tích sâu đã gộp vào, 2026-09-27). */}
         {canManage && (
           <p className="text-[11px] pt-3" style={{ color: PAL.muted, borderTop: `1px solid ${PAL.line}` }}>
-            Chỉ ops thấy: khung camp, kế hoạch phân bổ và affiliate tháng sau nhập ở tab <b>Nhập Ads & Ghi Chú</b>; bảng creator affiliate theo tháng ở trang <b>Affiliate</b>.
+            Chỉ ops thấy: target, khung camp và lịch tháng nhập ở <b>Kế Hoạch Tháng</b> (tháng không có kế hoạch: khung camp ở <b>Nhập Ads & Ghi Chú</b>); bảng creator affiliate theo tháng ở trang <b>Affiliate</b>.
           </p>
         )}
       </div>

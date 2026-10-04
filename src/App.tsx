@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useMemo, useRef, Suspense } from "react";
+import { rememberBrandId } from "./lib/defaultBrand";
 import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, Talent, Studio, Equipment, Brand, SessionFinance, ShiftSlot, RecurringShiftTemplate, BrandSku, PromoScheme, AppNotification } from "./types";
 import { TabErrorFallback } from "./components/common/TabErrorFallback";
 import { ErrorBoundary } from "./lib/errorReporting";
@@ -1895,6 +1896,7 @@ export default function App() {
                     brandName={currentBrandName}
                     sessions={activeSessions}
                     currentRole={currentRole}
+                    onOpenMonthPlan={() => { rememberBrandId(currentBrandId!); navigateTo("month_plan"); }}
                   />
                 )}
 

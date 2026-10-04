@@ -25,62 +25,39 @@ export interface MonthTargetPlan {
   // Target từng khung, đã quy ra tiền.
   byBucket: Record<CampDayBucket, number>;
   camp: CampOverrides;
-  // Nguồn để UI nói rõ số từ đâu ra.
-  source: "camp_targets" | "plan_pct" | "mixed";
 }
 
 export function monthTotalTarget(plan: MonthTargetPlan): number {
   return CAMP_DAY_BUCKET_ORDER.reduce((s, b) => s + plan.byBucket[b], 0);
 }
 
-function prevMonthOf(month: string): string {
-  const [y, m] = month.split("-").map(Number);
-  const d = new Date(y, m - 2, 1);
-  return `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, "0")}`;
-}
 
-// Dựng kế hoạch tháng X từ 2 dòng brand_monthly_reports:
-//   - dòng tháng X:   khung camp (camp*Start/End) + target riêng từng camp nếu ops đã điền (camp*TargetGmv)
-//   - dòng tháng X−1: "Kế hoạch tháng sau" = tổng target + % 4 khung (plan_target_gmv, plan_pct_*)
-// Target riêng từng camp (nếu có) thắng % kế hoạch — nó là con số ops chốt tay cho đúng tháng đó.
-// Không có gì cả ⇒ null, ca không có target (không bịa).
+// Target tháng X cho tháng KHÔNG có Kế Hoạch Tháng: target riêng từng khung camp ops nhập ở Nhập Ads & Ghi Chú
+// (camp*TargetGmv của dòng tháng X) + khung camp của dòng đó. Không có gì ⇒ null, ca không có target (không bịa).
+//
+// Bỏ nhánh "Kế hoạch tháng sau" (plan_target_gmv + plan_pct_* của dòng tháng X−1) ngày 2026-10-04 (audit người mới,
+// Nhóm 1): ô nhập đó trùng Kế Hoạch Tháng — Report Tháng phần 7 và Dashboard brand đã đọc Kế Hoạch Tháng, chỉ còn
+// Dashboard agency và target/ca của tháng không có kế hoạch rơi về ô này. Target tháng nhập ở MỘT chỗ: Kế Hoạch Tháng.
 export function buildMonthTargetPlan(
   brandId: string,
   month: string,
   reportsByBrandMonth: Map<string, BrandMonthlyReport>
 ): MonthTargetPlan | null {
   const cur = reportsByBrandMonth.get(`${brandId}|${month}`);
-  const prev = reportsByBrandMonth.get(`${brandId}|${prevMonthOf(month)}`);
 
   const camp: CampOverrides = {};
   if (cur?.campDdayStart && cur?.campDdayEnd) camp.dday = { start: cur.campDdayStart, end: cur.campDdayEnd };
   if (cur?.campMidmonthStart && cur?.campMidmonthEnd) camp.midmonth = { start: cur.campMidmonthStart, end: cur.campMidmonthEnd };
   if (cur?.campPaydayStart && cur?.campPaydayEnd) camp.payday = { start: cur.campPaydayStart, end: cur.campPaydayEnd };
 
-  const total = prev?.planTargetGmv ?? 0;
-  const pct = (v: number | undefined) => (total > 0 && v != null ? (total * v) / 100 : 0);
-  const fromPlan: Record<CampDayBucket, number> = {
-    daily: pct(prev?.planPctDaily),
-    dday: pct(prev?.planPctDday),
-    midmonth: pct(prev?.planPctMidmonth),
-    payday: pct(prev?.planPctPayday)
-  };
-  const explicit: Partial<Record<CampDayBucket, number>> = {};
-  if (cur?.campDdayTargetGmv) explicit.dday = cur.campDdayTargetGmv;
-  if (cur?.campMidmonthTargetGmv) explicit.midmonth = cur.campMidmonthTargetGmv;
-  if (cur?.campPaydayTargetGmv) explicit.payday = cur.campPaydayTargetGmv;
-
   const byBucket: Record<CampDayBucket, number> = {
-    daily: fromPlan.daily,
-    dday: explicit.dday ?? fromPlan.dday,
-    midmonth: explicit.midmonth ?? fromPlan.midmonth,
-    payday: explicit.payday ?? fromPlan.payday
+    daily: 0,
+    dday: cur?.campDdayTargetGmv ?? 0,
+    midmonth: cur?.campMidmonthTargetGmv ?? 0,
+    payday: cur?.campPaydayTargetGmv ?? 0
   };
   if (CAMP_DAY_BUCKET_ORDER.every((b) => byBucket[b] <= 0)) return null;
-
-  const nExplicit = Object.keys(explicit).length;
-  const source: MonthTargetPlan["source"] = nExplicit === 0 ? "plan_pct" : total > 0 ? "mixed" : "camp_targets";
-  return { brandId, month, byBucket, camp, source };
+  return { brandId, month, byBucket, camp };
 }
 
 // Phân bổ target của một tháng xuống từng ca. Chỉ nhận ca của đúng brand + tháng; ca Cancelled

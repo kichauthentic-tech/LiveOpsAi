@@ -318,7 +318,7 @@ export interface BrandMonthlyReport {
 
 // Affiliate THỰC TẾ tháng đang xem (migration 0067, Tab 04 Report Tháng) — nhập tay hoàn toàn từ
 // khi đổi nguồn Livestream sang creator_live_performance (không còn cột tên host để ghép tự động
-// với Dataraw như trước). Khác AffiliatePlanEntry (Tab 05) ở chỗ đây là số ĐÃ XẢY RA, không phải
+// với Dataraw như trước). Đây là số ĐÃ XẢY RA, không phải
 // kế hoạch — periodMonth trùng đúng tháng report đang xem, không lệch 1 tháng.
 export interface AffiliateActualEntry {
   id?: string;
@@ -343,22 +343,6 @@ export interface AffiliateActualEntry {
   timelineLabel?: string;
   liveImpressions?: number;
   orders?: number;
-  sortOrder?: number;
-}
-
-// Kế hoạch Affiliate theo creator cho tháng sau (migration 0065, Tab 05 Report Tháng) — nhập tay
-// hoàn toàn, không có nguồn tự động (dữ liệu về tương lai, chưa có phiên/Dataraw nào tồn tại).
-export interface AffiliatePlanEntry {
-  id?: string;
-  brandId: string;
-  periodMonth: string; // "YYYY-MM-01" — tháng KẾ HOẠCH, lệch 1 tháng so với periodMonth của report
-  creatorName: string;
-  campTag?: string;
-  scheduleLabel?: string;
-  timelineLabel?: string;
-  durationHours?: number;
-  targetGmv?: number;
-  budgetAds?: number;
   sortOrder?: number;
 }
 

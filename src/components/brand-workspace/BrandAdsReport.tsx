@@ -27,6 +27,8 @@ interface BrandAdsReportProps {
   brandName: string;
   sessions: LiveSession[];
   currentRole: UserRole;
+  /** Sang Kế Hoạch Tháng của brand này — nơi DUY NHẤT đặt target/khung camp cho tháng có kế hoạch. */
+  onOpenMonthPlan?: () => void;
 }
 
 function monthRange(month: string): { start: string; end: string } {
@@ -105,7 +107,7 @@ export function prefetchBrandAdsReport({ brandId, role }: TabPrefetchCtx): void 
   prefetchReportPlanningInputs(brandId, month);
 }
 
-export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandName, sessions, currentRole }) => {
+export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandName, sessions, currentRole, onOpenMonthPlan }) => {
   const canManage = CAN_MANAGE_ROLES.includes(currentRole);
   // Cùng tháng mở sẵn với Report Tháng — phần nhập ở đây đi theo report đó (lib/defaultMonth.ts).
   const [month, setMonth] = useState(() => defaultReportMonth(`${getTodayMonth()}-01`, sessions.filter((s) => s.brandId === brandId)));
@@ -345,7 +347,7 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
       {/* Công cụ nhập liệu của Report Tháng (khung camp, phân bổ + affiliate tháng sau) — chuyển từ Phụ lục của
           report sang đây 2026-09-26; dùng chung `report` với form trên để hai form không ghi đè số của nhau. */}
       {!loading && canManage && (
-        <ReportPlanningInputs key={`${month}|${report?.id ?? "none"}`} brandId={brandId} month={month} sessions={sessions} report={report} onSaved={setReport} readOnly={readOnly} />
+        <ReportPlanningInputs key={`${month}|${report?.id ?? "none"}`} brandId={brandId} month={month} report={report} onSaved={setReport} readOnly={readOnly} onOpenMonthPlan={onOpenMonthPlan} />
       )}
     </div>
   );

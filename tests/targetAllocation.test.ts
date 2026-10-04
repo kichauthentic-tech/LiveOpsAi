@@ -44,16 +44,25 @@ const planMonthTotals = new Map([[`${B}|${M}`, 100_000_000]]);
   eq("off-plan không ăn phần của ca chưa xếp", targets(out), { A: 50_000_000, C: 0 });
 }
 
-// 3) Không có kế hoạch chốt (planMonthTotals rỗng) + có target từ report tháng trước
-//    ⇒ giữ nguyên hành vi cũ: chia cho mọi ca theo giờ.
+// 3) Không có Kế Hoạch Tháng + có target khung camp nhập ở Nhập Ads ⇒ chia cho ca trong khung theo giờ.
 {
   const reports = new Map<string, BrandMonthlyReport>([
-    [`${B}|2026-08`, { brandId: B, periodMonth: "2026-08-01", planTargetGmv: 90_000_000, planPctDaily: 100 } as BrandMonthlyReport]
+    [`${B}|${M}`, { brandId: B, periodMonth: "2026-09-01", campMidmonthStart: "2026-09-10", campMidmonthEnd: "2026-09-11", campMidmonthTargetGmv: 90_000_000 } as BrandMonthlyReport]
   ]);
   const X = ca("X", "2026-09-10", "09:00", "12:00");
   const Y = ca("Y", "2026-09-11", "09:00", "12:00");
   const out = applyAllocatedTargets([X, Y], reports, new Map(), new Map());
-  eq("không có kế hoạch chốt → chia đều theo giờ (hành vi cũ)", targets(out), { X: 45_000_000, Y: 45_000_000 });
+  eq("không có kế hoạch → target khung camp chia theo giờ", targets(out), { X: 45_000_000, Y: 45_000_000 });
+}
+
+// 3b) Ô "Kế hoạch tháng sau" (plan_target_gmv của tháng trước) KHÔNG còn sinh target (2026-10-04: trùng Kế Hoạch Tháng).
+{
+  const reports = new Map<string, BrandMonthlyReport>([
+    [`${B}|2026-08`, { brandId: B, periodMonth: "2026-08-01", planTargetGmv: 90_000_000, planPctDaily: 100 } as BrandMonthlyReport]
+  ]);
+  const X = ca("X", "2026-09-10", "09:00", "12:00", { targetGmv: 7 });
+  const out = applyAllocatedTargets([X], reports, new Map(), new Map());
+  eq("ô kế hoạch tháng sau không còn là nguồn target", targets(out), { X: 7 });
 }
 
 // 4) Ca huỷ không mang target và không làm mất target của ca còn lại.

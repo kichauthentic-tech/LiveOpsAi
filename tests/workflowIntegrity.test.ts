@@ -18,13 +18,20 @@ const ca = (id: string, over: Partial<LiveSession> = {}): LiveSession =>
   }) as LiveSession;
 
 describe("#8 khung camp — một luật cho mọi màn", () => {
-  test("khoảng nhập ở Nhập Ads & Ghi Chú thắng Kế Hoạch Tháng, từng khung riêng", () => {
+  // Đổi 2026-10-04 (audit người mới): tháng có Kế Hoạch Tháng thì CHỈ kế hoạch quyết khung camp — một chỗ nhập.
+  test("tháng có Kế Hoạch Tháng: khung của kế hoạch, bỏ qua ô ở Nhập Ads", () => {
     const camp = effectiveCamp(
       { midmonth: { start: "2026-10-12", end: "2026-10-14" }, payday: { start: "2026-10-24", end: "2026-10-26" } },
       { campMidmonthStart: "2026-10-15", campMidmonthEnd: "2026-10-17" } as BrandMonthlyReport
     );
-    expect(camp.midmonth).toEqual({ start: "2026-10-15", end: "2026-10-17" });
+    expect(camp.midmonth).toEqual({ start: "2026-10-12", end: "2026-10-14" });
     expect(camp.payday).toEqual({ start: "2026-10-24", end: "2026-10-26" });
+    // Kế hoạch có nhưng không đặt khung nào ({}) vẫn là "có kế hoạch": ô Nhập Ads không được chen vào.
+    expect(effectiveCamp({}, { campMidmonthStart: "2026-10-15", campMidmonthEnd: "2026-10-17" } as BrandMonthlyReport)).toEqual({});
+  });
+  test("tháng không có Kế Hoạch Tháng: khoảng nhập ở Nhập Ads, thay thế lịch cố định", () => {
+    const camp = effectiveCamp(undefined, { campMidmonthStart: "2026-10-15", campMidmonthEnd: "2026-10-17" } as BrandMonthlyReport);
+    expect(camp.midmonth).toEqual({ start: "2026-10-15", end: "2026-10-17" });
     // Ngày 13 không còn là Mid-Month (khoảng ghi đè THAY THẾ, không cộng thêm).
     expect(resolveCampBucketType("2026-10-13", camp)).toBe("daily");
     expect(resolveCampBucketType("2026-10-16", camp)).toBe("midmonth");
