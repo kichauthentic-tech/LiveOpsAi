@@ -84,6 +84,8 @@ const UserRoleSettings = lazyNamed(() => import("./components/UserRoleSettings")
 const AiTrainingCenter = lazyNamed(() => import("./components/AiTrainingCenter"), "AiTrainingCenter");
 const EngineTrainingPanel = lazyNamed(() => import("./components/EngineTrainingPanel"), "EngineTrainingPanel");
 const OpsBoard = lazyNamed(() => import("./components/OpsBoard"), "OpsBoard");
+const TodoPanel = lazyNamed(() => import("./components/TodoPanel"), "TodoPanel");
+const GlossaryDialog = lazyNamed(() => import("./components/GlossaryDialog"), "GlossaryDialog");
 const LiveReconciliation = lazyNamed(() => import("./components/LiveReconciliation"), "LiveReconciliation");
 const HostPerformance = lazyNamed(() => import("./components/HostPerformance"), "HostPerformance");
 const BrandsOverview = lazyNamed(() => import("./components/BrandsOverview"), "BrandsOverview");
@@ -180,6 +182,7 @@ export default function App() {
   // `profile` lúc đầu là null nên currentRole rơi về "talent"; vì vậy mọi effect gate theo cờ này
   // phải có `currentRole` trong mảng dependency để chạy lại khi profile nạp xong.
   const isOpsRole = currentRole === "ceo" || currentRole === "admin" || currentRole === "operations";
+  const [helpOpen, setHelpOpen] = useState(false);
 
   // Chuông thông báo (migration 0083) — gate theo PHIÊN, không theo `profile`; đổi user thì hook tự
   // nạp lại vì RLS lọc theo auth.uid() của phiên hiện tại.
@@ -352,7 +355,7 @@ export default function App() {
   // Tải chunk tab ngay, không đợi cổng `coreDataReady` ở khối render (cổng đó giữ chunk lại tới khi
   // đợt nạp dữ liệu về xong ⇒ thêm một vòng mạng nối tiếp mỗi lần mở app / đổi tab).
   useEffect(() => {
-    const chunks = activeTab === "calendar" ? [opsView === "calendar" ? LiveCalendar : OpsBoard] : TAB_CHUNKS[activeTab];
+    const chunks = activeTab === "calendar" ? (opsView === "calendar" ? [LiveCalendar] : [OpsBoard, TodoPanel]) : TAB_CHUNKS[activeTab];
     chunks?.forEach((c) => c.preload());
   }, [activeTab, opsView]);
   // Previously these fetch errors were only stored in state and never rendered anywhere — a
@@ -1178,6 +1181,20 @@ export default function App() {
     setMobileMenuOpen(false);
   };
 
+  // Màn này người dùng mở được không (agency theo quyền; màn của Brand Workspace thì ops luôn mở được).
+  const myPermissionOverrides = activeUser?.customPermissionOverrides;
+  const canOpenTab = React.useCallback(
+    (tab: string) => {
+      const groups = [...agencyNavGroups(currentRole), ...(isOpsRole ? brandNavGroups(currentRole) : [])];
+      const item = groups.flatMap((g) => g.items).find((n) => n.id === tab);
+      if (!item) return false;
+      if (!item.perm) return true;
+      const own = myPermissionOverrides?.[item.perm]; // cùng luật checkPermission
+      return own !== undefined ? !!own : !!rolePermissions[currentRole]?.[item.perm];
+    },
+    [currentRole, isOpsRole, rolePermissions, myPermissionOverrides]
+  );
+
   // Mở một màn từ nút "việc cần làm" của màn khác: brandId có ⇒ vào Brand Workspace của brand đó.
   const navigateTo = (tab: string, brandId?: string) => {
     setWorkspace(brandId ? { type: "brand", brandId } : { type: "agency" });
@@ -1374,7 +1391,13 @@ export default function App() {
             )}
           </button>
           <div className="flex-1">
+            {helpOpen && (
+              <React.Suspense fallback={null}>
+                <GlossaryDialog currentRole={currentRole} onClose={() => setHelpOpen(false)} />
+              </React.Suspense>
+            )}
             <Header
+              onOpenHelp={() => setHelpOpen(true)}
               currentRole={currentRole}
               activeUserName={activeUser.name}
               activeUserTitle={activeUser.customRoleTitle}
@@ -1579,6 +1602,20 @@ export default function App() {
                       <button onClick={() => setOpsView("board")} className={`px-3 py-1.5 rounded-lg text-xs font-bold ${opsView === "board" ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)] hover:text-[var(--text)]"}`}>Bảng hôm nay / tuần</button>
                       <button onClick={() => setOpsView("calendar")} className={`px-3 py-1.5 rounded-lg text-xs font-bold ${opsView === "calendar" ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)] hover:text-[var(--text)]"}`}>Lịch & Studio</button>
                     </div>
+                    {/* Việc cần làm — tự sinh từ dữ liệu, mỗi việc một nút tới đúng màn (audit người mới 2026-10-04). */}
+                    {opsView === "board" && isOpsRole && (
+                      <TodoPanel
+                        brands={brands}
+                        sessions={activeSessions}
+                        shiftSlots={shiftSlots}
+                        rates={brandPlatformRates}
+                        monthlyReports={monthlyReports}
+                        talents={activeTalents}
+                        canSeeMoney={currentRole === "ceo" || currentRole === "admin"}
+                        canOpenTab={canOpenTab}
+                        onOpen={(t) => { if (t.rememberBrandId) rememberBrandId(t.rememberBrandId); navigateTo(t.tab, t.brandId); }}
+                      />
+                    )}
                     {opsView === "board" && (
                       <OpsBoard
                         mode="ops"

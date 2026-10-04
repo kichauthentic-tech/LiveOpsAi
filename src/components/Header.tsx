@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { UserRole, Brand, AppNotification } from "../types";
 import { NotificationBell } from "./NotificationBell";
-import { LogOut, Building2, ChevronDown, Check, Palette } from "lucide-react";
+import { LogOut, Building2, ChevronDown, Check, Palette, HelpCircle } from "lucide-react";
 import { useTheme, THEME_OPTIONS } from "../hooks/useTheme";
 import { BrandLogo } from "./ui/BrandLogo";
 
@@ -18,6 +18,8 @@ interface HeaderProps {
   workspace?: WorkspaceContext;
   onWorkspaceChange?: (next: WorkspaceContext) => void;
   brands?: Brand[];
+  /** Mở "Từ điển và cách dùng" (GlossaryDialog). */
+  onOpenHelp?: () => void;
   // Chuông thông báo (migration 0083). App giữ state qua useNotifications và quyết định bấm vào
   // thì nhảy tab nào — Header chỉ vẽ. Không truyền là không hiện chuông (màn chưa đăng nhập).
   notifications?: {
@@ -147,7 +149,8 @@ export const Header: React.FC<HeaderProps> = ({
   workspace,
   onWorkspaceChange,
   brands = [],
-  notifications
+  notifications,
+  onOpenHelp
 }) => {
   return (
     <header className="h-16 border-b border-[var(--border)]/80 px-2 sm:px-6 flex items-center justify-between bg-[var(--surface)]/40 backdrop-blur-md sticky top-0 z-40 text-[var(--text)] gap-4">
@@ -167,6 +170,17 @@ export const Header: React.FC<HeaderProps> = ({
             {activeUserTitle || currentRole}
           </span>
         </div>
+
+        {onOpenHelp && (
+          <button
+            onClick={onOpenHelp}
+            className="p-2 rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)]/80 hover:border-[var(--accent)] text-[var(--text-muted)] hover:text-[var(--text)] transition-all"
+            title="Từ điển và cách dùng"
+            aria-label="Từ điển và cách dùng"
+          >
+            <HelpCircle className="w-4 h-4" />
+          </button>
+        )}
 
         {notifications && <NotificationBell {...notifications} />}
 
