@@ -21,7 +21,7 @@
 - **04/10 tối: audit "người mới dùng khó"** (tài liệu cho user: Claude Doc "Audit LiveOps AI cho người mới dùng",
   https://claude.ai/code/artifact/304c57ba-c36e-466b-bc54-337147d9f736) — user bảo sửa hết, đã làm 5 bước, mỗi bước 1 commit
   đã push: `62cbff0` dọn chữ/dữ liệu mẫu (form CRM/Studio, mô tả quyền, chữ tiếng Anh, ngày `2026-10` → `10/2026`,
-  migration **`0134` CHƯA CHẠY**) · `fae158e` mở đúng tháng (`lib/defaultMonth.ts`) + ô thiếu có nút dẫn đường ·
+  migration `0134` ĐÃ CHẠY 05/10, `0135` CHƯA CHẠY) · `fae158e` mở đúng tháng (`lib/defaultMonth.ts`) + ô thiếu có nút dẫn đường ·
   `b1257cb` số ghi kỳ/cách đếm (Hiệu Suất Host, Talent Pool, Sổ Ca, Rate Card) · `69aa4c7` một thông tin một chỗ nhập
   (khung camp + target chỉ ở Kế Hoạch Tháng; bỏ ô "phân bổ target tháng sau" + "kế hoạch affiliate tháng sau" ở Nhập
   Ads; bỏ ô GMV/CVR gõ tay ở talent, AI ghép host nhận số thật) · `738c7a0` khối **Việc cần làm** trên Bảng Vận Hành
@@ -66,9 +66,10 @@
 ## 2. Việc còn treo
 
 **Cần user làm:**
-00. **Chạy migration `0134_clear_sample_brand_contacts.sql`** (xoá SĐT/email/KAM MẪU đã lỡ lưu trong `brands`: 0909 123 456
-   ở Franklin + CROCS, 0909 333 444 JOCKEY, 0909 111 222 VERA, KAM "Lê Quốc Bảo (KAM Lead)" ×4 — không có tài khoản nào
-   tên đó). Không phụ thuộc thứ tự deploy. Sau khi chạy: CRM hiện "Chưa nhập"/"Chưa chọn", nhập lại liên hệ thật.
+00. **Chạy migration `0135_clear_default_brand_kam.sql`** — `0134` (đã chạy 05/10) xoá xong SĐT/email mẫu nhưng KAM mẫu
+   còn: cả 4 brand gắn tài khoản HTA (form cũ tự chọn tài khoản đầu danh sách) kèm chữ "Lê Quốc Bảo (KAM Lead)" ⇒ chưa
+   ai từng chọn KAM. 0135 xoá cả chữ lẫn tài khoản gắn kèm; sau đó chọn KAM thật cho từng brand ở CRM. Không phụ thuộc
+   thứ tự deploy. Thẻ CRM nay hiện KAM theo tài khoản đã chọn (một nguồn), lưu form thì chữ KAM suy từ tài khoản.
 0. **Backup DB hằng ngày đang HỎNG** (GitHub Action `backup-supabase.yml` đỏ mỗi ngày, đo 04/10): secret
    `SUPABASE_DB_URL` trỏ tới `aws-0-ap-southeast-1.pooler.supabase.com`, pooler báo `tenant/user
    postgres.licqfomsrjkavipomplz not found` ⇒ sai host/region. Lấy lại chuỗi "Session pooler" ở Supabase Dashboard →
@@ -294,8 +295,8 @@ tháng không có kế hoạch chỉ còn target khung camp nhập ở Nhập Ad
 
 ## 6. Hạ tầng Supabase
 
-- 134 migration (`supabase/migrations/`), chạy tay theo thứ tự — **tới `0132` đều ĐÃ CHẠY** (0131 + 0132 ngày 02/10);
-  **`0133` ĐÃ CHẠY 04/10** (verify ở §1); **`0134` CHƯA CHẠY** (chỉ UPDATE dữ liệu mẫu trong `brands`, có chốt tự kiểm). Lô đối soát cũ (06–09/2026, không gắn brand) không áp dụng lại được — đo
+- 135 migration (`supabase/migrations/`), chạy tay theo thứ tự — **tới `0132` đều ĐÃ CHẠY** (0131 + 0132 ngày 02/10);
+  **`0133` ĐÃ CHẠY 04/10** (verify ở §1); **`0134` ĐÃ CHẠY 05/10** (verify: CRM không còn SĐT mẫu); **`0135` CHƯA CHẠY** (xoá KAM mẫu + tài khoản gắn tự động). Lô đối soát cũ (06–09/2026, không gắn brand) không áp dụng lại được — đo
   04/10 nó chỉ khớp ca CROCS nên chưa có số nào bị chia nhầm. Replay `0001 → 0133`: sạch, chạy lần 2 không lỗi; bộ kiểm hành vi
   `supabase/tests/0133_workflow_integrity.sql` chạy trên bản replay (in `OK ...`, 34 mục).
   Replay `0001 → 0132` trên Postgres cô lập: sạch.

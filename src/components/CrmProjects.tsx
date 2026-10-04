@@ -62,6 +62,8 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
     const [brandContractStatus, setBrandContractStatus] = useState<"Active" | "Pending" | "Completed">("Active");
   const [brandBillingModel, setBrandBillingModel] = useState<"gmv_commission" | "hourly">("gmv_commission");
 
+  const kamName = (b: Brand) => (b.ownerUserId ? users.find((u) => u.id === b.ownerUserId)?.name ?? b.owner : b.owner);
+
   // Form thêm brand mở TRỐNG (audit người mới 2026-10-04): bản cũ điền sẵn SĐT "0909 123 456", email
   // "contact@brand.com", KAM "Lê Quốc Bảo (KAM Lead)", doanh thu 500.000.000 và để trống thì lưu "Nguyễn Văn A" —
   // Franklin + CROCS trên production mang đúng SĐT mẫu đó, cả 4 brand mang KAM mẫu (không có tài khoản nào tên đó).
@@ -107,6 +109,7 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
     if (isSavingBrandRef.current) return;
     isSavingBrandRef.current = true;
 
+    const kam = staffUsers.find((u) => u.id === brandOwnerUserId);
     const brandPayload: Brand = {
       id: editingBrand ? editingBrand.id : `brand-${Date.now()}`,
       name: brandName,
@@ -118,7 +121,8 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
       // Cột "doanh thu tích luỹ" gõ tay đã bỏ khỏi form — GMV thật cộng từ ca. Giữ nguyên giá trị cũ khi sửa.
       totalGmv: editingBrand?.totalGmv ?? 0,
       contractStatus: brandContractStatus,
-      owner: brandOwner,
+      // Có danh sách tài khoản thì chữ KAM luôn suy từ tài khoản đang chọn — không để chữ cũ lệch tài khoản gắn kèm.
+      owner: staffUsers.length > 0 ? (kam ? `${kam.name} (${kam.customRoleTitle})` : "") : brandOwner,
       ownerUserId: brandOwnerUserId || undefined,
       billingModel: brandBillingModel
     };
@@ -206,7 +210,8 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
 
               <div className="grid grid-cols-2 gap-2 text-xs bg-[var(--surface-elevated)]/60 p-2.5 rounded-xl border border-[var(--border)] text-[var(--text-muted)]">
                 <div>Đại diện brand: <strong className="text-[var(--text)] block">{[b.contactName, b.phone].filter(Boolean).join(" · ") || <span className="font-normal text-[var(--text-faint)]">Chưa nhập</span>}</strong></div>
-                <div>KAM phụ trách: <strong className="text-[var(--text)] block">{b.owner || <span className="font-normal text-[var(--text-faint)]">Chưa chọn</span>}</strong></div>
+                {/* KAM = tài khoản đã chọn (một nguồn); chữ `owner` chỉ dùng khi không có danh sách tài khoản (form gõ tay). */}
+                <div>KAM phụ trách: <strong className="text-[var(--text)] block">{kamName(b) || <span className="font-normal text-[var(--text-faint)]">Chưa chọn</span>}</strong></div>
               </div>
 
               <div>
