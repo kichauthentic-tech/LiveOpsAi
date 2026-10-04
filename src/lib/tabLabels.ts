@@ -35,7 +35,7 @@ export const BRAND_TAB_LABELS: Record<string, string> = {
   brand_dashboard: "Dashboard",
   brand_calendar: "Lịch Vận Hành",
   brand_sessions: "Sổ Ca",
-  brand_skus: "SKU Showcase",
+  brand_skus: "Sản phẩm lên live",
   brand_monthly_report: "Report Tháng",
   brand_commitment_view: "Cam Kết Hợp Đồng",
   brand_next_month_plan: "Kế Hoạch Tháng Sau",

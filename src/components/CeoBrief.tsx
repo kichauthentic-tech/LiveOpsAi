@@ -878,7 +878,7 @@ const StaffList: React.FC<{ title: string; data: ReturnType<typeof hostRows>; un
       ) : (
         <div className="text-xs">
           <div className={`grid ${STAFF_COLS} pb-1 text-[11px] sm:uppercase sm:tracking-wider font-bold text-[var(--text-faint)]`}>
-            <span>Tên</span><span className="text-right">Sessions</span><span className="text-right">Giờ live</span><span className="hidden sm:block">GMV/giờ</span><span className="text-right sm:invisible">GMV/giờ</span><span className="text-right">Kỳ trước</span>
+            <span>Tên</span><span className="text-right">Số ca</span><span className="text-right">Giờ live</span><span className="hidden sm:block">GMV/giờ</span><span className="text-right sm:invisible">GMV/giờ</span><span className="text-right">Kỳ trước</span>
           </div>
           {data.rows.map((r) => {
             const g = r.totals.gmvPerHour ?? 0;

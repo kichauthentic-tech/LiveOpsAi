@@ -10,7 +10,7 @@ import {
 } from "../lib/performance/bulkFinalize";
 import { headlineFor } from "../lib/performance/hostSuggestion";
 import { useConfirm } from "../hooks/useConfirm";
-import { fmtVndShort } from "../lib/format";
+import { fmtMonth, fmtVndShort } from "../lib/format";
 
 interface BulkFinalizePanelProps {
   slots: ShiftSlot[];
@@ -153,7 +153,7 @@ export function BulkFinalizePanel({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-bold text-[var(--text)] flex items-center gap-2">
-            <Layers className="w-4 h-4 text-blue-400" /> Chốt Lịch Hàng Loạt — tháng {month}
+            <Layers className="w-4 h-4 text-blue-400" /> Chốt Lịch Hàng Loạt — tháng {fmtMonth(month)}
           </h3>
           <p className="text-[11px] text-[var(--text-muted)] mt-1 max-w-3xl">
             Mỗi ca được gợi ý Host xếp hạng cao nhất mà <strong>đang rảnh khung giờ đó</strong> — xét cả ca đã có trong hệ thống

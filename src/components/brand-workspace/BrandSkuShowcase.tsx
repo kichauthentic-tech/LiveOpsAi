@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { PageHeader } from "../common/PageHeader";
 import { BrandSku, UserRole } from "../../types";
 import { Package, Plus, Trash2, Star, TrendingUp } from "lucide-react";
 import { fetchSkuPerfMonthSlice, normalizeSkuName, TopSkuRow } from "../../lib/dataraw/monthlyProductSlice";
@@ -131,14 +132,16 @@ export const BrandSkuShowcase: React.FC<BrandSkuShowcaseProps> = ({ brandId, cur
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-bold text-[var(--text)] flex items-center gap-2">
-          <Package className="w-5 h-5 text-[var(--accent-text)]" /> SKU Showcase & Hero Product Catalog
-        </h2>
-        <span className="text-sm font-bold text-[var(--warning)] flex items-center gap-1">
-          <Star className="w-3.5 h-3.5" /> {heroCount} Hero SKU
-        </span>
-      </div>
+      <PageHeader
+        icon={Package}
+        title="Sản phẩm lên live"
+        description="Danh sách SKU host sẽ giới thiệu: thứ tự ghim lên giỏ, giá deal, và sản phẩm chủ lực (hero). Cột hiệu suất đọc từ file Sản Phẩm ở Dữ Liệu Gốc."
+        actions={
+          <span className="text-sm font-bold text-[var(--warning)] flex items-center gap-1">
+            <Star className="w-3.5 h-3.5" /> {heroCount} sản phẩm chủ lực
+          </span>
+        }
+      />
 
       {canEdit && (
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 flex flex-wrap items-center gap-2">
@@ -158,7 +161,7 @@ export const BrandSkuShowcase: React.FC<BrandSkuShowcaseProps> = ({ brandId, cur
           />
           <input
             type="number"
-            placeholder="Giá flash-deal"
+            placeholder="Giá deal"
             value={newFlashPrice}
             onChange={(e) => setNewFlashPrice(e.target.value)}
             className="w-32 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] text-xs focus:outline-none focus:border-[var(--accent)]"
@@ -185,7 +188,7 @@ export const BrandSkuShowcase: React.FC<BrandSkuShowcaseProps> = ({ brandId, cur
       )}
       {canEdit && !perfError && perfByName && !perfHasBatch && (
         <div className="p-3 bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl text-[var(--text-faint)] text-xs">
-          Chưa có Dữ Liệu Gốc (product_list) cho tháng {fmtMonthShort(currentMonth)} — cột hiệu suất sẽ trống tới khi upload ở tab Dữ Liệu Gốc.
+          Chưa có file Sản Phẩm của tháng {fmtMonthShort(currentMonth)} — cột hiệu suất sẽ trống tới khi up file đó ở Dữ Liệu Gốc.
         </div>
       )}
 
@@ -197,10 +200,10 @@ export const BrandSkuShowcase: React.FC<BrandSkuShowcaseProps> = ({ brandId, cur
                 <th className="py-2.5 px-4">Ghim</th>
                 <th className="py-2.5 px-2">SKU</th>
                 {canEdit && <th className="py-2.5 px-2">Hiệu suất {fmtMonthShort(currentMonth)}</th>}
-                <th className="py-2.5 px-2 text-right">Giá flash-deal</th>
+                <th className="py-2.5 px-2 text-right">Giá deal</th>
                 <th className="py-2.5 px-2 text-right">Giá gốc</th>
                 <th className="py-2.5 px-2 text-right">Xả kho %</th>
-                <th className="py-2.5 px-2">Hero</th>
+                <th className="py-2.5 px-2">Chủ lực</th>
                 <th className="py-2.5 px-2">Trạng thái</th>
                 {canEdit && <th className="py-2.5 px-4"></th>}
               </tr>

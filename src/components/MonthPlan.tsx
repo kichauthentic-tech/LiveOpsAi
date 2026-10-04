@@ -31,7 +31,7 @@ import { findBrandStudioId } from "../lib/db/brandStudios";
 import { useConfirm } from "../hooks/useConfirm";
 import { PageIntro } from "./common/PageIntro";
 
-import { fmtFixed, fmtVndShort, fmtVndFull } from "../lib/format";
+import { fmtMonth, fmtFixed, fmtVndShort, fmtVndFull } from "../lib/format";
 import { MonthPicker } from "./common/MonthPicker";
 interface MonthPlanProps {
   brands: Brand[];
@@ -471,7 +471,7 @@ export default function MonthPlan({
       setMsg("Lưới trống — chưa có gì để chốt.");
       return;
     }
-    if (drafts.length === 0 && locked && !(await confirm(`Lưới trống — chốt lại sẽ HUỶ toàn bộ ca đang mở của kế hoạch ${brand?.name} tháng ${month} (trừ ca đã có người đăng ký). Tiếp tục?`, { danger: true }))) return;
+    if (drafts.length === 0 && locked && !(await confirm(`Lưới trống — chốt lại sẽ HUỶ toàn bộ ca đang mở của kế hoạch ${brand?.name} tháng ${fmtMonth(month)} (trừ ca đã có người đăng ký). Tiếp tục?`, { danger: true }))) return;
     const gap = planHours - totals.hours;
     const warn = planHours > 0 && Math.abs(gap) > 0.01 ? `\n\nGiờ kế hoạch ${fmtH(totals.hours)}h ${gap > 0 ? "THIẾU" : "VƯỢT"} ${fmtH(Math.abs(gap))}h so với ${fmtH(planHours)}h cần xếp.` : "";
     const relockNote = locked ? "\n\nChốt lại sẽ mở thêm ca mới và HUỶ ca đang mở đã bị bỏ khỏi kế hoạch (trừ ca đã có người đăng ký)." : "";
@@ -487,7 +487,7 @@ export default function MonthPlan({
       ? `\n\n⚠ ${crossBrand.clashes.length} ca TRÙNG PHÒNG với brand khác (vd ${crossBrand.clashes[0].date.slice(8)}/${crossBrand.clashes[0].date.slice(5, 7)} ${crossBrand.clashes[0].startTime}: ${crossBrand.clashes[0].roomTakenBy}). Chốt vẫn gắn phòng này — phải đổi phòng từng ca sau.`
       : "";
     const capNote = overCapacity ? `\n\n⚠ Ngày ${overCapacity.date.slice(8)}/${overCapacity.date.slice(5, 7)} ${overCapacity.startTime} có ${overCapacity.concurrent} ca chạy cùng lúc toàn agency — có ${studios.length} phòng, ${hostCapacity} người host.` : "";
-    if (!(await confirm(`${locked ? "Chốt lại" : "Chốt"} kế hoạch ${brand?.name} tháng ${month}: ${drafts.length} ca chờ đăng ký?${warn}${targetWarn}${sumNote}${relockNote}${studioNote}${clashNote}${capNote}${pastNote}`))) return;
+    if (!(await confirm(`${locked ? "Chốt lại" : "Chốt"} kế hoạch ${brand?.name} tháng ${fmtMonth(month)}: ${drafts.length} ca chờ đăng ký?${warn}${targetWarn}${sumNote}${relockNote}${studioNote}${clashNote}${capNote}${pastNote}`))) return;
     const p = await save({ committing: true });
     if (!p) return;
     setSaving(true);
@@ -520,7 +520,7 @@ export default function MonthPlan({
     const openFromPlan = shiftSlots.filter((sl) => sl.status === "open" && sl.brandId === brandId && sl.date.slice(0, 7) === month).length;
     if (
       !(await confirm(
-        `XOÁ HẲN kế hoạch ${brand?.name} tháng ${month}?
+        `XOÁ HẲN kế hoạch ${brand?.name} tháng ${fmtMonth(month)}?
 
 ` +
           `• ${drafts.length} ca trong lưới kế hoạch bị xoá theo.

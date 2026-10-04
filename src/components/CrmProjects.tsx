@@ -52,29 +52,29 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
   const [isBrandModalOpen, setIsBrandModalOpen] = useState(false);
   const [editingBrand, setEditingBrand] = useState<Brand | null>(null);
   const [brandName, setBrandName] = useState("");
-  const [brandLogo, setBrandLogo] = useState("🌿");
-  const [brandIndustry, setBrandIndustry] = useState("Mỹ Phẩm / Skincare");
+  const [brandLogo, setBrandLogo] = useState("");
+  const [brandIndustry, setBrandIndustry] = useState("");
   const [brandContactName, setBrandContactName] = useState("");
   const [brandPhone, setBrandPhone] = useState("");
   const [brandEmail, setBrandEmail] = useState("");
-  const [brandOwner, setBrandOwner] = useState("Lê Quốc Bảo (KAM Lead)");
+  const [brandOwner, setBrandOwner] = useState("");
   const [brandOwnerUserId, setBrandOwnerUserId] = useState<string>("");
-  const [brandTotalGmv, setBrandTotalGmv] = useState(1200000000);
-  const [brandContractStatus, setBrandContractStatus] = useState<"Active" | "Pending" | "Completed">("Active");
+    const [brandContractStatus, setBrandContractStatus] = useState<"Active" | "Pending" | "Completed">("Active");
   const [brandBillingModel, setBrandBillingModel] = useState<"gmv_commission" | "hourly">("gmv_commission");
 
-  // Brand Handlers
+  // Form thêm brand mở TRỐNG (audit người mới 2026-10-04): bản cũ điền sẵn SĐT "0909 123 456", email
+  // "contact@brand.com", KAM "Lê Quốc Bảo (KAM Lead)", doanh thu 500.000.000 và để trống thì lưu "Nguyễn Văn A" —
+  // Franklin + CROCS trên production mang đúng SĐT mẫu đó, cả 4 brand mang KAM mẫu (không có tài khoản nào tên đó).
   const openAddBrandModal = () => {
     setEditingBrand(null);
     setBrandName("");
-    setBrandLogo("✨");
-    setBrandIndustry("Mỹ Phẩm / Thời Trang");
+    setBrandLogo("");
+    setBrandIndustry("");
     setBrandContactName("");
-    setBrandPhone("0909 123 456");
-    setBrandEmail("contact@brand.com");
-    setBrandOwner("Lê Quốc Bảo (KAM Lead)");
-    setBrandOwnerUserId(staffUsers[0]?.id || "");
-    setBrandTotalGmv(500000000);
+    setBrandPhone("");
+    setBrandEmail("");
+    setBrandOwner("");
+    setBrandOwnerUserId("");
     setBrandContractStatus("Active");
     setBrandBillingModel("gmv_commission");
     setIsBrandModalOpen(true);
@@ -87,10 +87,9 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
     setBrandIndustry(b.industry);
     setBrandContactName(b.contactName);
     setBrandPhone(b.phone);
-    setBrandEmail(b.email || "contact@brand.com");
+    setBrandEmail(b.email || "");
     setBrandOwner(b.owner);
     setBrandOwnerUserId(b.ownerUserId || "");
-    setBrandTotalGmv(b.totalGmv);
     setBrandContractStatus(b.contractStatus);
     setBrandBillingModel(b.billingModel ?? "gmv_commission");
     setIsBrandModalOpen(true);
@@ -99,7 +98,7 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
   const handleBrandOwnerSelect = (userId: string) => {
     setBrandOwnerUserId(userId);
     const staff = staffUsers.find((u) => u.id === userId);
-    if (staff) setBrandOwner(`${staff.name} (${staff.customRoleTitle})`);
+    setBrandOwner(staff ? `${staff.name} (${staff.customRoleTitle})` : "");
   };
 
   const handleSaveBrand = (e: React.FormEvent) => {
@@ -113,10 +112,11 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
       name: brandName,
       logo: brandLogo || "🏢",
       industry: brandIndustry,
-      contactName: brandContactName || "Nguyễn Văn A",
-      phone: brandPhone || "0909 123 456",
-      email: brandEmail || "info@brand.com",
-      totalGmv: Number(brandTotalGmv),
+      contactName: brandContactName.trim(),
+      phone: brandPhone.trim(),
+      email: brandEmail.trim(),
+      // Cột "doanh thu tích luỹ" gõ tay đã bỏ khỏi form — GMV thật cộng từ ca. Giữ nguyên giá trị cũ khi sửa.
+      totalGmv: editingBrand?.totalGmv ?? 0,
       contractStatus: brandContractStatus,
       owner: brandOwner,
       ownerUserId: brandOwnerUserId || undefined,
@@ -151,13 +151,13 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
       <div className="bg-[var(--surface)] p-6 rounded-2xl border border-[var(--border)] shadow-sm space-y-4">
         <div className="flex justify-between items-center">
           <div>
-            <h3 className="font-bold text-[var(--text)] text-base">Danh Sách Thương Hiệu Đối Tác ({brands.length} Brands)</h3>
+            <h3 className="font-bold text-[var(--text)] text-base">Brand đang hợp tác ({brands.length})</h3>
           </div>
           <button
             onClick={openAddBrandModal}
             className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow transition-all"
           >
-            <Plus className="w-4 h-4" /> Thêm Thương Hiệu
+            <Plus className="w-4 h-4" /> Thêm brand
           </button>
         </div>
 
@@ -205,19 +205,19 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
               </div>
 
               <div className="grid grid-cols-2 gap-2 text-xs bg-[var(--surface-elevated)]/60 p-2.5 rounded-xl border border-[var(--border)] text-[var(--text-muted)]">
-                <div>Đại diện Brand: <strong className="text-[var(--text)] block">{b.contactName} ({b.phone})</strong></div>
-                <div>Phụ trách KAM: <strong className="text-[var(--text)] block">{b.owner}</strong></div>
+                <div>Đại diện brand: <strong className="text-[var(--text)] block">{[b.contactName, b.phone].filter(Boolean).join(" · ") || <span className="font-normal text-[var(--text-faint)]">Chưa nhập</span>}</strong></div>
+                <div>KAM phụ trách: <strong className="text-[var(--text)] block">{b.owner || <span className="font-normal text-[var(--text-faint)]">Chưa chọn</span>}</strong></div>
               </div>
 
               <div>
                 <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-[var(--surface-elevated)] text-[var(--text-muted)] border border-[var(--border)] inline-flex items-center gap-1">
                   {b.billingModel === "hourly" ? (
                     <>
-                      <DollarSign className="w-3 h-3" /> Thu Phí Theo Giờ Live
+                      <DollarSign className="w-3 h-3" /> Thu phí theo giờ live
                     </>
                   ) : (
                     <>
-                      <Percent className="w-3 h-3" /> Thu Phí Theo % GMV
+                      <Percent className="w-3 h-3" /> Thu phí theo % doanh số
                     </>
                   )}
                 </span>
@@ -263,7 +263,7 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
             <div className="bg-[var(--surface)] text-[var(--text)] px-6 py-4 flex justify-between items-center shrink-0">
               <h3 className="font-bold text-sm flex items-center gap-2">
                 <Building2 className="w-4 h-4 text-[var(--accent-text)]" />
-                {editingBrand ? `Chỉnh Sửa Thương Hiệu: ${editingBrand.name}` : "Thêm Thương Hiệu Đối Tác Mới"}
+                {editingBrand ? `Sửa brand: ${editingBrand.name}` : "Thêm brand"}
               </h3>
               <button onClick={() => setIsBrandModalOpen(false)} className="p-1.5 -m-1.5 rounded text-[var(--text-muted)] hover:text-[var(--text)]">
                 <X className="w-5 h-5" />
@@ -273,13 +273,13 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
             <form onSubmit={handleSaveBrand} className="p-6 space-y-4 text-xs overflow-y-auto">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="sm:col-span-2">
-                  <label className="font-bold text-[var(--text-muted)] block mb-1">Tên Thương Hiệu (Brand Name) *</label>
+                  <label className="font-bold text-[var(--text-muted)] block mb-1">Tên brand *</label>
                   <input
                     type="text"
                     required
                     value={brandName}
                     onChange={(e) => setBrandName(e.target.value)}
-                    placeholder="VD: Maybelline Official"
+                    placeholder="VD: CROCS"
                     className="w-full p-2.5 border border-[var(--border)] rounded-xl font-semibold bg-[var(--surface-base)] text-[var(--text)] placeholder:text-[var(--text-faint)]"
                   />
                 </div>
@@ -297,7 +297,7 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="font-bold text-[var(--text-muted)] block mb-1">Ngành Hàng (Industry)</label>
+                  <label className="font-bold text-[var(--text-muted)] block mb-1">Ngành hàng</label>
                   <input
                     type="text"
                     value={brandIndustry}
@@ -307,7 +307,7 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-[var(--text-muted)] block mb-1">Trạng Thái Hợp Đồng</label>
+                  <label className="font-bold text-[var(--text-muted)] block mb-1">Trạng thái hợp tác</label>
                   <select
                     value={brandContractStatus}
                     onChange={(e) => setBrandContractStatus(e.target.value as "Active" | "Pending" | "Completed")}
@@ -315,29 +315,29 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
                   >
                     <option value="Active">Đang chạy</option>
                     <option value="Pending">Đang đàm phán</option>
-                    <option value="Completed">Đã xong</option>
+                    <option value="Completed">Đã dừng</option>
                   </select>
                 </div>
               </div>
 
               <div>
-                <label className="font-bold text-[var(--text-muted)] block mb-1">Hình Thức Thu Phí (Billing Model)</label>
+                <label className="font-bold text-[var(--text-muted)] block mb-1">Cách thu phí</label>
                 <select
                   value={brandBillingModel}
                   onChange={(e) => setBrandBillingModel(e.target.value as "gmv_commission" | "hourly")}
                   className="w-full p-2.5 border border-[var(--border)] rounded-xl font-semibold bg-[var(--surface-base)] text-[var(--text)]"
                 >
-                  <option value="gmv_commission">Theo % GMV (Commission)</option>
-                  <option value="hourly">Theo Giờ Live (Rate/Giờ)</option>
+                  <option value="gmv_commission">Theo % doanh số (hoa hồng)</option>
+                  <option value="hourly">Theo giờ live (đơn giá/giờ)</option>
                 </select>
                 <p className="text-[11px] text-[var(--text-faint)] mt-1">
-                  Quyết định công thức tính Doanh Thu Agency ở tab Finance & HR. "Theo Giờ Live" dùng đơn giá cấu hình ở tab Đăng Ký &amp; Chốt Lịch Host.
+                  Quyết định cách Finance & P&L tính doanh thu agency. Đơn giá/giờ và % hoa hồng nhập ở nút Rate Card (biểu tượng nhãn) trên thẻ brand. Số giờ cam kết mỗi tháng nhập ở Cam Kết Hợp Đồng.
                 </p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="font-bold text-[var(--text-muted)] block mb-1">Tên Người Đại Diện Brand</label>
+                  <label className="font-bold text-[var(--text-muted)] block mb-1">Người đại diện phía brand</label>
                   <input
                     type="text"
                     value={brandContactName}
@@ -347,27 +347,27 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-[var(--text-muted)] block mb-1">Số Điện Thoại Đại Diện</label>
+                  <label className="font-bold text-[var(--text-muted)] block mb-1">SĐT người đại diện</label>
                   <input
                     type="text"
                     value={brandPhone}
                     onChange={(e) => setBrandPhone(e.target.value)}
-                    placeholder="VD: 0909 123 456"
+                    placeholder="Số điện thoại"
                     className="w-full p-2.5 border border-[var(--border)] rounded-xl font-semibold bg-[var(--surface-base)] text-[var(--text)] placeholder:text-[var(--text-faint)]"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
                 <div>
-                  <label className="font-bold text-[var(--text-muted)] block mb-1">Nhân Viên Phụ Trách (KAM Lead)</label>
+                  <label className="font-bold text-[var(--text-muted)] block mb-1">KAM phụ trách</label>
                   {staffUsers.length > 0 ? (
                     <select
                       value={brandOwnerUserId}
                       onChange={(e) => handleBrandOwnerSelect(e.target.value)}
                       className="w-full p-2.5 border border-[var(--border)] rounded-xl font-semibold bg-[var(--surface-base)] text-[var(--text)]"
                     >
-                      <option value="">-- Chọn nhân sự phụ trách --</option>
+                      <option value="">Chưa chọn</option>
                       {staffUsers.map((u) => (
                         <option key={u.id} value={u.id}>
                           {u.name} ({u.customRoleTitle})
@@ -379,19 +379,10 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
                       type="text"
                       value={brandOwner}
                       onChange={(e) => setBrandOwner(e.target.value)}
-                      placeholder="VD: Lê Quốc Bảo"
+                      placeholder="Tên nhân sự phụ trách"
                       className="w-full p-2.5 border border-[var(--border)] rounded-xl font-semibold bg-[var(--surface-base)] text-[var(--text)] placeholder:text-[var(--text-faint)]"
                     />
                   )}
-                </div>
-                <div>
-                  <label className="font-bold text-[var(--text-muted)] block mb-1">Tổng Doanh Thu Tích Lũy</label>
-                  <input
-                    type="number"
-                    value={brandTotalGmv}
-                    onChange={(e) => setBrandTotalGmv(Number(e.target.value))}
-                    className="w-full p-2.5 border border-[var(--border)] rounded-xl font-semibold bg-[var(--surface-base)] text-[var(--text)] placeholder:text-[var(--text-faint)]"
-                  />
                 </div>
               </div>
 
@@ -401,13 +392,13 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
                   onClick={() => setIsBrandModalOpen(false)}
                   className="px-4 py-2 text-[var(--text-muted)] font-bold hover:bg-[var(--surface-elevated)] rounded-xl transition-all"
                 >
-                  Hủy Bỏ
+                  Huỷ
                 </button>
                 <button
                   type="submit"
                   className="px-5 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold rounded-xl shadow transition-all"
                 >
-                  {editingBrand ? "Cập Nhật Brand" : "Lưu Brand Mới"}
+                  {editingBrand ? "Lưu" : "Thêm brand"}
                 </button>
               </div>
             </form>

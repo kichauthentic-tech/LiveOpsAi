@@ -250,7 +250,7 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
       })
       .catch((err) => {
         if (cancelled) return;
-        setPhase1Error(err.message ?? "Không tải được dữ liệu Talent/Studio/Equipment từ Supabase.");
+        setPhase1Error(err.message ?? "Không tải được dữ liệu talent/phòng live/thiết bị — thử tải lại trang.");
       })
       .finally(() => {
         if (!cancelled) setTalentsLoadedFor(authUserId);
@@ -282,7 +282,7 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
     load(1)
       .catch((err) => {
         if (cancelled) return;
-        setSessionsError(err.message ?? "Không tải được dữ liệu Live Sessions từ Supabase.");
+        setSessionsError(err.message ?? "Không tải được dữ liệu ca live — thử tải lại trang.");
       })
       .finally(() => { if (!cancelled) setSessionsLoadedFor(authUserId); });
     completePastSessions()
@@ -304,7 +304,7 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
       })
       .catch((err) => {
         if (cancelled) return;
-        setPhase3Error(err.message ?? "Không tải được dữ liệu Brand từ Supabase.");
+        setPhase3Error(err.message ?? "Không tải được dữ liệu Brand — thử tải lại trang.");
       })
       .finally(() => {
         if (!cancelled) setBrandsLoaded(true);
@@ -331,7 +331,7 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
       .catch((err) => {
         usersLoadedRef.current = null; // hỏng thì mở khoá để lần mở tab sau thử lại
         if (cancelled) return;
-        setPhase4Error(err.message ?? "Không tải được danh sách tài khoản người dùng từ Supabase.");
+        setPhase4Error(err.message ?? "Không tải được danh sách tài khoản người dùng — thử tải lại trang.");
       });
     return () => {
       cancelled = true;
@@ -355,7 +355,7 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
       .catch((err) => {
         auditLogsLoadedRef.current = null;
         if (cancelled) return;
-        setPhase5Error(err.message ?? "Không tải được Audit Logs từ Supabase.");
+        setPhase5Error(err.message ?? "Không tải được nhật ký — thử tải lại trang.");
       });
     return () => {
       cancelled = true;
@@ -380,7 +380,7 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
       })
       .catch((err) => {
         if (cancelled) return;
-        setPhase6Error(errorMessage(err, "Không tải được Ma Trận Phân Quyền Role từ Supabase."));
+        setPhase6Error(errorMessage(err, "Không tải được quyền theo vai trò — thử tải lại trang."));
       })
       .finally(() => {
         if (!cancelled) setPhase6Loading(false);
@@ -408,7 +408,7 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
       })
       .catch((err) => {
         if (cancelled) return;
-        setPhase14Error(err.message ?? "Không tải được dữ liệu Đăng Ký & Chốt Lịch Host từ Supabase.");
+        setPhase14Error(err.message ?? "Không tải được dữ liệu đăng ký ca — thử tải lại trang.");
       });
     return () => {
       cancelled = true;
@@ -447,7 +447,7 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
       })
       .catch((err) => {
         if (cancelled) return;
-        setPhase19Error(err.message ?? "Không tải được Lịch Sử Rate Card từ Supabase.");
+        setPhase19Error(err.message ?? "Không tải được Lịch Sử Rate Card — thử tải lại trang.");
       });
     return () => {
       cancelled = true;
@@ -465,7 +465,7 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
       })
       .catch((err) => {
         if (cancelled) return;
-        setPhase7Error(err.message ?? "Không tải được dữ liệu Finance & HR từ Supabase.");
+        setPhase7Error(err.message ?? "Không tải được dữ liệu Finance — thử tải lại trang.");
       });
     return () => {
       cancelled = true;
@@ -483,7 +483,7 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
       })
       .catch((err) => {
         if (cancelled) return;
-        setPhaseB1Error(err.message ?? "Không tải được SKU Showcase từ Supabase.");
+        setPhaseB1Error(err.message ?? "Không tải được danh sách sản phẩm lên live.");
       });
     return () => {
       cancelled = true;
@@ -501,7 +501,7 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
       })
       .catch((err) => {
         if (cancelled) return;
-        setPhaseC3Error(err.message ?? "Không tải được Scheme khuyến mãi từ Supabase.");
+        setPhaseC3Error(err.message ?? "Không tải được Scheme khuyến mãi — thử tải lại trang.");
       });
     return () => {
       cancelled = true;
@@ -529,7 +529,7 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
       .catch((err) => {
         aiPromptsLoadedRef.current = null;
         if (cancelled) return;
-        setAiAgentPromptsError(err.message ?? "Không tải được AI Training Center từ Supabase.");
+        setAiAgentPromptsError(err.message ?? "Không tải được AI Training Center — thử tải lại trang.");
       })
       .finally(() => {
         if (!cancelled) setAiAgentPromptsLoading(false);

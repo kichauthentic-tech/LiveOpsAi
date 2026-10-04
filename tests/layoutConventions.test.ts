@@ -434,10 +434,10 @@ test("Đăng Ký Ca: talent không thấy bảng tải của cả đội", () =>
   const src = readFileSync(join(SRC, "components/ShiftScheduling.tsx"), "utf8");
   // "Tải Theo Host" là công cụ cân tải của ops (số ca + số giờ của từng đồng nghiệp) — trước đây
   // render vô điều kiện nên là khối DUY NHẤT có nội dung trên màn Đăng Ký Ca của talent.
-  const block = src.indexOf("Tải Theo Host — Tháng {selectedMonth}"); // chuỗi JSX, không phải comment
+  const block = src.indexOf("Số ca của từng host — tháng {fmtMonth(selectedMonth)}"); // chuỗi JSX, không phải comment
   // Rào gần nhất TRƯỚC khối, không phải rào `{admin && (` đầu tiên trong file.
   const gate = src.lastIndexOf("{admin && (", block);
-  expect(gate >= 0, "không tìm thấy rào {admin && ( nào trước khối Tải Theo Host").toBe(true);
+  expect(gate >= 0, "không tìm thấy rào {admin && ( nào trước khối Số ca của từng host").toBe(true);
   // Giữa rào và khối không được có `)}` đóng rào lại.
   expect(src.slice(gate + 11, block)).not.toContain(")}");
 });

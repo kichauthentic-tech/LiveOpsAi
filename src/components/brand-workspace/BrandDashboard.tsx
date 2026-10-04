@@ -282,7 +282,7 @@ export default function BrandDashboard({ brandId, brandName, sessions, shiftSlot
       <PageHeader
         icon={LayoutDashboard}
         title={`Dashboard · ${brandName}`}
-        description={`Tháng này tới đâu so với target plan, vì sao, và ${isOps ? "tuần tới / tháng sau nên sửa gì. Đề xuất chỉ dùng quy tắc đã qua backtest trên lịch sử của chính brand." : "nhịp theo tuần. Số của tháng hiện ra khi ops phát hành Report Tháng."}`}
+        description={`Tháng này tới đâu so với target plan, vì sao, và ${isOps ? "tuần tới / tháng sau nên sửa gì. Đề xuất chỉ dùng những quy tắc đã thử lại trên các tháng cũ của chính brand và đoán đúng hơn." : "nhịp theo tuần. Số của tháng hiện ra khi ops phát hành Report Tháng."}`}
         actions={
           <>
             {through && (
@@ -512,7 +512,7 @@ export default function BrandDashboard({ brandId, brandName, sessions, shiftSlot
 
       {/* 05 · Đề xuất tối ưu (ops) */}
       {isOps && (
-        <Card title="Đề xuất tối ưu" icon={<Lightbulb className="w-4 h-4 text-[var(--accent-text)]" />} sub="Chỉ quy tắc đã qua backtest walk-forward trên lịch sử của chính brand (dùng các tháng trước để đoán tháng sau). Mức ước lượng giả định giờ dời sang giữ được năng suất trung bình của khung đích — đọc là mức trần.">
+        <Card title="Đề xuất tối ưu" icon={<Lightbulb className="w-4 h-4 text-[var(--accent-text)]" />} sub="Chỉ giữ quy tắc đã được thử lại: lấy các tháng trước để đoán tháng sau, quy tắc nào đoán đúng hơn mới được đưa ra. Mức tăng ước tính là mức tối đa — giả định giờ dời sang khung khác vẫn bán tốt như trung bình khung đó.">
           <div className="space-y-4 text-xs">
             <div className={`border-l-2 pl-3 space-y-1.5 ${slotOk ? "border-emerald-500" : "border-[var(--border)] opacity-80"}`}>
               <p className="font-bold text-[var(--text)] flex items-center gap-2">
@@ -525,7 +525,7 @@ export default function BrandDashboard({ brandId, brandName, sessions, shiftSlot
                     <tr className="text-[var(--text-faint)] text-left">
                       <th className="pb-1 pr-3">Khung</th>
                       <th className="pb-1 pr-3 text-right">Chỉ số (1,00 = mặt bằng tháng)</th>
-                      <th className="pb-1 pr-3 text-right">Khoảng tin cậy 90%</th>
+                      <th className="pb-1 pr-3 text-right" title="90% khả năng chỉ số thật nằm trong khoảng này">Dao động có thể</th>
                       <th className="pb-1 text-right">Giờ lịch sử</th>
                     </tr>
                   </thead>
@@ -554,7 +554,7 @@ export default function BrandDashboard({ brandId, brandName, sessions, shiftSlot
                   })()}
                 </p>
               )}
-              <p className="text-[var(--text-faint)]">Backtest: dùng chỉ số khung của các tháng trước {wfSlot.gain == null ? "chưa đủ tháng để thử" : `${wfSlot.gain > 0 ? "giảm" : "tăng"} sai số dự đoán ${pct(Math.abs(wfSlot.gain))}`} ({wfSlot.months} tháng).</p>
+              <p className="text-[var(--text-faint)]">Thử lại trên tháng cũ: dùng chỉ số khung của các tháng trước {wfSlot.gain == null ? "chưa đủ tháng để thử" : `${wfSlot.gain > 0 ? "giảm" : "tăng"} sai số dự đoán ${pct(Math.abs(wfSlot.gain))}`} ({wfSlot.months} tháng).</p>
             </div>
 
             <div className={`border-l-2 pl-3 space-y-1.5 ${campOk ? "border-emerald-500" : "border-[var(--border)] opacity-80"}`}>
@@ -578,7 +578,7 @@ export default function BrandDashboard({ brandId, brandName, sessions, shiftSlot
                 <span className="px-2 py-0.5 rounded-full text-[11px] bg-[var(--surface-elevated)] text-[var(--text-faint)]">Đã thử, bị loại</span> Chọn thứ trong tuần để live · Xếp hạng host theo tháng
               </p>
               <p className="text-[var(--text-faint)]">
-                Chỉ số thứ trong tuần của các tháng trước {wfWeekday.gain == null ? "chưa đủ tháng để thử" : wfWeekday.gain > 0 ? `giảm sai số ${pct(wfWeekday.gain)}` : `làm sai số tăng ${pct(-wfWeekday.gain)}`}; hạng host tháng này không lặp lại tháng sau (đo CROCS 26/09: Spearman −0,04). Màn này không đưa lời khuyên dựa trên hai thứ đó.
+                Chỉ số thứ trong tuần của các tháng trước {wfWeekday.gain == null ? "chưa đủ tháng để thử" : wfWeekday.gain > 0 ? `giảm sai số ${pct(wfWeekday.gain)}` : `làm sai số tăng ${pct(-wfWeekday.gain)}`}; host đứng đầu tháng này gần như không đứng đầu tháng sau (thứ hạng giữa hai tháng không liên quan nhau, đo CROCS 26/09). Màn này không đưa lời khuyên dựa trên hai thứ đó.
               </p>
             </div>
           </div>
@@ -623,7 +623,7 @@ export default function BrandDashboard({ brandId, brandName, sessions, shiftSlot
 
       {/* 07 · Host có khoảng tin cậy (ops) */}
       {isOps && !hidden && hosts.length > 0 && (
-        <Card title="Host so với mặt bằng cùng loại ngày" icon={<Users className="w-4 h-4 text-[var(--accent-text)]" />} sub="Tỷ số GMV thực ÷ GMV kỳ vọng (cùng tháng × loại ngày × buổi). Chỉ nêu trên/dưới mặt bằng khi cả khoảng tin cậy 95% nằm một phía; còn lại là chưa kết luận được.">
+        <Card title="Host so với mặt bằng cùng loại ngày" icon={<Users className="w-4 h-4 text-[var(--accent-text)]" />} sub="Tỷ số GMV thực ÷ GMV kỳ vọng (cùng tháng × loại ngày × buổi). Chỉ nói host trên/dưới mặt bằng khi đủ ca để chắc chắn (95%); chưa đủ thì ghi là chưa kết luận.">
           <div className="overflow-x-auto">
             <table className="w-full text-xs min-w-[480px]">
               <thead>

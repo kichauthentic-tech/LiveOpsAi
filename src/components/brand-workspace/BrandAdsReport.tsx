@@ -9,7 +9,7 @@ import { errorMessage } from "../../lib/errorMessage";
 import { ReportPlanningInputs, prefetchReportPlanningInputs } from "./ReportPlanningInputs";
 import type { TabPrefetchCtx } from "../../lib/db/prefetch";
 
-import { fmtFixed, fmtVndShort } from "../../lib/format";
+import { fmtMonth, fmtFixed, fmtVndShort } from "../../lib/format";
 import { MonthPicker } from "../common/MonthPicker";
 import { PageHeader } from "../common/PageHeader";
 // Nhập Ads & Ghi Chú (tách khỏi Report Tháng 2026-09-21 theo yêu cầu user): phần ops nhập tay
@@ -193,7 +193,7 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
       <PageHeader
         icon={Megaphone}
         title={`Nhập Ads & Ghi Chú · ${brandName}`}
-        description={`Ads cost/ROAS tính máy từ Report Ca ở trên; phần bổ sung và ghi chú nhập tay ở dưới (không có API TikTok Shop cho các phần này). Số lưu ở đây đi cùng Report Tháng ${month} — khi report đã phát hành thì khoá, muốn sửa phải thu hồi ở Report Tháng.`}
+        description={`Ads cost/ROAS tính máy từ Report Ca ở trên; phần bổ sung và ghi chú nhập tay ở dưới (không có API TikTok Shop cho các phần này). Số lưu ở đây đi cùng Report Tháng ${fmtMonth(month)} — khi report đã phát hành thì khoá, muốn sửa phải thu hồi ở Report Tháng.`}
         actions={
           <>
             <MonthPicker value={month} onChange={setMonth} />
@@ -218,7 +218,7 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
         </h3>
         <p className="text-[11px] text-[var(--text-faint)]">
           Tính từ Ads cost host/ops nhập trong Report Ca của các phiên TikTok Completed trong tháng, đối chiếu GMV cùng phiên để
-          ra ROAS. So sánh MoM với tháng {prevMonthStr(month)}.
+          ra ROAS. So với tháng {fmtMonth(prevMonthStr(month))}.
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl p-3">
@@ -334,7 +334,7 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
           )}
           {canManage && isPublished && (
             <p className="pt-3 border-t border-[var(--border)] text-[11px] text-[var(--text-faint)]">
-              Report tháng {month} đã phát hành nên phần này khoá. Cần sửa: vào Report Tháng → "Thu Hồi Về Bản Nháp".
+              Report tháng {fmtMonth(month)} đã phát hành nên phần này khoá. Cần sửa: vào Report Tháng → "Thu Hồi Về Bản Nháp".
             </p>
           )}
         </div>

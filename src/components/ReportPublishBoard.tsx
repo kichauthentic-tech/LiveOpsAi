@@ -242,7 +242,7 @@ export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ brands, 
                           }`}
                         >
                           {isPublished ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
-                          {isPublished ? "Đã phát hành" : report ? "Nháp" : "Chưa có dòng"}
+                          {isPublished ? "Đã phát hành" : report ? "Nháp" : "Chưa tạo"}
                         </span>
                         {isPublished && report?.publishedAt && (
                           <span className="block text-[11px] text-[var(--text-faint)] mt-1">

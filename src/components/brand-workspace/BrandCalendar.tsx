@@ -3,7 +3,7 @@ import { Brand, LiveSession, PromoScheme, ShiftSlot, ShiftRegistration, Studio, 
 import { SessionWindow } from "../SessionWindow";
 import { SessionReportInput } from "../../lib/db/sessionReports";
 import { CalendarIcon, ChevronLeft, ChevronRight, Plus, Tag } from "lucide-react";
-import { fmtVndShort } from "../../lib/format";
+import { fmtMonth, fmtVndShort } from "../../lib/format";
 import { schemesForDate } from "../../lib/schemeUtils";
 import { CAMPAIGN_DAY_STYLES, getCampaignDayInfo } from "../../lib/campaignDays";
 import { OpenSlotModal } from "../scheduling/OpenSlotModal";
@@ -456,7 +456,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
       {viewMode === "month" && (
       <div className="space-y-2">
         {(sessionsByDate.size === 0 || Array.from(sessionsByDate.values()).flat().length === 0) && (
-          <p className="text-sm text-[var(--text-faint)] text-center py-6">Không có phiên live nào trong tháng {month}.</p>
+          <p className="text-sm text-[var(--text-faint)] text-center py-6">Không có phiên live nào trong tháng {fmtMonth(month)}.</p>
         )}
         {Array.from(sessionsByDate.entries())
           .sort(([a], [b]) => a.localeCompare(b))

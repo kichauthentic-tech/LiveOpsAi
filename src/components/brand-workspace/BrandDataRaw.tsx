@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { fmtPeriodLabel } from "../../lib/format";
 import { BrandDataRawImport, BrandDataRawRow, DataRawReportType, UserRole, LiveSession, Talent } from "../../types";
 import { parseDataRawExcel, ParsedDataRawImport } from "../../lib/dataraw/parseDataRawExcel";
 import { dataRawImportsRead, fetchDataRawRows, createOrReplaceDataRawImport, findExistingImportForMonth, deleteDataRawImport } from "../../lib/db/brandDataRaw";
@@ -82,7 +83,7 @@ function formatPeriodShort(imp: BrandDataRawImport): string {
     const short = (d: string) => { const [, m, day] = d.split("-"); return `${day}/${m}`; };
     return `${short(imp.periodStart)} – ${short(imp.periodEnd)}/${imp.periodEnd.slice(0, 4)}`;
   }
-  return imp.periodLabel || "(không rõ kỳ)";
+  return imp.periodLabel ? fmtPeriodLabel(imp.periodLabel) : "(không rõ kỳ)";
 }
 
 // Ops/CEO/Admin dùng để dựng report tháng + đối soát — brand không có role đăng nhập vào phần
@@ -217,10 +218,10 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ brandId, brandName, 
     <div className="space-y-4">
       <div>
         <h2 className="font-bold text-[var(--text)] text-lg flex items-center gap-2">
-          <Database className="w-5 h-5 text-[var(--accent)]" /> Dữ Liệu Gốc (Dataraw) — {brandName}
+          <Database className="w-5 h-5 text-[var(--accent)]" /> Dữ Liệu Gốc — {brandName}
         </h2>
         <p className="text-xs text-[var(--text-muted)] mt-1">
-          Nơi lưu nguyên trạng report Excel tải tay từ TikTok Shop mỗi tuần/tháng. Đây là cơ sở để dựng report + đối soát cuối tháng, sau này cần tra chỉ số nào chỉ cần mở lại import đúng kỳ. Upload trong cùng 1 tháng sẽ tự gộp/ghi đè vào đúng batch của tháng đó (TikTok export luôn cộng dồn từ đầu tháng).
+          Nơi lưu nguyên trạng report Excel tải tay từ TikTok Shop mỗi tuần/tháng. Đây là cơ sở để dựng report + đối soát cuối tháng, sau này cần tra chỉ số nào chỉ cần mở lại import đúng kỳ. Up lại file trong cùng một tháng sẽ thay bản cũ của tháng đó (file TikTok luôn cộng dồn từ đầu tháng).
         </p>
       </div>
 
@@ -278,7 +279,7 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ brandId, brandName, 
           <div className="space-y-3">
             <p className="text-xs font-semibold text-[var(--text)]">
               Đã đọc <span className="text-emerald-500">{parsedPreview.rows.length}</span> dòng, <span className="text-emerald-500">{parsedPreview.columns.length}</span> cột từ <span className="italic">{fileName}</span>
-              {parsedPreview.periodLabel && <> — kỳ: <span className="text-[var(--text)]">{parsedPreview.periodLabel}</span></>}
+              {parsedPreview.periodLabel && <> — kỳ: <span className="text-[var(--text)]">{fmtPeriodLabel(parsedPreview.periodLabel)}</span></>}
             </p>
 
             {replaceTarget && (
@@ -332,7 +333,7 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ brandId, brandName, 
                 >
                   {expandedGroups.has(monthKey) ? <ChevronDown className="w-3.5 h-3.5 shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 shrink-0" />}
                   <span className="text-xs font-bold text-[var(--text)]">{formatMonthLabel(monthKey)}</span>
-                  <span className="text-[11px] text-[var(--text-faint)]">· {groupImports.length} batch</span>
+                  <span className="text-[11px] text-[var(--text-faint)]">· {groupImports.length} lần tải</span>
                 </button>
 
                 {expandedGroups.has(monthKey) && (

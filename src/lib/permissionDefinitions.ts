@@ -2,48 +2,51 @@ import { PermissionDefinition } from "../types";
 
 // Nhãn + mô tả của từng PermissionKey cho lưới Ma Trận Phân Quyền. Dữ liệu tĩnh của app (trước
 // 2026-10-02 nằm ở src/data/mockData.ts dù chẳng có gì là mock). Bất biến key ↔ nav item: types.ts.
+//
+// Mô tả = ĐÚNG những màn công tắc này mở trong menu (appNav.ts), không hơn (audit người mới 2026-10-04: bản cũ
+// còn hứa "ghim SKU, chạy kịch bản live", "kiểm kê thiết bị bằng mã QR", "chấm điểm skill" — đều đã gỡ hoặc chưa
+// từng có). Đổi gate trong appNav.ts thì sửa câu ở đây theo.
 export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   {
     key: "manage_sessions",
-    label: "Quản Lý Phiên Livestream",
-    category: "Vận Hành & Studio",
-    description: "Tạo mới, chỉnh sửa, ghim SKU, chạy kịch bản live và cập nhật kết quả GMV."
+    label: "Kế hoạch, ca và số liệu",
+    category: "Vận hành",
+    description: "Mở Dashboard, Kế Hoạch Tháng, Sổ Ca, Đối Soát Số Liệu, Hiệu Suất Host, Toàn Cảnh Brand và Điều Phối Phát Hành."
   },
   {
     key: "manage_calendar",
-    label: "Điều Phối Lịch Vận Hành Studio",
-    category: "Vận Hành & Studio",
-    description: "Xếp lịch sử dụng Studio, gán Host & Assistant, duyệt khung giờ trùng."
+    label: "Bảng Vận Hành",
+    category: "Vận hành",
+    description: "Mở Bảng Vận Hành: ca hôm nay/tuần, lịch theo phòng live, mở ca chờ đăng ký."
   },
   {
     key: "manage_talents",
-    label: "Quản Lý Talent Pool & Matcher",
-    category: "Nội Dung & AI",
-    description: "Thêm, cập nhật profile Host/KOC/KOL, chấm điểm skill và duyệt mức thù lao/commission."
+    label: "Talent Pool",
+    category: "Nhân sự",
+    description: "Mở Talent Pool: thêm/sửa hồ sơ host và trợ live, rate, gợi ý ghép host bằng AI."
   },
   {
     key: "manage_studios_gear",
-    label: "Quản Lý Studio & Thiết Bị QR",
-    category: "Vận Hành & Studio",
-    description: "Quản lý phòng studio, kiểm kê thiết bị bằng mã QR, cập nhật bảo trì gear."
+    label: "Studios & Gear",
+    category: "Vận hành",
+    description: "Mở Studios & Gear: phòng live và thiết bị gắn với từng phòng."
   },
   {
     key: "manage_crm_projects",
-    label: "Quản Lý CRM & Dự Án Brand",
-    category: "Tổng Quan & Báo Cáo",
-    description: "Quản lý danh sách Brand khách hàng, hợp đồng cam kết KPI GMV và ngân sách campaign."
+    label: "CRM và hợp đồng",
+    category: "Kinh doanh",
+    description: "Mở CRM (thông tin brand, cách thu phí, Rate Card) và Cam Kết Hợp Đồng (giờ cam kết mỗi tháng)."
   },
   {
     key: "manage_tiktok_api",
-    label: "Cấu Hình TikTok API",
-    category: "Quản Trị System & Tài Chính",
-    description: "Kết nối/ngắt kết nối TikTok Shop (OAuth) và xem nhật ký webhook nhận về."
+    label: "TikTok API",
+    category: "Hệ thống",
+    description: "Mở màn kết nối TikTok Shop. Chưa dùng được: đang chờ TikTok cấp quyền."
   },
   {
     key: "manage_users_permissions",
-    label: "Quản Lý Phân Quyền & Người Dùng",
-    category: "Quản Trị System & Tài Chính",
-    description: "Quyền tối cao Admin: Tạo tài khoản, custom phân quyền theo role và xem Audit Log."
+    label: "Phân quyền và tài khoản",
+    category: "Hệ thống",
+    description: "Mở Phân Quyền & Role: tạo tài khoản, đổi quyền theo vai trò hoặc từng người, xem nhật ký."
   }
 ];
-

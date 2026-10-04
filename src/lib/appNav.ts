@@ -52,7 +52,7 @@ export function getDefaultTabForRole(role: UserRole): string {
 }
 
 export function agencyNavGroups(currentRole: UserRole): NavGroup[] {
-  // Badge trên nav: chỉ còn "DEMO" (đánh dấu module mock, thật sự cần biết trước khi bấm). Các
+  // Badge trên nav: chỉ dùng khi người dùng thật sự cần biết trước khi bấm (hiện: "Chưa dùng" ở TikTok API). Các
   // badge LIVE/SMART/NEW/CUSTOM/ADMIN đã bỏ (audit Module 2, 2026-09-18) — "NEW" trên tab đã có
   // nhiều tháng, "SMART"/"LIVE" không mang thông tin; badge nào cũng có thì không badge nào được đọc.
   // Navigation Items mapped to permission keys, grouped theo luồng công việc — đây là
@@ -130,7 +130,8 @@ export function agencyNavGroups(currentRole: UserRole): NavGroup[] {
         // manage_crm_projects: quyền này mặc định đúng bằng ceo/admin/operations, khớp RLS của
         // brand_contracts/brand_monthly_commitments (migration 0081) nên không cần key mới.
         { id: "brand_commitment", label: "Cam Kết Hợp Đồng", icon: FileSignature, perm: "manage_crm_projects" as PermissionKey },
-        { id: "tiktok_api", label: "TikTok API", icon: Link2, perm: "manage_tiktok_api" as PermissionKey },
+        // Badge "Chưa dùng": chờ TikTok cấp quyền (WORKSPACE_DESIGN §2) — người mới cần biết trước khi bấm.
+        { id: "tiktok_api", label: "TikTok API", icon: Link2, perm: "manage_tiktok_api" as PermissionKey, badge: "Chưa dùng" },
       ],
     },
     {
@@ -190,7 +191,7 @@ export function brandNavGroups(currentRole: UserRole): NavGroup[] {
         { id: "brand_dashboard", label: "Dashboard", icon: LayoutDashboard, perm: undefined },
         { id: "brand_calendar", label: "Lịch Vận Hành", icon: CalendarIcon, perm: undefined },
         { id: "brand_sessions", label: "Sổ Ca", icon: BookOpen, perm: undefined },
-        { id: "brand_skus", label: "SKU Showcase", icon: Package, perm: undefined },
+        { id: "brand_skus", label: "Sản phẩm lên live", icon: Package, perm: undefined },
         { id: "brand_monthly_report", label: "Report Tháng", icon: FileText, perm: undefined },
         // Cam Kết Hợp Đồng bản CHỈ ĐỌC cho khách (Đợt C/1, migration 0108). Khác hẳn tab cùng tên
         // bên Agency: bên đó ops soạn hợp đồng + nhìn xuyên mọi brand, đây chỉ trả lời "tháng này

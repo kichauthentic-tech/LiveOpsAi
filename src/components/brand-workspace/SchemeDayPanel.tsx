@@ -93,7 +93,7 @@ export const SchemeDayPanel: React.FC<SchemeDayPanelProps> = ({ brandId, date, s
         ))}
       </datalist>
 
-      {daySchemes.length === 0 && !adding && <p className="text-xs text-[var(--text-faint)]">Chưa có scheme nào áp dụng ngày này.</p>}
+      {daySchemes.length === 0 && !adding && <p className="text-xs text-[var(--text-faint)]">Ngày này chưa có khuyến mãi nào.</p>}
 
       <div className="space-y-1.5">
         {daySchemes.map((scheme) => {

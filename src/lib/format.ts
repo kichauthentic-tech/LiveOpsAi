@@ -50,3 +50,24 @@ export function fmtVndShort(n: number | null | undefined): string {
   }
   return Math.round(n).toLocaleString("vi-VN");
 }
+
+/**
+ * "2026-10" → "10/2026". Tháng/ngày hiển thị luôn kiểu Việt — không in chuỗi máy "2026-10" ra màn hình (audit
+ * người mới 2026-10-04: Nhân sự ca, Finance, Đối Soát còn in "Tháng 2026-10", "2026-06-01 ~ 2026-09-22").
+ */
+export function fmtMonth(month: string): string {
+  const [y, m] = month.split("-");
+  return y && m ? `${Number(m)}/${y}` : month;
+}
+
+/** "2026-06-01" → "01/06/2026"; `withYear: false` → "01/06". */
+export function fmtDateVn(date: string, withYear = true): string {
+  const [y, m, d] = date.slice(0, 10).split("-");
+  if (!y || !m || !d) return date;
+  return withYear ? `${d}/${m}/${y}` : `${d}/${m}`;
+}
+
+/** Nhãn kỳ copy nguyên từ file TikTok ("2026-06-01 ~ 2026-09-22") → "01/06/2026 – 22/09/2026". */
+export function fmtPeriodLabel(label: string): string {
+  return label.replace(/(\d{4})-(\d{2})-(\d{2})/g, "$3/$2/$1").replace(/\s*~\s*/g, " – ");
+}

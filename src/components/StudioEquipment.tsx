@@ -58,10 +58,8 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
   const [studioName, setStudioName] = useState("");
   const [studioRoomNumber, setStudioRoomNumber] = useState("");
   const [studioCapacity, setStudioCapacity] = useState(6);
-  const [studioTheme, setStudioTheme] = useState("Decor Hiện Đại, Ánh Sáng Ấm");
+  const [studioTheme, setStudioTheme] = useState("");
   const [studioStatus, setStudioStatus] = useState<"Live Now" | "Booked" | "Available" | "Maintenance">("Available");
-  const [studioEquipmentCount, setStudioEquipmentCount] = useState(10);
-  const [studioDailyHours, setStudioDailyHours] = useState(16);
 
   // Equipment Modal State
   const [isEquipmentModalOpen, setIsEquipmentModalOpen] = useState(false);
@@ -85,10 +83,8 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
     setStudioName("");
     setStudioRoomNumber(`Room ${101 + studios.length}`);
     setStudioCapacity(6);
-    setStudioTheme("Decor Hiện Đại, Ánh Sáng Tối Ưu Live Stream");
+    setStudioTheme("");
     setStudioStatus("Available");
-    setStudioEquipmentCount(8);
-    setStudioDailyHours(16);
     setIsStudioModalOpen(true);
   };
 
@@ -99,8 +95,6 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
     setStudioCapacity(s.capacity);
     setStudioTheme(s.theme);
     setStudioStatus(s.status);
-    setStudioEquipmentCount(s.equipmentCount);
-    setStudioDailyHours(s.dailyAvailableHours ?? 16);
     setIsStudioModalOpen(true);
   };
 
@@ -115,8 +109,10 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
       capacity: Number(studioCapacity),
       theme: studioTheme,
       status: studioStatus,
-      equipmentCount: Number(studioEquipmentCount),
-      dailyAvailableHours: Number(studioDailyHours)
+      // Hai ô gõ tay đã bỏ khỏi form (audit người mới 2026-10-04): "Số thiết bị" giờ đếm từ Kho Thiết Bị, "giờ
+      // hoạt động" hứa tính "tỷ lệ lấp đầy" mà không màn nào tính. Giữ nguyên giá trị cũ khi sửa.
+      equipmentCount: editingStudio?.equipmentCount ?? 0,
+      dailyAvailableHours: editingStudio?.dailyAvailableHours ?? 24
     };
 
     if (editingStudio) {
@@ -226,7 +222,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
             activeSubTab === "studios" ? "bg-[var(--accent)] text-white shadow" : "bg-[var(--surface-elevated)] text-[var(--text-muted)] hover:bg-[var(--surface-hover)]"
           }`}
         >
-          <span className="inline-flex items-center gap-1.5"><Building2 className="w-3.5 h-3.5" /> Danh Sách Studio ({studios.length} Phòng)</span>
+          <span className="inline-flex items-center gap-1.5"><Building2 className="w-3.5 h-3.5" /> Phòng live ({studios.length})</span>
         </button>
         <button
           onClick={() => setActiveSubTab("equipment")}
@@ -234,7 +230,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
             activeSubTab === "equipment" ? "bg-[var(--accent)] text-white shadow" : "bg-[var(--surface-elevated)] text-[var(--text-muted)] hover:bg-[var(--surface-hover)]"
           }`}
         >
-          <span className="inline-flex items-center gap-1.5"><Camera className="w-3.5 h-3.5" /> Kho Thiết Bị ({equipments.length} Thiết bị)</span>
+          <span className="inline-flex items-center gap-1.5"><Camera className="w-3.5 h-3.5" /> Thiết bị ({equipments.length})</span>
         </button>
       </div>
 
@@ -244,14 +240,14 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
           <div className="bg-[var(--surface)] p-6 rounded-2xl border border-[var(--border)] shadow-sm space-y-4">
             <div className="flex justify-between items-center">
               <div>
-                <h3 className="font-bold text-[var(--text)] text-base">Danh Sách Studio Hợp Tác & Vận Hành</h3>
-                <p className="text-xs text-[var(--text-muted)]">Quản lý không gian quay, decor phòng & trạng thái book lịch</p>
+                <h3 className="font-bold text-[var(--text)] text-base">Phòng live</h3>
+                <p className="text-xs text-[var(--text-muted)]">Mỗi brand gắn với một phòng ở Kế Hoạch Tháng; ca chốt ra sẽ dùng phòng đó.</p>
               </div>
               <button
                 onClick={openAddStudioModal}
                 className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow transition-all"
               >
-                <Plus className="w-4 h-4" /> Thêm Studio Mới
+                <Plus className="w-4 h-4" /> Thêm phòng
               </button>
             </div>
 
@@ -290,17 +286,16 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
                     </div>
                   </div>
 
-                  <div className="bg-[var(--surface)] p-3 rounded-xl border border-[var(--border)] space-y-1 text-xs">
-                    <span className="text-[var(--text-muted)] font-semibold block">Chủ đề / Decor Studio:</span>
-                    <p className="text-[var(--text)] font-medium">{s.theme}</p>
-                  </div>
+                  {s.theme && (
+                    <div className="bg-[var(--surface)] p-3 rounded-xl border border-[var(--border)] space-y-1 text-xs">
+                      <span className="text-[var(--text-muted)] font-semibold block">Ghi chú:</span>
+                      <p className="text-[var(--text)] font-medium">{s.theme}</p>
+                    </div>
+                  )}
 
                   <div className="flex justify-between items-center text-xs text-[var(--text-muted)] pt-2 border-t border-[var(--border)]">
-                    <span>Số thiết bị: <strong className="text-[var(--text)]">{s.equipmentCount} món</strong></span>
-                    <span>Sức chứa: <strong className="text-[var(--text)]">{s.capacity} người</strong></span>
-                  </div>
-                  <div className="text-xs text-[var(--text-muted)]">
-                    <span>Giờ hoạt động: <strong className="text-[var(--text)]">{s.dailyAvailableHours}h/ngày</strong></span>
+                    <span>Thiết bị: <strong className="text-[var(--text)]">{equipments.filter((e) => e.assignedStudioId === s.id).length} món</strong></span>
+                    <span>Sức chứa: <strong className="text-[var(--text)]">{s.capacity > 0 ? `${s.capacity} người` : "chưa nhập"}</strong></span>
                   </div>
                 </div>
               ))}
@@ -310,13 +305,13 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
           {/* Visual Booking Calendar */}
           <div className="bg-[var(--surface)] p-6 rounded-2xl border border-[var(--border)] shadow-sm space-y-4">
             <div className="flex justify-between items-center">
-              <h3 className="font-bold text-[var(--text)] text-base">Lịch Đặt Phòng Studio Hôm Nay</h3>
+              <h3 className="font-bold text-[var(--text)] text-base">Phòng nào có ca hôm nay</h3>
               <span className="text-xs font-semibold text-emerald-400 bg-emerald-950/80 px-3 py-1 rounded-full border border-emerald-800/50">
-                {todaysBookings.length} Phiên hôm nay
+                {todaysBookings.length} ca hôm nay
               </span>
             </div>
             {todaysBookings.length === 0 ? (
-              <p className="text-xs text-[var(--text-muted)] py-4 text-center">Chưa có phiên live nào được đặt lịch hôm nay.</p>
+              <p className="text-xs text-[var(--text-muted)] py-4 text-center">Hôm nay không có ca nào.</p>
             ) : (
               <div className="space-y-2 text-xs">
                 {todaysBookings.map((s) => (
@@ -462,18 +457,18 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
             <form onSubmit={handleSaveStudio} className="p-6 space-y-4 text-xs overflow-y-auto">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="font-bold text-[var(--text-muted)] block mb-1">Tên Studio *</label>
+                  <label className="font-bold text-[var(--text-muted)] block mb-1">Tên phòng *</label>
                   <input
                     type="text"
                     required
                     value={studioName}
                     onChange={(e) => setStudioName(e.target.value)}
-                    placeholder="VD: Studio D - Beauty & Glam"
+                    placeholder="VD: CROCS"
                     className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-[var(--text-muted)] block mb-1">Số / Mã Phòng *</label>
+                  <label className="font-bold text-[var(--text-muted)] block mb-1">Mã phòng *</label>
                   <input
                     type="text"
                     required
@@ -486,32 +481,30 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
               </div>
 
               <div>
-                <label className="font-bold text-[var(--text-muted)] block mb-1">Chủ Đề & Decor Studio</label>
+                <label className="font-bold text-[var(--text-muted)] block mb-1">Ghi chú (không bắt buộc)</label>
                 <input
                   type="text"
                   value={studioTheme}
                   onChange={(e) => setStudioTheme(e.target.value)}
-                  placeholder="VD: Phong cách đền Neon năng động, setup kệ mỹ phẩm"
+                  placeholder="VD: phòng nhỏ, ánh sáng ấm"
                   className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="font-bold text-[var(--text-muted)] block mb-1">Trạng Thái</label>
+                  <label className="font-bold text-[var(--text-muted)] block mb-1">Trạng thái</label>
                   <select
                     value={studioStatus}
                     onChange={(e) => setStudioStatus(e.target.value as "Live Now" | "Booked" | "Available" | "Maintenance")}
                     className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
                   >
                     <option value="Available">Sẵn sàng</option>
-                    <option value="Booked">Đã đặt</option>
-                    <option value="Live Now">Đang live</option>
                     <option value="Maintenance">Bảo trì</option>
                   </select>
                 </div>
                 <div>
-                  <label className="font-bold text-[var(--text-muted)] block mb-1">Sức Chứa (Người)</label>
+                  <label className="font-bold text-[var(--text-muted)] block mb-1">Sức chứa (người)</label>
                   <input
                     type="number"
                     value={studioCapacity}
@@ -519,29 +512,8 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
                     className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
                   />
                 </div>
-                <div>
-                  <label className="font-bold text-[var(--text-muted)] block mb-1">Số Thiết Bị</label>
-                  <input
-                    type="number"
-                    value={studioEquipmentCount}
-                    onChange={(e) => setStudioEquipmentCount(Number(e.target.value))}
-                    className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
-                  />
-                </div>
               </div>
 
-              <div>
-                <label className="font-bold text-[var(--text-muted)] block mb-1">Số Giờ Hoạt Động / Ngày</label>
-                <input
-                  type="number"
-                  min={1}
-                  max={24}
-                  value={studioDailyHours}
-                  onChange={(e) => setStudioDailyHours(Number(e.target.value))}
-                  className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
-                />
-                <p className="text-[11px] text-[var(--text-faint)] mt-1">Dùng làm mẫu số tính tỷ lệ lấp đầy (Studio Utilization) — mặc định 16h/ngày (8:00-24:00)</p>
-              </div>
 
               <div className="pt-4 border-t border-[var(--border)] flex justify-end gap-3">
                 <button

@@ -15,7 +15,7 @@ import {
 import { errorMessage } from "../lib/errorMessage";
 import { useConfirm } from "../hooks/useConfirm";
 import { PageIntro } from "./common/PageIntro";
-import { fmtVndFull } from "../lib/format";
+import { fmtPeriodLabel, fmtVndFull } from "../lib/format";
 import { Brand, LiveSession } from "../types";
 
 interface LiveReconciliationProps {
@@ -170,7 +170,7 @@ export function LiveReconciliation({ brands, sessions, onApplied, onOpenSession 
                   b.id === activeId ? "border-[var(--accent)] bg-[var(--surface-elevated)]" : "border-[var(--border)] hover:bg-[var(--surface-hover)]"
                 }`}
               >
-                <span className="font-bold text-[var(--text)] block truncate max-w-[220px]">{b.periodLabel ?? b.fileName ?? "Không rõ kỳ"}</span>
+                <span className="font-bold text-[var(--text)] block truncate max-w-[220px]">{b.periodLabel ? fmtPeriodLabel(b.periodLabel) : b.fileName ?? "Không rõ kỳ"}</span>
                 <span className="text-[11px] text-[var(--text-faint)]">
                   {brandName(b.brandId) ?? "chưa gắn brand"} · {b.rowCount} phiên · {b.appliedAt ? `đã áp dụng ${fmtTime(b.appliedAt)}` : "chưa áp dụng"}
                 </span>

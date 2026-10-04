@@ -42,6 +42,14 @@ interface UserRoleSettingsProps {
 // (tức các dòng có trong bảng `role_permissions` dưới DB): hai thứ đó lệch nhau mỗi khi một role bị
 // gỡ khỏi app mà dòng dưới DB chưa kịp dọn — đúng tình huống của 'moderator' 2026-09-22, lưới vẽ 5
 // thẻ trong khi nhãn tab ghi "Ma Trận Role (6)". Nguồn sự thật cho MÀN HÌNH là danh sách này.
+// Nhãn tiếng Việt cho loại nhật ký (giá trị DB giữ tiếng Anh).
+const AUDIT_CATEGORY_LABEL: Record<string, string> = {
+  "Permission Change": "Đổi quyền",
+  "Role Update": "Đổi vai trò",
+  "User Status": "Trạng thái tài khoản",
+  "Security Alert": "Cảnh báo"
+};
+
 const MATRIX_ROLES: UserRole[] = ["admin", "ceo", "operations", "brand", "talent"];
 
 // Group permissions by category. Không còn filter nào ở đây: từ 2026-09-22 mọi PermissionKey
@@ -329,15 +337,15 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
   const getRoleDefaultTitle = (role: UserRole) => {
     switch (role) {
       case "admin":
-        return "Quản Trị Viên Hệ Thống (Admin)";
+        return "Quản trị hệ thống";
       case "ceo":
-        return "Executive Director / CEO";
+        return "CEO";
       case "operations":
-        return "Operations Specialist";
+        return "Vận hành";
       case "brand":
-        return "Brand Client Representative";
+        return "Đại diện brand";
       case "talent":
-        return "Livestream Host & Talent";
+        return "Host / Trợ live";
     }
   };
 
@@ -351,7 +359,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
               <ShieldCheck className="w-5 h-5 text-[var(--accent-text)] shrink-0" /> Phân Quyền & Role
             </h2>
             <PageIntro>
-              Cấu hình Ma trận phân quyền chi tiết cho {MATRIX_ROLES.length} Role tiêu chuẩn, override quyền từng cá nhân & audit nhật ký an ninh.
+              Mỗi vai trò ({MATRIX_ROLES.length} vai trò) được mở những màn nào, quyền riêng cho từng tài khoản, nhật ký thay đổi quyền và số lượt mở từng màn.
             </PageIntro>
           </div>
         </div>
@@ -367,7 +375,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
             }`}
           >
             <Key className="w-4 h-4" />
-            <span>Ma Trận Role ({MATRIX_ROLES.length})</span>
+            <span>Quyền theo vai trò</span>
           </button>
 
           <button
@@ -379,7 +387,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
             }`}
           >
             <Users className="w-4 h-4" />
-            <span>Danh Sách Account ({users.length})</span>
+            <span>Tài khoản ({users.length})</span>
           </button>
 
           <button
@@ -391,7 +399,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
             }`}
           >
             <History className="w-4 h-4" />
-            <span>Audit Logs ({auditLogs.length >= AUDIT_LOG_LIMIT ? `${AUDIT_LOG_LIMIT} gần nhất` : auditLogs.length})</span>
+            <span>Nhật ký ({auditLogs.length >= AUDIT_LOG_LIMIT ? `${AUDIT_LOG_LIMIT} gần nhất` : auditLogs.length})</span>
           </button>
 
           {canSeeUsage && (
@@ -451,18 +459,18 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
 
                   <div>
                     <h3 className="font-extrabold text-[var(--text)] text-base">
-                      {roleKey === "admin" && "Quản Trị Viên Hệ Thống (Admin)"}
-                      {roleKey === "ceo" && "Executive Admin (CEO)"}
-                      {roleKey === "operations" && "Operations Manager"}
-                      {roleKey === "brand" && "Brand Client Portal"}
-                      {roleKey === "talent" && "Talent / Host Portal"}
+                      {roleKey === "admin" && "Quản trị hệ thống"}
+                      {roleKey === "ceo" && "CEO"}
+                      {roleKey === "operations" && "Vận hành"}
+                      {roleKey === "brand" && "Brand (khách hàng)"}
+                      {roleKey === "talent" && "Host / Trợ live"}
                     </h3>
                     <p className="text-[11px] text-[var(--text-muted)] line-clamp-2 mt-1">
-                      {roleKey === "admin" && "Quyền tối cao — mọi thứ CEO làm được + độc quyền cấu hình AI Training Center (kể cả CEO không sửa được)."}
-                      {roleKey === "ceo" && "Truy cập toàn quyền điều hành agency, P&L tài chính, CRM & phân quyền system."}
-                      {roleKey === "operations" && "Điều phối phòng studio, xếp lịch ca live, kiểm kê gear QR & duyệt script."}
-                      {roleKey === "brand" && "Cổng báo cáo dành cho Khách hàng: xem GMV thực thu, ROI, order analytics."}
-                      {roleKey === "talent" && "Cổng dành cho Host / Trợ live: xem lịch livestream, commission dự kiến & AI coaching."}
+                      {roleKey === "admin" && "Mọi thứ CEO làm được, thêm AI Training Center (chỉ admin)."}
+                      {roleKey === "ceo" && "Toàn bộ màn agency, Finance & P&L, CRM và phân quyền."}
+                      {roleKey === "operations" && "Lập kế hoạch tháng, xếp và chốt người cho ca, up số liệu, đối soát, làm report. Không thấy Finance."}
+                      {roleKey === "brand" && "Chỉ thấy workspace của brand mình: lịch, sổ ca, report tháng đã phát hành, cam kết, kế hoạch tháng sau."}
+                      {roleKey === "talent" && "Ca của mình, đăng ký ca, nộp report ca và hồ sơ cá nhân."}
                     </p>
                   </div>
 
@@ -487,12 +495,12 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                 <div className="flex items-center gap-2">
                   <Key className="w-5 h-5 text-[var(--accent-text)]" />
                   <h3 className="font-black text-lg text-[var(--text)]">
-                    Tùy Chỉnh Phân Quyền Chi Tiết Cho Role:{" "}
+                    Quyền của vai trò:{" "}
                     <span className="text-[var(--accent-text)] uppercase">{selectedRole}</span>
                   </h3>
                 </div>
                 <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                  Bật/tắt từng tính năng cụ thể. Các thay đổi sẽ được áp dụng ngay lập tức cho toàn bộ người dùng thuộc role này.
+                  Mỗi công tắc mở hoặc khoá một màn trong menu. Đổi ở đây áp dụng ngay cho mọi tài khoản thuộc vai trò này.
                 </p>
               </div>
 
@@ -502,7 +510,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                   className="px-3.5 py-1.5 bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--text-muted)] rounded-xl text-xs font-bold border border-[var(--border)] transition-all flex items-center gap-1.5"
                 >
                   <Sliders className="w-3.5 h-3.5 text-[var(--accent-text)]" />
-                  <span>Khôi Phục Mặc Định</span>
+                  <span>Về mặc định</span>
                 </button>
               </div>
             </div>
@@ -589,12 +597,12 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                 onChange={(e) => setUserRoleFilter(e.target.value)}
                 className="px-3 py-2 bg-[var(--surface-base)] text-xs text-[var(--text-muted)] rounded-xl border border-[var(--border)] focus:outline-none focus:border-[var(--accent)] font-bold"
               >
-                <option value="all">Tất cả Role</option>
+                <option value="all">Mọi vai trò</option>
                 <option value="admin">Admin</option>
-                <option value="ceo">CEO Admin</option>
-                <option value="operations">Operations</option>
-                <option value="brand">Brand Portal</option>
-                <option value="talent">Talent Host</option>
+                <option value="ceo">CEO</option>
+                <option value="operations">Vận hành</option>
+                <option value="brand">Brand</option>
+                <option value="talent">Host / Trợ live</option>
               </select>
             </div>
 
@@ -613,12 +621,12 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
               <table className="w-full text-left text-xs">
                 <thead className="bg-[var(--surface-base)]/80 text-[var(--text-muted)] font-extrabold uppercase border-b border-[var(--border)] text-[11px]">
                   <tr>
-                    <th className="p-4">Người Dùng System</th>
-                    <th className="p-4">Role Phân Quyền</th>
-                    <th className="p-4">Gán Thực Thể (Brand / Talent)</th>
+                    <th className="p-4">Người dùng</th>
+                    <th className="p-4">Vai trò</th>
+                    <th className="p-4">Gắn với</th>
                     <th className="p-4">Trạng Thái</th>
                     <th className="p-4">Đăng Nhập Cuối</th>
-                    <th className="p-4 text-right">Thao Tác</th>
+                    <th className="p-4 text-right"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]/80">
@@ -679,7 +687,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                               <span>{assignedTalent.name}</span>
                             </span>
                           ) : (
-                            <span className="text-[var(--text-faint)] text-[11px]">Toàn Cơ Quan (Agency-wide)</span>
+                            <span className="text-[var(--text-faint)] text-[11px]">Toàn agency</span>
                           )}
                         </td>
 
@@ -703,10 +711,10 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                             <button
                               onClick={() => setPermissionOverrideUser(u)}
                               className="p-1.5 bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--accent-text)] rounded-lg transition-all text-xs flex items-center gap-1"
-                              title="Override quyền riêng cho người dùng này"
+                              title="Quyền riêng cho tài khoản này"
                             >
                               <Key className="w-3.5 h-3.5" />
-                              <span className="hidden lg:inline text-[11px] font-bold">Custom Extra</span>
+                              <span className="hidden lg:inline text-[11px] font-bold">Quyền riêng</span>
                             </button>
 
                             {/* Edit Button */}
@@ -753,11 +761,10 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
             <div className="flex items-center gap-2">
               <History className="w-5 h-5 text-[var(--accent-text)]" />
               <h3 className="font-extrabold text-base text-[var(--text)]">
-                Nhật Ký An Ninh & Thay Đổi Phân Quyền (Audit Trails)
+                Nhật ký thay đổi tài khoản và quyền
               </h3>
             </div>
-            <span className="text-xs text-[var(--text-muted)] font-mono">Real-time Encrypted Log</span>
-          </div>
+                      </div>
 
           <div className="space-y-3">
             {auditLogs.map((log) => (
@@ -777,7 +784,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                           : "bg-blue-500/20 text-blue-300 border border-blue-500/30"
                       }`}
                     >
-                      {log.category}
+                      {AUDIT_CATEGORY_LABEL[log.category] ?? log.category}
                     </span>
                   </div>
                   <p className="text-[var(--text-muted)] text-[11px]">{log.details}</p>
@@ -797,7 +804,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
             <div className="flex justify-between items-center pb-3 border-b border-[var(--border)] shrink-0">
               <h3 className="font-black text-lg text-[var(--text)] flex items-center gap-2">
                 <UserPlus className="w-5 h-5 text-[var(--accent-text)]" />
-                {editingUser ? "Chỉnh Sửa Tài Khoản Người Dùng" : "Tạo Tài Khoản Người Dùng Mới"}
+                {editingUser ? "Sửa tài khoản" : "Tạo tài khoản"}
               </h3>
               <button
                 onClick={() => setIsUserModalOpen(false)}
@@ -813,7 +820,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                 <input
                   type="text"
                   required
-                  placeholder="Ví dụ: Nguyễn Văn A"
+                  placeholder="Họ và tên"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full px-3 py-2 bg-[var(--surface-base)] rounded-xl border border-[var(--border)] text-[var(--text)] focus:outline-none focus:border-[var(--accent)]"
@@ -826,14 +833,14 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                   type="email"
                   required
                   disabled={!!editingUser}
-                  placeholder="user@liveops.ai"
+                  placeholder="email@congty.com"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   className="w-full px-3 py-2 bg-[var(--surface-base)] rounded-xl border border-[var(--border)] text-[var(--text)] focus:outline-none focus:border-[var(--accent)] disabled:opacity-50 disabled:cursor-not-allowed"
                 />
                 {editingUser && (
                   <p className="text-[11px] text-[var(--text-faint)]">
-                    Không thể đổi email đăng nhập tại đây — email gắn với tài khoản Supabase Auth thật.
+                    Không thể đổi email đăng nhập tại đây — email là tên đăng nhập của tài khoản.
                   </p>
                 )}
                 {!editingUser && (
@@ -845,17 +852,17 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-[var(--text-muted)] font-bold block">Role Phân Quyền (*)</label>
+                  <label className="text-[var(--text-muted)] font-bold block">Vai trò (*)</label>
                   <select
                     value={formData.role}
                     onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
                     className="w-full px-3 py-2 bg-[var(--surface-base)] rounded-xl border border-[var(--border)] text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-bold"
                   >
-                    <option value="admin">Admin (Quản Trị Viên Hệ Thống)</option>
-                    <option value="ceo">CEO Admin</option>
-                    <option value="operations">Operations Manager</option>
-                    <option value="brand">Brand Client Portal</option>
-                    <option value="talent">Talent Host Portal</option>
+                    <option value="admin">Quản trị hệ thống</option>
+                    <option value="ceo">CEO</option>
+                    <option value="operations">Vận hành</option>
+                    <option value="brand">Brand (khách hàng)</option>
+                    <option value="talent">Host / Trợ live</option>
                   </select>
                 </div>
 
@@ -875,10 +882,10 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
               </div>
 
               <div className="space-y-1">
-                <label className="text-[var(--text-muted)] font-bold block">Chức Danh Custom (Job Title)</label>
+                <label className="text-[var(--text-muted)] font-bold block">Chức danh hiển thị</label>
                 <input
                   type="text"
-                  placeholder="Ví dụ: Key Account Manager (Brand Lead)"
+                  placeholder="Ví dụ: KAM, Trưởng ca"
                   value={formData.customRoleTitle}
                   onChange={(e) => setFormData({ ...formData, customRoleTitle: e.target.value })}
                   className="w-full px-3 py-2 bg-[var(--surface-base)] rounded-xl border border-[var(--border)] text-[var(--text)] focus:outline-none focus:border-[var(--accent)]"
@@ -897,7 +904,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                     onChange={(e) => setFormData({ ...formData, assignedBrandId: e.target.value })}
                     className="w-full px-3 py-2 bg-[var(--surface-base)] rounded-xl border border-[var(--border)] text-[var(--text)] focus:outline-none focus:border-emerald-500 font-bold"
                   >
-                    <option value="">-- Chọn Nhãn Hàng --</option>
+                    <option value="">Chọn brand</option>
                     {brands.map((b) => (
                       <option key={b.id} value={b.id}>
                         {b.name} ({b.industry})
@@ -912,14 +919,14 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                 <div className="space-y-2 p-3 bg-amber-950/80 border border-amber-500/30 rounded-xl">
                   {editingUser ? (
                     <div>
-                      <label className="text-amber-300 font-bold block mb-1">Gán Profile Talent Host (*)</label>
+                      <label className="text-amber-300 font-bold block mb-1">Hồ sơ talent của tài khoản này (*)</label>
                       <select
                         required
                         value={formData.assignedTalentId}
                         onChange={(e) => setFormData({ ...formData, assignedTalentId: e.target.value })}
                         className="w-full px-3 py-2 bg-[var(--surface-base)] rounded-xl border border-[var(--border)] text-[var(--text)] focus:outline-none focus:border-amber-500 font-bold"
                       >
-                        <option value="">-- Chọn Host Livestream --</option>
+                        <option value="">Chọn hồ sơ</option>
                         {talents.map((t) => (
                           <option key={t.id} value={t.id}>
                             {t.name} ({t.role})
@@ -1053,13 +1060,13 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                         <span className="font-bold text-[var(--text)] text-xs">{def.label}</span>
                         {isOverridden && (
                           <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[11px] font-black px-1.5 py-0.5 rounded">
-                            OVERRIDDEN
+                            QUYỀN RIÊNG
                           </span>
                         )}
                       </div>
                       <p className="text-[11px] text-[var(--text-muted)]">{def.description}</p>
                       <span className="text-[11px] text-[var(--text-faint)] font-mono">
-                        Quyền mặc định của Role: {roleDefault ? "ALLOWED" : "DENIED"}
+                        Mặc định theo vai trò: {roleDefault ? "được mở" : "bị khoá"}
                       </span>
                     </div>
 
@@ -1078,9 +1085,9 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                       }`}
                     >
                       {activeVal ? (
-                        <><Check className="w-3.5 h-3.5" /> ALLOWED</>
+                        <><Check className="w-3.5 h-3.5" /> Được mở</>
                       ) : (
-                        <><X className="w-3.5 h-3.5" /> DENIED</>
+                        <><X className="w-3.5 h-3.5" /> Bị khoá</>
                       )}
                     </button>
                   </div>

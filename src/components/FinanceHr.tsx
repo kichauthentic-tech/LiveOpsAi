@@ -19,7 +19,7 @@ import { useToast } from "../hooks/useToast";
 import { PageIntro } from "./common/PageIntro";
 import { isUnconfirmedPast } from "../lib/sessionStatus";
 
-import { fmtFixed } from "../lib/format";
+import { fmtMonth, fmtFixed } from "../lib/format";
 import { MonthPicker } from "./common/MonthPicker";
 import { PageHeader } from "./common/PageHeader";
 interface FinanceHrProps {
@@ -182,10 +182,10 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
         <div className="border-b border-[var(--border)] pb-3 flex items-center justify-between flex-wrap gap-2">
           <div>
             <h3 className="font-bold text-[var(--text)] text-base flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-[var(--accent-text)]" /> Báo Cáo P&L Thật Theo Phiên Live
+              <TrendingUp className="w-5 h-5 text-[var(--accent-text)]" /> Lãi/lỗ từng ca
             </h3>
             <PageIntro>
-              GMV & Host lấy từ dữ liệu phiên/talent thật trên Supabase. Commission Agency, chi phí Studio/Ads nhập & lưu thật, chỉ CEO mới duyệt được.
+              GMV lấy từ số của ca, tiền trả host/trợ live tính theo rate ở Talent Pool, doanh thu agency theo Rate Card của brand (CRM). Chi phí studio/ads nhập tay từng ca. Chỉ CEO duyệt.
             </PageIntro>
           </div>
           <div className="flex items-center gap-1 text-xs">
@@ -193,9 +193,9 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
           </div>
           <div className="text-right text-xs bg-[var(--surface-elevated)]/50 border border-[var(--border)] rounded-xl px-4 py-2">
             <div className="text-[var(--text-muted)]">
-              Tổng {rows.length} phiên{backfillCount > 0 && rows.length > 0 ? ` (không tính ${backfillCount} ca nạp bù)` : ""} · Net Profit
+              Tổng {rows.length} ca{backfillCount > 0 && rows.length > 0 ? ` (không tính ${backfillCount} ca nạp bù)` : ""} · Lãi/lỗ
               {missingSummary.rowsAffected > 0 && (
-                <span className="text-amber-300 font-bold"> · {rows.length - missingSummary.rowsAffected}/{rows.length} phiên đủ rate</span>
+                <span className="text-amber-300 font-bold"> · {rows.length - missingSummary.rowsAffected}/{rows.length} ca đủ rate</span>
               )}
             </div>
             <div className={`text-lg font-black ${totals.netProfit >= 0 ? "text-emerald-400" : "text-red-400"}`}>
@@ -210,7 +210,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
         {missingSummary.rowsAffected > 0 && (
           <div className="text-[11px] rounded-xl px-3 py-2 border border-rose-800/60 bg-rose-950/40 text-rose-200 space-y-1">
             <p>
-              <b>{missingSummary.rowsAffected}/{rows.length} phiên đang tính bằng rate chưa nhập</b> — Net Profit ở trên KHÔNG phải số thật,
+              <b>{missingSummary.rowsAffected}/{rows.length} ca đang tính bằng rate chưa nhập</b> — Lãi/lỗ ở trên KHÔNG phải số thật,
               nó đang coi phần chưa nhập là 0 (hoặc dùng % mặc định trong code).
             </p>
             <p className="text-rose-300/90">
@@ -250,21 +250,21 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
         {rows.length === 0 ? (
           <p className="text-xs text-[var(--text-muted)] italic py-6 text-center">
             {backfillCount > 0
-              ? `Tháng ${month} chỉ có ${backfillCount} ca nạp bù từ file — Finance & P&L không tính ca nạp bù (rate card tháng đó không chuẩn). Bản Tin CEO có tính các ca này.`
-              : `Không có phiên "Completed" nào trong tháng ${month} để tính P&L.`}
+              ? `Tháng ${fmtMonth(month)} chỉ có ${backfillCount} ca nạp bù từ file — Finance & P&L không tính ca nạp bù (rate card tháng đó không chuẩn). Bản Tin CEO có tính các ca này.`
+              : `Không có ca nào đã xong trong tháng ${fmtMonth(month)} để tính P&L.`}
           </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-left text-[var(--text-muted)] border-b border-[var(--border)]">
-                  <th className="py-2 pr-3">Phiên</th>
+                  <th className="py-2 pr-3">Ca</th>
                   <th className="py-2 pr-3">GMV</th>
                   <th className="py-2 pr-3">Doanh thu agency</th>
-                  <th className="py-2 pr-3">Chi Phí Studio</th>
-                  <th className="py-2 pr-3">Chi Phí Ads (điều chỉnh — để 0 nếu dùng số trợ live báo cáo)</th>
-                  <th className="py-2 pr-3">Trả Host / Trợ Live</th>
-                  <th className="py-2 pr-3">Net Profit</th>
+                  <th className="py-2 pr-3">Chi phí studio</th>
+                  <th className="py-2 pr-3">Chi phí ads (để 0 nếu dùng số trợ live báo)</th>
+                  <th className="py-2 pr-3">Trả host / trợ live</th>
+                  <th className="py-2 pr-3">Lãi/lỗ</th>
                   <th className="py-2 pr-3">Duyệt</th>
                 </tr>
               </thead>

@@ -355,7 +355,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
         <div className="flex flex-wrap justify-between items-center gap-4">
           <div>
             <h3 className="font-bold text-[var(--text)] text-base">
-              Danh Sách Đội Ngũ Talent &amp; Host Agency ({filteredTalents.length}/{talents.length} Talent)
+              Host và trợ live ({filteredTalents.length}/{talents.length})
             </h3>
             <p className="text-xs text-[var(--text-muted)]">Xếp theo số ca đã chạy. Bấm vào dòng để xem chi tiết &amp; hiệu suất từng người.</p>
           </div>
@@ -390,7 +390,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                 onClick={openAddModal}
                 className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow transition-all"
               >
-                <Plus className="w-4 h-4" /> Thêm Talent Mới
+                <Plus className="w-4 h-4" /> Thêm talent
               </button>
             )}
           </div>
@@ -538,7 +538,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
       <details className="group bg-gradient-to-r from-[var(--accent)]/25 to-[var(--surface)] text-[var(--text)] rounded-2xl border border-[var(--accent)]/50 shadow-lg">
         <summary className="list-none cursor-pointer px-6 py-4 flex items-center gap-2 text-[var(--accent-text)] font-bold text-sm">
           <Sparkles className="w-5 h-5 text-[var(--accent-text)] shrink-0" />
-          Trình AI Khớp Nối Host Cho Chiến Dịch
+          Gợi ý host bằng AI
           <ChevronDown className="w-4 h-4 ml-auto shrink-0 transition-transform group-open:rotate-180" />
         </summary>
         <div className="px-6 pb-6 space-y-4">
@@ -618,7 +618,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
             <div className="bg-[var(--surface)] text-[var(--text)] px-6 py-4 flex justify-between items-center">
               <h3 className="font-bold text-sm flex items-center gap-2">
                 <Users className="w-4 h-4 text-[var(--accent-text)]" />
-                {editingTalent ? `Chỉnh Sửa Talent: ${editingTalent.name}` : "Thêm Talent Mới Vào Hệ Thống"}
+                {editingTalent ? `Sửa talent: ${editingTalent.name}` : "Thêm talent"}
               </h3>
               <button onClick={() => setIsModalOpen(false)} className="p-1.5 -m-1.5 rounded text-[var(--text-muted)] hover:text-[var(--text)]">
                 <X className="w-5 h-5" />

@@ -65,8 +65,17 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
       <PageHeader
         icon={Server}
         title="TikTok API"
-        description="Trạng thái kết nối TikTok Shop Partner API và nhật ký webhook nhận về."
+        description="Kết nối TikTok Shop để app tự nhận số liệu live/đơn hàng, thay cho việc tải file tay."
       />
+
+      {/* Audit người mới 2026-10-04: màn có trong menu nhưng chưa dùng được — nói thẳng ở đầu trang thay vì để
+          người mới tưởng phải cấu hình gì đó ở đây. */}
+      {!tiktokStatus?.connected && (
+        <div className="bg-amber-500/10 border border-amber-500/40 text-[var(--text)] text-xs p-3 rounded-xl">
+          <b>Chưa dùng được.</b> Agency đang chờ TikTok cấp quyền cho ứng dụng. Trong lúc chờ, số liệu vào app bằng
+          cách tải file từ TikTok Shop rồi up ở <b>Dữ Liệu Gốc</b> (trong từng brand) và <b>Đối Soát Số Liệu</b>.
+        </div>
+      )}
 
       {actionError && (
         <div className="bg-red-950/80 border border-red-800/50 text-red-400 text-xs font-semibold p-3 rounded-xl">
@@ -81,7 +90,7 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
 
       <div className="grid md:grid-cols-3 gap-4 text-xs">
         <div className="bg-[var(--surface)] p-4 rounded-2xl border border-[var(--border)] shadow-sm space-y-1">
-          <span className="text-[var(--text-muted)] font-medium block">TikTok OAuth App Status</span>
+          <span className="text-[var(--text-muted)] font-medium block">Trạng thái kết nối</span>
           {tiktokStatusLoading ? (
             <div className="text-sm font-bold text-[var(--text-muted)] flex items-center gap-1.5">
               <RefreshCw className="w-4 h-4 animate-spin" /> Đang kiểm tra...
@@ -110,7 +119,7 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
                   disabled={disconnecting}
                   className="min-h-6 -mx-1.5 px-1.5 rounded text-[11px] font-bold text-red-600 hover:text-red-700 flex items-center gap-1"
                 >
-                  <Unlink className="w-3.5 h-3.5" /> {disconnecting ? "Đang ngắt..." : "Ngắt Kết Nối"}
+                  <Unlink className="w-3.5 h-3.5" /> {disconnecting ? "Đang ngắt..." : "Ngắt kết nối"}
                 </button>
               ) : (
                 <button
@@ -118,7 +127,7 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
                   disabled={connecting || !tiktokStatus?.configured}
                   className="min-h-6 -mx-1.5 px-1.5 rounded text-[11px] font-bold text-[var(--accent-text)] hover:opacity-80 flex items-center gap-1 disabled:text-[var(--text-muted)]"
                 >
-                  <Link2 className="w-3.5 h-3.5" /> {connecting ? "Đang chuyển hướng..." : "Kết Nối TikTok Shop"}
+                  <Link2 className="w-3.5 h-3.5" /> {connecting ? "Đang chuyển hướng..." : "Kết nối TikTok Shop"}
                 </button>
               )}
             </div>
@@ -126,7 +135,7 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
         </div>
 
         <div className="bg-[var(--surface)] p-4 rounded-2xl border border-[var(--border)] shadow-sm space-y-1">
-          <span className="text-[var(--text-muted)] font-medium block">Webhook Endpoint</span>
+          <span className="text-[var(--text-muted)] font-medium block">Địa chỉ nhận sự kiện (webhook)</span>
           <div className="text-sm font-bold text-[var(--accent-text)] flex items-center gap-1.5">
             <Activity className="w-4 h-4" /> /api/tiktok/webhook
           </div>
@@ -136,12 +145,12 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
         </div>
 
         <div className="bg-[var(--surface)] p-4 rounded-2xl border border-[var(--border)] shadow-sm space-y-1">
-          <span className="text-[var(--text-muted)] font-medium block">Access Token Hết Hạn</span>
+          <span className="text-[var(--text-muted)] font-medium block">Hạn của phiên kết nối</span>
           <div className="text-sm font-bold text-[var(--text)]">
             {tiktokStatus?.accessTokenExpiresAt ? new Date(tiktokStatus.accessTokenExpiresAt).toLocaleString("vi-VN") : "—"}
           </div>
           <span className="text-[11px] text-[var(--text-muted)]">
-            {tiktokStatus?.scope ? `Scope: ${tiktokStatus.scope}` : "Chưa có phiên OAuth nào"}
+            {tiktokStatus?.scope ? `Scope: ${tiktokStatus.scope}` : "Chưa kết nối lần nào"}
           </span>
         </div>
       </div>
@@ -151,13 +160,13 @@ export const TikTokApiAutomation: React.FC<TikTokApiAutomationProps> = ({
         <div className="flex justify-between items-center border-b border-[var(--border)] pb-3">
           <div className="flex items-center gap-2">
             <span className={`w-2.5 h-2.5 rounded-full ${tiktokStatus?.connected ? "bg-emerald-400 animate-ping" : "bg-[var(--text-faint)]"}`}></span>
-            <span className="font-bold text-emerald-400">Webhook Event Log (Thật)</span>
+            <span className="font-bold text-emerald-400">Sự kiện TikTok gửi về</span>
           </div>
           <button
             onClick={onRefreshTikTokStatus}
             className="bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--text)] font-sans text-xs px-3 py-1.5 rounded-lg font-bold flex items-center gap-1 transition-all"
           >
-            <RefreshCw className="w-3.5 h-3.5" /> Làm Mới
+            <RefreshCw className="w-3.5 h-3.5" /> Làm mới
           </button>
         </div>
 

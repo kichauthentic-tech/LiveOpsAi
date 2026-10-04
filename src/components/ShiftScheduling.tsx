@@ -47,7 +47,7 @@ import { eligibleSlots } from "../lib/performance/bulkFinalize";
 import { useToast } from "../hooks/useToast";
 import { PageIntro } from "./common/PageIntro";
 
-import { fmtFixed, fmtVndShort } from "../lib/format";
+import { fmtDateVn, fmtFixed, fmtMonth, fmtVndShort } from "../lib/format";
 import { MonthPicker } from "./common/MonthPicker";
 interface ShiftSchedulingProps {
   currentRole: UserRole;
@@ -622,7 +622,7 @@ export default function ShiftScheduling({
       {view === "calendar" && (
       <div className="bg-[#f8f9fa] dark:bg-slate-900 border border-pink-200 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl">
         <h3 className="font-black text-slate-900 dark:text-white flex items-center gap-2 mb-4">
-          <CalendarIcon className="w-4 h-4 text-blue-500 dark:text-blue-400" /> Lịch Ma Trận Tháng {selectedMonth}
+          <CalendarIcon className="w-4 h-4 text-blue-500 dark:text-blue-400" /> Lịch tháng {fmtMonth(selectedMonth)}
         </h3>
         <div className="overflow-x-auto -mx-1 px-1 pb-1">
           <div className="min-w-[760px] xl:min-w-0">
@@ -762,7 +762,7 @@ export default function ShiftScheduling({
         <div className="flex items-center justify-between gap-2 flex-wrap mb-4">
           <h3 className="font-bold text-[var(--text)] flex items-center gap-2">
             <Radio className="w-4 h-4 text-blue-400" />
-            {selectedDate ? `Ca Ngày ${dayLabel(selectedDate)} ${selectedDate}` : `Ca tháng ${selectedMonth}${showPast ? "" : " · từ hôm nay"}`}
+            {selectedDate ? `Ca ngày ${dayLabel(selectedDate)} ${fmtDateVn(selectedDate)}` : `Ca tháng ${fmtMonth(selectedMonth)}${showPast ? "" : " · từ hôm nay"}`}
           </h3>
           {selectedDate && (
             <button onClick={() => setSelectedDate(null)} className="text-xs text-blue-400 hover:text-blue-300 font-bold">
@@ -1082,7 +1082,7 @@ export default function ShiftScheduling({
       {admin && (
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-6 shadow-xl">
         <h3 className="font-bold text-[var(--text)] flex items-center gap-2 mb-4">
-          <Users className="w-4 h-4 text-[var(--accent-text)]" /> Tải Theo Host — Tháng {selectedMonth}
+          <Users className="w-4 h-4 text-[var(--accent-text)]" /> Số ca của từng host — tháng {fmtMonth(selectedMonth)}
         </h3>
         {loadByTalent.length === 0 ? (
           <p className="text-sm text-[var(--text-faint)]">Chưa có ca nào đã chốt trong tháng này.</p>

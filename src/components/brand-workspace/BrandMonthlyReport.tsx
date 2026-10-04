@@ -21,7 +21,7 @@ import { useToast } from "../../hooks/useToast";
 import { fetchMonthlyReportSnapshot, saveMonthlyReportSnapshot, StoredMonthlyReportSnapshot } from "../../lib/db/monthlyReportSnapshots";
 import { DataRawImportStamp, fetchDataRawImportStamps } from "../../lib/db/brandDataRaw";
 import { buildMonthlyReportSnapshot, COVERAGE_TYPES, snapshotFreshness, snapshotHeadline, SnapshotHeadline } from "../../lib/report/monthlySnapshot";
-import { fmtVndShort } from "../../lib/format";
+import { fmtMonth, fmtVndShort } from "../../lib/format";
 import { prefetchable, type TabPrefetchCtx } from "../../lib/db/prefetch";
 import { lazyNamed } from "../../lib/lazyNamed";
 
@@ -216,14 +216,14 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
       const { snapshot, fetched, reused } = await buildSnapshot();
       if (stored && isPublished) {
         const ok = await confirm(
-          `Report ${month} ĐÃ PHÁT HÀNH — cập nhật xong brand thấy ngay số mới.\n\n${headlineDiff(snapshotHeadline(stored.snapshot), snapshotHeadline(snapshot))}\n\nCập nhật và phát hành lại?`,
+          `Report tháng ${fmtMonth(month)} ĐÃ PHÁT HÀNH — cập nhật xong brand thấy ngay số mới.\n\n${headlineDiff(snapshotHeadline(stored.snapshot), snapshotHeadline(snapshot))}\n\nCập nhật và phát hành lại?`,
           { confirmLabel: "Cập nhật & phát hành lại" }
         );
         if (!ok) return;
       }
       await saveSnapshot(snapshot);
       showToast(
-        `Đã chốt số liệu report ${month}` + (reused.length ? ` — tải ${fetched.length} phần, dùng lại ${reused.length} phần không đổi.` : "."),
+        `Đã chốt số liệu report tháng ${fmtMonth(month)}` + (reused.length ? ` — tải ${fetched.length} phần, dùng lại ${reused.length} phần không đổi.` : "."),
         "success"
       );
     } catch (e) {
@@ -471,7 +471,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
           {canManage && !stored ? (
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-8 text-center space-y-3">
               <Database className="w-8 h-8 mx-auto text-[var(--text-faint)]" />
-              <div className="text-sm font-bold text-[var(--text)]">Tháng {month} chưa tạo report</div>
+              <div className="text-sm font-bold text-[var(--text)]">Tháng {fmtMonth(month)} chưa tạo report</div>
               <p className="text-xs text-[var(--text-muted)] max-w-xl mx-auto">
                 Bấm để tổng hợp số liệu từ ca có số và Dữ Liệu Gốc rồi chốt lại. Sau đó mở report chỉ đọc số đã chốt; khi có ca đối soát
                 thêm hay file mới, bấm "Cập nhật số liệu".
@@ -504,11 +504,11 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
             </>
           ) : isPublished ? (
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-8 text-center text-[var(--text-faint)] text-sm">
-              Report tháng {month} đã phát hành nhưng chưa có số liệu chốt — liên hệ Ops để cập nhật.
+              Report tháng {fmtMonth(month)} đã phát hành nhưng chưa có số liệu chốt — liên hệ Ops để cập nhật.
             </div>
           ) : (
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-8 text-center text-[var(--text-faint)] text-sm">
-              Report tháng {month} chưa được phát hành. Số liệu vận hành sẽ hiển thị khi Ops/CEO/Admin phát hành report.
+              Report tháng {fmtMonth(month)} chưa được phát hành. Số liệu vận hành sẽ hiển thị khi Ops/CEO/Admin phát hành report.
             </div>
           )}
 

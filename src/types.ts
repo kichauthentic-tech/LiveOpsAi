@@ -32,7 +32,7 @@ export type PermissionKey =
 export interface PermissionDefinition {
   key: PermissionKey;
   label: string;
-  category: "Tổng Quan & Báo Cáo" | "Vận Hành & Studio" | "Nội Dung & AI" | "Quản Trị System & Tài Chính";
+  category: "Vận hành" | "Nhân sự" | "Kinh doanh" | "Hệ thống";
   description: string;
 }
 

@@ -42,7 +42,7 @@ const PLAN_STATUS_CLS: Record<BrandMonthPlan["status"] | "none", string> = {
 };
 
 const REPORT_STATUS_LABEL: Record<BrandMonthlyReport["status"] | "none", string> = {
-  none: "Chưa có dòng",
+  none: "Chưa tạo",
   draft: "Nháp",
   published: "Đã phát hành"
 };

@@ -333,7 +333,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
 
         {/* Dải tổng hợp theo bộ lọc */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-          <Stat label="Sessions" value={String(summary.total)} sub={summary.countable < summary.total ? `${summary.countable} ca có số` : undefined} />
+          <Stat label="Số ca" value={String(summary.total)} sub={summary.countable < summary.total ? `${summary.countable} ca có số` : undefined} />
           <Stat label="Giờ live" value={fmtHours(summary.hours)} sub="giờ thật, thiếu thì lấy giờ kế hoạch" />
           <Stat label="GMV" value={allHidden ? LOCKED : fmtVndShort(summary.gmv)} accent={!allHidden} muted={allHidden} />
           <Stat label="Orders" value={allHidden ? LOCKED : fmtInt(summary.orders)} muted={allHidden} />

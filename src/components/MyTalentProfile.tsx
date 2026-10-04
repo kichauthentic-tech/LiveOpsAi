@@ -328,7 +328,7 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
               </div>
             )}
             <p className="text-[11px] text-[var(--text-faint)]">
-              Tính tự động từ các ca Completed trong tháng theo rate card hiện tại — số tạm tính, có thể đổi nếu ca chưa
+              Tính tự động từ các ca đã xong trong tháng theo rate card hiện tại — số tạm tính, có thể đổi nếu ca chưa
               đối soát xong hoặc Rate Card của bạn vừa được cập nhật.
             </p>
               </>

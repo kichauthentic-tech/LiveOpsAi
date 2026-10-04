@@ -158,7 +158,7 @@ export const SchemeWeekStrip: React.FC<SchemeWeekStripProps> = ({ brandId, weekD
       >
         <Tag className="w-3.5 h-3.5 shrink-0" />
         <span>
-          {weekSchemes.length > 0 ? `Scheme khuyến mãi (${weekSchemes.length})` : "Chưa có scheme — bấm để thêm"}
+          {weekSchemes.length > 0 ? `Khuyến mãi trong tuần (${weekSchemes.length})` : "Chưa ghi khuyến mãi tuần này — bấm để thêm"}
           {weekLabel && <span className="font-mono font-normal opacity-70 ml-1">· Tuần {weekLabel}</span>}
         </span>
         <ChevronDown className={`w-3.5 h-3.5 ml-auto shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
