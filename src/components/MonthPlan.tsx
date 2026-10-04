@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { defaultPlanMonth } from "../lib/defaultMonth";
 import { Brand, BrandMonthPlan, BrandMonthPlanSlot, BrandMonthlyCommitment, BrandStudio, CalendarEventRow, LiveSession, PlanCampRanges, PromoScheme, RecurringShiftTemplate, ShiftSlot, Studio, Talent } from "../types";
 import { AlertTriangle, Ban, CalendarRange, Lock, Plus, Repeat, Save, Sparkles, Trash2, Wand2, X } from "lucide-react";
 import { commitmentsRead } from "../lib/db/brandContracts";
@@ -76,6 +77,7 @@ export function prefetchMonthPlan(_ctx: TabPrefetchCtx): void {
   commitmentsRead.prefetch();
   calendarEventsRead.prefetch();
   planStatusesRead.prefetch(next);
+  planStatusesRead.prefetch(todayVn().slice(0, 7));
   const remembered = loadRememberedBrandId();
   if (remembered) {
     monthPlanRead.prefetch(remembered, next);
@@ -122,6 +124,10 @@ export default function MonthPlan({
   const [compare, setCompare] = useState<Record<SuggestStrategy, SuggestResult> | null>(null);
   // Nhắc việc: brand chưa chốt kế hoạch cho THÁNG SAU (theo hôm nay), bất kể đang xem tháng nào.
   const [nextMonthMissing, setNextMonthMissing] = useState<string[]>([]);
+  // Kế hoạch THÁNG NÀY còn nháp (đã tạo, chưa chốt) — việc đang treo. Mở màn thì nhảy về đó thay vì tháng sau
+  // (lib/defaultMonth.ts, audit người mới 2026-10-04: 04/10 kế hoạch T10 CROCS còn nháp mà màn mở T11 trống).
+  const [curMonthDrafts, setCurMonthDrafts] = useState<Brand[]>([]);
+  const userPicked = useRef(false);
   // Giai đoạn D: mọi ca kế hoạch đã chốt của brand (mọi tháng) → đối chiếu thực tế + hiệu chỉnh.
   const [lockedSlots, setLockedSlots] = useState<BrandMonthPlanSlot[]>([]);
   const [lockedSlotsTick, setLockedSlotsTick] = useState(0);
@@ -144,6 +150,22 @@ export default function MonthPlan({
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => refreshMissing(true), [brands, nextMonth]);
+  useEffect(() => {
+    const cur = today.slice(0, 7);
+    let alive = true;
+    planStatusesRead.take(cur).then((m) => {
+      if (!alive) return;
+      const drafts = brands.filter((b) => m.get(b.id)?.status === "draft");
+      setCurMonthDrafts(drafts);
+      // Chỉ nhảy tháng khi chính brand đang mở có nháp tháng này (đến từ nút "Chốt kế hoạch" của brand khác thì
+      // giữ đúng brand đó); brand khác còn nháp thì banner bên dưới nhắc.
+      if (userPicked.current || !drafts.some((b) => b.id === brandId)) return;
+      setMonth(defaultPlanMonth(today, new Set([cur])));
+    }).catch(() => {});
+    return () => { alive = false; };
+    // Chỉ lúc mount: sau khi người dùng tự chọn brand/tháng thì không nhảy nữa.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     if (!brandId) return;
     let alive = true;
@@ -571,17 +593,30 @@ export default function MonthPlan({
           </PageIntro>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
-          <select value={brandId} onChange={(e) => setBrandId(e.target.value)} className="bg-[var(--surface-base)] border border-[var(--border)] rounded-xl px-3 py-2 text-[var(--text)] text-sm font-bold">
+          <select value={brandId} onChange={(e) => { userPicked.current = true; setBrandId(e.target.value); }} className="bg-[var(--surface-base)] border border-[var(--border)] rounded-xl px-3 py-2 text-[var(--text)] text-sm font-bold">
             {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
-          <MonthPicker value={month} onChange={setMonth} />
+          <MonthPicker value={month} onChange={(m) => { userPicked.current = true; setMonth(m); }} />
         </div>
       </div>
+
+      {curMonthDrafts.length > 0 && !(month === today.slice(0, 7) && curMonthDrafts.some((b) => b.id === brandId)) && (
+        <div className="bg-amber-950/40 border border-amber-900 rounded-xl px-4 py-2.5 text-xs text-amber-200 flex flex-wrap items-center gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>Kế hoạch <b>tháng này</b> ({fmtMonth(today.slice(0, 7))}) còn là nháp, chưa chốt: <b>{curMonthDrafts.map((b) => b.name).join(", ")}</b> — chưa chốt thì chưa có ca để talent đăng ký và Dashboard chưa có target.</span>
+          <button
+            onClick={() => { userPicked.current = true; setBrandId(curMonthDrafts[0].id); setMonth(today.slice(0, 7)); }}
+            className="ml-auto px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 font-bold text-amber-100 hover:bg-amber-500/30"
+          >
+            Mở kế hoạch {curMonthDrafts[0].name} tháng {fmtMonth(today.slice(0, 7))}
+          </button>
+        </div>
+      )}
 
       {nextMonthMissing.length > 0 && (
         <div className="bg-amber-950/40 border border-amber-900 rounded-xl px-4 py-2.5 text-xs text-amber-200 flex flex-wrap items-center gap-2">
           <AlertTriangle className="w-4 h-4 shrink-0" />
-          <span>Tháng {nextMonth.slice(5)}/{nextMonth.slice(0, 4)} chưa chốt kế hoạch: <b>{nextMonthMissing.join(", ")}</b> — chốt trước khi mở đăng ký để talent còn thời gian đăng ký.</span>
+          <span>Tháng {fmtMonth(nextMonth)} chưa chốt kế hoạch: <b>{nextMonthMissing.join(", ")}</b> — chốt trước khi mở đăng ký để talent còn thời gian đăng ký.</span>
         </div>
       )}
 

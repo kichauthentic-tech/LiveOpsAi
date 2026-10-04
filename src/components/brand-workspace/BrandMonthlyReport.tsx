@@ -1,4 +1,5 @@
 import React, { Suspense, useEffect, useMemo, useState } from "react";
+import { defaultReportMonth } from "../../lib/defaultMonth";
 import { LiveSession, ShiftSlot, UserRole, BrandMonthlyReport as BrandMonthlyReportType, BrandPlatformRate } from "../../types";
 import {
   FileText,
@@ -63,7 +64,7 @@ const snapshotRead = prefetchable("reportSnapshot", fetchMonthlyReportSnapshot);
 const importStampsRead = prefetchable("importStamps", fetchDataRawImportStamps);
 export function prefetchBrandMonthlyReport({ brandId, role }: TabPrefetchCtx): void {
   if (!brandId) return;
-  const month = getTodayMonth();
+  const month = defaultReportMonth(`${getTodayMonth()}-01`, []); // = tháng trước; brand có ca tháng đó là trùng key mount
   monthlyReportRead.prefetch(brandId, `${month}-01`);
   snapshotRead.prefetch(brandId, month);
   MonthlyReportTabs.preload();
@@ -110,7 +111,9 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
   const canManage = CAN_MANAGE_ROLES.includes(currentRole);
   const canViewWeekly = CAN_VIEW_WEEKLY_ROLES.includes(currentRole);
   const [viewMode, setViewMode] = useState<"month" | "week">("month");
-  const [month, setMonth] = useState(getTodayMonth());
+  // Mở THÁNG ĐÃ HẾT gần nhất có ca của brand — report chỉ phát hành được sau khi hết tháng (0133); mở tháng đang
+  // chạy là gặp ngay "chưa tạo report" (audit người mới 2026-10-04). Xem tháng này: chọn ở bộ chọn tháng.
+  const [month, setMonth] = useState(() => defaultReportMonth(`${getTodayMonth()}-01`, sessions.filter((s) => s.brandId === brandId)));
   const monthNowVn = getTodayMonth();
   const [report, setReport] = useState<BrandMonthlyReportType | null>(null);
   const [loading, setLoading] = useState(true);

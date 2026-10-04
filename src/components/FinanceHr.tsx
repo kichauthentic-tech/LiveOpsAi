@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { defaultViewMonth } from "../lib/defaultMonth";
 import {
   LiveSession,
   Talent,
@@ -81,7 +82,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
 
   // Audit Module 3 (2026-09-18): trước đây là MỘT danh sách mọi ca Completed từ đầu tới giờ, tổng
   // cộng dồn cả đời — vài tháng nữa là vô nghĩa. Lọc theo tháng, mặc định tháng hiện tại (VN).
-  const [month, setMonth] = useState(() => todayVn().slice(0, 7));
+  const [month, setMonth] = useState(() => defaultViewMonth(todayVn(), sessions)); // tháng gần nhất có ca (lib/defaultMonth.ts)
 
   // Real P&L is only meaningful for sessions that actually ran and closed with real GMV/orders.
   // Ca backfill (sinh từ file để nạp bù tháng cũ, 0086) bỏ ra: rate card tháng đó không chuẩn.
@@ -250,7 +251,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
         {rows.length === 0 ? (
           <p className="text-xs text-[var(--text-muted)] italic py-6 text-center">
             {backfillCount > 0
-              ? `Tháng ${fmtMonth(month)} chỉ có ${backfillCount} ca nạp bù từ file — Finance & P&L không tính ca nạp bù (rate card tháng đó không chuẩn). Bản Tin CEO có tính các ca này.`
+              ? `Tháng ${fmtMonth(month)} chỉ có ${backfillCount} ca nạp bù từ file — Finance & P&L không tính ca nạp bù (lương và giá các tháng đó chưa nhập chuẩn). Xem GMV và giờ của các ca này ở Dashboard.`
               : `Không có ca nào đã xong trong tháng ${fmtMonth(month)} để tính P&L.`}
           </p>
         ) : (

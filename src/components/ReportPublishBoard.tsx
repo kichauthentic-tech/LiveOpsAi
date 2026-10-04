@@ -124,7 +124,7 @@ export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ brands, 
     }
     const ok = await confirm(
       (unreconciled > 0
-        ? `Còn ${unreconciled} phiên live Completed trong ${fmtMonthLabel(month)} chưa đối soát với TikTok — số trong report có thể còn đổi.\n\nVẫn phát hành ${fmtMonthLabel(month)} cho ${brandName}?`
+        ? `Còn ${unreconciled} ca đã xong trong ${fmtMonthLabel(month)} chưa đối soát với TikTok — số trong report có thể còn đổi.\n\nVẫn phát hành ${fmtMonthLabel(month)} cho ${brandName}?`
         : `Phát hành report ${fmtMonthLabel(month)} cho ${brandName}? Brand sẽ thấy report này ngay.`) +
         `\n\nPhát hành = ĐÓNG SỔ tháng: sau đó không sửa/đối soát/loại/huỷ ca của ${brandName} trong tháng này được nữa cho tới khi thu hồi report.`
     );
@@ -242,7 +242,7 @@ export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ brands, 
                           }`}
                         >
                           {isPublished ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
-                          {isPublished ? "Đã phát hành" : report ? "Nháp" : "Chưa tạo"}
+                          {isPublished ? "Đã phát hành" : report ? (sessionCount === 0 ? "Nháp · không có ca" : "Nháp") : "Chưa tạo"}
                         </span>
                         {isPublished && report?.publishedAt && (
                           <span className="block text-[11px] text-[var(--text-faint)] mt-1">

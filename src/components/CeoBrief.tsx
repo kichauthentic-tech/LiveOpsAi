@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { defaultViewMonth } from "../lib/defaultMonth";
 import { AlertTriangle, ArrowDownRight, ArrowUpRight, ChevronLeft, ChevronRight, CircleAlert, Info, LayoutDashboard, Lock, Minus } from "lucide-react";
 import {
   Brand,
@@ -145,7 +146,7 @@ const Sparkline: React.FC<{ values: number[] }> = ({ values }) => {
   );
 };
 
-const Kpi: React.FC<{ label: string; value: string; cur: number | null; prev: number | null; goodWhenUp?: boolean; extra?: string; series?: number[]; locked?: boolean }> = ({ label, value, cur, prev, goodWhenUp, extra, series, locked }) => (
+const Kpi: React.FC<{ label: string; value: string; cur: number | null; prev: number | null; goodWhenUp?: boolean; extra?: string; series?: number[]; locked?: boolean; empty?: boolean }> = ({ label, value, cur, prev, goodWhenUp, extra, series, locked, empty }) => (
   <Card className="!p-3.5 flex flex-col gap-0.5 min-w-0">
     <span className="text-[11px] font-bold text-[var(--text-faint)] flex items-center gap-1" title={metricHint(label)}>
       {label}
@@ -153,7 +154,8 @@ const Kpi: React.FC<{ label: string; value: string; cur: number | null; prev: nu
     </span>
     <span className="text-xl font-black text-[var(--text)] truncate">{value}</span>
     <span className="text-[11px] text-[var(--text-faint)] flex flex-wrap gap-x-1.5">
-      <Delta cur={cur} prev={prev} goodWhenUp={goodWhenUp} />
+      {/* Kỳ chưa có ca nào: không so (trước đây ra "↓100%" đỏ cho tháng chưa bắt đầu). */}
+      {empty ? <span className="text-[11px] text-[var(--text-faint)]">kỳ này chưa có ca</span> : <Delta cur={cur} prev={prev} goodWhenUp={goodWhenUp} />}
       {extra && <span>· {extra}</span>}
     </span>
     {series && <Sparkline values={series} />}
@@ -191,7 +193,11 @@ export default function CeoBrief(props: CeoBriefProps) {
   const today = todayVn();
   const canSeeMoney = currentRole === "ceo" || currentRole === "admin";
   const [grain, setGrain] = useState<Grain>("month");
-  const [anchor, setAnchor] = useState(today);
+  // Mở tháng gần nhất có ca, không phải tháng của hôm nay (lib/defaultMonth.ts — audit người mới 2026-10-04).
+  const [anchor, setAnchor] = useState(() => {
+    const m = defaultViewMonth(today, sessions);
+    return m === today.slice(0, 7) ? today : `${m}-01`;
+  });
   const [customEnd, setCustomEnd] = useState(today);
   const [brandId, setBrandId] = useState<string>("all");
   const [plans, setPlans] = useState<Map<string, BrandMonthPlan>>(new Map());
@@ -231,6 +237,7 @@ export default function CeoBrief(props: CeoBriefProps) {
   const curSessions = useMemo(() => (hasPeriod ? inRange(scopeSessions, period.start, period.end) : []), [scopeSessions, period, hasPeriod]);
   const prevSessions = useMemo(() => inRange(scopeSessions, period.prevStart, period.prevEnd), [scopeSessions, period]);
   const cur = useMemo(() => totalsOf(curSessions), [curSessions]);
+  const noCur = curSessions.length === 0;
   const prev = useMemo(() => totalsOf(prevSessions), [prevSessions]);
   const fin = useMemo(() => (canSeeMoney ? financeOf(curSessions, pnl) : null), [canSeeMoney, curSessions, pnl]);
   const finPrev = useMemo(() => (canSeeMoney ? financeOf(prevSessions, pnl) : null), [canSeeMoney, prevSessions, pnl]);
@@ -370,12 +377,12 @@ export default function CeoBrief(props: CeoBriefProps) {
         <SectionTitle title="Tổng quan" />
         <div className="grid grid-cols-1 xl:grid-cols-[1.25fr_1fr] gap-4 items-start">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            <Kpi label="LIVE GMV" value={money(cur.gmv)} cur={cur.gmv} prev={prev.gmv} extra={`${num(cur.sessions)} ca`} series={series((t) => t.gmv)} />
-            <Kpi label="Giờ live" value={hrs(cur.hours)} cur={cur.hours} prev={prev.hours} series={series((t) => t.hours)} />
-            <Kpi label="GMV/giờ" value={money(cur.gmvPerHour)} cur={cur.gmvPerHour} prev={prev.gmvPerHour} series={series((t) => t.gmvPerHour)} />
-            <Kpi label="Orders" value={num(cur.orders)} cur={cur.orders} prev={prev.orders} extra={cur.aov ? `AOV ${money(cur.aov)}` : undefined} series={series((t) => t.orders)} />
-            <Kpi label="Views" value={num(cur.views)} cur={cur.views} prev={prev.views} series={series((t) => t.views)} />
-            <Kpi label="Product CTR" value={fmtKeyMetric("pct2", cur.ctr)} cur={cur.ctr} prev={prev.ctr} series={series((t) => t.ctr)} />
+            <Kpi empty={noCur} label="LIVE GMV" value={money(cur.gmv)} cur={cur.gmv} prev={prev.gmv} extra={`${num(cur.sessions)} ca`} series={series((t) => t.gmv)} />
+            <Kpi empty={noCur} label="Giờ live" value={hrs(cur.hours)} cur={cur.hours} prev={prev.hours} series={series((t) => t.hours)} />
+            <Kpi empty={noCur} label="GMV/giờ" value={money(cur.gmvPerHour)} cur={cur.gmvPerHour} prev={prev.gmvPerHour} series={series((t) => t.gmvPerHour)} />
+            <Kpi empty={noCur} label="Orders" value={num(cur.orders)} cur={cur.orders} prev={prev.orders} extra={cur.aov ? `AOV ${money(cur.aov)}` : undefined} series={series((t) => t.orders)} />
+            <Kpi empty={noCur} label="Views" value={num(cur.views)} cur={cur.views} prev={prev.views} series={series((t) => t.views)} />
+            <Kpi empty={noCur} label="Product CTR" value={fmtKeyMetric("pct2", cur.ctr)} cur={cur.ctr} prev={prev.ctr} series={series((t) => t.ctr)} />
             {canSeeMoney && fin && (
               <>
                 <Kpi label="Doanh thu agency" value={fin.priced ? money(fin.revenue) : "Chưa tính được"} cur={fin.priced ? fin.revenue : null} prev={finPrev?.priced ? finPrev.revenue : null} extra={fin.sessions ? `${fin.priced}/${fin.sessions} ca đủ dữ liệu` : undefined} locked />
@@ -603,7 +610,7 @@ const MonthOverMonth: React.FC<{ sessions: LiveSession[]; brands: Brand[]; lastM
   }));
   return (
     <section className="space-y-3">
-      <SectionTitle title="Tháng qua tháng" note={`Tháng đang chạy so với cùng ${days} ngày đầu tháng trước`} />
+      <SectionTitle title="Tháng qua tháng" note={`Tháng cuối so với cùng ${days} ngày đầu tháng trước`} />
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_1.1fr] gap-4">
         <Card>
           <h4 className="font-black text-[var(--text)] mb-2 text-sm">GMV theo tháng</h4>
@@ -670,7 +677,7 @@ const MonthOverMonth: React.FC<{ sessions: LiveSession[]; brands: Brand[]; lastM
               )}
             </tbody>
           </table>
-          <p className="px-3 py-2 text-[11px] text-[var(--text-faint)] border-t border-[var(--border)]">* Tháng đang chạy, cộng tới ngày có số ({ddmm(last.through)}).{finCols ? " Lãi gộp chỉ cộng ca đủ dữ liệu tính tiền." : ""}</p>
+          <p className="px-3 py-2 text-[11px] text-[var(--text-faint)] border-t border-[var(--border)]">* {last.through < monthEndOf(`${last.month}-01`) ? (last.month < todayVn().slice(0, 7) ? `Tháng đã hết nhưng số mới về tới ${ddmm(last.through)} — cần up thêm file.` : `Tháng đang chạy, cộng tới ngày có số (${ddmm(last.through)}).`) : "Đủ tháng."}{finCols ? " Lãi gộp chỉ cộng ca đủ dữ liệu tính tiền." : ""}</p>
         </Card>
       </div>
     </section>

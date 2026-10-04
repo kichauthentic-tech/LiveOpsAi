@@ -1177,6 +1177,13 @@ export default function App() {
     setMobileMenuOpen(false);
   };
 
+  // Mở một màn từ nút "việc cần làm" của màn khác: brandId có ⇒ vào Brand Workspace của brand đó.
+  const navigateTo = (tab: string, brandId?: string) => {
+    setWorkspace(brandId ? { type: "brand", brandId } : { type: "agency" });
+    setActiveTab(tab);
+    setMobileMenuOpen(false);
+  };
+
   const handleWorkspaceChange = (next: WorkspaceContext) => {
     setWorkspace(next);
     const nextGroups = next.type === "brand" ? BRAND_NAV_GROUPS : AGENCY_NAV_GROUPS;
@@ -1729,6 +1736,7 @@ export default function App() {
                     sessions={activeSessions}
                     brandPlatformRates={brandPlatformRates}
                     monthlyReports={monthlyReports}
+                    onNavigate={navigateTo}
                   />
                 )}
 

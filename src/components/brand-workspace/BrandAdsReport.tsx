@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { defaultReportMonth } from "../../lib/defaultMonth";
 import { LiveSession, UserRole, BrandMonthlyReport as BrandMonthlyReportType } from "../../types";
 import { AlertTriangle, Loader2, Lock, Megaphone, Save, Target, TrendingUp } from "lucide-react";
 import { getTodayMonth } from "../../lib/dateUtils";
@@ -99,14 +100,15 @@ const MomChip: React.FC<{ current: number | null; previous: number | null }> = (
 // Lượt đọc lúc mở màn — nạp trước trong lúc chờ đợt nạp chung (lib/db/prefetch.ts).
 export function prefetchBrandAdsReport({ brandId, role }: TabPrefetchCtx): void {
   if (!brandId || (role && !CAN_MANAGE_ROLES.includes(role))) return;
-  const month = getTodayMonth();
+  const month = defaultReportMonth(`${getTodayMonth()}-01`, []);
   monthlyReportRead.prefetch(brandId, `${month}-01`);
   prefetchReportPlanningInputs(brandId, month);
 }
 
 export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandName, sessions, currentRole }) => {
   const canManage = CAN_MANAGE_ROLES.includes(currentRole);
-  const [month, setMonth] = useState(getTodayMonth());
+  // Cùng tháng mở sẵn với Report Tháng — phần nhập ở đây đi theo report đó (lib/defaultMonth.ts).
+  const [month, setMonth] = useState(() => defaultReportMonth(`${getTodayMonth()}-01`, sessions.filter((s) => s.brandId === brandId)));
   const [report, setReport] = useState<BrandMonthlyReportType | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -217,7 +219,7 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
           <Target className="w-4 h-4 text-[var(--accent-text)]" /> Ads Report Chi Tiết (TikTok)
         </h3>
         <p className="text-[11px] text-[var(--text-faint)]">
-          Tính từ Ads cost host/ops nhập trong Report Ca của các phiên TikTok Completed trong tháng, đối chiếu GMV cùng phiên để
+          Tính từ Ads cost host/ops nhập trong Report Ca của các ca TikTok đã xong trong tháng, đối chiếu GMV cùng phiên để
           ra ROAS. So với tháng {fmtMonth(prevMonthStr(month))}.
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -245,7 +247,7 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
         {adsReport.missingCount > 0 && (
           <div className="flex items-start gap-2 text-[11px] text-amber-300 bg-amber-950/60 border border-amber-800/50 rounded-xl p-2.5">
             <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
-            {adsReport.missingCount} phiên TikTok Completed trong tháng chưa nộp Report Ca (không có Ads cost) — số Ads cost/ROAS
+            {adsReport.missingCount} ca TikTok đã xong trong tháng chưa nộp Report Ca (không có Ads cost) — số Ads cost/ROAS
             phía trên đang thấp hơn thực tế tương ứng.
           </div>
         )}

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { rememberBrandId } from "../lib/defaultBrand";
 import { Download, LayoutGrid, Loader2 } from "lucide-react";
 import { Brand, BrandMonthlyReport, BrandMonthPlan, BrandPlatformRate, LiveSession } from "../types";
 import { planStatusesRead } from "../lib/db/monthPlans";
@@ -28,7 +29,18 @@ interface BrandsOverviewProps {
   sessions: LiveSession[];
   brandPlatformRates: BrandPlatformRate[];
   monthlyReports: Map<string, BrandMonthlyReport>;
+  /** Mở một màn (brandId có ⇒ mở trong Brand Workspace của brand đó). */
+  onNavigate?: (tab: string, brandId?: string) => void;
 }
+
+// Ô trạng thái "chưa có" là một NÚT tới đúng chỗ phải nhập (audit người mới 2026-10-04: bảng toàn chữ
+// "Chưa lập / Chưa có cam kết / Chưa tạo / Chưa set" mà không nói đi đâu để làm).
+const GoLink: React.FC<{ label: string; onClick?: () => void }> = ({ label, onClick }) =>
+  onClick ? (
+    <button onClick={onClick} className="block mt-1 text-[11px] font-bold text-[var(--accent-text)] hover:underline min-h-6">
+      {label} →
+    </button>
+  ) : null;
 
 const PLAN_STATUS_LABEL: Record<BrandMonthPlan["status"] | "none", string> = {
   none: "Chưa lập",
@@ -77,7 +89,7 @@ export function prefetchBrandsOverview(_ctx: TabPrefetchCtx): void {
   commitmentsRead.prefetch();
 }
 
-export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ brands, sessions, brandPlatformRates, monthlyReports }) => {
+export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ brands, sessions, brandPlatformRates, monthlyReports, onNavigate }) => {
   const { showToast } = useToast();
   const today = todayVn();
   const [month, setMonth] = useState(today.slice(0, 7));
@@ -186,8 +198,8 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ brands, sessions
           </div>
         </div>
         <PageIntro>
-          Trạng thái từng brand cho tháng đang xem — số thật đã xảy ra và trạng thái đọc thẳng từ DB, không có ô nào là dự
-          phóng.
+          Mỗi brand trong tháng đang xem: đã lập kế hoạch, nhập hợp đồng, làm report, nhập giá chưa — và số thật đã
+          chạy. Ô nào còn thiếu có nút dẫn tới chỗ nhập.
         </PageIntro>
       </div>
 
@@ -222,6 +234,9 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ brands, sessions
                       <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${PLAN_STATUS_CLS[planStatus]}`}>
                         {PLAN_STATUS_LABEL[planStatus]}
                       </span>
+                      {planStatus !== "locked" && (
+                        <GoLink label={planStatus === "none" ? "Lập kế hoạch" : "Chốt kế hoạch"} onClick={onNavigate && (() => { rememberBrandId(b.id); onNavigate("month_plan"); })} />
+                      )}
                       {plan?.brandConfirmedAt && (
                         <span className="block text-[11px] text-emerald-400 mt-1">✓ brand đã xác nhận</span>
                       )}
@@ -235,6 +250,7 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ brands, sessions
                       <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${COMMIT_STATUS_CLS[commitStatus]}`}>
                         {COMMIT_STATUS_LABEL[commitStatus]}
                       </span>
+                      {commitStatus === "no_commitment" && <GoLink label="Nhập hợp đồng" onClick={onNavigate && (() => onNavigate("brand_commitment"))} />}
                       {progress && (
                         <span className="block text-[11px] text-[var(--text-faint)] mt-1">
                           {fmtHours(progress.plannedTotalHours)}/{fmtHours(progress.committedHours)}
@@ -258,12 +274,18 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ brands, sessions
                       <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${REPORT_STATUS_CLS[reportStatus]}`}>
                         {REPORT_STATUS_LABEL[reportStatus]}
                       </span>
+                      {reportStatus !== "published" && month < today.slice(0, 7) && s.happened > 0 && (
+                        <GoLink label={reportStatus === "none" ? "Tạo report" : "Mở report"} onClick={onNavigate && (() => onNavigate("brand_monthly_report", b.id))} />
+                      )}
                     </td>
                     <td className="py-2.5 px-2">
                       {rates && rates.size > 0 ? (
                         <span className="text-[11px] text-[var(--text-muted)]">{[...rates].join(", ")}</span>
                       ) : (
-                        <span className="text-[11px] text-rose-300 font-bold">Chưa set</span>
+                        <>
+                          <span className="text-[11px] text-rose-300 font-bold">Chưa nhập</span>
+                          <GoLink label="Nhập ở CRM" onClick={onNavigate && (() => onNavigate("crm"))} />
+                        </>
                       )}
                     </td>
                   </tr>
