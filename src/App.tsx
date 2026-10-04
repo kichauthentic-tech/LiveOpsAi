@@ -229,25 +229,28 @@ export default function App() {
   // Ngưỡng 1440px: từ đó lịch còn ≥ 1.136px khi menu mở (đủ 7 cột tháng / lưới phòng theo giờ).
   const [sidebarPref, setSidebarPref] = useState<boolean>(() => loadStorage("sidebarCollapsed", false));
   useEffect(() => saveStorage("sidebarCollapsed", sidebarPref), [sidebarPref]);
+  // Lựa chọn tay RIÊNG cho màn hẹp (< 1440px), mặc định thu gọn như cũ. Trước đây mở menu ở màn hẹp chỉ có tác dụng
+  // tới lần tải lại — laptop 1.280–1.440px (phổ biến) luôn về ~20 biểu tượng không chữ, người mới phải rê chuột từng
+  // cái (audit người mới 2026-10-04, Nhóm 4). Nay mở một lần là nhớ.
+  const [sidebarNarrowPref, setSidebarNarrowPref] = useState<boolean>(() => loadStorage("sidebarCollapsedNarrow", true));
+  useEffect(() => saveStorage("sidebarCollapsedNarrow", sidebarNarrowPref), [sidebarNarrowPref]);
 
   const isCalendarModule = CALENDAR_TABS.has(activeTab);
   const isWideScreen = useMediaQuery("(min-width: 1440px)");
   const autoCollapse = !isWideScreen;
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(sidebarPref);
-  // Màn hẹp → tự thu gọn; rộng ra → trả lại đúng lựa chọn tay của user.
-  // Nếu user tự mở lại sidebar khi đang tự thu gọn thì effect này không chạy
-  // (deps không đổi) nên tôn trọng thao tác đó cho tới lần đổi cỡ màn kế tiếp.
+  // Màn hẹp → lựa chọn của màn hẹp (mặc định thu gọn); rộng ra → lựa chọn của màn rộng.
   useEffect(() => {
-    setSidebarCollapsed(autoCollapse ? true : sidebarPref);
-  }, [autoCollapse, sidebarPref]);
+    setSidebarCollapsed(autoCollapse ? sidebarNarrowPref : sidebarPref);
+  }, [autoCollapse, sidebarPref, sidebarNarrowPref]);
 
   const toggleSidebar = React.useCallback(() => {
     setSidebarCollapsed((v) => {
       const next = !v;
-      // Chỉ ghi đè lựa chọn mặc định khi không ở chế độ tự thu gọn — thao tác tay ở màn hẹp
-      // chỉ có tác dụng tạm thời, không đổi mặc định của user.
-      if (!autoCollapse) setSidebarPref(next);
+      // Màn rộng và màn hẹp nhớ lựa chọn riêng — mở menu ở laptop không làm đổi mặc định ở màn rộng.
+      if (autoCollapse) setSidebarNarrowPref(next);
+      else setSidebarPref(next);
       return next;
     });
   }, [autoCollapse]);

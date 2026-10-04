@@ -17,7 +17,17 @@
   bù từ file Creator-Live-Performance (229 ca, còn ca chưa gán host). **Không đề xuất tính năng mới**; hỏi user chạy thử
   tới đâu, cái gì kêu, rồi sửa đúng chỗ đó. **Không seed mock lại.**
 - **Nợ kỹ thuật đã hết** (đợt P2a-2…P2a-21, 01–02/10) và **audit code chết đã xong** (02/10): `npm run audit:dead` báo 0,
-  ESLint 0 lỗi (31 warning `set-state-in-effect` = nợ đã đo, cố ý `warn`), vitest 434/434 (04/10).
+  ESLint 0 lỗi (31 warning `set-state-in-effect` = nợ đã đo, cố ý `warn`), vitest 450/450 (04/10).
+- **04/10 tối: audit "người mới dùng khó"** (tài liệu cho user: Claude Doc "Audit LiveOps AI cho người mới dùng",
+  https://claude.ai/code/artifact/304c57ba-c36e-466b-bc54-337147d9f736) — user bảo sửa hết, đã làm 5 bước, mỗi bước 1 commit
+  đã push: `62cbff0` dọn chữ/dữ liệu mẫu (form CRM/Studio, mô tả quyền, chữ tiếng Anh, ngày `2026-10` → `10/2026`,
+  migration **`0134` CHƯA CHẠY**) · `fae158e` mở đúng tháng (`lib/defaultMonth.ts`) + ô thiếu có nút dẫn đường ·
+  `b1257cb` số ghi kỳ/cách đếm (Hiệu Suất Host, Talent Pool, Sổ Ca, Rate Card) · `69aa4c7` một thông tin một chỗ nhập
+  (khung camp + target chỉ ở Kế Hoạch Tháng; bỏ ô "phân bổ target tháng sau" + "kế hoạch affiliate tháng sau" ở Nhập
+  Ads; bỏ ô GMV/CVR gõ tay ở talent, AI ghép host nhận số thật) · `738c7a0` khối **Việc cần làm** trên Bảng Vận Hành
+  (`lib/todoList.ts`) + **Từ điển và cách dùng** (nút ? trên Header) · bước 6: menu màn hẹp nhớ lựa chọn mở. Phát hiện
+  lớn nhất: từ 23/09 không có ca nào được ghi vào app — chỉ bước "up file TikTok" đang được dùng (0 hợp đồng, 0 giá, 0
+  snapshot, 0 tự khai, kế hoạch duy nhất là T10 CROCS nháp).
 - **04/10: audit LOGIC vòng đời** (hợp đồng → kế hoạch → ca → đăng ký → chốt → vận hành → đối soát → report) theo yêu
   cầu user, user bảo "sửa hết": 14 điểm gãy đã sửa trong code + migration **`0133` (ĐÃ CHẠY trên production 04/10,
   commit `b901273` đã push)**. Chi tiết: mục `## Audit logic vòng đời (2026-10-04)` cuối file lịch sử. Verify: bộ kiểm SQL 34/34 trên bản
@@ -56,6 +66,9 @@
 ## 2. Việc còn treo
 
 **Cần user làm:**
+00. **Chạy migration `0134_clear_sample_brand_contacts.sql`** (xoá SĐT/email/KAM MẪU đã lỡ lưu trong `brands`: 0909 123 456
+   ở Franklin + CROCS, 0909 333 444 JOCKEY, 0909 111 222 VERA, KAM "Lê Quốc Bảo (KAM Lead)" ×4 — không có tài khoản nào
+   tên đó). Không phụ thuộc thứ tự deploy. Sau khi chạy: CRM hiện "Chưa nhập"/"Chưa chọn", nhập lại liên hệ thật.
 0. **Backup DB hằng ngày đang HỎNG** (GitHub Action `backup-supabase.yml` đỏ mỗi ngày, đo 04/10): secret
    `SUPABASE_DB_URL` trỏ tới `aws-0-ap-southeast-1.pooler.supabase.com`, pooler báo `tenant/user
    postgres.licqfomsrjkavipomplz not found` ⇒ sai host/region. Lấy lại chuỗi "Session pooler" ở Supabase Dashboard →
@@ -74,7 +87,10 @@
 7. Nhánh `503 ai_not_configured` đầu-cuối; đợt fetch lúc đăng nhập của role talent/brand.
 
 **Hoãn có chủ đích (có lý do, không phải quên):**
-8. Gộp menu / IA — chờ số liệu `ui_tab_views`.
+8. Gộp menu / IA — chờ số liệu `ui_tab_views`. Đo 04/10: 1.309 lượt mở đều của MỘT tài khoản (admin — phần lớn là các
+   phiên Claude verify) ⇒ chưa có tín hiệu nào; cần người dùng thật khác vài tuần.
+8b. Bảng `brand_affiliate_plans` + cột `plan_target_gmv/nmv/hours`, `plan_pct_*` của `brand_monthly_reports`: client không
+   còn đọc/ghi (04/10). Đếm dòng trên production trước khi drop (khuôn 0126/0132).
 9. Tích hợp TikTok API tự động — chờ scope Developer/ISV ở Partner Center. Lịch sử trước T7/2026: không có nguồn.
 10. Zalo OA worker gửi `notifications` (cần user đăng ký OA doanh nghiệp; memory `liveops-zalo-notification-plan`).
 11. Module tạo ca P2/P3 (khung lịch tuần theo brand, hiệu lực theo hợp đồng) — đã phân tích 19/09, chưa chốt làm.
@@ -160,6 +176,13 @@
 
 ### 5.2 Client (React / TS)
 - `strict` + `noUnusedLocals` bật; `@types/react*` phải có trong devDependencies (thiếu là JSX thành `any`, CI xanh giả).
+- **Cho người mới (audit 04/10 tối):** (1) mỗi thông tin MỘT chỗ nhập — màn khác chỉ hiện để đọc + nút sang chỗ nhập;
+  (2) form không điền sẵn giá trị mẫu, không có fallback "Nguyễn Văn A"; không có ô gõ tay cho số app tự tính được;
+  (3) ngày/tháng hiển thị qua `fmtMonth`/`fmtDateVn`/`fmtPeriodLabel` (lib/format.ts), không in `2026-10`; (4) mỗi con số
+  ghi kỳ + cách đếm ngay cạnh, không vá bằng câu chú thích ở màn khác; (5) ô "chưa có" kèm nút tới chỗ nhập
+  (`App.navigateTo(tab, brandId?)`); (6) bước nhập liệu mới mà thiếu thì làm hỏng màn khác ⇒ thêm một việc vào
+  `lib/todoList.ts`; thuật ngữ mới ⇒ thêm vào `GlossaryDialog.tsx`; (7) không chữ tiếng Anh/kỹ thuật lộ ra (Completed,
+  Supabase, batch, "Chưa có dòng"…) — tên chỉ số thì vẫn theo `metricGlossary.ts`.
 - **Tab mới phải vào `TAB_CHUNKS`** (App.tsx; `tests/bundleSplit.test.ts` canh) để chunk tải song song với dữ liệu. Component
   lazy lồng trong tab mà chỉ hiện sau một lượt đọc ⇒ gọi `X.preload()` cùng lúc bắn lượt đọc (khuôn `MonthlyReportTabs`).
 - **Giao diện** (`tests/layoutConventions.test.ts` canh): đầu trang dùng `PageHeader`; chọn tháng dùng `MonthPicker`, không
@@ -239,7 +262,10 @@
 "Ca có số" = `isCountable` (hostPerformance) · ca tính tiền = `isPnlSession` (pnl, từ 04/10 đòi `hasLiveEvidence`) · ca
 đã diễn ra thật = `hasLiveEvidence`, ca quá giờ chờ xác nhận = `isUnconfirmedPast`, ca có số ở DB (khoá dời giờ) =
 `hasSessionData` (cả ba ở sessionStatus) · khung camp hiệu lực = `effectiveCamp(planCamp, reportRow)` (campaignDays — MỌI
-màn; khoảng nhập ở Nhập Ads & Ghi Chú thắng Kế Hoạch Tháng) · dự kiến cuối tháng = `projectMonthEnd` /
+màn; tháng CÓ Kế Hoạch Tháng ⇒ chỉ khung của kế hoạch, ô Nhập Ads chỉ hiện để đọc; tháng KHÔNG có kế hoạch ⇒ ô Nhập Ads —
+đổi 04/10 tối, trước đó Nhập Ads thắng) · tháng mở sẵn của màn = `lib/defaultMonth.ts` (xem số: tháng gần nhất có ca;
+Report/Nhập Ads: tháng đã hết gần nhất; Kế Hoạch Tháng: tháng này nếu brand đang mở còn nháp) · việc cần làm =
+`buildTodos` (lib/todoList.ts) · dự kiến cuối tháng = `projectMonthEnd` /
 `MonthOutlook` · trùng lịch = `personClash`/`studioClash` (scheduling/conflicts) · giờ kế hoạch = `sessionDurationHours`, giờ
 live = `sessionHours`. GMV/giờ đem NHÂN với giờ lịch thì chia trên giờ kế hoạch; GMV/giờ BÁO CÁO chia trên giờ live. Thước
 đo xếp host là **GMV/giờ**, không phải GMV/ca. Cam kết hợp đồng đếm **giờ ca theo lịch** (kể cả ca GMV 0 đã có bằng chứng diễn ra), loại ca huỷ và ca chờ xác nhận.
@@ -256,7 +282,8 @@ live = `sessionHours`. GMV/giờ đem NHÂN với giờ lịch thì chia trên g
   giờ cam kết, KHÔNG vào lương/doanh thu — hiện "chờ xác nhận" ở Finance, Cam Kết, Nhân sự ca, Cửa sổ Ca Live; role brand
   tháng chưa phát hành (view che số) vẫn tính như cũ. Ca "loại khỏi báo cáo": vẫn trả công theo giờ, bỏ doanh thu +
   hoa hồng theo GMV (`SessionPnl.excluded`); Finance/Thu nhập talent đọc `sessions` (gồm ca loại), màn phân tích/brand
-  vẫn `activeSessions`. Tháng có Kế Hoạch Tháng chốt thì target KHÔNG lấy từ ô "Kế hoạch tháng sau" của Report. Sửa ca
+  vẫn `activeSessions`. Target tháng chỉ nhập ở Kế Hoạch Tháng; ô "Kế hoạch tháng sau" của Report đã bỏ (04/10 tối) —
+tháng không có kế hoạch chỉ còn target khung camp nhập ở Nhập Ads (`buildMonthTargetPlan`). Sửa ca
   (`update_session_with_children`) chỉ ghi cột lịch + người, trạng thái DB tự suy, ca có số không dời ngày/giờ. Kéo-thả ca
   sang ngày khác kiểm trùng người/phòng, chặn ca có số và ngày đã qua. Hợp đồng nháp không sinh cam kết; sinh lại dọn
   tháng ngoài khung (trừ tháng sửa tay).
@@ -267,8 +294,8 @@ live = `sessionHours`. GMV/giờ đem NHÂN với giờ lịch thì chia trên g
 
 ## 6. Hạ tầng Supabase
 
-- 133 migration (`supabase/migrations/`), chạy tay theo thứ tự — **tới `0132` đều ĐÃ CHẠY** (0131 + 0132 ngày 02/10);
-  **`0133` ĐÃ CHẠY 04/10** (verify ở §1). Lô đối soát cũ (06–09/2026, không gắn brand) không áp dụng lại được — đo
+- 134 migration (`supabase/migrations/`), chạy tay theo thứ tự — **tới `0132` đều ĐÃ CHẠY** (0131 + 0132 ngày 02/10);
+  **`0133` ĐÃ CHẠY 04/10** (verify ở §1); **`0134` CHƯA CHẠY** (chỉ UPDATE dữ liệu mẫu trong `brands`, có chốt tự kiểm). Lô đối soát cũ (06–09/2026, không gắn brand) không áp dụng lại được — đo
   04/10 nó chỉ khớp ca CROCS nên chưa có số nào bị chia nhầm. Replay `0001 → 0133`: sạch, chạy lần 2 không lỗi; bộ kiểm hành vi
   `supabase/tests/0133_workflow_integrity.sql` chạy trên bản replay (in `OK ...`, 34 mục).
   Replay `0001 → 0132` trên Postgres cô lập: sạch.
