@@ -16,7 +16,7 @@ import { useToast } from "../hooks/useToast";
 import { errorMessage } from "../lib/errorMessage";
 import { PageIntro } from "./common/PageIntro";
 
-import { fmtFixed, fmtVndShort } from "../lib/format";
+import { fmtDateVn, fmtFixed, fmtVndShort } from "../lib/format";
 import { METRIC, metricHint } from "../lib/metricGlossary";
 import { fmtKeyMetric, KEY_METRICS, keyMetricValue } from "../lib/report/keyMetrics";
 interface HostPerformanceProps {
@@ -135,7 +135,10 @@ export function HostPerformance({ sessions, brands }: HostPerformanceProps) {
           <p className="text-[11px] text-[var(--text-muted)] mt-4 flex items-start gap-1.5">
             {quality.manual > 0 && <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px text-amber-400" />}
             <span>
-              {quality.total} ca có số liệu: <span className="font-bold text-emerald-400">{quality.reconciled} đã đối soát</span>,{" "}
+              {/* Ghi kỳ ngay cạnh con số (audit người mới 2026-10-04): Talent Pool cộng MỌI tháng nên cùng một host
+                  hai màn ra hai số — trước đây chỉ Talent Pool có câu giải thích. */}
+              <b className="text-[var(--text)]">{fmtDateVn(from)} – {fmtDateVn(to)}{from === isoDaysAgo(90) ? " (90 ngày gần nhất)" : ""}</b>
+              {" · "}{quality.total} ca có số liệu: <span className="font-bold text-emerald-400">{quality.reconciled} đã đối soát</span>,{" "}
               <span className="font-bold text-sky-400">{quality.snapshot} số lúc giao ca</span>
               {quality.manual > 0 && (
                 <>

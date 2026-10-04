@@ -123,6 +123,7 @@ export const BrandRateCard: React.FC<BrandRateCardProps> = ({
                 <span className="font-bold text-[var(--text)]">{platform}</span>
                 <span className="text-[11px] text-[var(--text-faint)] uppercase font-bold">/ giờ live</span>
               </div>
+              <p className="text-[11px] text-[var(--text-faint)] -mt-2">Chỉ dùng cho brand thu phí theo giờ live (cách thu phí đặt ở thẻ brand trong CRM).</p>
               <p className="text-2xl font-black text-emerald-400">
                 {current ? fmtVndFull(current.ratePerHour) : "—"}
               </p>
@@ -148,7 +149,7 @@ export const BrandRateCard: React.FC<BrandRateCardProps> = ({
               <div className="pt-3 border-t border-[var(--border)] space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] text-[var(--text-faint)] uppercase font-bold">Tỷ lệ hoàn hủy</span>
-                  <span className="text-sm font-bold text-amber-400">{returnRate}%</span>
+                  <span className="text-sm font-bold text-amber-400">{returnRate > 0 ? `${returnRate}%` : "Chưa nhập"}</span>
                 </div>
                 {canEdit && (
                   <div className="flex items-center gap-2">
@@ -198,7 +199,10 @@ export const BrandRateCard: React.FC<BrandRateCardProps> = ({
                 )}
                 <div className="flex items-center justify-between text-[11px] pt-1">
                   <span className="text-[var(--text-faint)]">
-                    NMV ước tính (GMV {fmtVndFull(gmv)} × {(100 - returnRate)}%)
+                    {/* Tỷ lệ hoàn 0 = chưa nhập: NMV khi đó bằng GMV — nói ra thay vì in "× 100%" như một con số thật. */}
+                    {returnRate > 0
+                      ? <>NMV ước tính (GMV mọi tháng {fmtVndFull(gmv)} × {100 - returnRate}%)</>
+                      : <span className="text-amber-300">Chưa nhập tỷ lệ hoàn huỷ — NMV đang bằng GMV (mọi tháng)</span>}
                   </span>
                   <span className="font-bold text-[var(--text)]">{fmtVndFull(estimatedNmv)}</span>
                 </div>

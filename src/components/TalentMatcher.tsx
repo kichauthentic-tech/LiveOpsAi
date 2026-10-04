@@ -72,6 +72,12 @@ interface TalentMatcherProps {
   onDeleteTalent?: (id: string) => void;
 }
 
+/** Hồ sơ ghi Host mà chỉ từng chạy trợ live (hoặc ngược lại). */
+function roleMismatch(role: string | undefined, real: { sessionCount: number; assistSessionCount: number }): boolean {
+  const isAssistant = role === "Assistant";
+  return isAssistant ? real.sessionCount > 0 && real.assistSessionCount === 0 : real.assistSessionCount > 0 && real.sessionCount === 0;
+}
+
 export const TalentMatcher: React.FC<TalentMatcherProps> = ({
   currentRole,
   talents,
@@ -343,7 +349,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
       <PageHeader
         icon={Users}
         title="Talent Pool"
-        description="Host và trợ live của agency: vai trò, số ca và GMV/giờ từ các ca đã chạy, rate card. Bấm vào dòng để xem chi tiết từng người. Số ở đây cộng TOÀN BỘ ca đã chạy — Hiệu Suất Host mặc định chỉ 90 ngày gần nhất nên số bên đó nhỏ hơn, không phải lệch."
+        description="Host và trợ live của agency: vai trò, số ca, GMV và rate. Bấm vào dòng để xem chi tiết từng người."
       />
 
       {/* Danh sách talent — bảng, không phải lưới thẻ.
@@ -357,7 +363,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
             <h3 className="font-bold text-[var(--text)] text-base">
               Host và trợ live ({filteredTalents.length}/{talents.length})
             </h3>
-            <p className="text-xs text-[var(--text-muted)]">Xếp theo số ca đã chạy. Bấm vào dòng để xem chi tiết &amp; hiệu suất từng người.</p>
+            <p className="text-xs text-[var(--text-muted)]">Số ca, giờ và GMV cộng <b>mọi tháng</b> đã chạy (Hiệu Suất Host mặc định chỉ xem 90 ngày gần nhất). Xếp theo số ca.</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
@@ -447,6 +453,13 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                     <span className="hidden sm:inline ml-1.5 bg-[var(--accent)]/50 text-[var(--accent-text)] text-[11px] font-bold px-1.5 py-0.5 rounded">
                       {t.role === "Assistant" ? "Trợ live" : t.role || "Host"}
                     </span>
+                    {/* Vai trò gõ tay một lần, không đối chiếu ca thật (audit người mới 2026-10-04: "Host" mà 86 ca đều
+                        là trợ live). Lệch thì nói ra để ops sửa hồ sơ — không tự đổi. */}
+                    {roleMismatch(t.role, real) && (
+                      <span className="ml-1.5 text-amber-300 text-[11px] font-bold" title="Vai trò trên hồ sơ khác với vai người này thật sự chạy trong ca — bấm ✏️ để sửa">
+                        ⚠ chỉ chạy {t.role === "Assistant" ? "host" : "trợ live"}
+                      </span>
+                    )}
                   </td>
                   <td className="py-2.5 px-2 text-right font-mono text-[var(--text)]">{real.sessionCount || <Dash />}</td>
                   {show["Ca trợ"] && <td className="py-2.5 px-2 text-right font-mono text-[var(--text-muted)]">{real.assistSessionCount || <Dash />}</td>}

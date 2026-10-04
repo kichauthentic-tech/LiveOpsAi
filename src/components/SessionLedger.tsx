@@ -304,7 +304,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
             hơn 3 nút xám mà người đọc phải quét từng cái mới biết là (0). */}
         {!isBrandView && noMissing && (
           <p className="text-[11px] text-[var(--text-faint)]">
-            Không còn ca nào thiếu snapshot, report hay đối soát trong phạm vi đang lọc.
+            Không còn ca nào thiếu snapshot, report hay đối soát trong phạm vi đang lọc (ca nhập từ file, ca chưa diễn ra và ca huỷ không cần).
           </p>
         )}
         {!isBrandView && !noMissing && (
@@ -349,9 +349,11 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
               </p>
             ) : (
               <p className="text-xs text-[var(--text)] mt-1">
-                <b className="text-emerald-300">{summary.quality.reconciled}</b> đối soát ·{" "}
-                <b className="text-sky-300">{summary.quality.snapshot}</b> snapshot ·{" "}
-                <b className="text-amber-300">{summary.quality.manual}</b> tự khai
+                <span title="Mỗi ca tính một lần theo nguồn số tin cậy nhất nó đang có">
+                  <b className="text-emerald-300">{summary.quality.reconciled}</b> đã đối soát ·{" "}
+                  <b className="text-sky-300">{summary.quality.snapshot}</b> số lúc giao ca ·{" "}
+                  <b className="text-amber-300">{summary.quality.manual}</b> tự khai
+                </span>
               </p>
             )}
           </div>
@@ -603,10 +605,15 @@ const TrustBadge: React.FC<{ session: LiveSession }> = ({ session }) => {
   );
 };
 
-// 3 ô tiến trình dữ liệu: snapshot → report → đối soát. Ca không cần chốt (sắp tới/huỷ/nạp bù)
-// hiện mờ để không bị đọc nhầm là thiếu.
+// 3 ô tiến trình dữ liệu: snapshot → report → đối soát. Ca không cần chốt (sắp tới/huỷ/nạp bù) KHÔNG vẽ 3 ô
+// mờ nữa mà nói thẳng lý do (audit người mới 2026-10-04: 229 ca nạp bù đều hiện "Snapshot ✓ · Report ○ · Đối soát
+// ✓" cạnh câu "không còn ca nào thiếu report" — người mới đọc là mâu thuẫn).
 const PipelineDots: React.FC<{ session: LiveSession; today: string }> = ({ session, today }) => {
   const relevant = needsClosing(session, today);
+  if (!relevant) {
+    const why = session.status === "Cancelled" ? "Đã huỷ — không cần số" : session.isBackfill ? "Nhập từ file — không cần snapshot/report" : "Chưa diễn ra";
+    return <span className="text-[11px] text-[var(--text-faint)] whitespace-nowrap">{why}</span>;
+  }
   const steps: { label: string; done: boolean }[] = [
     { label: "Snapshot", done: hasSnapshot(session) },
     { label: "Report", done: hasReport(session) },

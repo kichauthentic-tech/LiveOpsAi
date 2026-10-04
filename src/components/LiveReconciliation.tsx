@@ -125,7 +125,7 @@ export function LiveReconciliation({ brands, sessions, onApplied, onOpenSession 
             <h2 className="text-lg font-black text-[var(--text)]">Đối Soát Số Liệu</h2>
             <PageIntro>
               TikTok còn cập nhật GMV nhiều giờ sau khi tắt live, nên số chốt lúc giao ca chỉ là tạm tính. Tải lại file{" "}
-              <span className="font-bold">Creator-Live-Performance</span> cho cả ngày/tuần/tháng rồi up một lần để chỉnh lại toàn bộ ca trong kỳ.
+              <span className="font-bold">Creator-Live-Performance</span> cho cả ngày/tuần/tháng rồi up một lần để chỉnh lại toàn bộ ca trong kỳ. "Phiên" là một lần bật live trên TikTok; một phiên dài có thể chia cho nhiều ca, nên số phiên và số ca không bằng nhau.
             </PageIntro>
           </div>
           <div className="shrink-0 flex flex-wrap items-center gap-2">
