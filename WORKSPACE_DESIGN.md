@@ -18,6 +18,10 @@
   tới đâu, cái gì kêu, rồi sửa đúng chỗ đó. **Không seed mock lại.**
 - **Nợ kỹ thuật đã hết** (đợt P2a-2…P2a-21, 01–02/10) và **audit code chết đã xong** (02/10): `npm run audit:dead` báo 0,
   ESLint 0 lỗi (31 warning `set-state-in-effect` = nợ đã đo, cố ý `warn`), vitest 467/467 (05/10).
+- **06/10: lịch T10 chốt tay → nạp 330 ca Upcoming 06→31/10** từ bảng tính "Bảng tính không có tiêu đề.xlsx" (VERA TikTok 66/Shopee 84, JOCKEY TikTok 25,
+  Franklin TikTok 48/Shopee 32, CROCS 75), ghi REST bằng phiên admin, không qua Kế Hoạch Tháng (lock_month_plan chỉ TikTok + mở đăng ký).
+  Không có target (cột TARGET trống). Bỏ qua: 01–04/10 (đã nạp thật từ trước; 05/10 nạp bù thêm 2 ca VERA Shopee + CROCS TikTok, còn Upcoming), 16 dòng CANCLE, 36 ca brand JEW (chưa là
+  brand trong hệ thống). Host/trợ chưa có hồ sơ (Mia, Su, Đạt, H.Dung, T.Linh, trợ Bin) để trống, tên ghi trong tiêu đề ca.
 - **05/10 tối: nạp lịch ca T6→05/10 từ file "YFB _ Working File 2026 - NEW.xlsx"** (6 sheet: VERA/JOCKEY × TikTok/Shopee,
   Franklin, CROCS). Nạp **893 ca** VERA (TikTok 298, Shopee 259), JOCKEY (TikTok 176, Shopee 72), Franklin (88; bắt đầu từ
   06/08) với host/trợ khớp hồ sơ talent, GMV từ cột "GMV Live" (trống thì cột "GMV"; riêng VERA Shopee cột đó là ATC nên
@@ -25,7 +29,7 @@
   Số Liệu để lên "Đã chốt"), `is_backfill` = true tới 30/09, ca 01–05/10 là ca thật. Ghi trực tiếp REST bằng phiên admin
   ở Browser pane (script nháp ở scratchpad, không commit). **CROCS không nạp lại** (247 ca room đã đối soát, tốt hơn
   bảng tính; sheet có nhiều dòng ca nhỏ trong cùng một room) — chỉ điền host/trợ cho 14/35 ca thiếu host khi MỘT dòng sheet
-  phủ ≥70% room; 21 ca còn lại room trải 2–3 ca khác host ⇒ cần tách ca (`split_backfill_session`) rồi gán. Bỏ qua: 8 dòng
+  phủ ≥70% room; đợt 2 (06/10): 13 room trải 2–4 ca khác host đã tách bằng `split_backfill_session` theo mốc đầu từng ca trong file (13 → 29 ca, tổng GMV CROCS giữ nguyên 20.848.133.466) + `bulk_assign_session_hosts`; CROCS nay 263 ca, còn 8 ca chưa host (mục 2). Ca 20/09 19:22: bỏ dòng file chồng lấn, tách tại 21:00; ca 30/09: khoảng 20–21h không có ca trong file, thuộc host ca đầu. Bỏ qua: 8 dòng
   thiếu/sai giờ hoặc năm sai (JOCKEY TTS dòng 77, 214; CROCS 8, 380, 396, 411, 455, 471), 7 ô GMV dạng "a/b" (ghi 0,
   không đoán), 3 dòng JOCKEY trùng nhau gộp. Host/trợ **chưa có hồ sơ talent**: Mia (52), Su (41), Đạt (8), Dung (4);
   trợ Trúc Như (84), Diễm Phương (9) ⇒ ca để trống host/trợ, tên ghi trong tiêu đề ca `(Host: …)`. Ô trợ ghi nhiều người
@@ -120,8 +124,9 @@
    Live Performance tháng 9 (export 05/10, 65 room) vào ô tháng 9 + Sinh 18 ca + Đối Soát lô CROCS ⇒ 65 ca, GMV
    5.217,1M = tổng file (số 01–22/09 lên +159M vì export mới hơn). Lô full cũ 01/06→22/09 vẫn ở ô tháng 6 ⇒ 2 lô chồng
    tháng 9 — an toàn nhờ `dedupeRoomsAcrossBatches` (creatorLivePerfSlice.ts: trùng Room ID giữa các lô thì lấy lô up
-   sau). **Còn thiếu để phát hành CROCS T6/T8/T9:** host cho 35 ca (T6: 2, T8: 3, T9: 30 — 12 ca 18–22/09 + 18 ca mới,
-   7 room ≥ 5h có thể phải tách 2 ca) — user gửi; 5 file shop T9 (Khuyến Mãi, Sản Phẩm, Shop Analytics, Live
+   sau). **Còn thiếu để phát hành CROCS T6/T8/T9:** host cho 8 ca (06/10 đã tách + gán nốt từ Working File, xem mục 1) — 27/06 19:59–23:59, 11/08 19:57–20:07,
+   16/08 11:00–14:00, 23/08 13:10–15:01, 18/09 22:15–23:05, 22/09 11:01–14:01, 23/09 09:00–13:10 và 13:11–00:31 (file
+   không có dòng ca hoặc chỉ phủ một phần) — user gửi; 5 file shop T9 (Khuyến Mãi, Sản Phẩm, Shop Analytics, Live
    Performance, Live Analysis) mới tới 21–22/09. Cách Claude up file: chạy `liveops-prod` (localhost:3100, đã đăng nhập
    admin, nối DB thật), chép file vào `dist/__upload/` rồi `fetch` cùng origin + gán vào `input[type=file]` — xoá file
    sau khi up.
@@ -130,7 +135,7 @@
    JOCKEY/VERA/Franklin: đã có ca T6→05/10 từ file Working File (05/10 tối, nhãn Tạm tính) — còn chờ file đối soát + tạo talent Mia/Su/Đạt/Dung/Trúc Như/Diễm Phương rồi gán host.
 2. **Nhập % hoa hồng/lương** (rate talent, commission brand) — đo 05/10: 33 talent rate = 0, chỉ JOCKEY có dòng rate brand
    (= 0), 0 hợp đồng. Khối tiền của Dashboard CEO và Finance mới có số.
-3. Gán host cho ca nạp bù CROCS còn thiếu: 35/247 ca (xem mục 1). Trợ live lưu ở `co_host_id`.
+3. Gán host cho ca nạp bù CROCS còn thiếu: 8/263 ca (xem mục 1). Trợ live lưu ở `co_host_id`.
 
 **Cần tài khoản/mật khẩu mà Claude không có:**
 4. Góc nhìn role `brand` bằng JWT thật — DB chưa có tài khoản brand nào (M9 đã đo bằng harness props-only).
