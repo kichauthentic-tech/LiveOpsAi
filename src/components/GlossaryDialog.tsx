@@ -19,6 +19,7 @@ const OPS_STEPS: { step: string; where: string; why: string }[] = [
   { step: "Talent đăng ký rảnh, ops chốt Host + Trợ live cho từng ca", where: "Nhân sự ca (talent thấy là Đăng Ký Ca)", why: "Ca có người mới hiện ở Bảng Vận Hành, Lịch." },
   { step: "Trong ca: trợ live up file lúc giao ca (snapshot), host nộp report ca", where: "Bảng Vận Hành → bấm vào ca (Cửa sổ Ca Live)", why: "Giữ ranh giới số giữa 2 ca chung một phòng live." },
   { step: "Hằng tuần/cuối tháng: tải file từ TikTok Shop, up ở Dữ Liệu Gốc và Đối Soát Số Liệu", where: "Dữ Liệu Gốc (trong từng brand) · Đối Soát Số Liệu", why: "TikTok còn cập nhật GMV nhiều giờ sau khi tắt live; số đối soát là số cuối." },
+  { step: "Hết tháng (brand có chạy Ads): tải file \"Campaign overview data\" theo ngày từ TikTok Ads", where: "Nhập Ads (trong từng brand)", why: "Report Tháng phần 6 lấy chi phí Ads, ROI, ROI theo loại ngày từ file này." },
   { step: "Hết tháng: tạo Report Tháng, kiểm số, rồi Phát hành cho brand", where: "Report Tháng (trong từng brand) · Điều Phối Phát Hành", why: "Phát hành = đóng sổ tháng: số của tháng không đổi nữa." },
   { step: "Theo dõi: tiến độ tháng, host nào bán tốt, lãi lỗ", where: "Dashboard · Hiệu Suất Host · Finance & P&L", why: "" }
 ];
@@ -42,6 +43,7 @@ const TERMS: { term: string; meaning: string }[] = [
   { term: "Nạp bù", meaning: "Ca tạo lại từ file TikTok cho những tháng chưa dùng app (T6–T9/2026). Không cần snapshot/report; không tính vào Finance." },
   { term: "Run-rate", meaning: "Thực đạt ÷ target của các ca kế hoạch tính tới ngày cuối có số. Dưới 100% là đang chậm so với kế hoạch." },
   { term: "Dự phóng cuối tháng", meaning: "Số đã có + giờ các ca còn trong lịch × GMV/giờ gần đây. Thử lại trên T7–T8: lệch khoảng ±8%." },
+  { term: "File Ads (Campaign overview)", meaning: "File TikTok Ads (GMV Max) theo ngày của cả cửa hàng: chi phí, đơn SKU, doanh thu gộp. Tải ở Nhập Ads, mỗi tháng một file. ROI = doanh thu gộp ÷ chi phí. Doanh thu gộp tính trước huỷ/hoàn nên có thể lớn hơn GMV của shop — không lấy làm % GMV." },
   { term: "Phát hành report", meaning: "Gửi Report Tháng cho brand xem. Từ lúc đó số và lịch của tháng bị khoá tới khi thu hồi." },
   { term: "Agency / Brand Workspace", meaning: "Agency: nhìn mọi brand (chọn ở góc trên bên trái). Brand: mọi màn của riêng một brand — Dashboard, Lịch, Report, Dữ Liệu Gốc…" }
 ];

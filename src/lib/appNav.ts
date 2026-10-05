@@ -207,13 +207,13 @@ export function brandNavGroups(currentRole: UserRole): NavGroup[] {
         { id: "brand_rate_card", label: "Rate Card", icon: Tag, perm: undefined },
         // Trang Affiliate (2026-09-22) — bảng phân tích theo TỪNG PHIÊN của creator affiliate,
         // tách hẳn khỏi form Report Tháng (yêu cầu ops). Brand xem được (migration 0102 nới RLS
-        // đọc), chỉ ops mới sửa được — khác "Nhập Ads & Ghi Chú"/"Dữ Liệu Gốc" vốn ẩn với brand.
+        // đọc), chỉ ops mới sửa được — khác "Nhập Ads"/"Dữ Liệu Gốc" vốn ẩn với brand.
         { id: "brand_affiliate", label: "Affiliate", icon: Users, perm: undefined },
-        // "Nhập Ads & Ghi Chú" (2026-09-21): phần nhập tay tách khỏi Report Tháng, ops-only như Dữ Liệu Gốc.
+        // "Nhập Ads" (2026-09-21): phần nhập tay tách khỏi Report Tháng, ops-only như Dữ Liệu Gốc.
         ...(currentRole === "brand"
           ? []
           : [
-              { id: "brand_ads_report", label: "Nhập Ads & Ghi Chú", icon: Megaphone, perm: undefined },
+              { id: "brand_ads_report", label: "Nhập Ads", icon: Megaphone, perm: undefined },
               { id: "brand_dataraw", label: "Dữ Liệu Gốc", icon: Database, perm: undefined }
             ]),
       ],

@@ -52,7 +52,7 @@ interface BrandMonthlyReportProps {
   // "brandId|YYYY-MM" → tổng target Kế Hoạch Tháng đã chốt (Đ5) — chỉ chuyển tiếp xuống
   // MonthlyReportTabs, màn này không tự dùng.
   planMonthTotals?: Map<string, number>;
-  // Nhảy sang tab "Nhập Ads & Ghi Chú" (ops-only, tab bị ẩn với brand nên chỉ truyền/dùng khi
+  // Nhảy sang tab "Nhập Ads" (ops-only, tab bị ẩn với brand nên chỉ truyền/dùng khi
   // canManage) — thay 2 chỗ trước đây chỉ NHẮC TÊN TAB bằng chữ, ops phải tự tìm trong sidebar.
   onOpenAdsReport?: () => void;
 }
@@ -101,8 +101,8 @@ function headlineDiff(before: SnapshotHeadline, after: SnapshotHeadline): string
   ].join("\n");
 }
 
-// Phần nhập tay Ads/ROAS/Promotion/Customer Insight/Account Health + Ads Report Chi Tiết (TikTok)
-// đã tách sang tab riêng "Nhập Ads & Ghi Chú" (BrandAdsReport.tsx, 2026-09-21) — Report Tháng chỉ
+// Phần nhập Ads (từ 05/10 là file TikTok Ads; ghi chú Promotion/Customer Insight/Account Health đã bỏ)
+// đã tách sang tab riêng "Nhập Ads" (BrandAdsReport.tsx, 2026-09-21) — Report Tháng chỉ
 // còn tài liệu 6 tab + phát hành/thu hồi (tab 05 "Phân Tích Sâu" gộp vào 2026-09-23, ops-only).
 
 export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId, brandName, sessions, currentRole, brandPlatformRates, shiftSlots, onOpenAdsReport, planMonthTotals }) => {
@@ -288,16 +288,16 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
 
   const isPublished = report?.status === "published";
 
-  // canManage && onOpenAdsReport: tab "Nhập Ads & Ghi Chú" bị ẩn khỏi sidebar với role brand
+  // canManage && onOpenAdsReport: tab "Nhập Ads" bị ẩn khỏi sidebar với role brand
   // (App.tsx), nên chỉ hiện nút nhảy tab khi chắc chắn tới được — brand vẫn thấy đúng tên tab
   // bằng chữ như trước, không phải nút bấm rồi đập vào Access Restricted.
   const adsReportLink =
     canManage && onOpenAdsReport ? (
       <button onClick={onOpenAdsReport} className="min-h-6 -mx-1 px-1 rounded font-semibold underline text-[var(--accent-text)] hover:opacity-80">
-        Nhập Ads & Ghi Chú
+        Nhập Ads
       </button>
     ) : (
-      <>"Nhập Ads & Ghi Chú"</>
+      <>"Nhập Ads"</>
     );
 
   // Chuyển Tháng / Tuần — nằm trong thẻ đầu trang của cả hai chế độ (Report Tuần nhận qua `headerExtra`).
@@ -334,8 +334,8 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
         description={
           <>
             Số liệu vận hành tính từ các ca có số trong tháng (Dữ Liệu Gốc chỉ dự phòng) và được CHỐT tại một thời điểm — mở report
-            không tính lại; ops bấm "Cập nhật số liệu" khi muốn lấy số mới. Ads/ROAS, Promotion, Customer Insight, Account Health
-            nhập tay ở tab {adsReportLink} — phát hành xong thì phần đó khoá theo report.
+            không tính lại; ops bấm "Cập nhật số liệu" khi muốn lấy số mới. File Ads (TikTok Ads) tải ở tab {adsReportLink}; nhận xét
+            cho brand viết bằng nút "Sửa Insight" ở từng phần.
           </>
         }
         actions={

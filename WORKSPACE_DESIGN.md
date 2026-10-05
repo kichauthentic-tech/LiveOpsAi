@@ -17,7 +17,25 @@
   bù từ file Creator-Live-Performance (229 ca, còn ca chưa gán host). **Không đề xuất tính năng mới**; hỏi user chạy thử
   tới đâu, cái gì kêu, rồi sửa đúng chỗ đó. **Không seed mock lại.**
 - **Nợ kỹ thuật đã hết** (đợt P2a-2…P2a-21, 01–02/10) và **audit code chết đã xong** (02/10): `npm run audit:dead` báo 0,
-  ESLint 0 lỗi (31 warning `set-state-in-effect` = nợ đã đo, cố ý `warn`), vitest 456/456 (05/10).
+  ESLint 0 lỗi (31 warning `set-state-in-effect` = nợ đã đo, cố ý `warn`), vitest 467/467 (05/10).
+- **05/10: Ads lấy từ FILE, không gõ tay** (user yêu cầu). File "Campaign overview data" của TikTok Ads (GMV Max, theo
+  ngày, toàn cửa hàng — gồm LIVE + Product GMV Max) tải ở **Nhập Ads** (chỗ nhập Ads DUY NHẤT) → lưu vào kho Dữ
+  Liệu Gốc loại `ads_campaign_overview` (migration **`0137`**, 1 file / brand / tháng, không liệt kê ở màn Dữ Liệu Gốc)
+  → Report Tháng phần 6 khối "Ads toàn cửa hàng" (chi phí, ROI, chi phí/đơn SKU, doanh thu gộp, so tháng trước cắt cùng
+  số ngày, ROI theo loại ngày theo `effectiveCamp`, biểu đồ theo ngày, nhận xét tự sinh, câu Ads trong Insight phần 6)
+  + 2 sheet Excel. Bỏ 2 ô "Ads cost bổ sung"/"ROAS ghi đè" (không màn nào đọc; cột `ads_spend/roas` giữ giá trị cũ).
+  Bộ đọc: `lib/dataraw/adsCampaignOverview.ts` (nhận tiêu đề Anh/Việt; từ chối file không theo ngày / trải 2 tháng /
+  không phải đồng / dòng tổng lệch quá dung sai — TikTok làm tròn lệch 2đ). Test đối chiếu số Franklin T9 với slide 22
+  deck Franklin (36.047.613 · 22,1x · 52.933/đơn · D-Day 42,8x). **0137 ĐÃ CHẠY 05/10.** Verify trên bản build nối DB
+  thật: xem trước đúng cả 2 file Anh/Việt; đã up file Ads Franklin T9 (bản `-2`, tiếng Anh) + Tạo report Franklin T9
+  (nháp, chưa phát hành) ⇒ phần 6 ra đúng số deck (Mid-Month 12,8x, Pay Day 8,2x, 23/09 3,8x), Insight phần 6 nói Ads
+  kể cả khi brand chưa có ca. Chưa đo: so tháng trước (Franklin chưa có file Ads T8).
+  **Gọn trang cùng ngày (user: "thừa quá"):** tab đổi tên **"Nhập Ads"**; bỏ 3 ô ghi chú Promotion/Customer
+  Insight/Account Health + nút Lưu (nhận xét viết bằng "Sửa Insight" ở từng phần Report; khối "Ghi chú của agency"
+  phần 7 bỏ theo), khối Ads theo ca từ Report Ca (Finance vẫn đọc `ads_cost`), khối "Target và lịch tháng sau". Khung
+  camp (`ReportPlanningInputs`) chỉ hiện ở tháng KHÔNG có Kế Hoạch Tháng, gập thành 1 dòng "lịch cố định: …". Đo trước
+  khi bỏ (bộ dòng report app nạp lúc đăng nhập): 4/4 dòng `brand_monthly_reports` trống cả 3 ô ghi chú, khung camp gõ
+  tay, `ads_spend/roas`.
 - **05/10: audit toàn app lần 3** (chi tiết: mục `## Audit toàn app lần 3 (2026-10-05)` cuối file lịch sử). Lỗ lớn nhất:
   **mọi tài khoản tự đổi được role/brand/quyền của chính mình** qua `profiles` (policy 0012) — vá bằng migration
   **`0136` (ĐÃ CHẠY 05/10)**, kèm đối soát hết khớp chạm mép và chốt
@@ -72,6 +90,9 @@
 ## 2. Việc còn treo
 
 **Cần user làm:**
+0000. Up file Ads (TikTok Ads → "Campaign overview data", xem theo ngày, mỗi file một tháng) cho các tháng/brand khác
+   có chạy Ads ở Nhập Ads — Franklin T8 để report T9 có cột so tháng trước. Muốn có "% ngân sách Ads" như deck
+   Franklin thì chốt chỗ nhập ngân sách (đề xuất: Kế Hoạch Tháng).
 000. Muốn bỏ 3 phiên "cần xem lại" của CROCS T9 (lô cũ khớp theo luật trước 0136): up lại file Creator Live
    Performance T9 ở Đối Soát (chọn CROCS) rồi Áp dụng.
 00. **Chọn KAM thật + nhập SĐT người đại diện cho 4 brand ở CRM** — 0134/0135 (đã chạy 05/10) xoá hết liên hệ/KAM mẫu,
@@ -108,7 +129,8 @@
 8. Gộp menu / IA — chờ số liệu `ui_tab_views`. Đo 04/10: 1.309 lượt mở đều của MỘT tài khoản (admin — phần lớn là các
    phiên Claude verify) ⇒ chưa có tín hiệu nào; cần người dùng thật khác vài tuần.
 8b. Bảng `brand_affiliate_plans` + cột `plan_target_gmv/nmv/hours`, `plan_pct_*` của `brand_monthly_reports`: client không
-   còn đọc/ghi (04/10). Đếm dòng trên production trước khi drop (khuôn 0126/0132).
+   còn đọc/ghi (04/10). Cột `ads_spend`, `roas`, `promotion_notes`, `customer_insight_notes`, `account_health_notes` cũng vậy từ 05/10 (0/4 dòng có
+   giá trị; chỉ còn được chép nguyên khi lưu khung camp). Đếm dòng trên production trước khi drop (khuôn 0126/0132).
 9. Tích hợp TikTok API tự động — chờ scope Developer/ISV ở Partner Center. Lịch sử trước T7/2026: không có nguồn.
 10. Zalo OA worker gửi `notifications` (cần user đăng ký OA doanh nghiệp; memory `liveops-zalo-notification-plan`).
 11. Module tạo ca P2/P3 (khung lịch tuần theo brand, hiệu lực theo hợp đồng) — đã phân tích 19/09, chưa chốt làm.
@@ -130,7 +152,7 @@
     Studios & Gear) · Kinh Doanh (CRM + Rate Card, Cam Kết Hợp Đồng, TikTok API) · Tài Chính (Finance & P&L — khoá cứng
     ceo/admin) · Hệ Thống (Phân Quyền & Role; AI Training Center — chỉ admin). Talent chỉ thấy: Ca Của Tôi, Đăng Ký Ca, Hồ Sơ.
   - Brand: Dashboard · Lịch Vận Hành · Sổ Ca · SKU Showcase · Report Tháng (toggle Tháng/Tuần) · Cam Kết Hợp Đồng (chỉ đọc)
-    · Kế Hoạch Tháng Sau (chỉ đọc + xác nhận) · Rate Card (chỉ đọc) · Affiliate · Nhập Ads & Ghi Chú + Dữ Liệu Gốc (ẩn với role brand).
+    · Kế Hoạch Tháng Sau (chỉ đọc + xác nhận) · Rate Card (chỉ đọc) · Affiliate · Nhập Ads + Dữ Liệu Gốc (ẩn với role brand).
 - **Mã nguồn:** `src/App.tsx` (state + handler + render tab, ~2.000 dòng) · `src/hooks/useWorkspaceData.ts` (mọi lượt nạp
   lúc đăng nhập, gate theo role/tab) · `src/components/*` (mỗi tab một chunk lazy qua `lazyNamed`) · `src/lib/db/*` (đọc/ghi
   Supabase) · `src/lib/{performance,report,scheduling,dataraw,liveSnapshot}` (logic thuần, có test) · `tests/*.test.ts` ·
@@ -153,7 +175,10 @@
    (trợ live up file Creator-Live-Performance lúc giao ca, 0078) < `tiktok_reconciled` (ops đối soát cuối kỳ, 0080).
    Snapshot là thứ DUY NHẤT giữ ranh giới giữa 2 ca chung một Room ID (số cộng dồn) — luật ở §5.6.
 3. **Dữ Liệu Gốc (Dataraw):** ops tải tay 6 loại report Excel (Seller Center / Streamer), upload theo brand + tháng
-   (1 batch / brand / loại / tháng, 0077). Dùng cho Report Tháng (phần shop), Affiliate, nạp bù ca.
+   (1 batch / brand / loại / tháng, 0077). Dùng cho Report Tháng (phần shop), Affiliate, nạp bù ca. Loại thứ 7
+   `ads_campaign_overview` (0137, file TikTok Ads) dùng chung kho nhưng tải/xoá ở Nhập Ads; Report Tháng đọc
+   qua piece `ads` của bản chụp (tháng report + tháng trước). Ads theo ca (`live_session_reports.ads_cost`) chỉ còn cho
+   lãi/lỗ từng ca ở Finance, là một phần của file — không cộng hai số.
 4. **Report Tháng** đọc **bản chụp** (`brand_monthly_report_snapshots`, 0119) do ops bấm Tạo/Cập nhật — mở report không tính
    lại. 7 phần: Kết luận · Thị trường hay vận hành · Vì sao · Sản phẩm · Host · Campaign & khung giờ · Tháng sau. Phát hành
    cho brand qua RPC; brand chỉ thấy số của tháng đã phát hành (view `live_sessions_secure`, 0107). **Phát hành = đóng
@@ -293,6 +318,10 @@ live = `sessionHours`. GMV/giờ đem NHÂN với giờ lịch thì chia trên g
 đo xếp host là **GMV/giờ**, không phải GMV/ca. Cam kết hợp đồng đếm **giờ ca theo lịch** (kể cả ca GMV 0 đã có bằng chứng diễn ra), loại ca huỷ và ca chờ xác nhận.
 
 ### 5.6 Luật nghiệp vụ đã chốt
+- **Ads (05/10):** nguồn duy nhất = file TikTok Ads theo ngày (`ads_campaign_overview`). ROI = doanh thu gộp ÷ chi phí
+  (cùng cách TikTok). Doanh thu gộp tính trước huỷ/hoàn (Franklin T9: 798tr > GMV shop 771tr) ⇒ KHÔNG trình bày như %
+  GMV, không cộng vào GMV. Chưa có ngân sách Ads dự kiến trong app (deck Franklin có "95,3% ngân sách" — user chưa chốt
+  nhập ở đâu, chỉ số đó chưa có).
 - **Run-rate chỉ tính bằng `planRunRate`** (28/09): target = Σ target ca của Kế Hoạch Tháng đã chốt (không chia lại khi lịch
   đổi); ca kế hoạch huỷ GIỮ target; ca ngoài kế hoạch target 0; ca thêm vào lưới sau khi chốt nhận target = dự báo.
 - **Report Tháng là nơi DUY NHẤT nói số một tháng SAU khi hết tháng** (đọc bản chụp; so cùng kỳ cắt 1..N khi tháng chưa hết).

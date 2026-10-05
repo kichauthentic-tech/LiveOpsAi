@@ -359,7 +359,10 @@ export type DataRawReportType =
   // Tab 02/04 (quyết định của user, chấp nhận đánh đổi: mất tên host tự động, GMV đổi ~15% so với
   // live_analysis vì khác hệ thống TikTok xuất — xem docs/WORKSPACE_HISTORY.md). live_analysis vẫn giữ
   // trong union vì dữ liệu cũ các brand đã upload trước đó không xoá, chỉ không dùng cho batch mới.
-  | "creator_live_performance";
+  | "creator_live_performance"
+  // migration 0137 (2026-10-05) — "Campaign overview data" của TikTok Ads (GMV Max, theo ngày, toàn cửa hàng).
+  // Nguồn duy nhất của Ads trong Nhập Ads + Report Tháng phần 6 (lib/dataraw/adsCampaignOverview.ts).
+  | "ads_campaign_overview";
 // Đã gỡ 2026-09-22 (quyết định của user):
 //   - "product_card_traffic_stats" (migration 0064): chưa từng có file thật nào được upload nên 2
 //     dòng Video/Product Card GMV của Report Tháng luôn bằng 0. Nay lấy từ shop_analytics +

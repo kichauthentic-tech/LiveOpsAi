@@ -184,6 +184,14 @@ test("Bối cảnh — đếm khung camp tăng/giảm cùng khung tháng trướ
   expect(i.action).toMatch(/^Xem lại cách chạy Daily: GMV\/giờ −37%/);
 });
 
+test("Bối cảnh — câu Ads (file TikTok Ads): có ca thì thêm một điểm; tháng chưa có ca nào (Franklin T9) vẫn nói Ads", () => {
+  const ads = { cost: 36_047_613, roi: 22.14, prevCost: 24_300_000, prevRoi: 10.5, zeroOrderDays: 2 };
+  const line = "Ads toàn cửa hàng: chi 36M (+48% so với cùng kỳ), ROI 22,1x (tháng trước 10,5x); 2 ngày tiêu tiền mà 0 đơn.";
+  expect(contextInsight([], [], ads)).toEqual({ headline: line, points: [], action: null });
+  expect(contextInsight([], [], null)).toBeNull();
+  expect(contextInsight([], [], { ...ads, cost: 0 })).toBeNull();
+});
+
 test("Việc cần làm của các phần gom về phần 7, bỏ việc autoNextSteps đã nói", () => {
   const ins = (action: string | null) => ({ headline: "x", points: [], action });
   const all = {

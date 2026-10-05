@@ -20,11 +20,12 @@ import { fetchMonthlyReport, saveMonthlyReportNarrative, saveMonthlyReportSectio
 import { contextInsight, HostInsightRow, hostVsPeer, InsightSection, insightToText, parseInsightText, peopleInsight, productsInsight, sectionNextSteps, SectionInsight, shopInsight, shortSku, whyInsight } from "../../lib/report/sectionInsights";
 import { CAMP_DAY_BUCKET_LABEL, CAMP_DAY_BUCKET_ORDER, effectiveCamp, resolveCampBucketType, type CampDayBucket, type CampOverrides } from "../../lib/campaignDays";
 import { dailyRhythm, liveFunnel, sessionSpread } from "../../lib/report/rhythm";
+import { adsMonthStats, adsPrevSameCut } from "../../lib/dataraw/adsCampaignOverview";
 import { errorMessage } from "../../lib/errorMessage";
 import { fmtKeyMetric, KEY_METRICS, keyMetricSheetColumns, keyMetricSheetLabel, keyMetricSheetValue, keyMetricValue, type KeyMetrics } from "../../lib/report/keyMetrics";
 import { byHost, byHostDayType, dayTypeTeamTotals, dayTypeMetrics, HOST_DAY_TYPE_ORDER, dataQuality, filterSessions, hostKey, splitUnassignedHost, DataQuality } from "../../lib/performance/hostPerformance";
 
-import { fmtFixed, fmtVndShort } from "../../lib/format";
+import { fmtDateVn, fmtFixed, fmtVndFull, fmtVndShort } from "../../lib/format";
 import { CHANNELS, DAY_TYPE_SHORT, LINK_BTN, PAL, SECTIONS, chartTooltipStyle } from "./report/theme";
 import { chartNum, fmtHours, fmtInt, fmtPct, fmtSessionStart, monthRangeLocal, nextMonthStrLocal, prevMonthStrLocal, promoStatusLabel } from "./report/format";
 import { ChartLegend, InsightBox, KpiTile, NarrativeEditor, Panel, ProgressBar, ReportTable, SectionDetail, SectionHead, WaterfallPanel, toWaterfall } from "./report/ui";
@@ -67,7 +68,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   const view = useMemo(() => snapshotView(snapshot), [snapshot]);
 
   // Dòng brand_monthly_reports của tháng: khoảng camp ops ghi đè, tóm tắt/việc tháng sau/Insight đã sửa, ghi chú
-  // agency. Form nhập các cột kế hoạch nằm ở tab Nhập Ads & Ghi Chú (ReportPlanningInputs).
+  // agency. Form nhập các cột kế hoạch nằm ở tab Nhập Ads (ReportPlanningInputs).
   const [monthlyReportRow, setMonthlyReportRow] = useState<BrandMonthlyReportType | null>(null);
   // Dòng tháng TRƯỚC: chỉ để lấy khung camp hiệu lực của tháng trước (so cùng khung) — effectiveCamp.
   const [prevReportRow, setPrevReportRow] = useState<BrandMonthlyReportType | null>(null);
@@ -146,7 +147,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   const planCur = plans[month] ?? null;
   const nextPlanFull = plans[nextMonth] ?? null;
 
-  // Khung camp D-Day/Mid-Month/Pay Day, từng khung: khoảng nhập ở Nhập Ads & Ghi Chú (0071) → khoảng của Kế Hoạch
+  // Khung camp D-Day/Mid-Month/Pay Day, từng khung: khoảng nhập ở Nhập Ads (0071) → khoảng của Kế Hoạch
   // Tháng (0094) → lịch camp cố định (lib/campaignDays.ts).
   const campOverrides: CampOverrides = useMemo(() => effectiveCamp(planCur?.plan.campRanges, monthlyReportRow), [monthlyReportRow, planCur]);
   // Tháng trước phân loại theo khoảng camp của CHÍNH tháng trước — đem khoảng của tháng này áp vào thì ngày camp
@@ -154,6 +155,15 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   const prevCampOverrides: CampOverrides = useMemo(() => effectiveCamp(plans[prevMonth]?.plan.campRanges, prevReportRow), [plans, prevMonth, prevReportRow]);
   const bucketCur = useMemo(() => (d: string) => resolveCampBucketType(d, campOverrides), [campOverrides]);
   const bucketPrev = useMemo(() => (d: string) => resolveCampBucketType(d, prevCampOverrides), [prevCampOverrides]);
+  // Ads toàn cửa hàng (file TikTok Ads, migration 0137) — tháng report + tháng trước cắt cùng số ngày, chia theo cùng
+  // khung camp hiệu lực như mọi bảng khác của report. null = tháng không có file (hoặc bản chụp trước 05/10).
+  const adsCurSlice = view.ads[month] ?? null;
+  const adsPrevSlice = hidden(prevMonth) ? null : (view.ads[prevMonth] ?? null);
+  const adsCur = useMemo(() => (adsCurSlice?.days.length ? adsMonthStats(adsCurSlice.days, bucketCur) : null), [adsCurSlice, bucketCur]);
+  const adsPrev = useMemo(
+    () => (adsCurSlice?.days.length && adsPrevSlice?.days.length ? adsMonthStats(adsPrevSameCut(adsCurSlice.days, adsPrevSlice.days, end), bucketPrev) : null),
+    [adsCurSlice, adsPrevSlice, end, bucketPrev]
+  );
   // Tháng cũ hơn chưa đọc Kế Hoạch Tháng ⇒ lịch camp mặc định.
   const bucketAny = useMemo(
     () => (d: string) => (d.startsWith(month) ? bucketCur(d) : d.startsWith(prevMonth) ? bucketPrev(d) : resolveCampBucketType(d)),
@@ -241,12 +251,12 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   // trước từng ra −40% cho T9 CROCS trong khi cùng kỳ chỉ −18%.
   const cmp = useMemo(() => compareWindow(month, snapshot.coverage.sessionsThrough), [month, snapshot]);
   // Bảng khung camp — MỖI khung so với CHÍNH khung đó tháng trước. Target: Kế Hoạch Tháng ĐÃ CHỐT (cộng target ca
-  // theo khung) → không có thì target nhập tay (Nhập Ads & Ghi Chú).
+  // theo khung) → không có thì target nhập tay (Nhập Ads).
   const planCampTargets = useMemo(() => {
     if (!planCur || planCur.plan.status !== "locked" || planCur.slots.length === 0) return null;
     return Object.fromEntries(planCampAllocation(planCur.slots, campOverrides).map((a) => [a.key, a.target > 0 ? a.target : null])) as Record<CampDayBucket, number | null>;
   }, [planCur, campOverrides]);
-  const campTargetSource = planCampTargets ? "Kế Hoạch Tháng đã chốt" : "nhập tay ở Nhập Ads & Ghi Chú";
+  const campTargetSource = planCampTargets ? "Kế Hoạch Tháng đã chốt" : "nhập tay ở Nhập Ads";
   const prevColLabel = cmp.partial ? `1–${Number(cmp.prevEnd.slice(8))}/${prevMonth.slice(5)}` : `Tháng ${prevMonth.slice(5)}`;
   const campDetailRows = useMemo(() => {
     const targets: Record<CampDayBucket, number | null> = planCampTargets ?? {
@@ -512,7 +522,11 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     why: whyInsight(livePrevStats, liveCurStats, { groups: dayGroups, mixRate }),
     people: peopleInsight(hostInsight.rows, reliability),
     products: productsInsight(skuMoveData, topPromo?.items?.[0] ?? null, giftNote),
-    context: contextInsight(campDetailRows, slotRows)
+    context: contextInsight(
+      campDetailRows,
+      slotRows,
+      adsCur && { cost: adsCur.cost, roi: adsCur.roi, prevCost: adsPrev?.cost ?? null, prevRoi: adsPrev?.roi ?? null, zeroOrderDays: adsCur.zeroOrderDays.length }
+    )
   };
   // Việc cần làm của từng phần gom về "Việc agency làm tháng sau" — khung Insight tự sinh không nói lại.
   const controlOpsGroup = controlOps ? (controlOps.key as "daily" | "camp") : null;
@@ -590,11 +604,6 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     }
   };
 
-  const agencyNotes = [
-    ["Khuyến mãi", monthlyReportRow?.promotionNotes],
-    ["Khách hàng", monthlyReportRow?.customerInsightNotes],
-    ["Sức khoẻ tài khoản", monthlyReportRow?.accountHealthNotes]
-  ].filter((x): x is [string, string] => !!x[1]?.trim());
 
   // Bảng xu hướng 4 tháng cùng số ngày (thay 8 ô xu hướng + bảng MoM + phễu + 2 biểu đồ 4 tháng — cùng số lặp 4 lần).
   // goodWhenUp null = trung tính (không tô). UPT live đổi theo quà tặng ⇒ trung tính; UPT bỏ quà mới là cách bán.
@@ -843,6 +852,31 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             "CTOR": n(r.ctor)
           }))
         },
+        ...(adsCur
+          ? [
+              {
+                name: "6 Ads theo ngay",
+                rows: adsCur.days.map((d) => ({
+                  "Ngày": fmtDateVn(d.date),
+                  "Loại ngày": CAMP_DAY_BUCKET_LABEL[bucketCur(d.date)],
+                  "Chi phí": d.cost,
+                  "Đơn SKU": d.orders,
+                  "Doanh thu gộp": d.revenue,
+                  "ROI": n(d.cost > 0 ? d.revenue / d.cost : null)
+                }))
+              },
+              {
+                name: "6 Ads theo loai ngay",
+                rows: [
+                  ...CAMP_DAY_BUCKET_ORDER.filter((b) => (adsCur.byBucket?.[b].days ?? 0) > 0).map((b) => {
+                    const r = adsCur.byBucket![b];
+                    return { "Loại ngày": CAMP_DAY_BUCKET_LABEL[b], "Số ngày": r.days, "Chi phí": r.cost, "Doanh thu gộp": r.revenue, "ROI": n(r.roi), "ROI tháng trước (cùng số ngày)": n(adsPrev?.byBucket?.[b].roi), "Đơn SKU": r.orders };
+                  }),
+                  { "Loại ngày": "Cả tháng", "Số ngày": adsCur.days.length, "Chi phí": adsCur.cost, "Doanh thu gộp": adsCur.revenue, "ROI": n(adsCur.roi), "ROI tháng trước (cùng số ngày)": n(adsPrev?.roi), "Đơn SKU": adsCur.orders }
+                ]
+              }
+            ]
+          : []),
         {
           name: "6 Top Sessions",
           rows: topSessions.map((s, idx) => ({
@@ -1462,7 +1496,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
 
         {/* ===== 6. Campaign & khung giờ ===== */}
         <section id="mr-context" className="space-y-4 scroll-mt-16">
-          <SectionHead no="6" title="Campaign & khung giờ" sub="Mỗi khung so với chính khung đó tháng trước, khung giờ bắt đầu ca" />
+          <SectionHead no="6" title="Campaign & khung giờ" sub="Mỗi khung so với chính khung đó tháng trước, Ads toàn cửa hàng, khung giờ bắt đầu ca" />
           {insightBox("context")}
           <SectionDetail open={detailOpen("context")} onOpen={() => openDetail("context")}>
             <Panel title="Campaign — so với cùng khung tháng trước" icon={<Flame className="w-4 h-4" />} sub={`GMV tính từ ca · Target GMV: ${campTargetSource} · ${cmp.label} · mỗi tháng dùng khoảng ngày Campaign của chính tháng đó`}>
@@ -1487,6 +1521,85 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                 })}
               </ReportTable>
             </Panel>
+            {adsCur ? (() => {
+              const prevLabel = adsCur.lastDate && adsCur.lastDate < end ? `1–${Number(adsCur.lastDate.slice(8))}/${prevMonth.slice(5)}` : `Tháng ${prevMonth.slice(5)}`;
+              const vsPrev = (cur: number | null, prev: number | null | undefined, fmt: (v: number) => string) => {
+                if (prev == null || cur == null) return undefined;
+                const c = pctChange(prev, cur);
+                return `${prevLabel}: ${fmt(prev)}${c != null ? ` (${c >= 0 ? "+" : "−"}${fmtFixed(Math.abs(c), 0)}%)` : ""}`;
+              };
+              const buckets = CAMP_DAY_BUCKET_ORDER.filter((b) => (adsCur.byBucket?.[b].days ?? 0) > 0);
+              const ranked = buckets.filter((b) => adsCur.byBucket![b].roi != null).sort((a, b) => adsCur.byBucket![b].roi! - adsCur.byBucket![a].roi!);
+              const roiX = (v: number | null | undefined) => (v != null ? `${fmtFixed(v, 1)}x` : "—");
+              const notes: string[] = [];
+              if (ranked.length >= 2) {
+                const hi = ranked[0];
+                const lo = ranked[ranked.length - 1];
+                notes.push(`ROI cao nhất ở ${DAY_TYPE_SHORT[hi]} (${roiX(adsCur.byBucket![hi].roi)}), thấp nhất ở ${DAY_TYPE_SHORT[lo]} (${roiX(adsCur.byBucket![lo].roi)}).`);
+              }
+              if (adsCur.zeroOrderDays.length) {
+                notes.push(`${adsCur.zeroOrderDays.length} ngày tiêu tiền mà 0 đơn (${adsCur.zeroOrderDays.map((d) => fmtDateVn(d.date, false)).join(", ")}) — ${fmtVndFull(adsCur.zeroOrderDays.reduce((a, d) => a + d.cost, 0))}.`);
+              }
+              if (adsCur.lowRoiDays.length) {
+                notes.push(`Ngày ROI thấp nhất trong các ngày chi đáng kể: ${adsCur.lowRoiDays.map((d) => `${fmtDateVn(d.date, false)} (${roiX(d.roi)}, chi ${fmtVndShort(d.cost)})`).join("; ")}.`);
+              }
+              notes.push("Doanh thu gộp TikTok tính theo đơn gốc trước huỷ/hoàn nên có thể lớn hơn GMV của shop — không dùng làm % GMV; ROI sau huỷ/hoàn sẽ thấp hơn.");
+              const chartData = adsCur.days.map((d) => ({ day: Number(d.date.slice(8)), cost: d.cost, roi: d.cost > 0 ? d.revenue / d.cost : null }));
+              return (
+                <Panel
+                  title="Ads toàn cửa hàng (TikTok Ads)"
+                  icon={<Megaphone className="w-4 h-4" />}
+                  sub={`File Campaign overview data · ${fmtDateVn(adsCur.firstDate!, false)}–${fmtDateVn(adsCur.lastDate!, false)} · gồm LIVE GMV Max và Product GMV Max · ROI = doanh thu gộp ÷ chi phí · so ${prevLabel}`}
+                >
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+                    <KpiTile label="Chi phí Ads" value={fmtVndShort(adsCur.cost)} note={vsPrev(adsCur.cost, adsPrev?.cost, fmtVndShort)} />
+                    <KpiTile label="ROI" value={roiX(adsCur.roi)} change={pctChange(adsPrev?.roi, adsCur.roi)} note={adsPrev ? `${prevLabel}: ${roiX(adsPrev.roi)}` : undefined} />
+                    <KpiTile label="Chi phí / đơn SKU" value={adsCur.costPerOrder != null ? fmtVndFull(adsCur.costPerOrder) : "—"} note={`${fmtVndFull(adsCur.orders)} đơn${adsPrev?.costPerOrder != null ? ` · ${prevLabel}: ${fmtVndFull(adsPrev.costPerOrder)}` : ""}`} />
+                    <KpiTile label="Doanh thu gộp từ Ads" value={fmtVndShort(adsCur.revenue)} change={pctChange(adsPrev?.revenue, adsCur.revenue)} />
+                  </div>
+                  <ReportTable head={["Loại ngày", "Số ngày", "Chi phí", "Doanh thu gộp", "ROI", `ROI ${prevLabel}`, "Đơn SKU"]}>
+                    {buckets.map((b, idx) => {
+                      const r = adsCur.byBucket![b];
+                      const p = adsPrev?.byBucket?.[b];
+                      return (
+                        <tr key={b} style={rowStyle(idx)}>
+                          <td className="py-2 px-3 font-semibold" style={{ color: PAL.gold }}>{CAMP_DAY_BUCKET_LABEL[b]}</td>
+                          <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{r.days}</td>
+                          <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.cream }}>{fmtVndShort(r.cost)}</td>
+                          <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{fmtVndShort(r.revenue)}</td>
+                          <td className="py-2 px-3 text-right font-mono font-bold" style={{ color: PAL.cream }}>{roiX(r.roi)}</td>
+                          <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{p && p.days > 0 ? roiX(p.roi) : "—"}</td>
+                          <td className="py-2 px-3 text-right font-mono" style={{ color: PAL.muted }}>{fmtVndFull(r.orders)}</td>
+                        </tr>
+                      );
+                    })}
+                  </ReportTable>
+                  <div style={{ height: 220 }} className="mt-4">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart data={chartData} margin={{ left: 4, right: 4 }}>
+                        <CartesianGrid stroke={PAL.line} vertical={false} />
+                        <XAxis dataKey="day" stroke={PAL.muted} fontSize={11} />
+                        <YAxis yAxisId="cost" stroke={PAL.muted} fontSize={11} tickFormatter={(v) => fmtVndShort(v)} width={52} />
+                        <YAxis yAxisId="roi" orientation="right" stroke={PAL.muted} fontSize={11} tickFormatter={(v) => `${v}x`} width={40} />
+                        <Tooltip
+                          contentStyle={chartTooltipStyle}
+                          labelFormatter={(d) => `Ngày ${d}/${month.slice(5)}`}
+                          formatter={(v, name) => (name === "ROI" ? `${fmtFixed(chartNum(v), 1)}x` : fmtVndFull(chartNum(v)))}
+                        />
+                        <Bar yAxisId="cost" dataKey="cost" name="Chi phí" fill={PAL.blue} radius={[3, 3, 0, 0]} />
+                        <Line yAxisId="roi" dataKey="roi" name="ROI" stroke={PAL.gold} dot={false} strokeWidth={2} connectNulls={false} />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <ChartLegend items={[["Chi phí Ads theo ngày", PAL.blue], ["ROI theo ngày (trục phải)", PAL.gold]]} />
+                  <ul className="mt-3 space-y-1 text-[11px] list-disc pl-4" style={{ color: PAL.muted }}>
+                    {notes.map((t) => <li key={t}>{t}</li>)}
+                  </ul>
+                </Panel>
+              );
+            })() : (
+              canManage && warnBox(<>Chưa có file Ads tháng {month.slice(5)}/{month.slice(0, 4)} trong bản chụp này. Brand có chạy Ads: tải file &quot;Campaign overview data&quot; ở Nhập Ads rồi bấm Cập nhật số liệu. Không chạy Ads thì bỏ qua — brand không thấy dòng này.</>)
+            )}
             <Panel title="Khung giờ bắt đầu ca" icon={<CalendarClock className="w-4 h-4" />} sub={`GMV/giờ · ${cmp.label}`}>
               <ReportTable head={["Khung giờ", "Sessions (trước → nay)", "GMV/giờ kỳ trước", "GMV/giờ kỳ này", "Thay đổi"]}>
                 {slotRows.map((r, idx) => (
@@ -1617,23 +1730,13 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                 </p>
               </Panel>
             )}
-            {agencyNotes.length > 0 && (
-              <div className="rounded-xl p-4 space-y-2" style={{ background: PAL.panel, border: `1px solid ${PAL.line}` }}>
-                <div className="text-[11px] uppercase tracking-wider" style={{ color: PAL.muted }}>Ghi chú của agency</div>
-                {agencyNotes.map(([label, text]) => (
-                  <p key={label} className="text-[13px] whitespace-pre-line" style={{ color: PAL.cream }}>
-                    <b style={{ color: PAL.gold }}>{label}:</b> {text}
-                  </p>
-                ))}
-              </div>
-            )}
           </SectionDetail>
         </section>
 
         {/* Chỉ là chỉ đường cho ops — report gửi brand là 7 phần ở trên (Phân tích sâu đã gộp vào, 2026-09-27). */}
         {canManage && (
           <p className="text-[11px] pt-3" style={{ color: PAL.muted, borderTop: `1px solid ${PAL.line}` }}>
-            Chỉ ops thấy: target, khung camp và lịch tháng nhập ở <b>Kế Hoạch Tháng</b> (tháng không có kế hoạch: khung camp ở <b>Nhập Ads & Ghi Chú</b>); bảng creator affiliate theo tháng ở trang <b>Affiliate</b>.
+            Chỉ ops thấy: target, khung camp và lịch tháng nhập ở <b>Kế Hoạch Tháng</b> (tháng không có kế hoạch: khung camp ở <b>Nhập Ads</b>); bảng creator affiliate theo tháng ở trang <b>Affiliate</b>.
           </p>
         )}
       </div>

@@ -1934,7 +1934,6 @@ export default function App() {
                     brandName={currentBrandName}
                     sessions={activeSessions}
                     currentRole={currentRole}
-                    onOpenMonthPlan={() => { rememberBrandId(currentBrandId!); navigateTo("month_plan"); }}
                   />
                 )}
 

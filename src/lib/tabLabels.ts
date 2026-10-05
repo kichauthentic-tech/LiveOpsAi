@@ -41,7 +41,7 @@ export const BRAND_TAB_LABELS: Record<string, string> = {
   brand_next_month_plan: "Kế Hoạch Tháng Sau",
   brand_rate_card: "Rate Card",
   brand_affiliate: "Affiliate",
-  brand_ads_report: "Nhập Ads & Ghi Chú",
+  brand_ads_report: "Nhập Ads",
   brand_dataraw: "Dữ Liệu Gốc",
   account_settings: "Tài Khoản Của Tôi"
 };

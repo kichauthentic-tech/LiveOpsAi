@@ -1,6 +1,8 @@
 import { BrandPlatformRate, DataRawReportType, LiveSession } from "../../types";
 import { CreatorLivePerfMonthSlice, fetchCreatorLivePerfMonthSlice } from "../dataraw/creatorLivePerfSlice";
 import {
+  AdsMonthSlice,
+  fetchAdsMonthSlice,
   CardGmvMonthSlice,
   fetchCardGmvMonthSlice,
   fetchShopDaysMonthSlice,
@@ -111,7 +113,9 @@ export function reportWindow(month: string): string[] {
 // dailyPerf (file Live Performance Core Stats) BỎ 2026-09-29: file đó cộng cả live của creator affiliate (CROCS
 // 1–21/09: LIVE GMV = Seller LIVE + Creator LIVE của Shop Analytics, lệch 0đ mọi ngày) nên không phải số agency;
 // biểu đồ duy nhất dùng nó đã bỏ. Bản chụp cũ còn piece này trong JSON — không ai đọc, không tính vào độ mới.
-type PieceKind = "creatorLive" | "topSku" | "topPromo" | "shopDays" | "cardGmv" | "skuRank" | "gifts";
+// ads (2026-10-05, migration 0137): file Ads "Campaign overview data" của tháng report + tháng trước (so tháng trước).
+// Piece mới ⇒ bản chụp cũ thiếu; chỉ báo "file Ads có thay đổi" khi brand thật sự có file (stampOf rỗng thì im).
+type PieceKind = "creatorLive" | "topSku" | "topPromo" | "shopDays" | "cardGmv" | "skuRank" | "gifts" | "ads";
 
 const PIECE_SOURCES: Record<PieceKind, DataRawReportType[]> = {
   creatorLive: ["creator_live_performance"],
@@ -120,7 +124,8 @@ const PIECE_SOURCES: Record<PieceKind, DataRawReportType[]> = {
   shopDays: ["shop_analytics"],
   cardGmv: ["product_list"],
   skuRank: ["product_list"],
-  gifts: ["product_list"]
+  gifts: ["product_list"],
+  ads: ["ads_campaign_overview"]
 };
 
 // Nhãn cho thông báo "file nào mới up" — cùng tên ops thấy ở Dữ Liệu Gốc.
@@ -128,7 +133,8 @@ export const REPORT_TYPE_LABEL: Partial<Record<DataRawReportType, string>> = {
   creator_live_performance: "Creator Live Performance",
   shop_analytics: "Shop Analytics",
   product_list: "Sản Phẩm",
-  shop_promotion: "Khuyến Mãi"
+  shop_promotion: "Khuyến Mãi",
+  ads_campaign_overview: "Ads (TikTok Ads)"
 };
 
 function pieceKey(kind: PieceKind, month: string): string {
@@ -167,7 +173,9 @@ function requiredPieces(month: string, sessions: LiveSession[] | SnapshotSession
     { kind: "topSku", month },
     { kind: "topPromo", month },
     { kind: "skuRank", month },
-    { kind: "skuRank", month: shiftMonth(month, -1) }
+    { kind: "skuRank", month: shiftMonth(month, -1) },
+    { kind: "ads", month },
+    { kind: "ads", month: shiftMonth(month, -1) }
   ];
   for (const m of reportWindow(month)) {
     out.push({ kind: "shopDays", month: m }, { kind: "cardGmv", month: m }, { kind: "gifts", month: m });
@@ -272,6 +280,8 @@ async function fetchPiece(kind: PieceKind, brandId: string, month: string, aggMe
       return fetchShopDaysMonthSlice(brandId, start, end);
     case "cardGmv":
       return fetchCardGmvMonthSlice(brandId, start, end);
+    case "ads":
+      return fetchAdsMonthSlice(brandId, start, end);
   }
 }
 
@@ -336,6 +346,8 @@ export interface SnapshotView {
   skuRank: Record<string, SkuRankSlice | null>;
   /** Theo tháng trong cửa sổ. null = bản chụp cũ chưa có (trước Report Tháng chuyên sâu). */
   gifts: Record<string, GiftSlice | null>;
+  /** Tháng report + tháng trước. null = bản chụp dựng trước 2026-10-05 (chưa có phần Ads). */
+  ads: Record<string, AdsMonthSlice | null>;
 }
 
 export function snapshotView(s: MonthlyReportSnapshot): SnapshotView {
@@ -351,8 +363,13 @@ export function snapshotView(s: MonthlyReportSnapshot): SnapshotView {
     cardGmv[m] = get<CardGmvMonthSlice>("cardGmv", m);
   }
   const skuRank: SnapshotView["skuRank"] = {};
-  for (const m of [shiftMonth(s.month, -1), s.month]) skuRank[m] = get<SkuRankSlice>("skuRank", m);
+  const ads: SnapshotView["ads"] = {};
+  for (const m of [shiftMonth(s.month, -1), s.month]) {
+    skuRank[m] = get<SkuRankSlice>("skuRank", m);
+    ads[m] = get<AdsMonthSlice>("ads", m);
+  }
   return {
+    ads,
     shopDays,
     cardGmv,
     skuRank,

@@ -33,7 +33,7 @@ export const chartTooltipStyle = { background: PAL.panel2, border: `1px solid ${
 
 // ---------- Bố cục 7 phần, kết luận trước (Report Tháng chuyên sâu, 2026-09-26) ----------
 // Thứ tự theo câu brand hỏi: kết quả thế nào → thị trường hay vận hành → vì sao → hàng → người → lịch → tháng sau.
-// Công cụ nhập liệu của ops (khung camp, kế hoạch tháng sau) đã chuyển sang tab Nhập Ads & Ghi Chú; bảng creator
+// Công cụ nhập liệu của ops (khung camp, kế hoạch tháng sau) đã chuyển sang tab Nhập Ads; bảng creator
 // affiliate nhập tay nằm ở trang Affiliate — report chỉ còn phần để đọc.
 
 export const SECTIONS: { id: string; label: string }[] = [

@@ -22,6 +22,7 @@ vi.mock("../src/lib/dataraw/monthlyProductSlice", () => ({
   ),
   fetchShopDaysMonthSlice: async (_b: string, s: string) => (calls.push(`shopDays ${s}`), { days: [{ date: s, gmv: 300, refunds: 30, orders: 3, visitors: 10, liveLinked: 150, affiliate: 50, video: 7 }], hasAnyBatch: true }),
   fetchCardGmvMonthSlice: async (_b: string, s: string) => (calls.push(`card ${s}`), { cardGmv: 40, hasAnyBatch: true }),
+  fetchAdsMonthSlice: async (_b: string, s: string) => (calls.push(`ads ${s}`), { days: [{ date: s, cost: 10, orders: 1, revenue: 200 }], hasAnyBatch: true }),
   fetchTopPromotionsMonthSlice: async (_b: string, s: string) => (calls.push(`promo ${s}`), { items: [], hasAnyBatch: true, excludedMultiMonth: 0 }),
   topSkuFromAgg: (agg: { skus: [string, number, number, number][] }) => ({ items: agg.skus.map(([name, gmv, gmvLive, orders]) => ({ name, gmv, gmvLive, orders })), hasAnyBatch: true }),
   skuRankFromAgg: (src: { agg: { skus: [string, number][] } } | null) => ({ items: (src?.agg.skus ?? []).map(([name, gmv], i) => ({ name, gmv, rank: i + 1 })), sellingSkus: 1, limit: 30, hasAnyBatch: !!src })
@@ -80,7 +81,7 @@ test("dựng lần đầu: bản tổng hợp SKU chỉ đọc 1 lần mỗi th�
   expect(calls.some((c) => c.startsWith("creatorLive"))).toBe(false);
   expect(reused).toEqual([]);
   expect(fetched.sort()).toEqual(
-    ["cardGmv|2026-06", "cardGmv|2026-07", "cardGmv|2026-08", "cardGmv|2026-09", "gifts|2026-06", "gifts|2026-07", "gifts|2026-08", "gifts|2026-09", "shopDays|2026-06", "shopDays|2026-07", "shopDays|2026-08", "shopDays|2026-09", "skuRank|2026-08", "skuRank|2026-09", "topPromo|2026-09", "topSku|2026-09"]
+    ["ads|2026-08", "ads|2026-09", "cardGmv|2026-06", "cardGmv|2026-07", "cardGmv|2026-08", "cardGmv|2026-09", "gifts|2026-06", "gifts|2026-07", "gifts|2026-08", "gifts|2026-09", "shopDays|2026-06", "shopDays|2026-07", "shopDays|2026-08", "shopDays|2026-09", "skuRank|2026-08", "skuRank|2026-09", "topPromo|2026-09", "topSku|2026-09"]
   );
   // Chỉ ca của brand, trong cửa sổ 4 tháng, trừ ca huỷ; không mang theo aiAnalysis.
   expect(snapshot.sessions.map((s) => s.id).sort()).toEqual(["aug", "jul", "jun", "sep1", "sep2"]);
@@ -126,6 +127,22 @@ test("file Live Performance (Core Stats) không còn là nguồn của report: u
   expect(calls).toEqual([]);
 });
 
+test("file Ads (0137): brand không chạy Ads không bị báo cũ; up file Ads T9 ⇒ báo đúng loại, chỉ tải lại Ads T9", async () => {
+  const first = await buildMonthlyReportSnapshot({ brandId: B, month: M, sessions, brandPlatformRates: [] });
+  expect(snapshotFreshness(first.snapshot, live()).upToDate).toBe(true);
+  // Bản chụp dựng trước khi có phần Ads (thiếu piece) + brand chưa có file Ads ⇒ vẫn "mới".
+  const legacy = { ...first.snapshot, pieces: Object.fromEntries(Object.entries(first.snapshot.pieces).filter(([k]) => !k.startsWith("ads|"))) };
+  expect(snapshotFreshness(legacy, live()).upToDate).toBe(true);
+  imports = [...baseImports, imp("ads-sep", "ads_campaign_overview", "2026-09-01", "2026-09-30", "2026-10-05T07:00:00Z")];
+  const f = snapshotFreshness(first.snapshot, live());
+  expect(f.changedFiles).toEqual(["Ads (TikTok Ads)"]);
+  expect(snapshotFreshness(legacy, live()).changedFiles).toEqual(["Ads (TikTok Ads)"]);
+  calls.length = 0;
+  const again = await buildMonthlyReportSnapshot({ brandId: B, month: M, sessions, brandPlatformRates: [], previous: first.snapshot });
+  expect(again.fetched).toEqual(["ads|2026-09"]);
+  expect(calls).toEqual(["ads 2026-09-01"]);
+});
+
 test("tháng trước lấy từ bản chụp tháng trước (cùng stamp) thay vì đọc lại file", async () => {
   const aug = await buildMonthlyReportSnapshot({ brandId: B, month: "2026-08", sessions, brandPlatformRates: [] });
   prevMonthPieces = aug.snapshot.pieces;
@@ -133,9 +150,10 @@ test("tháng trước lấy từ bản chụp tháng trước (cùng stamp) thay
   const sep = await buildMonthlyReportSnapshot({ brandId: B, month: M, sessions, brandPlatformRates: [] });
   // Cửa sổ T9 = T6..T9; bản chụp T8 (T5..T8) đã có shop + thẻ SP của T6, T7, T8.
   // skuRank|2026-08 = piece tháng report của bản chụp T8 ⇒ hạng tháng trước không phải đọc lại file T8.
-  expect(sep.reused.sort()).toEqual(["cardGmv|2026-06", "cardGmv|2026-07", "cardGmv|2026-08", "gifts|2026-06", "gifts|2026-07", "gifts|2026-08", "shopDays|2026-06", "shopDays|2026-07", "shopDays|2026-08", "skuRank|2026-08"]);
+  expect(sep.reused.sort()).toEqual(["ads|2026-08", "cardGmv|2026-06", "cardGmv|2026-07", "cardGmv|2026-08", "gifts|2026-06", "gifts|2026-07", "gifts|2026-08", "shopDays|2026-06", "shopDays|2026-07", "shopDays|2026-08", "skuRank|2026-08"]);
   expect(calls).not.toContain("productAgg 2026-08-01");
   expect(calls).not.toContain("shopDays 2026-08-01");
+  expect(calls).not.toContain("ads 2026-08-01");
   expect(calls).toContain("shopDays 2026-09-01");
 });
 

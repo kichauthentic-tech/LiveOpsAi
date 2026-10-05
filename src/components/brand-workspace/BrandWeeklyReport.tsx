@@ -105,7 +105,7 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
     };
   }, [brandId, planMonths]);
   const monthPlan = plans.get(monthKey) ?? null;
-  // Khung camp hiệu lực của tháng (effectiveCamp — audit workflow #8): khoảng ghi đè ở Nhập Ads & Ghi Chú thắng
+  // Khung camp hiệu lực của tháng (effectiveCamp — audit workflow #8): khoảng ghi đè ở Nhập Ads thắng
   // khoảng của Kế Hoạch Tháng, cùng luật với Report Tháng / Dashboard / Bản Tin CEO.
   const [monthReportRow, setMonthReportRow] = useState<BrandMonthlyReport | null>(null);
   useEffect(() => {

@@ -361,9 +361,31 @@ export interface SlotInsightRow {
   prev: { n: number; gmvPerHour: number | null };
 }
 
-export function contextInsight(camps: CampCompareRow[], slots: SlotInsightRow[]): SectionInsight | null {
+/** Ads toàn cửa hàng của tháng (file TikTok Ads, 0137) — tháng trước đã cắt cùng số ngày. */
+export interface AdsInsightInput {
+  cost: number;
+  roi: number | null;
+  prevCost: number | null;
+  prevRoi: number | null;
+  zeroOrderDays: number;
+}
+
+function adsLine(ads: AdsInsightInput): string {
+  const costChg = pctChange(ads.prevCost, ads.cost);
+  const roiTxt = (v: number) => `${v.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}x`;
+  return (
+    `Ads toàn cửa hàng: chi ${money(ads.cost)}${costChg != null ? ` (${signed(costChg, 0)} so với cùng kỳ)` : ""}` +
+    (ads.roi != null ? `, ROI ${roiTxt(ads.roi)}${ads.prevRoi != null ? ` (tháng trước ${roiTxt(ads.prevRoi)})` : ""}` : "") +
+    (ads.zeroOrderDays ? `; ${ads.zeroOrderDays} ngày tiêu tiền mà 0 đơn` : "") +
+    "."
+  );
+}
+
+export function contextInsight(camps: CampCompareRow[], slots: SlotInsightRow[], ads?: AdsInsightInput | null): SectionInsight | null {
+  const hasAds = !!ads && ads.cost > 0;
   const ran = camps.filter((r) => r.cur.sessions > 0);
-  if (ran.length === 0) return null;
+  // Tháng chưa có ca nào có số (vd brand mới nạp file) mà đã có file Ads ⇒ Insight chỉ nói Ads.
+  if (ran.length === 0) return hasAds ? { headline: adsLine(ads!), points: [], action: null } : null;
   const daily = ran.find((r) => r.key === "daily");
   const campRan = ran.filter((r) => r.key !== "daily");
   const withPrev = campRan.filter((r) => r.prev.sessions > 0);
@@ -376,7 +398,7 @@ export function contextInsight(camps: CampCompareRow[], slots: SlotInsightRow[])
     ]
       .filter(Boolean)
       .join("; ") + ".";
-  if (headline === ".") return null;
+  if (headline === ".") return hasAds ? { headline: adsLine(ads!), points: [], action: null } : null;
 
   // Không đọc lại từng dòng bảng Campaign ngay bên dưới (GMV, % target, GMV/giờ từng khung) — chỉ câu tổng.
   const points: string[] = [];
@@ -387,6 +409,7 @@ export function contextInsight(camps: CampCompareRow[], slots: SlotInsightRow[])
   if (bestSlot && worstSlot && bestSlot !== worstSlot) {
     points.push(`Khung giờ bắt đầu ca: ${bestSlot.label.toLowerCase()} bán tốt nhất (${money(bestSlot.cur.gmvPerHour!)}/giờ), ${worstSlot.label.toLowerCase()} thấp nhất (${money(worstSlot.cur.gmvPerHour!)}/giờ, ${worstSlot.cur.n} ca).`);
   }
+  if (hasAds) points.push(adsLine(ads!));
 
   const worstCamp = ran
     .map((r) => ({ r, h: pctChange(r.prev.gmvPerHour, r.cur.gmvPerHour) }))

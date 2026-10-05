@@ -741,7 +741,7 @@ function DriverBars({ parts, total }: { parts: { label: string; change: number }
   const mx = Math.max(0.05, ...parts.map((p) => Math.abs(p.change)));
   const worst = [...parts].slice(1).sort((a, b) => a.change - b.change)[0];
   const advice: Record<string, string> = {
-    [METRIC.viewsPerHour]: "kiểm tra ads và lịch đăng video trước giờ live (nhập Ads ở \"Nhập Ads & Ghi Chú\" để kết luận).",
+    [METRIC.viewsPerHour]: "kiểm tra ads và lịch đăng video trước giờ live (nhập Ads ở \"Nhập Ads\" để kết luận).",
     [METRIC.ctor]: "kiểm tra giá, voucher và tồn kho của các SKU được ghim nhiều nhất.",
     [METRIC.liveCtr]: "kiểm tra thứ tự ghim sản phẩm và kịch bản mở đầu.",
     [METRIC.aov]: "kiểm tra combo và quà tặng."

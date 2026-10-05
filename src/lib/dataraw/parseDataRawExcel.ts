@@ -1,5 +1,6 @@
 import { DataRawColumn, DataRawReportType } from "../../types";
 import { buildProductListAgg } from "./productListAgg";
+import { parseAdsCampaignOverview } from "./adsCampaignOverview";
 
 // Parser cho module Dataraw Brand Workspace (migration 0052) — 4 report Excel export tay từ
 // TikTok Shop Seller Center, mỗi loại có layout khác nhau (xem sample thật đã xem trong phiên
@@ -255,5 +256,6 @@ export async function parseDataRawExcel(file: File, reportType: DataRawReportTyp
     case "shop_analytics": return parseShopAnalytics(rows);
     case "live_performance_core_stats": return parseLivePerformanceCoreStats(rows);
     case "creator_live_performance": return parseCreatorLivePerformance(rows);
+    case "ads_campaign_overview": return parseAdsCampaignOverview(rows);
   }
 }

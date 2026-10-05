@@ -259,7 +259,7 @@ export default function CeoBrief(props: CeoBriefProps) {
     for (const b of brands) {
       const plan = plans.get(b.id);
       const reportPlan = buildMonthTargetPlan(b.id, month, monthlyReports);
-      // Cùng luật khung camp với mọi màn (effectiveCamp): khoảng nhập ở Nhập Ads & Ghi Chú thắng Kế Hoạch Tháng.
+      // Cùng luật khung camp với mọi màn (effectiveCamp): khoảng nhập ở Nhập Ads thắng Kế Hoạch Tháng.
       const camp: CampOverrides = effectiveCamp(plan?.campRanges, monthlyReports.get(`${b.id}|${month}`));
       const lockedSlotTargets = planSlotTargets.get(`${b.id}|${month}`) ?? [];
       const target = monthTargetOf(month, planMonthTotals.get(`${b.id}|${month}`), lockedSlotTargets, reportPlan, camp);
@@ -725,7 +725,7 @@ const TargetSection: React.FC<{ outlook: MonthOutlook; month: string; single: bo
   const band = (sign: 1 | -1) => projPts.map(([i, v]) => [i, v + sign * cp * PROJECTION_ERROR_BAND * ((i - startIdx) / span)] as [number, number]);
   const colW = (W - L - R) / Math.max(1, n - 1);
   const campIdx = o.days.map((d, i) => (o.buckets.find((b) => b.bucket !== "daily" && b.days.includes(d)) ? i : -1)).filter((i) => i >= 0);
-  const sourceLabel = o.target ? (o.target.source === "locked_plan" ? "Kế Hoạch Tháng đã chốt" : "target khung camp nhập ở Nhập Ads & Ghi Chú (tháng không có Kế Hoạch Tháng)") : null;
+  const sourceLabel = o.target ? (o.target.source === "locked_plan" ? "Kế Hoạch Tháng đã chốt" : "target khung camp nhập ở Nhập Ads (tháng không có Kế Hoạch Tháng)") : null;
   const stat = (label: string, value: React.ReactNode, sub?: React.ReactNode) => (
     <div className="bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3">
       <p className="text-[11px] uppercase tracking-wider font-bold text-[var(--text-faint)]">{label}</p>

@@ -3,6 +3,7 @@ import { DataRawColumn, DataRawReportType } from "../../types";
 import { dedupeInFlight } from "../db/dedupeInFlight";
 import { fetchRowsPaged } from "./fetchRowsPaged";
 import { readShopDays } from "./shopAnalyticsDays";
+import { readAdsDays, type AdsDay } from "./adsCampaignOverview";
 import { buildProductListAgg, cleanProductName, findCol, isCurrentProductAgg, num, PRODUCT_AGG_VERSION, ProductListAgg } from "./productListAgg";
 
 // Deep Dive Report Tháng — Top SKU (product_list) + Top khuyến mãi (shop_promotion). Cả 2 report
@@ -335,6 +336,18 @@ export async function fetchShopDaysMonthSlice(brandId: string, monthStart: strin
     }))
     .sort((a, b) => a.date.localeCompare(b.date));
   return { days, hasAnyBatch: true };
+}
+
+export interface AdsMonthSlice {
+  days: AdsDay[];
+  hasAnyBatch: boolean;
+}
+
+/** File Ads "Campaign overview data" của tháng (migration 0137) — 1 batch / tháng (file trải 2 tháng bị từ chối lúc
+ *  tải lên), ~30 dòng × 7 cột. Lọc theo tháng phòng batch cũ phủ rộng hơn. */
+export async function fetchAdsMonthSlice(brandId: string, monthStart: string, monthEnd: string): Promise<AdsMonthSlice> {
+  const { rows, columns, hasAnyBatch } = await fetchOverlappingBatchRows(brandId, "ads_campaign_overview", monthStart, monthEnd);
+  return { days: readAdsDays(columns, rows).filter((d) => d.date >= monthStart && d.date <= monthEnd), hasAnyBatch };
 }
 
 export interface CardGmvMonthSlice {

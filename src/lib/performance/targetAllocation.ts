@@ -32,7 +32,7 @@ export function monthTotalTarget(plan: MonthTargetPlan): number {
 }
 
 
-// Target tháng X cho tháng KHÔNG có Kế Hoạch Tháng: target riêng từng khung camp ops nhập ở Nhập Ads & Ghi Chú
+// Target tháng X cho tháng KHÔNG có Kế Hoạch Tháng: target riêng từng khung camp ops nhập ở Nhập Ads
 // (camp*TargetGmv của dòng tháng X) + khung camp của dòng đó. Không có gì ⇒ null, ca không có target (không bịa).
 //
 // Bỏ nhánh "Kế hoạch tháng sau" (plan_target_gmv + plan_pct_* của dòng tháng X−1) ngày 2026-10-04 (audit người mới,

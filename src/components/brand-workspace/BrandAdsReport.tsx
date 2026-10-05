@@ -1,34 +1,37 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { defaultReportMonth } from "../../lib/defaultMonth";
-import { LiveSession, UserRole, BrandMonthlyReport as BrandMonthlyReportType } from "../../types";
-import { AlertTriangle, Loader2, Lock, Megaphone, Save, Target, TrendingUp } from "lucide-react";
+import { LiveSession, UserRole, BrandMonthlyReport as BrandMonthlyReportType, BrandDataRawImport, DataRawReportType } from "../../types";
+import { AlertTriangle, FileSpreadsheet, Loader2, Lock, Megaphone, Target, Trash2, Upload } from "lucide-react";
+import { parseDataRawExcel, type ParsedDataRawImport } from "../../lib/dataraw/parseDataRawExcel";
+import { adsMonthStats, adsPrevSameCut, readAdsDays } from "../../lib/dataraw/adsCampaignOverview";
+import { fetchAdsMonthSlice, type AdsMonthSlice } from "../../lib/dataraw/monthlyProductSlice";
+import { createOrReplaceDataRawImport, dataRawImportsRead, deleteDataRawImport, fetchDataRawImports, findExistingImportForMonth } from "../../lib/db/brandDataRaw";
+import { useConfirm } from "../../hooks/useConfirm";
 import { getTodayMonth } from "../../lib/dateUtils";
-import { getCanonicalAdsCost } from "../../lib/metrics/adsCost";
-import { isoWeekStart } from "../../lib/dateUtils";
-import { monthlyReportRead, upsertMonthlyReport, MonthlyReportManualInput } from "../../lib/db/monthlyReports";
+import { monthlyReportRead } from "../../lib/db/monthlyReports";
 import { errorMessage } from "../../lib/errorMessage";
 import { ReportPlanningInputs, prefetchReportPlanningInputs } from "./ReportPlanningInputs";
 import type { TabPrefetchCtx } from "../../lib/db/prefetch";
 
-import { fmtMonth, fmtFixed, fmtVndShort } from "../../lib/format";
+import { fmtDateVn, fmtMonth, fmtFixed, fmtVndFull, fmtVndShort } from "../../lib/format";
 import { MonthPicker } from "../common/MonthPicker";
 import { PageHeader } from "../common/PageHeader";
-// Nhập Ads & Ghi Chú (tách khỏi Report Tháng 2026-09-21 theo yêu cầu user): phần ops nhập tay
-// Ads Spend bổ sung / ROAS ghi đè / Promotion / Customer Insight / Account Health trước đây nằm
-// cuối Report Tháng, lẫn với tài liệu gửi brand. Giờ là tab riêng trong Brand Workspace, chỉ
-// ops thấy. Vẫn ghi vào cùng dòng `brand_monthly_reports` (0051) — Report Tháng chỉ còn phát hành.
-// Khối "Ads Report Chi Tiết (TikTok)" (tính từ ads_cost trong Report Ca) đi theo sang đây để ops
-// nhìn số máy tính được rồi mới nhập phần bổ sung.
+// Nhập Ads (tab ops-only, tách khỏi Report Tháng 2026-09-21). Từ 2026-10-05 (migration 0137): Ads lấy từ FILE
+// "Campaign overview data" của TikTok Ads (GMV Max, theo ngày, toàn cửa hàng) tải lên ngay ở đây — chỗ DUY NHẤT nhập
+// Ads; file lưu vào kho Dữ Liệu Gốc (loại ads_campaign_overview, 1 file / brand / tháng), Report Tháng phần 6 đọc lại
+// qua bản chụp. Gọn trang 05/10 (user: "thừa quá"; đo production: 4/4 dòng report để trống các ô này) — đã bỏ:
+// ô "Ads cost bổ sung"/"ROAS ghi đè", 3 ô ghi chú Promotion/Customer Insight/Account Health (nhận xét viết bằng
+// "Sửa Insight" ở từng phần của Report Tháng), khối Ads theo ca từ Report Ca (Finance vẫn đọc), khối "Target và lịch
+// tháng sau" (chỉ là nút sang Kế Hoạch Tháng). Còn lại khung camp gập — chỉ tháng không có Kế Hoạch Tháng.
 
 const CAN_MANAGE_ROLES: UserRole[] = ["ceo", "operations", "admin"];
+const ADS_TYPE: DataRawReportType = "ads_campaign_overview";
 
 interface BrandAdsReportProps {
   brandId: string;
   brandName: string;
   sessions: LiveSession[];
   currentRole: UserRole;
-  /** Sang Kế Hoạch Tháng của brand này — nơi DUY NHẤT đặt target/khung camp cho tháng có kế hoạch. */
-  onOpenMonthPlan?: () => void;
 }
 
 function monthRange(month: string): { start: string; end: string } {
@@ -43,60 +46,21 @@ function prevMonthStr(month: string): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-interface AdsReportSummary {
-  totalAdsSpend: number;
-  totalGmv: number; // GMV của đúng các phiên có Ads Spend, để ROAS phản ánh đúng cặp chi phí-doanh thu
-  reportedCount: number;
-  missingCount: number; // phiên TikTok Completed nhưng chưa nộp Report Ca -> không có ads_cost
-  backfillCount: number; // ca nạp bù từ file — không có Report Ca bao giờ, Ads cost phải nhập ở "Ads cost bổ sung"
-  weekly: { weekStart: string; adsSpend: number; gmv: number }[];
-}
-
-// Chỉ session TikTok có Report Ca (live_session_reports) mới có ads_cost — Shopee không có field
-// này trong Excel gốc (xem migration 0046), nên Ads Report chi tiết chỉ tính được cho TikTok.
-function summarizeAdsReport(completed: LiveSession[]): AdsReportSummary {
-  const tikTokSessions = completed.filter((s) => s.platform === "TikTok");
-  const reported = tikTokSessions.filter((s) => s.report != null);
-  // Ca nạp bù (Dữ Liệu Gốc) không có Report Ca và không nộp bù được — đếm riêng, không gọi là "chưa nộp".
-  const missing = tikTokSessions.filter((s) => s.report == null && !s.isBackfill);
-  const backfill = tikTokSessions.filter((s) => s.report == null && s.isBackfill);
-
-  const weeklyMap = new Map<string, { weekStart: string; adsSpend: number; gmv: number }>();
-  let totalAdsSpend = 0;
-  let totalGmv = 0;
-  for (const s of reported) {
-    const spend = getCanonicalAdsCost(s);
-    totalAdsSpend += spend;
-    totalGmv += s.actualGmv || 0;
-    const weekStart = isoWeekStart(s.date);
-    const entry = weeklyMap.get(weekStart) || { weekStart, adsSpend: 0, gmv: 0 };
-    entry.adsSpend += spend;
-    entry.gmv += s.actualGmv || 0;
-    weeklyMap.set(weekStart, entry);
-  }
-
-  return {
-    totalAdsSpend,
-    totalGmv,
-    reportedCount: reported.length,
-    missingCount: missing.length,
-    backfillCount: backfill.length,
-    weekly: Array.from(weeklyMap.values()).sort((a, b) => a.weekStart.localeCompare(b.weekStart))
-  };
-}
-
 function momPct(current: number, previous: number): number | null {
   if (!previous) return null;
   return ((current - previous) / previous) * 100;
 }
 
-const MomChip: React.FC<{ current: number | null; previous: number | null }> = ({ current, previous }) => {
+// tone: "up" = tăng là tốt (xanh), "down" = giảm là tốt (chi phí/đơn), "neutral" = không tô màu (chi phí Ads).
+const MomChip: React.FC<{ current: number | null; previous: number | null; tone?: "up" | "down" | "neutral" }> = ({ current, previous, tone = "up" }) => {
   if (current == null || previous == null) return <div className="text-[11px] text-[var(--text-faint)] mt-0.5">MoM —</div>;
   const pct = momPct(current, previous);
   if (pct == null) return <div className="text-[11px] text-[var(--text-faint)] mt-0.5">MoM —</div>;
   const positive = pct >= 0;
+  const good = tone === "up" ? positive : !positive;
+  const color = tone === "neutral" ? "text-[var(--text-muted)]" : good ? "text-emerald-400" : "text-red-400";
   return (
-    <div className={`text-[11px] font-bold mt-0.5 ${positive ? "text-emerald-400" : "text-red-400"}`}>
+    <div className={`text-[11px] font-bold mt-0.5 ${color}`}>
       MoM {positive ? "+" : ""}
       {fmtFixed(pct, 1)}%
     </div>
@@ -108,57 +72,118 @@ export function prefetchBrandAdsReport({ brandId, role }: TabPrefetchCtx): void 
   if (!brandId || (role && !CAN_MANAGE_ROLES.includes(role))) return;
   const month = defaultReportMonth(`${getTodayMonth()}-01`, []);
   monthlyReportRead.prefetch(brandId, `${month}-01`);
+  dataRawImportsRead.prefetch(brandId, ADS_TYPE);
   prefetchReportPlanningInputs(brandId, month);
 }
 
-export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandName, sessions, currentRole, onOpenMonthPlan }) => {
+export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandName, sessions, currentRole }) => {
   const canManage = CAN_MANAGE_ROLES.includes(currentRole);
   // Cùng tháng mở sẵn với Report Tháng — phần nhập ở đây đi theo report đó (lib/defaultMonth.ts).
   const [month, setMonth] = useState(() => defaultReportMonth(`${getTodayMonth()}-01`, sessions.filter((s) => s.brandId === brandId)));
   const [report, setReport] = useState<BrandMonthlyReportType | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [savedAt, setSavedAt] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const [adsSpend, setAdsSpend] = useState<string>("");
-  const [roas, setRoas] = useState<string>("");
-  const [promotionNotes, setPromotionNotes] = useState("");
-  const [customerInsightNotes, setCustomerInsightNotes] = useState("");
-  const [accountHealthNotes, setAccountHealthNotes] = useState("");
+  const confirm = useConfirm();
+  // File Ads (TikTok Ads "Campaign overview data") — danh sách file đã tải + số của tháng đang xem và tháng trước.
+  const [adsImports, setAdsImports] = useState<BrandDataRawImport[]>([]);
+  const [adsCur, setAdsCur] = useState<AdsMonthSlice | null>(null);
+  const [adsPrev, setAdsPrev] = useState<AdsMonthSlice | null>(null);
+  // Khoá (tháng|lần ghi) của lượt đọc đã về — khác khoá hiện tại ⇒ đang đọc (không setState đầu effect).
+  const [adsLoadedKey, setAdsLoadedKey] = useState<string | null>(null);
+  const [adsVersion, setAdsVersion] = useState(0); // tăng sau mỗi lần tải lên/xoá ⇒ đọc lại
+  const [adsError, setAdsError] = useState<string | null>(null);
+  const [adsPreview, setAdsPreview] = useState<{ parsed: ParsedDataRawImport; fileName: string; replace?: BrandDataRawImport } | null>(null);
+  const [adsSaving, setAdsSaving] = useState(false);
 
   const { start, end } = useMemo(() => monthRange(month), [month]);
-  const completedSessions = useMemo(
-    () => sessions.filter((s) => s.brandId === brandId && s.date >= start && s.date <= end && s.status === "Completed"),
-    [sessions, brandId, start, end]
-  );
   const { start: prevStart, end: prevEnd } = useMemo(() => monthRange(prevMonthStr(month)), [month]);
-  const prevCompletedSessions = useMemo(
-    () => sessions.filter((s) => s.brandId === brandId && s.date >= prevStart && s.date <= prevEnd && s.status === "Completed"),
-    [sessions, brandId, prevStart, prevEnd]
-  );
 
-  const adsReport = useMemo(() => summarizeAdsReport(completedSessions), [completedSessions]);
-  const prevAdsReport = useMemo(() => summarizeAdsReport(prevCompletedSessions), [prevCompletedSessions]);
-  const adsRoas = adsReport.totalAdsSpend > 0 ? adsReport.totalGmv / adsReport.totalAdsSpend : null;
-  const prevAdsRoas = prevAdsReport.totalAdsSpend > 0 ? prevAdsReport.totalGmv / prevAdsReport.totalAdsSpend : null;
-  const adsPctGmv = adsReport.totalGmv > 0 ? (adsReport.totalAdsSpend / adsReport.totalGmv) * 100 : null;
+  useEffect(() => {
+    let cancelled = false;
+    // Lần đầu nhận bản nạp trước; sau khi ghi thì đọc thẳng (lib/db/prefetch.ts).
+    (adsVersion === 0 ? dataRawImportsRead.take(brandId, ADS_TYPE) : fetchDataRawImports(brandId, ADS_TYPE))
+      .then((list) => !cancelled && setAdsImports(list))
+      .catch((e) => !cancelled && setAdsError(errorMessage(e, "Không tải được danh sách file Ads")));
+    return () => {
+      cancelled = true;
+    };
+  }, [brandId, adsVersion]);
+  useEffect(() => {
+    let cancelled = false;
+    const key = `${brandId}|${start}|${adsVersion}`;
+    Promise.all([fetchAdsMonthSlice(brandId, start, end), fetchAdsMonthSlice(brandId, prevStart, prevEnd)])
+      .then(([cur, prev]) => {
+        if (cancelled) return;
+        setAdsCur(cur);
+        setAdsPrev(prev);
+      })
+      .catch((e) => !cancelled && setAdsError(errorMessage(e, "Không đọc được file Ads")))
+      .finally(() => !cancelled && setAdsLoadedKey(key));
+    return () => {
+      cancelled = true;
+    };
+  }, [brandId, start, end, prevStart, prevEnd, adsVersion]);
+
+  const adsLoading = adsLoadedKey !== `${brandId}|${start}|${adsVersion}`;
+  const adsImportOfMonth = useMemo(() => findExistingImportForMonth(adsImports, `${month}-01`), [adsImports, month]);
+  const adsStats = useMemo(() => (adsCur?.days.length ? adsMonthStats(adsCur.days) : null), [adsCur]);
+  // So cùng kỳ: tháng này chưa đủ ngày ⇒ tháng trước cắt cùng số ngày.
+  const adsPrevStats = useMemo(
+    () => (adsCur?.days.length && adsPrev?.days.length ? adsMonthStats(adsPrevSameCut(adsCur.days, adsPrev.days, end)) : null),
+    [adsCur, adsPrev, end]
+  );
+  const previewStats = useMemo(() => (adsPreview ? adsMonthStats(readAdsDays(adsPreview.parsed.columns, adsPreview.parsed.rows)) : null), [adsPreview]);
+
+  const handleAdsFile = async (file: File) => {
+    setAdsError(null);
+    setAdsPreview(null);
+    try {
+      const parsed = await parseDataRawExcel(file, ADS_TYPE);
+      setAdsPreview({ parsed, fileName: file.name, replace: findExistingImportForMonth(adsImports, parsed.periodStart) });
+    } catch (e) {
+      setAdsError(errorMessage(e, "Không đọc được file."));
+    }
+  };
+
+  const handleAdsConfirm = async () => {
+    if (!adsPreview) return;
+    setAdsSaving(true);
+    setAdsError(null);
+    try {
+      await createOrReplaceDataRawImport(brandId, ADS_TYPE, adsPreview.fileName, adsPreview.parsed, adsPreview.replace?.id);
+      const fileMonth = adsPreview.parsed.periodStart?.slice(0, 7);
+      setAdsPreview(null);
+      if (fileMonth && fileMonth !== month) setMonth(fileMonth);
+      setAdsVersion((v) => v + 1);
+    } catch (e) {
+      setAdsError(errorMessage(e, "Không lưu được file Ads."));
+    } finally {
+      setAdsSaving(false);
+    }
+  };
+
+  const handleAdsDelete = async () => {
+    if (!adsImportOfMonth) return;
+    if (!(await confirm(`Xoá file Ads tháng ${fmtMonth(month)}? Report Tháng sẽ không còn phần Ads của tháng này cho tới khi tải lại.`, { danger: true }))) return;
+    try {
+      await deleteDataRawImport(adsImportOfMonth.id);
+      setAdsVersion((v) => v + 1);
+    } catch (e) {
+      setAdsError(errorMessage(e, "Không xoá được file Ads."));
+    }
+  };
+
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setErrorMsg(null);
-    setSavedAt(null);
     if (canManage) prefetchReportPlanningInputs(brandId, month);
     monthlyReportRead.take(brandId, `${month}-01`)
       .then((r) => {
         if (cancelled) return;
         setReport(r);
-        setAdsSpend(r?.adsSpend != null ? String(r.adsSpend) : "");
-        setRoas(r?.roas != null ? String(r.roas) : "");
-        setPromotionNotes(r?.promotionNotes || "");
-        setCustomerInsightNotes(r?.customerInsightNotes || "");
-        setAccountHealthNotes(r?.accountHealthNotes || "");
       })
       .catch((e) => !cancelled && setErrorMsg(e.message || "Không tải được dữ liệu tháng"))
       .finally(() => !cancelled && setLoading(false));
@@ -170,38 +195,13 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
   const isPublished = report?.status === "published";
   const readOnly = !canManage || isPublished;
 
-  const handleSave = async () => {
-    setSaving(true);
-    setErrorMsg(null);
-    try {
-      // Cùng 1 dòng brand_monthly_reports còn chứa kế hoạch tháng sau + mốc campaign (Tab 05 /
-      // Tab 01 của Report Tháng) — pass-through nguyên giá trị đã tải, upsert ghi đè toàn bộ cột.
-      const input: MonthlyReportManualInput = {
-        ...(report ?? {}),
-        adsSpend: adsSpend ? Number(adsSpend) : undefined,
-        roas: roas ? Number(roas) : undefined,
-        promotionNotes: promotionNotes || undefined,
-        customerInsightNotes: customerInsightNotes || undefined,
-        accountHealthNotes: accountHealthNotes || undefined
-      };
-      const saved = await upsertMonthlyReport(brandId, `${month}-01`, input);
-      setReport(saved);
-      setSavedAt(new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }));
-    } catch (e) {
-      setErrorMsg(errorMessage(e, "Lưu thất bại"));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const inputCls = "w-full p-2.5 border border-[var(--border)] rounded-xl font-semibold text-[var(--text)] bg-[var(--surface-base)] disabled:opacity-60";
 
   return (
     <div className="space-y-5">
       <PageHeader
         icon={Megaphone}
-        title={`Nhập Ads & Ghi Chú · ${brandName}`}
-        description={`Ads cost/ROAS tính máy từ Report Ca ở trên; phần bổ sung và ghi chú nhập tay ở dưới (không có API TikTok Shop cho các phần này). Số lưu ở đây đi cùng Report Tháng ${fmtMonth(month)} — khi report đã phát hành thì khoá, muốn sửa phải thu hồi ở Report Tháng.`}
+        title={`Nhập Ads · ${brandName}`}
+        description={`Tải file "Campaign overview data" (xem theo ngày) từ TikTok Ads, mỗi tháng một file — app tự tính chi phí, ROI, chi phí/đơn và đưa vào Report Tháng phần 6. Nhận xét cho brand viết bằng nút "Sửa Insight" ở từng phần của Report Tháng.`}
         actions={
           <>
             <MonthPicker value={month} onChange={setMonth} />
@@ -218,147 +218,164 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
         <div className="p-3 bg-red-950/80 border border-red-800/50 rounded-xl text-red-300 text-xs font-semibold">{errorMsg}</div>
       )}
 
-      {/* Ads Report chi tiết — tính từ ads_cost thật trong Report Ca (live_session_reports),
-          chỉ có cho TikTok (Shopee không có field ads_cost trong Excel gốc, xem migration 0046). */}
-      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 space-y-3">
-        <h3 className="font-bold text-[var(--text)] text-sm flex items-center gap-2">
-          <Target className="w-4 h-4 text-[var(--accent-text)]" /> Ads Report Chi Tiết (TikTok)
-        </h3>
-        <p className="text-[11px] text-[var(--text-faint)]">
-          Tính từ Ads cost host/ops nhập trong Report Ca của các ca TikTok đã xong trong tháng, đối chiếu GMV cùng phiên để
-          ra ROAS. So với tháng {fmtMonth(prevMonthStr(month))}.
-        </p>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl p-3">
-            <div className="text-[11px] text-[var(--text-faint)]">Tổng Ads cost</div>
-            <div className="text-base font-black text-[var(--text)]">{fmtVndShort(adsReport.totalAdsSpend)}</div>
-            <MomChip current={adsReport.totalAdsSpend} previous={prevAdsReport.totalAdsSpend} />
+      {/* File Ads TikTok — chỗ DUY NHẤT nhập Ads (migration 0137, lib/dataraw/adsCampaignOverview.ts). */}
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h3 className="font-bold text-[var(--text)] text-sm flex items-center gap-2">
+              <Target className="w-4 h-4 text-[var(--accent-text)]" /> Ads toàn cửa hàng · tháng {fmtMonth(month)}
+            </h3>
+            <p className="text-[11px] text-[var(--text-faint)] mt-1">
+              Nguồn: file &quot;Campaign overview data&quot; của TikTok Ads (gồm LIVE GMV Max và Product GMV Max), xem theo ngày. ROI = doanh thu
+              gộp ÷ chi phí, cùng cách TikTok tính. So với tháng {fmtMonth(prevMonthStr(month))}
+              {adsStats?.lastDate && adsStats.lastDate < end ? ` cắt cùng số ngày (1–${Number(adsStats.lastDate.slice(8))})` : ""}.
+            </p>
           </div>
-          <div className="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl p-3">
-            <div className="text-[11px] text-[var(--text-faint)]">GMV các phiên có Ads</div>
-            <div className="text-base font-black text-[var(--text)]">{fmtVndShort(adsReport.totalGmv)}</div>
-            <MomChip current={adsReport.totalGmv} previous={prevAdsReport.totalGmv} />
-          </div>
-          <div className="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl p-3">
-            <div className="text-[11px] text-[var(--text-faint)]">ROAS</div>
-            <div className="text-base font-black text-[var(--text)]">{adsRoas != null ? `${fmtFixed(adsRoas, 1)}x` : "—"}</div>
-            <MomChip current={adsRoas} previous={prevAdsRoas} />
-          </div>
-          <div className="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl p-3">
-            <div className="text-[11px] text-[var(--text-faint)]">Ads cost / GMV</div>
-            <div className="text-base font-black text-[var(--text)]">{adsPctGmv != null ? `${fmtFixed(adsPctGmv, 1)}%` : "—"}</div>
-          </div>
+          {adsImportOfMonth && canManage && (
+            <button onClick={handleAdsDelete} className="text-[11px] font-bold text-red-400 hover:text-red-300 flex items-center gap-1 px-2 py-1 rounded-lg">
+              <Trash2 className="w-3.5 h-3.5" /> Xoá file tháng này
+            </button>
+          )}
         </div>
 
-        {adsReport.missingCount > 0 && (
-          <div className="flex items-start gap-2 text-[11px] text-amber-300 bg-amber-950/60 border border-amber-800/50 rounded-xl p-2.5">
-            <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
-            {adsReport.missingCount} ca TikTok đã xong trong tháng chưa nộp Report Ca (không có Ads cost) — số Ads cost/ROAS
-            phía trên đang thấp hơn thực tế tương ứng.
-          </div>
-        )}
-        {adsReport.backfillCount > 0 && (
-          <div className="flex items-start gap-2 text-[11px] text-[var(--text-muted)] bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-2.5">
-            <AlertTriangle className="w-3.5 h-3.5 text-[var(--text-faint)] shrink-0 mt-0.5" />
-            {adsReport.backfillCount} ca của tháng này nhập từ file (nạp bù) nên không có Report Ca — Ads cost của các ca đó
-            không tính được ở đây; nếu có, nhập tổng vào ô &quot;Ads cost bổ sung&quot; bên dưới.
-          </div>
+        {adsError && <div className="p-3 bg-red-950/80 border border-red-800/50 rounded-xl text-red-300 text-xs font-semibold">{adsError}</div>}
+
+        {canManage && !adsPreview && (
+          <label className="border-2 border-dashed border-[var(--border)] bg-[var(--surface-elevated)]/40 p-4 rounded-xl flex items-center justify-center gap-2 cursor-pointer hover:bg-[var(--surface-hover)]">
+            <Upload className="w-4 h-4 text-[var(--text-muted)]" />
+            <span className="font-bold text-[var(--text)] text-xs">
+              {adsImportOfMonth ? "Tải file mới để thay file tháng này" : "Chọn file Ads (.xlsx) tải từ TikTok Ads"}
+            </span>
+            <input
+              type="file"
+              accept=".xlsx,.xls"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                e.target.value = "";
+                if (f) handleAdsFile(f);
+              }}
+            />
+          </label>
         )}
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)]">
-                <th className="py-2 px-2">Tuần (bắt đầu Thứ Hai)</th>
-                <th className="py-2 px-2 text-right">Ads cost</th>
-                <th className="py-2 px-2 text-right">GMV</th>
-                <th className="py-2 px-2 text-right">ROAS</th>
-              </tr>
-            </thead>
-            <tbody>
-              {adsReport.weekly.map((w) => (
-                <tr key={w.weekStart} className="border-b border-[var(--border-muted)]">
-                  <td className="py-2 px-2 text-[var(--text)] font-semibold">{new Date(`${w.weekStart}T00:00:00`).toLocaleDateString("vi-VN")}</td>
-                  <td className="py-2 px-2 text-right text-[var(--text-muted)]">{fmtVndShort(w.adsSpend)}</td>
-                  <td className="py-2 px-2 text-right text-emerald-400 font-bold">{fmtVndShort(w.gmv)}</td>
-                  <td className="py-2 px-2 text-right text-[var(--text-muted)]">{w.adsSpend > 0 ? `${fmtFixed((w.gmv / w.adsSpend), 1)}x` : "—"}</td>
-                </tr>
-              ))}
-              {adsReport.weekly.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="py-6 text-center text-[var(--text-faint)] italic">
-                    Chưa có phiên TikTok nào có Report Ca trong tháng.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        <p className="text-[11px] text-[var(--text-faint)]">
-          Shopee chưa theo dõi Ads cost theo phiên (không có field này trong Excel gốc) — dùng ô "Ads cost bổ sung" bên dưới nếu
-          cần cộng thêm chi phí Ads ngoài TikTok livestream.
-        </p>
-      </div>
-
-      {loading ? (
-        <div className="flex items-center justify-center py-12 text-[var(--text-faint)] text-sm gap-2">
-          <Loader2 className="w-4 h-4 animate-spin" /> Đang tải...
-        </div>
-      ) : (
-        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 space-y-4">
-          <h3 className="font-bold text-[var(--text)] text-sm flex items-center gap-2">
-            <TrendingUp className="w-4 h-4 text-[var(--accent-text)]" /> Ads/ROAS bổ sung, Promotion, Customer Insight, Account Health
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="font-bold text-[var(--text-muted)] block mb-1">Ads cost bổ sung</label>
-              <p className="text-[11px] text-[var(--text-faint)] mb-1">
-                Chi phí Ads Shopee hoặc ads ngoài livestream, không tính được từ Report Ca (xem Ads Report Chi Tiết ở trên).
+        {adsPreview && previewStats && (
+          <div className="space-y-3 border border-[var(--border)] rounded-xl p-3 bg-[var(--surface-elevated)]/40">
+            <p className="text-xs font-semibold text-[var(--text)] flex items-center gap-2">
+              <FileSpreadsheet className="w-4 h-4 text-emerald-500" /> {adsPreview.fileName}
+            </p>
+            <p className="text-xs text-[var(--text-muted)]">
+              Tháng <b className="text-[var(--text)]">{fmtMonth(adsPreview.parsed.periodStart!.slice(0, 7))}</b> · {previewStats.days.length} ngày (
+              {fmtDateVn(previewStats.firstDate!, false)}–{fmtDateVn(previewStats.lastDate!, false)}) · chi phí{" "}
+              <b className="text-[var(--text)]">{fmtVndFull(previewStats.cost)}</b> · {fmtVndFull(previewStats.orders)} đơn SKU · doanh thu gộp{" "}
+              <b className="text-[var(--text)]">{fmtVndFull(previewStats.revenue)}</b> · ROI {previewStats.roi != null ? `${fmtFixed(previewStats.roi, 1)}x` : "—"}
+            </p>
+            <p className="text-[11px] text-amber-300">
+              File không ghi tên shop — kiểm lại đây đúng là Ads của <b>{brandName}</b> trước khi lưu.
+            </p>
+            {adsPreview.replace && (
+              <p className="text-[11px] text-amber-300">
+                Đã có file tháng này (tải {new Date(adsPreview.replace.importedAt).toLocaleString("vi-VN")}) — lưu sẽ THAY file cũ, không cộng dồn.
               </p>
-              <input type="number" value={adsSpend} onChange={(e) => setAdsSpend(e.target.value)} disabled={readOnly} className={inputCls} />
-            </div>
-            <div>
-              <label className="font-bold text-[var(--text-muted)] block mb-1">ROAS (ghi đè tổng, nếu cần)</label>
-              <input type="number" step="0.1" value={roas} onChange={(e) => setRoas(e.target.value)} disabled={readOnly} className={inputCls} />
-            </div>
-          </div>
-          <div>
-            <label className="font-bold text-[var(--text-muted)] block mb-1">Promotion / Voucher</label>
-            <textarea value={promotionNotes} onChange={(e) => setPromotionNotes(e.target.value)} disabled={readOnly} rows={3} className={`${inputCls} font-medium`} />
-          </div>
-          <div>
-            <label className="font-bold text-[var(--text-muted)] block mb-1">Customer Insight (khách mới/quay lại, follower)</label>
-            <textarea value={customerInsightNotes} onChange={(e) => setCustomerInsightNotes(e.target.value)} disabled={readOnly} rows={3} className={`${inputCls} font-medium`} />
-          </div>
-          <div>
-            <label className="font-bold text-[var(--text-muted)] block mb-1">Account Health (warning/violation)</label>
-            <textarea value={accountHealthNotes} onChange={(e) => setAccountHealthNotes(e.target.value)} disabled={readOnly} rows={3} className={`${inputCls} font-medium`} />
-          </div>
-
-          {canManage && !isPublished && (
-            <div className="pt-3 border-t border-[var(--border)] flex items-center justify-end gap-3">
-              {savedAt && <span className="text-[11px] text-emerald-400 font-semibold">Đã lưu lúc {savedAt}</span>}
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="px-5 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-60 text-white font-bold rounded-xl shadow transition-all flex items-center gap-2"
-              >
-                <Save className="w-4 h-4" /> {saving ? "Đang Lưu..." : "Lưu"}
+            )}
+            {isPublished && adsPreview.parsed.periodStart?.startsWith(month) && (
+              <p className="text-[11px] text-[var(--text-muted)]">
+                Report Tháng {fmtMonth(month)} đã phát hành: brand vẫn thấy số cũ tới khi thu hồi report và bấm Cập nhật số liệu.
+              </p>
+            )}
+            <div className="flex gap-2">
+              <button onClick={handleAdsConfirm} disabled={adsSaving} className="bg-[var(--accent)] text-white font-bold px-4 py-2 rounded-xl text-xs disabled:opacity-50">
+                {adsSaving ? "Đang lưu..." : adsPreview.replace ? "Lưu, thay file cũ" : "Lưu file Ads"}
+              </button>
+              <button onClick={() => setAdsPreview(null)} className="bg-[var(--surface-hover)] text-[var(--text-muted)] font-bold px-4 py-2 rounded-xl text-xs">
+                Huỷ
               </button>
             </div>
-          )}
-          {canManage && isPublished && (
-            <p className="pt-3 border-t border-[var(--border)] text-[11px] text-[var(--text-faint)]">
-              Report tháng {fmtMonth(month)} đã phát hành nên phần này khoá. Cần sửa: vào Report Tháng → "Thu Hồi Về Bản Nháp".
-            </p>
-          )}
-        </div>
-      )}
+          </div>
+        )}
 
-      {/* Công cụ nhập liệu của Report Tháng (khung camp, phân bổ + affiliate tháng sau) — chuyển từ Phụ lục của
-          report sang đây 2026-09-26; dùng chung `report` với form trên để hai form không ghi đè số của nhau. */}
+        {adsLoading ? (
+          <div className="flex items-center gap-2 text-[var(--text-faint)] text-xs">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Đang đọc file Ads...
+          </div>
+        ) : !adsStats ? (
+          <p className="text-xs text-[var(--text-faint)]">
+            Chưa có file Ads tháng {fmtMonth(month)}. Brand không chạy Ads tháng này thì bỏ qua — Report Tháng chỉ không có phần Ads.
+          </p>
+        ) : (
+          <>
+            {adsImportOfMonth && (
+              <p className="text-[11px] text-[var(--text-faint)]">
+                File: {adsImportOfMonth.fileName ?? "—"} · tải {new Date(adsImportOfMonth.importedAt).toLocaleString("vi-VN")} · {adsStats.days.length} ngày (
+                {fmtDateVn(adsStats.firstDate!, false)}–{fmtDateVn(adsStats.lastDate!, false)})
+              </p>
+            )}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl p-3">
+                <div className="text-[11px] text-[var(--text-faint)]">Chi phí Ads</div>
+                <div className="text-base font-black text-[var(--text)]">{fmtVndShort(adsStats.cost)}</div>
+                <MomChip current={adsStats.cost} previous={adsPrevStats?.cost ?? null} tone="neutral" />
+              </div>
+              <div className="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl p-3">
+                <div className="text-[11px] text-[var(--text-faint)]">ROI</div>
+                <div className="text-base font-black text-[var(--text)]">{adsStats.roi != null ? `${fmtFixed(adsStats.roi, 1)}x` : "—"}</div>
+                <MomChip current={adsStats.roi} previous={adsPrevStats?.roi ?? null} />
+              </div>
+              <div className="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl p-3">
+                <div className="text-[11px] text-[var(--text-faint)]">Chi phí / đơn SKU ({fmtVndFull(adsStats.orders)} đơn)</div>
+                <div className="text-base font-black text-[var(--text)]">{adsStats.costPerOrder != null ? fmtVndFull(adsStats.costPerOrder) : "—"}</div>
+                <MomChip current={adsStats.costPerOrder} previous={adsPrevStats?.costPerOrder ?? null} tone="down" />
+              </div>
+              <div className="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl p-3">
+                <div className="text-[11px] text-[var(--text-faint)]">Doanh thu gộp từ Ads</div>
+                <div className="text-base font-black text-[var(--text)]">{fmtVndShort(adsStats.revenue)}</div>
+                <MomChip current={adsStats.revenue} previous={adsPrevStats?.revenue ?? null} />
+              </div>
+            </div>
+            {adsStats.zeroOrderDays.length > 0 && (
+              <div className="flex items-start gap-2 text-[11px] text-amber-300 bg-amber-950/60 border border-amber-800/50 rounded-xl p-2.5">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                {adsStats.zeroOrderDays.length} ngày tiêu tiền mà 0 đơn ({adsStats.zeroOrderDays.map((d) => fmtDateVn(d.date, false)).join(", ")}) — tổng{" "}
+                {fmtVndFull(adsStats.zeroOrderDays.reduce((a, d) => a + d.cost, 0))}.
+              </div>
+            )}
+            <p className="text-[11px] text-[var(--text-faint)]">
+              Doanh thu gộp tính theo đơn gốc trước huỷ/hoàn nên có thể lớn hơn GMV của shop — đừng lấy số này chia GMV.
+            </p>
+            <details className="rounded-xl border border-[var(--border)]">
+              <summary className="cursor-pointer px-3 py-2 text-xs font-bold text-[var(--text-muted)]">Số từng ngày ({adsStats.days.length} ngày)</summary>
+              <div className="overflow-x-auto max-h-96">
+                <table className="w-full text-xs">
+                  <thead className="sticky top-0 bg-[var(--surface)]">
+                    <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)]">
+                      <th className="py-2 px-2">Ngày</th>
+                      <th className="py-2 px-2 text-right">Chi phí</th>
+                      <th className="py-2 px-2 text-right">Đơn SKU</th>
+                      <th className="py-2 px-2 text-right">Doanh thu gộp</th>
+                      <th className="py-2 px-2 text-right">ROI</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {adsStats.days.map((d) => (
+                      <tr key={d.date} className={`border-b border-[var(--border-muted)] ${d.cost > 0 && d.orders === 0 ? "text-amber-300" : ""}`}>
+                        <td className="py-1.5 px-2 font-semibold">{fmtDateVn(d.date, false)}</td>
+                        <td className="py-1.5 px-2 text-right">{fmtVndFull(d.cost)}</td>
+                        <td className="py-1.5 px-2 text-right">{fmtVndFull(d.orders)}</td>
+                        <td className="py-1.5 px-2 text-right">{fmtVndFull(d.revenue)}</td>
+                        <td className="py-1.5 px-2 text-right">{d.cost > 0 ? `${fmtFixed(d.revenue / d.cost, 1)}x` : "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </details>
+          </>
+        )}
+      </div>
+
+      {/* Khung camp cho tháng KHÔNG có Kế Hoạch Tháng (ReportPlanningInputs) — gập, mặc định lịch cố định. */}
       {!loading && canManage && (
-        <ReportPlanningInputs key={`${month}|${report?.id ?? "none"}`} brandId={brandId} month={month} report={report} onSaved={setReport} readOnly={readOnly} onOpenMonthPlan={onOpenMonthPlan} />
+        <ReportPlanningInputs key={`${month}|${report?.id ?? "none"}`} brandId={brandId} month={month} report={report} onSaved={setReport} readOnly={readOnly} />
       )}
     </div>
   );

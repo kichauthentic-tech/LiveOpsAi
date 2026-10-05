@@ -169,6 +169,10 @@ export async function createOrReplaceDataRawImport(
     if (batchError.code === "23505") {
       throw new Error("Đã có báo cáo cùng loại cho tháng này (có thể do bấm xác nhận 2 lần, hoặc người khác vừa upload xong) — tải lại trang rồi chọn ghi đè bản đó nếu cần.");
     }
+    // check_violation trên report_type: loại file mới (vd ads_campaign_overview, 0137) mà DB chưa chạy migration mở loại đó.
+    if (batchError.code === "23514" && /report_type/.test(batchError.message ?? "")) {
+      throw new Error("Hệ thống chưa nhận loại file này — cần chạy bản cập nhật cơ sở dữ liệu mới nhất (migration 0137). Báo admin rồi tải lại sau.");
+    }
     throw batchError;
   }
   const batch = importFromDb(batchData as DbImport);
