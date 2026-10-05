@@ -23,13 +23,13 @@
   Không có target (cột TARGET trống). Bỏ qua: 01–04/10 (đã nạp thật từ trước; 05/10 nạp bù thêm 2 ca VERA Shopee + CROCS TikTok, còn Upcoming), 16 dòng CANCLE, 36 ca brand JEW (chưa là
   brand trong hệ thống). Host/trợ chưa có hồ sơ (Mia, Su, Đạt, H.Dung, T.Linh, trợ Bin) để trống, tên ghi trong tiêu đề ca.
 - **06/10: chốt lịch + target/ca CROCS T10.** Lịch chốt (user): 20/10 có 09–12, 12–15, 18–21, 21–00; 21/10 và 22/10 thêm ca
-  11–14 (2 ca mới, chưa host); 26/10, 27/10 có ca 11–14; 31/10 là 11–14 + 21–00 (ca 20–23 đổi giờ). DB CROCS T10 nay **78 ca**
-  (05→31/10). Target/ca tính lại theo logic app (`targetAllocation.ts`): benchmark GMV/giờ theo loại ngày (D-Day 8–10,
-  Mid-Month 13–15, Pay Day 23–25 — lịch camp cố định của app) × khung giờ (T7+T8; ô thiếu — ngày thường khung sáng,
-  Mid-Month chiều — lấy từ DB) × số giờ ca, rồi co đều để tổng **= 5.141.294.000** (Target Livestream T10 trong Target 2026),
-  làm tròn nghìn, phần dư 5.000đ dồn vào 1 ca. Ghi `target_gmv` cho cả 78 ca (gồm 05/10 đã qua) = 4.536.209.000; **605.085.000
-  còn lại thuộc 11 slot 01–04/10 chưa có ca trong DB** (ca thật chưa ghi). Kế Hoạch Tháng T10 CROCS vẫn nháp với target tạm
-  5,5 tỷ (không khớp 5,141 tỷ) — chưa sửa.
+  11–14 (2 ca mới, chưa host); 26/10, 27/10 có ca 11–14; 31/10 là 11–14 + 21–00 (ca 20–23 đổi giờ). DB CROCS T10 nay **89 ca** (01→31/10; 11 ca 01–04/10 tạo 06/10 theo user, status Completed, `data_source='manual'`, chưa host/GMV). Target/ca
+  tính lại theo logic app (`targetAllocation.ts`): benchmark GMV/giờ theo loại ngày (D-Day 8–10, Mid-Month 13–15, Pay Day
+  23–25 — lịch camp cố định của app; 12/10 và 22/10 là ngày thường, user xác nhận) × khung giờ (T7+T8; ô thiếu — ngày thường
+  khung sáng, Mid-Month chiều — lấy từ DB) × số giờ ca, co đều để tổng **= 5.141.294.000** (Target Livestream T10 trong
+  Target 2026), làm tròn nghìn, dư 5.000đ dồn vào 1 ca. Đã ghi `target_gmv` cho cả 89 ca (gồm ca đã qua), tổng DB khớp. Kế Hoạch Tháng T10
+  CROCS vẫn nháp, target tạm 5,5 tỷ — user bảo để yên. Host/trợ Mia, Su, Đạt là **nickname** (user sẽ điền tên thật sau);
+  chỉ **H.Dung / Hoàng Dung là host mới** (cần tạo hồ sơ talent).
 - **05/10 tối: nạp lịch ca T6→05/10 từ file "YFB _ Working File 2026 - NEW.xlsx"** (6 sheet: VERA/JOCKEY × TikTok/Shopee,
   Franklin, CROCS). Nạp **893 ca** VERA (TikTok 298, Shopee 259), JOCKEY (TikTok 176, Shopee 72), Franklin (88; bắt đầu từ
   06/08) với host/trợ khớp hồ sơ talent, GMV từ cột "GMV Live" (trống thì cột "GMV"; riêng VERA Shopee cột đó là ATC nên
@@ -116,8 +116,7 @@
 ## 2. Việc còn treo
 
 **Cần user làm:**
-00000. CROCS T10: (a) quyết định có tạo 11 ca 01–04/10 (target 605.085.000) hay bỏ khỏi tổng; (b) sửa target tạm 5,5 tỷ của Kế
-   Hoạch Tháng nháp thành 5.141.294.000 trước khi chốt; (c) gán host cho 2 ca mới 21/10, 22/10 11–14.
+00000. CROCS T10: user tự gán host cho các ca (gồm 11 ca 01–04/10 và 21/10, 22/10 11–14); tên thật của Mia/Su/Đạt; hồ sơ talent Hoàng Dung. Sửa target tạm 5,5 tỷ của Kế Hoạch Tháng nháp trước khi chốt (user bảo để yên tạm thời).
 0000. Up file Ads (TikTok Ads → "Campaign overview data", xem theo ngày, mỗi file một tháng) cho các tháng/brand khác
    có chạy Ads ở Nhập Ads — Franklin T8 để report T9 có cột so tháng trước. Muốn có "% ngân sách Ads" như deck
    Franklin thì chốt chỗ nhập ngân sách (đề xuất: Kế Hoạch Tháng).
