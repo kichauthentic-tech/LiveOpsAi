@@ -34,6 +34,7 @@ const TERMS: { term: string; meaning: string }[] = [
   { term: "Ca / phiên live", meaning: "Ca là một khung giờ có host trực trong app. Phiên là một lần bật live trên TikTok. Một phiên dài có thể chia cho nhiều ca." },
   { term: "Kế hoạch nháp / đã chốt", meaning: "Nháp: đang soạn, chưa sinh ca. Chốt: ca đổ xuống Nhân sự ca để talent đăng ký. Vẫn sửa được target ca và khung camp sau khi chốt." },
   { term: "Ca chờ đăng ký", meaning: "Ca đã mở nhưng chưa chốt người." },
+  { term: "Report TikTok / Report Shopee", meaning: "Mỗi brand mỗi tháng có thể có hai report độc lập, một cho từng sàn. Phát hành, thu hồi và đóng sổ riêng từng sàn; brand chỉ thấy số của sàn đã phát hành. Report Shopee lấy số từ 4 file Shopee Live (Live List, theo ngày, tổng quan tháng, sản phẩm) — GMV Shopee là doanh số đặt, \"thực nhận\" là doanh số đã xác nhận (sau đơn huỷ)." },
   { term: "Đổi người giữa ca", meaning: "Host hoặc trợ live vào thay / ra sớm giữa chừng. Ghi ở Sửa ca → \"Đổi người giữa ca\": ai làm từ giờ nào đến giờ nào. Ca vẫn là một ca (một GMV); lương, giờ làm, trùng lịch và hiệu suất tính theo giờ từng người." },
   { term: "Target GMV tháng · KPI GMV · Tổng target", meaning: "Target GMV tháng: số ops đặt để chia xuống ca. KPI GMV: số brand giao cho cả shop, chỉ để Report so. Tổng target: cộng target từng ca — Dashboard dùng số này." },
   { term: "Ngày camp (D-Day, Mid-Month, Pay Day)", meaning: "Các đợt sale trong tháng. Mặc định D-Day = ngày trùng tháng (10/10), Mid-Month 13–15, Pay Day 23–25; đổi ở Kế Hoạch Tháng." },

@@ -2,6 +2,7 @@ import { supabase } from "../supabaseClient";
 import { fetchAllPages } from "./fetchAllPages";
 import { BrandMonthlyReport } from "../../types";
 import { prefetchable } from "./prefetch";
+import type { ReportPlatform } from "../reportPlatform";
 
 // Report tháng Brand Workspace (migration 0051) — số liệu vận hành (GMV/Host/SKU) không lưu ở
 // đây, luôn tính live từ LiveSession[] phía component. Bảng chỉ giữ phần nhập tay + trạng thái
@@ -11,6 +12,7 @@ interface DbMonthlyReport {
   id: string;
   brand_id: string;
   period_month: string;
+  platform?: ReportPlatform | null;
   status: string;
   ads_spend: number | null;
   roas: number | null;
@@ -48,6 +50,7 @@ function reportFromDb(row: DbMonthlyReport): BrandMonthlyReport {
     id: row.id,
     brandId: row.brand_id,
     periodMonth: row.period_month,
+    platform: row.platform ?? "TikTok",
     status: row.status as BrandMonthlyReport["status"],
     adsSpend: row.ads_spend ?? undefined,
     roas: row.roas ?? undefined,
@@ -115,31 +118,35 @@ export async function fetchAllMonthlyReports(): Promise<Map<string, BrandMonthly
   const out = new Map<string, BrandMonthlyReport>();
   for (const row of data) {
     const r = reportFromDb(row);
-    out.set(`${r.brandId}|${r.periodMonth.slice(0, 7)}`, r);
+    // Khoá TikTok giữ nguyên "brandId|YYYY-MM" (mọi nơi đọc target/kế hoạch hiện có đều là của TikTok); report Shopee
+    // (0139) có hậu tố riêng để không đè lên.
+    out.set(`${r.brandId}|${r.periodMonth.slice(0, 7)}${r.platform === "Shopee" ? "|Shopee" : ""}`, r);
   }
   return out;
 }
 
 // periodMonth: "YYYY-MM-01". Lấy report hiện có nếu đã tạo, không tự tạo mới — UI gọi
 // upsertMonthlyReport() khi ops lưu nháp lần đầu.
-export async function fetchMonthlyReport(brandId: string, periodMonth: string): Promise<BrandMonthlyReport | null> {
+export async function fetchMonthlyReport(brandId: string, periodMonth: string, platform: ReportPlatform = "TikTok"): Promise<BrandMonthlyReport | null> {
   const { data, error } = await supabase
     .from("brand_monthly_reports")
     .select("*")
     .eq("brand_id", brandId)
     .eq("period_month", periodMonth)
+    .eq("platform", platform)
     .maybeSingle();
   if (error) throw error;
   return data ? reportFromDb(data as DbMonthlyReport) : null;
 }
 
-export async function upsertMonthlyReport(brandId: string, periodMonth: string, input: MonthlyReportManualInput): Promise<BrandMonthlyReport> {
+export async function upsertMonthlyReport(brandId: string, periodMonth: string, input: MonthlyReportManualInput, platform: ReportPlatform = "TikTok"): Promise<BrandMonthlyReport> {
   const { data, error } = await supabase
     .from("brand_monthly_reports")
     .upsert(
       {
         brand_id: brandId,
         period_month: periodMonth,
+        platform,
         ads_spend: input.adsSpend ?? null,
         roas: input.roas ?? null,
         promotion_notes: input.promotionNotes ?? null,
@@ -165,7 +172,7 @@ export async function upsertMonthlyReport(brandId: string, periodMonth: string, 
         camp_payday_end: input.campPaydayEnd ?? null,
         camp_payday_target_gmv: input.campPaydayTargetGmv ?? null
       },
-      { onConflict: "brand_id,period_month" }
+      { onConflict: "brand_id,period_month,platform" }
     )
     .select()
     .single();
@@ -180,7 +187,8 @@ export async function upsertMonthlyReport(brandId: string, periodMonth: string, 
 export async function saveMonthlyReportNarrative(
   brandId: string,
   periodMonth: string,
-  narrative: { summaryText: string | null; nextStepsText: string | null }
+  narrative: { summaryText: string | null; nextStepsText: string | null },
+  platform: ReportPlatform = "TikTok"
 ): Promise<BrandMonthlyReport> {
   const cleared = narrative.summaryText === null && narrative.nextStepsText === null;
   const { data, error } = await supabase
@@ -189,11 +197,12 @@ export async function saveMonthlyReportNarrative(
       {
         brand_id: brandId,
         period_month: periodMonth,
+        platform,
         summary_text: narrative.summaryText,
         next_steps_text: narrative.nextStepsText,
         summary_saved_at: cleared ? null : new Date().toISOString()
       },
-      { onConflict: "brand_id,period_month" }
+      { onConflict: "brand_id,period_month,platform" }
     )
     .select()
     .single();
@@ -203,12 +212,13 @@ export async function saveMonthlyReportNarrative(
 
 // Insight từng phần (0121) — cũng đi đường riêng như tóm tắt. Đọc lại cột hiện có rồi ghi đè ĐÚNG 1 khoá,
 // để sửa phần "Người" không xoá mất bản đã sửa của phần "Hàng". text null = bỏ bản đã sửa của phần đó.
-export async function saveMonthlyReportSectionNote(brandId: string, periodMonth: string, section: string, text: string | null): Promise<BrandMonthlyReport> {
+export async function saveMonthlyReportSectionNote(brandId: string, periodMonth: string, section: string, text: string | null, platform: ReportPlatform = "TikTok"): Promise<BrandMonthlyReport> {
   const { data: cur, error: readErr } = await supabase
     .from("brand_monthly_reports")
     .select("section_notes")
     .eq("brand_id", brandId)
     .eq("period_month", periodMonth)
+    .eq("platform", platform)
     .maybeSingle();
   if (readErr) throw readErr;
   const notes = { ...(((cur as { section_notes: DbMonthlyReport["section_notes"] } | null)?.section_notes ?? {}) as Record<string, { text: string; savedAt: string }>) };
@@ -216,7 +226,7 @@ export async function saveMonthlyReportSectionNote(brandId: string, periodMonth:
   else notes[section] = { text, savedAt: new Date().toISOString() };
   const { data, error } = await supabase
     .from("brand_monthly_reports")
-    .upsert({ brand_id: brandId, period_month: periodMonth, section_notes: Object.keys(notes).length ? notes : null }, { onConflict: "brand_id,period_month" })
+    .upsert({ brand_id: brandId, period_month: periodMonth, platform, section_notes: Object.keys(notes).length ? notes : null }, { onConflict: "brand_id,period_month,platform" })
     .select()
     .single();
   if (error) throw error;

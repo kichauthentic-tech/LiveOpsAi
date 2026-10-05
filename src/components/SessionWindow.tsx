@@ -318,7 +318,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                   <TrustBadge session={s} />
                 )
               ) : (
-                <DataSourceBadge dataSource={s.dataSource} />
+                <DataSourceBadge dataSource={s.dataSource} platform={s.platform} />
               )}
               {!isBrandView && s.isBackfill && (
                 <span className="text-[11px] font-bold px-2 py-0.5 rounded-full border bg-[var(--surface-elevated)] text-[var(--text-faint)] border-[var(--border)]">nạp bù từ file</span>

@@ -18,6 +18,19 @@
   tới đâu, cái gì kêu, rồi sửa đúng chỗ đó. **Không seed mock lại.**
 - **Nợ kỹ thuật đã hết** (đợt P2a-2…P2a-21, 01–02/10) và **audit code chết đã xong** (02/10): `npm run audit:dead` báo 0,
   ESLint 0 lỗi (31 warning `set-state-in-effect` = nợ đã đo, cố ý `warn`), vitest 467/467 (05/10).
+- **06/10 tối: REPORT TÁCH THEO SÀN (TikTok / Shopee) — migration `0139` (CHƯA CHẠY), code xong, chưa push.** Yêu cầu user: hai report
+  độc lập, phát hành/thu hồi/đóng sổ riêng, brand chỉ thấy số của sàn đã phát hành; Shopee có file riêng. **GMV Shopee = doanh số ĐẶT
+  (Placed)**, doanh số xác nhận hiện riêng là "thực nhận" (user chốt). DB: cột `platform` ở `brand_monthly_reports`, `brand_monthly_report_snapshots`,
+  `live_reconciliation_batches` (dòng cũ = TikTok), khoá (brand, tháng, sàn); `private.brand_month_published(brand,date)` giữ nghĩa "TikTok" + bản 3 tham số
+  theo sàn; view `live_sessions_secure` và trigger đóng sổ xét sàn của ca; phát hành chỉ đếm ca chưa đối soát CỦA SÀN ĐÓ; `import_live_reconciliation(..., p_platform)`
+  khớp/ghi ca đúng sàn; 4 loại Dữ Liệu Gốc `shopee_live_list|shopee_product_list|shopee_daily|shopee_overview`. Client: `lib/dataraw/shopeeFiles.ts`
+  (bộ đọc 4 file, kể cả CSV tự đọc để SheetJS khỏi đổi ngày; khớp 4 file VERA Shopee T9: 50 phiên · 668.841.274đ đặt / 633.141.515đ xác nhận · 2.232 đơn · 175,3h · 29 ngày · 140 SP · 10 nguồn traffic),
+  `lib/report/shopeeSnapshot.ts` + `shopeeSnapshotBuild.ts` (bản chụp Shopee: kết quả, theo ngày, phễu + nguồn traffic, khung giờ, loại ngày camp, host, sản phẩm, "cách tính và điểm cần xác nhận"),
+  `ShopeeMonthlyReportTabs.tsx`, chọn sàn ở Report Tháng + Điều Phối Phát Hành + Đối Soát (file Live List) + Dữ Liệu Gốc. `fetchAllMonthlyReports` giữ khoá TikTok `brandId|YYYY-MM`,
+  Shopee có hậu tố `|Shopee`. **THỨ TỰ DEPLOY (quan trọng): push/deploy client TRƯỚC, rồi chạy 0139 NGAY SAU** — client mới + DB cũ: màn report lỗi đọc; client cũ + DB mới: lưu report/bản chụp lỗi (ON CONFLICT);
+  không mất dữ liệu ở cả hai trạng thái. Verify: replay 0001→0139 sạch + chạy lại 0139 sạch, bộ kiểm SQL 24 mục (`supabase/tests/0139_*.sql`; 0133/0136/0138 vẫn xanh), vitest 521/521 (+35: shopeeFiles/shopeeSnapshot/shopeeReportRender,
+  14 đột biến rơi đúng dòng), lint 0 lỗi, build, audit:dead 0; trên bản build nối DB thật: Dữ Liệu Gốc đọc đủ 4 file Shopee trong trình duyệt (xem trước, chưa lưu), Đối Soát có chọn sàn.
+  **Đo thật VERA Shopee T9:** file Shopee 669M / 50 phiên, app đang có 522M / 61 ca (nạp từ Working File) — lệch 28%, cần đối soát bằng Live List.
 - **06/10 chiều: gán host + dọn rác + "đổi người giữa ca".** Đo hiện trạng (1.501 ca): chỉ CROCS T6–T9 đã đối soát, VERA/JOCKEY/Franklin
   T6–T9 còn "Tạm tính". Đã dọn (user duyệt): 4 dòng `promo_schemes` test, lô đối soát 22/09 không gắn brand (228 dòng), 3 report nháp
   (Franklin T8, CROCS T8/T9; bản chụp của chúng GIỮ NGUYÊN, Tạo/Cập nhật là ghi đè). Gán host/trợ từ tiêu đề ca bằng `bulk_assign_session_hosts`:
@@ -128,6 +141,7 @@
 ## 2. Việc còn treo
 
 **Cần user làm:**
+0000000. **Push client rồi chạy `0139` ngay sau (xem §1 thứ tự deploy).** Sau đó: up 4 file Shopee mỗi tháng/brand ở Dữ Liệu Gốc → chọn Shopee (VERA/JOCKEY T6–T9; Franklin Shopee từ T10); đối soát ca Shopee bằng Live List ở Đối Soát (chọn brand + sàn Shopee); tạo + phát hành Report Shopee ở Report Tháng (nút Shopee). Chưa có file Shopee tháng 6, 7, 8 nào; JOCKEY chưa gửi file. Shopee không có Ads/khuyến mãi/GMV trực tiếp–gián tiếp (ghi trong "cách tính" của report).
 000000. 29 ca chưa host (user tự rà và gán sau): CROCS 21 (8 ca T6–T9 chờ user gửi, 11 ca 01–04/10, 21–22/10 11–14), VERA 7 (25/09, 26/09, 06/10, 18/10, 24/10, 25/10, 30/10), Franklin 26/09.
 00000. CROCS T10: user tự gán host cho các ca (gồm 11 ca 01–04/10 và 21/10, 22/10 11–14); tên thật của Mia/Su/Đạt; hồ sơ talent Hoàng Dung. Sửa target tạm 5,5 tỷ của Kế Hoạch Tháng nháp trước khi chốt (user bảo để yên tạm thời).
 0000. Up file Ads (TikTok Ads → "Campaign overview data", xem theo ngày, mỗi file một tháng) cho các tháng/brand khác
@@ -347,6 +361,7 @@
 - `date_trunc` trên cột `date` trong index phải ép `::timestamp`. Thông báo hàng loạt: đếm trước khi bắn (gom theo sự kiện lô).
 
 ### 5.5 Một khái niệm — một hàm (audit 28/09)
+Sàn của report = `lib/reportPlatform.ts` (`ReportPlatform`); mọi đọc/ghi report và bản chụp đi qua `lib/db/monthlyReports.ts` / `monthlyReportSnapshots.ts` với tham số `platform` (mặc định TikTok — TikTok giữ nguyên khoá nạp-trước, chỉ truyền sàn khi là Shopee). Ca/đối soát/phát hành luôn lọc theo sàn của ca, không trộn.
 Ai đứng ca nào, bao lâu = `lib/staffSegments.ts` (`effectiveSegments`, `personRoleMinutes`, `personWindows`, `roleShares`) — ca không có đoạn thì host_id/co_host_id làm cả ca; mọi màn tính lương/giờ/trùng lịch/hiệu suất theo người PHẢI đi qua đây (hoặc `computeSessionPnl().payouts`, `hostPortions`), không đọc `hostId`/`coHostId` thô cho số liệu. "Ca có số" = `isCountable` (hostPerformance) · ca tính tiền = `isPnlSession` (pnl, từ 04/10 đòi `hasLiveEvidence`) · ca
 đã diễn ra thật = `hasLiveEvidence`, ca quá giờ chờ xác nhận = `isUnconfirmedPast`, ca có số ở DB (khoá dời giờ) =
 `hasSessionData` (cả ba ở sessionStatus) · khung camp hiệu lực = `effectiveCamp(planCamp, reportRow)` (campaignDays — MỌI
@@ -386,7 +401,7 @@ tháng không có kế hoạch chỉ còn target khung camp nhập ở Nhập Ad
 
 ## 6. Hạ tầng Supabase
 
-- 138 migration (`supabase/migrations/`), chạy tay theo thứ tự — **`0138` (đổi người giữa ca) ĐÃ CHẠY 06/10.** `0137` đã chạy 05/10. **`0136` ĐÃ CHẠY 05/10** (verify production: lô đối soát thử với phòng kết thúc đúng phút ca CROCS 30/09 11:01 bắt đầu ⇒ không khớp, phòng chồng 29 phút ⇒ khớp; lô thử đã xoá; trigger profiles nằm trước đoạn đó trong cùng file + chốt tự kiểm cuối file), bộ kiểm
+- 139 migration (`supabase/migrations/`) — `0139` (report theo sàn) VIẾT 06/10, CHƯA CHẠY;, chạy tay theo thứ tự — **`0138` (đổi người giữa ca) ĐÃ CHẠY 06/10.** `0137` đã chạy 05/10. **`0136` ĐÃ CHẠY 05/10** (verify production: lô đối soát thử với phòng kết thúc đúng phút ca CROCS 30/09 11:01 bắt đầu ⇒ không khớp, phòng chồng 29 phút ⇒ khớp; lô thử đã xoá; trigger profiles nằm trước đoạn đó trong cùng file + chốt tự kiểm cuối file), bộ kiểm
   `supabase/tests/0136_profile_guard_recon_edges_lock_past.sql` (replay, DB trắng): 16 OK, đỏ khi thiếu 0136. **Tới `0132` đều ĐÃ CHẠY** (0131 + 0132 ngày 02/10);
   **`0133` ĐÃ CHẠY 04/10** (verify ở §1); **`0134` ĐÃ CHẠY 05/10** (verify: CRM không còn SĐT mẫu); **`0135` ĐÃ CHẠY 05/10** (verify: 4 brand KAM "Chưa chọn", form sửa cũng "Chưa chọn"). Lô đối soát cũ (06–09/2026, không gắn brand) không áp dụng lại được — đo
   04/10 nó chỉ khớp ca CROCS nên chưa có số nào bị chia nhầm. Replay `0001 → 0133`: sạch, chạy lần 2 không lỗi; bộ kiểm hành vi

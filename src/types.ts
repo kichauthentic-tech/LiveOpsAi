@@ -285,6 +285,8 @@ export interface BrandMonthlyReport {
   id: string;
   brandId: string;
   periodMonth: string; // "YYYY-MM-01"
+  /** Sàn của report (0139) — mỗi brand mỗi tháng có thể có một report TikTok và một report Shopee. */
+  platform: "TikTok" | "Shopee";
   status: "draft" | "published";
   adsSpend?: number;
   roas?: number;
@@ -374,7 +376,12 @@ export type DataRawReportType =
   | "creator_live_performance"
   // migration 0137 (2026-10-05) — "Campaign overview data" của TikTok Ads (GMV Max, theo ngày, toàn cửa hàng).
   // Nguồn duy nhất của Ads trong Nhập Ads + Report Tháng phần 6 (lib/dataraw/adsCampaignOverview.ts).
-  | "ads_campaign_overview";
+  | "ads_campaign_overview"
+  // migration 0139 (2026-10-06) — 4 file Shopee Seller Centre (Shopee Live), nguồn của Report Tháng SHOPEE (lib/dataraw/shopeeFiles.ts).
+  | "shopee_live_list"
+  | "shopee_product_list"
+  | "shopee_daily"
+  | "shopee_overview";
 // Đã gỡ 2026-09-22 (quyết định của user):
 //   - "product_card_traffic_stats" (migration 0064): chưa từng có file thật nào được upload nên 2
 //     dòng Video/Product Card GMV của Report Tháng luôn bằng 0. Nay lấy từ shop_analytics +

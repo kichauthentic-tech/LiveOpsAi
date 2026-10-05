@@ -1,6 +1,7 @@
 import { DataRawColumn, DataRawReportType } from "../../types";
 import { buildProductListAgg } from "./productListAgg";
 import { parseAdsCampaignOverview } from "./adsCampaignOverview";
+import { parseCsvRows, parseShopeeRows, type ShopeeFileType } from "./shopeeFiles";
 
 // Parser cho module Dataraw Brand Workspace (migration 0052) — 4 report Excel export tay từ
 // TikTok Shop Seller Center, mỗi loại có layout khác nhau (xem sample thật đã xem trong phiên
@@ -248,8 +249,14 @@ function parseCreatorLivePerformance(rows: unknown[][]): ParsedDataRawImport {
 
 export async function parseDataRawExcel(file: File, reportType: DataRawReportType): Promise<ParsedDataRawImport> {
   const buf = await file.arrayBuffer();
-  const rows = await readSheetRows(buf);
+  // File CSV (Shopee: theo ngày, overview) tự đọc bằng parseCsvRows — SheetJS sẽ đổi "01-09-2026" thành ngày kiểu Mỹ.
+  const isCsv = /\.csv$/i.test(file.name);
+  const rows = isCsv ? parseCsvRows(new TextDecoder("utf-8").decode(buf)) : await readSheetRows(buf);
   switch (reportType) {
+    case "shopee_live_list":
+    case "shopee_product_list":
+    case "shopee_daily":
+    case "shopee_overview": return parseShopeeRows(rows, reportType as ShopeeFileType);
     case "shop_promotion": return parseShopPromotion(rows);
     case "product_list": return parseProductList(rows);
     case "live_analysis": return parseLiveAnalysis(rows);

@@ -33,6 +33,15 @@ const REPORT_TABS: { id: DataRawReportType; label: string; hint: string }[] = [
   { id: "live_performance_core_stats", label: "Live Performance", hint: 'Export "Live Performance Core Stats" từ TikTok Shop Seller Center — GMV LIVE theo ngày. Report Tháng KHÔNG dùng (từ 2026-09-29): file này cộng cả live của creator affiliate nên không phải số agency; chỉ lưu để tra cứu.' }
 ];
 
+// 4 file Shopee Seller Centre (Shopee Live) — nguồn của Report Tháng Shopee và của đối soát ca Shopee (0139).
+const SHOPEE_TABS: { id: DataRawReportType; label: string; hint: string }[] = [
+  { id: "shopee_overview", label: "Tổng quan tháng", hint: 'Export "overview-v2…csv" từ Shopee Seller Centre (Dữ liệu Live → Tổng quan, chọn đúng một tháng) — doanh số, phễu, nguồn traffic của live cả tháng.' },
+  { id: "shopee_daily", label: "Theo ngày", hint: 'Export "export-sc__1m_…csv" từ Shopee Seller Centre — mỗi ngày một dòng (doanh số đặt/xác nhận, người xem, ATC, CTR…). Một file một tháng.' },
+  { id: "shopee_live_list", label: "Live List", hint: 'Export "…live_stream_list_export…xlsx" từ Shopee Seller Centre — mỗi phiên live một dòng: giờ bắt đầu, thời lượng, người xem, đơn, doanh số. Dùng cho Report Shopee VÀ để đối soát ca Shopee ở Đối Soát Số Liệu.' },
+  { id: "shopee_product_list", label: "Sản phẩm (Shopee)", hint: 'Export "…live_product_list_export…xlsx" từ Shopee Seller Centre — mỗi sản phẩm bán trong live một dòng (click, ATC, đơn, doanh số).' }
+];
+const SHOPEE_TYPE_IDS = new Set<DataRawReportType>(SHOPEE_TABS.map((t) => t.id));
+
 function fmtCell(v: unknown): string {
   if (v === null || v === undefined || v === "") return "—";
   return String(v);
@@ -111,7 +120,10 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ brandId, brandName, 
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
-  const activeTab = REPORT_TABS.find((t) => t.id === activeType)!;
+  // Sàn của file đang xem: loại Shopee tách khỏi 6 loại TikTok để không lẫn (0139).
+  const sourcePlatform: "TikTok" | "Shopee" = SHOPEE_TYPE_IDS.has(activeType) ? "Shopee" : "TikTok";
+  const visibleTabs = sourcePlatform === "Shopee" ? SHOPEE_TABS : REPORT_TABS;
+  const activeTab = [...REPORT_TABS, ...SHOPEE_TABS].find((t) => t.id === activeType)!;
 
   useEffect(() => {
     setExpandedId(null);
@@ -221,7 +233,7 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ brandId, brandName, 
           <Database className="w-5 h-5 text-[var(--accent)]" /> Dữ Liệu Gốc — {brandName}
         </h2>
         <p className="text-xs text-[var(--text-muted)] mt-1">
-          Nơi lưu nguyên trạng report Excel tải tay từ TikTok Shop mỗi tuần/tháng. Đây là cơ sở để dựng report + đối soát cuối tháng, sau này cần tra chỉ số nào chỉ cần mở lại import đúng kỳ. Up lại file trong cùng một tháng sẽ thay bản cũ của tháng đó (file TikTok luôn cộng dồn từ đầu tháng).
+          Nơi lưu nguyên trạng report Excel tải tay từ TikTok Shop và Shopee mỗi tuần/tháng (chọn sàn ở nút TikTok / Shopee). Đây là cơ sở để dựng report + đối soát cuối tháng, sau này cần tra chỉ số nào chỉ cần mở lại import đúng kỳ. Up lại file trong cùng một tháng sẽ thay bản cũ của tháng đó (file TikTok luôn cộng dồn từ đầu tháng).
         </p>
       </div>
 
@@ -231,8 +243,23 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ brandId, brandName, 
         </div>
       )}
 
+      <div className="inline-flex items-center gap-1 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-1" role="group" aria-label="Sàn của file">
+        {(["TikTok", "Shopee"] as const).map((pl) => (
+          <button
+            key={pl}
+            onClick={() => setActiveType(pl === "Shopee" ? SHOPEE_TABS[0].id : DEFAULT_REPORT_TYPE)}
+            aria-pressed={sourcePlatform === pl}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              sourcePlatform === pl ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)] hover:bg-[var(--surface-elevated)]"
+            }`}
+          >
+            {pl}
+          </button>
+        ))}
+      </div>
+
       <div className="flex flex-wrap gap-2 border-b border-[var(--border)] pb-3">
-        {REPORT_TABS.map((t) => (
+        {visibleTabs.map((t) => (
           <button
             key={t.id}
             onClick={() => setActiveType(t.id)}
@@ -267,10 +294,10 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ brandId, brandName, 
         {!parsedPreview ? (
           <label className="border-2 border-dashed border-[var(--border)] bg-[var(--surface-elevated)]/40 p-4 rounded-xl text-center flex items-center justify-center gap-2 cursor-pointer hover:bg-[var(--surface-hover)] block">
             <Upload className="w-4 h-4 text-[var(--text-muted)]" />
-            <p className="font-bold text-[var(--text)] text-xs">Kéo & Thả hoặc Chọn File Excel</p>
+            <p className="font-bold text-[var(--text)] text-xs">Kéo & Thả hoặc Chọn File {sourcePlatform === "Shopee" ? "Excel / CSV" : "Excel"}</p>
             <input
               type="file"
-              accept=".xlsx,.xls"
+              accept={sourcePlatform === "Shopee" ? ".xlsx,.xls,.csv" : ".xlsx,.xls"}
               className="hidden"
               onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
             />

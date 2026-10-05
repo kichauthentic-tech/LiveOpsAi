@@ -291,7 +291,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                     </td>
                     <td className="py-2 pr-3">
                       <div className={`font-bold text-[var(--text-muted)] ${excluded ? "line-through" : ""}`}>{money(s.actualGmv)}</div>
-                      <DataSourceBadge dataSource={s.dataSource} className="mt-0.5" />
+                      <DataSourceBadge dataSource={s.dataSource} platform={s.platform} className="mt-0.5" />
                     </td>
                     <td className="py-2 pr-3">
                       {isHourly ? (

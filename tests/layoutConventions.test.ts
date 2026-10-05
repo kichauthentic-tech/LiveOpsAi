@@ -255,7 +255,7 @@ test("Talent Pool: đếm cả ca chạy vai trợ (coHostId), không chỉ ca h
   // Giờ làm vai TRỢ phải đếm riêng chứ không để trống: người trợ 86 ca mà hiện "Giờ live —" đọc
   // như làm 0 giờ. Không cộng vào `hours` vì `hours` là mẫu số của GMV/giờ (GMV tính cho host).
   expect(metric).toMatch(/const assistHours = assisted\.reduce/);
-  expect(metric).toMatch(/\n    assistHours,\n/);
+  expect(metric).toMatch(/\n {4}assistHours,\n/);
   expect(src).toMatch(/real\.assistHours/);
   expect(src).not.toMatch(/Giờ live/);
   const profile = readFileSync(join(SRC, "components/MyTalentProfile.tsx"), "utf8");

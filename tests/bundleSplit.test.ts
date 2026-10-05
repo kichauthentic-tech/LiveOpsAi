@@ -73,6 +73,8 @@ test("Report Tháng: MonthlyReportTabs (recharts) chỉ được tải động",
 // rơi sang chunk khác — đó mới là thứ test này canh.
 const RECHARTS_FILES = [
   "components/brand-workspace/MonthlyReportTabs.tsx",
+  // Report Shopee (0139) cũng lazy (lazyNamed ở BrandMonthlyReport) — chunk riêng, chỉ tải khi chọn sàn Shopee.
+  "components/brand-workspace/ShopeeMonthlyReportTabs.tsx",
   "components/brand-workspace/report/ui.tsx"
 ];
 

@@ -12,6 +12,7 @@ import {
   importReconciliationFile,
   setReconciliationBucket
 } from "../lib/db/liveReconciliation";
+import { REPORT_PLATFORMS, type ReportPlatform } from "../lib/reportPlatform";
 import { errorMessage } from "../lib/errorMessage";
 import { useConfirm } from "../hooks/useConfirm";
 import { PageIntro } from "./common/PageIntro";
@@ -58,6 +59,7 @@ function fmtTime(iso?: string): string {
 export function LiveReconciliation({ brands, sessions, onApplied, onOpenSession }: LiveReconciliationProps) {
   const confirm = useConfirm();
   const [uploadBrandId, setUploadBrandId] = useState("");
+  const [uploadPlatform, setUploadPlatform] = useState<ReportPlatform>("TikTok");
   const brandName = (id?: string) => (id ? brands.find((b) => b.id === id)?.name ?? "brand đã xoá" : undefined);
   const sessionById = useMemo(() => new Map(sessions.map((s) => [s.id, s])), [sessions]);
   const sessionLabel = (id: string) => {
@@ -125,7 +127,7 @@ export function LiveReconciliation({ brands, sessions, onApplied, onOpenSession 
             <h2 className="text-lg font-black text-[var(--text)]">Đối Soát Số Liệu</h2>
             <PageIntro>
               TikTok còn cập nhật GMV nhiều giờ sau khi tắt live, nên số chốt lúc giao ca chỉ là tạm tính. Tải lại file{" "}
-              <span className="font-bold">Creator-Live-Performance</span> cho cả ngày/tuần/tháng rồi up một lần để chỉnh lại toàn bộ ca trong kỳ. "Phiên" là một lần bật live trên TikTok; một phiên dài có thể chia cho nhiều ca, nên số phiên và số ca không bằng nhau.
+              <span className="font-bold">Creator-Live-Performance</span> (TikTok) hoặc <span className="font-bold">Live List</span> (Shopee) cho cả ngày/tuần/tháng rồi up một lần để chỉnh lại toàn bộ ca của đúng sàn đó trong kỳ. "Phiên" là một lần bật live trên TikTok; một phiên dài có thể chia cho nhiều ca, nên số phiên và số ca không bằng nhau.
             </PageIntro>
           </div>
           <div className="shrink-0 flex flex-wrap items-center gap-2">
@@ -140,6 +142,16 @@ export function LiveReconciliation({ brands, sessions, onApplied, onOpenSession 
                 <option key={b.id} value={b.id}>{b.name}</option>
               ))}
             </select>
+            <select
+              aria-label="Sàn của file"
+              value={uploadPlatform}
+              onChange={(e) => setUploadPlatform(e.target.value as ReportPlatform)}
+              className="text-xs min-h-8 px-2 rounded-xl bg-[var(--surface-base)] border border-[var(--border)] text-[var(--text)]"
+            >
+              {REPORT_PLATFORMS.map((p) => (
+                <option key={p} value={p}>{p === "TikTok" ? "TikTok (Creator-Live-Performance)" : "Shopee (Live List)"}</option>
+              ))}
+            </select>
             <label className={uploadBrandId ? "" : "opacity-40 pointer-events-none"} title={uploadBrandId ? undefined : "Chọn brand trước — file là của MỘT tài khoản, chỉ khớp với ca của brand đó"}>
               <input
                 type="file"
@@ -149,7 +161,7 @@ export function LiveReconciliation({ brands, sessions, onApplied, onOpenSession 
                 onChange={(e) => {
                   const f = e.target.files?.[0];
                   e.target.value = "";
-                  if (f && uploadBrandId) void run(async () => { const id = await importReconciliationFile(f, uploadBrandId); await reloadBatches(id); });
+                  if (f && uploadBrandId) void run(async () => { const id = await importReconciliationFile(f, uploadBrandId, uploadPlatform); await reloadBatches(id); });
                 }}
               />
               <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--text)] cursor-pointer transition-colors">
@@ -172,7 +184,7 @@ export function LiveReconciliation({ brands, sessions, onApplied, onOpenSession 
               >
                 <span className="font-bold text-[var(--text)] block truncate max-w-[220px]">{b.periodLabel ? fmtPeriodLabel(b.periodLabel) : b.fileName ?? "Không rõ kỳ"}</span>
                 <span className="text-[11px] text-[var(--text-faint)]">
-                  {brandName(b.brandId) ?? "chưa gắn brand"} · {b.rowCount} phiên · {b.appliedAt ? `đã áp dụng ${fmtTime(b.appliedAt)}` : "chưa áp dụng"}
+                  {brandName(b.brandId) ?? "chưa gắn brand"} · {b.platform} · {b.rowCount} phiên · {b.appliedAt ? `đã áp dụng ${fmtTime(b.appliedAt)}` : "chưa áp dụng"}
                 </span>
               </button>
             ))}
@@ -285,7 +297,7 @@ export function LiveReconciliation({ brands, sessions, onApplied, onOpenSession 
             <p className="text-[11px] text-[var(--text-muted)] max-w-xl">
               {active.brandId ? (
                 <>
-                  File của <span className="font-bold">{brandName(active.brandId)}</span> — chỉ khớp với ca của brand này. Áp dụng sẽ ghi đè số
+                  File {active.platform} của <span className="font-bold">{brandName(active.brandId)}</span> — chỉ khớp với ca {active.platform} của brand này. Áp dụng sẽ ghi đè số
                   liệu của các ca thuộc rổ "khớp ca agency" và "cần xem lại", đổi nguồn dữ liệu thành <span className="font-bold">đã đối soát</span>.
                   Chạy lại nhiều lần được — mỗi lần tính lại từ đầu theo file này.
                 </>

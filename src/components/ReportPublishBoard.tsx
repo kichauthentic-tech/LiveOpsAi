@@ -9,6 +9,9 @@ import { useConfirm } from "../hooks/useConfirm";
 import { fetchMonthlyReportSnapshot, saveMonthlyReportSnapshot } from "../lib/db/monthlyReportSnapshots";
 import { fetchDataRawImportStamps } from "../lib/db/brandDataRaw";
 import { buildMonthlyReportSnapshot, snapshotFreshness } from "../lib/report/monthlySnapshot";
+import { shopeeSnapshotFreshness, shopeeStampsFor, type ShopeeReportSnapshot } from "../lib/report/shopeeSnapshot";
+import { buildShopeeReportSnapshot } from "../lib/report/shopeeSnapshotBuild";
+import { REPORT_PLATFORMS, type ReportPlatform } from "../lib/reportPlatform";
 import { PageIntro } from "./common/PageIntro";
 
 // Bảng điều phối phát hành report (còn lại của Đợt C, Audit Role × Workspace — xem
@@ -54,6 +57,11 @@ const monthRange = (month: string): { start: string; end: string } => {
 export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ brands, sessions, brandPlatformRates, planMonthTotals, monthlyReports, onReportsChanged }) => {
   const confirm = useConfirm();
   const today = getTodayMonth();
+  // Hai report độc lập theo sàn (0139): bảng này hiện một sàn một lúc.
+  const [platform, setPlatform] = useState<ReportPlatform>("TikTok");
+  const isShopee = platform === "Shopee";
+  // Khoá dòng report trong Map trung tâm: TikTok giữ "brandId|YYYY-MM", Shopee có hậu tố.
+  const reportKey = (brandId: string, month: string) => `${brandId}|${month}${isShopee ? "|Shopee" : ""}`;
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [rowError, setRowError] = useState<Record<string, string>>({});
 
@@ -63,9 +71,9 @@ export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ brands, 
   const months = useMemo(() => {
     const set = new Set<string>();
     for (let i = 0; i < MONTHS_BACK; i++) set.add(addMonths(today, -i));
-    for (const r of monthlyReports.values()) set.add(r.periodMonth.slice(0, 7));
+    for (const r of monthlyReports.values()) if (r.platform === platform) set.add(r.periodMonth.slice(0, 7));
     return [...set].sort((a, b) => (a < b ? 1 : -1));
-  }, [today, monthlyReports]);
+  }, [today, monthlyReports, platform]);
 
   const sortedBrands = useMemo(() => brands.slice().sort((a, b) => a.name.localeCompare(b.name)), [brands]);
 
@@ -74,7 +82,7 @@ export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ brands, 
   // dòng (CROCS T6–T9) có ca thật; 20 dòng còn lại bấm vào là gửi cho brand một report rỗng.
   const sessionCountFor = (brandId: string, month: string) => {
     const { start, end } = monthRange(month);
-    return sessions.filter((s) => s.brandId === brandId && s.date >= start && s.date <= end).length;
+    return sessions.filter((s) => s.brandId === brandId && s.platform === platform && s.date >= start && s.date <= end).length;
   };
 
   const unreconciledCountFor = (brandId: string, month: string) => {
@@ -82,6 +90,7 @@ export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ brands, 
     return sessions.filter(
       (s) =>
         s.brandId === brandId &&
+        s.platform === platform &&
         s.date >= start &&
         s.date <= end &&
         s.status === "Completed" &&
@@ -90,7 +99,7 @@ export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ brands, 
   };
 
   const handlePublish = async (brandId: string, month: string, existing: BrandMonthlyReport | undefined) => {
-    const key = `${brandId}|${month}`;
+    const key = reportKey(brandId, month);
     setRowError((e) => ({ ...e, [key]: "" }));
     const unreconciled = unreconciledCountFor(brandId, month);
     // Phát hành = brand NHÌN THẤY report, tức hành động hướng ra ngoài và không rút lại được trong
@@ -104,17 +113,23 @@ export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ brands, 
     let refresh = false;
     let hasStored: boolean;
     try {
-      const [stored, stamps] = await Promise.all([fetchMonthlyReportSnapshot(brandId, month), fetchDataRawImportStamps(brandId)]);
+      const [stored, stamps] = await Promise.all([fetchMonthlyReportSnapshot(brandId, month, platform), fetchDataRawImportStamps(brandId)]);
       hasStored = !!stored;
       if (stored) {
-        const f = snapshotFreshness(stored.snapshot, { sessions, planMonthTotals, brandPlatformRates, imports: stamps });
-        if (!f.upToDate) {
-          const why = [
-            f.changedSessionsThisMonth > 0 ? `${f.changedSessionsThisMonth} ca trong tháng đổi số/lịch` : "",
-            f.changedFiles.length > 0 ? `file mới: ${f.changedFiles.join(", ")}` : "",
-            f.configChanged ? "target/rate/công thức đổi" : ""
-          ].filter(Boolean).join(" · ");
-          if (!(await confirm(`Bản chụp số của ${fmtMonthLabel(month)} (${brandName}) đã cũ so với dữ liệu hiện tại${why ? `: ${why}` : ""}.\n\nĐồng ý = cập nhật bản chụp theo số mới rồi phát hành. Muốn xem lại số trước thì Huỷ và mở Report Tháng.`))) return;
+        const sf = isShopee
+          ? shopeeSnapshotFreshness(stored.snapshot as unknown as ShopeeReportSnapshot, { sessions, stamps: shopeeStampsFor(stamps, month) })
+          : null;
+        const f = isShopee ? null : snapshotFreshness(stored.snapshot, { sessions, planMonthTotals, brandPlatformRates, imports: stamps });
+        const upToDate = isShopee ? sf!.upToDate : f!.upToDate;
+        if (!upToDate) {
+          const why = isShopee
+            ? [sf!.sessionsChanged ? "ca Shopee đổi số/lịch/người" : "", sf!.filesChanged ? "file Shopee mới" : ""].filter(Boolean).join(" · ")
+            : [
+                f!.changedSessionsThisMonth > 0 ? `${f!.changedSessionsThisMonth} ca trong tháng đổi số/lịch` : "",
+                f!.changedFiles.length > 0 ? `file mới: ${f!.changedFiles.join(", ")}` : "",
+                f!.configChanged ? "target/rate/công thức đổi" : ""
+              ].filter(Boolean).join(" · ");
+          if (!(await confirm(`Bản chụp số ${platform} của ${fmtMonthLabel(month)} (${brandName}) đã cũ so với dữ liệu hiện tại${why ? `: ${why}` : ""}.\n\nĐồng ý = cập nhật bản chụp theo số mới rồi phát hành. Muốn xem lại số trước thì Huỷ và mở Report Tháng.`))) return;
           refresh = true;
         }
       }
@@ -124,9 +139,9 @@ export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ brands, 
     }
     const ok = await confirm(
       (unreconciled > 0
-        ? `Còn ${unreconciled} ca đã xong trong ${fmtMonthLabel(month)} chưa đối soát với TikTok — số trong report có thể còn đổi.\n\nVẫn phát hành ${fmtMonthLabel(month)} cho ${brandName}?`
-        : `Phát hành report ${fmtMonthLabel(month)} cho ${brandName}? Brand sẽ thấy report này ngay.`) +
-        `\n\nPhát hành = ĐÓNG SỔ tháng: sau đó không sửa/đối soát/loại/huỷ ca của ${brandName} trong tháng này được nữa cho tới khi thu hồi report.`
+        ? `Còn ${unreconciled} ca ${platform} đã xong trong ${fmtMonthLabel(month)} chưa đối soát với ${platform} — số trong report có thể còn đổi.\n\nVẫn phát hành ${fmtMonthLabel(month)} cho ${brandName}?`
+        : `Phát hành report ${platform} ${fmtMonthLabel(month)} cho ${brandName}? Brand sẽ thấy report này ngay.`) +
+        `\n\nPhát hành = ĐÓNG SỔ ${platform} của tháng: sau đó không sửa/đối soát/loại/huỷ ca ${platform} của ${brandName} trong tháng này được nữa cho tới khi thu hồi report (ca sàn kia không bị ảnh hưởng).`
     );
     if (!ok) return;
     const force = unreconciled > 0;
@@ -134,12 +149,14 @@ export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ brands, 
     try {
       // Tháng chưa có dòng brand_monthly_reports (chưa nhập Ads/kế hoạch gì) → tạo dòng nháp trống
       // rồi phát hành ngay, giống hành vi ở tab Report Tháng đơn brand.
-      const row = existing ?? (await upsertMonthlyReport(brandId, `${month}-01`, {}));
+      const row = existing ?? (await upsertMonthlyReport(brandId, `${month}-01`, {}, platform));
       // Tháng chưa từng bấm "Tạo report" → chốt số trước (cùng hành vi nút Phát hành ở Report Tháng).
       // Đã có bản chụp thì giữ nguyên: phát hành là gửi đúng số ops đã chốt.
       if (refresh || !hasStored) {
-        const { snapshot } = await buildMonthlyReportSnapshot({ brandId, month, sessions, planMonthTotals, brandPlatformRates });
-        await saveMonthlyReportSnapshot(brandId, month, snapshot);
+        const snapshot = isShopee
+          ? ((await buildShopeeReportSnapshot({ brandId, month, sessions })) as unknown as Awaited<ReturnType<typeof buildMonthlyReportSnapshot>>["snapshot"])
+          : (await buildMonthlyReportSnapshot({ brandId, month, sessions, planMonthTotals, brandPlatformRates })).snapshot;
+        await saveMonthlyReportSnapshot(brandId, month, snapshot, platform);
       }
       await publishMonthlyReport(row.id, force);
       onReportsChanged();
@@ -151,8 +168,8 @@ export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ brands, 
   };
 
   const handleUnpublish = async (brandId: string, month: string, reportId: string) => {
-    const key = `${brandId}|${month}`;
-    if (!(await confirm("Thu hồi report đã phát hành về bản nháp?"))) return;
+    const key = reportKey(brandId, month);
+    if (!(await confirm(`Thu hồi report ${platform} đã phát hành về bản nháp?`))) return;
     setRowError((e) => ({ ...e, [key]: "" }));
     setBusyKey(key);
     try {
@@ -173,9 +190,23 @@ export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ brands, 
         </h2>
         <PageIntro>
           Trạng thái phát hành Report Tháng của mọi brand, {MONTHS_BACK} tháng gần nhất — phát hành/thu hồi thẳng từ đây
-          thay vì mở lần lượt từng Brand Workspace. Report Tuần đọc theo Report Tháng (không publish riêng); Cam Kết Hợp
+          thay vì mở lần lượt từng Brand Workspace. TikTok và Shopee là hai report độc lập: chọn sàn ở nút bên dưới, mỗi sàn phát hành và đóng sổ riêng. Report Tuần đọc theo Report Tháng (không publish riêng); Cam Kết Hợp
           Đồng và Affiliate không có trạng thái phát hành nên không hiện ở đây.
         </PageIntro>
+        <div className="inline-flex items-center gap-1 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-1" role="group" aria-label="Sàn của report">
+          {REPORT_PLATFORMS.map((pl) => (
+            <button
+              key={pl}
+              onClick={() => setPlatform(pl)}
+              aria-pressed={platform === pl}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                platform === pl ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)] hover:bg-[var(--surface-elevated)]"
+              }`}
+            >
+              {pl}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-xl">
@@ -208,7 +239,7 @@ export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ brands, 
                     </td>
                   </tr>
                   {sortedBrands.map((b) => {
-                  const key = `${b.id}|${month}`;
+                  const key = reportKey(b.id, month);
                   const report = monthlyReports.get(key);
                   const isPublished = report?.status === "published";
                   const unreconciled = unreconciledCountFor(b.id, month);

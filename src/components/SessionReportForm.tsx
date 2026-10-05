@@ -134,7 +134,7 @@ export function SessionReportForm({ session, onSubmit, onCancel, canOverrideMetr
             : "border-amber-800/60 bg-amber-950/40 text-amber-200"
         }`}
       >
-        <DataSourceBadge dataSource={session.dataSource} className="mt-0.5 shrink-0" />
+        <DataSourceBadge dataSource={session.dataSource} platform={session.platform} className="mt-0.5 shrink-0" />
         <div className="flex-1 min-w-0">
           {hasBetterSource ? (
             <>

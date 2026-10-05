@@ -1,5 +1,6 @@
 import { supabase } from "../supabaseClient";
 import type { MonthlyReportSnapshot, SnapshotPieces } from "../report/monthlySnapshot";
+import type { ReportPlatform } from "../reportPlatform";
 
 // Bản chụp số liệu Report Tháng (migration 0119). Nội dung dựng ở lib/report/monthlySnapshot.ts —
 // file này chỉ đọc/ghi. `month` luôn là "YYYY-MM".
@@ -9,12 +10,13 @@ export interface StoredMonthlyReportSnapshot {
   computedAt: string;
 }
 
-export async function fetchMonthlyReportSnapshot(brandId: string, month: string): Promise<StoredMonthlyReportSnapshot | null> {
+export async function fetchMonthlyReportSnapshot(brandId: string, month: string, platform: ReportPlatform = "TikTok"): Promise<StoredMonthlyReportSnapshot | null> {
   const { data, error } = await supabase
     .from("brand_monthly_report_snapshots")
     .select("snapshot, computed_at")
     .eq("brand_id", brandId)
     .eq("period_month", `${month}-01`)
+    .eq("platform", platform)
     .maybeSingle();
   if (error) throw error;
   if (!data) return null;
@@ -24,18 +26,19 @@ export async function fetchMonthlyReportSnapshot(brandId: string, month: string)
 
 /** Chỉ phần `pieces` (số Dữ Liệu Gốc đã tổng hợp) của tháng khác — để tháng sau tái dùng số tháng trước
  *  làm cột so sánh mà không tải lại file, và không kéo theo danh sách ca của bản chụp đó. */
-export async function fetchSnapshotPieces(brandId: string, month: string): Promise<SnapshotPieces | null> {
+export async function fetchSnapshotPieces(brandId: string, month: string, platform: ReportPlatform = "TikTok"): Promise<SnapshotPieces | null> {
   const { data, error } = await supabase
     .from("brand_monthly_report_snapshots")
     .select("pieces:snapshot->pieces")
     .eq("brand_id", brandId)
     .eq("period_month", `${month}-01`)
+    .eq("platform", platform)
     .maybeSingle();
   if (error) throw error;
   return ((data as { pieces: SnapshotPieces | null } | null)?.pieces ?? null) || null;
 }
 
-export async function saveMonthlyReportSnapshot(brandId: string, month: string, snapshot: MonthlyReportSnapshot): Promise<string> {
+export async function saveMonthlyReportSnapshot(brandId: string, month: string, snapshot: MonthlyReportSnapshot, platform: ReportPlatform = "TikTok"): Promise<string> {
   const { data: auth } = await supabase.auth.getSession();
   const { data, error } = await supabase
     .from("brand_monthly_report_snapshots")
@@ -43,11 +46,12 @@ export async function saveMonthlyReportSnapshot(brandId: string, month: string, 
       {
         brand_id: brandId,
         period_month: `${month}-01`,
+        platform,
         snapshot,
         computed_at: snapshot.computedAt,
         computed_by: auth.session?.user.id ?? null
       },
-      { onConflict: "brand_id,period_month" }
+      { onConflict: "brand_id,period_month,platform" }
     )
     // Không trả lại cả jsonb vừa ghi — client đang giữ sẵn.
     .select("computed_at")

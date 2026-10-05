@@ -434,7 +434,7 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
                 <li key={s.id} className="flex flex-wrap items-center gap-1.5 text-xs">
                   <span className="font-mono text-[var(--text)]">{fmtDay(s.date)} {s.startTime}–{s.endTime}</span>
                   <span className="text-[var(--text-muted)]">{s.hostName || "chưa gán"}</span>
-                  <DataSourceBadge dataSource={s.dataSource} />
+                  <DataSourceBadge dataSource={s.dataSource} platform={s.platform} />
                   {missing.map((m) => (
                     <span key={m} className={`text-[11px] font-bold px-1.5 py-0.5 rounded border ${m === "reconcile" ? "bg-sky-950 text-sky-300 border-sky-800" : "bg-amber-950 text-amber-300 border-amber-800"}`}>{MISSING_LABEL[m]}</span>
                   ))}
