@@ -61,7 +61,7 @@ const SNAPSHOT_SESSION_FIELDS = [
   "targetGmv", "actualGmv", "totalOrders", "totalViews", "avgWatchTimeSeconds", "dataSource", "monthPublished",
   "liveDurationMinutes", "actualStartAt", "actualEndAt", "attributedItemsSold", "attributedSkuOrders",
   "impressions", "productImpressions", "productClicks", "newFollowers", "commentsCount", "sharesCount", "likesCount",
-  "liveRoomIds", "coHostId", "coHostName"
+  "liveRoomIds", "coHostId", "coHostName", "staffSegments"
 ] as const satisfies readonly (keyof LiveSession)[];
 export type SnapshotSession = Partial<Pick<LiveSession, (typeof SNAPSHOT_SESSION_FIELDS)[number]>> & Pick<LiveSession, "id" | "date" | "status">;
 
@@ -389,7 +389,7 @@ const SESSION_SIG_FIELDS: (keyof LiveSession)[] = [
   "targetGmv", "actualGmv", "totalOrders", "totalViews", "avgWatchTimeSeconds", "dataSource",
   "liveDurationMinutes", "actualStartAt", "actualEndAt", "attributedItemsSold", "attributedSkuOrders",
   "impressions", "productImpressions", "productClicks", "newFollowers", "commentsCount", "sharesCount", "likesCount",
-  "liveRoomIds", "coHostId", "coHostName"
+  "liveRoomIds", "coHostId", "coHostName", "staffSegments"
 ];
 function sessionSig(s: SnapshotSession | LiveSession): string {
   // "" / undefined / null coi như nhau — bản chụp đã bỏ trường trống (trimSession).

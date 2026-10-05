@@ -1,5 +1,6 @@
 import { LiveSession, ShiftSlot } from "../../types";
 import { DateTimeRange, dateTimeRangesOverlap } from "../dateUtils";
+import { personWindows } from "../staffSegments";
 
 // Kiểm trùng lịch — MỘT bộ luật cho mọi cửa xếp/sửa ca (audit 2026-09-28 mục 8). DB không chặn trùng, nên
 // cảnh báo ở UI là hàng rào duy nhất; trước bản này 5 cửa kiểm theo 4 luật khác nhau:
@@ -14,12 +15,13 @@ export interface ScheduleWindow extends DateTimeRange {
   studioId?: string;
 }
 
-/** Ca (chưa huỷ, chồng giờ) mà người này đang làm Host hoặc Trợ live. */
+/** Ca (chưa huỷ, chồng giờ) mà người này đang làm Host hoặc Trợ live. Ca đổi người giữa ca (0138) chỉ tính đúng khoảng
+ *  người này đứng ca — ra giữa ca thì phần sau của ca không còn chiếm họ. */
 export function personClash(sessions: LiveSession[], want: DateTimeRange, talentId: string | undefined, excludeSessionId?: string): LiveSession | null {
   if (!talentId) return null;
   return (
     sessions.find(
-      (s) => s.id !== excludeSessionId && s.status !== "Cancelled" && (s.hostId === talentId || s.coHostId === talentId) && dateTimeRangesOverlap(s, want)
+      (s) => s.id !== excludeSessionId && s.status !== "Cancelled" && personWindows(s, talentId).some((w) => dateTimeRangesOverlap(w, want))
     ) ?? null
   );
 }

@@ -144,6 +144,16 @@ export interface Equipment {
   isCustom?: boolean;
 }
 
+/** Một đoạn giờ của một người trong ca (migration 0138) — host/trợ đổi giữa ca. fromMin/toMin = phút kể từ giờ bắt
+ *  đầu ca (ca qua đêm không phải xử lý riêng). Logic dùng chung ở lib/staffSegments.ts. */
+export interface StaffSegment {
+  talentId: string;
+  talentName: string;
+  role: "host" | "co_host";
+  fromMin: number;
+  toMin: number;
+}
+
 export interface LiveSession {
   id: string;
   title: string;
@@ -158,6 +168,8 @@ export interface LiveSession {
   assistantName: string;
   coHostId?: string;
   coHostName: string;
+  /** Đoạn giờ từng người khi đổi người giữa ca. Vắng/rỗng = host/trợ làm cả ca (cách tính cũ). */
+  staffSegments?: StaffSegment[];
   platform: "TikTok" | "Shopee";
   date: string;
   startTime: string;

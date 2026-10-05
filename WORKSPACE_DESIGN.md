@@ -18,6 +18,18 @@
   tới đâu, cái gì kêu, rồi sửa đúng chỗ đó. **Không seed mock lại.**
 - **Nợ kỹ thuật đã hết** (đợt P2a-2…P2a-21, 01–02/10) và **audit code chết đã xong** (02/10): `npm run audit:dead` báo 0,
   ESLint 0 lỗi (31 warning `set-state-in-effect` = nợ đã đo, cố ý `warn`), vitest 467/467 (05/10).
+- **06/10 chiều: gán host + dọn rác + "đổi người giữa ca".** Đo hiện trạng (1.501 ca): chỉ CROCS T6–T9 đã đối soát, VERA/JOCKEY/Franklin
+  T6–T9 còn "Tạm tính". Đã dọn (user duyệt): 4 dòng `promo_schemes` test, lô đối soát 22/09 không gắn brand (228 dòng), 3 report nháp
+  (Franklin T8, CROCS T8/T9; bản chụp của chúng GIỮ NGUYÊN, Tạo/Cập nhật là ghi đè). Gán host/trợ từ tiêu đề ca bằng `bulk_assign_session_hosts`:
+  214 ca (Mia = Nguyễn Thị Xuân Mai, Su = Nguyễn Thị Thanh Hằng, H.Dung = Hoàng Dung, Đạt, T.Linh = Tiểu Linh, trợ Trúc Như/Diễm Phương,
+  "BIN" = profile **Hồng Toàn**, user xác nhận 06/10). Còn 29 ca chưa host (mục 2). **Đổi người giữa ca (migration `0138`, đã chạy)**:
+  bảng `session_staff_segments` (người · vai host|co_host · phút vào/ra tính từ giờ ca), ghi qua RPC `set_session_staff_segments`;
+  logic dùng chung `lib/staffSegments.ts` đọc bởi `pnl.ts` (mỗi người một dòng `payouts`, lương = rate giờ x giờ của MÌNH, OT/off sớm gắn người
+  đứng tới cuối ca), `conflicts.ts` (bận đúng khoảng đứng ca), `hostPerformance` (`hostPortions`: GMV/giờ chia theo giờ đứng ca), Thu nhập talent, Finance,
+  snapshot Report Tháng; UI = Sửa ca → "Đổi người giữa ca" (`StaffSegmentsEditor`, hành động qua `SessionActionsContext`). **Không có hoa hồng
+  theo GMV** (user chốt 06/10, đừng nghĩ tới). Verify: replay 0001→0138 sạch + bộ kiểm SQL 27 mục (`supabase/tests/0138_*.sql`, đỏ khi thiếu 0138),
+  vitest 486/486 (+19 `tests/staffSegments.test.ts`, 5 đột biến rơi đúng dòng), lint 0 lỗi, build, audit:dead 0; UI mở trên bản build nối DB thật:
+  trình soạn hiện, kiểm lỗi trực tiếp; client chịu được thiếu bảng (404 → coi như chưa ca nào đổi người). **0138 ĐÃ CHẠY 06/10;** ghi thật qua RPC đã đo: ca VERA Shopee 25/06 nhập Trúc Như 0–120p + Thảo 120–150p, người chính trợ = Trúc Như, Sổ Ca hiện "Đổi người giữa ca", 0 request lỗi.
 - **06/10: lịch T10 chốt tay → nạp 330 ca Upcoming 06→31/10** từ bảng tính "Bảng tính không có tiêu đề.xlsx" (VERA TikTok 66/Shopee 84, JOCKEY TikTok 25,
   Franklin TikTok 48/Shopee 32, CROCS 75), ghi REST bằng phiên admin, không qua Kế Hoạch Tháng (lock_month_plan chỉ TikTok + mở đăng ký).
   Không có target (cột TARGET trống). Bỏ qua: 01–04/10 (đã nạp thật từ trước; 05/10 nạp bù thêm 2 ca VERA Shopee + CROCS TikTok, còn Upcoming), 16 dòng CANCLE, 36 ca brand JEW (chưa là
@@ -116,6 +128,7 @@
 ## 2. Việc còn treo
 
 **Cần user làm:**
+000000. 29 ca chưa host (user tự rà và gán sau): CROCS 21 (8 ca T6–T9 chờ user gửi, 11 ca 01–04/10, 21–22/10 11–14), VERA 7 (25/09, 26/09, 06/10, 18/10, 24/10, 25/10, 30/10), Franklin 26/09.
 00000. CROCS T10: user tự gán host cho các ca (gồm 11 ca 01–04/10 và 21/10, 22/10 11–14); tên thật của Mia/Su/Đạt; hồ sơ talent Hoàng Dung. Sửa target tạm 5,5 tỷ của Kế Hoạch Tháng nháp trước khi chốt (user bảo để yên tạm thời).
 0000. Up file Ads (TikTok Ads → "Campaign overview data", xem theo ngày, mỗi file một tháng) cho các tháng/brand khác
    có chạy Ads ở Nhập Ads — Franklin T8 để report T9 có cột so tháng trước. Muốn có "% ngân sách Ads" như deck
@@ -334,7 +347,7 @@
 - `date_trunc` trên cột `date` trong index phải ép `::timestamp`. Thông báo hàng loạt: đếm trước khi bắn (gom theo sự kiện lô).
 
 ### 5.5 Một khái niệm — một hàm (audit 28/09)
-"Ca có số" = `isCountable` (hostPerformance) · ca tính tiền = `isPnlSession` (pnl, từ 04/10 đòi `hasLiveEvidence`) · ca
+Ai đứng ca nào, bao lâu = `lib/staffSegments.ts` (`effectiveSegments`, `personRoleMinutes`, `personWindows`, `roleShares`) — ca không có đoạn thì host_id/co_host_id làm cả ca; mọi màn tính lương/giờ/trùng lịch/hiệu suất theo người PHẢI đi qua đây (hoặc `computeSessionPnl().payouts`, `hostPortions`), không đọc `hostId`/`coHostId` thô cho số liệu. "Ca có số" = `isCountable` (hostPerformance) · ca tính tiền = `isPnlSession` (pnl, từ 04/10 đòi `hasLiveEvidence`) · ca
 đã diễn ra thật = `hasLiveEvidence`, ca quá giờ chờ xác nhận = `isUnconfirmedPast`, ca có số ở DB (khoá dời giờ) =
 `hasSessionData` (cả ba ở sessionStatus) · khung camp hiệu lực = `effectiveCamp(planCamp, reportRow)` (campaignDays — MỌI
 màn; tháng CÓ Kế Hoạch Tháng ⇒ chỉ khung của kế hoạch, ô Nhập Ads chỉ hiện để đọc; tháng KHÔNG có kế hoạch ⇒ ô Nhập Ads —
@@ -373,7 +386,7 @@ tháng không có kế hoạch chỉ còn target khung camp nhập ở Nhập Ad
 
 ## 6. Hạ tầng Supabase
 
-- 136 migration (`supabase/migrations/`), chạy tay theo thứ tự — **`0136` ĐÃ CHẠY 05/10** (verify production: lô đối soát thử với phòng kết thúc đúng phút ca CROCS 30/09 11:01 bắt đầu ⇒ không khớp, phòng chồng 29 phút ⇒ khớp; lô thử đã xoá; trigger profiles nằm trước đoạn đó trong cùng file + chốt tự kiểm cuối file), bộ kiểm
+- 138 migration (`supabase/migrations/`), chạy tay theo thứ tự — **`0138` (đổi người giữa ca) ĐÃ CHẠY 06/10.** `0137` đã chạy 05/10. **`0136` ĐÃ CHẠY 05/10** (verify production: lô đối soát thử với phòng kết thúc đúng phút ca CROCS 30/09 11:01 bắt đầu ⇒ không khớp, phòng chồng 29 phút ⇒ khớp; lô thử đã xoá; trigger profiles nằm trước đoạn đó trong cùng file + chốt tự kiểm cuối file), bộ kiểm
   `supabase/tests/0136_profile_guard_recon_edges_lock_past.sql` (replay, DB trắng): 16 OK, đỏ khi thiếu 0136. **Tới `0132` đều ĐÃ CHẠY** (0131 + 0132 ngày 02/10);
   **`0133` ĐÃ CHẠY 04/10** (verify ở §1); **`0134` ĐÃ CHẠY 05/10** (verify: CRM không còn SĐT mẫu); **`0135` ĐÃ CHẠY 05/10** (verify: 4 brand KAM "Chưa chọn", form sửa cũng "Chưa chọn"). Lô đối soát cũ (06–09/2026, không gắn brand) không áp dụng lại được — đo
   04/10 nó chỉ khớp ca CROCS nên chưa có số nào bị chia nhầm. Replay `0001 → 0133`: sạch, chạy lần 2 không lỗi; bộ kiểm hành vi

@@ -1,5 +1,6 @@
 import { LiveSession } from "../../types";
-import { isCountable, sessionHours, weekdayOf } from "./hostPerformance";
+import { hostPortions, isCountable, sessionHours, weekdayOf } from "./hostPerformance";
+import { personRoleMinutes, sessionMinutes } from "../staffSegments";
 
 // Đưa tín hiệu hiệu suất vào ĐÚNG lúc ops chọn người (màn Đăng Ký & Chốt Lịch), thay vì bắt ops
 // nhớ số từ tab Hiệu Suất Host rồi nhảy màn hình. Cùng định nghĩa "ca đáng đếm" và "giờ" với
@@ -101,19 +102,26 @@ export function suggestHosts(
   for (const s of sessions) {
     // Mệt mỏi / công bằng: đếm cả vai trò trợ, cả ca sắp tới, trừ ca huỷ.
     if (slot && s.status !== "Cancelled") {
-      for (const pid of [s.hostId, s.coHostId]) {
+      // Đổi người giữa ca (0138): chỉ tính phần giờ người đó đứng ca.
+      const dur = sessionMinutes(s);
+      for (const pid of new Set([s.hostId, s.coHostId, ...(s.staffSegments ?? []).map((g) => g.talentId)])) {
         if (!pid || !ids.has(pid)) continue;
-        if (s.date >= weekStart && s.date <= weekEnd) weekHours.set(pid, (weekHours.get(pid) ?? 0) + sessionHours(s));
+        const mins = personRoleMinutes(s, pid, "host") + personRoleMinutes(s, pid, "co_host");
+        if (mins <= 0) continue;
+        if (s.date >= weekStart && s.date <= weekEnd) weekHours.set(pid, (weekHours.get(pid) ?? 0) + (dur > 0 ? sessionHours(s) * (mins / dur) : 0));
         if (s.date.startsWith(monthKey)) monthSessions.set(pid, (monthSessions.get(pid) ?? 0) + 1);
       }
     }
-    if (!s.hostId || !ids.has(s.hostId)) continue;
     if (!isCountable(s)) continue;
     if (sinceDate && s.date < sinceDate) continue;
-    overall.set(s.hostId, add(overall.get(s.hostId) ?? EMPTY, s));
-    if (brandId && s.brandId === brandId) byBrand.set(s.hostId, add(byBrand.get(s.hostId) ?? EMPTY, s));
-    if (weekdayOf(s.date) === weekday) byWeekday.set(s.hostId, add(byWeekday.get(s.hostId) ?? EMPTY, s));
-    if (slot && rangesOverlap(s.startTime, s.endTime, slot.startTime, slot.endTime)) byBlock.set(s.hostId, add(byBlock.get(s.hostId) ?? EMPTY, s));
+    // Đổi host giữa ca: mỗi host một phần (số + giờ chia theo giờ đứng ca).
+    for (const p of hostPortions(s)) {
+      if (!p.hostId || !ids.has(p.hostId)) continue;
+      overall.set(p.hostId, add(overall.get(p.hostId) ?? EMPTY, p));
+      if (brandId && p.brandId === brandId) byBrand.set(p.hostId, add(byBrand.get(p.hostId) ?? EMPTY, p));
+      if (weekdayOf(p.date) === weekday) byWeekday.set(p.hostId, add(byWeekday.get(p.hostId) ?? EMPTY, p));
+      if (slot && rangesOverlap(p.startTime, p.endTime, slot.startTime, slot.endTime)) byBlock.set(p.hostId, add(byBlock.get(p.hostId) ?? EMPTY, p));
+    }
   }
 
   const rows = candidateIds.map<HostSuggestion>((id) => {

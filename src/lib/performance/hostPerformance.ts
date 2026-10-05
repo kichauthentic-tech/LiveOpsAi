@@ -1,5 +1,6 @@
 import { LiveSession } from "../../types";
 import { sessionDurationHours } from "../pnl";
+import { hasStaffSegments, roleShares } from "../staffSegments";
 import type { CampDayBucket } from "../campaignDays";
 import { METRIC } from "../metricGlossary";
 import { addKeyInput, emptyKeyCounts, keyInputFromSession, keyMetrics, type KeyCounts, type KeyMetrics } from "../report/keyMetrics";
@@ -47,6 +48,32 @@ export function isCountable(s: LiveSession): boolean {
   return s.dataSource === "tiktok_reconciled" || s.dataSource === "live_snapshot" || (s.actualGmv ?? 0) > 0 || (s.totalViews ?? 0) > 0;
 }
 
+// Đổi HOST giữa ca (0138): GMV/đơn/view và giờ của ca chia cho từng host theo GIỜ HỌ ĐỨNG (không có hoa hồng GMV —
+// đây chỉ là cách gán số cho thước GMV/giờ). Ca không đổi host đi nguyên ca như cũ. Hàm idempotent: bản chia đã bỏ
+// staffSegments nên không bị chia lần hai.
+const SCALED_COUNTERS = [
+  "actualGmv", "totalOrders", "totalViews", "attributedItemsSold", "attributedSkuOrders", "impressions", "productImpressions",
+  "productClicks", "newFollowers", "commentsCount", "sharesCount", "likesCount"
+] as const satisfies readonly (keyof LiveSession)[];
+
+export function hostPortions(s: LiveSession): LiveSession[] {
+  if (!hasStaffSegments(s, "host")) return [s];
+  const shares = roleShares(s, "host");
+  if (shares.length === 0) return [s];
+  const hours = sessionHours(s);
+  return shares.map((p) => {
+    const part: LiveSession = { ...s, hostId: p.talentId, hostName: p.name, staffSegments: undefined, liveDurationMinutes: hours * p.share * 60 };
+    for (const f of SCALED_COUNTERS) {
+      const v = s[f];
+      if (typeof v === "number") (part as unknown as Record<string, number>)[f] = v * p.share;
+    }
+    return part;
+  });
+}
+
+export const expandHostPortions = (sessions: LiveSession[]): LiveSession[] =>
+  sessions.some((s) => hasStaffSegments(s, "host")) ? sessions.flatMap(hostPortions) : sessions;
+
 function addTo(acc: PerfTotals, s: LiveSession): PerfTotals {
   return addKeyInput(acc, keyInputFromSession(s, sessionHours(s)));
 }
@@ -70,14 +97,16 @@ export interface PerfFilter {
 }
 
 export function filterSessions(sessions: LiveSession[], f: PerfFilter): LiveSession[] {
-  return sessions.filter((s) => {
+  const kept = sessions.filter((s) => {
     if (!isCountable(s)) return false;
     if (f.from && s.date < f.from) return false;
     if (f.to && s.date > f.to) return false;
     if (f.brandId && s.brandId !== f.brandId) return false;
-    if (f.hostId && s.hostId !== f.hostId) return false;
     return true;
   });
+  if (!f.hostId) return kept;
+  // Lọc theo host: ca đổi host giữa ca chỉ trả PHẦN của host đó (số + giờ chia theo giờ đứng ca).
+  return kept.flatMap((s) => hostPortions(s).filter((p) => p.hostId === f.hostId));
 }
 
 export function dataQuality(sessions: LiveSession[]): DataQuality {
@@ -127,7 +156,7 @@ export function splitUnassignedHost(rows: PerfRow[]): { ranked: PerfRow[]; unass
 }
 
 export function byHost(sessions: LiveSession[]): PerfRow[] {
-  return groupBy(sessions, hostKey, (s) => ({ label: s.hostName || "Chưa gán host" }));
+  return groupBy(expandHostPortions(sessions), hostKey, (s) => ({ label: s.hostName || "Chưa gán host" }));
 }
 
 export const WEEKDAY_LABELS = ["Chủ nhật", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"];
@@ -158,7 +187,7 @@ export interface HostWeekdayCell {
 
 export function hostWeekdayGrid(sessions: LiveSession[]): HostWeekdayCell[] {
   const acc = new Map<string, PerfTotals>();
-  for (const s of sessions) {
+  for (const s of expandHostPortions(sessions)) {
     // Cùng công thức khoá với byHost() để lưới khớp đúng dòng xếp hạng.
     const k = `${hostKey(s)}::${weekdayOf(s.date)}`;
     acc.set(k, addTo(acc.get(k) ?? emptyKeyCounts(), s));
@@ -222,15 +251,30 @@ export function byHostDayType(sessions: LiveSession[], bucketOf: (date: string) 
   };
   for (const s of sessions) {
     const h = sessionHours(s);
-    const hk = hostKey(s);
-    if (hk !== UNASSIGNED_HOST_KEY) {
-      addPart(rowOf(hk, s.hostName).byBucket[bucketOf(s.date)], s, h);
+    // Đổi host giữa ca: mỗi host một phần (số + giờ chia theo giờ đứng ca).
+    const hostParts = hostPortions(s);
+    const hostKeys = new Set<string>();
+    for (const hp of hostParts) {
+      const hk = hostKey(hp);
+      hostKeys.add(hk);
+      if (hk !== UNASSIGNED_HOST_KEY) addPart(rowOf(hk, hp.hostName).byBucket[bucketOf(hp.date)], hp, sessionHours(hp));
     }
-    const ck = coHostKey(s);
-    if (ck && ck !== hk) {
-      const part = rowOf(ck, s.coHostName).assist;
-      part.sessions += 1;
-      part.hours += h;
+    // Trợ live: mỗi người một phần giờ (đổi trợ giữa ca thì giờ chia theo giờ đứng ca).
+    const coShares = hasStaffSegments(s, "co_host") ? roleShares(s, "co_host") : null;
+    if (coShares) {
+      for (const p of coShares) {
+        if (hostKeys.has(p.talentId)) continue;
+        const part = rowOf(p.talentId, p.name).assist;
+        part.sessions += 1;
+        part.hours += h * p.share;
+      }
+    } else {
+      const ck = coHostKey(s);
+      if (ck && !hostKeys.has(ck)) {
+        const part = rowOf(ck, s.coHostName).assist;
+        part.sessions += 1;
+        part.hours += h;
+      }
     }
   }
   return [...rows.values()].sort((a, b) => hostGmvTotal(b) - hostGmvTotal(a) || b.assist.hours - a.assist.hours);

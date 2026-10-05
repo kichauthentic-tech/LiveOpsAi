@@ -168,7 +168,7 @@ export function buildTodos(input: TodoInput): Todo[] {
   // Rate talent (chỉ CEO/admin thấy rate): host/trợ đã chạy ca mà chưa có rate nào.
   if (input.canSeeMoney) {
     const worked = new Set<string>();
-    for (const s of sessions) if (s.status !== "Cancelled" && s.date <= today) { if (s.hostId) worked.add(s.hostId); if (s.coHostId) worked.add(s.coHostId); }
+    for (const s of sessions) if (s.status !== "Cancelled" && s.date <= today) { if (s.hostId) worked.add(s.hostId); if (s.coHostId) worked.add(s.coHostId); for (const g of s.staffSegments ?? []) worked.add(g.talentId); }
     const missing = input.talents.filter((t) => worked.has(t.id) && !t.rateHidden && !(t.ratePerHour > 0) && !(t.ratePerSession > 0) && !(t.assistantRatePerHour && t.assistantRatePerHour > 0));
     if (missing.length > 0) {
       out.push({ id: "talent-rate", level: "low", title: `${missing.length} talent đã chạy ca nhưng chưa có rate`, detail: "Chưa có rate thì lương và lãi/lỗ từng ca chưa tính được.", tab: "talents", action: "Mở Talent Pool" });

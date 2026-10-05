@@ -270,7 +270,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                 </tr>
               </thead>
               <tbody>
-                {rows.map(({ session: s, finance, talent, isHourly, grossAgencyRev, hostPayout, netProfit, hostPaidHourly, billableHours, otMinutes, earlyLeaveMinutes, coHost, coHostPayout, coHostPaidHourly, coHostUsesAssistantRate, missingInputs, excluded }) => {
+                {rows.map(({ session: s, finance, talent, isHourly, grossAgencyRev, hostPayout, netProfit, hostPaidHourly, billableHours, otMinutes, earlyLeaveMinutes, coHost, coHostPayout, coHostPaidHourly, coHostUsesAssistantRate, missingInputs, excluded, payouts, segmented }) => {
                   return (
                   <tr key={s.id} className="border-b border-[var(--border)]/60 align-middle">
                     <td className="py-2 pr-3">
@@ -339,7 +339,17 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                         công thực tế + phần OT/off sớm host đã khai, để ops đối chiếu khi duyệt. */}
                     <td className="py-2 pr-3">
                       <div className="text-amber-400 font-bold">{money(hostPayout)}</div>
-                      {hostPaidHourly && (
+                      {/* Đổi người giữa ca (0138): mỗi người một dòng — công theo giờ của chính họ. */}
+                      {segmented && (
+                        <div className="text-[11px] text-[var(--text-muted)] mt-0.5 space-y-0.5">
+                          {payouts.map((p) => (
+                            <div key={`${p.role}-${p.talentId}`}>
+                              {p.role === "host" ? "Host" : "Trợ"} {p.name}: {fmtFixed(p.hours, 2)}h · <b>{p.missingRate ? "chưa có rate" : money(p.payout)}</b>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {!segmented && hostPaidHourly && (
                         <div className="text-[11px] text-[var(--text-muted)] mt-0.5">
                           {fmtFixed(billableHours, 2)}h × rate/giờ
                           {otMinutes > 0 && <span className="text-emerald-400 font-bold"> · OT +{otMinutes}p</span>}
@@ -349,7 +359,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                       {/* Trợ live có công (user chốt 2026-09-18) — hiện tách dòng để ops thấy Net
                           Profit trừ những ai. Ca có co_host_id nhưng talent đã bị xoá thì không
                           tính được, phải nói ra chứ không im lặng ra 0. */}
-                      {coHost ? (
+                      {segmented ? null : coHost ? (
                         <div className="text-[11px] text-amber-300/80 mt-1">
                           Trợ live {coHost.name}: <b>{money(coHostPayout)}</b>
                           {coHostPaidHourly && <span className="text-[var(--text-muted)]"> ({fmtFixed(billableHours, 2)}h × {coHostUsesAssistantRate ? "rate trợ/giờ" : "rate host/giờ — chưa đặt rate trợ"})</span>}

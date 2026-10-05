@@ -6,7 +6,8 @@ import { ErrorBoundary } from "./lib/errorReporting";
 import { fetchTalents, updateTalent, updateMyTalentProfile, deleteTalent } from "./lib/db/talents";
 import { createStudio, updateStudio, deleteStudio } from "./lib/db/studios";
 import { createEquipment, updateEquipment, deleteEquipment } from "./lib/db/equipments";
-import { fetchSessions, finalizeShiftSlot, updateSession, deleteSession, cancelSession, setSessionExcluded } from "./lib/db/sessions";
+import { fetchSessions, finalizeShiftSlot, updateSession, deleteSession, cancelSession, setSessionExcluded, setSessionStaffSegments } from "./lib/db/sessions";
+import { SessionActionsContext } from "./lib/sessionActionsContext";
 import { submitSessionReport, SessionReportInput } from "./lib/db/sessionReports";
 import { createBrand, updateBrand, deleteBrand } from "./lib/db/brands";
 import { fetchUsers, updateUserProfile, inviteUser, deleteUserAccount, InviteUserPayload } from "./lib/db/users";
@@ -902,6 +903,22 @@ export default function App() {
       return false;
     }
   };
+  // Đổi người giữa ca (0138): ghi đoạn giờ từng người, RPC tự đồng bộ người chính của ca → state lấy lại bản ca đầy đủ.
+  const handleSetStaffSegments = async (session: LiveSession, segments: Parameters<typeof setSessionStaffSegments>[1], reason: string): Promise<boolean> => {
+    try {
+      const saved = await setSessionStaffSegments(session.id, segments);
+      setSessions((prev) => prev.map((x) => (x.id === saved.id ? saved : x)));
+      await pushAuditLog({
+        action: "Đổi người giữa ca",
+        details: `Ca ${session.date} ${session.startTime}-${session.endTime} (${session.brandName}): ${segments.length === 0 ? "bỏ chia đoạn, host/trợ làm cả ca" : `${segments.length} đoạn giờ`}. Lý do: ${reason.trim() || "Không ghi lý do"}.`,
+        category: "Security Alert"
+      });
+      return true;
+    } catch (e) {
+      showToast(`Không thể lưu người theo đoạn giờ: ${errorMessage(e)}`);
+      return false;
+    }
+  };
   const handleSubmitSessionReport = async (sessionId: string, input: SessionReportInput): Promise<boolean> => {
     try {
       const saved = await submitSessionReport(sessionId, input);
@@ -1340,6 +1357,7 @@ export default function App() {
   }
 
   return (
+    <SessionActionsContext.Provider value={{ setStaffSegments: handleSetStaffSegments }}>
     <div className="flex h-screen w-full bg-[var(--surface-base)] text-[var(--text)] overflow-hidden font-sans antialiased selection:bg-[var(--accent)] selection:text-white">
       {/* Left Sidebar Navigation */}
       <AppSidebar
@@ -2091,6 +2109,7 @@ export default function App() {
         </main>
       </div>
     </div>
+    </SessionActionsContext.Provider>
   );
 }
 

@@ -10,6 +10,7 @@ import {
 } from "../types";
 import { getCanonicalAdsCost } from "./metrics/adsCost";
 import { hasLiveEvidence } from "./sessionStatus";
+import { hasStaffSegments, segmentsOfRole, sessionMinutes, type StaffRole } from "./staffSegments";
 
 export const DEFAULT_FINANCE: Omit<SessionFinance, "sessionId"> = {
   agencyCommissionRate: 15,
@@ -92,6 +93,23 @@ export interface SessionPnl {
   // #6), nhưng phần theo GMV (doanh thu agency, hoa hồng host/trợ) = 0, vì GMV của ca đó bị coi là không dùng
   // được và brand không thấy ca đó trong số đã giao.
   excluded: boolean;
+  // Công từng người (migration 0138): ca không đổi người có đúng host (+ trợ); ca đổi người giữa ca có một dòng mỗi
+  // người. hostPayout / coHostPayout ở trên là TỔNG các dòng cùng vai.
+  payouts: PersonPayout[];
+  segmented: boolean;
+}
+
+export interface PersonPayout {
+  talentId: string;
+  name: string;
+  role: StaffRole;
+  /** Giờ tính lương của người này trong ca (đã cộng OT / trừ off sớm nếu họ là người cuối ca). */
+  hours: number;
+  payout: number;
+  /** Rate theo giờ (true) hay theo phiên chia theo giờ làm (false). */
+  paidHourly: boolean;
+  /** Người này không có rate/hoa hồng nào ⇒ công 0 là "chưa biết". */
+  missingRate: boolean;
 }
 
 export type PnlMissingInput =
@@ -163,7 +181,7 @@ export function computeSessionPnl(
     : isHourly
       ? sessionDurationHours(session.startTime, session.endTime) * hourlyRate
       : (estimatedNmv * finance.agencyCommissionRate) / 100;
-  const hostPayout = hostFixRate + (gmv * hostCommRate) / 100;
+  let hostPayout = hostFixRate + (gmv * hostCommRate) / 100;
 
   // OT/off sớm khai theo CA (report là của ca, không phải của từng người) nên giờ tính lương của
   // trợ live = giờ tính lương của host trong cùng ca.
@@ -180,7 +198,63 @@ export function computeSessionPnl(
       : coHostRateAtDate?.ratePerSession ?? coHost.ratePerSession ?? 0
     : 0;
   const coHostCommRate = coHost ? coHostRateAtDate?.commissionRate ?? coHost.commissionRate ?? 0 : 0;
-  const coHostPayout = coHost ? coHostFixRate + (gmv * coHostCommRate) / 100 : 0;
+  let coHostPayout = coHost ? coHostFixRate + (gmv * coHostCommRate) / 100 : 0;
+
+  const segmented = hasStaffSegments(session);
+  let payouts: PersonPayout[];
+  if (!segmented) {
+    payouts = [];
+    if (talent) {
+      payouts.push({ talentId: talent.id, name: talent.name, role: "host", hours: billableHours, payout: hostPayout, paidHourly: hostPaidHourly, missingRate: hostFixRate <= 0 && hostCommRate <= 0 });
+    }
+    if (coHost) {
+      payouts.push({ talentId: coHost.id, name: coHost.name, role: "co_host", hours: billableHours, payout: coHostPayout, paidHourly: coHostPaidHourly, missingRate: coHostFixRate <= 0 && coHostCommRate <= 0 });
+    }
+  } else {
+    // Đổi người giữa ca (0138): mỗi người ăn công theo GIỜ CỦA MÌNH. Rate theo giờ ⇒ rate x giờ; rate theo phiên (hoặc
+    // override tay ở Finance, vốn là số cố định cho cả ca) ⇒ chia theo phần giờ làm trong ca. OT/off sớm gắn vào người
+    // đứng tới cuối ca của vai đó. Không có hoa hồng GMV theo người ở đây (user chốt 06/10) — phần % nếu có chỉ chia
+    // theo phần giờ, giữ công thức cũ cho ca không đổi người.
+    const durMin = sessionMinutes(session);
+    const adjHours = ((session.report?.otMinutes ?? 0) - (session.report?.earlyLeaveMinutes ?? 0)) / 60;
+    payouts = [];
+    for (const role of ["host", "co_host"] as const) {
+      const segs = segmentsOfRole(session, role);
+      const byPerson = new Map<string, { name: string; minutes: number; endsAtEnd: boolean }>();
+      for (const g of segs) {
+        const cur = byPerson.get(g.talentId) ?? { name: g.talentName, minutes: 0, endsAtEnd: false };
+        cur.minutes += g.toMin - g.fromMin;
+        if (g.toMin >= durMin) cur.endsAtEnd = true;
+        if (!cur.name && g.talentName) cur.name = g.talentName;
+        byPerson.set(g.talentId, cur);
+      }
+      for (const [talentId, v] of byPerson) {
+        const t = talentById[talentId];
+        const r = t ? findTalentRateAsOf(talentRateHistory, talentId, session.date) : undefined;
+        const hours = Math.max(0, v.minutes / 60 + (v.endsAtEnd ? adjHours : 0));
+        const share = durMin > 0 ? v.minutes / durMin : 0;
+        let hourRate: number;
+        let comm: number;
+        let override: number | undefined;
+        if (role === "host") {
+          hourRate = r?.ratePerHour ?? t?.ratePerHour ?? 0;
+          comm = finance.hostCommissionRateOverride ?? r?.commissionRate ?? t?.commissionRate ?? 0;
+          override = finance.hostFixRateOverride;
+        } else {
+          const assistantRate = r?.assistantRatePerHour ?? t?.assistantRatePerHour ?? 0;
+          hourRate = assistantRate > 0 ? assistantRate : r?.ratePerHour ?? t?.ratePerHour ?? 0;
+          comm = r?.commissionRate ?? t?.commissionRate ?? 0;
+          override = undefined;
+        }
+        const paidHourly = override === undefined && hourRate > 0;
+        const fix = paidHourly ? hourRate * hours : (override ?? r?.ratePerSession ?? t?.ratePerSession ?? 0) * share;
+        const pay = fix + (gmv * comm * share) / 100;
+        payouts.push({ talentId, name: t?.name ?? v.name, role, hours, payout: pay, paidHourly, missingRate: fix <= 0 && comm <= 0 });
+      }
+    }
+    hostPayout = payouts.filter((x) => x.role === "host").reduce((sum, x) => sum + x.payout, 0);
+    coHostPayout = payouts.filter((x) => x.role === "co_host").reduce((sum, x) => sum + x.payout, 0);
+  }
 
   const totalCost = hostPayout + coHostPayout + finance.studioCost + getCanonicalAdsCost(session, finance);
   const netProfit = grossAgencyRev - totalCost;
@@ -189,8 +263,14 @@ export function computeSessionPnl(
   // trên, không bám vào `talent.ratePerHour` thô — override tay ở Finance (hostFixRateOverride)
   // là ops đã chốt số nên KHÔNG coi là thiếu.
   const missingInputs: PnlMissingInput[] = [];
-  if (hostFixRate <= 0 && hostCommRate <= 0) missingInputs.push("host_rate");
-  if (coHost && coHostFixRate <= 0 && coHostCommRate <= 0) missingInputs.push("cohost_rate");
+  const hostRateMissing = segmented
+    ? !payouts.some((x) => x.role === "host") || payouts.some((x) => x.role === "host" && x.missingRate)
+    : hostFixRate <= 0 && hostCommRate <= 0;
+  const coHostRateMissing = segmented
+    ? payouts.some((x) => x.role === "co_host" && x.missingRate)
+    : !!coHost && coHostFixRate <= 0 && coHostCommRate <= 0;
+  if (hostRateMissing) missingInputs.push("host_rate");
+  if (coHostRateMissing) missingInputs.push("cohost_rate");
   if (isHourly && hourlyRate <= 0) missingInputs.push("brand_rate");
   // Chỉ là "mặc định" khi KHÔNG có dòng session_finance cho ca này VÀ brand chưa đặt % hoa hồng (0118) —
   // ops đã vào sửa thì con số 15% là do họ chọn giữ, không phải app tự bịa.
@@ -207,7 +287,9 @@ export function computeSessionPnl(
     coHost,
     coHostPayout,
     coHostPaidHourly,
-    coHostUsesAssistantRate: !!coHost && coHostAssistantRate > 0
+    coHostUsesAssistantRate: !!coHost && coHostAssistantRate > 0,
+    payouts,
+    segmented
   };
 }
 
@@ -253,17 +335,12 @@ export function computeTalentMonthlyIncome(
   let missingRate = false;
   for (const session of sessions) {
     if (!isPnlSession(session, { includeBackfill: false }) || !session.date.startsWith(month)) continue;
-    const isHost = session.hostId === talentId;
-    const isCoHost = session.coHostId === talentId;
-    if (!isHost && !isCoHost) continue;
     const pnl = computeSessionPnl(session, financeBySessionId, talentById, {}, [], talentRateHistory, []);
-    if (isHost) {
-      rows.push({ session, role: "host", payout: pnl.hostPayout, billableHours: pnl.billableHours });
-      if (pnl.missingInputs.includes("host_rate")) missingRate = true;
-    }
-    if (isCoHost) {
-      rows.push({ session, role: "co_host", payout: pnl.coHostPayout, billableHours: pnl.billableHours });
-      if (pnl.missingInputs.includes("cohost_rate")) missingRate = true;
+    // Mỗi người một dòng công — ca đổi người giữa ca (0138) thì người này chỉ ăn phần giờ của mình.
+    for (const p of pnl.payouts) {
+      if (p.talentId !== talentId) continue;
+      rows.push({ session, role: p.role, payout: p.payout, billableHours: p.hours });
+      if (p.missingRate) missingRate = true;
     }
   }
   rows.sort((a, b) => (a.session.date < b.session.date ? 1 : -1));

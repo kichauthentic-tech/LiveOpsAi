@@ -3,7 +3,7 @@ import { addDays, eachDay, isoWeekStart } from "../dateUtils";
 import { isPnlSession, sessionDurationHours } from "../pnl";
 import { CampDayBucket, CampOverrides, CAMP_DAY_BUCKET_ORDER, resolveCampBucketType } from "../campaignDays";
 import { MonthTargetPlan } from "./targetAllocation";
-import { isCountable, sessionHours } from "./hostPerformance";
+import { expandHostPortions, isCountable, sessionHours } from "./hostPerformance";
 import { keyMetricsOfSessions, type KeyMetrics } from "../report/keyMetrics";
 
 // Bản Tin CEO (2026-09-25) — thay Toàn Cảnh Agency. File thuần: không đụng Supabase, test bằng vitest.
@@ -553,7 +553,8 @@ function staffBy(sessions: LiveSession[], prev: LiveSession[], keyOf: (s: LiveSe
 export const hostKeyOf = (s: LiveSession) => s.hostId || (s.hostName ? `ten:${s.hostName}` : UNASSIGNED);
 export const assistantKeyOf = (s: LiveSession) => s.coHostId || (s.coHostName ? `ten:${s.coHostName}` : UNASSIGNED);
 
-export const hostRows = (cur: LiveSession[], prev: LiveSession[]) => staffBy(cur, prev, hostKeyOf, (s) => s.hostName);
+// Đổi host giữa ca (0138): mỗi host một phần số + giờ theo giờ đứng ca.
+export const hostRows = (cur: LiveSession[], prev: LiveSession[]) => staffBy(expandHostPortions(cur), expandHostPortions(prev), hostKeyOf, (s) => s.hostName);
 export const assistantRows = (cur: LiveSession[], prev: LiveSession[]) => staffBy(cur, prev, assistantKeyOf, (s) => s.coHostName);
 
 export interface PairRow {
@@ -687,7 +688,7 @@ export function buildIssues(x: IssueInput): Issue[] {
   const cur = x.periodSessions.filter(isCountable);
   const hrs = new Map<string, { name: string; h: number }>();
   let totalH = 0;
-  for (const s of cur) {
+  for (const s of expandHostPortions(cur)) {
     totalH += sessionHours(s);
     const k = hostKeyOf(s);
     if (k === UNASSIGNED) continue;

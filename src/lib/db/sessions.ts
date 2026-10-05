@@ -1,7 +1,7 @@
 import { supabase } from "../supabaseClient";
 import { assertAffected } from "./assertAffected";
 import { fetchAllPages } from "./fetchAllPages";
-import { LiveSession, LiveSessionReport, UserRole } from "../../types";
+import { LiveSession, LiveSessionReport, StaffSegment, UserRole } from "../../types";
 
 // brands/studios/talents are all real Supabase tables now (Phases 1/3) and every
 // UI form selects these IDs from the real lists — no more free-text fallback, so
@@ -249,13 +249,16 @@ function sessionToDb(s: LiveSession) {
 
 // Report của từng ca. (Ba bảng con session_skus/checklist/minute_metrics — di sản Live Sessions Hub,
 // 0 dòng, không màn nào đọc — đã bỏ hẳn ở migration 0132.)
-async function fetchChildRowsForSessions(sessionIds: string[]): Promise<{ reports: DbSessionReport[] }> {
-  if (sessionIds.length === 0) return { reports: [] };
+async function fetchChildRowsForSessions(sessionIds: string[]): Promise<{ reports: DbSessionReport[]; segments: DbStaffSegment[] }> {
+  if (sessionIds.length === 0) return { reports: [], segments: [] };
   // Đường MỞ MỘT CA (SessionWindow, sau khi lưu): lọc đúng ca đó. Danh sách luôn ngắn nên không
   // cần chia lô — đường nạp cả Sổ Ca đã tách sang fetchAllReports() bên dưới.
-  const { data, error } = await supabase.from("live_session_reports").select("*").in("session_id", sessionIds);
-  if (error) throw error;
-  return { reports: (data as DbSessionReport[]) ?? [] };
+  const [rep, seg] = await Promise.all([
+    supabase.from("live_session_reports").select("*").in("session_id", sessionIds),
+    supabase.from("session_staff_segments").select("*").in("session_id", sessionIds)
+  ]);
+  if (rep.error) throw rep.error;
+  return { reports: (rep.data as DbSessionReport[]) ?? [], segments: segmentsOrEmpty(seg) };
 }
 
 // Đường NẠP CẢ SỔ CA — KHÔNG lọc theo session_id, chỉ cuộn trang.
@@ -286,15 +289,58 @@ async function fetchAllReports(): Promise<DbSessionReport[]> {
   );
 }
 
-function assembleSessions(rows: DbLiveSession[], reports: DbSessionReport[]): LiveSession[] {
+// Đoạn giờ đổi người giữa ca (0138). Bảng mới có thể CHƯA có trên production (client deploy trước migration) —
+// khi đó coi như không ca nào đổi người, đúng hành vi cũ, thay vì làm hỏng cả màn nạp ca.
+interface DbStaffSegment {
+  session_id: string;
+  talent_id: string;
+  talent_name: string;
+  role: StaffSegment["role"];
+  from_min: number;
+  to_min: number;
+}
+const TABLE_MISSING = new Set(["PGRST205", "42P01"]);
+function segmentsOrEmpty(res: { data: unknown; error: { code?: string } | null }): DbStaffSegment[] {
+  if (res.error) {
+    if (res.error.code && TABLE_MISSING.has(res.error.code)) return [];
+    throw res.error;
+  }
+  return (res.data as DbStaffSegment[]) ?? [];
+}
+
+async function fetchAllSegments(): Promise<DbStaffSegment[]> {
+  const out: DbStaffSegment[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const res = await supabase
+      .from("session_staff_segments")
+      .select("*")
+      .order("session_id", { ascending: true })
+      .order("from_min", { ascending: true })
+      .range(from, from + PAGE - 1);
+    const rows = segmentsOrEmpty(res);
+    out.push(...rows);
+    if (rows.length < PAGE) break;
+  }
+  return out;
+}
+
+function assembleSessions(rows: DbLiveSession[], reports: DbSessionReport[], segments: DbStaffSegment[] = []): LiveSession[] {
   // Index trước thay vì .find() trong vòng lặp — assemble chạy trên toàn bộ ca mỗi lần nạp lại.
   const reportBySessionId = new Map<string, DbSessionReport>();
   for (const r of reports) reportBySessionId.set(r.session_id, r);
+  const segBySessionId = new Map<string, StaffSegment[]>();
+  for (const g of segments) {
+    const list = segBySessionId.get(g.session_id) ?? [];
+    list.push({ talentId: g.talent_id, talentName: g.talent_name ?? "", role: g.role, fromMin: g.from_min, toMin: g.to_min });
+    segBySessionId.set(g.session_id, list);
+  }
   return rows.map((row) => {
     const report = reportBySessionId.get(row.id);
+    const staffSegments = segBySessionId.get(row.id);
     return {
       ...sessionFromDb(row),
-      report: report ? reportFromDb(report) : undefined
+      report: report ? reportFromDb(report) : undefined,
+      ...(staffSegments ? { staffSegments } : {})
     };
   });
 }
@@ -340,8 +386,8 @@ export async function completePastSessions(): Promise<number> {
 
 export async function fetchSessions(): Promise<LiveSession[]> {
   // Hai lượt đọc này độc lập nhau — nối tiếp chỉ cộng dồn RTT vô ích.
-  const [rows, reports] = await Promise.all([fetchAllSessionRows(), fetchAllReports()]);
-  return assembleSessions(rows, reports);
+  const [rows, reports, segments] = await Promise.all([fetchAllSessionRows(), fetchAllReports(), fetchAllSegments()]);
+  return assembleSessions(rows, reports, segments);
 }
 
 // Chốt người cho ca chờ đăng ký (0133): tạo ca + đánh dấu slot "finalized" trong MỘT transaction, khoá dòng
@@ -364,8 +410,8 @@ export async function updateSession(session: LiveSession): Promise<LiveSession> 
   });
   if (error) throw error;
   const row = data as DbLiveSession;
-  const { reports } = await fetchChildRowsForSessions([row.id]);
-  return assembleSessions([row], reports)[0];
+  const { reports, segments } = await fetchChildRowsForSessions([row.id]);
+  return assembleSessions([row], reports, segments)[0];
 }
 
 // Dùng sau khi gọi RPC submit_live_session_report (src/lib/db/sessionReports.ts) — RPC đó chỉ
@@ -378,8 +424,8 @@ export async function fetchSessionById(id: string): Promise<LiveSession> {
   }
   if (error) throw error;
   const row = data as DbLiveSession;
-  const { reports } = await fetchChildRowsForSessions([row.id]);
-  return assembleSessions([row], reports)[0];
+  const { reports, segments } = await fetchChildRowsForSessions([row.id]);
+  return assembleSessions([row], reports, segments)[0];
 }
 
 // Huỷ ca (0097): ca -> Cancelled + slot đã chốt -> cancelled trong 1 transaction; chặn nếu ca đã có số.
@@ -389,8 +435,8 @@ export async function cancelSession(id: string, reason: string, reopenSlot = fal
   const { data, error } = await supabase.rpc("cancel_session", { p_session_id: id, p_reason: reason, p_reopen_slot: reopenSlot });
   if (error) throw error;
   const rows = [data as DbLiveSession];
-  const { reports } = await fetchChildRowsForSessions([id]);
-  return assembleSessions(rows, reports)[0];
+  const { reports, segments } = await fetchChildRowsForSessions([id]);
+  return assembleSessions(rows, reports, segments)[0];
 }
 
 // Loại ca khỏi báo cáo / đưa trở lại (0114). Đường THAY THẾ cho việc xoá cứng khi ca đã có số:
@@ -403,12 +449,23 @@ export async function setSessionExcluded(id: string, excluded: boolean, reason =
     p_reason: reason
   });
   if (error) throw error;
-  const { reports } = await fetchChildRowsForSessions([id]);
-  return assembleSessions([data as DbLiveSession], reports)[0];
+  const { reports, segments } = await fetchChildRowsForSessions([id]);
+  return assembleSessions([data as DbLiveSession], reports, segments)[0];
 }
 
 export async function deleteSession(id: string): Promise<void> {
   const { data, error } = await supabase.from("live_sessions").delete().eq("id", id).select("id");
   if (error) throw error;
   assertAffected(data, "xoá ca");
+}
+
+// Đổi người giữa ca (0138): thay TOÀN BỘ đoạn giờ của ca trong một transaction; mảng rỗng = về cách tính cũ (host/trợ
+// làm cả ca). RPC tự đồng bộ host_id/co_host_id về người chính của vai có đoạn nên trả lại ca đã nạp lại đầy đủ.
+export async function setSessionStaffSegments(sessionId: string, segments: Pick<StaffSegment, "talentId" | "role" | "fromMin" | "toMin">[]): Promise<LiveSession> {
+  const { error } = await supabase.rpc("set_session_staff_segments", {
+    p_session_id: sessionId,
+    p_segments: segments.map((g) => ({ talent_id: g.talentId, role: g.role, from_min: g.fromMin, to_min: g.toMin }))
+  });
+  if (error) throw error;
+  return fetchSessionById(sessionId);
 }

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useContext, useEffect, useMemo, useState } from "react";
 import { SESSION_STATUS_CLS, SESSION_STATUS_LABEL_VI } from "../lib/sessionStatusUi";
 import { hasSessionData, isUnconfirmedPast } from "../lib/sessionStatus";
 import { AlertTriangle, Ban, CheckCircle2, Circle, EyeOff, Hand, Link2, Pencil, RotateCcw, Trash2, X } from "lucide-react";
@@ -26,6 +26,9 @@ import { SessionLiveSnapshotUpload } from "./SessionLiveSnapshotUpload";
 import { SessionReportForm } from "./SessionReportForm";
 import { useToast } from "../hooks/useToast";
 import { useConfirm } from "../hooks/useConfirm";
+import { SessionActionsContext } from "../lib/sessionActionsContext";
+import { describeStaff, hasStaffSegments } from "../lib/staffSegments";
+import { StaffSegmentsEditor } from "./StaffSegmentsEditor";
 import { metricHint } from "../lib/metricGlossary";
 
 // Cửa sổ Ca Live — MỘT cửa sổ chi tiết cho một ca, dùng chung cho mọi nơi click vào ca (Sổ Ca,
@@ -116,6 +119,8 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
 }) => {
   const { showToast } = useToast();
   const confirm = useConfirm();
+  const sessionActions = useContext(SessionActionsContext);
+  const [segOpen, setSegOpen] = useState(false);
   const isBrandView = viewer.role === "brand";
   const isOps = OPS_ROLES.includes(viewer.role);
   const isMine = !!viewer.myTalentId && (viewer.myTalentId === s.hostId || viewer.myTalentId === s.coHostId);
@@ -125,7 +130,8 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
   const canSnapshot = !isBrandView && (isOps || isMine) && !s.isBackfill && !!onSessionSnapshotApplied;
   const canEdit = isOps && !!onUpdateSession && !!studios && !!talents;
   // 0133: DB không cho dời ngày/giờ ca đã có số (ranh giới snapshot/đối soát tính theo giờ ca).
-  const scheduleLocked = hasSessionData(s);
+  // 0138: ca đã chia người theo đoạn giờ cũng khoá giờ (offset phút của đoạn sẽ lệch) — bỏ chia đoạn trước khi dời.
+  const scheduleLocked = hasSessionData(s) || hasStaffSegments(s);
   // Brand + tháng chưa phát hành Report Tháng (0107): view đã che số về null/0, cửa sổ này phải
   // nói rõ lý do thay vì hiện "—" như ca chưa có số.
   const hideMetrics = metricsHiddenFor(s, viewer.role);
@@ -150,6 +156,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
   useEffect(() => {
     setEditingReport(false);
     setEditing(false);
+    setSegOpen(false);
     setEdit({ date: s.date, startTime: s.startTime, endTime: s.endTime, studioId: s.studioId, hostId: s.hostId, coHostId: s.coHostId ?? "" });
     // Chỉ reset khi MỞ MỘT CA KHÁC. Nghe theo exhaustive-deps (thêm s.date/s.startTime/...) thì mỗi
     // lần refetch nền trả về ca có giá trị đổi sẽ xoá sạch phần ops đang sửa giữa dòng.
@@ -292,6 +299,11 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                   {!isBrandView && s.coHostName ? ` · Trợ ${s.coHostName}` : ""}
                   {!isBrandView && s.studioName ? ` · ${s.studioName}` : ""}
                 </p>
+                {!isBrandView && hasStaffSegments(s) && (
+                  <p className="text-[11px] text-amber-300 truncate" title={describeStaff(s).join(" · ")}>
+                    Đổi người giữa ca — {describeStaff(s).join(" · ")}
+                  </p>
+                )}
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-1.5 mt-2">
@@ -372,7 +384,9 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
               </div>
               {scheduleLocked && (
                 <p className="text-[11px] text-[var(--text-muted)]">
-                  Ca đã có số liệu nên không dời ngày/giờ được — ranh giới snapshot và đối soát tính theo giờ ca. Vẫn đổi được phòng, Host, Trợ live.
+                  {hasSessionData(s)
+                    ? "Ca đã có số liệu nên không dời ngày/giờ được — ranh giới snapshot và đối soát tính theo giờ ca. Vẫn đổi được phòng, Host, Trợ live."
+                    : "Ca đang chia người theo đoạn giờ nên không dời giờ được — bỏ chia đoạn (Đổi người giữa ca) trước."}
                 </p>
               )}
               <label className="block"><span className="font-bold text-[var(--text-muted)] block mb-1">Phòng Studio</span>
@@ -382,18 +396,26 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
               </label>
               <div className="grid grid-cols-2 gap-2">
                 <label className="block"><span className="font-bold text-[var(--text-muted)] block mb-1">Host</span>
-                  <select value={edit.hostId} onChange={(e) => setEdit({ ...edit, hostId: e.target.value })} className={inputCls}>
+                  <select value={edit.hostId} disabled={hasStaffSegments(s, "host")} onChange={(e) => setEdit({ ...edit, hostId: e.target.value })} className={`${inputCls} disabled:opacity-60`}>
                     <option value="">-- Chưa gán --</option>
                     {talents!.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                   </select>
                 </label>
                 <label className="block"><span className="font-bold text-[var(--text-muted)] block mb-1">Trợ live</span>
-                  <select value={edit.coHostId} onChange={(e) => setEdit({ ...edit, coHostId: e.target.value })} className={inputCls}>
+                  <select value={edit.coHostId} disabled={hasStaffSegments(s, "co_host")} onChange={(e) => setEdit({ ...edit, coHostId: e.target.value })} className={`${inputCls} disabled:opacity-60`}>
                     <option value="">-- Không có --</option>
                     {talents!.filter((t) => t.id !== edit.hostId).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                   </select>
                 </label>
               </div>
+              {(hasStaffSegments(s, "host") || hasStaffSegments(s, "co_host")) && (
+                <p className="text-[11px] text-[var(--text-muted)]">Vai đang chia theo đoạn giờ nên không đổi ở đây — dùng “Đổi người giữa ca”.</p>
+              )}
+              {sessionActions.setStaffSegments && (
+                <button type="button" onClick={() => setSegOpen((v) => !v)} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] text-[var(--text)] font-bold text-[11px]">
+                  {segOpen ? "Ẩn “Đổi người giữa ca”" : hasStaffSegments(s) ? "Sửa đổi người giữa ca" : "Đổi người giữa ca (vào thay / ra sớm)"}
+                </button>
+              )}
               {peopleChanged && (
                 <label className="block"><span className="font-bold text-amber-300 block mb-1">Lý do đổi người <span className="font-normal text-[var(--text-faint)]">(báo bận, đổi ca…) — ghi vào nhật ký, người mới/cũ được báo</span></span>
                   <input type="text" value={changeReason} onChange={(e) => setChangeReason(e.target.value)} placeholder="Vd: Host báo bận đột xuất" className={inputCls} />
@@ -405,6 +427,16 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                 <button onClick={saveEdit} disabled={saving} className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-60 text-white font-bold text-[11px]">{saving ? "Đang lưu..." : "Lưu thay đổi"}</button>
               </div>
             </section>
+          )}
+
+          {editing && canEdit && segOpen && sessionActions.setStaffSegments && (
+            <StaffSegmentsEditor
+              session={s}
+              talents={talents!}
+              allSessions={allSessions}
+              onSave={(segs, reason) => sessionActions.setStaffSegments!(s, segs, reason)}
+              onClose={() => setSegOpen(false)}
+            />
           )}
 
           {/* Kế hoạch vs thực tế */}

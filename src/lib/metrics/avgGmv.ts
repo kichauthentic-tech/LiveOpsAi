@@ -1,5 +1,6 @@
 import { LiveSession } from "../../types";
-import { isCountable, sessionHours } from "../performance/hostPerformance";
+import { hostPortions, isCountable, sessionHours } from "../performance/hostPerformance";
+import { personRoleMinutes, sessionMinutes } from "../staffSegments";
 import { MIN_SESSIONS_FOR_CONFIDENCE } from "../performance/hostSuggestion";
 
 export interface TalentRealTotals {
@@ -29,16 +30,21 @@ export interface TalentRealTotals {
 // thật cả 33 talent đều = 0 trong khi tab "Hiệu Suất Host" cộng từ live_sessions ra hàng tỷ, tức
 // hai màn nói hai số về cùng một người (audit 2026-09-21). Từ nay Talent Pool cũng cộng từ ca.
 export function computeTalentRealTotals(sessions: LiveSession[], talentId: string): TalentRealTotals {
-  const completed = sessions.filter((s) => s.hostId === talentId && isCountable(s));
+  // Đổi host giữa ca (0138): chỉ tính PHẦN của talent này (số + giờ chia theo giờ đứng ca).
+  const completed = sessions.flatMap((s) => (isCountable(s) ? hostPortions(s).filter((p) => p.hostId === talentId) : []));
   const totalGmv = completed.reduce((sum, s) => sum + (s.actualGmv || 0), 0);
   const hours = completed.reduce((sum, s) => sum + sessionHours(s), 0);
-  const assisted = sessions.filter((s) => s.coHostId === talentId && isCountable(s));
+  const assisted = sessions.filter((s) => isCountable(s) && personRoleMinutes(s, talentId, "co_host") > 0);
+  const assistHours = assisted.reduce((sum, s) => {
+    const dur = sessionMinutes(s);
+    return sum + (dur > 0 ? sessionHours(s) * (personRoleMinutes(s, talentId, "co_host") / dur) : 0);
+  }, 0);
   return {
     sessionCount: completed.length,
     totalGmv,
     avgGmvPerSession: completed.length > 0 ? totalGmv / completed.length : 0,
     assistSessionCount: assisted.length,
-    assistHours: assisted.reduce((sum, s) => sum + sessionHours(s), 0),
+    assistHours,
     hours,
     gmvPerHour: hours > 0 ? totalGmv / hours : 0
   };
@@ -65,7 +71,7 @@ export interface TalentBrandPerf {
  * Ngưỡng "đủ mẫu" dùng chung `MIN_SESSIONS_FOR_CONFIDENCE` với hostSuggestion.
  */
 export function computeTalentBrandPerf(sessions: LiveSession[], talentId: string, brandIds: string[]): TalentBrandPerf[] {
-  const mine = sessions.filter((s) => s.hostId === talentId && isCountable(s));
+  const mine = sessions.flatMap((s) => (isCountable(s) ? hostPortions(s).filter((p) => p.hostId === talentId) : []));
   // Brand có ca đứng trước, brand chưa chạy dồn xuống cuối — cùng luật với thứ tự dòng ở Talent Pool.
   return brandIds
     .map((brandId): TalentBrandPerf => {
