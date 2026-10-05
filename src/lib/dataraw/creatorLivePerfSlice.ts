@@ -156,7 +156,28 @@ interface DbImportLite {
   report_type: string;
   period_start: string | null;
   period_end: string | null;
+  imported_at: string;
   columns: DataRawColumn[];
+}
+
+// Hai lô cùng chứa một Room ID (vd lô full 01/06→22/09 + lô tháng 9 export lại cho đủ 23–30/09)
+// thì room đó chỉ được đếm MỘT lần — lấy dòng của lô up SAU (export mới hơn, số đã chốt hơn).
+// Trước 05/10 hàm này cộng mọi lô chạm tháng ⇒ up thêm file tháng là Report đếm đôi. Dòng thiếu
+// Room ID không khử được, giữ nguyên.
+export function dedupeRoomsAcrossBatches(batches: { importedAt: string; rows: CreatorLivePerfRow[] }[]): CreatorLivePerfRow[] {
+  const newestFirst = [...batches].sort((a, b) => b.importedAt.localeCompare(a.importedAt));
+  const seen = new Set<string>();
+  const out: CreatorLivePerfRow[] = [];
+  for (const b of newestFirst) {
+    for (const r of b.rows) {
+      if (r.roomId) {
+        if (seen.has(r.roomId)) continue;
+        seen.add(r.roomId);
+      }
+      out.push(r);
+    }
+  }
+  return out;
 }
 
 export interface CreatorLivePerfMonthSlice {
@@ -168,7 +189,7 @@ export interface CreatorLivePerfMonthSlice {
 export async function fetchCreatorLivePerfMonthSlice(brandId: string, monthStart: string, monthEnd: string): Promise<CreatorLivePerfMonthSlice> {
   const { data: imports, error } = await supabase
     .from("brand_dataraw_imports")
-    .select("id, report_type, period_start, period_end, columns")
+    .select("id, report_type, period_start, period_end, imported_at, columns")
     .eq("brand_id", brandId)
     .eq("report_type", "creator_live_performance");
   if (error) throw error;
@@ -184,7 +205,7 @@ export async function fetchCreatorLivePerfMonthSlice(brandId: string, monthStart
   // (CROCS T6→T9 đã 228), PostgREST cắt im lặng ở 1.000.
   const rowsByImport = await fetchRowsPaged(overlapping.map((i) => i.id));
 
-  const rows: CreatorLivePerfRow[] = [];
+  const batches: { importedAt: string; rows: CreatorLivePerfRow[] }[] = [];
   const coveredDays = new Set<string>();
   for (const imp of overlapping) {
     const raws = rowsByImport.get(imp.id) ?? [];
@@ -201,17 +222,20 @@ export async function fetchCreatorLivePerfMonthSlice(brandId: string, monthStart
       ) {
         coveredDays.add(d);
       }
+      const inMonth: CreatorLivePerfRow[] = [];
       for (const p of parsed) {
         const date = vnDateOf(p.startTime);
         if (date < monthStart || date > monthEnd) continue;
-        rows.push(p);
+        inMonth.push(p);
       }
+      batches.push({ importedAt: imp.imported_at, rows: inMonth });
     } catch {
       // Batch thiếu cột "Start Time" (sai report type lúc import) — bỏ qua batch này thay vì làm
       // chết toàn bộ Report Tháng.
     }
   }
 
+  const rows = dedupeRoomsAcrossBatches(batches);
   rows.sort((a, b) => a.startTime.localeCompare(b.startTime));
 
   return {

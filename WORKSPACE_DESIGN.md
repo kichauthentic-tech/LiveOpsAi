@@ -72,11 +72,24 @@
    `SUPABASE_DB_URL` trỏ tới `aws-0-ap-southeast-1.pooler.supabase.com`, pooler báo `tenant/user
    postgres.licqfomsrjkavipomplz not found` ⇒ sai host/region. Lấy lại chuỗi "Session pooler" ở Supabase Dashboard →
    Connect, cập nhật secret, chạy tay workflow một lần để kiểm.
-1. **24 file Dataraw CROCS T6–T9** chưa up (1 Creator Live Performance full T6→T9 · 4 Khuyến Mãi · 4 Sản Phẩm · 4 Shop
-   Analytics · 4 Live Performance · 4 Affiliate Creator List EN · 3 Live Analysis EN T7/T8/T9). `Product Card Traffic Stats`
-   chưa có file nào (khối đó trong Report Tháng tự ẩn).
-2. **Nhập % hoa hồng/lương** (rate talent, commission brand) — khối tiền của Dashboard CEO và Finance mới có số.
-3. Gán host cho ca nạp bù CROCS còn thiếu (Dữ Liệu Gốc → lưới nạp bù).
+1. **Nạp lịch sử T6–T9 cho 4 brand — user chốt 05/10:** JOCKEY/VERA/Franklin CÓ live T6–T9 và có sheet vận hành ⇒ nạp bù
+   như CROCS; Report T6–T9 mọi brand PHÁT HÀNH (đóng sổ) sau khi đủ số + gán host xong (**CROCS T7 đã phát hành 05/10**);
+   ca T10 (kể cả 01–05/10) tạo thành ca THẬT, user tự nhập — KHÔNG nạp bù T10 (ca `is_backfill` không vào Finance).
+   User 05/10: chốt TRỌN CROCS trước, 3 brand kia user tự up sau. **CROCS T9 đã đủ 01→30/09 (05/10):** up file Creator
+   Live Performance tháng 9 (export 05/10, 65 room) vào ô tháng 9 + Sinh 18 ca + Đối Soát lô CROCS ⇒ 65 ca, GMV
+   5.217,1M = tổng file (số 01–22/09 lên +159M vì export mới hơn). Lô full cũ 01/06→22/09 vẫn ở ô tháng 6 ⇒ 2 lô chồng
+   tháng 9 — an toàn nhờ `dedupeRoomsAcrossBatches` (creatorLivePerfSlice.ts: trùng Room ID giữa các lô thì lấy lô up
+   sau). **Còn thiếu để phát hành CROCS T6/T8/T9:** host cho 35 ca (T6: 2, T8: 3, T9: 30 — 12 ca 18–22/09 + 18 ca mới,
+   7 room ≥ 5h có thể phải tách 2 ca) — user gửi; 5 file shop T9 (Khuyến Mãi, Sản Phẩm, Shop Analytics, Live
+   Performance, Live Analysis) mới tới 21–22/09. Cách Claude up file: chạy `liveops-prod` (localhost:3100, đã đăng nhập
+   admin, nối DB thật), chép file vào `dist/__upload/` rồi `fetch` cùng origin + gán vào `input[type=file]` — xoá file
+   sau khi up.
+   Franklin T9 đủ bộ có sẵn ở `~/Downloads` (export 03/10: Creator Live Performance 47 room 01→30/09, Khuyến Mãi,
+   product_list_20260901, Core Stats, Shop Analytics_20261003) — chưa up.
+   JOCKEY/VERA/Franklin: 0 ca, Franklin chỉ có 4 file T8 dở (01–17/08).
+2. **Nhập % hoa hồng/lương** (rate talent, commission brand) — đo 05/10: 33 talent rate = 0, chỉ JOCKEY có dòng rate brand
+   (= 0), 0 hợp đồng. Khối tiền của Dashboard CEO và Finance mới có số.
+3. Gán host cho ca nạp bù CROCS còn thiếu: 35/247 ca (xem mục 1). Trợ live lưu ở `co_host_id`.
 
 **Cần tài khoản/mật khẩu mà Claude không có:**
 4. Góc nhìn role `brand` bằng JWT thật — DB chưa có tài khoản brand nào (M9 đã đo bằng harness props-only).

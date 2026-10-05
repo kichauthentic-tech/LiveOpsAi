@@ -22,6 +22,9 @@ interface CrmProjectsProps {
   onSaveCommissionRate: (brandId: string, platform: "TikTok" | "Shopee", commissionRate: number) => Promise<boolean>;
 }
 
+// Ngoài component: lint React Compiler coi Date.now() trong thân component là gọi hàm không thuần lúc render.
+const newBrandId = () => `brand-${Date.now()}`;
+
 export const CrmProjects: React.FC<CrmProjectsProps> = ({
   brands,
   users = [],
@@ -111,7 +114,7 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
 
     const kam = staffUsers.find((u) => u.id === brandOwnerUserId);
     const brandPayload: Brand = {
-      id: editingBrand ? editingBrand.id : `brand-${Date.now()}`,
+      id: editingBrand ? editingBrand.id : newBrandId(),
       name: brandName,
       logo: brandLogo || "🏢",
       industry: brandIndustry,
