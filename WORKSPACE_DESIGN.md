@@ -18,6 +18,20 @@
   tới đâu, cái gì kêu, rồi sửa đúng chỗ đó. **Không seed mock lại.**
 - **Nợ kỹ thuật đã hết** (đợt P2a-2…P2a-21, 01–02/10) và **audit code chết đã xong** (02/10): `npm run audit:dead` báo 0,
   ESLint 0 lỗi (31 warning `set-state-in-effect` = nợ đã đo, cố ý `warn`), vitest 467/467 (05/10).
+- **05/10 tối: nạp lịch ca T6→05/10 từ file "YFB _ Working File 2026 - NEW.xlsx"** (6 sheet: VERA/JOCKEY × TikTok/Shopee,
+  Franklin, CROCS). Nạp **893 ca** VERA (TikTok 298, Shopee 259), JOCKEY (TikTok 176, Shopee 72), Franklin (88; bắt đầu từ
+  06/08) với host/trợ khớp hồ sơ talent, GMV từ cột "GMV Live" (trống thì cột "GMV"; riêng VERA Shopee cột đó là ATC nên
+  không dùng), `data_source='manual'` (= nhãn **Tạm tính / chưa đối soát**; chờ up file đối soát từng brand ở Đối Soát
+  Số Liệu để lên "Đã chốt"), `is_backfill` = true tới 30/09, ca 01–05/10 là ca thật. Ghi trực tiếp REST bằng phiên admin
+  ở Browser pane (script nháp ở scratchpad, không commit). **CROCS không nạp lại** (247 ca room đã đối soát, tốt hơn
+  bảng tính; sheet có nhiều dòng ca nhỏ trong cùng một room) — chỉ điền host/trợ cho 14/35 ca thiếu host khi MỘT dòng sheet
+  phủ ≥70% room; 21 ca còn lại room trải 2–3 ca khác host ⇒ cần tách ca (`split_backfill_session`) rồi gán. Bỏ qua: 8 dòng
+  thiếu/sai giờ hoặc năm sai (JOCKEY TTS dòng 77, 214; CROCS 8, 380, 396, 411, 455, 471), 7 ô GMV dạng "a/b" (ghi 0,
+  không đoán), 3 dòng JOCKEY trùng nhau gộp. Host/trợ **chưa có hồ sơ talent**: Mia (52), Su (41), Đạt (8), Dung (4);
+  trợ Trúc Như (84), Diễm Phương (9) ⇒ ca để trống host/trợ, tên ghi trong tiêu đề ca `(Host: …)`. Ô trợ ghi nhiều người
+  ("Toàn 1h + Loan 2h") chỉ lấy người ghi nhiều giờ nhất. Tên trùng phụ thuộc vai: Vân/Trang/Linh ở cột host = Kim Vân/Kiều
+  Trang/Khánh Linh, ở cột trợ = Hồng Vân/Huyền Trang/Mỹ Linh. Verify: đếm DB khớp (VERA 557, JOCKEY 248, Franklin 88 ca),
+  Sổ Ca VERA hiện ca T10 nhãn "Tạm tính". Phát hành report T6–T9 sẽ bị chặn tới khi đối soát xong (`unreconciled_sessions`).
 - **05/10: Ads lấy từ FILE, không gõ tay** (user yêu cầu). File "Campaign overview data" của TikTok Ads (GMV Max, theo
   ngày, toàn cửa hàng — gồm LIVE + Product GMV Max) tải ở **Nhập Ads** (chỗ nhập Ads DUY NHẤT) → lưu vào kho Dữ
   Liệu Gốc loại `ads_campaign_overview` (migration **`0137`**, 1 file / brand / tháng, không liệt kê ở màn Dữ Liệu Gốc)
@@ -113,7 +127,7 @@
    sau khi up.
    Franklin T9 đủ bộ có sẵn ở `~/Downloads` (export 03/10: Creator Live Performance 47 room 01→30/09, Khuyến Mãi,
    product_list_20260901, Core Stats, Shop Analytics_20261003) — chưa up.
-   JOCKEY/VERA/Franklin: 0 ca, Franklin chỉ có 4 file T8 dở (01–17/08).
+   JOCKEY/VERA/Franklin: đã có ca T6→05/10 từ file Working File (05/10 tối, nhãn Tạm tính) — còn chờ file đối soát + tạo talent Mia/Su/Đạt/Dung/Trúc Như/Diễm Phương rồi gán host.
 2. **Nhập % hoa hồng/lương** (rate talent, commission brand) — đo 05/10: 33 talent rate = 0, chỉ JOCKEY có dòng rate brand
    (= 0), 0 hợp đồng. Khối tiền của Dashboard CEO và Finance mới có số.
 3. Gán host cho ca nạp bù CROCS còn thiếu: 35/247 ca (xem mục 1). Trợ live lưu ở `co_host_id`.
