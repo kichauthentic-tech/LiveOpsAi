@@ -29,7 +29,7 @@ import { fmtKeyMetric, KEY_METRICS, KEY_METRIC_GROUPS, KeyMetricDef, keyMetricVa
 import { controlGroup, controlLabel, liveGmvByDate, controlVerdict, hostReliability, isBorderline, reliabilityText, VERDICT_TEXT } from "../../lib/report/deepAnalysis";
 import { isCountable, sessionHours } from "../../lib/performance/hostPerformance";
 import { sessionDurationHours } from "../../lib/pnl";
-import { fmtVndShort } from "../../lib/format";
+import { fmtMonth, fmtVndShort } from "../../lib/format";
 import { METRIC, metricHint } from "../../lib/metricGlossary";
 import { PageHeader } from "../common/PageHeader";
 import OpsSupport, { prefetchOpsSupport } from "../OpsSupport";
@@ -594,7 +594,7 @@ export default function BrandDashboard({ brandId, brandName, sessions, shiftSlot
           sub="Chỉ cảnh báo — sửa ở Kế Hoạch Tháng."
         >
           {!check ? (
-            <p className="text-xs text-[var(--text-faint)]">Chưa có Kế Hoạch Tháng {nextMonthOf(month)}.</p>
+            <p className="text-xs text-[var(--text-faint)]">Chưa có Kế Hoạch Tháng {fmtMonth(nextMonthOf(month))}.</p>
           ) : (
             <div className="space-y-3 text-xs">
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

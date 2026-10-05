@@ -7,6 +7,7 @@ import { useConfirm } from "../hooks/useConfirm";
 import { PageIntro } from "./common/PageIntro";
 import { TabUsagePanel } from "./TabUsagePanel";
 import { accountStatusLabel } from "../lib/statusLabels";
+import { talentRoleLabel } from "../lib/talentName";
 
 export interface NewUserPayload {
   name: string;
@@ -625,7 +626,6 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                     <th className="p-4">Vai trò</th>
                     <th className="p-4">Gắn với</th>
                     <th className="p-4">Trạng Thái</th>
-                    <th className="p-4">Đăng Nhập Cuối</th>
                     <th className="p-4 text-right"></th>
                   </tr>
                 </thead>
@@ -703,8 +703,6 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                           </span>
                         </td>
 
-                        <td className="p-4 text-[var(--text-muted)] text-[11px]">{u.lastLogin}</td>
-
                         <td className="p-4 text-right">
                           <div className="flex items-center justify-end gap-2">
                             {/* Custom Permission Overrides Button */}
@@ -717,7 +715,8 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                               <span className="hidden lg:inline text-[11px] font-bold">Quyền riêng</span>
                             </button>
 
-                            {/* Edit Button */}
+                            {/* Edit Button — tài khoản Admin chỉ Admin sửa (0136 chặn ở DB) */}
+                            {(u.role !== "admin" || currentRole === "admin") && (
                             <button
                               onClick={() => openEditModal(u)}
                               className="p-1.5 bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--accent-text)] rounded-lg transition-all"
@@ -725,6 +724,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                             >
                               <Edit2 className="w-3.5 h-3.5" />
                             </button>
+                            )}
 
                             {/* Delete Button */}
                             {u.role !== "ceo" && u.role !== "admin" && (
@@ -858,7 +858,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                     onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
                     className="w-full px-3 py-2 bg-[var(--surface-base)] rounded-xl border border-[var(--border)] text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-bold"
                   >
-                    <option value="admin">Quản trị hệ thống</option>
+                    {(currentRole === "admin" || formData.role === "admin") && <option value="admin">Quản trị hệ thống</option>}
                     <option value="ceo">CEO</option>
                     <option value="operations">Vận hành</option>
                     <option value="brand">Brand (khách hàng)</option>
@@ -929,7 +929,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                         <option value="">Chọn hồ sơ</option>
                         {talents.map((t) => (
                           <option key={t.id} value={t.id}>
-                            {t.name} ({t.role})
+                            {t.name} ({talentRoleLabel(t.role)})
                           </option>
                         ))}
                       </select>

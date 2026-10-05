@@ -48,7 +48,6 @@ export interface SystemUser {
   status: "Active" | "Inactive";
   assignedBrandId?: string;
   assignedTalentId?: string;
-  lastLogin: string;
   customPermissionOverrides?: Partial<Record<PermissionKey, boolean>>;
   isCustom?: boolean;
 }

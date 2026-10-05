@@ -3,7 +3,7 @@ import { Brand, LiveSession, PromoScheme, ShiftSlot, ShiftRegistration, Studio, 
 import { SessionWindow } from "../SessionWindow";
 import { SessionReportInput } from "../../lib/db/sessionReports";
 import { CalendarIcon, ChevronLeft, ChevronRight, Plus, Tag } from "lucide-react";
-import { fmtMonth, fmtVndShort } from "../../lib/format";
+import { fmtDateVn, fmtMonth, fmtVndShort } from "../../lib/format";
 import { schemesForDate } from "../../lib/schemeUtils";
 import { CAMPAIGN_DAY_STYLES, getCampaignDayInfo } from "../../lib/campaignDays";
 import { OpenSlotModal } from "../scheduling/OpenSlotModal";
@@ -500,7 +500,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 shadow-sm">
             <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] pb-2 mb-3">
               <h3 className="font-bold text-[var(--text)] text-sm">
-                {getDayOfWeekName(selectedDate)}, {selectedDate}
+                {getDayOfWeekName(selectedDate)}, {fmtDateVn(selectedDate)}
               </h3>
               {canManage && (
                 <button

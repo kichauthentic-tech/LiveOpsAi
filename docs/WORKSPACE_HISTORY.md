@@ -4654,3 +4654,30 @@ có cấn nhau không, dưới góc nhìn chuyên gia; rồi bảo "sửa hết 
 
 Không làm (ngoài phạm vi, cần user quyết): hạn chót đóng đăng ký trước khi chốt người; thông báo cho người đăng ký mà
 không được chọn; trạng thái riêng "không diễn ra" (hiện dùng huỷ ca sau giờ — đã cho phép với ca chưa có số).
+
+## Audit toàn app lần 3 (2026-10-05)
+
+User: "audit toàn bộ app thêm 1 lần nữa, toàn diện, sâu rộng từng ngóc ngách". Cách làm: cổng chất lượng (lint/tsc/
+vitest/build/audit:dead/CI), đọc server + lớp ghi Supabase + thân hàm SQL hiện hành, replay `0001 → 0135` trên Postgres
+cô lập rồi đo quyền thật, đi 39 màn (17 Agency + 11 × 2 brand CROCS/Franklin) trên bản build production nối DB thật
+bằng `history.pushState` + `popstate` (ghi lỗi console + mọi request qua PerformanceObserver: 0 lỗi, 0 request hỏng),
+kiểm toàn vẹn dữ liệu production bằng phiên admin (247 ca, 0 ca chồng giờ cùng brand/host/phòng, 0 trạng thái sai
+ngày), chạy parser Dữ Liệu Gốc trên file thật Franklin T9 trong `~/Downloads` (Creator Live Performance 47 room
+647,9M, product_list, Shop Analytics, Khuyến Mãi, Core Stats — đọc đúng hết).
+
+| # | Phát hiện | Mức | Xử lý |
+|---|---|---|---|
+| 1 | Policy `profiles_update_self_or_ceo` (0012) cho người dùng UPDATE mọi cột dòng profiles của mình. Replay: talent `update profiles set role='admin'` ⇒ `current_user_role()` = admin. Cùng đường: brand đổi `assigned_brand_id` đọc brand khác, tự bật `custom_permission_overrides`, tự mở khoá `status`. Production ghi được cột này (ResetPasswordScreen dùng chính đường đó). | Nghiêm trọng | `0136` trigger `guard_profile_update` (invoker; service_role/postgres đi thẳng): người không phải ceo/admin chỉ đổi name/avatar/must_change_password/last_login; CEO không cấp/thu/sửa Admin. Server: role phải thuộc 5 role, chỉ Admin tạo/xoá Admin. UI Phân Quyền: ẩn lựa chọn Admin + nút sửa dòng Admin với người không phải Admin. |
+| 2 | Backup DB: 60/60 lần chạy gần nhất ĐỎ (từ 06/08 — chưa từng có bản backup nào). Secret `SUPABASE_DB_URL` trỏ project `licqfomsrjkavipomplz`, app chạy project `lpacyuwpkvuclxdnuauw` — sai PROJECT, không chỉ sai region. | Nghiêm trọng | Cần user: lấy chuỗi Session pooler của `lpacyuwpkvuclxdnuauw`, cập nhật secret, chạy tay workflow. |
+| 3 | Đối soát khớp phiên ↔ ca theo khung ĐÓNG (`<=`, `>=`): chạm mép cũng là giao ⇒ CROCS T9 có 3 phiên vào rổ "cần xem lại" chỉ vì ca sau bắt đầu đúng phút phiên trước tắt (ca kế được chia 1 giây ≈ vài nghìn đồng). | Thấp (số), gây nhiễu | `0136`: `<` / `>`. Lô cũ giữ kết quả khớp cũ — up lại file để khớp lại. |
+| 4 | `lock_month_plan` (0099) bỏ qua ca kế hoạch ngày đã qua TRƯỚC khi tìm ca ops đã mở sẵn cùng giờ ⇒ ca ops tự mở cho ngày đã qua (để ghi ca đã live, đúng tình huống CROCS 01–05/10) không bao giờ gắn vào kế hoạch, target không đổ xuống ca. | Trung bình | `0136`: có ca cùng giờ thì gắn, không có thì vẫn bỏ qua. Confirm/thông báo chốt ở Kế Hoạch Tháng nói cách ghi ca đã live. |
+| 5 | Engine Kế Hoạch Tháng đếm 1 ca cho mọi ô (thứ × 2h) ca chạm tới, kể cả 1 phút ⇒ AI Training hiện "T4 0–2h (6 ca) 26,9M/h" là khung giờ mạnh (6 ca tối tắt lúc 00:01). | Thấp | Chỉ đếm ca phủ ô ≥ 30 phút (`MIN_CELL_MINUTES`), test `suggestEngineCellCount`. |
+| 6 | Việc cần làm đếm ca thiếu host trong 90 ngày ⇒ 33, bỏ sót 2 ca T6 (report T6 chưa phát hành, đang cần gán để phát hành). | Thấp | Đếm mọi tháng chưa phát hành ⇒ 35 (khớp T6 2 + T8 3 + T9 30). |
+| 7 | Nhập Ads: "65 ca TikTok chưa nộp Report Ca" — cả 65 là ca nạp bù, không bao giờ có Report Ca. | Thấp | Tách dòng riêng: ca nạp bù ⇒ nhập Ads cost vào "Ads cost bổ sung". |
+| 8 | Ngày/tháng dạng máy còn lộ: Bảng Vận Hành "Thứ 2, 2026-10-05", "Phòng Studio theo giờ — 2026-10-05", Lịch brand, Nhân sự ca, Dashboard brand "Kế Hoạch Tháng 2026-11", AI Training "2026-06-01 → 2026-09-30", confirm mở ca quá khứ. Chữ Anh: "(Assistant)", Affiliate "MONTH / SEP 2026". Cột "Đăng Nhập Cuối" ở Phân Quyền luôn trống (không ai ghi `last_login`). | Thấp | Sửa hết; `talentRoleLabel` (lib/talentName) là nguồn duy nhất cho nhãn vai trò; bỏ cột trống; test canh "ngày đang chọn không in thẳng". |
+| 9 | Sentry chưa cấu hình trên production (`/api/health` → `sentryConfigured: false`) — lỗi phía người dùng không ai thấy. | Trung bình | Cần user (tạo DSN) nếu muốn. |
+| 10 | Report T9 CROCS là bản chụp 27/09 (47 ca, số tới 22/09) — nay 65 ca. Lô đối soát cũ không gắn brand vẫn nằm trong danh sách. Franklin T8: report nháp 0 ca vẫn có nút Phát hành (phát hành = đóng sổ, sẽ chặn nạp bù T8). | Vận hành | Ghi chú cho user, không sửa code. |
+
+Đo kèm: CI xanh ở commit cuối (2 commit 04/10 tối đỏ vì 1 lỗi lint, đã tự hết ở commit sau). Bộ kiểm SQL
+`supabase/tests/0136_*.sql` 16/16 OK trên replay có 0136, ĐỎ khi thiếu (1a, 2a, 2b, 3a, 3c); bộ 0133 vẫn 36 OK khi có
+0136. vitest 456/456 (thêm 3 test, mỗi test đã thử đột biến rơi đúng chỗ).

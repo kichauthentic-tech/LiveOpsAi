@@ -10,6 +10,7 @@ import { fmtVndShort, fmtVndFull, fmtFixed } from "../lib/format";
 import { statusLabel } from "../lib/statusLabels";
 import { METRIC, metricHint } from "../lib/metricGlossary";
 import { PageHeader } from "./common/PageHeader";
+import { talentRoleLabel } from "../lib/talentName";
 // Cột phụ: ở điện thoại bảng 11 cột rộng gấp mấy lần màn hình — giữ 4 cột trả lời "ai, vai gì,
 // chạy bao nhiêu ca, ra bao nhiêu tiền", phần còn lại chỉ hiện từ sm (cùng cách Sổ Ca đã làm, M4).
 const SUB_COL = "hidden sm:table-cell py-2.5 px-2";
@@ -390,7 +391,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
             >
               <option value="All">Tất cả vai trò</option>
               <option value="Host">Host</option>
-              <option value="Assistant">Trợ live (Assistant)</option>
+              <option value="Assistant">Trợ live</option>
             </select>
 
             {/* Add New Talent Button — tạo mới giờ kèm tạo account thật nên chỉ ceo/admin */}
@@ -453,7 +454,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                     {t.name}
                     {t.nickname && <span className="hidden sm:inline font-normal text-[var(--text-muted)]"> · {t.nickname}</span>}
                     <span className="hidden sm:inline ml-1.5 bg-[var(--accent)]/50 text-[var(--accent-text)] text-[11px] font-bold px-1.5 py-0.5 rounded">
-                      {t.role === "Assistant" ? "Trợ live" : t.role || "Host"}
+                      {talentRoleLabel(t.role)}
                     </span>
                     {/* Vai trò gõ tay một lần, không đối chiếu ca thật (audit người mới 2026-10-04: "Host" mà 86 ca đều
                         là trợ live). Lệch thì nói ra để ops sửa hồ sơ — không tự đổi. */}
@@ -701,7 +702,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                     className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
                   >
                     <option value="Host">Host</option>
-<option value="Assistant">Trợ live (Assistant)</option>
+<option value="Assistant">Trợ live</option>
                   </select>
                 </div>
                 <div>
@@ -901,7 +902,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                   <div className="flex items-center gap-1.5">
                     <h4 className="font-bold text-[var(--text)] text-sm truncate">{detailTalent.name}</h4>
                     <span className="bg-[var(--accent)]/50 text-[var(--accent-text)] text-[11px] font-bold px-1.5 py-0.5 rounded shrink-0">
-                      {detailTalent.role === "Assistant" ? "Trợ live" : detailTalent.role || "Host"}
+                      {talentRoleLabel(detailTalent.role)}
                     </span>
                   </div>
                   <p className="text-[var(--text-muted)]">

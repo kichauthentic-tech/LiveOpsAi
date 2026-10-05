@@ -503,7 +503,10 @@ export default function MonthPlan({
       ? `\n\nTarget các ca cộng lại ${fmtVndShort(totals.target)} ${sumDelta > 0 ? "VƯỢT" : "THIẾU"} ${fmtVndShort(Math.abs(sumDelta))} so với ô Target GMV tháng ${fmtVndShort(targetTotal)}. Sau khi chốt, target tháng = tổng các ca (${fmtVndShort(totals.target)}) ở mọi màn.`
       : "";
     const pastCount = drafts.filter((d) => d.date < today).length;
-    const pastNote = pastCount > 0 ? `\n\n${pastCount} ca ở ngày đã qua sẽ KHÔNG mở chờ đăng ký (chỉ giữ trong kế hoạch để đối chiếu).` : "";
+    const pastNote =
+      pastCount > 0
+        ? `\n\n${pastCount} ca ở ngày đã qua sẽ KHÔNG mở chờ đăng ký (chỉ giữ target trong kế hoạch). Ca nào đã live thật: mở ca đúng ngày giờ đó ở Bảng Vận Hành → Lịch & Studio → "Mở ca chờ đăng ký" — ca mở TRƯỚC khi chốt sẽ được gắn vào kế hoạch và nhận target; mở sau thì bấm "Chốt lại".`
+        : "";
     const studioNote = brandStudio ? `\n\nCa sinh ra gắn phòng ${brandStudio.name} (${brandStudio.roomNumber}).` : "\n\nBrand CHƯA có phòng live mặc định — ca sinh ra sẽ không có phòng (không kiểm được trùng phòng). Chọn ở Tham số → Phòng live trước nếu cần.";
     const clashNote = crossBrand.clashes.length > 0
       ? `\n\n⚠ ${crossBrand.clashes.length} ca TRÙNG PHÒNG với brand khác (vd ${crossBrand.clashes[0].date.slice(8)}/${crossBrand.clashes[0].date.slice(5, 7)} ${crossBrand.clashes[0].startTime}: ${crossBrand.clashes[0].roomTakenBy}). Chốt vẫn gắn phòng này — phải đổi phòng từng ca sau.`
@@ -525,7 +528,7 @@ export default function MonthPlan({
       setLockedSlotsTick((t) => t + 1);
       setMsg(
         `Đã chốt: mở ${r.created} ca mới${r.linked > 0 ? `, gắn ${r.linked} ca đã có sẵn` : ""}${r.cancelled > 0 ? `, huỷ ${r.cancelled} ca bị bỏ` : ""}` +
-          `${r.kept_registered > 0 ? `, GIỮ ${r.kept_registered} ca bị bỏ nhưng đã có người đăng ký (xử lý ở Nhân sự ca)` : ""}${(r.skipped_past ?? 0) > 0 ? `, bỏ qua ${r.skipped_past} ca ngày đã qua` : ""} — ${r.total_slots} ca đang chờ đăng ký.`
+          `${r.kept_registered > 0 ? `, GIỮ ${r.kept_registered} ca bị bỏ nhưng đã có người đăng ký (xử lý ở Nhân sự ca)` : ""}${(r.skipped_past ?? 0) > 0 ? `, bỏ qua ${r.skipped_past} ca ngày đã qua (ca nào đã live: mở ca đúng giờ ở Lịch & Studio rồi bấm Chốt lại để gắn target)` : ""} — ${r.total_slots} ca đang chờ đăng ký.`
       );
     } catch (e) {
       setMsg(`Không chốt được: ${errorMessage(e)}`);

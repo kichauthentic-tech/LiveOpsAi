@@ -14,3 +14,8 @@ export function talentOptionLabel(t: Pick<Talent, "name" | "nickname">): string 
   const nick = t.nickname?.trim();
   return nick && nick !== t.name ? `${nick} · ${t.name}` : t.name;
 }
+
+// Vai trò hiển thị: DB lưu "Host" / "Assistant" (enum talent_role, 0087), giao diện nói "Host" / "Trợ live".
+export function talentRoleLabel(role: Talent["role"] | undefined | null): string {
+  return role === "Assistant" ? "Trợ live" : role || "Host";
+}

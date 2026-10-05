@@ -11,13 +11,19 @@
 
 ---
 
-## 1. Giai đoạn hiện tại (cập nhật 2026-10-04)
+## 1. Giai đoạn hiện tại (cập nhật 2026-10-05)
 
 - **CHẠY THỬ THẬT trên dữ liệu thật** (từ 2026-09-18; mock đã xoá sạch 19/09). DB: 33 hồ sơ talent thật, CROCS T6–T9 nạp
   bù từ file Creator-Live-Performance (229 ca, còn ca chưa gán host). **Không đề xuất tính năng mới**; hỏi user chạy thử
   tới đâu, cái gì kêu, rồi sửa đúng chỗ đó. **Không seed mock lại.**
 - **Nợ kỹ thuật đã hết** (đợt P2a-2…P2a-21, 01–02/10) và **audit code chết đã xong** (02/10): `npm run audit:dead` báo 0,
-  ESLint 0 lỗi (31 warning `set-state-in-effect` = nợ đã đo, cố ý `warn`), vitest 450/450 (04/10).
+  ESLint 0 lỗi (31 warning `set-state-in-effect` = nợ đã đo, cố ý `warn`), vitest 456/456 (05/10).
+- **05/10: audit toàn app lần 3** (chi tiết: mục `## Audit toàn app lần 3 (2026-10-05)` cuối file lịch sử). Lỗ lớn nhất:
+  **mọi tài khoản tự đổi được role/brand/quyền của chính mình** qua `profiles` (policy 0012) — vá bằng migration
+  **`0136` (ĐÃ CHẠY 05/10)**, kèm đối soát hết khớp chạm mép và chốt
+  kế hoạch gắn được ca ngày đã qua do ops mở sẵn. Phía client: engine hết "khung giờ mạnh" ảo 0–2h, Việc cần làm đếm ca
+  thiếu host theo tháng chưa phát hành (35), Nhập Ads tách ca nạp bù, hết ngày dạng `2026-10-05`/"Assistant". Server:
+  chỉ Admin tạo/xoá Admin. vitest 456/456. Backup DB: 60/60 lần đỏ vì secret trỏ sai project — user sửa secret, **xanh lần đầu 05/10 07:55** (bản dump 2,0 MB).
 - **04/10 tối: audit "người mới dùng khó"** (tài liệu cho user: Claude Doc "Audit LiveOps AI cho người mới dùng",
   https://claude.ai/code/artifact/304c57ba-c36e-466b-bc54-337147d9f736) — user bảo sửa hết, đã làm 5 bước, mỗi bước 1 commit
   đã push: `62cbff0` dọn chữ/dữ liệu mẫu (form CRM/Studio, mô tả quyền, chữ tiếng Anh, ngày `2026-10` → `10/2026`,
@@ -66,12 +72,12 @@
 ## 2. Việc còn treo
 
 **Cần user làm:**
+000. Muốn bỏ 3 phiên "cần xem lại" của CROCS T9 (lô cũ khớp theo luật trước 0136): up lại file Creator Live
+   Performance T9 ở Đối Soát (chọn CROCS) rồi Áp dụng.
 00. **Chọn KAM thật + nhập SĐT người đại diện cho 4 brand ở CRM** — 0134/0135 (đã chạy 05/10) xoá hết liên hệ/KAM mẫu,
    nay cả 4 brand "KAM: Chưa chọn", đại diện chỉ còn tên (Stan, Tuấn, Mai, Khanh).
-0. **Backup DB hằng ngày đang HỎNG** (GitHub Action `backup-supabase.yml` đỏ mỗi ngày, đo 04/10): secret
-   `SUPABASE_DB_URL` trỏ tới `aws-0-ap-southeast-1.pooler.supabase.com`, pooler báo `tenant/user
-   postgres.licqfomsrjkavipomplz not found` ⇒ sai host/region. Lấy lại chuỗi "Session pooler" ở Supabase Dashboard →
-   Connect, cập nhật secret, chạy tay workflow một lần để kiểm.
+0b. **Sentry chưa cấu hình** (`/api/health` → `sentryConfigured: false`): lỗi phía người dùng không ai thấy. Muốn có thì
+   tạo project Sentry, đặt `SENTRY_DSN` trên Vercel.
 1. **Nạp lịch sử T6–T9 cho 4 brand — user chốt 05/10:** JOCKEY/VERA/Franklin CÓ live T6–T9 và có sheet vận hành ⇒ nạp bù
    như CROCS; Report T6–T9 mọi brand PHÁT HÀNH (đóng sổ) sau khi đủ số + gán host xong (**CROCS T7 đã phát hành 05/10**);
    ca T10 (kể cả 01–05/10) tạo thành ca THẬT, user tự nhập — KHÔNG nạp bù T10 (ca `is_backfill` không vào Finance).
@@ -187,6 +193,7 @@
 - Test mới đặt ở `tests/*.test.ts`. Mutation test phải xác nhận mutation rơi ĐÚNG DÒNG.
 
 ### 5.2 Client (React / TS)
+- Nhãn vai trò talent qua `talentRoleLabel` (lib/talentName.ts) — DB lưu "Assistant", màn hình nói "Trợ live".
 - `strict` + `noUnusedLocals` bật; `@types/react*` phải có trong devDependencies (thiếu là JSX thành `any`, CI xanh giả).
 - **Cho người mới (audit 04/10 tối):** (1) mỗi thông tin MỘT chỗ nhập — màn khác chỉ hiện để đọc + nút sang chỗ nhập;
   (2) form không điền sẵn giá trị mẫu, không có fallback "Nguyễn Văn A"; không có ô gõ tay cho số app tự tính được;
@@ -257,6 +264,9 @@
 - **View** không `security_invoker` chạy quyền owner — `drop view` + `create view` lại thì phải giữ mọi vế bảo mật (0114 từng
   xoá vế `is not null` của 0109; 0130 vá bằng cách bọc định nghĩa đang chạy).
 - User sửa dữ liệu của chính mình ⇒ RPC whitelist cột, không mở policy "update dòng của mình" (RLS chặn theo dòng, không cột).
+  `profiles` là ngoại lệ còn sót từ 0012 — đã bịt bằng trigger `guard_profile_update` (0136): thêm cột mới vào
+  `profiles` mà người dùng KHÔNG được tự đổi ⇒ thêm vào danh sách so sánh trong trigger đó. Admin chỉ do Admin cấp/thu.
+- Khớp khung giờ (đối soát, snapshot) dùng giao nhau MỞ (`<`, `>`): chạm mép không tính (0136).
 - **Drop column/table/function:** grep thân MỌI hàm plpgsql còn nhắc tên đó và `create or replace` trong cùng migration
   (Postgres chỉ plan thân hàm lúc gọi lần đầu). Không `cascade`. Drop bảng phải có chốt "còn dòng thì raise" (khuôn 0126/0132)
   và chốt tự kiểm cuối file.
@@ -306,7 +316,8 @@ tháng không có kế hoạch chỉ còn target khung camp nhập ở Nhập Ad
 
 ## 6. Hạ tầng Supabase
 
-- 135 migration (`supabase/migrations/`), chạy tay theo thứ tự — **tới `0132` đều ĐÃ CHẠY** (0131 + 0132 ngày 02/10);
+- 136 migration (`supabase/migrations/`), chạy tay theo thứ tự — **`0136` ĐÃ CHẠY 05/10** (verify production: lô đối soát thử với phòng kết thúc đúng phút ca CROCS 30/09 11:01 bắt đầu ⇒ không khớp, phòng chồng 29 phút ⇒ khớp; lô thử đã xoá; trigger profiles nằm trước đoạn đó trong cùng file + chốt tự kiểm cuối file), bộ kiểm
+  `supabase/tests/0136_profile_guard_recon_edges_lock_past.sql` (replay, DB trắng): 16 OK, đỏ khi thiếu 0136. **Tới `0132` đều ĐÃ CHẠY** (0131 + 0132 ngày 02/10);
   **`0133` ĐÃ CHẠY 04/10** (verify ở §1); **`0134` ĐÃ CHẠY 05/10** (verify: CRM không còn SĐT mẫu); **`0135` ĐÃ CHẠY 05/10** (verify: 4 brand KAM "Chưa chọn", form sửa cũng "Chưa chọn"). Lô đối soát cũ (06–09/2026, không gắn brand) không áp dụng lại được — đo
   04/10 nó chỉ khớp ca CROCS nên chưa có số nào bị chia nhầm. Replay `0001 → 0133`: sạch, chạy lần 2 không lỗi; bộ kiểm hành vi
   `supabase/tests/0133_workflow_integrity.sql` chạy trên bản replay (in `OK ...`, 34 mục).
@@ -318,8 +329,9 @@ tháng không có kế hoạch chỉ còn target khung camp nhập ở Nhập Ad
   policy khác không đổi; chạy lần 2 không lỗi; bảng còn dòng thì migration dừng mà không xoá gì. **Verify trên production
   sau khi chạy:** 4 bảng + `replace_session_children` trả 404; `update_session_with_children` gọi 2 hoặc 5 tham số đều
   vào tới thân hàm (P0001 not found với id giả); Sổ Ca vẫn `47 ca · 177,8h · 3,52B`, 24/24 request của trang 200.
-- Project Supabase chỉ phục vụ app này. Backup: GitHub Action `backup-supabase.yml` (pg_dump hằng ngày, cần secret
-  `SUPABASE_DB_URL` dạng Session pooler).
+- Project Supabase chỉ phục vụ app này (`lpacyuwpkvuclxdnuauw`). Backup: GitHub Action `backup-supabase.yml` (pg_dump
+  hằng ngày 03:00 UTC, artifact giữ 30 ngày, secret `SUPABASE_DB_URL` dạng Session pooler) — xanh từ 05/10; trước đó
+  secret trỏ project cũ `licqfomsrjkavipomplz` nên chưa từng có bản nào.
 - Tài khoản test & phiên admin của Browser pane: memory `liveops-test-login` / `testing-self-serve`.
 
 ## 7. Bẫy khi tự verify bằng Browser pane (không phải lỗi app)
@@ -336,6 +348,7 @@ tháng không có kế hoạch chỉ còn target khung camp nhập ở Nhập Ad
 
 | Mục trong file lịch sử | Tóm tắt |
 |---|---|
+| `## Audit toàn app lần 3 (2026-10-05)` | lỗ tự nâng quyền qua profiles (0136), backup sai project, đối soát chạm mép, chốt kế hoạch ngày đã qua, engine ô 1 phút, chữ/ngày lộ |
 | `## Audit logic vòng đời (2026-10-04)` | 14 điểm gãy hợp đồng→report + cách sửa; 0133 (đối soát theo brand, chốt người 1 transaction, đóng sổ tháng, khoá ca kế hoạch đã chốt, đăng ký chỉ ca mở) |
 | `## Audit code chết (2026-10-02)` | gỡ Hội Đồng AI, Workflow Rules, quét QR giả, ~25 export chết, 3 bảng con khỏi client; lỗi `"std-a"` ở Studios; `audit:dead`; 0131 (viết trước 0132) |
 | `"Cần làm ngay" bản 2026-10-02` | nhật ký P2a-8…P2a-21: lỗi chốt hàng loạt trợ live, cam kết hợp đồng, nạp bù, 0125–0130 bảo mật, đo hiệu năng (đã dừng) |

@@ -158,3 +158,18 @@ test("tiền không có đơn vị đ / ₫ / VNĐ, không tự ghép tr / tri�
   }
   expect(hits).toEqual([]);
 });
+
+// Audit 05/10: Bảng Vận Hành in "Thứ 2, 2026-10-05", Lịch brand và Nhân sự ca in ngày đang chọn dạng máy. Biến
+// ngày/tháng đang chọn không được rơi thẳng vào chữ JSX — qua fmtDateVn / fmtMonth (thuộc tính value=/key= thì được).
+test("ngày/tháng đang chọn không in thẳng ra màn hình dạng 2026-10-05", () => {
+  const hits: string[] = [];
+  for (const file of sourceFiles(SRC)) {
+    if (!file.endsWith(".tsx")) continue;
+    const rel = file.split("/src/")[1];
+    codeWithoutComments(file).forEach((line, i) => {
+      if (/[^=\w$]\{(selectedDate|selectedMonth)\}/.test(line) || /`[^`]*\$\{(selectedDate|selectedMonth)\}[^`]*`/.test(line) && !/\$\{(selectedDate|selectedMonth)\}[-T|]/.test(line))
+        hits.push(`${rel}:${i + 1} ${line.trim().slice(0, 100)}`);
+    });
+  }
+  expect(hits).toEqual([]);
+});

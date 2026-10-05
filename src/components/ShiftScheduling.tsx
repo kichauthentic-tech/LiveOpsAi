@@ -749,7 +749,7 @@ export default function ShiftScheduling({
           </span>
           {selectedDate && (
             <button onClick={() => setSelectedDate(null)} className="ml-auto text-blue-400 hover:text-blue-300 font-bold">
-              × Bỏ lọc ngày {selectedDate}
+              × Bỏ lọc ngày {fmtDateVn(selectedDate)}
             </button>
           )}
         </div>

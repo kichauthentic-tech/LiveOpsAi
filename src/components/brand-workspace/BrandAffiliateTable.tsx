@@ -9,7 +9,7 @@ import { useToast } from "../../hooks/useToast";
 import { Database, Download, Loader2, Plus, Save, Trash2, Users } from "lucide-react";
 import { metricHint } from "../../lib/metricGlossary";
 
-import { fmtFixed, fmtVndFull } from "../../lib/format";
+import { fmtFixed, fmtMonth, fmtVndFull } from "../../lib/format";
 import { MonthPicker } from "../common/MonthPicker";
 // Trang Affiliate (2026-09-22) — tách RIÊNG khỏi form Report Tháng theo yêu cầu ops. Bảng dựng
 // theo đúng file phân tích ops đang dùng: mỗi PHIÊN LIVE là 1 CỘT, mỗi chỉ số là 1 DÒNG, các cột
@@ -40,7 +40,6 @@ const CAMPAIGN_STYLE: Record<string, string> = {
   Clearance: "bg-slate-500 text-white"
 };
 
-const MONTH_ABBR = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 
 function monthsBetween(from: string, to: string): string[] {
   const out: string[] = [];
@@ -480,10 +479,10 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
           <table className="text-sm border-collapse">
             <thead>
               <tr className="bg-[var(--surface-elevated)]">
-                <th className={labelCls}>MONTH</th>
+                <th className={labelCls}>Tháng</th>
                 {columns.map((g) => (
                   <th key={g.month} colSpan={g.items.length} className="px-2 py-1.5 border-r border-[var(--border)] text-center font-bold tracking-wide">
-                    {MONTH_ABBR[Number(g.month.slice(5, 7)) - 1]} {g.month.slice(0, 4)}
+                    {fmtMonth(g.month.slice(0, 7))}
                   </th>
                 ))}
               </tr>
@@ -552,7 +551,7 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
         <div className="flex flex-wrap gap-2">
           {months.map((m) => (
             <button key={m} onClick={() => addBlank(m)} className="px-2.5 py-1.5 rounded-lg border border-dashed border-[var(--border)] text-xs text-[var(--text-faint)] flex items-center gap-1 hover:bg-[var(--surface-hover)]">
-              <Plus className="w-3 h-3" /> Thêm cột {MONTH_ABBR[Number(m.slice(5, 7)) - 1]} {m.slice(0, 4)}
+              <Plus className="w-3 h-3" /> Thêm cột tháng {fmtMonth(m.slice(0, 7))}
             </button>
           ))}
         </div>

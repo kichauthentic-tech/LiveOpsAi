@@ -127,9 +127,16 @@ export function buildTodos(input: TodoInput): Todo[] {
     }
   }
 
-  // 7. Ca đã chạy chưa gán host (90 ngày) — không vào xếp hạng host.
-  const from90 = addDays(today, -90);
-  const noHost = sessions.filter((s) => s.status !== "Cancelled" && s.date >= from90 && s.date <= today && !s.hostId);
+  // 7. Ca đã chạy chưa gán host, ở tháng CHƯA phát hành report — không vào xếp hạng host, và phát hành report thiếu
+  // host là gửi brand bảng Host thiếu người. Trước 05/10 lọc 90 ngày ⇒ 2 ca T6 của CROCS (report chưa phát hành,
+  // user đang gán host để phát hành T6–T9) không bao giờ hiện ở đây. Tháng đã phát hành = đã đóng sổ, không nhắc.
+  const noHost = sessions.filter(
+    (s) =>
+      s.status !== "Cancelled" &&
+      s.date <= today &&
+      !s.hostId &&
+      input.monthlyReports.get(`${s.brandId}|${s.date.slice(0, 7)}`)?.status !== "published"
+  );
   if (noHost.length > 0) {
     const allBackfill = noHost.every((s) => s.isBackfill);
     const brandOf = noHost[0].brandId;

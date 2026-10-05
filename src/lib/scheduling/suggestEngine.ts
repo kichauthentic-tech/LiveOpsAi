@@ -17,6 +17,7 @@ import { sessionDurationHours } from "../pnl";
 
 import { fmtFixed, fmtVndShort, fmtVndFull } from "../format";
 export const BLOCK_HOURS = 2; // khối giờ 2h → 12 khối/ngày
+const MIN_CELL_MINUTES = 30; // ca phủ ô ít hơn chừng này phút thì không tính vào số ca của ô
 // Các hằng số học/xếp nằm ở engineParams.ts (admin vặn được trong AI Training Center).
 
 export interface HistoryCell {
@@ -255,7 +256,10 @@ export function buildHistory(sessions: LiveSession[], brandId: string, asOf: str
       c.gmv += gmvCapped * frac * w;
       c.views += (s.totalViews || 0) * frac * w;
       c.orders += (s.totalOrders || 0) * frac * w;
-      c.n.add(s.id);
+      // Số ca của ô chỉ đếm ca phủ ô đó ≥ 30 phút. Trước 05/10 ca tắt lúc 00:01 cũng tính là "1 ca" của khối
+      // 0–2h hôm sau ⇒ AI Training hiện "T4 0–2h (6 ca) 26,9M/h" là khung giờ mạnh, trong khi cả 6 ca chỉ chạm
+      // ô đó 1 phút (GMV/giờ của ô = GMV/giờ trung bình cả ca, nhưng độ tin theo số ca lại đếm đủ 6).
+      if (seg >= MIN_CELL_MINUTES) c.n.add(s.id);
       acc.set(key, c);
       cur += seg;
     }

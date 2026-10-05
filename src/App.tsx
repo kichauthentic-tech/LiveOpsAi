@@ -545,7 +545,6 @@ export default function App() {
         status: profile.status,
         assignedBrandId: profile.assigned_brand_id ?? undefined,
         assignedTalentId: profile.assigned_talent_id ?? undefined,
-        lastLogin: profile.last_login ?? "",
         customPermissionOverrides: profile.custom_permission_overrides ?? undefined
       }
     : {
@@ -556,7 +555,6 @@ export default function App() {
         customRoleTitle: "",
         avatar: "",
         status: "Active",
-        lastLogin: ""
       };
 
   // Workspace thật đang áp dụng — role "brand" bị ép cứng vào brand của chính họ (không cho

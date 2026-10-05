@@ -10,6 +10,7 @@ import { errorMessage } from "../lib/errorMessage";
 import { fmtFixed, fmtVndShort, fmtVndFull } from "../lib/format";
 import { MonthPicker } from "./common/MonthPicker";
 import { PageHeader } from "./common/PageHeader";
+import { talentRoleLabel } from "../lib/talentName";
 interface MyTalentProfileProps {
   activeUser: SystemUser;
   talents: Talent[];
@@ -209,7 +210,7 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
           </div>
           <div className={TILE}>
             <div className="text-[var(--text-muted)]">Vai trò</div>
-            <div className="font-bold text-[var(--text)] mt-0.5">{myTalent.role === "Assistant" ? "Trợ live" : myTalent.role || "Host"}</div>
+            <div className="font-bold text-[var(--text)] mt-0.5">{talentRoleLabel(myTalent.role)}</div>
           </div>
           <div className={TILE}>
             <div className="text-[var(--text-muted)]">Trạng thái</div>

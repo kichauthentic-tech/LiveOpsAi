@@ -22,8 +22,9 @@ import { SessionWindow } from "./SessionWindow";
 import { SessionReportInput } from "../lib/db/sessionReports";
 import { Calendar as CalendarIcon, Building2, User, Plus, AlertTriangle, CheckCircle2, Search, X, ChevronLeft, ChevronRight, Tag, GripVertical } from "lucide-react";
 
-import { fmtVndShort } from "../lib/format";
+import { fmtDateVn, fmtVndShort } from "../lib/format";
 import { PageHeader } from "./common/PageHeader";
+import { talentRoleLabel } from "../lib/talentName";
 interface LiveCalendarProps {
   sessions: LiveSession[];
   shiftSlots?: ShiftSlot[];
@@ -572,7 +573,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
             <span className="font-mono font-bold text-[var(--text)] px-2.5 text-xs text-center min-w-[140px]">
               {viewMode === "month" && `Tháng ${currentMonth < 10 ? '0' + currentMonth : currentMonth} / ${currentYear}`}
               {viewMode === "week" && `Tuần (${currentWeekDates[0]?.dayNum}/${parseDateString(currentWeekDates[0]?.dateStr || '').month} - ${currentWeekDates[6]?.dayNum}/${parseDateString(currentWeekDates[6]?.dateStr || '').month})`}
-              {(viewMode === "day" || viewMode === "talent_workload") && `${getDayOfWeekName(selectedDate)}, ${selectedDate}`}
+              {(viewMode === "day" || viewMode === "talent_workload") && `${getDayOfWeekName(selectedDate)}, ${fmtDateVn(selectedDate)}`}
             </span>
 
             <button
@@ -680,7 +681,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
         >
           <option value="ALL">Tất cả talent ({talents.length})</option>
           {talents.map((t) => (
-            <option key={t.id} value={t.id}>{t.name} ({t.role})</option>
+            <option key={t.id} value={t.id}>{t.name} ({talentRoleLabel(t.role)})</option>
           ))}
         </select>
 
@@ -1080,7 +1081,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-[var(--border)] pb-3 gap-2">
             <div>
               <h3 className="font-bold text-[var(--text)] text-base flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-[var(--accent-text)] shrink-0" /> Phòng Studio theo giờ — {selectedDate} ({getDayOfWeekName(selectedDate)})
+                <Building2 className="w-5 h-5 text-[var(--accent-text)] shrink-0" /> Phòng Studio theo giờ — {fmtDateVn(selectedDate)} ({getDayOfWeekName(selectedDate)})
               </h3>
               <p className="text-xs text-[var(--text-muted)]">
                 {daySessions.length} ca đã chốt · {daySlots.length} ca chờ đăng ký · {totalHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h live. Kéo thẻ ca sang hàng phòng khác để đổi phòng (giữ giờ).
@@ -1212,7 +1213,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
           <div className="border-b border-[var(--border)] pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
               <h3 className="font-bold text-[var(--text)] text-base flex items-center gap-2">
-                <User className="w-5 h-5 text-[var(--accent-text)] shrink-0" /> Tải Làm Việc Host - Ngày {selectedDate}
+                <User className="w-5 h-5 text-[var(--accent-text)] shrink-0" /> Tải Làm Việc Host - Ngày {fmtDateVn(selectedDate)}
               </h3>
               <p className="text-xs text-[var(--text-muted)]">Tổng thời lượng live trong ngày</p>
             </div>
@@ -1260,7 +1261,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
 
                   <div className="space-y-1 text-xs">
                     <div className="flex justify-between font-medium">
-                      <span className="text-[var(--text-muted)]">Tổng giờ live ngày {selectedDate}:</span>
+                      <span className="text-[var(--text-muted)]">Tổng giờ live ngày {fmtDateVn(selectedDate)}:</span>
                       <strong className={isOverloaded ? "text-rose-400" : "text-emerald-400"}>{totalHoursToday} Giờ Live</strong>
                     </div>
                     <div className="w-full h-2 bg-[var(--surface-elevated)] rounded-full overflow-hidden">

@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { Brand, BrandStudio, LiveSession, ShiftSlot, Studio } from "../../types";
 import { AlertTriangle, CalendarClock, X } from "lucide-react";
 import { dateTimeRangesOverlap, getTodayDate } from "../../lib/dateUtils";
+import { fmtDateVn } from "../../lib/format";
 import { findBrandStudioId } from "../../lib/db/brandStudios";
 import { loadRememberedBrandId, pickDefaultBrandId, rememberBrandId } from "../../lib/defaultBrand";
 import { useToast } from "../../hooks/useToast";
@@ -108,7 +109,7 @@ export const OpenSlotModal: React.FC<OpenSlotModalProps> = ({
       return;
     }
     if (studioClash && !(await confirm(`Phòng ${studio?.name ?? ""} đang trùng với ${studioClash}. Vẫn mở ca?`))) return;
-    if (pastDays > 0 && !(await confirm(`Ngày ${date} đã qua ${pastDays} ngày. Ca mở ở quá khứ sẽ KHÔNG ai đăng ký được — chỉ dùng khi bạn đang nạp bù ca đã live (ops tự chốt người sau). Vẫn mở ca?`))) return;
+    if (pastDays > 0 && !(await confirm(`Ngày ${fmtDateVn(date)} đã qua ${pastDays} ngày. Ca mở ở quá khứ sẽ KHÔNG ai đăng ký được — chỉ dùng khi bạn đang nạp bù ca đã live (ops tự chốt người sau). Vẫn mở ca?`))) return;
     setSaving(true);
     const ok = await onCreateSlot({
       id: `slot-${Date.now()}`,

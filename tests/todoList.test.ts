@@ -58,4 +58,10 @@ describe("buildTodos", () => {
   test("có giá (đơn giá/giờ hoặc % hoa hồng) thì không nhắc", () => {
     expect(ids(base({ rates: [{ brandId: "crocs", platform: "TikTok", ratePerHour: 0, returnRate: 0, commissionRate: 3 } as never] }))).not.toContain("rate-crocs");
   });
+  test("ca chưa gán host: đếm mọi tháng CHƯA phát hành, bỏ tháng đã phát hành (không giới hạn 90 ngày)", () => {
+    // T6 ngoài 90 ngày nhưng chưa phát hành ⇒ tính; T7 trong 90 ngày nhưng đã phát hành ⇒ không tính.
+    const sessions = [ca("t6a", "2026-06-05", { hostId: "" }), ca("t6b", "2026-06-06", { hostId: "" }), ca("t7", "2026-07-20", { hostId: "" }), ca("t9", "2026-09-21", { hostId: "" })];
+    const t = buildTodos(base({ sessions, monthlyReports: new Map([["crocs|2026-07", { status: "published" } as BrandMonthlyReport]]) })).find((x) => x.id === "no-host")!;
+    expect(t.title).toBe("3 ca đã chạy chưa gán host");
+  });
 });

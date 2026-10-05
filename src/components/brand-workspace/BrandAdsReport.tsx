@@ -48,6 +48,7 @@ interface AdsReportSummary {
   totalGmv: number; // GMV của đúng các phiên có Ads Spend, để ROAS phản ánh đúng cặp chi phí-doanh thu
   reportedCount: number;
   missingCount: number; // phiên TikTok Completed nhưng chưa nộp Report Ca -> không có ads_cost
+  backfillCount: number; // ca nạp bù từ file — không có Report Ca bao giờ, Ads cost phải nhập ở "Ads cost bổ sung"
   weekly: { weekStart: string; adsSpend: number; gmv: number }[];
 }
 
@@ -56,7 +57,9 @@ interface AdsReportSummary {
 function summarizeAdsReport(completed: LiveSession[]): AdsReportSummary {
   const tikTokSessions = completed.filter((s) => s.platform === "TikTok");
   const reported = tikTokSessions.filter((s) => s.report != null);
-  const missing = tikTokSessions.filter((s) => s.report == null);
+  // Ca nạp bù (Dữ Liệu Gốc) không có Report Ca và không nộp bù được — đếm riêng, không gọi là "chưa nộp".
+  const missing = tikTokSessions.filter((s) => s.report == null && !s.isBackfill);
+  const backfill = tikTokSessions.filter((s) => s.report == null && s.isBackfill);
 
   const weeklyMap = new Map<string, { weekStart: string; adsSpend: number; gmv: number }>();
   let totalAdsSpend = 0;
@@ -77,6 +80,7 @@ function summarizeAdsReport(completed: LiveSession[]): AdsReportSummary {
     totalGmv,
     reportedCount: reported.length,
     missingCount: missing.length,
+    backfillCount: backfill.length,
     weekly: Array.from(weeklyMap.values()).sort((a, b) => a.weekStart.localeCompare(b.weekStart))
   };
 }
@@ -251,6 +255,13 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
             <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
             {adsReport.missingCount} ca TikTok đã xong trong tháng chưa nộp Report Ca (không có Ads cost) — số Ads cost/ROAS
             phía trên đang thấp hơn thực tế tương ứng.
+          </div>
+        )}
+        {adsReport.backfillCount > 0 && (
+          <div className="flex items-start gap-2 text-[11px] text-[var(--text-muted)] bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-2.5">
+            <AlertTriangle className="w-3.5 h-3.5 text-[var(--text-faint)] shrink-0 mt-0.5" />
+            {adsReport.backfillCount} ca của tháng này nhập từ file (nạp bù) nên không có Report Ca — Ads cost của các ca đó
+            không tính được ở đây; nếu có, nhập tổng vào ô &quot;Ads cost bổ sung&quot; bên dưới.
           </div>
         )}
 

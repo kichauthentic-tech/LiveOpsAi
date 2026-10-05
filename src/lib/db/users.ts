@@ -26,7 +26,6 @@ function fromDb(row: DbProfile): SystemUser {
     status: row.status,
     assignedBrandId: row.assigned_brand_id ?? undefined,
     assignedTalentId: row.assigned_talent_id ?? undefined,
-    lastLogin: row.last_login ?? "",
     customPermissionOverrides: row.custom_permission_overrides ?? undefined
   };
 }

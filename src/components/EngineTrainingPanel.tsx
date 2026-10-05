@@ -9,7 +9,7 @@ import { todayVn } from "../lib/performance/brandCommitment";
 import { useDefaultBrand } from "../hooks/useDefaultBrand";
 import { errorMessage } from "../lib/errorMessage";
 
-import { fmtFixed, fmtVndShort } from "../lib/format";
+import { fmtDateVn, fmtFixed, fmtVndShort } from "../lib/format";
 // AI Training Center — mục "Engine Kế Hoạch Tháng". Engine là thuật toán thuần, không phải LLM: không
 // có prompt để sửa, chỉ có tham số để vặn và kết quả học để nhìn. Hai nửa của panel đi cùng nhau: đổi
 // tham số bên trái → nửa "engine đã học gì" tính lại ngay (chưa cần lưu), để admin thấy nút vặn ảnh
@@ -124,7 +124,7 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
               <div className="text-xs space-y-3">
                 <div className="grid grid-cols-2 gap-x-3 gap-y-1">
                   <span className="text-[var(--text-muted)]" title="Ca đã đối soát, có GMV > 0 và có giờ — ca GMV 0 không dạy được engine">Ca đối soát có GMV</span><b className="text-[var(--text)] text-right">{history.sessions} · {history.months} tháng</b>
-                  <span className="text-[var(--text-muted)]">Khoảng</span><b className="text-[var(--text)] text-right">{history.firstDate} → {history.lastDate}</b>
+                  <span className="text-[var(--text-muted)]">Khoảng</span><b className="text-[var(--text)] text-right">{history.firstDate ? fmtDateVn(history.firstDate) : "—"} → {history.lastDate ? fmtDateVn(history.lastDate) : "—"}</b>
                   <span className="text-[var(--text-muted)]">GMV/giờ TB brand</span><b className="text-[var(--text)] text-right">{fmtM(history.brandGmvPerHour)}</b>
                   <span className="text-[var(--text-muted)]">Đủ dữ liệu để tin</span><b className={`text-right ${history.enough ? "text-emerald-400" : "text-amber-400"}`}>{history.enough ? "có" : `chưa (cần ≥ ${draft.minHistorySessions} ca, ${draft.minHistoryMonths} tháng)`}</b>
                 </div>

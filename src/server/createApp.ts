@@ -82,7 +82,7 @@ export function createApp() {
       ? createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
       : null;
 
-  type CallerResult = { userId: string; reason?: undefined } | { userId?: undefined; reason: string };
+  type CallerResult = { userId: string; role?: string; reason?: undefined } | { userId?: undefined; role?: undefined; reason: string };
 
   // Bearer token → id tài khoản đã đăng nhập (mọi role). `reason` đi thẳng vào body 403 để lỗi cấu
   // hình (sai project Supabase, phiên hết hạn, role chưa set) chẩn đoán được từ client, không cần log.
@@ -103,8 +103,12 @@ export function createApp() {
     if (error) return { reason: `profile_lookup_failed: ${error.message}` };
     if (!profile) return { reason: "profile_not_found" };
     if (!roles.includes(profile.role)) return { reason: `role_is_${profile.role}` };
-    return caller;
+    return { userId: caller.userId, role: profile.role };
   };
+
+  // Role cấp được qua route tạo tài khoản. Admin chỉ do Admin cấp (user chốt 23/09: admin > CEO) — cùng luật
+  // với trigger `guard_profile_update` (0136) ở DB; route này đi bằng service_role nên trigger không chặn hộ.
+  const ASSIGNABLE_ROLES = ["admin", "ceo", "operations", "brand", "talent"];
 
   // ceo hoặc admin (Admin là tập cha của CEO) — quản lý tài khoản, kết nối TikTok Shop.
   const requireCeoCaller = (req: express.Request) => requireRoleCaller(req, ["ceo", "admin"]);
@@ -145,6 +149,12 @@ export function createApp() {
       const { name, email, role, customRoleTitle, assignedBrandId, assignedTalentId, newTalentProfile, generatePassword } = req.body || {};
       if (!name || !email || !role) {
         return res.status(400).json({ error: "Thiếu name/email/role." });
+      }
+      if (!ASSIGNABLE_ROLES.includes(role)) {
+        return res.status(400).json({ error: `Vai trò không hợp lệ: ${role}` });
+      }
+      if (role === "admin" && caller.role !== "admin") {
+        return res.status(403).json({ error: "Chỉ tài khoản Admin mới tạo được tài khoản Admin." });
       }
       // Mặc định: gửi email mời, người dùng tự đặt mật khẩu qua link (luồng "Tạo Tài Khoản
       // Mới" ở Phân Quyền & Role). Khi `generatePassword` = true — dùng cho quick-add "Thêm
@@ -288,6 +298,12 @@ export function createApp() {
       const { id } = req.params;
       if (id === callerId) {
         return res.status(400).json({ error: "Không thể tự xóa tài khoản của chính mình." });
+      }
+      if (caller.role !== "admin") {
+        const { data: target } = await supabaseAdmin.from("profiles").select("role").eq("id", id).maybeSingle();
+        if (target?.role === "admin") {
+          return res.status(403).json({ error: "Chỉ tài khoản Admin mới xoá được tài khoản Admin." });
+        }
       }
       const { error } = await supabaseAdmin.auth.admin.deleteUser(id);
       if (error) {
