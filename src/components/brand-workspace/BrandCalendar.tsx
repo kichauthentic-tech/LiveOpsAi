@@ -52,7 +52,6 @@ interface BrandCalendarProps {
   // Cửa sổ Ca Live (2026-09-21): click ca đã có → cùng cửa sổ với agency; brand chỉ đọc.
   currentRole?: UserRole;
   onSessionsUpdated?: (sessions: LiveSession[]) => void;
-  onSessionSnapshotApplied?: (session: LiveSession) => void;
   onDeleteSession?: (id: string) => Promise<void>;
   onCancelSession?: (id: string, reason: string, reopenSlot: boolean) => Promise<boolean>;
   onSetSessionExcluded?: (id: string, excluded: boolean, reason: string) => Promise<boolean>;
@@ -115,7 +114,6 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
   onFinalizeSlot,
   currentRole,
   onSessionsUpdated,
-  onSessionSnapshotApplied,
   onDeleteSession,
   onCancelSession,
   onSetSessionExcluded,
@@ -596,7 +594,6 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
           shiftSlots={shiftSlots}
           onClose={() => setOpenSessionId(null)}
           onSessionsUpdated={onSessionsUpdated}
-          onSessionSnapshotApplied={onSessionSnapshotApplied}
           onUpdateSession={canManage ? onUpdateSession : undefined}
           onDeleteSession={canManage ? onDeleteSession : undefined}
           onCancelSession={canManage ? onCancelSession : undefined}

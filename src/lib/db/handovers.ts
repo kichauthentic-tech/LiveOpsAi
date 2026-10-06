@@ -51,3 +51,21 @@ export async function submitHandover(sessionId: string, input: HandoverInput): P
   const ids = [...new Set(((data as { id: string }[]) ?? []).map((r) => r.id).concat(sessionId))];
   return Promise.all(ids.map((id) => fetchSessionById(id)));
 }
+
+/** Giao ca TikTok (0145): file Creator-Live-Performance đã up ở bước 1 (apply_session_live_snapshot) — bước này chỉ ghi
+ *  sự cố/OT/ghi chú và đánh dấu đã giao. DB từ chối khi ca chưa có file. */
+export async function submitTikTokHandover(
+  sessionId: string,
+  v: { otMinutes: number; earlyLeaveMinutes: number; restartCount: number; hostLate: boolean; statusNote: string }
+): Promise<LiveSession> {
+  const { error } = await supabase.rpc("submit_tiktok_handover", {
+    p_session_id: sessionId,
+    p_ot_minutes: v.otMinutes,
+    p_early_leave_minutes: v.earlyLeaveMinutes,
+    p_restart_count: v.restartCount,
+    p_host_late: v.hostLate,
+    p_status_note: v.statusNote
+  });
+  if (error) throw error;
+  return fetchSessionById(sessionId);
+}

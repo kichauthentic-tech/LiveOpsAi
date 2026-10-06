@@ -1,13 +1,14 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link2 } from "lucide-react";
 import { LiveSession } from "../types";
-import { fmtCount, handoverShare, HandoverInput, MINUTE_PRESETS, parseCount, parseDashboardLink, PreviousHandover } from "../lib/handover";
+import { fmtCount, handoverShare, HandoverInput, parseCount, parseDashboardLink, PreviousHandover } from "../lib/handover";
+import { HandoverIncidents, incidentsFromReport, incidentValues } from "./HandoverIncidents";
 import { fetchPreviousHandover, submitHandover } from "../lib/db/handovers";
 import { errorMessage } from "../lib/errorMessage";
 import { fmtVndFull } from "../lib/format";
 import { PlatformChip } from "./common/PlatformChip";
 
-// Màn GIAO CA (0144, Đợt 2 lịch 2 sàn) — thay dòng Google Sheet trợ live gõ mỗi ca. Thiết kế cho điện thoại, làm trong
+// Màn GIAO CA của ca SHOPEE (0144; ca TikTok giao bằng file — TikTokHandover, user chốt 06/10 tối). Thiết kế cho điện thoại, làm trong
 // một phút: (1) dán link dashboard, (2) gõ 3 số ĐANG THẤY trên dashboard, (3) chạm chọn sự cố. Không hỏi CTR/CTOR/ERR/
 // AVG view: hai sàn đều có trong file đối soát cuối kỳ, gõ tay là nguồn của hàng trăm ô "4.29%", "28s" trong Sheet.
 // Ca nối: gõ đúng số TỔNG đang thấy, app tự trừ ca trước cùng phòng (trước đây trợ live tự trừ — và có ca bỏ trống).
@@ -17,9 +18,6 @@ interface Props {
   onSaved: (updated: LiveSession[]) => void;
   onCancel?: () => void;
 }
-
-type Incident = "ot" | "early" | "restart" | "late";
-const INCIDENT_LABEL: Record<Incident, string> = { ot: "OT", early: "Off sớm", restart: "Restart", late: "Host trễ" };
 
 const inputCls =
   "w-full min-h-11 px-3 py-2.5 border border-[var(--border)] rounded-xl text-base font-semibold text-[var(--text)] bg-[var(--surface-base)] placeholder:text-[var(--text-faint)]";
@@ -33,18 +31,7 @@ export function HandoverForm({ session: s, onSaved, onCancel }: Props) {
   const [views, setViews] = useState(fmtCount(r?.cumViews));
   const [third, setThird] = useState(fmtCount(isShopee ? r?.cumAtc : r?.cumOrders));
   const [coins, setCoins] = useState(fmtCount(r?.coinSpent));
-  const [incidents, setIncidents] = useState<Set<Incident>>(() => {
-    const out = new Set<Incident>();
-    if (r?.otMinutes) out.add("ot");
-    if (r?.earlyLeaveMinutes) out.add("early");
-    if (r?.restartCount) out.add("restart");
-    if (r?.hostLate) out.add("late");
-    return out;
-  });
-  const [otMinutes, setOtMinutes] = useState(r?.otMinutes || 30);
-  const [earlyMinutes, setEarlyMinutes] = useState(r?.earlyLeaveMinutes || 30);
-  const [restarts, setRestarts] = useState(r?.restartCount || 1);
-  const [note, setNote] = useState(r?.statusNote ?? "");
+  const [incidents, setIncidents] = useState(() => incidentsFromReport(r));
   const [prevState, setPrevState] = useState<{ ref: string; prev: PreviousHandover | null } | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -78,14 +65,6 @@ export function HandoverForm({ session: s, onSaved, onCancel }: Props) {
   if (!isShopee && cumThird == null) missing.push("số đơn");
   const canSubmit = missing.length === 0 && !wrongPlatform && !share?.belowPrevious && !saving;
 
-  const toggle = (k: Incident) =>
-    setIncidents((cur) => {
-      const next = new Set(cur);
-      if (next.has(k)) next.delete(k);
-      else next.add(k);
-      return next;
-    });
-
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!canSubmit || cumGmv == null || cumViews == null) return;
@@ -98,11 +77,7 @@ export function HandoverForm({ session: s, onSaved, onCancel }: Props) {
       cumOrders: isShopee ? null : cumThird,
       cumAtc: isShopee ? cumThird : null,
       coinSpent: isShopee ? parseCount(coins) : null,
-      otMinutes: incidents.has("ot") ? otMinutes : 0,
-      earlyLeaveMinutes: incidents.has("early") ? earlyMinutes : 0,
-      restartCount: incidents.has("restart") ? restarts : 0,
-      hostLate: incidents.has("late"),
-      statusNote: note.trim()
+      ...incidentValues(incidents)
     };
     try {
       onSaved(await submitHandover(s.id, input));
@@ -181,60 +156,7 @@ export function HandoverForm({ session: s, onSaved, onCancel }: Props) {
         )}
       </div>
 
-      <div className="space-y-2">
-        <p className={labelCls}>3 · Ca này có gì?</p>
-        <div className="flex flex-wrap gap-1.5">
-          <button
-            type="button"
-            aria-pressed={incidents.size === 0}
-            onClick={() => setIncidents(new Set())}
-            className={`min-h-9 px-3 rounded-full text-xs font-bold border ${incidents.size === 0 ? "bg-[var(--accent)] text-white border-[var(--accent)]" : "border-[var(--border)] text-[var(--text-muted)]"}`}
-          >
-            Đúng giờ, không sự cố
-          </button>
-          {(Object.keys(INCIDENT_LABEL) as Incident[]).map((k) => (
-            <button
-              key={k}
-              type="button"
-              aria-pressed={incidents.has(k)}
-              onClick={() => toggle(k)}
-              className={`min-h-9 px-3 rounded-full text-xs font-bold border ${incidents.has(k) ? "bg-amber-600 text-white border-amber-600" : "border-[var(--border)] text-[var(--text-muted)]"}`}
-            >
-              {INCIDENT_LABEL[k]}
-            </button>
-          ))}
-        </div>
-        {(["ot", "early"] as const).filter((k) => incidents.has(k)).map((k) => {
-          const val = k === "ot" ? otMinutes : earlyMinutes;
-          const set = k === "ot" ? setOtMinutes : setEarlyMinutes;
-          return (
-            <div key={k} className="flex flex-wrap items-center gap-1.5 text-xs">
-              <span className="font-bold text-[var(--text-muted)] w-14">{INCIDENT_LABEL[k]}</span>
-              {MINUTE_PRESETS.map((m) => (
-                <button key={m} type="button" onClick={() => set(m)} className={`min-h-8 px-2.5 rounded-lg border font-bold ${val === m ? "bg-[var(--accent)] text-white border-[var(--accent)]" : "border-[var(--border)] text-[var(--text-muted)]"}`}>
-                  {m}p
-                </button>
-              ))}
-              <input
-                aria-label={`${INCIDENT_LABEL[k]} (phút)`}
-                inputMode="numeric"
-                value={String(val)}
-                onChange={(e) => set(parseCount(e.target.value) ?? 0)}
-                className="w-16 min-h-8 px-2 rounded-lg border border-[var(--border)] bg-[var(--surface-base)] text-[var(--text)] font-mono"
-              />
-              <span className="text-[var(--text-faint)]">phút</span>
-            </div>
-          );
-        })}
-        {incidents.has("restart") && (
-          <div className="flex items-center gap-1.5 text-xs">
-            <span className="font-bold text-[var(--text-muted)] w-14">Restart</span>
-            <input aria-label="Số lần restart" inputMode="numeric" value={String(restarts)} onChange={(e) => setRestarts(parseCount(e.target.value) ?? 0)} className="w-16 min-h-8 px-2 rounded-lg border border-[var(--border)] bg-[var(--surface-base)] text-[var(--text)] font-mono" />
-            <span className="text-[var(--text-faint)]">lần</span>
-          </div>
-        )}
-        <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ghi chú (không bắt buộc)" className={`${inputCls} text-sm`} />
-      </div>
+      <HandoverIncidents label="3 · Ca này có gì?" value={incidents} onChange={setIncidents} />
 
       <p className="text-[11px] text-[var(--text-faint)]">
         Số lúc giao ca thường thấp hơn số chốt (đo T8–T9: 16–23%) vì đơn còn về sau khi tắt live. Số chốt lấy từ file đối soát cuối kỳ — các chỉ số

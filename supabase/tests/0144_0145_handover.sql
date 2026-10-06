@@ -1,4 +1,4 @@
--- Kiểm migration 0144 (giao ca). Chạy trên bản REPLAY cả chuỗi (README.md) SAU khi nạp 0144.
+-- Kiểm migration 0144 + 0145 (giao ca). Chạy trên bản REPLAY cả chuỗi (README.md) SAU khi nạp 0145.
 -- Mỗi mục in "OK ..."; ERROR là hỏng. Chạy trên bản replay CHƯA có 0144 thì phải đỏ ngay mục 1.
 -- Tình huống thật: phiên VERA Shopee 26/09 mã 41439111 chạy 18:00–00:30 qua ba ca (18–20, 20–21, 21–00:30);
 -- Sheet ghi ca đầu 4.267.859 (ATC 228, 5.883 lượt xem), file Shopee chốt cả phiên 12.322.359.
@@ -141,3 +141,25 @@ select pg_temp.chk('4b ca đã đối soát giữ số file, vẫn ghi nhận gi
 select pg_temp.chk('5a anon không có quyền EXECUTE',
   not has_function_privilege('anon', 'submit_session_handover(uuid, text, numeric, int, int, int, numeric, int, int, int, boolean, text)', 'execute')
   and not has_function_privilege('anon', 'handover_previous(uuid, text)', 'execute'));
+
+-- ============ 6) 0145: ca TikTok giao ca bằng file ============
+-- (Chạy cùng bộ này trên replay có 0145.) Ca TikTok đã qua, chưa có file.
+select pg_temp.as_user('a0000000-0000-0000-0000-000000000001');
+insert into live_sessions (id, title, brand_id, brand_name, date, start_time, end_time, co_host_id, status, platform) values
+  ('d0000000-0000-0000-0000-000000000005', 'VERA T2', 'b0000000-0000-0000-0000-00000000000a', 'VERA', current_date + 7, '10:00', '13:00', 'c0000000-0000-0000-0000-000000000001', 'Upcoming', 'TikTok');
+select pg_temp.chk('6a lời nhắc ca TikTok nói "up file"', body like '%up file Creator-Live-Performance%')
+  from notifications where session_id = 'd0000000-0000-0000-0000-000000000005' and kind = 'handover_due';
+select pg_temp.as_user('a0000000-0000-0000-0000-000000000002');  -- Trà Giang, trợ ca 5
+select pg_temp.must_fail('6b chưa up file thì chưa giao ca được',
+  $q$select submit_tiktok_handover('d0000000-0000-0000-0000-000000000005', 15, 0, 0, false, '')$q$, 'Up file Creator-Live-Performance');
+select pg_temp.must_fail('6c ca Shopee không giao bằng đường file',
+  $q$select submit_tiktok_handover('d0000000-0000-0000-0000-000000000001')$q$, 'Ca Shopee');
+insert into session_live_snapshots (session_id, file_name, boundary_at) values ('d0000000-0000-0000-0000-000000000005', 'Creator-Live-Performance.xlsx', now());
+select submit_tiktok_handover('d0000000-0000-0000-0000-000000000005', 15, 0, 1, true, 'mất mạng 5 phút');
+select pg_temp.chk('6d có file ⇒ giao ca xong, ghi OT/restart/host trễ, xoá lời nhắc',
+  r.handover_at is not null and r.ot_minutes = 15 and r.restart_count = 1 and r.host_late and r.submitted_by_talent_id = 'c0000000-0000-0000-0000-000000000001'
+  and not exists (select 1 from notifications n where n.session_id = r.session_id and n.kind = 'handover_due'))
+  from live_session_reports r where r.session_id = 'd0000000-0000-0000-0000-000000000005';
+select pg_temp.as_user('a0000000-0000-0000-0000-000000000003');  -- Thảo, không phải trợ ca 5
+select pg_temp.must_fail('6e người khác không giao hộ',
+  $q$select submit_tiktok_handover('d0000000-0000-0000-0000-000000000005')$q$, 'Chỉ trợ live');

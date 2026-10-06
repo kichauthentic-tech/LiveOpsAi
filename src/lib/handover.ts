@@ -1,6 +1,7 @@
 import type { LiveSession } from "../types";
 
-// Giao ca (0144, Đợt 2 lịch 2 sàn). Logic thuần — màn ở components/HandoverForm.tsx, ghi ở lib/db/handovers.ts.
+// Giao ca (0144/0145). Logic thuần. Ca TikTok giao bằng file Creator-Live-Performance + sự cố (TikTokHandover, user chốt
+// 06/10 tối); ca Shopee dán link dashboard + 3 số (HandoverForm). Ghi ở lib/db/handovers.ts.
 //
 // Người trực dán đúng link dashboard họ đang dán vào Google Sheet (Working File T8–T9: 87–97% dòng có link), app đọc ra
 // sàn + mã phòng/phiên. Hai dạng thật trong file:

@@ -7,9 +7,9 @@ import { dataQuality, DataQuality, isCountable, sessionHours } from "./performan
 // SKU/AI coach không có luồng ghi) và bảng Sessions thô của brand workspace. Chỉ đọc, không có
 // form sửa số tay: đường ghi số vẫn là snapshot → report → đối soát như đã chốt.
 
-// "report" = chưa GIAO CA (0144: giao ca ghi report ca; report cũ gõ tay trước 0144 cũng tính là đã có). File
-// Creator-Live-Performance lúc giao ca không còn là bước bắt buộc (06/10 đợt 2: giao ca = dán link + 3 số) — OPS vẫn up được.
-export type MissingStep = "report" | "reconcile";
+// "snapshot" = ca TikTok chưa up file Creator-Live-Performance (bước 1 giao ca TikTok, user chốt 06/10 tối); "report" =
+// chưa GIAO CA (0144/0145 ghi report ca; report cũ gõ tay trước 0144 cũng tính là đã có); "reconcile" = chưa đối soát.
+export type MissingStep = "snapshot" | "report" | "reconcile";
 
 export interface LedgerFilter {
   month: string; // "YYYY-MM", "" = mọi tháng
@@ -22,6 +22,12 @@ export interface LedgerFilter {
 // Đã có số từ file: bậc live_snapshot/tiktok_reconciled, hoặc ca nạp bù (0086) mang sẵn room.
 export function hasSnapshot(s: LiveSession): boolean {
   return s.dataSource === "live_snapshot" || s.dataSource === "tiktok_reconciled" || (s.liveRoomIds?.length ?? 0) > 0;
+}
+
+// Ca TikTok giao ca bằng file (Creator-Live-Performance là file của TikTok); ca Shopee không có file theo ca — giao ca
+// bằng link dashboard + số, số chốt đến từ Live List ở Đối Soát.
+export function needsSnapshotFile(s: Pick<LiveSession, "platform">): boolean {
+  return s.platform !== "Shopee";
 }
 
 export function hasReport(s: LiveSession): boolean {
@@ -43,6 +49,7 @@ export function needsClosing(s: LiveSession, today: string): boolean {
 export function missingSteps(s: LiveSession, today: string): MissingStep[] {
   if (!needsClosing(s, today)) return [];
   const out: MissingStep[] = [];
+  if (needsSnapshotFile(s) && !hasSnapshot(s)) out.push("snapshot");
   if (!hasReport(s)) out.push("report");
   if (!isReconciled(s)) out.push("reconcile");
   return out;
@@ -132,7 +139,7 @@ export function summarize(rows: LiveSession[], today: string): LedgerSummary {
   const hours = countable.reduce((a, s) => a + sessionHours(s), 0);
   const gmv = countable.reduce((a, s) => a + (s.actualGmv ?? 0), 0);
   const orders = countable.reduce((a, s) => a + (s.totalOrders ?? 0), 0);
-  const missing: Record<MissingStep, number> = { report: 0, reconcile: 0 };
+  const missing: Record<MissingStep, number> = { snapshot: 0, report: 0, reconcile: 0 };
   for (const s of rows) for (const m of missingSteps(s, today)) missing[m]++;
   return {
     total: rows.length,

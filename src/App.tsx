@@ -965,10 +965,6 @@ export default function App() {
   const handleReconciliationApplied = async () => {
     setSessions(await fetchSessions());
   };
-  // Snapshot upload trả về đúng LiveSession vừa tính lại — chỉ cần thay 1 phần tử trong state.
-  const handleSessionReconciled = (updated: LiveSession) => {
-    setSessions((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
-  };
   const handleDeleteSession = async (id: string) => {
     try {
       await deleteSession(id);
@@ -1636,7 +1632,6 @@ export default function App() {
                     studios={activeStudios}
                     talents={activeTalents}
                     onSessionsUpdated={handleSessionsUpdated}
-                    onSessionSnapshotApplied={handleSessionReconciled}
                     onUpdateSession={handleUpdateSession}
                     onDeleteSession={handleDeleteSession}
                     onCancelSession={handleCancelSession}
@@ -1678,7 +1673,6 @@ export default function App() {
                         currentRole={currentRole}
                         myTalentId={activeUser.assignedTalentId}
                         onSessionsUpdated={handleSessionsUpdated}
-                        onSessionSnapshotApplied={handleSessionReconciled}
                         onUpdateSession={handleUpdateSession}
                         onDeleteSession={handleDeleteSession}
                     onCancelSession={handleCancelSession}
@@ -1710,7 +1704,6 @@ export default function App() {
                     currentRole={currentRole}
                     schemes={promoSchemes}
                     onSessionsUpdated={handleSessionsUpdated}
-                    onSessionSnapshotApplied={handleSessionReconciled}
                     onDeleteSession={handleDeleteSession}
                     onCancelSession={handleCancelSession}
                     onSetSessionExcluded={handleSetSessionExcluded}
@@ -1733,7 +1726,6 @@ export default function App() {
                     currentRole={currentRole}
                     myTalentId={activeUser.assignedTalentId}
                     onSessionsUpdated={handleSessionsUpdated}
-                    onSessionSnapshotApplied={handleSessionReconciled}
                     onOpenScheduling={() => setActiveTab("shift_scheduling")}
                     requestOpenSessionId={notifOpenSessionId}
                     onOpenRequestHandled={() => setNotifOpenSessionId(null)}
@@ -1758,7 +1750,6 @@ export default function App() {
                     onSessionsUpdated={handleSessionsUpdated}
                     onUpdateSession={handleUpdateSession}
                     onLogAudit={pushAuditLog}
-                    onSessionSnapshotApplied={handleSessionReconciled}
                     onOpenMonthPlan={() => setActiveTab("month_plan")}
                     fatigueWeekHours={engineParams.fatigueWeekHours}
                     onCancelSession={handleCancelSession}
@@ -1887,7 +1878,6 @@ export default function App() {
                     canEdit={currentRole === "ceo" || currentRole === "operations" || currentRole === "admin"}
                     currentRole={currentRole}
                     onSessionsUpdated={handleSessionsUpdated}
-                    onSessionSnapshotApplied={handleSessionReconciled}
                     onDeleteSession={handleDeleteSession}
                     onCancelSession={handleCancelSession}
                     onSetSessionExcluded={handleSetSessionExcluded}
@@ -1911,7 +1901,6 @@ export default function App() {
                     brands={brands}
                     currentRole={currentRole}
                     onSessionsUpdated={handleSessionsUpdated}
-                    onSessionSnapshotApplied={handleSessionReconciled}
                   />
                 )}
 

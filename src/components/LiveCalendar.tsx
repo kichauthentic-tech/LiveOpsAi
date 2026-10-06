@@ -47,7 +47,6 @@ interface LiveCalendarProps {
   schemes?: PromoScheme[];
   // Cửa sổ Ca Live (2026-09-21): click ca → cùng một cửa sổ với Sổ Ca / Đăng Ký & Chốt Lịch.
   onSessionsUpdated?: (sessions: LiveSession[]) => void;
-  onSessionSnapshotApplied?: (session: LiveSession) => void;
   onDeleteSession?: (id: string) => Promise<void>;
   onCancelSession?: (id: string, reason: string, reopenSlot: boolean) => Promise<boolean>;
   onSetSessionExcluded?: (id: string, excluded: boolean, reason: string) => Promise<boolean>;
@@ -87,7 +86,6 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   currentRole,
   schemes = [],
   onSessionsUpdated,
-  onSessionSnapshotApplied,
   onDeleteSession,
   onCancelSession,
   onSetSessionExcluded,
@@ -1344,7 +1342,6 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
           shiftSlots={shiftSlots}
           onClose={() => setSelectedSessionDetail(null)}
           onSessionsUpdated={onSessionsUpdated}
-          onSessionSnapshotApplied={onSessionSnapshotApplied}
           onUpdateSession={onUpdateSession}
           onDeleteSession={onDeleteSession}
           onCancelSession={onCancelSession}

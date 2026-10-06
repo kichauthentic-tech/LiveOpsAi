@@ -68,7 +68,6 @@ interface ShiftSchedulingProps {
   onSessionsUpdated: (sessions: LiveSession[]) => void;
   // RPC apply_session_live_snapshot đã ghi DB và trả về LiveSession đầy đủ — chỉ cần đồng bộ
   // lại state, không gọi updateSession (sẽ ghi đè ngược số vừa tính bằng state cũ của client).
-  onSessionSnapshotApplied: (session: LiveSession) => void;
   // Nhắc việc (0091): brand chưa chốt Kế Hoạch Tháng cho tháng sau → nút nhảy sang tab đó.
   onOpenMonthPlan?: () => void;
   fatigueWeekHours?: number; // ngưỡng mệt, admin vặn ở AI Training Center; mặc định FATIGUE_WEEK_HOURS
@@ -165,7 +164,6 @@ export default function ShiftScheduling({
   onUpdateSession,
   onLogAudit,
   onSessionsUpdated,
-  onSessionSnapshotApplied,
   onOpenMonthPlan,
   fatigueWeekHours = FATIGUE_WEEK_HOURS,
   onCancelSession,
@@ -1131,7 +1129,6 @@ export default function ShiftScheduling({
             shiftSlots={shiftSlots}
             onClose={() => setOpenSessionId(null)}
             onSessionsUpdated={onSessionsUpdated}
-            onSessionSnapshotApplied={onSessionSnapshotApplied}
             onUpdateSession={admin ? onUpdateSession : undefined}
             onCancelSession={admin ? onCancelSession : undefined}
             onSetSessionExcluded={admin ? onSetSessionExcluded : undefined}

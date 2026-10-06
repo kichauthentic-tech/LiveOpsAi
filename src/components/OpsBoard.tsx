@@ -32,7 +32,6 @@ export interface OpsBoardProps {
   currentRole: UserRole;
   myTalentId?: string;
   onSessionsUpdated: (sessions: LiveSession[]) => void;
-  onSessionSnapshotApplied: (session: LiveSession) => void;
   onUpdateSession?: (session: LiveSession) => Promise<boolean>;
   onDeleteSession?: (id: string) => Promise<void>;
   onCancelSession?: (id: string, reason: string, reopenSlot: boolean) => Promise<boolean>;
@@ -49,7 +48,7 @@ export interface OpsBoardProps {
 type Range = "today" | "tomorrow" | "week" | "day";
 
 const WEEKDAY = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
-const MISSING_LABEL: Record<MissingStep, string> = { report: "chưa giao ca", reconcile: "chưa đối soát" };
+const MISSING_LABEL: Record<MissingStep, string> = { snapshot: "chưa up file", report: "chưa giao ca", reconcile: "chưa đối soát" };
 const STATUS_LABEL = SESSION_STATUS_LABEL_VI;
 const STATUS_CLS = SESSION_STATUS_CLS;
 
@@ -84,7 +83,6 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
   currentRole,
   myTalentId,
   onSessionsUpdated,
-  onSessionSnapshotApplied,
   onUpdateSession,
   onDeleteSession,
   onCancelSession,
@@ -144,7 +142,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
   // Talent: ca mình phải giao mà chưa giao + sắp tới 14 ngày.
   const mineDue = useMemo(
     // Chỉ ca MÌNH phải giao (mình là trợ live — 0144, user chốt 06/10: host không giao, ca không trợ thì OPS giao).
-    () => (mode === "mine" ? sessions.filter((s) => isHandoverPerson(s, myTalentId) && s.date <= today && missingSteps(s, today).includes("report")).sort((a, b) => b.date.localeCompare(a.date) || b.startTime.localeCompare(a.startTime)) : []),
+    () => (mode === "mine" ? sessions.filter((s) => isHandoverPerson(s, myTalentId) && s.date <= today && missingSteps(s, today).some((m) => m !== "reconcile")).sort((a, b) => b.date.localeCompare(a.date) || b.startTime.localeCompare(a.startTime)) : []),
     [mode, sessions, myTalentId, today]
   );
   const mineUpcoming = useMemo(
@@ -248,7 +246,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
             {mode === "mine" ? "Ca Của Tôi" : "Bảng Vận Hành"}
           </h2>
           <PageIntro>
-            {mode === "mine" ? "Ca bạn trực. Hết ca: bấm vào ca → Giao ca (dán link dashboard, gõ 3 số đang thấy, chọn sự cố)." : "Hôm nay có ca nào, ai trực, còn thiếu gì. Bấm vào ca để mở cửa sổ ca."}
+            {mode === "mine" ? "Ca bạn trực. Hết ca: bấm vào ca → Giao ca (TikTok: up file Creator-Live-Performance; Shopee: dán link dashboard + gõ 3 số; rồi chọn sự cố)." : "Hôm nay có ca nào, ai trực, còn thiếu gì. Bấm vào ca để mở cửa sổ ca."}
           </PageIntro>
         </div>
         {mode === "ops" && (
@@ -401,7 +399,6 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
           shiftSlots={shiftSlots}
           onClose={() => setOpenId(null)}
           onSessionsUpdated={onSessionsUpdated}
-          onSessionSnapshotApplied={onSessionSnapshotApplied}
           onUpdateSession={mode === "ops" ? onUpdateSession : undefined}
           onDeleteSession={mode === "ops" ? onDeleteSession : undefined}
           onCancelSession={mode === "ops" ? onCancelSession : undefined}

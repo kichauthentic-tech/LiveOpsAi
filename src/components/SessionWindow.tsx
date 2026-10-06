@@ -21,8 +21,8 @@ import {
 } from "../lib/sessionLedger";
 import { DataSourceBadge } from "./common/DataSourceBadge";
 import { BrandLogo } from "./ui/BrandLogo";
-import { SessionLiveSnapshotUpload } from "./SessionLiveSnapshotUpload";
 import { HandoverForm } from "./HandoverForm";
+import { TikTokHandover } from "./TikTokHandover";
 import { handoverOwnerLabel, hasHandover, isHandoverPerson } from "../lib/handover";
 import { useToast } from "../hooks/useToast";
 import { useConfirm } from "../hooks/useConfirm";
@@ -61,7 +61,6 @@ export interface SessionWindowProps {
   onClose: () => void;
   /** Giao ca xong: các ca đã đổi số (ca nối phía sau cũng tính lại) — App thay trong state. */
   onSessionsUpdated?: (sessions: LiveSession[]) => void;
-  onSessionSnapshotApplied?: (session: LiveSession) => void;
   onUpdateSession?: (session: LiveSession) => Promise<boolean>;
   onDeleteSession?: (id: string) => Promise<void>;
   // 0097: huỷ ca (ops) — ca chưa có số liệu; slot đã chốt về 'cancelled', talent được báo.
@@ -83,6 +82,7 @@ const WEEKDAY = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
 const STATUS_LABEL = SESSION_STATUS_LABEL_VI;
 const STATUS_CLS = SESSION_STATUS_CLS;
 const MISSING_LABEL: Record<MissingStep, string> = {
+  snapshot: "Chưa up file Creator-Live-Performance",
   report: "Chưa giao ca",
   reconcile: "Chưa đối soát"
 };
@@ -109,7 +109,6 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
   talents,
   onClose,
   onSessionsUpdated,
-  onSessionSnapshotApplied,
   onUpdateSession,
   onDeleteSession,
   onCancelSession,
@@ -129,8 +128,6 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
   // Giao ca (0144): trợ live của ca, ca không trợ thì OPS (user chốt 06/10). Host xem được ai phải giao.
   const showHandover = !isBrandView && !s.isBackfill && s.status !== "Cancelled" && !!onSessionsUpdated;
   const canHandover = showHandover && (isOps || isHandoverPerson(s, viewer.myTalentId));
-  // File Creator-Live-Performance (TikTok) nay là đường PHỤ của OPS — giao ca chính là dán link + 3 số. Ca Shopee không có file này.
-  const canSnapshotFile = isOps && !s.isBackfill && !!onSessionSnapshotApplied && s.platform !== "Shopee";
   const canEdit = isOps && !!onUpdateSession && !!studios && !!talents;
   // 0133: DB không cho dời ngày/giờ ca đã có số (ranh giới snapshot/đối soát tính theo giờ ca).
   // 0138: ca đã chia người theo đoạn giờ cũng khoá giờ (offset phút của đoạn sẽ lệch) — bỏ chia đoạn trước khi dời.
@@ -506,7 +503,8 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
             )}
           </section>
 
-          {/* Giao ca (0144): trợ live của ca — ca không trợ thì OPS — dán link dashboard + 3 số + sự cố. Thay form report cũ. */}
+          {/* Giao ca: trợ live của ca — ca không trợ thì OPS. TikTok = up file Creator-Live-Performance + sự cố (0145, user chốt
+              06/10 tối); Shopee = dán link dashboard + 3 số + sự cố (0144). Thay form report cũ. */}
           {showHandover && (
             <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface-base)]/60 p-3 space-y-3">
               <div className="flex items-center justify-between gap-2">
@@ -515,7 +513,17 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                   {handoverDone ? `đã giao ${new Date(s.report!.handoverAt!).toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" })}` : "chưa giao ca"}
                 </span>
               </div>
-              {handoverDone && !editingHandover && (
+              {handoverDone && !editingHandover && s.platform !== "Shopee" && (
+                <div className="space-y-1.5 text-xs">
+                  <p className="text-[var(--text-muted)]">{snapshotDone ? "Đã up file Creator-Live-Performance — số của ca ở \"Số liệu ca\" bên dưới." : "Chưa có file số liệu."}</p>
+                  {canHandover && (
+                    <button onClick={() => setEditingHandover(true)} className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-emerald-950 text-emerald-300 border border-emerald-800 hover:bg-emerald-900 transition-colors">
+                      Sửa giao ca / up lại file
+                    </button>
+                  )}
+                </div>
+              )}
+              {handoverDone && !editingHandover && s.platform === "Shopee" && (
                 <div className="space-y-1.5 text-xs">
                   <p className="flex flex-wrap items-center gap-1.5 text-[var(--text-muted)]">
                     <PlatformChip platform={s.platform} />
@@ -536,6 +544,16 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
               )}
               {(!handoverDone || editingHandover) &&
                 (canHandover ? (
+                  s.platform !== "Shopee" ? (
+                    <TikTokHandover
+                      session={s}
+                      onSaved={(updated) => {
+                        onSessionsUpdated!(updated);
+                        if (updated.some((u) => u.report?.handoverAt && u.id === s.id && u.report.handoverAt !== s.report?.handoverAt)) setEditingHandover(false);
+                      }}
+                      onCancel={editingHandover ? () => setEditingHandover(false) : undefined}
+                    />
+                  ) : (
                   <HandoverForm
                     session={s}
                     onSaved={(updated) => {
@@ -544,19 +562,10 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                     }}
                     onCancel={editingHandover ? () => setEditingHandover(false) : undefined}
                   />
+                  )
                 ) : (
                   <p className="text-xs text-[var(--text-muted)]">{handoverOwnerLabel(s)}.</p>
                 ))}
-              {canSnapshotFile && (
-                <details className="text-xs">
-                  <summary className="cursor-pointer text-[11px] font-bold text-[var(--text-faint)]">
-                    Cách khác (OPS, chỉ TikTok): up file Creator-Live-Performance{snapshotDone ? " — đã có file" : ""}
-                  </summary>
-                  <div className="pt-2">
-                    <SessionLiveSnapshotUpload session={s} onApplied={onSessionSnapshotApplied!} />
-                  </div>
-                </details>
-              )}
             </section>
           )}
 

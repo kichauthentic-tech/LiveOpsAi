@@ -66,8 +66,9 @@ describe("ai giao ca", () => {
     expect(handoverOwnerLabel(ca())).toBe("Trợ live Trà Giang giao ca");
     expect(handoverOwnerLabel(ca({ coHostId: undefined, coHostName: undefined }))).toBe("Ca không có trợ — OPS giao ca");
   });
-  test("bước còn thiếu: giao ca + đối soát, cả hai sàn, không còn đòi file TikTok", () => {
-    expect(missingSteps(ca({ platform: "TikTok" }), "2026-10-06")).toEqual(["report", "reconcile"]);
+  test("bước còn thiếu: TikTok up file → giao ca → đối soát; Shopee giao ca → đối soát (user chốt 06/10 tối)", () => {
+    expect(missingSteps(ca({ platform: "TikTok" }), "2026-10-06")).toEqual(["snapshot", "report", "reconcile"]);
+    expect(missingSteps(ca({ platform: "TikTok", dataSource: "live_snapshot" }), "2026-10-06")).toEqual(["report", "reconcile"]);
     expect(missingSteps(ca(), "2026-10-06")).toEqual(["report", "reconcile"]);
     const done = ca({ report: { handoverAt: "2026-10-05T13:20:00Z", submittedAt: "2026-10-05T13:20:00Z" } as LiveSession["report"] });
     expect(hasHandover(done)).toBe(true);
