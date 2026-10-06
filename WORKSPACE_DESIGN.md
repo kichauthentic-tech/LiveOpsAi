@@ -18,7 +18,7 @@
   tới đâu, cái gì kêu, rồi sửa đúng chỗ đó. **Không seed mock lại.**
 - **Nợ kỹ thuật đã hết** (đợt P2a-2…P2a-21, 01–02/10) và **audit code chết đã xong** (02/10): `npm run audit:dead` báo 0,
   ESLint 0 lỗi (31 warning `set-state-in-effect` = nợ đã đo, cố ý `warn`), vitest 467/467 (05/10).
-- **06/10 khuya: GIAO CA TIKTOK = UP FILE (migration `0145` CHƯA CHẠY).** User hỏi lại "đã build từ đầu là TikTok up file Excel" và chốt:
+- **06/10 khuya: GIAO CA TIKTOK = UP FILE (migration `0145` ĐÃ CHẠY 06/10; DB thật: ca CROCS TikTok chưa file ⇒ "Up file … trước", ca Shopee ⇒ "giao bằng link", 0 dòng ghi; lời nhắc ca TikTok đã đổi câu).** User hỏi lại "đã build từ đầu là TikTok up file Excel" và chốt:
   **ca TikTok giao ca bằng file Creator-Live-Performance** (bước 1, RPC `apply_session_live_snapshot` có sẵn) + **chọn sự cố/OT** (bước 2, RPC
   `submit_tiktok_handover` — DB từ chối khi ca chưa có file); **ca Shopee giữ dán link + 3 số** (Shopee không có file theo ca). Component
   `TikTokHandover` / `HandoverForm` (Shopee) / `HandoverIncidents` (dùng chung). Bước còn thiếu: TikTok `snapshot` → `report` → `reconcile`
@@ -180,8 +180,6 @@
 ## 2. Việc còn treo
 
 **Cần user làm:**
-0000000000. **CHẠY MIGRATION `0145_tiktok_handover_file.sql`** (client đã deploy: chưa chạy thì bước 2 giao ca TikTok báo lỗi). Sau đó Claude
-   verify: gọi `submit_tiktok_handover` cho ca TikTok chưa có file ⇒ phải trả "Up file Creator-Live-Performance…" (không ghi gì).
 000000000. **0144 ĐÃ CHẠY 06/10.** Chưa đo: một lần giao ca THẬT đầu-cuối (chờ ca thật + số thật). Tiếp: tạo tài khoản cho host/trợ (Phân Quyền & Role, gắn hồ sơ talent) — Đợt 3; hướng dẫn trợ live: hết ca mở Ca Của Tôi → ca → Giao ca.
 00000000. **0143 ĐÃ CHẠY 06/10** (user xác nhận). Sửa 27 chỗ trùng người T10 (Bảng Vận Hành → khối đỏ "chỗ trùng người", hoặc Việc cần làm) — 0143 KHÔNG chặn ca trùng sẵn,
    chỉ chặn lần ghi đưa người vào ca/dời giờ; 32 ca Franklin Shopee T10 chưa có phòng (đặt phòng mặc định ở CRM → Hợp đồng & giá, ca đã tạo thì Sửa ca).
@@ -469,7 +467,7 @@ target khung camp ở Nhập Ads bỏ 06/10 — tháng không có kế hoạch c
 
 ## 6. Hạ tầng Supabase
 
-- 145 migration (`supabase/migrations/`) — **`0145` (giao ca TikTok bằng file) CHƯA CHẠY**; `0144` (giao ca) ĐÃ CHẠY 06/10; `0143` (chặn trùng người) ĐÃ CHẠY 06/10; **`0139`–`0142` (report / kế hoạch / hợp đồng theo sàn, file Ads Shopee) ĐÃ CHẠY 06/10**;, chạy tay theo thứ tự — **`0138` (đổi người giữa ca) ĐÃ CHẠY 06/10.** `0137` đã chạy 05/10. **`0136` ĐÃ CHẠY 05/10** (verify production: lô đối soát thử với phòng kết thúc đúng phút ca CROCS 30/09 11:01 bắt đầu ⇒ không khớp, phòng chồng 29 phút ⇒ khớp; lô thử đã xoá; trigger profiles nằm trước đoạn đó trong cùng file + chốt tự kiểm cuối file), bộ kiểm
+- 145 migration (`supabase/migrations/`) — `0145` (giao ca TikTok bằng file) ĐÃ CHẠY 06/10; `0144` (giao ca) ĐÃ CHẠY 06/10; `0143` (chặn trùng người) ĐÃ CHẠY 06/10; **`0139`–`0142` (report / kế hoạch / hợp đồng theo sàn, file Ads Shopee) ĐÃ CHẠY 06/10**;, chạy tay theo thứ tự — **`0138` (đổi người giữa ca) ĐÃ CHẠY 06/10.** `0137` đã chạy 05/10. **`0136` ĐÃ CHẠY 05/10** (verify production: lô đối soát thử với phòng kết thúc đúng phút ca CROCS 30/09 11:01 bắt đầu ⇒ không khớp, phòng chồng 29 phút ⇒ khớp; lô thử đã xoá; trigger profiles nằm trước đoạn đó trong cùng file + chốt tự kiểm cuối file), bộ kiểm
   `supabase/tests/0136_profile_guard_recon_edges_lock_past.sql` (replay, DB trắng): 16 OK, đỏ khi thiếu 0136. **Tới `0132` đều ĐÃ CHẠY** (0131 + 0132 ngày 02/10);
   **`0133` ĐÃ CHẠY 04/10** (verify ở §1); **`0134` ĐÃ CHẠY 05/10** (verify: CRM không còn SĐT mẫu); **`0135` ĐÃ CHẠY 05/10** (verify: 4 brand KAM "Chưa chọn", form sửa cũng "Chưa chọn"). Lô đối soát cũ (06–09/2026, không gắn brand) không áp dụng lại được — đo
   04/10 nó chỉ khớp ca CROCS nên chưa có số nào bị chia nhầm. Replay `0001 → 0133`: sạch, chạy lần 2 không lỗi; bộ kiểm hành vi
