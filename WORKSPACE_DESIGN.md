@@ -54,8 +54,8 @@
     `handlePickChannel`. Vòng chốt tháng nay chỉ đi qua 2 workspace (Agency, brand). Verify: vitest 620/620, lint 0 lỗi, audit:dead 0, build;
     bản dev nối DB thật: 13 màn hai phạm vi không lỗi, Dashboard "Tất cả kênh" có bảng toàn agency (366 ca T10, GMV cộng riêng TikTok 73,5M /
     Shopee 24,6M) + khối TikTok + khối Shopee; Sổ Ca "Tất cả" ghi "TikTok 73,5M · Shopee 24,6M"; Affiliate VERA tự về TikTok.
-  - Bước tiếp: 4 số liệu chuẩn (1 workspace Agency + 1 mỗi brand, bộ lọc
-    kênh) → 4 số liệu chuẩn (thang nguồn số, Live List ⇒ ATC/CO/Xu, CEO + P&L theo kênh) → 5 chạy thật 2–4 tuần.
+  - Bước tiếp: 4 số liệu chuẩn (thang nguồn số đúng cho Shopee, Live List ⇒ ATC/CO/Xu khi đối soát, Finance lãi/lỗ theo kênh) → 5 chạy thật
+    2–4 tuần (không tính năng mới).
 
 - **CHẠY THỬ THẬT trên dữ liệu thật** (từ 2026-09-18; mock đã xoá sạch 19/09). DB: 33 hồ sơ talent thật, CROCS T6–T9 nạp
   bù từ file Creator-Live-Performance (229 ca, còn ca chưa gán host). **Không đề xuất tính năng mới**; hỏi user chạy thử
