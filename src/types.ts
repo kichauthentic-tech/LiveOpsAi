@@ -660,6 +660,8 @@ export interface BrandMonthPlan {
   campRanges: PlanCampRanges; // khoảng ngày camp riêng (0094); thiếu khoá = lịch camp cố định
   /** KPI GMV CẢ SHOP brand giao (0122) — mọi kênh, khác targetGmv (phần live); 0 = chưa giao. Không dùng để xếp ca. */
   shopTargetGmv: number;
+  /** Ngân sách Ads của tháng (0146); 0 = chưa đặt. Report Tháng tính % đã dùng. */
+  adsBudget: number;
   lockedAt?: string;
   /** Brand đã bấm "xác nhận đã xem lịch" (migration 0110). Tự rớt về undefined nếu ops sửa tham số
    *  kế hoạch hoặc ca kế hoạch SAU khi brand đã xác nhận — xem trigger ở migration, đừng set tay. */

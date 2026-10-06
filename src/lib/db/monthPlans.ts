@@ -26,6 +26,7 @@ interface DbPlan {
   target_gmv: number | null;
   camp_ranges: PlanCampRanges | null;
   shop_target_gmv: number | null;
+  ads_budget: number | null;
   locked_at: string | null;
   brand_confirmed_at: string | null;
 }
@@ -59,6 +60,7 @@ const planFromDb = (r: DbPlan): BrandMonthPlan => ({
   targetGmv: Number(r.target_gmv ?? 0),
   campRanges: r.camp_ranges ?? {},
   shopTargetGmv: Number(r.shop_target_gmv ?? 0),
+  adsBudget: Number(r.ads_budget ?? 0),
   lockedAt: r.locked_at ?? undefined,
   brandConfirmedAt: r.brand_confirmed_at ?? undefined
 });
@@ -114,7 +116,7 @@ export async function fetchPlanStatuses(month: string): Promise<Map<string, Bran
   return new Map((data as DbPlan[]).map((r) => [brandPlatformKey(r.brand_id, r.platform), planFromDb(r)]));
 }
 
-export type PlanSettings = Pick<BrandMonthPlan, "defaultSlotHours" | "liveWindowStart" | "liveWindowEnd" | "maxSlotsPerDay" | "notes" | "blackoutDates" | "targetGmv" | "campRanges" | "shopTargetGmv">;
+export type PlanSettings = Pick<BrandMonthPlan, "defaultSlotHours" | "liveWindowStart" | "liveWindowEnd" | "maxSlotsPerDay" | "notes" | "blackoutDates" | "targetGmv" | "campRanges" | "shopTargetGmv" | "adsBudget">;
 
 export async function upsertMonthPlan(brandId: string, month: string, settings: PlanSettings, platform: ReportPlatform = "TikTok"): Promise<BrandMonthPlan> {
   const { data, error } = await supabase
@@ -132,7 +134,8 @@ export async function upsertMonthPlan(brandId: string, month: string, settings: 
         blackout_dates: settings.blackoutDates,
         target_gmv: settings.targetGmv,
         camp_ranges: settings.campRanges,
-        shop_target_gmv: settings.shopTargetGmv > 0 ? settings.shopTargetGmv : null
+        shop_target_gmv: settings.shopTargetGmv > 0 ? settings.shopTargetGmv : null,
+        ads_budget: settings.adsBudget > 0 ? settings.adsBudget : null
       },
       { onConflict: "brand_id,month,platform" }
     )

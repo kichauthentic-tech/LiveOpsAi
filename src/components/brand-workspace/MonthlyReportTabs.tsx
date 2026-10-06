@@ -1543,7 +1543,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
                   sub={`File Campaign overview data · ${fmtDateVn(adsCur.firstDate!, false)}–${fmtDateVn(adsCur.lastDate!, false)} · gồm LIVE GMV Max và Product GMV Max · ROI = doanh thu gộp ÷ chi phí · so ${prevLabel}`}
                 >
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
-                    <KpiTile label="Chi phí Ads" value={fmtVndShort(adsCur.cost)} note={vsPrev(adsCur.cost, adsPrev?.cost, fmtVndShort)} />
+                    <KpiTile label="Chi phí Ads" value={fmtVndShort(adsCur.cost)} note={planCur && planCur.plan.adsBudget > 0 ? `${fmtPct((adsCur.cost / planCur.plan.adsBudget) * 100)} ngân sách ${fmtVndShort(planCur.plan.adsBudget)}${adsPrev ? ` · ${vsPrev(adsCur.cost, adsPrev.cost, fmtVndShort)}` : ""}` : vsPrev(adsCur.cost, adsPrev?.cost, fmtVndShort)} />
                     <KpiTile label="ROI" value={roiX(adsCur.roi)} change={pctChange(adsPrev?.roi, adsCur.roi)} note={adsPrev ? `${prevLabel}: ${roiX(adsPrev.roi)}` : undefined} />
                     <KpiTile label="Chi phí / đơn SKU" value={adsCur.costPerOrder != null ? fmtVndFull(adsCur.costPerOrder) : "—"} note={`${fmtVndFull(adsCur.orders)} đơn${adsPrev?.costPerOrder != null ? ` · ${prevLabel}: ${fmtVndFull(adsPrev.costPerOrder)}` : ""}`} />
                     <KpiTile label="Doanh thu gộp từ Ads" value={fmtVndShort(adsCur.revenue)} change={pctChange(adsPrev?.revenue, adsCur.revenue)} />

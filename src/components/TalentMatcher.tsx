@@ -135,7 +135,6 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
   const [formTotalGmv, setFormTotalGmv] = useState(0);
   const [formCvr, setFormCvr] = useState(0);
   const [formCtr, setFormCtr] = useState(0);
-  const [formRate, setFormRate] = useState(5000000);
   const [formRateHour, setFormRateHour] = useState(0);
   const [formAssistantRateHour, setFormAssistantRateHour] = useState(0);
   const [formScore, setFormScore] = useState(0);
@@ -159,7 +158,6 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
     setFormTotalGmv(0);
     setFormCvr(0);
     setFormCtr(0);
-    setFormRate(0);
     setFormRateHour(0);
     setFormAssistantRateHour(0);
     setFormScore(0);
@@ -181,7 +179,6 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
     setFormTotalGmv(t.totalGmv || 0);
     setFormCvr(t.cvrAvg || 0);
     setFormCtr(t.ctrAvg || 0);
-    setFormRate(t.ratePerSession || 0);
     setFormRateHour(t.ratePerHour || 0);
     setFormAssistantRateHour(t.assistantRatePerHour || 0);
     setFormScore(t.overallScore || 0);
@@ -217,11 +214,10 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
 
     if (editingTalent) {
       // Partial update — chỉ gửi rate/commissionRate nếu currentRole thấy được field này (form
-      // không hiện input cho non-ceo/admin nên formRate/formCommission vẫn giữ giá trị cũ = 0 từ
+      // không hiện input cho non-ceo/admin nên formRateHour/formCommission vẫn giữ giá trị cũ = 0 từ
       // view mask — gửi lên sẽ vô tình ghi đè rate thật thành 0 nếu không loại trừ ở đây).
       const patch: Partial<Talent> = { ...basePayload };
       if (canSeeRate) {
-        patch.ratePerSession = Number(formRate);
         patch.ratePerHour = Number(formRateHour);
         patch.assistantRatePerHour = Number(formAssistantRateHour);
       }
@@ -242,7 +238,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
         const generatedPassword = await onCreateTalentAccount({
           ...basePayload,
           email,
-          ratePerSession: Number(formRate),
+          ratePerSession: 0,
           ratePerHour: Number(formRateHour),
           assistantRatePerHour: Number(formAssistantRateHour),
           // Không có hoa hồng theo GMV cho talent (user chốt 06/10) — ô nhập đã bỏ.
@@ -722,23 +718,14 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
 
               {/* Ô GMV trung bình mỗi ca, GMV luỹ kế, CVR gõ tay đã bỏ (audit người mới 2026-10-04): bảng và chi tiết luôn hiện số TỰ CỘNG
                   từ ca, còn ô gõ tay vẫn lưu và còn được gửi cho AI ghép host — hai con số cho một người. */}
-              <div className={`grid grid-cols-1 gap-3 ${canSeeRate ? "sm:grid-cols-3" : "sm:grid-cols-1"}`}>
+              <div className={`grid grid-cols-1 gap-3 ${canSeeRate ? "sm:grid-cols-2" : "sm:grid-cols-1"}`}>
                 {/* Rate Card/Hoa hồng — trường bảo mật, chỉ ceo/admin sửa được (xem talents_secure). */}
                 {canSeeRate && (
                   <>
                     <div>
-                      <label className="font-bold text-[var(--text-muted)] block mb-1">Rate Card (/live)</label>
-                      <input
-                        type="number"
-                        value={formRate}
-                        onChange={(e) => setFormRate(Number(e.target.value))}
-                        className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
-                      />
-                    </div>
-                    <div>
-                      {/* Giai đoạn 3 — rate theo GIỜ, song song rate/phiên ở trên. Đặt > 0 thì
-                          lương ca tính theo giờ công thực tế (giờ ca + OT − off sớm, xem
-                          billableSessionHours ở lib/pnl.ts); để 0 thì giữ nguyên rate/phiên. */}
+                      {/* Rate theo GIỜ: lương ca = rate × giờ công thực tế (giờ ca + OT − off sớm, xem
+                          billableSessionHours ở lib/pnl.ts). Ô rate/phiên đã ẩn (06/10) — pnl.ts vẫn
+                          đọc giá trị cũ làm dự phòng khi rate giờ = 0. */}
                       <label className="font-bold text-[var(--text-muted)] block mb-1">Rate Card (/giờ)</label>
                       <input
                         type="number"
