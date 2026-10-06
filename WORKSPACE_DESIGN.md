@@ -18,7 +18,7 @@
   tới đâu, cái gì kêu, rồi sửa đúng chỗ đó. **Không seed mock lại.**
 - **Nợ kỹ thuật đã hết** (đợt P2a-2…P2a-21, 01–02/10) và **audit code chết đã xong** (02/10): `npm run audit:dead` báo 0,
   ESLint 0 lỗi (31 warning `set-state-in-effect` = nợ đã đo, cố ý `warn`), vitest 467/467 (05/10).
-- **06/10 tối: LỊCH 2 SÀN — ĐỢT 2 "GIAO CA" (migration `0144` CHƯA CHẠY).** Thay dòng Google Sheet trợ live gõ mỗi ca (user chốt: chuyển
+- **06/10 tối: LỊCH 2 SÀN — ĐỢT 2 "GIAO CA" (migration `0144` ĐÃ CHẠY 06/10, verify DB thật: link sai/sai sàn bị từ chối P0001 không ghi gì, `handover_previous` chạy, 52 lời nhắc hẹn giờ cho admin (ca không trợ), 0 hiện trước hạn; production đã có bản mới).** Thay dòng Google Sheet trợ live gõ mỗi ca (user chốt: chuyển
   thẳng sang app). Cửa sổ Ca → mục **Giao ca** (`HandoverForm`, cho điện thoại): dán link dashboard (`parseDashboardLink`: TikTok `room_id=`, Shopee
   `/live/<số>` ⇒ sàn + mã phòng/phiên, sai sàn thì chặn) · 3 số ĐANG THẤY (GMV, lượt xem, đơn TikTok / ATC Shopee; xu tuỳ chọn) · chạm chọn sự cố
   (OT/off sớm theo mốc phút, restart, host trễ) · ca nối: gõ số TỔNG, app tự trừ ca trước cùng phòng (RPC `submit_session_handover` +
@@ -171,9 +171,7 @@
 ## 2. Việc còn treo
 
 **Cần user làm:**
-000000000. **CHẠY MIGRATION `0144_session_handover.sql` NGAY** (client đã deploy gọi RPC giao ca — chưa chạy thì bấm Giao ca báo lỗi). Sau đó
-   Claude verify: gọi `submit_session_handover` với link sai (phải trả "Link dashboard chưa đúng", không ghi gì) + đếm thông báo `handover_due` sắp tới.
-   Rồi: tạo tài khoản cho host/trợ (Phân Quyền & Role, gắn hồ sơ talent) — Đợt 3; hướng dẫn trợ live: hết ca mở Ca Của Tôi → ca → Giao ca.
+000000000. **0144 ĐÃ CHẠY 06/10.** Chưa đo: một lần giao ca THẬT đầu-cuối (chờ ca thật + số thật). Tiếp: tạo tài khoản cho host/trợ (Phân Quyền & Role, gắn hồ sơ talent) — Đợt 3; hướng dẫn trợ live: hết ca mở Ca Của Tôi → ca → Giao ca.
 00000000. **0143 ĐÃ CHẠY 06/10** (user xác nhận). Sửa 27 chỗ trùng người T10 (Bảng Vận Hành → khối đỏ "chỗ trùng người", hoặc Việc cần làm) — 0143 KHÔNG chặn ca trùng sẵn,
    chỉ chặn lần ghi đưa người vào ca/dời giờ; 32 ca Franklin Shopee T10 chưa có phòng (đặt phòng mặc định ở CRM → Hợp đồng & giá, ca đã tạo thì Sửa ca).
    **Lịch + giao ca 2 sàn — đề xuất** https://claude.ai/artifact/J4Kk16eZYeTtrkKDYvQWpY: Đợt 1 + Đợt 2 XONG (§1). Còn: **Đợt 3** tài khoản cho 39 host/trợ — user chốt 06/10 **CHUYỂN THẲNG sang app, KHÔNG chạy song song Google Sheet**
@@ -460,7 +458,7 @@ target khung camp ở Nhập Ads bỏ 06/10 — tháng không có kế hoạch c
 
 ## 6. Hạ tầng Supabase
 
-- 144 migration (`supabase/migrations/`) — **`0144` (giao ca) CHƯA CHẠY**; `0143` (chặn trùng người) ĐÃ CHẠY 06/10; **`0139`–`0142` (report / kế hoạch / hợp đồng theo sàn, file Ads Shopee) ĐÃ CHẠY 06/10**;, chạy tay theo thứ tự — **`0138` (đổi người giữa ca) ĐÃ CHẠY 06/10.** `0137` đã chạy 05/10. **`0136` ĐÃ CHẠY 05/10** (verify production: lô đối soát thử với phòng kết thúc đúng phút ca CROCS 30/09 11:01 bắt đầu ⇒ không khớp, phòng chồng 29 phút ⇒ khớp; lô thử đã xoá; trigger profiles nằm trước đoạn đó trong cùng file + chốt tự kiểm cuối file), bộ kiểm
+- 144 migration (`supabase/migrations/`) — `0144` (giao ca) ĐÃ CHẠY 06/10; `0143` (chặn trùng người) ĐÃ CHẠY 06/10; **`0139`–`0142` (report / kế hoạch / hợp đồng theo sàn, file Ads Shopee) ĐÃ CHẠY 06/10**;, chạy tay theo thứ tự — **`0138` (đổi người giữa ca) ĐÃ CHẠY 06/10.** `0137` đã chạy 05/10. **`0136` ĐÃ CHẠY 05/10** (verify production: lô đối soát thử với phòng kết thúc đúng phút ca CROCS 30/09 11:01 bắt đầu ⇒ không khớp, phòng chồng 29 phút ⇒ khớp; lô thử đã xoá; trigger profiles nằm trước đoạn đó trong cùng file + chốt tự kiểm cuối file), bộ kiểm
   `supabase/tests/0136_profile_guard_recon_edges_lock_past.sql` (replay, DB trắng): 16 OK, đỏ khi thiếu 0136. **Tới `0132` đều ĐÃ CHẠY** (0131 + 0132 ngày 02/10);
   **`0133` ĐÃ CHẠY 04/10** (verify ở §1); **`0134` ĐÃ CHẠY 05/10** (verify: CRM không còn SĐT mẫu); **`0135` ĐÃ CHẠY 05/10** (verify: 4 brand KAM "Chưa chọn", form sửa cũng "Chưa chọn"). Lô đối soát cũ (06–09/2026, không gắn brand) không áp dụng lại được — đo
   04/10 nó chỉ khớp ca CROCS nên chưa có số nào bị chia nhầm. Replay `0001 → 0133`: sạch, chạy lần 2 không lỗi; bộ kiểm hành vi
