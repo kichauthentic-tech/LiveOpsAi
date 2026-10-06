@@ -2,7 +2,7 @@ import React, { useState, useEffect, useLayoutEffect, useMemo, useRef, Suspense 
 import { rememberBrandId } from "./lib/defaultBrand";
 import { requestCrmFocus } from "./lib/crmFocus";
 import { todayVn } from "./lib/performance/brandCommitment";
-import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, Talent, Studio, Equipment, Brand, SessionFinance, ShiftSlot, RecurringShiftTemplate, BrandSku, PromoScheme, AppNotification } from "./types";
+import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, Talent, Studio, Equipment, Brand, SessionFinance, ShiftSlot, RecurringShiftTemplate, BrandSku, PromoScheme, AppNotification, BrandChannel } from "./types";
 import { TabErrorFallback } from "./components/common/TabErrorFallback";
 import { ErrorBoundary } from "./lib/errorReporting";
 import { fetchTalents, updateTalent, updateMyTalentProfile, deleteTalent } from "./lib/db/talents";
@@ -50,7 +50,9 @@ import type { NewTalentAccountPayload } from "./components/TalentMatcher";
 import { saveEngineParams } from "./lib/db/engineParams";
 import { logTabView } from "./lib/db/tabViews";
 import { findBrandBySlug, parsePath, parsePlatformParam, routeToPath, withPlatformParam } from "./lib/routes";
-import { brandPlatformsOf, type PlatformScope, type ReportPlatform } from "./lib/reportPlatform";
+import { type PlatformScope, type ReportPlatform } from "./lib/reportPlatform";
+import { deriveChannels, platformsOfBrand } from "./lib/channels";
+import { createBrandChannel, updateBrandChannel } from "./lib/db/brandChannels";
 import { lazyNamed } from "./lib/lazyNamed";
 import { dropPrefetched, type TabPrefetchCtx } from "./lib/db/prefetch";
 import { useWorkspaceData } from "./hooks/useWorkspaceData";
@@ -340,6 +342,8 @@ export default function App() {
     setBrandPlatformRates,
     brandStudios,
     setBrandStudios,
+    brandChannels,
+    setBrandChannels,
     shiftRegistrations,
     setShiftRegistrations,
     recurringShiftTemplates,
@@ -601,10 +605,16 @@ export default function App() {
     isOpsRole && effectiveWorkspace.type === "agency" && PLATFORM_AGENCY_TABS.has(activeTab)
       ? TIKTOK_ONLY_AGENCY_TABS.has(activeTab) ? "TikTok" : agencyPlatformState
       : null;
-  const currentBrandPlatforms: ReportPlatform[] = useMemo(
-    () => (currentBrandId ? brandPlatformsOf(currentBrandId, sessions, [...shiftSlots, ...brandStudios]) : ["TikTok"]),
-    [currentBrandId, sessions, shiftSlots, brandStudios]
+  // Kênh brand × sàn (0149) — nguồn DUY NHẤT cho "brand chạy sàn nào". DB chưa có bảng (0149 chưa chạy) ⇒ suy như cũ.
+  const channels: BrandChannel[] = useMemo(
+    () => brandChannels ?? deriveChannels([...sessions, ...shiftSlots, ...brandStudios, ...brandPlatformRates]),
+    [brandChannels, sessions, shiftSlots, brandStudios, brandPlatformRates]
   );
+  // Brand chưa có kênh nào: workspace vẫn mở được (lịch trống) với sàn TikTok làm khung — CRM nhắc thêm kênh.
+  const currentBrandPlatforms: ReportPlatform[] = useMemo(() => {
+    const ps = currentBrandId ? platformsOfBrand(channels, currentBrandId) : [];
+    return ps.length > 0 ? ps : ["TikTok"];
+  }, [currentBrandId, channels]);
   const multiPlatform = currentBrandPlatforms.length > 1;
   // 07/10 (user chốt): MỖI SÀN MỘT WORKSPACE, không còn "Tổng 2 sàn" — hai sàn không gộp được. Không chọn gì ⇒ sàn đầu.
   const rawPlatformScope: PlatformScope =
@@ -619,8 +629,8 @@ export default function App() {
   const platformBrandStudios = useMemo(() => (effectiveWorkspace.type === "brand" ? brandStudios.filter(inScope) : brandStudios), [effectiveWorkspace.type, brandStudios, currentBrandId, platformScope]); // eslint-disable-line react-hooks/exhaustive-deps
   // Kênh brand × sàn cho bộ chọn workspace ở Header (07/10): brand hai sàn hiện thành mục riêng từng sàn + Tổng.
   const brandPlatformsMap = useMemo(
-    () => Object.fromEntries(brands.map((b) => [b.id, brandPlatformsOf(b.id, sessions, [...shiftSlots, ...brandStudios])])) as Record<string, ReportPlatform[]>,
-    [brands, sessions, shiftSlots, brandStudios]
+    () => Object.fromEntries(brands.map((b) => [b.id, platformsOfBrand(channels, b.id)])) as Record<string, ReportPlatform[]>,
+    [brands, channels]
   );
 
   // Nạp trước lượt đọc riêng của tab đang mở — CHỈ trong lúc chờ đợt nạp chung (màn chưa mount nên chưa
@@ -1187,6 +1197,19 @@ export default function App() {
       showToast(`Không thể huỷ đăng ký: ${errorMessage(e)}`);
       return false;
     }
+  };
+
+  // Kênh (0149): tạo / sửa ở CRM. Trả lỗi về form (không toast) để hiện tại chỗ.
+  const handleCreateChannel = async (brandId: string, platform: ReportPlatform): Promise<BrandChannel> => {
+    const created = await createBrandChannel(brandId, platform);
+    setBrandChannels((prev) => [...(prev ?? []).filter((c) => !(c.brandId === brandId && c.platform === platform)), created]);
+    void pushAuditLog({ action: "Thêm kênh", details: `${brands.find((b) => b.id === brandId)?.name ?? brandId} · ${platform}`, category: "Role Update" });
+    return created;
+  };
+  const handleUpdateChannel = async (id: string, patch: Parameters<typeof updateBrandChannel>[1]): Promise<BrandChannel> => {
+    const saved = await updateBrandChannel(id, patch);
+    setBrandChannels((prev) => (prev ?? []).map((c) => (c.id === id ? saved : c)));
+    return saved;
   };
 
   const handleSetBrandStudio = async (brandId: string, platform: "TikTok" | "Shopee", studioId: string): Promise<boolean> => {
@@ -1767,6 +1790,7 @@ export default function App() {
                     {opsView === "board" && isOpsRole && (
                       <TodoPanel
                         brands={brands}
+                        channels={channels}
                         sessions={activeSessions}
                         shiftSlots={shiftSlots}
                         rates={brandPlatformRates}
@@ -1807,6 +1831,7 @@ export default function App() {
                     )}
                     {opsView === "calendar" && (
                   <LiveCalendar
+                    channels={channels}
                     sessions={activeSessions}
                     shiftSlots={shiftSlots}
                     shiftRegistrations={shiftRegistrations}
@@ -1857,6 +1882,7 @@ export default function App() {
                 {activeTab === "shift_scheduling" && (
                   <ShiftScheduling
                     currentRole={currentRole}
+                    channels={channels}
                     activeUser={activeUser}
                     sessions={activeSessions}
                     talents={activeTalents}
@@ -1883,6 +1909,7 @@ export default function App() {
                   <MonthPlan
                     platform={agencyPlatformState}
                     brands={agencyBrands}
+                    channels={channels}
                     studios={activeStudios}
                     sessions={activeSessions}
                     shiftSlots={shiftSlots}
@@ -1915,6 +1942,7 @@ export default function App() {
                     platform={agencyPlatformState}
                     sessions={activeSessions}
                     brands={agencyBrands}
+                    brandChannels={channels}
                     talents={talents}
                     shiftSlots={shiftSlots}
                     planSlotTargets={planSlotTargets}
@@ -1949,6 +1977,7 @@ export default function App() {
                   <BrandsOverview
                     platform={agencyPlatformState}
                     brands={agencyBrands}
+                    brandChannels={channels}
                     sessions={activeSessions}
                     brandPlatformRates={brandPlatformRates}
                     monthlyReports={monthlyReports}
@@ -1994,6 +2023,7 @@ export default function App() {
 
                 {activeTab === "brand_calendar" && effectiveWorkspace.type === "brand" && (
                   <BrandCalendar
+                    channels={channels}
                     brandId={currentBrandId!}
                     brandName={currentBrandName}
                     sessions={platformSessions}
@@ -2166,6 +2196,10 @@ export default function App() {
                 {activeTab === "crm" && (
                   <CrmProjects
                     brands={brands}
+                    channels={channels}
+                    channelsEditable={brandChannels !== null}
+                    onCreateChannel={handleCreateChannel}
+                    onUpdateChannel={handleUpdateChannel}
                     users={users}
                     onAddBrand={handleAddBrand}
                     onUpdateBrand={handleUpdateBrand}
@@ -2173,7 +2207,6 @@ export default function App() {
                     currentRole={currentRole}
                     brandPlatformRates={brandPlatformRates}
                     brandPlatformRateHistory={brandPlatformRateHistory}
-                    sessions={activeSessions}
                     onSaveRate={handleSaveBrandPlatformRate}
                     onSaveReturnRate={handleSaveBrandPlatformReturnRate}
                     onSaveCommissionRate={handleSaveBrandPlatformCommissionRate}

@@ -28,7 +28,17 @@
     (hành vi + bộ quét: phép cộng số hiệu suất viết tay chỉ được ở file trong `SINGLE_PLATFORM_FILES`). Verify: tsc, lint 0 lỗi, vitest 613/613,
     audit:dead 0, đột biến bỏ lọc sàn ở `suggestHosts` ⇒ đúng 1 test đỏ; 14 màn agency trên bản dev nối DB thật không lỗi, Talent Pool hiện
     cột GMV TikTok / GMV Shopee. Việc của ops: gán phòng cho 87 ca Shopee (JOCKEY 72/72 chưa có phòng mặc định, Franklin 15/32).
-  - Bước tiếp: 1 thực thể Kênh (`brand_channels`) → 2 hồ sơ sàn (`src/lib/platforms/`) → 3 gộp menu (1 workspace Agency + 1 mỗi brand, bộ lọc
+  - **Bước 1 XONG phần code (07/10) — migration `0149` CHƯA CHẠY (chạy trước hay sau deploy đều được).** Bảng `brand_channels`
+    (brand × sàn, tên gian hàng, mã shop, active/paused, không xoá), nạp sẵn mọi cặp đang có (DB thật: 7 kênh); trigger
+    `trg_guard_channel_exists` trên 12 bảng có cột sàn từ chối dòng của kênh chưa tạo (cột sàn khác kiểu enum/text nên không dùng khoá
+    ngoại ghép). Client: `lib/channels.ts` (`platformsOfBrand`, `channelsOfBrand`, `findChannel`; `deriveChannels` CHỈ khi DB chưa có bảng)
+    thay hẳn `brandPlatformsOf` (đã xoá) ở App/Header/Kế Hoạch Tháng/Toàn Cảnh/Bản Tin CEO/Nhân sự ca/Việc cần làm/CRM; CRM là chỗ duy
+    nhất thêm / sửa / tạm dừng kênh (thẻ brand: "+ Thêm kênh Shopee", khối "Kênh {sàn}" trong Hợp đồng & giá); việc mới `channel-<brand>`
+    khi brand chưa có kênh đang chạy. Kèm sửa lỗi: "Mở ca chờ đăng ký" từng ghi cứng `platform: "TikTok"` ⇒ nay chọn kênh của brand.
+    Verify: replay 0001→0149 sạch, `supabase/tests/0149_brand_channels.sql` 19/19 + 11 bộ kiểm SQL cũ xanh trên chuỗi mới (đã thêm
+    khối tạo kênh cho brand thử; 0138 8c theo 0147, 0139/0140 "sàn lạ" theo trigger kênh); vitest 613/613, lint 0 lỗi, audit:dead 0;
+    bản dev nối DB thật (chưa có bảng) suy đủ 7 kênh, 10 màn không lỗi. Chưa đo: thêm kênh thật qua UI (cần 0149).
+  - Bước tiếp: 2 hồ sơ sàn (`src/lib/platforms/`) → 3 gộp menu (1 workspace Agency + 1 mỗi brand, bộ lọc
     kênh) → 4 số liệu chuẩn (thang nguồn số, Live List ⇒ ATC/CO/Xu, CEO + P&L theo kênh) → 5 chạy thật 2–4 tuần.
 
 - **CHẠY THỬ THẬT trên dữ liệu thật** (từ 2026-09-18; mock đã xoá sạch 19/09). DB: 33 hồ sơ talent thật, CROCS T6–T9 nạp
@@ -485,7 +495,7 @@ target khung camp ở Nhập Ads bỏ 06/10 — tháng không có kế hoạch c
 
 ## 6. Hạ tầng Supabase
 
-- 147 migration (`supabase/migrations/`) — `0147` (số lúc đổi host, Shopee gõ) ĐÃ CHẠY, **`0148` (TikTok up file lúc đổi host) ĐÃ CHẠY (đo 07/10);** `0145` (giao ca TikTok bằng file) ĐÃ CHẠY 06/10; `0144` (giao ca) ĐÃ CHẠY 06/10; `0143` (chặn trùng người) ĐÃ CHẠY 06/10; **`0139`–`0142` (report / kế hoạch / hợp đồng theo sàn, file Ads Shopee) ĐÃ CHẠY 06/10**;, chạy tay theo thứ tự — **`0138` (đổi người giữa ca) ĐÃ CHẠY 06/10.** `0137` đã chạy 05/10. **`0136` ĐÃ CHẠY 05/10** (verify production: lô đối soát thử với phòng kết thúc đúng phút ca CROCS 30/09 11:01 bắt đầu ⇒ không khớp, phòng chồng 29 phút ⇒ khớp; lô thử đã xoá; trigger profiles nằm trước đoạn đó trong cùng file + chốt tự kiểm cuối file), bộ kiểm
+- 149 migration (`supabase/migrations/`) — **`0149` (kênh brand × sàn) CHƯA CHẠY;** `0147` (số lúc đổi host, Shopee gõ) ĐÃ CHẠY, **`0148` (TikTok up file lúc đổi host) ĐÃ CHẠY (đo 07/10);** `0145` (giao ca TikTok bằng file) ĐÃ CHẠY 06/10; `0144` (giao ca) ĐÃ CHẠY 06/10; `0143` (chặn trùng người) ĐÃ CHẠY 06/10; **`0139`–`0142` (report / kế hoạch / hợp đồng theo sàn, file Ads Shopee) ĐÃ CHẠY 06/10**;, chạy tay theo thứ tự — **`0138` (đổi người giữa ca) ĐÃ CHẠY 06/10.** `0137` đã chạy 05/10. **`0136` ĐÃ CHẠY 05/10** (verify production: lô đối soát thử với phòng kết thúc đúng phút ca CROCS 30/09 11:01 bắt đầu ⇒ không khớp, phòng chồng 29 phút ⇒ khớp; lô thử đã xoá; trigger profiles nằm trước đoạn đó trong cùng file + chốt tự kiểm cuối file), bộ kiểm
   `supabase/tests/0136_profile_guard_recon_edges_lock_past.sql` (replay, DB trắng): 16 OK, đỏ khi thiếu 0136. **Tới `0132` đều ĐÃ CHẠY** (0131 + 0132 ngày 02/10);
   **`0133` ĐÃ CHẠY 04/10** (verify ở §1); **`0134` ĐÃ CHẠY 05/10** (verify: CRM không còn SĐT mẫu); **`0135` ĐÃ CHẠY 05/10** (verify: 4 brand KAM "Chưa chọn", form sửa cũng "Chưa chọn"). Lô đối soát cũ (06–09/2026, không gắn brand) không áp dụng lại được — đo
   04/10 nó chỉ khớp ca CROCS nên chưa có số nào bị chia nhầm. Replay `0001 → 0133`: sạch, chạy lần 2 không lỗi; bộ kiểm hành vi

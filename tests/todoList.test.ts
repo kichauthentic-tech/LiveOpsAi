@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { buildTodos, TodoInput } from "../src/lib/todoList";
-import { Brand, BrandMonthPlan, BrandMonthlyReport, LiveSession, ShiftSlot } from "../src/types";
+import { Brand, BrandChannel, BrandMonthPlan, BrandMonthlyReport, LiveSession, ShiftSlot } from "../src/types";
 
 // Danh sách "Việc cần làm" (audit người mới 2026-10-04). Tình huống dựng theo production 04/10: CROCS có số tới
 // 22/09, kế hoạch T10 còn nháp, chưa hợp đồng, chưa giá, report T9 chưa phát hành; 3 brand còn lại chưa có ca.
@@ -11,6 +11,7 @@ const ca = (id: string, date: string, over: Partial<LiveSession> = {}): LiveSess
 const base = (over: Partial<TodoInput> = {}): TodoInput => ({
   today: "2026-10-04",
   brands: [brand("crocs", "CROCS"), brand("franklin", "Franklin")],
+  channels: [{ id: "c1", brandId: "crocs", platform: "TikTok", shopName: "", shopRef: "", status: "active", note: "" } as BrandChannel],
   sessions: [ca("a", "2026-09-22"), ca("b", "2026-09-21", { hostId: "" })],
   shiftSlots: [],
   plansThisMonth: new Map([["crocs", { status: "draft" } as BrandMonthPlan]]),

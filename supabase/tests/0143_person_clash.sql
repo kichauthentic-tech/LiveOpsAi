@@ -34,6 +34,11 @@ insert into profiles (id, name, email, role) values ('a0000000-0000-0000-0000-00
   on conflict (id) do update set role = 'admin';
 select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000001', false);
 insert into brands (id, name) values ('b0000000-0000-0000-0000-00000000000a', 'CROCS'), ('b0000000-0000-0000-0000-00000000000b', 'Franklin');
+-- 0149: dòng của kênh chưa tồn tại bị từ chối — tạo đủ kênh cho brand thử (bỏ qua khi replay chưa tới 0149).
+do $$ begin if to_regclass('public.brand_channels') is not null then
+  execute $q$insert into brand_channels (brand_id, platform) select b.id, v.p from brands b cross join (values ('TikTok'), ('Shopee')) v(p) on conflict do nothing$q$;
+end if; end $$;
+
 insert into talents (id, name) values
   ('c0000000-0000-0000-0000-000000000001', 'Sỹ Hùng'),
   ('c0000000-0000-0000-0000-000000000002', 'Thái Toàn'),

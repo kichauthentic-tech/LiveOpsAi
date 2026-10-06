@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ChevronDown, ListChecks } from "lucide-react";
-import { Brand, BrandMonthPlan, BrandMonthlyCommitment, BrandMonthlyReport, BrandPlatformRate, LiveSession, ShiftSlot, Talent } from "../types";
+import { Brand, BrandChannel, BrandMonthPlan, BrandMonthlyCommitment, BrandMonthlyReport, BrandPlatformRate, LiveSession, ShiftSlot, Talent } from "../types";
 import { buildTodos, Todo, TodoLevel } from "../lib/todoList";
 import { planStatusesRead } from "../lib/db/monthPlans";
 import { commitmentsRead } from "../lib/db/brandContracts";
@@ -12,6 +12,7 @@ import { todayVn } from "../lib/performance/brandCommitment";
 
 interface Props {
   brands: Brand[];
+  channels: BrandChannel[];
   sessions: LiveSession[];
   shiftSlots: ShiftSlot[];
   rates: BrandPlatformRate[];
@@ -31,7 +32,7 @@ function nextMonthOf(month: string): string {
   return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
 }
 
-export const TodoPanel: React.FC<Props> = ({ brands, sessions, shiftSlots, rates, monthlyReports, talents, canSeeMoney, canOpenTab, onOpen }) => {
+export const TodoPanel: React.FC<Props> = ({ brands, channels, sessions, shiftSlots, rates, monthlyReports, talents, canSeeMoney, canOpenTab, onOpen }) => {
   const today = todayVn();
   const month = today.slice(0, 7);
   const [plansThisMonth, setPlansThisMonth] = useState<Map<string, BrandMonthPlan> | null>(null);
@@ -51,8 +52,8 @@ export const TodoPanel: React.FC<Props> = ({ brands, sessions, shiftSlots, rates
 
   const todos = useMemo(() => {
     if (!plansThisMonth || !plansNextMonth || !commitments) return null;
-    return buildTodos({ today, brands, sessions, shiftSlots, plansThisMonth, plansNextMonth, commitments, rates, monthlyReports, talents, canSeeMoney }).filter((t) => canOpenTab(t.tab));
-  }, [today, brands, sessions, shiftSlots, plansThisMonth, plansNextMonth, commitments, rates, monthlyReports, talents, canSeeMoney, canOpenTab]);
+    return buildTodos({ today, brands, channels, sessions, shiftSlots, plansThisMonth, plansNextMonth, commitments, rates, monthlyReports, talents, canSeeMoney }).filter((t) => canOpenTab(t.tab));
+  }, [today, brands, channels, sessions, shiftSlots, plansThisMonth, plansNextMonth, commitments, rates, monthlyReports, talents, canSeeMoney, canOpenTab]);
 
   if (todos === null) return null; // đang tải — không vẽ khung rỗng rồi nhảy
   const shown = expanded ? todos : todos.slice(0, COLLAPSED_COUNT);

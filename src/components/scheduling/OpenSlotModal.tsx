@@ -1,5 +1,7 @@
 import React, { useMemo, useState } from "react";
-import { Brand, BrandStudio, LiveSession, ShiftSlot, Studio } from "../../types";
+import { Brand, BrandChannel, BrandStudio, LiveSession, ShiftSlot, Studio } from "../../types";
+import { platformsOfBrand } from "../../lib/channels";
+import { platformOf, type ReportPlatform } from "../../lib/reportPlatform";
 import { AlertTriangle, CalendarClock, X } from "lucide-react";
 import { dateTimeRangesOverlap, getTodayDate } from "../../lib/dateUtils";
 import { fmtDateVn } from "../../lib/format";
@@ -15,6 +17,10 @@ import { useConfirm } from "../../hooks/useConfirm";
 interface OpenSlotModalProps {
   brands?: Brand[];
   fixedBrand?: { id: string; name: string }; // brand workspace: không cho đổi brand
+  /** Kênh brand × sàn (0149): ca mở thuộc một kênh đang chạy — trước 07/10 form ghi cứng TikTok. */
+  channels: BrandChannel[];
+  /** Brand workspace: sàn của workspace, chọn sẵn. */
+  initialPlatform?: ReportPlatform;
   studios: Studio[];
   brandStudios: BrandStudio[];
   sessions: LiveSession[];
@@ -37,6 +43,8 @@ const addHours = (hhmm: string, h: number) => {
 export const OpenSlotModal: React.FC<OpenSlotModalProps> = ({
   brands = [],
   fixedBrand,
+  channels,
+  initialPlatform,
   studios,
   brandStudios,
   sessions,
@@ -55,7 +63,13 @@ export const OpenSlotModal: React.FC<OpenSlotModalProps> = ({
   const [brandId, setBrandId] = useState(
     () => fixedBrand?.id ?? pickDefaultBrandId(brands, sessions, loadRememberedBrandId(), getTodayDate())
   );
-  const [studioId, setStudioId] = useState(initialStudioId || findBrandStudioId(brandStudios, brandId) || "");
+  const platformsFor = (id: string) => platformsOfBrand(channels, id, false);
+  const pickPlatform = (id: string, want?: ReportPlatform): ReportPlatform | null => {
+    const ps = platformsFor(id);
+    return want && ps.includes(want) ? want : ps[0] ?? null;
+  };
+  const [platform, setPlatform] = useState<ReportPlatform | null>(() => pickPlatform(brandId, initialPlatform));
+  const [studioId, setStudioId] = useState(initialStudioId || (platform ? findBrandStudioId(brandStudios, brandId, platform) : "") || "");
   const [date, setDate] = useState(initialDate);
   const [start, setStart] = useState(initialStart ?? "19:00");
   const [end, setEnd] = useState(initialEnd ?? (initialStart ? addHours(initialStart, 3) : "22:00"));
@@ -71,13 +85,13 @@ export const OpenSlotModal: React.FC<OpenSlotModalProps> = ({
     const round30 = (t: string) => { const [h, m] = t.split(":").map(Number); const r = (Math.round((h * 60 + m) / 30) * 30) % (24 * 60); return `${`${Math.floor(r / 60)}`.padStart(2, "0")}:${`${r % 60}`.padStart(2, "0")}`; };
     const count = new Map<string, number>();
     const add = (st: string, en: string) => { const k = `${round30(st)}|${round30(en)}`; count.set(k, (count.get(k) ?? 0) + 1); };
-    for (const s of sessions) if (s.brandId === brandId && s.status !== "Cancelled") add(s.startTime, s.endTime);
-    for (const sl of shiftSlots) if (sl.brandId === brandId && sl.status !== "cancelled") add(sl.startTime, sl.endTime);
+    for (const s of sessions) if (s.brandId === brandId && platformOf(s) === platform && s.status !== "Cancelled") add(s.startTime, s.endTime);
+    for (const sl of shiftSlots) if (sl.brandId === brandId && platformOf(sl) === platform && sl.status !== "cancelled") add(sl.startTime, sl.endTime);
     return [...count.entries()]
       .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
       .slice(0, 6)
       .map(([k]) => ({ start: k.slice(0, 5), end: k.slice(6, 11) }));
-  }, [sessions, shiftSlots, brandId]);
+  }, [sessions, shiftSlots, brandId, platform]);
 
   // Trùng phòng với ca đã chốt hoặc ca đang mở cùng ngày (ca đang mở cũng giữ phòng).
   const studioClash = useMemo(() => {
@@ -108,6 +122,10 @@ export const OpenSlotModal: React.FC<OpenSlotModalProps> = ({
       showToast("Chọn brand cho ca.");
       return;
     }
+    if (!platform) {
+      showToast("Brand chưa có kênh nào đang chạy — thêm kênh ở CRM trước.");
+      return;
+    }
     if (studioClash && !(await confirm(`Phòng ${studio?.name ?? ""} đang trùng với ${studioClash}. Vẫn mở ca?`))) return;
     if (pastDays > 0 && !(await confirm(`Ngày ${fmtDateVn(date)} đã qua ${pastDays} ngày. Ca mở ở quá khứ sẽ KHÔNG ai đăng ký được — chỉ dùng khi bạn đang nạp bù ca đã live (ops tự chốt người sau). Vẫn mở ca?`))) return;
     setSaving(true);
@@ -118,7 +136,7 @@ export const OpenSlotModal: React.FC<OpenSlotModalProps> = ({
       endTime: end,
       brandId,
       brandName: brandName,
-      platform: "TikTok",
+      platform,
       studioId: studioId || undefined,
       studioName: studio?.name ?? "",
       notes,
@@ -157,12 +175,34 @@ export const OpenSlotModal: React.FC<OpenSlotModalProps> = ({
                   onChange={(e) => {
                     setBrandId(e.target.value);
                     rememberBrandId(e.target.value);
-                    const def = findBrandStudioId(brandStudios, e.target.value);
+                    const p = pickPlatform(e.target.value, platform ?? undefined);
+                    setPlatform(p);
+                    const def = p ? findBrandStudioId(brandStudios, e.target.value, p) : "";
                     if (def) setStudioId(def);
                   }}
                   className={input}
                 >
                   {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+              )}
+            </label>
+            <label className="block">
+              <span className="font-bold text-[var(--text-muted)] block mb-1">Kênh (sàn)</span>
+              {platformsFor(brandId).length === 0 ? (
+                <div className={`${input} text-amber-300`}>Chưa có kênh — thêm ở CRM</div>
+              ) : (
+                <select
+                  id="open-slot-platform"
+                  value={platform ?? ""}
+                  onChange={(e) => {
+                    const p = e.target.value as ReportPlatform;
+                    setPlatform(p);
+                    const def = findBrandStudioId(brandStudios, brandId, p);
+                    if (def) setStudioId(def);
+                  }}
+                  className={input}
+                >
+                  {platformsFor(brandId).map((p) => <option key={p} value={p}>{brandName} · {p}</option>)}
                 </select>
               )}
             </label>

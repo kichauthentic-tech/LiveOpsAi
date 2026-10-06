@@ -22,6 +22,11 @@ end $$;
 
 insert into auth.users (id, email) values ('a0000000-0000-0000-0000-000000000001', 'admin@t') on conflict do nothing;
 insert into brands (id, name) values ('b0000000-0000-0000-0000-00000000000a', 'VERA');
+-- 0149: dòng của kênh chưa tồn tại bị từ chối — tạo đủ kênh cho brand thử (bỏ qua khi replay chưa tới 0149).
+do $$ begin if to_regclass('public.brand_channels') is not null then
+  execute $q$insert into brand_channels (brand_id, platform) select b.id, v.p from brands b cross join (values ('TikTok'), ('Shopee')) v(p) on conflict do nothing$q$;
+end if; end $$;
+
 insert into profiles (id, name, email, role) values ('a0000000-0000-0000-0000-000000000001', 'Admin', 'admin@t', 'admin')
   on conflict (id) do update set role = 'admin';
 select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000001', false);
@@ -42,7 +47,9 @@ select pg_temp.chk('1a hai kế hoạch cùng tháng khác sàn', count(*) = 2) 
 select pg_temp.must_fail('1b trùng (brand, tháng, sàn)',
   $q$insert into brand_month_plans (brand_id, month, platform) values ('b0000000-0000-0000-0000-00000000000a', date '2030-01-01', 'Shopee')$q$, 'duplicate key');
 select pg_temp.must_fail('1c sàn lạ',
-  $q$insert into brand_month_plans (brand_id, month, platform) values ('b0000000-0000-0000-0000-00000000000a', date '2030-02-01', 'Lazada')$q$, 'platform_check');
+  $q$insert into brand_month_plans (brand_id, month, platform) values ('b0000000-0000-0000-0000-00000000000a', date '2030-02-01', 'Lazada')$q$,
+  -- Sau 0149, trigger kênh chặn trước check constraint: sàn lạ không bao giờ có kênh.
+  (select case when to_regclass('public.brand_channels') is null then 'platform_check' else 'chưa có kênh Lazada' end));
 select pg_temp.chk('1d kế hoạch cũ (không ghi sàn) = TikTok',
   (select platform from brand_month_plans where id = 'e0000000-0000-0000-0000-0000000000a1') = 'TikTok');
 

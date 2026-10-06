@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Brand, BrandContract, BrandMonthlyCommitment, BrandPlatformRate, BrandPlatformRateHistoryEntry, BrandStudio, LiveSession, Studio, SystemUser, UserRole } from "../types";
+import React, { useEffect, useRef, useState } from "react";
+import { Brand, BrandChannel, BrandContract, BrandMonthlyCommitment, BrandPlatformRate, BrandPlatformRateHistoryEntry, BrandStudio, Studio, SystemUser, UserRole } from "../types";
 import { Building2, Plus, Edit3, Trash2, X, FileSignature } from "lucide-react";
 import { BrandLogo } from "./ui/BrandLogo";
 import { BrandConfigPanel } from "./BrandConfigPanel";
@@ -11,7 +11,8 @@ import type { TabPrefetchCtx } from "../lib/db/prefetch";
 import { findBrandStudioId } from "../lib/db/brandStudios";
 import { brandPriceLabel } from "../lib/brandPricing";
 import { contractCovering, monthKeyOf, todayVn } from "../lib/performance/brandCommitment";
-import { brandPlatformsOf, type ReportPlatform } from "../lib/reportPlatform";
+import { REPORT_PLATFORMS, type ReportPlatform } from "../lib/reportPlatform";
+import { findChannel, platformsOfBrand } from "../lib/channels";
 import { takeCrmFocus } from "../lib/crmFocus";
 import { errorMessage } from "../lib/errorMessage";
 import { fmtMonth } from "../lib/format";
@@ -25,7 +26,6 @@ interface CrmProjectsProps {
   currentRole: UserRole;
   brandPlatformRates: BrandPlatformRate[];
   brandPlatformRateHistory: BrandPlatformRateHistoryEntry[];
-  sessions: LiveSession[];
   onSaveRate: (brandId: string, platform: "TikTok" | "Shopee", ratePerHour: number) => Promise<boolean>;
   onSaveReturnRate: (brandId: string, platform: "TikTok" | "Shopee", returnRate: number) => Promise<boolean>;
   onSaveCommissionRate: (brandId: string, platform: "TikTok" | "Shopee", commissionRate: number) => Promise<boolean>;
@@ -34,6 +34,12 @@ interface CrmProjectsProps {
   onSetBrandStudio: (brandId: string, platform: "TikTok" | "Shopee", studioId: string) => Promise<boolean>;
   /** Sang Kế Hoạch Tháng của brand × sàn (sửa cam kết một tháng). */
   onOpenMonthPlan?: (brandId: string, platform: "TikTok" | "Shopee") => void;
+  /** Kênh brand × sàn (0149) — CRM là chỗ DUY NHẤT thêm / sửa / tạm dừng kênh. */
+  channels: BrandChannel[];
+  /** false = DB chưa có bảng kênh (0149 chưa chạy): ẩn nút thêm kênh. */
+  channelsEditable: boolean;
+  onCreateChannel: (brandId: string, platform: ReportPlatform) => Promise<unknown>;
+  onUpdateChannel: (id: string, patch: Partial<Pick<BrandChannel, "shopName" | "shopRef" | "status">>) => Promise<unknown>;
 }
 
 // Lượt đọc lúc mở màn — nạp trước trong lúc chờ đợt nạp chung (lib/db/prefetch.ts).
@@ -54,14 +60,17 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
   currentRole,
   brandPlatformRates,
   brandPlatformRateHistory,
-  sessions,
   onSaveRate,
   onSaveReturnRate,
   onSaveCommissionRate,
   studios,
   brandStudios,
   onSetBrandStudio,
-  onOpenMonthPlan
+  onOpenMonthPlan,
+  channels,
+  channelsEditable,
+  onCreateChannel,
+  onUpdateChannel
 }) => {
   const confirm = useConfirm();
   const today = todayVn();
@@ -94,11 +103,22 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
     setCommitments(m);
   };
 
-  // Sàn hiện trên thẻ: sàn brand có ca/phòng, cộng sàn đã có hợp đồng hoặc giá.
-  const platformsOf = useMemo(() => {
-    const extra = [...brandStudios, ...contracts, ...brandPlatformRates];
-    return (brandId: string) => brandPlatformsOf(brandId, sessions, extra);
-  }, [sessions, brandStudios, contracts, brandPlatformRates]);
+  // Sàn hiện trên thẻ = kênh brand đã có (0149), kể cả kênh tạm dừng.
+  const platformsOf = (brandId: string) => platformsOfBrand(channels, brandId);
+  const [channelError, setChannelError] = useState<string | null>(null);
+  const [addingChannel, setAddingChannel] = useState<string | null>(null);
+  const addChannel = async (brandId: string, platform: ReportPlatform) => {
+    setChannelError(null);
+    setAddingChannel(`${brandId}|${platform}`);
+    try {
+      await onCreateChannel(brandId, platform);
+      setFocus({ brandId, platform });
+    } catch (e) {
+      setChannelError(errorMessage(e, "Không thêm được kênh"));
+    } finally {
+      setAddingChannel(null);
+    }
+  };
   const thisMonth = monthKeyOf(today);
 
   // Guards against a rapid double-click firing two creates before React re-renders the
@@ -271,6 +291,7 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
                   const price = brandPriceLabel(b, brandPlatformRates, p);
                   const studio = studios.find((x) => x.id === findBrandStudioId(brandStudios, b.id, p));
                   const open = focus?.brandId === b.id && focus.platform === p;
+                  const ch = findChannel(channels, b.id, p);
                   const missing = <span className="text-amber-300">chưa có</span>;
                   return (
                     <button
@@ -280,7 +301,8 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
                       className={`w-full text-left text-[11px] rounded-xl border px-2.5 py-2 transition-all ${open ? "border-blue-500/60 bg-blue-950/20" : "border-[var(--border)] hover:border-blue-500/40"}`}
                     >
                       <span className="font-bold text-[var(--text)] flex items-center gap-1.5">
-                        <FileSignature className="w-3 h-3 text-blue-400" /> Hợp đồng & giá · {p}
+                        <FileSignature className="w-3 h-3 text-blue-400" /> Kênh {p}{ch?.shopName ? ` · ${ch.shopName}` : ""} — hợp đồng & giá
+                        {ch?.status === "paused" && <span className="text-amber-300 font-bold">tạm dừng</span>}
                         <span className="ml-auto font-normal text-[var(--accent-text)]">{open ? "Đóng" : canEdit ? "Sửa" : "Xem"}</span>
                       </span>
                       <span className="block text-[var(--text-muted)] mt-0.5">
@@ -291,6 +313,22 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
                     </button>
                   );
                 })}
+                {platformsOf(b.id).length === 0 && <p className="text-[11px] text-amber-300">Brand chưa có kênh nào — thêm kênh để lập kế hoạch, mở ca, nhập giá.</p>}
+                {canEdit && channelsEditable && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {REPORT_PLATFORMS.filter((p) => !platformsOf(b.id).includes(p)).map((p) => (
+                      <button
+                        key={p}
+                        onClick={() => void addChannel(b.id, p)}
+                        disabled={addingChannel === `${b.id}|${p}`}
+                        className="min-h-6 inline-flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-lg border border-dashed border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] hover:border-blue-500/50 disabled:opacity-50"
+                      >
+                        <Plus className="w-3 h-3" /> Thêm kênh {p}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {channelError && addingChannel === null && <p className="text-[11px] text-rose-300">{channelError}</p>}
               </div>
             </div>
           ))}
@@ -313,6 +351,9 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
             <BrandConfigPanel
               brand={b}
               platform={focus.platform}
+              platforms={platformsOf(b.id)}
+              channel={findChannel(channels, b.id, focus.platform)}
+              onUpdateChannel={channelsEditable ? onUpdateChannel : undefined}
               onPlatformChange={(p) => setFocus({ brandId: b.id, platform: p })}
               canEdit={canEdit}
               rates={brandPlatformRates}

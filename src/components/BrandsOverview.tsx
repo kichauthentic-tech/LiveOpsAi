@@ -3,9 +3,10 @@ import { rememberBrandId } from "../lib/defaultBrand";
 import { requestCrmFocus } from "../lib/crmFocus";
 import { brandPriceLabel } from "../lib/brandPricing";
 import { Download, LayoutGrid, Loader2 } from "lucide-react";
-import { Brand, BrandMonthlyReport, BrandMonthPlan, BrandPlatformRate, LiveSession } from "../types";
+import { Brand, BrandChannel, BrandMonthlyReport, BrandMonthPlan, BrandPlatformRate, LiveSession } from "../types";
 import { planStatusesRead } from "../lib/db/monthPlans";
-import { brandMonthKey, brandPlatformKey, brandPlatformsOf, type ReportPlatform } from "../lib/reportPlatform";
+import { brandMonthKey, brandPlatformKey, type ReportPlatform } from "../lib/reportPlatform";
+import { platformsOfBrand } from "../lib/channels";
 import { commitmentsRead, fetchBrandMonthlyCommitments } from "../lib/db/brandContracts";
 import type { TabPrefetchCtx } from "../lib/db/prefetch";
 import { CommitmentProgress, CommitmentStatus, computeAllProgress, todayVn } from "../lib/performance/brandCommitment";
@@ -31,6 +32,8 @@ interface BrandsOverviewProps {
   /** Sàn của workspace agency (07/10): mỗi brand một dòng của ĐÚNG sàn này. */
   platform: ReportPlatform;
   brands: Brand[];
+  /** Kênh brand × sàn (0149): một dòng mỗi kênh của sàn đang xem — kể cả kênh chưa có ca. */
+  brandChannels: BrandChannel[];
   sessions: LiveSession[];
   brandPlatformRates: BrandPlatformRate[];
   monthlyReports: Map<string, BrandMonthlyReport>;
@@ -94,7 +97,7 @@ export function prefetchBrandsOverview(_ctx: TabPrefetchCtx): void {
   commitmentsRead.prefetch();
 }
 
-export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ platform, brands, sessions, brandPlatformRates, monthlyReports, onNavigate }) => {
+export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ platform, brands, brandChannels, sessions, brandPlatformRates, monthlyReports, onNavigate }) => {
   const { showToast } = useToast();
   const today = todayVn();
   const [month, setMonth] = useState(today.slice(0, 7));
@@ -136,7 +139,7 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ platform, brands
     return brands
       .slice()
       .sort((a, b) => a.name.localeCompare(b.name))
-      .flatMap((b) => brandPlatformsOf(b.id, sessions).filter((p) => p === platform).map((p) => ({ b, p, multi: brandPlatformsOf(b.id, sessions).length > 1 })))
+      .flatMap((b) => platformsOfBrand(brandChannels, b.id).filter((p) => p === platform).map((p) => ({ b, p, multi: platformsOfBrand(brandChannels, b.id).length > 1 })))
       .map(({ b, p, multi }) => {
         const key = brandPlatformKey(b.id, p);
         const plan = planStatuses.get(key);
@@ -157,7 +160,7 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ platform, brands
           price: brandPriceLabel(b, brandPlatformRates, p)
         };
       });
-  }, [platform, brands, planStatuses, progressByBrand, sessions, month, today, monthlyReports, brandPlatformRates]);
+  }, [platform, brands, brandChannels, planStatuses, progressByBrand, sessions, month, today, monthlyReports, brandPlatformRates]);
 
   const exportXlsx = () => {
     const out = rows.map((r) => ({

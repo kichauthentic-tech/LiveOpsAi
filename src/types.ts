@@ -449,6 +449,22 @@ export interface BrandPlatformRate {
   commissionRate?: number;
 }
 
+// KÊNH = một gian hàng của brand trên một sàn (0149, audit đa sàn 07/10). Nguồn DUY NHẤT trả lời "brand chạy sàn nào" —
+// trước đó app đoán từ việc đã có ca/phòng (7 chỗ, 5 kiểu). Dòng ở 12 bảng có cột sàn phải thuộc một kênh đã tạo (trigger
+// DB). Không xoá được, chỉ tạm dừng.
+export interface BrandChannel {
+  id: string;
+  brandId: string;
+  platform: "TikTok" | "Shopee";
+  /** Tên gian hàng trên sàn (vd "VERA Official"). */
+  shopName: string;
+  /** Mã shop / handle trên sàn — để đối chiếu file (Shop ID của Shopee, @handle TikTok). */
+  shopRef: string;
+  status: "active" | "paused";
+  startedOn?: string;
+  note: string;
+}
+
 // Phòng live mặc định theo brand × nền tảng (0098): chốt Kế Hoạch Tháng ghi phòng này vào ca sinh ra;
 // form mở ca chọn sẵn. VERA có 2 phòng (TTS/SPE) vì live 2 nền tảng — nên không gắn thẳng lên Brand.
 export interface BrandStudio {

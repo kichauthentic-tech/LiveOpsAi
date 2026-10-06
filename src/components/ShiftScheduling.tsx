@@ -11,7 +11,7 @@ import {
   Talent,
   UserRole
 } from "../types";
-import type { BrandMonthPlan } from "../types";
+import type { BrandChannel, BrandMonthPlan } from "../types";
 import {
   Calendar as CalendarIcon,
   CalendarRange,
@@ -39,7 +39,8 @@ import { SessionEventCard, SessionCardTone, buildSlotMeta } from "./ui/SessionEv
 import { SessionWindow } from "./SessionWindow";
 import { commitmentsRead } from "../lib/db/brandContracts";
 import { planStatusesRead } from "../lib/db/monthPlans";
-import { brandPlatformKey, brandPlatformsOf, platformOf, type ReportPlatform } from "../lib/reportPlatform";
+import { brandPlatformKey, platformOf, type ReportPlatform } from "../lib/reportPlatform";
+import { platformsOfBrand } from "../lib/channels";
 import type { TabPrefetchCtx } from "../lib/db/prefetch";
 import { SchedulingGap, computeSchedulingGaps } from "../lib/performance/brandCommitment";
 import { FATIGUE_WEEK_HOURS, HostSuggestion, headlineFor, suggestHosts } from "../lib/performance/hostSuggestion";
@@ -69,6 +70,8 @@ interface ShiftSchedulingProps {
   // RPC apply_session_live_snapshot đã ghi DB và trả về LiveSession đầy đủ — chỉ cần đồng bộ
   // lại state, không gọi updateSession (sẽ ghi đè ngược số vừa tính bằng state cũ của client).
   // Nhắc việc (0091): brand chưa chốt Kế Hoạch Tháng cho tháng sau → nút nhảy sang tab đó.
+  /** Kênh brand × sàn (0149): nhắc kế hoạch tháng sau cho kênh đang chạy. */
+  channels: BrandChannel[];
   /** Mở Kế Hoạch Tháng của đúng kênh (brand × sàn) chưa chốt. */
   onOpenMonthPlan?: (brandId: string, platform: ReportPlatform) => void;
   fatigueWeekHours?: number; // ngưỡng mệt, admin vặn ở AI Training Center; mặc định FATIGUE_WEEK_HOURS
@@ -166,6 +169,7 @@ export default function ShiftScheduling({
   onLogAudit,
   onSessionsUpdated,
   onOpenMonthPlan,
+  channels,
   fatigueWeekHours = FATIGUE_WEEK_HOURS,
   onCancelSession,
   onSetSessionExcluded,
@@ -218,13 +222,13 @@ export default function ShiftScheduling({
     () =>
       nextPlans
         ? brands.flatMap((b) => {
-            const ps = brandPlatformsOf(b.id, sessions, shiftSlots);
+            const ps = platformsOfBrand(channels, b.id, false);
             return ps
               .filter((p) => nextPlans.get(brandPlatformKey(b.id, p))?.status !== "locked")
               .map((p) => ({ brandId: b.id, platform: p, label: ps.length > 1 ? `${b.name} ${p}` : b.name }));
           })
         : [],
-    [nextPlans, brands, sessions, shiftSlots]
+    [nextPlans, brands, channels]
   );
 
   const talentsById = useMemo(() => new Map(talents.map((t) => [t.id, t])), [talents]);

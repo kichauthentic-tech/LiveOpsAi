@@ -9,6 +9,7 @@ import {
   BrandPlatformRateHistoryEntry,
   BrandSku,
   BrandStudio,
+  BrandChannel,
   Equipment,
   LiveSession,
   PromoScheme,
@@ -38,6 +39,7 @@ import { fetchTikTokStatus, fetchTikTokWebhookEvents } from "../lib/db/tiktokInt
 import { fetchAiAgentPrompts } from "../lib/db/aiAgentPrompts";
 import { fetchBrandPlatformRates } from "../lib/db/brandPlatformRates";
 import { fetchBrandStudios } from "../lib/db/brandStudios";
+import { fetchBrandChannels } from "../lib/db/brandChannels";
 import { fetchShiftSlots } from "../lib/db/shiftSlots";
 import { fetchShiftRegistrations } from "../lib/db/shiftRegistrations";
 import { fetchRecurringShiftTemplates } from "../lib/db/recurringShiftTemplates";
@@ -192,6 +194,8 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
   const [brandPlatformRates, setBrandPlatformRates] = useState<BrandPlatformRate[]>([]);
   // Phòng live mặc định brand × nền tảng (0098) — chốt kế hoạch ghi vào ca, form mở ca chọn sẵn.
   const [brandStudios, setBrandStudios] = useState<BrandStudio[]>([]);
+  // Kênh brand × sàn (0149). null = DB chưa có bảng (0149 chưa chạy) ⇒ App tự suy kênh như cũ.
+  const [brandChannels, setBrandChannels] = useState<BrandChannel[] | null>(null);
   const [shiftRegistrations, setShiftRegistrations] = useState<ShiftRegistration[]>([]);
   const [recurringShiftTemplates, setRecurringShiftTemplates] = useState<RecurringShiftTemplate[]>([]);
   const [phase14Error, setPhase14Error] = useState<string | null>(null);
@@ -393,11 +397,12 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
   useEffect(() => {
     if (!authUserId) return;
     let cancelled = false;
-    Promise.all([fetchBrandPlatformRates(), fetchShiftSlots(), fetchShiftRegistrations(), fetchRecurringShiftTemplates(), fetchLockedPlanTargets().catch(() => ({ bySlotId: new Map<string, number>(), monthTotals: new Map<string, number>(), slotTargets: new Map<string, { date: string; target: number }[]>() })), fetchBrandStudios().catch(() => [] as BrandStudio[])])
-      .then(([rates, slots, regs, templates, planTargets, bStudios]) => {
+    Promise.all([fetchBrandPlatformRates(), fetchShiftSlots(), fetchShiftRegistrations(), fetchRecurringShiftTemplates(), fetchLockedPlanTargets().catch(() => ({ bySlotId: new Map<string, number>(), monthTotals: new Map<string, number>(), slotTargets: new Map<string, { date: string; target: number }[]>() })), fetchBrandStudios().catch(() => [] as BrandStudio[]), fetchBrandChannels()])
+      .then(([rates, slots, regs, templates, planTargets, bStudios, channels]) => {
         if (cancelled) return;
         setBrandPlatformRates(rates);
         setBrandStudios(bStudios);
+        setBrandChannels(channels);
         setShiftSlots(slots);
         setShiftRegistrations(regs);
         setRecurringShiftTemplates(templates);
@@ -641,6 +646,8 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
     setBrandPlatformRates,
     brandStudios,
     setBrandStudios,
+    brandChannels,
+    setBrandChannels,
     shiftRegistrations,
     setShiftRegistrations,
     recurringShiftTemplates,

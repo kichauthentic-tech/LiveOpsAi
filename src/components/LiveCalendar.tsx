@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { LiveSession, ShiftSlot, ShiftRegistration, Studio, Talent, Brand, PromoScheme, UserRole, BrandStudio, AuditLogEntry } from "../types";
+import { LiveSession, ShiftSlot, ShiftRegistration, Studio, Talent, Brand, PromoScheme, UserRole, BrandStudio, AuditLogEntry, BrandChannel } from "../types";
 import { schemesForDate } from "../lib/schemeUtils";
 
 import { clashedSessionIds, findPersonClashes, personClash, studioClash, studioClashLabel } from "../lib/scheduling/conflicts";
@@ -36,6 +36,8 @@ interface LiveCalendarProps {
   talents: Talent[];
   brands: Brand[];
   brandStudios?: BrandStudio[]; // phòng mặc định brand × nền tảng (0098) — đổi brand trong form mở ca thì chọn sẵn phòng
+  /** Kênh brand × sàn (0149) — form mở ca chọn kênh. */
+  channels: BrandChannel[];
   onUpdateSession?: (updatedSession: LiveSession) => Promise<boolean>;
   onCreateSlot?: (slot: ShiftSlot) => Promise<boolean>;
   onDeleteSlot?: (id: string) => Promise<void>;
@@ -76,6 +78,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   talents,
   brands,
   brandStudios = [],
+  channels,
   onUpdateSession,
   onCreateSlot,
   onDeleteSlot,
@@ -1320,6 +1323,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
       {slotModal && canManageSlots && onCreateSlot && (
         <OpenSlotModal
           brands={brands}
+          channels={channels}
           studios={studios}
           brandStudios={brandStudios}
           sessions={sessions}

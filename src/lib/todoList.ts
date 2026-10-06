@@ -1,8 +1,9 @@
-import { Brand, BrandMonthPlan, BrandMonthlyCommitment, BrandMonthlyReport, BrandPlatformRate, LiveSession, ShiftSlot, Talent } from "../types";
+import { Brand, BrandChannel, BrandMonthPlan, BrandMonthlyCommitment, BrandMonthlyReport, BrandPlatformRate, LiveSession, ShiftSlot, Talent } from "../types";
 import { isUnconfirmedPast } from "./sessionStatus";
 import { isCountable } from "./performance/hostPerformance";
 import { fmtDateVn, fmtMonth } from "./format";
-import { brandMonthKey, brandPlatformKey, brandPlatformsOf, sessionBrandMonthKey } from "./reportPlatform";
+import { brandMonthKey, brandPlatformKey, sessionBrandMonthKey } from "./reportPlatform";
+import { platformsOfBrand } from "./channels";
 import { brandPriceSet } from "./brandPricing";
 import { findPersonClashes } from "./scheduling/conflicts";
 
@@ -31,6 +32,8 @@ export interface Todo {
 export interface TodoInput {
   today: string; // YYYY-MM-DD
   brands: Brand[];
+  /** Kênh brand × sàn (0149) — việc theo sàn chỉ nhắc kênh ĐANG CHẠY. */
+  channels: BrandChannel[];
   sessions: LiveSession[];
   shiftSlots: ShiftSlot[];
   /** brandPlatformKey (brand × sàn) → kế hoạch tháng này / tháng sau (thiếu khoá = chưa lập). */
@@ -73,11 +76,6 @@ export function activeBrandIds(input: Pick<TodoInput, "today" | "sessions" | "pl
   return out;
 }
 
-/** Kế hoạch (tháng này + tháng sau) của brand — để brand chưa có ca Shopee nhưng đã lập kế hoạch Shopee vẫn được nhắc. */
-function plansOf(input: Pick<TodoInput, "plansThisMonth" | "plansNextMonth">, brandId: string): { brandId: string; platform: string }[] {
-  return [...input.plansThisMonth.values(), ...input.plansNextMonth.values()].filter((p) => p.brandId === brandId);
-}
-
 export function buildTodos(input: TodoInput): Todo[] {
   const { today, brands, sessions } = input;
   const month = today.slice(0, 7);
@@ -108,7 +106,11 @@ export function buildTodos(input: TodoInput): Todo[] {
     }
 
     // 2–4 và 8 theo TỪNG SÀN của brand (0139/0140: kế hoạch, target, report riêng từng sàn).
-    const platforms = brandPlatformsOf(b.id, own, [...input.shiftSlots, ...plansOf(input, b.id)]);
+    // Kênh đang chạy của brand (0149) — kênh tạm dừng không bị nhắc kế hoạch/cam kết/giá.
+    const platforms = platformsOfBrand(input.channels, b.id, false);
+    if (platforms.length === 0) {
+      out.push({ id: `channel-${b.id}`, level: "high", title: `${b.name} chưa có kênh nào đang chạy`, detail: "Thêm kênh TikTok / Shopee của brand ở CRM thì mới lập kế hoạch, mở ca, nhập giá được.", tab: "crm", rememberBrandId: b.id, action: "Thêm kênh ở CRM" });
+    }
     for (const p of platforms) {
       const name = platforms.length > 1 ? `${b.name} ${p}` : b.name;
       const sfx = p === "Shopee" ? "-shopee" : "";

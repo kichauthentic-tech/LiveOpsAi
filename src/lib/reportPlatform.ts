@@ -31,16 +31,3 @@ export const brandPlatformKey = (brandId: string, platform: ReportPlatform | str
   platform === "Shopee" ? `${brandId}|Shopee` : brandId;
 
 export const sessionBrandMonthKey = (s: Pick<LiveSession, "brandId" | "date" | "platform">) => brandMonthKey(s.brandId, s.date, s.platform);
-
-/** Sàn brand đang chạy (có ít nhất một ca hoặc một phòng gắn sàn đó), TikTok trước. Brand chưa có gì ⇒ ["TikTok"]. */
-export function brandPlatformsOf(
-  brandId: string,
-  sessions: { brandId?: string; platform?: string | null }[],
-  extra: { brandId?: string; platform?: string | null }[] = []
-): ReportPlatform[] {
-  const seen = new Set<ReportPlatform>();
-  for (const s of sessions) if (s.brandId === brandId) seen.add(s.platform === "Shopee" ? "Shopee" : "TikTok");
-  for (const s of extra) if (s.brandId === brandId) seen.add(s.platform === "Shopee" ? "Shopee" : "TikTok");
-  const out = REPORT_PLATFORMS.filter((p) => seen.has(p));
-  return out.length ? out : ["TikTok"];
-}

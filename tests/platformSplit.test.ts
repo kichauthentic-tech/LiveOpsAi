@@ -1,7 +1,8 @@
 // Tách theo sàn TikTok / Shopee (06/10, user chốt: kế hoạch, target, hợp đồng, report riêng từng sàn; xem cả riêng lẫn tổng).
 // Chạy: npx vitest run tests/platformSplit.test.ts
 import { describe, expect, test } from "vitest";
-import { brandMonthKey, brandPlatformKey, brandPlatformsOf, inPlatformScope, sessionBrandMonthKey } from "../src/lib/reportPlatform";
+import { brandMonthKey, brandPlatformKey, inPlatformScope, sessionBrandMonthKey } from "../src/lib/reportPlatform";
+import { deriveChannels, platformsOfBrand } from "../src/lib/channels";
 import { applyAllocatedTargets } from "../src/lib/performance/targetAllocation";
 import { lockedPlanTargetsFromRows } from "../src/lib/scheduling/lockedPlanTargets";
 import { computeAllProgress, computeSchedulingGaps, monthCommitmentOf } from "../src/lib/performance/brandCommitment";
@@ -26,10 +27,13 @@ describe("khoá brand × tháng × sàn", () => {
     expect(brandPlatformKey(B, "TikTok")).toBe(B);
     expect(brandPlatformKey(B, "Shopee")).toBe(`${B}|Shopee`);
   });
-  test("sàn brand đang chạy: từ ca + slot/phòng, TikTok trước; chưa có gì ⇒ TikTok", () => {
-    expect(brandPlatformsOf(B, [ca("a", "Shopee"), ca("b", "TikTok")])).toEqual(["TikTok", "Shopee"]);
-    expect(brandPlatformsOf(B, [], [{ brandId: B, platform: "Shopee" }])).toEqual(["Shopee"]);
-    expect(brandPlatformsOf("khac", [ca("a", "Shopee")])).toEqual(["TikTok"]);
+  test("sàn brand đang chạy = kênh (0149), TikTok trước; brand chưa có kênh ⇒ [] (không đoán TikTok)", () => {
+    const ch = (platform: "TikTok" | "Shopee", status: "active" | "paused" = "active") => ({ id: platform, brandId: B, platform, shopName: "", shopRef: "", status, note: "" });
+    expect(platformsOfBrand([ch("Shopee"), ch("TikTok")], B)).toEqual(["TikTok", "Shopee"]);
+    expect(platformsOfBrand([ch("Shopee", "paused"), ch("TikTok")], B, false)).toEqual(["TikTok"]);
+    expect(platformsOfBrand([ch("Shopee")], "khac")).toEqual([]);
+    // DB chưa có bảng kênh: suy từ dòng đang có, mỗi cặp brand × sàn một kênh.
+    expect(platformsOfBrand(deriveChannels([ca("a", "Shopee"), ca("b", "TikTok"), ca("c", "Shopee")]), B)).toEqual(["TikTok", "Shopee"]);
     expect(inPlatformScope(ca("a", "Shopee"), "Shopee")).toBe(true);
     expect(inPlatformScope(ca("a", "Shopee"), "TikTok")).toBe(false);
   });
@@ -101,6 +105,7 @@ describe("Việc cần làm theo sàn", () => {
     const todos = buildTodos({
       today: "2026-10-20",
       brands: [brand],
+      channels: (["TikTok", "Shopee"] as const).map((platform) => ({ id: platform, brandId: B, platform, shopName: "", shopRef: "", status: "active" as const, note: "" })),
       sessions: [ca("tt", "TikTok"), ca("sp", "Shopee")],
       shiftSlots: [],
       plansThisMonth: new Map([[brandPlatformKey(B, "TikTok"), plan("TikTok", "locked")], [brandPlatformKey(B, "Shopee"), plan("Shopee", "draft")]]),

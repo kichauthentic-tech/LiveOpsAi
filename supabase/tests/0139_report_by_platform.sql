@@ -25,6 +25,11 @@ insert into auth.users (id, email) values
   ('a0000000-0000-0000-0000-000000000009', 'brand@t')
 on conflict do nothing;
 insert into brands (id, name) values ('b0000000-0000-0000-0000-00000000000a', 'VERA');
+-- 0149: dòng của kênh chưa tồn tại bị từ chối — tạo đủ kênh cho brand thử (bỏ qua khi replay chưa tới 0149).
+do $$ begin if to_regclass('public.brand_channels') is not null then
+  execute $q$insert into brand_channels (brand_id, platform) select b.id, v.p from brands b cross join (values ('TikTok'), ('Shopee')) v(p) on conflict do nothing$q$;
+end if; end $$;
+
 insert into profiles (id, name, email, role) values ('a0000000-0000-0000-0000-000000000001', 'Admin', 'admin@t', 'admin')
   on conflict (id) do update set role = 'admin';
 insert into profiles (id, name, email, role, assigned_brand_id) values
@@ -46,7 +51,9 @@ select pg_temp.chk('1a hai report cùng tháng khác sàn', count(*) = 2) from b
 select pg_temp.must_fail('1b trùng (brand, tháng, sàn)',
   $q$insert into brand_monthly_reports (brand_id, period_month, platform) values ('b0000000-0000-0000-0000-00000000000a', date '2026-06-01', 'Shopee')$q$, 'duplicate key');
 select pg_temp.must_fail('1c sàn lạ',
-  $q$insert into brand_monthly_reports (brand_id, period_month, platform) values ('b0000000-0000-0000-0000-00000000000a', date '2026-05-01', 'Lazada')$q$, 'platform_check');
+  $q$insert into brand_monthly_reports (brand_id, period_month, platform) values ('b0000000-0000-0000-0000-00000000000a', date '2026-05-01', 'Lazada')$q$,
+  -- Sau 0149, trigger kênh chặn trước check constraint: sàn lạ không bao giờ có kênh.
+  (select case when to_regclass('public.brand_channels') is null then 'platform_check' else 'chưa có kênh Lazada' end));
 insert into brand_monthly_report_snapshots (brand_id, period_month, platform, snapshot) values
   ('b0000000-0000-0000-0000-00000000000a', date '2026-06-01', 'TikTok', '{}'), ('b0000000-0000-0000-0000-00000000000a', date '2026-06-01', 'Shopee', '{}');
 select pg_temp.chk('1d bản chụp theo sàn', count(*) = 2) from brand_monthly_report_snapshots;

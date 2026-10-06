@@ -3,6 +3,7 @@ import { defaultViewMonth } from "../lib/defaultMonth";
 import { AlertTriangle, ArrowDownRight, ArrowUpRight, ChevronLeft, ChevronRight, CircleAlert, Info, LayoutDashboard, Lock, Minus } from "lucide-react";
 import {
   Brand,
+  BrandChannel,
   BrandMonthPlan,
   BrandPlatformRate,
   BrandPlatformRateHistoryEntry,
@@ -56,7 +57,8 @@ import { BrandLogo } from "./ui/BrandLogo";
 import { PageIntro } from "./common/PageIntro";
 import { MonthPicker } from "./common/MonthPicker";
 import type { TabPrefetchCtx } from "../lib/db/prefetch";
-import { brandMonthKey, brandPlatformKey, brandPlatformsOf, inPlatformScope, PLATFORM_SCOPE_LABEL, type ReportPlatform } from "../lib/reportPlatform";
+import { brandMonthKey, brandPlatformKey, inPlatformScope, PLATFORM_SCOPE_LABEL, type ReportPlatform } from "../lib/reportPlatform";
+import { platformsOfBrand } from "../lib/channels";
 
 // Bản Tin CEO (2026-09-25) — thay Toàn Cảnh Agency. Mọi luật số nằm ở lib/performance/ceoBrief.ts;
 // file này chỉ trình bày. Khối tiền chỉ ceo/admin thấy, và chỉ cộng ca ĐỦ dữ liệu để tính tiền
@@ -67,6 +69,8 @@ interface CeoBriefProps {
   platform: ReportPlatform;
   sessions: LiveSession[];
   brands: Brand[];
+  /** Kênh brand × sàn (0149) — nguồn duy nhất cho "brand chạy sàn nào". */
+  brandChannels: BrandChannel[];
   talents: Talent[];
   shiftSlots: ShiftSlot[];
   /** brandMonthKey (brand × tháng × sàn) → target từng ca của Kế Hoạch Tháng đã chốt, gồm cả ca đã mất shift_slot (lỗi E2E #1). */
@@ -191,7 +195,7 @@ export function prefetchCeoBrief(_ctx: TabPrefetchCtx): void {
 }
 
 export default function CeoBrief(props: CeoBriefProps) {
-  const { platform, sessions, brands, talents, shiftSlots, planSlotTargets, planMonthTotals, financeRecords, brandPlatformRates, brandPlatformRateHistory, talentRateHistory, currentRole, onNavigate } = props;
+  const { platform, sessions, brands, brandChannels, talents, shiftSlots, planSlotTargets, planMonthTotals, financeRecords, brandPlatformRates, brandPlatformRateHistory, talentRateHistory, currentRole, onNavigate } = props;
   const today = todayVn();
   const canSeeMoney = currentRole === "ceo" || currentRole === "admin";
   const [grain, setGrain] = useState<Grain>("month");
@@ -268,8 +272,8 @@ export default function CeoBrief(props: CeoBriefProps) {
   // ---------- tháng: target, run-rate, dự phóng ----------
   // Mỗi kênh brand × sàn một outlook (target của kế hoạch ĐÚNG SÀN), rồi cộng theo brand trong phạm vi sàn đang xem.
   const channels = useMemo(
-    () => brands.flatMap((b) => brandPlatformsOf(b.id, sessions, shiftSlots).filter((p) => inPlatformScope({ platform: p }, platform)).map((p) => ({ b, p }))),
-    [brands, sessions, shiftSlots, platform]
+    () => brands.filter((b) => platformsOfBrand(brandChannels, b.id).includes(platform)).map((b) => ({ b, p: platform })),
+    [brands, brandChannels, platform]
   );
   const channelOutlooks = useMemo(() => {
     const out = new Map<string, MonthOutlook>();
@@ -295,7 +299,7 @@ export default function CeoBrief(props: CeoBriefProps) {
     return out;
   }, [brands, channels, channelOutlooks, month, today]);
   const scopeOutlook = useMemo(() => combineOutlooks(month, today, scopeIds.map((id) => outlooks.get(id)!).filter(Boolean)), [month, today, scopeIds, outlooks]);
-  const multiPlatform = (id: string) => channels.filter((c) => c.b.id === id).length > 1;
+  const multiPlatform = (id: string) => platformsOfBrand(brandChannels, id).length > 1;
   const channelName = (b: Brand, p: ReportPlatform) => (multiPlatform(b.id) || p === "Shopee" ? `${b.name} · ${p}` : b.name);
 
   const issues = useMemo(

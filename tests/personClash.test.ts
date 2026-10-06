@@ -84,6 +84,7 @@ describe("Việc cần làm", () => {
   const input = (sessions: LiveSession[]) => ({
     today: "2026-10-06",
     brands: [{ id: "crocs", name: "CROCS" } as Brand],
+    channels: [{ id: "c", brandId: "crocs", platform: "TikTok" as const, shopName: "", shopRef: "", status: "active" as const, note: "" }],
     sessions,
     shiftSlots: [],
     plansThisMonth: new Map(),

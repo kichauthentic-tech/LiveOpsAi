@@ -27,6 +27,11 @@ insert into auth.users (id, email) values
   ('a0000000-0000-0000-0000-000000000003', 'talent2@t')
 on conflict do nothing;
 insert into brands (id, name) values ('b0000000-0000-0000-0000-00000000000a', 'VERA');
+-- 0149: dòng của kênh chưa tồn tại bị từ chối — tạo đủ kênh cho brand thử (bỏ qua khi replay chưa tới 0149).
+do $$ begin if to_regclass('public.brand_channels') is not null then
+  execute $q$insert into brand_channels (brand_id, platform) select b.id, v.p from brands b cross join (values ('TikTok'), ('Shopee')) v(p) on conflict do nothing$q$;
+end if; end $$;
+
 insert into talents (id, name) values
   ('c0000000-0000-0000-0000-000000000001', 'Trúc Như'),
   ('c0000000-0000-0000-0000-000000000002', 'Thảo'),
@@ -120,7 +125,11 @@ select set_session_staff_segments('d0000000-0000-0000-0000-000000000002', jsonb_
   jsonb_build_object('talent_id', 'c0000000-0000-0000-0000-000000000002', 'role', 'co_host', 'from_min', 100, 'to_min', 210)));
 select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000002', false);
 set role authenticated;
-select pg_temp.chk('8c talent chỉ đọc đoạn của chính mình', count(*) = 1 and bool_and(talent_id = 'c0000000-0000-0000-0000-000000000002')) from session_staff_segments;
+-- 0147 mở rộng: talent đứng ca thấy ĐỦ đoạn của ca đó (để trợ biết lúc host đổi). Trước 0147: chỉ đoạn của mình.
+select pg_temp.chk('8c talent chỉ đọc đoạn của chính mình (sau 0147: đoạn của ca mình đứng)',
+  case when to_regprocedure('private.talent_on_session(uuid)') is null
+       then count(*) = 1 and bool_and(talent_id = 'c0000000-0000-0000-0000-000000000002')
+       else count(*) >= 1 and bool_or(talent_id = 'c0000000-0000-0000-0000-000000000002') end) from session_staff_segments;
 reset role;
 set role anon;
 select pg_temp.must_fail('8d anon không đọc được', $q$select count(*) from session_staff_segments$q$, 'permission denied');

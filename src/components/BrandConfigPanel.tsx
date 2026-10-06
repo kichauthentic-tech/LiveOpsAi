@@ -1,13 +1,13 @@
 import React, { useMemo, useState } from "react";
 import { CalendarRange, FileSignature, History, MapPin, Pencil, Plus, Tag, Trash2 } from "lucide-react";
-import { Brand, BrandContract, BrandMonthlyCommitment, BrandPlatformRate, BrandPlatformRateHistoryEntry, BrandStudio, Studio } from "../types";
+import { Brand, BrandChannel, BrandContract, BrandMonthlyCommitment, BrandPlatformRate, BrandPlatformRateHistoryEntry, BrandStudio, Studio } from "../types";
 import { createBrandContract, deleteBrandContract, generateContractCommitments, updateBrandContract } from "../lib/db/brandContracts";
 import { findBrandStudioId } from "../lib/db/brandStudios";
 import { generateThroughMonth, monthKeyOf, todayVn } from "../lib/performance/brandCommitment";
 import { rateOf } from "../lib/brandPricing";
 import { errorMessage } from "../lib/errorMessage";
 import { fmtDateVn, fmtMonth, fmtVndFull, fmtVndShort } from "../lib/format";
-import { REPORT_PLATFORMS, type ReportPlatform } from "../lib/reportPlatform";
+import { type ReportPlatform } from "../lib/reportPlatform";
 import { useConfirm } from "../hooks/useConfirm";
 import { MonthPicker } from "./common/MonthPicker";
 
@@ -22,6 +22,11 @@ import { MonthPicker } from "./common/MonthPicker";
 interface Props {
   brand: Brand;
   platform: ReportPlatform;
+  /** Sàn brand đã có kênh (0149) — nút gạt chỉ liệt kê các sàn này. */
+  platforms: ReportPlatform[];
+  /** Kênh đang mở (brand × `platform`). Vắng = DB chưa có bảng kênh (0149 chưa chạy). */
+  channel?: BrandChannel;
+  onUpdateChannel?: (id: string, patch: Partial<Pick<BrandChannel, "shopName" | "shopRef" | "status">>) => Promise<unknown>;
   onPlatformChange: (p: ReportPlatform) => void;
   canEdit: boolean;
   rates: BrandPlatformRate[];
@@ -105,9 +110,55 @@ function NumberField({
   );
 }
 
+// Thông tin KÊNH (0149): tên gian hàng, mã shop trên sàn, đang chạy / tạm dừng. Brand + sàn của kênh không đổi được.
+function ChannelInfo({ channel, platform, canEdit, onSave }: { channel?: BrandChannel; platform: ReportPlatform; canEdit: boolean; onSave: (patch: Partial<Pick<BrandChannel, "shopName" | "shopRef" | "status">>) => void }) {
+  const [shopName, setShopName] = useState(channel?.shopName ?? "");
+  const [shopRef, setShopRef] = useState(channel?.shopRef ?? "");
+  const real = !!channel && !channel.id.startsWith("derived:");
+  const dirty = real && (shopName.trim() !== channel!.shopName || shopRef.trim() !== channel!.shopRef);
+  const inputCls = "w-full bg-[var(--surface-elevated)] text-[var(--text)] text-xs px-2 py-1.5 rounded-lg border border-[var(--border)] disabled:opacity-60";
+  return (
+    <div className="bg-[var(--surface-base)]/60 border border-[var(--border)] rounded-xl p-3 flex flex-wrap items-end gap-3">
+      <div className="text-xs font-black text-[var(--text)] w-full sm:w-auto sm:self-center">
+        Kênh {platform}
+        {real && channel!.status === "paused" && <span className="ml-1.5 text-[11px] font-bold text-amber-300">tạm dừng</span>}
+      </div>
+      {!real ? (
+        <p className="text-[11px] text-[var(--text-faint)]">Chưa có bảng kênh trên DB (migration 0149) — tên gian hàng, mã shop sẽ nhập được sau khi chạy.</p>
+      ) : (
+        <>
+          <label className="flex-1 min-w-[10rem] text-[11px] text-[var(--text-muted)] space-y-1">
+            <span className="block">Tên gian hàng</span>
+            <input id={`ch-name-${platform}`} value={shopName} onChange={(e) => setShopName(e.target.value)} disabled={!canEdit} placeholder={platform === "Shopee" ? "Tên shop trên Shopee" : "Tên shop trên TikTok Shop"} className={inputCls} />
+          </label>
+          <label className="flex-1 min-w-[10rem] text-[11px] text-[var(--text-muted)] space-y-1">
+            <span className="block">{platform === "Shopee" ? "Shop ID" : "Handle / Shop ID"}</span>
+            <input id={`ch-ref-${platform}`} value={shopRef} onChange={(e) => setShopRef(e.target.value)} disabled={!canEdit} placeholder="Để đối chiếu file tải về" className={inputCls} />
+          </label>
+          {canEdit && (
+            <div className="flex gap-2">
+              <button disabled={!dirty} onClick={() => onSave({ shopName: shopName.trim(), shopRef: shopRef.trim() })} className="min-h-6 px-3 py-1.5 rounded-lg text-xs font-bold bg-[var(--accent)] text-white disabled:opacity-40">Lưu</button>
+              <button
+                onClick={() => onSave({ status: channel!.status === "paused" ? "active" : "paused" })}
+                className="min-h-6 px-3 py-1.5 rounded-lg text-xs font-bold border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]"
+                title={channel!.status === "paused" ? "Kênh chạy lại: hiện ở mọi màn lập lịch, việc cần làm" : "Tạm dừng: không nhắc kế hoạch / giá / cam kết, dữ liệu cũ giữ nguyên"}
+              >
+                {channel!.status === "paused" ? "Chạy lại" : "Tạm dừng kênh"}
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 export const BrandConfigPanel: React.FC<Props> = ({
   brand,
   platform,
+  platforms,
+  channel,
+  onUpdateChannel,
   onPlatformChange,
   canEdit,
   rates,
@@ -248,7 +299,7 @@ export const BrandConfigPanel: React.FC<Props> = ({
         ))}
         <span className="flex-1" />
         <div className="inline-flex items-center gap-1 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-1" role="group" aria-label="Sàn">
-          {REPORT_PLATFORMS.map((p) => (
+          {platforms.map((p) => (
             <button
               key={p}
               onClick={() => onPlatformChange(p)}
@@ -260,6 +311,8 @@ export const BrandConfigPanel: React.FC<Props> = ({
           ))}
         </div>
       </div>
+
+      <ChannelInfo key={channel?.id ?? platform} channel={channel} platform={platform} canEdit={canEdit && !!onUpdateChannel} onSave={(patch) => run(async () => { await onUpdateChannel!(channel!.id, patch); setNote(`Đã lưu kênh ${brand.name} · ${platform}.`); })} />
 
       {error && <p className="text-xs text-rose-300 bg-rose-950/30 border border-rose-900 rounded-lg px-3 py-2">{error}</p>}
       {note && <p className="text-xs text-emerald-300 bg-emerald-950/30 border border-emerald-900 rounded-lg px-3 py-2">{note}</p>}

@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { inPlatformScope, type PlatformScope } from "../../lib/reportPlatform";
-import { Brand, LiveSession, PromoScheme, ShiftSlot, ShiftRegistration, Studio, Talent, UserRole, BrandStudio, AuditLogEntry } from "../../types";
+import { Brand, LiveSession, PromoScheme, ShiftSlot, ShiftRegistration, Studio, Talent, UserRole, BrandStudio, AuditLogEntry, BrandChannel } from "../../types";
 import { SessionWindow } from "../SessionWindow";
 import { CalendarIcon, ChevronLeft, ChevronRight, Plus, Tag } from "lucide-react";
 import { fmtDateVn, fmtMonth, fmtVndShort } from "../../lib/format";
@@ -35,6 +35,8 @@ interface BrandCalendarProps {
   shiftRegistrations?: ShiftRegistration[];
   studios: Studio[];
   brandStudios?: BrandStudio[]; // phòng mặc định brand × nền tảng (0098) — form mở ca chọn sẵn
+  /** Kênh brand × sàn (0149) — form mở ca chọn kênh. */
+  channels: BrandChannel[];
   talents: Talent[];
   schemes?: PromoScheme[];
   onAddScheme?: (scheme: { title: string; description: string; startDate: string; endDate: string; brandId: string; category: string }) => Promise<void>;
@@ -98,6 +100,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
   shiftRegistrations = [],
   studios,
   brandStudios = [],
+  channels,
   talents,
   schemes = [],
   onAddScheme,
@@ -605,6 +608,8 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
       {modalState.open && canManage && (
         <OpenSlotModal
           fixedBrand={{ id: brandId, name: brandName }}
+          channels={channels}
+          initialPlatform={platformScope}
           studios={studios}
           brandStudios={brandStudios}
           sessions={sessions}

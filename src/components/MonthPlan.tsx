@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { defaultPlanMonth } from "../lib/defaultMonth";
-import { Brand, BrandContract, BrandMonthPlan, BrandMonthPlanSlot, BrandMonthlyCommitment, BrandStudio, CalendarEventRow, LiveSession, PlanCampRanges, PromoScheme, RecurringShiftTemplate, ShiftSlot, Studio, Talent } from "../types";
+import { Brand, BrandChannel, BrandContract, BrandMonthPlan, BrandMonthPlanSlot, BrandMonthlyCommitment, BrandStudio, CalendarEventRow, LiveSession, PlanCampRanges, PromoScheme, RecurringShiftTemplate, ShiftSlot, Studio, Talent } from "../types";
 import { AlertTriangle, Ban, CalendarRange, Lock, Plus, Repeat, Save, Sparkles, Trash2, Wand2, X } from "lucide-react";
 import { commitmentsRead, contractsRead, upsertMonthlyCommitment } from "../lib/db/brandContracts";
 import type { TabPrefetchCtx } from "../lib/db/prefetch";
@@ -34,11 +34,14 @@ import { PageIntro } from "./common/PageIntro";
 
 import { fmtMonth, fmtFixed, fmtVndShort, fmtVndFull } from "../lib/format";
 import { MonthPicker } from "./common/MonthPicker";
-import { brandPlatformKey, brandPlatformsOf, type ReportPlatform } from "../lib/reportPlatform";
+import { brandPlatformKey, type ReportPlatform } from "../lib/reportPlatform";
+import { platformsOfBrand } from "../lib/channels";
 interface MonthPlanProps {
   /** Sàn của workspace agency (07/10): kế hoạch, target, cam kết của sàn này — không còn nút chuyển sàn trong màn. */
   platform: ReportPlatform;
+  /** Brand CÓ KÊNH ở sàn này (App lọc theo brand_channels, 0149). */
   brands: Brand[];
+  channels: BrandChannel[];
   studios: Studio[];
   // Lịch sử ca (engine chỉ ăn ca Completed + tiktok_reconciled của đúng brand).
   sessions: LiveSession[];
@@ -93,6 +96,7 @@ export function prefetchMonthPlan(_ctx: TabPrefetchCtx): void {
 export default function MonthPlan({
   platform: platformProp,
   brands,
+  channels,
   studios,
   sessions,
   shiftSlots,
@@ -113,7 +117,7 @@ export default function MonthPlan({
   const [brandId, setBrandId] = useDefaultBrand(brands, sessions, today);
   // Kế hoạch theo sàn (0140): mỗi brand × tháng × sàn một kế hoạch, target riêng (user chốt 06/10). Đổi brand mà sàn đã
   // chọn không có ở brand mới thì về sàn đầu của brand đó.
-  const platforms = useMemo(() => (brandId ? brandPlatformsOf(brandId, sessions, [...shiftSlots, ...brandStudios]) : (["TikTok"] as ReportPlatform[])), [brandId, sessions, shiftSlots, brandStudios]);
+  const platforms = useMemo(() => (brandId ? platformsOfBrand(channels, brandId) : []), [brandId, channels]);
   // Sàn mở sẵn: sàn đã nhớ cùng brand (nút "Lập kế hoạch VERA Shopee" ở Dashboard/Toàn Cảnh/Việc cần làm — rememberBrandId).
   const platform: ReportPlatform = platformProp;
   const brandLabel = (name: string | undefined) => `${name ?? ""}${platforms.length > 1 || platform === "Shopee" ? ` ${platform}` : ""}`;
@@ -171,7 +175,7 @@ export default function MonthPlan({
       .then((m) =>
         setNextMonthMissing(
           // Chỉ sàn của workspace (07/10): kế hoạch sàn khác thuộc workspace của sàn đó.
-          brands.filter((b) => brandPlatformsOf(b.id, sessions, [...shiftSlots, ...brandStudios]).includes(platformProp)).filter((b) => m.get(brandPlatformKey(b.id, platformProp))?.status !== "locked").map((b) => b.name)
+          brands.filter((b) => m.get(brandPlatformKey(b.id, platformProp))?.status !== "locked").map((b) => b.name)
         )
       )
       .catch(() => setNextMonthMissing([]));
