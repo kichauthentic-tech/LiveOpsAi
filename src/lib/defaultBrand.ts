@@ -9,6 +9,9 @@
 import type { Brand, LiveSession } from "../types";
 
 const STORAGE_KEY = "liveops_os_v2_lastBrandId";
+// Sàn đi kèm brand vừa chọn (06/10, kế hoạch theo sàn — 0140): nút "Lập kế hoạch VERA Shopee" ở màn khác mở Kế Hoạch
+// Tháng đúng sàn đó. Chỉ có nghĩa với ĐÚNG brand đã nhớ — lưu "brandId|sàn".
+const PLATFORM_KEY = "liveops_os_v2_lastBrandPlatform";
 
 export function pickDefaultBrandId(
   brands: Pick<Brand, "id">[],
@@ -36,11 +39,22 @@ export function loadRememberedBrandId(): string | null {
   }
 }
 
-export function rememberBrandId(brandId: string): void {
+export function rememberBrandId(brandId: string, platform?: "TikTok" | "Shopee"): void {
   if (!brandId) return;
   try {
     localStorage.setItem(STORAGE_KEY, brandId);
+    if (platform) localStorage.setItem(PLATFORM_KEY, `${brandId}|${platform}`);
   } catch {
     // Chế độ ẩn danh/chặn storage: chỉ mất phần "nhớ", vẫn rơi về brand có ca gần nhất.
+  }
+}
+
+/** Sàn đã nhớ cho `brandId` (null = chưa nhớ hoặc nhớ cho brand khác). */
+export function loadRememberedPlatform(brandId: string): "TikTok" | "Shopee" | null {
+  try {
+    const [id, p] = (localStorage.getItem(PLATFORM_KEY) ?? "").split("|");
+    return id === brandId && (p === "TikTok" || p === "Shopee") ? p : null;
+  } catch {
+    return null;
   }
 }

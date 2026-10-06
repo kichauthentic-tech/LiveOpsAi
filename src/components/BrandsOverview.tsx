@@ -3,6 +3,7 @@ import { rememberBrandId } from "../lib/defaultBrand";
 import { Download, LayoutGrid, Loader2 } from "lucide-react";
 import { Brand, BrandMonthlyReport, BrandMonthPlan, BrandPlatformRate, LiveSession } from "../types";
 import { planStatusesRead } from "../lib/db/monthPlans";
+import { brandMonthKey, brandPlatformKey, brandPlatformsOf } from "../lib/reportPlatform";
 import { commitmentsRead, fetchBrandMonthlyCommitments } from "../lib/db/brandContracts";
 import type { TabPrefetchCtx } from "../lib/db/prefetch";
 import { CommitmentProgress, CommitmentStatus, computeAllProgress, todayVn } from "../lib/performance/brandCommitment";
@@ -119,7 +120,7 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ brands, sessions
   const brandNameById = useMemo(() => Object.fromEntries(brands.map((b) => [b.id, b.name])), [brands]);
   const progressByBrand = useMemo(() => {
     const rows = computeAllProgress(commitments, brandNameById, sessions, `${month}-01`, today);
-    return new Map(rows.map((r) => [r.brandId, r] as [string, CommitmentProgress]));
+    return new Map(rows.map((r) => [brandPlatformKey(r.brandId, r.platform), r] as [string, CommitmentProgress]));
   }, [commitments, brandNameById, sessions, month, today]);
 
   const rateSetByBrand = useMemo(() => {
@@ -136,29 +137,35 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ brands, sessions
   // ĐÚNG những gì bảng đang hiện — tính lại lần hai cho file là cách chắc chắn sẽ lệch sau một lần sửa
   // cột mà quên chỗ kia (đúng lớp lỗi "hai màn nói hai số" của dự án này).
   const rows = useMemo(() => {
+    // Mỗi dòng một brand × sàn (0139–0141): kế hoạch, cam kết, report riêng từng sàn.
     return brands
       .slice()
       .sort((a, b) => a.name.localeCompare(b.name))
-      .map((b) => {
-        const plan = planStatuses.get(b.id);
-        const progress = progressByBrand.get(b.id);
-        const s = summarize(filterLedger(sessions, { month, brandId: b.id }, today), today);
+      .flatMap((b) => brandPlatformsOf(b.id, sessions).map((p) => ({ b, p, multi: brandPlatformsOf(b.id, sessions).length > 1 })))
+      .map(({ b, p, multi }) => {
+        const key = brandPlatformKey(b.id, p);
+        const plan = planStatuses.get(key);
+        const progress = progressByBrand.get(key);
+        const s = summarize(filterLedger(sessions.filter((x) => (x.platform ?? "TikTok") === p), { month, brandId: b.id }, today), today);
         return {
           brand: b,
+          platform: p,
+          label: multi || p === "Shopee" ? `${b.name} · ${p}` : b.name,
           plan,
           planStatus: (plan?.status ?? "none") as BrandMonthPlan["status"] | "none",
           progress,
           commitStatus: (progress?.status ?? "no_commitment") as CommitmentStatus,
           sum: s,
-          reportStatus: (monthlyReports.get(`${b.id}|${month}`)?.status ?? "none") as BrandMonthlyReport["status"] | "none",
-          rates: rateSetByBrand.get(b.id)
+          reportStatus: (monthlyReports.get(brandMonthKey(b.id, month, p))?.status ?? "none") as BrandMonthlyReport["status"] | "none",
+          // Rate Card theo sàn: dòng Shopee chỉ "đã set" khi có giá Shopee.
+          rates: rateSetByBrand.get(b.id)?.has(p) ? new Set([p]) : undefined
         };
       });
   }, [brands, planStatuses, progressByBrand, sessions, month, today, monthlyReports, rateSetByBrand]);
 
   const exportXlsx = () => {
     const out = rows.map((r) => ({
-      Brand: r.brand.name,
+      Brand: r.label,
       "Kế hoạch tháng": PLAN_STATUS_LABEL[r.planStatus] + (r.plan?.brandConfirmedAt ? " · brand đã xác nhận" : ""),
       "Target kế hoạch": r.plan && r.plan.targetGmv > 0 ? r.plan.targetGmv : "",
       "Cam kết": COMMIT_STATUS_LABEL[r.commitStatus],
@@ -222,12 +229,12 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ brands, sessions
               </tr>
             </thead>
             <tbody>
-              {rows.map(({ brand: b, plan, planStatus, progress, commitStatus, sum: s, reportStatus, rates }) => {
+              {rows.map(({ brand: b, platform, label, plan, planStatus, progress, commitStatus, sum: s, reportStatus, rates }) => {
                 return (
-                  <tr key={b.id} className="border-b border-[var(--border-muted)] align-top">
+                  <tr key={brandPlatformKey(b.id, platform)} className="border-b border-[var(--border-muted)] align-top">
                     <td className="py-2.5 px-4">
                       <span className="inline-flex items-center gap-1.5 font-bold text-[var(--text)]">
-                        <BrandLogo brand={b} size="xs" /> {b.name}
+                        <BrandLogo brand={b} size="xs" /> {label}
                       </span>
                     </td>
                     <td className="py-2.5 px-2">
@@ -235,7 +242,7 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ brands, sessions
                         {PLAN_STATUS_LABEL[planStatus]}
                       </span>
                       {planStatus !== "locked" && (
-                        <GoLink label={planStatus === "none" ? "Lập kế hoạch" : "Chốt kế hoạch"} onClick={onNavigate && (() => { rememberBrandId(b.id); onNavigate("month_plan"); })} />
+                        <GoLink label={planStatus === "none" ? "Lập kế hoạch" : "Chốt kế hoạch"} onClick={onNavigate && (() => { rememberBrandId(b.id, platform); onNavigate("month_plan"); })} />
                       )}
                       {plan?.brandConfirmedAt && (
                         <span className="block text-[11px] text-emerald-400 mt-1">✓ brand đã xác nhận</span>

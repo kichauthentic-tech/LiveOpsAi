@@ -171,7 +171,7 @@ export async function createOrReplaceDataRawImport(
     }
     // check_violation trên report_type: loại file mới (vd ads_campaign_overview, 0137) mà DB chưa chạy migration mở loại đó.
     if (batchError.code === "23514" && /report_type/.test(batchError.message ?? "")) {
-      throw new Error("Hệ thống chưa nhận loại file này — cần chạy bản cập nhật cơ sở dữ liệu mới nhất (migration 0137 cho file Ads, 0139 cho file Shopee). Báo admin rồi tải lại sau.");
+      throw new Error("Hệ thống chưa nhận loại file này — cần chạy bản cập nhật cơ sở dữ liệu mới nhất (migration 0137 cho file Ads TikTok, 0139 cho file Shopee, 0142 cho file Ads Shopee). Báo admin rồi tải lại sau.");
     }
     throw batchError;
   }

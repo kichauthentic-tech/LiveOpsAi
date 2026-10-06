@@ -2,6 +2,7 @@ import { DataRawColumn, DataRawReportType } from "../../types";
 import { buildProductListAgg } from "./productListAgg";
 import { parseAdsCampaignOverview } from "./adsCampaignOverview";
 import { parseCsvRows, parseShopeeRows, type ShopeeFileType } from "./shopeeFiles";
+import { parseShopeeAdsRows } from "./shopeeAds";
 
 // Parser cho module Dataraw Brand Workspace (migration 0052) — 4 report Excel export tay từ
 // TikTok Shop Seller Center, mỗi loại có layout khác nhau (xem sample thật đã xem trong phiên
@@ -257,6 +258,7 @@ export async function parseDataRawExcel(file: File, reportType: DataRawReportTyp
     case "shopee_product_list":
     case "shopee_daily":
     case "shopee_overview": return parseShopeeRows(rows, reportType as ShopeeFileType);
+    case "shopee_ads": return parseShopeeAdsRows(rows);
     case "shop_promotion": return parseShopPromotion(rows);
     case "product_list": return parseProductList(rows);
     case "live_analysis": return parseLiveAnalysis(rows);

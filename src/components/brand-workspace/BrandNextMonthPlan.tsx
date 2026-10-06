@@ -8,6 +8,7 @@ import { todayVn } from "../../lib/performance/brandCommitment";
 import { errorMessage } from "../../lib/errorMessage";
 import { fmtVndShort } from "../../lib/format";
 import { PageHeader } from "../common/PageHeader";
+import type { ReportPlatform } from "../../lib/reportPlatform";
 
 // Kế hoạch tháng sau cho Brand Workspace — bản CHỈ ĐỌC + một nút "xác nhận đã xem" (Đợt C/2,
 // migration 0110). Khác hẳn "Kế Hoạch Tháng" bên Agency (MonthPlan.tsx): bên đó ops dựng lưới,
@@ -21,6 +22,10 @@ import { PageHeader } from "../common/PageHeader";
 interface BrandNextMonthPlanProps {
   brandId: string;
   brandName: string;
+  /** Sàn của kế hoạch (0140) — chọn ở bộ chuyển sàn của Brand workspace. */
+  platform: ReportPlatform;
+  /** Brand có hơn một sàn — tiêu đề ghi tên sàn. */
+  multiPlatform: boolean;
   // Xác nhận chỉ là hành động của chính tài khoản brand (guard trong RPC confirm_month_plan).
   // Ops mở Brand Workspace hộ khách vẫn thấy đúng lịch nhưng không có nút — bấm sẽ luôn bị DB từ
   // chối, hiện nút cho họ chỉ gây nhầm "mình xác nhận thay được".
@@ -48,10 +53,10 @@ const fmtDateTime = (iso: string) =>
 
 // Lượt đọc lúc mở màn — nạp trước trong lúc chờ đợt nạp chung (lib/db/prefetch.ts).
 export function prefetchBrandNextMonthPlan({ brandId }: TabPrefetchCtx): void {
-  if (brandId) monthPlanRead.prefetch(brandId, nextMonthOf(todayVn()));
+  if (brandId) monthPlanRead.prefetch(brandId, nextMonthOf(todayVn()), "TikTok");
 }
 
-export const BrandNextMonthPlan: React.FC<BrandNextMonthPlanProps> = ({ brandId, brandName, currentRole }) => {
+export const BrandNextMonthPlan: React.FC<BrandNextMonthPlanProps> = ({ brandId, brandName, platform, multiPlatform, currentRole }) => {
   const nextMonth = useMemo(() => nextMonthOf(todayVn()), []);
   const [plan, setPlan] = useState<BrandMonthPlan | null>(null);
   const [slots, setSlots] = useState<BrandMonthPlanSlot[]>([]);
@@ -62,7 +67,7 @@ export const BrandNextMonthPlan: React.FC<BrandNextMonthPlanProps> = ({ brandId,
   const load = () => {
     setLoading(true);
     setErrorMsg(null);
-    monthPlanRead.take(brandId, nextMonth)
+    monthPlanRead.take(brandId, nextMonth, platform)
       .then((r) => {
         setPlan(r?.plan ?? null);
         setSlots(r?.slots ?? []);
@@ -81,7 +86,7 @@ export const BrandNextMonthPlan: React.FC<BrandNextMonthPlanProps> = ({ brandId,
       .finally(() => setLoading(false));
   };
 
-  useEffect(load, [brandId, nextMonth]);
+  useEffect(load, [brandId, nextMonth, platform]);
 
   const totalHours = useMemo(() => slots.reduce((s, sl) => s + Math.max(sessionDurationHours(sl.startTime, sl.endTime), 0), 0), [slots]);
   const sortedSlots = useMemo(() => [...slots].sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime)), [slots]);
@@ -116,7 +121,7 @@ export const BrandNextMonthPlan: React.FC<BrandNextMonthPlanProps> = ({ brandId,
     <div className="space-y-5">
       <PageHeader
         icon={CalendarCheck2}
-        title={`Kế Hoạch ${fmtMonthLabel(nextMonth)} · ${brandName}`}
+        title={`Kế Hoạch ${fmtMonthLabel(nextMonth)} · ${brandName}${multiPlatform || platform === "Shopee" ? ` · ${platform}` : ""}`}
         description="Lịch lên sóng agency dự kiến xếp cho tháng sau. Xem qua rồi bấm xác nhận — nếu agency đổi gì sau đó, mục xác nhận sẽ tự mất để bạn biết lịch đã khác."
       />
 

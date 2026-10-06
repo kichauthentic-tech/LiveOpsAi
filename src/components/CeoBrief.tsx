@@ -56,6 +56,7 @@ import { BrandLogo } from "./ui/BrandLogo";
 import { PageIntro } from "./common/PageIntro";
 import { MonthPicker } from "./common/MonthPicker";
 import type { TabPrefetchCtx } from "../lib/db/prefetch";
+import { brandMonthKey, brandPlatformKey, brandPlatformsOf, inPlatformScope, PLATFORM_SCOPE_LABEL, type PlatformScope, type ReportPlatform } from "../lib/reportPlatform";
 
 // Bản Tin CEO (2026-09-25) — thay Toàn Cảnh Agency. Mọi luật số nằm ở lib/performance/ceoBrief.ts;
 // file này chỉ trình bày. Khối tiền chỉ ceo/admin thấy, và chỉ cộng ca ĐỦ dữ liệu để tính tiền
@@ -66,7 +67,7 @@ interface CeoBriefProps {
   brands: Brand[];
   talents: Talent[];
   shiftSlots: ShiftSlot[];
-  /** "brandId|YYYY-MM" → target từng ca của Kế Hoạch Tháng đã chốt, gồm cả ca đã mất shift_slot (lỗi E2E #1). */
+  /** brandMonthKey (brand × tháng × sàn) → target từng ca của Kế Hoạch Tháng đã chốt, gồm cả ca đã mất shift_slot (lỗi E2E #1). */
   planSlotTargets: Map<string, { date: string; target: number }[]>;
   planMonthTotals: Map<string, number>;
   monthlyReports: Map<string, BrandMonthlyReport>;
@@ -200,12 +201,17 @@ export default function CeoBrief(props: CeoBriefProps) {
   });
   const [customEnd, setCustomEnd] = useState(today);
   const [brandId, setBrandId] = useState<string>("all");
+  // Sàn (06/10): target, run-rate, dự phóng tính riêng từng kênh brand × sàn rồi mới cộng — kế hoạch TikTok không đem so
+  // với GMV Shopee. "all" = cộng hai sàn.
+  const [platform, setPlatform] = useState<PlatformScope>("all");
   const [plans, setPlans] = useState<Map<string, BrandMonthPlan>>(new Map());
   const [nextPlans, setNextPlans] = useState<Map<string, BrandMonthPlan>>(new Map());
   const tooltip = useTooltip();
 
   const scopeIds = useMemo(() => (brandId === "all" ? brands.map((b) => b.id) : [brandId]), [brandId, brands]);
-  const scopeSessions = useMemo(() => sessions.filter((s) => scopeIds.includes(s.brandId)), [sessions, scopeIds]);
+  const platformSessions = useMemo(() => (platform === "all" ? sessions : sessions.filter((s) => inPlatformScope(s, platform))), [sessions, platform]);
+  const scopeSessions = useMemo(() => platformSessions.filter((s) => scopeIds.includes(s.brandId)), [platformSessions, scopeIds]);
+  const hasShopee = useMemo(() => sessions.some((s) => s.platform === "Shopee"), [sessions]);
   const dataEnd = useMemo(() => lastDataDate(scopeSessions, today), [scopeSessions, today]);
   const period = useMemo(() => periodFor(grain, anchor, today, dataEnd, customEnd), [grain, anchor, today, dataEnd, customEnd]);
   const month = (grain === "month" ? anchor : period.start).slice(0, 7);
@@ -254,36 +260,61 @@ export default function CeoBrief(props: CeoBriefProps) {
   };
 
   // ---------- tháng: target, run-rate, dự phóng ----------
+  // Mỗi kênh brand × sàn một outlook (target của kế hoạch ĐÚNG SÀN), rồi cộng theo brand trong phạm vi sàn đang xem.
+  const channels = useMemo(
+    () => brands.flatMap((b) => brandPlatformsOf(b.id, sessions, shiftSlots).filter((p) => inPlatformScope({ platform: p }, platform)).map((p) => ({ b, p }))),
+    [brands, sessions, shiftSlots, platform]
+  );
+  const channelOutlooks = useMemo(() => {
+    const out = new Map<string, MonthOutlook>();
+    for (const { b, p } of channels) {
+      const key = brandMonthKey(b.id, month, p);
+      const plan = plans.get(brandPlatformKey(b.id, p));
+      const reportPlan = buildMonthTargetPlan(b.id, month, monthlyReports, p);
+      // Cùng luật khung camp với mọi màn (effectiveCamp).
+      const camp: CampOverrides = effectiveCamp(plan?.campRanges, monthlyReports.get(key));
+      const lockedSlotTargets = planSlotTargets.get(key) ?? [];
+      const target = monthTargetOf(month, planMonthTotals.get(key), lockedSlotTargets, reportPlan, camp);
+      const chSessions = sessions.filter((s) => s.brandId === b.id && (s.platform ?? "TikTok") === p);
+      const open = shiftSlots.filter((sl) => sl.brandId === b.id && (sl.platform ?? "TikTok") === p && sl.status === "open" && !sl.sessionId);
+      out.set(brandPlatformKey(b.id, p), monthOutlook(month, today, chSessions, open, target, camp));
+    }
+    return out;
+  }, [channels, plans, month, monthlyReports, shiftSlots, planSlotTargets, planMonthTotals, sessions, today]);
   const outlooks = useMemo(() => {
     const out = new Map<string, MonthOutlook>();
     for (const b of brands) {
-      const plan = plans.get(b.id);
-      const reportPlan = buildMonthTargetPlan(b.id, month, monthlyReports);
-      // Cùng luật khung camp với mọi màn (effectiveCamp): khoảng nhập ở Nhập Ads thắng Kế Hoạch Tháng.
-      const camp: CampOverrides = effectiveCamp(plan?.campRanges, monthlyReports.get(`${b.id}|${month}`));
-      const lockedSlotTargets = planSlotTargets.get(`${b.id}|${month}`) ?? [];
-      const target = monthTargetOf(month, planMonthTotals.get(`${b.id}|${month}`), lockedSlotTargets, reportPlan, camp);
-      const brandSessions = sessions.filter((s) => s.brandId === b.id);
-      const open = shiftSlots.filter((sl) => sl.brandId === b.id && sl.status === "open" && !sl.sessionId);
-      out.set(b.id, monthOutlook(month, today, brandSessions, open, target, camp));
+      const parts = channels.filter((c) => c.b.id === b.id).map((c) => channelOutlooks.get(brandPlatformKey(b.id, c.p))!).filter(Boolean);
+      if (parts.length) out.set(b.id, parts.length === 1 ? parts[0] : combineOutlooks(month, today, parts));
     }
     return out;
-  }, [brands, plans, month, monthlyReports, shiftSlots, planSlotTargets, planMonthTotals, sessions, today]);
+  }, [brands, channels, channelOutlooks, month, today]);
   const scopeOutlook = useMemo(() => combineOutlooks(month, today, scopeIds.map((id) => outlooks.get(id)!).filter(Boolean)), [month, today, scopeIds, outlooks]);
+  const multiPlatform = (id: string) => channels.filter((c) => c.b.id === id).length > 1;
+  const channelName = (b: Brand, p: ReportPlatform) => (multiPlatform(b.id) || p === "Shopee" ? `${b.name} · ${p}` : b.name);
 
   const issues = useMemo(
     () =>
       buildIssues({
         today,
-        brands: brands
-          .filter((b) => scopeIds.includes(b.id))
-          .map((b) => ({ brandId: b.id, name: b.name, outlook: outlooks.get(b.id)!, lastData: lastDataDate(sessions.filter((s) => s.brandId === b.id), today), nextPlan: nextPlans.get(b.id)?.status ?? null })),
+        // Cảnh báo theo từng kênh brand × sàn: cộng hai sàn thì sàn tụt bị sàn chạy tốt che mất.
+        brands: channels
+          .filter(({ b }) => scopeIds.includes(b.id))
+          .map(({ b, p }) => ({
+            brandId: b.id,
+            name: channelName(b, p),
+            clientName: b.name,
+            outlook: channelOutlooks.get(brandPlatformKey(b.id, p))!,
+            lastData: lastDataDate(sessions.filter((s) => s.brandId === b.id && (s.platform ?? "TikTok") === p), today),
+            nextPlan: nextPlans.get(brandPlatformKey(b.id, p))?.status ?? null
+          })),
         periodSessions: curSessions,
         finance: fin,
         agencyScope: brandId === "all",
         fmt: money
       }),
-    [today, brands, scopeIds, outlooks, sessions, nextPlans, curSessions, fin, brandId]
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- channelName chỉ đọc `channels`
+    [today, channels, scopeIds, channelOutlooks, sessions, nextPlans, curSessions, fin, brandId]
   );
 
   // ---------- điều khiển kỳ ----------
@@ -364,9 +395,15 @@ export default function CeoBrief(props: CeoBriefProps) {
             <option value="all">Tất cả brand</option>
             {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
+          {hasShopee && (
+            <select value={platform} onChange={(e) => setPlatform(e.target.value as PlatformScope)} className={inputCls} aria-label="Sàn">
+              {(["all", "TikTok", "Shopee"] as PlatformScope[]).map((p) => <option key={p} value={p}>{p === "all" ? "Cả 2 sàn" : p}</option>)}
+            </select>
+          )}
         </div>
         <p className="text-sm text-[var(--text-muted)]">
           Đang xem <b className="text-[var(--text)]">{periodLabel}</b>
+          {hasShopee && <> · {platform === "all" ? "cộng 2 sàn (target, run-rate tính riêng từng sàn rồi cộng)" : PLATFORM_SCOPE_LABEL[platform]}</>}
           {hasPeriod && <> · mũi tên {compareLabel}</>}
           {period.cutByData && <span className="text-amber-300"> · kỳ cắt tới {ddmm(period.end)} vì số liệu mới về tới ngày đó</span>}
         </p>
@@ -396,7 +433,7 @@ export default function CeoBrief(props: CeoBriefProps) {
 
       <AccountsTable
         brands={brands}
-        sessions={sessions}
+        sessions={platformSessions}
         period={{ start: period.start, end: period.end, prevStart: period.prevStart, prevEnd: period.prevEnd, has: hasPeriod }}
         outlooks={outlooks}
         today={today}

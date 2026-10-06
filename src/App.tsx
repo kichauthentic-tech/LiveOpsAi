@@ -47,7 +47,9 @@ import { useNotifications } from "./hooks/useNotifications";
 import type { NewTalentAccountPayload } from "./components/TalentMatcher";
 import { saveEngineParams } from "./lib/db/engineParams";
 import { logTabView } from "./lib/db/tabViews";
-import { findBrandBySlug, parsePath, routeToPath } from "./lib/routes";
+import { findBrandBySlug, parsePath, parsePlatformParam, routeToPath, withPlatformParam } from "./lib/routes";
+import { brandPlatformsOf, type PlatformScope, type ReportPlatform } from "./lib/reportPlatform";
+import { PlatformScopeBar } from "./components/common/PlatformScopeBar";
 import { lazyNamed } from "./lib/lazyNamed";
 import { dropPrefetched, type TabPrefetchCtx } from "./lib/db/prefetch";
 import { useWorkspaceData } from "./hooks/useWorkspaceData";
@@ -133,6 +135,17 @@ const TAB_CHUNKS: Record<string, { preload: () => void }[]> = {
 
 // Màn có lượt đọc riêng lúc mount (sau cổng `coreDataReady`) — gọi hàm nạp trước của chính màn đó trong
 // lúc đợt nạp chung còn chạy (src/lib/db/prefetch.ts). import() trùng với chunk ở TAB_CHUNKS, không tải hai lần.
+// Tab brand có số theo sàn ⇒ hiện bộ chuyển sàn. "all" = có nút "Tổng 2 sàn"; "single" = chỉ từng sàn (report, Ads độc lập).
+const PLATFORM_TABS: Record<string, "all" | "single"> = {
+  brand_dashboard: "all",
+  brand_calendar: "all",
+  brand_sessions: "all",
+  brand_monthly_report: "single",
+  brand_next_month_plan: "single",
+  brand_commitment_view: "single",
+  brand_ads_report: "single"
+};
+
 const TAB_DATA_PREFETCH: Record<string, (ctx: TabPrefetchCtx) => Promise<void>> = {
   agency_overview: (ctx) => import("./components/CeoBrief").then((m) => m.prefetchCeoBrief(ctx)),
   brand_dashboard: (ctx) => import("./components/brand-workspace/BrandDashboard").then((m) => m.prefetchBrandDashboard(ctx)),
@@ -581,6 +594,26 @@ export default function App() {
   const currentBrandId = effectiveWorkspace.type === "brand" ? effectiveWorkspace.brandId : undefined;
   const currentBrandName = brands.find((b) => b.id === currentBrandId)?.name || "Brand";
 
+  // Sàn đang xem trong Brand workspace (06/10, user chốt: mỗi brand × sàn có kế hoạch, target, report, hợp đồng riêng;
+  // brand xem được riêng từng sàn lẫn tổng). Nhớ theo brand; link `?san=` thắng lần mở đầu. Brand một sàn ⇒ không có thanh.
+  const [platformScopeByBrand, setPlatformScopeByBrand] = useState<Record<string, PlatformScope>>({});
+  const [urlPlatform] = useState(() => parsePlatformParam(window.location.search));
+  const currentBrandPlatforms: ReportPlatform[] = useMemo(
+    () => (currentBrandId ? brandPlatformsOf(currentBrandId, sessions, [...shiftSlots, ...brandStudios]) : ["TikTok"]),
+    [currentBrandId, sessions, shiftSlots, brandStudios]
+  );
+  const multiPlatform = currentBrandPlatforms.length > 1;
+  const rawPlatformScope: PlatformScope =
+    (currentBrandId && platformScopeByBrand[currentBrandId]) || urlPlatform || (multiPlatform ? "all" : currentBrandPlatforms[0]);
+  const platformScope: PlatformScope = !multiPlatform
+    ? currentBrandPlatforms[0]
+    : rawPlatformScope === "all" || currentBrandPlatforms.includes(rawPlatformScope)
+      ? rawPlatformScope
+      : "all";
+  // Tab chỉ có từng sàn (report, Ads, kế hoạch) thì "Tổng" quy về sàn đầu.
+  const singlePlatform: ReportPlatform = platformScope === "all" ? currentBrandPlatforms[0] : platformScope;
+  const setPlatformScope = (v: PlatformScope) => currentBrandId && setPlatformScopeByBrand((m) => ({ ...m, [currentBrandId]: v }));
+
   // Nạp trước lượt đọc riêng của tab đang mở — CHỈ trong lúc chờ đợt nạp chung (màn chưa mount nên chưa
   // ai `take`; sau đó màn mount ngay và tự đọc, nạp trước chỉ đẻ request thừa). Không đợi `profile`: đo
   // 2026-10-03, có lượt `profiles` về SAU cả đợt chung, chờ nó là mất luôn phần lợi. Chưa có profile thì
@@ -620,13 +653,14 @@ export default function App() {
     if (pendingBrandSlug) return;
     const path = routeToPath(effectiveWorkspace, activeTab, brands);
     if (!path) return;
-    if (path !== window.location.pathname) {
-      const url = path + window.location.search + window.location.hash;
-      if (routeSyncedRef.current) window.history.pushState(null, "", url);
+    const search = withPlatformParam(window.location.search, effectiveWorkspace.type === "brand" && multiPlatform && PLATFORM_TABS[activeTab] ? platformScope : null);
+    if (path !== window.location.pathname || search !== window.location.search) {
+      const url = path + search + window.location.hash;
+      if (routeSyncedRef.current && path !== window.location.pathname) window.history.pushState(null, "", url);
       else window.history.replaceState(null, "", url);
     }
     routeSyncedRef.current = true;
-  }, [effectiveWorkspace, activeTab, brands, pendingBrandSlug]);
+  }, [effectiveWorkspace, activeTab, brands, pendingBrandSlug, multiPlatform, platformScope]);
 
   // URL → state khi bấm Back/Forward.
   useEffect(() => {
@@ -642,6 +676,8 @@ export default function App() {
       if (!b) return;
       setWorkspace({ type: "brand", brandId: b.id });
       setActiveTab(r.tab ?? "brand_calendar");
+      const san = parsePlatformParam(window.location.search);
+      if (san) setPlatformScopeByBrand((m) => ({ ...m, [b.id]: san }));
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
@@ -1632,7 +1668,7 @@ export default function App() {
                         talents={activeTalents}
                         canSeeMoney={currentRole === "ceo" || currentRole === "admin"}
                         canOpenTab={canOpenTab}
-                        onOpen={(t) => { if (t.rememberBrandId) rememberBrandId(t.rememberBrandId); navigateTo(t.tab, t.brandId); }}
+                        onOpen={(t) => { if (t.rememberBrandId) rememberBrandId(t.rememberBrandId, t.rememberPlatform); navigateTo(t.tab, t.brandId); }}
                       />
                     )}
                     {opsView === "board" && (
@@ -1818,17 +1854,24 @@ export default function App() {
                 {/* Brand Workspace (Giai đoạn A) — mọi tab dưới đây chỉ render khi effectiveWorkspace
                     đang scope theo đúng 1 brand; component con nhận thẳng brandId + data đã lọc sẵn
                     (giữ nguyên pattern fetch-1-lần-ở-App/filter-bằng-useMemo hiện có). */}
+                {effectiveWorkspace.type === "brand" && multiPlatform && PLATFORM_TABS[activeTab] && (
+                  <PlatformScopeBar platforms={currentBrandPlatforms} value={platformScope} allowAll={PLATFORM_TABS[activeTab] === "all"} onChange={setPlatformScope} />
+                )}
+
                 {activeTab === "brand_dashboard" && effectiveWorkspace.type === "brand" && (
                   <BrandDashboard
                     brandId={currentBrandId!}
                     brandName={currentBrandName}
+                    platform={platformScope}
+                    platforms={currentBrandPlatforms}
+                    onPickPlatform={setPlatformScope}
                     sessions={activeSessions}
                     shiftSlots={shiftSlots}
                     promoSchemes={promoSchemes}
                     engineParams={engineParams}
                     currentRole={currentRole}
                     monthlyReports={monthlyReports}
-                    onOpenMonthPlan={() => { setWorkspace({ type: "agency" }); setActiveTab("month_plan"); }}
+                    onOpenMonthPlan={() => { rememberBrandId(currentBrandId!, singlePlatform); setWorkspace({ type: "agency" }); setActiveTab("month_plan"); }}
                     onOpenSession={(id) => { setWorkspace({ type: "agency" }); setOpsView("board"); setActiveTab("calendar"); setNotifOpenSessionId(id); }}
                     onOpenSessions={() => setActiveTab("brand_sessions")}
                   />
@@ -1839,6 +1882,7 @@ export default function App() {
                     brandId={currentBrandId!}
                     brandName={currentBrandName}
                     sessions={activeSessions}
+                    platformScope={platformScope}
                     shiftSlots={shiftSlots}
                     shiftRegistrations={shiftRegistrations}
                     studios={activeStudios}
@@ -1873,6 +1917,7 @@ export default function App() {
                     variant="brand"
                     brandId={currentBrandId!}
                     sessions={activeSessions}
+                    platformScope={platformScope}
                     shiftSlots={shiftSlots}
                     brands={brands}
                     currentRole={currentRole}
@@ -1896,6 +1941,7 @@ export default function App() {
                   <BrandMonthlyReport
                     brandId={currentBrandId!}
                     brandName={currentBrandName}
+                    platform={singlePlatform}
                     sessions={activeSessions}
                     currentRole={currentRole}
                     brandPlatformRates={brandPlatformRates}
@@ -1909,6 +1955,8 @@ export default function App() {
                   <BrandCommitmentView
                     brandId={currentBrandId!}
                     brandName={currentBrandName}
+                    platform={singlePlatform}
+                    multiPlatform={multiPlatform}
                     sessions={activeSessions}
                     currentRole={currentRole}
                   />
@@ -1918,6 +1966,8 @@ export default function App() {
                   <BrandNextMonthPlan
                     brandId={currentBrandId!}
                     brandName={currentBrandName}
+                    platform={singlePlatform}
+                    multiPlatform={multiPlatform}
                     currentRole={currentRole}
                   />
                 )}
@@ -1950,6 +2000,8 @@ export default function App() {
                   <BrandAdsReport
                     brandId={currentBrandId!}
                     brandName={currentBrandName}
+                    platform={singlePlatform}
+                    multiPlatform={multiPlatform}
                     sessions={activeSessions}
                     currentRole={currentRole}
                   />

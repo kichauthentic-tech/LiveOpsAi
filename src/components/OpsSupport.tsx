@@ -11,6 +11,7 @@ import { todayVn } from "../lib/performance/brandCommitment";
 import { fmtVndShort } from "../lib/format";
 import type { CampOverrides } from "../lib/campaignDays";
 import { SESSION_STATUS_CLS, SESSION_STATUS_LABEL_VI } from "../lib/sessionStatusUi";
+import type { ReportPlatform } from "../lib/reportPlatform";
 
 // Hỗ Trợ Vận Hành (user chốt 2026-09-21) — từ 2026-09-28 là MỘT PHẦN của Dashboard brand (user chốt gộp,
 // bỏ tab agency `ops_support`). Không đụng target cam kết, không ghi DB. Còn lại hai việc riêng của nó:
@@ -25,6 +26,8 @@ interface OpsSupportProps {
   projection: MonthEndProjection;
   brandId: string;
   brandName: string;
+  /** Sàn đang xem — Dashboard đã lọc `sessions`/`shiftSlots` của brand theo sàn này; kế hoạch đã chốt đọc theo sàn. */
+  platform: ReportPlatform;
   month: string; // "YYYY-MM"
   /** Kế hoạch của `month` — Dashboard đã nạp (trước 2026-10-03 panel tự nạp lại đúng truy vấn đó). */
   plan: { plan: BrandMonthPlan; slots: BrandMonthPlanSlot[] } | null;
@@ -51,18 +54,18 @@ const addDays = (d: string, n: number) => {
 };
 
 // Nạp trước cùng Dashboard brand (lib/db/prefetch.ts) — panel chỉ hiện với ops ở tháng hiện tại.
-export function prefetchOpsSupport(brandId: string): void {
+export function prefetchOpsSupport(brandId: string, platform: ReportPlatform = "TikTok"): void {
   calendarEventsRead.prefetch();
-  lockedPlanSlotsRead.prefetch(brandId);
+  lockedPlanSlotsRead.prefetch(brandId, platform);
 }
 
-export default function OpsSupport({ rr, projection, brandId, brandName, month, plan, camp, planLoading, sessions, shiftSlots, promoSchemes, engineParams, onOpenMonthPlan, onOpenSession }: OpsSupportProps) {
+export default function OpsSupport({ rr, projection, brandId, brandName, platform, month, plan, camp, planLoading, sessions, shiftSlots, promoSchemes, engineParams, onOpenMonthPlan, onOpenSession }: OpsSupportProps) {
   const today = todayVn();
   const [lockedSlots, setLockedSlots] = useState<BrandMonthPlanSlot[]>([]);
   const [events, setEvents] = useState<CalendarEventRow[]>([]);
   // Khoá brand của lần nạp ca-đã-chốt gần nhất — khác brand đang xem nghĩa là đang tải.
   const [lockedFor, setLockedFor] = useState<string | null>(null);
-  const loading = planLoading || lockedFor !== brandId;
+  const loading = planLoading || lockedFor !== `${brandId}|${platform}`;
 
   useEffect(() => {
     calendarEventsRead.take().then(setEvents).catch(() => setEvents([]));
@@ -71,14 +74,14 @@ export default function OpsSupport({ rr, projection, brandId, brandName, month, 
     if (!brandId) return;
     let alive = true;
     lockedPlanSlotsRead
-      .take(brandId)
+      .take(brandId, platform)
       .then((ls) => alive && setLockedSlots(ls))
       .catch(() => alive && setLockedSlots([]))
-      .finally(() => alive && setLockedFor(brandId));
+      .finally(() => alive && setLockedFor(`${brandId}|${platform}`));
     return () => {
       alive = false;
     };
-  }, [brandId]);
+  }, [brandId, platform]);
 
   const brandSessions = useMemo(() => sessions.filter((s) => s.brandId === brandId), [sessions, brandId]);
   const brandSchemes = useMemo(() => promoSchemes.filter((sc) => sc.brandId === brandId).map((sc) => ({ start: sc.startDate, end: sc.endDate, label: sc.title })), [promoSchemes, brandId]);

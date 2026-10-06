@@ -381,7 +381,10 @@ export type DataRawReportType =
   | "shopee_live_list"
   | "shopee_product_list"
   | "shopee_daily"
-  | "shopee_overview";
+  | "shopee_overview"
+  // migration 0142 (2026-10-06) — "Shopee Live Ads Report" (1 dòng / chiến dịch cho cả tháng), chi phí Ads của Report Shopee
+  // (lib/dataraw/shopeeAds.ts). Tải ở Nhập Ads khi chọn sàn Shopee.
+  | "shopee_ads";
 // Đã gỡ 2026-09-22 (quyết định của user):
 //   - "product_card_traffic_stats" (migration 0064): chưa từng có file thật nào được upload nên 2
 //     dòng Video/Product Card GMV của Report Tháng luôn bằng 0. Nay lấy từ shop_analytics +
@@ -460,17 +463,21 @@ export interface BrandContract {
   endMonth?: string; // undefined = chưa chốt ngày kết thúc / tự gia hạn
   monthlyHours: number; // giờ cam kết mặc định, chỉ là giá trị khởi tạo khi sinh dòng tháng
   monthlyGmv?: number; // undefined = hợp đồng không cam kết GMV
+  /** Sàn của hợp đồng (0141) — user chốt 06/10: hợp đồng riêng từng sàn. Thiếu = TikTok. */
+  platform?: "TikTok" | "Shopee";
   status: "draft" | "active" | "ended";
   note?: string;
 }
 
 // Con số CHỐT của từng tháng — đây mới là mẫu số mọi màn hình run-rate đọc, không phải
-// BrandContract.monthlyHours. Unique (brandId, periodMonth) ở DB: 1 brand 1 tháng đúng 1 con số.
+// BrandContract.monthlyHours. Unique (brandId, periodMonth, platform) ở DB (0141): 1 brand × sàn × tháng đúng 1 con số.
 export interface BrandMonthlyCommitment {
   id: string;
   brandId: string;
   contractId?: string; // undefined = hợp đồng gốc đã bị xoá, dòng vẫn giữ lại làm lịch sử
   periodMonth: string; // "YYYY-MM-01"
+  /** Sàn (0141). Thiếu = TikTok. */
+  platform?: "TikTok" | "Shopee";
   committedHours: number;
   committedGmv?: number;
   // true = ops sửa tay tháng này; sinh lại từ hợp đồng sẽ không ghi đè.
@@ -656,6 +663,8 @@ export interface BrandMonthPlan {
   id: string;
   brandId: string;
   month: string; // "YYYY-MM"
+  /** Sàn của kế hoạch (0140) — mỗi brand × tháng × sàn một kế hoạch, target riêng. */
+  platform: "TikTok" | "Shopee";
   status: "draft" | "locked";
   defaultSlotHours: number;
   liveWindowStart: string; // "HH:MM"

@@ -27,6 +27,7 @@ import { useConfirm, usePrompt } from "../hooks/useConfirm";
 import { PageIntro } from "./common/PageIntro";
 import { fmtVndShort } from "../lib/format";
 import { MonthPicker } from "./common/MonthPicker";
+import { brandPlatformKey, REPORT_PLATFORMS, type ReportPlatform } from "../lib/reportPlatform";
 
 interface BrandCommitmentProps {
   sessions: LiveSession[];
@@ -76,6 +77,8 @@ const inputCls =
 interface ContractDraft {
   id?: string;
   brandId: string;
+  /** Hợp đồng riêng từng sàn (0141, user chốt 06/10). */
+  platform: ReportPlatform;
   contractCode: string;
   startMonth: string;
   endMonth: string;
@@ -88,6 +91,7 @@ interface ContractDraft {
 function emptyDraft(brandId: string, today: string): ContractDraft {
   return {
     brandId,
+    platform: "TikTok",
     contractCode: "",
     startMonth: monthKeyOf(today),
     endMonth: "",
@@ -116,7 +120,7 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [draft, setDraft] = useState<ContractDraft | null>(null);
-  const [editingMonth, setEditingMonth] = useState<string | null>(null); // brandId đang sửa cam kết
+  const [editingMonth, setEditingMonth] = useState<string | null>(null); // brandPlatformKey đang sửa cam kết
   const [monthHours, setMonthHours] = useState("");
   const [monthGmv, setMonthGmv] = useState("");
 
@@ -176,12 +180,12 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
   );
 
   function startEditMonth(r: CommitmentProgress) {
-    setEditingMonth(r.brandId);
+    setEditingMonth(brandPlatformKey(r.brandId, r.platform));
     setMonthHours(String(r.committedHours));
     setMonthGmv(r.committedGmv === undefined ? "" : String(r.committedGmv));
   }
 
-  function saveMonth(brandId: string) {
+  function saveMonth(brandId: string, platform: ReportPlatform) {
     const hours = Number(monthHours);
     if (!Number.isFinite(hours) || hours < 0) {
       setError("Giờ cam kết phải là số không âm.");
@@ -194,7 +198,7 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
       return;
     }
     run(async () => {
-      await upsertMonthlyCommitment({ brandId, periodMonth, committedHours: hours, committedGmv: gmv });
+      await upsertMonthlyCommitment({ brandId, periodMonth, platform, committedHours: hours, committedGmv: gmv });
       setEditingMonth(null);
       await reload();
       setNote("Đã lưu cam kết tháng — dòng này được đánh dấu sửa tay, sinh lại từ hợp đồng sẽ không ghi đè.");
@@ -228,6 +232,7 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
       endMonth: draft.endMonth || undefined,
       monthlyHours: hours,
       monthlyGmv: gmv,
+      platform: draft.platform,
       status: draft.status,
       note: draft.note
     };
@@ -358,7 +363,7 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
                 <span>
                   {missing.length} brand có ca trong tháng này nhưng chưa đặt cam kết:{" "}
-                  <strong>{missing.map((id) => brandNameById[id] ?? id).join(", ")}</strong>. Số của các brand đó không có mẫu số nào để so.
+                  <strong>{missing.map((key) => { const [id, p] = key.split("|"); return `${brandNameById[id] ?? id} ${p ?? "TikTok"}`; }).join(", ")}</strong>. Số của các brand đó không có mẫu số nào để so.
                 </span>
               </p>
             )}
@@ -388,11 +393,11 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
                   </thead>
                   <tbody>
                     {rows.map((r) => {
-                      const editing = editingMonth === r.brandId;
+                      const editing = editingMonth === brandPlatformKey(r.brandId, r.platform);
                       return (
-                        <tr key={r.brandId} className="border-t border-[var(--border)]/60 align-middle">
+                        <tr key={brandPlatformKey(r.brandId, r.platform)} className="border-t border-[var(--border)]/60 align-middle">
                           <td className="py-2 pr-3 font-bold text-[var(--text)]">
-                            {r.brandName}
+                            {r.brandName} <span className="font-normal text-[var(--text-muted)]">· {r.platform}</span>
                             {r.isOverride && (
                               <span className="ml-1.5 text-[11px] font-bold text-amber-400" title="Ops đã sửa tay tháng này — sinh lại từ hợp đồng sẽ không ghi đè">
                                 SỬA TAY
@@ -407,7 +412,7 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
                                 <label className="text-[11px] text-[var(--text-faint)]">GMV (để trống nếu không cam kết)</label>
                                 <input value={monthGmv} onChange={(e) => setMonthGmv(e.target.value)} className={`${inputCls} w-40`} />
                                 <button
-                                  onClick={() => saveMonth(r.brandId)}
+                                  onClick={() => saveMonth(r.brandId, r.platform)}
                                   disabled={busy}
                                   className="px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white text-[11px] font-bold disabled:opacity-50"
                                 >
@@ -488,8 +493,8 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
                   {rows
                     .filter((r) => r.committedGmv !== undefined)
                     .map((r) => (
-                      <div key={r.brandId} className="bg-[var(--surface-base)] rounded-xl p-2.5">
-                        <p className="text-[11px] text-[var(--text-faint)]">{r.brandName}</p>
+                      <div key={brandPlatformKey(r.brandId, r.platform)} className="bg-[var(--surface-base)] rounded-xl p-2.5">
+                        <p className="text-[11px] text-[var(--text-faint)]">{r.brandName} · {r.platform}</p>
                         <p className="text-xs font-bold text-[var(--text)] mt-0.5">
                           {fmtVndShort(r.deliveredGmv)} / {fmtVndShort(r.committedGmv ?? 0)}
                         </p>
@@ -531,6 +536,14 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
                   >
                     {brands.map((b) => (
                       <option key={b.id} value={b.id}>{b.name}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-[11px] text-[var(--text-faint)]">Sàn</span>
+                  <select value={draft.platform} onChange={(e) => setDraft({ ...draft, platform: e.target.value as ReportPlatform })} className={inputCls}>
+                    {REPORT_PLATFORMS.map((p) => (
+                      <option key={p} value={p}>{p}</option>
                     ))}
                   </select>
                 </label>
@@ -615,7 +628,7 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
               <div key={c.id} className="bg-[var(--surface-base)] rounded-xl p-3 flex flex-wrap items-center justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-xs font-bold text-[var(--text)]">
-                    {brandNameById[c.brandId] ?? "Brand đã xoá"}
+                    {brandNameById[c.brandId] ?? "Brand đã xoá"} · {c.platform ?? "TikTok"}
                     {c.contractCode && <span className="text-[var(--text-faint)] font-normal"> · {c.contractCode}</span>}
                   </p>
                   <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
@@ -640,6 +653,7 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
                       setDraft({
                         id: c.id,
                         brandId: c.brandId,
+                        platform: c.platform ?? "TikTok",
                         contractCode: c.contractCode ?? "",
                         startMonth: c.startMonth,
                         endMonth: c.endMonth ?? "",
@@ -699,7 +713,7 @@ export function BrandCommitment({ sessions, brands }: BrandCommitmentProps) {
                   <tbody>
                     {commitments.map((m) => (
                       <tr key={m.id} className="border-t border-[var(--border)]/60">
-                        <td className="py-1.5 pr-3 text-[var(--text)]">{brandNameById[m.brandId] ?? "Brand đã xoá"}</td>
+                        <td className="py-1.5 pr-3 text-[var(--text)]">{brandNameById[m.brandId] ?? "Brand đã xoá"} <span className="text-[var(--text-muted)]">· {m.platform ?? "TikTok"}</span></td>
                         <td className="py-1.5 pr-3 text-[var(--text-muted)]">{monthLabel(m.periodMonth)}</td>
                         <td className="py-1.5 pr-3 text-right text-[var(--text)]">{fmtHours(m.committedHours)}</td>
                         <td className="py-1.5 pr-3 text-right text-[var(--text-muted)]">

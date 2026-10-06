@@ -4,7 +4,7 @@ import { Brand, BrandMonthPlan, BrandMonthPlanSlot, BrandMonthlyCommitment, Bran
 import { AlertTriangle, Ban, CalendarRange, Lock, Plus, Repeat, Save, Sparkles, Trash2, Wand2, X } from "lucide-react";
 import { commitmentsRead } from "../lib/db/brandContracts";
 import type { TabPrefetchCtx } from "../lib/db/prefetch";
-import { loadRememberedBrandId } from "../lib/defaultBrand";
+import { loadRememberedBrandId, loadRememberedPlatform, rememberBrandId } from "../lib/defaultBrand";
 import { errorMessage } from "../lib/errorMessage";
 import { PlanSettings, calendarEventsRead, deleteMonthPlan, fetchBrandLockedPlanSlots, fetchMonthPlan, fetchPlanStatuses, lockMonthPlan, lockedPlanSlotsRead, monthPlanRead, planStatusesRead, replacePlanSlots, upsertMonthPlan } from "../lib/db/monthPlans";
 import { PlanEvaluation, buildCalibration, evaluatePlan } from "../lib/scheduling/planEvaluation";
@@ -34,6 +34,7 @@ import { PageIntro } from "./common/PageIntro";
 
 import { fmtMonth, fmtFixed, fmtVndShort, fmtVndFull } from "../lib/format";
 import { MonthPicker } from "./common/MonthPicker";
+import { brandPlatformKey, brandPlatformsOf, type ReportPlatform } from "../lib/reportPlatform";
 interface MonthPlanProps {
   brands: Brand[];
   studios: Studio[];
@@ -80,8 +81,8 @@ export function prefetchMonthPlan(_ctx: TabPrefetchCtx): void {
   planStatusesRead.prefetch(todayVn().slice(0, 7));
   const remembered = loadRememberedBrandId();
   if (remembered) {
-    monthPlanRead.prefetch(remembered, next);
-    lockedPlanSlotsRead.prefetch(remembered);
+    monthPlanRead.prefetch(remembered, next, "TikTok");
+    lockedPlanSlotsRead.prefetch(remembered, "TikTok");
   }
 }
 
@@ -105,6 +106,18 @@ export default function MonthPlan({
   const confirm = useConfirm();
   const today = todayVn();
   const [brandId, setBrandId] = useDefaultBrand(brands, sessions, today);
+  // Kế hoạch theo sàn (0140): mỗi brand × tháng × sàn một kế hoạch, target riêng (user chốt 06/10). Đổi brand mà sàn đã
+  // chọn không có ở brand mới thì về sàn đầu của brand đó.
+  const platforms = useMemo(() => (brandId ? brandPlatformsOf(brandId, sessions, [...shiftSlots, ...brandStudios]) : (["TikTok"] as ReportPlatform[])), [brandId, sessions, shiftSlots, brandStudios]);
+  // Sàn mở sẵn: sàn đã nhớ cùng brand (nút "Lập kế hoạch VERA Shopee" ở Dashboard/Toàn Cảnh/Việc cần làm — rememberBrandId).
+  const [platformPick, setPlatformPick] = useState<ReportPlatform | null>(null);
+  const remembered = brandId ? loadRememberedPlatform(brandId) : null;
+  const want = platformPick ?? remembered;
+  const platform: ReportPlatform = want && platforms.includes(want) ? want : platforms[0];
+  const brandLabel = (name: string | undefined) => `${name ?? ""}${platforms.length > 1 || platform === "Shopee" ? ` ${platform}` : ""}`;
+  // Lịch sử cho engine/dự báo: chỉ ca CÙNG SÀN (năng suất hai sàn khác nhau — VERA Shopee ~1,6x GMV/giờ TikTok).
+  // Kiểm trùng phòng/người (crossBrandCheck) vẫn dùng mọi ca: người và phòng là vật lý, không theo sàn.
+  const platformSessions = useMemo(() => sessions.filter((s) => (s.platform ?? "TikTok") === platform), [sessions, platform]);
   const [month, setMonth] = useState(nextMonthOf(today.slice(0, 7), 1));
   const [plan, setPlan] = useState<BrandMonthPlan | null>(null);
   const [settings, setSettings] = useState<PlanSettings>(DEFAULT_SETTINGS);
@@ -133,9 +146,12 @@ export default function MonthPlan({
   const [lockedSlotsTick, setLockedSlotsTick] = useState(0);
 
   const brand = brands.find((b) => b.id === brandId);
-  const brandStudioId = findBrandStudioId(brandStudios, brandId);
+  const brandStudioId = findBrandStudioId(brandStudios, brandId, platform);
   const brandStudio = studios.find((s) => s.id === brandStudioId);
-  const brandTemplates = useMemo(() => recurringShiftTemplates.filter((t) => t.brandId === brandId), [recurringShiftTemplates, brandId]);
+  const brandTemplates = useMemo(
+    () => recurringShiftTemplates.filter((t) => t.brandId === brandId && (t.platform ?? "TikTok") === platform),
+    [recurringShiftTemplates, brandId, platform]
+  );
 
   useEffect(() => {
     commitmentsRead.take().then(setCommitments).catch(() => setCommitments([]));
@@ -145,7 +161,14 @@ export default function MonthPlan({
   // `initial` = lượt mount (lấy bản nạp trước nếu có); sau khi chốt/xoá kế hoạch thì luôn đọc mới.
   const refreshMissing = (initial = false) => {
     (initial ? planStatusesRead.take(nextMonth) : fetchPlanStatuses(nextMonth))
-      .then((m) => setNextMonthMissing(brands.filter((b) => m.get(b.id)?.status !== "locked").map((b) => b.name)))
+      .then((m) =>
+        setNextMonthMissing(
+          brands.flatMap((b) => {
+            const ps = brandPlatformsOf(b.id, sessions, [...shiftSlots, ...brandStudios]);
+            return ps.filter((p) => m.get(brandPlatformKey(b.id, p))?.status !== "locked").map((p) => (ps.length > 1 ? `${b.name} ${p}` : b.name));
+          })
+        )
+      )
       .catch(() => setNextMonthMissing([]));
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -155,7 +178,7 @@ export default function MonthPlan({
     let alive = true;
     planStatusesRead.take(cur).then((m) => {
       if (!alive) return;
-      const drafts = brands.filter((b) => m.get(b.id)?.status === "draft");
+      const drafts = brands.filter((b) => (["TikTok", "Shopee"] as ReportPlatform[]).some((p) => m.get(brandPlatformKey(b.id, p))?.status === "draft"));
       setCurMonthDrafts(drafts);
       // Chỉ nhảy tháng khi chính brand đang mở có nháp tháng này (đến từ nút "Chốt kế hoạch" của brand khác thì
       // giữ đúng brand đó); brand khác còn nháp thì banner bên dưới nhắc.
@@ -169,9 +192,9 @@ export default function MonthPlan({
   useEffect(() => {
     if (!brandId) return;
     let alive = true;
-    (lockedSlotsTick === 0 ? lockedPlanSlotsRead.take(brandId) : fetchBrandLockedPlanSlots(brandId)).then((r) => alive && setLockedSlots(r)).catch(() => alive && setLockedSlots([]));
+    (lockedSlotsTick === 0 ? lockedPlanSlotsRead.take(brandId, platform) : fetchBrandLockedPlanSlots(brandId, platform)).then((r) => alive && setLockedSlots(r)).catch(() => alive && setLockedSlots([]));
     return () => { alive = false; };
-  }, [brandId, lockedSlotsTick]);
+  }, [brandId, platform, lockedSlotsTick]);
   // Kế hoạch vs thực tế của THÁNG ĐANG XEM (chỉ khi đã chốt và có ca gắn).
   const evaluation = useMemo<PlanEvaluation | null>(() => {
     const cur = lockedSlots.filter((ps) => ps.date.startsWith(month));
@@ -192,7 +215,7 @@ export default function MonthPlan({
     let alive = true;
     setLoading(true);
     setMsg(null);
-    monthPlanRead.take(brandId, month)
+    monthPlanRead.take(brandId, month, platform)
       .then((r) => {
         if (!alive) return;
         if (r) {
@@ -212,18 +235,18 @@ export default function MonthPlan({
       .catch((e) => alive && setMsg(`Không tải được kế hoạch: ${errorMessage(e)}`))
       .finally(() => alive && setLoading(false));
     return () => { alive = false; };
-  }, [brandId, month]);
+  }, [brandId, month, platform]);
 
   const committedHours = useMemo(
-    () => commitments.find((c) => c.brandId === brandId && c.periodMonth === `${month}-01`)?.committedHours ?? 0,
-    [commitments, brandId, month]
+    () => commitments.find((c) => c.brandId === brandId && (c.platform ?? "TikTok") === platform && c.periodMonth === `${month}-01`)?.committedHours ?? 0,
+    [commitments, brandId, platform, month]
   );
   const planHours = hoursOverride ?? committedHours;
   // GMV cam kết trong hợp đồng (audit workflow 2026-10-04 #7): trước đây Kế Hoạch Tháng không đọc nó, nên màn
   // Cam Kết so với một con số còn run-rate so với con số khác mà không ai thấy hai số lệch nhau.
   const committedGmv = useMemo(
-    () => commitments.find((c) => c.brandId === brandId && c.periodMonth === `${month}-01`)?.committedGmv ?? 0,
-    [commitments, brandId, month]
+    () => commitments.find((c) => c.brandId === brandId && (c.platform ?? "TikTok") === platform && c.periodMonth === `${month}-01`)?.committedGmv ?? 0,
+    [commitments, brandId, platform, month]
   );
   // Target và khoảng camp là của riêng kế hoạch (0094) — không đọc Report Tháng.
   const targetTotal = settings.targetGmv > 0 ? settings.targetGmv : 0;
@@ -251,7 +274,7 @@ export default function MonthPlan({
   const timeLocked = (d: PlanDraftSlot) => isPastFrozen(d) || isStaffed(d);
   const eventByDate = useMemo(() => new Map(events.map((e) => [e.date, e])), [events]);
   const brandSchemes = useMemo(() => promoSchemes.filter((sc) => sc.brandId === brandId).map((sc) => ({ start: sc.startDate, end: sc.endDate, label: sc.title })), [promoSchemes, brandId]);
-  const history = useMemo(() => buildHistory(sessions, brandId, today, { events, schemes: brandSchemes, params: engineParams }), [sessions, brandId, today, events, brandSchemes, engineParams]);
+  const history = useMemo(() => buildHistory(platformSessions, brandId, today, { events, schemes: brandSchemes, params: engineParams }), [platformSessions, brandId, today, events, brandSchemes, engineParams]);
   // ---- Đ12: brand chưa có ca đối soát nào ----------------------------------------------------
   // `buildHistory` lọc theo brandId, rỗng ⇒ brandGmvPerHour = 0 ⇒ suggestMonthPlan trả mảng rỗng.
   // Lối ra: mượn HÌNH DẠNG của toàn agency, MỨC thì lấy từ chính cam kết của brand (không bịa).
@@ -268,9 +291,9 @@ export default function MonthPlan({
   const borrowedHistory = useMemo(
     () =>
       coldStart && borrowLevel > 0
-        ? buildBorrowedHistory(sessions, today, { events, schemes: brandSchemes, params: engineParams }, borrowLevel, borrowLevelSource)
+        ? buildBorrowedHistory(platformSessions, today, { events, schemes: brandSchemes, params: engineParams }, borrowLevel, borrowLevelSource)
         : null,
-    [coldStart, borrowLevel, borrowLevelSource, sessions, today, events, brandSchemes, engineParams]
+    [coldStart, borrowLevel, borrowLevelSource, platformSessions, today, events, brandSchemes, engineParams]
   );
   // Lịch sử engine THỰC SỰ dùng. Có lịch sử thật thì luôn ưu tiên lịch sử thật — không bao giờ mượn
   // đè lên dữ liệu của chính brand.
@@ -281,8 +304,8 @@ export default function MonthPlan({
   // chỉ đạt ~0,8 lần mặt bằng mà nhận target ngang ca 19–20h thì % Target đỏ vì KHUNG, không vì host.
   // null khi brand chưa đủ 2 tháng lịch sử ⇒ vẫn chia theo dự báo engine như trước.
   const weightModel = useMemo(
-    () => targetWeightModel(sessions.filter((s) => s.brandId === brandId), month, (d) => resolveCampBucketType(d, campRanges)),
-    [sessions, brandId, month, campRanges]
+    () => targetWeightModel(platformSessions.filter((s) => s.brandId === brandId), month, (d) => resolveCampBucketType(d, campRanges)),
+    [platformSessions, brandId, month, campRanges]
   );
   const allocationWeights = (next: PlanDraftSlot[], forecasts: number[]) =>
     weightModel ? targetWeights(next, weightModel, (d) => resolveCampBucketType(d, campRanges)) : forecasts;
@@ -473,7 +496,7 @@ export default function MonthPlan({
     try {
       const toSave = locked || opts?.committing ? { ...settings, targetGmv: Math.round(totals.target) } : settings;
       if (toSave !== settings) setSettings(toSave);
-      const p = await upsertMonthPlan(brandId, month, toSave);
+      const p = await upsertMonthPlan(brandId, month, toSave, platform);
       const saved = await replacePlanSlots(p.id, drafts.map((d) => ({ id: d.id, date: d.date, startTime: d.startTime, endTime: d.endTime, targetGmv: d.targetGmv, expectedGmv: d.expectedGmv, note: d.note })));
       setPlan(p);
       setDrafts(draftsFromSaved(saved));
@@ -493,7 +516,7 @@ export default function MonthPlan({
       setMsg("Lưới trống — chưa có gì để chốt.");
       return;
     }
-    if (drafts.length === 0 && locked && !(await confirm(`Lưới trống — chốt lại sẽ HUỶ toàn bộ ca đang mở của kế hoạch ${brand?.name} tháng ${fmtMonth(month)} (trừ ca đã có người đăng ký). Tiếp tục?`, { danger: true }))) return;
+    if (drafts.length === 0 && locked && !(await confirm(`Lưới trống — chốt lại sẽ HUỶ toàn bộ ca đang mở của kế hoạch ${brandLabel(brand?.name)} tháng ${fmtMonth(month)} (trừ ca đã có người đăng ký). Tiếp tục?`, { danger: true }))) return;
     const gap = planHours - totals.hours;
     const warn = planHours > 0 && Math.abs(gap) > 0.01 ? `\n\nGiờ kế hoạch ${fmtH(totals.hours)}h ${gap > 0 ? "THIẾU" : "VƯỢT"} ${fmtH(Math.abs(gap))}h so với ${fmtH(planHours)}h cần xếp.` : "";
     const relockNote = locked ? "\n\nChốt lại sẽ mở thêm ca mới và HUỶ ca đang mở đã bị bỏ khỏi kế hoạch (trừ ca đã có người đăng ký)." : "";
@@ -512,14 +535,14 @@ export default function MonthPlan({
       ? `\n\n⚠ ${crossBrand.clashes.length} ca TRÙNG PHÒNG với brand khác (vd ${crossBrand.clashes[0].date.slice(8)}/${crossBrand.clashes[0].date.slice(5, 7)} ${crossBrand.clashes[0].startTime}: ${crossBrand.clashes[0].roomTakenBy}). Chốt vẫn gắn phòng này — phải đổi phòng từng ca sau.`
       : "";
     const capNote = overCapacity ? `\n\n⚠ Ngày ${overCapacity.date.slice(8)}/${overCapacity.date.slice(5, 7)} ${overCapacity.startTime} có ${overCapacity.concurrent} ca chạy cùng lúc toàn agency — có ${studios.length} phòng, ${hostCapacity} người host.` : "";
-    if (!(await confirm(`${locked ? "Chốt lại" : "Chốt"} kế hoạch ${brand?.name} tháng ${fmtMonth(month)}: ${drafts.length} ca chờ đăng ký?${warn}${targetWarn}${sumNote}${relockNote}${studioNote}${clashNote}${capNote}${pastNote}`))) return;
+    if (!(await confirm(`${locked ? "Chốt lại" : "Chốt"} kế hoạch ${brandLabel(brand?.name)} tháng ${fmtMonth(month)}: ${drafts.length} ca chờ đăng ký?${warn}${targetWarn}${sumNote}${relockNote}${studioNote}${clashNote}${capNote}${pastNote}`))) return;
     const p = await save({ committing: true });
     if (!p) return;
     setSaving(true);
     try {
       const r = await lockMonthPlan(p.id);
       await onPlanLocked();
-      const fresh = await fetchMonthPlan(brandId, month);
+      const fresh = await fetchMonthPlan(brandId, month, platform);
       if (fresh) {
         setPlan(fresh.plan);
         setDrafts(draftsFromSaved(fresh.slots));
@@ -545,7 +568,7 @@ export default function MonthPlan({
     const openFromPlan = shiftSlots.filter((sl) => sl.status === "open" && sl.brandId === brandId && sl.date.slice(0, 7) === month).length;
     if (
       !(await confirm(
-        `XOÁ HẲN kế hoạch ${brand?.name} tháng ${fmtMonth(month)}?
+        `XOÁ HẲN kế hoạch ${brandLabel(brand?.name)} tháng ${fmtMonth(month)}?
 
 ` +
           `• ${drafts.length} ca trong lưới kế hoạch bị xoá theo.
@@ -599,6 +622,20 @@ export default function MonthPlan({
           <select value={brandId} onChange={(e) => { userPicked.current = true; setBrandId(e.target.value); }} className="bg-[var(--surface-base)] border border-[var(--border)] rounded-xl px-3 py-2 text-[var(--text)] text-sm font-bold">
             {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
+          {platforms.length > 1 && (
+            <div className="inline-flex items-center gap-1 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-1" role="group" aria-label="Sàn">
+              {platforms.map((p) => (
+                <button
+                  key={p}
+                  onClick={() => { userPicked.current = true; setPlatformPick(p); rememberBrandId(brandId, p); }}
+                  aria-pressed={platform === p}
+                  className={`min-h-6 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${platform === p ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)] hover:bg-[var(--surface-elevated)]"}`}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          )}
           <MonthPicker value={month} onChange={(m) => { userPicked.current = true; setMonth(m); }} />
         </div>
       </div>
@@ -686,8 +723,8 @@ export default function MonthPlan({
           </div>
           <input type="text" disabled={!editable} value={settings.notes} onChange={(e) => { setSettings((s) => ({ ...s, notes: e.target.value })); setDirty(true); }} placeholder="Ghi chú kế hoạch (tuỳ chọn)" className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-xs text-[var(--text)] disabled:opacity-60" />
           <label className="block text-xs">
-            <span className="font-bold text-[var(--text-muted)] block mb-1">Phòng live (TikTok) <span className="font-normal text-[var(--text-faint)]">— cấu hình brand, ca chốt ra gắn phòng này</span></span>
-            <select value={brandStudioId} onChange={(e) => { if (brandId) void onSetBrandStudio(brandId, "TikTok", e.target.value); }} className={`w-full bg-[var(--surface-base)] border rounded-lg p-2 text-[var(--text)] ${brandStudioId ? "border-[var(--border)]" : "border-amber-700"}`}>
+            <span className="font-bold text-[var(--text-muted)] block mb-1">Phòng live ({platform}) <span className="font-normal text-[var(--text-faint)]">— cấu hình brand, ca chốt ra gắn phòng này</span></span>
+            <select value={brandStudioId} onChange={(e) => { if (brandId) void onSetBrandStudio(brandId, platform, e.target.value); }} className={`w-full bg-[var(--surface-base)] border rounded-lg p-2 text-[var(--text)] ${brandStudioId ? "border-[var(--border)]" : "border-amber-700"}`}>
               <option value="">— Chưa chọn phòng —</option>
               {studios.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.roomNumber})</option>)}
             </select>
@@ -867,7 +904,7 @@ export default function MonthPlan({
 
       {rulesOpen && brand && (
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
-          <RecurringRulesPanel brandId={brandId} brandName={brand.name} templates={brandTemplates} studios={studios} currentUserId={currentUserId} defaultHours={settings.defaultSlotHours} onCreateTemplate={onCreateTemplate} onToggleTemplate={onToggleTemplate} onDeleteTemplate={onDeleteTemplate} />
+          <RecurringRulesPanel brandId={brandId} brandName={brand.name} platform={platform} templates={brandTemplates} studios={studios} currentUserId={currentUserId} defaultHours={settings.defaultSlotHours} onCreateTemplate={onCreateTemplate} onToggleTemplate={onToggleTemplate} onDeleteTemplate={onDeleteTemplate} />
         </div>
       )}
 

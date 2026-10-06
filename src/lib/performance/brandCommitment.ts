@@ -1,6 +1,7 @@
 import { BrandMonthlyCommitment, LiveSession, ShiftSlot } from "../../types";
 import { sessionDurationHours } from "../pnl";
 import { isUnconfirmedPast } from "../sessionStatus";
+import { brandPlatformKey } from "../reportPlatform";
 
 // Giai đoạn 4 của tầng dữ liệu gốc mới: đối chiếu CAM KẾT (brand ký bao nhiêu giờ/tháng) với
 // THỰC TẾ + ĐANG XẾP. Giai đoạn 3 trả lời "host nào làm tốt", tầng này trả lời câu đứng trước nó:
@@ -24,6 +25,8 @@ export type CommitmentStatus = "no_commitment" | "met" | "on_track" | "at_risk" 
 export interface CommitmentProgress {
   brandId: string;
   brandName: string;
+  /** Sàn của cam kết (0141) — giờ đã giao / đã xếp chỉ đếm ca cùng sàn. */
+  platform: "TikTok" | "Shopee";
   periodMonth: string; // "YYYY-MM-01"
   committedHours: number;
   committedGmv?: number;
@@ -127,8 +130,9 @@ export function computeCommitmentProgress(
   sessions: LiveSession[],
   today: string = todayVn()
 ): CommitmentProgress {
+  const platform = commitment.platform ?? "TikTok";
   const inScope = sessions.filter(
-    (s) => s.brandId === commitment.brandId && monthKeyOf(s.date) === commitment.periodMonth
+    (s) => s.brandId === commitment.brandId && (s.platform ?? "TikTok") === platform && monthKeyOf(s.date) === commitment.periodMonth
   );
 
   let deliveredHours = 0, deliveredSessions = 0, deliveredGmv = 0;
@@ -161,6 +165,7 @@ export function computeCommitmentProgress(
   return {
     brandId: commitment.brandId,
     brandName,
+    platform,
     periodMonth: commitment.periodMonth,
     committedHours: commitment.committedHours,
     committedGmv: commitment.committedGmv,
@@ -232,8 +237,10 @@ export function openSlotHoursByBrand(
     if (!s.brandId) continue;
     if (monthKeyOf(s.date) !== periodMonth) continue;
     if (s.date < today) continue;
-    const cur = out.get(s.brandId) ?? { hours: 0, count: 0 };
-    out.set(s.brandId, {
+    // Khoá brand × sàn (0141): TikTok = brandId như cũ, Shopee = "brandId|Shopee".
+    const key = brandPlatformKey(s.brandId, s.platform);
+    const cur = out.get(key) ?? { hours: 0, count: 0 };
+    out.set(key, {
       hours: cur.hours + sessionDurationHours(s.startTime, s.endTime),
       count: cur.count + 1
     });
@@ -252,7 +259,7 @@ export function computeSchedulingGaps(
   const openBy = openSlotHoursByBrand(slots, periodMonth, today);
   return computeAllProgress(commitments, brandNameById, sessions, periodMonth, today)
     .map((p) => {
-      const open = openBy.get(p.brandId) ?? { hours: 0, count: 0 };
+      const open = openBy.get(brandPlatformKey(p.brandId, p.platform)) ?? { hours: 0, count: 0 };
       return {
         ...p,
         openSlotHours: open.hours,
@@ -270,11 +277,13 @@ export function brandsMissingCommitment(
   sessions: LiveSession[],
   periodMonth: string
 ): string[] {
-  const has = new Set(commitments.filter((c) => c.periodMonth === periodMonth).map((c) => c.brandId));
+  // Theo brand × sàn (0141): VERA có cam kết TikTok mà ca Shopee chưa có cam kết vẫn phải nhắc. Trả brandPlatformKey.
+  const has = new Set(commitments.filter((c) => c.periodMonth === periodMonth).map((c) => brandPlatformKey(c.brandId, c.platform)));
   const seen = new Set<string>();
   for (const s of sessions) {
-    if (monthKeyOf(s.date) === periodMonth && s.status !== "Cancelled" && !has.has(s.brandId)) {
-      seen.add(s.brandId);
+    const key = brandPlatformKey(s.brandId, s.platform);
+    if (monthKeyOf(s.date) === periodMonth && s.status !== "Cancelled" && !has.has(key)) {
+      seen.add(key);
     }
   }
   return [...seen];

@@ -16,6 +16,9 @@ import type { TabPrefetchCtx } from "../../lib/db/prefetch";
 import { fmtDateVn, fmtMonth, fmtFixed, fmtVndFull, fmtVndShort } from "../../lib/format";
 import { MonthPicker } from "../common/MonthPicker";
 import { PageHeader } from "../common/PageHeader";
+import { ShopeeAdsPanel } from "./ShopeeAdsPanel";
+import { fetchMonthlyReport } from "../../lib/db/monthlyReports";
+import type { ReportPlatform } from "../../lib/reportPlatform";
 // Nhập Ads (tab ops-only, tách khỏi Report Tháng 2026-09-21). Từ 2026-10-05 (migration 0137): Ads lấy từ FILE
 // "Campaign overview data" của TikTok Ads (GMV Max, theo ngày, toàn cửa hàng) tải lên ngay ở đây — chỗ DUY NHẤT nhập
 // Ads; file lưu vào kho Dữ Liệu Gốc (loại ads_campaign_overview, 1 file / brand / tháng), Report Tháng phần 6 đọc lại
@@ -30,6 +33,9 @@ const ADS_TYPE: DataRawReportType = "ads_campaign_overview";
 interface BrandAdsReportProps {
   brandId: string;
   brandName: string;
+  /** Sàn (bộ chuyển sàn của Brand workspace): TikTok = file TikTok Ads (0137), Shopee = file Shopee Live Ads (0142). */
+  platform: ReportPlatform;
+  multiPlatform: boolean;
   sessions: LiveSession[];
   currentRole: UserRole;
 }
@@ -76,7 +82,8 @@ export function prefetchBrandAdsReport({ brandId, role }: TabPrefetchCtx): void 
   prefetchReportPlanningInputs(brandId, month);
 }
 
-export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandName, sessions, currentRole }) => {
+export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandName, platform, multiPlatform, sessions, currentRole }) => {
+  const isShopee = platform === "Shopee";
   const canManage = CAN_MANAGE_ROLES.includes(currentRole);
   // Cùng tháng mở sẵn với Report Tháng — phần nhập ở đây đi theo report đó (lib/defaultMonth.ts).
   const [month, setMonth] = useState(() => defaultReportMonth(`${getTodayMonth()}-01`, sessions.filter((s) => s.brandId === brandId)));
@@ -179,8 +186,8 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
     let cancelled = false;
     setLoading(true);
     setErrorMsg(null);
-    if (canManage) prefetchReportPlanningInputs(brandId, month);
-    monthlyReportRead.take(brandId, `${month}-01`)
+    if (canManage && !isShopee) prefetchReportPlanningInputs(brandId, month);
+    (isShopee ? fetchMonthlyReport(brandId, `${month}-01`, "Shopee") : monthlyReportRead.take(brandId, `${month}-01`))
       .then((r) => {
         if (cancelled) return;
         setReport(r);
@@ -190,7 +197,7 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
     return () => {
       cancelled = true;
     };
-  }, [brandId, month, canManage]);
+  }, [brandId, month, canManage, isShopee]);
 
   const isPublished = report?.status === "published";
   const readOnly = !canManage || isPublished;
@@ -200,8 +207,12 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
     <div className="space-y-5">
       <PageHeader
         icon={Megaphone}
-        title={`Nhập Ads · ${brandName}`}
-        description={`Tải file "Campaign overview data" (xem theo ngày) từ TikTok Ads, mỗi tháng một file — app tự tính chi phí, ROI, chi phí/đơn và đưa vào Report Tháng phần 6. Nhận xét cho brand viết bằng nút "Sửa Insight" ở từng phần của Report Tháng.`}
+        title={`Nhập Ads · ${brandName}${multiPlatform || isShopee ? ` · ${platform}` : ""}`}
+        description={
+          isShopee
+            ? 'Tải file "Shopee Live Ads Report" từ Quảng cáo Shopee, mỗi tháng một file — app tự tính chi phí, ROAS, chi phí/đơn và đưa vào Report Shopee. Xu (Coins Claimed) lấy sẵn từ file tổng quan Shopee ở Dữ Liệu Gốc, không cần nhập.'
+            : `Tải file "Campaign overview data" (xem theo ngày) từ TikTok Ads, mỗi tháng một file — app tự tính chi phí, ROI, chi phí/đơn và đưa vào Report Tháng phần 6. Nhận xét cho brand viết bằng nút "Sửa Insight" ở từng phần của Report Tháng.`
+        }
         actions={
           <>
             <MonthPicker value={month} onChange={setMonth} />
@@ -218,7 +229,12 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
         <div className="p-3 bg-red-950/80 border border-red-800/50 rounded-xl text-red-300 text-xs font-semibold">{errorMsg}</div>
       )}
 
-      {/* File Ads TikTok — chỗ DUY NHẤT nhập Ads (migration 0137, lib/dataraw/adsCampaignOverview.ts). */}
+      {isShopee && (
+        <ShopeeAdsPanel brandId={brandId} brandName={brandName} month={month} canManage={canManage} isPublished={isPublished} onMonthChange={setMonth} />
+      )}
+
+      {/* File Ads TikTok — chỗ DUY NHẤT nhập Ads TikTok (migration 0137, lib/dataraw/adsCampaignOverview.ts). */}
+      {!isShopee && (
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
@@ -373,8 +389,10 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
         )}
       </div>
 
-      {/* Khung camp cho tháng KHÔNG có Kế Hoạch Tháng (ReportPlanningInputs) — gập, mặc định lịch cố định. */}
-      {!loading && canManage && (
+      )}
+
+      {/* Khung camp cho tháng KHÔNG có Kế Hoạch Tháng (ReportPlanningInputs) — gập, mặc định lịch cố định. Report TikTok. */}
+      {!loading && canManage && !isShopee && (
         <ReportPlanningInputs key={`${month}|${report?.id ?? "none"}`} brandId={brandId} month={month} report={report} onSaved={setReport} readOnly={readOnly} />
       )}
     </div>

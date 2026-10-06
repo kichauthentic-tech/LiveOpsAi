@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { BarChart3, Clock, Database, Package, ShoppingBag, Users, Info } from "lucide-react";
+import { BarChart3, Clock, Database, Megaphone, Package, ShoppingBag, Users, Info } from "lucide-react";
 import type { BrandMonthlyReport } from "../../types";
 import { fmtFixed, fmtVndFull, fmtVndShort } from "../../lib/format";
 import { METRIC } from "../../lib/metricGlossary";
@@ -83,6 +83,28 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
           <p className="text-[11px]" style={{ color: PAL.muted }}>
             Mũi tên so với tháng trước theo bản chụp Shopee tháng trước ({p.days} ngày có doanh số, tới {p.lastDay ? dm(p.lastDay) : "—"}).
           </p>
+        )}
+        {(s.ads || s.promo) && (
+          <Panel title="Ads và khuyến mãi" icon={<Megaphone className="w-4 h-4" />} sub="Ads: file Shopee Live Ads (cả tháng) · Xu, voucher: file overview">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              {s.ads ? (
+                <>
+                  <KpiTile label="Chi phí Ads" value={fmtVndShort(s.ads.expense)} note={`${s.ads.campaigns} chiến dịch`} />
+                  <KpiTile label="ROAS" value={s.ads.roas != null ? `${fmtFixed(s.ads.roas, 1)}x` : "—"} note={`GMV từ Ads ${fmtVndShort(s.ads.gmv)}${h.gmv > 0 ? ` (${pct((s.ads.gmv / h.gmv) * 100)} GMV live)` : ""}`} />
+                  <KpiTile label="Chi phí / đơn Ads" value={s.ads.costPerOrder != null ? fmtVndShort(s.ads.costPerOrder) : "—"} note={`${fmtInt(s.ads.orders)} đơn từ Ads`} />
+                </>
+              ) : (
+                <KpiTile label="Chi phí Ads" value="—" note="Chưa có file Ads Shopee" />
+              )}
+              {s.promo && (
+                <KpiTile
+                  label="Xu khách nhận"
+                  value={fmtInt(s.promo.coins)}
+                  note={`≈ ${fmtVndShort(s.promo.coins)}${h.gmv > 0 && s.promo.coins > 0 ? ` (${pct((s.promo.coins / h.gmv) * 100, 2)} GMV)` : ""} · ${fmtInt(s.promo.vouchers)} voucher shop, ${fmtInt(s.promo.liveVouchers)} voucher live`}
+                />
+              )}
+            </div>
+          </Panel>
         )}
       </section>
 

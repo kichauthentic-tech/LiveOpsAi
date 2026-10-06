@@ -7,7 +7,9 @@ const WEEKDAY_NAMES = ["Chủ Nhật", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5
 interface RecurringRulesPanelProps {
   brandId: string;
   brandName: string;
-  templates: RecurringShiftTemplate[]; // đã lọc theo brand
+  /** Sàn của kế hoạch đang lập — quy tắc mới tạo ghi sàn này (0140). */
+  platform: RecurringShiftTemplate["platform"];
+  templates: RecurringShiftTemplate[]; // đã lọc theo brand + sàn
   studios: Studio[];
   currentUserId?: string;
   defaultHours: number;
@@ -27,6 +29,7 @@ const addHours = (hhmm: string, h: number) => {
 export const RecurringRulesPanel: React.FC<RecurringRulesPanelProps> = ({
   brandId,
   brandName,
+  platform,
   templates,
   studios,
   currentUserId,
@@ -52,7 +55,7 @@ export const RecurringRulesPanel: React.FC<RecurringRulesPanelProps> = ({
       isDaily: weekday === -1,
       brandId,
       brandName,
-      platform: "TikTok",
+      platform,
       startTime,
       endTime,
       studioId: studioId || undefined,

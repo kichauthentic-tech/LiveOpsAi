@@ -34,6 +34,8 @@ import { METRIC, metricHint } from "../../lib/metricGlossary";
 import { PageHeader } from "../common/PageHeader";
 import OpsSupport, { prefetchOpsSupport } from "../OpsSupport";
 import { MonthPicker } from "../common/MonthPicker";
+import { brandMonthKey, type PlatformScope, type ReportPlatform } from "../../lib/reportPlatform";
+import BrandDashboardTotal from "./BrandDashboardTotal";
 
 // Dashboard brand (2026-09-28) — màn TRONG tháng cho ops: tháng này tới đâu, vì sao, tuần tới / tháng sau
 // sửa gì. Report Tháng vẫn là bản chụp SAU tháng gửi brand; hai màn dùng CHUNG hàm (compareWindow,
@@ -45,6 +47,11 @@ import { MonthPicker } from "../common/MonthPicker";
 interface BrandDashboardProps {
   brandId: string;
   brandName: string;
+  /** Sàn đang xem (bộ chuyển sàn của Brand workspace). "all" ⇒ màn Tổng 2 sàn (BrandDashboardTotal). */
+  platform: PlatformScope;
+  /** Sàn brand có — một sàn thì không có màn Tổng. */
+  platforms: ReportPlatform[];
+  onPickPlatform: (p: ReportPlatform) => void;
   sessions: LiveSession[];
   shiftSlots: ShiftSlot[];
   promoSchemes: PromoScheme[];
@@ -102,17 +109,29 @@ export function prefetchBrandDashboard({ brandId, role }: TabPrefetchCtx): void 
   if (!brandId || (role && !OPS_ROLES.includes(role))) return;
   const month = todayVn().slice(0, 7);
   const pm = prevMonthOf(month);
-  monthPlanRead.prefetch(brandId, month);
-  monthPlanRead.prefetch(brandId, nextMonthOf(month));
+  monthPlanRead.prefetch(brandId, month, "TikTok");
+  monthPlanRead.prefetch(brandId, nextMonthOf(month), "TikTok");
   shopDaysRead.prefetch(brandId, `${month}-01`, monthEndOf(`${month}-01`));
   shopDaysRead.prefetch(brandId, `${pm}-01`, monthEndOf(`${pm}-01`));
   prefetchOpsSupport(brandId);
 }
 
-export default function BrandDashboard({ brandId, brandName, sessions, shiftSlots, promoSchemes, engineParams, currentRole, monthlyReports, onOpenMonthPlan, onOpenSession, onOpenSessions }: BrandDashboardProps) {
+export default function BrandDashboard(props: BrandDashboardProps) {
+  const { platform, platforms } = props;
+  if (platform === "all" && platforms.length > 1) return <BrandDashboardTotal {...props} />;
+  return <BrandDashboardOne {...props} platform={platform === "all" ? platforms[0] : platform} />;
+}
+
+// Dashboard của MỘT sàn: mọi số (KPI, run-rate, đề xuất, host) chỉ tính trên ca của sàn này và kế hoạch của sàn này.
+function BrandDashboardOne({ brandId, brandName, platform, platforms, sessions: allSessions, shiftSlots: allShiftSlots, promoSchemes, engineParams, currentRole, monthlyReports, onOpenMonthPlan, onOpenSession, onOpenSessions }: Omit<BrandDashboardProps, "platform" | "onPickPlatform"> & { platform: ReportPlatform }) {
   const today = todayVn();
   const isOps = OPS_ROLES.includes(currentRole);
+  // Ca/slot của brand khác giữ nguyên (OpsSupport đọc lịch toàn agency); của brand này chỉ giữ ĐÚNG SÀN.
+  const sessions = useMemo(() => allSessions.filter((s) => s.brandId !== brandId || (s.platform ?? "TikTok") === platform), [allSessions, brandId, platform]);
+  const shiftSlots = useMemo(() => allShiftSlots.filter((sl) => sl.brandId !== brandId || (sl.platform ?? "TikTok") === platform), [allShiftSlots, brandId, platform]);
   const brandSessions = useMemo(() => sessions.filter((s) => s.brandId === brandId), [sessions, brandId]);
+  const isShopee = platform === "Shopee";
+  const titleName = platforms.length > 1 || isShopee ? `${brandName} · ${platform}` : brandName;
   // Brand: mặc định tháng gần nhất đã phát hành (tháng đang chạy bị che số tới khi phát hành — 0107).
   const defaultMonth = useMemo(() => {
     if (isOps) return today.slice(0, 7);
@@ -127,22 +146,22 @@ export default function BrandDashboard({ brandId, brandName, sessions, shiftSlot
   const [nextPlan, setNextPlan] = useState<{ plan: BrandMonthPlan; slots: BrandMonthPlanSlot[] } | null>(null);
   // Khoá của lần tải xong gần nhất — khác (brand, tháng) đang xem nghĩa là đang tải (không setState đồng bộ trong effect).
   const [planKey, setPlanKey] = useState<string | null>(null);
-  const planLoading = planKey !== `${brandId}|${month}`;
+  const planLoading = planKey !== `${brandId}|${month}|${platform}`;
   useEffect(() => {
     let alive = true;
-    Promise.all([monthPlanRead.take(brandId, month).catch(() => null), monthPlanRead.take(brandId, nextMonthOf(month)).catch(() => null)]).then(([p, n]) => {
+    Promise.all([monthPlanRead.take(brandId, month, platform).catch(() => null), monthPlanRead.take(brandId, nextMonthOf(month), platform).catch(() => null)]).then(([p, n]) => {
       if (!alive) return;
       setPlan(p);
       setNextPlan(n);
-      setPlanKey(`${brandId}|${month}`);
+      setPlanKey(`${brandId}|${month}|${platform}`);
     });
     return () => {
       alive = false;
     };
-  }, [brandId, month]);
+  }, [brandId, month, platform]);
 
   // Khung camp hiệu lực — cùng luật với Report Tháng / Bản Tin CEO (effectiveCamp, audit workflow #8).
-  const reportRow = monthlyReports?.get(`${brandId}|${month}`);
+  const reportRow = monthlyReports?.get(brandMonthKey(brandId, month, platform));
   const camp = useMemo(() => effectiveCamp(plan?.plan.campRanges, reportRow), [plan, reportRow]);
   const bucketOf = useMemo(() => (d: string) => resolveCampBucketType(d, camp), [camp]);
   const mStart = `${month}-01`, mEnd = monthEndOf(mStart);
@@ -171,7 +190,8 @@ export default function BrandDashboard({ brandId, brandName, sessions, shiftSlot
   // ---- Nhóm đối chứng (ops — Dữ Liệu Gốc)
   const [shop, setShop] = useState<{ cur: ShopDaysMonthSlice; prev: ShopDaysMonthSlice } | null>(null);
   useEffect(() => {
-    if (!isOps) return;
+    // Shop Analytics là file TikTok Shop — nhóm đối chứng chỉ có nghĩa với sàn TikTok.
+    if (!isOps || isShopee) return;
     let alive = true;
     const pm = prevMonthOf(month);
     Promise.all([shopDaysRead.take(brandId, mStart, mEnd), shopDaysRead.take(brandId, `${pm}-01`, monthEndOf(`${pm}-01`))])
@@ -180,7 +200,7 @@ export default function BrandDashboard({ brandId, brandName, sessions, shiftSlot
     return () => {
       alive = false;
     };
-  }, [isOps, brandId, month, mStart, mEnd]);
+  }, [isOps, isShopee, brandId, month, mStart, mEnd]);
   // Cột live = ca agency, như Report Tháng phần 2 (Linked account của Shop Analytics đếm cả live ngoài ca).
   const agencyLive = useMemo(() => {
     const rows = liveGmvByDate(brandSessions.filter(hasLiveNumbers).map(sessionToLivePerfRow));
@@ -200,7 +220,7 @@ export default function BrandDashboard({ brandId, brandName, sessions, shiftSlot
   const cPos = useMemo(() => campPositions(campWindows(history, bucketOf)), [history, bucketOf]);
   const slotOk = slotRuleReliable(sIdx, wfSlot);
   const campOk = campRuleReliable(cPos);
-  const nextReportRow = monthlyReports?.get(`${brandId}|${nextMonthOf(month)}`);
+  const nextReportRow = monthlyReports?.get(brandMonthKey(brandId, nextMonthOf(month), platform));
   const nextCamp = useMemo(() => effectiveCamp(nextPlan?.plan.campRanges, nextReportRow), [nextPlan, nextReportRow]);
   const nextModel = useMemo(() => targetWeightModel(brandSessions, nextMonthOf(month), (d) => resolveCampBucketType(d, nextCamp)), [brandSessions, month, nextCamp]);
   const check = useMemo(
@@ -281,7 +301,7 @@ export default function BrandDashboard({ brandId, brandName, sessions, shiftSlot
     <div className="space-y-4 sm:space-y-6">
       <PageHeader
         icon={LayoutDashboard}
-        title={`Dashboard · ${brandName}`}
+        title={`Dashboard · ${titleName}`}
         description={`Tháng này tới đâu so với target plan, vì sao, và ${isOps ? "tuần tới / tháng sau nên sửa gì. Đề xuất chỉ dùng những quy tắc đã thử lại trên các tháng cũ của chính brand và đoán đúng hơn." : "nhịp theo tuần. Số của tháng hiện ra khi ops phát hành Report Tháng."}`}
         actions={
           <>
@@ -485,7 +505,11 @@ export default function BrandDashboard({ brandId, brandName, sessions, shiftSlot
                   })}
                 </ul>
               ) : (
-                <p className="text-xs text-[var(--text-faint)]">Chưa có Shop Analytics cho kỳ này ở Dữ Liệu Gốc — chưa so được với phần còn lại của shop.</p>
+                <p className="text-xs text-[var(--text-faint)]">
+                  {isShopee
+                    ? "Nhóm đối chứng dùng Shop Analytics của TikTok Shop — với Shopee chưa so được với phần còn lại của shop (xem Report Shopee phần nguồn traffic)."
+                    : "Chưa có Shop Analytics cho kỳ này ở Dữ Liệu Gốc — chưa so được với phần còn lại của shop."}
+                </p>
               )}
             </Card>
           )}
@@ -659,6 +683,7 @@ export default function BrandDashboard({ brandId, brandName, sessions, shiftSlot
           projection={projection}
           brandId={brandId}
           brandName={brandName}
+          platform={platform}
           month={month}
           plan={plan}
           camp={camp}

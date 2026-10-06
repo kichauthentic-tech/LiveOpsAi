@@ -60,7 +60,8 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     return new Set(reportWindow(month).filter((m) => m !== month && !published.has(m)));
   }, [canManage, liveSessions, brandId, month]);
   const sessions = useMemo(
-    () => hydrateSnapshotSessions(snapshot).filter((s) => !hiddenMonths.has(s.date.slice(0, 7))),
+    // Bản chụp chụp trước 06/10 còn lẫn ca Shopee — Report này là TikTok.
+    () => hydrateSnapshotSessions(snapshot).filter((s) => s.platform === "TikTok" && !hiddenMonths.has(s.date.slice(0, 7))),
     [snapshot, hiddenMonths]
   );
   const brandPlatformRates: BrandPlatformRate[] = snapshot.rates;

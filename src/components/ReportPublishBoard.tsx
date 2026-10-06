@@ -123,7 +123,7 @@ export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ brands, 
         const upToDate = isShopee ? sf!.upToDate : f!.upToDate;
         if (!upToDate) {
           const why = isShopee
-            ? [sf!.sessionsChanged ? "ca Shopee đổi số/lịch/người" : "", sf!.filesChanged ? "file Shopee mới" : ""].filter(Boolean).join(" · ")
+            ? [sf!.sessionsChanged ? "ca Shopee đổi số/lịch/người" : "", sf!.filesChanged ? "file Shopee mới" : "", sf!.formulaChanged ? "cách tính mới (Ads, xu)" : ""].filter(Boolean).join(" · ")
             : [
                 f!.changedSessionsThisMonth > 0 ? `${f!.changedSessionsThisMonth} ca trong tháng đổi số/lịch` : "",
                 f!.changedFiles.length > 0 ? `file mới: ${f!.changedFiles.join(", ")}` : "",

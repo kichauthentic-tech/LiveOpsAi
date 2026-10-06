@@ -111,7 +111,9 @@ describe("buildShopeeSnapshot", () => {
   test("ghi chú: nêu GMV = doanh số đặt, nêu phần Shopee không có, nêu lệch số ca với file", () => {
     const text = s.notes.join("\n");
     expect(text).toMatch(/doanh số ĐẶT/);
-    expect(text).toMatch(/Ads, khuyến mãi/);
+    expect(text).toMatch(/GMV trực tiếp\/gián tiếp/);
+    // Chưa tải file Ads Shopee (0142) thì nói rõ, không im lặng.
+    expect(text).toMatch(/Chưa có file Ads Shopee/);
     expect(text).toMatch(/28M so với 100M/);
   });
   test("thiếu file thì báo thiếu file nào", () => {
@@ -147,5 +149,42 @@ describe("độ mới của bản chụp", () => {
   test("số ngày của tháng", () => {
     expect(monthDays("2026-09")).toHaveLength(30);
     expect(monthDays("2026-02")).toHaveLength(28);
+  });
+});
+
+describe("Ads + xu (bản chụp bản 2, 0142)", () => {
+  const ads = { shopName: "VERA Official Store", shopId: "13346195", campaigns: [{ name: "LIVESTREAM ADS", id: "1", status: "Ongoing", objective: "", budget: 0, views: 81460, orders: 204, conversionPct: 0.25, gmv: 70_273_048, expense: 2_300_302, roas: 30.55 }], expense: 2_300_302, gmv: 70_273_048, orders: 204, views: 81460, roas: 70_273_048 / 2_300_302, costPerOrder: 2_300_302 / 204 };
+  test("có file Ads: bản chụp giữ chi phí/ROAS/chi phí mỗi đơn, nhận xét phần 1 nói Ads", () => {
+    const s2 = build({ ads, overview: overview({ coinsClaimed: 499_200, voucherClaimed: 12, specialVoucherClaimed: 7 }) });
+    expect(s2.version).toBe(2);
+    expect(s2.ads).toMatchObject({ expense: 2_300_302, gmv: 70_273_048, orders: 204, campaigns: 1, shopName: "VERA Official Store" });
+    expect(s2.ads!.roas).toBeCloseTo(30.55, 1);
+    expect(s2.promo).toEqual({ coins: 499_200, vouchers: 12, liveVouchers: 7 });
+    const sum = [s2.insights.summary!.headline, ...s2.insights.summary!.points].join("\n");
+    expect(sum).toMatch(/Ads Shopee Live: chi/);
+    expect(sum).toMatch(/499\.200 xu/);
+    expect(s2.notes.join("\n")).not.toMatch(/Chưa có file Ads Shopee/);
+  });
+  test("không có overview thì không có khối khuyến mãi; không có file Ads thì ads = null", () => {
+    const s2 = build({ overview: null });
+    expect(s2.promo).toBeNull();
+    expect(s2.ads).toBeNull();
+  });
+  test("bản chụp bản 1 (chưa có Ads/xu) bị coi là cũ để ops cập nhật", () => {
+    const old = { ...build(), version: 1 };
+    const f = shopeeSnapshotFreshness(old, { sessions, stamps: ["x@1"] });
+    expect(f.formulaChanged).toBe(true);
+    expect(f.upToDate).toBe(false);
+    expect(shopeeSnapshotFreshness(build(), { sessions, stamps: ["x@1"] }).upToDate).toBe(true);
+  });
+  test("file Ads Shopee nằm trong dấu file của tháng (up/xoá file Ads ⇒ bản chụp cũ)", () => {
+    const st = shopeeStampsFor(
+      [
+        { id: "a", reportType: "shopee_ads", periodStart: "2026-09-01", periodEnd: "2026-09-30", importedAt: "t1" },
+        { id: "b", reportType: "ads_campaign_overview", periodStart: "2026-09-01", periodEnd: "2026-09-30", importedAt: "t2" }
+      ] as Parameters<typeof shopeeStampsFor>[0],
+      "2026-09"
+    );
+    expect(st).toEqual(["a@t1"]);
   });
 });

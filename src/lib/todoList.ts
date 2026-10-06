@@ -2,6 +2,7 @@ import { Brand, BrandMonthPlan, BrandMonthlyCommitment, BrandMonthlyReport, Bran
 import { isUnconfirmedPast } from "./sessionStatus";
 import { isCountable } from "./performance/hostPerformance";
 import { fmtDateVn, fmtMonth } from "./format";
+import { brandMonthKey, brandPlatformKey, brandPlatformsOf, sessionBrandMonthKey } from "./reportPlatform";
 
 // "Việc cần làm" — danh sách TỰ SINH từ dữ liệu cho màn đầu tiên sau khi đăng nhập (audit người mới 2026-10-04,
 // Nhóm 4/5). Người cũ biết thứ tự việc (hợp đồng → giá → kế hoạch → chốt người → up số → report); người mới mở app
@@ -20,6 +21,8 @@ export interface Todo {
   brandId?: string;
   /** Nhớ brand này trước khi mở màn agency theo brand (Kế Hoạch Tháng). */
   rememberBrandId?: string;
+  /** Sàn đi kèm brand đã nhớ (kế hoạch theo sàn, 0140). */
+  rememberPlatform?: "TikTok" | "Shopee";
   action: string;
 }
 
@@ -28,12 +31,12 @@ export interface TodoInput {
   brands: Brand[];
   sessions: LiveSession[];
   shiftSlots: ShiftSlot[];
-  /** brandId → kế hoạch tháng này / tháng sau (thiếu khoá = chưa lập). */
+  /** brandPlatformKey (brand × sàn) → kế hoạch tháng này / tháng sau (thiếu khoá = chưa lập). */
   plansThisMonth: Map<string, BrandMonthPlan>;
   plansNextMonth: Map<string, BrandMonthPlan>;
   commitments: BrandMonthlyCommitment[];
   rates: BrandPlatformRate[];
-  /** "brandId|YYYY-MM" → dòng report. */
+  /** brandMonthKey (brand × tháng × sàn) → dòng report. */
   monthlyReports: Map<string, BrandMonthlyReport>;
   talents: Talent[];
   /** CEO/admin: thấy việc về tiền (rate talent). */
@@ -63,9 +66,14 @@ export function activeBrandIds(input: Pick<TodoInput, "today" | "sessions" | "pl
   const from = addDays(input.today, -60);
   const out = new Set<string>();
   for (const s of input.sessions) if (s.status !== "Cancelled" && s.date >= from) out.add(s.brandId);
-  for (const id of input.plansThisMonth.keys()) out.add(id);
-  for (const id of input.plansNextMonth.keys()) out.add(id);
+  for (const id of input.plansThisMonth.keys()) out.add(id.split("|")[0]);
+  for (const id of input.plansNextMonth.keys()) out.add(id.split("|")[0]);
   return out;
+}
+
+/** Kế hoạch (tháng này + tháng sau) của brand — để brand chưa có ca Shopee nhưng đã lập kế hoạch Shopee vẫn được nhắc. */
+function plansOf(input: Pick<TodoInput, "plansThisMonth" | "plansNextMonth">, brandId: string): { brandId: string; platform: string }[] {
+  return [...input.plansThisMonth.values(), ...input.plansNextMonth.values()].filter((p) => p.brandId === brandId);
 }
 
 export function buildTodos(input: TodoInput): Todo[] {
@@ -97,22 +105,37 @@ export function buildTodos(input: TodoInput): Todo[] {
       });
     }
 
-    // 2–3. Kế hoạch tháng này.
-    const cur = input.plansThisMonth.get(b.id);
-    if (cur?.status === "draft") {
-      out.push({ id: `plan-draft-${b.id}`, level: "high", title: `Kế hoạch tháng ${fmtMonth(month)} của ${b.name} còn nháp`, detail: "Chưa chốt thì chưa có ca để talent đăng ký và Dashboard chưa có target.", tab: "month_plan", rememberBrandId: b.id, action: "Chốt kế hoạch" });
-    } else if (!cur && !own.some((s) => s.date.startsWith(month) && s.status !== "Cancelled")) {
-      out.push({ id: `plan-none-${b.id}`, level: "medium", title: `${b.name} chưa có kế hoạch và chưa có ca nào tháng ${fmtMonth(month)}`, tab: "month_plan", rememberBrandId: b.id, action: "Lập kế hoạch" });
+    // 2–4 và 8 theo TỪNG SÀN của brand (0139/0140: kế hoạch, target, report riêng từng sàn).
+    const platforms = brandPlatformsOf(b.id, own, [...input.shiftSlots, ...plansOf(input, b.id)]);
+    for (const p of platforms) {
+      const name = platforms.length > 1 ? `${b.name} ${p}` : b.name;
+      const sfx = p === "Shopee" ? "-shopee" : "";
+      const ownP = own.filter((s) => (s.platform ?? "TikTok") === p);
+      // 2–3. Kế hoạch tháng này.
+      const cur = input.plansThisMonth.get(brandPlatformKey(b.id, p));
+      if (cur?.status === "draft") {
+        out.push({ id: `plan-draft-${b.id}${sfx}`, level: "high", title: `Kế hoạch tháng ${fmtMonth(month)} của ${name} còn nháp`, detail: "Chưa chốt thì chưa có ca để talent đăng ký và Dashboard chưa có target.", tab: "month_plan", rememberBrandId: b.id, rememberPlatform: p, action: "Chốt kế hoạch" });
+      } else if (!cur && !ownP.some((s) => s.date.startsWith(month) && s.status !== "Cancelled")) {
+        out.push({ id: `plan-none-${b.id}${sfx}`, level: "medium", title: `${name} chưa có kế hoạch và chưa có ca nào tháng ${fmtMonth(month)}`, tab: "month_plan", rememberBrandId: b.id, rememberPlatform: p, action: "Lập kế hoạch" });
+      }
+
+      // 4. Kế hoạch tháng sau — từ ngày 15, để talent còn thời gian đăng ký.
+      if (Number(today.slice(8, 10)) >= 15 && input.plansNextMonth.get(brandPlatformKey(b.id, p))?.status !== "locked") {
+        out.push({ id: `plan-next-${b.id}${sfx}`, level: "medium", title: `Kế hoạch tháng ${fmtMonth(nextMonth)} của ${name} chưa chốt`, tab: "month_plan", rememberBrandId: b.id, rememberPlatform: p, action: "Mở Kế Hoạch Tháng" });
+      }
+
+      // 8. Report tháng trước chưa phát hành.
+      if (ownP.some((s) => s.date.startsWith(prevMonth) && s.status !== "Cancelled") && input.monthlyReports.get(brandMonthKey(b.id, prevMonth, p))?.status !== "published") {
+        out.push({ id: `report-${b.id}${sfx}`, level: "medium", title: `Report ${p} tháng ${fmtMonth(prevMonth)} của ${b.name} chưa phát hành`, tab: "brand_monthly_report", brandId: b.id, action: "Mở report" });
+      }
     }
 
-    // 4. Kế hoạch tháng sau — từ ngày 15, để talent còn thời gian đăng ký.
-    if (Number(today.slice(8, 10)) >= 15 && input.plansNextMonth.get(b.id)?.status !== "locked") {
-      out.push({ id: `plan-next-${b.id}`, level: "medium", title: `Kế hoạch tháng ${fmtMonth(nextMonth)} của ${b.name} chưa chốt`, tab: "month_plan", rememberBrandId: b.id, action: "Mở Kế Hoạch Tháng" });
-    }
-
-    // 5. Hợp đồng / cam kết giờ tháng này.
-    if (!input.commitments.some((c) => c.brandId === b.id && c.periodMonth.startsWith(month))) {
-      out.push({ id: `commit-${b.id}`, level: "low", title: `${b.name} chưa có cam kết giờ tháng ${fmtMonth(month)}`, detail: "Nhập hợp đồng rồi bấm \"Sinh cam kết theo tháng\" — Kế Hoạch Tháng lấy số giờ cần xếp từ đây.", tab: "brand_commitment", action: "Nhập hợp đồng" });
+    // 5. Hợp đồng / cam kết giờ tháng này — riêng từng sàn (0141).
+    for (const p of platforms) {
+      if (!input.commitments.some((c) => c.brandId === b.id && (c.platform ?? "TikTok") === p && c.periodMonth.startsWith(month))) {
+        const name = platforms.length > 1 ? `${b.name} ${p}` : b.name;
+        out.push({ id: `commit-${b.id}${p === "Shopee" ? "-shopee" : ""}`, level: "low", title: `${name} chưa có cam kết giờ tháng ${fmtMonth(month)}`, detail: "Nhập hợp đồng (chọn sàn) rồi bấm \"Sinh cam kết theo tháng\" — Kế Hoạch Tháng lấy số giờ cần xếp từ đây.", tab: "brand_commitment", action: "Nhập hợp đồng" });
+      }
     }
 
     // 6. Giá: chưa có đơn giá/giờ lẫn % hoa hồng thì Finance và Dashboard không tính được doanh thu.
@@ -121,10 +144,6 @@ export function buildTodos(input: TodoInput): Todo[] {
       out.push({ id: `rate-${b.id}`, level: "low", title: `${b.name} chưa có giá (Rate Card)`, detail: "Chưa có giá thì Finance & P&L và Dashboard không tính được doanh thu, lãi.", tab: "crm", action: "Nhập ở CRM" });
     }
 
-    // 8. Report tháng trước chưa phát hành.
-    if (own.some((s) => s.date.startsWith(prevMonth) && s.status !== "Cancelled") && input.monthlyReports.get(`${b.id}|${prevMonth}`)?.status !== "published") {
-      out.push({ id: `report-${b.id}`, level: "medium", title: `Report tháng ${fmtMonth(prevMonth)} của ${b.name} chưa phát hành`, tab: "brand_monthly_report", brandId: b.id, action: "Mở report" });
-    }
   }
 
   // 7. Ca đã chạy chưa gán host, ở tháng CHƯA phát hành report — không vào xếp hạng host, và phát hành report thiếu
@@ -135,7 +154,7 @@ export function buildTodos(input: TodoInput): Todo[] {
       s.status !== "Cancelled" &&
       s.date <= today &&
       !s.hostId &&
-      input.monthlyReports.get(`${s.brandId}|${s.date.slice(0, 7)}`)?.status !== "published"
+      input.monthlyReports.get(sessionBrandMonthKey(s))?.status !== "published"
   );
   if (noHost.length > 0) {
     const allBackfill = noHost.every((s) => s.isBackfill);

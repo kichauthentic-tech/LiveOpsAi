@@ -15,6 +15,7 @@ import { metricsHiddenFor } from "../../lib/sessionLedger";
 import { downloadRowsAsXlsx } from "../../lib/exportXlsx";
 import { useToast } from "../../hooks/useToast";
 import { PageHeader } from "../common/PageHeader";
+import type { ReportPlatform } from "../../lib/reportPlatform";
 
 // Cam Kết Hợp Đồng — bản CHỈ ĐỌC cho Brand Workspace (Đợt C/1, migration 0108).
 //
@@ -42,6 +43,9 @@ import { PageHeader } from "../common/PageHeader";
 interface BrandCommitmentViewProps {
   brandId: string;
   brandName: string;
+  /** Hợp đồng riêng từng sàn (0141) — sàn chọn ở bộ chuyển sàn của Brand workspace. */
+  platform: ReportPlatform;
+  multiPlatform: boolean;
   sessions: LiveSession[];
   currentRole: UserRole;
 }
@@ -100,10 +104,13 @@ export function prefetchBrandCommitmentView({ brandId }: TabPrefetchCtx): void {
 export const BrandCommitmentView: React.FC<BrandCommitmentViewProps> = ({
   brandId,
   brandName,
+  platform,
+  multiPlatform,
   sessions,
   currentRole
 }) => {
-  const [rows, setRows] = useState<BrandCommitmentRow[]>([]);
+  const [allRows, setRows] = useState<BrandCommitmentRow[]>([]);
+  const rows = useMemo(() => allRows.filter((r) => r.platform === platform), [allRows, platform]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -142,7 +149,7 @@ export const BrandCommitmentView: React.FC<BrandCommitmentViewProps> = ({
       rows
         .map((r) =>
           computeCommitmentProgress(
-            { id: `${r.brandId}-${r.periodMonth}`, brandId: r.brandId, periodMonth: r.periodMonth, committedHours: r.committedHours, committedGmv: r.committedGmv, isOverride: r.isOverride },
+            { id: `${r.brandId}-${r.periodMonth}-${r.platform}`, brandId: r.brandId, periodMonth: r.periodMonth, platform: r.platform, committedHours: r.committedHours, committedGmv: r.committedGmv, isOverride: r.isOverride },
             brandName,
             sessions,
             today
@@ -161,12 +168,12 @@ export const BrandCommitmentView: React.FC<BrandCommitmentViewProps> = ({
   const monthHasHiddenMetrics = useMemo(() => {
     const map = new Map<string, boolean>();
     for (const s of sessions) {
-      if (s.brandId !== brandId) continue;
+      if (s.brandId !== brandId || (s.platform ?? "TikTok") !== platform) continue;
       const k = monthKeyOf(s.date);
       if (!map.has(k)) map.set(k, metricsHiddenFor(s, currentRole));
     }
     return map;
-  }, [sessions, brandId, currentRole]);
+  }, [sessions, brandId, platform, currentRole]);
 
   // Xuất Excel — đúng bảng "Lịch sử theo tháng" bên dưới, kể cả cột GMV bị che tháng chưa phát
   // hành (giữ nguyên chữ "chưa phát hành" như trên màn, không tự đoán số).
@@ -205,6 +212,7 @@ export const BrandCommitmentView: React.FC<BrandCommitmentViewProps> = ({
         title={
           <>
             Cam Kết Hợp Đồng · {brandName}
+            {(multiPlatform || platform === "Shopee") && ` · ${platform}`}
             {contractCode && <span className="ml-2 text-sm font-bold text-[var(--text-faint)]">· {contractCode}</span>}
           </>
         }

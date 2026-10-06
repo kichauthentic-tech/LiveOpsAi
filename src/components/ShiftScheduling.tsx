@@ -11,6 +11,7 @@ import {
   Talent,
   UserRole
 } from "../types";
+import type { BrandMonthPlan } from "../types";
 import {
   Calendar as CalendarIcon,
   CalendarRange,
@@ -39,6 +40,7 @@ import { SessionWindow } from "./SessionWindow";
 import { SessionReportInput } from "../lib/db/sessionReports";
 import { commitmentsRead } from "../lib/db/brandContracts";
 import { planStatusesRead } from "../lib/db/monthPlans";
+import { brandPlatformKey, brandPlatformsOf } from "../lib/reportPlatform";
 import type { TabPrefetchCtx } from "../lib/db/prefetch";
 import { SchedulingGap, computeSchedulingGaps } from "../lib/performance/brandCommitment";
 import { FATIGUE_WEEK_HOURS, HostSuggestion, headlineFor, suggestHosts } from "../lib/performance/hostSuggestion";
@@ -203,16 +205,27 @@ export default function ShiftScheduling({
     return () => { alive = false; };
   }, [admin]);
 
-  const [planMissing, setPlanMissing] = useState<string[]>([]);
+  const [nextPlans, setNextPlans] = useState<Map<string, BrandMonthPlan> | null>(null);
   useEffect(() => {
     if (!admin) return;
     const next = nextMonthKey(today);
     let alive = true;
     planStatusesRead.take(next)
-      .then((map) => { if (alive) setPlanMissing(brands.filter((b) => map.get(b.id)?.status !== "locked").map((b) => b.name)); })
-      .catch(() => { if (alive) setPlanMissing([]); });
+      .then((map) => { if (alive) setNextPlans(map); })
+      .catch(() => { if (alive) setNextPlans(null); });
     return () => { alive = false; };
-  }, [admin, brands, today]);
+  }, [admin, today]);
+  // Kế hoạch theo sàn (0140): VERA chốt TikTok mà chưa chốt Shopee vẫn phải nhắc "VERA Shopee".
+  const planMissing = useMemo(
+    () =>
+      nextPlans
+        ? brands.flatMap((b) => {
+            const ps = brandPlatformsOf(b.id, sessions, shiftSlots);
+            return ps.filter((p) => nextPlans.get(brandPlatformKey(b.id, p))?.status !== "locked").map((p) => (ps.length > 1 ? `${b.name} ${p}` : b.name));
+          })
+        : [],
+    [nextPlans, brands, sessions, shiftSlots]
+  );
 
   const talentsById = useMemo(() => new Map(talents.map((t) => [t.id, t])), [talents]);
   const brandById = useMemo(() => new Map(brands.map((b) => [b.id, b])), [brands]);
@@ -550,13 +563,13 @@ export default function ShiftScheduling({
               const done = g.hoursStillToOpen <= 0.01;
               return (
                 <div
-                  key={g.brandId}
+                  key={brandPlatformKey(g.brandId, g.platform)}
                   className={`rounded-xl p-3 border ${
                     done ? "bg-emerald-950/30 border-emerald-900" : "bg-rose-950/25 border-rose-900"
                   }`}
                 >
                   <div className="flex items-baseline justify-between gap-2">
-                    <span className="text-xs font-bold text-[var(--text)] truncate">{g.brandName}</span>
+                    <span className="text-xs font-bold text-[var(--text)] truncate">{g.brandName}{g.platform === "Shopee" ? " · Shopee" : ""}</span>
                     <span className="text-[11px] text-[var(--text-faint)] shrink-0">
                       cam kết {g.committedHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h
                     </span>

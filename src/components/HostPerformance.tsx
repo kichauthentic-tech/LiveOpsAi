@@ -19,6 +19,7 @@ import { PageIntro } from "./common/PageIntro";
 import { fmtDateVn, fmtFixed, fmtVndShort } from "../lib/format";
 import { METRIC, metricHint } from "../lib/metricGlossary";
 import { fmtKeyMetric, KEY_METRICS, keyMetricValue } from "../lib/report/keyMetrics";
+import { inPlatformScope, type PlatformScope } from "../lib/reportPlatform";
 interface HostPerformanceProps {
   sessions: LiveSession[];
   brands: Brand[];
@@ -43,10 +44,14 @@ export function HostPerformance({ sessions, brands }: HostPerformanceProps) {
   const [from, setFrom] = useState(() => isoDaysAgo(90));
   const [to, setTo] = useState(() => getTodayDate());
   const [brandId, setBrandId] = useState("");
+  // Xếp hạng theo TỪNG SÀN (06/10): GMV/giờ hai sàn khác hẳn nhau (VERA Shopee ~1,6x TikTok T6–T9) — gộp lại thì host
+  // đứng nhiều ca Shopee tự nhiên lên top. Mặc định TikTok; "cả 2 sàn" vẫn chọn được nhưng ghi rõ là không nên so.
+  const hasShopee = useMemo(() => sessions.some((s) => s.platform === "Shopee"), [sessions]);
+  const [platform, setPlatform] = useState<PlatformScope>("TikTok");
 
   const scoped = useMemo(
-    () => filterSessions(sessions, { from, to, brandId: brandId || undefined }),
-    [sessions, from, to, brandId]
+    () => filterSessions(sessions.filter((s) => inPlatformScope(s, platform)), { from, to, brandId: brandId || undefined }),
+    [sessions, platform, from, to, brandId]
   );
 
   // Ca chưa gán host tách khỏi xếp hạng (audit 2026-09-21): trước đây nó đứng chung bảng như một
@@ -84,7 +89,7 @@ export function HostPerformance({ sessions, brands }: HostPerformanceProps) {
       return row;
     });
     const wd: Record<string, string | number>[] = weekdays.map((w) => ({ Thứ: w.label, [METRIC.gmvPerHour]: w.gmvPerHour ?? "", "Số ca": w.sessionCount }));
-    const scope = brandId ? (brands.find((b) => b.id === brandId)?.name ?? "brand") : "tat-ca-brand";
+    const scope = `${brandId ? (brands.find((b) => b.id === brandId)?.name ?? "brand") : "tat-ca-brand"}_${platform === "all" ? "2-san" : platform}`;
     downloadSheetsAsXlsx(
       [
         { name: "Xep hang host", rows: rank },
@@ -116,6 +121,13 @@ export function HostPerformance({ sessions, brands }: HostPerformanceProps) {
                 <option key={b.id} value={b.id}>{b.name}</option>
               ))}
             </select>
+            {hasShopee && (
+              <select value={platform} onChange={(e) => setPlatform(e.target.value as PlatformScope)} className={inputCls} aria-label="Sàn">
+                <option value="TikTok">TikTok</option>
+                <option value="Shopee">Shopee</option>
+                <option value="all">Cả 2 sàn (không nên so)</option>
+              </select>
+            )}
             <button
               onClick={exportXlsx}
               disabled={hosts.length === 0}
@@ -138,6 +150,7 @@ export function HostPerformance({ sessions, brands }: HostPerformanceProps) {
               {/* Ghi kỳ ngay cạnh con số (audit người mới 2026-10-04): Talent Pool cộng MỌI tháng nên cùng một host
                   hai màn ra hai số — trước đây chỉ Talent Pool có câu giải thích. */}
               <b className="text-[var(--text)]">{fmtDateVn(from)} – {fmtDateVn(to)}{from === isoDaysAgo(90) ? " (90 ngày gần nhất)" : ""}</b>
+              {hasShopee && <> · <b className="text-[var(--text)]">{platform === "all" ? "cả 2 sàn — GMV/giờ hai sàn khác nhau, đừng so host giữa hai sàn" : `chỉ ca ${platform}`}</b></>}
               {" · "}{quality.total} ca có số liệu: <span className="font-bold text-emerald-400">{quality.reconciled} đã đối soát</span>,{" "}
               <span className="font-bold text-sky-400">{quality.snapshot} số lúc giao ca</span>
               {quality.manual > 0 && (

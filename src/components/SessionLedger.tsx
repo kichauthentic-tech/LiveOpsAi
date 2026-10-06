@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { inPlatformScope, type PlatformScope } from "../lib/reportPlatform";
 import { SESSION_STATUS_CLS, SESSION_STATUS_LABEL_VI } from "../lib/sessionStatusUi";
 import { BookOpen, CheckCircle2, ChevronRight, Circle, Download, EyeOff, Link2 } from "lucide-react";
 import { Brand, LiveSession, ShiftSlot, Studio, Talent, UserRole, AuditLogEntry } from "../types";
@@ -24,6 +25,8 @@ import { PageIntro } from "./common/PageIntro";
 interface SessionLedgerProps {
   variant: "agency" | "brand";
   sessions: LiveSession[];
+  /** Sàn đang xem ở Brand workspace (bộ chuyển sàn); Agency không truyền = cả hai sàn. */
+  platformScope?: PlatformScope;
   brands: Brand[];
   brandId?: string; // bắt buộc với variant brand
   currentRole: UserRole;
@@ -104,6 +107,7 @@ const LockedCell: React.FC = () => (
 export const SessionLedger: React.FC<SessionLedgerProps> = ({
   variant,
   sessions,
+  platformScope = "all",
   brands,
   brandId,
   currentRole,
@@ -125,8 +129,8 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
   const today = getTodayDate();
 
   const scoped = useMemo(
-    () => (isBrandView && brandId ? sessions.filter((s) => s.brandId === brandId) : sessions),
-    [sessions, isBrandView, brandId]
+    () => (isBrandView && brandId ? sessions.filter((s) => s.brandId === brandId && inPlatformScope(s, platformScope)) : sessions),
+    [sessions, isBrandView, brandId, platformScope]
   );
 
   const months = useMemo(() => ledgerMonths(scoped), [scoped]);
@@ -175,10 +179,10 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
   // Không lọc theo tháng đang chọn: cả điểm của khối này là tìm lại được ca đã loại, mà người đi
   // tìm thường không nhớ nó nằm tháng nào. Số lượng luôn rất nhỏ.
   const excludedScoped = useMemo(
-    () => (isBrandView && brandId ? excludedSessions.filter((s) => s.brandId === brandId) : excludedSessions)
+    () => (isBrandView && brandId ? excludedSessions.filter((s) => s.brandId === brandId && inPlatformScope(s, platformScope)) : excludedSessions)
       .slice()
       .sort((a, b) => b.date.localeCompare(a.date)),
-    [excludedSessions, isBrandView, brandId]
+    [excludedSessions, isBrandView, brandId, platformScope]
   );
 
   const patch = (p: Partial<LedgerFilter>) => setFilter((f) => ({ ...f, ...p }));

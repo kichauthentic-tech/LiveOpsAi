@@ -1,6 +1,7 @@
 import { BrandMonthlyReport, LiveSession } from "../../types";
 import { sessionDurationHours } from "../pnl";
 import { CampDayBucket, CampOverrides, CAMP_DAY_BUCKET_ORDER, resolveCampBucketType } from "../campaignDays";
+import { brandMonthKey, sessionBrandMonthKey, type ReportPlatform } from "../reportPlatform";
 
 // Target GMV của TỪNG CA — phân bổ TỪ TRÊN XUỐNG theo kế hoạch tháng của brand (user chốt 2026-09-18).
 //
@@ -22,6 +23,8 @@ import { CampDayBucket, CampOverrides, CAMP_DAY_BUCKET_ORDER, resolveCampBucketT
 export interface MonthTargetPlan {
   brandId: string;
   month: string; // "YYYY-MM"
+  /** Target riêng từng sàn (user chốt 06/10): kế hoạch TikTok chỉ chia cho ca TikTok. Thiếu = TikTok. */
+  platform?: ReportPlatform;
   // Target từng khung, đã quy ra tiền.
   byBucket: Record<CampDayBucket, number>;
   camp: CampOverrides;
@@ -41,9 +44,10 @@ export function monthTotalTarget(plan: MonthTargetPlan): number {
 export function buildMonthTargetPlan(
   brandId: string,
   month: string,
-  reportsByBrandMonth: Map<string, BrandMonthlyReport>
+  reportsByBrandMonth: Map<string, BrandMonthlyReport>,
+  platform: ReportPlatform = "TikTok"
 ): MonthTargetPlan | null {
-  const cur = reportsByBrandMonth.get(`${brandId}|${month}`);
+  const cur = reportsByBrandMonth.get(brandMonthKey(brandId, month, platform));
 
   const camp: CampOverrides = {};
   if (cur?.campDdayStart && cur?.campDdayEnd) camp.dday = { start: cur.campDdayStart, end: cur.campDdayEnd };
@@ -57,7 +61,7 @@ export function buildMonthTargetPlan(
     payday: cur?.campPaydayTargetGmv ?? 0
   };
   if (CAMP_DAY_BUCKET_ORDER.every((b) => byBucket[b] <= 0)) return null;
-  return { brandId, month, byBucket, camp };
+  return { brandId, month, platform, byBucket, camp };
 }
 
 // Phân bổ target của một tháng xuống từng ca. Chỉ nhận ca của đúng brand + tháng; ca Cancelled
@@ -65,7 +69,7 @@ export function buildMonthTargetPlan(
 export function allocateSessionTargets(sessions: LiveSession[], plan: MonthTargetPlan): Map<string, number> {
   const out = new Map<string, number>();
   const live = sessions.filter(
-    (s) => s.brandId === plan.brandId && s.date.startsWith(plan.month) && s.status !== "Cancelled"
+    (s) => s.brandId === plan.brandId && (s.platform ?? "TikTok") === (plan.platform ?? "TikTok") && s.date.startsWith(plan.month) && s.status !== "Cancelled"
   );
   if (live.length === 0) return out;
 
@@ -103,7 +107,7 @@ export function applyAllocatedTargets(
   sessions: LiveSession[],
   reportsByBrandMonth: Map<string, BrandMonthlyReport>,
   planTargetBySessionId?: Map<string, number>,
-  // Đ5 (2026-09-24): "brandId|YYYY-MM" → tổng target của Kế Hoạch Tháng ĐÃ CHỐT. Trước đây phần
+  // Đ5 (2026-09-24): brandMonthKey (brand × tháng × sàn) → tổng target của Kế Hoạch Tháng ĐÃ CHỐT. Trước đây phần
   // target còn dư (chia cho ca mở lẻ/thêm sau) lấy từ `buildMonthTargetPlan`, tức từ dòng
   // brand_monthly_reports của tháng TRƯỚC (tab "Kế Hoạch Tháng Sau") — một ô nhập KHÁC với ô
   // "Target GMV tháng" mà ops vừa gõ ở Kế Hoạch Tháng. Hai nguồn lệch nhau thì phần dư tính bằng
@@ -116,16 +120,18 @@ export function applyAllocatedTargets(
   const planned = new Set<string>(); // "brand|month" có kế hoạch
   const monthsWithPlanTargets = new Set<string>();
   if (planTargetBySessionId && planTargetBySessionId.size > 0) {
-    for (const s of sessions) if (planTargetBySessionId.has(s.id)) monthsWithPlanTargets.add(`${s.brandId}|${s.date.slice(0, 7)}`);
+    for (const s of sessions) if (planTargetBySessionId.has(s.id)) monthsWithPlanTargets.add(sessionBrandMonthKey(s));
   }
+  // Khoá brand × tháng × SÀN (0140): VERA có kế hoạch TikTok thì ca Shopee cùng tháng không phải "ca ngoài kế hoạch,
+  // target 0" — chúng thuộc kế hoạch Shopee (hoặc không có kế hoạch nào).
   for (const s of sessions) {
-    const key = `${s.brandId}|${s.date.slice(0, 7)}`;
+    const key = sessionBrandMonthKey(s);
     if (plans.has(key)) continue;
-    const p = buildMonthTargetPlan(s.brandId, s.date.slice(0, 7), reportsByBrandMonth);
+    const p = buildMonthTargetPlan(s.brandId, s.date.slice(0, 7), reportsByBrandMonth, s.platform === "Shopee" ? "Shopee" : "TikTok");
     plans.set(key, p);
     if (monthsWithPlanTargets.has(key)) {
       planned.add(key);
-      const inMonth = sessions.filter((x) => `${x.brandId}|${x.date.slice(0, 7)}` === key && x.status !== "Cancelled");
+      const inMonth = sessions.filter((x) => sessionBrandMonthKey(x) === key && x.status !== "Cancelled");
       let linkedSum = 0;
       const rest: LiveSession[] = [];
       for (const x of inMonth) {
@@ -168,7 +174,7 @@ export function applyAllocatedTargets(
   // nghĩa: ~33 useMemo phía dưới vẫn invalidate mỗi phút.
   let changed = false;
   const next = sessions.map((s) => {
-    const key = `${s.brandId}|${s.date.slice(0, 7)}`;
+    const key = sessionBrandMonthKey(s);
     if (!planned.has(key)) return s;
     const target = Math.round(alloc.get(s.id) ?? 0);
     if (target === s.targetGmv) return s;

@@ -24,7 +24,7 @@ import { DataRawImportStamp, fetchDataRawImportStamps } from "../../lib/db/brand
 import { buildMonthlyReportSnapshot, COVERAGE_TYPES, snapshotFreshness, snapshotHeadline, SnapshotHeadline, type MonthlyReportSnapshot } from "../../lib/report/monthlySnapshot";
 import { shopeeSnapshotFreshness, shopeeStampsFor, type ShopeeReportSnapshot } from "../../lib/report/shopeeSnapshot";
 import { buildShopeeReportSnapshot } from "../../lib/report/shopeeSnapshotBuild";
-import { REPORT_PLATFORMS, type ReportPlatform } from "../../lib/reportPlatform";
+import type { ReportPlatform } from "../../lib/reportPlatform";
 import { fmtMonth, fmtVndShort } from "../../lib/format";
 import { prefetchable, type TabPrefetchCtx } from "../../lib/db/prefetch";
 import { lazyNamed } from "../../lib/lazyNamed";
@@ -49,6 +49,8 @@ const CAN_VIEW_WEEKLY_ROLES: UserRole[] = ["ceo", "operations", "admin"];
 interface BrandMonthlyReportProps {
   brandId: string;
   brandName: string;
+  /** Sàn của report — App giữ (bộ chuyển sàn của Brand workspace). */
+  platform: ReportPlatform;
   sessions: LiveSession[];
   currentRole: UserRole;
   brandPlatformRates: BrandPlatformRate[];
@@ -109,19 +111,15 @@ function headlineDiff(before: SnapshotHeadline, after: SnapshotHeadline): string
 // đã tách sang tab riêng "Nhập Ads" (BrandAdsReport.tsx, 2026-09-21) — Report Tháng chỉ
 // còn tài liệu 6 tab + phát hành/thu hồi (tab 05 "Phân Tích Sâu" gộp vào 2026-09-23, ops-only).
 
-export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId, brandName, sessions, currentRole, brandPlatformRates, shiftSlots, onOpenAdsReport, planMonthTotals }) => {
+export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId, brandName, platform, sessions, currentRole, brandPlatformRates, shiftSlots, onOpenAdsReport, planMonthTotals }) => {
   const confirm = useConfirm();
   const { showToast } = useToast();
   const canManage = CAN_MANAGE_ROLES.includes(currentRole);
   const canViewWeekly = CAN_VIEW_WEEKLY_ROLES.includes(currentRole);
   const [viewMode, setViewMode] = useState<"month" | "week">("month");
-  // Sàn của report (0139): TikTok và Shopee là hai report độc lập — phát hành, thu hồi, đóng sổ riêng.
-  // Đổi brand thì về TikTok — lưu kèm brandId để khỏi cần effect đặt lại state.
-  const [platformPick, setPlatformPick] = useState<{ brandId: string; platform: ReportPlatform }>({ brandId, platform: "TikTok" });
-  const platform: ReportPlatform = platformPick.brandId === brandId ? platformPick.platform : "TikTok";
-  const setPlatform = (pl: ReportPlatform) => setPlatformPick({ brandId, platform: pl });
+  // Sàn của report (0139): TikTok và Shopee là hai report độc lập — phát hành, thu hồi, đóng sổ riêng. Chọn sàn ở bộ chuyển
+  // sàn của Brand workspace (App, PlatformScopeBar) — một chỗ chọn cho mọi tab.
   const isShopee = platform === "Shopee";
-  const hasShopee = useMemo(() => sessions.some((s) => s.brandId === brandId && s.platform === "Shopee"), [sessions, brandId]);
   // Mở THÁNG ĐÃ HẾT gần nhất có ca của brand — report chỉ phát hành được sau khi hết tháng (0133); mở tháng đang
   // chạy là gặp ngay "chưa tạo report" (audit người mới 2026-10-04). Xem tháng này: chọn ở bộ chọn tháng.
   const [month, setMonth] = useState(() => defaultReportMonth(`${getTodayMonth()}-01`, sessions.filter((s) => s.brandId === brandId)));
@@ -345,25 +343,6 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
     </div>
   ) : null;
 
-  // Chọn sàn (0139): hai report độc lập. Brand chỉ thấy lựa chọn khi có ca Shopee; Report Tuần chỉ có TikTok.
-  const platformSwitch =
-    hasShopee || isShopee ? (
-      <div className="inline-flex items-center gap-1 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-1" role="group" aria-label="Sàn của report">
-        {REPORT_PLATFORMS.map((pl) => (
-          <button
-            key={pl}
-            onClick={() => setPlatform(pl)}
-            aria-pressed={platform === pl}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-              platform === pl ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)] hover:bg-[var(--surface-elevated)]"
-            }`}
-          >
-            {pl}
-          </button>
-        ))}
-      </div>
-    ) : null;
-
   // Audit UX 2026-09-29 (M1): trước đây 3 khối chồng nhau trước nội dung — thanh Tháng/Tuần, thẻ tiêu đề 24px, thanh
   // "Số liệu chốt lúc…" — mục lục report ở y=309px. Gộp về MỘT PageHeader: tiêu đề + chế độ + tháng + trạng thái + phát hành,
   // dòng bản chụp là hàng phụ bên dưới.
@@ -396,7 +375,6 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
         actions={
           <>
             {modeSwitch}
-            {platformSwitch}
             <MonthPicker value={month} onChange={setMonth} />
             {report && (
               <span
@@ -468,7 +446,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
                     <span className="text-amber-300 font-semibold">
                       Có thay đổi từ lần chốt:{" "}
                       {isShopee && shopeeFresh
-                        ? [shopeeFresh.sessionsChanged && "ca Shopee", shopeeFresh.filesChanged && "file Shopee"].filter(Boolean).join(" · ")
+                        ? [shopeeFresh.sessionsChanged && "ca Shopee", shopeeFresh.filesChanged && "file Shopee", shopeeFresh.formulaChanged && "cách tính mới (Ads, xu)"].filter(Boolean).join(" · ")
                         : freshness &&
                           [
                             freshness.changedSessions > 0 &&

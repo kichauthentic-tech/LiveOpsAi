@@ -4,6 +4,7 @@ import { prefetchable } from "./prefetch";
 import { fetchAllPages } from "./fetchAllPages";
 import { LockedPlanRow, LockedPlanTargets, lockedPlanTargetsFromRows } from "../scheduling/lockedPlanTargets";
 import { BrandMonthPlan, BrandMonthPlanSlot, CalendarEventRow, PlanCampRanges } from "../../types";
+import { brandPlatformKey, type ReportPlatform } from "../reportPlatform";
 
 // Kế Hoạch Tháng (0090). Bảng nhỏ (1 dòng plan + ≤ ~100 ca/brand/tháng) — đọc theo brand+tháng,
 // ghi ca kế hoạch bằng cách thay cả lô (xoá dòng không còn, upsert dòng còn) để UI lưới không phải
@@ -13,6 +14,8 @@ interface DbPlan {
   id: string;
   brand_id: string;
   month: string;
+  /** 0140 — DB chưa chạy 0140 thì không có cột: coi là TikTok. */
+  platform?: ReportPlatform | null;
   status: BrandMonthPlan["status"];
   default_slot_hours: number;
   live_window_start: string;
@@ -45,6 +48,7 @@ const planFromDb = (r: DbPlan): BrandMonthPlan => ({
   id: r.id,
   brandId: r.brand_id,
   month: r.month.slice(0, 7),
+  platform: r.platform === "Shopee" ? "Shopee" : "TikTok",
   status: r.status,
   defaultSlotHours: Number(r.default_slot_hours),
   liveWindowStart: hhmm(r.live_window_start),
@@ -80,38 +84,46 @@ const slotFromDb = (r: DbPlanSlot): BrandMonthPlanSlot => ({
  * (đo 2026-10-01: 4 request thay vì 2 trước khi gộp). Mỗi caller vẫn tự `planFromDb`/`slotFromDb` ra đối
  * tượng riêng, chỉ dùng chung dòng JSON thô. Xem đầu file dedupeInFlight.ts.
  */
-export async function fetchMonthPlan(brandId: string, month: string): Promise<{ plan: BrandMonthPlan; slots: BrandMonthPlanSlot[] } | null> {
-  const data = await dedupeInFlight(`brand_month_plans+slots|${brandId}|${month}`, async () => {
+export async function fetchMonthPlan(
+  brandId: string,
+  month: string,
+  platform: ReportPlatform = "TikTok"
+): Promise<{ plan: BrandMonthPlan; slots: BrandMonthPlanSlot[] } | null> {
+  // Kế hoạch theo sàn (0140): đọc mọi kế hoạch của (brand, tháng) rồi lọc sàn phía client — DB chưa chạy 0140 (thiếu
+  // cột platform) vẫn đọc được, coi mọi kế hoạch là TikTok. Một khoá dedupe cho cả hai sàn: Dashboard "Tổng" đọc cả hai.
+  const rows = await dedupeInFlight(`brand_month_plans+slots|${brandId}|${month}`, async () => {
     const { data, error } = await supabase
       .from("brand_month_plans")
       .select("*, brand_month_plan_slots(*)")
       .eq("brand_id", brandId)
       .eq("month", `${month}-01`)
       .order("date", { referencedTable: "brand_month_plan_slots" })
-      .order("start_time", { referencedTable: "brand_month_plan_slots" })
-      .maybeSingle();
+      .order("start_time", { referencedTable: "brand_month_plan_slots" });
     if (error) throw error;
-    return data as (DbPlan & { brand_month_plan_slots: DbPlanSlot[] }) | null;
+    return (data ?? []) as (DbPlan & { brand_month_plan_slots: DbPlanSlot[] })[];
   });
+  const data = rows.find((r) => (r.platform === "Shopee" ? "Shopee" : "TikTok") === platform);
   if (!data) return null;
   return { plan: planFromDb(data), slots: (data.brand_month_plan_slots ?? []).map(slotFromDb) };
 }
 
+/** Kế hoạch của mọi brand trong tháng. Khoá = `brandPlatformKey` (brandId cho TikTok, "brandId|Shopee" cho Shopee). */
 export async function fetchPlanStatuses(month: string): Promise<Map<string, BrandMonthPlan>> {
   const { data, error } = await supabase.from("brand_month_plans").select("*").eq("month", `${month}-01`);
   if (error) throw error;
-  return new Map((data as DbPlan[]).map((r) => [r.brand_id, planFromDb(r)]));
+  return new Map((data as DbPlan[]).map((r) => [brandPlatformKey(r.brand_id, r.platform), planFromDb(r)]));
 }
 
 export type PlanSettings = Pick<BrandMonthPlan, "defaultSlotHours" | "liveWindowStart" | "liveWindowEnd" | "maxSlotsPerDay" | "notes" | "blackoutDates" | "targetGmv" | "campRanges" | "shopTargetGmv">;
 
-export async function upsertMonthPlan(brandId: string, month: string, settings: PlanSettings): Promise<BrandMonthPlan> {
+export async function upsertMonthPlan(brandId: string, month: string, settings: PlanSettings, platform: ReportPlatform = "TikTok"): Promise<BrandMonthPlan> {
   const { data, error } = await supabase
     .from("brand_month_plans")
     .upsert(
       {
         brand_id: brandId,
         month: `${month}-01`,
+        platform,
         default_slot_hours: settings.defaultSlotHours,
         live_window_start: settings.liveWindowStart,
         live_window_end: settings.liveWindowEnd,
@@ -122,7 +134,7 @@ export async function upsertMonthPlan(brandId: string, month: string, settings: 
         camp_ranges: settings.campRanges,
         shop_target_gmv: settings.shopTargetGmv > 0 ? settings.shopTargetGmv : null
       },
-      { onConflict: "brand_id,month" }
+      { onConflict: "brand_id,month,platform" }
     )
     .select()
     .single();
@@ -204,7 +216,8 @@ export async function fetchLockedPlanTargets(): Promise<LockedPlanTargets> {
   const data = await fetchAllPages<LockedPlanRow>((from, to) =>
     supabase
       .from("brand_month_plan_slots")
-      .select("slot_id,target_gmv,date,plan:brand_month_plans!inner(status,brand_id)")
+      // plan(*) chứ không gọi tên cột: DB chưa chạy 0140 (thiếu platform) vẫn đọc được — lockedPlanTargetsFromRows coi là TikTok.
+      .select("slot_id,target_gmv,date,plan:brand_month_plans!inner(*)")
       .eq("plan.status", "locked")
       .order("slot_id", { ascending: true })
       .range(from, to)
@@ -248,15 +261,22 @@ export async function confirmMonthPlan(planId: string): Promise<BrandMonthPlan> 
 
 // Mọi ca kế hoạch của các plan ĐÃ CHỐT của brand — gồm cả ca đã mất shift_slot (lỗi E2E #1): evaluatePlan
 // xếp chúng vào "unlinked" thay vì để target biến khỏi bảng "Kế hoạch vs thực tế".
-export async function fetchBrandLockedPlanSlots(brandId: string): Promise<BrandMonthPlanSlot[]> {
+export async function fetchBrandLockedPlanSlots(brandId: string, platform: ReportPlatform = "TikTok"): Promise<BrandMonthPlanSlot[]> {
+  // select * của kế hoạch (không gọi tên cột platform) để DB chưa chạy 0140 vẫn đọc được; lọc sàn phía client.
   const { data, error } = await supabase
     .from("brand_month_plan_slots")
-    .select("*,plan:brand_month_plans!inner(status,brand_id)")
+    .select("*,plan:brand_month_plans!inner(*)")
     .eq("plan.status", "locked")
     .eq("plan.brand_id", brandId)
     .order("date");
   if (error) throw error;
-  return ((data as DbPlanSlot[]) ?? []).map(slotFromDb);
+  type Row = DbPlanSlot & { plan: DbPlan | DbPlan[] | null };
+  return ((data as Row[]) ?? [])
+    .filter((r) => {
+      const plan = Array.isArray(r.plan) ? r.plan[0] : r.plan;
+      return (plan?.platform === "Shopee" ? "Shopee" : "TikTok") === platform;
+    })
+    .map(slotFromDb);
 }
 
 // Lượt đọc nạp-trước-được (lib/db/prefetch.ts) — định nghĩa MỘT chỗ cạnh hàm db để mọi màn dùng chung đúng key.

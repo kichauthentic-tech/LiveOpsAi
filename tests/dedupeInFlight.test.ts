@@ -23,9 +23,11 @@ function chain(table: string) {
     sent.push(`${table}|${sel}|${filters.join(",")}`);
     await new Promise((r) => setTimeout(r, LATENCY_MS));
     if (table === "brand_month_plans") {
-      // Từ 2026-10-03 fetchMonthPlan nhúng slots vào cùng request (`brand_month_plan_slots(*)`).
+      // Từ 2026-10-03 fetchMonthPlan nhúng slots vào cùng request (`brand_month_plan_slots(*)`); từ 0140 (06/10) đọc
+      // MỌI kế hoạch của (brand, tháng) — mỗi sàn một dòng — nên trả mảng.
       const embed = sel.includes("brand_month_plan_slots(");
-      return { data: planRow && embed ? { ...planRow, brand_month_plan_slots: slotRows } : planRow, error: null };
+      const row = planRow && embed ? { ...planRow, brand_month_plan_slots: slotRows } : planRow;
+      return { data: embed ? (row ? [row] : []) : row, error: null };
     }
     if (table === "brand_month_plan_slots") return { data: slotRows, error: null };
     if (table === "brand_dataraw_imports") {

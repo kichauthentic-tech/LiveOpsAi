@@ -225,11 +225,15 @@ export function hydrateSnapshotSessions(snapshot: MonthlyReportSnapshot): LiveSe
   return snapshot.sessions.map((s) => ({ ...HYDRATE_DEFAULTS, ...s, brandId: snapshot.brandId }));
 }
 
+// Bản chụp này là Report TikTok (Shopee có bản chụp riêng — shopeeSnapshot.ts, 0139): chỉ giữ ca TikTok. Trước 06/10
+// nó giữ cả ca Shopee nên số live của Report TikTok VERA/JOCKEY cộng lẫn GMV Shopee (pickLivePerfSource đọc mọi ca).
 function windowSessions(sessions: LiveSession[], brandId: string, month: string): LiveSession[] {
   const win = reportWindow(month);
   const start = monthBounds(win[0]).start;
   const end = monthBounds(month).end;
-  return sessions.filter((s) => s.brandId === brandId && s.date >= start && s.date <= end && s.status !== "Cancelled");
+  return sessions.filter(
+    (s) => s.brandId === brandId && (s.platform ?? "TikTok") === "TikTok" && s.date >= start && s.date <= end && s.status !== "Cancelled"
+  );
 }
 
 function windowPlanTotals(planMonthTotals: Map<string, number> | undefined, brandId: string, month: string): Record<string, number> {

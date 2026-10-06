@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { inPlatformScope, type PlatformScope } from "../../lib/reportPlatform";
 import { Brand, LiveSession, PromoScheme, ShiftSlot, ShiftRegistration, Studio, Talent, UserRole, BrandStudio, AuditLogEntry } from "../../types";
 import { SessionWindow } from "../SessionWindow";
 import { SessionReportInput } from "../../lib/db/sessionReports";
@@ -30,6 +31,8 @@ interface BrandCalendarProps {
   brandName: string;
   sessions: LiveSession[];
   shiftSlots?: ShiftSlot[];
+  /** Sàn đang xem (bộ chuyển sàn) — chỉ lọc ca/slot CỦA BRAND hiện trên lịch; `sessions` gốc vẫn đi xuống modal để kiểm trùng người cả hai sàn. */
+  platformScope?: PlatformScope;
   shiftRegistrations?: ShiftRegistration[];
   studios: Studio[];
   brandStudios?: BrandStudio[]; // phòng mặc định brand × nền tảng (0098) — form mở ca chọn sẵn
@@ -93,6 +96,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
   brandName,
   sessions,
   shiftSlots = [],
+  platformScope = "all",
   shiftRegistrations = [],
   studios,
   brandStudios = [],
@@ -139,12 +143,12 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
   const [openSessionId, setOpenSessionId] = useState<string | null>(null);
   const openSession = openSessionId ? sessions.find((x) => x.id === openSessionId) ?? null : null;
 
-  const brandSessions = useMemo(() => sessions.filter((s) => s.brandId === brandId), [sessions, brandId]);
+  const brandSessions = useMemo(() => sessions.filter((s) => s.brandId === brandId && inPlatformScope(s, platformScope)), [sessions, brandId, platformScope]);
   const brandSchemes = useMemo(() => schemes.filter((s) => s.brandId === brandId), [schemes, brandId]);
   const canManageSchemes = canManage && !!onAddScheme && !!onUpdateScheme && !!onDeleteScheme;
   const brandOpenSlots = useMemo(
-    () => shiftSlots.filter((sl) => sl.brandId === brandId && sl.status === "open"),
-    [shiftSlots, brandId]
+    () => shiftSlots.filter((sl) => sl.brandId === brandId && sl.status === "open" && inPlatformScope(sl, platformScope)),
+    [shiftSlots, brandId, platformScope]
   );
 
   const studioById = useMemo(() => {

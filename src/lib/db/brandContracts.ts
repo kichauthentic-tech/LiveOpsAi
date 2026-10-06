@@ -1,6 +1,7 @@
 import { supabase } from "../supabaseClient";
 import { BrandContract, BrandMonthlyCommitment, GenerateCommitmentsResult } from "../../types";
 import { prefetchable } from "./prefetch";
+import type { ReportPlatform } from "../reportPlatform";
 
 // Lớp cam kết hợp đồng (migration 0081). RLS chỉ mở cho ceo/admin/operations — talent và role
 // brand query thẳng 2 bảng này sẽ ra rỗng chứ không ra lỗi, nên đừng dựa vào "fetch được = có
@@ -14,6 +15,8 @@ interface DbBrandContract {
   end_month: string | null;
   monthly_hours: number;
   monthly_gmv: number | null;
+  /** 0141 — thiếu (DB chưa chạy 0141) = TikTok. */
+  platform?: ReportPlatform | null;
   status: BrandContract["status"];
   note: string | null;
 }
@@ -25,6 +28,7 @@ interface DbBrandMonthlyCommitment {
   period_month: string;
   committed_hours: number;
   committed_gmv: number | null;
+  platform?: ReportPlatform | null;
   is_override: boolean;
   note: string | null;
 }
@@ -38,6 +42,7 @@ function contractFromDb(row: DbBrandContract): BrandContract {
     endMonth: row.end_month ?? undefined,
     monthlyHours: row.monthly_hours,
     monthlyGmv: row.monthly_gmv ?? undefined,
+    platform: row.platform === "Shopee" ? "Shopee" : "TikTok",
     status: row.status,
     note: row.note ?? undefined
   };
@@ -49,6 +54,7 @@ function commitmentFromDb(row: DbBrandMonthlyCommitment): BrandMonthlyCommitment
     brandId: row.brand_id,
     contractId: row.contract_id ?? undefined,
     periodMonth: row.period_month,
+    platform: row.platform === "Shopee" ? "Shopee" : "TikTok",
     committedHours: row.committed_hours,
     committedGmv: row.committed_gmv ?? undefined,
     isOverride: row.is_override,
@@ -84,6 +90,7 @@ export async function createBrandContract(input: Omit<BrandContract, "id">): Pro
       end_month: input.endMonth || null,
       monthly_hours: input.monthlyHours,
       monthly_gmv: input.monthlyGmv ?? null,
+      platform: input.platform ?? "TikTok",
       status: input.status,
       note: input.note || null
     })
@@ -102,6 +109,7 @@ export async function updateBrandContract(id: string, input: Omit<BrandContract,
       end_month: input.endMonth || null,
       monthly_hours: input.monthlyHours,
       monthly_gmv: input.monthlyGmv ?? null,
+      platform: input.platform ?? "TikTok",
       status: input.status,
       note: input.note || null
     })
@@ -150,6 +158,7 @@ export async function generateContractCommitments(
 export async function upsertMonthlyCommitment(input: {
   brandId: string;
   periodMonth: string;
+  platform?: ReportPlatform;
   committedHours: number;
   committedGmv?: number;
   note?: string;
@@ -160,12 +169,13 @@ export async function upsertMonthlyCommitment(input: {
       {
         brand_id: input.brandId,
         period_month: input.periodMonth,
+        platform: input.platform ?? "TikTok",
         committed_hours: input.committedHours,
         committed_gmv: input.committedGmv ?? null,
         note: input.note || null,
         is_override: true
       },
-      { onConflict: "brand_id,period_month" }
+      { onConflict: "brand_id,period_month,platform" }
     )
     .select()
     .single();
@@ -194,6 +204,7 @@ export async function deleteMonthlyCommitment(id: string): Promise<void> {
 export interface BrandCommitmentRow {
   brandId: string;
   periodMonth: string;
+  platform: ReportPlatform;
   committedHours: number;
   committedGmv?: number;
   isOverride: boolean;
@@ -205,6 +216,7 @@ export interface BrandCommitmentRow {
 interface DbBrandCommitmentRow {
   brand_id: string;
   period_month: string;
+  platform?: ReportPlatform | null;
   committed_hours: number | string | null;
   committed_gmv: number | string | null;
   is_override: boolean | null;
@@ -226,6 +238,7 @@ export async function fetchBrandCommitmentProgress(brandId: string): Promise<Bra
   return ((data as DbBrandCommitmentRow[]) ?? []).map((r) => ({
     brandId: r.brand_id,
     periodMonth: r.period_month,
+    platform: r.platform === "Shopee" ? "Shopee" : "TikTok",
     committedHours: num(r.committed_hours),
     committedGmv: r.committed_gmv == null ? undefined : num(r.committed_gmv),
     isOverride: !!r.is_override,

@@ -618,7 +618,10 @@ export interface Issue {
 
 export interface BrandSnapshot {
   brandId: string;
+  /** Tên hiện trong cảnh báo — một dòng có thể là một kênh brand × sàn ("VERA · Shopee", 06/10). */
   name: string;
+  /** Tên khách (brand) khi `name` là tên kênh — cảnh báo tập trung khách cộng theo brand, không theo sàn. */
+  clientName?: string;
   outlook: MonthOutlook;
   lastData: string | null;
   /** Kế Hoạch Tháng của tháng sau: null = chưa có, "draft" | "locked". */
@@ -669,11 +672,18 @@ export function buildIssues(x: IssueInput): Issue[] {
   }
 
   if (x.agencyScope) {
-    const withSales = x.brands.filter((b) => b.outlook.actual > 0);
-    const total = withSales.reduce((a, b) => a + b.outlook.actual, 0);
-    const top = [...withSales].sort((a, b) => b.outlook.actual - a.outlook.actual)[0];
-    if (top && total > 0 && top.outlook.actual / total > CLIENT_CONCENTRATION_WARN) {
-      const share = top.outlook.actual / total;
+    // "Khách" là brand: kênh TikTok + Shopee của cùng brand cộng lại trước khi đo tập trung.
+    const byClient = new Map<string, { name: string; actual: number }>();
+    for (const b of x.brands) {
+      const c = byClient.get(b.brandId) ?? { name: b.clientName ?? b.name, actual: 0 };
+      c.actual += b.outlook.actual;
+      byClient.set(b.brandId, c);
+    }
+    const withSales = [...byClient.values()].filter((c) => c.actual > 0);
+    const total = withSales.reduce((a, c) => a + c.actual, 0);
+    const top = [...withSales].sort((a, b) => b.actual - a.actual)[0];
+    if (top && total > 0 && top.actual / total > CLIENT_CONCENTRATION_WARN) {
+      const share = top.actual / total;
       out.push({ level: share > 0.5 ? "bad" : "warn", title: `${pct(share)} GMV tháng đến từ một khách: ${top.name}`, detail: "Mốc an toàn phổ biến của agency dịch vụ: không khách nào quá 20–25% doanh thu." });
     }
     const idle = x.brands.filter((b) => !b.outlook.actual && !b.outlook.pending.length).map((b) => b.name);

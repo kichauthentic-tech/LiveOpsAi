@@ -30,7 +30,8 @@ const APP_STATIC_COMPONENTS = [
   "./components/AppSidebar", // khung app, luôn hiện — lazy nó chỉ làm sidebar nhấp nháy lúc mở
   "./components/Login",
   "./components/ResetPasswordScreen",
-  "./components/common/TabErrorFallback"
+  "./components/common/TabErrorFallback",
+  "./components/common/PlatformScopeBar" // bộ chuyển sàn của Brand workspace (06/10) — vài dòng nút, hiện trên mọi tab brand
 ];
 
 test("App.tsx không import tĩnh component tab — dùng lazyNamed/lazy", () => {
