@@ -25,7 +25,7 @@ import { buildMonthlyReportSnapshot, COVERAGE_TYPES, snapshotFreshness, snapshot
 import { shopeeSnapshotFreshness, shopeeStampsFor, type ShopeeReportSnapshot } from "../../lib/report/shopeeSnapshot";
 import { buildShopeeReportSnapshot } from "../../lib/report/shopeeSnapshotBuild";
 import type { ReportPlatform } from "../../lib/reportPlatform";
-import { fmtMonth, fmtVndShort } from "../../lib/format";
+import { fmtDateVn, fmtMonth, fmtVndShort } from "../../lib/format";
 import { prefetchable, type TabPrefetchCtx } from "../../lib/db/prefetch";
 import { lazyNamed } from "../../lib/lazyNamed";
 
@@ -497,7 +497,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
           <div className="flex flex-wrap gap-1.5">
             {unreconciledSessions.slice(0, 12).map((s) => (
               <span key={s.id} className="text-[11px] font-mono bg-amber-900/60 text-amber-200 px-2 py-0.5 rounded border border-amber-800/50">
-                {s.date} · {s.hostName}
+                {fmtDateVn(s.date)} {s.startTime.slice(0, 5)} · {s.hostName || "chưa gán host"}
               </span>
             ))}
             {unreconciledSessions.length > 12 && (
