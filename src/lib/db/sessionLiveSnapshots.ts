@@ -1,6 +1,6 @@
 import { supabase } from "../supabaseClient";
 import { LiveSession } from "../../types";
-import { parseSnapshotFile } from "../liveSnapshot/extractRooms";
+import type { SnapshotRoomRow } from "../liveSnapshot/extractRooms";
 import { fetchSessionById } from "./sessions";
 
 export interface SessionSnapshotRoom {
@@ -81,15 +81,15 @@ export async function fetchSessionSnapshot(sessionId: string): Promise<SessionSn
   };
 }
 
+// `rows` = CHỈ các phòng trợ đã tick ở SnapshotRoomPicker (file là cả ngày nhiều phòng).
 // Toàn bộ "trừ snapshot trước của cùng Room ID" chạy trong RPC (migration 0078) để mọi ca bị ảnh
 // hưởng được tính lại trong cùng một transaction — client chỉ parse file và đẩy dòng thô lên.
-export async function applySessionLiveSnapshot(sessionId: string, file: File): Promise<LiveSession> {
-  const parsed = await parseSnapshotFile(file);
+export async function applySessionLiveSnapshot(sessionId: string, fileName: string, periodLabel: string | undefined, rows: SnapshotRoomRow[]): Promise<LiveSession> {
   const { error } = await supabase.rpc("apply_session_live_snapshot", {
     p_session_id: sessionId,
-    p_file_name: file.name,
-    p_period_label: parsed.periodLabel ?? null,
-    p_rows: parsed.rows
+    p_file_name: fileName,
+    p_period_label: periodLabel ?? null,
+    p_rows: rows
   });
   if (error) throw error;
   return fetchSessionById(sessionId);

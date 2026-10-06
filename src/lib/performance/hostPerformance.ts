@@ -1,6 +1,7 @@
 import { LiveSession } from "../../types";
 import { sessionDurationHours } from "../pnl";
 import { hasStaffSegments, roleShares } from "../staffSegments";
+import { hostMetricShares } from "../segmentCheckpoints";
 import type { CampDayBucket } from "../campaignDays";
 import { METRIC } from "../metricGlossary";
 import { addKeyInput, emptyKeyCounts, keyInputFromSession, keyMetrics, type KeyCounts, type KeyMetrics } from "../report/keyMetrics";
@@ -61,11 +62,17 @@ export function hostPortions(s: LiveSession): LiveSession[] {
   const shares = roleShares(s, "host");
   if (shares.length === 0) return [s];
   const hours = sessionHours(s);
+  // Có số lúc đổi host (0147) thì GMV/view/đơn chia theo số THẬT từng host đã bán; thiếu số chỉ số nào thì chỉ số đó chia theo giờ.
+  const exact = hostMetricShares(s);
+  const exactFor: Partial<Record<(typeof SCALED_COUNTERS)[number], keyof typeof exact>> = { actualGmv: "gmv", totalViews: "views", totalOrders: "orders" };
   return shares.map((p) => {
-    const part: LiveSession = { ...s, hostId: p.talentId, hostName: p.name, staffSegments: undefined, liveDurationMinutes: hours * p.share * 60 };
+    const part: LiveSession = { ...s, hostId: p.talentId, hostName: p.name, staffSegments: undefined, staffCheckpoints: undefined, liveDurationMinutes: hours * p.share * 60 };
     for (const f of SCALED_COUNTERS) {
       const v = s[f];
-      if (typeof v === "number") (part as unknown as Record<string, number>)[f] = v * p.share;
+      if (typeof v !== "number") continue;
+      const metric = exactFor[f];
+      const share = (metric && exact[metric]?.get(p.talentId)) ?? p.share;
+      (part as unknown as Record<string, number>)[f] = v * share;
     }
     return part;
   });

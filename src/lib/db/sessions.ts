@@ -1,7 +1,7 @@
 import { supabase } from "../supabaseClient";
 import { assertAffected } from "./assertAffected";
 import { fetchAllPages } from "./fetchAllPages";
-import { LiveSession, LiveSessionReport, StaffSegment, UserRole } from "../../types";
+import { LiveSession, LiveSessionReport, StaffCheckpoint, StaffSegment, UserRole } from "../../types";
 
 // brands/studios/talents are all real Supabase tables now (Phases 1/3) and every
 // UI form selects these IDs from the real lists — no more free-text fallback, so
@@ -263,16 +263,17 @@ function sessionToDb(s: LiveSession) {
 
 // Report của từng ca. (Ba bảng con session_skus/checklist/minute_metrics — di sản Live Sessions Hub,
 // 0 dòng, không màn nào đọc — đã bỏ hẳn ở migration 0132.)
-async function fetchChildRowsForSessions(sessionIds: string[]): Promise<{ reports: DbSessionReport[]; segments: DbStaffSegment[] }> {
-  if (sessionIds.length === 0) return { reports: [], segments: [] };
+async function fetchChildRowsForSessions(sessionIds: string[]): Promise<{ reports: DbSessionReport[]; segments: DbStaffSegment[]; checkpoints: DbCheckpoint[] }> {
+  if (sessionIds.length === 0) return { reports: [], segments: [], checkpoints: [] };
   // Đường MỞ MỘT CA (SessionWindow, sau khi lưu): lọc đúng ca đó. Danh sách luôn ngắn nên không
   // cần chia lô — đường nạp cả Sổ Ca đã tách sang fetchAllReports() bên dưới.
-  const [rep, seg] = await Promise.all([
+  const [rep, seg, cp] = await Promise.all([
     supabase.from("live_session_reports").select("*").in("session_id", sessionIds),
-    supabase.from("session_staff_segments").select("*").in("session_id", sessionIds)
+    supabase.from("session_staff_segments").select("*").in("session_id", sessionIds),
+    supabase.from("session_segment_checkpoints").select("*").in("session_id", sessionIds)
   ]);
   if (rep.error) throw rep.error;
-  return { reports: (rep.data as DbSessionReport[]) ?? [], segments: segmentsOrEmpty(seg) };
+  return { reports: (rep.data as DbSessionReport[]) ?? [], segments: segmentsOrEmpty(seg), checkpoints: checkpointsOrEmpty(cp) };
 }
 
 // Đường NẠP CẢ SỔ CA — KHÔNG lọc theo session_id, chỉ cuộn trang.
@@ -322,6 +323,44 @@ function segmentsOrEmpty(res: { data: unknown; error: { code?: string } | null }
   return (res.data as DbStaffSegment[]) ?? [];
 }
 
+// Số lúc đổi host giữa ca (0147) — cùng cách chịu thiếu bảng như đoạn giờ.
+interface DbCheckpoint {
+  session_id: string;
+  at_min: number;
+  dashboard_link: string | null;
+  live_ref: string | null;
+  source: "link" | "file";
+  file_name: string | null;
+  cum_gmv: number;
+  cum_views: number | null;
+  cum_orders: number | null;
+  cum_atc: number | null;
+  base_gmv: number;
+  base_views: number;
+  base_orders: number;
+  base_atc: number;
+  reported_at: string;
+}
+function checkpointsOrEmpty(res: { data: unknown; error: { code?: string } | null }): DbCheckpoint[] {
+  return segmentsOrEmpty(res) as unknown as DbCheckpoint[];
+}
+
+async function fetchAllCheckpoints(): Promise<DbCheckpoint[]> {
+  const out: DbCheckpoint[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const res = await supabase
+      .from("session_segment_checkpoints")
+      .select("*")
+      .order("session_id", { ascending: true })
+      .order("at_min", { ascending: true })
+      .range(from, from + PAGE - 1);
+    const rows = checkpointsOrEmpty(res);
+    out.push(...rows);
+    if (rows.length < PAGE) break;
+  }
+  return out;
+}
+
 async function fetchAllSegments(): Promise<DbStaffSegment[]> {
   const out: DbStaffSegment[] = [];
   for (let from = 0; ; from += PAGE) {
@@ -338,7 +377,7 @@ async function fetchAllSegments(): Promise<DbStaffSegment[]> {
   return out;
 }
 
-function assembleSessions(rows: DbLiveSession[], reports: DbSessionReport[], segments: DbStaffSegment[] = []): LiveSession[] {
+function assembleSessions(rows: DbLiveSession[], reports: DbSessionReport[], segments: DbStaffSegment[] = [], checkpoints: DbCheckpoint[] = []): LiveSession[] {
   // Index trước thay vì .find() trong vòng lặp — assemble chạy trên toàn bộ ca mỗi lần nạp lại.
   const reportBySessionId = new Map<string, DbSessionReport>();
   for (const r of reports) reportBySessionId.set(r.session_id, r);
@@ -348,13 +387,36 @@ function assembleSessions(rows: DbLiveSession[], reports: DbSessionReport[], seg
     list.push({ talentId: g.talent_id, talentName: g.talent_name ?? "", role: g.role, fromMin: g.from_min, toMin: g.to_min });
     segBySessionId.set(g.session_id, list);
   }
+  const cpBySessionId = new Map<string, StaffCheckpoint[]>();
+  for (const c of checkpoints) {
+    const list = cpBySessionId.get(c.session_id) ?? [];
+    list.push({
+      atMin: c.at_min,
+      source: c.source ?? "link",
+      fileName: c.file_name ?? undefined,
+      link: c.dashboard_link ?? undefined,
+      liveRef: c.live_ref ?? undefined,
+      cumGmv: Number(c.cum_gmv),
+      cumViews: c.cum_views ?? undefined,
+      cumOrders: c.cum_orders ?? undefined,
+      cumAtc: c.cum_atc ?? undefined,
+      baseGmv: Number(c.base_gmv),
+      baseViews: c.base_views,
+      baseOrders: c.base_orders,
+      baseAtc: c.base_atc,
+      reportedAt: c.reported_at
+    });
+    cpBySessionId.set(c.session_id, list);
+  }
   return rows.map((row) => {
     const report = reportBySessionId.get(row.id);
     const staffSegments = segBySessionId.get(row.id);
+    const staffCheckpoints = cpBySessionId.get(row.id);
     return {
       ...sessionFromDb(row),
       report: report ? reportFromDb(report) : undefined,
-      ...(staffSegments ? { staffSegments } : {})
+      ...(staffSegments ? { staffSegments } : {}),
+      ...(staffCheckpoints ? { staffCheckpoints } : {})
     };
   });
 }
@@ -400,8 +462,8 @@ export async function completePastSessions(): Promise<number> {
 
 export async function fetchSessions(): Promise<LiveSession[]> {
   // Hai lượt đọc này độc lập nhau — nối tiếp chỉ cộng dồn RTT vô ích.
-  const [rows, reports, segments] = await Promise.all([fetchAllSessionRows(), fetchAllReports(), fetchAllSegments()]);
-  return assembleSessions(rows, reports, segments);
+  const [rows, reports, segments, checkpoints] = await Promise.all([fetchAllSessionRows(), fetchAllReports(), fetchAllSegments(), fetchAllCheckpoints()]);
+  return assembleSessions(rows, reports, segments, checkpoints);
 }
 
 // Chốt người cho ca chờ đăng ký (0133): tạo ca + đánh dấu slot "finalized" trong MỘT transaction, khoá dòng
@@ -424,8 +486,8 @@ export async function updateSession(session: LiveSession): Promise<LiveSession> 
   });
   if (error) throw error;
   const row = data as DbLiveSession;
-  const { reports, segments } = await fetchChildRowsForSessions([row.id]);
-  return assembleSessions([row], reports, segments)[0];
+  const { reports, segments, checkpoints } = await fetchChildRowsForSessions([row.id]);
+  return assembleSessions([row], reports, segments, checkpoints)[0];
 }
 
 // Dùng sau khi gọi RPC submit_session_handover (src/lib/db/handovers.ts) — RPC đó chỉ
@@ -438,8 +500,8 @@ export async function fetchSessionById(id: string): Promise<LiveSession> {
   }
   if (error) throw error;
   const row = data as DbLiveSession;
-  const { reports, segments } = await fetchChildRowsForSessions([row.id]);
-  return assembleSessions([row], reports, segments)[0];
+  const { reports, segments, checkpoints } = await fetchChildRowsForSessions([row.id]);
+  return assembleSessions([row], reports, segments, checkpoints)[0];
 }
 
 // Huỷ ca (0097): ca -> Cancelled + slot đã chốt -> cancelled trong 1 transaction; chặn nếu ca đã có số.
@@ -449,8 +511,8 @@ export async function cancelSession(id: string, reason: string, reopenSlot = fal
   const { data, error } = await supabase.rpc("cancel_session", { p_session_id: id, p_reason: reason, p_reopen_slot: reopenSlot });
   if (error) throw error;
   const rows = [data as DbLiveSession];
-  const { reports, segments } = await fetchChildRowsForSessions([id]);
-  return assembleSessions(rows, reports, segments)[0];
+  const { reports, segments, checkpoints } = await fetchChildRowsForSessions([id]);
+  return assembleSessions(rows, reports, segments, checkpoints)[0];
 }
 
 // Loại ca khỏi báo cáo / đưa trở lại (0114). Đường THAY THẾ cho việc xoá cứng khi ca đã có số:
@@ -463,8 +525,8 @@ export async function setSessionExcluded(id: string, excluded: boolean, reason =
     p_reason: reason
   });
   if (error) throw error;
-  const { reports, segments } = await fetchChildRowsForSessions([id]);
-  return assembleSessions([data as DbLiveSession], reports, segments)[0];
+  const { reports, segments, checkpoints } = await fetchChildRowsForSessions([id]);
+  return assembleSessions([data as DbLiveSession], reports, segments, checkpoints)[0];
 }
 
 export async function deleteSession(id: string): Promise<void> {

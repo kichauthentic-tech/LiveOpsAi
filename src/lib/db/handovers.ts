@@ -2,6 +2,7 @@ import { supabase } from "../supabaseClient";
 import { LiveSession } from "../../types";
 import { HandoverInput, PreviousHandover } from "../handover";
 import { fetchSessionById } from "./sessions";
+import type { SnapshotRoomRow } from "../liveSnapshot/extractRooms";
 
 // Giao ca (0144). Một RPC ghi report + số của ca và tính lại cả chuỗi ca nối cùng phòng; trả về mọi ca đã đổi số
 // (ca nối phía sau cũng đổi khi ca giữa được giao/sửa) để App thay đúng các ca đó trong state.
@@ -65,6 +66,36 @@ export async function submitTikTokHandover(
     p_restart_count: v.restartCount,
     p_host_late: v.hostLate,
     p_status_note: v.statusNote
+  });
+  if (error) throw error;
+  return fetchSessionById(sessionId);
+}
+
+/** Số lúc đổi host giữa ca (0147): số TỔNG đang thấy trên dashboard đúng lúc host xuống. atMin = phút kể từ giờ bắt đầu ca. */
+export async function submitSegmentCheckpoint(
+  sessionId: string,
+  v: { atMin: number; link: string; cumGmv: number; cumViews: number | null; cumOrders: number | null; cumAtc: number | null }
+): Promise<LiveSession> {
+  const { error } = await supabase.rpc("submit_segment_checkpoint", {
+    p_session_id: sessionId,
+    p_at_min: v.atMin,
+    p_link: v.link.trim(),
+    p_cum_gmv: v.cumGmv,
+    p_cum_views: v.cumViews,
+    p_cum_orders: v.cumOrders,
+    p_cum_atc: v.cumAtc
+  });
+  if (error) throw error;
+  return fetchSessionById(sessionId);
+}
+
+/** Số lúc đổi host của ca TIKTOK (0148): up file Creator-Live-Performance tải đúng lúc host xuống — không gõ tay. */
+export async function applySegmentCheckpointFile(sessionId: string, atMin: number, fileName: string, rows: SnapshotRoomRow[]): Promise<LiveSession> {
+  const { error } = await supabase.rpc("apply_segment_checkpoint_file", {
+    p_session_id: sessionId,
+    p_at_min: atMin,
+    p_file_name: fileName,
+    p_rows: rows
   });
   if (error) throw error;
   return fetchSessionById(sessionId);

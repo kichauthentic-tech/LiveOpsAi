@@ -28,6 +28,7 @@ import { useToast } from "../hooks/useToast";
 import { useConfirm } from "../hooks/useConfirm";
 import { SessionActionsContext } from "../lib/sessionActionsContext";
 import { describeStaff, hasStaffSegments } from "../lib/staffSegments";
+import { HostChangeReports } from "./HostChangeReports";
 import { StaffSegmentsEditor } from "./StaffSegmentsEditor";
 import { metricHint } from "../lib/metricGlossary";
 
@@ -502,6 +503,11 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
               </p>
             )}
           </section>
+
+          {/* Đổi host giữa ca: report thứ nhất = số lúc host xuống (0147), trợ live up ngay; report thứ hai = Giao ca bên dưới. */}
+          {showHandover && (
+            <HostChangeReports session={s} canSubmit={canHandover} onSaved={(u) => onSessionsUpdated!([u])} />
+          )}
 
           {/* Giao ca: trợ live của ca — ca không trợ thì OPS. TikTok = up file Creator-Live-Performance + sự cố (0145, user chốt
               06/10 tối); Shopee = dán link dashboard + 3 số + sự cố (0144). Thay form report cũ. */}

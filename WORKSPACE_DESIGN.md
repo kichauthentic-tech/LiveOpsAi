@@ -60,6 +60,21 @@
   (xác nhận hiện riêng "thực nhận"). Shopee có 4 loại Dữ Liệu Gốc + file Ads riêng (`shopee_ads`); đối soát ca Shopee bằng Live List. VERA Shopee T9 đã
   up 4 file + đối soát 61/61 ca + Ads T9; Report Shopee VERA T9 còn NHÁP. Quy ước khoá/lọc sàn: §5.5. Chi tiết + verify: lịch sử `## Tách sàn
   TikTok/Shopee — report (0139) + toàn app S1–S4 (0140–0142)`.
+- **06/10 tối: report RIÊNG khi đổi HOST giữa ca (migration `0147` ĐÃ CHẠY; `0148` CHƯA CHẠY).** **Ca TIKTOK = up FILE Creator-Live-Performance lúc host xuống, KHÔNG gõ tay (user chốt; `0148`: `apply_segment_checkpoint_file`, số = Σ(phòng trong file − ca trước cùng phòng), gõ tay bị trigger chặn); chỉ ca Shopee gõ số dashboard.** Trước đó 0138 chia GMV/view/đơn
+  cho host theo GIỜ đứng ca (ước lượng, sai khi host A bán dồn). Nay đổi host ⇒ HAI chỗ nhập: (1) "Report lúc đổi host" (`HostChangeReports` trong Cửa sổ Ca,
+  trợ live/OPS up link + số TỔNG đang thấy ngay khi host xuống → RPC `submit_segment_checkpoint`, bảng `session_segment_checkpoints` khoá (ca, phút đổi)),
+  (2) Giao ca cuối ca như cũ; host sau = số cuối − số lúc đổi. Logic = `lib/segmentCheckpoints.ts` (`hostBoundaries`, `missingCheckpoints`, `hostMetricShares`):
+  lấy TỶ LỆ các phần rồi nhân vào số chính thức của ca (số chốt cao hơn số lúc giao ca 16–23%), ca nối cùng phòng trừ số nền; `hostPortions` dùng tỷ lệ này
+  cho GMV/view/đơn, chỉ số nào thiếu số vẫn chia theo giờ, giờ luôn chia theo giờ đứng ca. Khoá theo phút nên đổi tên host ở "Đổi người giữa ca" không mất số.
+  0147 cũng mở policy đọc `session_staff_segments` cho mọi talent đứng ca đó (trước chỉ thấy đoạn của mình ⇒ trợ không biết host đổi lúc nào). Lương không đổi
+  (vẫn rate × giờ, không hoa hồng GMV). Verify: replay 0001→0147 sạch + `supabase/tests/0147_segment_checkpoints.sql` 20 mục, vitest 591/591 (+10
+  `tests/segmentCheckpoints.test.ts`), tsc/lint 0 lỗi/build/audit:dead sạch. CHƯA mở UI trên DB thật (chờ 0147). Còn treo: nhắc trợ up số (thông báo kiểu
+  `handover_due`), chặn Giao ca cuối nhỏ hơn số lúc đổi, Sổ Ca hiện cờ "thiếu số lúc đổi host".
+- **07/10: chọn PHÒNG khi up file Creator-Live-Performance (không migration).** File tải về là cả NGÀY nhiều phòng (đo file VERA 06/10: 3 phòng, Room Title
+  gần như trống, ca tắt/bật lại stream ⇒ nhiều Room ID liền nhau). Sau khi chọn file, `SnapshotRoomPicker` liệt kê phòng (giờ, thời lượng, GMV/đơn/xem, 4 số cuối ID),
+  tick sẵn phòng nằm trong giờ ca (`lib/liveSnapshot/roomSelection.ts`, cùng luật cửa sổ với `session_room_deltas`; phòng <50% trong ca không tick sẵn, ngoài ca
+  bị khoá); client CHỈ gửi dòng đã tick lên `apply_session_live_snapshot` / `apply_segment_checkpoint_file`. Dùng cho cả giao ca TikTok và số lúc đổi host (cửa sổ cắt
+  ở phút đổi). Verify: vitest 598/598 (+7 `tests/roomSelection.test.ts`), UI mở trên ca Franklin 08/10 bằng file giả cùng cấu trúc (chưa xác nhận/ghi DB).
 - **06/10 chiều: gán host + dọn rác + "đổi người giữa ca".** Đo hiện trạng (1.501 ca): chỉ CROCS T6–T9 đã đối soát, VERA/JOCKEY/Franklin
   T6–T9 còn "Tạm tính". Đã dọn (user duyệt): 4 dòng `promo_schemes` test, lô đối soát 22/09 không gắn brand (228 dòng), 3 report nháp
   (Franklin T8, CROCS T8/T9; bản chụp của chúng GIỮ NGUYÊN, Tạo/Cập nhật là ghi đè). Gán host/trợ từ tiêu đề ca bằng `bulk_assign_session_hosts`:
@@ -440,7 +455,7 @@ target khung camp ở Nhập Ads bỏ 06/10 — tháng không có kế hoạch c
 
 ## 6. Hạ tầng Supabase
 
-- 145 migration (`supabase/migrations/`) — `0145` (giao ca TikTok bằng file) ĐÃ CHẠY 06/10; `0144` (giao ca) ĐÃ CHẠY 06/10; `0143` (chặn trùng người) ĐÃ CHẠY 06/10; **`0139`–`0142` (report / kế hoạch / hợp đồng theo sàn, file Ads Shopee) ĐÃ CHẠY 06/10**;, chạy tay theo thứ tự — **`0138` (đổi người giữa ca) ĐÃ CHẠY 06/10.** `0137` đã chạy 05/10. **`0136` ĐÃ CHẠY 05/10** (verify production: lô đối soát thử với phòng kết thúc đúng phút ca CROCS 30/09 11:01 bắt đầu ⇒ không khớp, phòng chồng 29 phút ⇒ khớp; lô thử đã xoá; trigger profiles nằm trước đoạn đó trong cùng file + chốt tự kiểm cuối file), bộ kiểm
+- 147 migration (`supabase/migrations/`) — `0147` (số lúc đổi host, Shopee gõ) ĐÃ CHẠY, **`0148` (TikTok up file lúc đổi host) CHƯA CHẠY;** `0145` (giao ca TikTok bằng file) ĐÃ CHẠY 06/10; `0144` (giao ca) ĐÃ CHẠY 06/10; `0143` (chặn trùng người) ĐÃ CHẠY 06/10; **`0139`–`0142` (report / kế hoạch / hợp đồng theo sàn, file Ads Shopee) ĐÃ CHẠY 06/10**;, chạy tay theo thứ tự — **`0138` (đổi người giữa ca) ĐÃ CHẠY 06/10.** `0137` đã chạy 05/10. **`0136` ĐÃ CHẠY 05/10** (verify production: lô đối soát thử với phòng kết thúc đúng phút ca CROCS 30/09 11:01 bắt đầu ⇒ không khớp, phòng chồng 29 phút ⇒ khớp; lô thử đã xoá; trigger profiles nằm trước đoạn đó trong cùng file + chốt tự kiểm cuối file), bộ kiểm
   `supabase/tests/0136_profile_guard_recon_edges_lock_past.sql` (replay, DB trắng): 16 OK, đỏ khi thiếu 0136. **Tới `0132` đều ĐÃ CHẠY** (0131 + 0132 ngày 02/10);
   **`0133` ĐÃ CHẠY 04/10** (verify ở §1); **`0134` ĐÃ CHẠY 05/10** (verify: CRM không còn SĐT mẫu); **`0135` ĐÃ CHẠY 05/10** (verify: 4 brand KAM "Chưa chọn", form sửa cũng "Chưa chọn"). Lô đối soát cũ (06–09/2026, không gắn brand) không áp dụng lại được — đo
   04/10 nó chỉ khớp ca CROCS nên chưa có số nào bị chia nhầm. Replay `0001 → 0133`: sạch, chạy lần 2 không lỗi; bộ kiểm hành vi

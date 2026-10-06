@@ -154,6 +154,26 @@ export interface StaffSegment {
   toMin: number;
 }
 
+/** Số TỔNG trên dashboard lúc một host xuống giữa ca (migration 0147) — để chia GMV/view/đơn đúng cho từng host.
+ *  atMin = phút kể từ giờ bắt đầu ca (= toMin của đoạn host trước). base* = số tổng của ca nối trước cùng phòng. */
+export interface StaffCheckpoint {
+  atMin: number;
+  /** 'file' = TikTok up từ Creator-Live-Performance (0148); 'link' = Shopee gõ số từ dashboard (0147). */
+  source: "link" | "file";
+  fileName?: string;
+  link?: string;
+  liveRef?: string;
+  cumGmv: number;
+  cumViews?: number;
+  cumOrders?: number;
+  cumAtc?: number;
+  baseGmv: number;
+  baseViews: number;
+  baseOrders: number;
+  baseAtc: number;
+  reportedAt: string;
+}
+
 export interface LiveSession {
   id: string;
   title: string;
@@ -170,6 +190,8 @@ export interface LiveSession {
   coHostName: string;
   /** Đoạn giờ từng người khi đổi người giữa ca. Vắng/rỗng = host/trợ làm cả ca (cách tính cũ). */
   staffSegments?: StaffSegment[];
+  /** Số lúc đổi host giữa ca (0147). Vắng = chưa ai up ⇒ chia theo giờ. */
+  staffCheckpoints?: StaffCheckpoint[];
   platform: "TikTok" | "Shopee";
   date: string;
   startTime: string;

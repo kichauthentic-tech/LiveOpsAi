@@ -7,6 +7,8 @@ import {
   deleteSessionLiveSnapshot,
   fetchSessionSnapshot
 } from "../lib/db/sessionLiveSnapshots";
+import { parseSnapshotFile, type ParsedSnapshotFile } from "../lib/liveSnapshot/extractRooms";
+import { SnapshotRoomPicker } from "./SnapshotRoomPicker";
 import { errorMessage } from "../lib/errorMessage";
 import { useConfirm } from "../hooks/useConfirm";
 import { fmtVndFull } from "../lib/format";
@@ -30,6 +32,8 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // File đã đọc, đang chờ trợ tick đúng phòng của ca (file tải về là cả ngày nhiều phòng).
+  const [pending, setPending] = useState<{ fileName: string; parsed: ParsedSnapshotFile } | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -45,14 +49,28 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
     setBusy(true);
     setError(null);
     try {
-      const updated = await applySessionLiveSnapshot(session.id, file);
-      onApplied(updated);
-      setSnapshot(await fetchSessionSnapshot(session.id));
+      setPending({ fileName: file.name, parsed: await parseSnapshotFile(file) });
     } catch (e) {
       setError(errorMessage(e));
     } finally {
       setBusy(false);
       if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  async function confirmRooms(rows: ParsedSnapshotFile["rows"]) {
+    if (!pending) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const updated = await applySessionLiveSnapshot(session.id, pending.fileName, pending.parsed.periodLabel, rows);
+      onApplied(updated);
+      setSnapshot(await fetchSessionSnapshot(session.id));
+      setPending(null);
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -73,6 +91,29 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
 
   if (loading) {
     return <p className="text-[11px] text-[var(--text-faint)]">Đang tải số liệu ca...</p>;
+  }
+
+  if (pending) {
+    return (
+      <div className="space-y-2">
+        <SnapshotRoomPicker
+          session={session}
+          rows={pending.parsed.rows}
+          fileName={pending.fileName}
+          previouslySelected={snapshot?.rooms.map((r) => r.roomId)}
+          confirmLabel="Xác nhận phòng của ca này"
+          busy={busy}
+          onConfirm={(rows) => void confirmRooms(rows)}
+          onCancel={() => { setPending(null); setError(null); }}
+        />
+        {error && (
+          <p className="text-[11px] text-rose-400 flex items-start gap-1.5">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
+            {error}
+          </p>
+        )}
+      </div>
+    );
   }
 
   return (
