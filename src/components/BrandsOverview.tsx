@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { rememberBrandId } from "../lib/defaultBrand";
+import { requestCrmFocus } from "../lib/crmFocus";
+import { brandPriceLabel } from "../lib/brandPricing";
 import { Download, LayoutGrid, Loader2 } from "lucide-react";
 import { Brand, BrandMonthlyReport, BrandMonthPlan, BrandPlatformRate, LiveSession } from "../types";
 import { planStatusesRead } from "../lib/db/monthPlans";
@@ -123,15 +125,6 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ brands, sessions
     return new Map(rows.map((r) => [brandPlatformKey(r.brandId, r.platform), r] as [string, CommitmentProgress]));
   }, [commitments, brandNameById, sessions, month, today]);
 
-  const rateSetByBrand = useMemo(() => {
-    const map = new Map<string, Set<"TikTok" | "Shopee">>();
-    for (const r of brandPlatformRates) {
-      if (r.ratePerHour <= 0) continue;
-      if (!map.has(r.brandId)) map.set(r.brandId, new Set());
-      map.get(r.brandId)!.add(r.platform);
-    }
-    return map;
-  }, [brandPlatformRates]);
 
   // Dựng MỘT lần ở đây thay vì tính trong thân map của JSX (như bản 23/09): nút Xuất Excel phải ghi ra
   // ĐÚNG những gì bảng đang hiện — tính lại lần hai cho file là cách chắc chắn sẽ lệch sau một lần sửa
@@ -157,11 +150,12 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ brands, sessions
           commitStatus: (progress?.status ?? "no_commitment") as CommitmentStatus,
           sum: s,
           reportStatus: (monthlyReports.get(brandMonthKey(b.id, month, p))?.status ?? "none") as BrandMonthlyReport["status"] | "none",
-          // Rate Card theo sàn: dòng Shopee chỉ "đã set" khi có giá Shopee.
-          rates: rateSetByBrand.get(b.id)?.has(p) ? new Set([p]) : undefined
+          // Giá theo sàn + cách thu phí (lib/brandPricing.ts — cùng luật với Việc cần làm và P&L). Trước 06/10 chỉ nhìn
+          // đơn giá/giờ ⇒ brand thu theo % hoa hồng luôn hiện "Chưa nhập".
+          price: brandPriceLabel(b, brandPlatformRates, p)
         };
       });
-  }, [brands, planStatuses, progressByBrand, sessions, month, today, monthlyReports, rateSetByBrand]);
+  }, [brands, planStatuses, progressByBrand, sessions, month, today, monthlyReports, brandPlatformRates]);
 
   const exportXlsx = () => {
     const out = rows.map((r) => ({
@@ -178,7 +172,7 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ brands, sessions
       "Ca sắp tới": r.sum.upcoming,
       GMV: r.sum.gmv > 0 ? r.sum.gmv : "",
       "Report Tháng": REPORT_STATUS_LABEL[r.reportStatus],
-      "Rate Card": r.rates && r.rates.size > 0 ? [...r.rates].join(", ") : "Chưa set"
+      "Giá": r.price ?? "Chưa nhập"
     }));
     downloadRowsAsXlsx("Toan Canh Brand", out, `ToanCanhBrand_${month}.xlsx`).catch((e) =>
       showToast(`Không tải được file Excel: ${errorMessage(e)}`)
@@ -225,11 +219,11 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ brands, sessions
                 <th className="py-2.5 px-2 text-right">Giờ live</th>
                 <th className="py-2.5 px-2 text-right">GMV</th>
                 <th className="py-2.5 px-2">Report Tháng</th>
-                <th className="py-2.5 px-2">Rate Card</th>
+                <th className="py-2.5 px-2">Giá</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map(({ brand: b, platform, label, plan, planStatus, progress, commitStatus, sum: s, reportStatus, rates }) => {
+              {rows.map(({ brand: b, platform, label, plan, planStatus, progress, commitStatus, sum: s, reportStatus, price }) => {
                 return (
                   <tr key={brandPlatformKey(b.id, platform)} className="border-b border-[var(--border-muted)] align-top">
                     <td className="py-2.5 px-4">
@@ -257,7 +251,9 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ brands, sessions
                       <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${COMMIT_STATUS_CLS[commitStatus]}`}>
                         {COMMIT_STATUS_LABEL[commitStatus]}
                       </span>
-                      {commitStatus === "no_commitment" && <GoLink label="Nhập hợp đồng" onClick={onNavigate && (() => onNavigate("brand_commitment"))} />}
+                      {commitStatus === "no_commitment" && (
+                        <GoLink label="Đặt cam kết tháng" onClick={onNavigate && (() => { rememberBrandId(b.id, platform); onNavigate("month_plan"); })} />
+                      )}
                       {progress && (
                         <span className="block text-[11px] text-[var(--text-faint)] mt-1">
                           {fmtHours(progress.plannedTotalHours)}/{fmtHours(progress.committedHours)}
@@ -286,12 +282,12 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ brands, sessions
                       )}
                     </td>
                     <td className="py-2.5 px-2">
-                      {rates && rates.size > 0 ? (
-                        <span className="text-[11px] text-[var(--text-muted)]">{[...rates].join(", ")}</span>
+                      {price ? (
+                        <span className="text-[11px] text-[var(--text-muted)]">{price}</span>
                       ) : (
                         <>
                           <span className="text-[11px] text-rose-300 font-bold">Chưa nhập</span>
-                          <GoLink label="Nhập ở CRM" onClick={onNavigate && (() => onNavigate("crm"))} />
+                          <GoLink label="Nhập ở CRM" onClick={onNavigate && (() => { requestCrmFocus(b.id, platform); onNavigate("crm"); })} />
                         </>
                       )}
                     </td>

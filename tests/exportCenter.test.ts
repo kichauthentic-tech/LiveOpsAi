@@ -20,7 +20,7 @@ const REPORT_SCREENS: [string, string][] = [
   ["components/BrandsOverview.tsx", "Toàn Cảnh Brand — trạng thái từng brand trong tháng"],
   ["components/brand-workspace/MonthlyReportTabs.tsx", "Report Tháng — nhiều phần, 1 file nhiều sheet"],
   ["components/brand-workspace/BrandWeeklyReport.tsx", "Report Tuần"],
-  ["components/brand-workspace/BrandCommitmentView.tsx", "Cam Kết Hợp Đồng (brand đọc)"],
+  ["components/brand-workspace/BrandCommitmentView.tsx", "Hợp Đồng (brand đọc)"],
   ["components/brand-workspace/BrandAffiliateTable.tsx", "Affiliate"]
 ];
 

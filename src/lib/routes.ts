@@ -23,7 +23,6 @@ const AGENCY_TAB_SLUGS: Record<string, string> = {
   talents: "talent-pool",
   studios: "studios",
   crm: "crm",
-  brand_commitment: "cam-ket-hop-dong",
   tiktok_api: "tiktok-api",
   finance: "finance",
   user_settings: "phan-quyen",
@@ -42,7 +41,6 @@ const BRAND_TAB_SLUGS: Record<string, string> = {
   brand_monthly_report: "report-thang",
   brand_commitment_view: "cam-ket",
   brand_next_month_plan: "ke-hoach-thang-sau",
-  brand_rate_card: "rate-card",
   brand_affiliate: "affiliate",
   brand_ads_report: "nhap-ads",
   brand_dataraw: "du-lieu-goc",
@@ -50,8 +48,10 @@ const BRAND_TAB_SLUGS: Record<string, string> = {
 };
 
 const invert = (m: Record<string, string>) => Object.fromEntries(Object.entries(m).map(([k, v]) => [v, k]));
-const AGENCY_SLUG_TO_TAB = invert(AGENCY_TAB_SLUGS);
-const BRAND_SLUG_TO_TAB = invert(BRAND_TAB_SLUGS);
+// Link cũ của tab đã gộp (gộp cấu hình 06/10) vẫn mở được: "Cam Kết Hợp Đồng" bên Agency → CRM, "Rate Card" của
+// brand → tab Hợp Đồng của brand.
+const AGENCY_SLUG_TO_TAB: Record<string, string> = { ...invert(AGENCY_TAB_SLUGS), "cam-ket-hop-dong": "crm" };
+const BRAND_SLUG_TO_TAB: Record<string, string> = { ...invert(BRAND_TAB_SLUGS), "rate-card": "brand_commitment_view" };
 
 /** "Franklin Sports" → "franklin-sports". Bỏ dấu tiếng Việt, đ → d. */
 export function slugify(s: string): string {

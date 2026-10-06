@@ -1,11 +1,20 @@
-import React, { useRef, useState } from "react";
-import { Brand, BrandPlatformRate, BrandPlatformRateHistoryEntry, LiveSession, SystemUser, UserRole } from "../types";
-import { Building2, Plus, Edit3, Trash2, X, Tag, DollarSign, Percent } from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Brand, BrandContract, BrandMonthlyCommitment, BrandPlatformRate, BrandPlatformRateHistoryEntry, BrandStudio, LiveSession, Studio, SystemUser, UserRole } from "../types";
+import { Building2, Plus, Edit3, Trash2, X, FileSignature } from "lucide-react";
 import { BrandLogo } from "./ui/BrandLogo";
-import { BrandRateCard } from "./BrandRateCard";
+import { BrandConfigPanel } from "./BrandConfigPanel";
 import { useConfirm } from "../hooks/useConfirm";
 import { statusLabel } from "../lib/statusLabels";
 import { PageHeader } from "./common/PageHeader";
+import { commitmentsRead, contractsRead, fetchBrandContracts, fetchBrandMonthlyCommitments } from "../lib/db/brandContracts";
+import type { TabPrefetchCtx } from "../lib/db/prefetch";
+import { findBrandStudioId } from "../lib/db/brandStudios";
+import { brandPriceLabel } from "../lib/brandPricing";
+import { contractCovering, monthKeyOf, todayVn } from "../lib/performance/brandCommitment";
+import { brandPlatformsOf, type ReportPlatform } from "../lib/reportPlatform";
+import { takeCrmFocus } from "../lib/crmFocus";
+import { errorMessage } from "../lib/errorMessage";
+import { fmtMonth } from "../lib/format";
 
 interface CrmProjectsProps {
   brands: Brand[];
@@ -20,6 +29,17 @@ interface CrmProjectsProps {
   onSaveRate: (brandId: string, platform: "TikTok" | "Shopee", ratePerHour: number) => Promise<boolean>;
   onSaveReturnRate: (brandId: string, platform: "TikTok" | "Shopee", returnRate: number) => Promise<boolean>;
   onSaveCommissionRate: (brandId: string, platform: "TikTok" | "Shopee", commissionRate: number) => Promise<boolean>;
+  studios: Studio[];
+  brandStudios: BrandStudio[];
+  onSetBrandStudio: (brandId: string, platform: "TikTok" | "Shopee", studioId: string) => Promise<boolean>;
+  /** Sang Kế Hoạch Tháng của brand × sàn (sửa cam kết một tháng). */
+  onOpenMonthPlan?: (brandId: string, platform: "TikTok" | "Shopee") => void;
+}
+
+// Lượt đọc lúc mở màn — nạp trước trong lúc chờ đợt nạp chung (lib/db/prefetch.ts).
+export function prefetchCrm(_ctx: TabPrefetchCtx): void {
+  contractsRead.prefetch();
+  commitmentsRead.prefetch();
 }
 
 // Ngoài component: lint React Compiler coi Date.now() trong thân component là gọi hàm không thuần lúc render.
@@ -37,14 +57,49 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
   sessions,
   onSaveRate,
   onSaveReturnRate,
-  onSaveCommissionRate
+  onSaveCommissionRate,
+  studios,
+  brandStudios,
+  onSetBrandStudio,
+  onOpenMonthPlan
 }) => {
   const confirm = useConfirm();
+  const today = todayVn();
+  const canEdit = currentRole === "ceo" || currentRole === "admin" || currentRole === "operations";
   // Internal agency staff eligible to be KAM owners
   const staffUsers = users.filter((u) => u.role === "ceo" || u.role === "admin" || u.role === "operations");
-  // Rate Card set tập trung ở đây (CRM) thay vì phải vào từng Brand Workspace — chỉ mở 1
-  // brand tại 1 thời điểm, đóng lại khi chọn brand khác hoặc bấm đóng.
-  const [expandedRateCardBrandId, setExpandedRateCardBrandId] = useState<string | null>(null);
+  // "Hợp đồng & giá" — mở 1 brand × sàn tại 1 thời điểm. Nút "Sửa ở CRM" của màn khác bung sẵn đúng brand (crmFocus).
+  const [focus, setFocus] = useState<{ brandId: string; platform: ReportPlatform } | null>(() => takeCrmFocus());
+  const [contracts, setContracts] = useState<BrandContract[]>([]);
+  const [commitments, setCommitments] = useState<BrandMonthlyCommitment[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  // Khối sửa nằm dưới lưới thẻ brand — bấm mở (hoặc tới từ nút "Sửa ở CRM") thì cuộn tới, không thì trên điện thoại
+  // người dùng bấm mà tưởng không có gì xảy ra.
+  const panelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (focus) panelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [focus?.brandId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    Promise.all([contractsRead.take(), commitmentsRead.take()])
+      .then(([c, m]) => {
+        setContracts(c);
+        setCommitments(m);
+      })
+      .catch((e) => setLoadError(errorMessage(e, "Không tải được hợp đồng")));
+  }, []);
+  const reloadContracts = async () => {
+    const [c, m] = await Promise.all([fetchBrandContracts(), fetchBrandMonthlyCommitments()]);
+    setContracts(c);
+    setCommitments(m);
+  };
+
+  // Sàn hiện trên thẻ: sàn brand có ca/phòng, cộng sàn đã có hợp đồng hoặc giá.
+  const platformsOf = useMemo(() => {
+    const extra = [...brandStudios, ...contracts, ...brandPlatformRates];
+    return (brandId: string) => brandPlatformsOf(brandId, sessions, extra);
+  }, [sessions, brandStudios, contracts, brandPlatformRates]);
+  const thisMonth = monthKeyOf(today);
 
   // Guards against a rapid double-click firing two creates before React re-renders the
   // disabled button — a ref (not state) because the check must be synchronous on the very
@@ -62,8 +117,7 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
   const [brandEmail, setBrandEmail] = useState("");
   const [brandOwner, setBrandOwner] = useState("");
   const [brandOwnerUserId, setBrandOwnerUserId] = useState<string>("");
-    const [brandContractStatus, setBrandContractStatus] = useState<"Active" | "Pending" | "Completed">("Active");
-  const [brandBillingModel, setBrandBillingModel] = useState<"gmv_commission" | "hourly">("gmv_commission");
+  const [brandContractStatus, setBrandContractStatus] = useState<"Active" | "Pending" | "Completed">("Active");
 
   const kamName = (b: Brand) => (b.ownerUserId ? users.find((u) => u.id === b.ownerUserId)?.name ?? b.owner : b.owner);
 
@@ -81,7 +135,6 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
     setBrandOwner("");
     setBrandOwnerUserId("");
     setBrandContractStatus("Active");
-    setBrandBillingModel("gmv_commission");
     setIsBrandModalOpen(true);
   };
 
@@ -96,7 +149,6 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
     setBrandOwner(b.owner);
     setBrandOwnerUserId(b.ownerUserId || "");
     setBrandContractStatus(b.contractStatus);
-    setBrandBillingModel(b.billingModel ?? "gmv_commission");
     setIsBrandModalOpen(true);
   };
 
@@ -127,7 +179,8 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
       // Có danh sách tài khoản thì chữ KAM luôn suy từ tài khoản đang chọn — không để chữ cũ lệch tài khoản gắn kèm.
       owner: staffUsers.length > 0 ? (kam ? `${kam.name} (${kam.customRoleTitle})` : "") : brandOwner,
       ownerUserId: brandOwnerUserId || undefined,
-      billingModel: brandBillingModel
+      // Cách thu phí đặt ở "Hợp đồng & giá" (cùng chỗ với đơn giá/hoa hồng) — form brand giữ nguyên giá trị đang có.
+      billingModel: editingBrand?.billingModel ?? "gmv_commission"
     };
 
     if (editingBrand) {
@@ -151,8 +204,9 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
       <PageHeader
         icon={Building2}
         title="CRM"
-        description="Brand đang hợp tác: người liên hệ phía brand, KAM phụ trách và cách tính phí (theo giờ live hay % GMV)."
+        description="Brand đang hợp tác và MỌI điều khoản với từng brand: người liên hệ, KAM, cách thu phí, giá, hợp đồng + giờ cam kết, phòng live mặc định — theo từng sàn. Đây là chỗ nhập duy nhất; màn khác chỉ đọc."
       />
+      {loadError && <p className="text-xs text-rose-300 bg-rose-950/30 border border-rose-900 rounded-lg px-3 py-2">{loadError}</p>}
 
       {/* Brand CRM Section */}
       <div className="bg-[var(--surface)] p-6 rounded-2xl border border-[var(--border)] shadow-sm space-y-4">
@@ -188,13 +242,6 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
                     {statusLabel(b.contractStatus)}
                   </span>
                   <button
-                    onClick={() => setExpandedRateCardBrandId((cur) => (cur === b.id ? null : b.id))}
-                    className={`p-1.5 rounded transition-all ${expandedRateCardBrandId === b.id ? "text-blue-400" : "text-[var(--text-muted)] hover:text-blue-400"}`}
-                    title="Rate Card"
-                  >
-                    <Tag className="w-3.5 h-3.5" />
-                  </button>
-                  <button
                     onClick={() => openEditBrandModal(b)}
                     className="p-1.5 text-[var(--text-muted)] hover:text-[var(--accent-text)] rounded transition-all"
                     title="Chỉnh sửa Brand"
@@ -217,52 +264,74 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
                 <div>KAM phụ trách: <strong className="text-[var(--text)] block">{kamName(b) || <span className="font-normal text-[var(--text-faint)]">Chưa chọn</span>}</strong></div>
               </div>
 
-              <div>
-                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-[var(--surface-elevated)] text-[var(--text-muted)] border border-[var(--border)] inline-flex items-center gap-1">
-                  {b.billingModel === "hourly" ? (
-                    <>
-                      <DollarSign className="w-3 h-3" /> Thu phí theo giờ live
-                    </>
-                  ) : (
-                    <>
-                      <Percent className="w-3 h-3" /> Thu phí theo % doanh số
-                    </>
-                  )}
-                </span>
+              {/* Tóm tắt hợp đồng & giá theo sàn — bấm để mở khối sửa (chỗ nhập duy nhất). */}
+              <div className="space-y-1.5">
+                {platformsOf(b.id).map((p) => {
+                  const contract = contractCovering(contracts, b.id, p, thisMonth);
+                  const price = brandPriceLabel(b, brandPlatformRates, p);
+                  const studio = studios.find((x) => x.id === findBrandStudioId(brandStudios, b.id, p));
+                  const open = focus?.brandId === b.id && focus.platform === p;
+                  const missing = <span className="text-amber-300">chưa có</span>;
+                  return (
+                    <button
+                      key={p}
+                      onClick={() => setFocus(open ? null : { brandId: b.id, platform: p })}
+                      aria-expanded={open}
+                      className={`w-full text-left text-[11px] rounded-xl border px-2.5 py-2 transition-all ${open ? "border-blue-500/60 bg-blue-950/20" : "border-[var(--border)] hover:border-blue-500/40"}`}
+                    >
+                      <span className="font-bold text-[var(--text)] flex items-center gap-1.5">
+                        <FileSignature className="w-3 h-3 text-blue-400" /> Hợp đồng & giá · {p}
+                        <span className="ml-auto font-normal text-[var(--accent-text)]">{open ? "Đóng" : canEdit ? "Sửa" : "Xem"}</span>
+                      </span>
+                      <span className="block text-[var(--text-muted)] mt-0.5">
+                        Cam kết {fmtMonth(thisMonth.slice(0, 7))}: {contract ? <b className="text-[var(--text)]">{contract.monthlyHours.toLocaleString("vi-VN")}h/tháng</b> : missing}
+                        {" · "}Giá ({b.billingModel === "hourly" ? "theo giờ" : "theo %"}): {price ? <b className="text-[var(--text)]">{price}</b> : missing}
+                        {" · "}Phòng: {studio ? <b className="text-[var(--text)]">{studio.name}</b> : missing}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Rate Card — set tập trung tại đây cho mọi Brand, không cần vào từng Brand Workspace */}
-      {expandedRateCardBrandId && (
-        <div className="bg-[var(--surface)] p-6 rounded-2xl border border-blue-500/40 shadow-sm space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className="font-bold text-[var(--text)] text-base flex items-center gap-2">
-              <Tag className="w-4 h-4 text-blue-400" />
-              Rate Card — {brands.find((b) => b.id === expandedRateCardBrandId)?.name}
-            </h3>
-            <button
-              onClick={() => setExpandedRateCardBrandId(null)}
-              className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text)] rounded transition-all"
-              title="Đóng"
-            >
-              <X className="w-4 h-4" />
-            </button>
+      {focus && brands.some((b) => b.id === focus.brandId) && (() => {
+        const b = brands.find((x) => x.id === focus.brandId)!;
+        return (
+          <div ref={panelRef} className="bg-[var(--surface)] p-4 sm:p-6 rounded-2xl border border-blue-500/40 shadow-sm space-y-4 scroll-mt-4">
+            <div className="flex justify-between items-center">
+              <h3 className="font-bold text-[var(--text)] text-base flex items-center gap-2">
+                <FileSignature className="w-4 h-4 text-blue-400" />
+                Hợp đồng & giá — {b.name}
+              </h3>
+              <button onClick={() => setFocus(null)} className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text)] rounded transition-all" title="Đóng">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <BrandConfigPanel
+              brand={b}
+              platform={focus.platform}
+              onPlatformChange={(p) => setFocus({ brandId: b.id, platform: p })}
+              canEdit={canEdit}
+              rates={brandPlatformRates}
+              rateHistory={brandPlatformRateHistory}
+              contracts={contracts}
+              commitments={commitments}
+              studios={studios}
+              brandStudios={brandStudios}
+              onUpdateBrand={(next) => onUpdateBrand?.(next)}
+              onSaveRate={onSaveRate}
+              onSaveReturnRate={onSaveReturnRate}
+              onSaveCommissionRate={onSaveCommissionRate}
+              onSetBrandStudio={onSetBrandStudio}
+              onContractsChanged={reloadContracts}
+              onOpenMonthPlan={onOpenMonthPlan && ((p) => onOpenMonthPlan(b.id, p))}
+            />
           </div>
-          <BrandRateCard
-            brandId={expandedRateCardBrandId}
-            currentRole={currentRole}
-            brandPlatformRates={brandPlatformRates}
-            brandPlatformRateHistory={brandPlatformRateHistory}
-            sessions={sessions}
-            onSaveRate={onSaveRate}
-            onSaveReturnRate={onSaveReturnRate}
-            onSaveCommissionRate={onSaveCommissionRate}
-          />
-        </div>
-      )}
+        );
+      })()}
 
       {/* Brand Form Modal */}
       {isBrandModalOpen && (
@@ -328,20 +397,9 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
                 </div>
               </div>
 
-              <div>
-                <label className="font-bold text-[var(--text-muted)] block mb-1">Cách thu phí</label>
-                <select
-                  value={brandBillingModel}
-                  onChange={(e) => setBrandBillingModel(e.target.value as "gmv_commission" | "hourly")}
-                  className="w-full p-2.5 border border-[var(--border)] rounded-xl font-semibold bg-[var(--surface-base)] text-[var(--text)]"
-                >
-                  <option value="gmv_commission">Theo % doanh số (hoa hồng)</option>
-                  <option value="hourly">Theo giờ live (đơn giá/giờ)</option>
-                </select>
-                <p className="text-[11px] text-[var(--text-faint)] mt-1">
-                  Quyết định cách Finance & P&L tính doanh thu agency. Đơn giá/giờ và % hoa hồng nhập ở nút Rate Card (biểu tượng nhãn) trên thẻ brand. Số giờ cam kết mỗi tháng nhập ở Cam Kết Hợp Đồng.
-                </p>
-              </div>
+              <p className="text-[11px] text-[var(--text-faint)]">
+                Cách thu phí, giá, hợp đồng + giờ cam kết và phòng live mặc định nhập ở khối “Hợp đồng & giá” trên thẻ brand (sau khi lưu brand).
+              </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>

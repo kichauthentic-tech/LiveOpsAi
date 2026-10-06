@@ -596,7 +596,7 @@ export default function ShiftScheduling({
             })}
           </div>
           <p className="text-[11px] text-[var(--text-faint)] mt-2">
-            Giờ ca theo lịch, cùng loại giờ dùng để tính tiền brand. Brand chưa đặt cam kết không hiện ở đây — nhập ở tab Cam Kết Hợp Đồng.
+            Giờ ca theo lịch, cùng loại giờ dùng để tính tiền brand. Brand chưa đặt cam kết không hiện ở đây — nhập hợp đồng ở CRM hoặc giờ cam kết của tháng ở Kế Hoạch Tháng.
           </p>
         </div>
       )}

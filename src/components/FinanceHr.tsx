@@ -12,6 +12,7 @@ import {
 } from "../types";
 import { DollarSign, TrendingUp, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { PNL_MISSING_LABEL, PnlMissingInput, computeSessionPnl, isPnlSession } from "../lib/pnl";
+import { sessionAdsCost } from "../lib/metrics/adsCost";
 import { DataSourceBadge } from "./common/DataSourceBadge";
 import { dataQuality } from "../lib/performance/hostPerformance";
 import { errorMessage } from "../lib/errorMessage";
@@ -34,7 +35,7 @@ interface FinanceHrProps {
   brandPlatformRateHistory: BrandPlatformRateHistoryEntry[];
   onUpdateFinance: (
     sessionId: string,
-    patch: Partial<Pick<SessionFinance, "agencyCommissionRate" | "studioCost" | "adsCost" | "notes">>
+    patch: Partial<Pick<SessionFinance, "studioCost" | "notes">>
   ) => Promise<void>;
   onSetFinanceApproval: (sessionId: string, status: SessionFinance["approvalStatus"]) => Promise<void>;
 }
@@ -146,7 +147,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
 
   async function handleFieldChange(
     sessionId: string,
-    field: "agencyCommissionRate" | "studioCost" | "adsCost",
+    field: "studioCost",
     value: number
   ) {
     setSavingId(sessionId);
@@ -186,7 +187,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
               <TrendingUp className="w-5 h-5 text-[var(--accent-text)]" /> Lãi/lỗ từng ca
             </h3>
             <PageIntro>
-              GMV lấy từ số của ca, tiền trả host/trợ live tính theo rate ở Talent Pool, doanh thu agency theo Rate Card của brand (CRM). Chi phí studio/ads nhập tay từng ca. Chỉ CEO duyệt.
+              GMV lấy từ số của ca, tiền trả host/trợ live tính theo rate ở Talent Pool, doanh thu agency theo giá của brand (CRM → Hợp đồng & giá). Chi phí studio nhập ở đây, Ads theo ca lấy từ report ca. Chỉ CEO duyệt.
             </PageIntro>
           </div>
           <div className="flex items-center gap-1 text-xs">
@@ -222,7 +223,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                 </span>
               ))}
             </p>
-            <p className="text-rose-300/90">Nhập rate talent ở "Talent Pool", rate/giờ + tỷ lệ hoàn huỷ của brand ở "CRM → Rate Card".</p>
+            <p className="text-rose-300/90">Nhập rate talent ở "Talent Pool", giá + tỷ lệ hoàn huỷ của brand ở "CRM → Hợp đồng & giá".</p>
           </div>
         )}
 
@@ -263,14 +264,14 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                   <th className="py-2 pr-3">GMV</th>
                   <th className="py-2 pr-3">Doanh thu agency</th>
                   <th className="py-2 pr-3">Chi phí studio</th>
-                  <th className="py-2 pr-3">Chi phí ads (để 0 nếu dùng số trợ live báo)</th>
+                  <th className="py-2 pr-3">Chi phí ads (report ca)</th>
                   <th className="py-2 pr-3">Trả host / trợ live</th>
                   <th className="py-2 pr-3">Lãi/lỗ</th>
                   <th className="py-2 pr-3">Duyệt</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map(({ session: s, finance, talent, isHourly, grossAgencyRev, hostPayout, netProfit, hostPaidHourly, billableHours, otMinutes, earlyLeaveMinutes, coHost, coHostPayout, coHostPaidHourly, coHostUsesAssistantRate, missingInputs, excluded, payouts, segmented }) => {
+                {rows.map(({ session: s, finance, talent, isHourly, agencyCommissionRate, grossAgencyRev, hostPayout, netProfit, hostPaidHourly, billableHours, otMinutes, earlyLeaveMinutes, coHost, coHostPayout, coHostPaidHourly, coHostUsesAssistantRate, missingInputs, excluded, payouts, segmented }) => {
                   return (
                   <tr key={s.id} className="border-b border-[var(--border)]/60 align-middle">
                     <td className="py-2 pr-3">
@@ -302,15 +303,10 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                           <div className="font-bold text-[var(--text)] mt-0.5">{money(grossAgencyRev)}</div>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-1">
-                          <input
-                            type="number"
-                            defaultValue={finance.agencyCommissionRate}
-                            disabled={savingId === s.id}
-                            onBlur={(e) => handleFieldChange(s.id, "agencyCommissionRate", Number(e.target.value))}
-                            className="w-14 p-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface-base)] text-[var(--text)] font-bold disabled:opacity-40"
-                          />
-                          <span className="text-[var(--text-faint)]">% GMV</span>
+                        // % hoa hồng theo brand × sàn ở CRM (gộp cấu hình 06/10) — không sửa từng ca ở đây.
+                        <div>
+                          <span className="text-[11px] font-bold text-[var(--text-muted)]">{agencyCommissionRate}% NMV</span>
+                          <div className="font-bold text-[var(--text)] mt-0.5">{money(grossAgencyRev)}</div>
                         </div>
                       )}
                     </td>
@@ -324,16 +320,8 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                       />
                     </td>
                     <td className="py-2 pr-3">
-                      <input
-                        type="number"
-                        defaultValue={finance.adsCost}
-                        disabled={savingId === s.id}
-                        onBlur={(e) => handleFieldChange(s.id, "adsCost", Number(e.target.value))}
-                        className="w-24 p-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface-base)] text-[var(--text)] font-bold disabled:opacity-40"
-                      />
-                      <div className="text-[11px] text-[var(--text-faint)] mt-0.5">
-                        Trợ live báo cáo: {money(s.report?.adsCost ?? 0)}
-                      </div>
+                      {/* Một nguồn: số trợ live nhập ở report ca (gộp 06/10 — bỏ ô sửa thứ hai ở đây). */}
+                      <div className="font-bold text-[var(--text-muted)]">{money(sessionAdsCost(s))}</div>
                     </td>
                     {/* Giai đoạn 3 — nói rõ con số ra từ đâu: talent ăn theo giờ thì hiện giờ
                         công thực tế + phần OT/off sớm host đã khai, để ops đối chiếu khi duyệt. */}

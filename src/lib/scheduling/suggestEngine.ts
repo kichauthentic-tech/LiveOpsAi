@@ -695,7 +695,7 @@ export function suggestMonthPlan(history: HistorySummary, c: SuggestConstraints)
   };
 
   const committed = c.committedHours > 0 ? c.committedHours : 0;
-  if (committed <= 0 && c.mode !== "target") notes.push("Chưa có giờ cam kết tháng này — nhập ở Cam Kết Hợp Đồng để engine biết phải xếp bao nhiêu giờ.");
+  if (committed <= 0 && c.mode !== "target") notes.push("Chưa có giờ cam kết tháng này — nhập ở ô Giờ cam kết của Kế Hoạch Tháng (mặc định lấy từ hợp đồng ở CRM) để engine biết phải xếp bao nhiêu giờ.");
   {
     const raised = (["dday", "midmonth", "payday"] as CampDayBucket[]).filter((b) => dayCapOf(b) > maxPerDay);
     if (raised.length > 0) {

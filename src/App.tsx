@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useMemo, useRef, Suspense } from "react";
 import { rememberBrandId } from "./lib/defaultBrand";
+import { requestCrmFocus } from "./lib/crmFocus";
+import { todayVn } from "./lib/performance/brandCommitment";
 import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, Talent, Studio, Equipment, Brand, SessionFinance, ShiftSlot, RecurringShiftTemplate, BrandSku, PromoScheme, AppNotification } from "./types";
 import { TabErrorFallback } from "./components/common/TabErrorFallback";
 import { ErrorBoundary } from "./lib/errorReporting";
@@ -72,7 +74,6 @@ const BrandAdsReport = lazyNamed(() => import("./components/brand-workspace/Bran
 const BrandCommitmentView = lazyNamed(() => import("./components/brand-workspace/BrandCommitmentView"), "BrandCommitmentView");
 const BrandAffiliateTable = lazyNamed(() => import("./components/brand-workspace/BrandAffiliateTable"), "BrandAffiliateTable");
 const BrandNextMonthPlan = lazyNamed(() => import("./components/brand-workspace/BrandNextMonthPlan"), "BrandNextMonthPlan");
-const BrandRateCard = lazyNamed(() => import("./components/BrandRateCard"), "BrandRateCard");
 const BrandDataRaw = lazyNamed(() => import("./components/brand-workspace/BrandDataRaw"), "BrandDataRaw");
 const AccountSettings = lazyNamed(() => import("./components/AccountSettings"), "AccountSettings");
 const MyTalentProfile = lazyNamed(() => import("./components/MyTalentProfile"), "MyTalentProfile");
@@ -93,7 +94,6 @@ const LiveReconciliation = lazyNamed(() => import("./components/LiveReconciliati
 const HostPerformance = lazyNamed(() => import("./components/HostPerformance"), "HostPerformance");
 const BrandsOverview = lazyNamed(() => import("./components/BrandsOverview"), "BrandsOverview");
 const ReportPublishBoard = lazyNamed(() => import("./components/ReportPublishBoard"), "ReportPublishBoard");
-const BrandCommitment = lazyNamed(() => import("./components/BrandCommitment"), "BrandCommitment");
 const ShiftScheduling = lazyNamed(() => import("./components/ShiftScheduling"), "default");
 const MonthPlan = lazyNamed(() => import("./components/MonthPlan"), "default");
 const CeoBrief = lazyNamed(() => import("./components/CeoBrief"), "default");
@@ -110,7 +110,6 @@ const TAB_CHUNKS: Record<string, { preload: () => void }[]> = {
   host_performance: [HostPerformance],
   brands_overview: [BrandsOverview],
   report_publish_board: [ReportPublishBoard],
-  brand_commitment: [BrandCommitment],
   brand_dashboard: [BrandDashboard],
   brand_calendar: [BrandCalendar],
   brand_sessions: [SessionLedger],
@@ -118,7 +117,6 @@ const TAB_CHUNKS: Record<string, { preload: () => void }[]> = {
   brand_monthly_report: [BrandMonthlyReport],
   brand_commitment_view: [BrandCommitmentView],
   brand_next_month_plan: [BrandNextMonthPlan],
-  brand_rate_card: [BrandRateCard],
   brand_affiliate: [BrandAffiliateTable],
   brand_ads_report: [BrandAdsReport],
   brand_dataraw: [BrandDataRaw],
@@ -154,7 +152,7 @@ const TAB_DATA_PREFETCH: Record<string, (ctx: TabPrefetchCtx) => Promise<void>> 
   shift_scheduling: (ctx) => import("./components/ShiftScheduling").then((m) => m.prefetchShiftScheduling(ctx)),
   month_plan: (ctx) => import("./components/MonthPlan").then((m) => m.prefetchMonthPlan(ctx)),
   brands_overview: (ctx) => import("./components/BrandsOverview").then((m) => m.prefetchBrandsOverview(ctx)),
-  brand_commitment: (ctx) => import("./components/BrandCommitment").then((m) => m.prefetchBrandCommitment(ctx)),
+  crm: (ctx) => import("./components/CrmProjects").then((m) => m.prefetchCrm(ctx)),
   brand_commitment_view: (ctx) => import("./components/brand-workspace/BrandCommitmentView").then((m) => m.prefetchBrandCommitmentView(ctx)),
   brand_next_month_plan: (ctx) => import("./components/brand-workspace/BrandNextMonthPlan").then((m) => m.prefetchBrandNextMonthPlan(ctx)),
   brand_skus: (ctx) => import("./components/brand-workspace/BrandSkuShowcase").then((m) => m.prefetchBrandSkuShowcase(ctx)),
@@ -386,7 +384,7 @@ export default function App() {
 
   async function handleUpdateSessionFinance(
     sessionId: string,
-    patch: Partial<Pick<SessionFinance, "agencyCommissionRate" | "studioCost" | "adsCost" | "notes">>
+    patch: Partial<Pick<SessionFinance, "studioCost" | "notes">>
   ) {
     try {
       const updated = await upsertSessionFinance(sessionId, patch);
@@ -491,8 +489,11 @@ export default function App() {
       const isLiveNow = sessions.some(
         (s) => (s.hostId === t.id || s.hostName?.toLowerCase() === t.name?.toLowerCase()) && s.status === "Live Now"
       );
+      // "Đang bận" = có ca chưa diễn ra TRONG HÔM NAY. Trước 06/10 là bất kỳ ca Upcoming nào (kể cả tuần sau) cộng với
+      // ô trạng thái gõ tay ở Talent Pool — ô đó đã bỏ, trạng thái chỉ còn suy từ lịch.
+      const today = todayVn();
       const isUpcoming = sessions.some(
-        (s) => (s.hostId === t.id || s.hostName?.toLowerCase() === t.name?.toLowerCase()) && s.status === "Upcoming"
+        (s) => (s.hostId === t.id || s.hostName?.toLowerCase() === t.name?.toLowerCase()) && s.status === "Upcoming" && s.date === today
       );
       let derivedStatus: "Available" | "Busy" | "On Live" = t.availabilityStatus || "Available";
       if (isLiveNow) {
@@ -1668,7 +1669,7 @@ export default function App() {
                         talents={activeTalents}
                         canSeeMoney={currentRole === "ceo" || currentRole === "admin"}
                         canOpenTab={canOpenTab}
-                        onOpen={(t) => { if (t.rememberBrandId) rememberBrandId(t.rememberBrandId, t.rememberPlatform); navigateTo(t.tab, t.brandId); }}
+                        onOpen={(t) => { if (t.rememberBrandId) { if (t.tab === "crm") requestCrmFocus(t.rememberBrandId, t.rememberPlatform); else rememberBrandId(t.rememberBrandId, t.rememberPlatform); } navigateTo(t.tab, t.brandId); }}
                       />
                     )}
                     {opsView === "board" && (
@@ -1787,7 +1788,7 @@ export default function App() {
                     onPlanLocked={reloadShiftSlots}
                     engineParams={engineParams}
                     brandStudios={brandStudios}
-                    onSetBrandStudio={handleSetBrandStudio}
+                    onOpenCrm={(brandId, platform) => { requestCrmFocus(brandId, platform); navigateTo("crm"); }}
                     talents={talents}
                   />
                 )}
@@ -1809,7 +1810,6 @@ export default function App() {
                     shiftSlots={shiftSlots}
                     planSlotTargets={planSlotTargets}
                     planMonthTotals={planMonthTotals}
-                    monthlyReports={monthlyReports}
                     financeRecords={financeRecords}
                     brandPlatformRates={brandPlatformRates}
                     brandPlatformRateHistory={brandPlatformRateHistory}
@@ -1847,10 +1847,6 @@ export default function App() {
                 )}
 
 
-                {activeTab === "brand_commitment" && (
-                  <BrandCommitment sessions={activeSessions} brands={brands} />
-                )}
-
                 {/* Brand Workspace (Giai đoạn A) — mọi tab dưới đây chỉ render khi effectiveWorkspace
                     đang scope theo đúng 1 brand; component con nhận thẳng brandId + data đã lọc sẵn
                     (giữ nguyên pattern fetch-1-lần-ở-App/filter-bằng-useMemo hiện có). */}
@@ -1870,7 +1866,6 @@ export default function App() {
                     promoSchemes={promoSchemes}
                     engineParams={engineParams}
                     currentRole={currentRole}
-                    monthlyReports={monthlyReports}
                     onOpenMonthPlan={() => { rememberBrandId(currentBrandId!, singlePlatform); setWorkspace({ type: "agency" }); setActiveTab("month_plan"); }}
                     onOpenSession={(id) => { setWorkspace({ type: "agency" }); setOpsView("board"); setActiveTab("calendar"); setNotifOpenSessionId(id); }}
                     onOpenSessions={() => setActiveTab("brand_sessions")}
@@ -1959,6 +1954,9 @@ export default function App() {
                     multiPlatform={multiPlatform}
                     sessions={activeSessions}
                     currentRole={currentRole}
+                    brand={brands.find((b) => b.id === currentBrandId) ?? { id: currentBrandId!, billingModel: "gmv_commission" }}
+                    rates={brandPlatformRates}
+                    rateHistory={brandPlatformRateHistory}
                   />
                 )}
 
@@ -1969,20 +1967,6 @@ export default function App() {
                     platform={singlePlatform}
                     multiPlatform={multiPlatform}
                     currentRole={currentRole}
-                  />
-                )}
-
-                {activeTab === "brand_rate_card" && effectiveWorkspace.type === "brand" && (
-                  <BrandRateCard
-                    brandId={currentBrandId!}
-                    currentRole={currentRole}
-                    brandPlatformRates={brandPlatformRates}
-                    brandPlatformRateHistory={brandPlatformRateHistory}
-                    sessions={activeSessions}
-                    onSaveRate={handleSaveBrandPlatformRate}
-                    onSaveReturnRate={handleSaveBrandPlatformReturnRate}
-                    onSaveCommissionRate={handleSaveBrandPlatformCommissionRate}
-                    readOnly
                   />
                 )}
 
@@ -2073,6 +2057,10 @@ export default function App() {
                     onSaveRate={handleSaveBrandPlatformRate}
                     onSaveReturnRate={handleSaveBrandPlatformReturnRate}
                     onSaveCommissionRate={handleSaveBrandPlatformCommissionRate}
+                    studios={activeStudios}
+                    brandStudios={brandStudios}
+                    onSetBrandStudio={handleSetBrandStudio}
+                    onOpenMonthPlan={(brandId, platform) => { rememberBrandId(brandId, platform); navigateTo("month_plan"); }}
                   />
                 )}
 

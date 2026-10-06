@@ -11,13 +11,21 @@
 
 ---
 
-## 1. Giai đoạn hiện tại (cập nhật 2026-10-05)
+## 1. Giai đoạn hiện tại (cập nhật 2026-10-06)
 
 - **CHẠY THỬ THẬT trên dữ liệu thật** (từ 2026-09-18; mock đã xoá sạch 19/09). DB: 33 hồ sơ talent thật, CROCS T6–T9 nạp
   bù từ file Creator-Live-Performance (229 ca, còn ca chưa gán host). **Không đề xuất tính năng mới**; hỏi user chạy thử
   tới đâu, cái gì kêu, rồi sửa đúng chỗ đó. **Không seed mock lại.**
 - **Nợ kỹ thuật đã hết** (đợt P2a-2…P2a-21, 01–02/10) và **audit code chết đã xong** (02/10): `npm run audit:dead` báo 0,
   ESLint 0 lỗi (31 warning `set-state-in-effect` = nợ đã đo, cố ý `warn`), vitest 467/467 (05/10).
+- **06/10 sáng: GỘP CẤU HÌNH — mỗi điều khoản MỘT chỗ nhập (không migration).** User: nhập 2–3 nơi (rate card, cam kết…) ⇒ gom về
+  CRM, cam kết tháng đặt ở Kế Hoạch Tháng, sửa luôn mọi chỗ cùng lớp lỗi. Nay: CRM → **"Hợp đồng & giá"** (`BrandConfigPanel`, brand × sàn:
+  cách thu phí, giá, hợp đồng tự sinh cam kết từng tháng, phòng mặc định); tab Agency "Cam Kết Hợp Đồng" **đã gỡ**; Kế Hoạch Tháng có ô giờ/GMV
+  cam kết của tháng LƯU THẬT; brand: "Cam Kết" + "Rate Card" gộp thành tab **"Hợp Đồng"**. Kèm: Finance bỏ ô % hoa hồng + Ads từng ca (lỗi ngầm:
+  dòng Finance đóng băng 15%), Nhập Ads bỏ khung camp/target (chỉ Kế Hoạch Tháng), Talent Pool bỏ % hoa hồng + trạng thái gõ tay, Studios
+  "Đang live" suy từ ca, một luật "đã có giá" (`brandPriceSet`). Verify: vitest 548/548, lint/tsc/build/audit sạch, replay +
+  `supabase/tests/config_single_source.sql` 6/6, UI trên bản build nối DB thật (chỉ đọc). Chưa đo: ghi hợp đồng thật qua UI. Chi tiết: lịch
+  sử `## Gộp cấu hình một chỗ nhập (2026-10-06)`.
 - **06/10 khuya: TÁCH SÀN TOÀN APP (S1–S4) — migration `0140`, `0141`, `0142` ĐÃ CHẠY 06/10, code đã push + deploy (`71016d6`).** User chốt:
   hợp đồng **riêng** từng sàn, target **riêng** từng sàn, brand xem **cả riêng lẫn tổng**, chi phí Shopee có **file riêng**. Lý do đo
   được: VERA Shopee GMV/giờ ≈ 1,6× TikTok (T6–T9, Working File) ⇒ trộn sàn làm sai benchmark/xếp host/run-rate. Đã làm:
@@ -137,26 +145,8 @@
   ghi — đã có test 3f trên replay); luồng chốt người/up đối soát thật (chờ ops dùng).
 - 🛑 **User chốt 02/10: DỪNG nhánh đo tốc độ tải.** Mạng chỗ user là biến trội nên wall-clock vô nghĩa. Không chạy lại
   các phép đo P2a-17→P2a-20 trừ khi user yêu cầu rõ. Những gì đã sửa thì giữ (chứng minh bằng SỐ REQUEST và source).
-- **03/10 user hỏi lại "app load chậm hơn" → audit theo SỐ VÒNG MẠNG NỐI TIẾP** (không theo wall-clock; mạng user dao động
-  connect 50–415 ms tới cùng host). Bundle không phình (entry 496 KB), DB không đổi đáng kể, số request y nguyên (24 REST ở
-  Sổ Ca). Ba vòng nối tiếp đã cắt: (1) `vercel.json` thiếu header cache ⇒ `/assets/*` (tên có hash) bị trả
-  `max-age=0, must-revalidate`, mỗi lần mở app hỏi lại từng file — nay `max-age=31536000, immutable`; (2) chunk tab bị
-  cổng `coreDataReady` giữ tới khi cả đợt dữ liệu về (Sổ Ca: chunk khởi hành 352 ms → **62 ms**) — nay `TAB_CHUNKS` +
-  `preload()`; (3) Report Tháng: chunk biểu đồ 145 KB gzip đợi bản chụp về (665 ms → khởi hành cùng bản chụp 409 ms).
-  Thêm `<link rel="preconnect">` tới Supabase trong `index.html`. **Đợt 2 cùng ngày:** (4) `fetchMonthPlan` 2 truy vấn
-  nối tiếp → 1 (nhúng `brand_month_plan_slots(*)`; lợi cho mọi màn đọc plan); (5) lượt đọc riêng của Bản Tin CEO,
-  Dashboard brand, Report Tháng được NẠP TRƯỚC trong lúc chờ đợt chung (`src/lib/db/prefetch.ts`): Report Tháng khởi hành
-  115 ms, xong trước cả đợt chung; Dashboard CROCS nội dung giống từng ký tự với trước khi sửa, 0 request trùng.
-  OpsSupport nhận `plan` qua prop từ BrandDashboard. **Đợt 3 (04/10, quét lại 28 màn):** (6) React 19 giữ fallback
-  Suspense tối thiểu 300 ms và `React.lazy` luôn treo một nhịp kể cả khi chunk đã tải ⇒ mọi màn chậm thêm tới 300 ms
-  mỗi lần mở/đổi tab (đo: 308–330 ms không request, không long task). `lazyNamed` nay render thẳng khi chunk đã có +
-  App tải sẵn chunk các tab được phép lúc rảnh (ops: cả 2 workspace) ⇒ đổi tab bắt đầu đọc sau 6–35 ms. (7) Nhập Ads:
-  report → affiliate plans nối tiếp → song song (xong 128 ms thay vì 621–1.371). (8) Đối Soát: danh sách lô → dòng →
-  song song với "lô mới nhất kèm dòng" (1.201 → 649 ms). (9) `/api/admin/ai-agent-prompts` đọc prompts song song với
-  xác thực (1.241 → 765 ms). (10) Nạp trước thêm 8 màn (Nhân sự ca, Kế Hoạch Tháng, Toàn Cảnh Brand, Cam Kết HĐ, Cam
-  kết/KH Tháng Sau/SKU/Dữ Liệu Gốc của brand). Còn lại có chủ đích: Dashboard brand khối đối chứng (danh sách batch →
-  dòng, chỉ ops); Kế Hoạch Tháng phần theo brand khi máy chưa nhớ brand nào; Affiliate (đọc theo khoảng tháng do người
-  dùng chọn). **Sau deploy phải kiểm:** `curl -sI
+- **03/10–04/10: cắt vòng mạng nối tiếp lúc tải** (cache `/assets/*` immutable, chunk tab tải song song dữ liệu, nạp trước lượt đọc màn,
+  `lazyNamed` bỏ fallback 300 ms…). Chi tiết: lịch sử `## Cắt vòng mạng nối tiếp (2026-10-03/04)`. **Sau deploy phải kiểm:** `curl -sI
   https://live-ops-ai.vercel.app/assets/<file>.js` có `immutable`.
 - **Quyết định user đã chốt — đừng nêu lại:** luật run-rate (§5.6); Target GMV từng ca ở "Kế Hoạch Tháng Sau" brand ĐƯỢC
   thấy (01/10); tiền không có chữ "đ" (27/09); trung tâm xuất file = một module dùng chung, không dựng tab riêng (02/10);
@@ -165,8 +155,17 @@
 ## 2. Việc còn treo
 
 **Cần user làm:**
+00000000. **Đề xuất lịch + giao ca 2 sàn (06/10, chờ user chốt, CHƯA code):** https://claude.ai/artifact/J4Kk16eZYeTtrkKDYvQWpY. Đo: Bảng hôm nay/Ca Của Tôi/Cửa sổ Ca không ghi sàn;
+   ca Shopee bị đòi file Creator-Live-Performance (TikTok); 32 ca Franklin Shopee T10 + JOCKEY Shopee không có phòng (`brand_studios` chỉ VERA có Shopee);
+   lịch 06→31/10 có 24 cặp trùng người (7 khác sàn, 16 là Thái Toàn — nghi gán nhầm "Toàn" lúc nạp) + 3 ca host = trợ, app không báo (chỉ kiểm lúc sửa từng ca);
+   0 snapshot, 0 report ca T10, 6 tài khoản talent 0 lượt mở — giao ca thật đang ở Google Sheet Working File (T8–T9: 87–97% dòng có link dashboard,
+   ca nối CROCS 86/182, VERA TTS 46/140, VERA SPE 27/122); số giao ca thấp hơn số chốt: VERA Shopee T9 −22% tổng (trung vị phiên −16%), CROCS T8–T9 −23,5%.
+   Đề xuất 4 đợt: (1) nhãn sàn mọi dòng ca, bỏ bước file TikTok cho ca Shopee, quét trùng người thường trực (cả trợ) + todo, phòng mặc định mỗi kênh;
+   (2) màn "Giao ca" điện thoại: dán link (room_id / Shopee live id ⇒ sàn + ca nối), 3 số cộng dồn, app tự trừ ca trước, chạm chọn sự cố;
+   (3) rời Sheet: tài khoản 39 người, chạy song song 2 tuần; (4) checklist cuối tháng 7 kênh, chia ca nối theo số giao ca. 4 câu hỏi chờ user: trợ được đứng 2 phòng
+   cùng lúc?; ai giao ca khi không có trợ; host/trợ có dùng điện thoại riêng; giữ Sheet song song bao lâu, brand có đọc Sheet không.
 0000000. **0139–0142 đã chạy 06/10.** Việc còn lại của user: lập Kế Hoạch Tháng + target cho từng sàn (VERA/JOCKEY/Franklin Shopee);
-   nhập hợp đồng chọn sàn; up file Ads Shopee các tháng/brand khác ở Nhập Ads (chọn Shopee — VERA T9 đã có). Phần 0139: Sau đó: up 4 file Shopee mỗi tháng/brand ở Dữ Liệu Gốc → chọn Shopee (VERA/JOCKEY T6–T9; Franklin Shopee từ T10); đối soát ca Shopee bằng Live List ở Đối Soát (chọn brand + sàn Shopee); tạo + phát hành Report Shopee ở Report Tháng (nút Shopee). Chưa có file Shopee tháng 6, 7, 8 nào; JOCKEY chưa gửi file. Shopee không có Ads/khuyến mãi/GMV trực tiếp–gián tiếp (ghi trong "cách tính" của report).
+   nhập hợp đồng ở CRM → "Hợp đồng & giá" (chọn sàn); up file Ads Shopee các tháng/brand khác ở Nhập Ads (chọn Shopee — VERA T9 đã có). Phần 0139: Sau đó: up 4 file Shopee mỗi tháng/brand ở Dữ Liệu Gốc → chọn Shopee (VERA/JOCKEY T6–T9; Franklin Shopee từ T10); đối soát ca Shopee bằng Live List ở Đối Soát (chọn brand + sàn Shopee); tạo + phát hành Report Shopee ở Report Tháng (nút Shopee). Chưa có file Shopee tháng 6, 7, 8 nào; JOCKEY chưa gửi file. Shopee không có Ads/khuyến mãi/GMV trực tiếp–gián tiếp (ghi trong "cách tính" của report).
 000000. 29 ca chưa host (user tự rà và gán sau): CROCS 21 (8 ca T6–T9 chờ user gửi, 11 ca 01–04/10, 21–22/10 11–14), VERA 7 (25/09, 26/09, 06/10, 18/10, 24/10, 25/10, 30/10), Franklin 26/09.
 00000. CROCS T10: user tự gán host cho các ca (gồm 11 ca 01–04/10 và 21/10, 22/10 11–14); tên thật của Mia/Su/Đạt; hồ sơ talent Hoàng Dung. Sửa target tạm 5,5 tỷ của Kế Hoạch Tháng nháp trước khi chốt (user bảo để yên tạm thời).
 0000. Up file Ads (TikTok Ads → "Campaign overview data", xem theo ngày, mỗi file một tháng) cho các tháng/brand khác
@@ -194,8 +193,8 @@
    Franklin T9 đủ bộ có sẵn ở `~/Downloads` (export 03/10: Creator Live Performance 47 room 01→30/09, Khuyến Mãi,
    product_list_20260901, Core Stats, Shop Analytics_20261003) — chưa up.
    JOCKEY/VERA/Franklin: đã có ca T6→05/10 từ file Working File (05/10 tối, nhãn Tạm tính) — còn chờ file đối soát + tạo talent Mia/Su/Đạt/Dung/Trúc Như/Diễm Phương rồi gán host.
-2. **Nhập % hoa hồng/lương** (rate talent, commission brand) — đo 05/10: 33 talent rate = 0, chỉ JOCKEY có dòng rate brand
-   (= 0), 0 hợp đồng. Khối tiền của Dashboard CEO và Finance mới có số.
+2. **Nhập giá + lương**: giá brand (đơn giá/giờ hoặc % hoa hồng, tỷ lệ hoàn huỷ) + hợp đồng ở CRM → "Hợp đồng & giá"; rate talent ở
+   Talent Pool — đo 06/10: 0 hợp đồng, 1 dòng giá (JOCKEY = 0), talent rate = 0. Khối tiền của Dashboard CEO và Finance mới có số.
 3. Gán host cho ca nạp bù CROCS còn thiếu: 8/263 ca (xem mục 1). Trợ live lưu ở `co_host_id`.
 
 **Cần tài khoản/mật khẩu mà Claude không có:**
@@ -208,9 +207,11 @@
 **Hoãn có chủ đích (có lý do, không phải quên):**
 8. Gộp menu / IA — chờ số liệu `ui_tab_views`. Đo 04/10: 1.309 lượt mở đều của MỘT tài khoản (admin — phần lớn là các
    phiên Claude verify) ⇒ chưa có tín hiệu nào; cần người dùng thật khác vài tuần.
-8b. Bảng `brand_affiliate_plans` + cột `plan_target_gmv/nmv/hours`, `plan_pct_*` của `brand_monthly_reports`: client không
-   còn đọc/ghi (04/10). Cột `ads_spend`, `roas`, `promotion_notes`, `customer_insight_notes`, `account_health_notes` cũng vậy từ 05/10 (0/4 dòng có
-   giá trị; chỉ còn được chép nguyên khi lưu khung camp). Đếm dòng trên production trước khi drop (khuôn 0126/0132).
+8b. Cột/bảng client KHÔNG còn đọc/ghi — drop sau khi đếm dòng trên production (khuôn 0126/0132): bảng `brand_affiliate_plans`;
+   `brand_monthly_reports`: `plan_target_gmv/nmv/hours`, `plan_pct_*` (04/10), `ads_spend`, `roas`, 3 cột ghi chú (05/10), `camp_*_start/end/target_gmv`
+   (06/10, gộp cấu hình); `session_finance`: `agency_commission_rate`, `ads_cost` (06/10, pnl.ts không đọc), `host_fix_rate_override`,
+   `host_commission_rate_override` (không UI nào ghi, pnl.ts vẫn đọc — bỏ cùng lúc drop); `talents.commission_rate` (06/10, không ô nhập; pnl.ts vẫn đọc,
+   mọi dòng 0). `talents.availability_status`/`studios.status` giữ (chỉ còn giá trị nền Available/Bảo trì).
 9. Tích hợp TikTok API tự động — chờ scope Developer/ISV ở Partner Center. Lịch sử trước T7/2026: không có nguồn.
 10. Zalo OA worker gửi `notifications` (cần user đăng ký OA doanh nghiệp; memory `liveops-zalo-notification-plan`).
 11. Module tạo ca P2/P3 (khung lịch tuần theo brand, hiệu lực theo hợp đồng) — đã phân tích 19/09, chưa chốt làm.
@@ -229,10 +230,11 @@
 - **Nguồn sự thật của menu:** `agencyNavGroups()`/`brandNavGroups()` ở [src/lib/appNav.ts](src/lib/appNav.ts). Ảnh chụp:
   - Agency: Dashboard (Bản Tin CEO) · Lập Kế Hoạch (Kế Hoạch Tháng, Nhân sự ca) · Vận Hành Hằng Ngày (Bảng Vận Hành, Sổ Ca,
     Đối Soát Số Liệu) · Phân Tích (Hiệu Suất Host, Toàn Cảnh Brand, Điều Phối Phát Hành) · Tài Nguyên (Talent Pool,
-    Studios & Gear) · Kinh Doanh (CRM + Rate Card, Cam Kết Hợp Đồng, TikTok API) · Tài Chính (Finance & P&L — khoá cứng
+    Studios & Gear) · Kinh Doanh (CRM — gồm "Hợp đồng & giá", TikTok API) · Tài Chính (Finance & P&L — khoá cứng
     ceo/admin) · Hệ Thống (Phân Quyền & Role; AI Training Center — chỉ admin). Talent chỉ thấy: Ca Của Tôi, Đăng Ký Ca, Hồ Sơ.
-  - Brand: Dashboard · Lịch Vận Hành · Sổ Ca · SKU Showcase · Report Tháng (toggle Tháng/Tuần) · Cam Kết Hợp Đồng (chỉ đọc)
-    · Kế Hoạch Tháng Sau (chỉ đọc + xác nhận) · Rate Card (chỉ đọc) · Affiliate · Nhập Ads + Dữ Liệu Gốc (ẩn với role brand).
+    (Kinh Doanh chỉ còn CRM + TikTok API — "Cam Kết Hợp Đồng" gộp vào CRM/Kế Hoạch Tháng 06/10.)
+  - Brand: Dashboard · Lịch Vận Hành · Sổ Ca · SKU Showcase · Report Tháng (toggle Tháng/Tuần) · Hợp Đồng (chỉ đọc: cam kết + giá)
+    · Kế Hoạch Tháng Sau (chỉ đọc + xác nhận) · Affiliate · Nhập Ads + Dữ Liệu Gốc (ẩn với role brand).
 - **Mã nguồn:** `src/App.tsx` (state + handler + render tab, ~2.000 dòng) · `src/hooks/useWorkspaceData.ts` (mọi lượt nạp
   lúc đăng nhập, gate theo role/tab) · `src/components/*` (mỗi tab một chunk lazy qua `lazyNamed`) · `src/lib/db/*` (đọc/ghi
   Supabase) · `src/lib/{performance,report,scheduling,dataraw,liveSnapshot}` (logic thuần, có test) · `tests/*.test.ts` ·
@@ -245,6 +247,9 @@
 
 ## 4. Luồng dữ liệu
 
+0. **CRM → "Hợp đồng & giá"** (một lần mỗi brand × sàn, chỗ nhập DUY NHẤT): cách thu phí, giá (`brand_platform_rates`), hợp đồng
+   (`brand_contracts`; lưu đang hiệu lực ⇒ `generate_contract_commitments` đổ `brand_monthly_commitments` từng tháng), phòng mặc định
+   (`brand_studios`). Số riêng của một tháng sửa ở Kế Hoạch Tháng (`upsertMonthlyCommitment`, `is_override` = khác điều khoản hợp đồng).
 1. **Kế Hoạch Tháng** (`brand_month_plans` + `_slots`): ops lập lưới ca + target từng ca → **Chốt** (`lock_month_plan`) sinh
    `shift_slots` mở → talent đăng ký rảnh (RLS 0133: chỉ ca còn mở, chưa qua ngày) → ops chốt người qua RPC
    `finalize_shift_slot` (0133: một transaction, khoá dòng slot, từ chối slot không còn mở) ⇒ `live_sessions`. Kế hoạch
@@ -300,7 +305,10 @@
 ### 5.2 Client (React / TS)
 - Nhãn vai trò talent qua `talentRoleLabel` (lib/talentName.ts) — DB lưu "Assistant", màn hình nói "Trợ live".
 - `strict` + `noUnusedLocals` bật; `@types/react*` phải có trong devDependencies (thiếu là JSX thành `any`, CI xanh giả).
-- **Cho người mới (audit 04/10 tối):** (1) mỗi thông tin MỘT chỗ nhập — màn khác chỉ hiện để đọc + nút sang chỗ nhập;
+- **Cho người mới (audit 04/10 tối):** (1) mỗi thông tin MỘT chỗ nhập — màn khác chỉ hiện để đọc + nút sang chỗ nhập. Bản đồ chỗ
+  nhập (06/10): điều khoản thương mại + phòng mặc định ⇒ CRM "Hợp đồng & giá" (nút từ màn khác: `requestCrmFocus(brand, sàn)` + `navigateTo("crm")`
+  bung sẵn đúng khối); giờ/GMV cam kết + target + khung camp của một tháng ⇒ Kế Hoạch Tháng; rate talent ⇒ Talent Pool; Ads tháng ⇒ file ở
+  Nhập Ads, Ads theo ca ⇒ report ca; chi phí studio theo ca ⇒ Finance. Thứ app suy được (trạng thái phòng/talent đang live) KHÔNG có ô gõ;
   (2) form không điền sẵn giá trị mẫu, không có fallback "Nguyễn Văn A"; không có ô gõ tay cho số app tự tính được;
   (3) ngày/tháng hiển thị qua `fmtMonth`/`fmtDateVn`/`fmtPeriodLabel` (lib/format.ts), không in `2026-10`; (4) mỗi con số
   ghi kỳ + cách đếm ngay cạnh, không vá bằng câu chú thích ở màn khác; (5) ô "chưa có" kèm nút tới chỗ nhập
@@ -394,9 +402,10 @@ màn con nhận `platform` qua prop, không tự giữ state sàn. Nút sang K�
 Sàn của report = `lib/reportPlatform.ts` (`ReportPlatform`); mọi đọc/ghi report và bản chụp đi qua `lib/db/monthlyReports.ts` / `monthlyReportSnapshots.ts` với tham số `platform` (mặc định TikTok — TikTok giữ nguyên khoá nạp-trước, chỉ truyền sàn khi là Shopee). Ca/đối soát/phát hành luôn lọc theo sàn của ca, không trộn.
 Ai đứng ca nào, bao lâu = `lib/staffSegments.ts` (`effectiveSegments`, `personRoleMinutes`, `personWindows`, `roleShares`) — ca không có đoạn thì host_id/co_host_id làm cả ca; mọi màn tính lương/giờ/trùng lịch/hiệu suất theo người PHẢI đi qua đây (hoặc `computeSessionPnl().payouts`, `hostPortions`), không đọc `hostId`/`coHostId` thô cho số liệu. "Ca có số" = `isCountable` (hostPerformance) · ca tính tiền = `isPnlSession` (pnl, từ 04/10 đòi `hasLiveEvidence`) · ca
 đã diễn ra thật = `hasLiveEvidence`, ca quá giờ chờ xác nhận = `isUnconfirmedPast`, ca có số ở DB (khoá dời giờ) =
-`hasSessionData` (cả ba ở sessionStatus) · khung camp hiệu lực = `effectiveCamp(planCamp, reportRow)` (campaignDays — MỌI
-màn; tháng CÓ Kế Hoạch Tháng ⇒ chỉ khung của kế hoạch, ô Nhập Ads chỉ hiện để đọc; tháng KHÔNG có kế hoạch ⇒ ô Nhập Ads —
-đổi 04/10 tối, trước đó Nhập Ads thắng) · tháng mở sẵn của màn = `lib/defaultMonth.ts` (xem số: tháng gần nhất có ca;
+`hasSessionData` (cả ba ở sessionStatus) · khung camp hiệu lực = `effectiveCamp(planCamp)` (campaignDays — MỌI
+màn; chỉ khung của Kế Hoạch Tháng, thiếu khung thì lịch cố định — 06/10 bỏ ô Nhập Ads cho tháng không có kế hoạch) · đã có giá =
+`brandPriceSet`/`brandPriceLabel` (lib/brandPricing.ts) · cam kết của một tháng = `monthCommitmentOf` (dòng tháng thắng `contractCovering`) ·
+rate talent đang áp = `talentRateLabel` · tháng mở sẵn của màn = `lib/defaultMonth.ts` (xem số: tháng gần nhất có ca;
 Report/Nhập Ads: tháng đã hết gần nhất; Kế Hoạch Tháng: tháng này nếu brand đang mở còn nháp) · việc cần làm =
 `buildTodos` (lib/todoList.ts) · dự kiến cuối tháng = `projectMonthEnd` /
 `MonthOutlook` · trùng lịch = `personClash`/`studioClash` (scheduling/conflicts) · giờ kế hoạch = `sessionDurationHours`, giờ
@@ -419,11 +428,11 @@ live = `sessionHours`. GMV/giờ đem NHÂN với giờ lịch thì chia trên g
   giờ cam kết, KHÔNG vào lương/doanh thu — hiện "chờ xác nhận" ở Finance, Cam Kết, Nhân sự ca, Cửa sổ Ca Live; role brand
   tháng chưa phát hành (view che số) vẫn tính như cũ. Ca "loại khỏi báo cáo": vẫn trả công theo giờ, bỏ doanh thu +
   hoa hồng theo GMV (`SessionPnl.excluded`); Finance/Thu nhập talent đọc `sessions` (gồm ca loại), màn phân tích/brand
-  vẫn `activeSessions`. Target tháng chỉ nhập ở Kế Hoạch Tháng; ô "Kế hoạch tháng sau" của Report đã bỏ (04/10 tối) —
-tháng không có kế hoạch chỉ còn target khung camp nhập ở Nhập Ads (`buildMonthTargetPlan`). Sửa ca
+  vẫn `activeSessions`. Target tháng chỉ nhập ở Kế Hoạch Tháng; ô "Kế hoạch tháng sau" của Report đã bỏ (04/10 tối),
+target khung camp ở Nhập Ads bỏ 06/10 — tháng không có kế hoạch chốt thì không có target (ca giữ số DB). Sửa ca
   (`update_session_with_children`) chỉ ghi cột lịch + người, trạng thái DB tự suy, ca có số không dời ngày/giờ. Kéo-thả ca
-  sang ngày khác kiểm trùng người/phòng, chặn ca có số và ngày đã qua. Hợp đồng nháp không sinh cam kết; sinh lại dọn
-  tháng ngoài khung (trừ tháng sửa tay).
+  sang ngày khác kiểm trùng người/phòng, chặn ca có số và ngày đã qua. Hợp đồng nháp không sinh cam kết; lưu hợp đồng đang hiệu lực ở CRM tự sinh lại (dọn
+  tháng ngoài khung, giữ tháng sửa riêng ở Kế Hoạch Tháng). % hoa hồng agency chỉ theo giá brand × sàn (không sửa từng ca).
 - Snapshot theo ca: chỉ 13 cột ĐẾM ĐƯỢC mới đem trừ, tỷ lệ tính lại lúc đọc; mốc ranh giới = **giờ kết thúc ca**
   (`session_boundary_at`); room thuộc ca khi khung giao nhau cả 2 đầu; up lại cho cùng ca = thay thế.
 - Talent không bao giờ ghi đè số đã có snapshot/đối soát (RPC chặn). Thông báo "số khác số bạn báo" chỉ khi số cũ là
@@ -463,6 +472,8 @@ tháng không có kế hoạch chỉ còn target khung camp nhập ở Nhập Ad
 
 | Mục trong file lịch sử | Tóm tắt |
 |---|---|
+| `## Cắt vòng mạng nối tiếp (2026-10-03/04)` | 10 vòng mạng đã cắt (cache assets, TAB_CHUNKS, prefetch, lazyNamed, song song hoá) + chỗ còn lại có chủ đích |
+| `## Gộp cấu hình một chỗ nhập (2026-10-06)` | số đo trước khi gộp, từng chỗ nhập trùng đã bỏ, luật mới (is_override, generateThroughMonth, effectiveCamp 1 tham số), cách verify |
 | `## Audit toàn app lần 3 (2026-10-05)` | lỗ tự nâng quyền qua profiles (0136), backup sai project, đối soát chạm mép, chốt kế hoạch ngày đã qua, engine ô 1 phút, chữ/ngày lộ |
 | `## Audit logic vòng đời (2026-10-04)` | 14 điểm gãy hợp đồng→report + cách sửa; 0133 (đối soát theo brand, chốt người 1 transaction, đóng sổ tháng, khoá ca kế hoạch đã chốt, đăng ký chỉ ca mở) |
 | `## Audit code chết (2026-10-02)` | gỡ Hội Đồng AI, Workflow Rules, quét QR giả, ~25 export chết, 3 bảng con khỏi client; lỗi `"std-a"` ở Studios; `audit:dead`; 0131 (viết trước 0132) |

@@ -41,16 +41,15 @@ export async function fetchSessionFinances(): Promise<SessionFinance[]> {
   return rows.map(fromDb);
 }
 
+// Finance chỉ còn ghi chi phí studio + ghi chú theo ca (gộp cấu hình 06/10): % hoa hồng lấy từ giá brand ở CRM, Ads theo
+// ca từ report ca. Cột agency_commission_rate / ads_cost / *_override vẫn còn trong bảng (0 dòng trên production 06/10)
+// nhưng client không ghi nữa — pnl.ts không đọc agency_commission_rate/ads_cost.
 export async function upsertSessionFinance(
   sessionId: string,
-  patch: Partial<Omit<SessionFinance, "sessionId" | "approvalStatus" | "approvedByUserId" | "approvedAt">>
+  patch: Partial<Pick<SessionFinance, "studioCost" | "notes">>
 ): Promise<SessionFinance> {
   const row: Record<string, unknown> = { session_id: sessionId, updated_at: new Date().toISOString() };
-  if (patch.agencyCommissionRate !== undefined) row.agency_commission_rate = patch.agencyCommissionRate;
   if (patch.studioCost !== undefined) row.studio_cost = patch.studioCost;
-  if (patch.adsCost !== undefined) row.ads_cost = patch.adsCost;
-  if (patch.hostFixRateOverride !== undefined) row.host_fix_rate_override = patch.hostFixRateOverride;
-  if (patch.hostCommissionRateOverride !== undefined) row.host_commission_rate_override = patch.hostCommissionRateOverride;
   if (patch.notes !== undefined) row.notes = patch.notes;
 
   const { data, error } = await supabase

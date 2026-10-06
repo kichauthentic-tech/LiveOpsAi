@@ -10,7 +10,6 @@ import { useConfirm } from "../../hooks/useConfirm";
 import { getTodayMonth } from "../../lib/dateUtils";
 import { monthlyReportRead } from "../../lib/db/monthlyReports";
 import { errorMessage } from "../../lib/errorMessage";
-import { ReportPlanningInputs, prefetchReportPlanningInputs } from "./ReportPlanningInputs";
 import type { TabPrefetchCtx } from "../../lib/db/prefetch";
 
 import { fmtDateVn, fmtMonth, fmtFixed, fmtVndFull, fmtVndShort } from "../../lib/format";
@@ -79,7 +78,6 @@ export function prefetchBrandAdsReport({ brandId, role }: TabPrefetchCtx): void 
   const month = defaultReportMonth(`${getTodayMonth()}-01`, []);
   monthlyReportRead.prefetch(brandId, `${month}-01`);
   dataRawImportsRead.prefetch(brandId, ADS_TYPE);
-  prefetchReportPlanningInputs(brandId, month);
 }
 
 export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandName, platform, multiPlatform, sessions, currentRole }) => {
@@ -88,7 +86,6 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
   // Cùng tháng mở sẵn với Report Tháng — phần nhập ở đây đi theo report đó (lib/defaultMonth.ts).
   const [month, setMonth] = useState(() => defaultReportMonth(`${getTodayMonth()}-01`, sessions.filter((s) => s.brandId === brandId)));
   const [report, setReport] = useState<BrandMonthlyReportType | null>(null);
-  const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const confirm = useConfirm();
@@ -184,23 +181,19 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
     setErrorMsg(null);
-    if (canManage && !isShopee) prefetchReportPlanningInputs(brandId, month);
     (isShopee ? fetchMonthlyReport(brandId, `${month}-01`, "Shopee") : monthlyReportRead.take(brandId, `${month}-01`))
       .then((r) => {
         if (cancelled) return;
         setReport(r);
       })
-      .catch((e) => !cancelled && setErrorMsg(e.message || "Không tải được dữ liệu tháng"))
-      .finally(() => !cancelled && setLoading(false));
+      .catch((e) => !cancelled && setErrorMsg(e.message || "Không tải được dữ liệu tháng"));
     return () => {
       cancelled = true;
     };
   }, [brandId, month, canManage, isShopee]);
 
   const isPublished = report?.status === "published";
-  const readOnly = !canManage || isPublished;
 
 
   return (
@@ -391,10 +384,7 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
 
       )}
 
-      {/* Khung camp cho tháng KHÔNG có Kế Hoạch Tháng (ReportPlanningInputs) — gập, mặc định lịch cố định. Report TikTok. */}
-      {!loading && canManage && !isShopee && (
-        <ReportPlanningInputs key={`${month}|${report?.id ?? "none"}`} brandId={brandId} month={month} report={report} onSaved={setReport} readOnly={readOnly} />
-      )}
+      {/* Khung camp của tháng chỉ nhập ở Kế Hoạch Tháng (gộp cấu hình 06/10 — trước đó tháng không có kế hoạch nhập ở đây). */}
     </div>
   );
 };

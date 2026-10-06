@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { BrandMonthPlan, BrandMonthPlanSlot, BrandMonthlyReport, LiveSession, ShiftSlot, UserRole } from "../../types";
+import { BrandMonthPlan, BrandMonthPlanSlot, LiveSession, ShiftSlot, UserRole } from "../../types";
 import { AlertTriangle, CalendarRange, ChevronLeft, ChevronRight, ClipboardList, Database, Download, Loader2, Radio, TrendingDown, TrendingUp, Users } from "lucide-react";
 import { fmtVndShort } from "../../lib/format";
 import { fmtKeyMetric, KEY_METRICS, keyMetricSheetColumns, keyMetricSheetLabel, keyMetricSheetValue, keyMetricsOfSessions, keyMetricValue } from "../../lib/report/keyMetrics";
@@ -15,7 +15,6 @@ import { hasLiveNumbers, monthRunRate, monthRunRateFromPlan } from "../../lib/re
 import { planRunRate, projectMonthEnd } from "../../lib/performance/planRunRate";
 import { lastDataDate, monthOutlook } from "../../lib/performance/ceoBrief";
 import { fetchMonthPlan } from "../../lib/db/monthPlans";
-import { fetchMonthlyReport } from "../../lib/db/monthlyReports";
 import { effectiveCamp } from "../../lib/campaignDays";
 import { MissingStep, missingSteps } from "../../lib/sessionLedger";
 import { DataSourceBadge } from "../common/DataSourceBadge";
@@ -105,16 +104,6 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
     };
   }, [brandId, planMonths]);
   const monthPlan = plans.get(monthKey) ?? null;
-  // Khung camp hiệu lực của tháng (effectiveCamp — audit workflow #8): khoảng ghi đè ở Nhập Ads thắng
-  // khoảng của Kế Hoạch Tháng, cùng luật với Report Tháng / Dashboard / Bản Tin CEO.
-  const [monthReportRow, setMonthReportRow] = useState<BrandMonthlyReport | null>(null);
-  useEffect(() => {
-    let alive = true;
-    fetchMonthlyReport(brandId, `${monthKey}-01`).then((r) => alive && setMonthReportRow(r)).catch(() => alive && setMonthReportRow(null));
-    return () => {
-      alive = false;
-    };
-  }, [brandId, monthKey]);
   const lockedPlanSlots = useMemo(
     () => [...plans.values()].flatMap((p) => (p?.plan.status === "locked" ? p.slots : [])),
     [plans]
@@ -168,7 +157,8 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
   const monthRr = useMemo(() => {
     if (monthPlan?.plan.status === "locked" && monthPlan.plan.month === monthKey) {
       const bs = sessions.filter((s) => s.brandId === brandId);
-      const camp = effectiveCamp(monthPlan.plan.campRanges, monthReportRow);
+      // Khung camp hiệu lực (effectiveCamp — cùng luật mọi màn): khung của Kế Hoạch Tháng.
+      const camp = effectiveCamp(monthPlan.plan.campRanges);
       const rr = planRunRate(monthKey, monthPlan.slots, shiftSlots ?? [], bs, getTodayDate(), camp);
       const open = (shiftSlots ?? []).filter((sl) => sl.brandId === brandId && sl.status === "open" && !sl.sessionId);
       return monthRunRateFromPlan(rr, projectMonthEnd(rr, monthOutlook(monthKey, getTodayDate(), bs, open, null, camp)));
@@ -176,7 +166,7 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
     const [y, m] = monthKey.split("-").map(Number);
     const last = new Date(y, m, 0).getDate();
     return monthRunRate(sessions, brandId, `${monthKey}-01`, `${monthKey}-${String(last).padStart(2, "0")}`);
-  }, [monthPlan, sessions, brandId, monthKey, shiftSlots, monthReportRow]);
+  }, [monthPlan, sessions, brandId, monthKey, shiftSlots]);
 
   const days = useMemo(() => eachDay(weekStart, weekEnd), [weekStart, weekEnd]);
   const dailyRows = useMemo(

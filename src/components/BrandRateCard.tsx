@@ -1,245 +1,65 @@
-import React, { useMemo, useState } from "react";
-import { BrandPlatformRate, BrandPlatformRateHistoryEntry, LiveSession, UserRole } from "../types";
-import { Tag, History } from "lucide-react";
-import { fmtVndFull } from "../lib/format";
-import { PageHeader } from "./common/PageHeader";
+import React, { useMemo } from "react";
+import { Brand, BrandPlatformRate, BrandPlatformRateHistoryEntry } from "../types";
+import { History, Tag } from "lucide-react";
+import { fmtDateVn, fmtVndFull } from "../lib/format";
+import { rateOf } from "../lib/brandPricing";
+import type { ReportPlatform } from "../lib/reportPlatform";
 
-interface BrandRateCardProps {
-  brandId: string;
-  currentRole: UserRole;
-  brandPlatformRates: BrandPlatformRate[];
-  brandPlatformRateHistory: BrandPlatformRateHistoryEntry[];
-  sessions: LiveSession[];
-  onSaveRate: (brandId: string, platform: "TikTok" | "Shopee", ratePerHour: number) => Promise<boolean>;
-  onSaveReturnRate: (brandId: string, platform: "TikTok" | "Shopee", returnRate: number) => Promise<boolean>;
-  onSaveCommissionRate: (brandId: string, platform: "TikTok" | "Shopee", commissionRate: number) => Promise<boolean>;
-  // Đợt C/3: Brand Workspace nhúng lại đúng component này cho brand xem rate của chính mình —
-  // CHỈ ĐỌC dù người đang xem là ops (mở hộ khách). Sửa rate vẫn làm ở CRM bên Agency như cũ.
-  readOnly?: boolean;
+// Giá của brand × sàn — CHỈ ĐỌC, nằm trong tab "Hợp Đồng" của Brand Workspace (gộp với cam kết 06/10: hai nửa của
+// cùng một hợp đồng, trước đó là 2 tab "Rate Card" + "Cam Kết Hợp Đồng"). Sửa giá ở CRM → "Hợp đồng & giá"
+// (BrandConfigPanel) — chỗ nhập duy nhất. RLS đọc đã mở cho role brand từ 0105.
+
+interface Props {
+  brand: Pick<Brand, "id" | "billingModel">;
+  platform: ReportPlatform;
+  rates: BrandPlatformRate[];
+  rateHistory: BrandPlatformRateHistoryEntry[];
 }
 
-const PLATFORMS: ("TikTok" | "Shopee")[] = ["TikTok", "Shopee"];
-
-export const BrandRateCard: React.FC<BrandRateCardProps> = ({
-  brandId,
-  currentRole,
-  brandPlatformRates,
-  brandPlatformRateHistory,
-  sessions,
-  onSaveRate,
-  onSaveReturnRate,
-  onSaveCommissionRate,
-  readOnly = false
-}) => {
-  const canEdit = !readOnly && (currentRole === "ceo" || currentRole === "admin" || currentRole === "operations");
-  const [drafts, setDrafts] = useState<Partial<Record<"TikTok" | "Shopee", string>>>({});
-  const [busy, setBusy] = useState<"TikTok" | "Shopee" | null>(null);
-  const [returnDrafts, setReturnDrafts] = useState<Partial<Record<"TikTok" | "Shopee", string>>>({});
-  const [returnBusy, setReturnBusy] = useState<"TikTok" | "Shopee" | null>(null);
-  const [commDrafts, setCommDrafts] = useState<Partial<Record<"TikTok" | "Shopee", string>>>({});
-  const [commBusy, setCommBusy] = useState<"TikTok" | "Shopee" | null>(null);
-
-  const rateByPlatform = useMemo(() => {
-    const map: Partial<Record<"TikTok" | "Shopee", BrandPlatformRate>> = {};
-    for (const r of brandPlatformRates) {
-      if (r.brandId === brandId) map[r.platform] = r;
-    }
-    return map;
-  }, [brandPlatformRates, brandId]);
-
-  // GMV thực nhận đã cộng dồn theo platform (mọi session của brand này có actualGmv > 0) —
-  // dùng để ước tính NMV = GMV × (1 - tỷ lệ hoàn hủy). Chỉ mang tính tham khảo, KHÔNG feed
-  // vào lib/pnl.ts — P&L dùng % hoa hồng của ca (Finance) hoặc của brand (ô bên dưới, 0118).
-  const gmvByPlatform = useMemo(() => {
-    const map: Record<"TikTok" | "Shopee", number> = { TikTok: 0, Shopee: 0 };
-    for (const s of sessions) {
-      if (s.brandId === brandId && s.actualGmv > 0) map[s.platform] += s.actualGmv;
-    }
-    return map;
-  }, [sessions, brandId]);
-
-  const historyByPlatform = useMemo(() => {
-    const map: Record<"TikTok" | "Shopee", BrandPlatformRateHistoryEntry[]> = { TikTok: [], Shopee: [] };
-    brandPlatformRateHistory
-      .filter((h) => h.brandId === brandId)
-      .forEach((h) => map[h.platform].push(h));
-    Object.values(map).forEach((list) => list.sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom)));
-    return map;
-  }, [brandPlatformRateHistory, brandId]);
-
-  const handleSave = async (platform: "TikTok" | "Shopee") => {
-    const raw = drafts[platform];
-    if (raw === undefined) return;
-    const value = Number(raw);
-    if (!Number.isFinite(value) || value < 0) return;
-    setBusy(platform);
-    const ok = await onSaveRate(brandId, platform, value);
-    setBusy(null);
-    if (ok) setDrafts((d) => ({ ...d, [platform]: undefined }));
-  };
-
-  const handleSaveReturnRate = async (platform: "TikTok" | "Shopee") => {
-    const raw = returnDrafts[platform];
-    if (raw === undefined) return;
-    const value = Number(raw);
-    if (!Number.isFinite(value) || value < 0 || value > 100) return;
-    setReturnBusy(platform);
-    const ok = await onSaveReturnRate(brandId, platform, value);
-    setReturnBusy(null);
-    if (ok) setReturnDrafts((d) => ({ ...d, [platform]: undefined }));
-  };
-
-  const handleSaveCommissionRate = async (platform: "TikTok" | "Shopee") => {
-    const raw = commDrafts[platform];
-    if (raw === undefined) return;
-    const value = Number(raw);
-    if (!Number.isFinite(value) || value < 0 || value > 100) return;
-    setCommBusy(platform);
-    const ok = await onSaveCommissionRate(brandId, platform, value);
-    setCommBusy(null);
-    if (ok) setCommDrafts((d) => ({ ...d, [platform]: undefined }));
-  };
+export const BrandRateCard: React.FC<Props> = ({ brand, platform, rates, rateHistory }) => {
+  const rate = rateOf(rates, brand.id, platform);
+  const hourly = brand.billingModel === "hourly";
+  const history = useMemo(
+    () => rateHistory.filter((h) => h.brandId === brand.id && h.platform === platform).sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom)),
+    [rateHistory, brand.id, platform]
+  );
+  const cell = (label: string, value: string | null, note: string) => (
+    <div className="bg-[var(--surface-base)]/60 border border-[var(--border)] rounded-xl p-3">
+      <div className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-bold">{label}</div>
+      <div className={`mt-0.5 text-base font-black ${value ? "text-[var(--text)]" : "text-[var(--text-faint)]"}`}>{value ?? "chưa đặt"}</div>
+      <p className="text-[11px] text-[var(--text-faint)] mt-0.5">{note}</p>
+    </div>
+  );
 
   return (
-    <div className="space-y-5">
-      <PageHeader
-        icon={Tag}
-        title="Rate Card"
-        description="Đơn giá agency tính cho brand theo từng nền tảng: phí mỗi giờ live, tỉ lệ hoàn hủy dùng để ước NMV, và % hoa hồng."
-      />
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {PLATFORMS.map((platform) => {
-          const current = rateByPlatform[platform];
-          const draft = drafts[platform];
-          const returnDraft = returnDrafts[platform];
-          const commDraft = commDrafts[platform];
-          const returnRate = current?.returnRate ?? 0;
-          const gmv = gmvByPlatform[platform];
-          const estimatedNmv = gmv * (1 - returnRate / 100);
-          return (
-            <div key={platform} className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 space-y-3 shadow-xl">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-[var(--text)]">{platform}</span>
-                <span className="text-[11px] text-[var(--text-faint)] uppercase font-bold">/ giờ live</span>
-              </div>
-              <p className="text-[11px] text-[var(--text-faint)] -mt-2">Chỉ dùng cho brand thu phí theo giờ live (cách thu phí đặt ở thẻ brand trong CRM).</p>
-              <p className="text-2xl font-black text-emerald-400">
-                {current ? fmtVndFull(current.ratePerHour) : "—"}
-              </p>
-              {canEdit && (
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    placeholder="Rate mới"
-                    value={draft ?? ""}
-                    onChange={(e) => setDrafts((d) => ({ ...d, [platform]: e.target.value }))}
-                    className="flex-1 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] text-xs focus:outline-none focus:border-[var(--accent)]"
-                  />
-                  <button
-                    onClick={() => handleSave(platform)}
-                    disabled={busy !== null || draft === undefined || draft === ""}
-                    className="px-3 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-colors"
-                  >
-                    {busy === platform ? "..." : "Lưu"}
-                  </button>
-                </div>
-              )}
-
-              <div className="pt-3 border-t border-[var(--border)] space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-[var(--text-faint)] uppercase font-bold">Tỷ lệ hoàn hủy</span>
-                  <span className="text-sm font-bold text-amber-400">{returnRate > 0 ? `${returnRate}%` : "Chưa nhập"}</span>
-                </div>
-                {canEdit && (
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      min={0}
-                      max={100}
-                      placeholder="% mới"
-                      value={returnDraft ?? ""}
-                      onChange={(e) => setReturnDrafts((d) => ({ ...d, [platform]: e.target.value }))}
-                      className="flex-1 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] text-xs focus:outline-none focus:border-[var(--accent)]"
-                    />
-                    <button
-                      onClick={() => handleSaveReturnRate(platform)}
-                      disabled={returnBusy !== null || returnDraft === undefined || returnDraft === ""}
-                      className="px-3 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-colors"
-                    >
-                      {returnBusy === platform ? "..." : "Lưu"}
-                    </button>
-                  </div>
-                )}
-                <div className="flex items-center justify-between pt-2">
-                  <span className="text-[11px] text-[var(--text-faint)] uppercase font-bold">Hoa hồng agency (% NMV)</span>
-                  <span className="text-sm font-bold text-[var(--accent-text)]">{current?.commissionRate != null ? `${current.commissionRate}%` : "Chưa đặt"}</span>
-                </div>
-                <p className="text-[11px] text-[var(--text-faint)] leading-snug">Chỉ dùng cho brand tính phí theo % doanh số. Ca đã có % riêng ở Finance &amp; P&amp;L thì % của ca thắng.</p>
-                {canEdit && (
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      min={0}
-                      max={100}
-                      step={0.1}
-                      placeholder="% hoa hồng"
-                      value={commDraft ?? ""}
-                      onChange={(e) => setCommDrafts((d) => ({ ...d, [platform]: e.target.value }))}
-                      className="flex-1 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] text-xs focus:outline-none focus:border-[var(--accent)]"
-                    />
-                    <button
-                      onClick={() => handleSaveCommissionRate(platform)}
-                      disabled={commBusy !== null || commDraft === undefined || commDraft === ""}
-                      className="px-3 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-colors"
-                    >
-                      {commBusy === platform ? "..." : "Lưu"}
-                    </button>
-                  </div>
-                )}
-                <div className="flex items-center justify-between text-[11px] pt-1">
-                  <span className="text-[var(--text-faint)]">
-                    {/* Tỷ lệ hoàn 0 = chưa nhập: NMV khi đó bằng GMV — nói ra thay vì in "× 100%" như một con số thật. */}
-                    {returnRate > 0
-                      ? <>NMV ước tính (GMV mọi tháng {fmtVndFull(gmv)} × {100 - returnRate}%)</>
-                      : <span className="text-amber-300">Chưa nhập tỷ lệ hoàn huỷ — NMV đang bằng GMV (mọi tháng)</span>}
-                  </span>
-                  <span className="font-bold text-[var(--text)]">{fmtVndFull(estimatedNmv)}</span>
-                </div>
-              </div>
-            </div>
-          );
-        })}
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 space-y-3 shadow-xl">
+      <h3 className="font-black text-[var(--text)] flex items-center gap-2">
+        <Tag className="w-4 h-4 text-[var(--accent-text)]" /> Giá {platform}
+      </h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {hourly
+          ? cell("Đơn giá / giờ live", rate && rate.ratePerHour > 0 ? fmtVndFull(rate.ratePerHour) : null, "Tính trên giờ ca theo lịch.")
+          : cell("% hoa hồng agency", rate?.commissionRate != null ? `${rate.commissionRate}% NMV` : null, "NMV = GMV × (1 − tỷ lệ hoàn huỷ).")}
+        {cell("Tỷ lệ hoàn huỷ", rate && rate.returnRate > 0 ? `${rate.returnRate}%` : null, "Dùng để ước NMV từ GMV.")}
       </div>
-
-      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 space-y-4 shadow-xl">
-        <h3 className="font-bold text-[var(--text)] flex items-center gap-2">
-          <History className="w-4 h-4 text-[var(--text-faint)]" /> Lịch Sử Rate
-        </h3>
-        {PLATFORMS.map((platform) => (
-          <div key={platform} className="space-y-1.5">
-            <p className="text-xs font-bold text-[var(--text-muted)]">{platform}</p>
-            {historyByPlatform[platform].length === 0 ? (
-              <p className="text-[11px] text-[var(--text-faint)] pl-2">Chưa có lịch sử.</p>
-            ) : (
-              <div className="space-y-1">
-                {historyByPlatform[platform].map((h) => (
-                  <div key={h.id} className="flex items-center justify-between text-[11px] bg-[var(--surface-base)]/60 border border-[var(--border)] rounded-lg px-3 py-1.5">
-                    <span className="text-[var(--text-muted)] font-mono">
-                      {h.effectiveFrom} → {h.effectiveTo ?? "hiện tại"}
-                    </span>
-                    <span className="text-[var(--text)] font-bold">
-                      {fmtVndFull(h.ratePerHour)}
-                      <span className="text-amber-400 font-normal ml-2">· hoàn hủy {h.returnRate}%</span>
-                      {h.commissionRate != null && <span className="text-[var(--accent-text)] font-normal ml-2">· hoa hồng {h.commissionRate}%</span>}
-                    </span>
-                  </div>
-                ))}
+      {history.length > 0 && (
+        <details className="text-[11px]">
+          <summary className="cursor-pointer font-bold text-[var(--text-muted)] inline-flex items-center gap-1">
+            <History className="w-3 h-3" /> Lịch sử giá ({history.length})
+          </summary>
+          <div className="mt-1.5 space-y-1">
+            {history.map((h) => (
+              <div key={h.id} className="flex flex-wrap justify-between gap-1 bg-[var(--surface-base)]/60 border border-[var(--border)] rounded-lg px-3 py-1.5">
+                <span className="text-[var(--text-muted)]">{fmtDateVn(h.effectiveFrom)} → {h.effectiveTo ? fmtDateVn(h.effectiveTo) : "nay"}</span>
+                <span className="text-[var(--text)] font-bold">
+                  {hourly ? `${fmtVndFull(h.ratePerHour)}/giờ` : h.commissionRate != null ? `${h.commissionRate}%` : "—"}
+                  <span className="text-[var(--text-faint)] font-normal"> · hoàn huỷ {h.returnRate}%</span>
+                </span>
               </div>
-            )}
+            ))}
           </div>
-        ))}
-      </div>
+        </details>
+      )}
     </div>
   );
 };

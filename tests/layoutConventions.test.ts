@@ -410,10 +410,11 @@ test("Hồ Sơ Của Tôi: số đứng trước form, và ô trống nói lý d
     .map((c) => src.indexOf(`{/* ${c}`));
   expect(order.every((i) => i >= 0), `thiếu comment mốc khối: ${order}`).toBe(true);
   expect(order, `thứ tự khối sai: ${order}`).toEqual([...order].sort((a, b) => a - b));
-  // Rate/hoa hồng/CVR chưa nhập phải nói "ops chưa nhập", không in "0/live" hay "0%".
+  // Rate chưa nhập phải nói "ops chưa nhập", không in "0/live". Không có ô hoa hồng theo GMV (user chốt 06/10: talent
+  // chỉ ăn rate giờ/phiên) — hiện lại "Hoa hồng ops chưa nhập" là hứa một khoản không tồn tại.
   expect(src).toContain("ops chưa nhập");
   expect(src).toMatch(/\(myTalent\.ratePerSession \|\| 0\) > 0/);
-  expect(src).toMatch(/\(myTalent\.commissionRate \|\| 0\) > 0/);
+  expect(src).not.toMatch(/commissionRate/);
   // Không có dòng lương nào thì không in ô "Tổng thu nhập tạm tính: 0".
   // Neo vào ĐÚNG chuỗi JSX, không vào nhãn trần: nhãn ấy còn nằm trong comment giải thích ngay
   // phía trên nhánh rào, nên indexOf() thường sẽ bắt vào comment và luôn báo sai thứ tự.

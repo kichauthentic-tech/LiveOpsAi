@@ -1,4 +1,4 @@
-import { BrandMonthlyCommitment, LiveSession, ShiftSlot } from "../../types";
+import { BrandContract, BrandMonthlyCommitment, LiveSession, ShiftSlot } from "../../types";
 import { sessionDurationHours } from "../pnl";
 import { isUnconfirmedPast } from "../sessionStatus";
 import { brandPlatformKey } from "../reportPlatform";
@@ -270,21 +270,69 @@ export function computeSchedulingGaps(
     .sort((a, b) => b.hoursStillToOpen - a.hoursStillToOpen);
 }
 
-// Brand có ca trong tháng nhưng KHÔNG có dòng cam kết nào — không phải lỗi, nhưng ops cần biết để
-// còn nhập: mọi con số run-rate của brand đó đang không có mẫu số nào để so.
-export function brandsMissingCommitment(
-  commitments: BrandMonthlyCommitment[],
-  sessions: LiveSession[],
+// ====================================================================================
+// Cam kết của MỘT tháng — chỗ nhập duy nhất là Kế Hoạch Tháng (gộp cấu hình 06/10)
+// ====================================================================================
+// Điều khoản hợp đồng (giờ/GMV mỗi tháng, từ tháng nào tới tháng nào) nhập ở CRM; lưu hợp đồng là app tự sinh
+// dòng cam kết từng tháng. Số của riêng một tháng (brand mua thêm/bớt giờ) sửa ở Kế Hoạch Tháng — lúc lập lịch cho
+// chính tháng đó. Trước 06/10 có module "Cam Kết Hợp Đồng" riêng VÀ ô "giờ cần xếp" ở Kế Hoạch Tháng không lưu.
+
+/** Hợp đồng ĐANG HIỆU LỰC của brand × sàn phủ tháng `periodMonth` ("YYYY-MM-01"). Nháp / đã kết thúc không tính. */
+export function contractCovering(
+  contracts: BrandContract[],
+  brandId: string,
+  platform: "TikTok" | "Shopee",
   periodMonth: string
-): string[] {
-  // Theo brand × sàn (0141): VERA có cam kết TikTok mà ca Shopee chưa có cam kết vẫn phải nhắc. Trả brandPlatformKey.
-  const has = new Set(commitments.filter((c) => c.periodMonth === periodMonth).map((c) => brandPlatformKey(c.brandId, c.platform)));
-  const seen = new Set<string>();
-  for (const s of sessions) {
-    const key = brandPlatformKey(s.brandId, s.platform);
-    if (monthKeyOf(s.date) === periodMonth && s.status !== "Cancelled" && !has.has(key)) {
-      seen.add(key);
-    }
-  }
-  return [...seen];
+): BrandContract | undefined {
+  return contracts
+    .filter(
+      (c) =>
+        c.brandId === brandId &&
+        (c.platform ?? "TikTok") === platform &&
+        c.status === "active" &&
+        c.startMonth <= periodMonth &&
+        (!c.endMonth || c.endMonth >= periodMonth)
+    )
+    .sort((a, b) => b.startMonth.localeCompare(a.startMonth))[0];
+}
+
+function addMonths(periodMonth: string, n: number): string {
+  const [y, m] = periodMonth.split("-").map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + n, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-01`;
+}
+
+/**
+ * Mốc sinh cam kết cho hợp đồng CHƯA có tháng kết thúc (DB bắt buộc có mốc): tới hết tháng sau nữa — đủ để Kế Hoạch
+ * Tháng lập trước một tháng — và không trước tháng bắt đầu. Hợp đồng có tháng kết thúc ⇒ undefined (DB sinh tới đó).
+ * Tháng xa hơn: Kế Hoạch Tháng ghi dòng của tháng đó khi lưu (lấy mặc định từ hợp đồng).
+ */
+export function generateThroughMonth(contract: Pick<BrandContract, "startMonth" | "endMonth">, today: string = todayVn()): string | undefined {
+  if (contract.endMonth) return undefined;
+  const through = addMonths(monthKeyOf(today), 2);
+  return through < contract.startMonth ? contract.startMonth : through;
+}
+
+export interface MonthCommitment {
+  hours: number;
+  gmv?: number;
+  /** month = sửa riêng tháng này ở Kế Hoạch Tháng · contract = theo hợp đồng (đã sinh hoặc chưa) · none = chưa có gì. */
+  source: "month" | "contract" | "none";
+  row?: BrandMonthlyCommitment;
+  contract?: BrandContract;
+}
+
+/** Cam kết đang áp dụng cho brand × sàn × tháng: dòng tháng (nếu có) thắng điều khoản hợp đồng. */
+export function monthCommitmentOf(
+  commitments: BrandMonthlyCommitment[],
+  contracts: BrandContract[],
+  brandId: string,
+  platform: "TikTok" | "Shopee",
+  periodMonth: string
+): MonthCommitment {
+  const row = commitments.find((c) => c.brandId === brandId && (c.platform ?? "TikTok") === platform && c.periodMonth === periodMonth);
+  const contract = contractCovering(contracts, brandId, platform, periodMonth);
+  if (row) return { hours: row.committedHours, gmv: row.committedGmv, source: row.isOverride ? "month" : "contract", row, contract };
+  if (contract) return { hours: contract.monthlyHours, gmv: contract.monthlyGmv, source: "contract", contract };
+  return { hours: 0, source: "none" };
 }

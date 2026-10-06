@@ -3,7 +3,6 @@ import { defaultViewMonth } from "../lib/defaultMonth";
 import { AlertTriangle, ArrowDownRight, ArrowUpRight, ChevronLeft, ChevronRight, CircleAlert, Info, LayoutDashboard, Lock, Minus } from "lucide-react";
 import {
   Brand,
-  BrandMonthlyReport,
   BrandMonthPlan,
   BrandPlatformRate,
   BrandPlatformRateHistoryEntry,
@@ -42,7 +41,6 @@ import {
   prevMonthOf,
   totalsOf
 } from "../lib/performance/ceoBrief";
-import { buildMonthTargetPlan } from "../lib/performance/targetAllocation";
 import { metricHint } from "../lib/metricGlossary";
 import { todayVn } from "../lib/performance/brandCommitment";
 import { PNL_MISSING_LABEL, PnlMissingInput, computeSessionPnl } from "../lib/pnl";
@@ -70,7 +68,6 @@ interface CeoBriefProps {
   /** brandMonthKey (brand × tháng × sàn) → target từng ca của Kế Hoạch Tháng đã chốt, gồm cả ca đã mất shift_slot (lỗi E2E #1). */
   planSlotTargets: Map<string, { date: string; target: number }[]>;
   planMonthTotals: Map<string, number>;
-  monthlyReports: Map<string, BrandMonthlyReport>;
   financeRecords: SessionFinance[];
   brandPlatformRates: BrandPlatformRate[];
   brandPlatformRateHistory: BrandPlatformRateHistoryEntry[];
@@ -84,7 +81,7 @@ const ACTION_TAB: Record<IssueAction, { tab: string; label: string }> = {
   month_plan: { tab: "month_plan", label: "Mở Kế Hoạch Tháng" },
   reconcile: { tab: "live_reconciliation", label: "Mở Đối Soát" },
   talents: { tab: "talents", label: "Mở Talent Pool" },
-  rate_card: { tab: "crm", label: "Mở Rate Card" },
+  rate_card: { tab: "crm", label: "Mở Hợp đồng & giá (CRM)" },
   host_performance: { tab: "host_performance", label: "Mở Hiệu Suất Host" }
 };
 const BUCKET_LABEL: Record<CampDayBucket, string> = { dday: "D-Day", midmonth: "Mid-Month", payday: "Pay Day", daily: "Daily" };
@@ -190,7 +187,7 @@ export function prefetchCeoBrief(_ctx: TabPrefetchCtx): void {
 }
 
 export default function CeoBrief(props: CeoBriefProps) {
-  const { sessions, brands, talents, shiftSlots, planSlotTargets, planMonthTotals, monthlyReports, financeRecords, brandPlatformRates, brandPlatformRateHistory, talentRateHistory, currentRole, onNavigate } = props;
+  const { sessions, brands, talents, shiftSlots, planSlotTargets, planMonthTotals, financeRecords, brandPlatformRates, brandPlatformRateHistory, talentRateHistory, currentRole, onNavigate } = props;
   const today = todayVn();
   const canSeeMoney = currentRole === "ceo" || currentRole === "admin";
   const [grain, setGrain] = useState<Grain>("month");
@@ -270,17 +267,16 @@ export default function CeoBrief(props: CeoBriefProps) {
     for (const { b, p } of channels) {
       const key = brandMonthKey(b.id, month, p);
       const plan = plans.get(brandPlatformKey(b.id, p));
-      const reportPlan = buildMonthTargetPlan(b.id, month, monthlyReports, p);
       // Cùng luật khung camp với mọi màn (effectiveCamp).
-      const camp: CampOverrides = effectiveCamp(plan?.campRanges, monthlyReports.get(key));
+      const camp: CampOverrides = effectiveCamp(plan?.campRanges);
       const lockedSlotTargets = planSlotTargets.get(key) ?? [];
-      const target = monthTargetOf(month, planMonthTotals.get(key), lockedSlotTargets, reportPlan, camp);
+      const target = monthTargetOf(month, planMonthTotals.get(key), lockedSlotTargets);
       const chSessions = sessions.filter((s) => s.brandId === b.id && (s.platform ?? "TikTok") === p);
       const open = shiftSlots.filter((sl) => sl.brandId === b.id && (sl.platform ?? "TikTok") === p && sl.status === "open" && !sl.sessionId);
       out.set(brandPlatformKey(b.id, p), monthOutlook(month, today, chSessions, open, target, camp));
     }
     return out;
-  }, [channels, plans, month, monthlyReports, shiftSlots, planSlotTargets, planMonthTotals, sessions, today]);
+  }, [channels, plans, month, shiftSlots, planSlotTargets, planMonthTotals, sessions, today]);
   const outlooks = useMemo(() => {
     const out = new Map<string, MonthOutlook>();
     for (const b of brands) {
@@ -762,7 +758,7 @@ const TargetSection: React.FC<{ outlook: MonthOutlook; month: string; single: bo
   const band = (sign: 1 | -1) => projPts.map(([i, v]) => [i, v + sign * cp * PROJECTION_ERROR_BAND * ((i - startIdx) / span)] as [number, number]);
   const colW = (W - L - R) / Math.max(1, n - 1);
   const campIdx = o.days.map((d, i) => (o.buckets.find((b) => b.bucket !== "daily" && b.days.includes(d)) ? i : -1)).filter((i) => i >= 0);
-  const sourceLabel = o.target ? (o.target.source === "locked_plan" ? "Kế Hoạch Tháng đã chốt" : "target khung camp nhập ở Nhập Ads (tháng không có Kế Hoạch Tháng)") : null;
+  const sourceLabel = o.target ? "Kế Hoạch Tháng đã chốt" : null;
   const stat = (label: string, value: React.ReactNode, sub?: React.ReactNode) => (
     <div className="bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3">
       <p className="text-[11px] uppercase tracking-wider font-bold text-[var(--text-faint)]">{label}</p>

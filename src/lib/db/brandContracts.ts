@@ -152,15 +152,17 @@ export async function generateContractCommitments(
   };
 }
 
-// Ops sửa tay 1 tháng => luôn đóng dấu is_override để lần sinh lại từ hợp đồng không xoá mất.
-// Không để component tự quyết cờ này: quên set một lần là mất ngoại lệ đã nhập, mà lỗi chỉ lộ ra
-// vào lần bấm "sinh lại" sau đó rất lâu.
+// Ghi cam kết của MỘT tháng — chỉ Kế Hoạch Tháng gọi (gộp cấu hình 06/10). `isOverride` do NƠI GỌI tính bằng cách so
+// với điều khoản hợp đồng phủ tháng đó: khác ⇒ true (sinh lại từ hợp đồng sẽ không ghi đè), bằng ⇒ false + gắn
+// `contractId` (sửa hợp đồng ở CRM thì tháng này đổi theo). Không có hợp đồng ⇒ luôn là số sửa riêng.
 export async function upsertMonthlyCommitment(input: {
   brandId: string;
   periodMonth: string;
   platform?: ReportPlatform;
   committedHours: number;
   committedGmv?: number;
+  contractId?: string;
+  isOverride: boolean;
   note?: string;
 }): Promise<BrandMonthlyCommitment> {
   const { data, error } = await supabase
@@ -172,8 +174,9 @@ export async function upsertMonthlyCommitment(input: {
         platform: input.platform ?? "TikTok",
         committed_hours: input.committedHours,
         committed_gmv: input.committedGmv ?? null,
+        contract_id: input.contractId ?? null,
         note: input.note || null,
-        is_override: true
+        is_override: input.isOverride || !input.contractId
       },
       { onConflict: "brand_id,period_month,platform" }
     )
@@ -181,14 +184,6 @@ export async function upsertMonthlyCommitment(input: {
     .single();
   if (error) throw error;
   return commitmentFromDb(data as DbBrandMonthlyCommitment);
-}
-
-export async function deleteMonthlyCommitment(id: string): Promise<void> {
-  const { data, error } = await supabase.from("brand_monthly_commitments").delete().eq("id", id).select();
-  if (error) throw error;
-  if (((data as DbBrandMonthlyCommitment[]) ?? []).length === 0) {
-    throw new Error("Không xoá được cam kết tháng — có thể bạn không đủ quyền.");
-  }
 }
 
 // ---------------------------------------------------------------------------

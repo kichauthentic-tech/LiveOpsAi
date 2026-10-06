@@ -2,7 +2,6 @@ import { LiveSession, ShiftSlot } from "../../types";
 import { addDays, eachDay, isoWeekStart } from "../dateUtils";
 import { isPnlSession, sessionDurationHours } from "../pnl";
 import { CampDayBucket, CampOverrides, CAMP_DAY_BUCKET_ORDER, resolveCampBucketType } from "../campaignDays";
-import { MonthTargetPlan } from "./targetAllocation";
 import { expandHostPortions, isCountable, sessionHours } from "./hostPerformance";
 import { keyMetricsOfSessions, type KeyMetrics } from "../report/keyMetrics";
 
@@ -192,55 +191,30 @@ export interface MonthTarget {
   total: number;
   /** Target từng ngày trong tháng — cộng lại bằng `total`. */
   byDate: Map<string, number>;
-  source: "locked_plan" | "monthly_report";
 }
 
 /**
- * Nguồn target giống hệt applyAllocatedTargets (targetAllocation.ts) để các màn không nói hai số:
- * Kế Hoạch Tháng đã chốt thắng; không có thì kế hoạch của Report Tháng (tab 05); không có gì ⇒ null.
- * - Kế hoạch chốt: target từng ca kế hoạch rơi đúng ngày của ca; phần tổng chưa gắn được ngày (hiếm)
- *   chia đều các ngày.
- * - Report Tháng: target từng khung (D-Day/Mid/Pay/ngày thường) chia đều các ngày của khung.
+ * Nguồn target giống hệt applyAllocatedTargets (targetAllocation.ts) để các màn không nói hai số: Kế Hoạch Tháng đã
+ * chốt; không có ⇒ null (gộp cấu hình 06/10 bỏ nhánh "target khung camp nhập ở Nhập Ads"). Target từng ca kế hoạch rơi
+ * đúng ngày của ca; phần tổng chưa gắn được ngày (hiếm) chia đều các ngày.
  */
 export function monthTargetOf(
   month: string,
   lockedTotal: number | undefined,
-  lockedSlotTargets: { date: string; target: number }[],
-  reportPlan: MonthTargetPlan | null,
-  camp: CampOverrides | undefined
+  lockedSlotTargets: { date: string; target: number }[]
 ): MonthTarget | null {
+  if (!lockedTotal || lockedTotal <= 0) return null;
   const days = eachDay(`${month}-01`, monthEndOf(`${month}-01`));
   const byDate = new Map<string, number>(days.map((d) => [d, 0]));
-  if (lockedTotal && lockedTotal > 0) {
-    let placed = 0;
-    for (const s of lockedSlotTargets) {
-      if (!byDate.has(s.date)) continue;
-      byDate.set(s.date, byDate.get(s.date)! + s.target);
-      placed += s.target;
-    }
-    const rest = lockedTotal - placed;
-    if (rest > 0) for (const d of days) byDate.set(d, byDate.get(d)! + rest / days.length);
-    return { total: lockedTotal, byDate, source: "locked_plan" };
+  let placed = 0;
+  for (const s of lockedSlotTargets) {
+    if (!byDate.has(s.date)) continue;
+    byDate.set(s.date, byDate.get(s.date)! + s.target);
+    placed += s.target;
   }
-  if (reportPlan) {
-    const buckets = new Map<CampDayBucket, string[]>();
-    for (const d of days) {
-      const b = resolveCampBucketType(d, camp ?? reportPlan.camp);
-      buckets.set(b, [...(buckets.get(b) ?? []), d]);
-    }
-    let total = 0;
-    for (const b of CAMP_DAY_BUCKET_ORDER) {
-      const amount = reportPlan.byBucket[b] ?? 0;
-      if (amount <= 0) continue;
-      total += amount;
-      const ds = buckets.get(b);
-      // Khung không có ngày nào trong tháng (khoảng camp nhập lệch tháng) — dồn đều cả tháng, không để bốc hơi.
-      const spread = ds && ds.length > 0 ? ds : days;
-      for (const d of spread) byDate.set(d, byDate.get(d)! + amount / spread.length);
-    }
-    return total > 0 ? { total, byDate, source: "monthly_report" } : null;
-  }
-  return null;
+  const rest = lockedTotal - placed;
+  if (rest > 0) for (const d of days) byDate.set(d, byDate.get(d)! + rest / days.length);
+  return { total: lockedTotal, byDate };
 }
 
 export interface PendingItem {
@@ -447,7 +421,7 @@ export function combineOutlooks(month: string, today: string, list: MonthOutlook
   };
   const withTarget = list.filter((o) => o.target);
   const target: MonthTarget | null = withTarget.length
-    ? { total: withTarget.reduce((a, o) => a + o.target!.total, 0), byDate: sumMap((o) => o.target?.byDate ?? new Map()), source: withTarget[0].target!.source }
+    ? { total: withTarget.reduce((a, o) => a + o.target!.total, 0), byDate: sumMap((o) => o.target?.byDate ?? new Map()) }
     : null;
   const through = list.map((o) => o.through).filter((x): x is string => !!x).sort().pop() ?? null;
   const actual = list.reduce((a, o) => a + o.actual, 0);

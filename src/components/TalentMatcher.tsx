@@ -6,6 +6,7 @@ import { computeTalentRealTotals, computeTalentBrandPerf } from "../lib/metrics/
 import { errorMessage } from "../lib/errorMessage";
 import { useConfirm } from "../hooks/useConfirm";
 
+import { talentRateLabel } from "../lib/talentRate";
 import { fmtVndShort, fmtVndFull, fmtFixed } from "../lib/format";
 import { statusLabel } from "../lib/statusLabels";
 import { METRIC, metricHint } from "../lib/metricGlossary";
@@ -137,14 +138,12 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
   const [formRate, setFormRate] = useState(5000000);
   const [formRateHour, setFormRateHour] = useState(0);
   const [formAssistantRateHour, setFormAssistantRateHour] = useState(0);
-  const [formCommission, setFormCommission] = useState(3.5);
   const [formScore, setFormScore] = useState(0);
   // FIX L5 (audit 2026-08-21): trước đây mặc định số điện thoại/avatar demo cố định (nhìn như đã
   // nhập thật) và brandsWorkedWith luôn gán "Agency Network" (không phải brand nào trong hệ thống)
   // — dễ lưu nhầm vào DB nếu ops không để ý sửa. Để trống, input avatar đã có placeholder ví dụ.
   const [formPhone, setFormPhone] = useState("");
   const [formAvatar, setFormAvatar] = useState("");
-  const [formStatus, setFormStatus] = useState<"Available" | "Busy" | "On Live">("Available");
 
   const openAddModal = () => {
     setEditingTalent(null);
@@ -163,11 +162,9 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
     setFormRate(0);
     setFormRateHour(0);
     setFormAssistantRateHour(0);
-    setFormCommission(0);
     setFormScore(0);
     setFormPhone("");
     setFormAvatar("");
-    setFormStatus("Available");
     setIsModalOpen(true);
   };
 
@@ -187,11 +184,9 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
     setFormRate(t.ratePerSession || 0);
     setFormRateHour(t.ratePerHour || 0);
     setFormAssistantRateHour(t.assistantRatePerHour || 0);
-    setFormCommission(t.commissionRate || 0);
     setFormScore(t.overallScore || 0);
     setFormPhone(t.phone || "");
     setFormAvatar(t.avatar || "");
-    setFormStatus(t.availabilityStatus || "Available");
     setIsModalOpen(true);
   };
 
@@ -213,7 +208,9 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
       ctrAvg: Number(formCtr),
       cvrAvg: Number(formCvr), // 4 số trên không còn ô nhập: giữ nguyên giá trị cũ của hồ sơ (0 khi tạo mới)
       overallScore: Number(formScore),
-      availabilityStatus: formStatus,
+      // Trạng thái (sẵn sàng / có ca / đang live) app tự suy từ lịch (App.activeTalents — hồ sơ ở màn này là bản ĐÃ suy).
+      // Ô gõ tay bỏ 06/10 (đo: 39/39 hồ sơ = Available) — lưu nền "Sẵn sàng", không ghi trạng thái suy ra xuống DB.
+      availabilityStatus: "Available",
       brandsWorkedWith: editingTalent?.brandsWorkedWith || [],
       phone: formPhone
     };
@@ -227,7 +224,6 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
         patch.ratePerSession = Number(formRate);
         patch.ratePerHour = Number(formRateHour);
         patch.assistantRatePerHour = Number(formAssistantRateHour);
-        patch.commissionRate = Number(formCommission);
       }
       if (onUpdateTalent) onUpdateTalent(editingTalent.id, patch);
       setIsModalOpen(false);
@@ -249,7 +245,8 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
           ratePerSession: Number(formRate),
           ratePerHour: Number(formRateHour),
           assistantRatePerHour: Number(formAssistantRateHour),
-          commissionRate: Number(formCommission)
+          // Không có hoa hồng theo GMV cho talent (user chốt 06/10) — ô nhập đã bỏ.
+          commissionRate: 0
         });
         if (generatedPassword) {
           setRevealCreds({ email, password: generatedPassword });
@@ -309,7 +306,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
     .map((t) => ({
       t,
       real: computeTalentRealTotals(sessions, t.id),
-      rate: t.ratePerSession || 0
+      rate: talentRateLabel(t)
     }))
     .sort((a, b) => {
       // Tổng ca đã chạy trước (người trợ 86 ca làm việc nhiều hơn người host 3 ca), ca host là tiêu
@@ -329,13 +326,12 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
     // cộng dồn được qua brand (ca, giờ, GMV); so hiệu suất thì mở ngăn chi tiết (tách theo brand).
     { label: "Giờ host", has: (r) => r.real.hours > 0 },
     { label: "Giờ trợ", has: (r) => r.real.assistHours > 0 },
-    { label: "Rate card", has: (r) => canSeeRate && (!!r.t.rateHidden || r.rate > 0), fix: canSeeRate ? EDIT_HERE : undefined },
-    { label: "Hoa hồng", has: (r) => canSeeRate && (!!r.t.rateHidden || (r.t.commissionRate || 0) > 0), fix: canSeeRate ? EDIT_HERE : undefined },
+    { label: "Rate card", has: (r) => canSeeRate && (!!r.t.rateHidden || !!r.rate), fix: canSeeRate ? EDIT_HERE : undefined },
     { label: "SĐT", has: (r) => !!r.t.phone?.trim(), fix: EDIT_HERE },
-    { label: "Trạng thái", has: (r) => !!r.t.availabilityStatus && r.t.availabilityStatus !== "Available", fix: EDIT_HERE }
+    { label: "Trạng thái", has: (r) => !!r.t.availabilityStatus && r.t.availabilityStatus !== "Available" }
   ];
   const show = Object.fromEntries(hideableCols.map((c) => [c.label, rosterRows.some(c.has)])) as Record<string, boolean>;
-  const hiddenCols = hideableCols.filter((c) => !show[c.label] && (c.label !== "Rate card" || canSeeRate) && (c.label !== "Hoa hồng" || canSeeRate));
+  const hiddenCols = hideableCols.filter((c) => !show[c.label] && (c.label !== "Rate card" || canSeeRate));
   const colFixes = [...new Set(hiddenCols.map((c) => c.fix).filter((f): f is string => !!f))];
   // Đếm cột thay vì gõ số: bảng này có 8 cột bật/tắt được (M4 đã dính 1 lần colSpan lệch).
   const colCount = 2 + hideableCols.filter((c) => show[c.label]).length + 1;
@@ -417,7 +413,6 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                 {show["Giờ host"] && <th className={`${SUB_COL} text-right`}>Giờ host</th>}
                 {show["Giờ trợ"] && <th className={`${SUB_COL} text-right`}>Giờ trợ</th>}
                 {show["Rate card"] && <th className={`${SUB_COL} text-right`}>Rate card</th>}
-                {show["Hoa hồng"] && <th className={`${SUB_COL} text-right`}>Hoa hồng</th>}
                 {show["SĐT"] && <th className={SUB_COL}>SĐT</th>}
                 {show["Trạng thái"] && <th className={SUB_COL}>Trạng thái</th>}
                 <th className="py-2.5 px-2" />
@@ -483,12 +478,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                   )}
                   {show["Rate card"] && (
                     <td className={`${SUB_COL} text-right font-mono text-[var(--text)]`}>
-                      {t.rateHidden ? "ẩn" : rate > 0 ? fmtVndFull(rate) : <Dash />}
-                    </td>
-                  )}
-                  {show["Hoa hồng"] && (
-                    <td className={`${SUB_COL} text-right font-mono text-[var(--accent-text)]`}>
-                      {t.rateHidden ? "ẩn" : t.commissionRate > 0 ? `${t.commissionRate}%` : <Dash />}
+                      {t.rateHidden ? "ẩn" : rate ?? <Dash />}
                     </td>
                   )}
                   {show["SĐT"] && <td className={`${SUB_COL} font-mono text-[var(--text-muted)]`}>{t.phone || <Dash />}</td>}
@@ -693,7 +683,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                 </div>
               )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="font-bold text-[var(--text-muted)] block mb-1">Vai Trò</label>
                   <select
@@ -715,18 +705,6 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                     <option value="Nữ">Nữ</option>
                     <option value="Nam">Nam</option>
                     <option value="Khác">Khác</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="font-bold text-[var(--text-muted)] block mb-1">Trạng Thái</label>
-                  <select
-                    value={formStatus}
-                    onChange={(e) => setFormStatus(e.target.value as "Available" | "Busy" | "On Live")}
-                    className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
-                  >
-                    <option value="Available">Sẵn sàng</option>
-                    <option value="Busy">Đang bận</option>
-                    <option value="On Live">Đang live</option>
                   </select>
                 </div>
               </div>
@@ -785,16 +763,6 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                       <p className="text-[11px] text-[var(--text-faint)] mt-1">
                         {Number(formAssistantRateHour) > 0 ? "Ca làm trợ live tính theo rate này × giờ." : "Để 0 = ca làm trợ tính theo rate host ở trên."}
                       </p>
-                    </div>
-                    <div>
-                      <label className="font-bold text-[var(--text-muted)] block mb-1">Hoa Hồng % (Commission)</label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        value={formCommission}
-                        onChange={(e) => setFormCommission(Number(e.target.value))}
-                        className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
-                      />
                     </div>
                   </>
                 )}
@@ -968,8 +936,8 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
 
               {canSeeRate && (
                 <div className="grid grid-cols-2 gap-2 bg-amber-950/30 p-3 rounded-xl border border-amber-500/30">
-                  <div>Rate Card: <strong className="text-[var(--text)] block text-sm font-bold">{detailTalent.rateHidden ? "ẩn" : detailTalent.ratePerSession > 0 ? fmtVndFull(detailTalent.ratePerSession) : <span className="text-[var(--text-faint)] font-normal">chưa đặt</span>}</strong></div>
-                  <div>Hoa Hồng: <strong className="text-[var(--accent-text)] block text-sm font-bold">{detailTalent.rateHidden ? "ẩn" : (detailTalent.commissionRate || 0) > 0 ? `${detailTalent.commissionRate}%` : <span className="text-[var(--text-faint)] font-normal">chưa đặt</span>}</strong></div>
+                  <div>Rate Card: <strong className="text-[var(--text)] block text-sm font-bold">{detailTalent.rateHidden ? "ẩn" : talentRateLabel(detailTalent) ?? <span className="text-[var(--text-faint)] font-normal">chưa đặt</span>}</strong></div>
+                  <div>Rate trợ live: <strong className="text-[var(--text)] block text-sm font-bold">{detailTalent.rateHidden ? "ẩn" : (detailTalent.assistantRatePerHour || 0) > 0 ? `${fmtVndFull(detailTalent.assistantRatePerHour || 0)}/giờ` : <span className="text-[var(--text-faint)] font-normal">theo rate host</span>}</strong></div>
                 </div>
               )}
             </div>

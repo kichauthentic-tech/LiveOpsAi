@@ -31,7 +31,7 @@ describe("Dự kiến cuối tháng — brand chưa có lịch sử 28 ngày (l�
     const s1 = ca("2026-10-05", 0, { totalViews: 0 }); // đã qua giờ, chưa có số
     const shifts = [openSlot("o2", "2026-10-20")];
     const rr = planRunRate("2026-10", plan, shifts, [s1], "2026-10-07");
-    const target = monthTargetOf("2026-10", 100e6, plan.map((p) => ({ date: p.date, target: p.targetGmv })), null, undefined);
+    const target = monthTargetOf("2026-10", 100e6, plan.map((p) => ({ date: p.date, target: p.targetGmv })));
     const o = monthOutlook("2026-10", "2026-10-07", [s1], shifts, target, undefined);
     expect(o.rates).toBeNull();
     expect(o.projectionMethod).toBe("none");
@@ -46,7 +46,7 @@ describe("Dự kiến cuối tháng — brand chưa có lịch sử 28 ngày (l�
     const rr = planRunRate("2026-10", plan, shifts, [s1], "2026-10-07");
     // Dashboard gọi monthOutlook KHÔNG kèm target; CEO kèm target từ kế hoạch chốt.
     const dash = projectMonthEnd(rr, monthOutlook("2026-10", "2026-10-07", [s1], shifts, null, undefined));
-    const target = monthTargetOf("2026-10", 100e6, plan.map((p) => ({ date: p.date, target: p.targetGmv })), null, undefined);
+    const target = monthTargetOf("2026-10", 100e6, plan.map((p) => ({ date: p.date, target: p.targetGmv })));
     const ceo = monthOutlook("2026-10", "2026-10-07", [s1], shifts, target, undefined);
     // Có 1 ca có số trong 28 ngày ⇒ rates có ⇒ cả hai chiếu theo giờ: 40M + 2h × 20M/giờ = 80M.
     expect(dash).toEqual({ value: 80e6, method: "gmv_per_hour" });

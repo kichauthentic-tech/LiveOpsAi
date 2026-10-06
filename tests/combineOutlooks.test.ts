@@ -12,7 +12,7 @@ const ca = (brandId: string, date: string, gmv: number): LiveSession =>
 function scene() {
   const crocs = [ca("crocs", "2026-09-10", 3_000_000_000), ca("crocs", "2026-09-14", 530_000_000)];
   const vera = [ca("vera", "2026-09-10", 18_200_000)];
-  const target = monthTargetOf("2026-09", 100_000_000, [{ date: "2026-09-10", target: 14_700_000 }, { date: "2026-09-30", target: 85_300_000 }], null, undefined);
+  const target = monthTargetOf("2026-09", 100_000_000, [{ date: "2026-09-10", target: 14_700_000 }, { date: "2026-09-30", target: 85_300_000 }]);
   const oC = monthOutlook("2026-09", "2026-09-15", crocs, [], null, undefined);
   const oV = monthOutlook("2026-09", "2026-09-15", vera, [], target, undefined);
   return { oC, oV, all: combineOutlooks("2026-09", "2026-09-15", [oC, oV]) };

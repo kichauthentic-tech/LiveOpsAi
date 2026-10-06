@@ -35,7 +35,7 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
     key: "manage_crm_projects",
     label: "CRM và hợp đồng",
     category: "Kinh doanh",
-    description: "Mở CRM (thông tin brand, cách thu phí, Rate Card) và Cam Kết Hợp Đồng (giờ cam kết mỗi tháng)."
+    description: "Mở CRM: thông tin brand và Hợp đồng & giá (cách thu phí, giá, hợp đồng + giờ cam kết, phòng live mặc định)."
   },
   {
     key: "manage_tiktok_api",

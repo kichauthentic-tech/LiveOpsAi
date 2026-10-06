@@ -8,7 +8,7 @@ import {
   TalentRateHistoryEntry,
   BrandPlatformRateHistoryEntry
 } from "../types";
-import { getCanonicalAdsCost } from "./metrics/adsCost";
+import { sessionAdsCost } from "./metrics/adsCost";
 import { hasLiveEvidence } from "./sessionStatus";
 import { hasStaffSegments, segmentsOfRole, sessionMinutes, type StaffRole } from "./staffSegments";
 
@@ -64,6 +64,8 @@ export interface SessionPnl {
   // LƯU Ý dễ nhầm: isHourly là mô hình tính DOANH THU AGENCY của BRAND (grossAgencyRev), hoàn
   // toàn tách biệt với việc talent hưởng lương theo giờ hay theo phiên (hostPaidHourly bên dưới).
   isHourly: boolean;
+  /** % hoa hồng đang áp (brand × sàn ở CRM, hoặc mặc định khi chưa đặt) — chỉ có nghĩa khi !isHourly. */
+  agencyCommissionRate: number;
   grossAgencyRev: number;
   hostPayout: number;
   netProfit: number;
@@ -152,11 +154,13 @@ export function computeSessionPnl(
   const gmv = excluded ? 0 : session.actualGmv;
   const brandRateAtDate = findBrandRateAsOf(brandPlatformRateHistory, session.brandId, session.platform, session.date);
   const currentBrandRate = brandPlatformRates.find((r) => r.brandId === session.brandId && r.platform === session.platform);
-  // % hoa hồng theo brand (0118) — chỉ thay mặc định 15% khi ca CHƯA có dòng session_finance; ops đã
-  // chốt tay ở Finance thì số của ca thắng.
+  // % hoa hồng agency: CHỈ theo brand × sàn ở CRM (0118, giá tại ngày ca). Gộp cấu hình 06/10: bỏ ô % sửa từng ca ở
+  // Finance — trước đó hễ ca có dòng session_finance (kể cả chỉ vì bấm Duyệt hay nhập chi phí studio) là cột
+  // agency_commission_rate (DB mặc định 15) thắng % của brand, lặng lẽ. Đo 06/10: 0 dòng session_finance trên production.
   const brandCommission = brandRateAtDate?.commissionRate ?? currentBrandRate?.commissionRate;
+  const agencyCommissionRate = brandCommission ?? DEFAULT_FINANCE.agencyCommissionRate;
   const financeRow = financeBySessionId[session.id];
-  const finance = financeRow ?? { sessionId: session.id, ...DEFAULT_FINANCE, agencyCommissionRate: brandCommission ?? DEFAULT_FINANCE.agencyCommissionRate };
+  const finance = financeRow ?? { sessionId: session.id, ...DEFAULT_FINANCE };
   const talent = talentById[session.hostId];
   const brand = brandById[session.brandId];
   const talentRateAtDate = talent ? findTalentRateAsOf(talentRateHistory, talent.id, session.date) : undefined;
@@ -180,7 +184,7 @@ export function computeSessionPnl(
     ? 0
     : isHourly
       ? sessionDurationHours(session.startTime, session.endTime) * hourlyRate
-      : (estimatedNmv * finance.agencyCommissionRate) / 100;
+      : (estimatedNmv * agencyCommissionRate) / 100;
   let hostPayout = hostFixRate + (gmv * hostCommRate) / 100;
 
   // OT/off sớm khai theo CA (report là của ca, không phải của từng người) nên giờ tính lương của
@@ -256,7 +260,7 @@ export function computeSessionPnl(
     coHostPayout = payouts.filter((x) => x.role === "co_host").reduce((sum, x) => sum + x.payout, 0);
   }
 
-  const totalCost = hostPayout + coHostPayout + finance.studioCost + getCanonicalAdsCost(session, finance);
+  const totalCost = hostPayout + coHostPayout + finance.studioCost + sessionAdsCost(session);
   const netProfit = grossAgencyRev - totalCost;
 
   // Đ3: ghi nhận đúng những ô đang bị thay bằng 0/mặc định. Điều kiện bám sát ĐƯỜNG TÍNH thật ở
@@ -272,14 +276,12 @@ export function computeSessionPnl(
   if (hostRateMissing) missingInputs.push("host_rate");
   if (coHostRateMissing) missingInputs.push("cohost_rate");
   if (isHourly && hourlyRate <= 0) missingInputs.push("brand_rate");
-  // Chỉ là "mặc định" khi KHÔNG có dòng session_finance cho ca này VÀ brand chưa đặt % hoa hồng (0118) —
-  // ops đã vào sửa thì con số 15% là do họ chọn giữ, không phải app tự bịa.
-  if (!isHourly && !financeRow && brandCommission == null) missingInputs.push("commission_default");
+  if (!isHourly && brandCommission == null) missingInputs.push("commission_default");
 
   return {
     missingInputs,
     excluded,
-    session, finance, talent, isHourly, grossAgencyRev, hostPayout, netProfit,
+    session, finance, talent, isHourly, agencyCommissionRate, grossAgencyRev, hostPayout, netProfit,
     hostPaidHourly,
     billableHours,
     otMinutes: session.report?.otMinutes ?? 0,

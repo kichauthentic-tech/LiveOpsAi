@@ -27,7 +27,7 @@ describe("lockedPlanTargetsFromRows", () => {
   test("Bản Tin CEO: % đạt tính trên 100M, không phải 14,7M ('Đạt 124%' của lỗi cũ)", () => {
     const t = lockedPlanTargetsFromRows(rows);
     const key = `${VERA}|2026-09`;
-    const target = monthTargetOf("2026-09", t.monthTotals.get(key), t.slotTargets.get(key) ?? [], null, undefined)!;
+    const target = monthTargetOf("2026-09", t.monthTotals.get(key), t.slotTargets.get(key) ?? [])!;
     expect(target.total).toBe(100_000_000);
     expect(target.byDate.get("2026-09-30")).toBe(85_300_000); // đúng ngày, không bị rải đều cả tháng
     const s = { id: "s1", brandId: VERA, date: "2026-09-28", startTime: "00:00", endTime: "00:30", status: "Completed", actualGmv: 18_200_000, totalViews: 500, liveDurationMinutes: 28 } as LiveSession;

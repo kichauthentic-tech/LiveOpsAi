@@ -94,7 +94,7 @@ describe("planRunRate — luật plan ban đầu", () => {
   test("khớp Bản Tin CEO (monthOutlook) khi cùng kế hoạch đã chốt", () => {
     const { sessions, shifts, plan } = example();
     const r = planRunRate("2026-10", plan, shifts, sessions, "2026-10-07");
-    const tgt = monthTargetOf("2026-10", 400e6, plan.map((p) => ({ date: p.date, target: p.targetGmv })), null, undefined);
+    const tgt = monthTargetOf("2026-10", 400e6, plan.map((p) => ({ date: p.date, target: p.targetGmv })));
     const o = monthOutlook("2026-10", "2026-10-07", sessions, [], tgt, undefined);
     expect(o.runRate).toBeCloseTo(r.total.runRate!);
   });

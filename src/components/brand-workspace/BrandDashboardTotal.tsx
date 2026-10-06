@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, LayoutDashboard } from "lucide-react";
-import { BrandMonthPlan, BrandMonthPlanSlot, BrandMonthlyReport, LiveSession, ShiftSlot, UserRole } from "../../types";
+import { BrandMonthPlan, BrandMonthPlanSlot, LiveSession, ShiftSlot, UserRole } from "../../types";
 import { monthPlanRead } from "../../lib/db/monthPlans";
 import { effectiveCamp } from "../../lib/campaignDays";
 import { todayVn } from "../../lib/performance/brandCommitment";
@@ -8,7 +8,7 @@ import { lastDataDate, monthEndOf, monthOutlook, RUN_RATE_BAD, RUN_RATE_WARN, to
 import { planRunRate, projectMonthEnd } from "../../lib/performance/planRunRate";
 import { fmtMonth, fmtVndShort } from "../../lib/format";
 import { METRIC, metricHint } from "../../lib/metricGlossary";
-import { brandMonthKey, type ReportPlatform } from "../../lib/reportPlatform";
+import { type ReportPlatform } from "../../lib/reportPlatform";
 import { PageHeader } from "../common/PageHeader";
 import { MonthPicker } from "../common/MonthPicker";
 
@@ -25,7 +25,6 @@ interface Props {
   sessions: LiveSession[];
   shiftSlots: ShiftSlot[];
   currentRole: UserRole;
-  monthlyReports?: Map<string, BrandMonthlyReport>;
   onOpenMonthPlan: () => void;
 }
 
@@ -53,7 +52,7 @@ interface Row {
   projection: number | null;
 }
 
-export default function BrandDashboardTotal({ brandId, brandName, platforms, onPickPlatform, sessions, shiftSlots, currentRole, monthlyReports, onOpenMonthPlan }: Props) {
+export default function BrandDashboardTotal({ brandId, brandName, platforms, onPickPlatform, sessions, shiftSlots, currentRole, onOpenMonthPlan }: Props) {
   const today = todayVn();
   const isOps = OPS_ROLES.includes(currentRole);
   const brandSessions = useMemo(() => sessions.filter((s) => s.brandId === brandId), [sessions, brandId]);
@@ -88,7 +87,7 @@ export default function BrandDashboardTotal({ brandId, brandName, platforms, onP
         const hidden = !isOps && inMonth.some((s) => !s.monthPublished);
         const t = totalsOf(inMonth);
         const plan = plansReady ? plans!.byPlatform[p] ?? null : null;
-        const camp = effectiveCamp(plan?.plan.campRanges, monthlyReports?.get(brandMonthKey(brandId, month, p)));
+        const camp = effectiveCamp(plan?.plan.campRanges);
         const slots = shiftSlots.filter((sl) => sl.brandId === brandId && (sl.platform ?? "TikTok") === p);
         const locked = plan?.plan.status === "locked";
         const rr = locked ? planRunRate(month, plan!.slots, slots, ch, today, camp) : null;
@@ -111,7 +110,7 @@ export default function BrandDashboardTotal({ brandId, brandName, platforms, onP
           projection: proj?.value ?? null
         };
       }),
-    [platforms, brandSessions, mStart, mEnd, isOps, plansReady, plans, monthlyReports, brandId, month, shiftSlots, today]
+    [platforms, brandSessions, mStart, mEnd, isOps, plansReady, plans, brandId, month, shiftSlots, today]
   );
 
   const shown = rows.filter((r) => !r.hidden);

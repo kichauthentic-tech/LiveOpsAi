@@ -6,7 +6,7 @@ import { crossBrandCheck, PlanDraftSlot } from "../src/lib/scheduling/monthPlanG
 import { applyAllocatedTargets } from "../src/lib/performance/targetAllocation";
 import { computeSessionPnl, isPnlSession } from "../src/lib/pnl";
 import { hasLiveEvidence, hasSessionData, isUnconfirmedPast } from "../src/lib/sessionStatus";
-import { BrandMonthlyReport, LiveSession, ShiftSlot, Talent } from "../src/types";
+import { LiveSession, ShiftSlot, Talent } from "../src/types";
 
 const ca = (id: string, over: Partial<LiveSession> = {}): LiveSession =>
   ({
@@ -18,26 +18,17 @@ const ca = (id: string, over: Partial<LiveSession> = {}): LiveSession =>
   }) as LiveSession;
 
 describe("#8 khung camp — một luật cho mọi màn", () => {
-  // Đổi 2026-10-04 (audit người mới): tháng có Kế Hoạch Tháng thì CHỈ kế hoạch quyết khung camp — một chỗ nhập.
-  test("tháng có Kế Hoạch Tháng: khung của kế hoạch, bỏ qua ô ở Nhập Ads", () => {
-    const camp = effectiveCamp(
-      { midmonth: { start: "2026-10-12", end: "2026-10-14" }, payday: { start: "2026-10-24", end: "2026-10-26" } },
-      { campMidmonthStart: "2026-10-15", campMidmonthEnd: "2026-10-17" } as BrandMonthlyReport
-    );
-    expect(camp.midmonth).toEqual({ start: "2026-10-12", end: "2026-10-14" });
-    expect(camp.payday).toEqual({ start: "2026-10-24", end: "2026-10-26" });
-    // Kế hoạch có nhưng không đặt khung nào ({}) vẫn là "có kế hoạch": ô Nhập Ads không được chen vào.
-    expect(effectiveCamp({}, { campMidmonthStart: "2026-10-15", campMidmonthEnd: "2026-10-17" } as BrandMonthlyReport)).toEqual({});
-  });
-  test("tháng không có Kế Hoạch Tháng: khoảng nhập ở Nhập Ads, thay thế lịch cố định", () => {
-    const camp = effectiveCamp(undefined, { campMidmonthStart: "2026-10-15", campMidmonthEnd: "2026-10-17" } as BrandMonthlyReport);
+  // Gộp cấu hình 06/10: khung camp của một tháng CHỈ nhập ở Kế Hoạch Tháng (ô ở Nhập Ads cho tháng không có kế hoạch đã bỏ).
+  test("tháng có Kế Hoạch Tháng: khung của kế hoạch, thay thế lịch cố định", () => {
+    const camp = effectiveCamp({ midmonth: { start: "2026-10-15", end: "2026-10-17" }, payday: { start: "2026-10-24", end: "2026-10-26" } });
     expect(camp.midmonth).toEqual({ start: "2026-10-15", end: "2026-10-17" });
     // Ngày 13 không còn là Mid-Month (khoảng ghi đè THAY THẾ, không cộng thêm).
     expect(resolveCampBucketType("2026-10-13", camp)).toBe("daily");
     expect(resolveCampBucketType("2026-10-16", camp)).toBe("midmonth");
   });
-  test("không có gì ⇒ rỗng (lịch cố định)", () => {
-    expect(effectiveCamp(undefined, null)).toEqual({});
+  test("không có kế hoạch, hoặc kế hoạch không đặt khung ⇒ rỗng (lịch cố định)", () => {
+    expect(effectiveCamp(undefined)).toEqual({});
+    expect(effectiveCamp({})).toEqual({});
   });
 });
 
@@ -69,12 +60,9 @@ describe("#12 kiểm chéo brand khác khi lập kế hoạch", () => {
 });
 
 describe("#7 target khi tháng đã có Kế Hoạch Tháng chốt", () => {
-  test("chưa ca kế hoạch nào có người ⇒ ca mở lẻ target 0, KHÔNG lấy từ ô 'Kế hoạch tháng sau' của Report", () => {
-    const reports = new Map<string, BrandMonthlyReport>([
-      ["crocs|2026-09", { brandId: "crocs", periodMonth: "2026-09-01", planTargetGmv: 90_000_000, planPctDaily: 100 } as BrandMonthlyReport]
-    ]);
-    const lone = ca("le", { date: "2026-10-10" });
-    const out = applyAllocatedTargets([lone], reports, new Map(), new Map([["crocs|2026-10", 120_000_000]]));
+  test("chưa ca kế hoạch nào có người ⇒ ca mở lẻ target 0", () => {
+    const lone = ca("le", { date: "2026-10-10", targetGmv: 5 });
+    const out = applyAllocatedTargets([lone], new Map(), new Map([["crocs|2026-10", 120_000_000]]));
     expect(out.find((s) => s.id === "le")?.targetGmv).toBe(0);
   });
 });

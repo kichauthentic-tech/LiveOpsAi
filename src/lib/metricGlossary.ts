@@ -114,7 +114,7 @@ export const METRIC_HINT: Record<string, string> = {
   [METRIC.showGpm]: "GMV trên 1.000 LIVE impressions",
   [METRIC.watchGpm]: "GMV trên 1.000 Views",
   [METRIC.refundRate]: "Refunds ÷ GMV — hoàn tiền thực tế của shop trong kỳ",
-  [METRIC.returnCancelRate]: "Tỷ lệ hoàn hủy giả định ở Rate Card, dùng để ước tính NMV",
+  [METRIC.returnCancelRate]: "Tỷ lệ hoàn hủy giả định nhập ở CRM (Hợp đồng & giá), dùng để ước tính NMV",
   [METRIC.roas]: "GMV ÷ Ads cost",
   [METRIC.share]: "Phần trăm trên tổng"
 };

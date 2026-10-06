@@ -16,7 +16,7 @@ export const AGENCY_TAB_LABELS: Record<string, string> = {
   talents: "Talent Pool",
   studios: "Studios & Gear",
   crm: "CRM",
-  brand_commitment: "Cam Kết Hợp Đồng",
+  brand_commitment: "Cam Kết Hợp Đồng", // tab đã gộp vào CRM + Kế Hoạch Tháng (06/10) — giữ tên để "Lượt Mở Tab" đọc được lượt cũ
   tiktok_api: "TikTok API",
   finance: "Finance & P&L",
   user_settings: "Phân Quyền & Role",
@@ -37,9 +37,9 @@ export const BRAND_TAB_LABELS: Record<string, string> = {
   brand_sessions: "Sổ Ca",
   brand_skus: "Sản phẩm lên live",
   brand_monthly_report: "Report Tháng",
-  brand_commitment_view: "Cam Kết Hợp Đồng",
+  brand_commitment_view: "Hợp Đồng",
   brand_next_month_plan: "Kế Hoạch Tháng Sau",
-  brand_rate_card: "Rate Card",
+  brand_rate_card: "Rate Card", // đã gộp vào tab Hợp Đồng (06/10) — giữ tên cho lượt mở cũ
   brand_affiliate: "Affiliate",
   brand_ads_report: "Nhập Ads",
   brand_dataraw: "Dữ Liệu Gốc",

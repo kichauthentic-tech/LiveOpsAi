@@ -218,7 +218,7 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
           </div>
         </div>
 
-        <div className="bg-amber-950/30 border border-amber-500/30 rounded-xl p-3 grid grid-cols-2 gap-3 text-xs">
+        <div className="bg-amber-950/30 border border-amber-500/30 rounded-xl p-3 text-xs">
           <div>
             <div className="text-amber-300/80">Rate Card</div>
             {/* rateHidden = view `talents_secure` mask cột lương với người đang đăng nhập. Phải hiện
@@ -240,25 +240,13 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
               <div className="text-[11px] text-amber-300/80 mt-0.5">Trợ live: {fmtVndFull(myTalent.assistantRatePerHour || 0)}/giờ</div>
             )}
           </div>
-          <div>
-            <div className="text-amber-300/80">Hoa Hồng</div>
-            <div className="font-bold text-[var(--accent-text)] mt-0.5">
-              {myTalent.rateHidden ? (
-                <span className="text-[var(--text-muted)]">chưa xem được</span>
-              ) : (myTalent.commissionRate || 0) > 0 ? (
-                `${myTalent.commissionRate}%`
-              ) : (
-                <Empty>ops chưa nhập</Empty>
-              )}
-            </div>
-          </div>
         </div>
         <p className="text-[11px] text-[var(--text-faint)]">
           {myTalent.rateHidden
-            ? "Tài khoản của bạn chưa được liên kết đúng hồ sơ Talent nên chưa xem được Rate Card/Hoa hồng — báo Admin gán lại giúp."
+            ? "Tài khoản của bạn chưa được liên kết đúng hồ sơ Talent nên chưa xem được Rate Card — báo Admin gán lại giúp."
             : (myTalent.ratePerHour || 0) === 0 && (myTalent.ratePerSession || 0) === 0
               ? "Rate Card của bạn chưa được nhập nên chưa tính được lương — nhờ ops nhập ở Talent Pool."
-              : "Rate Card/Hoa hồng chỉ hiện cho chính bạn và CEO/Admin."}
+              : "Rate Card chỉ hiện cho chính bạn và CEO/Admin."}
         </p>
       </div>
 

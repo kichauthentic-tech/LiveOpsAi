@@ -1,13 +1,9 @@
-import { LiveSession, SessionFinance } from "../../types";
+import { LiveSession } from "../../types";
 
-// Nguồn chuẩn = live_session_reports.ads_cost (trợ live nhập ngay sau ca, TikTok-only — Shopee
-// chưa có input này nên mặc định 0).
-// session_finance.ads_cost giữ nguyên schema cũ (not null default 0, áp dụng mọi platform) nhưng
-// ĐỔI VAI TRÒ: không còn là nguồn nhập độc lập, chỉ còn là "điều chỉnh nội bộ agency" — thắng khi
-// ops đã thật sự gõ 1 số khác 0 vào Finance & P&L (quy ước tạm bợ do bước 1 không đổi schema; cột
-// chưa nullable nên không phân biệt được "0 vì chưa ai đụng" với "0 vì ops cố tình đặt 0" — sẽ có
-// migration làm nullable đúng nghĩa ở bước 3/4).
-export function getCanonicalAdsCost(session: LiveSession, finance?: Pick<SessionFinance, "adsCost">): number {
-  if (finance && finance.adsCost !== 0) return finance.adsCost;
+// Chi phí Ads của MỘT ca (chỉ cho lãi/lỗ từng ca ở Finance) = số trợ live nhập ở report ca (TikTok; Shopee không có ô
+// này). Ads của cả tháng lấy từ file TikTok/Shopee Ads ở Nhập Ads — không cộng hai số.
+// Gộp cấu hình 06/10: bỏ ô Ads từng ca ở Finance (`session_finance.ads_cost` — trước đó "thắng khi khác 0", thành hai
+// chỗ nhập cho cùng một số). Đo 06/10: 0 dòng session_finance, 0 report ca có ads_cost khác 0 trên production.
+export function sessionAdsCost(session: LiveSession): number {
   return session.report?.adsCost ?? 0;
 }

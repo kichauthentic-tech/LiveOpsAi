@@ -5,6 +5,7 @@ import { getTodayDate } from "../lib/dateUtils";
 import { useToast } from "../hooks/useToast";
 import { useConfirm } from "../hooks/useConfirm";
 import { statusLabel } from "../lib/statusLabels";
+import { SESSION_STATUS_LABEL_VI } from "../lib/sessionStatusUi";
 import { PageHeader } from "./common/PageHeader";
 
 interface StudioEquipmentProps {
@@ -59,7 +60,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
   const [studioRoomNumber, setStudioRoomNumber] = useState("");
   const [studioCapacity, setStudioCapacity] = useState(6);
   const [studioTheme, setStudioTheme] = useState("");
-  const [studioStatus, setStudioStatus] = useState<"Live Now" | "Booked" | "Available" | "Maintenance">("Available");
+  const [studioStatus, setStudioStatus] = useState<"Available" | "Maintenance">("Available");
 
   // Equipment Modal State
   const [isEquipmentModalOpen, setIsEquipmentModalOpen] = useState(false);
@@ -73,6 +74,12 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
   const [eqLastCheckDate, setEqLastCheckDate] = useState("");
 
   const todayStr = getTodayDate();
+  // Trạng thái phòng HIỂN THỊ = suy từ lịch (gộp cấu hình 06/10): đang có ca "Live Now" ở phòng ⇒ đang live; ô gõ tay chỉ
+  // còn "Sẵn sàng / Bảo trì". Trước đó nhãn LIVE NOW đọc thẳng cột status gõ tay (đo 06/10: 5/5 phòng = Available) nên
+  // không bao giờ bật dù phòng đang live.
+  const liveStudioIds = new Set(sessions.filter((x) => x.status === "Live Now" && x.studioId).map((x) => x.studioId));
+  const shownStatus = (st: Studio): Studio["status"] => (st.status === "Maintenance" ? "Maintenance" : liveStudioIds.has(st.id) ? "Live Now" : "Available");
+
   const todaysBookings = sessions
     .filter((s) => s.date === todayStr && s.status !== "Cancelled")
     .sort((a, b) => a.startTime.localeCompare(b.startTime));
@@ -94,7 +101,8 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
     setStudioRoomNumber(s.roomNumber);
     setStudioCapacity(s.capacity);
     setStudioTheme(s.theme);
-    setStudioStatus(s.status);
+    // Chỉ "Bảo trì" là trạng thái gõ tay; còn lại lưu "Sẵn sàng" (đang live do lịch quyết, không lưu).
+    setStudioStatus(s.status === "Maintenance" ? "Maintenance" : "Available");
     setIsStudioModalOpen(true);
   };
 
@@ -262,11 +270,10 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
 
                     <div className="flex items-center gap-1.5">
                       <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${
-                        s.status === "Live Now" ? "bg-red-500/20 text-red-300 animate-pulse" :
-                        s.status === "Booked" ? "bg-amber-500/20 text-amber-300" :
-                        s.status === "Maintenance" ? "bg-[var(--surface-hover)] text-[var(--text-muted)]" : "bg-emerald-500/20 text-emerald-300"
+                        shownStatus(s) === "Live Now" ? "bg-red-500/20 text-red-300 animate-pulse" :
+                        shownStatus(s) === "Maintenance" ? "bg-[var(--surface-hover)] text-[var(--text-muted)]" : "bg-emerald-500/20 text-emerald-300"
                       }`}>
-                        {statusLabel(s.status)}
+                        {statusLabel(shownStatus(s))}
                       </span>
 
                       <button
@@ -334,7 +341,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
                           : "bg-amber-500/20 text-amber-300"
                       }`}
                     >
-                      {s.status === "Live Now" ? "LIVE NOW" : s.status.toUpperCase()}
+                      {SESSION_STATUS_LABEL_VI[s.status] ?? s.status}
                     </span>
                   </div>
                 ))}
@@ -496,7 +503,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
                   <label className="font-bold text-[var(--text-muted)] block mb-1">Trạng thái</label>
                   <select
                     value={studioStatus}
-                    onChange={(e) => setStudioStatus(e.target.value as "Live Now" | "Booked" | "Available" | "Maintenance")}
+                    onChange={(e) => setStudioStatus(e.target.value as "Available" | "Maintenance")}
                     className="w-full p-2.5 border border-[var(--border)] bg-[var(--surface-base)] rounded-xl font-semibold text-[var(--text)]"
                   >
                     <option value="Available">Sẵn sàng</option>

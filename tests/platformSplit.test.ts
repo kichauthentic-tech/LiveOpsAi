@@ -2,12 +2,12 @@
 // Chạy: npx vitest run tests/platformSplit.test.ts
 import { describe, expect, test } from "vitest";
 import { brandMonthKey, brandPlatformKey, brandPlatformsOf, inPlatformScope, sessionBrandMonthKey } from "../src/lib/reportPlatform";
-import { applyAllocatedTargets, buildMonthTargetPlan } from "../src/lib/performance/targetAllocation";
+import { applyAllocatedTargets } from "../src/lib/performance/targetAllocation";
 import { lockedPlanTargetsFromRows } from "../src/lib/scheduling/lockedPlanTargets";
-import { brandsMissingCommitment, computeAllProgress, computeSchedulingGaps } from "../src/lib/performance/brandCommitment";
+import { computeAllProgress, computeSchedulingGaps, monthCommitmentOf } from "../src/lib/performance/brandCommitment";
 import { buildTodos } from "../src/lib/todoList";
 import { parsePlatformParam, withPlatformParam } from "../src/lib/routes";
-import type { Brand, BrandMonthPlan, BrandMonthlyCommitment, BrandMonthlyReport, LiveSession, ShiftSlot } from "../src/types";
+import type { Brand, BrandMonthPlan, BrandMonthlyCommitment, LiveSession, ShiftSlot } from "../src/types";
 
 const B = "brand-vera";
 const ca = (id: string, platform: "TikTok" | "Shopee", extra: Partial<LiveSession> = {}): LiveSession =>
@@ -47,7 +47,7 @@ describe("target từng ca theo sàn (0140)", () => {
     const tt = ca("tt", "TikTok");
     const sp = ca("sp", "Shopee", { targetGmv: 7_000_000 }); // số target cũ trong DB của ca Shopee
     const planTotals = new Map([[brandMonthKey(B, "2026-10", "TikTok"), 30_000_000]]);
-    const out = applyAllocatedTargets([tt, sp], new Map(), new Map([["tt", 30_000_000]]), planTotals);
+    const out = applyAllocatedTargets([tt, sp], new Map([["tt", 30_000_000]]), planTotals);
     expect(out.find((s) => s.id === "tt")!.targetGmv).toBe(30_000_000);
     // Shopee chưa có kế hoạch nào ⇒ giữ nguyên số đang có, không bị kế hoạch TikTok xoá về 0.
     expect(out.find((s) => s.id === "sp")!.targetGmv).toBe(7_000_000);
@@ -60,18 +60,8 @@ describe("target từng ca theo sàn (0140)", () => {
       [brandMonthKey(B, "2026-10", "TikTok"), 30_000_000],
       [brandMonthKey(B, "2026-10", "Shopee"), 50_000_000]
     ]);
-    const out = applyAllocatedTargets([tt, sp, off], new Map(), new Map([["tt", 30_000_000], ["sp", 50_000_000]]), planTotals);
+    const out = applyAllocatedTargets([tt, sp, off], new Map([["tt", 30_000_000], ["sp", 50_000_000]]), planTotals);
     expect(Object.fromEntries(out.map((s) => [s.id, s.targetGmv]))).toEqual({ tt: 30_000_000, sp: 50_000_000, off: 0 });
-  });
-  test("target khung camp (tháng không có kế hoạch) đọc report ĐÚNG SÀN và chỉ chia cho ca sàn đó", () => {
-    const reports = new Map<string, BrandMonthlyReport>([
-      [brandMonthKey(B, "2026-10", "Shopee"), { brandId: B, periodMonth: "2026-10-01", platform: "Shopee", campMidmonthStart: "2026-10-10", campMidmonthEnd: "2026-10-10", campMidmonthTargetGmv: 9_000_000 } as BrandMonthlyReport]
-    ]);
-    expect(buildMonthTargetPlan(B, "2026-10", reports, "TikTok")).toBeNull();
-    expect(buildMonthTargetPlan(B, "2026-10", reports, "Shopee")?.platform).toBe("Shopee");
-    const out = applyAllocatedTargets([ca("tt", "TikTok"), ca("sp", "Shopee")], reports, new Map(), new Map());
-    expect(out.find((s) => s.id === "sp")!.targetGmv).toBe(9_000_000);
-    expect(out.find((s) => s.id === "tt")!.targetGmv).toBe(0);
   });
   test("tổng target đã chốt tách theo sàn của kế hoạch; DB chưa chạy 0140 (thiếu platform) = TikTok", () => {
     const t = lockedPlanTargetsFromRows([
@@ -98,8 +88,9 @@ describe("cam kết hợp đồng theo sàn (0141)", () => {
     const g = computeSchedulingGaps([commit("TikTok", 10), commit("Shopee", 10)], { [B]: "VERA" }, [], slots, "2026-10-01", "2026-10-05");
     expect(Object.fromEntries(g.map((r) => [r.platform, r.openSlotHours]))).toEqual({ TikTok: 0, Shopee: 4 });
   });
-  test("có cam kết TikTok mà ca Shopee chưa có cam kết vẫn bị nhắc", () => {
-    expect(brandsMissingCommitment([commit("TikTok", 10)], [ca("tt", "TikTok"), ca("sp", "Shopee")], "2026-10-01")).toEqual([`${B}|Shopee`]);
+  test("cam kết TikTok không phải cam kết Shopee", () => {
+    expect(monthCommitmentOf([commit("TikTok", 10)], [], B, "TikTok", "2026-10-01").hours).toBe(10);
+    expect(monthCommitmentOf([commit("TikTok", 10)], [], B, "Shopee", "2026-10-01").source).toBe("none");
   });
 });
 

@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { defaultPlanMonth } from "../lib/defaultMonth";
-import { Brand, BrandMonthPlan, BrandMonthPlanSlot, BrandMonthlyCommitment, BrandStudio, CalendarEventRow, LiveSession, PlanCampRanges, PromoScheme, RecurringShiftTemplate, ShiftSlot, Studio, Talent } from "../types";
+import { Brand, BrandContract, BrandMonthPlan, BrandMonthPlanSlot, BrandMonthlyCommitment, BrandStudio, CalendarEventRow, LiveSession, PlanCampRanges, PromoScheme, RecurringShiftTemplate, ShiftSlot, Studio, Talent } from "../types";
 import { AlertTriangle, Ban, CalendarRange, Lock, Plus, Repeat, Save, Sparkles, Trash2, Wand2, X } from "lucide-react";
-import { commitmentsRead } from "../lib/db/brandContracts";
+import { commitmentsRead, contractsRead, upsertMonthlyCommitment } from "../lib/db/brandContracts";
 import type { TabPrefetchCtx } from "../lib/db/prefetch";
 import { loadRememberedBrandId, loadRememberedPlatform, rememberBrandId } from "../lib/defaultBrand";
 import { errorMessage } from "../lib/errorMessage";
 import { PlanSettings, calendarEventsRead, deleteMonthPlan, fetchBrandLockedPlanSlots, fetchMonthPlan, fetchPlanStatuses, lockMonthPlan, lockedPlanSlotsRead, monthPlanRead, planStatusesRead, replacePlanSlots, upsertMonthPlan } from "../lib/db/monthPlans";
 import { PlanEvaluation, buildCalibration, evaluatePlan } from "../lib/scheduling/planEvaluation";
-import { todayVn } from "../lib/performance/brandCommitment";
+import { computeCommitmentProgress, contractCovering, monthCommitmentOf, todayVn } from "../lib/performance/brandCommitment";
 import { useDefaultBrand } from "../hooks/useDefaultBrand";
 import { CAMPAIGN_DAY_STYLES, resolveCampBucketType } from "../lib/campaignDays";
 import { targetWeightModel, targetWeights } from "../lib/performance/slotInsights";
@@ -50,10 +50,11 @@ interface MonthPlanProps {
   // Chốt xong → App nạp lại shift_slots để Đăng Ký & Chốt Lịch / lịch thấy ca mới.
   onPlanLocked: () => Promise<void>;
   engineParams: EngineParams; // admin vặn ở AI Training Center (0095)
-  // Phòng live mặc định của brand (0098) — chốt ghi vào ca sinh ra. Cấu hình của brand, không thuộc
-  // kế hoạch: đổi được cả khi kế hoạch đã chốt (chỉ ảnh hưởng lần chốt sau).
+  // Phòng live mặc định của brand (0098) — chốt ghi vào ca sinh ra. Cấu hình của brand: CHỈ ĐỌC ở đây, đổi ở CRM →
+  // "Hợp đồng & giá" (gộp cấu hình 06/10; trước đó ô chọn phòng nằm ở màn này).
   brandStudios: BrandStudio[];
-  onSetBrandStudio: (brandId: string, platform: "TikTok" | "Shopee", studioId: string) => Promise<boolean>;
+  /** Sang CRM, bung sẵn "Hợp đồng & giá" của brand × sàn. */
+  onOpenCrm?: (brandId: string, platform: "TikTok" | "Shopee") => void;
   // Chỉ để so số ca chạy song song toàn agency với số người (audit workflow #12).
   talents: Talent[];
 }
@@ -76,6 +77,7 @@ const nextMonthOf = (month: string, delta: number) => {
 export function prefetchMonthPlan(_ctx: TabPrefetchCtx): void {
   const next = nextMonthOf(todayVn().slice(0, 7), 1);
   commitmentsRead.prefetch();
+  contractsRead.prefetch();
   calendarEventsRead.prefetch();
   planStatusesRead.prefetch(next);
   planStatusesRead.prefetch(todayVn().slice(0, 7));
@@ -100,7 +102,7 @@ export default function MonthPlan({
   onPlanLocked,
   engineParams,
   brandStudios,
-  onSetBrandStudio,
+  onOpenCrm,
   talents
 }: MonthPlanProps) {
   const confirm = useConfirm();
@@ -128,10 +130,14 @@ export default function MonthPlan({
   const [msg, setMsg] = useState<string | null>(null);
   const [rulesOpen, setRulesOpen] = useState(false);
   const [commitments, setCommitments] = useState<BrandMonthlyCommitment[]>([]);
+  const [contracts, setContracts] = useState<BrandContract[]>([]);
   const [suggestion, setSuggestion] = useState<{ history: HistorySummary; result: SuggestResult } | null>(null);
-  // Giờ engine phải xếp: mặc định = cam kết hợp đồng; ops sửa tại chỗ khi tháng này thoả thuận khác
-  // (không lưu — cam kết chính thức vẫn ở Cam Kết Hợp Đồng).
-  const [hoursOverride, setHoursOverride] = useState<number | null>(null);
+  // Cam kết CỦA THÁNG NÀY (gộp cấu hình 06/10): chỗ nhập duy nhất. Mặc định = điều khoản hợp đồng ở CRM; sửa ở đây là
+  // lưu thật vào dòng cam kết của tháng (trước đó là ô "giờ cần xếp" không lưu + module Cam Kết Hợp Đồng riêng).
+  // Chuỗi = đang gõ; null = theo số đã lưu / hợp đồng.
+  const [commitHoursDraft, setCommitHoursDraft] = useState<string | null>(null);
+  const [commitGmvDraft, setCommitGmvDraft] = useState<string | null>(null);
+  const [commitSaving, setCommitSaving] = useState(false);
   const [events, setEvents] = useState<CalendarEventRow[]>([]);
   const [strategy, setStrategy] = useState<SuggestStrategy>("max");
   const [compare, setCompare] = useState<Record<SuggestStrategy, SuggestResult> | null>(null);
@@ -155,6 +161,7 @@ export default function MonthPlan({
 
   useEffect(() => {
     commitmentsRead.take().then(setCommitments).catch(() => setCommitments([]));
+    contractsRead.take().then(setContracts).catch(() => setContracts([]));
     calendarEventsRead.take().then(setEvents).catch(() => setEvents([]));
   }, []);
   const nextMonth = nextMonthOf(today.slice(0, 7), 1);
@@ -230,24 +237,74 @@ export default function MonthPlan({
         setDirty(false);
         setSuggestion(null);
         setCompare(null);
-        setHoursOverride(null); // override giờ là theo brand+tháng, không mang sang brand khác
+        setCommitHoursDraft(null); // số đang gõ là của brand × sàn × tháng cũ — không mang sang
+        setCommitGmvDraft(null);
       })
       .catch((e) => alive && setMsg(`Không tải được kế hoạch: ${errorMessage(e)}`))
       .finally(() => alive && setLoading(false));
     return () => { alive = false; };
   }, [brandId, month, platform]);
 
-  const committedHours = useMemo(
-    () => commitments.find((c) => c.brandId === brandId && (c.platform ?? "TikTok") === platform && c.periodMonth === `${month}-01`)?.committedHours ?? 0,
-    [commitments, brandId, platform, month]
+  const monthCommit = useMemo(
+    () => monthCommitmentOf(commitments, contracts, brandId, platform, `${month}-01`),
+    [commitments, contracts, brandId, platform, month]
   );
-  const planHours = hoursOverride ?? committedHours;
-  // GMV cam kết trong hợp đồng (audit workflow 2026-10-04 #7): trước đây Kế Hoạch Tháng không đọc nó, nên màn
-  // Cam Kết so với một con số còn run-rate so với con số khác mà không ai thấy hai số lệch nhau.
-  const committedGmv = useMemo(
-    () => commitments.find((c) => c.brandId === brandId && (c.platform ?? "TikTok") === platform && c.periodMonth === `${month}-01`)?.committedGmv ?? 0,
-    [commitments, brandId, platform, month]
+  const commitDirty = commitHoursDraft !== null || commitGmvDraft !== null;
+  const commitHoursText = commitHoursDraft ?? (monthCommit.source === "none" ? "" : String(monthCommit.hours));
+  const commitGmvText = commitGmvDraft ?? (monthCommit.gmv === undefined ? "" : String(monthCommit.gmv));
+  // Engine xếp đúng số giờ cam kết của tháng (đang gõ cũng tính — để "Gợi ý phân bổ" thử ngay số mới).
+  const planHours = Number(commitHoursText) > 0 ? Number(commitHoursText) : 0;
+  // GMV cam kết (audit workflow 2026-10-04 #7): so với Target GMV tháng của kế hoạch.
+  const committedGmv = Number(commitGmvText) > 0 ? Number(commitGmvText) : 0;
+  // Tiến độ giao giờ của tháng đang xem — cùng hàm với Toàn Cảnh Brand / Nhân sự ca / tab Hợp Đồng của brand.
+  const commitProgress = useMemo(
+    () =>
+      planHours > 0
+        ? computeCommitmentProgress(
+            { id: "cur", brandId, platform, periodMonth: `${month}-01`, committedHours: planHours, committedGmv: committedGmv || undefined, isOverride: monthCommit.source === "month" },
+            brands.find((b) => b.id === brandId)?.name ?? "",
+            sessions,
+            today
+          )
+        : null,
+    [planHours, committedGmv, brandId, platform, month, monthCommit.source, brands, sessions, today]
   );
+
+  /** Ghi cam kết tháng đang xem (nếu có sửa). Trả false khi lỗi — nơi gọi dừng lại. */
+  const saveCommitment = async (): Promise<boolean> => {
+    if (!commitDirty || !brandId) return true;
+    const hoursRaw = commitHoursText.trim();
+    const hours = hoursRaw === "" ? 0 : Number(hoursRaw);
+    const gmvRaw = commitGmvText.trim();
+    const gmv = gmvRaw === "" ? undefined : Number(gmvRaw);
+    if (!Number.isFinite(hours) || hours < 0 || (gmv !== undefined && (!Number.isFinite(gmv) || gmv < 0))) {
+      setMsg("Giờ / GMV cam kết phải là số không âm (để trống GMV nếu không cam kết).");
+      return false;
+    }
+    const contract = contractCovering(contracts, brandId, platform, `${month}-01`);
+    setCommitSaving(true);
+    try {
+      const row = await upsertMonthlyCommitment({
+        brandId,
+        periodMonth: `${month}-01`,
+        platform,
+        committedHours: hours,
+        committedGmv: gmv,
+        contractId: contract?.id,
+        // Bằng đúng điều khoản hợp đồng ⇒ vẫn "theo hợp đồng" (sửa hợp đồng ở CRM thì tháng này đổi theo).
+        isOverride: !contract || hours !== contract.monthlyHours || gmv !== contract.monthlyGmv
+      });
+      setCommitments((prev) => [...prev.filter((c) => !(c.brandId === row.brandId && (c.platform ?? "TikTok") === (row.platform ?? "TikTok") && c.periodMonth === row.periodMonth)), row]);
+      setCommitHoursDraft(null);
+      setCommitGmvDraft(null);
+      return true;
+    } catch (e) {
+      setMsg(`Không lưu được cam kết tháng: ${errorMessage(e)}`);
+      return false;
+    } finally {
+      setCommitSaving(false);
+    }
+  };
   // Target và khoảng camp là của riêng kế hoạch (0094) — không đọc Report Tháng.
   const targetTotal = settings.targetGmv > 0 ? settings.targetGmv : 0;
   const campRanges = settings.campRanges;
@@ -452,7 +509,7 @@ export default function MonthPlan({
   // giờ cam kết và chia target theo dự báo từng ca.
   const suggest = (mode: "hours" | "target" = "hours") => {
     if (mode === "hours" && planHours <= 0) {
-      setMsg("Nhập giờ cần xếp (hoặc cam kết ở Cam Kết Hợp Đồng) để engine biết phải xếp bao nhiêu giờ — hoặc nhập Target GMV rồi bấm Xếp theo target.");
+      setMsg("Nhập giờ cam kết tháng này (ô bên phải — mặc định lấy từ hợp đồng ở CRM) để engine biết phải xếp bao nhiêu giờ — hoặc nhập Target GMV rồi bấm Xếp theo target.");
       return;
     }
     if (mode === "target" && targetTotal <= 0) {
@@ -492,6 +549,7 @@ export default function MonthPlan({
       setMsg(`Sửa lỗi trước khi lưu: ${errors[0]}${errors.length > 1 ? ` (+${errors.length - 1})` : ""}`);
       return null;
     }
+    if (!(await saveCommitment())) return null;
     setSaving(true);
     try {
       const toSave = locked || opts?.committing ? { ...settings, targetGmv: Math.round(totals.target) } : settings;
@@ -518,7 +576,7 @@ export default function MonthPlan({
     }
     if (drafts.length === 0 && locked && !(await confirm(`Lưới trống — chốt lại sẽ HUỶ toàn bộ ca đang mở của kế hoạch ${brandLabel(brand?.name)} tháng ${fmtMonth(month)} (trừ ca đã có người đăng ký). Tiếp tục?`, { danger: true }))) return;
     const gap = planHours - totals.hours;
-    const warn = planHours > 0 && Math.abs(gap) > 0.01 ? `\n\nGiờ kế hoạch ${fmtH(totals.hours)}h ${gap > 0 ? "THIẾU" : "VƯỢT"} ${fmtH(Math.abs(gap))}h so với ${fmtH(planHours)}h cần xếp.` : "";
+    const warn = planHours > 0 && Math.abs(gap) > 0.01 ? `\n\nGiờ kế hoạch ${fmtH(totals.hours)}h ${gap > 0 ? "THIẾU" : "VƯỢT"} ${fmtH(Math.abs(gap))}h so với ${fmtH(planHours)}h cam kết tháng này.` : "";
     const relockNote = locked ? "\n\nChốt lại sẽ mở thêm ca mới và HUỶ ca đang mở đã bị bỏ khỏi kế hoạch (trừ ca đã có người đăng ký)." : "";
     const targetWarn = targetGap && targetGap.pct > engineParams.targetGapWarnPct ? `\n\nDự báo lưới ${fmtVndShort(targetGap.forecast)} THIẾU ${fmtVndShort(targetGap.gap)} (${Math.round(targetGap.pct * 100)}%) so với target ${fmtVndShort(targetTotal)}${targetGap.fill ? ` — cần bù ~${fmtH(targetGap.extraHours)}h.` : " — thêm giờ trong khung cũng không chạm."} Sau khi chốt, target/ca KHÔNG chia lại nữa.` : "";
     const sumDelta = Math.round(totals.target) - targetTotal;
@@ -530,7 +588,7 @@ export default function MonthPlan({
       pastCount > 0
         ? `\n\n${pastCount} ca ở ngày đã qua sẽ KHÔNG mở chờ đăng ký (chỉ giữ target trong kế hoạch). Ca nào đã live thật: mở ca đúng ngày giờ đó ở Bảng Vận Hành → Lịch & Studio → "Mở ca chờ đăng ký" — ca mở TRƯỚC khi chốt sẽ được gắn vào kế hoạch và nhận target; mở sau thì bấm "Chốt lại".`
         : "";
-    const studioNote = brandStudio ? `\n\nCa sinh ra gắn phòng ${brandStudio.name} (${brandStudio.roomNumber}).` : "\n\nBrand CHƯA có phòng live mặc định — ca sinh ra sẽ không có phòng (không kiểm được trùng phòng). Chọn ở Tham số → Phòng live trước nếu cần.";
+    const studioNote = brandStudio ? `\n\nCa sinh ra gắn phòng ${brandStudio.name} (${brandStudio.roomNumber}).` : "\n\nBrand CHƯA có phòng live mặc định — ca sinh ra sẽ không có phòng (không kiểm được trùng phòng). Chọn ở CRM → Hợp đồng & giá trước nếu cần.";
     const clashNote = crossBrand.clashes.length > 0
       ? `\n\n⚠ ${crossBrand.clashes.length} ca TRÙNG PHÒNG với brand khác (vd ${crossBrand.clashes[0].date.slice(8)}/${crossBrand.clashes[0].date.slice(5, 7)} ${crossBrand.clashes[0].startTime}: ${crossBrand.clashes[0].roomTakenBy}). Chốt vẫn gắn phòng này — phải đổi phòng từng ca sau.`
       : "";
@@ -615,7 +673,7 @@ export default function MonthPlan({
             Kế Hoạch Tháng
           </h2>
           <PageIntro>
-            Lập lưới ca cho brand trước khi mở đăng ký: giờ theo cam kết, target đặt ngay trong kế hoạch, chốt là ca đổ xuống Nhân sự ca chờ talent đăng ký.
+            Lập lưới ca cho brand trước khi mở đăng ký: giờ cam kết và target của tháng đặt ngay tại đây (mặc định lấy từ hợp đồng ở CRM), chốt là ca đổ xuống Nhân sự ca chờ talent đăng ký.
           </PageIntro>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
@@ -722,24 +780,58 @@ export default function MonthPlan({
             })}
           </div>
           <input type="text" disabled={!editable} value={settings.notes} onChange={(e) => { setSettings((s) => ({ ...s, notes: e.target.value })); setDirty(true); }} placeholder="Ghi chú kế hoạch (tuỳ chọn)" className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-xs text-[var(--text)] disabled:opacity-60" />
-          <label className="block text-xs">
-            <span className="font-bold text-[var(--text-muted)] block mb-1">Phòng live ({platform}) <span className="font-normal text-[var(--text-faint)]">— cấu hình brand, ca chốt ra gắn phòng này</span></span>
-            <select value={brandStudioId} onChange={(e) => { if (brandId) void onSetBrandStudio(brandId, platform, e.target.value); }} className={`w-full bg-[var(--surface-base)] border rounded-lg p-2 text-[var(--text)] ${brandStudioId ? "border-[var(--border)]" : "border-amber-700"}`}>
-              <option value="">— Chưa chọn phòng —</option>
-              {studios.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.roomNumber})</option>)}
-            </select>
-          </label>
+          <div className="text-xs flex flex-wrap items-center justify-between gap-2">
+            <span className="text-[var(--text-muted)]">
+              <b>Phòng live ({platform}):</b>{" "}
+              {brandStudio ? <span className="text-[var(--text)]">{brandStudio.name} ({brandStudio.roomNumber})</span> : <span className="text-amber-300">chưa chọn</span>}
+              <span className="text-[var(--text-faint)]"> — ca chốt ra gắn phòng này</span>
+            </span>
+            {onOpenCrm && brandId && (
+              <button onClick={() => onOpenCrm(brandId, platform)} className="text-[11px] font-bold text-[var(--accent-text)] hover:underline">{brandStudio ? "Đổi ở CRM" : "Chọn ở CRM"} →</button>
+            )}
+          </div>
         </div>
 
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 space-y-2">
-          <h3 className="text-sm font-bold text-[var(--text)]">Giờ live</h3>
+          <h3 className="text-sm font-bold text-[var(--text)]">Cam kết tháng {fmtMonth(month)}</h3>
           <div className="text-xs space-y-1.5">
-            <div className="flex justify-between gap-2"><span className="text-[var(--text-muted)]">Giờ cam kết (Cam Kết Hợp Đồng)</span><b className="text-[var(--text)]">{committedHours > 0 ? `${fmtH(committedHours)}h` : "chưa nhập"}</b></div>
-            <div className="flex justify-between items-center gap-2"><span className="text-[var(--text-muted)]">Giờ cần xếp tháng này</span>
-              <input type="number" min="0" step="1" disabled={!editable} value={planHours || ""} placeholder="= cam kết" onChange={(e) => setHoursOverride(e.target.value === "" ? null : Number(e.target.value))} className="w-24 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1 text-right font-mono text-[var(--text)] disabled:opacity-60" />
+            <div className="flex justify-between items-center gap-2">
+              <label htmlFor="mp-commit-hours" className="text-[var(--text-muted)]">Giờ cam kết</label>
+              <input id="mp-commit-hours" type="number" min="0" step="1" value={commitHoursText} placeholder="chưa có" onChange={(e) => setCommitHoursDraft(e.target.value)} className="w-28 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1 text-right font-mono text-[var(--text)]" />
             </div>
-            <div className="flex justify-between gap-2"><span className="text-[var(--text-muted)]">GMV cam kết (hợp đồng)</span><b className="text-[var(--text)]">{committedGmv > 0 ? fmtVndShort(committedGmv) : "không cam kết"}</b></div>
-            <div className="flex justify-between gap-2"><span className="text-[var(--text-muted)]">Target GMV tháng</span><b className="text-[var(--text)]">{targetTotal > 0 ? fmtVndShort(targetTotal) : "chưa đặt"}</b></div>
+            <div className="flex justify-between items-center gap-2">
+              <label htmlFor="mp-commit-gmv" className="text-[var(--text-muted)]">GMV cam kết <span className="text-[var(--text-faint)]">(tuỳ chọn)</span></label>
+              <input id="mp-commit-gmv" type="number" min="0" step="1000000" value={commitGmvText} placeholder="không cam kết" onChange={(e) => setCommitGmvDraft(e.target.value)} className="w-36 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1 text-right font-mono text-[var(--text)]" />
+            </div>
+            <p className="text-[11px] text-[var(--text-faint)] leading-relaxed">
+              {monthCommit.source === "month" ? (
+                <>Đã sửa riêng tháng này{monthCommit.contract ? ` (hợp đồng: ${fmtH(monthCommit.contract.monthlyHours)}h/tháng)` : ""}.</>
+              ) : monthCommit.source === "contract" ? (
+                <>Theo hợp đồng{monthCommit.contract?.contractCode ? ` ${monthCommit.contract.contractCode}` : ""} ở CRM. Sửa ô trên nếu tháng này brand mua thêm/bớt giờ.</>
+              ) : (
+                <>Chưa có hợp đồng {platform} phủ tháng này — nhập điều khoản ở CRM, hoặc gõ thẳng số của tháng này.</>
+              )}
+              {onOpenCrm && brandId && (
+                <button onClick={() => onOpenCrm(brandId, platform)} className="ml-1 font-bold text-[var(--accent-text)] hover:underline">Hợp đồng ở CRM →</button>
+              )}
+            </p>
+            {commitDirty && (
+              <button onClick={() => void saveCommitment()} disabled={commitSaving} className="w-full text-[11px] font-bold px-2 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white disabled:opacity-50">
+                {commitSaving ? "Đang lưu…" : "Lưu cam kết tháng này"}
+              </button>
+            )}
+            {commitProgress && month <= today.slice(0, 7) && (
+              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 pt-1.5 border-t border-[var(--border)]/60">
+                <span className="text-[var(--text-muted)]">Đã live</span><b className="text-right text-emerald-400">{fmtH(commitProgress.deliveredHours)}h · {commitProgress.deliveredSessions} ca</b>
+                <span className="text-[var(--text-muted)]">Đang xếp</span><b className="text-right text-sky-400">{fmtH(commitProgress.scheduledHours)}h · {commitProgress.scheduledSessions} ca</b>
+                {commitProgress.unconfirmedSessions > 0 && (
+                  <><span className="text-[var(--text-muted)]" title="Ca đã qua giờ mà không có số/report/giờ live — chưa tính là đã giao">Chờ xác nhận</span><b className="text-right text-amber-300">{fmtH(commitProgress.unconfirmedHours)}h · {commitProgress.unconfirmedSessions} ca</b></>
+                )}
+                <span className="text-[var(--text-muted)]">Còn phải xếp</span>
+                <b className={`text-right ${commitProgress.gapHours > 0 ? "text-rose-400" : "text-emerald-400"}`}>{commitProgress.gapHours > 0 ? `${fmtH(commitProgress.gapHours)}h` : "đủ"}</b>
+              </div>
+            )}
+            <div className="flex justify-between gap-2 pt-1.5 border-t border-[var(--border)]/60"><span className="text-[var(--text-muted)]">Target GMV tháng</span><b className="text-[var(--text)]">{targetTotal > 0 ? fmtVndShort(targetTotal) : "chưa đặt"}</b></div>
             {!locked && committedGmv > 0 && targetTotal <= 0 && (
               <button
                 onClick={() => { setSettings((st) => ({ ...st, targetGmv: committedGmv })); setDrafts((prev) => withForecast(prev, committedGmv)); setDirty(true); }}
@@ -749,9 +841,9 @@ export default function MonthPlan({
               </button>
             )}
             {committedGmv > 0 && targetTotal > 0 && targetTotal < committedGmv && (
-              <p className="text-[11px] text-amber-300">Target kế hoạch thấp hơn GMV cam kết trong hợp đồng {fmtVndShort(committedGmv - targetTotal)} — run-rate đạt 100% vẫn hụt cam kết với brand.</p>
+              <p className="text-[11px] text-amber-300">Target kế hoạch thấp hơn GMV cam kết {fmtVndShort(committedGmv - targetTotal)} — run-rate đạt 100% vẫn hụt cam kết với brand.</p>
             )}
-            <p className="text-[11px] text-[var(--text-faint)] leading-relaxed">Giờ cam kết lấy từ hợp đồng; target đặt ngay trong kế hoạch này. "Gợi ý phân bổ" xếp đủ giờ; "Xếp theo target" xếp tới khi dự báo chạm target và cho biết cần bao nhiêu giờ.</p>
+            <p className="text-[11px] text-[var(--text-faint)] leading-relaxed">"Gợi ý phân bổ" xếp đủ giờ cam kết; "Xếp theo target" xếp tới khi dự báo chạm target và cho biết cần bao nhiêu giờ.</p>
           </div>
         </div>
 

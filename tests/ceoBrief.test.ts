@@ -79,19 +79,13 @@ describe("totalsOf / change", () => {
 
 describe("monthTargetOf", () => {
   test("kế hoạch chốt: target rơi đúng ngày ca, phần chưa gắn ngày chia đều", () => {
-    const t = monthTargetOf("2026-09", 300, [{ date: "2026-09-09", target: 100 }, { date: "2026-09-15", target: 170 }], null, undefined)!;
-    expect(t.source).toBe("locked_plan");
+    const t = monthTargetOf("2026-09", 300, [{ date: "2026-09-09", target: 100 }, { date: "2026-09-15", target: 170 }])!;
     expect(t.byDate.get("2026-09-09")).toBeCloseTo(101);
     expect([...t.byDate.values()].reduce((a, b) => a + b, 0)).toBeCloseTo(300);
   });
-  test("Report Tháng: target khung chia đều các ngày của khung", () => {
-    const t = monthTargetOf("2026-09", undefined, [], { brandId: "crocs", month: "2026-09", byBucket: { dday: 300, midmonth: 300, payday: 300, daily: 2100 }, camp: {} }, undefined)!;
-    expect(t.byDate.get("2026-09-08")).toBeCloseTo(100); // D-Day 7–9
-    expect(t.byDate.get("2026-09-02")).toBeCloseTo(100); // 21 ngày thường
-    expect(t.total).toBe(3000);
-  });
   test("không có gì ⇒ null", () => {
-    expect(monthTargetOf("2026-09", undefined, [], null, undefined)).toBeNull();
+    expect(monthTargetOf("2026-09", undefined, [])).toBeNull();
+    expect(monthTargetOf("2026-09", 0, [])).toBeNull();
   });
 });
 
@@ -117,7 +111,7 @@ describe("monthOutlook — dự phóng theo lịch", () => {
     expect(o.projected).toBe(120_000_000);
   });
   test("run-rate so với target TỚI NGÀY CÓ SỐ, không tới hôm nay", () => {
-    const target = monthTargetOf("2026-09", 300_000_000, [], null, undefined)!; // 10tr/ngày
+    const target = monthTargetOf("2026-09", 300_000_000, [])!; // 10tr/ngày
     const o = monthOutlook("2026-09", "2026-09-10", hist, [], target, undefined);
     expect(o.through).toBe("2026-09-03");
     expect(o.expectedToDate).toBeCloseTo(30_000_000);
@@ -125,7 +119,7 @@ describe("monthOutlook — dự phóng theo lịch", () => {
     expect(o.remainingDays).toBe(21); // 10 → 30, tính cả hôm nay
   });
   test("gộp brand: run-rate chỉ trên brand có target", () => {
-    const target = monthTargetOf("2026-09", 300_000_000, [], null, undefined)!;
+    const target = monthTargetOf("2026-09", 300_000_000, [])!;
     const a = monthOutlook("2026-09", "2026-09-10", hist, [], target, undefined);
     const b = monthOutlook("2026-09", "2026-09-10", hist.map((s) => ({ ...s, brandId: "vera" })), [], null, undefined);
     const all = combineOutlooks("2026-09", "2026-09-10", [a, b]);

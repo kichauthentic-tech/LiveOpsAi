@@ -2,7 +2,7 @@
 // Chạy: npm test    (chỉ file này: npx vitest run tests/targetAllocation.test.ts)
 import { expect, test } from "vitest";
 import { applyAllocatedTargets } from "../src/lib/performance/targetAllocation";
-import { LiveSession, BrandMonthlyReport } from "../src/types";
+import { LiveSession } from "../src/types";
 
 const B = "brand-vera";
 const M = "2026-09";
@@ -23,15 +23,13 @@ function eq(label: string, got: unknown, want: unknown) {
 }
 const targets = (list: LiveSession[]) => Object.fromEntries(list.map((s) => [s.id, s.targetGmv]));
 
-const noReports = new Map<string, BrandMonthlyReport>();
-
 // Kế hoạch 100tr = 2 ca × 50tr. Ca A đã chốt người (có session), ca B chưa.
 const planMonthTotals = new Map([[`${B}|${M}`, 100_000_000]]);
 
 // 1) Ca kế hoạch đã chốt người giữ đúng target ops đã chốt.
 {
   const A = ca("A", "2026-09-25", "09:00", "12:00");
-  const out = applyAllocatedTargets([A], noReports, new Map([["A", 50_000_000]]), planMonthTotals);
+  const out = applyAllocatedTargets([A], new Map([["A", 50_000_000]]), planMonthTotals);
   eq("ca kế hoạch giữ đúng target/ca", targets(out), { A: 50_000_000 });
 }
 
@@ -40,36 +38,24 @@ const planMonthTotals = new Map([[`${B}|${M}`, 100_000_000]]);
 {
   const A = ca("A", "2026-09-25", "09:00", "12:00");
   const C = ca("C", "2026-09-23", "09:00", "12:00"); // ops mở tay, ngoài kế hoạch
-  const out = applyAllocatedTargets([A, C], noReports, new Map([["A", 50_000_000]]), planMonthTotals);
+  const out = applyAllocatedTargets([A, C], new Map([["A", 50_000_000]]), planMonthTotals);
   eq("off-plan không ăn phần của ca chưa xếp", targets(out), { A: 50_000_000, C: 0 });
 }
 
-// 3) Không có Kế Hoạch Tháng + có target khung camp nhập ở Nhập Ads ⇒ chia cho ca trong khung theo giờ.
+// 3) Không có Kế Hoạch Tháng chốt ⇒ giữ nguyên target đang có trong DB (gộp cấu hình 06/10: không còn target khung
+//    camp nhập ở Nhập Ads — nguồn target duy nhất là Kế Hoạch Tháng).
 {
-  const reports = new Map<string, BrandMonthlyReport>([
-    [`${B}|${M}`, { brandId: B, periodMonth: "2026-09-01", campMidmonthStart: "2026-09-10", campMidmonthEnd: "2026-09-11", campMidmonthTargetGmv: 90_000_000 } as BrandMonthlyReport]
-  ]);
-  const X = ca("X", "2026-09-10", "09:00", "12:00");
-  const Y = ca("Y", "2026-09-11", "09:00", "12:00");
-  const out = applyAllocatedTargets([X, Y], reports, new Map(), new Map());
-  eq("không có kế hoạch → target khung camp chia theo giờ", targets(out), { X: 45_000_000, Y: 45_000_000 });
-}
-
-// 3b) Ô "Kế hoạch tháng sau" (plan_target_gmv của tháng trước) KHÔNG còn sinh target (2026-10-04: trùng Kế Hoạch Tháng).
-{
-  const reports = new Map<string, BrandMonthlyReport>([
-    [`${B}|2026-08`, { brandId: B, periodMonth: "2026-08-01", planTargetGmv: 90_000_000, planPctDaily: 100 } as BrandMonthlyReport]
-  ]);
   const X = ca("X", "2026-09-10", "09:00", "12:00", { targetGmv: 7 });
-  const out = applyAllocatedTargets([X], reports, new Map(), new Map());
-  eq("ô kế hoạch tháng sau không còn là nguồn target", targets(out), { X: 7 });
+  const input = [X];
+  const out = applyAllocatedTargets(input, new Map(), new Map());
+  eq("không có kế hoạch → giữ target DB, trả đúng mảng", out === input && out[0].targetGmv === 7, true);
 }
 
 // 4) Ca huỷ không mang target và không làm mất target của ca còn lại.
 {
   const A = ca("A", "2026-09-25", "09:00", "12:00");
   const D = ca("D", "2026-09-26", "09:00", "12:00", { status: "Cancelled" });
-  const out = applyAllocatedTargets([A, D], noReports, new Map([["A", 50_000_000]]), planMonthTotals);
+  const out = applyAllocatedTargets([A, D], new Map([["A", 50_000_000]]), planMonthTotals);
   eq("ca huỷ giữ target 0", targets(out).D, 0);
 }
 
@@ -77,7 +63,7 @@ const planMonthTotals = new Map([[`${B}|${M}`, 100_000_000]]);
 {
   const A = ca("A", "2026-09-25", "09:00", "12:00", { targetGmv: 50_000_000 });
   const input = [A];
-  const out = applyAllocatedTargets(input, noReports, new Map([["A", 50_000_000]]), planMonthTotals);
+  const out = applyAllocatedTargets(input, new Map([["A", 50_000_000]]), planMonthTotals);
   eq("không đổi → trả đúng mảng đầu vào", out === input, true);
 }
 

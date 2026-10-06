@@ -285,7 +285,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
       if (!stored) await saveSnapshot((await buildSnapshot()).snapshot);
       // Tháng chưa có dòng brand_monthly_reports (chưa nhập Ads/kế hoạch gì) → tạo dòng nháp trống
       // ngay đây rồi phát hành, ops không phải đi vòng qua tab Nhập Ads chỉ để "Lưu" cho có dòng.
-      const row = report ?? (await upsertMonthlyReport(brandId, `${month}-01`, {}, platform));
+      const row = report ?? (await upsertMonthlyReport(brandId, `${month}-01`, platform));
       // Đã xác nhận trong hộp thoại ở trên (kể cả phần ca chưa đối soát) ⇒ force khi còn ca chưa đối soát.
       const published = await publishMonthlyReport(row.id, unreconciledSessions.length > 0);
       setReport(published);

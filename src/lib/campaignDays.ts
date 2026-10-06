@@ -149,30 +149,10 @@ export function resolveCampBucketType(dateStr: string, overrides?: CampOverrides
 
 
 /**
- * Khung camp HIỆU LỰC của một brand-tháng — MỘT luật cho mọi màn (audit workflow 2026-10-04 #8). Trước đây Report
- * Tháng ưu tiên khoảng nhập ở "Nhập Ads" còn Dashboard/run-rate/Hỗ trợ vận hành chỉ đọc Kế Hoạch Tháng,
- * Bản Tin CEO thì ngược lại — cùng một ngày D-Day có thể rơi vào hai khung ở hai màn.
- *
- * MỘT CHỖ NHẬP cho mỗi tháng (audit người mới 2026-10-04, Nhóm 1): tháng ĐÃ có Kế Hoạch Tháng (bất kỳ trạng thái —
- * `planCamp` khác null/undefined, kể cả `{}`) ⇒ chỉ khung của kế hoạch (sửa được cả khi đã chốt) rồi lịch cố định;
- * ô ở Nhập Ads chỉ hiện để đọc. Tháng KHÔNG có kế hoạch (lịch sử) ⇒ khoảng nhập ở Nhập Ads rồi
- * lịch cố định. Trước đó Nhập Ads thắng Kế Hoạch Tháng, nên cùng một tháng có hai ô sửa khung camp.
+ * Khung camp HIỆU LỰC của một brand-tháng — MỘT luật cho mọi màn (audit workflow 2026-10-04 #8): khung của Kế Hoạch
+ * Tháng (sửa được cả khi đã chốt), thiếu khung nào thì lịch cố định. Gộp cấu hình 06/10: tháng KHÔNG có kế hoạch không
+ * còn ô nhập khung camp ở Nhập Ads — muốn lệch lịch cố định thì lập Kế Hoạch Tháng cho tháng đó (một chỗ nhập).
  */
-export function effectiveCamp(
-  planCamp: CampOverrides | null | undefined,
-  report:
-    | {
-        campDdayStart?: string; campDdayEnd?: string;
-        campMidmonthStart?: string; campMidmonthEnd?: string;
-        campPaydayStart?: string; campPaydayEnd?: string;
-      }
-    | null
-    | undefined
-): CampOverrides {
-  if (planCamp != null) return { ...planCamp };
-  const out: CampOverrides = {};
-  if (report?.campDdayStart && report.campDdayEnd) out.dday = { start: report.campDdayStart, end: report.campDdayEnd };
-  if (report?.campMidmonthStart && report.campMidmonthEnd) out.midmonth = { start: report.campMidmonthStart, end: report.campMidmonthEnd };
-  if (report?.campPaydayStart && report.campPaydayEnd) out.payday = { start: report.campPaydayStart, end: report.campPaydayEnd };
-  return out;
+export function effectiveCamp(planCamp: CampOverrides | null | undefined): CampOverrides {
+  return planCamp ? { ...planCamp } : {};
 }

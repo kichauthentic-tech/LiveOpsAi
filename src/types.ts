@@ -288,34 +288,8 @@ export interface BrandMonthlyReport {
   /** Sàn của report (0139) — mỗi brand mỗi tháng có thể có một report TikTok và một report Shopee. */
   platform: "TikTok" | "Shopee";
   status: "draft" | "published";
-  adsSpend?: number;
-  roas?: number;
-  promotionNotes?: string;
-  customerInsightNotes?: string;
-  accountHealthNotes?: string;
-  // Kế hoạch tháng sau (migration 0065, Tab 05 Report Tháng) — target GMV/giờ tổng + % phân bổ
-  // theo khung camp (Daily/D-Day/Mid-Month/Pay Day), nhập tay bởi ops (client gợi ý % mặc định
-  // theo lịch sử nhưng KHÔNG lưu công thức, chỉ lưu giá trị cuối ops đã chốt).
-  planTargetGmv?: number;
-  planTargetNmv?: number;
-  planTargetHours?: number;
-  planPctDaily?: number;
-  planPctDday?: number;
-  planPctMidmonth?: number;
-  planPctPayday?: number;
-  // Khung camp D-Day/Mid-Month/Pay Day của THÁNG ĐANG XEM (migration 0071, Tab 02 Livestream) —
-  // ghi đè khoảng ngày mặc định (lib/campaignDays.ts) + Target GMV mỗi khung riêng cho Report
-  // Tháng, KHÔNG ảnh hưởng Calendar/Ribbon toàn hệ thống. Để trống thì UI tự fallback về khung mặc
-  // định của tháng đang xem.
-  campDdayStart?: string;
-  campDdayEnd?: string;
-  campDdayTargetGmv?: number;
-  campMidmonthStart?: string;
-  campMidmonthEnd?: string;
-  campMidmonthTargetGmv?: number;
-  campPaydayStart?: string;
-  campPaydayEnd?: string;
-  campPaydayTargetGmv?: number;
+  // Các cột nhập tay cũ (ads_spend, roas, 3 ô ghi chú, plan_*, camp_*) vẫn còn trong bảng nhưng client không đọc/ghi
+  // nữa: Ads lấy từ file (05/10), target + khung camp chỉ ở Kế Hoạch Tháng (04/10 + gộp cấu hình 06/10).
   // Văn xuôi phần 1 "Tóm tắt" + phần 8 "Tháng sau" (0120) — undefined = chưa sửa, hiện bản tự sinh
   // từ bản chụp số liệu. Mỗi dòng là 1 gạch đầu dòng.
   summaryText?: string;

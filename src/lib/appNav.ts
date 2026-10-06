@@ -1,5 +1,5 @@
 import React from "react";
-import { BookOpen, BrainCircuit, Briefcase, Building2, CalendarCheck2, CalendarClock, Calendar as CalendarIcon, CalendarRange, ClipboardCheck, Database, DollarSign, FileSignature, FileText, LayoutDashboard, LayoutGrid, Link2, Megaphone, Package, Radio, Send, ShieldCheck, Tag, TrendingUp, Users } from "lucide-react";
+import { BookOpen, BrainCircuit, Briefcase, Building2, CalendarCheck2, CalendarClock, Calendar as CalendarIcon, CalendarRange, ClipboardCheck, Database, DollarSign, FileSignature, FileText, LayoutDashboard, LayoutGrid, Link2, Megaphone, Package, Radio, Send, ShieldCheck, TrendingUp, Users } from "lucide-react";
 import { PermissionKey, UserRole } from "../types";
 
 // Cấu hình sidebar + vài hằng số điều hướng, tách khỏi App.tsx 2026-10-01 (App.tsx 2.867 dòng).
@@ -125,11 +125,8 @@ export function agencyNavGroups(currentRole: UserRole): NavGroup[] {
       label: "Kinh Doanh",
       items: [
         { id: "crm", label: "CRM", icon: Briefcase, perm: "manage_crm_projects" as PermissionKey },
-        // Cam kết hợp đồng đặt cạnh CRM vì CRM đang giữ Rate Card (ĐƠN GIÁ mỗi giờ) — cam kết là
-        // KHỐI LƯỢNG giờ mỗi tháng, hai nửa của cùng một điều khoản thương mại. Dùng lại
-        // manage_crm_projects: quyền này mặc định đúng bằng ceo/admin/operations, khớp RLS của
-        // brand_contracts/brand_monthly_commitments (migration 0081) nên không cần key mới.
-        { id: "brand_commitment", label: "Cam Kết Hợp Đồng", icon: FileSignature, perm: "manage_crm_projects" as PermissionKey },
+        // "Cam Kết Hợp Đồng" riêng đã gộp (06/10, user: nhập một chỗ): điều khoản hợp đồng + giá + phòng live ở CRM →
+        // "Hợp đồng & giá"; giờ cam kết của một tháng ở Kế Hoạch Tháng; tiến độ giao giờ ở Toàn Cảnh Brand / Nhân sự ca.
         // Badge "Chưa dùng": chờ TikTok cấp quyền (WORKSPACE_DESIGN §2) — người mới cần biết trước khi bấm.
         { id: "tiktok_api", label: "TikTok API", icon: Link2, perm: "manage_tiktok_api" as PermissionKey, badge: "Chưa dùng" },
       ],
@@ -193,18 +190,13 @@ export function brandNavGroups(currentRole: UserRole): NavGroup[] {
         { id: "brand_sessions", label: "Sổ Ca", icon: BookOpen, perm: undefined },
         { id: "brand_skus", label: "Sản phẩm lên live", icon: Package, perm: undefined },
         { id: "brand_monthly_report", label: "Report Tháng", icon: FileText, perm: undefined },
-        // Cam Kết Hợp Đồng bản CHỈ ĐỌC cho khách (Đợt C/1, migration 0108). Khác hẳn tab cùng tên
-        // bên Agency: bên đó ops soạn hợp đồng + nhìn xuyên mọi brand, đây chỉ trả lời "tháng này
-        // cam kết bao nhiêu giờ, đã chạy bao nhiêu, còn bao nhiêu". Brand đọc qua view
-        // `brand_commitment_progress` (đã bỏ cột note nội bộ); 2 bảng gốc vẫn khoá ở ops như cũ.
-        { id: "brand_commitment_view", label: "Cam Kết Hợp Đồng", icon: FileSignature, perm: undefined },
+        // Hợp Đồng bản CHỈ ĐỌC cho khách (Đợt C/1, migration 0108): giờ cam kết + tiến độ + giá theo sàn. Gộp 06/10 hai tab
+        // "Cam Kết Hợp Đồng" + "Rate Card" (hai nửa của một hợp đồng). Brand đọc cam kết qua view `brand_commitment_progress`
+        // (đã bỏ cột note nội bộ), giá qua RLS 0105; chỗ sửa là CRM bên Agency.
+        { id: "brand_commitment_view", label: "Hợp Đồng", icon: FileSignature, perm: undefined },
         // Kế hoạch tháng sau, chỉ đọc + nút xác nhận (Đợt C/2, migration 0110). Đường đọc đã mở từ
         // 0105 (brand_month_plans_read_scoped); xác nhận đi qua RPC confirm_month_plan riêng.
         { id: "brand_next_month_plan", label: "Kế Hoạch Tháng Sau", icon: CalendarCheck2, perm: undefined },
-        // Rate Card của chính brand — CHỈ ĐỌC (Đợt C/3). RLS đã mở từ 0105
-        // (brand_platform_rates_read_scoped/_history), chỉ thiếu UI. Tái dùng nguyên BrandRateCard
-        // của CRM bên Agency với readOnly — sửa rate vẫn phải làm ở CRM, không mở đường ghi ở đây.
-        { id: "brand_rate_card", label: "Rate Card", icon: Tag, perm: undefined },
         // Trang Affiliate (2026-09-22) — bảng phân tích theo TỪNG PHIÊN của creator affiliate,
         // tách hẳn khỏi form Report Tháng (yêu cầu ops). Brand xem được (migration 0102 nới RLS
         // đọc), chỉ ops mới sửa được — khác "Nhập Ads"/"Dữ Liệu Gốc" vốn ẩn với brand.

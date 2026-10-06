@@ -14,27 +14,6 @@ interface DbMonthlyReport {
   period_month: string;
   platform?: ReportPlatform | null;
   status: string;
-  ads_spend: number | null;
-  roas: number | null;
-  promotion_notes: string | null;
-  customer_insight_notes: string | null;
-  account_health_notes: string | null;
-  plan_target_gmv: number | null;
-  plan_target_nmv: number | null;
-  plan_target_hours: number | null;
-  plan_pct_daily: number | null;
-  plan_pct_dday: number | null;
-  plan_pct_midmonth: number | null;
-  plan_pct_payday: number | null;
-  camp_dday_start: string | null;
-  camp_dday_end: string | null;
-  camp_dday_target_gmv: number | null;
-  camp_midmonth_start: string | null;
-  camp_midmonth_end: string | null;
-  camp_midmonth_target_gmv: number | null;
-  camp_payday_start: string | null;
-  camp_payday_end: string | null;
-  camp_payday_target_gmv: number | null;
   summary_text: string | null;
   next_steps_text: string | null;
   summary_saved_at: string | null;
@@ -52,27 +31,6 @@ function reportFromDb(row: DbMonthlyReport): BrandMonthlyReport {
     periodMonth: row.period_month,
     platform: row.platform ?? "TikTok",
     status: row.status as BrandMonthlyReport["status"],
-    adsSpend: row.ads_spend ?? undefined,
-    roas: row.roas ?? undefined,
-    promotionNotes: row.promotion_notes ?? undefined,
-    customerInsightNotes: row.customer_insight_notes ?? undefined,
-    accountHealthNotes: row.account_health_notes ?? undefined,
-    planTargetGmv: row.plan_target_gmv ?? undefined,
-    planTargetNmv: row.plan_target_nmv ?? undefined,
-    planTargetHours: row.plan_target_hours ?? undefined,
-    planPctDaily: row.plan_pct_daily ?? undefined,
-    planPctDday: row.plan_pct_dday ?? undefined,
-    planPctMidmonth: row.plan_pct_midmonth ?? undefined,
-    planPctPayday: row.plan_pct_payday ?? undefined,
-    campDdayStart: row.camp_dday_start ?? undefined,
-    campDdayEnd: row.camp_dday_end ?? undefined,
-    campDdayTargetGmv: row.camp_dday_target_gmv ?? undefined,
-    campMidmonthStart: row.camp_midmonth_start ?? undefined,
-    campMidmonthEnd: row.camp_midmonth_end ?? undefined,
-    campMidmonthTargetGmv: row.camp_midmonth_target_gmv ?? undefined,
-    campPaydayStart: row.camp_payday_start ?? undefined,
-    campPaydayEnd: row.camp_payday_end ?? undefined,
-    campPaydayTargetGmv: row.camp_payday_target_gmv ?? undefined,
     summaryText: row.summary_text ?? undefined,
     nextStepsText: row.next_steps_text ?? undefined,
     summarySavedAt: row.summary_saved_at ?? undefined,
@@ -82,30 +40,6 @@ function reportFromDb(row: DbMonthlyReport): BrandMonthlyReport {
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
-}
-
-export interface MonthlyReportManualInput {
-  adsSpend?: number;
-  roas?: number;
-  promotionNotes?: string;
-  customerInsightNotes?: string;
-  accountHealthNotes?: string;
-  planTargetGmv?: number;
-  planTargetNmv?: number;
-  planTargetHours?: number;
-  planPctDaily?: number;
-  planPctDday?: number;
-  planPctMidmonth?: number;
-  planPctPayday?: number;
-  campDdayStart?: string;
-  campDdayEnd?: string;
-  campDdayTargetGmv?: number;
-  campMidmonthStart?: string;
-  campMidmonthEnd?: string;
-  campMidmonthTargetGmv?: number;
-  campPaydayStart?: string;
-  campPaydayEnd?: string;
-  campPaydayTargetGmv?: number;
 }
 
 // Mọi dòng report (RLS tự cắt theo brand cho role brand) — App dùng để phân bổ target xuống từng
@@ -139,41 +73,12 @@ export async function fetchMonthlyReport(brandId: string, periodMonth: string, p
   return data ? reportFromDb(data as DbMonthlyReport) : null;
 }
 
-export async function upsertMonthlyReport(brandId: string, periodMonth: string, input: MonthlyReportManualInput, platform: ReportPlatform = "TikTok"): Promise<BrandMonthlyReport> {
+// Tạo dòng report nháp (chưa có thì tạo, có rồi thì giữ nguyên) — để phát hành tháng chưa từng có dòng. Chỉ ghi cột
+// định danh: mọi nội dung report (tóm tắt, Insight) có đường ghi riêng bên dưới, bản chụp số ở monthlyReportSnapshots.
+export async function upsertMonthlyReport(brandId: string, periodMonth: string, platform: ReportPlatform = "TikTok"): Promise<BrandMonthlyReport> {
   const { data, error } = await supabase
     .from("brand_monthly_reports")
-    .upsert(
-      {
-        brand_id: brandId,
-        period_month: periodMonth,
-        platform,
-        ads_spend: input.adsSpend ?? null,
-        roas: input.roas ?? null,
-        promotion_notes: input.promotionNotes ?? null,
-        customer_insight_notes: input.customerInsightNotes ?? null,
-        account_health_notes: input.accountHealthNotes ?? null,
-        // Đã sửa: các field kế hoạch dưới đây từng bị THIẾU khỏi payload upsert dù có trong
-        // MonthlyReportManualInput — Tab 05 "Kế hoạch tháng sau" tưởng đã lưu nhưng chưa từng ghi
-        // xuống DB (mọi field plan_* luôn bị null hoá lại mỗi lần upsert vì không có mặt trong object).
-        plan_target_gmv: input.planTargetGmv ?? null,
-        plan_target_nmv: input.planTargetNmv ?? null,
-        plan_target_hours: input.planTargetHours ?? null,
-        plan_pct_daily: input.planPctDaily ?? null,
-        plan_pct_dday: input.planPctDday ?? null,
-        plan_pct_midmonth: input.planPctMidmonth ?? null,
-        plan_pct_payday: input.planPctPayday ?? null,
-        camp_dday_start: input.campDdayStart ?? null,
-        camp_dday_end: input.campDdayEnd ?? null,
-        camp_dday_target_gmv: input.campDdayTargetGmv ?? null,
-        camp_midmonth_start: input.campMidmonthStart ?? null,
-        camp_midmonth_end: input.campMidmonthEnd ?? null,
-        camp_midmonth_target_gmv: input.campMidmonthTargetGmv ?? null,
-        camp_payday_start: input.campPaydayStart ?? null,
-        camp_payday_end: input.campPaydayEnd ?? null,
-        camp_payday_target_gmv: input.campPaydayTargetGmv ?? null
-      },
-      { onConflict: "brand_id,period_month,platform" }
-    )
+    .upsert({ brand_id: brandId, period_month: periodMonth, platform }, { onConflict: "brand_id,period_month,platform" })
     .select()
     .single();
   if (error) throw error;

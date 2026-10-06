@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Activity, AlertTriangle, CalendarRange, Gauge, LayoutDashboard, Lightbulb, TrendingUp, Users } from "lucide-react";
-import { BrandMonthPlan, BrandMonthPlanSlot, BrandMonthlyReport, LiveSession, PromoScheme, ShiftSlot, UserRole } from "../../types";
+import { BrandMonthPlan, BrandMonthPlanSlot, LiveSession, PromoScheme, ShiftSlot, UserRole } from "../../types";
 import { EngineParams } from "../../lib/scheduling/engineParams";
 import { monthPlanRead } from "../../lib/db/monthPlans";
 import { fetchShopDaysMonthSlice, ShopDaysMonthSlice } from "../../lib/dataraw/monthlyProductSlice";
@@ -34,7 +34,7 @@ import { METRIC, metricHint } from "../../lib/metricGlossary";
 import { PageHeader } from "../common/PageHeader";
 import OpsSupport, { prefetchOpsSupport } from "../OpsSupport";
 import { MonthPicker } from "../common/MonthPicker";
-import { brandMonthKey, type PlatformScope, type ReportPlatform } from "../../lib/reportPlatform";
+import { type PlatformScope, type ReportPlatform } from "../../lib/reportPlatform";
 import BrandDashboardTotal from "./BrandDashboardTotal";
 
 // Dashboard brand (2026-09-28) — màn TRONG tháng cho ops: tháng này tới đâu, vì sao, tuần tới / tháng sau
@@ -57,8 +57,6 @@ interface BrandDashboardProps {
   promoSchemes: PromoScheme[];
   engineParams: EngineParams;
   currentRole: UserRole;
-  /** "brandId|YYYY-MM" → dòng Report Tháng (App nạp sẵn) — chỉ để lấy khung camp hiệu lực (effectiveCamp). */
-  monthlyReports?: Map<string, BrandMonthlyReport>;
   onOpenMonthPlan: () => void;
   onOpenSession: (sessionId: string) => void;
   onOpenSessions: () => void;
@@ -123,7 +121,7 @@ export default function BrandDashboard(props: BrandDashboardProps) {
 }
 
 // Dashboard của MỘT sàn: mọi số (KPI, run-rate, đề xuất, host) chỉ tính trên ca của sàn này và kế hoạch của sàn này.
-function BrandDashboardOne({ brandId, brandName, platform, platforms, sessions: allSessions, shiftSlots: allShiftSlots, promoSchemes, engineParams, currentRole, monthlyReports, onOpenMonthPlan, onOpenSession, onOpenSessions }: Omit<BrandDashboardProps, "platform" | "onPickPlatform"> & { platform: ReportPlatform }) {
+function BrandDashboardOne({ brandId, brandName, platform, platforms, sessions: allSessions, shiftSlots: allShiftSlots, promoSchemes, engineParams, currentRole, onOpenMonthPlan, onOpenSession, onOpenSessions }: Omit<BrandDashboardProps, "platform" | "onPickPlatform"> & { platform: ReportPlatform }) {
   const today = todayVn();
   const isOps = OPS_ROLES.includes(currentRole);
   // Ca/slot của brand khác giữ nguyên (OpsSupport đọc lịch toàn agency); của brand này chỉ giữ ĐÚNG SÀN.
@@ -161,8 +159,7 @@ function BrandDashboardOne({ brandId, brandName, platform, platforms, sessions: 
   }, [brandId, month, platform]);
 
   // Khung camp hiệu lực — cùng luật với Report Tháng / Bản Tin CEO (effectiveCamp, audit workflow #8).
-  const reportRow = monthlyReports?.get(brandMonthKey(brandId, month, platform));
-  const camp = useMemo(() => effectiveCamp(plan?.plan.campRanges, reportRow), [plan, reportRow]);
+  const camp = useMemo(() => effectiveCamp(plan?.plan.campRanges), [plan]);
   const bucketOf = useMemo(() => (d: string) => resolveCampBucketType(d, camp), [camp]);
   const mStart = `${month}-01`, mEnd = monthEndOf(mStart);
   const monthSessions = useMemo(() => brandSessions.filter((s) => s.date >= mStart && s.date <= mEnd), [brandSessions, mStart, mEnd]);
@@ -220,8 +217,7 @@ function BrandDashboardOne({ brandId, brandName, platform, platforms, sessions: 
   const cPos = useMemo(() => campPositions(campWindows(history, bucketOf)), [history, bucketOf]);
   const slotOk = slotRuleReliable(sIdx, wfSlot);
   const campOk = campRuleReliable(cPos);
-  const nextReportRow = monthlyReports?.get(brandMonthKey(brandId, nextMonthOf(month), platform));
-  const nextCamp = useMemo(() => effectiveCamp(nextPlan?.plan.campRanges, nextReportRow), [nextPlan, nextReportRow]);
+  const nextCamp = useMemo(() => effectiveCamp(nextPlan?.plan.campRanges), [nextPlan]);
   const nextModel = useMemo(() => targetWeightModel(brandSessions, nextMonthOf(month), (d) => resolveCampBucketType(d, nextCamp)), [brandSessions, month, nextCamp]);
   const check = useMemo(
     () => (nextPlan ? planCheck(nextPlan.slots, brandSessions, lastDataDate(brandSessions, today), (d) => resolveCampBucketType(d, nextCamp), nextModel) : null),

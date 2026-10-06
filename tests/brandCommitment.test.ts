@@ -1,11 +1,13 @@
 // Cam kết hợp đồng (src/lib/performance/brandCommitment.ts) — 247 dòng thuần, chưa test nào chạm tới
-// (đo 2026-10-01). Module này nuôi 3 màn: Cam Kết Hợp Đồng (agency), bản chỉ-đọc cho brand
+// (đo 2026-10-01). Module này nuôi 3 màn: Kế Hoạch Tháng + Toàn Cảnh Brand (agency), bản chỉ-đọc cho brand
 // (BrandCommitmentView), và cột "Cam kết" của Toàn Cảnh Brand — cộng thêm khối "cần mở thêm bao nhiêu
 // giờ" trên màn Đăng Ký & Chốt Lịch. Đây là giờ dùng để TÍNH TIỀN brand (file tự ghi: "cam kết hợp đồng
 // và hoá đơn phải đếm CÙNG một loại giờ"), nên sai ở đây là sai hoá đơn hoặc sai số giờ giao cho khách.
 import { expect, test } from "vitest";
 import {
-  brandsMissingCommitment,
+  contractCovering,
+  generateThroughMonth,
+  monthCommitmentOf,
   computeAllProgress,
   computeCommitmentProgress,
   computeSchedulingGaps,
@@ -17,7 +19,7 @@ import {
   openSlotHoursByBrand,
   plannedHoursOf
 } from "../src/lib/performance/brandCommitment";
-import { BrandMonthlyCommitment, LiveSession, ShiftSlot } from "../src/types";
+import { BrandContract, BrandMonthlyCommitment, LiveSession, ShiftSlot } from "../src/types";
 
 const P = "2026-10-01";
 const B1 = "brand-crocs";
@@ -223,13 +225,34 @@ test("brand bị xoá vẫn hiện dòng, có nhãn thay vì tên rỗng", () =>
   expect(rows[0].brandName).toBe("Brand đã xoá");
 });
 
-test("brandsMissingCommitment: có ca trong tháng mà không có dòng cam kết", () => {
-  const sessions = [
-    ses("a", "2026-10-05", "09:00", "11:00", "Completed", { brandId: "b-chua-cam-ket" }),
-    ses("b", "2026-10-06", "09:00", "11:00", "Cancelled", { brandId: "b-chi-co-ca-huy" }),
-    ses("c", "2026-10-07", "09:00", "11:00", "Completed", { brandId: B1 })
-  ];
-  expect(brandsMissingCommitment([commit(B1, 10)], sessions, P)).toEqual(["b-chua-cam-ket"]);
+// ── Cam kết một tháng: hợp đồng (CRM) là mặc định, dòng tháng sửa ở Kế Hoạch Tháng thắng ─────────────────
+const contract = (over: Partial<BrandContract> = {}): BrandContract => ({
+  id: "hd1", brandId: B1, platform: "TikTok", startMonth: "2026-09-01", endMonth: "2026-12-01", monthlyHours: 100, monthlyGmv: 2_000_000_000, status: "active", ...over
+});
+
+test("contractCovering: chỉ hợp đồng đang hiệu lực, đúng sàn, phủ tháng", () => {
+  expect(contractCovering([contract()], B1, "TikTok", P)?.id).toBe("hd1");
+  expect(contractCovering([contract({ status: "draft" })], B1, "TikTok", P)).toBeUndefined();
+  expect(contractCovering([contract({ status: "ended" })], B1, "TikTok", P)).toBeUndefined();
+  expect(contractCovering([contract({ platform: "Shopee" })], B1, "TikTok", P)).toBeUndefined();
+  expect(contractCovering([contract({ endMonth: "2026-09-01" })], B1, "TikTok", P)).toBeUndefined();
+  expect(contractCovering([contract({ endMonth: undefined })], B1, "TikTok", P)?.id).toBe("hd1");
+  // Hai hợp đồng chồng tháng: hợp đồng ký sau thắng.
+  expect(contractCovering([contract(), contract({ id: "hd2", startMonth: "2026-10-01" })], B1, "TikTok", P)?.id).toBe("hd2");
+});
+
+test("monthCommitmentOf: dòng tháng thắng hợp đồng; chưa sinh dòng thì lấy điều khoản hợp đồng", () => {
+  expect(monthCommitmentOf([], [contract()], B1, "TikTok", P)).toMatchObject({ hours: 100, gmv: 2_000_000_000, source: "contract" });
+  expect(monthCommitmentOf([commit(B1, 80)], [contract()], B1, "TikTok", P)).toMatchObject({ hours: 80, source: "contract" });
+  expect(monthCommitmentOf([{ ...commit(B1, 120), isOverride: true }], [contract()], B1, "TikTok", P)).toMatchObject({ hours: 120, source: "month" });
+  expect(monthCommitmentOf([], [], B1, "TikTok", P)).toMatchObject({ hours: 0, source: "none" });
+});
+
+test("generateThroughMonth: hợp đồng mở thì sinh tới hết tháng sau nữa, không trước tháng bắt đầu", () => {
+  expect(generateThroughMonth({ startMonth: "2026-09-01", endMonth: "2026-12-01" }, "2026-10-06")).toBeUndefined();
+  expect(generateThroughMonth({ startMonth: "2026-09-01" }, "2026-10-06")).toBe("2026-12-01");
+  expect(generateThroughMonth({ startMonth: "2026-11-01" }, "2026-11-30")).toBe("2027-01-01");
+  expect(generateThroughMonth({ startMonth: "2027-06-01" }, "2026-10-06")).toBe("2027-06-01");
 });
 
 // ── MỞ THÊM BAO NHIÊU GIỜ: ca chờ đăng ký ở ngày đã qua ───────────────────────────────────────────

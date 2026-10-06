@@ -4681,3 +4681,60 @@ ngày), chạy parser Dữ Liệu Gốc trên file thật Franklin T9 trong `~/D
 Đo kèm: CI xanh ở commit cuối (2 commit 04/10 tối đỏ vì 1 lỗi lint, đã tự hết ở commit sau). Bộ kiểm SQL
 `supabase/tests/0136_*.sql` 16/16 OK trên replay có 0136, ĐỎ khi thiếu (1a, 2a, 2b, 3a, 3c); bộ 0133 vẫn 36 OK khi có
 0136. vitest 456/456 (thêm 3 test, mỗi test đã thử đột biến rơi đúng chỗ).
+
+
+## Gộp cấu hình một chỗ nhập (2026-10-06)
+
+User: "nhập liệu 2–3 nơi
+  (rate card, cam kết hợp đồng…), đưa vào cấu hình đúng 1 chỗ ở CRM; cam kết tháng set lúc lên Kế Hoạch Tháng, không cần module riêng;
+  check toàn app chỗ tương tự rồi fix 1 lần". Đo production trước khi gộp: 0 hợp đồng, 0 dòng cam kết, 1 dòng giá (JOCKEY, = 0), 0 dòng
+  `session_finance`, 0 report ca có `ads_cost`, 0 dòng report có khung camp, 5/5 phòng + 39/39 talent trạng thái gõ tay = Available ⇒
+  không phải chuyển dữ liệu. Đã làm: **CRM → "Hợp đồng & giá"** (`BrandConfigPanel.tsx`, mỗi brand × sàn): cách thu phí, giá (đơn giá/giờ
+  HOẶC % hoa hồng theo cách thu phí + tỷ lệ hoàn huỷ + lịch sử), hợp đồng (lưu "đang hiệu lực" là TỰ sinh cam kết từng tháng — bỏ nút
+  "Sinh cam kết theo tháng"; hợp đồng mở sinh tới hết tháng sau nữa, `generateThroughMonth`), dải cam kết từng tháng (chỉ đọc), phòng live
+  mặc định (dời từ Kế Hoạch Tháng). **Gỡ tab Agency "Cam Kết Hợp Đồng"** (`BrandCommitment.tsx` xoá; tiến độ giao giờ đã có ở Toàn Cảnh
+  Brand / Nhân sự ca / Kế Hoạch Tháng). **Kế Hoạch Tháng**: ô "Giờ cam kết" + "GMV cam kết" của tháng LƯU THẬT (thay ô "giờ cần xếp" không
+  lưu), mặc định = hợp đồng, tiến độ đã live/đang xếp/chờ xác nhận/còn thiếu ngay dưới; phòng live chỉ đọc + "Đổi ở CRM". Brand workspace:
+  2 tab "Cam Kết Hợp Đồng" + "Rate Card" gộp thành **"Hợp Đồng"** (`brand_commitment_view`, link cũ `/rate-card` và `/cam-ket-hop-dong` vẫn
+  mở). **Cùng lớp lỗi, sửa luôn:** (1) Finance bỏ ô % hoa hồng từng ca — lỗi ngầm: ca có dòng `session_finance` (kể cả chỉ vì bấm Duyệt) thì
+  cột DB mặc định 15% thắng % của brand; % nay chỉ theo giá brand ở CRM; (2) Finance bỏ ô Ads từng ca (trùng ô Ads ở report ca —
+  `sessionAdsCost`); (3) khung camp + target từng khung ở Nhập Ads (tháng không có kế hoạch, `ReportPlanningInputs.tsx` xoá) ⇒ chỉ Kế Hoạch
+  Tháng: `effectiveCamp(planCamp)` 1 tham số, `buildMonthTargetPlan`/`monthTargetOf` bỏ nhánh report, `applyAllocatedTargets(sessions,
+  planTargets, planTotals)`, 3 lượt đọc dòng report chỉ để lấy khung camp (Dashboard, Report Tuần, Report Tháng tháng trước) bỏ;
+  (4) Talent Pool bỏ ô % hoa hồng talent (user chốt không có hoa hồng GMV) + ô trạng thái gõ tay (suy từ lịch; "Đang bận" = có ca hôm nay,
+  trước là bất kỳ ca sắp tới); cột/ô "Rate card" trước chỉ in rate/phiên ⇒ `talentRateLabel` (rate/giờ thắng, cùng pnl.ts); (5) Studios:
+  nhãn "Đang live" suy từ ca (trước đọc cột gõ tay, không bao giờ bật), danh sách ca hôm nay hết chữ "UPCOMING"; (6) "đã có giá chưa" một
+  luật `brandPriceSet` (lib/brandPricing.ts) cho Việc cần làm / Toàn Cảnh Brand / CRM — Toàn Cảnh trước chỉ nhìn đơn giá/giờ nên brand thu
+  theo % luôn "Chưa nhập"; (7) client thôi ghi/đọc các cột report cũ (ads_spend, roas, 3 ghi chú, plan_*, camp_*) — `upsertMonthlyReport`
+  chỉ tạo dòng. Verify: vitest 548/548 (chế độ CI, +7 `tests/singleSourceConfig.test.ts`; đột biến "dòng Finance thắng giá brand" rơi đúng
+  test), tsc, lint 0 lỗi (30 warning), build, audit:dead 0; replay 0001→0142 + `supabase/tests/config_single_source.sql` 6/6 (admin ghi cam
+  kết qua RLS, tháng sửa riêng không bị hợp đồng ghi đè, tháng bằng hợp đồng đổi theo khi sửa hợp đồng, hợp đồng mở sinh đúng mốc + sàn);
+  trên bản build nối DB thật (chỉ đọc, không ghi dữ liệu thử): CRM 4 brand × sàn, khối VERA TikTok/Shopee, Kế Hoạch Tháng ô cam kết + "Đổi ở
+  CRM" mở đúng VERA Shopee, Toàn Cảnh Brand (cột "Giá", "Đặt cam kết tháng →"), tab Hợp Đồng brand + link cũ, Finance chỉ còn ô chi phí
+  studio, Nhập Ads hết khối camp, form Talent Pool, menu Agency hết "Cam Kết Hợp Đồng". **Chưa đo trên DB thật:** ghi hợp đồng/cam kết
+  thật qua UI (chờ user nhập hợp đồng đầu tiên).
+
+
+## Cắt vòng mạng nối tiếp (2026-10-03/04)
+
+- **03/10 user hỏi lại "app load chậm hơn" → audit theo SỐ VÒNG MẠNG NỐI TIẾP** (không theo wall-clock; mạng user dao động
+  connect 50–415 ms tới cùng host). Bundle không phình (entry 496 KB), DB không đổi đáng kể, số request y nguyên (24 REST ở
+  Sổ Ca). Ba vòng nối tiếp đã cắt: (1) `vercel.json` thiếu header cache ⇒ `/assets/*` (tên có hash) bị trả
+  `max-age=0, must-revalidate`, mỗi lần mở app hỏi lại từng file — nay `max-age=31536000, immutable`; (2) chunk tab bị
+  cổng `coreDataReady` giữ tới khi cả đợt dữ liệu về (Sổ Ca: chunk khởi hành 352 ms → **62 ms**) — nay `TAB_CHUNKS` +
+  `preload()`; (3) Report Tháng: chunk biểu đồ 145 KB gzip đợi bản chụp về (665 ms → khởi hành cùng bản chụp 409 ms).
+  Thêm `<link rel="preconnect">` tới Supabase trong `index.html`. **Đợt 2 cùng ngày:** (4) `fetchMonthPlan` 2 truy vấn
+  nối tiếp → 1 (nhúng `brand_month_plan_slots(*)`; lợi cho mọi màn đọc plan); (5) lượt đọc riêng của Bản Tin CEO,
+  Dashboard brand, Report Tháng được NẠP TRƯỚC trong lúc chờ đợt chung (`src/lib/db/prefetch.ts`): Report Tháng khởi hành
+  115 ms, xong trước cả đợt chung; Dashboard CROCS nội dung giống từng ký tự với trước khi sửa, 0 request trùng.
+  OpsSupport nhận `plan` qua prop từ BrandDashboard. **Đợt 3 (04/10, quét lại 28 màn):** (6) React 19 giữ fallback
+  Suspense tối thiểu 300 ms và `React.lazy` luôn treo một nhịp kể cả khi chunk đã tải ⇒ mọi màn chậm thêm tới 300 ms
+  mỗi lần mở/đổi tab (đo: 308–330 ms không request, không long task). `lazyNamed` nay render thẳng khi chunk đã có +
+  App tải sẵn chunk các tab được phép lúc rảnh (ops: cả 2 workspace) ⇒ đổi tab bắt đầu đọc sau 6–35 ms. (7) Nhập Ads:
+  report → affiliate plans nối tiếp → song song (xong 128 ms thay vì 621–1.371). (8) Đối Soát: danh sách lô → dòng →
+  song song với "lô mới nhất kèm dòng" (1.201 → 649 ms). (9) `/api/admin/ai-agent-prompts` đọc prompts song song với
+  xác thực (1.241 → 765 ms). (10) Nạp trước thêm 8 màn (Nhân sự ca, Kế Hoạch Tháng, Toàn Cảnh Brand, Cam Kết HĐ, Cam
+  kết/KH Tháng Sau/SKU/Dữ Liệu Gốc của brand). Còn lại có chủ đích: Dashboard brand khối đối chứng (danh sách batch →
+  dòng, chỉ ops); Kế Hoạch Tháng phần theo brand khi máy chưa nhớ brand nào; Affiliate (đọc theo khoảng tháng do người
+  dùng chọn). **Sau deploy phải kiểm:** `curl -sI
+  https://live-ops-ai.vercel.app/assets/<file>.js` có `immutable`.

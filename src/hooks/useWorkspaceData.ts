@@ -162,8 +162,8 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
     return () => window.clearInterval(t);
   }, []);
   const sessions = useMemo(
-    () => applyAllocatedTargets(withEffectiveStatus(rawSessions, nowMs), monthlyReports, planTargetsBySessionId, planMonthTotals),
-    [rawSessions, nowMs, monthlyReports, planTargetsBySessionId, planMonthTotals]
+    () => applyAllocatedTargets(withEffectiveStatus(rawSessions, nowMs), planTargetsBySessionId, planMonthTotals),
+    [rawSessions, nowMs, planTargetsBySessionId, planMonthTotals]
   );
   // Kế hoạch tháng được sửa ở Report Tháng (Tab 05) mà App không nhận callback — nạp lại mỗi khi
   // đổi tab là đủ, bảng nhỏ và target chỉ cần đúng khi người dùng nhìn sang màn khác.

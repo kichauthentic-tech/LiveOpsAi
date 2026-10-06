@@ -149,7 +149,7 @@ export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ brands, 
     try {
       // Tháng chưa có dòng brand_monthly_reports (chưa nhập Ads/kế hoạch gì) → tạo dòng nháp trống
       // rồi phát hành ngay, giống hành vi ở tab Report Tháng đơn brand.
-      const row = existing ?? (await upsertMonthlyReport(brandId, `${month}-01`, {}, platform));
+      const row = existing ?? (await upsertMonthlyReport(brandId, `${month}-01`, platform));
       // Tháng chưa từng bấm "Tạo report" → chốt số trước (cùng hành vi nút Phát hành ở Report Tháng).
       // Đã có bản chụp thì giữ nguyên: phát hành là gửi đúng số ops đã chốt.
       if (refresh || !hasStored) {

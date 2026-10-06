@@ -3,6 +3,7 @@ import { isUnconfirmedPast } from "./sessionStatus";
 import { isCountable } from "./performance/hostPerformance";
 import { fmtDateVn, fmtMonth } from "./format";
 import { brandMonthKey, brandPlatformKey, brandPlatformsOf, sessionBrandMonthKey } from "./reportPlatform";
+import { brandPriceSet } from "./brandPricing";
 
 // "Việc cần làm" — danh sách TỰ SINH từ dữ liệu cho màn đầu tiên sau khi đăng nhập (audit người mới 2026-10-04,
 // Nhóm 4/5). Người cũ biết thứ tự việc (hợp đồng → giá → kế hoạch → chốt người → up số → report); người mới mở app
@@ -19,7 +20,7 @@ export interface Todo {
   /** Màn mở khi bấm; `brandId` có ⇒ mở trong Brand Workspace của brand đó. */
   tab: string;
   brandId?: string;
-  /** Nhớ brand này trước khi mở màn agency theo brand (Kế Hoạch Tháng). */
+  /** Nhớ brand này trước khi mở màn agency theo brand (Kế Hoạch Tháng; CRM thì bung sẵn "Hợp đồng & giá" của nó). */
   rememberBrandId?: string;
   /** Sàn đi kèm brand đã nhớ (kế hoạch theo sàn, 0140). */
   rememberPlatform?: "TikTok" | "Shopee";
@@ -130,18 +131,21 @@ export function buildTodos(input: TodoInput): Todo[] {
       }
     }
 
-    // 5. Hợp đồng / cam kết giờ tháng này — riêng từng sàn (0141).
+    // 5. Cam kết giờ tháng này — riêng từng sàn (0141). Điều khoản nhập ở CRM (lưu hợp đồng là tự sinh từng tháng); số
+    // của một tháng đặt ở Kế Hoạch Tháng (gộp cấu hình 06/10) ⇒ nút mở Kế Hoạch Tháng đúng brand × sàn.
     for (const p of platforms) {
       if (!input.commitments.some((c) => c.brandId === b.id && (c.platform ?? "TikTok") === p && c.periodMonth.startsWith(month))) {
         const name = platforms.length > 1 ? `${b.name} ${p}` : b.name;
-        out.push({ id: `commit-${b.id}${p === "Shopee" ? "-shopee" : ""}`, level: "low", title: `${name} chưa có cam kết giờ tháng ${fmtMonth(month)}`, detail: "Nhập hợp đồng (chọn sàn) rồi bấm \"Sinh cam kết theo tháng\" — Kế Hoạch Tháng lấy số giờ cần xếp từ đây.", tab: "brand_commitment", action: "Nhập hợp đồng" });
+        out.push({ id: `commit-${b.id}${p === "Shopee" ? "-shopee" : ""}`, level: "low", title: `${name} chưa có cam kết giờ tháng ${fmtMonth(month)}`, detail: "Đặt giờ cam kết của tháng ở Kế Hoạch Tháng (hoặc nhập hợp đồng ở CRM — app tự đổ ra từng tháng). Thiếu số này thì không so được giờ đã giao.", tab: "month_plan", rememberBrandId: b.id, rememberPlatform: p, action: "Mở Kế Hoạch Tháng" });
       }
     }
 
-    // 6. Giá: chưa có đơn giá/giờ lẫn % hoa hồng thì Finance và Dashboard không tính được doanh thu.
-    const rated = input.rates.some((r) => r.brandId === b.id && (r.ratePerHour > 0 || (r.commissionRate ?? 0) > 0));
-    if (!rated) {
-      out.push({ id: `rate-${b.id}`, level: "low", title: `${b.name} chưa có giá (Rate Card)`, detail: "Chưa có giá thì Finance & P&L và Dashboard không tính được doanh thu, lãi.", tab: "crm", action: "Nhập ở CRM" });
+    // 6. Giá theo sàn: luật chung `brandPriceSet` (thu theo giờ ⇒ đơn giá/giờ; theo % ⇒ % hoa hồng đã đặt).
+    for (const p of platforms) {
+      if (!brandPriceSet(b, input.rates, p)) {
+        const name = platforms.length > 1 ? `${b.name} ${p}` : b.name;
+        out.push({ id: `rate-${b.id}${p === "Shopee" ? "-shopee" : ""}`, level: "low", title: `${name} chưa có giá`, detail: "Chưa có giá thì Finance & P&L và Dashboard không tính được doanh thu, lãi.", tab: "crm", rememberBrandId: b.id, rememberPlatform: p, action: "Nhập ở CRM" });
+      }
     }
 
   }
@@ -195,7 +199,7 @@ export function buildTodos(input: TodoInput): Todo[] {
   }
 
   if (idle.length > 0) {
-    out.push({ id: "idle", level: "low", title: `${names(idle)}: chưa có ca nào gần đây`, detail: "Nếu brand đang hợp tác, bắt đầu từ Cam Kết Hợp Đồng rồi Kế Hoạch Tháng.", tab: "month_plan", rememberBrandId: idle[0].id, action: "Lập kế hoạch" });
+    out.push({ id: "idle", level: "low", title: `${names(idle)}: chưa có ca nào gần đây`, detail: "Nếu brand đang hợp tác, bắt đầu từ CRM (hợp đồng & giá) rồi Kế Hoạch Tháng.", tab: "month_plan", rememberBrandId: idle[0].id, action: "Lập kế hoạch" });
   }
 
   return out.sort((a, b) => LEVEL_ORDER[a.level] - LEVEL_ORDER[b.level]);

@@ -13,9 +13,8 @@ interface Props {
 }
 
 const OPS_STEPS: { step: string; where: string; why: string }[] = [
-  { step: "Nhập hợp đồng và giờ cam kết mỗi tháng", where: "Cam Kết Hợp Đồng", why: "Kế Hoạch Tháng lấy số giờ cần xếp từ đây." },
-  { step: "Nhập giá: cách thu phí, đơn giá/giờ hoặc % hoa hồng, tỷ lệ hoàn huỷ", where: "CRM → nút Rate Card trên thẻ brand", why: "Thiếu giá thì Finance và Dashboard không tính được doanh thu, lãi." },
-  { step: "Lập Kế Hoạch Tháng: lưới ca, target từng ca, khung ngày camp, phòng live — rồi bấm Chốt", where: "Kế Hoạch Tháng", why: "Chốt xong mới có ca để talent đăng ký; target tháng = tổng target các ca." },
+  { step: "Một lần cho mỗi brand × sàn: cách thu phí, giá (đơn giá/giờ hoặc % hoa hồng, tỷ lệ hoàn huỷ), hợp đồng + giờ cam kết mỗi tháng, phòng live mặc định", where: "CRM → \"Hợp đồng & giá\" trên thẻ brand", why: "Chỗ nhập duy nhất. Lưu hợp đồng là app tự đổ giờ cam kết ra từng tháng; thiếu giá thì Finance và Dashboard không tính được doanh thu, lãi." },
+  { step: "Lập Kế Hoạch Tháng: giờ cam kết của tháng (mặc định theo hợp đồng), lưới ca, target từng ca, khung ngày camp — rồi bấm Chốt", where: "Kế Hoạch Tháng", why: "Chốt xong mới có ca để talent đăng ký; target tháng = tổng target các ca. Tháng brand mua thêm/bớt giờ thì sửa giờ cam kết ngay ở đây." },
   { step: "Talent đăng ký rảnh, ops chốt Host + Trợ live cho từng ca", where: "Nhân sự ca (talent thấy là Đăng Ký Ca)", why: "Ca có người mới hiện ở Bảng Vận Hành, Lịch." },
   { step: "Trong ca: trợ live up file lúc giao ca (snapshot), host nộp report ca", where: "Bảng Vận Hành → bấm vào ca (Cửa sổ Ca Live)", why: "Giữ ranh giới số giữa 2 ca chung một phòng live." },
   { step: "Hằng tuần/cuối tháng: tải file từ TikTok Shop, up ở Dữ Liệu Gốc và Đối Soát Số Liệu", where: "Dữ Liệu Gốc (trong từng brand) · Đối Soát Số Liệu", why: "TikTok còn cập nhật GMV nhiều giờ sau khi tắt live; số đối soát là số cuối." },
@@ -38,7 +37,7 @@ const TERMS: { term: string; meaning: string }[] = [
   { term: "Đổi người giữa ca", meaning: "Host hoặc trợ live vào thay / ra sớm giữa chừng. Ghi ở Sửa ca → \"Đổi người giữa ca\": ai làm từ giờ nào đến giờ nào. Ca vẫn là một ca (một GMV); lương, giờ làm, trùng lịch và hiệu suất tính theo giờ từng người." },
   { term: "Target GMV tháng · KPI GMV · Tổng target", meaning: "Target GMV tháng: số ops đặt để chia xuống ca. KPI GMV: số brand giao cho cả shop, chỉ để Report so. Tổng target: cộng target từng ca — Dashboard dùng số này." },
   { term: "Ngày camp (D-Day, Mid-Month, Pay Day)", meaning: "Các đợt sale trong tháng. Mặc định D-Day = ngày trùng tháng (10/10), Mid-Month 13–15, Pay Day 23–25; đổi ở Kế Hoạch Tháng." },
-  { term: "Cam kết giờ", meaning: "Số giờ live brand mua mỗi tháng theo hợp đồng; tính theo giờ ca trong lịch." },
+  { term: "Cam kết giờ", meaning: "Số giờ live brand mua mỗi tháng theo hợp đồng; tính theo giờ ca trong lịch. Điều khoản nhập ở CRM, số riêng của một tháng sửa ở Kế Hoạch Tháng." },
   { term: "Số tự khai", meaning: "Số host/trợ live tự nhập trong report ca. Tin cậy thấp nhất." },
   { term: "Snapshot (số lúc giao ca)", meaning: "File TikTok trợ live up ngay lúc hết ca. Dùng để tách số của 2 ca liền nhau cùng một phòng." },
   { term: "Đối soát", meaning: "Up file TikTok cuối kỳ để thay mọi số tạm bằng số cuối cùng. Số đã đối soát là số tin được nhất." },

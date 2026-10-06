@@ -23,9 +23,9 @@
       ],
       "port": 3100,
       "env": {
-        "PORT": "3100",
         "NODE_ENV": "production"
-      }
+      },
+      "autoPort": true
     }
   ]
 }

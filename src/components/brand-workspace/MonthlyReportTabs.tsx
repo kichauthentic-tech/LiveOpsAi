@@ -68,19 +68,14 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   const planMonthTotals = useMemo(() => new Map(Object.entries(snapshot.planMonthTotals)), [snapshot]);
   const view = useMemo(() => snapshotView(snapshot), [snapshot]);
 
-  // Dòng brand_monthly_reports của tháng: khoảng camp ops ghi đè, tóm tắt/việc tháng sau/Insight đã sửa, ghi chú
-  // agency. Form nhập các cột kế hoạch nằm ở tab Nhập Ads (ReportPlanningInputs).
+  // Dòng brand_monthly_reports của tháng: tóm tắt/việc tháng sau/Insight đã sửa. Khung camp + target lấy từ Kế Hoạch
+  // Tháng (gộp cấu hình 06/10 — trước đó tháng không có kế hoạch đọc khung/target khung nhập ở Nhập Ads).
   const [monthlyReportRow, setMonthlyReportRow] = useState<BrandMonthlyReportType | null>(null);
-  // Dòng tháng TRƯỚC: chỉ để lấy khung camp hiệu lực của tháng trước (so cùng khung) — effectiveCamp.
-  const [prevReportRow, setPrevReportRow] = useState<BrandMonthlyReportType | null>(null);
   useEffect(() => {
     let cancelled = false;
     fetchMonthlyReport(brandId, `${month}-01`)
       .then((row) => !cancelled && setMonthlyReportRow(row))
       .catch(() => !cancelled && setMonthlyReportRow(null));
-    fetchMonthlyReport(brandId, `${prevMonthStrLocal(month)}-01`)
-      .then((row) => !cancelled && setPrevReportRow(row))
-      .catch(() => !cancelled && setPrevReportRow(null));
     return () => {
       cancelled = true;
     };
@@ -128,13 +123,13 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
       const bs = sessions.filter((s) => s.brandId === brandId);
       // Cùng khung camp hiệu lực với phần còn lại của report (effectiveCamp — audit workflow #8); trước đây
       // run-rate đọc khung Kế Hoạch Tháng còn bảng khung camp đọc khung đã ghi đè ⇒ hai khung trong một trang.
-      const camp = effectiveCamp(p.plan.campRanges, monthlyReportRow);
+      const camp = effectiveCamp(p.plan.campRanges);
       const rr = planRunRate(month, p.slots, shiftSlots, bs, todayVn(), camp);
       const open = shiftSlots.filter((sl) => sl.brandId === brandId && sl.status === "open" && !sl.sessionId);
       return monthRunRateFromPlan(rr, projectMonthEnd(rr, monthOutlook(month, todayVn(), bs, open, null, camp)));
     }
     return monthRunRate(sessions, brandId, start, end);
-  }, [plans, month, sessions, brandId, start, end, shiftSlots, monthlyReportRow]);
+  }, [plans, month, sessions, brandId, start, end, shiftSlots]);
   useEffect(() => {
     let cancelled = false;
     const ms = [prevMonth, month, nextMonth];
@@ -150,10 +145,10 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
 
   // Khung camp D-Day/Mid-Month/Pay Day, từng khung: khoảng nhập ở Nhập Ads (0071) → khoảng của Kế Hoạch
   // Tháng (0094) → lịch camp cố định (lib/campaignDays.ts).
-  const campOverrides: CampOverrides = useMemo(() => effectiveCamp(planCur?.plan.campRanges, monthlyReportRow), [monthlyReportRow, planCur]);
+  const campOverrides: CampOverrides = useMemo(() => effectiveCamp(planCur?.plan.campRanges), [planCur]);
   // Tháng trước phân loại theo khoảng camp của CHÍNH tháng trước — đem khoảng của tháng này áp vào thì ngày camp
   // tháng trước (vd D-Day 8/8) bị tính thành ngày thường vì khung đó đã bị ghi đè.
-  const prevCampOverrides: CampOverrides = useMemo(() => effectiveCamp(plans[prevMonth]?.plan.campRanges, prevReportRow), [plans, prevMonth, prevReportRow]);
+  const prevCampOverrides: CampOverrides = useMemo(() => effectiveCamp(plans[prevMonth]?.plan.campRanges), [plans, prevMonth]);
   const bucketCur = useMemo(() => (d: string) => resolveCampBucketType(d, campOverrides), [campOverrides]);
   const bucketPrev = useMemo(() => (d: string) => resolveCampBucketType(d, prevCampOverrides), [prevCampOverrides]);
   // Ads toàn cửa hàng (file TikTok Ads, migration 0137) — tháng report + tháng trước cắt cùng số ngày, chia theo cùng
@@ -252,20 +247,15 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   // trước từng ra −40% cho T9 CROCS trong khi cùng kỳ chỉ −18%.
   const cmp = useMemo(() => compareWindow(month, snapshot.coverage.sessionsThrough), [month, snapshot]);
   // Bảng khung camp — MỖI khung so với CHÍNH khung đó tháng trước. Target: Kế Hoạch Tháng ĐÃ CHỐT (cộng target ca
-  // theo khung) → không có thì target nhập tay (Nhập Ads).
+  // theo khung); không có kế hoạch chốt ⇒ không có target (không còn ô nhập tay ở Nhập Ads — gộp cấu hình 06/10).
   const planCampTargets = useMemo(() => {
     if (!planCur || planCur.plan.status !== "locked" || planCur.slots.length === 0) return null;
     return Object.fromEntries(planCampAllocation(planCur.slots, campOverrides).map((a) => [a.key, a.target > 0 ? a.target : null])) as Record<CampDayBucket, number | null>;
   }, [planCur, campOverrides]);
-  const campTargetSource = planCampTargets ? "Kế Hoạch Tháng đã chốt" : "nhập tay ở Nhập Ads";
+  const campTargetSource = "Kế Hoạch Tháng đã chốt";
   const prevColLabel = cmp.partial ? `1–${Number(cmp.prevEnd.slice(8))}/${prevMonth.slice(5)}` : `Tháng ${prevMonth.slice(5)}`;
   const campDetailRows = useMemo(() => {
-    const targets: Record<CampDayBucket, number | null> = planCampTargets ?? {
-      dday: monthlyReportRow?.campDdayTargetGmv ?? null,
-      midmonth: monthlyReportRow?.campMidmonthTargetGmv ?? null,
-      payday: monthlyReportRow?.campPaydayTargetGmv ?? null,
-      daily: null
-    };
+    const targets: Record<CampDayBucket, number | null> = planCampTargets ?? { dday: null, midmonth: null, payday: null, daily: null };
     return campCompare(liveCurrent?.rows ?? [], { start: cmp.curStart, end: cmp.curEnd, overrides: campOverrides }, livePrev?.rows ?? [], { start: cmp.prevStart, end: cmp.prevEnd, overrides: prevCampOverrides }, targets).map((r) => ({
       ...r,
       label: CAMP_DAY_BUCKET_LABEL[r.key],
@@ -275,7 +265,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
       ctr: r.cur.ctr,
       ctor: r.cur.ctor
     }));
-  }, [liveCurrent, livePrev, cmp, campOverrides, prevCampOverrides, planCampTargets, monthlyReportRow]);
+  }, [liveCurrent, livePrev, cmp, campOverrides, prevCampOverrides, planCampTargets]);
 
   // ============================ Số của 7 phần ============================
   // Phép tính nằm ở lib/report/monthlyReportInsights.ts + deepAnalysis.ts (thuần, có test). Ở đây chỉ nối dây.
@@ -386,7 +376,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   const refundRateShop = shopCur && shopCur.gmv > 0 ? (shopCur.refunds / shopCur.gmv) * 100 : null;
   const tiktokReturnRate = brandPlatformRates.find((r) => r.brandId === brandId && r.platform === "TikTok")?.returnRate;
   const nmvRate = hasReturnRateConfig ? tiktokReturnRate ?? null : refundRateShop;
-  const nmvSource = hasReturnRateConfig ? "tỷ lệ hoàn hủy ở Rate Card" : refundRateShop != null ? "Refund rate thực của cả shop trong kỳ" : null;
+  const nmvSource = hasReturnRateConfig ? "tỷ lệ hoàn hủy ở CRM (Hợp đồng & giá)" : refundRateShop != null ? "Refund rate thực của cả shop trong kỳ" : null;
 
   // Luỹ kế GMV live theo ngày — tháng report vs tháng trước (cùng trục ngày 1..31).
   const cumulativeData = useMemo(() => {
@@ -973,7 +963,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
             <KpiTile
               label="NMV (ước tính)"
               value={nmvRate != null ? fmtVndShort(liveCurStats.gmv * (1 - nmvRate / 100)) : "—"}
-              note={nmvRate != null ? `trừ ${fmtPct(nmvRate)} — ${nmvSource}` : "chưa có tỷ lệ hoàn hủy (Rate Card) / Refund rate (Shop Analytics)"}
+              note={nmvRate != null ? `trừ ${fmtPct(nmvRate)} — ${nmvSource}` : "chưa có tỷ lệ hoàn hủy (CRM) / Refund rate (Shop Analytics)"}
             />
             <KpiTile label="Giờ live" value={fmtHours(liveCurStats.hours)} change={pctChange(livePrevStats.hours, liveCurStats.hours)} note={`${liveCurStats.sessions} ca có số`} />
             <KpiTile label="GMV/giờ" value={liveCurStats.gmvPerHour != null ? fmtVndShort(liveCurStats.gmvPerHour) : "—"} change={pctChange(livePrevStats.gmvPerHour, liveCurStats.gmvPerHour)} />
@@ -1737,7 +1727,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         {/* Chỉ là chỉ đường cho ops — report gửi brand là 7 phần ở trên (Phân tích sâu đã gộp vào, 2026-09-27). */}
         {canManage && (
           <p className="text-[11px] pt-3" style={{ color: PAL.muted, borderTop: `1px solid ${PAL.line}` }}>
-            Chỉ ops thấy: target, khung camp và lịch tháng nhập ở <b>Kế Hoạch Tháng</b> (tháng không có kế hoạch: khung camp ở <b>Nhập Ads</b>); bảng creator affiliate theo tháng ở trang <b>Affiliate</b>.
+            Chỉ ops thấy: target, khung camp và lịch tháng nhập ở <b>Kế Hoạch Tháng</b>; bảng creator affiliate theo tháng ở trang <b>Affiliate</b>.
           </p>
         )}
       </div>

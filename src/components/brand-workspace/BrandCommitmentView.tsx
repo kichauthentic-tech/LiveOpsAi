@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Download, FileSignature, Loader2, TrendingUp } from "lucide-react";
-import { LiveSession, UserRole } from "../../types";
+import { Brand, BrandPlatformRate, BrandPlatformRateHistoryEntry, LiveSession, UserRole } from "../../types";
 import { BrandCommitmentRow, commitmentProgressRead } from "../../lib/db/brandContracts";
 import type { TabPrefetchCtx } from "../../lib/db/prefetch";
 import {
@@ -16,13 +16,13 @@ import { downloadRowsAsXlsx } from "../../lib/exportXlsx";
 import { useToast } from "../../hooks/useToast";
 import { PageHeader } from "../common/PageHeader";
 import type { ReportPlatform } from "../../lib/reportPlatform";
+import { BrandRateCard } from "../BrandRateCard";
 
-// Cam Kết Hợp Đồng — bản CHỈ ĐỌC cho Brand Workspace (Đợt C/1, migration 0108).
+// Hợp Đồng — bản CHỈ ĐỌC cho Brand Workspace (Đợt C/1, migration 0108): cam kết giờ + giá của brand × sàn.
 //
-// Khác hẳn tab "Cam Kết Hợp Đồng" bên Agency (BrandCommitment.tsx): bên đó ops soạn hợp đồng, sinh
-// cam kết từng tháng, sửa tay từng tháng, và nhìn xuyên mọi brand để biết "tháng này còn thiếu bao
-// nhiêu giờ phải xếp cho brand nào". Màn này trả lời đúng một câu của khách: **tháng này cam kết
-// bao nhiêu giờ, đã chạy bao nhiêu, còn bao nhiêu**. Không nút, không form.
+// Gộp 06/10: trước đó là 2 tab "Cam Kết Hợp Đồng" + "Rate Card" cho hai nửa của cùng một hợp đồng. Chỗ NHẬP là CRM →
+// "Hợp đồng & giá" (điều khoản) và Kế Hoạch Tháng (số riêng của một tháng). Màn này trả lời đúng một câu của khách:
+// **tháng này cam kết bao nhiêu giờ, đã chạy bao nhiêu, còn bao nhiêu, giá thế nào**. Không nút, không form.
 //
 // ====================================================================================
 // VÌ SAO MÀN NÀY VẪN CHẠY ĐƯỢC SAU ĐỢT B — đọc kỹ trước khi sửa
@@ -48,6 +48,9 @@ interface BrandCommitmentViewProps {
   multiPlatform: boolean;
   sessions: LiveSession[];
   currentRole: UserRole;
+  brand: Pick<Brand, "id" | "billingModel">;
+  rates: BrandPlatformRate[];
+  rateHistory: BrandPlatformRateHistoryEntry[];
 }
 
 const STATUS_LABEL: Record<CommitmentProgress["status"], string> = {
@@ -107,7 +110,10 @@ export const BrandCommitmentView: React.FC<BrandCommitmentViewProps> = ({
   platform,
   multiPlatform,
   sessions,
-  currentRole
+  currentRole,
+  brand,
+  rates,
+  rateHistory
 }) => {
   const [allRows, setRows] = useState<BrandCommitmentRow[]>([]);
   const rows = useMemo(() => allRows.filter((r) => r.platform === platform), [allRows, platform]);
@@ -211,14 +217,14 @@ export const BrandCommitmentView: React.FC<BrandCommitmentViewProps> = ({
         icon={FileSignature}
         title={
           <>
-            Cam Kết Hợp Đồng · {brandName}
+            Hợp Đồng · {brandName}
             {(multiPlatform || platform === "Shopee") && ` · ${platform}`}
             {contractCode && <span className="ml-2 text-sm font-bold text-[var(--text-faint)]">· {contractCode}</span>}
           </>
         }
         description={
           <>
-            Số giờ lên sóng cam kết mỗi tháng và tiến độ thực hiện. Giờ tính theo <b>khung giờ ca đã chốt</b> — cùng loại giờ
+            Số giờ lên sóng cam kết mỗi tháng, tiến độ thực hiện và giá theo hợp đồng. Giờ tính theo <b>khung giờ ca đã chốt</b> — cùng loại giờ
             dùng để đối chiếu hợp đồng.
           </>
         }
@@ -243,6 +249,8 @@ export const BrandCommitmentView: React.FC<BrandCommitmentViewProps> = ({
           Chưa có cam kết hợp đồng nào được thiết lập cho {brandName}.
         </div>
       )}
+
+      <BrandRateCard brand={brand} platform={platform} rates={rates} rateHistory={rateHistory} />
 
       {/* Tháng đang chạy — nổi bật riêng, vì đó là câu hỏi khách mở màn này để hỏi. */}
       {current && (
