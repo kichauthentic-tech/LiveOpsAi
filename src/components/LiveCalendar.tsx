@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { LiveSession, ShiftSlot, ShiftRegistration, Studio, Talent, Brand, PromoScheme, UserRole, BrandStudio, AuditLogEntry } from "../types";
 import { schemesForDate } from "../lib/schemeUtils";
 
-import { personClash, studioClash, studioClashLabel } from "../lib/scheduling/conflicts";
+import { clashedSessionIds, findPersonClashes, personClash, studioClash, studioClashLabel } from "../lib/scheduling/conflicts";
 import { hasSessionData } from "../lib/sessionStatus";
 import { CAMPAIGN_DAY_STYLES, getCampaignDayInfo } from "../lib/campaignDays";
 import { BrandLogo } from "./ui/BrandLogo";
@@ -25,6 +25,9 @@ import { Calendar as CalendarIcon, Building2, User, Plus, AlertTriangle, CheckCi
 import { fmtDateVn, fmtVndShort } from "../lib/format";
 import { PageHeader } from "./common/PageHeader";
 import { talentRoleLabel } from "../lib/talentName";
+import { PlatformChip } from "./common/PlatformChip";
+import { personRoleMinutes, personWindows } from "../lib/staffSegments";
+import { dateTimeRangesOverlap } from "../lib/dateUtils";
 interface LiveCalendarProps {
   sessions: LiveSession[];
   shiftSlots?: ShiftSlot[];
@@ -101,6 +104,9 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
 
   // View Mode: Month, Week, Day Matrix, Talent Workload, List
   const [viewMode, setViewMode] = useState<"month" | "week" | "day" | "talent_workload">("day");
+  // Ca có người bị xếp trùng giờ (user chốt 06/10: một người chỉ đứng một ca tại một thời điểm) — viền đỏ trên thẻ ca.
+  const clashMap = useMemo(() => clashedSessionIds(findPersonClashes(sessions)), [sessions]);
+  const clashRing = (id: string) => (clashMap.has(id) ? "ring-2 ring-rose-500" : undefined);
 
   // Selected Date string YYYY-MM-DD (defaults to real today's date)
   const [selectedDate, setSelectedDate] = useState<string>(() => getTodayDateString());
@@ -845,7 +851,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                         brandName={ds.brandName}
                         startTime={ds.startTime}
                         endTime={ds.endTime}
-                        meta={buildSessionMeta(ds, talentLookup)}
+                        meta={buildSessionMeta(ds, talentLookup)} className={clashRing(ds.id)}
                         targetGmv={ds.targetGmv}
                         metaLimit={4}
                         tone={SESSION_TONE[ds.status]}
@@ -1014,7 +1020,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                         startTime={ds.startTime}
                         endTime={ds.endTime}
                         title={ds.title}
-                        meta={buildSessionMeta(ds, talentLookup)}
+                        meta={buildSessionMeta(ds, talentLookup)} className={clashRing(ds.id)}
                         targetGmv={ds.targetGmv}
                         size="md"
                         tone={SESSION_TONE[ds.status]}
@@ -1158,7 +1164,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                             startTime={ms.startTime}
                             endTime={ms.endTime}
                             title={ms.title}
-                            meta={buildSessionMeta(ms, talentLookup)}
+                            meta={buildSessionMeta(ms, talentLookup)} className={clashRing(ms.id)}
                             targetGmv={ms.targetGmv}
                             size="md"
                             tone={SESSION_TONE[ms.status]}
@@ -1195,7 +1201,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                     ))}
                     {noRoomSessions.map((ms) => (
                       <div key={ms.id} className="absolute top-2 bottom-2 px-0.5" style={pos(ms.startTime, ms.endTime)}>
-                        <SessionEventCard theme={getBrandTheme(ms.brandName)} brand={brandById.get(ms.brandId)} brandName={ms.brandName} startTime={ms.startTime} endTime={ms.endTime} title={ms.title} meta={buildSessionMeta(ms, talentLookup)} targetGmv={ms.targetGmv} size="md" tone={SESSION_TONE[ms.status]} statusLabel={SESSION_STATUS_LABEL[ms.status]} dragging={draggedSessionId === ms.id} draggable onDragStart={(e) => handleDragStart(e, ms)} onDragEnd={handleDragEnd} onClick={() => setSelectedSessionDetail(ms)} />
+                        <SessionEventCard theme={getBrandTheme(ms.brandName)} brand={brandById.get(ms.brandId)} brandName={ms.brandName} startTime={ms.startTime} endTime={ms.endTime} title={ms.title} meta={buildSessionMeta(ms, talentLookup)} className={clashRing(ms.id)} targetGmv={ms.targetGmv} size="md" tone={SESSION_TONE[ms.status]} statusLabel={SESSION_STATUS_LABEL[ms.status]} dragging={draggedSessionId === ms.id} draggable onDragStart={(e) => handleDragStart(e, ms)} onDragEnd={handleDragEnd} onClick={() => setSelectedSessionDetail(ms)} />
                       </div>
                     ))}
                   </div>
@@ -1213,7 +1219,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
           <div className="border-b border-[var(--border)] pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
               <h3 className="font-bold text-[var(--text)] text-base flex items-center gap-2">
-                <User className="w-5 h-5 text-[var(--accent-text)] shrink-0" /> Tải Làm Việc Host - Ngày {fmtDateVn(selectedDate)}
+                <User className="w-5 h-5 text-[var(--accent-text)] shrink-0" /> Tải Làm Việc Host + Trợ - Ngày {fmtDateVn(selectedDate)}
               </h3>
               <p className="text-xs text-[var(--text-muted)]">Tổng thời lượng live trong ngày</p>
             </div>
@@ -1223,46 +1229,59 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {talents.map((t) => {
-              const hostSessions = sessions.filter((s) => s.hostId === t.id && s.date === selectedDate && s.status !== "Cancelled");
-              const totalMinutesToday = hostSessions.reduce((acc, curr) => {
-                const [h1, m1] = curr.startTime.split(":").map(Number);
-                const [h2, m2] = curr.endTime.split(":").map(Number);
-                let minutes = (h2 * 60 + m2) - (h1 * 60 + m1);
-                if (minutes < 0) minutes += 24 * 60; // ca qua đêm, vd 22:00 -> 05:00
-                return acc + minutes;
-              }, 0);
-              const totalHoursToday = Math.round((totalMinutesToday / 60) * 10) / 10;
-
-              const isOverloaded = totalHoursToday > 5;
+            {/* Tính cả vai Trợ live và đổi người giữa ca (trước 06/10 chỉ đếm ca làm HOST: trợ live không bao giờ hiện,
+                và người bị xếp hai ca cùng giờ chỉ bị gọi là "quá tải"). Người có ca lên trước. */}
+            {talents
+              .map((t) => {
+                const mine = sessions
+                  .filter((s) => s.date === selectedDate && s.status !== "Cancelled" && personWindows(s, t.id).length > 0)
+                  .sort((a, b) => a.startTime.localeCompare(b.startTime));
+                const minutes = mine.reduce((acc, s) => acc + personRoleMinutes(s, t.id, "host") + personRoleMinutes(s, t.id, "co_host"), 0);
+                const clashIds = new Set<string>();
+                mine.forEach((a, i) => {
+                  if (a.hostId === t.id && a.coHostId === t.id && !a.staffSegments?.length) clashIds.add(a.id);
+                  for (const b of mine.slice(i + 1)) {
+                    if (personWindows(a, t.id).some((wa) => personWindows(b, t.id).some((wb) => dateTimeRangesOverlap(wa, wb)))) { clashIds.add(a.id); clashIds.add(b.id); }
+                  }
+                });
+                return { t, mine, hours: Math.round((minutes / 60) * 10) / 10, clashIds };
+              })
+              .sort((a, b) => b.mine.length - a.mine.length || a.t.name.localeCompare(b.t.name, "vi"))
+              .map(({ t, mine, hours: totalHoursToday, clashIds }) => {
+              const isOverloaded = totalHoursToday > 6;
+              const hasClash = clashIds.size > 0;
 
               return (
-                <div key={t.id} className="bg-[var(--surface-base)] border border-[var(--border)] p-4 rounded-2xl space-y-3">
+                <div key={t.id} className={`bg-[var(--surface-base)] border p-4 rounded-2xl space-y-3 ${hasClash ? "border-rose-700" : "border-[var(--border)]"}`}>
                   <div className="flex justify-between items-center gap-2">
                     <div className="flex items-center space-x-3">
                       <img src={t.avatar} alt={t.name} className="w-10 h-10 rounded-full object-cover border border-[var(--border)] shrink-0" />
                       <div>
                         <h4 className="font-bold text-[var(--text)] text-sm line-clamp-1">{t.name}</h4>
-                        <span className="text-xs text-[var(--accent-text)] font-medium">{t.role} • Score: {t.overallScore}</span>
+                        <span className="text-xs text-[var(--accent-text)] font-medium">{talentRoleLabel(t.role)}</span>
                       </div>
                     </div>
                     <span
                       className={`text-[11px] font-bold px-2.5 py-1 rounded-full shrink-0 ${
-                        isOverloaded
+                        hasClash || isOverloaded
                           ? "bg-rose-950 text-rose-300 border border-rose-800"
                           : totalHoursToday > 0
                           ? "bg-emerald-950 text-emerald-300 border border-emerald-800"
                           : "bg-[var(--surface-elevated)] text-[var(--text-muted)]"
                       }`}
                     >
-                      {isOverloaded ? (<span className="inline-flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Cảnh Báo Quá Tải</span>) : totalHoursToday > 0 ? "Bận Phiên Live" : "Rảnh"}
+                      {hasClash ? (
+                        <span className="inline-flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Trùng giờ</span>
+                      ) : isOverloaded ? (
+                        <span className="inline-flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Quá 6 giờ</span>
+                      ) : totalHoursToday > 0 ? "Có ca" : "Rảnh"}
                     </span>
                   </div>
 
                   <div className="space-y-1 text-xs">
                     <div className="flex justify-between font-medium">
-                      <span className="text-[var(--text-muted)]">Tổng giờ live ngày {fmtDateVn(selectedDate)}:</span>
-                      <strong className={isOverloaded ? "text-rose-400" : "text-emerald-400"}>{totalHoursToday} Giờ Live</strong>
+                      <span className="text-[var(--text-muted)]">Giờ đứng ca ngày {fmtDateVn(selectedDate)} (host + trợ):</span>
+                      <strong className={isOverloaded ? "text-rose-400" : "text-emerald-400"}>{totalHoursToday} giờ</strong>
                     </div>
                     <div className="w-full h-2 bg-[var(--surface-elevated)] rounded-full overflow-hidden">
                       <div
@@ -1273,16 +1292,20 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   </div>
 
                   <div className="space-y-1.5 pt-2 border-t border-[var(--border)]">
-                    <span className="text-[11px] font-bold text-[var(--text-faint)] uppercase block">Phiên Được Phân Bổ:</span>
-                    {hostSessions.length > 0 ? (
-                      hostSessions.map((hs) => (
-                        <div key={hs.id} className="p-2 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-xs flex justify-between items-center gap-2">
-                          <span className="font-bold text-[var(--text)] truncate">{hs.title}</span>
+                    <span className="text-[11px] font-bold text-[var(--text-faint)] uppercase block">Ca trong ngày</span>
+                    {mine.length > 0 ? (
+                      mine.map((hs) => (
+                        <div key={hs.id} className={`p-2 rounded-xl bg-[var(--surface)] border text-xs flex justify-between items-center gap-2 ${clashIds.has(hs.id) ? "border-rose-700" : "border-[var(--border)]"}`}>
+                          <span className="flex items-center gap-1.5 min-w-0">
+                            <span className="font-bold text-[var(--text)] truncate">{hs.brandName}</span>
+                            <PlatformChip platform={hs.platform} />
+                            <span className="text-[11px] text-[var(--text-faint)] shrink-0">{hs.hostId === t.id ? "host" : "trợ"}</span>
+                          </span>
                           <span className="font-mono text-[11px] text-[var(--accent-text)] shrink-0">{hs.startTime}-{hs.endTime}</span>
                         </div>
                       ))
                     ) : (
-                      <p className="text-[11px] text-[var(--text-faint)] italic">Chưa có lịch phiên live trong ngày này.</p>
+                      <p className="text-[11px] text-[var(--text-faint)] italic">Chưa có ca trong ngày này.</p>
                     )}
                   </div>
                 </div>

@@ -3,7 +3,8 @@ import { SESSION_STATUS_CLS, SESSION_STATUS_LABEL_VI } from "../lib/sessionStatu
 import { hasSessionData, isUnconfirmedPast } from "../lib/sessionStatus";
 import { AlertTriangle, Ban, CheckCircle2, Circle, EyeOff, Hand, Link2, Pencil, RotateCcw, Trash2, X } from "lucide-react";
 import { AuditLogEntry, Brand, LiveSession, ShiftSlot, Studio, Talent, UserRole } from "../types";
-import { personClash, studioClash, studioClashLabel } from "../lib/scheduling/conflicts";
+import { findPersonClashes, personClash, studioClash, studioClashLabel } from "../lib/scheduling/conflicts";
+import { PlatformChip } from "./common/PlatformChip";
 import { fmtVndShort } from "../lib/format";
 import { fmtKeyMetric, KEY_METRICS, keyMetricsOfSessions, keyMetricValue } from "../lib/report/keyMetrics";
 import { sessionHours } from "../lib/performance/hostPerformance";
@@ -14,6 +15,7 @@ import {
   hasReport,
   hasSnapshot,
   linkedSessions,
+  needsSnapshotFile,
   missingSteps,
   sessionCounters,
   sessionIncidents,
@@ -127,7 +129,8 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
   // Up file / nộp report: ops, hoặc host/trợ của đúng ca (khớp guard can_edit_session_snapshot, 0082).
   // U6: ca nạp bù (tháng cũ) không có report — không hiện form.
   const canReport = !isBrandView && (isOps || isMine) && !s.isBackfill && !!onSubmitSessionReport;
-  const canSnapshot = !isBrandView && (isOps || isMine) && !s.isBackfill && !!onSessionSnapshotApplied;
+  // File Creator-Live-Performance là file của TikTok — ca Shopee không có bước này (06/10), giao ca bằng report.
+  const canSnapshot = !isBrandView && (isOps || isMine) && !s.isBackfill && !!onSessionSnapshotApplied && needsSnapshotFile(s);
   const canEdit = isOps && !!onUpdateSession && !!studios && !!talents;
   // 0133: DB không cho dời ngày/giờ ca đã có số (ranh giới snapshot/đối soát tính theo giờ ca).
   // 0138: ca đã chia người theo đoạn giờ cũng khoá giờ (offset phút của đoạn sẽ lệch) — bỏ chia đoạn trước khi dời.
@@ -198,11 +201,26 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
     if (h) out.host = `${talents?.find((t) => t.id === edit.hostId)?.name ?? "Host"} đang ${h.hostId === edit.hostId ? "làm Host" : "làm Trợ live"} ca ${who(h)}`;
     const c = personClash(allSessions, edit, edit.coHostId || undefined, s.id);
     if (c) out.coHost = `${talents?.find((t) => t.id === edit.coHostId)?.name ?? "Trợ live"} đang ${c.hostId === edit.coHostId ? "làm Host" : "làm Trợ live"} ca ${who(c)}`;
+    if (edit.hostId && edit.hostId === edit.coHostId) out.coHost = `${talents?.find((t) => t.id === edit.hostId)?.name ?? "Người này"} vừa là Host vừa là Trợ live của chính ca này`;
     return out;
   }, [editing, edit, allSessions, shiftSlots, talents, s.id]);
 
+  // Một người chỉ đứng MỘT ca tại một thời điểm (user chốt 06/10) ⇒ trùng người là CHẶN, không chỉ cảnh báo. Cùng
+  // phạm vi với chốt DB 0143: chỉ chặn khi lần sửa này đưa người đó vào (đổi người) hoặc dời giờ — ca đang trùng sẵn
+  // vẫn đổi phòng được, để không kẹt khi đang gỡ từng chỗ trùng.
+  // Trùng người ĐANG CÓ trên lịch (không phải lúc sửa) — nói ngay ở đầu cửa sổ để ops thấy khi mở ca.
+  const standingClashes = useMemo(
+    () => (isBrandView ? [] : findPersonClashes(allSessions).filter((c) => c.session.id === s.id || c.other?.id === s.id)),
+    [isBrandView, allSessions, s.id]
+  );
+  const scheduleChanged = edit.date !== s.date || edit.startTime !== s.startTime || edit.endTime !== s.endTime;
+  const personBlocked =
+    (!!conflicts.host && (scheduleChanged || edit.hostId !== s.hostId)) ||
+    (!!conflicts.coHost && (scheduleChanged || (edit.coHostId || "") !== (s.coHostId ?? "")));
+
   const saveEdit = async () => {
     if (!onUpdateSession) return;
+    if (personBlocked) { showToast("Một người không đứng hai ca cùng lúc — đổi người hoặc giờ ca trước khi lưu."); return; }
     if (edit.startTime === edit.endTime) { showToast("Giờ bắt đầu và giờ kết thúc không được trùng nhau."); return; }
     const studioObj = studios?.find((x) => x.id === edit.studioId);
     const hostObj = talents?.find((t) => t.id === edit.hostId);
@@ -307,6 +325,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-1.5 mt-2">
+              <PlatformChip platform={s.platform} />
               <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${STATUS_CLS[s.status]}`}>{STATUS_LABEL[s.status]}</span>
               {/* Nhãn tin cậy nói "số này chốt tới đâu" — vô nghĩa khi chưa được thấy số nào. */}
               {isBrandView ? (
@@ -367,6 +386,24 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
             </div>
           )}
 
+          {standingClashes.length > 0 && (
+            <div className="rounded-xl border border-rose-800 bg-rose-950/50 p-3 text-xs text-rose-200 flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>
+                <b>Trùng người</b> — một người chỉ đứng một ca tại một thời điểm:
+                {standingClashes.map((c, i) => {
+                  const o = c.other ? (c.session.id === s.id ? c.other : c.session) : null;
+                  return (
+                    <span key={i} className="block">
+                      {o ? `${c.talentName} còn ở ca ${o.brandName} ${o.platform ?? "TikTok"} ${fmtDate(o.date)} ${o.startTime}–${o.endTime}` : `${c.talentName} vừa là Host vừa là Trợ live của ca này`}
+                    </span>
+                  );
+                })}
+                {isOps && <span className="block mt-1 text-rose-300/90">Bấm "Sửa ca · thay người" để đổi người.</span>}
+              </span>
+            </div>
+          )}
+
           {/* Sửa ca (ops) */}
           {editing && canEdit && (
             <section className="space-y-3 text-xs bg-[var(--surface-base)] p-3 rounded-xl border border-[var(--border)]">
@@ -375,6 +412,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                   {conflicts.studio && <p>• Trùng Studio: "{conflicts.studio}"</p>}
                   {conflicts.host && <p>• Trùng Host: {conflicts.host}</p>}
                   {conflicts.coHost && <p>• Trùng Trợ live: {conflicts.coHost}</p>}
+                  {personBlocked && <p className="font-bold">Không lưu được: một người chỉ đứng một ca tại một thời điểm.</p>}
                 </div>
               )}
               <div className="grid grid-cols-3 gap-2">
@@ -424,7 +462,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
               <p className="text-[11px] text-[var(--text-faint)]">Target GMV của ca lấy từ Kế Hoạch Tháng đã chốt — không sửa ở đây.</p>
               <div className="flex justify-end gap-2 pt-1">
                 <button onClick={() => setEditing(false)} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] text-[var(--text-muted)] font-bold text-[11px]">Huỷ</button>
-                <button onClick={saveEdit} disabled={saving} className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-60 text-white font-bold text-[11px]">{saving ? "Đang lưu..." : "Lưu thay đổi"}</button>
+                <button onClick={saveEdit} disabled={saving || personBlocked} title={personBlocked ? "Trùng người — đổi người hoặc giờ ca" : undefined} className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-60 text-white font-bold text-[11px]">{saving ? "Đang lưu..." : "Lưu thay đổi"}</button>
               </div>
             </section>
           )}
@@ -473,8 +511,8 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
               <div className="flex items-center justify-between gap-2">
                 <h4 className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-bold">Nộp số liệu ca</h4>
                 <div className="flex items-center gap-1">
-                  <StepPill n={1} label="File số liệu" done={snapshotDone} />
-                  <StepPill n={2} label="Report" done={reportDone} />
+                  {canSnapshot && <StepPill n={1} label="File số liệu" done={snapshotDone} />}
+                  <StepPill n={canSnapshot ? 2 : 1} label="Report" done={reportDone} />
                 </div>
               </div>
               {canSnapshot && (
@@ -486,7 +524,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
               {canReport && (
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-1.5">
-                    <p className="text-xs font-bold text-[var(--text)]">Bước 2 · Khai phần máy không biết {reportDone && <span className="text-emerald-400 font-normal">— đã nộp</span>}</p>
+                    <p className="text-xs font-bold text-[var(--text)]">{canSnapshot ? "Bước 2 · Khai phần máy không biết" : "Report giao ca"} {reportDone && <span className="text-emerald-400 font-normal">— đã nộp</span>}</p>
                     {!editingReport && (
                       <button onClick={() => setEditingReport(true)} className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-emerald-950 text-emerald-300 border border-emerald-800 hover:bg-emerald-900 transition-colors">
                         {reportDone ? "Sửa report" : "Nhập report"}
@@ -494,7 +532,11 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                     )}
                   </div>
                   {!editingReport && !reportDone && (
-                    <p className="text-[11px] text-[var(--text-faint)]">OT / off sớm / restart / ADS / xu đã tung / link dashboard{snapshotDone ? "" : " — chưa có file thì 5 ô số phải gõ tay, ops sẽ đối soát lại"}.</p>
+                    <p className="text-[11px] text-[var(--text-faint)]">
+                      {needsSnapshotFile(s)
+                        ? `OT / off sớm / restart / ADS / link dashboard${snapshotDone ? "" : " — chưa có file thì 5 ô số phải gõ tay, ops sẽ đối soát lại"}.`
+                        : "Số đọc trên dashboard Shopee lúc hết ca (GMV, ATC, lượt xem…) + OT / off sớm / restart / xu đã tung / link dashboard. Số chốt lấy từ file Live List ở Đối Soát cuối kỳ."}
+                    </p>
                   )}
                   {editingReport && (
                     <SessionReportForm
@@ -596,7 +638,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
             // "Còn thiếu để chốt: Chưa đối soát" — cùng một cửa sổ nói hai điều ngược nhau. Đây là
             // đúng guard đã dùng ở badge nguồn số phía trên.
             if (s.reconciledAt && s.dataSource === "tiktok_reconciled") {
-              events.push({ at: s.reconciledAt, label: "Đối soát TikTok ghi đè số liệu" });
+              events.push({ at: s.reconciledAt, label: `Đối soát ${s.platform === "Shopee" ? "Shopee" : "TikTok"} ghi đè số liệu` });
             }
             if (s.cancelledAt) events.push({ at: s.cancelledAt, label: `Huỷ ca${s.cancelReason ? ` — ${s.cancelReason}` : ""}` });
             if (events.length === 0) return null;
@@ -619,7 +661,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
           {/* Phiên TikTok / ca nối */}
           {!isBrandView && ((s.liveRoomIds?.length ?? 0) > 0 || linkedLabel.length > 0) && (
             <section>
-              <h4 className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-bold mb-2">Phiên TikTok</h4>
+              <h4 className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-bold mb-2">Phiên {s.platform === "Shopee" ? "Shopee" : "TikTok"}</h4>
               {(s.liveRoomIds?.length ?? 0) > 0 && <p className="text-xs text-[var(--text-muted)] font-mono break-all">Room: {s.liveRoomIds!.join(", ")}</p>}
               {linkedLabel.length > 0 && (
                 <p className="text-xs text-sky-300 mt-1 flex items-start gap-1"><Link2 className="w-3.5 h-3.5 shrink-0 mt-0.5" /><span>Ca nối, chung room với: {linkedLabel.join("; ")}</span></p>

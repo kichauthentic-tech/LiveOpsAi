@@ -22,6 +22,12 @@ export function hasSnapshot(s: LiveSession): boolean {
   return s.dataSource === "live_snapshot" || s.dataSource === "tiktok_reconciled" || (s.liveRoomIds?.length ?? 0) > 0;
 }
 
+// Bước "up file lúc giao ca" chỉ có ở TikTok: file Creator-Live-Performance là của TikTok Streamer. Shopee chưa có file
+// tương đương trong app (06/10) — ca Shopee giao ca bằng report (số gõ tay), số chốt đến từ Live List ở Đối Soát.
+export function needsSnapshotFile(s: Pick<LiveSession, "platform">): boolean {
+  return s.platform !== "Shopee";
+}
+
 export function hasReport(s: LiveSession): boolean {
   return !!s.report?.submittedAt || !!s.report?.submittedByTalentId;
 }
@@ -41,7 +47,7 @@ export function needsClosing(s: LiveSession, today: string): boolean {
 export function missingSteps(s: LiveSession, today: string): MissingStep[] {
   if (!needsClosing(s, today)) return [];
   const out: MissingStep[] = [];
-  if (!hasSnapshot(s)) out.push("snapshot");
+  if (needsSnapshotFile(s) && !hasSnapshot(s)) out.push("snapshot");
   if (!hasReport(s)) out.push("report");
   if (!isReconciled(s)) out.push("reconcile");
   return out;

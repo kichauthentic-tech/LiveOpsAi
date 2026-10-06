@@ -4738,3 +4738,30 @@ User: "nhập liệu 2–3 nơi
   dòng, chỉ ops); Kế Hoạch Tháng phần theo brand khi máy chưa nhớ brand nào; Affiliate (đọc theo khoảng tháng do người
   dùng chọn). **Sau deploy phải kiểm:** `curl -sI
   https://live-ops-ai.vercel.app/assets/<file>.js` có `immutable`.
+
+
+## Lịch 2 sàn — khảo sát + Đợt 1 (2026-10-06)
+
+Đề xuất cho user (artifact): https://claude.ai/artifact/J4Kk16eZYeTtrkKDYvQWpY.
+
+**Số đo khảo sát (DB thật 06/10 + "YFB _ Working File 2026 - NEW.xlsx" T8–T9 + Live List Shopee VERA T9):**
+- VERA live song song 2 sàn: 58–86 cặp ca TikTok × Shopee chồng giờ/tháng (T6–T10), 2 phòng VERA TTS / VERA SPE. Franklin T10: 37 cặp.
+  `brand_studios` chỉ VERA có dòng Shopee ⇒ 32/32 ca Franklin Shopee T10 không phòng. 31/39 host/trợ có ca ở cả 2 sàn.
+- Lịch 06→31/10: 24 cặp ca trùng người (7 khác sàn; 16 là Huỳnh Thái Toàn, nghi gán nhầm "Toàn" lúc nạp) + 3 ca Thái Toàn vừa host vừa trợ
+  (JOCKEY 10/10 20–23, 14/10 11–13, 15/10 11–13). User tự sửa.
+- App: 0 dòng `session_live_snapshots`, 0 report ca cho 37 ca T10 đã xong, 6 tài khoản talent (tạo 05/10) 0 lượt mở. Giao ca thật ở Google Sheet:
+  T8–T9 87–97% dòng có link dashboard (TikTok `room_id=…`, Shopee `creator-center/dashboard/live/<id>`), 90% dòng TikTok có 8–10 chỉ số, ô sự cố
+  trống 76–100%, ô số ghi dạng chữ nhiều (CROCS CTOR 99/182, VERA TTS CTR 111/140). Ca nối (link chung): CROCS 86/182, VERA TTS 46/140, VERA SPE 27/122.
+- Số giao ca thấp hơn số chốt: VERA Shopee T9 gõ 521,8M vs Live List 668,8M (−22%), trung vị phiên −16%, 18/42 phiên lệch >20%; CROCS T8–T9 gõ 8,49 tỷ
+  vs đối soát 11,10 tỷ (−23,5%), trung vị ngày −20%. Ca nối VERA Shopee T9 trợ tự trừ: tổng 5 phiên lệch file −1…−10%.
+- Ví dụ thật ca nối: VERA Shopee 26/09 phiên 41439111 (18:00–00:30) — Sheet: 18–20 = 4.267.859 (ATC 228, 5.883 xem), 20–21 trống, 21–00:30 = 7.245.500;
+  file chốt cả phiên 12.322.359.
+
+**Đợt 1 (code):**
+- **0143:** trigger `trg_guard_person_clash` (live_sessions: insert/đổi người/dời giờ/khôi phục) + `trg_guard_segment_person_clash`
+  (session_staff_segments) qua `private.person_windows` / `private.person_clash_message`, lỗi P0001 "Trùng người: X đã có ca … — …". Verify: replay
+  0001→0143 sạch + chạy lại 0143 sạch, `supabase/tests/0143_person_clash.sql` 16 mục (đỏ ở 1a khi thiếu 0143), 0133/0136/0138/0139/0140_0142/config vẫn
+  xanh; vitest 558/558 (+10 `tests/personClash.test.ts`, 2 đột biến rơi đúng test), lint 0 lỗi, tsc, build, audit:dead 0; bản build nối DB thật:
+  khối đỏ 27 chỗ trùng (24 cặp + 3 ca host = trợ, khớp số đo), việc "32 ca sắp tới chưa có phòng live", Cửa sổ Ca Franklin 08/10 có banner +
+  chọn trợ bận ⇒ nút Lưu khoá (không lưu), ca VERA Shopee chỉ còn "Report giao ca", Tải Lịch 20/10 Sỹ Hùng/Thái Toàn "Trùng giờ", 375px không tràn.
+

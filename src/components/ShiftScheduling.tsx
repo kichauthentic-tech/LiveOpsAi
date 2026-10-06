@@ -961,7 +961,8 @@ export default function ShiftScheduling({
                           </select>
                           <button
                             onClick={() => handleFinalize(slot)}
-                            disabled={!pick.hostId || busySlotId === slot.id}
+                            disabled={!pick.hostId || busySlotId === slot.id || conflict.hostConflict || coHostConflict || (!!pick.coHostId && pick.coHostId === pick.hostId)}
+                            title={conflict.hostConflict || coHostConflict ? "Một người chỉ đứng một ca tại một thời điểm — chọn người khác" : undefined}
                             className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"
                           >
                             <Check className="w-3.5 h-3.5" /> Chốt Lịch

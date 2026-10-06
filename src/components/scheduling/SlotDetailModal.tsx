@@ -217,7 +217,8 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
             {onFinalizeSlot && (
               <button
                 onClick={handleFinalize}
-                disabled={!hostId || busy}
+                disabled={!hostId || busy || !!hostConflict || !!coHostConflict || (!!coHostId && coHostId === hostId)}
+                title={hostConflict || coHostConflict ? "Một người chỉ đứng một ca tại một thời điểm — chọn người khác" : undefined}
                 className="w-full flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-bold px-3 py-2.5 rounded-xl transition-colors"
               >
                 <Check className="w-3.5 h-3.5" /> {busy ? "Đang chốt..." : "Chốt Lịch"}

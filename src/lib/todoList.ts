@@ -4,6 +4,7 @@ import { isCountable } from "./performance/hostPerformance";
 import { fmtDateVn, fmtMonth } from "./format";
 import { brandMonthKey, brandPlatformKey, brandPlatformsOf, sessionBrandMonthKey } from "./reportPlatform";
 import { brandPriceSet } from "./brandPricing";
+import { findPersonClashes } from "./scheduling/conflicts";
 
 // "Việc cần làm" — danh sách TỰ SINH từ dữ liệu cho màn đầu tiên sau khi đăng nhập (audit người mới 2026-10-04,
 // Nhóm 4/5). Người cũ biết thứ tự việc (hợp đồng → giá → kế hoạch → chốt người → up số → report); người mới mở app
@@ -179,6 +180,34 @@ export function buildTodos(input: TodoInput): Todo[] {
   const unconfirmed = sessions.filter(isUnconfirmedPast);
   if (unconfirmed.length > 0) {
     out.push({ id: "unconfirmed", level: "high", title: `${unconfirmed.length} ca đã qua giờ chưa có số, chưa có report`, detail: "Up số/nhập report nếu ca có diễn ra, huỷ ca nếu không.", tab: "sessions", action: "Mở Sổ Ca" });
+  }
+
+  // 9b. Trùng người từ hôm nay (user chốt 06/10: một người chỉ đứng MỘT ca tại một thời điểm). Lịch nạp hàng loạt
+  // T10 có 24 cặp trùng + 3 ca vừa host vừa trợ mà không màn nào báo.
+  const clashes = findPersonClashes(sessions, { from: today });
+  if (clashes.length > 0) {
+    const people = [...new Set(clashes.map((c) => c.talentName).filter(Boolean))];
+    out.push({
+      id: "person-clash",
+      level: "high",
+      title: `${clashes.length} chỗ trùng người trên lịch từ hôm nay`,
+      detail: `${people.slice(0, 4).join(", ")}${people.length > 4 ? ` và ${people.length - 4} người khác` : ""} đang được xếp hai ca cùng giờ (hoặc vừa host vừa trợ một ca).`,
+      tab: "calendar",
+      action: "Xem và đổi người"
+    });
+  }
+
+  // 9c. Ca sắp tới chưa có phòng — không kiểm được trùng phòng (32 ca Franklin Shopee T10, 06/10).
+  const noRoom = sessions.filter((s) => s.status !== "Cancelled" && !s.isBackfill && s.date >= today && !s.studioId);
+  if (noRoom.length > 0) {
+    out.push({
+      id: "no-room",
+      level: "medium",
+      title: `${noRoom.length} ca sắp tới chưa có phòng live`,
+      detail: "Đặt phòng mặc định cho brand × sàn ở CRM → Hợp đồng & giá (ca mới tự nhận), ca đã tạo thì mở ca → Sửa ca để chọn phòng.",
+      tab: "calendar",
+      action: "Mở Bảng Vận Hành"
+    });
   }
 
   // 10. Ca chờ đăng ký trong 7 ngày tới chưa có người.

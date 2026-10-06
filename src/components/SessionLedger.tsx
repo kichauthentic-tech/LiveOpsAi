@@ -10,9 +10,10 @@ import { SessionReportInput } from "../lib/db/sessionReports";
 import { downloadRowsAsXlsx } from "../lib/exportXlsx";
 import { useToast } from "../hooks/useToast";
 import { errorMessage } from "../lib/errorMessage";
-import { LedgerFilter, MissingStep, brandTrustLabel, filterLedger, groupByDate, hasReport, hasSnapshot, isReconciled, needsClosing, metricsHiddenFor, ledgerHosts, ledgerMonths, linkedSessions, missingSteps, sessionIncidents, summarize } from "../lib/sessionLedger";
+import { LedgerFilter, MissingStep, brandTrustLabel, filterLedger, groupByDate, hasReport, hasSnapshot, isReconciled, needsSnapshotFile, needsClosing, metricsHiddenFor, ledgerHosts, ledgerMonths, linkedSessions, missingSteps, sessionIncidents, summarize } from "../lib/sessionLedger";
 
 import { BrandLogo } from "./ui/BrandLogo";
+import { PlatformChip } from "./common/PlatformChip";
 import { SessionWindow } from "./SessionWindow";
 import { PageIntro } from "./common/PageIntro";
 
@@ -202,6 +203,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
         "Giờ": `${s.startTime}–${s.endTime}`
       };
       if (!isBrandView) row["Brand"] = s.brandName;
+      row["Sàn"] = s.platform ?? "TikTok";
       row["Host"] = s.hostName || (isBrandView ? "" : "chưa gán");
       if (!isBrandView) row["Trợ live"] = s.coHostName || "";
       row["Trạng thái"] = STATUS_LABEL[s.status];
@@ -220,7 +222,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
         : !needsClosing(s, today)
           ? "Chưa cần đóng"
           : [
-              hasSnapshot(s) ? "Snapshot ✓" : "Snapshot ✗",
+              ...(needsSnapshotFile(s) ? [hasSnapshot(s) ? "Snapshot ✓" : "Snapshot ✗"] : []),
               hasReport(s) ? "Report ✓" : "Report ✗",
               isReconciled(s) ? "Đối soát ✓" : "Đối soát ✗"
             ].join(", ");
@@ -414,6 +416,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
                       >
                         <td className="py-2.5 px-4 font-mono text-[var(--text)] whitespace-nowrap">
                           {s.startTime}–{s.endTime}
+                          {isBrandView && <PlatformChip platform={s.platform} className="ml-1.5 font-sans" />}
                           {s.actualStartAt && (
                             <span className="block text-[11px] text-[var(--text-faint)] font-sans">
                               thật {fmtTime(s.actualStartAt)}–{fmtTime(s.actualEndAt)}
@@ -425,6 +428,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
                             <span className="inline-flex items-center gap-1.5 text-[var(--text)] font-bold">
                               <BrandLogo brand={brandsById.get(s.brandId) ?? { name: s.brandName, logo: "" }} size="xs" />
                               {s.brandName}
+                              <PlatformChip platform={s.platform} />
                             </span>
                           </td>
                         )}
@@ -542,6 +546,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
                 <button onClick={() => setOpenId(s.id)} className="w-full text-left py-2 hover:bg-[var(--surface-hover)] rounded-lg px-2 -mx-2 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                   <span className="font-mono text-[11px] text-[var(--text-muted)]">{s.date} {s.startTime}–{s.endTime}</span>
                   <span className="text-xs font-bold text-[var(--text)]">{s.brandName}</span>
+                  <PlatformChip platform={s.platform} />
                   <span className="text-[11px] text-[var(--text-muted)]">{s.hostName || "—"}</span>
                   <span className="text-[11px] font-bold text-violet-300">{fmtVndShort(s.actualGmv ?? 0)}</span>
                   {s.excludedReason && <span className="text-[11px] text-[var(--text-faint)] italic">— {s.excludedReason}</span>}
@@ -619,7 +624,7 @@ const PipelineDots: React.FC<{ session: LiveSession; today: string }> = ({ sessi
     return <span className="text-[11px] text-[var(--text-faint)] whitespace-nowrap">{why}</span>;
   }
   const steps: { label: string; done: boolean }[] = [
-    { label: "Snapshot", done: hasSnapshot(session) },
+    ...(needsSnapshotFile(session) ? [{ label: "Snapshot", done: hasSnapshot(session) }] : []),
     { label: "Report", done: hasReport(session) },
     { label: "Đối soát", done: isReconciled(session) }
   ];

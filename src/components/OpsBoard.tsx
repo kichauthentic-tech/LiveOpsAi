@@ -8,6 +8,8 @@ import { sessionHours } from "../lib/performance/hostPerformance";
 import { SessionReportInput } from "../lib/db/sessionReports";
 import { MissingStep, missingSteps } from "../lib/sessionLedger";
 import { BrandLogo } from "./ui/BrandLogo";
+import { PlatformChip } from "./common/PlatformChip";
+import { clashedSessionIds, findPersonClashes } from "../lib/scheduling/conflicts";
 import { SessionWindow } from "./SessionWindow";
 import { PageIntro } from "./common/PageIntro";
 
@@ -173,6 +175,11 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
     };
   }, [rows, today]);
 
+  // Trùng người từ hôm nay trở đi (user chốt 06/10: một người chỉ đứng một ca tại một thời điểm). Quét cả lịch, không
+  // chỉ khoảng đang xem — chỗ trùng ngày 25 vẫn phải thấy khi đang xem hôm nay.
+  const clashes = useMemo(() => findPersonClashes(sessions, { from: today }), [sessions, today]);
+  const clashBySession = useMemo(() => clashedSessionIds(clashes), [clashes]);
+
   const openSession = openId ? sessions.find((s) => s.id === openId) ?? null : null;
 
   const SessionRow = ({ s }: { s: LiveSession }) => {
@@ -184,6 +191,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
         <span className="flex items-center gap-1.5 min-w-0">
           <BrandLogo brand={brandById.get(s.brandId) ?? { name: s.brandName, logo: "" }} size="xs" />
           <span className="text-sm font-bold text-[var(--text)] truncate">{s.brandName}</span>
+          <PlatformChip platform={s.platform} />
         </span>
         {mode === "mine" && <span className="text-[11px] text-[var(--text-faint)]">{fmtDay(s.date)}</span>}
         <span className="text-xs text-[var(--text-muted)] truncate">
@@ -192,6 +200,14 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
           {s.studioName ? ` · ${s.studioName}` : ""}
         </span>
         <span className="ml-auto flex flex-wrap items-center gap-1">
+          {clashBySession.has(s.id) && (
+            <span className="text-[11px] font-bold px-1.5 py-0.5 rounded border bg-rose-950 text-rose-300 border-rose-800" title="Người này có ca khác cùng giờ">
+              trùng người: {clashBySession.get(s.id)!.join(", ")}
+            </span>
+          )}
+          {mode === "ops" && !s.studioId && s.status !== "Cancelled" && s.date >= today && (
+            <span className="text-[11px] font-bold px-1.5 py-0.5 rounded border bg-amber-950/60 text-amber-300 border-amber-800">chưa có phòng</span>
+          )}
           <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${STATUS_CLS[s.status]}`}>{STATUS_LABEL[s.status]}</span>
           {s.actualGmv ? <span className="text-[11px] font-bold text-emerald-300">{fmtVndShort(s.actualGmv)}</span> : null}
           {actionable.map((m) => (
@@ -209,6 +225,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
       <span className="flex items-center gap-1.5 min-w-0">
         <BrandLogo brand={r.slot.brandId ? brandById.get(r.slot.brandId) : undefined} size="xs" />
         <span className="text-sm font-bold text-[var(--text)] truncate">{r.slot.brandName}</span>
+        <PlatformChip platform={r.slot.platform} />
       </span>
       <span className="text-xs text-rose-300 font-bold flex items-center gap-1"><UserX className="w-3.5 h-3.5" /> chưa có người · {r.registered} đăng ký</span>
       <span className="ml-auto text-[11px] text-[var(--text-faint)] flex items-center gap-1"><CalendarClock className="w-3.5 h-3.5" /> chốt ở Nhân sự ca</span>
@@ -263,6 +280,36 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
               <Stat label="Chưa nộp số liệu" value={String(summary.pending)} tone={summary.pending > 0 ? "warn" : "ok"} />
               <Stat label="GMV đã ghi nhận" value={summary.gmv > 0 ? fmtVndShort(summary.gmv) : "—"} />
             </div>
+          )}
+          {clashes.length > 0 && (
+            <details className="group bg-rose-950/30 border border-rose-800 rounded-2xl" open={clashes.length <= 5}>
+              <summary className="list-none cursor-pointer p-3 sm:p-4 flex items-center gap-2 text-sm font-black text-rose-200">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                {clashes.length} chỗ trùng người từ hôm nay
+                <span className="text-[11px] font-normal text-rose-300/80">— một người chỉ đứng một ca tại một thời điểm; bấm ca để đổi người</span>
+                <ChevronDown className="w-4 h-4 ml-auto shrink-0 transition-transform group-open:rotate-180" />
+              </summary>
+              <ul className="px-3 sm:px-4 pb-3 sm:pb-4 space-y-1.5">
+                {clashes.map((c, i) => (
+                  <li key={i} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                    <span className="font-mono text-[var(--text-muted)] w-[64px] shrink-0">{fmtDay(c.session.date)}</span>
+                    <span className="font-bold text-[var(--text)]">{c.talentName || "?"}</span>
+                    {c.other ? (
+                      <>
+                        <ClashLink s={c.session} onOpen={setOpenId} />
+                        <span className="text-[var(--text-faint)]">và</span>
+                        <ClashLink s={c.other} onOpen={setOpenId} />
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-[var(--text-muted)]">vừa là Host vừa là Trợ live của</span>
+                        <ClashLink s={c.session} onOpen={setOpenId} />
+                      </>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </details>
           )}
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 sm:p-4 space-y-4">
             {rows.length === 0 && (
@@ -365,6 +412,14 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
     </div>
   );
 };
+
+const ClashLink: React.FC<{ s: LiveSession; onOpen: (id: string) => void }> = ({ s, onOpen }) => (
+  <button onClick={() => onOpen(s.id)} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-rose-800/70 bg-[var(--surface-base)] hover:border-rose-500 text-[var(--text)] min-h-6">
+    <span className="font-bold">{s.brandName}</span>
+    <PlatformChip platform={s.platform} />
+    <span className="font-mono">{s.startTime}–{s.endTime}</span>
+  </button>
+);
 
 const Stat: React.FC<{ label: string; value: string; tone?: "ok" | "warn" }> = ({ label, value, tone }) => (
   <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3">
