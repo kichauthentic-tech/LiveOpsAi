@@ -18,31 +18,23 @@
   tới đâu, cái gì kêu, rồi sửa đúng chỗ đó. **Không seed mock lại.**
 - **Nợ kỹ thuật đã hết** (đợt P2a-2…P2a-21, 01–02/10) và **audit code chết đã xong** (02/10): `npm run audit:dead` báo 0,
   ESLint 0 lỗi (31 warning `set-state-in-effect` = nợ đã đo, cố ý `warn`), vitest 467/467 (05/10).
-- **06/10 khuya: GIAO CA TIKTOK = UP FILE (migration `0145` ĐÃ CHẠY 06/10; DB thật: ca CROCS TikTok chưa file ⇒ "Up file … trước", ca Shopee ⇒ "giao bằng link", 0 dòng ghi; lời nhắc ca TikTok đã đổi câu).** User hỏi lại "đã build từ đầu là TikTok up file Excel" và chốt:
-  **ca TikTok giao ca bằng file Creator-Live-Performance** (bước 1, RPC `apply_session_live_snapshot` có sẵn) + **chọn sự cố/OT** (bước 2, RPC
-  `submit_tiktok_handover` — DB từ chối khi ca chưa có file); **ca Shopee giữ dán link + 3 số** (Shopee không có file theo ca). Component
-  `TikTokHandover` / `HandoverForm` (Shopee) / `HandoverIncidents` (dùng chung). Bước còn thiếu: TikTok `snapshot` → `report` → `reconcile`
-  (khôi phục `needsSnapshotFile`), Shopee `report` → `reconcile`. Bỏ prop chết `onSessionSnapshotApplied` (file up nay đi qua `onSessionsUpdated`).
-  Lời nhắc ca TikTok nói "up file". `submit_session_handover` (0144) vẫn nhận ca TikTok ở DB nhưng UI chỉ dùng cho Shopee. Verify: replay + chạy
-  lại 0145 sạch, `supabase/tests/0144_0145_handover.sql` 25 mục (đỏ ở 6a khi thiếu 0145), vitest 565/565, lint 0 lỗi, build, audit 0; bản build nối DB
-  thật 375px: ca VERA TikTok hiện "1 · Up file … 2 · Ca này có gì?", nút Giao ca khoá tới khi có file, dòng ca ghi "chưa up file · chưa giao ca";
-  ca VERA Shopee vẫn form link + số.
-- **06/10 tối: LỊCH 2 SÀN — ĐỢT 2 "GIAO CA" (migration `0144` ĐÃ CHẠY 06/10, verify DB thật: link sai/sai sàn bị từ chối P0001 không ghi gì, `handover_previous` chạy, 52 lời nhắc hẹn giờ cho admin (ca không trợ), 0 hiện trước hạn; production đã có bản mới).** Thay dòng Google Sheet trợ live gõ mỗi ca (user chốt: chuyển
-  thẳng sang app). Cửa sổ Ca → mục **Giao ca** (`HandoverForm`, cho điện thoại): dán link dashboard (`parseDashboardLink`: TikTok `room_id=`, Shopee
-  `/live/<số>` ⇒ sàn + mã phòng/phiên, sai sàn thì chặn) · 3 số ĐANG THẤY (GMV, lượt xem, đơn TikTok / ATC Shopee; xu tuỳ chọn) · chạm chọn sự cố
-  (OT/off sớm theo mốc phút, restart, host trễ) · ca nối: gõ số TỔNG, app tự trừ ca trước cùng phòng (RPC `submit_session_handover` +
-  `private.apply_handover_chain` tính lại cả chuỗi khi giao/sửa ca giữa hoặc đổi link; số phải nằm giữa ca trước và ca sau). Người giao = trợ live
-  (`co_host_id` hoặc đoạn trợ khi đổi người giữa ca), ca không trợ ⇒ OPS (`private.can_handover`). Số của ca vào `live_sessions` bậc 'manual'; ca đã
-  snapshot/đối soát giữ số file. Cột mới ở `live_session_reports`: `live_ref, cum_gmv, cum_orders, cum_views, cum_atc, handover_at,
-  handover_prev_session_id`. **Nhắc giao ca** không cần máy chủ hẹn giờ: thông báo `handover_due` tạo sẵn khi xếp ca với `created_at` = hết ca + 15
-  phút (giờ VN), client chỉ đọc `created_at <= now()`, "đọc hết" không nuốt lời nhắc tương lai; giao xong thì xoá; đổi trợ/giờ thì tạo lại.
-  **Gỡ:** form report cũ (`SessionReportForm`, `submitSessionReport`) và bước bắt buộc "up file Creator-Live-Performance" — file nay là đường phụ
-  của OPS (chỉ TikTok, gập trong Giao ca). Bước còn thiếu của ca = **chưa giao ca → chưa đối soát** (`MissingStep` bỏ `snapshot`); Ca Của Tôi
-  "Cần giao ca" chỉ liệt kê ca mình là trợ. Prop `onSubmitSessionReport` ⇒ `onSessionsUpdated(sessions[])`. Verify: lịch sử `## Lịch 2 sàn — Đợt 2 giao ca (2026-10-06)`.
-- **06/10 chiều: LỊCH 2 SÀN — ĐỢT 1, `0143` ĐÃ CHẠY.** User chốt: một người (host HAY trợ) chỉ đứng MỘT ca tại một thời điểm. `PlatformChip` ở mọi
-  dòng ca; `findPersonClashes` ⇒ khối đỏ Bảng Vận Hành, viền đỏ thẻ ca, banner Cửa sổ Ca, việc `person-clash`/`no-room`; chặn Lưu/Chốt Lịch khi đưa
-  người vào ca thứ hai cùng giờ; trigger 0143 chặn ở DB (chỉ lần ghi đưa người vào/dời giờ; ca trùng sẵn vẫn sửa được phần khác); Tải Lịch Host tính
-  cả trợ. Chi tiết + verify: lịch sử `## Lịch 2 sàn — khảo sát + Đợt 1 (2026-10-06)`.
+- **06/10: LỊCH 2 SÀN — Đợt 1 (`0143`), Đợt 2 (`0144`), giao ca TikTok bằng file (`0145`) ĐỀU ĐÃ CHẠY + verify DB thật; Đợt 3 có màn cấp tài khoản.**
+  - **Trùng người (0143):** một người (host HAY trợ, cả đoạn đổi người giữa ca) chỉ đứng MỘT ca một lúc. `PlatformChip` mọi dòng ca; `findPersonClashes`
+    ⇒ khối đỏ Bảng Vận Hành, viền đỏ thẻ, banner Cửa sổ Ca, việc `person-clash`/`no-room`; chặn Lưu/Chốt Lịch; trigger DB chỉ chặn lần ghi đưa người
+    vào/dời giờ (ca trùng sẵn vẫn sửa phần khác).
+  - **Giao ca (0144 + 0145):** Cửa sổ Ca → Giao ca. **TikTok** = `TikTokHandover`: bước 1 up file Creator-Live-Performance (`apply_session_live_snapshot`),
+    bước 2 chọn sự cố (`submit_tiktok_handover`, DB từ chối khi chưa có file). **Shopee** = `HandoverForm`: dán link dashboard (`parseDashboardLink`)
+    + số TỔNG đang thấy (GMV, lượt xem, ATC), app tự trừ ca nối cùng phòng (`submit_session_handover` + `private.apply_handover_chain`). Sự cố dùng
+    chung `HandoverIncidents`. Người giao = trợ live (cột hoặc đoạn trợ), ca không trợ ⇒ OPS (`private.can_handover`). Nhắc giao ca = thông báo
+    `handover_due` tạo sẵn với `created_at` = hết ca + 15 phút, client đọc `created_at <= now()`. Bước còn thiếu: TikTok file → giao ca → đối soát;
+    Shopee giao ca → đối soát. Gỡ form report cũ; prop `onSessionsUpdated(sessions[])`.
+  - **Cấp tài khoản (Đợt 3, không migration):** "Thêm Tài Khoản Mới"/"Thêm Talent Mới" luôn tạo hồ sơ MỚI ⇒ 32 hồ sơ thật cấp kiểu đó sẽ ra hồ sơ trùng
+    không thấy ca. Nay Phân Quyền & Role → Tài khoản → khối vàng **"Host / trợ chưa có tài khoản"** (`TalentAccountGrants`, ceo/admin; xếp theo số ca
+    từ hôm nay — `lib/talentAccounts.ts`): gõ email → Cấp tài khoản (`assignedTalentId` + mật khẩu tạm server sinh, bắt đổi lần đầu) ⇒ hiện mật khẩu một
+    lần + **Copy lời nhắn** dán Zalo. Server kiểm trước khi tạo auth user: hồ sơ tồn tại, role talent, hồ sơ chưa có tài khoản (400/409).
+    Verify Đợt 3: 6 test, vitest 571/571, lint 0 lỗi, build, audit 0; bản build nối DB thật hiện 32 hồ sơ / 27 có ca, email sai chặn tại dòng, 375px ổn,
+    server trả 400 cho hồ sơ lạ / role khác. Chưa bấm cấp thật (việc của user); nhánh 409 chưa chạy được (chưa hồ sơ nào có tài khoản).
+  - Chi tiết + verify từng đợt: lịch sử `## Lịch 2 sàn — khảo sát + Đợt 1`, `## … Đợt 2 giao ca`, `## … giao ca TikTok bằng file (0145) + Đợt 3 tài khoản`.
 - **06/10 sáng: GỘP CẤU HÌNH — mỗi điều khoản MỘT chỗ nhập (không migration).** User: nhập 2–3 nơi (rate card, cam kết…) ⇒ gom về
   CRM, cam kết tháng đặt ở Kế Hoạch Tháng, sửa luôn mọi chỗ cùng lớp lỗi. Nay: CRM → **"Hợp đồng & giá"** (`BrandConfigPanel`, brand × sàn:
   cách thu phí, giá, hợp đồng tự sinh cam kết từng tháng, phòng mặc định); tab Agency "Cam Kết Hợp Đồng" **đã gỡ**; Kế Hoạch Tháng có ô giờ/GMV
@@ -51,43 +43,11 @@
   "Đang live" suy từ ca, một luật "đã có giá" (`brandPriceSet`). Verify: vitest 548/548, lint/tsc/build/audit sạch, replay +
   `supabase/tests/config_single_source.sql` 6/6, UI trên bản build nối DB thật (chỉ đọc). Chưa đo: ghi hợp đồng thật qua UI. Chi tiết: lịch
   sử `## Gộp cấu hình một chỗ nhập (2026-10-06)`.
-- **06/10 khuya: TÁCH SÀN TOÀN APP (S1–S4) — migration `0140`, `0141`, `0142` ĐÃ CHẠY 06/10, code đã push + deploy (`71016d6`).** User chốt:
-  hợp đồng **riêng** từng sàn, target **riêng** từng sàn, brand xem **cả riêng lẫn tổng**, chi phí Shopee có **file riêng**. Lý do đo
-  được: VERA Shopee GMV/giờ ≈ 1,6× TikTok (T6–T9, Working File) ⇒ trộn sàn làm sai benchmark/xếp host/run-rate. Đã làm:
-  **bộ chuyển sàn** Brand workspace (`PlatformScopeBar`, URL `?san=tiktok|shopee|tong`, `PLATFORM_TABS` ở App: Dashboard/Lịch/Sổ Ca có
-  "Tổng 2 sàn"; Report/Kế Hoạch Tháng Sau/Cam Kết/Nhập Ads chỉ từng sàn); **Dashboard Tổng** (`BrandDashboardTotal`: mỗi sàn
-  run-rate + dự kiến trên kế hoạch của chính nó rồi cộng; dòng Tổng chỉ có target khi MỌI sàn có kế hoạch chốt); Dashboard 1 sàn
-  lọc ca/slot/kế hoạch/report đúng sàn, nhóm đối chứng chỉ TikTok; **Kế Hoạch Tháng theo sàn** (0140: khoá brand×tháng×sàn,
-  `lock_month_plan` sinh/gắn ca đúng sàn + phòng của sàn; MonthPlan có nút sàn, engine/dự báo chỉ học ca cùng sàn, quy tắc lặp theo sàn);
-  **target/ca** (`applyAllocatedTargets`, `lockedPlanTargetsFromRows` khoá theo sàn — trước đó kế hoạch TikTok gán target 0 cho ca Shopee);
-  **Bản Tin CEO** outlook theo kênh brand×sàn rồi cộng, cảnh báo theo kênh (tập trung khách vẫn cộng theo brand), lọc sàn; **Hiệu Suất
-  Host** mặc định chỉ TikTok; **Cam kết HĐ theo sàn** (0141: cột platform ở hợp đồng + cam kết, generate theo sàn, view
-  `brand_commitment_progress` thêm cột); Toàn Cảnh Brand / Nhân sự ca / Việc cần làm theo kênh; **Ads Shopee** (0142: loại
-  `shopee_ads`, bộ đọc `lib/dataraw/shopeeAds.ts`, `ShopeeAdsPanel` ở Nhập Ads khi chọn Shopee) + **Report Shopee bản chụp v2** có khối
-  "Ads và khuyến mãi" (chi phí, ROAS, chi phí/đơn; xu = Coins Claimed của file overview — VERA T9 499.200 xu). **Lỗi thật đã sửa kèm:**
-  bản chụp Report TikTok giữ cả ca Shopee ⇒ số live Report TikTok VERA/JOCKEY cộng lẫn GMV Shopee (`windowSessions` nay chỉ TikTok).
-  Verify: replay 0001→0142 sạch, chạy lại 0140–0142 sạch, `supabase/tests/0140_0142_platform.sql` 14/14 (đỏ khi thiếu 0140), 0133/0136/0139 vẫn
-  xanh; vitest 543/543 (+`platformSplit`, `shopeeAds`, đột biến rơi đúng test), lint 0 lỗi, build, audit:dead 0; trên bản build nối DB thật:
-  Dashboard VERA Tổng (T10 tới 04/10: TikTok 31,5M · Shopee 24,6M), Dashboard Shopee, Kế Hoạch Tháng mở đúng VERA Shopee, Bản Tin CEO, Toàn Cảnh
-  7 dòng kênh, Hiệu Suất Host, Nhập Ads Shopee xem trước file thật VERA T9 (2.300.302 · GMV Ads 70.273.048 · ROAS 30,55x — CHƯA lưu). Sau khi chạy
-  migration (đo trên DB thật): cột sàn đọc được ở kế hoạch/hợp đồng/cam kết/view; **đã lưu file Ads Shopee VERA T9** (0142 nhận loại shopee_ads)
-  + Cập nhật bản chụp Report Shopee VERA T9 (nháp) ⇒ "Ads Shopee Live: chi 2,3M, GMV từ Ads 70,3M (ROAS 30,5x), 11K/đơn — 10,5% GMV live";
-  lưu thử kế hoạch nháp VERA **Shopee** T11 ⇒ dòng DB `platform=Shopee`, màn TikTok T11 vẫn trống, rồi XOÁ (DB T11 còn 0 dòng). Report TikTok
-  VERA T9 chỉ đếm 70 ca TikTok chưa đối soát. User xác nhận 06/10: Shop ID file Ads (13346195) và User Id Live List (13347498) là CÙNG shop VERA.
-  Chưa đo: ghi hợp đồng Shopee (0141 chiều ghi), chốt kế hoạch Shopee thật (đã có bộ kiểm SQL 2a–2c).
-- **06/10 tối: REPORT TÁCH THEO SÀN (TikTok / Shopee) — migration `0139` (ĐÃ CHẠY + ĐÃ DEPLOY 06/10).** Yêu cầu user: hai report
-  độc lập, phát hành/thu hồi/đóng sổ riêng, brand chỉ thấy số của sàn đã phát hành; Shopee có file riêng. **GMV Shopee = doanh số ĐẶT
-  (Placed)**, doanh số xác nhận hiện riêng là "thực nhận" (user chốt). DB: cột `platform` ở `brand_monthly_reports`, `brand_monthly_report_snapshots`,
-  `live_reconciliation_batches` (dòng cũ = TikTok), khoá (brand, tháng, sàn); `private.brand_month_published(brand,date)` giữ nghĩa "TikTok" + bản 3 tham số
-  theo sàn; view `live_sessions_secure` và trigger đóng sổ xét sàn của ca; phát hành chỉ đếm ca chưa đối soát CỦA SÀN ĐÓ; `import_live_reconciliation(..., p_platform)`
-  khớp/ghi ca đúng sàn; 4 loại Dữ Liệu Gốc `shopee_live_list|shopee_product_list|shopee_daily|shopee_overview`. Client: `lib/dataraw/shopeeFiles.ts`
-  (bộ đọc 4 file, kể cả CSV tự đọc để SheetJS khỏi đổi ngày; khớp 4 file VERA Shopee T9: 50 phiên · 668.841.274đ đặt / 633.141.515đ xác nhận · 2.232 đơn · 175,3h · 29 ngày · 140 SP · 10 nguồn traffic),
-  `lib/report/shopeeSnapshot.ts` + `shopeeSnapshotBuild.ts` (bản chụp Shopee: kết quả, theo ngày, phễu + nguồn traffic, khung giờ, loại ngày camp, host, sản phẩm, "cách tính và điểm cần xác nhận"),
-  `ShopeeMonthlyReportTabs.tsx`, chọn sàn ở Report Tháng + Điều Phối Phát Hành + Đối Soát (file Live List) + Dữ Liệu Gốc. `fetchAllMonthlyReports` giữ khoá TikTok `brandId|YYYY-MM`,
-  Shopee có hậu tố `|Shopee`. **Thứ tự deploy đúng là push client TRƯỚC rồi chạy 0139 NGAY SAU (lần này user chạy 0139 trước, push sau vài phút — không mất gì)** — client mới + DB cũ: màn report lỗi đọc; client cũ + DB mới: lưu report/bản chụp lỗi (ON CONFLICT);
-  không mất dữ liệu ở cả hai trạng thái. Verify: replay 0001→0139 sạch + chạy lại 0139 sạch, bộ kiểm SQL 24 mục (`supabase/tests/0139_*.sql`; 0133/0136/0138 vẫn xanh), vitest 521/521 (+35: shopeeFiles/shopeeSnapshot/shopeeReportRender,
-  14 đột biến rơi đúng dòng), lint 0 lỗi, build, audit:dead 0; trên bản build nối DB thật: Dữ Liệu Gốc đọc đủ 4 file Shopee trong trình duyệt (xem trước, chưa lưu), Đối Soát có chọn sàn.
-  **VERA Shopee T9 đã làm thật (06/10):** up 4 file Shopee → Dữ Liệu Gốc (overview 182 · sản phẩm 140 · Live List 50 · theo ngày 29); đối soát bằng Live List ĐÃ ÁP DỤNG: 61/61 ca khớp, GMV ca 521,8M → 663,3M (file 668,8M; chênh 5,5M = phiên 23/09 11:00 không có ca trong app, user chọn để trống), 5 phiên dài chia nhiều ca (09/09 · 15/09 · 26/09 · 24/09 · 29/09) chỉ đúng tổng, ước lượng từng ca; Report Shopee VERA T9 là NHÁP (chưa phát hành), bản chụp đã cập nhật sau đối soát.
+- **06/10: TÁCH SÀN TikTok/Shopee — report `0139` + toàn app S1–S4 `0140`–`0142` ĐÃ CHẠY + DEPLOY.** Hợp đồng, target, kế hoạch tháng, cam kết,
+  report (phát hành/đóng sổ), đối soát, Ads đều RIÊNG từng sàn; brand xem riêng + "Tổng 2 sàn" (Dashboard/Lịch/Sổ Ca). GMV Shopee = doanh số ĐẶT
+  (xác nhận hiện riêng "thực nhận"). Shopee có 4 loại Dữ Liệu Gốc + file Ads riêng (`shopee_ads`); đối soát ca Shopee bằng Live List. VERA Shopee T9 đã
+  up 4 file + đối soát 61/61 ca + Ads T9; Report Shopee VERA T9 còn NHÁP. Quy ước khoá/lọc sàn: §5.5. Chi tiết + verify: lịch sử `## Tách sàn
+  TikTok/Shopee — report (0139) + toàn app S1–S4 (0140–0142)`.
 - **06/10 chiều: gán host + dọn rác + "đổi người giữa ca".** Đo hiện trạng (1.501 ca): chỉ CROCS T6–T9 đã đối soát, VERA/JOCKEY/Franklin
   T6–T9 còn "Tạm tính". Đã dọn (user duyệt): 4 dòng `promo_schemes` test, lô đối soát 22/09 không gắn brand (228 dòng), 3 report nháp
   (Franklin T8, CROCS T8/T9; bản chụp của chúng GIỮ NGUYÊN, Tạo/Cập nhật là ghi đè). Gán host/trợ từ tiêu đề ca bằng `bulk_assign_session_hosts`:
@@ -180,10 +140,10 @@
 ## 2. Việc còn treo
 
 **Cần user làm:**
-000000000. **0144 ĐÃ CHẠY 06/10.** Chưa đo: một lần giao ca THẬT đầu-cuối (chờ ca thật + số thật). Tiếp: tạo tài khoản cho host/trợ (Phân Quyền & Role, gắn hồ sơ talent) — Đợt 3; hướng dẫn trợ live: hết ca mở Ca Của Tôi → ca → Giao ca.
+000000000. **Cấp tài khoản cho host/trợ (Đợt 3):** Phân Quyền & Role → Tài khoản → khối vàng "Host / trợ chưa có tài khoản" — gõ email từng người (người có ca sớm nhất trên đầu), Cấp tài khoản, Copy lời nhắn gửi Zalo. KHÔNG dùng "Thêm Tài Khoản Mới" cho người đã có hồ sơ (ra hồ sơ trùng). Chưa đo: một lần giao ca THẬT đầu-cuối (0144/0145 đã chạy; chờ ca thật + số/file thật).
 00000000. **0143 ĐÃ CHẠY 06/10** (user xác nhận). Sửa 27 chỗ trùng người T10 (Bảng Vận Hành → khối đỏ "chỗ trùng người", hoặc Việc cần làm) — 0143 KHÔNG chặn ca trùng sẵn,
    chỉ chặn lần ghi đưa người vào ca/dời giờ; 32 ca Franklin Shopee T10 chưa có phòng (đặt phòng mặc định ở CRM → Hợp đồng & giá, ca đã tạo thì Sửa ca).
-   **Lịch + giao ca 2 sàn — đề xuất** https://claude.ai/artifact/J4Kk16eZYeTtrkKDYvQWpY: Đợt 1 + Đợt 2 XONG (§1). Còn: **Đợt 3** tài khoản cho 39 host/trợ — user chốt 06/10 **CHUYỂN THẲNG sang app, KHÔNG chạy song song Google Sheet**
+   **Lịch + giao ca 2 sàn — đề xuất** https://claude.ai/artifact/J4Kk16eZYeTtrkKDYvQWpY: Đợt 1 + Đợt 2 XONG, Đợt 3 có màn cấp tài khoản (§1). Còn: **Đợt 3** user cấp tài khoản cho host/trợ — user chốt 06/10 **CHUYỂN THẲNG sang app, KHÔNG chạy song song Google Sheet**
    (nên Đợt 2 phải xong + verify kỹ trước khi phát tài khoản; GMV mất thì lấy lại từ đối soát, OT/sự cố thì không) · **Đợt 4** checklist cuối tháng
    7 kênh ở Điều Phối Phát Hành, chia ca nối theo số giao ca, ước tính số chốt (sau backtest). User chốt 06/10: ca không có trợ ⇒ **OP giao ca**;
    host/trợ dùng điện thoại riêng được. Số đo nền: lịch sử `## Lịch 2 sàn — khảo sát + Đợt 1 (2026-10-06)`.
@@ -423,6 +383,7 @@ Shopee thêm `|Shopee`) và `brandPlatformKey(brand, sàn)` (Map kế hoạch th
 Đọc kế hoạch/hợp đồng bằng `select *` rồi lọc sàn phía client (thiếu cột = TikTok). Bộ chuyển sàn chỉ một chỗ: App (`PLATFORM_TABS`);
 màn con nhận `platform` qua prop, không tự giữ state sàn. Nút sang Kế Hoạch Tháng nhớ sàn qua `rememberBrandId(brand, sàn)`.
 Sàn của report = `lib/reportPlatform.ts` (`ReportPlatform`); mọi đọc/ghi report và bản chụp đi qua `lib/db/monthlyReports.ts` / `monthlyReportSnapshots.ts` với tham số `platform` (mặc định TikTok — TikTok giữ nguyên khoá nạp-trước, chỉ truyền sàn khi là Shopee). Ca/đối soát/phát hành luôn lọc theo sàn của ca, không trộn.
+Tài khoản cho người ĐÃ có hồ sơ talent = `TalentAccountGrants` (`assignedTalentId`, server chặn hồ sơ đã có tài khoản); đường `newTalentProfile` chỉ cho người mới.
 Trùng người = `personClash` (một người, lúc sửa) / `findPersonClashes` + `clashedSessionIds` (quét cả lịch) trong `scheduling/conflicts.ts`, DB
 chặn bằng 0143 cùng luật — đừng viết vòng so giờ riêng.
 Nhãn sàn trên một ca = `<PlatformChip>` (components/common). Giao ca = `lib/handover.ts` (đọc link, phần của ca, ai giao) + RPC 0144 — regex
@@ -501,6 +462,8 @@ target khung camp ở Nhập Ads bỏ 06/10 — tháng không có kế hoạch c
 |---|---|
 | `## Cắt vòng mạng nối tiếp (2026-10-03/04)` | 10 vòng mạng đã cắt (cache assets, TAB_CHUNKS, prefetch, lazyNamed, song song hoá) + chỗ còn lại có chủ đích |
 | `## Gộp cấu hình một chỗ nhập (2026-10-06)` | số đo trước khi gộp, từng chỗ nhập trùng đã bỏ, luật mới (is_override, generateThroughMonth, effectiveCamp 1 tham số), cách verify |
+| `## Tách sàn TikTok/Shopee — report (0139) + toàn app S1–S4 (0140–0142) (2026-10-06)` | nguyên văn mục §1 tách sàn: bộ chuyển sàn, Dashboard Tổng, kế hoạch/cam kết/Ads theo sàn, 4 file Shopee, VERA Shopee T9 làm thật, thứ tự deploy 0139 |
+| `## Lịch 2 sàn — giao ca TikTok bằng file (0145) + Đợt 3 tài khoản (2026-10-06)` | nguyên văn mục §1 của 0143/0144/0145/Đợt 3 trước khi gộp; Đợt 3 cấp tài khoản cho hồ sơ có sẵn |
 | `## Lịch 2 sàn — Đợt 2 giao ca (2026-10-06)` | 0144: giao ca, ca nối tự trừ, nhắc giao ca hẹn giờ, gỡ form report cũ — cách verify |
 | `## Lịch 2 sàn — khảo sát + Đợt 1 (2026-10-06)` | số đo lịch/giao ca 2 sàn, Working File, số giao ca lệch số chốt, 0143 chặn trùng người |
 | `## Audit toàn app lần 3 (2026-10-05)` | lỗ tự nâng quyền qua profiles (0136), backup sai project, đối soát chạm mép, chốt kế hoạch ngày đã qua, engine ô 1 phút, chữ/ngày lộ |

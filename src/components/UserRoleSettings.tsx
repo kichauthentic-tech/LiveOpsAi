@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { AUDIT_LOG_LIMIT } from "../lib/db/auditLogs";
-import { UserRole, PermissionKey, PermissionDefinition, RolePermissionsMap, SystemUser, AuditLogEntry, Brand, Talent } from "../types";
+import { UserRole, PermissionKey, PermissionDefinition, RolePermissionsMap, SystemUser, AuditLogEntry, Brand, Talent, LiveSession } from "../types";
 import { PERMISSION_DEFINITIONS as permissionDefinitions } from "../lib/permissionDefinitions";
 import { ShieldCheck, UserPlus, Users, Key, Lock, Unlock, Check, X, Search, Sliders, History, Sparkles, Trash2, Edit2, Radio, Building2, Zap, BarChart3 } from "lucide-react";
 import { useConfirm } from "../hooks/useConfirm";
@@ -8,6 +8,7 @@ import { PageIntro } from "./common/PageIntro";
 import { TabUsagePanel } from "./TabUsagePanel";
 import { accountStatusLabel } from "../lib/statusLabels";
 import { talentRoleLabel } from "../lib/talentName";
+import { TalentAccountGrants } from "./TalentAccountGrants";
 
 export interface NewUserPayload {
   name: string;
@@ -37,6 +38,9 @@ interface UserRoleSettingsProps {
   auditLogs: AuditLogEntry[];
   brands: Brand[];
   talents: Talent[];
+  sessions: LiveSession[];
+  /** Cấp tài khoản cho hồ sơ talent có sẵn — trả mật khẩu tạm (một lần). */
+  onGrantTalentAccount: (talentId: string, email: string) => Promise<string | undefined>;
 }
 
 // Danh sách role app thật sự hiển thị trong Ma Trận. Cố ý KHÔNG suy từ Object.keys(rolePermissions)
@@ -71,7 +75,9 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
   onDeleteUser,
   auditLogs,
   brands,
-  talents
+  talents,
+  sessions,
+  onGrantTalentAccount
 }) => {
   const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState<"roles" | "users" | "audit" | "usage">("roles");
@@ -102,10 +108,8 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
     assignedTalentId: ""
   });
 
-  // Đảo chiều luồng tạo talent (chỉ áp dụng khi tạo mới, không phải sửa): mọi talent mới đều
-  // nhập nhanh thông tin cơ bản ở đây, server tự tạo hồ sơ Talent Pool + link 2 chiều luôn —
-  // không còn chọn "link vào hồ sơ có sẵn" (dữ liệu hiện tại chỉ là demo, sẽ clear/tạo lại
-  // bằng dữ liệu talent thật nên không cần giữ đường link hồ sơ cũ).
+  // Tạo talent ở modal này = người MỚI: server tự tạo hồ sơ Talent Pool + link 2 chiều. Người đã có hồ sơ (34+ hồ sơ
+  // thật nạp 19/09 không kèm tài khoản) thì cấp ở khối TalentAccountGrants phía trên danh sách — giữ nguyên ca cũ.
   const [newTalentForm, setNewTalentForm] = useState<{
     phone: string;
     role: Talent["role"];
@@ -616,6 +620,10 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
             </button>
           </div>
 
+          {(currentRole === "ceo" || currentRole === "admin") && (
+            <TalentAccountGrants talents={talents} users={users} sessions={sessions} onGrant={onGrantTalentAccount} />
+          )}
+
           {/* User List Table / Cards */}
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-xl text-[var(--text)]">
             <div className="overflow-x-auto">
@@ -937,7 +945,8 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                   ) : (
                     <div className="space-y-2">
                       <p className="text-[11px] text-amber-300/80">
-                        Tên hồ sơ Talent Pool = Tên hiển thị ở trên ({formData.name || "chưa nhập"}). Hệ thống tự tạo + link tài khoản này ngay sau khi tạo.
+                        Chỉ dành cho người MỚI chưa có hồ sơ: hệ thống tạo hồ sơ Talent Pool tên "{formData.name || "chưa nhập"}" và gắn tài khoản này.
+                        Người đã đứng ca rồi thì đóng lại, cấp ở khối "Host / trợ chưa có tài khoản" — tạo ở đây sẽ ra hồ sơ trùng, không thấy ca cũ.
                       </p>
                       <div className="grid grid-cols-2 gap-2">
                         <input

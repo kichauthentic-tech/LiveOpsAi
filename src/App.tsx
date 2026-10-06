@@ -811,6 +811,29 @@ export default function App() {
     setUsers(refreshedUsers);
     return generatedPassword;
   };
+  // Cấp tài khoản cho hồ sơ talent CÓ SẴN (Phân Quyền & Role → "Host/trợ chưa có tài khoản"): giữ nguyên hồ sơ + ca cũ,
+  // mật khẩu tạm do server sinh, trả về một lần. Lỗi để UserRoleSettings hiện tại dòng.
+  const handleGrantTalentAccount = async (talentId: string, email: string): Promise<string | undefined> => {
+    const t = talents.find((x) => x.id === talentId);
+    if (!t) throw new Error("Không thấy hồ sơ talent.");
+    const { generatedPassword } = await inviteUser({
+      name: t.name,
+      email: email.trim(),
+      role: "talent",
+      customRoleTitle: t.role === "Assistant" ? "Trợ live" : "Host",
+      assignedTalentId: talentId,
+      generatePassword: true
+    });
+    const [refreshedTalents, refreshedUsers] = await Promise.all([fetchTalents(), fetchUsers()]);
+    setTalents(refreshedTalents);
+    setUsers(refreshedUsers);
+    await pushAuditLog({
+      action: `Cấp tài khoản cho hồ sơ talent`,
+      details: `Cấp tài khoản ${email.trim()} cho hồ sơ ${t.name}`,
+      category: "User Status"
+    });
+    return generatedPassword;
+  };
   const handleUpdateTalent = async (id: string, patch: Partial<Talent>) => {
     try {
       const saved = await updateTalent(id, patch);
@@ -2117,6 +2140,8 @@ export default function App() {
                     auditLogs={auditLogs}
                     brands={brands}
                     talents={activeTalents}
+                    sessions={sessions}
+                    onGrantTalentAccount={handleGrantTalentAccount}
                   />
                 )}
 

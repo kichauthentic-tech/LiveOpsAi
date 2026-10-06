@@ -156,6 +156,21 @@ export function createApp() {
       if (role === "admin" && caller.role !== "admin") {
         return res.status(403).json({ error: "Chỉ tài khoản Admin mới tạo được tài khoản Admin." });
       }
+      // Cấp tài khoản cho hồ sơ talent CÓ SẴN (Đợt 3 lịch 2 sàn, 06/10): kiểm TRƯỚC khi tạo auth user — hồ sơ đã có
+      // tài khoản thì từ chối, kẻo hai tài khoản cùng trỏ một hồ sơ (ai giao ca, ai xem lương sẽ lẫn).
+      if (assignedTalentId) {
+        if (role !== "talent") {
+          return res.status(400).json({ error: "Chỉ tài khoản Host / Trợ live mới gắn hồ sơ talent." });
+        }
+        const { data: t, error: tErr } = await supabaseAdmin.from("talents").select("id, profile_id").eq("id", assignedTalentId).maybeSingle();
+        if (tErr || !t) {
+          return res.status(400).json({ error: "Không thấy hồ sơ talent này." });
+        }
+        const { count } = await supabaseAdmin.from("profiles").select("id", { count: "exact", head: true }).eq("assigned_talent_id", assignedTalentId);
+        if (t.profile_id || (count ?? 0) > 0) {
+          return res.status(409).json({ error: "Hồ sơ này đã có tài khoản — sửa tài khoản đó ở danh sách bên dưới." });
+        }
+      }
       // Mặc định: gửi email mời, người dùng tự đặt mật khẩu qua link (luồng "Tạo Tài Khoản
       // Mới" ở Phân Quyền & Role). Khi `generatePassword` = true — dùng cho quick-add "Thêm
       // Talent Mới" ở Talent Pool (ceo/admin) — tạo tài khoản với mật khẩu NGẪU NHIÊN do server
