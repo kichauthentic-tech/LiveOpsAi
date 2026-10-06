@@ -39,7 +39,7 @@
   7 dòng kênh, Hiệu Suất Host, Nhập Ads Shopee xem trước file thật VERA T9 (2.300.302 · GMV Ads 70.273.048 · ROAS 30,55x — CHƯA lưu). Chưa đo:
   Report Tháng/Đối Soát trên DB thật (cần 0139), ghi kế hoạch/hợp đồng Shopee (cần 0140/0141). Mã shop file Ads (13346195) ≠ User Id Live List
   (13347498) — chỉ cảnh báo, chờ user xác nhận.
-- **06/10 tối: REPORT TÁCH THEO SÀN (TikTok / Shopee) — migration `0139` (CHƯA CHẠY), code xong, chưa push.** Yêu cầu user: hai report
+- **06/10 tối: REPORT TÁCH THEO SÀN (TikTok / Shopee) — migration `0139` (ĐÃ CHẠY + ĐÃ DEPLOY 06/10).** Yêu cầu user: hai report
   độc lập, phát hành/thu hồi/đóng sổ riêng, brand chỉ thấy số của sàn đã phát hành; Shopee có file riêng. **GMV Shopee = doanh số ĐẶT
   (Placed)**, doanh số xác nhận hiện riêng là "thực nhận" (user chốt). DB: cột `platform` ở `brand_monthly_reports`, `brand_monthly_report_snapshots`,
   `live_reconciliation_batches` (dòng cũ = TikTok), khoá (brand, tháng, sàn); `private.brand_month_published(brand,date)` giữ nghĩa "TikTok" + bản 3 tham số
@@ -48,10 +48,10 @@
   (bộ đọc 4 file, kể cả CSV tự đọc để SheetJS khỏi đổi ngày; khớp 4 file VERA Shopee T9: 50 phiên · 668.841.274đ đặt / 633.141.515đ xác nhận · 2.232 đơn · 175,3h · 29 ngày · 140 SP · 10 nguồn traffic),
   `lib/report/shopeeSnapshot.ts` + `shopeeSnapshotBuild.ts` (bản chụp Shopee: kết quả, theo ngày, phễu + nguồn traffic, khung giờ, loại ngày camp, host, sản phẩm, "cách tính và điểm cần xác nhận"),
   `ShopeeMonthlyReportTabs.tsx`, chọn sàn ở Report Tháng + Điều Phối Phát Hành + Đối Soát (file Live List) + Dữ Liệu Gốc. `fetchAllMonthlyReports` giữ khoá TikTok `brandId|YYYY-MM`,
-  Shopee có hậu tố `|Shopee`. **THỨ TỰ DEPLOY (quan trọng): push/deploy client TRƯỚC, rồi chạy 0139 NGAY SAU** — client mới + DB cũ: màn report lỗi đọc; client cũ + DB mới: lưu report/bản chụp lỗi (ON CONFLICT);
+  Shopee có hậu tố `|Shopee`. **Thứ tự deploy đúng là push client TRƯỚC rồi chạy 0139 NGAY SAU (lần này user chạy 0139 trước, push sau vài phút — không mất gì)** — client mới + DB cũ: màn report lỗi đọc; client cũ + DB mới: lưu report/bản chụp lỗi (ON CONFLICT);
   không mất dữ liệu ở cả hai trạng thái. Verify: replay 0001→0139 sạch + chạy lại 0139 sạch, bộ kiểm SQL 24 mục (`supabase/tests/0139_*.sql`; 0133/0136/0138 vẫn xanh), vitest 521/521 (+35: shopeeFiles/shopeeSnapshot/shopeeReportRender,
   14 đột biến rơi đúng dòng), lint 0 lỗi, build, audit:dead 0; trên bản build nối DB thật: Dữ Liệu Gốc đọc đủ 4 file Shopee trong trình duyệt (xem trước, chưa lưu), Đối Soát có chọn sàn.
-  **Đo thật VERA Shopee T9:** file Shopee 669M / 50 phiên, app đang có 522M / 61 ca (nạp từ Working File) — lệch 28%, cần đối soát bằng Live List.
+  **VERA Shopee T9 đã làm thật (06/10):** up 4 file Shopee → Dữ Liệu Gốc (overview 182 · sản phẩm 140 · Live List 50 · theo ngày 29); đối soát bằng Live List ĐÃ ÁP DỤNG: 61/61 ca khớp, GMV ca 521,8M → 663,3M (file 668,8M; chênh 5,5M = phiên 23/09 11:00 không có ca trong app, user chọn để trống), 5 phiên dài chia nhiều ca (09/09 · 15/09 · 26/09 · 24/09 · 29/09) chỉ đúng tổng, ước lượng từng ca; Report Shopee VERA T9 là NHÁP (chưa phát hành), bản chụp đã cập nhật sau đối soát.
 - **06/10 chiều: gán host + dọn rác + "đổi người giữa ca".** Đo hiện trạng (1.501 ca): chỉ CROCS T6–T9 đã đối soát, VERA/JOCKEY/Franklin
   T6–T9 còn "Tạm tính". Đã dọn (user duyệt): 4 dòng `promo_schemes` test, lô đối soát 22/09 không gắn brand (228 dòng), 3 report nháp
   (Franklin T8, CROCS T8/T9; bản chụp của chúng GIỮ NGUYÊN, Tạo/Cập nhật là ghi đè). Gán host/trợ từ tiêu đề ca bằng `bulk_assign_session_hosts`:
