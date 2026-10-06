@@ -421,7 +421,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
               {isShopee
                 ? (() => {
                     const sh = stored.snapshot as unknown as ShopeeReportSnapshot;
-                    return `doanh số tới ${sh.headline.lastDay ? fmtDayMonth(sh.headline.lastDay) : "—"} · file: ${[sh.files.overview && "overview", sh.files.daily && "theo ngày", sh.files.live && "Live List", sh.files.products && "Product List"].filter(Boolean).join(", ") || "chưa có"}`;
+                    return `doanh số tới ${sh.headline.lastDay ? fmtDayMonth(sh.headline.lastDay) : "—"} · file: ${[sh.files.overview && "overview", sh.files.daily && "theo ngày", sh.files.live && "Live List", sh.files.products && "Product List", sh.ads && "Ads"].filter(Boolean).join(", ") || "chưa có"}`;
                   })()
                 : (
                   <>
