@@ -151,7 +151,7 @@
 ## 2. Việc còn treo
 
 **Cần user làm:**
-000000000. **Cấp tài khoản cho host/trợ (Đợt 3):** Phân Quyền & Role → Tài khoản → khối vàng "Host / trợ chưa có tài khoản" — gõ email từng người (hoặc để trống ⇒ đăng nhập bằng tên, "Thêm email" sau), Cấp tài khoản, Copy lời nhắn gửi Zalo. Hoặc bấm "Cấp cho tất cả N người có ca" một lần. KHÔNG dùng "Thêm Tài Khoản Mới" cho người đã có hồ sơ (ra hồ sơ trùng). Chưa đo: một lần giao ca THẬT đầu-cuối (0144/0145 đã chạy; chờ ca thật + số/file thật).
+000000000. **Đợt 3 tài khoản XONG 06/10:** user cấp 27 tài khoản đăng nhập bằng tên (Thái Toàn + 26 người có ca), app đếm 37 tài khoản, khối vàng còn 5 hồ sơ chưa có ca sắp tới; 27 tài khoản gắn đúng hồ sơ cùng tên. Còn: thêm email thật khi có (nút "Thêm email"); 6 tài khoản talent cũ mang email thử (hhhhh@ / test@ / hostesttt@…) — nếu là người thật thì Đặt lại MK + gửi lại. Chưa đo: một lần giao ca THẬT đầu-cuối.
 00000000. **0143 ĐÃ CHẠY 06/10** (user xác nhận). Sửa 27 chỗ trùng người T10 (Bảng Vận Hành → khối đỏ "chỗ trùng người", hoặc Việc cần làm) — 0143 KHÔNG chặn ca trùng sẵn,
    chỉ chặn lần ghi đưa người vào ca/dời giờ; 32 ca Franklin Shopee T10 chưa có phòng (đặt phòng mặc định ở CRM → Hợp đồng & giá, ca đã tạo thì Sửa ca).
    **Lịch + giao ca 2 sàn — đề xuất** https://claude.ai/artifact/J4Kk16eZYeTtrkKDYvQWpY: Đợt 1 + Đợt 2 XONG, Đợt 3 có màn cấp tài khoản (§1). Còn: **Đợt 3** user cấp tài khoản cho host/trợ — user chốt 06/10 **CHUYỂN THẲNG sang app, KHÔNG chạy song song Google Sheet**
