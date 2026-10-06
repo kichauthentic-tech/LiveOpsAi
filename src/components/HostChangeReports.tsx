@@ -8,6 +8,7 @@ import { parseSnapshotFile, type ParsedSnapshotFile } from "../lib/liveSnapshot/
 import { SnapshotRoomPicker } from "./SnapshotRoomPicker";
 import { errorMessage } from "../lib/errorMessage";
 import { fmtVndFull } from "../lib/format";
+import { profileOf } from "../lib/platforms/profiles";
 
 // Chỗ nhập report thứ nhất khi ĐỔI HOST giữa ca (0147; user chốt 06/10): host này xuống thì trợ live up NGAY số TỔNG đang
 // thấy trên dashboard. Report thứ hai là Giao ca cuối ca ở ngay bên dưới — host sau = số cuối − số lúc đổi.
@@ -25,17 +26,18 @@ const labelCls = "block text-xs font-bold text-[var(--text-muted)] mb-1";
 
 function BoundaryCard({ session: s, boundary: b, canSubmit, onSaved }: { boundary: HostBoundary } & Props) {
   const done = checkpointAt(s, b.atMin);
-  const isShopee = s.platform === "Shopee";
+  const prof = profileOf(s);
+  const third3 = prof.handoverThird;
   const [open, setOpen] = useState(!done);
   const [link, setLink] = useState(done?.link ?? s.report?.dashboardLink1 ?? s.staffCheckpoints?.find((c) => c.link)?.link ?? "");
   const [gmv, setGmv] = useState(fmtCount(done?.cumGmv));
   const [views, setViews] = useState(fmtCount(done?.cumViews));
-  const [third, setThird] = useState(fmtCount(isShopee ? done?.cumAtc : done?.cumOrders));
+  const [third, setThird] = useState(fmtCount(third3.key === "atc" ? done?.cumAtc : done?.cumOrders));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fileRef = useRef<HTMLInputElement>(null);
-  const isTikTok = s.platform === "TikTok";
+  const byFile = prof.segmentCheckpoint === "file";
 
   const [pending, setPending] = useState<{ fileName: string; parsed: ParsedSnapshotFile } | null>(null);
 
@@ -76,7 +78,7 @@ function BoundaryCard({ session: s, boundary: b, canSubmit, onSaved }: { boundar
   if (!parsed) missing.push("link dashboard");
   if (cumGmv == null) missing.push("GMV");
   if (cumViews == null) missing.push("lượt xem");
-  if (!isShopee && cumThird == null) missing.push("số đơn");
+  if (third3.required && cumThird == null) missing.push(`số ${third3.label.toLowerCase()}`);
   const ready = missing.length === 0 && !wrongPlatform && !saving;
 
   const submit = async () => {
@@ -90,8 +92,8 @@ function BoundaryCard({ session: s, boundary: b, canSubmit, onSaved }: { boundar
           link,
           cumGmv,
           cumViews,
-          cumOrders: isShopee ? null : cumThird,
-          cumAtc: isShopee ? cumThird : null
+          cumOrders: third3.key === "orders" ? cumThird : null,
+          cumAtc: third3.key === "atc" ? cumThird : null
         })
       );
       setOpen(false);
@@ -123,7 +125,7 @@ function BoundaryCard({ session: s, boundary: b, canSubmit, onSaved }: { boundar
       {done && !open && (
         <div className="space-y-1.5 text-xs text-[var(--text-muted)]">
           <p>
-            {done.source === "file" ? `Từ file ${done.fileName ?? "Creator-Live-Performance"} — số của ca tính tới lúc đổi: ` : "Số TỔNG lúc đổi: "}<span className="font-mono text-[var(--text)]">GMV {fmtVndFull(done.cumGmv)} · {fmtCount(done.cumViews ?? 0)} lượt xem{isShopee ? (done.cumAtc != null ? ` · ${fmtCount(done.cumAtc)} ATC` : "") : ` · ${fmtCount(done.cumOrders ?? 0)} đơn`}</span>
+            {done.source === "file" ? `Từ file ${done.fileName ?? "Creator-Live-Performance"} — số của ca tính tới lúc đổi: ` : "Số TỔNG lúc đổi: "}<span className="font-mono text-[var(--text)]">GMV {fmtVndFull(done.cumGmv)} · {fmtCount(done.cumViews ?? 0)} lượt xem{third3.key === "atc" ? (done.cumAtc != null ? ` · ${fmtCount(done.cumAtc)} ATC` : "") : ` · ${fmtCount(done.cumOrders ?? 0)} đơn`}</span>
           </p>
           <p>
             {b.fromName || "Host trước"} làm: <b className="font-mono text-[var(--text)]">GMV {fmtVndFull(Math.max(done.cumGmv - done.baseGmv, 0))}</b>
@@ -131,14 +133,14 @@ function BoundaryCard({ session: s, boundary: b, canSubmit, onSaved }: { boundar
           </p>
           {canSubmit && (
             <button type="button" onClick={() => setOpen(true)} className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-emerald-950 text-emerald-300 border border-emerald-800 hover:bg-emerald-900 transition-colors">
-              {isTikTok ? "Up lại file" : "Sửa số"}
+              {byFile ? "Up lại file" : "Sửa số"}
             </button>
           )}
         </div>
       )}
 
       {open && !canSubmit && <p className="text-xs text-[var(--text-muted)]">Trợ live (hoặc OPS khi ca không có trợ) up số khi host xuống.</p>}
-      {open && canSubmit && isTikTok && pending && (
+      {open && canSubmit && byFile && pending && (
         <div className="space-y-2">
           <SnapshotRoomPicker
             session={s}
@@ -153,7 +155,7 @@ function BoundaryCard({ session: s, boundary: b, canSubmit, onSaved }: { boundar
           {error && <p className="text-xs text-rose-300 bg-rose-950/50 border border-rose-800 rounded-xl px-3 py-2">{error}</p>}
         </div>
       )}
-      {open && canSubmit && isTikTok && !pending && (
+      {open && canSubmit && byFile && !pending && (
         <div className="space-y-2">
           <div className="rounded-xl border border-dashed border-[var(--border)] p-3 text-center">
             <Upload className="w-5 h-5 text-[var(--text-faint)] mx-auto mb-1.5" />
@@ -172,20 +174,20 @@ function BoundaryCard({ session: s, boundary: b, canSubmit, onSaved }: { boundar
           )}
         </div>
       )}
-      {open && canSubmit && !isTikTok && (
+      {open && canSubmit && !byFile && (
         <div className="space-y-2">
           <p className="text-[11px] text-[var(--text-muted)]">
             Mở dashboard, chụp số <b>TỔNG đang thấy ngay lúc {b.fromName || "host"} xuống</b> rồi nhập — đừng đợi hết ca, vì lúc đó không còn tách được phần của từng host.
           </p>
           <label className="block" htmlFor={`cp-link-${b.atMin}`}>
             <span className={labelCls}>Link dashboard của phòng live</span>
-            <input id={`cp-link-${b.atMin}`} type="url" inputMode="url" autoComplete="off" value={link} onChange={(e) => setLink(e.target.value)} className={`${inputCls} text-sm font-mono`} placeholder={isShopee ? "https://banhang.shopee.vn/creator-center/dashboard/live/…" : "https://shop.tiktok.com/workbench/live/overview?room_id=…"} />
+            <input id={`cp-link-${b.atMin}`} type="url" inputMode="url" autoComplete="off" value={link} onChange={(e) => setLink(e.target.value)} className={`${inputCls} text-sm font-mono`} placeholder={prof.dashboardLinkExample} />
           </label>
           {link.trim() !== "" && !parsed && <p className="text-[11px] text-amber-300">Chưa đọc được link.</p>}
           {wrongPlatform && <p className="text-[11px] text-rose-300 font-bold">Ca này là ca {s.platform}, kiểm lại link.</p>}
           {numField(`cp-gmv-${b.atMin}`, "GMV", gmv, setGmv, "vd 11.513.359")}
           <div className="grid grid-cols-2 gap-2">
-            {numField(`cp-third-${b.atMin}`, isShopee ? "ATC" : "Đơn", third, setThird, isShopee ? "không bắt buộc" : undefined)}
+            {numField(`cp-third-${b.atMin}`, third3.label, third, setThird, third3.required ? undefined : "không bắt buộc")}
             {numField(`cp-views-${b.atMin}`, "Lượt xem", views, setViews)}
           </div>
           {error && <p className="text-xs text-rose-300 bg-rose-950/50 border border-rose-800 rounded-xl px-3 py-2">{error}</p>}

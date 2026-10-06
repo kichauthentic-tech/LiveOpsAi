@@ -7,6 +7,7 @@ import { fetchPreviousHandover, submitHandover } from "../lib/db/handovers";
 import { errorMessage } from "../lib/errorMessage";
 import { fmtVndFull } from "../lib/format";
 import { PlatformChip } from "./common/PlatformChip";
+import { profileOf } from "../lib/platforms/profiles";
 
 // Màn GIAO CA của ca SHOPEE (0144; ca TikTok giao bằng file — TikTokHandover, user chốt 06/10 tối). Thiết kế cho điện thoại, làm trong
 // một phút: (1) dán link dashboard, (2) gõ 3 số ĐANG THẤY trên dashboard, (3) chạm chọn sự cố. Không hỏi CTR/CTOR/ERR/
@@ -25,11 +26,12 @@ const labelCls = "block text-xs font-bold text-[var(--text-muted)] mb-1";
 
 export function HandoverForm({ session: s, onSaved, onCancel }: Props) {
   const r = s.report;
-  const isShopee = s.platform === "Shopee";
+  const prof = profileOf(s);
+  const third3 = prof.handoverThird;
   const [link, setLink] = useState(r?.dashboardLink1 ?? "");
   const [gmv, setGmv] = useState(fmtCount(r?.cumGmv));
   const [views, setViews] = useState(fmtCount(r?.cumViews));
-  const [third, setThird] = useState(fmtCount(isShopee ? r?.cumAtc : r?.cumOrders));
+  const [third, setThird] = useState(fmtCount(third3.key === "atc" ? r?.cumAtc : r?.cumOrders));
   const [coins, setCoins] = useState(fmtCount(r?.coinSpent));
   const [incidents, setIncidents] = useState(() => incidentsFromReport(r));
   const [prevState, setPrevState] = useState<{ ref: string; prev: PreviousHandover | null } | null>(null);
@@ -56,13 +58,13 @@ export function HandoverForm({ session: s, onSaved, onCancel }: Props) {
   const cumGmv = parseCount(gmv);
   const cumViews = parseCount(views);
   const cumThird = parseCount(third);
-  const share = cumGmv != null ? handoverShare({ cumGmv, cumViews: cumViews ?? 0, cumOrders: isShopee ? null : cumThird, cumAtc: isShopee ? cumThird : null }, prev) : null;
+  const share = cumGmv != null ? handoverShare({ cumGmv, cumViews: cumViews ?? 0, cumOrders: third3.key === "orders" ? cumThird : null, cumAtc: third3.key === "atc" ? cumThird : null }, prev) : null;
 
   const missing: string[] = [];
   if (!parsed) missing.push("link dashboard");
   if (cumGmv == null) missing.push("GMV");
   if (cumViews == null) missing.push("lượt xem");
-  if (!isShopee && cumThird == null) missing.push("số đơn");
+  if (third3.required && cumThird == null) missing.push(`số ${third3.label.toLowerCase()}`);
   const canSubmit = missing.length === 0 && !wrongPlatform && !share?.belowPrevious && !saving;
 
   const submit = async (e: FormEvent) => {
@@ -74,9 +76,9 @@ export function HandoverForm({ session: s, onSaved, onCancel }: Props) {
       link,
       cumGmv,
       cumViews,
-      cumOrders: isShopee ? null : cumThird,
-      cumAtc: isShopee ? cumThird : null,
-      coinSpent: isShopee ? parseCount(coins) : null,
+      cumOrders: third3.key === "orders" ? cumThird : null,
+      cumAtc: third3.key === "atc" ? cumThird : null,
+      coinSpent: prof.handoverCoins ? parseCount(coins) : null,
       ...incidentValues(incidents)
     };
     try {
@@ -115,19 +117,19 @@ export function HandoverForm({ session: s, onSaved, onCancel }: Props) {
           autoComplete="off"
           value={link}
           onChange={(e) => setLink(e.target.value)}
-          placeholder={isShopee ? "https://banhang.shopee.vn/creator-center/dashboard/live/…" : "https://shop.tiktok.com/workbench/live/overview?room_id=…"}
+          placeholder={prof.dashboardLinkExample}
           className={`${inputCls} text-sm font-mono`}
         />
         {link.trim() !== "" && !parsed && (
           <p className="text-[11px] text-amber-300">
-            Chưa đọc được link. {isShopee ? "Ca Shopee: dán link Creator Center có \"/dashboard/live/<số>\"." : "Ca TikTok: dán link TikTok Shop có \"room_id=…\"."}
+            Chưa đọc được link. {prof.dashboardLinkHint}
           </p>
         )}
         {parsed && (
           <p className={`text-[11px] flex flex-wrap items-center gap-1.5 ${wrongPlatform ? "text-rose-300" : "text-emerald-300"}`}>
             <Link2 className="w-3.5 h-3.5" />
             <PlatformChip platform={parsed.platform} />
-            {parsed.platform === "Shopee" ? "phiên" : "phòng"} <span className="font-mono">{parsed.liveRef}</span>
+            {profileOf(parsed.platform).liveRefNoun} <span className="font-mono">{parsed.liveRef}</span>
             {wrongPlatform && <b>— ca này là ca {s.platform}, kiểm lại link.</b>}
             {!wrongPlatform && (prev ? <span>· ca nối với ca {prev.startTime}–{prev.endTime}</span> : <span>· phòng mới (ca đầu)</span>)}
           </p>
@@ -138,10 +140,10 @@ export function HandoverForm({ session: s, onSaved, onCancel }: Props) {
         <p className={labelCls}>2 · Số đang thấy trên dashboard{prev ? " (số TỔNG từ lúc bật phòng)" : ""}</p>
         {numField("handover-gmv", "GMV", gmv, setGmv, "vd 11.513.359")}
         <div className="grid grid-cols-2 gap-2">
-          {numField("handover-third", isShopee ? "ATC" : "Đơn", third, setThird, isShopee ? "không bắt buộc" : undefined)}
+          {numField("handover-third", third3.label, third, setThird, third3.required ? undefined : "không bắt buộc")}
           {numField("handover-views", "Lượt xem", views, setViews)}
         </div>
-        {isShopee && numField("handover-coins", "Xu đã tung (nếu có)", coins, setCoins, "không bắt buộc")}
+        {prof.handoverCoins && numField("handover-coins", "Xu đã tung (nếu có)", coins, setCoins, "không bắt buộc")}
         {prev && share && (
           <div className={`rounded-xl px-3 py-2 text-xs ${share.belowPrevious ? "bg-rose-950/60 text-rose-200 border border-rose-800" : "bg-emerald-950/50 text-emerald-200 border border-emerald-800"}`}>
             {share.belowPrevious ? (
@@ -149,7 +151,7 @@ export function HandoverForm({ session: s, onSaved, onCancel }: Props) {
             ) : (
               <>
                 Ca này = số đang thấy − ca {prev.startTime}–{prev.endTime}:{" "}
-                <b className="font-mono">GMV {fmtVndFull(share.gmv)} · {fmtCount(share.views)} lượt xem{isShopee ? (share.atc != null ? ` · ${fmtCount(share.atc)} ATC` : "") : ` · ${fmtCount(share.orders)} đơn`}</b>
+                <b className="font-mono">GMV {fmtVndFull(share.gmv)} · {fmtCount(share.views)} lượt xem{third3.key === "atc" ? (share.atc != null ? ` · ${fmtCount(share.atc)} ATC` : "") : ` · ${fmtCount(share.orders)} đơn`}</b>
               </>
             )}
           </div>

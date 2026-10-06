@@ -2,7 +2,7 @@ import { supabase } from "../supabaseClient";
 import { fetchAllPages } from "./fetchAllPages";
 import { BrandMonthlyReport } from "../../types";
 import { prefetchable } from "./prefetch";
-import type { ReportPlatform } from "../reportPlatform";
+import { brandMonthKey, platformOf, type ReportPlatform } from "../reportPlatform";
 
 // Report tháng Brand Workspace (migration 0051) — số liệu vận hành (GMV/Host/SKU) không lưu ở
 // đây, luôn tính live từ LiveSession[] phía component. Bảng chỉ giữ phần nhập tay + trạng thái
@@ -29,7 +29,7 @@ function reportFromDb(row: DbMonthlyReport): BrandMonthlyReport {
     id: row.id,
     brandId: row.brand_id,
     periodMonth: row.period_month,
-    platform: row.platform ?? "TikTok",
+    platform: platformOf(row),
     status: row.status as BrandMonthlyReport["status"],
     summaryText: row.summary_text ?? undefined,
     nextStepsText: row.next_steps_text ?? undefined,
@@ -54,7 +54,7 @@ export async function fetchAllMonthlyReports(): Promise<Map<string, BrandMonthly
     const r = reportFromDb(row);
     // Khoá TikTok giữ nguyên "brandId|YYYY-MM" (mọi nơi đọc target/kế hoạch hiện có đều là của TikTok); report Shopee
     // (0139) có hậu tố riêng để không đè lên.
-    out.set(`${r.brandId}|${r.periodMonth.slice(0, 7)}${r.platform === "Shopee" ? "|Shopee" : ""}`, r);
+    out.set(brandMonthKey(r.brandId, r.periodMonth, r.platform), r);
   }
   return out;
 }

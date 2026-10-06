@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { inPlatformScope, type PlatformScope } from "../lib/reportPlatform";
+import { platformOf, inPlatformScope, type PlatformScope } from "../lib/reportPlatform";
 import { SESSION_STATUS_CLS, SESSION_STATUS_LABEL_VI } from "../lib/sessionStatusUi";
 import { BookOpen, CheckCircle2, ChevronRight, Circle, Download, EyeOff, Link2 } from "lucide-react";
 import { Brand, LiveSession, ShiftSlot, Studio, Talent, UserRole, AuditLogEntry } from "../types";
@@ -200,7 +200,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
         "Giờ": `${s.startTime}–${s.endTime}`
       };
       if (!isBrandView) row["Brand"] = s.brandName;
-      row["Sàn"] = s.platform ?? "TikTok";
+      row["Sàn"] = platformOf(s);
       row["Host"] = s.hostName || (isBrandView ? "" : "chưa gán");
       if (!isBrandView) row["Trợ live"] = s.coHostName || "";
       row["Trạng thái"] = STATUS_LABEL[s.status];

@@ -17,7 +17,7 @@ import { MonthPicker } from "../common/MonthPicker";
 import { PageHeader } from "../common/PageHeader";
 import { ShopeeAdsPanel } from "./ShopeeAdsPanel";
 import { fetchMonthlyReport } from "../../lib/db/monthlyReports";
-import type { ReportPlatform } from "../../lib/reportPlatform";
+import { channelTitle, LEGACY_PLATFORM, type ReportPlatform } from "../../lib/reportPlatform";
 // Nhập Ads (tab ops-only, tách khỏi Report Tháng 2026-09-21). Từ 2026-10-05 (migration 0137): Ads lấy từ FILE
 // "Campaign overview data" của TikTok Ads (GMV Max, theo ngày, toàn cửa hàng) tải lên ngay ở đây — chỗ DUY NHẤT nhập
 // Ads; file lưu vào kho Dữ Liệu Gốc (loại ads_campaign_overview, 1 file / brand / tháng), Report Tháng phần 6 đọc lại
@@ -80,14 +80,17 @@ export function prefetchBrandAdsReport({ brandId, role }: TabPrefetchCtx): void 
   dataRawImportsRead.prefetch(brandId, ADS_TYPE);
 }
 
-export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandName, platform, multiPlatform, sessions, currentRole }) => {
-  const isShopee = platform === "Shopee";
-  const canManage = CAN_MANAGE_ROLES.includes(currentRole);
-  // Cùng tháng mở sẵn với Report Tháng — phần nhập ở đây đi theo report đó (lib/defaultMonth.ts).
-  const [month, setMonth] = useState(() => defaultReportMonth(`${getTodayMonth()}-01`, sessions.filter((s) => s.brandId === brandId)));
-  const [report, setReport] = useState<BrandMonthlyReportType | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+interface AdsPanelProps {
+  brandId: string;
+  brandName: string;
+  month: string;
+  canManage: boolean;
+  isPublished: boolean;
+  onMonthChange: (m: string) => void;
+}
 
+// File Ads TikTok — chỗ DUY NHẤT nhập Ads TikTok (migration 0137, lib/dataraw/adsCampaignOverview.ts).
+function TikTokAdsPanel({ brandId, brandName, month, canManage, isPublished, onMonthChange: setMonth }: AdsPanelProps) {
   const confirm = useConfirm();
   // File Ads (TikTok Ads "Campaign overview data") — danh sách file đã tải + số của tháng đang xem và tháng trước.
   const [adsImports, setAdsImports] = useState<BrandDataRawImport[]>([]);
@@ -179,10 +182,183 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
   };
 
 
+  return (
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h3 className="font-bold text-[var(--text)] text-sm flex items-center gap-2">
+            <Target className="w-4 h-4 text-[var(--accent-text)]" /> Ads toàn cửa hàng · tháng {fmtMonth(month)}
+          </h3>
+          <p className="text-[11px] text-[var(--text-faint)] mt-1">
+            Nguồn: file &quot;Campaign overview data&quot; của TikTok Ads (gồm LIVE GMV Max và Product GMV Max), xem theo ngày. ROI = doanh thu
+            gộp ÷ chi phí, cùng cách TikTok tính. So với tháng {fmtMonth(prevMonthStr(month))}
+            {adsStats?.lastDate && adsStats.lastDate < end ? ` cắt cùng số ngày (1–${Number(adsStats.lastDate.slice(8))})` : ""}.
+          </p>
+        </div>
+        {adsImportOfMonth && canManage && (
+          <button onClick={handleAdsDelete} className="text-[11px] font-bold text-red-400 hover:text-red-300 flex items-center gap-1 px-2 py-1 rounded-lg">
+            <Trash2 className="w-3.5 h-3.5" /> Xoá file tháng này
+          </button>
+        )}
+      </div>
+
+      {adsError && <div className="p-3 bg-red-950/80 border border-red-800/50 rounded-xl text-red-300 text-xs font-semibold">{adsError}</div>}
+
+      {canManage && !adsPreview && (
+        <label className="border-2 border-dashed border-[var(--border)] bg-[var(--surface-elevated)]/40 p-4 rounded-xl flex items-center justify-center gap-2 cursor-pointer hover:bg-[var(--surface-hover)]">
+          <Upload className="w-4 h-4 text-[var(--text-muted)]" />
+          <span className="font-bold text-[var(--text)] text-xs">
+            {adsImportOfMonth ? "Tải file mới để thay file tháng này" : "Chọn file Ads (.xlsx) tải từ TikTok Ads"}
+          </span>
+          <input
+            type="file"
+            accept=".xlsx,.xls"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = "";
+              if (f) handleAdsFile(f);
+            }}
+          />
+        </label>
+      )}
+
+      {adsPreview && previewStats && (
+        <div className="space-y-3 border border-[var(--border)] rounded-xl p-3 bg-[var(--surface-elevated)]/40">
+          <p className="text-xs font-semibold text-[var(--text)] flex items-center gap-2">
+            <FileSpreadsheet className="w-4 h-4 text-emerald-500" /> {adsPreview.fileName}
+          </p>
+          <p className="text-xs text-[var(--text-muted)]">
+            Tháng <b className="text-[var(--text)]">{fmtMonth(adsPreview.parsed.periodStart!.slice(0, 7))}</b> · {previewStats.days.length} ngày (
+            {fmtDateVn(previewStats.firstDate!, false)}–{fmtDateVn(previewStats.lastDate!, false)}) · chi phí{" "}
+            <b className="text-[var(--text)]">{fmtVndFull(previewStats.cost)}</b> · {fmtVndFull(previewStats.orders)} đơn SKU · doanh thu gộp{" "}
+            <b className="text-[var(--text)]">{fmtVndFull(previewStats.revenue)}</b> · ROI {previewStats.roi != null ? `${fmtFixed(previewStats.roi, 1)}x` : "—"}
+          </p>
+          <p className="text-[11px] text-amber-300">
+            File không ghi tên shop — kiểm lại đây đúng là Ads của <b>{brandName}</b> trước khi lưu.
+          </p>
+          {adsPreview.replace && (
+            <p className="text-[11px] text-amber-300">
+              Đã có file tháng này (tải {new Date(adsPreview.replace.importedAt).toLocaleString("vi-VN")}) — lưu sẽ THAY file cũ, không cộng dồn.
+            </p>
+          )}
+          {isPublished && adsPreview.parsed.periodStart?.startsWith(month) && (
+            <p className="text-[11px] text-[var(--text-muted)]">
+              Report Tháng {fmtMonth(month)} đã phát hành: brand vẫn thấy số cũ tới khi thu hồi report và bấm Cập nhật số liệu.
+            </p>
+          )}
+          <div className="flex gap-2">
+            <button onClick={handleAdsConfirm} disabled={adsSaving} className="bg-[var(--accent)] text-white font-bold px-4 py-2 rounded-xl text-xs disabled:opacity-50">
+              {adsSaving ? "Đang lưu..." : adsPreview.replace ? "Lưu, thay file cũ" : "Lưu file Ads"}
+            </button>
+            <button onClick={() => setAdsPreview(null)} className="bg-[var(--surface-hover)] text-[var(--text-muted)] font-bold px-4 py-2 rounded-xl text-xs">
+              Huỷ
+            </button>
+          </div>
+        </div>
+      )}
+
+      {adsLoading ? (
+        <div className="flex items-center gap-2 text-[var(--text-faint)] text-xs">
+          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Đang đọc file Ads...
+        </div>
+      ) : !adsStats ? (
+        <p className="text-xs text-[var(--text-faint)]">
+          Chưa có file Ads tháng {fmtMonth(month)}. Brand không chạy Ads tháng này thì bỏ qua — Report Tháng chỉ không có phần Ads.
+        </p>
+      ) : (
+        <>
+          {adsImportOfMonth && (
+            <p className="text-[11px] text-[var(--text-faint)]">
+              File: {adsImportOfMonth.fileName ?? "—"} · tải {new Date(adsImportOfMonth.importedAt).toLocaleString("vi-VN")} · {adsStats.days.length} ngày (
+              {fmtDateVn(adsStats.firstDate!, false)}–{fmtDateVn(adsStats.lastDate!, false)})
+            </p>
+          )}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl p-3">
+              <div className="text-[11px] text-[var(--text-faint)]">Chi phí Ads</div>
+              <div className="text-base font-black text-[var(--text)]">{fmtVndShort(adsStats.cost)}</div>
+              <MomChip current={adsStats.cost} previous={adsPrevStats?.cost ?? null} tone="neutral" />
+            </div>
+            <div className="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl p-3">
+              <div className="text-[11px] text-[var(--text-faint)]">ROI</div>
+              <div className="text-base font-black text-[var(--text)]">{adsStats.roi != null ? `${fmtFixed(adsStats.roi, 1)}x` : "—"}</div>
+              <MomChip current={adsStats.roi} previous={adsPrevStats?.roi ?? null} />
+            </div>
+            <div className="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl p-3">
+              <div className="text-[11px] text-[var(--text-faint)]">Chi phí / đơn SKU ({fmtVndFull(adsStats.orders)} đơn)</div>
+              <div className="text-base font-black text-[var(--text)]">{adsStats.costPerOrder != null ? fmtVndFull(adsStats.costPerOrder) : "—"}</div>
+              <MomChip current={adsStats.costPerOrder} previous={adsPrevStats?.costPerOrder ?? null} tone="down" />
+            </div>
+            <div className="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl p-3">
+              <div className="text-[11px] text-[var(--text-faint)]">Doanh thu gộp từ Ads</div>
+              <div className="text-base font-black text-[var(--text)]">{fmtVndShort(adsStats.revenue)}</div>
+              <MomChip current={adsStats.revenue} previous={adsPrevStats?.revenue ?? null} />
+            </div>
+          </div>
+          {adsStats.zeroOrderDays.length > 0 && (
+            <div className="flex items-start gap-2 text-[11px] text-amber-300 bg-amber-950/60 border border-amber-800/50 rounded-xl p-2.5">
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+              {adsStats.zeroOrderDays.length} ngày tiêu tiền mà 0 đơn ({adsStats.zeroOrderDays.map((d) => fmtDateVn(d.date, false)).join(", ")}) — tổng{" "}
+              {fmtVndFull(adsStats.zeroOrderDays.reduce((a, d) => a + d.cost, 0))}.
+            </div>
+          )}
+          <p className="text-[11px] text-[var(--text-faint)]">
+            Doanh thu gộp tính theo đơn gốc trước huỷ/hoàn nên có thể lớn hơn GMV của shop — đừng lấy số này chia GMV.
+          </p>
+          <details className="rounded-xl border border-[var(--border)]">
+            <summary className="cursor-pointer px-3 py-2 text-xs font-bold text-[var(--text-muted)]">Số từng ngày ({adsStats.days.length} ngày)</summary>
+            <div className="overflow-x-auto max-h-96">
+              <table className="w-full text-xs">
+                <thead className="sticky top-0 bg-[var(--surface)]">
+                  <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)]">
+                    <th className="py-2 px-2">Ngày</th>
+                    <th className="py-2 px-2 text-right">Chi phí</th>
+                    <th className="py-2 px-2 text-right">Đơn SKU</th>
+                    <th className="py-2 px-2 text-right">Doanh thu gộp</th>
+                    <th className="py-2 px-2 text-right">ROI</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {adsStats.days.map((d) => (
+                    <tr key={d.date} className={`border-b border-[var(--border-muted)] ${d.cost > 0 && d.orders === 0 ? "text-amber-300" : ""}`}>
+                      <td className="py-1.5 px-2 font-semibold">{fmtDateVn(d.date, false)}</td>
+                      <td className="py-1.5 px-2 text-right">{fmtVndFull(d.cost)}</td>
+                      <td className="py-1.5 px-2 text-right">{fmtVndFull(d.orders)}</td>
+                      <td className="py-1.5 px-2 text-right">{fmtVndFull(d.revenue)}</td>
+                      <td className="py-1.5 px-2 text-right">{d.cost > 0 ? `${fmtFixed(d.revenue / d.cost, 1)}x` : "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
+        </>
+      )}
+    </div>
+
+  );
+}
+
+const ADS_INTRO: Record<ReportPlatform, string> = {
+  TikTok: 'Tải file "Campaign overview data" (xem theo ngày) từ TikTok Ads, mỗi tháng một file — app tự tính chi phí, ROI, chi phí/đơn và đưa vào Report Tháng phần 6. Nhận xét cho brand viết bằng nút "Sửa Insight" ở từng phần của Report Tháng.',
+  Shopee: 'Tải file "Shopee Live Ads Report" từ Quảng cáo Shopee, mỗi tháng một file — app tự tính chi phí, ROAS, chi phí/đơn và đưa vào Report Shopee. Xu (Coins Claimed) lấy sẵn từ file tổng quan Shopee ở Dữ Liệu Gốc, không cần nhập.'
+};
+// Khung nhập file Ads của từng sàn — thêm sàn mà quên khung là lỗi compile.
+const ADS_PANELS: Record<ReportPlatform, React.FC<AdsPanelProps>> = { TikTok: TikTokAdsPanel, Shopee: ShopeeAdsPanel };
+
+export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandName, platform, multiPlatform, sessions, currentRole }) => {
+  const AdsPanel = ADS_PANELS[platform];
+  const canManage = CAN_MANAGE_ROLES.includes(currentRole);
+  // Cùng tháng mở sẵn với Report Tháng — phần nhập ở đây đi theo report đó (lib/defaultMonth.ts).
+  const [month, setMonth] = useState(() => defaultReportMonth(`${getTodayMonth()}-01`, sessions.filter((s) => s.brandId === brandId)));
+  const [report, setReport] = useState<BrandMonthlyReportType | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
   useEffect(() => {
     let cancelled = false;
     setErrorMsg(null);
-    (isShopee ? fetchMonthlyReport(brandId, `${month}-01`, "Shopee") : monthlyReportRead.take(brandId, `${month}-01`))
+    (platform === LEGACY_PLATFORM ? monthlyReportRead.take(brandId, `${month}-01`) : fetchMonthlyReport(brandId, `${month}-01`, platform))
       .then((r) => {
         if (cancelled) return;
         setReport(r);
@@ -191,7 +367,7 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
     return () => {
       cancelled = true;
     };
-  }, [brandId, month, canManage, isShopee]);
+  }, [brandId, month, canManage, platform]);
 
   const isPublished = report?.status === "published";
 
@@ -200,12 +376,8 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
     <div className="space-y-5">
       <PageHeader
         icon={Megaphone}
-        title={`Nhập Ads · ${brandName}${multiPlatform || isShopee ? ` · ${platform}` : ""}`}
-        description={
-          isShopee
-            ? 'Tải file "Shopee Live Ads Report" từ Quảng cáo Shopee, mỗi tháng một file — app tự tính chi phí, ROAS, chi phí/đơn và đưa vào Report Shopee. Xu (Coins Claimed) lấy sẵn từ file tổng quan Shopee ở Dữ Liệu Gốc, không cần nhập.'
-            : `Tải file "Campaign overview data" (xem theo ngày) từ TikTok Ads, mỗi tháng một file — app tự tính chi phí, ROI, chi phí/đơn và đưa vào Report Tháng phần 6. Nhận xét cho brand viết bằng nút "Sửa Insight" ở từng phần của Report Tháng.`
-        }
+        title={`Nhập Ads · ${channelTitle(brandName, platform, multiPlatform)}`}
+        description={ADS_INTRO[platform]}
         actions={
           <>
             <MonthPicker value={month} onChange={setMonth} />
@@ -222,167 +394,9 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
         <div className="p-3 bg-red-950/80 border border-red-800/50 rounded-xl text-red-300 text-xs font-semibold">{errorMsg}</div>
       )}
 
-      {isShopee && (
-        <ShopeeAdsPanel brandId={brandId} brandName={brandName} month={month} canManage={canManage} isPublished={isPublished} onMonthChange={setMonth} />
-      )}
+      {/* Mỗi sàn một khung nhập file Ads (ADS_PANELS) — TikTok: "Campaign overview data" theo ngày (0137), Shopee: Live Ads Report (0142). */}
+      <AdsPanel brandId={brandId} brandName={brandName} month={month} canManage={canManage} isPublished={isPublished} onMonthChange={setMonth} />
 
-      {/* File Ads TikTok — chỗ DUY NHẤT nhập Ads TikTok (migration 0137, lib/dataraw/adsCampaignOverview.ts). */}
-      {!isShopee && (
-      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 space-y-4">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div>
-            <h3 className="font-bold text-[var(--text)] text-sm flex items-center gap-2">
-              <Target className="w-4 h-4 text-[var(--accent-text)]" /> Ads toàn cửa hàng · tháng {fmtMonth(month)}
-            </h3>
-            <p className="text-[11px] text-[var(--text-faint)] mt-1">
-              Nguồn: file &quot;Campaign overview data&quot; của TikTok Ads (gồm LIVE GMV Max và Product GMV Max), xem theo ngày. ROI = doanh thu
-              gộp ÷ chi phí, cùng cách TikTok tính. So với tháng {fmtMonth(prevMonthStr(month))}
-              {adsStats?.lastDate && adsStats.lastDate < end ? ` cắt cùng số ngày (1–${Number(adsStats.lastDate.slice(8))})` : ""}.
-            </p>
-          </div>
-          {adsImportOfMonth && canManage && (
-            <button onClick={handleAdsDelete} className="text-[11px] font-bold text-red-400 hover:text-red-300 flex items-center gap-1 px-2 py-1 rounded-lg">
-              <Trash2 className="w-3.5 h-3.5" /> Xoá file tháng này
-            </button>
-          )}
-        </div>
-
-        {adsError && <div className="p-3 bg-red-950/80 border border-red-800/50 rounded-xl text-red-300 text-xs font-semibold">{adsError}</div>}
-
-        {canManage && !adsPreview && (
-          <label className="border-2 border-dashed border-[var(--border)] bg-[var(--surface-elevated)]/40 p-4 rounded-xl flex items-center justify-center gap-2 cursor-pointer hover:bg-[var(--surface-hover)]">
-            <Upload className="w-4 h-4 text-[var(--text-muted)]" />
-            <span className="font-bold text-[var(--text)] text-xs">
-              {adsImportOfMonth ? "Tải file mới để thay file tháng này" : "Chọn file Ads (.xlsx) tải từ TikTok Ads"}
-            </span>
-            <input
-              type="file"
-              accept=".xlsx,.xls"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                e.target.value = "";
-                if (f) handleAdsFile(f);
-              }}
-            />
-          </label>
-        )}
-
-        {adsPreview && previewStats && (
-          <div className="space-y-3 border border-[var(--border)] rounded-xl p-3 bg-[var(--surface-elevated)]/40">
-            <p className="text-xs font-semibold text-[var(--text)] flex items-center gap-2">
-              <FileSpreadsheet className="w-4 h-4 text-emerald-500" /> {adsPreview.fileName}
-            </p>
-            <p className="text-xs text-[var(--text-muted)]">
-              Tháng <b className="text-[var(--text)]">{fmtMonth(adsPreview.parsed.periodStart!.slice(0, 7))}</b> · {previewStats.days.length} ngày (
-              {fmtDateVn(previewStats.firstDate!, false)}–{fmtDateVn(previewStats.lastDate!, false)}) · chi phí{" "}
-              <b className="text-[var(--text)]">{fmtVndFull(previewStats.cost)}</b> · {fmtVndFull(previewStats.orders)} đơn SKU · doanh thu gộp{" "}
-              <b className="text-[var(--text)]">{fmtVndFull(previewStats.revenue)}</b> · ROI {previewStats.roi != null ? `${fmtFixed(previewStats.roi, 1)}x` : "—"}
-            </p>
-            <p className="text-[11px] text-amber-300">
-              File không ghi tên shop — kiểm lại đây đúng là Ads của <b>{brandName}</b> trước khi lưu.
-            </p>
-            {adsPreview.replace && (
-              <p className="text-[11px] text-amber-300">
-                Đã có file tháng này (tải {new Date(adsPreview.replace.importedAt).toLocaleString("vi-VN")}) — lưu sẽ THAY file cũ, không cộng dồn.
-              </p>
-            )}
-            {isPublished && adsPreview.parsed.periodStart?.startsWith(month) && (
-              <p className="text-[11px] text-[var(--text-muted)]">
-                Report Tháng {fmtMonth(month)} đã phát hành: brand vẫn thấy số cũ tới khi thu hồi report và bấm Cập nhật số liệu.
-              </p>
-            )}
-            <div className="flex gap-2">
-              <button onClick={handleAdsConfirm} disabled={adsSaving} className="bg-[var(--accent)] text-white font-bold px-4 py-2 rounded-xl text-xs disabled:opacity-50">
-                {adsSaving ? "Đang lưu..." : adsPreview.replace ? "Lưu, thay file cũ" : "Lưu file Ads"}
-              </button>
-              <button onClick={() => setAdsPreview(null)} className="bg-[var(--surface-hover)] text-[var(--text-muted)] font-bold px-4 py-2 rounded-xl text-xs">
-                Huỷ
-              </button>
-            </div>
-          </div>
-        )}
-
-        {adsLoading ? (
-          <div className="flex items-center gap-2 text-[var(--text-faint)] text-xs">
-            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Đang đọc file Ads...
-          </div>
-        ) : !adsStats ? (
-          <p className="text-xs text-[var(--text-faint)]">
-            Chưa có file Ads tháng {fmtMonth(month)}. Brand không chạy Ads tháng này thì bỏ qua — Report Tháng chỉ không có phần Ads.
-          </p>
-        ) : (
-          <>
-            {adsImportOfMonth && (
-              <p className="text-[11px] text-[var(--text-faint)]">
-                File: {adsImportOfMonth.fileName ?? "—"} · tải {new Date(adsImportOfMonth.importedAt).toLocaleString("vi-VN")} · {adsStats.days.length} ngày (
-                {fmtDateVn(adsStats.firstDate!, false)}–{fmtDateVn(adsStats.lastDate!, false)})
-              </p>
-            )}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl p-3">
-                <div className="text-[11px] text-[var(--text-faint)]">Chi phí Ads</div>
-                <div className="text-base font-black text-[var(--text)]">{fmtVndShort(adsStats.cost)}</div>
-                <MomChip current={adsStats.cost} previous={adsPrevStats?.cost ?? null} tone="neutral" />
-              </div>
-              <div className="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl p-3">
-                <div className="text-[11px] text-[var(--text-faint)]">ROI</div>
-                <div className="text-base font-black text-[var(--text)]">{adsStats.roi != null ? `${fmtFixed(adsStats.roi, 1)}x` : "—"}</div>
-                <MomChip current={adsStats.roi} previous={adsPrevStats?.roi ?? null} />
-              </div>
-              <div className="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl p-3">
-                <div className="text-[11px] text-[var(--text-faint)]">Chi phí / đơn SKU ({fmtVndFull(adsStats.orders)} đơn)</div>
-                <div className="text-base font-black text-[var(--text)]">{adsStats.costPerOrder != null ? fmtVndFull(adsStats.costPerOrder) : "—"}</div>
-                <MomChip current={adsStats.costPerOrder} previous={adsPrevStats?.costPerOrder ?? null} tone="down" />
-              </div>
-              <div className="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl p-3">
-                <div className="text-[11px] text-[var(--text-faint)]">Doanh thu gộp từ Ads</div>
-                <div className="text-base font-black text-[var(--text)]">{fmtVndShort(adsStats.revenue)}</div>
-                <MomChip current={adsStats.revenue} previous={adsPrevStats?.revenue ?? null} />
-              </div>
-            </div>
-            {adsStats.zeroOrderDays.length > 0 && (
-              <div className="flex items-start gap-2 text-[11px] text-amber-300 bg-amber-950/60 border border-amber-800/50 rounded-xl p-2.5">
-                <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
-                {adsStats.zeroOrderDays.length} ngày tiêu tiền mà 0 đơn ({adsStats.zeroOrderDays.map((d) => fmtDateVn(d.date, false)).join(", ")}) — tổng{" "}
-                {fmtVndFull(adsStats.zeroOrderDays.reduce((a, d) => a + d.cost, 0))}.
-              </div>
-            )}
-            <p className="text-[11px] text-[var(--text-faint)]">
-              Doanh thu gộp tính theo đơn gốc trước huỷ/hoàn nên có thể lớn hơn GMV của shop — đừng lấy số này chia GMV.
-            </p>
-            <details className="rounded-xl border border-[var(--border)]">
-              <summary className="cursor-pointer px-3 py-2 text-xs font-bold text-[var(--text-muted)]">Số từng ngày ({adsStats.days.length} ngày)</summary>
-              <div className="overflow-x-auto max-h-96">
-                <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-[var(--surface)]">
-                    <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)]">
-                      <th className="py-2 px-2">Ngày</th>
-                      <th className="py-2 px-2 text-right">Chi phí</th>
-                      <th className="py-2 px-2 text-right">Đơn SKU</th>
-                      <th className="py-2 px-2 text-right">Doanh thu gộp</th>
-                      <th className="py-2 px-2 text-right">ROI</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {adsStats.days.map((d) => (
-                      <tr key={d.date} className={`border-b border-[var(--border-muted)] ${d.cost > 0 && d.orders === 0 ? "text-amber-300" : ""}`}>
-                        <td className="py-1.5 px-2 font-semibold">{fmtDateVn(d.date, false)}</td>
-                        <td className="py-1.5 px-2 text-right">{fmtVndFull(d.cost)}</td>
-                        <td className="py-1.5 px-2 text-right">{fmtVndFull(d.orders)}</td>
-                        <td className="py-1.5 px-2 text-right">{fmtVndFull(d.revenue)}</td>
-                        <td className="py-1.5 px-2 text-right">{d.cost > 0 ? `${fmtFixed(d.revenue / d.cost, 1)}x` : "—"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </details>
-          </>
-        )}
-      </div>
-
-      )}
 
       {/* Khung camp của tháng chỉ nhập ở Kế Hoạch Tháng (gộp cấu hình 06/10 — trước đó tháng không có kế hoạch nhập ở đây). */}
     </div>

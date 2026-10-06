@@ -34,7 +34,7 @@ import { PageIntro } from "./common/PageIntro";
 
 import { fmtMonth, fmtFixed, fmtVndShort, fmtVndFull } from "../lib/format";
 import { MonthPicker } from "./common/MonthPicker";
-import { brandPlatformKey, type ReportPlatform } from "../lib/reportPlatform";
+import { channelTitle, platformOf, brandPlatformKey, type ReportPlatform } from "../lib/reportPlatform";
 import { platformsOfBrand } from "../lib/channels";
 interface MonthPlanProps {
   /** Sàn của workspace agency (07/10): kế hoạch, target, cam kết của sàn này — không còn nút chuyển sàn trong màn. */
@@ -120,10 +120,10 @@ export default function MonthPlan({
   const platforms = useMemo(() => (brandId ? platformsOfBrand(channels, brandId) : []), [brandId, channels]);
   // Sàn mở sẵn: sàn đã nhớ cùng brand (nút "Lập kế hoạch VERA Shopee" ở Dashboard/Toàn Cảnh/Việc cần làm — rememberBrandId).
   const platform: ReportPlatform = platformProp;
-  const brandLabel = (name: string | undefined) => `${name ?? ""}${platforms.length > 1 || platform === "Shopee" ? ` ${platform}` : ""}`;
+  const brandLabel = (name: string | undefined) => channelTitle(name ?? "", platform, platforms.length > 1).replace(" · ", " ");
   // Lịch sử cho engine/dự báo: chỉ ca CÙNG SÀN (năng suất hai sàn khác nhau — VERA Shopee ~1,6x GMV/giờ TikTok).
   // Kiểm trùng phòng/người (crossBrandCheck) vẫn dùng mọi ca: người và phòng là vật lý, không theo sàn.
-  const platformSessions = useMemo(() => sessions.filter((s) => (s.platform ?? "TikTok") === platform), [sessions, platform]);
+  const platformSessions = useMemo(() => sessions.filter((s) => platformOf(s) === platform), [sessions, platform]);
   const [month, setMonth] = useState(nextMonthOf(today.slice(0, 7), 1));
   const [plan, setPlan] = useState<BrandMonthPlan | null>(null);
   const [settings, setSettings] = useState<PlanSettings>(DEFAULT_SETTINGS);
@@ -159,7 +159,7 @@ export default function MonthPlan({
   const brandStudioId = findBrandStudioId(brandStudios, brandId, platform);
   const brandStudio = studios.find((s) => s.id === brandStudioId);
   const brandTemplates = useMemo(
-    () => recurringShiftTemplates.filter((t) => t.brandId === brandId && (t.platform ?? "TikTok") === platform),
+    () => recurringShiftTemplates.filter((t) => t.brandId === brandId && platformOf(t) === platform),
     [recurringShiftTemplates, brandId, platform]
   );
 
@@ -296,7 +296,7 @@ export default function MonthPlan({
         // Bằng đúng điều khoản hợp đồng ⇒ vẫn "theo hợp đồng" (sửa hợp đồng ở CRM thì tháng này đổi theo).
         isOverride: !contract || hours !== contract.monthlyHours || gmv !== contract.monthlyGmv
       });
-      setCommitments((prev) => [...prev.filter((c) => !(c.brandId === row.brandId && (c.platform ?? "TikTok") === (row.platform ?? "TikTok") && c.periodMonth === row.periodMonth)), row]);
+      setCommitments((prev) => [...prev.filter((c) => !(c.brandId === row.brandId && platformOf(c) === platformOf(row) && c.periodMonth === row.periodMonth)), row]);
       setCommitHoursDraft(null);
       setCommitGmvDraft(null);
       return true;

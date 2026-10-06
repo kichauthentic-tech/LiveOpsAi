@@ -21,11 +21,11 @@ import { useConfirm } from "../../hooks/useConfirm";
 import { useToast } from "../../hooks/useToast";
 import { fetchMonthlyReportSnapshot, saveMonthlyReportSnapshot, StoredMonthlyReportSnapshot } from "../../lib/db/monthlyReportSnapshots";
 import { DataRawImportStamp, fetchDataRawImportStamps } from "../../lib/db/brandDataRaw";
-import { buildMonthlyReportSnapshot, COVERAGE_TYPES, snapshotFreshness, snapshotHeadline, SnapshotHeadline, type MonthlyReportSnapshot } from "../../lib/report/monthlySnapshot";
-import { shopeeSnapshotFreshness, shopeeStampsFor, type ShopeeReportSnapshot } from "../../lib/report/shopeeSnapshot";
-import { buildShopeeReportSnapshot } from "../../lib/report/shopeeSnapshotBuild";
-import type { ReportPlatform } from "../../lib/reportPlatform";
-import { fmtDateVn, fmtMonth, fmtVndShort } from "../../lib/format";
+import { type MonthlyReportSnapshot } from "../../lib/report/monthlySnapshot";
+import { type ShopeeReportSnapshot } from "../../lib/report/shopeeSnapshot";
+import { REPORT_ENGINES, type AnySnapshot } from "../../lib/report/reportEngines";
+import { channelTitle, LEGACY_PLATFORM, type ReportPlatform } from "../../lib/reportPlatform";
+import { fmtDateVn, fmtMonth } from "../../lib/format";
 import { prefetchable, type TabPrefetchCtx } from "../../lib/db/prefetch";
 import { lazyNamed } from "../../lib/lazyNamed";
 
@@ -37,6 +37,29 @@ import { lazyNamed } from "../../lib/lazyNamed";
 // `Suspense` của App.tsx và làm trắng cả khu vực tab, mất luôn phần đầu trang đã vẽ xong.
 const MonthlyReportTabs = lazyNamed(() => import("./MonthlyReportTabs"), "MonthlyReportTabs");
 const ShopeeMonthlyReportTabs = lazyNamed(() => import("./ShopeeMonthlyReportTabs"), "ShopeeMonthlyReportTabs");
+
+interface ReportViewProps {
+  brandId: string;
+  brandName: string;
+  month: string;
+  snapshot: AnySnapshot;
+  report: BrandMonthlyReportType | null;
+  canManage: boolean;
+  onReportChange: (r: BrandMonthlyReportType) => void;
+  liveSessions: LiveSession[];
+  shiftSlots?: ShiftSlot[];
+}
+// Khung hiển thị report của từng sàn (cùng khoá với REPORT_ENGINES) — thêm sàn mà quên khung là lỗi compile.
+const REPORT_VIEWS: Record<ReportPlatform, { preload: () => void; Render: React.FC<ReportViewProps> }> = {
+  TikTok: {
+    preload: () => void MonthlyReportTabs.preload(),
+    Render: (p) => <MonthlyReportTabs brandId={p.brandId} brandName={p.brandName} month={p.month} snapshot={p.snapshot as MonthlyReportSnapshot} liveSessions={p.liveSessions} shiftSlots={p.shiftSlots} canManage={p.canManage} />
+  },
+  Shopee: {
+    preload: () => void ShopeeMonthlyReportTabs.preload(),
+    Render: (p) => <ShopeeMonthlyReportTabs brandId={p.brandId} brandName={p.brandName} month={p.month} snapshot={p.snapshot as ShopeeReportSnapshot} report={p.report} canManage={p.canManage} onReportChange={p.onReportChange} />
+  }
+};
 import { MonthPicker } from "../common/MonthPicker";
 import { PageHeader } from "../common/PageHeader";
 
@@ -85,27 +108,12 @@ function monthRange(month: string): { start: string; end: string } {
   return { start, end };
 }
 
-const fmtDayMonth = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 const fmtStamp = (iso: string) => {
   const d = new Date(iso);
   const p = (n: number) => String(n).padStart(2, "0");
   return `${p(d.getHours())}:${p(d.getMinutes())} ${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`;
 };
 
-function headlineDiff(before: SnapshotHeadline, after: SnapshotHeadline): string {
-  const money = (v: number) => fmtVndShort(v);
-  const hours = (v: number) => `${v.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h`;
-  const line = (label: string, a: string, b: string) => `${label}: ${a === b ? a + " (không đổi)" : `${a} → ${b}`}`;
-  return [
-    line("Total GMV", money(before.shopGmv), money(after.shopGmv)),
-    line("LIVE GMV (agency)", money(before.totalGmv), money(after.totalGmv)),
-    line("Ca có số", String(before.sessionsWithNumbers), String(after.sessionsWithNumbers)),
-    line("Giờ live", hours(before.liveHours), hours(after.liveHours)),
-    line("Video GMV", money(before.videoGmv), money(after.videoGmv)),
-    line("Product card GMV", money(before.cardGmv), money(after.cardGmv)),
-    line("Top SKU #1", before.topSku ?? "—", after.topSku ?? "—")
-  ].join("\n");
-}
 
 // Phần nhập Ads (từ 05/10 là file TikTok Ads; ghi chú Promotion/Customer Insight/Account Health đã bỏ)
 // đã tách sang tab riêng "Nhập Ads" (BrandAdsReport.tsx, 2026-09-21) — Report Tháng chỉ
@@ -117,9 +125,10 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
   const canManage = CAN_MANAGE_ROLES.includes(currentRole);
   const canViewWeekly = CAN_VIEW_WEEKLY_ROLES.includes(currentRole);
   const [viewMode, setViewMode] = useState<"month" | "week">("month");
-  // Sàn của report (0139): TikTok và Shopee là hai report độc lập — phát hành, thu hồi, đóng sổ riêng. Chọn sàn ở bộ chuyển
-  // sàn của Brand workspace (App, PlatformScopeBar) — một chỗ chọn cho mọi tab.
-  const isShopee = platform === "Shopee";
+  // Sàn của report (0139): TikTok và Shopee là hai report độc lập — phát hành, thu hồi, đóng sổ riêng, mỗi sàn một engine
+  // (lib/report/reportEngines.ts) và một khung hiển thị (REPORT_VIEWS). Sàn chọn ở workspace (App) — một chỗ cho mọi tab.
+  const engine = REPORT_ENGINES[platform];
+  const View = REPORT_VIEWS[platform];
   // Mở THÁNG ĐÃ HẾT gần nhất có ca của brand — report chỉ phát hành được sau khi hết tháng (0133); mở tháng đang
   // chạy là gặp ngay "chưa tạo report" (audit người mới 2026-10-04). Xem tháng này: chọn ở bộ chọn tháng.
   const [month, setMonth] = useState(() => defaultReportMonth(`${getTodayMonth()}-01`, sessions.filter((s) => s.brandId === brandId)));
@@ -131,7 +140,12 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
 
   // Bản chụp số liệu (0119) — Report Tháng chỉ đọc bản này. Chưa có thì ops bấm "Tạo report" (quyết
   // định 2026-09-25: không tự dựng khi mở, ai bấm mới tốn tài nguyên).
-  const [stored, setStored] = useState<StoredMonthlyReportSnapshot | null>(null);
+  // Bản chụp gắn khoá (brand, tháng, sàn) của lượt đọc: đổi brand/sàn thì lần vẽ đầu tiên KHÔNG được đọc bản chụp của kênh cũ
+  // (07/10: chuyển Report VERA·Shopee → CROCS từng sập vì engine TikTok đọc bản chụp Shopee còn trong state).
+  const snapKey = `${brandId}|${month}|${platform}`;
+  const [storedState, setStoredState] = useState<{ key: string; value: StoredMonthlyReportSnapshot | null }>({ key: "", value: null });
+  const stored = storedState.key === snapKey ? storedState.value : null;
+  const setStored = (value: StoredMonthlyReportSnapshot | null) => setStoredState({ key: snapKey, value });
   const [snapLoading, setSnapLoading] = useState(true);
   const [building, setBuilding] = useState(false);
   // Dấu batch Dữ Liệu Gốc hiện tại (vài trăm byte/batch) — chỉ ops, để biết bản chụp đã cũ chưa.
@@ -160,7 +174,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
     setLoading(true);
     setErrorMsg(null);
     // Chỉ truyền sàn khi là Shopee — TikTok giữ đúng khoá nạp-trước (prefetch) đã có.
-    monthlyReportRead.take(brandId, `${month}-01`, isShopee ? "Shopee" : undefined)
+    monthlyReportRead.take(brandId, `${month}-01`, platform === LEGACY_PLATFORM ? undefined : platform)
       .then((r) => {
         if (cancelled) return;
         setReport(r);
@@ -170,22 +184,22 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
     return () => {
       cancelled = true;
     };
-  }, [brandId, month, isShopee]);
+  }, [brandId, month, platform]);
 
   useEffect(() => {
     let cancelled = false;
     setSnapLoading(true);
     setStored(null);
     // Chunk biểu đồ tải cùng lúc với bản chụp, không đợi bản chụp về rồi mới bắt đầu (một vòng mạng nối tiếp).
-    (isShopee ? ShopeeMonthlyReportTabs : MonthlyReportTabs).preload();
-    snapshotRead.take(brandId, month, isShopee ? "Shopee" : undefined)
-      .then((r) => !cancelled && setStored(r))
+    View.preload();
+    snapshotRead.take(brandId, month, platform === LEGACY_PLATFORM ? undefined : platform)
+      .then((r) => !cancelled && setStoredState({ key: `${brandId}|${month}|${platform}`, value: r }))
       .catch((e) => !cancelled && setErrorMsg(errorMessage(e, "Không tải được số liệu report")))
       .finally(() => !cancelled && setSnapLoading(false));
     return () => {
       cancelled = true;
     };
-  }, [brandId, month, isShopee]);
+  }, [brandId, month, platform]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const refreshImportStamps = () =>
     fetchDataRawImportStamps(brandId)
@@ -205,22 +219,15 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
   // Ca sống đã có sẵn trong app (0 egress), dấu batch nhỏ ⇒ biết ngay bản chụp cũ tới đâu mà không tải
   // lại file nào.
   const freshness = useMemo(
-    () => (stored && importStamps && !isShopee ? snapshotFreshness(stored.snapshot, { sessions, planMonthTotals, brandPlatformRates, imports: importStamps }) : null),
-    [stored, importStamps, sessions, planMonthTotals, brandPlatformRates, isShopee]
+    () => (stored && importStamps ? engine.freshness(stored.snapshot as AnySnapshot, { sessions, planMonthTotals, brandPlatformRates, stamps: importStamps, month }) : null),
+    [engine, stored, importStamps, sessions, planMonthTotals, brandPlatformRates, month]
   );
-  const shopeeFresh = useMemo(
-    () => (stored && importStamps && isShopee ? shopeeSnapshotFreshness(stored.snapshot as unknown as ShopeeReportSnapshot, { sessions, stamps: shopeeStampsFor(importStamps, month) }) : null),
-    [stored, importStamps, sessions, isShopee, month]
-  );
-  // Một hình dạng chung cho thanh "số liệu chốt" của cả hai sàn.
-  const upToDate = isShopee ? shopeeFresh?.upToDate : freshness?.upToDate;
+  const upToDate = freshness?.upToDate;
 
   const buildSnapshot = async (): Promise<{ snapshot: MonthlyReportSnapshot; fetched: string[]; reused: string[] }> => {
-    if (isShopee) {
-      const snap = await buildShopeeReportSnapshot({ brandId, month, sessions });
-      return { snapshot: snap as unknown as MonthlyReportSnapshot, fetched: [], reused: [] };
-    }
-    return buildMonthlyReportSnapshot({ brandId, month, sessions, planMonthTotals, brandPlatformRates, previous: stored?.snapshot ?? null });
+    const r = await engine.build({ brandId, month, sessions, planMonthTotals, brandPlatformRates, previous: (stored?.snapshot as AnySnapshot | undefined) ?? null });
+    // Bảng bản chụp lưu jsonb — mỗi sàn một hình dạng; lớp db gõ theo bản TikTok.
+    return { ...r, snapshot: r.snapshot as MonthlyReportSnapshot };
   };
 
   const saveSnapshot = async (snapshot: MonthlyReportSnapshot) => {
@@ -241,9 +248,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
       if (stored && isPublished) {
         const ok = await confirm(
           `Report ${platform} tháng ${fmtMonth(month)} ĐÃ PHÁT HÀNH — cập nhật xong brand thấy ngay số mới.\n\n${
-            isShopee
-              ? `GMV Shopee: ${fmtVndShort((stored.snapshot as unknown as ShopeeReportSnapshot).headline.gmv)} → ${fmtVndShort((snapshot as unknown as ShopeeReportSnapshot).headline.gmv)}`
-              : headlineDiff(snapshotHeadline(stored.snapshot), snapshotHeadline(snapshot))
+            engine.headlineChange(stored.snapshot as AnySnapshot, snapshot as AnySnapshot)
           }\n\nCập nhật và phát hành lại?`,
           { confirmLabel: "Cập nhật & phát hành lại" }
         );
@@ -265,7 +270,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
   // "đã biết còn ca chưa đối soát"; nay nút ở thẻ đầu trang, cảnh báo (số cũ / ca chưa đối soát) nằm trong hộp xác nhận.
   const handlePublish = async () => {
     const warnings = [
-      stored && (isShopee ? shopeeFresh : freshness) && !upToDate
+      stored && freshness && !upToDate
         ? `• Số liệu chốt lúc ${fmtStamp(stored.computedAt)} và đã có thay đổi sau đó — phát hành bây giờ là gửi số đã chốt. Huỷ rồi bấm "Cập nhật số liệu" nếu muốn gửi số mới nhất.`
         : null,
       !stored ? "• Chưa có số liệu chốt — phát hành sẽ tự tổng hợp số trước." : null,
@@ -355,21 +360,15 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
         <>
       <PageHeader
         icon={FileText}
-        title={`Report Tháng ${Number(monthM)}/${monthY} · ${brandName}${isShopee ? " · Shopee" : ""}`}
+        title={`Report Tháng ${Number(monthM)}/${monthY} · ${channelTitle(brandName, platform, false)}`}
         description={
           <>
-            {isShopee ? (
-              <>
-                Report Shopee tính từ 4 file Shopee Live (Live List, theo ngày, overview, Product List) và ca Shopee trong app, CHỐT tại
-                một thời điểm — mở report không tính lại. GMV = doanh số đặt. Report TikTok và Shopee phát hành, thu hồi, đóng sổ riêng.
-              </>
-            ) : (
-              <>
-                Số liệu vận hành tính từ các ca có số trong tháng (Dữ Liệu Gốc chỉ dự phòng) và được CHỐT tại một thời điểm — mở report
-                không tính lại; ops bấm "Cập nhật số liệu" khi muốn lấy số mới. File Ads (TikTok Ads) tải ở tab {adsReportLink}; nhận xét
-                cho brand viết bằng nút "Sửa Insight" ở từng phần.
-              </>
-            )}
+            {engine.description.split("{ads}").map((part, i, all) => (
+              <React.Fragment key={i}>
+                {part}
+                {i < all.length - 1 && adsReportLink}
+              </React.Fragment>
+            ))}
           </>
         }
         actions={
@@ -417,52 +416,24 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
             <span className="flex items-center gap-1.5 text-[var(--text)] font-semibold">
               <Database className="w-3.5 h-3.5 text-[var(--accent-text)]" /> Số liệu chốt lúc {fmtStamp(stored.computedAt)}
             </span>
-            <span className="text-[var(--text-muted)]">
-              {isShopee
-                ? (() => {
-                    const sh = stored.snapshot as unknown as ShopeeReportSnapshot;
-                    return `doanh số tới ${sh.headline.lastDay ? fmtDayMonth(sh.headline.lastDay) : "—"} · file: ${[sh.files.overview && "overview", sh.files.daily && "theo ngày", sh.files.live && "Live List", sh.files.products && "Product List", sh.ads && "Ads"].filter(Boolean).join(", ") || "chưa có"}`;
-                  })()
-                : (
-                  <>
-                    {stored.snapshot.coverage.sessionsThrough ? `ca có số tới ${fmtDayMonth(stored.snapshot.coverage.sessionsThrough)}` : "chưa có ca nào có số"}
-                    {" · "}
-                    {(() => {
-                      // Chỉ loại file report còn đọc — bản chụp cũ còn ghi Live Performance (21/09) làm mốc sai.
-                      const ends = COVERAGE_TYPES.map((t) => stored.snapshot.coverage.datarawThrough[t]).filter((d): d is string => !!d).sort();
-                      return ends.length ? `Dữ Liệu Gốc tới ${fmtDayMonth(ends[0])}` : "chưa có file Dữ Liệu Gốc";
-                    })()}
-                  </>
-                )}
-            </span>
+            <span className="text-[var(--text-muted)]">{engine.coverage(stored.snapshot as AnySnapshot)}</span>
             {canManage && (
               <span className="ml-auto flex items-center gap-3">
-                {(isShopee ? shopeeFresh : freshness) &&
+                {freshness &&
                   (upToDate ? (
                     <span className="text-emerald-400 font-semibold flex items-center gap-1">
                       <CheckCircle2 className="w-3.5 h-3.5" /> Đã mới nhất
                     </span>
                   ) : (
                     <span className="text-amber-300 font-semibold">
-                      Có thay đổi từ lần chốt:{" "}
-                      {isShopee && shopeeFresh
-                        ? [shopeeFresh.sessionsChanged && "ca Shopee", shopeeFresh.filesChanged && "file Shopee", shopeeFresh.formulaChanged && "cách tính mới (Ads, xu)"].filter(Boolean).join(" · ")
-                        : freshness &&
-                          [
-                            freshness.changedSessions > 0 &&
-                              `${freshness.changedSessions} ca${freshness.changedSessionsThisMonth !== freshness.changedSessions ? ` (${freshness.changedSessionsThisMonth} trong tháng này)` : ""}`,
-                            freshness.changedFiles.length > 0 && `file ${freshness.changedFiles.join(", ")}`,
-                            freshness.configChanged && "target/rate/công thức"
-                          ]
-                            .filter(Boolean)
-                            .join(" · ")}
+                      Có thay đổi từ lần chốt: {freshness.changes.join(" · ")}
                     </span>
                   ))}
                 <button
                   onClick={handleCreateOrRefresh}
                   disabled={building}
                   className={`px-3 py-1.5 rounded-lg font-bold inline-flex items-center gap-1.5 disabled:opacity-60 ${
-                    (isShopee ? shopeeFresh : freshness) && !upToDate
+                    freshness && !upToDate
                       ? "bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white"
                       : "border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-elevated)]"
                   }`}
@@ -522,7 +493,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
               <Database className="w-8 h-8 mx-auto text-[var(--text-faint)]" />
               <div className="text-sm font-bold text-[var(--text)]">Tháng {fmtMonth(month)} chưa tạo report {platform}</div>
               <p className="text-xs text-[var(--text-muted)] max-w-xl mx-auto">
-                {isShopee ? "Bấm để tổng hợp số liệu từ 4 file Shopee và ca Shopee trong app rồi chốt lại." : "Bấm để tổng hợp số liệu từ ca có số và Dữ Liệu Gốc rồi chốt lại."} Sau đó mở report chỉ đọc số đã chốt; khi có ca đối soát
+                {engine.createHint} Sau đó mở report chỉ đọc số đã chốt; khi có ca đối soát
                 thêm hay file mới, bấm "Cập nhật số liệu".
               </p>
               <button
@@ -547,19 +518,17 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
               </div>
             }
           >
-            {isShopee ? (
-              <ShopeeMonthlyReportTabs
-                brandId={brandId}
-                brandName={brandName}
-                month={month}
-                snapshot={stored.snapshot as unknown as ShopeeReportSnapshot}
-                report={report}
-                canManage={canManage}
-                onReportChange={setReport}
-              />
-            ) : (
-              <MonthlyReportTabs brandId={brandId} brandName={brandName} month={month} snapshot={stored.snapshot} liveSessions={sessions} shiftSlots={shiftSlots} canManage={canManage} />
-            )}
+            <View.Render
+              brandId={brandId}
+              brandName={brandName}
+              month={month}
+              snapshot={stored.snapshot as AnySnapshot}
+              report={report}
+              canManage={canManage}
+              onReportChange={setReport}
+              liveSessions={sessions}
+              shiftSlots={shiftSlots}
+            />
           </Suspense>
 
             </>

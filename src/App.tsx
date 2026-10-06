@@ -50,8 +50,9 @@ import type { NewTalentAccountPayload } from "./components/TalentMatcher";
 import { saveEngineParams } from "./lib/db/engineParams";
 import { logTabView } from "./lib/db/tabViews";
 import { findBrandBySlug, parsePath, parsePlatformParam, routeToPath, withPlatformParam } from "./lib/routes";
-import { type PlatformScope, type ReportPlatform } from "./lib/reportPlatform";
+import { platformOf, type PlatformScope, type ReportPlatform } from "./lib/reportPlatform";
 import { deriveChannels, platformsOfBrand } from "./lib/channels";
+import { profileOf } from "./lib/platforms/profiles";
 import { createBrandChannel, updateBrandChannel } from "./lib/db/brandChannels";
 import { lazyNamed } from "./lib/lazyNamed";
 import { dropPrefetched, type TabPrefetchCtx } from "./lib/db/prefetch";
@@ -623,7 +624,7 @@ export default function App() {
   // Tab chỉ có từng sàn (report, Ads, kế hoạch) thì "Tổng" quy về sàn đầu.
   const singlePlatform: ReportPlatform = platformScope;
   // Mọi tab của workspace brand chỉ nhận ca/ca mở/studio ĐÚNG SÀN (brand khác giữ nguyên vì engine/OpsSupport đọc lịch toàn agency).
-  const inScope = (x: { brandId?: string; platform?: string | null }) => x.brandId !== currentBrandId || (x.platform === "Shopee" ? "Shopee" : "TikTok") === platformScope;
+  const inScope = (x: { brandId?: string; platform?: string | null }) => x.brandId !== currentBrandId || platformOf(x) === platformScope;
   const platformSessions = useMemo(() => (effectiveWorkspace.type === "brand" ? activeSessions.filter(inScope) : activeSessions), [effectiveWorkspace.type, activeSessions, currentBrandId, platformScope]); // eslint-disable-line react-hooks/exhaustive-deps
   const platformSlots = useMemo(() => (effectiveWorkspace.type === "brand" ? shiftSlots.filter(inScope) : shiftSlots), [effectiveWorkspace.type, shiftSlots, currentBrandId, platformScope]); // eslint-disable-line react-hooks/exhaustive-deps
   const platformBrandStudios = useMemo(() => (effectiveWorkspace.type === "brand" ? brandStudios.filter(inScope) : brandStudios), [effectiveWorkspace.type, brandStudios, currentBrandId, platformScope]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1304,18 +1305,16 @@ export default function App() {
   const AGENCY_NAV_GROUPS = agencyNavGroups(currentRole);
   const BRAND_NAV_GROUPS = brandNavGroups(currentRole);
 
-  // Workspace Shopee bỏ tab chỉ có dữ liệu TikTok (Affiliate, SKU từ file sản phẩm TikTok Shop).
-  const SHOPEE_HIDDEN_TABS = new Set(["brand_affiliate", "brand_skus"]);
+  // Tab không có nguồn dữ liệu ở sàn đang xem (hồ sơ sàn: Shopee không có Affiliate/SKU từ file TikTok Shop).
+  const hiddenBrandTabs = new Set(profileOf(platformScope).hiddenBrandTabs);
   const navGroups =
     effectiveWorkspace.type === "brand"
-      ? platformScope === "Shopee"
-        ? BRAND_NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => !SHOPEE_HIDDEN_TABS.has(i.id)) }))
-        : BRAND_NAV_GROUPS
+      ? BRAND_NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => !hiddenBrandTabs.has(i.id)) }))
       : isOpsRole
         ? filterAgencyNav(AGENCY_NAV_GROUPS, agencyPlatform)
         : AGENCY_NAV_GROUPS;
   // Brand chạy sàn của workspace agency đang mở — danh sách brand của mọi màn số liệu agency.
-  const agencyBrands = useMemo(() => brands.filter((b) => (brandPlatformsMap[b.id] ?? ["TikTok"]).includes(agencyPlatformState)), [brands, brandPlatformsMap, agencyPlatformState]);
+  const agencyBrands = useMemo(() => brands.filter((b) => (brandPlatformsMap[b.id] ?? []).includes(agencyPlatformState)), [brands, brandPlatformsMap, agencyPlatformState]);
   const navItems = navGroups.flatMap((g) => g.items);
 
   // Phần lớn thông báo là về MỘT CA của chính người nhận (xếp/rút/đổi giờ/huỷ/đối soát). Q4 (audit

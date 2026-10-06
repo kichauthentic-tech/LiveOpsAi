@@ -20,6 +20,8 @@ import { DataRawImportStamp, fetchDataRawImportStamps } from "../db/brandDataRaw
 import { fetchSnapshotPieces } from "../db/monthlyReportSnapshots";
 import { giftSliceFromAgg, type GiftSlice } from "./deepAnalysis";
 import { hasLiveNumbers, sessionsInRange } from "./sessionsLivePerf";
+import { platformOf } from "../reportPlatform";
+import { PLATFORM_PROFILES } from "../platforms/profiles";
 
 // Bản chụp số liệu Report Tháng (2026-09-25, migration 0119).
 //
@@ -39,6 +41,9 @@ import { hasLiveNumbers, sessionsInRange } from "./sessionsLivePerf";
 // so cùng số ngày). Bản chụp v1 vẫn đọc được; phần thiếu hiện "bấm Cập nhật số liệu".
 // v3 (2026-09-26): ca lưu thêm coHostId/coHostName — bảng "Host Theo Loại Ngày" ghi giờ trợ live.
 // Bản chụp v2 không có trợ live ⇒ cột đó trống, report nhắc bấm cập nhật.
+// Report Tháng (bản này) là report của sàn TikTok; Shopee có bản chụp riêng (shopeeSnapshot.ts).
+const REPORT_PLATFORM_OF_SNAPSHOT = PLATFORM_PROFILES.TikTok.id;
+
 export const SNAPSHOT_VERSION = 3;
 // Piece v2 (2026-09-27, gộp Phân tích sâu vào Report Tháng): skuRank thêm skusFor80Pct; topPromo thêm
 // discount/ROI từng chương trình, tổng giảm giá, top chương trình dài hạn. Bản chụp piece v1 báo "công thức
@@ -232,7 +237,7 @@ function windowSessions(sessions: LiveSession[], brandId: string, month: string)
   const start = monthBounds(win[0]).start;
   const end = monthBounds(month).end;
   return sessions.filter(
-    (s) => s.brandId === brandId && (s.platform ?? "TikTok") === "TikTok" && s.date >= start && s.date <= end && s.status !== "Cancelled"
+    (s) => s.brandId === brandId && platformOf(s) === REPORT_PLATFORM_OF_SNAPSHOT && s.date >= start && s.date <= end && s.status !== "Cancelled"
   );
 }
 

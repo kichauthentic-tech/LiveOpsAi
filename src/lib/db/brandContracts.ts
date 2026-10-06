@@ -1,7 +1,7 @@
 import { supabase } from "../supabaseClient";
 import { BrandContract, BrandMonthlyCommitment, GenerateCommitmentsResult } from "../../types";
 import { prefetchable } from "./prefetch";
-import type { ReportPlatform } from "../reportPlatform";
+import { platformOf, type ReportPlatform } from "../reportPlatform";
 
 // Lớp cam kết hợp đồng (migration 0081). RLS chỉ mở cho ceo/admin/operations — talent và role
 // brand query thẳng 2 bảng này sẽ ra rỗng chứ không ra lỗi, nên đừng dựa vào "fetch được = có
@@ -42,7 +42,7 @@ function contractFromDb(row: DbBrandContract): BrandContract {
     endMonth: row.end_month ?? undefined,
     monthlyHours: row.monthly_hours,
     monthlyGmv: row.monthly_gmv ?? undefined,
-    platform: row.platform === "Shopee" ? "Shopee" : "TikTok",
+    platform: platformOf(row),
     status: row.status,
     note: row.note ?? undefined
   };
@@ -54,7 +54,7 @@ function commitmentFromDb(row: DbBrandMonthlyCommitment): BrandMonthlyCommitment
     brandId: row.brand_id,
     contractId: row.contract_id ?? undefined,
     periodMonth: row.period_month,
-    platform: row.platform === "Shopee" ? "Shopee" : "TikTok",
+    platform: platformOf(row),
     committedHours: row.committed_hours,
     committedGmv: row.committed_gmv ?? undefined,
     isOverride: row.is_override,
@@ -90,7 +90,7 @@ export async function createBrandContract(input: Omit<BrandContract, "id">): Pro
       end_month: input.endMonth || null,
       monthly_hours: input.monthlyHours,
       monthly_gmv: input.monthlyGmv ?? null,
-      platform: input.platform ?? "TikTok",
+      platform: platformOf(input),
       status: input.status,
       note: input.note || null
     })
@@ -109,7 +109,7 @@ export async function updateBrandContract(id: string, input: Omit<BrandContract,
       end_month: input.endMonth || null,
       monthly_hours: input.monthlyHours,
       monthly_gmv: input.monthlyGmv ?? null,
-      platform: input.platform ?? "TikTok",
+      platform: platformOf(input),
       status: input.status,
       note: input.note || null
     })
@@ -171,7 +171,7 @@ export async function upsertMonthlyCommitment(input: {
       {
         brand_id: input.brandId,
         period_month: input.periodMonth,
-        platform: input.platform ?? "TikTok",
+        platform: platformOf(input),
         committed_hours: input.committedHours,
         committed_gmv: input.committedGmv ?? null,
         contract_id: input.contractId ?? null,
@@ -233,7 +233,7 @@ export async function fetchBrandCommitmentProgress(brandId: string): Promise<Bra
   return ((data as DbBrandCommitmentRow[]) ?? []).map((r) => ({
     brandId: r.brand_id,
     periodMonth: r.period_month,
-    platform: r.platform === "Shopee" ? "Shopee" : "TikTok",
+    platform: platformOf(r),
     committedHours: num(r.committed_hours),
     committedGmv: r.committed_gmv == null ? undefined : num(r.committed_gmv),
     isOverride: !!r.is_override,

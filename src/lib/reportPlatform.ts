@@ -15,7 +15,18 @@ export type PlatformScope = ReportPlatform;
 export const PLATFORM_SCOPE_LABEL: Record<PlatformScope, string> = { TikTok: "TikTok", Shopee: "Shopee" };
 
 /** Sàn của một dòng (ca, ca mở, kế hoạch…). Dòng cũ thiếu cột sàn = TikTok. */
-export const platformOf = (x: { platform?: string | null }): ReportPlatform => (x.platform === "Shopee" ? "Shopee" : "TikTok");
+export const platformOf = (x: { platform?: string | null }): ReportPlatform =>
+  (REPORT_PLATFORMS as readonly string[]).includes(x.platform ?? "") ? (x.platform as ReportPlatform) : LEGACY_PLATFORM;
+
+/** Sàn mặc định của dòng cũ (trước 0139 mọi thứ là TikTok) — khoá Map của sàn này không có hậu tố. */
+export const LEGACY_PLATFORM: ReportPlatform = "TikTok";
+
+/** Hậu tố khoá của sàn trong id việc / khoá cũ: TikTok "" (giữ khoá cũ), sàn khác "-shopee". */
+export const platformIdSuffix = (p: ReportPlatform) => (p === LEGACY_PLATFORM ? "" : `-${p.toLowerCase()}`);
+
+/** Tên kênh hiện trên màn: "VERA · Shopee"; brand chỉ một kênh trên sàn mặc định thì giữ tên brand ("CROCS"). */
+export const channelTitle = (brandName: string, platform: ReportPlatform, multi: boolean) =>
+  multi || platform !== LEGACY_PLATFORM ? `${brandName} · ${platform}` : brandName;
 
 export const inPlatformScope = (s: { platform?: string | null }, scope: PlatformScope) => platformOf(s) === scope;
 
@@ -24,10 +35,10 @@ export const inPlatformScope = (s: { platform?: string | null }, scope: Platform
  * "brandId|YYYY-MM" (mọi nơi đọc trước 0139 đều là TikTok); Shopee thêm hậu tố "|Shopee".
  */
 export const brandMonthKey = (brandId: string, month: string, platform: ReportPlatform | string | null | undefined = "TikTok") =>
-  `${brandId}|${month.slice(0, 7)}${platform === "Shopee" ? "|Shopee" : ""}`;
+  `${brandId}|${month.slice(0, 7)}${platformOf({ platform }) === LEGACY_PLATFORM ? "" : `|${platformOf({ platform })}`}`;
 
 /** Khoá brand × sàn (Map kế hoạch theo tháng: brandId cho TikTok, "brandId|Shopee" cho Shopee). */
 export const brandPlatformKey = (brandId: string, platform: ReportPlatform | string | null | undefined = "TikTok") =>
-  platform === "Shopee" ? `${brandId}|Shopee` : brandId;
+  platformOf({ platform }) === LEGACY_PLATFORM ? brandId : `${brandId}|${platformOf({ platform })}`;
 
 export const sessionBrandMonthKey = (s: Pick<LiveSession, "brandId" | "date" | "platform">) => brandMonthKey(s.brandId, s.date, s.platform);

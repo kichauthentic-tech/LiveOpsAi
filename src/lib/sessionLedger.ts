@@ -1,5 +1,6 @@
 import { LiveSession, UserRole } from "../types";
 import { assertOnePlatform } from "./platforms/perf";
+import { profileOf } from "./platforms/profiles";
 import { SnapshotCounters, SnapshotRatios, computeSnapshotRatios } from "./liveSnapshot/metrics";
 import { dataQuality, DataQuality, isCountable, sessionHours } from "./performance/hostPerformance";
 
@@ -28,7 +29,7 @@ export function hasSnapshot(s: LiveSession): boolean {
 // Ca TikTok giao ca bằng file (Creator-Live-Performance là file của TikTok); ca Shopee không có file theo ca — giao ca
 // bằng link dashboard + số, số chốt đến từ Live List ở Đối Soát.
 export function needsSnapshotFile(s: Pick<LiveSession, "platform">): boolean {
-  return s.platform !== "Shopee";
+  return profileOf(s).handover === "file";
 }
 
 export function hasReport(s: LiveSession): boolean {

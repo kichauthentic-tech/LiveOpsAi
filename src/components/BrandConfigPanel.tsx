@@ -7,9 +7,10 @@ import { generateThroughMonth, monthKeyOf, todayVn } from "../lib/performance/br
 import { rateOf } from "../lib/brandPricing";
 import { errorMessage } from "../lib/errorMessage";
 import { fmtDateVn, fmtMonth, fmtVndFull, fmtVndShort } from "../lib/format";
-import { type ReportPlatform } from "../lib/reportPlatform";
+import { platformOf, type ReportPlatform } from "../lib/reportPlatform";
 import { useConfirm } from "../hooks/useConfirm";
 import { MonthPicker } from "./common/MonthPicker";
+import { profileOf } from "../lib/platforms/profiles";
 
 // "Hợp đồng & giá" của MỘT brand — chỗ nhập DUY NHẤT cho mọi điều khoản thương mại (gộp cấu hình 06/10, user: "đưa
 // vào cấu hình đúng 1 chỗ ở CRM"). Trước đó: đơn giá/hoa hồng/hoàn huỷ ở nút Rate Card trong CRM, hợp đồng + giờ cam
@@ -129,10 +130,10 @@ function ChannelInfo({ channel, platform, canEdit, onSave }: { channel?: BrandCh
         <>
           <label className="flex-1 min-w-[10rem] text-[11px] text-[var(--text-muted)] space-y-1">
             <span className="block">Tên gian hàng</span>
-            <input id={`ch-name-${platform}`} value={shopName} onChange={(e) => setShopName(e.target.value)} disabled={!canEdit} placeholder={platform === "Shopee" ? "Tên shop trên Shopee" : "Tên shop trên TikTok Shop"} className={inputCls} />
+            <input id={`ch-name-${platform}`} value={shopName} onChange={(e) => setShopName(e.target.value)} disabled={!canEdit} placeholder={profileOf(platform).shopNamePlaceholder} className={inputCls} />
           </label>
           <label className="flex-1 min-w-[10rem] text-[11px] text-[var(--text-muted)] space-y-1">
-            <span className="block">{platform === "Shopee" ? "Shop ID" : "Handle / Shop ID"}</span>
+            <span className="block">{profileOf(platform).shopRefLabel}</span>
             <input id={`ch-ref-${platform}`} value={shopRef} onChange={(e) => setShopRef(e.target.value)} disabled={!canEdit} placeholder="Để đối chiếu file tải về" className={inputCls} />
           </label>
           {canEdit && (
@@ -189,7 +190,7 @@ export const BrandConfigPanel: React.FC<Props> = ({
     [rateHistory, brand.id, platform]
   );
   const myContracts = useMemo(
-    () => contracts.filter((c) => c.brandId === brand.id && (c.platform ?? "TikTok") === platform).sort((a, b) => b.startMonth.localeCompare(a.startMonth)),
+    () => contracts.filter((c) => c.brandId === brand.id && platformOf(c) === platform).sort((a, b) => b.startMonth.localeCompare(a.startMonth)),
     [contracts, brand.id, platform]
   );
   // Cam kết từng tháng: từ 3 tháng trước tới mọi tháng đã sinh phía sau (lịch sử xa hơn không cần để nhập hợp đồng).
@@ -201,7 +202,7 @@ export const BrandConfigPanel: React.FC<Props> = ({
   const monthRows = useMemo(
     () =>
       commitments
-        .filter((c) => c.brandId === brand.id && (c.platform ?? "TikTok") === platform && c.periodMonth >= fromMonth)
+        .filter((c) => c.brandId === brand.id && platformOf(c) === platform && c.periodMonth >= fromMonth)
         .sort((a, b) => a.periodMonth.localeCompare(b.periodMonth)),
     [commitments, brand.id, platform, fromMonth]
   );

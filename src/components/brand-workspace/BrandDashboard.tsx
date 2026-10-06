@@ -23,19 +23,9 @@ import {
   walkForward,
   weeklySeries
 } from "../../lib/performance/slotInsights";
-import { compareWindow, driverBreakdown, DRIVER_LABEL, liveStatsFromRows, LiveStats } from "../../lib/report/monthlyReportInsights";
+import { compareWindow } from "../../lib/report/monthlyReportInsights";
 import { hasLiveNumbers, sessionToLivePerfRow } from "../../lib/report/sessionsLivePerf";
-import { fmtKeyMetric, KEY_METRICS, KEY_METRIC_GROUPS, KeyMetricDef, keyMetricValue } from "../../lib/report/keyMetrics";
-import {
-  fmtShopeeMetric,
-  shopeeDriverBreakdown,
-  shopeeKeyMetricsOfSessions,
-  shopeeMetricValue,
-  SHOPEE_DRIVER_LABEL,
-  SHOPEE_METRICS,
-  SHOPEE_METRIC_GROUPS,
-  type ShopeeMetricDef
-} from "../../lib/report/shopeeKeyMetrics";
+import { profileOf, type MetricDefView } from "../../lib/platforms/profiles";
 import { controlGroup, controlLabel, liveGmvByDate, controlVerdict, hostReliability, isBorderline, reliabilityText, VERDICT_TEXT } from "../../lib/report/deepAnalysis";
 import { isCountable, sessionHours } from "../../lib/performance/hostPerformance";
 import { sessionDurationHours } from "../../lib/pnl";
@@ -44,7 +34,7 @@ import { METRIC, metricHint } from "../../lib/metricGlossary";
 import { PageHeader } from "../common/PageHeader";
 import OpsSupport, { prefetchOpsSupport } from "../OpsSupport";
 import { MonthPicker } from "../common/MonthPicker";
-import { type ReportPlatform } from "../../lib/reportPlatform";
+import { channelTitle, platformOf, type ReportPlatform } from "../../lib/reportPlatform";
 
 // Dashboard brand (2026-09-28) — màn TRONG tháng cho ops: tháng này tới đâu, vì sao, tuần tới / tháng sau
 // sửa gì. Report Tháng vẫn là bản chụp SAU tháng gửi brand; hai màn dùng CHUNG hàm (compareWindow,
@@ -105,8 +95,6 @@ const Stat: React.FC<{ label: string; value: string; hint?: React.ReactNode; ton
   </div>
 );
 
-const statsOf = (sessions: LiveSession[], start: string, end: string): LiveStats =>
-  liveStatsFromRows(sessions.filter((s) => s.date >= start && s.date <= end && hasLiveNumbers(s)).map(sessionToLivePerfRow), start, end);
 
 // Lượt đọc riêng của màn — nạp trước trong lúc chờ đợt nạp chung (lib/db/prefetch.ts). Chỉ ops (hoặc role chưa
 // biết): role brand mặc định xem tháng phát hành gần nhất, tính từ ca — chưa biết trước khi đợt chung về.
@@ -131,11 +119,11 @@ function BrandDashboardOne({ brandId, brandName, platform, platforms, sessions: 
   const today = todayVn();
   const isOps = OPS_ROLES.includes(currentRole);
   // Ca/slot của brand khác giữ nguyên (OpsSupport đọc lịch toàn agency); của brand này chỉ giữ ĐÚNG SÀN.
-  const sessions = useMemo(() => allSessions.filter((s) => s.brandId !== brandId || (s.platform ?? "TikTok") === platform), [allSessions, brandId, platform]);
-  const shiftSlots = useMemo(() => allShiftSlots.filter((sl) => sl.brandId !== brandId || (sl.platform ?? "TikTok") === platform), [allShiftSlots, brandId, platform]);
+  const sessions = useMemo(() => allSessions.filter((s) => s.brandId !== brandId || platformOf(s) === platform), [allSessions, brandId, platform]);
+  const shiftSlots = useMemo(() => allShiftSlots.filter((sl) => sl.brandId !== brandId || platformOf(sl) === platform), [allShiftSlots, brandId, platform]);
   const brandSessions = useMemo(() => sessions.filter((s) => s.brandId === brandId), [sessions, brandId]);
-  const isShopee = platform === "Shopee";
-  const titleName = platforms.length > 1 || isShopee ? `${brandName} · ${platform}` : brandName;
+  const prof = profileOf(platform);
+  const titleName = channelTitle(brandName, platform, platforms.length > 1);
   // Brand: mặc định tháng gần nhất đã phát hành (tháng đang chạy bị che số tới khi phát hành — 0107).
   const defaultMonth = useMemo(() => {
     if (isOps) return today.slice(0, 7);
@@ -175,13 +163,10 @@ function BrandDashboardOne({ brandId, brandName, platform, platforms, sessions: 
 
   // ---- KPI so cùng kỳ (cắt theo ngày cuối có số — compareWindow, như Report Tháng)
   const win = useMemo(() => compareWindow(month, through), [month, through]);
-  const cur = useMemo(() => statsOf(brandSessions, win.curStart, win.curEnd), [brandSessions, win]);
-  const prev = useMemo(() => statsOf(brandSessions, win.prevStart, win.prevEnd), [brandSessions, win]);
-  const drivers = useMemo(() => (isShopee ? null : driverBreakdown(prev, cur)), [isShopee, prev, cur]);
-  // Sàn Shopee có bộ chỉ số RIÊNG (Viewers/ATC/CO/GPM/Xu), không mượn 18 chỉ số TikTok — file Shopee không có impressions/click/CTOR.
-  const sCur = useMemo(() => (isShopee ? shopeeKeyMetricsOfSessions(brandSessions.filter((s) => s.date >= win.curStart && s.date <= win.curEnd && hasLiveNumbers(s)), sessionHours) : null), [isShopee, brandSessions, win]);
-  const sPrev = useMemo(() => (isShopee ? shopeeKeyMetricsOfSessions(brandSessions.filter((s) => s.date >= win.prevStart && s.date <= win.prevEnd && hasLiveNumbers(s)), sessionHours) : null), [isShopee, brandSessions, win]);
-  const sDrivers = useMemo(() => (sCur && sPrev ? shopeeDriverBreakdown(sPrev, sCur) : null), [sCur, sPrev]);
+  // Bộ chỉ số của sàn (hồ sơ sàn): TikTok 18 chỉ số, Shopee Viewers/ATC/CO/GPM/Xu — không mượn chỉ số của sàn kia.
+  const mCur = useMemo(() => prof.metrics.ofSessions(brandSessions.filter((s) => s.date >= win.curStart && s.date <= win.curEnd && hasLiveNumbers(s)), sessionHours), [prof, brandSessions, win]);
+  const mPrev = useMemo(() => prof.metrics.ofSessions(brandSessions.filter((s) => s.date >= win.prevStart && s.date <= win.prevEnd && hasLiveNumbers(s)), sessionHours), [prof, brandSessions, win]);
+  const drivers = useMemo(() => prof.metrics.drivers(mPrev, mCur), [prof, mPrev, mCur]);
 
   // ---- Run-rate theo plan ban đầu
   const locked = !planLoading && plan?.plan.status === "locked";
@@ -198,7 +183,7 @@ function BrandDashboardOne({ brandId, brandName, platform, platforms, sessions: 
   const [shop, setShop] = useState<{ cur: ShopDaysMonthSlice; prev: ShopDaysMonthSlice } | null>(null);
   useEffect(() => {
     // Shop Analytics là file TikTok Shop — nhóm đối chứng chỉ có nghĩa với sàn TikTok.
-    if (!isOps || isShopee) return;
+    if (!isOps || !prof.hasShopAnalytics) return;
     let alive = true;
     const pm = prevMonthOf(month);
     Promise.all([shopDaysRead.take(brandId, mStart, mEnd), shopDaysRead.take(brandId, `${pm}-01`, monthEndOf(`${pm}-01`))])
@@ -207,7 +192,7 @@ function BrandDashboardOne({ brandId, brandName, platform, platforms, sessions: 
     return () => {
       alive = false;
     };
-  }, [isOps, isShopee, brandId, month, mStart, mEnd]);
+  }, [isOps, prof, brandId, month, mStart, mEnd]);
   // Cột live = ca agency, như Report Tháng phần 2 (Linked account của Shop Analytics đếm cả live ngoài ca).
   const agencyLive = useMemo(() => {
     const rows = liveGmvByDate(brandSessions.filter(hasLiveNumbers).map(sessionToLivePerfRow));
@@ -296,19 +281,11 @@ function BrandDashboardOne({ brandId, brandName, platform, platforms, sessions: 
   const STATE_LABEL: Record<string, string> = { done: "Đã xong", no_data: "Chưa có số", pending: "Sắp tới", cancelled: "Huỷ (giữ target)", offplan: "Ngoài kế hoạch" };
 
   /** Một ô Key Metrics: giá trị kỳ này + % đổi so với cùng kỳ (giá trị kỳ trước trong ngoặc). */
-  const metricCell = (d: KeyMetricDef, size?: "lg" | "sm") => {
-    const a = keyMetricValue(prev, d.key), b = keyMetricValue(cur, d.key);
+  const metricCell = (d: MetricDefView, size?: "lg" | "sm") => {
+    const a = prof.metrics.value(mPrev, d.key), b = prof.metrics.value(mCur, d.key);
     const ch = a && b != null ? b / a - 1 : null;
     const tone = ch == null || d.goodWhenUp == null || Math.abs(ch) < 0.02 ? "" : ch > 0 === d.goodWhenUp ? "text-emerald-400" : "text-rose-400";
-    return <Stat key={d.key} size={size} label={d.label} value={fmtKeyMetric(d, b)} hint={<span className={tone}>{signed(ch)} <span className="text-[var(--text-faint)]">({fmtKeyMetric(d, a)})</span></span>} />;
-  };
-
-  const shopeeCell = (d: ShopeeMetricDef, size?: "lg" | "sm") => {
-    if (!sCur || !sPrev) return null;
-    const a = shopeeMetricValue(sPrev, d.key), b = shopeeMetricValue(sCur, d.key);
-    const ch = a && b != null ? b / a - 1 : null;
-    const tone = ch == null || d.goodWhenUp == null || Math.abs(ch) < 0.02 ? "" : ch > 0 === d.goodWhenUp ? "text-emerald-400" : "text-rose-400";
-    return <Stat key={d.key} size={size} label={d.label} value={fmtShopeeMetric(d, b)} hint={<span className={tone}>{signed(ch)} <span className="text-[var(--text-faint)]">({fmtShopeeMetric(d, a)})</span></span>} />;
+    return <Stat key={d.key} size={size} label={d.label} value={prof.metrics.fmt(d, b)} hint={<span className={tone}>{signed(ch)} <span className="text-[var(--text-faint)]">({prof.metrics.fmt(d, a)})</span></span>} />;
   };
 
   return (
@@ -487,54 +464,28 @@ function BrandDashboardOne({ brandId, brandName, platform, platforms, sessions: 
           {/* 02b · Key Metrics — vẫn đủ 18 chỉ số + AOV (lib/report/keyMetrics.ts), nhưng phân tầng (M2):
               5 ô "Kết quả" đọc trước, 14 ô còn lại gom theo phễu live. Màu theo chiều tốt của từng chỉ số,
               trung tính thì không tô. */}
-          {isShopee ? (
-            <Card title={`Tháng ${Number(month.slice(5))} tới ${through ? dm(through) : "—"}`} icon={<Activity className="w-4 h-4 text-[var(--accent-text)]" />} sub={`So với cùng kỳ: ${win.label}. Chỉ số Shopee: GMV = doanh số đặt; ATC, CO, đơn và xu chỉ tính trên các ca có khai số đó.`}>
-              <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-                {SHOPEE_METRICS.filter((d) => d.group === "result").map((d) => shopeeCell(d, "lg"))}
-              </div>
-              {SHOPEE_METRIC_GROUPS.filter((g) => g.group !== "result").map((g) => (
-                <div key={g.group}>
-                  <p className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2" title={g.hint}>{g.label}</p>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-                    {SHOPEE_METRICS.filter((d) => d.group === g.group).map((d) => shopeeCell(d, "sm"))}
-                  </div>
+          <Card title={`Tháng ${Number(month.slice(5))} tới ${through ? dm(through) : "—"}`} icon={<Activity className="w-4 h-4 text-[var(--accent-text)]" />} sub={`So với cùng kỳ: ${win.label}${prof.metricsNote ? `. ${prof.metricsNote}` : ""}`}>
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+              {prof.metrics.defs.filter((d) => d.group === "result").map((d) => metricCell(d, "lg"))}
+            </div>
+            {prof.metrics.groups.filter((g) => g.group !== "result").map((g) => (
+              <div key={g.group}>
+                <p className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2" title={g.hint}>{g.label}</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                  {prof.metrics.defs.filter((d) => d.group === g.group).map((d) => metricCell(d, "sm"))}
                 </div>
-              ))}
-              {sCur && sCur.sessions > 0 && sCur.atcViewers < sCur.viewers * 0.5 && (
-                <p className="text-xs text-amber-300">Mới {sCur.atc > 0 || sCur.atcViewers > 0 ? "một phần" : "chưa ca nào"} có số ATC ({Math.round((sCur.atcViewers / (sCur.viewers || 1)) * 100)}% lượng Viewers) — các tỷ lệ phễu bên trên chỉ phản ánh những ca đó. Đủ số khi giao ca có khai ATC hoặc đối soát bằng Live List.</p>
-              )}
-              {(sCur?.orders ?? 0) === 0 && <p className="text-xs text-[var(--text-faint)]">Số đơn và AOV của ca Shopee chỉ có sau khi đối soát Live List ở màn Đối Soát; lúc giao ca người trực chỉ khai GMV, Viewers, ATC.</p>}
-            </Card>
-          ) : (
-            <Card title={`Tháng ${Number(month.slice(5))} tới ${through ? dm(through) : "—"}`} icon={<Activity className="w-4 h-4 text-[var(--accent-text)]" />} sub={`So với cùng kỳ: ${win.label}`}>
-              <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-                {KEY_METRICS.filter((d) => d.group === "result").map((d) => metricCell(d, "lg"))}
               </div>
-              {KEY_METRIC_GROUPS.filter((g) => g.group !== "result").map((g) => (
-                <div key={g.group}>
-                  <p className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2" title={g.hint}>{g.label}</p>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-                    {KEY_METRICS.filter((d) => d.group === g.group).map((d) => metricCell(d, "sm"))}
-                  </div>
-                </div>
-              ))}
-            </Card>
-          )}
+            ))}
+            {prof.metrics.coverageNotes(mCur).map((n) => (
+              <p key={n.text} className={`text-xs ${n.tone === "warn" ? "text-amber-300" : "text-[var(--text-faint)]"}`}>{n.text}</p>
+            ))}
+          </Card>
 
-          {/* 03 · Vì sao (ops) — Shopee: phễu Viewers → ATC → GMV, không có click/CTOR như TikTok */}
-          {isOps && isShopee && (
-            <Card title="Vì sao GMV đổi" icon={<TrendingUp className="w-4 h-4 text-[var(--accent-text)]" />} sub={`GMV = ${METRIC.liveHours} × ${METRIC.viewersPerHour} × ${METRIC.atcRate} × GMV/ATC — ${win.label}. Chỉ tính trên các ca có khai ATC.`}>
-              {sDrivers && sCur && sPrev ? (
-                <DriverBars parts={sDrivers.parts.map((p) => ({ label: SHOPEE_DRIVER_LABEL[p.key], change: p.change / 100 }))} total={sCur.atcGmv / (sPrev.atcGmv || 1) - 1} />
-              ) : (
-                <p className="text-xs text-[var(--text-faint)]">Chưa tách được: cần cả kỳ này và kỳ trước đều có ca Shopee khai số ATC (lúc giao ca hoặc đối soát Live List). Nguồn traffic và nhóm đối chứng của Shopee xem ở Report Tháng Shopee.</p>
-              )}
-            </Card>
-          )}
-          {isOps && !isShopee && drivers && (
-            <Card title="Vì sao GMV đổi" icon={<TrendingUp className="w-4 h-4 text-[var(--accent-text)]" />} sub={`GMV = ${METRIC.liveHours} × ${METRIC.viewsPerHour} × ${METRIC.liveCtr} × ${METRIC.ctor} × ${METRIC.aov} — ${win.label}`}>
-              <DriverBars parts={drivers.parts.map((p) => ({ label: DRIVER_LABEL[p.key], change: p.change / 100 }))} total={cur.gmv / (prev.gmv || 1) - 1} />
-              {control.length > 0 ? (
+          {/* 03 · Vì sao (ops) — phễu của sàn (hồ sơ sàn): TikTok Views/giờ × LIVE CTR × CTOR × AOV, Shopee Viewers/giờ × ATC/Viewer × GMV/ATC */}
+          {isOps && (
+            <Card title="Vì sao GMV đổi" icon={<TrendingUp className="w-4 h-4 text-[var(--accent-text)]" />} sub={`${prof.metrics.driverFormula} — ${win.label}`}>
+              {drivers ? <DriverBars parts={drivers.parts} total={drivers.total} /> : <p className="text-xs text-[var(--text-faint)]">{prof.metrics.driverEmptyHint}</p>}
+              {!prof.hasShopAnalytics ? null : control.length > 0 ? (
                 <ul className="text-xs text-[var(--text-muted)] space-y-1">
                   <li className="text-[var(--text-faint)]">Nhóm đối chứng — live = ca agency, phần còn lại của shop = Total GMV trừ {`Seller LIVE`}; cùng cách tính với Report Tháng:</li>
                   {control.map((r) => {
@@ -548,11 +499,7 @@ function BrandDashboardOne({ brandId, brandName, platform, platforms, sessions: 
                   })}
                 </ul>
               ) : (
-                <p className="text-xs text-[var(--text-faint)]">
-                  {isShopee
-                    ? "Nhóm đối chứng dùng Shop Analytics của TikTok Shop — với Shopee chưa so được với phần còn lại của shop (xem Report Shopee phần nguồn traffic)."
-                    : "Chưa có Shop Analytics cho kỳ này ở Dữ Liệu Gốc — chưa so được với phần còn lại của shop."}
-                </p>
+                <p className="text-xs text-[var(--text-faint)]">Chưa có Shop Analytics cho kỳ này ở Dữ Liệu Gốc — chưa so được với phần còn lại của shop.</p>
               )}
             </Card>
           )}

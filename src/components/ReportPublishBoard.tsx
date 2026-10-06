@@ -8,10 +8,9 @@ import { BrandLogo } from "./ui/BrandLogo";
 import { useConfirm } from "../hooks/useConfirm";
 import { fetchMonthlyReportSnapshot, saveMonthlyReportSnapshot } from "../lib/db/monthlyReportSnapshots";
 import { fetchDataRawImportStamps } from "../lib/db/brandDataRaw";
-import { buildMonthlyReportSnapshot, snapshotFreshness } from "../lib/report/monthlySnapshot";
-import { shopeeSnapshotFreshness, shopeeStampsFor, type ShopeeReportSnapshot } from "../lib/report/shopeeSnapshot";
-import { buildShopeeReportSnapshot } from "../lib/report/shopeeSnapshotBuild";
-import { type ReportPlatform } from "../lib/reportPlatform";
+import { type MonthlyReportSnapshot } from "../lib/report/monthlySnapshot";
+import { REPORT_ENGINES, type AnySnapshot } from "../lib/report/reportEngines";
+import { brandMonthKey, type ReportPlatform } from "../lib/reportPlatform";
 import { PageIntro } from "./common/PageIntro";
 
 // Bảng điều phối phát hành report (còn lại của Đợt C, Audit Role × Workspace — xem
@@ -59,10 +58,10 @@ const monthRange = (month: string): { start: string; end: string } => {
 export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ platform, brands, sessions, brandPlatformRates, planMonthTotals, monthlyReports, onReportsChanged }) => {
   const confirm = useConfirm();
   const today = getTodayMonth();
-  // Hai report độc lập theo sàn (0139): bảng này hiện một sàn một lúc.
-  const isShopee = platform === "Shopee";
-  // Khoá dòng report trong Map trung tâm: TikTok giữ "brandId|YYYY-MM", Shopee có hậu tố.
-  const reportKey = (brandId: string, month: string) => `${brandId}|${month}${isShopee ? "|Shopee" : ""}`;
+  // Hai report độc lập theo sàn (0139): bảng này hiện một sàn một lúc; dựng / kiểm độ mới bằng engine của sàn.
+  const engine = REPORT_ENGINES[platform];
+  // Khoá dòng report trong Map trung tâm (brandMonthKey: TikTok giữ "brandId|YYYY-MM", sàn khác có hậu tố).
+  const reportKey = (brandId: string, month: string) => brandMonthKey(brandId, month, platform);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [rowError, setRowError] = useState<Record<string, string>>({});
 
@@ -117,19 +116,9 @@ export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ platform
       const [stored, stamps] = await Promise.all([fetchMonthlyReportSnapshot(brandId, month, platform), fetchDataRawImportStamps(brandId)]);
       hasStored = !!stored;
       if (stored) {
-        const sf = isShopee
-          ? shopeeSnapshotFreshness(stored.snapshot as unknown as ShopeeReportSnapshot, { sessions, stamps: shopeeStampsFor(stamps, month) })
-          : null;
-        const f = isShopee ? null : snapshotFreshness(stored.snapshot, { sessions, planMonthTotals, brandPlatformRates, imports: stamps });
-        const upToDate = isShopee ? sf!.upToDate : f!.upToDate;
-        if (!upToDate) {
-          const why = isShopee
-            ? [sf!.sessionsChanged ? "ca Shopee đổi số/lịch/người" : "", sf!.filesChanged ? "file Shopee mới" : "", sf!.formulaChanged ? "cách tính mới (Ads, xu)" : ""].filter(Boolean).join(" · ")
-            : [
-                f!.changedSessionsThisMonth > 0 ? `${f!.changedSessionsThisMonth} ca trong tháng đổi số/lịch` : "",
-                f!.changedFiles.length > 0 ? `file mới: ${f!.changedFiles.join(", ")}` : "",
-                f!.configChanged ? "target/rate/công thức đổi" : ""
-              ].filter(Boolean).join(" · ");
+        const f = engine.freshness(stored.snapshot as AnySnapshot, { sessions, planMonthTotals, brandPlatformRates, stamps, month });
+        if (!f.upToDate) {
+          const why = f.changes.join(" · ");
           if (!(await confirm(`Bản chụp số ${platform} của ${fmtMonthLabel(month)} (${brandName}) đã cũ so với dữ liệu hiện tại${why ? `: ${why}` : ""}.\n\nĐồng ý = cập nhật bản chụp theo số mới rồi phát hành. Muốn xem lại số trước thì Huỷ và mở Report Tháng.`))) return;
           refresh = true;
         }
@@ -154,10 +143,9 @@ export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ platform
       // Tháng chưa từng bấm "Tạo report" → chốt số trước (cùng hành vi nút Phát hành ở Report Tháng).
       // Đã có bản chụp thì giữ nguyên: phát hành là gửi đúng số ops đã chốt.
       if (refresh || !hasStored) {
-        const snapshot = isShopee
-          ? ((await buildShopeeReportSnapshot({ brandId, month, sessions })) as unknown as Awaited<ReturnType<typeof buildMonthlyReportSnapshot>>["snapshot"])
-          : (await buildMonthlyReportSnapshot({ brandId, month, sessions, planMonthTotals, brandPlatformRates })).snapshot;
-        await saveMonthlyReportSnapshot(brandId, month, snapshot, platform);
+        const { snapshot } = await engine.build({ brandId, month, sessions, planMonthTotals, brandPlatformRates });
+        // Bảng bản chụp lưu jsonb — mỗi sàn một hình dạng; lớp db gõ theo bản TikTok.
+        await saveMonthlyReportSnapshot(brandId, month, snapshot as MonthlyReportSnapshot, platform);
       }
       await publishMonthlyReport(row.id, force);
       onReportsChanged();

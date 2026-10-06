@@ -2,6 +2,7 @@ import { supabase } from "../supabaseClient";
 import { assertAffected } from "./assertAffected";
 import { fetchAllPages } from "./fetchAllPages";
 import { LiveSession, LiveSessionReport, StaffCheckpoint, StaffSegment, UserRole } from "../../types";
+import { platformOf } from "../reportPlatform";
 
 // brands/studios/talents are all real Supabase tables now (Phases 1/3) and every
 // UI form selects these IDs from the real lists — no more free-text fallback, so
@@ -244,7 +245,7 @@ function sessionToDb(s: LiveSession) {
     assistant_name: s.assistantName ?? "",
     co_host_id: orNull(s.coHostId),
     co_host_name: s.coHostName ?? "",
-    platform: s.platform ?? "TikTok",
+    platform: platformOf(s),
     date: s.date,
     start_time: s.startTime,
     end_time: s.endTime,

@@ -38,7 +38,18 @@
     Verify: replay 0001→0149 sạch, `supabase/tests/0149_brand_channels.sql` 19/19 + 11 bộ kiểm SQL cũ xanh trên chuỗi mới (đã thêm
     khối tạo kênh cho brand thử; 0138 8c theo 0147, 0139/0140 "sàn lạ" theo trigger kênh); vitest 613/613, lint 0 lỗi, audit:dead 0;
     bản dev nối DB thật (chưa có bảng) suy đủ 7 kênh, 10 màn không lỗi. Chưa đo: thêm kênh thật qua UI (cần 0149).
-  - Bước tiếp: 2 hồ sơ sàn (`src/lib/platforms/`) → 3 gộp menu (1 workspace Agency + 1 mỗi brand, bộ lọc
+  - **Bước 2 XONG (07/10, không migration): HỒ SƠ SÀN.** `src/lib/platforms/profiles.ts` (`PLATFORM_PROFILES`, `profileOf(sàn | dòng)`):
+    nhãn, màu chip, định nghĩa GMV, "phòng"/"phiên", Views/Viewers, cách giao ca (`handover: file|link`, `handoverThird`, xu), số lúc đổi host,
+    bộ đếm TikTok trong Cửa sổ Ca, file đối soát, loại Dữ Liệu Gốc + file Ads, tab ẩn, Shop Analytics, phễu (`funnel`), ô KPI CEO, và
+    `metrics` = bộ chỉ số tầng 2 (`defs`, `groups`, `ofSessions`, `value`, `fmt`, `drivers`, `coverageNotes`, `hostRanking`). Report Tháng /
+    Điều Phối Phát Hành dùng `lib/report/reportEngines.ts` (`REPORT_ENGINES[sàn]`: build, freshness, coverage, headlineChange); khung hiển thị
+    `REPORT_VIEWS`, khung Ads `ADS_PANELS`, bộ đọc file đối soát `RECON_FILE_READERS` — đều `Record<ReportPlatform, …>` (thêm sàn mà quên là lỗi
+    compile). `platformOf` / `brandMonthKey` / `channelTitle` / `platformIdSuffix` / `LEGACY_PLATFORM` ở `lib/reportPlatform.ts`. Số nhánh so
+    tên sàn ngoài lõi: ~210 ⇒ 0 (`tests/platformProfiles.test.ts` quét; chỉ `lib/platforms/`, `lib/reportPlatform.ts`, `server/`, `lib/appNav.ts`
+    — appNav gỡ ở Bước 3). Kèm sửa lỗi có từ trước: Report Tháng sập một nhịp khi chuyển VERA·Shopee → CROCS (bản chụp kênh cũ còn trong state ⇒
+    nay khoá theo brand|tháng|sàn); Nhập Ads Shopee không còn đọc file Ads TikTok ngầm. Verify: vitest 619/619, lint 0 lỗi, audit:dead 0, build;
+    bản dev nối DB thật: 21 màn hai sàn không lỗi, VERA·Shopee hiện Viewers/ATC/phễu Shopee, CROCS hiện CTOR/phễu TikTok, CEO Shopee ô Viewers/GPM.
+  - Bước tiếp: 3 gộp menu (1 workspace Agency + 1 mỗi brand, bộ lọc
     kênh) → 4 số liệu chuẩn (thang nguồn số, Live List ⇒ ATC/CO/Xu, CEO + P&L theo kênh) → 5 chạy thật 2–4 tuần.
 
 - **CHẠY THỬ THẬT trên dữ liệu thật** (từ 2026-09-18; mock đã xoá sạch 19/09). DB: 33 hồ sơ talent thật, CROCS T6–T9 nạp

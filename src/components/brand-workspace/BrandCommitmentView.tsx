@@ -15,7 +15,7 @@ import { metricsHiddenFor } from "../../lib/sessionLedger";
 import { downloadRowsAsXlsx } from "../../lib/exportXlsx";
 import { useToast } from "../../hooks/useToast";
 import { PageHeader } from "../common/PageHeader";
-import type { ReportPlatform } from "../../lib/reportPlatform";
+import { channelTitle, platformOf, type ReportPlatform } from "../../lib/reportPlatform";
 import { BrandRateCard } from "../BrandRateCard";
 
 // Hợp Đồng — bản CHỈ ĐỌC cho Brand Workspace (Đợt C/1, migration 0108): cam kết giờ + giá của brand × sàn.
@@ -174,7 +174,7 @@ export const BrandCommitmentView: React.FC<BrandCommitmentViewProps> = ({
   const monthHasHiddenMetrics = useMemo(() => {
     const map = new Map<string, boolean>();
     for (const s of sessions) {
-      if (s.brandId !== brandId || (s.platform ?? "TikTok") !== platform) continue;
+      if (s.brandId !== brandId || platformOf(s) !== platform) continue;
       const k = monthKeyOf(s.date);
       if (!map.has(k)) map.set(k, metricsHiddenFor(s, currentRole));
     }
@@ -217,8 +217,7 @@ export const BrandCommitmentView: React.FC<BrandCommitmentViewProps> = ({
         icon={FileSignature}
         title={
           <>
-            Hợp Đồng · {brandName}
-            {(multiPlatform || platform === "Shopee") && ` · ${platform}`}
+            Hợp Đồng · {channelTitle(brandName, platform, multiPlatform)}
             {contractCode && <span className="ml-2 text-sm font-bold text-[var(--text-faint)]">· {contractCode}</span>}
           </>
         }

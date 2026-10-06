@@ -55,10 +55,7 @@ export function computeTalentRealTotals(sessions: LiveSession[], talentId: strin
     assistSessionCount: assisted.length,
     assistHours,
     hours,
-    perf: {
-      TikTok: perfOf(completed.filter((s) => platformOf(s) === "TikTok")),
-      Shopee: perfOf(completed.filter((s) => platformOf(s) === "Shopee"))
-    }
+    perf: Object.fromEntries(REPORT_PLATFORMS.map((p) => [p, perfOf(completed.filter((s) => platformOf(s) === p))])) as Record<ReportPlatform, TalentPlatformPerf>
   };
 }
 

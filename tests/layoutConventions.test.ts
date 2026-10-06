@@ -133,12 +133,13 @@ test("Key Metrics: đủ 19 chỉ số (18 + AOV), chỉ số nào cũng có nh�
 test("Dashboard brand: Run-rate so target đứng TRƯỚC lưới Key Metrics", () => {
   const src = readFileSync(join(SRC, "components/brand-workspace/BrandDashboard.tsx"), "utf8");
   const runRate = src.indexOf('title="Run-rate so với target plan"');
-  const keyMetrics = src.indexOf('KEY_METRICS.filter((d) => d.group === "result")');
+  // Bước 2 đa sàn: lưới đọc bộ chỉ số của sàn qua hồ sơ sàn (prof.metrics.defs).
+  const keyMetrics = src.indexOf('prof.metrics.defs.filter((d) => d.group === "result")');
   expect(runRate).toBeGreaterThan(-1);
   expect(keyMetrics).toBeGreaterThan(-1);
   expect(runRate).toBeLessThan(keyMetrics);
   // Không quay lại lưới phẳng 19 ô cùng cỡ.
-  expect(src).not.toMatch(/\{KEY_METRICS\.map\(/);
+  expect(src).not.toMatch(/\{(KEY_METRICS|prof\.metrics\.defs)\.map\(/);
 });
 
 test("Dashboard agency: khối không tính được thì không chiếm chỗ ngang bằng ô có số", () => {

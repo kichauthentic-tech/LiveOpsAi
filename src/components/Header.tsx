@@ -4,6 +4,7 @@ import { NotificationBell } from "./NotificationBell";
 import { LogOut, Building2, ChevronDown, Check, Palette, HelpCircle } from "lucide-react";
 import { useTheme, THEME_OPTIONS } from "../hooks/useTheme";
 import { BrandLogo } from "./ui/BrandLogo";
+import { profileOf } from "../lib/platforms/profiles";
 import { PLATFORM_SCOPE_LABEL, type PlatformScope, type ReportPlatform } from "../lib/reportPlatform";
 
 // Giai đoạn A (Workspace Agency ↔ Brand) — xem docs/WORKSPACE_HISTORY.md.
@@ -129,7 +130,7 @@ const WorkspaceSwitcher: React.FC<{
                     <BrandLogo brand={b} size="sm" />
                     <span className="flex-1 text-left truncate">
                       {b.name}
-                      {ch && <span className={`ml-1.5 font-bold ${ch === "Shopee" ? "text-orange-400" : "text-[var(--text-muted)]"}`}>· {PLATFORM_SCOPE_LABEL[ch]}</span>}
+                      {ch && <span className={`ml-1.5 font-bold ${profileOf(ch).textClass}`}>· {PLATFORM_SCOPE_LABEL[ch]}</span>}
                     </span>
                     {active && <Check className="w-3.5 h-3.5 text-blue-400" />}
                   </button>

@@ -1,3 +1,4 @@
+import { platformOf } from "./reportPlatform";
 // Nút "Sửa ở CRM" từ màn khác (Kế Hoạch Tháng, Toàn Cảnh Brand, Việc cần làm) mở thẳng khối "Hợp đồng & giá" của
 // đúng brand × sàn. Một lần dùng: CRM đọc rồi xoá ngay khi mount — mở CRM từ menu thì không tự bung brand nào.
 const KEY = "liveops_crm_focus";
@@ -16,7 +17,7 @@ export function takeCrmFocus(): { brandId: string; platform: "TikTok" | "Shopee"
     sessionStorage.removeItem(KEY);
     if (!v) return null;
     const [brandId, p] = v.split("|");
-    return brandId ? { brandId, platform: p === "Shopee" ? "Shopee" : "TikTok" } : null;
+    return brandId ? { brandId, platform: platformOf({ platform: p }) } : null;
   } catch {
     return null;
   }

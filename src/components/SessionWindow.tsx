@@ -6,8 +6,8 @@ import { AuditLogEntry, Brand, LiveSession, ShiftSlot, Studio, Talent, UserRole 
 import { findPersonClashes, personClash, studioClash, studioClashLabel } from "../lib/scheduling/conflicts";
 import { PlatformChip } from "./common/PlatformChip";
 import { fmtVndShort } from "../lib/format";
-import { fmtKeyMetric, KEY_METRICS, keyMetricsOfSessions, keyMetricValue } from "../lib/report/keyMetrics";
-import { fmtShopeeMetric, shopeeKeyMetricsOfSessions, shopeeMetricValue, SHOPEE_METRICS } from "../lib/report/shopeeKeyMetrics";
+import { profileOf } from "../lib/platforms/profiles";
+import { platformOf } from "../lib/reportPlatform";
 import { sessionHours } from "../lib/performance/hostPerformance";
 import {
   MissingStep,
@@ -180,8 +180,8 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
   const planHours = sessionHours({ ...s, liveDurationMinutes: undefined });
   const liveHours = s.liveDurationMinutes ? s.liveDurationMinutes / 60 : 0;
   const gmvPerHour = liveHours > 0 ? (s.actualGmv ?? 0) / liveHours : planHours > 0 ? (s.actualGmv ?? 0) / planHours : 0;
-  const km = keyMetricsOfSessions([s], () => (liveHours > 0 ? liveHours : planHours));
-  const skm = shopeeKeyMetricsOfSessions([s], () => (liveHours > 0 ? liveHours : planHours));
+  const prof = profileOf(s);
+  const metricTotals = prof.metrics.ofSessions([s], () => (liveHours > 0 ? liveHours : planHours));
   const linked = useMemo(() => linkedSessions(allSessions).get(s.id) ?? [], [allSessions, s.id]);
   const linkedLabel = linked
     .map((id) => allSessions.find((x) => x.id === id))
@@ -396,7 +396,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                   const o = c.other ? (c.session.id === s.id ? c.other : c.session) : null;
                   return (
                     <span key={i} className="block">
-                      {o ? `${c.talentName} còn ở ca ${o.brandName} ${o.platform ?? "TikTok"} ${fmtDate(o.date)} ${o.startTime}–${o.endTime}` : `${c.talentName} vừa là Host vừa là Trợ live của ca này`}
+                      {o ? `${c.talentName} còn ở ca ${o.brandName} ${platformOf(o)} ${fmtDate(o.date)} ${o.startTime}–${o.endTime}` : `${c.talentName} vừa là Host vừa là Trợ live của ca này`}
                     </span>
                   );
                 })}
@@ -521,7 +521,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                   {handoverDone ? `đã giao ${new Date(s.report!.handoverAt!).toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" })}` : "chưa giao ca"}
                 </span>
               </div>
-              {handoverDone && !editingHandover && s.platform !== "Shopee" && (
+              {handoverDone && !editingHandover && prof.handover === "file" && (
                 <div className="space-y-1.5 text-xs">
                   <p className="text-[var(--text-muted)]">{snapshotDone ? "Đã up file Creator-Live-Performance — số của ca ở \"Số liệu ca\" bên dưới." : "Chưa có file số liệu."}</p>
                   {canHandover && (
@@ -531,16 +531,16 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                   )}
                 </div>
               )}
-              {handoverDone && !editingHandover && s.platform === "Shopee" && (
+              {handoverDone && !editingHandover && prof.handover === "link" && (
                 <div className="space-y-1.5 text-xs">
                   <p className="flex flex-wrap items-center gap-1.5 text-[var(--text-muted)]">
                     <PlatformChip platform={s.platform} />
-                    {s.platform === "Shopee" ? "phiên" : "phòng"} <span className="font-mono text-[var(--text)]">{s.report!.liveRef}</span>
+                    {prof.liveRefNoun} <span className="font-mono text-[var(--text)]">{s.report!.liveRef}</span>
                     {s.report!.dashboardLink1 && <a href={s.report!.dashboardLink1} target="_blank" rel="noreferrer" className="text-[var(--accent-text)] underline">mở dashboard</a>}
                     {handoverPrev && <span>· ca nối với ca {handoverPrev.startTime}–{handoverPrev.endTime}</span>}
                   </p>
                   <p className="text-[var(--text-muted)]">
-                    Số đang thấy lúc giao: <span className="font-mono text-[var(--text)]">GMV {fmtVndShort(s.report!.cumGmv ?? 0)} · {(s.report!.cumViews ?? 0).toLocaleString("vi-VN")} lượt xem{s.platform === "Shopee" ? (s.report!.cumAtc != null ? ` · ${s.report!.cumAtc.toLocaleString("vi-VN")} ATC` : "") : ` · ${(s.report!.cumOrders ?? 0).toLocaleString("vi-VN")} đơn`}</span>
+                    Số đang thấy lúc giao: <span className="font-mono text-[var(--text)]">GMV {fmtVndShort(s.report!.cumGmv ?? 0)} · {(s.report!.cumViews ?? 0).toLocaleString("vi-VN")} lượt xem{prof.handoverThird.key === "atc" ? (s.report!.cumAtc != null ? ` · ${s.report!.cumAtc.toLocaleString("vi-VN")} ATC` : "") : ` · ${(s.report!.cumOrders ?? 0).toLocaleString("vi-VN")} đơn`}</span>
                     {handoverPrev ? " — số của ca này đã trừ ca trước, xem \"Số liệu ca\" bên dưới." : ""}
                   </p>
                   {canHandover && (
@@ -552,7 +552,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
               )}
               {(!handoverDone || editingHandover) &&
                 (canHandover ? (
-                  s.platform !== "Shopee" ? (
+                  prof.handover === "file" ? (
                     <TikTokHandover
                       session={s}
                       onSaved={(updated) => {
@@ -613,20 +613,18 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
               <>
                 {/* Key Metrics đủ 18 chỉ số + AOV, cùng hàm/thứ tự với mọi report (lib/report/keyMetrics.ts). */}
                 <div className="grid grid-cols-3 gap-2">
-                  {s.platform === "Shopee"
-                    ? SHOPEE_METRICS.map((d) => <KV key={d.key} label={d.label} value={fmtShopeeMetric(d, shopeeMetricValue(skm, d.key))} />)
-                    : KEY_METRICS.map((d) => <KV key={d.key} label={d.label} value={fmtKeyMetric(d, keyMetricValue(km, d.key))} />)}
+                  {prof.metrics.defs.map((d) => <KV key={d.key} label={d.label} value={prof.metrics.fmt(d, prof.metrics.value(metricTotals, d.key))} />)}
                 </div>
                 <p className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-bold mt-3 mb-2">Số khác</p>
                 <div className="grid grid-cols-3 gap-2">
                   {/* Shopee chỉ có Comments ở mức ca (file Live List); SKU orders/followers/shares/likes/PCU/Show GPM là số TikTok. */}
-                  {s.platform !== "Shopee" && <KV label="SKU orders" value={fmtInt(counters.skuOrders)} />}
-                  {s.platform !== "Shopee" && <KV label="New followers" value={fmtInt(counters.newFollowers)} />}
+                  {prof.showsTikTokCounters && <KV label="SKU orders" value={fmtInt(counters.skuOrders)} />}
+                  {prof.showsTikTokCounters && <KV label="New followers" value={fmtInt(counters.newFollowers)} />}
                   <KV label="Comments" value={fmtInt(counters.comments)} />
-                  {s.platform !== "Shopee" && <KV label="Shares" value={fmtInt(counters.shares)} />}
-                  {s.platform !== "Shopee" && <KV label="Likes" value={fmtInt(counters.likes)} />}
-                  {s.platform !== "Shopee" && <KV label="PCU" value={fmtInt(s.peakViewers)} />}
-                  {s.platform !== "Shopee" && ratios && (
+                  {prof.showsTikTokCounters && <KV label="Shares" value={fmtInt(counters.shares)} />}
+                  {prof.showsTikTokCounters && <KV label="Likes" value={fmtInt(counters.likes)} />}
+                  {prof.showsTikTokCounters && <KV label="PCU" value={fmtInt(s.peakViewers)} />}
+                  {prof.showsTikTokCounters && ratios && (
                     <>
                       <KV label="SKU order rate" value={fmtPct(ratios.skuOrderRate)} />
                       <KV label="Show GPM" value={fmtVndShort(ratios.showGpm)} />
@@ -639,8 +637,8 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
               <>
                 <div className="grid grid-cols-3 gap-2">
                   <KV label="Orders" value={fmtInt(s.totalOrders)} />
-                  <KV label={s.platform === "Shopee" ? "Viewers" : "Views"} value={fmtInt(s.totalViews)} />
-                  {s.platform !== "Shopee" && <KV label="PCU" value={fmtInt(s.peakViewers)} />}
+                  <KV label={prof.viewsLabel} value={fmtInt(s.totalViews)} />
+                  {prof.showsTikTokCounters && <KV label="PCU" value={fmtInt(s.peakViewers)} />}
                 </div>
                 <p className="text-[11px] text-amber-300 mt-2">Số tự khai tay — chưa có file nên không tính được tỷ lệ.</p>
               </>
@@ -661,7 +659,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
             // "Còn thiếu để chốt: Chưa đối soát" — cùng một cửa sổ nói hai điều ngược nhau. Đây là
             // đúng guard đã dùng ở badge nguồn số phía trên.
             if (s.reconciledAt && s.dataSource === "tiktok_reconciled") {
-              events.push({ at: s.reconciledAt, label: `Đối soát ${s.platform === "Shopee" ? "Shopee" : "TikTok"} ghi đè số liệu` });
+              events.push({ at: s.reconciledAt, label: `Đối soát ${prof.label} ghi đè số liệu` });
             }
             if (s.cancelledAt) events.push({ at: s.cancelledAt, label: `Huỷ ca${s.cancelReason ? ` — ${s.cancelReason}` : ""}` });
             if (events.length === 0) return null;
@@ -684,7 +682,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
           {/* Phiên TikTok / ca nối */}
           {!isBrandView && ((s.liveRoomIds?.length ?? 0) > 0 || linkedLabel.length > 0) && (
             <section>
-              <h4 className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-bold mb-2">Phiên {s.platform === "Shopee" ? "Shopee" : "TikTok"}</h4>
+              <h4 className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-bold mb-2">Phiên {prof.label}</h4>
               {(s.liveRoomIds?.length ?? 0) > 0 && <p className="text-xs text-[var(--text-muted)] font-mono break-all">Room: {s.liveRoomIds!.join(", ")}</p>}
               {linkedLabel.length > 0 && (
                 <p className="text-xs text-sky-300 mt-1 flex items-start gap-1"><Link2 className="w-3.5 h-3.5 shrink-0 mt-0.5" /><span>Ca nối, chung room với: {linkedLabel.join("; ")}</span></p>

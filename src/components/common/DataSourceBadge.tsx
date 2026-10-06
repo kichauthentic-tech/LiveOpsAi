@@ -1,6 +1,7 @@
 import React from "react";
 import { CheckCircle2, Clock, FileCheck2 } from "lucide-react";
 import { LiveSession } from "../../types";
+import { profileOf } from "../../lib/platforms/profiles";
 
 interface DataSourceBadgeProps {
   dataSource: LiveSession["dataSource"];
@@ -10,7 +11,7 @@ interface DataSourceBadgeProps {
 }
 
 export const DataSourceBadge: React.FC<DataSourceBadgeProps> = ({ dataSource, platform = "TikTok", className = "" }) => {
-  const shop = platform === "Shopee" ? "Shopee" : "TikTok Shop";
+  const shop = profileOf({ platform }).shopLabel;
   if (dataSource === "tiktok_reconciled") {
     return (
       <span

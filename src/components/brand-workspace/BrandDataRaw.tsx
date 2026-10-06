@@ -8,6 +8,8 @@ import { Database, Upload, FileSpreadsheet, AlertTriangle, Trash2, Search, Chevr
 import { BackfillFromRooms } from "./BackfillFromRooms";
 import { errorMessage } from "../../lib/errorMessage";
 import { useConfirm } from "../../hooks/useConfirm";
+import { platformOf } from "../../lib/reportPlatform";
+import { profileOf } from "../../lib/platforms/profiles";
 
 interface BrandDataRawProps {
   /** Sàn của workspace (07/10): chỉ hiện 6 loại file TikTok hoặc 4 loại file Shopee, không còn nút chuyển sàn trong màn. */
@@ -42,7 +44,8 @@ const SHOPEE_TABS: { id: DataRawReportType; label: string; hint: string }[] = [
   { id: "shopee_live_list", label: "Live List", hint: 'Export "…live_stream_list_export…xlsx" từ Shopee Seller Centre — mỗi phiên live một dòng: giờ bắt đầu, thời lượng, người xem, đơn, doanh số. Dùng cho Report Shopee VÀ để đối soát ca Shopee ở Đối Soát Số Liệu.' },
   { id: "shopee_product_list", label: "Sản phẩm (Shopee)", hint: 'Export "…live_product_list_export…xlsx" từ Shopee Seller Centre — mỗi sản phẩm bán trong live một dòng (click, ATC, đơn, doanh số).' }
 ];
-const SHOPEE_TYPE_IDS = new Set<DataRawReportType>(SHOPEE_TABS.map((t) => t.id));
+// Mọi loại file; workspace chỉ hiện loại của sàn đang xem (hồ sơ sàn `dataRawTypes`) — không lẫn file hai sàn.
+const ALL_TABS = [...REPORT_TABS, ...SHOPEE_TABS];
 
 function fmtCell(v: unknown): string {
   if (v === null || v === undefined || v === "") return "—";
@@ -110,9 +113,11 @@ export function prefetchBrandDataRaw({ brandId }: TabPrefetchCtx): void {
 export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ platform, brandId, brandName, currentRole, sessions: allSessions, talents, onSessionsChanged }) => {
   const confirm = useConfirm();
   const canManage = CAN_MANAGE.includes(currentRole);
-  const [activeType, setActiveType] = useState<DataRawReportType>(platform === "Shopee" ? SHOPEE_TABS[0].id : DEFAULT_REPORT_TYPE);
+  const prof = profileOf(platform);
+  const visibleTabs = ALL_TABS.filter((t) => prof.dataRawTypes.includes(t.id));
+  const [activeType, setActiveType] = useState<DataRawReportType>(visibleTabs[0]?.id ?? DEFAULT_REPORT_TYPE);
   // Nạp bù ca chỉ cho ca đúng sàn của workspace.
-  const sessions = useMemo(() => allSessions.filter((s) => (s.platform ?? "TikTok") === platform), [allSessions, platform]);
+  const sessions = useMemo(() => allSessions.filter((s) => platformOf(s) === platform), [allSessions, platform]);
   const [imports, setImports] = useState<BrandDataRawImport[]>([]);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -124,10 +129,7 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ platform, brandId, b
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
-  // Sàn của file đang xem: loại Shopee tách khỏi 6 loại TikTok để không lẫn (0139).
-  const sourcePlatform: "TikTok" | "Shopee" = SHOPEE_TYPE_IDS.has(activeType) ? "Shopee" : "TikTok";
-  const visibleTabs = sourcePlatform === "Shopee" ? SHOPEE_TABS : REPORT_TABS;
-  const activeTab = [...REPORT_TABS, ...SHOPEE_TABS].find((t) => t.id === activeType)!;
+  const activeTab = ALL_TABS.find((t) => t.id === activeType)!;
 
   useEffect(() => {
     setExpandedId(null);
@@ -237,7 +239,7 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ platform, brandId, b
           <Database className="w-5 h-5 text-[var(--accent)]" /> Dữ Liệu Gốc — {brandName}
         </h2>
         <p className="text-xs text-[var(--text-muted)] mt-1">
-          Nơi lưu nguyên trạng report Excel tải tay từ {platform === "Shopee" ? "Shopee Seller Centre" : "TikTok Shop"} mỗi tuần/tháng (workspace này chỉ có file của sàn {platform}). Đây là cơ sở để dựng report + đối soát cuối tháng, sau này cần tra chỉ số nào chỉ cần mở lại import đúng kỳ. Up lại file trong cùng một tháng sẽ thay bản cũ của tháng đó {platform === "TikTok" ? "(file TikTok luôn cộng dồn từ đầu tháng)" : ""}.
+          Nơi lưu nguyên trạng report Excel tải tay từ {prof.sellerCenterLabel} mỗi tuần/tháng (workspace này chỉ có file của sàn {platform}). Đây là cơ sở để dựng report + đối soát cuối tháng, sau này cần tra chỉ số nào chỉ cần mở lại import đúng kỳ. Up lại file trong cùng một tháng sẽ thay bản cũ của tháng đó {prof.dataRawReplaceNote}.
         </p>
       </div>
 
@@ -283,10 +285,10 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ platform, brandId, b
         {!parsedPreview ? (
           <label className="border-2 border-dashed border-[var(--border)] bg-[var(--surface-elevated)]/40 p-4 rounded-xl text-center flex items-center justify-center gap-2 cursor-pointer hover:bg-[var(--surface-hover)] block">
             <Upload className="w-4 h-4 text-[var(--text-muted)]" />
-            <p className="font-bold text-[var(--text)] text-xs">Kéo & Thả hoặc Chọn File {sourcePlatform === "Shopee" ? "Excel / CSV" : "Excel"}</p>
+            <p className="font-bold text-[var(--text)] text-xs">Kéo & Thả hoặc Chọn File {prof.dataRawAcceptLabel}</p>
             <input
               type="file"
-              accept={sourcePlatform === "Shopee" ? ".xlsx,.xls,.csv" : ".xlsx,.xls"}
+              accept={prof.dataRawAccept}
               className="hidden"
               onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
             />

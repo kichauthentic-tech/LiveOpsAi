@@ -4,7 +4,7 @@ import { isPnlSession, sessionDurationHours } from "../pnl";
 import { CampDayBucket, CampOverrides, CAMP_DAY_BUCKET_ORDER, resolveCampBucketType } from "../campaignDays";
 import { expandHostPortions, isCountable, sessionHours } from "./hostPerformance";
 import { keyMetricsOfSessions, type KeyMetrics } from "../report/keyMetrics";
-import { REPORT_PLATFORMS, type ReportPlatform } from "../reportPlatform";
+import { platformOf, REPORT_PLATFORMS, type ReportPlatform } from "../reportPlatform";
 
 // Bản Tin CEO (2026-09-25) — thay Toàn Cảnh Agency. File thuần: không đụng Supabase, test bằng vitest.
 //
@@ -652,7 +652,7 @@ export function buildIssues(x: IssueInput): Issue[] {
     // Tập trung khách đo RIÊNG từng sàn (user chốt 07/10: không bao giờ cộng GMV TikTok với Shopee). Sàn chỉ có một khách
     // thì không có gì để so — bỏ qua thay vì báo "100% từ một khách".
     for (const plat of REPORT_PLATFORMS) {
-      const onPlat = x.brands.filter((b) => (b.platform ?? "TikTok") === plat);
+      const onPlat = x.brands.filter((b) => platformOf(b) === plat);
       if (onPlat.length < 2) continue;
       const rows = onPlat.filter((b) => b.outlook.actual > 0);
       if (rows.length === 0) continue;

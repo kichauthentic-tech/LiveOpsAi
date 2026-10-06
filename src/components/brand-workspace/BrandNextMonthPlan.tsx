@@ -9,6 +9,7 @@ import { errorMessage } from "../../lib/errorMessage";
 import { fmtVndShort } from "../../lib/format";
 import { PageHeader } from "../common/PageHeader";
 import type { ReportPlatform } from "../../lib/reportPlatform";
+import { channelTitle } from "../../lib/reportPlatform";
 
 // Kế hoạch tháng sau cho Brand Workspace — bản CHỈ ĐỌC + một nút "xác nhận đã xem" (Đợt C/2,
 // migration 0110). Khác hẳn "Kế Hoạch Tháng" bên Agency (MonthPlan.tsx): bên đó ops dựng lưới,
@@ -121,7 +122,7 @@ export const BrandNextMonthPlan: React.FC<BrandNextMonthPlanProps> = ({ brandId,
     <div className="space-y-5">
       <PageHeader
         icon={CalendarCheck2}
-        title={`Kế Hoạch ${fmtMonthLabel(nextMonth)} · ${brandName}${multiPlatform || platform === "Shopee" ? ` · ${platform}` : ""}`}
+        title={`Kế Hoạch ${fmtMonthLabel(nextMonth)} · ${channelTitle(brandName, platform, multiPlatform)}`}
         description="Lịch lên sóng agency dự kiến xếp cho tháng sau. Xem qua rồi bấm xác nhận — nếu agency đổi gì sau đó, mục xác nhận sẽ tự mất để bạn biết lịch đã khác."
       />
 

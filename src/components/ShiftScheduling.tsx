@@ -39,7 +39,7 @@ import { SessionEventCard, SessionCardTone, buildSlotMeta } from "./ui/SessionEv
 import { SessionWindow } from "./SessionWindow";
 import { commitmentsRead } from "../lib/db/brandContracts";
 import { planStatusesRead } from "../lib/db/monthPlans";
-import { brandPlatformKey, platformOf, type ReportPlatform } from "../lib/reportPlatform";
+import { channelTitle, brandPlatformKey, platformOf, type ReportPlatform } from "../lib/reportPlatform";
 import { platformsOfBrand } from "../lib/channels";
 import type { TabPrefetchCtx } from "../lib/db/prefetch";
 import { SchedulingGap, computeSchedulingGaps } from "../lib/performance/brandCommitment";
@@ -584,7 +584,7 @@ export default function ShiftScheduling({
                   }`}
                 >
                   <div className="flex items-baseline justify-between gap-2">
-                    <span className="text-xs font-bold text-[var(--text)] truncate">{g.brandName}{g.platform === "Shopee" ? " · Shopee" : ""}</span>
+                    <span className="text-xs font-bold text-[var(--text)] truncate">{channelTitle(g.brandName, g.platform, false)}</span>
                     <span className="text-[11px] text-[var(--text-faint)] shrink-0">
                       cam kết {g.committedHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h
                     </span>

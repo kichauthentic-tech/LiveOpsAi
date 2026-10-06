@@ -30,6 +30,11 @@ import { CHANNELS, DAY_TYPE_SHORT, LINK_BTN, PAL, SECTIONS, chartTooltipStyle } 
 import { chartNum, fmtHours, fmtInt, fmtPct, fmtSessionStart, monthRangeLocal, nextMonthStrLocal, prevMonthStrLocal, promoStatusLabel } from "./report/format";
 import { ChartLegend, InsightBox, KpiTile, NarrativeEditor, Panel, ProgressBar, ReportTable, SectionDetail, SectionHead, WaterfallPanel, toWaterfall } from "./report/ui";
 import { HostPerformancePanel } from "./report/HostPerformancePanel";
+import { PLATFORM_PROFILES } from "../../lib/platforms/profiles";
+import { platformOf } from "../../lib/reportPlatform";
+
+// Report Tháng này là report của sàn TikTok (Shopee: ShopeeMonthlyReportTabs) — chỉ đọc ca TikTok.
+const REPORT_PLATFORM = PLATFORM_PROFILES.TikTok.id;
 interface MonthlyReportTabsProps {
   brandId: string;
   brandName: string;
@@ -61,7 +66,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   }, [canManage, liveSessions, brandId, month]);
   const sessions = useMemo(
     // Bản chụp chụp trước 06/10 còn lẫn ca Shopee — Report này là TikTok.
-    () => hydrateSnapshotSessions(snapshot).filter((s) => s.platform === "TikTok" && !hiddenMonths.has(s.date.slice(0, 7))),
+    () => hydrateSnapshotSessions(snapshot).filter((s) => platformOf(s) === REPORT_PLATFORM && !hiddenMonths.has(s.date.slice(0, 7))),
     [snapshot, hiddenMonths]
   );
   const brandPlatformRates: BrandPlatformRate[] = snapshot.rates;
@@ -189,7 +194,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   }
   const hostPerformance = useMemo<HostPerfRow[]>(() => {
     const tiktokSessions = filterSessions(
-      completedInPeriod.filter((s) => s.platform === "TikTok"),
+      completedInPeriod.filter((s) => platformOf(s) === REPORT_PLATFORM),
       {}
     );
     const byKey = new Map<string, LiveSession[]>();
@@ -215,9 +220,9 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
         m: r
       }));
   }, [completedInPeriod]);
-  const hostQuality = useMemo(() => dataQuality(filterSessions(completedInPeriod.filter((s) => s.platform === "TikTok"), {})), [completedInPeriod]);
+  const hostQuality = useMemo(() => dataQuality(filterSessions(completedInPeriod.filter((s) => platformOf(s) === REPORT_PLATFORM), {})), [completedInPeriod]);
   const unassignedHost = useMemo(
-    () => splitUnassignedHost(byHost(filterSessions(completedInPeriod.filter((s) => s.platform === "TikTok"), {}))).unassigned,
+    () => splitUnassignedHost(byHost(filterSessions(completedInPeriod.filter((s) => platformOf(s) === REPORT_PLATFORM), {}))).unassigned,
     [completedInPeriod]
   );
 
@@ -374,7 +379,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
 
   // NMV: tỷ lệ hoàn ở Rate Card nếu đã nhập, không thì Refund rate thực của cả shop trong kỳ — ước tính, ghi rõ.
   const refundRateShop = shopCur && shopCur.gmv > 0 ? (shopCur.refunds / shopCur.gmv) * 100 : null;
-  const tiktokReturnRate = brandPlatformRates.find((r) => r.brandId === brandId && r.platform === "TikTok")?.returnRate;
+  const tiktokReturnRate = brandPlatformRates.find((r) => r.brandId === brandId && r.platform === REPORT_PLATFORM)?.returnRate;
   const nmvRate = hasReturnRateConfig ? tiktokReturnRate ?? null : refundRateShop;
   const nmvSource = hasReturnRateConfig ? "tỷ lệ hoàn hủy ở CRM (Hợp đồng & giá)" : refundRateShop != null ? "Refund rate thực của cả shop trong kỳ" : null;
 
@@ -445,7 +450,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
 
   // Phần 5 — so mặt bằng tháng này (cột phụ) theo loại ngày.
   const hostInsight = useMemo(() => {
-    const tiktok = filterSessions(completedInPeriod.filter((s) => s.platform === "TikTok"), {});
+    const tiktok = filterSessions(completedInPeriod.filter((s) => platformOf(s) === REPORT_PLATFORM), {});
     const rows = new Map<string, HostInsightRow>();
     for (const b of CAMP_DAY_BUCKET_ORDER) {
       const part = tiktok.filter((s) => resolveCampBucketType(s.date, campOverrides) === b);
@@ -465,7 +470,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
 
   // Phần 5 — so mặt bằng GỘP các tháng có số trong bản chụp, kèm khoảng tin cậy (cột chính để so host).
   const reliabilitySessions = useMemo(
-    () => filterSessions(sessions.filter((s) => s.brandId === brandId && s.platform === "TikTok" && s.status === "Completed"), {}),
+    () => filterSessions(sessions.filter((s) => s.brandId === brandId && platformOf(s) === REPORT_PLATFORM && s.status === "Completed"), {}),
     [sessions, brandId]
   );
   const reliability = useMemo(() => hostReliability(reliabilitySessions, bucketAny), [reliabilitySessions, bucketAny]);
@@ -476,7 +481,7 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
   const hostDayType = useMemo(
     () =>
       byHostDayType(
-        filterSessions(completedInPeriod.filter((s) => s.platform === "TikTok"), {}),
+        filterSessions(completedInPeriod.filter((s) => platformOf(s) === REPORT_PLATFORM), {}),
         (date) => resolveCampBucketType(date, campOverrides)
       ),
     [completedInPeriod, campOverrides]

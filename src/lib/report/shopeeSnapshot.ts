@@ -7,6 +7,8 @@ import type { SectionInsight } from "./sectionInsights";
 import { fmtVndShort } from "../format";
 import { METRIC } from "../metricGlossary";
 import type { ShopeeAdsStats } from "../dataraw/shopeeAds";
+import { PLATFORM_PROFILES } from "../platforms/profiles";
+import { platformOf } from "../reportPlatform";
 
 // Bản chụp Report Tháng SHOPEE (migration 0139, 2026-10-06). Hàm thuần — không import supabaseClient nên test được không
 // cần .env. Cùng nguyên tắc với report TikTok: dựng MỘT lần khi ops bấm "Tạo/Cập nhật", mở report chỉ đọc bản chụp.
@@ -20,6 +22,8 @@ import type { ShopeeAdsStats } from "../dataraw/shopeeAds";
 //   - Ads (bản 2, 06/10): file "Shopee Live Ads Report" (shopee_ads, 0142) — tổng cả tháng theo chiến dịch, không theo ngày.
 //     Khuyến mãi: Xu (Coins Claimed) và voucher đã nhận lấy từ file overview — Shopee chỉ cho SỐ LƯỢNG, coi 1 xu = 1đ.
 //   - Loại ngày camp theo lịch cố định (D-Day, Mid-Month 13–15, Pay Day 23–25) — chưa đọc khung camp ghi đè của Kế Hoạch Tháng TikTok.
+
+const SHOPEE = PLATFORM_PROFILES.Shopee.id;
 
 export const SHOPEE_SNAPSHOT_VERSION = 2;
 
@@ -113,7 +117,7 @@ const hoursOf = (s: ShopeeStream) => s.durationSec / 3600;
 /** Chữ ký rẻ của tập ca Shopee trong tháng — đổi khi ca thêm/bớt/đổi số/đổi người. */
 export function shopeeSessionsSig(sessions: LiveSession[], brandId: string, month: string): string {
   const rows = sessions
-    .filter((s) => s.brandId === brandId && s.platform === "Shopee" && s.date.startsWith(month) && s.status !== "Cancelled")
+    .filter((s) => s.brandId === brandId && platformOf(s) === SHOPEE && s.date.startsWith(month) && s.status !== "Cancelled")
     .map((s) => [s.id, s.status, s.hostId, s.coHostId ?? "", s.actualGmv ?? 0, s.dataSource ?? "", s.startTime, s.endTime, s.excludedFromReports ? 1 : 0].join("|"))
     .sort();
   let h = 5381;
@@ -191,7 +195,7 @@ export function buildShopeeSnapshot(input: ShopeeSnapshotInput): ShopeeReportSna
   const prev = input.prev;
 
   // ---- ca trong app
-  const appSessions = input.sessions.filter((s) => s.brandId === brandId && s.platform === "Shopee" && s.date.startsWith(month) && s.status !== "Cancelled");
+  const appSessions = input.sessions.filter((s) => s.brandId === brandId && platformOf(s) === SHOPEE && s.date.startsWith(month) && s.status !== "Cancelled");
   const completed = appSessions.filter((s) => s.status === "Completed" && !s.excludedFromReports);
   const countable = filterSessions(completed, {});
   const hostRowsAll = byHost(countable);

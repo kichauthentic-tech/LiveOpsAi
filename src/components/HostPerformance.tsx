@@ -1,15 +1,7 @@
 import { useMemo, useState } from "react";
 import { AlertTriangle, Download, TrendingUp } from "lucide-react";
 import { Brand, LiveSession } from "../types";
-import {
-  WEEKDAY_LABELS,
-  byHost,
-  byWeekday,
-  dataQuality,
-  filterSessions,
-  hostWeekdayGrid,
-  splitUnassignedHost
-} from "../lib/performance/hostPerformance";
+import { WEEKDAY_LABELS, byWeekday, dataQuality, filterSessions, hostWeekdayGrid } from "../lib/performance/hostPerformance";
 import { getTodayDate } from "../lib/dateUtils";
 import { downloadSheetsAsXlsx } from "../lib/exportXlsx";
 import { useToast } from "../hooks/useToast";
@@ -18,9 +10,7 @@ import { PageIntro } from "./common/PageIntro";
 
 import { fmtDateVn, fmtFixed, fmtVndShort } from "../lib/format";
 import { METRIC, metricHint } from "../lib/metricGlossary";
-import { fmtKeyMetric, KEY_METRICS, keyMetricValue } from "../lib/report/keyMetrics";
-import { fmtShopeeMetric, shopeeMetricValue, SHOPEE_METRICS } from "../lib/report/shopeeKeyMetrics";
-import { byHostShopee, splitUnassignedShopee } from "../lib/performance/shopeeHostPerformance";
+import { profileOf } from "../lib/platforms/profiles";
 import { inPlatformScope, type PlatformScope } from "../lib/reportPlatform";
 interface HostPerformanceProps {
   /** Sàn của workspace agency (07/10) — hai sàn không xếp hạng chung. */
@@ -41,8 +31,7 @@ function isoDaysAgo(days: number): string {
 }
 
 const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0]; // Thứ 2 → Chủ nhật
-const RANK_COLS = KEY_METRICS.filter((d) => d.key !== "gmvPerHour");
-const SHOPEE_RANK_COLS = SHOPEE_METRICS.filter((d) => d.key !== "gmvPerHour");
+
 
 export function HostPerformance({ platform, sessions, brands }: HostPerformanceProps) {
   const { showToast } = useToast();
@@ -59,11 +48,11 @@ export function HostPerformance({ platform, sessions, brands }: HostPerformanceP
 
   // Ca chưa gán host tách khỏi xếp hạng (audit 2026-09-21): trước đây nó đứng chung bảng như một
   // "host" tên "Chưa gán host" và chiếm luôn một hạng trong top.
-  const { ranked: tiktokHosts, unassigned: unassignedHost } = useMemo(() => splitUnassignedHost(byHost(scoped)), [scoped]);
-  // Sàn Shopee có cột riêng (Viewers/ATC/CO/GPM/Xu) — file Shopee không có impressions/click/CTR/CTOR của TikTok.
-  const shopeeOnly = platform === "Shopee";
-  const { ranked: shopeeHosts } = useMemo(() => (shopeeOnly ? splitUnassignedShopee(byHostShopee(scoped)) : { ranked: [] }), [shopeeOnly, scoped]);
-  const hosts = tiktokHosts;
+  // Bộ chỉ số của sàn đang xem (hồ sơ sàn): TikTok 18 chỉ số, Shopee Viewers/ATC/CO/GPM/Xu. GMV/giờ là cột xếp hạng nên ghim
+  // ngay sau tên host, các chỉ số còn lại theo đúng thứ tự chung. Ca chưa gán host tách khỏi xếp hạng (audit 2026-09-21).
+  const metrics = profileOf(platform).metrics;
+  const rankCols = metrics.defs.filter((d) => d.key !== "gmvPerHour");
+  const { ranked: hosts, unassigned: unassignedHost } = useMemo(() => metrics.hostRanking(scoped), [metrics, scoped]);
   const weekdays = useMemo(() => byWeekday(scoped), [scoped]);
   const grid = useMemo(() => hostWeekdayGrid(scoped), [scoped]);
   const quality = useMemo(() => dataQuality(scoped), [scoped]);
@@ -78,18 +67,10 @@ export function HostPerformance({ platform, sessions, brands }: HostPerformanceP
   // Excel còn lọc/xếp/tính được — đây là chỗ khác duy nhất so với màn hình, và là cả lý do xuất file.
   // Ô trống = chỉ số không có dữ liệu, đúng chỗ màn hình in "—"; không ghi 0 vào, 0 là một con số thật.
   const exportXlsx = () => {
-    const shopeeRank = shopeeHosts.map((h) => {
-      const row: Record<string, string | number> = { Host: h.label, "Số ca": h.sessionCount, [METRIC.gmvPerHour]: h.gmvPerHour ?? "" };
-      for (const d of SHOPEE_RANK_COLS) {
-        const v = shopeeMetricValue(h, d.key);
-        row[d.label] = v == null || Number.isNaN(v) ? "" : v;
-      }
-      return row;
-    });
     const rank = hosts.map((h) => {
       const row: Record<string, string | number> = { Host: h.label, "Số ca": h.sessionCount, [METRIC.gmvPerHour]: h.gmvPerHour ?? "" };
-      for (const d of RANK_COLS) {
-        const v = keyMetricValue(h, d.key);
+      for (const d of rankCols) {
+        const v = metrics.value(h, d.key);
         row[d.label] = v == null || Number.isNaN(v) ? "" : v;
       }
       return row;
@@ -107,7 +88,7 @@ export function HostPerformance({ platform, sessions, brands }: HostPerformanceP
     const scope = `${brandId ? (brands.find((b) => b.id === brandId)?.name ?? "brand") : "tat-ca-brand"}_${platform}`;
     downloadSheetsAsXlsx(
       [
-        { name: "Xep hang host", rows: shopeeOnly ? shopeeRank : rank },
+        { name: "Xep hang host", rows: rank },
         { name: "Host x Thu", rows: gridRows },
         { name: "Hieu suat theo Thu", rows: wd }
       ],
@@ -200,35 +181,23 @@ export function HostPerformance({ platform, sessions, brands }: HostPerformanceP
                   <tr className="text-[var(--text-faint)] text-left text-[11px]">
                     <th className="font-bold pb-2 pr-3 sticky left-0 bg-[var(--surface)]">Host</th>
                     <th className="font-bold pb-2 pr-3 text-right whitespace-nowrap" title={metricHint(METRIC.gmvPerHour)}>{METRIC.gmvPerHour}</th>
-                    {(shopeeOnly ? SHOPEE_RANK_COLS : RANK_COLS).map((d) => (
+                    {rankCols.map((d) => (
                       <th key={d.key} className="font-bold pb-2 pr-3 text-right whitespace-nowrap" title={metricHint(d.label)}>{d.label}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {shopeeOnly
-                    ? shopeeHosts.map((h) => (
-                        <tr key={h.key} className="border-t border-[var(--border)]/60">
-                          <td className="py-2 pr-3 font-bold text-[var(--text)] whitespace-nowrap sticky left-0 bg-[var(--surface)]">
-                            {h.label} <span className="font-normal text-[var(--text-faint)]">· {h.sessionCount} ca</span>
-                          </td>
-                          <td className="py-2 pr-3 text-right font-bold text-emerald-400 whitespace-nowrap">{fmtVndShort(h.gmvPerHour)}</td>
-                          {SHOPEE_RANK_COLS.map((d) => (
-                            <td key={d.key} className="py-2 pr-3 text-right text-[var(--text-muted)] whitespace-nowrap">{fmtShopeeMetric(d, shopeeMetricValue(h, d.key))}</td>
-                          ))}
-                        </tr>
-                      ))
-                    : hosts.map((h) => (
-                        <tr key={h.key} className="border-t border-[var(--border)]/60">
-                          <td className="py-2 pr-3 font-bold text-[var(--text)] whitespace-nowrap sticky left-0 bg-[var(--surface)]">
-                            {h.label} <span className="font-normal text-[var(--text-faint)]">· {h.sessionCount} ca</span>
-                          </td>
-                          <td className="py-2 pr-3 text-right font-bold text-emerald-400 whitespace-nowrap">{fmtVndShort(h.gmvPerHour)}</td>
-                          {RANK_COLS.map((d) => (
-                            <td key={d.key} className="py-2 pr-3 text-right text-[var(--text-muted)] whitespace-nowrap">{fmtKeyMetric(d, keyMetricValue(h, d.key))}</td>
-                          ))}
-                        </tr>
+                  {hosts.map((h) => (
+                    <tr key={h.key} className="border-t border-[var(--border)]/60">
+                      <td className="py-2 pr-3 font-bold text-[var(--text)] whitespace-nowrap sticky left-0 bg-[var(--surface)]">
+                        {h.label} <span className="font-normal text-[var(--text-faint)]">· {h.sessionCount} ca</span>
+                      </td>
+                      <td className="py-2 pr-3 text-right font-bold text-emerald-400 whitespace-nowrap">{fmtVndShort(h.gmvPerHour ?? 0)}</td>
+                      {rankCols.map((d) => (
+                        <td key={d.key} className="py-2 pr-3 text-right text-[var(--text-muted)] whitespace-nowrap">{metrics.fmt(d, metrics.value(h, d.key))}</td>
                       ))}
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>

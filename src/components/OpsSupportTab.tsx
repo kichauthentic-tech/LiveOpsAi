@@ -7,7 +7,7 @@ import { effectiveCamp } from "../lib/campaignDays";
 import { todayVn } from "../lib/performance/brandCommitment";
 import { monthOutlook } from "../lib/performance/ceoBrief";
 import { planRunRate, projectMonthEnd } from "../lib/performance/planRunRate";
-import { type ReportPlatform } from "../lib/reportPlatform";
+import { platformOf, type ReportPlatform } from "../lib/reportPlatform";
 import { loadRememberedBrandId, pickDefaultBrandId, rememberBrandId } from "../lib/defaultBrand";
 import { PageHeader } from "./common/PageHeader";
 import OpsSupport from "./OpsSupport";
@@ -38,8 +38,8 @@ export default function OpsSupportTab({ platform, brands, sessions, shiftSlots, 
   const brand = brands.find((b) => b.id === brandId);
 
   // Ca/slot của brand này chỉ giữ ĐÚNG SÀN (như Dashboard); brand khác giữ nguyên vì engine đọc lịch toàn agency.
-  const sess = useMemo(() => sessions.filter((s) => s.brandId !== brandId || (s.platform ?? "TikTok") === platform), [sessions, brandId, platform]);
-  const slots = useMemo(() => shiftSlots.filter((sl) => sl.brandId !== brandId || (sl.platform ?? "TikTok") === platform), [shiftSlots, brandId, platform]);
+  const sess = useMemo(() => sessions.filter((s) => s.brandId !== brandId || platformOf(s) === platform), [sessions, brandId, platform]);
+  const slots = useMemo(() => shiftSlots.filter((sl) => sl.brandId !== brandId || platformOf(sl) === platform), [shiftSlots, brandId, platform]);
   const brandSessions = useMemo(() => sess.filter((s) => s.brandId === brandId), [sess, brandId]);
 
   const [plan, setPlan] = useState<{ plan: BrandMonthPlan; slots: BrandMonthPlanSlot[] } | null>(null);

@@ -18,6 +18,7 @@ import { useConfirm } from "../hooks/useConfirm";
 import { PageIntro } from "./common/PageIntro";
 import { fmtPeriodLabel, fmtVndFull } from "../lib/format";
 import { Brand, LiveSession } from "../types";
+import { profileOf } from "../lib/platforms/profiles";
 
 interface LiveReconciliationProps {
   /** Sàn của workspace agency (07/10): chỉ lô và file của sàn này — TikTok dùng Creator-Live-Performance, Shopee dùng Live List. */
@@ -145,7 +146,7 @@ export function LiveReconciliation({ platform, brands, sessions, onApplied, onOp
                 <option key={b.id} value={b.id}>{b.name}</option>
               ))}
             </select>
-            <span className="text-xs font-bold text-[var(--text-muted)]">{platform === "TikTok" ? "File TikTok (Creator-Live-Performance)" : "File Shopee (Live List)"}</span>
+            <span className="text-xs font-bold text-[var(--text-muted)]">{`File ${profileOf(platform).label} (${profileOf(platform).reconciliationFile})`}</span>
             <label className={uploadBrandId ? "" : "opacity-40 pointer-events-none"} title={uploadBrandId ? undefined : "Chọn brand trước — file là của MỘT tài khoản, chỉ khớp với ca của brand đó"}>
               <input
                 type="file"

@@ -75,5 +75,7 @@ test("các report dùng KEY_METRICS", () => {
     "components/HostPerformance.tsx",
     "components/CeoBrief.tsx"
   ];
-  for (const f of files) expect(readFileSync(join(__dirname, "..", "src", f), "utf8"), f).toMatch(/KEY_METRICS\.(map|filter)/);
+  // Bước 2 đa sàn (07/10): màn hiện cả hai sàn đọc bộ chỉ số qua hồ sơ sàn (`profileOf(x).metrics.defs` = KEY_METRICS
+  // của TikTok / SHOPEE_METRICS của Shopee) — vẫn là bộ chuẩn, không tự liệt kê.
+  for (const f of files) expect(readFileSync(join(__dirname, "..", "src", f), "utf8"), f).toMatch(/(KEY_METRICS|metrics\.defs)\.(map|filter)/);
 });

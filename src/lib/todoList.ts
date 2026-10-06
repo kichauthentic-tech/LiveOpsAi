@@ -2,7 +2,8 @@ import { Brand, BrandChannel, BrandMonthPlan, BrandMonthlyCommitment, BrandMonth
 import { isUnconfirmedPast } from "./sessionStatus";
 import { isCountable } from "./performance/hostPerformance";
 import { fmtDateVn, fmtMonth } from "./format";
-import { brandMonthKey, brandPlatformKey, sessionBrandMonthKey } from "./reportPlatform";
+import { platformOf, brandMonthKey, brandPlatformKey, LEGACY_PLATFORM, platformIdSuffix, sessionBrandMonthKey } from "./reportPlatform";
+import { profileOf } from "./platforms/profiles";
 import { platformsOfBrand } from "./channels";
 import { brandPriceSet } from "./brandPricing";
 import { findPersonClashes } from "./scheduling/conflicts";
@@ -98,7 +99,7 @@ export function buildTodos(input: TodoInput): Todo[] {
         id: `stale-${b.id}`,
         level: gap > 3 ? "high" : "medium",
         title: `Số liệu ${b.name} mới tới ${fmtDateVn(last, false)} (${gap} ngày trước)`,
-        detail: "Tải file Creator Live Performance từ TikTok rồi up ở Dữ Liệu Gốc; cuối kỳ up thêm ở Đối Soát Số Liệu.",
+        detail: [...new Set(platformsOfBrand(input.channels, b.id).map((p) => profileOf(p).staleDataHint))].join(" ") || profileOf(LEGACY_PLATFORM).staleDataHint,
         tab: "brand_dataraw",
         brandId: b.id,
         action: "Up file"
@@ -113,8 +114,8 @@ export function buildTodos(input: TodoInput): Todo[] {
     }
     for (const p of platforms) {
       const name = platforms.length > 1 ? `${b.name} ${p}` : b.name;
-      const sfx = p === "Shopee" ? "-shopee" : "";
-      const ownP = own.filter((s) => (s.platform ?? "TikTok") === p);
+      const sfx = platformIdSuffix(p);
+      const ownP = own.filter((s) => platformOf(s) === p);
       // 2–3. Kế hoạch tháng này.
       const cur = input.plansThisMonth.get(brandPlatformKey(b.id, p));
       if (cur?.status === "draft") {
@@ -137,9 +138,9 @@ export function buildTodos(input: TodoInput): Todo[] {
     // 5. Cam kết giờ tháng này — riêng từng sàn (0141). Điều khoản nhập ở CRM (lưu hợp đồng là tự sinh từng tháng); số
     // của một tháng đặt ở Kế Hoạch Tháng (gộp cấu hình 06/10) ⇒ nút mở Kế Hoạch Tháng đúng brand × sàn.
     for (const p of platforms) {
-      if (!input.commitments.some((c) => c.brandId === b.id && (c.platform ?? "TikTok") === p && c.periodMonth.startsWith(month))) {
+      if (!input.commitments.some((c) => c.brandId === b.id && platformOf(c) === p && c.periodMonth.startsWith(month))) {
         const name = platforms.length > 1 ? `${b.name} ${p}` : b.name;
-        out.push({ id: `commit-${b.id}${p === "Shopee" ? "-shopee" : ""}`, level: "low", title: `${name} chưa có cam kết giờ tháng ${fmtMonth(month)}`, detail: "Đặt giờ cam kết của tháng ở Kế Hoạch Tháng (hoặc nhập hợp đồng ở CRM — app tự đổ ra từng tháng). Thiếu số này thì không so được giờ đã giao.", tab: "month_plan", rememberBrandId: b.id, rememberPlatform: p, action: "Mở Kế Hoạch Tháng" });
+        out.push({ id: `commit-${b.id}${platformIdSuffix(p)}`, level: "low", title: `${name} chưa có cam kết giờ tháng ${fmtMonth(month)}`, detail: "Đặt giờ cam kết của tháng ở Kế Hoạch Tháng (hoặc nhập hợp đồng ở CRM — app tự đổ ra từng tháng). Thiếu số này thì không so được giờ đã giao.", tab: "month_plan", rememberBrandId: b.id, rememberPlatform: p, action: "Mở Kế Hoạch Tháng" });
       }
     }
 
@@ -147,7 +148,7 @@ export function buildTodos(input: TodoInput): Todo[] {
     for (const p of platforms) {
       if (!brandPriceSet(b, input.rates, p)) {
         const name = platforms.length > 1 ? `${b.name} ${p}` : b.name;
-        out.push({ id: `rate-${b.id}${p === "Shopee" ? "-shopee" : ""}`, level: "low", title: `${name} chưa có giá`, detail: "Chưa có giá thì Finance & P&L và Dashboard không tính được doanh thu, lãi.", tab: "crm", rememberBrandId: b.id, rememberPlatform: p, action: "Nhập ở CRM" });
+        out.push({ id: `rate-${b.id}${platformIdSuffix(p)}`, level: "low", title: `${name} chưa có giá`, detail: "Chưa có giá thì Finance & P&L và Dashboard không tính được doanh thu, lãi.", tab: "crm", rememberBrandId: b.id, rememberPlatform: p, action: "Nhập ở CRM" });
       }
     }
 

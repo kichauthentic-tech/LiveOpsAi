@@ -3,7 +3,7 @@ import { assertAffected } from "./assertAffected";
 import { parseSnapshotFile } from "../liveSnapshot/extractRooms";
 import { parseDataRawExcel } from "../dataraw/parseDataRawExcel";
 import { readShopeeStreams, shopeeStreamsToReconRows } from "../dataraw/shopeeFiles";
-import type { ReportPlatform } from "../reportPlatform";
+import { platformOf, type ReportPlatform } from "../reportPlatform";
 
 export type ReconciliationBucket = "agency" | "review" | "unassigned" | "inhouse";
 
@@ -67,7 +67,7 @@ function batchFromDb(b: DbBatch): ReconciliationBatch {
   return {
     id: b.id,
     brandId: b.brand_id ?? undefined,
-    platform: b.platform ?? "TikTok",
+    platform: platformOf(b),
     fileName: b.file_name ?? undefined,
     periodLabel: b.period_label ?? undefined,
     periodStart: b.period_start ?? undefined,
@@ -131,24 +131,22 @@ export async function fetchLatestReconciliationRows(): Promise<{ batchId: string
   return { batchId: row.id, rows: (row.live_reconciliation_rows ?? []).map(rowFromDb) };
 }
 
+// Bộ đọc file đối soát của từng sàn (hồ sơ sàn: `reconciliationFile`). Record đủ mọi sàn ⇒ thêm sàn mà quên bộ đọc là lỗi compile.
+const RECON_FILE_READERS: Record<ReportPlatform, (file: File) => Promise<{ rows: unknown[]; periodLabel?: string; periodStart?: string; periodEnd?: string }>> = {
+  // Creator-Live-Performance của TikTok: một dòng mỗi PHÒNG (Room ID, số cộng dồn).
+  TikTok: (file) => parseSnapshotFile(file),
+  // Live List của Shopee Seller Centre: mỗi phiên một dòng, đi qua CÙNG đường đối soát (GMV = doanh số đặt).
+  Shopee: async (file) => {
+    const parsed = await parseDataRawExcel(file, "shopee_live_list");
+    return { rows: shopeeStreamsToReconRows(readShopeeStreams(parsed.rows)), periodLabel: parsed.periodLabel, periodStart: parsed.periodStart, periodEnd: parsed.periodEnd };
+  }
+};
+
 // Chỉ nạp + tự khớp room với ca, CHƯA ghi gì vào live_sessions — ops xem rổ rồi mới bấm áp dụng.
 // `brandId` bắt buộc (0133): file Creator-Live-Performance là của MỘT tài khoản; khớp theo giờ với mọi brand thì
 // phiên của CROCS rơi vào ca JOCKEY cùng giờ và GMV bị chia sang đó.
 export async function importReconciliationFile(file: File, brandId: string, platform: ReportPlatform = "TikTok"): Promise<string> {
-  let periodLabel: string | undefined;
-  let periodStart: string | undefined;
-  let periodEnd: string | undefined;
-  let rows: unknown[];
-  if (platform === "Shopee") {
-    // Live List của Shopee Seller Centre: mỗi phiên một dòng, đi qua CÙNG đường đối soát (GMV = doanh số đặt).
-    const parsed = await parseDataRawExcel(file, "shopee_live_list");
-    rows = shopeeStreamsToReconRows(readShopeeStreams(parsed.rows));
-    ({ periodLabel, periodStart, periodEnd } = parsed);
-  } else {
-    const parsed = await parseSnapshotFile(file);
-    rows = parsed.rows;
-    ({ periodLabel, periodStart, periodEnd } = parsed);
-  }
+  const { rows, periodLabel, periodStart, periodEnd } = await RECON_FILE_READERS[platform](file);
   const { data, error } = await supabase.rpc("import_live_reconciliation", {
     p_file_name: file.name,
     p_period_label: periodLabel ?? null,

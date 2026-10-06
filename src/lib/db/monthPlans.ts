@@ -4,7 +4,7 @@ import { prefetchable } from "./prefetch";
 import { fetchAllPages } from "./fetchAllPages";
 import { LockedPlanRow, LockedPlanTargets, lockedPlanTargetsFromRows } from "../scheduling/lockedPlanTargets";
 import { BrandMonthPlan, BrandMonthPlanSlot, CalendarEventRow, PlanCampRanges } from "../../types";
-import { brandPlatformKey, type ReportPlatform } from "../reportPlatform";
+import { platformOf, brandPlatformKey, type ReportPlatform } from "../reportPlatform";
 
 // Kế Hoạch Tháng (0090). Bảng nhỏ (1 dòng plan + ≤ ~100 ca/brand/tháng) — đọc theo brand+tháng,
 // ghi ca kế hoạch bằng cách thay cả lô (xoá dòng không còn, upsert dòng còn) để UI lưới không phải
@@ -49,7 +49,7 @@ const planFromDb = (r: DbPlan): BrandMonthPlan => ({
   id: r.id,
   brandId: r.brand_id,
   month: r.month.slice(0, 7),
-  platform: r.platform === "Shopee" ? "Shopee" : "TikTok",
+  platform: platformOf(r),
   status: r.status,
   defaultSlotHours: Number(r.default_slot_hours),
   liveWindowStart: hhmm(r.live_window_start),
@@ -104,7 +104,7 @@ export async function fetchMonthPlan(
     if (error) throw error;
     return (data ?? []) as (DbPlan & { brand_month_plan_slots: DbPlanSlot[] })[];
   });
-  const data = rows.find((r) => (r.platform === "Shopee" ? "Shopee" : "TikTok") === platform);
+  const data = rows.find((r) => platformOf(r) === platform);
   if (!data) return null;
   return { plan: planFromDb(data), slots: (data.brand_month_plan_slots ?? []).map(slotFromDb) };
 }
@@ -277,7 +277,7 @@ export async function fetchBrandLockedPlanSlots(brandId: string, platform: Repor
   return ((data as Row[]) ?? [])
     .filter((r) => {
       const plan = Array.isArray(r.plan) ? r.plan[0] : r.plan;
-      return (plan?.platform === "Shopee" ? "Shopee" : "TikTok") === platform;
+      return platformOf(plan ?? {}) === platform;
     })
     .map(slotFromDb);
 }

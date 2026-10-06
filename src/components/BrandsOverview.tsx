@@ -5,7 +5,7 @@ import { brandPriceLabel } from "../lib/brandPricing";
 import { Download, LayoutGrid, Loader2 } from "lucide-react";
 import { Brand, BrandChannel, BrandMonthlyReport, BrandMonthPlan, BrandPlatformRate, LiveSession } from "../types";
 import { planStatusesRead } from "../lib/db/monthPlans";
-import { brandMonthKey, brandPlatformKey, type ReportPlatform } from "../lib/reportPlatform";
+import { channelTitle, platformOf, brandMonthKey, brandPlatformKey, type ReportPlatform } from "../lib/reportPlatform";
 import { platformsOfBrand } from "../lib/channels";
 import { commitmentsRead, fetchBrandMonthlyCommitments } from "../lib/db/brandContracts";
 import type { TabPrefetchCtx } from "../lib/db/prefetch";
@@ -144,11 +144,11 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ platform, brands
         const key = brandPlatformKey(b.id, p);
         const plan = planStatuses.get(key);
         const progress = progressByBrand.get(key);
-        const s = summarize(filterLedger(sessions.filter((x) => (x.platform ?? "TikTok") === p), { month, brandId: b.id }, today), today);
+        const s = summarize(filterLedger(sessions.filter((x) => platformOf(x) === p), { month, brandId: b.id }, today), today);
         return {
           brand: b,
           platform: p,
-          label: multi || p === "Shopee" ? `${b.name} · ${p}` : b.name,
+          label: channelTitle(b.name, p, multi),
           plan,
           planStatus: (plan?.status ?? "none") as BrandMonthPlan["status"] | "none",
           progress,

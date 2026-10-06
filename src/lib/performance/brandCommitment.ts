@@ -1,7 +1,7 @@
 import { BrandContract, BrandMonthlyCommitment, LiveSession, ShiftSlot } from "../../types";
 import { sessionDurationHours } from "../pnl";
 import { isUnconfirmedPast } from "../sessionStatus";
-import { brandPlatformKey } from "../reportPlatform";
+import { platformOf, brandPlatformKey } from "../reportPlatform";
 
 // Giai đoạn 4 của tầng dữ liệu gốc mới: đối chiếu CAM KẾT (brand ký bao nhiêu giờ/tháng) với
 // THỰC TẾ + ĐANG XẾP. Giai đoạn 3 trả lời "host nào làm tốt", tầng này trả lời câu đứng trước nó:
@@ -130,9 +130,9 @@ export function computeCommitmentProgress(
   sessions: LiveSession[],
   today: string = todayVn()
 ): CommitmentProgress {
-  const platform = commitment.platform ?? "TikTok";
+  const platform = platformOf(commitment);
   const inScope = sessions.filter(
-    (s) => s.brandId === commitment.brandId && (s.platform ?? "TikTok") === platform && monthKeyOf(s.date) === commitment.periodMonth
+    (s) => s.brandId === commitment.brandId && platformOf(s) === platform && monthKeyOf(s.date) === commitment.periodMonth
   );
 
   let deliveredHours = 0, deliveredSessions = 0, deliveredGmv = 0;
@@ -288,7 +288,7 @@ export function contractCovering(
     .filter(
       (c) =>
         c.brandId === brandId &&
-        (c.platform ?? "TikTok") === platform &&
+        platformOf(c) === platform &&
         c.status === "active" &&
         c.startMonth <= periodMonth &&
         (!c.endMonth || c.endMonth >= periodMonth)
@@ -330,7 +330,7 @@ export function monthCommitmentOf(
   platform: "TikTok" | "Shopee",
   periodMonth: string
 ): MonthCommitment {
-  const row = commitments.find((c) => c.brandId === brandId && (c.platform ?? "TikTok") === platform && c.periodMonth === periodMonth);
+  const row = commitments.find((c) => c.brandId === brandId && platformOf(c) === platform && c.periodMonth === periodMonth);
   const contract = contractCovering(contracts, brandId, platform, periodMonth);
   if (row) return { hours: row.committedHours, gmv: row.committedGmv, source: row.isOverride ? "month" : "contract", row, contract };
   if (contract) return { hours: contract.monthlyHours, gmv: contract.monthlyGmv, source: "contract", contract };
