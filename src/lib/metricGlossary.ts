@@ -51,6 +51,15 @@ export const METRIC = {
   gmvPerView: "GMV/View",
   showGpm: "Show GPM",
   watchGpm: "Watch GPM",
+  viewers: "Viewers", // Shopee: người xem riêng biệt (không cùng cách đếm với Views của TikTok)
+  viewersPerHour: "Viewers/giờ",
+  atc: "ATC", // Shopee: Add-to-cart, số lần thêm vào giỏ trong phiên
+  atcRate: "ATC/Viewer", // Shopee: ATC ÷ Viewers (%)
+  checkout: "CO", // Shopee: Checkout, số lần bấm thanh toán
+  coRate: "CO/ATC", // Shopee: CO ÷ ATC (%)
+  orderPerAtc: "Orders/ATC", // Shopee: Orders ÷ ATC (%)
+  gpm: "GPM", // Shopee: GMV trên 1.000 Viewers
+  coins: "Xu đã tung",
   refunds: "Refunds",
   refundRate: "Refund rate",
   returnCancelRate: "Tỷ lệ hoàn hủy",
@@ -113,6 +122,15 @@ export const METRIC_HINT: Record<string, string> = {
   [METRIC.gmvPerView]: "GMV ÷ Views",
   [METRIC.showGpm]: "GMV trên 1.000 LIVE impressions",
   [METRIC.watchGpm]: "GMV trên 1.000 Views",
+  [METRIC.viewers]: "Shopee: số người xem riêng biệt trong phiên (không cùng cách đếm với Views của TikTok, đừng đem so với TikTok)",
+  [METRIC.viewersPerHour]: "Viewers ÷ Giờ live",
+  [METRIC.atc]: "Shopee Add-to-cart: số lần người xem thêm sản phẩm vào giỏ trong phiên — chỉ các ca có số ATC",
+  [METRIC.atcRate]: "ATC ÷ Viewers — bao nhiêu người xem bấm thêm giỏ; chỉ các ca có số ATC",
+  [METRIC.checkout]: "Shopee Checkout: số lần bấm thanh toán — chỉ các ca có số CO",
+  [METRIC.coRate]: "CO ÷ ATC — bao nhiêu giỏ đi tới bước thanh toán; chỉ các ca có cả hai số",
+  [METRIC.orderPerAtc]: "Orders ÷ ATC — bao nhiêu lượt thêm giỏ thành đơn đặt; chỉ các ca có cả hai số (số đơn có sau khi đối soát Live List)",
+  [METRIC.gpm]: "GMV trên 1.000 Viewers (Shopee: GPM)",
+  [METRIC.coins]: "Xu shop tung trong live (quy 1 xu thành 1 đồng); chỉ các ca có khai số xu",
   [METRIC.refundRate]: "Refunds ÷ GMV — hoàn tiền thực tế của shop trong kỳ",
   [METRIC.returnCancelRate]: "Tỷ lệ hoàn hủy giả định nhập ở CRM (Hợp đồng & giá), dùng để ước tính NMV",
   [METRIC.roas]: "GMV ÷ Ads cost",

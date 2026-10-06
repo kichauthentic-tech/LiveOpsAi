@@ -10,6 +10,8 @@ import { errorMessage } from "../../lib/errorMessage";
 import { useConfirm } from "../../hooks/useConfirm";
 
 interface BrandDataRawProps {
+  /** Sàn của workspace (07/10): chỉ hiện 6 loại file TikTok hoặc 4 loại file Shopee, không còn nút chuyển sàn trong màn. */
+  platform: "TikTok" | "Shopee";
   brandId: string;
   brandName: string;
   currentRole: UserRole;
@@ -105,10 +107,12 @@ export function prefetchBrandDataRaw({ brandId }: TabPrefetchCtx): void {
   if (brandId) dataRawImportsRead.prefetch(brandId, DEFAULT_REPORT_TYPE);
 }
 
-export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ brandId, brandName, currentRole, sessions, talents, onSessionsChanged }) => {
+export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ platform, brandId, brandName, currentRole, sessions: allSessions, talents, onSessionsChanged }) => {
   const confirm = useConfirm();
   const canManage = CAN_MANAGE.includes(currentRole);
-  const [activeType, setActiveType] = useState<DataRawReportType>(DEFAULT_REPORT_TYPE);
+  const [activeType, setActiveType] = useState<DataRawReportType>(platform === "Shopee" ? SHOPEE_TABS[0].id : DEFAULT_REPORT_TYPE);
+  // Nạp bù ca chỉ cho ca đúng sàn của workspace.
+  const sessions = useMemo(() => allSessions.filter((s) => (s.platform ?? "TikTok") === platform), [allSessions, platform]);
   const [imports, setImports] = useState<BrandDataRawImport[]>([]);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -233,7 +237,7 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ brandId, brandName, 
           <Database className="w-5 h-5 text-[var(--accent)]" /> Dữ Liệu Gốc — {brandName}
         </h2>
         <p className="text-xs text-[var(--text-muted)] mt-1">
-          Nơi lưu nguyên trạng report Excel tải tay từ TikTok Shop và Shopee mỗi tuần/tháng (chọn sàn ở nút TikTok / Shopee). Đây là cơ sở để dựng report + đối soát cuối tháng, sau này cần tra chỉ số nào chỉ cần mở lại import đúng kỳ. Up lại file trong cùng một tháng sẽ thay bản cũ của tháng đó (file TikTok luôn cộng dồn từ đầu tháng).
+          Nơi lưu nguyên trạng report Excel tải tay từ {platform === "Shopee" ? "Shopee Seller Centre" : "TikTok Shop"} mỗi tuần/tháng (workspace này chỉ có file của sàn {platform}). Đây là cơ sở để dựng report + đối soát cuối tháng, sau này cần tra chỉ số nào chỉ cần mở lại import đúng kỳ. Up lại file trong cùng một tháng sẽ thay bản cũ của tháng đó {platform === "TikTok" ? "(file TikTok luôn cộng dồn từ đầu tháng)" : ""}.
         </p>
       </div>
 
@@ -242,21 +246,6 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ brandId, brandName, 
           <AlertTriangle className="w-4 h-4 shrink-0" /> {error}
         </div>
       )}
-
-      <div className="inline-flex items-center gap-1 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-1" role="group" aria-label="Sàn của file">
-        {(["TikTok", "Shopee"] as const).map((pl) => (
-          <button
-            key={pl}
-            onClick={() => setActiveType(pl === "Shopee" ? SHOPEE_TABS[0].id : DEFAULT_REPORT_TYPE)}
-            aria-pressed={sourcePlatform === pl}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-              sourcePlatform === pl ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)] hover:bg-[var(--surface-elevated)]"
-            }`}
-          >
-            {pl}
-          </button>
-        ))}
-      </div>
 
       <div className="flex flex-wrap gap-2 border-b border-[var(--border)] pb-3">
         {visibleTabs.map((t) => (

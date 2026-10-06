@@ -19,8 +19,12 @@ import { PageIntro } from "./common/PageIntro";
 import { fmtDateVn, fmtFixed, fmtVndShort } from "../lib/format";
 import { METRIC, metricHint } from "../lib/metricGlossary";
 import { fmtKeyMetric, KEY_METRICS, keyMetricValue } from "../lib/report/keyMetrics";
+import { fmtShopeeMetric, shopeeMetricValue, SHOPEE_METRICS } from "../lib/report/shopeeKeyMetrics";
+import { byHostShopee, splitUnassignedShopee } from "../lib/performance/shopeeHostPerformance";
 import { inPlatformScope, type PlatformScope } from "../lib/reportPlatform";
 interface HostPerformanceProps {
+  /** Sàn của workspace agency (07/10) — hai sàn không xếp hạng chung. */
+  platform: PlatformScope;
   sessions: LiveSession[];
   brands: Brand[];
 }
@@ -38,16 +42,15 @@ function isoDaysAgo(days: number): string {
 
 const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0]; // Thứ 2 → Chủ nhật
 const RANK_COLS = KEY_METRICS.filter((d) => d.key !== "gmvPerHour");
+const SHOPEE_RANK_COLS = SHOPEE_METRICS.filter((d) => d.key !== "gmvPerHour");
 
-export function HostPerformance({ sessions, brands }: HostPerformanceProps) {
+export function HostPerformance({ platform, sessions, brands }: HostPerformanceProps) {
   const { showToast } = useToast();
   const [from, setFrom] = useState(() => isoDaysAgo(90));
   const [to, setTo] = useState(() => getTodayDate());
   const [brandId, setBrandId] = useState("");
   // Xếp hạng theo TỪNG SÀN (06/10): GMV/giờ hai sàn khác hẳn nhau (VERA Shopee ~1,6x TikTok T6–T9) — gộp lại thì host
   // đứng nhiều ca Shopee tự nhiên lên top. Mặc định TikTok; "cả 2 sàn" vẫn chọn được nhưng ghi rõ là không nên so.
-  const hasShopee = useMemo(() => sessions.some((s) => s.platform === "Shopee"), [sessions]);
-  const [platform, setPlatform] = useState<PlatformScope>("TikTok");
 
   const scoped = useMemo(
     () => filterSessions(sessions.filter((s) => inPlatformScope(s, platform)), { from, to, brandId: brandId || undefined }),
@@ -56,7 +59,11 @@ export function HostPerformance({ sessions, brands }: HostPerformanceProps) {
 
   // Ca chưa gán host tách khỏi xếp hạng (audit 2026-09-21): trước đây nó đứng chung bảng như một
   // "host" tên "Chưa gán host" và chiếm luôn một hạng trong top.
-  const { ranked: hosts, unassigned: unassignedHost } = useMemo(() => splitUnassignedHost(byHost(scoped)), [scoped]);
+  const { ranked: tiktokHosts, unassigned: unassignedHost } = useMemo(() => splitUnassignedHost(byHost(scoped)), [scoped]);
+  // Sàn Shopee có cột riêng (Viewers/ATC/CO/GPM/Xu) — file Shopee không có impressions/click/CTR/CTOR của TikTok.
+  const shopeeOnly = platform === "Shopee";
+  const { ranked: shopeeHosts } = useMemo(() => (shopeeOnly ? splitUnassignedShopee(byHostShopee(scoped)) : { ranked: [] }), [shopeeOnly, scoped]);
+  const hosts = tiktokHosts;
   const weekdays = useMemo(() => byWeekday(scoped), [scoped]);
   const grid = useMemo(() => hostWeekdayGrid(scoped), [scoped]);
   const quality = useMemo(() => dataQuality(scoped), [scoped]);
@@ -71,6 +78,14 @@ export function HostPerformance({ sessions, brands }: HostPerformanceProps) {
   // Excel còn lọc/xếp/tính được — đây là chỗ khác duy nhất so với màn hình, và là cả lý do xuất file.
   // Ô trống = chỉ số không có dữ liệu, đúng chỗ màn hình in "—"; không ghi 0 vào, 0 là một con số thật.
   const exportXlsx = () => {
+    const shopeeRank = shopeeHosts.map((h) => {
+      const row: Record<string, string | number> = { Host: h.label, "Số ca": h.sessionCount, [METRIC.gmvPerHour]: h.gmvPerHour ?? "" };
+      for (const d of SHOPEE_RANK_COLS) {
+        const v = shopeeMetricValue(h, d.key);
+        row[d.label] = v == null || Number.isNaN(v) ? "" : v;
+      }
+      return row;
+    });
     const rank = hosts.map((h) => {
       const row: Record<string, string | number> = { Host: h.label, "Số ca": h.sessionCount, [METRIC.gmvPerHour]: h.gmvPerHour ?? "" };
       for (const d of RANK_COLS) {
@@ -89,10 +104,10 @@ export function HostPerformance({ sessions, brands }: HostPerformanceProps) {
       return row;
     });
     const wd: Record<string, string | number>[] = weekdays.map((w) => ({ Thứ: w.label, [METRIC.gmvPerHour]: w.gmvPerHour ?? "", "Số ca": w.sessionCount }));
-    const scope = `${brandId ? (brands.find((b) => b.id === brandId)?.name ?? "brand") : "tat-ca-brand"}_${platform === "all" ? "2-san" : platform}`;
+    const scope = `${brandId ? (brands.find((b) => b.id === brandId)?.name ?? "brand") : "tat-ca-brand"}_${platform}`;
     downloadSheetsAsXlsx(
       [
-        { name: "Xep hang host", rows: rank },
+        { name: "Xep hang host", rows: shopeeOnly ? shopeeRank : rank },
         { name: "Host x Thu", rows: gridRows },
         { name: "Hieu suat theo Thu", rows: wd }
       ],
@@ -121,13 +136,6 @@ export function HostPerformance({ sessions, brands }: HostPerformanceProps) {
                 <option key={b.id} value={b.id}>{b.name}</option>
               ))}
             </select>
-            {hasShopee && (
-              <select value={platform} onChange={(e) => setPlatform(e.target.value as PlatformScope)} className={inputCls} aria-label="Sàn">
-                <option value="TikTok">TikTok</option>
-                <option value="Shopee">Shopee</option>
-                <option value="all">Cả 2 sàn (không nên so)</option>
-              </select>
-            )}
             <button
               onClick={exportXlsx}
               disabled={hosts.length === 0}
@@ -150,7 +158,7 @@ export function HostPerformance({ sessions, brands }: HostPerformanceProps) {
               {/* Ghi kỳ ngay cạnh con số (audit người mới 2026-10-04): Talent Pool cộng MỌI tháng nên cùng một host
                   hai màn ra hai số — trước đây chỉ Talent Pool có câu giải thích. */}
               <b className="text-[var(--text)]">{fmtDateVn(from)} – {fmtDateVn(to)}{from === isoDaysAgo(90) ? " (90 ngày gần nhất)" : ""}</b>
-              {hasShopee && <> · <b className="text-[var(--text)]">{platform === "all" ? "cả 2 sàn — GMV/giờ hai sàn khác nhau, đừng so host giữa hai sàn" : `chỉ ca ${platform}`}</b></>}
+              {" · "}<b className="text-[var(--text)]">chỉ ca {platform}</b>
               {" · "}{quality.total} ca có số liệu: <span className="font-bold text-emerald-400">{quality.reconciled} đã đối soát</span>,{" "}
               <span className="font-bold text-sky-400">{quality.snapshot} số lúc giao ca</span>
               {quality.manual > 0 && (
@@ -192,23 +200,35 @@ export function HostPerformance({ sessions, brands }: HostPerformanceProps) {
                   <tr className="text-[var(--text-faint)] text-left text-[11px]">
                     <th className="font-bold pb-2 pr-3 sticky left-0 bg-[var(--surface)]">Host</th>
                     <th className="font-bold pb-2 pr-3 text-right whitespace-nowrap" title={metricHint(METRIC.gmvPerHour)}>{METRIC.gmvPerHour}</th>
-                    {RANK_COLS.map((d) => (
+                    {(shopeeOnly ? SHOPEE_RANK_COLS : RANK_COLS).map((d) => (
                       <th key={d.key} className="font-bold pb-2 pr-3 text-right whitespace-nowrap" title={metricHint(d.label)}>{d.label}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {hosts.map((h) => (
-                    <tr key={h.key} className="border-t border-[var(--border)]/60">
-                      <td className="py-2 pr-3 font-bold text-[var(--text)] whitespace-nowrap sticky left-0 bg-[var(--surface)]">
-                        {h.label} <span className="font-normal text-[var(--text-faint)]">· {h.sessionCount} ca</span>
-                      </td>
-                      <td className="py-2 pr-3 text-right font-bold text-emerald-400 whitespace-nowrap">{fmtVndShort(h.gmvPerHour)}</td>
-                      {RANK_COLS.map((d) => (
-                        <td key={d.key} className="py-2 pr-3 text-right text-[var(--text-muted)] whitespace-nowrap">{fmtKeyMetric(d, keyMetricValue(h, d.key))}</td>
+                  {shopeeOnly
+                    ? shopeeHosts.map((h) => (
+                        <tr key={h.key} className="border-t border-[var(--border)]/60">
+                          <td className="py-2 pr-3 font-bold text-[var(--text)] whitespace-nowrap sticky left-0 bg-[var(--surface)]">
+                            {h.label} <span className="font-normal text-[var(--text-faint)]">· {h.sessionCount} ca</span>
+                          </td>
+                          <td className="py-2 pr-3 text-right font-bold text-emerald-400 whitespace-nowrap">{fmtVndShort(h.gmvPerHour)}</td>
+                          {SHOPEE_RANK_COLS.map((d) => (
+                            <td key={d.key} className="py-2 pr-3 text-right text-[var(--text-muted)] whitespace-nowrap">{fmtShopeeMetric(d, shopeeMetricValue(h, d.key))}</td>
+                          ))}
+                        </tr>
+                      ))
+                    : hosts.map((h) => (
+                        <tr key={h.key} className="border-t border-[var(--border)]/60">
+                          <td className="py-2 pr-3 font-bold text-[var(--text)] whitespace-nowrap sticky left-0 bg-[var(--surface)]">
+                            {h.label} <span className="font-normal text-[var(--text-faint)]">· {h.sessionCount} ca</span>
+                          </td>
+                          <td className="py-2 pr-3 text-right font-bold text-emerald-400 whitespace-nowrap">{fmtVndShort(h.gmvPerHour)}</td>
+                          {RANK_COLS.map((d) => (
+                            <td key={d.key} className="py-2 pr-3 text-right text-[var(--text-muted)] whitespace-nowrap">{fmtKeyMetric(d, keyMetricValue(h, d.key))}</td>
+                          ))}
+                        </tr>
                       ))}
-                    </tr>
-                  ))}
                 </tbody>
               </table>
             </div>

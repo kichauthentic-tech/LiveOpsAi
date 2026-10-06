@@ -25,8 +25,8 @@ import { PageIntro } from "./common/PageIntro";
 interface SessionLedgerProps {
   variant: "agency" | "brand";
   sessions: LiveSession[];
-  /** Sàn đang xem ở Brand workspace (bộ chuyển sàn); Agency không truyền = cả hai sàn. */
-  platformScope?: PlatformScope;
+  /** Sàn của workspace (07/10: mỗi sàn một workspace, không còn "cả hai sàn"). */
+  platformScope: PlatformScope;
   brands: Brand[];
   brandId?: string; // bắt buộc với variant brand
   currentRole: UserRole;
@@ -106,7 +106,7 @@ const LockedCell: React.FC = () => (
 export const SessionLedger: React.FC<SessionLedgerProps> = ({
   variant,
   sessions,
-  platformScope = "all",
+  platformScope,
   brands,
   brandId,
   currentRole,
@@ -127,7 +127,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
   const today = getTodayDate();
 
   const scoped = useMemo(
-    () => (isBrandView && brandId ? sessions.filter((s) => s.brandId === brandId && inPlatformScope(s, platformScope)) : sessions),
+    () => (isBrandView && brandId ? sessions.filter((s) => s.brandId === brandId && inPlatformScope(s, platformScope)) : sessions.filter((s) => inPlatformScope(s, platformScope))),
     [sessions, isBrandView, brandId, platformScope]
   );
 
@@ -177,7 +177,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
   // Không lọc theo tháng đang chọn: cả điểm của khối này là tìm lại được ca đã loại, mà người đi
   // tìm thường không nhớ nó nằm tháng nào. Số lượng luôn rất nhỏ.
   const excludedScoped = useMemo(
-    () => (isBrandView && brandId ? excludedSessions.filter((s) => s.brandId === brandId && inPlatformScope(s, platformScope)) : excludedSessions)
+    () => (isBrandView && brandId ? excludedSessions.filter((s) => s.brandId === brandId && inPlatformScope(s, platformScope)) : excludedSessions.filter((s) => inPlatformScope(s, platformScope)))
       .slice()
       .sort((a, b) => b.date.localeCompare(a.date)),
     [excludedSessions, isBrandView, brandId, platformScope]
@@ -242,7 +242,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
             </h2>
             <PageIntro>
               {isBrandView
-                ? "Từng ca live đã chạy cho brand: giờ live thật, GMV, đơn, lượt xem. Số “Tạm tính” còn chờ TikTok cập nhật, “Đã chốt” là số đối soát cuối kỳ."
+                ? "Từng ca live đã chạy cho brand: giờ live thật, GMV, đơn, lượt xem. Số “Tạm tính” còn chờ sàn cập nhật, “Đã chốt” là số đối soát cuối kỳ."
                 : "Từng ca đã/đang chạy: số thật của ca, số đó tin được tới đâu, và còn thiếu bước nào (TikTok: up file → giao ca; Shopee: giao ca; rồi đối soát) để chốt tháng."}
             </PageIntro>
             {hiddenCount > 0 && (

@@ -50,17 +50,21 @@ import { CampDayBucket, CampOverrides, effectiveCamp } from "../lib/campaignDays
 import { getBrandTheme } from "../lib/brandTheme";
 import { fmtVndShort } from "../lib/format";
 import { fmtKeyMetric, KEY_METRICS, keyMetricValue } from "../lib/report/keyMetrics";
+import { isCountable, sessionHours } from "../lib/performance/hostPerformance";
+import { fmtShopeeMetric, shopeeKeyMetricsOfSessions, shopeeMetricValue, SHOPEE_METRICS, type ShopeeKeyMetrics } from "../lib/report/shopeeKeyMetrics";
 import { BrandLogo } from "./ui/BrandLogo";
 import { PageIntro } from "./common/PageIntro";
 import { MonthPicker } from "./common/MonthPicker";
 import type { TabPrefetchCtx } from "../lib/db/prefetch";
-import { brandMonthKey, brandPlatformKey, brandPlatformsOf, inPlatformScope, PLATFORM_SCOPE_LABEL, type PlatformScope, type ReportPlatform } from "../lib/reportPlatform";
+import { brandMonthKey, brandPlatformKey, brandPlatformsOf, inPlatformScope, PLATFORM_SCOPE_LABEL, type ReportPlatform } from "../lib/reportPlatform";
 
 // Bản Tin CEO (2026-09-25) — thay Toàn Cảnh Agency. Mọi luật số nằm ở lib/performance/ceoBrief.ts;
 // file này chỉ trình bày. Khối tiền chỉ ceo/admin thấy, và chỉ cộng ca ĐỦ dữ liệu để tính tiền
 // (không in số tính trên rate = 0 hay % mặc định trong code).
 
 interface CeoBriefProps {
+  /** Sàn của workspace agency (07/10). */
+  platform: ReportPlatform;
   sessions: LiveSession[];
   brands: Brand[];
   talents: Talent[];
@@ -187,7 +191,7 @@ export function prefetchCeoBrief(_ctx: TabPrefetchCtx): void {
 }
 
 export default function CeoBrief(props: CeoBriefProps) {
-  const { sessions, brands, talents, shiftSlots, planSlotTargets, planMonthTotals, financeRecords, brandPlatformRates, brandPlatformRateHistory, talentRateHistory, currentRole, onNavigate } = props;
+  const { platform, sessions, brands, talents, shiftSlots, planSlotTargets, planMonthTotals, financeRecords, brandPlatformRates, brandPlatformRateHistory, talentRateHistory, currentRole, onNavigate } = props;
   const today = todayVn();
   const canSeeMoney = currentRole === "ceo" || currentRole === "admin";
   const [grain, setGrain] = useState<Grain>("month");
@@ -198,17 +202,14 @@ export default function CeoBrief(props: CeoBriefProps) {
   });
   const [customEnd, setCustomEnd] = useState(today);
   const [brandId, setBrandId] = useState<string>("all");
-  // Sàn (06/10): target, run-rate, dự phóng tính riêng từng kênh brand × sàn rồi mới cộng — kế hoạch TikTok không đem so
-  // với GMV Shopee. "all" = cộng hai sàn.
-  const [platform, setPlatform] = useState<PlatformScope>("all");
+  // Sàn do workspace agency quyết định (07/10): hai sàn không gộp được nên Bản Tin CEO chỉ có MỘT sàn, không có "cả 2 sàn".
   const [plans, setPlans] = useState<Map<string, BrandMonthPlan>>(new Map());
   const [nextPlans, setNextPlans] = useState<Map<string, BrandMonthPlan>>(new Map());
   const tooltip = useTooltip();
 
   const scopeIds = useMemo(() => (brandId === "all" ? brands.map((b) => b.id) : [brandId]), [brandId, brands]);
-  const platformSessions = useMemo(() => (platform === "all" ? sessions : sessions.filter((s) => inPlatformScope(s, platform))), [sessions, platform]);
+  const platformSessions = useMemo(() => sessions.filter((s) => inPlatformScope(s, platform)), [sessions, platform]);
   const scopeSessions = useMemo(() => platformSessions.filter((s) => scopeIds.includes(s.brandId)), [platformSessions, scopeIds]);
-  const hasShopee = useMemo(() => sessions.some((s) => s.platform === "Shopee"), [sessions]);
   const dataEnd = useMemo(() => lastDataDate(scopeSessions, today), [scopeSessions, today]);
   const period = useMemo(() => periodFor(grain, anchor, today, dataEnd, customEnd), [grain, anchor, today, dataEnd, customEnd]);
   const month = (grain === "month" ? anchor : period.start).slice(0, 7);
@@ -250,6 +251,14 @@ export default function CeoBrief(props: CeoBriefProps) {
     const from = grain === "day" || period.end === period.start ? addDays(period.end, -13) : period.start;
     return eachDay(from, period.end);
   }, [grain, period, hasPeriod]);
+  const shopeeOnly = platform === "Shopee";
+  const curS = useMemo(() => (shopeeOnly ? shopeeTotalsOf(curSessions) : null), [shopeeOnly, curSessions]);
+  const prevS = useMemo(() => (shopeeOnly ? shopeeTotalsOf(prevSessions) : null), [shopeeOnly, prevSessions]);
+  const seriesS = (pick: (t: ShopeeKeyMetrics) => number | null) => {
+    const byDate = new Map<string, LiveSession[]>();
+    for (const s of scopeSessions) if (s.date >= (sparkDays[0] ?? "9") && s.date <= period.end) byDate.set(s.date, [...(byDate.get(s.date) ?? []), s]);
+    return sparkDays.map((d) => pick(shopeeTotalsOf(byDate.get(d) ?? [])) ?? 0);
+  };
   const series = (pick: (t: Totals) => number | null) => {
     const byDate = new Map<string, LiveSession[]>();
     for (const s of scopeSessions) if (s.date >= (sparkDays[0] ?? "9") && s.date <= period.end) byDate.set(s.date, [...(byDate.get(s.date) ?? []), s]);
@@ -391,15 +400,10 @@ export default function CeoBrief(props: CeoBriefProps) {
             <option value="all">Tất cả brand</option>
             {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
-          {hasShopee && (
-            <select value={platform} onChange={(e) => setPlatform(e.target.value as PlatformScope)} className={inputCls} aria-label="Sàn">
-              {(["all", "TikTok", "Shopee"] as PlatformScope[]).map((p) => <option key={p} value={p}>{p === "all" ? "Cả 2 sàn" : p}</option>)}
-            </select>
-          )}
         </div>
         <p className="text-sm text-[var(--text-muted)]">
           Đang xem <b className="text-[var(--text)]">{periodLabel}</b>
-          {hasShopee && <> · {platform === "all" ? "cộng 2 sàn (target, run-rate tính riêng từng sàn rồi cộng)" : PLATFORM_SCOPE_LABEL[platform]}</>}
+          {" · "}<b className="text-[var(--text)]">{PLATFORM_SCOPE_LABEL[platform]}</b>
           {hasPeriod && <> · mũi tên {compareLabel}</>}
           {period.cutByData && <span className="text-amber-300"> · kỳ cắt tới {ddmm(period.end)} vì số liệu mới về tới ngày đó</span>}
         </p>
@@ -413,9 +417,18 @@ export default function CeoBrief(props: CeoBriefProps) {
             <Kpi empty={noCur} label="LIVE GMV" value={money(cur.gmv)} cur={cur.gmv} prev={prev.gmv} extra={`${num(cur.sessions)} ca`} series={series((t) => t.gmv)} />
             <Kpi empty={noCur} label="Giờ live" value={hrs(cur.hours)} cur={cur.hours} prev={prev.hours} series={series((t) => t.hours)} />
             <Kpi empty={noCur} label="GMV/giờ" value={money(cur.gmvPerHour)} cur={cur.gmvPerHour} prev={prev.gmvPerHour} series={series((t) => t.gmvPerHour)} />
-            <Kpi empty={noCur} label="Orders" value={num(cur.orders)} cur={cur.orders} prev={prev.orders} extra={cur.aov ? `AOV ${money(cur.aov)}` : undefined} series={series((t) => t.orders)} />
-            <Kpi empty={noCur} label="Views" value={num(cur.views)} cur={cur.views} prev={prev.views} series={series((t) => t.views)} />
-            <Kpi empty={noCur} label="Product CTR" value={fmtKeyMetric("pct2", cur.ctr)} cur={cur.ctr} prev={prev.ctr} series={series((t) => t.ctr)} />
+            <Kpi empty={noCur} label="Orders" value={platform === "Shopee" && cur.orders === 0 ? "—" : num(cur.orders)} cur={cur.orders} prev={prev.orders} extra={cur.aov ? `AOV ${money(cur.aov)}` : undefined} series={series((t) => t.orders)} />
+            {shopeeOnly && curS && prevS ? (
+              <>
+                <Kpi empty={noCur} label="Viewers" value={curS.viewers > 0 ? num(curS.viewers) : "—"} cur={curS.viewers} prev={prevS.viewers} series={seriesS((t) => t.viewers)} />
+                <Kpi empty={noCur} label="GPM" value={money(curS.gpm)} cur={curS.gpm} prev={prevS.gpm} series={seriesS((t) => t.gpm)} />
+              </>
+            ) : (
+              <>
+                <Kpi empty={noCur} label="Views" value={num(cur.views)} cur={cur.views} prev={prev.views} series={series((t) => t.views)} />
+                <Kpi empty={noCur} label="Product CTR" value={fmtKeyMetric("pct2", cur.ctr)} cur={cur.ctr} prev={prev.ctr} series={series((t) => t.ctr)} />
+              </>
+            )}
             {canSeeMoney && fin && (
               <>
                 <Kpi label="Doanh thu agency" value={fin.priced ? money(fin.revenue) : "Chưa tính được"} cur={fin.priced ? fin.revenue : null} prev={finPrev?.priced ? finPrev.revenue : null} extra={fin.sessions ? `${fin.priced}/${fin.sessions} ca đủ dữ liệu` : undefined} locked />
@@ -440,7 +453,7 @@ export default function CeoBrief(props: CeoBriefProps) {
         onNavigate={onNavigate}
       />
 
-      <MonthOverMonth sessions={scopeSessions} brands={brands.filter((b) => scopeIds.includes(b.id))} lastMonth={dataEnd && dataEnd.slice(0, 7) < today.slice(0, 7) ? dataEnd.slice(0, 7) : today.slice(0, 7)} dataEnd={dataEnd} pnl={canSeeMoney ? pnl : null} />
+      <MonthOverMonth sessions={scopeSessions} brands={brands.filter((b) => scopeIds.includes(b.id))} lastMonth={dataEnd && dataEnd.slice(0, 7) < today.slice(0, 7) ? dataEnd.slice(0, 7) : today.slice(0, 7)} dataEnd={dataEnd} pnl={canSeeMoney ? pnl : null} shopee={platform === "Shopee"} />
 
       <TargetSection
         outlook={scopeOutlook}
@@ -616,7 +629,10 @@ const AccountsTable: React.FC<{
 
 // ---------------------------------------------------------------------------
 
-const MonthOverMonth: React.FC<{ sessions: LiveSession[]; brands: Brand[]; lastMonth: string; dataEnd: string | null; pnl: PnlFn | null }> = ({ sessions, brands, lastMonth, dataEnd, pnl }) => {
+/** Số Shopee của một đoạn ca (cùng luật "ca có số" với totalsOf). */
+const shopeeTotalsOf = (sessions: LiveSession[]): ShopeeKeyMetrics => shopeeKeyMetricsOfSessions(sessions.filter(isCountable), sessionHours);
+
+const MonthOverMonth: React.FC<{ sessions: LiveSession[]; brands: Brand[]; lastMonth: string; dataEnd: string | null; pnl: PnlFn | null; shopee: boolean }> = ({ sessions, brands, lastMonth, dataEnd, pnl, shopee }) => {
   const allCols = monthColumns(sessions, lastMonth, 6, dataEnd);
   const firstWithData = allCols.findIndex((c) => c.totals.sessions > 0);
   const cols = firstWithData > 0 ? allCols.slice(firstWithData) : allCols;
@@ -635,12 +651,15 @@ const MonthOverMonth: React.FC<{ sessions: LiveSession[]; brands: Brand[]; lastM
   const step = (W - L - R) / cols.length, bw = Math.min(56, step * 0.55);
   const y = (v: number) => T + (H - T - B) * (1 - v / nice);
 
-  // Key Metrics đủ 18 chỉ số + AOV (lib/report/keyMetrics.ts), cùng thứ tự mọi report.
-  const rows: { label: string; get: (t: Totals) => number | null; fmt: (v: number | null) => string }[] = KEY_METRICS.map((d) => ({
-    label: d.label,
-    get: (t: Totals) => keyMetricValue(t, d.key),
-    fmt: (v: number | null) => fmtKeyMetric(d, v)
-  }));
+  // Key Metrics đủ 18 chỉ số + AOV (lib/report/keyMetrics.ts), cùng thứ tự mọi report. Sàn Shopee đọc bộ chỉ số RIÊNG
+  // (lib/report/shopeeKeyMetrics.ts) — file Shopee không có impressions/click/CTR/CTOR.
+  type AnyTotals = Totals | ShopeeKeyMetrics;
+  const rows: { label: string; get: (t: AnyTotals) => number | null; fmt: (v: number | null) => string }[] = shopee
+    ? SHOPEE_METRICS.map((d) => ({ label: d.label, get: (t: AnyTotals) => shopeeMetricValue(t as ShopeeKeyMetrics, d.key), fmt: (v: number | null) => fmtShopeeMetric(d, v) }))
+    : KEY_METRICS.map((d) => ({ label: d.label, get: (t: AnyTotals) => keyMetricValue(t as Totals, d.key), fmt: (v: number | null) => fmtKeyMetric(d, v) }));
+  const colTotals: AnyTotals[] = shopee ? cols.map((c) => shopeeTotalsOf(inRange(sessions, `${c.month}-01`, c.through))) : cols.map((c) => c.totals);
+  const lastTotals = colTotals[colTotals.length - 1];
+  const fairTotals: AnyTotals = shopee ? shopeeTotalsOf(inRange(sessions, `${prevM}-01`, fairEnd)) : fair;
   return (
     <section className="space-y-3">
       <SectionTitle title="Tháng qua tháng" note={`Tháng cuối so với cùng ${days} ngày đầu tháng trước`} />
@@ -697,8 +716,8 @@ const MonthOverMonth: React.FC<{ sessions: LiveSession[]; brands: Brand[]; lastM
               {rows.map((r) => (
                 <tr key={r.label}>
                   <td className="px-3 py-2 text-[var(--text-muted)] whitespace-nowrap">{r.label}</td>
-                  {cols.map((c) => <td key={c.month} className="px-3 py-2 text-right text-[var(--text)] whitespace-nowrap">{c.totals.sessions ? r.fmt(r.get(c.totals)) : "—"}</td>)}
-                  <td className="px-3 py-2 text-right"><Delta cur={r.get(last.totals)} prev={fair.sessions ? r.get(fair) : null} /></td>
+                  {cols.map((c, i) => <td key={c.month} className="px-3 py-2 text-right text-[var(--text)] whitespace-nowrap">{colTotals[i].sessions ? r.fmt(r.get(colTotals[i])) : "—"}</td>)}
+                  <td className="px-3 py-2 text-right"><Delta cur={r.get(lastTotals)} prev={fairTotals.sessions ? r.get(fairTotals) : null} /></td>
                 </tr>
               ))}
               {finCols && finFair && (

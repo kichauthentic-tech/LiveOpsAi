@@ -5,7 +5,7 @@ import { brandPriceLabel } from "../lib/brandPricing";
 import { Download, LayoutGrid, Loader2 } from "lucide-react";
 import { Brand, BrandMonthlyReport, BrandMonthPlan, BrandPlatformRate, LiveSession } from "../types";
 import { planStatusesRead } from "../lib/db/monthPlans";
-import { brandMonthKey, brandPlatformKey, brandPlatformsOf } from "../lib/reportPlatform";
+import { brandMonthKey, brandPlatformKey, brandPlatformsOf, type ReportPlatform } from "../lib/reportPlatform";
 import { commitmentsRead, fetchBrandMonthlyCommitments } from "../lib/db/brandContracts";
 import type { TabPrefetchCtx } from "../lib/db/prefetch";
 import { CommitmentProgress, CommitmentStatus, computeAllProgress, todayVn } from "../lib/performance/brandCommitment";
@@ -28,6 +28,8 @@ import { MonthPicker } from "./common/MonthPicker";
 // thay vì ops phải mở lần lượt 4 Brand Workspace để tự ghép câu trả lời đó trong đầu.
 
 interface BrandsOverviewProps {
+  /** Sàn của workspace agency (07/10): mỗi brand một dòng của ĐÚNG sàn này. */
+  platform: ReportPlatform;
   brands: Brand[];
   sessions: LiveSession[];
   brandPlatformRates: BrandPlatformRate[];
@@ -92,7 +94,7 @@ export function prefetchBrandsOverview(_ctx: TabPrefetchCtx): void {
   commitmentsRead.prefetch();
 }
 
-export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ brands, sessions, brandPlatformRates, monthlyReports, onNavigate }) => {
+export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ platform, brands, sessions, brandPlatformRates, monthlyReports, onNavigate }) => {
   const { showToast } = useToast();
   const today = todayVn();
   const [month, setMonth] = useState(today.slice(0, 7));
@@ -134,7 +136,7 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ brands, sessions
     return brands
       .slice()
       .sort((a, b) => a.name.localeCompare(b.name))
-      .flatMap((b) => brandPlatformsOf(b.id, sessions).map((p) => ({ b, p, multi: brandPlatformsOf(b.id, sessions).length > 1 })))
+      .flatMap((b) => brandPlatformsOf(b.id, sessions).filter((p) => p === platform).map((p) => ({ b, p, multi: brandPlatformsOf(b.id, sessions).length > 1 })))
       .map(({ b, p, multi }) => {
         const key = brandPlatformKey(b.id, p);
         const plan = planStatuses.get(key);
@@ -155,7 +157,7 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ brands, sessions
           price: brandPriceLabel(b, brandPlatformRates, p)
         };
       });
-  }, [brands, planStatuses, progressByBrand, sessions, month, today, monthlyReports, brandPlatformRates]);
+  }, [platform, brands, planStatuses, progressByBrand, sessions, month, today, monthlyReports, brandPlatformRates]);
 
   const exportXlsx = () => {
     const out = rows.map((r) => ({

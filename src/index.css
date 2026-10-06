@@ -545,4 +545,3 @@ html:not(.dark) [class~="bg-slate-700"] { background-color: var(--surface-hover)
 html:not(.dark) [class~="text-slate-100"], html:not(.dark) [class~="text-slate-200"], html:not(.dark) [class~="text-slate-300"] { color: var(--text); }
 html:not(.dark) [class~="text-slate-400"] { color: var(--text-muted); }
 html:not(.dark) [class~="border-slate-700"], html:not(.dark) [class~="border-slate-800"], html:not(.dark) [class~="border-slate-900"] { border-color: var(--border); }
-

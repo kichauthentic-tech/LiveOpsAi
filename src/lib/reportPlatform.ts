@@ -6,12 +6,15 @@ import type { LiveSession } from "../types";
 export type ReportPlatform = "TikTok" | "Shopee";
 export const REPORT_PLATFORMS: ReportPlatform[] = ["TikTok", "Shopee"];
 
-/** Phạm vi đang xem: một sàn, hoặc "all" = tổng hai sàn (chỉ cộng, không so). */
-export type PlatformScope = ReportPlatform | "all";
-export const PLATFORM_SCOPE_LABEL: Record<PlatformScope, string> = { all: "Tổng 2 sàn", TikTok: "TikTok", Shopee: "Shopee" };
+/**
+ * Sàn đang xem. 07/10 (user chốt): hai sàn khác bản chất dữ liệu nên KHÔNG có phạm vi "tất cả sàn" cho bất kỳ màn số liệu nào —
+ * chỉ lịch (Bảng Vận Hành, Nhân sự ca) và tài nguyên chung (talent, studio, lương theo người) nhìn xuyên sàn. Giữ tên
+ * `PlatformScope` cho chỗ đã dùng; kiểu này không còn giá trị "all" nên màn nào muốn "cả hai" là lỗi compile.
+ */
+export type PlatformScope = ReportPlatform;
+export const PLATFORM_SCOPE_LABEL: Record<PlatformScope, string> = { TikTok: "TikTok", Shopee: "Shopee" };
 
-export const inPlatformScope = (s: { platform?: string | null }, scope: PlatformScope) =>
-  scope === "all" || (s.platform ?? "TikTok") === scope;
+export const inPlatformScope = (s: { platform?: string | null }, scope: PlatformScope) => (s.platform ?? "TikTok") === scope;
 
 /**
  * Khoá brand × tháng × sàn dùng ở mọi Map (report, tổng target kế hoạch, target theo ngày…). TikTok giữ khoá cũ

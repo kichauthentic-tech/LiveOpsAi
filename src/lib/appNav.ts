@@ -1,5 +1,5 @@
 import React from "react";
-import { BookOpen, BrainCircuit, Briefcase, Building2, CalendarCheck2, CalendarClock, Calendar as CalendarIcon, CalendarRange, ClipboardCheck, Database, DollarSign, FileSignature, FileText, LayoutDashboard, LayoutGrid, Link2, Megaphone, Package, Radio, Send, ShieldCheck, TrendingUp, Users } from "lucide-react";
+import { BookOpen, BrainCircuit, Briefcase, Building2, CalendarCheck2, CalendarClock, Calendar as CalendarIcon, CalendarRange, Activity, ClipboardCheck, Database, DollarSign, FileSignature, FileText, LayoutDashboard, LayoutGrid, Link2, Megaphone, Package, Radio, Send, ShieldCheck, TrendingUp, Users } from "lucide-react";
 import { PermissionKey, UserRole } from "../types";
 
 // Cấu hình sidebar + vài hằng số điều hướng, tách khỏi App.tsx 2026-10-01 (App.tsx 2.867 dòng).
@@ -12,6 +12,26 @@ export interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
   perm: PermissionKey | undefined;
   badge?: string;
+}
+
+/**
+ * Tab agency CÓ SỐ LIỆU THEO SÀN (07/10, user chốt: hai sàn khác bản chất dữ liệu, không gộp được). Chỉ xuất hiện ở workspace
+ * "Agency · TikTok" / "Agency · Shopee". Tab còn lại (lịch, nhân sự ca, talent, studio, CRM, finance theo người, hệ thống) là
+ * workspace "Agency · Chung". `tiktok_api` chỉ có ở sàn TikTok.
+ */
+export const PLATFORM_AGENCY_TABS = new Set([
+  "agency_overview", "month_plan", "sessions", "live_reconciliation", "ops_support", "host_performance", "brands_overview", "report_publish_board", "tiktok_api"
+]);
+export const TIKTOK_ONLY_AGENCY_TABS = new Set(["tiktok_api"]);
+
+/** Nhóm menu của workspace agency: `platform` = sàn đang mở, null = workspace Chung. Bỏ nhóm rỗng. */
+export function filterAgencyNav(groups: NavGroup[], platform: "TikTok" | "Shopee" | null): NavGroup[] {
+  return groups
+    .map((g) => ({
+      ...g,
+      items: g.items.filter((i) => (platform ? PLATFORM_AGENCY_TABS.has(i.id) && !(platform === "Shopee" && TIKTOK_ONLY_AGENCY_TABS.has(i.id)) : !PLATFORM_AGENCY_TABS.has(i.id)))
+    }))
+    .filter((g) => g.items.length > 0);
 }
 
 export interface NavGroup {
@@ -96,8 +116,9 @@ export function agencyNavGroups(currentRole: UserRole): NavGroup[] {
               // (hôm nay/tuần, việc còn thiếu) + chế độ xem Lịch & Studio (LiveCalendar cũ).
               { id: "calendar", label: "Bảng Vận Hành", icon: CalendarIcon, perm: "manage_calendar" as PermissionKey },
               { id: "sessions", label: "Sổ Ca", icon: BookOpen, perm: "manage_sessions" as PermissionKey },
-              { id: "live_reconciliation", label: "Đối Soát Số Liệu", icon: ClipboardCheck, perm: "manage_sessions" as PermissionKey }
-              // Hỗ Trợ Vận Hành (2026-09-21) đã GỘP vào Dashboard của từng Brand Workspace (user chốt 2026-09-28).
+              { id: "live_reconciliation", label: "Đối Soát Số Liệu", icon: ClipboardCheck, perm: "manage_sessions" as PermissionKey },
+              // Hỗ Trợ Vận Hành: 28/09 gộp vào Dashboard brand; 07/10 user chốt tách lại — benchmark ca sắp live chỉ ở đây, không ở Dashboard brand.
+              { id: "ops_support", label: "Hỗ Trợ Vận Hành", icon: Activity, perm: "manage_calendar" as PermissionKey }
             ]
           },
           {

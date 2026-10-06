@@ -18,6 +18,7 @@ const AGENCY_TAB_SLUGS: Record<string, string> = {
   sessions: "so-ca",
   live_reconciliation: "doi-soat",
   host_performance: "hieu-suat-host",
+  ops_support: "ho-tro-van-hanh",
   brands_overview: "toan-canh-brand",
   report_publish_board: "phat-hanh-report",
   talents: "talent-pool",
@@ -105,8 +106,8 @@ export function findBrandBySlug<B extends { id: string; name: string }>(brands: 
 }
 
 // Sàn đang xem ở Brand workspace (06/10) — query `?san=tiktok|shopee|tong` để link gửi đi mở đúng sàn. Không có ⇒ mặc định
-// (App: brand hai sàn mở "Tổng", một sàn mở sàn đó).
-const SAN_SLUGS: Record<PlatformScope, string> = { all: "tong", TikTok: "tiktok", Shopee: "shopee" };
+// (App: mở sàn đầu của brand; không còn "tong" từ 07/10).
+const SAN_SLUGS: Record<PlatformScope, string> = { TikTok: "tiktok", Shopee: "shopee" };
 
 export function parsePlatformParam(search: string): PlatformScope | null {
   const v = new URLSearchParams(search).get("san")?.toLowerCase();

@@ -74,6 +74,12 @@ export function hostPortions(s: LiveSession): LiveSession[] {
       const share = (metric && exact[metric]?.get(p.talentId)) ?? p.share;
       (part as unknown as Record<string, number>)[f] = v * share;
     }
+    // ATC / CO / Xu (Shopee) nằm ở báo cáo ca — chưa có số lúc đổi host cho các trường này nên chia theo giờ đứng ca.
+    if (s.report) {
+      const r = s.report;
+      const scale = (v: number | undefined) => (typeof v === "number" ? v * p.share : v);
+      part.report = { ...r, atcCount: scale(r.atcCount), checkoutCount: scale(r.checkoutCount), coinSpent: scale(r.coinSpent) };
+    }
     return part;
   });
 }

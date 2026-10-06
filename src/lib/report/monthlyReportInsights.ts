@@ -94,16 +94,16 @@ export const DRIVER_LABEL: Record<DriverKey, string> = {
   aov: METRIC.aov
 };
 
-export interface DriverBreakdown {
+export interface DriverBreakdown<K extends string = DriverKey> {
   from: number;
   to: number;
   delta: number;
-  parts: { key: DriverKey; value: number; change: number }[];
+  parts: { key: K; value: number; change: number }[];
 }
 
 /** GMV = tích các thừa số. Chia ΔGMV theo tỷ trọng log của từng thừa số — các phần cộng đúng bằng ΔGMV,
  *  không phụ thuộc thứ tự như cách "đổi lần lượt từng biến". Thiếu thừa số ở một bên ⇒ null (không bịa). */
-function logShareBreakdown(fromGmv: number, toGmv: number, factors: [DriverKey, number, number][]): DriverBreakdown | null {
+export function logShareBreakdown<K extends string>(fromGmv: number, toGmv: number, factors: [K, number, number][]): DriverBreakdown<K> | null {
   if (fromGmv <= 0 || toGmv <= 0 || factors.some(([, x, y]) => !(x > 0) || !(y > 0))) return null;
   const delta = toGmv - fromGmv;
   // Chia theo tổng log của CHÍNH các thừa số (bằng log(GMV mới/cũ) khi tích đúng bằng GMV) — số nguồn làm tròn

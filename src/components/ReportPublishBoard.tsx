@@ -11,7 +11,7 @@ import { fetchDataRawImportStamps } from "../lib/db/brandDataRaw";
 import { buildMonthlyReportSnapshot, snapshotFreshness } from "../lib/report/monthlySnapshot";
 import { shopeeSnapshotFreshness, shopeeStampsFor, type ShopeeReportSnapshot } from "../lib/report/shopeeSnapshot";
 import { buildShopeeReportSnapshot } from "../lib/report/shopeeSnapshotBuild";
-import { REPORT_PLATFORMS, type ReportPlatform } from "../lib/reportPlatform";
+import { type ReportPlatform } from "../lib/reportPlatform";
 import { PageIntro } from "./common/PageIntro";
 
 // Bảng điều phối phát hành report (còn lại của Đợt C, Audit Role × Workspace — xem
@@ -26,6 +26,8 @@ const MONTHS_BACK = 6;
 const COL_COUNT = 5;
 
 interface ReportPublishBoardProps {
+  /** Sàn của workspace agency (07/10): mỗi sàn phát hành và đóng sổ riêng. */
+  platform: ReportPlatform;
   brands: Brand[];
   sessions: LiveSession[];
   // Để tự tạo bản chụp số liệu (0119) khi phát hành tháng chưa có — không có bản chụp thì brand mở
@@ -54,11 +56,10 @@ const monthRange = (month: string): { start: string; end: string } => {
   return { start: `${month}-01`, end: `${month}-${String(lastDay).padStart(2, "0")}` };
 };
 
-export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ brands, sessions, brandPlatformRates, planMonthTotals, monthlyReports, onReportsChanged }) => {
+export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ platform, brands, sessions, brandPlatformRates, planMonthTotals, monthlyReports, onReportsChanged }) => {
   const confirm = useConfirm();
   const today = getTodayMonth();
   // Hai report độc lập theo sàn (0139): bảng này hiện một sàn một lúc.
-  const [platform, setPlatform] = useState<ReportPlatform>("TikTok");
   const isShopee = platform === "Shopee";
   // Khoá dòng report trong Map trung tâm: TikTok giữ "brandId|YYYY-MM", Shopee có hậu tố.
   const reportKey = (brandId: string, month: string) => `${brandId}|${month}${isShopee ? "|Shopee" : ""}`;
@@ -190,23 +191,9 @@ export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ brands, 
         </h2>
         <PageIntro>
           Trạng thái phát hành Report Tháng của mọi brand, {MONTHS_BACK} tháng gần nhất — phát hành/thu hồi thẳng từ đây
-          thay vì mở lần lượt từng Brand Workspace. TikTok và Shopee là hai report độc lập: chọn sàn ở nút bên dưới, mỗi sàn phát hành và đóng sổ riêng. Report Tuần đọc theo Report Tháng (không publish riêng); Cam Kết Hợp
+          thay vì mở lần lượt từng Brand Workspace. Workspace này chỉ có report của sàn {platform}; TikTok và Shopee phát hành và đóng sổ riêng. Report Tuần đọc theo Report Tháng (không publish riêng); Cam Kết Hợp
           Đồng và Affiliate không có trạng thái phát hành nên không hiện ở đây.
         </PageIntro>
-        <div className="inline-flex items-center gap-1 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-1" role="group" aria-label="Sàn của report">
-          {REPORT_PLATFORMS.map((pl) => (
-            <button
-              key={pl}
-              onClick={() => setPlatform(pl)}
-              aria-pressed={platform === pl}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                platform === pl ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)] hover:bg-[var(--surface-elevated)]"
-              }`}
-            >
-              {pl}
-            </button>
-          ))}
-        </div>
       </div>
 
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-xl">

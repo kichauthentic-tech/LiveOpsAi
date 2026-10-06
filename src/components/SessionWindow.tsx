@@ -7,6 +7,7 @@ import { findPersonClashes, personClash, studioClash, studioClashLabel } from ".
 import { PlatformChip } from "./common/PlatformChip";
 import { fmtVndShort } from "../lib/format";
 import { fmtKeyMetric, KEY_METRICS, keyMetricsOfSessions, keyMetricValue } from "../lib/report/keyMetrics";
+import { fmtShopeeMetric, shopeeKeyMetricsOfSessions, shopeeMetricValue, SHOPEE_METRICS } from "../lib/report/shopeeKeyMetrics";
 import { sessionHours } from "../lib/performance/hostPerformance";
 import {
   MissingStep,
@@ -180,6 +181,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
   const liveHours = s.liveDurationMinutes ? s.liveDurationMinutes / 60 : 0;
   const gmvPerHour = liveHours > 0 ? (s.actualGmv ?? 0) / liveHours : planHours > 0 ? (s.actualGmv ?? 0) / planHours : 0;
   const km = keyMetricsOfSessions([s], () => (liveHours > 0 ? liveHours : planHours));
+  const skm = shopeeKeyMetricsOfSessions([s], () => (liveHours > 0 ? liveHours : planHours));
   const linked = useMemo(() => linkedSessions(allSessions).get(s.id) ?? [], [allSessions, s.id]);
   const linkedLabel = linked
     .map((id) => allSessions.find((x) => x.id === id))
@@ -611,19 +613,20 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
               <>
                 {/* Key Metrics đủ 18 chỉ số + AOV, cùng hàm/thứ tự với mọi report (lib/report/keyMetrics.ts). */}
                 <div className="grid grid-cols-3 gap-2">
-                  {KEY_METRICS.map((d) => (
-                    <KV key={d.key} label={d.label} value={fmtKeyMetric(d, keyMetricValue(km, d.key))} />
-                  ))}
+                  {s.platform === "Shopee"
+                    ? SHOPEE_METRICS.map((d) => <KV key={d.key} label={d.label} value={fmtShopeeMetric(d, shopeeMetricValue(skm, d.key))} />)
+                    : KEY_METRICS.map((d) => <KV key={d.key} label={d.label} value={fmtKeyMetric(d, keyMetricValue(km, d.key))} />)}
                 </div>
                 <p className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-bold mt-3 mb-2">Số khác</p>
                 <div className="grid grid-cols-3 gap-2">
-                  <KV label="SKU orders" value={fmtInt(counters.skuOrders)} />
-                  <KV label="New followers" value={fmtInt(counters.newFollowers)} />
+                  {/* Shopee chỉ có Comments ở mức ca (file Live List); SKU orders/followers/shares/likes/PCU/Show GPM là số TikTok. */}
+                  {s.platform !== "Shopee" && <KV label="SKU orders" value={fmtInt(counters.skuOrders)} />}
+                  {s.platform !== "Shopee" && <KV label="New followers" value={fmtInt(counters.newFollowers)} />}
                   <KV label="Comments" value={fmtInt(counters.comments)} />
-                  <KV label="Shares" value={fmtInt(counters.shares)} />
-                  <KV label="Likes" value={fmtInt(counters.likes)} />
-                  <KV label="PCU" value={fmtInt(s.peakViewers)} />
-                  {ratios && (
+                  {s.platform !== "Shopee" && <KV label="Shares" value={fmtInt(counters.shares)} />}
+                  {s.platform !== "Shopee" && <KV label="Likes" value={fmtInt(counters.likes)} />}
+                  {s.platform !== "Shopee" && <KV label="PCU" value={fmtInt(s.peakViewers)} />}
+                  {s.platform !== "Shopee" && ratios && (
                     <>
                       <KV label="SKU order rate" value={fmtPct(ratios.skuOrderRate)} />
                       <KV label="Show GPM" value={fmtVndShort(ratios.showGpm)} />
@@ -636,8 +639,8 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
               <>
                 <div className="grid grid-cols-3 gap-2">
                   <KV label="Orders" value={fmtInt(s.totalOrders)} />
-                  <KV label="Views" value={fmtInt(s.totalViews)} />
-                  <KV label="PCU" value={fmtInt(s.peakViewers)} />
+                  <KV label={s.platform === "Shopee" ? "Viewers" : "Views"} value={fmtInt(s.totalViews)} />
+                  {s.platform !== "Shopee" && <KV label="PCU" value={fmtInt(s.peakViewers)} />}
                 </div>
                 <p className="text-[11px] text-amber-300 mt-2">Số tự khai tay — chưa có file nên không tính được tỷ lệ.</p>
               </>

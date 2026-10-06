@@ -350,7 +350,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
   return (
     <div className="space-y-5">
       {viewMode === "week" ? (
-        <BrandWeeklyReport brandId={brandId} brandName={brandName} sessions={sessions} currentRole={currentRole} shiftSlots={shiftSlots} headerExtra={modeSwitch} />
+        <BrandWeeklyReport brandId={brandId} brandName={brandName} platform={platform} sessions={sessions} currentRole={currentRole} shiftSlots={shiftSlots} headerExtra={modeSwitch} />
       ) : (
         <>
       <PageHeader

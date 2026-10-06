@@ -30,12 +30,12 @@ describe("khoá brand × tháng × sàn", () => {
     expect(brandPlatformsOf(B, [ca("a", "Shopee"), ca("b", "TikTok")])).toEqual(["TikTok", "Shopee"]);
     expect(brandPlatformsOf(B, [], [{ brandId: B, platform: "Shopee" }])).toEqual(["Shopee"]);
     expect(brandPlatformsOf("khac", [ca("a", "Shopee")])).toEqual(["TikTok"]);
-    expect(inPlatformScope(ca("a", "Shopee"), "all")).toBe(true);
+    expect(inPlatformScope(ca("a", "Shopee"), "Shopee")).toBe(true);
     expect(inPlatformScope(ca("a", "Shopee"), "TikTok")).toBe(false);
   });
   test("URL ?san=", () => {
     expect(parsePlatformParam("?san=shopee")).toBe("Shopee");
-    expect(parsePlatformParam("?san=tong")).toBe("all");
+    expect(parsePlatformParam("?san=tong")).toBeNull(); // không còn "Tổng 2 sàn"
     expect(parsePlatformParam("?x=1")).toBeNull();
     expect(withPlatformParam("?x=1", "TikTok")).toBe("?x=1&san=tiktok");
     expect(withPlatformParam("?san=tiktok", null)).toBe("");

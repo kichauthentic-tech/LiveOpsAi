@@ -40,6 +40,8 @@ interface OpsSupportProps {
   engineParams: EngineParams;
   onOpenMonthPlan: () => void;
   onOpenSession: (sessionId: string) => void;
+  /** Khối nào hiện: Dashboard brand chỉ hiện "fill" (phương án bù); tab Hỗ Trợ Vận Hành của agency chỉ hiện "benchmark" (07/10). */
+  show?: "fill" | "benchmark" | "both";
 }
 
 const WEEKDAY = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
@@ -59,12 +61,13 @@ export function prefetchOpsSupport(brandId: string, platform: ReportPlatform = "
   lockedPlanSlotsRead.prefetch(brandId, platform);
 }
 
-export default function OpsSupport({ rr, projection, brandId, brandName, platform, month, plan, camp, planLoading, sessions, shiftSlots, promoSchemes, engineParams, onOpenMonthPlan, onOpenSession }: OpsSupportProps) {
+export default function OpsSupport({ rr, projection, brandId, brandName, platform, month, plan, camp, planLoading, sessions, shiftSlots, promoSchemes, engineParams, onOpenMonthPlan, onOpenSession, show = "both" }: OpsSupportProps) {
   const today = todayVn();
   const [lockedSlots, setLockedSlots] = useState<BrandMonthPlanSlot[]>([]);
   const [events, setEvents] = useState<CalendarEventRow[]>([]);
   // Khoá brand của lần nạp ca-đã-chốt gần nhất — khác brand đang xem nghĩa là đang tải.
   const [lockedFor, setLockedFor] = useState<string | null>(null);
+  const isShopee = platform === "Shopee";
   const loading = planLoading || lockedFor !== `${brandId}|${platform}`;
 
   useEffect(() => {
@@ -140,7 +143,7 @@ export default function OpsSupport({ rr, projection, brandId, brandName, platfor
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* 1. Phương án bù — chỉ khi kế hoạch đã chốt và dự kiến thiếu quá ngưỡng */}
-      {loading ? null : tracking && tracking.gap > 0 && tracking.gapPct > engineParams.targetGapWarnPct ? (
+      {show === "benchmark" || loading ? null : tracking && tracking.gap > 0 && tracking.gapPct > engineParams.targetGapWarnPct ? (
         <section className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-6 shadow-xl space-y-3">
           <h3 className="font-bold text-[var(--text)] flex items-center gap-2">
             <TrendingDown className="w-4 h-4 text-amber-300" /> Dự kiến thiếu {fmtVndShort(tracking.gap)} ({fmtPct(tracking.gapPct, 1)} target) — phương án bù
@@ -180,11 +183,11 @@ export default function OpsSupport({ rr, projection, brandId, brandName, platfor
                 <p className="text-[var(--text-muted)]">Không còn ca kế hoạch nào phía trước — chỉ còn cách thêm giờ (A).</p>
               ) : tracking.upliftPct !== null && tracking.upliftPct > 0 ? (
                 <>
-                  <p className="text-[var(--text-muted)]">Mỗi ca còn lại phải cao hơn dự kiến <b className="text-[var(--text)]">{fmtPct(tracking.upliftPct)}</b>. GMV = Views × CVR × AOV (CVR = LIVE CTR × CTOR), nên tương đương một trong:</p>
+                  <p className="text-[var(--text-muted)]">Mỗi ca còn lại phải cao hơn dự kiến <b className="text-[var(--text)]">{fmtPct(tracking.upliftPct)}</b>. {isShopee ? "GMV = Viewers × ATC/Viewer × GMV/ATC, nên tương đương một trong:" : "GMV = Views × CVR × AOV (CVR = LIVE CTR × CTOR), nên tương đương một trong:"}</p>
                   <ul className="list-disc pl-4 text-[var(--text-muted)] space-y-0.5">
-                    <li>Views (traffic/ads) <b className="text-[var(--text)]">+{fmtPct(tracking.upliftPct)}</b> cùng CVR/AOV</li>
-                    <li>CVR <b className="text-[var(--text)]">+{fmtPct(tracking.upliftPct)}</b> (deal/voucher, kịch bản chốt)</li>
-                    <li>AOV <b className="text-[var(--text)]">+{fmtPct(tracking.upliftPct)}</b> (combo, upsell)</li>
+                    <li>{isShopee ? "Viewers" : "Views"} (traffic/ads) <b className="text-[var(--text)]">+{fmtPct(tracking.upliftPct)}</b> {isShopee ? "cùng ATC/Viewer và GMV/ATC" : "cùng CVR/AOV"}</li>
+                    <li>{isShopee ? "ATC/Viewer" : "CVR"} <b className="text-[var(--text)]">+{fmtPct(tracking.upliftPct)}</b> ({isShopee ? "xu/voucher live, deal giờ vàng, kịch bản kéo thêm giỏ" : "deal/voucher, kịch bản chốt"})</li>
+                    <li>{isShopee ? "GMV/ATC" : "AOV"} <b className="text-[var(--text)]">+{fmtPct(tracking.upliftPct)}</b> (combo, upsell)</li>
                     <li>hoặc kết hợp: mỗi thứ +{fmtPct(Math.pow(1 + tracking.upliftPct, 1 / 3) - 1)}</li>
                   </ul>
                 </>
@@ -200,12 +203,13 @@ export default function OpsSupport({ rr, projection, brandId, brandName, platfor
         </section>
       ) : null}
 
-      {/* 2. Benchmark ca sắp live */}
+      {/* 2. Benchmark ca sắp live — nằm ở tab Hỗ Trợ Vận Hành của agency, không hiện ở Dashboard brand */}
+      {show !== "fill" && (
       <section className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-6 shadow-xl space-y-3">
         <div>
           <h3 className="font-bold text-[var(--text)] flex items-center gap-2"><Radio className="w-4 h-4 text-[var(--accent-text)]" /> Benchmark ca sắp live (7 ngày) — {brandName}</h3>
           <p className="text-xs text-[var(--text-muted)] mt-1">
-            Kỳ vọng theo ô thứ × giờ của lịch sử brand (median, đã nhân hệ số camp/lễ/scheme{tracking?.realityFactor ? `, k=${tracking.realityFactor.toLocaleString("vi-VN", { maximumFractionDigits: 2 })}` : ""}). Trong ca, ops so bằng mắt với dashboard TikTok: <b>view thấp</b> → đẩy traffic; <b>CTR/CVR thấp</b> → tối ưu deal/kịch bản; <b>ads vượt</b> → hãm.
+            Kỳ vọng theo ô thứ × giờ của lịch sử brand (median, đã nhân hệ số camp/lễ/scheme{tracking?.realityFactor ? `, k=${tracking.realityFactor.toLocaleString("vi-VN", { maximumFractionDigits: 2 })}` : ""}). {isShopee ? <>Trong ca, ops so bằng mắt với dashboard Shopee Creator Center: <b>Viewers thấp</b> → đẩy traffic; <b>ATC thấp</b> → xu/voucher live, deal giờ vàng.</> : <>Trong ca, ops so bằng mắt với dashboard TikTok: <b>view thấp</b> → đẩy traffic; <b>CTR/CVR thấp</b> → tối ưu deal/kịch bản; <b>ads vượt</b> → hãm.</>}
           </p>
         </div>
         {history.brandGmvPerHour <= 0 ? (
@@ -241,19 +245,19 @@ export default function OpsSupport({ rr, projection, brandId, brandName, platfor
                         <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">GMV kỳ vọng</p><p className="font-bold text-[var(--text)]">{fmtVndShort(b.expectedGmv * k)}</p></div>
                         <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">GMV/giờ</p><p className="font-bold text-[var(--text)]">{fmtVndShort(b.gmvPerHour * k)}</p></div>
                         <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">Target GMV ca</p><p className={`font-bold ${target > 0 && target > b.expectedGmv * k * engineParams.highExpectationRatio ? "text-amber-300" : "text-[var(--text)]"}`}>{target > 0 ? fmtVndShort(target) : "—"}</p></div>
-                        <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">Views/giờ</p><p className="font-mono text-[var(--text)]">{fmtN(b.viewsPerHour)}</p></div>
-                        <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">Tổng view</p><p className="font-mono text-[var(--text)]">{fmtN(b.expectedViews)}</p></div>
-                        <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">Orders kỳ vọng</p><p className="font-mono text-[var(--text)]">{fmtN(b.expectedOrders)}</p></div>
-                        <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">CVR</p><p className="font-mono text-[var(--text)]">{fmtPct(b.conversion, 2)}</p></div>
-                        <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">LIVE CTR</p><p className="font-mono text-[var(--text)]">{b.liveCtr === null ? "—" : `${b.liveCtr.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%`}</p></div>
-                        <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">AOV</p><p className="font-mono text-[var(--text)]">{b.aov > 0 ? fmtVndShort(b.aov) : "—"}</p></div>
-                        <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">Ads / giờ</p><p className="font-mono text-[var(--text)]">{b.adsPerHour === null ? "chưa có report" : fmtVndShort(b.adsPerHour)}</p></div>
+                        <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">{isShopee ? "Viewers/giờ" : "Views/giờ"}</p><p className="font-mono text-[var(--text)]">{fmtN(b.viewsPerHour)}</p></div>
+                        <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">{isShopee ? "Tổng viewers" : "Tổng view"}</p><p className="font-mono text-[var(--text)]">{fmtN(b.expectedViews)}</p></div>
+                        {!isShopee && <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">Orders kỳ vọng</p><p className="font-mono text-[var(--text)]">{fmtN(b.expectedOrders)}</p></div>}
+                        {!isShopee && <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">CVR</p><p className="font-mono text-[var(--text)]">{fmtPct(b.conversion, 2)}</p></div>}
+                        {!isShopee && <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">LIVE CTR</p><p className="font-mono text-[var(--text)]">{b.liveCtr === null ? "—" : `${b.liveCtr.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%`}</p></div>}
+                        {!isShopee && <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">AOV</p><p className="font-mono text-[var(--text)]">{b.aov > 0 ? fmtVndShort(b.aov) : "—"}</p></div>}
+                        {!isShopee && <div><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">Ads / giờ</p><p className="font-mono text-[var(--text)]">{b.adsPerHour === null ? "chưa có report" : fmtVndShort(b.adsPerHour)}</p></div>}
                         <div className="col-span-2"><p className="text-[11px] uppercase font-bold text-[var(--text-faint)]">Hệ số ngày</p><p className="font-mono text-[var(--text)]">×{b.dayFactor.toLocaleString("vi-VN", { maximumFractionDigits: 2 })}{b.dayFactor > 1.05 ? " (camp/lễ/scheme)" : ""}</p></div>
                       </div>
                       {(b.thin || b.cellTags.includes("weak") || b.cellTags.includes("traffic_low_cvr")) && (
                         <p className="text-[11px] text-amber-300">
                           {b.thin ? "Ít dữ liệu ở khung này — chỉ tham khảo. " : ""}
-                          {b.cellTags.includes("traffic_low_cvr") ? "Khung này lịch sử view khá nhưng CVR thấp — ưu tiên deal chốt đơn. " : ""}
+                          {b.cellTags.includes("traffic_low_cvr") ? (isShopee ? "Khung này lịch sử viewers khá nhưng chốt thấp — ưu tiên xu/voucher live để kéo giỏ. " : "Khung này lịch sử view khá nhưng CVR thấp — ưu tiên deal chốt đơn. ") : ""}
                           {b.cellTags.includes("weak") ? "Khung yếu trong lịch sử." : ""}
                         </p>
                       )}
@@ -265,6 +269,7 @@ export default function OpsSupport({ rr, projection, brandId, brandName, platfor
           </div>
         )}
       </section>
+      )}
     </div>
   );
 }

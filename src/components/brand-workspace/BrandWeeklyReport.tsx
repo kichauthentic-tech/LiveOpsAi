@@ -11,6 +11,9 @@ import { DataRawWeekSlice, fetchDataRawWeekSlice } from "../../lib/dataraw/weekl
 import { addDays, eachDay, isoWeekNumber, isoWeekStart } from "../../lib/dateUtils";
 import { getTodayDate } from "../../lib/dateUtils";
 import { byHost, filterSessions, sessionHours, splitUnassignedHost } from "../../lib/performance/hostPerformance";
+import { byHostShopee, splitUnassignedShopee, type ShopeePerfRow } from "../../lib/performance/shopeeHostPerformance";
+import { fmtShopeeMetric, shopeeKeyMetricsOfSessions, shopeeMetricValue, SHOPEE_METRICS, type ShopeeKeyMetrics } from "../../lib/report/shopeeKeyMetrics";
+import type { ReportPlatform } from "../../lib/reportPlatform";
 import { hasLiveNumbers, monthRunRate, monthRunRateFromPlan } from "../../lib/report/sessionsLivePerf";
 import { planRunRate, projectMonthEnd } from "../../lib/performance/planRunRate";
 import { lastDataDate, monthOutlook } from "../../lib/performance/ceoBrief";
@@ -22,6 +25,8 @@ import { DataSourceBadge } from "../common/DataSourceBadge";
 interface BrandWeeklyReportProps {
   brandId: string;
   brandName: string;
+  /** Sàn đang xem (bộ chuyển sàn của Brand workspace): mọi số, kế hoạch, ca mở của report chỉ thuộc sàn này. */
+  platform: ReportPlatform;
   sessions: LiveSession[];
   currentRole: UserRole;
   shiftSlots?: ShiftSlot[]; // ca mở chưa có người tuần tới
@@ -57,11 +62,18 @@ const Kpi: React.FC<{ label: string; value: string; delta?: number | null; hint?
 // Tháng mới là bản giao brand). Nguồn: `live_sessions` (ca có số: đối soát/snapshot/nạp bù) + target
 // kế hoạch đã đổ xuống ca + shift_slots cho tuần tới. Dataraw (số TikTok toàn shop theo ngày) chỉ
 // đặt cạnh để ops thấy GMV live chiếm bao nhiêu trong shop — không còn là nguồn chính.
-export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, brandName, sessions, currentRole, shiftSlots = [], headerExtra }) => {
+export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, brandName, platform, sessions: allSessions, currentRole, shiftSlots: allShiftSlots = [], headerExtra }) => {
   const today = getTodayDate();
+  const isShopee = platform === "Shopee";
+  // TikTok và Shopee là hai báo cáo riêng (user chốt 07/10): ca/slot của brand này chỉ giữ ĐÚNG SÀN.
+  const sessions = useMemo(() => allSessions.filter((s) => s.brandId !== brandId || (s.platform ?? "TikTok") === platform), [allSessions, brandId, platform]);
+  const shiftSlots = useMemo(() => allShiftSlots.filter((sl) => sl.brandId !== brandId || (sl.platform ?? "TikTok") === platform), [allShiftSlots, brandId, platform]);
   const [weekStart, setWeekStart] = useState(() => isoWeekStart(today));
-  const [slice, setSlice] = useState<DataRawWeekSlice | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [sliceRaw, setSlice] = useState<DataRawWeekSlice | null>(null);
+  const [loadingRaw, setLoading] = useState(true);
+  // Total GMV theo ngày là file Shop Analytics của TikTok Shop — Shopee không có cột này (file theo ngày của Shopee ở Report Tháng).
+  const slice = isShopee ? null : sliceRaw;
+  const loading = !isShopee && loadingRaw;
 
   const weekEnd = useMemo(() => addDays(weekStart, 6), [weekStart]);
   const prevStart = useMemo(() => addDays(weekStart, -7), [weekStart]);
@@ -72,6 +84,7 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
 
   useEffect(() => {
     let cancelled = false;
+    if (isShopee) return;
     setLoading(true);
     fetchDataRawWeekSlice(brandId, weekStart, weekEnd)
       .then((s) => !cancelled && setSlice(s))
@@ -80,7 +93,7 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
     return () => {
       cancelled = true;
     };
-  }, [brandId, weekStart, weekEnd]);
+  }, [brandId, weekStart, weekEnd, isShopee]);
 
   const inRange = (from: string, to: string) => sessions.filter((s) => s.brandId === brandId && s.date >= from && s.date <= to);
   const weekSessions = useMemo(() => inRange(weekStart, weekEnd), [sessions, brandId, weekStart, weekEnd]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -96,13 +109,13 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
   const [plans, setPlans] = useState<Map<string, { plan: BrandMonthPlan; slots: BrandMonthPlanSlot[] } | null>>(new Map());
   useEffect(() => {
     let alive = true;
-    Promise.all(planMonths.map((m) => fetchMonthPlan(brandId, m).catch(() => null))).then((rs) => {
+    Promise.all(planMonths.map((m) => fetchMonthPlan(brandId, m, platform).catch(() => null))).then((rs) => {
       if (alive) setPlans(new Map(planMonths.map((m, i) => [m, rs[i]])));
     });
     return () => {
       alive = false;
     };
-  }, [brandId, planMonths]);
+  }, [brandId, planMonths, platform]);
   const monthPlan = plans.get(monthKey) ?? null;
   const lockedPlanSlots = useMemo(
     () => [...plans.values()].flatMap((p) => (p?.plan.status === "locked" ? p.slots : [])),
@@ -142,6 +155,8 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
       orders,
       // Key Metrics đủ 18 chỉ số + AOV — cùng hàm với Report Tháng / Dashboard / Hiệu Suất Host (lib/report/keyMetrics.ts).
       km: keyMetricsOfSessions(done, sessionHours),
+      // Sàn Shopee đọc bộ chỉ số riêng (Viewers/ATC/CO/GPM/Xu) — lib/report/shopeeKeyMetrics.ts.
+      skm: shopeeKeyMetricsOfSessions(done, sessionHours),
       target,
       targetDone,
       achieved: targetDone > 0 ? gmv / targetDone : null,
@@ -182,10 +197,29 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
 
   const topSessions = useMemo(() => weekSessions.filter(hasLiveNumbers).sort((a, b) => (b.actualGmv ?? 0) - (a.actualGmv ?? 0)).slice(0, 5), [weekSessions]);
   // Ca chưa gán host không đứng chung bảng host (audit 2026-09-21) — hiện thành dòng nhắc riêng.
-  const { ranked: hosts, unassigned: unassignedHost } = useMemo(
+  const { ranked: tiktokHosts, unassigned: tiktokUnassigned } = useMemo(
     () => splitUnassignedHost(byHost(filterSessions(weekSessions, {})).sort((a, b) => b.gmv - a.gmv)),
     [weekSessions]
   );
+  const { ranked: shopeeHosts, unassigned: shopeeUnassigned } = useMemo(
+    () => (isShopee ? splitUnassignedShopee(byHostShopee(filterSessions(weekSessions, {})).sort((a, b) => b.gmv - a.gmv)) : { ranked: [] as ShopeePerfRow[], unassigned: null }),
+    [isShopee, weekSessions]
+  );
+  const hosts: { key: string; label: string; sessionCount: number }[] = isShopee ? shopeeHosts : tiktokHosts;
+  const unassignedHost = isShopee ? shopeeUnassigned : tiktokUnassigned;
+  // Bảng Key Metrics: một dòng = một chỉ số, giá trị kỳ này / kỳ trước / từng host. Sàn quyết định bộ chỉ số.
+  type MetricRow = { key: string; label: string; extra: boolean; goodWhenUp: boolean | null; fmt: (v: number | null) => string; cur: number | null; prev: number | null; host: (h: { key: string }) => number | null };
+  const metricRows: MetricRow[] = isShopee
+    ? SHOPEE_METRICS.map((d) => ({
+        key: d.key, label: d.label, extra: false, goodWhenUp: d.goodWhenUp, fmt: (v) => fmtShopeeMetric(d, v),
+        cur: shopeeMetricValue(cur.skm, d.key), prev: shopeeMetricValue(prev.skm, d.key),
+        host: (h) => shopeeMetricValue(h as unknown as ShopeeKeyMetrics, d.key)
+      }))
+    : KEY_METRICS.map((d) => ({
+        key: d.key, label: d.label, extra: !!d.extra, goodWhenUp: d.goodWhenUp, fmt: (v) => fmtKeyMetric(d, v),
+        cur: keyMetricValue(cur.km, d.key), prev: keyMetricValue(prev.km, d.key),
+        host: (h) => keyMetricValue(h as unknown as ReturnType<typeof keyMetricsOfSessions>, d.key)
+      }));
   const todo = useMemo(() => weekSessions.map((s) => ({ s, missing: missingSteps(s, today) })).filter((x) => x.missing.length > 0).sort((a, b) => a.s.date.localeCompare(b.s.date)), [weekSessions, today]);
   const nextOpenSlots = useMemo(() => shiftSlots.filter((sl) => sl.brandId === brandId && sl.status === "open" && sl.date >= nextStart && sl.date <= nextEnd), [shiftSlots, brandId, nextStart, nextEnd]);
   // Target tuần tới: cùng luật targetOfDay — ca kế hoạch chưa có người (ca chờ đăng ký) vẫn mang target của nó.
@@ -212,19 +246,23 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
         },
         {
           name: "Key Metrics",
-          rows: KEY_METRICS.map((d) => ({
-            "Chỉ số": keyMetricSheetLabel(d),
-            "Tuần này": keyMetricSheetValue(cur.km, d.key),
-            "Tuần trước": keyMetricSheetValue(prev.km, d.key)
-          }))
+          rows: isShopee
+            ? SHOPEE_METRICS.map((d) => ({ "Chỉ số": d.label, "Tuần này": shopeeMetricValue(cur.skm, d.key) ?? "", "Tuần trước": shopeeMetricValue(prev.skm, d.key) ?? "" }))
+            : KEY_METRICS.map((d) => ({
+                "Chỉ số": keyMetricSheetLabel(d),
+                "Tuần này": keyMetricSheetValue(cur.km, d.key),
+                "Tuần trước": keyMetricSheetValue(prev.km, d.key)
+              }))
         },
         {
           name: "Host Tuan Nay",
-          rows: hosts.map((h) => ({
-            "Host": h.label,
-            "Sessions": h.sessionCount,
-            ...keyMetricSheetColumns(h)
-          }))
+          rows: isShopee
+            ? shopeeHosts.map((h) => ({ "Host": h.label, "Sessions": h.sessionCount, ...Object.fromEntries(SHOPEE_METRICS.map((d) => [d.label, shopeeMetricValue(h, d.key) ?? ""])) }))
+            : tiktokHosts.map((h) => ({
+                "Host": h.label,
+                "Sessions": h.sessionCount,
+                ...keyMetricSheetColumns(h)
+              }))
         }
       ],
       `ReportTuan_${brandName}_tuan${week}-${year}.xlsx`.replace(/\s+/g, "_")
@@ -243,7 +281,7 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
           <div>
             <p className="text-[11px] font-bold text-[var(--text-faint)] uppercase tracking-wider">Report Tuần · vận hành nội bộ</p>
             <h3 className="font-bold text-[var(--text)] text-lg flex items-center gap-2">
-              <CalendarRange className="w-5 h-5 text-emerald-500" /> {brandName} — Tuần {week}/{year}
+              <CalendarRange className="w-5 h-5 text-emerald-500" /> {brandName}{isShopee ? " · Shopee" : ""} — Tuần {week}/{year}
               <span className="text-sm font-normal text-[var(--text-muted)]">({fmtDay(weekStart)} → {fmtDay(weekEnd)})</span>
             </h3>
           </div>
@@ -392,24 +430,24 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
               </tr>
             </thead>
             <tbody>
-              {KEY_METRICS.map((d) => {
-                const a = keyMetricValue(cur.km, d.key), b = keyMetricValue(prev.km, d.key);
+              {metricRows.map((d) => {
+                const a = d.cur, b = d.prev;
                 const chg = a != null && b != null && b !== 0 ? a / b - 1 : null;
                 const tone = chg == null || d.goodWhenUp == null || Math.abs(chg) < 0.005 ? "text-[var(--text-faint)]" : chg > 0 === d.goodWhenUp ? "text-emerald-400" : "text-rose-400";
                 return (
                   <tr key={d.key} className="border-t border-[var(--border)]/60">
                     <td className={`py-1.5 pr-3 whitespace-nowrap ${d.extra ? "text-[var(--text-faint)]" : "text-[var(--text)]"} font-medium`} title={metricHint(d.label)}>{d.label}</td>
-                    <td className="py-1.5 pr-3 text-right font-bold text-[var(--text)] whitespace-nowrap">{fmtKeyMetric(d, a)}</td>
-                    <td className="py-1.5 pr-3 text-right text-[var(--text-muted)] whitespace-nowrap">{fmtKeyMetric(d, b)}</td>
+                    <td className="py-1.5 pr-3 text-right font-bold text-[var(--text)] whitespace-nowrap">{d.fmt(a)}</td>
+                    <td className="py-1.5 pr-3 text-right text-[var(--text-muted)] whitespace-nowrap">{d.fmt(b)}</td>
                     <td className={`py-1.5 pr-3 text-right font-bold whitespace-nowrap border-r border-[var(--border)] ${tone}`}>{chg == null ? "—" : `${chg >= 0 ? "+" : "−"}${fmtPct(Math.abs(chg))}`}</td>
-                    {hosts.map((h) => <td key={h.key} className="py-1.5 px-2 text-right text-[var(--text-muted)] whitespace-nowrap">{fmtKeyMetric(d, keyMetricValue(h, d.key))}</td>)}
+                    {hosts.map((h) => <td key={h.key} className="py-1.5 px-2 text-right text-[var(--text-muted)] whitespace-nowrap">{d.fmt(d.host(h))}</td>)}
                   </tr>
                 );
               })}
             </tbody>
           </table>
         </div>
-        <p className="text-[11px] text-[var(--text-faint)]">± so tuần trước: xanh = tốt lên, đỏ = xấu đi, xám = trung tính (UPT, Avg. price, Giờ live). ERR, LIVE impressions/giờ, Avg. view chỉ tính các ca có số của trường đó.</p>
+        <p className="text-[11px] text-[var(--text-faint)]">± so tuần trước: xanh = tốt lên, đỏ = xấu đi, xám = trung tính ({isShopee ? "Giờ live, Xu đã tung" : "UPT, Avg. price, Giờ live"}). {isShopee ? "ATC, CO, Orders, Xu chỉ tính các ca có khai số đó; số đơn có sau khi đối soát Live List." : "ERR, LIVE impressions/giờ, Avg. view chỉ tính các ca có số của trường đó."}</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

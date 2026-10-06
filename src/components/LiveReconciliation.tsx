@@ -12,7 +12,7 @@ import {
   importReconciliationFile,
   setReconciliationBucket
 } from "../lib/db/liveReconciliation";
-import { REPORT_PLATFORMS, type ReportPlatform } from "../lib/reportPlatform";
+import { type ReportPlatform } from "../lib/reportPlatform";
 import { errorMessage } from "../lib/errorMessage";
 import { useConfirm } from "../hooks/useConfirm";
 import { PageIntro } from "./common/PageIntro";
@@ -20,6 +20,8 @@ import { fmtPeriodLabel, fmtVndFull } from "../lib/format";
 import { Brand, LiveSession } from "../types";
 
 interface LiveReconciliationProps {
+  /** Sàn của workspace agency (07/10): chỉ lô và file của sàn này — TikTok dùng Creator-Live-Performance, Shopee dùng Live List. */
+  platform: ReportPlatform;
   /** Brand của file — bắt buộc chọn trước khi up (0133). */
   brands: Brand[];
   /** Mọi ca (kể cả đã loại) — chỉ để gắn nhãn brand + giờ cho ca khớp với từng phiên. */
@@ -56,17 +58,18 @@ function fmtTime(iso?: string): string {
   return iso ? new Date(iso).toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—";
 }
 
-export function LiveReconciliation({ brands, sessions, onApplied, onOpenSession }: LiveReconciliationProps) {
+export function LiveReconciliation({ platform, brands, sessions, onApplied, onOpenSession }: LiveReconciliationProps) {
   const confirm = useConfirm();
   const [uploadBrandId, setUploadBrandId] = useState("");
-  const [uploadPlatform, setUploadPlatform] = useState<ReportPlatform>("TikTok");
+  const uploadPlatform = platform;
   const brandName = (id?: string) => (id ? brands.find((b) => b.id === id)?.name ?? "brand đã xoá" : undefined);
   const sessionById = useMemo(() => new Map(sessions.map((s) => [s.id, s])), [sessions]);
   const sessionLabel = (id: string) => {
     const s = sessionById.get(id);
     return s ? `${s.brandName} ${s.date.slice(8, 10)}/${s.date.slice(5, 7)} ${s.startTime}–${s.endTime}` : "ca";
   };
-  const [batches, setBatches] = useState<ReconciliationBatch[]>([]);
+  const [allBatches, setBatches] = useState<ReconciliationBatch[]>([]);
+  const batches = useMemo(() => allBatches.filter((b) => b.platform === platform), [allBatches, platform]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [rows, setRows] = useState<ReconciliationRow[]>([]);
   const [busy, setBusy] = useState(false);
@@ -142,16 +145,7 @@ export function LiveReconciliation({ brands, sessions, onApplied, onOpenSession 
                 <option key={b.id} value={b.id}>{b.name}</option>
               ))}
             </select>
-            <select
-              aria-label="Sàn của file"
-              value={uploadPlatform}
-              onChange={(e) => setUploadPlatform(e.target.value as ReportPlatform)}
-              className="text-xs min-h-8 px-2 rounded-xl bg-[var(--surface-base)] border border-[var(--border)] text-[var(--text)]"
-            >
-              {REPORT_PLATFORMS.map((p) => (
-                <option key={p} value={p}>{p === "TikTok" ? "TikTok (Creator-Live-Performance)" : "Shopee (Live List)"}</option>
-              ))}
-            </select>
+            <span className="text-xs font-bold text-[var(--text-muted)]">{platform === "TikTok" ? "File TikTok (Creator-Live-Performance)" : "File Shopee (Live List)"}</span>
             <label className={uploadBrandId ? "" : "opacity-40 pointer-events-none"} title={uploadBrandId ? undefined : "Chọn brand trước — file là của MỘT tài khoản, chỉ khớp với ca của brand đó"}>
               <input
                 type="file"

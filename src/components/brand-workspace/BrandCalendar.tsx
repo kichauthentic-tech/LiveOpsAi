@@ -31,7 +31,7 @@ interface BrandCalendarProps {
   sessions: LiveSession[];
   shiftSlots?: ShiftSlot[];
   /** Sàn đang xem (bộ chuyển sàn) — chỉ lọc ca/slot CỦA BRAND hiện trên lịch; `sessions` gốc vẫn đi xuống modal để kiểm trùng người cả hai sàn. */
-  platformScope?: PlatformScope;
+  platformScope: PlatformScope;
   shiftRegistrations?: ShiftRegistration[];
   studios: Studio[];
   brandStudios?: BrandStudio[]; // phòng mặc định brand × nền tảng (0098) — form mở ca chọn sẵn
@@ -94,7 +94,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
   brandName,
   sessions,
   shiftSlots = [],
-  platformScope = "all",
+  platformScope,
   shiftRegistrations = [],
   studios,
   brandStudios = [],

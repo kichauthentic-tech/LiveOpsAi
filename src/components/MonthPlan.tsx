@@ -4,7 +4,7 @@ import { Brand, BrandContract, BrandMonthPlan, BrandMonthPlanSlot, BrandMonthlyC
 import { AlertTriangle, Ban, CalendarRange, Lock, Plus, Repeat, Save, Sparkles, Trash2, Wand2, X } from "lucide-react";
 import { commitmentsRead, contractsRead, upsertMonthlyCommitment } from "../lib/db/brandContracts";
 import type { TabPrefetchCtx } from "../lib/db/prefetch";
-import { loadRememberedBrandId, loadRememberedPlatform, rememberBrandId } from "../lib/defaultBrand";
+import { loadRememberedBrandId } from "../lib/defaultBrand";
 import { errorMessage } from "../lib/errorMessage";
 import { PlanSettings, calendarEventsRead, deleteMonthPlan, fetchBrandLockedPlanSlots, fetchMonthPlan, fetchPlanStatuses, lockMonthPlan, lockedPlanSlotsRead, monthPlanRead, planStatusesRead, replacePlanSlots, upsertMonthPlan } from "../lib/db/monthPlans";
 import { PlanEvaluation, buildCalibration, evaluatePlan } from "../lib/scheduling/planEvaluation";
@@ -36,6 +36,8 @@ import { fmtMonth, fmtFixed, fmtVndShort, fmtVndFull } from "../lib/format";
 import { MonthPicker } from "./common/MonthPicker";
 import { brandPlatformKey, brandPlatformsOf, type ReportPlatform } from "../lib/reportPlatform";
 interface MonthPlanProps {
+  /** Sàn của workspace agency (07/10): kế hoạch, target, cam kết của sàn này — không còn nút chuyển sàn trong màn. */
+  platform: ReportPlatform;
   brands: Brand[];
   studios: Studio[];
   // Lịch sử ca (engine chỉ ăn ca Completed + tiktok_reconciled của đúng brand).
@@ -89,6 +91,7 @@ export function prefetchMonthPlan(_ctx: TabPrefetchCtx): void {
 }
 
 export default function MonthPlan({
+  platform: platformProp,
   brands,
   studios,
   sessions,
@@ -112,10 +115,7 @@ export default function MonthPlan({
   // chọn không có ở brand mới thì về sàn đầu của brand đó.
   const platforms = useMemo(() => (brandId ? brandPlatformsOf(brandId, sessions, [...shiftSlots, ...brandStudios]) : (["TikTok"] as ReportPlatform[])), [brandId, sessions, shiftSlots, brandStudios]);
   // Sàn mở sẵn: sàn đã nhớ cùng brand (nút "Lập kế hoạch VERA Shopee" ở Dashboard/Toàn Cảnh/Việc cần làm — rememberBrandId).
-  const [platformPick, setPlatformPick] = useState<ReportPlatform | null>(null);
-  const remembered = brandId ? loadRememberedPlatform(brandId) : null;
-  const want = platformPick ?? remembered;
-  const platform: ReportPlatform = want && platforms.includes(want) ? want : platforms[0];
+  const platform: ReportPlatform = platformProp;
   const brandLabel = (name: string | undefined) => `${name ?? ""}${platforms.length > 1 || platform === "Shopee" ? ` ${platform}` : ""}`;
   // Lịch sử cho engine/dự báo: chỉ ca CÙNG SÀN (năng suất hai sàn khác nhau — VERA Shopee ~1,6x GMV/giờ TikTok).
   // Kiểm trùng phòng/người (crossBrandCheck) vẫn dùng mọi ca: người và phòng là vật lý, không theo sàn.
@@ -170,22 +170,20 @@ export default function MonthPlan({
     (initial ? planStatusesRead.take(nextMonth) : fetchPlanStatuses(nextMonth))
       .then((m) =>
         setNextMonthMissing(
-          brands.flatMap((b) => {
-            const ps = brandPlatformsOf(b.id, sessions, [...shiftSlots, ...brandStudios]);
-            return ps.filter((p) => m.get(brandPlatformKey(b.id, p))?.status !== "locked").map((p) => (ps.length > 1 ? `${b.name} ${p}` : b.name));
-          })
+          // Chỉ sàn của workspace (07/10): kế hoạch sàn khác thuộc workspace của sàn đó.
+          brands.filter((b) => brandPlatformsOf(b.id, sessions, [...shiftSlots, ...brandStudios]).includes(platformProp)).filter((b) => m.get(brandPlatformKey(b.id, platformProp))?.status !== "locked").map((b) => b.name)
         )
       )
       .catch(() => setNextMonthMissing([]));
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => refreshMissing(true), [brands, nextMonth]);
+  useEffect(() => refreshMissing(true), [brands, nextMonth, platformProp]);
   useEffect(() => {
     const cur = today.slice(0, 7);
     let alive = true;
     planStatusesRead.take(cur).then((m) => {
       if (!alive) return;
-      const drafts = brands.filter((b) => (["TikTok", "Shopee"] as ReportPlatform[]).some((p) => m.get(brandPlatformKey(b.id, p))?.status === "draft"));
+      const drafts = brands.filter((b) => m.get(brandPlatformKey(b.id, platformProp))?.status === "draft");
       setCurMonthDrafts(drafts);
       // Chỉ nhảy tháng khi chính brand đang mở có nháp tháng này (đến từ nút "Chốt kế hoạch" của brand khác thì
       // giữ đúng brand đó); brand khác còn nháp thì banner bên dưới nhắc.
@@ -680,20 +678,6 @@ export default function MonthPlan({
           <select value={brandId} onChange={(e) => { userPicked.current = true; setBrandId(e.target.value); }} className="bg-[var(--surface-base)] border border-[var(--border)] rounded-xl px-3 py-2 text-[var(--text)] text-sm font-bold">
             {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
-          {platforms.length > 1 && (
-            <div className="inline-flex items-center gap-1 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-1" role="group" aria-label="Sàn">
-              {platforms.map((p) => (
-                <button
-                  key={p}
-                  onClick={() => { userPicked.current = true; setPlatformPick(p); rememberBrandId(brandId, p); }}
-                  aria-pressed={platform === p}
-                  className={`min-h-6 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${platform === p ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)] hover:bg-[var(--surface-elevated)]"}`}
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
-          )}
           <MonthPicker value={month} onChange={(m) => { userPicked.current = true; setMonth(m); }} />
         </div>
       </div>
