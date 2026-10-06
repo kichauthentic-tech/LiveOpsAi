@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { platformOf, inPlatformScope, type PlatformScope } from "../lib/reportPlatform";
+import { inChannelScope, platformOf, REPORT_PLATFORMS, type ChannelScope } from "../lib/reportPlatform";
 import { SESSION_STATUS_CLS, SESSION_STATUS_LABEL_VI } from "../lib/sessionStatusUi";
 import { BookOpen, CheckCircle2, ChevronRight, Circle, Download, EyeOff, Link2 } from "lucide-react";
 import { Brand, LiveSession, ShiftSlot, Studio, Talent, UserRole, AuditLogEntry } from "../types";
@@ -26,7 +26,8 @@ interface SessionLedgerProps {
   variant: "agency" | "brand";
   sessions: LiveSession[];
   /** Sàn của workspace (07/10: mỗi sàn một workspace, không còn "cả hai sàn"). */
-  platformScope: PlatformScope;
+  /** "all" = mọi kênh: bảng gồm ca hai sàn (chip sàn), số hiệu suất tổng TÁCH THEO SÀN. */
+  platformScope: ChannelScope;
   brands: Brand[];
   brandId?: string; // bắt buộc với variant brand
   currentRole: UserRole;
@@ -127,7 +128,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
   const today = getTodayDate();
 
   const scoped = useMemo(
-    () => (isBrandView && brandId ? sessions.filter((s) => s.brandId === brandId && inPlatformScope(s, platformScope)) : sessions.filter((s) => inPlatformScope(s, platformScope))),
+    () => (isBrandView && brandId ? sessions.filter((s) => s.brandId === brandId && inChannelScope(s, platformScope)) : sessions.filter((s) => inChannelScope(s, platformScope))),
     [sessions, isBrandView, brandId, platformScope]
   );
 
@@ -148,7 +149,29 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
 
   const rows = useMemo(() => filterLedger(scoped, filter, today), [scoped, filter, today]);
   const days = useMemo(() => groupByDate(rows), [rows]);
-  const summary = useMemo(() => summarize(rows, today), [rows, today]);
+  // Tổng hiệu suất tính RIÊNG từng sàn (user chốt 07/10: không cộng GMV/đơn hai sàn); số vận hành (ca, giờ, bước còn thiếu,
+  // nguồn số) thì cộng được.
+  const perPlatform = useMemo(
+    () => REPORT_PLATFORMS.map((p) => ({ p, rows: rows.filter((s) => platformOf(s) === p) })).filter((x) => x.rows.length > 0).map((x) => ({ p: x.p, sum: summarize(x.rows, today) })),
+    [rows, today]
+  );
+  const summary = useMemo(() => {
+    const parts = perPlatform.map((x) => x.sum);
+    if (parts.length === 1) return parts[0];
+    const ops = summarize([], today);
+    for (const x of parts) {
+      ops.total += x.total;
+      ops.countable += x.countable;
+      ops.hours += x.hours;
+      for (const m of Object.keys(ops.missing) as MissingStep[]) ops.missing[m] += x.missing[m];
+      for (const k of Object.keys(ops.quality) as (keyof typeof ops.quality)[]) ops.quality[k] += x.quality[k];
+    }
+    return ops;
+  }, [perPlatform, today]);
+  const multiPlatformRows = perPlatform.length > 1;
+  /** Ô số hiệu suất: một sàn ⇒ một số; nhiều sàn ⇒ mỗi sàn một dòng (không có tổng chung). */
+  const perfValue = (pick: (x: ReturnType<typeof summarize>) => string) =>
+    multiPlatformRows ? perPlatform.map((x) => `${x.p} ${pick(x.sum)}`).join(" · ") : pick(summary);
   const noMissing = (["snapshot", "report", "reconcile"] as MissingStep[]).every((m) => summary.missing[m] === 0);
   // M4, cùng luật với M3 (Dashboard agency): cột không ca nào có số thì không dành chỗ cho nó. Target GMV
   // của ca chỉ có khi đã chốt Kế Hoạch Tháng — chưa chốt thì cả cột là "—" (đo 29/09: 47/47 dòng).
@@ -177,7 +200,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
   // Không lọc theo tháng đang chọn: cả điểm của khối này là tìm lại được ca đã loại, mà người đi
   // tìm thường không nhớ nó nằm tháng nào. Số lượng luôn rất nhỏ.
   const excludedScoped = useMemo(
-    () => (isBrandView && brandId ? excludedSessions.filter((s) => s.brandId === brandId && inPlatformScope(s, platformScope)) : excludedSessions.filter((s) => inPlatformScope(s, platformScope)))
+    () => (isBrandView && brandId ? excludedSessions.filter((s) => s.brandId === brandId && inChannelScope(s, platformScope)) : excludedSessions.filter((s) => inChannelScope(s, platformScope)))
       .slice()
       .sort((a, b) => b.date.localeCompare(a.date)),
     [excludedSessions, isBrandView, brandId, platformScope]
@@ -338,9 +361,9 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
           <Stat label="Số ca" value={String(summary.total)} sub={summary.countable < summary.total ? `${summary.countable} ca có số` : undefined} />
           <Stat label="Giờ live" value={fmtHours(summary.hours)} sub="giờ thật, thiếu thì lấy giờ kế hoạch" />
-          <Stat label="GMV" value={allHidden ? LOCKED : fmtVndShort(summary.gmv)} accent={!allHidden} muted={allHidden} />
-          <Stat label="Orders" value={allHidden ? LOCKED : fmtInt(summary.orders)} muted={allHidden} />
-          <Stat label="GMV/giờ" value={allHidden ? LOCKED : fmtVndShort(summary.gmvPerHour)} muted={allHidden} />
+          <Stat label="GMV" value={allHidden ? LOCKED : perfValue((x) => fmtVndShort(x.gmv))} accent={!allHidden} muted={allHidden} />
+          <Stat label="Orders" value={allHidden ? LOCKED : perfValue((x) => fmtInt(x.orders))} muted={allHidden} />
+          <Stat label="GMV/giờ" value={allHidden ? LOCKED : perfValue((x) => fmtVndShort(x.gmvPerHour))} muted={allHidden} />
           <div className="bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-2.5">
             <p className="text-[11px] uppercase tracking-wider text-[var(--text-faint)]">Nguồn số liệu</p>
             {summary.countable === 0 ? (

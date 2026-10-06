@@ -5,7 +5,7 @@ import { LogOut, Building2, ChevronDown, Check, Palette, HelpCircle } from "luci
 import { useTheme, THEME_OPTIONS } from "../hooks/useTheme";
 import { BrandLogo } from "./ui/BrandLogo";
 import { profileOf } from "../lib/platforms/profiles";
-import { PLATFORM_SCOPE_LABEL, type PlatformScope, type ReportPlatform } from "../lib/reportPlatform";
+import { type ReportPlatform } from "../lib/reportPlatform";
 
 // Giai đoạn A (Workspace Agency ↔ Brand) — xem docs/WORKSPACE_HISTORY.md.
 export type WorkspaceContext = { type: "agency" } | { type: "brand"; brandId: string };
@@ -19,15 +19,8 @@ interface HeaderProps {
   // role "brand" tự khoá vào workspace của họ ở App.tsx, không truyền props này xuống.
   workspace?: WorkspaceContext;
   onWorkspaceChange?: (next: WorkspaceContext) => void;
-  /** Kênh brand × sàn (07/10): mỗi brand chạy hai sàn hiện thành "VERA · TikTok", "VERA · Shopee", "VERA · Tổng". */
+  /** Kênh của từng brand (0149) — ghi cạnh tên brand trong bộ chọn. */
   brandPlatforms?: Record<string, ReportPlatform[]>;
-  platformScope?: PlatformScope;
-  onPickChannel?: (brandId: string, scope: ReportPlatform) => void;
-  /** false = role brand: không có mục Agency (chỉ chọn sàn của brand mình). */
-  showAgency?: boolean;
-  /** Workspace agency (07/10): sàn đang mở, null = "Chung" (lịch, nhân sự, talent, studio, CRM, finance, hệ thống). */
-  agencyPlatform?: ReportPlatform | null;
-  onPickAgency?: (platform: ReportPlatform | null) => void;
   brands?: Brand[];
   /** Mở "Từ điển và cách dùng" (GlossaryDialog). */
   onOpenHelp?: () => void;
@@ -46,16 +39,10 @@ const WorkspaceSwitcher: React.FC<{
   brands: Brand[];
   onChange: (next: WorkspaceContext) => void;
   brandPlatforms?: Record<string, ReportPlatform[]>;
-  platformScope?: PlatformScope;
-  onPickChannel?: (brandId: string, scope: ReportPlatform) => void;
-  showAgency?: boolean;
-  agencyPlatform?: ReportPlatform | null;
-  onPickAgency?: (platform: ReportPlatform | null) => void;
-}> = ({ workspace, brands, onChange, brandPlatforms, platformScope, onPickChannel, showAgency = true, agencyPlatform = null, onPickAgency }) => {
+}> = ({ workspace, brands, onChange, brandPlatforms }) => {
   const [open, setOpen] = useState(false);
   const currentBrand = workspace.type === "brand" ? brands.find((b) => b.id === workspace.brandId) : undefined;
-  const currentPlatforms = currentBrand ? brandPlatforms?.[currentBrand.id] ?? [] : [];
-  const label = workspace.type === "agency" ? "Agency (Toàn cảnh)" : `${currentBrand?.name ?? "Brand"}${currentPlatforms.length > 1 && platformScope ? ` · ${PLATFORM_SCOPE_LABEL[platformScope]}` : ""}`;
+  const label = workspace.type === "agency" ? "Agency" : currentBrand?.name ?? "Brand";
 
   return (
     <div className="relative">
@@ -63,21 +50,8 @@ const WorkspaceSwitcher: React.FC<{
         onClick={() => setOpen((v) => !v)}
         className="flex items-center gap-2 bg-[var(--surface-elevated)]/80 hover:bg-[var(--surface-hover)] border border-[var(--border)]/60 px-3 py-1.5 rounded-full transition-colors"
       >
-        {workspace.type === "agency" ? (
-          <Building2 className="w-3.5 h-3.5 text-blue-400" />
-        ) : (
-          <BrandLogo brand={currentBrand} size="xs" />
-        )}
-        {/* Màn điện thoại: "Agency (Toàn cảnh)" từng xuống 3 dòng (audit UX 2026-09-26) — rút còn "Agency". */}
-        <span className="text-xs font-bold text-[var(--text)] whitespace-nowrap truncate max-w-[9rem] sm:max-w-none">
-          {workspace.type === "agency" ? (
-            <>
-              Agency<span className="hidden sm:inline"> · {agencyPlatform ?? "Chung"}</span>
-            </>
-          ) : (
-            label
-          )}
-        </span>
+        {workspace.type === "agency" ? <Building2 className="w-3.5 h-3.5 text-blue-400" /> : <BrandLogo brand={currentBrand} size="xs" />}
+        <span className="text-xs font-bold text-[var(--text)] whitespace-nowrap truncate max-w-[9rem] sm:max-w-none">{label}</span>
         <ChevronDown className="w-3.5 h-3.5 text-[var(--text-muted)]" />
       </button>
 
@@ -85,57 +59,51 @@ const WorkspaceSwitcher: React.FC<{
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div className="absolute left-0 top-full mt-2 w-64 bg-[var(--surface)] border border-[var(--border)] rounded-xl shadow-2xl z-50 py-1.5 max-h-96 overflow-y-auto">
-            {showAgency && (
-              <>
-                {/* Agency tách theo sàn (07/10): Chung = lịch + tài nguyên + tiền theo người; mỗi sàn có số liệu riêng. */}
-                {([{ p: "TikTok" as const, hint: "Dashboard, Sổ Ca, Đối Soát, Hiệu Suất Host…" }, { p: "Shopee" as const, hint: "Dashboard, Sổ Ca, Đối Soát, Hiệu Suất Host…" }, { p: null, hint: "Lịch, Nhân sự ca, Talent, Studio, CRM, Finance" }] as const).map(({ p, hint }) => (
-                  <button
-                    key={p ?? "chung"}
-                    onClick={() => {
-                      if (onPickAgency) onPickAgency(p);
-                      else onChange({ type: "agency" });
-                      setOpen(false);
-                    }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-[var(--text)] hover:bg-[var(--surface-elevated)]/80 transition-colors"
-                  >
-                    <Building2 className="w-4 h-4 text-blue-400 shrink-0" />
-                    <span className="flex-1 text-left">
-                      Agency · {p ?? "Chung"}
-                      <span className="block text-[11px] font-normal text-[var(--text-faint)]">{hint}</span>
-                    </span>
-                    {workspace.type === "agency" && agencyPlatform === p && <Check className="w-3.5 h-3.5 text-blue-400" />}
-                  </button>
-                ))}
-                <div className="border-t border-[var(--border)] my-1.5" />
-              </>
-            )}
+            {/* Bước 3 đa sàn (07/10): sàn KHÔNG còn là workspace — Agency một mục, mỗi brand một mục (kênh của brand ghi bên
+                cạnh); sàn chọn ở thanh đầu nội dung của từng màn. */}
+            <button
+              onClick={() => {
+                onChange({ type: "agency" });
+                setOpen(false);
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-[var(--text)] hover:bg-[var(--surface-elevated)]/80 transition-colors"
+            >
+              <Building2 className="w-4 h-4 text-blue-400 shrink-0" />
+              <span className="flex-1 text-left">
+                Agency
+                <span className="block text-[11px] font-normal text-[var(--text-faint)]">Mọi brand, mọi kênh</span>
+              </span>
+              {workspace.type === "agency" && <Check className="w-3.5 h-3.5 text-blue-400" />}
+            </button>
+            <div className="border-t border-[var(--border)] my-1.5" />
             <p className="px-3 pb-1 text-[11px] font-bold uppercase tracking-widest text-[var(--text-faint)]">Brand</p>
             {brands.length === 0 && <p className="px-3 py-2 text-[11px] text-[var(--text-faint)]">Chưa có Brand nào.</p>}
-            {brands.flatMap((b) => {
+            {brands.map((b) => {
               const plats = brandPlatforms?.[b.id] ?? [];
-              // Brand hai sàn: mỗi sàn là một workspace riêng (không có mục Tổng); brand một sàn giữ một mục như cũ.
-              const channels: (ReportPlatform | null)[] = plats.length > 1 && onPickChannel ? plats : [null];
-              return channels.map((ch) => {
-                const active = workspace.type === "brand" && workspace.brandId === b.id && (ch === null || platformScope === ch);
-                return (
-                  <button
-                    key={`${b.id}|${ch ?? ""}`}
-                    onClick={() => {
-                      if (ch === null || !onPickChannel) onChange({ type: "brand", brandId: b.id });
-                      else onPickChannel(b.id, ch);
-                      setOpen(false);
-                    }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-[var(--text)] hover:bg-[var(--surface-elevated)]/80 transition-colors"
-                  >
-                    <BrandLogo brand={b} size="sm" />
-                    <span className="flex-1 text-left truncate">
-                      {b.name}
-                      {ch && <span className={`ml-1.5 font-bold ${profileOf(ch).textClass}`}>· {PLATFORM_SCOPE_LABEL[ch]}</span>}
-                    </span>
-                    {active && <Check className="w-3.5 h-3.5 text-blue-400" />}
-                  </button>
-                );
-              });
+              const active = workspace.type === "brand" && workspace.brandId === b.id;
+              return (
+                <button
+                  key={b.id}
+                  onClick={() => {
+                    onChange({ type: "brand", brandId: b.id });
+                    setOpen(false);
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-[var(--text)] hover:bg-[var(--surface-elevated)]/80 transition-colors"
+                >
+                  <BrandLogo brand={b} size="sm" />
+                  <span className="flex-1 text-left truncate">
+                    {b.name}
+                    {plats.length > 0 && (
+                      <span className="ml-1.5 font-normal">
+                        {plats.map((p) => (
+                          <span key={p} className={`ml-1 text-[11px] font-bold ${profileOf(p).textClass}`}>{p}</span>
+                        ))}
+                      </span>
+                    )}
+                  </span>
+                  {active && <Check className="w-3.5 h-3.5 text-blue-400" />}
+                </button>
+              );
             })}
           </div>
         </>
@@ -191,11 +159,6 @@ export const Header: React.FC<HeaderProps> = ({
   workspace,
   onWorkspaceChange,
   brandPlatforms,
-  platformScope,
-  onPickChannel,
-  showAgency,
-  agencyPlatform,
-  onPickAgency,
   brands = [],
   notifications,
   onOpenHelp
@@ -205,7 +168,7 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Active Region & Live Status */}
       <div className="flex items-center gap-6 min-w-0">
         {workspace && onWorkspaceChange && (
-          <WorkspaceSwitcher workspace={workspace} brands={brands} onChange={onWorkspaceChange} brandPlatforms={brandPlatforms} platformScope={platformScope} onPickChannel={onPickChannel} showAgency={showAgency} agencyPlatform={agencyPlatform} onPickAgency={onPickAgency} />
+          <WorkspaceSwitcher workspace={workspace} brands={brands} onChange={onWorkspaceChange} brandPlatforms={brandPlatforms} />
         )}
       </div>
 

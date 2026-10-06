@@ -40,6 +40,9 @@ describe("khoá brand × tháng × sàn", () => {
   test("URL ?san=", () => {
     expect(parsePlatformParam("?san=shopee")).toBe("Shopee");
     expect(parsePlatformParam("?san=tong")).toBeNull(); // không còn "Tổng 2 sàn"
+    // Bước 3 (07/10): màn "mọi kênh" có "Tất cả" = khối riêng từng sàn (không cộng số).
+    expect(parsePlatformParam("?san=tat-ca")).toBe("all");
+    expect(withPlatformParam("", "all")).toBe("?san=tat-ca");
     expect(parsePlatformParam("?x=1")).toBeNull();
     expect(withPlatformParam("?x=1", "TikTok")).toBe("?x=1&san=tiktok");
     expect(withPlatformParam("?san=tiktok", null)).toBe("");
@@ -143,5 +146,16 @@ describe("Bản Tin CEO: tập trung khách tính riêng từng sàn (07/10: kh�
     });
     const t = issues.map((i) => i.title).filter((x) => /một khách/.test(x));
     expect(t).toEqual(["54% GMV TikTok tháng đến từ một khách: VERA"]);
+  });
+});
+
+describe("phạm vi kênh của màn (Bước 3)", () => {
+  test("màn mọi kênh giữ 'Tất cả' khi có hơn một sàn; màn một kênh quy về sàn đơn gần nhất", async () => {
+    const { resolveChannelScope } = await import("../src/lib/reportPlatform");
+    expect(resolveChannelScope("all", "Shopee", ["TikTok", "Shopee"], "all")).toBe("all");
+    expect(resolveChannelScope("all", "Shopee", ["TikTok", "Shopee"], "one")).toBe("Shopee");
+    expect(resolveChannelScope("all", "Shopee", ["TikTok"], "all")).toBe("TikTok");
+    expect(resolveChannelScope("Shopee", "TikTok", ["TikTok"], "one")).toBe("TikTok");
+    expect(resolveChannelScope("Shopee", "TikTok", ["TikTok", "Shopee"], "all")).toBe("Shopee");
   });
 });

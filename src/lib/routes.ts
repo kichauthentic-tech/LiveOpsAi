@@ -6,7 +6,7 @@
 // Slug cố định theo id tab (KHÔNG suy từ nhãn menu) để đổi tên menu không làm gãy link đã gửi.
 //   Agency:  /so-ca, /ke-hoach-thang, ...        Brand: /brand/crocs/report-thang, ...
 
-import type { PlatformScope } from "./reportPlatform";
+import type { ChannelScope } from "./reportPlatform";
 
 export type RouteWorkspace = { type: "agency" } | { type: "brand"; brandId: string };
 
@@ -107,16 +107,17 @@ export function findBrandBySlug<B extends { id: string; name: string }>(brands: 
 
 // Sàn đang xem ở Brand workspace (06/10) — query `?san=tiktok|shopee|tong` để link gửi đi mở đúng sàn. Không có ⇒ mặc định
 // (App: mở sàn đầu của brand; không còn "tong" từ 07/10).
-const SAN_SLUGS: Record<PlatformScope, string> = { TikTok: "tiktok", Shopee: "shopee" };
+// `?san=` của bộ lọc kênh (Bước 3 đa sàn): một sàn, hoặc "tat-ca" ở màn mọi kênh (khối riêng từng sàn, không cộng số).
+const SAN_SLUGS: Record<ChannelScope, string> = { TikTok: "tiktok", Shopee: "shopee", all: "tat-ca" };
 
-export function parsePlatformParam(search: string): PlatformScope | null {
+export function parsePlatformParam(search: string): ChannelScope | null {
   const v = new URLSearchParams(search).get("san")?.toLowerCase();
-  const hit = (Object.keys(SAN_SLUGS) as PlatformScope[]).find((k) => SAN_SLUGS[k] === v);
+  const hit = (Object.keys(SAN_SLUGS) as ChannelScope[]).find((k) => SAN_SLUGS[k] === v);
   return hit ?? null;
 }
 
 /** `search` mới với `san` = scope (null = bỏ tham số). Giữ nguyên các tham số khác. */
-export function withPlatformParam(search: string, scope: PlatformScope | null): string {
+export function withPlatformParam(search: string, scope: ChannelScope | null): string {
   const q = new URLSearchParams(search);
   if (scope) q.set("san", SAN_SLUGS[scope]);
   else q.delete("san");

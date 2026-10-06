@@ -49,9 +49,7 @@ const BRANCH_RE = /(===|!==)\s*"(Shopee|TikTok)"|"(Shopee|TikTok)"\s*(===|!==)|\
 const ALLOWED = (rel: string) =>
   rel.startsWith("lib/platforms/") ||
   rel === "lib/reportPlatform.ts" ||
-  rel.startsWith("server/") ||
-  // Workspace agency theo sàn — gỡ ở Bước 3 (gộp menu).
-  rel === "lib/appNav.ts";
+  rel.startsWith("server/");
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const f of readdirSync(dir)) {

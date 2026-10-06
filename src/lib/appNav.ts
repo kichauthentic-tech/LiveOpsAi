@@ -15,24 +15,32 @@ export interface NavItem {
 }
 
 /**
- * Tab agency CÓ SỐ LIỆU THEO SÀN (07/10, user chốt: hai sàn khác bản chất dữ liệu, không gộp được). Chỉ xuất hiện ở workspace
- * "Agency · TikTok" / "Agency · Shopee". Tab còn lại (lịch, nhân sự ca, talent, studio, CRM, finance theo người, hệ thống) là
- * workspace "Agency · Chung". `tiktok_api` chỉ có ở sàn TikTok.
+ * Phạm vi kênh của từng màn (Bước 3 lộ trình đa sàn, 07/10). Sàn KHÔNG còn là workspace: một workspace Agency + một workspace mỗi
+ * brand, sidebar không đổi khi đổi sàn; màn có số theo sàn hiện thanh chọn sàn ở đầu nội dung.
+ *   "all" = màn mọi kênh: thêm lựa chọn "Tất cả" — hiện khối RIÊNG từng sàn, không có số hiệu suất gộp hai sàn.
+ *   "one" = việc trên dữ liệu của đúng một gian hàng (kế hoạch, đối soát, report, Ads, Dữ Liệu Gốc…): chọn một sàn.
+ * Màn không có ở đây (lịch toàn agency, nhân sự ca, talent, studio, CRM, finance, hệ thống) đã nhìn mọi kênh sẵn.
  */
-export const PLATFORM_AGENCY_TABS = new Set([
-  "agency_overview", "month_plan", "sessions", "live_reconciliation", "ops_support", "host_performance", "brands_overview", "report_publish_board", "tiktok_api"
-]);
-export const TIKTOK_ONLY_AGENCY_TABS = new Set(["tiktok_api"]);
-
-/** Nhóm menu của workspace agency: `platform` = sàn đang mở, null = workspace Chung. Bỏ nhóm rỗng. */
-export function filterAgencyNav(groups: NavGroup[], platform: "TikTok" | "Shopee" | null): NavGroup[] {
-  return groups
-    .map((g) => ({
-      ...g,
-      items: g.items.filter((i) => (platform ? PLATFORM_AGENCY_TABS.has(i.id) && !(platform === "Shopee" && TIKTOK_ONLY_AGENCY_TABS.has(i.id)) : !PLATFORM_AGENCY_TABS.has(i.id)))
-    }))
-    .filter((g) => g.items.length > 0);
-}
+export const TAB_CHANNEL_SCOPE: Record<string, "all" | "one"> = {
+  agency_overview: "all",
+  sessions: "all",
+  host_performance: "all",
+  brands_overview: "all",
+  report_publish_board: "all",
+  month_plan: "one",
+  live_reconciliation: "one",
+  ops_support: "one",
+  brand_dashboard: "one",
+  brand_calendar: "all",
+  brand_sessions: "all",
+  brand_skus: "one",
+  brand_monthly_report: "one",
+  brand_commitment_view: "one",
+  brand_next_month_plan: "one",
+  brand_affiliate: "one",
+  brand_ads_report: "one",
+  brand_dataraw: "one"
+};
 
 export interface NavGroup {
   label: string;

@@ -12,6 +12,23 @@ export const REPORT_PLATFORMS: ReportPlatform[] = ["TikTok", "Shopee"];
  * `PlatformScope` cho chỗ đã dùng; kiểu này không còn giá trị "all" nên màn nào muốn "cả hai" là lỗi compile.
  */
 export type PlatformScope = ReportPlatform;
+/**
+ * Bộ lọc kênh của một màn (Bước 3 lộ trình đa sàn, 07/10): màn "mọi kênh" (Dashboard CEO, Sổ Ca, Hiệu Suất Host, Toàn Cảnh,
+ * Điều Phối Phát Hành, Lịch) nhận thêm "all" và hiện KHỐI RIÊNG từng sàn — không bao giờ một con số hiệu suất gộp hai sàn.
+ */
+export type ChannelScope = ReportPlatform | "all";
+/**
+ * Phạm vi thật của một màn từ lựa chọn của người dùng: màn mọi kênh giữ "Tất cả" khi có hơn một sàn; màn một kênh (hoặc lựa
+ * chọn là sàn không có ở đây) quy về sàn đơn gần nhất, không thì sàn đầu.
+ */
+export function resolveChannelScope(choice: ChannelScope, single: ReportPlatform, platforms: ReportPlatform[], tabScope: "all" | "one"): ChannelScope {
+  if (tabScope === "all" && choice === "all" && platforms.length > 1) return "all";
+  if (choice !== "all" && platforms.includes(choice)) return choice;
+  return platforms.includes(single) ? single : platforms[0] ?? LEGACY_PLATFORM;
+}
+
+export const inChannelScope = (s: { platform?: string | null }, scope: ChannelScope) => scope === "all" || platformOf(s) === scope;
+
 export const PLATFORM_SCOPE_LABEL: Record<PlatformScope, string> = { TikTok: "TikTok", Shopee: "Shopee" };
 
 /** Sàn của một dòng (ca, ca mở, kế hoạch…). Dòng cũ thiếu cột sàn = TikTok. */

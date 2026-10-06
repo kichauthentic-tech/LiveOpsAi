@@ -49,7 +49,12 @@
     — appNav gỡ ở Bước 3). Kèm sửa lỗi có từ trước: Report Tháng sập một nhịp khi chuyển VERA·Shopee → CROCS (bản chụp kênh cũ còn trong state ⇒
     nay khoá theo brand|tháng|sàn); Nhập Ads Shopee không còn đọc file Ads TikTok ngầm. Verify: vitest 619/619, lint 0 lỗi, audit:dead 0, build;
     bản dev nối DB thật: 21 màn hai sàn không lỗi, VERA·Shopee hiện Viewers/ATC/phễu Shopee, CROCS hiện CTOR/phễu TikTok, CEO Shopee ô Viewers/GPM.
-  - Bước tiếp: 3 gộp menu (1 workspace Agency + 1 mỗi brand, bộ lọc
+  - **Bước 3 XONG (07/10, không migration): GỘP MENU.** Bỏ 3 workspace Agency·TikTok/Shopee/Chung + 7 workspace brand·sàn ⇒ switcher 5 mục
+    (Agency + 4 brand), thanh "Sàn" trong trang (xem §3). Gỡ `PLATFORM_AGENCY_TABS`/`TIKTOK_ONLY_AGENCY_TABS`/`filterAgencyNav`, `handlePickAgency`,
+    `handlePickChannel`. Vòng chốt tháng nay chỉ đi qua 2 workspace (Agency, brand). Verify: vitest 620/620, lint 0 lỗi, audit:dead 0, build;
+    bản dev nối DB thật: 13 màn hai phạm vi không lỗi, Dashboard "Tất cả kênh" có bảng toàn agency (366 ca T10, GMV cộng riêng TikTok 73,5M /
+    Shopee 24,6M) + khối TikTok + khối Shopee; Sổ Ca "Tất cả" ghi "TikTok 73,5M · Shopee 24,6M"; Affiliate VERA tự về TikTok.
+  - Bước tiếp: 4 số liệu chuẩn (1 workspace Agency + 1 mỗi brand, bộ lọc
     kênh) → 4 số liệu chuẩn (thang nguồn số, Live List ⇒ ATC/CO/Xu, CEO + P&L theo kênh) → 5 chạy thật 2–4 tuần.
 
 - **CHẠY THỬ THẬT trên dữ liệu thật** (từ 2026-09-18; mock đã xoá sạch 19/09). DB: 33 hồ sơ talent thật, CROCS T6–T9 nạp
@@ -282,8 +287,15 @@
 - **Stack:** React 19 + Vite 6 + Tailwind 4 (client) · Express (API, `src/server/createApp.ts`) · Supabase (Postgres + Auth
   + RLS). Deploy Vercel: frontend tĩnh từ `dist/`, `/api/*` → `api/index.ts` (Node ESM từng file, KHÔNG bundle).
   `server.ts` chỉ cho dev (`npm run dev`, Vite middleware) và Node truyền thống (`npm start`, phục vụ `dist/`).
-- **Hai workspace** chuyển bằng switcher trên Header: **Agency** (ceo/admin/operations, xuyên mọi brand) và **Brand**
-  (mỗi brand một workspace: CROCS, JOCKEY, VERA, Franklin; role `brand` bị khoá vào đúng brand qua `assigned_brand_id`).
+- **Workspace (Bước 3 đa sàn, 07/10):** switcher trên Header = **Agency** (ceo/admin/operations, mọi brand, mọi kênh) + **một mục mỗi
+  brand** (CROCS, JOCKEY, VERA, Franklin; kênh của brand ghi cạnh tên). Role `brand` khoá vào brand của mình qua `assigned_brand_id`, không
+  có switcher. **Sàn KHÔNG phải workspace:** sidebar không đổi khi đổi sàn; màn theo sàn có thanh **"Sàn"** đầu nội dung (`ChannelBar`),
+  phạm vi khai ở `TAB_CHANNEL_SCOPE` (appNav): `"all"` = Dashboard CEO, Sổ Ca, Hiệu Suất Host, Toàn Cảnh Brand, Điều Phối Phát Hành, Lịch +
+  Sổ Ca brand — thêm "Tất cả kênh" (agency: `perPlatformBlocks` xếp khối riêng từng sàn; Sổ Ca: số vận hành cộng, GMV/đơn/GMV giờ ghi
+  từng sàn; Dashboard có thêm `AgencyChannelSummary` = ca/giờ/tiền toàn agency + GMV từng kênh, cộng trong một sàn); `"one"` = Kế Hoạch
+  Tháng, Đối Soát, Hỗ Trợ Vận Hành và các tab brand còn lại. State: `agencyChoice/agencySingle`, `brandChoice/brandSingle` →
+  `resolveChannelScope` (reportPlatform.ts); URL `?san=tiktok|shopee|tat-ca`. Tab không có nguồn ở một sàn (hồ sơ `hiddenBrandTabs`) chỉ
+  ẩn khỏi sidebar khi MỌI kênh của brand đều không có nguồn; thanh sàn chỉ liệt kê sàn hợp lệ cho tab.
   Có URL route (`src/lib/routes.ts`): `/so-ca`, `/brand/crocs/report-thang`…
 - **Nguồn sự thật của menu:** `agencyNavGroups()`/`brandNavGroups()` ở [src/lib/appNav.ts](src/lib/appNav.ts). Ảnh chụp:
   - Agency: Dashboard (Bản Tin CEO) · Lập Kế Hoạch (Kế Hoạch Tháng, Nhân sự ca) · Vận Hành Hằng Ngày (Bảng Vận Hành, Sổ Ca,

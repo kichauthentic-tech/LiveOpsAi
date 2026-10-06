@@ -31,7 +31,8 @@ const APP_STATIC_COMPONENTS = [
   "./components/Login",
   "./components/ResetPasswordScreen",
   "./components/common/TabErrorFallback",
-  "./components/common/PlatformScopeBar" // bộ chuyển sàn của Brand workspace (06/10) — vài dòng nút, hiện trên mọi tab brand
+  "./components/common/ChannelBar", // thanh chọn sàn đầu nội dung (Bước 3 đa sàn, 07/10) — vài dòng nút, hiện trên mọi màn theo sàn
+  "./components/common/PlatformChip" // nhãn sàn ở đầu khối từng sàn của màn "mọi kênh"
 ];
 
 test("App.tsx không import tĩnh component tab — dùng lazyNamed/lazy", () => {
