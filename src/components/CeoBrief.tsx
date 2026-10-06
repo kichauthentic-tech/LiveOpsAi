@@ -309,6 +309,7 @@ export default function CeoBrief(props: CeoBriefProps) {
             brandId: b.id,
             name: channelName(b, p),
             clientName: b.name,
+            platform: p,
             outlook: channelOutlooks.get(brandPlatformKey(b.id, p))!,
             lastData: lastDataDate(sessions.filter((s) => s.brandId === b.id && (s.platform ?? "TikTok") === p), today),
             nextPlan: nextPlans.get(brandPlatformKey(b.id, p))?.status ?? null

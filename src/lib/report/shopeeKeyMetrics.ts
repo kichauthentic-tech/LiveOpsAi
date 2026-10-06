@@ -1,6 +1,7 @@
 import type { LiveSession } from "../../types";
 import { fmtFixed, fmtVndShort } from "../format";
 import { METRIC } from "../metricGlossary";
+import { assertOnePlatform } from "../platforms/perf";
 import { logShareBreakdown, type DriverBreakdown } from "./monthlyReportInsights";
 
 // Key Metrics SHOPEE (user chốt 07/10): file Shopee khác bản chất file TikTok — không có LIVE impressions / Product
@@ -127,8 +128,10 @@ export function shopeeKeyMetrics(c: ShopeeKeyCounts): ShopeeKeyMetrics {
   };
 }
 
-export const shopeeKeyMetricsOfSessions = (sessions: LiveSession[], hoursOf: (s: LiveSession) => number): ShopeeKeyMetrics =>
-  shopeeKeyMetrics(sessions.reduce<ShopeeKeyCounts>((c, s) => addShopeeInput(c, shopeeInputFromSession(s, hoursOf(s))), emptyShopeeCounts()));
+export const shopeeKeyMetricsOfSessions = (sessions: LiveSession[], hoursOf: (s: LiveSession) => number): ShopeeKeyMetrics => {
+  assertOnePlatform(sessions, "shopeeKeyMetricsOfSessions");
+  return shopeeKeyMetrics(sessions.reduce<ShopeeKeyCounts>((c, s) => addShopeeInput(c, shopeeInputFromSession(s, hoursOf(s))), emptyShopeeCounts()));
+};
 
 // ---------- danh sách hiển thị ----------
 

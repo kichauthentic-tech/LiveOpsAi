@@ -3,6 +3,8 @@ import { Talent, Brand, UserRole, LiveSession } from "../types";
 import { Users, Sparkles, Award, Search, Plus, Edit3, Trash2, X, Phone, Loader2, AlertTriangle, KeyRound, ChevronDown } from "lucide-react";
 import { authedFetch } from "../lib/authedFetch";
 import { computeTalentRealTotals, computeTalentBrandPerf } from "../lib/metrics/avgGmv";
+import { REPORT_PLATFORMS, type ReportPlatform } from "../lib/reportPlatform";
+import { PlatformChip } from "./common/PlatformChip";
 import { errorMessage } from "../lib/errorMessage";
 import { useConfirm } from "../hooks/useConfirm";
 
@@ -97,6 +99,8 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
   const canSeeRate = currentRole === "ceo" || currentRole === "admin";
   const [selectedBrandId, setSelectedBrandId] = useState("brand-1");
   const [targetCategory, setTargetCategory] = useState("Mỹ phẩm Skincare");
+  // Sàn của ca cần ghép host: số GMV gửi AI chỉ của sàn này (user chốt 07/10: không gộp hiệu suất hai sàn).
+  const [matchPlatform, setMatchPlatform] = useState<ReportPlatform>("TikTok");
   const [matchingResults, setMatchingResults] = useState<TalentMatchResult[] | null>(null);
   const [isMatching, setIsMatching] = useState(false);
   // 2026-10-01: bỏ hẳn bảng xếp hạng thay thế khi AI không chạy được. Hai bản trước đều là số bịa
@@ -266,8 +270,8 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
     const activeBrand = brands.find((b) => b.id === selectedBrandId) || brands[0];
     // Gửi số THẬT cộng từ ca, không phải số gõ tay trong hồ sơ (phần lớn = 0) — server chỉ giữ id/tên/ngành/GMV.
     const rawTalents = (talents ?? []).map((t) => {
-      const real = computeTalentRealTotals(sessions, t.id);
-      return { id: t.id, name: t.name, niches: t.niches, avgGmvPerSession: Math.round(real.avgGmvPerSession), totalGmv: Math.round(real.totalGmv) };
+      const p = computeTalentRealTotals(sessions, t.id).perf[matchPlatform];
+      return { id: t.id, name: t.name, niches: t.niches, avgGmvPerSession: Math.round(p.avgGmvPerSession), totalGmv: Math.round(p.gmv) };
     });
     setIsMatching(true);
     setMatchingError(null);
@@ -275,7 +279,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
       const res = await authedFetch("/api/gemini/match-talents", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ brand: activeBrand, targetCategory, talents: rawTalents })
+        body: JSON.stringify({ brand: activeBrand, targetCategory, platform: matchPlatform, talents: rawTalents })
       });
       const data = await res.json();
       if (data.success && Array.isArray(data.results) && data.results.length > 0) {
@@ -317,9 +321,10 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
   const EDIT_HERE = "nút sửa ✏️ trên từng dòng";
   const hideableCols: { label: string; has: (r: (typeof rosterRows)[number]) => boolean; fix?: string }[] = [
     { label: "Ca trợ", has: (r) => r.real.assistSessionCount > 0 },
-    { label: "GMV tích luỹ", has: (r) => r.real.totalGmv > 0 },
-    // KHÔNG có cột GMV/giờ gộp mọi brand ở bảng: xem `computeTalentBrandPerf`. Bảng chỉ giữ thứ
-    // cộng dồn được qua brand (ca, giờ, GMV); so hiệu suất thì mở ngăn chi tiết (tách theo brand).
+    // GMV TÁCH THEO SÀN (user chốt 07/10: không bao giờ cộng hiệu suất TikTok với Shopee). KHÔNG có cột GMV/giờ
+    // gộp mọi brand: xem `computeTalentBrandPerf`; so hiệu suất thì mở ngăn chi tiết (tách theo kênh brand × sàn).
+    { label: "GMV TikTok", has: (r) => r.real.perf.TikTok.gmv > 0 },
+    { label: "GMV Shopee", has: (r) => r.real.perf.Shopee.gmv > 0 },
     { label: "Giờ host", has: (r) => r.real.hours > 0 },
     { label: "Giờ trợ", has: (r) => r.real.assistHours > 0 },
     { label: "Rate card", has: (r) => canSeeRate && (!!r.t.rateHidden || !!r.rate), fix: canSeeRate ? EDIT_HERE : undefined },
@@ -405,7 +410,8 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                 <th className="py-2.5 px-2">Tên</th>
                 <th className="py-2.5 px-2 text-right">Ca host</th>
                 {show["Ca trợ"] && <th className="py-2.5 px-2 text-right">Ca trợ</th>}
-                {show["GMV tích luỹ"] && <th className="py-2.5 px-2 text-right">GMV tích luỹ</th>}
+                {show["GMV TikTok"] && <th className="py-2.5 px-2 text-right">GMV TikTok</th>}
+                {show["GMV Shopee"] && <th className="py-2.5 px-2 text-right">GMV Shopee</th>}
                 {show["Giờ host"] && <th className={`${SUB_COL} text-right`}>Giờ host</th>}
                 {show["Giờ trợ"] && <th className={`${SUB_COL} text-right`}>Giờ trợ</th>}
                 {show["Rate card"] && <th className={`${SUB_COL} text-right`}>Rate card</th>}
@@ -457,10 +463,12 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                   </td>
                   <td className="py-2.5 px-2 text-right font-mono text-[var(--text)]">{real.sessionCount || <Dash />}</td>
                   {show["Ca trợ"] && <td className="py-2.5 px-2 text-right font-mono text-[var(--text-muted)]">{real.assistSessionCount || <Dash />}</td>}
-                  {show["GMV tích luỹ"] && (
-                    <td className="py-2.5 px-2 text-right font-mono font-bold text-[var(--text)]">
-                      {real.totalGmv > 0 ? fmtVndShort(real.totalGmv) : <Dash />}
-                    </td>
+                  {(["TikTok", "Shopee"] as const).map((p) =>
+                    show[`GMV ${p}`] ? (
+                      <td key={p} className="py-2.5 px-2 text-right font-mono font-bold text-[var(--text)]">
+                        {real.perf[p].gmv > 0 ? fmtVndShort(real.perf[p].gmv) : <Dash />}
+                      </td>
+                    ) : null
                   )}
                   {show["Giờ host"] && (
                     <td className={`${SUB_COL} text-right font-mono text-[var(--text-muted)]`}>
@@ -541,7 +549,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
           <ChevronDown className="w-4 h-4 ml-auto shrink-0 transition-transform group-open:rotate-180" />
         </summary>
         <div className="px-6 pb-6 space-y-4">
-          <div className="grid md:grid-cols-3 gap-4 text-xs">
+          <div className="grid md:grid-cols-4 gap-4 text-xs">
             <div>
               <label className="text-[var(--text-muted)] block mb-1 font-semibold">Chọn Thương Hiệu (Brand):</label>
               <select
@@ -553,6 +561,19 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                   <option key={b.id} value={b.id}>
                     {b.name} ({b.industry})
                   </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="match-platform" className="text-[var(--text-muted)] block mb-1 font-semibold">Sàn của ca:</label>
+              <select
+                id="match-platform"
+                value={matchPlatform}
+                onChange={(e) => setMatchPlatform(e.target.value as ReportPlatform)}
+                className="w-full bg-[var(--surface-elevated)] text-[var(--text)] p-2.5 rounded-xl border border-[var(--border)] font-bold focus:ring-2 focus:ring-[var(--accent)]"
+              >
+                {REPORT_PLATFORMS.map((p) => (
+                  <option key={p} value={p}>{p}</option>
                 ))}
               </select>
             </div>
@@ -872,7 +893,8 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
               <div className="grid grid-cols-2 gap-2 bg-[var(--surface-base)]/40 p-3 rounded-xl border border-[var(--border)]">
                 <div>Ca host (có số): <strong className="text-[var(--text)] block text-sm font-bold">{detailReal.sessionCount}</strong></div>
                 <div>Ca trợ (có số): <strong className="text-[var(--text)] block text-sm font-bold">{detailReal.assistSessionCount}</strong></div>
-                <div>GMV lũy kế: <strong className="text-[var(--text)] block text-sm font-bold">{detailReal.totalGmv > 0 ? fmtVndShort(detailReal.totalGmv) : <Dash />}</strong></div>
+                <div>GMV TikTok: <strong className="text-[var(--text)] block text-sm font-bold">{detailReal.perf.TikTok.gmv > 0 ? fmtVndShort(detailReal.perf.TikTok.gmv) : <Dash />}</strong></div>
+                <div>GMV Shopee: <strong className="text-[var(--text)] block text-sm font-bold">{detailReal.perf.Shopee.gmv > 0 ? fmtVndShort(detailReal.perf.Shopee.gmv) : <Dash />}</strong></div>
                 <div>Giờ host: <strong className="text-[var(--text)] block text-sm font-bold">{detailReal.hours > 0 ? `${fmtFixed(detailReal.hours, 1)}h` : <Dash />}</strong></div>
                 <div>Giờ trợ: <strong className="text-[var(--text)] block text-sm font-bold">{detailReal.assistHours > 0 ? `${fmtFixed(detailReal.assistHours, 1)}h` : <Dash />}</strong></div>
                 <div>CTR TB: <strong className="text-[var(--accent-text)] block text-sm font-bold">{detailTalent.ctrAvg > 0 ? `${detailTalent.ctrAvg}%` : <Dash />}</strong></div>
@@ -889,17 +911,17 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                   host bán đồ lót. Ngưỡng "đủ mẫu" dùng chung với hostSuggestion (3 ca). */}
               <div className="space-y-1.5">
                 <p className="font-bold text-[var(--text-muted)]" title={metricHint(METRIC.gmvPerHour)}>
-                  {METRIC.gmvPerHour} theo brand
+                  {METRIC.gmvPerHour} theo kênh (brand × sàn)
                 </p>
                 {detailBrandPerf.every((b) => b.sessions === 0) ? (
-                  <p className="text-[11px] text-[var(--text-faint)]">Chưa chạy ca nào có số cho brand nào.</p>
+                  <p className="text-[11px] text-[var(--text-faint)]">Chưa chạy ca nào có số cho kênh nào.</p>
                 ) : (
                   <ul className="space-y-1">
-                    {detailBrandPerf.map((b) => {
+                    {detailBrandPerf.filter((b) => b.sessions > 0).map((b) => {
                       const brand = brands.find((x) => x.id === b.brandId);
                       return (
-                        <li key={b.brandId} className="flex items-baseline justify-between gap-3 border-b border-[var(--border)]/60 pb-1">
-                          <span className={b.sessions > 0 ? "text-[var(--text)] font-medium" : "text-[var(--text-faint)]"}>{brand?.name ?? b.brandId}</span>
+                        <li key={`${b.brandId}|${b.platform}`} className="flex items-baseline justify-between gap-3 border-b border-[var(--border)]/60 pb-1">
+                          <span className="text-[var(--text)] font-medium">{brand?.name ?? b.brandId} <PlatformChip platform={b.platform} /></span>
                           {b.sessions === 0 ? (
                             <span className="text-[11px] text-[var(--text-faint)] shrink-0">chưa chạy ca nào</span>
                           ) : (
@@ -916,7 +938,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
                   </ul>
                 )}
                 <p className="text-[11px] text-[var(--text-faint)] leading-relaxed">
-                  Không có số GMV/giờ gộp mọi brand: chỉ số này phụ thuộc ngành hàng và giá bán của brand hơn là người chạy.
+                  Không có số GMV/giờ gộp mọi brand hay gộp hai sàn: chỉ số này phụ thuộc ngành hàng, giá bán và sàn hơn là người chạy.
                   Muốn xếp hạng host trong một brand thì mở Hiệu Suất Host (có lọc brand, thứ và khung giờ).
                 </p>
               </div>

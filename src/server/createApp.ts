@@ -815,7 +815,9 @@ export function createApp() {
     try {
       if (!(await requireAuthedCallerOrReject(req, res))) return;
       if (rejectIfPayloadTooLarge(req, res)) return;
-      const { brand, targetCategory, talents } = req.body;
+      const { brand, targetCategory, talents, platform } = req.body;
+      // Số GMV trong danh sách talent là của MỘT sàn (client chọn) — user chốt 07/10: không gộp hiệu suất TikTok với Shopee.
+      const platformLabel = platform === "Shopee" ? "Shopee" : "TikTok Shop";
       const ai = getGeminiClient();
 
       if (!ai) return res.status(503).json({ success: false, code: "ai_not_configured", error: AI_NOT_CONFIGURED });
@@ -828,6 +830,7 @@ export function createApp() {
 
 Thương hiệu cần ghép: ${brand?.name || "Brand"} (Ngành: ${brand?.industry || "N/A"})
 Danh mục sản phẩm SKU mục tiêu: ${targetCategory}
+Sàn livestream của ca: ${platformLabel} (mọi số GMV bên dưới chỉ tính các ca trên sàn này)
 
 Danh sách Talent hiện có (dữ liệu thật từ hệ thống):
 ${JSON.stringify(sanitizeTalentsForAi(talents))}

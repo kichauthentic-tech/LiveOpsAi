@@ -240,7 +240,7 @@ export function BulkFinalizePanel({
                         </select>
                         {h && h.scope !== "none" && (
                           <div className="text-[11px] text-emerald-400 mt-0.5">
-                            {fmtPerHour(h.value)} ({h.scope === "brand" ? "brand này" : "chung"}, {h.sessions} ca)
+                            {fmtPerHour(h.value)} ({h.scope === "brand" ? "brand này" : "chung"} {headline!.platform}, {h.sessions} ca)
                           </div>
                         )}
                         {r.noFreeCandidate && (

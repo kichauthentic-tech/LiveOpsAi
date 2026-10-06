@@ -240,7 +240,9 @@ test("Talent Pool: đếm cả ca chạy vai trợ (coHostId), không chỉ ca h
   const src = readFileSync(join(SRC, "components/TalentMatcher.tsx"), "utf8");
   expect(src).toMatch(/real\.assistSessionCount/);
   // Hiệu suất đo theo GIỜ, không theo ca: ca 5 giờ và ca 2 giờ không cùng cỡ.
-  expect(metric).toMatch(/gmvPerHour: hours > 0 \? totalGmv \/ hours : 0/);
+  expect(metric).toMatch(/gmvPerHour: hours > 0 \? gmv \/ hours : 0/);
+  // 07/10: hiệu suất tách theo sàn, không còn tổng GMV gộp TikTok + Shopee.
+  expect(metric).not.toMatch(/totalGmv/);
   expect(src).not.toMatch(/GMV\/ca/);
   // ...nhưng KHÔNG có số GMV/giờ gộp mọi brand ở bảng lẫn hồ sơ talent: chỉ số này phụ thuộc ngành
   // hàng/giá bán của brand hơn là người chạy. Đo 2026-09-30: chênh lệch giữa host 1,40×, trong khi

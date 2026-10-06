@@ -8,6 +8,8 @@ import { sessionHours } from "../lib/performance/hostPerformance";
 import { MissingStep, missingSteps } from "../lib/sessionLedger";
 import { BrandLogo } from "./ui/BrandLogo";
 import { PlatformChip } from "./common/PlatformChip";
+import { sumGmvByPlatform } from "../lib/platforms/perf";
+import { REPORT_PLATFORMS } from "../lib/reportPlatform";
 import { isHandoverPerson } from "../lib/handover";
 import { clashedSessionIds, findPersonClashes } from "../lib/scheduling/conflicts";
 import { SessionWindow } from "./SessionWindow";
@@ -170,7 +172,8 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
       total: rows.length,
       noHost: rows.filter((r) => r.kind === "slot" || !r.session.hostId).length,
       pending: ss.filter((s) => missingSteps(s, today).some((m) => m !== "reconcile")).length,
-      gmv: ss.reduce((a, s) => a + (s.actualGmv ?? 0), 0)
+      // GMV tách theo sàn — user chốt 07/10: không bao giờ cộng GMV TikTok với Shopee.
+      gmv: sumGmvByPlatform(ss)
     };
   }, [rows, today]);
 
@@ -277,7 +280,10 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
               <Stat label={range === "week" ? "Ca trong tuần" : "Ca trong ngày"} value={String(summary.total)} />
               <Stat label="Chưa có người" value={String(summary.noHost)} tone={summary.noHost > 0 ? "warn" : "ok"} />
               <Stat label="Chưa giao ca" value={String(summary.pending)} tone={summary.pending > 0 ? "warn" : "ok"} />
-              <Stat label="GMV đã ghi nhận" value={summary.gmv > 0 ? fmtVndShort(summary.gmv) : "—"} />
+              <Stat
+                label="GMV đã ghi nhận"
+                value={REPORT_PLATFORMS.some((p) => summary.gmv[p] > 0) ? REPORT_PLATFORMS.filter((p) => summary.gmv[p] > 0).map((p) => `${p} ${fmtVndShort(summary.gmv[p])}`).join(" · ") : "—"}
+              />
             </div>
           )}
           {clashes.length > 0 && (

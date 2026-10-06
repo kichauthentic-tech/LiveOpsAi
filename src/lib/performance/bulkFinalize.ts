@@ -3,6 +3,7 @@ import { LiveSession, ShiftRegistration, ShiftSlot } from "../../types";
 import { dateTimeRangesOverlap } from "../dateUtils";
 import { FATIGUE_WEEK_HOURS, HostSuggestion, mondayOf, suggestHosts } from "./hostSuggestion";
 import { sessionDurationHours } from "../pnl";
+import { platformOf } from "../reportPlatform";
 
 // Chốt lịch hàng loạt (điểm nghẽn #3 của audit module Vận Hành Live). Không phải vòng lặp gọi
 // onFinalizeSlot nhiều lần — có một cái bẫy bắt buộc phải xử ở đây:
@@ -152,7 +153,7 @@ export function planBulkFinalize(
       slot.brandId,
       new Date(`${slot.date}T00:00:00`).getDay(),
       opts.perfSince,
-      { date: slot.date, startTime: slot.startTime, endTime: slot.endTime }
+      { date: slot.date, startTime: slot.startTime, endTime: slot.endTime, platform: platformOf(slot) }
     );
 
     // Người đầu tiên (theo xếp hạng) mà không bận ở khung giờ này. Giai đoạn D: người đã quá ngưỡng

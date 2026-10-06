@@ -77,7 +77,7 @@ export default function OpsSupportTab({ platform, brands, sessions, shiftSlots, 
         description="Kỳ vọng cho các ca sắp live trong 7 ngày tới, để ops điều ca và so với số đang chạy trong phiên. Chỉ ca của sàn đang chọn ở workspace — năng suất hai sàn khác nhau nên không có benchmark chung."
         actions={
           <>
-            <select value={brandId} onChange={(e) => { setPickedBrand(e.target.value); rememberBrandId(e.target.value, platform); }} className={selectCls} aria-label="Brand">
+            <select value={brandId} onChange={(e) => { setPickedBrand(e.target.value); rememberBrandId(e.target.value); }} className={selectCls} aria-label="Brand">
               {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
           </>

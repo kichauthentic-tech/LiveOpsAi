@@ -2,6 +2,7 @@ import type { LiveSession } from "../../types";
 import type { CreatorLivePerfRow } from "../dataraw/creatorLivePerfSlice";
 import { fmtFixed, fmtVndShort } from "../format";
 import { METRIC } from "../metricGlossary";
+import { assertOnePlatform } from "../platforms/perf";
 
 // Key Metrics — MỘT bộ chỉ số live cho mọi report (user chốt 2026-09-29): Report Tháng (xu hướng, host, Excel),
 // Report Tuần, Dashboard brand, cửa sổ ca, Hiệu Suất Host, Bản Tin CEO đều hiện đủ 18 chỉ số theo đúng thứ tự dưới,
@@ -135,8 +136,10 @@ export function keyMetrics(c: KeyCounts): KeyMetrics {
   };
 }
 
-export const keyMetricsOfSessions = (sessions: LiveSession[], hoursOf: (s: LiveSession) => number): KeyMetrics =>
-  keyMetrics(sessions.reduce((c, s) => addKeyInput(c, keyInputFromSession(s, hoursOf(s))), emptyKeyCounts()));
+export const keyMetricsOfSessions = (sessions: LiveSession[], hoursOf: (s: LiveSession) => number): KeyMetrics => {
+  assertOnePlatform(sessions, "keyMetricsOfSessions");
+  return keyMetrics(sessions.reduce((c, s) => addKeyInput(c, keyInputFromSession(s, hoursOf(s))), emptyKeyCounts()));
+};
 
 // ---------- danh sách hiển thị ----------
 

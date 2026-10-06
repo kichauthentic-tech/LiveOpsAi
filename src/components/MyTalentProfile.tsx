@@ -176,10 +176,17 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
                 thật 33/33 talent đều = 0, nên host đã chạy 59 ca (7,31 tỷ) mở hồ sơ ra thấy "0". Talent
                 Pool đã bỏ cột nhập tay từ audit 2026-09-21 — hai màn phải nói cùng một số về cùng một
                 người (xem đầu file src/lib/metrics/avgGmv.ts). */}
+            {/* Tách theo sàn (user chốt 07/10): không bao giờ cộng GMV TikTok với Shopee. */}
             <div className="text-[var(--text-muted)]">GMV lũy kế</div>
             <div className="font-bold text-emerald-400 mt-0.5">
-              {myReal.totalGmv > 0 ? (
-                fmtVndShort(myReal.totalGmv)
+              {myReal.perf.TikTok.gmv > 0 || myReal.perf.Shopee.gmv > 0 ? (
+                (["TikTok", "Shopee"] as const)
+                  .filter((p) => myReal.perf[p].gmv > 0)
+                  .map((p) => (
+                    <span key={p} className="block">
+                      {fmtVndShort(myReal.perf[p].gmv)} <span className="text-[11px] font-normal text-[var(--text-faint)]">{p}</span>
+                    </span>
+                  ))
               ) : myReal.assistSessionCount > 0 ? (
                 <Empty>GMV ca trợ tính cho host</Empty>
               ) : (

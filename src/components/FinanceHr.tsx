@@ -120,12 +120,12 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
     () =>
       rows.reduce(
         (acc, r) => ({
-          gmv: acc.gmv + (r.excluded ? 0 : r.session.actualGmv),
           grossAgencyRev: acc.grossAgencyRev + r.grossAgencyRev,
           hostPayout: acc.hostPayout + r.hostPayout + r.coHostPayout,
           netProfit: acc.netProfit + r.netProfit
         }),
-        { gmv: 0, grossAgencyRev: 0, hostPayout: 0, netProfit: 0 }
+        // Chỉ cộng TIỀN (cộng được qua sàn). Không có tổng GMV: user chốt 07/10 không cộng GMV TikTok với Shopee.
+        { grossAgencyRev: 0, hostPayout: 0, netProfit: 0 }
       ),
     [rows]
   );

@@ -25,6 +25,7 @@ import { fmtDateVn, fmtVndShort } from "../lib/format";
 import { PageHeader } from "./common/PageHeader";
 import { talentRoleLabel } from "../lib/talentName";
 import { PlatformChip } from "./common/PlatformChip";
+import { platformsWithValue, sumByPlatform } from "../lib/platforms/perf";
 import { personRoleMinutes, personWindows } from "../lib/staffSegments";
 import { dateTimeRangesOverlap } from "../lib/dateUtils";
 interface LiveCalendarProps {
@@ -755,7 +756,9 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
               const daySlots = openSlots.filter((sl) => sl.date === cell.dateStr);
               const isSelected = cell.dateStr === selectedDate;
               const isToday = cell.dateStr === getTodayDateString();
-              const totalGmvTarget = daySessions.reduce((acc, curr) => acc + curr.targetGmv, 0);
+              // Target tách theo sàn — user chốt 07/10: không cộng target/GMV TikTok với Shopee.
+              const dayTarget = sumByPlatform(daySessions, (s) => s.targetGmv);
+              const dayTargetPlatforms = platformsWithValue(dayTarget);
               const hasLiveNow = daySessions.some((s) => s.status === "Live Now");
 
               const monthCellKey = `month_${cell.dateStr}`;
@@ -891,11 +894,13 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   </div>
 
                   {/* Day total GMV */}
-                  {totalGmvTarget > 0 ? (
-                    <div className="text-[11px] font-mono font-bold text-[var(--success)] pt-1 border-t border-[var(--border-muted)] truncate">
-                      Target: {fmtVndShort(totalGmvTarget)}
+                  {dayTargetPlatforms.length > 0 ? (
+                    <div className="text-[11px] font-mono font-bold text-[var(--success)] pt-1 border-t border-[var(--border-muted)]">
+                      {dayTargetPlatforms.map((p) => (
+                        <div key={p} className="truncate">Target {p}: {fmtVndShort(dayTarget[p])}</div>
+                      ))}
                     </div>
-                  ) : (
+                  ) : daySessions.length > 0 ? null : (
                     <div className="text-[11px] text-[var(--text-faint)] italic">Trống lịch</div>
                   )}
                 </div>

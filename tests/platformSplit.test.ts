@@ -120,23 +120,23 @@ describe("Việc cần làm theo sàn", () => {
   });
 });
 
-describe("Bản Tin CEO: tập trung khách cộng theo brand, không theo sàn", () => {
-  test("Franklin TikTok 30 + VERA TikTok 35 + VERA Shopee 35 ⇒ khách lớn nhất là VERA 70%, không phải 'Franklin · TikTok'", async () => {
+describe("Bản Tin CEO: tập trung khách tính riêng từng sàn (07/10: không cộng GMV hai sàn)", () => {
+  test("TikTok: Franklin 30 + VERA 35 ⇒ VERA 54% GMV TikTok; Shopee chỉ một khách ⇒ không báo", async () => {
     const { buildIssues } = await import("../src/lib/performance/ceoBrief");
     const o = (actual: number) => ({ actual, pending: [], runRate: null, target: null, gap: null, buckets: [], projectionMethod: "none", remainingDays: 20, projected: actual, expectedToDate: null }) as never;
     const issues = buildIssues({
       today: "2026-10-10",
       brands: [
-        { brandId: "f", name: "Franklin", clientName: "Franklin", outlook: o(30), lastData: "2026-10-09", nextPlan: "locked" },
-        { brandId: "v", name: "VERA · TikTok", clientName: "VERA", outlook: o(35), lastData: "2026-10-09", nextPlan: "locked" },
-        { brandId: "v", name: "VERA · Shopee", clientName: "VERA", outlook: o(35), lastData: "2026-10-09", nextPlan: "locked" }
+        { brandId: "f", name: "Franklin", clientName: "Franklin", platform: "TikTok", outlook: o(30), lastData: "2026-10-09", nextPlan: "locked" },
+        { brandId: "v", name: "VERA · TikTok", clientName: "VERA", platform: "TikTok", outlook: o(35), lastData: "2026-10-09", nextPlan: "locked" },
+        { brandId: "v", name: "VERA · Shopee", clientName: "VERA", platform: "Shopee", outlook: o(35), lastData: "2026-10-09", nextPlan: "locked" }
       ],
       periodSessions: [],
       finance: null,
       agencyScope: true,
       fmt: String
     });
-    const t = issues.map((i) => i.title).find((x) => /một khách/.test(x));
-    expect(t).toBe("70% GMV tháng đến từ một khách: VERA");
+    const t = issues.map((i) => i.title).filter((x) => /một khách/.test(x));
+    expect(t).toEqual(["54% GMV TikTok tháng đến từ một khách: VERA"]);
   });
 });

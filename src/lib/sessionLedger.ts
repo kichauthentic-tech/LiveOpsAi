@@ -1,4 +1,5 @@
 import { LiveSession, UserRole } from "../types";
+import { assertOnePlatform } from "./platforms/perf";
 import { SnapshotCounters, SnapshotRatios, computeSnapshotRatios } from "./liveSnapshot/metrics";
 import { dataQuality, DataQuality, isCountable, sessionHours } from "./performance/hostPerformance";
 
@@ -133,6 +134,8 @@ export interface LedgerSummary {
 // Tổng hợp theo đúng bộ lọc đang xem. Số hiệu suất chỉ cộng ca "đếm được" (isCountable — cùng
 // quy ước với Hiệu Suất Host) để GMV/giờ không bị pha loãng bởi ca chưa có số.
 export function summarize(rows: LiveSession[], today: string): LedgerSummary {
+  // GMV/đơn/GMV/giờ của bảng tổng chỉ có nghĩa trong MỘT sàn (07/10). Màn xem mọi kênh gọi summarize từng sàn.
+  assertOnePlatform(rows, "summarize (Sổ Ca)");
   const countable = rows.filter(isCountable);
   const happened = rows.filter((s) => hasHappened(s, today)).length;
   const cancelled = rows.filter((s) => s.status === "Cancelled").length;

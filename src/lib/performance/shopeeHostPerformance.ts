@@ -1,4 +1,5 @@
 import type { LiveSession } from "../../types";
+import { assertOnePlatform } from "../platforms/perf";
 import { expandHostPortions, hostKey, sessionHours, UNASSIGNED_HOST_KEY } from "./hostPerformance";
 import { addShopeeInput, emptyShopeeCounts, shopeeInputFromSession, shopeeKeyMetrics, type ShopeeKeyCounts, type ShopeeKeyMetrics } from "../report/shopeeKeyMetrics";
 
@@ -12,6 +13,7 @@ export interface ShopeePerfRow extends ShopeeKeyMetrics {
 }
 
 export function byHostShopee(sessions: LiveSession[]): ShopeePerfRow[] {
+  assertOnePlatform(sessions, "byHostShopee");
   const acc = new Map<string, { t: ShopeeKeyCounts; label: string }>();
   for (const s of expandHostPortions(sessions)) {
     const k = hostKey(s);

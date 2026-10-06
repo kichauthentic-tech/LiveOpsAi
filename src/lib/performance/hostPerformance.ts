@@ -4,6 +4,7 @@ import { hasStaffSegments, roleShares } from "../staffSegments";
 import { hostMetricShares } from "../segmentCheckpoints";
 import type { CampDayBucket } from "../campaignDays";
 import { METRIC } from "../metricGlossary";
+import { assertOnePlatform } from "../platforms/perf";
 import { addKeyInput, emptyKeyCounts, keyInputFromSession, keyMetrics, type KeyCounts, type KeyMetrics } from "../report/keyMetrics";
 
 // Giai đoạn 3 của tầng dữ liệu gốc mới: đọc ra hiệu suất thật để làm nền cho việc SẮP LỊCH.
@@ -169,6 +170,7 @@ export function splitUnassignedHost(rows: PerfRow[]): { ranked: PerfRow[]; unass
 }
 
 export function byHost(sessions: LiveSession[]): PerfRow[] {
+  assertOnePlatform(sessions, "byHost");
   return groupBy(expandHostPortions(sessions), hostKey, (s) => ({ label: s.hostName || "Chưa gán host" }));
 }
 

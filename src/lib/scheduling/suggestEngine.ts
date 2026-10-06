@@ -14,6 +14,7 @@ import { LiveSession } from "../../types";
 import { CampDayBucket, CampOverrides, resolveCampBucketType } from "../campaignDays";
 import { DEFAULT_ENGINE_PARAMS, EngineParams } from "./engineParams";
 import { sessionDurationHours } from "../pnl";
+import { assertOnePlatform } from "../platforms/perf";
 
 import { fmtFixed, fmtVndShort, fmtVndFull } from "../format";
 export const BLOCK_HOURS = 2; // khối giờ 2h → 12 khối/ngày
@@ -179,6 +180,8 @@ export function buildHistory(sessions: LiveSession[], brandId: string, asOf: str
       s.actualGmv > 0 &&
       sessionDurationHours(s.startTime, s.endTime) > 0
   );
+  // Lịch sử của một brand là lịch sử của MỘT kênh: GMV/giờ hai sàn khác bản chất (07/10). Màn gọi phải lọc sàn trước.
+  assertOnePlatform(usable, "buildHistory");
   const empty: HistorySummary = {
     sessions: usable.length,
     months: 0,

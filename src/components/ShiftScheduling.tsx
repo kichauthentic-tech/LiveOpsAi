@@ -39,7 +39,7 @@ import { SessionEventCard, SessionCardTone, buildSlotMeta } from "./ui/SessionEv
 import { SessionWindow } from "./SessionWindow";
 import { commitmentsRead } from "../lib/db/brandContracts";
 import { planStatusesRead } from "../lib/db/monthPlans";
-import { brandPlatformKey, brandPlatformsOf } from "../lib/reportPlatform";
+import { brandPlatformKey, brandPlatformsOf, platformOf, type ReportPlatform } from "../lib/reportPlatform";
 import type { TabPrefetchCtx } from "../lib/db/prefetch";
 import { SchedulingGap, computeSchedulingGaps } from "../lib/performance/brandCommitment";
 import { FATIGUE_WEEK_HOURS, HostSuggestion, headlineFor, suggestHosts } from "../lib/performance/hostSuggestion";
@@ -69,7 +69,8 @@ interface ShiftSchedulingProps {
   // RPC apply_session_live_snapshot đã ghi DB và trả về LiveSession đầy đủ — chỉ cần đồng bộ
   // lại state, không gọi updateSession (sẽ ghi đè ngược số vừa tính bằng state cũ của client).
   // Nhắc việc (0091): brand chưa chốt Kế Hoạch Tháng cho tháng sau → nút nhảy sang tab đó.
-  onOpenMonthPlan?: () => void;
+  /** Mở Kế Hoạch Tháng của đúng kênh (brand × sàn) chưa chốt. */
+  onOpenMonthPlan?: (brandId: string, platform: ReportPlatform) => void;
   fatigueWeekHours?: number; // ngưỡng mệt, admin vặn ở AI Training Center; mặc định FATIGUE_WEEK_HOURS
   onCancelSession?: (id: string, reason: string, reopenSlot: boolean) => Promise<boolean>; // 0097, dùng trong Cửa sổ Ca Live
   onSetSessionExcluded?: (id: string, excluded: boolean, reason: string) => Promise<boolean>;
@@ -130,7 +131,7 @@ const suggestionLabel = (s: HostSuggestion, fatigueAt: number) => {
   ].filter(Boolean);
   const tail = extras.length > 0 ? ` · ${extras.join(" · ")}` : "";
   if (h.scope === "none") return `${s.name} · chưa có dữ liệu${tail}`;
-  const scope = h.scope === "brand" ? "brand này" : "chung";
+  const scope = h.scope === "brand" ? `brand này, ${s.platform}` : `chung ${s.platform}`;
   return `${s.name} · ${fmtPerHour(h.value)} (${scope}, ${h.sessions} ca)${tail}`;
 };
 
@@ -218,7 +219,9 @@ export default function ShiftScheduling({
       nextPlans
         ? brands.flatMap((b) => {
             const ps = brandPlatformsOf(b.id, sessions, shiftSlots);
-            return ps.filter((p) => nextPlans.get(brandPlatformKey(b.id, p))?.status !== "locked").map((p) => (ps.length > 1 ? `${b.name} ${p}` : b.name));
+            return ps
+              .filter((p) => nextPlans.get(brandPlatformKey(b.id, p))?.status !== "locked")
+              .map((p) => ({ brandId: b.id, platform: p, label: ps.length > 1 ? `${b.name} ${p}` : b.name }));
           })
         : [],
     [nextPlans, brands, sessions, shiftSlots]
@@ -461,7 +464,7 @@ export default function ShiftScheduling({
           slot.brandId,
           new Date(`${slot.date}T00:00:00`).getDay(),
           perfSince,
-          { date: slot.date, startTime: slot.startTime, endTime: slot.endTime }
+          { date: slot.date, startTime: slot.startTime, endTime: slot.endTime, platform: platformOf(slot) }
         )
       );
     }
@@ -510,8 +513,19 @@ export default function ShiftScheduling({
       {admin && planMissing.length > 0 && (
         <div className="bg-amber-950/40 border border-amber-900 rounded-xl px-4 py-2.5 text-xs text-amber-200 flex flex-wrap items-center gap-2">
           <AlertTriangle className="w-4 h-4 shrink-0" />
-          <span>Tháng sau chưa chốt kế hoạch ca: <b>{planMissing.join(", ")}</b>.</span>
-          {onOpenMonthPlan && <button onClick={onOpenMonthPlan} className="ml-auto min-h-6 -mx-1 px-1 rounded inline-flex items-center text-[11px] font-bold text-amber-100 underline underline-offset-2">Mở Kế Hoạch Tháng →</button>}
+          <span>Tháng sau chưa chốt kế hoạch ca:</span>
+          {planMissing.map((m, i) => (
+            <React.Fragment key={`${m.brandId}|${m.platform}`}>
+              {onOpenMonthPlan ? (
+                <button onClick={() => onOpenMonthPlan(m.brandId, m.platform)} className="min-h-6 -mx-0.5 px-0.5 rounded font-bold text-amber-100 underline underline-offset-2" title="Mở Kế Hoạch Tháng của kênh này">
+                  {m.label}
+                </button>
+              ) : (
+                <b>{m.label}</b>
+              )}
+              {i < planMissing.length - 1 ? "," : "."}
+            </React.Fragment>
+          ))}
         </div>
       )}
 
@@ -1012,11 +1026,11 @@ export default function ShiftScheduling({
                                   </span>
                                   {s.brandSessions > 0 ? (
                                     <span className="text-[11px] text-emerald-400">
-                                      {fmtPerHour(s.brandGmvPerHour)} với brand này ({s.brandSessions} ca)
+                                      {fmtPerHour(s.brandGmvPerHour)} với brand này trên {s.platform} ({s.brandSessions} ca)
                                     </span>
                                   ) : s.overallSessions > 0 ? (
                                     <span className="text-[11px] text-[var(--text-muted)]">
-                                      chưa live brand này · {fmtPerHour(s.overallGmvPerHour)} chung ({s.overallSessions} ca)
+                                      chưa live brand này trên {s.platform} · {fmtPerHour(s.overallGmvPerHour)} chung {s.platform} ({s.overallSessions} ca)
                                     </span>
                                   ) : (
                                     <span className="text-[11px] text-[var(--text-faint)]">chưa có ca nào có số liệu</span>

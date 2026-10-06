@@ -14,7 +14,10 @@ export const REPORT_PLATFORMS: ReportPlatform[] = ["TikTok", "Shopee"];
 export type PlatformScope = ReportPlatform;
 export const PLATFORM_SCOPE_LABEL: Record<PlatformScope, string> = { TikTok: "TikTok", Shopee: "Shopee" };
 
-export const inPlatformScope = (s: { platform?: string | null }, scope: PlatformScope) => (s.platform ?? "TikTok") === scope;
+/** Sàn của một dòng (ca, ca mở, kế hoạch…). Dòng cũ thiếu cột sàn = TikTok. */
+export const platformOf = (x: { platform?: string | null }): ReportPlatform => (x.platform === "Shopee" ? "Shopee" : "TikTok");
+
+export const inPlatformScope = (s: { platform?: string | null }, scope: PlatformScope) => platformOf(s) === scope;
 
 /**
  * Khoá brand × tháng × sàn dùng ở mọi Map (report, tổng target kế hoạch, target theo ngày…). TikTok giữ khoá cũ

@@ -2,11 +2,22 @@ import { LiveSession } from "../../types";
 import { hostPortions, isCountable, sessionHours } from "../performance/hostPerformance";
 import { personRoleMinutes, sessionMinutes } from "../staffSegments";
 import { MIN_SESSIONS_FOR_CONFIDENCE } from "../performance/hostSuggestion";
+import { platformOf, REPORT_PLATFORMS, type ReportPlatform } from "../reportPlatform";
+
+/** Số hiệu suất của talent trên MỘT sàn. User chốt 07/10: không bao giờ cộng hiệu suất TikTok với Shopee. */
+export interface TalentPlatformPerf {
+  /** Ca làm HOST có số trên sàn này. */
+  sessions: number;
+  gmv: number;
+  hours: number;
+  avgGmvPerSession: number;
+  /** GMV ÷ giờ live — thước so host trong CÙNG sàn (ca 5 giờ và ca 2 giờ không cùng cỡ). */
+  gmvPerHour: number;
+}
 
 export interface TalentRealTotals {
+  /** Số VẬN HÀNH, cộng được qua mọi sàn: ca làm host có số. */
   sessionCount: number;
-  totalGmv: number;
-  avgGmvPerSession: number;
   /**
    * Ca người này chạy với vai TRỢ (`coHostId`). Tách riêng chứ không cộng vào `sessionCount`:
    * GMV của ca tính cho host, cộng sang trợ là đếm đôi. Nhưng bỏ hẳn thì Talent Pool nói
@@ -15,16 +26,17 @@ export interface TalentRealTotals {
   assistSessionCount: number;
   /** Giờ live thật của các ca làm HOST (`liveDurationMinutes` nếu có, không thì giờ theo lịch). */
   hours: number;
-  /** Giờ live của các ca làm TRỢ — tách riêng như `assistSessionCount`, không cộng vào `hours`
-   *  (vì `hours` là mẫu số của GMV/giờ, mà GMV của ca tính cho host). */
+  /** Giờ live của các ca làm TRỢ — tách riêng như `assistSessionCount`, không cộng vào `hours`. */
   assistHours: number;
-  /**
-   * GMV ÷ Giờ live. Đây mới là thước đo so được giữa các host: ca dài 5 giờ và ca 2 giờ không
-   * cùng cỡ, nên GMV/ca phụ thuộc độ dài ca hơn là năng lực người chạy. Cùng định nghĩa với
-   * `METRIC.gmvPerHour` ở Hiệu Suất Host / Report Tháng.
-   */
-  gmvPerHour: number;
+  /** Hiệu suất làm host, TÁCH THEO SÀN — không có bản gộp. */
+  perf: Record<ReportPlatform, TalentPlatformPerf>;
 }
+
+const perfOf = (rows: LiveSession[]): TalentPlatformPerf => {
+  const gmv = rows.reduce((sum, s) => sum + (s.actualGmv || 0), 0);
+  const hours = rows.reduce((sum, s) => sum + sessionHours(s), 0);
+  return { sessions: rows.length, gmv, hours, avgGmvPerSession: rows.length > 0 ? gmv / rows.length : 0, gmvPerHour: hours > 0 ? gmv / hours : 0 };
+};
 
 // Talent Pool trước đây đọc thẳng cột nhập tay `talents.total_gmv`/`avg_gmv_per_session` — trên DB
 // thật cả 33 talent đều = 0 trong khi tab "Hiệu Suất Host" cộng từ live_sessions ra hàng tỷ, tức
@@ -32,7 +44,6 @@ export interface TalentRealTotals {
 export function computeTalentRealTotals(sessions: LiveSession[], talentId: string): TalentRealTotals {
   // Đổi host giữa ca (0138): chỉ tính PHẦN của talent này (số + giờ chia theo giờ đứng ca).
   const completed = sessions.flatMap((s) => (isCountable(s) ? hostPortions(s).filter((p) => p.hostId === talentId) : []));
-  const totalGmv = completed.reduce((sum, s) => sum + (s.actualGmv || 0), 0);
   const hours = completed.reduce((sum, s) => sum + sessionHours(s), 0);
   const assisted = sessions.filter((s) => isCountable(s) && personRoleMinutes(s, talentId, "co_host") > 0);
   const assistHours = assisted.reduce((sum, s) => {
@@ -41,17 +52,20 @@ export function computeTalentRealTotals(sessions: LiveSession[], talentId: strin
   }, 0);
   return {
     sessionCount: completed.length,
-    totalGmv,
-    avgGmvPerSession: completed.length > 0 ? totalGmv / completed.length : 0,
     assistSessionCount: assisted.length,
     assistHours,
     hours,
-    gmvPerHour: hours > 0 ? totalGmv / hours : 0
+    perf: {
+      TikTok: perfOf(completed.filter((s) => platformOf(s) === "TikTok")),
+      Shopee: perfOf(completed.filter((s) => platformOf(s) === "Shopee"))
+    }
   };
 }
 
 export interface TalentBrandPerf {
   brandId: string;
+  /** Kênh = brand × sàn: GMV/giờ chỉ so được trong cùng một sàn. */
+  platform: ReportPlatform;
   sessions: number;
   hours: number;
   gmv: number;
@@ -72,14 +86,16 @@ export interface TalentBrandPerf {
  */
 export function computeTalentBrandPerf(sessions: LiveSession[], talentId: string, brandIds: string[]): TalentBrandPerf[] {
   const mine = sessions.flatMap((s) => (isCountable(s) ? hostPortions(s).filter((p) => p.hostId === talentId) : []));
-  // Brand có ca đứng trước, brand chưa chạy dồn xuống cuối — cùng luật với thứ tự dòng ở Talent Pool.
+  // Mỗi KÊNH (brand × sàn) một dòng — 07/10 user chốt không gộp hiệu suất hai sàn. Kênh có ca đứng trước.
   return brandIds
-    .map((brandId): TalentBrandPerf => {
-      const rows = mine.filter((s) => s.brandId === brandId);
+    .flatMap((brandId) => REPORT_PLATFORMS.map((platform) => ({ brandId, platform })))
+    .map(({ brandId, platform }): TalentBrandPerf => {
+      const rows = mine.filter((s) => s.brandId === brandId && platformOf(s) === platform);
       const gmv = rows.reduce((sum, s) => sum + (s.actualGmv || 0), 0);
       const hours = rows.reduce((sum, s) => sum + sessionHours(s), 0);
       return {
         brandId,
+        platform,
         sessions: rows.length,
         hours,
         gmv,

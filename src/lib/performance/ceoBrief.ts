@@ -4,6 +4,7 @@ import { isPnlSession, sessionDurationHours } from "../pnl";
 import { CampDayBucket, CampOverrides, CAMP_DAY_BUCKET_ORDER, resolveCampBucketType } from "../campaignDays";
 import { expandHostPortions, isCountable, sessionHours } from "./hostPerformance";
 import { keyMetricsOfSessions, type KeyMetrics } from "../report/keyMetrics";
+import { REPORT_PLATFORMS, type ReportPlatform } from "../reportPlatform";
 
 // Bản Tin CEO (2026-09-25) — thay Toàn Cảnh Agency. File thuần: không đụng Supabase, test bằng vitest.
 //
@@ -594,8 +595,10 @@ export interface BrandSnapshot {
   brandId: string;
   /** Tên hiện trong cảnh báo — một dòng có thể là một kênh brand × sàn ("VERA · Shopee", 06/10). */
   name: string;
-  /** Tên khách (brand) khi `name` là tên kênh — cảnh báo tập trung khách cộng theo brand, không theo sàn. */
+  /** Tên khách (brand) khi `name` là tên kênh. */
   clientName?: string;
+  /** Sàn của dòng — cảnh báo tập trung khách tính RIÊNG từng sàn (07/10: không cộng GMV hai sàn). Thiếu = TikTok. */
+  platform?: ReportPlatform;
   outlook: MonthOutlook;
   lastData: string | null;
   /** Kế Hoạch Tháng của tháng sau: null = chưa có, "draft" | "locked". */
@@ -646,19 +649,19 @@ export function buildIssues(x: IssueInput): Issue[] {
   }
 
   if (x.agencyScope) {
-    // "Khách" là brand: kênh TikTok + Shopee của cùng brand cộng lại trước khi đo tập trung.
-    const byClient = new Map<string, { name: string; actual: number }>();
-    for (const b of x.brands) {
-      const c = byClient.get(b.brandId) ?? { name: b.clientName ?? b.name, actual: 0 };
-      c.actual += b.outlook.actual;
-      byClient.set(b.brandId, c);
-    }
-    const withSales = [...byClient.values()].filter((c) => c.actual > 0);
-    const total = withSales.reduce((a, c) => a + c.actual, 0);
-    const top = [...withSales].sort((a, b) => b.actual - a.actual)[0];
-    if (top && total > 0 && top.actual / total > CLIENT_CONCENTRATION_WARN) {
-      const share = top.actual / total;
-      out.push({ level: share > 0.5 ? "bad" : "warn", title: `${pct(share)} GMV tháng đến từ một khách: ${top.name}`, detail: "Mốc an toàn phổ biến của agency dịch vụ: không khách nào quá 20–25% doanh thu." });
+    // Tập trung khách đo RIÊNG từng sàn (user chốt 07/10: không bao giờ cộng GMV TikTok với Shopee). Sàn chỉ có một khách
+    // thì không có gì để so — bỏ qua thay vì báo "100% từ một khách".
+    for (const plat of REPORT_PLATFORMS) {
+      const onPlat = x.brands.filter((b) => (b.platform ?? "TikTok") === plat);
+      if (onPlat.length < 2) continue;
+      const rows = onPlat.filter((b) => b.outlook.actual > 0);
+      if (rows.length === 0) continue;
+      const total = rows.reduce((a, c) => a + c.outlook.actual, 0);
+      const top = [...rows].sort((a, b) => b.outlook.actual - a.outlook.actual)[0];
+      if (total > 0 && top.outlook.actual / total > CLIENT_CONCENTRATION_WARN) {
+        const share = top.outlook.actual / total;
+        out.push({ level: share > 0.5 ? "bad" : "warn", title: `${pct(share)} GMV ${plat} tháng đến từ một khách: ${top.clientName ?? top.name}`, detail: "Mốc an toàn phổ biến của agency dịch vụ: không khách nào quá 20–25% doanh thu." });
+      }
     }
     const idle = x.brands.filter((b) => !b.outlook.actual && !b.outlook.pending.length).map((b) => b.name);
     if (idle.length) out.push({ level: "warn", title: `${idle.join(", ")} chưa có ca nào tháng ${Number(month.slice(5))}`, detail: "Tài khoản đang có trên hệ thống nhưng tháng này chưa chạy, cũng chưa có ca trong lịch.", action: "month_plan" });

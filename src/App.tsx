@@ -1337,6 +1337,15 @@ export default function App() {
     setMobileMenuOpen(false);
   };
 
+  // Mở Kế Hoạch Tháng của đúng một kênh (brand × sàn) từ bất kỳ màn nào.
+  const openMonthPlanFor = (brandId: string, platform: ReportPlatform) => {
+    rememberBrandId(brandId);
+    setAgencyPlatformState(platform);
+    setWorkspace({ type: "agency" });
+    setActiveTab("month_plan");
+    setMobileMenuOpen(false);
+  };
+
   // Chọn workspace agency: sàn ⇒ mở Dashboard của sàn đó; null (Chung) ⇒ mở Bảng Vận Hành.
   const handlePickAgency = (platform: ReportPlatform | null) => {
     setWorkspace({ type: "agency" });
@@ -1765,7 +1774,12 @@ export default function App() {
                         talents={activeTalents}
                         canSeeMoney={currentRole === "ceo" || currentRole === "admin"}
                         canOpenTab={canOpenTab}
-                        onOpen={(t) => { if (t.rememberBrandId) { if (t.tab === "crm") requestCrmFocus(t.rememberBrandId, t.rememberPlatform); else rememberBrandId(t.rememberBrandId, t.rememberPlatform); } navigateTo(t.tab, t.brandId); }}
+                        onOpen={(t) => {
+                          if (t.rememberBrandId) { if (t.tab === "crm") requestCrmFocus(t.rememberBrandId, t.rememberPlatform); else rememberBrandId(t.rememberBrandId); }
+                          // Việc của một kênh (vd "Kế hoạch VERA Shopee còn nháp") mở màn đích ĐÚNG sàn đó.
+                          if (t.rememberPlatform && PLATFORM_AGENCY_TABS.has(t.tab)) setAgencyPlatformState(t.rememberPlatform);
+                          navigateTo(t.tab, t.brandId);
+                        }}
                       />
                     )}
                     {opsView === "board" && (
@@ -1857,7 +1871,7 @@ export default function App() {
                     onSessionsUpdated={handleSessionsUpdated}
                     onUpdateSession={handleUpdateSession}
                     onLogAudit={pushAuditLog}
-                    onOpenMonthPlan={() => setActiveTab("month_plan")}
+                    onOpenMonthPlan={(brandId, platform) => openMonthPlanFor(brandId, platform)}
                     fatigueWeekHours={engineParams.fatigueWeekHours}
                     onCancelSession={handleCancelSession}
                     onSetSessionExcluded={handleSetSessionExcluded}
@@ -1923,7 +1937,7 @@ export default function App() {
                     promoSchemes={promoSchemes}
                     engineParams={engineParams}
                     onOpenSession={(id) => { setOpsView("board"); setActiveTab("calendar"); setNotifOpenSessionId(id); }}
-                    onOpenMonthPlan={(brandId, platform) => { rememberBrandId(brandId, platform); setActiveTab("month_plan"); }}
+                    onOpenMonthPlan={(brandId, platform) => openMonthPlanFor(brandId, platform)}
                   />
                 )}
 
@@ -1972,7 +1986,7 @@ export default function App() {
                     promoSchemes={promoSchemes}
                     engineParams={engineParams}
                     currentRole={currentRole}
-                    onOpenMonthPlan={() => { rememberBrandId(currentBrandId!, singlePlatform); setAgencyPlatformState(singlePlatform); setWorkspace({ type: "agency" }); setActiveTab("month_plan"); }}
+                    onOpenMonthPlan={() => openMonthPlanFor(currentBrandId!, singlePlatform)}
                     onOpenSession={(id) => { setWorkspace({ type: "agency" }); setOpsView("board"); setActiveTab("calendar"); setNotifOpenSessionId(id); }}
                     onOpenSessions={() => setActiveTab("brand_sessions")}
                   />
@@ -2166,7 +2180,7 @@ export default function App() {
                     studios={activeStudios}
                     brandStudios={brandStudios}
                     onSetBrandStudio={handleSetBrandStudio}
-                    onOpenMonthPlan={(brandId, platform) => { rememberBrandId(brandId, platform); navigateTo("month_plan"); }}
+                    onOpenMonthPlan={(brandId, platform) => openMonthPlanFor(brandId, platform)}
                   />
                 )}
 

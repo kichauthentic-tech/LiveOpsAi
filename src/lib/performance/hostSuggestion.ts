@@ -1,6 +1,7 @@
 import { LiveSession } from "../../types";
 import { hostPortions, isCountable, sessionHours, weekdayOf } from "./hostPerformance";
 import { personRoleMinutes, sessionMinutes } from "../staffSegments";
+import { platformOf, type ReportPlatform } from "../reportPlatform";
 
 // Đưa tín hiệu hiệu suất vào ĐÚNG lúc ops chọn người (màn Đăng Ký & Chốt Lịch), thay vì bắt ops
 // nhớ số từ tab Hiệu Suất Host rồi nhảy màn hình. Cùng định nghĩa "ca đáng đếm" và "giờ" với
@@ -10,6 +11,8 @@ import { personRoleMinutes, sessionMinutes } from "../staffSegments";
 export interface HostSuggestion {
   talentId: string;
   name: string;
+  /** Sàn của ca đang chốt — mọi số GMV/giờ dưới đây chỉ tính từ ca cùng sàn này. */
+  platform: ReportPlatform;
   // Với đúng BRAND của ca đang chốt.
   brandGmvPerHour: number;
   brandSessions: number;
@@ -36,6 +39,10 @@ export interface SlotContext {
   date: string;
   startTime: string;
   endTime: string;
+  /** Sàn của ca đang chốt. Số hiệu suất (GMV/giờ) chỉ tính từ ca CÙNG SÀN — user chốt 07/10: không bao giờ gộp
+   *  hiệu suất TikTok với Shopee (VERA Shopee ~1,66x TikTok, gộp là host chạy Shopee tự lên đầu cho ca TikTok).
+   *  Mệt mỏi / công bằng (giờ tuần, ca tháng) vẫn đếm mọi sàn: một người là một người. */
+  platform: ReportPlatform;
 }
 
 // Ngưỡng cảnh báo mệt: > 24h/tuần đã xếp (≈ 8 ca 3h) — ops vẫn chọn được, chỉ được nhắc.
@@ -85,8 +92,8 @@ export function suggestHosts(
   sessions: LiveSession[],
   brandId: string | undefined,
   weekday: number,
-  sinceDate?: string, // "YYYY-MM-DD", bỏ qua ca cũ hơn mốc này
-  slot?: SlotContext
+  sinceDate: string | undefined, // "YYYY-MM-DD", bỏ qua ca cũ hơn mốc này
+  slot: SlotContext
 ): HostSuggestion[] {
   const ids = new Set(candidateIds);
   const overall = new Map<string, Acc>();
@@ -95,13 +102,13 @@ export function suggestHosts(
   const byBlock = new Map<string, Acc>();
   const weekHours = new Map<string, number>();
   const monthSessions = new Map<string, number>();
-  const weekStart = slot ? mondayOf(slot.date) : "";
-  const weekEnd = slot ? (() => { const d = new Date(`${weekStart}T00:00:00`); d.setDate(d.getDate() + 6); return `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, "0")}-${`${d.getDate()}`.padStart(2, "0")}`; })() : "";
-  const monthKey = slot ? slot.date.slice(0, 7) : "";
+  const weekStart = mondayOf(slot.date);
+  const weekEnd = (() => { const d = new Date(`${weekStart}T00:00:00`); d.setDate(d.getDate() + 6); return `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, "0")}-${`${d.getDate()}`.padStart(2, "0")}`; })();
+  const monthKey = slot.date.slice(0, 7);
 
   for (const s of sessions) {
     // Mệt mỏi / công bằng: đếm cả vai trò trợ, cả ca sắp tới, trừ ca huỷ.
-    if (slot && s.status !== "Cancelled") {
+    if (s.status !== "Cancelled") {
       // Đổi người giữa ca (0138): chỉ tính phần giờ người đó đứng ca.
       const dur = sessionMinutes(s);
       for (const pid of new Set([s.hostId, s.coHostId, ...(s.staffSegments ?? []).map((g) => g.talentId)])) {
@@ -114,13 +121,14 @@ export function suggestHosts(
     }
     if (!isCountable(s)) continue;
     if (sinceDate && s.date < sinceDate) continue;
+    if (platformOf(s) !== slot.platform) continue;
     // Đổi host giữa ca: mỗi host một phần (số + giờ chia theo giờ đứng ca).
     for (const p of hostPortions(s)) {
       if (!p.hostId || !ids.has(p.hostId)) continue;
       overall.set(p.hostId, add(overall.get(p.hostId) ?? EMPTY, p));
       if (brandId && p.brandId === brandId) byBrand.set(p.hostId, add(byBrand.get(p.hostId) ?? EMPTY, p));
       if (weekdayOf(p.date) === weekday) byWeekday.set(p.hostId, add(byWeekday.get(p.hostId) ?? EMPTY, p));
-      if (slot && rangesOverlap(p.startTime, p.endTime, slot.startTime, slot.endTime)) byBlock.set(p.hostId, add(byBlock.get(p.hostId) ?? EMPTY, p));
+      if (rangesOverlap(p.startTime, p.endTime, slot.startTime, slot.endTime)) byBlock.set(p.hostId, add(byBlock.get(p.hostId) ?? EMPTY, p));
     }
   }
 
@@ -131,6 +139,7 @@ export function suggestHosts(
     return {
       talentId: id,
       name: talentNameById.get(id) ?? id,
+      platform: slot.platform,
       brandGmvPerHour: perHour(b),
       brandSessions: b.count,
       weekdayGmvPerHour: perHour(w),

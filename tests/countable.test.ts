@@ -29,6 +29,7 @@ describe("isCountable — một luật cho Report, Hiệu Suất Host, Sổ Ca, 
   test("Talent Pool: ca đã xong mà chưa có số không kéo GMV/ca xuống", () => {
     const t = computeTalentRealTotals(cases.map(([, s]) => s), "h1");
     expect(t.sessionCount).toBe(4);
-    expect(t.avgGmvPerSession).toBe(15e6);
+    expect(t.perf.TikTok.avgGmvPerSession).toBe(15e6);
+    expect(t.perf.Shopee.sessions).toBe(0);
   });
 });

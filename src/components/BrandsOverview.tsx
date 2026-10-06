@@ -238,7 +238,7 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ platform, brands
                         {PLAN_STATUS_LABEL[planStatus]}
                       </span>
                       {planStatus !== "locked" && (
-                        <GoLink label={planStatus === "none" ? "Lập kế hoạch" : "Chốt kế hoạch"} onClick={onNavigate && (() => { rememberBrandId(b.id, platform); onNavigate("month_plan"); })} />
+                        <GoLink label={planStatus === "none" ? "Lập kế hoạch" : "Chốt kế hoạch"} onClick={onNavigate && (() => { rememberBrandId(b.id); onNavigate("month_plan"); })} />
                       )}
                       {plan?.brandConfirmedAt && (
                         <span className="block text-[11px] text-emerald-400 mt-1">✓ brand đã xác nhận</span>
@@ -254,7 +254,7 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ platform, brands
                         {COMMIT_STATUS_LABEL[commitStatus]}
                       </span>
                       {commitStatus === "no_commitment" && (
-                        <GoLink label="Đặt cam kết tháng" onClick={onNavigate && (() => { rememberBrandId(b.id, platform); onNavigate("month_plan"); })} />
+                        <GoLink label="Đặt cam kết tháng" onClick={onNavigate && (() => { rememberBrandId(b.id); onNavigate("month_plan"); })} />
                       )}
                       {progress && (
                         <span className="block text-[11px] text-[var(--text-faint)] mt-1">
