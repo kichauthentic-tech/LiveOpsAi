@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { Lock, Mail, Loader2 } from "lucide-react";
+import { isAliasEmail, loginIdentifierToEmail } from "../lib/loginName";
 
 export const Login: React.FC = () => {
   const { signIn, sendPasswordResetEmail } = useAuth();
@@ -21,8 +22,14 @@ export const Login: React.FC = () => {
     setInfo(null);
     setSubmitting(true);
 
+    const loginEmail = loginIdentifierToEmail(email);
     if (mode === "forgot") {
-      const result = await sendPasswordResetEmail(email);
+      if (isAliasEmail(loginEmail)) {
+        setSubmitting(false);
+        setError("Tài khoản đăng nhập bằng tên chưa có email để nhận thư — nhờ quản lý bấm \"Đặt lại mật khẩu\" rồi gửi mật khẩu tạm cho bạn.");
+        return;
+      }
+      const result = await sendPasswordResetEmail(loginEmail);
       setSubmitting(false);
       if (result.error) {
         setError(result.error);
@@ -32,7 +39,7 @@ export const Login: React.FC = () => {
       return;
     }
 
-    const result = await signIn(email, password);
+    const result = await signIn(loginEmail, password);
     setSubmitting(false);
     if (result.error) setError(result.error);
   };
@@ -60,9 +67,14 @@ export const Login: React.FC = () => {
           <div className="relative">
             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-faint)]" />
             <input
-              type="email"
+              type="text"
+              inputMode="email"
+              autoCapitalize="none"
+              autoCorrect="off"
+              autoComplete="username"
               required
-              placeholder="Email"
+              aria-label="Email hoặc tên đăng nhập"
+              placeholder="Email hoặc tên đăng nhập"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full pl-9 pr-3 py-2.5 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl text-sm outline-none focus:border-[var(--accent)]"

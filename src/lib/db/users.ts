@@ -137,3 +137,22 @@ export async function deleteUserAccount(userId: string): Promise<void> {
     throw new Error(body.error || "Không thể xóa tài khoản.");
   }
 }
+
+// Thêm/đổi email đăng nhập của tài khoản khác (tài khoản cấp bằng tên đăng nhập, bổ sung email sau). Qua server vì cần service_role.
+export async function setUserEmail(userId: string, email: string): Promise<void> {
+  const res = await authedFetch(`/api/admin/users/${encodeURIComponent(userId)}/email`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email })
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || "Không đổi được email.");
+}
+
+// Đặt lại mật khẩu tài khoản khác: server sinh mật khẩu tạm, trả về một lần, lần đăng nhập tới bị bắt đổi.
+export async function resetUserPassword(userId: string): Promise<string> {
+  const res = await authedFetch(`/api/admin/users/${encodeURIComponent(userId)}/reset-password`, { method: "POST" });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok || !body.generatedPassword) throw new Error(body.error || "Không đặt lại được mật khẩu.");
+  return body.generatedPassword;
+}

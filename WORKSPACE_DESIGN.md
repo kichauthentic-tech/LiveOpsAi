@@ -34,6 +34,14 @@
     lần + **Copy lời nhắn** dán Zalo. Server kiểm trước khi tạo auth user: hồ sơ tồn tại, role talent, hồ sơ chưa có tài khoản (400/409).
     Verify Đợt 3: 6 test, vitest 571/571, lint 0 lỗi, build, audit 0; bản build nối DB thật hiện 32 hồ sơ / 27 có ca, email sai chặn tại dòng, 375px ổn,
     server trả 400 cho hồ sơ lạ / role khác. Chưa bấm cấp thật (việc của user); nhánh 409 chưa chạy được (chưa hồ sơ nào có tài khoản).
+  - **Cấp trước, email sau (user chốt 06/10):** để trống ô email ⇒ tài khoản đăng nhập bằng **tên** (`lib/loginName.ts`: gợi ý hai chữ cuối bỏ dấu,
+    trùng thêm số; email nội bộ `<tên>@liveops.invalid` không gửi thư được; ô đăng nhập nhận tên trần). Danh sách tài khoản hiện "Tên đăng nhập … ·
+    chưa có email" + **Thêm email** (`PATCH /api/admin/users/:id/email`, service_role, không cần xác nhận) và **Đặt lại MK** cho mọi tài khoản trừ mình
+    (`POST /api/admin/users/:id/reset-password`, mật khẩu tạm + bắt đổi; CEO không đụng Admin). Quên mật khẩu / tự đổi email với tài khoản tên ⇒ chặn,
+    bảo nhờ quản lý (khỏi gửi thư tới địa chỉ chết). Verify: 579 test, lint 0 lỗi, build, audit 0; bản build nối DB thật: 32 tên gợi ý không trùng,
+    server từ chối tự sửa mình (400) / tài khoản lạ (404) / không token (403) / tên có dấu / tên không kèm mật khẩu tạm, Quên mật khẩu với tên bị chặn,
+    hộp xác nhận Đặt lại MK huỷ thì không gọi server. **Chưa đo:** Supabase có nhận đuôi `.invalid` khi tạo user thật không — lần cấp đầu tiên để trống
+    email là phép thử; nếu báo lỗi email thì đổi `LOGIN_ALIAS_DOMAIN`.
   - Chi tiết + verify từng đợt: lịch sử `## Lịch 2 sàn — khảo sát + Đợt 1`, `## … Đợt 2 giao ca`, `## … giao ca TikTok bằng file (0145) + Đợt 3 tài khoản`.
 - **06/10 sáng: GỘP CẤU HÌNH — mỗi điều khoản MỘT chỗ nhập (không migration).** User: nhập 2–3 nơi (rate card, cam kết…) ⇒ gom về
   CRM, cam kết tháng đặt ở Kế Hoạch Tháng, sửa luôn mọi chỗ cùng lớp lỗi. Nay: CRM → **"Hợp đồng & giá"** (`BrandConfigPanel`, brand × sàn:
@@ -140,7 +148,7 @@
 ## 2. Việc còn treo
 
 **Cần user làm:**
-000000000. **Cấp tài khoản cho host/trợ (Đợt 3):** Phân Quyền & Role → Tài khoản → khối vàng "Host / trợ chưa có tài khoản" — gõ email từng người (người có ca sớm nhất trên đầu), Cấp tài khoản, Copy lời nhắn gửi Zalo. KHÔNG dùng "Thêm Tài Khoản Mới" cho người đã có hồ sơ (ra hồ sơ trùng). Chưa đo: một lần giao ca THẬT đầu-cuối (0144/0145 đã chạy; chờ ca thật + số/file thật).
+000000000. **Cấp tài khoản cho host/trợ (Đợt 3):** Phân Quyền & Role → Tài khoản → khối vàng "Host / trợ chưa có tài khoản" — gõ email từng người (hoặc để trống ⇒ đăng nhập bằng tên, "Thêm email" sau), Cấp tài khoản, Copy lời nhắn gửi Zalo. Lần đầu để trống email = phép thử đuôi `.invalid` với Supabase. KHÔNG dùng "Thêm Tài Khoản Mới" cho người đã có hồ sơ (ra hồ sơ trùng). Chưa đo: một lần giao ca THẬT đầu-cuối (0144/0145 đã chạy; chờ ca thật + số/file thật).
 00000000. **0143 ĐÃ CHẠY 06/10** (user xác nhận). Sửa 27 chỗ trùng người T10 (Bảng Vận Hành → khối đỏ "chỗ trùng người", hoặc Việc cần làm) — 0143 KHÔNG chặn ca trùng sẵn,
    chỉ chặn lần ghi đưa người vào ca/dời giờ; 32 ca Franklin Shopee T10 chưa có phòng (đặt phòng mặc định ở CRM → Hợp đồng & giá, ca đã tạo thì Sửa ca).
    **Lịch + giao ca 2 sàn — đề xuất** https://claude.ai/artifact/J4Kk16eZYeTtrkKDYvQWpY: Đợt 1 + Đợt 2 XONG, Đợt 3 có màn cấp tài khoản (§1). Còn: **Đợt 3** user cấp tài khoản cho host/trợ — user chốt 06/10 **CHUYỂN THẲNG sang app, KHÔNG chạy song song Google Sheet**
@@ -383,7 +391,7 @@ Shopee thêm `|Shopee`) và `brandPlatformKey(brand, sàn)` (Map kế hoạch th
 Đọc kế hoạch/hợp đồng bằng `select *` rồi lọc sàn phía client (thiếu cột = TikTok). Bộ chuyển sàn chỉ một chỗ: App (`PLATFORM_TABS`);
 màn con nhận `platform` qua prop, không tự giữ state sàn. Nút sang Kế Hoạch Tháng nhớ sàn qua `rememberBrandId(brand, sàn)`.
 Sàn của report = `lib/reportPlatform.ts` (`ReportPlatform`); mọi đọc/ghi report và bản chụp đi qua `lib/db/monthlyReports.ts` / `monthlyReportSnapshots.ts` với tham số `platform` (mặc định TikTok — TikTok giữ nguyên khoá nạp-trước, chỉ truyền sàn khi là Shopee). Ca/đối soát/phát hành luôn lọc theo sàn của ca, không trộn.
-Tài khoản cho người ĐÃ có hồ sơ talent = `TalentAccountGrants` (`assignedTalentId`, server chặn hồ sơ đã có tài khoản); đường `newTalentProfile` chỉ cho người mới.
+Tài khoản chưa có email = email nội bộ qua `lib/loginName.ts` (`isAliasEmail`/`loginLabel` khi hiện, không gửi thư tới đó). Tài khoản cho người ĐÃ có hồ sơ talent = `TalentAccountGrants` (`assignedTalentId`, server chặn hồ sơ đã có tài khoản); đường `newTalentProfile` chỉ cho người mới.
 Trùng người = `personClash` (một người, lúc sửa) / `findPersonClashes` + `clashedSessionIds` (quét cả lịch) trong `scheduling/conflicts.ts`, DB
 chặn bằng 0143 cùng luật — đừng viết vòng so giờ riêng.
 Nhãn sàn trên một ca = `<PlatformChip>` (components/common). Giao ca = `lib/handover.ts` (đọc link, phần của ca, ai giao) + RPC 0144 — regex

@@ -11,6 +11,7 @@ import { fmtFixed, fmtVndShort, fmtVndFull } from "../lib/format";
 import { MonthPicker } from "./common/MonthPicker";
 import { PageHeader } from "./common/PageHeader";
 import { talentRoleLabel } from "../lib/talentName";
+import { isAliasEmail, loginLabel } from "../lib/loginName";
 interface MyTalentProfileProps {
   activeUser: SystemUser;
   talents: Talent[];
@@ -398,6 +399,15 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
           <Mail className="w-4 h-4 text-[var(--accent-text)]" />
           Đổi Email Đăng Nhập
         </div>
+        {isAliasEmail(activeUser.email) ? (
+          // Tài khoản đăng nhập bằng tên (lib/loginName.ts): Supabase đòi xác nhận ở địa chỉ cũ — địa chỉ nội bộ không nhận thư
+          // được ⇒ quản lý thêm email ở Phân Quyền & Role (đổi bằng service_role, không cần xác nhận).
+          <p className="text-xs text-[var(--text-faint)]">
+            Bạn đang đăng nhập bằng tên <span className="font-mono font-bold text-[var(--text-muted)]">{loginLabel(activeUser.email)}</span>, chưa có email.
+            Gửi email của bạn cho quản lý để họ thêm vào tài khoản.
+          </p>
+        ) : (
+        <>
         <p className="text-xs text-[var(--text-faint)]">Email hiện tại: <span className="text-[var(--text-muted)] font-semibold">{activeUser.email}</span></p>
 
         <form onSubmit={handleChangeEmail} className="space-y-3">
@@ -447,6 +457,8 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
             Gửi Yêu Cầu Đổi Email
           </button>
         </form>
+        </>
+        )}
       </div>
 
     </div>

@@ -3,6 +3,7 @@ import { SystemUser } from "../types";
 import { useAuth } from "../hooks/useAuth";
 import { User, Lock, Mail, Loader2, CheckCircle2, KeyRound } from "lucide-react";
 import { errorMessage } from "../lib/errorMessage";
+import { isAliasEmail, loginLabel } from "../lib/loginName";
 
 interface AccountSettingsProps {
   activeUser: SystemUser;
@@ -111,8 +112,12 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ activeUser, on
 
         <div className="flex items-center gap-2 text-xs text-[var(--text-faint)]">
           <Mail className="w-3.5 h-3.5" />
-          <span>{activeUser.email}</span>
-          <span className="text-[var(--text-faint)]">(email đăng nhập, không thể tự đổi ở đây)</span>
+          <span>{loginLabel(activeUser.email)}</span>
+          <span className="text-[var(--text-faint)]">
+            {isAliasEmail(activeUser.email)
+              ? "(tên đăng nhập — tài khoản chưa có email, nhờ quản lý thêm)"
+              : "(email đăng nhập, không thể tự đổi ở đây)"}
+          </span>
         </div>
 
         <form onSubmit={handleSaveName} className="space-y-3">
@@ -222,7 +227,18 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ activeUser, on
         </form>
       </div>
 
-      {/* Quên mật khẩu hiện tại */}
+      {/* Quên mật khẩu hiện tại — tài khoản chưa có email (tên đăng nhập) không nhận thư được: nhờ quản lý đặt lại. */}
+      {isAliasEmail(activeUser.email) ? (
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-6 space-y-2">
+          <div className="flex items-center gap-2 text-sm font-bold text-[var(--text)]">
+            <KeyRound className="w-4 h-4 text-[var(--accent-text)]" />
+            Quên Mật Khẩu Hiện Tại?
+          </div>
+          <p className="text-xs text-[var(--text-faint)]">
+            Tài khoản này chưa có email nên không gửi thư đặt lại được. Nhờ quản lý bấm "Đặt lại mật khẩu" ở Phân Quyền & Role rồi gửi mật khẩu tạm cho bạn.
+          </p>
+        </div>
+      ) : (
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-6 space-y-3">
         <div className="flex items-center gap-2 text-sm font-bold text-[var(--text)]">
           <KeyRound className="w-4 h-4 text-[var(--accent-text)]" />
@@ -250,6 +266,7 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ activeUser, on
           Gửi Email Đặt Lại Mật Khẩu
         </button>
       </div>
+      )}
     </div>
   );
 };

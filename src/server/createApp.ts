@@ -3,6 +3,7 @@ import crypto from "crypto";
 import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
+import { isAliasEmail, isLoginName, loginLabel } from "../lib/loginName.js";
 import * as Sentry from "@sentry/node";
 
 dotenv.config();
@@ -156,6 +157,15 @@ export function createApp() {
       if (role === "admin" && caller.role !== "admin") {
         return res.status(403).json({ error: "Chỉ tài khoản Admin mới tạo được tài khoản Admin." });
       }
+      // Tài khoản chưa có email (email nội bộ @liveops.invalid, lib/loginName.ts): không gửi thư mời được ⇒ bắt buộc mật khẩu tạm.
+      if (isAliasEmail(email)) {
+        if (!isLoginName(loginLabel(email))) {
+          return res.status(400).json({ error: "Tên đăng nhập chỉ gồm chữ thường không dấu, số, dấu . _ - (3–30 ký tự)." });
+        }
+        if (!generatePassword) {
+          return res.status(400).json({ error: "Tài khoản chưa có email phải dùng mật khẩu tạm." });
+        }
+      }
       // Cấp tài khoản cho hồ sơ talent CÓ SẴN (Đợt 3 lịch 2 sàn, 06/10): kiểm TRƯỚC khi tạo auth user — hồ sơ đã có
       // tài khoản thì từ chối, kẻo hai tài khoản cùng trỏ một hồ sơ (ai giao ca, ai xem lương sẽ lẫn).
       if (assignedTalentId) {
@@ -296,6 +306,58 @@ export function createApp() {
     } catch (err) {
       console.error("Invite user error:", err);
       res.status(500).json({ error: "Lỗi hệ thống khi tạo tài khoản mới." });
+    }
+  });
+
+  // Chặn chung cho hai route sửa tài khoản người khác dưới đây: ceo/admin, không tự sửa mình qua đây (dùng Tài Khoản Của Tôi),
+  // CEO không đụng tài khoản Admin (cùng luật xoá tài khoản).
+  const requireManageTarget = async (req: express.Request, targetId: string): Promise<{ error?: [number, string] }> => {
+    const caller = await requireCeoCaller(req);
+    if (!caller.userId) return { error: [403, `Chỉ tài khoản CEO/Admin mới làm được việc này. (${caller.reason})`] };
+    if (targetId === caller.userId) return { error: [400, "Tài khoản của chính mình thì sửa ở Tài Khoản Của Tôi."] };
+    const { data: target } = await supabaseAdmin!.from("profiles").select("role").eq("id", targetId).maybeSingle();
+    if (!target) return { error: [404, "Không thấy tài khoản."] };
+    if (target.role === "admin" && caller.role !== "admin") return { error: [403, "Chỉ tài khoản Admin mới sửa được tài khoản Admin."] };
+    return {};
+  };
+
+  // Thêm/đổi email đăng nhập (tài khoản cấp trước bằng tên đăng nhập, bổ sung email sau — 06/10). Đổi bằng service_role nên
+  // không cần xác nhận qua thư; trigger sync_profile_email (0047) chép sang profiles.email.
+  app.patch("/api/admin/users/:id/email", async (req, res) => {
+    try {
+      if (!supabaseAdmin) return res.status(503).json({ error: "Server chưa cấu hình SUPABASE_SERVICE_ROLE_KEY." });
+      const guard = await requireManageTarget(req, req.params.id);
+      if (guard.error) return res.status(guard.error[0]).json({ error: guard.error[1] });
+      const email = String(req.body?.email || "").trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || isAliasEmail(email)) {
+        return res.status(400).json({ error: "Email chưa đúng dạng." });
+      }
+      const { error } = await supabaseAdmin.auth.admin.updateUserById(req.params.id, { email, email_confirm: true });
+      if (error) return res.status(400).json({ error: /already|registered|exists/i.test(error.message) ? "Email này đã thuộc tài khoản khác." : error.message });
+      await supabaseAdmin.from("profiles").update({ email }).eq("id", req.params.id);
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Set email error:", err);
+      res.status(500).json({ error: "Lỗi hệ thống khi đổi email." });
+    }
+  });
+
+  // Đặt lại mật khẩu: server sinh mật khẩu tạm, trả về MỘT lần, bắt đổi ở lần đăng nhập tới. Thay "Quên mật khẩu" cho tài khoản
+  // chưa có email (thư không gửi được) — dùng được cho mọi tài khoản.
+  app.post("/api/admin/users/:id/reset-password", async (req, res) => {
+    try {
+      if (!supabaseAdmin) return res.status(503).json({ error: "Server chưa cấu hình SUPABASE_SERVICE_ROLE_KEY." });
+      const guard = await requireManageTarget(req, req.params.id);
+      if (guard.error) return res.status(guard.error[0]).json({ error: guard.error[1] });
+      const password = generateTempPassword();
+      const { error } = await supabaseAdmin.auth.admin.updateUserById(req.params.id, { password });
+      if (error) return res.status(400).json({ error: error.message });
+      const { error: flagError } = await supabaseAdmin.from("profiles").update({ must_change_password: true }).eq("id", req.params.id);
+      if (flagError) console.error("Bật must_change_password thất bại sau khi đặt lại mật khẩu:", flagError);
+      res.json({ success: true, generatedPassword: password });
+    } catch (err) {
+      console.error("Reset password error:", err);
+      res.status(500).json({ error: "Lỗi hệ thống khi đặt lại mật khẩu." });
     }
   });
 

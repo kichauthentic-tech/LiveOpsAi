@@ -2,13 +2,15 @@ import React, { useState, useMemo } from "react";
 import { AUDIT_LOG_LIMIT } from "../lib/db/auditLogs";
 import { UserRole, PermissionKey, PermissionDefinition, RolePermissionsMap, SystemUser, AuditLogEntry, Brand, Talent, LiveSession } from "../types";
 import { PERMISSION_DEFINITIONS as permissionDefinitions } from "../lib/permissionDefinitions";
-import { ShieldCheck, UserPlus, Users, Key, Lock, Unlock, Check, X, Search, Sliders, History, Sparkles, Trash2, Edit2, Radio, Building2, Zap, BarChart3 } from "lucide-react";
+import { ShieldCheck, UserPlus, Users, Key, Lock, Unlock, Check, X, Search, Sliders, History, Sparkles, Trash2, Edit2, Radio, Building2, Zap, BarChart3, KeyRound, MailPlus } from "lucide-react";
 import { useConfirm } from "../hooks/useConfirm";
 import { PageIntro } from "./common/PageIntro";
 import { TabUsagePanel } from "./TabUsagePanel";
 import { accountStatusLabel } from "../lib/statusLabels";
 import { talentRoleLabel } from "../lib/talentName";
 import { TalentAccountGrants } from "./TalentAccountGrants";
+import { CredentialDialog, IssuedCredential } from "./CredentialDialog";
+import { isAliasEmail, loginLabel } from "../lib/loginName";
 
 export interface NewUserPayload {
   name: string;
@@ -41,6 +43,10 @@ interface UserRoleSettingsProps {
   sessions: LiveSession[];
   /** Cấp tài khoản cho hồ sơ talent có sẵn — trả mật khẩu tạm (một lần). */
   onGrantTalentAccount: (talentId: string, email: string) => Promise<string | undefined>;
+  /** Thêm email thật cho tài khoản đang đăng nhập bằng tên (lib/loginName.ts). */
+  onSetUserEmail: (userId: string, email: string) => Promise<void>;
+  /** Đặt lại mật khẩu — trả mật khẩu tạm (một lần). */
+  onResetUserPassword: (userId: string) => Promise<string>;
 }
 
 // Danh sách role app thật sự hiển thị trong Ma Trận. Cố ý KHÔNG suy từ Object.keys(rolePermissions)
@@ -77,7 +83,9 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
   brands,
   talents,
   sessions,
-  onGrantTalentAccount
+  onGrantTalentAccount,
+  onSetUserEmail,
+  onResetUserPassword
 }) => {
   const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState<"roles" | "users" | "audit" | "usage">("roles");
@@ -116,6 +124,42 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
     gender: string;
     niches: string;
   }>({ phone: "", role: "Host", gender: "Nữ", niches: "" });
+
+  // Thêm email (tài khoản đăng nhập bằng tên) + đặt lại mật khẩu — chỉ ceo/admin, không áp cho chính mình, CEO không đụng Admin.
+  const canManageAccounts = currentRole === "ceo" || currentRole === "admin";
+  const canManage = (u: SystemUser) => canManageAccounts && u.id !== currentUserId && (u.role !== "admin" || currentRole === "admin");
+  const [emailFor, setEmailFor] = useState<SystemUser | null>(null);
+  const [newEmail, setNewEmail] = useState("");
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [savingEmail, setSavingEmail] = useState(false);
+  const [issued, setIssued] = useState<IssuedCredential | null>(null);
+  const saveEmail = async () => {
+    if (!emailFor) return;
+    const email = newEmail.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || isAliasEmail(email)) {
+      setEmailError("Email chưa đúng dạng (vd: ten@gmail.com).");
+      return;
+    }
+    setSavingEmail(true);
+    setEmailError(null);
+    try {
+      await onSetUserEmail(emailFor.id, email);
+      setEmailFor(null);
+    } catch (e) {
+      setEmailError(e instanceof Error ? e.message : "Không đổi được email.");
+    } finally {
+      setSavingEmail(false);
+    }
+  };
+  const resetPassword = async (u: SystemUser) => {
+    if (!(await confirm(`Đặt lại mật khẩu cho "${u.name}"? Mật khẩu hiện tại hết hiệu lực ngay; bạn gửi mật khẩu tạm mới cho họ.`))) return;
+    try {
+      const password = await onResetUserPassword(u.id);
+      setIssued({ name: u.name, email: u.email, password, kind: "reset" });
+    } catch {
+      // App.tsx đã hiện lỗi.
+    }
+  };
 
   // Modal state for Custom User Permissions Overrides
   const [permissionOverrideUser, setPermissionOverrideUser] = useState<SystemUser | null>(null);
@@ -667,7 +711,27 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                                   </span>
                                 )}
                               </div>
-                              <span className="text-[var(--text-muted)] text-[11px] block">{u.email}</span>
+                              {isAliasEmail(u.email) ? (
+                                <span className="text-[11px] block text-[var(--text-muted)]">
+                                  Tên đăng nhập <span className="font-mono font-bold">{loginLabel(u.email)}</span> ·{" "}
+                                  <span className="text-amber-500 font-bold">chưa có email</span>
+                                  {canManage(u) && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setEmailFor(u);
+                                        setNewEmail("");
+                                        setEmailError(null);
+                                      }}
+                                      className="ml-2 inline-flex items-center gap-1 text-[var(--accent-text)] font-bold hover:underline"
+                                    >
+                                      <MailPlus className="w-3 h-3" /> Thêm email
+                                    </button>
+                                  )}
+                                </span>
+                              ) : (
+                                <span className="text-[var(--text-muted)] text-[11px] block">{u.email}</span>
+                              )}
                             </div>
                           </div>
                         </td>
@@ -734,11 +798,23 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                             </button>
                             )}
 
+                            {canManage(u) && (
+                              <button
+                                onClick={() => resetPassword(u)}
+                                className="p-1.5 bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--accent-text)] rounded-lg transition-all text-xs flex items-center gap-1"
+                                title="Đặt lại mật khẩu (mật khẩu tạm mới)"
+                                aria-label={`Đặt lại mật khẩu cho ${u.name}`}
+                              >
+                                <KeyRound className="w-3.5 h-3.5" />
+                                <span className="hidden lg:inline text-[11px] font-bold">Đặt lại MK</span>
+                              </button>
+                            )}
+
                             {/* Delete Button */}
                             {u.role !== "ceo" && u.role !== "admin" && (
                               <button
                                 onClick={async () => {
-                                  if (await confirm(`Bạn có chắc chắn muốn xóa vĩnh viễn tài khoản "${u.name}" (${u.email})?`, { danger: true })) {
+                                  if (await confirm(`Bạn có chắc chắn muốn xóa vĩnh viễn tài khoản "${u.name}" (${loginLabel(u.email)})?`, { danger: true })) {
                                     onDeleteUser(u.id);
                                   }
                                 }}
@@ -1115,6 +1191,51 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
           </div>
         </div>
       )}
+
+      {emailFor && (
+        <div className="fixed inset-0 bg-[var(--surface)]/70 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <form
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Thêm email cho ${emailFor.name}`}
+            onSubmit={(e) => {
+              e.preventDefault();
+              saveEmail();
+            }}
+            className="bg-[var(--surface)] w-full max-w-sm rounded-2xl shadow-2xl border border-[var(--border)] p-5 space-y-3 text-xs"
+          >
+            <h3 className="font-bold text-sm flex items-center gap-2">
+              <MailPlus className="w-4 h-4 text-[var(--accent-text)]" />
+              Thêm email cho {emailFor.name}
+            </h3>
+            <p className="text-[var(--text-muted)]">
+              Từ lúc lưu, {emailFor.name} đăng nhập bằng email này (tên <span className="font-mono">{loginLabel(emailFor.email)}</span> hết dùng được), mật
+              khẩu giữ nguyên, và tự dùng được "Quên mật khẩu".
+            </p>
+            <input
+              type="email"
+              inputMode="email"
+              autoCapitalize="none"
+              autoFocus
+              aria-label="Email"
+              placeholder="ten@gmail.com"
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              className="w-full min-h-10 px-3 bg-[var(--surface-base)] text-sm text-[var(--text)] rounded-xl border border-[var(--border)] focus:outline-none focus:border-[var(--accent)]"
+            />
+            {emailError && <p className="font-bold text-red-500">{emailError}</p>}
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setEmailFor(null)} className="flex-1 min-h-10 border border-[var(--border)] rounded-xl font-bold text-[var(--text-muted)]">
+                Huỷ
+              </button>
+              <button type="submit" disabled={savingEmail} className="flex-1 min-h-10 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white rounded-xl font-bold">
+                {savingEmail ? "Đang lưu…" : "Lưu email"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+      {issued && <CredentialDialog cred={issued} onClose={() => setIssued(null)} />}
     </div>
   );
 };

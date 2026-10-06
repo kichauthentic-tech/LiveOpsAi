@@ -1,7 +1,7 @@
 // Cấp tài khoản cho hồ sơ talent có sẵn (Đợt 3 lịch 2 sàn). Ai lên đầu danh sách, ai bị loại.
 // Chạy: npx vitest run tests/talentAccounts.test.ts
 import { describe, expect, test } from "vitest";
-import { credentialMessage, isEmail, talentsWithoutAccount } from "../src/lib/talentAccounts";
+import { credentialMessage, talentsWithoutAccount } from "../src/lib/talentAccounts";
 import type { LiveSession, Talent } from "../src/types";
 
 const t = (id: string, name: string, over: Partial<Talent> = {}): Talent => ({ id, name, role: "Host", ...over }) as Talent;
@@ -41,11 +41,6 @@ describe("talentsWithoutAccount", () => {
   });
 });
 
-test("isEmail", () => {
-  expect(isEmail(" an@gmail.com ")).toBe(true);
-  expect(isEmail("an@gmail")).toBe(false);
-  expect(isEmail("0901234567")).toBe(false);
-});
 
 test("credentialMessage có link, email, mật khẩu, chỗ giao ca", () => {
   const m = credentialMessage("An", "an@gmail.com", "Xy12-ab", "https://live-ops-ai.vercel.app");
@@ -53,4 +48,11 @@ test("credentialMessage có link, email, mật khẩu, chỗ giao ca", () => {
   expect(m).toContain("an@gmail.com");
   expect(m).toContain("Xy12-ab");
   expect(m).toContain("Giao ca");
+});
+
+test("credentialMessage: tài khoản chưa có email ghi tên đăng nhập; đặt lại mật khẩu có câu riêng", () => {
+  const m = credentialMessage("Toàn", "thaitoan@liveops.invalid", "Ab3", "https://x", "reset");
+  expect(m).toContain("Tên đăng nhập: thaitoan");
+  expect(m).not.toContain("liveops.invalid");
+  expect(m).toContain("đặt lại");
 });

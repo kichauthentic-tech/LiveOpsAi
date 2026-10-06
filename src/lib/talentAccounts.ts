@@ -1,4 +1,5 @@
 import type { LiveSession, SystemUser, Talent } from "../types";
+import { isAliasEmail, loginLabel } from "./loginName";
 
 // Đợt 3 lịch 2 sàn: cấp tài khoản cho host/trợ ĐÃ có hồ sơ (34+ hồ sơ thật nạp 19/09 không kèm tài khoản). Luồng "Thêm
 // Tài Khoản Mới" cũ luôn tạo hồ sơ talent MỚI — tài khoản đó không thấy ca nào. Ở đây gắn tài khoản vào đúng hồ sơ cũ.
@@ -38,17 +39,17 @@ export function talentsWithoutAccount(
     .sort((a, b) => b.upcoming - a.upcoming || a.talent.name.localeCompare(b.talent.name, "vi"));
 }
 
-export function isEmail(s: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim());
-}
-
-/** Lời nhắn dán Zalo cho host/trợ sau khi cấp tài khoản. Mật khẩu chỉ hiện một lần, lần đầu đăng nhập bị bắt đổi. */
-export function credentialMessage(name: string, email: string, password: string, appUrl: string): string {
+/** Lời nhắn dán Zalo sau khi cấp tài khoản / đặt lại mật khẩu. Mật khẩu chỉ hiện một lần, lần đăng nhập tới bị bắt đổi.
+ *  Tài khoản chưa có email (lib/loginName.ts) ⇒ ghi "Tên đăng nhập" thay cho email. */
+export function credentialMessage(name: string, email: string, password: string, appUrl: string, kind: "new" | "reset" = "new"): string {
+  const login = isAliasEmail(email) ? `• Tên đăng nhập: ${loginLabel(email)}` : `• Email: ${email}`;
   return [
-    `Chào ${name}, đây là tài khoản LiveOps của bạn:`,
+    kind === "new" ? `Chào ${name}, đây là tài khoản LiveOps của bạn:` : `Chào ${name}, mật khẩu LiveOps của bạn đã được đặt lại:`,
     `• Mở: ${appUrl}`,
-    `• Email: ${email}`,
+    login,
     `• Mật khẩu tạm: ${password}`,
-    `Lần đầu đăng nhập app sẽ bắt đổi mật khẩu. Vào "Ca Của Tôi" để xem lịch; hết ca thì mở ca → Giao ca.`
+    kind === "new"
+      ? `Lần đầu đăng nhập app sẽ bắt đổi mật khẩu. Vào "Ca Của Tôi" để xem lịch; hết ca thì mở ca → Giao ca.`
+      : `Đăng nhập xong app sẽ bắt đổi mật khẩu mới.`
   ].join("\n");
 }

@@ -11,7 +11,7 @@ import { createEquipment, updateEquipment, deleteEquipment } from "./lib/db/equi
 import { fetchSessions, finalizeShiftSlot, updateSession, deleteSession, cancelSession, setSessionExcluded, setSessionStaffSegments } from "./lib/db/sessions";
 import { SessionActionsContext } from "./lib/sessionActionsContext";
 import { createBrand, updateBrand, deleteBrand } from "./lib/db/brands";
-import { fetchUsers, updateUserProfile, inviteUser, deleteUserAccount, InviteUserPayload } from "./lib/db/users";
+import { fetchUsers, updateUserProfile, inviteUser, deleteUserAccount, InviteUserPayload, setUserEmail, resetUserPassword } from "./lib/db/users";
 import { createAuditLog } from "./lib/db/auditLogs";
 import { updateRolePermissions } from "./lib/db/rolePermissions";
 import { upsertSessionFinance, setSessionFinanceApproval } from "./lib/db/finance";
@@ -833,6 +833,32 @@ export default function App() {
       category: "User Status"
     });
     return generatedPassword;
+  };
+  // Thêm email cho tài khoản đăng nhập bằng tên / đặt lại mật khẩu (Phân Quyền & Role). Lỗi: toast + ném tiếp để màn giữ hộp mở.
+  const handleSetUserEmail = async (userId: string, email: string) => {
+    const target = users.find((u) => u.id === userId);
+    await setUserEmail(userId, email);
+    setUsers(await fetchUsers());
+    await pushAuditLog({
+      action: `Thêm email đăng nhập`,
+      details: `Tài khoản ${target?.name ?? userId}: ${target?.email ?? ""} → ${email}`,
+      category: "User Status"
+    });
+  };
+  const handleResetUserPassword = async (userId: string): Promise<string> => {
+    const target = users.find((u) => u.id === userId);
+    try {
+      const password = await resetUserPassword(userId);
+      await pushAuditLog({
+        action: `Đặt lại mật khẩu`,
+        details: `Đặt lại mật khẩu tạm cho ${target?.name ?? userId} (${target?.email ?? ""})`,
+        category: "Security Alert"
+      });
+      return password;
+    } catch (e) {
+      showToast(`Không đặt lại được mật khẩu: ${errorMessage(e)}`);
+      throw e;
+    }
   };
   const handleUpdateTalent = async (id: string, patch: Partial<Talent>) => {
     try {
@@ -2142,6 +2168,8 @@ export default function App() {
                     talents={activeTalents}
                     sessions={sessions}
                     onGrantTalentAccount={handleGrantTalentAccount}
+                    onSetUserEmail={handleSetUserEmail}
+                    onResetUserPassword={handleResetUserPassword}
                   />
                 )}
 
