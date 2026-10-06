@@ -40,8 +40,11 @@
     (`POST /api/admin/users/:id/reset-password`, mật khẩu tạm + bắt đổi; CEO không đụng Admin). Quên mật khẩu / tự đổi email với tài khoản tên ⇒ chặn,
     bảo nhờ quản lý (khỏi gửi thư tới địa chỉ chết). Verify: 579 test, lint 0 lỗi, build, audit 0; bản build nối DB thật: 32 tên gợi ý không trùng,
     server từ chối tự sửa mình (400) / tài khoản lạ (404) / không token (403) / tên có dấu / tên không kèm mật khẩu tạm, Quên mật khẩu với tên bị chặn,
-    hộp xác nhận Đặt lại MK huỷ thì không gọi server. **Chưa đo:** Supabase có nhận đuôi `.invalid` khi tạo user thật không — lần cấp đầu tiên để trống
-    email là phép thử; nếu báo lỗi email thì đổi `LOGIN_ALIAS_DOMAIN`.
+    hộp xác nhận Đặt lại MK huỷ thì không gọi server. **Supabase nhận đuôi `.invalid`:** user cấp `thaitoan` (Huỳnh Thái Toàn) 06/10 15:27, gắn đúng hồ sơ.
+  - **"Cấp cho tất cả N người có ca"** (cùng khối): mọi dòng có ca từ hôm nay, ô trống ⇒ tên gợi ý; ô nào sai thì dừng, báo đỏ đúng dòng; hỏi xác nhận
+    (đếm bao nhiêu người bằng tên / email) ⇒ gọi lần lượt (`handleGrantTalentAccounts`, lỗi một người không dừng cả loạt, nạp lại + ghi nhật ký MỘT lần)
+    ⇒ `BulkCredentialsDialog`: bảng tên đăng nhập + mật khẩu tạm từng người, Copy từng người / Copy tất cả, đóng khi còn người chưa copy thì hỏi lại.
+    Verify: bản build nối DB thật hiện "Cấp cho tất cả 26 người có ca", hộp xác nhận đúng số (26 bằng tên), Huỷ ⇒ không gọi server.
   - Chi tiết + verify từng đợt: lịch sử `## Lịch 2 sàn — khảo sát + Đợt 1`, `## … Đợt 2 giao ca`, `## … giao ca TikTok bằng file (0145) + Đợt 3 tài khoản`.
 - **06/10 sáng: GỘP CẤU HÌNH — mỗi điều khoản MỘT chỗ nhập (không migration).** User: nhập 2–3 nơi (rate card, cam kết…) ⇒ gom về
   CRM, cam kết tháng đặt ở Kế Hoạch Tháng, sửa luôn mọi chỗ cùng lớp lỗi. Nay: CRM → **"Hợp đồng & giá"** (`BrandConfigPanel`, brand × sàn:
@@ -148,7 +151,7 @@
 ## 2. Việc còn treo
 
 **Cần user làm:**
-000000000. **Cấp tài khoản cho host/trợ (Đợt 3):** Phân Quyền & Role → Tài khoản → khối vàng "Host / trợ chưa có tài khoản" — gõ email từng người (hoặc để trống ⇒ đăng nhập bằng tên, "Thêm email" sau), Cấp tài khoản, Copy lời nhắn gửi Zalo. Lần đầu để trống email = phép thử đuôi `.invalid` với Supabase. KHÔNG dùng "Thêm Tài Khoản Mới" cho người đã có hồ sơ (ra hồ sơ trùng). Chưa đo: một lần giao ca THẬT đầu-cuối (0144/0145 đã chạy; chờ ca thật + số/file thật).
+000000000. **Cấp tài khoản cho host/trợ (Đợt 3):** Phân Quyền & Role → Tài khoản → khối vàng "Host / trợ chưa có tài khoản" — gõ email từng người (hoặc để trống ⇒ đăng nhập bằng tên, "Thêm email" sau), Cấp tài khoản, Copy lời nhắn gửi Zalo. Hoặc bấm "Cấp cho tất cả N người có ca" một lần. KHÔNG dùng "Thêm Tài Khoản Mới" cho người đã có hồ sơ (ra hồ sơ trùng). Chưa đo: một lần giao ca THẬT đầu-cuối (0144/0145 đã chạy; chờ ca thật + số/file thật).
 00000000. **0143 ĐÃ CHẠY 06/10** (user xác nhận). Sửa 27 chỗ trùng người T10 (Bảng Vận Hành → khối đỏ "chỗ trùng người", hoặc Việc cần làm) — 0143 KHÔNG chặn ca trùng sẵn,
    chỉ chặn lần ghi đưa người vào ca/dời giờ; 32 ca Franklin Shopee T10 chưa có phòng (đặt phòng mặc định ở CRM → Hợp đồng & giá, ca đã tạo thì Sửa ca).
    **Lịch + giao ca 2 sàn — đề xuất** https://claude.ai/artifact/J4Kk16eZYeTtrkKDYvQWpY: Đợt 1 + Đợt 2 XONG, Đợt 3 có màn cấp tài khoản (§1). Còn: **Đợt 3** user cấp tài khoản cho host/trợ — user chốt 06/10 **CHUYỂN THẲNG sang app, KHÔNG chạy song song Google Sheet**

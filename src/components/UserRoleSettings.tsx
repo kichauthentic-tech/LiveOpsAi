@@ -11,6 +11,7 @@ import { talentRoleLabel } from "../lib/talentName";
 import { TalentAccountGrants } from "./TalentAccountGrants";
 import { CredentialDialog, IssuedCredential } from "./CredentialDialog";
 import { isAliasEmail, loginLabel } from "../lib/loginName";
+import type { GrantResult } from "../lib/talentAccounts";
 
 export interface NewUserPayload {
   name: string;
@@ -42,7 +43,7 @@ interface UserRoleSettingsProps {
   talents: Talent[];
   sessions: LiveSession[];
   /** Cấp tài khoản cho hồ sơ talent có sẵn — trả mật khẩu tạm (một lần). */
-  onGrantTalentAccount: (talentId: string, email: string) => Promise<string | undefined>;
+  onGrantTalentAccounts: (items: { talentId: string; email: string }[], onProgress?: (done: number) => void) => Promise<GrantResult[]>;
   /** Thêm email thật cho tài khoản đang đăng nhập bằng tên (lib/loginName.ts). */
   onSetUserEmail: (userId: string, email: string) => Promise<void>;
   /** Đặt lại mật khẩu — trả mật khẩu tạm (một lần). */
@@ -83,7 +84,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
   brands,
   talents,
   sessions,
-  onGrantTalentAccount,
+  onGrantTalentAccounts,
   onSetUserEmail,
   onResetUserPassword
 }) => {
@@ -665,7 +666,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
           </div>
 
           {(currentRole === "ceo" || currentRole === "admin") && (
-            <TalentAccountGrants talents={talents} users={users} sessions={sessions} onGrant={onGrantTalentAccount} />
+            <TalentAccountGrants talents={talents} users={users} sessions={sessions} onGrant={onGrantTalentAccounts} />
           )}
 
           {/* User List Table / Cards */}

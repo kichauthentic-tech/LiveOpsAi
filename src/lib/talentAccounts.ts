@@ -4,6 +4,15 @@ import { isAliasEmail, loginLabel } from "./loginName";
 // Đợt 3 lịch 2 sàn: cấp tài khoản cho host/trợ ĐÃ có hồ sơ (34+ hồ sơ thật nạp 19/09 không kèm tài khoản). Luồng "Thêm
 // Tài Khoản Mới" cũ luôn tạo hồ sơ talent MỚI — tài khoản đó không thấy ca nào. Ở đây gắn tài khoản vào đúng hồ sơ cũ.
 
+/** Kết quả cấp tài khoản cho một hồ sơ: có `password` (hiện một lần) hoặc `error`. */
+export interface GrantResult {
+  talentId: string;
+  name: string;
+  email: string;
+  password?: string;
+  error?: string;
+}
+
 export interface TalentWithoutAccount {
   talent: Talent;
   /** Số ca (chưa huỷ, không phải ca nạp file) từ hôm nay trở đi mà người này đứng host/trợ/một đoạn. */

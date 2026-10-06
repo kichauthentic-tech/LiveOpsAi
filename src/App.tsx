@@ -12,6 +12,7 @@ import { fetchSessions, finalizeShiftSlot, updateSession, deleteSession, cancelS
 import { SessionActionsContext } from "./lib/sessionActionsContext";
 import { createBrand, updateBrand, deleteBrand } from "./lib/db/brands";
 import { fetchUsers, updateUserProfile, inviteUser, deleteUserAccount, InviteUserPayload, setUserEmail, resetUserPassword } from "./lib/db/users";
+import type { GrantResult } from "./lib/talentAccounts";
 import { createAuditLog } from "./lib/db/auditLogs";
 import { updateRolePermissions } from "./lib/db/rolePermissions";
 import { upsertSessionFinance, setSessionFinanceApproval } from "./lib/db/finance";
@@ -811,28 +812,45 @@ export default function App() {
     setUsers(refreshedUsers);
     return generatedPassword;
   };
-  // Cấp tài khoản cho hồ sơ talent CÓ SẴN (Phân Quyền & Role → "Host/trợ chưa có tài khoản"): giữ nguyên hồ sơ + ca cũ,
-  // mật khẩu tạm do server sinh, trả về một lần. Lỗi để UserRoleSettings hiện tại dòng.
-  const handleGrantTalentAccount = async (talentId: string, email: string): Promise<string | undefined> => {
-    const t = talents.find((x) => x.id === talentId);
-    if (!t) throw new Error("Không thấy hồ sơ talent.");
-    const { generatedPassword } = await inviteUser({
-      name: t.name,
-      email: email.trim(),
-      role: "talent",
-      customRoleTitle: t.role === "Assistant" ? "Trợ live" : "Host",
-      assignedTalentId: talentId,
-      generatePassword: true
-    });
-    const [refreshedTalents, refreshedUsers] = await Promise.all([fetchTalents(), fetchUsers()]);
-    setTalents(refreshedTalents);
-    setUsers(refreshedUsers);
-    await pushAuditLog({
-      action: `Cấp tài khoản cho hồ sơ talent`,
-      details: `Cấp tài khoản ${email.trim()} cho hồ sơ ${t.name}`,
-      category: "User Status"
-    });
-    return generatedPassword;
+  // Cấp tài khoản cho hồ sơ talent CÓ SẴN (Phân Quyền & Role → "Host/trợ chưa có tài khoản"): giữ nguyên hồ sơ + ca cũ, mật khẩu
+  // tạm do server sinh, trả về một lần. Một người hay cả loạt ("Cấp cho tất cả") đi cùng đường: gọi lần lượt (lỗi một người không
+  // dừng cả loạt), nạp lại talents/users + ghi nhật ký MỘT lần ở cuối.
+  const handleGrantTalentAccounts = async (
+    items: { talentId: string; email: string }[],
+    onProgress?: (done: number) => void
+  ): Promise<GrantResult[]> => {
+    const results: GrantResult[] = [];
+    for (const it of items) {
+      const t = talents.find((x) => x.id === it.talentId);
+      const email = it.email.trim();
+      try {
+        if (!t) throw new Error("Không thấy hồ sơ talent.");
+        const { generatedPassword } = await inviteUser({
+          name: t.name,
+          email,
+          role: "talent",
+          customRoleTitle: t.role === "Assistant" ? "Trợ live" : "Host",
+          assignedTalentId: it.talentId,
+          generatePassword: true
+        });
+        results.push({ talentId: it.talentId, name: t.name, email, password: generatedPassword });
+      } catch (e) {
+        results.push({ talentId: it.talentId, name: t?.name ?? it.talentId, email, error: errorMessage(e) });
+      }
+      onProgress?.(results.length);
+    }
+    const ok = results.filter((r) => !r.error);
+    if (ok.length > 0) {
+      const [refreshedTalents, refreshedUsers] = await Promise.all([fetchTalents(), fetchUsers()]);
+      setTalents(refreshedTalents);
+      setUsers(refreshedUsers);
+      await pushAuditLog({
+        action: `Cấp tài khoản cho hồ sơ talent`,
+        details: `Cấp ${ok.length} tài khoản: ${ok.map((r) => `${r.name} (${r.email})`).join(", ")}`,
+        category: "User Status"
+      });
+    }
+    return results;
   };
   // Thêm email cho tài khoản đăng nhập bằng tên / đặt lại mật khẩu (Phân Quyền & Role). Lỗi: toast + ném tiếp để màn giữ hộp mở.
   const handleSetUserEmail = async (userId: string, email: string) => {
@@ -2167,7 +2185,7 @@ export default function App() {
                     brands={brands}
                     talents={activeTalents}
                     sessions={sessions}
-                    onGrantTalentAccount={handleGrantTalentAccount}
+                    onGrantTalentAccounts={handleGrantTalentAccounts}
                     onSetUserEmail={handleSetUserEmail}
                     onResetUserPassword={handleResetUserPassword}
                   />
