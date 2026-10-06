@@ -213,7 +213,9 @@ export interface LiveSession {
   // Đối soát TikTok (migration 0050) — "manual" = talent tự nhập, chưa chính xác vì TikTok
   // chưa chốt hoàn/hủy; "live_snapshot" = số thật đọc từ file trợ live up lúc giao ca, nhưng
   // TikTok còn cập nhật trễ (migration 0078); "tiktok_reconciled" = đã đối soát chốt.
-  dataSource?: "manual" | "live_snapshot" | "tiktok_reconciled";
+  // 0150: "handover_typed" = số dashboard gõ lúc giao ca (Shopee), cùng bậc "số lúc giao ca" với live_snapshot — đọc bậc qua
+  // lib/dataSource.ts (`dataSourceTier`), không so chuỗi.
+  dataSource?: "manual" | "handover_typed" | "live_snapshot" | "tiktok_reconciled";
   reconciledAt?: string;
   cancelReason?: string; // 0097 — lý do huỷ ca (ops)
   cancelledAt?: string;

@@ -32,7 +32,7 @@ function BoundaryCard({ session: s, boundary: b, canSubmit, onSaved }: { boundar
   const [link, setLink] = useState(done?.link ?? s.report?.dashboardLink1 ?? s.staffCheckpoints?.find((c) => c.link)?.link ?? "");
   const [gmv, setGmv] = useState(fmtCount(done?.cumGmv));
   const [views, setViews] = useState(fmtCount(done?.cumViews));
-  const [third, setThird] = useState(fmtCount(third3.key === "atc" ? done?.cumAtc : done?.cumOrders));
+  const [third, setThird] = useState(fmtCount(third3?.key === "atc" ? done?.cumAtc : done?.cumOrders));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -78,7 +78,7 @@ function BoundaryCard({ session: s, boundary: b, canSubmit, onSaved }: { boundar
   if (!parsed) missing.push("link dashboard");
   if (cumGmv == null) missing.push("GMV");
   if (cumViews == null) missing.push("lượt xem");
-  if (third3.required && cumThird == null) missing.push(`số ${third3.label.toLowerCase()}`);
+  if (third3?.required && cumThird == null) missing.push(`số ${third3.label.toLowerCase()}`);
   const ready = missing.length === 0 && !wrongPlatform && !saving;
 
   const submit = async () => {
@@ -92,8 +92,8 @@ function BoundaryCard({ session: s, boundary: b, canSubmit, onSaved }: { boundar
           link,
           cumGmv,
           cumViews,
-          cumOrders: third3.key === "orders" ? cumThird : null,
-          cumAtc: third3.key === "atc" ? cumThird : null
+          cumOrders: third3?.key === "orders" ? cumThird : null,
+          cumAtc: third3?.key === "atc" ? cumThird : null
         })
       );
       setOpen(false);
@@ -125,7 +125,7 @@ function BoundaryCard({ session: s, boundary: b, canSubmit, onSaved }: { boundar
       {done && !open && (
         <div className="space-y-1.5 text-xs text-[var(--text-muted)]">
           <p>
-            {done.source === "file" ? `Từ file ${done.fileName ?? "Creator-Live-Performance"} — số của ca tính tới lúc đổi: ` : "Số TỔNG lúc đổi: "}<span className="font-mono text-[var(--text)]">GMV {fmtVndFull(done.cumGmv)} · {fmtCount(done.cumViews ?? 0)} lượt xem{third3.key === "atc" ? (done.cumAtc != null ? ` · ${fmtCount(done.cumAtc)} ATC` : "") : ` · ${fmtCount(done.cumOrders ?? 0)} đơn`}</span>
+            {done.source === "file" ? `Từ file ${done.fileName ?? "Creator-Live-Performance"} — số của ca tính tới lúc đổi: ` : "Số TỔNG lúc đổi: "}<span className="font-mono text-[var(--text)]">GMV {fmtVndFull(done.cumGmv)} · {fmtCount(done.cumViews ?? 0)} lượt xem{third3?.key === "atc" ? (done.cumAtc != null ? ` · ${fmtCount(done.cumAtc)} ATC` : "") : third3 ? ` · ${fmtCount(done.cumOrders ?? 0)} đơn` : ""}</span>
           </p>
           <p>
             {b.fromName || "Host trước"} làm: <b className="font-mono text-[var(--text)]">GMV {fmtVndFull(Math.max(done.cumGmv - done.baseGmv, 0))}</b>
@@ -187,7 +187,7 @@ function BoundaryCard({ session: s, boundary: b, canSubmit, onSaved }: { boundar
           {wrongPlatform && <p className="text-[11px] text-rose-300 font-bold">Ca này là ca {s.platform}, kiểm lại link.</p>}
           {numField(`cp-gmv-${b.atMin}`, "GMV", gmv, setGmv, "vd 11.513.359")}
           <div className="grid grid-cols-2 gap-2">
-            {numField(`cp-third-${b.atMin}`, third3.label, third, setThird, third3.required ? undefined : "không bắt buộc")}
+            {third3 && numField(`cp-third-${b.atMin}`, third3.label, third, setThird, third3.required ? undefined : "không bắt buộc")}
             {numField(`cp-views-${b.atMin}`, "Lượt xem", views, setViews)}
           </div>
           {error && <p className="text-xs text-rose-300 bg-rose-950/50 border border-rose-800 rounded-xl px-3 py-2">{error}</p>}

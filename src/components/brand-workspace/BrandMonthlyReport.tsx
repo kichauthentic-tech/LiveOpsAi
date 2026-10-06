@@ -62,6 +62,7 @@ const REPORT_VIEWS: Record<ReportPlatform, { preload: () => void; Render: React.
 };
 import { MonthPicker } from "../common/MonthPicker";
 import { PageHeader } from "../common/PageHeader";
+import { dataSourceTier } from "../../lib/dataSource";
 
 // Report Tuần không còn là tab riêng ở menu (2026-08-23) — gộp làm chế độ xem "Tuần" ngay trong
 // Report Tháng qua toggle bên dưới, tái dùng nguyên BrandWeeklyReport.tsx (đã tự chặn quyền qua
@@ -161,12 +162,12 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
   const completedSessions = useMemo(() => sessionsInPeriod.filter((s) => s.status === "Completed"), [sessionsInPeriod]);
 
   const unreconciledSessions = useMemo(
-    () => completedSessions.filter((s) => (s.dataSource ?? "manual") !== "tiktok_reconciled"),
+    () => completedSessions.filter((s) => dataSourceTier(s) !== "reconciled"),
     [completedSessions]
   );
   // Từ 0078 có bậc giữa: số đọc từ file lúc giao ca — chưa chốt nhưng không còn là "tự nhập".
   // Gộp chung với ca tự khai thì cảnh báo nói sai về phần lớn ca, ops sẽ học cách bỏ qua nó.
-  const manualOnly = useMemo(() => unreconciledSessions.filter((s) => (s.dataSource ?? "manual") === "manual"), [unreconciledSessions]);
+  const manualOnly = useMemo(() => unreconciledSessions.filter((s) => dataSourceTier(s) === "manual"), [unreconciledSessions]);
   const snapshotOnly = unreconciledSessions.length - manualOnly.length;
 
   useEffect(() => {
@@ -462,7 +463,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
           </div>
           <p className="text-[11px] text-amber-300">
             {manualOnly.length > 0 && `${manualOnly.length} phiên là số talent tự khai, chưa có gì bảo chứng. `}
-            {snapshotOnly > 0 && `${snapshotOnly} phiên đã có số từ file lúc giao ca nhưng ${platform} còn cập nhật hoàn/huỷ trễ. `}
+            {snapshotOnly > 0 && `${snapshotOnly} phiên đã có số lúc giao ca nhưng ${platform} còn cập nhật đơn/hoàn/huỷ sau đó. `}
             Đối soát trước khi phát hành report cho khách — vào "Vận Hành Live → Đối Soát Số Liệu" và chọn sàn {platform}.
           </p>
           <div className="flex flex-wrap gap-1.5">

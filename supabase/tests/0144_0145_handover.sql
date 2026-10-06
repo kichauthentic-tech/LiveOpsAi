@@ -95,7 +95,9 @@ select pg_temp.must_fail('2c link không đọc được',
 -- ============ 3) Giao ca + ca nối ============
 select count(*) from submit_session_handover('d0000000-0000-0000-0000-000000000001',
   'https://banhang.shopee.vn/creator-center/dashboard/live/41439111', 4267859, 5883, null, 228, null, 15, 0, 0, false, 'ổn');
-select pg_temp.chk('3a ca đầu: số của ca = số cộng dồn', actual_gmv = 4267859 and total_views = 5883 and data_source = 'manual')
+select pg_temp.chk('3a ca đầu: số của ca = số cộng dồn', actual_gmv = 4267859 and total_views = 5883
+  -- 0150: giao ca gõ số ghi bậc 'handover_typed' (trước 0150: 'manual').
+  and data_source = (case when pg_get_functiondef('private.apply_handover_chain(uuid, text, text)'::regprocedure) ~ 'handover_typed' then 'handover_typed' else 'manual' end))
   from live_sessions where id = 'd0000000-0000-0000-0000-000000000001';
 select pg_temp.chk('3b report ghi người giao, OT, ATC, mã phiên; lời nhắc bị xoá',
   r.live_ref = '41439111' and r.atc_count = 228 and r.ot_minutes = 15 and r.submitted_by_talent_id = 'c0000000-0000-0000-0000-000000000001'

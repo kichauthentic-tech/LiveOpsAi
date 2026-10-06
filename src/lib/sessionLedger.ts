@@ -3,6 +3,7 @@ import { assertOnePlatform } from "./platforms/perf";
 import { profileOf } from "./platforms/profiles";
 import { SnapshotCounters, SnapshotRatios, computeSnapshotRatios } from "./liveSnapshot/metrics";
 import { dataQuality, DataQuality, isCountable, sessionHours } from "./performance/hostPerformance";
+import { dataSourceTier } from "./dataSource";
 
 // Sổ Ca (2026-09-19): nhìn theo TỪNG CA đã/đang chạy — số thật của ca, số đó tin được tới đâu,
 // và còn thiếu bước nào để chốt tháng. Thay cho Live Sessions Hub (màn demo: chart phút/checklist/
@@ -23,7 +24,7 @@ export interface LedgerFilter {
 
 // Đã có số từ file: bậc live_snapshot/tiktok_reconciled, hoặc ca nạp bù (0086) mang sẵn room.
 export function hasSnapshot(s: LiveSession): boolean {
-  return s.dataSource === "live_snapshot" || s.dataSource === "tiktok_reconciled" || (s.liveRoomIds?.length ?? 0) > 0;
+  return s.dataSource === "live_snapshot" || dataSourceTier(s) === "reconciled" || (s.liveRoomIds?.length ?? 0) > 0;
 }
 
 // Ca TikTok giao ca bằng file (Creator-Live-Performance là file của TikTok); ca Shopee không có file theo ca — giao ca
@@ -37,7 +38,7 @@ export function hasReport(s: LiveSession): boolean {
 }
 
 export function isReconciled(s: LiveSession): boolean {
-  return s.dataSource === "tiktok_reconciled";
+  return dataSourceTier(s) === "reconciled";
 }
 
 // Chỉ ca ĐÃ CHẠY mới "thiếu" được gì: ca sắp tới chưa có gì để thiếu, ca huỷ không cần số, ca

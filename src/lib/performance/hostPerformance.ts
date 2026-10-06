@@ -6,6 +6,7 @@ import type { CampDayBucket } from "../campaignDays";
 import { METRIC } from "../metricGlossary";
 import { assertOnePlatform } from "../platforms/perf";
 import { addKeyInput, emptyKeyCounts, keyInputFromSession, keyMetrics, type KeyCounts, type KeyMetrics } from "../report/keyMetrics";
+import { dataSourceTier, hasHandoverOrBetter } from "../dataSource";
 
 // Giai đoạn 3 của tầng dữ liệu gốc mới: đọc ra hiệu suất thật để làm nền cho việc SẮP LỊCH.
 // Chỉ tổng hợp, không tự xếp lịch — ops vẫn là người quyết, đúng tinh thần đã chốt (tránh lặp lại
@@ -47,7 +48,7 @@ export function sessionHours(s: LiveSession): number {
 // Không dùng cho tiền (isPnlSession — ca GMV 0 chưa up file vẫn trả lương) hay giờ đã giao cho brand (isDelivered).
 export function isCountable(s: LiveSession): boolean {
   if (s.status !== "Completed") return false;
-  return s.dataSource === "tiktok_reconciled" || s.dataSource === "live_snapshot" || (s.actualGmv ?? 0) > 0 || (s.totalViews ?? 0) > 0;
+  return hasHandoverOrBetter(s) || (s.actualGmv ?? 0) > 0 || (s.totalViews ?? 0) > 0;
 }
 
 // Đổi HOST giữa ca (0138): GMV/đơn/view và giờ của ca chia cho từng host theo GIỜ HỌ ĐỨNG (không có hoa hồng GMV —
@@ -126,8 +127,9 @@ export function filterSessions(sessions: LiveSession[], f: PerfFilter): LiveSess
 export function dataQuality(sessions: LiveSession[]): DataQuality {
   const q: DataQuality = { total: sessions.length, reconciled: 0, snapshot: 0, manual: 0 };
   for (const s of sessions) {
-    if (s.dataSource === "tiktok_reconciled") q.reconciled++;
-    else if (s.dataSource === "live_snapshot") q.snapshot++;
+    const tier = dataSourceTier(s);
+    if (tier === "reconciled") q.reconciled++;
+    else if (tier === "handover") q.snapshot++;
     else q.manual++;
   }
   return q;

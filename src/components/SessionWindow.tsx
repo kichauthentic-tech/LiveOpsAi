@@ -32,6 +32,7 @@ import { describeStaff, hasStaffSegments } from "../lib/staffSegments";
 import { HostChangeReports } from "./HostChangeReports";
 import { StaffSegmentsEditor } from "./StaffSegmentsEditor";
 import { metricHint } from "../lib/metricGlossary";
+import { dataSourceTier } from "../lib/dataSource";
 
 // Cửa sổ Ca Live — MỘT cửa sổ chi tiết cho một ca, dùng chung cho mọi nơi click vào ca (Sổ Ca,
 // Lịch Vận Hành, Đăng Ký & Chốt Lịch, Sessions bên brand). Thay cho 3 "chi tiết ca" khác nhau
@@ -265,7 +266,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
     }
   };
 
-  const hasData = s.dataSource !== "manual" || (s.actualGmv ?? 0) > 0 || (s.totalOrders ?? 0) > 0;
+  const hasData = dataSourceTier(s) !== "manual" || (s.actualGmv ?? 0) > 0 || (s.totalOrders ?? 0) > 0;
   const canCancel = isOps && !!onCancelSession && s.status !== "Cancelled" && !hasData;
   const doCancel = async (reopenSlot: boolean) => {
     if (!onCancelSession) return;
@@ -344,7 +345,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                 <span className="text-[11px] font-bold px-2 py-0.5 rounded-full border bg-[var(--surface-elevated)] text-[var(--text-faint)] border-[var(--border)]">nạp bù từ file</span>
               )}
               {/* RPC snapshot (0078) cũng ghi reconciled_at — chỉ gọi là "đối soát" khi nguồn số thật sự là tiktok_reconciled. */}
-              {s.reconciledAt && s.dataSource === "tiktok_reconciled" && <span className="text-[11px] text-[var(--text-faint)]">đối soát {new Date(s.reconciledAt).toLocaleDateString("vi-VN")}</span>}
+              {s.reconciledAt && dataSourceTier(s) === "reconciled" && <span className="text-[11px] text-[var(--text-faint)]">đối soát {new Date(s.reconciledAt).toLocaleDateString("vi-VN")}</span>}
               {isMine && <span className="text-[11px] font-bold px-2 py-0.5 rounded-full border bg-sky-950 text-sky-300 border-sky-800">ca của tôi</span>}
             </div>
           </div>
@@ -540,7 +541,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                     {handoverPrev && <span>· ca nối với ca {handoverPrev.startTime}–{handoverPrev.endTime}</span>}
                   </p>
                   <p className="text-[var(--text-muted)]">
-                    Số đang thấy lúc giao: <span className="font-mono text-[var(--text)]">GMV {fmtVndShort(s.report!.cumGmv ?? 0)} · {(s.report!.cumViews ?? 0).toLocaleString("vi-VN")} lượt xem{prof.handoverThird.key === "atc" ? (s.report!.cumAtc != null ? ` · ${s.report!.cumAtc.toLocaleString("vi-VN")} ATC` : "") : ` · ${(s.report!.cumOrders ?? 0).toLocaleString("vi-VN")} đơn`}</span>
+                    Số đang thấy lúc giao: <span className="font-mono text-[var(--text)]">GMV {fmtVndShort(s.report!.cumGmv ?? 0)} · {(s.report!.cumViews ?? 0).toLocaleString("vi-VN")} lượt xem{prof.handoverThird?.key !== "orders" ? (s.report!.cumAtc != null ? ` · ${s.report!.cumAtc.toLocaleString("vi-VN")} ATC` : "") : ` · ${(s.report!.cumOrders ?? 0).toLocaleString("vi-VN")} đơn`}</span>
                     {handoverPrev ? " — số của ca này đã trừ ca trước, xem \"Số liệu ca\" bên dưới." : ""}
                   </p>
                   {canHandover && (
@@ -658,7 +659,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
             // dataSource thì ca vừa up file đã hiện "Đối soát TikTok ghi đè số liệu" ngay dưới dòng
             // "Còn thiếu để chốt: Chưa đối soát" — cùng một cửa sổ nói hai điều ngược nhau. Đây là
             // đúng guard đã dùng ở badge nguồn số phía trên.
-            if (s.reconciledAt && s.dataSource === "tiktok_reconciled") {
+            if (s.reconciledAt && dataSourceTier(s) === "reconciled") {
               events.push({ at: s.reconciledAt, label: `Đối soát ${prof.label} ghi đè số liệu` });
             }
             if (s.cancelledAt) events.push({ at: s.cancelledAt, label: `Huỷ ca${s.cancelReason ? ` — ${s.cancelReason}` : ""}` });

@@ -19,6 +19,7 @@ import { fetchMonthPlan } from "../../lib/db/monthPlans";
 import { effectiveCamp } from "../../lib/campaignDays";
 import { MissingStep, missingSteps } from "../../lib/sessionLedger";
 import { DataSourceBadge } from "../common/DataSourceBadge";
+import { dataSourceTier } from "../../lib/dataSource";
 
 interface BrandWeeklyReportProps {
   brandId: string;
@@ -156,9 +157,9 @@ export const BrandWeeklyReport: React.FC<BrandWeeklyReportProps> = ({ brandId, b
       target,
       targetDone,
       achieved: targetDone > 0 ? gmv / targetDone : null,
-      reconciled: done.filter((s) => s.dataSource === "tiktok_reconciled").length,
-      snapshot: done.filter((s) => s.dataSource === "live_snapshot").length,
-      manual: done.filter((s) => s.dataSource === "manual").length
+      reconciled: done.filter((s) => dataSourceTier(s) === "reconciled").length,
+      snapshot: done.filter((s) => dataSourceTier(s) === "handover").length,
+      manual: done.filter((s) => dataSourceTier(s) === "manual").length
     };
   };
   const cur = useMemo(() => totals(weekSessions, weekStart, weekEnd), [weekSessions, weekStart, weekEnd, planTargetByDate, lockedMonths, through]); // eslint-disable-line react-hooks/exhaustive-deps

@@ -142,13 +142,12 @@ export type ShopeeMetricKey =
 type Kind = "money" | "int" | "pct1" | "pct2" | "hours";
 
 /** Phân tầng theo phễu Shopee: kết quả → người xem vào → thêm giỏ/thanh toán → khuyến mãi. */
-export type ShopeeMetricGroup = "result" | "traffic" | "conversion" | "promo";
+export type ShopeeMetricGroup = "result" | "traffic" | "conversion";
 
 export const SHOPEE_METRIC_GROUPS: { group: ShopeeMetricGroup; label: string; hint: string }[] = [
   { group: "result", label: "Kết quả", hint: "Tiền thu được trên số giờ đã chạy." },
   { group: "traffic", label: "Người xem", hint: "Shopee đưa bao nhiêu người vào phòng live." },
-  { group: "conversion", label: "Thêm giỏ → thanh toán → đơn", hint: "Người xem thêm giỏ, đi tới thanh toán, rồi chốt đơn. Chỉ tính trên các ca có khai số đó." },
-  { group: "promo", label: "Khuyến mãi", hint: "Xu shop tung trong live." }
+  { group: "conversion", label: "Thêm giỏ → đơn", hint: "Người xem thêm giỏ rồi chốt đơn. ATC và đơn của ca có sau khi đối soát bằng Live List." }
 ];
 
 export interface ShopeeMetricDef {
@@ -160,6 +159,8 @@ export interface ShopeeMetricDef {
   group: ShopeeMetricGroup;
 }
 
+// Bộ hiển thị theo ca (07/10): bỏ CO và Xu — không file Shopee nào có hai số này THEO PHIÊN (Live List chỉ có ATC/đơn/người
+// xem; Xu chỉ ở file tổng quan tháng, Report Shopee đọc ở đó) và user chốt trợ live không gõ thêm số lúc giao ca.
 export const SHOPEE_METRICS: ShopeeMetricDef[] = [
   { key: "gmv", label: METRIC.gmv, kind: "money", goodWhenUp: true, group: "result" },
   { key: "gmvPerHour", label: METRIC.gmvPerHour, kind: "money", goodWhenUp: true, group: "result" },
@@ -173,11 +174,7 @@ export const SHOPEE_METRICS: ShopeeMetricDef[] = [
   { key: "atcRate", label: METRIC.atcRate, kind: "pct2", goodWhenUp: true, group: "conversion" },
   { key: "atcPerHour", label: "ATC/giờ", kind: "int", goodWhenUp: true, group: "conversion" },
   { key: "gmvPerAtc", label: "GMV/ATC", kind: "money", goodWhenUp: true, group: "conversion" },
-  { key: "checkout", label: METRIC.checkout, kind: "int", goodWhenUp: true, group: "conversion" },
-  { key: "coRate", label: METRIC.coRate, kind: "pct1", goodWhenUp: true, group: "conversion" },
-  { key: "orderPerAtc", label: METRIC.orderPerAtc, kind: "pct1", goodWhenUp: true, group: "conversion" },
-  { key: "coins", label: METRIC.coins, kind: "int", goodWhenUp: null, group: "promo" },
-  { key: "coinsPctGmv", label: "Xu/GMV", kind: "pct2", goodWhenUp: null, group: "promo" }
+  { key: "orderPerAtc", label: METRIC.orderPerAtc, kind: "pct1", goodWhenUp: true, group: "conversion" }
 ];
 
 /** Giá trị một chỉ số; kỳ không có ca ⇒ null. Chỉ số cộng dồn của trường thiếu hẳn (0 ca khai) cũng ⇒ null, không hiện "0". */

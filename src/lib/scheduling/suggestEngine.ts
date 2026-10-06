@@ -17,6 +17,7 @@ import { sessionDurationHours } from "../pnl";
 import { assertOnePlatform } from "../platforms/perf";
 
 import { fmtFixed, fmtVndShort, fmtVndFull } from "../format";
+import { dataSourceTier } from "../dataSource";
 export const BLOCK_HOURS = 2; // khối giờ 2h → 12 khối/ngày
 const MIN_CELL_MINUTES = 30; // ca phủ ô ít hơn chừng này phút thì không tính vào số ca của ô
 // Các hằng số học/xếp nằm ở engineParams.ts (admin vặn được trong AI Training Center).
@@ -176,7 +177,7 @@ export function buildHistory(sessions: LiveSession[], brandId: string, asOf: str
     (s) =>
       (brandId === ALL_BRANDS || s.brandId === brandId) &&
       s.status === "Completed" &&
-      s.dataSource === "tiktok_reconciled" &&
+      dataSourceTier(s) === "reconciled" &&
       s.actualGmv > 0 &&
       sessionDurationHours(s.startTime, s.endTime) > 0
   );
@@ -407,7 +408,7 @@ export function buildBorrowedHistory(
   if (agency.brandGmvPerHour <= 0) return null; // cả agency cũng chưa có gì để mượn
   const k = levelGmvPerHour / agency.brandGmvPerHour;
   const brands = new Set(
-    sessions.filter((s) => s.status === "Completed" && s.dataSource === "tiktok_reconciled" && s.actualGmv > 0).map((s) => s.brandId)
+    sessions.filter((s) => s.status === "Completed" && dataSourceTier(s) === "reconciled" && s.actualGmv > 0).map((s) => s.brandId)
   ).size;
   return {
     ...agency,

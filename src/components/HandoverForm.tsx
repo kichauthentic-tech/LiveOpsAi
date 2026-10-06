@@ -31,8 +31,7 @@ export function HandoverForm({ session: s, onSaved, onCancel }: Props) {
   const [link, setLink] = useState(r?.dashboardLink1 ?? "");
   const [gmv, setGmv] = useState(fmtCount(r?.cumGmv));
   const [views, setViews] = useState(fmtCount(r?.cumViews));
-  const [third, setThird] = useState(fmtCount(third3.key === "atc" ? r?.cumAtc : r?.cumOrders));
-  const [coins, setCoins] = useState(fmtCount(r?.coinSpent));
+  const [third, setThird] = useState(fmtCount(third3?.key === "atc" ? r?.cumAtc : r?.cumOrders));
   const [incidents, setIncidents] = useState(() => incidentsFromReport(r));
   const [prevState, setPrevState] = useState<{ ref: string; prev: PreviousHandover | null } | null>(null);
   const [saving, setSaving] = useState(false);
@@ -58,13 +57,13 @@ export function HandoverForm({ session: s, onSaved, onCancel }: Props) {
   const cumGmv = parseCount(gmv);
   const cumViews = parseCount(views);
   const cumThird = parseCount(third);
-  const share = cumGmv != null ? handoverShare({ cumGmv, cumViews: cumViews ?? 0, cumOrders: third3.key === "orders" ? cumThird : null, cumAtc: third3.key === "atc" ? cumThird : null }, prev) : null;
+  const share = cumGmv != null ? handoverShare({ cumGmv, cumViews: cumViews ?? 0, cumOrders: third3?.key === "orders" ? cumThird : null, cumAtc: third3?.key === "atc" ? cumThird : null }, prev) : null;
 
   const missing: string[] = [];
   if (!parsed) missing.push("link dashboard");
   if (cumGmv == null) missing.push("GMV");
   if (cumViews == null) missing.push("lượt xem");
-  if (third3.required && cumThird == null) missing.push(`số ${third3.label.toLowerCase()}`);
+  if (third3?.required && cumThird == null) missing.push(`số ${third3.label.toLowerCase()}`);
   const canSubmit = missing.length === 0 && !wrongPlatform && !share?.belowPrevious && !saving;
 
   const submit = async (e: FormEvent) => {
@@ -76,9 +75,9 @@ export function HandoverForm({ session: s, onSaved, onCancel }: Props) {
       link,
       cumGmv,
       cumViews,
-      cumOrders: third3.key === "orders" ? cumThird : null,
-      cumAtc: third3.key === "atc" ? cumThird : null,
-      coinSpent: prof.handoverCoins ? parseCount(coins) : null,
+      cumOrders: third3?.key === "orders" ? cumThird : null,
+      cumAtc: third3?.key === "atc" ? cumThird : null,
+      coinSpent: null,
       ...incidentValues(incidents)
     };
     try {
@@ -140,10 +139,9 @@ export function HandoverForm({ session: s, onSaved, onCancel }: Props) {
         <p className={labelCls}>2 · Số đang thấy trên dashboard{prev ? " (số TỔNG từ lúc bật phòng)" : ""}</p>
         {numField("handover-gmv", "GMV", gmv, setGmv, "vd 11.513.359")}
         <div className="grid grid-cols-2 gap-2">
-          {numField("handover-third", third3.label, third, setThird, third3.required ? undefined : "không bắt buộc")}
+          {third3 && numField("handover-third", third3.label, third, setThird, third3.required ? undefined : "không bắt buộc")}
           {numField("handover-views", "Lượt xem", views, setViews)}
         </div>
-        {prof.handoverCoins && numField("handover-coins", "Xu đã tung (nếu có)", coins, setCoins, "không bắt buộc")}
         {prev && share && (
           <div className={`rounded-xl px-3 py-2 text-xs ${share.belowPrevious ? "bg-rose-950/60 text-rose-200 border border-rose-800" : "bg-emerald-950/50 text-emerald-200 border border-emerald-800"}`}>
             {share.belowPrevious ? (
@@ -151,7 +149,7 @@ export function HandoverForm({ session: s, onSaved, onCancel }: Props) {
             ) : (
               <>
                 Ca này = số đang thấy − ca {prev.startTime}–{prev.endTime}:{" "}
-                <b className="font-mono">GMV {fmtVndFull(share.gmv)} · {fmtCount(share.views)} lượt xem{third3.key === "atc" ? (share.atc != null ? ` · ${fmtCount(share.atc)} ATC` : "") : ` · ${fmtCount(share.orders)} đơn`}</b>
+                <b className="font-mono">GMV {fmtVndFull(share.gmv)} · {fmtCount(share.views)} lượt xem{third3?.key === "atc" ? (share.atc != null ? ` · ${fmtCount(share.atc)} ATC` : "") : third3 ? ` · ${fmtCount(share.orders)} đơn` : ""}</b>
               </>
             )}
           </div>

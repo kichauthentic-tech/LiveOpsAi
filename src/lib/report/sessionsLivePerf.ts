@@ -2,6 +2,7 @@ import { LiveSession } from "../../types";
 import type { MonthEndProjection, PlanRunRate } from "../performance/planRunRate";
 import { isCountable, sessionHours } from "../performance/hostPerformance";
 import { CreatorLivePerfMonthSlice, CreatorLivePerfRow } from "../dataraw/creatorLivePerfSlice";
+import { dataSourceTier } from "../dataSource";
 
 // Report Tháng — đổi nguồn số (user chốt 2026-09-21): phần Livestream/Tổng quan đọc từ `live_sessions`
 // đã có số (đối soát / snapshot / nạp bù) thay vì phụ thuộc file Creator-Live-Performance up ở Dữ
@@ -78,9 +79,9 @@ export function pickLivePerfSource(sessions: LiveSession[], brandId: string, sta
       slice: { rows, missingDays: [], hasAnyBatch: true },
       source: "sessions",
       sessionCount: ss.length,
-      reconciled: ss.filter((s) => s.dataSource === "tiktok_reconciled").length,
-      snapshot: ss.filter((s) => s.dataSource === "live_snapshot").length,
-      manual: ss.filter((s) => s.dataSource === "manual").length
+      reconciled: ss.filter((s) => dataSourceTier(s) === "reconciled").length,
+      snapshot: ss.filter((s) => dataSourceTier(s) === "handover").length,
+      manual: ss.filter((s) => dataSourceTier(s) === "manual").length
     };
   }
   if (dataraw?.hasAnyBatch) return { slice: dataraw, source: "dataraw", sessionCount: 0, reconciled: 0, snapshot: 0, manual: 0 };

@@ -54,8 +54,18 @@
     `handlePickChannel`. Vòng chốt tháng nay chỉ đi qua 2 workspace (Agency, brand). Verify: vitest 620/620, lint 0 lỗi, audit:dead 0, build;
     bản dev nối DB thật: 13 màn hai phạm vi không lỗi, Dashboard "Tất cả kênh" có bảng toàn agency (366 ca T10, GMV cộng riêng TikTok 73,5M /
     Shopee 24,6M) + khối TikTok + khối Shopee; Sổ Ca "Tất cả" ghi "TikTok 73,5M · Shopee 24,6M"; Affiliate VERA tự về TikTok.
-  - Bước tiếp: 4 số liệu chuẩn (thang nguồn số đúng cho Shopee, Live List ⇒ ATC/CO/Xu khi đối soát, Finance lãi/lỗ theo kênh) → 5 chạy thật
-    2–4 tuần (không tính năng mới).
+  - **Bước 4 XONG phần code (07/10) — migration `0150` CHƯA CHẠY (chạy trước hay sau deploy đều được).** (a) Thang nguồn số một cho mọi sàn:
+    `lib/dataSource.ts` (`dataSourceTier`: manual < handover < reconciled); 0150 thêm giá trị `handover_typed` = số dashboard GÕ lúc giao ca
+    (Shopee) — trước đó ghi `manual`, nhãn "Tạm tính" chung với số nạp bảng tính; badge "Số Lúc Giao Ca" giải thích theo hồ sơ sàn; phát
+    hành report vẫn coi `handover_typed` là chưa đối soát; thông báo "đối soát lệch ≥5%" nhận bậc này. (b) User chốt: ATC/CO/Xu lấy từ Live
+    List khi đối soát, trợ không gõ ⇒ 0150 cho `apply_live_reconciliation` ghi ATC của phiên (raw.atc, chia theo lượt xem) vào `atc_count`;
+    giao ca / số lúc đổi host Shopee chỉ còn link + GMV + lượt xem (`handoverThird: null`, bỏ ô Xu). **Live List KHÔNG có CO và Xu theo
+    phiên** (Xu chỉ ở file tổng quan tháng) ⇒ bỏ CO, CO/ATC, Xu, Xu/GMV khỏi bộ chỉ số Shopee theo ca (Report Shopee tháng vẫn đọc Xu từ
+    file tổng quan). (c) Finance & P&L: bảng lãi/lỗ theo kênh + dòng "Toàn agency" (tiền cộng được). DB `tiktok_reconciled` giữ tên (đổi
+    tên giá trị phải viết lại ~10 hàm SQL — để sau, màn hình đọc qua `dataSourceTier`). Verify: replay + `supabase/tests/0150_*.sql` 9/9
+    (gồm đối soát Live List ghi ATC 140), bộ giao ca 0144/0145 25/25 với 0150; vitest 620/620, lint 0 lỗi, audit:dead 0; Finance trên bản
+    dev nối DB thật hiện 4 kênh + Toàn agency 23 ca.
+  - Bước tiếp: 5 chạy thật 2–4 tuần (không tính năng mới): giao ca thật, chốt tháng 10 trong app cho ít nhất một kênh mỗi sàn.
 
 - **CHẠY THỬ THẬT trên dữ liệu thật** (từ 2026-09-18; mock đã xoá sạch 19/09). DB: 33 hồ sơ talent thật, CROCS T6–T9 nạp
   bù từ file Creator-Live-Performance (229 ca, còn ca chưa gán host). **Không đề xuất tính năng mới**; hỏi user chạy thử
@@ -518,7 +528,7 @@ target khung camp ở Nhập Ads bỏ 06/10 — tháng không có kế hoạch c
 
 ## 6. Hạ tầng Supabase
 
-- 149 migration (`supabase/migrations/`) — **`0149` (kênh brand × sàn) CHƯA CHẠY;** `0147` (số lúc đổi host, Shopee gõ) ĐÃ CHẠY, **`0148` (TikTok up file lúc đổi host) ĐÃ CHẠY (đo 07/10);** `0145` (giao ca TikTok bằng file) ĐÃ CHẠY 06/10; `0144` (giao ca) ĐÃ CHẠY 06/10; `0143` (chặn trùng người) ĐÃ CHẠY 06/10; **`0139`–`0142` (report / kế hoạch / hợp đồng theo sàn, file Ads Shopee) ĐÃ CHẠY 06/10**;, chạy tay theo thứ tự — **`0138` (đổi người giữa ca) ĐÃ CHẠY 06/10.** `0137` đã chạy 05/10. **`0136` ĐÃ CHẠY 05/10** (verify production: lô đối soát thử với phòng kết thúc đúng phút ca CROCS 30/09 11:01 bắt đầu ⇒ không khớp, phòng chồng 29 phút ⇒ khớp; lô thử đã xoá; trigger profiles nằm trước đoạn đó trong cùng file + chốt tự kiểm cuối file), bộ kiểm
+- 150 migration (`supabase/migrations/`) — **`0149` (kênh brand × sàn) và `0150` (bậc nguồn số giao ca gõ + ATC từ Live List) CHƯA CHẠY;** `0147` (số lúc đổi host, Shopee gõ) ĐÃ CHẠY, **`0148` (TikTok up file lúc đổi host) ĐÃ CHẠY (đo 07/10);** `0145` (giao ca TikTok bằng file) ĐÃ CHẠY 06/10; `0144` (giao ca) ĐÃ CHẠY 06/10; `0143` (chặn trùng người) ĐÃ CHẠY 06/10; **`0139`–`0142` (report / kế hoạch / hợp đồng theo sàn, file Ads Shopee) ĐÃ CHẠY 06/10**;, chạy tay theo thứ tự — **`0138` (đổi người giữa ca) ĐÃ CHẠY 06/10.** `0137` đã chạy 05/10. **`0136` ĐÃ CHẠY 05/10** (verify production: lô đối soát thử với phòng kết thúc đúng phút ca CROCS 30/09 11:01 bắt đầu ⇒ không khớp, phòng chồng 29 phút ⇒ khớp; lô thử đã xoá; trigger profiles nằm trước đoạn đó trong cùng file + chốt tự kiểm cuối file), bộ kiểm
   `supabase/tests/0136_profile_guard_recon_edges_lock_past.sql` (replay, DB trắng): 16 OK, đỏ khi thiếu 0136. **Tới `0132` đều ĐÃ CHẠY** (0131 + 0132 ngày 02/10);
   **`0133` ĐÃ CHẠY 04/10** (verify ở §1); **`0134` ĐÃ CHẠY 05/10** (verify: CRM không còn SĐT mẫu); **`0135` ĐÃ CHẠY 05/10** (verify: 4 brand KAM "Chưa chọn", form sửa cũng "Chưa chọn"). Lô đối soát cũ (06–09/2026, không gắn brand) không áp dụng lại được — đo
   04/10 nó chỉ khớp ca CROCS nên chưa có số nào bị chia nhầm. Replay `0001 → 0133`: sạch, chạy lần 2 không lỗi; bộ kiểm hành vi

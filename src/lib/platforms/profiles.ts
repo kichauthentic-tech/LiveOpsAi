@@ -138,10 +138,9 @@ export interface PlatformProfile {
   // ---- giao ca ----
   /** Cách giao ca: "file" = up file Creator-Live-Performance (TikTok); "link" = dán link dashboard + gõ số (Shopee). */
   handover: "file" | "link";
-  /** Số đếm thứ ba khi gõ số lúc giao ca / đổi host: TikTok = đơn (bắt buộc), Shopee = ATC (không bắt buộc). */
-  handoverThird: { key: "orders" | "atc"; label: string; required: boolean };
-  /** Có ô "Xu đã tung" lúc giao ca. */
-  handoverCoins: boolean;
+  /** Số đếm thứ ba khi GÕ số lúc giao ca / đổi host (ngoài GMV + lượt xem). null = không gõ (Shopee, user chốt 07/10: ATC lấy từ
+   *  Live List khi đối soát). TikTok giao ca bằng file — ô này chỉ dùng nếu sàn gõ tay. */
+  handoverThird: { key: "orders" | "atc"; label: string; required: boolean } | null;
   dashboardLinkExample: string;
   dashboardLinkHint: string;
   /** Số lúc đổi host giữa ca: "file" (TikTok, 0148) hay "link" (Shopee, 0147). */
@@ -198,7 +197,6 @@ export const PLATFORM_PROFILES: Record<ReportPlatform, PlatformProfile> = {
     },
     handover: "file",
     handoverThird: { key: "orders", label: "Đơn", required: true },
-    handoverCoins: false,
     dashboardLinkExample: "https://shop.tiktok.com/workbench/live/overview?room_id=…",
     dashboardLinkHint: 'Ca TikTok: dán link TikTok Shop có "room_id=…".',
     segmentCheckpoint: "file",
@@ -241,8 +239,7 @@ export const PLATFORM_PROFILES: Record<ReportPlatform, PlatformProfile> = {
       inSessionTip: "Trong ca, ops so bằng mắt với dashboard Shopee Creator Center: Viewers thấp → đẩy traffic; ATC thấp → xu/voucher live, deal giờ vàng."
     },
     handover: "link",
-    handoverThird: { key: "atc", label: "ATC", required: false },
-    handoverCoins: true,
+    handoverThird: null,
     dashboardLinkExample: "https://banhang.shopee.vn/creator-center/dashboard/live/…",
     dashboardLinkHint: 'Ca Shopee: dán link Creator Center có "/dashboard/live/<số>".',
     segmentCheckpoint: "link",

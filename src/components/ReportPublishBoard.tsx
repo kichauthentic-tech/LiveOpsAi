@@ -12,6 +12,7 @@ import { type MonthlyReportSnapshot } from "../lib/report/monthlySnapshot";
 import { REPORT_ENGINES, type AnySnapshot } from "../lib/report/reportEngines";
 import { brandMonthKey, type ReportPlatform } from "../lib/reportPlatform";
 import { PageIntro } from "./common/PageIntro";
+import { dataSourceTier } from "../lib/dataSource";
 
 // Bảng điều phối phát hành report (còn lại của Đợt C, Audit Role × Workspace — xem
 // docs/WORKSPACE_HISTORY.md) — ops coi trạng thái phát hành Report Tháng của TẤT CẢ brand × nhiều tháng
@@ -94,7 +95,7 @@ export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ platform
         s.date >= start &&
         s.date <= end &&
         s.status === "Completed" &&
-        (s.dataSource ?? "manual") !== "tiktok_reconciled"
+        dataSourceTier(s) !== "reconciled"
     ).length;
   };
 

@@ -24,6 +24,8 @@ import { isUnconfirmedPast } from "../lib/sessionStatus";
 import { fmtMonth, fmtFixed } from "../lib/format";
 import { MonthPicker } from "./common/MonthPicker";
 import { PageHeader } from "./common/PageHeader";
+import { PlatformChip } from "./common/PlatformChip";
+import { platformOf, REPORT_PLATFORMS, type ReportPlatform } from "../lib/reportPlatform";
 interface FinanceHrProps {
   sessions: LiveSession[];
   talents: Talent[];
@@ -129,6 +131,23 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
       ),
     [rows]
   );
+  // Lãi/lỗ THEO KÊNH (Bước 4 đa sàn, 07/10): tiền của agency cộng được qua mọi kênh (user chốt) — một bảng toàn agency, mỗi dòng
+  // một kênh brand × sàn. Không có cột GMV: GMV hai sàn không cộng.
+  const byChannel = useMemo(() => {
+    const m = new Map<string, { brandName: string; platform: ReportPlatform; n: number; rev: number; pay: number; profit: number }>();
+    for (const r of rows) {
+      const p = platformOf(r.session);
+      const k = `${r.session.brandId}|${p}`;
+      const e = m.get(k) ?? { brandName: r.session.brandName, platform: p, n: 0, rev: 0, pay: 0, profit: 0 };
+      e.n += 1;
+      e.rev += r.grossAgencyRev;
+      e.pay += r.hostPayout + r.coHostPayout;
+      e.profit += r.netProfit;
+      m.set(k, e);
+    }
+    return [...m.values()].sort((a, b) => REPORT_PLATFORMS.indexOf(a.platform) - REPORT_PLATFORMS.indexOf(b.platform) || a.brandName.localeCompare(b.brandName));
+  }, [rows]);
+
   const totalMargin = totals.grossAgencyRev > 0 ? fmtFixed(((totals.netProfit / totals.grossAgencyRev) * 100), 1) : "0";
 
   // Đ3: phiên nào đang được tính bằng rate = 0 / % mặc định. Số 0 vì "chưa nhập rate" và số 0 vì
@@ -243,9 +262,46 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
         {rows.length > 0 && quality.reconciled < quality.total && (
           <div className="text-[11px] rounded-xl px-3 py-2 border border-amber-800/60 bg-amber-950/40 text-amber-200">
             Nguồn GMV của {quality.total} phiên: <b>{quality.reconciled}</b> đã đối soát
-            {quality.snapshot > 0 && <>, <b>{quality.snapshot}</b> số lúc giao ca (TikTok còn cập nhật hoàn/huỷ)</>}
+            {quality.snapshot > 0 && <>, <b>{quality.snapshot}</b> số lúc giao ca (sàn còn cập nhật đơn/hoàn/huỷ sau đó)</>}
             {quality.manual > 0 && <>, <b>{quality.manual}</b> talent tự khai (chưa có gì bảo chứng)</>}.
             Số tiền của các phiên chưa đối soát là tạm tính — duyệt sau khi đối soát ở "Vận Hành Live → Đối Soát Số Liệu".
+          </div>
+        )}
+
+        {byChannel.length > 1 && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-left text-[11px] uppercase tracking-wider text-[var(--text-faint)] border-b border-[var(--border)]">
+                  <th className="py-2 pr-3">Kênh</th>
+                  <th className="py-2 pr-3 text-right">Ca</th>
+                  <th className="py-2 pr-3 text-right">Doanh thu agency</th>
+                  <th className="py-2 pr-3 text-right">Trả host / trợ live</th>
+                  <th className="py-2 pr-3 text-right">Lãi/lỗ</th>
+                  <th className="py-2 pr-3 text-right">Biên</th>
+                </tr>
+              </thead>
+              <tbody>
+                {byChannel.map((c) => (
+                  <tr key={`${c.brandName}|${c.platform}`} className="border-b border-[var(--border-muted)]">
+                    <td className="py-2 pr-3 font-bold text-[var(--text)] whitespace-nowrap">{c.brandName} <PlatformChip platform={c.platform} /></td>
+                    <td className="py-2 pr-3 text-right font-mono">{c.n}</td>
+                    <td className="py-2 pr-3 text-right font-mono">{money(c.rev)}</td>
+                    <td className="py-2 pr-3 text-right font-mono">{money(c.pay)}</td>
+                    <td className={`py-2 pr-3 text-right font-mono font-bold ${c.profit >= 0 ? "text-emerald-400" : "text-red-400"}`}>{money(c.profit)}</td>
+                    <td className="py-2 pr-3 text-right font-mono">{c.rev > 0 ? `${fmtFixed((c.profit / c.rev) * 100, 1)}%` : "—"}</td>
+                  </tr>
+                ))}
+                <tr className="bg-[var(--surface-elevated)]/40 font-bold">
+                  <td className="py-2 pr-3 text-[var(--text)]">Toàn agency</td>
+                  <td className="py-2 pr-3 text-right font-mono">{rows.length}</td>
+                  <td className="py-2 pr-3 text-right font-mono">{money(totals.grossAgencyRev)}</td>
+                  <td className="py-2 pr-3 text-right font-mono">{money(totals.hostPayout)}</td>
+                  <td className={`py-2 pr-3 text-right font-mono ${totals.netProfit >= 0 ? "text-emerald-400" : "text-red-400"}`}>{money(totals.netProfit)}</td>
+                  <td className="py-2 pr-3 text-right font-mono">{totalMargin}%</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         )}
 

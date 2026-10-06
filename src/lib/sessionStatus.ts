@@ -1,4 +1,5 @@
 import { LiveSession } from "../types";
+import { dataSourceTier } from "./dataSource";
 
 // Trạng thái HIỂN THỊ của ca theo giờ thật (audit N1, 0096). DB chỉ ghi 'Completed' khi có số liệu
 // hoặc job quét chạy; giữa hai lần đó client tự suy để Bảng Vận Hành / Ca Của Tôi / Sổ Ca không
@@ -47,7 +48,7 @@ export function withEffectiveStatus(sessions: LiveSession[], nowMs: number): Liv
  * ngày/giờ của ca này (ranh giới snapshot + đối soát tính theo giờ ca), form Sửa ca khoá sẵn ô ngày/giờ.
  */
 export function hasSessionData(s: Pick<LiveSession, "dataSource" | "actualGmv" | "totalViews">): boolean {
-  return (s.dataSource ?? "manual") !== "manual" || (s.actualGmv ?? 0) > 0 || (s.totalViews ?? 0) > 0;
+  return dataSourceTier(s) !== "manual" || (s.actualGmv ?? 0) > 0 || (s.totalViews ?? 0) > 0;
 }
 
 /**
