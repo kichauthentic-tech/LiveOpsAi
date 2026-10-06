@@ -231,7 +231,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
           <div className="text-[11px] rounded-xl px-3 py-2 border border-amber-800/60 bg-amber-950/40 text-amber-200 space-y-1">
             <p>
               <b>{unconfirmed.length} ca đã qua giờ nhưng chưa có bằng chứng diễn ra</b> (không số, không report, không giờ live) — CHƯA tính
-              lương/doanh thu. Ca có chạy: up file hoặc nhập report ở Cửa sổ Ca Live. Ca không diễn ra: huỷ ca để khỏi tính vào giờ cam kết.
+              lương/doanh thu. Ca có chạy: giao ca ở Cửa sổ Ca Live. Ca không diễn ra: huỷ ca để khỏi tính vào giờ cam kết.
             </p>
             <p className="text-amber-300/90">
               {unconfirmed.slice(0, 8).map((s) => `${s.brandName} ${s.date.slice(8)}/${s.date.slice(5, 7)} ${s.startTime} (${s.hostName || "chưa gán"})`).join(" · ")}

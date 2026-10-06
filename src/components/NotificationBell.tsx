@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Bell, Check, CalendarPlus, CalendarClock, Hand, UserMinus, Clock, XCircle, Scale } from "lucide-react";
+import { Bell, Check, CalendarPlus, CalendarClock, ClipboardCheck, Hand, UserMinus, Clock, XCircle, Scale } from "lucide-react";
 import { AppNotification, AppNotificationKind } from "../types";
 
 interface Props {
@@ -17,7 +17,8 @@ const ICON: Record<AppNotificationKind, React.ComponentType<{ className?: string
   shift_cancelled: XCircle,
   report_reconciled: Scale,
   shift_open: CalendarClock,
-  shift_dropout_request: Hand
+  shift_dropout_request: Hand,
+  handover_due: ClipboardCheck
 };
 
 const TONE: Record<AppNotificationKind, string> = {
@@ -27,7 +28,8 @@ const TONE: Record<AppNotificationKind, string> = {
   shift_cancelled: "text-red-400",
   report_reconciled: "text-violet-400",
   shift_open: "text-sky-400",
-  shift_dropout_request: "text-amber-400"
+  shift_dropout_request: "text-amber-400",
+  handover_due: "text-rose-400"
 };
 
 // "5 phút trước" / "2 giờ trước" / "18/09" — chuông cần cảm giác mới/cũ hơn là dấu thời gian đủ.

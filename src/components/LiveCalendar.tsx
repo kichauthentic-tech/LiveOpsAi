@@ -19,7 +19,6 @@ import {
 import { SlotDetailModal } from "./scheduling/SlotDetailModal";
 import { OpenSlotModal } from "./scheduling/OpenSlotModal";
 import { SessionWindow } from "./SessionWindow";
-import { SessionReportInput } from "../lib/db/sessionReports";
 import { Calendar as CalendarIcon, Building2, User, Plus, AlertTriangle, CheckCircle2, Search, X, ChevronLeft, ChevronRight, Tag, GripVertical } from "lucide-react";
 
 import { fmtDateVn, fmtVndShort } from "../lib/format";
@@ -47,7 +46,7 @@ interface LiveCalendarProps {
   currentRole?: UserRole;
   schemes?: PromoScheme[];
   // Cửa sổ Ca Live (2026-09-21): click ca → cùng một cửa sổ với Sổ Ca / Đăng Ký & Chốt Lịch.
-  onSubmitSessionReport?: (sessionId: string, input: SessionReportInput) => Promise<boolean>;
+  onSessionsUpdated?: (sessions: LiveSession[]) => void;
   onSessionSnapshotApplied?: (session: LiveSession) => void;
   onDeleteSession?: (id: string) => Promise<void>;
   onCancelSession?: (id: string, reason: string, reopenSlot: boolean) => Promise<boolean>;
@@ -87,7 +86,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   currentUserId,
   currentRole,
   schemes = [],
-  onSubmitSessionReport,
+  onSessionsUpdated,
   onSessionSnapshotApplied,
   onDeleteSession,
   onCancelSession,
@@ -1344,7 +1343,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
           talents={talents}
           shiftSlots={shiftSlots}
           onClose={() => setSelectedSessionDetail(null)}
-          onSubmitSessionReport={onSubmitSessionReport}
+          onSessionsUpdated={onSessionsUpdated}
           onSessionSnapshotApplied={onSessionSnapshotApplied}
           onUpdateSession={onUpdateSession}
           onDeleteSession={onDeleteSession}

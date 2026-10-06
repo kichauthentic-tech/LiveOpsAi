@@ -7,7 +7,6 @@ import { describe, expect, test, vi } from "vitest";
 vi.mock("../src/lib/supabaseClient", () => ({ supabase: {} }));
 
 const { findPersonClashes, clashedSessionIds } = await import("../src/lib/scheduling/conflicts");
-const { missingSteps } = await import("../src/lib/sessionLedger");
 const { buildTodos } = await import("../src/lib/todoList");
 import type { Brand, LiveSession } from "../src/types";
 
@@ -78,14 +77,6 @@ describe("findPersonClashes", () => {
     const m = clashedSessionIds(findPersonClashes(list));
     expect([...m.keys()].sort()).toEqual(["a", "b", "c", "d"]);
     expect(m.get("a")).toEqual(["Bùi Sỹ Hùng"]);
-  });
-});
-
-describe("ca Shopee không có bước up file TikTok", () => {
-  test("missingSteps: Shopee chỉ thiếu report + đối soát", () => {
-    const done = { status: "Completed" as const, dataSource: "manual" as const, date: "2026-10-05" };
-    expect(missingSteps(ca("t", done), "2026-10-06")).toEqual(["snapshot", "report", "reconcile"]);
-    expect(missingSteps(ca("s", { ...done, platform: "Shopee" }), "2026-10-06")).toEqual(["report", "reconcile"]);
   });
 });
 

@@ -35,7 +35,7 @@ const fmtDay = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
 const fmtInt = (n: number) => Math.round(n).toLocaleString("vi-VN");
 const fmtH = (n: number) => `${n.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h`;
 const fmtPct = (x: number | null, d = 0) => (x === null ? "—" : `${(x * 100).toLocaleString("vi-VN", { maximumFractionDigits: d })}%`);
-const MISSING_LABEL: Record<MissingStep, string> = { snapshot: "chưa up file", report: "chưa report", reconcile: "chưa đối soát" };
+const MISSING_LABEL: Record<MissingStep, string> = { report: "chưa giao ca", reconcile: "chưa đối soát" };
 
 // Hoisted ra module scope (react-hooks/static-components, audit 2026-09-24) — định nghĩa lại bên
 // trong BrandWeeklyReport thì mỗi render tạo ra một component KHÁC (identity mới), React coi như

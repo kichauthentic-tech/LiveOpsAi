@@ -179,7 +179,7 @@ export function buildTodos(input: TodoInput): Todo[] {
   // 9. Ca đã qua giờ mà chưa có bằng chứng diễn ra.
   const unconfirmed = sessions.filter(isUnconfirmedPast);
   if (unconfirmed.length > 0) {
-    out.push({ id: "unconfirmed", level: "high", title: `${unconfirmed.length} ca đã qua giờ chưa có số, chưa có report`, detail: "Up số/nhập report nếu ca có diễn ra, huỷ ca nếu không.", tab: "sessions", action: "Mở Sổ Ca" });
+    out.push({ id: "unconfirmed", level: "high", title: `${unconfirmed.length} ca đã qua giờ chưa giao ca`, detail: "Ca có diễn ra: mở ca → Giao ca (trợ live giao, ca không trợ thì OPS). Không diễn ra: huỷ ca.", tab: "sessions", action: "Mở Sổ Ca" });
   }
 
   // 9b. Trùng người từ hôm nay (user chốt 06/10: một người chỉ đứng MỘT ca tại một thời điểm). Lịch nạp hàng loạt

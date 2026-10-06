@@ -34,6 +34,8 @@ export async function fetchMyNotifications(limit = 50): Promise<AppNotification[
   const { data, error } = await supabase
     .from("notifications")
     .select("id, kind, title, body, session_id, brand_id, read_at, created_at")
+    // Lời nhắc giao ca (0144) được tạo sẵn với created_at = lúc đến hạn — chưa tới giờ thì chưa hiện.
+    .lte("created_at", new Date().toISOString())
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) throw error;

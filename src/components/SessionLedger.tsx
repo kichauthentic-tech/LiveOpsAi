@@ -6,11 +6,10 @@ import { Brand, LiveSession, ShiftSlot, Studio, Talent, UserRole, AuditLogEntry 
 import { getTodayDate } from "../lib/dateUtils";
 import { fmtVndShort } from "../lib/format";
 import { sessionHours } from "../lib/performance/hostPerformance";
-import { SessionReportInput } from "../lib/db/sessionReports";
 import { downloadRowsAsXlsx } from "../lib/exportXlsx";
 import { useToast } from "../hooks/useToast";
 import { errorMessage } from "../lib/errorMessage";
-import { LedgerFilter, MissingStep, brandTrustLabel, filterLedger, groupByDate, hasReport, hasSnapshot, isReconciled, needsSnapshotFile, needsClosing, metricsHiddenFor, ledgerHosts, ledgerMonths, linkedSessions, missingSteps, sessionIncidents, summarize } from "../lib/sessionLedger";
+import { LedgerFilter, MissingStep, brandTrustLabel, filterLedger, groupByDate, hasReport, isReconciled, needsClosing, metricsHiddenFor, ledgerHosts, ledgerMonths, linkedSessions, missingSteps, sessionIncidents, summarize } from "../lib/sessionLedger";
 
 import { BrandLogo } from "./ui/BrandLogo";
 import { PlatformChip } from "./common/PlatformChip";
@@ -36,7 +35,7 @@ interface SessionLedgerProps {
   studios?: Studio[];
   talents?: Talent[];
   shiftSlots?: ShiftSlot[]; // chỉ để Cửa sổ ca cảnh báo trùng phòng với ca chờ đăng ký
-  onSubmitSessionReport: (sessionId: string, input: SessionReportInput) => Promise<boolean>;
+  onSessionsUpdated: (sessions: LiveSession[]) => void;
   onSessionSnapshotApplied: (session: LiveSession) => void;
   onUpdateSession?: (session: LiveSession) => Promise<boolean>;
   onDeleteSession?: (id: string) => Promise<void>;
@@ -59,8 +58,7 @@ const STATUS_CLS = SESSION_STATUS_CLS;
 const SUB_COL = "hidden sm:table-cell py-2.5 px-2";
 
 const MISSING_LABEL: Record<MissingStep, string> = {
-  snapshot: "Chưa up snapshot",
-  report: "Chưa có report",
+  report: "Chưa giao ca",
   reconcile: "Chưa đối soát"
 };
 
@@ -116,7 +114,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
   studios,
   talents,
   shiftSlots = [],
-  onSubmitSessionReport,
+  onSessionsUpdated,
   onSessionSnapshotApplied,
   onUpdateSession,
   onDeleteSession,
@@ -152,7 +150,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
   const rows = useMemo(() => filterLedger(scoped, filter, today), [scoped, filter, today]);
   const days = useMemo(() => groupByDate(rows), [rows]);
   const summary = useMemo(() => summarize(rows, today), [rows, today]);
-  const noMissing = (["snapshot", "report", "reconcile"] as MissingStep[]).every((m) => summary.missing[m] === 0);
+  const noMissing = (["report", "reconcile"] as MissingStep[]).every((m) => summary.missing[m] === 0);
   // M4, cùng luật với M3 (Dashboard agency): cột không ca nào có số thì không dành chỗ cho nó. Target GMV
   // của ca chỉ có khi đã chốt Kế Hoạch Tháng — chưa chốt thì cả cột là "—" (đo 29/09: 47/47 dòng).
   const showTargetCol = !isBrandView && rows.some((s) => !!s.targetGmv);
@@ -222,8 +220,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
         : !needsClosing(s, today)
           ? "Chưa cần đóng"
           : [
-              ...(needsSnapshotFile(s) ? [hasSnapshot(s) ? "Snapshot ✓" : "Snapshot ✗"] : []),
-              hasReport(s) ? "Report ✓" : "Report ✗",
+              hasReport(s) ? "Giao ca ✓" : "Giao ca ✗",
               isReconciled(s) ? "Đối soát ✓" : "Đối soát ✗"
             ].join(", ");
       row["Sự cố"] = incidents.map((i) => i.label).join(", ");
@@ -246,7 +243,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
             <PageIntro>
               {isBrandView
                 ? "Từng ca live đã chạy cho brand: giờ live thật, GMV, đơn, lượt xem. Số “Tạm tính” còn chờ TikTok cập nhật, “Đã chốt” là số đối soát cuối kỳ."
-                : "Từng ca đã/đang chạy: số thật của ca, số đó tin được tới đâu, và còn thiếu bước nào (snapshot → report → đối soát) để chốt tháng."}
+                : "Từng ca đã/đang chạy: số thật của ca, số đó tin được tới đâu, và còn thiếu bước nào (giao ca → đối soát) để chốt tháng."}
             </PageIntro>
             {hiddenCount > 0 && (
               <p className="text-[11px] text-amber-300 mt-1.5 max-w-2xl">
@@ -310,13 +307,13 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
             hơn 3 nút xám mà người đọc phải quét từng cái mới biết là (0). */}
         {!isBrandView && noMissing && (
           <p className="text-[11px] text-[var(--text-faint)]">
-            Không còn ca nào thiếu snapshot, report hay đối soát trong phạm vi đang lọc (ca nhập từ file, ca chưa diễn ra và ca huỷ không cần).
+            Không còn ca nào chưa giao ca hay chưa đối soát trong phạm vi đang lọc (ca nhập từ file, ca chưa diễn ra và ca huỷ không cần).
           </p>
         )}
         {!isBrandView && !noMissing && (
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-[11px] text-[var(--text-faint)] mr-1">Còn thiếu:</span>
-            {(["snapshot", "report", "reconcile"] as MissingStep[]).map((m) => {
+            {(["report", "reconcile"] as MissingStep[]).map((m) => {
               const active = filter.missing === m;
               return (
                 <button
@@ -568,7 +565,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
           talents={isBrandView ? undefined : talents}
           shiftSlots={shiftSlots}
           onClose={() => setOpenId(null)}
-          onSubmitSessionReport={onSubmitSessionReport}
+          onSessionsUpdated={onSessionsUpdated}
           onSessionSnapshotApplied={onSessionSnapshotApplied}
           onUpdateSession={isBrandView ? undefined : onUpdateSession}
           onDeleteSession={onDeleteSession}
@@ -614,18 +611,17 @@ const TrustBadge: React.FC<{ session: LiveSession }> = ({ session }) => {
   );
 };
 
-// 3 ô tiến trình dữ liệu: snapshot → report → đối soát. Ca không cần chốt (sắp tới/huỷ/nạp bù) KHÔNG vẽ 3 ô
+// Ô tiến trình dữ liệu: giao ca → đối soát (file lúc giao ca không còn bắt buộc từ 06/10). Ca không cần chốt (sắp tới/huỷ/nạp bù) KHÔNG vẽ 3 ô
 // mờ nữa mà nói thẳng lý do (audit người mới 2026-10-04: 229 ca nạp bù đều hiện "Snapshot ✓ · Report ○ · Đối soát
 // ✓" cạnh câu "không còn ca nào thiếu report" — người mới đọc là mâu thuẫn).
 const PipelineDots: React.FC<{ session: LiveSession; today: string }> = ({ session, today }) => {
   const relevant = needsClosing(session, today);
   if (!relevant) {
-    const why = session.status === "Cancelled" ? "Đã huỷ — không cần số" : session.isBackfill ? "Nhập từ file — không cần snapshot/report" : "Chưa diễn ra";
+    const why = session.status === "Cancelled" ? "Đã huỷ — không cần số" : session.isBackfill ? "Nhập từ file — không cần giao ca" : "Chưa diễn ra";
     return <span className="text-[11px] text-[var(--text-faint)] whitespace-nowrap">{why}</span>;
   }
   const steps: { label: string; done: boolean }[] = [
-    ...(needsSnapshotFile(session) ? [{ label: "Snapshot", done: hasSnapshot(session) }] : []),
-    { label: "Report", done: hasReport(session) },
+    { label: "Giao ca", done: hasReport(session) },
     { label: "Đối soát", done: isReconciled(session) }
   ];
   return (

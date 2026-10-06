@@ -2,7 +2,6 @@ import React, { useMemo, useState } from "react";
 import { inPlatformScope, type PlatformScope } from "../../lib/reportPlatform";
 import { Brand, LiveSession, PromoScheme, ShiftSlot, ShiftRegistration, Studio, Talent, UserRole, BrandStudio, AuditLogEntry } from "../../types";
 import { SessionWindow } from "../SessionWindow";
-import { SessionReportInput } from "../../lib/db/sessionReports";
 import { CalendarIcon, ChevronLeft, ChevronRight, Plus, Tag } from "lucide-react";
 import { fmtDateVn, fmtMonth, fmtVndShort } from "../../lib/format";
 import { schemesForDate } from "../../lib/schemeUtils";
@@ -52,7 +51,7 @@ interface BrandCalendarProps {
   onFinalizeSlot?: (slot: ShiftSlot, hostId: string, coHostId: string | null) => Promise<boolean>;
   // Cửa sổ Ca Live (2026-09-21): click ca đã có → cùng cửa sổ với agency; brand chỉ đọc.
   currentRole?: UserRole;
-  onSubmitSessionReport?: (sessionId: string, input: SessionReportInput) => Promise<boolean>;
+  onSessionsUpdated?: (sessions: LiveSession[]) => void;
   onSessionSnapshotApplied?: (session: LiveSession) => void;
   onDeleteSession?: (id: string) => Promise<void>;
   onCancelSession?: (id: string, reason: string, reopenSlot: boolean) => Promise<boolean>;
@@ -115,7 +114,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
   onUnregisterSlot,
   onFinalizeSlot,
   currentRole,
-  onSubmitSessionReport,
+  onSessionsUpdated,
   onSessionSnapshotApplied,
   onDeleteSession,
   onCancelSession,
@@ -596,7 +595,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
           talents={canManage ? talents : undefined}
           shiftSlots={shiftSlots}
           onClose={() => setOpenSessionId(null)}
-          onSubmitSessionReport={onSubmitSessionReport}
+          onSessionsUpdated={onSessionsUpdated}
           onSessionSnapshotApplied={onSessionSnapshotApplied}
           onUpdateSession={canManage ? onUpdateSession : undefined}
           onDeleteSession={canManage ? onDeleteSession : undefined}

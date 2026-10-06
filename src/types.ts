@@ -270,6 +270,15 @@ export interface LiveSessionReport {
   gpm?: number;
   checkoutCount?: number; // "CO"
   coinSpent?: number; // Xu đã tung
+  // Giao ca (0144): link dashboard (dashboardLink1) ⇒ mã phòng TikTok / mã phiên Shopee; số CỘNG DỒN đang thấy trên dashboard
+  // lúc hết ca. Số của ca (đã trừ ca trước cùng phòng) nằm ở actualGmv/totalViews/totalOrders của ca, ATC Shopee ở atcCount.
+  liveRef?: string;
+  cumGmv?: number;
+  cumOrders?: number;
+  cumViews?: number;
+  cumAtc?: number;
+  handoverAt?: string;
+  handoverPrevSessionId?: string;
   submittedByTalentId?: string;
   submittedByRole?: UserRole;
   submittedAt?: string;
@@ -617,7 +626,8 @@ export type AppNotificationKind =
   | "shift_cancelled"
   | "report_reconciled"
   | "shift_open"              // 0116/Đ9 — có ca đang mở chờ đăng ký (ca phát sinh, hoặc tổng cả tháng)
-  | "shift_dropout_request";  // 0116/Đ7 — talent báo không đi được ca đã chốt; gửi cho OPS
+  | "shift_dropout_request"   // 0116/Đ7 — talent báo không đi được ca đã chốt; gửi cho OPS
+  | "handover_due";           // 0144 — hết ca 15 phút chưa giao ca (gửi trợ live, ca không trợ thì OPS)
 
 export interface AppNotification {
   id: string;

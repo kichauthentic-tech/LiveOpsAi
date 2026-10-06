@@ -118,6 +118,13 @@ interface DbSessionReport {
   gpm: number | null;
   checkout_count: number | null;
   coin_spent: number | null;
+  live_ref?: string | null;
+  cum_gmv?: number | null;
+  cum_orders?: number | null;
+  cum_views?: number | null;
+  cum_atc?: number | null;
+  handover_at?: string | null;
+  handover_prev_session_id?: string | null;
   submitted_by_talent_id: string | null;
   submitted_by_role: UserRole | null;
   submitted_at: string | null;
@@ -151,6 +158,13 @@ function reportFromDb(row: DbSessionReport): LiveSessionReport {
     gpm: row.gpm ?? undefined,
     checkoutCount: row.checkout_count ?? undefined,
     coinSpent: row.coin_spent ?? undefined,
+    liveRef: row.live_ref ?? undefined,
+    cumGmv: row.cum_gmv ?? undefined,
+    cumOrders: row.cum_orders ?? undefined,
+    cumViews: row.cum_views ?? undefined,
+    cumAtc: row.cum_atc ?? undefined,
+    handoverAt: row.handover_at ?? undefined,
+    handoverPrevSessionId: row.handover_prev_session_id ?? undefined,
     submittedByTalentId: row.submitted_by_talent_id ?? undefined,
     submittedByRole: row.submitted_by_role ?? undefined,
     submittedAt: row.submitted_at ?? undefined
@@ -414,7 +428,7 @@ export async function updateSession(session: LiveSession): Promise<LiveSession> 
   return assembleSessions([row], reports, segments)[0];
 }
 
-// Dùng sau khi gọi RPC submit_live_session_report (src/lib/db/sessionReports.ts) — RPC đó chỉ
+// Dùng sau khi gọi RPC submit_session_handover (src/lib/db/handovers.ts) — RPC đó chỉ
 // trả về row live_sessions thô, cần assemble lại đầy đủ (kèm .report) trước khi cập nhật state.
 export async function fetchSessionById(id: string): Promise<LiveSession> {
   let { data, error } = await supabase.from(READ_VIEW).select("*").eq("id", id).single();

@@ -5,10 +5,10 @@ import { Brand, LiveSession, ShiftRegistration, ShiftSlot, Studio, Talent, UserR
 import { getTodayDate } from "../lib/dateUtils";
 import { fmtFixed, fmtVndShort } from "../lib/format";
 import { sessionHours } from "../lib/performance/hostPerformance";
-import { SessionReportInput } from "../lib/db/sessionReports";
 import { MissingStep, missingSteps } from "../lib/sessionLedger";
 import { BrandLogo } from "./ui/BrandLogo";
 import { PlatformChip } from "./common/PlatformChip";
+import { isHandoverPerson } from "../lib/handover";
 import { clashedSessionIds, findPersonClashes } from "../lib/scheduling/conflicts";
 import { SessionWindow } from "./SessionWindow";
 import { PageIntro } from "./common/PageIntro";
@@ -31,7 +31,7 @@ export interface OpsBoardProps {
   talents: Talent[];
   currentRole: UserRole;
   myTalentId?: string;
-  onSubmitSessionReport: (sessionId: string, input: SessionReportInput) => Promise<boolean>;
+  onSessionsUpdated: (sessions: LiveSession[]) => void;
   onSessionSnapshotApplied: (session: LiveSession) => void;
   onUpdateSession?: (session: LiveSession) => Promise<boolean>;
   onDeleteSession?: (id: string) => Promise<void>;
@@ -49,7 +49,7 @@ export interface OpsBoardProps {
 type Range = "today" | "tomorrow" | "week" | "day";
 
 const WEEKDAY = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
-const MISSING_LABEL: Record<MissingStep, string> = { snapshot: "chưa up file", report: "chưa report", reconcile: "chưa đối soát" };
+const MISSING_LABEL: Record<MissingStep, string> = { report: "chưa giao ca", reconcile: "chưa đối soát" };
 const STATUS_LABEL = SESSION_STATUS_LABEL_VI;
 const STATUS_CLS = SESSION_STATUS_CLS;
 
@@ -83,7 +83,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
   talents,
   currentRole,
   myTalentId,
-  onSubmitSessionReport,
+  onSessionsUpdated,
   onSessionSnapshotApplied,
   onUpdateSession,
   onDeleteSession,
@@ -141,10 +141,11 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
     return out.sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
   }, [mode, sessions, shiftSlots, from, to, regsBySlot]);
 
-  // Talent: ca của tôi cần nộp (đã qua, thiếu file/report) + sắp tới 14 ngày.
+  // Talent: ca mình phải giao mà chưa giao + sắp tới 14 ngày.
   const mineDue = useMemo(
-    () => (mode === "mine" ? sessions.filter((s) => mine(s) && s.date <= today && missingSteps(s, today).some((m) => m !== "reconcile")).sort((a, b) => b.date.localeCompare(a.date) || b.startTime.localeCompare(a.startTime)) : []),
-    [mode, sessions, mine, today]
+    // Chỉ ca MÌNH phải giao (mình là trợ live — 0144, user chốt 06/10: host không giao, ca không trợ thì OPS giao).
+    () => (mode === "mine" ? sessions.filter((s) => isHandoverPerson(s, myTalentId) && s.date <= today && missingSteps(s, today).includes("report")).sort((a, b) => b.date.localeCompare(a.date) || b.startTime.localeCompare(a.startTime)) : []),
+    [mode, sessions, myTalentId, today]
   );
   const mineUpcoming = useMemo(
     () => (mode === "mine" ? sessions.filter((s) => mine(s) && s.date >= today && s.date <= addDays(today, 14) && s.status !== "Cancelled" && !mineDue.includes(s)).sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(a.startTime)) : []),
@@ -247,7 +248,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
             {mode === "mine" ? "Ca Của Tôi" : "Bảng Vận Hành"}
           </h2>
           <PageIntro>
-            {mode === "mine" ? "Ca bạn trực: nộp file số liệu + report ngay khi hết ca. Bấm vào ca để mở." : "Hôm nay có ca nào, ai trực, còn thiếu gì. Bấm vào ca để mở cửa sổ ca."}
+            {mode === "mine" ? "Ca bạn trực. Hết ca: bấm vào ca → Giao ca (dán link dashboard, gõ 3 số đang thấy, chọn sự cố)." : "Hôm nay có ca nào, ai trực, còn thiếu gì. Bấm vào ca để mở cửa sổ ca."}
           </PageIntro>
         </div>
         {mode === "ops" && (
@@ -277,7 +278,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <Stat label={range === "week" ? "Ca trong tuần" : "Ca trong ngày"} value={String(summary.total)} />
               <Stat label="Chưa có người" value={String(summary.noHost)} tone={summary.noHost > 0 ? "warn" : "ok"} />
-              <Stat label="Chưa nộp số liệu" value={String(summary.pending)} tone={summary.pending > 0 ? "warn" : "ok"} />
+              <Stat label="Chưa giao ca" value={String(summary.pending)} tone={summary.pending > 0 ? "warn" : "ok"} />
               <Stat label="GMV đã ghi nhận" value={summary.gmv > 0 ? fmtVndShort(summary.gmv) : "—"} />
             </div>
           )}
@@ -337,13 +338,13 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
           )}
           <section className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 sm:p-4 space-y-2">
             <h3 className="text-sm font-black text-[var(--text)] flex items-center gap-2">
-              Cần nộp số liệu
+              Cần giao ca
               {mineDue.length > 0 && <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-800">{mineDue.length}</span>}
             </h3>
             {mineDue.length === 0 ? (
               // "Không còn ca nào" khẳng định là đã làm xong — sai với người chưa từng có ca nào.
               <p className="text-xs text-[var(--text-faint)] italic">
-                {mineDone.length === 0 ? "Bạn chưa có ca nào trong hệ thống." : "Không còn ca nào thiếu file/report."}
+                {mineDone.length === 0 ? "Bạn chưa có ca nào trong hệ thống." : "Không còn ca nào bạn phải giao."}
               </p>
             ) : (
               mineDue.map((s) => <SessionRow key={s.id} s={s} />)
@@ -399,7 +400,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
           talents={mode === "ops" ? talents : undefined}
           shiftSlots={shiftSlots}
           onClose={() => setOpenId(null)}
-          onSubmitSessionReport={onSubmitSessionReport}
+          onSessionsUpdated={onSessionsUpdated}
           onSessionSnapshotApplied={onSessionSnapshotApplied}
           onUpdateSession={mode === "ops" ? onUpdateSession : undefined}
           onDeleteSession={mode === "ops" ? onDeleteSession : undefined}

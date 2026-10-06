@@ -39,7 +39,7 @@ export const DataSourceBadge: React.FC<DataSourceBadgeProps> = ({ dataSource, pl
   return (
     <span
       className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border bg-amber-950 text-amber-300 border-amber-800 ${className}`}
-      title={`Số liệu do talent nhập tay (hoặc nạp từ bảng tính vận hành), chờ đối soát với báo cáo chính thức từ ${shop}`}
+      title={`Số lúc giao ca (trợ live gõ từ dashboard khi hết ca, thường thấp hơn số chốt vì đơn còn về sau) hoặc nạp từ bảng tính vận hành — chờ đối soát với báo cáo chính thức từ ${shop}`}
     >
       <Clock className="w-3 h-3" /> Tạm Tính
     </span>

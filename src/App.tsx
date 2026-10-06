@@ -10,7 +10,6 @@ import { createStudio, updateStudio, deleteStudio } from "./lib/db/studios";
 import { createEquipment, updateEquipment, deleteEquipment } from "./lib/db/equipments";
 import { fetchSessions, finalizeShiftSlot, updateSession, deleteSession, cancelSession, setSessionExcluded, setSessionStaffSegments } from "./lib/db/sessions";
 import { SessionActionsContext } from "./lib/sessionActionsContext";
-import { submitSessionReport, SessionReportInput } from "./lib/db/sessionReports";
 import { createBrand, updateBrand, deleteBrand } from "./lib/db/brands";
 import { fetchUsers, updateUserProfile, inviteUser, deleteUserAccount, InviteUserPayload } from "./lib/db/users";
 import { createAuditLog } from "./lib/db/auditLogs";
@@ -956,15 +955,10 @@ export default function App() {
       return false;
     }
   };
-  const handleSubmitSessionReport = async (sessionId: string, input: SessionReportInput): Promise<boolean> => {
-    try {
-      const saved = await submitSessionReport(sessionId, input);
-      setSessions((prev) => prev.map((s) => (s.id === saved.id ? saved : s)));
-      return true;
-    } catch (e) {
-      showToast(`Không thể lưu report ca live: ${errorMessage(e)}`);
-      return false;
-    }
+  // Giao ca (0144) trả về mọi ca đã đổi số — ca nối phía sau tính lại khi ca giữa được giao/sửa.
+  const handleSessionsUpdated = (updated: LiveSession[]) => {
+    const byId = new Map(updated.map((u) => [u.id, u]));
+    setSessions((prev) => prev.map((s) => byId.get(s.id) ?? s));
   };
   // Đối soát ghi đè nhiều ca cùng lúc trong 1 RPC nên không có danh sách session trả về — nạp lại
   // toàn bộ thay vì cố suy ra ca nào đã đổi.
@@ -1641,7 +1635,7 @@ export default function App() {
                     myTalentId={activeUser.assignedTalentId}
                     studios={activeStudios}
                     talents={activeTalents}
-                    onSubmitSessionReport={handleSubmitSessionReport}
+                    onSessionsUpdated={handleSessionsUpdated}
                     onSessionSnapshotApplied={handleSessionReconciled}
                     onUpdateSession={handleUpdateSession}
                     onDeleteSession={handleDeleteSession}
@@ -1683,7 +1677,7 @@ export default function App() {
                         talents={activeTalents}
                         currentRole={currentRole}
                         myTalentId={activeUser.assignedTalentId}
-                        onSubmitSessionReport={handleSubmitSessionReport}
+                        onSessionsUpdated={handleSessionsUpdated}
                         onSessionSnapshotApplied={handleSessionReconciled}
                         onUpdateSession={handleUpdateSession}
                         onDeleteSession={handleDeleteSession}
@@ -1715,7 +1709,7 @@ export default function App() {
                     currentUserId={activeUser.id}
                     currentRole={currentRole}
                     schemes={promoSchemes}
-                    onSubmitSessionReport={handleSubmitSessionReport}
+                    onSessionsUpdated={handleSessionsUpdated}
                     onSessionSnapshotApplied={handleSessionReconciled}
                     onDeleteSession={handleDeleteSession}
                     onCancelSession={handleCancelSession}
@@ -1738,7 +1732,7 @@ export default function App() {
                     talents={activeTalents}
                     currentRole={currentRole}
                     myTalentId={activeUser.assignedTalentId}
-                    onSubmitSessionReport={handleSubmitSessionReport}
+                    onSessionsUpdated={handleSessionsUpdated}
                     onSessionSnapshotApplied={handleSessionReconciled}
                     onOpenScheduling={() => setActiveTab("shift_scheduling")}
                     requestOpenSessionId={notifOpenSessionId}
@@ -1761,7 +1755,7 @@ export default function App() {
                     onRegister={handleRegisterSlot}
                     onUnregister={handleUnregisterSlot}
                     onFinalizeSlot={handleFinalizeShiftSlot}
-                    onSubmitSessionReport={handleSubmitSessionReport}
+                    onSessionsUpdated={handleSessionsUpdated}
                     onUpdateSession={handleUpdateSession}
                     onLogAudit={pushAuditLog}
                     onSessionSnapshotApplied={handleSessionReconciled}
@@ -1892,7 +1886,7 @@ export default function App() {
                     // P1 (0088): chỉ ops tạo/sửa ca — brand xem lịch, không có nút tạo (RLS 0035 đã gỡ).
                     canEdit={currentRole === "ceo" || currentRole === "operations" || currentRole === "admin"}
                     currentRole={currentRole}
-                    onSubmitSessionReport={handleSubmitSessionReport}
+                    onSessionsUpdated={handleSessionsUpdated}
                     onSessionSnapshotApplied={handleSessionReconciled}
                     onDeleteSession={handleDeleteSession}
                     onCancelSession={handleCancelSession}
@@ -1916,7 +1910,7 @@ export default function App() {
                     shiftSlots={shiftSlots}
                     brands={brands}
                     currentRole={currentRole}
-                    onSubmitSessionReport={handleSubmitSessionReport}
+                    onSessionsUpdated={handleSessionsUpdated}
                     onSessionSnapshotApplied={handleSessionReconciled}
                   />
                 )}

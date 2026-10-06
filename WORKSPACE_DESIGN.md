@@ -18,16 +18,22 @@
   tới đâu, cái gì kêu, rồi sửa đúng chỗ đó. **Không seed mock lại.**
 - **Nợ kỹ thuật đã hết** (đợt P2a-2…P2a-21, 01–02/10) và **audit code chết đã xong** (02/10): `npm run audit:dead` báo 0,
   ESLint 0 lỗi (31 warning `set-state-in-effect` = nợ đã đo, cố ý `warn`), vitest 467/467 (05/10).
-- **06/10 chiều: LỊCH 2 SÀN — ĐỢT 1 (nhãn sàn + chặn trùng người), migration `0143` CHƯA CHẠY.** User chốt: một người (host HAY trợ)
-  chỉ đứng MỘT ca tại một thời điểm ⇒ trùng là lỗi, chặn. Đã làm: `PlatformChip` (TikTok xanh / Shopee cam) ở Bảng hôm nay/tuần, Ca Của Tôi,
-  Cửa sổ Ca, Sổ Ca (+ cột "Sàn" khi xuất Excel), ca chờ; **ca Shopee bỏ bước "Up file Creator-Live-Performance"** (`needsSnapshotFile`; Cửa sổ Ca
-  chỉ còn "Report giao ca", "chưa up file" không còn đếm cho ca Shopee); **quét trùng người** `findPersonClashes` (conflicts.ts, cùng luật
-  `personClash`: cả trợ, cả đổi người giữa ca, qua đêm, chạm mép không tính, bỏ ca huỷ/nạp bù) ⇒ khối đỏ ở Bảng Vận Hành, chip "trùng người"
-  trên dòng ca, viền đỏ thẻ ca ở Lịch tháng/tuần/phòng, banner ở Cửa sổ Ca, 2 việc mới (`person-clash` đỏ, `no-room` vàng); **chặn** nút Lưu
-  ở Sửa ca, Chốt Lịch ở Nhân sự ca + popup ca chờ khi trùng (chỉ khi lần sửa đưa người vào hoặc dời giờ — ca trùng sẵn vẫn đổi phòng được);
-  Tải Lịch Host tính cả trợ + đoạn đổi người, nhãn "Trùng giờ" tách "Quá 6 giờ" (trước: >5h đã gọi quá tải, trợ không bao giờ hiện, chữ
-  "Assistant • Score: 0"). **0143:** trigger chặn ở DB (live_sessions + session_staff_segments), lỗi P0001 "Trùng người: …". Verify (chi tiết:
-  lịch sử `## Lịch 2 sàn — khảo sát + Đợt 1 (2026-10-06)`): replay + `supabase/tests/0143_person_clash.sql` 16 mục, vitest 558/558, bản build nối DB thật.
+- **06/10 tối: LỊCH 2 SÀN — ĐỢT 2 "GIAO CA" (migration `0144` CHƯA CHẠY).** Thay dòng Google Sheet trợ live gõ mỗi ca (user chốt: chuyển
+  thẳng sang app). Cửa sổ Ca → mục **Giao ca** (`HandoverForm`, cho điện thoại): dán link dashboard (`parseDashboardLink`: TikTok `room_id=`, Shopee
+  `/live/<số>` ⇒ sàn + mã phòng/phiên, sai sàn thì chặn) · 3 số ĐANG THẤY (GMV, lượt xem, đơn TikTok / ATC Shopee; xu tuỳ chọn) · chạm chọn sự cố
+  (OT/off sớm theo mốc phút, restart, host trễ) · ca nối: gõ số TỔNG, app tự trừ ca trước cùng phòng (RPC `submit_session_handover` +
+  `private.apply_handover_chain` tính lại cả chuỗi khi giao/sửa ca giữa hoặc đổi link; số phải nằm giữa ca trước và ca sau). Người giao = trợ live
+  (`co_host_id` hoặc đoạn trợ khi đổi người giữa ca), ca không trợ ⇒ OPS (`private.can_handover`). Số của ca vào `live_sessions` bậc 'manual'; ca đã
+  snapshot/đối soát giữ số file. Cột mới ở `live_session_reports`: `live_ref, cum_gmv, cum_orders, cum_views, cum_atc, handover_at,
+  handover_prev_session_id`. **Nhắc giao ca** không cần máy chủ hẹn giờ: thông báo `handover_due` tạo sẵn khi xếp ca với `created_at` = hết ca + 15
+  phút (giờ VN), client chỉ đọc `created_at <= now()`, "đọc hết" không nuốt lời nhắc tương lai; giao xong thì xoá; đổi trợ/giờ thì tạo lại.
+  **Gỡ:** form report cũ (`SessionReportForm`, `submitSessionReport`) và bước bắt buộc "up file Creator-Live-Performance" — file nay là đường phụ
+  của OPS (chỉ TikTok, gập trong Giao ca). Bước còn thiếu của ca = **chưa giao ca → chưa đối soát** (`MissingStep` bỏ `snapshot`); Ca Của Tôi
+  "Cần giao ca" chỉ liệt kê ca mình là trợ. Prop `onSubmitSessionReport` ⇒ `onSessionsUpdated(sessions[])`. Verify: lịch sử `## Lịch 2 sàn — Đợt 2 giao ca (2026-10-06)`.
+- **06/10 chiều: LỊCH 2 SÀN — ĐỢT 1, `0143` ĐÃ CHẠY.** User chốt: một người (host HAY trợ) chỉ đứng MỘT ca tại một thời điểm. `PlatformChip` ở mọi
+  dòng ca; `findPersonClashes` ⇒ khối đỏ Bảng Vận Hành, viền đỏ thẻ ca, banner Cửa sổ Ca, việc `person-clash`/`no-room`; chặn Lưu/Chốt Lịch khi đưa
+  người vào ca thứ hai cùng giờ; trigger 0143 chặn ở DB (chỉ lần ghi đưa người vào/dời giờ; ca trùng sẵn vẫn sửa được phần khác); Tải Lịch Host tính
+  cả trợ. Chi tiết + verify: lịch sử `## Lịch 2 sàn — khảo sát + Đợt 1 (2026-10-06)`.
 - **06/10 sáng: GỘP CẤU HÌNH — mỗi điều khoản MỘT chỗ nhập (không migration).** User: nhập 2–3 nơi (rate card, cam kết…) ⇒ gom về
   CRM, cam kết tháng đặt ở Kế Hoạch Tháng, sửa luôn mọi chỗ cùng lớp lỗi. Nay: CRM → **"Hợp đồng & giá"** (`BrandConfigPanel`, brand × sàn:
   cách thu phí, giá, hợp đồng tự sinh cam kết từng tháng, phòng mặc định); tab Agency "Cam Kết Hợp Đồng" **đã gỡ**; Kế Hoạch Tháng có ô giờ/GMV
@@ -165,12 +171,12 @@
 ## 2. Việc còn treo
 
 **Cần user làm:**
-00000000. **CHẠY MIGRATION `0143_person_clash_guard.sql`** (chặn một người ở hai ca cùng giờ, ở DB). Độc lập với deploy (client đã tự chặn).
-   Sau khi chạy: sửa 27 chỗ trùng người T10 (Bảng Vận Hành → khối đỏ "chỗ trùng người", hoặc Việc cần làm) — 0143 KHÔNG chặn ca trùng sẵn,
+000000000. **CHẠY MIGRATION `0144_session_handover.sql` NGAY** (client đã deploy gọi RPC giao ca — chưa chạy thì bấm Giao ca báo lỗi). Sau đó
+   Claude verify: gọi `submit_session_handover` với link sai (phải trả "Link dashboard chưa đúng", không ghi gì) + đếm thông báo `handover_due` sắp tới.
+   Rồi: tạo tài khoản cho host/trợ (Phân Quyền & Role, gắn hồ sơ talent) — Đợt 3; hướng dẫn trợ live: hết ca mở Ca Của Tôi → ca → Giao ca.
+00000000. **0143 ĐÃ CHẠY 06/10** (user xác nhận). Sửa 27 chỗ trùng người T10 (Bảng Vận Hành → khối đỏ "chỗ trùng người", hoặc Việc cần làm) — 0143 KHÔNG chặn ca trùng sẵn,
    chỉ chặn lần ghi đưa người vào ca/dời giờ; 32 ca Franklin Shopee T10 chưa có phòng (đặt phòng mặc định ở CRM → Hợp đồng & giá, ca đã tạo thì Sửa ca).
-   **Lịch + giao ca 2 sàn — đề xuất** https://claude.ai/artifact/J4Kk16eZYeTtrkKDYvQWpY: Đợt 1 XONG (§1). Còn: **Đợt 2** màn "Giao ca" điện thoại
-   (dán link dashboard ⇒ sàn + mã phòng/phiên + ca nối; 3 số cộng dồn, app tự trừ ca trước; chạm chọn sự cố; nhắc 15 phút sau ca; cần migration
-   lưu mã phiên + số cộng dồn) · **Đợt 3** tài khoản cho 39 host/trợ — user chốt 06/10 **CHUYỂN THẲNG sang app, KHÔNG chạy song song Google Sheet**
+   **Lịch + giao ca 2 sàn — đề xuất** https://claude.ai/artifact/J4Kk16eZYeTtrkKDYvQWpY: Đợt 1 + Đợt 2 XONG (§1). Còn: **Đợt 3** tài khoản cho 39 host/trợ — user chốt 06/10 **CHUYỂN THẲNG sang app, KHÔNG chạy song song Google Sheet**
    (nên Đợt 2 phải xong + verify kỹ trước khi phát tài khoản; GMV mất thì lấy lại từ đối soát, OT/sự cố thì không) · **Đợt 4** checklist cuối tháng
    7 kênh ở Điều Phối Phát Hành, chia ca nối theo số giao ca, ước tính số chốt (sau backtest). User chốt 06/10: ca không có trợ ⇒ **OP giao ca**;
    host/trợ dùng điện thoại riêng được. Số đo nền: lịch sử `## Lịch 2 sàn — khảo sát + Đợt 1 (2026-10-06)`.
@@ -411,8 +417,9 @@ Shopee thêm `|Shopee`) và `brandPlatformKey(brand, sàn)` (Map kế hoạch th
 màn con nhận `platform` qua prop, không tự giữ state sàn. Nút sang Kế Hoạch Tháng nhớ sàn qua `rememberBrandId(brand, sàn)`.
 Sàn của report = `lib/reportPlatform.ts` (`ReportPlatform`); mọi đọc/ghi report và bản chụp đi qua `lib/db/monthlyReports.ts` / `monthlyReportSnapshots.ts` với tham số `platform` (mặc định TikTok — TikTok giữ nguyên khoá nạp-trước, chỉ truyền sàn khi là Shopee). Ca/đối soát/phát hành luôn lọc theo sàn của ca, không trộn.
 Trùng người = `personClash` (một người, lúc sửa) / `findPersonClashes` + `clashedSessionIds` (quét cả lịch) trong `scheduling/conflicts.ts`, DB
-chặn bằng 0143 cùng luật — đừng viết vòng so giờ riêng. Ca có bước up file lúc giao ca hay không = `needsSnapshotFile` (sessionLedger; Shopee = không).
-Nhãn sàn trên một ca = `<PlatformChip>` (components/common).
+chặn bằng 0143 cùng luật — đừng viết vòng so giờ riêng.
+Nhãn sàn trên một ca = `<PlatformChip>` (components/common). Giao ca = `lib/handover.ts` (đọc link, phần của ca, ai giao) + RPC 0144 — regex
+link giữ GIỐNG HỆT `private.parse_dashboard_link` (test canh); số của ca nối chỉ tính ở `private.apply_handover_chain`, client chỉ xem trước.
 Ai đứng ca nào, bao lâu = `lib/staffSegments.ts` (`effectiveSegments`, `personRoleMinutes`, `personWindows`, `roleShares`) — ca không có đoạn thì host_id/co_host_id làm cả ca; mọi màn tính lương/giờ/trùng lịch/hiệu suất theo người PHẢI đi qua đây (hoặc `computeSessionPnl().payouts`, `hostPortions`), không đọc `hostId`/`coHostId` thô cho số liệu. "Ca có số" = `isCountable` (hostPerformance) · ca tính tiền = `isPnlSession` (pnl, từ 04/10 đòi `hasLiveEvidence`) · ca
 đã diễn ra thật = `hasLiveEvidence`, ca quá giờ chờ xác nhận = `isUnconfirmedPast`, ca có số ở DB (khoá dời giờ) =
 `hasSessionData` (cả ba ở sessionStatus) · khung camp hiệu lực = `effectiveCamp(planCamp)` (campaignDays — MỌI
@@ -453,7 +460,7 @@ target khung camp ở Nhập Ads bỏ 06/10 — tháng không có kế hoạch c
 
 ## 6. Hạ tầng Supabase
 
-- 143 migration (`supabase/migrations/`) — **`0143` (chặn trùng người) CHƯA CHẠY**; **`0139`–`0142` (report / kế hoạch / hợp đồng theo sàn, file Ads Shopee) ĐÃ CHẠY 06/10**;, chạy tay theo thứ tự — **`0138` (đổi người giữa ca) ĐÃ CHẠY 06/10.** `0137` đã chạy 05/10. **`0136` ĐÃ CHẠY 05/10** (verify production: lô đối soát thử với phòng kết thúc đúng phút ca CROCS 30/09 11:01 bắt đầu ⇒ không khớp, phòng chồng 29 phút ⇒ khớp; lô thử đã xoá; trigger profiles nằm trước đoạn đó trong cùng file + chốt tự kiểm cuối file), bộ kiểm
+- 144 migration (`supabase/migrations/`) — **`0144` (giao ca) CHƯA CHẠY**; `0143` (chặn trùng người) ĐÃ CHẠY 06/10; **`0139`–`0142` (report / kế hoạch / hợp đồng theo sàn, file Ads Shopee) ĐÃ CHẠY 06/10**;, chạy tay theo thứ tự — **`0138` (đổi người giữa ca) ĐÃ CHẠY 06/10.** `0137` đã chạy 05/10. **`0136` ĐÃ CHẠY 05/10** (verify production: lô đối soát thử với phòng kết thúc đúng phút ca CROCS 30/09 11:01 bắt đầu ⇒ không khớp, phòng chồng 29 phút ⇒ khớp; lô thử đã xoá; trigger profiles nằm trước đoạn đó trong cùng file + chốt tự kiểm cuối file), bộ kiểm
   `supabase/tests/0136_profile_guard_recon_edges_lock_past.sql` (replay, DB trắng): 16 OK, đỏ khi thiếu 0136. **Tới `0132` đều ĐÃ CHẠY** (0131 + 0132 ngày 02/10);
   **`0133` ĐÃ CHẠY 04/10** (verify ở §1); **`0134` ĐÃ CHẠY 05/10** (verify: CRM không còn SĐT mẫu); **`0135` ĐÃ CHẠY 05/10** (verify: 4 brand KAM "Chưa chọn", form sửa cũng "Chưa chọn"). Lô đối soát cũ (06–09/2026, không gắn brand) không áp dụng lại được — đo
   04/10 nó chỉ khớp ca CROCS nên chưa có số nào bị chia nhầm. Replay `0001 → 0133`: sạch, chạy lần 2 không lỗi; bộ kiểm hành vi
@@ -487,6 +494,7 @@ target khung camp ở Nhập Ads bỏ 06/10 — tháng không có kế hoạch c
 |---|---|
 | `## Cắt vòng mạng nối tiếp (2026-10-03/04)` | 10 vòng mạng đã cắt (cache assets, TAB_CHUNKS, prefetch, lazyNamed, song song hoá) + chỗ còn lại có chủ đích |
 | `## Gộp cấu hình một chỗ nhập (2026-10-06)` | số đo trước khi gộp, từng chỗ nhập trùng đã bỏ, luật mới (is_override, generateThroughMonth, effectiveCamp 1 tham số), cách verify |
+| `## Lịch 2 sàn — Đợt 2 giao ca (2026-10-06)` | 0144: giao ca, ca nối tự trừ, nhắc giao ca hẹn giờ, gỡ form report cũ — cách verify |
 | `## Lịch 2 sàn — khảo sát + Đợt 1 (2026-10-06)` | số đo lịch/giao ca 2 sàn, Working File, số giao ca lệch số chốt, 0143 chặn trùng người |
 | `## Audit toàn app lần 3 (2026-10-05)` | lỗ tự nâng quyền qua profiles (0136), backup sai project, đối soát chạm mép, chốt kế hoạch ngày đã qua, engine ô 1 phút, chữ/ngày lộ |
 | `## Audit logic vòng đời (2026-10-04)` | 14 điểm gãy hợp đồng→report + cách sửa; 0133 (đối soát theo brand, chốt người 1 transaction, đóng sổ tháng, khoá ca kế hoạch đã chốt, đăng ký chỉ ca mở) |

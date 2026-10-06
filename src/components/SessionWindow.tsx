@@ -8,14 +8,11 @@ import { PlatformChip } from "./common/PlatformChip";
 import { fmtVndShort } from "../lib/format";
 import { fmtKeyMetric, KEY_METRICS, keyMetricsOfSessions, keyMetricValue } from "../lib/report/keyMetrics";
 import { sessionHours } from "../lib/performance/hostPerformance";
-import { SessionReportInput } from "../lib/db/sessionReports";
 import {
   MissingStep,
   brandTrustLabel,
-  hasReport,
   hasSnapshot,
   linkedSessions,
-  needsSnapshotFile,
   missingSteps,
   sessionCounters,
   sessionIncidents,
@@ -25,7 +22,8 @@ import {
 import { DataSourceBadge } from "./common/DataSourceBadge";
 import { BrandLogo } from "./ui/BrandLogo";
 import { SessionLiveSnapshotUpload } from "./SessionLiveSnapshotUpload";
-import { SessionReportForm } from "./SessionReportForm";
+import { HandoverForm } from "./HandoverForm";
+import { handoverOwnerLabel, hasHandover, isHandoverPerson } from "../lib/handover";
 import { useToast } from "../hooks/useToast";
 import { useConfirm } from "../hooks/useConfirm";
 import { SessionActionsContext } from "../lib/sessionActionsContext";
@@ -61,7 +59,8 @@ export interface SessionWindowProps {
   // Ca chờ đăng ký — để cảnh báo trùng phòng khi sửa ca (ca chờ còn mở cũng giữ phòng). Thiếu = chỉ xét ca đã chốt.
   shiftSlots?: ShiftSlot[];
   onClose: () => void;
-  onSubmitSessionReport?: (sessionId: string, input: SessionReportInput) => Promise<boolean>;
+  /** Giao ca xong: các ca đã đổi số (ca nối phía sau cũng tính lại) — App thay trong state. */
+  onSessionsUpdated?: (sessions: LiveSession[]) => void;
   onSessionSnapshotApplied?: (session: LiveSession) => void;
   onUpdateSession?: (session: LiveSession) => Promise<boolean>;
   onDeleteSession?: (id: string) => Promise<void>;
@@ -84,8 +83,7 @@ const WEEKDAY = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
 const STATUS_LABEL = SESSION_STATUS_LABEL_VI;
 const STATUS_CLS = SESSION_STATUS_CLS;
 const MISSING_LABEL: Record<MissingStep, string> = {
-  snapshot: "Chưa up file số liệu",
-  report: "Chưa có report",
+  report: "Chưa giao ca",
   reconcile: "Chưa đối soát"
 };
 
@@ -110,7 +108,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
   shiftSlots = [],
   talents,
   onClose,
-  onSubmitSessionReport,
+  onSessionsUpdated,
   onSessionSnapshotApplied,
   onUpdateSession,
   onDeleteSession,
@@ -128,9 +126,11 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
   const isMine = !!viewer.myTalentId && (viewer.myTalentId === s.hostId || viewer.myTalentId === s.coHostId);
   // Up file / nộp report: ops, hoặc host/trợ của đúng ca (khớp guard can_edit_session_snapshot, 0082).
   // U6: ca nạp bù (tháng cũ) không có report — không hiện form.
-  const canReport = !isBrandView && (isOps || isMine) && !s.isBackfill && !!onSubmitSessionReport;
-  // File Creator-Live-Performance là file của TikTok — ca Shopee không có bước này (06/10), giao ca bằng report.
-  const canSnapshot = !isBrandView && (isOps || isMine) && !s.isBackfill && !!onSessionSnapshotApplied && needsSnapshotFile(s);
+  // Giao ca (0144): trợ live của ca, ca không trợ thì OPS (user chốt 06/10). Host xem được ai phải giao.
+  const showHandover = !isBrandView && !s.isBackfill && s.status !== "Cancelled" && !!onSessionsUpdated;
+  const canHandover = showHandover && (isOps || isHandoverPerson(s, viewer.myTalentId));
+  // File Creator-Live-Performance (TikTok) nay là đường PHỤ của OPS — giao ca chính là dán link + 3 số. Ca Shopee không có file này.
+  const canSnapshotFile = isOps && !s.isBackfill && !!onSessionSnapshotApplied && s.platform !== "Shopee";
   const canEdit = isOps && !!onUpdateSession && !!studios && !!talents;
   // 0133: DB không cho dời ngày/giờ ca đã có số (ranh giới snapshot/đối soát tính theo giờ ca).
   // 0138: ca đã chia người theo đoạn giờ cũng khoá giờ (offset phút của đoạn sẽ lệch) — bỏ chia đoạn trước khi dời.
@@ -139,7 +139,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
   // nói rõ lý do thay vì hiện "—" như ca chưa có số.
   const hideMetrics = metricsHiddenFor(s, viewer.role);
 
-  const [editingReport, setEditingReport] = useState(false);
+  const [editingHandover, setEditingHandover] = useState(false);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -157,7 +157,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
   const [changeReason, setChangeReason] = useState("");
   const peopleChanged = edit.hostId !== s.hostId || (edit.coHostId || "") !== (s.coHostId ?? "");
   useEffect(() => {
-    setEditingReport(false);
+    setEditingHandover(false);
     setEditing(false);
     setSegOpen(false);
     setEdit({ date: s.date, startTime: s.startTime, endTime: s.endTime, studioId: s.studioId, hostId: s.hostId, coHostId: s.coHostId ?? "" });
@@ -297,7 +297,8 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
   };
 
   const snapshotDone = hasSnapshot(s);
-  const reportDone = hasReport(s);
+  const handoverDone = hasHandover(s);
+  const handoverPrev = s.report?.handoverPrevSessionId ? allSessions.find((x) => x.id === s.report!.handoverPrevSessionId) : undefined;
 
   return (
     <>
@@ -379,7 +380,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                 Còn thiếu để chốt: {missing.map((m) => MISSING_LABEL[m]).join(" · ")}
                 {isOps && isUnconfirmedPast(s) && (
                   <span className="block mt-1 text-amber-300/90">
-                    Ca đã qua giờ mà chưa có bằng chứng diễn ra — chưa tính vào giờ cam kết và lương. Có chạy: up file / nhập report. Không diễn ra: huỷ ca ở cuối cửa sổ này.
+                    Ca đã qua giờ mà chưa có bằng chứng diễn ra — chưa tính vào giờ cam kết và lương. Có chạy: giao ca (mục Giao ca bên dưới). Không diễn ra: huỷ ca ở cuối cửa sổ này.
                   </span>
                 )}
               </span>
@@ -505,58 +506,62 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
             )}
           </section>
 
-          {/* Số liệu ca — 2 bước cho người trực ca: up file → khai thêm → nộp */}
-          {(canSnapshot || canReport) && (
+          {/* Giao ca (0144): trợ live của ca — ca không trợ thì OPS — dán link dashboard + 3 số + sự cố. Thay form report cũ. */}
+          {showHandover && (
             <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface-base)]/60 p-3 space-y-3">
               <div className="flex items-center justify-between gap-2">
-                <h4 className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-bold">Nộp số liệu ca</h4>
-                <div className="flex items-center gap-1">
-                  {canSnapshot && <StepPill n={1} label="File số liệu" done={snapshotDone} />}
-                  <StepPill n={canSnapshot ? 2 : 1} label="Report" done={reportDone} />
-                </div>
+                <h4 className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-bold">Giao ca</h4>
+                <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${handoverDone ? "bg-emerald-950 text-emerald-300 border-emerald-800" : "bg-amber-950 text-amber-300 border-amber-800"}`}>
+                  {handoverDone ? `đã giao ${new Date(s.report!.handoverAt!).toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" })}` : "chưa giao ca"}
+                </span>
               </div>
-              {canSnapshot && (
-                <div>
-                  <p className="text-xs font-bold text-[var(--text)] mb-1.5">Bước 1 · Up file Creator-Live-Performance {snapshotDone && <span className="text-emerald-400 font-normal">— đã có</span>}</p>
-                  <SessionLiveSnapshotUpload session={s} onApplied={onSessionSnapshotApplied!} />
+              {handoverDone && !editingHandover && (
+                <div className="space-y-1.5 text-xs">
+                  <p className="flex flex-wrap items-center gap-1.5 text-[var(--text-muted)]">
+                    <PlatformChip platform={s.platform} />
+                    {s.platform === "Shopee" ? "phiên" : "phòng"} <span className="font-mono text-[var(--text)]">{s.report!.liveRef}</span>
+                    {s.report!.dashboardLink1 && <a href={s.report!.dashboardLink1} target="_blank" rel="noreferrer" className="text-[var(--accent-text)] underline">mở dashboard</a>}
+                    {handoverPrev && <span>· ca nối với ca {handoverPrev.startTime}–{handoverPrev.endTime}</span>}
+                  </p>
+                  <p className="text-[var(--text-muted)]">
+                    Số đang thấy lúc giao: <span className="font-mono text-[var(--text)]">GMV {fmtVndShort(s.report!.cumGmv ?? 0)} · {(s.report!.cumViews ?? 0).toLocaleString("vi-VN")} lượt xem{s.platform === "Shopee" ? (s.report!.cumAtc != null ? ` · ${s.report!.cumAtc.toLocaleString("vi-VN")} ATC` : "") : ` · ${(s.report!.cumOrders ?? 0).toLocaleString("vi-VN")} đơn`}</span>
+                    {handoverPrev ? " — số của ca này đã trừ ca trước, xem \"Số liệu ca\" bên dưới." : ""}
+                  </p>
+                  {canHandover && (
+                    <button onClick={() => setEditingHandover(true)} className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-emerald-950 text-emerald-300 border border-emerald-800 hover:bg-emerald-900 transition-colors">
+                      Sửa giao ca
+                    </button>
+                  )}
                 </div>
               )}
-              {canReport && (
-                <div>
-                  <div className="flex items-center justify-between gap-2 mb-1.5">
-                    <p className="text-xs font-bold text-[var(--text)]">{canSnapshot ? "Bước 2 · Khai phần máy không biết" : "Report giao ca"} {reportDone && <span className="text-emerald-400 font-normal">— đã nộp</span>}</p>
-                    {!editingReport && (
-                      <button onClick={() => setEditingReport(true)} className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-emerald-950 text-emerald-300 border border-emerald-800 hover:bg-emerald-900 transition-colors">
-                        {reportDone ? "Sửa report" : "Nhập report"}
-                      </button>
-                    )}
+              {(!handoverDone || editingHandover) &&
+                (canHandover ? (
+                  <HandoverForm
+                    session={s}
+                    onSaved={(updated) => {
+                      onSessionsUpdated!(updated);
+                      setEditingHandover(false);
+                    }}
+                    onCancel={editingHandover ? () => setEditingHandover(false) : undefined}
+                  />
+                ) : (
+                  <p className="text-xs text-[var(--text-muted)]">{handoverOwnerLabel(s)}.</p>
+                ))}
+              {canSnapshotFile && (
+                <details className="text-xs">
+                  <summary className="cursor-pointer text-[11px] font-bold text-[var(--text-faint)]">
+                    Cách khác (OPS, chỉ TikTok): up file Creator-Live-Performance{snapshotDone ? " — đã có file" : ""}
+                  </summary>
+                  <div className="pt-2">
+                    <SessionLiveSnapshotUpload session={s} onApplied={onSessionSnapshotApplied!} />
                   </div>
-                  {!editingReport && !reportDone && (
-                    <p className="text-[11px] text-[var(--text-faint)]">
-                      {needsSnapshotFile(s)
-                        ? `OT / off sớm / restart / ADS / link dashboard${snapshotDone ? "" : " — chưa có file thì 5 ô số phải gõ tay, ops sẽ đối soát lại"}.`
-                        : "Số đọc trên dashboard Shopee lúc hết ca (GMV, ATC, lượt xem…) + OT / off sớm / restart / xu đã tung / link dashboard. Số chốt lấy từ file Live List ở Đối Soát cuối kỳ."}
-                    </p>
-                  )}
-                  {editingReport && (
-                    <SessionReportForm
-                      session={s}
-                      onSubmit={async (input) => {
-                        const ok = await onSubmitSessionReport!(s.id, input);
-                        if (ok) setEditingReport(false);
-                        return ok;
-                      }}
-                      onCancel={() => setEditingReport(false)}
-                      canOverrideMetrics={isOps}
-                    />
-                  )}
-                </div>
+                </details>
               )}
             </section>
           )}
 
           {/* Report đã nộp (mọi vai đọc được) */}
-          {!editingReport && (s.report || incidents.length > 0) && (
+          {!editingHandover && (s.report || incidents.length > 0) && (
             <section>
               <h4 className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-bold mb-2">Report ca</h4>
               {s.report ? (
@@ -568,14 +573,14 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                     ))}
                   </div>
                   {s.report.statusNote && <p className="text-xs text-[var(--text)] whitespace-pre-wrap">{s.report.statusNote}</p>}
-                  {(s.report.dashboardLink1 || s.report.dashboardLink2) && (
+                  {!s.report.handoverAt && (s.report.dashboardLink1 || s.report.dashboardLink2) && (
                     <div className="flex flex-wrap gap-2 text-[11px]">
                       {s.report.dashboardLink1 && <a href={s.report.dashboardLink1} target="_blank" rel="noreferrer" className="text-[var(--accent-text)] underline">Dashboard 1</a>}
                       {s.report.dashboardLink2 && <a href={s.report.dashboardLink2} target="_blank" rel="noreferrer" className="text-[var(--accent-text)] underline">Dashboard 2</a>}
                     </div>
                   )}
                   {s.report.submittedAt && (
-                    <p className="text-[11px] text-[var(--text-faint)]">Nhập lúc {new Date(s.report.submittedAt).toLocaleString("vi-VN")}{s.report.submittedByRole ? ` · ${s.report.submittedByRole}` : ""}</p>
+                    <p className="text-[11px] text-[var(--text-faint)]">Nhập lúc {new Date(s.report.submittedAt).toLocaleString("vi-VN")}{s.report.submittedByRole ? ` · ${s.report.submittedByRole === "talent" ? "trợ live" : "OPS"}` : ""}</p>
                   )}
                 </div>
               ) : (
@@ -768,11 +773,6 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
   );
 };
 
-const StepPill: React.FC<{ n: number; label: string; done: boolean }> = ({ n, label, done }) => (
-  <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-1.5 py-0.5 rounded border ${done ? "bg-emerald-950 text-emerald-300 border-emerald-800" : "bg-[var(--surface-base)] text-[var(--text-faint)] border-[var(--border)]"}`}>
-    {done ? <CheckCircle2 className="w-3 h-3" /> : <Circle className="w-3 h-3" />} {n} · {label}
-  </span>
-);
 
 const TrustBadge: React.FC<{ session: LiveSession }> = ({ session }) => {
   const label = brandTrustLabel(session);

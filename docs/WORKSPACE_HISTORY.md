@@ -4765,3 +4765,11 @@ User: "nhập liệu 2–3 nơi
   khối đỏ 27 chỗ trùng (24 cặp + 3 ca host = trợ, khớp số đo), việc "32 ca sắp tới chưa có phòng live", Cửa sổ Ca Franklin 08/10 có banner +
   chọn trợ bận ⇒ nút Lưu khoá (không lưu), ca VERA Shopee chỉ còn "Report giao ca", Tải Lịch 20/10 Sỹ Hùng/Thái Toàn "Trùng giờ", 375px không tràn.
 
+
+
+## Lịch 2 sàn — Đợt 2 giao ca (2026-10-06)
+
+Verify: replay 0001→0144 + chạy lại
+  0144 sạch, `supabase/tests/0144_session_handover.sql` 20 mục (đỏ ở 1a khi thiếu 0144; ca nối thật VERA Shopee 26/09: 12.322.359 − 4.267.859 =
+  8.054.500), mọi bộ SQL cũ xanh; vitest 565/565 (+`tests/handover.test.ts`, regex khớp migration); lint 0 lỗi (30 cảnh báo như cũ), build,
+  audit:dead 0; bản build nối DB thật ở 375px: form hiện đủ, nhận link Shopee thật, báo sai sàn, không tràn ngang (CHƯA bấm Giao ca — cần 0144).

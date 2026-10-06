@@ -37,7 +37,6 @@ import { PosterDayCell } from "./ui/PosterCalendarGrid";
 import { getBrandTheme } from "../lib/brandTheme";
 import { SessionEventCard, SessionCardTone, buildSlotMeta } from "./ui/SessionEventCard";
 import { SessionWindow } from "./SessionWindow";
-import { SessionReportInput } from "../lib/db/sessionReports";
 import { commitmentsRead } from "../lib/db/brandContracts";
 import { planStatusesRead } from "../lib/db/monthPlans";
 import { brandPlatformKey, brandPlatformsOf } from "../lib/reportPlatform";
@@ -66,7 +65,7 @@ interface ShiftSchedulingProps {
   onFinalizeSlot: (slot: ShiftSlot, hostId: string, coHostId: string | null) => Promise<boolean>;
   onUpdateSession: (session: LiveSession) => Promise<boolean>;
   onLogAudit: (entry: { action: string; details: string; category: AuditLogEntry["category"] }) => Promise<void>;
-  onSubmitSessionReport: (sessionId: string, input: SessionReportInput) => Promise<boolean>;
+  onSessionsUpdated: (sessions: LiveSession[]) => void;
   // RPC apply_session_live_snapshot đã ghi DB và trả về LiveSession đầy đủ — chỉ cần đồng bộ
   // lại state, không gọi updateSession (sẽ ghi đè ngược số vừa tính bằng state cũ của client).
   onSessionSnapshotApplied: (session: LiveSession) => void;
@@ -165,7 +164,7 @@ export default function ShiftScheduling({
   onFinalizeSlot,
   onUpdateSession,
   onLogAudit,
-  onSubmitSessionReport,
+  onSessionsUpdated,
   onSessionSnapshotApplied,
   onOpenMonthPlan,
   fatigueWeekHours = FATIGUE_WEEK_HOURS,
@@ -1131,7 +1130,7 @@ export default function ShiftScheduling({
             talents={admin ? talents : undefined}
             shiftSlots={shiftSlots}
             onClose={() => setOpenSessionId(null)}
-            onSubmitSessionReport={onSubmitSessionReport}
+            onSessionsUpdated={onSessionsUpdated}
             onSessionSnapshotApplied={onSessionSnapshotApplied}
             onUpdateSession={admin ? onUpdateSession : undefined}
             onCancelSession={admin ? onCancelSession : undefined}
