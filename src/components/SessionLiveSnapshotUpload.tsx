@@ -9,6 +9,7 @@ import {
 } from "../lib/db/sessionLiveSnapshots";
 import { parseSnapshotFile, type ParsedSnapshotFile } from "../lib/liveSnapshot/extractRooms";
 import { preloadSpreadsheetReader } from "../lib/dataraw/parseDataRawExcel";
+import { fetchRoomLinks, fetchSnapshotParts, type RoomLinks } from "../lib/db/sessionRoomLinks";
 import { SnapshotRoomPicker } from "./SnapshotRoomPicker";
 import { errorMessage } from "../lib/errorMessage";
 import { useConfirm } from "../hooks/useConfirm";
@@ -32,6 +33,9 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 0153: ca nối từ ca trước (mốc trừ) và số mảnh của ca bị ngắt room — chỉ để cảnh báo, lỗi đọc thì bỏ qua.
+  const [links, setLinks] = useState<RoomLinks>({});
+  const [partCount, setPartCount] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
   // File đã đọc, đang chờ trợ tick đúng phòng của ca (file tải về là cả ngày nhiều phòng).
   const [pending, setPending] = useState<{ fileName: string; parsed: ParsedSnapshotFile } | null>(null);
@@ -40,6 +44,8 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
   useEffect(() => {
     let alive = true;
     setLoading(true);
+    fetchRoomLinks(session.id).then((l) => { if (alive) setLinks(l); }).catch(() => undefined);
+    fetchSnapshotParts(session.id).then((p) => { if (alive) setPartCount(p.length); }).catch(() => undefined);
     fetchSessionSnapshot(session.id)
       .then((s) => { if (alive) setSnapshot(s); })
       .catch((e) => { if (alive) setError(errorMessage(e)); })
@@ -103,6 +109,7 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
           rows={pending.parsed.rows}
           fileName={pending.fileName}
           previouslySelected={snapshot?.rooms.map((r) => r.roomId)}
+          prevBaseline={links.prev?.boundaryAt ? { boundaryMs: Date.parse(links.prev.boundaryAt), roomIds: links.prev.roomIds, label: `${links.prev.startTime}–${links.prev.endTime}` } : undefined}
           confirmLabel="Xác nhận phòng của ca này"
           busy={busy}
           onConfirm={(rows) => void confirmRooms(rows)}
@@ -188,9 +195,19 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
         </div>
       )}
 
+      {links.prev && !links.prev.hasSnapshot && (
+        <p className="text-[11px] text-amber-300 flex items-start gap-1.5">
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
+          Ca này nối từ ca {links.prev.startTime}–{links.prev.endTime} nhưng ca đó chưa up file lúc giao ca — số của ca này sẽ chưa hiện cho tới khi ca đó up.
+        </p>
+      )}
+
       {snapshot && (
         <button
-          onClick={() => fileRef.current?.click()}
+          onClick={async () => {
+            if (partCount > 0 && !(await confirm("Ca này đang có các mảnh room bị ngắt. Up lại file khác sẽ XOÁ hết mảnh (số + lý do ngắt) và tính lại từ file mới. Tiếp tục?", { danger: true }))) return;
+            fileRef.current?.click();
+          }}
           disabled={busy}
           className="text-[11px] text-[var(--text-muted)] hover:text-[var(--text)] underline disabled:opacity-40"
         >

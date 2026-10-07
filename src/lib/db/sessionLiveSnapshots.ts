@@ -12,6 +12,8 @@ export interface SessionSnapshotRoom {
   gmv: number;
   orders: number;
   views: number;
+  /** Mảnh (≥ 2) mà phòng này thuộc về khi ca bị ngắt room; vắng = mảnh đầu (lần up đầu). 0153. */
+  partId?: string;
 }
 
 export interface SessionSnapshot {
@@ -21,6 +23,8 @@ export interface SessionSnapshot {
   periodLabel?: string;
   capturedAt: string;
   rowCount: number;
+  /** 0153: snapshot do OPS chia ước lượng theo thời gian (ca nối mà ca trước quên up file), không phải file thật. */
+  isEstimated: boolean;
   rooms: SessionSnapshotRoom[];
 }
 
@@ -31,6 +35,7 @@ interface DbSnapshot {
   period_label: string | null;
   captured_at: string;
   row_count: number;
+  is_estimated: boolean | null;
 }
 
 interface DbSnapshotRow {
@@ -42,6 +47,7 @@ interface DbSnapshotRow {
   gmv: number;
   orders: number;
   views: number;
+  part_id: string | null;
 }
 
 export async function fetchSessionSnapshot(sessionId: string): Promise<SessionSnapshot | null> {
@@ -56,7 +62,7 @@ export async function fetchSessionSnapshot(sessionId: string): Promise<SessionSn
 
   const { data: rowData, error: rowError } = await supabase
     .from("session_live_snapshot_rows")
-    .select("room_id, room_title, started_at, ended_at, duration_minutes, gmv, orders, views")
+    .select("room_id, room_title, started_at, ended_at, duration_minutes, gmv, orders, views, part_id")
     .eq("snapshot_id", snap.id)
     .order("started_at", { ascending: true });
   if (rowError) throw rowError;
@@ -68,6 +74,7 @@ export async function fetchSessionSnapshot(sessionId: string): Promise<SessionSn
     periodLabel: snap.period_label ?? undefined,
     capturedAt: snap.captured_at,
     rowCount: snap.row_count,
+    isEstimated: snap.is_estimated === true,
     rooms: ((rowData ?? []) as DbSnapshotRow[]).map((r) => ({
       roomId: r.room_id,
       roomTitle: r.room_title ?? undefined,
@@ -76,7 +83,8 @@ export async function fetchSessionSnapshot(sessionId: string): Promise<SessionSn
       durationMinutes: Number(r.duration_minutes) || 0,
       gmv: Number(r.gmv) || 0,
       orders: Number(r.orders) || 0,
-      views: Number(r.views) || 0
+      views: Number(r.views) || 0,
+      partId: r.part_id ?? undefined
     }))
   };
 }

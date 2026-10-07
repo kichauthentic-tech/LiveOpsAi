@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { LiveSession } from "../types";
 import { submitTikTokHandover } from "../lib/db/handovers";
 import { errorMessage } from "../lib/errorMessage";
 import { hasSnapshot } from "../lib/sessionLedger";
 import { SessionLiveSnapshotUpload } from "./SessionLiveSnapshotUpload";
 import { HandoverIncidents, incidentsFromReport, incidentValues } from "./HandoverIncidents";
+import { fetchSnapshotParts } from "../lib/db/sessionRoomLinks";
+import { suggestedRestartCount } from "../lib/liveSnapshot/roomCases";
 
 // Giao ca của ca TIKTOK (user chốt 06/10 tối — giữ cách build ban đầu): (1) up file Creator-Live-Performance tải từ
 // TikTok ngay khi hết ca — file giữ đúng ranh giới ca nối (số cộng dồn của phòng, app trừ lần up trước, 0078);
@@ -21,6 +23,23 @@ export function TikTokHandover({ session: s, onSaved, onCancel }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileDone = hasSnapshot(s);
+
+  // Ca bị ngắt room (0153): điền sẵn "Restart ×N" theo số lần ngắt đã ghi / số room − 1 — chỉ gợi ý, trợ vẫn sửa được. Không đụng
+  // vào report đã có số restart hoặc khi trợ đã tự bật/tắt.
+  const roomCount = s.liveRoomIds?.length ?? 0;
+  useEffect(() => {
+    if ((s.report?.restartCount ?? 0) > 0) return;
+    let alive = true;
+    fetchSnapshotParts(s.id)
+      .then((parts) => {
+        const n = suggestedRestartCount(parts.length, roomCount);
+        if (!alive || n <= 0) return;
+        setIncidents((cur) => (cur.on.includes("restart") ? cur : { ...cur, on: [...cur.on, "restart"], restarts: n }));
+      })
+      .catch(() => undefined);
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chạy theo ca + số room, không theo state sự cố đang gõ
+  }, [s.id, roomCount]);
 
   const submit = async () => {
     setSaving(true);

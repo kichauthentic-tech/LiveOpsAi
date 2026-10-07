@@ -13,6 +13,18 @@
 
 ## 1. Giai đoạn hiện tại (cập nhật 2026-10-07)
 
+- **08/10 (khuya): CA NỐI (1 room → nhiều ca) XÁC NHẬN TƯỜNG MINH + CA BỊ NGẮT ROOM (1 ca → nhiều room) THEO MẢNH — migration `0153` CHƯA CHẠY (user chạy tay; tới lúc đó
+  phần "Room của ca này" tự ẩn, `isRoomLinksBackendMissing`). Verify: replay 0124 → `_fixture_room_links.sql` → 0153 + `supabase/tests/0153_room_links_parts.sql` 49/49 trên Postgres tạm (chạy lại 0153 sạch),
+  vitest 671/672 (+8 `tests/roomCases.test.ts`; 1 đỏ là Talent Pool `lg:sticky` có sẵn), tsc/lint/audit:dead/build sạch; UI xem bằng trang thử backend giả (đã xoá) — CHƯA thử với DB thật có 0153.**
+  Quyết định user chốt 08/10: B (không gặp) không làm; chỉ 2 trường hợp trên. **Ca nối:** ca trước A mở Cửa sổ Ca Live → mục "Room của ca này" → "Ca nối", chọn ĐÚNG ca sau B từ ca đã plan
+  (`room_link_candidates`: cùng brand, TikTok, B bắt đầu sau A và ≤ 2h sau khi A hết, không huỷ/không loại) → `link_session_room`. Bảng `session_room_links` (A→B, mỗi ca ≤1 trước/≤1 sau ⇒ chuỗi A→B→C).
+  Khi có liên kết, mốc trừ của B = snapshot của CHÍNH A (view `session_room_deltas` đã sửa; ca KHÔNG liên kết giữ cách cũ "snapshot gần nhất cùng room" — không đụng dữ liệu T6–T9). B nối mà A chưa up file ⇒ số B bị KHOÁ
+  (view không trả dòng, `recompute_session_from_snapshot` không ghi) tới khi A up; lối thoát chỉ OPS `estimate_handover_split` = tạo snapshot ƯỚC LƯỢNG cho A (số cộng dồn của room chia tuyến tính theo thời gian tới giờ hết ca A,
+  `session_live_snapshots.is_estimated`), A up file thật thì thay. Xoá file A khi B đã up bị chặn (gỡ liên kết trước). **Ca ngắt room:** mảnh 1 = lần up đầu; mỗi mảnh sau (`session_snapshot_parts`, `apply_session_snapshot_part`) = một lần
+  tắt/bật lại kèm lý do (rớt mạng/tắt bật có chủ ý/đổi thiết bị/TikTok cắt/live thử/khác) + ghi chú, up file riêng (chọn phòng, phòng đã có bị ẩn) hoặc chỉ ghi nhận lý do; phòng trùng Room ID thay bản cũ. Số ca vẫn = Σ delta mọi room
+  (giờ live = Σ thời lượng từng room, khoảng nghỉ KHÔNG tính, hiện riêng "gián đoạn X phút" = `roomGapMinutes`); form Giao ca điền sẵn "Restart ×N" (`suggestedRestartCount`, chỉ gợi ý). Up lại file thường cho ca đã có mảnh ⇒ xoá mảnh (trigger + confirm).
+  Code: `components/SessionRoomCase.tsx` (đặt trong `SessionWindow`, TikTok, ops/host-trợ của ca), `lib/db/sessionRoomLinks.ts`, `lib/liveSnapshot/roomCases.ts`; `SnapshotRoomPicker` thêm `prevBaseline` (cảnh báo phòng B bắt đầu trước giờ hết A mà A không có) + `heading`.
+  Chưa làm: `apply_segment_checkpoint_file` (số lúc đổi host) vẫn lấy mốc ngầm theo "snapshot gần nhất ca khác" (đúng khi A→B liền kề); chưa có chip "ca nối/ngắt room" ở danh sách Sổ Ca. Chi tiết: lịch sử `## Ca nối + ca bị ngắt room (2026-10-08)`.
 - **08/10 (muộn): "KẾ HOẠCH VS THỰC TẾ" CỦA CỬA SỔ CA LIVE THÀNH 2 CỘT + NHẬP TAY THỰC TẾ (migration `0152` ĐÃ CHẠY 08/10, user thử OK; tsc, vitest 663/664 — 1 đỏ là Talent Pool `lg:sticky` có sẵn;
   replay 0001→0152 + `supabase/tests/0152_set_session_actuals.sql` 14/14 trên Postgres tạm; user xác nhận chạy được trên app thật; test vẽ SSR `tests/sessionPlanVsActual.test.ts`).**
   `components/SessionPlanVsActual.tsx` (thay khối cũ trong `SessionWindow`): bảng Kế hoạch | Thực tế — Giờ live (giờ ca | giờ live thật), GMV (target | GMV + "% target"), GMV/giờ (target ÷ giờ ca | thực tế).
@@ -182,6 +194,7 @@
 ## 2. Việc còn treo
 
 **Cần user làm:**
+- **Chạy migration `0153`** (Supabase SQL Editor) rồi thử trên app thật: mở một ca TikTok → "Room của ca này" → Ca nối / Ca bị ngắt; tới lúc chạy thì phần đó tự ẩn (và console có vài 404 RPC).
 000000000. **Đợt 3 tài khoản XONG 06/10:** user cấp 27 tài khoản đăng nhập bằng tên (Thái Toàn + 26 người có ca), app đếm 37 tài khoản, khối vàng còn 5 hồ sơ chưa có ca sắp tới; 27 tài khoản gắn đúng hồ sơ cùng tên. Còn: thêm email thật khi có (nút "Thêm email"); 6 tài khoản talent cũ mang email thử (hhhhh@ / test@ / hostesttt@…) — nếu là người thật thì Đặt lại MK + gửi lại. Chưa đo: một lần giao ca THẬT đầu-cuối.
 00000000. **0143 ĐÃ CHẠY 06/10** (user xác nhận). Sửa 27 chỗ trùng người T10 (Bảng Vận Hành → khối đỏ "chỗ trùng người", hoặc Việc cần làm) — 0143 KHÔNG chặn ca trùng sẵn,
    chỉ chặn lần ghi đưa người vào ca/dời giờ; 32 ca Franklin Shopee T10 chưa có phòng (đặt phòng mặc định ở CRM → Hợp đồng & giá, ca đã tạo thì Sửa ca).
@@ -484,13 +497,13 @@ target khung camp ở Nhập Ads bỏ 06/10 — tháng không có kế hoạch c
   sang ngày khác kiểm trùng người/phòng, chặn ca có số và ngày đã qua. Hợp đồng nháp không sinh cam kết; lưu hợp đồng đang hiệu lực ở CRM tự sinh lại (dọn
   tháng ngoài khung, giữ tháng sửa riêng ở Kế Hoạch Tháng). % hoa hồng agency chỉ theo giá brand × sàn (không sửa từng ca).
 - Snapshot theo ca: chỉ 13 cột ĐẾM ĐƯỢC mới đem trừ, tỷ lệ tính lại lúc đọc; mốc ranh giới = **giờ kết thúc ca**
-  (`session_boundary_at`); room thuộc ca khi khung giao nhau cả 2 đầu; up lại cho cùng ca = thay thế.
+  (`session_boundary_at`); room thuộc ca khi khung giao nhau cả 2 đầu; up lại cho cùng ca = thay thế. **Ca nối phải xác nhận tường minh (0153):** có `session_room_links` thì mốc trừ = snapshot của đúng ca trước, ca trước chưa up ⇒ số ca sau khoá; ca ngắt room = nhiều room trong snapshot, mỗi lần ngắt là một mảnh có lý do.
 - Talent không bao giờ ghi đè số đã có snapshot/đối soát (RPC chặn). Thông báo "số khác số bạn báo" chỉ khi số cũ là
   `manual` và lệch ≥ 5%. Ca `is_backfill` không vào Finance. Planner/gợi ý chỉ ĐỀ XUẤT, không bao giờ tự chốt ngầm.
 
 ## 6. Hạ tầng Supabase
 
-- 151 migration (`supabase/migrations/`) — **`0151` (chốt kế hoạch gắn vào ca đã nhập sẵn) ĐÃ CHẠY 07/10 (user xác nhận; chưa verify bằng lần Chốt thật);** **`0149` (kênh brand × sàn) và `0150` (bậc nguồn số giao ca gõ + ATC từ Live List) ĐÃ CHẠY 07/10;** `0147` (số lúc đổi host, Shopee gõ) ĐÃ CHẠY, **`0148` (TikTok up file lúc đổi host) ĐÃ CHẠY (đo 07/10);** `0145` (giao ca TikTok bằng file) ĐÃ CHẠY 06/10; `0144` (giao ca) ĐÃ CHẠY 06/10; `0143` (chặn trùng người) ĐÃ CHẠY 06/10; **`0139`–`0142` (report / kế hoạch / hợp đồng theo sàn, file Ads Shopee) ĐÃ CHẠY 06/10**;, chạy tay theo thứ tự — **`0138` (đổi người giữa ca) ĐÃ CHẠY 06/10.** `0137` đã chạy 05/10. **`0136` ĐÃ CHẠY 05/10** (verify production: lô đối soát thử với phòng kết thúc đúng phút ca CROCS 30/09 11:01 bắt đầu ⇒ không khớp, phòng chồng 29 phút ⇒ khớp; lô thử đã xoá; trigger profiles nằm trước đoạn đó trong cùng file + chốt tự kiểm cuối file), bộ kiểm
+- 153 migration (`supabase/migrations/`) — **`0153` (ca nối tường minh + ca bị ngắt room) CHƯA CHẠY (08/10; chạy tay SAU 0152, idempotent).** **`0151` (chốt kế hoạch gắn vào ca đã nhập sẵn) ĐÃ CHẠY 07/10 (user xác nhận; chưa verify bằng lần Chốt thật);** **`0149` (kênh brand × sàn) và `0150` (bậc nguồn số giao ca gõ + ATC từ Live List) ĐÃ CHẠY 07/10;** `0147` (số lúc đổi host, Shopee gõ) ĐÃ CHẠY, **`0148` (TikTok up file lúc đổi host) ĐÃ CHẠY (đo 07/10);** `0145` (giao ca TikTok bằng file) ĐÃ CHẠY 06/10; `0144` (giao ca) ĐÃ CHẠY 06/10; `0143` (chặn trùng người) ĐÃ CHẠY 06/10; **`0139`–`0142` (report / kế hoạch / hợp đồng theo sàn, file Ads Shopee) ĐÃ CHẠY 06/10**;, chạy tay theo thứ tự — **`0138` (đổi người giữa ca) ĐÃ CHẠY 06/10.** `0137` đã chạy 05/10. **`0136` ĐÃ CHẠY 05/10** (verify production: lô đối soát thử với phòng kết thúc đúng phút ca CROCS 30/09 11:01 bắt đầu ⇒ không khớp, phòng chồng 29 phút ⇒ khớp; lô thử đã xoá; trigger profiles nằm trước đoạn đó trong cùng file + chốt tự kiểm cuối file), bộ kiểm
   `supabase/tests/0136_profile_guard_recon_edges_lock_past.sql` (replay, DB trắng): 16 OK, đỏ khi thiếu 0136. **Tới `0132` đều ĐÃ CHẠY** (0131 + 0132 ngày 02/10);
   **`0133` ĐÃ CHẠY 04/10** (verify ở §1); **`0134` ĐÃ CHẠY 05/10** (verify: CRM không còn SĐT mẫu); **`0135` ĐÃ CHẠY 05/10** (verify: 4 brand KAM "Chưa chọn", form sửa cũng "Chưa chọn"). Lô đối soát cũ (06–09/2026, không gắn brand) không áp dụng lại được — đo
   04/10 nó chỉ khớp ca CROCS nên chưa có số nào bị chia nhầm. Replay `0001 → 0133`: sạch, chạy lần 2 không lỗi; bộ kiểm hành vi
@@ -548,6 +561,7 @@ target khung camp ở Nhập Ads bỏ 06/10 — tháng không có kế hoạch c
 | `## Report Tháng …` (8 phần · chuyên sâu · bỏ trùng lặp · bản chụp · gộp phân tích sâu) | cấu trúc 7 phần, bản chụp 0119, control group, quà tặng/UPT, khoảng tin cậy host |
 | `## Key Metrics 18 chỉ số` · `## Chuẩn hoá tên chỉ số` | `keyMetrics.ts`, `metricGlossary.ts` |
 | `## Tầng dữ liệu gốc mới — snapshot theo ca …` | cơ chế snapshot, công thức tỷ lệ đối chiếu 89 phiên thật |
+| `## Ca nối + ca bị ngắt room (2026-10-08)` | 0153: bảng liên kết/mảnh, view trừ số theo liên kết, ước lượng chia theo thời gian, cách đã test |
 | `## Nạp bù ca từ file Creator-Live-Performance …` | 0086, quy trình chuẩn khi có file mới, gán host ca nạp bù |
 | `## Module "Kế Hoạch Tháng" …` · `## Module tạo ca — P1 …` | 0088, 0090–0099: lưới, chốt, camp ranges, phòng live |
 | `## Sổ Ca …` · `## Module hỗ trợ vận hành …` · `## Tái cấu trúc màn hình Vận Hành Live …` | 3 màn vận hành và luật của chúng |

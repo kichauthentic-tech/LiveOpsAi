@@ -3,6 +3,7 @@ import { AlertTriangle } from "lucide-react";
 import type { LiveSession } from "../types";
 import type { SnapshotRoomRow } from "../lib/liveSnapshot/extractRooms";
 import { classifyRooms, sessionWindow, shortRoomId, sumRooms } from "../lib/liveSnapshot/roomSelection";
+import { roomsMissingFromPrev, type PrevBaseline } from "../lib/liveSnapshot/roomCases";
 import { fmtCount } from "../lib/handover";
 import { fmtVndFull } from "../lib/format";
 
@@ -17,6 +18,10 @@ interface Props {
   untilMin?: number;
   /** Phòng đã chọn ở lần up trước của ca này — tick sẵn lại. */
   previouslySelected?: string[];
+  /** Ca nối từ ca trước: mốc trừ của ca trước — cảnh báo phòng đã tick mà ca trước không có (0153). */
+  prevBaseline?: PrevBaseline & { label: string };
+  /** Tiêu đề thay thế (vd mảnh sau của ca bị ngắt room). */
+  heading?: string;
   confirmLabel: string;
   busy: boolean;
   onConfirm: (rows: SnapshotRoomRow[]) => void;
@@ -30,7 +35,7 @@ const dur = (m: number) => {
   return `${Math.floor(r / 60)}h${String(r % 60).padStart(2, "0")}`;
 };
 
-export function SnapshotRoomPicker({ session: s, rows, fileName, untilMin, previouslySelected, confirmLabel, busy, onConfirm, onCancel }: Props) {
+export function SnapshotRoomPicker({ session: s, rows, fileName, untilMin, previouslySelected, prevBaseline, heading, confirmLabel, busy, onConfirm, onCancel }: Props) {
   const win = useMemo(() => sessionWindow(s, untilMin), [s, untilMin]);
   const choices = useMemo(() => classifyRooms(rows, win), [rows, win]);
   const [picked, setPicked] = useState<Set<string>>(() => {
@@ -48,12 +53,13 @@ export function SnapshotRoomPicker({ session: s, rows, fileName, untilMin, previ
       return n;
     });
   const edgeTicked = choices.filter((c) => picked.has(c.row.roomId) && c.overlapShare < 0.5);
+  const missingFromPrev = prevBaseline ? roomsMissingFromPrev(selected, prevBaseline) : [];
   const endClock = new Date(win.endMs).toLocaleTimeString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit" });
 
   return (
     <div className="space-y-2.5 rounded-xl border border-[var(--accent)]/40 bg-[var(--surface-base)] p-3">
       <div>
-        <p className="text-xs font-bold text-[var(--text)]">Chọn phòng live của ca này</p>
+        <p className="text-xs font-bold text-[var(--text)]">{heading ?? "Chọn phòng live của ca này"}</p>
         <p className="text-[11px] text-[var(--text-muted)]">
           File <span className="font-mono">{fileName}</span> có <b>{rows.length}</b> phòng (cả ngày). Tick đúng phòng ca {s.startTime}–{s.endTime}
           {untilMin != null ? ` tính tới ${endClock}` : ""} đang live — ca bị tắt/bật lại stream sẽ có nhiều phòng liền nhau.
@@ -104,6 +110,13 @@ export function SnapshotRoomPicker({ session: s, rows, fileName, untilMin, previ
         <p className="text-[11px] text-amber-300 flex items-start gap-1.5">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
           Bạn đã tick phòng chủ yếu nằm ngoài ca. Nếu ca kề bên chưa up file thì số cả phòng sẽ bị tính cho ca này.
+        </p>
+      )}
+
+      {prevBaseline && missingFromPrev.length > 0 && (
+        <p className="text-[11px] text-amber-300 flex items-start gap-1.5">
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
+          Phòng {missingFromPrev.map(shortRoomId).join(", ")} bắt đầu trước giờ hết ca {prevBaseline.label} nhưng ca đó không có phòng này — ca này sẽ nhận CẢ phòng. Nhờ trợ ca trước kiểm tra file của họ.
         </p>
       )}
 

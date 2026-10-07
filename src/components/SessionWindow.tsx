@@ -25,6 +25,7 @@ import { BrandLogo } from "./ui/BrandLogo";
 import { HandoverForm } from "./HandoverForm";
 import { SessionPlanVsActual } from "./SessionPlanVsActual";
 import { TikTokHandover } from "./TikTokHandover";
+import { SessionRoomCase } from "./SessionRoomCase";
 import { handoverOwnerLabel, hasHandover, isHandoverPerson } from "../lib/handover";
 import { useToast } from "../hooks/useToast";
 import { useConfirm } from "../hooks/useConfirm";
@@ -561,6 +562,11 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                   <p className="text-xs text-[var(--text-muted)]">{handoverOwnerLabel(s)}.</p>
                 ))}
             </section>
+          )}
+
+          {/* Room của ca (0153): ca NỐI (1 room → nhiều ca) và ca BỊ NGẮT ROOM (1 ca → nhiều room) — chỉ TikTok, trợ/OPS xác nhận. */}
+          {showHandover && prof.handover === "file" && (isOps || isMine) && (
+            <SessionRoomCase key={s.id} session={s} canEdit={canHandover} isOps={isOps} onSessionsUpdated={(u) => onSessionsUpdated!(u)} />
           )}
 
           {/* Report đã nộp (mọi vai đọc được) */}
