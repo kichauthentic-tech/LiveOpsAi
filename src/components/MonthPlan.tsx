@@ -366,8 +366,11 @@ export default function MonthPlan({
   // chỉ đạt ~0,8 lần mặt bằng mà nhận target ngang ca 19–20h thì % Target đỏ vì KHUNG, không vì host.
   // null khi brand chưa đủ 2 tháng lịch sử ⇒ vẫn chia theo dự báo engine như trước.
   const weightModel = useMemo(
-    () => targetWeightModel(platformSessions.filter((s) => s.brandId === brandId), month, (d) => resolveCampBucketType(d, campRanges)),
-    [platformSessions, brandId, month, campRanges]
+    // Lịch sử xếp loại ngày theo lịch cố định, KHÔNG theo khung camp tháng đang lập: khung nhập tay là ngày của THÁNG NÀY,
+    // áp lên T6–T9 nó xoá D-Day/Mid-Month/Pay Day cũ khỏi lịch sử (07/10: nhập D-Day 8–11 ⇒ GMV/giờ D-Day = ngày thường ⇒ target ca
+    // D-Day bằng ca thường, thấp hơn dự báo cả chục triệu). Khung nhập tay chỉ dùng để xếp loại cho CA CỦA THÁNG (allocationWeights).
+    () => targetWeightModel(platformSessions.filter((s) => s.brandId === brandId), month, (d) => resolveCampBucketType(d)),
+    [platformSessions, brandId, month]
   );
   const allocationWeights = (next: PlanDraftSlot[], forecasts: number[]) =>
     weightModel ? targetWeights(next, weightModel, (d) => resolveCampBucketType(d, campRanges)) : forecasts;

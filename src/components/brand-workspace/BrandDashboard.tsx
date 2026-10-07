@@ -213,7 +213,8 @@ function BrandDashboardOne({ brandId, brandName, platform, platforms, sessions: 
   const slotOk = slotRuleReliable(sIdx, wfSlot);
   const campOk = campRuleReliable(cPos);
   const nextCamp = useMemo(() => effectiveCamp(nextPlan?.plan.campRanges), [nextPlan]);
-  const nextModel = useMemo(() => targetWeightModel(brandSessions, nextMonthOf(month), (d) => resolveCampBucketType(d, nextCamp)), [brandSessions, month, nextCamp]);
+  // Lịch sử theo lịch cố định (khung camp của tháng sau không áp lên T6–T9 — xem MonthPlan.weightModel).
+  const nextModel = useMemo(() => targetWeightModel(brandSessions, nextMonthOf(month), (d) => resolveCampBucketType(d)), [brandSessions, month]);
   const check = useMemo(
     () => (nextPlan ? planCheck(nextPlan.slots, brandSessions, lastDataDate(brandSessions, today), (d) => resolveCampBucketType(d, nextCamp), nextModel) : null),
     [nextPlan, brandSessions, today, nextModel, nextCamp]

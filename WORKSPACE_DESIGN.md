@@ -88,6 +88,7 @@
     `supabase/tests/0151_*.sql` 11/11 (đỏ khi thiếu 0151) + `0140_0142` vẫn 14 OK; vitest 625/625, lint 0 lỗi, audit:dead 0, build; dựng thử
     từ DB thật cả 6 kênh = 0 lỗi lưới. CHƯA xem trên giao diện (cần đăng nhập). Việc user: mỗi kênh (6): Kế Hoạch Tháng → T10 →
     "Dựng lưới từ … ca đã nhập" → nhập Target GMV tháng + "Chia lại target" (CROCS đã có target từng ca) → Chốt.
+  - **07/10 — sửa chia target ca (Kế Hoạch Tháng + Dashboard brand, mục "Kế Hoạch Tháng Sau"):** mô hình trọng số (`targetWeightModel`) từng dựng lịch sử bằng khung camp NHẬP TAY của tháng đang lập ⇒ nhập D-Day 8–11 làm ngày D-Day T7–T9 thành "ngày thường", GMV/giờ D-Day = ngày thường, target ca D-Day bằng ca thường (thấp hơn dự báo). Nay lịch sử luôn xếp loại theo lịch cố định (`resolveCampBucketType(d)`), khung nhập tay chỉ xếp loại CA CỦA THÁNG. Test: `tests/slotInsights.test.ts`. Quy ước: lịch sử cho mô hình không bao giờ áp khung camp của tháng khác. Chưa rõ: sửa ngày camp trong lưới chưa thấy tự chia lại target trong lần thử tay — cần bấm "Chia lại target".
   - Bước tiếp: 5 chạy thật 2–4 tuần (không tính năng mới): giao ca thật, chốt tháng 10 trong app cho ít nhất một kênh mỗi sàn.
 
 - **CHẠY THỬ THẬT trên dữ liệu thật** (từ 2026-09-18; mock đã xoá sạch 19/09). DB: 33 hồ sơ talent thật, CROCS T6–T9 nạp

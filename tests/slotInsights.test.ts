@@ -121,6 +121,22 @@ describe("chia target ca theo chỉ số khung", () => {
     expect(w[1] / w[0]).toBeCloseTo(1.5, 1);
     expect(w[2]).toBeGreaterThan(w[4]);
   });
+  test("khung camp nhập tay của tháng lập KHÔNG xoá D-Day khỏi lịch sử: ca D-Day vẫn nặng hơn ca thường", () => {
+    const overrides = { dday: { start: "2026-10-08", end: "2026-10-11" } };
+    const withOverride = (d: string) => resolveCampBucketType(d, overrides);
+    // Cách cũ (mô hình dựng bằng khung tháng sau): lịch sử D-Day bị coi là ngày thường ⇒ D-Day = ngày thường.
+    const broken = targetWeightModel(history(), "2026-10", withOverride)!;
+    expect(broken.bucketRate.dday).toBe(broken.bucketRate.daily);
+    // Cách đúng: mô hình dựng bằng lịch cố định, ca của tháng xếp loại bằng khung nhập tay.
+    const model = targetWeightModel(history(), "2026-10", bucketOf)!;
+    expect(model.bucketRate.dday).toBeGreaterThan(model.bucketRate.daily);
+    const slots = [
+      { date: "2026-10-10", startTime: "11:00", endTime: "14:00" },
+      { date: "2026-10-04", startTime: "11:00", endTime: "14:00" }
+    ];
+    const w = targetWeights(slots, model, withOverride);
+    expect(w[0]).toBeGreaterThan(w[1]);
+  });
   test("chưa đủ 2 tháng lịch sử ⇒ null (Kế Hoạch Tháng dùng dự báo engine như cũ)", () => {
     expect(targetWeightModel(history().filter((s) => s.date < "2026-07-01"), "2026-10", bucketOf)).toBeNull();
   });
