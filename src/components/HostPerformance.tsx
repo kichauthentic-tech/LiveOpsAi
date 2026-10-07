@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
-import { AlertTriangle, Download, TrendingUp } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, Download, TrendingUp } from "lucide-react";
 import { Brand, LiveSession } from "../types";
 import { WEEKDAY_LABELS, byWeekday, dataQuality, filterSessions, hostWeekdayGrid } from "../lib/performance/hostPerformance";
-import { getTodayDate } from "../lib/dateUtils";
+import { addDays, getTodayDate, isoWeekNumber, isoWeekStart } from "../lib/dateUtils";
 import { downloadSheetsAsXlsx } from "../lib/exportXlsx";
 import { useToast } from "../hooks/useToast";
 import { errorMessage } from "../lib/errorMessage";
@@ -32,11 +32,55 @@ function isoDaysAgo(days: number): string {
 
 const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0]; // Thứ 2 → Chủ nhật
 
+// Kỳ xem (08/10): Ngày / Tuần (ISO, thứ Hai–Chủ nhật) / Tháng, có nút ‹ › chuyển kỳ; "range" giữ ô chọn khoảng ngày tự do (mặc định cũ 90 ngày).
+type PeriodMode = "day" | "week" | "month" | "range";
+const PERIOD_LABEL: Record<PeriodMode, string> = { day: "Ngày", week: "Tuần", month: "Tháng", range: "Tuỳ chọn" };
+
+function monthEnd(date: string): string {
+  const y = Number(date.slice(0, 4));
+  const m = Number(date.slice(5, 7));
+  return `${date.slice(0, 7)}-${`${new Date(Date.UTC(y, m, 0)).getUTCDate()}`.padStart(2, "0")}`;
+}
+
+/** Khoảng [from, to] của kỳ chứa `anchor`. */
+function periodBounds(mode: Exclude<PeriodMode, "range">, anchor: string): { from: string; to: string } {
+  if (mode === "day") return { from: anchor, to: anchor };
+  if (mode === "week") {
+    const from = isoWeekStart(anchor);
+    return { from, to: addDays(from, 6) };
+  }
+  return { from: `${anchor.slice(0, 7)}-01`, to: monthEnd(anchor) };
+}
+
+/** Lùi/tiến một kỳ — tháng nhảy theo lịch (không cộng 30 ngày) để không trôi ngày. */
+function shiftAnchor(mode: Exclude<PeriodMode, "range">, anchor: string, dir: -1 | 1): string {
+  if (mode === "day") return addDays(anchor, dir);
+  if (mode === "week") return addDays(anchor, 7 * dir);
+  const d = new Date(Date.UTC(Number(anchor.slice(0, 4)), Number(anchor.slice(5, 7)) - 1 + dir, 1));
+  return `${d.getUTCFullYear()}-${`${d.getUTCMonth() + 1}`.padStart(2, "0")}-01`;
+}
+
+function periodLabel(mode: Exclude<PeriodMode, "range">, anchor: string): string {
+  if (mode === "day") return fmtDateVn(anchor);
+  if (mode === "week") {
+    const { week, year } = isoWeekNumber(anchor);
+    const { from, to } = periodBounds("week", anchor);
+    return `Tuần ${week}/${year} · ${fmtDateVn(from, false)} – ${fmtDateVn(to, false)}`;
+  }
+  return `Tháng ${Number(anchor.slice(5, 7))}/${anchor.slice(0, 4)}`;
+}
+
 
 export function HostPerformance({ platform, sessions, brands }: HostPerformanceProps) {
   const { showToast } = useToast();
-  const [from, setFrom] = useState(() => isoDaysAgo(90));
-  const [to, setTo] = useState(() => getTodayDate());
+  const [mode, setMode] = useState<PeriodMode>("month");
+  const [anchor, setAnchor] = useState(() => getTodayDate());
+  const [rangeFrom, setRangeFrom] = useState(() => isoDaysAgo(90));
+  const [rangeTo, setRangeTo] = useState(() => getTodayDate());
+  const { from, to } = mode === "range" ? { from: rangeFrom, to: rangeTo } : periodBounds(mode, anchor);
+  const today = getTodayDate();
+  // Không cho tiến qua kỳ chứa hôm nay — chưa có ca nào để xếp hạng.
+  const canNext = mode !== "range" && periodBounds(mode, anchor).to < today;
   const [brandId, setBrandId] = useState("");
   // Xếp hạng theo TỪNG SÀN (06/10): GMV/giờ hai sàn khác hẳn nhau (VERA Shopee ~1,6x TikTok T6–T9) — gộp lại thì host
   // đứng nhiều ca Shopee tự nhiên lên top. Mặc định TikTok; "cả 2 sàn" vẫn chọn được nhưng ghi rõ là không nên so.
@@ -108,9 +152,41 @@ export function HostPerformance({ platform, sessions, brands }: HostPerformanceP
             </PageIntro>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={inputCls} />
-            <span className="text-xs text-[var(--text-faint)]">→</span>
-            <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={inputCls} />
+            <div className="flex rounded-lg border border-[var(--border)] overflow-hidden" role="group" aria-label="Kỳ xem">
+              {(Object.keys(PERIOD_LABEL) as PeriodMode[]).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setMode(m)}
+                  aria-pressed={mode === m}
+                  className={`px-2.5 py-1.5 text-xs font-bold ${mode === m ? "bg-[var(--accent)] text-white" : "bg-[var(--surface-base)] text-[var(--text-muted)] hover:text-[var(--text)]"}`}
+                >
+                  {PERIOD_LABEL[m]}
+                </button>
+              ))}
+            </div>
+            {mode === "range" ? (
+              <>
+                <input type="date" value={rangeFrom} onChange={(e) => setRangeFrom(e.target.value)} className={inputCls} />
+                <span className="text-xs text-[var(--text-faint)]">→</span>
+                <input type="date" value={rangeTo} onChange={(e) => setRangeTo(e.target.value)} className={inputCls} />
+              </>
+            ) : (
+              <div className="flex items-center gap-1">
+                <button onClick={() => setAnchor(shiftAnchor(mode, anchor, -1))} className={`${inputCls} px-1.5`} title="Kỳ trước" aria-label="Kỳ trước">
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+                <span className="text-xs font-bold text-[var(--text)] min-w-[9rem] text-center whitespace-nowrap">{periodLabel(mode, anchor)}</span>
+                <button
+                  onClick={() => setAnchor(shiftAnchor(mode, anchor, 1))}
+                  disabled={!canNext}
+                  className={`${inputCls} px-1.5 disabled:opacity-40`}
+                  title="Kỳ sau"
+                  aria-label="Kỳ sau"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
             <select value={brandId} onChange={(e) => setBrandId(e.target.value)} className={inputCls}>
               <option value="">Tất cả brand</option>
               {brands.map((b) => (
@@ -138,7 +214,7 @@ export function HostPerformance({ platform, sessions, brands }: HostPerformanceP
             <span>
               {/* Ghi kỳ ngay cạnh con số (audit người mới 2026-10-04): Talent Pool cộng MỌI tháng nên cùng một host
                   hai màn ra hai số — trước đây chỉ Talent Pool có câu giải thích. */}
-              <b className="text-[var(--text)]">{fmtDateVn(from)} – {fmtDateVn(to)}{from === isoDaysAgo(90) ? " (90 ngày gần nhất)" : ""}</b>
+              <b className="text-[var(--text)]">{from === to ? fmtDateVn(from) : `${fmtDateVn(from)} – ${fmtDateVn(to)}`}{mode === "range" && from === isoDaysAgo(90) ? " (90 ngày gần nhất)" : ""}</b>
               {" · "}<b className="text-[var(--text)]">chỉ ca {platform}</b>
               {" · "}{quality.total} ca có số liệu: <span className="font-bold text-emerald-400">{quality.reconciled} đã đối soát</span>,{" "}
               <span className="font-bold text-sky-400">{quality.snapshot} số lúc giao ca</span>

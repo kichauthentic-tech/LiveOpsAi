@@ -13,6 +13,11 @@
 
 ## 1. Giai đoạn hiện tại (cập nhật 2026-10-07)
 
+- **08/10 (sau): "TẢI LỊCH HOST" CHIA NHÓM HOST / TRỢ LIVE (CHƯA commit; tsc sạch, `uiReadability` xanh lại — đã đổi `text-[10px]`→`[11px]` trong `TalentLoadTimeline.tsx`; đã xem trên app thật 08/10 + 09/10).** Nhóm theo vai CHIẾM NHIỀU GIỜ HƠN trong ngày (hoà → Host); người làm cả hai vai chỉ MỘT hàng (để trùng giờ host×trợ vẫn chồng thẻ, giờ cộng dồn cho mức 6h), dòng phụ "Host 3h + Trợ 6h", thẻ vai phụ viền nét đứt + nhãn vai. Vai tính theo TỪNG ĐOẠN (`effectiveSegments`), không theo cả ca. "Rảnh cả ngày" chia theo vai hồ sơ. Việc còn treo: chưa có bộ lọc/tab riêng Host|Trợ nếu ops cần.
+- **08/10: HIỆU SUẤT HOST CHỌN KỲ NGÀY / TUẦN / THÁNG (CHƯA commit; tsc sạch; đã xem trên app thật qua dev server :3100, admin).** `components/HostPerformance.tsx`: nút Ngày | Tuần | Tháng | Tuỳ chọn + ‹ › chuyển kỳ
+  (tuần ISO thứ Hai–CN, tháng nhảy theo lịch, không tiến qua kỳ chứa hôm nay); đổi chế độ giữ nguyên mốc `anchor`. Mặc định = **Tháng hiện tại** (trước đây cố định 90 ngày gần nhất); "Tuỳ chọn" giữ ô từ–đến cũ
+  (mặc định 90 ngày). Chỉ là bộ lọc `from/to` đưa vào `filterSessions` — mọi bảng/xuất Excel đi theo kỳ đã chọn, chưa có bảng xu hướng host × kỳ.
+
 - **08/10: BỎ MÀN "NHÂN SỰ CA" CỦA AGENCY, TÁCH "ĐĂNG KÝ CA" CỦA TALENT RA MÀN RIÊNG (user chốt "làm cả 2"; CHƯA commit; tsc, vitest 647/649 — 2 test đỏ là LỖI CÓ SẴN không thuộc đợt
   này: Talent Pool `lg:sticky`, `TalentLoadTimeline` text-[10px] —, audit:dead 0; đã xem trên app thật nối DB thật (admin, user đăng nhập hộ): `/nhan-su-ca` → Bảng Vận Hành, menu không còn mục, khối "Việc lập kế hoạch ca" hiện đúng số liệu; CHƯA thử mở dòng ca chưa có người (T10 không có ca mở nào; tạo ca thử sẽ gửi thông báo thật cho talent) và CHƯA thử màn Đăng Ký Ca bằng tài khoản talent).** Lý do: màn ops trùng Bảng Vận Hành /
   Cửa sổ Ca Live (danh sách ca, đăng ký, chốt Host+Trợ live), còn talent chỉ dùng chung component vì `shift_scheduling` là màn duy nhất họ đăng ký ca. `ShiftScheduling.tsx` (1.140 dòng) đã xoá.
