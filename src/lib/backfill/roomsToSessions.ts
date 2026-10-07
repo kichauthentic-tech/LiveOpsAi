@@ -2,6 +2,7 @@
 // supabaseClient để unit test chạy được (xem quy ước ở lib/performance/targetAllocation.ts).
 import { LiveSession } from "../../types";
 import { CreatorLivePerfRow } from "../dataraw/creatorLivePerfSlice";
+import type { SnapshotRoomRow } from "../liveSnapshot/extractRooms";
 
 // Đúng hình dạng 1 phần tử p_rows của RPC create_backfill_sessions.
 export interface BackfillRoomPayload {
@@ -23,6 +24,8 @@ export interface BackfillRoomPayload {
   shares: number;
   likes: number;
   avg_view_duration_sec: number;
+  /** Chỉ Shopee (Live List có ATC theo phiên) — RPC ghi vào live_session_reports.atc_count. */
+  atc?: number;
 }
 
 // Cùng lý do với extractRooms.ts: cột "Duration" làm tròn xuống phút, lấy hiệu End−Start làm chuẩn.
@@ -55,6 +58,34 @@ export function roomToPayload(r: CreatorLivePerfRow): BackfillRoomPayload | null
     shares: r.shares,
     likes: r.likes,
     avg_view_duration_sec: r.avgViewDurationSec
+  };
+}
+
+/** Dòng "room" chung của hai sàn (SnapshotRoomRow: TikTok = một phòng, Shopee = một phiên Live List) → payload RPC.
+ *  Shopee: mã SHP-<ngày>-<giờ> làm room_id (cùng mã với đối soát/snapshot nên phiên đã có ca được nhận ra), atc nằm ở raw.atc. */
+export function snapshotRowToPayload(r: SnapshotRoomRow): BackfillRoomPayload | null {
+  if (!r.roomId || !r.startedAt || !r.endedAt) return null;
+  const atc = Number((r.raw as Record<string, unknown> | undefined)?.atc);
+  return {
+    room_id: r.roomId,
+    room_title: r.roomTitle ?? "",
+    started_at: r.startedAt,
+    ended_at: r.endedAt,
+    duration_minutes: r.durationMinutes,
+    gmv: r.gmv,
+    orders: r.orders,
+    items_sold: r.itemsSold,
+    sku_orders: r.skuOrders,
+    views: r.views,
+    impressions: r.impressions,
+    product_impressions: r.productImpressions,
+    product_clicks: r.productClicks,
+    new_followers: r.newFollowers,
+    comments: r.comments,
+    shares: r.shares,
+    likes: r.likes,
+    avg_view_duration_sec: r.views > 0 ? Math.round(r.watchSeconds / r.views) : 0,
+    ...(Number.isFinite(atc) && atc > 0 ? { atc } : {})
   };
 }
 
@@ -112,11 +143,11 @@ export interface BackfillPlan {
 
 export const LONG_ROOM_MINUTES = 5 * 60;
 
-export function planBackfill(rows: CreatorLivePerfRow[], linked: Set<string>, windows: SessionWindow[] = []): BackfillPlan {
+/** null = dòng thiếu Room ID / giờ (đếm vào `invalid`). Dùng chung cho cả hai sàn. */
+export function planBackfillPayloads(payloads: (BackfillRoomPayload | null)[], linked: Set<string>, windows: SessionWindow[] = []): BackfillPlan {
   const plan: BackfillPlan = { toCreate: [], existing: 0, overlapping: 0, invalid: 0, longRooms: [] };
   const seen = new Set<string>();
-  for (const r of rows) {
-    const p = roomToPayload(r);
+  for (const p of payloads) {
     if (!p) { plan.invalid++; continue; }
     if (seen.has(p.room_id)) continue; // file có thể lặp room khi ops up nhiều batch chồng ngày
     seen.add(p.room_id);

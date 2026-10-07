@@ -326,7 +326,7 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ platform, brandId, b
       )}
 
       {/* Hai khối dưới đọc danh sách ca: chờ ca về (cờ coreReady) thay vì hiện "0 ca" — phần up file bên dưới không phải chờ. */}
-      {!coreReady && (isReconType || activeType === "creator_live_performance") && (
+      {!coreReady && isReconType && (
         <div className="bg-[var(--surface)] p-4 rounded-2xl border border-[var(--border)] text-xs text-[var(--text-muted)]">
           Đang tải danh sách ca để đối soát / nạp bù — bạn vẫn có thể chọn file ở khung Import bên dưới.
         </div>
@@ -344,9 +344,10 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ platform, brandId, b
         />
       )}
 
-      {/* Nạp bù ca từ room — chỉ có ý nghĩa với file Creator-Live-Performance */}
-      {coreReady && activeType === "creator_live_performance" && (
+      {/* Nạp bù ca từ file — chỉ có ý nghĩa với file số liệu theo ca của sàn (TikTok Creator-Live-Performance, Shopee Live List; Shopee từ 0156) */}
+      {coreReady && isReconType && (
         <BackfillFromRooms
+          platform={platform}
           brandId={brandId}
           brandName={brandName}
           months={backfillMonths(imports, sessions, brandId)}

@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { LiveSession, Talent } from "../../types";
 import { Layers, Scissors, Users, Wand2, CalendarDays, Save, ChevronDown, ChevronUp } from "lucide-react";
-import { fetchCreatorLivePerfMonthSlice, CreatorLivePerfRow } from "../../lib/dataraw/creatorLivePerfSlice";
+import { fetchBackfillPayloads } from "../../lib/dataraw/backfillRooms";
+import { type ReportPlatform } from "../../lib/reportPlatform";
+import { profileOf } from "../../lib/platforms/profiles";
 import { createBackfillSessions, bulkAssignSessionHosts, splitBackfillSession } from "../../lib/db/backfillSessions";
 import {
-  planBackfill, roomIdsLinkedToSessions, sessionWindows, hasOverlappingSession, buildHostGrid, fillByWeekday, copyFromPreviousMonth,
+  planBackfillPayloads, roomIdsLinkedToSessions, BackfillRoomPayload, sessionWindows, hasOverlappingSession, buildHostGrid, fillByWeekday, copyFromPreviousMonth,
   diffAssignments, currentAssignment, DraftAssignments, prevMonthOf, LONG_ROOM_MINUTES
 } from "../../lib/backfill/roomsToSessions";
 import { vnParts } from "../../lib/dataraw/liveAnalysisRows";
@@ -14,17 +16,18 @@ import { useToast } from "../../hooks/useToast";
 import { useConfirm, usePrompt } from "../../hooks/useConfirm";
 import { fmtVndFull } from "../../lib/format";
 
-// Nạp bù ca từ file Creator-Live-Performance (migration 0086) — 2 bước, nằm ngay dưới ô import
-// của tab "Creator Live Performance" trong Dữ Liệu Gốc:
+// Nạp bù ca từ file số liệu theo ca của sàn — TikTok: Creator-Live-Performance (migration 0086), Shopee: Live List (0156, 08/10).
+// 2 bước, nằm ngay trên ô import của tab file đó trong Dữ Liệu Gốc:
 //   1. "Sinh ca từ file": mỗi room → 1 ca Completed đã đối soát, host trống.
 //   2. Lưới ngày × Ca 1..N để gán host/trợ live hàng loạt — công cụ điền theo thứ / sao chép
 //      tháng trước thay cho việc mở form từng ca.
 // Dùng được cho cả tháng đang chạy: room trợ live quên up lúc giao ca sẽ ra ca ở bước 1.
 
 interface Props {
+  platform: ReportPlatform;
   brandId: string;
   brandName: string;
-  months: string[]; // "YYYY-MM" các tháng đã có batch Creator-Live-Performance, mới nhất trước
+  months: string[]; // "YYYY-MM" các tháng đã có batch file số liệu theo ca của sàn, mới nhất trước
   sessions: LiveSession[];
   talents: Talent[];
   onSessionsChanged: () => Promise<void>;
@@ -45,13 +48,14 @@ function readHidden(): boolean {
   try { return localStorage.getItem(HIDE_KEY) === "1"; } catch { return false; }
 }
 
-export const BackfillFromRooms: React.FC<Props> = ({ brandId, brandName, months, sessions, talents, onSessionsChanged }) => {
+export const BackfillFromRooms: React.FC<Props> = ({ platform, brandId, brandName, months, sessions, talents, onSessionsChanged }) => {
+  const prof = profileOf(platform);
   const { showToast } = useToast();
   const confirm = useConfirm();
   const prompt = usePrompt();
   const [month, setMonth] = useState<string>(months[0] ?? "");
   const [hidden, setHidden] = useState<boolean>(readHidden);
-  const [rows, setRows] = useState<CreatorLivePerfRow[]>([]);
+  const [rows, setRows] = useState<(BackfillRoomPayload | null)[]>([]);
   const [loadingRows, setLoadingRows] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -76,19 +80,19 @@ export const BackfillFromRooms: React.FC<Props> = ({ brandId, brandName, months,
     setLoadingRows(true);
     setError(null);
     const [start, end] = monthBounds(month);
-    fetchCreatorLivePerfMonthSlice(brandId, start, end)
-      .then((slice) => { if (alive) setRows(slice.rows); })
+    fetchBackfillPayloads(brandId, platform, start, end)
+      .then((payloads) => { if (alive) setRows(payloads); })
       .catch((e) => { if (alive) setError(`Không đọc được batch tháng này: ${errorMessage(e)}`); })
       .finally(() => { if (alive) setLoadingRows(false); });
     return () => { alive = false; };
-  }, [brandId, month]);
+  }, [brandId, platform, month]);
 
   // Đổi tháng/brand thì bỏ nháp — nháp gắn với session id nên không lẫn, nhưng UI "N thay đổi" sẽ sai.
   useEffect(() => { setDraft({}); setMessage(null); }, [brandId, month]);
 
   const linked = useMemo(() => roomIdsLinkedToSessions(sessions, brandId), [sessions, brandId]);
   const windows = useMemo(() => sessionWindows(sessions, brandId), [sessions, brandId]);
-  const plan = useMemo(() => planBackfill(rows, linked, windows), [rows, linked, windows]);
+  const plan = useMemo(() => planBackfillPayloads(rows, linked, windows), [rows, linked, windows]);
   const grid = useMemo(() => buildHostGrid(sessions, brandId, month), [sessions, brandId, month]);
   const prevGrid = useMemo(() => (month ? buildHostGrid(sessions, brandId, prevMonthOf(month)) : { rows: [], columns: 0 }), [sessions, brandId, month]);
   const monthSessions = useMemo(() => grid.rows.flatMap((r) => r.cells.filter(Boolean).map((c) => c!.session)), [grid]);
@@ -102,9 +106,9 @@ export const BackfillFromRooms: React.FC<Props> = ({ brandId, brandName, months,
     setGenerating(true);
     setError(null);
     try {
-      const r = await createBackfillSessions(brandId, plan.toCreate);
+      const r = await createBackfillSessions(brandId, plan.toCreate, platform);
       await onSessionsChanged();
-      setMessage(`Đã sinh ${r.inserted} ca${r.skipped_existing ? `, bỏ qua ${r.skipped_existing} room đã có ca` : ""}${r.skipped_invalid ? `, ${r.skipped_invalid} dòng thiếu giờ` : ""}.`);
+      setMessage(`Đã sinh ${r.inserted} ca${r.skipped_existing ? `, bỏ qua ${r.skipped_existing} ${prof.liveUnitWord} đã có ca` : ""}${r.skipped_invalid ? `, ${r.skipped_invalid} dòng thiếu giờ` : ""}.`);
     } catch (e) {
       setError(`Không sinh được ca: ${errorMessage(e)}`);
     } finally {
@@ -175,7 +179,7 @@ export const BackfillFromRooms: React.FC<Props> = ({ brandId, brandName, months,
     return (
       <div className="bg-[var(--surface)] px-4 py-2.5 rounded-2xl border border-[var(--border)] flex items-center justify-between gap-2">
         <span className="font-bold text-[var(--text-muted)] text-xs flex items-center gap-2">
-          <Layers className="w-4 h-4" /> Nạp bù ca từ file — {brandName}
+          <Layers className="w-4 h-4" /> Nạp bù ca từ file {platform} — {brandName}
         </span>
         <button type="button" onClick={toggleHidden} className="text-[11px] font-bold text-[var(--accent-text)] flex items-center gap-1">
           Hiện <ChevronDown className="w-3.5 h-3.5" />
@@ -190,7 +194,7 @@ export const BackfillFromRooms: React.FC<Props> = ({ brandId, brandName, months,
     <div className="bg-[var(--surface)] p-4 rounded-2xl border border-[var(--border)] shadow-sm space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h4 className="font-bold text-[var(--text)] text-xs flex items-center gap-2">
-          <Layers className="w-4 h-4 text-[var(--accent-text)]" /> Nạp bù ca từ file — {brandName}
+          <Layers className="w-4 h-4 text-[var(--accent-text)]" /> Nạp bù ca từ file {platform} — {brandName}
         </h4>
         <div className="flex items-center gap-2">
           <select value={month} onChange={(e) => setMonth(e.target.value)} className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1 text-xs text-[var(--text)]">
@@ -208,19 +212,19 @@ export const BackfillFromRooms: React.FC<Props> = ({ brandId, brandName, months,
       {/* Bước 1 — sinh ca */}
       <div className="bg-[var(--surface-base)]/60 border border-[var(--border)] rounded-xl p-3 flex flex-wrap items-center justify-between gap-3">
         <div className="text-[11px] text-[var(--text-muted)] space-y-0.5">
-          <p className="font-bold text-[var(--text)]">Bước 1 · Sinh ca từ room</p>
+          <p className="font-bold text-[var(--text)]">Bước 1 · Sinh ca từ {prof.liveUnitWord}</p>
           {loadingRows ? (
             <p>Đang đọc file...</p>
           ) : (
             <p>
-              File có <b className="text-[var(--text)]">{rows.length}</b> room · đã có ca <b className="text-[var(--text)]">{plan.existing}</b> · sẽ tạo{" "}
+              File có <b className="text-[var(--text)]">{rows.length}</b> {prof.liveUnitWord} · đã có ca <b className="text-[var(--text)]">{plan.existing}</b> · sẽ tạo{" "}
               <b className="text-[var(--text)]">{plan.toCreate.length}</b>
               {plan.overlapping > 0 && (
-                <> · <span className="text-amber-600">{plan.overlapping} room chồng giờ ca đã có trong lịch</span> — không sinh thêm, dùng Đối soát số liệu ở trên để chia số vào ca đó</>
+                <> · <span className="text-amber-600">{plan.overlapping} {prof.liveUnitWord} chồng giờ ca đã có trong lịch</span> — không sinh thêm, dùng Đối soát số liệu ở trên để chia số vào ca đó</>
               )}
               {plan.invalid > 0 && <> · {plan.invalid} dòng thiếu giờ (bỏ qua)</>}
               {plan.longRooms.length > 0 && (
-                <> · <span className="text-amber-600">{plan.longRooms.length} room ≥ {LONG_ROOM_MINUTES / 60}h</span> — sinh xong tách ở lưới bên dưới nếu là 2 ca</>
+                <> · <span className="text-amber-600">{plan.longRooms.length} {prof.liveUnitWord} ≥ {LONG_ROOM_MINUTES / 60}h</span> — sinh xong tách ở lưới bên dưới nếu là 2 ca</>
               )}
             </p>
           )}
@@ -253,7 +257,7 @@ export const BackfillFromRooms: React.FC<Props> = ({ brandId, brandName, months,
         </div>
 
         {monthSessions.length === 0 ? (
-          <p className="text-[11px] text-[var(--text-faint)]">Tháng này chưa có ca nào — sinh ca ở bước 1 trước.</p>
+          <p className="text-[11px] text-[var(--text-faint)]">Tháng này chưa có ca {platform} nào — sinh ca ở bước 1 trước.</p>
         ) : (
           <>
             {/* Công cụ điền */}
@@ -358,7 +362,7 @@ export const BackfillFromRooms: React.FC<Props> = ({ brandId, brandName, months,
                               {s.isBackfill && isLong && !hasOverlappingSession(s, windows) && (
                                 <button
                                   type="button"
-                                  title="Room dài — tách thành 2 ca"
+                                  title={`${prof.liveUnitWord[0].toUpperCase()}${prof.liveUnitWord.slice(1)} dài — tách thành 2 ca`}
                                   disabled={splitting === s.id}
                                   onClick={() => handleSplit(s)}
                                   className="text-amber-600 hover:text-amber-500 disabled:opacity-50 flex items-center gap-0.5"

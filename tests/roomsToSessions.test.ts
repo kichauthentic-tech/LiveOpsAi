@@ -4,7 +4,7 @@
 //
 // Chỗ dễ sai nhất và là lỗi tìm được đợt này: `buildHostGrid` xếp thứ tự ca trong ngày bằng
 // `(actualStartAt ?? startTime)` — trộn ISO timestamp với chuỗi "HH:MM" trong cùng một phép so sánh.
-import { expect, test } from "vitest";
+import { describe, expect, test } from "vitest";
 import {
   LONG_ROOM_MINUTES,
   buildHostGrid,
@@ -12,10 +12,11 @@ import {
   currentAssignment,
   diffAssignments,
   fillByWeekday,
-  planBackfill,
   prevMonthOf,
   roomIdsLinkedToSessions,
   roomToPayload,
+  planBackfillPayloads,
+  snapshotRowToPayload,
   sessionWindows,
   hasOverlappingSession,
   type DraftAssignments
@@ -110,7 +111,7 @@ test("planBackfill: bỏ room đã gắn ca, bỏ room trùng trong file, đếm
     row("r2", "2026-09-11T01:00:00Z", "2026-09-11T03:00:00Z"),
     row(undefined, "2026-09-12T01:00:00Z", "2026-09-12T03:00:00Z")
   ];
-  const plan = planBackfill(rows, new Set(["r2"]));
+  const plan = planBackfillPayloads(rows.map(roomToPayload), new Set(["r2"]));
   expect(plan.toCreate.map((p) => p.room_id)).toEqual(["r1"]);
   expect(plan.existing).toBe(1);
   expect(plan.invalid).toBe(1);
@@ -119,7 +120,7 @@ test("planBackfill: bỏ room đã gắn ca, bỏ room trùng trong file, đếm
 test("room dài bất thường được gắn cờ để ops tách sau khi sinh", () => {
   const long = row("r-long", "2026-09-10T00:00:00Z", "2026-09-10T06:00:00Z"); // 6h
   const ok = row("r-ok", "2026-09-11T00:00:00Z", "2026-09-11T02:00:00Z");
-  const plan = planBackfill([long, ok], new Set());
+  const plan = planBackfillPayloads([long, ok].map(roomToPayload), new Set());
   expect(plan.longRooms.map((p) => p.room_id)).toEqual(["r-long"]);
   expect(LONG_ROOM_MINUTES).toBe(300);
 });
@@ -275,7 +276,7 @@ test("planBackfill: room chồng giờ ca có sẵn thì KHÔNG sinh ca, chỉ �
   const free = row("r-trong", "2026-10-15T13:00:00Z", "2026-10-15T15:00:00Z");
   const caA = ses("A", "2026-10-13", "20:00", { endTime: "23:00" });
   const caB = ses("B", "2026-10-13", "23:00", { endTime: "02:00" }); // qua nửa đêm
-  const plan = planBackfill([room, free], new Set(), sessionWindows([caA, caB], B));
+  const plan = planBackfillPayloads([room, free].map(roomToPayload), new Set(), sessionWindows([caA, caB], B));
   expect(plan.toCreate.map((p) => p.room_id)).toEqual(["r-trong"]);
   expect(plan.overlapping).toBe(1);
 });
@@ -292,7 +293,7 @@ test("sessionWindows: bỏ ca huỷ và ca brand khác; ca qua nửa đêm kết
 test("chạm mép không tính chồng giờ (room kết thúc đúng lúc ca sau bắt đầu)", () => {
   // room 18:00–20:00 VN, ca có sẵn bắt đầu 20:00
   const room = row("r-mep", "2026-10-13T11:00:00Z", "2026-10-13T13:00:00Z");
-  const plan = planBackfill([room], new Set(), sessionWindows([ses("A", "2026-10-13", "20:00")], B));
+  const plan = planBackfillPayloads([room].map(roomToPayload), new Set(), sessionWindows([ses("A", "2026-10-13", "20:00")], B));
   expect(plan.toCreate).toHaveLength(1);
   expect(plan.overlapping).toBe(0);
 });
@@ -302,4 +303,62 @@ test("hasOverlappingSession: ca nạp bù dài có ca khác chồng giờ thì k
   const next = ses("next", "2026-10-13", "23:00", { endTime: "02:00" });
   expect(hasOverlappingSession(long, sessionWindows([long, next], B))).toBe(true);
   expect(hasOverlappingSession(long, sessionWindows([long], B))).toBe(false);
+});
+
+// ---- Nạp bù ca cho Shopee (0156, 08/10) ----
+import { dedupeShopeePayloads } from "../src/lib/dataraw/backfillRooms";
+import { readShopeeStreams, shopeeStreamsToSnapshotRows } from "../src/lib/dataraw/shopeeFiles";
+
+const shopeeRaw = (start: string, durationSec: string, sales: number, extra: Record<string, unknown> = {}) => ({
+  "No.": 1, "Livestream Name": "HÈ THÁNG 6", "Start Time": start, "Duration:": durationSec, Viewers: 500, "Engaged Viewers": 50,
+  Comments: 3, ATC: 40, "Avg. Viewing Duration": "00:00:30", "Orders(Placed Order)": 10, "Orders(Confirmed Order)": 8,
+  "Items Sold(Placed Order)": 12, "Items Sold(Confirmed Order)": 9, "Sales(Placed Order)": sales, "Sales(Confirmed Order)": sales - 1, ...extra
+});
+
+describe("nạp bù ca Shopee từ Live List", () => {
+  const streams = readShopeeStreams([shopeeRaw("06-06-2026 08:00", "01:30:00", 2_000_000)]);
+  const rows = shopeeStreamsToSnapshotRows(streams);
+
+  test("phiên Shopee → payload RPC: mã SHP-, GMV = đặt, ATC giữ lại, viewers vào views", () => {
+    expect(rows.length).toBe(1);
+    const p = snapshotRowToPayload(rows[0])!;
+    expect(p.room_id).toBe("SHP-2026-06-06-0800");
+    expect(p.gmv).toBe(2_000_000);
+    expect(p.orders).toBe(10);
+    expect(p.views).toBe(500);
+    expect(p.atc).toBe(40);
+    expect(p.avg_view_duration_sec).toBe(30);
+    expect(p.duration_minutes).toBe(90);
+    expect(p.started_at < p.ended_at).toBe(true);
+  });
+
+  test("TikTok không có ATC ⇒ payload không có khoá atc", () => {
+    const p = snapshotRowToPayload({ ...rows[0], raw: {} })!;
+    expect("atc" in p).toBe(false);
+  });
+
+  test("thiếu giờ bắt đầu/kết thúc ⇒ null (đếm vào 'thiếu giờ')", () => {
+    expect(snapshotRowToPayload({ ...rows[0], endedAt: undefined })).toBeNull();
+  });
+
+  test("lập kế hoạch: phiên đã có ca (cùng mã SHP-) = đã có; phiên chồng ca có sẵn không sinh thêm", () => {
+    const more = shopeeStreamsToSnapshotRows(readShopeeStreams([
+      shopeeRaw("06-06-2026 08:00", "01:30:00", 2_000_000),
+      shopeeRaw("07-06-2026 08:00", "01:30:00", 1_000_000),
+      shopeeRaw("08-06-2026 08:00", "01:30:00", 1_000_000)
+    ])).map(snapshotRowToPayload);
+    const existing = ses("s1", "2026-06-08", "08:00", { endTime: "09:30", platform: "Shopee" });
+    const plan = planBackfillPayloads(more, new Set(["SHP-2026-06-06-0800"]), sessionWindows([existing], B));
+    expect(plan.existing).toBe(1);
+    expect(plan.overlapping).toBe(1);
+    expect(plan.toCreate.map((p) => p.room_id)).toEqual(["SHP-2026-06-07-0800"]);
+  });
+
+  test("hai lô cùng chứa một phiên ⇒ đếm một lần, lấy lô up sau", () => {
+    const a = shopeeStreamsToSnapshotRows(readShopeeStreams([shopeeRaw("06-06-2026 08:00", "01:30:00", 1_000_000)])).map(snapshotRowToPayload);
+    const b = shopeeStreamsToSnapshotRows(readShopeeStreams([shopeeRaw("06-06-2026 08:00", "01:30:00", 1_500_000)])).map(snapshotRowToPayload);
+    const out = dedupeShopeePayloads([{ importedAt: "2026-10-01T00:00:00Z", payloads: a }, { importedAt: "2026-10-08T00:00:00Z", payloads: b }]);
+    expect(out.length).toBe(1);
+    expect(out[0]!.gmv).toBe(1_500_000);
+  });
 });

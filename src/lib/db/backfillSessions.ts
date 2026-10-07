@@ -1,7 +1,8 @@
 import { supabase } from "../supabaseClient";
 import { BackfillRoomPayload } from "../backfill/roomsToSessions";
+import { LEGACY_PLATFORM, type ReportPlatform } from "../reportPlatform";
 
-// 3 RPC của migration 0086 — nạp bù ca từ file Creator-Live-Performance. Guard role nằm trong
+// 3 RPC của migration 0086 (create_backfill_sessions thêm p_platform ở 0156) — nạp bù ca từ file Creator-Live-Performance (TikTok) / Live List (Shopee). Guard role nằm trong
 // thân hàm (ceo/admin/operations), client không cần chặn thêm nhưng UI ẩn với role khác.
 
 export interface BackfillResult {
@@ -13,12 +14,14 @@ export interface BackfillResult {
 // Gửi theo lô để 1 tháng 60–70 room không thành 1 payload quá lớn khi ops up nhiều tháng liền.
 const BATCH = 200;
 
-export async function createBackfillSessions(brandId: string, rows: BackfillRoomPayload[]): Promise<BackfillResult> {
+export async function createBackfillSessions(brandId: string, rows: BackfillRoomPayload[], platform: ReportPlatform = LEGACY_PLATFORM): Promise<BackfillResult> {
   const total: BackfillResult = { inserted: 0, skipped_existing: 0, skipped_invalid: 0 };
   for (let i = 0; i < rows.length; i += BATCH) {
     const { data, error } = await supabase.rpc("create_backfill_sessions", {
       p_brand_id: brandId,
-      p_rows: rows.slice(i, i + BATCH)
+      p_rows: rows.slice(i, i + BATCH),
+      // Sàn mặc định (TikTok) không gửi p_platform: DB chưa chạy 0156 vẫn nạp bù TikTok được như cũ; Shopee cần 0156 (DB cũ báo lỗi hàm không tồn tại).
+      ...(platform === LEGACY_PLATFORM ? {} : { p_platform: platform })
     });
     if (error) throw error;
     const r = data as BackfillResult;

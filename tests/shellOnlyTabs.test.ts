@@ -35,7 +35,7 @@ describe("Dữ Liệu Gốc: khối cần ca tự chờ", () => {
   const src = read("components/brand-workspace/BrandDataRaw.tsx");
   test("Đối soát và Nạp bù chỉ vẽ khi ca đã về", () => {
     expect(src).toContain("{coreReady && isReconType && (");
-    expect(src).toContain('{coreReady && activeType === "creator_live_performance" && (');
+    expect(src.match(/\{coreReady && isReconType && \(/g)?.length, "Đối soát + Nạp bù (cả hai sàn từ 0156) đều chờ ca").toBe(2);
   });
   test("App truyền cờ ca đã nạp", () => {
     expect(read("App.tsx")).toContain("coreReady={coreDataReady}");
