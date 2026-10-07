@@ -66,7 +66,8 @@ interface DbLiveSession {
   total_views: number;
   ctr_avg: number;
   cvr_avg: number;
-  ai_analysis: LiveSession["aiAnalysis"] | null;
+  // Danh sách ca không còn đọc cột này (SESSION_READ_COLUMNS) — chỉ có ở row thô từ RPC/đọc một ca.
+  ai_analysis?: LiveSession["aiAnalysis"] | null;
   data_source: LiveSession["dataSource"] | null;
   reconciled_at: string | null;
   cancel_reason?: string | null;
@@ -426,31 +427,56 @@ function assembleSessions(rows: DbLiveSession[], reports: DbSessionReport[], seg
 // nạp bù ca từ file (0086) tổng ca chưa bao giờ chạm ngưỡng, nhưng 4 brand × 6 tháng × ~60 room là
 // vượt ngay. Phân trang bằng range() tới khi trang trả về ít hơn PAGE.
 const PAGE = 1000;
+// Bắn PAGES_PER_WAVE trang CÙNG LÚC rồi mới xét có cần đợt kế (đo 07/10: 1.501 ca = 2 trang; đọc nối tiếp thì
+// trang 2 chỉ bắt đầu khi trang 1 xong, cộng thêm cả một chặng chờ vào cổng `coreDataReady`). Trang thừa ngoài
+// cuối bảng chỉ trả mảng rỗng (PostgREST dùng offset/limit nên không lỗi 416) — rẻ hơn một chặng mạng.
+const PAGES_PER_WAVE = 2;
+
+// Cột view `live_sessions_secure` mà `sessionFromDb` thực sự đọc. Không `select *`: bỏ `created_at`, `updated_at`
+// (không map vào LiveSession) và `ai_analysis` (không màn nào đọc) — ~9% dung lượng danh sách ca (đo 07/10:
+// 1,3 MB/1.000 dòng). Thêm cột mới vào DbLiveSession/sessionFromDb thì thêm vào đây (test canh).
+export const SESSION_READ_COLUMNS = [
+  "id", "title", "brand_id", "brand_name", "shop_tiktok_handle", "studio_id", "studio_name", "host_id", "host_name",
+  "assistant_id", "assistant_name", "co_host_id", "co_host_name", "platform", "date", "start_time", "end_time", "status",
+  "target_gmv", "actual_gmv", "total_orders", "avg_watch_time_seconds", "peak_viewers", "total_views", "ctr_avg", "cvr_avg",
+  "data_source", "reconciled_at", "cancel_reason", "cancelled_at", "tiktok_room_id",
+  "actual_start_at", "actual_end_at", "live_duration_minutes", "attributed_items_sold", "attributed_sku_orders",
+  "impressions", "product_impressions", "product_clicks", "new_followers", "comments_count", "shares_count", "likes_count",
+  "live_room_ids", "is_backfill", "month_published", "excluded_from_reports", "excluded_reason", "excluded_at"
+].join(",");
+
 async function fetchAllSessionRows(): Promise<DbLiveSession[]> {
   const out: DbLiveSession[] = [];
-  // Rơi về bảng gốc một lần rồi giữ nguyên cho các trang sau — không thử lại view mỗi trang.
+  // Rơi về bảng gốc một lần rồi giữ nguyên cho các đợt sau — không thử lại view mỗi đợt.
   let source: string = READ_VIEW;
-  for (let from = 0; ; from += PAGE) {
-    const page = () =>
-      supabase
-        .from(source)
-        .select("*")
-        .order("date", { ascending: false })
-        .order("start_time", { ascending: false })
-        .order("id", { ascending: true })
-        .range(from, from + PAGE - 1);
-    let { data, error } = await page();
-    if (error?.code === VIEW_MISSING && source === READ_VIEW) {
+  for (let from = 0; ; from += PAGE * PAGES_PER_WAVE) {
+    const wave = () =>
+      Promise.all(
+        Array.from({ length: PAGES_PER_WAVE }, (_, i) => {
+          const start = from + i * PAGE;
+          return supabase
+            .from(source)
+            .select(source === READ_VIEW ? SESSION_READ_COLUMNS : "*")
+            .order("date", { ascending: false })
+            .order("start_time", { ascending: false })
+            .order("id", { ascending: true })
+            .range(start, start + PAGE - 1);
+        })
+      );
+    let results = await wave();
+    if (source === READ_VIEW && results.some((r) => r.error?.code === VIEW_MISSING)) {
       warnViewMissing();
       source = "live_sessions";
-      ({ data, error } = await page());
+      results = await wave();
     }
-    if (error) throw error;
-    const rows = (data as DbLiveSession[]) ?? [];
-    out.push(...rows);
-    if (rows.length < PAGE) break;
+    // Ghép đúng thứ tự trang; trang ngắn đầu tiên là cuối bảng (các trang sau nó, nếu có, rỗng).
+    for (const { data, error } of results) {
+      if (error) throw error;
+      const rows = (data as unknown as DbLiveSession[]) ?? [];
+      out.push(...rows);
+      if (rows.length < PAGE) return out;
+    }
   }
-  return out;
 }
 
 // Đóng ca đã qua giờ kết thúc mà chưa ai ghi số (0096). Gọi lúc app mở; lỗi thì bỏ qua — client vẫn

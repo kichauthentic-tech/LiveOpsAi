@@ -8,6 +8,7 @@ import {
   fetchSessionSnapshot
 } from "../lib/db/sessionLiveSnapshots";
 import { parseSnapshotFile, type ParsedSnapshotFile } from "../lib/liveSnapshot/extractRooms";
+import { preloadSpreadsheetReader } from "../lib/dataraw/parseDataRawExcel";
 import { SnapshotRoomPicker } from "./SnapshotRoomPicker";
 import { errorMessage } from "../lib/errorMessage";
 import { useConfirm } from "../hooks/useConfirm";
@@ -35,6 +36,7 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
   // File đã đọc, đang chờ trợ tick đúng phòng của ca (file tải về là cả ngày nhiều phòng).
   const [pending, setPending] = useState<{ fileName: string; parsed: ParsedSnapshotFile } | null>(null);
 
+  useEffect(() => { preloadSpreadsheetReader(); }, []);
   useEffect(() => {
     let alive = true;
     setLoading(true);

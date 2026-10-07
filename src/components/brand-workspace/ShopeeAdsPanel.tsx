@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { FileSpreadsheet, Loader2, Target, Trash2, Upload } from "lucide-react";
 import type { BrandDataRawImport, DataRawReportType } from "../../types";
-import { parseDataRawExcel, type ParsedDataRawImport } from "../../lib/dataraw/parseDataRawExcel";
+import { parseDataRawExcel, preloadSpreadsheetReader, type ParsedDataRawImport } from "../../lib/dataraw/parseDataRawExcel";
 import { shopeeAdsStats, type ShopeeAdsStats } from "../../lib/dataraw/shopeeAds";
 import { fetchOverlappingBatchRows } from "../../lib/dataraw/monthlyProductSlice";
 import { createOrReplaceDataRawImport, deleteDataRawImport, fetchDataRawImports, findExistingImportForMonth } from "../../lib/db/brandDataRaw";
@@ -66,6 +66,7 @@ export function ShopeeAdsPanel({ brandId, brandName, month, canManage, isPublish
   const start = `${month}-01`, end = monthEnd(month);
   const key = `${brandId}|${month}|${version}`;
 
+  useEffect(() => { preloadSpreadsheetReader(); }, []);
   useEffect(() => {
     let alive = true;
     fetchDataRawImports(brandId, TYPE)

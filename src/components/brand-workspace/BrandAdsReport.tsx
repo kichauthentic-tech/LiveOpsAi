@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { defaultReportMonth } from "../../lib/defaultMonth";
 import { LiveSession, UserRole, BrandMonthlyReport as BrandMonthlyReportType, BrandDataRawImport, DataRawReportType } from "../../types";
 import { AlertTriangle, FileSpreadsheet, Loader2, Lock, Megaphone, Target, Trash2, Upload } from "lucide-react";
-import { parseDataRawExcel, type ParsedDataRawImport } from "../../lib/dataraw/parseDataRawExcel";
+import { parseDataRawExcel, preloadSpreadsheetReader, type ParsedDataRawImport } from "../../lib/dataraw/parseDataRawExcel";
 import { adsMonthStats, adsPrevSameCut, readAdsDays } from "../../lib/dataraw/adsCampaignOverview";
 import { fetchAdsMonthSlice, type AdsMonthSlice } from "../../lib/dataraw/monthlyProductSlice";
 import { createOrReplaceDataRawImport, dataRawImportsRead, deleteDataRawImport, fetchDataRawImports, findExistingImportForMonth } from "../../lib/db/brandDataRaw";
@@ -106,6 +106,7 @@ function TikTokAdsPanel({ brandId, brandName, month, canManage, isPublished, onM
   const { start, end } = useMemo(() => monthRange(month), [month]);
   const { start: prevStart, end: prevEnd } = useMemo(() => monthRange(prevMonthStr(month)), [month]);
 
+  useEffect(() => { preloadSpreadsheetReader(); }, []);
   useEffect(() => {
     let cancelled = false;
     // Lần đầu nhận bản nạp trước; sau khi ghi thì đọc thẳng (lib/db/prefetch.ts).

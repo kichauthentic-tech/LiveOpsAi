@@ -9,6 +9,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { PAGE_SIZE, fetchAllPages } from "../src/lib/db/fetchAllPages";
+import { SESSION_READ_COLUMNS } from "../src/lib/db/sessions";
 
 const SRC = join(__dirname, "..", "src");
 const DB = join(SRC, "lib/db");
@@ -95,8 +96,26 @@ test("đọc cả bảng ở bảng lớn dần phải cuộn trang", () => {
 
 test("hàm tự cuộn trang sẵn có của Sổ Ca không bị gỡ mất", () => {
   const body = bodyOf("sessions.ts", "fetchAllSessionRows");
-  expect(body).toContain(".range(from, from + PAGE - 1)");
+  expect(body).toContain(".range(start, start + PAGE - 1)");
   expect(body, "phải dừng theo trang ngắn, không dừng theo một con số đoán").toContain("rows.length < PAGE");
+});
+
+describe("fetchAllSessionRows — đợt trang song song + cột tường minh", () => {
+  test("bắn nhiều trang cùng lúc, không chờ trang trước", () => {
+    const body = bodyOf("sessions.ts", "fetchAllSessionRows");
+    expect(body, "các trang trong một đợt phải qua Promise.all").toContain("Promise.all(");
+    expect(body, "đợt kế bắt đầu sau cả đợt, không phải sau một trang").toContain("from += PAGE * PAGES_PER_WAVE");
+  });
+
+  test("cột đọc ca khớp những gì sessionFromDb dùng", () => {
+    const src = readFileSync(join(DB, "sessions.ts"), "utf8");
+    const mapper = src.slice(src.indexOf("function sessionFromDb("), src.indexOf("function sessionToDb("));
+    const used = new Set([...mapper.matchAll(/row\.([a-z_0-9]+)/g)].map((m) => m[1]));
+    const listed = new Set(SESSION_READ_COLUMNS.split(","));
+    // ai_analysis cố ý không đọc ở danh sách (không màn nào dùng) — mọi cột khác sessionFromDb đọc phải có trong danh sách.
+    for (const col of used) if (col !== "ai_analysis") expect(listed.has(col), `thiếu cột ${col} trong SESSION_READ_COLUMNS`).toBe(true);
+    for (const col of listed) expect(used.has(col), `${col} có trong SESSION_READ_COLUMNS nhưng sessionFromDb không đọc`).toBe(true);
+  });
 });
 
 test("nhật ký chặn có chủ ý bằng .limit() và nói rõ trên màn", () => {

@@ -58,6 +58,17 @@ function buildRows(rows: unknown[][], startIdx: number, columns: DataRawColumn[]
 }
 
 // xlsx tải động — chỉ cần lúc nhập file (xem src/lib/exportXlsx.ts).
+// Chunk ~500 KB: nếu đợi tới lúc chọn file mới tải thì người dùng thấy đứng hình vài giây trên mạng yếu (đo 07/10:
+// ~150 KB/s tới Supabase/Cloudflare). Các màn có ô chọn file gọi hàm này khi mở để chunk về sẵn lúc rảnh.
+let xlsxPreloaded = false;
+export function preloadSpreadsheetReader(): void {
+  if (xlsxPreloaded) return;
+  xlsxPreloaded = true;
+  const load = () => { void import("xlsx").catch(() => { xlsxPreloaded = false; }); };
+  if (typeof window !== "undefined" && "requestIdleCallback" in window) window.requestIdleCallback(load, { timeout: 3000 });
+  else setTimeout(load, 1500);
+}
+
 async function readSheetRows(file: ArrayBuffer): Promise<unknown[][]> {
   const XLSX = await import("xlsx");
   const wb = XLSX.read(file, { type: "array" });

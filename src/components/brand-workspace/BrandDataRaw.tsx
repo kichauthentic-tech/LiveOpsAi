@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { fmtPeriodLabel } from "../../lib/format";
 import { BrandDataRawImport, BrandDataRawRow, DataRawReportType, UserRole, LiveSession, Talent } from "../../types";
-import { parseDataRawExcel, ParsedDataRawImport } from "../../lib/dataraw/parseDataRawExcel";
+import { parseDataRawExcel, preloadSpreadsheetReader, ParsedDataRawImport } from "../../lib/dataraw/parseDataRawExcel";
 import { dataRawImportsRead, fetchDataRawRows, createOrReplaceDataRawImport, findExistingImportForMonth, deleteDataRawImport } from "../../lib/db/brandDataRaw";
 import type { TabPrefetchCtx } from "../../lib/db/prefetch";
 import { Database, Upload, FileSpreadsheet, AlertTriangle, Trash2, Search, ChevronDown, ChevronRight } from "lucide-react";
@@ -152,6 +152,7 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ platform, brandId, b
 
   const activeTab = ALL_TABS.find((t) => t.id === activeType)!;
 
+  useEffect(() => { preloadSpreadsheetReader(); }, []);
   useEffect(() => {
     setExpandedId(null);
     setRows([]);

@@ -13,6 +13,14 @@
 
 ## 1. Giai đoạn hiện tại (cập nhật 2026-10-07)
 
+- **07/10 (cuối ngày): GIẢM THỜI GIAN MỞ APP — danh sách ca là cổ chai (CHƯA commit; tsc, vitest 633/633, audit:dead, đã đo lại trên trình duyệt).**
+  Đo: mở app = 28–36 request, mọi bảng khác xong ≤2 s nhưng `live_sessions_secure` (1.501 ca = 2 trang, ~1,3 MB/1.000 dòng, ~95% byte lúc mở) mất ~10 s và giữ cổng
+  `coreDataReady`. Mạng máy user tới Cloudflare/Supabase yếu (RTT ~215 ms, ~150 KB/s, TLS 0,5–3,5 s) nên byte + số chặng nối tiếp là đòn bẩy duy nhất. Đã làm:
+  (1) `fetchAllSessionRows` bắn 2 trang/đợt SONG SONG (`PAGES_PER_WAVE`) thay vì nối tiếp; (2) đọc ca bằng `SESSION_READ_COLUMNS` (bỏ `created_at`, `updated_at`,
+  `ai_analysis` — ~9% byte; rơi về `*` khi view chưa có); (4) `preloadSpreadsheetReader()` (parseDataRawExcel.ts) tải sẵn chunk `xlsx` 500 KB lúc rảnh khi mở Dữ Liệu Gốc /
+  Nhập Ads / Shopee Ads / Cửa sổ Ca. Sau sửa: 2 trang cùng bắt đầu một lúc, màn sẵn sàng ~4,6 s (trước ~10–12 s; số mạng dao động). **Chưa làm (cần user chốt):** chỉ nạp
+  3–4 tháng ca gần nhất lúc mở (ảnh hưởng report tháng/hiệu suất host); tăng hạn JWT ở Supabase (token hết hạn thì 1 lệnh refresh 0,3–3,7 s chặn mọi truy vấn).
+
 - **07/10 (user chốt): GỘP "Đối Soát Số Liệu" VÀO "Dữ Liệu Gốc" — một file chỉ up MỘT lần (CHƯA commit, CHƯA verify trên trình duyệt: phiên Claude không
   có đăng nhập).** Màn riêng + mục menu + route `/doi-soat` đã xoá. Ở Dữ Liệu Gốc của brand: loại file đối soát của sàn (`RECON_TYPE` ở `BrandDataRaw.tsx`:
   TikTok = Creator Live Performance, Shopee = Live List) — Xác nhận import ⇒ ghi kho Dữ Liệu Gốc NHƯ CŨ rồi tự tạo lô đối soát từ chính dữ liệu vừa đọc
@@ -327,6 +335,8 @@
   MỘT lần cạnh hàm db (`planStatusesRead`, `monthPlanRead`, `commitmentsRead`…) — test cấm trùng tên `prefetchable`.
   Màn mount sau một lượt đọc của cha (khuôn `ReportPlanningInputs`) thì cha gọi `prefetchX` cùng lúc lượt đọc của nó.
   App xoá kho trong `useLayoutEffect` khi đổi tab (effect thường của con chạy TRƯỚC cha ⇒ sẽ xoá nhầm).
+- **Đọc ca = `fetchAllSessionRows`** (sessions.ts): đợt trang song song + cột tường minh `SESSION_READ_COLUMNS` (test `pagedQueries` canh khớp `sessionFromDb`). Thêm cột vào
+  `sessionFromDb` thì thêm vào danh sách. Màn có ô chọn file Excel gọi `preloadSpreadsheetReader()` lúc mở (xlsx là chunk động 500 KB).
 - **Tab lazy chỉ qua `lazyNamed`** (không `React.lazy` trực tiếp): chunk đã tải thì render thẳng, tránh fallback
   Suspense bị React giữ 300 ms (`tests/lazyNamed.test.ts`, mutation đã thử).
 - **Mọi `.update()`/`.delete()` kèm `.select()` + `assertAffected`** — RLS lọc 0 dòng thì PostgREST trả 204 im lặng.
