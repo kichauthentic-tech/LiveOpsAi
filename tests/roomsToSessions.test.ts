@@ -16,6 +16,8 @@ import {
   prevMonthOf,
   roomIdsLinkedToSessions,
   roomToPayload,
+  sessionWindows,
+  hasOverlappingSession,
   type DraftAssignments
 } from "../src/lib/backfill/roomsToSessions";
 import { CreatorLivePerfRow } from "../src/lib/dataraw/creatorLivePerfSlice";
@@ -262,4 +264,42 @@ test("currentAssignment quy undefined về chuỗi rỗng", () => {
 test("prevMonthOf lùi đúng, kể cả qua năm", () => {
   expect(prevMonthOf("2026-09")).toBe("2026-08");
   expect(prevMonthOf("2026-01")).toBe("2025-12");
+});
+
+// ── Không sinh/tách ca chồng lên ca có sẵn (07/10) ────────────────────────────────────────────────
+// Ca T10 đã nạp bằng file lịch (chưa có Room ID, chưa có snapshot giữa ca). Room 20:00–02:00 chạy xuyên 2 ca có sẵn:
+// sinh ca hay tách ca đều tạo ca THỪA chồng lên ca kế hoạch — phải để Đối soát chia số vào 2 ca đó.
+test("planBackfill: room chồng giờ ca có sẵn thì KHÔNG sinh ca, chỉ đếm 'overlapping'", () => {
+  // 13/10 20:00 → 14/10 02:00 (giờ VN) = 13:00Z → 19:00Z
+  const room = row("r-xuyen", "2026-10-13T13:00:00Z", "2026-10-13T19:00:00Z");
+  const free = row("r-trong", "2026-10-15T13:00:00Z", "2026-10-15T15:00:00Z");
+  const caA = ses("A", "2026-10-13", "20:00", { endTime: "23:00" });
+  const caB = ses("B", "2026-10-13", "23:00", { endTime: "02:00" }); // qua nửa đêm
+  const plan = planBackfill([room, free], new Set(), sessionWindows([caA, caB], B));
+  expect(plan.toCreate.map((p) => p.room_id)).toEqual(["r-trong"]);
+  expect(plan.overlapping).toBe(1);
+});
+
+test("sessionWindows: bỏ ca huỷ và ca brand khác; ca qua nửa đêm kết thúc sang ngày sau", () => {
+  const w = sessionWindows(
+    [ses("ok", "2026-10-13", "23:00", { endTime: "02:00" }), ses("huy", "2026-10-13", "10:00", { status: "Cancelled" }), ses("khac", "2026-10-13", "10:00", { brandId: "brand-khac" })],
+    B
+  );
+  expect(w.map((x) => x.id)).toEqual(["ok"]);
+  expect(w[0].endMs - w[0].startMs).toBe(3 * 3600 * 1000);
+});
+
+test("chạm mép không tính chồng giờ (room kết thúc đúng lúc ca sau bắt đầu)", () => {
+  // room 18:00–20:00 VN, ca có sẵn bắt đầu 20:00
+  const room = row("r-mep", "2026-10-13T11:00:00Z", "2026-10-13T13:00:00Z");
+  const plan = planBackfill([room], new Set(), sessionWindows([ses("A", "2026-10-13", "20:00")], B));
+  expect(plan.toCreate).toHaveLength(1);
+  expect(plan.overlapping).toBe(0);
+});
+
+test("hasOverlappingSession: ca nạp bù dài có ca khác chồng giờ thì không được tách", () => {
+  const long = ses("long", "2026-10-13", "20:00", { endTime: "02:00", isBackfill: true, actualStartAt: "2026-10-13T13:00:00Z", actualEndAt: "2026-10-13T19:00:00Z" });
+  const next = ses("next", "2026-10-13", "23:00", { endTime: "02:00" });
+  expect(hasOverlappingSession(long, sessionWindows([long, next], B))).toBe(true);
+  expect(hasOverlappingSession(long, sessionWindows([long], B))).toBe(false);
 });

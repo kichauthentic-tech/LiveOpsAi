@@ -26,6 +26,7 @@ import { type ShopeeReportSnapshot } from "../../lib/report/shopeeSnapshot";
 import { REPORT_ENGINES, type AnySnapshot } from "../../lib/report/reportEngines";
 import { channelTitle, LEGACY_PLATFORM, type ReportPlatform } from "../../lib/reportPlatform";
 import { fmtDateVn, fmtMonth } from "../../lib/format";
+import { profileOf } from "../../lib/platforms/profiles";
 import { prefetchable, type TabPrefetchCtx } from "../../lib/db/prefetch";
 import { lazyNamed } from "../../lib/lazyNamed";
 
@@ -464,7 +465,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
           <p className="text-[11px] text-amber-300">
             {manualOnly.length > 0 && `${manualOnly.length} phiên là số talent tự khai, chưa có gì bảo chứng. `}
             {snapshotOnly > 0 && `${snapshotOnly} phiên đã có số lúc giao ca nhưng ${platform} còn cập nhật đơn/hoàn/huỷ sau đó. `}
-            Đối soát trước khi phát hành report cho khách — vào "Vận Hành Live → Đối Soát Số Liệu" và chọn sàn {platform}.
+            Đối soát trước khi phát hành report cho khách — vào Dữ Liệu Gốc → file {profileOf(platform).reconciliationFile}, up file rồi bấm Áp dụng ở mục Đối soát số liệu.
           </p>
           <div className="flex flex-wrap gap-1.5">
             {unreconciledSessions.slice(0, 12).map((s) => (

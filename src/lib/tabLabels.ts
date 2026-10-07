@@ -8,7 +8,6 @@ export const AGENCY_TAB_LABELS: Record<string, string> = {
   shift_scheduling: "Nhân sự ca",
   calendar: "Bảng Vận Hành",
   sessions: "Sổ Ca",
-  live_reconciliation: "Đối Soát Số Liệu",
   ops_support: "Hỗ Trợ Vận Hành", // gộp vào Dashboard brand 28/09, rồi khôi phục thành tab agency 07/10 (chỉ còn benchmark ca sắp live)
   host_performance: "Hiệu Suất Host",
   brands_overview: "Toàn Cảnh Brand",

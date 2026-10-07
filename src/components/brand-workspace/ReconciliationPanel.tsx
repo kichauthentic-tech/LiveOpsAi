@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, FileSpreadsheet, RefreshCw, Trash2, Upload } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { AlertTriangle, CheckCircle2, FileSpreadsheet, RefreshCw, Trash2 } from "lucide-react";
 import {
   ReconciliationBatch,
   ReconciliationBucket,
@@ -8,28 +8,27 @@ import {
   deleteReconciliationBatch,
   fetchReconciliationBatches,
   fetchReconciliationRows,
-  fetchLatestReconciliationRows,
-  importReconciliationFile,
   setReconciliationBucket
-} from "../lib/db/liveReconciliation";
-import { type ReportPlatform } from "../lib/reportPlatform";
-import { errorMessage } from "../lib/errorMessage";
-import { useConfirm } from "../hooks/useConfirm";
-import { PageIntro } from "./common/PageIntro";
-import { fmtPeriodLabel, fmtVndFull } from "../lib/format";
-import { Brand, LiveSession } from "../types";
-import { profileOf } from "../lib/platforms/profiles";
+} from "../../lib/db/liveReconciliation";
+import { type ReportPlatform } from "../../lib/reportPlatform";
+import { errorMessage } from "../../lib/errorMessage";
+import { useConfirm } from "../../hooks/useConfirm";
+import { fmtPeriodLabel, fmtVndFull } from "../../lib/format";
+import { LiveSession } from "../../types";
 
-interface LiveReconciliationProps {
-  /** Sàn của workspace agency (07/10): chỉ lô và file của sàn này — TikTok dùng Creator-Live-Performance, Shopee dùng Live List. */
+// Đối soát số liệu của MỘT brand + MỘT sàn, nằm ngay trong Dữ Liệu Gốc (gộp 07/10 — trước đây là màn riêng
+// "Đối Soát Số Liệu" bắt up file lần hai). Lô đối soát được tạo từ chính lần up ở Dữ Liệu Gốc (hoặc từ một lần tải đã lưu);
+// ở đây chỉ xem rổ khớp + Áp dụng. Logic khớp/chia số vẫn ở RPC import_live_reconciliation / apply_live_reconciliation.
+
+interface Props {
+  brandId: string;
+  brandName: string;
   platform: ReportPlatform;
-  /** Brand của file — bắt buộc chọn trước khi up (0133). */
-  brands: Brand[];
-  /** Mọi ca (kể cả đã loại) — chỉ để gắn nhãn brand + giờ cho ca khớp với từng phiên. */
+  /** Ca của brand — chỉ để gắn nhãn ngày + giờ cho ca khớp với từng phiên. */
   sessions: LiveSession[];
+  /** Đổi giá trị ⇒ nạp lại danh sách lô (sau khi tạo lô mới từ lần up/lần tải). */
+  reloadKey: number;
   onApplied: () => Promise<void> | void;
-  // U7 (audit 2026-09-21): mở Cửa sổ Ca Live của ca khớp với phiên (xem số bị ghi đè ngay tại chỗ).
-  onOpenSession?: (sessionId: string) => void;
 }
 
 const BUCKET_LABEL: Record<ReconciliationBucket, string> = {
@@ -59,50 +58,37 @@ function fmtTime(iso?: string): string {
   return iso ? new Date(iso).toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—";
 }
 
-export function LiveReconciliation({ platform, brands, sessions, onApplied, onOpenSession }: LiveReconciliationProps) {
+export function ReconciliationPanel({ brandId, brandName, platform, sessions, reloadKey, onApplied }: Props) {
   const confirm = useConfirm();
-  const [uploadBrandId, setUploadBrandId] = useState("");
-  const uploadPlatform = platform;
-  const brandName = (id?: string) => (id ? brands.find((b) => b.id === id)?.name ?? "brand đã xoá" : undefined);
   const sessionById = useMemo(() => new Map(sessions.map((s) => [s.id, s])), [sessions]);
   const sessionLabel = (id: string) => {
     const s = sessionById.get(id);
-    return s ? `${s.brandName} ${s.date.slice(8, 10)}/${s.date.slice(5, 7)} ${s.startTime}–${s.endTime}` : "ca";
+    return s ? `${s.date.slice(8, 10)}/${s.date.slice(5, 7)} ${s.startTime}–${s.endTime}` : "ca";
   };
-  const [allBatches, setBatches] = useState<ReconciliationBatch[]>([]);
-  const batches = useMemo(() => allBatches.filter((b) => b.platform === platform), [allBatches, platform]);
+  const [batches, setBatches] = useState<ReconciliationBatch[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [rows, setRows] = useState<ReconciliationRow[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
 
-  async function reloadBatches(selectId?: string) {
-    const list = await fetchReconciliationBatches();
+  const reloadBatches = useCallback(async (selectId?: string) => {
+    const list = await fetchReconciliationBatches(brandId, platform);
     setBatches(list);
-    const next = selectId ?? activeId ?? list[0]?.id ?? null;
+    const next = selectId ?? list[0]?.id ?? null;
     setActiveId(next);
     setRows(next ? await fetchReconciliationRows(next) : []);
-  }
+  }, [brandId, platform]);
 
-  // Lúc mở màn: danh sách lô và lô mới nhất kèm dòng bắn SONG SONG (một vòng mạng thay vì hai). Có lô mới
-  // chen vào giữa hai request thì hai bên lệch id ⇒ đọc lại dòng theo đúng lô đầu danh sách.
+  // Mở màn / đổi brand / có lô mới (reloadKey) ⇒ nạp lại, chọn lô mới nhất.
   useEffect(() => {
     let alive = true;
-    Promise.all([fetchReconciliationBatches(), fetchLatestReconciliationRows()])
-      .then(async ([list, latest]) => {
-        if (!alive) return;
-        setBatches(list);
-        const first = list[0]?.id ?? null;
-        setActiveId(first);
-        const rs = !first ? [] : latest?.batchId === first ? latest.rows : await fetchReconciliationRows(first);
-        if (alive) setRows(rs);
-      })
-      .catch((e) => alive && setError(errorMessage(e)));
-    return () => {
-      alive = false;
-    };
-  }, []);
+    setBusy(true);
+    reloadBatches()
+      .catch((e) => alive && setError(errorMessage(e)))
+      .finally(() => alive && setBusy(false));
+    return () => { alive = false; };
+  }, [reloadBatches, reloadKey]);
 
   async function run(fn: () => Promise<void>) {
     setBusy(true);
@@ -124,51 +110,16 @@ export function LiveReconciliation({ platform, brands, sessions, onApplied, onOp
   })).filter((g) => g.items.length > 0);
 
   return (
-    <div className="space-y-4">
-      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-black text-[var(--text)]">Đối Soát Số Liệu</h2>
-            <PageIntro>
-              TikTok còn cập nhật GMV nhiều giờ sau khi tắt live, nên số chốt lúc giao ca chỉ là tạm tính. Tải lại file{" "}
-              <span className="font-bold">Creator-Live-Performance</span> (TikTok) hoặc <span className="font-bold">Live List</span> (Shopee) cho cả ngày/tuần/tháng rồi up một lần để chỉnh lại toàn bộ ca của đúng sàn đó trong kỳ. "Phiên" là một lần bật live trên TikTok; một phiên dài có thể chia cho nhiều ca, nên số phiên và số ca không bằng nhau.
-            </PageIntro>
-          </div>
-          <div className="shrink-0 flex flex-wrap items-center gap-2">
-            <select
-              aria-label="Brand của file"
-              value={uploadBrandId}
-              onChange={(e) => setUploadBrandId(e.target.value)}
-              className="text-xs min-h-8 px-2 rounded-xl bg-[var(--surface-base)] border border-[var(--border)] text-[var(--text)]"
-            >
-              <option value="">Chọn brand của file…</option>
-              {brands.map((b) => (
-                <option key={b.id} value={b.id}>{b.name}</option>
-              ))}
-            </select>
-            <span className="text-xs font-bold text-[var(--text-muted)]">{`File ${profileOf(platform).label} (${profileOf(platform).reconciliationFile})`}</span>
-            <label className={uploadBrandId ? "" : "opacity-40 pointer-events-none"} title={uploadBrandId ? undefined : "Chọn brand trước — file là của MỘT tài khoản, chỉ khớp với ca của brand đó"}>
-              <input
-                type="file"
-                accept=".xlsx,.xls"
-                className="hidden"
-                disabled={busy || !uploadBrandId}
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  e.target.value = "";
-                  if (f && uploadBrandId) void run(async () => { const id = await importReconciliationFile(f, uploadBrandId, uploadPlatform); await reloadBatches(id); });
-                }}
-              />
-              <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--text)] cursor-pointer transition-colors">
-                <Upload className="w-3.5 h-3.5" />
-                {busy ? "Đang xử lý..." : "Up File Đối Soát"}
-              </span>
-            </label>
-          </div>
-        </div>
+    <div className="space-y-3">
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4">
+        <h4 className="font-bold text-[var(--text)] text-xs">Đối soát số liệu — {brandName}</h4>
+        <p className="text-[11px] text-[var(--text-muted)] mt-1 max-w-3xl">
+          Mỗi lần up file ở dưới tự tạo một lần đối soát: app khớp từng phiên live với ca CÓ SẴN của brand theo giờ, bạn xem rổ rồi bấm Áp dụng để thay số tạm bằng số cuối của sàn.
+          Phiên dài chạy xuyên 2 ca (chưa có số lúc giao ca) vẫn chia được cho cả hai ca — chia ước lượng theo thời gian, tổng đúng bằng file.
+        </p>
 
         {batches.length > 0 && (
-          <div className="flex flex-wrap gap-2 mt-4">
+          <div className="flex flex-wrap gap-2 mt-3">
             {batches.map((b) => (
               <button
                 key={b.id}
@@ -179,7 +130,7 @@ export function LiveReconciliation({ platform, brands, sessions, onApplied, onOp
               >
                 <span className="font-bold text-[var(--text)] block truncate max-w-[220px]">{b.periodLabel ? fmtPeriodLabel(b.periodLabel) : b.fileName ?? "Không rõ kỳ"}</span>
                 <span className="text-[11px] text-[var(--text-faint)]">
-                  {brandName(b.brandId) ?? "chưa gắn brand"} · {b.platform} · {b.rowCount} phiên · {b.appliedAt ? `đã áp dụng ${fmtTime(b.appliedAt)}` : "chưa áp dụng"}
+                  {b.rowCount} phiên · {b.appliedAt ? `đã áp dụng ${fmtTime(b.appliedAt)}` : "chưa áp dụng"}
                 </span>
               </button>
             ))}
@@ -201,7 +152,7 @@ export function LiveReconciliation({ platform, brands, sessions, onApplied, onOp
       {!active && !busy && (
         <div className="bg-[var(--surface)] border border-dashed border-[var(--border)] rounded-2xl p-8 text-center">
           <FileSpreadsheet className="w-6 h-6 text-[var(--text-faint)] mx-auto mb-2" />
-          <p className="text-xs text-[var(--text-muted)]">Chưa có lần đối soát nào. Up file để bắt đầu.</p>
+          <p className="text-xs text-[var(--text-muted)]">Chưa có lần đối soát nào của brand này. Up file ở trên (hoặc bấm "Đối soát" ở một lần tải trong Lịch Sử Import) để bắt đầu.</p>
         </div>
       )}
 
@@ -266,15 +217,15 @@ export function LiveReconciliation({ platform, brands, sessions, onApplied, onOp
                           <td className="py-1.5 pr-3 text-right font-bold text-[var(--text)]">{fmtVndFull(r.gmv)}</td>
                           <td className="py-1.5 pr-3 text-right text-[var(--text-muted)]">{r.orders}</td>
                           <td className="py-1.5 text-right text-[var(--text-muted)]">
-                            {r.matchedSessionIds.length === 0 ? "—" : onOpenSession ? (
+                            {r.matchedSessionIds.length === 0 ? "—" : (
                               <span className="inline-flex gap-1 justify-end flex-wrap">
                                 {r.matchedSessionIds.map((id) => (
-                                  <button key={id} onClick={() => onOpenSession(id)} className="inline-flex items-center min-h-6 px-1.5 py-0.5 rounded border border-sky-800 text-sky-300 hover:bg-sky-950 font-bold whitespace-nowrap" title="Mở ca">
+                                  <span key={id} className="inline-flex items-center px-1.5 py-0.5 rounded border border-sky-800 text-sky-300 font-bold whitespace-nowrap">
                                     {sessionLabel(id)}
-                                  </button>
+                                  </span>
                                 ))}
                               </span>
-                            ) : r.matchedSessionIds.length}
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -292,14 +243,14 @@ export function LiveReconciliation({ platform, brands, sessions, onApplied, onOp
             <p className="text-[11px] text-[var(--text-muted)] max-w-xl">
               {active.brandId ? (
                 <>
-                  File {active.platform} của <span className="font-bold">{brandName(active.brandId)}</span> — chỉ khớp với ca {active.platform} của brand này. Áp dụng sẽ ghi đè số
+                  File {active.platform} của <span className="font-bold">{brandName}</span> — chỉ khớp với ca {active.platform} của brand này. Áp dụng sẽ ghi đè số
                   liệu của các ca thuộc rổ "khớp ca agency" và "cần xem lại", đổi nguồn dữ liệu thành <span className="font-bold">đã đối soát</span>.
                   Chạy lại nhiều lần được — mỗi lần tính lại từ đầu theo file này.
                 </>
               ) : (
                 <span className="text-amber-300">
                   Lô này nạp khi đối soát còn khớp ca theo giờ với MỌI brand (có thể chia nhầm GMV sang brand khác cùng giờ) — không áp dụng
-                  được nữa. Xoá lô, chọn brand rồi up lại file.
+                  được nữa. Xoá lô rồi tạo lại từ lần tải ở Lịch Sử Import.
                 </span>
               )}
             </p>
@@ -313,7 +264,7 @@ export function LiveReconciliation({ platform, brands, sessions, onApplied, onOp
                   setNote(`Đã cập nhật ${n} ca theo số liệu đối soát.`);
                 })}
                 disabled={busy || !active.brandId}
-                title={active.brandId ? undefined : "Lô nạp trước khi đối soát gắn brand — xoá lô và up lại file, chọn đúng brand"}
+                title={active.brandId ? undefined : "Lô nạp trước khi đối soát gắn brand — xoá lô rồi tạo lại từ Lịch Sử Import"}
                 className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white disabled:opacity-40 transition-colors"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
@@ -323,7 +274,6 @@ export function LiveReconciliation({ platform, brands, sessions, onApplied, onOp
                 onClick={() => void run(async () => {
                   if (!(await confirm("Xoá lần đối soát này? Số liệu đã ghi vào các ca KHÔNG bị hoàn lại.", { danger: true }))) return;
                   await deleteReconciliationBatch(active.id);
-                  setActiveId(null);
                   await reloadBatches();
                 })}
                 disabled={busy}

@@ -119,7 +119,7 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
               </select>
             </div>
             {!history || history.sessions === 0 ? (
-              <p className="text-xs text-[var(--text-muted)]">Brand chưa có ca đối soát nào — không có gì để học. Đối soát ở Đối Soát Số Liệu hoặc nạp bù từ file.</p>
+              <p className="text-xs text-[var(--text-muted)]">Brand chưa có ca đối soát nào — không có gì để học. Up file ở Dữ Liệu Gốc của brand rồi Áp dụng đối soát, hoặc nạp bù từ file.</p>
             ) : (
               <div className="text-xs space-y-3">
                 <div className="grid grid-cols-2 gap-x-3 gap-y-1">

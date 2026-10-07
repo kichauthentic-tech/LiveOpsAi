@@ -70,9 +70,41 @@ export function roomIdsLinkedToSessions(sessions: LiveSession[], brandId: string
   return out;
 }
 
+// Khung giờ của ca CÓ SẴN (lịch/kế hoạch/đã nhập) của brand — dùng để KHÔNG sinh ca nạp bù chồng lên ca đã có.
+// Ca chưa có giờ live thật: lấy giờ kế hoạch theo giờ VN, ca qua nửa đêm (kết thúc ≤ bắt đầu) thì kết thúc sang ngày sau.
+export interface SessionWindow { id: string; startMs: number; endMs: number }
+
+export function sessionWindows(sessions: LiveSession[], brandId: string): SessionWindow[] {
+  const out: SessionWindow[] = [];
+  for (const s of sessions) {
+    if (s.brandId !== brandId || s.status === "Cancelled") continue;
+    const startMs = startMsOf(s);
+    let endMs = s.actualEndAt ? Date.parse(s.actualEndAt) : NaN;
+    if (!Number.isFinite(endMs)) {
+      endMs = Date.parse(`${s.date}T${s.endTime}:00Z`) - VN_OFFSET_MS;
+      if (endMs <= startMs) endMs += 24 * 3600 * 1000;
+    }
+    if (Number.isFinite(startMs) && Number.isFinite(endMs) && endMs > startMs) out.push({ id: s.id, startMs, endMs });
+  }
+  return out;
+}
+
+// Giao nhau MỞ (chạm mép không tính) — cùng luật với khớp đối soát (0136).
+function overlapsAny(startMs: number, endMs: number, windows: SessionWindow[], exceptId?: string): boolean {
+  return windows.some((w) => w.id !== exceptId && startMs < w.endMs && endMs > w.startMs);
+}
+
+/** Ca nạp bù này có ca KHÁC của brand chồng giờ không (vd ca sau đã có trong kế hoạch)? Có ⇒ đừng tách: dùng Đối soát để chia số vào ca có sẵn. */
+export function hasOverlappingSession(s: LiveSession, windows: SessionWindow[]): boolean {
+  const own = windows.find((w) => w.id === s.id);
+  return own ? overlapsAny(own.startMs, own.endMs, windows, s.id) : false;
+}
+
 export interface BackfillPlan {
   toCreate: BackfillRoomPayload[];
   existing: number;
+  // Room chồng giờ một ca CÓ SẴN (chưa gắn Room ID) — không sinh ca mới, để Đối soát khớp và chia số vào ca đó.
+  overlapping: number;
   invalid: number;
   // Room dài bất thường — thường là host không tắt stream giữa 2 ca, nên gợi ý tách sau khi sinh.
   longRooms: BackfillRoomPayload[];
@@ -80,8 +112,8 @@ export interface BackfillPlan {
 
 export const LONG_ROOM_MINUTES = 5 * 60;
 
-export function planBackfill(rows: CreatorLivePerfRow[], linked: Set<string>): BackfillPlan {
-  const plan: BackfillPlan = { toCreate: [], existing: 0, invalid: 0, longRooms: [] };
+export function planBackfill(rows: CreatorLivePerfRow[], linked: Set<string>, windows: SessionWindow[] = []): BackfillPlan {
+  const plan: BackfillPlan = { toCreate: [], existing: 0, overlapping: 0, invalid: 0, longRooms: [] };
   const seen = new Set<string>();
   for (const r of rows) {
     const p = roomToPayload(r);
@@ -89,6 +121,7 @@ export function planBackfill(rows: CreatorLivePerfRow[], linked: Set<string>): B
     if (seen.has(p.room_id)) continue; // file có thể lặp room khi ops up nhiều batch chồng ngày
     seen.add(p.room_id);
     if (linked.has(p.room_id)) { plan.existing++; continue; }
+    if (overlapsAny(Date.parse(p.started_at), Date.parse(p.ended_at), windows)) { plan.overlapping++; continue; }
     plan.toCreate.push(p);
     if (p.duration_minutes >= LONG_ROOM_MINUTES) plan.longRooms.push(p);
   }

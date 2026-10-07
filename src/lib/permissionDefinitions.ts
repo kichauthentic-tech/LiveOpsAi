@@ -11,7 +11,7 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
     key: "manage_sessions",
     label: "Kế hoạch, ca và số liệu",
     category: "Vận hành",
-    description: "Mở Dashboard, Kế Hoạch Tháng, Sổ Ca, Đối Soát Số Liệu, Hiệu Suất Host, Toàn Cảnh Brand và Điều Phối Phát Hành."
+    description: "Mở Dashboard, Kế Hoạch Tháng, Sổ Ca, Hiệu Suất Host, Toàn Cảnh Brand và Điều Phối Phát Hành."
   },
   {
     key: "manage_calendar",

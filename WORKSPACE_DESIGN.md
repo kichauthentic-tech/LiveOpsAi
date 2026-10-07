@@ -13,6 +13,18 @@
 
 ## 1. Giai đoạn hiện tại (cập nhật 2026-10-07)
 
+- **07/10 (user chốt): GỘP "Đối Soát Số Liệu" VÀO "Dữ Liệu Gốc" — một file chỉ up MỘT lần (CHƯA commit, CHƯA verify trên trình duyệt: phiên Claude không
+  có đăng nhập).** Màn riêng + mục menu + route `/doi-soat` đã xoá. Ở Dữ Liệu Gốc của brand: loại file đối soát của sàn (`RECON_TYPE` ở `BrandDataRaw.tsx`:
+  TikTok = Creator Live Performance, Shopee = Live List) — Xác nhận import ⇒ ghi kho Dữ Liệu Gốc NHƯ CŨ rồi tự tạo lô đối soát từ chính dữ liệu vừa đọc
+  (`importReconciliationFromParsed`, `lib/db/liveReconciliation.ts`); mỗi lần tải trong Lịch Sử Import có nút **Đối soát** (dựng lại từ columns + dòng đã lưu,
+  không cần up lại — dùng cho T9/T10 đã up sẵn). `ReconciliationPanel.tsx` (rổ khớp ca + Áp dụng + xoá lô) nằm trên khối Nạp bù. KHÔNG đổi DB/RPC
+  (`import_live_reconciliation` / `apply_live_reconciliation` giữ nguyên, lô cũ vẫn xem được); `snapshotRowsFromParsed` (extractRooms.ts) là phép chuẩn hoá
+  chung. Lỗi tạo lô sau khi đã lưu import không làm mất import (báo riêng + nút thử lại). Link CeoBrief "reconcile" nay mở Toàn Cảnh Brand.
+  **Luật cho ca nối thiếu snapshot giữa ca:** ĐỪNG Sinh ca / tách ca khi ca sau đã có trong lịch/kế hoạch — Đối soát khớp room vào cả 2 ca có sẵn (rổ "Cần xem
+  lại"), chia theo thời gian chồng, tổng đúng bằng file, host/target giữ nguyên. Nay `planBackfill(rows, linked, sessionWindows)` bỏ room chồng giờ ca có sẵn
+  (đếm `overlapping`) và nút "tách" ẩn khi `hasOverlappingSession` (client; RPC `split_backfill_session` CHƯA chặn — nếu cần thì migration mới). Khối Nạp bù có
+  nút Ẩn/Hiện (localStorage `liveops.backfillFromRooms.hidden`). Test: `tests/roomsToSessions.test.ts` +4; vitest 631/631, tsc, audit:dead 0, build.
+  **Việc kế:** user đăng nhập thử luồng up → Đối soát → Áp dụng trên 1 brand (Claude không được nhập mật khẩu); cân nhắc chặn tách ở RPC.
 - **07/10: AUDIT ĐA SÀN + LỘ TRÌNH 6 BƯỚC (đang làm, user bảo làm hết theo thứ tự).** Báo cáo: https://claude.ai/artifact/NhFbjXqFhMnMXCaJkLUDww
   (5 nguyên nhân gốc: sàn chỉ là cột dán vào 12 bảng, không có thực thể Kênh; ~250 nhánh `if Shopee`; 10 workspace; lọc sàn tự giác từng màn;
   quyết định đảo liên tục). **User chốt 07/10 (luật cứng, §5.6):** dữ liệu gốc hai sàn khác hoàn toàn; **KHÔNG BAO GIỜ cộng/gộp/xếp hạng gộp
@@ -43,7 +55,7 @@
     bộ đếm TikTok trong Cửa sổ Ca, file đối soát, loại Dữ Liệu Gốc + file Ads, tab ẩn, Shop Analytics, phễu (`funnel`), ô KPI CEO, và
     `metrics` = bộ chỉ số tầng 2 (`defs`, `groups`, `ofSessions`, `value`, `fmt`, `drivers`, `coverageNotes`, `hostRanking`). Report Tháng /
     Điều Phối Phát Hành dùng `lib/report/reportEngines.ts` (`REPORT_ENGINES[sàn]`: build, freshness, coverage, headlineChange); khung hiển thị
-    `REPORT_VIEWS`, khung Ads `ADS_PANELS`, bộ đọc file đối soát `RECON_FILE_READERS` — đều `Record<ReportPlatform, …>` (thêm sàn mà quên là lỗi
+    `REPORT_VIEWS`, khung Ads `ADS_PANELS`, bộ dựng dòng đối soát `RECON_ROW_BUILDERS` — đều `Record<ReportPlatform, …>` (thêm sàn mà quên là lỗi
     compile). `platformOf` / `brandMonthKey` / `channelTitle` / `platformIdSuffix` / `LEGACY_PLATFORM` ở `lib/reportPlatform.ts`. Số nhánh so
     tên sàn ngoài lõi: ~210 ⇒ 0 (`tests/platformProfiles.test.ts` quét; chỉ `lib/platforms/`, `lib/reportPlatform.ts`, `server/`, `lib/appNav.ts`
     — appNav gỡ ở Bước 3). Kèm sửa lỗi có từ trước: Report Tháng sập một nhịp khi chuyển VERA·Shopee → CROCS (bản chụp kênh cũ còn trong state ⇒
@@ -127,7 +139,7 @@
    có chạy Ads ở Nhập Ads — Franklin T8 để report T9 có cột so tháng trước. Muốn có "% ngân sách Ads" như deck
    Franklin thì chốt chỗ nhập ngân sách (đề xuất: Kế Hoạch Tháng).
 000. Muốn bỏ 3 phiên "cần xem lại" của CROCS T9 (lô cũ khớp theo luật trước 0136): up lại file Creator Live
-   Performance T9 ở Đối Soát (chọn CROCS) rồi Áp dụng.
+   Performance T9 ở Dữ Liệu Gốc (CROCS) rồi bấm "Đối soát" ở lần tải đó và Áp dụng.
 00. **Chọn KAM thật + nhập SĐT người đại diện cho 4 brand ở CRM** — 0134/0135 (đã chạy 05/10) xoá hết liên hệ/KAM mẫu,
    nay cả 4 brand "KAM: Chưa chọn", đại diện chỉ còn tên (Stan, Tuấn, Mai, Khanh).
 0b. **Sentry chưa cấu hình** (`/api/health` → `sentryConfigured: false`): lỗi phía người dùng không ai thấy. Muốn có thì
@@ -185,13 +197,13 @@
   phạm vi khai ở `TAB_CHANNEL_SCOPE` (appNav): `"all"` = Dashboard CEO, Sổ Ca, Hiệu Suất Host, Toàn Cảnh Brand, Điều Phối Phát Hành, Lịch +
   Sổ Ca brand — thêm "Tất cả kênh" (agency: `perPlatformBlocks` xếp khối riêng từng sàn; Sổ Ca: số vận hành cộng, GMV/đơn/GMV giờ ghi
   từng sàn; Dashboard có thêm `AgencyChannelSummary` = ca/giờ/tiền toàn agency + GMV từng kênh, cộng trong một sàn); `"one"` = Kế Hoạch
-  Tháng, Đối Soát, Hỗ Trợ Vận Hành và các tab brand còn lại. State: `agencyChoice/agencySingle`, `brandChoice/brandSingle` →
+  Tháng, Hỗ Trợ Vận Hành và các tab brand còn lại (Dữ Liệu Gốc gồm cả đối soát). State: `agencyChoice/agencySingle`, `brandChoice/brandSingle` →
   `resolveChannelScope` (reportPlatform.ts); URL `?san=tiktok|shopee|tat-ca`. Tab không có nguồn ở một sàn (hồ sơ `hiddenBrandTabs`) chỉ
   ẩn khỏi sidebar khi MỌI kênh của brand đều không có nguồn; thanh sàn chỉ liệt kê sàn hợp lệ cho tab.
   Có URL route (`src/lib/routes.ts`): `/so-ca`, `/brand/crocs/report-thang`…
 - **Nguồn sự thật của menu:** `agencyNavGroups()`/`brandNavGroups()` ở [src/lib/appNav.ts](src/lib/appNav.ts). Ảnh chụp:
   - Agency: Dashboard (Bản Tin CEO) · Lập Kế Hoạch (Kế Hoạch Tháng, Nhân sự ca) · Vận Hành Hằng Ngày (Bảng Vận Hành, Sổ Ca,
-    Đối Soát Số Liệu) · Phân Tích (Hiệu Suất Host, Toàn Cảnh Brand, Điều Phối Phát Hành) · Tài Nguyên (Talent Pool,
+    Hỗ Trợ Vận Hành) · Phân Tích (Hiệu Suất Host, Toàn Cảnh Brand, Điều Phối Phát Hành) · Tài Nguyên (Talent Pool,
     Studios & Gear) · Kinh Doanh (CRM — gồm "Hợp đồng & giá", TikTok API) · Tài Chính (Finance & P&L — khoá cứng
     ceo/admin) · Hệ Thống (Phân Quyền & Role; AI Training Center — chỉ admin). Talent chỉ thấy: Ca Của Tôi, Đăng Ký Ca, Hồ Sơ.
     (Kinh Doanh chỉ còn CRM + TikTok API — "Cam Kết Hợp Đồng" gộp vào CRM/Kế Hoạch Tháng 06/10.)

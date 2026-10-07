@@ -213,7 +213,7 @@ export const PLATFORM_PROFILES: Record<ReportPlatform, PlatformProfile> = {
     adsFileType: "ads_campaign_overview",
     adsFileLabel: "Campaign overview data (TikTok Ads, theo ngày)",
     hiddenBrandTabs: [],
-    staleDataHint: "Tải file Creator Live Performance từ TikTok rồi up ở Dữ Liệu Gốc; cuối kỳ up thêm ở Đối Soát Số Liệu."
+    staleDataHint: "Tải file Creator Live Performance từ TikTok rồi up ở Dữ Liệu Gốc — một lần up là tự tạo đối soát; cuối kỳ bấm Áp dụng."
   },
   Shopee: {
     id: "Shopee",
@@ -257,7 +257,7 @@ export const PLATFORM_PROFILES: Record<ReportPlatform, PlatformProfile> = {
     adsFileType: "shopee_ads",
     adsFileLabel: "Shopee Live Ads Report (một dòng mỗi chiến dịch)",
     hiddenBrandTabs: ["brand_affiliate", "brand_skus"],
-    staleDataHint: "Tải file Live List từ Shopee Seller Centre rồi up ở Dữ Liệu Gốc (chọn Shopee); cuối kỳ đối soát bằng Live List."
+    staleDataHint: "Tải file Live List từ Shopee Seller Centre rồi up ở Dữ Liệu Gốc (chọn Shopee); cuối kỳ bấm Áp dụng đối soát ngay ở đó."
   }
 };
 

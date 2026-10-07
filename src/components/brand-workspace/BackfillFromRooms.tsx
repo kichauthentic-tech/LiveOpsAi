@@ -4,7 +4,7 @@ import { Layers, Scissors, Users, Wand2, CalendarDays, Save, ChevronDown, Chevro
 import { fetchCreatorLivePerfMonthSlice, CreatorLivePerfRow } from "../../lib/dataraw/creatorLivePerfSlice";
 import { createBackfillSessions, bulkAssignSessionHosts, splitBackfillSession } from "../../lib/db/backfillSessions";
 import {
-  planBackfill, roomIdsLinkedToSessions, buildHostGrid, fillByWeekday, copyFromPreviousMonth,
+  planBackfill, roomIdsLinkedToSessions, sessionWindows, hasOverlappingSession, buildHostGrid, fillByWeekday, copyFromPreviousMonth,
   diffAssignments, currentAssignment, DraftAssignments, prevMonthOf, LONG_ROOM_MINUTES
 } from "../../lib/backfill/roomsToSessions";
 import { vnParts } from "../../lib/dataraw/liveAnalysisRows";
@@ -87,7 +87,8 @@ export const BackfillFromRooms: React.FC<Props> = ({ brandId, brandName, months,
   useEffect(() => { setDraft({}); setMessage(null); }, [brandId, month]);
 
   const linked = useMemo(() => roomIdsLinkedToSessions(sessions, brandId), [sessions, brandId]);
-  const plan = useMemo(() => planBackfill(rows, linked), [rows, linked]);
+  const windows = useMemo(() => sessionWindows(sessions, brandId), [sessions, brandId]);
+  const plan = useMemo(() => planBackfill(rows, linked, windows), [rows, linked, windows]);
   const grid = useMemo(() => buildHostGrid(sessions, brandId, month), [sessions, brandId, month]);
   const prevGrid = useMemo(() => (month ? buildHostGrid(sessions, brandId, prevMonthOf(month)) : { rows: [], columns: 0 }), [sessions, brandId, month]);
   const monthSessions = useMemo(() => grid.rows.flatMap((r) => r.cells.filter(Boolean).map((c) => c!.session)), [grid]);
@@ -214,6 +215,9 @@ export const BackfillFromRooms: React.FC<Props> = ({ brandId, brandName, months,
             <p>
               File có <b className="text-[var(--text)]">{rows.length}</b> room · đã có ca <b className="text-[var(--text)]">{plan.existing}</b> · sẽ tạo{" "}
               <b className="text-[var(--text)]">{plan.toCreate.length}</b>
+              {plan.overlapping > 0 && (
+                <> · <span className="text-amber-600">{plan.overlapping} room chồng giờ ca đã có trong lịch</span> — không sinh thêm, dùng Đối soát số liệu ở trên để chia số vào ca đó</>
+              )}
               {plan.invalid > 0 && <> · {plan.invalid} dòng thiếu giờ (bỏ qua)</>}
               {plan.longRooms.length > 0 && (
                 <> · <span className="text-amber-600">{plan.longRooms.length} room ≥ {LONG_ROOM_MINUTES / 60}h</span> — sinh xong tách ở lưới bên dưới nếu là 2 ca</>
@@ -348,7 +352,10 @@ export const BackfillFromRooms: React.FC<Props> = ({ brandId, brandName, months,
                                 {s.startTime}–{s.endTime}
                                 <span className="font-sans ml-1.5 text-[var(--text-faint)]">{fmtMoney(s.actualGmv)}</span>
                               </span>
-                              {s.isBackfill && isLong && (
+                              {s.isBackfill && isLong && hasOverlappingSession(s, windows) && (
+                                <span className="text-[var(--text-faint)] font-sans" title="Đã có ca khác chồng giờ ca này — tách sẽ tạo ca thừa. Dùng Đối soát số liệu để chia số vào các ca có sẵn.">đã có ca chồng giờ</span>
+                              )}
+                              {s.isBackfill && isLong && !hasOverlappingSession(s, windows) && (
                                 <button
                                   type="button"
                                   title="Room dài — tách thành 2 ca"

@@ -264,7 +264,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
             Nguồn GMV của {quality.total} phiên: <b>{quality.reconciled}</b> đã đối soát
             {quality.snapshot > 0 && <>, <b>{quality.snapshot}</b> số lúc giao ca (sàn còn cập nhật đơn/hoàn/huỷ sau đó)</>}
             {quality.manual > 0 && <>, <b>{quality.manual}</b> talent tự khai (chưa có gì bảo chứng)</>}.
-            Số tiền của các phiên chưa đối soát là tạm tính — duyệt sau khi đối soát ở "Vận Hành Live → Đối Soát Số Liệu".
+            Số tiền của các phiên chưa đối soát là tạm tính — duyệt sau khi đối soát ở Dữ Liệu Gốc của brand (mục Đối soát số liệu).
           </div>
         )}
 

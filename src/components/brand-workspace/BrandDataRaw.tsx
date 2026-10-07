@@ -6,9 +6,11 @@ import { dataRawImportsRead, fetchDataRawRows, createOrReplaceDataRawImport, fin
 import type { TabPrefetchCtx } from "../../lib/db/prefetch";
 import { Database, Upload, FileSpreadsheet, AlertTriangle, Trash2, Search, ChevronDown, ChevronRight } from "lucide-react";
 import { BackfillFromRooms } from "./BackfillFromRooms";
+import { ReconciliationPanel } from "./ReconciliationPanel";
+import { importReconciliationFromParsed } from "../../lib/db/liveReconciliation";
 import { errorMessage } from "../../lib/errorMessage";
 import { useConfirm } from "../../hooks/useConfirm";
-import { platformOf } from "../../lib/reportPlatform";
+import { platformOf, type ReportPlatform } from "../../lib/reportPlatform";
 import { profileOf } from "../../lib/platforms/profiles";
 
 interface BrandDataRawProps {
@@ -23,6 +25,12 @@ interface BrandDataRawProps {
   talents: Talent[];
   onSessionsChanged: () => Promise<void>;
 }
+
+// File mỗi sàn dùng để ĐỐI SOÁT ca (một dòng mỗi phiên live): up ở loại này là tự tạo lần đối soát, không up lần hai.
+const RECON_TYPE: Record<ReportPlatform, DataRawReportType> = {
+  TikTok: "creator_live_performance",
+  Shopee: "shopee_live_list"
+};
 
 const REPORT_TABS: { id: DataRawReportType; label: string; hint: string }[] = [
   { id: "shop_promotion", label: "Khuyến Mãi", hint: 'Export "Shop Promotion List" từ TikTok Shop Seller Center.' },
@@ -41,7 +49,7 @@ const REPORT_TABS: { id: DataRawReportType; label: string; hint: string }[] = [
 const SHOPEE_TABS: { id: DataRawReportType; label: string; hint: string }[] = [
   { id: "shopee_overview", label: "Tổng quan tháng", hint: 'Export "overview-v2…csv" từ Shopee Seller Centre (Dữ liệu Live → Tổng quan, chọn đúng một tháng) — Sales, Viewers, ATC, Product Impressions/Clicks, Traffic Source, Coins/Voucher của live cả tháng.' },
   { id: "shopee_daily", label: "Theo ngày", hint: 'Export "export-sc__1m_…csv" từ Shopee Seller Centre — mỗi ngày một dòng (Sales đặt/xác nhận, Orders, Viewers, ATC, CTR, GPM…). Một file một tháng.' },
-  { id: "shopee_live_list", label: "Live List", hint: 'Export "…live_stream_list_export…xlsx" từ Shopee Seller Centre — mỗi phiên live một dòng: Start Time, Duration, Viewers, ATC, Orders, Items Sold, Sales. Dùng cho Report Shopee VÀ để đối soát ca Shopee ở Đối Soát Số Liệu.' },
+  { id: "shopee_live_list", label: "Live List", hint: 'Export "…live_stream_list_export…xlsx" từ Shopee Seller Centre — mỗi phiên live một dòng: Start Time, Duration, Viewers, ATC, Orders, Items Sold, Sales. Dùng cho Report Shopee VÀ để đối soát ca Shopee — up ở đây là tự tạo lần đối soát ngay bên dưới.' },
   { id: "shopee_product_list", label: "Sản phẩm (Shopee)", hint: 'Export "…live_product_list_export…xlsx" từ Shopee Seller Centre — mỗi sản phẩm bán trong live một dòng (Product Clicks, ATC, Orders, Sales).' }
 ];
 // Mọi loại file; workspace chỉ hiện loại của sàn đang xem (hồ sơ sàn `dataRawTypes`) — không lẫn file hai sàn.
@@ -128,6 +136,11 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ platform, brandId, b
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [reconKey, setReconKey] = useState(0);
+  const [reconBusyId, setReconBusyId] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const isReconType = activeType === RECON_TYPE[platform];
+  const brandSessions = useMemo(() => allSessions.filter((s) => s.brandId === brandId), [allSessions, brandId]);
 
   const activeTab = ALL_TABS.find((t) => t.id === activeType)!;
 
@@ -138,6 +151,7 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ platform, brandId, b
     setReplaceTarget(undefined);
     setFileName("");
     setError(null);
+    setNotice(null);
     dataRawImportsRead.take(brandId, activeType)
       .then((list) => {
         setImports(list);
@@ -176,14 +190,50 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ platform, brandId, b
       const batch = await createOrReplaceDataRawImport(brandId, activeType, fileName, parsedPreview, replaceTarget?.id);
       setImports((prev) => (replaceTarget ? prev.map((i) => (i.id === batch.id ? batch : i)) : [batch, ...prev]));
       setExpandedGroups((prev) => new Set(prev).add(groupMonthKey(batch)));
+      const justParsed = parsedPreview;
+      const justName = fileName;
       setParsedPreview(null);
       setReplaceTarget(undefined);
       setFileName("");
       setExpandedId(batch.id);
+      // File đối soát của sàn: tạo luôn lần đối soát từ CHÍNH dữ liệu vừa đọc. Lỗi ở bước này không làm mất lần import đã lưu.
+      if (isReconType) {
+        try {
+          await importReconciliationFromParsed(justName, justParsed, brandId, platform);
+          setReconKey((k) => k + 1);
+          setNotice("Đã lưu vào Dữ Liệu Gốc và tạo lần đối soát — xem rổ khớp ca ở mục Đối soát số liệu phía trên rồi bấm Áp dụng.");
+        } catch (e) {
+          setError(`Đã lưu vào Dữ Liệu Gốc, nhưng chưa tạo được lần đối soát: ${errorMessage(e)}. Bấm "Đối soát" ở lần tải này trong Lịch Sử Import để thử lại.`);
+        }
+      }
     } catch (e) {
       setError(errorMessage(e, "Không tạo được import."));
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Tạo lần đối soát từ một lần tải ĐÃ LƯU (không cần up lại file): dựng lại parsed từ columns + dòng đã lưu.
+  const handleReconcileImport = async (imp: BrandDataRawImport) => {
+    setReconBusyId(imp.id);
+    setError(null);
+    setNotice(null);
+    try {
+      const saved = await fetchDataRawRows(imp.id);
+      const parsed: ParsedDataRawImport = {
+        periodLabel: imp.periodLabel,
+        periodStart: imp.periodStart,
+        periodEnd: imp.periodEnd,
+        columns: imp.columns,
+        rows: saved.map((r) => r.raw)
+      };
+      await importReconciliationFromParsed(imp.fileName, parsed, brandId, platform);
+      setReconKey((k) => k + 1);
+      setNotice(`Đã tạo lần đối soát từ ${formatPeriodShort(imp)} — xem rổ khớp ca ở mục Đối soát số liệu phía trên.`);
+    } catch (e) {
+      setError(errorMessage(e, "Không tạo được lần đối soát."));
+    } finally {
+      setReconBusyId(null);
     }
   };
 
@@ -262,6 +312,22 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ platform, brandId, b
           </button>
         ))}
       </div>
+
+      {notice && (
+        <div className="bg-emerald-950/30 border border-emerald-800/50 text-emerald-400 text-xs font-semibold p-3 rounded-xl">{notice}</div>
+      )}
+
+      {/* Đối soát số liệu — gộp vào đây (07/10), cùng một lần up với Dữ Liệu Gốc */}
+      {isReconType && (
+        <ReconciliationPanel
+          brandId={brandId}
+          brandName={brandName}
+          platform={platform}
+          sessions={brandSessions}
+          reloadKey={reconKey}
+          onApplied={onSessionsChanged}
+        />
+      )}
 
       {/* Nạp bù ca từ room — chỉ có ý nghĩa với file Creator-Live-Performance */}
       {activeType === "creator_live_performance" && (
@@ -367,6 +433,16 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ platform, brandId, b
                             <span className="truncate">{formatPeriodShort(imp)}</span>
                             <span className="text-[var(--text-faint)] font-normal shrink-0">· {imp.rowCount} dòng · cập nhật {new Date(imp.importedAt).toLocaleDateString("vi-VN")}</span>
                           </button>
+                          {isReconType && (
+                            <button
+                              onClick={() => void handleReconcileImport(imp)}
+                              disabled={reconBusyId !== null}
+                              title="Tạo lần đối soát từ lần tải này (không cần up lại file)"
+                              className="shrink-0 text-[11px] font-bold px-2 py-1 rounded-lg bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--text)] disabled:opacity-40"
+                            >
+                              {reconBusyId === imp.id ? "Đang tạo..." : "Đối soát"}
+                            </button>
+                          )}
                           <button onClick={() => handleDelete(imp.id)} className="text-red-500/70 hover:text-red-500 shrink-0 p-1.5 rounded">
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>

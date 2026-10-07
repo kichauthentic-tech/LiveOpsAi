@@ -60,10 +60,10 @@ describe("gộp Avg. view của nhiều ca", () => {
 test("đường đọc file phải đẩy watchSeconds xuống RPC, nếu không cột vẫn kẹt ở 0", () => {
   const src = readFileSync(join(__dirname, "../src/lib/liveSnapshot/extractRooms.ts"), "utf8");
   expect(src).toMatch(/watchSeconds: watchSecondsOf\(r\.avgViewDurationSec, r\.views\)/);
-  // Cả 2 đường nạp file (snapshot lúc giao ca + đối soát cuối kỳ) dùng chung parseSnapshotFile,
-  // nên chỉ cần 1 chỗ — nhưng phải chắc là đối soát vẫn đi qua đó.
+  // Cả 2 đường nạp file (snapshot lúc giao ca + đối soát cuối kỳ) dùng chung phép chuẩn hoá của extractRooms
+  // (parseSnapshotFile cho file, snapshotRowsFromParsed cho dữ liệu đã đọc) — phải chắc là đối soát vẫn đi qua đó.
   const recon = readFileSync(join(__dirname, "../src/lib/db/liveReconciliation.ts"), "utf8");
-  expect(recon).toMatch(/parseSnapshotFile/);
+  expect(recon).toMatch(/snapshotRowsFromParsed/);
 
   for (const f of ["0124_avg_view_duration_from_file.sql"]) {
     const sql = readFileSync(join(__dirname, "../supabase/migrations", f), "utf8");

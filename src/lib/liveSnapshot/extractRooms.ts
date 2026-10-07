@@ -1,4 +1,4 @@
-import { parseDataRawExcel } from "../dataraw/parseDataRawExcel";
+import { parseDataRawExcel, type ParsedDataRawImport } from "../dataraw/parseDataRawExcel";
 import { mapCreatorLivePerfRows } from "../dataraw/creatorLivePerfSlice";
 
 // Một dòng room đã chuẩn hoá, sẵn sàng đẩy vào RPC apply_session_live_snapshot (migration 0078).
@@ -69,7 +69,12 @@ function exactDurationMinutes(startedAt?: string, endedAt?: string, fallbackHour
 }
 
 export async function parseSnapshotFile(file: File): Promise<ParsedSnapshotFile> {
-  const parsed = await parseDataRawExcel(file, "creator_live_performance");
+  return snapshotRowsFromParsed(await parseDataRawExcel(file, "creator_live_performance"));
+}
+
+/** Cùng phép chuẩn hoá cho dữ liệu đã đọc sẵn — file vừa up, hoặc batch Creator-Live-Performance đã lưu ở Dữ Liệu Gốc
+ *  (`columns` + `rows` lưu nguyên, nên dựng lại được đúng các dòng room mà không cần file gốc). */
+export function snapshotRowsFromParsed(parsed: ParsedDataRawImport): ParsedSnapshotFile {
   const mapped = mapCreatorLivePerfRows(parsed.columns, parsed.rows);
 
   const rows: SnapshotRoomRow[] = [];

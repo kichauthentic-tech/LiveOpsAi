@@ -1,5 +1,5 @@
 import React from "react";
-import { BookOpen, BrainCircuit, Briefcase, Building2, CalendarCheck2, CalendarClock, Calendar as CalendarIcon, CalendarRange, Activity, ClipboardCheck, Database, DollarSign, FileSignature, FileText, LayoutDashboard, LayoutGrid, Link2, Megaphone, Package, Radio, Send, ShieldCheck, TrendingUp, Users } from "lucide-react";
+import { BookOpen, BrainCircuit, Briefcase, Building2, CalendarCheck2, CalendarClock, Calendar as CalendarIcon, CalendarRange, Activity, Database, DollarSign, FileSignature, FileText, LayoutDashboard, LayoutGrid, Link2, Megaphone, Package, Radio, Send, ShieldCheck, TrendingUp, Users } from "lucide-react";
 import { PermissionKey, UserRole } from "../types";
 
 // Cấu hình sidebar + vài hằng số điều hướng, tách khỏi App.tsx 2026-10-01 (App.tsx 2.867 dòng).
@@ -28,7 +28,6 @@ export const TAB_CHANNEL_SCOPE: Record<string, "all" | "one"> = {
   brands_overview: "all",
   report_publish_board: "all",
   month_plan: "one",
-  live_reconciliation: "one",
   ops_support: "one",
   brand_dashboard: "one",
   brand_calendar: "all",
@@ -124,7 +123,6 @@ export function agencyNavGroups(currentRole: UserRole): NavGroup[] {
               // (hôm nay/tuần, việc còn thiếu) + chế độ xem Lịch & Studio (LiveCalendar cũ).
               { id: "calendar", label: "Bảng Vận Hành", icon: CalendarIcon, perm: "manage_calendar" as PermissionKey },
               { id: "sessions", label: "Sổ Ca", icon: BookOpen, perm: "manage_sessions" as PermissionKey },
-              { id: "live_reconciliation", label: "Đối Soát Số Liệu", icon: ClipboardCheck, perm: "manage_sessions" as PermissionKey },
               // Hỗ Trợ Vận Hành: 28/09 gộp vào Dashboard brand; 07/10 user chốt tách lại — benchmark ca sắp live chỉ ở đây, không ở Dashboard brand.
               { id: "ops_support", label: "Hỗ Trợ Vận Hành", icon: Activity, perm: "manage_calendar" as PermissionKey }
             ]

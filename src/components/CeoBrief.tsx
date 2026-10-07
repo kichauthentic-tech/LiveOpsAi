@@ -86,7 +86,7 @@ interface CeoBriefProps {
 const ACTION_TAB: Record<IssueAction, { tab: string; label: string }> = {
   sessions: { tab: "sessions", label: "Mở Sổ Ca" },
   month_plan: { tab: "month_plan", label: "Mở Kế Hoạch Tháng" },
-  reconcile: { tab: "live_reconciliation", label: "Mở Đối Soát" },
+  reconcile: { tab: "brands_overview", label: "Mở Toàn Cảnh Brand → Dữ Liệu Gốc" },
   talents: { tab: "talents", label: "Mở Talent Pool" },
   rate_card: { tab: "crm", label: "Mở Hợp đồng & giá (CRM)" },
   host_performance: { tab: "host_performance", label: "Mở Hiệu Suất Host" }

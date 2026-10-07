@@ -16,7 +16,6 @@ const AGENCY_TAB_SLUGS: Record<string, string> = {
   shift_scheduling: "nhan-su-ca",
   calendar: "bang-van-hanh",
   sessions: "so-ca",
-  live_reconciliation: "doi-soat",
   host_performance: "hieu-suat-host",
   ops_support: "ho-tro-van-hanh",
   brands_overview: "toan-canh-brand",

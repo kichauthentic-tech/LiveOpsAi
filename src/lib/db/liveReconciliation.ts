@@ -1,7 +1,7 @@
 import { supabase } from "../supabaseClient";
 import { assertAffected } from "./assertAffected";
-import { parseSnapshotFile } from "../liveSnapshot/extractRooms";
-import { parseDataRawExcel } from "../dataraw/parseDataRawExcel";
+import { snapshotRowsFromParsed } from "../liveSnapshot/extractRooms";
+import type { ParsedDataRawImport } from "../dataraw/parseDataRawExcel";
 import { readShopeeStreams, shopeeStreamsToReconRows } from "../dataraw/shopeeFiles";
 import { platformOf, type ReportPlatform } from "../reportPlatform";
 
@@ -78,10 +78,13 @@ function batchFromDb(b: DbBatch): ReconciliationBatch {
   };
 }
 
-export async function fetchReconciliationBatches(limit = 10): Promise<ReconciliationBatch[]> {
+/** Các lô đối soát của MỘT brand trên MỘT sàn — màn Dữ Liệu Gốc của brand đó. */
+export async function fetchReconciliationBatches(brandId: string, platform: ReportPlatform, limit = 12): Promise<ReconciliationBatch[]> {
   const { data, error } = await supabase
     .from("live_reconciliation_batches")
     .select("*")
+    .eq("brand_id", brandId)
+    .eq("platform", platform)
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) throw error;
@@ -114,44 +117,30 @@ export async function fetchReconciliationRows(batchId: string): Promise<Reconcil
   return ((data ?? []) as DbRow[]).map(rowFromDb);
 }
 
-/** Lô MỚI NHẤT kèm dòng của nó trong MỘT request (nhúng `live_reconciliation_rows`). Màn Đối Soát bắn nó
- *  SONG SONG với `fetchReconciliationBatches` lúc mở — trước 2026-10-04 là hai vòng nối tiếp (danh sách lô
- *  rồi mới tới dòng của lô đầu; đo: 524 → 869 → 1.201 ms). Cùng thứ tự `created_at desc` với danh sách. */
-export async function fetchLatestReconciliationRows(): Promise<{ batchId: string; rows: ReconciliationRow[] } | null> {
-  const { data, error } = await supabase
-    .from("live_reconciliation_batches")
-    .select(`id, live_reconciliation_rows(${ROW_COLS})`)
-    .order("created_at", { ascending: false })
-    .order("started_at", { referencedTable: "live_reconciliation_rows", ascending: true })
-    .limit(1)
-    .maybeSingle();
-  if (error) throw error;
-  if (!data) return null;
-  const row = data as { id: string; live_reconciliation_rows: DbRow[] | null };
-  return { batchId: row.id, rows: (row.live_reconciliation_rows ?? []).map(rowFromDb) };
-}
-
-// Bộ đọc file đối soát của từng sàn (hồ sơ sàn: `reconciliationFile`). Record đủ mọi sàn ⇒ thêm sàn mà quên bộ đọc là lỗi compile.
-const RECON_FILE_READERS: Record<ReportPlatform, (file: File) => Promise<{ rows: unknown[]; periodLabel?: string; periodStart?: string; periodEnd?: string }>> = {
+// Bộ dựng dòng đối soát của từng sàn từ dữ liệu ĐÃ ĐỌC (hồ sơ sàn: `reconciliationFile`). Record đủ mọi sàn ⇒ thêm sàn mà quên bộ dựng là lỗi compile.
+const RECON_ROW_BUILDERS: Record<ReportPlatform, (parsed: ParsedDataRawImport) => unknown[]> = {
   // Creator-Live-Performance của TikTok: một dòng mỗi PHÒNG (Room ID, số cộng dồn).
-  TikTok: (file) => parseSnapshotFile(file),
+  TikTok: (parsed) => snapshotRowsFromParsed(parsed).rows,
   // Live List của Shopee Seller Centre: mỗi phiên một dòng, đi qua CÙNG đường đối soát (GMV = doanh số đặt).
-  Shopee: async (file) => {
-    const parsed = await parseDataRawExcel(file, "shopee_live_list");
-    return { rows: shopeeStreamsToReconRows(readShopeeStreams(parsed.rows)), periodLabel: parsed.periodLabel, periodStart: parsed.periodStart, periodEnd: parsed.periodEnd };
-  }
+  Shopee: (parsed) => shopeeStreamsToReconRows(readShopeeStreams(parsed.rows))
 };
 
 // Chỉ nạp + tự khớp room với ca, CHƯA ghi gì vào live_sessions — ops xem rổ rồi mới bấm áp dụng.
+// Nhận dữ liệu đã đọc (file vừa up ở Dữ Liệu Gốc, hoặc batch đã lưu ở đó): một file chỉ up MỘT lần.
 // `brandId` bắt buộc (0133): file Creator-Live-Performance là của MỘT tài khoản; khớp theo giờ với mọi brand thì
 // phiên của CROCS rơi vào ca JOCKEY cùng giờ và GMV bị chia sang đó.
-export async function importReconciliationFile(file: File, brandId: string, platform: ReportPlatform = "TikTok"): Promise<string> {
-  const { rows, periodLabel, periodStart, periodEnd } = await RECON_FILE_READERS[platform](file);
+export async function importReconciliationFromParsed(
+  fileName: string | undefined,
+  parsed: ParsedDataRawImport,
+  brandId: string,
+  platform: ReportPlatform
+): Promise<string> {
+  const rows = RECON_ROW_BUILDERS[platform](parsed);
   const { data, error } = await supabase.rpc("import_live_reconciliation", {
-    p_file_name: file.name,
-    p_period_label: periodLabel ?? null,
-    p_period_start: periodStart ?? null,
-    p_period_end: periodEnd ?? null,
+    p_file_name: fileName ?? null,
+    p_period_label: parsed.periodLabel ?? null,
+    p_period_start: parsed.periodStart ?? null,
+    p_period_end: parsed.periodEnd ?? null,
     p_rows: rows,
     p_brand_id: brandId,
     p_platform: platform

@@ -95,7 +95,6 @@ const EngineTrainingPanel = lazyNamed(() => import("./components/EngineTrainingP
 const OpsBoard = lazyNamed(() => import("./components/OpsBoard"), "OpsBoard");
 const TodoPanel = lazyNamed(() => import("./components/TodoPanel"), "TodoPanel");
 const GlossaryDialog = lazyNamed(() => import("./components/GlossaryDialog"), "GlossaryDialog");
-const LiveReconciliation = lazyNamed(() => import("./components/LiveReconciliation"), "LiveReconciliation");
 const HostPerformance = lazyNamed(() => import("./components/HostPerformance"), "HostPerformance");
 const BrandsOverview = lazyNamed(() => import("./components/BrandsOverview"), "BrandsOverview");
 const ReportPublishBoard = lazyNamed(() => import("./components/ReportPublishBoard"), "ReportPublishBoard");
@@ -112,7 +111,6 @@ const TAB_CHUNKS: Record<string, { preload: () => void }[]> = {
   my_shifts: [OpsBoard],
   shift_scheduling: [ShiftScheduling],
   month_plan: [MonthPlan],
-  live_reconciliation: [LiveReconciliation],
   agency_overview: [CeoBrief, AgencyChannelSummary],
   host_performance: [HostPerformance],
   ops_support: [OpsSupportTab],
@@ -1967,16 +1965,6 @@ export default function App() {
                     brandStudios={brandStudios}
                     onOpenCrm={(brandId, platform) => { requestCrmFocus(brandId, platform); navigateTo("crm"); }}
                     talents={talents}
-                  />
-                )}
-
-                {activeTab === "live_reconciliation" && (
-                  <LiveReconciliation
-                    platform={agencyPlatformState}
-                    brands={agencyBrands}
-                    sessions={sessions}
-                    onApplied={handleReconciliationApplied}
-                    onOpenSession={(id) => { setOpsView("board"); setActiveTab("calendar"); setNotifOpenSessionId(id); }}
                   />
                 )}
 
