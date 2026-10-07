@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { LiveSession, ShiftSlot, ShiftRegistration, Studio, Talent, Brand, PromoScheme, UserRole, BrandStudio, AuditLogEntry, BrandChannel } from "../types";
 import { schemesForDate } from "../lib/schemeUtils";
 
-import { clashedSessionIds, findPersonClashes, personClash, studioClash, studioClashLabel } from "../lib/scheduling/conflicts";
+import { clashDescriptions, clashedSessionIds, findPersonClashes, personClash, studioClash, studioClashLabel } from "../lib/scheduling/conflicts";
 import { hasSessionData } from "../lib/sessionStatus";
 import { CAMPAIGN_DAY_STYLES, getCampaignDayInfo } from "../lib/campaignDays";
 import { BrandLogo } from "./ui/BrandLogo";
@@ -57,11 +57,13 @@ interface LiveCalendarProps {
 }
 
 // Lịch Ngày (trục phòng): tối thiểu 64px mỗi giờ, mỗi làn cao LANE_H — đủ cho thẻ "gọn" 3 dòng (Host + Trợ live
-// xuống dòng thì vẫn vừa); ca chồng giờ cùng phòng xếp làn riêng.
+// xuống dòng thì vẫn vừa); ca chồng giờ cùng phòng xếp làn riêng. Mọi thẻ cao ĐÚNG LANE_H (prop `fill`) — chỉ
+// chiều rộng đổi theo thời lượng, nên ca cùng giờ luôn cùng hình dạng.
 const HOUR_PX = 64;
 const LANE_H = 116;
 const LANE_GAP = 6;
 const LANE_PAD = 8;
+const EMPTY_ROW_H = 56;
 
 // Ngày hôm nay theo giờ local, format YYYY-MM-DD
 const getTodayDateString = () => {
@@ -108,8 +110,15 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   // View Mode: Month, Week, Day Matrix, Talent Workload, List
   const [viewMode, setViewMode] = useState<"month" | "week" | "day" | "talent_workload">("day");
   // Ca có người bị xếp trùng giờ (user chốt 06/10: một người chỉ đứng một ca tại một thời điểm) — viền đỏ trên thẻ ca.
-  const clashMap = useMemo(() => clashedSessionIds(findPersonClashes(sessions)), [sessions]);
+  const clashList = useMemo(() => findPersonClashes(sessions), [sessions]);
+  const clashMap = useMemo(() => clashedSessionIds(clashList), [clashList]);
+  const clashWhy = useMemo(() => clashDescriptions(clashList), [clashList]);
   const clashRing = (id: string) => (clashMap.has(id) ? "ring-2 ring-rose-500" : undefined);
+  // Tooltip của thẻ ca: nếu ca bị trùng người thì ghi rõ trùng với ca nào, đặt TRƯỚC câu hướng dẫn kéo thả.
+  const clashTip = (id: string, base: string) => {
+    const why = clashWhy.get(id);
+    return why ? `⚠ Trùng lịch: ${why.join("; ")}\n${base}` : base;
+  };
 
   // Selected Date string YYYY-MM-DD (defaults to real today's date)
   const [selectedDate, setSelectedDate] = useState<string>(() => getTodayDateString());
@@ -865,9 +874,9 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                         tone={SESSION_TONE[ds.status]}
                         dragging={draggedSessionId === ds.id}
                         draggable
-                        tooltip={`${ds.title} · ${ds.studioName} · Host ${ds.hostName}${
+                        tooltip={clashTip(ds.id, `${ds.title} · ${ds.studioName} · Host ${ds.hostName}${
                           ds.coHostName ? ` · Trợ ${ds.coHostName}` : ""
-                        } — kéo thả sang ngày khác để chuyển lịch`}
+                        } — kéo thả sang ngày khác để chuyển lịch`)}
                         onDragStart={(e) => {
                           e.stopPropagation();
                           handleDragStart(e, ds);
@@ -1032,7 +1041,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                         tone={SESSION_TONE[ds.status]}
                         dragging={draggedSessionId === ds.id}
                         draggable
-                        tooltip="Kéo để đổi ngày"
+                        tooltip={clashTip(ds.id, "Kéo để đổi ngày")}
                         onDragStart={(e) => handleDragStart(e, ds)}
                         onDragEnd={handleDragEnd}
                         onClick={() => setSelectedSessionDetail(ds)}
@@ -1097,14 +1106,16 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
             it.lane = free >= 0 ? free : laneEnds.length;
             laneEnds[it.lane] = it.e;
           }
-          const lanes = Math.max(1, laneEnds.length);
+          // Phòng trống thu thấp (vẫn đủ chỗ cho chữ "Trống" + thả/bấm đôi) — không chiếm cao bằng hàng có ca.
+          if (items.length === 0) return { items, height: EMPTY_ROW_H };
+          const lanes = laneEnds.length;
           return { items, height: LANE_PAD * 2 + lanes * LANE_H + (lanes - 1) * LANE_GAP };
         };
         const renderLaneItem = (it: LaneItem) => {
           const start = it.slot?.startTime ?? it.session!.startTime;
           const end = it.slot?.endTime ?? it.session!.endTime;
           return (
-            <div key={it.id} className="absolute px-0.5" style={{ ...pos(start, end), top: LANE_PAD + it.lane * (LANE_H + LANE_GAP) }}>
+            <div key={it.id} className="absolute px-0.5" style={{ ...pos(start, end), top: LANE_PAD + it.lane * (LANE_H + LANE_GAP), height: LANE_H }}>
               {it.slot ? (
                 <SessionEventCard
                   theme={getBrandTheme(it.slot.brandName)}
@@ -1116,6 +1127,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   meta={buildSlotMeta(it.slot)}
                   tone="pending"
                   pending
+                  fill
                   tooltip={`Ca chờ đăng ký · ${it.slot.startTime}-${it.slot.endTime} · Bấm để xem/đăng ký/chốt lịch`}
                   onClick={() => setSelectedSlotDetail(it.slot!)}
                 />
@@ -1134,7 +1146,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   tone={SESSION_TONE[it.session!.status]}
                   dragging={draggedSessionId === it.session!.id}
                   draggable
-                  tooltip="Kéo sang hàng phòng khác để đổi phòng"
+                  fill
+                  tooltip={clashTip(it.session!.id, "Kéo sang hàng phòng khác để đổi phòng")}
                   onDragStart={(e) => handleDragStart(e, it.session!)}
                   onDragEnd={handleDragEnd}
                   onClick={() => setSelectedSessionDetail(it.session!)}
@@ -1169,8 +1182,13 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
               <div className="flex border-b border-[var(--border)] bg-[var(--surface-base)] text-[11px] font-mono text-[var(--text-muted)]">
                 <div className="w-44 shrink-0 p-2 font-bold uppercase tracking-wider border-r border-[var(--border)] sticky left-0 bg-[var(--surface-base)] z-10">Phòng</div>
                 <div className="relative flex-1 h-8" style={{ minWidth: timelineMinWidth }}>
-                  {hours.map((m) => (
-                    <span key={m} className="absolute top-2 -translate-x-1/2" style={{ left: `${((m - axisStart) / span) * 100}%` }}>{fmtHour(m)}</span>
+                  {/* Nhãn đầu/cuối trục căn vào trong (trước: cùng -50% nên "08:00" bị cắt còn ":00", "23:00" còn "23:"). */}
+                  {hours.map((m, i) => (
+                    <span
+                      key={m}
+                      className={`absolute top-2 ${i === 0 ? "ml-1.5" : i === hours.length - 1 ? "-translate-x-full -ml-1.5" : "-translate-x-1/2"}`}
+                      style={{ left: `${((m - axisStart) / span) * 100}%` }}
+                    >{fmtHour(m)}</span>
                   ))}
                 </div>
               </div>

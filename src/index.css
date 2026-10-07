@@ -569,7 +569,13 @@ html:not(.dark) [class~="border-slate-700"], html:not(.dark) [class~="border-sla
 .sc[data-draggable="true"]:active { cursor: grabbing; }
 .sc[data-pending="true"] { border-style: dashed; background: color-mix(in srgb, var(--b) 7%, var(--surface)); }
 .dark .sc[data-pending="true"] { background: color-mix(in srgb, var(--b) 11%, var(--surface)); }
-.sc[data-tone="live"] { outline: 2px solid #e11d48; outline-offset: 1px; }
+/* Ca đang live: VIỀN thẻ chớp đỏ (user 08/10 — một chấm nhỏ không đủ nổi). Huy hiệu LIVE bên trong đứng yên. */
+.sc[data-tone="live"] { border-color: #e11d48; outline: 3px solid #e11d48; outline-offset: 0; animation: sc-blink 1.1s ease-in-out infinite; }
+@keyframes sc-blink {
+  0%, 100% { outline-color: #e11d48; border-color: #e11d48; }
+  50% { outline-color: rgba(225, 29, 72, .12); border-color: rgba(225, 29, 72, .35); }
+}
+@media (prefers-reduced-motion: reduce) { .sc[data-tone="live"] { animation: none; } }
 .sc[data-tone="cancelled"] { opacity: .62; }
 .sc[data-tone="cancelled"] .sc-time { text-decoration: line-through; }
 .sc-head { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 5px; min-width: 0; }
@@ -582,6 +588,8 @@ html:not(.dark) [class~="border-slate-700"], html:not(.dark) [class~="border-sla
 .sc-st { width: 16px; height: 16px; flex: none; }
 .sc-who { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
 .sc-chip { display: inline-flex; align-items: center; gap: 3px; max-width: 100%; font-size: 11px; font-weight: 600; line-height: 1.2; padding: 2px 5px; border-radius: 5px; background: color-mix(in srgb, var(--text) 8%, transparent); }
+.sc-chip[data-warn="true"] { background: #e11d48; color: #fff; }
+.sc-chip[data-warn="true"] > svg { opacity: 1; }
 .sc-chip > svg { width: 11px; height: 11px; flex: none; opacity: .7; }
 .sc-chip > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sc-foot { display: flex; align-items: center; gap: 6px; min-width: 0; }
@@ -589,10 +597,19 @@ html:not(.dark) [class~="border-slate-700"], html:not(.dark) [class~="border-sla
 .sc-title { display: none; font-size: 11px; font-weight: 600; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .sc-pill { margin-left: auto; flex: none; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; font-weight: 700; line-height: 1; padding: 3px 7px; border-radius: 999px; white-space: nowrap; background: var(--pbg); color: var(--pfg); }
 .sc-live { display: inline-flex; align-items: center; gap: 4px; padding: 3px; border-radius: 999px; background: #e11d48; color: #fff; font-size: 10px; font-weight: 800; letter-spacing: .06em; line-height: 1.1; }
-.sc-live::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #fff; animation: sc-pulse 1.2s infinite; }
+.sc-live::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #fff; }
 .sc-live > b { display: none; font-weight: 800; }
-@keyframes sc-pulse { 50% { opacity: .25; } }
-@media (prefers-reduced-motion: reduce) { .sc-live::before { animation: none; } }
+/* fill (lịch Ngày): thẻ cao bằng ô cha để mọi ca cùng chiều cao; dưới 460px xếp cột, Target GMV ghim đáy.
+   Từ 460px thẻ đã là một hàng ngang (căn giữa dọc) nên chỉ cần cao bằng ô. */
+.sc-wrap-fill { height: 100%; }
+.sc-fill { height: 100%; }
+@container (max-width: 459px) {
+  .sc.sc-fill { display: flex; flex-direction: column; align-items: stretch; }
+  .sc.sc-fill .sc-foot { margin-top: auto; }
+}
+@container (max-width: 100px) {
+  .sc.sc-fill { align-items: center; }
+}
 .sc-actual { font-size: 11px; font-weight: 700; }
 @container (min-width: 200px) {
   .sc-bname, .sc-title { display: block; }

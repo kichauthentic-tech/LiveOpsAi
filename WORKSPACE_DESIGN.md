@@ -46,6 +46,13 @@
   (`import_live_reconciliation` / `apply_live_reconciliation` giữ nguyên, lô cũ vẫn xem được); `snapshotRowsFromParsed` (extractRooms.ts) là phép chuẩn hoá
   chung. Lỗi tạo lô sau khi đã lưu import không làm mất import (báo riêng + nút thử lại). Link CeoBrief "reconcile" nay mở Toàn Cảnh Brand.
   **Luật cho ca nối thiếu snapshot giữa ca:** ĐỪNG Sinh ca / tách ca khi ca sau đã có trong lịch/kế hoạch — Đối soát khớp room vào cả 2 ca có sẵn (rổ "Cần xem
+- **08/10: TINH CHỈNH THẺ CA + LỊCH NGÀY (CHƯA commit; tsc, vitest mới 24/24; xem trên thẻ mẫu dựng ở trang đăng nhập, CHƯA xem trên app thật có dữ liệu).** Lịch Ngày: mọi thẻ cao
+  ĐÚNG `LANE_H` (prop `fill` của `SessionEventCard`, Target GMV ghim đáy; chỉ rộng đổi theo giờ), phòng trống thu còn `EMPTY_ROW_H` 56px, nhãn đầu/cuối trục giờ căn vào trong
+  (hết bị cắt `:00`/`23:`). Thẻ (mọi lịch): ca ĐANG LIVE = viền chớp đỏ (`sc-blink`, tắt khi reduced-motion; huy hiệu LIVE đứng yên); `buildSessionMeta` thêm chip đỏ
+  "Chưa có host" (ca Upcoming/Live, không hiện cho brand) và chip "A → B" khi đổi người giữa ca (tooltip ghi giờ đổi, `SessionCardMeta.warn`); viền đỏ trùng người nay có
+  tooltip "X cũng đang ở ca …" (`clashDescriptions` ở `lib/scheduling/conflicts.ts`, `clashTip` ở LiveCalendar). Chưa làm: giờ vào thực tế của ca live ("trễ 7p"), đánh dấu
+  `excludedFromReports` trên thẻ. 2 test đang đỏ KHÔNG do đợt này: `layoutConventions` (Talent Pool `lg:sticky`), `uiReadability` (TalentLoadTimeline `text-[10px]`).
+
   lại"), chia theo thời gian chồng, tổng đúng bằng file, host/target giữ nguyên. Nay `planBackfill(rows, linked, sessionWindows)` bỏ room chồng giờ ca có sẵn
   (đếm `overlapping`) và nút "tách" ẩn khi `hasOverlappingSession` (client; RPC `split_backfill_session` CHƯA chặn — nếu cần thì migration mới). Khối Nạp bù có
   nút Ẩn/Hiện (localStorage `liveops.backfillFromRooms.hidden`). Test: `tests/roomsToSessions.test.ts` +4; vitest 631/631, tsc, audit:dead 0, build.

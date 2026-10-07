@@ -6,7 +6,7 @@ import { describe, expect, test, vi } from "vitest";
 
 vi.mock("../src/lib/supabaseClient", () => ({ supabase: {} }));
 
-const { findPersonClashes, clashedSessionIds } = await import("../src/lib/scheduling/conflicts");
+const { findPersonClashes, clashedSessionIds, clashDescriptions } = await import("../src/lib/scheduling/conflicts");
 const { buildTodos } = await import("../src/lib/todoList");
 import type { Brand, LiveSession } from "../src/types";
 
@@ -103,5 +103,19 @@ describe("Việc cần làm", () => {
   test("trùng đã qua ngày thì không nhắc", () => {
     const t = buildTodos(input([ca("a", { date: "2026-10-01" }), ca("b", { date: "2026-10-01", startTime: "19:00" })]));
     expect(t.find((x) => x.id === "person-clash")).toBeUndefined();
+  });
+});
+
+describe("clashDescriptions (tooltip viền đỏ)", () => {
+  test("ghi rõ người đó còn ở ca nào, hai phía đều có câu giải thích", () => {
+    const a = ca("a");
+    const b = ca("b", { brandName: "FRANKLIN", startTime: "19:00", endTime: "22:00", studioName: "Room 202" });
+    const why = clashDescriptions(findPersonClashes([a, b]));
+    expect(why.get("a")).toEqual(["Bùi Sỹ Hùng cũng đang ở ca FRANKLIN 19:00–22:00 (Room 202)"]);
+    expect(why.get("b")).toEqual(["Bùi Sỹ Hùng cũng đang ở ca CROCS 18:00–21:00"]);
+  });
+  test("vừa host vừa trợ cùng một ca", () => {
+    const why = clashDescriptions(findPersonClashes([ca("a", { coHostId: "hung", coHostName: "Bùi Sỹ Hùng" })]));
+    expect(why.get("a")).toEqual(["Bùi Sỹ Hùng vừa là Host vừa là Trợ live của chính ca này"]);
   });
 });

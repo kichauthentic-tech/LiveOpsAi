@@ -2,6 +2,7 @@ import React from "react";
 import { Building2, CheckCircle2, Clock, LucideIcon, Mic, Users, XCircle } from "lucide-react";
 import { Brand, LiveSession, ShiftSlot, Talent } from "../../types";
 import { talentShortName } from "../../lib/talentName";
+import { clockAtOffset, hasStaffSegments, segmentsOfRole } from "../../lib/staffSegments";
 import { BrandTheme } from "../../lib/brandTheme";
 import { getBrandLogoAsset } from "../../lib/brandLogos";
 import { getBrandEmoji } from "../../lib/brandIcons";
@@ -23,6 +24,8 @@ export interface SessionCardMeta {
   label: string;
   /** Tooltip riêng cho chip (vd tên host đầy đủ khi label đã rút gọn). */
   title?: string;
+  /** Chip cảnh báo (đỏ): thiếu người, v.v. — thứ ops phải xử lý, khác chip tên người. */
+  warn?: boolean;
 }
 
 export type SessionCardTone = "live" | "upcoming" | "completed" | "cancelled" | "pending";
@@ -54,6 +57,8 @@ interface SessionEventCardProps {
   onDragStart?: (e: React.DragEvent) => void;
   onDragEnd?: (e: React.DragEvent) => void;
   className?: string;
+  /** Thẻ cao đúng bằng ô cha (lịch Ngày: mọi thẻ cùng một chiều cao, Target GMV ghim đáy) thay vì cao theo nội dung. */
+  fill?: boolean;
 }
 
 const STATUS_TEXT: Record<SessionCardTone, string | undefined> = {
@@ -122,7 +127,8 @@ export const SessionEventCard: React.FC<SessionEventCardProps> = ({
   onClick,
   onDragStart,
   onDragEnd,
-  className = ""
+  className = "",
+  fill
 }) => {
   const logo = getBrandLogoAsset(brand ?? { name: brandName });
   const style = {
@@ -137,7 +143,7 @@ export const SessionEventCard: React.FC<SessionEventCardProps> = ({
   const shownTone: SessionCardTone = isPending && tone === "upcoming" ? "pending" : tone;
 
   return (
-    <div className="sc-wrap">
+    <div className={`sc-wrap${fill ? " sc-wrap-fill" : ""}`}>
       <div
         draggable={draggable}
         onDragStart={onDragStart}
@@ -149,7 +155,7 @@ export const SessionEventCard: React.FC<SessionEventCardProps> = ({
         data-clickable={onClick || draggable ? "true" : undefined}
         data-draggable={draggable ? "true" : undefined}
         style={style}
-        className={`sc ${className}`}
+        className={`sc${fill ? " sc-fill" : ""} ${className}`}
       >
         <div className="sc-head">
           {logo ? (
@@ -171,7 +177,7 @@ export const SessionEventCard: React.FC<SessionEventCardProps> = ({
         {meta.length > 0 && (
           <div className="sc-who">
             {meta.map((m, i) => (
-              <span key={i} title={m.title ?? m.label} className="sc-chip">
+              <span key={i} title={m.title ?? m.label} className="sc-chip" data-warn={m.warn ? "true" : undefined}>
                 {m.icon && <m.icon aria-hidden />}
                 <span>{m.label}</span>
               </span>
@@ -221,13 +227,31 @@ export const buildSessionMeta = (
 ): SessionCardMeta[] => {
   // Nền tảng KHÔNG nằm trong meta nữa — thẻ vẽ logo sàn qua prop `platform`.
   const meta: SessionCardMeta[] = [];
-  if (s.hostName) meta.push({ icon: Mic, label: talentShortName(lookup?.(s.hostId), s.hostName), title: `Host: ${s.hostName}` });
+  // Một vai có thể do nhiều người đứng nối nhau (đổi người giữa ca, 0138): "Dung → Thịnh", tooltip ghi giờ đổi.
+  const roleChip = (role: "host" | "co_host", icon: LucideIcon, fallbackName: string, fallbackId: string | undefined, roleLabel: string): SessionCardMeta | null => {
+    if (hasStaffSegments(s, role)) {
+      const segs = segmentsOfRole(s, role);
+      const names = segs.map((g) => talentShortName(lookup?.(g.talentId), g.talentName));
+      const label = names.filter((n, i) => n !== names[i - 1]).join(" → ");
+      const title = `${roleLabel}: ${segs.map((g) => `${g.talentName || "?"} ${clockAtOffset(s, g.fromMin)}–${clockAtOffset(s, g.toMin)}`).join(" → ")}`;
+      return label ? { icon, label, title } : null;
+    }
+    return fallbackName ? { icon, label: talentShortName(lookup?.(fallbackId), fallbackName), title: `${roleLabel}: ${fallbackName}` } : null;
+  };
+  const host = roleChip("host", Mic, s.hostName, s.hostId, "Host");
+  if (host) meta.push(host);
+  // Ca sắp/đang diễn ra mà chưa có host: chip đỏ để ops quét lịch thấy chỗ hở (trước đây thẻ chỉ trống, nhìn như bình thường).
+  // Brand không thấy: chuyện xếp người là của agency.
+  else if (viewerRole !== "brand" && (s.status === "Upcoming" || s.status === "Live Now")) {
+    meta.push({ icon: Mic, label: "Chưa có host", title: "Ca này chưa xếp host", warn: true });
+  }
   // Trợ live là nhân sự nội bộ agency bố trí, không phải thứ brand mua. SessionWindow đã giấu chip
   // này (và cả studio + Target GMV) với role brand từ trước — lịch thì không, nên cùng một ca hiện
   // hai kiểu ở hai màn. Audit 2026-09-22 chọn theo SessionWindow: nó là màn chi tiết, lập trường ở
   // đó mới là lập trường đã cân nhắc.
-  if (s.coHostName && viewerRole !== "brand") {
-    meta.push({ icon: Users, label: talentShortName(lookup?.(s.coHostId), s.coHostName), title: `Trợ live: ${s.coHostName}` });
+  if (viewerRole !== "brand") {
+    const co = roleChip("co_host", Users, s.coHostName, s.coHostId, "Trợ live");
+    if (co) meta.push(co);
   }
   return meta;
 };

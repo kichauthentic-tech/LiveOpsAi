@@ -120,3 +120,24 @@ export function clashedSessionIds(clashes: PersonClash[]): Map<string, string[]>
   }
   return m;
 }
+
+/** id ca → câu giải thích VÌ SAO thẻ ca viền đỏ ("Y.Nhi cũng đang ở ca CROCS 11:00–14:00 (Room 203)"), cho tooltip. */
+export function clashDescriptions(clashes: PersonClash[]): Map<string, string[]> {
+  const m = new Map<string, string[]>();
+  const add = (id: string, text: string) => {
+    const l = m.get(id) ?? [];
+    if (!l.includes(text)) l.push(text);
+    m.set(id, l);
+  };
+  for (const c of clashes) {
+    if (!c.other) {
+      add(c.session.id, `${c.talentName} vừa là Host vừa là Trợ live của chính ca này`);
+      continue;
+    }
+    for (const [mine, theirs] of [[c.session, c.other], [c.other, c.session]] as const) {
+      const where = [theirs.studioName, theirs.date !== mine.date ? theirs.date : ""].filter(Boolean).join(", ");
+      add(mine.id, `${c.talentName} cũng đang ở ca ${theirs.brandName} ${theirs.startTime}–${theirs.endTime}${where ? ` (${where})` : ""}`);
+    }
+  }
+  return m;
+}
