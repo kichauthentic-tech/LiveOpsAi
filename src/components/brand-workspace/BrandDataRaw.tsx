@@ -93,6 +93,14 @@ function monthsCoveredBy(imports: BrandDataRawImport[]): string[] {
   return Array.from(out).sort((a, b) => (a < b ? 1 : -1));
 }
 
+// Tháng của khối Nạp bù = tháng file phủ + tháng brand đã có ca trong lịch. Tháng đang chạy chưa có file nào phủ
+// (CROCS T10, 07/10) vẫn phải chọn được để gán host/trợ live cho ca đã có; bước 1 (sinh ca từ room) chỉ ra 0 room.
+function backfillMonths(imports: BrandDataRawImport[], sessions: LiveSession[], brandId: string): string[] {
+  const out = new Set(monthsCoveredBy(imports));
+  for (const s of sessions) if (s.brandId === brandId && s.date) out.add(s.date.slice(0, 7));
+  return Array.from(out).sort((a, b) => (a < b ? 1 : -1));
+}
+
 function formatMonthLabel(key: string): string {
   const [y, m] = key.split("-");
   return `Tháng ${parseInt(m, 10)}/${y}`;
@@ -334,7 +342,7 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ platform, brandId, b
         <BackfillFromRooms
           brandId={brandId}
           brandName={brandName}
-          months={monthsCoveredBy(imports)}
+          months={backfillMonths(imports, sessions, brandId)}
           sessions={sessions}
           talents={talents}
           onSessionsChanged={onSessionsChanged}
