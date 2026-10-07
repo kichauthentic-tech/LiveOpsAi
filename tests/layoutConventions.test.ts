@@ -177,12 +177,6 @@ test("Lịch brand mở thẳng màn Ngày ở điện thoại (lưới tháng c
   expect(src).toMatch(/matchMedia\("\(max-width: 639px\)"\)\.matches \? "day" : "month"/);
 });
 
-test('Nhân sự ca: "Tải theo Host" không còn là bảng w-full bị kéo ngang', () => {
-  const src = readFileSync(join(SRC, "components/ShiftScheduling.tsx"), "utf8");
-  expect(src).not.toMatch(/<table className="w-full text-sm min-w-\[420px\]">/);
-  expect(src).toMatch(/sm:columns-2 xl:columns-3/);
-});
-
 // ---- M5 Kế Hoạch Tháng (2026-09-29) ----
 
 test("Kế Hoạch Tháng: ô/nút trong lưới ca đạt sàn 24px và hàng vừa bề ngang ô ngày", () => {
@@ -444,21 +438,18 @@ test("Ca Của Tôi: có lịch sử ca đã chạy, và không nói 'không cò
   expect(src).toMatch(/mineDone\.length === 0 \? "Bạn chưa có ca nào trong hệ thống\."/);
 });
 
-test("Đăng Ký Ca: talent không thấy bảng tải của cả đội", () => {
-  const src = readFileSync(join(SRC, "components/ShiftScheduling.tsx"), "utf8");
-  // "Tải Theo Host" là công cụ cân tải của ops (số ca + số giờ của từng đồng nghiệp) — trước đây
-  // render vô điều kiện nên là khối DUY NHẤT có nội dung trên màn Đăng Ký Ca của talent.
-  const block = src.indexOf("Số ca của từng host — tháng {fmtMonth(selectedMonth)}"); // chuỗi JSX, không phải comment
-  // Rào gần nhất TRƯỚC khối, không phải rào `{admin && (` đầu tiên trong file.
-  const gate = src.lastIndexOf("{admin && (", block);
-  expect(gate >= 0, "không tìm thấy rào {admin && ( nào trước khối Số ca của từng host").toBe(true);
-  // Giữa rào và khối không được có `)}` đóng rào lại.
-  expect(src.slice(gate + 11, block)).not.toContain(")}");
+test("Đăng Ký Ca: màn riêng của talent, không mang công cụ của ops", () => {
+  const src = readFileSync(join(SRC, "components/TalentShiftSignup.tsx"), "utf8");
+  // Trước 08/10 talent dùng chung component "Nhân sự ca" với ops (phần ops rào bằng `admin &&`; từng lộ bảng số ca/giờ của cả
+  // đội cho talent). Màn riêng thì không được kéo lại chốt người, gợi ý host, bảng tải, cam kết hợp đồng.
+  for (const banned of ["onFinalizeSlot", "suggestHosts", "BulkFinalizePanel", "commitmentsRead", "loadByTalent", "sessions"]) {
+    expect(src, `TalentShiftSignup không được dùng ${banned}`).not.toContain(banned);
+  }
 });
 
 // ── Rà lại E2E 2026-09-28, mục #5 / #6 / #7 (sửa 2026-09-30) ────────────────────────────────────
 
-test("Nhân sự ca: ca sinh từ Kế Hoạch Tháng không bị gọi là 'Phát sinh'", () => {
+test("ca sinh từ Kế Hoạch Tháng giữ plan_id khi đọc/ghi DB", () => {
   // `shift_slots.plan_id` đã có từ migration 0091 (`lock_month_plan` ghi cho mọi ca nó tạo), nhưng
   // client không map nên UI chỉ phân biệt được `templateId` ⇒ ca có kế hoạch kỹ nhất mang nhãn của
   // ca chữa cháy. Ba nguồn gốc phải ra ba nhãn.
@@ -466,12 +457,6 @@ test("Nhân sự ca: ca sinh từ Kế Hoạch Tháng không bị gọi là 'Ph�
   expect(db, "fromDb phải đọc plan_id").toMatch(/planId: row\.plan_id/);
   expect(db, "toDb phải ghi lại plan_id, nếu không mỗi lần sửa ca là xoá mất").toMatch(/plan_id: orNull\(s\.planId\)/);
   expect(readFileSync(join(SRC, "types.ts"), "utf8")).toMatch(/planId\?: string;/);
-
-  const ui = readFileSync(join(SRC, "components/ShiftScheduling.tsx"), "utf8");
-  // Neo vào chuỗi JSX (`>Phát sinh</span>`), không vào nhãn trần: nhãn trần còn nằm trong comment
-  // giải thích phía trên, indexOf() sẽ bắt vào comment và cắt ra lát rỗng.
-  const label = ui.slice(ui.indexOf("slot.templateId ?"), ui.indexOf(">Phát sinh</span>"));
-  expect(label, "phải có nhánh slot.planId giữa 'Tự động' và 'Phát sinh'").toMatch(/slot\.planId \?/);
 });
 
 test("Điều Phối Phát Hành: phát hành LUÔN hỏi, không chỉ khi còn ca chưa đối soát", () => {

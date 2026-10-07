@@ -15,7 +15,7 @@ interface Props {
 const OPS_STEPS: { step: string; where: string; why: string }[] = [
   { step: "Một lần cho mỗi brand × sàn: cách thu phí, giá (đơn giá/giờ hoặc % hoa hồng, tỷ lệ hoàn huỷ), hợp đồng + giờ cam kết mỗi tháng, phòng live mặc định", where: "CRM → \"Hợp đồng & giá\" trên thẻ brand", why: "Chỗ nhập duy nhất. Lưu hợp đồng là app tự đổ giờ cam kết ra từng tháng; thiếu giá thì Finance và Dashboard không tính được doanh thu, lãi." },
   { step: "Lập Kế Hoạch Tháng: giờ cam kết của tháng (mặc định theo hợp đồng), lưới ca, target từng ca, khung ngày camp — rồi bấm Chốt", where: "Kế Hoạch Tháng", why: "Chốt xong mới có ca để talent đăng ký; target tháng = tổng target các ca. Tháng brand mua thêm/bớt giờ thì sửa giờ cam kết ngay ở đây." },
-  { step: "Talent đăng ký rảnh, ops chốt Host + Trợ live cho từng ca", where: "Nhân sự ca (talent thấy là Đăng Ký Ca)", why: "Ca có người mới hiện ở Bảng Vận Hành, Lịch." },
+  { step: "Talent đăng ký rảnh, ops chốt Host + Trợ live cho từng ca", where: "Bảng Vận Hành (bấm dòng ca chưa có người; talent đăng ký ở Đăng Ký Ca)", why: "Ca chốt người xong mới thành ca thật trên lịch." },
   { step: "Trong ca: trợ live up file lúc giao ca (snapshot), host nộp report ca", where: "Bảng Vận Hành → bấm vào ca (Cửa sổ Ca Live)", why: "Giữ ranh giới số giữa 2 ca chung một phòng live." },
   { step: "Hằng tuần/cuối tháng: tải file từ TikTok Shop, up ở Dữ Liệu Gốc (một lần up là tự đối soát ca)", where: "Dữ Liệu Gốc (trong từng brand) → Creator Live Performance / Live List", why: "TikTok còn cập nhật GMV nhiều giờ sau khi tắt live; số đối soát là số cuối." },
   { step: "Hết tháng (brand có chạy Ads): tải file \"Campaign overview data\" theo ngày từ TikTok Ads", where: "Nhập Ads (trong từng brand)", why: "Report Tháng phần 6 lấy chi phí Ads, ROI, ROI theo loại ngày từ file này." },
@@ -31,7 +31,7 @@ const TALENT_STEPS: { step: string; where: string; why: string }[] = [
 
 const TERMS: { term: string; meaning: string }[] = [
   { term: "Ca / phiên live", meaning: "Ca là một khung giờ có host trực trong app. Phiên là một lần bật live trên TikTok. Một phiên dài có thể chia cho nhiều ca." },
-  { term: "Kế hoạch nháp / đã chốt", meaning: "Nháp: đang soạn, chưa sinh ca. Chốt: ca đổ xuống Nhân sự ca để talent đăng ký. Vẫn sửa được target ca và khung camp sau khi chốt." },
+  { term: "Kế hoạch nháp / đã chốt", meaning: "Nháp: đang soạn, chưa sinh ca. Chốt: ca đổ xuống Bảng Vận Hành (chờ đăng ký) để talent đăng ký. Vẫn sửa được target ca và khung camp sau khi chốt." },
   { term: "Ca chờ đăng ký", meaning: "Ca đã mở nhưng chưa chốt người." },
   { term: "Report TikTok / Report Shopee", meaning: "Mỗi brand mỗi tháng có thể có hai report độc lập, một cho từng sàn. Phát hành, thu hồi và đóng sổ riêng từng sàn; brand chỉ thấy số của sàn đã phát hành. Report Shopee lấy số từ 4 file Shopee Live (Live List, theo ngày, tổng quan tháng, sản phẩm) — GMV Shopee là Sales(Placed Order); Sales (Confirmed Order) là số thực nhận (sau đơn huỷ). Tên chỉ số trong report Shopee lấy đúng tên cột file Shopee (Viewers, Views, ATC, ABS, GPM…) — Shopee không có AOV, CTOR, LIVE CTR, ERR hay CO." },
   { term: "Đổi người giữa ca", meaning: "Host hoặc trợ live vào thay / ra sớm giữa chừng. Ghi ở Sửa ca → \"Đổi người giữa ca\": ai làm từ giờ nào đến giờ nào. Ca vẫn là một ca (một GMV); lương, giờ làm, trùng lịch và hiệu suất tính theo giờ từng người." },

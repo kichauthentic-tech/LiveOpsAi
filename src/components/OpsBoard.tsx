@@ -14,6 +14,7 @@ import { isHandoverPerson } from "../lib/handover";
 import { clashedSessionIds, findPersonClashes } from "../lib/scheduling/conflicts";
 import { SessionWindow } from "./SessionWindow";
 import { PageIntro } from "./common/PageIntro";
+import { SlotDetailModal } from "./scheduling/SlotDetailModal";
 
 // Bảng Vận Hành — màn của NHỊP HẰNG NGÀY (tái cấu trúc 2026-09-21): hôm nay / ngày / tuần này có
 // ca nào, ai trực, phòng nào, và mỗi ca còn thiếu gì (chưa có người · chưa up file · chưa report ·
@@ -40,8 +41,12 @@ export interface OpsBoardProps {
   onSetSessionExcluded?: (id: string, excluded: boolean, reason: string) => Promise<boolean>;
   onRequestDropout?: (sessionId: string, reason: string) => Promise<boolean>; // Đ7 (0116) — talent báo bận, chỉ gửi thông báo cho ops
   onLogAudit?: (entry: { action: string; details: string; category: AuditLogEntry["category"] }) => Promise<void>;
-  // Ca chưa có người → nhảy sang Đăng Ký & Chốt Lịch.
+  // Talent ("Ca Của Tôi"): nút nhảy sang Đăng Ký Ca. Ops không cần — dòng ca chưa có người mở thẳng panel chốt người.
   onOpenScheduling?: () => void;
+  // Ops chốt Host + Trợ live ngay trên dòng ca chưa có người (SlotDetailModal) — màn "Nhân sự ca" đã bỏ 08/10.
+  onFinalizeSlot?: (slot: ShiftSlot, hostId: string, coHostId: string | null) => Promise<boolean>;
+  onDeleteSlot?: (id: string) => Promise<void>;
+  fatigueWeekHours?: number;
   // Q4: bấm thông báo → App đặt id ca cần mở; bảng mở Cửa sổ Ca Live rồi báo lại để App xoá yêu cầu.
   requestOpenSessionId?: string | null;
   onOpenRequestHandled?: () => void;
@@ -92,6 +97,9 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
   onRequestDropout,
   onLogAudit,
   onOpenScheduling,
+  onFinalizeSlot,
+  onDeleteSlot,
+  fatigueWeekHours,
   requestOpenSessionId = null,
   onOpenRequestHandled
 }) => {
@@ -99,6 +107,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
   const [range, setRange] = useState<Range>("today");
   const [anchor, setAnchor] = useState(today);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [openSlotId, setOpenSlotId] = useState<string | null>(null);
   useEffect(() => {
     if (!requestOpenSessionId) return;
     setOpenId(requestOpenSessionId);
@@ -222,7 +231,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
   };
 
   const SlotRow = ({ r }: { r: Extract<Row, { kind: "slot" }> }) => (
-    <button onClick={onOpenScheduling} className="w-full text-left bg-[var(--surface-base)] border border-dashed border-rose-800/70 hover:border-rose-500 rounded-xl p-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 transition-colors" title="Chốt người ở Nhân sự ca">
+    <button onClick={() => setOpenSlotId(r.slot.id)} className="w-full text-left bg-[var(--surface-base)] border border-dashed border-rose-800/70 hover:border-rose-500 rounded-xl p-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 transition-colors" title="Mở để chốt Host + Trợ live">
       <span className="font-mono text-sm font-black text-[var(--text)] w-[104px] shrink-0">{r.startTime.slice(0, 5)}–{r.endTime.slice(0, 5)}</span>
       <span className="flex items-center gap-1.5 min-w-0">
         <BrandLogo brand={r.slot.brandId ? brandById.get(r.slot.brandId) : undefined} size="xs" />
@@ -230,7 +239,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
         <PlatformChip platform={r.slot.platform} />
       </span>
       <span className="text-xs text-rose-300 font-bold flex items-center gap-1"><UserX className="w-3.5 h-3.5" /> chưa có người · {r.registered} đăng ký</span>
-      <span className="ml-auto text-[11px] text-[var(--text-faint)] flex items-center gap-1"><CalendarClock className="w-3.5 h-3.5" /> chốt ở Nhân sự ca</span>
+      <span className="ml-auto text-[11px] text-[var(--text-faint)] flex items-center gap-1"><CalendarClock className="w-3.5 h-3.5" /> chốt người</span>
     </button>
   );
 
@@ -392,6 +401,24 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
           )}
         </>
       )}
+
+      {openSlotId && (() => {
+        const slot = shiftSlots.find((x) => x.id === openSlotId);
+        return slot ? (
+          <SlotDetailModal
+            slot={slot}
+            onClose={() => setOpenSlotId(null)}
+            talents={talents}
+            registrations={shiftRegistrations}
+            sessions={sessions}
+            shiftSlots={shiftSlots}
+            canManage={mode === "ops"}
+            onFinalizeSlot={onFinalizeSlot}
+            onDeleteSlot={onDeleteSlot}
+            fatigueWeekHours={fatigueWeekHours}
+          />
+        ) : null;
+      })()}
 
       {openSession && (
         <SessionWindow

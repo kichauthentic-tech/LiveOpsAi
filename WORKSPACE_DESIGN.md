@@ -13,6 +13,19 @@
 
 ## 1. Giai đoạn hiện tại (cập nhật 2026-10-07)
 
+- **08/10: BỎ MÀN "NHÂN SỰ CA" CỦA AGENCY, TÁCH "ĐĂNG KÝ CA" CỦA TALENT RA MÀN RIÊNG (user chốt "làm cả 2"; CHƯA commit; tsc, vitest 647/649 — 2 test đỏ là LỖI CÓ SẴN không thuộc đợt
+  này: Talent Pool `lg:sticky`, `TalentLoadTimeline` text-[10px] —, audit:dead 0; đã xem trên app thật nối DB thật (admin, user đăng nhập hộ): `/nhan-su-ca` → Bảng Vận Hành, menu không còn mục, khối "Việc lập kế hoạch ca" hiện đúng số liệu; CHƯA thử mở dòng ca chưa có người (T10 không có ca mở nào; tạo ca thử sẽ gửi thông báo thật cho talent) và CHƯA thử màn Đăng Ký Ca bằng tài khoản talent).** Lý do: màn ops trùng Bảng Vận Hành /
+  Cửa sổ Ca Live (danh sách ca, đăng ký, chốt Host+Trợ live), còn talent chỉ dùng chung component vì `shift_scheduling` là màn duy nhất họ đăng ký ca. `ShiftScheduling.tsx` (1.140 dòng) đã xoá.
+  - **Talent:** `components/TalentShiftSignup.tsx` — chỉ liệt kê ca ĐANG MỞ từ hôm nay theo ngày + nút "Tôi rảnh ca này"/huỷ; id tab `shift_scheduling` và route `/nhan-su-ca` giữ cho talent
+    (thông báo `shift_open` vẫn trỏ về đây). Test `layoutConventions` cấm màn này import chốt người/gợi ý host/bảng tải.
+  - **Ops/CEO/admin:** mục menu "Nhân sự ca" bỏ; link `/nhan-su-ca` và activeTab đã lưu → Bảng Vận Hành (effect ở App, cạnh `firstAllowedTab`). Dòng ca chưa có người ở Bảng Vận Hành mở
+    `SlotDetailModal` (chốt Host + Trợ live; nay có gợi ý Host xếp theo GMV/giờ 90 ngày cùng sàn + cảnh báo mệt, `suggestionLabel` ở `lib/performance/hostSuggestion.ts`). Khối mới
+    `components/OpsPlanningTodo.tsx` ở cuối Bảng Vận Hành (trên khối Hỗ Trợ Vận Hành): kênh chưa chốt Kế Hoạch Tháng sau · ca mở thiếu người của tháng đang chọn · cam kết hợp đồng còn thiếu giờ
+    (chỉ hiện brand thiếu/có ca chưa xác nhận) · Chốt lịch hàng loạt; có chọn tháng. Prefetch đăng ký ở `TAB_DATA_PREFETCH.calendar`.
+  - **Bỏ hẳn (đã có chỗ khác):** lịch tháng + danh sách ca của Nhân sự ca, bảng "Số ca của từng host" (xem Lịch & Studio → Tải host / Hiệu Suất Host), nhãn nguồn ca (Tự động/Kế hoạch tháng/Phát sinh),
+    bảng xếp hạng chi tiết dưới ô chọn Host (nay gói vào nhãn trong ô chọn). Banner kế hoạch: sửa luôn lỗi tên brand vô hình ở theme sáng (`text-amber-100` → `text-amber-200`).
+  - **Việc kế:** khi có ca mở thật thì bấm thử dòng ca chưa có người (SlotDetailModal + gợi ý Host), và xem Đăng Ký Ca bằng tài khoản talent; chuỗi "Nhân sự ca" còn trong comment code/test là lịch sử, không hiển thị.
+
 - **07/10 (đêm): THIẾT KẾ LẠI TALENT POOL — danh sách + hồ sơ cạnh nhau (user duyệt mockup; CHƯA commit; tsc, vitest 650/650, audit:dead 0; đã xem trên app thật
   nối DB thật ở 1440/1024/375px, 40 talent, 0 lỗi console, 0 tràn ngang).** `components/TalentMatcher.tsx`: bảng 11 cột + popup chi tiết → dải 4 số (Talent / Đã chạy ca /
   Giờ host+trợ / Chưa gắn ca, tính trên TOÀN BỘ talent) + nút lọc vai trò có đếm + danh sách một dòng/người (avatar chữ cái, vai trò, ca·giờ host/trợ, thanh khối lượng so với
@@ -33,6 +46,13 @@
   Quy ước: thẻ ca mới KHÔNG tự đặt màu/nhãn — thêm brand ⇒ khai `accent/ink/inkDark` ở `BRAND_THEMES` (không khai thì tự suy, vẫn qua test tương phản); thông tin phụ thêm
   vào mảng `meta`; chú giải dùng `SessionCardLegend`. Chưa làm: đổi chữ TikTok/Shopee thành logo ở Sổ Ca / Bản Tin CEO / Hiệu suất Host (đã loại khỏi phạm vi).
 
+- **08/10: TINH CHỈNH THẺ CA + LỊCH NGÀY (CHƯA commit; tsc, vitest mới 24/24; xem trên thẻ mẫu dựng ở trang đăng nhập, CHƯA xem trên app thật có dữ liệu).** Lịch Ngày: mọi thẻ cao
+  ĐÚNG `LANE_H` (prop `fill` của `SessionEventCard`, Target GMV ghim đáy; chỉ rộng đổi theo giờ), phòng trống thu còn `EMPTY_ROW_H` 56px, nhãn đầu/cuối trục giờ căn vào trong
+  (hết bị cắt `:00`/`23:`). Thẻ (mọi lịch): ca ĐANG LIVE = viền chớp đỏ (`sc-blink`, tắt khi reduced-motion; huy hiệu LIVE đứng yên); `buildSessionMeta` thêm chip đỏ
+  "Chưa có host" (ca Upcoming/Live, không hiện cho brand) và chip "A → B" khi đổi người giữa ca (tooltip ghi giờ đổi, `SessionCardMeta.warn`); viền đỏ trùng người nay có
+  tooltip "X cũng đang ở ca …" (`clashDescriptions` ở `lib/scheduling/conflicts.ts`, `clashTip` ở LiveCalendar). Chưa làm: giờ vào thực tế của ca live ("trễ 7p"), đánh dấu
+  `excludedFromReports` trên thẻ. 2 test đang đỏ KHÔNG do đợt này: `layoutConventions` (Talent Pool `lg:sticky`), `uiReadability` (TalentLoadTimeline `text-[10px]`).
+
 - **07/10 (cuối ngày): GIẢM THỜI GIAN MỞ APP (đã commit 8058e6f; tsc, vitest 650/650, đã đo trên trình duyệt).** Cổ chai = danh sách ca (1.501 ca, ~95% byte lúc mở) giữ
   `coreDataReady` ~10 s trên mạng yếu của user. Đã làm: 2 trang ca song song + `SESSION_READ_COLUMNS` + tải sẵn xlsx (commit 5615c13); **Dữ Liệu Gốc + Nhập Ads chờ `shellDataReady`
   (brand + kênh), không chờ ca** — hiện ~0,8 s dù ca về 6,5 s; Nạp bù/Đối soát tự chờ `coreReady`. Số đo + hướng đã cân và BỎ (cắt cửa sổ ca, cache IndexedDB) → HISTORY §"Giảm thời gian mở app".
@@ -46,13 +66,6 @@
   (`import_live_reconciliation` / `apply_live_reconciliation` giữ nguyên, lô cũ vẫn xem được); `snapshotRowsFromParsed` (extractRooms.ts) là phép chuẩn hoá
   chung. Lỗi tạo lô sau khi đã lưu import không làm mất import (báo riêng + nút thử lại). Link CeoBrief "reconcile" nay mở Toàn Cảnh Brand.
   **Luật cho ca nối thiếu snapshot giữa ca:** ĐỪNG Sinh ca / tách ca khi ca sau đã có trong lịch/kế hoạch — Đối soát khớp room vào cả 2 ca có sẵn (rổ "Cần xem
-- **08/10: TINH CHỈNH THẺ CA + LỊCH NGÀY (CHƯA commit; tsc, vitest mới 24/24; xem trên thẻ mẫu dựng ở trang đăng nhập, CHƯA xem trên app thật có dữ liệu).** Lịch Ngày: mọi thẻ cao
-  ĐÚNG `LANE_H` (prop `fill` của `SessionEventCard`, Target GMV ghim đáy; chỉ rộng đổi theo giờ), phòng trống thu còn `EMPTY_ROW_H` 56px, nhãn đầu/cuối trục giờ căn vào trong
-  (hết bị cắt `:00`/`23:`). Thẻ (mọi lịch): ca ĐANG LIVE = viền chớp đỏ (`sc-blink`, tắt khi reduced-motion; huy hiệu LIVE đứng yên); `buildSessionMeta` thêm chip đỏ
-  "Chưa có host" (ca Upcoming/Live, không hiện cho brand) và chip "A → B" khi đổi người giữa ca (tooltip ghi giờ đổi, `SessionCardMeta.warn`); viền đỏ trùng người nay có
-  tooltip "X cũng đang ở ca …" (`clashDescriptions` ở `lib/scheduling/conflicts.ts`, `clashTip` ở LiveCalendar). Chưa làm: giờ vào thực tế của ca live ("trễ 7p"), đánh dấu
-  `excludedFromReports` trên thẻ. 2 test đang đỏ KHÔNG do đợt này: `layoutConventions` (Talent Pool `lg:sticky`), `uiReadability` (TalentLoadTimeline `text-[10px]`).
-
   lại"), chia theo thời gian chồng, tổng đúng bằng file, host/target giữ nguyên. Nay `planBackfill(rows, linked, sessionWindows)` bỏ room chồng giờ ca có sẵn
   (đếm `overlapping`) và nút "tách" ẩn khi `hasOverlappingSession` (client; RPC `split_backfill_session` CHƯA chặn — nếu cần thì migration mới). Khối Nạp bù có
   nút Ẩn/Hiện (localStorage `liveops.backfillFromRooms.hidden`). Test: `tests/roomsToSessions.test.ts` +4; vitest 631/631, tsc, audit:dead 0, build.
@@ -66,7 +79,7 @@
   - **Bước 0 XONG (07/10):** gợi ý host + chốt hàng loạt chỉ tính GMV/giờ cùng sàn của ca (`SlotContext.platform`, mệt mỏi vẫn đếm mọi sàn);
     Talent Pool / AI ghép host / Hồ Sơ Của Tôi tách GMV theo sàn (`TalentRealTotals.perf[sàn]`, không còn `totalGmv`; AI ghép host có ô chọn sàn);
     Bảng Vận Hành "GMV đã ghi nhận" và "Target" từng ngày ở Lịch & Studio tách theo sàn; tập trung khách ở Bản Tin CEO tính riêng từng sàn;
-    Finance bỏ tổng GMV; việc "Kế hoạch VERA Shopee…" và nút ở Nhân sự ca / CRM mở đúng sàn (`openMonthPlanFor` ở App, bỏ `loadRememberedPlatform`
+    Finance bỏ tổng GMV; việc "Kế hoạch VERA Shopee…" và nút ở Bảng Vận Hành / CRM mở đúng sàn (`openMonthPlanFor` ở App, bỏ `loadRememberedPlatform`
     chết). Khoá bằng code: `lib/platforms/perf.ts` (`sumByPlatform`, `assertOnePlatform` — ném lỗi ở dev/test khi mảng ca lẫn sàn, gắn ở
     `keyMetricsOfSessions`, `shopeeKeyMetricsOfSessions`, `byHost`, `byHostShopee`, `buildHistory`, `summarize`) + `tests/noCrossPlatformPerf.test.ts`
     (hành vi + bộ quét: phép cộng số hiệu suất viết tay chỉ được ở file trong `SINGLE_PLATFORM_FILES`). Verify: tsc, lint 0 lỗi, vitest 613/613,
@@ -234,10 +247,10 @@
   ẩn khỏi sidebar khi MỌI kênh của brand đều không có nguồn; thanh sàn chỉ liệt kê sàn hợp lệ cho tab.
   Có URL route (`src/lib/routes.ts`): `/so-ca`, `/brand/crocs/report-thang`…
 - **Nguồn sự thật của menu:** `agencyNavGroups()`/`brandNavGroups()` ở [src/lib/appNav.ts](src/lib/appNav.ts). Ảnh chụp:
-  - Agency: Dashboard (Bản Tin CEO) · Lập Kế Hoạch (Kế Hoạch Tháng, Nhân sự ca) · Vận Hành Hằng Ngày (Bảng Vận Hành, Lịch & Studio — tách tab con
+  - Agency: Dashboard (Bản Tin CEO) · Lập Kế Hoạch (Kế Hoạch Tháng; "Nhân sự ca" đã bỏ 08/10 — chốt người ở Bảng Vận Hành) · Vận Hành Hằng Ngày (Bảng Vận Hành, Lịch & Studio — tách tab con
     thành mục riêng 07/10, id `studio_calendar`, `opsView` đã gỡ —, Sổ Ca; Hỗ Trợ Vận Hành đã gộp 08/10 thành khối thu gọn cuối Bảng Vận Hành, `OpsSupportTab` tự chọn brand × sàn, link cũ `/ho-tro-van-hanh` và activeTab lưu `ops_support` chuyển về `calendar`) · Phân Tích (Hiệu Suất Host, Toàn Cảnh Brand, Điều Phối Phát Hành) · Tài Nguyên (Talent Pool,
     Studios & Gear) · Kinh Doanh (CRM — gồm "Hợp đồng & giá", TikTok API) · Tài Chính (Finance & P&L — khoá cứng
-    ceo/admin) · Hệ Thống (Phân Quyền & Role; AI Training Center — chỉ admin). Talent chỉ thấy: Ca Của Tôi, Đăng Ký Ca, Hồ Sơ.
+    ceo/admin) · Hệ Thống (Phân Quyền & Role; AI Training Center — chỉ admin). Talent chỉ thấy: Ca Của Tôi, Đăng Ký Ca (`TalentShiftSignup`, id `shift_scheduling`), Hồ Sơ.
     (Kinh Doanh chỉ còn CRM + TikTok API — "Cam Kết Hợp Đồng" gộp vào CRM/Kế Hoạch Tháng 06/10.)
   - Brand: Dashboard · Lịch Vận Hành · Sổ Ca · SKU Showcase · Report Tháng (toggle Tháng/Tuần) · Hợp Đồng (chỉ đọc: cam kết + giá)
     · Kế Hoạch Tháng Sau (chỉ đọc + xác nhận) · Affiliate · Nhập Ads + Dữ Liệu Gốc (ẩn với role brand).
@@ -449,7 +462,7 @@ live = `sessionHours`. GMV/giờ đem NHÂN với giờ lịch thì chia trên g
   Core Stats gồm cả creator affiliate — không dùng làm số agency. CTOR = Orders ÷ Product clicks. Kết luận về host cần
   khoảng tin cậy nhiều tháng (phân phối t). So sánh cắt theo **ngày cuối có số**, không theo lịch.
 - **Luật vòng đời (04/10, audit logic):** ca quá giờ không bằng chứng (số/report/giờ live/nạp bù) KHÔNG tính là đã giao
-  giờ cam kết, KHÔNG vào lương/doanh thu — hiện "chờ xác nhận" ở Finance, Cam Kết, Nhân sự ca, Cửa sổ Ca Live; role brand
+  giờ cam kết, KHÔNG vào lương/doanh thu — hiện "chờ xác nhận" ở Finance, Cam Kết, Bảng Vận Hành, Cửa sổ Ca Live; role brand
   tháng chưa phát hành (view che số) vẫn tính như cũ. Ca "loại khỏi báo cáo": vẫn trả công theo giờ, bỏ doanh thu +
   hoa hồng theo GMV (`SessionPnl.excluded`); Finance/Thu nhập talent đọc `sessions` (gồm ca loại), màn phân tích/brand
   vẫn `activeSessions`. Target tháng chỉ nhập ở Kế Hoạch Tháng; ô "Kế hoạch tháng sau" của Report đã bỏ (04/10 tối),

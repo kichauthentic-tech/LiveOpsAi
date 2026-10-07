@@ -425,7 +425,7 @@ export default function MonthPlan({
     // Bỏ ca khỏi kế hoạch đã chốt = bỏ luôn target của nó khỏi target tháng. Luật run-rate: ca kế hoạch HUỶ thì
     // giữ target — muốn vậy thì huỷ ca ở Nhân sự ca, đừng bỏ khỏi lưới. Nói rõ trước khi bỏ.
     if (locked && d?.id && d.targetGmv > 0 && !(await confirm(
-      `Bỏ ca ${d.date.slice(8)}/${d.date.slice(5, 7)} ${d.startTime}–${d.endTime} khỏi kế hoạch đã chốt?\n\nTarget ${fmtVndShort(d.targetGmv)} của ca này sẽ bị trừ khỏi target tháng. Nếu chỉ là ca không chạy được (vẫn tính vào mẫu số run-rate) thì huỷ ca ở Nhân sự ca thay vì bỏ khỏi lưới.`,
+      `Bỏ ca ${d.date.slice(8)}/${d.date.slice(5, 7)} ${d.startTime}–${d.endTime} khỏi kế hoạch đã chốt?\n\nTarget ${fmtVndShort(d.targetGmv)} của ca này sẽ bị trừ khỏi target tháng. Nếu chỉ là ca không chạy được (vẫn tính vào mẫu số run-rate) thì huỷ ca ở Bảng Vận Hành thay vì bỏ khỏi lưới.`,
       { danger: true }
     ))) return;
     setDrafts((prev) => withForecast(prev.filter((x) => x.key !== key)));
@@ -666,7 +666,7 @@ export default function MonthPlan({
       setLockedSlotsTick((t) => t + 1);
       setMsg(
         `Đã chốt: mở ${r.created} ca mới${(r.linked_sessions ?? 0) > 0 ? `, gắn ${r.linked_sessions} ca đã nhập` : ""}${r.linked > 0 ? `, gắn ${r.linked} ca đã có sẵn` : ""}${r.cancelled > 0 ? `, huỷ ${r.cancelled} ca bị bỏ` : ""}` +
-          `${r.kept_registered > 0 ? `, GIỮ ${r.kept_registered} ca bị bỏ nhưng đã có người đăng ký (xử lý ở Nhân sự ca)` : ""}${(r.skipped_past ?? 0) > 0 ? `, bỏ qua ${r.skipped_past} ca ngày đã qua (ca nào đã live: mở ca đúng giờ ở Lịch & Studio rồi bấm Chốt lại để gắn target)` : ""} — ${r.total_slots} ca kế hoạch đã có ca thật/ca chờ${r.created > 0 ? ` (${r.created} ca đang chờ đăng ký)` : ""}.`
+          `${r.kept_registered > 0 ? `, GIỮ ${r.kept_registered} ca bị bỏ nhưng đã có người đăng ký (xử lý ở Bảng Vận Hành)` : ""}${(r.skipped_past ?? 0) > 0 ? `, bỏ qua ${r.skipped_past} ca ngày đã qua (ca nào đã live: mở ca đúng giờ ở Lịch & Studio rồi bấm Chốt lại để gắn target)` : ""} — ${r.total_slots} ca kế hoạch đã có ca thật/ca chờ${r.created > 0 ? ` (${r.created} ca đang chờ đăng ký)` : ""}.`
       );
     } catch (e) {
       setMsg(`Không chốt được: ${errorMessage(e)}`);
@@ -690,7 +690,7 @@ export default function MonthPlan({
 ` +
           `• Ca chờ đăng ký đã sinh ra từ kế hoạch này (khoảng ${openFromPlan} ca đang mở) sẽ bị HUỶ.
 ` +
-          `• Ca đã chốt người thì KHÔNG xoá được — nếu có, DB sẽ chặn và bạn phải xử từng ca ở Nhân sự ca trước.
+          `• Ca đã chốt người thì KHÔNG xoá được — nếu có, DB sẽ chặn và bạn phải xử từng ca ở Bảng Vận Hành trước.
 
 ` +
           `Không hoàn tác được.`,
@@ -730,7 +730,7 @@ export default function MonthPlan({
             Kế Hoạch Tháng
           </h2>
           <PageIntro>
-            Lập lưới ca cho brand trước khi mở đăng ký: giờ cam kết và target của tháng đặt ngay tại đây (mặc định lấy từ hợp đồng ở CRM), chốt là ca đổ xuống Nhân sự ca chờ talent đăng ký.
+            Lập lưới ca cho brand trước khi mở đăng ký: giờ cam kết và target của tháng đặt ngay tại đây (mặc định lấy từ hợp đồng ở CRM), chốt là ca đổ xuống Bảng Vận Hành chờ talent đăng ký.
           </PageIntro>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">

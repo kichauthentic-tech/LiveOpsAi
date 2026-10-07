@@ -217,7 +217,7 @@ export function buildTodos(input: TodoInput): Todo[] {
   const week = addDays(today, 7);
   const open = input.shiftSlots.filter((sl) => sl.status === "open" && !sl.sessionId && sl.date >= today && sl.date <= week);
   if (open.length > 0) {
-    out.push({ id: "open-slots", level: "high", title: `${open.length} ca trong 7 ngày tới chưa có người`, tab: "shift_scheduling", action: "Chốt người" });
+    out.push({ id: "open-slots", level: "high", title: `${open.length} ca trong 7 ngày tới chưa có người`, tab: "calendar", action: "Chốt người ở Bảng Vận Hành" });
   }
 
   // Rate talent (chỉ CEO/admin thấy rate): host/trợ đã chạy ca mà chưa có rate nào.

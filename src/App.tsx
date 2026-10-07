@@ -99,7 +99,8 @@ const GlossaryDialog = lazyNamed(() => import("./components/GlossaryDialog"), "G
 const HostPerformance = lazyNamed(() => import("./components/HostPerformance"), "HostPerformance");
 const BrandsOverview = lazyNamed(() => import("./components/BrandsOverview"), "BrandsOverview");
 const ReportPublishBoard = lazyNamed(() => import("./components/ReportPublishBoard"), "ReportPublishBoard");
-const ShiftScheduling = lazyNamed(() => import("./components/ShiftScheduling"), "default");
+const TalentShiftSignup = lazyNamed(() => import("./components/TalentShiftSignup"), "default");
+const OpsPlanningTodo = lazyNamed(() => import("./components/OpsPlanningTodo"), "default");
 const MonthPlan = lazyNamed(() => import("./components/MonthPlan"), "default");
 const OpsSupportTab = lazyNamed(() => import("./components/OpsSupportTab"), "default");
 const CeoBrief = lazyNamed(() => import("./components/CeoBrief"), "default");
@@ -111,11 +112,11 @@ const renamedTab = (t: string) => (t === "ops_support" ? "calendar" : t);
 // Chunk của từng tab — để tải SONG SONG với đợt nạp dữ liệu (xem `preload` ở lib/lazyNamed.ts). Phải
 // khớp với khối render tab bên dưới; thiếu một tab thì tab đó chỉ chậm như trước, không hỏng.
 const TAB_CHUNKS: Record<string, { preload: () => void }[]> = {
-  calendar: [OpsBoard, TodoPanel, OpsSupportTab],
+  calendar: [OpsBoard, TodoPanel, OpsPlanningTodo, OpsSupportTab],
   studio_calendar: [LiveCalendar],
   sessions: [SessionLedger],
   my_shifts: [OpsBoard],
-  shift_scheduling: [ShiftScheduling],
+  shift_scheduling: [TalentShiftSignup],
   month_plan: [MonthPlan],
   agency_overview: [CeoBrief, AgencyChannelSummary],
   host_performance: [HostPerformance],
@@ -150,7 +151,7 @@ const TAB_DATA_PREFETCH: Record<string, (ctx: TabPrefetchCtx) => Promise<void>> 
   brand_dashboard: (ctx) => import("./components/brand-workspace/BrandDashboard").then((m) => m.prefetchBrandDashboard(ctx)),
   brand_monthly_report: (ctx) => import("./components/brand-workspace/BrandMonthlyReport").then((m) => m.prefetchBrandMonthlyReport(ctx)),
   brand_ads_report: (ctx) => import("./components/brand-workspace/BrandAdsReport").then((m) => m.prefetchBrandAdsReport(ctx)),
-  shift_scheduling: (ctx) => import("./components/ShiftScheduling").then((m) => m.prefetchShiftScheduling(ctx)),
+  calendar: (ctx) => import("./components/OpsPlanningTodo").then((m) => m.prefetchOpsPlanning(ctx)),
   month_plan: (ctx) => import("./components/MonthPlan").then((m) => m.prefetchMonthPlan(ctx)),
   brands_overview: (ctx) => import("./components/BrandsOverview").then((m) => m.prefetchBrandsOverview(ctx)),
   crm: (ctx) => import("./components/CrmProjects").then((m) => m.prefetchCrm(ctx)),
@@ -1440,6 +1441,12 @@ export default function App() {
   // rơi vào "calendar" gate `manage_calendar` = false, tức moderator CHƯA BAO GIỜ đăng nhập được).
   // Sửa hằng số chỉ vá được đúng role vừa phát hiện; CEO tắt `manage_calendar` của operations ở Ma
   // Trận là lỗi quay lại ngay. Nên vá bằng lưới an toàn tính từ chính navItems.
+  // "Nhân sự ca" (agency) đã bỏ 08/10 — chỉ còn "Đăng Ký Ca" của talent dùng id này. Link /nhan-su-ca và activeTab đã lưu của
+  // ops/ceo/admin chuyển về Bảng Vận Hành (nơi chốt người), không rơi vào màn "Quyền Truy Cập Bị Hạn Chế".
+  useEffect(() => {
+    if (profile && currentRole !== "talent" && activeTab === "shift_scheduling") setActiveTab("calendar");
+  }, [profile, currentRole, activeTab]);
+
   const firstAllowedTab = navItems.find((n) => !n.perm || checkPermission(n.perm))?.id;
 
   // Màn đầu đã hiện ⇒ lúc trình duyệt rảnh tải sẵn chunk của các tab được phép, để bấm menu không phải đợi
@@ -1862,10 +1869,25 @@ export default function App() {
                   onSetSessionExcluded={handleSetSessionExcluded}
                   onRequestDropout={handleRequestDropout}
                   onLogAudit={pushAuditLog}
-                      onOpenScheduling={() => setActiveTab("shift_scheduling")}
+                      onFinalizeSlot={handleFinalizeShiftSlot}
+                      onDeleteSlot={handleDeleteShiftSlot}
+                      fatigueWeekHours={engineParams.fatigueWeekHours}
                       requestOpenSessionId={notifOpenSessionId}
                       onOpenRequestHandled={() => setNotifOpenSessionId(null)}
                     />
+                    {isOpsRole && (
+                      <OpsPlanningTodo
+                        brands={brands}
+                        channels={channels}
+                        sessions={activeSessions}
+                        talents={activeTalents}
+                        shiftSlots={shiftSlots}
+                        shiftRegistrations={shiftRegistrations}
+                        fatigueWeekHours={engineParams.fatigueWeekHours}
+                        onFinalizeSlot={handleFinalizeShiftSlot}
+                        onOpenMonthPlan={(brandId, platform) => openMonthPlanFor(brandId, platform)}
+                      />
+                    )}
                     {isOpsRole && (
                       <OpsSupportTab
                         platform={agencyPlatformState}
@@ -1929,29 +1951,14 @@ export default function App() {
                   />
                 )}
 
-                {activeTab === "shift_scheduling" && (
-                  <ShiftScheduling
-                    currentRole={currentRole}
-                    channels={channels}
-                    activeUser={activeUser}
-                    sessions={activeSessions}
-                    talents={activeTalents}
+                {activeTab === "shift_scheduling" && currentRole === "talent" && (
+                  <TalentShiftSignup
                     brands={brands}
-                    studios={activeStudios}
                     shiftSlots={shiftSlots}
                     shiftRegistrations={shiftRegistrations}
-                    onDeleteSlot={handleDeleteShiftSlot}
+                    myTalentId={activeUser.assignedTalentId}
                     onRegister={handleRegisterSlot}
                     onUnregister={handleUnregisterSlot}
-                    onFinalizeSlot={handleFinalizeShiftSlot}
-                    onSessionsUpdated={handleSessionsUpdated}
-                    onUpdateSession={handleUpdateSession}
-                    onLogAudit={pushAuditLog}
-                    onOpenMonthPlan={(brandId, platform) => openMonthPlanFor(brandId, platform)}
-                    fatigueWeekHours={engineParams.fatigueWeekHours}
-                    onCancelSession={handleCancelSession}
-                    onSetSessionExcluded={handleSetSessionExcluded}
-                    onRequestDropout={handleRequestDropout}
                   />
                 )}
 

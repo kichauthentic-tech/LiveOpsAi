@@ -5,7 +5,7 @@
 export const AGENCY_TAB_LABELS: Record<string, string> = {
   agency_overview: "Dashboard",
   month_plan: "Kế Hoạch Tháng",
-  shift_scheduling: "Nhân sự ca",
+  shift_scheduling: "Nhân sự ca", // màn agency đã bỏ 08/10 (chốt người ở Bảng Vận Hành) — giữ tên để "Lượt Mở Tab" đọc được lượt cũ; talent vẫn dùng id này (Đăng Ký Ca)
   calendar: "Bảng Vận Hành",
   studio_calendar: "Lịch & Studio",
   sessions: "Sổ Ca",

@@ -2,6 +2,7 @@ import { LiveSession } from "../../types";
 import { hostPortions, isCountable, sessionHours, weekdayOf } from "./hostPerformance";
 import { personRoleMinutes, sessionMinutes } from "../staffSegments";
 import { platformOf, type ReportPlatform } from "../reportPlatform";
+import { fmtFixed, fmtVndShort } from "../format";
 
 // Đưa tín hiệu hiệu suất vào ĐÚNG lúc ops chọn người (màn Đăng Ký & Chốt Lịch), thay vì bắt ops
 // nhớ số từ tab Hiệu Suất Host rồi nhảy màn hình. Cùng định nghĩa "ca đáng đếm" và "giờ" với
@@ -171,4 +172,24 @@ export function headlineFor(s: HostSuggestion): { value: number; scope: "brand" 
   if (s.brandSessions > 0) return { value: s.brandGmvPerHour, scope: "brand", sessions: s.brandSessions };
   if (s.overallSessions > 0) return { value: s.overallGmvPerHour, scope: "overall", sessions: s.overallSessions };
   return { value: 0, scope: "none", sessions: 0 };
+}
+
+// GMV/giờ gọn để nhét cạnh tên host trong ô chọn — chỗ này chỉ còn vài ký tự, số đầy đủ xem ở Hiệu Suất Host.
+const fmtPerHour = (n: number) => `${fmtVndShort(n)}/h`;
+
+/**
+ * Nhãn một ứng viên Host trong ô chọn: luôn nói rõ số đang hiện là của brand này hay số chung (ops tưởng số chung là
+ * số của brand rồi xếp nhầm là kiểu sai nguy hiểm nhất), kèm khung giờ, số ca đã xếp trong tháng và cảnh báo mệt.
+ */
+export function suggestionLabel(s: HostSuggestion, fatigueAt: number): string {
+  const h = headlineFor(s);
+  const extras = [
+    s.blockSessions >= 2 ? `khung này ${fmtPerHour(s.blockGmvPerHour)}` : "",
+    s.monthSessions > 0 ? `${s.monthSessions} ca tháng này` : "",
+    s.weekHours > fatigueAt ? `⚠ ${fmtFixed(s.weekHours, 0)}h tuần này` : ""
+  ].filter(Boolean);
+  const tail = extras.length > 0 ? ` · ${extras.join(" · ")}` : "";
+  if (h.scope === "none") return `${s.name} · chưa có dữ liệu${tail}`;
+  const scope = h.scope === "brand" ? `brand này, ${s.platform}` : `chung ${s.platform}`;
+  return `${s.name} · ${fmtPerHour(h.value)} (${scope}, ${h.sessions} ca)${tail}`;
 }

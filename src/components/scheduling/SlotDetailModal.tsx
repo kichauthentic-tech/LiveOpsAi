@@ -1,9 +1,12 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { LiveSession, ShiftSlot, ShiftRegistration, Talent } from "../../types";
 import { X, Users, UserCheck, UserX, Check, AlertTriangle, Trash2 } from "lucide-react";
-import { dateTimeRangesOverlap } from "../../lib/dateUtils";
+import { dateTimeRangesOverlap, getTodayDate } from "../../lib/dateUtils";
 import { personClash } from "../../lib/scheduling/conflicts";
 import { useToast } from "../../hooks/useToast";
+import { FATIGUE_WEEK_HOURS, suggestHosts, suggestionLabel } from "../../lib/performance/hostSuggestion";
+import { talentShortName } from "../../lib/talentName";
+import { platformOf } from "../../lib/reportPlatform";
 
 interface SlotDetailModalProps {
   slot: ShiftSlot;
@@ -18,11 +21,12 @@ interface SlotDetailModalProps {
   onUnregister?: (slotId: string, talentId: string) => Promise<boolean>;
   onFinalizeSlot?: (slot: ShiftSlot, hostId: string, coHostId: string | null) => Promise<boolean>;
   onDeleteSlot?: (id: string) => Promise<void>;
+  fatigueWeekHours?: number; // ngưỡng mệt (AI Training Center), mặc định FATIGUE_WEEK_HOURS
 }
 
-// Panel đăng ký/chốt lịch cho 1 Ca — mở trực tiếp từ bất kỳ view lịch nào
-// (Month/Week/Day Matrix/List, Agency hoặc Brand) thay vì bắt buộc phải sang
-// "Đăng Ký & Chốt Lịch". Logic đăng ký/chốt giữ nguyên y hệt ShiftScheduling.tsx.
+// Panel đăng ký/chốt lịch cho 1 Ca — mở từ bất kỳ lịch nào (Agency/Brand) và từ dòng ca chưa có người ở Bảng Vận Hành.
+// Từ 08/10 đây là NƠI DUY NHẤT ops chốt Host + Trợ live (màn "Nhân sự ca" đã bỏ): người đã đăng ký được xếp theo
+// GMV/giờ 90 ngày gần nhất cùng sàn (suggestHosts), kèm cảnh báo mệt.
 export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
   slot,
   onClose,
@@ -35,7 +39,8 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
   onRegister,
   onUnregister,
   onFinalizeSlot,
-  onDeleteSlot
+  onDeleteSlot,
+  fatigueWeekHours = FATIGUE_WEEK_HOURS
 }) => {
   const { showToast } = useToast();
   const [hostId, setHostId] = useState("");
@@ -47,6 +52,23 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
   // Q1 (audit 2026-09-21): cho chốt cả người chưa đăng ký rảnh (ops xếp tay), có cảnh báo.
   const regIds = new Set(regs.map((r) => r.talentId));
   const others = talents.filter((t) => !regIds.has(t.id)).sort((a, b) => a.name.localeCompare(b.name, "vi"));
+  // Gợi ý xếp hạng chỉ cho người đã đăng ký; mốc 90 ngày — lấy cả đời thì host đã tiến bộ/đi xuống từ nửa năm trước vẫn kéo trung bình.
+  const suggestions = useMemo(() => {
+    if (!canManage) return [];
+    const d = new Date(`${getTodayDate()}T00:00:00`);
+    d.setDate(d.getDate() - 90);
+    const since = `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, "0")}-${`${d.getDate()}`.padStart(2, "0")}`;
+    const nameById = new Map(talents.map((t) => [t.id, talentShortName(t)]));
+    return suggestHosts(
+      registrations.filter((r) => r.slotId === slot.id).map((r) => r.talentId),
+      nameById,
+      sessions,
+      slot.brandId,
+      new Date(`${slot.date}T00:00:00`).getDay(),
+      since,
+      { date: slot.date, startTime: slot.startTime, endTime: slot.endTime, platform: platformOf(slot) }
+    );
+  }, [canManage, registrations, talents, sessions, slot]);
   const iAmRegistered = myTalentId ? regs.some((r) => r.talentId === myTalentId) : false;
 
   // Luật trùng lịch chung (lib/scheduling/conflicts.ts) — kiểm cả Trợ live (audit 2026-09-28 mục 8: bản cũ chỉ kiểm Host).
@@ -164,10 +186,10 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
                 className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-2 text-xs text-[var(--text)] focus:outline-none focus:border-blue-500"
               >
                 <option value="">Host…</option>
-                {regs.length > 0 && (
-                  <optgroup label="Đã đăng ký rảnh">
-                    {regs.map((r) => (
-                      <option key={r.talentId} value={r.talentId}>{talentsById.get(r.talentId)?.name ?? r.talentId}</option>
+                {suggestions.length > 0 && (
+                  <optgroup label="Đã đăng ký rảnh (xếp theo hiệu suất)">
+                    {suggestions.map((s) => (
+                      <option key={s.talentId} value={s.talentId}>{suggestionLabel(s, fatigueWeekHours)}</option>
                     ))}
                   </optgroup>
                 )}
@@ -228,7 +250,7 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
         )}
 
         {!myTalentId && !canManage && (
-          <p className="text-xs text-[var(--text-faint)] text-center py-2">Xem chi tiết đăng ký ở "Nhân sự ca".</p>
+          <p className="text-xs text-[var(--text-faint)] text-center py-2">Chỉ operations mới xem được danh sách đăng ký.</p>
         )}
 
         <div className="pt-2 border-t border-[var(--border)] flex justify-end">

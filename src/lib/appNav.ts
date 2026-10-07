@@ -48,7 +48,7 @@ export interface NavGroup {
 // Các tab mà nội dung chính là lưới lịch — bỏ giới hạn max-w-7xl để lấy hết chiều ngang
 // (lưới 7 cột / ma trận 5 khung giờ cần ~150px mỗi ô). Không còn tự thu
 // gọn sidebar theo tab — xem `autoCollapse`.
-export const CALENDAR_TABS = new Set(["calendar", "studio_calendar", "brand_calendar", "shift_scheduling"]);
+export const CALENDAR_TABS = new Set(["calendar", "studio_calendar", "brand_calendar"]);
 
 // Tab không đọc ca / talent / report tháng — không phải chờ đợt nạp đầu (coreDataReady). Mọi tab khác
 // hiện khung chờ tới khi nạp xong, thay vì vẽ "0 ca" / "Chưa có…" giả (audit UX 2026-09-29).
@@ -115,11 +115,10 @@ export function agencyNavGroups(currentRole: UserRole): NavGroup[] {
           {
             label: "Lập Kế Hoạch",
             items: [
-              // Kế Hoạch Tháng (0090) — lập lưới ca + target trước khi mở đăng ký; chốt là ca đổ xuống
-              // Đăng Ký & Chốt Lịch. Chỉ ops (manage_sessions = ceo/admin/operations).
-              { id: "month_plan", label: "Kế Hoạch Tháng", icon: CalendarRange, perm: "manage_sessions" as PermissionKey },
-              // Đăng ký & Chốt Lịch Host — không gate theo PermissionKey (talent cũng dùng, ở nhóm trên).
-              { id: "shift_scheduling", label: "Nhân sự ca", icon: CalendarClock, perm: undefined }
+              // Kế Hoạch Tháng (0090) — lập lưới ca + target trước khi mở đăng ký; chốt là ca đổ xuống Bảng Vận Hành
+              // (ca chờ đăng ký). Chỉ ops (manage_sessions = ceo/admin/operations). Màn "Nhân sự ca" đã bỏ 08/10: chốt Host + Trợ live
+              // ở Bảng Vận Hành (bấm dòng ca chưa có người), việc lập kế hoạch tồn đọng nằm ở khối cuối Bảng Vận Hành.
+              { id: "month_plan", label: "Kế Hoạch Tháng", icon: CalendarRange, perm: "manage_sessions" as PermissionKey }
             ]
           },
           {
