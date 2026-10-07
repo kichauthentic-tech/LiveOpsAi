@@ -1,23 +1,48 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { AffiliateActualEntry, LiveSession, UserRole } from "../../types";
+import { AffiliateActualEntry, AffiliatePlanMonth, LiveSession, UserRole } from "../../types";
 import { fetchAffiliateActuals, replaceAffiliateActuals } from "../../lib/db/affiliateActuals";
+import { fetchAffiliatePlanMonth, upsertAffiliatePlanMonth } from "../../lib/db/affiliatePlanMonths";
+import { CampOverrides, effectiveCamp } from "../../lib/campaignDays";
+import { fetchMonthPlan } from "../../lib/db/monthPlans";
 import { fetchAffiliateLiveSessions } from "../../lib/dataraw/affiliateLiveSessionSlice";
 import type { AffiliateLiveSessionRow } from "../../lib/dataraw/affiliateLiveRows";
+import {
+  AffiliateRow,
+  DEFAULT_FX_RATE,
+  PastedPlanRow,
+  dayLabelOf,
+  defaultAffiliatePlanMonth,
+  entryStatus,
+  parseDayLabel,
+  parsePlanPaste,
+  planBudget,
+  planGmvPerHour,
+  planHours,
+  planTotals,
+  sortPlanRows,
+  suggestCampName,
+  toUsd
+} from "../../lib/affiliate/plan";
+import { matchPlanToSessions, sameCreator } from "../../lib/affiliate/planMatch";
 import { errorMessage } from "../../lib/errorMessage";
 import { downloadRowsAsXlsx } from "../../lib/exportXlsx";
 import { useToast } from "../../hooks/useToast";
-import { Database, Download, Loader2, Plus, Save, Trash2, Users } from "lucide-react";
+import { BarChart3, CalendarDays, ClipboardPaste, Database, Download, Link2, Loader2, Lock, Plus, Save, Send, Trash2, Undo2, Users } from "lucide-react";
 import { metricHint } from "../../lib/metricGlossary";
 
 import { fmtFixed, fmtMonth, fmtVndFull } from "../../lib/format";
 import { MonthPicker } from "../common/MonthPicker";
-// Trang Affiliate (2026-09-22) — tách RIÊNG khỏi form Report Tháng theo yêu cầu ops. Bảng dựng
-// theo đúng file phân tích ops đang dùng: mỗi PHIÊN LIVE là 1 CỘT, mỗi chỉ số là 1 DÒNG, các cột
-// gom theo tháng bằng một dải tiêu đề ở trên.
+import { AffiliatePlanTable, CAMPAIGN_STYLE, CAMPAIGN_TYPES } from "./AffiliatePlanTable";
+// Trang Affiliate (2026-09-22) — tách RIÊNG khỏi form Report Tháng theo yêu cầu ops. Hai chế độ xem (0155, 2026-10-08):
+//   • KẾ HOẠCH — bảng dạng sheet ops vẫn lập hằng tháng (AffiliatePlanTable); dán thẳng từ Google Sheet; "Chốt, gửi brand"
+//     thì brand mới thấy (sau chốt vẫn sửa được, brand thấy ngay).
+//   • THEO DÕI — bảng phân tích theo đúng file ops: mỗi PHIÊN LIVE là 1 CỘT, mỗi chỉ số là 1 DÒNG, các cột gom theo tháng.
+// Số thực tế nạp từ file "Live Analysis" (Dữ Liệu Gốc) rồi KHỚP vào dòng kế hoạch (ngày + creator); phiên không có kế
+// hoạch vào bảng như phiên "Ngoài kế hoạch".
 //
-// Dữ liệu vẫn nằm ở brand_affiliate_actuals (migration 0067 + 0102) — cùng bảng Tab 04 Report
-// Tháng đọc, nên số ở 2 nơi không bao giờ lệch. Lưu theo từng tháng (replace cả tháng) vì
-// replaceAffiliateActuals() khoá theo (brand_id, period_month).
+// Dữ liệu vẫn nằm ở brand_affiliate_actuals (migration 0067 + 0102 + 0155) — một dòng đi từ kế hoạch tới có số, nên
+// không có bảng thứ hai để lệch nhau. Lưu theo từng tháng (replace cả tháng) vì replaceAffiliateActuals() khoá theo
+// (brand_id, period_month).
 
 interface BrandAffiliateTableProps {
   brandId: string;
@@ -29,17 +54,6 @@ interface BrandAffiliateTableProps {
   // đường canManage (nút "Nạp Từ Dữ Liệu Gốc" đã tự gate canManage) nên không cần gate lại ở đây.
   onOpenDataRaw?: () => void;
 }
-
-// Phân loại camp do ops đặt, không file TikTok nào có. Màu bám theo file Excel gốc của ops
-// (Big = đỏ đậm, Medium = xanh nhạt) để nhìn quen mắt.
-const CAMPAIGN_TYPES = ["Big", "Medium", "Brand Day", "Clearance"] as const;
-const CAMPAIGN_STYLE: Record<string, string> = {
-  Big: "bg-red-700 text-white",
-  Medium: "bg-sky-100 text-sky-800",
-  "Brand Day": "bg-amber-500 text-white",
-  Clearance: "bg-slate-500 text-white"
-};
-
 
 function monthsBetween(from: string, to: string): string[] {
   const out: string[] = [];
@@ -80,29 +94,23 @@ const fmtPct = (n?: number | null, d = 2) => (n == null || Number.isNaN(n) ? "�
 const fmtNum = (n?: number | null, d = 1) => (n == null || Number.isNaN(n) ? "—" : fmtFixed(n, d));
 
 // "2026-09-03" -> "3/9/2026" (đúng dạng dòng "Day" trong file ops).
-function dayLabel(iso: string): string {
-  const [y, m, d] = iso.split("-");
-  return `${Number(d)}/${Number(m)}/${y}`;
-}
+const dayLabel = dayLabelOf;
 
-// Dòng nạp từ Dữ Liệu Gốc -> entry của tháng tương ứng. Các trường ops phải tự nhập
-// (campaignType / targetGmv / adsCost) cố ý để trống, KHÔNG đoán.
 // Entry trong state mang thêm _key cục bộ: update()/removeEntry() phải khớp theo khoá ỔN ĐỊNH,
 // không khớp theo tham chiếu object — sửa 2 ô của cùng 1 cột trong cùng một nhịp (hoặc thao tác
 // tự động) sẽ tạo object mới ở lần đầu, làm lần sau không tìm thấy dòng và mất thay đổi.
 // _key không bao giờ xuống DB: replaceAffiliateActuals() chỉ map các cột có tên rõ ràng.
-type Row = AffiliateActualEntry & { _key: string };
+type Row = AffiliateRow;
 
 let keySeq = 0;
 const nextKey = () => `r${++keySeq}`;
 
-function rowToEntry(brandId: string, r: AffiliateLiveSessionRow): Row {
+const todayVn = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Ho_Chi_Minh" });
+
+// Phần THỰC TẾ của một phiên trong file Live Analysis — ghi vào dòng kế hoạch đã khớp, hoặc dòng mới nếu phiên không có
+// kế hoạch. Các trường ops phải tự nhập (targetGmv / adsCost / campaignType) cố ý KHÔNG đụng tới, không đoán.
+function sessionActuals(r: AffiliateLiveSessionRow): Partial<AffiliateActualEntry> {
   return {
-    _key: nextKey(),
-    brandId,
-    periodMonth: `${r.date.slice(0, 7)}-01`,
-    creatorName: r.creatorName || r.nickname,
-    liveDateLabel: dayLabel(r.date),
     timelineLabel: r.timelineLabel,
     // Làm tròn 1 chữ số như file ops; phiên TikTok gộp nhiều ngày (vd "74h 48min") vẫn giữ nguyên
     // số thật ở đây để ops thấy mà sửa, không tự bịa lại.
@@ -118,11 +126,41 @@ function rowToEntry(brandId: string, r: AffiliateLiveSessionRow): Row {
   };
 }
 
+// Phiên trong file KHÔNG có dòng kế hoạch -> dòng mới của tháng tương ứng, đã live ("ngoài kế hoạch").
+function rowToEntry(brandId: string, r: AffiliateLiveSessionRow): Row {
+  return {
+    _key: nextKey(),
+    brandId,
+    periodMonth: `${r.date.slice(0, 7)}-01`,
+    creatorName: r.creatorName || r.nickname,
+    liveDateLabel: dayLabel(r.date),
+    status: "done",
+    ...sessionActuals(r)
+  };
+}
+
+// Cột theo dõi sắp theo ngày live (rồi giờ bắt đầu thực): phiên khớp vào dòng kế hoạch giữ thứ tự cũ của dòng kế hoạch nên không
+// thể dựa vào sortOrder. Cột chưa có ngày hợp lệ xuống cuối theo thứ tự thêm.
+function byLiveDate(a: Row, b: Row): number {
+  const da = parseDayLabel(a.liveDateLabel) ?? "9999";
+  const db = parseDayLabel(b.liveDateLabel) ?? "9999";
+  if (da !== db) return da.localeCompare(db);
+  const ta = a.timelineLabel ?? "";
+  const tb = b.timelineLabel ?? "";
+  return ta !== tb ? ta.localeCompare(tb) : (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+}
+
+// Dòng đã có kế hoạch = có khung giờ/target/ngân sách kế hoạch (dòng cũ trước 0155 chỉ có target gõ tay cũng tính).
+const hasPlan = (e: AffiliateActualEntry) => !!(e.planTimelineLabel || e.targetGmv != null || e.planBudgetAds != null);
+
 export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole, onOpenDataRaw }: BrandAffiliateTableProps) {
   const canManage = currentRole === "ceo" || currentRole === "admin" || currentRole === "operations";
 
+  const [mode, setMode] = useState<"plan" | "track">("plan");
   const [fromMonth, setFromMonth] = useState(() => addMonths(thisMonth(), -3));
   const [toMonth, setToMonth] = useState(thisMonth);
+  // Tháng đang LẬP kế hoạch: từ ngày 20 mở sẵn tháng sau (ops lập kế hoạch cuối tháng).
+  const [planMonth, setPlanMonth] = useState(() => defaultAffiliatePlanMonth(todayVn()));
   const [entries, setEntries] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -133,13 +171,28 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
 
+  // Trạng thái tháng đang lập (0155): tỷ giá + đã chốt chưa. metaMissing = DB chưa chạy migration 0155.
+  const [monthMeta, setMonthMeta] = useState<AffiliatePlanMonth | null>(null);
+  const [metaMissing, setMetaMissing] = useState(false);
+  const [fx, setFx] = useState(DEFAULT_FX_RATE);
+  const [fxDirty, setFxDirty] = useState(false);
+  const [campCtx, setCampCtx] = useState<{ overrides?: CampOverrides; shopTarget?: number }>({});
+  const [confirmPublish, setConfirmPublish] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [pasteText, setPasteText] = useState("");
+
   const [importing, setImporting] = useState(false);
   const [importRows, setImportRows] = useState<AffiliateLiveSessionRow[] | null>(null);
   const [importPicked, setImportPicked] = useState<Set<string>>(new Set());
+  // Dòng kế hoạch đã qua ngày mà file không có phiên — ops tick để đánh dấu "Huỷ / dời".
+  const [cancelPicked, setCancelPicked] = useState<Set<string>>(new Set());
   // Ô đang được gõ — xem numInput() bên dưới.
   const [focusedCell, setFocusedCell] = useState<string | null>(null);
 
-  const months = useMemo(() => monthsBetween(fromMonth, toMonth), [fromMonth, toMonth]);
+  const rangeMonths = useMemo(() => monthsBetween(fromMonth, toMonth), [fromMonth, toMonth]);
+  // Nạp/lưu gộp cả dải theo dõi lẫn tháng đang lập: đổi chế độ xem không làm mất thay đổi chưa lưu.
+  const months = useMemo(() => [...new Set([...rangeMonths, planMonth])].sort(), [rangeMonths, planMonth]);
 
   // Nickname tài khoản shop lấy từ chính ca của brand — dùng để đánh dấu dòng KHÔNG phải affiliate
   // khi nạp (batch Live Analysis xuất ở view mặc định chỉ toàn dòng của shop).
@@ -167,24 +220,71 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
     void reload();
   }, [reload]);
 
-  // Cột hiển thị: gom theo tháng (chỉ tháng nằm trong dải đang xem), trong tháng sắp theo ngày live.
+  // Tỷ giá + trạng thái chốt của tháng đang lập, và khung camp / KPI cả shop từ Kế Hoạch Tháng (camp gợi ý theo ngày dùng
+  // đúng khoảng ngày camp ops đã đặt ở đó — một chỗ nhập).
+  useEffect(() => {
+    let stale = false;
+    (async () => {
+      try {
+        const m = await fetchAffiliatePlanMonth(brandId, `${planMonth}-01`);
+        if (stale) return;
+        setMonthMeta(m);
+        setFx(m?.fxRate ?? DEFAULT_FX_RATE);
+        setMetaMissing(false);
+      } catch (e) {
+        if (stale) return;
+        setMonthMeta(null);
+        setFx(DEFAULT_FX_RATE);
+        // Chưa chạy 0155 → bảng chưa có; lỗi khác (mạng…) cũng không chặn bảng, chỉ báo.
+        if (/brand_affiliate_plan_months|schema cache|does not exist/i.test(errorMessage(e, ""))) setMetaMissing(true);
+        else setErrorMsg(errorMessage(e, "Không tải được trạng thái kế hoạch Affiliate"));
+      }
+      try {
+        const mp = await fetchMonthPlan(brandId, planMonth);
+        if (!stale) setCampCtx({ overrides: effectiveCamp(mp?.plan.campRanges), shopTarget: mp?.plan.shopTargetGmv });
+      } catch {
+        if (!stale) setCampCtx({});
+      }
+    })();
+    return () => {
+      stale = true;
+    };
+  }, [brandId, planMonth]);
+
+  // Đổi tháng khi còn thay đổi chưa lưu sẽ nạp lại và mất sạch — chặn, bắt lưu trước.
+  const guardDirty = (apply: () => void) => {
+    if (dirty || fxDirty) {
+      setErrorMsg("Còn thay đổi chưa lưu — bấm Lưu trước khi đổi tháng.");
+      return;
+    }
+    apply();
+  };
+
+  // Cột hiển thị ở chế độ THEO DÕI: chỉ phiên đã live, gom theo tháng (chỉ tháng nằm trong dải đang xem), trong tháng sắp theo ngày live.
   const columns = useMemo(() => {
     const byMonth = new Map<string, Row[]>();
     for (const e of entries) {
+      if (entryStatus(e) !== "done") continue;
       const m = e.periodMonth.slice(0, 7);
-      if (!months.includes(m)) continue;
+      if (!rangeMonths.includes(m)) continue;
       const list = byMonth.get(m) ?? [];
       list.push(e);
       byMonth.set(m, list);
     }
-    return months
+    return rangeMonths
       .filter((m) => byMonth.has(m))
-      .map((m) => ({ month: m, items: (byMonth.get(m) ?? []).slice().sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)) }));
-  }, [entries, months]);
+      .map((m) => ({ month: m, items: (byMonth.get(m) ?? []).slice().sort(byLiveDate) }));
+  }, [entries, rangeMonths]);
 
   const flatColumns = useMemo(() => columns.flatMap((g) => g.items), [columns]);
 
-  // Xuất Excel — mỗi cột (1 phiên/creator) đang hiện trên bảng thành 1 dòng, đúng dải tháng đang
+  // Dòng của tháng đang lập. Brand không thấy phiên đã huỷ/dời.
+  const planRows = useMemo(
+    () => entries.filter((e) => e.periodMonth.slice(0, 7) === planMonth && (canManage || entryStatus(e) !== "cancelled")),
+    [entries, planMonth, canManage]
+  );
+
+  // Xuất Excel (chế độ THEO DÕI) — mỗi cột (1 phiên/creator) đang hiện trên bảng thành 1 dòng, đúng dải tháng đang
   // lọc. Bảng UI xoay ngang (chỉ số theo dòng, phiên theo cột) chỉ để đọc trên màn; ra Excel thì
   // trả về chiều thường (mỗi dòng 1 phiên) cho dễ lọc/pivot tiếp.
   const { showToast } = useToast();
@@ -194,6 +294,7 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
       flatColumns.map((e) => ({
         "Tháng": e.periodMonth.slice(0, 7),
         "Creator": e.creatorName,
+        "Camp": e.campName ?? "",
         "Campaign Type": e.campaignType ?? "",
         "Ngày Live": e.liveDateLabel ?? "",
         "Timeline": e.timelineLabel ?? "",
@@ -216,6 +317,48 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
     ).catch((e) => showToast(`Không tải được file Excel: ${errorMessage(e)}`));
   };
 
+  // Xuất Excel (chế độ KẾ HOẠCH) — đúng cột sheet kế hoạch ops vẫn dùng, kèm dòng Total.
+  const handleExportPlan = () => {
+    const rows = sortPlanRows(planRows.filter((e) => entryStatus(e) !== "cancelled"));
+    const totals = planTotals(rows);
+    const dd = (label?: string) => {
+      const iso = parseDayLabel(label);
+      return iso ? `${iso.slice(8)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}` : label ?? "";
+    };
+    downloadRowsAsXlsx(
+      "Kế hoạch Affiliate",
+      [
+        ...rows.map((e) => ({
+          "Lịch live": dd(e.liveDateLabel),
+          "Creator": e.creatorName,
+          "Camp Name": e.campName ?? "",
+          "Quy mô": e.campaignType ?? "",
+          "Timeline": e.planTimelineLabel ?? "",
+          "Duration": planHours(e) ?? "",
+          "Target GMV": e.targetGmv ?? "",
+          "GMV/hour": Math.round(planGmvPerHour(e) ?? 0) || "",
+          "Đơn vị $": Math.round(toUsd(e.targetGmv, fx) ?? 0) || "",
+          "Budget Ads": planBudget(e) ?? "",
+          "Note": e.note ?? ""
+        })),
+        {
+          "Lịch live": "Total",
+          "Creator": "",
+          "Camp Name": "",
+          "Quy mô": "",
+          "Timeline": "",
+          "Duration": totals.hours || "",
+          "Target GMV": totals.target,
+          "GMV/hour": totals.hours ? Math.round(totals.target / totals.hours) : "",
+          "Đơn vị $": Math.round(totals.target / fx) || "",
+          "Budget Ads": totals.budgetAds,
+          "Note": ""
+        }
+      ],
+      `KeHoach_Affiliate_${brandName}_${planMonth}.xlsx`.replace(/\s+/g, "_")
+    ).catch((e) => showToast(`Không tải được file Excel: ${errorMessage(e)}`));
+  };
+
   const update = (entry: Row, patch: Partial<AffiliateActualEntry>) => {
     setEntries((prev) => prev.map((e) => (e._key === entry._key ? { ...e, ...patch } : e)));
     setDirty(true);
@@ -226,43 +369,135 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
     setDirty(true);
   };
 
+  // Cột trống ở chế độ THEO DÕI: phiên đã live nhập tay hoàn toàn.
   const addBlank = (month: string) => {
     setEntries((prev) => [
       ...prev,
-      { _key: nextKey(), brandId, periodMonth: `${month}-01`, creatorName: "", sortOrder: prev.filter((e) => e.periodMonth.startsWith(month)).length }
+      { _key: nextKey(), brandId, periodMonth: `${month}-01`, creatorName: "", status: "done", sortOrder: prev.filter((e) => e.periodMonth.startsWith(month)).length }
     ]);
     setDirty(true);
   };
 
-  const handleSave = async () => {
+  // Dòng kế hoạch mới: ngày mặc định là ngày cuối cùng đang có trong tháng (hoặc mùng 1).
+  const addPlanRow = () => {
+    const last = sortPlanRows(planRows).map((r) => parseDayLabel(r.liveDateLabel)).filter((d): d is string => !!d).pop();
+    const iso = last ?? `${planMonth}-01`;
+    setEntries((prev) => [
+      ...prev,
+      {
+        _key: nextKey(),
+        brandId,
+        periodMonth: `${planMonth}-01`,
+        creatorName: "",
+        liveDateLabel: dayLabelOf(iso),
+        campName: suggestCampName(iso, campCtx.overrides),
+        status: "planned",
+        sortOrder: prev.length
+      }
+    ]);
+    setDirty(true);
+  };
+
+  // Ô dán từ Google Sheet: chỉ nhận dòng đúng tháng đang lập; dòng đã có (cùng ngày + creator + timeline) bỏ qua để dán lại không nhân đôi.
+  const pasted = useMemo(() => parsePlanPaste(pasteText), [pasteText]);
+  const isDuplicatePaste = useCallback(
+    (r: PastedPlanRow) =>
+      planRows.some(
+        (e) =>
+          parseDayLabel(e.liveDateLabel) === r.date &&
+          sameCreator(e.creatorName, r.creatorName) &&
+          (e.planTimelineLabel ?? "").trim() === (r.planTimelineLabel ?? "").trim()
+      ),
+    [planRows]
+  );
+  const pasteFresh = pasted.filter((r) => r.date.startsWith(planMonth) && !isDuplicatePaste(r));
+  const pasteOtherMonth = pasted.filter((r) => !r.date.startsWith(planMonth)).length;
+  const pasteDuplicate = pasted.filter((r) => r.date.startsWith(planMonth) && isDuplicatePaste(r)).length;
+
+  const applyPaste = () => {
+    if (pasteFresh.length === 0) return;
+    setEntries((prev) => [
+      ...prev,
+      ...pasteFresh.map((r, i): Row => ({
+        _key: nextKey(),
+        brandId,
+        periodMonth: `${planMonth}-01`,
+        creatorName: r.creatorName,
+        liveDateLabel: dayLabelOf(r.date),
+        campName: r.campName ?? suggestCampName(r.date, campCtx.overrides),
+        planTimelineLabel: r.planTimelineLabel,
+        planDurationHours: r.planDurationHours,
+        targetGmv: r.targetGmv,
+        planBudgetAds: r.planBudgetAds,
+        note: r.note,
+        status: "planned",
+        sortOrder: prev.length + i
+      }))
+    ]);
+    setDirty(true);
+    setPasteOpen(false);
+    setPasteText("");
+  };
+
+  // Trả về true khi lưu xong hết (để "Chốt" chờ được kết quả lưu trước khi chốt).
+  const handleSave = async (): Promise<boolean> => {
+    if (metaMissing) {
+      setErrorMsg("Database chưa chạy migration 0155 nên chưa lưu được — chạy file supabase/migrations/0155_affiliate_plan_first.sql trên Supabase rồi lưu lại.");
+      return false;
+    }
     setSaving(true);
     setErrorMsg(null);
     setMissingDataraw(false);
     try {
       // Lưu TỪNG tháng trong dải đang xem, kể cả tháng giờ rỗng — replaceAffiliateActuals() xoá
-      // sạch tháng đó trước khi insert, nên tháng bị ops xoá hết cột cũng được dọn đúng.
+      // sạch tháng đó trước khi insert, nên tháng bị ops xoá hết cột cũ cũng được dọn đúng.
       for (const m of months) {
         const items = entries
           .filter((e) => e.periodMonth.slice(0, 7) === m)
           .map((e, idx) => ({ ...e, sortOrder: idx }));
         await replaceAffiliateActuals(brandId, `${m}-01`, items);
       }
+      if (fxDirty && !metaMissing) {
+        setMonthMeta(await upsertAffiliatePlanMonth(brandId, `${planMonth}-01`, { fxRate: fx }));
+        setFxDirty(false);
+      }
       await reload();
       setSavedAt(new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }));
+      return true;
     } catch (e) {
       setErrorMsg(errorMessage(e, "Lưu thất bại"));
+      return false;
     } finally {
       setSaving(false);
     }
   };
+
+  // "Chốt, gửi brand" / "Thu hồi". Chốt xong ops vẫn sửa được; brand thấy ngay số mới (không có bước chốt lại).
+  const handlePublish = async (publish: boolean) => {
+    setErrorMsg(null);
+    setPublishing(true);
+    try {
+      if (publish && (dirty || fxDirty) && !(await handleSave())) return;
+      setMonthMeta(await upsertAffiliatePlanMonth(brandId, `${planMonth}-01`, { published: publish, fxRate: fx }));
+      setFxDirty(false);
+      setConfirmPublish(false);
+      showToast(publish ? `Đã chốt kế hoạch ${fmtMonth(planMonth)} — brand đã xem được` : "Đã thu hồi — brand không còn thấy kế hoạch tháng này");
+    } catch (e) {
+      setErrorMsg(errorMessage(e, publish ? "Chốt thất bại" : "Thu hồi thất bại"));
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  const importMonths = mode === "plan" ? [planMonth] : rangeMonths;
 
   const openImport = async () => {
     setImporting(true);
     setErrorMsg(null);
     setMissingDataraw(false);
     try {
-      const { start } = monthRange(months[0]);
-      const { end } = monthRange(months[months.length - 1]);
+      const { start } = monthRange(importMonths[0]);
+      const { end } = monthRange(importMonths[importMonths.length - 1]);
       const slice = await fetchAffiliateLiveSessions(brandId, start, end, shopHandle);
       if (!slice.hasAnyBatch) {
         setErrorMsg('Chưa có batch "Live Analysis" nào phủ dải tháng này trong Dữ Liệu Gốc. Export ở Seller Center với chế độ xem "linked accounts" rồi import vào tab Live Analysis.');
@@ -272,10 +507,12 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
       setImportRows(slice.rows);
       // Bỏ tick sẵn: phiên của chính tài khoản shop, phiên đã có cột, và phiên không phát sinh
       // click lẫn đơn cho brand (buổi live riêng của creator lọt vào báo cáo vì còn sót sản phẩm
-      // trong giỏ). Vẫn LIỆT KÊ cả 3 loại để ops tự tick lại nếu muốn.
+      // trong giỏ). Vẫn LIỆT KÊ cả 3 loại để ops tự tick lại nếu muốn. Phiên KHỚP một dòng kế hoạch thì tick sẵn
+      // (trừ khi nó là tài khoản shop).
       setImportPicked(
         new Set(slice.rows.filter((r) => !r.isShopAccount && !r.noBrandActivity && !hasColumnFor(r)).map((r) => r.key))
       );
+      setCancelPicked(new Set());
     } catch (e) {
       setErrorMsg(errorMessage(e, "Không đọc được Dữ Liệu Gốc"));
     } finally {
@@ -283,19 +520,47 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
     }
   };
 
-  // Đã có cột cho phiên này chưa — khớp theo ngày + tên creator, vì entry đã lưu không giữ Room ID.
+  // Đã có cột cho phiên này chưa — khớp theo ngày + tên creator (khớp mờ: "Khói" ≈ "Kiot Khói"), vì entry đã lưu
+  // không giữ Room ID. Chỉ tính dòng ĐÃ LIVE: dòng kế hoạch chưa có số thì chính là chỗ phiên này sẽ khớp vào.
   function hasColumnFor(r: AffiliateLiveSessionRow): boolean {
     const label = dayLabel(r.date);
-    const name = (r.creatorName || r.nickname).trim().toLowerCase();
-    return entries.some((e) => e.liveDateLabel === label && e.creatorName.trim().toLowerCase() === name);
+    return entries.some(
+      (e) => entryStatus(e) === "done" && e.liveDateLabel === label && (sameCreator(e.creatorName, r.creatorName) || sameCreator(e.creatorName, r.nickname))
+    );
   }
 
+  // Ghép phiên trong file với dòng kế hoạch chưa có số (cùng ngày, cùng creator, giờ bắt đầu gần nhất).
+  const importMatch = useMemo(() => {
+    if (!importRows) return null;
+    const planned = entries
+      .filter((e) => entryStatus(e) === "planned")
+      .map((e) => ({ key: e._key, date: parseDayLabel(e.liveDateLabel) ?? "", creatorName: e.creatorName, planTimelineLabel: e.planTimelineLabel }))
+      .filter((p) => p.date);
+    const sess = importRows.map((r) => ({ key: r.key, date: r.date, creatorName: r.creatorName, nickname: r.nickname, timelineLabel: r.timelineLabel }));
+    return matchPlanToSessions(planned, sess);
+  }, [importRows, entries]);
+
   const confirmImport = () => {
-    if (!importRows) return;
+    if (!importRows || !importMatch) return;
     const picked = importRows.filter((r) => importPicked.has(r.key));
-    setEntries((prev) => [...prev, ...picked.map((r) => rowToEntry(brandId, r))]);
+    const planBySession = new Map(importMatch.pairs.map((p) => [p.sessionKey, p.planKey]));
+    setEntries((prev) => {
+      let next = prev.map((e) => (cancelPicked.has(e._key) ? { ...e, status: "cancelled" as const } : e));
+      const added: Row[] = [];
+      for (const r of picked) {
+        const planKey = planBySession.get(r.key);
+        if (planKey) {
+          // Khớp kế hoạch: giữ tên/camp/target/giờ kế hoạch của ops, chỉ điền số thực tế và chuyển sang "Đã live".
+          next = next.map((e) => (e._key === planKey ? { ...e, ...sessionActuals(r), status: "done" as const } : e));
+        } else {
+          added.push({ ...rowToEntry(brandId, r), campName: suggestCampName(r.date, r.date.startsWith(planMonth) ? campCtx.overrides : undefined) });
+        }
+      }
+      return [...next, ...added];
+    });
     setImportRows(null);
     setImportPicked(new Set());
+    setCancelPicked(new Set());
     setDirty(true);
   };
 
@@ -359,6 +624,10 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
     </tr>
   );
 
+  const published = !!monthMeta?.publishedAt;
+  const btn = "px-3 py-2 rounded-lg bg-[var(--surface-elevated)] border border-[var(--border)] text-sm font-semibold flex items-center gap-1.5 disabled:opacity-50";
+  const nPlanned = planRows.filter((e) => entryStatus(e) === "planned").length;
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
@@ -367,28 +636,58 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
             <Users className="w-5 h-5 text-emerald-600" /> Affiliate — {brandName}
           </h2>
           <p className="text-xs text-[var(--text-faint)] mt-0.5">
-            Mỗi phiên live của creator affiliate là 1 cột. Số tự động đọc từ file "Live Analysis" (Dữ Liệu Gốc);
-            Campaign Type / Target / Ads cost nhập tay.
+            {mode === "plan"
+              ? "Lập kế hoạch từng phiên creator affiliate trước (dán từ Google Sheet được). Sau khi live, nạp file Live Analysis từ Dữ Liệu Gốc — số thực tế tự khớp vào đúng dòng kế hoạch."
+              : 'Mỗi phiên live đã diễn ra là 1 cột. Số tự động đọc từ file "Live Analysis" (Dữ Liệu Gốc); Target / Ads cost / Quy mô nhập tay hoặc lấy từ kế hoạch.'}
           </p>
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          <MonthPicker value={fromMonth} max={toMonth} onChange={setFromMonth} arrows={false} ariaLabel="Từ tháng" />
-          <span className="text-[var(--text-faint)]">→</span>
-          <MonthPicker value={toMonth} min={fromMonth} onChange={setToMonth} arrows={false} ariaLabel="Đến tháng" />
+          <div role="tablist" aria-label="Chế độ xem" className="flex rounded-lg bg-[var(--surface-elevated)] p-0.5 border border-[var(--border)]">
+            {(
+              [
+                ["plan", "Kế hoạch", CalendarDays],
+                ["track", "Theo dõi", BarChart3]
+              ] as const
+            ).map(([id, label, Icon]) => (
+              <button
+                key={id}
+                role="tab"
+                aria-selected={mode === id}
+                onClick={() => setMode(id)}
+                className={`px-3 py-1.5 rounded-md text-sm font-semibold flex items-center gap-1.5 ${mode === id ? "bg-[var(--surface-base)] text-[var(--text)] shadow-sm" : "text-[var(--text-faint)]"}`}
+              >
+                <Icon className="w-4 h-4" /> {label}
+              </button>
+            ))}
+          </div>
+          {mode === "plan" ? (
+            <MonthPicker value={planMonth} onChange={(m) => guardDirty(() => { setPlanMonth(m); setConfirmPublish(false); })} ariaLabel="Tháng kế hoạch" />
+          ) : (
+            <>
+              <MonthPicker value={fromMonth} max={toMonth} onChange={(m) => guardDirty(() => setFromMonth(m))} arrows={false} ariaLabel="Từ tháng" />
+              <span className="text-[var(--text-faint)]">→</span>
+              <MonthPicker value={toMonth} min={fromMonth} onChange={(m) => guardDirty(() => setToMonth(m))} arrows={false} ariaLabel="Đến tháng" />
+            </>
+          )}
           <button
-            onClick={handleExport}
-            disabled={flatColumns.length === 0}
-            title="Xuất đúng dải tháng đang xem ra Excel"
-            className="px-3 py-2 rounded-lg bg-[var(--surface-elevated)] border border-[var(--border)] text-sm font-semibold flex items-center gap-1.5 disabled:opacity-50"
+            onClick={mode === "plan" ? handleExportPlan : handleExport}
+            disabled={mode === "plan" ? planRows.length === 0 : flatColumns.length === 0}
+            title={mode === "plan" ? "Xuất kế hoạch tháng đang lập ra Excel đúng cột sheet kế hoạch" : "Xuất đúng dải tháng đang xem ra Excel"}
+            className={btn}
           >
             <Download className="w-4 h-4" /> Xuất Excel
           </button>
           {canManage && (
             <>
-              <button onClick={openImport} disabled={importing || loading} className="px-3 py-2 rounded-lg bg-[var(--surface-elevated)] border border-[var(--border)] text-sm font-semibold flex items-center gap-1.5 disabled:opacity-60">
+              {mode === "plan" && (
+                <button onClick={() => setPasteOpen((v) => !v)} className={btn} aria-expanded={pasteOpen}>
+                  <ClipboardPaste className="w-4 h-4" /> Dán từ Google Sheet
+                </button>
+              )}
+              <button onClick={openImport} disabled={importing || loading} className={`${btn} disabled:opacity-60`} title="Đọc file Live Analysis trong Dữ Liệu Gốc và khớp vào kế hoạch">
                 {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Database className="w-4 h-4" />} Nạp Từ Dữ Liệu Gốc
               </button>
-              <button onClick={handleSave} disabled={saving || !dirty} className="px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold flex items-center gap-1.5 disabled:opacity-50">
+              <button onClick={() => void handleSave()} disabled={saving || (!dirty && !fxDirty)} className="px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold flex items-center gap-1.5 disabled:opacity-50">
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Lưu
               </button>
             </>
@@ -406,54 +705,250 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
           )}
         </div>
       )}
+      {metaMissing && canManage && (
+        <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-sm text-amber-800">
+          Database chưa có bảng trạng thái kế hoạch Affiliate (migration 0155). Chạy file <code>supabase/migrations/0155_affiliate_plan_first.sql</code> trên Supabase trước khi lưu kế hoạch — lưu bây giờ sẽ báo lỗi.
+        </div>
+      )}
       {savedAt && !dirty && <div className="p-2 rounded-xl bg-emerald-50 border border-emerald-200 text-sm text-emerald-700">Đã lưu lúc {savedAt}.</div>}
 
-      {importRows && (
+      {mode === "plan" && canManage && !metaMissing && (
+        <div className="p-3 rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)]/50 flex flex-wrap items-center gap-3 text-sm">
+          <span className={`px-2 py-0.5 rounded text-xs font-semibold flex items-center gap-1 ${published ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
+            {published ? <Lock className="w-3 h-3" /> : null} {published ? "Đã chốt" : "Nháp"}
+          </span>
+          <span className="text-[var(--text-faint)]">
+            {published
+              ? "Brand đang thấy kế hoạch tháng này. Bạn vẫn sửa được — brand thấy ngay số mới, không cần chốt lại."
+              : "Brand chưa thấy kế hoạch tháng này. Chốt khi kế hoạch đã sẵn sàng gửi brand."}
+          </span>
+          <label className="ml-auto flex items-center gap-1.5 text-xs text-[var(--text-faint)]">
+            Tỷ giá $
+            <input
+              className="w-20 min-h-7 rounded border border-[var(--border)] bg-transparent px-1.5 text-right text-sm text-[var(--text)]"
+              aria-label="Tỷ giá đổi sang đô la"
+              inputMode="numeric"
+              value={fmtVndFull(fx)}
+              onChange={(ev) => {
+                const n = Number(ev.target.value.replace(/[.\s]/g, "").replace(",", "."));
+                if (n > 0) {
+                  setFx(n);
+                  setFxDirty(true);
+                }
+              }}
+            />
+          </label>
+          {!published ? (
+            confirmPublish ? (
+              <span className="flex items-center gap-2">
+                <span className="text-xs text-[var(--text-faint)]">Gửi {nPlanned > 0 ? `${planRows.length} phiên` : "kế hoạch"} cho brand?</span>
+                <button onClick={() => void handlePublish(true)} disabled={publishing || planRows.length === 0} className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-sm font-semibold flex items-center gap-1.5 disabled:opacity-50">
+                  {publishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Xác nhận chốt
+                </button>
+                <button onClick={() => setConfirmPublish(false)} className="px-2.5 py-1.5 rounded-lg border border-[var(--border)] text-sm">Huỷ</button>
+              </span>
+            ) : (
+              <button onClick={() => setConfirmPublish(true)} disabled={planRows.length === 0} className={btn} title={planRows.length === 0 ? "Chưa có phiên nào để chốt" : undefined}>
+                <Send className="w-4 h-4" /> Chốt, gửi brand
+              </button>
+            )
+          ) : (
+            <button onClick={() => void handlePublish(false)} disabled={publishing} className={btn}>
+              {publishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Undo2 className="w-4 h-4" />} Thu hồi
+            </button>
+          )}
+        </div>
+      )}
+
+      {pasteOpen && mode === "plan" && canManage && (
         <div className="p-3 rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)]/50 space-y-2">
           <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
-            <Download className="w-4 h-4" /> {importRows.length} phiên đọc được từ Live Analysis — chọn phiên muốn thêm
+            <ClipboardPaste className="w-4 h-4" /> Dán các dòng kế hoạch từ Google Sheet
           </div>
-          <div className="max-h-64 overflow-auto text-xs">
-            {importRows.map((r) => {
-              const exists = hasColumnFor(r);
-              return (
-                <label key={r.key} className="flex items-center gap-2 py-1 border-b border-[var(--border)]/50 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={importPicked.has(r.key)}
-                    onChange={(ev) =>
-                      setImportPicked((prev) => {
-                        const next = new Set(prev);
-                        if (ev.target.checked) next.add(r.key);
-                        else next.delete(r.key);
-                        return next;
-                      })
-                    }
-                  />
+          <textarea
+            value={pasteText}
+            onChange={(ev) => setPasteText(ev.target.value)}
+            rows={5}
+            aria-label="Dán kế hoạch từ Google Sheet"
+            placeholder={"09/10/2026\tKhói\tD-Day\t10h - 18h\t8\t700.000.000\t…\t…\t24.500.000"}
+            className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-base)] p-2 text-xs font-mono"
+          />
+          <div className="text-xs text-[var(--text-faint)]">
+            Bôi đen vùng ô từ cột <b>Lịch live</b> tới <b>Note</b> trong sheet rồi dán vào đây (dòng tiêu đề và dòng Total tự bỏ qua).
+            {pasted.length > 0 && (
+              <span className="ml-1 text-[var(--text)]">
+                Đọc được {pasted.length} dòng: thêm {pasteFresh.length}
+                {pasteDuplicate > 0 ? `, ${pasteDuplicate} dòng đã có` : ""}
+                {pasteOtherMonth > 0 ? `, ${pasteOtherMonth} dòng khác tháng ${fmtMonth(planMonth)} (bỏ qua)` : ""}.
+              </span>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <button onClick={applyPaste} disabled={pasteFresh.length === 0} className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-sm font-semibold disabled:opacity-50">
+              Thêm {pasteFresh.length} phiên
+            </button>
+            <button onClick={() => { setPasteOpen(false); setPasteText(""); }} className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-sm">Đóng</button>
+          </div>
+        </div>
+      )}
+
+      {importRows && importMatch && (
+        <div className="p-3 rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)]/50 space-y-2">
+          <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
+            <Link2 className="w-4 h-4" /> {importRows.length} phiên đọc được từ Live Analysis — khớp với kế hoạch
+          </div>
+          <div className="max-h-80 overflow-auto text-xs">
+            {(() => {
+              const rowOf = new Map(importRows.map((r) => [r.key, r]));
+              const planOf = new Map(entries.map((e) => [e._key, e]));
+              const check = (r: AffiliateLiveSessionRow) => (
+                <input
+                  type="checkbox"
+                  aria-label={`Chọn phiên ${dayLabel(r.date)} ${r.creatorName || r.nickname}`}
+                  checked={importPicked.has(r.key)}
+                  onChange={(ev) =>
+                    setImportPicked((prev) => {
+                      const next = new Set(prev);
+                      if (ev.target.checked) next.add(r.key);
+                      else next.delete(r.key);
+                      return next;
+                    })
+                  }
+                />
+              );
+              const sessionInfo = (r: AffiliateLiveSessionRow) => (
+                <span className="text-[var(--text-faint)]">
+                  {r.timelineLabel} · {fmtVndFull(r.directGmv)} · {fmtVndFull(r.viewer)} viewer · {fmtVndFull(r.liveImpressions)} hiển thị
+                </span>
+              );
+              const unplannedRow = (r: AffiliateLiveSessionRow, exists: boolean) => (
+                <label key={r.key} className="flex flex-wrap items-center gap-2 py-1 border-b border-[var(--border)]/50 cursor-pointer">
+                  {check(r)}
                   <span className="font-mono">{dayLabel(r.date)}</span>
                   <span className="font-semibold">{r.creatorName}</span>
-                  <span className="text-[var(--text-faint)]">
-                    {r.timelineLabel} · {fmtVndFull(r.directGmv)} · {fmtInt(r.viewer)} viewer · {fmtInt(r.liveImpressions)} hiển thị
-                  </span>
+                  {sessionInfo(r)}
                   {r.isShopAccount && <span className="px-1.5 rounded bg-slate-200 text-slate-700">tài khoản shop</span>}
                   {r.noBrandActivity && (
                     <span className="px-1.5 rounded bg-slate-200 text-slate-700" title="Không có click lẫn đơn cho brand — thường là buổi live riêng của creator, chỉ lọt vào báo cáo vì còn sót sản phẩm trong giỏ. Tick lại nếu bạn vẫn muốn đưa vào bảng.">
                       0 click / 0 đơn
                     </span>
                   )}
-                  {exists && <span className="px-1.5 rounded bg-amber-100 text-amber-800">đã có cột</span>}
+                  {exists ? <span className="px-1.5 rounded bg-slate-200 text-slate-700">đã có cột</span> : <span className="px-1.5 rounded bg-amber-100 text-amber-800">ngoài kế hoạch</span>}
                 </label>
               );
-            })}
+              const unplanned = importMatch.unplannedSessions.map((k) => rowOf.get(k)).filter((r): r is AffiliateLiveSessionRow => !!r);
+              const alreadyIn = unplanned.filter((r) => hasColumnFor(r));
+              const outsidePlan = unplanned.filter((r) => !hasColumnFor(r));
+              const today = todayVn();
+              const lateUnmatched = importMatch.unmatchedPlans.map((k) => planOf.get(k)).filter((e): e is Row => !!e && (parseDayLabel(e.liveDateLabel) ?? "9999") < today);
+              const title = "font-semibold text-[var(--text-faint)] mt-2 mb-1";
+              return (
+                <>
+                  <div className={title}>Khớp kế hoạch ({importMatch.pairs.length})</div>
+                  {importMatch.pairs.length === 0 && <div className="py-1 text-[var(--text-faint)]">Không có phiên nào khớp dòng kế hoạch (cùng ngày và cùng creator).</div>}
+                  {importMatch.pairs.map((p) => {
+                    const r = rowOf.get(p.sessionKey);
+                    const e = planOf.get(p.planKey);
+                    if (!r || !e) return null;
+                    return (
+                      <label key={p.sessionKey} className="flex flex-wrap items-center gap-2 py-1 border-b border-[var(--border)]/50 cursor-pointer">
+                        {check(r)}
+                        <span className="font-mono">{dayLabel(r.date)}</span>
+                        <span className="font-semibold">{e.creatorName}</span>
+                        <span className="text-[var(--text-faint)]">kế hoạch {e.planTimelineLabel || "—"} · target {e.targetGmv != null ? fmtVndFull(e.targetGmv) : "—"} →</span>
+                        {sessionInfo(r)}
+                        <span className="px-1.5 rounded bg-emerald-100 text-emerald-800">
+                          khớp{p.startDiffMin != null ? `, lệch ${p.startDiffMin > 0 ? "+" : ""}${p.startDiffMin} phút` : ""}
+                        </span>
+                      </label>
+                    );
+                  })}
+                  <div className={title}>Có trong file nhưng không có kế hoạch ({outsidePlan.length})</div>
+                  {outsidePlan.length === 0 && <div className="py-1 text-[var(--text-faint)]">Không có.</div>}
+                  {outsidePlan.map((r) => unplannedRow(r, false))}
+                  {alreadyIn.length > 0 && (
+                    <>
+                      <div className={title}>Đã có số trong bảng ({alreadyIn.length}) — bỏ qua, tick nếu muốn thêm lần nữa</div>
+                      {alreadyIn.map((r) => unplannedRow(r, true))}
+                    </>
+                  )}
+                  {lateUnmatched.length > 0 && (
+                    <>
+                      <div className={title}>Kế hoạch đã qua ngày nhưng file không có phiên ({lateUnmatched.length}) — tick để đánh dấu Huỷ / dời</div>
+                      {lateUnmatched.map((e) => (
+                        <label key={e._key} className="flex flex-wrap items-center gap-2 py-1 border-b border-[var(--border)]/50 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            aria-label={`Huỷ phiên ${e.liveDateLabel} ${e.creatorName}`}
+                            checked={cancelPicked.has(e._key)}
+                            onChange={(ev) =>
+                              setCancelPicked((prev) => {
+                                const next = new Set(prev);
+                                if (ev.target.checked) next.add(e._key);
+                                else next.delete(e._key);
+                                return next;
+                              })
+                            }
+                          />
+                          <span className="font-mono">{e.liveDateLabel}</span>
+                          <span className="font-semibold">{e.creatorName}</span>
+                          <span className="text-[var(--text-faint)]">kế hoạch {e.planTimelineLabel || "—"} · target {e.targetGmv != null ? fmtVndFull(e.targetGmv) : "—"}</span>
+                          <span className="px-1.5 rounded bg-red-100 text-red-800">chưa có số</span>
+                        </label>
+                      ))}
+                    </>
+                  )}
+                </>
+              );
+            })()}
           </div>
           <div className="flex gap-2">
-            <button onClick={confirmImport} className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-sm font-semibold">Thêm {importPicked.size} cột</button>
+            <button onClick={confirmImport} className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-sm font-semibold">
+              Áp dụng {importPicked.size} phiên{cancelPicked.size > 0 ? ` + huỷ ${cancelPicked.size}` : ""}
+            </button>
             <button onClick={() => setImportRows(null)} className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-sm">Huỷ</button>
           </div>
         </div>
       )}
 
-      {loading ? (
+      {mode === "plan" ? (
+        loading ? (
+          <div className="p-8 text-center text-[var(--text-faint)] flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Đang tải…</div>
+        ) : planRows.length === 0 ? (
+          <div className="p-8 text-center text-sm text-[var(--text-faint)] border border-dashed border-[var(--border)] rounded-xl">
+            {canManage ? (
+              <>
+                Chưa có kế hoạch Affiliate cho {fmtMonth(planMonth)}. Bấm <b>Dán từ Google Sheet</b> để đưa bản kế hoạch ops đang lập vào, hoặc <b>Thêm phiên</b> để nhập từng dòng.
+              </>
+            ) : (
+              <>
+                Kế hoạch Affiliate {fmtMonth(planMonth)} chưa được chốt.
+                <span className="block mt-1 text-[11px]">Kế hoạch từng tháng hiện ở đây sau khi agency chốt và gửi cho brand.</span>
+              </>
+            )}
+          </div>
+        ) : (
+          <AffiliatePlanTable
+            rows={planRows}
+            month={planMonth}
+            fxRate={fx}
+            readOnly={!canManage}
+            campOverrides={campCtx.overrides}
+            shopTarget={canManage ? campCtx.shopTarget : undefined}
+            onChange={update}
+            onRemove={removeEntry}
+          />
+        )
+      ) : null}
+      {mode === "plan" && canManage && (
+        <div className="flex flex-wrap gap-2">
+          <button onClick={addPlanRow} className="px-2.5 py-1.5 rounded-lg border border-dashed border-[var(--border)] text-xs text-[var(--text-faint)] flex items-center gap-1 hover:bg-[var(--surface-hover)]">
+            <Plus className="w-3 h-3" /> Thêm phiên
+          </button>
+        </div>
+      )}
+
+      {mode !== "track" ? null : loading ? (
         <div className="p-8 text-center text-[var(--text-faint)] flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Đang tải…</div>
       ) : flatColumns.length === 0 ? (
         <div className="p-8 text-center text-sm text-[var(--text-faint)] border border-dashed border-[var(--border)] rounded-xl">
@@ -462,15 +957,15 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
               nguyên nhân thứ hai ra, đừng để khách đoán là agency không làm gì. */}
           {currentRole === "brand" ? (
             <>
-              Chưa có dữ liệu affiliate nào được phát hành cho dải tháng này.
+              Chưa có dữ liệu affiliate nào được chốt cho dải tháng này.
               <span className="block mt-1 text-[11px]">
-                Số liệu từng tháng hiện ở đây sau khi Report Tháng của tháng đó được phát hành.
+                Số liệu từng tháng hiện ở đây sau khi agency chốt và gửi cho brand.
               </span>
             </>
           ) : (
             <>
-              Chưa có phiên affiliate nào trong dải tháng này.
-              {canManage && <> Bấm <b>Nạp Từ Dữ Liệu Gốc</b> để đọc từ file Live Analysis, hoặc thêm cột thủ công bên dưới.</>}
+              Chưa có phiên affiliate nào đã live trong dải tháng này.
+              {canManage && <> Bấm <b>Nạp Từ Dữ Liệu Gốc</b> để đọc từ file Live Analysis (khớp vào kế hoạch), hoặc thêm cột thủ công bên dưới.</>}
             </>
           )}
         </div>
@@ -505,10 +1000,17 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
                   </select>
                 )
               )}
+              {metricRow("Camp", (e) => <span className="text-xs font-semibold">{e.campName || "—"}</span>)}
+              {metricRow("Kế hoạch", (e) => (
+                <span className={`px-2 py-0.5 rounded text-xs font-semibold ${hasPlan(e) ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
+                  {hasPlan(e) ? "Có kế hoạch" : "Ngoài kế hoạch"}
+                </span>
+              ))}
               {metricRow("Creator", (e, label) => textInput(e, label, "creatorName"), "font-bold")}
               {metricRow("Day", (e, label) => textInput(e, label, "liveDateLabel"), "bg-emerald-50/60 font-semibold")}
               {metricRow("Timeline", (e, label) => textInput(e, label, "timelineLabel"))}
               {metricRow("Target GMV", (e, label) => numInput(e, label, "targetGmv", fmtInt), "bg-[var(--surface-elevated)] font-bold")}
+              {metricRow("Giờ kế hoạch", (e) => <span>{fmtNum(planHours(e), 1)}</span>)}
               {metricRow("Direct GMV", (e, label) => numInput(e, label, "directGmv", fmtInt), "text-red-600 font-bold")}
               {metricRow("Giờ live", (e, label) => numInput(e, label, "durationHours", (n) => fmtNum(n, 1)))}
               {metricRow("GMV/giờ", (e) => <span>{e.directGmv && e.durationHours ? fmtInt(e.directGmv / e.durationHours) : "—"}</span>)}
@@ -521,6 +1023,7 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
               {metricRow("LIVE CTR", (e, label) => numInput(e, label, "ctr", (n) => fmtPct(n)))}
               {metricRow("CTOR", (e, label) => numInput(e, label, "ctor", (n) => fmtPct(n)))}
               {metricRow("Ads cost", (e, label) => numInput(e, label, "adsCost", fmtInt))}
+              {metricRow("Budget Ads", (e) => <span>{planBudget(e) != null ? fmtInt(planBudget(e)) : "—"}</span>)}
               {metricRow("ROAS", (e) => <span>{e.directGmv && e.adsCost ? fmtNum(e.directGmv / e.adsCost, 1) : "—"}</span>)}
               {metricRow("Orders", (e, label) => numInput(e, label, "orders", fmtInt))}
               {metricRow("Items sold", (e, label) => numInput(e, label, "itemsSold", fmtInt))}
@@ -547,9 +1050,9 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
         </div>
       )}
 
-      {canManage && (
+      {mode === "track" && canManage && (
         <div className="flex flex-wrap gap-2">
-          {months.map((m) => (
+          {rangeMonths.map((m) => (
             <button key={m} onClick={() => addBlank(m)} className="px-2.5 py-1.5 rounded-lg border border-dashed border-[var(--border)] text-xs text-[var(--text-faint)] flex items-center gap-1 hover:bg-[var(--surface-hover)]">
               <Plus className="w-3 h-3" /> Thêm cột tháng {fmtMonth(m.slice(0, 7))}
             </button>

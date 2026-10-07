@@ -1,8 +1,10 @@
 import { supabase } from "../supabaseClient";
-import { AffiliateActualEntry } from "../../types";
+import { AffiliateActualEntry, AffiliateEntryStatus } from "../../types";
 
 // Affiliate thực tế tháng đang xem (migration 0067, Report Tháng Tab 04) — nhập tay hoàn toàn, cùng
 // pattern "replace toàn bộ danh sách mỗi lần lưu" như brand_affiliate_plans (affiliatePlans.ts).
+// Từ 0155 cùng bảng này giữ luôn KẾ HOẠCH: một dòng = một phiên, status 'planned' → 'done' khi file thực tế khớp vào
+// (xem lib/affiliate/plan.ts). Trạng thái chốt/tỷ giá theo tháng ở affiliatePlanMonths.ts.
 
 interface DbAffiliateActual {
   id: string;
@@ -24,6 +26,13 @@ interface DbAffiliateActual {
   live_impressions: number | null;
   orders: number | null;
   sort_order: number;
+  // 0155 — thiếu khi DB chưa chạy migration: fromDb coi là dòng 'done'.
+  status?: AffiliateEntryStatus | null;
+  camp_name?: string | null;
+  plan_timeline_label?: string | null;
+  plan_duration_hours?: number | null;
+  plan_budget_ads?: number | null;
+  note?: string | null;
 }
 
 function fromDb(row: DbAffiliateActual): AffiliateActualEntry {
@@ -46,7 +55,13 @@ function fromDb(row: DbAffiliateActual): AffiliateActualEntry {
     timelineLabel: row.timeline_label ?? undefined,
     liveImpressions: row.live_impressions ?? undefined,
     orders: row.orders ?? undefined,
-    sortOrder: row.sort_order
+    sortOrder: row.sort_order,
+    status: row.status ?? "done",
+    campName: row.camp_name ?? undefined,
+    planTimelineLabel: row.plan_timeline_label ?? undefined,
+    planDurationHours: row.plan_duration_hours ?? undefined,
+    planBudgetAds: row.plan_budget_ads ?? undefined,
+    note: row.note ?? undefined
   };
 }
 
@@ -62,13 +77,17 @@ export async function fetchAffiliateActuals(brandId: string, periodMonth: string
   return ((data as DbAffiliateActual[]) ?? []).map(fromDb);
 }
 
+// Thay cả tháng: CHÈN dòng mới trước, XOÁ dòng cũ (theo id đã đọc lúc đầu) sau. Thứ tự cũ (xoá rồi chèn) mất sạch tháng khi
+// lệnh chèn lỗi giữa chừng — vd DB chưa chạy migration thêm cột (0155), RLS từ chối, mất mạng. Giờ chèn lỗi thì dòng cũ còn
+// nguyên; xoá lỗi thì tháng tạm có dòng trùng (ném lỗi để UI báo, lần lưu sau dọn tiếp).
 export async function replaceAffiliateActuals(brandId: string, periodMonth: string, entries: AffiliateActualEntry[]): Promise<AffiliateActualEntry[]> {
-  const { error: deleteError } = await supabase
+  const { data: oldRows, error: readError } = await supabase
     .from("brand_affiliate_actuals")
-    .delete()
+    .select("id")
     .eq("brand_id", brandId)
     .eq("period_month", periodMonth);
-  if (deleteError) throw deleteError;
+  if (readError) throw readError;
+  const oldIds = ((oldRows as { id: string }[]) ?? []).map((r) => r.id);
 
   const rows = entries
     .filter((e) => e.creatorName.trim())
@@ -90,11 +109,24 @@ export async function replaceAffiliateActuals(brandId: string, periodMonth: stri
       timeline_label: e.timelineLabel?.trim() || null,
       live_impressions: e.liveImpressions ?? null,
       orders: e.orders ?? null,
+      status: e.status ?? "done",
+      camp_name: e.campName?.trim() || null,
+      plan_timeline_label: e.planTimelineLabel?.trim() || null,
+      plan_duration_hours: e.planDurationHours ?? null,
+      plan_budget_ads: e.planBudgetAds ?? null,
+      note: e.note?.trim() || null,
       sort_order: idx
     }));
-  if (rows.length === 0) return [];
 
-  const { data, error } = await supabase.from("brand_affiliate_actuals").insert(rows).select();
-  if (error) throw error;
-  return ((data as DbAffiliateActual[]) ?? []).sort((a, b) => a.sort_order - b.sort_order).map(fromDb);
+  let inserted: DbAffiliateActual[] = [];
+  if (rows.length > 0) {
+    const { data, error } = await supabase.from("brand_affiliate_actuals").insert(rows).select();
+    if (error) throw error;
+    inserted = (data as DbAffiliateActual[]) ?? [];
+  }
+  if (oldIds.length > 0) {
+    const { error: deleteError } = await supabase.from("brand_affiliate_actuals").delete().in("id", oldIds);
+    if (deleteError) throw deleteError;
+  }
+  return inserted.sort((a, b) => a.sort_order - b.sort_order).map(fromDb);
 }

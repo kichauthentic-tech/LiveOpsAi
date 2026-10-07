@@ -364,6 +364,28 @@ export interface AffiliateActualEntry {
   liveImpressions?: number;
   orders?: number;
   sortOrder?: number;
+  // KẾ HOẠCH TRƯỚC, SỐ SAU (migration 0155): cùng một dòng đi từ lúc lập kế hoạch tới lúc có số. targetGmv là target kế
+  // hoạch; các trường dưới là phần kế hoạch của giờ/ads (giờ thực = durationHours/timelineLabel, ads thực = adsCost).
+  /** Thiếu = 'done' (dòng có từ trước 0155 đều là phiên đã live). */
+  status?: AffiliateEntryStatus;
+  /** D-Day / Mid-Month / Pay Day / Daily — khác campaignType (Big/Medium = quy mô). */
+  campName?: string;
+  planTimelineLabel?: string;
+  planDurationHours?: number;
+  planBudgetAds?: number;
+  note?: string;
+}
+
+export type AffiliateEntryStatus = "planned" | "done" | "cancelled";
+
+/** Trạng thái kế hoạch Affiliate của một (brand, tháng) — migration 0155. */
+export interface AffiliatePlanMonth {
+  brandId: string;
+  periodMonth: string; // "YYYY-MM-01"
+  /** Tỷ giá cho cột "Đơn vị $" (mặc định 26.300). */
+  fxRate: number;
+  /** Có giá trị = ops đã "Chốt, gửi brand" — brand chỉ thấy tháng đã chốt. Sau chốt ops vẫn sửa được. */
+  publishedAt?: string;
 }
 
 // Module Dataraw Brand Workspace (migration 0052) — kho lưu nguyên trạng 4 report Excel tải tay
