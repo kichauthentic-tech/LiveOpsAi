@@ -25,10 +25,10 @@
   Quy ước: thẻ ca mới KHÔNG tự đặt màu/nhãn — thêm brand ⇒ khai `accent/ink/inkDark` ở `BRAND_THEMES` (không khai thì tự suy, vẫn qua test tương phản); thông tin phụ thêm
   vào mảng `meta`; chú giải dùng `SessionCardLegend`. Chưa làm: đổi chữ TikTok/Shopee thành logo ở Sổ Ca / Bản Tin CEO / Hiệu suất Host (đã loại khỏi phạm vi).
 
-- **07/10 (cuối ngày): GIẢM THỜI GIAN MỞ APP (cổng theo màn CHƯA commit; tsc, vitest 650/650, đã đo trên trình duyệt).** Cổ chai = danh sách ca (1.501 ca, ~95% byte lúc mở) giữ
+- **07/10 (cuối ngày): GIẢM THỜI GIAN MỞ APP (đã commit 8058e6f; tsc, vitest 650/650, đã đo trên trình duyệt).** Cổ chai = danh sách ca (1.501 ca, ~95% byte lúc mở) giữ
   `coreDataReady` ~10 s trên mạng yếu của user. Đã làm: 2 trang ca song song + `SESSION_READ_COLUMNS` + tải sẵn xlsx (commit 5615c13); **Dữ Liệu Gốc + Nhập Ads chờ `shellDataReady`
   (brand + kênh), không chờ ca** — hiện ~0,8 s dù ca về 6,5 s; Nạp bù/Đối soát tự chờ `coreReady`. Số đo + hướng đã cân và BỎ (cắt cửa sổ ca, cache IndexedDB) → HISTORY §"Giảm thời gian mở app".
-  **Mốc quay lại:** ~1.800 ca hoặc user thấy chậm ⇒ `PAGES_PER_WAVE` 3, rồi tải theo phạm vi từng màn. Việc user: tăng hạn JWT ở Supabase.
+  **Mốc quay lại:** ~1.800 ca hoặc user thấy chậm ⇒ `PAGES_PER_WAVE` 3, rồi tải theo phạm vi từng màn. Hạn JWT (Auth → Sessions → Access token expiry) đã tăng 3600 → 86400 s ngày 07/10; cần đăng nhập lại để nhận hạn mới.
 
 - **07/10 (user chốt): GỘP "Đối Soát Số Liệu" VÀO "Dữ Liệu Gốc" — một file chỉ up MỘT lần (CHƯA commit, CHƯA verify trên trình duyệt: phiên Claude không
   có đăng nhập).** Màn riêng + mục menu + route `/doi-soat` đã xoá. Ở Dữ Liệu Gốc của brand: loại file đối soát của sàn (`RECON_TYPE` ở `BrandDataRaw.tsx`:
