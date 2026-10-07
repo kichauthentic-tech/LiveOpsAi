@@ -140,7 +140,6 @@ test("mọi tab render trong App.tsx đều có trong TAB_CHUNKS", () => {
   const rendered = new Set([...app.matchAll(/\{activeTab === "([a-z_]+)" &&/g)].map((m) => m[1]));
   const table = app.slice(app.indexOf("const TAB_CHUNKS"), app.indexOf("};", app.indexOf("const TAB_CHUNKS")));
   const listed = new Set([...table.matchAll(/^\s+([a-z_]+):/gm)].map((m) => m[1]));
-  listed.add("calendar"); // chọn chunk theo opsView ở effect preload, không nằm trong bảng
   expect(rendered.size).toBeGreaterThan(20);
   expect([...rendered].filter((t) => !listed.has(t))).toEqual([]);
 });

@@ -1,5 +1,5 @@
 import React from "react";
-import { BookOpen, BrainCircuit, Briefcase, Building2, CalendarCheck2, CalendarClock, Calendar as CalendarIcon, CalendarRange, Activity, Database, DollarSign, FileSignature, FileText, LayoutDashboard, LayoutGrid, Link2, Megaphone, Package, Radio, Send, ShieldCheck, TrendingUp, Users } from "lucide-react";
+import { BookOpen, BrainCircuit, Briefcase, Building2, CalendarCheck2, Clapperboard, CalendarClock, Calendar as CalendarIcon, CalendarRange, Activity, Database, DollarSign, FileSignature, FileText, LayoutDashboard, LayoutGrid, Link2, Megaphone, Package, Radio, Send, ShieldCheck, TrendingUp, Users } from "lucide-react";
 import { PermissionKey, UserRole } from "../types";
 
 // Cấu hình sidebar + vài hằng số điều hướng, tách khỏi App.tsx 2026-10-01 (App.tsx 2.867 dòng).
@@ -49,7 +49,7 @@ export interface NavGroup {
 // Các tab mà nội dung chính là lưới lịch — bỏ giới hạn max-w-7xl để lấy hết chiều ngang
 // (lưới 7 cột / ma trận 5 khung giờ cần ~150px mỗi ô). Không còn tự thu
 // gọn sidebar theo tab — xem `autoCollapse`.
-export const CALENDAR_TABS = new Set(["calendar", "brand_calendar", "shift_scheduling"]);
+export const CALENDAR_TABS = new Set(["calendar", "studio_calendar", "brand_calendar", "shift_scheduling"]);
 
 // Tab không đọc ca / talent / report tháng — không phải chờ đợt nạp đầu (coreDataReady). Mọi tab khác
 // hiện khung chờ tới khi nạp xong, thay vì vẽ "0 ca" / "Chưa có…" giả (audit UX 2026-09-29).
@@ -126,9 +126,10 @@ export function agencyNavGroups(currentRole: UserRole): NavGroup[] {
           {
             label: "Vận Hành Hằng Ngày",
             items: [
-              // "calendar" giữ id cũ (quyền manage_calendar, localStorage) — nội dung là Bảng Vận Hành
-              // (hôm nay/tuần, việc còn thiếu) + chế độ xem Lịch & Studio (LiveCalendar cũ).
+              // "calendar" giữ id cũ (quyền manage_calendar, localStorage) — nội dung là Bảng Vận Hành (việc cần làm,
+              // hôm nay/tuần). Lịch & Studio (LiveCalendar cũ) từng là tab con ở đây, tách thành mục riêng 07/10.
               { id: "calendar", label: "Bảng Vận Hành", icon: CalendarIcon, perm: "manage_calendar" as PermissionKey },
+              { id: "studio_calendar", label: "Lịch & Studio", icon: Clapperboard, perm: "manage_calendar" as PermissionKey },
               { id: "sessions", label: "Sổ Ca", icon: BookOpen, perm: "manage_sessions" as PermissionKey },
               // Hỗ Trợ Vận Hành: 28/09 gộp vào Dashboard brand; 07/10 user chốt tách lại — benchmark ca sắp live chỉ ở đây, không ở Dashboard brand.
               { id: "ops_support", label: "Hỗ Trợ Vận Hành", icon: Activity, perm: "manage_calendar" as PermissionKey }

@@ -643,7 +643,7 @@ export default function MonthPlan({
     const matchedNote = matchedCount > 0 ? `\n\n${matchedCount} ca trùng giờ với ca đã nhập sẽ được GẮN vào ca đó (nhận target, không mở đăng ký). Cần migration 0151 đã chạy — chưa chạy thì chốt sẽ mở thêm ca chờ đăng ký trùng giờ.` : "";
     const pastNote =
       pastCount > 0
-        ? `\n\n${pastCount} ca ở ngày đã qua không có ca đã nhập tương ứng sẽ KHÔNG mở chờ đăng ký (chỉ giữ target trong kế hoạch). Ca nào đã live thật: mở ca đúng ngày giờ đó ở Bảng Vận Hành → Lịch & Studio → "Mở ca chờ đăng ký" — ca mở TRƯỚC khi chốt sẽ được gắn vào kế hoạch và nhận target; mở sau thì bấm "Chốt lại".`
+        ? `\n\n${pastCount} ca ở ngày đã qua không có ca đã nhập tương ứng sẽ KHÔNG mở chờ đăng ký (chỉ giữ target trong kế hoạch). Ca nào đã live thật: mở ca đúng ngày giờ đó ở Lịch & Studio → "Mở ca chờ đăng ký" — ca mở TRƯỚC khi chốt sẽ được gắn vào kế hoạch và nhận target; mở sau thì bấm "Chốt lại".`
         : "";
     const studioNote = brandStudio ? `\n\nCa sinh ra gắn phòng ${brandStudio.name} (${brandStudio.roomNumber}).` : "\n\nBrand CHƯA có phòng live mặc định — ca sinh ra sẽ không có phòng (không kiểm được trùng phòng). Chọn ở CRM → Hợp đồng & giá trước nếu cần.";
     const clashNote = crossBrand.clashes.length > 0

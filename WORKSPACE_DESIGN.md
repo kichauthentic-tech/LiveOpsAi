@@ -227,8 +227,8 @@
   ẩn khỏi sidebar khi MỌI kênh của brand đều không có nguồn; thanh sàn chỉ liệt kê sàn hợp lệ cho tab.
   Có URL route (`src/lib/routes.ts`): `/so-ca`, `/brand/crocs/report-thang`…
 - **Nguồn sự thật của menu:** `agencyNavGroups()`/`brandNavGroups()` ở [src/lib/appNav.ts](src/lib/appNav.ts). Ảnh chụp:
-  - Agency: Dashboard (Bản Tin CEO) · Lập Kế Hoạch (Kế Hoạch Tháng, Nhân sự ca) · Vận Hành Hằng Ngày (Bảng Vận Hành, Sổ Ca,
-    Hỗ Trợ Vận Hành) · Phân Tích (Hiệu Suất Host, Toàn Cảnh Brand, Điều Phối Phát Hành) · Tài Nguyên (Talent Pool,
+  - Agency: Dashboard (Bản Tin CEO) · Lập Kế Hoạch (Kế Hoạch Tháng, Nhân sự ca) · Vận Hành Hằng Ngày (Bảng Vận Hành, Lịch & Studio — tách tab con
+    thành mục riêng 07/10, id `studio_calendar`, `opsView` đã gỡ —, Sổ Ca, Hỗ Trợ Vận Hành) · Phân Tích (Hiệu Suất Host, Toàn Cảnh Brand, Điều Phối Phát Hành) · Tài Nguyên (Talent Pool,
     Studios & Gear) · Kinh Doanh (CRM — gồm "Hợp đồng & giá", TikTok API) · Tài Chính (Finance & P&L — khoá cứng
     ceo/admin) · Hệ Thống (Phân Quyền & Role; AI Training Center — chỉ admin). Talent chỉ thấy: Ca Của Tôi, Đăng Ký Ca, Hồ Sơ.
     (Kinh Doanh chỉ còn CRM + TikTok API — "Cam Kết Hợp Đồng" gộp vào CRM/Kế Hoạch Tháng 06/10.)

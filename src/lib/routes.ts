@@ -15,6 +15,7 @@ const AGENCY_TAB_SLUGS: Record<string, string> = {
   month_plan: "ke-hoach-thang",
   shift_scheduling: "nhan-su-ca",
   calendar: "bang-van-hanh",
+  studio_calendar: "lich-studio",
   sessions: "so-ca",
   host_performance: "hieu-suat-host",
   ops_support: "ho-tro-van-hanh",

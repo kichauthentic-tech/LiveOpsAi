@@ -108,6 +108,8 @@ const AgencyChannelSummary = lazyNamed(() => import("./components/AgencyChannelS
 // Chunk của từng tab — để tải SONG SONG với đợt nạp dữ liệu (xem `preload` ở lib/lazyNamed.ts). Phải
 // khớp với khối render tab bên dưới; thiếu một tab thì tab đó chỉ chậm như trước, không hỏng.
 const TAB_CHUNKS: Record<string, { preload: () => void }[]> = {
+  calendar: [OpsBoard, TodoPanel],
+  studio_calendar: [LiveCalendar],
   sessions: [SessionLedger],
   my_shifts: [OpsBoard],
   shift_scheduling: [ShiftScheduling],
@@ -219,11 +221,10 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<string>(() =>
     initialRoute ? initialRoute.tab ?? "brand_calendar" : loadStorage("activeTab", "shift_scheduling")
   );
-  // Bảng Vận Hành (2026-09-21): "board" = hôm nay/tuần + việc còn thiếu; "calendar" = Lịch & Studio cũ.
-  const [opsView, setOpsView] = useState<"board" | "calendar">(() => loadStorage("opsView", "board"));
+  // Bảng Vận Hành ("calendar") và Lịch & Studio ("studio_calendar") là hai mục sidebar riêng (2026-10-07; trước đó là
+  // hai tab con của "calendar" chọn bằng state opsView).
   // Q4: ca cần mở sau khi bấm thông báo (OpsBoard tiêu thụ rồi xoá).
   const [notifOpenSessionId, setNotifOpenSessionId] = useState<string | null>(null);
-  useEffect(() => saveStorage("opsView", opsView), [opsView]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   // Thu gọn sidebar thành thanh icon (w-16) để nhường không gian ngang cho nội dung.
   // Chỉ áp dụng từ breakpoint md trở lên — dưới md sidebar vẫn là drawer trượt như cũ.
@@ -372,9 +373,8 @@ export default function App() {
   // Tải chunk tab ngay, không đợi cổng `coreDataReady` ở khối render (cổng đó giữ chunk lại tới khi
   // đợt nạp dữ liệu về xong ⇒ thêm một vòng mạng nối tiếp mỗi lần mở app / đổi tab).
   useEffect(() => {
-    const chunks = activeTab === "calendar" ? (opsView === "calendar" ? [LiveCalendar] : [OpsBoard, TodoPanel]) : TAB_CHUNKS[activeTab];
-    chunks?.forEach((c) => c.preload());
-  }, [activeTab, opsView]);
+    TAB_CHUNKS[activeTab]?.forEach((c) => c.preload());
+  }, [activeTab]);
   // Previously these fetch errors were only stored in state and never rendered anywhere — a
   // failed fetch left a tab silently empty forever with no indication anything went wrong.
   const [dismissedDataErrorSignature, setDismissedDataErrorSignature] = useState<string | null>(null);
@@ -1367,10 +1367,7 @@ export default function App() {
     void notifications.markRead([n.id]);
     if (n.kind === "shift_open") setActiveTab("shift_scheduling");
     else if (currentRole === "talent") setActiveTab("my_shifts");
-    else {
-      setOpsView("board");
-      setActiveTab("calendar");
-    }
+    else setActiveTab("calendar");
     if (n.sessionId) setNotifOpenSessionId(n.sessionId);
     setMobileMenuOpen(false);
   };
@@ -1453,8 +1450,7 @@ export default function App() {
     if (!coreDataReady || !allowedTabsKey) return;
     const run = () =>
       allowedTabsKey.split(",").forEach((id) => {
-        if (id === "calendar") [OpsBoard, LiveCalendar].forEach((c) => c.preload());
-        else TAB_CHUNKS[id]?.forEach((c) => c.preload());
+        TAB_CHUNKS[id]?.forEach((c) => c.preload());
       });
     // Safari chưa có requestIdleCallback.
     if (typeof window.requestIdleCallback === "function") {
@@ -1824,12 +1820,8 @@ export default function App() {
 
                 {activeTab === "calendar" && (
                   <div className="space-y-4">
-                    <div className="flex items-center gap-1 bg-[var(--surface)] border border-[var(--border)] rounded-xl p-1 w-fit">
-                      <button onClick={() => setOpsView("board")} className={`px-3 py-1.5 rounded-lg text-xs font-bold ${opsView === "board" ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)] hover:text-[var(--text)]"}`}>Bảng hôm nay / tuần</button>
-                      <button onClick={() => setOpsView("calendar")} className={`px-3 py-1.5 rounded-lg text-xs font-bold ${opsView === "calendar" ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)] hover:text-[var(--text)]"}`}>Lịch & Studio</button>
-                    </div>
                     {/* Việc cần làm — tự sinh từ dữ liệu, mỗi việc một nút tới đúng màn (audit người mới 2026-10-04). */}
-                    {opsView === "board" && isOpsRole && (
+                    {isOpsRole && (
                       <TodoPanel
                         brands={brands}
                         channels={channels}
@@ -1851,30 +1843,31 @@ export default function App() {
                         }}
                       />
                     )}
-                    {opsView === "board" && (
-                      <OpsBoard
-                        mode="ops"
-                        sessions={activeSessions}
-                        shiftSlots={shiftSlots}
-                        shiftRegistrations={shiftRegistrations}
-                        brands={brands}
-                        studios={activeStudios}
-                        talents={activeTalents}
-                        currentRole={currentRole}
-                        myTalentId={activeUser.assignedTalentId}
-                        onSessionsUpdated={handleSessionsUpdated}
-                        onUpdateSession={handleUpdateSession}
-                        onDeleteSession={handleDeleteSession}
-                    onCancelSession={handleCancelSession}
-                    onSetSessionExcluded={handleSetSessionExcluded}
-                    onRequestDropout={handleRequestDropout}
-                    onLogAudit={pushAuditLog}
-                        onOpenScheduling={() => setActiveTab("shift_scheduling")}
-                        requestOpenSessionId={notifOpenSessionId}
-                        onOpenRequestHandled={() => setNotifOpenSessionId(null)}
-                      />
-                    )}
-                    {opsView === "calendar" && (
+                    <OpsBoard
+                      mode="ops"
+                      sessions={activeSessions}
+                      shiftSlots={shiftSlots}
+                      shiftRegistrations={shiftRegistrations}
+                      brands={brands}
+                      studios={activeStudios}
+                      talents={activeTalents}
+                      currentRole={currentRole}
+                      myTalentId={activeUser.assignedTalentId}
+                      onSessionsUpdated={handleSessionsUpdated}
+                      onUpdateSession={handleUpdateSession}
+                      onDeleteSession={handleDeleteSession}
+                  onCancelSession={handleCancelSession}
+                  onSetSessionExcluded={handleSetSessionExcluded}
+                  onRequestDropout={handleRequestDropout}
+                  onLogAudit={pushAuditLog}
+                      onOpenScheduling={() => setActiveTab("shift_scheduling")}
+                      requestOpenSessionId={notifOpenSessionId}
+                      onOpenRequestHandled={() => setNotifOpenSessionId(null)}
+                    />
+                  </div>
+                )}
+
+                {activeTab === "studio_calendar" && (
                   <LiveCalendar
                     channels={channels}
                     sessions={activeSessions}
@@ -1901,8 +1894,6 @@ export default function App() {
                     onRequestDropout={handleRequestDropout}
                     onLogAudit={pushAuditLog}
                   />
-                    )}
-                  </div>
                 )}
 
                 {activeTab === "my_shifts" && currentRole === "talent" && (
@@ -2018,7 +2009,7 @@ export default function App() {
                     shiftSlots={shiftSlots}
                     promoSchemes={promoSchemes}
                     engineParams={engineParams}
-                    onOpenSession={(id) => { setOpsView("board"); setActiveTab("calendar"); setNotifOpenSessionId(id); }}
+                    onOpenSession={(id) => { setActiveTab("calendar"); setNotifOpenSessionId(id); }}
                     onOpenMonthPlan={(brandId, platform) => openMonthPlanFor(brandId, platform)}
                   />
                 )}
@@ -2072,7 +2063,7 @@ export default function App() {
                     engineParams={engineParams}
                     currentRole={currentRole}
                     onOpenMonthPlan={() => openMonthPlanFor(currentBrandId!, singlePlatform)}
-                    onOpenSession={(id) => { setWorkspace({ type: "agency" }); setOpsView("board"); setActiveTab("calendar"); setNotifOpenSessionId(id); }}
+                    onOpenSession={(id) => { setWorkspace({ type: "agency" }); setActiveTab("calendar"); setNotifOpenSessionId(id); }}
                     onOpenSessions={() => setActiveTab("brand_sessions")}
                   />
                 )}
