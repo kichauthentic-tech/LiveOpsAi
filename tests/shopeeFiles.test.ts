@@ -9,7 +9,7 @@ vi.mock("../src/lib/supabaseClient", () => ({ supabase: {} }));
 
 const {
   parseCsvRows, parseShopeeDaily, parseShopeeLiveList, parseShopeeOverview, parseShopeeProductList, readShopeeDays, readShopeeOverview,
-  readShopeeProducts, readShopeeStreams, shopeeDate, shopeeDurationSec, shopeeNum, shopeeStreamsToReconRows, vnIso, flattenShopeeOverview
+  readShopeeProducts, readShopeeStreams, shopeeDate, shopeeDurationSec, shopeeNum, shopeeStreamsToSnapshotRows, vnIso, flattenShopeeOverview
 } = await import("../src/lib/dataraw/shopeeFiles");
 const { parseDataRawExcel } = await import("../src/lib/dataraw/parseDataRawExcel");
 
@@ -71,10 +71,38 @@ describe("Live List → phiên", () => {
     expect(() => parseShopeeLiveList(live([[...s1.slice(0, 4), "hôm qua", ...s1.slice(5)]]))).toThrow(/giờ bắt đầu/);
     expect(() => parseShopeeLiveList(live([]))).toThrow(/không có phiên/);
   });
-  test("dòng đối soát: GMV = doanh số ĐẶT, doanh số xác nhận giữ trong raw, mã phòng tổng hợp", () => {
-    const rows = shopeeStreamsToReconRows(readShopeeStreams(parseShopeeLiveList(live([s2])).rows));
+  test("dòng snapshot/đối soát: GMV = doanh số ĐẶT, doanh số xác nhận giữ trong raw, mã phòng tổng hợp", () => {
+    const rows = shopeeStreamsToSnapshotRows(readShopeeStreams(parseShopeeLiveList(live([s2])).rows));
     expect(rows[0]).toMatchObject({ roomId: "SHP-2026-09-29-1102", gmv: 4430000, orders: 14, views: 1019, startedAt: "2026-09-29T11:02:00+07:00", endedAt: "2026-09-29T13:17:40+07:00" });
     expect((rows[0].raw as Record<string, unknown>).salesConfirmed).toBe(4046000);
+    // ATC không có cột riêng ở bảng snapshot ⇒ nằm trong raw để DB trừ giữa hai lần up (0154)
+    expect((rows[0].raw as Record<string, unknown>).atc).toBe(readShopeeStreams(parseShopeeLiveList(live([s2])).rows)[0].atc);
+  });
+});
+
+describe("file Live List làm file giao ca / đổi host (0154) — cùng đường snapshot với TikTok", () => {
+  test("snapshotRowsFromParsed(Shopee): một phiên = một dòng room, cột chỉ TikTok = 0, ATC nằm trong raw", async () => {
+    const { snapshotRowsFromParsed, SNAPSHOT_FILE_TYPE } = await import("../src/lib/liveSnapshot/extractRooms");
+    const out = snapshotRowsFromParsed(parseShopeeLiveList(live([s1, s2])), "Shopee");
+    expect(out.rows.map((r) => r.roomId)).toEqual(["SHP-2026-09-30-2200", "SHP-2026-09-29-1102"]);
+    const r = out.rows[1];
+    expect(r).toMatchObject({ gmv: 4430000, orders: 14, views: 1019, comments: 44, impressions: 0, productClicks: 0, newFollowers: 0, shares: 0, likes: 0, watchSeconds: 60 * 1019 });
+    expect((r.raw as Record<string, unknown>).atc).toBe(84);
+    expect(SNAPSHOT_FILE_TYPE.Shopee).toBe("shopee_live_list");
+    expect(SNAPSHOT_FILE_TYPE.TikTok).toBe("creator_live_performance");
+  });
+  test("picker: ca 11:00–13:00 ngày 29/09 chọn sẵn phiên 11:02, không chọn phiên 30/09", async () => {
+    const { snapshotRowsFromParsed } = await import("../src/lib/liveSnapshot/extractRooms");
+    const { classifyRooms, sessionWindow } = await import("../src/lib/liveSnapshot/roomSelection");
+    const rows = snapshotRowsFromParsed(parseShopeeLiveList(live([s1, s2])), "Shopee").rows;
+    const picks = classifyRooms(rows, sessionWindow({ date: "2026-09-29", startTime: "11:00", endTime: "13:00" }));
+    expect(picks.filter((c) => c.suggested).map((c) => c.row.roomId)).toEqual(["SHP-2026-09-29-1102"]);
+    expect(picks.find((c) => c.row.roomId === "SHP-2026-09-30-2200")?.inWindow).toBe(false);
+  });
+  test("migration 0154 đọc ATC từ raw của dòng snapshot (client không gửi cột riêng)", () => {
+    const sql = readFileSync(join(__dirname, "..", "supabase", "migrations", "0154_shopee_snapshot_from_live_list.sql"), "utf8");
+    expect(sql).toContain("c.raw ? 'atc'");
+    expect(sql).toContain("atc_count");
   });
 });
 

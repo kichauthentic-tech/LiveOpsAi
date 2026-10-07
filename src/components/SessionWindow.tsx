@@ -22,9 +22,8 @@ import {
 } from "../lib/sessionLedger";
 import { DataSourceBadge } from "./common/DataSourceBadge";
 import { BrandLogo } from "./ui/BrandLogo";
-import { HandoverForm } from "./HandoverForm";
 import { SessionPlanVsActual } from "./SessionPlanVsActual";
-import { TikTokHandover } from "./TikTokHandover";
+import { FileHandover } from "./FileHandover";
 import { SessionRoomCase } from "./SessionRoomCase";
 import { handoverOwnerLabel, hasHandover, isHandoverPerson } from "../lib/handover";
 import { useToast } from "../hooks/useToast";
@@ -33,7 +32,7 @@ import { SessionActionsContext } from "../lib/sessionActionsContext";
 import { describeStaff, hasStaffSegments } from "../lib/staffSegments";
 import { HostChangeReports } from "./HostChangeReports";
 import { StaffSegmentsEditor } from "./StaffSegmentsEditor";
-import { METRIC, metricHint } from "../lib/metricGlossary";
+import { metricHint } from "../lib/metricGlossary";
 import { dataSourceTier } from "../lib/dataSource";
 
 // Cửa sổ Ca Live — MỘT cửa sổ chi tiết cho một ca, dùng chung cho mọi nơi click vào ca (Sổ Ca,
@@ -86,11 +85,8 @@ const WEEKDAY = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
 
 const STATUS_LABEL = SESSION_STATUS_LABEL_VI;
 const STATUS_CLS = SESSION_STATUS_CLS;
-const MISSING_LABEL: Record<MissingStep, string> = {
-  snapshot: "Chưa up file Creator-Live-Performance",
-  report: "Chưa giao ca",
-  reconcile: "Chưa đối soát"
-};
+const missingLabel = (step: MissingStep, file: string): string =>
+  step === "snapshot" ? `Chưa up file ${file}` : step === "report" ? "Chưa giao ca" : "Chưa đối soát";
 
 function fmtDate(d: string): string {
   const [y, m, day] = d.split("-").map(Number);
@@ -302,7 +298,6 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
 
   const snapshotDone = hasSnapshot(s);
   const handoverDone = hasHandover(s);
-  const handoverPrev = s.report?.handoverPrevSessionId ? allSessions.find((x) => x.id === s.report!.handoverPrevSessionId) : undefined;
 
   return (
     <>
@@ -381,7 +376,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
             <div className="rounded-xl border border-amber-800 bg-amber-950/50 p-3 text-xs text-amber-200 flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
               <span>
-                Còn thiếu để chốt: {missing.map((m) => MISSING_LABEL[m]).join(" · ")}
+                Còn thiếu để chốt: {missing.map((m) => missingLabel(m, prof.reconciliationFile)).join(" · ")}
                 {isOps && isUnconfirmedPast(s) && (
                   <span className="block mt-1 text-amber-300/90">
                     Ca đã qua giờ mà chưa có bằng chứng diễn ra — chưa tính vào giờ cam kết và lương. Có chạy: giao ca (mục Giao ca bên dưới). Không diễn ra: huỷ ca ở cuối cửa sổ này.
@@ -498,8 +493,8 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
             <HostChangeReports session={s} canSubmit={canHandover} onSaved={(u) => onSessionsUpdated!([u])} />
           )}
 
-          {/* Giao ca: trợ live của ca — ca không trợ thì OPS. TikTok = up file Creator-Live-Performance + sự cố (0145, user chốt
-              06/10 tối); Shopee = dán link dashboard + 3 số + sự cố (0144). Thay form report cũ. */}
+          {/* Giao ca: trợ live của ca — ca không trợ thì OPS. Cả hai sàn một luồng: up file số liệu của sàn (TikTok Creator-Live-Performance,
+              Shopee Live List — 0154) + chọn sự cố (0145). Thay form report cũ. */}
           {showHandover && (
             <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface-base)]/60 p-3 space-y-3">
               <div className="flex items-center justify-between gap-2">
@@ -508,9 +503,9 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                   {handoverDone ? `đã giao ${new Date(s.report!.handoverAt!).toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" })}` : "chưa giao ca"}
                 </span>
               </div>
-              {handoverDone && !editingHandover && prof.handover === "file" && (
+              {handoverDone && !editingHandover && (
                 <div className="space-y-1.5 text-xs">
-                  <p className="text-[var(--text-muted)]">{snapshotDone ? "Đã up file Creator-Live-Performance — số của ca ở \"Số liệu ca\" bên dưới." : "Chưa có file số liệu."}</p>
+                  <p className="text-[var(--text-muted)]">{snapshotDone ? `Đã up file ${prof.reconciliationFile} — số của ca ở "Số liệu ca" bên dưới.` : "Chưa có file số liệu."}</p>
                   {canHandover && (
                     <button onClick={() => setEditingHandover(true)} className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-emerald-950 text-emerald-300 border border-emerald-800 hover:bg-emerald-900 transition-colors">
                       Sửa giao ca / up lại file
@@ -518,54 +513,24 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                   )}
                 </div>
               )}
-              {handoverDone && !editingHandover && prof.handover === "link" && (
-                <div className="space-y-1.5 text-xs">
-                  <p className="flex flex-wrap items-center gap-1.5 text-[var(--text-muted)]">
-                    <PlatformChip platform={s.platform} />
-                    {prof.liveRefNoun} <span className="font-mono text-[var(--text)]">{s.report!.liveRef}</span>
-                    {s.report!.dashboardLink1 && <a href={s.report!.dashboardLink1} target="_blank" rel="noreferrer" className="text-[var(--accent-text)] underline">mở dashboard</a>}
-                    {handoverPrev && <span>· ca nối với ca {handoverPrev.startTime}–{handoverPrev.endTime}</span>}
-                  </p>
-                  <p className="text-[var(--text-muted)]">
-                    Số đang thấy lúc giao: <span className="font-mono text-[var(--text)]">GMV {fmtVndShort(s.report!.cumGmv ?? 0)} · {(s.report!.cumViews ?? 0).toLocaleString("vi-VN")} {prof.viewsLabel}{prof.handoverThird?.key !== "orders" ? (s.report!.cumAtc != null ? ` · ${s.report!.cumAtc.toLocaleString("vi-VN")} ${METRIC.atc}` : "") : ` · ${(s.report!.cumOrders ?? 0).toLocaleString("vi-VN")} ${METRIC.orders}`}</span>
-                    {handoverPrev ? " — số của ca này đã trừ ca trước, xem \"Số liệu ca\" bên dưới." : ""}
-                  </p>
-                  {canHandover && (
-                    <button onClick={() => setEditingHandover(true)} className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-emerald-950 text-emerald-300 border border-emerald-800 hover:bg-emerald-900 transition-colors">
-                      Sửa giao ca
-                    </button>
-                  )}
-                </div>
-              )}
               {(!handoverDone || editingHandover) &&
                 (canHandover ? (
-                  prof.handover === "file" ? (
-                    <TikTokHandover
-                      session={s}
-                      onSaved={(updated) => {
-                        onSessionsUpdated!(updated);
-                        if (updated.some((u) => u.report?.handoverAt && u.id === s.id && u.report.handoverAt !== s.report?.handoverAt)) setEditingHandover(false);
-                      }}
-                      onCancel={editingHandover ? () => setEditingHandover(false) : undefined}
-                    />
-                  ) : (
-                  <HandoverForm
+                  <FileHandover
                     session={s}
                     onSaved={(updated) => {
                       onSessionsUpdated!(updated);
-                      setEditingHandover(false);
+                      if (updated.some((u) => u.report?.handoverAt && u.id === s.id && u.report.handoverAt !== s.report?.handoverAt)) setEditingHandover(false);
                     }}
                     onCancel={editingHandover ? () => setEditingHandover(false) : undefined}
                   />
-                  )
                 ) : (
                   <p className="text-xs text-[var(--text-muted)]">{handoverOwnerLabel(s)}.</p>
                 ))}
             </section>
           )}
 
-          {/* Room của ca (0153): ca NỐI (1 room → nhiều ca) và ca BỊ NGẮT ROOM (1 ca → nhiều room) — chỉ TikTok, trợ/OPS xác nhận. */}
-          {showHandover && prof.handover === "file" && (isOps || isMine) && (
+          {/* Room của ca (0153, Shopee 0154): ca NỐI (1 room/phiên → nhiều ca) và ca BỊ NGẮT (1 ca → nhiều room/phiên), trợ/OPS xác nhận. */}
+          {showHandover && (isOps || isMine) && (
             <SessionRoomCase key={s.id} session={s} canEdit={canHandover} isOps={isOps} onSessionsUpdated={(u) => onSessionsUpdated!(u)} />
           )}
 

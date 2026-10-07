@@ -1,16 +1,17 @@
 import { useEffect, useState } from "react";
 import { LiveSession } from "../types";
-import { submitTikTokHandover } from "../lib/db/handovers";
+import { submitFileHandover } from "../lib/db/handovers";
 import { errorMessage } from "../lib/errorMessage";
 import { hasSnapshot } from "../lib/sessionLedger";
 import { SessionLiveSnapshotUpload } from "./SessionLiveSnapshotUpload";
 import { HandoverIncidents, incidentsFromReport, incidentValues } from "./HandoverIncidents";
 import { fetchSnapshotParts } from "../lib/db/sessionRoomLinks";
 import { suggestedRestartCount } from "../lib/liveSnapshot/roomCases";
+import { profileOf } from "../lib/platforms/profiles";
 
-// Giao ca của ca TIKTOK (user chốt 06/10 tối — giữ cách build ban đầu): (1) up file Creator-Live-Performance tải từ
-// TikTok ngay khi hết ca — file giữ đúng ranh giới ca nối (số cộng dồn của phòng, app trừ lần up trước, 0078);
-// (2) chạm chọn sự cố/OT rồi bấm Giao ca (0145 — DB từ chối khi chưa có file). Ca Shopee: HandoverForm.
+// Giao ca, MỘT luồng cho cả hai sàn (TikTok user chốt 06/10 tối; Shopee chuyển sang file 08/10, migration 0154): (1) up file số liệu
+// tải từ sàn ngay khi hết ca — TikTok Creator-Live-Performance, Shopee Live List — file giữ đúng ranh giới ca nối (số cộng dồn của
+// phòng/phiên, app trừ lần up trước, 0078); (2) chạm chọn sự cố/OT rồi bấm Giao ca (DB từ chối khi chưa có file).
 
 interface Props {
   session: LiveSession;
@@ -18,11 +19,12 @@ interface Props {
   onCancel?: () => void;
 }
 
-export function TikTokHandover({ session: s, onSaved, onCancel }: Props) {
+export function FileHandover({ session: s, onSaved, onCancel }: Props) {
   const [incidents, setIncidents] = useState(() => incidentsFromReport(s.report));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileDone = hasSnapshot(s);
+  const prof = profileOf(s);
 
   // Ca bị ngắt room (0153): điền sẵn "Restart ×N" theo số lần ngắt đã ghi / số room − 1 — chỉ gợi ý, trợ vẫn sửa được. Không đụng
   // vào report đã có số restart hoặc khi trợ đã tự bật/tắt.
@@ -45,7 +47,7 @@ export function TikTokHandover({ session: s, onSaved, onCancel }: Props) {
     setSaving(true);
     setError(null);
     try {
-      onSaved([await submitTikTokHandover(s.id, incidentValues(incidents))]);
+      onSaved([await submitFileHandover(s.id, incidentValues(incidents))]);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -57,7 +59,7 @@ export function TikTokHandover({ session: s, onSaved, onCancel }: Props) {
     <div className="space-y-3">
       <div className="space-y-1.5">
         <p className="block text-xs font-bold text-[var(--text-muted)]">
-          1 · Up file Creator-Live-Performance {fileDone && <span className="text-emerald-400 font-normal">— đã có</span>}
+          1 · Up file {prof.reconciliationFile} {fileDone && <span className="text-emerald-400 font-normal">— đã có</span>}
         </p>
         <SessionLiveSnapshotUpload session={s} onApplied={(u) => onSaved([u])} />
       </div>

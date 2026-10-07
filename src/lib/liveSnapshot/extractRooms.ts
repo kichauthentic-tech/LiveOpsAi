@@ -1,5 +1,8 @@
+import type { DataRawReportType } from "../../types";
+import type { ReportPlatform } from "../reportPlatform";
 import { parseDataRawExcel, type ParsedDataRawImport } from "../dataraw/parseDataRawExcel";
 import { mapCreatorLivePerfRows } from "../dataraw/creatorLivePerfSlice";
+import { readShopeeStreams, shopeeStreamsToSnapshotRows } from "../dataraw/shopeeFiles";
 
 // Một dòng room đã chuẩn hoá, sẵn sàng đẩy vào RPC apply_session_live_snapshot (migration 0078).
 // Chỉ các trường ĐẾM ĐƯỢC được tách riêng — mọi tỷ lệ (AOV, GPM, CTR, CTOR, *_rate) nằm trong
@@ -68,13 +71,38 @@ function exactDurationMinutes(startedAt?: string, endedAt?: string, fallbackHour
   return Math.round(fallbackHours * 60 * 10000) / 10000;
 }
 
-export async function parseSnapshotFile(file: File): Promise<ParsedSnapshotFile> {
-  return snapshotRowsFromParsed(await parseDataRawExcel(file, "creator_live_performance"));
+/** File số liệu theo ca của từng sàn: TikTok = Creator-Live-Performance (một dòng / phòng), Shopee = Live List (một dòng / phiên). */
+export const SNAPSHOT_FILE_TYPE: Record<ReportPlatform, DataRawReportType> = {
+  TikTok: "creator_live_performance",
+  Shopee: "shopee_live_list"
+};
+
+export async function parseSnapshotFile(file: File, platform: ReportPlatform): Promise<ParsedSnapshotFile> {
+  return snapshotRowsFromParsed(await parseDataRawExcel(file, SNAPSHOT_FILE_TYPE[platform]), platform);
 }
 
-/** Cùng phép chuẩn hoá cho dữ liệu đã đọc sẵn — file vừa up, hoặc batch Creator-Live-Performance đã lưu ở Dữ Liệu Gốc
- *  (`columns` + `rows` lưu nguyên, nên dựng lại được đúng các dòng room mà không cần file gốc). */
-export function snapshotRowsFromParsed(parsed: ParsedDataRawImport): ParsedSnapshotFile {
+/** Cùng phép chuẩn hoá cho dữ liệu đã đọc sẵn — file vừa up, hoặc batch đã lưu ở Dữ Liệu Gốc (`columns` + `rows` lưu nguyên,
+ *  nên dựng lại được đúng các dòng room/phiên mà không cần file gốc). Mỗi sàn một cách đọc, cùng ra `SnapshotRoomRow`. */
+export function snapshotRowsFromParsed(parsed: ParsedDataRawImport, platform: ReportPlatform): ParsedSnapshotFile {
+  const reader = SNAPSHOT_ROW_READERS[platform];
+  const rows = reader.read(parsed);
+  if (rows.length === 0) throw new Error(reader.emptyError);
+  return { periodLabel: parsed.periodLabel, periodStart: parsed.periodStart, periodEnd: parsed.periodEnd, rows };
+}
+
+// Record đủ mọi sàn ⇒ thêm sàn mà quên cách đọc là lỗi compile.
+const SNAPSHOT_ROW_READERS: Record<ReportPlatform, { read: (parsed: ParsedDataRawImport) => SnapshotRoomRow[]; emptyError: string }> = {
+  TikTok: {
+    read: (parsed) => tiktokSnapshotRows(parsed),
+    emptyError: 'File không có dòng phiên live nào đọc được — kiểm tra lại đúng file "Creator-Live-Performance" tải từ TikTok Creator Center.'
+  },
+  Shopee: {
+    read: (parsed) => shopeeStreamsToSnapshotRows(readShopeeStreams(parsed.rows)),
+    emptyError: 'File không có phiên live nào đọc được — kiểm tra lại đúng file "Live List" tải từ Shopee Seller Centre.'
+  }
+};
+
+function tiktokSnapshotRows(parsed: ParsedDataRawImport): SnapshotRoomRow[] {
   const mapped = mapCreatorLivePerfRows(parsed.columns, parsed.rows);
 
   const rows: SnapshotRoomRow[] = [];
@@ -102,10 +130,5 @@ export function snapshotRowsFromParsed(parsed: ParsedDataRawImport): ParsedSnaps
       raw: r.sourceRow
     });
   }
-
-  if (rows.length === 0) {
-    throw new Error('File không có dòng phiên live nào đọc được — kiểm tra lại đúng file "Creator-Live-Performance" tải từ TikTok Creator Center.');
-  }
-
-  return { periodLabel: parsed.periodLabel, periodStart: parsed.periodStart, periodEnd: parsed.periodEnd, rows };
+  return rows;
 }

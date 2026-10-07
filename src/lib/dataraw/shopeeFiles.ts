@@ -1,5 +1,6 @@
 import type { DataRawColumn } from "../../types";
 import type { ParsedDataRawImport } from "./parseDataRawExcel";
+import type { SnapshotRoomRow } from "../liveSnapshot/extractRooms";
 
 // 4 file Shopee Seller Centre (Shopee Live) — migration 0139, 2026-10-06. Hàm thuần, không import supabaseClient nên
 // test chạy được không cần .env. Đối chiếu bằng 4 file thật của VERA Shopee T9 (shop 13347498):
@@ -506,10 +507,12 @@ export function readShopeeOverview(data: Record<string, unknown>[]): ShopeeOverv
 
 // ---------- đối soát ----------
 
-/** Phiên Shopee → dòng của đường đối soát chung (import_live_reconciliation). roomId là mã tổng hợp theo giờ bắt đầu
- *  (Shopee không có Room ID); GMV = doanh số ĐẶT; viewers đưa vào cột views (Shopee chỉ cho người xem riêng biệt theo phiên).
- *  Doanh số xác nhận và các số khác giữ trong raw. */
-export function shopeeStreamsToReconRows(streams: ShopeeStream[]): Record<string, unknown>[] {
+/** Phiên Shopee → dòng "room" của đường snapshot / đối soát chung (apply_session_live_snapshot, import_live_reconciliation).
+ *  roomId là mã tổng hợp theo giờ bắt đầu (Shopee không có Room ID); GMV = doanh số ĐẶT; viewers đưa vào cột views (Shopee chỉ cho
+ *  người xem riêng biệt theo phiên). Số trong file là CỘNG DỒN từ lúc bật phiên (file "RealTime" kể cả phiên đang live) nên ca nối
+ *  cùng phiên trừ lần up trước y hệt TikTok. ATC (không có cột đếm riêng trong bảng snapshot) và các số khác nằm trong raw — DB đọc
+ *  raw.atc để trừ giữa hai lần up (0154). Cột chỉ TikTok có (impressions, follower, share, like…) = 0. */
+export function shopeeStreamsToSnapshotRows(streams: ShopeeStream[]): SnapshotRoomRow[] {
   return streams.map((s) => ({
     roomId: `SHP-${s.date}-${s.time.replace(":", "")}`,
     roomTitle: s.name,
@@ -521,7 +524,13 @@ export function shopeeStreamsToReconRows(streams: ShopeeStream[]): Record<string
     orders: s.ordersPlaced,
     skuOrders: s.ordersPlaced,
     views: s.viewers,
+    impressions: 0,
+    productImpressions: 0,
+    productClicks: 0,
+    newFollowers: 0,
     comments: s.comments,
+    shares: 0,
+    likes: 0,
     watchSeconds: s.avgViewSec * s.viewers,
     raw: {
       source: "shopee_live_list",

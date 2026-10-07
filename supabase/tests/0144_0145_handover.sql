@@ -1,4 +1,5 @@
 -- Kiểm migration 0144 + 0145 (giao ca). Chạy trên bản REPLAY cả chuỗi (README.md) SAU khi nạp 0145.
+-- LƯU Ý (0154): bộ kiểm này mô tả chuỗi TRƯỚC 0154 — chạy trên replay dừng ở 0153. 0154 cố ý bỏ đường gõ tay/Shopee-link (số lúc đổi host 'link' bị chặn ở mọi sàn, ca Shopee giao ca bằng file), nên vài mục ở đây không còn đúng sau 0154; mục tương ứng nằm ở 0154_shopee_snapshot_from_live_list.sql.
 -- Mỗi mục in "OK ..."; ERROR là hỏng. Chạy trên bản replay CHƯA có 0144 thì phải đỏ ngay mục 1.
 -- Tình huống thật: phiên VERA Shopee 26/09 mã 41439111 chạy 18:00–00:30 qua ba ca (18–20, 20–21, 21–00:30);
 -- Sheet ghi ca đầu 4.267.859 (ATC 228, 5.883 lượt xem), file Shopee chốt cả phiên 12.322.359.

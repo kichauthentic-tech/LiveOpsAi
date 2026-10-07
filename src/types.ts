@@ -158,7 +158,7 @@ export interface StaffSegment {
  *  atMin = phút kể từ giờ bắt đầu ca (= toMin của đoạn host trước). base* = số tổng của ca nối trước cùng phòng. */
 export interface StaffCheckpoint {
   atMin: number;
-  /** 'file' = TikTok up từ Creator-Live-Performance (0148); 'link' = Shopee gõ số từ dashboard (0147). */
+  /** 'file' = up từ file số liệu của sàn (TikTok Creator-Live-Performance 0148, Shopee Live List 0154); 'link' = số gõ từ dashboard (0147, bản cũ — không ghi mới nữa). */
   source: "link" | "file";
   fileName?: string;
   link?: string;

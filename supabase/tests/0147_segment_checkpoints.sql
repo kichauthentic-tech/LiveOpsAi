@@ -1,4 +1,5 @@
 -- Kiểm migration 0147 (số lúc đổi host giữa ca). Chạy trên bản REPLAY cả chuỗi SAU khi nạp 0147; thiếu 0147 thì đỏ ngay mục 0.
+-- LƯU Ý (0154): bộ kiểm này mô tả chuỗi TRƯỚC 0154 — chạy trên replay dừng ở 0153. 0154 cố ý bỏ đường gõ tay/Shopee-link (số lúc đổi host 'link' bị chặn ở mọi sàn, ca Shopee giao ca bằng file), nên vài mục ở đây không còn đúng sau 0154; mục tương ứng nằm ở 0154_shopee_snapshot_from_live_list.sql.
 \set ON_ERROR_STOP on
 set client_min_messages = notice;
 

@@ -14,6 +14,8 @@ import { SnapshotRoomPicker } from "./SnapshotRoomPicker";
 import { errorMessage } from "../lib/errorMessage";
 import { useConfirm } from "../hooks/useConfirm";
 import { fmtVndFull } from "../lib/format";
+import { profileOf } from "../lib/platforms/profiles";
+import { platformOf } from "../lib/reportPlatform";
 
 interface SessionLiveSnapshotUploadProps {
   session: LiveSession;
@@ -24,11 +26,12 @@ function fmtTime(iso?: string): string {
   return iso ? new Date(iso).toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" }) : "—";
 }
 
-// Trợ live tải file "Creator-Live-Performance" từ TikTok Streamer (Creator Center) ngay khi hết ca rồi up
-// vào đúng ca đang trực. Số của ca = hiệu so với lần up gần nhất của cùng Room ID (migration
-// 0078) — nên up đúng lúc giao ca là bắt buộc với ca nối, không phải thủ tục cho có.
+// Trợ live tải file số liệu của sàn ngay khi hết ca rồi up vào đúng ca đang trực — TikTok: "Creator-Live-Performance" (Streamer /
+// Creator Center), Shopee: "Live List" (Seller Centre). Số của ca = hiệu so với lần up gần nhất của cùng Room ID / phiên (migration
+// 0078, Shopee 0154) — nên up đúng lúc giao ca là bắt buộc với ca nối, không phải thủ tục cho có.
 export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSnapshotUploadProps) {
   const confirm = useConfirm();
+  const prof = profileOf(session);
   const [snapshot, setSnapshot] = useState<SessionSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -57,7 +60,7 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
     setBusy(true);
     setError(null);
     try {
-      setPending({ fileName: file.name, parsed: await parseSnapshotFile(file) });
+      setPending({ fileName: file.name, parsed: await parseSnapshotFile(file, platformOf(session)) });
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -135,7 +138,7 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
               <div className="min-w-0">
                 <p className="text-xs font-bold text-emerald-300 truncate">{snapshot.fileName ?? "Đã nạp số liệu"}</p>
                 <p className="text-[11px] text-[var(--text-faint)]">
-                  Up lúc {fmtTime(snapshot.capturedAt)} · {snapshot.rowCount} phiên trong file
+                  Up lúc {fmtTime(snapshot.capturedAt)} · {snapshot.rowCount} {prof.liveFileRowNoun} trong file
                 </p>
               </div>
             </div>
@@ -159,14 +162,14 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
               <p className="text-xs font-bold text-[var(--text)]">{(session.totalOrders ?? 0).toLocaleString("vi-VN")}</p>
             </div>
             <div className="bg-[var(--surface-base)] rounded-lg py-1.5">
-              <p className="text-[11px] text-[var(--text-faint)]">Views</p>
+              <p className="text-[11px] text-[var(--text-faint)]">{prof.viewsLabel}</p>
               <p className="text-xs font-bold text-[var(--text)]">{(session.totalViews ?? 0).toLocaleString("vi-VN")}</p>
             </div>
           </div>
 
           {(session.liveRoomIds?.length ?? 0) > 0 && (
             <p className="text-[11px] text-[var(--text-faint)]">
-              Tính từ {session.liveRoomIds!.length} phiên live thuộc ca này
+              Tính từ {session.liveRoomIds!.length} {prof.liveFileRowNoun} live thuộc ca này
               {session.actualStartAt ? ` · live thật ${fmtTime(session.actualStartAt)} → ${fmtTime(session.actualEndAt)}` : ""}
             </p>
           )}
@@ -174,7 +177,7 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
           {(session.liveRoomIds?.length ?? 0) === 0 && (
             <p className="text-[11px] text-amber-400 flex items-start gap-1.5">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
-              File không có phiên nào thuộc ca này. Có thể up nhầm ca, hoặc phiên live chưa phát sinh số liệu.
+              File không có {prof.liveFileRowNoun} nào thuộc ca này. Có thể up nhầm ca, hoặc chưa phát sinh số liệu.
             </p>
           )}
         </div>
@@ -182,7 +185,7 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
         <div className="rounded-xl border border-dashed border-[var(--border)] p-3 text-center">
           <FileSpreadsheet className="w-5 h-5 text-[var(--text-faint)] mx-auto mb-1.5" />
           <p className="text-[11px] text-[var(--text-muted)] mb-2">
-            Tải file <span className="font-bold">Creator-Live-Performance</span> từ TikTok Streamer rồi up vào ngay khi hết ca.
+            Tải file <span className="font-bold">{prof.reconciliationFile}</span> từ {prof.liveFileWhere} rồi up vào ngay khi hết ca.
           </p>
           <button
             onClick={() => fileRef.current?.click()}

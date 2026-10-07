@@ -6,8 +6,9 @@ import { classifyRooms, sessionWindow, shortRoomId, sumRooms } from "../lib/live
 import { roomsMissingFromPrev, type PrevBaseline } from "../lib/liveSnapshot/roomCases";
 import { fmtCount } from "../lib/handover";
 import { fmtVndFull } from "../lib/format";
+import { profileOf } from "../lib/platforms/profiles";
 
-// Bước "chọn đúng phòng" sau khi chọn file Creator-Live-Performance: file là cả ngày nhiều phòng, trợ tick phòng ĐANG LIVE
+// Bước "chọn đúng phòng/phiên" sau khi chọn file số liệu (TikTok Creator-Live-Performance, Shopee Live List): file là cả ngày nhiều dòng, trợ tick phòng ĐANG LIVE
 // của ca mình rồi mới gửi (client chỉ gửi dòng đã tick). Dùng cho cả up file giao ca và up file lúc đổi host.
 
 interface Props {
@@ -36,6 +37,9 @@ const dur = (m: number) => {
 };
 
 export function SnapshotRoomPicker({ session: s, rows, fileName, untilMin, previouslySelected, prevBaseline, heading, confirmLabel, busy, onConfirm, onCancel }: Props) {
+  const prof = profileOf(s);
+  const noun = prof.liveFileRowNoun; // "phòng" (TikTok) / "phiên" (Shopee)
+  const viewsWord = prof.viewsLabel.toLowerCase();
   const win = useMemo(() => sessionWindow(s, untilMin), [s, untilMin]);
   const choices = useMemo(() => classifyRooms(rows, win), [rows, win]);
   const [picked, setPicked] = useState<Set<string>>(() => {
@@ -59,10 +63,10 @@ export function SnapshotRoomPicker({ session: s, rows, fileName, untilMin, previ
   return (
     <div className="space-y-2.5 rounded-xl border border-[var(--accent)]/40 bg-[var(--surface-base)] p-3">
       <div>
-        <p className="text-xs font-bold text-[var(--text)]">{heading ?? "Chọn phòng live của ca này"}</p>
+        <p className="text-xs font-bold text-[var(--text)]">{heading ?? `Chọn ${noun} live của ca này`}</p>
         <p className="text-[11px] text-[var(--text-muted)]">
-          File <span className="font-mono">{fileName}</span> có <b>{rows.length}</b> phòng (cả ngày). Tick đúng phòng ca {s.startTime}–{s.endTime}
-          {untilMin != null ? ` tính tới ${endClock}` : ""} đang live — ca bị tắt/bật lại stream sẽ có nhiều phòng liền nhau.
+          File <span className="font-mono">{fileName}</span> có <b>{rows.length}</b> {noun} (cả ngày). Tick đúng {noun} ca {s.startTime}–{s.endTime}
+          {untilMin != null ? ` tính tới ${endClock}` : ""} đang live — ca bị tắt/bật lại stream sẽ có nhiều {noun} liền nhau.
         </p>
       </div>
 
@@ -82,12 +86,12 @@ export function SnapshotRoomPicker({ session: s, rows, fileName, untilMin, previ
                     {vnTime(c.row.startedAt)} → {c.row.endedAt ? vnTime(c.row.endedAt) : "đang live"} <span className="font-normal text-[var(--text-muted)]">({dur(c.row.durationMinutes)})</span>
                   </span>
                   <span className="block font-mono text-[11px] text-[var(--text-muted)]">
-                    GMV {fmtVndFull(c.row.gmv)} · {fmtCount(c.row.orders)} đơn · {fmtCount(c.row.views)} xem · phòng {shortRoomId(c.row.roomId)}
+                    GMV {fmtVndFull(c.row.gmv)} · {fmtCount(c.row.orders)} đơn · {fmtCount(c.row.views)} {viewsWord} · {noun} {shortRoomId(c.row.roomId)}
                     {c.row.roomTitle ? ` · "${c.row.roomTitle}"` : ""}
                   </span>
                   {!c.inWindow && <span className="block text-[11px] text-[var(--text-faint)]">Ngoài giờ ca — không tính cho ca này.</span>}
                   {c.inWindow && c.overlapShare < 0.5 && (
-                    <span className="block text-[11px] text-amber-300">Chỉ {Math.round(c.overlapShare * 100)}% phòng nằm trong ca này — nhiều khả năng của ca kề bên.</span>
+                    <span className="block text-[11px] text-amber-300">Chỉ {Math.round(c.overlapShare * 100)}% {noun} nằm trong ca này — nhiều khả năng của ca kề bên.</span>
                   )}
                 </span>
               </label>
@@ -98,25 +102,25 @@ export function SnapshotRoomPicker({ session: s, rows, fileName, untilMin, previ
 
       <div className={`rounded-lg px-2.5 py-2 text-xs ${selected.length === 0 ? "bg-rose-950/50 text-rose-200 border border-rose-800" : "bg-emerald-950/40 text-emerald-200 border border-emerald-800"}`}>
         {selected.length === 0 ? (
-          "Chưa tick phòng nào."
+          `Chưa tick ${noun} nào.`
         ) : (
           <>
-            Ca này = <b>{totals.rooms} phòng</b> · <b className="font-mono">GMV {fmtVndFull(totals.gmv)} · {fmtCount(totals.orders)} đơn · {fmtCount(totals.views)} xem</b>
-            <span className="text-[11px] opacity-80"> (số cộng dồn của phòng; ca nối cùng phòng app tự trừ lần up trước)</span>
+            Ca này = <b>{totals.rooms} {noun}</b> · <b className="font-mono">GMV {fmtVndFull(totals.gmv)} · {fmtCount(totals.orders)} đơn · {fmtCount(totals.views)} {viewsWord}</b>
+            <span className="text-[11px] opacity-80"> (số cộng dồn của {noun}; ca nối cùng {noun} app tự trừ lần up trước)</span>
           </>
         )}
       </div>
       {edgeTicked.length > 0 && (
         <p className="text-[11px] text-amber-300 flex items-start gap-1.5">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
-          Bạn đã tick phòng chủ yếu nằm ngoài ca. Nếu ca kề bên chưa up file thì số cả phòng sẽ bị tính cho ca này.
+          Bạn đã tick {noun} chủ yếu nằm ngoài ca. Nếu ca kề bên chưa up file thì số cả {noun} sẽ bị tính cho ca này.
         </p>
       )}
 
       {prevBaseline && missingFromPrev.length > 0 && (
         <p className="text-[11px] text-amber-300 flex items-start gap-1.5">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
-          Phòng {missingFromPrev.map(shortRoomId).join(", ")} bắt đầu trước giờ hết ca {prevBaseline.label} nhưng ca đó không có phòng này — ca này sẽ nhận CẢ phòng. Nhờ trợ ca trước kiểm tra file của họ.
+          {noun[0].toUpperCase() + noun.slice(1)} {missingFromPrev.map(shortRoomId).join(", ")} bắt đầu trước giờ hết ca {prevBaseline.label} nhưng ca đó không có {noun} này — ca này sẽ nhận CẢ {noun}. Nhờ trợ ca trước kiểm tra file của họ.
         </p>
       )}
 

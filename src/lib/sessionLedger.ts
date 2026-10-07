@@ -1,6 +1,5 @@
 import { LiveSession, UserRole } from "../types";
 import { assertOnePlatform } from "./platforms/perf";
-import { profileOf } from "./platforms/profiles";
 import { SnapshotCounters, SnapshotRatios, computeSnapshotRatios } from "./liveSnapshot/metrics";
 import { dataQuality, DataQuality, isCountable, sessionHours } from "./performance/hostPerformance";
 import { dataSourceTier } from "./dataSource";
@@ -10,7 +9,7 @@ import { dataSourceTier } from "./dataSource";
 // SKU/AI coach không có luồng ghi) và bảng Sessions thô của brand workspace. Chỉ đọc, không có
 // form sửa số tay: đường ghi số vẫn là snapshot → report → đối soát như đã chốt.
 
-// "snapshot" = ca TikTok chưa up file Creator-Live-Performance (bước 1 giao ca TikTok, user chốt 06/10 tối); "report" =
+// "snapshot" = ca chưa up file số liệu của sàn (TikTok Creator-Live-Performance, Shopee Live List — bước 1 giao ca; Shopee từ 0154); "report" =
 // chưa GIAO CA (0144/0145 ghi report ca; report cũ gõ tay trước 0144 cũng tính là đã có); "reconcile" = chưa đối soát.
 export type MissingStep = "snapshot" | "report" | "reconcile";
 
@@ -25,12 +24,6 @@ export interface LedgerFilter {
 // Đã có số từ file: bậc live_snapshot/tiktok_reconciled, hoặc ca nạp bù (0086) mang sẵn room.
 export function hasSnapshot(s: LiveSession): boolean {
   return s.dataSource === "live_snapshot" || dataSourceTier(s) === "reconciled" || (s.liveRoomIds?.length ?? 0) > 0;
-}
-
-// Ca TikTok giao ca bằng file (Creator-Live-Performance là file của TikTok); ca Shopee không có file theo ca — giao ca
-// bằng link dashboard + số, số chốt đến từ Live List ở Đối Soát.
-export function needsSnapshotFile(s: Pick<LiveSession, "platform">): boolean {
-  return profileOf(s).handover === "file";
 }
 
 export function hasReport(s: LiveSession): boolean {
@@ -52,7 +45,7 @@ export function needsClosing(s: LiveSession, today: string): boolean {
 export function missingSteps(s: LiveSession, today: string): MissingStep[] {
   if (!needsClosing(s, today)) return [];
   const out: MissingStep[] = [];
-  if (needsSnapshotFile(s) && !hasSnapshot(s)) out.push("snapshot");
+  if (!hasSnapshot(s)) out.push("snapshot");
   if (!hasReport(s)) out.push("report");
   if (!isReconciled(s)) out.push("reconcile");
   return out;

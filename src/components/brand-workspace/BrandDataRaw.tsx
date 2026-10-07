@@ -7,10 +7,11 @@ import type { TabPrefetchCtx } from "../../lib/db/prefetch";
 import { Database, Upload, FileSpreadsheet, AlertTriangle, Trash2, Search, ChevronDown, ChevronRight } from "lucide-react";
 import { BackfillFromRooms } from "./BackfillFromRooms";
 import { ReconciliationPanel } from "./ReconciliationPanel";
+import { SNAPSHOT_FILE_TYPE } from "../../lib/liveSnapshot/extractRooms";
 import { importReconciliationFromParsed } from "../../lib/db/liveReconciliation";
 import { errorMessage } from "../../lib/errorMessage";
 import { useConfirm } from "../../hooks/useConfirm";
-import { platformOf, type ReportPlatform } from "../../lib/reportPlatform";
+import { platformOf } from "../../lib/reportPlatform";
 import { profileOf } from "../../lib/platforms/profiles";
 
 interface BrandDataRawProps {
@@ -28,12 +29,6 @@ interface BrandDataRawProps {
   coreReady: boolean;
   onSessionsChanged: () => Promise<void>;
 }
-
-// File mỗi sàn dùng để ĐỐI SOÁT ca (một dòng mỗi phiên live): up ở loại này là tự tạo lần đối soát, không up lần hai.
-const RECON_TYPE: Record<ReportPlatform, DataRawReportType> = {
-  TikTok: "creator_live_performance",
-  Shopee: "shopee_live_list"
-};
 
 const REPORT_TABS: { id: DataRawReportType; label: string; hint: string }[] = [
   { id: "shop_promotion", label: "Khuyến Mãi", hint: 'Export "Shop Promotion List" từ TikTok Shop Seller Center.' },
@@ -150,7 +145,8 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ platform, brandId, b
   const [reconKey, setReconKey] = useState(0);
   const [reconBusyId, setReconBusyId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const isReconType = activeType === RECON_TYPE[platform];
+  // File mỗi sàn dùng để ĐỐI SOÁT ca (một dòng mỗi phiên live) — cũng là file giao ca: up ở loại này là tự tạo lần đối soát, không up lần hai.
+  const isReconType = activeType === SNAPSHOT_FILE_TYPE[platform];
   const brandSessions = useMemo(() => allSessions.filter((s) => s.brandId === brandId), [allSessions, brandId]);
 
   const activeTab = ALL_TABS.find((t) => t.id === activeType)!;

@@ -258,7 +258,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
             {mode === "mine" ? "Ca Của Tôi" : "Bảng Vận Hành"}
           </h2>
           <PageIntro>
-            {mode === "mine" ? "Ca bạn trực. Hết ca: bấm vào ca → Giao ca (TikTok: up file Creator-Live-Performance; Shopee: dán link dashboard + gõ 3 số; rồi chọn sự cố)." : "Hôm nay có ca nào, ai trực, còn thiếu gì. Bấm vào ca để mở cửa sổ ca."}
+            {mode === "mine" ? "Ca bạn trực. Hết ca: bấm vào ca → Giao ca (up file số liệu của sàn — TikTok: Creator-Live-Performance, Shopee: Live List — rồi chọn sự cố)." : "Hôm nay có ca nào, ai trực, còn thiếu gì. Bấm vào ca để mở cửa sổ ca."}
           </PageIntro>
         </div>
         {mode === "ops" && (

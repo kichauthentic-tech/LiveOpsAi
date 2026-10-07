@@ -79,13 +79,13 @@ const SHOPEE_METRICS_SET: PlatformMetricSet = {
     return d ? { parts: d.parts.map((p) => ({ label: SHOPEE_DRIVER_LABEL[p.key], change: p.change / 100 })), total: b.atcGmv / (a.atcGmv || 1) - 1 } : null;
   },
   driverFormula: `GMV = ${METRIC.liveHours} × ${METRIC.viewersPerHour} × ${METRIC.atcRate} × ${METRIC.gmvPerAtc} — chỉ tính trên các ca có số ${METRIC.atc}`,
-  driverEmptyHint: `Chưa tách được: cần cả kỳ này và kỳ trước đều có ca Shopee đã đối soát bằng Live List (${METRIC.atc} chỉ có từ file đó). Nguồn traffic và phễu Product Impressions → Product Clicks → Orders của Shopee xem ở Report Tháng Shopee.`,
+  driverEmptyHint: `Chưa tách được: cần cả kỳ này và kỳ trước đều có ca Shopee đã up file Live List (${METRIC.atc} chỉ có từ file đó). Nguồn traffic và phễu Product Impressions → Product Clicks → Orders của Shopee xem ở Report Tháng Shopee.`,
   coverageNotes: (t) => {
     const m = t as ShopeeKeyMetrics;
     const out: { tone: "warn" | "faint"; text: string }[] = [];
     if (m.sessions > 0 && m.atcViewers < m.viewers * 0.5)
-      out.push({ tone: "warn", text: `Mới ${m.atc > 0 || m.atcViewers > 0 ? "một phần" : "chưa ca nào"} có số ${METRIC.atc} (${Math.round((m.atcViewers / (m.viewers || 1)) * 100)}% ${METRIC.viewers}) — ${METRIC.atcRate} và ${METRIC.gmvPerAtc} chỉ phản ánh những ca đó. Đủ số khi đối soát bằng Live List.` });
-    if (m.orders === 0) out.push({ tone: "faint", text: `${METRIC.orders}, ${METRIC.abs} và ${METRIC.itemsSoldShopee} của ca Shopee chỉ có sau khi đối soát Live List ở màn Đối Soát; lúc giao ca người trực chỉ khai GMV và ${METRIC.viewers}.` });
+      out.push({ tone: "warn", text: `Mới ${m.atc > 0 || m.atcViewers > 0 ? "một phần" : "chưa ca nào"} có số ${METRIC.atc} (${Math.round((m.atcViewers / (m.viewers || 1)) * 100)}% ${METRIC.viewers}) — ${METRIC.atcRate} và ${METRIC.gmvPerAtc} chỉ phản ánh những ca đó. Đủ số khi ca có file Live List (up lúc giao ca hoặc ở Dữ Liệu Gốc).` });
+    if (m.orders === 0) out.push({ tone: "faint", text: `${METRIC.orders}, ${METRIC.abs} và ${METRIC.itemsSoldShopee} của ca Shopee chỉ có từ file Live List (up lúc giao ca hoặc ở Dữ Liệu Gốc); ca chưa có file chỉ có GMV và ${METRIC.viewers} khai tay.` });
     return out;
   },
   hostRanking: (sessions) => splitUnassignedShopee(byHostShopee(sessions))
@@ -137,16 +137,13 @@ export interface PlatformProfile {
     /** Benchmark ca có đủ ô đơn / CVR / LIVE CTR / AOV / Ads giờ (TikTok có từ file theo ca; Shopee không). */
     hasOrderFunnel: boolean;
   };
-  // ---- giao ca ----
-  /** Cách giao ca: "file" = up file Creator-Live-Performance (TikTok); "link" = dán link dashboard + gõ số (Shopee). */
-  handover: "file" | "link";
-  /** Số đếm thứ ba khi GÕ số lúc giao ca / đổi host (ngoài GMV + lượt xem). null = không gõ (Shopee, user chốt 07/10: ATC lấy từ
-   *  Live List khi đối soát). TikTok giao ca bằng file — ô này chỉ dùng nếu sàn gõ tay. */
-  handoverThird: { key: "orders" | "atc"; label: string; required: boolean } | null;
-  dashboardLinkExample: string;
-  dashboardLinkHint: string;
-  /** Số lúc đổi host giữa ca: "file" (TikTok, 0148) hay "link" (Shopee, 0147). */
-  segmentCheckpoint: "file" | "link";
+  // ---- giao ca / đổi host: cả hai sàn cùng MỘT cơ chế up file (snapshot theo ca, 0078/0154). Tên file = `reconciliationFile`; loại file = SNAPSHOT_FILE_TYPE. ----
+  /** Nơi tải file số liệu theo ca trên sàn — câu hướng dẫn cho trợ live lúc giao ca / đổi host. */
+  liveFileWhere: string;
+  /** Mỗi dòng trong file là gì, để hướng dẫn chọn đúng dòng của ca: TikTok một phòng, Shopee một phiên. */
+  liveFileRowNoun: string;
+  /** Cách gọi "đơn vị live" trong câu của màn ca nối / ca bị ngắt (cột `live_room_ids` của ca): TikTok "room", Shopee "phiên". */
+  liveUnitWord: string;
   /** Cửa sổ ca hiện các bộ đếm riêng của TikTok (SKU orders, followers, shares, likes, PCU, tỷ lệ snapshot). */
   showsTikTokCounters: boolean;
   // ---- dữ liệu gốc / đối soát / Ads ----
@@ -198,11 +195,9 @@ export const PLATFORM_PROFILES: Record<ReportPlatform, PlatformProfile> = {
       hasOrderFunnel: true,
       inSessionTip: "Trong ca, ops so bằng mắt với dashboard TikTok: view thấp → đẩy traffic; CTR/CVR thấp → tối ưu deal/kịch bản; ads vượt → hãm."
     },
-    handover: "file",
-    handoverThird: { key: "orders", label: "Đơn", required: true },
-    dashboardLinkExample: "https://shop.tiktok.com/workbench/live/overview?room_id=…",
-    dashboardLinkHint: 'Ca TikTok: dán link TikTok Shop có "room_id=…".',
-    segmentCheckpoint: "file",
+    liveFileWhere: "TikTok Streamer (Creator Center)",
+    liveFileRowNoun: "phòng",
+    liveUnitWord: "room",
     showsTikTokCounters: true,
     reconciliationFile: "Creator-Live-Performance",
     dataRawTypes: ["creator_live_performance", "shop_promotion", "product_list", "shop_analytics", "live_performance_core_stats", "live_analysis"],
@@ -230,8 +225,8 @@ export const PLATFORM_PROFILES: Record<ReportPlatform, PlatformProfile> = {
     metrics: SHOPEE_METRICS_SET,
     briefKpis: [{ key: "viewers", label: METRIC.viewers }, { key: "atc", label: METRIC.atc }],
     hasShopAnalytics: false,
-    metricsNote: `Tên chỉ số theo file Shopee. GMV = Sales(Placed Order). ${METRIC.viewersPerHour} là số tự tính; ${METRIC.atc}, ${METRIC.orders}, ${METRIC.abs}, ${METRIC.itemsSoldShopee} chỉ tính trên các ca đã đối soát Live List.`,
-    metricsLegend: `xám = trung tính (Giờ live). ${METRIC.atc}, ${METRIC.orders}, ${METRIC.abs}, ${METRIC.itemsSoldShopee} chỉ tính các ca có số đó (có sau khi đối soát Live List).`,
+    metricsNote: `Tên chỉ số theo file Shopee. GMV = Sales(Placed Order). ${METRIC.viewersPerHour} là số tự tính; ${METRIC.atc}, ${METRIC.orders}, ${METRIC.abs}, ${METRIC.itemsSoldShopee} chỉ tính trên các ca đã có file Live List.`,
+    metricsLegend: `xám = trung tính (Giờ live). ${METRIC.atc}, ${METRIC.orders}, ${METRIC.abs}, ${METRIC.itemsSoldShopee} chỉ tính các ca có số đó (có khi ca đã up file Live List).`,
     funnel: {
       traffic: "Viewers",
       conversion: "ATC/Viewer",
@@ -242,11 +237,9 @@ export const PLATFORM_PROFILES: Record<ReportPlatform, PlatformProfile> = {
       hasOrderFunnel: false,
       inSessionTip: "Trong ca, ops so bằng mắt với dashboard Shopee Creator Center: Viewers thấp → đẩy traffic; ATC thấp → xu/voucher live, deal giờ vàng."
     },
-    handover: "link",
-    handoverThird: null,
-    dashboardLinkExample: "https://banhang.shopee.vn/creator-center/dashboard/live/…",
-    dashboardLinkHint: 'Ca Shopee: dán link Creator Center có "/dashboard/live/<số>".',
-    segmentCheckpoint: "link",
+    liveFileWhere: "Shopee Seller Centre → Shopee Live → Live List (Export)",
+    liveFileRowNoun: "phiên",
+    liveUnitWord: "phiên",
     showsTikTokCounters: false,
     reconciliationFile: "Live List",
     dataRawTypes: ["shopee_live_list", "shopee_product_list", "shopee_daily", "shopee_overview"],

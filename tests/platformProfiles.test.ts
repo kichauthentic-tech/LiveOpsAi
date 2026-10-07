@@ -37,8 +37,8 @@ describe("hồ sơ sàn", () => {
     expect(platformOf({})).toBe("TikTok");
     expect(platformOf({ platform: "Lazada" })).toBe("TikTok");
     expect(platformOf({ platform: "Shopee" })).toBe("Shopee");
-    expect(profileOf({ platform: "Shopee" }).handover).toBe("link");
-    expect(profileOf("TikTok").handover).toBe("file");
+    expect(profileOf({ platform: "Shopee" }).reconciliationFile).toBe("Live List");
+    expect(profileOf("TikTok").reconciliationFile).toBe("Creator-Live-Performance");
   });
 });
 

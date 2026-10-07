@@ -2,7 +2,6 @@ import { supabase } from "../supabaseClient";
 import { assertAffected } from "./assertAffected";
 import { snapshotRowsFromParsed } from "../liveSnapshot/extractRooms";
 import type { ParsedDataRawImport } from "../dataraw/parseDataRawExcel";
-import { readShopeeStreams, shopeeStreamsToReconRows } from "../dataraw/shopeeFiles";
 import { platformOf, type ReportPlatform } from "../reportPlatform";
 
 export type ReconciliationBucket = "agency" | "review" | "unassigned" | "inhouse";
@@ -117,14 +116,6 @@ export async function fetchReconciliationRows(batchId: string): Promise<Reconcil
   return ((data ?? []) as DbRow[]).map(rowFromDb);
 }
 
-// Bộ dựng dòng đối soát của từng sàn từ dữ liệu ĐÃ ĐỌC (hồ sơ sàn: `reconciliationFile`). Record đủ mọi sàn ⇒ thêm sàn mà quên bộ dựng là lỗi compile.
-const RECON_ROW_BUILDERS: Record<ReportPlatform, (parsed: ParsedDataRawImport) => unknown[]> = {
-  // Creator-Live-Performance của TikTok: một dòng mỗi PHÒNG (Room ID, số cộng dồn).
-  TikTok: (parsed) => snapshotRowsFromParsed(parsed).rows,
-  // Live List của Shopee Seller Centre: mỗi phiên một dòng, đi qua CÙNG đường đối soát (GMV = doanh số đặt).
-  Shopee: (parsed) => shopeeStreamsToReconRows(readShopeeStreams(parsed.rows))
-};
-
 // Chỉ nạp + tự khớp room với ca, CHƯA ghi gì vào live_sessions — ops xem rổ rồi mới bấm áp dụng.
 // Nhận dữ liệu đã đọc (file vừa up ở Dữ Liệu Gốc, hoặc batch đã lưu ở đó): một file chỉ up MỘT lần.
 // `brandId` bắt buộc (0133): file Creator-Live-Performance là của MỘT tài khoản; khớp theo giờ với mọi brand thì
@@ -135,7 +126,8 @@ export async function importReconciliationFromParsed(
   brandId: string,
   platform: ReportPlatform
 ): Promise<string> {
-  const rows = RECON_ROW_BUILDERS[platform](parsed);
+  // Mỗi sàn một cách đọc dòng (TikTok: Room ID cộng dồn; Shopee: phiên Live List, GMV = doanh số đặt) — cùng đường với snapshot theo ca.
+  const rows = snapshotRowsFromParsed(parsed, platform).rows;
   const { data, error } = await supabase.rpc("import_live_reconciliation", {
     p_file_name: fileName ?? null,
     p_period_label: parsed.periodLabel ?? null,

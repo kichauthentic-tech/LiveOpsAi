@@ -10,7 +10,7 @@ import { sessionHours } from "../lib/performance/hostPerformance";
 import { downloadRowsAsXlsx } from "../lib/exportXlsx";
 import { useToast } from "../hooks/useToast";
 import { errorMessage } from "../lib/errorMessage";
-import { LedgerFilter, MissingStep, brandTrustLabel, filterLedger, groupByDate, hasReport, hasSnapshot, isReconciled, needsSnapshotFile, needsClosing, metricsHiddenFor, ledgerHosts, ledgerMonths, linkedSessions, missingSteps, sessionIncidents, summarize } from "../lib/sessionLedger";
+import { LedgerFilter, MissingStep, brandTrustLabel, filterLedger, groupByDate, hasReport, hasSnapshot, isReconciled, needsClosing, metricsHiddenFor, ledgerHosts, ledgerMonths, linkedSessions, missingSteps, sessionIncidents, summarize } from "../lib/sessionLedger";
 
 import { BrandLogo } from "./ui/BrandLogo";
 import { PlatformChip } from "./common/PlatformChip";
@@ -245,7 +245,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
         : !needsClosing(s, today)
           ? "Chưa cần đóng"
           : [
-              ...(needsSnapshotFile(s) ? [hasSnapshot(s) ? "File ✓" : "File ✗"] : []),
+              hasSnapshot(s) ? "File ✓" : "File ✗",
               hasReport(s) ? "Giao ca ✓" : "Giao ca ✗",
               isReconciled(s) ? "Đối soát ✓" : "Đối soát ✗"
             ].join(", ");
@@ -646,7 +646,7 @@ const PipelineDots: React.FC<{ session: LiveSession; today: string }> = ({ sessi
     return <span className="text-[11px] text-[var(--text-faint)] whitespace-nowrap">{why}</span>;
   }
   const steps: { label: string; done: boolean }[] = [
-    ...(needsSnapshotFile(session) ? [{ label: "File", done: hasSnapshot(session) }] : []),
+    { label: "File", done: hasSnapshot(session) },
     { label: "Giao ca", done: hasReport(session) },
     { label: "Đối soát", done: isReconciled(session) }
   ];

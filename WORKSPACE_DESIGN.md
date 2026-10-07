@@ -13,7 +13,21 @@
 
 ## 1. Giai đoạn hiện tại (cập nhật 2026-10-07)
 
-- **08/10 (khuya): CA NỐI (1 room → nhiều ca) XÁC NHẬN TƯỜNG MINH + CA BỊ NGẮT ROOM (1 ca → nhiều room) THEO MẢNH — migration `0153` CHƯA CHẠY (user chạy tay; tới lúc đó
+- **08/10 (sáng): SHOPEE GIAO CA / ĐỔI HOST BẰNG FILE LIVE LIST — CÙNG CƠ CHẾ SNAPSHOT VỚI TIKTOK — migration `0154` ĐÃ CHẠY 08/10 (user xác nhận cùng 0153; chưa thử Giao ca Shopee thật trên app).**
+  User chốt 08/10 (đưa file mẫu `…sc_live_stream_list_export…xlsx`, sheet "RealTime Live List", gồm cả phiên đang live): bỏ đường "dán link dashboard + gõ số" của Shopee, dùng đúng đường file của TikTok.
+  **Cách làm:** một phiên Shopee = một "room" (mã tổng hợp `SHP-<ngày>-<HHmm>`, cùng mã đường đối soát) đi qua `apply_session_live_snapshot` / `session_room_deltas` / ca nối + ngắt (0153) /
+  `apply_segment_checkpoint_file` (0148) — số trong file là cộng dồn nên ca nối cùng phiên trừ lần up trước. `lib/liveSnapshot/extractRooms.ts`: `parseSnapshotFile(file, platform)`,
+  `snapshotRowsFromParsed(parsed, platform)` (`SNAPSHOT_ROW_READERS` Record theo sàn), `SNAPSHOT_FILE_TYPE`; `shopeeStreamsToSnapshotRows` (shopeeFiles.ts) thay `shopeeStreamsToReconRows`; đối soát
+  Shopee đi cùng đường đó. **ATC** không có cột trong bảng snapshot ⇒ nằm ở `raw.atc` của dòng; 0154 trừ ATC giữa hai lần up trong view và ghi `live_session_reports.atc_count` cho ca Shopee
+  (xoá snapshot ⇒ gỡ; ước lượng chia cả ATC). 0154 cũng: `submit_file_handover` (thay `submit_tiktok_handover`, hàm cũ còn trong DB, client không gọi), `apply_segment_checkpoint_file` + `room_link_error`
+  không còn chỉ-TikTok, số lúc đổi host gõ tay ('link') bị chặn ở MỌI sàn, lời nhắc giao ca Shopee "up file Live List". **Client:** `FileHandover` (thay `TikTokHandover`), `HostChangeReports` chỉ còn đường file,
+  `SessionLiveSnapshotUpload`/`SnapshotRoomPicker`/`SessionRoomCase` nói theo hồ sơ sàn (phiên/room); XOÁ `HandoverForm`, `parseDashboardLink`, `handoverShare`, `submitHandover`, `submitSegmentCheckpoint`,
+  `fetchPreviousHandover`; `needsSnapshotFile` bỏ ⇒ ca Shopee đã chạy mà chưa có file cũng hiện "File ✗/thiếu bước snapshot" như TikTok (ca nạp từ Working File 'manual' sẽ hiện — đúng ý, up Live List để hết).
+  Verify: replay 0001→0153 + 0154 (chạy 2 lần sạch) + `supabase/tests/0154_shopee_snapshot_from_live_list.sql` (tất cả OK: ATC trừ giữa 2 ca, checkpoint file Shopee, chặn gõ tay, xoá file gỡ ATC, ước lượng chia ATC, ca nối Shopee);
+  test 0144/0147/0148 cũ mô tả chuỗi TRƯỚC 0154 (đã ghi chú đầu file); file mẫu thật đọc ra 5 phiên đúng GMV/ATC; tsc, lint 0 lỗi, audit:dead 0, vitest 673/674 (đỏ = Talent Pool `lg:sticky` có sẵn), build;
+  `tests/fileHandoverPlatforms.test.ts` (SSR hai sàn), `tests/shopeeFiles.test.ts` +3. CHƯA thử trên app thật (cần đăng nhập). **Việc user:** thử Giao ca một ca Shopee bằng file Live List.
+  Lưu ý: ca Shopee giao ca bằng file ⇒ GMV = Sales(Placed Order) của file, ATC/Orders/Items có ngay lúc giao ca (trước chỉ có sau đối soát); `Engaged Viewers`/`Items Sold` thiếu trong file mẫu ⇒ 0.
+- **08/10 (khuya): CA NỐI (1 room → nhiều ca) XÁC NHẬN TƯỜNG MINH + CA BỊ NGẮT ROOM (1 ca → nhiều room) THEO MẢNH — migration `0153` ĐÃ CHẠY 08/10 (user xác nhận; trước đó
   phần "Room của ca này" tự ẩn, `isRoomLinksBackendMissing`). Verify: replay 0124 → `_fixture_room_links.sql` → 0153 + `supabase/tests/0153_room_links_parts.sql` 49/49 trên Postgres tạm (chạy lại 0153 sạch),
   vitest 671/672 (+8 `tests/roomCases.test.ts`; 1 đỏ là Talent Pool `lg:sticky` có sẵn), tsc/lint/audit:dead/build sạch; UI xem bằng trang thử backend giả (đã xoá) — CHƯA thử với DB thật có 0153.**
   Quyết định user chốt 08/10: B (không gặp) không làm; chỉ 2 trường hợp trên. **Ca nối:** ca trước A mở Cửa sổ Ca Live → mục "Room của ca này" → "Ca nối", chọn ĐÚNG ca sau B từ ca đã plan
@@ -23,7 +37,7 @@
   `session_live_snapshots.is_estimated`), A up file thật thì thay. Xoá file A khi B đã up bị chặn (gỡ liên kết trước). **Ca ngắt room:** mảnh 1 = lần up đầu; mỗi mảnh sau (`session_snapshot_parts`, `apply_session_snapshot_part`) = một lần
   tắt/bật lại kèm lý do (rớt mạng/tắt bật có chủ ý/đổi thiết bị/TikTok cắt/live thử/khác) + ghi chú, up file riêng (chọn phòng, phòng đã có bị ẩn) hoặc chỉ ghi nhận lý do; phòng trùng Room ID thay bản cũ. Số ca vẫn = Σ delta mọi room
   (giờ live = Σ thời lượng từng room, khoảng nghỉ KHÔNG tính, hiện riêng "gián đoạn X phút" = `roomGapMinutes`); form Giao ca điền sẵn "Restart ×N" (`suggestedRestartCount`, chỉ gợi ý). Up lại file thường cho ca đã có mảnh ⇒ xoá mảnh (trigger + confirm).
-  Code: `components/SessionRoomCase.tsx` (đặt trong `SessionWindow`, TikTok, ops/host-trợ của ca), `lib/db/sessionRoomLinks.ts`, `lib/liveSnapshot/roomCases.ts`; `SnapshotRoomPicker` thêm `prevBaseline` (cảnh báo phòng B bắt đầu trước giờ hết A mà A không có) + `heading`.
+  Code: `components/SessionRoomCase.tsx` (đặt trong `SessionWindow`, cả hai sàn từ 0154, ops/host-trợ của ca), `lib/db/sessionRoomLinks.ts`, `lib/liveSnapshot/roomCases.ts`; `SnapshotRoomPicker` thêm `prevBaseline` (cảnh báo phòng B bắt đầu trước giờ hết A mà A không có) + `heading`.
   Chưa làm: `apply_segment_checkpoint_file` (số lúc đổi host) vẫn lấy mốc ngầm theo "snapshot gần nhất ca khác" (đúng khi A→B liền kề); chưa có chip "ca nối/ngắt room" ở danh sách Sổ Ca. Chi tiết: lịch sử `## Ca nối + ca bị ngắt room (2026-10-08)`.
 - **08/10 (muộn): "KẾ HOẠCH VS THỰC TẾ" CỦA CỬA SỔ CA LIVE THÀNH 2 CỘT + NHẬP TAY THỰC TẾ (migration `0152` ĐÃ CHẠY 08/10, user thử OK; tsc, vitest 663/664 — 1 đỏ là Talent Pool `lg:sticky` có sẵn;
   replay 0001→0152 + `supabase/tests/0152_set_session_actuals.sql` 14/14 trên Postgres tạm; user xác nhận chạy được trên app thật; test vẽ SSR `tests/sessionPlanVsActual.test.ts`).**
@@ -121,7 +135,7 @@
     khối tạo kênh cho brand thử; 0138 8c theo 0147, 0139/0140 "sàn lạ" theo trigger kênh); vitest 613/613, lint 0 lỗi, audit:dead 0;
     bản dev nối DB thật (chưa có bảng) suy đủ 7 kênh, 10 màn không lỗi. Chưa đo: thêm kênh thật qua UI (cần 0149).
   - **Bước 2 XONG (07/10, không migration): HỒ SƠ SÀN.** `src/lib/platforms/profiles.ts` (`PLATFORM_PROFILES`, `profileOf(sàn | dòng)`):
-    nhãn, màu chip, định nghĩa GMV, "phòng"/"phiên", Views/Viewers, cách giao ca (`handover: file|link`, `handoverThird`, xu), số lúc đổi host,
+    nhãn, màu chip, định nghĩa GMV, "phòng"/"phiên", Views/Viewers, nơi tải/tên file giao ca (`liveFileWhere`, `liveFileRowNoun`, `liveUnitWord`; trước 08/10 còn `handover: file|link`/`handoverThird` — đã bỏ ở 0154), số lúc đổi host,
     bộ đếm TikTok trong Cửa sổ Ca, file đối soát, loại Dữ Liệu Gốc + file Ads, tab ẩn, Shop Analytics, phễu (`funnel`), ô KPI CEO, và
     `metrics` = bộ chỉ số tầng 2 (`defs`, `groups`, `ofSessions`, `value`, `fmt`, `drivers`, `coverageNotes`, `hostRanking`). Report Tháng /
     Điều Phối Phát Hành dùng `lib/report/reportEngines.ts` (`REPORT_ENGINES[sàn]`: build, freshness, coverage, headlineChange); khung hiển thị
@@ -141,7 +155,7 @@
     (Shopee) — trước đó ghi `manual`, nhãn "Tạm tính" chung với số nạp bảng tính; badge "Số Lúc Giao Ca" giải thích theo hồ sơ sàn; phát
     hành report vẫn coi `handover_typed` là chưa đối soát; thông báo "đối soát lệch ≥5%" nhận bậc này. (b) User chốt: ATC/CO/Xu lấy từ Live
     List khi đối soát, trợ không gõ ⇒ 0150 cho `apply_live_reconciliation` ghi ATC của phiên (raw.atc, chia theo lượt xem) vào `atc_count`;
-    giao ca / số lúc đổi host Shopee chỉ còn link + GMV + lượt xem (`handoverThird: null`, bỏ ô Xu). **Live List KHÔNG có CO và Xu theo
+    giao ca / số lúc đổi host Shopee (bản link, ĐÃ THAY bằng file ở 0154 — 08/10) chỉ có link + GMV + lượt xem. **Live List KHÔNG có CO và Xu theo
     phiên** (Xu chỉ ở file tổng quan tháng) ⇒ bỏ CO, CO/ATC, Xu, Xu/GMV khỏi bộ chỉ số Shopee theo ca (Report Shopee tháng vẫn đọc Xu từ
     file tổng quan). (c) Finance & P&L: bảng lãi/lỗ theo kênh + dòng "Toàn agency" (tiền cộng được). DB `tiktok_reconciled` giữ tên (đổi
     tên giá trị phải viết lại ~10 hàm SQL — để sau, màn hình đọc qua `dataSourceTier`). Verify: replay + `supabase/tests/0150_*.sql` 9/9
@@ -180,7 +194,7 @@
 - **Nợ kỹ thuật đã hết** (đợt P2a-2…P2a-21, 01–02/10) và **audit code chết đã xong** (02/10): `npm run audit:dead` báo 0,
   ESLint 0 lỗi (31 warning `set-state-in-effect` = nợ đã đo, cố ý `warn`), vitest 467/467 (05/10).
 - **Các đợt 04–07/10 trước audit đa sàn** (chi tiết nguyên văn + cách verify: lịch sử `## §1 các đợt 04–07/10 (chuyển khỏi WORKSPACE 07/10)`):
-  lịch 2 sàn + chặn trùng người (0143); giao ca: TikTok up file Creator-Live-Performance + chọn sự cố (0145), Shopee dán link + số (0144,
+  lịch 2 sàn + chặn trùng người (0143); giao ca: TikTok up file Creator-Live-Performance + chọn sự cố (0145), Shopee dán link + số (0144; BỎ 08/10, nay file Live List — 0154;
   ca nối tự trừ, nhắc `handover_due`); cấp tài khoản host/trợ theo tên (27 tài khoản, `TalentAccountGrants`); gộp cấu hình một chỗ nhập
   (CRM "Hợp đồng & giá", Kế Hoạch Tháng cho số một tháng, Ads ngân sách 0146); tách sàn report/kế hoạch/hợp đồng (0139–0142); bộ chỉ số
   Shopee riêng (`shopeeKeyMetrics.ts`); Hỗ Trợ Vận Hành thành tab agency; đổi host giữa ca có số riêng (0147 Shopee gõ, 0148 TikTok up file,
@@ -194,7 +208,7 @@
 ## 2. Việc còn treo
 
 **Cần user làm:**
-- **Chạy migration `0153`** (Supabase SQL Editor) rồi thử trên app thật: mở một ca TikTok → "Room của ca này" → Ca nối / Ca bị ngắt; tới lúc chạy thì phần đó tự ẩn (và console có vài 404 RPC).
+- **0153 + 0154 ĐÃ CHẠY 08/10. Thử trên app thật** — Shopee: mở ca → Giao ca → up file Live List → chọn phiên → Giao ca; TikTok: mở một ca TikTok → "Room của ca này" → Ca nối / Ca bị ngắt; 
 000000000. **Đợt 3 tài khoản XONG 06/10:** user cấp 27 tài khoản đăng nhập bằng tên (Thái Toàn + 26 người có ca), app đếm 37 tài khoản, khối vàng còn 5 hồ sơ chưa có ca sắp tới; 27 tài khoản gắn đúng hồ sơ cùng tên. Còn: thêm email thật khi có (nút "Thêm email"); 6 tài khoản talent cũ mang email thử (hhhhh@ / test@ / hostesttt@…) — nếu là người thật thì Đặt lại MK + gửi lại. Chưa đo: một lần giao ca THẬT đầu-cuối.
 00000000. **0143 ĐÃ CHẠY 06/10** (user xác nhận). Sửa 27 chỗ trùng người T10 (Bảng Vận Hành → khối đỏ "chỗ trùng người", hoặc Việc cần làm) — 0143 KHÔNG chặn ca trùng sẵn,
    chỉ chặn lần ghi đưa người vào ca/dời giờ; 32 ca Franklin Shopee T10 chưa có phòng (đặt phòng mặc định ở CRM → Hợp đồng & giá, ca đã tạo thì Sửa ca).
@@ -503,7 +517,7 @@ target khung camp ở Nhập Ads bỏ 06/10 — tháng không có kế hoạch c
 
 ## 6. Hạ tầng Supabase
 
-- 153 migration (`supabase/migrations/`) — **`0153` (ca nối tường minh + ca bị ngắt room) CHƯA CHẠY (08/10; chạy tay SAU 0152, idempotent).** **`0151` (chốt kế hoạch gắn vào ca đã nhập sẵn) ĐÃ CHẠY 07/10 (user xác nhận; chưa verify bằng lần Chốt thật);** **`0149` (kênh brand × sàn) và `0150` (bậc nguồn số giao ca gõ + ATC từ Live List) ĐÃ CHẠY 07/10;** `0147` (số lúc đổi host, Shopee gõ) ĐÃ CHẠY, **`0148` (TikTok up file lúc đổi host) ĐÃ CHẠY (đo 07/10);** `0145` (giao ca TikTok bằng file) ĐÃ CHẠY 06/10; `0144` (giao ca) ĐÃ CHẠY 06/10; `0143` (chặn trùng người) ĐÃ CHẠY 06/10; **`0139`–`0142` (report / kế hoạch / hợp đồng theo sàn, file Ads Shopee) ĐÃ CHẠY 06/10**;, chạy tay theo thứ tự — **`0138` (đổi người giữa ca) ĐÃ CHẠY 06/10.** `0137` đã chạy 05/10. **`0136` ĐÃ CHẠY 05/10** (verify production: lô đối soát thử với phòng kết thúc đúng phút ca CROCS 30/09 11:01 bắt đầu ⇒ không khớp, phòng chồng 29 phút ⇒ khớp; lô thử đã xoá; trigger profiles nằm trước đoạn đó trong cùng file + chốt tự kiểm cuối file), bộ kiểm
+- 154 migration (`supabase/migrations/`) — **`0154` (Shopee giao ca/đổi host bằng file Live List, ATC theo phiên) CHƯA CHẠY (08/10; chạy tay SAU 0153, idempotent).** **`0153` (ca nối tường minh + ca bị ngắt room) CHƯA CHẠY (08/10; chạy tay SAU 0152, idempotent).** **`0151` (chốt kế hoạch gắn vào ca đã nhập sẵn) ĐÃ CHẠY 07/10 (user xác nhận; chưa verify bằng lần Chốt thật);** **`0149` (kênh brand × sàn) và `0150` (bậc nguồn số giao ca gõ + ATC từ Live List) ĐÃ CHẠY 07/10;** `0147` (số lúc đổi host, Shopee gõ) ĐÃ CHẠY, **`0148` (TikTok up file lúc đổi host) ĐÃ CHẠY (đo 07/10);** `0145` (giao ca TikTok bằng file) ĐÃ CHẠY 06/10; `0144` (giao ca) ĐÃ CHẠY 06/10; `0143` (chặn trùng người) ĐÃ CHẠY 06/10; **`0139`–`0142` (report / kế hoạch / hợp đồng theo sàn, file Ads Shopee) ĐÃ CHẠY 06/10**;, chạy tay theo thứ tự — **`0138` (đổi người giữa ca) ĐÃ CHẠY 06/10.** `0137` đã chạy 05/10. **`0136` ĐÃ CHẠY 05/10** (verify production: lô đối soát thử với phòng kết thúc đúng phút ca CROCS 30/09 11:01 bắt đầu ⇒ không khớp, phòng chồng 29 phút ⇒ khớp; lô thử đã xoá; trigger profiles nằm trước đoạn đó trong cùng file + chốt tự kiểm cuối file), bộ kiểm
   `supabase/tests/0136_profile_guard_recon_edges_lock_past.sql` (replay, DB trắng): 16 OK, đỏ khi thiếu 0136. **Tới `0132` đều ĐÃ CHẠY** (0131 + 0132 ngày 02/10);
   **`0133` ĐÃ CHẠY 04/10** (verify ở §1); **`0134` ĐÃ CHẠY 05/10** (verify: CRM không còn SĐT mẫu); **`0135` ĐÃ CHẠY 05/10** (verify: 4 brand KAM "Chưa chọn", form sửa cũng "Chưa chọn"). Lô đối soát cũ (06–09/2026, không gắn brand) không áp dụng lại được — đo
   04/10 nó chỉ khớp ca CROCS nên chưa có số nào bị chia nhầm. Replay `0001 → 0133`: sạch, chạy lần 2 không lỗi; bộ kiểm hành vi
