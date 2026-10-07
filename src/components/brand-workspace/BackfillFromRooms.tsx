@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { LiveSession, Talent } from "../../types";
-import { Layers, Scissors, Users, Wand2, CalendarDays, Save } from "lucide-react";
+import { Layers, Scissors, Users, Wand2, CalendarDays, Save, ChevronDown, ChevronUp } from "lucide-react";
 import { fetchCreatorLivePerfMonthSlice, CreatorLivePerfRow } from "../../lib/dataraw/creatorLivePerfSlice";
 import { createBackfillSessions, bulkAssignSessionHosts, splitBackfillSession } from "../../lib/db/backfillSessions";
 import {
@@ -39,11 +39,18 @@ function monthBounds(m: string): [string, string] {
   return [`${m}-01`, `${m}-${String(last).padStart(2, "0")}`];
 }
 
+// Ẩn/hiện khối này — nhớ theo trình duyệt (chỉ là tiện lợi cho người xem, không ảnh hưởng dữ liệu).
+const HIDE_KEY = "liveops.backfillFromRooms.hidden";
+function readHidden(): boolean {
+  try { return localStorage.getItem(HIDE_KEY) === "1"; } catch { return false; }
+}
+
 export const BackfillFromRooms: React.FC<Props> = ({ brandId, brandName, months, sessions, talents, onSessionsChanged }) => {
   const { showToast } = useToast();
   const confirm = useConfirm();
   const prompt = usePrompt();
   const [month, setMonth] = useState<string>(months[0] ?? "");
+  const [hidden, setHidden] = useState<boolean>(readHidden);
   const [rows, setRows] = useState<CreatorLivePerfRow[]>([]);
   const [loadingRows, setLoadingRows] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -157,6 +164,25 @@ export const BackfillFromRooms: React.FC<Props> = ({ brandId, brandName, months,
 
   if (months.length === 0) return null;
 
+  const toggleHidden = () => {
+    const next = !hidden;
+    setHidden(next);
+    try { localStorage.setItem(HIDE_KEY, next ? "1" : "0"); } catch { /* trình duyệt chặn lưu — bỏ qua */ }
+  };
+
+  if (hidden) {
+    return (
+      <div className="bg-[var(--surface)] px-4 py-2.5 rounded-2xl border border-[var(--border)] flex items-center justify-between gap-2">
+        <span className="font-bold text-[var(--text-muted)] text-xs flex items-center gap-2">
+          <Layers className="w-4 h-4" /> Nạp bù ca từ file — {brandName}
+        </span>
+        <button type="button" onClick={toggleHidden} className="text-[11px] font-bold text-[var(--accent-text)] flex items-center gap-1">
+          Hiện <ChevronDown className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    );
+  }
+
   const selectCls = "bg-[var(--surface)] border border-[var(--border)] rounded-lg px-1.5 py-1 text-[11px] text-[var(--text)] w-full";
 
   return (
@@ -165,9 +191,14 @@ export const BackfillFromRooms: React.FC<Props> = ({ brandId, brandName, months,
         <h4 className="font-bold text-[var(--text)] text-xs flex items-center gap-2">
           <Layers className="w-4 h-4 text-[var(--accent-text)]" /> Nạp bù ca từ file — {brandName}
         </h4>
-        <select value={month} onChange={(e) => setMonth(e.target.value)} className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1 text-xs text-[var(--text)]">
-          {months.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}
-        </select>
+        <div className="flex items-center gap-2">
+          <select value={month} onChange={(e) => setMonth(e.target.value)} className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1 text-xs text-[var(--text)]">
+            {months.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}
+          </select>
+          <button type="button" onClick={toggleHidden} className="text-[11px] font-bold text-[var(--text-muted)] hover:text-[var(--text)] flex items-center gap-1">
+            Ẩn <ChevronUp className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
       {error && <p className="text-[11px] text-rose-500">{error}</p>}
