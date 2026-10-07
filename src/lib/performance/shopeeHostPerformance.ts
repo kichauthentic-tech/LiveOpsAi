@@ -4,7 +4,7 @@ import { expandHostPortions, hostKey, sessionHours, UNASSIGNED_HOST_KEY } from "
 import { addShopeeInput, emptyShopeeCounts, shopeeInputFromSession, shopeeKeyMetrics, type ShopeeKeyCounts, type ShopeeKeyMetrics } from "../report/shopeeKeyMetrics";
 
 // Xếp hạng host SÀN SHOPEE: cùng cách gom host (kể cả đổi host giữa ca) với byHost() của TikTok, nhưng cộng bằng
-// bộ chỉ số Shopee (Viewers/ATC/CO/GPM/Xu) thay vì 18 chỉ số TikTok. Ghi chú ở lib/report/shopeeKeyMetrics.ts.
+// bộ chỉ số Shopee (Viewers/ATC/ABS/Items Sold) thay vì 18 chỉ số TikTok. Ghi chú ở lib/report/shopeeKeyMetrics.ts.
 
 export interface ShopeePerfRow extends ShopeeKeyMetrics {
   key: string;

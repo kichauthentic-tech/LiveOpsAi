@@ -342,7 +342,7 @@ function TikTokAdsPanel({ brandId, brandName, month, canManage, isPublished, onM
 
 const ADS_INTRO: Record<ReportPlatform, string> = {
   TikTok: 'Tải file "Campaign overview data" (xem theo ngày) từ TikTok Ads, mỗi tháng một file — app tự tính chi phí, ROI, chi phí/đơn và đưa vào Report Tháng phần 6. Nhận xét cho brand viết bằng nút "Sửa Insight" ở từng phần của Report Tháng.',
-  Shopee: 'Tải file "Shopee Live Ads Report" từ Quảng cáo Shopee, mỗi tháng một file — app tự tính chi phí, ROAS, chi phí/đơn và đưa vào Report Shopee. Xu (Coins Claimed) lấy sẵn từ file tổng quan Shopee ở Dữ Liệu Gốc, không cần nhập.'
+  Shopee: 'Tải file "Shopee Live Ads Report" từ Quảng cáo Shopee, mỗi tháng một file — app tự tính Expense, ROAS, Expense/Orders và đưa vào Report Shopee. Coins Claimed lấy sẵn từ file tổng quan Shopee ở Dữ Liệu Gốc, không cần nhập.'
 };
 // Khung nhập file Ads của từng sàn — thêm sàn mà quên khung là lỗi compile.
 const ADS_PANELS: Record<ReportPlatform, React.FC<AdsPanelProps>> = { TikTok: TikTokAdsPanel, Shopee: ShopeeAdsPanel };

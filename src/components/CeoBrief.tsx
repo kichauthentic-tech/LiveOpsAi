@@ -423,7 +423,7 @@ export default function CeoBrief(props: CeoBriefProps) {
             <Kpi empty={noCur} label="LIVE GMV" value={money(cur.gmv)} cur={cur.gmv} prev={prev.gmv} extra={`${num(cur.sessions)} ca`} series={series((t) => t.gmv)} />
             <Kpi empty={noCur} label="Giờ live" value={hrs(cur.hours)} cur={cur.hours} prev={prev.hours} series={series((t) => t.hours)} />
             <Kpi empty={noCur} label="GMV/giờ" value={money(cur.gmvPerHour)} cur={cur.gmvPerHour} prev={prev.gmvPerHour} series={series((t) => t.gmvPerHour)} />
-            <Kpi empty={noCur} label="Orders" value={prof.metrics.value(curM, "orders") == null ? "—" : num(cur.orders)} cur={cur.orders} prev={prev.orders} extra={cur.aov ? `AOV ${money(cur.aov)}` : undefined} series={series((t) => t.orders)} />
+            <Kpi empty={noCur} label="Orders" value={prof.metrics.value(curM, "orders") == null ? "—" : num(cur.orders)} cur={cur.orders} prev={prev.orders} extra={cur.aov ? `${prof.basketLabel} ${money(cur.aov)}` : undefined} series={series((t) => t.orders)} />
             {prof.briefKpis.map(({ key, label }) => {
               const def = prof.metrics.defs.find((d) => d.key === key)!;
               const c = prof.metrics.value(curM, key);
@@ -649,7 +649,7 @@ const MonthOverMonth: React.FC<{ sessions: LiveSession[]; brands: Brand[]; lastM
   const step = (W - L - R) / cols.length, bw = Math.min(56, step * 0.55);
   const y = (v: number) => T + (H - T - B) * (1 - v / nice);
 
-  // Bộ chỉ số của sàn (hồ sơ sàn: TikTok 18 chỉ số + AOV, Shopee Viewers/ATC/CO/GPM/Xu), cùng thứ tự mọi report.
+  // Bộ chỉ số của sàn (hồ sơ sàn: TikTok 18 chỉ số + AOV, Shopee Viewers/ATC/ABS/Items Sold), cùng thứ tự mọi report.
   const totalsIn = (from: string, to: string) => metrics.ofSessions(inRange(sessions, from, to).filter(isCountable), sessionHours);
   const rows = metrics.defs.map((d) => ({ label: d.label, get: (t: MetricTotals) => metrics.value(t, d.key), fmt: (v: number | null) => metrics.fmt(d, v) }));
   const colTotals = cols.map((c) => totalsIn(`${c.month}-01`, c.through));

@@ -8,6 +8,7 @@ import { errorMessage } from "../lib/errorMessage";
 import { fmtVndFull } from "../lib/format";
 import { PlatformChip } from "./common/PlatformChip";
 import { profileOf } from "../lib/platforms/profiles";
+import { METRIC } from "../lib/metricGlossary";
 
 // Màn GIAO CA của ca SHOPEE (0144; ca TikTok giao bằng file — TikTokHandover, user chốt 06/10 tối). Thiết kế cho điện thoại, làm trong
 // một phút: (1) dán link dashboard, (2) gõ 3 số ĐANG THẤY trên dashboard, (3) chạm chọn sự cố. Không hỏi CTR/CTOR/ERR/
@@ -62,7 +63,7 @@ export function HandoverForm({ session: s, onSaved, onCancel }: Props) {
   const missing: string[] = [];
   if (!parsed) missing.push("link dashboard");
   if (cumGmv == null) missing.push("GMV");
-  if (cumViews == null) missing.push("lượt xem");
+  if (cumViews == null) missing.push(prof.viewsLabel);
   if (third3?.required && cumThird == null) missing.push(`số ${third3.label.toLowerCase()}`);
   const canSubmit = missing.length === 0 && !wrongPlatform && !share?.belowPrevious && !saving;
 
@@ -140,7 +141,7 @@ export function HandoverForm({ session: s, onSaved, onCancel }: Props) {
         {numField("handover-gmv", "GMV", gmv, setGmv, "vd 11.513.359")}
         <div className="grid grid-cols-2 gap-2">
           {third3 && numField("handover-third", third3.label, third, setThird, third3.required ? undefined : "không bắt buộc")}
-          {numField("handover-views", "Lượt xem", views, setViews)}
+          {numField("handover-views", prof.viewsLabel, views, setViews)}
         </div>
         {prev && share && (
           <div className={`rounded-xl px-3 py-2 text-xs ${share.belowPrevious ? "bg-rose-950/60 text-rose-200 border border-rose-800" : "bg-emerald-950/50 text-emerald-200 border border-emerald-800"}`}>
@@ -149,7 +150,7 @@ export function HandoverForm({ session: s, onSaved, onCancel }: Props) {
             ) : (
               <>
                 Ca này = số đang thấy − ca {prev.startTime}–{prev.endTime}:{" "}
-                <b className="font-mono">GMV {fmtVndFull(share.gmv)} · {fmtCount(share.views)} lượt xem{third3?.key === "atc" ? (share.atc != null ? ` · ${fmtCount(share.atc)} ATC` : "") : third3 ? ` · ${fmtCount(share.orders)} đơn` : ""}</b>
+                <b className="font-mono">GMV {fmtVndFull(share.gmv)} · {fmtCount(share.views)} {prof.viewsLabel}{third3?.key === "atc" ? (share.atc != null ? ` · ${fmtCount(share.atc)} ${METRIC.atc}` : "") : third3 ? ` · ${fmtCount(share.orders)} ${METRIC.orders}` : ""}</b>
               </>
             )}
           </div>

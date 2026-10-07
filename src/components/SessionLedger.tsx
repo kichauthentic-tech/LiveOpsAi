@@ -5,6 +5,7 @@ import { BookOpen, CheckCircle2, ChevronRight, Circle, Download, EyeOff, Link2 }
 import { Brand, LiveSession, ShiftSlot, Studio, Talent, UserRole, AuditLogEntry } from "../types";
 import { getTodayDate } from "../lib/dateUtils";
 import { fmtVndShort } from "../lib/format";
+import { profileOf } from "../lib/platforms/profiles";
 import { sessionHours } from "../lib/performance/hostPerformance";
 import { downloadRowsAsXlsx } from "../lib/exportXlsx";
 import { useToast } from "../hooks/useToast";
@@ -124,6 +125,8 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
   excludedSessions = [],
   onLogAudit
 }) => {
+  // Một sàn: gọi đúng tên của sàn (Shopee "Viewers", TikTok "Views"); xem cả hai sàn: ghi cả hai, không gộp.
+  const viewsHead = platformScope === "all" ? "Views / Viewers" : profileOf(platformScope).viewsLabel;
   const isBrandView = variant === "brand";
   const today = getTodayDate();
 
@@ -231,7 +234,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
       if (!isBrandView) row["Target GMV"] = s.targetGmv || 0;
       row["GMV"] = hideMetrics ? "Chưa phát hành" : s.actualGmv || 0;
       row["Orders"] = hideMetrics ? "Chưa phát hành" : s.totalOrders || 0;
-      if (isBrandView) row["Views"] = hideMetrics ? "Chưa phát hành" : s.totalViews || 0;
+      if (isBrandView) row[viewsHead] = hideMetrics ? "Chưa phát hành" : s.totalViews || 0;
       row["GMV/giờ"] = hideMetrics ? "Chưa phát hành" : Math.round(gmvPerHour);
       row[isBrandView ? "Số liệu" : "Dữ liệu"] = isBrandView
         ? hideMetrics
@@ -402,7 +405,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
                 {showTargetCol && <th className={`${SUB_COL} text-right`}>Target GMV</th>}
                 <th className="py-2.5 px-2 text-right">GMV</th>
                 <th className={`${SUB_COL} text-right`}>Orders</th>
-                {isBrandView && <th className={`${SUB_COL} text-right`}>Views</th>}
+                {isBrandView && <th className={`${SUB_COL} text-right`}>{viewsHead}</th>}
                 <th className={`${SUB_COL} text-right`}>GMV/giờ</th>
                 <th className="py-2.5 px-2">{isBrandView ? "Số liệu" : "Dữ liệu"}</th>
                 <th className={SUB_COL}>Sự cố</th>

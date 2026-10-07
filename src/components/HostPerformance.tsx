@@ -48,7 +48,7 @@ export function HostPerformance({ platform, sessions, brands }: HostPerformanceP
 
   // Ca chưa gán host tách khỏi xếp hạng (audit 2026-09-21): trước đây nó đứng chung bảng như một
   // "host" tên "Chưa gán host" và chiếm luôn một hạng trong top.
-  // Bộ chỉ số của sàn đang xem (hồ sơ sàn): TikTok 18 chỉ số, Shopee Viewers/ATC/CO/GPM/Xu. GMV/giờ là cột xếp hạng nên ghim
+  // Bộ chỉ số của sàn đang xem (hồ sơ sàn): TikTok 18 chỉ số, Shopee Viewers/ATC/ABS/Items Sold. GMV/giờ là cột xếp hạng nên ghim
   // ngay sau tên host, các chỉ số còn lại theo đúng thứ tự chung. Ca chưa gán host tách khỏi xếp hạng (audit 2026-09-21).
   const metrics = profileOf(platform).metrics;
   const rankCols = metrics.defs.filter((d) => d.key !== "gmvPerHour");

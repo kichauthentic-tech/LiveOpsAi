@@ -31,7 +31,7 @@ import { SessionActionsContext } from "../lib/sessionActionsContext";
 import { describeStaff, hasStaffSegments } from "../lib/staffSegments";
 import { HostChangeReports } from "./HostChangeReports";
 import { StaffSegmentsEditor } from "./StaffSegmentsEditor";
-import { metricHint } from "../lib/metricGlossary";
+import { METRIC, metricHint } from "../lib/metricGlossary";
 import { dataSourceTier } from "../lib/dataSource";
 
 // Cửa sổ Ca Live — MỘT cửa sổ chi tiết cho một ca, dùng chung cho mọi nơi click vào ca (Sổ Ca,
@@ -541,7 +541,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                     {handoverPrev && <span>· ca nối với ca {handoverPrev.startTime}–{handoverPrev.endTime}</span>}
                   </p>
                   <p className="text-[var(--text-muted)]">
-                    Số đang thấy lúc giao: <span className="font-mono text-[var(--text)]">GMV {fmtVndShort(s.report!.cumGmv ?? 0)} · {(s.report!.cumViews ?? 0).toLocaleString("vi-VN")} lượt xem{prof.handoverThird?.key !== "orders" ? (s.report!.cumAtc != null ? ` · ${s.report!.cumAtc.toLocaleString("vi-VN")} ATC` : "") : ` · ${(s.report!.cumOrders ?? 0).toLocaleString("vi-VN")} đơn`}</span>
+                    Số đang thấy lúc giao: <span className="font-mono text-[var(--text)]">GMV {fmtVndShort(s.report!.cumGmv ?? 0)} · {(s.report!.cumViews ?? 0).toLocaleString("vi-VN")} {prof.viewsLabel}{prof.handoverThird?.key !== "orders" ? (s.report!.cumAtc != null ? ` · ${s.report!.cumAtc.toLocaleString("vi-VN")} ${METRIC.atc}` : "") : ` · ${(s.report!.cumOrders ?? 0).toLocaleString("vi-VN")} ${METRIC.orders}`}</span>
                     {handoverPrev ? " — số của ca này đã trừ ca trước, xem \"Số liệu ca\" bên dưới." : ""}
                   </p>
                   {canHandover && (

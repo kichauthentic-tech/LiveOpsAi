@@ -408,6 +408,7 @@ export interface ShopeeOverview {
   itemsPlaced: number;
   itemsConfirmed: number;
   absPlaced: number;
+  salesPerBuyerPlaced: number;
   sessions: number;
   durationSec: number;
   viewers: number;
@@ -475,6 +476,7 @@ export function readShopeeOverview(data: Record<string, unknown>[]): ShopeeOverv
     itemsPlaced: n(TX, "Total Items Sold(Placed Order)"),
     itemsConfirmed: n(TX, "Total Items Sold(Confirmed Order)"),
     absPlaced: n(TX, "ABS(Placed Order)"),
+    salesPerBuyerPlaced: n(TX, "Sales Per Buyer(Placed Order)"),
     sessions: n(TP, "Total Livestream Sessions"),
     durationSec: shopeeDurationSec(get(TP, "Total Livestream Duration")),
     viewers: n(TP, "Total Viewers"),

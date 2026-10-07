@@ -78,14 +78,14 @@ const SHOPEE_METRICS_SET: PlatformMetricSet = {
     const d = shopeeDriverBreakdown(a, b);
     return d ? { parts: d.parts.map((p) => ({ label: SHOPEE_DRIVER_LABEL[p.key], change: p.change / 100 })), total: b.atcGmv / (a.atcGmv || 1) - 1 } : null;
   },
-  driverFormula: `GMV = ${METRIC.liveHours} × ${METRIC.viewersPerHour} × ${METRIC.atcRate} × GMV/ATC — chỉ tính trên các ca có khai ATC`,
-  driverEmptyHint: "Chưa tách được: cần cả kỳ này và kỳ trước đều có ca Shopee có số ATC (lúc giao ca hoặc đối soát Live List). Nguồn traffic và nhóm đối chứng của Shopee xem ở Report Tháng Shopee.",
+  driverFormula: `GMV = ${METRIC.liveHours} × ${METRIC.viewersPerHour} × ${METRIC.atcRate} × ${METRIC.gmvPerAtc} — chỉ tính trên các ca có số ${METRIC.atc}`,
+  driverEmptyHint: `Chưa tách được: cần cả kỳ này và kỳ trước đều có ca Shopee đã đối soát bằng Live List (${METRIC.atc} chỉ có từ file đó). Nguồn traffic và phễu Product Impressions → Product Clicks → Orders của Shopee xem ở Report Tháng Shopee.`,
   coverageNotes: (t) => {
     const m = t as ShopeeKeyMetrics;
     const out: { tone: "warn" | "faint"; text: string }[] = [];
     if (m.sessions > 0 && m.atcViewers < m.viewers * 0.5)
-      out.push({ tone: "warn", text: `Mới ${m.atc > 0 || m.atcViewers > 0 ? "một phần" : "chưa ca nào"} có số ATC (${Math.round((m.atcViewers / (m.viewers || 1)) * 100)}% lượng Viewers) — các tỷ lệ phễu bên trên chỉ phản ánh những ca đó. Đủ số khi đối soát bằng Live List.` });
-    if (m.orders === 0) out.push({ tone: "faint", text: "Số đơn và AOV của ca Shopee chỉ có sau khi đối soát Live List ở màn Đối Soát; lúc giao ca người trực chỉ khai GMV, Viewers." });
+      out.push({ tone: "warn", text: `Mới ${m.atc > 0 || m.atcViewers > 0 ? "một phần" : "chưa ca nào"} có số ${METRIC.atc} (${Math.round((m.atcViewers / (m.viewers || 1)) * 100)}% ${METRIC.viewers}) — ${METRIC.atcRate} và ${METRIC.gmvPerAtc} chỉ phản ánh những ca đó. Đủ số khi đối soát bằng Live List.` });
+    if (m.orders === 0) out.push({ tone: "faint", text: `${METRIC.orders}, ${METRIC.abs} và ${METRIC.itemsSoldShopee} của ca Shopee chỉ có sau khi đối soát Live List ở màn Đối Soát; lúc giao ca người trực chỉ khai GMV và ${METRIC.viewers}.` });
     return out;
   },
   hostRanking: (sessions) => splitUnassignedShopee(byHostShopee(sessions))
@@ -109,6 +109,8 @@ export interface PlatformProfile {
   liveRefNoun: string;
   /** Nhãn lượt xem của sàn. */
   viewsLabel: string;
+  /** Tên sàn gọi "giá trị trung bình mỗi đơn" = GMV ÷ Orders: TikTok AOV, Shopee ABS. */
+  basketLabel: string;
   /** Bộ chỉ số tầng 2. */
   metrics: PlatformMetricSet;
   /** Có file Shop Analytics (GMV cả shop theo ngày) ở Dữ Liệu Gốc — nhóm đối chứng "phần còn lại của shop", cột Total GMV. */
@@ -117,9 +119,9 @@ export interface PlatformProfile {
   metricsNote: string;
   /** Chú thích bảng Key Metrics so kỳ trước: chỉ số trung tính + chỉ số chỉ tính trên ca có số. */
   metricsLegend: string;
-  /** Hai ô KPI phễu ở Bản Tin CEO (sau GMV, giờ, GMV/giờ, đơn): TikTok Views + Product CTR; Shopee Viewers + GPM. */
+  /** Hai ô KPI phễu ở Bản Tin CEO (sau GMV, giờ, GMV/giờ, đơn): TikTok Views + Product CTR; Shopee Viewers + ATC. */
   briefKpis: { key: string; label: string }[];
-  /** Phễu tách GMV: TikTok = Views/giờ × LIVE CTR × CTOR × AOV; Shopee = Viewers/giờ × ATC/Viewer × GMV/ATC. */
+  /** Phễu tách GMV: TikTok = Views/giờ × LIVE CTR × CTOR × AOV; Shopee = Viewers/giờ × ATC/Viewer × GMV/ATC (tự tính từ Viewers, ATC). */
   funnel: {
     traffic: string;
     conversion: string;
@@ -180,6 +182,7 @@ export const PLATFORM_PROFILES: Record<ReportPlatform, PlatformProfile> = {
     gmvDefinition: "GMV LIVE của TikTok — gồm cả đơn huỷ/hoàn, khoá theo lúc thanh toán",
     liveRefNoun: "phòng",
     viewsLabel: "Views",
+    basketLabel: METRIC.aov,
     metrics: TIKTOK_METRICS,
     briefKpis: [{ key: "views", label: "Views" }, { key: "ctr", label: "Product CTR" }],
     hasShopAnalytics: true,
@@ -220,14 +223,15 @@ export const PLATFORM_PROFILES: Record<ReportPlatform, PlatformProfile> = {
     textClass: "text-orange-400",
     shopNamePlaceholder: "Tên shop trên Shopee",
     shopRefLabel: "Shop ID",
-    gmvDefinition: "Doanh số đơn ĐẶT của Shopee (Placed) — đơn xác nhận là số riêng",
+    gmvDefinition: "Sales(Placed Order) của Shopee — doanh số đơn ĐẶT; Sales(Confirmed Order) là số thực nhận, hiện riêng",
     liveRefNoun: "phiên",
     viewsLabel: "Viewers",
+    basketLabel: METRIC.abs,
     metrics: SHOPEE_METRICS_SET,
-    briefKpis: [{ key: "viewers", label: "Viewers" }, { key: "gpm", label: "GPM" }],
+    briefKpis: [{ key: "viewers", label: METRIC.viewers }, { key: "atc", label: METRIC.atc }],
     hasShopAnalytics: false,
-    metricsNote: "Chỉ số Shopee: GMV = doanh số đặt; ATC, CO, đơn và xu chỉ tính trên các ca có số đó.",
-    metricsLegend: "xám = trung tính (Giờ live, Xu đã tung). ATC, CO, Orders, Xu chỉ tính các ca có số đó; số đơn có sau khi đối soát Live List.",
+    metricsNote: `Tên chỉ số theo file Shopee. GMV = Sales(Placed Order). ${METRIC.viewersPerHour} là số tự tính; ${METRIC.atc}, ${METRIC.orders}, ${METRIC.abs}, ${METRIC.itemsSoldShopee} chỉ tính trên các ca đã đối soát Live List.`,
+    metricsLegend: `xám = trung tính (Giờ live). ${METRIC.atc}, ${METRIC.orders}, ${METRIC.abs}, ${METRIC.itemsSoldShopee} chỉ tính các ca có số đó (có sau khi đối soát Live List).`,
     funnel: {
       traffic: "Viewers",
       conversion: "ATC/Viewer",

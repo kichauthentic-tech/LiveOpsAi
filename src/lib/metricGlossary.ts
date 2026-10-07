@@ -51,15 +51,40 @@ export const METRIC = {
   gmvPerView: "GMV/View",
   showGpm: "Show GPM",
   watchGpm: "Watch GPM",
-  viewers: "Viewers", // Shopee: người xem riêng biệt (không cùng cách đếm với Views của TikTok)
+  // ---- SHOPEE: tên theo ĐÚNG cột trong file Shopee Seller Centre (Live List, theo ngày, overview, Product List, Live Ads).
+  // Shopee không có LIVE impressions / ERR / LIVE CTR / CTOR / CVR / UPT / AOV / CO / Direct–Indirect GMV: đừng dùng tên TikTok cho số Shopee.
+  viewers: "Viewers", // Total Viewers: người xem riêng biệt (khác Views — Total Views — của chính Shopee)
   viewersPerHour: "Viewers/giờ",
-  atc: "ATC", // Shopee: Add-to-cart, số lần thêm vào giỏ trong phiên
-  atcRate: "ATC/Viewer", // Shopee: ATC ÷ Viewers (%)
-  checkout: "CO", // Shopee: Checkout, số lần bấm thanh toán
-  coRate: "CO/ATC", // Shopee: CO ÷ ATC (%)
-  orderPerAtc: "Orders/ATC", // Shopee: Orders ÷ ATC (%)
-  gpm: "GPM", // Shopee: GMV trên 1.000 Viewers
-  coins: "Xu đã tung",
+  engagedViewers: "Engaged Viewers",
+  avgViewingDuration: "Avg. Viewing Duration",
+  pcu: "PCU",
+  atc: "ATC", // Total ATC: số lần thêm vào giỏ
+  atcRate: "ATC/Viewer", // tự tính: ATC ÷ Viewers (%)
+  gmvPerAtc: "GMV/ATC", // tự tính: GMV ÷ ATC
+  abs: "ABS", // ABS(Placed Order) = Average Basket Size = Sales ÷ Orders — tên Shopee của AOV
+  itemsSoldShopee: "Items Sold", // Shopee Items Sold(Placed Order) — viết hoa chữ S như tên cột Shopee
+  salesConfirmed: "Sales (Confirmed Order)",
+  ordersConfirmed: "Orders (Confirmed Order)",
+  buyers: "Buyers",
+  salesPerBuyer: "Sales Per Buyer",
+  salesNewCustomers: "Sales from New Customers",
+  ctr: "CTR", // Shopee: Product Clicks ÷ Product Impressions (khác Product CTR của TikTok chỉ ở tên)
+  orderRate: "Order Rate", // Shopee: Orders ÷ Product Clicks
+  clickToOrderRate: "Click to Order Rate",
+  gpm: "GPM", // Shopee GPM(Placed Order) = Sales trên 1.000 Views (Total Views), KHÔNG phải trên Viewers
+  totalLikes: "Total Likes",
+  totalShares: "Total Shares",
+  totalComments: "Total Comments",
+  liveNewFollowers: "Live New Followers",
+  shopVoucherClaimed: "Shop Voucher Claimed",
+  specialLiveVoucherClaimed: "Special Live Voucher Claimed",
+  coinsClaimed: "Coins Claimed",
+  salesRatio: "Sales Ratio",
+  liveViews: "Live Views",
+  liveViewers: "Live Viewers",
+  budget: "Budget", // Shopee Live Ads
+  conversionRate: "Conversion Rate", // Shopee Live Ads
+  expense: "Expense", // Shopee Live Ads: chi phí
   refunds: "Refunds",
   refundRate: "Refund rate",
   returnCancelRate: "Tỷ lệ hoàn hủy",
@@ -111,7 +136,7 @@ export const METRIC_HINT: Record<string, string> = {
   [METRIC.impressionsPerHour]: "LIVE impressions ÷ Giờ live (chỉ các ca có số LIVE impressions)",
   [METRIC.productImpressions]: "Lượt hiển thị sản phẩm trong phiên",
   [METRIC.productClicks]: "Lượt click vào sản phẩm",
-  [METRIC.aov]: "Average Order Value = GMV ÷ Orders",
+  [METRIC.aov]: "Average Order Value = GMV ÷ Orders (TikTok; Shopee gọi là ABS)",
   [METRIC.upt]: "Units Per Transaction = Items sold ÷ Orders",
   [METRIC.avgPrice]: "Giá bán trung bình mỗi sản phẩm = GMV ÷ Items sold",
   [METRIC.err]: "Enter Room Rate = Views ÷ LIVE impressions (TikTok: Tap-through rate) — chỉ các ca có số LIVE impressions",
@@ -122,18 +147,41 @@ export const METRIC_HINT: Record<string, string> = {
   [METRIC.gmvPerView]: "GMV ÷ Views",
   [METRIC.showGpm]: "GMV trên 1.000 LIVE impressions",
   [METRIC.watchGpm]: "GMV trên 1.000 Views",
-  [METRIC.viewers]: "Shopee: số người xem riêng biệt trong phiên (không cùng cách đếm với Views của TikTok, đừng đem so với TikTok)",
-  [METRIC.viewersPerHour]: "Viewers ÷ Giờ live",
-  [METRIC.atc]: "Shopee Add-to-cart: số lần người xem thêm sản phẩm vào giỏ trong phiên — chỉ các ca có số ATC",
-  [METRIC.atcRate]: "ATC ÷ Viewers — bao nhiêu người xem bấm thêm giỏ; chỉ các ca có số ATC",
-  [METRIC.checkout]: "Shopee Checkout: số lần bấm thanh toán — chỉ các ca có số CO",
-  [METRIC.coRate]: "CO ÷ ATC — bao nhiêu giỏ đi tới bước thanh toán; chỉ các ca có cả hai số",
-  [METRIC.orderPerAtc]: "Orders ÷ ATC — bao nhiêu lượt thêm giỏ thành đơn đặt; chỉ các ca có cả hai số (số đơn có sau khi đối soát Live List)",
-  [METRIC.gpm]: "GMV trên 1.000 Viewers (Shopee: GPM)",
-  [METRIC.coins]: "Xu shop tung trong live (quy 1 xu thành 1 đồng); chỉ các ca có khai số xu",
+  [METRIC.viewers]: "Shopee Total Viewers: số người xem riêng biệt trong phiên (không cùng cách đếm với Views của TikTok, đừng đem so với TikTok)",
+  [METRIC.viewersPerHour]: "Tự tính: Viewers ÷ Giờ live",
+  [METRIC.engagedViewers]: "Shopee Engaged Viewers: người xem có tương tác (bình luận, thả tim, bấm sản phẩm…)",
+  [METRIC.avgViewingDuration]: "Shopee Avg. Viewing Duration: thời gian xem trung bình mỗi người xem",
+  [METRIC.pcu]: "Peak Concurrent Users: số người xem cùng lúc cao nhất",
+  [METRIC.atc]: "Shopee Total ATC (Add-to-cart): số lần người xem thêm sản phẩm vào giỏ — có theo ca sau khi đối soát bằng Live List",
+  [METRIC.atcRate]: "Tự tính: ATC ÷ Viewers — bao nhiêu người xem bấm thêm giỏ; chỉ các ca có số ATC",
+  [METRIC.gmvPerAtc]: "Tự tính: GMV ÷ ATC — mỗi lần thêm giỏ đáng bao nhiêu tiền; chỉ các ca có số ATC",
+  [METRIC.itemsSoldShopee]: "Shopee Items Sold(Placed Order): số sản phẩm bán ra theo đơn đặt — có theo ca sau khi đối soát bằng Live List",
+  [METRIC.abs]: "Shopee ABS(Placed Order) — Average Basket Size = Sales(Placed Order) ÷ Orders(Placed Order)",
+  [METRIC.salesConfirmed]: "Shopee Sales(Confirmed Order): doanh số đơn đã xác nhận = số thực nhận sau đơn huỷ",
+  [METRIC.ordersConfirmed]: "Shopee Orders(Confirmed Order): số đơn đã xác nhận",
+  [METRIC.buyers]: "Shopee Buyers(Placed Order): số người mua",
+  [METRIC.salesPerBuyer]: "Shopee Sales Per Buyer(Placed Order): doanh số trung bình mỗi người mua",
+  [METRIC.salesNewCustomers]: "Shopee Sales from New Customers(Placed Order): doanh số từ khách mua lần đầu",
+  [METRIC.ctr]: "Shopee CTR (cả file theo ngày lẫn file overview): lượt click sản phẩm ÷ lượt hiển thị",
+  [METRIC.orderRate]: "Shopee Order Rate(Placed Order): Orders ÷ Product Clicks",
+  [METRIC.clickToOrderRate]: "Shopee Click to Order Rate(Placed Order): Orders ÷ lượt click",
+  [METRIC.gpm]: "Shopee GPM(Placed Order): Sales trên 1.000 Views (Total Views) — không có theo ca vì Live List không có Views",
+  [METRIC.totalLikes]: "Shopee Total Likes: lượt thả tim",
+  [METRIC.totalShares]: "Shopee Total Shares: lượt chia sẻ",
+  [METRIC.totalComments]: "Shopee Total Comments: lượt bình luận",
+  [METRIC.liveNewFollowers]: "Shopee Live New Followers: người theo dõi mới có được từ live",
+  [METRIC.shopVoucherClaimed]: "Shopee Shop Voucher Claimed: số voucher shop khách đã nhận trong live",
+  [METRIC.specialLiveVoucherClaimed]: "Shopee Special Live Voucher Claimed: số voucher riêng của live khách đã nhận",
+  [METRIC.coinsClaimed]: "Shopee Coins Claimed: số xu khách đã nhận trong live (quy 1 xu thành 1 đồng); chưa biết xu do shop hay Shopee tài trợ",
+  [METRIC.salesRatio]: "Shopee Sales Ratio(Placed Order): phần doanh số của live đến từ nguồn này",
+  [METRIC.liveViews]: "Shopee Live Views: lượt xem live đến từ nguồn này",
+  [METRIC.liveViewers]: "Shopee Live Viewers: người xem live đến từ nguồn này",
+  [METRIC.budget]: "Shopee Live Ads — Budget: ngân sách ngày của chiến dịch",
+  [METRIC.conversionRate]: "Shopee Live Ads — Conversion Rate: Orders ÷ Views của chiến dịch",
+  [METRIC.expense]: "Shopee Live Ads — Expense: chi phí chiến dịch trong kỳ",
   [METRIC.refundRate]: "Refunds ÷ GMV — hoàn tiền thực tế của shop trong kỳ",
   [METRIC.returnCancelRate]: "Tỷ lệ hoàn hủy giả định nhập ở CRM (Hợp đồng & giá), dùng để ước tính NMV",
-  [METRIC.roas]: "GMV ÷ Ads cost",
+  [METRIC.roas]: "GMV ÷ Ads cost (Shopee Live Ads: GMV ÷ Expense)",
   [METRIC.share]: "Phần trăm trên tổng"
 };
 

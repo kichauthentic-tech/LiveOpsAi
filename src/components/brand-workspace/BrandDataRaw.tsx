@@ -39,10 +39,10 @@ const REPORT_TABS: { id: DataRawReportType; label: string; hint: string }[] = [
 
 // 4 file Shopee Seller Centre (Shopee Live) — nguồn của Report Tháng Shopee và của đối soát ca Shopee (0139).
 const SHOPEE_TABS: { id: DataRawReportType; label: string; hint: string }[] = [
-  { id: "shopee_overview", label: "Tổng quan tháng", hint: 'Export "overview-v2…csv" từ Shopee Seller Centre (Dữ liệu Live → Tổng quan, chọn đúng một tháng) — doanh số, phễu, nguồn traffic của live cả tháng.' },
-  { id: "shopee_daily", label: "Theo ngày", hint: 'Export "export-sc__1m_…csv" từ Shopee Seller Centre — mỗi ngày một dòng (doanh số đặt/xác nhận, người xem, ATC, CTR…). Một file một tháng.' },
-  { id: "shopee_live_list", label: "Live List", hint: 'Export "…live_stream_list_export…xlsx" từ Shopee Seller Centre — mỗi phiên live một dòng: giờ bắt đầu, thời lượng, người xem, đơn, doanh số. Dùng cho Report Shopee VÀ để đối soát ca Shopee ở Đối Soát Số Liệu.' },
-  { id: "shopee_product_list", label: "Sản phẩm (Shopee)", hint: 'Export "…live_product_list_export…xlsx" từ Shopee Seller Centre — mỗi sản phẩm bán trong live một dòng (click, ATC, đơn, doanh số).' }
+  { id: "shopee_overview", label: "Tổng quan tháng", hint: 'Export "overview-v2…csv" từ Shopee Seller Centre (Dữ liệu Live → Tổng quan, chọn đúng một tháng) — Sales, Viewers, ATC, Product Impressions/Clicks, Traffic Source, Coins/Voucher của live cả tháng.' },
+  { id: "shopee_daily", label: "Theo ngày", hint: 'Export "export-sc__1m_…csv" từ Shopee Seller Centre — mỗi ngày một dòng (Sales đặt/xác nhận, Orders, Viewers, ATC, CTR, GPM…). Một file một tháng.' },
+  { id: "shopee_live_list", label: "Live List", hint: 'Export "…live_stream_list_export…xlsx" từ Shopee Seller Centre — mỗi phiên live một dòng: Start Time, Duration, Viewers, ATC, Orders, Items Sold, Sales. Dùng cho Report Shopee VÀ để đối soát ca Shopee ở Đối Soát Số Liệu.' },
+  { id: "shopee_product_list", label: "Sản phẩm (Shopee)", hint: 'Export "…live_product_list_export…xlsx" từ Shopee Seller Centre — mỗi sản phẩm bán trong live một dòng (Product Clicks, ATC, Orders, Sales).' }
 ];
 // Mọi loại file; workspace chỉ hiện loại của sàn đang xem (hồ sơ sàn `dataRawTypes`) — không lẫn file hai sàn.
 const ALL_TABS = [...REPORT_TABS, ...SHOPEE_TABS];

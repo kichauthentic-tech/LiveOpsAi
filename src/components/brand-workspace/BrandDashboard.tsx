@@ -163,7 +163,7 @@ function BrandDashboardOne({ brandId, brandName, platform, platforms, sessions: 
 
   // ---- KPI so cùng kỳ (cắt theo ngày cuối có số — compareWindow, như Report Tháng)
   const win = useMemo(() => compareWindow(month, through), [month, through]);
-  // Bộ chỉ số của sàn (hồ sơ sàn): TikTok 18 chỉ số, Shopee Viewers/ATC/CO/GPM/Xu — không mượn chỉ số của sàn kia.
+  // Bộ chỉ số của sàn (hồ sơ sàn): TikTok 18 chỉ số, Shopee Viewers/ATC/ABS/Items Sold — không mượn chỉ số của sàn kia.
   const mCur = useMemo(() => prof.metrics.ofSessions(brandSessions.filter((s) => s.date >= win.curStart && s.date <= win.curEnd && hasLiveNumbers(s)), sessionHours), [prof, brandSessions, win]);
   const mPrev = useMemo(() => prof.metrics.ofSessions(brandSessions.filter((s) => s.date >= win.prevStart && s.date <= win.prevEnd && hasLiveNumbers(s)), sessionHours), [prof, brandSessions, win]);
   const drivers = useMemo(() => prof.metrics.drivers(mPrev, mCur), [prof, mPrev, mCur]);

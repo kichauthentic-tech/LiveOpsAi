@@ -65,6 +65,18 @@
     tên giá trị phải viết lại ~10 hàm SQL — để sau, màn hình đọc qua `dataSourceTier`). Verify: replay + `supabase/tests/0150_*.sql` 9/9
     (gồm đối soát Live List ghi ATC 140), bộ giao ca 0144/0145 25/25 với 0150; vitest 620/620, lint 0 lỗi, audit:dead 0; Finance trên bản
     dev nối DB thật hiện 4 kênh + Toàn agency 23 ca.
+  - **Đồng bộ tên chỉ số Shopee XONG (07/10 tối, không migration):** user bảo dashboard/report Shopee dùng chung khuôn TikTok nên có chỉ số
+    không tồn tại hoặc tự chế. Đối chiếu với 4 file Shopee + file Live Ads thật ⇒ tên đúng cột Shopee ở `METRIC` (`metricGlossary.ts`: Viewers,
+    Engaged Viewers, ATC, ABS, Items Sold, Sales (Confirmed Order), CTR, Order Rate, GPM, Coins Claimed, Shop/Special Live Voucher Claimed, Sales Ratio,
+    Live Views/Viewers, Expense, Budget, Conversion Rate…, tooltip ghi "tự tính" cho số không có trong file). Bộ chỉ số THEO CA của Shopee còn 9 ô:
+    GMV, GMV/giờ, Giờ live, Orders, **ABS (không phải AOV)**, Items Sold, Viewers, Viewers/giờ, ATC (Live List chỉ có bấy nhiêu theo phiên); **bỏ** CO, CO/ATC,
+    Orders/ATC, ATC/giờ, Xu đã tung, GPM theo ca (GPM Shopee chia cho Total Views mà Live List không có — bản cũ chia cho Viewers là sai định nghĩa).
+    `PlatformProfile.basketLabel` (AOV/ABS), `briefKpis` Shopee = Viewers + ATC. Report Tháng Shopee: nhãn theo cột Shopee, thêm khối Engagement (GPM, Sales Per Buyer,
+    Avg. Viewing Duration, PCU, Total Likes/Shares/Comments, Live New Followers), Ads/khuyến mãi theo Expense/Coins Claimed/Voucher; `SHOPEE_SNAPSHOT_VERSION` 3
+    (bản chụp cũ vẫn mở được, hiện "cần cập nhật số liệu" — ops bấm Cập nhật để có nhãn mới). Bảng Ads Shopee đủ cột của file. Form giao ca/đổi host Shopee ghi "Viewers".
+    Giữ nguyên "GMV" làm tên chính (user chốt 06/10 GMV = Sales(Placed Order)); đổi sang "Sales" chỉ cần sửa `METRIC.gmv` cho Shopee nếu user muốn. Khoá bằng
+    `tests/shopeeMetricNames.test.ts` (quét chữ hiển thị file thuần Shopee + bộ 9 ô). Verify: tsc, lint 0 lỗi, vitest 622/622, audit:dead 0, build; bản build nối DB
+    thật: Dashboard VERA·Shopee, Report Tháng (bản chụp cũ), Bản Tin CEO Shopee không lỗi, đúng tên mới.
   - Bước tiếp: 5 chạy thật 2–4 tuần (không tính năng mới): giao ca thật, chốt tháng 10 trong app cho ít nhất một kênh mỗi sàn.
 
 - **CHẠY THỬ THẬT trên dữ liệu thật** (từ 2026-09-18; mock đã xoá sạch 19/09). DB: 33 hồ sơ talent thật, CROCS T6–T9 nạp
@@ -335,7 +347,7 @@
 từ ca/phòng; thêm kênh chỉ ở CRM; DB chặn dòng của kênh chưa tạo (0149). (2) Khác biệt giữa sàn = hồ sơ sàn `profileOf(...)`
 (`lib/platforms/profiles.ts`) hoặc `Record<ReportPlatform, …>` (REPORT_ENGINES, REPORT_VIEWS, ADS_PANELS, RECON_FILE_READERS) — không viết
 `=== "Shopee"` ngoài `lib/platforms/`, `lib/reportPlatform.ts`, `server/` (`tests/platformProfiles.test.ts` quét). (3) Màn theo sàn khai
-ở `TAB_CHANNEL_SCOPE`; "all" = khối riêng từng sàn, không có số hiệu suất gộp (`tests/noCrossPlatformPerf.test.ts`). (4) Nguồn số đọc bậc
+ở `TAB_CHANNEL_SCOPE`; "all" = khối riêng từng sàn, không có số hiệu suất gộp (`tests/noCrossPlatformPerf.test.ts`). (5) Tên chỉ số Shopee = tên cột file Shopee qua `METRIC`, không dịch/tự đặt, không mượn tên TikTok (AOV→ABS, Views≠Viewers); chỉ số file không có thì KHÔNG hiện. (4) Nguồn số đọc bậc
 qua `dataSourceTier` (lib/dataSource.ts), không so chuỗi `data_source`.
 **Sàn (06/10) = một chiều ngang hàng brand:** khoá Map dùng `brandMonthKey(brand, tháng, sàn)` (TikTok giữ khoá cũ `brandId|YYYY-MM`,
 Shopee thêm `|Shopee`) và `brandPlatformKey(brand, sàn)` (Map kế hoạch theo tháng); sàn brand đang chạy = `brandPlatformsOf`; lọc =

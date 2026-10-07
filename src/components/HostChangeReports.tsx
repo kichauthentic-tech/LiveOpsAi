@@ -9,6 +9,7 @@ import { SnapshotRoomPicker } from "./SnapshotRoomPicker";
 import { errorMessage } from "../lib/errorMessage";
 import { fmtVndFull } from "../lib/format";
 import { profileOf } from "../lib/platforms/profiles";
+import { METRIC } from "../lib/metricGlossary";
 
 // Chỗ nhập report thứ nhất khi ĐỔI HOST giữa ca (0147; user chốt 06/10): host này xuống thì trợ live up NGAY số TỔNG đang
 // thấy trên dashboard. Report thứ hai là Giao ca cuối ca ở ngay bên dưới — host sau = số cuối − số lúc đổi.
@@ -77,7 +78,7 @@ function BoundaryCard({ session: s, boundary: b, canSubmit, onSaved }: { boundar
   const missing: string[] = [];
   if (!parsed) missing.push("link dashboard");
   if (cumGmv == null) missing.push("GMV");
-  if (cumViews == null) missing.push("lượt xem");
+  if (cumViews == null) missing.push(prof.viewsLabel);
   if (third3?.required && cumThird == null) missing.push(`số ${third3.label.toLowerCase()}`);
   const ready = missing.length === 0 && !wrongPlatform && !saving;
 
@@ -125,7 +126,7 @@ function BoundaryCard({ session: s, boundary: b, canSubmit, onSaved }: { boundar
       {done && !open && (
         <div className="space-y-1.5 text-xs text-[var(--text-muted)]">
           <p>
-            {done.source === "file" ? `Từ file ${done.fileName ?? "Creator-Live-Performance"} — số của ca tính tới lúc đổi: ` : "Số TỔNG lúc đổi: "}<span className="font-mono text-[var(--text)]">GMV {fmtVndFull(done.cumGmv)} · {fmtCount(done.cumViews ?? 0)} lượt xem{third3?.key === "atc" ? (done.cumAtc != null ? ` · ${fmtCount(done.cumAtc)} ATC` : "") : third3 ? ` · ${fmtCount(done.cumOrders ?? 0)} đơn` : ""}</span>
+            {done.source === "file" ? `Từ file ${done.fileName ?? "Creator-Live-Performance"} — số của ca tính tới lúc đổi: ` : "Số TỔNG lúc đổi: "}<span className="font-mono text-[var(--text)]">GMV {fmtVndFull(done.cumGmv)} · {fmtCount(done.cumViews ?? 0)} {prof.viewsLabel}{third3?.key === "atc" ? (done.cumAtc != null ? ` · ${fmtCount(done.cumAtc)} ${METRIC.atc}` : "") : third3 ? ` · ${fmtCount(done.cumOrders ?? 0)} ${METRIC.orders}` : ""}</span>
           </p>
           <p>
             {b.fromName || "Host trước"} làm: <b className="font-mono text-[var(--text)]">GMV {fmtVndFull(Math.max(done.cumGmv - done.baseGmv, 0))}</b>
@@ -188,7 +189,7 @@ function BoundaryCard({ session: s, boundary: b, canSubmit, onSaved }: { boundar
           {numField(`cp-gmv-${b.atMin}`, "GMV", gmv, setGmv, "vd 11.513.359")}
           <div className="grid grid-cols-2 gap-2">
             {third3 && numField(`cp-third-${b.atMin}`, third3.label, third, setThird, third3.required ? undefined : "không bắt buộc")}
-            {numField(`cp-views-${b.atMin}`, "Lượt xem", views, setViews)}
+            {numField(`cp-views-${b.atMin}`, prof.viewsLabel, views, setViews)}
           </div>
           {error && <p className="text-xs text-rose-300 bg-rose-950/50 border border-rose-800 rounded-xl px-3 py-2">{error}</p>}
           <div className="flex gap-2">

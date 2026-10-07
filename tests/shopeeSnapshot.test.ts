@@ -17,7 +17,7 @@ const day = (date: string, gmv: number): ShopeeDay => ({
 });
 const prod = (name: string, sales: number): ShopeeProduct => ({ rank: 1, name, clicks: 10, atc: 5, ordersPlaced: 3, ordersConfirmed: 3, itemsPlaced: 3, itemsConfirmed: 3, salesPlaced: sales, salesConfirmed: sales });
 const overview = (over: Partial<ShopeeOverview> = {}): ShopeeOverview => ({
-  salesPlaced: 100_000_000, salesConfirmed: 95_000_000, salesNewPlaced: 0, salesOldPlaced: 0, ordersPlaced: 300, ordersConfirmed: 280, itemsPlaced: 350, itemsConfirmed: 330, absPlaced: 333_333,
+  salesPlaced: 100_000_000, salesConfirmed: 95_000_000, salesNewPlaced: 0, salesOldPlaced: 0, ordersPlaced: 300, ordersConfirmed: 280, itemsPlaced: 350, itemsConfirmed: 330, absPlaced: 333_333, salesPerBuyerPlaced: 0,
   sessions: 4, durationSec: 12 * 3600, viewers: 5000, engaged: 500, views: 8000, pcu: 30, avgViewSec: 40, atc: 400, productImpressions: 20000, productClicks: 2000, ctrPct: 10,
   orderRatePlacedPct: 15, orderRateConfirmedPct: 14, buyersPlaced: 250, buyersConfirmed: 240, gpmPlaced: 0, likes: 0, shares: 0, comments: 0, newFollowers: 0, voucherClaimed: 0,
   specialVoucherClaimed: 0, coinsClaimed: 0,
@@ -45,7 +45,7 @@ describe("headline", () => {
     expect(h.liveHours).toBe(12);
     expect(h.liveSessions).toBe(4);
     expect(h.gmvPerHour).toBeCloseTo(100_000_000 / 12, 3);
-    expect(h.aov).toBeCloseTo(100_000_000 / 300, 3);
+    expect(h.abs).toBeCloseTo(100_000_000 / 300, 3);
     expect(h.days).toBe(3);
     expect(h.lastDay).toBe("2026-09-26");
   });
@@ -110,7 +110,7 @@ describe("buildShopeeSnapshot", () => {
   });
   test("ghi chú: nêu GMV = doanh số đặt, nêu phần Shopee không có, nêu lệch số ca với file", () => {
     const text = s.notes.join("\n");
-    expect(text).toMatch(/doanh số ĐẶT/);
+    expect(text).toMatch(/Sales\(Placed Order\)/);
     expect(text).toMatch(/GMV trực tiếp\/gián tiếp/);
     // Chưa tải file Ads Shopee (0142) thì nói rõ, không im lặng.
     expect(text).toMatch(/Chưa có file Ads Shopee/);
@@ -156,13 +156,13 @@ describe("Ads + xu (bản chụp bản 2, 0142)", () => {
   const ads = { shopName: "VERA Official Store", shopId: "13346195", campaigns: [{ name: "LIVESTREAM ADS", id: "1", status: "Ongoing", objective: "", budget: 0, views: 81460, orders: 204, conversionPct: 0.25, gmv: 70_273_048, expense: 2_300_302, roas: 30.55 }], expense: 2_300_302, gmv: 70_273_048, orders: 204, views: 81460, roas: 70_273_048 / 2_300_302, costPerOrder: 2_300_302 / 204 };
   test("có file Ads: bản chụp giữ chi phí/ROAS/chi phí mỗi đơn, nhận xét phần 1 nói Ads", () => {
     const s2 = build({ ads, overview: overview({ coinsClaimed: 499_200, voucherClaimed: 12, specialVoucherClaimed: 7 }) });
-    expect(s2.version).toBe(2);
+    expect(s2.version).toBe(3);
     expect(s2.ads).toMatchObject({ expense: 2_300_302, gmv: 70_273_048, orders: 204, campaigns: 1, shopName: "VERA Official Store" });
     expect(s2.ads!.roas).toBeCloseTo(30.55, 1);
     expect(s2.promo).toEqual({ coins: 499_200, vouchers: 12, liveVouchers: 7 });
     const sum = [s2.insights.summary!.headline, ...s2.insights.summary!.points].join("\n");
-    expect(sum).toMatch(/Ads Shopee Live: chi/);
-    expect(sum).toMatch(/499\.200 xu/);
+    expect(sum).toMatch(/Ads Shopee Live: Expense/);
+    expect(sum).toMatch(/Coins Claimed 499\.200/);
     expect(s2.notes.join("\n")).not.toMatch(/Chưa có file Ads Shopee/);
   });
   test("không có overview thì không có khối khuyến mãi; không có file Ads thì ads = null", () => {

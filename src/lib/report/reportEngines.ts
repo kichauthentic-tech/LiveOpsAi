@@ -87,7 +87,7 @@ const SHOPEE_ENGINE: ReportEngine = {
     const f = shopeeSnapshotFreshness(snap as ShopeeReportSnapshot, { sessions: live.sessions, stamps: shopeeStampsFor(live.stamps, live.month) });
     return {
       upToDate: f.upToDate,
-      changes: [f.sessionsChanged && "ca Shopee đổi số/lịch/người", f.filesChanged && "file Shopee mới", f.formulaChanged && "cách tính mới (Ads, xu)"].filter((x): x is string => !!x)
+      changes: [f.sessionsChanged && "ca Shopee đổi số/lịch/người", f.filesChanged && "file Shopee mới", f.formulaChanged && "cách tính và tên chỉ số mới (đúng tên cột Shopee)"].filter((x): x is string => !!x)
     };
   },
   coverage: (snap) => {
@@ -97,7 +97,7 @@ const SHOPEE_ENGINE: ReportEngine = {
   },
   headlineChange: (b, a) => `GMV Shopee: ${fmtVndShort((b as ShopeeReportSnapshot).headline.gmv)} → ${fmtVndShort((a as ShopeeReportSnapshot).headline.gmv)}`,
   description:
-    "Report Shopee tính từ 4 file Shopee Live (Live List, theo ngày, overview, Product List) và ca Shopee trong app, CHỐT tại một thời điểm — mở report không tính lại. GMV = doanh số đặt. Report TikTok và Shopee phát hành, thu hồi, đóng sổ riêng.",
+    "Report Shopee tính từ 4 file Shopee Live (Live List, theo ngày, overview, Product List) và ca Shopee trong app, CHỐT tại một thời điểm — mở report không tính lại. GMV = Sales(Placed Order), tên chỉ số theo đúng cột file Shopee. Report TikTok và Shopee phát hành, thu hồi, đóng sổ riêng.",
   createHint: "Bấm để tổng hợp số liệu từ 4 file Shopee và ca Shopee trong app rồi chốt lại."
 };
 

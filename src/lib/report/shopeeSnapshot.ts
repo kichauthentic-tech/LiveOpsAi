@@ -25,7 +25,8 @@ import { platformOf } from "../reportPlatform";
 
 const SHOPEE = PLATFORM_PROFILES.Shopee.id;
 
-export const SHOPEE_SNAPSHOT_VERSION = 2;
+// Bản 3 (07/10): đổi tên chỉ số theo đúng cột file Shopee (Viewers, ABS, Sales (Confirmed Order)…) + thêm GPM/PCU/Avg. Viewing Duration/Engagement.
+export const SHOPEE_SNAPSHOT_VERSION = 3;
 
 export interface ShopeeHeadline {
   gmv: number; // doanh số đặt
@@ -33,7 +34,7 @@ export interface ShopeeHeadline {
   orders: number;
   ordersConfirmed: number;
   items: number;
-  aov: number | null; // GMV ÷ đơn đặt
+  abs: number | null; // ABS(Placed Order) = GMV ÷ đơn đặt
   liveHours: number;
   liveSessions: number;
   gmvPerHour: number | null;
@@ -174,7 +175,7 @@ export function shopeeHeadline(streams: ShopeeStream[], days: ShopeeDay[], overv
     orders,
     ordersConfirmed,
     items,
-    aov: ratio(gmv, orders),
+    abs: ratio(gmv, orders),
     liveHours,
     liveSessions,
     gmvPerHour: ratio(gmv, liveHours),
@@ -306,18 +307,18 @@ export function shopeeInsights(s: ShopeeReportSnapshot): Record<ShopeeSection, S
   const out: Record<ShopeeSection, SectionInsight | null> = { summary: null, daily: null, funnel: null, schedule: null, people: null, products: null };
   if (h.gmv > 0) {
     const points: string[] = [];
-    if (h.confirmed > 0) points.push(`Thực nhận (đã trừ đơn huỷ) ${fmtM(h.confirmed)} — đơn huỷ chiếm ${pct((1 - h.confirmed / h.gmv) * 100)} giá trị.`);
+    if (h.confirmed > 0) points.push(`${METRIC.salesConfirmed} (thực nhận, đã trừ đơn huỷ) ${fmtM(h.confirmed)} — đơn huỷ chiếm ${pct((1 - h.confirmed / h.gmv) * 100)} giá trị.`);
     if (h.liveHours > 0) points.push(`${h.liveSessions} phiên live, ${h.liveHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })} giờ → ${METRIC.gmvPerHour} ${fmtM(h.gmvPerHour ?? 0)}.`);
-    let headline = `GMV Shopee ${fmtM(h.gmv)} từ ${h.orders.toLocaleString("vi-VN")} đơn.`;
+    let headline = `GMV Shopee ${fmtM(h.gmv)} từ ${h.orders.toLocaleString("vi-VN")} ${METRIC.orders}.`;
     if (s.prev && s.prev.gmv > 0) {
       const d = (h.gmv / s.prev.gmv - 1) * 100;
       headline = `GMV Shopee ${fmtM(h.gmv)}, ${d >= 0 ? "tăng" : "giảm"} ${pct(Math.abs(d))} so với tháng trước (${fmtM(s.prev.gmv)}).`;
       if (s.prev.gmvPerHour && h.gmvPerHour) points.push(`GMV/giờ live ${h.gmvPerHour >= s.prev.gmvPerHour ? "tăng" : "giảm"} ${pct(Math.abs((h.gmvPerHour / s.prev.gmvPerHour - 1) * 100))} so với tháng trước.`);
     }
     if (s.ads && s.ads.expense > 0) {
-      points.push(`Ads Shopee Live: chi ${fmtM(s.ads.expense)}, GMV từ Ads ${fmtM(s.ads.gmv)} (ROAS ${s.ads.roas != null ? s.ads.roas.toLocaleString("vi-VN", { maximumFractionDigits: 1 }) : "—"}x)${s.ads.costPerOrder != null ? `, ${fmtM(s.ads.costPerOrder)}/đơn` : ""} — GMV từ Ads chiếm ${pct((s.ads.gmv / h.gmv) * 100)} GMV live.`);
+      points.push(`Ads Shopee Live: ${METRIC.expense} ${fmtM(s.ads.expense)}, GMV từ Ads ${fmtM(s.ads.gmv)} (${METRIC.roas} ${s.ads.roas != null ? s.ads.roas.toLocaleString("vi-VN", { maximumFractionDigits: 1 }) : "—"}x)${s.ads.costPerOrder != null ? `, ${fmtM(s.ads.costPerOrder)}/${METRIC.orders}` : ""} — GMV từ Ads chiếm ${pct((s.ads.gmv / h.gmv) * 100)} GMV live.`);
     }
-    if (s.promo && s.promo.coins > 0) points.push(`Khách nhận ${s.promo.coins.toLocaleString("vi-VN")} xu trong live (≈ ${fmtM(s.promo.coins)}, ${pct((s.promo.coins / h.gmv) * 100, 2)} GMV).`);
+    if (s.promo && s.promo.coins > 0) points.push(`${METRIC.coinsClaimed} ${s.promo.coins.toLocaleString("vi-VN")} (≈ ${fmtM(s.promo.coins)}, ${pct((s.promo.coins / h.gmv) * 100, 2)} GMV).`);
     out.summary = { headline, points, action: null };
   }
   if (s.days.length > 0) {
@@ -331,9 +332,9 @@ export function shopeeInsights(s: ShopeeReportSnapshot): Record<ShopeeSection, S
   if (o && o.views > 0) {
     const best = [...o.sources].filter((x) => x.salesPlaced > 0).sort((a, b) => b.salesPlaced - a.salesPlaced)[0];
     const points: string[] = [];
-    if (o.productImpressions > 0) points.push(`Hiển thị sản phẩm ${o.productImpressions.toLocaleString("vi-VN")} → click ${o.productClicks.toLocaleString("vi-VN")} (CTR ${pct(o.ctrPct, 2)}) → đơn đặt ${o.ordersPlaced.toLocaleString("vi-VN")} (tỷ lệ đơn trên click ${pct(o.orderRatePlacedPct, 2)}).`);
-    if (best) points.push(`Nguồn mang doanh số nhiều nhất: ${best.key} (${pct(best.salesRatioPct, 0)}).`);
-    out.funnel = { headline: `${o.viewers.toLocaleString("vi-VN")} người xem, ${o.views.toLocaleString("vi-VN")} lượt xem; ${o.engaged.toLocaleString("vi-VN")} người tương tác (${pct(o.viewers > 0 ? (o.engaged / o.viewers) * 100 : 0)}).`, points, action: null };
+    if (o.productImpressions > 0) points.push(`Product Impressions ${o.productImpressions.toLocaleString("vi-VN")} → Product Clicks ${o.productClicks.toLocaleString("vi-VN")} (${METRIC.ctr} ${pct(o.ctrPct, 2)}) → ${METRIC.orders} ${o.ordersPlaced.toLocaleString("vi-VN")} (${METRIC.orderRate} ${pct(o.orderRatePlacedPct, 2)}).`);
+    if (best) points.push(`Traffic Source mang nhiều Sales nhất: ${best.key} (${METRIC.salesRatio} ${pct(best.salesRatioPct, 0)}).`);
+    out.funnel = { headline: `${o.viewers.toLocaleString("vi-VN")} ${METRIC.viewers}, ${o.views.toLocaleString("vi-VN")} ${METRIC.views}; ${METRIC.engagedViewers} ${o.engaged.toLocaleString("vi-VN")} (${pct(o.viewers > 0 ? (o.engaged / o.viewers) * 100 : 0)} ${METRIC.viewers}).`, points, action: null };
   }
   if (s.slots.length > 0 || s.camps.length > 0) {
     // Khung giờ chỉ được nêu khi đủ mẫu (một phiên marathon 16 giờ không đại diện cho cả khung).
@@ -359,10 +360,10 @@ export function shopeeInsights(s: ShopeeReportSnapshot): Record<ShopeeSection, S
   if (s.products.count > 0 && s.products.top.length > 0) {
     const t = s.products.top[0];
     out.products = {
-      headline: `Sản phẩm số 1: ${t.name.slice(0, 70)} — ${fmtM(t.salesPlaced)} (${pct(s.products.totalSales > 0 ? (t.salesPlaced / s.products.totalSales) * 100 : 0)} doanh số live).`,
+      headline: `Sản phẩm số 1: ${t.name.slice(0, 70)} — ${fmtM(t.salesPlaced)} (${pct(s.products.totalSales > 0 ? (t.salesPlaced / s.products.totalSales) * 100 : 0)} Sales(Placed Order) của live).`,
       points: [
-        s.products.top3Share != null ? `Ba sản phẩm đầu chiếm ${pct(s.products.top3Share * 100)} doanh số live.` : "",
-        `${s.products.withSales}/${s.products.count} sản phẩm có doanh số trong live.`
+        s.products.top3Share != null ? `Ba sản phẩm đầu chiếm ${pct(s.products.top3Share * 100)} Sales(Placed Order) của live.` : "",
+        `${s.products.withSales}/${s.products.count} sản phẩm có Sales trong live.`
       ].filter(Boolean),
       action: null
     };
@@ -375,7 +376,7 @@ export function shopeeInsights(s: ShopeeReportSnapshot): Record<ShopeeSection, S
 export function shopeeNotes(s: ShopeeReportSnapshot): string[] {
   const n: string[] = [];
   const h = s.headline;
-  n.push("GMV = doanh số ĐẶT (Placed Order) của live; doanh số xác nhận (Confirmed) là số thực nhận sau đơn huỷ. Shopee không cho lý do huỷ/hoàn.");
+  n.push("GMV = Sales(Placed Order) của live; Sales(Confirmed Order) là số thực nhận sau đơn huỷ. Shopee không cho lý do huỷ/hoàn.");
   const miss = [!s.files.overview && "overview (tổng quan tháng)", !s.files.daily && "theo ngày", !s.files.live && "Live List", !s.files.products && "Product List"].filter(Boolean);
   if (miss.length) n.push(`Chưa có file: ${miss.join(", ")} — các phần dùng file đó đang trống hoặc lấy từ file khác.`);
   if (s.files.live && s.files.daily) {
@@ -392,9 +393,9 @@ export function shopeeNotes(s: ShopeeReportSnapshot): string[] {
   if (s.unassigned && s.unassigned.sessions > 0) n.push(`${s.unassigned.sessions} ca chưa gán host (${fmtM(s.unassigned.gmv)} GMV) không nằm trong xếp hạng.`);
   n.push("Loại ngày camp theo lịch cố định (D-Day = ngày trùng tháng và 2 ngày trước, Mid-Month 13–15, Pay Day 23–25); chưa đọc khung camp ghi đè của Kế Hoạch Tháng.");
   if (s.ads === null) n.push("Chưa có file Ads Shopee của tháng (tải ở Nhập Ads, chọn sàn Shopee) — report chưa có chi phí Ads.");
-  if (s.ads) n.push(`Ads lấy từ file "Shopee Live Ads Report"${s.ads.shopName ? ` của shop ${s.ads.shopName}` : ""}: ${s.ads.campaigns} chiến dịch, tổng cả tháng — Shopee không cho số theo ngày nên không tách ROAS theo loại ngày. GMV từ Ads là một phần của GMV live, không cộng thêm.`);
-  if (s.promo) n.push("Xu và voucher lấy từ file overview: Shopee chỉ cho số lượng đã nhận; mỗi xu quy ra 1 đồng, chưa biết xu do shop hay Shopee tài trợ.");
-  n.push("Shopee không có trong report này: GMV trực tiếp/gián tiếp, bảng chấm KPI theo nhóm (video, KOL). Viewers là người xem riêng biệt theo file Shopee, không cùng cách đếm với Views của TikTok.");
+  if (s.ads) n.push(`Ads lấy từ file "Shopee Live Ads Report"${s.ads.shopName ? ` của shop ${s.ads.shopName}` : ""}: ${s.ads.campaigns} chiến dịch, tổng cả tháng — Shopee không cho số theo ngày nên không tách ROAS theo loại ngày. GMV trong file Ads là một phần của GMV live, không cộng thêm.`);
+  if (s.promo) n.push("Coins Claimed và voucher (Shop Voucher Claimed, Special Live Voucher Claimed) lấy từ file overview: Shopee chỉ cho số lượng đã nhận; mỗi xu quy ra 1 đồng, chưa biết xu do shop hay Shopee tài trợ.");
+  n.push("Tên chỉ số trong report này lấy đúng tên cột file Shopee (Viewers, Views, ATC, ABS, GPM…). Shopee không có GMV trực tiếp/gián tiếp, LIVE impressions, CTOR hay bảng chấm KPI theo nhóm (video, KOL). Viewers là người xem riêng biệt, không cùng cách đếm với Views của TikTok; GPM của Shopee tính trên Views, không phải Viewers.");
   return n;
 }
 

@@ -8,6 +8,7 @@ import { createOrReplaceDataRawImport, deleteDataRawImport, fetchDataRawImports,
 import { useConfirm } from "../../hooks/useConfirm";
 import { errorMessage } from "../../lib/errorMessage";
 import { fmtFixed, fmtMonth, fmtVndFull, fmtVndShort } from "../../lib/format";
+import { METRIC, metricHint } from "../../lib/metricGlossary";
 
 // Nhập Ads — sàn Shopee (06/10, user chốt: chi phí Shopee có file riêng). Tải file "Shopee Live Ads Report" (một dòng /
 // chiến dịch cho cả tháng) vào kho Dữ Liệu Gốc loại shopee_ads (migration 0142), 1 file / brand / tháng; Report Shopee đọc
@@ -35,19 +36,19 @@ function StatsGrid({ s }: { s: ShopeeAdsStats }) {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
       <div className={box}>
-        <div className="text-[11px] text-[var(--text-faint)]">Chi phí Ads</div>
+        <div className="text-[11px] text-[var(--text-faint)]" title={metricHint(METRIC.expense)}>{METRIC.expense}</div>
         <div className="text-base font-black text-[var(--text)]">{fmtVndShort(s.expense)}</div>
       </div>
       <div className={box}>
-        <div className="text-[11px] text-[var(--text-faint)]">ROAS</div>
+        <div className="text-[11px] text-[var(--text-faint)]" title={metricHint(METRIC.roas)}>{METRIC.roas}</div>
         <div className="text-base font-black text-[var(--text)]">{s.roas != null ? `${fmtFixed(s.roas, 1)}x` : "—"}</div>
       </div>
       <div className={box}>
-        <div className="text-[11px] text-[var(--text-faint)]">Chi phí / đơn ({fmtVndFull(s.orders)} đơn)</div>
+        <div className="text-[11px] text-[var(--text-faint)]">{METRIC.expense}/{METRIC.orders} ({fmtVndFull(s.orders)} {METRIC.orders})</div>
         <div className="text-base font-black text-[var(--text)]">{s.costPerOrder != null ? fmtVndFull(s.costPerOrder) : "—"}</div>
       </div>
       <div className={box}>
-        <div className="text-[11px] text-[var(--text-faint)]">GMV từ Ads</div>
+        <div className="text-[11px] text-[var(--text-faint)]">{METRIC.gmv} (file Ads)</div>
         <div className="text-base font-black text-[var(--text)]">{fmtVndShort(s.gmv)}</div>
       </div>
     </div>
@@ -174,8 +175,8 @@ export function ShopeeAdsPanel({ brandId, brandName, month, canManage, isPublish
             <FileSpreadsheet className="w-4 h-4 text-emerald-500" /> {preview.fileName}
           </p>
           <p className="text-xs text-[var(--text-muted)]">
-            Tháng <b className="text-[var(--text)]">{fmtMonth(preview.parsed.periodStart!.slice(0, 7))}</b> · {previewStats.campaigns.length} chiến dịch · chi phí{" "}
-            <b className="text-[var(--text)]">{fmtVndFull(previewStats.expense)}</b> · GMV từ Ads <b className="text-[var(--text)]">{fmtVndFull(previewStats.gmv)}</b> · ROAS{" "}
+            Tháng <b className="text-[var(--text)]">{fmtMonth(preview.parsed.periodStart!.slice(0, 7))}</b> · {previewStats.campaigns.length} chiến dịch · {METRIC.expense}{" "}
+            <b className="text-[var(--text)]">{fmtVndFull(previewStats.expense)}</b> · {METRIC.gmv} <b className="text-[var(--text)]">{fmtVndFull(previewStats.gmv)}</b> · {METRIC.roas}{" "}
             {previewStats.roas != null ? `${fmtFixed(previewStats.roas, 2)}x` : "—"}
           </p>
           <p className="text-[11px] text-amber-300">
@@ -216,33 +217,37 @@ export function ShopeeAdsPanel({ brandId, brandName, month, canManage, isPublish
             </p>
           )}
           <StatsGrid s={stats} />
-          {stats.campaigns.length > 1 && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs min-w-[560px]">
-                <thead>
-                  <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)]">
-                    <th className="py-2 px-2">Chiến dịch</th>
-                    <th className="py-2 px-2 text-right">Chi phí</th>
-                    <th className="py-2 px-2 text-right">Đơn</th>
-                    <th className="py-2 px-2 text-right">GMV</th>
-                    <th className="py-2 px-2 text-right">ROAS</th>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs min-w-[720px]">
+              <thead>
+                <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)]">
+                  <th className="py-2 px-2">Campaign Name</th>
+                  <th className="py-2 px-2 text-right">{METRIC.budget}</th>
+                  <th className="py-2 px-2 text-right">{METRIC.views}</th>
+                  <th className="py-2 px-2 text-right">{METRIC.orders}</th>
+                  <th className="py-2 px-2 text-right">{METRIC.conversionRate}</th>
+                  <th className="py-2 px-2 text-right">{METRIC.gmv}</th>
+                  <th className="py-2 px-2 text-right">{METRIC.expense}</th>
+                  <th className="py-2 px-2 text-right">{METRIC.roas}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stats.campaigns.map((c) => (
+                  <tr key={c.id || c.name} className="border-b border-[var(--border-muted)]">
+                    <td className="py-1.5 px-2 font-semibold">{c.name}</td>
+                    <td className="py-1.5 px-2 text-right">{fmtVndFull(c.budget)}</td>
+                    <td className="py-1.5 px-2 text-right">{fmtVndFull(c.views)}</td>
+                    <td className="py-1.5 px-2 text-right">{fmtVndFull(c.orders)}</td>
+                    <td className="py-1.5 px-2 text-right">{fmtFixed(c.conversionPct, 2)}%</td>
+                    <td className="py-1.5 px-2 text-right">{fmtVndFull(c.gmv)}</td>
+                    <td className="py-1.5 px-2 text-right">{fmtVndFull(c.expense)}</td>
+                    <td className="py-1.5 px-2 text-right">{c.roas != null ? `${fmtFixed(c.roas, 1)}x` : "—"}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {stats.campaigns.map((c) => (
-                    <tr key={c.id || c.name} className="border-b border-[var(--border-muted)]">
-                      <td className="py-1.5 px-2 font-semibold">{c.name}</td>
-                      <td className="py-1.5 px-2 text-right">{fmtVndFull(c.expense)}</td>
-                      <td className="py-1.5 px-2 text-right">{fmtVndFull(c.orders)}</td>
-                      <td className="py-1.5 px-2 text-right">{fmtVndFull(c.gmv)}</td>
-                      <td className="py-1.5 px-2 text-right">{c.roas != null ? `${fmtFixed(c.roas, 1)}x` : "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          <p className="text-[11px] text-[var(--text-faint)]">GMV từ Ads là số Shopee quy cho quảng cáo (trước huỷ/hoàn) — một phần của GMV live, không cộng thêm vào.</p>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-[11px] text-[var(--text-faint)]">GMV trong file Ads là số Shopee quy cho quảng cáo (trước huỷ/hoàn) — một phần của GMV live, không cộng thêm vào.</p>
         </>
       )}
     </div>

@@ -13,7 +13,9 @@ import type { ShopeeReportSnapshot, ShopeeSection } from "../../lib/report/shope
 
 // Report Tháng SHOPEE (migration 0139): đọc bản chụp đã chốt (lib/report/shopeeSnapshot.ts), cùng skin đen-vàng và cùng bộ
 // khung với report TikTok. 6 phần theo deck report tháng của Franklin: kết quả → xu hướng ngày → phễu & nguồn traffic →
-// lịch live → host → sản phẩm, cuối là "Cách tính và điểm cần xác nhận". GMV Shopee = doanh số ĐẶT (user chốt 06/10).
+// lịch live → host → sản phẩm, cuối là "Cách tính và điểm cần xác nhận". GMV Shopee = Sales(Placed Order) (user chốt 06/10).
+// TÊN CHỈ SỐ (user chốt 07/10): đúng tên cột file Shopee (Viewers, Views, ATC, ABS, GPM, Sales (Confirmed Order)…) — qua METRIC
+// trong lib/metricGlossary.ts, không tự dịch/đặt tên; tiêu đề phần và câu giải thích vẫn tiếng Việt.
 
 const SECTION_LABEL: Record<ShopeeSection, string> = {
   summary: "Kết quả",
@@ -29,6 +31,9 @@ const pct = (v: number | null | undefined, d = 1) => (v == null ? "—" : `${fmt
 const change = (cur: number | null | undefined, prev: number | null | undefined): number | null =>
   cur != null && prev != null && prev > 0 ? (cur / prev - 1) * 100 : null;
 const hoursLabel = (h: number) => `${h.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h`;
+const durLabel = (sec: number) => (sec >= 60 ? `${Math.floor(sec / 60)}m${String(Math.round(sec % 60)).padStart(2, "0")}s` : `${Math.round(sec)}s`);
+/** ABS = Sales ÷ Orders; bản chụp cũ (bản 2) chưa lưu `abs` thì tính lại từ hai số đã có. */
+const absOf = (x: { gmv: number; orders: number; abs?: number | null }): number | null => x.abs ?? (x.orders > 0 ? x.gmv / x.orders : null);
 
 const TD = "py-2 px-3 text-right font-mono";
 const TD1 = "py-2 px-3 font-semibold";
@@ -67,17 +72,17 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
     <div className="space-y-8 rounded-2xl p-4 sm:p-6" style={{ background: PAL.bg }} aria-label={`Report Shopee tháng ${Number(monthM)}/${monthY} ${brandName}`}>
       {/* 1 · Kết quả */}
       <section className="space-y-4">
-        <SectionHead no="1" title={SECTION_LABEL.summary} sub={`Shopee Live · 01–${h.lastDay ? dm(h.lastDay) : "…"}/${monthY} · GMV = doanh số đặt`} />
+        <SectionHead no="1" title={SECTION_LABEL.summary} sub={`Shopee Live · 01–${h.lastDay ? dm(h.lastDay) : "…"}/${monthY} · GMV = Sales(Placed Order)`} />
         {insight("summary")}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <KpiTile label="GMV" value={fmtVndShort(h.gmv)} change={change(h.gmv, p?.gmv)} note={`Đặt ${fmtVndFull(h.gmv)}`} />
-          <KpiTile label="Thực nhận (đã xác nhận)" value={fmtVndShort(h.confirmed)} change={change(h.confirmed, p?.confirmed)} note={cancelPct != null ? `Huỷ ${pct(cancelPct)} giá trị` : "Chưa có doanh số xác nhận"} />
-          <KpiTile label="Đơn hàng" value={fmtInt(h.orders)} change={change(h.orders, p?.orders)} note={`${fmtInt(h.ordersConfirmed)} đơn xác nhận`} />
-          <KpiTile label={METRIC.aov} value={h.aov != null ? fmtVndShort(h.aov) : "—"} change={change(h.aov, p?.aov)} note="GMV ÷ đơn đặt" />
+          <KpiTile label={METRIC.gmv} value={fmtVndShort(h.gmv)} change={change(h.gmv, p?.gmv)} note={`Sales(Placed Order) ${fmtVndFull(h.gmv)}`} />
+          <KpiTile label={METRIC.salesConfirmed} value={fmtVndShort(h.confirmed)} change={change(h.confirmed, p?.confirmed)} note={cancelPct != null ? `Thực nhận · huỷ ${pct(cancelPct)} giá trị` : "Chưa có Sales(Confirmed Order)"} />
+          <KpiTile label={METRIC.orders} value={fmtInt(h.orders)} change={change(h.orders, p?.orders)} note={`${fmtInt(h.ordersConfirmed)} ${METRIC.ordersConfirmed}`} />
+          <KpiTile label={METRIC.abs} value={absOf(h) != null ? fmtVndShort(absOf(h)!) : "—"} change={change(absOf(h), p ? absOf(p) : null)} note="Sales ÷ Orders (Placed Order)" />
           <KpiTile label={METRIC.liveHours} value={hoursLabel(h.liveHours)} change={change(h.liveHours, p?.liveHours)} note={`${fmtInt(h.liveSessions)} phiên live`} />
-          <KpiTile label={METRIC.gmvPerHour} value={h.gmvPerHour != null ? fmtVndShort(h.gmvPerHour) : "—"} change={change(h.gmvPerHour, p?.gmvPerHour)} note="GMV ÷ giờ live (Live List)" />
-          <KpiTile label="Người xem" value={fmtInt(h.viewers)} change={change(h.viewers, p?.viewers)} note={`${fmtInt(h.views)} lượt xem`} />
-          <KpiTile label="Món bán ra" value={fmtInt(h.items)} change={change(h.items, p?.items)} />
+          <KpiTile label={METRIC.gmvPerHour} value={h.gmvPerHour != null ? fmtVndShort(h.gmvPerHour) : "—"} change={change(h.gmvPerHour, p?.gmvPerHour)} note="Tự tính: GMV ÷ giờ live (Live List)" />
+          <KpiTile label={METRIC.viewers} value={fmtInt(h.viewers)} change={change(h.viewers, p?.viewers)} note={`${fmtInt(h.views)} ${METRIC.views}`} />
+          <KpiTile label={METRIC.itemsSoldShopee} value={fmtInt(h.items)} change={change(h.items, p?.items)} />
         </div>
         {p && (
           <p className="text-[11px]" style={{ color: PAL.muted }}>
@@ -85,23 +90,23 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
           </p>
         )}
         {(s.ads || s.promo) && (
-          <Panel title="Ads và khuyến mãi" icon={<Megaphone className="w-4 h-4" />} sub="Ads: file Shopee Live Ads (cả tháng) · Xu, voucher: file overview">
+          <Panel title="Ads và khuyến mãi" icon={<Megaphone className="w-4 h-4" />} sub="Expense, ROAS: file Shopee Live Ads (cả tháng) · Coins, voucher: file overview">
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               {s.ads ? (
                 <>
-                  <KpiTile label="Chi phí Ads" value={fmtVndShort(s.ads.expense)} note={`${s.ads.campaigns} chiến dịch`} />
-                  <KpiTile label="ROAS" value={s.ads.roas != null ? `${fmtFixed(s.ads.roas, 1)}x` : "—"} note={`GMV từ Ads ${fmtVndShort(s.ads.gmv)}${h.gmv > 0 ? ` (${pct((s.ads.gmv / h.gmv) * 100)} GMV live)` : ""}`} />
-                  <KpiTile label="Chi phí / đơn Ads" value={s.ads.costPerOrder != null ? fmtVndShort(s.ads.costPerOrder) : "—"} note={`${fmtInt(s.ads.orders)} đơn từ Ads`} />
+                  <KpiTile label={METRIC.expense} value={fmtVndShort(s.ads.expense)} note={`${s.ads.campaigns} chiến dịch Live Ads`} />
+                  <KpiTile label={METRIC.roas} value={s.ads.roas != null ? `${fmtFixed(s.ads.roas, 1)}x` : "—"} note={`GMV trong file Ads ${fmtVndShort(s.ads.gmv)}${h.gmv > 0 ? ` (${pct((s.ads.gmv / h.gmv) * 100)} GMV live)` : ""}`} />
+                  <KpiTile label={`${METRIC.expense}/${METRIC.orders}`} value={s.ads.costPerOrder != null ? fmtVndShort(s.ads.costPerOrder) : "—"} note={`${fmtInt(s.ads.orders)} ${METRIC.orders} trong file Ads`} />
                 </>
               ) : (
-                <KpiTile label="Chi phí Ads" value="—" note="Chưa có file Ads Shopee" />
+                <KpiTile label={METRIC.expense} value="—" note="Chưa có file Ads Shopee" />
               )}
               {s.promo && (
-                <KpiTile
-                  label="Xu khách nhận"
-                  value={fmtInt(s.promo.coins)}
-                  note={`≈ ${fmtVndShort(s.promo.coins)}${h.gmv > 0 && s.promo.coins > 0 ? ` (${pct((s.promo.coins / h.gmv) * 100, 2)} GMV)` : ""} · ${fmtInt(s.promo.vouchers)} voucher shop, ${fmtInt(s.promo.liveVouchers)} voucher live`}
-                />
+                <>
+                  <KpiTile label={METRIC.coinsClaimed} value={fmtInt(s.promo.coins)} note={`≈ ${fmtVndShort(s.promo.coins)}${h.gmv > 0 && s.promo.coins > 0 ? ` (${pct((s.promo.coins / h.gmv) * 100, 2)} GMV)` : ""}`} />
+                  <KpiTile label={METRIC.shopVoucherClaimed} value={fmtInt(s.promo.vouchers)} />
+                  <KpiTile label={METRIC.specialLiveVoucherClaimed} value={fmtInt(s.promo.liveVouchers)} />
+                </>
               )}
             </div>
           </Panel>
@@ -110,12 +115,12 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
 
       {/* 2 · Xu hướng theo ngày */}
       <section className="space-y-4">
-        <SectionHead no="2" title={SECTION_LABEL.daily} sub="Doanh số đặt từng ngày (file theo ngày)" />
+        <SectionHead no="2" title={SECTION_LABEL.daily} sub="Sales(Placed Order) từng ngày (file theo ngày)" />
         {insight("daily")}
         {s.days.length === 0 ? (
           <EmptyNote text="Chưa có file theo ngày (export-sc…csv) của tháng này — up ở Dữ Liệu Gốc." />
         ) : (
-          <Panel title="GMV theo ngày" icon={<BarChart3 className="w-4 h-4" />} sub="Cột sáng = ngày camp (D-Day, Mid-Month, Pay Day)">
+          <Panel title={`${METRIC.gmv} theo ngày`} icon={<BarChart3 className="w-4 h-4" />} sub="Cột sáng = ngày camp (D-Day, Mid-Month, Pay Day)">
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
@@ -140,7 +145,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
         )}
         {s.days.length > 0 && (
           <Panel title="Ngày cao nhất" icon={<ShoppingBag className="w-4 h-4" />} sub={`Top 5 trên ${s.days.length} ngày có số`}>
-            <ReportTable head={["Ngày", "GMV", "Thực nhận", "Đơn", "Người xem", "% GMV tháng"]}>
+            <ReportTable head={["Ngày", METRIC.gmv, METRIC.salesConfirmed, METRIC.orders, "Total Viewers", "% GMV tháng"]}>
               {[...s.days]
                 .sort((a, b) => b.salesPlaced - a.salesPlaced)
                 .slice(0, 5)
@@ -171,17 +176,29 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
         ) : (
           <>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <KpiTile label="Người xem" value={fmtInt(o.viewers)} note={`${fmtInt(o.views)} lượt xem`} />
-              <KpiTile label="Tương tác" value={fmtInt(o.engaged)} note={`${pct(o.viewers > 0 ? (o.engaged / o.viewers) * 100 : null)} người xem`} />
-              <KpiTile label="Hiển thị sản phẩm" value={fmtInt(o.productImpressions)} />
-              <KpiTile label="Click sản phẩm" value={fmtInt(o.productClicks)} note={`CTR ${pct(o.ctrPct, 2)}`} />
-              <KpiTile label="Thêm vào giỏ" value={fmtInt(o.atc)} />
-              <KpiTile label="Đơn đặt" value={fmtInt(o.ordersPlaced)} note={`Tỷ lệ đơn/click ${pct(o.orderRatePlacedPct, 2)}`} />
-              {o.buyersPlaced > 0 && <KpiTile label="Người mua" value={fmtInt(o.buyersPlaced)} note={`${fmtInt(o.buyersConfirmed)} xác nhận`} />}
-              <KpiTile label="Khách mới" value={pct(o.salesNewPlaced + o.salesOldPlaced > 0 ? (o.salesNewPlaced / (o.salesNewPlaced + o.salesOldPlaced)) * 100 : null, 0)} note="% doanh số từ khách mới" />
+              <KpiTile label={METRIC.viewers} value={fmtInt(o.viewers)} note={`${fmtInt(o.views)} ${METRIC.views}`} />
+              <KpiTile label={METRIC.engagedViewers} value={fmtInt(o.engaged)} note={`${pct(o.viewers > 0 ? (o.engaged / o.viewers) * 100 : null)} ${METRIC.viewers}`} />
+              <KpiTile label="Product Impressions" value={fmtInt(o.productImpressions)} />
+              <KpiTile label="Product Clicks" value={fmtInt(o.productClicks)} note={`${METRIC.ctr} ${pct(o.ctrPct, 2)} (Conversion Funnel)`} />
+              <KpiTile label={METRIC.atc} value={fmtInt(o.atc)} />
+              <KpiTile label={`${METRIC.orders} (Placed Order)`} value={fmtInt(o.ordersPlaced)} note={`${METRIC.orderRate} ${pct(o.orderRatePlacedPct, 2)}`} />
+              {o.buyersPlaced > 0 && <KpiTile label={METRIC.buyers} value={fmtInt(o.buyersPlaced)} note={`${fmtInt(o.buyersConfirmed)} Buyers(Confirmed Order)`} />}
+              <KpiTile label={METRIC.salesNewCustomers} value={pct(o.salesNewPlaced + o.salesOldPlaced > 0 ? (o.salesNewPlaced / (o.salesNewPlaced + o.salesOldPlaced)) * 100 : null, 0)} note="% Sales(Placed Order)" />
             </div>
-            <Panel title="Nguồn traffic của live" icon={<Database className="w-4 h-4" />} sub="Doanh số và lượt xem theo nguồn dẫn vào phòng live">
-              <ReportTable head={["Nguồn", "% doanh số", "Doanh số đặt", "Lượt xem", "Người xem", "Tương tác"]}>
+            <Panel title="Engagement" icon={<Users className="w-4 h-4" />} sub="Cả tháng, từ file overview của Shopee">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <KpiTile label={METRIC.gpm} value={o.gpmPlaced > 0 ? fmtVndShort(o.gpmPlaced) : "—"} note="Sales trên 1.000 Views" />
+                <KpiTile label={METRIC.salesPerBuyer} value={o.salesPerBuyerPlaced > 0 ? fmtVndShort(o.salesPerBuyerPlaced) : "—"} />
+                <KpiTile label={METRIC.avgViewingDuration} value={o.avgViewSec > 0 ? durLabel(o.avgViewSec) : "—"} />
+                <KpiTile label={METRIC.pcu} value={fmtInt(o.pcu)} />
+                <KpiTile label={METRIC.totalLikes} value={fmtInt(o.likes)} />
+                <KpiTile label={METRIC.totalShares} value={fmtInt(o.shares)} />
+                <KpiTile label={METRIC.totalComments} value={fmtInt(o.comments)} />
+                <KpiTile label={METRIC.liveNewFollowers} value={fmtInt(o.newFollowers)} />
+              </div>
+            </Panel>
+            <Panel title="Nguồn traffic của live" icon={<Database className="w-4 h-4" />} sub="Sales và lượt xem theo Traffic Source dẫn vào phòng live">
+              <ReportTable head={["Traffic Source", METRIC.salesRatio, "Sales (Placed Order)", METRIC.liveViews, METRIC.liveViewers, METRIC.engagedViewers]}>
                 {[...o.sources]
                   .sort((a, b) => b.salesPlaced - a.salesPlaced)
                   .map((x) => (
@@ -209,13 +226,13 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
         ) : (
           <>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <KpiTile label="Giờ live thực tế" value={hoursLabel(h.liveHours)} note={s.plan.hours > 0 ? `Lịch ca trong app ${hoursLabel(s.plan.hours)}` : "Chưa có ca Shopee trong app"} />
+              <KpiTile label={`${METRIC.liveHours} thực tế`} value={hoursLabel(h.liveHours)} note={s.plan.hours > 0 ? `Lịch ca trong app ${hoursLabel(s.plan.hours)}` : "Chưa có ca Shopee trong app"} />
               <KpiTile label="Số phiên" value={fmtInt(h.liveSessions)} note={`${s.plan.sessions} ca trong app`} />
-              <KpiTile label="GMV/phiên" value={h.liveSessions > 0 ? fmtVndShort(h.gmv / h.liveSessions) : "—"} />
+              <KpiTile label="GMV/phiên" note="Tự tính: GMV ÷ số phiên" value={h.liveSessions > 0 ? fmtVndShort(h.gmv / h.liveSessions) : "—"} />
               <KpiTile label={METRIC.gmvPerHour} value={h.gmvPerHour != null ? fmtVndShort(h.gmvPerHour) : "—"} />
             </div>
             <Panel title="Theo khung giờ" icon={<Clock className="w-4 h-4" />}>
-              <ReportTable head={["Khung giờ", "Phiên", "Giờ live", "GMV", "GMV/giờ", "Người xem TB/phiên"]}>
+              <ReportTable head={["Khung giờ", "Phiên", "Giờ live", METRIC.gmv, METRIC.gmvPerHour, `${METRIC.viewers} TB/phiên`]}>
                 {s.slots.map((x) => (
                   <tr key={x.key} style={{ borderBottom: `1px solid ${PAL.line}`, color: PAL.cream }}>
                     <td className={TD1}>{x.label}</td>
@@ -229,7 +246,7 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
               </ReportTable>
             </Panel>
             <Panel title="Theo loại ngày" icon={<Clock className="w-4 h-4" />} sub="Lịch camp cố định: D-Day, Mid-Month 13–15, Pay Day 23–25">
-              <ReportTable head={["Loại ngày", "Ngày", "Phiên", "Giờ live", "GMV", "% GMV", "GMV/giờ"]}>
+              <ReportTable head={["Loại ngày", "Ngày", "Phiên", "Giờ live", METRIC.gmv, `% ${METRIC.gmv}`, METRIC.gmvPerHour]}>
                 {s.camps.map((x) => (
                   <tr key={x.key} style={{ borderBottom: `1px solid ${PAL.line}`, color: PAL.cream }}>
                     <td className={TD1}>{x.label}</td>
@@ -255,11 +272,11 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
           <EmptyNote text="Chưa có ca Shopee đã diễn ra và đã gán host trong tháng này." />
         ) : (
           <Panel
-            title="Xếp hạng GMV/giờ"
+            title={`Xếp hạng ${METRIC.gmvPerHour}`}
             icon={<Users className="w-4 h-4" />}
             sub={s.quality.manual > 0 ? `${s.quality.manual}/${s.quality.total} ca còn là số tạm (chưa đối soát bằng Live List)` : "Tất cả ca đã đối soát"}
           >
-            <ReportTable head={["Host", "Ca", "Giờ", "GMV", "GMV/giờ"]}>
+            <ReportTable head={["Host", "Ca", "Giờ", METRIC.gmv, METRIC.gmvPerHour]}>
               {s.hosts.map((x) => (
                 <tr key={x.key} style={{ borderBottom: `1px solid ${PAL.line}`, color: PAL.cream }}>
                   <td className={TD1}>{x.name}</td>
@@ -281,13 +298,13 @@ export const ShopeeMonthlyReportTabs: React.FC<Props> = ({ brandId, brandName, m
 
       {/* 6 · Sản phẩm */}
       <section className="space-y-4">
-        <SectionHead no="6" title={SECTION_LABEL.products} sub="Product List của Shopee Live — doanh số bán trong live" />
+        <SectionHead no="6" title={SECTION_LABEL.products} sub="Product List của Shopee Live — Sales(Placed Order) trong live" />
         {insight("products")}
         {s.products.count === 0 ? (
           <EmptyNote text="Chưa có file Product List (…live_product_list…xlsx) của tháng này — up ở Dữ Liệu Gốc." />
         ) : (
-          <Panel title="Sản phẩm bán chạy" icon={<Package className="w-4 h-4" />} sub={`${s.products.withSales}/${s.products.count} sản phẩm có doanh số · ba sản phẩm đầu ${pct(s.products.top3Share != null ? s.products.top3Share * 100 : null)}`}>
-            <ReportTable head={["#", "Sản phẩm", "GMV", "% live", "Đơn", "Click", "Thêm giỏ"]}>
+          <Panel title="Sản phẩm bán chạy" icon={<Package className="w-4 h-4" />} sub={`${s.products.withSales}/${s.products.count} sản phẩm có Sales · ba sản phẩm đầu ${pct(s.products.top3Share != null ? s.products.top3Share * 100 : null)}`}>
+            <ReportTable head={["#", "Product(s)", METRIC.gmv, "% live", METRIC.orders, "Product Clicks", METRIC.atc]}>
               {(showAllProducts ? s.products.top : s.products.top.slice(0, 10)).map((x, i) => (
                 <tr key={`${x.rank}-${i}`} style={{ borderBottom: `1px solid ${PAL.line}`, color: PAL.cream }}>
                   <td className={TD1}>{i + 1}</td>
