@@ -307,6 +307,8 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
         "LIVE CTR": e.ctr ?? "",
         "CTOR": e.ctor ?? "",
         "Ads cost": e.adsCost ?? "",
+        "Budget Ads": planBudget(e) ?? "",
+        "Ads / Budget %": e.adsCost != null && planBudget(e) ? Math.round((e.adsCost / planBudget(e)!) * 100) : "",
         "ROAS": e.directGmv && e.adsCost ? Math.round((e.directGmv / e.adsCost) * 10) / 10 : "",
         "Orders": e.orders ?? "",
         "Items sold": e.itemsSold ?? "",
@@ -1024,6 +1026,13 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
               {metricRow("CTOR", (e, label) => numInput(e, label, "ctor", (n) => fmtPct(n)))}
               {metricRow("Ads cost", (e, label) => numInput(e, label, "adsCost", fmtInt))}
               {metricRow("Budget Ads", (e) => <span>{planBudget(e) != null ? fmtInt(planBudget(e)) : "—"}</span>)}
+              {metricRow("Ads / Budget", (e) => {
+                const budget = planBudget(e);
+                if (e.adsCost == null || !budget) return <span>—</span>;
+                const pct = (e.adsCost / budget) * 100;
+                // Chi vượt ngân sách kế hoạch thì đỏ.
+                return <span className={pct > 100 ? "text-red-600 font-semibold" : ""}>{fmtPct(pct, 0)}</span>;
+              })}
               {metricRow("ROAS", (e) => <span>{e.directGmv && e.adsCost ? fmtNum(e.directGmv / e.adsCost, 1) : "—"}</span>)}
               {metricRow("Orders", (e, label) => numInput(e, label, "orders", fmtInt))}
               {metricRow("Items sold", (e, label) => numInput(e, label, "itemsSold", fmtInt))}

@@ -7,6 +7,7 @@ import { profileOf } from "./platforms/profiles";
 import { platformsOfBrand } from "./channels";
 import { brandPriceSet } from "./brandPricing";
 import { findPersonClashes } from "./scheduling/conflicts";
+import { parseDayLabel } from "./affiliate/plan";
 
 // "Việc cần làm" — danh sách TỰ SINH từ dữ liệu cho màn đầu tiên sau khi đăng nhập (audit người mới 2026-10-04,
 // Nhóm 4/5). Người cũ biết thứ tự việc (hợp đồng → giá → kế hoạch → chốt người → up số → report); người mới mở app
@@ -47,6 +48,15 @@ export interface TodoInput {
   talents: Talent[];
   /** CEO/admin: thấy việc về tiền (rate talent). */
   canSeeMoney: boolean;
+  /**
+   * Kế hoạch Affiliate các tháng trước/này/sau (0155) — tối giản. Thiếu (chưa nạp được / DB chưa chạy 0155) ⇒ bỏ qua mọi việc
+   * Affiliate chứ không nhắc nhầm.
+   */
+  affiliate?: {
+    rows: { brandId: string; periodMonth: string; status: "planned" | "done" | "cancelled"; liveDateLabel?: string }[];
+    /** `${brandId}|YYYY-MM` của tháng đã Chốt gửi brand. */
+    published: Set<string>;
+  };
 }
 
 const LEVEL_ORDER: Record<TodoLevel, number> = { high: 0, medium: 1, low: 2 };
@@ -152,6 +162,46 @@ export function buildTodos(input: TodoInput): Todo[] {
       }
     }
 
+
+    // 6b. Affiliate (chỉ sàn có tab này — hồ sơ Shopee ẩn `brand_affiliate`). Ba việc, đều dẫn tới tab Affiliate của brand.
+    if (input.affiliate && platforms.some((p) => !profileOf(p).hiddenBrandTabs.includes("brand_affiliate"))) {
+      const rows = input.affiliate.rows.filter((r) => r.brandId === b.id);
+      const monthOf = (r: { periodMonth: string }) => r.periodMonth.slice(0, 7);
+
+      // Phiên kế hoạch đã qua ngày (≥ 2 ngày — file Live Analysis về trễ nên sáng hôm sau chưa nhắc) mà chưa có số.
+      const grace = addDays(today, -1);
+      const late = rows
+        .filter((r) => r.status === "planned" && (monthOf(r) === month || monthOf(r) === prevMonth))
+        .map((r) => parseDayLabel(r.liveDateLabel))
+        .filter((d): d is string => !!d && d < grace);
+      if (late.length > 0) {
+        const oldest = late.reduce((a, d) => (d < a ? d : a));
+        out.push({
+          id: `aff-late-${b.id}`,
+          level: daysBetween(oldest, today) > 3 ? "high" : "medium",
+          title: `${late.length} phiên Affiliate của ${b.name} đã qua ngày chưa có số`,
+          detail: "Up file Live Analysis (xem \"linked accounts\") ở Dữ Liệu Gốc, rồi Nạp Từ Dữ Liệu Gốc ở tab Affiliate. Phiên không diễn ra thì đánh dấu Huỷ / dời.",
+          tab: "brand_affiliate",
+          brandId: b.id,
+          action: "Nạp số Affiliate"
+        });
+      }
+
+      // Kế hoạch tháng sau: từ ngày 15, chỉ nhắc brand ĐÃ dùng Affiliate (có dòng ở tháng trước/này/sau) — brand không chạy
+      // affiliate thì không bị nhắc.
+      const usesAffiliate = rows.some((r) => [prevMonth, month, nextMonth].includes(monthOf(r)));
+      const nextHas = rows.some((r) => monthOf(r) === nextMonth && r.status !== "cancelled");
+      if (Number(today.slice(8, 10)) >= 15 && usesAffiliate && !nextHas) {
+        out.push({ id: `aff-plan-next-${b.id}`, level: "medium", title: `${b.name} chưa lập kế hoạch Affiliate tháng ${fmtMonth(nextMonth)}`, detail: "Dán kế hoạch từ Google Sheet ở tab Affiliate → Kế hoạch.", tab: "brand_affiliate", brandId: b.id, action: "Lập kế hoạch Affiliate" });
+      }
+
+      // Có kế hoạch nhưng chưa Chốt: brand chỉ thấy tháng đã chốt.
+      for (const m of [month, nextMonth]) {
+        if (rows.some((r) => monthOf(r) === m && r.status === "planned") && !input.affiliate.published.has(`${b.id}|${m}`)) {
+          out.push({ id: `aff-unpublished-${b.id}-${m}`, level: "low", title: `Kế hoạch Affiliate tháng ${fmtMonth(m)} của ${b.name} chưa chốt gửi brand`, detail: "Brand chỉ thấy kế hoạch Affiliate sau khi bạn bấm Chốt, gửi brand ở tab Affiliate.", tab: "brand_affiliate", brandId: b.id, action: "Mở tab Affiliate" });
+        }
+      }
+    }
   }
 
   // 7. Ca đã chạy chưa gán host, ở tháng CHƯA phát hành report — không vào xếp hạng host, và phát hành report thiếu

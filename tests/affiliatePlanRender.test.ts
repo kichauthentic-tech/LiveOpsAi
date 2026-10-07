@@ -41,9 +41,10 @@ describe("AffiliatePlanTable", () => {
     expect(html).toContain("87.500.000");
     expect(html).toContain("$26.616");
   });
-  test("% KPI cả shop chỉ hiện khi có KPI", () => {
+  test("% KPI cả shop: có KPI thì hiện %; ops chưa nhập thì nhắc; chỉ đọc mà chưa có KPI thì bỏ thẻ", () => {
     expect(render(true, ROWS, 5_000_000_000)).toContain("16,0%");
-    expect(render(true)).toContain("Chưa nhập KPI cả shop");
+    expect(render(false)).toContain("Chưa nhập KPI cả shop");
+    expect(render(true)).not.toContain("KPI cả shop");
   });
   test("hai cột thực tế chỉ hiện khi có phiên đã live", () => {
     expect(render(true)).not.toContain("Direct GMV");

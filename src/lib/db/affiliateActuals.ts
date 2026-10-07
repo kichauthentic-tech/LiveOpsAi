@@ -130,3 +130,41 @@ export async function replaceAffiliateActuals(brandId: string, periodMonth: stri
   }
   return inserted.sort((a, b) => a.sort_order - b.sort_order).map(fromDb);
 }
+
+/** Dòng tối giản cho khối "Việc cần làm" (ops): không kéo số liệu, chỉ đủ biết phiên nào chưa có số / tháng nào chưa chốt. */
+export interface AffiliateTodoRow {
+  brandId: string;
+  periodMonth: string; // "YYYY-MM-01"
+  status: AffiliateEntryStatus;
+  liveDateLabel?: string;
+}
+
+export interface AffiliateTodoData {
+  rows: AffiliateTodoRow[];
+  /** `${brandId}|YYYY-MM` của tháng ops đã Chốt gửi brand. */
+  published: Set<string>;
+}
+
+/** months: ["YYYY-MM", …]. Ném lỗi khi DB chưa chạy 0155 (thiếu cột status / bảng tháng) — nơi gọi nuốt để khối việc vẫn hiện. */
+export async function fetchAffiliateTodoData(months: string[]): Promise<AffiliateTodoData> {
+  const periods = months.map((m) => `${m}-01`);
+  const [rowsRes, monthsRes] = await Promise.all([
+    supabase.from("brand_affiliate_actuals").select("brand_id, period_month, status, live_date_label").in("period_month", periods),
+    supabase.from("brand_affiliate_plan_months").select("brand_id, period_month, published_at").in("period_month", periods)
+  ]);
+  if (rowsRes.error) throw rowsRes.error;
+  if (monthsRes.error) throw monthsRes.error;
+  return {
+    rows: ((rowsRes.data as { brand_id: string; period_month: string; status: AffiliateEntryStatus | null; live_date_label: string | null }[]) ?? []).map((r) => ({
+      brandId: r.brand_id,
+      periodMonth: r.period_month,
+      status: r.status ?? "done",
+      liveDateLabel: r.live_date_label ?? undefined
+    })),
+    published: new Set(
+      ((monthsRes.data as { brand_id: string; period_month: string; published_at: string | null }[]) ?? [])
+        .filter((m) => m.published_at)
+        .map((m) => `${m.brand_id}|${m.period_month.slice(0, 7)}`)
+    )
+  };
+}

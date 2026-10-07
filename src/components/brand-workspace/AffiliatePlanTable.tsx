@@ -134,15 +134,17 @@ export function AffiliatePlanTable({ rows, month, fxRate, readOnly, campOverride
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 [&>*]:min-w-0">
         {kpi("Phiên kế hoạch", String(totals.sessions))}
         {kpi("Tổng target", fmtVndShort(totals.target), totals.hours > 0 ? `${fmtFixed(totals.hours, 1)} giờ live` : undefined)}
         {kpi("GMV/giờ kế hoạch", totals.hours > 0 ? fmtVndShort(totals.target / totals.hours) : "—")}
-        {kpi(
-          "Chiếm KPI cả shop",
-          shopTarget && shopTarget > 0 ? `${fmtFixed((totals.target / shopTarget) * 100, 1)}%` : "—",
-          shopTarget && shopTarget > 0 ? `KPI ${fmtVndShort(shopTarget)} (Kế Hoạch Tháng)` : "Chưa nhập KPI cả shop ở Kế Hoạch Tháng"
-        )}
+        {/* Chỉ đọc mà chưa có KPI thì bỏ thẻ này (nói "chưa nhập" cho người không nhập được là vô ích); màn ops thì giữ để nhắc. */}
+        {(!readOnly || (shopTarget && shopTarget > 0)) &&
+          kpi(
+            "Chiếm KPI cả shop",
+            shopTarget && shopTarget > 0 ? `${fmtFixed((totals.target / shopTarget) * 100, 1)}%` : "—",
+            shopTarget && shopTarget > 0 ? `KPI ${fmtVndShort(shopTarget)} (Kế Hoạch Tháng)` : "Chưa nhập KPI cả shop ở Kế Hoạch Tháng"
+          )}
       </div>
 
       <div className="overflow-auto border border-[var(--border)] rounded-xl bg-[var(--surface-base)]">

@@ -4,6 +4,7 @@ import { Brand, BrandChannel, BrandMonthPlan, BrandMonthlyCommitment, BrandMonth
 import { buildTodos, Todo, TodoLevel } from "../lib/todoList";
 import { planStatusesRead } from "../lib/db/monthPlans";
 import { commitmentsRead } from "../lib/db/brandContracts";
+import { AffiliateTodoData, fetchAffiliateTodoData } from "../lib/db/affiliateActuals";
 import { todayVn } from "../lib/performance/brandCommitment";
 
 // Khối "Việc cần làm" ở đầu Bảng Vận Hành — màn đầu tiên của ops sau khi đăng nhập (audit người mới 2026-10-04).
@@ -32,12 +33,19 @@ function nextMonthOf(month: string): string {
   return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
 }
 
+function prevMonthOf(month: string): string {
+  const [y, m] = month.split("-").map(Number);
+  return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
+}
+
 export const TodoPanel: React.FC<Props> = ({ brands, channels, sessions, shiftSlots, rates, monthlyReports, talents, canSeeMoney, canOpenTab, onOpen }) => {
   const today = todayVn();
   const month = today.slice(0, 7);
   const [plansThisMonth, setPlansThisMonth] = useState<Map<string, BrandMonthPlan> | null>(null);
   const [plansNextMonth, setPlansNextMonth] = useState<Map<string, BrandMonthPlan> | null>(null);
   const [commitments, setCommitments] = useState<BrandMonthlyCommitment[] | null>(null);
+  // Kế hoạch Affiliate (0155): lỗi (DB chưa chạy 0155, mạng) ⇒ null = bỏ qua việc Affiliate chứ không chặn cả khối.
+  const [affiliate, setAffiliate] = useState<AffiliateTodoData | null | undefined>(undefined);
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
@@ -45,15 +53,16 @@ export const TodoPanel: React.FC<Props> = ({ brands, channels, sessions, shiftSl
     planStatusesRead.take(month).then((m) => alive && setPlansThisMonth(m)).catch(() => alive && setPlansThisMonth(new Map()));
     planStatusesRead.take(nextMonthOf(month)).then((m) => alive && setPlansNextMonth(m)).catch(() => alive && setPlansNextMonth(new Map()));
     commitmentsRead.take().then((c) => alive && setCommitments(c)).catch(() => alive && setCommitments([]));
+    fetchAffiliateTodoData([prevMonthOf(month), month, nextMonthOf(month)]).then((a) => alive && setAffiliate(a)).catch(() => alive && setAffiliate(null));
     return () => {
       alive = false;
     };
   }, [month]);
 
   const todos = useMemo(() => {
-    if (!plansThisMonth || !plansNextMonth || !commitments) return null;
-    return buildTodos({ today, brands, channels, sessions, shiftSlots, plansThisMonth, plansNextMonth, commitments, rates, monthlyReports, talents, canSeeMoney }).filter((t) => canOpenTab(t.tab));
-  }, [today, brands, channels, sessions, shiftSlots, plansThisMonth, plansNextMonth, commitments, rates, monthlyReports, talents, canSeeMoney, canOpenTab]);
+    if (!plansThisMonth || !plansNextMonth || !commitments || affiliate === undefined) return null;
+    return buildTodos({ today, brands, channels, sessions, shiftSlots, plansThisMonth, plansNextMonth, commitments, rates, monthlyReports, talents, canSeeMoney, affiliate: affiliate ?? undefined }).filter((t) => canOpenTab(t.tab));
+  }, [today, brands, channels, sessions, shiftSlots, plansThisMonth, plansNextMonth, commitments, rates, monthlyReports, talents, canSeeMoney, affiliate, canOpenTab]);
 
   if (todos === null) return null; // đang tải — không vẽ khung rỗng rồi nhảy
   const shown = expanded ? todos : todos.slice(0, COLLAPSED_COUNT);

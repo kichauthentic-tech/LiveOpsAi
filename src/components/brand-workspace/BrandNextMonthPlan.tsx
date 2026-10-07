@@ -10,6 +10,8 @@ import { fmtVndShort } from "../../lib/format";
 import { PageHeader } from "../common/PageHeader";
 import type { ReportPlatform } from "../../lib/reportPlatform";
 import { channelTitle } from "../../lib/reportPlatform";
+import { profileOf } from "../../lib/platforms/profiles";
+import { AffiliateNextMonthSection } from "./AffiliateNextMonthSection";
 
 // Kế hoạch tháng sau cho Brand Workspace — bản CHỈ ĐỌC + một nút "xác nhận đã xem" (Đợt C/2,
 // migration 0110). Khác hẳn "Kế Hoạch Tháng" bên Agency (MonthPlan.tsx): bên đó ops dựng lưới,
@@ -212,6 +214,9 @@ export const BrandNextMonthPlan: React.FC<BrandNextMonthPlanProps> = ({ brandId,
           )}
         </div>
       )}
+
+      {/* Sàn nào có tab Affiliate (hồ sơ sàn: hiddenBrandTabs) thì có khối này. Nguồn là kế hoạch ở tab Affiliate. */}
+      {!profileOf(platform).hiddenBrandTabs.includes("brand_affiliate") && <AffiliateNextMonthSection brandId={brandId} month={nextMonth} isOps={currentRole !== "brand"} shopTarget={plan?.shopTargetGmv} />}
     </div>
   );
 };
