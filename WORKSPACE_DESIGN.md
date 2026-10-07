@@ -13,6 +13,14 @@
 
 ## 1. Giai đoạn hiện tại (cập nhật 2026-10-07)
 
+- **07/10 (đêm): THIẾT KẾ LẠI TALENT POOL — danh sách + hồ sơ cạnh nhau (user duyệt mockup; CHƯA commit; tsc, vitest 650/650, audit:dead 0; đã xem trên app thật
+  nối DB thật ở 1440/1024/375px, 40 talent, 0 lỗi console, 0 tràn ngang).** `components/TalentMatcher.tsx`: bảng 11 cột + popup chi tiết → dải 4 số (Talent / Đã chạy ca /
+  Giờ host+trợ / Chưa gắn ca, tính trên TOÀN BỘ talent) + nút lọc vai trò có đếm + danh sách một dòng/người (avatar chữ cái, vai trò, ca·giờ host/trợ, thanh khối lượng so với
+  người chạy nhiều nhất, tổng ca) + hồ sơ bên phải (4 ô ca/giờ, thanh GMV từng sàn — không tổng gộp, GMV/giờ brand × sàn, rate card chỉ ceo/admin, sửa/xoá). Từ `xl` (1280px)
+  hồ sơ là cột dính; dưới `xl` bấm dòng mở hồ sơ thành tấm phủ màn hình (`sheetOpen`). Số cộng từ ca tính một lần (`allRows` useMemo). Bỏ khỏi UI: ô CTR TB gõ tay và cột SĐT/
+  Trạng thái riêng (SĐT + trạng thái ≠ Sẵn sàng nằm trong hồ sơ). Không đổi DB/API/quyền; modal Thêm/Sửa, mật khẩu một lần, khối AI gập lại giữ nguyên. Test layout của màn
+  này (`layoutConventions.test.ts` mục M6) đã viết lại cho bố cục mới; màu thanh GMV theo sàn qua `GMV_BAR: Record<ReportPlatform,…>` (không `=== "Shopee"`, `platformProfiles.test.ts` canh).
+
 - **07/10 (tối): THIẾT KẾ LẠI THẺ CA TRÊN MỌI LỊCH (user duyệt mockup + 3 quyết định; CHƯA commit; tsc, lint 0 lỗi, vitest 644/644, audit:dead 0, build; đã xem trên
   trang thử không đăng nhập ở 1440/1280, 4 theme, Agency tháng/tuần/ngày + Brand tháng/danh sách; CHƯA xem trên app thật có dữ liệu thật; Nhân sự ca chỉ qua tsc — cùng thẻ + PosterDayCell với Brand).**
   `SessionEventCard` viết lại: nền = màu brand pha loãng vào nền ô (color-mix, `.sc` ở index.css) + logo brand 22–24px; nền tảng = logo (`PlatformLogo`,

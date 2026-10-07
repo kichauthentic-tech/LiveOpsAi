@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Talent, Brand, UserRole, LiveSession } from "../types";
-import { Users, Sparkles, Award, Search, Plus, Edit3, Trash2, X, Phone, Loader2, AlertTriangle, KeyRound, ChevronDown } from "lucide-react";
+import { Users, Sparkles, Search, Plus, Edit3, Trash2, X, Phone, Loader2, AlertTriangle, KeyRound, ChevronDown } from "lucide-react";
 import { authedFetch } from "../lib/authedFetch";
 import { computeTalentRealTotals, computeTalentBrandPerf } from "../lib/metrics/avgGmv";
 import { REPORT_PLATFORMS, type ReportPlatform } from "../lib/reportPlatform";
@@ -14,10 +14,6 @@ import { statusLabel } from "../lib/statusLabels";
 import { METRIC, metricHint } from "../lib/metricGlossary";
 import { PageHeader } from "./common/PageHeader";
 import { talentRoleLabel } from "../lib/talentName";
-// Cột phụ: ở điện thoại bảng 11 cột rộng gấp mấy lần màn hình — giữ 4 cột trả lời "ai, vai gì,
-// chạy bao nhiêu ca, ra bao nhiêu tiền", phần còn lại chỉ hiện từ sm (cùng cách Sổ Ca đã làm, M4).
-const SUB_COL = "hidden sm:table-cell py-2.5 px-2";
-
 const Dash: React.FC = () => <span className="text-[var(--text-faint)]">—</span>;
 
 // Ảnh đại diện: 0/33 hồ sơ thật có ảnh, nên trước đây cả 33 người hiện CHUNG một ảnh stock
@@ -82,6 +78,12 @@ function roleMismatch(role: string | undefined, real: { sessionCount: number; as
   return isAssistant ? real.sessionCount > 0 && real.assistSessionCount === 0 : real.assistSessionCount > 0 && real.sessionCount === 0;
 }
 
+// Màu thanh GMV theo sàn, cùng tông với nhãn sàn (PlatformChip) để nhận ra không cần đọc chữ.
+const GMV_BAR: Record<ReportPlatform, string> = { TikTok: "bg-cyan-400/80", Shopee: "bg-orange-400/80" };
+
+/** Tổng ca đã chạy (host + trợ): thước đo "ai đang làm việc" của danh sách. */
+const totalCa = (r: { real: { sessionCount: number; assistSessionCount: number } }) => r.real.sessionCount + r.real.assistSessionCount;
+
 export const TalentMatcher: React.FC<TalentMatcherProps> = ({
   currentRole,
   talents,
@@ -118,9 +120,9 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTalent, setEditingTalent] = useState<Talent | null>(null);
 
-  // Detail/performance view (read-only) — click vào thân card mở modal này thay vì đi thẳng
-  // vào modal sửa; icon bút chì vẫn mở modal sửa như cũ.
-  const [detailTalent, setDetailTalent] = useState<Talent | null>(null);
+  // Hồ sơ bên phải: người đang chọn. `sheetOpen` chỉ có nghĩa ở < xl, nơi hồ sơ mở thành tấm phủ màn hình.
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   // Form State
   const [formName, setFormName] = useState("");
@@ -294,252 +296,329 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
       setIsMatching(false);
     }
   };
-  const filteredTalents = talents.filter((t) => {
-    const matchesSearch = t.name.toLowerCase().includes(searchTerm.toLowerCase()) || (t.phone && t.phone.includes(searchTerm));
-    const matchesRole = selectedRoleFilter === "All" || t.role === selectedRoleFilter;
-    return matchesSearch && matchesRole;
-  });
+  // Số cộng từ ca thật tính MỘT lần cho cả danh sách (gõ ô tìm kiếm không tính lại). Xếp người đã chạy ca lên trước:
+  // 16/33 hồ sơ chưa gắn với ca nào, để xen kẽ theo thứ tự DB thì phải lướt hết danh sách mới biết ai đang làm việc.
+  // Tổng ca đã chạy trước (người trợ 86 ca làm việc nhiều hơn người host 3 ca), ca host là tiêu chí phụ vì đó mới là vai gánh GMV.
+  const allRows = useMemo(
+    () =>
+      talents
+        .map((t) => ({ t, real: computeTalentRealTotals(sessions, t.id), rate: talentRateLabel(t) }))
+        .sort((a, b) => totalCa(b) - totalCa(a) || b.real.sessionCount - a.real.sessionCount || a.t.name.localeCompare(b.t.name, "vi")),
+    [talents, sessions]
+  );
+  const query = searchTerm.trim().toLowerCase();
+  const rosterRows = allRows.filter(
+    ({ t }) =>
+      (selectedRoleFilter === "All" || t.role === selectedRoleFilter) &&
+      (!query || t.name.toLowerCase().includes(query) || (t.nickname ?? "").toLowerCase().includes(query) || (t.phone ?? "").includes(query))
+  );
+  const activeRows = rosterRows.filter((r) => totalCa(r) > 0);
+  const idleRows = rosterRows.filter((r) => totalCa(r) === 0);
+  // Dải tổng quan và số đếm trên nút lọc tính trên TOÀN BỘ talent, không đổi theo ô tìm kiếm.
+  const overview = {
+    all: allRows.length,
+    active: allRows.filter((r) => totalCa(r) > 0).length,
+    hours: allRows.reduce((s, r) => s + r.real.hours + r.real.assistHours, 0),
+    hosts: talents.filter((t) => t.role !== "Assistant").length,
+    assistants: talents.filter((t) => t.role === "Assistant").length
+  };
+  const maxCa = Math.max(1, ...allRows.map(totalCa));
 
-  // Xếp người đã chạy ca lên trước: 16/33 hồ sơ chưa gắn với ca nào, để xen kẽ theo thứ tự DB thì
-  // phải lướt hết danh sách mới biết ai đang làm việc.
-  const rosterRows = filteredTalents
-    .map((t) => ({
-      t,
-      real: computeTalentRealTotals(sessions, t.id),
-      rate: talentRateLabel(t)
-    }))
-    .sort((a, b) => {
-      // Tổng ca đã chạy trước (người trợ 86 ca làm việc nhiều hơn người host 3 ca), ca host là tiêu
-      // chí phụ vì đó mới là vai gánh GMV.
-      const total = (r: typeof a) => r.real.sessionCount + r.real.assistSessionCount;
-      return total(b) - total(a) || b.real.sessionCount - a.real.sessionCount || a.t.name.localeCompare(b.t.name, "vi");
-    });
+  // Hồ sơ bên phải: người đang chọn, hoặc người đầu danh sách khi chưa chọn / người đã chọn bị lọc mất.
+  const selected = rosterRows.find((r) => r.t.id === selectedId) ?? rosterRows[0] ?? null;
+  const selectedBrandPerf = selected ? computeTalentBrandPerf(sessions, selected.t.id, brands.map((b) => b.id)) : [];
+  const selectedGmvMax = selected ? Math.max(...REPORT_PLATFORMS.map((p) => selected.real.perf[p].gmv)) : 0;
 
-  // Cột nào KHÔNG dòng nào mang thông tin thì ẩn hẳn và nói chỗ điền — chỗ trống rộng bằng chỗ có
-  // số khiến người đọc tưởng đã nhập rồi mà bằng 0 (cùng luật với Dashboard agency, M3). Trạng thái
-  // tính là "có thông tin" khi khác mặc định Available: cột này sinh ra để báo ai đang bận/đang live.
-  const EDIT_HERE = "nút sửa ✏️ trên từng dòng";
-  const hideableCols: { label: string; has: (r: (typeof rosterRows)[number]) => boolean; fix?: string }[] = [
-    { label: "Ca trợ", has: (r) => r.real.assistSessionCount > 0 },
-    // GMV TÁCH THEO SÀN (user chốt 07/10: không bao giờ cộng hiệu suất TikTok với Shopee). KHÔNG có cột GMV/giờ
-    // gộp mọi brand: xem `computeTalentBrandPerf`; so hiệu suất thì mở ngăn chi tiết (tách theo kênh brand × sàn).
-    { label: "GMV TikTok", has: (r) => r.real.perf.TikTok.gmv > 0 },
-    { label: "GMV Shopee", has: (r) => r.real.perf.Shopee.gmv > 0 },
-    { label: "Giờ host", has: (r) => r.real.hours > 0 },
-    { label: "Giờ trợ", has: (r) => r.real.assistHours > 0 },
-    { label: "Rate card", has: (r) => canSeeRate && (!!r.t.rateHidden || !!r.rate), fix: canSeeRate ? EDIT_HERE : undefined },
-    { label: "SĐT", has: (r) => !!r.t.phone?.trim(), fix: EDIT_HERE },
-    { label: "Trạng thái", has: (r) => !!r.t.availabilityStatus && r.t.availabilityStatus !== "Available" }
-  ];
-  const show = Object.fromEntries(hideableCols.map((c) => [c.label, rosterRows.some(c.has)])) as Record<string, boolean>;
-  const hiddenCols = hideableCols.filter((c) => !show[c.label] && (c.label !== "Rate card" || canSeeRate));
-  const colFixes = [...new Set(hiddenCols.map((c) => c.fix).filter((f): f is string => !!f))];
-  // Đếm cột thay vì gõ số: bảng này có 8 cột bật/tắt được (M4 đã dính 1 lần colSpan lệch).
-  const colCount = 2 + hideableCols.filter((c) => show[c.label]).length + 1;
-  // Số hồ sơ chưa gắn với ca nào — xếp cuối bảng, có dòng ngăn để mắt dừng lại thay vì lướt qua
-  // một dải "—" dài không biết bắt đầu từ đâu.
-  const idleCount = rosterRows.filter((r) => r.real.sessionCount + r.real.assistSessionCount === 0).length;
-  const activeCount = rosterRows.length - idleCount;
-
-  // id rỗng ⇒ trả về toàn 0, nên gọi được cả khi chưa mở ngăn chi tiết (tránh nhánh null trong JSX).
-  const detailReal = computeTalentRealTotals(sessions, detailTalent?.id ?? "");
-  const detailBrandPerf = computeTalentBrandPerf(sessions, detailTalent?.id ?? "", brands.map((b) => b.id));
+  const renderRow = (r: (typeof allRows)[number]) => {
+    const { t, real } = r;
+    const isSel = selected?.t.id === t.id;
+    const n = totalCa(r);
+    const parts = [
+      real.sessionCount > 0 && `${real.sessionCount} ca host${real.hours > 0 ? ` · ${fmtFixed(real.hours, 0)}h` : ""}`,
+      real.assistSessionCount > 0 && `${real.assistSessionCount} ca trợ${real.assistHours > 0 ? ` · ${fmtFixed(real.assistHours, 0)}h` : ""}`
+    ].filter(Boolean);
+    return (
+      <button
+        key={t.id}
+        type="button"
+        aria-pressed={isSel}
+        onClick={() => {
+          setSelectedId(t.id);
+          setSheetOpen(true);
+        }}
+        className={`w-full text-left grid grid-cols-[2.25rem_minmax(0,1fr)_2rem] sm:grid-cols-[2.25rem_minmax(0,1fr)_5.5rem_2rem] items-center gap-3 px-3 py-2.5 border-b border-l-2 border-b-[var(--border-muted)] transition-colors ${
+          isSel ? "bg-[var(--accent)]/15 border-l-[var(--accent-text)]" : "border-l-transparent hover:bg-[var(--surface-elevated)]/50"
+        }`}
+      >
+        <TalentAvatar talent={t} className="w-9 h-9 text-xs" />
+        <span className="min-w-0 block">
+          <span className="flex items-center gap-1.5 min-w-0">
+            <span className="font-bold text-[var(--text)] text-[13px] truncate">{t.name}</span>
+            {/* Vai trò gõ tay một lần, không đối chiếu ca thật (audit người mới 2026-10-04: "Host" mà 86 ca đều
+                là trợ live). Lệch thì nói ra để ops sửa hồ sơ — không tự đổi. */}
+            {roleMismatch(t.role, real) && (
+              <span className="text-amber-300 shrink-0" title={`Vai trò trên hồ sơ khác với vai người này thật sự chạy trong ca (chỉ chạy ${t.role === "Assistant" ? "host" : "trợ live"}) — mở hồ sơ để sửa`}>
+                <AlertTriangle className="w-3.5 h-3.5" />
+              </span>
+            )}
+          </span>
+          <span className="flex items-center gap-1.5 text-[11px] text-[var(--text-faint)] min-w-0">
+            <span className="bg-[var(--accent)]/50 text-[var(--accent-text)] font-bold px-1.5 py-0.5 rounded shrink-0">{talentRoleLabel(t.role)}</span>
+            <span className="truncate">{parts.length ? parts.join(" · ") : "Chưa gắn với ca nào"}</span>
+          </span>
+        </span>
+        <span className="hidden sm:block h-1.5 rounded-full bg-[var(--surface-elevated)] overflow-hidden" title="Tổng ca so với người chạy nhiều nhất">
+          <span className="block h-full rounded-full bg-[var(--accent-text)]/70" style={{ width: `${Math.round((n / maxCa) * 100)}%` }} />
+        </span>
+        <span className="text-right font-mono text-[13px] font-bold text-[var(--text)]">{n || <Dash />}</span>
+      </button>
+    );
+  };
 
   return (
     <div className="space-y-6">
       <PageHeader
         icon={Users}
         title="Talent Pool"
-        description="Host và trợ live của agency: vai trò, số ca, GMV và rate. Bấm vào dòng để xem chi tiết từng người."
+        description="Host và trợ live của agency: vai trò, số ca, GMV và rate. Chọn một người để xem hồ sơ bên cạnh."
       />
 
-      {/* Danh sách talent — bảng, không phải lưới thẻ.
-          M6 (audit UX lần 2): 33 thẻ × 224px = 3,7 màn, nhưng đo trên DB thật thì 4/6 ô dữ liệu
-          của thẻ GIỐNG HỆT NHAU ở cả 33 người (rate 0, hoa hồng 0%, CVR —, SĐT N/A) và cả 33 dùng
-          CHUNG một ảnh stock. Thẻ chỉ đáng bằng chỗ nó chiếm khi các ô trong thẻ phân biệt được
-          người này với người kia. */}
-      <div className="bg-[var(--surface)] p-4 sm:p-6 rounded-2xl border border-[var(--border)] shadow-sm space-y-4">
-        <div className="flex flex-wrap justify-between items-center gap-4">
-          <div>
-            <h3 className="font-bold text-[var(--text)] text-base">
-              Host và trợ live ({filteredTalents.length}/{talents.length})
-            </h3>
-            <p className="text-xs text-[var(--text-muted)]">Số ca, giờ và GMV cộng <b>mọi tháng</b> đã chạy (Hiệu Suất Host mặc định chỉ xem 90 ngày gần nhất). Xếp theo số ca.</p>
+      {/* Dải tổng quan — trả lời "đội đang ở trạng thái nào" trước khi lướt danh sách. */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {[
+          { label: "Talent", value: String(overview.all) },
+          { label: "Đã chạy ca", value: String(overview.active) },
+          { label: "Giờ host + trợ", value: `${fmtFixed(overview.hours, 0)}h` },
+          { label: "Chưa gắn ca", value: String(overview.all - overview.active) }
+        ].map((k) => (
+          <div key={k.label} className="bg-[var(--surface)] border border-[var(--border)] rounded-xl px-4 py-3">
+            <p className="text-[11px] text-[var(--text-faint)] font-semibold">{k.label}</p>
+            <p className="text-xl font-bold text-[var(--text)] font-mono">{k.value}</p>
           </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Search Input */}
-            <div className="relative">
-              <Search className="w-4 h-4 text-[var(--text-muted)] absolute left-3 top-2.5" />
-              <input
-                type="text"
-                placeholder="Tìm theo tên/SĐT..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 pr-3 py-1.5 text-xs bg-[var(--surface-elevated)] text-[var(--text)] placeholder:text-[var(--text-faint)] border border-[var(--border)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--accent)] font-medium"
-              />
-            </div>
-
-            {/* Role Filter */}
-            <select
-              value={selectedRoleFilter}
-              onChange={(e) => setSelectedRoleFilter(e.target.value)}
-              className="py-1.5 px-3 text-xs bg-[var(--surface-elevated)] text-[var(--text)] border border-[var(--border)] rounded-xl font-bold focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-            >
-              <option value="All">Tất cả vai trò</option>
-              <option value="Host">Host</option>
-              <option value="Assistant">Trợ live</option>
-            </select>
-
-            {/* Add New Talent Button — tạo mới giờ kèm tạo account thật nên chỉ ceo/admin */}
-            {canSeeRate && (
-              <button
-                onClick={openAddModal}
-                className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow transition-all"
-              >
-                <Plus className="w-4 h-4" /> Thêm talent
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)] uppercase text-[11px] tracking-wider">
-                <th className="py-2.5 px-2">Tên</th>
-                <th className="py-2.5 px-2 text-right">Ca host</th>
-                {show["Ca trợ"] && <th className="py-2.5 px-2 text-right">Ca trợ</th>}
-                {show["GMV TikTok"] && <th className="py-2.5 px-2 text-right">GMV TikTok</th>}
-                {show["GMV Shopee"] && <th className="py-2.5 px-2 text-right">GMV Shopee</th>}
-                {show["Giờ host"] && <th className={`${SUB_COL} text-right`}>Giờ host</th>}
-                {show["Giờ trợ"] && <th className={`${SUB_COL} text-right`}>Giờ trợ</th>}
-                {show["Rate card"] && <th className={`${SUB_COL} text-right`}>Rate card</th>}
-                {show["SĐT"] && <th className={SUB_COL}>SĐT</th>}
-                {show["Trạng thái"] && <th className={SUB_COL}>Trạng thái</th>}
-                <th className="py-2.5 px-2" />
-              </tr>
-            </thead>
-            <tbody>
-              {rosterRows.length === 0 && (
-                <tr>
-                  <td colSpan={colCount} className="py-6 text-center text-[var(--text-faint)]">
-                    Không có talent nào khớp bộ lọc.
-                  </td>
-                </tr>
-              )}
-              {rosterRows.map(({ t, real, rate }, i) => (
-                <React.Fragment key={t.id}>
-                {i === activeCount && idleCount > 0 && (
-                  <tr className="bg-[var(--surface-elevated)]/50">
-                    <td colSpan={colCount} className="py-1.5 px-2 text-[11px] font-bold text-[var(--text-muted)]">
-                      {idleCount} hồ sơ chưa gắn với ca nào
-                      <span className="text-[var(--text-faint)] font-normal"> — tài khoản mới hoặc chưa được xếp ca</span>
-                    </td>
-                  </tr>
-                )}
-                <tr
-                  onClick={() => setDetailTalent(t)}
-                  className="border-b border-[var(--border-muted)] cursor-pointer hover:bg-[var(--surface-elevated)]/40 transition-colors"
-                  title="Xem chi tiết & hiệu suất"
-                >
-                  {/* Tên không xuống dòng (ở 375px "Huỳnh Thái Toàn · Thái Toàn" vỡ thành 5 dòng, dòng cao
-                      150px) và vai trò nằm ngay cạnh tên thay vì thành một cột riêng — bỏ được ~70px bề ngang
-                      để cột "Ca trợ" lọt vào màn điện thoại, vì với 8 người thì đó là con số DUY NHẤT họ có. Ở < sm còn ẩn
-                      nốt nhãn vai trò: cột nào có số đã nói người đó chạy vai gì, ngăn chi tiết vẫn ghi đủ. */}
-                  <td className="py-2.5 px-2 text-[var(--text)] font-bold whitespace-nowrap">
-                    {t.name}
-                    {t.nickname && <span className="hidden sm:inline font-normal text-[var(--text-muted)]"> · {t.nickname}</span>}
-                    <span className="hidden sm:inline ml-1.5 bg-[var(--accent)]/50 text-[var(--accent-text)] text-[11px] font-bold px-1.5 py-0.5 rounded">
-                      {talentRoleLabel(t.role)}
-                    </span>
-                    {/* Vai trò gõ tay một lần, không đối chiếu ca thật (audit người mới 2026-10-04: "Host" mà 86 ca đều
-                        là trợ live). Lệch thì nói ra để ops sửa hồ sơ — không tự đổi. */}
-                    {roleMismatch(t.role, real) && (
-                      <span className="ml-1.5 text-amber-300 text-[11px] font-bold" title="Vai trò trên hồ sơ khác với vai người này thật sự chạy trong ca — bấm ✏️ để sửa">
-                        ⚠ chỉ chạy {t.role === "Assistant" ? "host" : "trợ live"}
-                      </span>
-                    )}
-                  </td>
-                  <td className="py-2.5 px-2 text-right font-mono text-[var(--text)]">{real.sessionCount || <Dash />}</td>
-                  {show["Ca trợ"] && <td className="py-2.5 px-2 text-right font-mono text-[var(--text-muted)]">{real.assistSessionCount || <Dash />}</td>}
-                  {(["TikTok", "Shopee"] as const).map((p) =>
-                    show[`GMV ${p}`] ? (
-                      <td key={p} className="py-2.5 px-2 text-right font-mono font-bold text-[var(--text)]">
-                        {real.perf[p].gmv > 0 ? fmtVndShort(real.perf[p].gmv) : <Dash />}
-                      </td>
-                    ) : null
-                  )}
-                  {show["Giờ host"] && (
-                    <td className={`${SUB_COL} text-right font-mono text-[var(--text-muted)]`}>
-                      {real.hours > 0 ? `${fmtFixed(real.hours, 1)}h` : <Dash />}
-                    </td>
-                  )}
-                  {show["Giờ trợ"] && (
-                    <td className={`${SUB_COL} text-right font-mono text-[var(--text-muted)]`}>
-                      {real.assistHours > 0 ? `${fmtFixed(real.assistHours, 1)}h` : <Dash />}
-                    </td>
-                  )}
-                  {show["Rate card"] && (
-                    <td className={`${SUB_COL} text-right font-mono text-[var(--text)]`}>
-                      {t.rateHidden ? "ẩn" : rate ?? <Dash />}
-                    </td>
-                  )}
-                  {show["SĐT"] && <td className={`${SUB_COL} font-mono text-[var(--text-muted)]`}>{t.phone || <Dash />}</td>}
-                  {show["Trạng thái"] && (
-                    <td className={SUB_COL}>
-                      <span
-                        className={`text-[11px] font-bold px-2 py-0.5 rounded whitespace-nowrap ${
-                          t.availabilityStatus === "On Live"
-                            ? "bg-red-900/80 text-red-300"
-                            : t.availabilityStatus === "Busy"
-                              ? "bg-amber-900/80 text-amber-300"
-                              : "bg-emerald-900/80 text-emerald-300"
-                        }`}
-                      >
-                        {statusLabel(t.availabilityStatus || "Available")}
-                      </span>
-                    </td>
-                  )}
-                  <td className="py-2.5 px-2">
-                    <div className="flex items-center justify-end gap-1">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openEditModal(t);
-                        }}
-                        className="p-1.5 text-[var(--text-muted)] hover:text-[var(--accent-text)] hover:bg-[var(--accent-hover)]/40 rounded-lg transition-all"
-                        title="Chỉnh sửa Talent"
-                      >
-                        <Edit3 className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDelete(t.id, t.name);
-                        }}
-                        className="p-1.5 text-[var(--text-muted)] hover:text-red-400 hover:bg-red-950/80 rounded-lg transition-all"
-                        title="Xóa Talent"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-                </React.Fragment>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {hiddenCols.length > 0 && (
-          <p className="text-[11px] text-[var(--text-faint)] leading-relaxed">
-            Ẩn {hiddenCols.length} cột vì chưa người nào có dữ liệu: <span className="text-[var(--text-muted)]">{hiddenCols.map((c) => c.label).join(", ")}</span>.
-            {colFixes.length > 0 && ` Điền ở ${colFixes.join("; ")}.`}
-          </p>
-        )}
+        ))}
       </div>
 
+      {/* Danh sách (trái) + hồ sơ (phải).
+          M6 (audit UX lần 2): 33 thẻ × 224px = 3,7 màn, mà 4/6 ô dữ liệu của thẻ GIỐNG HỆT NHAU ở cả 33 người — nên danh sách
+          chỉ giữ thứ phân biệt được người này với người kia (vai trò, số ca, giờ, khối lượng), còn chi tiết nằm ở hồ sơ bên phải.
+          Ở < xl hồ sơ mở thành tấm trượt phủ màn hình khi bấm một dòng. */}
+      <div className="grid xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] gap-4 items-start">
+        <div className="bg-[var(--surface)] rounded-2xl border border-[var(--border)] shadow-sm overflow-hidden">
+          <div className="p-3 sm:p-4 space-y-3 border-b border-[var(--border)]">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative flex-1 min-w-[10rem]">
+                <Search className="w-4 h-4 text-[var(--text-muted)] absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  placeholder="Tìm theo tên hoặc SĐT"
+                  aria-label="Tìm talent"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 text-xs bg-[var(--surface-elevated)] text-[var(--text)] placeholder:text-[var(--text-faint)] border border-[var(--border)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--accent)] font-medium"
+                />
+              </div>
+              {/* Thêm talent — tạo mới kèm tạo account thật nên chỉ ceo/admin */}
+              {canSeeRate && (
+                <button
+                  onClick={openAddModal}
+                  className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow transition-all"
+                >
+                  <Plus className="w-4 h-4" /> Thêm talent
+                </button>
+              )}
+            </div>
+            <div className="flex border border-[var(--border)] rounded-xl overflow-hidden text-xs font-bold" role="group" aria-label="Lọc theo vai trò">
+              {[
+                { v: "All", label: "Tất cả", n: overview.all },
+                { v: "Host", label: "Host", n: overview.hosts },
+                { v: "Assistant", label: "Trợ live", n: overview.assistants }
+              ].map((o) => (
+                <button
+                  key={o.v}
+                  type="button"
+                  aria-pressed={selectedRoleFilter === o.v}
+                  onClick={() => setSelectedRoleFilter(o.v)}
+                  className={`flex-1 py-2 transition-colors ${
+                    selectedRoleFilter === o.v ? "bg-[var(--accent)]/30 text-[var(--accent-text)]" : "text-[var(--text-muted)] hover:bg-[var(--surface-elevated)]"
+                  }`}
+                >
+                  {o.label} <span className="font-mono font-normal">{o.n}</span>
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-[var(--text-faint)]">
+              Số ca và giờ cộng <b>mọi tháng</b> đã chạy (Hiệu Suất Host mặc định chỉ xem 90 ngày gần nhất). Xếp theo tổng ca.
+            </p>
+          </div>
+
+          {rosterRows.length === 0 && <p className="py-8 text-center text-xs text-[var(--text-faint)]">Không có talent nào khớp bộ lọc.</p>}
+          {activeRows.map(renderRow)}
+          {idleRows.length > 0 && (
+            <>
+              {/* Dòng ngăn để mắt dừng lại thay vì lướt qua một dải "—" dài không biết bắt đầu từ đâu. */}
+              {activeRows.length > 0 && (
+                <div className="px-3 py-1.5 text-[11px] font-bold text-[var(--text-muted)] bg-[var(--surface-elevated)]/50 border-b border-[var(--border-muted)]">
+                  {idleRows.length} hồ sơ chưa gắn với ca nào
+                  <span className="text-[var(--text-faint)] font-normal"> — tài khoản mới hoặc chưa được xếp ca</span>
+                </div>
+              )}
+              {idleRows.map(renderRow)}
+            </>
+          )}
+        </div>
+
+        {/* Hồ sơ talent đang chọn */}
+        {sheetOpen && <div className="xl:hidden fixed inset-0 z-40 bg-black/60" onClick={() => setSheetOpen(false)} />}
+        <aside
+          className={`${
+            sheetOpen ? "fixed inset-x-0 bottom-0 top-14 z-50 rounded-t-2xl" : "hidden"
+          } xl:block xl:sticky xl:inset-x-auto xl:bottom-auto xl:top-4 xl:z-auto xl:rounded-2xl xl:max-h-[calc(100vh-2rem)] overflow-y-auto bg-[var(--surface)] border border-[var(--border)] shadow-sm`}
+        >
+          {!selected ? (
+            <p className="p-8 text-center text-xs text-[var(--text-faint)]">Chọn một talent để xem hồ sơ.</p>
+          ) : (
+            <div className="p-4 sm:p-5 space-y-4 text-xs">
+              <div className="flex items-start gap-3">
+                <TalentAvatar talent={selected.t} className="w-14 h-14 text-lg" />
+                <div className="min-w-0 flex-1">
+                  <h4 className="font-bold text-[var(--text)] text-base leading-tight">{selected.t.name}</h4>
+                  <p className="text-[var(--text-muted)] mt-0.5 flex flex-wrap items-center gap-x-1.5">
+                    {selected.t.nickname && <span>{selected.t.nickname} ·</span>}
+                    <span className="bg-[var(--accent)]/50 text-[var(--accent-text)] text-[11px] font-bold px-1.5 py-0.5 rounded">{talentRoleLabel(selected.t.role)}</span>
+                    {selected.t.availabilityStatus && selected.t.availabilityStatus !== "Available" && (
+                      <span
+                        className={`text-[11px] font-bold px-1.5 py-0.5 rounded ${
+                          selected.t.availabilityStatus === "On Live" ? "bg-red-900/80 text-red-300" : "bg-amber-900/80 text-amber-300"
+                        }`}
+                      >
+                        {statusLabel(selected.t.availabilityStatus)}
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-[var(--text-muted)] flex items-center gap-1 mt-1">
+                    <Phone className="w-3 h-3 shrink-0" /> {selected.t.phone || <span className="text-[var(--text-faint)]">Chưa có SĐT</span>}
+                  </p>
+                  <p className="text-[var(--text-faint)] mt-0.5">
+                    {[selected.t.gender, (selected.t.niches || []).join(", ")].filter(Boolean).join(" • ") || <Dash />}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    onClick={() => openEditModal(selected.t)}
+                    className="p-1.5 text-[var(--text-muted)] hover:text-[var(--accent-text)] hover:bg-[var(--accent-hover)]/40 rounded-lg transition-all"
+                    title="Chỉnh sửa Talent"
+                    aria-label="Chỉnh sửa Talent"
+                  >
+                    <Edit3 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(selected.t.id, selected.t.name)}
+                    className="p-1.5 text-[var(--text-muted)] hover:text-red-400 hover:bg-red-950/80 rounded-lg transition-all"
+                    title="Xóa Talent"
+                    aria-label="Xóa Talent"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setSheetOpen(false)}
+                    className="xl:hidden p-1.5 text-[var(--text-muted)] hover:text-[var(--text)] rounded-lg"
+                    aria-label="Đóng hồ sơ"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              {roleMismatch(selected.t.role, selected.real) && (
+                <p className="flex items-start gap-1.5 text-[11px] text-amber-300 bg-amber-950/40 border border-amber-500/30 rounded-lg px-2.5 py-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  Hồ sơ ghi {talentRoleLabel(selected.t.role)} nhưng người này chỉ chạy {selected.t.role === "Assistant" ? "host" : "trợ live"} trong ca — bấm ✏️ để sửa vai trò.
+                </p>
+              )}
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {[
+                  { label: "Ca host", value: selected.real.sessionCount || null },
+                  { label: "Ca trợ", value: selected.real.assistSessionCount || null },
+                  { label: "Giờ host", value: selected.real.hours > 0 ? `${fmtFixed(selected.real.hours, 1)}h` : null },
+                  { label: "Giờ trợ", value: selected.real.assistHours > 0 ? `${fmtFixed(selected.real.assistHours, 1)}h` : null }
+                ].map((k) => (
+                  <div key={k.label} className="bg-[var(--surface-base)]/40 border border-[var(--border)] rounded-xl px-3 py-2">
+                    <p className="text-[11px] text-[var(--text-faint)]">{k.label}</p>
+                    <p className="text-base font-bold text-[var(--text)] font-mono">{k.value ?? <Dash />}</p>
+                  </div>
+                ))}
+              </div>
+              {selected.real.sessionCount === 0 && selected.real.assistSessionCount > 0 && (
+                <p className="text-[11px] text-[var(--text-faint)]">
+                  GMV của ca tính cho host, nên người chỉ chạy vai trợ không có GMV lũy kế — không phải chưa làm ca nào.
+                </p>
+              )}
+
+              {/* GMV TÁCH THEO SÀN (user chốt 07/10: không bao giờ cộng hiệu suất TikTok với Shopee) — mỗi sàn một thanh, không có tổng. */}
+              <div className="space-y-2">
+                <p className="font-bold text-[var(--text-muted)]">GMV theo sàn <span className="font-normal text-[var(--text-faint)]">(mỗi sàn một thanh, không cộng gộp)</span></p>
+                {selectedGmvMax > 0 ? (
+                  REPORT_PLATFORMS.map((p) => {
+                    const g = selected.real.perf[p].gmv;
+                    return (
+                      <div key={p} className="flex items-center gap-2">
+                        <span className="w-16 shrink-0"><PlatformChip platform={p} /></span>
+                        <span className="flex-1 h-2 rounded-full bg-[var(--surface-elevated)] overflow-hidden">
+                          <span className={`block h-full rounded-full ${GMV_BAR[p]}`} style={{ width: `${Math.round((g / selectedGmvMax) * 100)}%` }} />
+                        </span>
+                        <span className="w-16 text-right font-mono font-bold text-[var(--text)]">{g > 0 ? fmtVndShort(g) : <Dash />}</span>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="text-[11px] text-[var(--text-faint)]">Chưa có GMV ở sàn nào.</p>
+                )}
+              </div>
+
+              {/* GMV/giờ TÁCH THEO BRAND, không có số gộp: GMV/giờ phụ thuộc ngành hàng và giá bán của
+                  brand nhiều hơn phụ thuộc người chạy, nên gộp lại rồi xếp hạng là so host bán giày với
+                  host bán đồ lót. Ngưỡng "đủ mẫu" dùng chung với hostSuggestion (3 ca). */}
+              <div className="space-y-1.5">
+                <p className="font-bold text-[var(--text-muted)]" title={metricHint(METRIC.gmvPerHour)}>
+                  {METRIC.gmvPerHour} theo kênh (brand × sàn)
+                </p>
+                {selectedBrandPerf.every((b) => b.sessions === 0) ? (
+                  <p className="text-[11px] text-[var(--text-faint)]">Chưa chạy ca nào có số cho kênh nào.</p>
+                ) : (
+                  <ul className="space-y-1">
+                    {selectedBrandPerf.filter((b) => b.sessions > 0).map((b) => {
+                      const brand = brands.find((x) => x.id === b.brandId);
+                      return (
+                        <li key={`${b.brandId}|${b.platform}`} className="flex items-baseline justify-between gap-3 border-b border-[var(--border)]/60 pb-1">
+                          <span className="text-[var(--text)] font-medium">{brand?.name ?? b.brandId} <PlatformChip platform={b.platform} /></span>
+                          <span className="shrink-0 font-mono text-[var(--text)] text-right">
+                            <b className="text-emerald-400">{fmtVndShort(Math.round(b.gmvPerHour))}</b>/giờ
+                            <span className="text-[var(--text-faint)] font-sans block sm:inline">
+                              {" · "}{b.sessions} ca · {fmtFixed(b.hours, 1)}h · {b.confidence === "ok" ? "đủ mẫu" : "ít mẫu"}
+                            </span>
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+                <p className="text-[11px] text-[var(--text-faint)] leading-relaxed">
+                  Không có số GMV/giờ gộp mọi brand hay gộp hai sàn: chỉ số này phụ thuộc ngành hàng, giá bán và sàn hơn là người chạy.
+                  Muốn xếp hạng host trong một brand thì mở Hiệu Suất Host (có lọc brand, thứ và khung giờ).
+                </p>
+              </div>
+
+              {canSeeRate && (
+                <div className="grid grid-cols-2 gap-2 bg-amber-950/30 p-3 rounded-xl border border-amber-500/30">
+                  <div>Rate Card: <strong className="text-[var(--text)] block text-sm font-bold">{selected.t.rateHidden ? "ẩn" : selected.rate ?? <span className="text-[var(--text-faint)] font-normal">chưa đặt</span>}</strong></div>
+                  <div>Rate trợ live: <strong className="text-[var(--text)] block text-sm font-bold">{selected.t.rateHidden ? "ẩn" : (selected.t.assistantRatePerHour || 0) > 0 ? `${fmtVndFull(selected.t.assistantRatePerHour || 0)}/giờ` : <span className="text-[var(--text-faint)] font-normal">theo rate host</span>}</strong></div>
+                </div>
+              )}
+            </div>
+          )}
+        </aside>
+      </div>
       {/* Trình AI khớp nối — công cụ phụ, xếp sau danh sách và gập lại.
           Trước đây chiếm 144px đầu trang, mặc định brand đầu danh sách (Franklin, 0 ca). */}
       <details className="group bg-gradient-to-r from-[var(--accent)]/25 to-[var(--surface)] text-[var(--text)] rounded-2xl border border-[var(--accent)]/50 shadow-lg">
@@ -852,103 +931,6 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
               >
                 Đã Giao Cho Talent — Đóng
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Detail/Performance Modal (read-only) — mở khi click thân card */}
-      {detailTalent && (
-        <div className="fixed inset-0 bg-[var(--surface)]/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--surface)] w-full max-w-lg rounded-2xl shadow-2xl border border-[var(--border)] overflow-hidden max-h-[90vh] flex flex-col">
-            <div className="bg-[var(--surface)] text-[var(--text)] px-6 py-4 flex justify-between items-center border-b border-[var(--border)]">
-              <h3 className="font-bold text-sm flex items-center gap-2">
-                <Award className="w-4 h-4 text-[var(--accent-text)]" />
-                Chi Tiết & Hiệu Suất: {detailTalent.name}
-              </h3>
-              <button onClick={() => setDetailTalent(null)} className="p-1.5 -m-1.5 rounded text-[var(--text-muted)] hover:text-[var(--text)]">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4 text-xs overflow-y-auto">
-              <div className="flex items-center gap-3">
-                <TalentAvatar talent={detailTalent} />
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <h4 className="font-bold text-[var(--text)] text-sm truncate">{detailTalent.name}</h4>
-                    <span className="bg-[var(--accent)]/50 text-[var(--accent-text)] text-[11px] font-bold px-1.5 py-0.5 rounded shrink-0">
-                      {talentRoleLabel(detailTalent.role)}
-                    </span>
-                  </div>
-                  <p className="text-[var(--text-muted)]">
-                    {[detailTalent.gender, (detailTalent.niches || []).join(", ")].filter(Boolean).join(" • ") || <Dash />}
-                  </p>
-                  <p className="text-[var(--text-muted)] flex items-center gap-1 mt-0.5">
-                    <Phone className="w-3 h-3" /> {detailTalent.phone || <Dash />}
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 bg-[var(--surface-base)]/40 p-3 rounded-xl border border-[var(--border)]">
-                <div>Ca host (có số): <strong className="text-[var(--text)] block text-sm font-bold">{detailReal.sessionCount}</strong></div>
-                <div>Ca trợ (có số): <strong className="text-[var(--text)] block text-sm font-bold">{detailReal.assistSessionCount}</strong></div>
-                <div>GMV TikTok: <strong className="text-[var(--text)] block text-sm font-bold">{detailReal.perf.TikTok.gmv > 0 ? fmtVndShort(detailReal.perf.TikTok.gmv) : <Dash />}</strong></div>
-                <div>GMV Shopee: <strong className="text-[var(--text)] block text-sm font-bold">{detailReal.perf.Shopee.gmv > 0 ? fmtVndShort(detailReal.perf.Shopee.gmv) : <Dash />}</strong></div>
-                <div>Giờ host: <strong className="text-[var(--text)] block text-sm font-bold">{detailReal.hours > 0 ? `${fmtFixed(detailReal.hours, 1)}h` : <Dash />}</strong></div>
-                <div>Giờ trợ: <strong className="text-[var(--text)] block text-sm font-bold">{detailReal.assistHours > 0 ? `${fmtFixed(detailReal.assistHours, 1)}h` : <Dash />}</strong></div>
-                <div>CTR TB: <strong className="text-[var(--accent-text)] block text-sm font-bold">{detailTalent.ctrAvg > 0 ? `${detailTalent.ctrAvg}%` : <Dash />}</strong></div>
-                <div>Trạng Thái: <strong className="text-[var(--text)] block text-sm font-bold">{statusLabel(detailTalent.availabilityStatus || "Available")}</strong></div>
-              </div>
-              {detailReal.sessionCount === 0 && detailReal.assistSessionCount > 0 && (
-                <p className="text-[11px] text-[var(--text-faint)]">
-                  GMV của ca tính cho host, nên người chỉ chạy vai trợ không có GMV lũy kế — không phải chưa làm ca nào.
-                </p>
-              )}
-
-              {/* GMV/giờ TÁCH THEO BRAND, không có số gộp: GMV/giờ phụ thuộc ngành hàng và giá bán của
-                  brand nhiều hơn phụ thuộc người chạy, nên gộp lại rồi xếp hạng là so host bán giày với
-                  host bán đồ lót. Ngưỡng "đủ mẫu" dùng chung với hostSuggestion (3 ca). */}
-              <div className="space-y-1.5">
-                <p className="font-bold text-[var(--text-muted)]" title={metricHint(METRIC.gmvPerHour)}>
-                  {METRIC.gmvPerHour} theo kênh (brand × sàn)
-                </p>
-                {detailBrandPerf.every((b) => b.sessions === 0) ? (
-                  <p className="text-[11px] text-[var(--text-faint)]">Chưa chạy ca nào có số cho kênh nào.</p>
-                ) : (
-                  <ul className="space-y-1">
-                    {detailBrandPerf.filter((b) => b.sessions > 0).map((b) => {
-                      const brand = brands.find((x) => x.id === b.brandId);
-                      return (
-                        <li key={`${b.brandId}|${b.platform}`} className="flex items-baseline justify-between gap-3 border-b border-[var(--border)]/60 pb-1">
-                          <span className="text-[var(--text)] font-medium">{brand?.name ?? b.brandId} <PlatformChip platform={b.platform} /></span>
-                          {b.sessions === 0 ? (
-                            <span className="text-[11px] text-[var(--text-faint)] shrink-0">chưa chạy ca nào</span>
-                          ) : (
-                            <span className="shrink-0 font-mono text-[var(--text)]">
-                              <b className="text-emerald-400">{fmtVndShort(Math.round(b.gmvPerHour))}</b>/giờ
-                              <span className="text-[var(--text-faint)] font-sans">
-                                {" · "}{b.sessions} ca · {fmtFixed(b.hours, 1)}h · {b.confidence === "ok" ? "đủ mẫu" : "ít mẫu"}
-                              </span>
-                            </span>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-                <p className="text-[11px] text-[var(--text-faint)] leading-relaxed">
-                  Không có số GMV/giờ gộp mọi brand hay gộp hai sàn: chỉ số này phụ thuộc ngành hàng, giá bán và sàn hơn là người chạy.
-                  Muốn xếp hạng host trong một brand thì mở Hiệu Suất Host (có lọc brand, thứ và khung giờ).
-                </p>
-              </div>
-
-              {canSeeRate && (
-                <div className="grid grid-cols-2 gap-2 bg-amber-950/30 p-3 rounded-xl border border-amber-500/30">
-                  <div>Rate Card: <strong className="text-[var(--text)] block text-sm font-bold">{detailTalent.rateHidden ? "ẩn" : talentRateLabel(detailTalent) ?? <span className="text-[var(--text-faint)] font-normal">chưa đặt</span>}</strong></div>
-                  <div>Rate trợ live: <strong className="text-[var(--text)] block text-sm font-bold">{detailTalent.rateHidden ? "ẩn" : (detailTalent.assistantRatePerHour || 0) > 0 ? `${fmtVndFull(detailTalent.assistantRatePerHour || 0)}/giờ` : <span className="text-[var(--text-faint)] font-normal">theo rate host</span>}</strong></div>
-                </div>
-              )}
             </div>
           </div>
         </div>

@@ -204,24 +204,30 @@ test("Kế Hoạch Tháng: ô/nút trong lưới ca đạt sàn 24px và hàng v
 
 // ---- M6 Talent Pool (2026-09-30) ----
 
-test("Talent Pool: danh sách là bảng, không phải lưới 33 thẻ", () => {
+test("Talent Pool: danh sách + hồ sơ cạnh nhau, không phải lưới 33 thẻ hay bảng 11 cột", () => {
   const src = readFileSync(join(SRC, "components/TalentMatcher.tsx"), "utf8");
   // Lưới thẻ cũ: 33 thẻ × 224px, trong đó 4/6 ô dữ liệu giống hệt nhau ở cả 33 người.
   expect(src).not.toMatch(/grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4/);
-  expect(src).toMatch(/<table className="w-full text-xs">/);
-  // Cột phụ ẩn ở điện thoại như Sổ Ca (M4).
-  expect(src).toMatch(/const SUB_COL = "hidden sm:table-cell/);
+  // Bảng 11 cột cũ rộng gấp mấy lần màn điện thoại; chi tiết dồn sang hồ sơ bên phải (master–detail, 07/10).
+  expect(src).not.toMatch(/<table/);
+  expect(src).toMatch(/const renderRow = /);
+  expect(src).toMatch(/<aside/);
+  // Ở < lg hồ sơ là tấm phủ màn hình, từ lg là cột dính bên phải.
+  expect(src).toMatch(/lg:sticky/);
+  expect(src).toMatch(/sheetOpen/);
 });
 
-test("Talent Pool: ẩn cột chưa ai có dữ liệu và nói chỗ điền", () => {
+test("Talent Pool: chỉ hiện thứ có dữ liệu, ô trống nói lý do thay vì in 0", () => {
   const src = readFileSync(join(SRC, "components/TalentMatcher.tsx"), "utf8");
-  expect(src).toMatch(/const hideableCols:/);
-  expect(src).toMatch(/const show = Object\.fromEntries\(hideableCols\.map/);
-  expect(src).toMatch(/hiddenCols\.length > 0 &&/);
-  // Đếm cột thay vì gõ số (M4 đã dính một lần colSpan lệch).
-  expect(src).toMatch(/const colCount = 2 \+ hideableCols\.filter/);
-  expect(src).toMatch(/colSpan=\{colCount\}/);
-  expect(src).not.toMatch(/colSpan=\{\d+\}/);
+  // Hồ sơ chưa gắn ca nào xếp cuối, có dòng ngăn — không để một dải "—" dài.
+  expect(src).toMatch(/const activeRows = /);
+  expect(src).toMatch(/const idleRows = /);
+  expect(src).toMatch(/hồ sơ chưa gắn với ca nào/);
+  // Số 0 không in ra như một giá trị: dùng <Dash />.
+  expect(src).toMatch(/\{n \|\| <Dash \/>\}/);
+  expect(src).toMatch(/Chưa có GMV ở sàn nào/);
+  // Số cộng từ ca tính một lần cho cả danh sách, không tính lại mỗi lần gõ ô tìm kiếm.
+  expect(src).toMatch(/const allRows = useMemo\(/);
 });
 
 test("Talent Pool: không bịa mặt người, không hiện 0đ thay cho chưa đặt", () => {
@@ -274,11 +280,11 @@ test("Talent Pool: trình AI khớp nối gập lại và xếp sau danh sách",
   const src = readFileSync(join(SRC, "components/TalentMatcher.tsx"), "utf8");
   expect(src).toMatch(/<details className="group/);
   expect(src).toMatch(/group-open:rotate-180/);
-  // Bảng phải đứng trước khối AI trong cây JSX.
-  const table = src.indexOf('<table className="w-full text-xs">');
+  // Danh sách + hồ sơ phải đứng trước khối AI trong cây JSX.
+  const list = src.indexOf("<aside");
   const details = src.indexOf('<details className="group');
-  expect(table).toBeGreaterThan(-1);
-  expect(details).toBeGreaterThan(table);
+  expect(list).toBeGreaterThan(-1);
+  expect(details).toBeGreaterThan(list);
 });
 
 // ---- M7 nhóm màn còn lại (2026-09-30) ----
