@@ -352,7 +352,11 @@ export const BrandAdsReport: React.FC<BrandAdsReportProps> = ({ brandId, brandNa
   const AdsPanel = ADS_PANELS[platform];
   const canManage = CAN_MANAGE_ROLES.includes(currentRole);
   // Cùng tháng mở sẵn với Report Tháng — phần nhập ở đây đi theo report đó (lib/defaultMonth.ts).
-  const [month, setMonth] = useState(() => defaultReportMonth(`${getTodayMonth()}-01`, sessions.filter((s) => s.brandId === brandId)));
+  // Tháng mặc định suy từ ca của brand — ca có thể về SAU lúc màn mở (màn không đợi danh sách ca), nên chỉ giữ tháng người
+  // dùng tự chọn; chưa chọn thì tháng mặc định tự theo ca khi ca về.
+  const defaultMonth = useMemo(() => defaultReportMonth(`${getTodayMonth()}-01`, sessions.filter((s) => s.brandId === brandId)), [sessions, brandId]);
+  const [pickedMonth, setMonth] = useState<string | null>(null);
+  const month = pickedMonth ?? defaultMonth;
   const [report, setReport] = useState<BrandMonthlyReportType | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 

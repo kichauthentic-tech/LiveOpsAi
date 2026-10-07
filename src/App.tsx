@@ -61,6 +61,7 @@ import { dropPrefetched, type TabPrefetchCtx } from "./lib/db/prefetch";
 import { useWorkspaceData } from "./hooks/useWorkspaceData";
 import {
   CALENDAR_TABS,
+  TABS_NEEDING_SHELL_ONLY,
   TABS_WITHOUT_CORE_DATA,
   TABS_WITHOUT_NAV_ITEM,
   agencyNavGroups,
@@ -362,9 +363,12 @@ export default function App() {
     phaseC3Error,
     sessions,
     coreDataReady,
+    shellDataReady,
     reloadRolePermissions,
     refreshTikTokStatus
   } = useWorkspaceData({ session, currentRole, isOpsRole, activeTab });
+  // Cổng dữ liệu của tab đang mở: màn nhập số liệu chỉ cần brand + kênh (TABS_NEEDING_SHELL_ONLY), còn lại chờ đủ ca/talent/report.
+  const tabDataReady = TABS_NEEDING_SHELL_ONLY.has(activeTab) ? shellDataReady : coreDataReady;
   // Tải chunk tab ngay, không đợi cổng `coreDataReady` ở khối render (cổng đó giữ chunk lại tới khi
   // đợt nạp dữ liệu về xong ⇒ thêm một vòng mạng nối tiếp mỗi lần mở app / đổi tab).
   useEffect(() => {
@@ -662,11 +666,11 @@ export default function App() {
   }, [activeTab]);
   const prefetchBrandId = profile ? currentBrandId : workspace.type === "brand" ? workspace.brandId : undefined;
   useEffect(() => {
-    if (!session || coreDataReady) return;
+    if (!session || tabDataReady) return;
     TAB_DATA_PREFETCH[activeTab]?.({ brandId: prefetchBrandId, role: profile ? currentRole : undefined }).catch(() => {});
     // `session` chỉ cần có/không — object mới mỗi lần làm mới token không đổi gì ở đây.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, !!session, !!profile, coreDataReady, prefetchBrandId, currentRole]);
+  }, [activeTab, !!session, !!profile, tabDataReady, prefetchBrandId, currentRole]);
 
   // Link /brand/<slug>/… mở lúc brand chưa nạp: đối chiếu slug một lần khi đã nạp xong. Điều chỉnh
   // state ngay trong render (không qua effect) để lần vẽ đầu sau khi nạp đã đúng brand, không nháy Agency.
@@ -1770,7 +1774,7 @@ export default function App() {
                 )}
               >
               <Suspense fallback={<TabLoading />}>
-                {!coreDataReady && !TABS_WITHOUT_CORE_DATA.has(activeTab) ? (
+                {!tabDataReady && !TABS_WITHOUT_CORE_DATA.has(activeTab) ? (
                   <TabLoading />
                 ) : (
                 <>
@@ -2200,6 +2204,7 @@ export default function App() {
                     currentRole={currentRole}
                     sessions={platformSessions}
                     talents={activeTalents}
+                    coreReady={coreDataReady}
                     onSessionsChanged={handleReconciliationApplied}
                   />
                 )}

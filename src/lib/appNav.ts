@@ -56,6 +56,13 @@ export const CALENDAR_TABS = new Set(["calendar", "brand_calendar", "shift_sched
 // (Gần như tab nào cũng nhận `sessions` — kể cả CRM/Studios/Rate Card — nên danh sách này cố ý ngắn.)
 export const TABS_WITHOUT_CORE_DATA = new Set(["account_settings", "tiktok_api"]);
 
+// Màn nhập số liệu: phần chính (chọn file, lịch sử import) không đọc ca/talent/report — chỉ cần biết brand và kênh để chọn sàn.
+// Chờ `shellDataReady` (brand + kênh) thay vì `coreDataReady` (cả ca/talent/report): danh sách ca là thứ nặng nhất lúc mở app
+// (1.500 ca, tăng ~400 ca/tháng) nên không để nó giữ màn nhập số liệu. Phần cần ca TRONG các màn này (Nạp bù, Đối soát, tháng
+// mặc định của Nhập Ads) tự chờ `coreReady`/sessions — KHÔNG vẽ "0 ca" giả. Thêm tab vào đây chỉ khi đã kiểm nó không đọc
+// `sessions`/`talents`/`monthlyReports` ngoài các khối tự chờ (test `tests/shellOnlyTabs.test.ts` canh hai tab hiện có).
+export const TABS_NEEDING_SHELL_ONLY = new Set(["brand_dataraw", "brand_ads_report"]);
+
 // Tab render được nhưng cố ý KHÔNG nằm trong sidebar (vào từ menu user ở Header). Phải khai
 // báo ở đây vì isTabAllowed coi "không có nav item" là không được phép.
 export const TABS_WITHOUT_NAV_ITEM = new Set(["account_settings"]);

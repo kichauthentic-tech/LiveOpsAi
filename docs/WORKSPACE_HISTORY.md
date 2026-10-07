@@ -5012,3 +5012,21 @@ Nguyên văn các mục §1 của WORKSPACE_DESIGN.md trước khi gọn lại (
 - **03/10–04/10: cắt vòng mạng nối tiếp lúc tải** (cache `/assets/*` immutable, chunk tab tải song song dữ liệu, nạp trước lượt đọc màn,
   `lazyNamed` bỏ fallback 300 ms…). Chi tiết: lịch sử `## Cắt vòng mạng nối tiếp (2026-10-03/04)`. **Sau deploy phải kiểm:** `curl -sI
   https://live-ops-ai.vercel.app/assets/<file>.js` có `immutable`.
+
+## Giảm thời gian mở app (2026-10-07)
+Trigger: user thấy app "load lâu khi bắt đầu nhập số liệu". Chi tiết (số đo trên máy user, mạng yếu — đừng so tuyệt đối):
+- **Mạng:** ping Cloudflare HKG ~215 ms (Google 76 ms); tải 1 MB ~6 s (~150 KB/s); TLS tới Supabase 0,5–3,5 s; `cloudflare.com` cũng dao động 0,9–3,3 s ⇒ lỗi đường truyền, không phải vùng DB.
+- **Khởi động:** 28–36 request. Làm mới token hết hạn chặn mọi truy vấn 0,3–3,7 s (tuần tự). Mọi bảng khác xong ≤2 s, riêng `live_sessions_secure` ~10 s (+ trang 2 nối tiếp).
+  1.501 ca (T6 251, T7 275, T8 288, T9 318, T10 370; T6–T9 là nạp bù); `select *` = 52 cột, 1,3 MB raw / 85 KB gzip mỗi 1.000 dòng; các cột còn lại ~95% byte lúc mở. Chỉ `ai_analysis`,
+  `created_at`, `updated_at` không dùng (~9%). Bảng con (reports/segments/checkpoints/finance) hiện 0–1 KB nhưng sẽ phình khi nhóm dùng vòng đời thật.
+- **Đã làm (5615c13):** 2 trang song song, cột tường minh, preload xlsx. Sau đó: màn hiện ~4,6 s (trước 10–12 s). **Cổng theo màn:** `TABS_NEEDING_SHELL_ONLY` (Dữ Liệu Gốc, Nhập Ads) + `shellDataReady`;
+  kênh brand nạp riêng. Đo iframe với ca bị chặn 6 s: màn 0,5–0,85 s, Nhập Ads giữ tháng 9/2026 trước và sau khi ca về, brand hai sàn (JOCKEY) chọn sàn đúng từ lần vẽ đầu.
+- **Cắt cửa sổ ca (ĐÃ CÂN, BỎ):** cửa sổ T8–T10 = 976 ca (1 trang, −35% byte) nhưng đổi hành vi ~25 màn, phần lớn IM LẶNG: snapshot Report Tháng M lấy ca từ M−3 (`monthlySnapshot.ts:235`) ⇒
+  dựng/phát hành report T8–T10 thiếu T6–T7 và lưu vào DB (ReportPublishBoard.tsx:102-158); mọi report bị báo "đã đổi"; cam kết tháng cũ "Đang chậm" (brandCommitment.ts:127); nạp bù xem trước sai +
+  có thể sinh ca thứ hai cho buổi live chưa có room id (server không kiểm chồng giờ); tổng talent/AI ghép host, dự báo (cần ≥20 ca đối soát/2–3 tháng), Sổ Ca, TodoPanel, Host/Xếp ca (90 ngày = 09/07), chọn tháng cũ ra 0.
+  `App.tsx:1072` tải lại TOÀN BỘ ca sau đối soát — cửa sổ phải áp ở đó nữa.
+- **Cache cục bộ IndexedDB (ĐÃ THIẾT KẾ, HOÃN):** bản sao ca theo user + so bảng kê (id, updated_at) để chỉ tải dòng đổi/xoá; chỉ ceo/admin/operations (view che số theo tháng phát hành không đổi `updated_at` ⇒ brand/talent bỏ qua);
+  ghi bản sao bằng dòng RPC trả về sau mỗi lần sửa; khoá tạo/phát hành report tới khi đồng bộ xong; phiên bản bản sao = hash `SESSION_READ_COLUMNS`; xoá khi đăng xuất, TTL 7 ngày; cờ localStorage tắt/bật, làm trên nhánh riêng.
+  Rủi ro đã liệt kê (20 mục): nháy giá trị cũ, report dựng từ ca cũ, mất mạng hiện số cũ, dữ liệu nhạy cảm trên đĩa, đổi role, cổng `coreDataReady`/prefetch (`App.tsx:665`), test Node không có IndexedDB. Đảo quy ước "KHÔNG cache" §5.3.
+- **Chưa kiểm được:** PostgREST/Supabase có hỗ trợ ETag + 304 không (trình duyệt không lộ header ETag; cần thử bằng curl).
+

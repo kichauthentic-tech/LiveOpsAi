@@ -95,7 +95,9 @@ test("sidebar thu gọn chỉ theo bề ngang màn, không theo tab (hết nhả
 
 test("tab chờ đợt nạp dữ liệu đầu thay vì vẽ 0 ca / 'Chưa có…' giả", () => {
   const app = readFileSync(join(SRC, "App.tsx"), "utf8");
-  expect(app).toMatch(/!coreDataReady && !TABS_WITHOUT_CORE_DATA\.has\(activeTab\)/);
+  // Cổng của tab = cổng đủ ca/talent/report, trừ màn nhập số liệu (TABS_NEEDING_SHELL_ONLY, xem tests/shellOnlyTabs.test.ts).
+  expect(app).toMatch(/!tabDataReady && !TABS_WITHOUT_CORE_DATA\.has\(activeTab\)/);
+  expect(app).toMatch(/const tabDataReady = TABS_NEEDING_SHELL_ONLY\.has\(activeTab\) \? shellDataReady : coreDataReady;/);
   // Ca phải nạp song song với RPC đóng ca đã qua giờ, không nối đuôi sau nó.
   expect(app).not.toMatch(/completePastSessions\(\)\s*\.catch\([^)]*\)\s*\.then\(\(\) => fetchSessions\(\)\)/);
 });

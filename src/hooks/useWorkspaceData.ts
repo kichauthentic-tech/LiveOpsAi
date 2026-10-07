@@ -234,6 +234,11 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
   const [talentsLoadedFor, setTalentsLoadedFor] = useState<string | null>(null);
   const [sessionsLoadedFor, setSessionsLoadedFor] = useState<string | null>(null);
   const [reportsLoadedFor, setReportsLoadedFor] = useState<string | null>(null);
+  // Kênh brand × sàn nạp RIÊNG (bảng nhỏ), không nằm chung đợt đăng ký ca/kế hoạch tháng vốn chậm nhất — màn chỉ cần
+  // biết "brand chạy sàn nào" (Dữ Liệu Gốc, Nhập Ads) không phải chờ cả đợt đó.
+  const [channelsLoadedFor, setChannelsLoadedFor] = useState<string | null>(null);
+  // Đủ để vẽ màn KHÔNG đọc ca/talent/report (lib/appNav.ts TABS_NEEDING_SHELL_ONLY): đã biết brand và kênh để chọn sàn.
+  const shellDataReady = !!authUserId && brandsLoaded && channelsLoadedFor === authUserId;
   const coreDataReady =
     !!authUserId &&
     talentsLoadedFor === authUserId &&
@@ -393,15 +398,28 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
     };
   }, [authUserId, permissionsNonce]);
 
+  // Kênh brand × sàn (0149): bảng nhỏ, nạp riêng để `shellDataReady` không phải chờ đợt đăng ký ca bên dưới. Lỗi thì vẫn
+  // đánh dấu đã xong (kênh rơi về suy từ dữ liệu như trước 0149) và báo cùng chỗ với đợt đó — không để màn treo ở khung chờ.
   useEffect(() => {
     if (!authUserId) return;
     let cancelled = false;
-    Promise.all([fetchBrandPlatformRates(), fetchShiftSlots(), fetchShiftRegistrations(), fetchRecurringShiftTemplates(), fetchLockedPlanTargets().catch(() => ({ bySlotId: new Map<string, number>(), monthTotals: new Map<string, number>(), slotTargets: new Map<string, { date: string; target: number }[]>() })), fetchBrandStudios().catch(() => [] as BrandStudio[]), fetchBrandChannels()])
-      .then(([rates, slots, regs, templates, planTargets, bStudios, channels]) => {
+    fetchBrandChannels()
+      .then((channels) => { if (!cancelled) setBrandChannels(channels); })
+      .catch((err) => { if (!cancelled) setPhase14Error(err.message ?? "Không tải được dữ liệu kênh brand — thử tải lại trang."); })
+      .finally(() => { if (!cancelled) setChannelsLoadedFor(authUserId); });
+    return () => {
+      cancelled = true;
+    };
+  }, [authUserId]);
+
+  useEffect(() => {
+    if (!authUserId) return;
+    let cancelled = false;
+    Promise.all([fetchBrandPlatformRates(), fetchShiftSlots(), fetchShiftRegistrations(), fetchRecurringShiftTemplates(), fetchLockedPlanTargets().catch(() => ({ bySlotId: new Map<string, number>(), monthTotals: new Map<string, number>(), slotTargets: new Map<string, { date: string; target: number }[]>() })), fetchBrandStudios().catch(() => [] as BrandStudio[])])
+      .then(([rates, slots, regs, templates, planTargets, bStudios]) => {
         if (cancelled) return;
         setBrandPlatformRates(rates);
         setBrandStudios(bStudios);
-        setBrandChannels(channels);
         setShiftSlots(slots);
         setShiftRegistrations(regs);
         setRecurringShiftTemplates(templates);
@@ -679,6 +697,7 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
     sessions,
     planTargetsBySessionId,
     coreDataReady,
+    shellDataReady,
     reloadRolePermissions,
     refreshTikTokStatus
   };

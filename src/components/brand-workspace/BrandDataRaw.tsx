@@ -23,6 +23,9 @@ interface BrandDataRawProps {
   // đã có ca và để gán host; onSessionsChanged nạp lại ca sau khi sinh/gán.
   sessions: LiveSession[];
   talents: Talent[];
+  /** Ca/talent đã nạp xong chưa. Màn mở ngay khi có brand + kênh (không đợi 1.500 ca); khối cần ca (Nạp bù, Đối soát)
+   *  chờ cờ này thay vì vẽ "0 ca" giả. */
+  coreReady: boolean;
   onSessionsChanged: () => Promise<void>;
 }
 
@@ -126,7 +129,7 @@ export function prefetchBrandDataRaw({ brandId }: TabPrefetchCtx): void {
   if (brandId) dataRawImportsRead.prefetch(brandId, DEFAULT_REPORT_TYPE);
 }
 
-export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ platform, brandId, brandName, currentRole, sessions: allSessions, talents, onSessionsChanged }) => {
+export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ platform, brandId, brandName, currentRole, sessions: allSessions, talents, coreReady, onSessionsChanged }) => {
   const confirm = useConfirm();
   const canManage = CAN_MANAGE.includes(currentRole);
   const prof = profileOf(platform);
@@ -326,8 +329,15 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ platform, brandId, b
         <div className="bg-emerald-950/30 border border-emerald-800/50 text-emerald-400 text-xs font-semibold p-3 rounded-xl">{notice}</div>
       )}
 
+      {/* Hai khối dưới đọc danh sách ca: chờ ca về (cờ coreReady) thay vì hiện "0 ca" — phần up file bên dưới không phải chờ. */}
+      {!coreReady && (isReconType || activeType === "creator_live_performance") && (
+        <div className="bg-[var(--surface)] p-4 rounded-2xl border border-[var(--border)] text-xs text-[var(--text-muted)]">
+          Đang tải danh sách ca để đối soát / nạp bù — bạn vẫn có thể chọn file ở khung Import bên dưới.
+        </div>
+      )}
+
       {/* Đối soát số liệu — gộp vào đây (07/10), cùng một lần up với Dữ Liệu Gốc */}
-      {isReconType && (
+      {coreReady && isReconType && (
         <ReconciliationPanel
           brandId={brandId}
           brandName={brandName}
@@ -339,7 +349,7 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ platform, brandId, b
       )}
 
       {/* Nạp bù ca từ room — chỉ có ý nghĩa với file Creator-Live-Performance */}
-      {activeType === "creator_live_performance" && (
+      {coreReady && activeType === "creator_live_performance" && (
         <BackfillFromRooms
           brandId={brandId}
           brandName={brandName}
