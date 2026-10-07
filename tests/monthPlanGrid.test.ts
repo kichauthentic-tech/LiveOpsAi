@@ -11,7 +11,9 @@ import {
   daysOfMonth,
   draftKeyOf,
   draftsFromSaved,
+  draftsFromSessions,
   draftsFromSuggestion,
+  endsAfterMidnight,
   mergeFromTemplates,
   nextSlotForDay,
   slotHours,
@@ -228,4 +230,45 @@ test("mergeFromTemplates thêm ca còn thiếu và GIỮ NGUYÊN ca ops đã v�
   expect(next[0]).toMatchObject({ key: "mine", targetGmv: 777 }); // không bị ghi đè
   expect(next.filter((x) => x.date === "2026-10-08")).toHaveLength(1); // không nhân đôi
   expect(next.find((x) => x.date === "2026-10-15")?.note).toBe("từ quy tắc");
+});
+
+// ── dựng lưới từ ca đã nhập (07/10: lịch T10 nạp bằng file, 0 shift_slots) ──────────────────────────────
+
+
+const sess = (date: string, startTime: string, endTime: string, targetGmv = 0, status: "Upcoming" | "Cancelled" | "Completed" = "Upcoming") => ({ date, startTime, endTime, targetGmv, status });
+
+test("draftsFromSessions: bỏ ca huỷ, gộp ca trùng hệt giờ, giữ target ghi trên ca", () => {
+  const { next, added, duplicates } = draftsFromSessions(
+    [
+      sess("2026-10-02", "11:00", "14:00", 10_000_000),
+      sess("2026-10-02", "11:00", "14:00", 99), // trùng hệt (VERA TikTok 03/10 có thật) — chỉ lấy một
+      sess("2026-10-01", "20:00:00", "23:00:00", 5_000_000), // giờ có giây vẫn về hh:mm
+      sess("2026-10-03", "11:00", "14:00", 7, "Cancelled")
+    ],
+    []
+  );
+  expect(added).toBe(2);
+  expect(duplicates).toBe(1);
+  expect(next.map(draftKeyOf)).toEqual(["2026-10-01|20:00|23:00", "2026-10-02|11:00|14:00"]);
+  expect(next.map((x) => x.targetGmv)).toEqual([5_000_000, 10_000_000]);
+});
+
+test("draftsFromSessions: ca đã có trong lưới giữ nguyên id/target, chỉ thêm ca còn thiếu", () => {
+  const have = d("2026-10-02", "11:00", "14:00", { id: "plan-slot-1", targetGmv: 42 });
+  const { next, added } = draftsFromSessions([sess("2026-10-02", "11:00", "14:00", 1), sess("2026-10-04", "09:00", "12:00", 8)], [have]);
+  expect(added).toBe(1);
+  expect(next.find((x) => x.date === "2026-10-02")).toMatchObject({ id: "plan-slot-1", targetGmv: 42 });
+});
+
+test("ca qua nửa đêm hợp lệ trong lưới; nhập ngược giờ ban ngày vẫn bị chặn", () => {
+  const win = { ...PLAN, liveWindowStart: "09:00", liveWindowEnd: "23:59" };
+  expect(endsAfterMidnight({ startTime: "21:00", endTime: "00:30" })).toBe(true);
+  expect(endsAfterMidnight({ startTime: "21:00", endTime: "00:00" })).toBe(true);
+  expect(endsAfterMidnight({ startTime: "11:00", endTime: "09:00" })).toBe(false);
+  expect(validateDrafts([d("2026-10-09", "21:00", "00:30")], win)).toEqual([]);
+  expect(validateDrafts([d("2026-10-09", "11:00", "09:00")], win)[0]).toContain("kết thúc trước khi bắt đầu");
+  // chồng giờ tính qua nửa đêm: ca 21:00–00:30 và ca 23:00 cùng ngày chồng nhau
+  expect(validateDrafts([d("2026-10-09", "21:00", "00:30"), d("2026-10-09", "23:00", "23:30")], win).join()).toContain("chồng giờ");
+  // ca qua nửa đêm bắt đầu sau cuối khung vẫn ngoài khung
+  expect(validateDrafts([d("2026-10-09", "23:30", "00:30")], { ...PLAN, liveWindowStart: "09:00", liveWindowEnd: "23:00" }).join()).toContain("ngoài khung");
 });

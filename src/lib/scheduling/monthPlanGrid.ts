@@ -77,6 +77,32 @@ export function mergeFromTemplates(
   return { next: [...drafts, ...added], added: added.length };
 }
 
+// Dựng lưới từ CA ĐÃ NHẬP (live_sessions nạp từ file/tạo tay trước khi có kế hoạch — 07/10: lịch T10 của 6 kênh). Mỗi ca chưa huỷ
+// thành một ca kế hoạch theo (ngày, giờ bắt đầu, giờ kết thúc); khoá trùng (hai ca nhập hệt nhau) chỉ lấy một. Target ca = target đã
+// ghi trên ca thật nếu có (file lịch có cột target), không thì 0 — để ops nhập target tháng rồi "Chia target". Ca đã có trong lưới giữ
+// nguyên (id, target); `base` mặc định là lưới hiện tại, truyền [] để dựng lại từ đầu.
+export function draftsFromSessions(
+  sessions: Pick<LiveSession, "date" | "startTime" | "endTime" | "status" | "targetGmv">[],
+  base: PlanDraftSlot[]
+): { next: PlanDraftSlot[]; added: number; duplicates: number } {
+  const have = new Set(base.map(draftKeyOf));
+  const added: PlanDraftSlot[] = [];
+  let duplicates = 0;
+  const ordered = [...sessions].filter((x) => x.status !== "Cancelled").sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
+  for (const x of ordered) {
+    const slot = { date: x.date, startTime: x.startTime.slice(0, 5), endTime: x.endTime.slice(0, 5) };
+    const k = draftKeyOf(slot);
+    if (have.has(k)) {
+      duplicates++;
+      continue;
+    }
+    have.add(k);
+    added.push({ key: newKey(), ...slot, targetGmv: Math.max(0, Math.round(x.targetGmv || 0)), note: "" });
+  }
+  const next = [...base, ...added].sort((a, b) => draftKeyOf(a).localeCompare(draftKeyOf(b)));
+  return { next, added: added.length, duplicates };
+}
+
 // Chia target tổng xuống từng ca theo trọng số — một công thức duy nhất cho cả lưới ops tự vẽ lẫn lưới
 // engine gợi ý. Ca cuối nhận phần dư làm tròn. Trọng số từ 2026-09-28 (user chốt): giờ × GMV/giờ loại
 // ngày × chỉ số khung giờ / vị trí ngày camp (`targetWeights`, slotInsights.ts) khi brand đủ 2 tháng
@@ -110,13 +136,24 @@ export function totalsOf(drafts: PlanDraftSlot[]): PlanTotals {
   };
 }
 
-// Lỗi chặn lưu: giờ kết thúc ≤ bắt đầu, ngoài khung, trùng/chồng giờ trong ngày, quá số ca/ngày.
+const toMin = (t: string) => {
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+};
+
+/** Ca kết thúc SAU nửa đêm (21:00–00:30, 22:03–00:03): giờ kết thúc nhỏ hơn giờ bắt đầu và rơi vào rạng sáng. Giờ kết thúc
+ *  sớm hơn giờ bắt đầu mà KHÔNG rạng sáng (11:00–09:00) vẫn là nhập ngược. */
+export const endsAfterMidnight = (s: Pick<PlanDraftSlot, "startTime" | "endTime">) => s.endTime < s.startTime && s.endTime <= "06:00";
+
+// Lỗi chặn lưu: giờ kết thúc ≤ bắt đầu (trừ ca qua nửa đêm), ngoài khung, trùng/chồng giờ trong ngày, quá số ca/ngày.
 export function validateDrafts(drafts: PlanDraftSlot[], plan: Pick<BrandMonthPlan, "liveWindowStart" | "liveWindowEnd" | "maxSlotsPerDay">): string[] {
   const errors: string[] = [];
   const byDay = new Map<string, PlanDraftSlot[]>();
   for (const d of drafts) {
-    if (d.endTime <= d.startTime) errors.push(`${d.date}: ca ${d.startTime}-${d.endTime} kết thúc trước khi bắt đầu`);
-    if (d.startTime < plan.liveWindowStart || d.endTime > plan.liveWindowEnd) errors.push(`${d.date}: ca ${d.startTime}-${d.endTime} ngoài khung ${plan.liveWindowStart}-${plan.liveWindowEnd}`);
+    const overnight = endsAfterMidnight(d);
+    if (d.endTime <= d.startTime && !overnight) errors.push(`${d.date}: ca ${d.startTime}-${d.endTime} kết thúc trước khi bắt đầu`);
+    // Ca qua nửa đêm: chỉ giờ BẮT ĐẦU phải nằm trong khung (giờ kết thúc ở ngày hôm sau).
+    if (d.startTime < plan.liveWindowStart || (overnight ? d.startTime >= plan.liveWindowEnd : d.endTime > plan.liveWindowEnd)) errors.push(`${d.date}: ca ${d.startTime}-${d.endTime} ngoài khung ${plan.liveWindowStart}-${plan.liveWindowEnd}`);
     const list = byDay.get(d.date) ?? [];
     list.push(d);
     byDay.set(d.date, list);
@@ -125,7 +162,9 @@ export function validateDrafts(drafts: PlanDraftSlot[], plan: Pick<BrandMonthPla
     if (list.length > plan.maxSlotsPerDay) errors.push(`${day}: ${list.length} ca, vượt tối đa ${plan.maxSlotsPerDay}`);
     const sorted = [...list].sort((a, b) => a.startTime.localeCompare(b.startTime));
     for (let i = 1; i < sorted.length; i++) {
-      if (sorted[i].startTime < sorted[i - 1].endTime) errors.push(`${day}: ca ${sorted[i].startTime} chồng giờ với ca ${sorted[i - 1].startTime}-${sorted[i - 1].endTime}`);
+      const prev = sorted[i - 1];
+      const prevEnd = toMin(prev.endTime) + (endsAfterMidnight(prev) ? 24 * 60 : 0);
+      if (toMin(sorted[i].startTime) < prevEnd) errors.push(`${day}: ca ${sorted[i].startTime} chồng giờ với ca ${prev.startTime}-${prev.endTime}`);
     }
   }
   return errors;

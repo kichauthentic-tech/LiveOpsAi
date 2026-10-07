@@ -17,8 +17,11 @@ import {
   allocateDraftTargets,
   crossBrandCheck,
   daysOfMonth,
+  draftKeyOf,
   draftsFromSaved,
+  draftsFromSessions,
   draftsFromSuggestion,
+  endsAfterMidnight,
   mergeFromTemplates,
   nextSlotForDay,
   slotHours,
@@ -440,6 +443,51 @@ export default function MonthPlan({
     setDirty(added > 0 || dirty);
     setMsg(added > 0 ? `Nạp thêm ${added} ca từ quy tắc lặp.` : brandTemplates.filter((t) => t.active).length === 0 ? "Brand chưa có quy tắc lặp nào active." : "Mọi ca theo quy tắc đã có trong lưới.");
   };
+  // Ca đã nhập sẵn (file lịch / tạo tay) của brand × sàn × tháng đang xem — nguồn của "Dựng lưới từ ca đã nhập" và của số ca
+  // Chốt sẽ GẮN thay vì mở ca chờ đăng ký (0151).
+  const monthSessions = useMemo(
+    () => platformSessions.filter((s) => s.brandId === brandId && s.date.slice(0, 7) === month && s.status !== "Cancelled"),
+    [platformSessions, brandId, month]
+  );
+  // Lịch tháng đã nhập bằng file thì kế hoạch phải dựng theo ĐÚNG lịch đó: lưới nháp tự sinh gần như không khớp ca thật (đo 07/10:
+  // CROCS T10 26/75 ca khớp giờ) nên chốt nó sẽ mở hàng chục ca chờ đăng ký trùng và để 60+ ca thật "ngoài kế hoạch, target 0".
+  const loadFromSessions = async () => {
+    if (monthSessions.length === 0) {
+      setMsg(`${brandLabel(brand?.name)} chưa có ca nào đã nhập trong tháng ${fmtMonth(month)}.`);
+      return;
+    }
+    if (!locked && drafts.length > 0 && !(await confirm(`Dựng lại lưới theo ${monthSessions.length} ca đã nhập? ${drafts.length} ca nháp đang có sẽ được thay (chưa lưu thì mất). Target ghi sẵn trên ca đã nhập được giữ; chưa có thì chia từ Target GMV tháng.`))) return;
+    const { next, added, duplicates } = draftsFromSessions(monthSessions, locked ? drafts : []);
+    const perDay = new Map<string, number>();
+    for (const d of next) perDay.set(d.date, (perDay.get(d.date) ?? 0) + 1);
+    const overnight = next.some((d) => endsAfterMidnight(d));
+    const ends = next.filter((d) => !endsAfterMidnight(d)).map((d) => d.endTime);
+    setSettings((st) => ({
+      ...st,
+      maxSlotsPerDay: Math.min(8, Math.max(st.maxSlotsPerDay, ...perDay.values())),
+      liveWindowStart: [st.liveWindowStart, ...next.map((d) => d.startTime)].sort()[0],
+      liveWindowEnd: [st.liveWindowEnd, ...ends, ...(overnight ? ["23:59"] : [])].sort().at(-1) ?? st.liveWindowEnd
+    }));
+    const fileTarget = totalsOf(next).target;
+    if (fileTarget > 0) {
+      // Target đã ghi trên ca thật: giữ nguyên từng ca, KHÔNG chia lại; target tháng = tổng.
+      if (!locked) setSettings((st) => ({ ...st, targetGmv: Math.round(fileTarget) }));
+      setDrafts(next);
+    } else {
+      setDrafts(withForecast(next));
+    }
+    setDirty(true);
+    const noTarget = next.filter((d) => d.targetGmv <= 0).length;
+    setMsg(
+      `${locked ? `Thêm ${added} ca đã nhập chưa có trong kế hoạch` : `Đã dựng lưới ${next.length} ca theo lịch đã nhập`}${duplicates > 0 ? ` (bỏ ${duplicates} ca trùng hệt giờ)` : ""}. ` +
+        (fileTarget > 0
+          ? `Target lấy từ ca đã nhập: tổng ${fmtVndShort(fileTarget)}${noTarget > 0 ? `, ${noTarget} ca chưa có target` : ""}. `
+          : targetTotal > 0
+            ? `Đã chia ${fmtVndShort(targetTotal)} xuống ca. `
+            : "Chưa có target — nhập Target GMV tháng rồi bấm Chia lại target. ") +
+        "Kiểm tra rồi bấm Chốt: ca đã nhập được GẮN vào kế hoạch, không mở ca chờ đăng ký."
+    );
+  };
   // Chia target tổng xuống ca theo DỰ BÁO từng ca (cùng công thức engine gợi ý); brand chưa có lịch
   // sử thì chia theo giờ.
   const allocate = () => {
@@ -585,17 +633,21 @@ export default function MonthPlan({
     const sumNote = Math.abs(sumDelta) >= 1
       ? `\n\nTarget các ca cộng lại ${fmtVndShort(totals.target)} ${sumDelta > 0 ? "VƯỢT" : "THIẾU"} ${fmtVndShort(Math.abs(sumDelta))} so với ô Target GMV tháng ${fmtVndShort(targetTotal)}. Sau khi chốt, target tháng = tổng các ca (${fmtVndShort(totals.target)}) ở mọi màn.`
       : "";
-    const pastCount = drafts.filter((d) => d.date < today).length;
+    // 0151: ca kế hoạch trùng giờ với ca đã nhập thì được GẮN vào ca đó (không mở ca chờ đăng ký), kể cả ngày đã qua.
+    const enteredKeys = new Set(monthSessions.map(draftKeyOf));
+    const matchedCount = drafts.filter((d) => !d.slotId && enteredKeys.has(draftKeyOf(d))).length;
+    const pastCount = drafts.filter((d) => d.date < today && !enteredKeys.has(draftKeyOf(d))).length;
+    const matchedNote = matchedCount > 0 ? `\n\n${matchedCount} ca trùng giờ với ca đã nhập sẽ được GẮN vào ca đó (nhận target, không mở đăng ký). Cần migration 0151 đã chạy — chưa chạy thì chốt sẽ mở thêm ca chờ đăng ký trùng giờ.` : "";
     const pastNote =
       pastCount > 0
-        ? `\n\n${pastCount} ca ở ngày đã qua sẽ KHÔNG mở chờ đăng ký (chỉ giữ target trong kế hoạch). Ca nào đã live thật: mở ca đúng ngày giờ đó ở Bảng Vận Hành → Lịch & Studio → "Mở ca chờ đăng ký" — ca mở TRƯỚC khi chốt sẽ được gắn vào kế hoạch và nhận target; mở sau thì bấm "Chốt lại".`
+        ? `\n\n${pastCount} ca ở ngày đã qua không có ca đã nhập tương ứng sẽ KHÔNG mở chờ đăng ký (chỉ giữ target trong kế hoạch). Ca nào đã live thật: mở ca đúng ngày giờ đó ở Bảng Vận Hành → Lịch & Studio → "Mở ca chờ đăng ký" — ca mở TRƯỚC khi chốt sẽ được gắn vào kế hoạch và nhận target; mở sau thì bấm "Chốt lại".`
         : "";
     const studioNote = brandStudio ? `\n\nCa sinh ra gắn phòng ${brandStudio.name} (${brandStudio.roomNumber}).` : "\n\nBrand CHƯA có phòng live mặc định — ca sinh ra sẽ không có phòng (không kiểm được trùng phòng). Chọn ở CRM → Hợp đồng & giá trước nếu cần.";
     const clashNote = crossBrand.clashes.length > 0
       ? `\n\n⚠ ${crossBrand.clashes.length} ca TRÙNG PHÒNG với brand khác (vd ${crossBrand.clashes[0].date.slice(8)}/${crossBrand.clashes[0].date.slice(5, 7)} ${crossBrand.clashes[0].startTime}: ${crossBrand.clashes[0].roomTakenBy}). Chốt vẫn gắn phòng này — phải đổi phòng từng ca sau.`
       : "";
     const capNote = overCapacity ? `\n\n⚠ Ngày ${overCapacity.date.slice(8)}/${overCapacity.date.slice(5, 7)} ${overCapacity.startTime} có ${overCapacity.concurrent} ca chạy cùng lúc toàn agency — có ${studios.length} phòng, ${hostCapacity} người host.` : "";
-    if (!(await confirm(`${locked ? "Chốt lại" : "Chốt"} kế hoạch ${brandLabel(brand?.name)} tháng ${fmtMonth(month)}: ${drafts.length} ca chờ đăng ký?${warn}${targetWarn}${sumNote}${relockNote}${studioNote}${clashNote}${capNote}${pastNote}`))) return;
+    if (!(await confirm(`${locked ? "Chốt lại" : "Chốt"} kế hoạch ${brandLabel(brand?.name)} tháng ${fmtMonth(month)}: ${drafts.length} ca${matchedCount > 0 ? ` (${matchedCount} gắn ca đã nhập, ${drafts.length - matchedCount} chờ đăng ký)` : " chờ đăng ký"}?${warn}${targetWarn}${sumNote}${relockNote}${studioNote}${clashNote}${capNote}${matchedNote}${pastNote}`))) return;
     const p = await save({ committing: true });
     if (!p) return;
     setSaving(true);
@@ -610,8 +662,8 @@ export default function MonthPlan({
       refreshMissing();
       setLockedSlotsTick((t) => t + 1);
       setMsg(
-        `Đã chốt: mở ${r.created} ca mới${r.linked > 0 ? `, gắn ${r.linked} ca đã có sẵn` : ""}${r.cancelled > 0 ? `, huỷ ${r.cancelled} ca bị bỏ` : ""}` +
-          `${r.kept_registered > 0 ? `, GIỮ ${r.kept_registered} ca bị bỏ nhưng đã có người đăng ký (xử lý ở Nhân sự ca)` : ""}${(r.skipped_past ?? 0) > 0 ? `, bỏ qua ${r.skipped_past} ca ngày đã qua (ca nào đã live: mở ca đúng giờ ở Lịch & Studio rồi bấm Chốt lại để gắn target)` : ""} — ${r.total_slots} ca đang chờ đăng ký.`
+        `Đã chốt: mở ${r.created} ca mới${(r.linked_sessions ?? 0) > 0 ? `, gắn ${r.linked_sessions} ca đã nhập` : ""}${r.linked > 0 ? `, gắn ${r.linked} ca đã có sẵn` : ""}${r.cancelled > 0 ? `, huỷ ${r.cancelled} ca bị bỏ` : ""}` +
+          `${r.kept_registered > 0 ? `, GIỮ ${r.kept_registered} ca bị bỏ nhưng đã có người đăng ký (xử lý ở Nhân sự ca)` : ""}${(r.skipped_past ?? 0) > 0 ? `, bỏ qua ${r.skipped_past} ca ngày đã qua (ca nào đã live: mở ca đúng giờ ở Lịch & Studio rồi bấm Chốt lại để gắn target)` : ""} — ${r.total_slots} ca kế hoạch đã có ca thật/ca chờ${r.created > 0 ? ` (${r.created} ca đang chờ đăng ký)` : ""}.`
       );
     } catch (e) {
       setMsg(`Không chốt được: ${errorMessage(e)}`);
@@ -872,6 +924,11 @@ export default function MonthPlan({
             <button onClick={() => suggest("hours")} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] border border-[var(--accent)]/60 text-xs font-bold text-[var(--accent-text)] flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" /> Gợi ý phân bổ</button>
             <button onClick={() => suggest("target")} disabled={targetTotal <= 0} title={targetTotal <= 0 ? "Nhập Target GMV tháng trước" : "Xếp tới khi dự báo chạm target"} className="px-3 py-1.5 rounded-lg border border-[var(--accent)]/40 text-xs font-bold text-[var(--accent-text)] disabled:opacity-40 flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" /> Xếp theo target</button>
           </>
+        )}
+        {editable && monthSessions.length > 0 && (
+          <button onClick={() => void loadFromSessions()} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] border border-[var(--accent)]/60 text-xs font-bold text-[var(--accent-text)] flex items-center gap-1.5" title="Lịch tháng đã nhập bằng file/tạo tay: dựng kế hoạch theo đúng các ca đó rồi Chốt để đồng bộ">
+            <CalendarRange className="w-3.5 h-3.5" /> Dựng lưới từ {monthSessions.length} ca đã nhập
+          </button>
         )}
         {editable && <button onClick={loadTemplates} className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-xs font-bold text-[var(--text)] hover:border-[var(--accent)]">Nạp từ quy tắc</button>}
         {/* Sau khi chốt: không gợi ý lại / chia lại target / xoá hết — target từng ca là số đã cam kết (luật run-rate). */}

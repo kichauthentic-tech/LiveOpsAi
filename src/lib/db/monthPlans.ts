@@ -199,6 +199,7 @@ export interface LockPlanResult {
   kept_registered: number; // bị bỏ khỏi kế hoạch nhưng đã có người đăng ký → giữ, ops tự xử
   total_slots: number;
   skipped_past?: number; // 0099: ca kế hoạch ở ngày đã qua, không sinh slot
+  linked_sessions?: number; // 0151: ca kế hoạch gắn vào ca thật nạp sẵn (không mở đăng ký)
 }
 
 export async function lockMonthPlan(planId: string): Promise<LockPlanResult> {

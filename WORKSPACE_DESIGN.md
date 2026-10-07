@@ -77,6 +77,17 @@
     Giữ nguyên "GMV" làm tên chính (user chốt 06/10 GMV = Sales(Placed Order)); đổi sang "Sales" chỉ cần sửa `METRIC.gmv` cho Shopee nếu user muốn. Khoá bằng
     `tests/shopeeMetricNames.test.ts` (quét chữ hiển thị file thuần Shopee + bộ 9 ô). Verify: tsc, lint 0 lỗi, vitest 622/622, audit:dead 0, build; bản build nối DB
     thật: Dashboard VERA·Shopee, Report Tháng (bản chụp cũ), Bản Tin CEO Shopee không lỗi, đúng tên mới.
+  - **07/10 — chốt tháng 10 khi lịch đã nhập bằng file (migration `0151`, ĐÃ CHẠY 07/10 — user xác nhận):** DB thật lúc đo: T10 có 366 ca `live_sessions` (6 kênh), 0
+    `shift_slots`, chỉ một kế hoạch nháp (CROCS TikTok 75 ca / 5,5 tỷ, chỉ 26 ca khớp giờ ca thật). `lock_month_plan` (0140) chỉ nhận ra
+    SHIFT_SLOT có sẵn ⇒ Chốt sẽ mở ~44 ca chờ đăng ký TRÙNG ca đã có host (kèm thông báo cho mọi talent) và để 63 ca thật "ngoài kế hoạch,
+    target 0". Sửa: `0151` — ca kế hoạch trùng brand|ngày|giờ|sàn với ca thật chưa huỷ (chưa shift_slot nào trỏ tới) ⇒ tạo `shift_slots`
+    `finalized` + `session_id` (hình dạng `finalize_shift_slot`), không mở đăng ký, kể cả ngày đã qua; trả thêm `linked_sessions`. Client: nút
+    **"Dựng lưới từ N ca đã nhập"** ở Kế Hoạch Tháng (`draftsFromSessions`, `monthPlanGrid.ts`) dựng lưới đúng theo ca đã nhập, giữ target ghi
+    trên ca (CROCS 5,141 tỷ), tự nới khung giờ/số ca-ngày; `validateDrafts` nhận ca QUA NỬA ĐÊM (`endsAfterMidnight`: kết thúc ≤ 06:00 và < giờ
+    bắt đầu). (`0151` đã chạy nên bấm Chốt an toàn.) Verify: replay 0001→0151 sạch,
+    `supabase/tests/0151_*.sql` 11/11 (đỏ khi thiếu 0151) + `0140_0142` vẫn 14 OK; vitest 625/625, lint 0 lỗi, audit:dead 0, build; dựng thử
+    từ DB thật cả 6 kênh = 0 lỗi lưới. CHƯA xem trên giao diện (cần đăng nhập). Việc user: mỗi kênh (6): Kế Hoạch Tháng → T10 →
+    "Dựng lưới từ … ca đã nhập" → nhập Target GMV tháng + "Chia lại target" (CROCS đã có target từng ca) → Chốt.
   - Bước tiếp: 5 chạy thật 2–4 tuần (không tính năng mới): giao ca thật, chốt tháng 10 trong app cho ít nhất một kênh mỗi sàn.
 
 - **CHẠY THỬ THẬT trên dữ liệu thật** (từ 2026-09-18; mock đã xoá sạch 19/09). DB: 33 hồ sơ talent thật, CROCS T6–T9 nạp
@@ -403,7 +414,7 @@ target khung camp ở Nhập Ads bỏ 06/10 — tháng không có kế hoạch c
 
 ## 6. Hạ tầng Supabase
 
-- 150 migration (`supabase/migrations/`) — **`0149` (kênh brand × sàn) và `0150` (bậc nguồn số giao ca gõ + ATC từ Live List) ĐÃ CHẠY 07/10;** `0147` (số lúc đổi host, Shopee gõ) ĐÃ CHẠY, **`0148` (TikTok up file lúc đổi host) ĐÃ CHẠY (đo 07/10);** `0145` (giao ca TikTok bằng file) ĐÃ CHẠY 06/10; `0144` (giao ca) ĐÃ CHẠY 06/10; `0143` (chặn trùng người) ĐÃ CHẠY 06/10; **`0139`–`0142` (report / kế hoạch / hợp đồng theo sàn, file Ads Shopee) ĐÃ CHẠY 06/10**;, chạy tay theo thứ tự — **`0138` (đổi người giữa ca) ĐÃ CHẠY 06/10.** `0137` đã chạy 05/10. **`0136` ĐÃ CHẠY 05/10** (verify production: lô đối soát thử với phòng kết thúc đúng phút ca CROCS 30/09 11:01 bắt đầu ⇒ không khớp, phòng chồng 29 phút ⇒ khớp; lô thử đã xoá; trigger profiles nằm trước đoạn đó trong cùng file + chốt tự kiểm cuối file), bộ kiểm
+- 151 migration (`supabase/migrations/`) — **`0151` (chốt kế hoạch gắn vào ca đã nhập sẵn) ĐÃ CHẠY 07/10 (user xác nhận; chưa verify bằng lần Chốt thật);** **`0149` (kênh brand × sàn) và `0150` (bậc nguồn số giao ca gõ + ATC từ Live List) ĐÃ CHẠY 07/10;** `0147` (số lúc đổi host, Shopee gõ) ĐÃ CHẠY, **`0148` (TikTok up file lúc đổi host) ĐÃ CHẠY (đo 07/10);** `0145` (giao ca TikTok bằng file) ĐÃ CHẠY 06/10; `0144` (giao ca) ĐÃ CHẠY 06/10; `0143` (chặn trùng người) ĐÃ CHẠY 06/10; **`0139`–`0142` (report / kế hoạch / hợp đồng theo sàn, file Ads Shopee) ĐÃ CHẠY 06/10**;, chạy tay theo thứ tự — **`0138` (đổi người giữa ca) ĐÃ CHẠY 06/10.** `0137` đã chạy 05/10. **`0136` ĐÃ CHẠY 05/10** (verify production: lô đối soát thử với phòng kết thúc đúng phút ca CROCS 30/09 11:01 bắt đầu ⇒ không khớp, phòng chồng 29 phút ⇒ khớp; lô thử đã xoá; trigger profiles nằm trước đoạn đó trong cùng file + chốt tự kiểm cuối file), bộ kiểm
   `supabase/tests/0136_profile_guard_recon_edges_lock_past.sql` (replay, DB trắng): 16 OK, đỏ khi thiếu 0136. **Tới `0132` đều ĐÃ CHẠY** (0131 + 0132 ngày 02/10);
   **`0133` ĐÃ CHẠY 04/10** (verify ở §1); **`0134` ĐÃ CHẠY 05/10** (verify: CRM không còn SĐT mẫu); **`0135` ĐÃ CHẠY 05/10** (verify: 4 brand KAM "Chưa chọn", form sửa cũng "Chưa chọn"). Lô đối soát cũ (06–09/2026, không gắn brand) không áp dụng lại được — đo
   04/10 nó chỉ khớp ca CROCS nên chưa có số nào bị chia nhầm. Replay `0001 → 0133`: sạch, chạy lần 2 không lỗi; bộ kiểm hành vi
