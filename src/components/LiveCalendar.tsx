@@ -19,16 +19,14 @@ import {
 import { PlatformLogo } from "./ui/PlatformLogo";
 import { SlotDetailModal } from "./scheduling/SlotDetailModal";
 import { OpenSlotModal } from "./scheduling/OpenSlotModal";
+import { TalentLoadTimeline } from "./scheduling/TalentLoadTimeline";
 import { SessionWindow } from "./SessionWindow";
 import { Calendar as CalendarIcon, Building2, User, Plus, AlertTriangle, CheckCircle2, Search, X, ChevronLeft, ChevronRight, Tag, GripVertical } from "lucide-react";
 
 import { fmtDateVn, fmtVndShort } from "../lib/format";
 import { PageHeader } from "./common/PageHeader";
 import { talentRoleLabel } from "../lib/talentName";
-import { PlatformChip } from "./common/PlatformChip";
 import { platformsWithValue, sumByPlatform } from "../lib/platforms/perf";
-import { personRoleMinutes, personWindows } from "../lib/staffSegments";
-import { dateTimeRangesOverlap } from "../lib/dateUtils";
 interface LiveCalendarProps {
   sessions: LiveSession[];
   shiftSlots?: ShiftSlot[];
@@ -447,6 +445,15 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   const talentLookup = (id: string | undefined) => (id ? talents.find((t) => t.id === id) : undefined);
   // Session/ShiftSlot lưu sẵn `brandName`; tra theo tên để lấy logo cho các chỗ chỉ có tên (chú giải).
   const brandByName = new Map<string, Brand>(brands.map((b) => [b.name, b]));
+
+  // Bộ lọc phòng/brand/ô tìm kiếm (không gồm talent) — "Tải Lịch Host" dùng để chọn người hiện ra.
+  const matchesStudioBrandSearch = (s: LiveSession) => {
+    if (selectedStudioFilter !== "ALL" && s.studioId !== selectedStudioFilter) return false;
+    if (selectedBrandFilter !== "ALL" && s.brandId !== selectedBrandFilter) return false;
+    const q = searchQuery.trim().toLowerCase();
+    if (q === "") return true;
+    return [s.title, s.brandName, s.hostName, s.studioName].some((v) => v.toLowerCase().includes(q));
+  };
 
   // Filter sessions
   const filteredSessions = sessions.filter((s) => {
@@ -1223,106 +1230,18 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
         );
       })()}
 
-      {/* VIEW 4: TALENT WORKLOAD */}
+      {/* VIEW 4: TẢI LỊCH HOST — mỗi người một hàng trên trục giờ (scheduling/TalentLoadTimeline) */}
       {viewMode === "talent_workload" && (
-        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-6 shadow-xl space-y-4">
-          <div className="border-b border-[var(--border)] pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div>
-              <h3 className="font-bold text-[var(--text)] text-base flex items-center gap-2">
-                <User className="w-5 h-5 text-[var(--accent-text)] shrink-0" /> Tải Làm Việc Host + Trợ - Ngày {fmtDateVn(selectedDate)}
-              </h3>
-              <p className="text-xs text-[var(--text-muted)]">Tổng thời lượng live trong ngày</p>
-            </div>
-            <span className="bg-blue-950 text-blue-300 border border-blue-800/80 text-xs font-bold px-3 py-1 rounded-full self-start sm:self-auto">
-              Max Khuyên Dùng: 6 giờ / ngày
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Tính cả vai Trợ live và đổi người giữa ca (trước 06/10 chỉ đếm ca làm HOST: trợ live không bao giờ hiện,
-                và người bị xếp hai ca cùng giờ chỉ bị gọi là "quá tải"). Người có ca lên trước. */}
-            {talents
-              .map((t) => {
-                const mine = sessions
-                  .filter((s) => s.date === selectedDate && s.status !== "Cancelled" && personWindows(s, t.id).length > 0)
-                  .sort((a, b) => a.startTime.localeCompare(b.startTime));
-                const minutes = mine.reduce((acc, s) => acc + personRoleMinutes(s, t.id, "host") + personRoleMinutes(s, t.id, "co_host"), 0);
-                const clashIds = new Set<string>();
-                mine.forEach((a, i) => {
-                  if (a.hostId === t.id && a.coHostId === t.id && !a.staffSegments?.length) clashIds.add(a.id);
-                  for (const b of mine.slice(i + 1)) {
-                    if (personWindows(a, t.id).some((wa) => personWindows(b, t.id).some((wb) => dateTimeRangesOverlap(wa, wb)))) { clashIds.add(a.id); clashIds.add(b.id); }
-                  }
-                });
-                return { t, mine, hours: Math.round((minutes / 60) * 10) / 10, clashIds };
-              })
-              .sort((a, b) => b.mine.length - a.mine.length || a.t.name.localeCompare(b.t.name, "vi"))
-              .map(({ t, mine, hours: totalHoursToday, clashIds }) => {
-              const isOverloaded = totalHoursToday > 6;
-              const hasClash = clashIds.size > 0;
-
-              return (
-                <div key={t.id} className={`bg-[var(--surface-base)] border p-4 rounded-2xl space-y-3 ${hasClash ? "border-rose-700" : "border-[var(--border)]"}`}>
-                  <div className="flex justify-between items-center gap-2">
-                    <div className="flex items-center space-x-3">
-                      <img src={t.avatar} alt={t.name} className="w-10 h-10 rounded-full object-cover border border-[var(--border)] shrink-0" />
-                      <div>
-                        <h4 className="font-bold text-[var(--text)] text-sm line-clamp-1">{t.name}</h4>
-                        <span className="text-xs text-[var(--accent-text)] font-medium">{talentRoleLabel(t.role)}</span>
-                      </div>
-                    </div>
-                    <span
-                      className={`text-[11px] font-bold px-2.5 py-1 rounded-full shrink-0 ${
-                        hasClash || isOverloaded
-                          ? "bg-rose-950 text-rose-300 border border-rose-800"
-                          : totalHoursToday > 0
-                          ? "bg-emerald-950 text-emerald-300 border border-emerald-800"
-                          : "bg-[var(--surface-elevated)] text-[var(--text-muted)]"
-                      }`}
-                    >
-                      {hasClash ? (
-                        <span className="inline-flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Trùng giờ</span>
-                      ) : isOverloaded ? (
-                        <span className="inline-flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Quá 6 giờ</span>
-                      ) : totalHoursToday > 0 ? "Có ca" : "Rảnh"}
-                    </span>
-                  </div>
-
-                  <div className="space-y-1 text-xs">
-                    <div className="flex justify-between font-medium">
-                      <span className="text-[var(--text-muted)]">Giờ đứng ca ngày {fmtDateVn(selectedDate)} (host + trợ):</span>
-                      <strong className={isOverloaded ? "text-rose-400" : "text-emerald-400"}>{totalHoursToday} giờ</strong>
-                    </div>
-                    <div className="w-full h-2 bg-[var(--surface-elevated)] rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full ${isOverloaded ? "bg-rose-500" : "bg-[var(--accent)]"}`}
-                        style={{ width: `${Math.min(100, (totalHoursToday / 6) * 100)}%` }}
-                      ></div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5 pt-2 border-t border-[var(--border)]">
-                    <span className="text-[11px] font-bold text-[var(--text-faint)] uppercase block">Ca trong ngày</span>
-                    {mine.length > 0 ? (
-                      mine.map((hs) => (
-                        <div key={hs.id} className={`p-2 rounded-xl bg-[var(--surface)] border text-xs flex justify-between items-center gap-2 ${clashIds.has(hs.id) ? "border-rose-700" : "border-[var(--border)]"}`}>
-                          <span className="flex items-center gap-1.5 min-w-0">
-                            <span className="font-bold text-[var(--text)] truncate">{hs.brandName}</span>
-                            <PlatformChip platform={hs.platform} />
-                            <span className="text-[11px] text-[var(--text-faint)] shrink-0">{hs.hostId === t.id ? "host" : "trợ"}</span>
-                          </span>
-                          <span className="font-mono text-[11px] text-[var(--accent-text)] shrink-0">{hs.startTime}-{hs.endTime}</span>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-[11px] text-[var(--text-faint)] italic">Chưa có ca trong ngày này.</p>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        <TalentLoadTimeline
+          date={selectedDate}
+          sessions={sessions}
+          talents={talents}
+          talentFilter={selectedHostFilter}
+          sessionMatches={matchesStudioBrandSearch}
+          hasSessionFilter={selectedStudioFilter !== "ALL" || selectedBrandFilter !== "ALL" || searchQuery.trim() !== ""}
+          searchQuery={searchQuery}
+          onOpenSession={setSelectedSessionDetail}
+        />
       )}
 
       {slotModal && canManageSlots && onCreateSlot && (
