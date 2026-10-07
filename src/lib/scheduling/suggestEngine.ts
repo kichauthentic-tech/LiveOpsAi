@@ -453,8 +453,10 @@ function expectedGphFor(date: string, start: number, end: number, h: HistorySumm
     const blockEnd = (Math.floor(cur / (BLOCK_HOURS * 60)) + 1) * BLOCK_HOURS * 60;
     const seg = Math.min(blockEnd, end) - cur;
     const block = Math.floor((cur % (24 * 60)) / (BLOCK_HOURS * 60));
-    const c = get(wd, block);
-    const cal = calibration?.get(`${wd}|${block}`) ?? 1;
+    // Phần sau nửa đêm của ca qua đêm thuộc thứ kế tiếp (cùng cách với đoạn xếp ca ở trên).
+    const wdCur = cur >= 24 * 60 ? (wd + 1) % 7 : wd;
+    const c = get(wdCur, block);
+    const cal = calibration?.get(`${wdCur}|${block}`) ?? 1;
     // Ô chưa có lịch sử: 70% trung bình brand — vẫn chọn được nhưng thua ô đã chứng minh.
     sum += (c ? c.gmvPerHour : h.brandGmvPerHour * 0.7) * cal * (seg / 60);
     if (c) cells.push(c);
@@ -811,7 +813,14 @@ export function estimateSlots(
     const sch = (ctx.schemes ?? []).some((r) => date >= r.start && date <= r.end);
     return (e ? history.eventMultipliers[e.kind] : 1) * (sch ? history.schemeMultiplier : 1);
   };
-  const parsed = slots.map((s) => ({ ...s, start: toMin(s.startTime), end: toMin(s.endTime), bucket: resolveCampBucketType(s.date, ctx.camp) }));
+  // Ca qua nửa đêm (21:00–00:00, 21:00–00:30): giờ kết thúc nhỏ hơn giờ bắt đầu ⇒ cộng 24h. Trước đây độ dài ra âm nên dự báo = 0
+  // và cả lưới thiếu dự báo của mọi ca tối muộn (07/10: CROCS T10 16/86 ca → "thiếu 6% so với target" sai chiều).
+  const parsed = slots.map((s) => {
+    const start = toMin(s.startTime);
+    let end = toMin(s.endTime);
+    if (end <= start) end += 24 * 60;
+    return { ...s, start, end, bucket: resolveCampBucketType(s.date, ctx.camp) };
+  });
   return parsed.map((s) => {
     const hours = (s.end - s.start) / 60;
     if (hours <= 0) return 0;
