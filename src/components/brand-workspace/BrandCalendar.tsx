@@ -2,26 +2,24 @@ import React, { useMemo, useState } from "react";
 import { inChannelScope, type ChannelScope } from "../../lib/reportPlatform";
 import { Brand, LiveSession, PromoScheme, ShiftSlot, ShiftRegistration, Studio, Talent, UserRole, BrandStudio, AuditLogEntry, BrandChannel } from "../../types";
 import { SessionWindow } from "../SessionWindow";
-import { CalendarIcon, ChevronLeft, ChevronRight, Plus, Tag } from "lucide-react";
+import { Building2, CalendarIcon, ChevronLeft, ChevronRight, Plus, Tag } from "lucide-react";
 import { fmtDateVn, fmtMonth, fmtVndShort } from "../../lib/format";
 import { schemesForDate } from "../../lib/schemeUtils";
 import { CAMPAIGN_DAY_STYLES, getCampaignDayInfo } from "../../lib/campaignDays";
 import { OpenSlotModal } from "../scheduling/OpenSlotModal";
 import { SlotDetailModal } from "../scheduling/SlotDetailModal";
 import { PosterCalendarHeader, PosterCalendarGrid, PosterDayCell } from "../ui/PosterCalendarGrid";
-import { EventPill, EventPillTier } from "../ui/EventPill";
 import { CampaignDayRibbon, CampaignDayBanner } from "../ui/CampaignDayRibbon";
 import { SchemeWeekStrip } from "./SchemeWeekStrip";
 import { SchemeDayPanel } from "./SchemeDayPanel";
 import {
+  SessionCardLegend,
   SessionEventCard,
   SESSION_TONE,
-  SESSION_STATUS_LABEL,
   buildSessionMeta,
   buildSlotMeta
 } from "../ui/SessionEventCard";
 import { getBrandTheme } from "../../lib/brandTheme";
-import { SESSION_STATUS_LABEL_VI } from "../../lib/sessionStatusUi";
 import { metricsHiddenFor } from "../../lib/sessionLedger";
 import { MonthPicker } from "../common/MonthPicker";
 
@@ -70,13 +68,6 @@ const getTodayDateString = () => {
   const month = `${d.getMonth() + 1}`.padStart(2, "0");
   const day = `${d.getDate()}`.padStart(2, "0");
   return `${year}-${month}-${day}`;
-};
-
-const STATUS_TIER: Record<LiveSession["status"], EventPillTier> = {
-  "Live Now": "black_bold",
-  Upcoming: "teal_gradient",
-  Completed: "green_flag",
-  Cancelled: "white_box"
 };
 
 const shiftDay = (dateStr: string, delta: number) => {
@@ -263,13 +254,12 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
             key={s.id}
             theme={brandTheme}
             brandName={s.brandName || brandName}
+            platform={s.platform}
             startTime={s.startTime}
             endTime={s.endTime}
             meta={buildSessionMeta({ ...s, hostName: talentById[s.hostId]?.name ?? s.hostName, studioName: studioById[s.studioId]?.name ?? s.studioName }, talentLookup, metaViewer)}
             targetGmv={brandViewer ? undefined : s.targetGmv}
-            metaLimit={4}
             tone={SESSION_TONE[s.status]}
-            statusLabel={SESSION_STATUS_LABEL[s.status]}
             tooltip={
               brandViewer
                 ? `${s.title} · Host ${talentById[s.hostId]?.name ?? s.hostName}`
@@ -288,10 +278,10 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
             key={sl.id}
             theme={brandTheme}
             brandName={sl.brandName || brandName}
+            platform={sl.platform}
             startTime={sl.startTime}
             endTime={sl.endTime}
             meta={buildSlotMeta(sl, metaViewer)}
-            metaLimit={2}
             tone="pending"
             pending
             tooltip={brandViewer ? `Ca chờ đăng ký · ${sl.startTime}-${sl.endTime}` : `Ca chờ đăng ký · ${sl.startTime}-${sl.endTime} · ${sl.studioName}`}
@@ -378,6 +368,8 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
           </>
         }
       />
+
+      <SessionCardLegend showCancelled className="px-1" />
 
       {viewMode === "month" && (
       <PosterCalendarGrid weekdayLabels={WEEKDAY_LABELS} minWidthClassName="min-w-[1080px] xl:min-w-0">
@@ -468,28 +460,35 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
           .map(([date, list]) => (
             <div key={date} className="bg-[var(--surface)] border border-[var(--border)] rounded-xl px-4 py-3 space-y-1.5 shadow-sm">
               <p className="text-xs font-bold text-[var(--text-muted)] font-mono">{date}</p>
-              {list.map((s) => (
-                <div
-                  key={s.id}
-                  onClick={() => setOpenSessionId(s.id)}
-                  className={`flex flex-wrap items-center gap-2 text-[11px] text-[var(--text-faint)] cursor-pointer hover:text-[var(--text)]`}
-                >
-                  <EventPill tier={STATUS_TIER[s.status]} label={SESSION_STATUS_LABEL_VI[s.status]} />
-                  <span>
-                    {s.startTime}-{s.endTime}
-                  </span>
-                  <span>Host: {s.hostName}</span>
-                  {s.coHostName && <span>Trợ live: {s.coHostName}</span>}
-                  {/* Audit 2026-09-28 mục 9: chế độ Tháng (mặc định) từng in Studio + GMV cho role brand, GMV tháng chưa
-                      phát hành bị view 0107 che thành 0 nên hiện "0" — thẻ tuần/ngày, Cửa sổ ca, Sổ Ca đều giấu. */}
-                  {!brandViewer && s.studioName && <span>Studio: {s.studioName}</span>}
-                  {s.status === "Completed" && (
-                    <span className="ml-auto font-bold text-[var(--success)]">
-                      {metricsHiddenFor(s, currentRole ?? "brand") ? <span className="font-normal text-[var(--text-faint)]">chưa phát hành</span> : fmtVndShort(s.actualGmv || 0)}
+              {list.map((s) => {
+                // Cùng thẻ với lưới tháng/tuần (tầng "rộng" một hàng) — trước đây là dòng chữ + nhãn trạng thái riêng.
+                const studioLabel = studioById[s.studioId]?.name ?? s.studioName;
+                const meta = buildSessionMeta({ ...s, hostName: talentById[s.hostId]?.name ?? s.hostName, studioName: studioLabel }, talentLookup, metaViewer);
+                if (!brandViewer && studioLabel) meta.push({ icon: Building2, label: studioLabel.split(" - ")[0], title: `Studio: ${studioLabel}` });
+                return (
+                  <div key={s.id} className="flex items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <SessionEventCard
+                        theme={brandTheme}
+                        brandName={s.brandName || brandName}
+                        platform={s.platform}
+                        startTime={s.startTime}
+                        endTime={s.endTime}
+                        title={s.title}
+                        meta={meta}
+                        targetGmv={brandViewer ? undefined : s.targetGmv}
+                        tone={SESSION_TONE[s.status]}
+                        onClick={() => setOpenSessionId(s.id)}
+                      />
+                    </div>
+                    {/* Audit 2026-09-28 mục 9: chế độ Tháng (mặc định) từng in GMV cho role brand, GMV tháng chưa phát hành
+                        bị view 0107 che thành 0 nên hiện "0" — nay vẫn ghi "chưa phát hành" khi bị che. */}
+                    <span className="sc-actual shrink-0 w-24 text-right text-[var(--success)]" title={s.status === "Completed" ? "GMV đã ghi nhận" : undefined}>
+                      {s.status !== "Completed" ? null : metricsHiddenFor(s, currentRole ?? "brand") ? <span className="font-normal text-[var(--text-faint)]">chưa phát hành</span> : fmtVndShort(s.actualGmv || 0)}
                     </span>
-                  )}
-                </div>
-              ))}
+                  </div>
+                );
+              })}
             </div>
           ))}
       </div>
@@ -532,6 +531,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
                         key={s.id}
                         theme={brandTheme}
                         brandName={s.brandName || brandName}
+            platform={s.platform}
                         startTime={s.startTime}
                         endTime={s.endTime}
                         title={s.title}
@@ -541,9 +541,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
                           studioName: studioById[s.studioId]?.name ?? s.studioName
                         }, talentLookup, metaViewer)}
                         targetGmv={brandViewer ? undefined : s.targetGmv}
-                        size="md"
                         tone={SESSION_TONE[s.status]}
-                        statusLabel={SESSION_STATUS_LABEL[s.status]}
                         tooltip={
                           brandViewer
                             ? `${s.title} · Host ${talentById[s.hostId]?.name ?? s.hostName}`
@@ -559,10 +557,10 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
                       key={sl.id}
                       theme={brandTheme}
                       brandName={sl.brandName || brandName}
+            platform={sl.platform}
                       startTime={sl.startTime}
                       endTime={sl.endTime}
                       meta={buildSlotMeta(sl, metaViewer)}
-                      size="md"
                       tone="pending"
                       pending
                       tooltip={brandViewer ? `Ca chờ đăng ký · ${sl.startTime}-${sl.endTime}` : `Ca chờ đăng ký · ${sl.startTime}-${sl.endTime} · ${sl.studioName}`}

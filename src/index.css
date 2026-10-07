@@ -545,3 +545,78 @@ html:not(.dark) [class~="bg-slate-700"] { background-color: var(--surface-hover)
 html:not(.dark) [class~="text-slate-100"], html:not(.dark) [class~="text-slate-200"], html:not(.dark) [class~="text-slate-300"] { color: var(--text); }
 html:not(.dark) [class~="text-slate-400"] { color: var(--text-muted); }
 html:not(.dark) [class~="border-slate-700"], html:not(.dark) [class~="border-slate-800"], html:not(.dark) [class~="border-slate-900"] { border-color: var(--border); }
+
+/*
+  Thẻ ca Live (ui/SessionEventCard) — dùng chung mọi lịch (Agency tháng/tuần/ngày, Brand, Nhân sự ca).
+  Màu: nền + viền = màu brand pha loãng vào nền ô lịch (color-mix với var(--surface) nên tự đúng ở cả 4 theme);
+  CSS biến --b / --pbg / --pfg / --pbg-d / --pfg-d do component đổ từ BrandTheme qua inline style.
+  Bố cục theo ĐỘ RỘNG CỦA CHÍNH THẺ (container query), không theo viewport — cùng một thẻ nằm trong ô tháng
+  150px, cột tuần, thanh giờ 64px hay hàng ngang 900px đều xếp lại cho vừa, không giấu thông tin:
+    ≤100px vi mô · 101–199px gọn · 200–459px vừa (thêm tên brand + tiêu đề) · ≥460px một hàng ngang.
+*/
+.sc-wrap { container-type: inline-size; width: 100%; min-width: 0; }
+.sc {
+  --b: #64748b; --pbg: #334155; --pfg: #ffffff;
+  display: grid; gap: 5px; width: 100%; min-width: 0; box-sizing: border-box; text-align: left; color: var(--text);
+  padding: 6px 7px; border-radius: 10px; position: relative;
+  background: color-mix(in srgb, var(--b) 14%, var(--surface));
+  border: 1.5px solid color-mix(in srgb, var(--b) 60%, var(--surface));
+}
+.dark .sc { --pbg: var(--pbg-d); --pfg: var(--pfg-d); background: color-mix(in srgb, var(--b) 22%, var(--surface)); }
+.sc[data-clickable="true"] { cursor: pointer; transition: transform .12s, box-shadow .12s; }
+.sc[data-clickable="true"]:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(0, 0, 0, .18); }
+.sc[data-draggable="true"] { cursor: grab; }
+.sc[data-draggable="true"]:active { cursor: grabbing; }
+.sc[data-pending="true"] { border-style: dashed; background: color-mix(in srgb, var(--b) 7%, var(--surface)); }
+.dark .sc[data-pending="true"] { background: color-mix(in srgb, var(--b) 11%, var(--surface)); }
+.sc[data-tone="live"] { outline: 2px solid #e11d48; outline-offset: 1px; }
+.sc[data-tone="cancelled"] { opacity: .62; }
+.sc[data-tone="cancelled"] .sc-time { text-decoration: line-through; }
+.sc-head { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 5px; min-width: 0; }
+.sc-blogo { width: 22px; height: 22px; border-radius: 6px; flex: none; background: #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, .14); object-fit: cover; }
+.sc-blogo[data-pad="true"] { object-fit: contain; padding: 2px; }
+.sc-emoji { width: 22px; height: 22px; border-radius: 6px; flex: none; background: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; line-height: 1; }
+.sc-time { font-size: 11px; font-weight: 700; line-height: 1.1; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.sc-bname { display: none; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.sc-badges { margin-left: auto; display: flex; align-items: center; gap: 3px; flex: none; }
+.sc-st { width: 16px; height: 16px; flex: none; }
+.sc-who { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.sc-chip { display: inline-flex; align-items: center; gap: 3px; max-width: 100%; font-size: 11px; font-weight: 600; line-height: 1.2; padding: 2px 5px; border-radius: 5px; background: color-mix(in srgb, var(--text) 8%, transparent); }
+.sc-chip > svg { width: 11px; height: 11px; flex: none; opacity: .7; }
+.sc-chip > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sc-foot { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.sc-foot:not(:has(.sc-pill)) { display: none; }
+.sc-title { display: none; font-size: 11px; font-weight: 600; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.sc-pill { margin-left: auto; flex: none; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; font-weight: 700; line-height: 1; padding: 3px 7px; border-radius: 999px; white-space: nowrap; background: var(--pbg); color: var(--pfg); }
+.sc-live { display: inline-flex; align-items: center; gap: 4px; padding: 3px; border-radius: 999px; background: #e11d48; color: #fff; font-size: 10px; font-weight: 800; letter-spacing: .06em; line-height: 1.1; }
+.sc-live::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #fff; animation: sc-pulse 1.2s infinite; }
+.sc-live > b { display: none; font-weight: 800; }
+@keyframes sc-pulse { 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .sc-live::before { animation: none; } }
+.sc-actual { font-size: 11px; font-weight: 700; }
+@container (min-width: 200px) {
+  .sc-bname, .sc-title { display: block; }
+  .sc .sc-foot { display: flex; }
+  .sc-time { font-size: 13px; }
+  .sc-blogo, .sc-emoji { width: 24px; height: 24px; }
+  .sc-head { flex-wrap: nowrap; }
+  .sc-live { padding: 2px 6px 2px 5px; }
+  .sc-live > b { display: inline; }
+}
+@container (min-width: 460px) {
+  .sc { display: flex; align-items: center; gap: 12px; padding: 7px 10px; }
+  .sc-head { display: contents; }
+  .sc-blogo, .sc-emoji { order: 1; }
+  .sc-time { order: 2; min-width: 104px; }
+  .sc-bname { order: 3; min-width: 64px; }
+  .sc-who { order: 4; }
+  .sc-foot { order: 5; flex: 1; }
+  .sc-badges { order: 6; margin-left: 0; }
+}
+@container (max-width: 100px) {
+  .sc { padding: 5px 4px; gap: 4px; justify-items: center; }
+  .sc-head { flex-direction: column; gap: 3px; }
+  .sc-time { font-size: 11px; }
+  .sc-te, .sc-who, .sc-foot { display: none; }
+  .sc-badges { margin: 0; }
+}

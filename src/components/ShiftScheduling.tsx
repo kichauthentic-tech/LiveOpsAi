@@ -35,7 +35,7 @@ import { personClash, studioClash } from "../lib/scheduling/conflicts";
 import { CampaignDayRibbon } from "./ui/CampaignDayRibbon";
 import { PosterDayCell } from "./ui/PosterCalendarGrid";
 import { getBrandTheme } from "../lib/brandTheme";
-import { SessionEventCard, SessionCardTone, buildSlotMeta } from "./ui/SessionEventCard";
+import { SessionCardLegend, SessionEventCard, SessionCardTone, buildSlotMeta } from "./ui/SessionEventCard";
 import { SessionWindow } from "./SessionWindow";
 import { commitmentsRead } from "../lib/db/brandContracts";
 import { planStatusesRead } from "../lib/db/monthPlans";
@@ -88,11 +88,6 @@ const SLOT_TONE: Record<ShiftSlot["status"], SessionCardTone> = {
   open: "pending",
   finalized: "upcoming",
   cancelled: "cancelled"
-};
-const SLOT_STATUS_LABEL: Record<ShiftSlot["status"], string | undefined> = {
-  open: undefined,
-  finalized: undefined,
-  cancelled: "HUỶ"
 };
 
 const getTodayDateString = () => {
@@ -723,11 +718,11 @@ export default function ShiftScheduling({
                           theme={getBrandTheme(s.brandName)}
                           brand={brandById.get(s.brandId ?? "")}
                           brandName={s.brandName}
+                          platform={s.platform}
                           startTime={s.startTime}
                           endTime={s.endTime}
                           meta={buildSlotMeta(s)}
                           tone={SLOT_TONE[s.status]}
-                          statusLabel={SLOT_STATUS_LABEL[s.status]}
                           pending={s.status === "open"}
                           tooltip={`${s.startTime}-${s.endTime} · ${s.studioName} · ${
                             s.status === "open"
@@ -750,25 +745,10 @@ export default function ShiftScheduling({
           </div>
         </div>
 
-        {/* Chú giải phải khớp đúng cách SessionEventCard vẽ trạng thái thật: nền card lấy màu
-            brand (không có màu cố định theo trạng thái), trạng thái phân biệt bằng KIỂU VIỀN —
-            viền đứt = ca mở (chưa/đã có người đăng ký đều cùng 1 kiểu viền, card không có chip
-            đếm số người đăng ký nên 2 trạng thái này không phân biệt được bằng mắt), viền liền =
-            đã chốt, viền liền mờ = đã huỷ. 2 mục cảnh báo theo NGÀY bên dưới vẫn là chấm màu cố
-            định (bg-rose-500/bg-amber-400) vì đó là badge riêng, không phải card. */}
+        {/* Chú giải khớp StatusIcon của SessionEventCard (07/10): nền thẻ = màu brand, trạng thái = biểu tượng + kiểu viền.
+            2 mục cảnh báo theo NGÀY bên dưới vẫn là chấm màu cố định vì đó là badge riêng của ô ngày, không phải thẻ. */}
         <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-500 dark:text-slate-400 mt-3 pt-3 border-t border-slate-200 dark:border-slate-800">
-          <span className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-md bg-slate-300 dark:bg-slate-700 border-2 border-dashed border-slate-500 dark:border-slate-400" />
-            Ca mở, chờ đăng ký
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-md bg-slate-300 dark:bg-slate-700 border-2 border-solid border-slate-500 dark:border-slate-400" />
-            Đã chốt
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-md bg-slate-300 dark:bg-slate-700 border-2 border-solid border-slate-500 dark:border-slate-400 opacity-60 saturate-50" />
-            Đã huỷ
-          </span>
+          <SessionCardLegend variant="slot" />
           <span className="flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-rose-500" /> Ngày có ca thiếu người
           </span>

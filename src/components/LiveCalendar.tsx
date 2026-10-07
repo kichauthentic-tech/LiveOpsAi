@@ -12,10 +12,11 @@ import { CampaignDayRibbon, CampaignDayBanner } from "./ui/CampaignDayRibbon";
 import {
   SessionEventCard,
   SESSION_TONE,
-  SESSION_STATUS_LABEL,
+  SessionCardLegend,
   buildSessionMeta,
   buildSlotMeta
 } from "./ui/SessionEventCard";
+import { PlatformLogo } from "./ui/PlatformLogo";
 import { SlotDetailModal } from "./scheduling/SlotDetailModal";
 import { OpenSlotModal } from "./scheduling/OpenSlotModal";
 import { SessionWindow } from "./SessionWindow";
@@ -57,9 +58,12 @@ interface LiveCalendarProps {
   onLogAudit?: (entry: { action: string; details: string; category: AuditLogEntry["category"] }) => Promise<void>;
 }
 
-// Chiều cao vùng card trong 1 ô lịch tháng — đủ cho ~2 card, ô nào nhiều hơn thì cuộn dọc
-// bên trong chính ô đó thay vì đẩy vỡ layout lưới hoặc cắt gộp thành "+N phiên nữa".
-const MONTH_CELL_LIST_MAX_H = "max-h-[76px] sm:max-h-[168px]";
+// Lịch Ngày (trục phòng): tối thiểu 64px mỗi giờ, mỗi làn cao LANE_H — đủ cho thẻ "gọn" 3 dòng (Host + Trợ live
+// xuống dòng thì vẫn vừa); ca chồng giờ cùng phòng xếp làn riêng.
+const HOUR_PX = 64;
+const LANE_H = 116;
+const LANE_GAP = 6;
+const LANE_PAD = 8;
 
 // Ngày hôm nay theo giờ local, format YYYY-MM-DD
 const getTodayDateString = () => {
@@ -712,7 +716,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
               <h3 className="font-black text-[var(--text)] text-base flex items-center gap-2">
                 <CalendarIcon className="w-5 h-5 text-[var(--accent-text)] shrink-0" /> Tổng Quan Lịch Tháng {currentMonth}/{currentYear}
               </h3>
-              <p className="text-xs text-[var(--text-muted)]">Kéo thả để đổi lịch · Màu badge = màu nhận diện của brand</p>
+              <p className="text-xs text-[var(--text-muted)]">Kéo thả để đổi lịch · Màu thẻ = màu nhận diện của brand</p>
             </div>
             <div className="flex items-center gap-1.5 flex-wrap text-[11px] font-semibold">
               {monthBrandNames.map((name) => {
@@ -720,17 +724,15 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                 return (
                   <span
                     key={name}
-                    style={{ background: theme.primary, color: theme.onPrimary, borderColor: theme.secondary }}
-                    className="inline-flex items-center gap-1 px-2 py-1 rounded-full border text-[11px] font-black uppercase tracking-tight shadow-sm"
+                    style={{ "--b": theme.accent } as React.CSSProperties}
+                    className="inline-flex items-center gap-1.5 pl-1 pr-2 py-0.5 rounded-full border-[1.5px] text-[var(--text)] text-[11px] font-black uppercase tracking-tight bg-[color-mix(in_srgb,var(--b)_14%,var(--surface))] border-[color-mix(in_srgb,var(--b)_60%,var(--surface))]"
                   >
-                    <BrandLogo brand={brandByName.get(name)} size="xs" className="rounded bg-white" />
+                    <BrandLogo brand={brandByName.get(name)} size="sm" className="rounded-md bg-white" />
                     {name}
                   </span>
                 );
               })}
-              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full border-2 border-dashed border-[var(--border)] text-[var(--text-muted)] text-[11px] font-black uppercase">
-                Viền đứt = ca chờ ĐK
-              </span>
+              <SessionCardLegend />
             </div>
           </div>
 
@@ -841,24 +843,19 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   </div>
 
                   {/* Session badges in cell — card to theo màu brand (lib/brandTheme.ts).
-                      Ngày nào nhiều session/ca hơn chỗ chứa thì cuộn dọc trong chính ô đó,
-                      không cắt gộp thành "+N nữa" nữa — click vào card vẫn xem chi tiết được. */}
-                  <div
-                    className={`space-y-1.5 my-1 flex-1 overflow-y-auto overscroll-contain pr-0.5 scrollbar-thin ${MONTH_CELL_LIST_MAX_H}`}
-                  >
+                      Ô lịch tự cao ra theo số thẻ (07/10: bỏ cuộn trong ô — thẻ nằm dưới bị che là mất thông tin). */}
+                  <div className="space-y-1.5 my-1 flex-1">
                     {daySessions.map((ds) => (
                       <SessionEventCard
                         key={ds.id}
                         theme={getBrandTheme(ds.brandName)}
                         brand={brandById.get(ds.brandId)}
-                        brandName={ds.brandName}
+                        brandName={ds.brandName} platform={ds.platform}
                         startTime={ds.startTime}
                         endTime={ds.endTime}
                         meta={buildSessionMeta(ds, talentLookup)} className={clashRing(ds.id)}
                         targetGmv={ds.targetGmv}
-                        metaLimit={4}
                         tone={SESSION_TONE[ds.status]}
-                        statusLabel={SESSION_STATUS_LABEL[ds.status]}
                         dragging={draggedSessionId === ds.id}
                         draggable
                         tooltip={`${ds.title} · ${ds.studioName} · Host ${ds.hostName}${
@@ -880,11 +877,10 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                         key={sl.id}
                         theme={getBrandTheme(sl.brandName)}
                         brand={brandById.get(sl.brandId ?? "")}
-                        brandName={sl.brandName}
+                        brandName={sl.brandName} platform={sl.platform}
                         startTime={sl.startTime}
                         endTime={sl.endTime}
                         meta={buildSlotMeta(sl)}
-                        metaLimit={2}
                         tone="pending"
                         pending
                         tooltip={`Ca chờ đăng ký · ${sl.startTime}-${sl.endTime} · ${sl.studioName}`}
@@ -900,7 +896,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   {dayTargetPlatforms.length > 0 ? (
                     <div className="text-[11px] font-mono font-bold text-[var(--success)] pt-1 border-t border-[var(--border-muted)]">
                       {dayTargetPlatforms.map((p) => (
-                        <div key={p} className="truncate">Target {p}: {fmtVndShort(dayTarget[p])}</div>
+                        <div key={p} className="truncate flex items-center gap-1" title={`Target ${p}`}>Target <PlatformLogo platform={p} size="xs" /> {fmtVndShort(dayTarget[p])}</div>
                       ))}
                     </div>
                   ) : daySessions.length > 0 ? null : (
@@ -924,6 +920,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
               </h3>
               <p className="text-xs text-[var(--text-muted)]">Kéo thả để đổi lịch</p>
             </div>
+            <SessionCardLegend />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
@@ -997,19 +994,17 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                     </div>
                   </div>
 
-                  {/* Session cards under this day — cuộn dọc khi nhiều hơn 2 card, đồng bộ với
-                      ô lịch tháng (MONTH_CELL_LIST_MAX_H) thay vì đẩy cả hàng tuần cao dần. */}
-                  <div className="space-y-2 min-h-[160px] max-h-[230px] overflow-y-auto overscroll-contain pr-0.5 scrollbar-thin">
+                  {/* Session cards under this day — cột tuần cao ra theo số thẻ, không cuộn trong ô. */}
+                  <div className="space-y-2 min-h-[160px]">
                     {daySlots.map((sl) => (
                       <SessionEventCard
                         key={sl.id}
                         theme={getBrandTheme(sl.brandName)}
                         brand={brandById.get(sl.brandId ?? "")}
-                        brandName={sl.brandName}
+                        brandName={sl.brandName} platform={sl.platform}
                         startTime={sl.startTime}
                         endTime={sl.endTime}
                         meta={buildSlotMeta(sl)}
-                        size="md"
                         tone="pending"
                         pending
                         tooltip="Ca chờ đăng ký — bấm để xem/đăng ký/chốt lịch"
@@ -1021,15 +1016,13 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                         key={ds.id}
                         theme={getBrandTheme(ds.brandName)}
                         brand={brandById.get(ds.brandId)}
-                        brandName={ds.brandName}
+                        brandName={ds.brandName} platform={ds.platform}
                         startTime={ds.startTime}
                         endTime={ds.endTime}
                         title={ds.title}
                         meta={buildSessionMeta(ds, talentLookup)} className={clashRing(ds.id)}
                         targetGmv={ds.targetGmv}
-                        size="md"
                         tone={SESSION_TONE[ds.status]}
-                        statusLabel={SESSION_STATUS_LABEL[ds.status]}
                         dragging={draggedSessionId === ds.id}
                         draggable
                         tooltip="Kéo để đổi ngày"
@@ -1082,8 +1075,70 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
         for (let m = axisStart; m <= axisEnd; m += 60) hours.push(m);
         const fmtHour = (m: number) => `${`${Math.floor(m / 60) % 24}`.padStart(2, "0")}:00`;
         const pos = (start: string, end: string) => ({ left: `${((toMin(start) - axisStart) / span) * 100}%`, width: `${((endMin(start, end) - toMin(start)) / span) * 100}%` });
+        // Mỗi giờ trên trục tối thiểu HOUR_PX để ca 1 tiếng còn thẻ vi mô đọc được (trước: ~43px/giờ ⇒ chữ bị cắt).
+        const timelineMinWidth = (span / 60) * HOUR_PX;
+        // Xếp làn: ca chồng giờ trong CÙNG phòng xuống làn dưới thay vì đè lên nhau (trước: absolute chồng nhau).
+        type LaneItem = { id: string; s: number; e: number; lane: number; slot?: ShiftSlot; session?: LiveSession };
+        const layoutLanes = (slots: ShiftSlot[], sessions: LiveSession[]) => {
+          const items: LaneItem[] = [
+            ...slots.map((sl) => ({ id: `slot_${sl.id}`, s: toMin(sl.startTime), e: endMin(sl.startTime, sl.endTime), lane: 0, slot: sl })),
+            ...sessions.map((ms) => ({ id: `ses_${ms.id}`, s: toMin(ms.startTime), e: endMin(ms.startTime, ms.endTime), lane: 0, session: ms }))
+          ].sort((a, b) => a.s - b.s || a.e - b.e);
+          const laneEnds: number[] = [];
+          for (const it of items) {
+            const free = laneEnds.findIndex((end) => end <= it.s);
+            it.lane = free >= 0 ? free : laneEnds.length;
+            laneEnds[it.lane] = it.e;
+          }
+          const lanes = Math.max(1, laneEnds.length);
+          return { items, height: LANE_PAD * 2 + lanes * LANE_H + (lanes - 1) * LANE_GAP };
+        };
+        const renderLaneItem = (it: LaneItem) => {
+          const start = it.slot?.startTime ?? it.session!.startTime;
+          const end = it.slot?.endTime ?? it.session!.endTime;
+          return (
+            <div key={it.id} className="absolute px-0.5" style={{ ...pos(start, end), top: LANE_PAD + it.lane * (LANE_H + LANE_GAP) }}>
+              {it.slot ? (
+                <SessionEventCard
+                  theme={getBrandTheme(it.slot.brandName)}
+                  brand={brandById.get(it.slot.brandId ?? "")}
+                  brandName={it.slot.brandName}
+                  platform={it.slot.platform}
+                  startTime={it.slot.startTime}
+                  endTime={it.slot.endTime}
+                  meta={buildSlotMeta(it.slot)}
+                  tone="pending"
+                  pending
+                  tooltip={`Ca chờ đăng ký · ${it.slot.startTime}-${it.slot.endTime} · Bấm để xem/đăng ký/chốt lịch`}
+                  onClick={() => setSelectedSlotDetail(it.slot!)}
+                />
+              ) : (
+                <SessionEventCard
+                  theme={getBrandTheme(it.session!.brandName)}
+                  brand={brandById.get(it.session!.brandId)}
+                  brandName={it.session!.brandName}
+                  platform={it.session!.platform}
+                  startTime={it.session!.startTime}
+                  endTime={it.session!.endTime}
+                  title={it.session!.title}
+                  meta={buildSessionMeta(it.session!, talentLookup)}
+                  className={clashRing(it.session!.id)}
+                  targetGmv={it.session!.targetGmv}
+                  tone={SESSION_TONE[it.session!.status]}
+                  dragging={draggedSessionId === it.session!.id}
+                  draggable
+                  tooltip="Kéo sang hàng phòng khác để đổi phòng"
+                  onDragStart={(e) => handleDragStart(e, it.session!)}
+                  onDragEnd={handleDragEnd}
+                  onClick={() => setSelectedSessionDetail(it.session!)}
+                />
+              )}
+            </div>
+          );
+        };
         const noRoomSessions = daySessions.filter((s) => !studios.some((st) => st.id === s.studioId));
         const noRoomSlots = daySlots.filter((sl) => !studios.some((st) => st.id === sl.studioId));
+        const noRoomLayout = layoutLanes(noRoomSlots, noRoomSessions);
         const totalHours = daySessions.reduce((a, s) => a + (endMin(s.startTime, s.endTime) - toMin(s.startTime)) / 60, 0);
         const campaignDay = getCampaignDayInfo(selectedDate);
         return (
@@ -1098,19 +1153,15 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                 {daySessions.length} ca đã chốt · {daySlots.length} ca chờ đăng ký · {totalHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h live. Kéo thẻ ca sang hàng phòng khác để đổi phòng (giữ giờ).
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-3 text-[11px] font-semibold text-[var(--text-muted)]">
-              <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-md bg-rose-500 ring-2 ring-rose-400 ring-offset-1 ring-offset-[var(--surface)] animate-pulse" /> Live</span>
-              <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-md bg-[var(--surface-hover)] border-2 border-solid border-[var(--border)]" /> Đã chốt</span>
-              <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-md bg-[var(--surface-elevated)]/60 border-2 border-dashed border-[var(--border)]" /> Chờ đăng ký</span>
-            </div>
+            <SessionCardLegend />
           </div>
 
           <div className="overflow-x-auto rounded-xl border border-[var(--border)]/80 scrollbar-thin">
-            <div className="min-w-[860px]">
+            <div style={{ minWidth: 176 + timelineMinWidth }}>
               {/* Trục giờ */}
               <div className="flex border-b border-[var(--border)] bg-[var(--surface-base)] text-[11px] font-mono text-[var(--text-muted)]">
                 <div className="w-44 shrink-0 p-2 font-bold uppercase tracking-wider border-r border-[var(--border)] sticky left-0 bg-[var(--surface-base)] z-10">Phòng</div>
-                <div className="relative flex-1 h-8">
+                <div className="relative flex-1 h-8" style={{ minWidth: timelineMinWidth }}>
                   {hours.map((m) => (
                     <span key={m} className="absolute top-2 -translate-x-1/2" style={{ left: `${((m - axisStart) / span) * 100}%` }}>{fmtHour(m)}</span>
                   ))}
@@ -1121,6 +1172,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                 const rowSlots = daySlots.filter((sl) => sl.studioId === std.id);
                 const rowKey = `row_${std.id}`;
                 const hovered = dragOverCellKey === rowKey;
+                const rowLayout = layoutLanes(rowSlots, rowSessions);
                 return (
                   <div key={std.id} className={`flex border-b border-[var(--border)]/60 last:border-b-0 transition-colors ${hovered ? "bg-[var(--accent)]/15" : "hover:bg-[var(--surface-elevated)]/20"}`}>
                     <div className="w-44 shrink-0 p-3 border-r border-[var(--border)] sticky left-0 bg-[var(--surface)] z-10">
@@ -1133,7 +1185,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                       </div>
                     </div>
                     <div
-                      className="relative flex-1 h-[132px]"
+                      className="relative flex-1"
+                      style={{ height: rowLayout.height, minWidth: timelineMinWidth }}
                       onDragOver={(e) => handleDragOver(e, rowKey)}
                       onDragLeave={(e) => handleDragLeave(e, rowKey)}
                       onDrop={(e) => handleDropOnStudioRow(e, std)}
@@ -1143,46 +1196,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                       {hours.map((m) => (
                         <span key={m} className="absolute top-0 bottom-0 border-l border-[var(--border)]/40" style={{ left: `${((m - axisStart) / span) * 100}%` }} />
                       ))}
-                      {rowSlots.map((sl) => (
-                        <div key={sl.id} className="absolute top-2 bottom-2 px-0.5" style={pos(sl.startTime, sl.endTime)}>
-                          <SessionEventCard
-                            theme={getBrandTheme(sl.brandName)}
-                            brand={brandById.get(sl.brandId ?? "")}
-                            brandName={sl.brandName}
-                            startTime={sl.startTime}
-                            endTime={sl.endTime}
-                            meta={buildSlotMeta(sl)}
-                            size="md"
-                            tone="pending"
-                            pending
-                            tooltip={`Ca chờ đăng ký · ${sl.startTime}-${sl.endTime} · Bấm để xem/đăng ký/chốt lịch`}
-                            onClick={() => setSelectedSlotDetail(sl)}
-                          />
-                        </div>
-                      ))}
-                      {rowSessions.map((ms) => (
-                        <div key={ms.id} className="absolute top-2 bottom-2 px-0.5" style={pos(ms.startTime, ms.endTime)}>
-                          <SessionEventCard
-                            theme={getBrandTheme(ms.brandName)}
-                            brand={brandById.get(ms.brandId)}
-                            brandName={ms.brandName}
-                            startTime={ms.startTime}
-                            endTime={ms.endTime}
-                            title={ms.title}
-                            meta={buildSessionMeta(ms, talentLookup)} className={clashRing(ms.id)}
-                            targetGmv={ms.targetGmv}
-                            size="md"
-                            tone={SESSION_TONE[ms.status]}
-                            statusLabel={SESSION_STATUS_LABEL[ms.status]}
-                            dragging={draggedSessionId === ms.id}
-                            draggable
-                            tooltip="Kéo sang hàng phòng khác để đổi phòng"
-                            onDragStart={(e) => handleDragStart(e, ms)}
-                            onDragEnd={handleDragEnd}
-                            onClick={() => setSelectedSessionDetail(ms)}
-                          />
-                        </div>
-                      ))}
+                      {rowLayout.items.map(renderLaneItem)}
                       {rowSessions.length === 0 && rowSlots.length === 0 && (
                         <span className="absolute inset-0 flex items-center justify-center text-[11px] text-[var(--text-faint)] pointer-events-none">
                           {hovered ? "Thả vào đây để đổi phòng" : "Trống"}
@@ -1198,17 +1212,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                     <p className="text-xs font-bold text-amber-300">Chưa gán phòng</p>
                     <p className="text-[11px] text-[var(--text-muted)]">mở ca → sửa phòng</p>
                   </div>
-                  <div className="relative flex-1 h-[132px]">
-                    {noRoomSlots.map((sl) => (
-                      <div key={sl.id} className="absolute top-2 bottom-2 px-0.5" style={pos(sl.startTime, sl.endTime)}>
-                        <SessionEventCard theme={getBrandTheme(sl.brandName)} brand={brandById.get(sl.brandId ?? "")} brandName={sl.brandName} startTime={sl.startTime} endTime={sl.endTime} meta={buildSlotMeta(sl)} size="md" tone="pending" pending onClick={() => setSelectedSlotDetail(sl)} />
-                      </div>
-                    ))}
-                    {noRoomSessions.map((ms) => (
-                      <div key={ms.id} className="absolute top-2 bottom-2 px-0.5" style={pos(ms.startTime, ms.endTime)}>
-                        <SessionEventCard theme={getBrandTheme(ms.brandName)} brand={brandById.get(ms.brandId)} brandName={ms.brandName} startTime={ms.startTime} endTime={ms.endTime} title={ms.title} meta={buildSessionMeta(ms, talentLookup)} className={clashRing(ms.id)} targetGmv={ms.targetGmv} size="md" tone={SESSION_TONE[ms.status]} statusLabel={SESSION_STATUS_LABEL[ms.status]} dragging={draggedSessionId === ms.id} draggable onDragStart={(e) => handleDragStart(e, ms)} onDragEnd={handleDragEnd} onClick={() => setSelectedSessionDetail(ms)} />
-                      </div>
-                    ))}
+                  <div className="relative flex-1" style={{ height: noRoomLayout.height, minWidth: timelineMinWidth }}>
+                    {noRoomLayout.items.map(renderLaneItem)}
                   </div>
                 </div>
               )}

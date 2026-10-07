@@ -13,6 +13,18 @@
 
 ## 1. Giai đoạn hiện tại (cập nhật 2026-10-07)
 
+- **07/10 (tối): THIẾT KẾ LẠI THẺ CA TRÊN MỌI LỊCH (user duyệt mockup + 3 quyết định; CHƯA commit; tsc, lint 0 lỗi, vitest 644/644, audit:dead 0, build; đã xem trên
+  trang thử không đăng nhập ở 1440/1280, 4 theme, Agency tháng/tuần/ngày + Brand tháng/danh sách; CHƯA xem trên app thật có dữ liệu thật; Nhân sự ca chỉ qua tsc — cùng thẻ + PosterDayCell với Brand).**
+  `SessionEventCard` viết lại: nền = màu brand pha loãng vào nền ô (color-mix, `.sc` ở index.css) + logo brand 22–24px; nền tảng = logo (`PlatformLogo`,
+  `lib/platformLogos.ts`, ảnh ở `src/assets/platforms/`), hết chip chữ TikTok/Shopee; trạng thái = biểu tượng (xanh tích xong / X đỏ huỷ + giờ gạch + mờ / chấm LIVE /
+  đồng hồ chờ ĐK), hết nhãn XONG/HUỶ (`statusLabel`, `SESSION_STATUS_LABEL` đã xoá, `tone` quyết định); Target GMV = viên thuốc đặc `BrandTheme.ink` (đo ≥7:1 sáng/tối,
+  `tests/sessionCardTheme.test.ts`). **Quyết định user:** (A) thẻ hẹp bỏ tên brand (≥200px mới hiện); (B) ô lịch tháng/tuần/PosterDayCell **cao ra theo số thẻ, không cuộn trong
+  ô** (hàng tuần dài khi ngày nhiều ca — chủ ý); (C) chip Host/Trợ live giữ tên rút gọn + biểu tượng, không còn `metaLimit`/"+N". Bố cục theo **độ rộng của chính thẻ**
+  (container query: ≤100px vi mô · gọn · ≥200px vừa · ≥460px một hàng). Lịch Ngày (LiveCalendar): trục tối thiểu 64px/giờ (`HOUR_PX`), ca chồng giờ cùng phòng xếp làn
+  (`layoutLanes`, `LANE_H` 116) thay vì đè. Lịch Brand tháng: danh sách chữ bên dưới nay là thẻ tầng rộng + cột GMV đã ghi nhận. `EventPill` xoá (hết nơi dùng).
+  Quy ước: thẻ ca mới KHÔNG tự đặt màu/nhãn — thêm brand ⇒ khai `accent/ink/inkDark` ở `BRAND_THEMES` (không khai thì tự suy, vẫn qua test tương phản); thông tin phụ thêm
+  vào mảng `meta`; chú giải dùng `SessionCardLegend`. Chưa làm: đổi chữ TikTok/Shopee thành logo ở Sổ Ca / Bản Tin CEO / Hiệu suất Host (đã loại khỏi phạm vi).
+
 - **07/10 (cuối ngày): GIẢM THỜI GIAN MỞ APP — danh sách ca là cổ chai (CHƯA commit; tsc, vitest 633/633, audit:dead, đã đo lại trên trình duyệt).**
   Đo: mở app = 28–36 request, mọi bảng khác xong ≤2 s nhưng `live_sessions_secure` (1.501 ca = 2 trang, ~1,3 MB/1.000 dòng, ~95% byte lúc mở) mất ~10 s và giữ cổng
   `coreDataReady`. Mạng máy user tới Cloudflare/Supabase yếu (RTT ~215 ms, ~150 KB/s, TLS 0,5–3,5 s) nên byte + số chặng nối tiếp là đòn bẩy duy nhất. Đã làm:
