@@ -105,10 +105,13 @@ const OpsSupportTab = lazyNamed(() => import("./components/OpsSupportTab"), "def
 const CeoBrief = lazyNamed(() => import("./components/CeoBrief"), "default");
 const AgencyChannelSummary = lazyNamed(() => import("./components/AgencyChannelSummary"), "AgencyChannelSummary");
 
+// Tab đã gộp (08/10: Hỗ Trợ Vận Hành → Bảng Vận Hành) — activeTab đã lưu ở localStorage không được rơi vào màn "Quyền Truy Cập Bị Hạn Chế".
+const renamedTab = (t: string) => (t === "ops_support" ? "calendar" : t);
+
 // Chunk của từng tab — để tải SONG SONG với đợt nạp dữ liệu (xem `preload` ở lib/lazyNamed.ts). Phải
 // khớp với khối render tab bên dưới; thiếu một tab thì tab đó chỉ chậm như trước, không hỏng.
 const TAB_CHUNKS: Record<string, { preload: () => void }[]> = {
-  calendar: [OpsBoard, TodoPanel],
+  calendar: [OpsBoard, TodoPanel, OpsSupportTab],
   studio_calendar: [LiveCalendar],
   sessions: [SessionLedger],
   my_shifts: [OpsBoard],
@@ -116,7 +119,6 @@ const TAB_CHUNKS: Record<string, { preload: () => void }[]> = {
   month_plan: [MonthPlan],
   agency_overview: [CeoBrief, AgencyChannelSummary],
   host_performance: [HostPerformance],
-  ops_support: [OpsSupportTab],
   brands_overview: [BrandsOverview],
   report_publish_board: [ReportPublishBoard],
   brand_dashboard: [BrandDashboard],
@@ -219,7 +221,7 @@ export default function App() {
   // thắng localStorage. Brand chỉ biết slug lúc này — đối chiếu khi danh sách brand nạp xong (bên dưới).
   const [initialRoute] = useState(() => parsePath(window.location.pathname));
   const [activeTab, setActiveTab] = useState<string>(() =>
-    initialRoute ? initialRoute.tab ?? "brand_calendar" : loadStorage("activeTab", "shift_scheduling")
+    initialRoute ? initialRoute.tab ?? "brand_calendar" : renamedTab(loadStorage("activeTab", "shift_scheduling"))
   );
   // Bảng Vận Hành ("calendar") và Lịch & Studio ("studio_calendar") là hai mục sidebar riêng (2026-10-07; trước đó là
   // hai tab con của "calendar" chọn bằng state opsView).
@@ -1864,6 +1866,18 @@ export default function App() {
                       requestOpenSessionId={notifOpenSessionId}
                       onOpenRequestHandled={() => setNotifOpenSessionId(null)}
                     />
+                    {isOpsRole && (
+                      <OpsSupportTab
+                        platform={agencyPlatformState}
+                        brandsOn={brandsOn}
+                        sessions={activeSessions}
+                        shiftSlots={shiftSlots}
+                        promoSchemes={promoSchemes}
+                        engineParams={engineParams}
+                        onOpenSession={(id) => setNotifOpenSessionId(id)}
+                        onOpenMonthPlan={(brandId, platform) => openMonthPlanFor(brandId, platform)}
+                      />
+                    )}
                   </div>
                 )}
 
@@ -1999,19 +2013,6 @@ export default function App() {
                     />
                     ))}
                   </>
-                )}
-
-                {activeTab === "ops_support" && (
-                  <OpsSupportTab
-                    platform={agencyPlatformState}
-                    brands={agencyBrands}
-                    sessions={activeSessions}
-                    shiftSlots={shiftSlots}
-                    promoSchemes={promoSchemes}
-                    engineParams={engineParams}
-                    onOpenSession={(id) => { setActiveTab("calendar"); setNotifOpenSessionId(id); }}
-                    onOpenMonthPlan={(brandId, platform) => openMonthPlanFor(brandId, platform)}
-                  />
                 )}
 
                 {activeTab === "host_performance" && (

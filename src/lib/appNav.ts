@@ -1,5 +1,5 @@
 import React from "react";
-import { BookOpen, BrainCircuit, Briefcase, Building2, CalendarCheck2, Clapperboard, CalendarClock, Calendar as CalendarIcon, CalendarRange, Activity, Database, DollarSign, FileSignature, FileText, LayoutDashboard, LayoutGrid, Link2, Megaphone, Package, Radio, Send, ShieldCheck, TrendingUp, Users } from "lucide-react";
+import { BookOpen, BrainCircuit, Briefcase, Building2, CalendarCheck2, Clapperboard, CalendarClock, Calendar as CalendarIcon, CalendarRange, Database, DollarSign, FileSignature, FileText, LayoutDashboard, LayoutGrid, Link2, Megaphone, Package, Radio, Send, ShieldCheck, TrendingUp, Users } from "lucide-react";
 import { PermissionKey, UserRole } from "../types";
 
 // Cấu hình sidebar + vài hằng số điều hướng, tách khỏi App.tsx 2026-10-01 (App.tsx 2.867 dòng).
@@ -28,7 +28,6 @@ export const TAB_CHANNEL_SCOPE: Record<string, "all" | "one"> = {
   brands_overview: "all",
   report_publish_board: "all",
   month_plan: "one",
-  ops_support: "one",
   brand_dashboard: "one",
   brand_calendar: "all",
   brand_sessions: "all",
@@ -130,9 +129,9 @@ export function agencyNavGroups(currentRole: UserRole): NavGroup[] {
               // hôm nay/tuần). Lịch & Studio (LiveCalendar cũ) từng là tab con ở đây, tách thành mục riêng 07/10.
               { id: "calendar", label: "Bảng Vận Hành", icon: CalendarIcon, perm: "manage_calendar" as PermissionKey },
               { id: "studio_calendar", label: "Lịch & Studio", icon: Clapperboard, perm: "manage_calendar" as PermissionKey },
-              { id: "sessions", label: "Sổ Ca", icon: BookOpen, perm: "manage_sessions" as PermissionKey },
-              // Hỗ Trợ Vận Hành: 28/09 gộp vào Dashboard brand; 07/10 user chốt tách lại — benchmark ca sắp live chỉ ở đây, không ở Dashboard brand.
-              { id: "ops_support", label: "Hỗ Trợ Vận Hành", icon: Activity, perm: "manage_calendar" as PermissionKey }
+              // Hỗ Trợ Vận Hành (benchmark ca sắp live): 28/09 gộp vào Dashboard brand, 07/10 tách thành tab riêng, 08/10 gộp vào
+              // Bảng Vận Hành (khối thu gọn cuối trang) vì hai màn cùng trả lời "ca sắp tới thế nào".
+              { id: "sessions", label: "Sổ Ca", icon: BookOpen, perm: "manage_sessions" as PermissionKey }
             ]
           },
           {

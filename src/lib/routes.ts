@@ -18,7 +18,6 @@ const AGENCY_TAB_SLUGS: Record<string, string> = {
   studio_calendar: "lich-studio",
   sessions: "so-ca",
   host_performance: "hieu-suat-host",
-  ops_support: "ho-tro-van-hanh",
   brands_overview: "toan-canh-brand",
   report_publish_board: "phat-hanh-report",
   talents: "talent-pool",
@@ -51,7 +50,7 @@ const BRAND_TAB_SLUGS: Record<string, string> = {
 const invert = (m: Record<string, string>) => Object.fromEntries(Object.entries(m).map(([k, v]) => [v, k]));
 // Link cũ của tab đã gộp (gộp cấu hình 06/10) vẫn mở được: "Cam Kết Hợp Đồng" bên Agency → CRM, "Rate Card" của
 // brand → tab Hợp Đồng của brand.
-const AGENCY_SLUG_TO_TAB: Record<string, string> = { ...invert(AGENCY_TAB_SLUGS), "cam-ket-hop-dong": "crm" };
+const AGENCY_SLUG_TO_TAB: Record<string, string> = { ...invert(AGENCY_TAB_SLUGS), "cam-ket-hop-dong": "crm", "ho-tro-van-hanh": "calendar" };
 const BRAND_SLUG_TO_TAB: Record<string, string> = { ...invert(BRAND_TAB_SLUGS), "rate-card": "brand_commitment_view" };
 
 /** "Franklin Sports" → "franklin-sports". Bỏ dấu tiếng Việt, đ → d. */
