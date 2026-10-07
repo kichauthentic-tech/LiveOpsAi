@@ -13,6 +13,13 @@
 
 ## 1. Giai đoạn hiện tại (cập nhật 2026-10-07)
 
+- **08/10 (muộn): "KẾ HOẠCH VS THỰC TẾ" CỦA CỬA SỔ CA LIVE THÀNH 2 CỘT + NHẬP TAY THỰC TẾ (migration `0152` ĐÃ CHẠY 08/10, user thử OK; tsc, vitest 663/664 — 1 đỏ là Talent Pool `lg:sticky` có sẵn;
+  replay 0001→0152 + `supabase/tests/0152_set_session_actuals.sql` 14/14 trên Postgres tạm; user xác nhận chạy được trên app thật; test vẽ SSR `tests/sessionPlanVsActual.test.ts`).**
+  `components/SessionPlanVsActual.tsx` (thay khối cũ trong `SessionWindow`): bảng Kế hoạch | Thực tế — Giờ live (giờ ca | giờ live thật), GMV (target | GMV + "% target"), GMV/giờ (target ÷ giờ ca | thực tế).
+  Brand: ô Kế hoạch của GMV/GMV/giờ là "—" (không lộ target). **Thực tế có hai đường vào:** (1) file / giao ca / đối soát tự ghi đè như cũ; (2) ops bấm "Nhập tay thực tế" (giờ live từ–đến + GMV)
+  ⇒ RPC `set_session_actuals` (0152, `setSessionActuals` ở `lib/db/sessions.ts`). Luật DB: chỉ ceo/operations/admin; ca chưa huỷ, đã bắt đầu; **chỉ ghi khi `data_source = 'manual'`** (đã có số file/giao ca/đối soát thì
+  chặn — muốn đổi thì up file mới); giữ `manual` ⇒ vẫn "Tạm tính"; giờ live gõ cả hai hoặc để trống, qua nửa đêm tự tính; tháng đã phát hành Report bị trigger 0133 chặn. Nút ẩn ở client khi tier ≠ manual, đã giao ca, hoặc `s.date > today`.
+  **Việc kế:** nhập tay mới chỉ có GMV + giờ live (Orders/Views chưa có ô — nếu cần thì thêm tham số RPC).
 - **08/10 (sau): "TẢI LỊCH HOST" CHIA NHÓM HOST / TRỢ LIVE (CHƯA commit; tsc sạch, `uiReadability` xanh lại — đã đổi `text-[10px]`→`[11px]` trong `TalentLoadTimeline.tsx`; đã xem trên app thật 08/10 + 09/10).** Nhóm theo vai CHIẾM NHIỀU GIỜ HƠN trong ngày (hoà → Host); người làm cả hai vai chỉ MỘT hàng (để trùng giờ host×trợ vẫn chồng thẻ, giờ cộng dồn cho mức 6h), dòng phụ "Host 3h + Trợ 6h", thẻ vai phụ viền nét đứt + nhãn vai. Vai tính theo TỪNG ĐOẠN (`effectiveSegments`), không theo cả ca. "Rảnh cả ngày" chia theo vai hồ sơ. Việc còn treo: chưa có bộ lọc/tab riêng Host|Trợ nếu ops cần.
 - **08/10: HIỆU SUẤT HOST CHỌN KỲ NGÀY / TUẦN / THÁNG (CHƯA commit; tsc sạch; đã xem trên app thật qua dev server :3100, admin).** `components/HostPerformance.tsx`: nút Ngày | Tuần | Tháng | Tuỳ chọn + ‹ › chuyển kỳ
   (tuần ISO thứ Hai–CN, tháng nhảy theo lịch, không tiến qua kỳ chứa hôm nay); đổi chế độ giữ nguyên mốc `anchor`. Mặc định = **Tháng hiện tại** (trước đây cố định 90 ngày gần nhất); "Tuỳ chọn" giữ ô từ–đến cũ

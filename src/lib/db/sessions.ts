@@ -517,6 +517,19 @@ export async function updateSession(session: LiveSession): Promise<LiveSession> 
   return assembleSessions([row], reports, segments, checkpoints)[0];
 }
 
+/** Ops gõ tay "Thực tế" của ca (0152): GMV + giờ live thật (HH:MM, cả hai hoặc không). DB chỉ nhận khi ca chưa có số từ
+ *  file/giao ca/đối soát — file up sau tự ghi đè. */
+export async function setSessionActuals(sessionId: string, v: { gmv: number; liveStart?: string; liveEnd?: string }): Promise<LiveSession> {
+  const { error } = await supabase.rpc("set_session_actuals", {
+    p_session_id: sessionId,
+    p_gmv: v.gmv,
+    p_live_start: v.liveStart || null,
+    p_live_end: v.liveEnd || null
+  });
+  if (error) throw error;
+  return fetchSessionById(sessionId);
+}
+
 // Dùng sau khi gọi RPC submit_session_handover (src/lib/db/handovers.ts) — RPC đó chỉ
 // trả về row live_sessions thô, cần assemble lại đầy đủ (kèm .report) trước khi cập nhật state.
 export async function fetchSessionById(id: string): Promise<LiveSession> {

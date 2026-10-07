@@ -23,6 +23,7 @@ import {
 import { DataSourceBadge } from "./common/DataSourceBadge";
 import { BrandLogo } from "./ui/BrandLogo";
 import { HandoverForm } from "./HandoverForm";
+import { SessionPlanVsActual } from "./SessionPlanVsActual";
 import { TikTokHandover } from "./TikTokHandover";
 import { handoverOwnerLabel, hasHandover, isHandoverPerson } from "../lib/handover";
 import { useToast } from "../hooks/useToast";
@@ -95,7 +96,6 @@ function fmtDate(d: string): string {
   return `${WEEKDAY[new Date(y, m - 1, day).getDay()]} ${String(day).padStart(2, "0")}/${String(m).padStart(2, "0")}/${y}`;
 }
 const fmtTime = (iso?: string) => (iso ? new Date(iso).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : "—");
-const fmtHours = (h: number) => (h > 0 ? `${h.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h` : "—");
 const fmtInt = (n: number | undefined) => (n ?? 0).toLocaleString("vi-VN");
 const fmtPct = (n: number) => `${n.toLocaleString("vi-VN", { maximumFractionDigits: 2 })}%`;
 
@@ -180,7 +180,6 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
   const missing = isBrandView ? [] : missingSteps(s, today);
   const planHours = sessionHours({ ...s, liveDurationMinutes: undefined });
   const liveHours = s.liveDurationMinutes ? s.liveDurationMinutes / 60 : 0;
-  const gmvPerHour = liveHours > 0 ? (s.actualGmv ?? 0) / liveHours : planHours > 0 ? (s.actualGmv ?? 0) / planHours : 0;
   const prof = profileOf(s);
   const metricTotals = prof.metrics.ofSessions([s], () => (liveHours > 0 ? liveHours : planHours));
   const linked = useMemo(() => linkedSessions(allSessions).get(s.id) ?? [], [allSessions, s.id]);
@@ -266,6 +265,9 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
     }
   };
 
+  // Gõ tay "Thực tế" (0152): ops, ca đã tới ngày (DB chặn theo giờ), chưa huỷ, chưa có số từ file/giao ca/đối soát — DB guard lại đúng các điều này.
+  const canEnterActuals =
+    isOps && !!onSessionsUpdated && s.status !== "Cancelled" && dataSourceTier(s) === "manual" && !hasHandover(s) && s.date <= today;
   const hasData = dataSourceTier(s) !== "manual" || (s.actualGmv ?? 0) > 0 || (s.totalOrders ?? 0) > 0;
   const canCancel = isOps && !!onCancelSession && s.status !== "Cancelled" && !hasData;
   const doCancel = async (reopenSlot: boolean) => {
@@ -479,33 +481,16 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
             />
           )}
 
-          {/* Kế hoạch vs thực tế */}
-          <section>
-            <h4 className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-bold mb-2">Kế hoạch vs thực tế</h4>
-            <div className="grid grid-cols-2 gap-2">
-              <KV label="Giờ kế hoạch" value={`${s.startTime}–${s.endTime} (${fmtHours(planHours)})`} />
-              {hideMetrics ? (
-                <>
-                  <KV label="Giờ live" value="chưa phát hành" muted />
-                  <KV label="GMV" value="chưa phát hành" muted />
-                  <KV label="GMV/giờ" value="chưa phát hành" muted />
-                </>
-              ) : (
-                <>
-                  <KV label="Giờ live" value={s.actualStartAt ? `${fmtTime(s.actualStartAt)}–${fmtTime(s.actualEndAt)} (${fmtHours(liveHours)})` : "chưa có file"} muted={!s.actualStartAt} />
-                  {!isBrandView && <KV label="Target GMV" value={s.targetGmv ? fmtVndShort(s.targetGmv) : "chưa có target"} muted={!s.targetGmv} />}
-                  <KV label="GMV" value={s.actualGmv ? fmtVndShort(s.actualGmv) : "—"} accent={!!s.actualGmv} />
-                  {!isBrandView && s.targetGmv > 0 && <KV label="% Target" value={fmtPct(((s.actualGmv ?? 0) / s.targetGmv) * 100)} />}
-                  <KV label="GMV/giờ" value={gmvPerHour > 0 ? fmtVndShort(gmvPerHour) : "—"} />
-                </>
-              )}
-            </div>
-            {hideMetrics && (
-              <p className="mt-2 text-[11px] text-[var(--text-faint)] italic">
-                Số liệu tháng {s.date.slice(0, 7)} sẽ hiện tại đây sau khi Report Tháng được phát hành.
-              </p>
-            )}
-          </section>
+          {/* Kế hoạch vs thực tế — hai cột; Thực tế tự cập nhật khi up file, hoặc ops gõ tay khi chưa có file (0152). */}
+          <SessionPlanVsActual
+            session={s}
+            planHours={planHours}
+            liveHours={liveHours}
+            hideMetrics={hideMetrics}
+            isBrandView={isBrandView}
+            canEnter={canEnterActuals}
+            onSaved={(u) => onSessionsUpdated?.([u])}
+          />
 
           {/* Đổi host giữa ca: report thứ nhất = số lúc host xuống (0147), trợ live up ngay; report thứ hai = Giao ca bên dưới. */}
           {showHandover && (
