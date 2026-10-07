@@ -14,6 +14,7 @@ import {
   SESSION_TONE,
   SessionCardLegend,
   buildSessionMeta,
+  buildLateBadge,
   buildSlotMeta
 } from "./ui/SessionEventCard";
 import { PlatformLogo } from "./ui/PlatformLogo";
@@ -60,7 +61,7 @@ interface LiveCalendarProps {
 // xuống dòng thì vẫn vừa); ca chồng giờ cùng phòng xếp làn riêng. Mọi thẻ cao ĐÚNG LANE_H (prop `fill`) — chỉ
 // chiều rộng đổi theo thời lượng, nên ca cùng giờ luôn cùng hình dạng.
 const HOUR_PX = 64;
-const LANE_H = 116;
+const LANE_H = 124;
 const LANE_GAP = 6;
 const LANE_PAD = 8;
 const EMPTY_ROW_H = 56;
@@ -869,7 +870,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                         brandName={ds.brandName} platform={ds.platform}
                         startTime={ds.startTime}
                         endTime={ds.endTime}
-                        meta={buildSessionMeta(ds, talentLookup)} className={clashRing(ds.id)}
+                        meta={buildSessionMeta(ds, talentLookup)} lateBadge={buildLateBadge(ds)} className={clashRing(ds.id)}
                         targetGmv={ds.targetGmv}
                         tone={SESSION_TONE[ds.status]}
                         dragging={draggedSessionId === ds.id}
@@ -1036,7 +1037,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                         startTime={ds.startTime}
                         endTime={ds.endTime}
                         title={ds.title}
-                        meta={buildSessionMeta(ds, talentLookup)} className={clashRing(ds.id)}
+                        meta={buildSessionMeta(ds, talentLookup)} lateBadge={buildLateBadge(ds)} className={clashRing(ds.id)}
                         targetGmv={ds.targetGmv}
                         tone={SESSION_TONE[ds.status]}
                         dragging={draggedSessionId === ds.id}
@@ -1141,6 +1142,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   endTime={it.session!.endTime}
                   title={it.session!.title}
                   meta={buildSessionMeta(it.session!, talentLookup)}
+                  lateBadge={buildLateBadge(it.session!)}
                   className={clashRing(it.session!.id)}
                   targetGmv={it.session!.targetGmv}
                   tone={SESSION_TONE[it.session!.status]}

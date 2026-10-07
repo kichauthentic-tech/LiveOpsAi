@@ -42,7 +42,7 @@
   `tests/sessionCardTheme.test.ts`). **Quyết định user:** (A) thẻ hẹp bỏ tên brand (≥200px mới hiện); (B) ô lịch tháng/tuần/PosterDayCell **cao ra theo số thẻ, không cuộn trong
   ô** (hàng tuần dài khi ngày nhiều ca — chủ ý); (C) chip Host/Trợ live giữ tên rút gọn + biểu tượng, không còn `metaLimit`/"+N". Bố cục theo **độ rộng của chính thẻ**
   (container query: ≤100px vi mô · gọn · ≥200px vừa · ≥460px một hàng). Lịch Ngày (LiveCalendar): trục tối thiểu 64px/giờ (`HOUR_PX`), ca chồng giờ cùng phòng xếp làn
-  (`layoutLanes`, `LANE_H` 116) thay vì đè. Lịch Brand tháng: danh sách chữ bên dưới nay là thẻ tầng rộng + cột GMV đã ghi nhận. `EventPill` xoá (hết nơi dùng).
+  (`layoutLanes`, `LANE_H` 124) thay vì đè. Lịch Brand tháng: danh sách chữ bên dưới nay là thẻ tầng rộng + cột GMV đã ghi nhận. `EventPill` xoá (hết nơi dùng).
   Quy ước: thẻ ca mới KHÔNG tự đặt màu/nhãn — thêm brand ⇒ khai `accent/ink/inkDark` ở `BRAND_THEMES` (không khai thì tự suy, vẫn qua test tương phản); thông tin phụ thêm
   vào mảng `meta`; chú giải dùng `SessionCardLegend`. Chưa làm: đổi chữ TikTok/Shopee thành logo ở Sổ Ca / Bản Tin CEO / Hiệu suất Host (đã loại khỏi phạm vi).
 
@@ -50,8 +50,9 @@
   ĐÚNG `LANE_H` (prop `fill` của `SessionEventCard`, Target GMV ghim đáy; chỉ rộng đổi theo giờ), phòng trống thu còn `EMPTY_ROW_H` 56px, nhãn đầu/cuối trục giờ căn vào trong
   (hết bị cắt `:00`/`23:`). Thẻ (mọi lịch): ca ĐANG LIVE = viền chớp đỏ (`sc-blink`, tắt khi reduced-motion; huy hiệu LIVE đứng yên); `buildSessionMeta` thêm chip đỏ
   "Chưa có host" (ca Upcoming/Live, không hiện cho brand) và chip "A → B" khi đổi người giữa ca (tooltip ghi giờ đổi, `SessionCardMeta.warn`); viền đỏ trùng người nay có
-  tooltip "X cũng đang ở ca …" (`clashDescriptions` ở `lib/scheduling/conflicts.ts`, `clashTip` ở LiveCalendar). Chưa làm: giờ vào thực tế của ca live ("trễ 7p"), đánh dấu
-  `excludedFromReports` trên thẻ. 2 test đang đỏ KHÔNG do đợt này: `layoutConventions` (Talent Pool `lg:sticky`), `uiReadability` (TalentLoadTimeline `text-[10px]`).
+  tooltip "X cũng đang ở ca …" (`clashDescriptions` ở `lib/scheduling/conflicts.ts`, `clashTip` ở LiveCalendar). Huy hiệu hổ phách "+12p" (vào live trễ, `lateStartInfo` ở `lib/sessionStatus.ts`, `buildLateBadge`, chỉ lịch Agency, nằm hàng đầu thẻ để không thêm chiều cao; `LANE_H` 116→124 vì ca 2h có Host+Trợ+Target đo được ~121px): CHỈ có sau
+  khi file số liệu được up (ca đang live thường chưa có) và chỉ báo khi muộn 10–180p, vì `actual_start_at` = giờ SỚM NHẤT của room trong file (0078), ca nối tiếp trong room đã live từ ca trước sẽ có giờ thật sớm hơn kế hoạch. Chưa làm: đánh dấu
+  `excludedFromReports` trên thẻ, "off sớm" (cùng nguồn `actual_end_at`). 2 test đang đỏ KHÔNG do đợt này: `layoutConventions` (Talent Pool `lg:sticky`), `uiReadability` (TalentLoadTimeline `text-[10px]`).
 
 - **07/10 (cuối ngày): GIẢM THỜI GIAN MỞ APP (đã commit 8058e6f; tsc, vitest 650/650, đã đo trên trình duyệt).** Cổ chai = danh sách ca (1.501 ca, ~95% byte lúc mở) giữ
   `coreDataReady` ~10 s trên mạng yếu của user. Đã làm: 2 trang ca song song + `SESSION_READ_COLUMNS` + tải sẵn xlsx (commit 5615c13); **Dữ Liệu Gốc + Nhập Ads chờ `shellDataReady`

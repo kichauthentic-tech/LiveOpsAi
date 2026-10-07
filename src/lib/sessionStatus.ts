@@ -69,3 +69,37 @@ export function hasLiveEvidence(s: LiveSession): boolean {
 export function isUnconfirmedPast(s: LiveSession): boolean {
   return s.status === "Completed" && s.monthPublished !== false && !hasLiveEvidence(s);
 }
+
+// Vào live TRỄ so với giờ kế hoạch — chỉ nói điều số liệu đủ chắc để nói. `actual_start_at` = giờ bắt đầu SỚM NHẤT của
+// các room trong file số liệu (0078), KHÔNG phải "giờ ca này bắt đầu": ca nối tiếp trong một room đã live từ ca trước sẽ
+// có giờ vào SỚM hơn kế hoạch hàng giờ. Vì vậy chỉ báo khi vào MUỘN (≥ LATE_START_MIN); vào sớm/đúng giờ thì im lặng,
+// và muộn quá LATE_START_MAX_MIN thì nhiều khả năng là room khác chứ không phải host trễ. Ca nạp bù: giờ thật chính là
+// giờ kế hoạch (sinh từ room) nên không có gì để so. Dữ liệu chỉ có SAU khi file số liệu được up — ca đang live thường chưa có.
+export const LATE_START_MIN = 10;
+export const LATE_START_MAX_MIN = 180;
+
+export interface LateStartInfo {
+  minutes: number;
+  /** HH:MM giờ VN. */
+  plannedStart: string;
+  actualStart: string;
+  actualEnd?: string;
+}
+
+const vnClock = (ms: number) => new Date(ms + 7 * 3600000).toISOString().slice(11, 16);
+
+export function lateStartInfo(s: Pick<LiveSession, "date" | "startTime" | "endTime" | "status" | "isBackfill" | "actualStartAt" | "actualEndAt">): LateStartInfo | null {
+  if (!s.actualStartAt || s.isBackfill || s.status === "Cancelled") return null;
+  const actual = Date.parse(s.actualStartAt);
+  if (!Number.isFinite(actual)) return null;
+  const [planned] = sessionWindowMs(s);
+  const minutes = Math.round((actual - planned) / 60000);
+  if (minutes < LATE_START_MIN || minutes > LATE_START_MAX_MIN) return null;
+  const end = s.actualEndAt ? Date.parse(s.actualEndAt) : NaN;
+  return { minutes, plannedStart: vnClock(planned), actualStart: vnClock(actual), actualEnd: Number.isFinite(end) ? vnClock(end) : undefined };
+}
+
+/** Nhãn ngắn cho huy hiệu trên thẻ: "+12p", "+1h05". */
+export function lateStartLabel(minutes: number): string {
+  return minutes < 60 ? `+${minutes}p` : `+${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, "0")}`;
+}

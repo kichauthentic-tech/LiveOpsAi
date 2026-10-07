@@ -585,6 +585,7 @@ html:not(.dark) [class~="border-slate-700"], html:not(.dark) [class~="border-sla
 .sc-time { font-size: 11px; font-weight: 700; line-height: 1.1; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .sc-bname { display: none; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .sc-badges { margin-left: auto; display: flex; align-items: center; gap: 3px; flex: none; }
+.sc-late { flex: none; font-size: 11px; font-weight: 800; line-height: 1; padding: 3px 5px; border-radius: 999px; white-space: nowrap; font-variant-numeric: tabular-nums; background: #f59e0b; color: #1c1917; }
 .sc-st { width: 16px; height: 16px; flex: none; }
 .sc-who { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
 .sc-chip { display: inline-flex; align-items: center; gap: 3px; max-width: 100%; font-size: 11px; font-weight: 600; line-height: 1.2; padding: 2px 5px; border-radius: 5px; background: color-mix(in srgb, var(--text) 8%, transparent); }
@@ -617,8 +618,13 @@ html:not(.dark) [class~="border-slate-700"], html:not(.dark) [class~="border-sla
   .sc-time { font-size: 13px; }
   .sc-blogo, .sc-emoji { width: 24px; height: 24px; }
   .sc-head { flex-wrap: nowrap; }
+  /* Thẻ 200–259px có thêm huy hiệu "+12p" thì một hàng không đủ chỗ (logo + giờ + 3 biểu tượng) → huy hiệu rớt xuống hàng 2. */
+  .sc-head:has(.sc-late) { flex-wrap: wrap; }
   .sc-live { padding: 2px 6px 2px 5px; }
   .sc-live > b { display: inline; }
+}
+@container (min-width: 260px) {
+  .sc-head:has(.sc-late) { flex-wrap: nowrap; }
 }
 @container (min-width: 460px) {
   .sc { display: flex; align-items: center; gap: 12px; padding: 7px 10px; }
@@ -635,5 +641,5 @@ html:not(.dark) [class~="border-slate-700"], html:not(.dark) [class~="border-sla
   .sc-head { flex-direction: column; gap: 3px; }
   .sc-time { font-size: 11px; }
   .sc-te, .sc-who, .sc-foot { display: none; }
-  .sc-badges { margin: 0; }
+  .sc-badges { margin: 0; flex-wrap: wrap; justify-content: center; }
 }

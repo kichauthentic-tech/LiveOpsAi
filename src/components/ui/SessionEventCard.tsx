@@ -2,6 +2,7 @@ import React from "react";
 import { Building2, CheckCircle2, Clock, LucideIcon, Mic, Users, XCircle } from "lucide-react";
 import { Brand, LiveSession, ShiftSlot, Talent } from "../../types";
 import { talentShortName } from "../../lib/talentName";
+import { lateStartInfo, lateStartLabel } from "../../lib/sessionStatus";
 import { clockAtOffset, hasStaffSegments, segmentsOfRole } from "../../lib/staffSegments";
 import { BrandTheme } from "../../lib/brandTheme";
 import { getBrandLogoAsset } from "../../lib/brandLogos";
@@ -49,6 +50,8 @@ interface SessionEventCardProps {
   tone?: SessionCardTone;
   /** Ca chờ đăng ký: viền đứt + nền nhạt hơn để phân biệt với phiên đã chốt cùng brand. */
   pending?: boolean;
+  /** Vào live trễ so với kế hoạch (từ lateStartInfo): huy hiệu hổ phách cạnh biểu tượng sàn/trạng thái — nằm ở hàng đầu để không thêm chiều cao thẻ. */
+  lateBadge?: { label: string; title: string };
   /** Đang bị kéo (drag) — làm mờ card gốc. */
   dragging?: boolean;
   draggable?: boolean;
@@ -98,6 +101,7 @@ export const SessionCardLegend: React.FC<{ showCancelled?: boolean; variant?: "s
         <span className="inline-flex items-center gap-1.5"><CheckCircle2 className="sc-st text-emerald-600 dark:text-emerald-400" strokeWidth={2.4} /> Đã xong</span>
         {showCancelled && <span className="inline-flex items-center gap-1.5"><XCircle className="sc-st text-rose-600 dark:text-rose-400" strokeWidth={2.4} /> Đã huỷ</span>}
         <span className="inline-flex items-center gap-1.5"><Clock className="sc-st" strokeWidth={2.4} /> Chờ đăng ký (viền đứt)</span>
+        <span className="inline-flex items-center gap-1.5"><span className="sc-late">+12p</span> Vào live trễ (theo file số liệu)</span>
       </>
     ) : (
       <>
@@ -128,7 +132,8 @@ export const SessionEventCard: React.FC<SessionEventCardProps> = ({
   onDragStart,
   onDragEnd,
   className = "",
-  fill
+  fill,
+  lateBadge
 }) => {
   const logo = getBrandLogoAsset(brand ?? { name: brandName });
   const style = {
@@ -169,6 +174,7 @@ export const SessionEventCard: React.FC<SessionEventCardProps> = ({
           </span>
           <span className="sc-bname">{brandName}</span>
           <span className="sc-badges">
+            {lateBadge && <span className="sc-late" title={lateBadge.title}>{lateBadge.label}</span>}
             <PlatformLogo platform={platform} />
             <StatusIcon tone={shownTone} />
           </span>
@@ -215,6 +221,17 @@ export const SESSION_TONE: Record<LiveSession["status"], SessionCardTone> = {
 // Tên trên chip: nickname ops đặt (0087) nếu tra được talent, không thì cắt 2 từ cuối họ tên
 // (Nguyễn Thị Mai Anh → Mai Anh) — xem lib/talentName.ts.
 type TalentLookup = (id: string | undefined) => Pick<Talent, "name" | "nickname"> | undefined;
+
+/** Huy hiệu "vào trễ" cho thẻ ca — null nếu đúng giờ/không đủ dữ liệu (xem lateStartInfo). Chỉ cho agency: trễ giờ là chuyện nội bộ. */
+export const buildLateBadge = (s: LiveSession, viewerRole?: "agency" | "brand"): { label: string; title: string } | undefined => {
+  if (viewerRole === "brand") return undefined;
+  const late = lateStartInfo(s);
+  if (!late) return undefined;
+  return {
+    label: lateStartLabel(late.minutes),
+    title: `Vào live trễ ${late.minutes} phút: kế hoạch ${late.plannedStart}, thật ${late.actualStart}${late.actualEnd ? `–${late.actualEnd}` : ""} (theo file số liệu)`
+  };
+};
 
 /** Chip Host + Trợ live. Target GMV KHÔNG nằm trong danh sách này — nó có viên thuốc riêng cuối thẻ (prop
  * `targetGmv` của SessionEventCard, đổ trực tiếp từ `s.targetGmv` ở call-site).
