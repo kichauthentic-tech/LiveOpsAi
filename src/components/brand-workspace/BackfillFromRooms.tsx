@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { LiveSession, Talent } from "../../types";
-import { Layers, Scissors, Users, Wand2, CalendarDays, Save, ChevronDown, ChevronUp } from "lucide-react";
+import { Layers, Scissors, Users, Wand2, CalendarDays, Save, ChevronDown, ChevronUp, Home, Trash2 } from "lucide-react";
 import { fetchBackfillPayloads } from "../../lib/dataraw/backfillRooms";
 import { type ReportPlatform } from "../../lib/reportPlatform";
 import { profileOf } from "../../lib/platforms/profiles";
-import { createBackfillSessions, bulkAssignSessionHosts, splitBackfillSession } from "../../lib/db/backfillSessions";
+import { createBackfillSessions, bulkAssignSessionHosts, splitBackfillSession, deleteBackfillSession } from "../../lib/db/backfillSessions";
+import { fetchInhouseRooms, markInhouseRooms, unmarkInhouseRooms, type InhouseRoom } from "../../lib/db/inhouseRooms";
 import {
   planBackfillPayloads, roomIdsLinkedToSessions, BackfillRoomPayload, sessionWindows, hasOverlappingSession, buildHostGrid, fillByWeekday, copyFromPreviousMonth,
-  diffAssignments, currentAssignment, DraftAssignments, prevMonthOf, LONG_ROOM_MINUTES
+  diffAssignments, currentAssignment, DraftAssignments, prevMonthOf, LONG_ROOM_MINUTES, groupByStartHour
 } from "../../lib/backfill/roomsToSessions";
 import { vnParts } from "../../lib/dataraw/liveAnalysisRows";
 import { talentOptionLabel } from "../../lib/talentName";
@@ -18,7 +19,8 @@ import { fmtVndFull } from "../../lib/format";
 
 // Nạp bù ca từ file số liệu theo ca của sàn — TikTok: Creator-Live-Performance (migration 0086), Shopee: Live List (0156, 08/10).
 // 2 bước, nằm ngay trên ô import của tab file đó trong Dữ Liệu Gốc:
-//   1. "Sinh ca từ file": mỗi room → 1 ca Completed đã đối soát, host trống.
+//   1. "Sinh ca từ file": mỗi room → 1 ca Completed đã đối soát, host trống. Trước khi sinh, Ops phân loại từng room:
+//      "agency" (mặc định, sẽ thành ca) hay "inhouse" (brand tự live — chỉ ghi nhãn vào brand_inhouse_rooms, 0157, không thành ca).
 //   2. Lưới ngày × Ca 1..N để gán host/trợ live hàng loạt — công cụ điền theo thứ / sao chép
 //      tháng trước thay cho việc mở form từng ca.
 // Dùng được cho cả tháng đang chạy: room trợ live quên up lúc giao ca sẽ ra ca ở bước 1.
@@ -58,11 +60,15 @@ export const BackfillFromRooms: React.FC<Props> = ({ platform, brandId, brandNam
   const [rows, setRows] = useState<(BackfillRoomPayload | null)[]>([]);
   const [loadingRows, setLoadingRows] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [inhouseSaved, setInhouseSaved] = useState<InhouseRoom[]>([]);
+  const [inhouseDraft, setInhouseDraft] = useState<Set<string>>(new Set());
+  const [showClassify, setShowClassify] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftAssignments>({});
   const [saving, setSaving] = useState(false);
   const [splitting, setSplitting] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
   // Công cụ "Điền theo thứ"
   const [toolWeekdays, setToolWeekdays] = useState<Set<number>>(new Set([1, 2, 3, 4, 5, 6, 0]));
   const [toolCol, setToolCol] = useState(0);
@@ -87,12 +93,31 @@ export const BackfillFromRooms: React.FC<Props> = ({ platform, brandId, brandNam
     return () => { alive = false; };
   }, [brandId, platform, month]);
 
+  // Room đã đánh dấu inhouse (0157) — tải theo brand+sàn, không theo tháng (room_id là duy nhất nên không lẫn tháng).
+  useEffect(() => {
+    let alive = true;
+    fetchInhouseRooms(brandId, platform)
+      .then((r) => { if (alive) setInhouseSaved(r); })
+      .catch((e) => { if (alive) setError(`Không đọc được nhãn inhouse: ${errorMessage(e)}`); });
+    return () => { alive = false; };
+  }, [brandId, platform]);
+
+  useEffect(() => { setInhouseDraft(new Set()); }, [brandId, platform, month]);
+
   // Đổi tháng/brand thì bỏ nháp — nháp gắn với session id nên không lẫn, nhưng UI "N thay đổi" sẽ sai.
   useEffect(() => { setDraft({}); setMessage(null); }, [brandId, month]);
 
   const linked = useMemo(() => roomIdsLinkedToSessions(sessions, brandId), [sessions, brandId]);
   const windows = useMemo(() => sessionWindows(sessions, brandId), [sessions, brandId]);
-  const plan = useMemo(() => planBackfillPayloads(rows, linked, windows), [rows, linked, windows]);
+  const inhouseSavedIds = useMemo(() => new Set(inhouseSaved.map((r) => r.roomId)), [inhouseSaved]);
+  const plan = useMemo(() => planBackfillPayloads(rows, linked, windows, inhouseSavedIds), [rows, linked, windows, inhouseSavedIds]);
+  const draftInhouse = useMemo(() => plan.toCreate.filter((p) => inhouseDraft.has(p.room_id)), [plan, inhouseDraft]);
+  const agencyCount = plan.toCreate.length - draftInhouse.length;
+  const hourGroups = useMemo(() => groupByStartHour(plan.toCreate), [plan]);
+  const savedInThisMonth = useMemo(() => {
+    const [start, end] = month ? monthBounds(month) : ["", ""];
+    return inhouseSaved.filter((r) => r.startedAt && vnParts(r.startedAt).date >= start && vnParts(r.startedAt).date <= end);
+  }, [inhouseSaved, month]);
   const grid = useMemo(() => buildHostGrid(sessions, brandId, month), [sessions, brandId, month]);
   const prevGrid = useMemo(() => (month ? buildHostGrid(sessions, brandId, prevMonthOf(month)) : { rows: [], columns: 0 }), [sessions, brandId, month]);
   const monthSessions = useMemo(() => grid.rows.flatMap((r) => r.cells.filter(Boolean).map((c) => c!.session)), [grid]);
@@ -100,19 +125,52 @@ export const BackfillFromRooms: React.FC<Props> = ({ platform, brandId, brandNam
   const unassigned = monthSessions.filter((s) => !(draft[s.id] ?? currentAssignment(s)).hostId).length;
   const hostOptions = useMemo(() => [...talents].sort((a, b) => a.name.localeCompare(b.name, "vi")), [talents]);
 
+  const toggleInhouse = (ids: string[], on: boolean) =>
+    setInhouseDraft((prev) => {
+      const n = new Set(prev);
+      for (const id of ids) { if (on) n.add(id); else n.delete(id); }
+      return n;
+    });
+
   const handleGenerate = async () => {
     if (plan.toCreate.length === 0) return;
-    if (!(await confirm(`Sinh ${plan.toCreate.length} ca cho ${brandName} ${monthLabel(month)} từ file? Host để trống, gán ở lưới bên dưới.`))) return;
+    const agencyRows = plan.toCreate.filter((p) => !inhouseDraft.has(p.room_id));
+    const inhouseRows = draftInhouse;
+    const parts = [
+      agencyRows.length > 0 ? `sinh ${agencyRows.length} ca agency (host để trống, gán ở lưới bên dưới)` : "",
+      inhouseRows.length > 0 ? `ghi nhận ${inhouseRows.length} ${prof.liveUnitWord} là brand tự live (inhouse), không tạo ca` : ""
+    ].filter(Boolean);
+    if (!(await confirm(`${brandName} ${monthLabel(month)}: ${parts.join("; ")}?`))) return;
     setGenerating(true);
     setError(null);
     try {
-      const r = await createBackfillSessions(brandId, plan.toCreate, platform);
+      // Ghi nhãn inhouse trước: nếu bước sinh ca lỗi thì lần bấm lại không còn hỏi lại các room đã phân loại.
+      const marked = await markInhouseRooms(brandId, platform, inhouseRows);
+      if (inhouseRows.length > 0) setInhouseSaved(await fetchInhouseRooms(brandId, platform));
+      setInhouseDraft(new Set());
+      const r = agencyRows.length > 0 ? await createBackfillSessions(brandId, agencyRows, platform) : { inserted: 0, skipped_existing: 0, skipped_invalid: 0 };
       await onSessionsChanged();
-      setMessage(`Đã sinh ${r.inserted} ca${r.skipped_existing ? `, bỏ qua ${r.skipped_existing} ${prof.liveUnitWord} đã có ca` : ""}${r.skipped_invalid ? `, ${r.skipped_invalid} dòng thiếu giờ` : ""}.`);
+      setMessage(
+        [
+          r.inserted > 0 || agencyRows.length > 0 ? `Đã sinh ${r.inserted} ca${r.skipped_existing ? `, bỏ qua ${r.skipped_existing} ${prof.liveUnitWord} đã có ca` : ""}${r.skipped_invalid ? `, ${r.skipped_invalid} dòng thiếu giờ` : ""}` : "",
+          marked > 0 ? `đã ghi nhận ${marked} ${prof.liveUnitWord} inhouse` : ""
+        ].filter(Boolean).join("; ") + "."
+      );
     } catch (e) {
       setError(`Không sinh được ca: ${errorMessage(e)}`);
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const handleUnmark = async (roomIds: string[]) => {
+    setError(null);
+    try {
+      await unmarkInhouseRooms(brandId, roomIds);
+      setInhouseSaved(await fetchInhouseRooms(brandId, platform));
+      setMessage(`Đã bỏ nhãn inhouse của ${roomIds.length} ${prof.liveUnitWord} — chúng quay lại danh sách chờ sinh ca.`);
+    } catch (e) {
+      setError(`Không bỏ được nhãn: ${errorMessage(e)}`);
     }
   };
 
@@ -136,6 +194,23 @@ export const BackfillFromRooms: React.FC<Props> = ({ platform, brandId, brandNam
       setError(`Không lưu được: ${errorMessage(e)}`);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDelete = async (s: LiveSession) => {
+    const hostNote = s.hostId ? " Host đã gán cho ca này cũng mất." : "";
+    if (!(await confirm(`Xoá ca ${s.date} ${s.startTime}–${s.endTime} (${fmtMoney(s.actualGmv)})?${hostNote} ${prof.liveUnitWord[0].toUpperCase()}${prof.liveUnitWord.slice(1)} trong file sẽ quay lại danh sách chờ phân loại.`, { danger: true }))) return;
+    setDeleting(s.id);
+    setError(null);
+    try {
+      await deleteBackfillSession(s.id);
+      setDraft((prev) => { const n = { ...prev }; delete n[s.id]; return n; });
+      await onSessionsChanged();
+      setMessage(`Đã xoá ca ${s.date} ${s.startTime}–${s.endTime}.`);
+    } catch (e) {
+      setError(`Không xoá được ca: ${errorMessage(e)}`);
+    } finally {
+      setDeleting(null);
     }
   };
 
@@ -209,34 +284,103 @@ export const BackfillFromRooms: React.FC<Props> = ({ platform, brandId, brandNam
       {error && <p className="text-[11px] text-rose-500">{error}</p>}
       {message && <p className="text-[11px] text-emerald-600">{message}</p>}
 
-      {/* Bước 1 — sinh ca */}
-      <div className="bg-[var(--surface-base)]/60 border border-[var(--border)] rounded-xl p-3 flex flex-wrap items-center justify-between gap-3">
-        <div className="text-[11px] text-[var(--text-muted)] space-y-0.5">
-          <p className="font-bold text-[var(--text)]">Bước 1 · Sinh ca từ {prof.liveUnitWord}</p>
-          {loadingRows ? (
-            <p>Đang đọc file...</p>
-          ) : (
-            <p>
-              File có <b className="text-[var(--text)]">{rows.length}</b> {prof.liveUnitWord} · đã có ca <b className="text-[var(--text)]">{plan.existing}</b> · sẽ tạo{" "}
-              <b className="text-[var(--text)]">{plan.toCreate.length}</b>
-              {plan.overlapping > 0 && (
-                <> · <span className="text-amber-600">{plan.overlapping} {prof.liveUnitWord} chồng giờ ca đã có trong lịch</span> — không sinh thêm, dùng Đối soát số liệu ở trên để chia số vào ca đó</>
-              )}
-              {plan.invalid > 0 && <> · {plan.invalid} dòng thiếu giờ (bỏ qua)</>}
-              {plan.longRooms.length > 0 && (
-                <> · <span className="text-amber-600">{plan.longRooms.length} {prof.liveUnitWord} ≥ {LONG_ROOM_MINUTES / 60}h</span> — sinh xong tách ở lưới bên dưới nếu là 2 ca</>
-              )}
-            </p>
-          )}
+      {/* Bước 1 — phân loại + sinh ca */}
+      <div className="bg-[var(--surface-base)]/60 border border-[var(--border)] rounded-xl p-3 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="text-[11px] text-[var(--text-muted)] space-y-0.5">
+            <p className="font-bold text-[var(--text)]">Bước 1 · Phân loại và sinh ca từ {prof.liveUnitWord}</p>
+            {loadingRows ? (
+              <p>Đang đọc file...</p>
+            ) : (
+              <p>
+                File có <b className="text-[var(--text)]">{rows.length}</b> {prof.liveUnitWord} · đã có ca <b className="text-[var(--text)]">{plan.existing}</b>
+                {plan.inhouse > 0 && <> · inhouse <b className="text-sky-500">{plan.inhouse}</b></>}
+                {" "}· chờ phân loại <b className="text-[var(--text)]">{plan.toCreate.length}</b>
+                {plan.toCreate.length > 0 && (
+                  <> → ca agency <b className="text-[var(--text)]">{agencyCount}</b>{draftInhouse.length > 0 && <>, inhouse <b className="text-sky-500">{draftInhouse.length}</b></>}</>
+                )}
+                {plan.overlapping > 0 && (
+                  <> · <span className="text-amber-600">{plan.overlapping} {prof.liveUnitWord} chồng giờ ca đã có trong lịch</span> — không sinh thêm, dùng Đối soát số liệu ở trên để chia số vào ca đó</>
+                )}
+                {plan.invalid > 0 && <> · {plan.invalid} dòng thiếu giờ (bỏ qua)</>}
+                {plan.longRooms.length > 0 && (
+                  <> · <span className="text-amber-600">{plan.longRooms.length} {prof.liveUnitWord} ≥ {LONG_ROOM_MINUTES / 60}h</span> — sinh xong tách ở lưới bên dưới nếu là 2 ca</>
+                )}
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={handleGenerate}
+            disabled={generating || loadingRows || plan.toCreate.length === 0}
+            className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white font-bold text-[11px] flex items-center gap-1.5"
+          >
+            <Wand2 className="w-3.5 h-3.5" /> {generating ? "Đang lưu..." : agencyCount > 0 ? `Sinh ${agencyCount} ca` : draftInhouse.length > 0 ? `Ghi nhận ${draftInhouse.length} inhouse` : "Sinh 0 ca"}
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={handleGenerate}
-          disabled={generating || loadingRows || plan.toCreate.length === 0}
-          className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white font-bold text-[11px] flex items-center gap-1.5"
-        >
-          <Wand2 className="w-3.5 h-3.5" /> {generating ? "Đang sinh..." : `Sinh ${plan.toCreate.length} ca`}
-        </button>
+
+        {plan.toCreate.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-[11px] text-[var(--text-muted)]">
+              Mỗi {prof.liveUnitWord} chưa có ca có thể là <b className="text-[var(--text)]">agency live bị thiếu ca</b> hoặc <b className="text-sky-500">brand tự live (inhouse)</b>.
+              Mặc định tất cả là agency — đánh dấu inhouse những {prof.liveUnitWord} không phải của agency trước khi sinh ca.
+            </p>
+            <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+              <span className="font-bold text-[var(--text-muted)]">Theo giờ bắt đầu:</span>
+              {hourGroups.map((g) => {
+                const allOn = g.roomIds.every((id) => inhouseDraft.has(id));
+                return (
+                  <button
+                    key={g.hour}
+                    type="button"
+                    onClick={() => toggleInhouse(g.roomIds, !allOn)}
+                    title={allOn ? "Bỏ đánh dấu inhouse cả cụm" : "Đánh dấu inhouse cả cụm"}
+                    className={`px-2 py-0.5 rounded font-bold border ${allOn ? "bg-sky-600 text-white border-sky-600" : "border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]"}`}
+                  >
+                    {g.label} · {g.roomIds.length}
+                  </button>
+                );
+              })}
+              <button type="button" onClick={() => setShowClassify((v) => !v)} className="ml-auto font-bold text-[var(--accent-text)] flex items-center gap-1">
+                {showClassify ? "Ẩn danh sách" : `Xem ${plan.toCreate.length} ${prof.liveUnitWord}`}
+                {showClassify ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+            {showClassify && (
+              <div className="max-h-72 overflow-y-auto border border-[var(--border)] rounded-lg divide-y divide-[var(--border)]">
+                {plan.toCreate.map((p) => {
+                  const on = inhouseDraft.has(p.room_id);
+                  return (
+                    <div key={p.room_id} className="flex items-center gap-3 px-2.5 py-1.5 text-[11px]">
+                      <span className="w-28 font-mono text-[var(--text)]">{vnParts(p.started_at).label}</span>
+                      <span className="w-24 text-[var(--text-muted)]">→ {vnParts(p.ended_at).time} · {Math.round(p.duration_minutes)}p</span>
+                      <span className="w-28 text-right font-bold text-[var(--text)]">{fmtMoney(p.gmv)}</span>
+                      <span className="w-12 text-right text-[var(--text-muted)]">{p.orders} đơn</span>
+                      <span className="ml-auto flex rounded-md overflow-hidden border border-[var(--border)] font-bold">
+                        <button type="button" onClick={() => toggleInhouse([p.room_id], false)} className={`px-2 py-0.5 ${!on ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)]"}`}>Agency</button>
+                        <button type="button" onClick={() => toggleInhouse([p.room_id], true)} className={`px-2 py-0.5 ${on ? "bg-sky-600 text-white" : "text-[var(--text-muted)]"}`}>Inhouse</button>
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {savedInThisMonth.length > 0 && (
+          <div className="text-[11px] text-[var(--text-muted)] flex flex-wrap items-center gap-2">
+            <Home className="w-3.5 h-3.5 text-sky-500" />
+            <span>Đã ghi nhận inhouse tháng này: <b className="text-sky-500">{savedInThisMonth.length}</b> {prof.liveUnitWord} · GMV {fmtMoney(savedInThisMonth.reduce((a, r) => a + r.gmv, 0))} — không tính vào ca agency</span>
+            <button
+              type="button"
+              onClick={async () => { if (await confirm(`Bỏ nhãn inhouse của ${savedInThisMonth.length} ${prof.liveUnitWord} tháng này? Chúng sẽ quay lại danh sách chờ sinh ca.`)) await handleUnmark(savedInThisMonth.map((r) => r.roomId)); }}
+              className="font-bold text-[var(--accent-text)]"
+            >
+              Bỏ nhãn
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Bước 2 — gán host */}
@@ -358,6 +502,17 @@ export const BackfillFromRooms: React.FC<Props> = ({ platform, brandId, brandNam
                               </span>
                               {s.isBackfill && isLong && hasOverlappingSession(s, windows) && (
                                 <span className="text-[var(--text-faint)] font-sans" title="Đã có ca khác chồng giờ ca này — tách sẽ tạo ca thừa. Dùng Đối soát số liệu để chia số vào các ca có sẵn.">đã có ca chồng giờ</span>
+                              )}
+                              {s.isBackfill && (
+                                <button
+                                  type="button"
+                                  title="Xoá ca nạp bù này (nạp nhầm, hoặc là ca inhouse)"
+                                  disabled={deleting === s.id}
+                                  onClick={() => handleDelete(s)}
+                                  className="ml-auto p-1.5 -m-1.5 text-[var(--text-faint)] hover:text-rose-500 disabled:opacity-50"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
                               )}
                               {s.isBackfill && isLong && !hasOverlappingSession(s, windows) && (
                                 <button

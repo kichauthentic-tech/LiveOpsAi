@@ -13,6 +13,12 @@
 
 ## 1. Giai đoạn hiện tại (cập nhật 2026-10-08)
 
+- **09/10: PHÂN LOẠI AGENCY/INHOUSE KHI NẠP BÙ CA + ĐỐI SOÁT KHÔNG TRÙNG + XOÁ CA NẠP BÙ — migration `0157`, `0158`, `0159` ĐÃ CHẠY 09/10 (user xác nhận; chưa verify bằng thao tác thật trên app).**
+  - **0157** bảng `brand_inhouse_rooms (brand_id, room_id, platform, số đo chính)` + RPC `mark_inhouse_rooms` / `unmark_inhouse_rooms` (ceo/admin/ops; không đánh dấu room đã thành ca). `BackfillFromRooms` Bước 1: mỗi room chờ sinh ca chọn Agency (mặc định) / Inhouse, có nút đánh dấu cả cụm theo giờ bắt đầu, "Bỏ nhãn". Bấm nút = ghi nhãn TRƯỚC rồi sinh ca phần agency. `planBackfillPayloads(…, inhouse)` có `plan.inhouse`; `groupByStartHour`; `src/lib/db/inhouseRooms.ts`.
+  - **0158** `import_live_reconciliation` xoá lô cũ cùng (brand, sàn, period_start, period_end) trước khi tạo lô mới ⇒ up lại file cùng kỳ là CẬP NHẬT, không thêm lô; cuối file dọn lô trùng đang có (giữ lô mới nhất mỗi nhóm). Kỳ/sàn khác vẫn là lô riêng.
+  - **0159** rổ đối soát theo kịp: trigger trên `live_sessions` (ca `is_backfill` mới/đổi mã room ⇒ dòng đối soát cùng brand+sàn+room gắn vào ca, `unassigned`→`agency`; ca bị xoá ⇒ gỡ id, hết ca ⇒ về `unassigned`), trigger trên `brand_inhouse_rooms` (đánh dấu ⇒ dòng `unassigned` sang `inhouse`, bỏ nhãn ⇒ về `unassigned`), RPC `delete_backfill_session` (chỉ ca `is_backfill`) + nút thùng rác ở lưới gán host. Có bước đồng bộ các dòng đã có. Sau sinh/xoá ca, `BrandDataRaw` bump `reconKey` để panel Đối soát nạp lại.
+  - Verify: replay 0001→0159 trên Postgres tạm (0157–0159 chạy lại 2 lần sạch) + `supabase/tests/0157_0158_inhouse_and_recon_replace.sql` đủ mục OK; tsc, eslint 0 lỗi, vitest `roomsToSessions` +3. CHƯA thử trên UI/DB thật.
+  - Còn lại: `create_backfill_sessions` chưa tự bỏ qua room có nhãn inhouse (chỉ client lọc); sau khi gán host ở lưới, bấm "Áp dụng" lại ở Đối soát cho số y như cũ (số ca bù đã là số cuối từ file).
 - **08/10 (tối): NẠP BÙ CA TỪ FILE CHO SHOPEE — migration `0156` ĐÃ CHẠY 08/10 (user xác nhận; chưa bấm "Sinh ca" Shopee thật).**
   User báo "SPE chưa có nạp bù ca từ file": khối Nạp bù chỉ gắn với tab Creator Live Performance (TikTok). Nay hiện ở tab file số liệu theo ca của MỌI sàn (`isReconType` ở `BrandDataRaw`: TikTok Creator-Live-Performance, Shopee Live List),
   dưới khối Đối soát. **Cách làm:** `lib/dataraw/backfillRooms.ts` (`fetchBackfillPayloads`, Record theo sàn: TikTok đọc slice cũ, Shopee đọc batch `shopee_live_list` → `readShopeeStreams` → `shopeeStreamsToSnapshotRows`, khử trùng phiên giữa các lô, lô up sau thắng);

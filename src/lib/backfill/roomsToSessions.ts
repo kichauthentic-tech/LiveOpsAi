@@ -134,6 +134,8 @@ export function hasOverlappingSession(s: LiveSession, windows: SessionWindow[]):
 export interface BackfillPlan {
   toCreate: BackfillRoomPayload[];
   existing: number;
+  // Room Ops đã đánh dấu "brand tự live" (0157) — không phải ca agency nên không sinh ca.
+  inhouse: number;
   // Room chồng giờ một ca CÓ SẴN (chưa gắn Room ID) — không sinh ca mới, để Đối soát khớp và chia số vào ca đó.
   overlapping: number;
   invalid: number;
@@ -144,19 +146,41 @@ export interface BackfillPlan {
 export const LONG_ROOM_MINUTES = 5 * 60;
 
 /** null = dòng thiếu Room ID / giờ (đếm vào `invalid`). Dùng chung cho cả hai sàn. */
-export function planBackfillPayloads(payloads: (BackfillRoomPayload | null)[], linked: Set<string>, windows: SessionWindow[] = []): BackfillPlan {
-  const plan: BackfillPlan = { toCreate: [], existing: 0, overlapping: 0, invalid: 0, longRooms: [] };
+export function planBackfillPayloads(
+  payloads: (BackfillRoomPayload | null)[],
+  linked: Set<string>,
+  windows: SessionWindow[] = [],
+  inhouse: Set<string> = new Set()
+): BackfillPlan {
+  const plan: BackfillPlan = { toCreate: [], existing: 0, inhouse: 0, overlapping: 0, invalid: 0, longRooms: [] };
   const seen = new Set<string>();
   for (const p of payloads) {
     if (!p) { plan.invalid++; continue; }
     if (seen.has(p.room_id)) continue; // file có thể lặp room khi ops up nhiều batch chồng ngày
     seen.add(p.room_id);
     if (linked.has(p.room_id)) { plan.existing++; continue; }
+    if (inhouse.has(p.room_id)) { plan.inhouse++; continue; }
     if (overlapsAny(Date.parse(p.started_at), Date.parse(p.ended_at), windows)) { plan.overlapping++; continue; }
     plan.toCreate.push(p);
     if (p.duration_minutes >= LONG_ROOM_MINUTES) plan.longRooms.push(p);
   }
   return plan;
+}
+
+/** Gom room theo giờ bắt đầu (giờ VN) để đánh dấu inhouse cả cụm một lần — brand tự live thường lặp một khung giờ mỗi ngày. */
+export interface StartHourGroup { hour: number; label: string; roomIds: string[] }
+
+export function groupByStartHour(payloads: BackfillRoomPayload[]): StartHourGroup[] {
+  const byHour = new Map<number, string[]>();
+  for (const p of payloads) {
+    const hour = new Date(Date.parse(p.started_at) + VN_OFFSET_MS).getUTCHours();
+    const list = byHour.get(hour) ?? [];
+    list.push(p.room_id);
+    byHour.set(hour, list);
+  }
+  return [...byHour.entries()]
+    .sort((a, b) => b[1].length - a[1].length || a[0] - b[0])
+    .map(([hour, roomIds]) => ({ hour, label: `${String(hour).padStart(2, "0")}h`, roomIds }));
 }
 
 // ---------------------------------------------------------------------------

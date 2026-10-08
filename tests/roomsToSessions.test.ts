@@ -16,6 +16,7 @@ import {
   roomIdsLinkedToSessions,
   roomToPayload,
   planBackfillPayloads,
+  groupByStartHour,
   snapshotRowToPayload,
   sessionWindows,
   hasOverlappingSession,
@@ -360,5 +361,30 @@ describe("nạp bù ca Shopee từ Live List", () => {
     const out = dedupeShopeePayloads([{ importedAt: "2026-10-01T00:00:00Z", payloads: a }, { importedAt: "2026-10-08T00:00:00Z", payloads: b }]);
     expect(out.length).toBe(1);
     expect(out[0]!.gmv).toBe(1_500_000);
+  });
+});
+
+describe("phân loại inhouse trước khi nạp bù ca (0157)", () => {
+  test("room đã đánh dấu inhouse không vào toCreate và được đếm riêng", () => {
+    const rows = [row("r1", "2026-09-10T06:00:00Z", "2026-09-10T08:00:00Z"), row("r2", "2026-09-11T06:00:00Z", "2026-09-11T08:00:00Z")];
+    const plan = planBackfillPayloads(rows.map(roomToPayload), new Set(), [], new Set(["r2"]));
+    expect(plan.toCreate.map((p) => p.room_id)).toEqual(["r1"]);
+    expect(plan.inhouse).toBe(1);
+  });
+
+  test("room đã có ca thì tính 'đã có ca', không tính inhouse dù có nhãn", () => {
+    const plan = planBackfillPayloads([roomToPayload(row("r1", "2026-09-10T06:00:00Z", "2026-09-10T08:00:00Z"))], new Set(["r1"]), [], new Set(["r1"]));
+    expect(plan.existing).toBe(1);
+    expect(plan.inhouse).toBe(0);
+  });
+
+  test("groupByStartHour gom theo giờ VN, cụm đông nhất đứng đầu", () => {
+    const ps = [
+      row("a", "2026-09-10T06:00:00Z", "2026-09-10T08:00:00Z"), // 13:00 VN
+      row("b", "2026-09-11T06:10:00Z", "2026-09-11T08:00:00Z"), // 13:10 VN
+      row("c", "2026-09-11T12:00:00Z", "2026-09-11T14:00:00Z") // 19:00 VN
+    ].map(roomToPayload).filter((p): p is NonNullable<typeof p> => !!p);
+    const g = groupByStartHour(ps);
+    expect(g.map((x) => [x.hour, x.roomIds])).toEqual([[13, ["a", "b"]], [19, ["c"]]]);
   });
 });

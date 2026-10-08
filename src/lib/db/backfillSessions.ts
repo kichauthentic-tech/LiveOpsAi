@@ -47,3 +47,9 @@ export async function splitBackfillSession(sessionId: string, splitAt: string): 
   if (error) throw error;
   return data as string;
 }
+
+// Xoá ca do nạp bù sinh ra (0159) — chỉ ca is_backfill. Rổ đối soát tự trả phiên về "chưa gán nhãn" nên phiên đó sinh ca lại được.
+export async function deleteBackfillSession(sessionId: string): Promise<void> {
+  const { error } = await supabase.rpc("delete_backfill_session", { p_session_id: sessionId });
+  if (error) throw error;
+}

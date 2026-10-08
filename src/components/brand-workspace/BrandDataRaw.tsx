@@ -353,7 +353,7 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ platform, brandId, b
           months={backfillMonths(imports, sessions, brandId)}
           sessions={sessions}
           talents={talents}
-          onSessionsChanged={onSessionsChanged}
+          onSessionsChanged={async () => { await onSessionsChanged(); setReconKey((k) => k + 1); }}
         />
       )}
 
