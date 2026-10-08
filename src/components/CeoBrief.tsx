@@ -135,23 +135,27 @@ const SectionTitle: React.FC<{ title: string; note?: React.ReactNode }> = ({ tit
   </div>
 );
 
-const Sparkline: React.FC<{ values: number[] }> = ({ values }) => {
+const Sparkline: React.FC<{ values: number[]; prev?: (number | null)[] }> = ({ values, prev }) => {
   if (values.length < 2) return null;
   const w = 200, h = 32;
-  const max = Math.max(...values, 0), min = Math.min(...values, 0);
+  const all = [...values, ...(prev ?? []).filter((v): v is number => v != null)];
+  const max = Math.max(...all, 0), min = Math.min(...all, 0);
   const x = (i: number) => (i / (values.length - 1)) * (w - 4) + 2;
   const y = (v: number) => h - 3 - ((v - min) / (max - min || 1)) * (h - 8);
   const pts = values.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+  // Kỳ trước cùng thứ tự ngày (nét đứt mờ): ngày nào kỳ trước không có thì bỏ điểm đó.
+  const prevPts = (prev ?? []).map((v, i) => (v == null ? null : `${x(i).toFixed(1)},${y(v).toFixed(1)}`)).filter(Boolean).join(" ");
   return (
     <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="w-full h-8 mt-1" aria-hidden="true">
       <polygon points={`2,${h - 3} ${pts} ${w - 2},${h - 3}`} style={{ fill: "var(--accent)", opacity: 0.12 }} />
+      {prevPts && <polyline points={prevPts} style={{ fill: "none", stroke: "var(--text-faint)", strokeWidth: 1.5, strokeDasharray: "3 3", opacity: 0.8 }} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />}
       <polyline points={pts} style={{ fill: "none", stroke: "var(--accent)", strokeWidth: 2 }} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
       <circle cx={x(values.length - 1)} cy={y(values[values.length - 1])} r={3} style={{ fill: "var(--accent)" }} />
     </svg>
   );
 };
 
-const Kpi: React.FC<{ label: string; value: string; cur: number | null; prev: number | null; goodWhenUp?: boolean; extra?: string; series?: number[]; locked?: boolean; empty?: boolean }> = ({ label, value, cur, prev, goodWhenUp, extra, series, locked, empty }) => (
+const Kpi: React.FC<{ label: string; value: string; cur: number | null; prev: number | null; goodWhenUp?: boolean; extra?: string; series?: number[]; prevSeries?: (number | null)[]; locked?: boolean; empty?: boolean }> = ({ label, value, cur, prev, goodWhenUp, extra, series, prevSeries, locked, empty }) => (
   <Card className="!p-3.5 flex flex-col gap-0.5 min-w-0">
     <span className="text-[11px] font-bold text-[var(--text-faint)] flex items-center gap-1" title={metricHint(label)}>
       {label}
@@ -163,7 +167,7 @@ const Kpi: React.FC<{ label: string; value: string; cur: number | null; prev: nu
       {empty ? <span className="text-[11px] text-[var(--text-faint)]">kỳ này chưa có ca</span> : <Delta cur={cur} prev={prev} goodWhenUp={goodWhenUp} />}
       {extra && <span>· {extra}</span>}
     </span>
-    {series && <Sparkline values={series} />}
+    {series && <Sparkline values={series} prev={prevSeries} />}
   </Card>
 );
 
@@ -259,16 +263,25 @@ export default function CeoBrief(props: CeoBriefProps) {
   const metricsOf = (xs: LiveSession[]) => prof.metrics.ofSessions(xs.filter(isCountable), sessionHours);
   const curM = useMemo(() => metricsOf(curSessions), [curSessions, prof]); // eslint-disable-line react-hooks/exhaustive-deps
   const prevM = useMemo(() => metricsOf(prevSessions), [prevSessions, prof]); // eslint-disable-line react-hooks/exhaustive-deps
-  const seriesM = (key: string) => {
+  // Line theo ngày của kỳ đang xem + đường nét đứt kỳ trước, cùng thứ tự ngày (ngày i của kỳ này ↔ ngày i của kỳ trước).
+  const prevOffset = hasPeriod ? eachDay(period.prevStart, period.start).length - 1 : 0; // số ngày lùi về kỳ trước
+  const sparkBuckets = (days: string[]) => {
     const byDate = new Map<string, LiveSession[]>();
-    for (const s of scopeSessions) if (s.date >= (sparkDays[0] ?? "9") && s.date <= period.end) byDate.set(s.date, [...(byDate.get(s.date) ?? []), s]);
-    return sparkDays.map((d) => prof.metrics.value(metricsOf(byDate.get(d) ?? []), key) ?? 0);
+    for (const s of scopeSessions) if (s.date >= (days[0] ?? "9") && s.date <= (days[days.length - 1] ?? "")) byDate.set(s.date, [...(byDate.get(s.date) ?? []), s]);
+    return byDate;
   };
-  const series = (pick: (t: Totals) => number | null) => {
-    const byDate = new Map<string, LiveSession[]>();
-    for (const s of scopeSessions) if (s.date >= (sparkDays[0] ?? "9") && s.date <= period.end) byDate.set(s.date, [...(byDate.get(s.date) ?? []), s]);
-    return sparkDays.map((d) => pick(totalsOf(byDate.get(d) ?? [])) ?? 0);
+  const strictPrev = !(grain === "day" || period.end === period.start); // xem 1 ngày: line 14 ngày gần nhất, kỳ trước lùi cùng số ngày, không cắt theo prevEnd
+  const sparkOf = (pick: (xs: LiveSession[]) => number | null) => {
+    const curBy = sparkBuckets(sparkDays);
+    const prevDays = sparkDays.map((d) => addDays(d, -prevOffset));
+    const prevBy = sparkBuckets(prevDays);
+    return {
+      series: sparkDays.map((d) => pick(curBy.get(d) ?? []) ?? 0),
+      prevSeries: prevDays.map((d) => (strictPrev && (d < period.prevStart || d > period.prevEnd) ? null : pick(prevBy.get(d) ?? []) ?? 0)),
+    };
   };
+  const seriesM = (key: string) => sparkOf((xs) => prof.metrics.value(metricsOf(xs), key));
+  const series = (pick: (t: Totals) => number | null) => sparkOf((xs) => pick(totalsOf(xs)));
 
   // ---------- tháng: target, run-rate, dự phóng ----------
   // Mỗi kênh brand × sàn một outlook (target của kế hoạch ĐÚNG SÀN), rồi cộng theo brand trong phạm vi sàn đang xem.
@@ -410,7 +423,7 @@ export default function CeoBrief(props: CeoBriefProps) {
         <p className="text-sm text-[var(--text-muted)]">
           Đang xem <b className="text-[var(--text)]">{periodLabel}</b>
           {" · "}<b className="text-[var(--text)]">{PLATFORM_SCOPE_LABEL[platform]}</b>
-          {hasPeriod && <> · mũi tên {compareLabel}</>}
+          {hasPeriod && <> · mũi tên {compareLabel} · nét đứt trên biểu đồ nhỏ = kỳ so sánh</>}
           {period.cutByData && <span className="text-amber-300"> · kỳ cắt tới {ddmm(period.end)} vì số liệu mới về tới ngày đó</span>}
         </p>
       </Card>
@@ -420,14 +433,14 @@ export default function CeoBrief(props: CeoBriefProps) {
         <SectionTitle title="Tổng quan" />
         <div className="grid grid-cols-1 xl:grid-cols-[1.25fr_1fr] gap-4 items-start">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            <Kpi empty={noCur} label="LIVE GMV" value={money(cur.gmv)} cur={cur.gmv} prev={prev.gmv} extra={`${num(cur.sessions)} ca`} series={series((t) => t.gmv)} />
-            <Kpi empty={noCur} label="Giờ live" value={hrs(cur.hours)} cur={cur.hours} prev={prev.hours} series={series((t) => t.hours)} />
-            <Kpi empty={noCur} label="GMV/giờ" value={money(cur.gmvPerHour)} cur={cur.gmvPerHour} prev={prev.gmvPerHour} series={series((t) => t.gmvPerHour)} />
-            <Kpi empty={noCur} label="Orders" value={prof.metrics.value(curM, "orders") == null ? "—" : num(cur.orders)} cur={cur.orders} prev={prev.orders} extra={cur.aov ? `${prof.basketLabel} ${money(cur.aov)}` : undefined} series={series((t) => t.orders)} />
+            <Kpi empty={noCur} label="LIVE GMV" value={money(cur.gmv)} cur={cur.gmv} prev={prev.gmv} extra={`${num(cur.sessions)} ca`} {...series((t) => t.gmv)} />
+            <Kpi empty={noCur} label="Giờ live" value={hrs(cur.hours)} cur={cur.hours} prev={prev.hours} {...series((t) => t.hours)} />
+            <Kpi empty={noCur} label="GMV/giờ" value={money(cur.gmvPerHour)} cur={cur.gmvPerHour} prev={prev.gmvPerHour} {...series((t) => t.gmvPerHour)} />
+            <Kpi empty={noCur} label="Orders" value={prof.metrics.value(curM, "orders") == null ? "—" : num(cur.orders)} cur={cur.orders} prev={prev.orders} extra={cur.aov ? `${prof.basketLabel} ${money(cur.aov)}` : undefined} {...series((t) => t.orders)} />
             {prof.briefKpis.map(({ key, label }) => {
               const def = prof.metrics.defs.find((d) => d.key === key)!;
               const c = prof.metrics.value(curM, key);
-              return <Kpi key={key} empty={noCur} label={label} value={prof.metrics.fmt(def, c)} cur={c ?? 0} prev={prof.metrics.value(prevM, key) ?? 0} series={seriesM(key)} />;
+              return <Kpi key={key} empty={noCur} label={label} value={prof.metrics.fmt(def, c)} cur={c ?? 0} prev={prof.metrics.value(prevM, key) ?? 0} {...seriesM(key)} />;
             })}
             {canSeeMoney && fin && (
               <>
