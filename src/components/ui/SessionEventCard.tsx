@@ -2,7 +2,7 @@ import React from "react";
 import { Building2, CheckCircle2, Clock, LucideIcon, Mic, Users, XCircle } from "lucide-react";
 import { Brand, LiveSession, ShiftSlot, Talent } from "../../types";
 import { talentShortName } from "../../lib/talentName";
-import { lateStartInfo, lateStartLabel } from "../../lib/sessionStatus";
+import { durationDeviationInfo, minutesLabel, targetPct } from "../../lib/sessionStatus";
 import { clockAtOffset, hasStaffSegments, segmentsOfRole } from "../../lib/staffSegments";
 import { BrandTheme } from "../../lib/brandTheme";
 import { getBrandLogoAsset } from "../../lib/brandLogos";
@@ -50,8 +50,10 @@ interface SessionEventCardProps {
   tone?: SessionCardTone;
   /** Ca chờ đăng ký: viền đứt + nền nhạt hơn để phân biệt với phiên đã chốt cùng brand. */
   pending?: boolean;
-  /** Vào live trễ so với kế hoạch (từ lateStartInfo): huy hiệu hổ phách cạnh biểu tượng sàn/trạng thái — nằm ở hàng đầu để không thêm chiều cao thẻ. */
-  lateBadge?: { label: string; title: string };
+  /** Thời lượng live lệch kế hoạch (từ durationDeviationInfo): OT (tím đặc) / off sớm (viền đỏ rỗng) ở hàng đầu thẻ. `prefix` ("OT ", "Off ") ẩn ở thẻ hẹp. */
+  durationBadge?: { kind: "ot" | "early"; prefix: string; value: string; title: string };
+  /** % Target của ca đã xong: nửa trái viên Target (màu theo `level`). Chỉ có hiệu lực khi có `targetGmv`. */
+  pctBadge?: { label: string; level: "hit" | "mid" | "low"; title: string };
   /** Đang bị kéo (drag) — làm mờ card gốc. */
   dragging?: boolean;
   draggable?: boolean;
@@ -89,8 +91,9 @@ const StatusIcon: React.FC<{ tone: SessionCardTone }> = ({ tone }) => {
 
 /** Chú giải trạng thái thẻ — dùng chung mọi lịch, đúng các biểu tượng StatusIcon vẽ.
  * `variant="slot"` cho lịch Nhân sự ca (ca mở / đã chốt / đã huỷ, không có live/xong). */
-export const SessionCardLegend: React.FC<{ showCancelled?: boolean; variant?: "session" | "slot"; className?: string }> = ({
+export const SessionCardLegend: React.FC<{ showCancelled?: boolean; showTiming?: boolean; variant?: "session" | "slot"; className?: string }> = ({
   showCancelled,
+  showTiming,
   variant = "session",
   className = ""
 }) => (
@@ -101,7 +104,13 @@ export const SessionCardLegend: React.FC<{ showCancelled?: boolean; variant?: "s
         <span className="inline-flex items-center gap-1.5"><CheckCircle2 className="sc-st text-emerald-600 dark:text-emerald-400" strokeWidth={2.4} /> Đã xong</span>
         {showCancelled && <span className="inline-flex items-center gap-1.5"><XCircle className="sc-st text-rose-600 dark:text-rose-400" strokeWidth={2.4} /> Đã huỷ</span>}
         <span className="inline-flex items-center gap-1.5"><Clock className="sc-st" strokeWidth={2.4} /> Chờ đăng ký (viền đứt)</span>
-        <span className="inline-flex items-center gap-1.5"><span className="sc-late">+12p</span> Vào live trễ (theo file số liệu)</span>
+        {showTiming && (
+          <>
+            <span className="inline-flex items-center gap-1.5"><span className="sc-dur" data-kind="ot">OT +25p</span> Live quá giờ (OT)</span>
+            <span className="inline-flex items-center gap-1.5"><span className="sc-dur" data-kind="early">Off −30p</span> Live thiếu giờ (off sớm)</span>
+            <span className="inline-flex items-center gap-1.5"><span className="sc-pill sc-pill-split"><b data-level="hit">112%</b><i>25M</i></span> % Target (xanh ≥100% · đỏ &lt;70%)</span>
+          </>
+        )}
       </>
     ) : (
       <>
@@ -133,7 +142,8 @@ export const SessionEventCard: React.FC<SessionEventCardProps> = ({
   onDragEnd,
   className = "",
   fill,
-  lateBadge
+  durationBadge,
+  pctBadge
 }) => {
   const logo = getBrandLogoAsset(brand ?? { name: brandName });
   const style = {
@@ -174,7 +184,12 @@ export const SessionEventCard: React.FC<SessionEventCardProps> = ({
           </span>
           <span className="sc-bname">{brandName}</span>
           <span className="sc-badges">
-            {lateBadge && <span className="sc-late" title={lateBadge.title}>{lateBadge.label}</span>}
+            {durationBadge && (
+              <span className="sc-dur" data-kind={durationBadge.kind} title={durationBadge.title}>
+                <span className="sc-dur-pre">{durationBadge.prefix}</span>
+                {durationBadge.value}
+              </span>
+            )}
             <PlatformLogo platform={platform} />
             <StatusIcon tone={shownTone} />
           </span>
@@ -195,9 +210,16 @@ export const SessionEventCard: React.FC<SessionEventCardProps> = ({
           <div className="sc-foot">
             {title && <span className="sc-title">{title}</span>}
             {!!targetGmv && (
-              <span className="sc-pill" title={`Target GMV: ${fmtVndFull(targetGmv)}`}>
-                {fmtVndShort(targetGmv)}
-              </span>
+              pctBadge ? (
+                <span className="sc-pill sc-pill-split" title={`${pctBadge.title} · Target GMV: ${fmtVndFull(targetGmv)}`}>
+                  <b data-level={pctBadge.level}>{pctBadge.label}</b>
+                  <i>{fmtVndShort(targetGmv)}</i>
+                </span>
+              ) : (
+                <span className="sc-pill" title={`Target GMV: ${fmtVndFull(targetGmv)}`}>
+                  {fmtVndShort(targetGmv)}
+                </span>
+              )
             )}
           </div>
         )}
@@ -222,15 +244,27 @@ export const SESSION_TONE: Record<LiveSession["status"], SessionCardTone> = {
 // (Nguyễn Thị Mai Anh → Mai Anh) — xem lib/talentName.ts.
 type TalentLookup = (id: string | undefined) => Pick<Talent, "name" | "nickname"> | undefined;
 
-/** Huy hiệu "vào trễ" cho thẻ ca — null nếu đúng giờ/không đủ dữ liệu (xem lateStartInfo). Chỉ cho agency: trễ giờ là chuyện nội bộ. */
-export const buildLateBadge = (s: LiveSession, viewerRole?: "agency" | "brand"): { label: string; title: string } | undefined => {
+/** Huy hiệu OT / off sớm theo thời lượng live — chỉ agency (liên quan tính công). Giờ vào/ra thật trong tooltip là giờ của room trong file. */
+export const buildDurationBadge = (s: LiveSession, viewerRole?: "agency" | "brand"): SessionEventCardProps["durationBadge"] => {
   if (viewerRole === "brand") return undefined;
-  const late = lateStartInfo(s);
-  if (!late) return undefined;
+  const dev = durationDeviationInfo(s);
+  if (!dev) return undefined;
+  const ot = dev.kind === "ot";
+  const window = dev.actualStart && dev.actualEnd ? `Room ${dev.actualStart}–${dev.actualEnd}. ` : "";
   return {
-    label: lateStartLabel(late.minutes),
-    title: `Vào live trễ ${late.minutes} phút: kế hoạch ${late.plannedStart}, thật ${late.actualStart}${late.actualEnd ? `–${late.actualEnd}` : ""} (theo file số liệu)`
+    kind: dev.kind,
+    prefix: ot ? "OT " : "Off ",
+    value: `${ot ? "+" : "−"}${minutesLabel(dev.minutes)}`,
+    title: `${ot ? "Live quá giờ" : "Live thiếu giờ"} ${dev.minutes} phút: ${minutesLabel(dev.liveMinutes)} thật / ${minutesLabel(dev.plannedMinutes)} kế hoạch. ${window}(theo file số liệu)`
   };
+};
+
+/** Nửa % Target của viên Target — chỉ agency, ca đã xong có số liệu và có target (xem targetPct). */
+export const buildPctBadge = (s: LiveSession, viewerRole?: "agency" | "brand"): SessionEventCardProps["pctBadge"] => {
+  if (viewerRole === "brand") return undefined;
+  const t = targetPct(s);
+  if (!t) return undefined;
+  return { label: `${t.pct}%`, level: t.level, title: `% Target: ${fmtVndFull(s.actualGmv ?? 0)} / ${fmtVndFull(s.targetGmv)}` };
 };
 
 /** Chip Host + Trợ live. Target GMV KHÔNG nằm trong danh sách này — nó có viên thuốc riêng cuối thẻ (prop

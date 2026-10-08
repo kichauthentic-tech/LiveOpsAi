@@ -564,7 +564,11 @@ html:not(.dark) [class~="border-slate-700"], html:not(.dark) [class~="border-sla
 .sc-time { font-size: 11px; font-weight: 700; line-height: 1.1; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .sc-bname { display: none; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .sc-badges { margin-left: auto; display: flex; align-items: center; gap: 3px; flex: none; }
-.sc-late { flex: none; font-size: 11px; font-weight: 800; line-height: 1; padding: 3px 5px; border-radius: 999px; white-space: nowrap; font-variant-numeric: tabular-nums; background: #f59e0b; color: #1c1917; }
+.sc-dur { flex: none; font-size: 11px; font-weight: 800; line-height: 1; padding: 3px 5px; border-radius: 999px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.sc-dur[data-kind="ot"] { background: #6d28d9; color: #fff; }
+.sc-dur[data-kind="early"] { background: transparent; color: #be123c; box-shadow: inset 0 0 0 1.5px #e11d48; }
+.dark .sc-dur[data-kind="early"] { color: #fda4af; }
+.sc-dur-pre { display: none; }
 .sc-st { width: 16px; height: 16px; flex: none; }
 .sc-who { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
 .sc-chip { display: inline-flex; align-items: center; gap: 3px; max-width: 100%; font-size: 11px; font-weight: 600; line-height: 1.2; padding: 2px 5px; border-radius: 5px; background: color-mix(in srgb, var(--text) 8%, transparent); }
@@ -576,6 +580,12 @@ html:not(.dark) [class~="border-slate-700"], html:not(.dark) [class~="border-sla
 .sc-foot:not(:has(.sc-pill)) { display: none; }
 .sc-title { display: none; font-size: 11px; font-weight: 600; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .sc-pill { margin-left: auto; flex: none; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; font-weight: 700; line-height: 1; padding: 3px 7px; border-radius: 999px; white-space: nowrap; background: var(--pbg); color: var(--pfg); }
+.sc-pill-split { display: inline-flex; padding: 0; overflow: hidden; }
+.sc-pill-split > b, .sc-pill-split > i { font: inherit; font-style: normal; padding: 3px 6px; }
+.sc-pill-split > b { color: #fff; }
+.sc-pill-split > b[data-level="hit"] { background: #047857; }
+.sc-pill-split > b[data-level="mid"] { background: #475569; }
+.sc-pill-split > b[data-level="low"] { background: #be123c; }
 .sc-live { display: inline-flex; align-items: center; gap: 4px; padding: 3px; border-radius: 999px; background: #e11d48; color: #fff; font-size: 10px; font-weight: 800; letter-spacing: .06em; line-height: 1.1; }
 .sc-live::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #fff; }
 .sc-live > b { display: none; font-weight: 800; }
@@ -597,13 +607,14 @@ html:not(.dark) [class~="border-slate-700"], html:not(.dark) [class~="border-sla
   .sc-time { font-size: 13px; }
   .sc-blogo, .sc-emoji { width: 24px; height: 24px; }
   .sc-head { flex-wrap: nowrap; }
-  /* Thẻ 200–259px có thêm huy hiệu "+12p" thì một hàng không đủ chỗ (logo + giờ + 3 biểu tượng) → huy hiệu rớt xuống hàng 2. */
-  .sc-head:has(.sc-late) { flex-wrap: wrap; }
+  /* Thẻ 200–259px có thêm huy hiệu OT/Off thì một hàng không đủ chỗ (logo + giờ + 3 biểu tượng) → huy hiệu rớt xuống hàng 2. */
+  .sc-head:has(.sc-dur) { flex-wrap: wrap; }
+  .sc-dur-pre { display: inline; }
   .sc-live { padding: 2px 6px 2px 5px; }
   .sc-live > b { display: inline; }
 }
 @container (min-width: 260px) {
-  .sc-head:has(.sc-late) { flex-wrap: nowrap; }
+  .sc-head:has(.sc-dur) { flex-wrap: nowrap; }
 }
 @container (min-width: 460px) {
   .sc { display: flex; align-items: center; gap: 12px; padding: 7px 10px; }
@@ -614,6 +625,12 @@ html:not(.dark) [class~="border-slate-700"], html:not(.dark) [class~="border-sla
   .sc-who { order: 4; }
   .sc-foot { order: 5; flex: 1; }
   .sc-badges { order: 6; margin-left: 0; }
+  .sc-foot { min-width: 58px; }
+  .sc-foot:has(.sc-pill-split) { min-width: 96px; }
+}
+/* 460–559px: viên Target + nhãn OT/off rộng hơn bản cũ ~40–60px → bỏ tên brand (đã có logo) để không đè nhau. */
+@container (min-width: 460px) and (max-width: 559px) {
+  .sc:has(.sc-dur, .sc-pill-split) .sc-bname { display: none; }
 }
 @container (max-width: 100px) {
   .sc { padding: 5px 4px; gap: 4px; justify-items: center; }

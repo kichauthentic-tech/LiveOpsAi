@@ -70,36 +70,66 @@ export function isUnconfirmedPast(s: LiveSession): boolean {
   return s.status === "Completed" && s.monthPublished !== false && !hasLiveEvidence(s);
 }
 
-// Vào live TRỄ so với giờ kế hoạch — chỉ nói điều số liệu đủ chắc để nói. `actual_start_at` = giờ bắt đầu SỚM NHẤT của
-// các room trong file số liệu (0078), KHÔNG phải "giờ ca này bắt đầu": ca nối tiếp trong một room đã live từ ca trước sẽ
-// có giờ vào SỚM hơn kế hoạch hàng giờ. Vì vậy chỉ báo khi vào MUỘN (≥ LATE_START_MIN); vào sớm/đúng giờ thì im lặng,
-// và muộn quá LATE_START_MAX_MIN thì nhiều khả năng là room khác chứ không phải host trễ. Ca nạp bù: giờ thật chính là
-// giờ kế hoạch (sinh từ room) nên không có gì để so. Dữ liệu chỉ có SAU khi file số liệu được up — ca đang live thường chưa có.
-export const LATE_START_MIN = 10;
-export const LATE_START_MAX_MIN = 180;
+// OT / off sớm theo THỜI LƯỢNG LIVE: `liveDurationMinutes` (tổng thời lượng các room đã TRỪ mốc ca trước, 0078/0153) − thời
+// lượng kế hoạch. Team live luôn phải đủ duration đã đặt ⇒ vào trễ thì cuối ca tự OT, nên không có nhãn "vào trễ" riêng; con số
+// quan trọng (và là số tính công) là tổng giờ live so với kế hoạch. Khác cách đo bằng giờ kết thúc thật: `actual_end_at` là giờ
+// kết thúc MUỘN NHẤT của room nên ca nối cùng room bị báo OT bừa, còn thời lượng đã tách riêng từng ca. Giờ vào/ra thật
+// (`actual_start_at`/`actual_end_at`, giờ của room) chỉ đưa vào tooltip để tham khảo.
+// Ngưỡng 10 phút để không báo nhiễu; OT quá 3 giờ nhiều khả năng là room khác/ca chưa tách chứ không phải host kéo dài.
+// Ca nạp bù: giờ thật chính là giờ kế hoạch (sinh từ room) nên không có gì để so.
+export const DURATION_DEVIATION_MIN = 10;
+export const OT_MAX_MIN = 180;
 
-export interface LateStartInfo {
+export interface DurationDeviationInfo {
+  kind: "ot" | "early";
+  /** Phút lệch (luôn dương). */
   minutes: number;
-  /** HH:MM giờ VN. */
-  plannedStart: string;
-  actualStart: string;
+  plannedMinutes: number;
+  liveMinutes: number;
+  /** HH:MM giờ VN của room trong file — chỉ để tham khảo, có thể thiếu. */
+  actualStart?: string;
   actualEnd?: string;
 }
 
 const vnClock = (ms: number) => new Date(ms + 7 * 3600000).toISOString().slice(11, 16);
 
-export function lateStartInfo(s: Pick<LiveSession, "date" | "startTime" | "endTime" | "status" | "isBackfill" | "actualStartAt" | "actualEndAt">): LateStartInfo | null {
-  if (!s.actualStartAt || s.isBackfill || s.status === "Cancelled") return null;
-  const actual = Date.parse(s.actualStartAt);
-  if (!Number.isFinite(actual)) return null;
-  const [planned] = sessionWindowMs(s);
-  const minutes = Math.round((actual - planned) / 60000);
-  if (minutes < LATE_START_MIN || minutes > LATE_START_MAX_MIN) return null;
-  const end = s.actualEndAt ? Date.parse(s.actualEndAt) : NaN;
-  return { minutes, plannedStart: vnClock(planned), actualStart: vnClock(actual), actualEnd: Number.isFinite(end) ? vnClock(end) : undefined };
+export function durationDeviationInfo(
+  s: Pick<LiveSession, "date" | "startTime" | "endTime" | "status" | "isBackfill" | "liveDurationMinutes" | "actualStartAt" | "actualEndAt">
+): DurationDeviationInfo | null {
+  if (s.isBackfill || s.status === "Cancelled" || !((s.liveDurationMinutes ?? 0) > 0)) return null;
+  const liveMinutes = Math.round(s.liveDurationMinutes!);
+  const [start, end] = sessionWindowMs(s);
+  const plannedMinutes = Math.round((end - start) / 60000);
+  const diff = liveMinutes - plannedMinutes;
+  const kind = diff >= DURATION_DEVIATION_MIN && diff <= OT_MAX_MIN ? "ot" : -diff >= DURATION_DEVIATION_MIN ? "early" : null;
+  if (!kind) return null;
+  const clock = (iso?: string) => {
+    const ms = iso ? Date.parse(iso) : NaN;
+    return Number.isFinite(ms) ? vnClock(ms) : undefined;
+  };
+  return { kind, minutes: Math.abs(diff), plannedMinutes, liveMinutes, actualStart: clock(s.actualStartAt), actualEnd: clock(s.actualEndAt) };
 }
 
-/** Nhãn ngắn cho huy hiệu trên thẻ: "+12p", "+1h05". */
-export function lateStartLabel(minutes: number): string {
-  return minutes < 60 ? `+${minutes}p` : `+${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, "0")}`;
+/** "25p", "1h05", "8h" — phút → nhãn ngắn (dấu +/− do nơi vẽ thêm). */
+export function minutesLabel(minutes: number): string {
+  return minutes < 60 ? `${minutes}p` : minutes % 60 === 0 ? `${minutes / 60}h` : `${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, "0")}`;
+}
+
+// % Target của ca ĐÃ XONG có số liệu = Thực đạt ÷ Target (tên chuẩn trong metricGlossary). Ngưỡng màu là mốc hiển thị, không
+// phải luật nghiệp vụ: ≥100 đạt, 70–99 trung tính, <70 thấp.
+export const PCT_TARGET_HIT = 100;
+export const PCT_TARGET_LOW = 70;
+
+export interface TargetPct {
+  pct: number;
+  level: "hit" | "mid" | "low";
+}
+
+export function targetPct(
+  s: Pick<LiveSession, "status" | "targetGmv" | "actualGmv" | "dataSource" | "totalViews" | "isBackfill" | "excludedFromReports" | "monthPublished">
+): TargetPct | null {
+  if (s.status !== "Completed" || s.monthPublished === false || s.excludedFromReports) return null;
+  if (!(s.targetGmv > 0) || !hasSessionData(s)) return null;
+  const pct = Math.round(((s.actualGmv ?? 0) / s.targetGmv) * 100);
+  return { pct, level: pct >= PCT_TARGET_HIT ? "hit" : pct >= PCT_TARGET_LOW ? "mid" : "low" };
 }

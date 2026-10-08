@@ -14,7 +14,8 @@ import {
   SESSION_TONE,
   SessionCardLegend,
   buildSessionMeta,
-  buildLateBadge,
+  buildDurationBadge,
+  buildPctBadge,
   buildSlotMeta
 } from "./ui/SessionEventCard";
 import { PlatformLogo } from "./ui/PlatformLogo";
@@ -749,7 +750,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   </span>
                 );
               })}
-              <SessionCardLegend />
+              <SessionCardLegend showTiming />
             </div>
           </div>
 
@@ -870,7 +871,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                         brandName={ds.brandName} platform={ds.platform}
                         startTime={ds.startTime}
                         endTime={ds.endTime}
-                        meta={buildSessionMeta(ds, talentLookup)} lateBadge={buildLateBadge(ds)} className={clashRing(ds.id)}
+                        meta={buildSessionMeta(ds, talentLookup)} durationBadge={buildDurationBadge(ds, "agency")} pctBadge={buildPctBadge(ds, "agency")} className={clashRing(ds.id)}
                         targetGmv={ds.targetGmv}
                         tone={SESSION_TONE[ds.status]}
                         dragging={draggedSessionId === ds.id}
@@ -937,7 +938,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
               </h3>
               <p className="text-xs text-[var(--text-muted)]">Kéo thả để đổi lịch</p>
             </div>
-            <SessionCardLegend />
+            <SessionCardLegend showTiming />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
@@ -1037,7 +1038,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                         startTime={ds.startTime}
                         endTime={ds.endTime}
                         title={ds.title}
-                        meta={buildSessionMeta(ds, talentLookup)} lateBadge={buildLateBadge(ds)} className={clashRing(ds.id)}
+                        meta={buildSessionMeta(ds, talentLookup)} durationBadge={buildDurationBadge(ds, "agency")} pctBadge={buildPctBadge(ds, "agency")} className={clashRing(ds.id)}
                         targetGmv={ds.targetGmv}
                         tone={SESSION_TONE[ds.status]}
                         dragging={draggedSessionId === ds.id}
@@ -1142,7 +1143,9 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   endTime={it.session!.endTime}
                   title={it.session!.title}
                   meta={buildSessionMeta(it.session!, talentLookup)}
-                  lateBadge={buildLateBadge(it.session!)}
+                 
+                  durationBadge={buildDurationBadge(it.session!, "agency")}
+                  pctBadge={buildPctBadge(it.session!, "agency")}
                   className={clashRing(it.session!.id)}
                   targetGmv={it.session!.targetGmv}
                   tone={SESSION_TONE[it.session!.status]}
@@ -1175,7 +1178,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                 {daySessions.length} ca đã chốt · {daySlots.length} ca chờ đăng ký · {totalHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h live. Kéo thẻ ca sang hàng phòng khác để đổi phòng (giữ giờ).
               </p>
             </div>
-            <SessionCardLegend />
+            <SessionCardLegend showTiming />
           </div>
 
           <div className="overflow-x-auto rounded-xl border border-[var(--border)]/80 scrollbar-thin">

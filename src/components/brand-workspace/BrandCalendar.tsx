@@ -17,6 +17,8 @@ import {
   SessionEventCard,
   SESSION_TONE,
   buildSessionMeta,
+  buildDurationBadge,
+  buildPctBadge,
   buildSlotMeta
 } from "../ui/SessionEventCard";
 import { getBrandTheme } from "../../lib/brandTheme";
@@ -134,7 +136,6 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
   const canManage = canEdit && !!onUpdateSession && !!onCreateSlot;
   const [openSessionId, setOpenSessionId] = useState<string | null>(null);
   const openSession = openSessionId ? sessions.find((x) => x.id === openSessionId) ?? null : null;
-
   const brandSessions = useMemo(() => sessions.filter((s) => s.brandId === brandId && inChannelScope(s, platformScope)), [sessions, brandId, platformScope]);
   const brandSchemes = useMemo(() => schemes.filter((s) => s.brandId === brandId), [schemes, brandId]);
   const canManageSchemes = canManage && !!onAddScheme && !!onUpdateScheme && !!onDeleteScheme;
@@ -259,6 +260,8 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
             endTime={s.endTime}
             meta={buildSessionMeta({ ...s, hostName: talentById[s.hostId]?.name ?? s.hostName, studioName: studioById[s.studioId]?.name ?? s.studioName }, talentLookup, metaViewer)}
             targetGmv={brandViewer ? undefined : s.targetGmv}
+            durationBadge={buildDurationBadge(s, metaViewer)}
+            pctBadge={buildPctBadge(s, metaViewer)}
             tone={SESSION_TONE[s.status]}
             tooltip={
               brandViewer
@@ -369,7 +372,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
         }
       />
 
-      <SessionCardLegend showCancelled className="px-1" />
+      <SessionCardLegend showCancelled showTiming={!brandViewer} className="px-1" />
 
       {viewMode === "month" && (
       <PosterCalendarGrid weekdayLabels={WEEKDAY_LABELS} minWidthClassName="min-w-[1080px] xl:min-w-0">
@@ -477,6 +480,8 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
                         title={s.title}
                         meta={meta}
                         targetGmv={brandViewer ? undefined : s.targetGmv}
+            durationBadge={buildDurationBadge(s, metaViewer)}
+            pctBadge={buildPctBadge(s, metaViewer)}
                         tone={SESSION_TONE[s.status]}
                         onClick={() => setOpenSessionId(s.id)}
                       />
@@ -541,6 +546,8 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
                           studioName: studioById[s.studioId]?.name ?? s.studioName
                         }, talentLookup, metaViewer)}
                         targetGmv={brandViewer ? undefined : s.targetGmv}
+            durationBadge={buildDurationBadge(s, metaViewer)}
+            pctBadge={buildPctBadge(s, metaViewer)}
                         tone={SESSION_TONE[s.status]}
                         tooltip={
                           brandViewer
