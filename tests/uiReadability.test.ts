@@ -1,5 +1,5 @@
 // Canh các sửa P0 của audit UX/UI 2026-09-26 (docs/WORKSPACE_HISTORY.md `## Audit UX/UI`) không bị viết ngược lại:
-// token màu của 4 theme đủ tương phản WCAG 1.4.3, không còn cỡ chữ < 11px, không còn hộp thoại gốc của
+// token màu của 3 theme đủ tương phản WCAG 1.4.3, không còn cỡ chữ < 11px, không còn hộp thoại gốc của
 // trình duyệt (alert/confirm/prompt — chặn cả tab, không test được, không theo theme).
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
@@ -46,9 +46,9 @@ function themeTokens(): Record<string, Record<string, string>> {
   return out;
 }
 
-test("4 theme đều có token và chữ đạt 4.5:1 trên nền thẻ", () => {
+test("3 theme đều có token và chữ đạt 4.5:1 trên nền thẻ", () => {
   const themes = themeTokens();
-  expect(Object.keys(themes).sort()).toEqual(["midnight", "ocean", "sand", "yfb"]);
+  expect(Object.keys(themes).sort()).toEqual(["midnight", "sand", "yfb"]);
   const fails: string[] = [];
   for (const [name, t] of Object.entries(themes)) {
     for (const fg of ["text", "text-muted", "text-faint", "accent-text"]) {

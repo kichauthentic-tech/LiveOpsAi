@@ -2,12 +2,11 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
-  Design tokens cho 3 theme preset — dropdown đổi qua src/hooks/useTheme.tsx.
-  "midnight"/"ocean" là theme tối (kèm class .dark để mọi utility dark: hiện có vẫn hoạt động),
+  Design tokens cho 3 theme preset (YFB mặc định, Midnight, Sand) — dropdown đổi qua src/hooks/useTheme.tsx.
+  "yfb"/"midnight" là theme tối (kèm class .dark để mọi utility dark: hiện có vẫn hoạt động),
   "sand" là theme sáng. Component mới nên ưu tiên dùng token (var(--surface) qua class bg-[var(--surface)]
   hoặc utility tương ứng) thay vì hardcode bg-slate-900 để tự động đổi theo cả 3 theme.
 */
-:root,
 .theme-midnight {
   --surface-base: #020617;
   --surface: #0f172a;
@@ -31,28 +30,8 @@
   --danger: #ef4444;
 }
 
-.theme-ocean {
-  --surface-base: #041014;
-  --surface: #0b1f26;
-  --surface-elevated: #123039;
-  --surface-hover: #1c4550;
-  --surface-muted: rgba(18, 48, 57, 0.6);
-  --text: #ecfeff;
-  --text-muted: #a5f3fc;
-  --text-faint: #5f9ea8;
-  --border: #1c4550;
-  --border-muted: rgba(28, 69, 80, 0.6);
-  /* cyan-700: chữ trắng trên #06b6d4 cũ chỉ 2.4:1. */
-  --accent: #0e7490;
-  --accent-hover: #155e75;
-  --accent-text: #67e8f9;
-  --accent-contrast: #ffffff;
-  --success: #14b8a6;
-  --warning: #f59e0b;
-  --danger: #f43f5e;
-}
-
 /* YFB — theo đúng bộ nhận diện đen–vàng report Crocs x YFB Vietnam gốc. */
+:root,
 .theme-yfb {
   --surface-base: #0b0b0d;
   --surface: #17171b;
@@ -121,7 +100,7 @@
   kiểu text-emerald-400 / text-amber-300, ~70 viền tối border-*-800/900 — trên theme "sand" thành các
   ô đen lốm đốm và chữ nhạt không đọc được. Thay tay từng chỗ không đáng (và component mới rất dễ
   lại viết theo thói quen dark). Lớp này ánh xạ các utility đó sang sắc độ sáng tương ứng CHỈ KHI
-  <html> không có class .dark (useTheme.tsx bật .dark cho midnight/ocean/yfb):
+  <html> không có class .dark (useTheme.tsx bật .dark cho yfb/midnight):
     bg-{màu}-950|900[/x]  → {màu}-100     text-{màu}-200|300|400[/x] → {màu}-700
     border-{màu}-700|800|900[/x] → {màu}-300
   Nằm ngoài @layer nên thắng utility của Tailwind (layered) mà không cần !important.
@@ -548,7 +527,7 @@ html:not(.dark) [class~="border-slate-700"], html:not(.dark) [class~="border-sla
 
 /*
   Thẻ ca Live (ui/SessionEventCard) — dùng chung mọi lịch (Agency tháng/tuần/ngày, Brand, Nhân sự ca).
-  Màu: nền + viền = màu brand pha loãng vào nền ô lịch (color-mix với var(--surface) nên tự đúng ở cả 4 theme);
+  Màu: nền + viền = màu brand pha loãng vào nền ô lịch (color-mix với var(--surface) nên tự đúng ở cả 3 theme);
   CSS biến --b / --pbg / --pfg / --pbg-d / --pfg-d do component đổ từ BrandTheme qua inline style.
   Bố cục theo ĐỘ RỘNG CỦA CHÍNH THẺ (container query), không theo viewport — cùng một thẻ nằm trong ô tháng
   150px, cột tuần, thanh giờ 64px hay hàng ngang 900px đều xếp lại cho vừa, không giấu thông tin:

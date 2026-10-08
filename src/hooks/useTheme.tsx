@@ -1,12 +1,11 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 
-export type Theme = "midnight" | "ocean" | "sand" | "yfb";
+export type Theme = "yfb" | "midnight" | "sand";
 
 export const THEME_OPTIONS: Array<{ id: Theme; label: string; dark: boolean }> = [
+  { id: "yfb", label: "YFB", dark: true },
   { id: "midnight", label: "Midnight", dark: true },
-  { id: "ocean", label: "Ocean", dark: true },
-  { id: "sand", label: "Sand", dark: false },
-  { id: "yfb", label: "YFB", dark: true }
+  { id: "sand", label: "Sand", dark: false }
 ];
 
 interface ThemeContextValue {
@@ -18,13 +17,13 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 const STORAGE_KEY = "liveops-theme";
 
-// Theme cũ chỉ có "light"/"dark" (trước khi có 3 preset) — map sang preset tương ứng để
-// không mất lựa chọn user đã lưu trước đó.
+// YFB là theme chính (mặc định). Giá trị cũ được map sang preset tương ứng: "light" → sand,
+// "ocean" (đã bỏ) và chưa chọn gì → yfb.
 const getInitialTheme = (): Theme => {
   const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored === "midnight" || stored === "ocean" || stored === "sand" || stored === "yfb") return stored;
+  if (stored === "midnight" || stored === "sand" || stored === "yfb") return stored;
   if (stored === "light") return "sand";
-  return "midnight";
+  return "yfb";
 };
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
