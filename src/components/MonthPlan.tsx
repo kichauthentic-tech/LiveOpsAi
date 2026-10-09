@@ -481,19 +481,23 @@ export default function MonthPlan({
       liveWindowEnd: [st.liveWindowEnd, ...ends, ...(overnight ? ["23:59"] : [])].sort().at(-1) ?? st.liveWindowEnd
     }));
     const fileTarget = totalsOf(next).target;
+    let result: PlanDraftSlot[];
     if (fileTarget > 0) {
       // Target đã ghi trên ca thật: giữ nguyên từng ca, KHÔNG chia lại; target tháng = tổng.
       if (!locked) setSettings((st) => ({ ...st, targetGmv: Math.round(fileTarget) }));
-      setDrafts(next);
+      // Kế hoạch đã chốt: ca vừa thêm (chưa có id, target 0) nhận target = dự báo riêng của ca — withForecast không đụng ca cũ
+      // (10/10: bấm "Dựng lưới" ở VERA Shopee thêm 17 ca nhưng cả 17 ca target 0 vì nhánh này bỏ qua withForecast).
+      result = locked ? withForecast(next) : next;
     } else {
-      setDrafts(withForecast(next));
+      result = withForecast(next);
     }
+    setDrafts(result);
     setDirty(true);
-    const noTarget = next.filter((d) => d.targetGmv <= 0).length;
+    const noTarget = result.filter((d) => d.targetGmv <= 0).length;
     setMsg(
       `${locked ? `Thêm ${added} ca đã nhập chưa có trong kế hoạch` : `Đã dựng lưới ${next.length} ca theo lịch đã nhập`}${duplicates > 0 ? ` (bỏ ${duplicates} ca trùng hệt giờ)` : ""}. ` +
         (fileTarget > 0
-          ? `Target lấy từ ca đã nhập: tổng ${fmtVndShort(fileTarget)}${noTarget > 0 ? `, ${noTarget} ca chưa có target` : ""}. `
+          ? `Target lấy từ ca đã nhập: tổng ${fmtVndShort(totalsOf(result).target)}${locked && added > 0 ? " (ca thêm mới nhận target = dự báo của ca)" : ""}${noTarget > 0 ? `, ${noTarget} ca chưa có target` : ""}. `
           : targetTotal > 0
             ? `Đã chia ${fmtVndShort(targetTotal)} xuống ca. `
             : "Chưa có target — nhập Target GMV tháng rồi bấm Chia lại target. ") +
