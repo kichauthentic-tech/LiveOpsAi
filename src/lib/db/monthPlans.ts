@@ -3,7 +3,7 @@ import { dedupeInFlight } from "./dedupeInFlight";
 import { prefetchable } from "./prefetch";
 import { fetchAllPages } from "./fetchAllPages";
 import { LockedPlanRow, LockedPlanTargets, lockedPlanTargetsFromRows } from "../scheduling/lockedPlanTargets";
-import { BrandMonthPlan, BrandMonthPlanSlot, CalendarEventRow, PlanCampRanges } from "../../types";
+import { BrandMonthPlan, BrandMonthPlanSlot, CalendarEventRow, PlanCampRanges, PlanGroupTargets } from "../../types";
 import { platformOf, brandPlatformKey, type ReportPlatform } from "../reportPlatform";
 
 // Kế Hoạch Tháng (0090). Bảng nhỏ (1 dòng plan + ≤ ~100 ca/brand/tháng) — đọc theo brand+tháng,
@@ -25,6 +25,8 @@ interface DbPlan {
   blackout_dates: string[] | null;
   target_gmv: number | null;
   camp_ranges: PlanCampRanges | null;
+  /** 0161 — DB chưa chạy 0161 thì không có cột. */
+  group_targets?: PlanGroupTargets | null;
   shop_target_gmv: number | null;
   ads_budget: number | null;
   locked_at: string | null;
@@ -45,6 +47,20 @@ interface DbPlanSlot {
 
 const hhmm = (t: string) => t.slice(0, 5);
 
+// Có cột group_targets trên DB chưa (0161)? Biết sau lần đọc đầu tiên; chưa biết (null) thì chỉ gửi khi thật sự có target nhóm,
+// để DB chưa chạy 0161 vẫn lưu được kế hoạch như cũ.
+let groupTargetsColumn: boolean | null = null;
+
+/** Chỉ giữ khoá hợp lệ với số > 0. */
+export function cleanGroupTargets(g: PlanGroupTargets | null | undefined): PlanGroupTargets {
+  const out: PlanGroupTargets = {};
+  for (const k of ["dday", "midmonth", "payday", "daily"] as const) {
+    const v = Number(g?.[k] ?? 0);
+    if (Number.isFinite(v) && v > 0) out[k] = Math.round(v);
+  }
+  return out;
+}
+
 const planFromDb = (r: DbPlan): BrandMonthPlan => ({
   id: r.id,
   brandId: r.brand_id,
@@ -59,6 +75,7 @@ const planFromDb = (r: DbPlan): BrandMonthPlan => ({
   blackoutDates: r.blackout_dates ?? [],
   targetGmv: Number(r.target_gmv ?? 0),
   campRanges: r.camp_ranges ?? {},
+  groupTargets: cleanGroupTargets(r.group_targets),
   shopTargetGmv: Number(r.shop_target_gmv ?? 0),
   adsBudget: Number(r.ads_budget ?? 0),
   lockedAt: r.locked_at ?? undefined,
@@ -104,6 +121,7 @@ export async function fetchMonthPlan(
     if (error) throw error;
     return (data ?? []) as (DbPlan & { brand_month_plan_slots: DbPlanSlot[] })[];
   });
+  if (rows.length > 0) groupTargetsColumn = "group_targets" in rows[0];
   const data = rows.find((r) => platformOf(r) === platform);
   if (!data) return null;
   return { plan: planFromDb(data), slots: (data.brand_month_plan_slots ?? []).map(slotFromDb) };
@@ -116,9 +134,11 @@ export async function fetchPlanStatuses(month: string): Promise<Map<string, Bran
   return new Map((data as DbPlan[]).map((r) => [brandPlatformKey(r.brand_id, r.platform), planFromDb(r)]));
 }
 
-export type PlanSettings = Pick<BrandMonthPlan, "defaultSlotHours" | "liveWindowStart" | "liveWindowEnd" | "maxSlotsPerDay" | "notes" | "blackoutDates" | "targetGmv" | "campRanges" | "shopTargetGmv" | "adsBudget">;
+export type PlanSettings = Pick<BrandMonthPlan, "defaultSlotHours" | "liveWindowStart" | "liveWindowEnd" | "maxSlotsPerDay" | "notes" | "blackoutDates" | "targetGmv" | "campRanges" | "groupTargets" | "shopTargetGmv" | "adsBudget">;
 
 export async function upsertMonthPlan(brandId: string, month: string, settings: PlanSettings, platform: ReportPlatform = "TikTok"): Promise<BrandMonthPlan> {
+  const groupTargets = cleanGroupTargets(settings.groupTargets);
+  const sendGroupTargets = groupTargetsColumn === true || Object.keys(groupTargets).length > 0;
   const { data, error } = await supabase
     .from("brand_month_plans")
     .upsert(
@@ -134,6 +154,7 @@ export async function upsertMonthPlan(brandId: string, month: string, settings: 
         blackout_dates: settings.blackoutDates,
         target_gmv: settings.targetGmv,
         camp_ranges: settings.campRanges,
+        ...(sendGroupTargets ? { group_targets: groupTargets } : {}),
         shop_target_gmv: settings.shopTargetGmv > 0 ? settings.shopTargetGmv : null,
         ads_budget: settings.adsBudget > 0 ? settings.adsBudget : null
       },

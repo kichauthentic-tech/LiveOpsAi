@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { defaultPlanMonth } from "../lib/defaultMonth";
-import { Brand, BrandChannel, BrandContract, BrandMonthPlan, BrandMonthPlanSlot, BrandMonthlyCommitment, BrandStudio, CalendarEventRow, LiveSession, PlanCampRanges, PromoScheme, RecurringShiftTemplate, ShiftSlot, Studio, Talent } from "../types";
+import { Brand, BrandChannel, BrandContract, BrandMonthPlan, BrandMonthPlanSlot, BrandMonthlyCommitment, BrandStudio, CalendarEventRow, LiveSession, PlanCampRanges, PlanGroupTargets, PromoScheme, RecurringShiftTemplate, ShiftSlot, Studio, Talent } from "../types";
 import { AlertTriangle, Ban, CalendarRange, Lock, Plus, Repeat, Save, Sparkles, Trash2, Wand2, X } from "lucide-react";
 import { commitmentsRead, contractsRead, upsertMonthlyCommitment } from "../lib/db/brandContracts";
 import type { TabPrefetchCtx } from "../lib/db/prefetch";
@@ -11,15 +11,18 @@ import { PlanEvaluation, buildCalibration, evaluatePlan } from "../lib/schedulin
 import { computeCommitmentProgress, contractCovering, monthCommitmentOf, todayVn } from "../lib/performance/brandCommitment";
 import { useDefaultBrand } from "../hooks/useDefaultBrand";
 import { CAMPAIGN_DAY_STYLES, resolveCampBucketType } from "../lib/campaignDays";
-import { targetWeightModel, targetWeights } from "../lib/performance/slotInsights";
+import { allocatorWeights, buildAllocator } from "../lib/performance/allocationModel";
 import {
   PlanDraftSlot,
+  GROUP_BUCKETS,
   allocateDraftTargets,
   crossBrandCheck,
   daysOfMonth,
   draftKeyOf,
   draftsFromSaved,
   draftsFromSessions,
+  groupBreakdown,
+  sumGroupTargets,
   draftsFromSuggestion,
   endsAfterMidnight,
   mergeFromTemplates,
@@ -28,6 +31,7 @@ import {
   totalsOf,
   validateDrafts
 } from "../lib/scheduling/monthPlanGrid";
+import { PlanGroupTargetsBlock } from "./PlanGroupTargets";
 import { RecurringRulesPanel } from "./scheduling/RecurringRulesPanel";
 import { HistorySummary, STRATEGY_LABEL, SuggestResult, SuggestStrategy, buildBorrowedHistory, buildHistory, estimateSlots, suggestMonthPlan } from "../lib/scheduling/suggestEngine";
 import { EngineParams } from "../lib/scheduling/engineParams";
@@ -69,7 +73,7 @@ interface MonthPlanProps {
 
 const WEEKDAY_LABELS = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
 const fmtH = (n: number) => n.toLocaleString("vi-VN", { maximumFractionDigits: 1 });
-const DEFAULT_SETTINGS: PlanSettings = { defaultSlotHours: 3, liveWindowStart: "09:00", liveWindowEnd: "23:00", maxSlotsPerDay: 3, notes: "", blackoutDates: [], targetGmv: 0, campRanges: {}, shopTargetGmv: 0, adsBudget: 0 };
+const DEFAULT_SETTINGS: PlanSettings = { defaultSlotHours: 3, liveWindowStart: "09:00", liveWindowEnd: "23:00", maxSlotsPerDay: 3, notes: "", blackoutDates: [], targetGmv: 0, campRanges: {}, groupTargets: {}, shopTargetGmv: 0, adsBudget: 0 };
 const CAMP_RANGE_LABEL: Record<keyof PlanCampRanges, string> = { dday: "D-Day", midmonth: "Mid-Month", payday: "Pay Day" };
 
 const nextMonthOf = (month: string, delta: number) => {
@@ -232,7 +236,7 @@ export default function MonthPlan({
         if (!alive) return;
         if (r) {
           setPlan(r.plan);
-          setSettings({ defaultSlotHours: r.plan.defaultSlotHours, liveWindowStart: r.plan.liveWindowStart, liveWindowEnd: r.plan.liveWindowEnd, maxSlotsPerDay: r.plan.maxSlotsPerDay, notes: r.plan.notes, blackoutDates: r.plan.blackoutDates, targetGmv: r.plan.targetGmv, campRanges: r.plan.campRanges, shopTargetGmv: r.plan.shopTargetGmv, adsBudget: r.plan.adsBudget });
+          setSettings({ defaultSlotHours: r.plan.defaultSlotHours, liveWindowStart: r.plan.liveWindowStart, liveWindowEnd: r.plan.liveWindowEnd, maxSlotsPerDay: r.plan.maxSlotsPerDay, notes: r.plan.notes, blackoutDates: r.plan.blackoutDates, targetGmv: r.plan.targetGmv, campRanges: r.plan.campRanges, groupTargets: r.plan.groupTargets, shopTargetGmv: r.plan.shopTargetGmv, adsBudget: r.plan.adsBudget });
           setDrafts(draftsFromSaved(r.slots));
         } else {
           setPlan(null);
@@ -362,28 +366,33 @@ export default function MonthPlan({
   const engineHistory = coldStart && borrowedHistory ? borrowedHistory : history;
 
   const estimateCtx = useMemo(() => ({ camp: campRanges, events, schemes: brandSchemes, calibration: calibration?.factors }), [campRanges, events, brandSchemes, calibration]);
-  // Chia target ca theo chỉ số khung giờ + vị trí ngày camp (user chốt 2026-09-28): ca 11–13h lịch sử
-  // chỉ đạt ~0,8 lần mặt bằng mà nhận target ngang ca 19–20h thì % Target đỏ vì KHUNG, không vì host.
-  // null khi brand chưa đủ 2 tháng lịch sử ⇒ vẫn chia theo dự báo engine như trước.
-  const weightModel = useMemo(
+  // Chia target ca bằng engine v2 (2026-10-09, lib/performance/allocationModel.ts): giờ × loại ngày × khung giờ bắt đầu × vị trí ngày
+  // trong đợt, fit đồng thời, trộn với cách cũ (user chốt 2026-09-28: ca 11–13h lịch sử chỉ ~0,8 lần mặt bằng mà nhận target ngang ca
+  // 19–20h thì % Target đỏ vì KHUNG, không vì host). Tham số + bảng backtest ở AI Training Center.
+  // null khi brand chưa đủ lịch sử cho cả hai cách ⇒ vẫn chia theo dự báo engine như trước.
+  const allocator = useMemo(
     // Lịch sử xếp loại ngày theo lịch cố định, KHÔNG theo khung camp tháng đang lập: khung nhập tay là ngày của THÁNG NÀY,
     // áp lên T6–T9 nó xoá D-Day/Mid-Month/Pay Day cũ khỏi lịch sử (07/10: nhập D-Day 8–11 ⇒ GMV/giờ D-Day = ngày thường ⇒ target ca
     // D-Day bằng ca thường, thấp hơn dự báo cả chục triệu). Khung nhập tay chỉ dùng để xếp loại cho CA CỦA THÁNG (allocationWeights).
-    () => targetWeightModel(platformSessions.filter((s) => s.brandId === brandId), month, (d) => resolveCampBucketType(d)),
-    [platformSessions, brandId, month]
+    () => buildAllocator(platformSessions.filter((s) => s.brandId === brandId), month, engineParams),
+    [platformSessions, brandId, month, engineParams]
   );
-  const allocationWeights = (next: PlanDraftSlot[], forecasts: number[]) =>
-    weightModel ? targetWeights(next, weightModel, (d) => resolveCampBucketType(d, campRanges)) : forecasts;
+  const allocationWeights = (next: PlanDraftSlot[], forecasts: number[], camp = campRanges) =>
+    allocator ? allocatorWeights(allocator, next, (d) => resolveCampBucketType(d, camp)).blended : forecasts;
+  // Target theo nhóm ngày (0161): nhóm nào ops đã nhập thì ca nhóm đó chia đúng số ấy, nhóm trống chia phần còn lại của target tháng.
+  const groupSpec = (targets = settings.groupTargets, camp = campRanges) => ({ bucketOf: (d: string) => resolveCampBucketType(d, camp), targets });
   // Target đi theo lưới (user chốt 2026-09-21): ở giai đoạn NHÁP, mọi thay đổi cấu trúc (thêm/bỏ/dời
   // ca, đổi giờ, cấm ngày, nạp quy tắc) → chia lại target tháng theo dự báo mới của cả lưới, không
   // chờ bấm "Chia target theo dự báo". Sau khi CHỐT, target/ca là số cam kết với brand/host — không
   // chia lại; ca thêm sau chốt mang target = dự báo riêng của nó, phần bù/run-rate là việc của module
   // hỗ trợ vận hành (sau). Sửa target/ca bằng tay không kích hoạt chia lại (thanh "Tổng target" báo lệch).
-  const withForecast = (next: PlanDraftSlot[], target = targetTotal, ctx = estimateCtx): PlanDraftSlot[] => {
+  const withForecast = (next: PlanDraftSlot[], target = targetTotal, ctx = estimateCtx, groupTargets = settings.groupTargets): PlanDraftSlot[] => {
     if (next.length === 0) return next;
     const w = estimateSlots(engineHistory, next, ctx);
     const flag = (d: PlanDraftSlot) => ({ ...d, highExpectation: d.expectedGmv ? d.targetGmv > d.expectedGmv * engineParams.highExpectationRatio : d.highExpectation });
-    if (!locked && target > 0) return allocateDraftTargets(next, target, allocationWeights(next, w), w).map(flag);
+    const camp = ctx.camp ?? campRanges;
+    const total = Math.max(target, sumGroupTargets(groupTargets));
+    if (!locked && total > 0) return allocateDraftTargets(next, total, allocationWeights(next, w, camp), w, groupSpec(groupTargets, camp)).map(flag);
     return next.map((d, i) => flag({
       ...d,
       expectedGmv: w[i] > 0 ? Math.round(w[i]) : d.expectedGmv,
@@ -494,7 +503,8 @@ export default function MonthPlan({
   // Chia target tổng xuống ca theo DỰ BÁO từng ca (cùng công thức engine gợi ý); brand chưa có lịch
   // sử thì chia theo giờ.
   const allocate = () => {
-    if (targetTotal <= 0) {
+    const total = Math.max(targetTotal, sumGroupTargets(settings.groupTargets));
+    if (total <= 0) {
       setMsg("Nhập Target GMV tháng ở Tham số lập kế hoạch trước.");
       return;
     }
@@ -504,14 +514,16 @@ export default function MonthPlan({
     }
     const weights = estimateSlots(engineHistory, drafts, estimateCtx);
     const byForecast = weights.some((w) => w > 0);
-    setDrafts(allocateDraftTargets(drafts, targetTotal, allocationWeights(drafts, weights), weights));
+    const grouped = sumGroupTargets(settings.groupTargets) > 0;
+    setDrafts(allocateDraftTargets(drafts, total, allocationWeights(drafts, weights), weights, groupSpec()));
     setDirty(true);
     setMsg(
-      weightModel
-        ? `Đã chia ${fmtVndShort(targetTotal)} theo giờ × GMV/giờ từng loại ngày${weightModel.useSlot ? " × chỉ số khung giờ" : ""}${weightModel.useCamp ? " × vị trí ngày trong đợt Mid-Month/Pay Day" : ""} (lịch sử các tháng trước).`
+      (grouped ? "Đã chia theo target từng nhóm ngày bạn nhập (nhóm trống chia phần còn lại). " : "") +
+      (allocator
+        ? `Đã chia ${fmtVndShort(total)} theo giờ × loại ngày${allocator.glm?.useBand ? " × khung giờ" : ""}${allocator.glm?.useCampPos ? " × vị trí ngày trong đợt Mid-Month/Pay Day" : ""} (lịch sử các tháng trước; ${allocator.glm && allocator.old ? `trộn ${Math.round(allocator.share * 100)}% mô hình v2 + ${Math.round((1 - allocator.share) * 100)}% cách cũ` : allocator.glm ? "mô hình v2" : "cách cũ — chưa đủ lịch sử cho v2"}).`
         : byForecast
-          ? `Đã chia ${fmtVndShort(targetTotal)} theo dự báo từng ca (${history.sessions} ca lịch sử).`
-          : `Brand chưa có lịch sử đối soát — đã chia ${fmtVndShort(targetTotal)} đều theo giờ.`
+          ? `Đã chia ${fmtVndShort(total)} theo dự báo từng ca (${history.sessions} ca lịch sử).`
+          : `Brand chưa có lịch sử đối soát — đã chia ${fmtVndShort(total)} đều theo giờ.`)
     );
   };
   // Đổ gợi ý vào lưới. Ngày camp có thể nhiều ca hơn trần ops đặt (engine nới theo giờ/ngày lịch sử) —
@@ -721,6 +733,19 @@ export default function MonthPlan({
   const hoursDelta = planHours > 0 ? totals.hours - planHours : null;
   const targetDelta = targetTotal > 0 ? totals.target - targetTotal : null;
 
+  const groupRows = groupBreakdown(drafts, (d) => resolveCampBucketType(d, campRanges), settings.groupTargets);
+  // Nhập đủ 4 nhóm thì target tháng = tổng 4 nhóm (ô Target tháng khoá); nhập một phần mà tổng vượt target tháng thì nâng target tháng lên
+  // bằng tổng, để phần còn lại không âm.
+  const allGroupsSet = GROUP_BUCKETS.every((b) => (settings.groupTargets[b] ?? 0) > 0);
+  const setGroupTargets = (next: PlanGroupTargets) => {
+    const sum = sumGroupTargets(next);
+    const total = GROUP_BUCKETS.every((b) => (next[b] ?? 0) > 0) ? sum : Math.max(settings.targetGmv, sum);
+    setSettings((s) => ({ ...s, groupTargets: next, targetGmv: total }));
+    if (!locked) setDrafts((prev) => withForecast(prev, total, estimateCtx, next));
+    setDirty(true);
+  };
+
+
   return (
     <div className="space-y-6">
       <div className="bg-[var(--surface)] border border-[var(--border)] p-4 sm:p-6 rounded-2xl shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -785,13 +810,14 @@ export default function MonthPlan({
           </div>
           <label className="block text-xs">
             <span className="font-bold text-[var(--text-muted)] block mb-1">Target GMV tháng</span>
-            <input type="number" min="0" step="1000000" disabled={!editable || locked} title={locked ? "Kế hoạch đã chốt: target tháng = tổng target các ca, sửa target từng ca trong lưới" : undefined} value={settings.targetGmv || ""} placeholder="0 = chưa đặt" onChange={(e) => { const t = Number(e.target.value) || 0; setSettings((s) => ({ ...s, targetGmv: t })); if (!locked && t > 0) setDrafts((prev) => withForecast(prev, t)); setDirty(true); }} className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] font-mono disabled:opacity-60" />
+            <input type="number" min="0" step="1000000" disabled={!editable || locked || allGroupsSet} title={locked ? "Kế hoạch đã chốt: target tháng = tổng target các ca, sửa target từng ca trong lưới" : allGroupsSet ? "Đã nhập đủ 4 nhóm ngày: target tháng = tổng 4 nhóm" : undefined} value={settings.targetGmv || ""} placeholder="0 = chưa đặt" onChange={(e) => { const t = Number(e.target.value) || 0; setSettings((s) => ({ ...s, targetGmv: t })); if (!locked && t > 0) setDrafts((prev) => withForecast(prev, t)); setDirty(true); }} className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] font-mono disabled:opacity-60" />
             {locked ? (
               <span className="text-[11px] text-[var(--text-faint)]">Đã chốt — lưu sẽ ghi = tổng target các ca ({fmtVndShort(totals.target)})</span>
             ) : (
               targetTotal > 0 && <span className="text-[11px] text-[var(--text-faint)]">{fmtVndShort(targetTotal)}</span>
             )}
           </label>
+          <PlanGroupTargetsBlock rows={groupRows} targets={settings.groupTargets} targetTotal={targetTotal} historyRate={allocator?.old?.bucketRate ?? null} editable={editable} locked={locked} onChange={setGroupTargets} />
           <label className="block text-xs">
             <span className="font-bold text-[var(--text-muted)] block mb-1">KPI GMV <span className="font-normal text-[var(--text-faint)]">— brand giao, mọi kênh; chỉ để Report Tháng so, không dùng xếp ca</span></span>
             <input type="number" min="0" step="1000000" disabled={!editable} value={settings.shopTargetGmv || ""} placeholder="0 = brand chưa giao" onChange={(e) => { setSettings((s) => ({ ...s, shopTargetGmv: Number(e.target.value) || 0 })); setDirty(true); }} className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] font-mono disabled:opacity-60" />

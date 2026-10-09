@@ -1,5 +1,6 @@
 // Kế Hoạch Tháng — phần thuần cho lưới ngày × ca (giai đoạn A, 0090). Không gọi DB.
-import { BrandMonthPlan, BrandMonthPlanSlot, LiveSession, RecurringShiftTemplate, ShiftSlot } from "../../types";
+import { BrandMonthPlan, BrandMonthPlanSlot, LiveSession, PlanGroupTargets, RecurringShiftTemplate, ShiftSlot } from "../../types";
+import type { CampDayBucket } from "../campaignDays";
 import { sessionDurationHours } from "../pnl";
 import { dateTimeRangesOverlap } from "../dateUtils";
 import { planMonthSlots } from "./planMonthSlots";
@@ -108,8 +109,9 @@ export function draftsFromSessions(
 // ngày × chỉ số khung giờ / vị trí ngày camp (`targetWeights`, slotInsights.ts) khi brand đủ 2 tháng
 // lịch sử; chưa đủ thì dự báo engine; không có gì thì theo giờ. `forecasts` (dự báo engine) chỉ để
 // ghi `expectedGmv` — cột "dự báo" và cờ "target cao" của từng ca vẫn là của engine.
-export function allocateDraftTargets(drafts: PlanDraftSlot[], targetTotal: number, weights: number[], forecasts: number[] = weights): PlanDraftSlot[] {
+export function allocateDraftTargets(drafts: PlanDraftSlot[], targetTotal: number, weights: number[], forecasts: number[] = weights, groups?: GroupTargetSpec): PlanDraftSlot[] {
   const w = weights.some((x) => x > 0) ? weights : drafts.map(slotHours);
+  if (groups && drafts.length > 0 && GROUP_BUCKETS.some((b) => (groups.targets[b] ?? 0) > 0)) return allocateByGroup(drafts, targetTotal, w, forecasts, groups);
   const sum = w.reduce((a, b) => a + b, 0);
   if (sum <= 0 || targetTotal <= 0) return drafts.map((d) => ({ ...d, targetGmv: 0 }));
   let assigned = 0;
@@ -117,6 +119,82 @@ export function allocateDraftTargets(drafts: PlanDraftSlot[], targetTotal: numbe
     const t = i === drafts.length - 1 ? Math.round(targetTotal - assigned) : Math.round((targetTotal * w[i]) / sum);
     assigned += t;
     return { ...d, targetGmv: t, expectedGmv: forecasts[i] > 0 ? Math.round(forecasts[i]) : d.expectedGmv };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Target theo nhóm ngày (0161, 09/10): ops chốt trước target D-Day / Mid-Month / Pay Day / ngày thường, rồi chia từng nhóm
+// xuống ca theo trọng số của engine. Nhóm KHÔNG nhập chia chung phần còn lại của target tháng (tháng − tổng các nhóm đã nhập).
+// ---------------------------------------------------------------------------
+
+export const GROUP_BUCKETS: CampDayBucket[] = ["dday", "midmonth", "payday", "daily"];
+export const GROUP_LABEL: Record<CampDayBucket, string> = { dday: "D-Day", midmonth: "Mid-Month", payday: "Pay Day", daily: "Ngày thường" };
+
+export interface GroupTargetSpec {
+  /** Loại ngày của ca — nhớ truyền khung camp nhập tay của tháng (resolveCampBucketType(d, campRanges)). */
+  bucketOf: (date: string) => CampDayBucket;
+  targets: PlanGroupTargets;
+}
+
+export const sumGroupTargets = (g: PlanGroupTargets | undefined): number => GROUP_BUCKETS.reduce((a, b) => a + Math.max(0, g?.[b] ?? 0), 0);
+
+/** Chia `amount` cho các ca theo trọng số; ca có trọng số lớn nhất nhận phần dư làm tròn nên tổng khớp từng đồng. */
+function splitPool(amount: number, idx: number[], w: number[], hoursOf: (i: number) => number): Map<number, number> {
+  const out = new Map<number, number>();
+  if (idx.length === 0 || amount <= 0) return out;
+  let weights = idx.map((i) => w[i]);
+  if (!(weights.reduce((a, b) => a + b, 0) > 0)) weights = idx.map(hoursOf);
+  const sum = weights.reduce((a, b) => a + b, 0);
+  if (!(sum > 0)) weights = idx.map(() => 1);
+  const total = weights.reduce((a, b) => a + b, 0);
+  let assigned = 0;
+  let big = 0;
+  idx.forEach((i, k) => {
+    const v = Math.round((amount * weights[k]) / total);
+    out.set(i, v);
+    assigned += v;
+    if (weights[k] > weights[big]) big = k;
+  });
+  out.set(idx[big], (out.get(idx[big]) ?? 0) + Math.round(amount - assigned));
+  return out;
+}
+
+function allocateByGroup(drafts: PlanDraftSlot[], targetTotal: number, w: number[], forecasts: number[], groups: GroupTargetSpec): PlanDraftSlot[] {
+  const bucket = drafts.map((d) => groups.bucketOf(d.date));
+  const pools = new Map<CampDayBucket, number[]>();
+  bucket.forEach((b, i) => pools.set(b, [...(pools.get(b) ?? []), i]));
+  const given = (b: CampDayBucket) => Math.max(0, groups.targets[b] ?? 0);
+  const rest = pools.size > 0 ? [...pools.keys()].filter((b) => given(b) <= 0) : [];
+  const out = new Array<number>(drafts.length).fill(0);
+  const hoursOf = (i: number) => slotHours(drafts[i]);
+  for (const [b, idx] of pools) {
+    if (given(b) <= 0) continue;
+    for (const [i, v] of splitPool(given(b), idx, w, hoursOf)) out[i] = v;
+  }
+  // Phần còn lại của target tháng chia chung cho mọi ca thuộc nhóm không nhập (kể cả nhóm không nhập nhưng nhóm đã nhập chưa có ca).
+  const remain = Math.max(0, targetTotal - sumGroupTargets(groups.targets));
+  const restIdx = rest.flatMap((b) => pools.get(b) ?? []).sort((a, b) => a - b);
+  for (const [i, v] of splitPool(remain, restIdx, w, hoursOf)) out[i] = v;
+  return drafts.map((d, i) => ({ ...d, targetGmv: out[i], expectedGmv: forecasts[i] > 0 ? Math.round(forecasts[i]) : d.expectedGmv }));
+}
+
+export interface GroupBreakdownRow {
+  bucket: CampDayBucket;
+  slots: number;
+  hours: number;
+  /** Tổng target các ca của nhóm đang có trong lưới. */
+  slotTarget: number;
+  /** Target nhóm ops đã nhập (undefined = không nhập). */
+  given?: number;
+  /** Nhóm đã nhập target nhưng lưới chưa có ca nào của nhóm ⇒ phần này chưa được chia đi đâu. */
+  orphaned: boolean;
+}
+
+export function groupBreakdown(drafts: PlanDraftSlot[], bucketOf: (date: string) => CampDayBucket, targets: PlanGroupTargets): GroupBreakdownRow[] {
+  return GROUP_BUCKETS.map((b) => {
+    const xs = drafts.filter((d) => bucketOf(d.date) === b);
+    const given = (targets[b] ?? 0) > 0 ? targets[b] : undefined;
+    return { bucket: b, slots: xs.length, hours: xs.reduce((a, d) => a + slotHours(d), 0), slotTarget: xs.reduce((a, d) => a + d.targetGmv, 0), given, orphaned: given !== undefined && xs.length === 0 };
   });
 }
 

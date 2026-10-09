@@ -63,6 +63,11 @@ describe("targetPct", () => {
     expect(targetPct(ca({ actualGmv: 20_500_000 }))?.level).toBe("mid");
     expect(targetPct(ca({ actualGmv: 13_500_000 }))).toEqual({ pct: 54, level: "low" });
   });
+  it("mốc đỏ là 60% (hạ từ 70% ngày 09/10): 65% trung tính, 59% và 60% đúng mốc", () => {
+    expect(targetPct(ca({ actualGmv: 16_250_000 }))).toEqual({ pct: 65, level: "mid" });
+    expect(targetPct(ca({ actualGmv: 15_000_000 }))).toEqual({ pct: 60, level: "mid" });
+    expect(targetPct(ca({ actualGmv: 14_750_000 }))).toEqual({ pct: 59, level: "low" });
+  });
   it("chưa xong, chưa có số liệu, không có target, loại khỏi báo cáo, tháng chưa phát hành → null", () => {
     expect(targetPct(ca({ status: "Live Now" }))).toBeNull();
     expect(targetPct(ca({ dataSource: "manual", actualGmv: 0 }))).toBeNull();

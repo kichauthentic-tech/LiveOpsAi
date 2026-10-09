@@ -108,7 +108,7 @@ export const SessionCardLegend: React.FC<{ showCancelled?: boolean; showTiming?:
           <>
             <span className="inline-flex items-center gap-1.5"><span className="sc-dur" data-kind="ot">OT +25p</span> Live quá giờ (OT)</span>
             <span className="inline-flex items-center gap-1.5"><span className="sc-dur" data-kind="early">Off −30p</span> Live thiếu giờ (off sớm)</span>
-            <span className="inline-flex items-center gap-1.5"><span className="sc-pill sc-pill-split"><b data-level="hit">112%</b><i>25M</i></span> % Target (xanh ≥100% · đỏ &lt;70%)</span>
+            <span className="inline-flex items-center gap-1.5"><span className="sc-pill sc-pill-split"><b data-level="hit">112%</b><i>25M</i></span> % Target (xanh ≥100% · đỏ &lt;60%)</span>
           </>
         )}
       </>

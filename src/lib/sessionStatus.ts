@@ -116,9 +116,11 @@ export function minutesLabel(minutes: number): string {
 }
 
 // % Target của ca ĐÃ XONG có số liệu = Thực đạt ÷ Target (tên chuẩn trong metricGlossary). Ngưỡng màu là mốc hiển thị, không
-// phải luật nghiệp vụ: ≥100 đạt, 70–99 trung tính, <70 thấp.
+// phải luật nghiệp vụ: ≥100 đạt, 60–99 trung tính, <60 thấp. Mốc đỏ hạ 70 → 60 ngày 09/10 (user chốt) sau backtest chia target ca:
+// ngay cả khi target đúng kỳ vọng thì ~14% ca vẫn dưới 70% (và ~12% trên 130%) chỉ vì nhiễu từng ca; mốc 60% còn ~10% ca (p10 của
+// GMV/target = 0,62). Một ca đỏ KHÔNG nói host kém — đánh giá host trên nhiều ca cộng dồn.
 export const PCT_TARGET_HIT = 100;
-export const PCT_TARGET_LOW = 70;
+export const PCT_TARGET_LOW = 60;
 
 export interface TargetPct {
   pct: number;

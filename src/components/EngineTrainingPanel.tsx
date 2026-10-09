@@ -8,6 +8,7 @@ import { fetchBrandLockedPlanSlots, fetchCalendarEvents } from "../lib/db/monthP
 import { todayVn } from "../lib/performance/brandCommitment";
 import { useDefaultBrand } from "../hooks/useDefaultBrand";
 import { errorMessage } from "../lib/errorMessage";
+import { AllocationTrainingCard } from "./AllocationTrainingCard";
 
 import { fmtDateVn, fmtFixed, fmtVndShort } from "../lib/format";
 // AI Training Center — mục "Engine Kế Hoạch Tháng". Engine là thuật toán thuần, không phải LLM: không
@@ -111,6 +112,7 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
       <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
         {/* Nửa trái: engine đã học gì */}
         <div className="xl:col-span-2 space-y-4">
+          {brandId && <AllocationTrainingCard brandId={brandId} sessions={sessions} params={draft} today={today} />}
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 space-y-3">
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-sm font-bold text-[var(--text)] flex items-center gap-1.5"><BrainCircuit className="w-4 h-4 text-[var(--accent-text)]" /> Engine đã học gì</h3>

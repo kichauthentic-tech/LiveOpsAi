@@ -720,6 +720,8 @@ export interface BrandMonthPlan {
   blackoutDates: string[]; // ngày brand cấm live (0091)
   targetGmv: number; // target GMV tháng của kế hoạch (0094) — riêng, không đọc Report Tháng
   campRanges: PlanCampRanges; // khoảng ngày camp riêng (0094); thiếu khoá = lịch camp cố định
+  /** Target chốt trước theo nhóm ngày (0161) — chỉ là nháp lập kế hoạch; thiếu khoá = nhóm đó tự chia phần còn lại. */
+  groupTargets: PlanGroupTargets;
   /** KPI GMV CẢ SHOP brand giao (0122) — mọi kênh, khác targetGmv (phần live); 0 = chưa giao. Không dùng để xếp ca. */
   shopTargetGmv: number;
   /** Ngân sách Ads của tháng (0146); 0 = chưa đặt. Report Tháng tính % đã dùng. */
@@ -729,6 +731,8 @@ export interface BrandMonthPlan {
    *  kế hoạch hoặc ca kế hoạch SAU khi brand đã xác nhận — xem trigger ở migration, đừng set tay. */
   brandConfirmedAt?: string;
 }
+
+export type PlanGroupTargets = Partial<Record<"dday" | "midmonth" | "payday" | "daily", number>>;
 
 export type PlanCampRanges = Partial<Record<"dday" | "midmonth" | "payday", { start: string; end: string }>>;
 

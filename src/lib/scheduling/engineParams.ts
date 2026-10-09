@@ -45,6 +45,12 @@ export interface EngineParams {
   highExpectationRatio: number; // target/ca > dự báo × X → cờ đỏ "kỳ vọng quá sức"
   hoursToHitMultiplier: number; // tìm giờ cần cho target tới X× cam kết
   targetGapWarnPct: number; // lưới nháp dự báo thiếu > X% target → dải cảnh báo + phương án bù giờ
+  // --- Chia target ca (engine v2, lib/performance/allocationModel.ts) ---
+  allocEnsembleShare: number; // tỷ trọng mô hình v2 khi trộn với cách cũ (0 = chỉ cách cũ, 1 = chỉ v2)
+  allocRidge: number; // phạt ridge: hệ số co về 1 khi ít dữ liệu (đơn vị "ca ảo")
+  allocMinMonths: number; // tháng lịch sử tối thiểu để dùng mô hình v2
+  allocUseBand: boolean; // hệ số khung giờ bắt đầu
+  allocUseCampPos: boolean; // hệ số vị trí ngày trong đợt Mid-Month/Pay Day
   // --- Hiệu chỉnh kế hoạch vs thực tế ---
   calibrationK: number;
   calibrationMin: number;
@@ -88,6 +94,11 @@ export const DEFAULT_ENGINE_PARAMS: EngineParams = {
   highExpectationRatio: 1.3,
   hoursToHitMultiplier: 2,
   targetGapWarnPct: 0.03,
+  allocEnsembleShare: 0.5,
+  allocRidge: 3,
+  allocMinMonths: 2,
+  allocUseBand: true,
+  allocUseCampPos: true,
   calibrationK: 3,
   calibrationMin: 0.5,
   calibrationMax: 1.6,
@@ -150,6 +161,11 @@ export const ENGINE_PARAM_META: EngineParamMeta[] = [
   { key: "highExpectationRatio", group: "target", label: "Cờ đỏ khi target/ca > dự báo × X", help: "Ca bị kỳ vọng quá sức so với lịch sử — ops nên xem lại target hoặc thêm giờ.", kind: "number", min: 1, max: 3, step: 0.05 },
   { key: "hoursToHitMultiplier", group: "target", label: "Tìm giờ cần cho target tới X× cam kết", help: "Khi dự báo thiếu target, engine chạy tiếp tới X× giờ cam kết để tìm mốc đủ.", kind: "number", min: 1, max: 5, step: 0.5 },
   { key: "targetGapWarnPct", group: "target", label: "Cảnh báo khi lưới nháp dự báo thiếu > X target", help: "Sửa ca trong nháp là target chia lại tự động; dự báo cả lưới hụt quá ngưỡng này thì hiện dải cảnh báo kèm số giờ cần bù và nút bù giờ. 0.03 = 3%.", kind: "number", min: 0, max: 0.5, step: 0.01 },
+  { key: "allocEnsembleShare", group: "target", label: "Chia target ca: tỷ trọng mô hình v2", help: "Target ca = v2 × X + cách cũ × (1−X). 0.5 là mức backtest cho sai số thấp nhất và ổn định nhất qua các brand; 1 = chỉ v2; 0 = chỉ cách cũ. Bảng backtest ngay bên dưới cho thấy đổi số này tác động sai số ra sao.", kind: "number", min: 0, max: 1, step: 0.05 },
+  { key: "allocRidge", group: "target", label: "Chia target ca: độ co hệ số về 1", help: "Hệ số loại ngày/khung giờ/vị trí ngày bị kéo về 1 như có thêm X ca ảo. Brand ít ca hoặc nhiễu thì tăng; backtest CROCS gần như không nhạy trong 0.5–8.", kind: "number", min: 0, max: 50, step: 0.5 },
+  { key: "allocMinMonths", group: "target", label: "Chia target ca: tháng lịch sử tối thiểu cho v2", help: "Dưới mức này chỉ dùng cách cũ (hoặc chia theo dự báo engine nếu cách cũ cũng chưa đủ).", kind: "number", min: 1, max: 6, step: 1 },
+  { key: "allocUseBand", group: "target", label: "Chia target ca: dùng hệ số khung giờ", help: "Ca bắt đầu 11–14h lịch sử CROCS chỉ ~0,8× mặt bằng, 18–21h ~1,07×; áp cho cả D-Day, Mid-Month, Pay Day. Tắt để thấy khung giờ đóng góp bao nhiêu điểm sai số.", kind: "boolean" },
+  { key: "allocUseCampPos", group: "target", label: "Chia target ca: dùng hệ số vị trí ngày trong đợt", help: "Ngày 1 của Mid-Month/Pay Day mạnh hơn ngày 3 (CROCS ~1,3× so với ~0,8×). Brand có mẫu hình khác thì hệ số tự học theo brand; tắt nếu thấy bảng backtest không cải thiện.", kind: "boolean" },
   { key: "calibrationK", group: "calibration", label: "Kéo hệ số hiệu chỉnh về 1", help: "Ô có ít ca kế hoạch đã có thực tế bị kéo về 1 (không hiệu chỉnh). k lớn = thận trọng hơn.", kind: "number", min: 0, max: 20, step: 1 },
   { key: "calibrationMin", group: "calibration", label: "Hệ số hiệu chỉnh — sàn", help: "", kind: "number", min: 0.1, max: 1, step: 0.05 },
   { key: "calibrationMax", group: "calibration", label: "Hệ số hiệu chỉnh — trần", help: "", kind: "number", min: 1, max: 5, step: 0.1 },
