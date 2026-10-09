@@ -5,6 +5,7 @@ import { CampDayBucket, CampOverrides, CAMP_DAY_BUCKET_ORDER, resolveCampBucketT
 import { expandHostPortions, isCountable, sessionHours } from "./hostPerformance";
 import { keyMetricsOfSessions, type KeyMetrics } from "../report/keyMetrics";
 import { platformOf, REPORT_PLATFORMS, type ReportPlatform } from "../reportPlatform";
+import { coneHalf, landingOf } from "./forecastCone";
 
 // Bản Tin CEO (2026-09-25) — thay Toàn Cảnh Agency. File thuần: không đụng Supabase, test bằng vitest.
 //
@@ -21,8 +22,6 @@ import { platformOf, REPORT_PLATFORMS, type ReportPlatform } from "../reportPlat
 
 export type Grain = "day" | "week" | "month" | "custom";
 
-/** Sai số dự phóng hiện trên màn (dải ±). Lấy từ backtest 6 mốc T7/T8/2026 — lệch lớn nhất 7,8%. */
-export const PROJECTION_ERROR_BAND = 0.08;
 /** Số ngày lịch sử để tính doanh số/giờ cho dự phóng. */
 export const PROJECTION_LOOKBACK_DAYS = 28;
 /** Một khách vượt ngưỡng này là rủi ro tập trung (mốc 20–25% của agency dịch vụ). */
@@ -637,7 +636,15 @@ export function buildIssues(x: IssueInput): Issue[] {
       out.push({ level: o.runRate < RUN_RATE_BAD ? "bad" : "warn", title: `${b.name} chậm tiến độ: đạt ${pct(o.runRate)} kỳ vọng`, detail: `Đã có ${x.fmt(o.actual)}, kỳ vọng tới ngày có số là ${x.fmt(o.expectedToDate ?? 0)} (theo target từng ngày).`, action: "month_plan" });
     }
     if (o.target && o.gap != null && o.gap < 0) {
-      out.push({ level: "bad", title: `${b.name} dự phóng thiếu ${x.fmt(-o.gap)} so với target`, detail: `Dự phóng cuối tháng ${x.fmt(o.projected)} (${o.projectionMethod === "run_rate" ? "theo run-rate — chưa có GMV/giờ 28 ngày" : `±${Math.round(PROJECTION_ERROR_BAND * 100)}%`}) với lịch đang có. Cần thêm ca hoặc tăng doanh số/giờ.`, action: "month_plan" });
+      // Mức báo theo khả năng đạt target (forecastCone.landingOf), không theo số tuyệt đối: thiếu 1,7% mà dải còn bao target ≠ thiếu 30%.
+      const l = landingOf(o);
+      const half = coneHalf(o.actual, o.projected);
+      out.push({
+        level: l.key === "short" ? "bad" : "warn",
+        title: `${b.name} dự phóng thiếu ${x.fmt(-o.gap)} so với target${l.pHit != null ? ` (khả năng đạt ≈ ${pct(l.pHit)})` : ""}`,
+        detail: `Dự phóng cuối tháng ${x.fmt(o.projected)} (${o.projectionMethod === "run_rate" ? "theo run-rate — chưa có GMV/giờ 28 ngày" : `dải ~80%: ${x.fmt(o.projected - half)} – ${x.fmt(o.projected + half)}`}) với lịch đang có. Xem tab Action để biết cần thêm bao nhiêu giờ.`,
+        action: "month_plan"
+      });
     }
     if (o.remainingDays > 0 && o.pending.filter((p) => p.date >= x.today).length === 0 && o.actual > 0) {
       out.push({ level: "bad", title: `${b.name}: chưa có ca nào trong lịch cho ${o.remainingDays} ngày còn lại`, detail: "Dự phóng chỉ bằng số đã có. Kiểm tra lịch và Kế Hoạch Tháng.", action: "month_plan" });

@@ -145,15 +145,16 @@ test("Dashboard brand: Run-rate so target đứng TRƯỚC lưới Key Metrics",
 });
 
 test("Dashboard agency: khối không tính được thì không chiếm chỗ ngang bằng ô có số", () => {
-  const src = readFileSync(join(SRC, "components/CeoBrief.tsx"), "utf8");
-  // Bảng "Các tài khoản": cột nào không brand nào có số thì ẩn, và phải nói đã ẩn cột nào.
-  expect(src).toMatch(/const hidden = hideable\.filter/);
-  expect(src).toMatch(/Ẩn \{hidden\.length\} cột chưa brand nào có số/);
-  // Target & dự phóng: 3 ô phụ thuộc target chỉ dựng khi có target.
-  expect(src).toMatch(/\{o\.target && stat\("Run-rate"/);
-  expect(src).toMatch(/\{o\.target && stat\("Cần mỗi ngày còn lại"/);
+  const cockpit = readFileSync(join(SRC, "components/dashboard/Cockpit.tsx"), "utf8");
+  // Bảng "Từng tài khoản": cột Target / Run-rate / Dự phóng ÷ target chỉ dựng khi có brand có target, và nói rõ khi nào hiện.
+  expect(cockpit).toMatch(/\{anyTarget && <th/);
+  expect(cockpit).toMatch(/Cột Target, Run-rate và Dự phóng ÷ target hiện khi OP chốt Kế Hoạch Tháng/);
+  // Run-rate bốn tầng: chưa brand nào có target thì một thẻ ngắn có nút đi chốt, không dựng thang rỗng.
+  expect(cockpit).toMatch(/ladder\.length > 0 \? \(/);
+  expect(cockpit).toMatch(/Chốt Kế Hoạch Tháng →/);
   // Tài chính: chưa tính được ca nào thì không dựng 6 ô KPI + 2 biểu đồ/bảng rỗng.
-  expect(src).toMatch(/\{fin\.priced === 0 \? \(/);
+  const fin = readFileSync(join(SRC, "components/dashboard/FinanceSection.tsx"), "utf8");
+  expect(fin).toMatch(/\{fin\.priced === 0 \? \(/);
 });
 
 // ---- M4 Vận hành (2026-09-29) ----

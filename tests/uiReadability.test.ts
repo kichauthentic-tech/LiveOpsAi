@@ -118,7 +118,8 @@ test("mọi var(--token) dùng trong src/ đều được khai báo (index.css h
 // được giữ toFixed: toạ độ SVG, cột số file Excel, giá trị điền sẵn vào ô input (parseFloat đọc dấu chấm).
 const TOFIXED_ALLOWED: [string, RegExp][] = [
   ["lib/format.ts", /./],
-  ["components/CeoBrief.tsx", /\bx\(|\by\(/],
+  ["components/dashboard/shared.tsx", /\bx\(|\by\(/],
+  ["components/dashboard/RunRate.tsx", /\bx\(|\by\(/],
   ["components/SessionLedger.tsx", /row\["Giờ live"\]/],
   ["components/brand-workspace/MonthlyReportTabs.tsx", /setPct(Daily|Dday|Midmonth|Payday)\(/]
 ];

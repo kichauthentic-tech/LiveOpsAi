@@ -73,7 +73,7 @@ test("các report dùng KEY_METRICS", () => {
     "components/brand-workspace/BrandDashboard.tsx",
     "components/SessionWindow.tsx",
     "components/HostPerformance.tsx",
-    "components/CeoBrief.tsx"
+    "components/dashboard/MonthOverMonth.tsx"
   ];
   // Bước 2 đa sàn (07/10): màn hiện cả hai sàn đọc bộ chỉ số qua hồ sơ sàn (`profileOf(x).metrics.defs` = KEY_METRICS
   // của TikTok / SHOPEE_METRICS của Shopee) — vẫn là bộ chuẩn, không tự liệt kê.
