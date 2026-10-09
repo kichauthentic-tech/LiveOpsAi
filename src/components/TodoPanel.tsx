@@ -68,7 +68,7 @@ export const TodoPanel: React.FC<Props> = ({ brands, channels, sessions, shiftSl
   const shown = expanded ? todos : todos.slice(0, COLLAPSED_COUNT);
 
   return (
-    <section className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5 space-y-3" aria-label="Việc cần làm">
+    <section className="@container bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5 space-y-3" aria-label="Việc cần làm">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="font-bold text-[var(--text)] text-sm flex items-center gap-2">
           <ListChecks className="w-4 h-4 text-[var(--accent-text)]" /> Việc cần làm
@@ -81,15 +81,16 @@ export const TodoPanel: React.FC<Props> = ({ brands, channels, sessions, shiftSl
       ) : (
         <ul className="divide-y divide-[var(--border-muted)]">
           {shown.map((t) => (
-            <li key={t.id} className="py-2 flex items-start gap-3">
+            // Khung hẹp (cột phải Bảng Vận Hành ~400px): nút xuống dưới chữ thay vì ép chữ còn ~200px.
+            <li key={t.id} className="py-2 flex flex-wrap @md:flex-nowrap items-start gap-x-3 gap-y-1.5">
               <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${LEVEL_DOT[t.level]}`} aria-hidden />
-              <div className="flex-1 min-w-0">
+              <div className="flex-1 min-w-0 basis-[calc(100%-1.25rem)] @md:basis-auto">
                 <p className="text-xs font-bold text-[var(--text)]">{t.title}</p>
                 {t.detail && <p className="text-[11px] text-[var(--text-muted)] mt-0.5">{t.detail}</p>}
               </div>
               <button
                 onClick={() => onOpen(t)}
-                className="shrink-0 min-h-6 px-2.5 py-1 rounded-lg border border-[var(--border)] text-[11px] font-bold text-[var(--accent-text)] hover:border-[var(--accent)]"
+                className="shrink-0 ml-5 @md:ml-0 min-h-6 px-2.5 py-1 rounded-lg border border-[var(--border)] text-[11px] font-bold text-[var(--accent-text)] hover:border-[var(--accent)]"
               >
                 {t.action} →
               </button>

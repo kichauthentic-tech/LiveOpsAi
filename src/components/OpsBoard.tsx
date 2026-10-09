@@ -13,7 +13,7 @@ import { REPORT_PLATFORMS } from "../lib/reportPlatform";
 import { isHandoverPerson } from "../lib/handover";
 import { clashedSessionIds, findPersonClashes } from "../lib/scheduling/conflicts";
 import { SessionWindow } from "./SessionWindow";
-import { PageIntro } from "./common/PageIntro";
+import { PageHeader } from "./common/PageHeader";
 import { SlotDetailModal } from "./scheduling/SlotDetailModal";
 
 // Bảng Vận Hành — màn của NHỊP HẰNG NGÀY (tái cấu trúc 2026-09-21): hôm nay / ngày / tuần này có
@@ -50,6 +50,8 @@ export interface OpsBoardProps {
   // Q4: bấm thông báo → App đặt id ca cần mở; bảng mở Cửa sổ Ca Live rồi báo lại để App xoá yêu cầu.
   requestOpenSessionId?: string | null;
   onOpenRequestHandled?: () => void;
+  // Cột phải của mode "ops" (Việc cần làm): màn rộng đứng cạnh danh sách ca và dính khi cuộn; màn hẹp nằm ngay dưới tiêu đề.
+  aside?: React.ReactNode;
 }
 
 type Range = "today" | "tomorrow" | "week" | "day";
@@ -101,7 +103,8 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
   onDeleteSlot,
   fatigueWeekHours,
   requestOpenSessionId = null,
-  onOpenRequestHandled
+  onOpenRequestHandled,
+  aside
 }) => {
   const today = getTodayDate();
   const [range, setRange] = useState<Range>("today");
@@ -205,7 +208,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
           <PlatformChip platform={s.platform} />
         </span>
         {mode === "mine" && <span className="text-[11px] text-[var(--text-faint)]">{fmtDay(s.date)}</span>}
-        <span className="text-xs text-[var(--text-muted)] truncate">
+        <span className="flex-1 basis-40 min-w-0 text-xs text-[var(--text-muted)] truncate" title={[s.hostName ? `Host ${s.hostName}` : "chưa gán host", s.coHostName ? `Trợ ${s.coHostName}` : "", s.studioName ?? ""].filter(Boolean).join(" · ")}>
           {s.hostName ? `Host ${s.hostName}` : <span className="text-rose-300 font-bold">chưa gán host</span>}
           {s.coHostName ? ` · Trợ ${s.coHostName}` : ""}
           {s.studioName ? ` · ${s.studioName}` : ""}
@@ -238,7 +241,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
         <span className="text-sm font-bold text-[var(--text)] truncate">{r.slot.brandName}</span>
         <PlatformChip platform={r.slot.platform} />
       </span>
-      <span className="text-xs text-rose-300 font-bold flex items-center gap-1"><UserX className="w-3.5 h-3.5" /> chưa có người · {r.registered} đăng ký</span>
+      <span className="flex-1 basis-40 min-w-0 text-xs text-rose-300 font-bold flex items-center gap-1"><UserX className="w-3.5 h-3.5" /> chưa có người · {r.registered} đăng ký</span>
       <span className="ml-auto text-[11px] text-[var(--text-faint)] flex items-center gap-1"><CalendarClock className="w-3.5 h-3.5" /> chốt người</span>
     </button>
   );
@@ -251,18 +254,12 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
 
   return (
     <div className="space-y-4">
-      <div className="bg-[var(--surface)] border border-[var(--border)] p-4 sm:p-6 rounded-2xl shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-black text-[var(--text)] flex items-center gap-2">
-            <Radio className="w-5 h-5 text-red-400" />
-            {mode === "mine" ? "Ca Của Tôi" : "Bảng Vận Hành"}
-          </h2>
-          <PageIntro>
-            {mode === "mine" ? "Ca bạn trực. Hết ca: bấm vào ca → Giao ca (up file số liệu của sàn — TikTok: Creator-Live-Performance, Shopee: Live List — rồi chọn sự cố)." : "Hôm nay có ca nào, ai trực, còn thiếu gì. Bấm vào ca để mở cửa sổ ca."}
-          </PageIntro>
-        </div>
-        {mode === "ops" && (
-          <div className="flex flex-wrap items-center gap-2">
+      <PageHeader
+        icon={Radio}
+        title={mode === "mine" ? "Ca Của Tôi" : "Bảng Vận Hành"}
+        description={mode === "mine" ? "Ca bạn trực. Hết ca: bấm vào ca → Giao ca (up file số liệu của sàn — TikTok: Creator-Live-Performance, Shopee: Live List — rồi chọn sự cố)." : "Hôm nay có ca nào, ai trực, còn thiếu gì. Bấm vào ca để mở cửa sổ ca."}
+        actions={mode === "ops" ? (
+          <>
             {(["today", "tomorrow", "week", "day"] as Range[]).map((r) => (
               <button key={r} onClick={() => { setRange(r); if (r === "today") setAnchor(today); }} className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${range === r ? "bg-[var(--accent)] text-white border-[var(--accent)]" : "border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]"}`}>
                 {r === "today" ? "Hôm nay" : r === "tomorrow" ? "Ngày mai" : r === "week" ? "Tuần" : "Ngày…"}
@@ -275,12 +272,14 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
                 <button onClick={() => setAnchor(addDays(anchor, range === "week" ? 7 : 1))} className="p-1.5 rounded-lg border border-[var(--border)] text-[var(--text-muted)]"><ChevronRight className="w-4 h-4" /></button>
               </div>
             )}
-          </div>
-        )}
-      </div>
+          </>
+        ) : undefined}
+      />
 
       {mode === "ops" && (
-        <>
+        <div className={aside ? "grid gap-4 xl:grid-cols-[minmax(0,1fr)_400px] items-start" : ""}>
+          {aside && <aside className="min-w-0 xl:col-start-2 xl:row-start-1 xl:sticky xl:top-0">{aside}</aside>}
+          <div className="space-y-4 min-w-0 xl:col-start-1 xl:row-start-1">
           {/* Không có ca nào thì 4 ô "0 / 0 / 0 / —" không nói gì mà câu trạng thái ngay dưới đã nói đủ
               (kèm chỗ mở ca) — bỏ luôn hàng ô thay vì bày 4 số 0 (audit UX lần 2 — M7, cùng luật với
               Run-rate ở Dashboard brand M2). */}
@@ -338,7 +337,8 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
               </div>
             ))}
           </div>
-        </>
+          </div>
+        </div>
       )}
 
       {mode === "mine" && (

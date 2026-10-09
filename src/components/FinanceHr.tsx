@@ -196,6 +196,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
         icon={DollarSign}
         title="Finance & P&L"
         description="Lãi/lỗ theo từng ca đã chạy xong trong tháng: GMV, hoa hồng agency, chi phí host, studio và ads."
+        actions={<MonthPicker value={month} onChange={setMonth} size="sm" />}
       />
 
       {/* Real P&L report per completed session */}
@@ -208,9 +209,6 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
             <PageIntro>
               GMV lấy từ số của ca, tiền trả host/trợ live tính theo rate ở Talent Pool, doanh thu agency theo giá của brand (CRM → Hợp đồng & giá). Chi phí studio nhập ở đây, Ads theo ca lấy từ report ca. Chỉ CEO duyệt.
             </PageIntro>
-          </div>
-          <div className="flex items-center gap-1 text-xs">
-            <MonthPicker value={month} onChange={setMonth} size="sm" />
           </div>
           <div className="text-right text-xs bg-[var(--surface-elevated)]/50 border border-[var(--border)] rounded-xl px-4 py-2">
             <div className="text-[var(--text-muted)]">

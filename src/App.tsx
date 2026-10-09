@@ -1829,9 +1829,12 @@ export default function App() {
 
                 {activeTab === "calendar" && (
                   <div className="space-y-4">
-                    {/* Việc cần làm — tự sinh từ dữ liệu, mỗi việc một nút tới đúng màn (audit người mới 2026-10-04). */}
-                    {isOpsRole && (
-                      <TodoPanel
+                    {/* Việc cần làm — tự sinh từ dữ liệu, mỗi việc một nút tới đúng màn (audit người mới 2026-10-04). Từ 10/10 là cột
+                        phải của Bảng Vận Hành: trước đó đứng TRÊN tiêu đề trang, đẩy danh sách ca hôm nay xuống dưới màn đầu. */}
+                    <OpsBoard
+                      mode="ops"
+                      aside={isOpsRole ? (
+                        <TodoPanel
                         brands={brands}
                         channels={channels}
                         sessions={activeSessions}
@@ -1851,9 +1854,7 @@ export default function App() {
                           navigateTo(t.tab, t.brandId);
                         }}
                       />
-                    )}
-                    <OpsBoard
-                      mode="ops"
+                      ) : undefined}
                       sessions={activeSessions}
                       shiftSlots={shiftSlots}
                       shiftRegistrations={shiftRegistrations}

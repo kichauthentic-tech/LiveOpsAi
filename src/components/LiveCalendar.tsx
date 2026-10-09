@@ -522,7 +522,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
       <PageHeader
         icon={CalendarIcon}
         title="Lịch Vận Hành"
-        description="Ca live theo tháng, tuần, phòng studio và host — mở ca chờ đăng ký, kéo thả thẻ ca để đổi giờ hoặc đổi phòng."
+        description="Ca live theo tháng, tuần, phòng studio và host. Kéo thẻ ca sang hàng phòng khác để đổi phòng (giữ giờ), sang ngày khác để đổi ngày; đổi giờ thì mở ca → Sửa."
         actions={
           <button
             onClick={() => setSlotModal({ date: selectedDate })}
@@ -531,127 +531,163 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
             <Plus className="w-4 h-4" /> Mở ca chờ đăng ký
           </button>
         }
-      />
+      >
+        {/* Chế độ xem + chọn ngày + bộ lọc nằm trong thẻ đầu trang (sắp lại 10/10: trước là 3 dải riêng + 1 dải hướng dẫn kéo-thả). */}
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+          {/* View Mode Switcher */}
+          <div className="overflow-x-auto no-scrollbar pb-1 lg:pb-0">
+            <div className="flex items-center bg-[var(--surface-base)] p-1 rounded-xl border border-[var(--border)] text-xs font-bold whitespace-nowrap min-w-max">
+              <button
+                onClick={() => setViewMode("month")}
+                className={`px-3 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
+                  viewMode === "month"
+                    ? "bg-[var(--accent)] text-white shadow-sm font-black"
+                    : "text-[var(--text-muted)] hover:text-[var(--text)]"
+                }`}
+              >
+                <CalendarIcon className="w-3.5 h-3.5" /> Lịch Tháng
+              </button>
+              <button
+                onClick={() => setViewMode("week")}
+                className={`px-3 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
+                  viewMode === "week"
+                    ? "bg-[var(--accent)] text-white shadow-sm font-black"
+                    : "text-[var(--text-muted)] hover:text-[var(--text)]"
+                }`}
+              >
+                <CalendarIcon className="w-3.5 h-3.5" /> Lịch Tuần
+              </button>
+              <button
+                onClick={() => setViewMode("day")}
+                className={`px-3 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
+                  viewMode === "day"
+                    ? "bg-[var(--accent)] text-white shadow-sm font-black"
+                    : "text-[var(--text-muted)] hover:text-[var(--text)]"
+                }`}
+              >
+                <Building2 className="w-3.5 h-3.5" /> Phòng theo giờ
+              </button>
+              <button
+                onClick={() => setViewMode("talent_workload")}
+                className={`px-3 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
+                  viewMode === "talent_workload"
+                    ? "bg-[var(--accent)] text-white shadow-sm font-black"
+                    : "text-[var(--text-muted)] hover:text-[var(--text)]"
+                }`}
+              >
+                <User className="w-3.5 h-3.5" /> Tải Lịch Host
+              </button>
+            </div>
+          </div>
 
-      {/* Primary Navigation & Date View Control Bar */}
-      <div className="bg-[var(--surface)]/90 border border-[var(--border)] p-3 sm:p-4 rounded-2xl flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
-        {/* View Mode Switcher */}
-        <div className="overflow-x-auto no-scrollbar pb-1 lg:pb-0">
-          <div className="flex items-center bg-[var(--surface-base)] p-1 rounded-xl border border-[var(--border)] text-xs font-bold whitespace-nowrap min-w-max">
-            <button
-              onClick={() => setViewMode("month")}
-              className={`px-3 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
-                viewMode === "month"
-                  ? "bg-[var(--accent)] text-white shadow-sm font-black"
-                  : "text-[var(--text-muted)] hover:text-[var(--text)]"
-              }`}
-            >
-              <CalendarIcon className="w-3.5 h-3.5" /> Lịch Tháng
-            </button>
-            <button
-              onClick={() => setViewMode("week")}
-              className={`px-3 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
-                viewMode === "week"
-                  ? "bg-[var(--accent)] text-white shadow-sm font-black"
-                  : "text-[var(--text-muted)] hover:text-[var(--text)]"
-              }`}
-            >
-              <CalendarIcon className="w-3.5 h-3.5" /> Lịch Tuần
-            </button>
-            <button
-              onClick={() => setViewMode("day")}
-              className={`px-3 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
-                viewMode === "day"
-                  ? "bg-[var(--accent)] text-white shadow-sm font-black"
-                  : "text-[var(--text-muted)] hover:text-[var(--text)]"
-              }`}
-            >
-              <Building2 className="w-3.5 h-3.5" /> Phòng theo giờ
-            </button>
-            <button
-              onClick={() => setViewMode("talent_workload")}
-              className={`px-3 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
-                viewMode === "talent_workload"
-                  ? "bg-[var(--accent)] text-white shadow-sm font-black"
-                  : "text-[var(--text-muted)] hover:text-[var(--text)]"
-              }`}
-            >
-              <User className="w-3.5 h-3.5" /> Tải Lịch Host
-            </button>
+          {/* Date / Month / Week Step Navigation */}
+          <div className="flex flex-wrap items-center justify-between lg:justify-end gap-2 text-xs">
+            <div className="flex items-center gap-1 bg-[var(--surface-base)] p-1 rounded-xl border border-[var(--border)]">
+              <button
+                onClick={handlePrevPeriod}
+                className="p-1.5 hover:bg-[var(--surface-elevated)] text-[var(--text-muted)] rounded-lg transition-colors"
+                title="Thời gian trước"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+
+              <button
+                onClick={handleGoToday}
+                className="px-2.5 py-1 text-[11px] font-bold bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--accent-text)] rounded-lg transition-colors"
+              >
+                Hôm Nay
+              </button>
+
+              <span className="font-mono font-bold text-[var(--text)] px-2.5 text-xs text-center min-w-[140px]">
+                {viewMode === "month" && `Tháng ${currentMonth < 10 ? '0' + currentMonth : currentMonth} / ${currentYear}`}
+                {viewMode === "week" && `Tuần (${currentWeekDates[0]?.dayNum}/${parseDateString(currentWeekDates[0]?.dateStr || '').month} - ${currentWeekDates[6]?.dayNum}/${parseDateString(currentWeekDates[6]?.dateStr || '').month})`}
+                {(viewMode === "day" || viewMode === "talent_workload") && `${getDayOfWeekName(selectedDate)}, ${fmtDateVn(selectedDate)}`}
+              </span>
+
+              <button
+                onClick={handleNextPeriod}
+                className="p-1.5 hover:bg-[var(--surface-elevated)] text-[var(--text-muted)] rounded-lg transition-colors"
+                title="Thời gian tiếp"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Quick Date Picker */}
+            <div className="flex items-center gap-2 bg-[var(--surface-base)] px-3 py-1.5 rounded-xl border border-[var(--border)]">
+              <CalendarIcon className="w-3.5 h-3.5 text-[var(--accent-text)] shrink-0" />
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val) {
+                    setSelectedDate(val);
+                    const parsed = parseDateString(val);
+                    setCurrentYear(parsed.year);
+                    setCurrentMonth(parsed.month);
+                  }
+                }}
+                className="bg-transparent text-[var(--text)] focus:outline-none cursor-pointer font-mono text-xs"
+              />
+            </div>
           </div>
         </div>
 
-        {/* Date / Month / Week Step Navigation */}
-        <div className="flex flex-wrap items-center justify-between lg:justify-end gap-2 text-xs">
-          <div className="flex items-center gap-1 bg-[var(--surface-base)] p-1 rounded-xl border border-[var(--border)]">
-            <button
-              onClick={handlePrevPeriod}
-              className="p-1.5 hover:bg-[var(--surface-elevated)] text-[var(--text-muted)] rounded-lg transition-colors"
-              title="Thời gian trước"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-
-            <button
-              onClick={handleGoToday}
-              className="px-2.5 py-1 text-[11px] font-bold bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--accent-text)] rounded-lg transition-colors"
-            >
-              Hôm Nay
-            </button>
-
-            <span className="font-mono font-bold text-[var(--text)] px-2.5 text-xs text-center min-w-[140px]">
-              {viewMode === "month" && `Tháng ${currentMonth < 10 ? '0' + currentMonth : currentMonth} / ${currentYear}`}
-              {viewMode === "week" && `Tuần (${currentWeekDates[0]?.dayNum}/${parseDateString(currentWeekDates[0]?.dateStr || '').month} - ${currentWeekDates[6]?.dayNum}/${parseDateString(currentWeekDates[6]?.dateStr || '').month})`}
-              {(viewMode === "day" || viewMode === "talent_workload") && `${getDayOfWeekName(selectedDate)}, ${fmtDateVn(selectedDate)}`}
-            </span>
-
-            <button
-              onClick={handleNextPeriod}
-              className="p-1.5 hover:bg-[var(--surface-elevated)] text-[var(--text-muted)] rounded-lg transition-colors"
-              title="Thời gian tiếp"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Quick Date Picker */}
-          <div className="flex items-center gap-2 bg-[var(--surface-base)] px-3 py-1.5 rounded-xl border border-[var(--border)]">
-            <CalendarIcon className="w-3.5 h-3.5 text-[var(--accent-text)] shrink-0" />
+        {/* Filter Dropdowns & Search — đặt ngay trên lịch để lọc áp dụng tức thì cho view đang xem */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs">
+          <div className="relative">
+            <Search className="w-4 h-4 text-[var(--text-muted)] absolute left-3 top-3" />
             <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => {
-                const val = e.target.value;
-                if (val) {
-                  setSelectedDate(val);
-                  const parsed = parseDateString(val);
-                  setCurrentYear(parsed.year);
-                  setCurrentMonth(parsed.month);
-                }
-              }}
-              className="bg-transparent text-[var(--text)] focus:outline-none cursor-pointer font-mono text-xs"
+              type="text"
+              placeholder="Tìm theo tên phiên, Host, Brand..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl pl-9 pr-3 py-2 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
             />
           </div>
-        </div>
-      </div>
 
-      {/* DRAG & DROP HELPER BANNER */}
-      {draggedSessionId ? (
-        <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white px-4 py-3 rounded-2xl shadow-xl border border-blue-400/50 flex items-center justify-between animate-pulse">
-          <div className="flex items-center gap-2.5 text-xs font-bold">
-            <GripVertical className="w-5 h-5 text-amber-300 shrink-0" />
-            <span>Đang kéo — thả để đổi lịch</span>
-          </div>
-          <span className="text-[11px] bg-black/40 px-2.5 py-1 rounded-lg font-mono font-bold shrink-0">
-            Giữ &amp; Di Chuột Để Thả
-          </span>
+          <select
+            value={selectedStudioFilter}
+            onChange={(e) => setSelectedStudioFilter(e.target.value)}
+            className="bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-2 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
+          >
+            <option value="ALL">Tất cả phòng Studio ({studios.length})</option>
+            {studios.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+
+          <select
+            value={selectedHostFilter}
+            onChange={(e) => setSelectedHostFilter(e.target.value)}
+            className="bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-2 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
+          >
+            <option value="ALL">Tất cả talent ({talents.length})</option>
+            {talents.map((t) => (
+              <option key={t.id} value={t.id}>{t.name} ({talentRoleLabel(t.role)})</option>
+            ))}
+          </select>
+
+          <select
+            value={selectedBrandFilter}
+            onChange={(e) => setSelectedBrandFilter(e.target.value)}
+            className="bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-2 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
+          >
+            <option value="ALL">Tất cả Brand Khách Hàng ({brands.length})</option>
+            {brands.map((b) => (
+              <option key={b.id} value={b.id}>{b.name}</option>
+            ))}
+          </select>
         </div>
-      ) : (
-        <div className="bg-[var(--surface)]/60 border border-[var(--border)]/80 px-4 py-2.5 rounded-xl text-xs text-[var(--text-muted)] flex items-center gap-2">
-          <GripVertical className="w-4 h-4 text-blue-400 shrink-0" />
-          <span>
-            <strong className="text-blue-300 font-semibold">Kéo-thả:</strong> ở Phòng theo giờ, kéo thẻ ca sang hàng phòng khác để đổi phòng (giữ giờ); ở Lịch Tuần/Tháng, kéo sang ngày khác để đổi ngày. Đổi giờ thì mở ca → Sửa.
-          </span>
+
+      </PageHeader>
+
+      {/* Đang kéo: nhãn nổi cố định — trước đây là một dải chèn vào giữa trang, đẩy cả lịch xuống đúng lúc đang kéo. */}
+      {draggedSessionId && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white px-4 py-2.5 rounded-2xl shadow-xl border border-blue-400/50 flex items-center gap-2.5 text-xs font-bold pointer-events-none">
+          <GripVertical className="w-5 h-5 text-amber-300 shrink-0" />
+          <span>Đang kéo — thả vào phòng / ngày mới để đổi lịch</span>
         </div>
       )}
 
@@ -678,53 +714,6 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
           </button>
         </div>
       )}
-
-      {/* Filter Dropdowns & Search — đặt ngay trên lịch để lọc áp dụng tức thì cho view đang xem */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs">
-        <div className="relative">
-          <Search className="w-4 h-4 text-[var(--text-muted)] absolute left-3 top-3" />
-          <input
-            type="text"
-            placeholder="Tìm theo tên phiên, Host, Brand..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-xl pl-9 pr-3 py-2 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
-          />
-        </div>
-
-        <select
-          value={selectedStudioFilter}
-          onChange={(e) => setSelectedStudioFilter(e.target.value)}
-          className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-2 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
-        >
-          <option value="ALL">Tất cả phòng Studio ({studios.length})</option>
-          {studios.map((s) => (
-            <option key={s.id} value={s.id}>{s.name}</option>
-          ))}
-        </select>
-
-        <select
-          value={selectedHostFilter}
-          onChange={(e) => setSelectedHostFilter(e.target.value)}
-          className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-2 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
-        >
-          <option value="ALL">Tất cả talent ({talents.length})</option>
-          {talents.map((t) => (
-            <option key={t.id} value={t.id}>{t.name} ({talentRoleLabel(t.role)})</option>
-          ))}
-        </select>
-
-        <select
-          value={selectedBrandFilter}
-          onChange={(e) => setSelectedBrandFilter(e.target.value)}
-          className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-2 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
-        >
-          <option value="ALL">Tất cả Brand Khách Hàng ({brands.length})</option>
-          {brands.map((b) => (
-            <option key={b.id} value={b.id}>{b.name}</option>
-          ))}
-        </select>
-      </div>
 
       {/* VIEW 1: MONTH VIEW (Lịch Tháng - Bảng Lịch 30/31 Ngày) */}
       {viewMode === "month" && (

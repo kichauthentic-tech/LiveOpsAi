@@ -394,7 +394,7 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)] uppercase text-[11px] tracking-wider">
+              <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)] uppercase text-[11px] tracking-wider whitespace-nowrap">
                 <th className="py-2.5 px-4">Giờ</th>
                 {!isBrandView && <th className="py-2.5 px-2">Brand</th>}
                 <th className="py-2.5 px-2">Host</th>
@@ -455,7 +455,8 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
                             </span>
                           </td>
                         )}
-                        <td className="py-2.5 px-2 text-[var(--text)]">
+                        {/* Tên host/trợ không xuống dòng (trước: cột bị ép còn ~90px, mỗi dòng ca cao 3 dòng chữ trong khi cột Sự cố trống). */}
+                        <td className="py-2.5 px-2 text-[var(--text)] whitespace-nowrap">
                           {s.hostName || <span className="text-[var(--text-faint)] italic">{isBrandView ? "—" : "chưa gán"}</span>}
                           {!isBrandView && s.coHostName && (
                             <span className="block text-[11px] text-[var(--text-faint)]">+ {s.coHostName}</span>

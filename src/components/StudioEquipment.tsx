@@ -242,33 +242,54 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
         </button>
       </div>
 
-      {/* Studio View */}
-      {activeSubTab === "studios" && (
-        <div className="space-y-6">
-          <div className="bg-[var(--surface)] p-6 rounded-2xl border border-[var(--border)] shadow-sm space-y-4">
-            <div className="flex justify-between items-center">
-              <div>
-                <h3 className="font-bold text-[var(--text)] text-base">Phòng live</h3>
-                <p className="text-xs text-[var(--text-muted)]">Mỗi brand gắn với một phòng ở Kế Hoạch Tháng; ca chốt ra sẽ dùng phòng đó.</p>
-              </div>
-              <button
-                onClick={openAddStudioModal}
-                className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow transition-all"
-              >
-                <Plus className="w-4 h-4" /> Thêm phòng
-              </button>
+      {/* Studio View — sắp lại 10/10: ca hôm nay nằm ngay trong thẻ từng phòng (trước là danh sách 24 dòng riêng dưới lưới phòng,
+          phải dò tên phòng trong ngoặc vuông để biết phòng nào bận). */}
+      {activeSubTab === "studios" && (() => {
+        const knownStudio = new Set(studios.map((st) => st.id));
+        const noRoomToday = todaysBookings.filter((b) => !b.studioId || !knownStudio.has(b.studioId));
+        const BookingLine = ({ b }: { b: LiveSession }) => (
+          <li className="flex items-center gap-2 text-xs min-w-0">
+            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${b.status === "Live Now" ? "bg-red-400 animate-pulse" : b.status === "Completed" ? "bg-emerald-400" : "bg-amber-400"}`} aria-hidden />
+            <span className="font-mono font-bold text-[var(--text)] shrink-0">{b.startTime}–{b.endTime}</span>
+            <span className="text-[var(--text-muted)] truncate" title={`${b.brandName}${b.hostName ? ` · Host ${b.hostName}` : ""} · ${SESSION_STATUS_LABEL_VI[b.status] ?? b.status}`}>
+              {b.brandName}{b.hostName ? ` · ${b.hostName}` : ""}
+            </span>
+            {b.status === "Live Now" && <span className="ml-auto shrink-0 text-[11px] font-bold text-red-300">{SESSION_STATUS_LABEL_VI[b.status]}</span>}
+          </li>
+        );
+        return (
+        <div className="bg-[var(--surface)] p-4 sm:p-6 rounded-2xl border border-[var(--border)] shadow-sm space-y-4">
+          <div className="flex flex-wrap justify-between items-center gap-3">
+            <div>
+              <h3 className="font-bold text-[var(--text)] text-base flex flex-wrap items-center gap-2">
+                Phòng live
+                <span className="text-[11px] font-semibold text-emerald-400 bg-emerald-950/80 px-2.5 py-0.5 rounded-full border border-emerald-800/50">
+                  {todaysBookings.length} ca hôm nay
+                </span>
+              </h3>
+              <p className="text-xs text-[var(--text-muted)]">Mỗi brand gắn với một phòng ở Kế Hoạch Tháng; ca chốt ra sẽ dùng phòng đó. Dưới mỗi phòng là các ca hôm nay.</p>
             </div>
+            <button
+              onClick={openAddStudioModal}
+              className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow transition-all"
+            >
+              <Plus className="w-4 h-4" /> Thêm phòng
+            </button>
+          </div>
 
-            <div className="grid md:grid-cols-3 gap-6">
-              {studios.map((s) => (
-                <div key={s.id} className="bg-[var(--surface-elevated)]/40 p-5 rounded-2xl border border-[var(--border)] shadow-sm space-y-4 relative group hover:border-[var(--accent)] transition-all">
-                  <div className="flex justify-between items-start">
-                    <div>
+          <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            {studios.map((s) => {
+              const today = todaysBookings.filter((b) => b.studioId === s.id);
+              return (
+                <div key={s.id} className="bg-[var(--surface-elevated)]/40 p-4 rounded-2xl border border-[var(--border)] shadow-sm flex flex-col gap-3 hover:border-[var(--accent)] transition-all">
+                  <div className="flex justify-between items-start gap-2">
+                    <div className="min-w-0">
                       <span className="text-xs text-[var(--accent-text)] font-bold bg-[var(--accent)]/30 px-2 py-0.5 rounded">{s.roomNumber}</span>
-                      <h3 className="font-bold text-[var(--text)] text-base mt-1">{s.name}</h3>
+                      <h3 className="font-bold text-[var(--text)] text-base mt-1 truncate">{s.name}</h3>
+                      {s.theme && <p className="text-[11px] text-[var(--text-muted)] truncate" title={s.theme}>Ghi chú: {s.theme}</p>}
                     </div>
 
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1 shrink-0">
                       <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${
                         shownStatus(s) === "Live Now" ? "bg-red-500/20 text-red-300 animate-pulse" :
                         shownStatus(s) === "Maintenance" ? "bg-[var(--surface-hover)] text-[var(--text-muted)]" : "bg-emerald-500/20 text-emerald-300"
@@ -293,63 +314,33 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
                     </div>
                   </div>
 
-                  {s.theme && (
-                    <div className="bg-[var(--surface)] p-3 rounded-xl border border-[var(--border)] space-y-1 text-xs">
-                      <span className="text-[var(--text-muted)] font-semibold block">Ghi chú:</span>
-                      <p className="text-[var(--text)] font-medium">{s.theme}</p>
-                    </div>
-                  )}
+                  <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] p-3 flex-1">
+                    <p className="text-[11px] font-bold text-[var(--text-faint)] uppercase tracking-wider mb-1.5">Ca hôm nay · {today.length}</p>
+                    {today.length === 0 ? (
+                      <p className="text-xs text-[var(--text-faint)] italic">Trống cả ngày.</p>
+                    ) : (
+                      <ul className="space-y-1">{today.map((b) => <BookingLine key={b.id} b={b} />)}</ul>
+                    )}
+                  </div>
 
-                  <div className="flex justify-between items-center text-xs text-[var(--text-muted)] pt-2 border-t border-[var(--border)]">
+                  <div className="flex justify-between items-center text-xs text-[var(--text-muted)]">
                     <span>Thiết bị: <strong className="text-[var(--text)]">{equipments.filter((e) => e.assignedStudioId === s.id).length} món</strong></span>
                     <span>Sức chứa: <strong className="text-[var(--text)]">{s.capacity > 0 ? `${s.capacity} người` : "chưa nhập"}</strong></span>
                   </div>
                 </div>
-              ))}
-            </div>
+              );
+            })}
           </div>
 
-          {/* Visual Booking Calendar */}
-          <div className="bg-[var(--surface)] p-6 rounded-2xl border border-[var(--border)] shadow-sm space-y-4">
-            <div className="flex justify-between items-center">
-              <h3 className="font-bold text-[var(--text)] text-base">Phòng nào có ca hôm nay</h3>
-              <span className="text-xs font-semibold text-emerald-400 bg-emerald-950/80 px-3 py-1 rounded-full border border-emerald-800/50">
-                {todaysBookings.length} ca hôm nay
-              </span>
+          {noRoomToday.length > 0 && (
+            <div className="rounded-xl border border-amber-800 bg-amber-950/30 p-3">
+              <p className="text-[11px] font-bold text-amber-300 mb-1.5">{noRoomToday.length} ca hôm nay chưa có phòng — mở ca ở Bảng Vận Hành → Sửa để gán phòng</p>
+              <ul className="grid sm:grid-cols-2 xl:grid-cols-3 gap-x-4 gap-y-1">{noRoomToday.map((b) => <BookingLine key={b.id} b={b} />)}</ul>
             </div>
-            {todaysBookings.length === 0 ? (
-              <p className="text-xs text-[var(--text-muted)] py-4 text-center">Hôm nay không có ca nào.</p>
-            ) : (
-              <div className="space-y-2 text-xs">
-                {todaysBookings.map((s) => (
-                  <div
-                    key={s.id}
-                    className={`p-3 rounded-xl border flex justify-between items-center ${
-                      s.status === "Live Now" ? "bg-rose-500/10 border-rose-500/40" : "bg-[var(--accent)]/10 border-[var(--accent)]/30"
-                    }`}
-                  >
-                    <div>
-                      <span className={`font-bold ${s.status === "Live Now" ? "text-rose-400" : "text-[var(--accent-text)]"}`}>
-                        {s.startTime} - {s.endTime} [{s.studioName}]
-                      </span>
-                      <p className="text-[var(--text-muted)]">{s.brandName} (Host {s.hostName})</p>
-                    </div>
-                    <span
-                      className={`text-[11px] font-bold px-2 py-0.5 rounded ${
-                        s.status === "Live Now"
-                          ? "bg-red-500/20 text-red-300 animate-pulse"
-                          : "bg-amber-500/20 text-amber-300"
-                      }`}
-                    >
-                      {SESSION_STATUS_LABEL_VI[s.status] ?? s.status}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          )}
         </div>
-      )}
+        );
+      })()}
 
       {/* Equipment View */}
       {activeSubTab === "equipment" && (

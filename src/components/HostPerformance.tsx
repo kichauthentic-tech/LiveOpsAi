@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { AlertTriangle, ChevronLeft, ChevronRight, Download, TrendingUp } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, Download, TrendingUp, Trophy } from "lucide-react";
 import { Brand, LiveSession } from "../types";
 import { WEEKDAY_LABELS, byWeekday, dataQuality, filterSessions, hostWeekdayGrid } from "../lib/performance/hostPerformance";
 import { addDays, getTodayDate, isoWeekNumber, isoWeekStart } from "../lib/dateUtils";
@@ -145,7 +145,9 @@ export function HostPerformance({ platform, sessions, brands }: HostPerformanceP
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-lg font-black text-[var(--text)]">Hiệu Suất Host</h2>
+            <h2 className="text-lg font-black text-[var(--text)] flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-[var(--accent-text)] shrink-0" /> Hiệu Suất Host
+            </h2>
             <PageIntro>
               Đọc từ số liệu ca đã có, để trả lời câu hỏi khi sắp lịch: host nào hiệu quả nhất với brand nào, và mạnh nhất vào thứ mấy.
               Đây là số liệu tham khảo cho ops tự quyết, app không tự xếp lịch.
@@ -235,7 +237,7 @@ export function HostPerformance({ platform, sessions, brands }: HostPerformanceP
         <>
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5">
             <h3 className="text-xs font-black text-[var(--text)] flex items-center gap-1.5">
-              <TrendingUp className="w-3.5 h-3.5" /> Xếp hạng host theo GMV/giờ
+              <Trophy className="w-3.5 h-3.5" /> Xếp hạng host theo GMV/giờ
             </h3>
             <p className="text-[11px] text-[var(--text-faint)] mt-0.5">
               GMV/giờ là thước đo dùng để phân bổ ca — đo hiệu quả trên mỗi giờ nhân lực bỏ ra, không thiên vị host được xếp nhiều ca dài.
@@ -283,6 +285,7 @@ export function HostPerformance({ platform, sessions, brands }: HostPerformanceP
             <h3 className="text-xs font-black text-[var(--text)]">Host Mạnh Nhất Vào Thứ Mấy</h3>
             <p className="text-[11px] text-[var(--text-faint)] mt-0.5">
               Đậm hơn = GMV/giờ cao hơn. Ô trống nghĩa là host chưa từng live thứ đó trong khoảng đã chọn, không phải hiệu suất bằng 0.
+              Hàng cuối "Mọi host" = hiệu suất chung của thứ đó — dùng để quyết định nên mở nhiều ca vào thứ nào, tách khỏi chuyện host nào trực.
             </p>
             <div className="mt-3 overflow-x-auto">
               <table className="w-full text-xs min-w-[560px]">
@@ -320,23 +323,28 @@ export function HostPerformance({ platform, sessions, brands }: HostPerformanceP
                     </tr>
                   ))}
                 </tbody>
+                {/* "Hiệu Suất Chung Theo Thứ" từng là một thẻ 7 ô riêng ở cuối trang — nay là hàng tổng của lưới để thẳng cột với từng host. */}
+                <tfoot>
+                  <tr className="border-t-2 border-[var(--border)]">
+                    <td className="pt-2 pr-3 font-black text-[var(--text)] whitespace-nowrap">Mọi host</td>
+                    {WEEKDAY_ORDER.map((wd) => {
+                      const w = weekdays.find((x) => x.key === String(wd));
+                      return (
+                        <td key={wd} className="pt-2 px-1 text-center">
+                          {w ? (
+                            <>
+                              <p className="text-[11px] font-black text-emerald-400">{fmtVndShort(w.gmvPerHour)}</p>
+                              <p className="text-[11px] text-[var(--text-faint)]">{w.sessionCount} ca</p>
+                            </>
+                          ) : (
+                            <span className="text-[var(--text-faint)]">—</span>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                </tfoot>
               </table>
-            </div>
-          </div>
-
-          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5">
-            <h3 className="text-xs font-black text-[var(--text)]">Hiệu Suất Chung Theo Thứ</h3>
-            <p className="text-[11px] text-[var(--text-faint)] mt-0.5">
-              Dùng để quyết định nên mở nhiều ca vào thứ nào, tách khỏi chuyện host nào trực.
-            </p>
-            <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
-              {weekdays.map((w) => (
-                <div key={w.key} className="bg-[var(--surface-base)] rounded-xl p-2.5 text-center">
-                  <p className="text-[11px] text-[var(--text-faint)]">{w.label}</p>
-                  <p className="text-sm font-black text-emerald-400 mt-1">{fmtVndShort(w.gmvPerHour)}</p>
-                  <p className="text-[11px] text-[var(--text-faint)] mt-0.5">GMV/giờ · {w.sessionCount} ca</p>
-                </div>
-              ))}
             </div>
           </div>
         </>

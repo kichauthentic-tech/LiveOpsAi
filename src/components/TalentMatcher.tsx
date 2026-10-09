@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { Talent, Brand, UserRole, LiveSession } from "../types";
 import { Users, Sparkles, Search, Plus, Edit3, Trash2, X, Phone, Loader2, AlertTriangle, KeyRound, ChevronDown } from "lucide-react";
 import { authedFetch } from "../lib/authedFetch";
@@ -99,6 +99,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
   // Tạo talent mới giờ luôn kèm tạo account thật (Supabase Admin API) nên cũng chỉ ceo/admin
   // làm được — dùng chung điều kiện này cho cả 2 mục đích.
   const canSeeRate = currentRole === "ceo" || currentRole === "admin";
+  const aiRef = useRef<HTMLDetailsElement>(null);
   const [selectedBrandId, setSelectedBrandId] = useState("brand-1");
   const [targetCategory, setTargetCategory] = useState("Mỹ phẩm Skincare");
   // Sàn của ca cần ghép host: số GMV gửi AI chỉ của sàn này (user chốt 07/10: không gộp hiệu suất hai sàn).
@@ -381,6 +382,20 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
         icon={Users}
         title="Talent Pool"
         description="Host và trợ live của agency: vai trò, số ca, GMV và rate. Chọn một người để xem hồ sơ bên cạnh."
+        actions={
+          // Khối AI nằm cuối trang (sau danh sách ~40 người) — nút này mở và cuộn thẳng tới nó.
+          <button
+            onClick={() => {
+              const el = aiRef.current;
+              if (!el) return;
+              el.open = true;
+              el.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border border-[var(--accent)]/50 text-[var(--accent-text)] hover:bg-[var(--accent)]/10"
+          >
+            <Sparkles className="w-4 h-4" /> Gợi ý host bằng AI
+          </button>
+        }
       />
 
       {/* Dải tổng quan — trả lời "đội đang ở trạng thái nào" trước khi lướt danh sách. */}
@@ -621,7 +636,7 @@ export const TalentMatcher: React.FC<TalentMatcherProps> = ({
       </div>
       {/* Trình AI khớp nối — công cụ phụ, xếp sau danh sách và gập lại.
           Trước đây chiếm 144px đầu trang, mặc định brand đầu danh sách (Franklin, 0 ca). */}
-      <details className="group bg-gradient-to-r from-[var(--accent)]/25 to-[var(--surface)] text-[var(--text)] rounded-2xl border border-[var(--accent)]/50 shadow-lg">
+      <details className="group scroll-mt-4 bg-gradient-to-r from-[var(--accent)]/25 to-[var(--surface)] text-[var(--text)] rounded-2xl border border-[var(--accent)]/50 shadow-lg" ref={aiRef}>
         <summary className="list-none cursor-pointer px-6 py-4 flex items-center gap-2 text-[var(--accent-text)] font-bold text-sm">
           <Sparkles className="w-5 h-5 text-[var(--accent-text)] shrink-0" />
           Gợi ý host bằng AI

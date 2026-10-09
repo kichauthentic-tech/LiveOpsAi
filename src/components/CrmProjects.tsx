@@ -225,26 +225,22 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
         icon={Building2}
         title="CRM"
         description="Brand đang hợp tác và MỌI điều khoản với từng brand: người liên hệ, KAM, cách thu phí, giá, hợp đồng + giờ cam kết, phòng live mặc định — theo từng sàn. Đây là chỗ nhập duy nhất; màn khác chỉ đọc."
-      />
-      {loadError && <p className="text-xs text-rose-300 bg-rose-950/30 border border-rose-900 rounded-lg px-3 py-2">{loadError}</p>}
-
-      {/* Brand CRM Section */}
-      <div className="bg-[var(--surface)] p-6 rounded-2xl border border-[var(--border)] shadow-sm space-y-4">
-        <div className="flex justify-between items-center">
-          <div>
-            <h3 className="font-bold text-[var(--text)] text-base">Brand đang hợp tác ({brands.length})</h3>
-          </div>
+        actions={
           <button
             onClick={openAddBrandModal}
             className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow transition-all"
           >
             <Plus className="w-4 h-4" /> Thêm brand
           </button>
-        </div>
+        }
+      />
+      {loadError && <p className="text-xs text-rose-300 bg-rose-950/30 border border-rose-900 rounded-lg px-3 py-2">{loadError}</p>}
 
+      {/* Brand CRM Section — sắp lại 10/10: bỏ thẻ bọc "Brand đang hợp tác (N)" (thẻ trong thẻ), nút Thêm brand lên thẻ đầu trang. */}
+      <div className="space-y-4">
         <div className="grid md:grid-cols-2 gap-4">
           {brands.map((b) => (
-            <div key={b.id} className="p-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-elevated)]/40 space-y-3 hover:border-[var(--accent)]/50 transition-all relative group">
+            <div key={b.id} className="p-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm space-y-3 hover:border-[var(--accent)]/50 transition-all relative group">
               <div className="flex justify-between items-start">
                 <div className="flex items-center space-x-3">
                   <BrandLogo brand={b} size="md" className="bg-[var(--surface-elevated)] border border-[var(--border)] shadow-sm" />
