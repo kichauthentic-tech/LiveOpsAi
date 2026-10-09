@@ -3,6 +3,7 @@ import { dedupeInFlight } from "./dedupeInFlight";
 import { prefetchable } from "./prefetch";
 import { fetchAllPages } from "./fetchAllPages";
 import { LockedPlanRow, LockedPlanTargets, lockedPlanTargetsFromRows } from "../scheduling/lockedPlanTargets";
+import { RetargetAuditRow, RetargetBatch, summarizeRetargetBatches } from "../scheduling/retarget";
 import { BrandMonthPlan, BrandMonthPlanSlot, CalendarEventRow, PlanCampRanges, PlanGroupTargets } from "../../types";
 import { platformOf, brandPlatformKey, type ReportPlatform } from "../reportPlatform";
 
@@ -309,3 +310,37 @@ export const planStatusesRead = prefetchable("planStatuses", fetchPlanStatuses);
 export const monthPlanRead = prefetchable("monthPlan", fetchMonthPlan);
 export const calendarEventsRead = prefetchable("calendarEvents", fetchCalendarEvents);
 export const lockedPlanSlotsRead = prefetchable("lockedPlanSlots", fetchBrandLockedPlanSlots);
+
+// Chia lại target CẢ LƯỚI của kế hoạch đã chốt, kể cả ca đã qua (0162). RPC security definer, chỉ ceo/admin; ghi nhật ký.
+export interface RetargetResult {
+  batch_id: string;
+  changed: number;
+  past_changed: number;
+  old_total: number;
+  new_total: number;
+}
+
+export async function retargetMonthPlan(planId: string, targets: { id: string; target: number }[], note = ""): Promise<RetargetResult> {
+  const { data, error } = await supabase.rpc("retarget_month_plan", { p_plan_id: planId, p_targets: targets, p_note: note });
+  if (error) {
+    // PGRST202 = PostgREST không thấy hàm: DB chưa chạy 0162.
+    if (error.code === "PGRST202") throw new Error("DB chưa chạy migration 0162 (retarget_month_plan) — chạy SQL trong Supabase rồi thử lại.");
+    throw error;
+  }
+  return data as RetargetResult;
+}
+
+// Nhật ký các vòng chia lại của một kế hoạch (mới nhất trước). Bảng chưa có (chưa chạy 0162) ⇒ [] chứ không báo lỗi.
+export async function fetchRetargetHistory(planId: string, today: string): Promise<RetargetBatch[]> {
+  const { data, error } = await supabase
+    .from("plan_target_audit")
+    .select("batch_id,changed_at,changed_by,note,date,old_target,new_target")
+    .eq("plan_id", planId)
+    .order("changed_at", { ascending: false })
+    .limit(1000);
+  if (error) {
+    if (error.code === "42P01" || error.code === "PGRST205") return [];
+    throw error;
+  }
+  return summarizeRetargetBatches((data as RetargetAuditRow[]) ?? [], today);
+}

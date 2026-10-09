@@ -95,6 +95,7 @@ const SINGLE_PLATFORM_FILES: Record<string, string> = {
   "lib/performance/handlingPlan.ts": "nhận ca của MỘT kênh brand × sàn (CeoBrief lọc theo platformOf trước khi gọi)",
   "lib/performance/hostSuggestion.ts": "lọc platformOf(s) === slot.platform trước khi cộng",
   "lib/performance/planRunRate.ts": "run-rate của một kế hoạch (brand × tháng × sàn)",
+  "lib/scheduling/retarget.ts": "cộng target các ca của MỘT kế hoạch (brand × tháng × sàn) đang mở trong Kế Hoạch Tháng",
   "lib/performance/slotInsights.ts": "Dashboard brand / Kế Hoạch Tháng truyền ca một kênh",
   "lib/report/deepAnalysis.ts": "report TikTok",
   "lib/report/keyMetrics.ts": "keyMetricsOfSessions có assertOnePlatform",
