@@ -13,7 +13,7 @@
 
 ## 1. Giai đoạn hiện tại (cập nhật 2026-10-09)
 
-- **10/10: SẮP LẠI BỐ CỤC CẢ APP (nhánh `layout-pass`, worktree `.claude/worktrees/layout`; chỉ JSX/CSS, không đổi logic, không migration; tsc/eslint 0 lỗi, audit:dead sạch, vitest còn 2 đỏ có sẵn của parser Shopee).**
+- **10/10: SẮP LẠI BỐ CỤC CẢ APP (đã gộp vào main 10/10, làm trong worktree riêng rồi xoá; chỉ JSX/CSS, không đổi logic, không migration; tsc/eslint 0 lỗi, audit:dead sạch, vitest còn 2 đỏ có sẵn của parser Shopee).**
   Đi từng trang Agency + Brand ở 1440px và 375px. Đã sửa: Bảng Vận Hành (Việc cần làm thành cột phải dính, prop `aside` của `OpsBoard`), Lịch & Studio (chế độ xem/ngày/lọc vào `PageHeader`; điện thoại gập 3 ô lọc sau nút "Lọc"), Sổ Ca, Hiệu Suất Host (hàng "Mọi host" thay thẻ theo thứ), Talent Pool, Studios (ca hôm nay trong thẻ phòng), CRM, Finance (1 khối cảnh báo, 1 nhãn thiếu rate/ca), Phân Quyền, Tài Khoản, Report Tháng (mục lục z-20), Hợp Đồng brand (tháng đang chạy trước giá), SKU, Affiliate, Dữ Liệu Gốc. KHÔNG động: 2 Dashboard (phiên khác đang làm lại), Kế Hoạch Tháng (user vừa chốt). Chi tiết: lịch sử `## Sắp lại bố cục cả app (2026-10-10)`.
 
 - **10/10: SẮP LẠI BỐ CỤC KẾ HOẠCH THÁNG + SỬA "DỰNG LƯỚI TỪ CA ĐÃ NHẬP" (không migration; bố cục CHƯA commit, sửa lỗi dựng lưới đã commit `4f6af13`; tsc/eslint 0 lỗi, vitest còn đúng 3 đỏ có sẵn).**
