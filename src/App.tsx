@@ -104,6 +104,7 @@ const OpsPlanningTodo = lazyNamed(() => import("./components/OpsPlanningTodo"), 
 const MonthPlan = lazyNamed(() => import("./components/MonthPlan"), "default");
 const OpsSupportTab = lazyNamed(() => import("./components/OpsSupportTab"), "default");
 const CeoBrief = lazyNamed(() => import("./components/CeoBrief"), "default");
+const RunRateBoard = lazyNamed(() => import("./components/RunRateBoard"), "RunRateBoard");
 const AgencyChannelSummary = lazyNamed(() => import("./components/AgencyChannelSummary"), "AgencyChannelSummary");
 
 // Tab đã gộp (08/10: Hỗ Trợ Vận Hành → Bảng Vận Hành) — activeTab đã lưu ở localStorage không được rơi vào màn "Quyền Truy Cập Bị Hạn Chế".
@@ -115,6 +116,7 @@ const TAB_CHUNKS: Record<string, { preload: () => void }[]> = {
   calendar: [OpsBoard, TodoPanel, OpsPlanningTodo, OpsSupportTab],
   studio_calendar: [LiveCalendar],
   sessions: [SessionLedger],
+  run_rate: [RunRateBoard],
   my_shifts: [OpsBoard],
   shift_scheduling: [TalentShiftSignup],
   month_plan: [MonthPlan],
@@ -1824,6 +1826,17 @@ export default function App() {
                     onSetSessionExcluded={handleSetSessionExcluded}
                     onRequestDropout={handleRequestDropout}
                     onLogAudit={pushAuditLog}
+                  />
+                )}
+
+                {activeTab === "run_rate" && (
+                  <RunRateBoard
+                    sessions={activeSessions}
+                    brands={brands}
+                    brandChannels={channels}
+                    shiftSlots={shiftSlots}
+                    onNavigate={setActiveTab}
+                    onOpenMonthPlan={(brandId, platform) => openMonthPlanFor(brandId, platform)}
                   />
                 )}
 

@@ -17,6 +17,7 @@ const AGENCY_TAB_SLUGS: Record<string, string> = {
   calendar: "bang-van-hanh",
   studio_calendar: "lich-studio",
   sessions: "so-ca",
+  run_rate: "run-rate",
   host_performance: "hieu-suat-host",
   brands_overview: "toan-canh-brand",
   report_publish_board: "phat-hanh-report",

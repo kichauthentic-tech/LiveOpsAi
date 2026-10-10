@@ -98,6 +98,7 @@ const SINGLE_PLATFORM_FILES: Record<string, string> = {
   "lib/performance/hostSuggestion.ts": "lọc platformOf(s) === slot.platform trước khi cộng",
   "lib/performance/monthForecast.ts": "buildMonthForecaster có assertOnePlatform; dự báo của một kênh brand × sàn",
   "lib/performance/planRunRate.ts": "run-rate của một kế hoạch (brand × tháng × sàn)",
+  "lib/performance/runRateUpdate.ts": "monthActualOf có assertOnePlatform; mọi hàm khác chỉ chia lại số của MỘT tài khoản brand × sàn từ planRunRate",
   "lib/scheduling/rebase.ts": "cộng target các ca của MỘT kế hoạch (brand × tháng × sàn) đang mở trong Kế Hoạch Tháng",
   "lib/scheduling/boost.ts": "cộng target đề xuất các ca tăng cường của MỘT kế hoạch (brand × tháng × sàn) — chỉ danh sách của kế hoạch đang mở",
   "lib/performance/slotInsights.ts": "Dashboard brand / Kế Hoạch Tháng truyền ca một kênh",
