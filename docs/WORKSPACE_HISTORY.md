@@ -5094,3 +5094,40 @@ Bối cảnh: user liệt kê các trường hợp một ca TikTok có ≠ 1 Roo
 - Chạy `useMemo` trên mảng dựng lại mỗi lần vẽ làm React Compiler từ chối ("Existing memoization could not be preserved") — bỏ useMemo cho phần rẻ; trạng thái chọn kênh/ngày suy ra lúc vẽ thay vì effect đồng bộ.
 
 **Kiểm:** tsc, eslint 0 lỗi, `audit:dead` sạch, build xanh, vitest chỉ còn 3 đỏ có sẵn trước đợt này (Talent Pool lg:sticky, shopeeFiles Live List 50 phiên, shopeeReportRender). Xem bằng Browser pane (phiên admin có sẵn): TikTok có CROCS đủ 4 tầng (tháng 108%, D-Day 80%, Mid-Month/Pay Day sắp tới với target + dự phóng theo lịch, hôm qua 80%, hôm nay "chờ số"), Shopee chỉ dự báo (VERA 518,6M khớp số của app), "Tất cả kênh" ra hai khối tách; 375px không tràn ngang ở cả 4 tab. **Chưa kiểm:** role ceo/brand, cột tiền khi đã có rate. Theme sáng `sand` đã xem: đọc được (chữ % xanh nhạt hơi mờ như các màn cũ).
+
+## Sắp lại bố cục cả app (2026-10-10)
+
+Yêu cầu user: "đi từng trang của app, tự phân tích và sắp xếp lại layout của cả app". Làm trong worktree riêng
+(`.claude/worktrees/layout`, nhánh `layout-pass`) vì 2 phiên khác đang sửa `main` cùng lúc. Verify trên bản build
+(`layout-prod`, cổng 3107) ở 1440×900 và 375×812, dữ liệu thật.
+
+**Đợt 1 (`afc9339`)**
+- Bảng Vận Hành: `TodoPanel` trước đứng TRÊN tiêu đề trang, đẩy danh sách ca hôm nay xuống dưới màn đầu → thành cột
+  phải 400px dính (`OpsBoard` prop `aside`). Điện thoại giữ thứ tự cũ (việc cần làm trước — quyết định audit người mới
+  04/10). Dòng ca: `flex-1 basis-40 min-w-0` để không gãy 2–3 hàng.
+- Lịch & Studio: 3 dải công cụ + dải hướng dẫn kéo-thả gộp vào thẻ đầu → lịch lên cao ~130px. Dải "đang kéo" chèn vào
+  giữa trang (đẩy lịch xuống lúc đang kéo) → nhãn nổi `fixed bottom-6`.
+- Sổ Ca: tên host `whitespace-nowrap` (trước xuống 3–4 dòng). Hiệu Suất Host: thẻ 7 ô "theo thứ" → hàng `tfoot`
+  "Mọi host" thẳng cột. Talent Pool: nút mở thẳng khối AI (khối vẫn cuối trang như đã chốt). Studios: ca hôm nay vào
+  trong thẻ phòng (trang ngắn hơn một nửa). CRM: "Thêm brand" lên thẻ đầu, bỏ thẻ lồng. Finance: MonthPicker lên thẻ đầu.
+
+**Đợt 2 (`1a20bac`)**
+- Finance: 3 hộp cảnh báo (thiếu rate / ca chưa xác nhận / nguồn GMV) cao ~230px → 1 khối; mỗi ca 2–3 nhãn đỏ dài
+  (70/70 ca thiếu) → 1 nhãn "Thiếu rate host · rate trợ live · % commission", nhãn đầy đủ ở `title`.
+- Phân Quyền: `PageHeader`; 5 vai trò trong `xl:grid-cols-6` (1 ô trống) → 5 cột; 4 nhóm quyền mỗi nhóm 1 hàng (3/4 nhóm
+  có 1–2 công tắc) → 1 lưới chung, tên nhóm là dòng nhỏ trên mỗi thẻ (8 hàng → 3).
+- Tài Khoản: `PageHeader`, 2 cột từ lg (trước 1 cột max-w-2xl, nửa phải trống).
+- Report Tháng: cột đầu bảng (`report/ui.tsx`, sticky ngang z-10) vẽ đè mục lục (cũng z-10, đứng trước trong DOM) khi
+  cuộn → mục lục z-20.
+- Hợp Đồng brand: tháng đang chạy lên trước khối giá. SKU: ô thêm + ghi chú + bảng gộp 1 thẻ. Affiliate, Dữ Liệu Gốc:
+  `PageHeader`, thanh công cụ/tab trong thẻ. Dữ Liệu Gốc KHÔNG chia Import | Lịch sử 2 cột: sau khi chọn file, Import
+  hiện bảng xem trước rộng theo số cột file.
+- Test Talent Pool chờ `lg:sticky` nhưng `6073929` đã đổi sang xl → test nhận `(lg|xl):sticky`.
+
+**Khổ 375px (`ed4b2b5`)** — đo tràn ngang mọi trang Agency + Brand (CROCS): chỉ Phân Quyền tràn (thanh 4 tab 613px) do
+khung `actions` của `PageHeader` không có `max-w-full` → sửa ở `PageHeader` cho mọi trang. Lịch: 4 ô lọc cao ~200px →
+3 ô chọn gập sau nút "Lọc (n)" (`sm:` trở lên giữ nguyên). Phân Quyền: thẻ vai trò 2 cột, ẩn mô tả.
+
+**Cố ý không đổi:** 2 Dashboard (phiên khác đang làm lại), Kế Hoạch Tháng (user chốt bố cục 10/10), AI Training Center
+(phiên Engine đang sửa). Màn talent (Ca của tôi, Hồ sơ) chưa xem được — không có tài khoản talent còn gắn hồ sơ.
+
