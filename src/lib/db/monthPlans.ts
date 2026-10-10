@@ -344,3 +344,13 @@ export async function fetchRetargetHistory(planId: string, today: string): Promi
   }
   return summarizeRetargetBatches((data as RetargetAuditRow[]) ?? [], today);
 }
+
+// Ngân sách Ads đã nhập ở Kế Hoạch Tháng của một kênh, theo tháng ("YYYY-MM" → số). Dùng cho phép đo tín hiệu dẫn ở AI Training
+// Center (engine target v3 bước 4) — tháng chưa nhập không có trong map.
+export async function fetchChannelAdsBudgets(brandId: string, platform: ReportPlatform): Promise<Map<string, number>> {
+  const { data, error } = await supabase.from("brand_month_plans").select("month,ads_budget").eq("brand_id", brandId).eq("platform", platform);
+  if (error) throw error;
+  const out = new Map<string, number>();
+  for (const r of (data as { month: string; ads_budget: number | null }[]) ?? []) if (Number(r.ads_budget) > 0) out.set(String(r.month).slice(0, 7), Number(r.ads_budget));
+  return out;
+}

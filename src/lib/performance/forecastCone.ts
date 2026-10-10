@@ -30,8 +30,12 @@ export function normalCdf(x: number): number {
   return 0.5 * (1 + (x >= 0 ? y : -y));
 }
 
-/** Nửa dải tuyệt đối tại cuối tháng: 35% phần dự phóng còn lại (GMV chưa về). */
-export const coneHalf = (actual: number, projected: number) => CONE_COEF * Math.max(0, projected - actual);
+/**
+ * Nửa dải tuyệt đối tại cuối tháng = hệ số × phần dự phóng còn lại (GMV chưa về). Hệ số theo kênh (`MonthOutlook.coneCoef`) từ
+ * engine target v3 (10/10): 0,22 kênh đủ lịch sử / 0,30 kênh ít — backtest cho dự báo theo hình dạng bao ~80% tháng. Thiếu hệ số
+ * (dự phóng kiểu cũ GMV/giờ 28 ngày) thì giữ 35% như 09/10.
+ */
+export const coneHalf = (actual: number, projected: number, coef: number = CONE_COEF) => coef * Math.max(0, projected - actual);
 
 export interface Cone {
   /** Điểm mỗi ngày từ ngày cuối có số tới cuối tháng (cộng dồn). Rỗng khi không chiếu theo giờ. */
@@ -47,7 +51,8 @@ export interface Cone {
  * Dải cộng dồn: tại ngày i, nửa dải = 35% × (dự phóng cộng dồn tới i − đã có). Cuối tháng = 35% × phần còn lại.
  * `scale` < 1 khi vẽ nhiều kênh cộng lại (sai số độc lập: xem combineCones). Chỉ chiếu theo giờ mới có dải (run-rate/none không có phần "giờ còn lại" để đo).
  */
-export function coneOf(o: Pick<MonthOutlook, "days" | "through" | "actual" | "projected" | "forecastByDate" | "pending" | "projectionMethod">, scale = 1): Cone {
+export function coneOf(o: Pick<MonthOutlook, "days" | "through" | "actual" | "projected" | "forecastByDate" | "pending" | "projectionMethod" | "coneCoef">, scale = 1): Cone {
+  const coef = o.coneCoef ?? CONE_COEF;
   const n = o.days.length;
   const throughIdx = o.through ? o.days.indexOf(o.through) : -1;
   const startIdx = Math.max(0, throughIdx);
@@ -59,10 +64,10 @@ export function coneOf(o: Pick<MonthOutlook, "days" | "through" | "actual" | "pr
   const points: ConePoint[] = [{ i: startIdx, lo: cum, mid: cum, hi: cum }];
   for (let i = startIdx + 1; i < n; i++) {
     cum += o.forecastByDate.get(o.days[i]) ?? 0;
-    const h = CONE_COEF * (cum - o.actual) * scale;
+    const h = coef * (cum - o.actual) * scale;
     points.push({ i, lo: cum - h, mid: cum, hi: cum + h });
   }
-  const half = coneHalf(o.actual, o.projected) * scale;
+  const half = coneHalf(o.actual, o.projected, coef) * scale;
   return { points, startIdx, lo: o.projected - half, hi: o.projected + half, halfShare: o.projected > 0 ? half / o.projected : 0 };
 }
 
@@ -91,8 +96,8 @@ export const LANDING_LABEL: Record<LandingKey, string> = {
  * Khả năng đạt target = P(GMV cuối tháng ≥ target) với GMV cuối ~ chuẩn(dự phóng, σ), σ = nửa dải ÷ 1,28.
  * Tháng đã hết (không còn phần chưa biết) thì chắc chắn: 1 hoặc 0.
  */
-export function landingOf(o: Pick<MonthOutlook, "actual" | "projected" | "projectionMethod" | "target">, halfOverride?: number): Landing {
-  const half = halfOverride ?? coneHalf(o.actual, o.projected);
+export function landingOf(o: Pick<MonthOutlook, "actual" | "projected" | "projectionMethod" | "target" | "coneCoef">, halfOverride?: number): Landing {
+  const half = halfOverride ?? coneHalf(o.actual, o.projected, o.coneCoef);
   const lo = o.projected - half, hi = o.projected + half;
   if (!o.target) return { key: "no_target", pHit: null, ratio: null, lo, hi };
   if (o.projectionMethod === "none") return { key: "no_forecast", pHit: null, ratio: null, lo, hi };
@@ -103,9 +108,9 @@ export function landingOf(o: Pick<MonthOutlook, "actual" | "projected" | "projec
 }
 
 /** Cộng dải nhiều kênh: sai số các kênh coi như độc lập ⇒ cộng theo căn bậc hai tổng bình phương (cộng thẳng thì dải quá rộng). */
-export function combineCones(list: Pick<MonthOutlook, "actual" | "projected">[]): { projected: number; half: number; lo: number; hi: number } {
+export function combineCones(list: Pick<MonthOutlook, "actual" | "projected" | "coneCoef">[]): { projected: number; half: number; lo: number; hi: number } {
   const projected = list.reduce((a, o) => a + o.projected, 0);
-  const half = Math.sqrt(list.reduce((a, o) => a + coneHalf(o.actual, o.projected) ** 2, 0));
+  const half = Math.sqrt(list.reduce((a, o) => a + coneHalf(o.actual, o.projected, o.coneCoef) ** 2, 0));
   return { projected, half, lo: projected - half, hi: projected + half };
 }
 
@@ -127,7 +132,7 @@ export function forecastFlags(o: Pick<MonthOutlook, "pending" | "rates" | "proje
   if (o.projectionMethod === "none") return [{ level: "warn", text: "Chưa có GMV/giờ 28 ngày hay run-rate để chiếu." }];
   if (o.projectionMethod === "run_rate") out.push({ level: "warn", text: "Chưa có ca nào trong 28 ngày — dự phóng theo run-rate, kém tin hơn." });
   const missingPast = o.pending.filter((p) => p.kind === "session" && p.date < today);
-  if (missingPast.length) out.push({ level: "warn", text: `${missingPast.length} ca đã chạy chưa có số — đang tạm tính theo GMV/giờ gần đây.` });
+  if (missingPast.length) out.push({ level: "warn", text: `${missingPast.length} ca đã chạy chưa có số — đang tạm tính theo dự báo từng ca.` });
   const openFuture = o.pending.filter((p) => p.kind === "open_slot");
   if (openFuture.length) {
     const g = openFuture.reduce((a, p) => a + p.forecast, 0);
@@ -141,7 +146,7 @@ export function forecastFlags(o: Pick<MonthOutlook, "pending" | "rates" | "proje
  * Khả năng đạt target của một nhóm kênh CÓ target: cộng thực đạt, dự phóng, target; dải theo căn bậc hai tổng bình phương.
  * `list` phải là outlook từng kênh (không phải outlook gộp) và đều có target.
  */
-export function landingOfMany(list: Pick<MonthOutlook, "actual" | "projected" | "projectionMethod" | "target">[]): Landing & { target: number } {
+export function landingOfMany(list: Pick<MonthOutlook, "actual" | "projected" | "projectionMethod" | "target" | "coneCoef">[]): Landing & { target: number } {
   const target = list.reduce((a, o) => a + (o.target?.total ?? 0), 0);
   const sum = { actual: list.reduce((a, o) => a + o.actual, 0), projected: list.reduce((a, o) => a + o.projected, 0) };
   const method = list.some((o) => o.projectionMethod === "none") ? "none" : list.some((o) => o.projectionMethod === "run_rate") ? "run_rate" : "gmv_per_hour";

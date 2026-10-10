@@ -155,7 +155,7 @@ export const Cockpit: React.FC<{
 
 /** Hệ số co dải khi cộng nhiều kênh (căn bậc hai tổng bình phương ÷ tổng thẳng). */
 function coneScale(list: MonthOutlook[]): number {
-  const lin = list.reduce((a, o) => a + coneHalf(o.actual, o.projected), 0);
+  const lin = list.reduce((a, o) => a + coneHalf(o.actual, o.projected, o.coneCoef), 0);
   return lin > 0 ? combineCones(list).half / lin : 1;
 }
 
@@ -169,7 +169,7 @@ const AccountsTable: React.FC<{ m: DashModel; outs: { b: DashModel["brands"][num
     .map(({ b, o }) => {
       const bs = m.platformSessions.filter((s) => s.brandId === b.id);
       const landing = o.target && o.projectionMethod !== "none" ? landingOfMany([o]) : null;
-      const half = coneHalf(o.actual, o.projected);
+      const half = coneHalf(o.actual, o.projected, o.coneCoef);
       const last = bs.filter((s) => isCountable(s) && s.date <= m.today).map((s) => s.date).sort().pop() ?? null;
       return { b, o, landing, half, last, rr: m.planRR.get(b.id) ?? null };
     })

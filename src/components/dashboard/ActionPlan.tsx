@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { BrandLogo } from "../ui/BrandLogo";
 import { coneHalf, LANDING_LABEL } from "../../lib/performance/forecastCone";
 import { applyWhatIf, type HandlingPlan, type Lever, type PlanMode } from "../../lib/performance/handlingPlan";
+import { CHECKPOINT_LABEL } from "../../lib/performance/monthForecast";
 import type { Brand } from "../../types";
 import type { MonthOutlook } from "../../lib/performance/ceoBrief";
 import type { DashModel } from "./model";
@@ -33,7 +34,7 @@ const WhatIfBox: React.FC<{ o: MonthOutlook; p: HandlingPlan }> = ({ o, p }) => 
   if (!o.target || p.marginalRate == null) return null;
   const r = applyWhatIf(o, p, { addHours: hours, ratePct });
   const changed = hours !== 0 || ratePct !== 0;
-  const half = coneHalf(o.actual, r.projected);
+  const half = coneHalf(o.actual, r.projected, o.coneCoef);
   const slider = "w-full accent-[var(--accent)]";
   return (
     <div className="border-t border-[var(--border)] pt-3 space-y-2">
@@ -58,7 +59,35 @@ const WhatIfBox: React.FC<{ o: MonthOutlook; p: HandlingPlan }> = ({ o, p }) => 
   );
 };
 
-const ChannelPlan: React.FC<{ b: Brand; o: MonthOutlook; p: HandlingPlan; name: string }> = ({ b, o, p, name }) => (
+// Ba mốc điều chỉnh giờ (engine target v3): mốc đã qua mờ đi, mốc đang hiệu lực đậm; dưới là số giờ cần đổi cho phần còn lại.
+const CheckpointStrip: React.FC<{ o: MonthOutlook; p: HandlingPlan; today: string }> = ({ o, p, today }) => {
+  if (!o.target || p.checkpoints.length === 0) return null;
+  const active = p.checkpoint?.checkpoint.key;
+  const c = p.checkpoint;
+  const dm = (d: string) => `${Number(d.slice(8))}/${Number(d.slice(5, 7))}`;
+  return (
+    <div className="border-t border-[var(--border)] pt-3 space-y-2">
+      <p className="text-xs font-bold text-[var(--text)]">Mốc điều chỉnh giờ</p>
+      <ol className="flex flex-wrap gap-1.5">
+        {p.checkpoints.map((k) => (
+          <li key={k.key} className={`text-[11px] px-2 py-1 rounded-lg border ${k.key === active ? "border-[var(--accent)] text-[var(--text)] font-bold" : k.date < today ? "border-[var(--border)] text-[var(--text-faint)]" : "border-[var(--border)] text-[var(--text-muted)]"}`}>
+            {CHECKPOINT_LABEL[k.key]} · {dm(k.date)}{k.date > today ? " (sắp tới)" : ""}
+          </li>
+        ))}
+      </ol>
+      {c && (
+        <p className="text-xs text-[var(--text-muted)] leading-snug">
+          {c.gap <= 0
+            ? <>Dự phóng đã chạm target — không cần thêm giờ ở mốc này.</>
+            : <>Thiếu <b className="text-[var(--text)]">{money(c.gap)}</b> ⇒ cần <b className="text-[var(--text)]">+{Math.round(c.needPct * 100)}%</b> giờ của phần còn lại{c.capped ? <> (vượt trần, đề xuất <b className="text-[var(--text)]">+{Math.round(c.pct * 100)}%</b> ≈ {hrs(c.extraHours)} và báo brand sớm)</> : <> ≈ <b className="text-[var(--text)]">{hrs(c.extraHours)}</b></>}; làm đủ thì dự phóng ≈ {money(c.projectedAfter)}.</>}
+        </p>
+      )}
+      <p className="text-[11px] text-[var(--text-faint)] leading-snug">Mô phỏng T7–T9 trên số thật: làm đủ 3 mốc (bù tối đa +30% giờ còn lại) thì 9/9 tháng CROCS + VERA đạt ≥ 95% target; không điều chỉnh chỉ 3/9.</p>
+    </div>
+  );
+};
+
+const ChannelPlan: React.FC<{ b: Brand; o: MonthOutlook; p: HandlingPlan; name: string; today: string }> = ({ b, o, p, name, today }) => (
   <Card className="space-y-3">
     <div className="flex flex-wrap items-center justify-between gap-2">
       <h4 className="font-black text-[var(--text)] flex items-center gap-2"><BrandLogo brand={b} size="xs" /> {name}</h4>
@@ -94,6 +123,7 @@ const ChannelPlan: React.FC<{ b: Brand; o: MonthOutlook; p: HandlingPlan; name: 
         ))}
       </ul>
     )}
+    <CheckpointStrip o={o} p={p} today={today} />
     <WhatIfBox o={o} p={p} />
   </Card>
 );
@@ -111,7 +141,7 @@ export const ActionPlan: React.FC<{ m: DashModel }> = ({ m }) => {
       <SectionTitle title="Action theo dự phóng" note={`Tháng ${Number(m.month.slice(5))} · mỗi kênh một thẻ, kênh cần hành động nhất lên đầu`} />
       {rows.length === 0 ? <Card><p className="text-sm text-[var(--text-faint)]">Chưa có kênh nào có số hay lịch trong tháng này.</p></Card> : (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
-          {rows.map(({ b, o, p }) => <ChannelPlan key={b.id} b={b} o={o} p={p} name={m.channelName(b)} />)}
+          {rows.map(({ b, o, p }) => <ChannelPlan key={b.id} b={b} o={o} p={p} name={m.channelName(b)} today={m.today} />)}
         </div>
       )}
     </div>

@@ -2005,6 +2005,7 @@ export default function App() {
                       <CeoBrief
                       key={p}
                       platform={p}
+                      engineParams={engineParams}
                       sessions={activeSessions}
                       brands={brandsOn(p)}
                       brandChannels={channels}

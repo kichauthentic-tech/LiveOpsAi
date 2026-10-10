@@ -51,6 +51,14 @@ export interface EngineParams {
   allocMinMonths: number; // tháng lịch sử tối thiểu để dùng mô hình v2
   allocUseBand: boolean; // hệ số khung giờ bắt đầu
   allocUseCampPos: boolean; // hệ số vị trí ngày trong đợt Mid-Month/Pay Day
+  // --- Dự báo GMV tháng (engine target v3, lib/performance/monthForecast.ts) ---
+  fcRecentDays: number; // mức "gần đây" = GMV ÷ trọng số của N ngày cuối lịch sử
+  fcCredibility: number; // trong tháng: số đã có kéo về mức lập kế hoạch bao nhiêu (0 = tin hẳn số đã có)
+  fcBandBig: number; // nửa dải 80% lúc lập, kênh đủ lịch sử (tỷ lệ của dự báo)
+  fcBandSmall: number; // nửa dải 80% lúc lập, kênh ít lịch sử
+  fcOutOfRangeFactor: number; // giờ/ngày vượt p90 lịch sử chỉ ra X lần GMV của giờ trong vùng
+  fcBiasCorrect: boolean; // tự hiệu chỉnh khi các tháng trước dự báo lệch cùng chiều > 5%
+  fcCheckpointCap: number; // mốc điều chỉnh: bù tối đa +X giờ của phần tháng còn lại
   // --- Hiệu chỉnh kế hoạch vs thực tế ---
   calibrationK: number;
   calibrationMin: number;
@@ -99,6 +107,13 @@ export const DEFAULT_ENGINE_PARAMS: EngineParams = {
   allocMinMonths: 2,
   allocUseBand: true,
   allocUseCampPos: true,
+  fcRecentDays: 28,
+  fcCredibility: 0.1,
+  fcBandBig: 0.22,
+  fcBandSmall: 0.3,
+  fcOutOfRangeFactor: 0.5,
+  fcBiasCorrect: false,
+  fcCheckpointCap: 0.3,
   calibrationK: 3,
   calibrationMin: 0.5,
   calibrationMax: 1.6,
@@ -166,6 +181,13 @@ export const ENGINE_PARAM_META: EngineParamMeta[] = [
   { key: "allocMinMonths", group: "target", label: "Chia target ca: tháng lịch sử tối thiểu cho v2", help: "Dưới mức này chỉ dùng cách cũ (hoặc chia theo dự báo engine nếu cách cũ cũng chưa đủ).", kind: "number", min: 1, max: 6, step: 1 },
   { key: "allocUseBand", group: "target", label: "Chia target ca: dùng hệ số khung giờ", help: "Ca bắt đầu 11–14h lịch sử CROCS chỉ ~0,8× mặt bằng, 18–21h ~1,07×; áp cho cả D-Day, Mid-Month, Pay Day. Tắt để thấy khung giờ đóng góp bao nhiêu điểm sai số.", kind: "boolean" },
   { key: "allocUseCampPos", group: "target", label: "Chia target ca: dùng hệ số vị trí ngày trong đợt", help: "Ngày 1 của Mid-Month/Pay Day mạnh hơn ngày 3 (CROCS ~1,3× so với ~0,8×). Brand có mẫu hình khác thì hệ số tự học theo brand; tắt nếu thấy bảng backtest không cải thiện.", kind: "boolean" },
+  { key: "fcRecentDays", group: "target", label: "Dự báo tháng: số ngày của mức gần đây", help: "Mức GMV tháng tới = trung bình nhân của (mức N ngày gần nhất) và (mức 3 tháng gần nhất), mỗi mức đã chia theo hình dạng tháng (loại ngày, khung giờ). Backtest 10/10: 28 ngày; 14–56 chênh ≤1,5 điểm %.", kind: "number", min: 7, max: 90, step: 1 },
+  { key: "fcCredibility", group: "target", label: "Dự báo trong tháng: kéo về mức lập kế hoạch", help: "Số đã có của tháng được tin bao nhiêu so với mức lúc lập. 0 = tin hẳn số đã có; 0.1 là mức backtest tốt nhất (sai số tổng tháng CROCS+VERA ngày 8: 8%, ngày 15: 5%, ngày 18: 3%; Dashboard cũ 12% / 8% / 6%). Tăng khi đầu tháng hay có ngày đột biến.", kind: "number", min: 0, max: 1, step: 0.05 },
+  { key: "fcBandBig", group: "target", label: "Dải 80% lúc lập — kênh đủ lịch sử", help: "Nửa dải ±X × dự báo cho kênh có ≥ 3 tháng, mỗi tháng ≥ 40 ca. Backtest walk-forward: 80% tháng lệch ≤ 22%. Trong tháng dải thu lại theo phần còn lại (X × phần chưa về).", kind: "number", min: 0.05, max: 1, step: 0.01 },
+  { key: "fcBandSmall", group: "target", label: "Dải 80% lúc lập — kênh ít lịch sử", help: "Như trên cho kênh còn lại. Backtest: 80% tháng lệch ≤ 30%.", kind: "number", min: 0.05, max: 1, step: 0.01 },
+  { key: "fcOutOfRangeFactor", group: "target", label: "Giờ vượt vùng lịch sử ra bao nhiêu", help: "Ngày có tổng giờ live vượt p90 giờ/ngày cùng loại ngày trong lịch sử: phần giờ vượt chỉ tính X lần GMV/giờ (chưa có bằng chứng thêm giờ ra thêm GMV — VERA T10 tuần đầu giờ gấp đôi, GMV gần như đứng yên). 1 = nhân tuyến tính như cũ.", kind: "number", min: 0, max: 1, step: 0.05 },
+  { key: "fcBiasCorrect", group: "target", label: "Tự hiệu chỉnh khi dự báo lệch cùng chiều", help: "Khi ≥ 2 tháng gần nhất dự báo lúc lập lệch cùng chiều và trung bình > 5%, nhân dự báo với hệ số bù nửa phần lệch. Mặc định tắt: 3 tháng dữ liệu chưa đủ để chứng minh có lợi (backtest ở thẻ Dự báo tháng); lệch luôn được hiện ra dù tắt.", kind: "boolean" },
+  { key: "fcCheckpointCap", group: "target", label: "Mốc điều chỉnh: bù tối đa bao nhiêu giờ", help: "Ở 3 mốc (sau đợt D-Day, sau Mid-Month, ngày 20) engine tính số giờ cần thêm cho phần tháng còn lại để dự báo chạm target, kẹp ở +X. Mô phỏng 10/10: +30% ⇒ 9/9 tháng CROCS+VERA đạt ≥ 95% target.", kind: "number", min: 0, max: 1, step: 0.05 },
   { key: "calibrationK", group: "calibration", label: "Kéo hệ số hiệu chỉnh về 1", help: "Ô có ít ca kế hoạch đã có thực tế bị kéo về 1 (không hiệu chỉnh). k lớn = thận trọng hơn.", kind: "number", min: 0, max: 20, step: 1 },
   { key: "calibrationMin", group: "calibration", label: "Hệ số hiệu chỉnh — sàn", help: "", kind: "number", min: 0.1, max: 1, step: 0.05 },
   { key: "calibrationMax", group: "calibration", label: "Hệ số hiệu chỉnh — trần", help: "", kind: "number", min: 1, max: 5, step: 0.1 },

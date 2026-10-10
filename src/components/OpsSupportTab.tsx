@@ -70,8 +70,8 @@ export default function OpsSupportTab({ platform: defaultPlatform, brandsOn, ses
   const outlook = useMemo(() => {
     if (!rr) return null;
     const open = slots.filter((sl) => sl.brandId === brandId && sl.status === "open" && !sl.sessionId);
-    return monthOutlook(month, today, brandSessions, open, null, camp);
-  }, [rr, slots, brandId, month, today, brandSessions, camp]);
+    return monthOutlook(month, today, brandSessions, open, null, camp, engineParams);
+  }, [rr, slots, brandId, month, today, brandSessions, camp, engineParams]);
   const projection = useMemo(() => projectMonthEnd(rr, outlook), [rr, outlook]);
 
   return (

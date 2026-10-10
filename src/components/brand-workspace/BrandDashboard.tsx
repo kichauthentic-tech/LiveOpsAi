@@ -175,8 +175,8 @@ function BrandDashboardOne({ brandId, brandName, platform, platforms, sessions: 
   const outlook = useMemo(() => {
     if (!rr) return null;
     const open = shiftSlots.filter((sl) => sl.brandId === brandId && sl.status === "open" && !sl.sessionId);
-    return monthOutlook(month, today, brandSessions, open, null, camp);
-  }, [rr, shiftSlots, brandId, month, today, brandSessions, camp]);
+    return monthOutlook(month, today, brandSessions, open, null, camp, engineParams);
+  }, [rr, shiftSlots, brandId, month, today, brandSessions, camp, engineParams]);
   const projection = useMemo(() => projectMonthEnd(rr, outlook), [rr, outlook]);
 
   // ---- Nhóm đối chứng (ops — Dữ Liệu Gốc)

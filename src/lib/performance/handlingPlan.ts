@@ -7,6 +7,7 @@ import { isCountable } from "./hostPerformance";
 import type { MonthOutlook } from "./ceoBrief";
 import { coneHalf, landingOf, type Landing, type LandingKey } from "./forecastCone";
 import { SLOT_BLOCK_LABEL, slotBlock, slotIndex, slotRuleReliable, walkForward, type SlotBlock } from "./slotInsights";
+import { CHECKPOINT_LABEL, activeCheckpoint, checkpointAdvice, checkpointsOf, type Checkpoint, type CheckpointAdvice } from "./monthForecast";
 
 // Phương án xử lý theo dự phóng (09/10/2026). Mọi đòn bẩy đều ra SỐ từ chính dữ liệu của kênh (GMV/giờ 28 ngày, lịch còn lại,
 // lịch sử ngày camp), kèm căn cứ — không có lời khuyên chung chung. Không có số tiền lãi/lỗ của đòn bẩy vì commission và rate
@@ -80,6 +81,10 @@ export interface HandlingPlan {
   futureForecast: number;
   elasticity: Elasticity;
   levers: Lever[];
+  /** Ba mốc điều chỉnh giờ của tháng (sau đợt D-Day, sau Mid-Month, ngày 20 — engine target v3). */
+  checkpoints: Checkpoint[];
+  /** Phương án ở mốc gần nhất đã tới (null trước mốc đầu, khi chưa có target hoặc không còn ca). */
+  checkpoint: CheckpointAdvice | null;
 }
 
 export interface PlanInput {
@@ -90,6 +95,8 @@ export interface PlanInput {
   camp?: CampOverrides;
   /** Giờ một ca điển hình để đổi "giờ cần thêm" ra "số ca" (mặc định kế hoạch). */
   slotHours?: number;
+  /** Mốc điều chỉnh: bù tối đa +X giờ của phần còn lại (EngineParams.fcCheckpointCap). Thiếu = 0,3. */
+  checkpointCap?: number;
 }
 
 const round1 = (v: number) => Math.round(v * 10) / 10;
@@ -111,6 +118,13 @@ export function handlingPlan(x: PlanInput): HandlingPlan {
   const gap = o.target && o.projectionMethod !== "none" ? o.target.total - o.projected : null;
   const mode: PlanMode = landing.key === "no_target" ? "no_target" : landing.key === "no_forecast" ? "no_forecast" : landing.key;
   const levers: Lever[] = [];
+  // P6 (engine target v3): mốc gần nhất đã tới ⇒ giờ cần đổi cho phần còn lại theo co giãn, kẹp trần. Trước mốc đầu vẫn tính để
+  // biết sớm, chỉ là chưa tới lúc chốt điều chỉnh.
+  const checkpoints = checkpointsOf(o.month, o.days, bucketOf);
+  const cp = activeCheckpoint(checkpoints, x.today) ?? checkpoints[0] ?? null;
+  const checkpoint = cp && o.target && o.projectionMethod !== "none"
+    ? checkpointAdvice(cp, o.target.total, o.projected, futureForecast, remainingHours, el.value, x.checkpointCap ?? 0.3)
+    : null;
 
   // 1. Số chưa về của ca đã chạy — sửa trước vì mọi con số khác đang dựa vào ước tính.
   const missingPast = o.pending.filter((p) => p.kind === "session" && p.date < x.today);
@@ -120,7 +134,7 @@ export function handlingPlan(x: PlanInput): HandlingPlan {
       id: "data_missing",
       tone: "fix",
       title: `Cập nhật số của ${missingPast.length} ca đã chạy`,
-      detail: `Đang tạm tính ${g > 0 ? "khoảng " : ""}theo GMV/giờ gần đây. Up file giao ca / đối soát để thay bằng số thật — dự phóng và run-rate sẽ chính xác hơn.`,
+      detail: `Đang tạm tính ${g > 0 ? `khoảng ${fmtVndShort(g)} ` : ""}theo dự báo từng ca. Up file giao ca / đối soát để thay bằng số thật — dự phóng và run-rate sẽ chính xác hơn.`,
       gmv: g > 0 ? g : null,
       hours: round1(missingPast.reduce((a, p) => a + p.hours, 0)),
       basis: "Ca đã quá ngày mà chưa có số (monthOutlook.pending, loại ca)."
@@ -138,7 +152,7 @@ export function handlingPlan(x: PlanInput): HandlingPlan {
       detail: `${h1(open.reduce((a, p) => a + p.hours, 0))} giờ đang nằm trong dự phóng. Không ai nhận thì dự phóng mất khoảng ${fmtVndShort(g)} GMV.`,
       gmv: g,
       hours: round1(open.reduce((a, p) => a + p.hours, 0)),
-      basis: "Ca mở trong lịch × GMV/giờ 28 ngày (tách ngày camp / ngày thường)."
+      basis: "Ca mở trong lịch × dự báo từng ca (engine target v3: hình dạng tháng × mức đã cập nhật bằng số trong tháng; kênh chưa đủ lịch sử: GMV/giờ 28 ngày)."
     });
   }
 
@@ -185,17 +199,18 @@ export function handlingPlan(x: PlanInput): HandlingPlan {
   }
 
   const adding = landing.key === "short" || landing.key === "unlikely";
-  if (gap != null && gap > 0 && marginalDaily && marginalDaily > 0) {
-    // 5. Thiếu: cần thêm bao nhiêu giờ.
-    const hrs = gap / marginalDaily;
+  if (gap != null && gap > 0 && checkpoint && checkpoint.pct > 0) {
+    // 5. Thiếu: cần thêm bao nhiêu giờ — công thức mốc điều chỉnh (đổi_giờ = ((R̂ + thiếu) ÷ R̂)^(1 ÷ co_giãn) − 1, kẹp trần).
+    const hrs = checkpoint.extraHours;
+    const cpLabel = `${CHECKPOINT_LABEL[checkpoint.checkpoint.key]} (${Number(checkpoint.checkpoint.date.slice(8))}/${Number(checkpoint.checkpoint.date.slice(5, 7))})`;
     levers.push({
       id: "add_hours",
       tone: "grow",
-      title: `Thêm khoảng ${Math.ceil(hrs)} giờ live (≈ ${Math.ceil(hrs / slotHours)} ca ${slotHours}h)`,
-      detail: `Để dự phóng chạm target cần bù ${fmtVndShort(gap)} GMV. ${bestBlock ? `Ưu tiên khung ${SLOT_BLOCK_LABEL[bestBlock.block].toLowerCase()} — chỉ số ${bestBlock.idx.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} so với ngày thường (qua backtest).` : "Chưa đủ dữ liệu để chỉ khung giờ nào tốt hơn."}`,
-      gmv: gap,
+      title: `Mốc ${cpLabel}: thêm khoảng ${Math.ceil(hrs)} giờ live (+${Math.round(checkpoint.pct * 100)}% giờ còn lại, ≈ ${Math.ceil(hrs / slotHours)} ca ${slotHours}h)`,
+      detail: `${checkpoint.capped ? `Để chạm target cần +${Math.round(checkpoint.needPct * 100)}% giờ — vượt trần +${Math.round((x.checkpointCap ?? 0.3) * 100)}%, nên thêm tới trần VÀ báo brand sớm khả năng hụt (làm đủ trần thì dự phóng ≈ ${fmtVndShort(checkpoint.projectedAfter)}). ` : `Làm đủ thì dự phóng ≈ ${fmtVndShort(checkpoint.projectedAfter)} (chạm target). `}${bestBlock ? `Ưu tiên khung ${SLOT_BLOCK_LABEL[bestBlock.block].toLowerCase()} — chỉ số ${bestBlock.idx.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} so với ngày thường (qua backtest).` : "Chưa đủ dữ liệu để chỉ khung giờ nào tốt hơn."}`,
+      gmv: checkpoint.projectedAfter - o.projected,
       hours: Math.ceil(hrs),
-      basis: `Thiếu ÷ (GMV/giờ ngày thường 28 ngày × co giãn); ${elNote}.`
+      basis: `Thiếu ${fmtVndShort(gap)} trên dự phóng ${fmtVndShort(futureForecast)} của ${h1(remainingHours)}h còn lại; giờ cần = ((còn lại + thiếu) ÷ còn lại)^(1 ÷ co giãn) − 1; ${elNote}. Ba mốc điều chỉnh mỗi tháng: sau đợt D-Day, sau Mid-Month, ngày 20.`
     });
   }
   // 6. GMV/giờ cần trên giờ còn lại.
@@ -253,7 +268,7 @@ export function handlingPlan(x: PlanInput): HandlingPlan {
 
   const order: Record<LeverTone, number> = { fix: 0, grow: 1, info: 2 };
   levers.sort((a, b) => order[a.tone] - order[b.tone] || (b.gmv ?? 0) - (a.gmv ?? 0));
-  return { mode, landing: landing.key, gap, remainingHours, needRate, blendedRate, marginalRate: marginalDaily, futureForecast, elasticity: el, levers };
+  return { mode, landing: landing.key, gap, remainingHours, needRate, blendedRate, marginalRate: marginalDaily, futureForecast, elasticity: el, levers, checkpoints, checkpoint };
 }
 
 export interface WhatIf {
@@ -268,6 +283,6 @@ export interface WhatIf {
  */
 export function applyWhatIf(o: MonthOutlook, plan: HandlingPlan, w: WhatIf): { projected: number; landing: Landing } {
   const projected = o.projected + w.addHours * (plan.marginalRate ?? 0) + (plan.futureForecast * w.ratePct) / 100;
-  const half = coneHalf(o.actual, projected);
-  return { projected, landing: landingOf({ actual: o.actual, projected, projectionMethod: o.projectionMethod, target: o.target }, half) };
+  const half = coneHalf(o.actual, projected, o.coneCoef);
+  return { projected, landing: landingOf({ actual: o.actual, projected, projectionMethod: o.projectionMethod, target: o.target, coneCoef: o.coneCoef }, half) };
 }

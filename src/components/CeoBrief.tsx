@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { DEFAULT_ENGINE_PARAMS, type EngineParams } from "../lib/scheduling/engineParams";
 import { defaultViewMonth } from "../lib/defaultMonth";
 import { AlertTriangle, ChevronLeft, ChevronRight, CircleAlert, Info, LayoutDashboard } from "lucide-react";
 import {
@@ -36,6 +37,8 @@ import {
 import { todayVn } from "../lib/performance/brandCommitment";
 import { computeSessionPnl } from "../lib/pnl";
 import { monthPlanRead, planStatusesRead } from "../lib/db/monthPlans";
+import { recordForecastSnapshots } from "../lib/db/forecastSnapshots";
+import { coneHalf } from "../lib/performance/forecastCone";
 import { addDays, eachDay } from "../lib/dateUtils";
 import { CampOverrides, effectiveCamp } from "../lib/campaignDays";
 import { isCountable, sessionHours } from "../lib/performance/hostPerformance";
@@ -80,6 +83,8 @@ interface CeoBriefProps {
   talentRateHistory: TalentRateHistoryEntry[];
   currentRole: UserRole;
   onNavigate: (tab: string) => void;
+  /** Tham số engine (AI Training Center) — dự báo tháng v3 đọc nhóm `fc*`/`alloc*`. Thiếu = mặc định. */
+  engineParams?: EngineParams;
 }
 
 type DashTab = "overview" | "drill" | "plan" | "agency";
@@ -94,6 +99,7 @@ export function prefetchCeoBrief(_ctx: TabPrefetchCtx): void {
 
 export default function CeoBrief(props: CeoBriefProps) {
   const { platform, sessions, brands, brandChannels, talents, shiftSlots, planSlotTargets, planMonthTotals, financeRecords, brandPlatformRates, brandPlatformRateHistory, talentRateHistory, currentRole, onNavigate } = props;
+  const engineParams = props.engineParams ?? DEFAULT_ENGINE_PARAMS;
   const today = todayVn();
   const canSeeMoney = currentRole === "ceo" || currentRole === "admin";
   const [grain, setGrain] = useState<Grain>("month");
@@ -207,10 +213,10 @@ export default function CeoBrief(props: CeoBriefProps) {
       const target = monthTargetOf(month, planMonthTotals.get(key), lockedSlotTargets);
       const chSessions = sessions.filter((s) => s.brandId === b.id && platformOf(s) === p);
       const open = shiftSlots.filter((sl) => sl.brandId === b.id && platformOf(sl) === p && sl.status === "open" && !sl.sessionId);
-      out.set(brandPlatformKey(b.id, p), monthOutlook(month, today, chSessions, open, target, camp));
+      out.set(brandPlatformKey(b.id, p), monthOutlook(month, today, chSessions, open, target, camp, engineParams));
     }
     return out;
-  }, [channels, plans, month, shiftSlots, planSlotTargets, planMonthTotals, sessions, today]);
+  }, [channels, plans, month, shiftSlots, planSlotTargets, planMonthTotals, sessions, today, engineParams]);
   const outlooks = useMemo(() => {
     const out = new Map<string, MonthOutlook>();
     for (const b of brands) {
@@ -222,6 +228,25 @@ export default function CeoBrief(props: CeoBriefProps) {
   const scopeOutlook = useMemo(() => combineOutlooks(month, today, scopeIds.map((id) => outlooks.get(id)!).filter(Boolean)), [month, today, scopeIds, outlooks]);
   const multiPlatform = (id: string) => platformsOfBrand(brandChannels, id).length > 1;
   const channelName = (b: Brand, p: ReportPlatform) => channelTitle(b.name, p, multiPlatform(b.id));
+
+  // Sổ độ chính xác dự báo (0163, engine target v3 P7): khi ceo/ops/admin xem THÁNG NÀY, ghi dự phóng của từng kênh cho hôm nay
+  // (mở nhiều lần thì DB ghi đè dòng của ngày). Mỗi kênh tối đa một lần ghi cho mỗi (ngày, số dự phóng) trong phiên. Lỗi ghi không
+  // làm hỏng Dashboard — chỉ mất một dòng sổ.
+  const ledgerWritten = useRef(new Set<string>());
+  useEffect(() => {
+    if (!["ceo", "operations", "admin"].includes(currentRole) || month !== today.slice(0, 7)) return;
+    const rows = channels
+      .map(({ b, p }) => ({ b, p, o: channelOutlooks.get(brandPlatformKey(b.id, p)) }))
+      .filter((x): x is { b: Brand; p: ReportPlatform; o: MonthOutlook } => !!x.o && x.o.forecastModel === "shape" && x.o.projectionMethod !== "none" && (x.o.actual > 0 || x.o.pending.length > 0))
+      .map(({ b, p, o }) => {
+        const half = coneHalf(o.actual, o.projected, o.coneCoef);
+        return { brandId: b.id, platform: p, month, asOf: today, kind: "daily" as const, p50: o.projected, lo: o.projected - half, hi: o.projected + half, actual: o.actual, target: o.target?.total ?? null, seenShare: o.shape?.seenShare ?? null, ratio: o.shape?.ratio ?? null };
+      })
+      .filter((r) => !ledgerWritten.current.has(`${r.brandId}|${r.platform}|${r.asOf}|${Math.round(r.p50)}`));
+    if (rows.length === 0) return;
+    rows.forEach((r) => ledgerWritten.current.add(`${r.brandId}|${r.platform}|${r.asOf}|${Math.round(r.p50)}`));
+    recordForecastSnapshots(rows).catch((e) => console.warn("Ghi sổ dự báo không được:", e));
+  }, [channelOutlooks, channels, currentRole, month, today]);
 
   const issues = useMemo(
     () =>
@@ -291,10 +316,10 @@ export default function CeoBrief(props: CeoBriefProps) {
       const camp: CampOverrides = effectiveCamp(plans.get(brandPlatformKey(b.id, p))?.campRanges);
       const chSessions = sessions.filter((s) => s.brandId === b.id && platformOf(s) === p);
       const plan = plans.get(brandPlatformKey(b.id, p));
-      out.set(b.id, handlingPlan({ outlook: o, today, sessions: chSessions, camp, slotHours: plan?.defaultSlotHours }));
+      out.set(b.id, handlingPlan({ outlook: o, today, sessions: chSessions, camp, slotHours: plan?.defaultSlotHours, checkpointCap: engineParams.fcCheckpointCap }));
     }
     return out;
-  }, [channels, channelOutlooks, plans, sessions, today]);
+  }, [channels, channelOutlooks, plans, sessions, today, engineParams.fcCheckpointCap]);
 
   const scopedBrands = useMemo(() => brands.filter((b) => scopeIds.includes(b.id)), [brands, scopeIds]);
   const model: DashModel = {

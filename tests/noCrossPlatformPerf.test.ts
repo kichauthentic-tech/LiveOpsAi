@@ -85,6 +85,7 @@ const SUM_RE = new RegExp(`reduce\\s*[<(]|\\+=|\\+\\s*\\(?\\s*[\\w!?.]+\\.(${PER
  */
 const SINGLE_PLATFORM_FILES: Record<string, string> = {
   "lib/affiliate/plan.ts": "kế hoạch Affiliate chỉ có ở TikTok (hồ sơ Shopee ẩn tab brand_affiliate), tổng theo một brand × tháng",
+  "components/ForecastTrainingCard.tsx": "thẻ lọc ca theo brand + sàn đã chọn (`channel`) trước khi cộng",
   "components/brand-workspace/BrandDashboard.tsx": "workspace brand đã lọc ca theo sàn (platformSessions ở App)",
   "components/brand-workspace/BrandWeeklyReport.tsx": "nhận `platform`, lọc ca theo sàn",
   "components/brand-workspace/MonthlyReportTabs.tsx": "report TikTok, chỉ ca TikTok",
@@ -94,6 +95,7 @@ const SINGLE_PLATFORM_FILES: Record<string, string> = {
   "lib/performance/ceoBrief.ts": "CeoBrief truyền ca của một sàn",
   "lib/performance/handlingPlan.ts": "nhận ca của MỘT kênh brand × sàn (CeoBrief lọc theo platformOf trước khi gọi)",
   "lib/performance/hostSuggestion.ts": "lọc platformOf(s) === slot.platform trước khi cộng",
+  "lib/performance/monthForecast.ts": "buildMonthForecaster có assertOnePlatform; dự báo của một kênh brand × sàn",
   "lib/performance/planRunRate.ts": "run-rate của một kế hoạch (brand × tháng × sàn)",
   "lib/scheduling/retarget.ts": "cộng target các ca của MỘT kế hoạch (brand × tháng × sàn) đang mở trong Kế Hoạch Tháng",
   "lib/performance/slotInsights.ts": "Dashboard brand / Kế Hoạch Tháng truyền ca một kênh",

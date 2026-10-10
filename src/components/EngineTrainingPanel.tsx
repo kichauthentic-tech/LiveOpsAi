@@ -9,6 +9,8 @@ import { todayVn } from "../lib/performance/brandCommitment";
 import { useDefaultBrand } from "../hooks/useDefaultBrand";
 import { errorMessage } from "../lib/errorMessage";
 import { AllocationTrainingCard } from "./AllocationTrainingCard";
+import { ForecastTrainingCard } from "./ForecastTrainingCard";
+import { LEGACY_PLATFORM, REPORT_PLATFORMS, platformOf, type ReportPlatform } from "../lib/reportPlatform";
 
 import { fmtDateVn, fmtFixed, fmtVndShort } from "../lib/format";
 // AI Training Center — mục "Engine Kế Hoạch Tháng". Engine là thuật toán thuần, không phải LLM: không
@@ -57,8 +59,14 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
   }, [brandId]);
 
   const schemes = useMemo(() => promoSchemes.filter((sc) => sc.brandId === brandId).map((sc) => ({ start: sc.startDate, end: sc.endDate, label: sc.title })), [promoSchemes, brandId]);
+  // Lịch sử engine là của MỘT kênh (buildHistory chặn ca lẫn hai sàn — 07/10): brand có cả TikTok và Shopee chọn sàn ở đầu thẻ.
+  // Trước 10/10 thẻ truyền ca mọi sàn ⇒ chọn VERA/JOCKEY là cả trang AI Training Center sập ở bản dev (bản build chỉ ghi lỗi, số trộn hai sàn).
+  const brandPlatforms = useMemo(() => REPORT_PLATFORMS.filter((p) => sessions.some((s) => s.brandId === brandId && platformOf(s) === p)), [sessions, brandId]);
+  const [histPick, setHistPick] = useState<ReportPlatform | null>(null);
+  const histPlatform: ReportPlatform = histPick && brandPlatforms.includes(histPick) ? histPick : brandPlatforms[0] ?? LEGACY_PLATFORM;
+  const histSessions = useMemo(() => sessions.filter((s) => platformOf(s) === histPlatform), [sessions, histPlatform]);
   // Học lại với tham số ĐANG SỬA — đây là chỗ admin thấy nút vặn có tác dụng.
-  const history = useMemo(() => (brandId ? buildHistory(sessions, brandId, today, { events, schemes, params: draft }) : null), [sessions, brandId, today, events, schemes, draft]);
+  const history = useMemo(() => (brandId ? buildHistory(histSessions, brandId, today, { events, schemes, params: draft }) : null), [histSessions, brandId, today, events, schemes, draft]);
   const evaluation = useMemo(() => {
     if (lockedSlots.length === 0) return null;
     const byMonth = new Map<string, BrandMonthPlanSlot[]>();
@@ -112,13 +120,21 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
       <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
         {/* Nửa trái: engine đã học gì */}
         <div className="xl:col-span-2 space-y-4">
+          {brandId && <ForecastTrainingCard brandId={brandId} sessions={sessions} params={draft} today={today} schemes={schemes} />}
           {brandId && <AllocationTrainingCard brandId={brandId} sessions={sessions} params={draft} today={today} />}
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 space-y-3">
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-sm font-bold text-[var(--text)] flex items-center gap-1.5"><BrainCircuit className="w-4 h-4 text-[var(--accent-text)]" /> Engine đã học gì</h3>
-              <select value={brandId} onChange={(e) => setBrandId(e.target.value)} className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1 text-xs font-bold text-[var(--text)]">
-                {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </select>
+              <div className="flex gap-1.5">
+                <select value={brandId} onChange={(e) => setBrandId(e.target.value)} className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1 text-xs font-bold text-[var(--text)]">
+                  {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+                {brandPlatforms.length > 1 && (
+                  <select value={histPlatform} onChange={(e) => setHistPick(e.target.value as ReportPlatform)} aria-label="Sàn" className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1 text-xs font-bold text-[var(--text)]">
+                    {brandPlatforms.map((p) => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                )}
+              </div>
             </div>
             {!history || history.sessions === 0 ? (
               <p className="text-xs text-[var(--text-muted)]">Brand chưa có ca đối soát nào — không có gì để học. Up file ở Dữ Liệu Gốc của brand rồi Áp dụng đối soát, hoặc nạp bù từ file.</p>

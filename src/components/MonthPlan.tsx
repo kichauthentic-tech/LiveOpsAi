@@ -36,6 +36,8 @@ import { RetargetBatch, RetargetPlan, buildRetarget } from "../lib/scheduling/re
 import { PlanGroupTargetsBlock } from "./PlanGroupTargets";
 import { RecurringRulesPanel } from "./scheduling/RecurringRulesPanel";
 import { HistorySummary, STRATEGY_LABEL, SuggestResult, SuggestStrategy, buildBorrowedHistory, buildHistory, estimateSlots, suggestMonthPlan } from "../lib/scheduling/suggestEngine";
+import { buildMonthForecaster, planOutlook, slotForecasts } from "../lib/performance/monthForecast";
+import { recordForecastSnapshots } from "../lib/db/forecastSnapshots";
 import { EngineParams } from "../lib/scheduling/engineParams";
 import { findBrandStudioId } from "../lib/db/brandStudios";
 import { useConfirm } from "../hooks/useConfirm";
@@ -301,6 +303,12 @@ export default function MonthPlan({
       setMsg("Giờ / GMV cam kết phải là số không âm (để trống GMV nếu không cam kết).");
       return false;
     }
+    // 10/10: VERA TikTok T10 lưu giờ cam kết = 550.000.000 (target GMV gõ nhầm vào ô giờ) ⇒ "thiếu 549.999.787,7h". Một kênh một tháng
+    // không thể quá ~2.000 giờ (744h/phòng × vài phòng) — số lớn hơn gần như chắc là tiền.
+    if (hours > 2000) {
+      setMsg(`Giờ cam kết ${hours.toLocaleString("vi-VN")} giờ quá lớn — có phải số tiền? Target GMV nhập ở ô "Target GMV tháng".`);
+      return false;
+    }
     const contract = contractCovering(contracts, brandId, platform, `${month}-01`);
     setCommitSaving(true);
     try {
@@ -390,6 +398,16 @@ export default function MonthPlan({
   );
   const allocationWeights = (next: PlanDraftSlot[], forecasts: number[], camp = campRanges) =>
     allocator ? allocatorWeights(allocator, next, (d) => resolveCampBucketType(d, camp)).blended : forecasts;
+  // Dự báo GMV từng ca = engine target v3 (lib/performance/monthForecast.ts, 10/10): cùng mô hình hình dạng với bộ chia target, mức
+  // = trung bình nhân (28 ngày gần nhất, 3 tháng gần nhất), ngày giờ vượt vùng lịch sử bị giảm. Thay `estimateSlots` (đếm uplift camp
+  // hai lần — sai số tổng tháng lúc lập 31% so với 13%). Brand chưa đủ 15 ca lịch sử (cold start mượn hình dạng) vẫn rơi về engine cũ.
+  const forecaster = useMemo(
+    () => buildMonthForecaster(platformSessions.filter((s) => s.brandId === brandId), month, engineParams),
+    [platformSessions, brandId, month, engineParams]
+  );
+  const forecastsFor = (next: { date: string; startTime: string; endTime: string }[], ctx: typeof estimateCtx = estimateCtx): number[] =>
+    forecaster ? slotForecasts(forecaster, next, (d) => resolveCampBucketType(d, ctx.camp ?? campRanges)) : estimateSlots(engineHistory, next, ctx);
+  const sumOf = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
   // Target theo nhóm ngày (0161): nhóm nào ops đã nhập thì ca nhóm đó chia đúng số ấy, nhóm trống chia phần còn lại của target tháng.
   const groupSpec = (targets = settings.groupTargets, camp = campRanges) => ({ bucketOf: (d: string) => resolveCampBucketType(d, camp), targets });
   // Target đi theo lưới (user chốt 2026-09-21): ở giai đoạn NHÁP, mọi thay đổi cấu trúc (thêm/bỏ/dời
@@ -399,7 +417,7 @@ export default function MonthPlan({
   // hỗ trợ vận hành (sau). Sửa target/ca bằng tay không kích hoạt chia lại (thanh "Tổng target" báo lệch).
   const withForecast = (next: PlanDraftSlot[], target = targetTotal, ctx = estimateCtx, groupTargets = settings.groupTargets): PlanDraftSlot[] => {
     if (next.length === 0) return next;
-    const w = estimateSlots(engineHistory, next, ctx);
+    const w = forecastsFor(next, ctx);
     const flag = (d: PlanDraftSlot) => ({ ...d, highExpectation: d.expectedGmv ? d.targetGmv > d.expectedGmv * engineParams.highExpectationRatio : d.highExpectation });
     const camp = ctx.camp ?? campRanges;
     const total = Math.max(target, sumGroupTargets(groupTargets));
@@ -531,7 +549,7 @@ export default function MonthPlan({
       setMsg("Lưới đang trống — vẽ ca hoặc bấm Gợi ý phân bổ trước.");
       return;
     }
-    const weights = estimateSlots(engineHistory, drafts, estimateCtx);
+    const weights = forecastsFor(drafts);
     const byForecast = weights.some((w) => w > 0);
     const grouped = sumGroupTargets(settings.groupTargets) > 0;
     setDrafts(allocateDraftTargets(drafts, total, allocationWeights(drafts, weights), weights, groupSpec()));
@@ -553,9 +571,23 @@ export default function MonthPlan({
     for (const d of next) perDay.set(d.date, (perDay.get(d.date) ?? 0) + 1);
     const maxDay = Math.max(0, ...perDay.values());
     if (maxDay > settings.maxSlotsPerDay) setSettings((st) => ({ ...st, maxSlotsPerDay: maxDay }));
-    setDrafts(next);
+    // Bộ xếp lịch chọn GIỜ; dự báo + target từng ca tính lại bằng engine v3 để mọi con số trên lưới đi từ một mô hình.
+    setDrafts(withForecast(next));
     setDirty(true);
   };
+  // Bộ xếp lịch (suggestMonthPlan) dừng khi DỰ BÁO CỦA NÓ chạm target. Dự báo đó khác v3 ⇒ quy target về thang của bộ xếp lịch bằng
+  // tỷ lệ hai dự báo trên cùng lưới, để lịch xếp ra có dự báo v3 ≈ target.
+  const schedulerTarget = (target: number, sample: { date: string; startTime: string; endTime: string }[]) => {
+    if (!forecaster || sample.length === 0) return target;
+    const mine = sumOf(forecastsFor(sample));
+    const theirs = sumOf(estimateSlots(engineHistory, sample, estimateCtx));
+    return mine > 0 && theirs > 0 ? target * (theirs / mine) : target;
+  };
+  // Dự báo cả lưới (P50 + dải ~80% + khả năng đạt target) — cùng phân phối với Dashboard.
+  const gridOutlook = useMemo(
+    () => (forecaster && drafts.length > 0 ? planOutlook(forecaster, drafts, (d) => resolveCampBucketType(d, campRanges), targetTotal) : null),
+    [forecaster, drafts, campRanges, targetTotal]
+  );
   const baseConstraints = useMemo(() => ({
     month,
     today,
@@ -578,17 +610,17 @@ export default function MonthPlan({
   const targetGap = useMemo(() => {
     // engineHistory, KHÔNG phải history: cold start có mượn hình dạng thì vẫn dự báo được, nên vẫn
     // phải cảnh báo hụt target. Bỏ sót chỗ này khi vá Đ12 (2026-09-24), `exhaustive-deps` bắt được.
-    if (locked || targetTotal <= 0 || drafts.length === 0 || engineHistory.brandGmvPerHour <= 0) return null;
-    const forecast = estimateSlots(engineHistory, drafts, estimateCtx).reduce((a, b) => a + b, 0);
+    if (locked || targetTotal <= 0 || drafts.length === 0 || (!forecaster && engineHistory.brandGmvPerHour <= 0)) return null;
+    const forecast = gridOutlook ? gridOutlook.p50 : sumOf(estimateSlots(engineHistory, drafts, estimateCtx));
     const gap = targetTotal - forecast;
     const pct = gap / targetTotal;
-    if (pct <= engineParams.targetGapWarnPct) return { forecast, gap, pct, fill: null as SuggestResult | null, extraHours: 0, extraSlots: [] as SuggestResult["slots"] };
-    const fill = suggestMonthPlan(engineHistory, { ...baseConstraints, mode: "target", strategy });
+    if (pct <= engineParams.targetGapWarnPct || engineHistory.brandGmvPerHour <= 0) return { forecast, gap, pct, fill: null as SuggestResult | null, extraHours: 0, extraSlots: [] as SuggestResult["slots"] };
+    const fill = suggestMonthPlan(engineHistory, { ...baseConstraints, targetGmv: schedulerTarget(targetTotal, drafts), mode: "target", strategy });
     const fixed = new Set(drafts.map((d) => `${d.date}|${d.startTime}|${d.endTime}`));
     const extraSlots = fill.slots.filter((sl) => !fixed.has(`${sl.date}|${sl.startTime}|${sl.endTime}`));
     const extraHours = extraSlots.reduce((a, sl) => a + sl.hours, 0);
     return { forecast, gap, pct, fill: fill.hoursToHitTarget !== null && extraSlots.length > 0 ? fill : null, extraHours, extraSlots };
-  }, [locked, targetTotal, drafts, engineHistory, estimateCtx, engineParams.targetGapWarnPct, baseConstraints, strategy]);
+  }, [locked, targetTotal, drafts, engineHistory, estimateCtx, engineParams.targetGapWarnPct, baseConstraints, strategy, gridOutlook, forecaster]); // eslint-disable-line react-hooks/exhaustive-deps
   // Giai đoạn B — engine gợi ý: ca đang có trong lưới được giữ làm ca cố định, engine xếp thêm cho đủ
   // giờ cam kết và chia target theo dự báo từng ca.
   const suggest = (mode: "hours" | "target" = "hours") => {
@@ -600,12 +632,16 @@ export default function MonthPlan({
       setMsg("Nhập Target GMV tháng ở Tham số lập kế hoạch trước.");
       return;
     }
-    const base = { ...baseConstraints, mode };
+    // Xếp theo target: quy target về thang dự báo của bộ xếp lịch (lưới đang có làm mẫu; lưới trống thì chạy thử một lượt).
+    const pilot = mode === "target" && drafts.length === 0 ? suggestMonthPlan(engineHistory, { ...baseConstraints, mode, strategy }).slots : drafts;
+    const base = { ...baseConstraints, mode, targetGmv: mode === "target" ? schedulerTarget(targetTotal, pilot) : baseConstraints.targetGmv };
+    // Dự báo hiện trên bảng so sánh = engine v3 của cả lưới kết quả (không phải dự báo nội bộ của bộ xếp lịch).
+    const v3 = (r: SuggestResult): SuggestResult => (forecaster && r.slots.length ? { ...r, forecastGmv: sumOf(forecastsFor(r.slots)), targetGapGmv: targetTotal - sumOf(forecastsFor(r.slots)) } : r);
     // Chạy cả 3 phương án để so sánh; áp phương án đang chọn vào lưới.
     const all: Record<SuggestStrategy, SuggestResult> = {
-      max: suggestMonthPlan(engineHistory, { ...base, strategy: "max" }),
-      balanced: suggestMonthPlan(engineHistory, { ...base, strategy: "balanced" }),
-      lean: suggestMonthPlan(engineHistory, { ...base, strategy: "lean" })
+      max: v3(suggestMonthPlan(engineHistory, { ...base, strategy: "max" })),
+      balanced: v3(suggestMonthPlan(engineHistory, { ...base, strategy: "balanced" })),
+      lean: v3(suggestMonthPlan(engineHistory, { ...base, strategy: "lean" }))
     };
     setCompare(all);
     const result = all[strategy];
@@ -639,7 +675,7 @@ export default function MonthPlan({
       return;
     }
     if (drafts.length === 0) return;
-    const w = estimateSlots(engineHistory, drafts, estimateCtx);
+    const w = forecastsFor(drafts);
     const after = allocateDraftTargets(drafts, total, allocationWeights(drafts, w, campRanges), w, groupSpec(retargetGroups, campRanges));
     setRetargetPreview({ plan: buildRetarget(drafts, after, today), after, basis: allocator ? "v2" : "engine" });
   };
@@ -751,6 +787,11 @@ export default function MonthPlan({
     setSaving(true);
     try {
       const r = await lockMonthPlan(p.id);
+      // Sổ độ chính xác (0163): dự báo LÚC CHỐT của lưới vừa chốt — để cuối tháng so với GMV thật. Lỗi ghi không chặn việc chốt.
+      if (gridOutlook) {
+        recordForecastSnapshots([{ brandId, platform, month, asOf: today, kind: "plan", p50: gridOutlook.p50, lo: gridOutlook.lo, hi: gridOutlook.hi, target: Math.round(totals.target) }])
+          .catch((e) => console.warn("Ghi sổ dự báo lúc chốt không được:", e));
+      }
       await onPlanLocked();
       const fresh = await fetchMonthPlan(brandId, month, platform);
       if (fresh) {
@@ -995,6 +1036,23 @@ export default function MonthPlan({
             </b>
           </div>
           {errors.length > 0 && <p className="text-[11px] text-rose-300">{errors[0]}{errors.length > 1 ? ` · +${errors.length - 1} lỗi` : ""}</p>}
+          {gridOutlook && forecaster && (
+            <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 pt-2 border-t border-[var(--border)]/60 text-xs" data-testid="grid-forecast">
+              <span className="col-span-2 text-[11px] font-bold text-[var(--text-muted)] mb-0.5" title="Engine target v3: giờ × loại ngày × khung giờ × vị trí ngày, mức = trung bình nhân 28 ngày gần nhất và 3 tháng gần nhất. Backtest lúc lập: sai ~13% với kênh lớn — tổng tháng không thể đoán trước chính xác hơn vì mức GMV/giờ của brand tự dao động; trong tháng Dashboard cập nhật theo số thật.">Dự báo GMV của lưới</span>
+              <span className="text-[var(--text-muted)]">Dự báo giữa (P50)</span><b className="text-right text-[var(--text)]">{fmtVndShort(gridOutlook.p50)}</b>
+              <span className="text-[var(--text-muted)]">Dải ~80%</span><b className="text-right text-[var(--text)]">{fmtVndShort(gridOutlook.lo)} – {fmtVndShort(gridOutlook.hi)}</b>
+              {gridOutlook.pHit !== null && (
+                <><span className="text-[var(--text-muted)]">Khả năng đạt target</span><b className={`text-right ${gridOutlook.pHit >= 0.8 ? "text-emerald-400" : gridOutlook.pHit >= 0.5 ? "text-sky-400" : gridOutlook.pHit >= 0.2 ? "text-amber-400" : "text-rose-400"}`}>{Math.round(gridOutlook.pHit * 100)}%</b></>
+              )}
+              {gridOutlook.excessHours > 0.05 && (
+                <span className="col-span-2 text-[11px] text-amber-300 leading-snug">{fmtH(gridOutlook.excessHours)}h nằm ở các ngày dày giờ hơn mọi khi (vượt p90 giờ/ngày lịch sử) — phần giờ đó chỉ tính {Math.round(engineParams.fcOutOfRangeFactor * 100)}% GMV/giờ vì chưa có bằng chứng thêm giờ ra thêm GMV.</span>
+              )}
+              {forecaster.pastErrors.length > 0 && (
+                <span className="col-span-2 text-[11px] text-[var(--text-faint)] leading-snug">Dự báo lúc lập các tháng trước lệch: {forecaster.pastErrors.map((e) => `T${Number(e.month.slice(5))} ${e.error > 0 ? "+" : ""}${Math.round(e.error * 100)}%`).join(" · ")}{forecaster.biasFactor !== 1 ? ` — đã tự hiệu chỉnh ×${fmtFixed(forecaster.biasFactor, 2)}` : ""}.</span>
+              )}
+              {forecaster.mostlyManual && <span className="col-span-2 text-[11px] text-amber-300 leading-snug">Lịch sử của kênh chủ yếu là số nhập tay (chưa đối soát) — độ tin thấp hơn; up file đối soát để chắc hơn.</span>}
+            </div>
+          )}
           {commitProgress && month <= today.slice(0, 7) && (
             <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 pt-2 border-t border-[var(--border)]/60 text-xs">
               <span className="col-span-2 text-[11px] font-bold text-[var(--text-muted)] mb-0.5">Tiến độ giờ cam kết</span>

@@ -55,6 +55,8 @@ export interface HistorySummary {
   firstDate?: string;
   lastDate?: string;
   brandGmvPerHour: number;
+  /** Mức nền ngày thường (đã chia hệ số camp/lễ/scheme) — mức mà ô thứ × khung giờ quy về; dùng cho ô thiếu dữ liệu. */
+  baseGmvPerHour: number;
   campMultipliers: Record<CampDayBucket, number>;
   campLearned: Record<CampDayBucket, boolean>;
   diminishing: number[]; // hệ số ca thứ 1, 2, 3… trong ngày
@@ -187,6 +189,7 @@ export function buildHistory(sessions: LiveSession[], brandId: string, asOf: str
     sessions: usable.length,
     months: 0,
     brandGmvPerHour: 0,
+    baseGmvPerHour: 0,
     campMultipliers: { daily: 1, dday: 1, midmonth: 1, payday: 1 },
     campLearned: { daily: false, dday: false, midmonth: false, payday: false },
     diminishing: [1, 0.85, 0.7, 0.6],
@@ -242,54 +245,8 @@ export function buildHistory(sessions: LiveSession[], brandId: string, asOf: str
     const list = byDate.get(s.date) ?? [];
     list.push(s);
     byDate.set(s.date, list);
-
-    const wd = weekdayOf(s.date);
-    let cur = toMin(s.startTime);
-    let end = toMin(s.endTime);
-    if (end <= cur) end += 24 * 60;
-    const totalMin = end - cur;
-    while (cur < end) {
-      const blockEnd = (Math.floor(cur / (BLOCK_HOURS * 60)) + 1) * BLOCK_HOURS * 60;
-      const seg = Math.min(blockEnd, end) - cur;
-      const frac = seg / totalMin;
-      const block = Math.floor((cur % (24 * 60)) / (BLOCK_HOURS * 60));
-      const wdAdj = cur >= 24 * 60 ? (wd + 1) % 7 : wd;
-      const key = `${wdAdj}|${block}`;
-      const c = acc.get(key) ?? { hours: 0, gmv: 0, views: 0, orders: 0, n: new Set<string>() };
-      c.hours += (seg / 60) * w;
-      c.gmv += gmvCapped * frac * w;
-      c.views += (s.totalViews || 0) * frac * w;
-      c.orders += (s.totalOrders || 0) * frac * w;
-      // Số ca của ô chỉ đếm ca phủ ô đó ≥ 30 phút. Trước 05/10 ca tắt lúc 00:01 cũng tính là "1 ca" của khối
-      // 0–2h hôm sau ⇒ AI Training hiện "T4 0–2h (6 ca) 26,9M/h" là khung giờ mạnh, trong khi cả 6 ca chỉ chạm
-      // ô đó 1 phút (GMV/giờ của ô = GMV/giờ trung bình cả ca, nhưng độ tin theo số ca lại đếm đủ 6).
-      if (seg >= MIN_CELL_MINUTES) c.n.add(s.id);
-      acc.set(key, c);
-      cur += seg;
-    }
   }
   const brandGmvPerHour = totalW > 0 ? totalGmvW / totalW : 0;
-
-  const cells: HistoryCell[] = [];
-  for (const [key, c] of acc) {
-    const [wd, block] = key.split("|").map(Number);
-    const raw = c.hours > 0 ? c.gmv / c.hours : 0;
-    const n = c.n.size;
-    const shrunk = (n * raw + P.shrinkK * brandGmvPerHour) / (n + P.shrinkK);
-    const viewsPerHour = c.hours > 0 ? c.views / c.hours : 0;
-    const conversion = c.views > 0 ? c.orders / c.views : 0;
-    cells.push({ weekday: wd, block, hours: c.hours, gmv: c.gmv, views: c.views, orders: c.orders, n, gmvPerHour: shrunk, rawGmvPerHour: raw, viewsPerHour, conversion, tag: "thin" });
-  }
-  // Nhãn: so với trung vị brand.
-  const medGph = percentile(cells.map((c) => c.gmvPerHour), 0.5);
-  const medVph = percentile(cells.filter((c) => c.views > 0).map((c) => c.viewsPerHour), 0.5);
-  const medConv = percentile(cells.filter((c) => c.views > 0).map((c) => c.conversion), 0.5);
-  for (const c of cells) {
-    if (c.n < 2) c.tag = "thin";
-    else if (c.gmvPerHour >= medGph * 1.15) c.tag = "strong";
-    else if (medVph > 0 && c.viewsPerHour >= medVph * 1.15 && c.conversion < medConv * 0.85) c.tag = "traffic_low_cvr";
-    else c.tag = c.gmvPerHour < medGph * 0.85 ? "weak" : "thin";
-  }
 
   // Hệ số camp học từ lịch sử — cần ≥ 3 ca trong khung và có ngày thường để so; clamp [0.8, 3].
   const dailyGph = bucketAcc.daily.h > 0 ? bucketAcc.daily.g / bucketAcc.daily.h : brandGmvPerHour;
@@ -357,12 +314,75 @@ export function buildHistory(sessions: LiveSession[], brandId: string, asOf: str
     schemeLearned = true;
   }
 
+  // Ô thứ × khối 2h = mức NỀN của ngày thường (10/10, engine target v3): GMV của ca chia cho hệ số loại ngày × lễ/sự kiện × scheme
+  // của chính ngày đó trước khi rải vào ô. Trước đây ô học từ GMV thô (gồm cả uplift ngày camp) rồi `estimateSlots`/xếp lịch lại
+  // nhân hệ số camp ⇒ đếm uplift hai lần: VERA Shopee T8 ngày thường dự báo 4,31tr/giờ so với lịch sử ngày thường 2,96; sai số tổng
+  // tháng lúc lập 31% (CROCS+VERA). Dự báo tổng tháng nay ở lib/performance/monthForecast.ts; ô ở đây còn để xếp lịch chọn giờ.
+  let baseG = 0;
+  let baseH = 0;
+  for (const s of usable) {
+    const hours = sessionDurationHours(s.startTime, s.endTime);
+    const w = weightOf(s);
+    const ek = eventKindOf(s.date);
+    const season = campMultipliers[resolveCampBucketType(s.date)] * (ek ? eventMultipliers[ek] : 1) * (inScheme(s.date) ? schemeMultiplier : 1);
+    const gmvCapped = (Math.min(s.actualGmv / hours, cap) * hours) / (season > 0 ? season : 1);
+    baseG += gmvCapped * w;
+    baseH += hours * w;
+    const wd = weekdayOf(s.date);
+    let cur = toMin(s.startTime);
+    let end = toMin(s.endTime);
+    if (end <= cur) end += 24 * 60;
+    const totalMin = end - cur;
+    while (cur < end) {
+      const blockEnd = (Math.floor(cur / (BLOCK_HOURS * 60)) + 1) * BLOCK_HOURS * 60;
+      const seg = Math.min(blockEnd, end) - cur;
+      const frac = seg / totalMin;
+      const block = Math.floor((cur % (24 * 60)) / (BLOCK_HOURS * 60));
+      const wdAdj = cur >= 24 * 60 ? (wd + 1) % 7 : wd;
+      const key = `${wdAdj}|${block}`;
+      const c = acc.get(key) ?? { hours: 0, gmv: 0, views: 0, orders: 0, n: new Set<string>() };
+      c.hours += (seg / 60) * w;
+      c.gmv += gmvCapped * frac * w;
+      c.views += (s.totalViews || 0) * frac * w;
+      c.orders += (s.totalOrders || 0) * frac * w;
+      // Số ca của ô chỉ đếm ca phủ ô đó ≥ 30 phút. Trước 05/10 ca tắt lúc 00:01 cũng tính là "1 ca" của khối
+      // 0–2h hôm sau ⇒ AI Training hiện "T4 0–2h (6 ca) 26,9M/h" là khung giờ mạnh, trong khi cả 6 ca chỉ chạm
+      // ô đó 1 phút (GMV/giờ của ô = GMV/giờ trung bình cả ca, nhưng độ tin theo số ca lại đếm đủ 6).
+      if (seg >= MIN_CELL_MINUTES) c.n.add(s.id);
+      acc.set(key, c);
+      cur += seg;
+    }
+  }
+  const baseGmvPerHour = baseH > 0 ? baseG / baseH : brandGmvPerHour;
+
+  const cells: HistoryCell[] = [];
+  for (const [key, c] of acc) {
+    const [wd, block] = key.split("|").map(Number);
+    const raw = c.hours > 0 ? c.gmv / c.hours : 0;
+    const n = c.n.size;
+    const shrunk = (n * raw + P.shrinkK * baseGmvPerHour) / (n + P.shrinkK);
+    const viewsPerHour = c.hours > 0 ? c.views / c.hours : 0;
+    const conversion = c.views > 0 ? c.orders / c.views : 0;
+    cells.push({ weekday: wd, block, hours: c.hours, gmv: c.gmv, views: c.views, orders: c.orders, n, gmvPerHour: shrunk, rawGmvPerHour: raw, viewsPerHour, conversion, tag: "thin" });
+  }
+  // Nhãn: so với trung vị brand.
+  const medGph = percentile(cells.map((c) => c.gmvPerHour), 0.5);
+  const medVph = percentile(cells.filter((c) => c.views > 0).map((c) => c.viewsPerHour), 0.5);
+  const medConv = percentile(cells.filter((c) => c.views > 0).map((c) => c.conversion), 0.5);
+  for (const c of cells) {
+    if (c.n < 2) c.tag = "thin";
+    else if (c.gmvPerHour >= medGph * 1.15) c.tag = "strong";
+    else if (medVph > 0 && c.viewsPerHour >= medVph * 1.15 && c.conversion < medConv * 0.85) c.tag = "traffic_low_cvr";
+    else c.tag = c.gmvPerHour < medGph * 0.85 ? "weak" : "thin";
+  }
+
   return {
     sessions: usable.length,
     months,
     firstDate,
     lastDate,
     brandGmvPerHour,
+    baseGmvPerHour,
     campMultipliers,
     campLearned,
     diminishing,
@@ -413,6 +433,7 @@ export function buildBorrowedHistory(
   return {
     ...agency,
     brandGmvPerHour: levelGmvPerHour,
+    baseGmvPerHour: agency.baseGmvPerHour * k,
     // Chỉ các cột TIỀN được scale. `viewsPerHour`/`conversion` giữ nguyên của agency: chúng không
     // suy ra được từ mức GMV ops nhập (cùng GMV/giờ có thể tới từ ít người xem giá cao hoặc ngược
     // lại), và engine xếp lịch không đọc tới chúng — chỉ benchmark từng ca mới đọc, mà benchmark
@@ -458,7 +479,7 @@ function expectedGphFor(date: string, start: number, end: number, h: HistorySumm
     const c = get(wdCur, block);
     const cal = calibration?.get(`${wdCur}|${block}`) ?? 1;
     // Ô chưa có lịch sử: 70% trung bình brand — vẫn chọn được nhưng thua ô đã chứng minh.
-    sum += (c ? c.gmvPerHour : h.brandGmvPerHour * 0.7) * cal * (seg / 60);
+    sum += (c ? c.gmvPerHour : h.baseGmvPerHour * 0.7) * cal * (seg / 60);
     if (c) cells.push(c);
     cur += seg;
   }

@@ -175,7 +175,8 @@ describe("handlingPlan", () => {
     const future = Array.from({ length: 10 }, (_, k) => ca(addDays("2026-09-21", k), { status: "Upcoming", actualGmv: 0, totalViews: 0, totalOrders: 0, startTime: "10:00", endTime: "13:00" }));
     const sessions = [...hist, ...future];
     const base = monthOutlook("2026-09", "2026-09-20", sessions, [], null, undefined);
-    const target = monthTargetOf("2026-09", base.projected * 1.2, [{ date: "2026-09-05", target: base.projected * 1.2 }]);
+    // Thiếu nhỏ (3%) để không chạm trần +30% của mốc điều chỉnh (engine target v3).
+    const target = monthTargetOf("2026-09", base.projected * 1.03, [{ date: "2026-09-05", target: base.projected * 1.03 }]);
     const o = monthOutlook("2026-09", "2026-09-20", sessions, [], target, undefined);
     const p = handlingPlan({ outlook: o, today: "2026-09-20", sessions });
     expect(p.elasticity.reliable).toBe(true);
@@ -183,8 +184,14 @@ describe("handlingPlan", () => {
     expect(p.elasticity.value).toBeLessThan(0.8);
     expect(p.marginalRate!).toBeCloseTo(o.rates!.daily * p.elasticity.value, 3);
     expect(p.marginalRate!).toBeLessThan(o.rates!.daily);
+    // 10/10: giờ cần theo công thức mốc điều chỉnh ((R̂ + thiếu) ÷ R̂)^(1 ÷ co giãn) − 1 trên giờ còn lại — co giãn < 1 ⇒ cần NHIỀU
+    // giờ hơn cách tỷ lệ thẳng (thiếu ÷ GMV/giờ trung bình của phần còn lại).
     const add = p.levers.find((l) => l.id === "add_hours")!;
-    expect(add.hours).toBe(Math.ceil(p.gap! / p.marginalRate!));
+    const R = p.futureForecast;
+    const need = p.remainingHours * (Math.pow((R + p.gap!) / R, 1 / p.elasticity.value) - 1);
+    expect(p.checkpoint!.capped).toBe(false);
+    expect(add.hours).toBe(Math.ceil(need));
+    expect(need).toBeGreaterThan(p.gap! / (R / p.remainingHours));
   });
   test("vượt xa target ⇒ chế độ chắc đạt, đòn bẩy mở rộng + đề xuất nâng target", () => {
     const base = scenario();

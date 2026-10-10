@@ -6,15 +6,18 @@ import { expandHostPortions, isCountable, sessionHours } from "./hostPerformance
 import { keyMetricsOfSessions, type KeyMetrics } from "../report/keyMetrics";
 import { platformOf, REPORT_PLATFORMS, type ReportPlatform } from "../reportPlatform";
 import { coneHalf, landingOf } from "./forecastCone";
+import { DEFAULT_ENGINE_PARAMS } from "../scheduling/engineParams";
+import { ForecastParams, buildMonthForecaster, inMonthProjection } from "./monthForecast";
 
 // Bản Tin CEO (2026-09-25) — thay Toàn Cảnh Agency. File thuần: không đụng Supabase, test bằng vitest.
 //
 // Ba luật đã trả giá mới có, đừng nới:
 //   1. So sánh cắt theo NGÀY CUỐI CÓ SỐ, không theo lịch. Số nạp theo đợt (chậm 2-3 ngày) mà cắt theo
 //      lịch thì mấy ngày chưa nạp bị đọc thành "không bán được" — màn cũ báo −33,6% khi thực tế −18,4%.
-//   2. Dự phóng = đã có + giờ các ca CÒN LẠI TRONG LỊCH × doanh số/giờ 28 ngày gần nhất (tách ngày camp
-//      và ngày thường). Backtest T7/T8 trên số thật: lệch −7%…+8%. Engine của Kế Hoạch Tháng (trackMonth,
-//      hệ số k) lệch +9%…+47% trên cùng dữ liệu — không dùng engine cho số trên màn CEO.
+//   2. Dự phóng = đã có + các ca CÒN LẠI TRONG LỊCH × dự báo theo hình dạng tháng (engine target v3, 10/10:
+//      monthForecast.ts — mức lúc lập cập nhật bằng GMV thật ÷ kỳ vọng của chính các ca đã có số). Backtest T7–T9
+//      CROCS+VERA ngày 8/15/18: 8% / 5% / 3%; cách cũ (giờ × doanh số/giờ 28 ngày) 12% / 8% / 6% — cách cũ chỉ còn
+//      là đường lùi khi kênh chưa đủ 15 ca lịch sử.
 //      "Ca còn lại trong lịch" gồm cả ca mở chưa có người và ca mở ngoài Kế Hoạch Tháng — tăng cường
 //      lịch là dự phóng tăng theo ngay, không chờ ca chạy xong.
 //   3. Tiến độ kỳ vọng tới hôm nay đi theo target TỪNG NGÀY (ngày camp nặng hơn), không chia đều theo
@@ -266,6 +269,12 @@ export interface MonthOutlook {
   actualByDate: Map<string, number>;
   forecastByDate: Map<string, number>;
   buckets: BucketOutlook[];
+  /** Hệ số dải ~80% (× phần dự phóng chưa về). Thiếu = 0,35 của cách chiếu cũ. */
+  coneCoef?: number;
+  /** "shape" = engine target v3 (monthForecast.ts); "rate28" = giờ × GMV/giờ 28 ngày (đường lùi). */
+  forecastModel?: "shape" | "rate28";
+  /** Chẩn đoán dự báo v3 của kênh (chỉ outlook một kênh). */
+  shape?: ShapeDiagnostics;
   /**
    * Chỉ có ở outlook GỘP khi CHỈ MỘT PHẦN brand có target (lỗi E2E #2, 2026-09-28): target là của các brand
    * có kế hoạch, còn `actual`/`actualByDate`/`projected` là của MỌI brand — đem chia cho nhau ra "Đã đạt
@@ -282,6 +291,20 @@ export interface MonthOutlook {
     pending: PendingItem[];
     projectionMethod: MonthOutlook["projectionMethod"];
   };
+}
+
+export interface ShapeDiagnostics {
+  /** GMV thật ÷ kỳ vọng của các ca đã có số trong tháng (null = chưa có ca nào có số). */
+  ratio: number | null;
+  /** Phần trọng số tháng đã có số (0–1). */
+  seenShare: number;
+  band: number;
+  big: boolean;
+  /** Giờ/ngày vượt p90 lịch sử của lịch tháng — phần vượt chỉ tính một phần GMV. */
+  excessHours: number;
+  /** Lệch dự báo lúc lập trung bình các tháng trước (dự báo ÷ thực tế − 1). */
+  bias: number | null;
+  mostlyManual: boolean;
 }
 
 /** Doanh số/giờ (theo giờ ca kế hoạch — cùng đơn vị với ca sắp tới) trong 28 ngày tới `through`. */
@@ -310,7 +333,8 @@ export function monthOutlook(
   brandSessions: LiveSession[],
   openSlots: ShiftSlot[],
   target: MonthTarget | null,
-  camp: CampOverrides | undefined
+  camp: CampOverrides | undefined,
+  params: ForecastParams = DEFAULT_ENGINE_PARAMS
 ): MonthOutlook {
   const mStart = `${month}-01`, mEnd = monthEndOf(mStart);
   const days = eachDay(mStart, mEnd);
@@ -322,17 +346,27 @@ export function monthOutlook(
   const rateFor = (d: string) => (rates ? (bucketOf(d) === "daily" ? rates.daily : rates.camp) : 0);
 
   // Còn lại trong lịch: ca chưa có số (sắp tới, hoặc đã qua mà số chưa về) + ca mở chưa có người.
-  const pending: PendingItem[] = [];
-  for (const s of inMonth) {
-    if (isCountable(s)) continue;
-    const hours = sessionDurationHours(s.startTime, s.endTime);
-    pending.push({ date: s.date, hours, forecast: hours * rateFor(s.date), kind: "session", bucket: bucketOf(s.date) });
-  }
+  // Ca có số nhưng ngày > hôm nay (hiếm — số nhập trước) không vào `done` lẫn `pending`, như trước.
+  const rest: { date: string; startTime: string; endTime: string; kind: PendingItem["kind"] }[] = [];
+  for (const s of inMonth) if (!isCountable(s)) rest.push({ date: s.date, startTime: s.startTime, endTime: s.endTime, kind: "session" });
   for (const sl of openSlots) {
     if (sl.status !== "open" || sl.sessionId || sl.date < today || sl.date < mStart || sl.date > mEnd) continue;
-    const hours = sessionDurationHours(sl.startTime, sl.endTime);
-    pending.push({ date: sl.date, hours, forecast: hours * rateFor(sl.date), kind: "open_slot", bucket: bucketOf(sl.date) });
+    rest.push({ date: sl.date, startTime: sl.startTime, endTime: sl.endTime, kind: "open_slot" });
   }
+  // Engine target v3: lịch sử TRƯỚC tháng của chính kênh này ⇒ mức + hình dạng; số đã có của tháng cập nhật mức. Chưa đủ lịch sử ⇒ cách cũ.
+  const forecaster = buildMonthForecaster(brandSessions, month, params);
+  let shape: ShapeDiagnostics | undefined;
+  let restForecast: number[];
+  if (forecaster) {
+    const items = [
+      ...done.map((s) => ({ date: s.date, startTime: s.startTime, endTime: s.endTime, actual: s.actualGmv ?? 0 })),
+      ...rest.map((r) => ({ date: r.date, startTime: r.startTime, endTime: r.endTime, actual: null }))
+    ];
+    const proj = inMonthProjection(forecaster, items, bucketOf);
+    restForecast = rest.map((_, i) => proj.perItem[done.length + i]);
+    shape = { ratio: proj.ratio, seenShare: proj.seenShare, band: forecaster.band, big: forecaster.big, excessHours: proj.excessHours, bias: forecaster.bias, mostlyManual: forecaster.mostlyManual };
+  } else restForecast = rest.map((r) => sessionDurationHours(r.startTime, r.endTime) * rateFor(r.date));
+  const pending: PendingItem[] = rest.map((r, i) => ({ date: r.date, hours: sessionDurationHours(r.startTime, r.endTime), forecast: restForecast[i], kind: r.kind, bucket: bucketOf(r.date) }));
 
   const actualByDate = new Map<string, number>();
   for (const s of done) actualByDate.set(s.date, (actualByDate.get(s.date) ?? 0) + (s.actualGmv ?? 0));
@@ -350,7 +384,7 @@ export function monthOutlook(
   const runRateNow = expectedToDate && expectedToDate > 0 ? actual / expectedToDate : null;
   let projectionMethod: MonthOutlook["projectionMethod"] = "gmv_per_hour";
   let projected = actual + pending.reduce((a, p) => a + p.forecast, 0);
-  if (!rates && pending.length > 0) {
+  if (!rates && !forecaster && pending.length > 0) {
     if (target && runRateNow != null && expectedToDate != null) {
       projectionMethod = "run_rate";
       projected = actual + (target.total - expectedToDate) * runRateNow;
@@ -407,7 +441,10 @@ export function monthOutlook(
     needPerRemainingDay: target && remainingDays > 0 ? Math.max(0, target.total - actual) / remainingDays : null,
     actualByDate,
     forecastByDate,
-    buckets
+    buckets,
+    coneCoef: forecaster ? forecaster.band : undefined,
+    forecastModel: forecaster ? "shape" : "rate28",
+    shape
   };
 }
 
@@ -476,6 +513,13 @@ export function combineOutlooks(month: string, today: string, list: MonthOutlook
     actualByDate: sumMap((o) => o.actualByDate),
     forecastByDate: sumMap((o) => o.forecastByDate),
     buckets: CAMP_DAY_BUCKET_ORDER.map(bucketMerge),
+    // Hệ số dải của tổng = trung bình theo phần còn lại của từng kênh (vẽ dải gộp; khả năng đạt gộp dùng combineCones).
+    coneCoef: (() => {
+      const rem = list.map((o) => Math.max(0, o.projected - o.actual));
+      const R = rem.reduce((a, v) => a + v, 0);
+      return R > 0 ? list.reduce((a, o, i) => a + (o.coneCoef ?? 0.35) * rem[i], 0) / R : list[0]?.coneCoef;
+    })(),
+    forecastModel: list.length && list.every((o) => o.forecastModel === "shape") ? "shape" : list.length ? "rate28" : undefined,
     targetScope: partialTarget
       ? {
           brands: withTarget.length,
