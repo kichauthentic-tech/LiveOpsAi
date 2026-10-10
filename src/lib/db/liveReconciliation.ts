@@ -33,6 +33,8 @@ export interface ReconciliationRow {
   durationMinutes: number;
   bucket: ReconciliationBucket;
   matchedSessionIds: string[];
+  /** 0166: dòng bị loại khỏi lần áp dụng — ca khớp với nó giữ nguyên số hiện có. */
+  excluded: boolean;
 }
 
 interface DbBatch {
@@ -60,6 +62,7 @@ interface DbRow {
   duration_minutes: number;
   bucket: ReconciliationBucket;
   matched_session_ids: string[] | null;
+  excluded?: boolean | null;
 }
 
 function batchFromDb(b: DbBatch): ReconciliationBatch {
@@ -103,17 +106,33 @@ const rowFromDb = (r: DbRow): ReconciliationRow => ({
   views: Number(r.views) || 0,
   durationMinutes: Number(r.duration_minutes) || 0,
   bucket: r.bucket,
-  matchedSessionIds: r.matched_session_ids ?? []
+  matchedSessionIds: r.matched_session_ids ?? [],
+  excluded: r.excluded === true
 });
 
 export async function fetchReconciliationRows(batchId: string): Promise<ReconciliationRow[]> {
+  const query = (cols: string) => supabase.from("live_reconciliation_rows").select(cols).eq("batch_id", batchId).order("started_at", { ascending: true });
+  let res = await query(`${ROW_COLS}, excluded`);
+  // Chưa chạy migration 0166 ⇒ chưa có cột `excluded`: đọc như cũ (mọi dòng được đối soát).
+  if (res.error && res.error.code === "42703") res = await query(ROW_COLS);
+  if (res.error) throw res.error;
+  return ((res.data ?? []) as unknown as DbRow[]).map(rowFromDb);
+}
+
+/** Chọn / bỏ chọn các phiên cho lần Áp dụng (0166). `excluded = true` ⇒ phiên không đối soát. */
+export async function setReconciliationRowsExcluded(batchId: string, rowIds: string[], excluded: boolean): Promise<void> {
+  if (rowIds.length === 0) return;
   const { data, error } = await supabase
     .from("live_reconciliation_rows")
-    .select(ROW_COLS)
+    .update({ excluded })
     .eq("batch_id", batchId)
-    .order("started_at", { ascending: true });
-  if (error) throw error;
-  return ((data ?? []) as DbRow[]).map(rowFromDb);
+    .in("id", rowIds)
+    .select("id");
+  if (error) {
+    if (error.code === "42703" || error.code === "PGRST204") throw new Error("Chưa chạy migration 0166 nên chưa chọn được phiên đối soát.");
+    throw error;
+  }
+  assertAffected(data, "chọn phiên đối soát");
 }
 
 // Chỉ nạp + tự khớp room với ca, CHƯA ghi gì vào live_sessions — ops xem rổ rồi mới bấm áp dụng.

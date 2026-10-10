@@ -8,7 +8,8 @@ import {
   deleteReconciliationBatch,
   fetchReconciliationBatches,
   fetchReconciliationRows,
-  setReconciliationBucket
+  setReconciliationBucket,
+  setReconciliationRowsExcluded
 } from "../../lib/db/liveReconciliation";
 import { type ReportPlatform } from "../../lib/reportPlatform";
 import { errorMessage } from "../../lib/errorMessage";
@@ -51,6 +52,9 @@ const BUCKET_TONE: Record<ReconciliationBucket, string> = {
   unassigned: "border-[var(--border)] bg-[var(--surface-base)]",
   inhouse: "border-sky-800 bg-sky-950/30"
 };
+
+// Chỉ hai rổ này được ghi vào ca khi Áp dụng — nên chỉ ở đây mới chọn phiên nào đối soát.
+const APPLIED_BUCKETS: ReconciliationBucket[] = ["agency", "review"];
 
 const ORDER: ReconciliationBucket[] = ["agency", "review", "unassigned", "inhouse"];
 
@@ -103,7 +107,24 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
     }
   }
 
+  // Chọn / bỏ chọn phiên: cập nhật ngay trên màn rồi mới ghi DB; ghi lỗi thì nạp lại để màn khớp DB.
+  async function setExcluded(ids: string[], excluded: boolean) {
+    if (!activeId || ids.length === 0) return;
+    const idSet = new Set(ids);
+    setRows((prev) => prev.map((r) => (idSet.has(r.id) ? { ...r, excluded } : r)));
+    setError(null);
+    setNote(null);
+    try {
+      await setReconciliationRowsExcluded(activeId, ids, excluded);
+    } catch (e) {
+      setError(errorMessage(e));
+      setRows(await fetchReconciliationRows(activeId));
+    }
+  }
+
   const active = batches.find((b) => b.id === activeId);
+  const applicable = rows.filter((r) => APPLIED_BUCKETS.includes(r.bucket));
+  const selectedCount = applicable.filter((r) => !r.excluded).length;
   const grouped = ORDER.map((bucket) => ({
     bucket,
     items: rows.filter((r) => r.bucket === bucket)
@@ -160,6 +181,10 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
         <div className="space-y-3">
           {grouped.map(({ bucket, items }) => {
             const totalGmv = items.reduce((s, r) => s + r.gmv, 0);
+            const selectable = APPLIED_BUCKETS.includes(bucket);
+            const picked = items.filter((r) => !r.excluded);
+            const pickedGmv = picked.reduce((s, r) => s + r.gmv, 0);
+            const shown = selectable ? items : items.slice(0, 20);
             return (
               <div key={bucket} className={`border rounded-2xl p-4 ${BUCKET_TONE[bucket]}`}>
                 <div className="flex flex-wrap items-start justify-between gap-2">
@@ -168,7 +193,31 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
                       {BUCKET_LABEL[bucket]} · {items.length} phiên · {fmtVndFull(totalGmv)}
                     </p>
                     <p className="text-[11px] text-[var(--text-muted)] mt-0.5 max-w-2xl">{BUCKET_HINT[bucket]}</p>
+                    {selectable && (
+                      <p className="text-[11px] mt-1 text-[var(--text)]">
+                        Đối soát <span className="font-bold">{picked.length}/{items.length}</span> phiên · {fmtVndFull(pickedGmv)}
+                        {picked.length < items.length && <span className="text-amber-300"> · {items.length - picked.length} phiên bị bỏ qua, ca khớp giữ nguyên số hiện có</span>}
+                      </p>
+                    )}
                   </div>
+                  {selectable && (
+                    <div className="shrink-0 flex items-center gap-3 text-[11px]">
+                      <button
+                        onClick={() => void setExcluded(items.filter((r) => r.excluded).map((r) => r.id), false)}
+                        disabled={busy || picked.length === items.length}
+                        className="font-bold text-emerald-300 hover:text-emerald-200 underline disabled:opacity-40 disabled:no-underline"
+                      >
+                        Chọn tất cả
+                      </button>
+                      <button
+                        onClick={() => void setExcluded(picked.map((r) => r.id), true)}
+                        disabled={busy || picked.length === 0}
+                        className="text-[var(--text-muted)] hover:text-[var(--text)] underline disabled:opacity-40 disabled:no-underline"
+                      >
+                        Bỏ chọn tất cả
+                      </button>
+                    </div>
+                  )}
                   {bucket === "unassigned" && (
                     <button
                       onClick={() => void run(async () => {
@@ -200,6 +249,7 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
                   <table className="w-full text-[11px] min-w-[520px]">
                     <thead>
                       <tr className="text-[var(--text-faint)] text-left">
+                        {selectable && <th className="font-bold pb-1.5 pr-2 w-6" aria-label="Đối soát phiên này" />}
                         <th className="font-bold pb-1.5 pr-3">Phiên live</th>
                         <th className="font-bold pb-1.5 pr-3">Thời gian</th>
                         <th className="font-bold pb-1.5 pr-3 text-right">GMV</th>
@@ -208,8 +258,20 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
                       </tr>
                     </thead>
                     <tbody>
-                      {items.slice(0, 20).map((r) => (
-                        <tr key={r.id} className="border-t border-[var(--border)]/60">
+                      {shown.map((r) => (
+                        <tr key={r.id} className={`border-t border-[var(--border)]/60 ${r.excluded ? "opacity-50" : ""}`}>
+                          {selectable && (
+                            <td className="py-1.5 pr-2">
+                              <input
+                                type="checkbox"
+                                checked={!r.excluded}
+                                onChange={(e) => void setExcluded([r.id], !e.target.checked)}
+                                disabled={busy}
+                                aria-label={`Đối soát phiên ${r.roomTitle || r.roomId} ${fmtTime(r.startedAt)}`}
+                                className="w-3.5 h-3.5 accent-emerald-500 cursor-pointer"
+                              />
+                            </td>
+                          )}
                           <td className="py-1.5 pr-3 text-[var(--text-muted)] truncate max-w-[200px]">{r.roomTitle || r.roomId}</td>
                           <td className="py-1.5 pr-3 text-[var(--text-faint)] whitespace-nowrap">
                             {fmtTime(r.startedAt)} → {fmtTime(r.endedAt)}
@@ -231,8 +293,8 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
                       ))}
                     </tbody>
                   </table>
-                  {items.length > 20 && (
-                    <p className="text-[11px] text-[var(--text-faint)] mt-2">… và {items.length - 20} phiên nữa</p>
+                  {shown.length < items.length && (
+                    <p className="text-[11px] text-[var(--text-faint)] mt-2">… và {items.length - shown.length} phiên nữa</p>
                   )}
                 </div>
               </div>
@@ -245,6 +307,7 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
                 <>
                   File {active.platform} của <span className="font-bold">{brandName}</span> — chỉ khớp với ca {active.platform} của brand này. Áp dụng sẽ ghi đè số
                   liệu của các ca thuộc rổ "khớp ca agency" và "cần xem lại", đổi nguồn dữ liệu thành <span className="font-bold">đã đối soát</span>.
+                  Chỉ các phiên được tick mới được ghi; phiên bỏ tick không đụng tới số của ca. Bỏ tick sau khi đã áp dụng thì số đã ghi KHÔNG tự hoàn lại.
                   Chạy lại nhiều lần được — mỗi lần tính lại từ đầu theo file này.
                 </>
               ) : (
@@ -257,13 +320,18 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
             <div className="flex items-center gap-2">
               <button
                 onClick={() => void run(async () => {
-                  if (!(await confirm("Áp dụng đối soát và ghi đè số liệu các ca trong kỳ này?"))) return;
+                  const skipped = applicable.length - selectedCount;
+                  if (selectedCount === 0) throw new Error("Chưa chọn phiên nào để đối soát — tick ít nhất một phiên.");
+                  const ask = skipped > 0
+                    ? `Áp dụng đối soát ${selectedCount} phiên đã chọn (bỏ qua ${skipped} phiên) và ghi đè số liệu các ca khớp?`
+                    : "Áp dụng đối soát và ghi đè số liệu các ca trong kỳ này?";
+                  if (!(await confirm(ask))) return;
                   const n = await applyReconciliation(active.id);
                   await onApplied();
                   await reloadBatches(active.id);
                   setNote(`Đã cập nhật ${n} ca theo số liệu đối soát.`);
                 })}
-                disabled={busy || !active.brandId}
+                disabled={busy || !active.brandId || selectedCount === 0}
                 title={active.brandId ? undefined : "Lô nạp trước khi đối soát gắn brand — xoá lô rồi tạo lại từ Lịch Sử Import"}
                 className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white disabled:opacity-40 transition-colors"
               >
