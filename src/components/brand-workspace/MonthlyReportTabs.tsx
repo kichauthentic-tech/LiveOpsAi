@@ -916,8 +916,10 @@ export const MonthlyReportTabs: React.FC<MonthlyReportTabsProps> = ({ brandId, b
     // (đo 2026-09-29: cuộn 4.000px thì mục lục ở y=−3.691). Bo góc trên giao cho chính mục lục. `-top-3 sm:-top-6` = trừ
     // đúng padding của <main> (p-3 sm:p-6) để mục lục dính sát mép, không chừa khe cho nội dung lọt qua phía trên.
     <div className="rounded-2xl" style={{ background: PAL.bg, border: `1px solid ${PAL.line}` }}>
-      {/* Mục lục 7 phần — trang cuộn (user chốt 2026-09-25): tab giấu nội dung, brand có thể không bao giờ mở tới. */}
-      <div ref={tocRef} className="flex items-center gap-1 px-3 py-2 overflow-x-auto sticky -top-3 sm:-top-6 z-10 rounded-t-2xl" style={{ background: PAL.bg, borderBottom: `1px solid ${PAL.line}` }}>
+      {/* Mục lục 7 phần — trang cuộn (user chốt 2026-09-25): tab giấu nội dung, brand có thể không bao giờ mở tới.
+          z-20 (10/10): cột đầu của bảng report (report/ui.tsx) dính ngang với z-10, đứng sau trong DOM nên
+          cùng z-10 thì ô "NHÓM NGÀY"… vẽ đè lên mục lục khi cuộn qua. */}
+      <div ref={tocRef} className="flex items-center gap-1 px-3 py-2 overflow-x-auto sticky -top-3 sm:-top-6 z-20 rounded-t-2xl" style={{ background: PAL.bg, borderBottom: `1px solid ${PAL.line}` }}>
         {SECTIONS.map((sec) => (
           <button
             key={sec.id}

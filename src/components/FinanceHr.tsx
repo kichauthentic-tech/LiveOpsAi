@@ -44,6 +44,15 @@ interface FinanceHrProps {
 
 const money = (n: number) => Math.round(n).toLocaleString("vi-VN");
 
+// Nhãn ngắn để gộp các mục thiếu của một ca thành MỘT nhãn trong bảng (10/10: trước đó mỗi mục
+// một nhãn dài, 70/70 ca thiếu 2–3 mục → mỗi dòng cao 3–4 hàng). Nhãn đầy đủ nằm ở `title`.
+const MISSING_SHORT: Record<PnlMissingInput, string> = {
+  host_rate: "rate host",
+  cohost_rate: "rate trợ live",
+  brand_rate: "rate brand",
+  commission_default: "% commission"
+};
+
 export const FinanceHr: React.FC<FinanceHrProps> = ({
   sessions,
   talents,
@@ -225,44 +234,58 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
 
         {/* Đ3 (2026-09-24): trước bản này màn P&L in ra con số chắc nịch dựng trên rate = 0 và %
             commission mặc định trong code, không một chữ cảnh báo — trong khi Report Tháng thì đã
-            cảnh báo đúng kiểu này cho tỷ lệ hoàn huỷ. Đây là cùng một câu, đặt đúng chỗ. */}
-        {missingSummary.rowsAffected > 0 && (
-          <div className="text-[11px] rounded-xl px-3 py-2 border border-rose-800/60 bg-rose-950/40 text-rose-200 space-y-1">
-            <p>
-              <b>{missingSummary.rowsAffected}/{rows.length} ca đang tính bằng rate chưa nhập</b> — Lãi/lỗ ở trên KHÔNG phải số thật,
-              nó đang coi phần chưa nhập là 0 (hoặc dùng % mặc định trong code).
-            </p>
-            <p className="text-rose-300/90">
-              {missingSummary.byKind.map(([kind, n], i) => (
-                <span key={kind}>
-                  {i > 0 && " · "}
-                  {PNL_MISSING_LABEL[kind]}: {n} phiên
-                </span>
-              ))}
-            </p>
-            <p className="text-rose-300/90">Nhập rate talent ở "Talent Pool", giá + tỷ lệ hoàn huỷ của brand ở "CRM → Hợp đồng & giá".</p>
-          </div>
-        )}
-
-        {unconfirmed.length > 0 && (
-          <div className="text-[11px] rounded-xl px-3 py-2 border border-amber-800/60 bg-amber-950/40 text-amber-200 space-y-1">
-            <p>
-              <b>{unconfirmed.length} ca đã qua giờ nhưng chưa có bằng chứng diễn ra</b> (không số, không report, không giờ live) — CHƯA tính
-              lương/doanh thu. Ca có chạy: giao ca ở Cửa sổ Ca Live. Ca không diễn ra: huỷ ca để khỏi tính vào giờ cam kết.
-            </p>
-            <p className="text-amber-300/90">
-              {unconfirmed.slice(0, 8).map((s) => `${s.brandName} ${s.date.slice(8)}/${s.date.slice(5, 7)} ${s.startTime} (${s.hostName || "chưa gán"})`).join(" · ")}
-              {unconfirmed.length > 8 ? ` · +${unconfirmed.length - 8} ca` : ""}
-            </p>
-          </div>
-        )}
-
-        {rows.length > 0 && quality.reconciled < quality.total && (
-          <div className="text-[11px] rounded-xl px-3 py-2 border border-amber-800/60 bg-amber-950/40 text-amber-200">
-            Nguồn GMV của {quality.total} phiên: <b>{quality.reconciled}</b> đã đối soát
-            {quality.snapshot > 0 && <>, <b>{quality.snapshot}</b> số lúc giao ca (sàn còn cập nhật đơn/hoàn/huỷ sau đó)</>}
-            {quality.manual > 0 && <>, <b>{quality.manual}</b> talent tự khai (chưa có gì bảo chứng)</>}.
-            Số tiền của các phiên chưa đối soát là tạm tính — duyệt sau khi đối soát ở Dữ Liệu Gốc của brand (mục Đối soát số liệu).
+            cảnh báo đúng kiểu này cho tỷ lệ hoàn huỷ. Đây là cùng một câu, đặt đúng chỗ.
+            10/10: 3 dải cảnh báo (thiếu rate / ca chưa xác nhận / nguồn GMV) gộp thành MỘT khối,
+            mỗi lý do một dòng có chấm màu — trước đó 3 hộp màu chồng nhau đẩy bảng xuống ~230px. */}
+        {(missingSummary.rowsAffected > 0 || unconfirmed.length > 0 || (rows.length > 0 && quality.reconciled < quality.total)) && (
+          <div className="text-[11px] rounded-xl border border-[var(--border)] bg-[var(--surface-base)] divide-y divide-[var(--border-muted)]">
+            <p className="px-3 py-1.5 font-bold text-[var(--text-muted)] uppercase tracking-wider">Số trên trang này chưa chắc chắn vì</p>
+            {missingSummary.rowsAffected > 0 && (
+              <div className="px-3 py-2 flex gap-2">
+                <span className="mt-1 w-2 h-2 rounded-full bg-rose-500 shrink-0" aria-hidden />
+                <div className="space-y-0.5 min-w-0">
+                  <p className="text-rose-200">
+                    <b>{missingSummary.rowsAffected}/{rows.length} ca đang tính bằng rate chưa nhập</b> — Lãi/lỗ ở trên KHÔNG phải số thật,
+                    nó đang coi phần chưa nhập là 0 (hoặc dùng % mặc định trong code).
+                  </p>
+                  <p className="text-[var(--text-muted)]">
+                    {missingSummary.byKind.map(([kind, n], i) => (
+                      <span key={kind}>
+                        {i > 0 && " · "}
+                        {PNL_MISSING_LABEL[kind]}: {n} phiên
+                      </span>
+                    ))}
+                    . Nhập rate talent ở "Talent Pool", giá + tỷ lệ hoàn huỷ của brand ở "CRM → Hợp đồng & giá".
+                  </p>
+                </div>
+              </div>
+            )}
+            {unconfirmed.length > 0 && (
+              <div className="px-3 py-2 flex gap-2">
+                <span className="mt-1 w-2 h-2 rounded-full bg-amber-500 shrink-0" aria-hidden />
+                <div className="space-y-0.5 min-w-0">
+                  <p className="text-amber-200">
+                    <b>{unconfirmed.length} ca đã qua giờ nhưng chưa có bằng chứng diễn ra</b> (không số, không report, không giờ live) — CHƯA tính
+                    lương/doanh thu. Ca có chạy: giao ca ở Cửa sổ Ca Live. Ca không diễn ra: huỷ ca để khỏi tính vào giờ cam kết.
+                  </p>
+                  <p className="text-[var(--text-muted)]">
+                    {unconfirmed.slice(0, 8).map((s) => `${s.brandName} ${s.date.slice(8)}/${s.date.slice(5, 7)} ${s.startTime} (${s.hostName || "chưa gán"})`).join(" · ")}
+                    {unconfirmed.length > 8 ? ` · +${unconfirmed.length - 8} ca` : ""}
+                  </p>
+                </div>
+              </div>
+            )}
+            {rows.length > 0 && quality.reconciled < quality.total && (
+              <div className="px-3 py-2 flex gap-2">
+                <span className="mt-1 w-2 h-2 rounded-full bg-amber-500 shrink-0" aria-hidden />
+                <p className="text-amber-200 min-w-0">
+                  Nguồn GMV của {quality.total} phiên: <b>{quality.reconciled}</b> đã đối soát
+                  {quality.snapshot > 0 && <>, <b>{quality.snapshot}</b> số lúc giao ca (sàn còn cập nhật đơn/hoàn/huỷ sau đó)</>}
+                  {quality.manual > 0 && <>, <b>{quality.manual}</b> talent tự khai (chưa có gì bảo chứng)</>}.
+                  <span className="text-[var(--text-muted)]"> Số tiền của các phiên chưa đối soát là tạm tính — duyệt sau khi đối soát ở Dữ Liệu Gốc của brand (mục Đối soát số liệu).</span>
+                </p>
+              </div>
+            )}
           </div>
         )}
 
@@ -336,11 +359,11 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                             Đã loại khỏi báo cáo — chỉ tính công, không tính GMV/doanh thu
                           </span>
                         )}
-                        {missingInputs.map((m) => (
-                          <span key={m} className="text-[11px] font-bold bg-rose-950 text-rose-300 border border-rose-800 px-1.5 py-0.5 rounded-full" title={PNL_MISSING_LABEL[m]}>
-                            {PNL_MISSING_LABEL[m]}
+                        {missingInputs.length > 0 && (
+                          <span className="text-[11px] font-bold bg-rose-950 text-rose-300 border border-rose-800 px-1.5 py-0.5 rounded-full" title={missingInputs.map((m) => PNL_MISSING_LABEL[m]).join("\n")}>
+                            Thiếu {missingInputs.map((m) => MISSING_SHORT[m]).join(" · ")}
                           </span>
-                        ))}
+                        )}
                       </div>
                       <div className="text-[var(--text-muted)]">{s.brandName} · {s.date} · Host {talent?.name ?? s.hostName}</div>
                     </td>

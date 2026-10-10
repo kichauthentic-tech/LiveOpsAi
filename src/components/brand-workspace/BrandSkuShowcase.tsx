@@ -143,56 +143,58 @@ export const BrandSkuShowcase: React.FC<BrandSkuShowcaseProps> = ({ brandId, cur
         }
       />
 
-      {canEdit && (
-        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 flex flex-wrap items-center gap-2">
-          <input
-            type="text"
-            placeholder="Tên SKU"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            className="flex-1 min-w-[140px] bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] text-xs focus:outline-none focus:border-[var(--accent)]"
-          />
-          <input
-            type="text"
-            placeholder="Mã SKU"
-            value={newSkuCode}
-            onChange={(e) => setNewSkuCode(e.target.value)}
-            className="w-28 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] text-xs focus:outline-none focus:border-[var(--accent)]"
-          />
-          <input
-            type="number"
-            placeholder="Giá deal"
-            value={newFlashPrice}
-            onChange={(e) => setNewFlashPrice(e.target.value)}
-            className="w-32 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] text-xs focus:outline-none focus:border-[var(--accent)]"
-          />
-          <input
-            type="number"
-            placeholder="Giá gốc"
-            value={newOriginalPrice}
-            onChange={(e) => setNewOriginalPrice(e.target.value)}
-            className="w-28 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] text-xs focus:outline-none focus:border-[var(--accent)]"
-          />
-          <button
-            onClick={handleCreate}
-            disabled={busy || !newName.trim() || !newFlashPrice}
-            className="flex items-center gap-1 px-3 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5" /> Thêm SKU
-          </button>
-        </div>
-      )}
-
-      {canEdit && perfError && (
-        <div className="p-3 bg-red-950/80 border border-red-800/50 rounded-xl text-red-300 text-xs font-semibold">{perfError}</div>
-      )}
-      {canEdit && !perfError && perfByName && !perfHasBatch && (
-        <div className="p-3 bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl text-[var(--text-faint)] text-xs">
-          Chưa có file Sản Phẩm của tháng {fmtMonthShort(currentMonth)} — cột hiệu suất sẽ trống tới khi up file đó ở Dữ Liệu Gốc.
-        </div>
-      )}
-
+      {/* 10/10: ô thêm SKU + dòng "chưa có file Sản Phẩm" + bảng gộp thành MỘT thẻ (trước là 3 thẻ rời
+          chồng nhau, ô thêm trông như một trang con riêng). */}
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-xl">
+          {canEdit && (
+          <div className="p-4 border-b border-[var(--border)] flex flex-wrap items-center gap-2">
+            <input
+              type="text"
+              placeholder="Tên SKU"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              className="flex-1 min-w-[140px] bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] text-xs focus:outline-none focus:border-[var(--accent)]"
+            />
+            <input
+              type="text"
+              placeholder="Mã SKU"
+              value={newSkuCode}
+              onChange={(e) => setNewSkuCode(e.target.value)}
+              className="w-28 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] text-xs focus:outline-none focus:border-[var(--accent)]"
+            />
+            <input
+              type="number"
+              placeholder="Giá deal"
+              value={newFlashPrice}
+              onChange={(e) => setNewFlashPrice(e.target.value)}
+              className="w-32 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] text-xs focus:outline-none focus:border-[var(--accent)]"
+            />
+            <input
+              type="number"
+              placeholder="Giá gốc"
+              value={newOriginalPrice}
+              onChange={(e) => setNewOriginalPrice(e.target.value)}
+              className="w-28 bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)] text-xs focus:outline-none focus:border-[var(--accent)]"
+            />
+            <button
+              onClick={handleCreate}
+              disabled={busy || !newName.trim() || !newFlashPrice}
+              className="flex items-center gap-1 px-3 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" /> Thêm SKU
+            </button>
+          </div>
+        )}
+
+        {canEdit && perfError && (
+          <div className="px-4 py-2.5 border-b border-[var(--border)] bg-red-950/60 text-red-300 text-xs font-semibold">{perfError}</div>
+        )}
+        {canEdit && !perfError && perfByName && !perfHasBatch && (
+          <div className="px-4 py-2.5 border-b border-[var(--border)] bg-[var(--surface-base)] text-[var(--text-faint)] text-xs">
+            Chưa có file Sản Phẩm của tháng {fmtMonthShort(currentMonth)} — cột hiệu suất sẽ trống tới khi up file đó ở Dữ Liệu Gốc.
+          </div>
+        )}
+
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>

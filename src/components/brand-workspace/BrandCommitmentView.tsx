@@ -249,8 +249,6 @@ export const BrandCommitmentView: React.FC<BrandCommitmentViewProps> = ({
         </div>
       )}
 
-      <BrandRateCard brand={brand} platform={platform} rates={rates} rateHistory={rateHistory} />
-
       {/* Tháng đang chạy — nổi bật riêng, vì đó là câu hỏi khách mở màn này để hỏi. */}
       {current && (
         <div className="bg-[var(--surface)] border border-[var(--accent)]/40 rounded-2xl p-5 shadow-xl space-y-4">
@@ -285,6 +283,10 @@ export const BrandCommitmentView: React.FC<BrandCommitmentViewProps> = ({
           </p>
         </div>
       )}
+
+      {/* Giá theo hợp đồng — 10/10: dời xuống dưới tháng đang chạy. Giá ít khi đổi, còn tiến độ tháng
+          là câu hỏi khách mở màn này để hỏi (xem chú thích ngay trên). */}
+      <BrandRateCard brand={brand} platform={platform} rates={rates} rateHistory={rateHistory} />
 
       {/* Lịch sử theo tháng */}
       {progress.length > 0 && (

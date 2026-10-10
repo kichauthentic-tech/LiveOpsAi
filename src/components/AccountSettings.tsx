@@ -4,6 +4,7 @@ import { useAuth } from "../hooks/useAuth";
 import { User, Lock, Mail, Loader2, CheckCircle2, KeyRound } from "lucide-react";
 import { errorMessage } from "../lib/errorMessage";
 import { isAliasEmail, loginLabel } from "../lib/loginName";
+import { PageHeader } from "./common/PageHeader";
 
 interface AccountSettingsProps {
   activeUser: SystemUser;
@@ -97,12 +98,12 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ activeUser, on
   };
 
   return (
-    <div className="space-y-6 max-w-2xl">
-      <div>
-        <h1 className="text-xl font-black text-[var(--text)]">Tài Khoản Của Tôi</h1>
-        <p className="text-xs text-[var(--text-faint)] mt-1">Quản lý tên hiển thị và mật khẩu đăng nhập của bạn.</p>
-      </div>
+    <div className="space-y-6 max-w-5xl">
+      <PageHeader icon={User} title="Tài Khoản Của Tôi" description="Quản lý tên hiển thị và mật khẩu đăng nhập của bạn." />
 
+      {/* 10/10: 2 cột từ lg (thông tin | mật khẩu) thay vì một cột max-w-2xl dồn sát trái, nửa phải
+          màn trống. Trên điện thoại vẫn đúng thứ tự: thông tin → đổi mật khẩu → quên mật khẩu. */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
       {/* Thông tin cơ bản */}
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-6 space-y-4">
         <div className="flex items-center gap-2 text-sm font-bold text-[var(--text)]">
@@ -155,6 +156,7 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ activeUser, on
         </form>
       </div>
 
+      <div className="space-y-6">
       {/* Đổi mật khẩu */}
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-6 space-y-4">
         <div className="flex items-center gap-2 text-sm font-bold text-[var(--text)]">
@@ -267,6 +269,8 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ activeUser, on
         </button>
       </div>
       )}
+      </div>
+      </div>
     </div>
   );
 };

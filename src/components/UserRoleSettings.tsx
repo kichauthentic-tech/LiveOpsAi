@@ -2,9 +2,9 @@ import React, { useState, useMemo } from "react";
 import { AUDIT_LOG_LIMIT } from "../lib/db/auditLogs";
 import { UserRole, PermissionKey, PermissionDefinition, RolePermissionsMap, SystemUser, AuditLogEntry, Brand, Talent, LiveSession } from "../types";
 import { PERMISSION_DEFINITIONS as permissionDefinitions } from "../lib/permissionDefinitions";
-import { ShieldCheck, UserPlus, Users, Key, Lock, Unlock, Check, X, Search, Sliders, History, Sparkles, Trash2, Edit2, Radio, Building2, Zap, BarChart3, KeyRound, MailPlus } from "lucide-react";
+import { ShieldCheck, UserPlus, Users, Key, Lock, Unlock, Check, X, Search, Sliders, History, Trash2, Edit2, Radio, Building2, Zap, BarChart3, KeyRound, MailPlus } from "lucide-react";
 import { useConfirm } from "../hooks/useConfirm";
-import { PageIntro } from "./common/PageIntro";
+import { PageHeader } from "./common/PageHeader";
 import { TabUsagePanel } from "./TabUsagePanel";
 import { accountStatusLabel } from "../lib/statusLabels";
 import { talentRoleLabel } from "../lib/talentName";
@@ -401,20 +401,12 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Top Banner */}
-      <div className="bg-[var(--surface)] border border-[var(--border)] p-6 rounded-2xl shadow-xl flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 text-[var(--text)]">
-        <div className="min-w-0">
-          <div>
-            <h2 className="text-lg font-black text-[var(--text)] flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-[var(--accent-text)] shrink-0" /> Phân Quyền & Role
-            </h2>
-            <PageIntro>
-              Mỗi vai trò ({MATRIX_ROLES.length} vai trò) được mở những màn nào, quyền riêng cho từng tài khoản, nhật ký thay đổi quyền và số lượt mở từng màn.
-            </PageIntro>
-          </div>
-        </div>
-
-        {/* Tab Switcher */}
+      {/* Top Banner — 10/10: dùng PageHeader chung (trước là bản chép tay p-6 cao hơn các trang khác). */}
+      <PageHeader
+        icon={ShieldCheck}
+        title="Phân Quyền & Role"
+        description={`Mỗi vai trò (${MATRIX_ROLES.length} vai trò) được mở những màn nào, quyền riêng cho từng tài khoản, nhật ký thay đổi quyền và số lượt mở từng màn.`}
+        actions={
         <div className="flex items-center bg-[var(--surface-base)] p-1.5 rounded-xl border border-[var(--border)] text-xs font-bold gap-1 max-w-full overflow-x-auto whitespace-nowrap shrink-0">
           <button
             onClick={() => setActiveTab("roles")}
@@ -466,13 +458,14 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
             </button>
           )}
         </div>
-      </div>
+        }
+      />
 
       {/* TAB 1: ROLE PERMISSIONS MATRIX */}
       {activeTab === "roles" && (
         <div className="space-y-6">
           {/* Role selector selector cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
             {MATRIX_ROLES.map((roleKey) => {
               const isSelected = selectedRole === roleKey;
               const permsMap = rolePermissions[roleKey];
@@ -565,17 +558,12 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
               </div>
             </div>
 
-            {/* Permission Toggles grouped by Category */}
-            <div className="space-y-6">
-              {(Object.entries(groupedPermissions) as [string, PermissionDefinition[]][]).map(([category, defs]) => (
-                <div key={category} className="space-y-3">
-                  <div className="flex items-center gap-2 text-xs font-black text-[var(--text-muted)] uppercase tracking-wider bg-[var(--surface-base)]/60 p-2.5 rounded-xl border border-[var(--border)]/80">
-                    <Sparkles className="w-3.5 h-3.5 text-[var(--accent-text)]" />
-                    <span>{category}</span>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {defs.map((def) => {
+            {/* Permission Toggles grouped by Category — 10/10: một lưới chung, tên nhóm thành dòng nhỏ
+                trên mỗi thẻ. Trước đó mỗi nhóm một thanh tiêu đề + một hàng riêng, 3/4 nhóm chỉ có 1–2
+                công tắc nên 2/3 hàng bỏ trống và trang dài gấp đôi. */}
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+              {(Object.entries(groupedPermissions) as [string, PermissionDefinition[]][]).flatMap(([category, defs]) =>
+                    defs.map((def) => {
                       const isAllowed = rolePermissions[selectedRole][def.key];
                       const isCEO =
                         (selectedRole === "ceo" || selectedRole === "admin") && def.key === "manage_users_permissions";
@@ -590,7 +578,8 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                               : "bg-[var(--surface-base)]/40 border-[var(--border)] hover:border-[var(--border)] opacity-60 hover:opacity-100"
                           }`}
                         >
-                          <div className="space-y-1">
+                          <div className="space-y-1 min-w-0">
+                            <p className="text-[11px] font-black uppercase tracking-wider text-[var(--text-faint)]">{category}</p>
                             <div className="flex items-center gap-2">
                               {isAllowed ? (
                                 <Lock className="w-3.5 h-3.5 text-emerald-400" />
@@ -614,10 +603,8 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                           </div>
                         </div>
                       );
-                    })}
-                  </div>
-                </div>
-              ))}
+                    })
+              )}
             </div>
           </div>
         </div>

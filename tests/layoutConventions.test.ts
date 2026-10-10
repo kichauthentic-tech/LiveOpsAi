@@ -207,8 +207,8 @@ test("Talent Pool: danh sách + hồ sơ cạnh nhau, không phải lưới 33 t
   expect(src).not.toMatch(/<table/);
   expect(src).toMatch(/const renderRow = /);
   expect(src).toMatch(/<aside/);
-  // Ở < lg hồ sơ là tấm phủ màn hình, từ lg là cột dính bên phải.
-  expect(src).toMatch(/lg:sticky/);
+  // Hồ sơ là tấm phủ màn hình ở màn hẹp, từ xl (bản 6073929 đổi từ lg) là cột dính bên phải.
+  expect(src).toMatch(/(lg|xl):sticky/);
   expect(src).toMatch(/sheetOpen/);
 });
 

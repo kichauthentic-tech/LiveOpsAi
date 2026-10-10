@@ -13,6 +13,7 @@ import { errorMessage } from "../../lib/errorMessage";
 import { useConfirm } from "../../hooks/useConfirm";
 import { platformOf } from "../../lib/reportPlatform";
 import { profileOf } from "../../lib/platforms/profiles";
+import { PageHeader } from "../common/PageHeader";
 
 interface BrandDataRawProps {
   /** Sàn của workspace (07/10): chỉ hiện 6 loại file TikTok hoặc 4 loại file Shopee, không còn nút chuyển sàn trong màn. */
@@ -292,34 +293,34 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ platform, brandId, b
 
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="font-bold text-[var(--text)] text-lg flex items-center gap-2">
-          <Database className="w-5 h-5 text-[var(--accent)]" /> Dữ Liệu Gốc — {brandName}
-        </h2>
-        <p className="text-xs text-[var(--text-muted)] mt-1">
-          Nơi lưu nguyên trạng report Excel tải tay từ {prof.sellerCenterLabel} mỗi tuần/tháng (workspace này chỉ có file của sàn {platform}). Đây là cơ sở để dựng report + đối soát cuối tháng, sau này cần tra chỉ số nào chỉ cần mở lại import đúng kỳ. Up lại file trong cùng một tháng sẽ thay bản cũ của tháng đó {prof.dataRawReplaceNote}.
-        </p>
-      </div>
+      {/* 10/10: thẻ đầu trang chung + tab loại file nằm trong thẻ (trước là tiêu đề trần + dải tab rời).
+          Import và Lịch sử import KHÔNG chia 2 cột: sau khi chọn file, khối Import hiện bảng xem trước
+          rộng theo số cột của file — chia đôi thì bảng đó phải cuộn ngang. */}
+      <PageHeader
+        icon={Database}
+        title={`Dữ Liệu Gốc — ${brandName}`}
+        description={<>Nơi lưu nguyên trạng report Excel tải tay từ {prof.sellerCenterLabel} mỗi tuần/tháng (workspace này chỉ có file của sàn {platform}). Đây là cơ sở để dựng report + đối soát cuối tháng, sau này cần tra chỉ số nào chỉ cần mở lại import đúng kỳ. Up lại file trong cùng một tháng sẽ thay bản cũ của tháng đó {prof.dataRawReplaceNote}.</>}
+      >
+        <div className="flex flex-wrap gap-2">
+          {visibleTabs.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setActiveType(t.id)}
+              className={`text-xs font-bold px-3 py-1.5 rounded-xl border ${
+                activeType === t.id ? "bg-[var(--accent)] text-[var(--accent-text)] border-[var(--accent)]" : "bg-[var(--surface-elevated)] text-[var(--text-muted)] border-[var(--border)] hover:bg-[var(--surface-hover)]"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </PageHeader>
 
       {error && (
         <div className="bg-red-950/40 border border-red-800/50 text-red-400 text-xs font-semibold p-3 rounded-xl flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 shrink-0" /> {error}
         </div>
       )}
-
-      <div className="flex flex-wrap gap-2 border-b border-[var(--border)] pb-3">
-        {visibleTabs.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setActiveType(t.id)}
-            className={`text-xs font-bold px-3 py-1.5 rounded-xl border ${
-              activeType === t.id ? "bg-[var(--accent)] text-[var(--accent-text)] border-[var(--accent)]" : "bg-[var(--surface-elevated)] text-[var(--text-muted)] border-[var(--border)] hover:bg-[var(--surface-hover)]"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
 
       {notice && (
         <div className="bg-emerald-950/30 border border-emerald-800/50 text-emerald-400 text-xs font-semibold p-3 rounded-xl">{notice}</div>

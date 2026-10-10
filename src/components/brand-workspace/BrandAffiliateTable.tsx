@@ -32,6 +32,7 @@ import { metricHint } from "../../lib/metricGlossary";
 
 import { fmtFixed, fmtMonth, fmtVndFull } from "../../lib/format";
 import { MonthPicker } from "../common/MonthPicker";
+import { PageHeader } from "../common/PageHeader";
 import { AffiliatePlanTable, CAMPAIGN_STYLE, CAMPAIGN_TYPES } from "./AffiliatePlanTable";
 // Trang Affiliate (2026-09-22) — tách RIÊNG khỏi form Report Tháng theo yêu cầu ops. Hai chế độ xem (0155, 2026-10-08):
 //   • KẾ HOẠCH — bảng dạng sheet ops vẫn lập hằng tháng (AffiliatePlanTable); dán thẳng từ Google Sheet; "Chốt, gửi brand"
@@ -632,18 +633,18 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <div>
-          <h2 className="text-lg font-black text-[var(--text)] flex items-center gap-2">
-            <Users className="w-5 h-5 text-emerald-600" /> Affiliate — {brandName}
-          </h2>
-          <p className="text-xs text-[var(--text-faint)] mt-0.5">
-            {mode === "plan"
-              ? "Lập kế hoạch từng phiên creator affiliate trước (dán từ Google Sheet được). Sau khi live, nạp file Live Analysis từ Dữ Liệu Gốc — số thực tế tự khớp vào đúng dòng kế hoạch."
-              : 'Mỗi phiên live đã diễn ra là 1 cột. Số tự động đọc từ file "Live Analysis" (Dữ Liệu Gốc); Target / Ads cost / Quy mô nhập tay hoặc lấy từ kế hoạch.'}
-          </p>
-        </div>
-        <div className="ml-auto flex flex-wrap items-center gap-2">
+      {/* 10/10: thẻ đầu trang chung (PageHeader) — trước là tiêu đề trần không khung, khác mọi trang khác.
+          Thanh công cụ thành hàng phụ để dòng giải thích không bị dồn còn 1/3 chiều ngang. */}
+      <PageHeader
+        icon={Users}
+        title={`Affiliate — ${brandName}`}
+        description={
+          mode === "plan"
+            ? "Lập kế hoạch từng phiên creator affiliate trước (dán từ Google Sheet được). Sau khi live, nạp file Live Analysis từ Dữ Liệu Gốc — số thực tế tự khớp vào đúng dòng kế hoạch."
+            : 'Mỗi phiên live đã diễn ra là 1 cột. Số tự động đọc từ file "Live Analysis" (Dữ Liệu Gốc); Target / Ads cost / Quy mô nhập tay hoặc lấy từ kế hoạch.'
+        }
+      >
+        <div className="flex flex-wrap items-center gap-2">
           <div role="tablist" aria-label="Chế độ xem" className="flex rounded-lg bg-[var(--surface-elevated)] p-0.5 border border-[var(--border)]">
             {(
               [
@@ -695,7 +696,7 @@ export function BrandAffiliateTable({ brandId, brandName, sessions, currentRole,
             </>
           )}
         </div>
-      </div>
+      </PageHeader>
 
       {errorMsg && (
         <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700 flex flex-wrap items-center gap-2">
