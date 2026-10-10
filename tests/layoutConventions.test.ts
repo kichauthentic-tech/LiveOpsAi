@@ -145,16 +145,31 @@ test("Dashboard brand: Run-rate so target đứng TRƯỚC lưới Key Metrics",
 });
 
 test("Dashboard agency: khối không tính được thì không chiếm chỗ ngang bằng ô có số", () => {
-  const cockpit = readFileSync(join(SRC, "components/dashboard/Cockpit.tsx"), "utf8");
-  // Bảng "Từng tài khoản": cột Target / Run-rate / Dự phóng ÷ target chỉ dựng khi có brand có target, và nói rõ khi nào hiện.
-  expect(cockpit).toMatch(/\{anyTarget && <th/);
-  expect(cockpit).toMatch(/Cột Target, Run-rate và Dự phóng ÷ target hiện khi OP chốt Kế Hoạch Tháng/);
-  // Run-rate bốn tầng: chưa brand nào có target thì một thẻ ngắn có nút đi chốt, không dựng thang rỗng.
-  expect(cockpit).toMatch(/ladder\.length > 0 \? \(/);
-  expect(cockpit).toMatch(/Chốt Kế Hoạch Tháng →/);
+  const board = readFileSync(join(SRC, "components/dashboard/ThisMonth.tsx"), "utf8");
+  // Bảng kết luận từng kênh: cột Target / Thiếu-dư / Run-rate chỉ dựng khi có kênh có target, và nói rõ khi nào hiện.
+  expect(board).toMatch(/\{anyTarget && <th/);
+  expect(board).toMatch(/Cột Target, Thiếu\/dư và Run-rate hiện khi OP chốt Kế Hoạch Tháng/);
+  // Kênh chưa chốt kế hoạch: một dòng "chờ chốt kế hoạch", không vẽ thanh run-rate rỗng.
+  expect(board).toMatch(/chờ chốt kế hoạch/);
+  // Ô tiền ở đầu màn chỉ dựng khi đã tính được ít nhất một ca (10/10 — trước đó 2 ô "Chưa tính được" chiếm chỗ).
+  const shell = readFileSync(join(SRC, "components/CeoBrief.tsx"), "utf8");
+  expect(shell).toMatch(/const showMoney = canSeeMoney && !!fin && fin\.priced > 0/);
   // Tài chính: chưa tính được ca nào thì không dựng 6 ô KPI + 2 biểu đồ/bảng rỗng.
   const fin = readFileSync(join(SRC, "components/dashboard/FinanceSection.tsx"), "utf8");
   expect(fin).toMatch(/\{fin\.priced === 0 \? \(/);
+});
+
+test("Dashboard agency: mỗi kênh MỘT kết luận, không còn hàng Hôm qua/Hôm nay và bảng xếp host thô qua brand", () => {
+  const board = readFileSync(join(SRC, "components/dashboard/ThisMonth.tsx"), "utf8");
+  expect(board).toMatch(/<LandingChip keyName=\{v\.landing\.key\} \/>/);
+  expect(board).not.toMatch(/Dự phóng ÷ target/);
+  const health = readFileSync(join(SRC, "components/dashboard/Health.tsx"), "utf8");
+  // Host/trợ so mặt bằng trong CÙNG kênh (hostReliability), không xếp GMV/giờ thô qua brand.
+  expect(health).toMatch(/hostReliability\(xs, h\.bucketOf, "host"\)/);
+  expect(health).toMatch(/hostReliability\(xs, h\.bucketOf, "assistant"\)/);
+  for (const f of ["components/dashboard/ThisMonth.tsx", "components/dashboard/Health.tsx", "components/CeoBrief.tsx"]) {
+    expect(readFileSync(join(SRC, f), "utf8"), f).not.toMatch(/"Hôm qua"|"Hôm nay"/);
+  }
 });
 
 // ---- M4 Vận hành (2026-09-29) ----

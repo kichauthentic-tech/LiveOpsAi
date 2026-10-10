@@ -7,10 +7,8 @@ import {
   combineOutlooks,
   financeOf,
   lastDataDate,
-  monthColumns,
   monthOutlook,
   monthTargetOf,
-  pairRows,
   periodFor,
   projectionRates,
   totalsOf
@@ -135,17 +133,6 @@ describe("financeOf", () => {
     expect([f.sessions, f.priced, f.profitableSessions]).toEqual([4, 3, 2]);
     expect([f.days, f.profitableDays]).toEqual([2, 1]);
     expect(f.missing.get("host_rate")).toBe(1);
-  });
-});
-
-describe("pairRows / monthColumns", () => {
-  test("cặp dưới 3 ca không xếp hạng", () => {
-    const s = [ca("2026-09-01"), ca("2026-09-02"), ca("2026-09-03"), ca("2026-09-04", { coHostId: "a2", coHostName: "Trợ 2" })];
-    expect(pairRows(s).map((p) => p.assistant)).toEqual(["Trợ 1"]);
-  });
-  test("tháng đang chạy cộng tới ngày có số", () => {
-    const cols = monthColumns([ca("2026-08-20"), ca("2026-09-02")], "2026-09", 2, "2026-09-22");
-    expect(cols.map((c) => [c.month, c.partial, c.totals.sessions])).toEqual([["2026-08", false, 1], ["2026-09", true, 1]]);
   });
 });
 

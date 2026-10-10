@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DEFAULT_ENGINE_PARAMS, type EngineParams } from "../lib/scheduling/engineParams";
 import { defaultViewMonth } from "../lib/defaultMonth";
-import { AlertTriangle, ChevronLeft, ChevronRight, CircleAlert, Info, LayoutDashboard } from "lucide-react";
+import { ChevronLeft, ChevronRight, LayoutDashboard } from "lucide-react";
 import {
   Brand,
   BrandChannel,
@@ -18,7 +18,6 @@ import {
 } from "../types";
 import {
   Grain,
-  Issue,
   MonthOutlook,
   PnlFn,
   Totals,
@@ -28,6 +27,7 @@ import {
   inRange,
   lastDataDate,
   monthOutlook,
+  monthEndOf,
   monthTargetOf,
   nextMonthOf,
   periodFor,
@@ -40,7 +40,11 @@ import { monthPlanRead, planStatusesRead } from "../lib/db/monthPlans";
 import { recordForecastSnapshots } from "../lib/db/forecastSnapshots";
 import { coneHalf } from "../lib/performance/forecastCone";
 import { addDays, eachDay } from "../lib/dateUtils";
-import { CampOverrides, effectiveCamp } from "../lib/campaignDays";
+import { CampDayBucket, CampOverrides, effectiveCamp, resolveCampBucketType } from "../lib/campaignDays";
+import { channelVerdict, dataCoverage, dataDiscipline, gmvTree, likeForLike, likeForLikeMany, nextWaveReadiness, peopleLoad, targetFeasibility } from "../lib/performance/channelHealth";
+import { commitmentsRead, contractsRead } from "../lib/db/brandContracts";
+import { computeCommitmentProgress, monthCommitmentOf } from "../lib/performance/brandCommitment";
+import { MAX_RECOMMENDED_HOURS } from "./scheduling/TalentLoadTimeline";
 import { isCountable, sessionHours } from "../lib/performance/hostPerformance";
 import { handlingPlan, type HandlingPlan } from "../lib/performance/handlingPlan";
 import { planRunRate, type PlanRunRate } from "../lib/performance/planRunRate";
@@ -50,19 +54,21 @@ import { MonthPicker } from "./common/MonthPicker";
 import type { TabPrefetchCtx } from "../lib/db/prefetch";
 import { channelTitle, platformOf, brandMonthKey, brandPlatformKey, inPlatformScope, PLATFORM_SCOPE_LABEL, type ReportPlatform } from "../lib/reportPlatform";
 import { platformsOfBrand } from "../lib/channels";
-import { ACTION_TAB, Card, Kpi, ddmm, hrs, money, num, pct, useTooltip } from "./dashboard/shared";
-import { Cockpit } from "./dashboard/Cockpit";
-import { DrillDown } from "./dashboard/DrillDown";
-import { ActionPlan } from "./dashboard/ActionPlan";
+import { Card, Kpi, ddmm, hrs, money, num, pct, useTooltip } from "./dashboard/shared";
+import { ThisMonth } from "./dashboard/ThisMonth";
+import { Health } from "./dashboard/Health";
 import { AgencyHealth } from "./dashboard/AgencyHealth";
-import { MonthOverMonth } from "./dashboard/MonthOverMonth";
-import { StaffSection } from "./dashboard/StaffSection";
 import { FinanceSection } from "./dashboard/FinanceSection";
-import type { DashModel } from "./dashboard/model";
+import type { ChannelHealth, DashModel } from "./dashboard/model";
+import type { BrandContract, BrandMonthlyCommitment } from "../types";
 
-// Dashboard agency (làm lại 09/10/2026 — thay Bản Tin CEO một trang dài). Mọi luật số nằm ở lib/performance/*
-// (ceoBrief, planRunRate, forecastCone, handlingPlan, runRateLadder); các file components/dashboard/* và file này chỉ trình bày.
-// Bốn tab: Overview (sáu câu hỏi của CEO) · Deepdive (kênh → đợt → ngày → ca) · Action (phương án theo dự phóng) · Agency (nhân sự, tháng qua tháng, tiền).
+// Dashboard agency. Làm lại 09/10/2026 (4 tab) rồi 10/10/2026 thành HAI tab theo đề xuất https://claude.ai/artifact/DKuM9K9dLJy1nTvFPPtYNX:
+//   "Tháng này" (CEO): số tin tới đâu → mỗi kênh MỘT kết luận + nguyên nhân gốc → việc → chi tiết một kênh (cây GMV, thị trường hay mình,
+//                      run-rate theo đợt, phương án, đi sâu ngày/ca). Gộp Overview + Deepdive + Action cũ.
+//   "Sức khoẻ":       người, host/trợ so mặt bằng trong brand, xu hướng lưu lượng, cam kết giờ, kỷ luật dữ liệu, tiền.
+// Luật số ở lib/performance/* (ceoBrief, channelHealth, planRunRate, forecastCone, handlingPlan); file này chỉ tính một lần rồi trình bày.
+// "Hôm qua / Hôm nay / đang làm" là việc của Bảng Vận Hành, không còn ở màn CEO. Cắt mọi so sánh ở NGÀY ĐỦ SỐ (≥ 90% giờ ca có số);
+// xem theo tháng thì mũi tên so CÙNG LOẠI NGÀY tháng trước (channelHealth.likeForLike), không so ngày lịch.
 // Khối tiền chỉ ceo/admin thấy, và chỉ cộng ca ĐỦ dữ liệu để tính tiền. Mỗi sàn một khối riêng (App.perPlatformBlocks): không cộng GMV hai sàn.
 
 interface CeoBriefProps {
@@ -87,14 +93,16 @@ interface CeoBriefProps {
   engineParams?: EngineParams;
 }
 
-type DashTab = "overview" | "drill" | "plan" | "agency";
-const TAB_LABEL: Record<DashTab, string> = { overview: "Overview", drill: "Deepdive", plan: "Action", agency: "Agency" };
+type DashTab = "month" | "health";
+const TAB_LABEL: Record<DashTab, string> = { month: "Tháng này", health: "Sức khoẻ" };
 
 // Trạng thái kế hoạch tháng này + tháng sau — nạp trước trong lúc chờ đợt nạp chung (lib/db/prefetch.ts).
 export function prefetchCeoBrief(_ctx: TabPrefetchCtx): void {
   const month = todayVn().slice(0, 7);
   planStatusesRead.prefetch(month);
   planStatusesRead.prefetch(nextMonthOf(month));
+  commitmentsRead.prefetch();
+  contractsRead.prefetch();
 }
 
 export default function CeoBrief(props: CeoBriefProps) {
@@ -110,7 +118,11 @@ export default function CeoBrief(props: CeoBriefProps) {
   });
   const [customEnd, setCustomEnd] = useState(today);
   const [brandId, setBrandId] = useState<string>("all");
-  const [tab, setTab] = useState<DashTab>("overview");
+  const [tab, setTab] = useState<DashTab>("month");
+  // Kênh đang mở chi tiết ở "Tháng này" (null = kênh cần xử lý nhất).
+  const [channelPick, setChannelPick] = useState<string | null>(null);
+  const [commitments, setCommitments] = useState<BrandMonthlyCommitment[]>([]);
+  const [contracts, setContracts] = useState<BrandContract[]>([]);
   // Ca kế hoạch của các kênh đã CHỐT (brandId → ca) — nguồn của run-rate theo ca/ngày/đợt (planRunRate).
   const [planSlots, setPlanSlots] = useState<Map<string, BrandMonthPlanSlot[]>>(new Map());
   // Sàn do workspace agency quyết định (07/10): hai sàn không gộp được nên Bản Tin CEO chỉ có MỘT sàn, không có "cả 2 sàn".
@@ -122,7 +134,9 @@ export default function CeoBrief(props: CeoBriefProps) {
   const platformSessions = useMemo(() => sessions.filter((s) => inPlatformScope(s, platform)), [sessions, platform]);
   const scopeSessions = useMemo(() => platformSessions.filter((s) => scopeIds.includes(s.brandId)), [platformSessions, scopeIds]);
   const dataEnd = useMemo(() => lastDataDate(scopeSessions, today), [scopeSessions, today]);
-  const period = useMemo(() => periodFor(grain, anchor, today, dataEnd, customEnd), [grain, anchor, today, dataEnd, customEnd]);
+  // Ngày đủ số (≥ 90% giờ ca có số) — mọi kỳ cắt ở đây, không ở "ngày cuối có số bất kỳ" (10/10: 09/10 mới 6/21 ca có số).
+  const completeEnd = useMemo(() => dataCoverage(scopeSessions, today).completeThrough ?? dataEnd, [scopeSessions, today, dataEnd]);
+  const period = useMemo(() => periodFor(grain, anchor, today, completeEnd, customEnd), [grain, anchor, today, completeEnd, customEnd]);
   const month = (grain === "month" ? anchor : period.start).slice(0, 7);
 
   useEffect(() => {
@@ -144,6 +158,13 @@ export default function CeoBrief(props: CeoBriefProps) {
     planStatusesRead.take(nextMonthOf(today.slice(0, 7))).then((m) => alive && setNextPlans(m)).catch(() => alive && setNextPlans(new Map()));
     return () => { alive = false; };
   }, [today]);
+  // Cam kết giờ (CRM / Kế Hoạch Tháng) cho khối "Cam kết giờ và kỷ luật dữ liệu". Lỗi đọc ⇒ coi như chưa có cam kết.
+  useEffect(() => {
+    let alive = true;
+    commitmentsRead.take().then((x) => alive && setCommitments(x)).catch(() => alive && setCommitments([]));
+    contractsRead.take().then((x) => alive && setContracts(x)).catch(() => alive && setContracts([]));
+    return () => { alive = false; };
+  }, []);
 
   // ---------- tiền ----------
   const pnl: PnlFn = useMemo(() => {
@@ -156,52 +177,21 @@ export default function CeoBrief(props: CeoBriefProps) {
     };
   }, [financeRecords, talents, brands, brandPlatformRates, talentRateHistory, brandPlatformRateHistory]);
 
-  // ---------- kỳ đang xem ----------
-  const hasPeriod = period.end >= period.start;
-  const curSessions = useMemo(() => (hasPeriod ? inRange(scopeSessions, period.start, period.end) : []), [scopeSessions, period, hasPeriod]);
-  const prevSessions = useMemo(() => inRange(scopeSessions, period.prevStart, period.prevEnd), [scopeSessions, period]);
-  const cur = useMemo(() => totalsOf(curSessions), [curSessions]);
-  const noCur = curSessions.length === 0;
-  const prev = useMemo(() => totalsOf(prevSessions), [prevSessions]);
-  const fin = useMemo(() => (canSeeMoney ? financeOf(curSessions, pnl) : null), [canSeeMoney, curSessions, pnl]);
-  const finPrev = useMemo(() => (canSeeMoney ? financeOf(prevSessions, pnl) : null), [canSeeMoney, prevSessions, pnl]);
-
-  const sparkDays = useMemo(() => {
-    if (!hasPeriod) return [];
-    const from = grain === "day" || period.end === period.start ? addDays(period.end, -13) : period.start;
-    return eachDay(from, period.end);
-  }, [grain, period, hasPeriod]);
-  // Bộ chỉ số của sàn đang xem (hồ sơ sàn) — ô phễu và bảng tháng qua tháng đọc từ đây, không rẽ nhánh theo tên sàn.
-  const prof = profileOf(platform);
-  const metricsOf = (xs: LiveSession[]) => prof.metrics.ofSessions(xs.filter(isCountable), sessionHours);
-  const curM = useMemo(() => metricsOf(curSessions), [curSessions, prof]); // eslint-disable-line react-hooks/exhaustive-deps
-  const prevM = useMemo(() => metricsOf(prevSessions), [prevSessions, prof]); // eslint-disable-line react-hooks/exhaustive-deps
-  // Line theo ngày của kỳ đang xem + đường nét đứt kỳ trước, cùng thứ tự ngày (ngày i của kỳ này ↔ ngày i của kỳ trước).
-  const prevOffset = hasPeriod ? eachDay(period.prevStart, period.start).length - 1 : 0; // số ngày lùi về kỳ trước
-  const sparkBuckets = (days: string[]) => {
-    const byDate = new Map<string, LiveSession[]>();
-    for (const s of scopeSessions) if (s.date >= (days[0] ?? "9") && s.date <= (days[days.length - 1] ?? "")) byDate.set(s.date, [...(byDate.get(s.date) ?? []), s]);
-    return byDate;
-  };
-  const strictPrev = !(grain === "day" || period.end === period.start); // xem 1 ngày: line 14 ngày gần nhất, kỳ trước lùi cùng số ngày, không cắt theo prevEnd
-  const sparkOf = (pick: (xs: LiveSession[]) => number | null) => {
-    const curBy = sparkBuckets(sparkDays);
-    const prevDays = sparkDays.map((d) => addDays(d, -prevOffset));
-    const prevBy = sparkBuckets(prevDays);
-    return {
-      series: sparkDays.map((d) => pick(curBy.get(d) ?? []) ?? 0),
-      prevSeries: prevDays.map((d) => (strictPrev && (d < period.prevStart || d > period.prevEnd) ? null : pick(prevBy.get(d) ?? []) ?? 0)),
-    };
-  };
-  const seriesM = (key: string) => sparkOf((xs) => prof.metrics.value(metricsOf(xs), key));
-  const series = (pick: (t: Totals) => number | null) => sparkOf((xs) => pick(totalsOf(xs)));
-
-  // ---------- tháng: target, run-rate, dự phóng ----------
+  // ---------- kênh, khung camp, dự phóng ----------
   // Mỗi kênh brand × sàn một outlook (target của kế hoạch ĐÚNG SÀN), rồi cộng theo brand trong phạm vi sàn đang xem.
   const channels = useMemo(
     () => brands.filter((b) => platformsOfBrand(brandChannels, b.id).includes(platform)).map((b) => ({ b, p: platform })),
     [brands, brandChannels, platform]
   );
+  // Khung camp hiệu lực của từng kênh (kế hoạch đã chốt có thể nới D-Day, vd CROCS 08–11/10) — cùng luật mọi màn (effectiveCamp).
+  const bucketOfCh = useMemo(() => {
+    const out = new Map<string, (d: string) => CampDayBucket>();
+    for (const { b, p } of channels) {
+      const camp: CampOverrides = effectiveCamp(plans.get(brandPlatformKey(b.id, p))?.campRanges);
+      out.set(b.id, (d: string) => resolveCampBucketType(d, camp));
+    }
+    return out;
+  }, [channels, plans]);
   const channelOutlooks = useMemo(() => {
     const out = new Map<string, MonthOutlook>();
     for (const { b, p } of channels) {
@@ -228,6 +218,64 @@ export default function CeoBrief(props: CeoBriefProps) {
   const scopeOutlook = useMemo(() => combineOutlooks(month, today, scopeIds.map((id) => outlooks.get(id)!).filter(Boolean)), [month, today, scopeIds, outlooks]);
   const multiPlatform = (id: string) => platformsOfBrand(brandChannels, id).length > 1;
   const channelName = (b: Brand, p: ReportPlatform) => channelTitle(b.name, p, multiPlatform(b.id));
+
+  // ---------- kỳ đang xem ----------
+  const hasPeriod = period.end >= period.start;
+  const curSessions = useMemo(() => (hasPeriod ? inRange(scopeSessions, period.start, period.end) : []), [scopeSessions, period, hasPeriod]);
+  const prevSessions = useMemo(() => inRange(scopeSessions, period.prevStart, period.prevEnd), [scopeSessions, period]);
+  // Xem theo tháng: mũi tên so CÙNG LOẠI NGÀY tháng trước (ngày thường thứ k ↔ thứ k, đợt camp cùng vị trí; mỗi kênh theo khung camp của nó).
+  const lfl = useMemo(
+    () =>
+      grain === "month" && hasPeriod
+        ? likeForLikeMany(
+            channels.filter(({ b }) => scopeIds.includes(b.id)).map(({ b }) => ({ sessions: platformSessions.filter((s) => s.brandId === b.id), bucketCur: bucketOfCh.get(b.id)! })),
+            month,
+            period.end
+          )
+        : null,
+    [grain, hasPeriod, channels, scopeIds, platformSessions, bucketOfCh, month, period.end]
+  );
+  const cmpCurSessions = lfl ? lfl.cur : curSessions;
+  const cmpPrevSessions = lfl ? lfl.prev : prevSessions;
+  const cur = useMemo(() => totalsOf(curSessions), [curSessions]);
+  const noCur = curSessions.length === 0;
+  const prev = useMemo(() => totalsOf(prevSessions), [prevSessions]);
+  const cmpCur = useMemo(() => totalsOf(cmpCurSessions), [cmpCurSessions]);
+  const cmpPrev = useMemo(() => totalsOf(cmpPrevSessions), [cmpPrevSessions]);
+  const fin = useMemo(() => (canSeeMoney ? financeOf(curSessions, pnl) : null), [canSeeMoney, curSessions, pnl]);
+  const finPrev = useMemo(() => (canSeeMoney ? financeOf(prevSessions, pnl) : null), [canSeeMoney, prevSessions, pnl]);
+
+  const sparkDays = useMemo(() => {
+    if (!hasPeriod) return [];
+    const from = grain === "day" || period.end === period.start ? addDays(period.end, -13) : period.start;
+    return eachDay(from, period.end);
+  }, [grain, period, hasPeriod]);
+  // Bộ chỉ số của sàn đang xem (hồ sơ sàn) — ô phễu đọc từ đây, không rẽ nhánh theo tên sàn.
+  const prof = profileOf(platform);
+  const metricsOf = (xs: LiveSession[]) => prof.metrics.ofSessions(xs.filter(isCountable), sessionHours);
+  const curM = useMemo(() => metricsOf(curSessions), [curSessions, prof]); // eslint-disable-line react-hooks/exhaustive-deps
+  const cmpCurM = useMemo(() => metricsOf(cmpCurSessions), [cmpCurSessions, prof]); // eslint-disable-line react-hooks/exhaustive-deps
+  const cmpPrevM = useMemo(() => metricsOf(cmpPrevSessions), [cmpPrevSessions, prof]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Line theo ngày của kỳ đang xem + đường nét đứt kỳ so sánh. Tháng: ngày i ↔ ngày cùng loại tháng trước; kỳ khác: lùi cùng số ngày.
+  const prevOffset = hasPeriod ? eachDay(period.prevStart, period.start).length - 1 : 0;
+  const sparkBuckets = (days: string[]) => {
+    const byDate = new Map<string, LiveSession[]>();
+    for (const s of scopeSessions) if (s.date >= (days[0] ?? "9") && s.date <= (days[days.length - 1] ?? "")) byDate.set(s.date, [...(byDate.get(s.date) ?? []), s]);
+    return byDate;
+  };
+  const strictPrev = !(grain === "day" || period.end === period.start); // xem 1 ngày: line 14 ngày gần nhất, kỳ trước lùi cùng số ngày, không cắt theo prevEnd
+  const sparkOf = (pick: (xs: LiveSession[]) => number | null) => {
+    const curBy = sparkBuckets(sparkDays);
+    if (lfl) return { series: sparkDays.map((d) => pick(curBy.get(d) ?? []) ?? 0), prevSeries: sparkDays.map((d) => (lfl.prevByCurDay.has(d) ? pick(lfl.prevByCurDay.get(d)!) ?? 0 : null)) };
+    const prevDays = sparkDays.map((d) => addDays(d, -prevOffset));
+    const prevBy = sparkBuckets(prevDays);
+    return {
+      series: sparkDays.map((d) => pick(curBy.get(d) ?? []) ?? 0),
+      prevSeries: prevDays.map((d) => (strictPrev && (d < period.prevStart || d > period.prevEnd) ? null : pick(prevBy.get(d) ?? []) ?? 0)),
+    };
+  };
+  const seriesM = (key: string) => sparkOf((xs) => prof.metrics.value(metricsOf(xs), key));
+  const series = (pick: (t: Totals) => number | null) => sparkOf((xs) => pick(totalsOf(xs)));
 
   // Sổ độ chính xác dự báo (0163, engine target v3 P7): khi ceo/ops/admin xem THÁNG NÀY, ghi dự phóng của từng kênh cho hôm nay
   // (mở nhiều lần thì DB ghi đè dòng của ngày). Mỗi kênh tối đa một lần ghi cho mỗi (ngày, số dự phóng) trong phiên. Lỗi ghi không
@@ -281,7 +329,7 @@ export default function CeoBrief(props: CeoBriefProps) {
   };
   const pickGrain = (g: Grain) => {
     setGrain(g);
-    if (g === "day") setAnchor(dataEnd && dataEnd < today ? dataEnd : addDays(today, -1));
+    if (g === "day") setAnchor(completeEnd && completeEnd < today ? completeEnd : addDays(today, -1));
     else if (g === "custom") { setAnchor(`${today.slice(0, 7)}-01`); setCustomEnd(today); }
     else setAnchor(today);
   };
@@ -292,10 +340,10 @@ export default function CeoBrief(props: CeoBriefProps) {
       : grain === "month"
         ? `Tháng ${Number(month.slice(5))}/${month.slice(0, 4)} · ${ddmm(period.start)}–${ddmm(period.end)}`
         : `${ddmm(period.start)} → ${ddmm(period.end)}`;
-  const compareLabel = grain === "day" ? `so với cùng thứ tuần trước (${ddmm(period.prevStart)})` : `so với ${ddmm(period.prevStart)}–${ddmm(period.prevEnd)}`;
+  const compareLabel = grain === "day" ? `so với cùng thứ tuần trước (${ddmm(period.prevStart)})` : grain === "month" ? "so cùng loại ngày tháng trước (ngày thường ↔ ngày thường, đợt camp cùng vị trí)" : `so với ${ddmm(period.prevStart)}–${ddmm(period.prevEnd)}`;
   const canNext = grain === "custom" ? false : grain === "day" ? anchor < today : period.calendarEnd < today;
   const inputCls = "bg-[var(--surface-base)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-[var(--text)] focus:outline-none focus:border-[var(--accent)]";
-  const stale = dataEnd != null && dataEnd < addDays(today, -1);
+  const stale = completeEnd != null && completeEnd < addDays(today, -1);
   // ---------- run-rate theo kế hoạch đã chốt + phương án xử lý (từng kênh) ----------
   const planRR = useMemo(() => {
     const out = new Map<string, PlanRunRate>();
@@ -321,27 +369,77 @@ export default function CeoBrief(props: CeoBriefProps) {
     return out;
   }, [channels, channelOutlooks, plans, sessions, today, engineParams.fcCheckpointCap]);
 
+  // ---------- sức khoẻ từng kênh (lib/performance/channelHealth.ts) ----------
+  const health = useMemo(() => {
+    const out = new Map<string, ChannelHealth>();
+    const mStart = `${month}-01`, mEnd = monthEndOf(mStart);
+    for (const { b, p } of channels) {
+      const o = channelOutlooks.get(brandPlatformKey(b.id, p));
+      if (!o) continue;
+      const bucketOf = bucketOfCh.get(b.id)!;
+      const chSessions = sessions.filter((s) => s.brandId === b.id && platformOf(s) === p);
+      const coverage = dataCoverage(chSessions, today, mStart, mEnd);
+      const plan = plans.get(brandPlatformKey(b.id, p));
+      const locked = plan?.status === "locked";
+      const feasibility = locked ? targetFeasibility(chSessions, month, planSlots.get(b.id) ?? []) : null;
+      const tree = gmvTree(profileOf(platform).metrics, likeForLike(chSessions, month, coverage.completeThrough, bucketOf, undefined, (k) => k === "daily"));
+      const openByDate = new Map<string, number>();
+      for (const x of o.pending) if (x.kind === "open_slot") openByDate.set(x.date, (openByDate.get(x.date) ?? 0) + x.hours);
+      const wave = month === today.slice(0, 7) ? nextWaveReadiness(chSessions, openByDate, month, today, bucketOf) : null;
+      const mc = monthCommitmentOf(commitments, contracts, b.id, p, mStart);
+      const commitment = mc.source === "none" || mc.hours <= 0
+        ? null
+        : computeCommitmentProgress({ id: mc.row?.id ?? "", brandId: b.id, platform: p, periodMonth: mStart, committedHours: mc.hours, committedGmv: mc.gmv, isOverride: mc.source === "month" }, b.name, chSessions, today);
+      out.set(b.id, {
+        coverage,
+        feasibility,
+        tree,
+        wave,
+        verdict: channelVerdict({ outlook: o, coverage, feasibility, tree, wave, today }),
+        discipline: dataDiscipline({
+          coverage,
+          today,
+          monthSessions: chSessions.filter((s) => s.date >= mStart && s.date <= mEnd),
+          commitmentHours: mc.source === "none" ? null : mc.hours,
+          planTarget: locked ? plan!.targetGmv : null,
+          planSlotSum: locked ? planMonthTotals.get(brandMonthKey(b.id, month, p)) ?? null : null
+        }),
+        commitment,
+        bucketOf
+      });
+    }
+    return out;
+  }, [channels, channelOutlooks, bucketOfCh, sessions, today, month, plans, planSlots, platform, commitments, contracts, planMonthTotals]);
+  const coverage = useMemo(() => dataCoverage(scopeSessions, today, `${month}-01`, monthEndOf(`${month}-01`)), [scopeSessions, today, month]);
+  // Tải người: số vận hành nên tính cả hai sàn (một người là một người); phạm vi brand thì chỉ ca của brand đó.
+  const people = useMemo(
+    () => peopleLoad(sessions.filter((s) => brandId === "all" || s.brandId === brandId), `${month}-01`, monthEndOf(`${month}-01`), (s) => channelTitle(s.brandName, platformOf(s), platformsOfBrand(brandChannels, s.brandId).length > 1), MAX_RECOMMENDED_HOURS),
+    [sessions, brandId, month, brandChannels]
+  );
+
   const scopedBrands = useMemo(() => brands.filter((b) => scopeIds.includes(b.id)), [brands, scopeIds]);
   const model: DashModel = {
-    platform, today, month, brands, scopeIds, platformSessions, scopeSessions, outlooks, scopeOutlook, planRR, handling,
-    cur, prev, issues, channelName: (b) => channelName(b, platform)
+    platform, today, month, brands, scopeIds, platformSessions, scopeSessions, outlooks, scopeOutlook, planRR, handling, health, coverage,
+    cur, prev, cmp: { cur: cmpCur, prev: cmpPrev }, issues, channelName: (b) => channelName(b, platform)
   };
 
+  // Ô tiền chỉ dựng khi đã tính được ít nhất một ca — chưa nhập rate thì khối Tài chính ở tab Sức khoẻ nói còn thiếu gì.
+  const showMoney = canSeeMoney && !!fin && fin.priced > 0;
   const kpi = (
     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-      <Kpi empty={noCur} label="LIVE GMV" value={money(cur.gmv)} cur={cur.gmv} prev={prev.gmv} extra={`${num(cur.sessions)} ca`} {...series((t) => t.gmv)} />
-      <Kpi empty={noCur} label="Giờ live" value={hrs(cur.hours)} cur={cur.hours} prev={prev.hours} {...series((t) => t.hours)} />
-      <Kpi empty={noCur} label="GMV/giờ" value={money(cur.gmvPerHour)} cur={cur.gmvPerHour} prev={prev.gmvPerHour} {...series((t) => t.gmvPerHour)} />
-      <Kpi empty={noCur} label="Orders" value={prof.metrics.value(curM, "orders") == null ? "—" : num(cur.orders)} cur={cur.orders} prev={prev.orders} extra={cur.aov ? `${prof.basketLabel} ${money(cur.aov)}` : undefined} {...series((t) => t.orders)} />
+      <Kpi empty={noCur} label="LIVE GMV" value={money(cur.gmv)} cur={cmpCur.gmv} prev={cmpPrev.gmv} extra={`${num(cur.sessions)} ca`} {...series((t) => t.gmv)} />
+      <Kpi empty={noCur} label="Giờ live" value={hrs(cur.hours)} cur={cmpCur.hours} prev={cmpPrev.hours} {...series((t) => t.hours)} />
+      <Kpi empty={noCur} label="GMV/giờ" value={money(cur.gmvPerHour)} cur={cmpCur.gmvPerHour} prev={cmpPrev.gmvPerHour} {...series((t) => t.gmvPerHour)} />
+      <Kpi empty={noCur} label="Orders" value={prof.metrics.value(curM, "orders") == null ? "—" : num(cur.orders)} cur={cmpCur.orders} prev={cmpPrev.orders} extra={cur.aov ? `${prof.basketLabel} ${money(cur.aov)}` : undefined} {...series((t) => t.orders)} />
       {prof.briefKpis.map(({ key, label }) => {
         const def = prof.metrics.defs.find((d) => d.key === key)!;
         const c = prof.metrics.value(curM, key);
-        return <Kpi key={key} empty={noCur} label={label} value={prof.metrics.fmt(def, c)} cur={c ?? 0} prev={prof.metrics.value(prevM, key) ?? 0} {...seriesM(key)} />;
+        return <Kpi key={key} empty={noCur} label={label} value={prof.metrics.fmt(def, c)} cur={prof.metrics.value(cmpCurM, key) ?? 0} prev={prof.metrics.value(cmpPrevM, key) ?? 0} {...seriesM(key)} />;
       })}
-      {canSeeMoney && fin && (
+      {showMoney && (
         <>
-          <Kpi label="Doanh thu agency" value={fin.priced ? money(fin.revenue) : "Chưa tính được"} cur={fin.priced ? fin.revenue : null} prev={finPrev?.priced ? finPrev.revenue : null} extra={fin.sessions ? `${fin.priced}/${fin.sessions} ca đủ dữ liệu` : undefined} locked />
-          <Kpi label="Lãi gộp" value={fin.priced ? money(fin.profit) : "Chưa tính được"} cur={fin.priced ? fin.profit : null} prev={finPrev?.priced ? finPrev.profit : null} extra={fin.margin != null ? `biên ${pct(fin.margin)}` : undefined} locked />
+          <Kpi label="Doanh thu agency" value={money(fin!.revenue)} cur={fin!.revenue} prev={finPrev?.priced ? finPrev.revenue : null} extra={`${fin!.priced}/${fin!.sessions} ca đủ dữ liệu`} locked />
+          <Kpi label="Lãi gộp" value={money(fin!.profit)} cur={fin!.profit} prev={finPrev?.priced ? finPrev.profit : null} extra={fin!.margin != null ? `biên ${pct(fin!.margin)}` : undefined} locked />
         </>
       )}
     </div>
@@ -359,14 +457,14 @@ export default function CeoBrief(props: CeoBriefProps) {
               <LayoutDashboard className="w-5 h-5 text-[var(--accent-text)]" /> Dashboard
             </h2>
             <PageIntro>
-              Toàn cảnh agency và từng tài khoản: đang ở đâu, cuối tháng về đâu, sắp tới gì, phải làm gì{canSeeMoney ? ", kèm nhân sự và tiền" : " và nhân sự"}. So sánh luôn cắt về cùng số ngày có số liệu.
+              Mỗi kênh về đâu cuối tháng và vì sao, việc gì cần làm, rồi sức khoẻ agency: người, khách, dữ liệu{canSeeMoney ? ", tiền" : ""}. Mọi so sánh cắt ở ngày đủ số và so cùng loại ngày.
             </PageIntro>
           </div>
           <span
             className={`self-start shrink-0 text-xs font-bold px-3 py-1.5 rounded-full ${stale ? "bg-amber-500/15 text-amber-300" : "bg-emerald-500/15 text-emerald-300"}`}
-            title="Ngày gần nhất có ca đã có số liệu, trong phạm vi brand đang xem"
+            title="Ngày cuối mà ít nhất 90% giờ ca đã chạy có số, trong phạm vi brand đang xem"
           >
-            {dataEnd ? `● Số liệu đến ${ddmm(dataEnd)}${stale ? " — chưa cập nhật" : ""}` : "Chưa có số liệu"}
+            {completeEnd ? `● Số đủ tới ${ddmm(completeEnd)}${stale ? " — còn ca chờ số" : ""}` : "Chưa có số liệu"}
           </span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -406,7 +504,7 @@ export default function CeoBrief(props: CeoBriefProps) {
           Đang xem <b className="text-[var(--text)]">{periodLabel}</b>
           {" · "}<b className="text-[var(--text)]">{PLATFORM_SCOPE_LABEL[platform]}</b>
           {hasPeriod && <> · mũi tên {compareLabel} · nét đứt trên biểu đồ nhỏ = kỳ so sánh</>}
-          {period.cutByData && <span className="text-amber-300"> · kỳ cắt tới {ddmm(period.end)} vì số liệu mới về tới ngày đó</span>}
+          {period.cutByData && <span className="text-amber-300"> · kỳ cắt tới {ddmm(period.end)} vì sau ngày đó chưa đủ 90% giờ ca có số</span>}
         </p>
         <div className="flex flex-wrap gap-1 border-t border-[var(--border)] pt-3" role="tablist" aria-label="Phần của Dashboard">
           {(Object.keys(TAB_LABEL) as DashTab[]).map((t) => (
@@ -418,62 +516,20 @@ export default function CeoBrief(props: CeoBriefProps) {
         </div>
       </Card>
 
-      {tab === "overview" && (
-        <Cockpit
-          m={model}
-          kpi={kpi}
-          issues={<IssueList issues={issues} onNavigate={onNavigate} />}
-          selected={brandId}
-          onSelectBrand={(id) => setBrandId(brandId === id ? "all" : id)}
-          onNavigate={onNavigate}
-          onOpenPlan={() => setTab("plan")}
-        />
+      {tab === "month" && (
+        <ThisMonth m={model} kpi={kpi} selected={channelPick} onSelect={setChannelPick} onNavigate={onNavigate} canReadShop={["ceo", "operations", "admin"].includes(currentRole)} />
       )}
-      {tab === "drill" && <DrillDown m={model} onNavigate={onNavigate} />}
-      {tab === "plan" && <ActionPlan m={model} />}
-      {tab === "agency" && (
-        <div className="space-y-5 sm:space-y-7">
-          <AgencyHealth m={model} curSessions={curSessions} onNavigate={onNavigate} />
-          <MonthOverMonth sessions={scopeSessions} brands={scopedBrands} lastMonth={dataEnd && dataEnd.slice(0, 7) < today.slice(0, 7) ? dataEnd.slice(0, 7) : today.slice(0, 7)} dataEnd={dataEnd} pnl={canSeeMoney ? pnl : null} metrics={prof.metrics} />
-          <StaffSection cur={curSessions} prev={prevSessions} />
-          {canSeeMoney && fin && <FinanceSection fin={fin} finPrev={finPrev} sessions={curSessions} brands={scopedBrands} pnl={pnl} period={period} onNavigate={onNavigate} />}
-        </div>
+      {tab === "health" && (
+        <Health
+          m={model}
+          people={people}
+          dayLimit={MAX_RECOMMENDED_HOURS}
+          weekLimit={engineParams.fatigueWeekHours}
+          agencyTiles={<AgencyHealth m={model} curSessions={curSessions} onNavigate={onNavigate} />}
+          finance={canSeeMoney && fin ? <FinanceSection fin={fin} finPrev={finPrev} sessions={curSessions} brands={scopedBrands} pnl={pnl} period={period} onNavigate={onNavigate} /> : null}
+        />
       )}
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-
-const IssueList: React.FC<{ issues: Issue[]; onNavigate: (tab: string) => void }> = ({ issues, onNavigate }) => (
-  <Card>
-    <div className="flex items-baseline justify-between mb-2">
-      <h4 className="font-black text-[var(--text)]">Cần chú ý</h4>
-      <span className="text-[11px] text-[var(--text-faint)]">tự sinh từ số liệu · đỏ trước</span>
-    </div>
-    {issues.length === 0 ? (
-      <p className="text-sm text-emerald-400 py-2">Không có gì cần chú ý.</p>
-    ) : (
-      <ul className="divide-y divide-[var(--border)]">
-        {issues.slice(0, 8).map((it, i) => {
-          const Icon = it.level === "info" ? Info : it.level === "bad" ? CircleAlert : AlertTriangle;
-          const color = it.level === "bad" ? "text-rose-400" : it.level === "warn" ? "text-amber-300" : "text-[var(--text-faint)]";
-          return (
-            <li key={i} className="py-2.5 flex gap-2.5">
-              <Icon className={`w-4 h-4 mt-0.5 shrink-0 ${color}`} aria-label={it.level === "bad" ? "Cần xử lý" : it.level === "warn" ? "Cần để ý" : "Thông tin"} />
-              <div className="min-w-0">
-                <p className="text-sm font-bold text-[var(--text)]">{it.title}</p>
-                <p className="text-xs text-[var(--text-faint)] leading-snug">{it.detail}</p>
-                {it.action && (
-                  <button onClick={() => onNavigate(ACTION_TAB[it.action!].tab)} className="min-h-6 -mx-1 px-1 rounded inline-flex items-center text-xs font-bold text-[var(--accent-text)] hover:underline mt-0.5">
-                    {ACTION_TAB[it.action].label} →
-                  </button>
-                )}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-    )}
-  </Card>
-);

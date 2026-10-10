@@ -1,13 +1,12 @@
 import React from "react";
 import { RUN_RATE_BAD, RUN_RATE_WARN, type MonthOutlook } from "../../lib/performance/ceoBrief";
 import { coneOf, LANDING_LABEL, type LandingKey } from "../../lib/performance/forecastCone";
-import { runRateTone, type LadderRow } from "../../lib/performance/runRateLadder";
+import { runRateTone } from "../../lib/performance/channelHealth";
 import { fmtVndShort } from "../../lib/format";
-import { Card, WEEKDAY, ddmm, money, niceMax, pct, weekdayIdx } from "./shared";
+import { WEEKDAY, ddmm, money, niceMax, weekdayIdx } from "./shared";
 
 // Thanh bullet (Stephen Few): nền ba vùng đỏ / vàng / xanh theo đúng ngưỡng 85% / 95% đang dùng trong app, vạch đen = 100%.
 
-const TONE_TEXT: Record<ReturnType<typeof runRateTone>, string> = { good: "text-emerald-400", warn: "text-amber-300", bad: "text-rose-400", none: "text-[var(--text-faint)]" };
 const TONE_FILL: Record<ReturnType<typeof runRateTone>, string> = { good: "var(--success)", warn: "var(--warning)", bad: "var(--danger)", none: "var(--text-faint)" };
 const SCALE_MAX = 1.5;
 
@@ -36,47 +35,6 @@ export const LandingChip: React.FC<{ keyName: LandingKey }> = ({ keyName }) => {
   };
   return <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${cls[keyName]}`}>{LANDING_LABEL[keyName]}</span>;
 };
-
-const STATE_LABEL = { done: "đã qua", live: "đang chạy", next: "sắp tới" } as const;
-
-export const RunRateLadder: React.FC<{ rows: LadderRow[]; note: React.ReactNode }> = ({ rows, note }) => (
-  <Card className="space-y-3">
-    <div>
-      <h4 className="font-black text-[var(--text)]">Run-rate bốn tầng</h4>
-      <p className="text-xs text-[var(--text-faint)] leading-snug mt-0.5">
-        Run-rate = GMV thực đạt ÷ target các ca kế hoạch đã chốt tới ngày có số. Vạch đen = 100%; nền đỏ dưới {Math.round(RUN_RATE_BAD * 100)}%, vàng {Math.round(RUN_RATE_BAD * 100)}–{Math.round(RUN_RATE_WARN * 100)}%, xanh từ {Math.round(RUN_RATE_WARN * 100)}%.
-      </p>
-    </div>
-    <div className="grid grid-cols-[minmax(110px,1.1fr)_minmax(120px,2fr)_auto] sm:grid-cols-[minmax(150px,1.1fr)_minmax(160px,2.2fr)_minmax(150px,1fr)] gap-x-3 gap-y-2.5 items-center">
-      {rows.map((r) => {
-        const next = r.state === "next";
-        const tone = r.partial ? "none" : runRateTone(r.runRate);
-        return (
-          <React.Fragment key={`${r.tier}-${r.key}`}>
-            <div className={`min-w-0 ${r.tier === "month" ? "" : "pl-3 border-l border-[var(--border)]"}`}>
-              <p className={`font-bold truncate ${r.tier === "month" ? "text-[var(--text)]" : "text-sm text-[var(--text)]"}`}>{r.label}</p>
-              <p className="text-[11px] text-[var(--text-faint)] leading-snug">{r.sub} · {STATE_LABEL[r.state]}</p>
-            </div>
-            {next ? (
-              <p className="text-xs text-[var(--text-faint)] leading-snug">Target {money(r.target)}{r.forecast != null && r.forecast > 0 ? ` · dự phóng theo lịch ${money(r.forecast)}` : " · chưa có ca trong lịch"}</p>
-            ) : (
-              <RunRateBar value={r.runRate} muted={r.partial} />
-            )}
-            <div className="text-right text-sm whitespace-nowrap">
-              {next ? <span className="text-[var(--text-faint)]">—</span> : r.runRate == null ? <span className="text-xs text-[var(--text-faint)]">chờ số</span> : (
-                <>
-                  <b className={TONE_TEXT[tone]}>{pct(r.runRate)}</b>
-                  <span className="block text-[11px] text-[var(--text-faint)]">{money(r.actual)} / {money(r.targetToDate)}</span>
-                </>
-              )}
-            </div>
-          </React.Fragment>
-        );
-      })}
-    </div>
-    <p className="text-[11px] text-[var(--text-faint)] leading-snug">{note}</p>
-  </Card>
-);
 
 // ---------------------------------------------------------------------------
 // Biểu đồ lũy kế + dải dự phóng rộng dần

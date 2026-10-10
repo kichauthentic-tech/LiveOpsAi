@@ -4,7 +4,7 @@ import type { ShopDayLite, ShopDaysMonthSlice } from "../dataraw/monthlyProductS
 import type { ProductListAgg } from "../dataraw/productListAgg";
 import { vnDateOf } from "../dataraw/vnDate";
 import { fmtVndShort } from "../format";
-import { hostKey, isCountable, sessionHours, UNASSIGNED_HOST_KEY } from "../performance/hostPerformance";
+import { coHostKey, hostKey, isCountable, sessionHours, UNASSIGNED_HOST_KEY } from "../performance/hostPerformance";
 import type { LiveSession } from "../../types";
 import { liveStatsFromRows, pctChange, signed, type CompareWindow, type LiveStats } from "./monthlyReportInsights";
 
@@ -331,7 +331,10 @@ const partOf = (s: LiveSession) => (Number((s.startTime || "00:00").slice(0, 2))
  * buổi (gồm cả ca chưa gán host). Khoảng tin cậy theo phương sai của ước lượng tỷ số (delta method) — tất định,
  * không lấy mẫu ngẫu nhiên nên report mở lại vẫn ra đúng số. Chỉ kết luận trên/dưới khi khoảng nằm hẳn một phía 1.
  */
-export function hostReliability(sessions: LiveSession[], bucketOf: (date: string) => CampDayBucket): HostReliability[] {
+export function hostReliability(sessions: LiveSession[], bucketOf: (date: string) => CampDayBucket, who: "host" | "assistant" = "host"): HostReliability[] {
+  // `who = "assistant"` (Dashboard agency 10/10): cùng phép tính cho trợ live — mặt bằng của ô vẫn là cả nhóm ca, chỉ đổi người được gán.
+  const keyOf = (s: LiveSession) => (who === "host" ? hostKey(s) : coHostKey(s) ?? UNASSIGNED_HOST_KEY);
+  const nameOf = (s: LiveSession) => (who === "host" ? s.hostName : s.coHostName);
   // isCountable: bỏ ca đang live có số dở dang (audit 2026-09-28 mục 6).
   const valid = sessions.filter((s) => isCountable(s) && (s.actualGmv ?? 0) > 0 && sessionHours(s) > 0);
   const cell = (s: LiveSession) => `${s.date.slice(0, 7)}|${bucketOf(s.date)}|${partOf(s)}`;
@@ -345,10 +348,10 @@ export function hostReliability(sessions: LiveSession[], bucketOf: (date: string
   }
   const byHost = new Map<string, { name: string; g: number[]; e: number[] }>();
   for (const s of valid) {
-    const key = hostKey(s);
+    const key = keyOf(s);
     if (key === UNASSIGNED_HOST_KEY) continue;
     const r = rate.get(cell(s))!;
-    const x = byHost.get(key) ?? { name: s.hostName || key, g: [], e: [] };
+    const x = byHost.get(key) ?? { name: nameOf(s) || key, g: [], e: [] };
     x.g.push(s.actualGmv);
     x.e.push((sessionHours(s) * r.g) / r.h);
     byHost.set(key, x);

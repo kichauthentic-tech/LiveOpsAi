@@ -5,12 +5,11 @@ import { applyWhatIf, type HandlingPlan, type Lever, type PlanMode } from "../..
 import { CHECKPOINT_LABEL } from "../../lib/performance/monthForecast";
 import type { Brand } from "../../types";
 import type { MonthOutlook } from "../../lib/performance/ceoBrief";
-import type { DashModel } from "./model";
 import { LandingChip } from "./RunRate";
-import { Card, SectionTitle, hrs, money, pct } from "./shared";
+import { Card, hrs, money, pct } from "./shared";
 
-// Tab "Action": theo dự phóng, kênh nào hụt thì làm gì, kênh nào đang tốt thì scale thế nào. Mọi đòn bẩy ra số từ dữ liệu
-// của chính kênh (lib/performance/handlingPlan.ts) và ghi căn cứ ngay bên dưới.
+// Phương án của MỘT kênh (đòn bẩy, mốc điều chỉnh giờ, thử kịch bản) — 10/10 nằm trong phần chi tiết kênh của "Tháng này"
+// (tab Action riêng đã gộp vào). Mọi đòn bẩy ra số từ dữ liệu của chính kênh (lib/performance/handlingPlan.ts), căn cứ ghi ngay bên dưới.
 
 const MODE_TEXT: Record<PlanMode, (o: MonthOutlook, p: HandlingPlan) => string> = {
   no_target: () => "Chưa có target nên chưa biết hụt hay dư. Dưới đây là các việc làm cho số liệu và lịch đáng tin hơn.",
@@ -87,7 +86,7 @@ const CheckpointStrip: React.FC<{ o: MonthOutlook; p: HandlingPlan; today: strin
   );
 };
 
-const ChannelPlan: React.FC<{ b: Brand; o: MonthOutlook; p: HandlingPlan; name: string; today: string }> = ({ b, o, p, name, today }) => (
+export const ChannelPlan: React.FC<{ b: Brand; o: MonthOutlook; p: HandlingPlan; name: string; today: string }> = ({ b, o, p, name, today }) => (
   <Card className="space-y-3">
     <div className="flex flex-wrap items-center justify-between gap-2">
       <h4 className="font-black text-[var(--text)] flex items-center gap-2"><BrandLogo brand={b} size="xs" /> {name}</h4>
@@ -127,23 +126,3 @@ const ChannelPlan: React.FC<{ b: Brand; o: MonthOutlook; p: HandlingPlan; name: 
     <WhatIfBox o={o} p={p} />
   </Card>
 );
-
-export const ActionPlan: React.FC<{ m: DashModel }> = ({ m }) => {
-  const rows = m.brands
-    .filter((b) => m.scopeIds.includes(b.id))
-    .map((b) => ({ b, o: m.outlooks.get(b.id), p: m.handling.get(b.id) }))
-    .filter((x): x is { b: Brand; o: MonthOutlook; p: HandlingPlan } => !!x.o && !!x.p && (x.o.actual > 0 || x.o.pending.length > 0));
-  // Cần hành động nhất lên đầu: sẽ hụt → khó đạt → chưa chắc → chưa có target → chắc đạt.
-  const rank: Record<string, number> = { short: 0, unlikely: 1, likely: 2, no_forecast: 3, no_target: 4, safe: 5 };
-  rows.sort((a, z) => rank[a.p.mode] - rank[z.p.mode]);
-  return (
-    <div className="space-y-4">
-      <SectionTitle title="Action theo dự phóng" note={`Tháng ${Number(m.month.slice(5))} · mỗi kênh một thẻ, kênh cần hành động nhất lên đầu`} />
-      {rows.length === 0 ? <Card><p className="text-sm text-[var(--text-faint)]">Chưa có kênh nào có số hay lịch trong tháng này.</p></Card> : (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
-          {rows.map(({ b, o, p }) => <ChannelPlan key={b.id} b={b} o={o} p={p} name={m.channelName(b)} today={m.today} />)}
-        </div>
-      )}
-    </div>
-  );
-};

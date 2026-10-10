@@ -146,6 +146,12 @@ function pieceKey(kind: PieceKind, month: string): string {
   return `${kind}|${month}`;
 }
 
+/** Piece Shop Analytics của một tháng trong bản chụp (role brand đọc được bản chụp đã phát hành, không đọc được Dữ Liệu Gốc) —
+ *  Dashboard brand dùng cho "Live trong Total GMV" ở lớp khách (10/10). */
+export function shopDaysPiece(pieces: SnapshotPieces | null | undefined, month: string): ShopDaysMonthSlice | null {
+  return (pieces?.[pieceKey("shopDays", month)]?.data as ShopDaysMonthSlice | undefined) ?? null;
+}
+
 function overlapping(imports: DataRawImportStamp[], types: DataRawReportType[], start: string, end: string): DataRawImportStamp[] {
   return imports.filter((i) => types.includes(i.reportType) && !!i.periodStart && !!i.periodEnd && i.periodStart <= end && i.periodEnd >= start);
 }

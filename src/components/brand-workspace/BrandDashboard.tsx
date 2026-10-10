@@ -9,6 +9,13 @@ import { todayVn } from "../../lib/performance/brandCommitment";
 import { prefetchable, type TabPrefetchCtx } from "../../lib/db/prefetch";
 import { lastDataDate, monthEndOf, monthOutlook, prevMonthOf, nextMonthOf, RUN_RATE_BAD, RUN_RATE_WARN } from "../../lib/performance/ceoBrief";
 import { planRunRate, PlanRunRateSlot, projectMonthEnd, PROJECTION_METHOD_LABEL } from "../../lib/performance/planRunRate";
+import { dataCoverage, gmvTree, LEVER_OWNER, likeForLike, MAX_MONTH_HOURS, runRateByWave, runRateThrough } from "../../lib/performance/channelHealth";
+import { landingOf } from "../../lib/performance/forecastCone";
+import { computeCommitmentProgress } from "../../lib/performance/brandCommitment";
+import { commitmentProgressRead, type BrandCommitmentRow } from "../../lib/db/brandContracts";
+import { fetchSnapshotPieces } from "../../lib/db/monthlyReportSnapshots";
+import { shopDaysPiece } from "../../lib/report/monthlySnapshot";
+import { LandingChip } from "../dashboard/RunRate";
 import {
   SLOT_BLOCKS,
   SLOT_BLOCK_LABEL,
@@ -36,7 +43,8 @@ import OpsSupport, { prefetchOpsSupport } from "../OpsSupport";
 import { MonthPicker } from "../common/MonthPicker";
 import { channelTitle, platformOf, type ReportPlatform } from "../../lib/reportPlatform";
 
-// Dashboard brand (2026-09-28) — màn TRONG tháng cho ops: tháng này tới đâu, vì sao, tuần tới / tháng sau
+// Dashboard brand (2026-09-28; 10/10 thêm lớp khách + luật của channelHealth: cắt ở NGÀY ĐỦ SỐ, so CÙNG LOẠI NGÀY, một nhãn
+// kết luận, "GMV/giờ cần" thay "Cần mỗi ngày còn lại" — chia đều theo ngày bỏ qua ngày camp) — màn TRONG tháng cho ops: tháng này tới đâu, vì sao, tuần tới / tháng sau
 // sửa gì. Report Tháng vẫn là bản chụp SAU tháng gửi brand; hai màn dùng CHUNG hàm (compareWindow,
 // driverBreakdown, controlGroup, hostReliability, planRunRate) nên không nói hai số.
 // Role brand thấy bản rút gọn (user chốt): KPI, run-rate, nhịp tuần — không thấy đề xuất nội bộ, soát kế
@@ -158,26 +166,75 @@ function BrandDashboardOne({ brandId, brandName, platform, platforms, sessions: 
   const mStart = `${month}-01`, mEnd = monthEndOf(mStart);
   const monthSessions = useMemo(() => brandSessions.filter((s) => s.date >= mStart && s.date <= mEnd), [brandSessions, mStart, mEnd]);
   const hidden = !isOps && monthSessions.some((s) => !s.monthPublished);
-  const through = useMemo(() => lastDataDate(monthSessions, today), [monthSessions, today]);
+  // Ngày đủ số (≥ 90% giờ ca có số — channelHealth). Chưa ngày nào đủ thì rơi về ngày cuối có số.
+  const coverage = useMemo(() => dataCoverage(brandSessions, today, mStart, mEnd), [brandSessions, today, mStart, mEnd]);
+  const lastAny = useMemo(() => lastDataDate(monthSessions, today), [monthSessions, today]);
+  const through = coverage.completeThrough ?? lastAny;
   const lagDays = through && month === today.slice(0, 7) ? Math.round((new Date(`${today}T00:00:00`).getTime() - new Date(`${through}T00:00:00`).getTime()) / 86400000) : 0;
 
-  // ---- KPI so cùng kỳ (cắt theo ngày cuối có số — compareWindow, như Report Tháng)
+  // ---- KPI so CÙNG LOẠI NGÀY tháng trước (channelHealth.likeForLike): ngày thường thứ k ↔ thứ k, đợt camp cùng vị trí.
+  // Cửa sổ lịch (compareWindow) chỉ còn cho nhóm đối chứng shop — khối đó tự tách ngày thường / ngày camp.
   const win = useMemo(() => compareWindow(month, through), [month, through]);
+  const lflAll = useMemo(() => likeForLike(brandSessions, month, through, bucketOf), [brandSessions, month, through, bucketOf]);
+  const lflDaily = useMemo(() => likeForLike(brandSessions, month, through, bucketOf, undefined, (b) => b === "daily"), [brandSessions, month, through, bucketOf]);
   // Bộ chỉ số của sàn (hồ sơ sàn): TikTok 18 chỉ số, Shopee Viewers/ATC/ABS/Items Sold — không mượn chỉ số của sàn kia.
-  const mCur = useMemo(() => prof.metrics.ofSessions(brandSessions.filter((s) => s.date >= win.curStart && s.date <= win.curEnd && hasLiveNumbers(s)), sessionHours), [prof, brandSessions, win]);
-  const mPrev = useMemo(() => prof.metrics.ofSessions(brandSessions.filter((s) => s.date >= win.prevStart && s.date <= win.prevEnd && hasLiveNumbers(s)), sessionHours), [prof, brandSessions, win]);
-  const drivers = useMemo(() => prof.metrics.drivers(mPrev, mCur), [prof, mPrev, mCur]);
+  // Ô hiện số của MỌI ca tới ngày đủ số; phần trăm đổi tính trên hai vế cùng loại ngày.
+  const mShown = useMemo(() => prof.metrics.ofSessions(brandSessions.filter((s) => s.date >= mStart && through != null && s.date <= through && hasLiveNumbers(s)), sessionHours), [prof, brandSessions, mStart, through]);
+  const mCur = useMemo(() => prof.metrics.ofSessions(lflAll.cur, sessionHours), [prof, lflAll]);
+  const mPrev = useMemo(() => prof.metrics.ofSessions(lflAll.prev, sessionHours), [prof, lflAll]);
+  // "Vì sao GMV đổi": phễu của ngày thường so ngày thường (ngày camp lệch số ngày giữa hai tháng làm méo cả phễu).
+  const drivers = useMemo(() => prof.metrics.drivers(prof.metrics.ofSessions(lflDaily.prev, sessionHours), prof.metrics.ofSessions(lflDaily.cur, sessionHours)), [prof, lflDaily]);
+  const tree = useMemo(() => gmvTree(prof.metrics, lflDaily), [prof, lflDaily]);
 
   // ---- Run-rate theo plan ban đầu
   const locked = !planLoading && plan?.plan.status === "locked";
   const rr = useMemo(() => (locked && plan ? planRunRate(month, plan.slots, shiftSlots, brandSessions, today, camp) : null), [locked, plan, month, shiftSlots, brandSessions, today, camp]);
-  // Dự kiến cuối tháng — MỘT số cho cả trang (thẻ run-rate + khối phương án bù) và trùng Bản Tin CEO.
+  // Dự kiến cuối tháng — MỘT số cho cả trang (thẻ run-rate + khối phương án bù) và trùng Dashboard agency. Target = target từng ca
+  // của kế hoạch đã chốt (cùng nguồn planRunRate) ⇒ có luôn khả năng đạt (landingOf) và run-rate cắt ở ngày đủ số.
   const outlook = useMemo(() => {
     if (!rr) return null;
     const open = shiftSlots.filter((sl) => sl.brandId === brandId && sl.status === "open" && !sl.sessionId);
-    return monthOutlook(month, today, brandSessions, open, null, camp, engineParams);
+    return monthOutlook(month, today, brandSessions, open, { total: rr.total.target, byDate: rr.targetByDate }, camp, engineParams);
   }, [rr, shiftSlots, brandId, month, today, brandSessions, camp, engineParams]);
   const projection = useMemo(() => projectMonthEnd(rr, outlook), [rr, outlook]);
+  const landing = outlook && month >= today.slice(0, 7) ? landingOf(outlook) : null;
+  const rrCut = outlook ? runRateThrough(outlook, through) : null;
+  const waveRows = outlook ? runRateByWave(outlook, through).filter((w) => w.key !== "month") : [];
+  // GMV/giờ cần cho phần còn lại = (target − đã có) ÷ giờ các ca còn trong lịch (gồm ca đã chạy chờ số) — thay "cần mỗi ngày":
+  // chia đều theo ngày coi ngày thường như ngày D-Day.
+  const remainingHours = outlook ? outlook.pending.reduce((a, p) => a + p.hours, 0) : 0;
+  const needPerHour = rr && outlook && remainingHours > 0 ? Math.max(0, rr.total.target - outlook.actual) / remainingHours : null;
+  const trailingPerHour = useMemo(() => {
+    if (!through) return null;
+    const from = new Date(`${through}T00:00:00`);
+    from.setDate(from.getDate() - 27);
+    const f = `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, "0")}-${String(from.getDate()).padStart(2, "0")}`;
+    const xs = brandSessions.filter((s) => isCountable(s) && s.date >= f && s.date <= through);
+    const h = xs.reduce((a, s) => a + sessionDurationHours(s.startTime, s.endTime), 0);
+    return h > 0 ? xs.reduce((a, s) => a + (s.actualGmv ?? 0), 0) / h : null;
+  }, [brandSessions, through]);
+
+  // ---- Lớp khách: giờ đã giao / cam kết + live trong Total GMV (brand đọc qua bản chụp Report đã phát hành)
+  const [commitRows, setCommitRows] = useState<BrandCommitmentRow[]>([]);
+  useEffect(() => {
+    let alive = true;
+    commitmentProgressRead.take(brandId).then((r) => alive && setCommitRows(r)).catch(() => alive && setCommitRows([]));
+    return () => { alive = false; };
+  }, [brandId]);
+  const commitment = useMemo(() => {
+    const row = commitRows.find((r) => r.periodMonth === mStart && r.platform === platform);
+    if (!row || row.committedHours <= 0) return null;
+    return computeCommitmentProgress({ id: "", brandId, platform, periodMonth: mStart, committedHours: row.committedHours, committedGmv: row.committedGmv, isOverride: row.isOverride }, brandName, brandSessions, today);
+  }, [commitRows, mStart, platform, brandId, brandName, brandSessions, today]);
+  const [publishedShop, setPublishedShop] = useState<{ key: string; slice: ShopDaysMonthSlice | null } | null>(null);
+  useEffect(() => {
+    // Role brand không đọc được Dữ Liệu Gốc (RLS) — lấy piece Shop Analytics của bản chụp Report đã phát hành.
+    if (isOps || !prof.hasShopAnalytics) return;
+    let alive = true;
+    const key = `${brandId}|${month}`;
+    fetchSnapshotPieces(brandId, month, platform).then((p) => alive && setPublishedShop({ key, slice: shopDaysPiece(p, month) })).catch(() => alive && setPublishedShop({ key, slice: null }));
+    return () => { alive = false; };
+  }, [isOps, prof, brandId, month, platform]);
 
   // ---- Nhóm đối chứng (ops — Dữ Liệu Gốc)
   const [shop, setShop] = useState<{ cur: ShopDaysMonthSlice; prev: ShopDaysMonthSlice } | null>(null);
@@ -202,6 +259,16 @@ function BrandDashboardOne({ brandId, brandName, platform, platforms, sessions: 
     () => (shop ? controlGroup(shop.prev.days, shop.cur.days, win, (d) => resolveCampBucketType(d), bucketOf, agencyLive) : []),
     [shop, win, bucketOf, agencyLive]
   );
+  // Live trong Total GMV: GMV ca agency ÷ Total GMV của shop, cùng tập ngày (ngày file shop có số, tới ngày đủ số).
+  const liveShare = useMemo(() => {
+    const days = (isOps ? shop?.cur.days : publishedShop?.key === `${brandId}|${month}` ? publishedShop.slice?.days : null) ?? [];
+    const inWin = days.filter((d) => d.date >= mStart && through != null && d.date <= through);
+    if (inWin.length === 0) return null;
+    const set = new Set(inWin.map((d) => d.date));
+    const total = inWin.reduce((a, d) => a + d.gmv, 0);
+    const live = brandSessions.filter((s) => set.has(s.date) && isCountable(s)).reduce((a, s) => a + (s.actualGmv ?? 0), 0);
+    return total > 0 ? { share: live / total, last: inWin[inWin.length - 1].date } : null;
+  }, [isOps, shop, publishedShop, brandId, month, mStart, through, brandSessions]);
 
   // ---- Nhịp tuần, đề xuất, soát kế hoạch, host
   const weeks = useMemo(() => weeklySeries(brandSessions, through, 16), [brandSessions, through]);
@@ -286,7 +353,7 @@ function BrandDashboardOne({ brandId, brandName, platform, platforms, sessions: 
     const a = prof.metrics.value(mPrev, d.key), b = prof.metrics.value(mCur, d.key);
     const ch = a && b != null ? b / a - 1 : null;
     const tone = ch == null || d.goodWhenUp == null || Math.abs(ch) < 0.02 ? "" : ch > 0 === d.goodWhenUp ? "text-emerald-400" : "text-rose-400";
-    return <Stat key={d.key} size={size} label={d.label} value={prof.metrics.fmt(d, b)} hint={<span className={tone}>{signed(ch)} <span className="text-[var(--text-faint)]">({prof.metrics.fmt(d, a)})</span></span>} />;
+    return <Stat key={d.key} size={size} label={d.label} value={prof.metrics.fmt(d, prof.metrics.value(mShown, d.key))} hint={<span className={tone}>{signed(ch)} <span className="text-[var(--text-faint)]">({prof.metrics.fmt(d, a)})</span></span>} />;
   };
 
   return (
@@ -298,8 +365,8 @@ function BrandDashboardOne({ brandId, brandName, platform, platforms, sessions: 
         actions={
           <>
             {through && (
-              <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${lagDays > 2 ? "bg-rose-500/15 text-rose-400" : "bg-emerald-500/15 text-emerald-400"}`}>
-                Số liệu tới {dm(through)}{lagDays > 0 ? ` · trễ ${lagDays} ngày` : ""}
+              <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${lagDays > 3 ? "bg-rose-500/15 text-rose-400" : "bg-emerald-500/15 text-emerald-400"}`} title="Ngày cuối mà ít nhất 90% giờ ca đã chạy có số. Trễ = số ngày sau mốc đó tới hôm qua.">
+                Số đủ tới {dm(through)}{lagDays > 1 ? ` · trễ ${lagDays - 1} ngày` : ""}
               </span>
             )}
             <MonthPicker value={month} onChange={setPickedMonth} ariaLabel="Tháng" />
@@ -336,6 +403,34 @@ function BrandDashboardOne({ brandId, brandName, platform, platforms, sessions: 
               CHƯA có plan đã chốt thì KHÔNG dựng cả thẻ: đo 29/09 thấy thẻ rỗng vẫn chiếm 192px và đẩy số thật
               xuống dưới, trong khi hiện chưa brand/tháng nào có plan chốt ⇒ đó là trạng thái thường ngày, không
               phải ngoại lệ. Thay bằng 1 dòng, vì đầu trang đã có chip "Kế hoạch T9: chưa có" bấm được rồi. */}
+          {/* 00 · Lớp khách (10/10): bốn câu brand hỏi — kết quả so target, live chiếm bao nhiêu trong shop, agency đã giao đủ giờ
+              chưa, năng suất mỗi giờ so tháng trước (cùng loại ngày). Ops thấy đúng khối brand thấy. */}
+          <Card title={isOps ? "Tóm tắt brand đang thấy" : `Tóm tắt tháng ${Number(month.slice(5))}`} icon={<Gauge className="w-4 h-4 text-[var(--accent-text)]" />} sub={through ? `Tới ${dm(through)} — ngày cuối mà ít nhất 90% giờ ca đã có số.` : "Tháng này chưa có ca nào có số."}>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <Stat
+                label={rr ? "Kết quả so target" : METRIC.gmv}
+                value={rr ? pct(rr.total.pctTarget, 1) : fmtVndShort(mShown.gmv)}
+                hint={rr ? <>{fmtVndShort(rr.total.actual)} / {fmtVndShort(rr.total.target)}{landing ? <> · <LandingChip keyName={landing.key} />{landing.pHit != null ? ` ${pct(landing.pHit)}` : ""}</> : ""}</> : "tháng này chưa có Kế Hoạch Tháng đã chốt nên chưa có target"}
+              />
+              <Stat
+                label="Live trong Total GMV"
+                value={liveShare ? pct(liveShare.share, 1) : "—"}
+                hint={liveShare ? `GMV ca agency ÷ Total GMV của shop · file shop tới ${dm(liveShare.last)}` : prof.hasShopAnalytics ? (isOps ? "chưa có file Shop Analytics của tháng ở Dữ Liệu Gốc" : "hiện khi Report Tháng có số Shop Analytics") : `${prof.label} không có file Total GMV theo ngày`}
+              />
+              <Stat
+                label="Giờ đã giao / cam kết"
+                value={!commitment ? "—" : commitment.committedHours > MAX_MONTH_HOURS ? "—" : `${num(commitment.deliveredHours, 0)}/${num(commitment.committedHours, 0)}h`}
+                hint={!commitment ? "chưa có cam kết giờ cho tháng này" : commitment.committedHours > MAX_MONTH_HOURS ? (isOps ? `cam kết đang ghi ${num(commitment.committedHours, 0)} giờ — sửa ở Kế Hoạch Tháng` : "đang cập nhật") : `+ ${num(commitment.scheduledHours, 0)}h còn trong lịch${commitment.gapHours > 0 ? ` · thiếu ${num(commitment.gapHours, 0)}h` : ""}`}
+              />
+              <Stat
+                label="GMV/giờ ngày thường"
+                value={tree?.gmvPerHour.cur != null ? fmtVndShort(tree.gmvPerHour.cur) : "—"}
+                tone={tree?.gmvPerHour.change == null || Math.abs(tree.gmvPerHour.change) < 0.03 ? undefined : tree.gmvPerHour.change > 0 ? "text-emerald-400" : "text-rose-400"}
+                hint={tree ? <>{signed(tree.gmvPerHour.change)} so ngày thường tháng trước{isOps && tree.worst && tree.worst.change < -0.03 ? <> · giảm nhiều nhất {tree.worst.label} {signed(tree.worst.change)} ({LEVER_OWNER[tree.worst.label] ?? "xem phễu"})</> : ""}</> : "chưa đủ ca ngày thường ở cả hai tháng để so"}
+              />
+            </div>
+          </Card>
+
           {planLoading ? (
             <p className="text-xs text-[var(--text-faint)]">Đang tải kế hoạch…</p>
           ) : !rr ? (
@@ -350,21 +445,27 @@ function BrandDashboardOne({ brandId, brandName, platform, platforms, sessions: 
             <Card
               title="Run-rate so với target plan"
               icon={<Gauge className="w-4 h-4 text-[var(--accent-text)]" />}
-              sub="Target = tổng target các ca của Kế Hoạch Tháng đã chốt. Run-rate = thực đạt ÷ target các ca có ngày ≤ ngày cuối có số. Ca huỷ vẫn giữ target; ca mở thêm ngoài plan được cộng thực đạt, target = 0."
+              right={landing ? <span className="inline-flex items-center gap-1.5"><LandingChip keyName={landing.key} />{landing.pHit != null && <span className="text-xs text-[var(--text-faint)]">khả năng đạt {pct(landing.pHit)}</span>}</span> : undefined}
+              sub="Target = tổng target các ca của Kế Hoạch Tháng đã chốt. Run-rate = thực đạt ÷ target các ca có ngày ≤ ngày đủ số (≥ 90% giờ ca có số). Ca huỷ vẫn giữ target; ca mở thêm ngoài plan được cộng thực đạt, target = 0. Nhãn = khả năng đạt target theo dự phóng."
             >
               <>
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                  <Stat label={METRIC.runRate} value={pct(rr.total.runRate, 1)} tone={rrTone(rr.total.runRate)} hint={`đạt ${fmtVndShort(rr.total.actual)} / target tới ${rr.through ? dm(rr.through) : "—"} ${fmtVndShort(rr.total.targetToDate)}`} />
+                  <Stat label={METRIC.runRate} value={pct(rrCut?.runRate, 1)} tone={rrTone(rrCut?.runRate)} hint={`đạt ${fmtVndShort(rrCut?.actual ?? 0)} / target tới ${through ? dm(through) : "—"} ${fmtVndShort(rrCut?.expected ?? 0)}`} />
                   <Stat label={METRIC.pctTarget} value={pct(rr.total.pctTarget, 1)} hint={`${fmtVndShort(rr.total.actual)} / ${fmtVndShort(rr.total.target)} · ${rr.slots.length} ca kế hoạch`} />
                   <Stat label="Dự kiến cuối tháng" value={projection.value != null ? fmtVndShort(projection.value) : "—"} tone={projection.value == null ? undefined : projection.value >= rr.total.target ? "text-emerald-400" : "text-rose-400"} hint={`${signed(projection.value != null ? projection.value / rr.total.target - 1 : null)} so với target · ${PROJECTION_METHOD_LABEL[projection.method]}`} />
-                  <Stat label="Cần mỗi ngày còn lại" value={rr.total.needPerRemainingDay != null ? fmtVndShort(rr.total.needPerRemainingDay) : "—"} hint={`${rr.total.remainingDays} ngày còn lại`} />
+                  <Stat
+                    label="GMV/giờ cần"
+                    value={needPerHour != null ? fmtVndShort(needPerHour) : "—"}
+                    tone={needPerHour != null && trailingPerHour != null ? (needPerHour <= trailingPerHour ? "text-emerald-400" : needPerHour > trailingPerHour * 1.3 ? "text-rose-400" : "text-amber-300") : undefined}
+                    hint={needPerHour != null ? `cho ${num(remainingHours, 0)} giờ còn trong lịch${trailingPerHour != null ? ` · 28 ngày qua ${fmtVndShort(trailingPerHour)}/giờ` : ""}` : "không còn ca nào trong lịch"}
+                  />
                 </div>
-                <CumulativeChart month={month} targetByDate={rr.targetByDate} actualByDate={rr.actualByDate} through={rr.through} runRate={rr.total.runRate} bucketOf={bucketOf} />
+                <CumulativeChart month={month} targetByDate={rr.targetByDate} actualByDate={rr.actualByDate} through={through} runRate={rrCut?.runRate ?? null} bucketOf={bucketOf} />
                 {(rr.cancelledCount > 0 || rr.offPlan.length > 0 || rr.noDataCount > 0) && (
                   <p className="text-xs text-[var(--text-muted)]">
                     {rr.cancelledCount > 0 && <>{rr.cancelledCount} ca kế hoạch huỷ — target vẫn giữ trong mẫu số{rr.cancelledTargetToDate > 0 ? ` (${fmtVndShort(rr.cancelledTargetToDate)} tới nay)` : ""}. </>}
                     {rr.offPlan.length > 0 && <>{rr.offPlan.length} ca ngoài kế hoạch đã cộng {fmtVndShort(rr.offPlanActual)} vào thực đạt. </>}
-                    {rr.noDataCount > 0 && <span className="text-amber-300">{rr.noDataCount} ca kế hoạch đã qua mà chưa có số — run-rate đang thấp hơn thực tế cho tới khi có file.</span>}
+                    {rr.noDataCount > 0 && <span className="text-amber-300">{rr.noDataCount} ca kế hoạch đã qua mà chưa có số — run-rate chỉ tính tới ngày đủ số{through ? ` (${dm(through)})` : ""}, dự phóng đang tạm tính các ca này.</span>}
                   </p>
                 )}
 
@@ -384,19 +485,22 @@ function BrandDashboardOne({ brandId, brandName, platform, platforms, sessions: 
                         </tr>
                       </thead>
                       <tbody>
-                        {rr.buckets.map((b) => (
-                          <tr key={b.bucket} className="border-t border-[var(--border)]/60">
-                            <td className="py-1.5 pr-3 font-bold text-[var(--text)]">{CAMP_DAY_BUCKET_LABEL[b.bucket]}</td>
-                            <td className="py-1.5 pr-3 font-mono text-[var(--text-muted)]">{b.bucket === "daily" ? `${b.days.length} ngày` : b.days.map(dm).join(", ")}</td>
-                            <td className="py-1.5 pr-3 text-[var(--text-muted)]">
-                              {b.status === "done" ? "Đã xong" : b.status === "live" ? `Đang chạy (${b.daysPassed}/${b.days.length})` : b.status === "next" ? "Sắp tới" : "—"}
-                            </td>
-                            <td className="py-1.5 pr-3 text-right font-mono">{fmtVndShort(b.target)} <span className="text-[var(--text-faint)]">{b.slotCount} ca</span></td>
-                            <td className="py-1.5 pr-3 text-right font-mono">{b.slotCountToDate ? fmtVndShort(b.targetToDate) : "—"}</td>
-                            <td className="py-1.5 pr-3 text-right font-mono">{b.daysPassed ? fmtVndShort(b.actual) : "—"}</td>
-                            <td className="py-1.5 text-right">{b.targetToDate > 0 ? <span className={`px-2 py-0.5 rounded-full font-bold ${rrPill(b.runRate)}`}>{pct(b.runRate)}</span> : <span className="text-[var(--text-faint)]">chưa tới</span>}</td>
-                          </tr>
-                        ))}
+                        {/* Cắt ở ngày đủ số (runRateByWave — cùng target với planRunRate); số ca lấy từ planRunRate. */}
+                        {waveRows.map((w) => {
+                          const b = w.key === "month" ? undefined : rr.buckets.find((x) => x.bucket === w.key);
+                          const passed = w.days.filter((d) => through != null && d <= through).length;
+                          return (
+                            <tr key={w.key} className="border-t border-[var(--border)]/60">
+                              <td className="py-1.5 pr-3 font-bold text-[var(--text)]">{w.key === "month" ? w.label : CAMP_DAY_BUCKET_LABEL[w.key]}</td>
+                              <td className="py-1.5 pr-3 font-mono text-[var(--text-muted)]">{w.key === "daily" ? `${w.days.length} ngày` : w.days.map(dm).join(", ")}</td>
+                              <td className="py-1.5 pr-3 text-[var(--text-muted)]">{w.state === "done" ? "Đã xong" : w.state === "live" ? `Đang chạy (${passed}/${w.days.length})` : "Sắp tới"}</td>
+                              <td className="py-1.5 pr-3 text-right font-mono">{fmtVndShort(w.target)} {b && <span className="text-[var(--text-faint)]">{b.slotCount} ca</span>}</td>
+                              <td className="py-1.5 pr-3 text-right font-mono">{w.targetToDate > 0 ? fmtVndShort(w.targetToDate) : "—"}</td>
+                              <td className="py-1.5 pr-3 text-right font-mono">{passed ? fmtVndShort(w.actual) : "—"}</td>
+                              <td className="py-1.5 text-right">{w.targetToDate > 0 ? <span className={`px-2 py-0.5 rounded-full font-bold ${rrPill(w.runRate)}`}>{pct(w.runRate)}</span> : <span className="text-[var(--text-faint)]">chưa tới</span>}</td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -465,7 +569,7 @@ function BrandDashboardOne({ brandId, brandName, platform, platforms, sessions: 
           {/* 02b · Key Metrics — vẫn đủ 18 chỉ số + AOV (lib/report/keyMetrics.ts), nhưng phân tầng (M2):
               5 ô "Kết quả" đọc trước, 14 ô còn lại gom theo phễu live. Màu theo chiều tốt của từng chỉ số,
               trung tính thì không tô. */}
-          <Card title={`Tháng ${Number(month.slice(5))} tới ${through ? dm(through) : "—"}`} icon={<Activity className="w-4 h-4 text-[var(--accent-text)]" />} sub={`So với cùng kỳ: ${win.label}${prof.metricsNote ? `. ${prof.metricsNote}` : ""}`}>
+          <Card title={`Tháng ${Number(month.slice(5))} tới ${through ? dm(through) : "—"}`} icon={<Activity className="w-4 h-4 text-[var(--accent-text)]" />} sub={`Số = mọi ca tới ngày đủ số; % đổi so cùng loại ngày tháng trước (ngày thường thứ k ↔ thứ k, đợt camp cùng vị trí), số trong ngoặc là vế tháng trước${prof.metricsNote ? `. ${prof.metricsNote}` : ""}`}>
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
               {prof.metrics.defs.filter((d) => d.group === "result").map((d) => metricCell(d, "lg"))}
             </div>
@@ -477,14 +581,14 @@ function BrandDashboardOne({ brandId, brandName, platform, platforms, sessions: 
                 </div>
               </div>
             ))}
-            {prof.metrics.coverageNotes(mCur).map((n) => (
+            {prof.metrics.coverageNotes(mShown).map((n) => (
               <p key={n.text} className={`text-xs ${n.tone === "warn" ? "text-amber-300" : "text-[var(--text-faint)]"}`}>{n.text}</p>
             ))}
           </Card>
 
           {/* 03 · Vì sao (ops) — phễu của sàn (hồ sơ sàn): TikTok Views/giờ × LIVE CTR × CTOR × AOV, Shopee Viewers/giờ × ATC/Viewer × GMV/ATC */}
           {isOps && (
-            <Card title="Vì sao GMV đổi" icon={<TrendingUp className="w-4 h-4 text-[var(--accent-text)]" />} sub={`${prof.metrics.driverFormula} — ${win.label}`}>
+            <Card title="Vì sao GMV đổi" icon={<TrendingUp className="w-4 h-4 text-[var(--accent-text)]" />} sub={`${prof.metrics.driverFormula} — ngày thường tháng này so ngày thường cùng thứ tự tháng trước (số ngày camp khác nhau giữa hai tháng làm méo phễu)`}>
               {drivers ? <DriverBars parts={drivers.parts} total={drivers.total} /> : <p className="text-xs text-[var(--text-faint)]">{prof.metrics.driverEmptyHint}</p>}
               {!prof.hasShopAnalytics ? null : control.length > 0 ? (
                 <ul className="text-xs text-[var(--text-muted)] space-y-1">
@@ -778,7 +882,7 @@ function DriverBars({ parts, total }: { parts: { label: string; change: number }
         </div>
       ))}
       <p className="text-xs text-[var(--text-muted)]">
-        {METRIC.gmv} {signed(total)} so với cùng kỳ.{" "}
+        {METRIC.gmv} ngày thường {signed(total)} so ngày thường cùng thứ tự tháng trước.{" "}
         {worst && worst.change < -0.03 ? <>Kéo xuống nhiều nhất: <b className="text-[var(--text)]">{worst.label}</b> ({signed(worst.change)}) — {advice[worst.label] ?? ""}</> : "Không có chỉ số tỷ lệ nào giảm quá 3%."}
       </p>
     </div>

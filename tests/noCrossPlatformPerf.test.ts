@@ -93,6 +93,7 @@ const SINGLE_PLATFORM_FILES: Record<string, string> = {
   "lib/metrics/avgGmv.ts": "perfOf/computeTalentBrandPerf nhận mảng đã lọc theo sàn",
   "lib/performance/brandCommitment.ts": "cam kết của một kênh: lọc brand + sàn + tháng",
   "lib/performance/ceoBrief.ts": "CeoBrief truyền ca của một sàn",
+  "lib/performance/channelHealth.ts": "targetFeasibility nhận ca + ca kế hoạch của MỘT kênh brand × sàn (assertOnePlatform trên lịch sử); gmvTree cộng qua metrics.ofSessions (đã assert)",
   "lib/performance/handlingPlan.ts": "nhận ca của MỘT kênh brand × sàn (CeoBrief lọc theo platformOf trước khi gọi)",
   "lib/performance/hostSuggestion.ts": "lọc platformOf(s) === slot.platform trước khi cộng",
   "lib/performance/monthForecast.ts": "buildMonthForecaster có assertOnePlatform; dự báo của một kênh brand × sàn",

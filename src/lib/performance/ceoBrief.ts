@@ -539,87 +539,9 @@ export function combineOutlooks(month: string, today: string, list: MonthOutlook
 // Nhân sự
 // ---------------------------------------------------------------------------
 
-export interface StaffRow {
-  key: string;
-  name: string;
-  totals: Totals;
-  /** Tỷ trọng giờ live trong kỳ. */
-  hoursShare: number;
-  prevGmvPerHour: number | null;
-}
-
 export const UNASSIGNED = "__unassigned__";
 
-function staffBy(sessions: LiveSession[], prev: LiveSession[], keyOf: (s: LiveSession) => string, nameOf: (s: LiveSession) => string): { rows: StaffRow[]; unassigned: Totals | null; average: number | null } {
-  const cur = sessions.filter(isCountable);
-  const groups = new Map<string, LiveSession[]>();
-  for (const s of cur) groups.set(keyOf(s), [...(groups.get(keyOf(s)) ?? []), s]);
-  const prevGroups = new Map<string, LiveSession[]>();
-  for (const s of prev.filter(isCountable)) prevGroups.set(keyOf(s), [...(prevGroups.get(keyOf(s)) ?? []), s]);
-  const all = totalsOf(cur);
-  const rows: StaffRow[] = [];
-  for (const [k, list] of groups) {
-    if (k === UNASSIGNED) continue;
-    const t = totalsOf(list);
-    rows.push({ key: k, name: nameOf(list[0]), totals: t, hoursShare: all.hours > 0 ? t.hours / all.hours : 0, prevGmvPerHour: prevGroups.has(k) ? totalsOf(prevGroups.get(k)!).gmvPerHour : null });
-  }
-  rows.sort((a, b) => (b.totals.gmvPerHour ?? 0) - (a.totals.gmvPerHour ?? 0));
-  const un = groups.get(UNASSIGNED);
-  return { rows, unassigned: un ? totalsOf(un) : null, average: all.gmvPerHour };
-}
-
 export const hostKeyOf = (s: LiveSession) => s.hostId || (s.hostName ? `ten:${s.hostName}` : UNASSIGNED);
-export const assistantKeyOf = (s: LiveSession) => s.coHostId || (s.coHostName ? `ten:${s.coHostName}` : UNASSIGNED);
-
-// Đổi host giữa ca (0138): mỗi host một phần số + giờ theo giờ đứng ca.
-export const hostRows = (cur: LiveSession[], prev: LiveSession[]) => staffBy(expandHostPortions(cur), expandHostPortions(prev), hostKeyOf, (s) => s.hostName);
-export const assistantRows = (cur: LiveSession[], prev: LiveSession[]) => staffBy(cur, prev, assistantKeyOf, (s) => s.coHostName);
-
-export interface PairRow {
-  host: string;
-  assistant: string;
-  totals: Totals;
-}
-
-/** Cặp host + trợ live chạy chung từ `minSessions` ca trở lên, xếp theo doanh số/giờ. */
-export function pairRows(sessions: LiveSession[], minSessions = 3): PairRow[] {
-  const groups = new Map<string, LiveSession[]>();
-  for (const s of sessions) {
-    if (!isCountable(s) || hostKeyOf(s) === UNASSIGNED || assistantKeyOf(s) === UNASSIGNED) continue;
-    const k = `${hostKeyOf(s)}|${assistantKeyOf(s)}`;
-    groups.set(k, [...(groups.get(k) ?? []), s]);
-  }
-  return [...groups.values()]
-    .filter((l) => l.length >= minSessions)
-    .map((l) => ({ host: l[0].hostName, assistant: l[0].coHostName, totals: totalsOf(l) }))
-    .sort((a, b) => (b.totals.gmvPerHour ?? 0) - (a.totals.gmvPerHour ?? 0));
-}
-
-// ---------------------------------------------------------------------------
-// Tháng qua tháng
-// ---------------------------------------------------------------------------
-
-export interface MonthColumn {
-  month: string;
-  /** Tháng đang chạy — cộng tới ngày cuối có số. */
-  partial: boolean;
-  through: string;
-  totals: Totals;
-}
-
-export function monthColumns(sessions: LiveSession[], lastMonth: string, count: number, dataEnd: string | null): MonthColumn[] {
-  const months: string[] = [];
-  let m = lastMonth;
-  for (let i = 0; i < count; i++) {
-    months.unshift(m);
-    m = prevMonthOf(m);
-  }
-  return months.map((mo) => {
-    const end = monthEndOf(`${mo}-01`);
-    const through = dataEnd && dataEnd < end && dataEnd >= `${mo}-01` ? dataEnd : end;
-    return { month: mo, partial: through < end, through, totals: totalsOf(inRange(sessions, `${mo}-01`, through)) };
-  });
-}
 
 // ---------------------------------------------------------------------------
 // Cần chú ý
@@ -627,11 +549,18 @@ export function monthColumns(sessions: LiveSession[], lastMonth: string, count: 
 
 export type IssueLevel = "bad" | "warn" | "info";
 export type IssueAction = "sessions" | "month_plan" | "reconcile" | "talents" | "rate_card" | "host_performance";
+/** Mã cảnh báo (10/10): màn mới tách nhóm dữ liệu / kinh doanh và bỏ dòng đã nằm trong bảng kết luận từng kênh. */
+export type IssueCode = "missing_data" | "behind" | "short" | "no_schedule" | "camp_weak" | "concentration" | "idle" | "next_plan" | "host_load" | "losing" | "no_host";
+/** Việc dữ liệu (ops up file / gán host) — không chen vào danh sách việc kinh doanh của CEO. */
+export const DATA_ISSUES: ReadonlySet<IssueCode> = new Set<IssueCode>(["missing_data", "no_host"]);
+/** Đã thành dòng của bảng kết luận từng kênh (một nhãn + nguyên nhân gốc) — không lặp lại ở danh sách việc. */
+export const BOARD_ISSUES: ReadonlySet<IssueCode> = new Set<IssueCode>(["behind", "short", "no_schedule"]);
 export interface Issue {
   level: IssueLevel;
   title: string;
   detail: string;
   action?: IssueAction;
+  code?: IssueCode;
 }
 
 export interface BrandSnapshot {
@@ -670,32 +599,33 @@ export function buildIssues(x: IssueInput): Issue[] {
     const missing = b.outlook.pending.filter((p) => p.kind === "session" && p.date < x.today);
     if (missing.length === 0) continue;
     const oldest = missing.map((p) => p.date).sort()[0];
-    out.push({ level: "bad", title: `${b.name}: ${missing.length} ca đã chạy chưa có số`, detail: `Từ ${oldest.slice(8, 10)}/${oldest.slice(5, 7)} — chưa up file giao ca hoặc chưa đối soát. Dự phóng đang tạm tính phần này theo doanh số/giờ gần đây.`, action: "reconcile" });
+    out.push({ level: "bad", title: `${b.name}: ${missing.length} ca đã chạy chưa có số`, detail: `Từ ${oldest.slice(8, 10)}/${oldest.slice(5, 7)} — chưa up file giao ca hoặc chưa đối soát. Dự phóng đang tạm tính phần này theo doanh số/giờ gần đây.`, action: "reconcile", code: "missing_data" });
   }
 
   for (const b of x.brands) {
     const o = b.outlook;
     if (!o.actual && !o.pending.length) continue;
     if (o.runRate != null && o.runRate < RUN_RATE_WARN) {
-      out.push({ level: o.runRate < RUN_RATE_BAD ? "bad" : "warn", title: `${b.name} chậm tiến độ: đạt ${pct(o.runRate)} kỳ vọng`, detail: `Đã có ${x.fmt(o.actual)}, kỳ vọng tới ngày có số là ${x.fmt(o.expectedToDate ?? 0)} (theo target từng ngày).`, action: "month_plan" });
+      out.push({ level: o.runRate < RUN_RATE_BAD ? "bad" : "warn", title: `${b.name} chậm tiến độ: đạt ${pct(o.runRate)} kỳ vọng`, detail: `Đã có ${x.fmt(o.actual)}, kỳ vọng tới ngày có số là ${x.fmt(o.expectedToDate ?? 0)} (theo target từng ngày).`, action: "month_plan", code: "behind" });
     }
     if (o.target && o.gap != null && o.gap < 0) {
       // Mức báo theo khả năng đạt target (forecastCone.landingOf), không theo số tuyệt đối: thiếu 1,7% mà dải còn bao target ≠ thiếu 30%.
       const l = landingOf(o);
-      const half = coneHalf(o.actual, o.projected);
+      const half = coneHalf(o.actual, o.projected, o.coneCoef);
       out.push({
         level: l.key === "short" ? "bad" : "warn",
         title: `${b.name} dự phóng thiếu ${x.fmt(-o.gap)} so với target${l.pHit != null ? ` (khả năng đạt ≈ ${pct(l.pHit)})` : ""}`,
         detail: `Dự phóng cuối tháng ${x.fmt(o.projected)} (${o.projectionMethod === "run_rate" ? "theo run-rate — chưa có GMV/giờ 28 ngày" : `dải ~80%: ${x.fmt(o.projected - half)} – ${x.fmt(o.projected + half)}`}) với lịch đang có. Xem tab Action để biết cần thêm bao nhiêu giờ.`,
-        action: "month_plan"
+        action: "month_plan",
+        code: "short"
       });
     }
     if (o.remainingDays > 0 && o.pending.filter((p) => p.date >= x.today).length === 0 && o.actual > 0) {
-      out.push({ level: "bad", title: `${b.name}: chưa có ca nào trong lịch cho ${o.remainingDays} ngày còn lại`, detail: "Dự phóng chỉ bằng số đã có. Kiểm tra lịch và Kế Hoạch Tháng.", action: "month_plan" });
+      out.push({ level: "bad", title: `${b.name}: chưa có ca nào trong lịch cho ${o.remainingDays} ngày còn lại`, detail: "Dự phóng chỉ bằng số đã có. Kiểm tra lịch và Kế Hoạch Tháng.", action: "month_plan", code: "no_schedule" });
     }
     const lastCamp = o.buckets.filter((c) => c.bucket !== "daily" && c.status === "done" && c.perDay != null && c.prevPerDay != null).pop();
     if (lastCamp && lastCamp.perDay! < lastCamp.prevPerDay! * 0.85) {
-      out.push({ level: "warn", title: `${b.name}: đợt camp vừa rồi yếu hơn tháng trước`, detail: `${x.fmt(lastCamp.perDay!)}/ngày so với ${x.fmt(lastCamp.prevPerDay!)}/ngày tháng trước (${pct(lastCamp.perDay! / lastCamp.prevPerDay! - 1)}).` });
+      out.push({ level: "warn", title: `${b.name}: đợt camp vừa rồi yếu hơn tháng trước`, detail: `${x.fmt(lastCamp.perDay!)}/ngày so với ${x.fmt(lastCamp.prevPerDay!)}/ngày tháng trước (${pct(lastCamp.perDay! / lastCamp.prevPerDay! - 1)}).`, code: "camp_weak" });
     }
   }
 
@@ -711,16 +641,16 @@ export function buildIssues(x: IssueInput): Issue[] {
       const top = [...rows].sort((a, b) => b.outlook.actual - a.outlook.actual)[0];
       if (total > 0 && top.outlook.actual / total > CLIENT_CONCENTRATION_WARN) {
         const share = top.outlook.actual / total;
-        out.push({ level: share > 0.5 ? "bad" : "warn", title: `${pct(share)} GMV ${plat} tháng đến từ một khách: ${top.clientName ?? top.name}`, detail: "Mốc an toàn phổ biến của agency dịch vụ: không khách nào quá 20–25% doanh thu." });
+        out.push({ level: share > 0.5 ? "bad" : "warn", title: `${pct(share)} GMV ${plat} tháng đến từ một khách: ${top.clientName ?? top.name}`, detail: "Mốc an toàn phổ biến của agency dịch vụ: không khách nào quá 20–25% doanh thu.", code: "concentration" });
       }
     }
     const idle = x.brands.filter((b) => !b.outlook.actual && !b.outlook.pending.length).map((b) => b.name);
-    if (idle.length) out.push({ level: "warn", title: `${idle.join(", ")} chưa có ca nào tháng ${Number(month.slice(5))}`, detail: "Tài khoản đang có trên hệ thống nhưng tháng này chưa chạy, cũng chưa có ca trong lịch.", action: "month_plan" });
+    if (idle.length) out.push({ level: "warn", title: `${idle.join(", ")} chưa có ca nào tháng ${Number(month.slice(5))}`, detail: "Tài khoản đang có trên hệ thống nhưng tháng này chưa chạy, cũng chưa có ca trong lịch.", action: "month_plan", code: "idle" });
   }
 
   if (dayDiff(x.today, monthEnd) <= 10) {
     const unplanned = x.brands.filter((b) => b.nextPlan !== "locked");
-    if (unplanned.length) out.push({ level: "warn", title: `Tháng sau chưa chốt kế hoạch: ${unplanned.map((b) => b.name + (b.nextPlan === "draft" ? " (nháp)" : "")).join(", ")}`, detail: `Còn ${dayDiff(x.today, monthEnd) + 1} ngày tới tháng mới — chốt trước để talent còn thời gian đăng ký.`, action: "month_plan" });
+    if (unplanned.length) out.push({ level: "warn", title: `Tháng sau chưa chốt kế hoạch: ${unplanned.map((b) => b.name + (b.nextPlan === "draft" ? " (nháp)" : "")).join(", ")}`, detail: `Còn ${dayDiff(x.today, monthEnd) + 1} ngày tới tháng mới — chốt trước để talent còn thời gian đăng ký.`, action: "month_plan", code: "next_plan" });
   }
 
   const cur = x.periodSessions.filter(isCountable);
@@ -736,15 +666,15 @@ export function buildIssues(x: IssueInput): Issue[] {
   }
   const topHost = [...hrs.values()].sort((a, b) => b.h - a.h)[0];
   if (topHost && totalH > 0 && topHost.h / totalH > PERSON_CONCENTRATION_WARN) {
-    out.push({ level: "warn", title: `${topHost.name} gánh ${pct(topHost.h / totalH)} giờ live của kỳ`, detail: "Người này nghỉ là hụt một phần lớn lịch — cần host dự phòng.", action: "host_performance" });
+    out.push({ level: "warn", title: `${topHost.name} gánh ${pct(topHost.h / totalH)} giờ live của kỳ`, detail: "Người này nghỉ là hụt một phần lớn lịch — cần host dự phòng.", action: "host_performance", code: "host_load" });
   }
   if (x.finance && x.finance.priced > 0) {
     const losing = x.finance.priced - x.finance.profitableSessions;
-    if (losing > 0) out.push({ level: "warn", title: `${losing}/${x.finance.priced} phiên lỗ trong kỳ`, detail: "Doanh thu agency của phiên không đủ trả chi phí trực tiếp. Xem mục Tài chính." });
+    if (losing > 0) out.push({ level: "warn", title: `${losing}/${x.finance.priced} phiên lỗ trong kỳ`, detail: "Doanh thu agency của phiên không đủ trả chi phí trực tiếp. Xem mục Tài chính.", code: "losing" });
   }
   const noHost = cur.filter((s) => hostKeyOf(s) === UNASSIGNED);
   if (noHost.length) {
-    out.push({ level: "info", title: `${noHost.length} ca chưa ghi host`, detail: `${x.fmt(noHost.reduce((a, s) => a + (s.actualGmv ?? 0), 0))} GMV chưa biết của ai, không xếp hạng được.`, action: "sessions" });
+    out.push({ level: "info", title: `${noHost.length} ca chưa ghi host`, detail: `${x.fmt(noHost.reduce((a, s) => a + (s.actualGmv ?? 0), 0))} GMV chưa biết của ai, không xếp hạng được.`, action: "sessions", code: "no_host" });
   }
 
   const rank: Record<IssueLevel, number> = { bad: 0, warn: 1, info: 2 };

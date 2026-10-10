@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { BrandLogo } from "../ui/BrandLogo";
-import { runRateTone } from "../../lib/performance/runRateLadder";
+import { runRateTone } from "../../lib/performance/channelHealth";
 import { isCountable } from "../../lib/performance/hostPerformance";
 import { sessionDurationHours } from "../../lib/pnl";
 import type { BucketOutlook } from "../../lib/performance/ceoBrief";
@@ -99,9 +99,11 @@ const ShiftTable: React.FC<{ date: string; today: string; rr: PlanRunRate | null
   );
 };
 
-export const DrillDown: React.FC<{ m: DashModel; onNavigate: (tab: string) => void }> = ({ m, onNavigate }) => {
+// `channelId` (10/10): nằm trong phần chi tiết của MỘT kênh ở "Tháng này" — kênh do bảng kết luận chọn, không hiện bộ chọn kênh riêng.
+export const DrillDown: React.FC<{ m: DashModel; onNavigate: (tab: string) => void; channelId?: string }> = ({ m, onNavigate, channelId }) => {
   const choices = m.brands.filter((b) => m.scopeIds.includes(b.id) && m.outlooks.get(b.id));
-  const [pickedBrand, setBrandId] = useState("");
+  const [picked, setBrandId] = useState("");
+  const pickedBrand = channelId ?? picked;
   // Kênh đang chọn bị loại khỏi phạm vi (đổi bộ lọc brand) thì rơi về kênh đầu — suy ra lúc vẽ, không đồng bộ bằng effect.
   // Mặc định: kênh đã chốt kế hoạch (có run-rate tới ca), không thì kênh nhiều GMV nhất.
   const fallback = choices.find((c) => m.planRR.has(c.id)) ?? [...choices].sort((a, z) => (m.outlooks.get(z.id)?.actual ?? 0) - (m.outlooks.get(a.id)?.actual ?? 0))[0];
@@ -125,13 +127,13 @@ export const DrillDown: React.FC<{ m: DashModel; onNavigate: (tab: string) => vo
   return (
     <div className="space-y-5 sm:space-y-6">
       <div className="flex flex-wrap items-center gap-2">
-        <div className="inline-flex flex-wrap bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-1" role="group" aria-label="Chọn kênh">
+        {!channelId && <div className="inline-flex flex-wrap bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-1" role="group" aria-label="Chọn kênh">
           {choices.map((c) => (
             <button key={c.id} onClick={() => setBrandId(c.id)} aria-pressed={brandId === c.id} className={`px-3 py-1.5 rounded-lg text-sm font-bold inline-flex items-center gap-2 transition-colors ${brandId === c.id ? "bg-[var(--accent)] text-[var(--accent-contrast)]" : "text-[var(--text-muted)] hover:text-[var(--text)]"}`}>
               <BrandLogo brand={c} size="xs" /> {m.channelName(c)}
             </button>
           ))}
-        </div>
+        </div>}
         {!hasPlan && (
           <button onClick={() => onNavigate("month_plan")} className="min-h-6 px-1 rounded inline-flex items-center text-xs font-bold text-[var(--accent-text)] hover:underline">Chưa chốt Kế Hoạch Tháng nên chưa có run-rate theo đợt, ngày, ca — chốt kế hoạch →</button>
         )}
