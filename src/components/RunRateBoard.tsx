@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Download, Gauge, Info, Send } from "lucide-react";
+import { Download, Gauge, Info } from "lucide-react";
 import type { Brand, BrandChannel, BrandMonthPlan, BrandMonthPlanSlot, LiveSession, ShiftSlot } from "../types";
 import { PageHeader } from "./common/PageHeader";
 import { MonthPicker } from "./common/MonthPicker";
 import { useTooltip } from "./dashboard/shared";
 import { AccountCard } from "./runrate/AccountCard";
 import { AccountDetail } from "./runrate/AccountDetail";
-import { toUpdateAccount, UpdateComposer } from "./runrate/UpdateComposer";
 import type { Lens } from "./runrate/lenses";
 import type { AccountVM } from "./runrate/types";
 import { defaultViewMonth } from "../lib/defaultMonth";
@@ -19,7 +18,7 @@ import { todayVn } from "../lib/performance/brandCommitment";
 import { monthEndOf } from "../lib/performance/ceoBrief";
 import { dataCoverage } from "../lib/performance/channelHealth";
 import { planRunRate } from "../lib/performance/planRunRate";
-import { buildAccountRunRate, monthActualOf, resolveAsOf, runRateExportSheets } from "../lib/performance/runRateUpdate";
+import { buildAccountRunRate, monthActualOf, resolveAsOf, runRateExportSheets, type ExportAccount } from "../lib/performance/runRateUpdate";
 import { brandPlatformKey, channelTitle, platformOf, REPORT_PLATFORMS, type ReportPlatform } from "../lib/reportPlatform";
 import { profileOf } from "../lib/platforms/profiles";
 import { useToast } from "../hooks/useToast";
@@ -38,6 +37,14 @@ interface RunRateBoardProps {
   onOpenMonthPlan: (brandId: string, platform: ReportPlatform) => void;
 }
 
+const toExportAccount = (vm: AccountVM): ExportAccount => ({
+  name: vm.name,
+  platform: vm.platform,
+  report: vm.report,
+  missing: vm.report ? undefined : vm.planStatus === "locked" ? "no_data" : "no_plan",
+  actualOnly: vm.actualOnly > 0 ? vm.actualOnly : undefined
+});
+
 export function RunRateBoard({ sessions, brands, brandChannels, shiftSlots, onNavigate, onOpenMonthPlan }: RunRateBoardProps) {
   const today = todayVn();
   const { showToast } = useToast();
@@ -46,7 +53,6 @@ export function RunRateBoard({ sessions, brands, brandChannels, shiftSlots, onNa
   const [asOfPick, setAsOfPick] = useState<string | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [lens, setLens] = useState<Lens>("month");
-  const [composerOpen, setComposerOpen] = useState(false);
   const detailRef = useRef<HTMLDivElement>(null);
   // Kế hoạch + ca kế hoạch gắn nhãn tháng đã đọc: đổi tháng thì dữ liệu cũ tự bị coi là chưa có (không cần reset trong effect).
   const [planData, setPlanData] = useState<{ month: string; plans: Map<string, BrandMonthPlan> } | null>(null);
@@ -130,7 +136,7 @@ export function RunRateBoard({ sessions, brands, brandChannels, shiftSlots, onNa
   };
 
   const exportXlsx = () => {
-    const sheets = runRateExportSheets(vms.map(toUpdateAccount));
+    const sheets = runRateExportSheets(vms.map(toExportAccount));
     const stamp = asOfPick ?? today;
     downloadSheetsAsXlsx(sheets, `RunRate_${month}_${stamp}.xlsx`).catch((e) => showToast(`Không tải được file Excel: ${errorMessage(e)}`));
   };
@@ -140,15 +146,12 @@ export function RunRateBoard({ sessions, brands, brandChannels, shiftSlots, onNa
       <PageHeader
         icon={Gauge}
         title="Run-rate"
-        description="Kết quả đạt được so với target đã chốt, theo tháng, đợt campaign, ngày và từng ca. Xem xong bấm “Soạn cập nhật” để có sẵn bản tin gửi sếp và brand."
+        description="Kết quả đạt được so với target đã chốt, theo tháng, đợt campaign, ngày và từng ca."
         actions={
           <>
             <MonthPicker value={month} onChange={(m) => { setMonth(m); setAsOfPick(null); }} max={today.slice(0, 7)} />
             <button type="button" onClick={exportXlsx} disabled={!anyReport} className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-bold border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] hover:border-[var(--accent)] disabled:opacity-40 min-h-[40px]">
               <Download className="w-4 h-4" />Tải Excel
-            </button>
-            <button type="button" onClick={() => setComposerOpen(true)} disabled={!anyReport} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-black bg-[var(--accent)] text-[var(--accent-contrast)] hover:bg-[var(--accent-hover)] disabled:opacity-40 min-h-[40px] shadow">
-              <Send className="w-4 h-4" />Soạn cập nhật
             </button>
           </>
         }
@@ -216,7 +219,6 @@ export function RunRateBoard({ sessions, brands, brandChannels, shiftSlots, onNa
         </>
       )}
 
-      <UpdateComposer open={composerOpen} onClose={() => setComposerOpen(false)} accounts={vms} month={month} today={today} selectedKey={selected?.key ?? null} onExport={exportXlsx} />
       {tooltip.node}
     </div>
   );

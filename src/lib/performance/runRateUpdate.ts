@@ -1,20 +1,17 @@
 import type { LiveSession } from "../../types";
 import { eachDay, isoWeekStart } from "../dateUtils";
 import type { CampDayBucket } from "../campaignDays";
-import { fmtVndShort } from "../format";
 import { assertOnePlatform } from "../platforms/perf";
 import { monthEndOf, RUN_RATE_BAD, RUN_RATE_WARN } from "./ceoBrief";
 import { runRateTone, WAVE_NAME, type RunRateTone } from "./channelHealth";
 import { isCountable } from "./hostPerformance";
-import { profileOf } from "../platforms/profiles";
-import { REPORT_PLATFORMS } from "../reportPlatform";
 import type { PlanRunRate, PlanSlotState } from "./planRunRate";
 
 // "Cập nhật run-rate" cho sếp + brand (module Run-rate, 11/10/2026). KHÔNG có luật số mới: mọi con số đi qua `planRunRate`
 // (target = Σ target ca của Kế Hoạch Tháng đã chốt, ca huỷ giữ target, ca ngoài plan target 0). File này chỉ
 //   1) cắt kết quả ở một ngày "số tới" tuỳ chọn (mặc định ngày đủ số — channelHealth.dataCoverage) rồi chia theo
 //      tháng / tuần / đợt campaign / ngày / ca,
-//   2) soạn bản tin chữ để gửi (Zalo…) cho sếp (mọi tài khoản) hoặc cho một brand.
+//   2) xuất Excel (4 sheet) đúng những gì đang hiện.
 // MỘT tài khoản = một kênh brand × sàn; không có hàm nào ở đây cộng hai tài khoản với nhau (luật đa sàn 07/10).
 
 export interface RRLine {
@@ -299,20 +296,10 @@ export function runRateVerdict(v: number | null): RunRateVerdict {
 }
 
 // ---------------------------------------------------------------------------
-// Bản tin chữ
+// Tài khoản đưa vào file Excel
 // ---------------------------------------------------------------------------
 
-export interface UpdateSections {
-  month: boolean;
-  wave: boolean;
-  week: boolean;
-  day: boolean;
-  shift: boolean;
-}
-
-export const DEFAULT_SECTIONS: UpdateSections = { month: true, wave: true, week: false, day: true, shift: false };
-
-export interface UpdateAccount {
+export interface ExportAccount {
   /** Tên hiển thị: "CROCS" hoặc "VERA · Shopee" khi brand chạy hai sàn. */
   name: string;
   platform: "TikTok" | "Shopee";
@@ -324,86 +311,7 @@ export interface UpdateAccount {
   actualOnly?: number;
 }
 
-const ddmm = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
-const pct0 = (v: number | null | undefined) => (v == null || !isFinite(v) ? "—" : `${Math.round(v * 100)}%`);
-const rangeLabel = (a: string, b: string) => (a === b ? ddmm(a) : `${ddmm(a)}–${ddmm(b)}`);
 const STATUS_LABEL: Record<WaveStatus, string> = { done: "đã xong", live: "đang chạy", next: "sắp tới" };
-
-function accountLines(a: UpdateAccount, sections: UpdateSections, dayFocus: string | null): string[] {
-  const r = a.report;
-  if (!r) {
-    return a.missing === "no_plan"
-      ? [`• ${a.name}: chưa chốt Kế Hoạch Tháng nên chưa có target để tính run-rate${a.actualOnly ? ` (đã đạt ${fmtVndShort(a.actualOnly)})` : ""}.`]
-      : [`• ${a.name}: tháng này chưa có số.`];
-  }
-  const t = r.total;
-  const v = runRateVerdict(t.runRate);
-  const out: string[] = [];
-  out.push(`▸ ${a.name} — run-rate ${pct0(t.runRate)} · ${v.label}${r.asOf ? ` (số tới ${ddmm(r.asOf)})` : ""}`);
-  if (sections.month) {
-    out.push(`  Tháng: đạt ${fmtVndShort(t.actual)} / kỳ vọng tới nay ${fmtVndShort(t.targetToDate)} · target tháng ${fmtVndShort(t.target)} (${pct0(t.pctTarget)})`);
-    if (t.keepPace != null) out.push(`  Giữ nhịp này → cuối tháng khoảng ${fmtVndShort(t.keepPace)} (${pct0(t.keepPacePct)} target)`);
-    if (t.needPerRemainingDay != null && t.remainingDays > 0) out.push(`  Muốn kịp target: ${fmtVndShort(t.needPerRemainingDay)}/ngày × ${t.remainingDays} ngày còn lại`);
-  }
-  if (sections.wave) {
-    for (const w of r.waves.filter((x) => x.status !== "next" || x.bucket !== "daily")) {
-      // Đợt camp là một khoảng ngày liền nhau; "ngày thường" rải khắp tháng nên không ghi khoảng.
-      const head = `  ${w.label}${w.bucket === "daily" ? "" : ` ${rangeLabel(w.from, w.to)}`} (${STATUS_LABEL[w.status]})`;
-      if (w.status === "next") out.push(`${head}: target ${fmtVndShort(w.target)}`);
-      else if (w.targetToDate <= 0) out.push(`${head}: chưa có ca nào tới ngày số tới (target đợt ${fmtVndShort(w.target)})`);
-      else out.push(`${head}: ${fmtVndShort(w.actual)} / ${fmtVndShort(w.targetToDate)} → ${pct0(w.runRate)}`);
-    }
-  }
-  if (sections.week) {
-    for (const w of r.weeks.filter((x) => x.status !== "next")) out.push(`  ${w.label}: ${fmtVndShort(w.actual)} / ${fmtVndShort(w.targetToDate)} → ${pct0(w.runRate)}`);
-  }
-  if (sections.day) {
-    const d = r.days.find((x) => x.date === (dayFocus ?? r.asOf));
-    if (d && d.counted) out.push(d.target > 0 || d.actual > 0 ? `  Ngày ${ddmm(d.date)}: ${fmtVndShort(d.actual)} / target ${fmtVndShort(d.target)}${d.pctTarget != null ? ` → ${pct0(d.pctTarget)}` : ""}` : `  Ngày ${ddmm(d.date)}: không có ca.`);
-  }
-  if (sections.shift) {
-    const day = dayFocus ?? r.asOf;
-    for (const s of r.shifts.filter((x) => x.date === day && x.state !== "cancelled")) {
-      const who = [s.hostName, s.assistantName].filter(Boolean).join(" + ");
-      const res = s.state === "done" ? `${fmtVndShort(s.actual)} / ${fmtVndShort(s.target)}${s.pctTarget != null ? ` → ${pct0(s.pctTarget)}` : ""}` : s.state === "no_data" ? `chưa có số (target ${fmtVndShort(s.target)})` : `target ${fmtVndShort(s.target)}`;
-      out.push(`  Ca ${s.startTime}–${s.endTime}${who ? ` · ${who}` : ""}: ${res}`);
-    }
-  }
-  return out;
-}
-
-/**
- * Bản tin gửi đi. `boss` = mọi tài khoản, mỗi sàn một nhóm (không có dòng tổng gộp hai sàn). `brand` = các tài khoản của MỘT brand.
- * Chữ thuần, không markdown — dán thẳng vào Zalo/Teams/email.
- */
-export function buildUpdateMessage(opts: {
-  audience: "boss" | "brand";
-  month: string;
-  today: string;
-  accounts: UpdateAccount[];
-  sections: UpdateSections;
-  /** Ngày muốn nêu ở mục Ngày / Ca; null = ngày "số tới" của từng tài khoản. */
-  dayFocus: string | null;
-  note: string;
-  brandName?: string;
-}): string {
-  const { audience, month, today, accounts, sections, dayFocus, note } = opts;
-  const title = `${audience === "brand" && opts.brandName ? `${opts.brandName} · ` : ""}Run-rate LIVE · Tháng ${Number(month.slice(5))}/${month.slice(0, 4)}`;
-  const lines: string[] = [title, `Cập nhật ${ddmm(today)}`, ""];
-  const present = REPORT_PLATFORMS.filter((p) => accounts.some((a) => a.platform === p));
-  if (audience === "boss" && present.length > 1) {
-    for (const p of present) {
-      lines.push(profileOf({ platform: p }).label.toUpperCase());
-      for (const a of accounts.filter((x) => x.platform === p)) lines.push(...accountLines(a, sections, dayFocus), "");
-    }
-  } else {
-    for (const a of accounts) lines.push(...accountLines(a, sections, dayFocus), "");
-  }
-  const withTarget = accounts.some((a) => a.report);
-  if (withTarget) lines.push("Run-rate = thực đạt ÷ target các ca kế hoạch tới ngày có số (ca huỷ vẫn giữ target, ca ngoài kế hoạch target 0).");
-  if (note.trim()) lines.push("", note.trim());
-  return lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
-}
 
 // ---------------------------------------------------------------------------
 // Xuất Excel — đúng những gì đã hiện trên màn hình, mỗi dòng thuộc MỘT tài khoản (không dòng tổng gộp)
@@ -417,8 +325,8 @@ const round = (v: number | null) => (v == null ? "" : Math.round(v));
 
 type Row = Record<string, string | number>;
 
-export function runRateExportSheets(accounts: UpdateAccount[]): { name: string; rows: Row[] }[] {
-  const withReport = accounts.filter((a): a is UpdateAccount & { report: AccountRunRate } => !!a.report);
+export function runRateExportSheets(accounts: ExportAccount[]): { name: string; rows: Row[] }[] {
+  const withReport = accounts.filter((a): a is ExportAccount & { report: AccountRunRate } => !!a.report);
   const overview: Row[] = accounts.map((a) => {
     const r = a.report;
     return {

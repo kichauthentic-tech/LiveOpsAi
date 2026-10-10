@@ -2,7 +2,7 @@
 // Chạy: npx vitest run tests/runRateUpdate.test.ts
 import { describe, expect, test } from "vitest";
 import { planRunRate } from "../src/lib/performance/planRunRate";
-import { buildAccountRunRate, buildUpdateMessage, DEFAULT_SECTIONS, monthActualOf, resolveAsOf, runRateVerdict, type UpdateAccount } from "../src/lib/performance/runRateUpdate";
+import { buildAccountRunRate, monthActualOf, resolveAsOf, runRateExportSheets, runRateVerdict } from "../src/lib/performance/runRateUpdate";
 import type { BrandMonthPlanSlot, LiveSession, ShiftSlot } from "../src/types";
 
 let seq = 0;
@@ -143,49 +143,21 @@ describe("monthActualOf", () => {
   });
 });
 
-describe("buildUpdateMessage", () => {
+describe("runRateExportSheets", () => {
   const report = buildAccountRunRate(rrOf(), "2026-10-06");
-  const acc = (name: string, platform: "TikTok" | "Shopee", r = report): UpdateAccount => ({ name, platform, report: r });
 
-  test("bản cho sếp: tách nhóm từng sàn, không có dòng tổng gộp, có công thức run-rate", () => {
-    const t = buildUpdateMessage({ audience: "boss", month: "2026-10", today: "2026-10-07", accounts: [acc("CROCS", "TikTok"), acc("VERA · Shopee", "Shopee")], sections: DEFAULT_SECTIONS, dayFocus: null, note: "" });
-    expect(t).toContain("TIKTOK");
-    expect(t).toContain("SHOPEE");
-    expect(t).toContain("▸ CROCS — run-rate 88%");
-    expect(t).toContain("Cập nhật 07/10");
-    expect(t).toContain("Run-rate = thực đạt ÷ target");
-    expect(t).not.toMatch(/tổng cộng|toàn agency/i);
-    expect(t).not.toContain("đ ");
-  });
-
-  test("đợt: ngày thường không ghi khoảng ngày; đợt chưa có ca nào tới số tới thì nói rõ thay vì '0 / 0'", () => {
-    const t = buildUpdateMessage({ audience: "boss", month: "2026-10", today: "2026-10-07", accounts: [acc("CROCS", "TikTok")], sections: { ...DEFAULT_SECTIONS, day: false }, dayFocus: null, note: "" });
-    expect(t).toMatch(/\n {2}Ngày thường \(đang chạy\): 350M \/ 400M → 88%/);
-    expect(t).not.toContain("0 / 0");
-    const live = { ...report, waves: [{ ...report.waves[0], bucket: "dday" as const, label: "D-Day", status: "live" as const, targetToDate: 0, actual: 0, runRate: null, target: 160e6, from: "2026-10-08", to: "2026-10-10" }] };
-    const t2 = buildUpdateMessage({ audience: "boss", month: "2026-10", today: "2026-10-07", accounts: [acc("CROCS", "TikTok", live)], sections: { ...DEFAULT_SECTIONS, day: false }, dayFocus: null, note: "" });
-    expect(t2).toContain("D-Day 08/10–10/10 (đang chạy): chưa có ca nào tới ngày số tới (target đợt 160M)");
-  });
-
-  test("bản cho brand: một tài khoản, đúng mục đã chọn, ghi chú nằm cuối", () => {
-    const t = buildUpdateMessage({
-      audience: "brand", brandName: "CROCS", month: "2026-10", today: "2026-10-07", accounts: [acc("CROCS", "TikTok")],
-      sections: { month: false, wave: false, week: false, day: true, shift: true }, dayFocus: "2026-10-05", note: "Mai tăng 1 ca tối."
-    });
-    expect(t.startsWith("CROCS · Run-rate LIVE · Tháng 10/2026")).toBe(true);
-    expect(t).not.toContain("Tháng: đạt");
-    expect(t).toContain("Ngày 05/10: 90M / target 100M → 90%");
-    expect(t).toContain("Ca 20:00–23:00 · Host 1 + Trợ 1: 90M / 100M → 90%");
-    expect(t.endsWith("Mai tăng 1 ca tối.")).toBe(true);
-  });
-
-  test("tài khoản chưa chốt kế hoạch được nói rõ, không bịa run-rate", () => {
-    const t = buildUpdateMessage({
-      audience: "boss", month: "2026-10", today: "2026-10-07", sections: DEFAULT_SECTIONS, dayFocus: null, note: "",
-      accounts: [{ name: "JOCKEY · Shopee", platform: "Shopee", report: null, missing: "no_plan", actualOnly: 120e6 }]
-    });
-    expect(t).toContain("JOCKEY · Shopee: chưa chốt Kế Hoạch Tháng");
-    expect(t).toContain("đã đạt 120M");
-    expect(t).not.toContain("Run-rate = thực đạt");
+  test("4 sheet, mỗi dòng thuộc một tài khoản, không dòng tổng gộp", () => {
+    const sheets = runRateExportSheets([
+      { name: "CROCS", platform: "TikTok", report },
+      { name: "JOCKEY · Shopee", platform: "Shopee", report: null, missing: "no_plan", actualOnly: 120e6 }
+    ]);
+    expect(sheets.map((s) => s.name)).toEqual(["Tổng quan", "Theo đợt", "Theo ngày", "Theo ca"]);
+    const [overview, , , shifts] = sheets;
+    expect(overview.rows).toHaveLength(2);
+    expect(overview.rows[0]).toMatchObject({ "Tài khoản": "CROCS", "Số tới ngày": "2026-10-06", "Target tháng": 500e6, "Thực đạt": 350e6, "Run-rate (%)": 87.5 });
+    expect(overview.rows[1]).toMatchObject({ "Tài khoản": "JOCKEY · Shopee", "Thực đạt": 120e6, "Run-rate (%)": "", "Ghi chú": "Chưa chốt Kế Hoạch Tháng" });
+    expect(shifts.rows).toHaveLength(5);
+    expect(shifts.rows.every((r) => r["Tài khoản"] === "CROCS")).toBe(true);
+    expect(shifts.rows[2]["Trạng thái"]).toBe("Đã huỷ (giữ target)");
   });
 });
