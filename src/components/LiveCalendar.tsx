@@ -23,7 +23,7 @@ import { SlotDetailModal } from "./scheduling/SlotDetailModal";
 import { OpenSlotModal } from "./scheduling/OpenSlotModal";
 import { TalentLoadTimeline } from "./scheduling/TalentLoadTimeline";
 import { SessionWindow } from "./SessionWindow";
-import { Calendar as CalendarIcon, Building2, User, Plus, AlertTriangle, CheckCircle2, Search, X, ChevronLeft, ChevronRight, Tag, GripVertical } from "lucide-react";
+import { Calendar as CalendarIcon, Building2, User, Plus, AlertTriangle, CheckCircle2, Search, X, ChevronLeft, ChevronRight, Tag, GripVertical, SlidersHorizontal } from "lucide-react";
 
 import { fmtDateVn, fmtVndShort } from "../lib/format";
 import { PageHeader } from "./common/PageHeader";
@@ -134,6 +134,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   const [selectedHostFilter, setSelectedHostFilter] = useState<string>("ALL");
   const [selectedBrandFilter, setSelectedBrandFilter] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
+  // Điện thoại: 3 ô lọc gập sau nút "Lọc" (10/10 — mở sẵn thì 4 ô cao ~200px, lịch rơi khỏi màn đầu).
+  const [showFilters, setShowFilters] = useState(false);
 
   // Modal State
   const [selectedSessionDetail, setSelectedSessionDetail] = useState<LiveSession | null>(null);
@@ -636,7 +638,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
 
         {/* Filter Dropdowns & Search — đặt ngay trên lịch để lọc áp dụng tức thì cho view đang xem */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs">
-          <div className="relative">
+          <div className="flex gap-2">
+          <div className="relative flex-1 min-w-0">
             <Search className="w-4 h-4 text-[var(--text-muted)] absolute left-3 top-3" />
             <input
               type="text"
@@ -646,6 +649,24 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
               className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-xl pl-9 pr-3 py-2 text-[var(--text)] focus:outline-none focus:border-[var(--accent)] font-medium"
             />
           </div>
+          {(() => {
+            const activeFilters = [selectedStudioFilter, selectedHostFilter, selectedBrandFilter].filter((v) => v !== "ALL").length;
+            return (
+              <button
+                type="button"
+                onClick={() => setShowFilters((v) => !v)}
+                aria-expanded={showFilters}
+                className={`sm:hidden shrink-0 flex items-center gap-1.5 px-3 rounded-xl border font-bold ${
+                  activeFilters > 0 ? "border-[var(--accent)] text-[var(--accent-text)]" : "border-[var(--border)] text-[var(--text-muted)]"
+                } bg-[var(--surface-base)]`}
+              >
+                <SlidersHorizontal className="w-4 h-4" /> Lọc{activeFilters > 0 ? ` (${activeFilters})` : ""}
+              </button>
+            );
+          })()}
+          </div>
+
+          <div className={`${showFilters ? "contents" : "hidden"} sm:contents`}>
 
           <select
             value={selectedStudioFilter}
@@ -679,6 +700,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
               <option key={b.id} value={b.id}>{b.name}</option>
             ))}
           </select>
+          </div>
         </div>
 
       </PageHeader>

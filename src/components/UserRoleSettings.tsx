@@ -465,7 +465,9 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
       {activeTab === "roles" && (
         <div className="space-y-6">
           {/* Role selector selector cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+          {/* 10/10: 5 vai trò = 5 cột ở xl (trước xl:grid-cols-6 chừa 1 ô trống). Điện thoại 2 cột, ẩn dòng mô tả —
+              1 cột thì 5 thẻ cao ~750px trước khi tới công tắc quyền. */}
+          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4">
             {MATRIX_ROLES.map((roleKey) => {
               const isSelected = selectedRole === roleKey;
               const permsMap = rolePermissions[roleKey];
@@ -481,34 +483,34 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                 <button
                   key={roleKey}
                   onClick={() => setSelectedRole(roleKey)}
-                  className={`p-4 rounded-2xl border text-left transition-all relative overflow-hidden space-y-3 ${
+                  className={`p-3 sm:p-4 rounded-2xl border text-left transition-all relative overflow-hidden space-y-3 min-w-0 ${
                     isSelected
                       ? "bg-[var(--surface)] border-[var(--accent)] ring-2 ring-[var(--accent)]/20 shadow-xl"
                       : "bg-[var(--surface)]/50 border-[var(--border)] hover:border-[var(--border)] hover:bg-[var(--surface)]/80"
                   }`}
                 >
-                  <div className="flex justify-between items-start">
+                  <div className="flex justify-between items-start gap-2">
                     <span
-                      className={`text-[11px] font-black uppercase px-2.5 py-1 rounded-lg border ${getRoleBadgeStyle(
+                      className={`text-[11px] font-black uppercase px-2 sm:px-2.5 py-1 rounded-lg border truncate ${getRoleBadgeStyle(
                         roleKey
                       )}`}
                     >
                       {roleKey.toUpperCase()}
                     </span>
-                    <span className="text-xs font-mono font-bold text-[var(--text-muted)]">
-                      {enabledCount}/{totalCount} quyền
+                    <span className="text-xs font-mono font-bold text-[var(--text-muted)] whitespace-nowrap">
+                      {enabledCount}/{totalCount}<span className="hidden sm:inline"> quyền</span>
                     </span>
                   </div>
 
                   <div>
-                    <h3 className="font-extrabold text-[var(--text)] text-base">
+                    <h3 className="font-extrabold text-[var(--text)] text-sm sm:text-base">
                       {roleKey === "admin" && "Quản trị hệ thống"}
                       {roleKey === "ceo" && "CEO"}
                       {roleKey === "operations" && "Vận hành"}
                       {roleKey === "brand" && "Brand (khách hàng)"}
                       {roleKey === "talent" && "Host / Trợ live"}
                     </h3>
-                    <p className="text-[11px] text-[var(--text-muted)] line-clamp-2 mt-1">
+                    <p className="hidden sm:block text-[11px] text-[var(--text-muted)] line-clamp-2 mt-1">
                       {roleKey === "admin" && "Mọi thứ CEO làm được, thêm AI Training Center (chỉ admin)."}
                       {roleKey === "ceo" && "Toàn bộ màn agency, Finance & P&L, CRM và phân quyền."}
                       {roleKey === "operations" && "Lập kế hoạch tháng, xếp và chốt người cho ca, up số liệu, đối soát, làm report. Không thấy Finance."}

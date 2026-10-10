@@ -27,7 +27,8 @@ export const PageHeader: React.FC<{
         </h2>
         {description && <PageIntro>{description}</PageIntro>}
       </div>
-      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+      {/* max-w-full: thanh tab nowrap (vd Phân Quyền, 613px) tự cuộn ngang trong khung thay vì đẩy cả trang tràn ở 375px. */}
+      {actions && <div className="flex flex-wrap items-center gap-2 max-w-full min-w-0">{actions}</div>}
     </div>
     {children}
   </div>
