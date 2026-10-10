@@ -1,4 +1,4 @@
-import { Brand, BrandChannel, BrandMonthPlan, BrandMonthlyCommitment, BrandMonthlyReport, BrandPlatformRate, LiveSession, ShiftSlot, Talent } from "../types";
+import { BoostSlot, Brand, BrandChannel, BrandMonthPlan, BrandMonthPlanSlot, BrandMonthlyCommitment, BrandMonthlyReport, BrandPlatformRate, LiveSession, ShiftSlot, Talent } from "../types";
 import { isUnconfirmedPast } from "./sessionStatus";
 import { isCountable } from "./performance/hostPerformance";
 import { fmtDateVn, fmtMonth } from "./format";
@@ -7,6 +7,8 @@ import { profileOf } from "./platforms/profiles";
 import { platformsOfBrand } from "./channels";
 import { brandPriceSet } from "./brandPricing";
 import { findPersonClashes } from "./scheduling/conflicts";
+import { draftKeyOf, draftsFromSaved } from "./scheduling/monthPlanGrid";
+import { collectRebase } from "./scheduling/rebase";
 import { parseDayLabel } from "./affiliate/plan";
 
 // "Việc cần làm" — danh sách TỰ SINH từ dữ liệu cho màn đầu tiên sau khi đăng nhập (audit người mới 2026-10-04,
@@ -41,6 +43,11 @@ export interface TodoInput {
   /** brandPlatformKey (brand × sàn) → kế hoạch tháng này / tháng sau (thiếu khoá = chưa lập). */
   plansThisMonth: Map<string, BrandMonthPlan>;
   plansNextMonth: Map<string, BrandMonthPlan>;
+  /**
+   * Ca kế hoạch của các plan ĐÃ CHỐT tháng này + dòng ca tăng cường (0165), gom theo plan id. Thiếu (chưa nạp được) ⇒ bỏ qua việc
+   * "ca ngoài kế hoạch" chứ không nhắc nhầm.
+   */
+  coverage?: { slotsByPlan: Map<string, BrandMonthPlanSlot[]>; boostByPlan: Map<string, BoostSlot[]> };
   commitments: BrandMonthlyCommitment[];
   rates: BrandPlatformRate[];
   /** brandMonthKey (brand × tháng × sàn) → dòng report. */
@@ -132,6 +139,22 @@ export function buildTodos(input: TodoInput): Todo[] {
         out.push({ id: `plan-draft-${b.id}${sfx}`, level: "high", title: `Kế hoạch tháng ${fmtMonth(month)} của ${name} còn nháp`, detail: "Chưa chốt thì chưa có ca để talent đăng ký và Dashboard chưa có target.", tab: "month_plan", rememberBrandId: b.id, rememberPlatform: p, action: "Chốt kế hoạch" });
       } else if (!cur && !ownP.some((s) => s.date.startsWith(month) && s.status !== "Cancelled")) {
         out.push({ id: `plan-none-${b.id}${sfx}`, level: "medium", title: `${name} chưa có kế hoạch và chưa có ca nào tháng ${fmtMonth(month)}`, tab: "month_plan", rememberBrandId: b.id, rememberPlatform: p, action: "Lập kế hoạch" });
+      }
+
+      // 3b. Ca trên lịch chưa nằm trong kế hoạch ĐÃ CHỐT (ca nạp bù, ca OP mở ngoài kế hoạch) ⇒ chưa có target, chưa vào tổng. Ca tăng cường
+      // (0165) cố ý nằm ngoài kế hoạch gốc nên không đếm ở đây; chỉ nhắc khi ca tăng cường còn thiếu target đề xuất.
+      if (cur?.status === "locked" && input.coverage) {
+        const boost = input.coverage.boostByPlan.get(cur.id) ?? [];
+        const boostKeys = new Set(boost.map(draftKeyOf));
+        const set = collectRebase({ planDrafts: draftsFromSaved(input.coverage.slotsByPlan.get(cur.id) ?? []), sessions, shiftSlots: input.shiftSlots, brandId: b.id, platform: p, month, today });
+        const outside = set.rows.filter((r) => r.source === "added" && !boostKeys.has(draftKeyOf(r.draft))).length;
+        if (outside > 0) {
+          out.push({ id: `plan-outside-${b.id}${sfx}`, level: "medium", title: `${name}: ${outside} ca trên lịch chưa có trong kế hoạch tháng ${fmtMonth(month)}`, detail: "Ca nạp bù hoặc ca OP mở ngoài kế hoạch nên chưa có target. Ở Kế Hoạch Tháng bấm \"Chia lại theo lịch hiện có…\" để đưa vào và chia target.", tab: "month_plan", rememberBrandId: b.id, rememberPlatform: p, action: "Mở Kế Hoạch Tháng" });
+        }
+        const pendingBoost = boost.filter((x) => x.targetPending).length;
+        if (pendingBoost > 0) {
+          out.push({ id: `plan-boost-${b.id}${sfx}`, level: "low", title: `${name}: ${pendingBoost} ca tăng cường chưa có target đề xuất`, detail: "Mở Kế Hoạch Tháng của kênh này thì engine tự điền target đề xuất (không cộng vào target tháng).", tab: "month_plan", rememberBrandId: b.id, rememberPlatform: p, action: "Mở Kế Hoạch Tháng" });
+        }
       }
 
       // 4. Kế hoạch tháng sau — từ ngày 15, để talent còn thời gian đăng ký.

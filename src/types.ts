@@ -744,6 +744,20 @@ export interface CalendarEventRow {
   label: string;
 }
 
+// Ca tăng cường (0165): ca OP mở thêm sau khi kế hoạch đã chốt. Target đề xuất từ engine, KHÔNG cộng vào target tháng / run-rate.
+export interface BoostSlot {
+  id: string;
+  planId: string;
+  shiftSlotId?: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  targetGmv: number;
+  expectedGmv: number;
+  /** true = chưa có target đề xuất, chờ client điền. */
+  targetPending: boolean;
+}
+
 export interface BrandMonthPlanSlot {
   id: string;
   planId: string;

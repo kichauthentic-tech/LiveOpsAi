@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { buildTodos, TodoInput } from "../src/lib/todoList";
-import { Brand, BrandChannel, BrandMonthPlan, BrandMonthlyReport, LiveSession, ShiftSlot } from "../src/types";
+import { BoostSlot, Brand, BrandChannel, BrandMonthPlan, BrandMonthPlanSlot, BrandMonthlyReport, LiveSession, ShiftSlot } from "../src/types";
 
 // Danh sách "Việc cần làm" (audit người mới 2026-10-04). Tình huống dựng theo production 04/10: CROCS có số tới
 // 22/09, kế hoạch T10 còn nháp, chưa hợp đồng, chưa giá, report T9 chưa phát hành; 3 brand còn lại chưa có ca.
@@ -64,5 +64,41 @@ describe("buildTodos", () => {
     const sessions = [ca("t6a", "2026-06-05", { hostId: "" }), ca("t6b", "2026-06-06", { hostId: "" }), ca("t7", "2026-07-20", { hostId: "" }), ca("t9", "2026-09-21", { hostId: "" })];
     const t = buildTodos(base({ sessions, monthlyReports: new Map([["crocs|2026-07", { status: "published" } as BrandMonthlyReport]]) })).find((x) => x.id === "no-host")!;
     expect(t.title).toBe("3 ca đã chạy chưa gán host");
+  });
+
+  // ---- Ca ngoài kế hoạch + ca tăng cường (0165) ----
+  const planSlot = (over: Partial<BrandMonthPlanSlot> = {}): BrandMonthPlanSlot =>
+    ({ id: "ps1", planId: "p1", date: "2026-10-10", startTime: "11:00", endTime: "14:00", targetGmv: 100, expectedGmv: 0, note: "", ...over }) as BrandMonthPlanSlot;
+  const boostRow = (over: Partial<BoostSlot> = {}): BoostSlot =>
+    ({ id: "b1", planId: "p1", date: "2026-10-12", startTime: "20:00", endTime: "22:00", targetGmv: 0, expectedGmv: 0, targetPending: false, ...over }) as BoostSlot;
+  const lockedBase = (over: Partial<TodoInput> = {}) =>
+    base({
+      today: "2026-10-14",
+      plansThisMonth: new Map([["crocs", { id: "p1", status: "locked" } as BrandMonthPlan]]),
+      sessions: [ca("a", "2026-10-13"), ca("orphan", "2026-10-12", { startTime: "20:00", endTime: "22:00" })],
+      coverage: { slotsByPlan: new Map([["p1", [planSlot()]]]), boostByPlan: new Map() },
+      ...over
+    });
+
+  test("ca trên lịch chưa có trong kế hoạch đã chốt ⇒ nhắc, đếm đúng số ca", () => {
+    const t = buildTodos(lockedBase()).find((x) => x.id === "plan-outside-crocs")!;
+    expect(t.title).toContain("2 ca trên lịch chưa có trong kế hoạch");
+    expect(t.tab).toBe("month_plan");
+    expect(t.rememberBrandId).toBe("crocs");
+  });
+  test("ca đã khớp giờ với một ca kế hoạch thì không đếm", () => {
+    const sessions = [ca("a", "2026-10-10", { startTime: "11:00", endTime: "14:00" })];
+    expect(ids(lockedBase({ sessions }))).not.toContain("plan-outside-crocs");
+  });
+  test("ca tăng cường cố ý nằm ngoài kế hoạch gốc nên không đếm; chỉ nhắc khi còn thiếu target đề xuất", () => {
+    const sessions = [ca("orphan", "2026-10-12", { startTime: "20:00", endTime: "22:00" })];
+    const withBoost = (b: BoostSlot) => lockedBase({ sessions, coverage: { slotsByPlan: new Map([["p1", [planSlot()]]]), boostByPlan: new Map([["p1", [b]]]) } });
+    expect(ids(withBoost(boostRow()))).not.toContain("plan-outside-crocs");
+    expect(ids(withBoost(boostRow()))).not.toContain("plan-boost-crocs");
+    expect(ids(withBoost(boostRow({ targetPending: true })))).toContain("plan-boost-crocs");
+  });
+  test("chưa nạp được độ phủ kế hoạch (coverage thiếu) hoặc kế hoạch còn nháp ⇒ bỏ qua, không nhắc nhầm", () => {
+    expect(ids(lockedBase({ coverage: undefined }))).not.toContain("plan-outside-crocs");
+    expect(ids(lockedBase({ plansThisMonth: new Map([["crocs", { id: "p1", status: "draft" } as BrandMonthPlan]]) }))).not.toContain("plan-outside-crocs");
   });
 });

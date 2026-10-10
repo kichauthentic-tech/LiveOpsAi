@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { defaultPlanMonth } from "../lib/defaultMonth";
-import { Brand, BrandChannel, BrandContract, BrandMonthPlan, BrandMonthPlanSlot, BrandMonthlyCommitment, BrandStudio, CalendarEventRow, LiveSession, PlanCampRanges, PlanGroupTargets, PromoScheme, RecurringShiftTemplate, ShiftSlot, Studio, Talent } from "../types";
+import { BoostSlot, Brand, BrandChannel, BrandContract, BrandMonthPlan, BrandMonthPlanSlot, BrandMonthlyCommitment, BrandStudio, CalendarEventRow, LiveSession, PlanCampRanges, PlanGroupTargets, PromoScheme, RecurringShiftTemplate, ShiftSlot, Studio, Talent } from "../types";
 import { AlertTriangle, Ban, CalendarRange, Lock, Plus, Repeat, Save, Sparkles, Trash2, Wand2, X } from "lucide-react";
 import { commitmentsRead, contractsRead, upsertMonthlyCommitment } from "../lib/db/brandContracts";
 import type { TabPrefetchCtx } from "../lib/db/prefetch";
 import { loadRememberedBrandId } from "../lib/defaultBrand";
 import { errorMessage } from "../lib/errorMessage";
-import { PlanSettings, calendarEventsRead, deleteMonthPlan, fetchBrandLockedPlanSlots, fetchMonthPlan, fetchPlanStatuses, fetchRetargetHistory, lockMonthPlan, lockedPlanSlotsRead, monthPlanRead, planStatusesRead, replacePlanSlots, retargetMonthPlan, upsertMonthPlan } from "../lib/db/monthPlans";
+import { PlanSettings, calendarEventsRead, deleteMonthPlan, fetchBoostSlots, fetchBrandLockedPlanSlots, fetchMonthPlan, fetchPlanStatuses, fetchRetargetHistory, lockMonthPlan, lockedPlanSlotsRead, monthPlanRead, planStatusesRead, replacePlanSlots, rebaseMonthPlan, setBoostTargets, upsertMonthPlan } from "../lib/db/monthPlans";
 import { PlanEvaluation, buildCalibration, evaluatePlan } from "../lib/scheduling/planEvaluation";
 import { computeCommitmentProgress, contractCovering, monthCommitmentOf, todayVn } from "../lib/performance/brandCommitment";
 import { useDefaultBrand } from "../hooks/useDefaultBrand";
@@ -32,7 +32,9 @@ import {
   totalsOf,
   validateDrafts
 } from "../lib/scheduling/monthPlanGrid";
-import { RetargetBatch, RetargetPlan, buildRetarget } from "../lib/scheduling/retarget";
+import { RetargetBatch } from "../lib/scheduling/retarget";
+import { boostFillItems, summarizeBoost } from "../lib/scheduling/boost";
+import { RebasePlan, RebaseSet, activeDrafts, buildRebase, collectRebase, mergeAllocated } from "../lib/scheduling/rebase";
 import { PlanGroupTargetsBlock } from "./PlanGroupTargets";
 import { RecurringRulesPanel } from "./scheduling/RecurringRulesPanel";
 import { HistorySummary, STRATEGY_LABEL, SuggestResult, SuggestStrategy, buildBorrowedHistory, buildHistory, estimateSlots, suggestMonthPlan } from "../lib/scheduling/suggestEngine";
@@ -150,7 +152,7 @@ export default function MonthPlan({
   const [retargetTotal, setRetargetTotal] = useState("");
   const [retargetGroups, setRetargetGroups] = useState<PlanGroupTargets>({});
   const [retargetNote, setRetargetNote] = useState("");
-  const [retargetPreview, setRetargetPreview] = useState<{ plan: RetargetPlan; after: PlanDraftSlot[]; basis: "v2" | "engine" } | null>(null);
+  const [retargetPreview, setRetargetPreview] = useState<{ set: RebaseSet; plan: RebasePlan; after: PlanDraftSlot[]; basis: "v2" | "engine" } | null>(null);
   const [retargetBusy, setRetargetBusy] = useState(false);
   const [retargetHistory, setRetargetHistory] = useState<RetargetBatch[]>([]);
   const [commitments, setCommitments] = useState<BrandMonthlyCommitment[]>([]);
@@ -174,6 +176,8 @@ export default function MonthPlan({
   // Giai đoạn D: mọi ca kế hoạch đã chốt của brand (mọi tháng) → đối chiếu thực tế + hiệu chỉnh.
   const [lockedSlots, setLockedSlots] = useState<BrandMonthPlanSlot[]>([]);
   const [lockedSlotsTick, setLockedSlotsTick] = useState(0);
+  const [boostSlots, setBoostSlots] = useState<BoostSlot[]>([]);
+  const boostFilling = useRef(false);
 
   const brand = brands.find((b) => b.id === brandId);
   const brandStudioId = findBrandStudioId(brandStudios, brandId, platform);
@@ -408,6 +412,37 @@ export default function MonthPlan({
   const forecastsFor = (next: { date: string; startTime: string; endTime: string }[], ctx: typeof estimateCtx = estimateCtx): number[] =>
     forecaster ? slotForecasts(forecaster, next, (d) => resolveCampBucketType(d, ctx.camp ?? campRanges)) : estimateSlots(engineHistory, next, ctx);
   const sumOf = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
+  // Ca tăng cường (0165): ca OP mở thêm sau khi chốt tự có dòng ở DB (trigger) nhưng chưa có target — điền target đề xuất = dự báo engine của
+  // CHÍNH ca đó. Không cộng vào target tháng / run-rate (bảng riêng plan_boost_slots), các ca kế hoạch khác không đổi. Engine chạy ở client
+  // nên DB không tự điền được; mở Kế Hoạch Tháng của kênh là đủ để điền. Lỗi điền không chặn việc xem danh sách.
+  useEffect(() => {
+    if (!plan || !locked) return;
+    let alive = true;
+    (async () => {
+      try {
+        let rows = await fetchBoostSlots(plan.id);
+        const pending = rows.filter((x) => x.targetPending);
+        if (pending.length > 0 && !boostFilling.current) {
+          boostFilling.current = true;
+          try {
+            const items = boostFillItems(pending, forecastsFor(pending));
+            if (items.length > 0 && (await setBoostTargets(plan.id, items)) > 0) rows = await fetchBoostSlots(plan.id);
+          } catch (e) {
+            console.warn("Điền target ca tăng cường không được:", e);
+          } finally {
+            boostFilling.current = false;
+          }
+        }
+        if (alive) setBoostSlots(rows);
+      } catch {
+        if (alive) setBoostSlots([]);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plan?.id, locked, shiftSlots.length, lockedSlotsTick, forecaster, engineHistory]);
   // Target theo nhóm ngày (0161): nhóm nào ops đã nhập thì ca nhóm đó chia đúng số ấy, nhóm trống chia phần còn lại của target tháng.
   const groupSpec = (targets = settings.groupTargets, camp = campRanges) => ({ bucketOf: (d: string) => resolveCampBucketType(d, camp), targets });
   // Target đi theo lưới (user chốt 2026-09-21): ở giai đoạn NHÁP, mọi thay đổi cấu trúc (thêm/bỏ/dời
@@ -654,11 +689,17 @@ export default function MonthPlan({
     setMsg(`${mode === "target" ? "Xếp theo target" : "Gợi ý"} ${result.slots.length} ca · ${fmtH(result.totalHours)}h · dự báo ${fmtVndShort(result.forecastGmv)}${targetTotal > 0 ? ` / target ${fmtVndShort(targetTotal)}` : ""}${drafts.length > 0 ? ` (giữ ${drafts.length} ca đang có)` : ""}.`);
   };
 
-  // ---- Chia lại target cả lưới sau chốt (0162) ----------------------------------------------------------------------------
-  // Dùng đúng bộ chia của lưới nháp (allocationWeights + groupSpec) nhưng trên MỌI ca kể cả đã qua; ghi qua RPC retarget_month_plan
-  // (chỉ ceo/admin, có nhật ký). Xem trước tính phía client, chưa ghi gì.
+  // ---- Chia lại THEO LỊCH HIỆN CÓ (0164) -----------------------------------------------------------------------------------
+  // Một bước: gom MỌI ca đang có trên lịch của kênh × tháng (ca đã trong kế hoạch + ca OP thêm ngoài kế hoạch, kể cả ngày đã qua),
+  // bỏ ca đã huỷ, chia target tháng mới xuống các ca còn chạy bằng đúng bộ chia của lưới nháp (allocationWeights + groupSpec), rồi ghi
+  // một transaction qua RPC rebase_month_plan (chỉ ceo/admin, có nhật ký): đổi target ca có sẵn, đưa ca OP thêm vào kế hoạch, ca huỷ về 0.
+  // Xem trước tính phía client, chưa ghi gì. Chỉ ca ĐÃ LƯU của kế hoạch được tính — sửa chưa lưu trên lưới không ảnh hưởng.
   const curKey = `${brandId}|${month}|${platform}`;
   const retargetOpen = locked && retargetKey === curKey;
+  const rebaseSet = useMemo(
+    () => (retargetOpen ? collectRebase({ planDrafts: drafts, sessions, shiftSlots, brandId, platform, month, today }) : null),
+    [retargetOpen, drafts, sessions, shiftSlots, brandId, platform, month, today]
+  );
   const openRetarget = () => {
     setRetargetKey(curKey);
     setRetargetTotal(String(Math.round(totals.target)));
@@ -674,25 +715,31 @@ export default function MonthPlan({
       setMsg("Nhập Target GMV tháng mới (lớn hơn 0) để xem trước.");
       return;
     }
-    if (drafts.length === 0) return;
-    const w = forecastsFor(drafts);
-    const after = allocateDraftTargets(drafts, total, allocationWeights(drafts, w, campRanges), w, groupSpec(retargetGroups, campRanges));
-    setRetargetPreview({ plan: buildRetarget(drafts, after, today), after, basis: allocator ? "v2" : "engine" });
+    if (!rebaseSet) return;
+    const act = activeDrafts(rebaseSet);
+    if (act.length === 0) {
+      setMsg("Không có ca nào còn chạy trên lịch để chia target.");
+      return;
+    }
+    const w = forecastsFor(act);
+    const afterActive = allocateDraftTargets(act, total, allocationWeights(act, w, campRanges), w, groupSpec(retargetGroups, campRanges));
+    const after = mergeAllocated(rebaseSet, afterActive);
+    setRetargetPreview({ set: rebaseSet, after, plan: buildRebase(rebaseSet, after, today), basis: allocator ? "v2" : "engine" });
   };
   const applyRetarget = async () => {
     if (!plan || !retargetPreview) return;
-    if (dirty || retargetPreview.plan.unsynced > 0) {
-      setMsg("Lưới đang có sửa chưa lưu hoặc ca chưa đồng bộ — bấm \"Chốt lại (đồng bộ ca)\" trước rồi chia lại target.");
-      return;
-    }
     const pv = retargetPreview.plan;
-    if (pv.changed === 0) {
-      setMsg("Kết quả chia trùng target hiện tại — không có gì để ghi.");
+    if (pv.items.length === 0) {
+      setMsg("Kết quả chia trùng target hiện tại và không có ca nào cần thêm — không có gì để ghi.");
       return;
     }
     if (!(await confirm(
-      `Chia lại target ${brandLabel(brand?.name)} tháng ${fmtMonth(month)}: ${pv.changed} ca đổi (${pv.pastChanged} ca ĐÃ QUA), tổng ${fmtVndShort(pv.oldTotal)} → ${fmtVndShort(pv.newTotal)}.\n\n` +
-        "Ghi ngay vào kế hoạch đã chốt: % Target của ca đã xong, run-rate và Dashboard của tháng này đổi theo. Giờ ca không đổi. Mỗi lần được ghi nhật ký (target cũ → mới)."
+      `Chia lại target ${brandLabel(brand?.name)} tháng ${fmtMonth(month)} theo lịch hiện có: ${pv.activeSlots} ca còn chạy, tổng ${fmtVndShort(pv.oldTotal)} → ${fmtVndShort(pv.newTotal)}.\n\n` +
+        `• ${pv.changed} ca trong kế hoạch đổi target (${pv.pastChanged} ca ĐÃ QUA)\n` +
+        `• ${pv.added} ca trên lịch chưa có trong kế hoạch được THÊM vào kế hoạch (${pv.addedPast} ca đã qua)\n` +
+        `• ${pv.zeroed} ca huỷ / không có ca thật về target 0\n\n` +
+        "Ghi ngay vào kế hoạch đã chốt: % Target của ca đã xong, run-rate và Dashboard của tháng này đổi theo. Giờ ca không đổi. Mỗi lần được ghi nhật ký (target cũ → mới)." +
+        (dirty ? "\n\nLưới đang có sửa CHƯA LƯU — sẽ bị bỏ khi tải lại kế hoạch sau khi ghi." : "")
     ))) return;
     // Ghi kèm bộ tham số engine lúc chia để so các vòng thử với nhau (AI Training Center → nhóm Target).
     const ep = engineParams;
@@ -700,17 +747,18 @@ export default function MonthPlan({
     const note = [retargetNote.trim(), `${retargetPreview.basis === "v2" ? "v2" : "engine"} share=${ep.allocEnsembleShare} ridge=${ep.allocRidge} minM=${ep.allocMinMonths} band=${ep.allocUseBand ? 1 : 0} pos=${ep.allocUseCampPos ? 1 : 0}`, grp ? `nhóm ${grp}` : ""].filter(Boolean).join(" | ");
     setRetargetBusy(true);
     try {
-      const r = await retargetMonthPlan(plan.id, pv.updates, note);
+      const r = await rebaseMonthPlan(plan.id, pv.items, note);
       await onPlanLocked();
       const fresh = await fetchMonthPlan(brandId, month, platform);
       if (fresh) {
         setPlan(fresh.plan);
         setDrafts(draftsFromSaved(fresh.slots));
+        setDirty(false);
       }
       setLockedSlotsTick((t) => t + 1);
       setRetargetPreview(null);
       fetchRetargetHistory(plan.id, today).then(setRetargetHistory).catch(() => undefined);
-      setMsg(`Đã chia lại target: ${r.changed} ca đổi (${r.past_changed} ca đã qua), tổng ${fmtVndShort(r.old_total)} → ${fmtVndShort(r.new_total)}. Đã ghi nhật ký.`);
+      setMsg(`Đã chia lại target: ${r.changed} ca đổi (${r.past_changed} ca đã qua), thêm ${r.added} ca từ lịch, ${r.zeroed} ca huỷ về 0; tổng ${fmtVndShort(r.old_total)} → ${fmtVndShort(r.new_total)}. Đã ghi nhật ký.`);
     } catch (e) {
       setMsg(`Không chia lại được: ${errorMessage(e)}`);
     } finally {
@@ -976,7 +1024,7 @@ export default function MonthPlan({
             <label className="block">
               <span className="font-bold text-[var(--text-muted)] block mb-1">Target GMV tháng</span>
               <input type="number" min="0" step="1000000" disabled={!editable || locked || allGroupsSet} title={locked ? "Kế hoạch đã chốt: target tháng = tổng target các ca, sửa target từng ca trong lưới" : allGroupsSet ? "Đã nhập đủ 4 nhóm ngày: target tháng = tổng 4 nhóm" : undefined} value={settings.targetGmv || ""} placeholder="0 = chưa đặt" onChange={(e) => { const t = Number(e.target.value) || 0; setSettings((s) => ({ ...s, targetGmv: t })); if (!locked && t > 0) setDrafts((prev) => withForecast(prev, t)); setDirty(true); }} className={FIELD} />
-              <span className="text-[11px] text-[var(--text-faint)] leading-snug block mt-0.5">{locked ? `Đã chốt = tổng target ca (${fmtVndShort(totals.target)}). Đổi cả lưới: Thêm ▾ → Chia lại target cả lưới.` : targetTotal > 0 ? `${fmtVndShort(targetTotal)} — ` : ""}Số GMV live agency phải đạt; chia xuống từng ca, run-rate và % Target tính từ đây.</span>
+              <span className="text-[11px] text-[var(--text-faint)] leading-snug block mt-0.5">{locked ? `Đã chốt = tổng target ca (${fmtVndShort(totals.target)}). Đổi cả tháng theo lịch hiện có: nút "Chia lại theo lịch hiện có…".` : targetTotal > 0 ? `${fmtVndShort(targetTotal)} — ` : ""}Số GMV live agency phải đạt; chia xuống từng ca, run-rate và % Target tính từ đây.</span>
             </label>
             <div className="block">
               <label htmlFor="mp-commit-hours" className="font-bold text-[var(--text-muted)] block mb-1">Giờ cam kết</label>
@@ -1104,7 +1152,7 @@ export default function MonthPlan({
                 <button onClick={() => suggest("target")} disabled={targetTotal <= 0} title={targetTotal <= 0 ? "Nhập Target GMV tháng trước" : "Xếp tới khi dự báo chạm target và cho biết cần bao nhiêu giờ"} className="px-3 py-1.5 rounded-lg border border-[var(--accent)]/40 text-xs font-bold text-[var(--accent-text)] disabled:opacity-40 flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" /> Xếp theo target</button>
               </>
             )}
-            {editable && monthSessions.length > 0 && (
+            {editable && !locked && monthSessions.length > 0 && (
               <button onClick={() => void loadFromSessions()} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] border border-[var(--accent)]/60 text-xs font-bold text-[var(--accent-text)] flex items-center gap-1.5" title="Lịch tháng đã nhập bằng file/tạo tay: dựng kế hoạch theo đúng các ca đó rồi Chốt để đồng bộ">
                 <CalendarRange className="w-3.5 h-3.5" /> Dựng lưới từ {monthSessions.length} ca đã nhập
               </button>
@@ -1118,7 +1166,7 @@ export default function MonthPlan({
               </>
             )}
             {editable && locked && (
-              <button onClick={openRetarget} className="px-3 py-1.5 rounded-lg border border-[var(--accent)]/60 text-xs font-bold text-[var(--accent-text)] hover:bg-[var(--surface-elevated)] flex items-center gap-1.5" title="Chỉ ceo/admin. Đổi target cả lưới kể cả ca đã qua, có nhật ký"><Wand2 className="w-3.5 h-3.5" /> Chia lại target cả lưới…</button>
+              <button onClick={openRetarget} className="px-3 py-1.5 rounded-lg border border-[var(--accent)]/60 text-xs font-bold text-[var(--accent-text)] hover:bg-[var(--surface-elevated)] flex items-center gap-1.5" title="Chỉ ceo/admin. Lấy mọi ca đang có trên lịch (kể cả ca OP thêm và ca đã qua), bỏ ca huỷ, chia lại target tháng, có nhật ký"><Wand2 className="w-3.5 h-3.5" /> Chia lại theo lịch hiện có…</button>
             )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -1148,9 +1196,9 @@ export default function MonthPlan({
         <div className="bg-[var(--surface)] border border-[var(--accent)]/50 rounded-2xl p-4 space-y-3 text-xs">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
-              <h3 className="text-sm font-bold text-[var(--text)]">Chia lại target cả lưới — gồm ca đã qua</h3>
+              <h3 className="text-sm font-bold text-[var(--text)]">Chia lại target theo lịch hiện có — gồm ca OP thêm và ca đã qua</h3>
               <p className="text-[11px] text-[var(--text-muted)] leading-relaxed max-w-3xl">
-                Chia {drafts.length} ca theo bộ chia engine (v2 nếu brand đủ lịch sử, không thì dự báo engine). Giờ ca không đổi. Ghi xong thì % Target ca đã xong, run-rate và Dashboard của tháng này đổi theo ngay; mỗi lần có nhật ký target cũ → mới. Chỉ ceo/admin ghi được.
+                Lấy MỌI ca đang có trên lịch của kênh trong tháng (ca đã trong kế hoạch + ca OP thêm ngoài kế hoạch, kể cả ngày đã qua), bỏ ca đã huỷ, rồi chia target mới xuống các ca còn chạy theo bộ chia engine (v2 nếu brand đủ lịch sử, không thì dự báo engine). Ca OP thêm được đưa vào kế hoạch ngay (tính vào giờ + tổng target); ca huỷ về target 0. Giờ ca không đổi. Ghi xong thì % Target ca đã xong, run-rate và Dashboard của tháng này đổi theo; mỗi lần có nhật ký target cũ → mới. Chỉ ceo/admin ghi được.
               </p>
             </div>
             <button onClick={() => { setRetargetKey(null); setRetargetPreview(null); }} className="px-2.5 py-1 rounded-lg border border-[var(--border)] font-bold text-[var(--text-muted)] hover:text-[var(--text)]">Đóng</button>
@@ -1167,23 +1215,33 @@ export default function MonthPlan({
                 <input type="text" value={retargetNote} onChange={(e) => setRetargetNote(e.target.value)} placeholder="vd: vòng 3, share 0.7" className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg p-2 text-[var(--text)]" />
               </label>
             </div>
-            <PlanGroupTargetsBlock rows={groupBreakdown(drafts, (d) => resolveCampBucketType(d, campRanges), retargetGroups)} targets={retargetGroups} targetTotal={Number(retargetTotal) || 0} historyRate={allocator?.old?.bucketRate ?? null} editable locked={false} onChange={(g) => { setRetargetGroups(g); setRetargetPreview(null); }} />
+            <PlanGroupTargetsBlock rows={groupBreakdown(rebaseSet ? activeDrafts(rebaseSet) : drafts, (d) => resolveCampBucketType(d, campRanges), retargetGroups)} targets={retargetGroups} targetTotal={Number(retargetTotal) || 0} historyRate={allocator?.old?.bucketRate ?? null} editable locked={false} onChange={(g) => { setRetargetGroups(g); setRetargetPreview(null); }} />
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button onClick={previewRetarget} disabled={retargetBusy} className="px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] border border-[var(--accent)]/60 font-bold text-[var(--accent-text)] disabled:opacity-40">Xem trước</button>
             <button onClick={() => void applyRetarget()} disabled={!retargetPreview || retargetBusy || loading || saving} className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold disabled:opacity-40">{retargetBusy ? "Đang ghi…" : "Áp dụng & ghi nhật ký"}</button>
-            {(dirty || unsynced > 0) && <span className="text-[11px] text-amber-300">Lưới có thay đổi chưa đồng bộ — Chốt lại trước khi áp dụng.</span>}
+            {dirty && <span className="text-[11px] text-amber-300">Lưới có sửa chưa lưu — chỉ ca đã lưu của kế hoạch được tính; sửa chưa lưu sẽ bị bỏ sau khi áp dụng.</span>}
           </div>
           {retargetPreview && (() => {
             const pv = retargetPreview.plan;
             const bk = (d: string) => resolveCampBucketType(d, campRanges);
-            const rowsBefore = groupBreakdown(drafts, bk, {});
+            const rowsBefore = groupBreakdown(retargetPreview.set.rows.map((r) => r.draft), bk, {});
             const rowsAfter = groupBreakdown(retargetPreview.after, bk, {});
+            const added = retargetPreview.set.rows.filter((r) => r.source === "added");
+            const dropped = retargetPreview.set.rows.filter((r) => r.state !== "active");
+            const dm = (d: string) => `${d.slice(8)}/${d.slice(5, 7)}`;
             return (
               <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-base)] p-3 space-y-2">
                 <p className="text-[var(--text)]">
-                  <b>{pv.changed}</b> ca đổi target (<b className={pv.pastChanged > 0 ? "text-amber-300" : ""}>{pv.pastChanged} ca đã qua</b>) · tổng <b>{fmtVndShort(pv.oldTotal)}</b> → <b>{fmtVndShort(pv.newTotal)}</b> · chia theo <b>{retargetPreview.basis === "v2" ? "mô hình v2 (trộn với cách cũ)" : "dự báo engine — brand chưa đủ lịch sử cho v2"}</b>
+                  <b>{pv.activeSlots}</b> ca còn chạy chia target · tổng <b>{fmtVndShort(pv.oldTotal)}</b> → <b>{fmtVndShort(pv.newTotal)}</b> · chia theo <b>{retargetPreview.basis === "v2" ? "mô hình v2 (trộn với cách cũ)" : "dự báo engine"}</b>
                 </p>
+                <ul className="text-[11px] text-[var(--text-muted)] space-y-0.5 list-disc pl-4">
+                  <li><b className="text-[var(--text)]">{pv.changed}</b> ca trong kế hoạch đổi target (<b className={pv.pastChanged > 0 ? "text-amber-300" : "text-[var(--text)]"}>{pv.pastChanged} ca đã qua</b>)</li>
+                  <li><b className="text-[var(--text)]">{pv.added}</b> ca trên lịch CHƯA có trong kế hoạch sẽ được thêm vào ({pv.addedPast} ca đã qua)</li>
+                  <li><b className="text-[var(--text)]">{dropped.length}</b> ca huỷ / không có ca thật bị bỏ khỏi phần chia (target về 0)</li>
+                  {retargetPreview.set.skippedSameTime > 0 && <li className="text-amber-300">{retargetPreview.set.skippedSameTime} ca trên lịch trùng đúng giờ với ca khác của kênh — không thêm được vào kế hoạch</li>}
+                  {retargetPreview.set.futureNoCalendar > 0 && <li>{retargetPreview.set.futureNoCalendar} ca kế hoạch sắp tới chưa có ca trên lịch (chưa mở ca) — vẫn tính vào phần chia</li>}
+                </ul>
                 <table className="w-full text-[11px]">
                   <thead><tr className="text-[var(--text-faint)] text-left"><th className="py-1">Nhóm ngày</th><th>Ca</th><th className="text-right">Target cũ</th><th className="text-right">Target mới</th><th className="text-right">Đổi</th></tr></thead>
                   <tbody>
@@ -1200,7 +1258,15 @@ export default function MonthPlan({
                     })}
                   </tbody>
                 </table>
-                {pv.unsynced > 0 && <p className="text-amber-300">{pv.unsynced} ca chưa có trong DB (chưa Chốt lại) — sẽ không được ghi.</p>}
+                {(added.length > 0 || dropped.length > 0) && (
+                  <details className="text-[11px] text-[var(--text-muted)]">
+                    <summary className="cursor-pointer font-bold">Chi tiết ca thêm vào ({added.length}) và ca bị bỏ ({dropped.length})</summary>
+                    <ul className="mt-1 space-y-0.5 max-h-48 overflow-auto">
+                      {added.map((r) => <li key={r.key} className="font-mono">+ {dm(r.draft.date)} {r.draft.startTime}–{r.draft.endTime} · {r.reason}</li>)}
+                      {dropped.map((r) => <li key={r.key} className="font-mono">− {dm(r.draft.date)} {r.draft.startTime}–{r.draft.endTime} · {r.reason} (target cũ {fmtVndShort(r.draft.targetGmv)})</li>)}
+                    </ul>
+                  </details>
+                )}
               </div>
             );
           })()}
@@ -1221,6 +1287,29 @@ export default function MonthPlan({
           )}
         </div>
       )}
+
+      {locked && boostSlots.length > 0 && boostSlots[0].planId === plan?.id && (() => {
+        const bs = summarizeBoost(boostSlots, today);
+        return (
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 space-y-2 text-xs">
+            <h3 className="text-sm font-bold text-[var(--text)]">Ca tăng cường ({bs.count})</h3>
+            <p className="text-[11px] text-[var(--text-muted)] leading-relaxed max-w-3xl">
+              Ca OP mở thêm sau khi chốt kế hoạch. Target là <b>đề xuất của engine</b> cho riêng ca đó để chấm ca — <b>không cộng vào target tháng</b> ({fmtVndShort(totals.target)}) và run-rate; GMV của ca vẫn cộng vào thực đạt.
+              Muốn đưa vào kế hoạch gốc và chia lại cả tháng: "Chia lại theo lịch hiện có…".
+              {bs.targetSum > 0 && <> Σ đề xuất <b className="text-[var(--text)]">{fmtVndShort(bs.targetSum)}</b>.</>}
+              {bs.pending > 0 && <span className="text-amber-300"> {bs.pending} ca đang chờ target (engine chưa có dự báo cho ca này).</span>}
+            </p>
+            <ul className="text-[11px] space-y-0.5 max-h-48 overflow-auto">
+              {boostSlots.map((b) => (
+                <li key={b.id} className="flex flex-wrap gap-x-3 font-mono text-[var(--text-muted)]">
+                  <span>{b.date.slice(8)}/{b.date.slice(5, 7)} {b.startTime}–{b.endTime}{b.date < today ? " · đã qua" : ""}</span>
+                  <span className={b.targetPending ? "text-amber-300" : "text-[var(--text)]"}>{b.targetPending ? "chờ target" : `đề xuất ${fmtVndShort(b.targetGmv)}`}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      })()}
 
       {(crossBrand.clashes.length > 0 || overCapacity) && (
         <div className="bg-rose-950/30 border border-rose-900 rounded-xl px-4 py-2.5 text-xs text-rose-200 space-y-1">

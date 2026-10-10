@@ -4,7 +4,9 @@ import { prefetchable } from "./prefetch";
 import { fetchAllPages } from "./fetchAllPages";
 import { LockedPlanRow, LockedPlanTargets, lockedPlanTargetsFromRows } from "../scheduling/lockedPlanTargets";
 import { RetargetAuditRow, RetargetBatch, summarizeRetargetBatches } from "../scheduling/retarget";
-import { BrandMonthPlan, BrandMonthPlanSlot, CalendarEventRow, PlanCampRanges, PlanGroupTargets } from "../../types";
+import type { RebaseItem } from "../scheduling/rebase";
+import type { BoostFillItem } from "../scheduling/boost";
+import { BoostSlot, BrandMonthPlan, BrandMonthPlanSlot, CalendarEventRow, PlanCampRanges, PlanGroupTargets } from "../../types";
 import { platformOf, brandPlatformKey, type ReportPlatform } from "../reportPlatform";
 
 // Kế Hoạch Tháng (0090). Bảng nhỏ (1 dòng plan + ≤ ~100 ca/brand/tháng) — đọc theo brand+tháng,
@@ -320,14 +322,20 @@ export interface RetargetResult {
   new_total: number;
 }
 
-export async function retargetMonthPlan(planId: string, targets: { id: string; target: number }[], note = ""): Promise<RetargetResult> {
-  const { data, error } = await supabase.rpc("retarget_month_plan", { p_plan_id: planId, p_targets: targets, p_note: note });
+// "Chia lại theo lịch hiện có" (0164): đổi target ca có sẵn + đưa ca OP thêm (kể cả đã qua) vào kế hoạch, một transaction. Chỉ ceo/admin.
+export interface RebaseResult extends RetargetResult {
+  added: number;
+  linked: number;
+  zeroed: number;
+}
+
+export async function rebaseMonthPlan(planId: string, items: RebaseItem[], note = ""): Promise<RebaseResult> {
+  const { data, error } = await supabase.rpc("rebase_month_plan", { p_plan_id: planId, p_items: items, p_note: note });
   if (error) {
-    // PGRST202 = PostgREST không thấy hàm: DB chưa chạy 0162.
-    if (error.code === "PGRST202") throw new Error("DB chưa chạy migration 0162 (retarget_month_plan) — chạy SQL trong Supabase rồi thử lại.");
+    if (error.code === "PGRST202") throw new Error("DB chưa chạy migration 0164 (rebase_month_plan) — chạy SQL trong Supabase rồi thử lại.");
     throw error;
   }
-  return data as RetargetResult;
+  return data as RebaseResult;
 }
 
 // Nhật ký các vòng chia lại của một kế hoạch (mới nhất trước). Bảng chưa có (chưa chạy 0162) ⇒ [] chứ không báo lỗi.
@@ -353,4 +361,89 @@ export async function fetchChannelAdsBudgets(brandId: string, platform: ReportPl
   const out = new Map<string, number>();
   for (const r of (data as { month: string; ads_budget: number | null }[]) ?? []) if (Number(r.ads_budget) > 0) out.set(String(r.month).slice(0, 7), Number(r.ads_budget));
   return out;
+}
+
+// Ca tăng cường (0165). Bảng chưa có (chưa chạy 0165) ⇒ [] chứ không báo lỗi — client mới chạy được với DB cũ.
+interface DbBoostSlot {
+  id: string;
+  plan_id: string;
+  shift_slot_id: string | null;
+  date: string;
+  start_time: string;
+  end_time: string;
+  target_gmv: number;
+  expected_gmv: number;
+  target_pending: boolean;
+}
+
+export async function fetchBoostSlots(planId: string): Promise<BoostSlot[]> {
+  const { data, error } = await supabase.from("plan_boost_slots").select("*").eq("plan_id", planId).order("date").order("start_time");
+  if (error) {
+    if (error.code === "42P01" || error.code === "PGRST205") return [];
+    throw error;
+  }
+  return ((data as DbBoostSlot[]) ?? []).map((r) => ({
+    id: r.id,
+    planId: r.plan_id,
+    shiftSlotId: r.shift_slot_id ?? undefined,
+    date: r.date,
+    startTime: hhmm(r.start_time),
+    endTime: hhmm(r.end_time),
+    targetGmv: Number(r.target_gmv),
+    expectedGmv: Number(r.expected_gmv),
+    targetPending: r.target_pending
+  }));
+}
+
+// Điền target đề xuất của engine cho ca tăng cường (ceo/admin/operations). Trả số dòng đã ghi.
+export async function setBoostTargets(planId: string, items: BoostFillItem[]): Promise<number> {
+  if (items.length === 0) return 0;
+  const { data, error } = await supabase.rpc("set_boost_targets", { p_plan_id: planId, p_items: items });
+  if (error) {
+    if (error.code === "PGRST202") throw new Error("DB chưa chạy migration 0165 (set_boost_targets) — chạy SQL trong Supabase rồi thử lại.");
+    throw error;
+  }
+  return data as number;
+}
+
+// Độ phủ kế hoạch của tháng cho "Việc cần làm": ca kế hoạch của các plan ĐÃ CHỐT + dòng ca tăng cường, gom theo plan_id. Chỉ để đếm ca trên
+// lịch chưa nằm trong kế hoạch. Bảng tăng cường chưa có (chưa chạy 0165) ⇒ không có ca tăng cường, không báo lỗi.
+export interface PlanCoverage {
+  slotsByPlan: Map<string, BrandMonthPlanSlot[]>;
+  boostByPlan: Map<string, BoostSlot[]>;
+}
+
+export async function fetchPlanCoverage(month: string): Promise<PlanCoverage> {
+  const rows = await fetchAllPages<DbPlanSlot>((from, to) =>
+    supabase
+      .from("brand_month_plan_slots")
+      .select("*,plan:brand_month_plans!inner(status,month)")
+      .eq("plan.status", "locked")
+      .eq("plan.month", `${month}-01`)
+      .order("date")
+      .range(from, to)
+  );
+  const slotsByPlan = new Map<string, BrandMonthPlanSlot[]>();
+  for (const r of rows) slotsByPlan.set(r.plan_id, [...(slotsByPlan.get(r.plan_id) ?? []), slotFromDb(r)]);
+  const boostByPlan = new Map<string, BoostSlot[]>();
+  const { data, error } = await supabase.from("plan_boost_slots").select("*,plan:brand_month_plans!inner(month)").eq("plan.month", `${month}-01`).limit(1000);
+  if (error) {
+    if (error.code !== "42P01" && error.code !== "PGRST205") throw error;
+  } else {
+    for (const r of (data as DbBoostSlot[]) ?? []) {
+      const b: BoostSlot = {
+        id: r.id,
+        planId: r.plan_id,
+        shiftSlotId: r.shift_slot_id ?? undefined,
+        date: r.date,
+        startTime: hhmm(r.start_time),
+        endTime: hhmm(r.end_time),
+        targetGmv: Number(r.target_gmv),
+        expectedGmv: Number(r.expected_gmv),
+        targetPending: r.target_pending
+      };
+      boostByPlan.set(r.plan_id, [...(boostByPlan.get(r.plan_id) ?? []), b]);
+    }
+  }
+  return { slotsByPlan, boostByPlan };
 }

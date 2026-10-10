@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { ChevronDown, ListChecks } from "lucide-react";
 import { Brand, BrandChannel, BrandMonthPlan, BrandMonthlyCommitment, BrandMonthlyReport, BrandPlatformRate, LiveSession, ShiftSlot, Talent } from "../types";
 import { buildTodos, Todo, TodoLevel } from "../lib/todoList";
-import { planStatusesRead } from "../lib/db/monthPlans";
+import { PlanCoverage, fetchPlanCoverage, planStatusesRead } from "../lib/db/monthPlans";
 import { commitmentsRead } from "../lib/db/brandContracts";
 import { AffiliateTodoData, fetchAffiliateTodoData } from "../lib/db/affiliateActuals";
 import { todayVn } from "../lib/performance/brandCommitment";
@@ -46,12 +46,15 @@ export const TodoPanel: React.FC<Props> = ({ brands, channels, sessions, shiftSl
   const [commitments, setCommitments] = useState<BrandMonthlyCommitment[] | null>(null);
   // Kế hoạch Affiliate (0155): lỗi (DB chưa chạy 0155, mạng) ⇒ null = bỏ qua việc Affiliate chứ không chặn cả khối.
   const [affiliate, setAffiliate] = useState<AffiliateTodoData | null | undefined>(undefined);
+  // Độ phủ kế hoạch (ca ngoài kế hoạch, ca tăng cường): lỗi ⇒ null = bỏ qua hai việc này chứ không chặn cả khối.
+  const [coverage, setCoverage] = useState<PlanCoverage | null | undefined>(undefined);
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     let alive = true;
     planStatusesRead.take(month).then((m) => alive && setPlansThisMonth(m)).catch(() => alive && setPlansThisMonth(new Map()));
     planStatusesRead.take(nextMonthOf(month)).then((m) => alive && setPlansNextMonth(m)).catch(() => alive && setPlansNextMonth(new Map()));
+    fetchPlanCoverage(month).then((c) => alive && setCoverage(c)).catch(() => alive && setCoverage(null));
     commitmentsRead.take().then((c) => alive && setCommitments(c)).catch(() => alive && setCommitments([]));
     fetchAffiliateTodoData([prevMonthOf(month), month, nextMonthOf(month)]).then((a) => alive && setAffiliate(a)).catch(() => alive && setAffiliate(null));
     return () => {
@@ -60,9 +63,9 @@ export const TodoPanel: React.FC<Props> = ({ brands, channels, sessions, shiftSl
   }, [month]);
 
   const todos = useMemo(() => {
-    if (!plansThisMonth || !plansNextMonth || !commitments || affiliate === undefined) return null;
-    return buildTodos({ today, brands, channels, sessions, shiftSlots, plansThisMonth, plansNextMonth, commitments, rates, monthlyReports, talents, canSeeMoney, affiliate: affiliate ?? undefined }).filter((t) => canOpenTab(t.tab));
-  }, [today, brands, channels, sessions, shiftSlots, plansThisMonth, plansNextMonth, commitments, rates, monthlyReports, talents, canSeeMoney, affiliate, canOpenTab]);
+    if (!plansThisMonth || !plansNextMonth || !commitments || affiliate === undefined || coverage === undefined) return null;
+    return buildTodos({ today, brands, channels, sessions, shiftSlots, plansThisMonth, plansNextMonth, coverage: coverage ?? undefined, commitments, rates, monthlyReports, talents, canSeeMoney, affiliate: affiliate ?? undefined }).filter((t) => canOpenTab(t.tab));
+  }, [today, brands, channels, sessions, shiftSlots, plansThisMonth, plansNextMonth, coverage, commitments, rates, monthlyReports, talents, canSeeMoney, affiliate, canOpenTab]);
 
   if (todos === null) return null; // đang tải — không vẽ khung rỗng rồi nhảy
   const shown = expanded ? todos : todos.slice(0, COLLAPSED_COUNT);
