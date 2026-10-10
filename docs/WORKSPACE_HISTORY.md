@@ -5374,3 +5374,16 @@ Nguyên văn các mục §1 của `WORKSPACE_DESIGN.md` ngày 07–09/10, chuy�
 **Làm (không migration):** xem §1 WORKSPACE 10/10. Bẫy gặp khi làm: (1) ghép ngày tháng trước theo "ngày thường thứ k" chứ không theo số ngày — 07/10 (ngày thường thứ 7) ↔ 10/09 vì 07–09/09 là D-Day; (2) "ngày đủ số" ban đầu lấy ngày đủ cuối cùng ⇒ JOCKEY "đủ tới 04/10, trễ 5 ngày" dù 05–08/10 không có ca — sửa: mốc chạy tới ngay trước ngày có ca đầu tiên còn thiếu; (3) để "N ca chờ số" đứng đầu mọi kênh lại che VERA −47% — chỉ đứng đầu khi phần tạm tính ≥ 5% dự phóng (CROCS 4 ca D-Day ~310M = 5,8% vẫn đứng đầu); (4) sổ dự báo 0163 của phiên khác gọi `record_forecast_snapshots` ⇒ 404 ở console tới khi chạy 0163 — không phải lỗi màn này.
 
 **Số trên app sau khi làm (10/10, TikTok, đủ tới 08/10):** VERA "Sẽ hụt 0%" − GMV/giờ ngày thường −47% (Views/giờ −30%, LIVE CTR −20%, CTOR −16%); JOCKEY "Khó đạt 25%" − target ×1,73; CROCS "Có thể đạt 63%" dự phóng 5,39B (engine v3) − 4 ca D-Day chờ số ~310M; Franklin "Có thể đạt 66%" − target ×0,80. Shopee: VERA "Sẽ hụt" − target ×1,55 + Viewers/giờ −29%; Franklin Shopee kênh mới. Dữ liệu sai bắt được: target_gmv kế hoạch ≠ Σ target ca ở CROCS TT (5,21B vs 5,15B) và VERA Shopee (1,29B vs 1,1B).
+
+
+## Lượt live + ca nối trong Giao ca (2026-10-11)
+
+**Yêu cầu user:** 5 trường hợp snapshot khi vận hành (ca thường; restart ⇒ mỗi lượt một ô up; ca nối; nối nhiều ca cùng room; xen kẽ nối/restart). 0153 đã có backend nhưng UI ở khối riêng dưới Giao ca và nút restart khoá tới khi có file đầu.
+
+**Số đo (read-only, TikTok T6–T10, 1.144 room Creator-Live-Performance × ca đã lên lịch):** ca có 1 room 703 / 2 room 58 (7,6%, không ca nào ≥ 3 lượt chính); khoảng nghỉ giữa các lượt restart trung vị 4,8' (p90 6,4', max 13,5'); 228 ranh giới ca liền kề (≤30'): 126 có room xuyên giờ giao (55%), 102 room mới; chuỗi ≥ 3 ca 32/190, trộn nối+mới 11; 11 ranh giới có restart ở ca trước (4 vừa nối vừa restart). Hai room không chạy cùng lúc nên mỗi ranh giới tối đa một room xuyên.
+
+**Quyết định user (11/10):** (1) mỗi lượt restart có một lần up riêng (không chỉ ghi nhận từ file đầu); (2) ca nối để trợ xác nhận (app chỉ đề xuất); (3) làm dải chuỗi ca trong ngày cùng đợt.
+
+**Build:** xem WORKSPACE_DESIGN §5.6 "Lượt live". Không migration — dùng lại `apply_session_snapshot_part`, `link_session_room`. `apply_session_snapshot_part` thay dòng cùng Room ID nên lượt thêm sau không nhân đôi số. Tick nhiều room ở bước 1 = nhiều lần gọi RPC liên tiếp (không atomic): lỗi giữa chừng thì ca còn lượt đầu, thêm lượt thiếu bằng nút "Thêm lượt restart".
+
+**Kiểm:** `tests/roomCases.test.ts` (+10: vai room, dung sai 5', lượt, chuỗi ca qua nửa đêm, ranh giới khoá), `fileHandoverPlatforms` (bước 1/2/3), tsc, eslint 0 lỗi; vitest chỉ còn 2 đỏ có sẵn (shopeeFiles Live List 50 phiên, shopeeReportRender). **Chưa kiểm trên app thật** — Browser pane chưa đăng nhập; cần thử: up file có 2 room, thêm lượt restart, room đang live ⇒ hộp chọn ca sau, dải chuỗi.

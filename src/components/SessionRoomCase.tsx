@@ -10,6 +10,7 @@ import {
   estimateHandoverSplit,
   fetchRoomLinkCandidates,
   fetchRoomLinks,
+  fetchRoomLinksAmong,
   fetchSnapshotParts,
   isRoomLinksBackendMissing,
   linkSessionRoom,
@@ -17,8 +18,9 @@ import {
 } from "../lib/db/sessionRoomLinks";
 import { SessionSnapshot, fetchSessionSnapshot } from "../lib/db/sessionLiveSnapshots";
 import { parseSnapshotFile, type ParsedSnapshotFile } from "../lib/liveSnapshot/extractRooms";
-import { BREAK_REASONS, BreakReason, breakReasonLabel, nextLinkStatus, roomGapMinutes } from "../lib/liveSnapshot/roomCases";
-import { shortRoomId } from "../lib/liveSnapshot/roomSelection";
+import { BREAK_REASONS, BreakReason, adjacentShiftChain, breakReasonLabel, buildTurns, chainBoundaries, nextLinkStatus, roomGapMinutes, roomsFromPrev, runOverRoom } from "../lib/liveSnapshot/roomCases";
+import { sessionWindow, shortRoomId } from "../lib/liveSnapshot/roomSelection";
+import { hasSnapshot } from "../lib/sessionLedger";
 import { preloadSpreadsheetReader } from "../lib/dataraw/parseDataRawExcel";
 import { SnapshotRoomPicker } from "./SnapshotRoomPicker";
 import { errorMessage } from "../lib/errorMessage";
@@ -28,14 +30,27 @@ import { platformOf } from "../lib/reportPlatform";
 
 // "Room của ca này" (user chốt 08/10, migration 0153; mở cho Shopee ở 0154 — ở đó gọi là "phiên") — hai trường hợp room ≠ ca, đều do trợ/OPS xác nhận trong Cửa sổ Ca Live:
 //  • CA NỐI: room chạy tiếp sang ca sau. Chọn ĐÚNG ca sau đã plan trên lịch; số ca sau = room cộng dồn − snapshot của ca này.
-//  • CA BỊ NGẮT ROOM: tắt/bật lại stream ⇒ nhiều room trong 1 ca. Mỗi lần ngắt là một mảnh kèm lý do; số ca = tổng mọi room.
+//  • CA BỊ NGẮT ROOM: tắt/bật lại stream ⇒ nhiều room trong 1 ca. Mỗi room là một LƯỢT live: lượt đầu = file đầu, mỗi lượt restart sau
+//    đó có một mảnh + một lần up file riêng, kèm lý do; số ca = tổng mọi room.
+// 11/10 (user duyệt): nằm TRONG bước Giao ca; app tự phát hiện room chạy qua giờ giao ⇒ đề xuất sẵn ca sau để trợ chỉ xác nhận; dải
+// chuỗi ca trong ngày cho thấy ranh giới nối/không nối và ca đang bị khoá.
 
 interface Props {
   session: LiveSession;
   /** Trợ/host của ca hoặc OPS. */
   canEdit: boolean;
   isOps: boolean;
+  /** Các ca đã nạp — để vẽ dải chuỗi ca liền kề trong ngày và tìm ca trước. */
+  allSessions?: LiveSession[];
   onSessionsUpdated: (sessions: LiveSession[]) => void;
+}
+
+const dismissKey = (id: string) => `liveops:no-room-link:${id}`;
+function readDismissed(id: string): boolean {
+  try { return localStorage.getItem(dismissKey(id)) === "1"; } catch { return false; }
+}
+function writeDismissed(id: string) {
+  try { localStorage.setItem(dismissKey(id), "1"); } catch { /* chỉ là tiện lợi theo trình duyệt */ }
 }
 
 const fmtDay = (d: string) => (d ? `${d.slice(8, 10)}/${d.slice(5, 7)}` : "");
@@ -46,7 +61,7 @@ const linkedLabel = (x: { date: string; startTime: string; endTime: string; host
 const chipBase = "text-[11px] font-bold px-2 py-0.5 rounded-full border";
 const btnGhost = "inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--text)] disabled:opacity-40 transition-colors";
 
-export function SessionRoomCase({ session: s, canEdit, isOps, onSessionsUpdated }: Props) {
+export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSessionsUpdated }: Props) {
   const confirm = useConfirm();
   // TikTok gọi là room, Shopee gọi là phiên (một dòng trong file Live List) — cùng cơ chế snapshot nên cùng màn.
   const prof = profileOf(s);
@@ -60,6 +75,8 @@ export function SessionRoomCase({ session: s, canEdit, isOps, onSessionsUpdated 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [chainLinks, setChainLinks] = useState<{ prevId: string; nextId: string }[]>([]);
+  const [dismissed, setDismissed] = useState(() => readDismissed(s.id));
   const [chooser, setChooser] = useState<RoomLinkCandidate[] | null>(null);
   const [pickedNext, setPickedNext] = useState("");
 
@@ -92,6 +109,35 @@ export function SessionRoomCase({ session: s, canEdit, isOps, onSessionsUpdated 
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chạy theo dấu vết số liệu `stamp`, không theo từng field của ca
   }, [stamp, tick]);
+
+  // Dải chuỗi ca liền kề trong ngày (cùng brand + sàn, cách nhau ≤ 30 phút).
+  const chain = allSessions ? adjacentShiftChain(s, allSessions) : [s];
+  const chainIds = chain.map((x) => x.id).join(",");
+  useEffect(() => {
+    if (chain.length < 2) return;
+    let alive = true;
+    fetchRoomLinksAmong(chainIds.split(",")).then((l) => { if (alive) setChainLinks(l); }).catch(() => undefined);
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chạy theo danh sách ca trong chuỗi + sau mỗi thao tác, không theo từng field
+  }, [chainIds, tick, stamp]);
+
+  // Room chạy qua giờ giao (chưa kết thúc / kết thúc sau giờ hết ca) mà chưa nối ⇒ tự mở danh sách ca sau để trợ chỉ xác nhận.
+  const win = sessionWindow(s);
+  const overRoom = snapshot && !snapshot.isEstimated ? runOverRoom(snapshot.rooms, win) : undefined;
+  const suggestKey = overRoom && canEdit && !links.next && !dismissed && !loading ? overRoom.roomId : "";
+  useEffect(() => {
+    if (!suggestKey) return;
+    let alive = true;
+    fetchRoomLinkCandidates(s.id)
+      .then((c) => {
+        if (!alive) return;
+        setChooser(c);
+        const free = c.filter((x) => !x.takenBy);
+        setPickedNext(free.length === 1 ? free[0].sessionId : "");
+      })
+      .catch(() => undefined);
+    return () => { alive = false; };
+  }, [suggestKey, s.id]);
 
   const run = async (fn: () => Promise<LiveSession[] | LiveSession>) => {
     setBusy(true);
@@ -161,14 +207,14 @@ export function SessionRoomCase({ session: s, canEdit, isOps, onSessionsUpdated 
   };
 
   const removePart = async (p: SnapshotPart) => {
-    if (!(await confirm(`Xoá mảnh ${p.partNo} (${breakReasonLabel(p.reason)})? Số của các ${prof.liveFileRowNoun} thuộc mảnh này sẽ bị bỏ khỏi ca.`, { danger: true }))) return;
+    if (!(await confirm(`Xoá lượt ${p.partNo} (${breakReasonLabel(p.reason)})? Số của các ${prof.liveFileRowNoun} thuộc lượt này sẽ bị bỏ khỏi ca.`, { danger: true }))) return;
     await run(() => deleteSessionSnapshotPart(p.id, s.id));
   };
 
   if (unavailable) return null;
   const shell = (body: React.ReactNode) => (
     <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface-base)]/60 p-3 space-y-2">
-      <h4 className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-bold">{Unit} của ca này</h4>
+      <h4 className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-bold">Lượt live & ca nối</h4>
       {body}
     </section>
   );
@@ -177,6 +223,15 @@ export function SessionRoomCase({ session: s, canEdit, isOps, onSessionsUpdated 
   const rooms = snapshot?.rooms ?? [];
   const gap = roomGapMinutes(rooms);
   const multiRoom = rooms.length > 1 || parts.length > 0;
+  const turns = buildTurns(rooms, parts);
+  const nextTurnNo = (turns[turns.length - 1]?.no ?? 1) + 1;
+  const fromPrevRooms = snapshot ? roomsFromPrev(rooms, win) : [];
+  const myIdx = chain.findIndex((x) => x.id === s.id);
+  const prevShift = myIdx > 0 ? chain[myIdx - 1] : undefined;
+  const boundaries = chainBoundaries(chain, chainLinks, (id) => {
+    const x = chain.find((c) => c.id === id);
+    return !!x && hasSnapshot(x);
+  });
   const prev = links.prev;
   const next = links.next;
   const waiting = nextLinkStatus(!!prev, !!prev?.hasSnapshot) === "waiting";
@@ -190,15 +245,15 @@ export function SessionRoomCase({ session: s, canEdit, isOps, onSessionsUpdated 
           session={s}
           rows={fresh}
           fileName={pendingFile.fileName}
-          heading={`Chọn ${prof.liveFileRowNoun} của mảnh sau (${breakReasonLabel(partForm.reason)})`}
+          heading={`Lượt ${nextTurnNo} (${breakReasonLabel(partForm.reason)}) — chọn ${prof.liveFileRowNoun} của lượt này`}
           prevBaseline={prev?.boundaryAt ? { boundaryMs: Date.parse(prev.boundaryAt), roomIds: prev.roomIds, label: `${prev.startTime}–${prev.endTime}` } : undefined}
-          confirmLabel="Thêm mảnh này vào ca"
+          confirmLabel={`Thêm lượt ${nextTurnNo} vào ca`}
           busy={busy}
           onConfirm={(r) => void savePart(r, pendingFile.fileName, pendingFile.parsed.periodLabel)}
           onCancel={() => { setPendingFile(null); setError(null); }}
         />
         {fresh.length < pendingFile.parsed.rows.length && (
-          <p className="text-[11px] text-[var(--text-faint)]">Đã ẩn {pendingFile.parsed.rows.length - fresh.length} {prof.liveFileRowNoun} đã có ở mảnh trước của ca này.</p>
+          <p className="text-[11px] text-[var(--text-faint)]">Đã ẩn {pendingFile.parsed.rows.length - fresh.length} {prof.liveFileRowNoun} đã có ở lượt trước của ca này.</p>
         )}
         {error && <ErrorLine text={error} />}
       </div>
@@ -209,7 +264,10 @@ export function SessionRoomCase({ session: s, canEdit, isOps, onSessionsUpdated 
     <div className="space-y-3">
       {/* Trạng thái hiện tại */}
       <div className="flex flex-wrap items-center gap-1.5">
-        {!prev && !next && !multiRoom && <span className={`${chipBase} bg-[var(--surface-elevated)] text-[var(--text-muted)] border-[var(--border)]`}>Bình thường — 1 {unit} riêng</span>}
+        {!prev && !next && !multiRoom && (s.liveRoomIds?.length ?? 0) > 1 && (
+          <span className={`${chipBase} bg-amber-950 text-amber-300 border-amber-800`}>{s.liveRoomIds!.length} {unit} theo số đã nạp — chưa có file giao ca để ghi lý do từng lượt</span>
+        )}
+        {!prev && !next && !multiRoom && (s.liveRoomIds?.length ?? 0) <= 1 && <span className={`${chipBase} bg-[var(--surface-elevated)] text-[var(--text-muted)] border-[var(--border)]`}>Bình thường — 1 {unit} riêng</span>}
         {prev && <span className={`${chipBase} bg-sky-950 text-sky-300 border-sky-800`}>Nối từ ca {prev.startTime}–{prev.endTime}</span>}
         {next && <span className={`${chipBase} bg-sky-950 text-sky-300 border-sky-800`}>Nối sang ca {next.startTime}–{next.endTime}</span>}
         {multiRoom && <span className={`${chipBase} bg-amber-950 text-amber-300 border-amber-800`}>{rooms.length} {unit}{parts.length > 0 ? ` · bị ngắt ×${Math.max(parts.length, rooms.length - 1)}` : ""}</span>}
@@ -279,7 +337,9 @@ export function SessionRoomCase({ session: s, canEdit, isOps, onSessionsUpdated 
       {/* Chọn ca sau */}
       {chooser && (
         <div className="rounded-xl border border-[var(--accent)]/40 bg-[var(--surface-base)] p-3 space-y-2">
-          <p className="text-xs font-bold text-[var(--text)]">{Unit} này chạy tiếp sang ca nào?</p>
+          <p className="text-xs font-bold text-[var(--text)]">
+            {overRoom ? <>{Unit} <span className="font-mono">{shortRoomId(overRoom.roomId)}</span> đang chạy qua giờ giao ca — chạy tiếp sang ca nào?</> : <>{Unit} này chạy tiếp sang ca nào?</>}
+          </p>
           <p className="text-[11px] text-[var(--text-muted)]">Chỉ liệt kê ca {s.platform} cùng brand đã có trên lịch, bắt đầu sau ca này và trong vòng 2 giờ sau khi ca này hết.</p>
           {chooser.length === 0 ? (
             <p className="text-xs text-amber-300">Chưa có ca nào trên lịch phù hợp. Nhờ OPS thêm ca sau vào lịch trước, rồi quay lại đây.</p>
@@ -302,7 +362,13 @@ export function SessionRoomCase({ session: s, canEdit, isOps, onSessionsUpdated 
             </ul>
           )}
           <div className="flex gap-2">
-            <button onClick={() => setChooser(null)} disabled={busy} className="min-h-10 px-4 rounded-xl bg-[var(--surface-elevated)] text-[var(--text-muted)] font-bold text-xs">Thôi</button>
+            <button
+              onClick={() => { setChooser(null); if (overRoom) { writeDismissed(s.id); setDismissed(true); } }}
+              disabled={busy}
+              className="min-h-10 px-4 rounded-xl bg-[var(--surface-elevated)] text-[var(--text-muted)] font-bold text-xs"
+            >
+              {overRoom ? `Không, ${unit} kết thúc ở ca này` : "Thôi"}
+            </button>
             <button onClick={() => void confirmLink()} disabled={busy || !pickedNext} className="flex-1 min-h-10 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black text-xs">
               {busy ? "Đang lưu..." : "Xác nhận ca nối này"}
             </button>
@@ -310,39 +376,100 @@ export function SessionRoomCase({ session: s, canEdit, isOps, onSessionsUpdated 
         </div>
       )}
 
-      {/* Ca bị ngắt room: các mảnh */}
-      {multiRoom && (
+      {/* Các lượt live của ca: mỗi room = một lượt; lượt restart có lý do + file riêng */}
+      {snapshot && !snapshot.isEstimated && (
         <div className="rounded-xl border border-amber-900 bg-amber-950/20 p-2.5 text-xs space-y-1.5">
-          <p className="font-bold text-amber-200"><Scissors className="w-3.5 h-3.5 inline mr-1 -mt-0.5" />Ca bị ngắt {unit} — số ca là tổng mọi {unit}</p>
-          <ul className="space-y-1 text-[var(--text)]">
-            <li>
-              <b>Mảnh 1</b> · {rooms.filter((r) => !r.partId).map((r) => `${vnTime(r.startedAt)}→${vnTime(r.endedAt)} (${shortRoomId(r.roomId)})`).join(", ") || "file đầu"}
-            </li>
-            {parts.map((p) => (
-              <li key={p.id} className="flex items-start justify-between gap-2">
-                <span>
-                  <b>Mảnh {p.partNo}</b> · {breakReasonLabel(p.reason)}
-                  {p.roomIds.length > 0 ? ` · ${rooms.filter((r) => r.partId === p.id).map((r) => `${vnTime(r.startedAt)}→${vnTime(r.endedAt)} (${shortRoomId(r.roomId)})`).join(", ") || p.roomIds.map(shortRoomId).join(", ")}` : ` · chỉ ghi nhận (${unit} đã nằm trong file đầu)`}
-                  {p.note ? <span className="text-[var(--text-muted)]"> — {p.note}</span> : null}
-                </span>
-                {canEdit && (
-                  <button onClick={() => void removePart(p)} disabled={busy} title="Xoá mảnh" className="p-1.5 -m-1.5 shrink-0 text-[var(--text-faint)] hover:text-rose-400 disabled:opacity-40">
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-          <p className="text-[11px] text-[var(--text-muted)]">
-            Gián đoạn giữa các {unit}: <b>{gap} phút</b> · giờ live = cộng thời lượng từng {unit} (khoảng nghỉ không tính).
+          <p className="font-bold text-amber-200">
+            <Scissors className="w-3.5 h-3.5 inline mr-1 -mt-0.5" />
+            Các lượt live của ca{turns.length > 1 ? ` — restart ×${turns.length - 1}, số ca là tổng mọi ${unit}` : ""}
           </p>
+          <ul className="space-y-1 text-[var(--text)]">
+            {turns.map((t) => {
+              const spans = t.rooms.map((r) => `${vnTime(r.startedAt)}→${r.endedAt ? vnTime(r.endedAt) : "đang live"} (${shortRoomId(r.roomId)})`).join(", ");
+              const part = parts.find((p) => p.id === t.partId);
+              return (
+                <li key={t.partId ?? "first"} className="flex items-start justify-between gap-2">
+                  <span>
+                    <b>Lượt {t.no}</b>
+                    {t.no > 1 ? ` · ${breakReasonLabel(t.reason ?? "other")}` : " · lượt đầu"}
+                    {spans ? ` · ${spans}` : t.no > 1 ? ` · chỉ ghi nhận (${unit} đã nằm trong file lượt trước)` : ""}
+                    {t.note ? <span className="text-[var(--text-muted)]"> — {t.note}</span> : null}
+                  </span>
+                  {canEdit && part && (
+                    <button onClick={() => void removePart(part)} disabled={busy} title="Xoá lượt này" className="p-1.5 -m-1.5 shrink-0 text-[var(--text-faint)] hover:text-rose-400 disabled:opacity-40">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          {multiRoom && (
+            <p className="text-[11px] text-[var(--text-muted)]">
+              Gián đoạn giữa các {unit}: <b>{gap} phút</b> · giờ live = cộng thời lượng từng {unit} (khoảng nghỉ không tính).
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Room bắt đầu trước giờ vào ca mà ca này chưa được xác nhận nối từ ca trước ⇒ đang nhận CẢ room */}
+      {!prev && fromPrevRooms.length > 0 && (
+        <div className="rounded-xl border border-amber-800 bg-amber-950/40 p-2.5 text-xs space-y-1.5">
+          <p className="text-amber-300 flex items-start gap-1.5">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
+            <span>
+              {Unit} {fromPrevRooms.map((r) => shortRoomId(r.roomId)).join(", ")} bắt đầu TRƯỚC giờ vào ca nhưng ca này chưa được xác nhận nối từ ca trước ⇒ đang tính CẢ {unit} cho ca này.
+              {prevShift ? ` Ca liền trước: ${linkedLabel(prevShift)}.` : " Chưa thấy ca liền trước trên lịch."}
+            </span>
+          </p>
+          {isOps && prevShift && (
+            <button
+              onClick={async () => {
+                if (!(await confirm(`Xác nhận: ${unit} của ca ${linkedLabel(prevShift)} chạy tiếp sang ca này? Số ca này = ${unit} cộng dồn trừ file ca đó up lúc giao ca.`))) return;
+                await run(() => linkSessionRoom(prevShift.id, s.id));
+              }}
+              disabled={busy}
+              className={btnGhost}
+            >
+              <Link2 className="w-3.5 h-3.5" /> Xác nhận nối từ ca {prevShift.startTime.slice(0, 5)}–{prevShift.endTime.slice(0, 5)}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Dải chuỗi ca liền kề trong ngày */}
+      {chain.length > 1 && (
+        <div className="rounded-xl border border-[var(--border)] p-2.5 space-y-1.5">
+          <p className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-bold">Chuỗi ca liền kề trong ngày</p>
+          <div className="flex flex-wrap items-center gap-1 text-[11px]">
+            {chain.map((c, i) => {
+              const bd = i > 0 ? boundaries[i - 1] : undefined;
+              const here = c.id === s.id;
+              return (
+                <React.Fragment key={c.id}>
+                  {bd && (
+                    <span
+                      title={bd.kind === "linked" ? `${Unit} chạy tiếp: ca sau trừ mốc ca trước${bd.locked ? " — ca trước CHƯA up file ⇒ ca sau đang khoá số" : ""}` : `Chưa xác nhận nối — ${unit} mới ở ca sau`}
+                      className={`font-bold px-1 ${bd.kind === "linked" ? (bd.locked ? "text-amber-300" : "text-sky-300") : "text-[var(--text-faint)]"}`}
+                    >
+                      {bd.kind === "linked" ? (bd.locked ? "⛓🔒" : "⛓") : "○"}
+                    </span>
+                  )}
+                  <span className={`px-2 py-0.5 rounded-lg border ${here ? "border-emerald-700 bg-emerald-950/40 text-emerald-200 font-bold" : "border-[var(--border)] text-[var(--text-muted)]"}`}>
+                    {c.startTime.slice(0, 5)}–{c.endTime.slice(0, 5)} {hasSnapshot(c) ? "✔" : "·"}
+                  </span>
+                </React.Fragment>
+              );
+            })}
+          </div>
+          <p className="text-[11px] text-[var(--text-faint)]">⛓ {unit} chạy tiếp (ca sau trừ mốc ca trước) · ○ chưa xác nhận nối ({unit} mới) · 🔒 chờ file ca trước · ✔ đã có file</p>
         </div>
       )}
 
       {/* Thêm mảnh */}
       {partForm && !pendingFile && (
         <div className="rounded-xl border border-[var(--accent)]/40 bg-[var(--surface-base)] p-3 space-y-2">
-          <p className="text-xs font-bold text-[var(--text)]">Vì sao {unit} bị ngắt?</p>
+          <p className="text-xs font-bold text-[var(--text)]">Lượt {nextTurnNo}: vì sao {unit} bị ngắt?</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
             {BREAK_REASONS.map((r) => (
               <label key={r.key} className={`flex items-start gap-2 rounded-lg border px-2.5 py-1.5 text-xs cursor-pointer ${partForm.reason === r.key ? "border-emerald-700 bg-emerald-950/30" : "border-[var(--border)]"}`}>
@@ -360,7 +487,7 @@ export function SessionRoomCase({ session: s, canEdit, isOps, onSessionsUpdated 
           <div className="flex flex-wrap gap-2">
             <button onClick={() => { setPartForm(null); setError(null); }} disabled={busy} className="min-h-10 px-4 rounded-xl bg-[var(--surface-elevated)] text-[var(--text-muted)] font-bold text-xs">Thôi</button>
             <button onClick={() => fileRef.current?.click()} disabled={busy} className="min-h-10 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black text-xs">
-              {busy ? "Đang xử lý..." : `Up file có ${unit} mảnh sau`}
+              {busy ? "Đang xử lý..." : `Up file riêng của lượt ${nextTurnNo}`}
             </button>
             {rooms.length > 1 && (
               <button onClick={() => void savePart([], null)} disabled={busy} className="min-h-10 px-4 rounded-xl bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--text)] font-bold text-xs" title={`Các ${unit} đã nằm sẵn trong file đã up — chỉ ghi lý do`}>
@@ -382,14 +509,14 @@ export function SessionRoomCase({ session: s, canEdit, isOps, onSessionsUpdated 
           <button
             onClick={() => setPartForm({ reason: "network", note: "" })}
             disabled={busy || !snapshot}
-            title={snapshot ? undefined : "Up file của ca (mảnh đầu) ở bước Giao ca trước"}
+            title={snapshot ? undefined : "Up file của lượt đầu trước, rồi mới thêm lượt restart"}
             className={btnGhost}
           >
-            <Plus className="w-3.5 h-3.5" /> Ca bị ngắt: thêm mảnh {unit} sau
+            <Plus className="w-3.5 h-3.5" /> Thêm lượt restart (up file riêng)
           </button>
         </div>
       )}
-      {canEdit && !snapshot && !chooser && !partForm && <p className="text-[11px] text-[var(--text-faint)]">Ca bị ngắt {unit}: up file mảnh đầu ở bước Giao ca trước, rồi mới thêm mảnh sau.</p>}
+      {canEdit && !snapshot && !chooser && !partForm && <p className="text-[11px] text-[var(--text-faint)]">Restart giữa ca: up file lượt đầu trước, rồi bấm "Thêm lượt restart" — mỗi lượt có một lần up file riêng.</p>}
 
       {error && <ErrorLine text={error} />}
       <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleFile(f); }} />

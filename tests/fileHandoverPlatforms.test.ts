@@ -27,6 +27,8 @@ describe("FileHandover — một luồng, tên file theo sàn", () => {
     const html = renderToStaticMarkup(React.createElement(ConfirmProvider, null, React.createElement(FileHandover, { session: ses(platform), onSaved: () => {} })));
     expect(html).toContain(`1 · Up file ${file}`);
     expect(html).toContain("Up file ở bước 1 trước");
+    expect(html).toContain("2 · Lượt live &amp; ca nối");
+    expect(html).toContain("3 · Ca này có gì?");
     expect(html).not.toMatch(/Link dashboard|link dashboard|gõ số/);
     noBad(html);
   });

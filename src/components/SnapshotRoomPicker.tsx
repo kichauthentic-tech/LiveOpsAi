@@ -3,7 +3,7 @@ import { AlertTriangle } from "lucide-react";
 import type { LiveSession } from "../types";
 import type { SnapshotRoomRow } from "../lib/liveSnapshot/extractRooms";
 import { classifyRooms, sessionWindow, shortRoomId, sumRooms } from "../lib/liveSnapshot/roomSelection";
-import { roomsMissingFromPrev, type PrevBaseline } from "../lib/liveSnapshot/roomCases";
+import { BREAK_REASONS, roomsMissingFromPrev, sortTurns, type BreakReason, type PrevBaseline } from "../lib/liveSnapshot/roomCases";
 import { fmtCount } from "../lib/handover";
 import { fmtVndFull } from "../lib/format";
 import { profileOf } from "../lib/platforms/profiles";
@@ -25,7 +25,9 @@ interface Props {
   heading?: string;
   confirmLabel: string;
   busy: boolean;
-  onConfirm: (rows: SnapshotRoomRow[]) => void;
+  /** Tick từ 2 room trở lên = ca có restart: hỏi lý do cho từng lượt sau lượt đầu (lượt = một room, xếp theo giờ). `reasons` theo Room ID. */
+  askRestartReasons?: boolean;
+  onConfirm: (rows: SnapshotRoomRow[], reasons: Record<string, BreakReason>) => void;
   onCancel: () => void;
 }
 
@@ -36,7 +38,7 @@ const dur = (m: number) => {
   return `${Math.floor(r / 60)}h${String(r % 60).padStart(2, "0")}`;
 };
 
-export function SnapshotRoomPicker({ session: s, rows, fileName, untilMin, previouslySelected, prevBaseline, heading, confirmLabel, busy, onConfirm, onCancel }: Props) {
+export function SnapshotRoomPicker({ session: s, rows, fileName, untilMin, previouslySelected, prevBaseline, heading, confirmLabel, busy, askRestartReasons, onConfirm, onCancel }: Props) {
   const prof = profileOf(s);
   const noun = prof.liveFileRowNoun; // "phòng" (TikTok) / "phiên" (Shopee)
   const viewsWord = prof.viewsLabel.toLowerCase();
@@ -47,7 +49,9 @@ export function SnapshotRoomPicker({ session: s, rows, fileName, untilMin, previ
     const fromPrev = choices.filter((c) => c.inWindow && prev.has(c.row.roomId));
     return new Set((fromPrev.length > 0 ? fromPrev : choices.filter((c) => c.suggested)).map((c) => c.row.roomId));
   });
+  const [reasons, setReasons] = useState<Record<string, BreakReason>>({});
   const selected = choices.filter((c) => picked.has(c.row.roomId)).map((c) => c.row);
+  const turns = sortTurns(selected);
   const totals = sumRooms(selected);
   const toggle = (id: string) =>
     setPicked((p) => {
@@ -117,6 +121,26 @@ export function SnapshotRoomPicker({ session: s, rows, fileName, untilMin, previ
         </p>
       )}
 
+      {askRestartReasons && turns.length > 1 && (
+        <div className="rounded-lg border border-amber-800 bg-amber-950/30 px-2.5 py-2 text-xs space-y-1.5">
+          <p className="font-bold text-amber-200">Ca có {turns.length} {noun} = {turns.length} lượt live (restart ×{turns.length - 1}). Mỗi lượt sau lượt đầu cần một lý do:</p>
+          <ul className="space-y-1">
+            {turns.slice(1).map((r, i) => (
+              <li key={r.roomId} className="flex flex-wrap items-center gap-2">
+                <span className="text-[var(--text)]">Lượt {i + 2} · {vnTime(r.startedAt)} · {noun} {shortRoomId(r.roomId)}</span>
+                <select
+                  value={reasons[r.roomId] ?? "network"}
+                  onChange={(e) => setReasons((cur) => ({ ...cur, [r.roomId]: e.target.value as BreakReason }))}
+                  className="bg-[var(--surface)] border border-[var(--border)] rounded-lg px-2 py-1 text-[var(--text)] text-xs"
+                >
+                  {BREAK_REASONS.map((b) => <option key={b.key} value={b.key}>{b.label}</option>)}
+                </select>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {prevBaseline && missingFromPrev.length > 0 && (
         <p className="text-[11px] text-amber-300 flex items-start gap-1.5">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
@@ -130,7 +154,7 @@ export function SnapshotRoomPicker({ session: s, rows, fileName, untilMin, previ
         </button>
         <button
           type="button"
-          onClick={() => onConfirm(selected)}
+          onClick={() => onConfirm(selected, reasons)}
           disabled={busy || selected.length === 0}
           className="flex-1 min-h-11 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black text-sm"
         >

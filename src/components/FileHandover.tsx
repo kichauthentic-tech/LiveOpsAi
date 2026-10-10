@@ -4,6 +4,7 @@ import { submitFileHandover } from "../lib/db/handovers";
 import { errorMessage } from "../lib/errorMessage";
 import { hasSnapshot } from "../lib/sessionLedger";
 import { SessionLiveSnapshotUpload } from "./SessionLiveSnapshotUpload";
+import { SessionRoomCase } from "./SessionRoomCase";
 import { HandoverIncidents, incidentsFromReport, incidentValues } from "./HandoverIncidents";
 import { fetchSnapshotParts } from "../lib/db/sessionRoomLinks";
 import { suggestedRestartCount } from "../lib/liveSnapshot/roomCases";
@@ -11,15 +12,19 @@ import { profileOf } from "../lib/platforms/profiles";
 
 // Giao ca, MỘT luồng cho cả hai sàn (TikTok user chốt 06/10 tối; Shopee chuyển sang file 08/10, migration 0154): (1) up file số liệu
 // tải từ sàn ngay khi hết ca — TikTok Creator-Live-Performance, Shopee Live List — file giữ đúng ranh giới ca nối (số cộng dồn của
-// phòng/phiên, app trừ lần up trước, 0078); (2) chạm chọn sự cố/OT rồi bấm Giao ca (DB từ chối khi chưa có file).
+// phòng/phiên, app trừ lần up trước, 0078); (2) các lượt live + ca nối (11/10: nằm ngay trong giao ca — restart thì mỗi lượt up file riêng,
+// room chạy qua giờ giao thì đề xuất sẵn ca sau để trợ xác nhận); (3) chạm chọn sự cố/OT rồi bấm Giao ca (DB từ chối khi chưa có file).
 
 interface Props {
   session: LiveSession;
+  /** Cho khối "Lượt live & ca nối": OPS được xác nhận nối từ ca trước; allSessions để vẽ chuỗi ca liền kề. */
+  isOps?: boolean;
+  allSessions?: LiveSession[];
   onSaved: (updated: LiveSession[]) => void;
   onCancel?: () => void;
 }
 
-export function FileHandover({ session: s, onSaved, onCancel }: Props) {
+export function FileHandover({ session: s, isOps = false, allSessions, onSaved, onCancel }: Props) {
   const [incidents, setIncidents] = useState(() => incidentsFromReport(s.report));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,7 +68,11 @@ export function FileHandover({ session: s, onSaved, onCancel }: Props) {
         </p>
         <SessionLiveSnapshotUpload session={s} onApplied={(u) => onSaved([u])} />
       </div>
-      <HandoverIncidents label="2 · Ca này có gì?" value={incidents} onChange={setIncidents} />
+      <div className="space-y-1.5">
+        <p className="block text-xs font-bold text-[var(--text-muted)]">2 · Lượt live & ca nối</p>
+        <SessionRoomCase key={s.id} session={s} canEdit isOps={isOps} allSessions={allSessions} onSessionsUpdated={onSaved} />
+      </div>
+      <HandoverIncidents label="3 · Ca này có gì?" value={incidents} onChange={setIncidents} />
       {error && <p className="text-xs text-rose-300 bg-rose-950/50 border border-rose-800 rounded-xl px-3 py-2">{error}</p>}
       <div className="flex gap-2">
         {onCancel && (

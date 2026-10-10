@@ -9,7 +9,8 @@ import {
 } from "../lib/db/sessionLiveSnapshots";
 import { parseSnapshotFile, type ParsedSnapshotFile } from "../lib/liveSnapshot/extractRooms";
 import { preloadSpreadsheetReader } from "../lib/dataraw/parseDataRawExcel";
-import { fetchRoomLinks, fetchSnapshotParts, type RoomLinks } from "../lib/db/sessionRoomLinks";
+import { applySessionSnapshotPart, fetchRoomLinks, fetchSnapshotParts, type RoomLinks } from "../lib/db/sessionRoomLinks";
+import { sortTurns, type BreakReason } from "../lib/liveSnapshot/roomCases";
 import { SnapshotRoomPicker } from "./SnapshotRoomPicker";
 import { errorMessage } from "../lib/errorMessage";
 import { useConfirm } from "../hooks/useConfirm";
@@ -69,13 +70,22 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
     }
   }
 
-  async function confirmRooms(rows: ParsedSnapshotFile["rows"]) {
+  // Mỗi room tick = một LƯỢT live. Lượt đầu vào snapshot, các lượt sau (restart) vào thành từng mảnh kèm lý do — cùng cơ chế
+  // với "Thêm lượt restart" nên về sau sửa/xoá từng lượt được. Một file cả ngày có thể chứa đủ các lượt; lượt nào chưa có
+  // trong file thì thêm sau bằng file riêng.
+  async function confirmRooms(rows: ParsedSnapshotFile["rows"], reasons: Record<string, BreakReason>) {
     if (!pending) return;
     setBusy(true);
     setError(null);
     try {
-      const updated = await applySessionLiveSnapshot(session.id, pending.fileName, pending.parsed.periodLabel, rows);
+      const turns = sortTurns(rows);
+      let updated = await applySessionLiveSnapshot(session.id, pending.fileName, pending.parsed.periodLabel, turns.slice(0, 1));
       onApplied(updated);
+      for (const t of turns.slice(1)) {
+        updated = await applySessionSnapshotPart(session.id, reasons[t.roomId] ?? "network", "", pending.fileName, pending.parsed.periodLabel, [t]);
+        onApplied(updated);
+      }
+      fetchSnapshotParts(session.id).then((p) => setPartCount(p.length)).catch(() => undefined);
       setSnapshot(await fetchSessionSnapshot(session.id));
       setPending(null);
     } catch (e) {
@@ -115,7 +125,8 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
           prevBaseline={links.prev?.boundaryAt ? { boundaryMs: Date.parse(links.prev.boundaryAt), roomIds: links.prev.roomIds, label: `${links.prev.startTime}–${links.prev.endTime}` } : undefined}
           confirmLabel="Xác nhận phòng của ca này"
           busy={busy}
-          onConfirm={(rows) => void confirmRooms(rows)}
+          askRestartReasons
+          onConfirm={(rows, reasons) => void confirmRooms(rows, reasons)}
           onCancel={() => { setPending(null); setError(null); }}
         />
         {error && (

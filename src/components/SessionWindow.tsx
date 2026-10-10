@@ -517,6 +517,8 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                 (canHandover ? (
                   <FileHandover
                     session={s}
+                    isOps={isOps}
+                    allSessions={allSessions}
                     onSaved={(updated) => {
                       onSessionsUpdated!(updated);
                       if (updated.some((u) => u.report?.handoverAt && u.id === s.id && u.report.handoverAt !== s.report?.handoverAt)) setEditingHandover(false);
@@ -530,8 +532,9 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
           )}
 
           {/* Room của ca (0153, Shopee 0154): ca NỐI (1 room/phiên → nhiều ca) và ca BỊ NGẮT (1 ca → nhiều room/phiên), trợ/OPS xác nhận. */}
-          {showHandover && (isOps || isMine) && (
-            <SessionRoomCase key={s.id} session={s} canEdit={canHandover} isOps={isOps} onSessionsUpdated={(u) => onSessionsUpdated!(u)} />
+          {/* Khi form Giao ca đang mở thì khối này nằm TRONG form (bước 2), không vẽ hai lần. */}
+          {showHandover && (isOps || isMine) && !(canHandover && (!handoverDone || editingHandover)) && (
+            <SessionRoomCase key={s.id} session={s} canEdit={canHandover} isOps={isOps} allSessions={allSessions} onSessionsUpdated={(u) => onSessionsUpdated!(u)} />
           )}
 
           {/* Report đã nộp (mọi vai đọc được) */}

@@ -141,6 +141,14 @@ export async function fetchRoomLinks(sessionId: string): Promise<RoomLinks> {
   return out;
 }
 
+/** Các cặp nối (ca trước → ca sau) mà HAI đầu đều nằm trong `ids` — để vẽ dải chuỗi ca trong ngày. RLS chỉ trả cặp người xem được; lỗi ⇒ không có cặp. */
+export async function fetchRoomLinksAmong(ids: string[]): Promise<{ prevId: string; nextId: string }[]> {
+  if (ids.length < 2) return [];
+  const { data, error } = await supabase.from("session_room_links").select("prev_session_id, next_session_id").in("prev_session_id", ids).in("next_session_id", ids);
+  if (error) throw error;
+  return ((data ?? []) as { prev_session_id: string; next_session_id: string }[]).map((r) => ({ prevId: r.prev_session_id, nextId: r.next_session_id }));
+}
+
 export async function fetchSnapshotParts(sessionId: string): Promise<SnapshotPart[]> {
   const { data, error } = await supabase
     .from("session_snapshot_parts")

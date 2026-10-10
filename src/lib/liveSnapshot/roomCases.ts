@@ -74,3 +74,139 @@ export function nextLinkStatus(hasPrevLink: boolean, prevHasSnapshot: boolean): 
   if (!hasPrevLink) return "none";
   return prevHasSnapshot ? "ready" : "waiting";
 }
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// Phân loại room theo vai trong ca + dải chuỗi ca trong ngày (đề xuất 11/10, số đo T6–T10: 55% ranh giới ca liền kề là ca nối,
+// khoảng nghỉ restart trung vị 4,8' / tối đa 13,5'). Chỉ là logic thuần để GỢI Ý — DB vẫn là nơi trừ/cộng số.
+// ---------------------------------------------------------------------------------------------------------------------------
+
+/** Dung sai quanh giờ vào/hết ca: room chạm rìa vài phút không tính là "xuyên ranh giới". */
+export const ROOM_EDGE_TOLERANCE_MIN = 5;
+
+export type RoomRole =
+  | "full" //       nằm trọn trong ca
+  | "from_prev" //  bắt đầu trước giờ vào ca (đến từ ca trước)
+  | "runs_over" //  chưa kết thúc / kết thúc sau giờ hết ca (chạy tiếp sang ca sau)
+  | "both" //       cả hai (room chạy suốt qua ca này)
+  | "outside"; //   không giao với ca
+
+export interface RoomTimes {
+  startedAt?: string;
+  endedAt?: string;
+}
+
+/** Vai của một room trong cửa sổ ca. Room không có giờ bắt đầu coi như bắt đầu đúng lúc vào ca; room chưa có giờ kết thúc = đang live. */
+export function classifyRoomRole(room: RoomTimes, win: { startMs: number; endMs: number }): RoomRole {
+  const tol = ROOM_EDGE_TOLERANCE_MIN * 60000;
+  const start = room.startedAt ? Date.parse(room.startedAt) : NaN;
+  const end = room.endedAt ? Date.parse(room.endedAt) : NaN;
+  const live = !room.endedAt || !Number.isFinite(end);
+  if ((!live && end <= win.startMs) || (Number.isFinite(start) && start >= win.endMs)) return "outside";
+  const fromPrev = Number.isFinite(start) && start < win.startMs - tol;
+  const runsOver = live || end > win.endMs + tol;
+  return fromPrev && runsOver ? "both" : fromPrev ? "from_prev" : runsOver ? "runs_over" : "full";
+}
+
+/** Room chạy qua giờ hết ca (tối đa một — hai room không chạy cùng lúc). Trả room có giờ kết thúc muộn nhất. */
+export function runOverRoom<T extends RoomTimes>(rooms: T[], win: { startMs: number; endMs: number }): T | undefined {
+  const over = rooms.filter((r) => {
+    const role = classifyRoomRole(r, win);
+    return role === "runs_over" || role === "both";
+  });
+  if (over.length === 0) return undefined;
+  const key = (r: T) => (r.endedAt ? Date.parse(r.endedAt) : Infinity);
+  return over.reduce((a, b) => (key(b) > key(a) ? b : a));
+}
+
+/** Room đến từ ca trước (bắt đầu trước giờ vào ca). */
+export function roomsFromPrev<T extends RoomTimes>(rooms: T[], win: { startMs: number; endMs: number }): T[] {
+  return rooms.filter((r) => {
+    const role = classifyRoomRole(r, win);
+    return role === "from_prev" || role === "both";
+  });
+}
+
+/** Mỗi room của ca là một LƯỢT live; lượt sắp theo giờ bắt đầu (room thiếu giờ xếp cuối). */
+export function sortTurns<T extends RoomTimes>(rooms: T[]): T[] {
+  const key = (r: T) => (r.startedAt ? Date.parse(r.startedAt) : Infinity);
+  return [...rooms].sort((a, b) => key(a) - key(b));
+}
+
+export interface TurnView<R> {
+  /** 1 = lượt đầu (file đầu); ≥ 2 = mảnh restart. */
+  no: number;
+  partId?: string;
+  reason?: BreakReason;
+  note?: string;
+  fileName?: string;
+  rooms: R[];
+}
+
+/** Ghép room của snapshot với các mảnh: lượt 1 = room không thuộc mảnh nào; lượt k ≥ 2 = mảnh k (có thể rỗng = chỉ ghi nhận lý do). */
+export function buildTurns<R extends RoomTimes & { partId?: string }>(
+  rooms: R[],
+  parts: { id: string; partNo: number; reason: BreakReason; note?: string; fileName?: string }[]
+): TurnView<R>[] {
+  const first = sortTurns(rooms.filter((r) => !r.partId));
+  const out: TurnView<R>[] = first.length > 0 || parts.length === 0 ? [{ no: 1, rooms: first }] : [{ no: 1, rooms: [] }];
+  for (const p of [...parts].sort((a, b) => a.partNo - b.partNo)) {
+    out.push({ no: p.partNo, partId: p.id, reason: p.reason, note: p.note, fileName: p.fileName, rooms: sortTurns(rooms.filter((r) => r.partId === p.id)) });
+  }
+  return out;
+}
+
+export interface ChainShiftLike {
+  id: string;
+  brandId: string;
+  platform: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  status: string;
+  isBackfill?: boolean;
+}
+
+/** Các ca liền kề (cách nhau ≤ maxGapMin, tính theo giờ thật nên ca qua nửa đêm vẫn đúng) cùng brand + sàn mà ca `s` thuộc về, theo thứ tự giờ. */
+export function adjacentShiftChain<T extends ChainShiftLike>(s: T, all: T[], maxGapMin = 30): T[] {
+  const span = (x: T) => {
+    const startMs = Date.parse(`${x.date}T${x.startTime.slice(0, 5)}:00+07:00`);
+    let endMs = Date.parse(`${x.date}T${x.endTime.slice(0, 5)}:00+07:00`);
+    if (endMs <= startMs) endMs += 86400000;
+    return { startMs, endMs };
+  };
+  const pool = all
+    .filter((x) => x.brandId === s.brandId && x.platform === s.platform && x.status !== "Cancelled" && !x.isBackfill)
+    .sort((a, b) => span(a).startMs - span(b).startMs);
+  const idx = pool.findIndex((x) => x.id === s.id);
+  if (idx < 0) return [s];
+  const gap = (a: T, b: T) => Math.abs(span(b).startMs - span(a).endMs) / 60000;
+  let lo = idx;
+  let hi = idx;
+  while (lo > 0 && gap(pool[lo - 1], pool[lo]) <= maxGapMin) lo--;
+  while (hi < pool.length - 1 && gap(pool[hi], pool[hi + 1]) <= maxGapMin) hi++;
+  return pool.slice(lo, hi + 1);
+}
+
+export type BoundaryKind = "linked" | "unlinked";
+
+export interface ChainBoundary {
+  prevId: string;
+  nextId: string;
+  /** linked = trợ/OPS đã xác nhận room chạy tiếp (N); unlinked = chưa nối (room mới, hoặc chưa xác nhận). */
+  kind: BoundaryKind;
+  /** Ca sau bị khoá số vì ca trước (nối) chưa có file. */
+  locked: boolean;
+}
+
+/** Trạng thái từng ranh giới của chuỗi: nối hay chưa, và có đang khoá không. `links` = các cặp (prev → next) đã xác nhận. */
+export function chainBoundaries(chain: { id: string }[], links: { prevId: string; nextId: string }[], hasFile: (id: string) => boolean): ChainBoundary[] {
+  const linked = new Set(links.map((l) => `${l.prevId}>${l.nextId}`));
+  const out: ChainBoundary[] = [];
+  for (let i = 0; i + 1 < chain.length; i++) {
+    const prevId = chain[i].id;
+    const nextId = chain[i + 1].id;
+    const isLinked = linked.has(`${prevId}>${nextId}`);
+    out.push({ prevId, nextId, kind: isLinked ? "linked" : "unlinked", locked: isLinked && !hasFile(prevId) });
+  }
+  return out;
+}
