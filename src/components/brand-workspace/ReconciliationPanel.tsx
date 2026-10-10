@@ -8,6 +8,7 @@ import {
   deleteReconciliationBatch,
   fetchReconciliationBatches,
   fetchReconciliationRows,
+  mergeReconciliationRows,
   setReconciliationBucket,
   setReconciliationRowsExcluded
 } from "../../lib/db/liveReconciliation";
@@ -16,6 +17,7 @@ import { errorMessage } from "../../lib/errorMessage";
 import { useConfirm } from "../../hooks/useConfirm";
 import { fmtPeriodLabel, fmtVndFull } from "../../lib/format";
 import { LiveSession } from "../../types";
+import { suggestMergeGroups } from "../../lib/reconciliation/mergeRestarts";
 
 // Đối soát số liệu của MỘT brand + MỘT sàn, nằm ngay trong Dữ Liệu Gốc (gộp 07/10 — trước đây là màn riêng
 // "Đối Soát Số Liệu" bắt up file lần hai). Lô đối soát được tạo từ chính lần up ở Dữ Liệu Gốc (hoặc từ một lần tải đã lưu);
@@ -67,7 +69,8 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
   const sessionById = useMemo(() => new Map(sessions.map((s) => [s.id, s])), [sessions]);
   const sessionLabel = (id: string) => {
     const s = sessionById.get(id);
-    return s ? `${s.date.slice(8, 10)}/${s.date.slice(5, 7)} ${s.startTime}–${s.endTime}` : "ca";
+    // Không thấy trong danh sách = ca đã loại khỏi report (vd mảnh restart 2 phút của ca nạp bù) hoặc đã xoá.
+    return s ? `${s.date.slice(8, 10)}/${s.date.slice(5, 7)} ${s.startTime}–${s.endTime}` : "ca ẩn";
   };
   const [batches, setBatches] = useState<ReconciliationBatch[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -75,6 +78,8 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  // Nhóm gộp restart đang bị bỏ tick (mặc định gợi ý nào cũng được tick); khoá theo id dòng đầu của nhóm.
+  const [mergeOff, setMergeOff] = useState<Set<string>>(new Set());
 
   const reloadBatches = useCallback(async (selectId?: string) => {
     const list = await fetchReconciliationBatches(brandId, platform);
@@ -82,6 +87,11 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
     const next = selectId ?? list[0]?.id ?? null;
     setActiveId(next);
     setRows(next ? await fetchReconciliationRows(next) : []);
+  }, [brandId, platform]);
+
+  // Số phiên của lô đổi sau khi gộp — nạp lại danh sách lô nhưng giữ lô đang xem.
+  const reloadBatchList = useCallback(async () => {
+    setBatches(await fetchReconciliationBatches(brandId, platform));
   }, [brandId, platform]);
 
   // Mở màn / đổi brand / có lô mới (reloadKey) ⇒ nạp lại, chọn lô mới nhất.
@@ -123,6 +133,8 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
   }
 
   const active = batches.find((b) => b.id === activeId);
+  const mergeGroups = useMemo(() => suggestMergeGroups(rows), [rows]);
+  const mergePicked = mergeGroups.filter((g) => !mergeOff.has(g.ids[0]));
   const applicable = rows.filter((r) => APPLIED_BUCKETS.includes(r.bucket));
   const selectedCount = applicable.filter((r) => !r.excluded).length;
   const grouped = ORDER.map((bucket) => ({
@@ -174,6 +186,51 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
         <div className="bg-[var(--surface)] border border-dashed border-[var(--border)] rounded-2xl p-8 text-center">
           <FileSpreadsheet className="w-6 h-6 text-[var(--text-faint)] mx-auto mb-2" />
           <p className="text-xs text-[var(--text-muted)]">Chưa có lần đối soát nào của brand này. Up file ở trên (hoặc bấm "Đối soát" ở một lần tải trong Lịch Sử Import) để bắt đầu.</p>
+        </div>
+      )}
+
+      {active && mergeGroups.length > 0 && (
+        <div className="border border-violet-800 bg-violet-950/30 rounded-2xl p-4">
+          <p className="text-xs font-black text-[var(--text)]">Ca bị restart / ngắt giữa chừng · {mergeGroups.length} nhóm</p>
+          <p className="text-[11px] text-[var(--text-muted)] mt-0.5 max-w-2xl">
+            Mỗi lần tắt bật stream sàn sinh thêm một phiên (có khi chỉ 1–2 phút, GMV 0) nên một ca bị tách thành nhiều dòng. Gộp lại thành một phiên: giờ lấy từ đầu tới cuối,
+            GMV/đơn/lượt xem cộng lại (tổng không đổi), bỏ ca đã loại khỏi nhãn "Ca khớp". Chưa ghi gì vào ca cho tới khi bạn bấm Áp dụng.
+          </p>
+          <ul className="mt-2 space-y-1">
+            {mergeGroups.map((g) => {
+              const key = g.ids[0];
+              return (
+                <li key={key}>
+                  <label className="flex items-center gap-2 text-[11px] text-[var(--text-muted)] cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!mergeOff.has(key)}
+                      onChange={(e) => setMergeOff((prev) => { const next = new Set(prev); if (e.target.checked) next.delete(key); else next.add(key); return next; })}
+                      disabled={busy}
+                      className="w-3.5 h-3.5 accent-violet-500 cursor-pointer"
+                    />
+                    <span className="whitespace-nowrap text-[var(--text)]">{fmtTime(g.startedAt)} → {fmtTime(g.endedAt)}</span>
+                    <span>· {g.ids.length} phiên{g.blips > 0 ? ` (${g.blips} mảnh ngắn)` : ""} · {fmtVndFull(g.gmv)}</span>
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
+          <button
+            onClick={() => void run(async () => {
+              if (mergePicked.length === 0) throw new Error("Chưa chọn nhóm nào để gộp.");
+              if (!(await confirm(`Gộp ${mergePicked.length} nhóm (${mergePicked.reduce((s, g) => s + g.ids.length, 0)} dòng thành ${mergePicked.length})? Lần gộp này không hoàn lại được — muốn tách lại thì tạo lại lần đối soát từ file.`))) return;
+              const removed = await mergeReconciliationRows(active.id, mergePicked.map((g) => g.ids));
+              setRows(await fetchReconciliationRows(active.id));
+              await reloadBatchList();
+              setMergeOff(new Set());
+              setNote(`Đã gộp ${removed} dòng vào ${mergePicked.length} phiên.`);
+            })}
+            disabled={busy || mergePicked.length === 0}
+            className="mt-3 text-xs font-bold px-3 py-2 rounded-xl bg-violet-700 hover:bg-violet-600 text-white disabled:opacity-40 transition-colors"
+          >
+            Gộp {mergePicked.length} nhóm đã chọn
+          </button>
         </div>
       )}
 

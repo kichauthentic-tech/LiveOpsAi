@@ -174,6 +174,16 @@ export async function setReconciliationBucket(
   return (data as number) ?? 0;
 }
 
+/** Gộp các nhóm dòng (mỗi nhóm = ids của một ca bị restart/ngắt) thành một dòng/nhóm (0167). Trả số dòng đã gộp bỏ. */
+export async function mergeReconciliationRows(batchId: string, groups: string[][]): Promise<number> {
+  const { data, error } = await supabase.rpc("merge_reconciliation_rows", { p_batch_id: batchId, p_groups: groups });
+  if (error) {
+    if (error.code === "PGRST202") throw new Error("Chưa chạy migration 0167 nên chưa gộp được dòng đối soát.");
+    throw error;
+  }
+  return (data as number) ?? 0;
+}
+
 export async function applyReconciliation(batchId: string): Promise<number> {
   const { data, error } = await supabase.rpc("apply_live_reconciliation", { p_batch_id: batchId });
   if (error) throw error;
