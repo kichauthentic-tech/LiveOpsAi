@@ -4,6 +4,7 @@ import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 import { isAliasEmail, isLoginName, loginLabel } from "../lib/loginName.js";
+import { registerAskRoute } from "./askData.js";
 import * as Sentry from "@sentry/node";
 
 dotenv.config();
@@ -733,6 +734,7 @@ export function createApp() {
         database: databaseOk,
         databaseError,
         geminiConfigured: Boolean(process.env.GEMINI_API_KEY),
+        anthropicConfigured: Boolean(process.env.ANTHROPIC_API_KEY),
         tiktokConfigured: Boolean(process.env.TIKTOK_APP_KEY && process.env.TIKTOK_APP_SECRET),
         sentryConfigured: Boolean(process.env.SENTRY_DSN),
       },
@@ -857,6 +859,9 @@ Hãy chấm điểm mức độ phù hợp (matchScore, 0-100) cho MỖI talent 
       res.status(502).json({ success: false, code: "ai_upstream_error", error: AI_UPSTREAM_ERROR });
     }
   });
+
+  // Hỏi số liệu (Phòng Điều Hành, 11/10/2026): Claude + Gemini, tự chuyển khi một bên hết lượt — src/server/askData.ts.
+  registerAskRoute(app, requireRoleCaller);
 
   // `/api/gemini/optimize-schedule` ĐÃ GỠ 2026-10-01. Màn gọi nó bị bỏ từ 53674f6 (Lịch & Studio chỉ
   // còn "Mở ca chờ đăng ký"), nên route chỉ còn tồn tại để trả một gợi ý BỊA khi chưa có API key:

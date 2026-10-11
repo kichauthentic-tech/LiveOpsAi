@@ -16,6 +16,8 @@ import { commitmentProgressRead, type BrandCommitmentRow } from "../../lib/db/br
 import { fetchSnapshotPieces } from "../../lib/db/monthlyReportSnapshots";
 import { shopDaysPiece } from "../../lib/report/monthlySnapshot";
 import { LandingChip } from "../dashboard/RunRate";
+import { BrandLanding } from "../control-room/BrandLanding";
+import { buildChannelRoom } from "../../lib/performance/controlRoom";
 import {
   SLOT_BLOCKS,
   SLOT_BLOCK_LABEL,
@@ -198,6 +200,13 @@ function BrandDashboardOne({ brandId, brandName, platform, platforms, sessions: 
   }, [rr, shiftSlots, brandId, month, today, brandSessions, camp, engineParams]);
   const projection = useMemo(() => projectMonthEnd(rr, outlook), [rr, outlook]);
   const landing = outlook && month >= today.slice(0, 7) ? landingOf(outlook) : null;
+  // Đường khả năng về đích theo ngày (Phòng Điều Hành 11/10) — ops tính từ ca; role brand đọc RPC chỉ có xác suất (khối `hidden` bên dưới).
+  const landingRoom = useMemo(() => {
+    if (!isOps || !rr || month !== today.slice(0, 7)) return null;
+    const chSessions = brandSessions.filter((s) => platformOf(s) === platform);
+    const open = shiftSlots.filter((sl) => sl.brandId === brandId && platformOf(sl) === platform && sl.status === "open" && !sl.sessionId);
+    return buildChannelRoom({ sessions: chSessions, month, today, target: rr.total.target, bucketOf, params: engineParams, openSlots: open });
+  }, [isOps, rr, month, today, brandSessions, platform, shiftSlots, brandId, bucketOf, engineParams]);
   const rrCut = outlook ? runRateThrough(outlook, through) : null;
   const waveRows = outlook ? runRateByWave(outlook, through).filter((w) => w.key !== "month") : [];
   // GMV/giờ cần cho phần còn lại = (target − đã có) ÷ giờ các ca còn trong lịch (gồm ca đã chạy chờ số) — thay "cần mỗi ngày":
@@ -393,10 +402,13 @@ function BrandDashboardOne({ brandId, brandName, platform, platforms, sessions: 
       </PageHeader>
 
       {hidden ? (
+        <>
+        {month === today.slice(0, 7) && <BrandLanding brandId={brandId} month={month} platform={platform} />}
         <div className="text-sm text-[var(--text-muted)] bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-6 flex items-start gap-2">
           <AlertTriangle className="w-4 h-4 text-amber-300 shrink-0 mt-0.5" />
           Số liệu tháng {month.slice(5)}/{month.slice(0, 4)} sẽ hiện khi ops phát hành Report Tháng. Chọn tháng đã phát hành ở ô tháng phía trên.
         </div>
+        </>
       ) : (
         <>
           {/* 02 · Run-rate theo plan ban đầu — câu hỏi chính "tháng này có về đích không", nên đứng trên KPI (M2).
@@ -430,6 +442,8 @@ function BrandDashboardOne({ brandId, brandName, platform, platforms, sessions: 
               />
             </div>
           </Card>
+
+          {landingRoom && landingRoom.target ? <BrandLanding brandId={brandId} month={month} platform={platform} room={landingRoom} /> : null}
 
           {planLoading ? (
             <p className="text-xs text-[var(--text-faint)]">Đang tải kế hoạch…</p>

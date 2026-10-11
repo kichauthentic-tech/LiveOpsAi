@@ -111,6 +111,7 @@ const MonthPlan = lazyNamed(() => import("./components/MonthPlan"), "default");
 const OpsSupportTab = lazyNamed(() => import("./components/OpsSupportTab"), "default");
 const CeoBrief = lazyNamed(() => import("./components/CeoBrief"), "default");
 const RunRateBoard = lazyNamed(() => import("./components/RunRateBoard"), "RunRateBoard");
+const ControlRoom = lazyNamed(() => import("./components/ControlRoom"), "default");
 const AgencyChannelSummary = lazyNamed(() => import("./components/AgencyChannelSummary"), "AgencyChannelSummary");
 
 // Tab đã gộp (08/10: Hỗ Trợ Vận Hành → Bảng Vận Hành) — activeTab đã lưu ở localStorage không được rơi vào màn "Quyền Truy Cập Bị Hạn Chế".
@@ -123,6 +124,7 @@ const TAB_CHUNKS: Record<string, { preload: () => void }[]> = {
   studio_calendar: [LiveCalendar],
   sessions: [SessionLedger],
   run_rate: [RunRateBoard],
+  control_room: [ControlRoom],
   my_shifts: [TalentToday],
   talent_calendar: [LiveCalendar],
   shift_scheduling: [TalentShiftSignup],
@@ -1849,6 +1851,29 @@ export default function App() {
                     onSetSessionExcluded={handleSetSessionExcluded}
                     onRequestDropout={handleRequestDropout}
                     onLogAudit={pushAuditLog}
+                  />
+                )}
+
+                {activeTab === "control_room" && (
+                  <ControlRoom
+                    sessions={activeSessions}
+                    brands={brands}
+                    brandChannels={channels}
+                    shiftSlots={shiftSlots}
+                    talents={talents}
+                    studios={studios}
+                    brandStudios={brandStudios}
+                    planSlotTargets={planSlotTargets}
+                    planMonthTotals={planMonthTotals}
+                    brandPlatformRates={brandPlatformRates}
+                    engineParams={engineParams}
+                    currentRole={currentRole}
+                    onOpenMonthPlan={(brandId, platform) => openMonthPlanFor(brandId, platform)}
+                    onSessionsChanged={async () => {
+                      const [s, sl] = await Promise.all([fetchSessions(), fetchShiftSlots()]);
+                      setSessions(s);
+                      setShiftSlots(sl);
+                    }}
                   />
                 )}
 

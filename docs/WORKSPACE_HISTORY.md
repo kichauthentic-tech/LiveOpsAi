@@ -5434,3 +5434,18 @@ ngay dưới ⇒ bọc `(select ...)` luôn ở RPC.
 48 giờ, cùng giờ thì theo tên. Lỗi lúc làm: dùng `git stash` để so lint khi một phiên khác đang sửa cùng repo (0170 Bảng Cục Diện) —
 thay đổi của phiên kia về nguyên vẹn nhưng KHÔNG dùng stash khi có phiên song song.
 
+## Phòng Điều Hành (2026-10-11)
+
+Yêu cầu: user "bí ý tưởng dashboard", muốn một dashboard agency + brand khác Run-rate, chưa ai làm. Bản 1 (Bảng Cục Diện: xác suất về đích, GMV kỳ vọng, giờ cận biên — https://claude.ai/artifact/5bgQfsfQ81KjKoCq83GebC) bị chê "đơn giản" — user chọn cả 4 lý do: phạm vi hẹp, không "wow", chưa đủ mới, chỉ để xem; người dùng = cả sếp, OP, brand. Bản 2 (https://claude.ai/artifact/Hu2U23dfazeNpkbfJ518n9) mượn tháp điều khiển + bản sao số (chuỗi cung ứng), xG / xác suất thắng (thể thao), công suất (công ty dịch vụ), "5 nút 4 tỷ lệ" (agency Douyin).
+
+Số đo trên số thật (đọc DB 11/10, script ở scratchpad, walk-forward — mỗi ca chỉ dùng số có trước ngày của nó):
+- GMV kỳ vọng từng ca: WAPE 29% so với 34% (GMV/giờ 28 ngày × giờ), 956 ca T7–T10; VERA Shopee 33% vs 69%, JOCKEY Shopee 55% vs 81%.
+- Dải 80% (0,35 × phần còn lại kênh lớn / 0,5 kênh nhỏ trên mô hình thử) chứa kết quả thật 82% (445 lần đo, 16 kênh-tháng T7–T9): đầu tháng 92%, giữa 80%, cuối 71%. App dùng band của engine v3 (0,22/0,30).
+- Khả năng đạt lúc đầu tháng 10: CROCS 41%, Franklin TT 55%, VERA TT 12%, VERA Shopee 8%, JOCKEY TT 6%, Franklin Shopee ~0%. VERA Shopee 28 ca đầu tháng đạt 140% kỳ vọng nhưng target gấp 1,46 mức 50/50.
+- Host: sau khi trừ khung giờ/camp, chênh ±13% (log), một ca ±56%; cần ~46 ca để tin; bảng xếp thô lặp lại tháng sau r = 0,40, sau khi trừ khung giờ 0,15 (thô chủ yếu đo "ai được xếp ca tốt"); 6/38 cặp host-kênh đủ chắc. Trợ live: ICC ≈ 1%, tháng sau ngược dấu (r −0,31) ⇒ không chấm trợ bằng GMV.
+- Phễu TikTok, phần lệch của ca: lượt xem 20%, CTR 17%, chốt đơn 32%, giá trị đơn 31%; host giải thích 0% phần chốt đơn (khung Douyin gán cho host — không đúng ở dữ liệu này).
+- Mệt: giờ 7 ngày trước, ca thứ hai trong ngày, số ngày liền — hệ số ≈ 0 (se 0,03–0,07); 1/149 người-tuần > 40 giờ (Huỳnh Thái Toàn tuần 42: 51,5 giờ).
+- Phòng: 6 phòng = 1 phòng/kênh; CROCS dùng 81% giờ vàng (19–24h), JOCKEY phòng 13%. Tự xếp 8 ca thử dồn hết vào JOCKEY TikTok (11% → 51%).
+- Cầu CROCS T9 so T8: giờ +860M, cơ cấu ca −234M, năng suất nền −1.286M (lượt xem/giờ −17%, đơn/lượt xem −10%). File sản phẩm CROCS: 5 mẫu giảm mạnh nhất = 325M / 787M live giảm (T9 quy 31 ngày); 40 mẫu bán chạy nhất có trung vị 75% GMV từ live.
+- Đã thử và BỎ: cảnh báo sớm CUSUM (bắt 7/9 tháng giảm ≥ 15%, luật đơn giản 85% bắt 8/9); khung chiều 13–17h (+21% nhưng ~90 ca, không đưa vào gợi ý — app vẫn có khung 14h nhưng tính hệ số của engine).
+- Dữ liệu lệch phát hiện: Franklin TikTok cam kết tháng ghi GMV 650M, Kế Hoạch Tháng chốt 750M.
