@@ -1,16 +1,14 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { SESSION_STATUS_CLS, SESSION_STATUS_LABEL_VI } from "../lib/sessionStatusUi";
 import { AlertTriangle, CalendarClock, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Radio, UserX } from "lucide-react";
 import { Brand, LiveSession, ShiftRegistration, ShiftSlot, Studio, Talent, UserRole, AuditLogEntry } from "../types";
 import { getTodayDate } from "../lib/dateUtils";
-import { fmtFixed, fmtVndShort } from "../lib/format";
-import { sessionHours } from "../lib/performance/hostPerformance";
+import { fmtVndShort } from "../lib/format";
 import { MissingStep, missingSteps } from "../lib/sessionLedger";
 import { BrandLogo } from "./ui/BrandLogo";
 import { PlatformChip } from "./common/PlatformChip";
 import { sumGmvByPlatform } from "../lib/platforms/perf";
 import { REPORT_PLATFORMS } from "../lib/reportPlatform";
-import { isHandoverPerson } from "../lib/handover";
 import { clashedSessionIds, findPersonClashes } from "../lib/scheduling/conflicts";
 import { SessionWindow } from "./SessionWindow";
 import { PageHeader } from "./common/PageHeader";
@@ -20,12 +18,10 @@ import { SlotDetailModal } from "./scheduling/SlotDetailModal";
 // ca nào, ai trực, phòng nào, và mỗi ca còn thiếu gì (chưa có người · chưa up file · chưa report ·
 // chưa đối soát). Click ca → Cửa sổ Ca Live. Không đặt ca ở đây — đặt ca là việc lập kế hoạch
 // (Kế Hoạch Tháng / Đăng Ký & Chốt Lịch).
-//  - mode "ops": mọi brand, mặc định hôm nay, chuyển ngày/tuần.
-//  - mode "mine" (talent — "Ca của tôi"): chỉ ca mình là host/trợ; hai khối "Cần nộp số liệu" (ca đã
-//    qua còn thiếu file/report) và "Sắp tới 14 ngày". Đây là nơi trợ live nộp report.
+//  Mọi brand, mặc định hôm nay, chuyển ngày/tuần. Màn "Ca của tôi" của talent (mode "mine" cũ) đã thay bằng app talent
+//  (components/talent/TalentToday, 11/10).
 
 export interface OpsBoardProps {
-  mode: "ops" | "mine";
   sessions: LiveSession[];
   shiftSlots: ShiftSlot[];
   shiftRegistrations: ShiftRegistration[];
@@ -41,8 +37,6 @@ export interface OpsBoardProps {
   onSetSessionExcluded?: (id: string, excluded: boolean, reason: string) => Promise<boolean>;
   onRequestDropout?: (sessionId: string, reason: string) => Promise<boolean>; // Đ7 (0116) — talent báo bận, chỉ gửi thông báo cho ops
   onLogAudit?: (entry: { action: string; details: string; category: AuditLogEntry["category"] }) => Promise<void>;
-  // Talent ("Ca Của Tôi"): nút nhảy sang Đăng Ký Ca. Ops không cần — dòng ca chưa có người mở thẳng panel chốt người.
-  onOpenScheduling?: () => void;
   // Ops chốt Host + Trợ live ngay trên dòng ca chưa có người (SlotDetailModal) — màn "Nhân sự ca" đã bỏ 08/10.
   onFinalizeSlot?: (slot: ShiftSlot, hostId: string, coHostId: string | null) => Promise<boolean>;
   onDeleteSlot?: (id: string) => Promise<void>;
@@ -50,7 +44,7 @@ export interface OpsBoardProps {
   // Q4: bấm thông báo → App đặt id ca cần mở; bảng mở Cửa sổ Ca Live rồi báo lại để App xoá yêu cầu.
   requestOpenSessionId?: string | null;
   onOpenRequestHandled?: () => void;
-  // Cột phải của mode "ops" (Việc cần làm): màn rộng đứng cạnh danh sách ca và dính khi cuộn; màn hẹp nằm ngay dưới tiêu đề.
+  // Cột phải (Việc cần làm): màn rộng đứng cạnh danh sách ca và dính khi cuộn; màn hẹp nằm ngay dưới tiêu đề.
   aside?: React.ReactNode;
 }
 
@@ -82,7 +76,6 @@ type Row =
   | { kind: "slot"; date: string; startTime: string; endTime: string; slot: ShiftSlot; registered: number };
 
 export const OpsBoard: React.FC<OpsBoardProps> = ({
-  mode,
   sessions,
   shiftSlots,
   shiftRegistrations,
@@ -98,7 +91,6 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
   onSetSessionExcluded,
   onRequestDropout,
   onLogAudit,
-  onOpenScheduling,
   onFinalizeSlot,
   onDeleteSlot,
   fatigueWeekHours,
@@ -131,16 +123,8 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
     return [anchor, anchor];
   }, [range, anchor, today]);
 
-  // useCallback để hai useMemo dưới dep được vào chính `mine` thay vì `myTalentId` (dep sai mà
-  // `exhaustive-deps` chưa từng chạy nên không ai thấy) — và giữ identity theo quy ước chống re-render.
-  const mine = useCallback(
-    (s: LiveSession) => !!myTalentId && (s.hostId === myTalentId || s.coHostId === myTalentId),
-    [myTalentId]
-  );
-
   // Ops: mọi ca (session + slot mở chưa chốt) trong khoảng đang xem.
   const rows = useMemo<Row[]>(() => {
-    if (mode !== "ops") return [];
     const out: Row[] = [];
     for (const s of sessions) {
       if (s.date < from || s.date > to || s.isBackfill) continue;
@@ -151,32 +135,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
       out.push({ kind: "slot", date: sl.date, startTime: sl.startTime, endTime: sl.endTime, slot: sl, registered: regsBySlot.get(sl.id) ?? 0 });
     }
     return out.sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
-  }, [mode, sessions, shiftSlots, from, to, regsBySlot]);
-
-  // Talent: ca mình phải giao mà chưa giao + sắp tới 14 ngày.
-  const mineDue = useMemo(
-    // Chỉ ca MÌNH phải giao (mình là trợ live — 0144, user chốt 06/10: host không giao, ca không trợ thì OPS giao).
-    () => (mode === "mine" ? sessions.filter((s) => isHandoverPerson(s, myTalentId) && s.date <= today && missingSteps(s, today).some((m) => m !== "reconcile")).sort((a, b) => b.date.localeCompare(a.date) || b.startTime.localeCompare(a.startTime)) : []),
-    [mode, sessions, myTalentId, today]
-  );
-  const mineUpcoming = useMemo(
-    () => (mode === "mine" ? sessions.filter((s) => mine(s) && s.date >= today && s.date <= addDays(today, 14) && s.status !== "Cancelled" && !mineDue.includes(s)).sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(a.startTime)) : []),
-    [mode, sessions, mine, today, mineDue]
-  );
-
-  // Hai khối trên chỉ là VIỆC CẦN LÀM. Trên dữ liệu thật (2026-09-30) 229/229 ca đều là ca nạp bù
-  // (`needsClosing` loại) và không ca nào ở tương lai, nên "Ca Của Tôi" rỗng hoàn toàn với 100% talent
-  // — kể cả host đã chạy 59 ca, 267,7h, 7,31 tỷ GMV. Ca đã chạy là thứ duy nhất họ thật sự có, nên
-  // liệt kê ở đây; để trong <details> để không chiếm chỗ của phần việc khi có việc.
-  const mineDone = useMemo(
-    () =>
-      mode === "mine"
-        ? sessions
-            .filter((s) => mine(s) && s.status === "Completed")
-            .sort((a, b) => b.date.localeCompare(a.date) || b.startTime.localeCompare(a.startTime))
-        : [],
-    [mode, sessions, mine]
-  );
+  }, [sessions, shiftSlots, from, to, regsBySlot]);
 
   const summary = useMemo(() => {
     const ss = rows.filter((r): r is Extract<Row, { kind: "session" }> => r.kind === "session").map((r) => r.session);
@@ -207,7 +166,6 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
           <span className="text-sm font-bold text-[var(--text)] truncate">{s.brandName}</span>
           <PlatformChip platform={s.platform} />
         </span>
-        {mode === "mine" && <span className="text-[11px] text-[var(--text-faint)]">{fmtDay(s.date)}</span>}
         <span className="flex-1 basis-40 min-w-0 text-xs text-[var(--text-muted)] truncate" title={[s.hostName ? `Host ${s.hostName}` : "chưa gán host", s.coHostName ? `Trợ ${s.coHostName}` : "", s.studioName ?? ""].filter(Boolean).join(" · ")}>
           {s.hostName ? `Host ${s.hostName}` : <span className="text-rose-300 font-bold">chưa gán host</span>}
           {s.coHostName ? ` · Trợ ${s.coHostName}` : ""}
@@ -219,7 +177,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
               trùng người: {clashBySession.get(s.id)!.join(", ")}
             </span>
           )}
-          {mode === "ops" && !s.studioId && s.status !== "Cancelled" && s.date >= today && (
+          {!s.studioId && s.status !== "Cancelled" && s.date >= today && (
             <span className="text-[11px] font-bold px-1.5 py-0.5 rounded border bg-amber-950/60 text-amber-300 border-amber-800">chưa có phòng</span>
           )}
           <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${STATUS_CLS[s.status]}`}>{STATUS_LABEL[s.status]}</span>
@@ -256,9 +214,9 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
     <div className="space-y-4">
       <PageHeader
         icon={Radio}
-        title={mode === "mine" ? "Ca Của Tôi" : "Bảng Vận Hành"}
-        description={mode === "mine" ? "Ca bạn trực. Hết ca: bấm vào ca → Giao ca (up file số liệu của sàn — TikTok: Creator-Live-Performance, Shopee: Live List — rồi chọn sự cố)." : "Hôm nay có ca nào, ai trực, còn thiếu gì. Bấm vào ca để mở cửa sổ ca."}
-        actions={mode === "ops" ? (
+        title="Bảng Vận Hành"
+        description="Hôm nay có ca nào, ai trực, còn thiếu gì. Bấm vào ca để mở cửa sổ ca."
+        actions={
           <>
             {(["today", "tomorrow", "week", "day"] as Range[]).map((r) => (
               <button key={r} onClick={() => { setRange(r); if (r === "today") setAnchor(today); }} className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${range === r ? "bg-[var(--accent)] text-white border-[var(--accent)]" : "border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]"}`}>
@@ -273,10 +231,9 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
               </div>
             )}
           </>
-        ) : undefined}
+        }
       />
 
-      {mode === "ops" && (
         <div className={aside ? "grid gap-4 xl:grid-cols-[minmax(0,1fr)_400px] items-start" : ""}>
           {aside && <aside className="min-w-0 xl:col-start-2 xl:row-start-1 xl:sticky xl:top-0">{aside}</aside>}
           <div className="space-y-4 min-w-0 xl:col-start-1 xl:row-start-1">
@@ -339,68 +296,6 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
           </div>
           </div>
         </div>
-      )}
-
-      {mode === "mine" && (
-        <>
-          {!myTalentId && (
-            <div className="rounded-xl border border-amber-800 bg-amber-950/50 p-3 text-xs text-amber-200 flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>Tài khoản này chưa gắn với hồ sơ talent nào — nhờ ops gắn ở Phân Quyền & Role để thấy ca của bạn.</span>
-            </div>
-          )}
-          <section className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 sm:p-4 space-y-2">
-            <h3 className="text-sm font-black text-[var(--text)] flex items-center gap-2">
-              Cần giao ca
-              {mineDue.length > 0 && <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-800">{mineDue.length}</span>}
-            </h3>
-            {mineDue.length === 0 ? (
-              // "Không còn ca nào" khẳng định là đã làm xong — sai với người chưa từng có ca nào.
-              <p className="text-xs text-[var(--text-faint)] italic">
-                {mineDone.length === 0 ? "Bạn chưa có ca nào trong hệ thống." : "Không còn ca nào bạn phải giao."}
-              </p>
-            ) : (
-              mineDue.map((s) => <SessionRow key={s.id} s={s} />)
-            )}
-          </section>
-          <section className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 sm:p-4 space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-black text-[var(--text)]">Sắp tới (14 ngày)</h3>
-              {onOpenScheduling && (
-                <button onClick={onOpenScheduling} className="text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-blue-950 text-blue-300 border border-blue-800 hover:bg-blue-900 flex items-center gap-1"><CalendarClock className="w-3.5 h-3.5" /> Đăng ký ca</button>
-              )}
-            </div>
-            {mineUpcoming.length === 0 ? <p className="text-xs text-[var(--text-faint)] italic">Chưa có ca nào được chốt cho bạn. Đăng ký ca mở ở tab Đăng Ký Ca.</p> : mineUpcoming.map((s) => <SessionRow key={s.id} s={s} />)}
-          </section>
-          {mineDone.length > 0 && (
-            <details className="group bg-[var(--surface)] border border-[var(--border)] rounded-2xl">
-              <summary className="list-none cursor-pointer p-3 sm:p-4 flex items-center gap-2 text-sm font-black text-[var(--text)]">
-                Ca đã chạy
-                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-[var(--surface-base)] text-[var(--text-muted)] border border-[var(--border)]">{mineDone.length}</span>
-                <ChevronDown className="w-4 h-4 ml-auto shrink-0 text-[var(--text-muted)] transition-transform group-open:rotate-180" />
-              </summary>
-              <div className="px-3 sm:px-4 pb-3 sm:pb-4 max-h-96 overflow-y-auto">
-                {mineDone.map((s) => {
-                  const asHost = s.hostId === myTalentId;
-                  return (
-                    <div key={s.id} className="flex items-baseline gap-2 sm:gap-3 text-xs py-1.5 border-b border-[var(--border-muted)] last:border-0">
-                      <span className="font-mono text-[var(--text-muted)] shrink-0">{s.date.slice(5)}</span>
-                      <span className="font-bold text-[var(--text)] truncate">{s.brandName}</span>
-                      <span className="text-[11px] text-[var(--text-faint)] shrink-0">{asHost ? "host" : "trợ"}</span>
-                      <span className="ml-auto shrink-0 text-[var(--text-muted)] tabular-nums">{fmtFixed(sessionHours(s), 1)}h</span>
-                      {/* GMV chỉ hiện ở ca mình làm HOST: GMV của ca tính cho host, in cả ở dòng ca trợ là
-                          đếm đôi — cùng luật với `assistSessionCount` ở Talent Pool. */}
-                      <span className="w-[62px] shrink-0 text-right font-bold text-emerald-300 tabular-nums">
-                        {asHost && s.actualGmv ? fmtVndShort(s.actualGmv) : ""}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </details>
-          )}
-        </>
-      )}
 
       {openSlotId && (() => {
         const slot = shiftSlots.find((x) => x.id === openSlotId);
@@ -412,7 +307,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
             registrations={shiftRegistrations}
             sessions={sessions}
             shiftSlots={shiftSlots}
-            canManage={mode === "ops"}
+            canManage
             onFinalizeSlot={onFinalizeSlot}
             onDeleteSlot={onDeleteSlot}
             fatigueWeekHours={fatigueWeekHours}
@@ -427,17 +322,17 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
           viewer={{ role: currentRole, myTalentId }}
           today={today}
           allSessions={sessions}
-          studios={mode === "ops" ? studios : undefined}
-          talents={mode === "ops" ? talents : undefined}
+          studios={studios}
+          talents={talents}
           shiftSlots={shiftSlots}
           onClose={() => setOpenId(null)}
           onSessionsUpdated={onSessionsUpdated}
-          onUpdateSession={mode === "ops" ? onUpdateSession : undefined}
-          onDeleteSession={mode === "ops" ? onDeleteSession : undefined}
-          onCancelSession={mode === "ops" ? onCancelSession : undefined}
-          onSetSessionExcluded={mode === "ops" ? onSetSessionExcluded : undefined}
+          onUpdateSession={onUpdateSession}
+          onDeleteSession={onDeleteSession}
+          onCancelSession={onCancelSession}
+          onSetSessionExcluded={onSetSessionExcluded}
           onRequestDropout={onRequestDropout}
-          onLogAudit={mode === "ops" ? onLogAudit : undefined}
+          onLogAudit={onLogAudit}
         />
       )}
     </div>

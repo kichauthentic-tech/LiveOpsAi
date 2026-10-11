@@ -27,6 +27,8 @@ export interface SessionCardMeta {
   title?: string;
   /** Chip cảnh báo (đỏ): thiếu người, v.v. — thứ ops phải xử lý, khác chip tên người. */
   warn?: boolean;
+  /** Chip của chính người đang xem (app talent: "Bạn") — nền đảo màu để thấy ngay ca mình trên lịch toàn agency. */
+  me?: boolean;
 }
 
 export type SessionCardTone = "live" | "upcoming" | "completed" | "cancelled" | "pending";
@@ -198,7 +200,7 @@ export const SessionEventCard: React.FC<SessionEventCardProps> = ({
         {meta.length > 0 && (
           <div className="sc-who">
             {meta.map((m, i) => (
-              <span key={i} title={m.title ?? m.label} className="sc-chip" data-warn={m.warn ? "true" : undefined}>
+              <span key={i} title={m.title ?? m.label} className="sc-chip" data-warn={m.warn ? "true" : undefined} data-me={m.me ? "true" : undefined}>
                 {m.icon && <m.icon aria-hidden />}
                 <span>{m.label}</span>
               </span>
@@ -274,7 +276,9 @@ export const buildSessionMeta = (
   s: LiveSession,
   lookup?: TalentLookup,
   /** Cách nhìn của người đang xem. "brand" bỏ các chip là chuyện nội bộ agency — xem ghi chú dưới. */
-  viewerRole?: "agency" | "brand"
+  viewerRole?: "agency" | "brand",
+  /** Talent đang xem (app talent): chip của chính họ ghi "Bạn" và đảo màu. */
+  meId?: string
 ): SessionCardMeta[] => {
   // Nền tảng KHÔNG nằm trong meta nữa — thẻ vẽ logo sàn qua prop `platform`.
   const meta: SessionCardMeta[] = [];
@@ -282,12 +286,14 @@ export const buildSessionMeta = (
   const roleChip = (role: "host" | "co_host", icon: LucideIcon, fallbackName: string, fallbackId: string | undefined, roleLabel: string): SessionCardMeta | null => {
     if (hasStaffSegments(s, role)) {
       const segs = segmentsOfRole(s, role);
-      const names = segs.map((g) => talentShortName(lookup?.(g.talentId), g.talentName));
+      const names = segs.map((g) => (meId && g.talentId === meId ? "Bạn" : talentShortName(lookup?.(g.talentId), g.talentName)));
       const label = names.filter((n, i) => n !== names[i - 1]).join(" → ");
       const title = `${roleLabel}: ${segs.map((g) => `${g.talentName || "?"} ${clockAtOffset(s, g.fromMin)}–${clockAtOffset(s, g.toMin)}`).join(" → ")}`;
-      return label ? { icon, label, title } : null;
+      return label ? { icon, label, title, me: !!meId && segs.some((g) => g.talentId === meId) } : null;
     }
-    return fallbackName ? { icon, label: talentShortName(lookup?.(fallbackId), fallbackName), title: `${roleLabel}: ${fallbackName}` } : null;
+    if (!fallbackName) return null;
+    const me = !!meId && fallbackId === meId;
+    return { icon, label: me ? "Bạn" : talentShortName(lookup?.(fallbackId), fallbackName), title: `${roleLabel}: ${fallbackName}`, me };
   };
   const host = roleChip("host", Mic, s.hostName, s.hostId, "Host");
   if (host) meta.push(host);

@@ -12,7 +12,7 @@ import { fmtNum } from "../lib/format";
 const DAY_OPTIONS = [7, 30, 90] as const;
 
 // Tab chỉ talent thấy — không tính là "chưa ai mở" với agency khi talent chưa dùng app.
-const TALENT_ONLY = new Set(["my_shifts", "my_talent_profile"]);
+const TALENT_ONLY = new Set(["my_shifts", "talent_calendar", "my_talent_profile"]);
 
 interface Grouped {
   key: string;

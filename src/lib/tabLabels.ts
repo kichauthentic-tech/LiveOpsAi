@@ -23,7 +23,8 @@ export const AGENCY_TAB_LABELS: Record<string, string> = {
   user_settings: "Phân Quyền & Role",
   ai_training: "AI Training Center",
   account_settings: "Tài Khoản Của Tôi",
-  my_shifts: "Ca Của Tôi",
+  my_shifts: "Hôm Nay", // trước 11/10 là "Ca Của Tôi" (OpsBoard mode mine) — app talent T1
+  talent_calendar: "Lịch",
   my_talent_profile: "Hồ Sơ Của Tôi"
 };
 

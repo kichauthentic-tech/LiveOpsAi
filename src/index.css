@@ -574,6 +574,8 @@ html:not(.dark) [class~="border-slate-700"], html:not(.dark) [class~="border-sla
 .sc-chip { display: inline-flex; align-items: center; gap: 3px; max-width: 100%; font-size: 11px; font-weight: 600; line-height: 1.2; padding: 2px 5px; border-radius: 5px; background: color-mix(in srgb, var(--text) 8%, transparent); }
 .sc-chip[data-warn="true"] { background: #e11d48; color: #fff; }
 .sc-chip[data-warn="true"] > svg { opacity: 1; }
+.sc-chip[data-me="true"] { background: var(--text); color: var(--surface); }
+.sc-chip[data-me="true"] > svg { opacity: 1; }
 .sc-chip > svg { width: 11px; height: 11px; flex: none; opacity: .7; }
 .sc-chip > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sc-foot { display: flex; align-items: center; gap: 6px; min-width: 0; }

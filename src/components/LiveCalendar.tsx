@@ -9,6 +9,7 @@ import { BrandLogo } from "./ui/BrandLogo";
 import { getBrandTheme } from "../lib/brandTheme";
 
 import { CampaignDayRibbon, CampaignDayBanner } from "./ui/CampaignDayRibbon";
+import { isMine } from "../lib/talent/myShifts";
 import {
   SessionEventCard,
   SESSION_TONE,
@@ -110,7 +111,11 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   }, [propSessions]);
 
   // View Mode: Month, Week, Day Matrix, Talent Workload, List
-  const [viewMode, setViewMode] = useState<"month" | "week" | "day" | "talent_workload">("day");
+  // App talent (T1, 11/10): cùng lịch, cùng thẻ ca, chỉ đọc — không kéo-thả, không mở ca, không Tải Lịch Host; mở sẵn Lịch Tuần
+  // và "Của tôi" (công tắc sang Toàn agency). Talent thấy số như ops (user chốt 11/10, phương án A).
+  const talentView = currentRole === "talent";
+  const [viewMode, setViewMode] = useState<"month" | "week" | "day" | "talent_workload">(talentView ? "week" : "day");
+  const [onlyMine, setOnlyMine] = useState(true);
   // Ca có người bị xếp trùng giờ (user chốt 06/10: một người chỉ đứng một ca tại một thời điểm) — viền đỏ trên thẻ ca.
   const clashList = useMemo(() => findPersonClashes(sessions), [sessions]);
   const clashMap = useMemo(() => clashedSessionIds(clashList), [clashList]);
@@ -141,6 +146,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   const [selectedSessionDetail, setSelectedSessionDetail] = useState<LiveSession | null>(null);
   const [selectedSlotDetail, setSelectedSlotDetail] = useState<ShiftSlot | null>(null);
   const canManageSlots = currentRole === "ceo" || currentRole === "admin" || currentRole === "operations";
+  // Kéo-thả ghi thẳng vào ca — chỉ khi có quyền VÀ có đường ghi. Trước 11/10 thiếu `onUpdateSession` thì thả vẫn báo "Đã chuyển".
+  const canEdit = canManageSlots && !!onUpdateSession;
   // Q2: form duy nhất là "Mở ca chờ đăng ký" (OpenSlotModal); prefill ngày/phòng/giờ từ ô được bấm.
   const [slotModal, setSlotModal] = useState<{ date: string; studioId?: string; start?: string; end?: string } | null>(null);
 
@@ -206,7 +213,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
       return;
     }
     setDraggedSessionId(null);
-    const ok = onUpdateSession ? await onUpdateSession({ ...session, studioId: targetStudio.id, studioName: targetStudio.name }) : true;
+    if (!onUpdateSession) return;
+    const ok = await onUpdateSession({ ...session, studioId: targetStudio.id, studioName: targetStudio.name });
     if (ok) showToast(`Đã chuyển "${session.brandName}" ${session.startTime}–${session.endTime} sang ${targetStudio.name}.`, "success");
   };
 
@@ -248,7 +256,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
     }
     const updatedSession: LiveSession = { ...session, date: targetDateStr };
     setDraggedSessionId(null);
-    const ok = onUpdateSession ? await onUpdateSession(updatedSession) : true;
+    if (!onUpdateSession) return;
+    const ok = await onUpdateSession(updatedSession);
     if (ok) {
       showToast(
         `Đã chuyển phiên live "${session.brandName}" sang ngày ${targetDateStr}!`,
@@ -279,7 +288,8 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
     }
     const updatedSession: LiveSession = { ...session, date: targetDateStr };
     setDraggedSessionId(null);
-    const ok = onUpdateSession ? await onUpdateSession(updatedSession) : true;
+    if (!onUpdateSession) return;
+    const ok = await onUpdateSession(updatedSession);
     if (ok) {
       showToast(
         `Đã chuyển phiên live "${session.brandName}" sang ngày ${targetDateStr}!`,
@@ -470,6 +480,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
 
   // Filter sessions
   const filteredSessions = sessions.filter((s) => {
+    if (talentView && onlyMine && !isMine(s, myTalentId)) return false;
     if (selectedStudioFilter !== "ALL" && s.studioId !== selectedStudioFilter) return false;
     if (selectedHostFilter !== "ALL" && s.hostId !== selectedHostFilter) return false;
     if (selectedBrandFilter !== "ALL" && s.brandId !== selectedBrandFilter) return false;
@@ -489,6 +500,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   // slot chưa có host).
   const openSlots = shiftSlots.filter((sl) => {
     if (sl.status !== "open") return false;
+    if (talentView && onlyMine) return false;
     if (selectedStudioFilter !== "ALL" && sl.studioId !== selectedStudioFilter) return false;
     if (selectedBrandFilter !== "ALL" && sl.brandId !== selectedBrandFilter) return false;
     if (searchQuery.trim() !== "") {
@@ -523,15 +535,35 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
     <div className="space-y-4 sm:space-y-6">
       <PageHeader
         icon={CalendarIcon}
-        title="Lịch Vận Hành"
-        description="Ca live theo tháng, tuần, phòng studio và host. Kéo thẻ ca sang hàng phòng khác để đổi phòng (giữ giờ), sang ngày khác để đổi ngày; đổi giờ thì mở ca → Sửa."
+        title={talentView ? "Lịch" : "Lịch Vận Hành"}
+        description={
+          talentView
+            ? "Lịch ca đã chốt của bạn và của toàn agency, theo tháng, tuần, phòng. Bấm một ca để xem chi tiết; ca của bạn có chip \"Bạn\"."
+            : "Ca live theo tháng, tuần, phòng studio và host. Kéo thẻ ca sang hàng phòng khác để đổi phòng (giữ giờ), sang ngày khác để đổi ngày; đổi giờ thì mở ca → Sửa."
+        }
         actions={
+          talentView ? (
+            <div role="group" aria-label="Phạm vi lịch" className="flex items-center bg-[var(--surface-base)] p-1 rounded-xl border border-[var(--border)] text-xs font-bold">
+              {([[true, "Của tôi"], [false, "Toàn agency"]] as const).map(([v, label]) => (
+                <button
+                  key={label}
+                  type="button"
+                  aria-pressed={onlyMine === v}
+                  onClick={() => setOnlyMine(v)}
+                  className={`px-3 py-2 min-h-8 rounded-lg transition-all ${onlyMine === v ? "bg-[var(--accent)] text-white shadow-sm font-black" : "text-[var(--text-muted)] hover:text-[var(--text)]"}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          ) : canManageSlots && onCreateSlot ? (
           <button
             onClick={() => setSlotModal({ date: selectedDate })}
             className="w-full sm:w-auto bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-[var(--accent)]/20 transition-all active:scale-95"
           >
             <Plus className="w-4 h-4" /> Mở ca chờ đăng ký
           </button>
+          ) : undefined
         }
       >
         {/* Chế độ xem + chọn ngày + bộ lọc nằm trong thẻ đầu trang (sắp lại 10/10: trước là 3 dải riêng + 1 dải hướng dẫn kéo-thả). */}
@@ -569,7 +601,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
               >
                 <Building2 className="w-3.5 h-3.5" /> Phòng theo giờ
               </button>
-              <button
+              {canManageSlots && <button
                 onClick={() => setViewMode("talent_workload")}
                 className={`px-3 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
                   viewMode === "talent_workload"
@@ -578,7 +610,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                 }`}
               >
                 <User className="w-3.5 h-3.5" /> Tải Lịch Host
-              </button>
+              </button>}
             </div>
           </div>
 
@@ -745,7 +777,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
               <h3 className="font-black text-[var(--text)] text-base flex items-center gap-2">
                 <CalendarIcon className="w-5 h-5 text-[var(--accent-text)] shrink-0" /> Tổng Quan Lịch Tháng {currentMonth}/{currentYear}
               </h3>
-              <p className="text-xs text-[var(--text-muted)]">Kéo thả để đổi lịch · Màu thẻ = màu nhận diện của brand</p>
+              <p className="text-xs text-[var(--text-muted)]">{canEdit ? "Kéo thả để đổi lịch · " : ""}Màu thẻ = màu nhận diện của brand</p>
             </div>
             <div className="flex items-center gap-1.5 flex-wrap text-[11px] font-semibold">
               {monthBrandNames.map((name) => {
@@ -882,18 +914,18 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                         brandName={ds.brandName} platform={ds.platform}
                         startTime={ds.startTime}
                         endTime={ds.endTime}
-                        meta={buildSessionMeta(ds, talentLookup)} durationBadge={buildDurationBadge(ds, "agency")} pctBadge={buildPctBadge(ds, "agency")} className={clashRing(ds.id)}
+                        meta={buildSessionMeta(ds, talentLookup, undefined, talentView ? myTalentId : undefined)} durationBadge={buildDurationBadge(ds, "agency")} pctBadge={buildPctBadge(ds, "agency")} className={clashRing(ds.id)}
                         targetGmv={ds.targetGmv}
                         tone={SESSION_TONE[ds.status]}
                         dragging={draggedSessionId === ds.id}
-                        draggable
+                        draggable={canEdit}
                         tooltip={clashTip(ds.id, `${ds.title} · ${ds.studioName} · Host ${ds.hostName}${
                           ds.coHostName ? ` · Trợ ${ds.coHostName}` : ""
-                        } — kéo thả sang ngày khác để chuyển lịch`)}
-                        onDragStart={(e) => {
+                        }${canEdit ? " — kéo thả sang ngày khác để chuyển lịch" : ""}`)}
+                        onDragStart={canEdit ? (e) => {
                           e.stopPropagation();
                           handleDragStart(e, ds);
-                        }}
+                        } : undefined}
                         onDragEnd={handleDragEnd}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -947,7 +979,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
               <h3 className="font-black text-[var(--text)] text-base flex items-center gap-2">
                 <CalendarIcon className="w-5 h-5 text-[var(--accent-text)]" /> Lịch Vận Hành Tuần
               </h3>
-              <p className="text-xs text-[var(--text-muted)]">Kéo thả để đổi lịch</p>
+              {canEdit && <p className="text-xs text-[var(--text-muted)]">Kéo thả để đổi lịch</p>}
             </div>
             <SessionCardLegend showTiming />
           </div>
@@ -1049,23 +1081,28 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                         startTime={ds.startTime}
                         endTime={ds.endTime}
                         title={ds.title}
-                        meta={buildSessionMeta(ds, talentLookup)} durationBadge={buildDurationBadge(ds, "agency")} pctBadge={buildPctBadge(ds, "agency")} className={clashRing(ds.id)}
+                        meta={buildSessionMeta(ds, talentLookup, undefined, talentView ? myTalentId : undefined)} durationBadge={buildDurationBadge(ds, "agency")} pctBadge={buildPctBadge(ds, "agency")} className={clashRing(ds.id)}
                         targetGmv={ds.targetGmv}
                         tone={SESSION_TONE[ds.status]}
                         dragging={draggedSessionId === ds.id}
-                        draggable
-                        tooltip={clashTip(ds.id, "Kéo để đổi ngày")}
-                        onDragStart={(e) => handleDragStart(e, ds)}
+                        draggable={canEdit}
+                        tooltip={clashTip(ds.id, canEdit ? "Kéo để đổi ngày" : `${ds.studioName} · Host ${ds.hostName}`)}
+                        onDragStart={canEdit ? (e) => handleDragStart(e, ds) : undefined}
                         onDragEnd={handleDragEnd}
                         onClick={() => setSelectedSessionDetail(ds)}
                       />
                     ))}
 
-                    {daySessions.length === 0 && daySlots.length === 0 && (
+                    {/* Người không mở ca được (talent): một dòng chữ — ô "+ Trống" cao 96px mời một thao tác họ không có,
+                        và 4–5 ngày trống liền nhau đẩy ca thật xuống dưới màn điện thoại. */}
+                    {daySessions.length === 0 && daySlots.length === 0 && !canManageSlots && (
+                      <p className="text-[11px] text-[var(--text-faint)] italic">Không có ca</p>
+                    )}
+                    {daySessions.length === 0 && daySlots.length === 0 && canManageSlots && (
                       <div
                         onClick={() => {
                           setSelectedDate(wDay.dateStr);
-                          if (canManageSlots) setSlotModal({ date: wDay.dateStr });
+                          setSlotModal({ date: wDay.dateStr });
                         }}
                         className={`h-24 rounded-xl border border-dashed transition-all cursor-pointer flex flex-col items-center justify-center space-y-1 ${
                           isWeekHovered
@@ -1153,18 +1190,17 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   startTime={it.session!.startTime}
                   endTime={it.session!.endTime}
                   title={it.session!.title}
-                  meta={buildSessionMeta(it.session!, talentLookup)}
-                 
+                  meta={buildSessionMeta(it.session!, talentLookup, undefined, talentView ? myTalentId : undefined)}
                   durationBadge={buildDurationBadge(it.session!, "agency")}
                   pctBadge={buildPctBadge(it.session!, "agency")}
                   className={clashRing(it.session!.id)}
                   targetGmv={it.session!.targetGmv}
                   tone={SESSION_TONE[it.session!.status]}
                   dragging={draggedSessionId === it.session!.id}
-                  draggable
+                  draggable={canEdit}
                   fill
-                  tooltip={clashTip(it.session!.id, "Kéo sang hàng phòng khác để đổi phòng")}
-                  onDragStart={(e) => handleDragStart(e, it.session!)}
+                  tooltip={clashTip(it.session!.id, canEdit ? "Kéo sang hàng phòng khác để đổi phòng" : `${it.session!.brandName} · Host ${it.session!.hostName}`)}
+                  onDragStart={canEdit ? (e) => handleDragStart(e, it.session!) : undefined}
                   onDragEnd={handleDragEnd}
                   onClick={() => setSelectedSessionDetail(it.session!)}
                 />
@@ -1186,7 +1222,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                 <Building2 className="w-5 h-5 text-[var(--accent-text)] shrink-0" /> Phòng Studio theo giờ — {fmtDateVn(selectedDate)} ({getDayOfWeekName(selectedDate)})
               </h3>
               <p className="text-xs text-[var(--text-muted)]">
-                {daySessions.length} ca đã chốt · {daySlots.length} ca chờ đăng ký · {totalHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h live. Kéo thẻ ca sang hàng phòng khác để đổi phòng (giữ giờ).
+                {daySessions.length} ca đã chốt · {daySlots.length} ca chờ đăng ký · {totalHours.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}h live.{canEdit ? " Kéo thẻ ca sang hàng phòng khác để đổi phòng (giữ giờ)." : ""}
               </p>
             </div>
             <SessionCardLegend showTiming />

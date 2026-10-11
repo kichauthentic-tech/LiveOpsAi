@@ -5387,3 +5387,50 @@ Nguyên văn các mục §1 của `WORKSPACE_DESIGN.md` ngày 07–09/10, chuy�
 **Build:** xem WORKSPACE_DESIGN §5.6 "Lượt live". Không migration — dùng lại `apply_session_snapshot_part`, `link_session_room`. `apply_session_snapshot_part` thay dòng cùng Room ID nên lượt thêm sau không nhân đôi số. Tick nhiều room ở bước 1 = nhiều lần gọi RPC liên tiếp (không atomic): lỗi giữa chừng thì ca còn lượt đầu, thêm lượt thiếu bằng nút "Thêm lượt restart".
 
 **Kiểm:** `tests/roomCases.test.ts` (+10: vai room, dung sai 5', lượt, chuỗi ca qua nửa đêm, ranh giới khoá), `fileHandoverPlatforms` (bước 1/2/3), tsc, eslint 0 lỗi; vitest chỉ còn 2 đỏ có sẵn (shopeeFiles Live List 50 phiên, shopeeReportRender). **Chưa kiểm trên app thật** — Browser pane chưa đăng nhập; cần thử: up file có 2 room, thêm lượt restart, room đang live ⇒ hộp chọn ca sau, dải chuỗi.
+
+
+## App talent T1 (2026-10-11)
+
+Yêu cầu user: giao diện role Talent chuyên nghiệp, dễ dùng — (1) xem + đăng ký ca trên lịch kế hoạch đã mở, (2) lịch đã chốt của toàn agency +
+của riêng mình (cùng thẻ ca, cùng cấu trúc lịch agency), (3) nhập snapshot/report vận hành, (4) tài khoản (rate, tổng giờ, hiệu suất, sửa
+thông tin), (5) module đề xuất thêm. Đề xuất (số đo, nghiên cứu Deputy/Toast/Timetastic/Harvard Shift Project, prototype điện thoại trên lịch
+thật 05–18/10): https://claude.ai/artifact/KjJ4fQ9pVqd7WYAkyJqudk.
+
+**Số đo 11/10:** 34 tài khoản talent, 0 lượt mở màn role talent từ 26/09 (2.981 lượt toàn app); tuần 05–11/10 92 ca, 67 "chưa giao ca"; tuần
+12–18/10 96 ca, 0 ca mở chờ chốt; 2 tuần 05–18/10 (187 ca không huỷ, 34 người): 25/34 người có ngày ≥2 ca (tối đa 5), 56 lần ca nối ≤30',
+88 lượt kết thúc sau 23:00, 3 người vừa host vừa trợ; 12 chỗ trùng người; rate talent = 0 (đo 06/10). RLS: talent đọc `live_sessions_secure`
+đủ GMV/target mọi ca (0107 chỉ che brand) — user chốt giữ nguyên (A).
+
+**User chốt:** A thấy số như ops; B chỉ đăng ký từng ca mở; C chỉ số của mình so mặt bằng; D giao ca trên máy tính phòng live. Module
+đề xuất chưa làm (T2/T3): xác nhận đã nhận lịch, đổi ca có duyệt, chuẩn bị ca cho host, bảng công cuối tháng, Zalo OA (khai giờ rảnh BỎ theo B).
+
+**Đã build (không migration):** xem §1 WORKSPACE 11/10 (tối). Bẫy gặp khi đo: thanh tab lấy `navItems` thì ra cả mục ops (sidebar lọc theo
+quyền, thanh tab chưa) ⇒ chỉ lấy mục không gắn quyền; thẻ "Cần giao ca" thiếu ngày ⇒ nhóm theo ngày; ô "+ Trống" 96px ở Lịch Tuần cho người
+không mở ca được ⇒ một dòng chữ; tiêu đề tháng lặp; thu nhập in "0" khi chưa có rate. Harness đo: `measure-talent.html` +
+`src/__harness/talent.tsx` mount 4 màn với `fetchX()` thật dưới phiên admin, callback ghi no-op, `?demo=1` đổi 20 ca sắp tới thành ca mở trong
+bộ nhớ — đã xoá.
+
+### T2 — "Đã nhận lịch" + "Chuẩn bị ca" (2026-10-11, đêm)
+
+User "làm tiếp" sau T1. Phạm vi T2 gốc (che số, nhận lịch, giờ rảnh) rút còn **nhận lịch** vì user chốt A (không che số) và B (không
+khai giờ rảnh); thêm "chuẩn bị ca cho host" (module đề xuất không cần migration).
+
+**Đo DB trước khi dựng "Chuẩn bị ca" (harness `?probe=1`, phiên admin):** `brand_skus` 0 dòng, `promo_schemes` 0 dòng; 30 ngày qua 347
+ca, 93 có report, 1 có ghi chú giao ca ("PFM thấp"), 0 host trễ / 0 restart khai; 257 ca sắp tới, 58 có target, 109 có ca trước cùng
+brand × sàn có GMV trong 7 ngày ⇒ bỏ phần sản phẩm/khuyến mãi/ghi chú (luôn trống), giữ ngày camp + target + ca trước cùng kênh +
+ca trước cùng phòng.
+
+**0169 `shift_acks`** (khoá session_id+talent_id; ngày/giờ lúc nhận). RLS: ops đọc hết, talent đọc dòng mình, brand 0; ghi chỉ qua RPC
+`ack_my_shifts(uuid[])` (bỏ qua ca không phải của mình / đã huỷ; người chỉ có ở một đoạn 0138 nhận được). Đổi giờ: dòng giữ nguyên,
+client so ⇒ "đổi giờ". Rút người: constraint trigger `deferrable initially deferred` trên `live_sessions` (host/co_host đổi) và
+`session_staff_segments` (delete) — HOÃN vì `set_session_staff_segments` xoá hết đoạn rồi chèn lại trong cùng lệnh (xoá ngay thì mất
+dòng của người chỉ có ở đoạn; mục 5b của bộ kiểm). Bẫy gặp: bảng mới cần `grant select ... to authenticated` (không thì "permission
+denied" trước cả RLS); guard `sqlGuards` quét 1.200 ký tự sau `create policy` nên bắt cả `current_user_talent_id()` trong thân RPC
+ngay dưới ⇒ bọc `(select ...)` luôn ở RPC.
+
+**Client:** khối "Lịch mới cần bạn xác nhận" đặt DƯỚI thẻ ca kế tiếp (lần đầu mở app Sỹ Hùng có 20 ca chờ nhận — đặt trên thì đẩy
+"ca tới là gì" khỏi màn đầu); một nút "Đã nhận cả N ca", ca không đi được thì mở ca → "Không đi được ca này" (0116). Chấm đỏ tab Hôm nay
+= ca phải giao + ca chờ nhận (đếm theo mốc giờ lúc nạp, không `Date.now()` lúc render — luật react-hooks/purity). OP: `unackedSoon`
+48 giờ, cùng giờ thì theo tên. Lỗi lúc làm: dùng `git stash` để so lint khi một phiên khác đang sửa cùng repo (0170 Bảng Cục Diện) —
+thay đổi của phiên kia về nguyên vẹn nhưng KHÔNG dùng stash khi có phiên song song.
+

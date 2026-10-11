@@ -1,5 +1,5 @@
 import React from "react";
-import { BookOpen, BrainCircuit, Briefcase, Building2, CalendarCheck2, Clapperboard, CalendarClock, Calendar as CalendarIcon, CalendarRange, Database, DollarSign, FileSignature, FileText, Gauge, LayoutDashboard, LayoutGrid, Link2, Megaphone, Package, Radio, Send, ShieldCheck, TrendingUp, Users } from "lucide-react";
+import { BookOpen, BrainCircuit, Briefcase, Building2, CalendarCheck2, CalendarDays, Clapperboard, CalendarClock, Calendar as CalendarIcon, CalendarRange, Database, DollarSign, FileSignature, FileText, Gauge, LayoutDashboard, LayoutGrid, Link2, Megaphone, Package, Send, ShieldCheck, Sun, TrendingUp, User, Users } from "lucide-react";
 import { PermissionKey, UserRole } from "../types";
 
 // Cấu hình sidebar + vài hằng số điều hướng, tách khỏi App.tsx 2026-10-01 (App.tsx 2.867 dòng).
@@ -48,7 +48,7 @@ export interface NavGroup {
 // Các tab mà nội dung chính là lưới lịch — bỏ giới hạn max-w-7xl để lấy hết chiều ngang
 // (lưới 7 cột / ma trận 5 khung giờ cần ~150px mỗi ô). Không còn tự thu
 // gọn sidebar theo tab — xem `autoCollapse`.
-export const CALENDAR_TABS = new Set(["calendar", "studio_calendar", "brand_calendar"]);
+export const CALENDAR_TABS = new Set(["calendar", "studio_calendar", "brand_calendar", "talent_calendar"]);
 
 // Tab không đọc ca / talent / report tháng — không phải chờ đợt nạp đầu (coreDataReady). Mọi tab khác
 // hiện khung chờ tới khi nạp xong, thay vì vẽ "0 ca" / "Chưa có…" giả (audit UX 2026-09-29).
@@ -93,15 +93,17 @@ export function agencyNavGroups(currentRole: UserRole): NavGroup[] {
   // Brand Workspace (Giai đoạn A, docs/WORKSPACE_HISTORY.md).
   const AGENCY_NAV_GROUPS: NavGroup[] = [
     // Tái cấu trúc 2026-09-21: tách LẬP KẾ HOẠCH (trước tháng) khỏi VẬN HÀNH (hằng ngày).
-    // Talent chỉ thấy: Ca Của Tôi (nơi nộp số liệu/report), Đăng Ký ca, Hồ Sơ.
+    // App talent T1 (11/10): 4 tab — Hôm Nay (id cũ `my_shifts`: thông báo + localStorage trỏ vào), Lịch (LiveCalendar cách nhìn
+    // talent), Đăng Ký Ca, Hồ Sơ. Điện thoại: thanh tab dưới đáy (TalentTabBar); máy tính phòng live: sidebar.
     ...(currentRole === "talent"
       ? [
           {
             label: "Của Tôi",
             items: [
-              { id: "my_shifts", label: "Ca Của Tôi", icon: Radio, perm: undefined },
+              { id: "my_shifts", label: "Hôm Nay", icon: Sun, perm: undefined },
+              { id: "talent_calendar", label: "Lịch", icon: CalendarDays, perm: undefined },
               { id: "shift_scheduling", label: "Đăng Ký Ca", icon: CalendarClock, perm: undefined },
-              { id: "my_talent_profile", label: "Hồ Sơ Của Tôi", icon: Users, perm: undefined }
+              { id: "my_talent_profile", label: "Hồ Sơ Của Tôi", icon: User, perm: undefined }
             ]
           }
         ]

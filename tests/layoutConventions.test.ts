@@ -444,14 +444,25 @@ test("Hồ Sơ Của Tôi: số đứng trước form, và ô trống nói lý d
   expect(guard >= 0 && guard < zeroTile, "ô tổng thu nhập phải nằm trong nhánh rows.length > 0").toBe(true);
 });
 
-test("Ca Của Tôi: có lịch sử ca đã chạy, và không nói 'không còn ca nào' với người chưa có ca", () => {
-  const src = readFileSync(join(SRC, "components/OpsBoard.tsx"), "utf8");
-  // Hai khối cũ chỉ là việc-cần-làm; trên dữ liệu thật cả hai đều rỗng với 100% talent (229/229 ca là
-  // ca nạp bù nên `needsClosing` loại, và không ca nào ở tương lai) — màn trắng với cả host 59 ca.
-  expect(src).toMatch(/const mineDone = useMemo\(/);
-  expect(src).toMatch(/mine\(s\) && s\.status === "Completed"/);
-  expect(src).toMatch(/\{mineDone\.length > 0 && \(/);
-  expect(src).toMatch(/mineDone\.length === 0 \? "Bạn chưa có ca nào trong hệ thống\."/);
+test("App talent: có lịch sử ca đã chạy, và không nói 'không còn ca nào' với người chưa có ca", () => {
+  // "Ca Của Tôi" (OpsBoard mode mine) thay bằng app talent 11/10. Luật cũ giữ nguyên: ca đã chạy là thứ duy nhất nhiều talent
+  // thật sự có (229/229 ca nạp bù 30/09) ⇒ Hồ sơ liệt kê ca đã chạy của tháng; Hôm nay nói "chưa có ca nào" với người chưa có ca.
+  const profile = readFileSync(join(SRC, "components/MyTalentProfile.tsx"), "utf8");
+  expect(profile).toMatch(/const monthDone = useMemo\(/);
+  expect(profile).toMatch(/\{monthDone\.length > 0 && \(/);
+  const today = readFileSync(join(SRC, "components/talent/TalentToday.tsx"), "utf8");
+  expect(today).toContain('mine.length === 0 ? "Bạn chưa có ca nào trên lịch."');
+  const board = readFileSync(join(SRC, "components/OpsBoard.tsx"), "utf8");
+  expect(board).not.toMatch(/mode === "mine"/);
+});
+
+test("Lịch cách nhìn talent: không kéo-thả, thả không báo thành công giả", () => {
+  const src = readFileSync(join(SRC, "components/LiveCalendar.tsx"), "utf8");
+  // Trước 11/10 thả thẻ khi thiếu onUpdateSession vẫn báo "Đã chuyển" (`onUpdateSession ? … : true`).
+  expect(src).not.toMatch(/onUpdateSession \? await onUpdateSession\([^)]*\) : true/);
+  expect(src.match(/draggable=\{canEdit\}/g)?.length).toBe(3);
+  expect(src).not.toMatch(/^\s+draggable$/m);
+  expect(src).toMatch(/const canEdit = canManageSlots && !!onUpdateSession;/);
 });
 
 test("Đăng Ký Ca: màn riêng của talent, không mang công cụ của ops", () => {

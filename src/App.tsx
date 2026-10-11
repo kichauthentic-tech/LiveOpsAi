@@ -41,6 +41,11 @@ import {
   PanelLeftOpen
 } from "lucide-react";
 import { AppSidebar } from "./components/AppSidebar";
+import { TalentTabBar } from "./components/talent/TalentTabBar";
+import { handoverDue, mySessions } from "./lib/talent/myShifts";
+import { myPendingAcks } from "./lib/talent/acks";
+import { useShiftAcks } from "./hooks/useShiftAcks";
+import { getTodayDate } from "./lib/dateUtils";
 import { Header, WorkspaceContext } from "./components/Header";
 import { Login } from "./components/Login";
 import { ResetPasswordScreen } from "./components/ResetPasswordScreen";
@@ -100,6 +105,7 @@ const HostPerformance = lazyNamed(() => import("./components/HostPerformance"), 
 const BrandsOverview = lazyNamed(() => import("./components/BrandsOverview"), "BrandsOverview");
 const ReportPublishBoard = lazyNamed(() => import("./components/ReportPublishBoard"), "ReportPublishBoard");
 const TalentShiftSignup = lazyNamed(() => import("./components/TalentShiftSignup"), "default");
+const TalentToday = lazyNamed(() => import("./components/talent/TalentToday"), "TalentToday");
 const OpsPlanningTodo = lazyNamed(() => import("./components/OpsPlanningTodo"), "default");
 const MonthPlan = lazyNamed(() => import("./components/MonthPlan"), "default");
 const OpsSupportTab = lazyNamed(() => import("./components/OpsSupportTab"), "default");
@@ -117,7 +123,8 @@ const TAB_CHUNKS: Record<string, { preload: () => void }[]> = {
   studio_calendar: [LiveCalendar],
   sessions: [SessionLedger],
   run_rate: [RunRateBoard],
-  my_shifts: [OpsBoard],
+  my_shifts: [TalentToday],
+  talent_calendar: [LiveCalendar],
   shift_scheduling: [TalentShiftSignup],
   month_plan: [MonthPlan],
   agency_overview: [CeoBrief, AgencyChannelSummary],
@@ -578,6 +585,17 @@ export default function App() {
         avatar: "",
         status: "Active",
       };
+
+  // App talent (T1, 11/10): ca của chính người này (Đăng Ký Ca chặn ca mở trùng giờ) + số ca phải giao (chấm đỏ trên thanh tab).
+  const myTalentIdForApp = currentRole === "talent" ? activeUser.assignedTalentId : undefined;
+  const talentMyShifts = useMemo(() => mySessions(activeSessions, myTalentIdForApp), [activeSessions, myTalentIdForApp]);
+  const talentDueCount = useMemo(() => handoverDue(activeSessions, myTalentIdForApp, getTodayDate()).length, [activeSessions, myTalentIdForApp]);
+  // T2 (0169): ca mới xếp / đổi giờ chưa bấm "Đã nhận" — cộng vào chấm đỏ của tab Hôm nay.
+  const { acks: talentAcks, loadedAt: talentAcksAt, ack: handleAckShifts } = useShiftAcks(!!myTalentIdForApp);
+  const talentAckCount = useMemo(
+    () => (talentAcks ? myPendingAcks(activeSessions, myTalentIdForApp, talentAcks, talentAcksAt).length : 0),
+    [activeSessions, myTalentIdForApp, talentAcks, talentAcksAt]
+  );
 
   // Workspace thật đang áp dụng — role "brand" bị ép cứng vào brand của chính họ (không cho
   // chọn lại); ceo/admin/operations dùng state `workspace` từ switcher; các role khác
@@ -1360,6 +1378,10 @@ export default function App() {
     );
   const agencyBrands = brandsOn(agencyPlatformState);
   const navItems = navGroups.flatMap((g) => g.items);
+  // Thanh tab dưới đáy của talent chỉ có 4 màn của talent (mục không gắn quyền). Talent được cấp thêm quyền riêng thì vẫn giữ nút ☰
+  // để mở sidebar — không thì mục đó không có đường vào trên điện thoại.
+  const talentTabItems = navItems.filter((i) => !i.perm);
+  const talentTabsOnly = currentRole === "talent" && !navItems.some((i) => i.perm && checkPermission(i.perm));
 
   // Phần lớn thông báo là về MỘT CA của chính người nhận (xếp/rút/đổi giờ/huỷ/đối soát). Q4 (audit
   // 2026-09-21): talent → Ca Của Tôi, ops → Bảng Vận Hành, và mở luôn Cửa sổ Ca Live của ca đó
@@ -1580,7 +1602,8 @@ export default function App() {
         <div className="flex items-center border-b border-[var(--border)] bg-[var(--surface)]/30 pr-4">
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-4 md:hidden text-[var(--text-muted)] hover:text-[var(--text)]"
+            aria-label="Mở menu"
+            className={`p-4 md:hidden text-[var(--text-muted)] hover:text-[var(--text)] ${talentTabsOnly ? "hidden" : ""}`}
           >
             <Menu className="w-5 h-5" />
           </button>
@@ -1663,7 +1686,7 @@ export default function App() {
 
         {/* Dynamic View Content */}
         <main
-          className="flex-1 overflow-y-auto p-3 sm:p-6 scrollbar-thin"
+          className={`flex-1 overflow-y-auto p-3 sm:p-6 scrollbar-thin ${currentRole === "talent" ? "pb-24 md:pb-6" : ""}`}
         >
           <div className={`mx-auto space-y-6 ${isCalendarModule ? "max-w-none" : "max-w-7xl"}`}>
             {!isTabAllowed && (phase6Loading || pendingBrandSlug) ? (
@@ -1845,7 +1868,6 @@ export default function App() {
                     {/* Việc cần làm — tự sinh từ dữ liệu, mỗi việc một nút tới đúng màn (audit người mới 2026-10-04). Từ 10/10 là cột
                         phải của Bảng Vận Hành: trước đó đứng TRÊN tiêu đề trang, đẩy danh sách ca hôm nay xuống dưới màn đầu. */}
                     <OpsBoard
-                      mode="ops"
                       aside={isOpsRole ? (
                         <TodoPanel
                         brands={brands}
@@ -1947,20 +1969,40 @@ export default function App() {
                 )}
 
                 {activeTab === "my_shifts" && currentRole === "talent" && (
-                  <OpsBoard
-                    mode="mine"
+                  <TalentToday
                     sessions={activeSessions}
                     shiftSlots={shiftSlots}
-                    shiftRegistrations={shiftRegistrations}
                     brands={brands}
-                    studios={activeStudios}
                     talents={activeTalents}
                     currentRole={currentRole}
                     myTalentId={activeUser.assignedTalentId}
+                    currentUserId={activeUser.id}
                     onSessionsUpdated={handleSessionsUpdated}
-                    onOpenScheduling={() => setActiveTab("shift_scheduling")}
+                    onRequestDropout={handleRequestDropout}
+                    onOpenTab={setActiveTab}
                     requestOpenSessionId={notifOpenSessionId}
                     onOpenRequestHandled={() => setNotifOpenSessionId(null)}
+                    acks={talentAcks}
+                    onAck={handleAckShifts}
+                  />
+                )}
+
+                {activeTab === "talent_calendar" && currentRole === "talent" && (
+                  <LiveCalendar
+                    channels={channels}
+                    sessions={activeSessions}
+                    shiftSlots={shiftSlots}
+                    shiftRegistrations={shiftRegistrations}
+                    studios={activeStudios}
+                    talents={activeTalents}
+                    brands={brands}
+                    onRegisterSlot={handleRegisterSlot}
+                    onUnregisterSlot={handleUnregisterSlot}
+                    myTalentId={activeUser.assignedTalentId}
+                    currentUserId={activeUser.id}
+                    currentRole={currentRole}
+                    schemes={promoSchemes}
+                    onSessionsUpdated={handleSessionsUpdated}
                     onRequestDropout={handleRequestDropout}
                   />
                 )}
@@ -1971,6 +2013,7 @@ export default function App() {
                     shiftSlots={shiftSlots}
                     shiftRegistrations={shiftRegistrations}
                     myTalentId={activeUser.assignedTalentId}
+                    myShifts={talentMyShifts}
                     onRegister={handleRegisterSlot}
                     onUnregister={handleUnregisterSlot}
                   />
@@ -2247,6 +2290,7 @@ export default function App() {
                     financeRecords={financeRecords}
                     talentRateHistory={talentRateHistory}
                     onSaveMyProfile={handleSaveMyTalentProfile}
+                    onOpenAccount={() => setActiveTab("account_settings")}
                   />
                 )}
 
@@ -2375,6 +2419,17 @@ export default function App() {
             )}
           </div>
         </main>
+        {currentRole === "talent" && (
+          <TalentTabBar
+            items={talentTabItems}
+            activeTab={activeTab}
+            onSelect={(tab) => {
+              setActiveTab(tab);
+              setMobileMenuOpen(false);
+            }}
+            badges={{ my_shifts: talentDueCount + talentAckCount }}
+          />
+        )}
       </div>
     </div>
     </SessionActionsContext.Provider>

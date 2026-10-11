@@ -1,17 +1,22 @@
 import React, { useMemo, useState } from "react";
 import { SystemUser, Talent, LiveSession, SessionFinance, TalentRateHistoryEntry } from "../types";
 import { useAuth } from "../hooks/useAuth";
-import { User, Phone, Cake, Mail, Loader2, Lock, ShieldAlert, Award, Wallet } from "lucide-react";
+import { User, Phone, Cake, Mail, Loader2, Lock, ShieldAlert, Award, Wallet, CalendarDays, TrendingUp, KeyRound } from "lucide-react";
 import { computeTalentRealTotals } from "../lib/metrics/avgGmv";
 import { computeTalentMonthlyIncome } from "../lib/pnl";
 import { todayVn } from "../lib/performance/brandCommitment";
 import { errorMessage } from "../lib/errorMessage";
 
-import { fmtFixed, fmtVndShort, fmtVndFull } from "../lib/format";
+import { fmtDateVn, fmtFixed, fmtVndShort, fmtVndFull } from "../lib/format";
 import { MonthPicker } from "./common/MonthPicker";
 import { PageHeader } from "./common/PageHeader";
 import { talentRoleLabel } from "../lib/talentName";
 import { isAliasEmail, loginLabel } from "../lib/loginName";
+import { getTodayDate } from "../lib/dateUtils";
+import { monthSummary, myRole } from "../lib/talent/myShifts";
+import { myChannelStanding, STANDING_DAYS } from "../lib/talent/standing";
+import { isBorderline, reliabilityText } from "../lib/report/deepAnalysis";
+import { PlatformChip } from "./common/PlatformChip";
 interface MyTalentProfileProps {
   activeUser: SystemUser;
   talents: Talent[];
@@ -24,6 +29,8 @@ interface MyTalentProfileProps {
   // trả void, nên try/catch dưới đây thành code chết và form luôn báo "Đã cập nhật" kể cả khi DB
   // không ghi được gì (bug C3). Handler riêng này bắt buộc phải để lỗi nổi lên.
   onSaveMyProfile: (patch: { phone: string; avatar: string; dateOfBirth?: string }) => Promise<void>;
+  /** Mở "Tài Khoản Của Tôi" (đổi mật khẩu) — màn đó vào từ menu người dùng, app talent đặt thêm nút ở đây. */
+  onOpenAccount?: () => void;
 }
 
 const money = (n: number) => Math.round(n).toLocaleString("vi-VN");
@@ -45,7 +52,8 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
   payrollSessions,
   financeRecords,
   talentRateHistory,
-  onSaveMyProfile
+  onSaveMyProfile,
+  onOpenAccount
 }) => {
   const { reauthenticate, updateEmail } = useAuth();
   const myTalent = talents.find((t) => t.id === activeUser.assignedTalentId);
@@ -73,6 +81,20 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
 
   // id rỗng ⇒ trả về toàn 0, gọi được cả khi chưa gắn hồ sơ talent (tránh nhánh null trong JSX).
   const myReal = useMemo(() => computeTalentRealTotals(sessions, myTalent?.id ?? ""), [sessions, myTalent]);
+  // App talent T1 (11/10): số của tháng đang chọn (cùng tháng với Thu Nhập) + hiệu suất so mặt bằng cùng kênh (user chốt
+  // phương án C: chỉ số của mình, không tên người khác). Ca đã chạy đọc `payrollSessions` (gồm ca loại khỏi báo cáo — vẫn là
+  // giờ đã làm); hiệu suất đọc `sessions` (activeSessions) như mọi màn phân tích.
+  const month = useMemo(() => (myTalent ? monthSummary(payrollSessions, myTalent.id, incomeMonth) : null), [payrollSessions, myTalent, incomeMonth]);
+  const monthDone = useMemo(
+    () =>
+      myTalent
+        ? payrollSessions
+            .filter((s) => s.date.startsWith(incomeMonth) && s.status === "Completed" && myRole(s, myTalent.id))
+            .sort((a, b) => b.date.localeCompare(a.date) || b.startTime.localeCompare(a.startTime))
+        : [],
+    [payrollSessions, myTalent, incomeMonth]
+  );
+  const standing = useMemo(() => myChannelStanding(sessions, myTalent?.id, getTodayDate()), [sessions, myTalent]);
 
   const [phone, setPhone] = useState(myTalent?.phone ?? "");
   const [avatar, setAvatar] = useState(myTalent?.avatar ?? "");
@@ -139,7 +161,96 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
 
   return (
     <div className="space-y-6 max-w-2xl">
-      <PageHeader icon={User} title="Hồ Sơ Của Tôi" description="Xem hiệu suất, thù lao của bạn và tự cập nhật thông tin liên hệ." />
+      <PageHeader
+        icon={User}
+        title="Hồ Sơ Của Tôi"
+        description="Giờ đã làm, thu nhập tạm tính, hiệu suất của bạn và thông tin cá nhân."
+        actions={<MonthPicker value={incomeMonth} onChange={setIncomeMonth} size="sm" />}
+      />
+
+      {month && (
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-6 space-y-3">
+          <div className="flex items-center gap-2 text-sm font-bold text-[var(--text)]">
+            <CalendarDays className="w-4 h-4 text-[var(--accent-text)]" />
+            Ca và giờ làm
+          </div>
+          <div className="grid grid-cols-2 gap-3 text-xs">
+            <div className={TILE}>
+              <div className="text-[var(--text-muted)]">Ca đã chạy</div>
+              <div className="font-bold text-[var(--text)] mt-0.5 text-base">{month.done.count > 0 ? `${month.done.count} ca` : <Empty>chưa có</Empty>}</div>
+              {month.done.hostCount > 0 && month.done.coCount > 0 && (
+                <div className="text-[11px] text-[var(--text-faint)]">{month.done.hostCount} host · {month.done.coCount} trợ</div>
+              )}
+            </div>
+            <div className={TILE}>
+              <div className="text-[var(--text-muted)]">Giờ đã làm (theo lịch)</div>
+              <div className="font-bold text-[var(--text)] mt-0.5 text-base">
+                {month.done.hostHours + month.done.coHours > 0 ? `${fmtFixed(month.done.hostHours + month.done.coHours, 1)}h` : <Empty>chưa có</Empty>}
+              </div>
+              {month.done.hostHours > 0 && month.done.coHours > 0 && (
+                <div className="text-[11px] text-[var(--text-faint)]">{fmtFixed(month.done.hostHours, 1)}h host · {fmtFixed(month.done.coHours, 1)}h trợ</div>
+              )}
+            </div>
+            <div className={TILE}>
+              <div className="text-[var(--text-muted)]">Ca đã chốt còn lại</div>
+              <div className="font-bold text-[var(--text)] mt-0.5 text-base">{month.upcoming.count > 0 ? `${month.upcoming.count} ca` : <Empty>không còn</Empty>}</div>
+            </div>
+            <div className={TILE}>
+              <div className="text-[var(--text-muted)]">Giờ còn lại</div>
+              <div className="font-bold text-[var(--text)] mt-0.5 text-base">{month.upcoming.hours > 0 ? `${fmtFixed(month.upcoming.hours, 1)}h` : <Empty>—</Empty>}</div>
+            </div>
+          </div>
+          {monthDone.length > 0 && (
+            <details className="group">
+              <summary className="cursor-pointer text-xs font-bold text-[var(--accent-text)] min-h-6 flex items-center">Xem {monthDone.length} ca đã chạy</summary>
+              <div className="mt-2 max-h-80 overflow-y-auto">
+                {monthDone.map((s) => {
+                  const asHost = myRole(s, myTalent.id) === "host";
+                  return (
+                    <div key={s.id} className="flex items-center gap-2 text-xs py-1.5 border-b border-[var(--border-muted)] last:border-0">
+                      <span className="font-mono text-[var(--text-muted)] shrink-0">{s.date.slice(8)}/{s.date.slice(5, 7)}</span>
+                      <span className="font-bold text-[var(--text)] truncate min-w-0">{s.brandName}</span>
+                      <PlatformChip platform={s.platform} />
+                      <span className="text-[11px] text-[var(--text-faint)] shrink-0">{asHost ? "host" : "trợ"}</span>
+                      <span className="font-mono text-[var(--text-muted)] shrink-0 ml-auto">{s.startTime}–{s.endTime}</span>
+                      {/* GMV chỉ ở ca mình làm HOST — GMV của ca tính cho host (cùng luật assistSessionCount ở Talent Pool). */}
+                      <span className="w-[56px] shrink-0 text-right font-bold text-emerald-400">{asHost && s.actualGmv ? fmtVndShort(s.actualGmv) : ""}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </details>
+          )}
+        </div>
+      )}
+
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-6 space-y-3">
+        <div className="flex items-center gap-2 text-sm font-bold text-[var(--text)]">
+          <TrendingUp className="w-4 h-4 text-[var(--accent-text)]" />
+          Hiệu suất so mặt bằng
+        </div>
+        <p className="text-[11px] text-[var(--text-faint)] -mt-1">
+          {STANDING_DAYS} ngày gần nhất, mỗi kênh brand × sàn một dòng: GMV thực của ca bạn ÷ GMV nếu bán bằng trung bình cả nhóm ở cùng tháng,
+          loại ngày (lịch camp cố định) và buổi. Chỉ ghi trên/dưới khi khoảng tin cậy 95% nằm hẳn một phía.
+        </p>
+        {standing.length === 0 ? (
+          <p className="text-xs text-[var(--text-faint)]">Chưa có ca nào có số trong {STANDING_DAYS} ngày gần nhất.</p>
+        ) : (
+          <div className="space-y-2">
+            {standing.map((r) => (
+              <div key={`${r.brandId}|${r.platform}|${r.role}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs border-b border-[var(--border-muted)] pb-2 last:border-0 last:pb-0">
+                <span className="font-bold text-[var(--text)] flex items-center gap-1.5">{r.brandName} <PlatformChip platform={r.platform} /></span>
+                <span className="text-[var(--text-faint)]">{r.role === "host" ? "Host" : "Trợ live"} · {r.sessions} ca</span>
+                <span className="ml-auto font-mono font-bold text-[var(--text)]">{reliabilityText(r)}</span>
+                <span className={`w-full sm:w-auto text-[11px] font-bold ${r.verdict === "above" ? "text-emerald-400" : r.verdict === "below" ? "text-rose-400" : "text-[var(--text-faint)]"}`}>
+                  {r.verdict === "above" ? "Trên mặt bằng" : r.verdict === "below" ? "Dưới mặt bằng" : r.sessions < 3 ? "Chưa đủ 3 ca để kết luận" : "Trong dao động bình thường"}
+                  {r.verdict !== "unclear" && isBorderline(r) ? " (sát ngưỡng)" : ""}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Thứ tự khối (audit UX lần 2 — màn talent, 2026-09-30): SỐ trước, FORM sau. Trước đây hai form
           ghi (đổi SĐT, đổi email đăng nhập) chiếm 507/900px màn đầu ở desktop và TRỌN màn đầu 812px ở
@@ -149,7 +260,7 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-6 space-y-4">
         <div className="flex items-center gap-2 text-sm font-bold text-[var(--text)]">
           <Award className="w-4 h-4 text-[var(--accent-text)]" />
-          Hiệu Suất & Thù Lao
+          Từ trước tới nay & Rate
         </div>
         <p className="text-[11px] text-[var(--text-faint)] -mt-2">
           Số liệu hiệu suất được tính tự động từ báo cáo phiên live, không thể tự sửa ở đây.
@@ -265,9 +376,8 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-sm font-bold text-[var(--text)]">
             <Wallet className="w-4 h-4 text-[var(--accent-text)]" />
-            Thu Nhập Tháng Này
+            Thu nhập tạm tính
           </div>
-          <MonthPicker value={incomeMonth} onChange={setIncomeMonth} size="sm" />
         </div>
 
         {myTalent.rateHidden ? (
@@ -287,7 +397,10 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
               <>
             <div className="bg-amber-950/30 border border-amber-500/30 rounded-xl p-4">
               <div className="text-amber-300/80 text-[11px]">Tổng thu nhập tạm tính</div>
-              <div className="font-black text-2xl text-[var(--text)] mt-0.5">{money(income.total)}</div>
+              {/* Rate chưa nhập ⇒ mọi dòng 0: in "0" là nói "tháng này bạn không được trả đồng nào" — sai. */}
+              <div className="font-black text-2xl text-[var(--text)] mt-0.5">
+                {income.missingRate && income.total === 0 ? <span className="text-base font-bold text-[var(--text-muted)]">chưa tính được — ops chưa nhập rate</span> : money(income.total)}
+              </div>
             </div>
 
             {/* Đ3: rate chưa nhập ra payout 0đ, giống hệt "tháng này không có ca" — với người vừa
@@ -313,11 +426,11 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
                   <tbody>
                     {income.rows.map((r) => (
                       <tr key={`${r.session.id}:${r.role}`} className="border-b border-[var(--border-muted)]">
-                        <td className="py-1.5 px-1 whitespace-nowrap">{r.session.date}</td>
+                        <td className="py-1.5 px-1 whitespace-nowrap">{fmtDateVn(r.session.date, false)}</td>
                         <td className="py-1.5 px-1 whitespace-nowrap">{r.session.brandName}</td>
                         <td className="py-1.5 px-1 whitespace-nowrap">{ROLE_LABEL[r.role]}</td>
                         <td className="py-1.5 px-1 text-right whitespace-nowrap">{fmtFixed(r.billableHours, 1)}h</td>
-                        <td className="py-1.5 px-1 text-right font-bold text-[var(--text)] whitespace-nowrap">{money(r.payout)}</td>
+                        <td className="py-1.5 px-1 text-right font-bold text-[var(--text)] whitespace-nowrap">{r.payout === 0 && income.missingRate ? <Empty>—</Empty> : money(r.payout)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -399,6 +512,16 @@ export const MyTalentProfile: React.FC<MyTalentProfileProps> = ({
           </button>
         </form>
       </div>
+
+      {onOpenAccount && (
+        <button
+          type="button"
+          onClick={onOpenAccount}
+          className="w-full sm:w-auto px-4 py-2.5 min-h-8 rounded-xl border border-[var(--border)] bg-[var(--surface)] hover:border-[var(--accent)] text-xs font-bold text-[var(--text)] flex items-center justify-center gap-2"
+        >
+          <KeyRound className="w-4 h-4 text-[var(--accent-text)]" /> Đổi mật khẩu
+        </button>
+      )}
 
       {/* Đổi email đăng nhập */}
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-6 space-y-4">

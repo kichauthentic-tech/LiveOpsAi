@@ -6,6 +6,7 @@ import { PlanCoverage, fetchPlanCoverage, planStatusesRead } from "../lib/db/mon
 import { commitmentsRead } from "../lib/db/brandContracts";
 import { AffiliateTodoData, fetchAffiliateTodoData } from "../lib/db/affiliateActuals";
 import { todayVn } from "../lib/performance/brandCommitment";
+import { fetchShiftAcks, type ShiftAck } from "../lib/db/shiftAcks";
 
 // Khối "Việc cần làm" ở đầu Bảng Vận Hành — màn đầu tiên của ops sau khi đăng nhập (audit người mới 2026-10-04).
 // Trước đây màn đó chỉ có "Không có ca nào hôm nay" trong khi kế hoạch còn nháp, số liệu cũ 12 ngày, chưa brand nào
@@ -48,6 +49,8 @@ export const TodoPanel: React.FC<Props> = ({ brands, channels, sessions, shiftSl
   const [affiliate, setAffiliate] = useState<AffiliateTodoData | null | undefined>(undefined);
   // Độ phủ kế hoạch (ca ngoài kế hoạch, ca tăng cường): lỗi ⇒ null = bỏ qua hai việc này chứ không chặn cả khối.
   const [coverage, setCoverage] = useState<PlanCoverage | null | undefined>(undefined);
+  // "Đã nhận lịch" (0169): lỗi (DB chưa chạy 0169) ⇒ null = bỏ qua việc "chưa nhận lịch".
+  const [acks, setAcks] = useState<ShiftAck[] | null | undefined>(undefined);
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
@@ -57,15 +60,16 @@ export const TodoPanel: React.FC<Props> = ({ brands, channels, sessions, shiftSl
     fetchPlanCoverage(month).then((c) => alive && setCoverage(c)).catch(() => alive && setCoverage(null));
     commitmentsRead.take().then((c) => alive && setCommitments(c)).catch(() => alive && setCommitments([]));
     fetchAffiliateTodoData([prevMonthOf(month), month, nextMonthOf(month)]).then((a) => alive && setAffiliate(a)).catch(() => alive && setAffiliate(null));
+    fetchShiftAcks(todayVn()).then((a) => alive && setAcks(a)).catch(() => alive && setAcks(null));
     return () => {
       alive = false;
     };
   }, [month]);
 
   const todos = useMemo(() => {
-    if (!plansThisMonth || !plansNextMonth || !commitments || affiliate === undefined || coverage === undefined) return null;
-    return buildTodos({ today, brands, channels, sessions, shiftSlots, plansThisMonth, plansNextMonth, coverage: coverage ?? undefined, commitments, rates, monthlyReports, talents, canSeeMoney, affiliate: affiliate ?? undefined }).filter((t) => canOpenTab(t.tab));
-  }, [today, brands, channels, sessions, shiftSlots, plansThisMonth, plansNextMonth, coverage, commitments, rates, monthlyReports, talents, canSeeMoney, affiliate, canOpenTab]);
+    if (!plansThisMonth || !plansNextMonth || !commitments || affiliate === undefined || coverage === undefined || acks === undefined) return null;
+    return buildTodos({ today, acks: acks ?? undefined, brands, channels, sessions, shiftSlots, plansThisMonth, plansNextMonth, coverage: coverage ?? undefined, commitments, rates, monthlyReports, talents, canSeeMoney, affiliate: affiliate ?? undefined }).filter((t) => canOpenTab(t.tab));
+  }, [today, acks, brands, channels, sessions, shiftSlots, plansThisMonth, plansNextMonth, coverage, commitments, rates, monthlyReports, talents, canSeeMoney, affiliate, canOpenTab]);
 
   if (todos === null) return null; // đang tải — không vẽ khung rỗng rồi nhảy
   const shown = expanded ? todos : todos.slice(0, COLLAPSED_COUNT);

@@ -10,6 +10,8 @@ import { findPersonClashes } from "./scheduling/conflicts";
 import { draftKeyOf, draftsFromSaved } from "./scheduling/monthPlanGrid";
 import { collectRebase } from "./scheduling/rebase";
 import { parseDayLabel } from "./affiliate/plan";
+import type { ShiftAck } from "./db/shiftAcks";
+import { unackedSoon } from "./talent/acks";
 
 // "Việc cần làm" — danh sách TỰ SINH từ dữ liệu cho màn đầu tiên sau khi đăng nhập (audit người mới 2026-10-04,
 // Nhóm 4/5). Người cũ biết thứ tự việc (hợp đồng → giá → kế hoạch → chốt người → up số → report); người mới mở app
@@ -35,6 +37,10 @@ export interface Todo {
 
 export interface TodoInput {
   today: string; // YYYY-MM-DD
+  /** Dòng "Đã nhận lịch" (0169) — vắng = DB chưa chạy 0169 / đọc lỗi ⇒ bỏ qua việc "chưa nhận lịch". */
+  acks?: ShiftAck[];
+  /** Giờ hiện tại (ms) cho việc tính theo giờ — vắng thì Date.now(). */
+  nowMs?: number;
   brands: Brand[];
   /** Kênh brand × sàn (0149) — việc theo sàn chỉ nhắc kênh ĐANG CHẠY. */
   channels: BrandChannel[];
@@ -284,6 +290,25 @@ export function buildTodos(input: TodoInput): Todo[] {
       tab: "calendar",
       action: "Mở Bảng Vận Hành"
     });
+  }
+
+  // 9b. Người đứng ca trong 48 giờ tới chưa bấm "Đã nhận" lịch (app talent T2, 0169). Ca sát giờ (≤ 12 giờ) ⇒ đỏ: gọi nhắc
+  // trước khi người đó không tới. Gồm cả người chỉ đứng một đoạn khi đổi người giữa ca.
+  if (input.acks) {
+    const now = input.nowMs ?? Date.now();
+    const people = unackedSoon(sessions, input.acks, now, 48);
+    if (people.length > 0) {
+      const shifts = new Set(people.flatMap((p) => p.sessions.map((s) => s.id))).size;
+      const first = (p: (typeof people)[number]) => `${fmtDateVn(p.sessions[0].date, false)} ${p.sessions[0].startTime}`;
+      out.push({
+        id: "unacked-shifts",
+        level: people.some((p) => p.firstStartMs - now <= 12 * 3600_000) ? "high" : "medium",
+        title: `${people.length} người chưa nhận lịch ${shifts} ca trong 48 giờ tới`,
+        detail: `${people.slice(0, 4).map((p) => `${p.name} (${p.sessions.length} ca, sớm nhất ${first(p)})`).join(", ")}${people.length > 4 ? ` và ${people.length - 4} người khác` : ""}. Talent bấm "Đã nhận" ở tab Hôm nay của app; chưa nhận thì nhắn/gọi nhắc.`,
+        tab: "calendar",
+        action: "Mở Bảng Vận Hành"
+      });
+    }
   }
 
   // 10. Ca chờ đăng ký trong 7 ngày tới chưa có người.
