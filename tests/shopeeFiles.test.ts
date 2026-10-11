@@ -64,6 +64,12 @@ describe("Live List → phiên", () => {
     expect(st[1].durationSec).toBe(2 * 3600 + 15 * 60 + 40);
     expect(st[1].avgViewSec).toBe(60);
   });
+  test("phiên đang chạy lúc tải file (Duration 0) = chưa kết thúc, không phải phiên 0 phút", () => {
+    const running = [PERIOD, 13347498, 3, "SALE NGÀY ĐÔI", "30-09-2026 09:59", "00:00:00", 100, 20, 30, "00:00:40", 2110, 32, 30, 40, 38, "₫10.518.280", "₫9.000.000"];
+    const st = readShopeeStreams(parseShopeeLiveList(live([running])).rows);
+    expect(st[0].endAt).toBeUndefined();
+    expect(shopeeStreamsToSnapshotRows(st)[0].endedAt).toBeUndefined();
+  });
   test("từ chối: không phải file Live List, thiếu cột, trải 2 tháng, giờ hỏng, rỗng", () => {
     expect(() => parseShopeeLiveList([["a", "b"], [1, 2]])).toThrow(/Live List/);
     expect(() => parseShopeeLiveList([LIVE_HEAD.filter((h) => h !== "Viewers"), [PERIOD, 1, 1, "x", "30-09-2026 22:00", "01:00:00"]])).toThrow(/Thiếu cột/);

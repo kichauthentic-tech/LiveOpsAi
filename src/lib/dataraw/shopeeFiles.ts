@@ -149,7 +149,8 @@ export interface ShopeeStream {
   date: string; // ngày bắt đầu, giờ VN
   time: string; // HH:mm
   startAt: string; // ISO +07:00
-  endAt: string;
+  /** Không có = phiên CHƯA kết thúc: Live List tải lúc phiên còn chạy để Duration 0 (ca nối up giữa phiên) ⇒ không có giờ kết thúc. */
+  endAt?: string;
   durationSec: number;
   viewers: number;
   engaged: number;
@@ -178,7 +179,7 @@ export function readShopeeStreams(data: Record<string, unknown>[]): ShopeeStream
       date: dt.date,
       time: dt.time,
       startAt: vnIso(dt.date, dt.time),
-      endAt: vnIso(dt.date, dt.time, durationSec),
+      endAt: durationSec > 0 ? vnIso(dt.date, dt.time, durationSec) : undefined,
       durationSec,
       viewers: shopeeNum(val(r, "Viewers")),
       engaged: shopeeNum(val(r, "Engaged Viewers")),

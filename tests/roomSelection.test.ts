@@ -50,6 +50,20 @@ describe("gợi ý phòng theo giờ ca", () => {
   });
 });
 
+describe("ca nối / phiên chưa kết thúc (Live List Shopee tải giữa phiên)", () => {
+  test("phiên còn live bắt đầu từ ca trước vẫn được gợi ý cho ca nối dù phần lớn thời lượng thuộc ca trước", () => {
+    // phiên 09:59 chưa kết thúc, ca nối 13:00–15:00 up lúc 15:05 ⇒ chỉ ~40% thời lượng trong ca.
+    const live = room("S", "09:59:00", undefined, 10_518_280, 32, 2110);
+    const cs = classifyRooms([live], sessionWindow(ca("13:00", "15:00")), Date.parse("2026-10-06T15:05:00+07:00"));
+    expect(cs[0].overlapShare).toBeLessThan(0.5);
+    expect(cs[0].suggested).toBe(true);
+  });
+  test("phòng đã có ở ca trước (ca nối) được gợi ý dù đã kết thúc và chỉ chạm một phần ca này", () => {
+    const cs = classifyRooms(rows, sessionWindow(ca("12:30", "15:00")), Date.now(), ["B"]);
+    expect(cs.find((c) => c.row.roomId === "B")!.suggested).toBe(true);
+  });
+});
+
 describe("tổng các phòng đã chọn", () => {
   test("cộng GMV / đơn / view", () => {
     expect(sumRooms(rows.slice(0, 2))).toEqual({ rooms: 2, gmv: 3_117_926, orders: 10, views: 1087 });

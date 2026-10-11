@@ -8,7 +8,8 @@ import { sessionMinutes } from "../staffSegments";
 // mình trước khi gửi; client chỉ gửi các dòng đã tick nên DB không phải đoán.
 //
 // Quy tắc "phòng này có thể thuộc ca" CÙNG LUẬT với session_room_deltas (0078/0124): phòng kết thúc sau giờ vào ca (hoặc chưa
-// kết thúc) và bắt đầu trước giờ cuối cửa sổ. Phòng ngoài cửa sổ DB sẽ bỏ qua nên picker không cho tick.
+// kết thúc) và bắt đầu trước giờ cuối cửa sổ. Luật này chỉ để GỢI Ý — trợ vẫn tick được phòng ngoài cửa sổ (giờ trong file có
+// thể sai, vd Live List Shopee tải giữa phiên để Duration 0); dòng đã tick mang raw.picked nên DB nhận mà không lọc lại (0168).
 
 export interface SessionWindow {
   startMs: number;
@@ -30,13 +31,15 @@ export interface RoomChoice {
   overlapMin: number;
   /** Phần của phòng nằm trong ca (0..1). Thấp = phòng chủ yếu thuộc ca khác, chỉ chạm rìa ca này. */
   overlapShare: number;
-  /** Nên tick sẵn: nằm trong ca và phần lớn thời lượng thuộc ca này. */
+  /** Nên tick sẵn: nằm trong ca và phần lớn thời lượng thuộc ca này — hoặc phòng còn đang live / ca trước đã có phòng này (ca nối:
+   *  phần của ca trước được trừ nên tỷ lệ thời lượng không nói lên gì). */
   suggested: boolean;
 }
 
 /** Phòng chạm rìa ca (< 50% thời lượng nằm trong ca) mặc định KHÔNG tick: nếu ca kề đó chưa up file thì số cả phòng
  *  sẽ bị tính hết cho ca này. */
-export function classifyRooms(rows: SnapshotRoomRow[], win: SessionWindow, now = Date.now()): RoomChoice[] {
+export function classifyRooms(rows: SnapshotRoomRow[], win: SessionWindow, now = Date.now(), carryRoomIds: string[] = []): RoomChoice[] {
+  const carry = new Set(carryRoomIds);
   return rows
     .map((row) => {
       const start = row.startedAt ? Date.parse(row.startedAt) : NaN;
@@ -46,7 +49,7 @@ export function classifyRooms(rows: SnapshotRoomRow[], win: SessionWindow, now =
       const overlapMs = Math.max(Math.min(end, win.endMs) - Math.max(s, win.startMs), 0);
       const total = Math.max(end - s, 1);
       const overlapShare = inWindow ? Math.min(overlapMs / total, 1) : 0;
-      return { row, inWindow, overlapMin: Math.round(overlapMs / 60000), overlapShare, suggested: inWindow && overlapShare >= 0.5 };
+      return { row, inWindow, overlapMin: Math.round(overlapMs / 60000), overlapShare, suggested: inWindow && (overlapShare >= 0.5 || !row.endedAt || carry.has(row.roomId)) };
     })
     .sort((a, b) => (Date.parse(a.row.startedAt ?? "") || 0) - (Date.parse(b.row.startedAt ?? "") || 0));
 }

@@ -43,10 +43,10 @@ export function SnapshotRoomPicker({ session: s, rows, fileName, untilMin, previ
   const noun = prof.liveFileRowNoun; // "phòng" (TikTok) / "phiên" (Shopee)
   const viewsWord = prof.viewsLabel.toLowerCase();
   const win = useMemo(() => sessionWindow(s, untilMin), [s, untilMin]);
-  const choices = useMemo(() => classifyRooms(rows, win), [rows, win]);
+  const choices = useMemo(() => classifyRooms(rows, win, Date.now(), prevBaseline?.roomIds), [rows, win, prevBaseline?.roomIds]);
   const [picked, setPicked] = useState<Set<string>>(() => {
     const prev = new Set(previouslySelected ?? []);
-    const fromPrev = choices.filter((c) => c.inWindow && prev.has(c.row.roomId));
+    const fromPrev = choices.filter((c) => prev.has(c.row.roomId));
     return new Set((fromPrev.length > 0 ? fromPrev : choices.filter((c) => c.suggested)).map((c) => c.row.roomId));
   });
   const [reasons, setReasons] = useState<Record<string, BreakReason>>({});
@@ -60,7 +60,8 @@ export function SnapshotRoomPicker({ session: s, rows, fileName, untilMin, previ
       else n.add(id);
       return n;
     });
-  const edgeTicked = choices.filter((c) => picked.has(c.row.roomId) && c.overlapShare < 0.5);
+  const edgeTicked = choices.filter((c) => picked.has(c.row.roomId) && c.inWindow && c.overlapShare < 0.5 && c.row.endedAt);
+  const outsideTicked = choices.filter((c) => picked.has(c.row.roomId) && !c.inWindow);
   const missingFromPrev = prevBaseline ? roomsMissingFromPrev(selected, prevBaseline) : [];
   const endClock = new Date(win.endMs).toLocaleTimeString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit" });
 
@@ -80,21 +81,23 @@ export function SnapshotRoomPicker({ session: s, rows, fileName, untilMin, previ
           return (
             <li key={c.row.roomId}>
               <label
-                className={`flex items-start gap-2.5 rounded-lg border px-2.5 py-2 text-xs ${
-                  !c.inWindow ? "opacity-45 border-[var(--border)]" : on ? "border-emerald-700 bg-emerald-950/30 cursor-pointer" : "border-[var(--border)] cursor-pointer"
+                className={`flex items-start gap-2.5 rounded-lg border px-2.5 py-2 text-xs cursor-pointer ${
+                  on ? (c.inWindow ? "border-emerald-700 bg-emerald-950/30" : "border-amber-700 bg-amber-950/20") : c.inWindow ? "border-[var(--border)]" : "border-[var(--border)] opacity-60"
                 }`}
               >
-                <input type="checkbox" className="mt-0.5 w-4 h-4 shrink-0" checked={on} disabled={!c.inWindow} onChange={() => toggle(c.row.roomId)} />
+                <input type="checkbox" className="mt-0.5 w-4 h-4 shrink-0" checked={on} onChange={() => toggle(c.row.roomId)} />
                 <span className="min-w-0 flex-1 space-y-0.5">
                   <span className="block font-bold text-[var(--text)]">
-                    {vnTime(c.row.startedAt)} → {c.row.endedAt ? vnTime(c.row.endedAt) : "đang live"} <span className="font-normal text-[var(--text-muted)]">({dur(c.row.durationMinutes)})</span>
+                    {vnTime(c.row.startedAt)} → {c.row.endedAt ? vnTime(c.row.endedAt) : "đang live"}
+                    {c.row.endedAt && <span className="font-normal text-[var(--text-muted)]"> ({dur(c.row.durationMinutes)})</span>}
+                    {c.suggested && <span className="ml-1.5 rounded bg-emerald-900/60 px-1.5 py-px text-[11px] font-bold text-emerald-200">gợi ý</span>}
                   </span>
                   <span className="block font-mono text-[11px] text-[var(--text-muted)]">
                     GMV {fmtVndFull(c.row.gmv)} · {fmtCount(c.row.orders)} đơn · {fmtCount(c.row.views)} {viewsWord} · {noun} {shortRoomId(c.row.roomId)}
                     {c.row.roomTitle ? ` · "${c.row.roomTitle}"` : ""}
                   </span>
-                  {!c.inWindow && <span className="block text-[11px] text-[var(--text-faint)]">Ngoài giờ ca — không tính cho ca này.</span>}
-                  {c.inWindow && c.overlapShare < 0.5 && (
+                  {!c.inWindow && <span className="block text-[11px] text-[var(--text-faint)]">Ngoài giờ ca theo file — thường là của ca khác.</span>}
+                  {c.inWindow && c.overlapShare < 0.5 && c.row.endedAt && !c.suggested && (
                     <span className="block text-[11px] text-amber-300">Chỉ {Math.round(c.overlapShare * 100)}% {noun} nằm trong ca này — nhiều khả năng của ca kề bên.</span>
                   )}
                 </span>
@@ -118,6 +121,13 @@ export function SnapshotRoomPicker({ session: s, rows, fileName, untilMin, previ
         <p className="text-[11px] text-amber-300 flex items-start gap-1.5">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
           Bạn đã tick {noun} chủ yếu nằm ngoài ca. Nếu ca kề bên chưa up file thì số cả {noun} sẽ bị tính cho ca này.
+        </p>
+      )}
+
+      {outsideTicked.length > 0 && (
+        <p className="text-[11px] text-amber-300 flex items-start gap-1.5">
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
+          Bạn đã tick {outsideTicked.length} {noun} nằm ngoài giờ ca theo file ({outsideTicked.map((c) => shortRoomId(c.row.roomId)).join(", ")}). App vẫn tính cho ca này — chỉ tick khi chắc {noun} đó đúng là của ca.
         </p>
       )}
 
@@ -154,7 +164,7 @@ export function SnapshotRoomPicker({ session: s, rows, fileName, untilMin, previ
         </button>
         <button
           type="button"
-          onClick={() => onConfirm(selected, reasons)}
+          onClick={() => onConfirm(selected.map((r) => ({ ...r, raw: { ...r.raw, picked: true } })), reasons)}
           disabled={busy || selected.length === 0}
           className="flex-1 min-h-11 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black text-sm"
         >
