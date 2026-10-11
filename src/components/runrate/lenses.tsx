@@ -60,9 +60,18 @@ export const MonthLens: React.FC<{ r: AccountRunRate; color: string }> = ({ r, c
 // Đợt campaign
 // ---------------------------------------------------------------------------
 
-const WaveCard: React.FC<{ w: RRWave; onFocus: (f: LensFocus) => void; active: boolean }> = ({ w, onFocus, active }) => {
+/** Màu cho "phải chạy X% target các ngày còn lại": cùng ngưỡng run-rate, đảo chiều (cần 105% ≈ đang ở 95%). */
+const toneOfNeed = (need: number): ReturnType<typeof toneOfPct> => toneOfPct(need > 0 ? 1 / need : 1);
+
+/** "pace" = run-rate (đạt ÷ kỳ vọng tới nay); "whole" = đạt ÷ target cả đợt. */
+export type WaveMode = "pace" | "whole";
+
+const WaveCard: React.FC<{ w: RRWave; mode: WaveMode; onFocus: (f: LensFocus) => void; active: boolean }> = ({ w, mode, onFocus, active }) => {
   const tone = toneOfPct(w.runRate);
   const camp = w.bucket !== "daily";
+  const next = w.status === "next";
+  const whole = mode === "whole";
+  const big = whole ? w.pctTarget : w.runRate;
   return (
     <div className={`relative rounded-2xl border p-4 flex flex-col gap-3 bg-[var(--surface)] overflow-hidden transition-colors ${active ? "border-[var(--accent)]" : "border-[var(--border)]"}`}>
       <span className="absolute inset-x-0 top-0 h-1" style={{ background: BUCKET_COLOR[w.bucket], opacity: camp ? 1 : 0.4 }} />
@@ -75,19 +84,41 @@ const WaveCard: React.FC<{ w: RRWave; onFocus: (f: LensFocus) => void; active: b
       </div>
       <div className="flex items-end justify-between gap-2">
         <div>
-          <div className={`text-3xl font-black leading-none ${tabular}`} style={{ color: w.status === "next" ? "var(--text-faint)" : TONE_VAR[tone] }}>{w.status === "next" ? "—" : pct(w.runRate)}</div>
-          <div className="text-[11px] text-[var(--text-faint)] mt-1">run-rate của đợt</div>
+          <div className={`text-3xl font-black leading-none ${tabular}`} style={{ color: next ? "var(--text-faint)" : TONE_VAR[tone] }}>{next ? "—" : pct(big)}</div>
+          <div className="text-[11px] text-[var(--text-faint)] mt-1">{whole ? "đã đạt / target cả đợt" : "run-rate của đợt"}</div>
         </div>
-        {w.status !== "next" && <TonePill tone={tone}>{tone === "good" ? "Đúng tiến độ" : tone === "warn" ? "Hơi chậm" : tone === "bad" ? "Chậm" : "Chưa có số"}</TonePill>}
+        {!next && <TonePill tone={tone}>{tone === "good" ? "Đúng tiến độ" : tone === "warn" ? "Hơi chậm" : tone === "bad" ? "Chậm" : "Chưa có số"}</TonePill>}
       </div>
-      <PctBar value={w.status === "next" ? null : w.runRate} tone={tone} label={`Run-rate đợt ${w.label}: ${pct(w.runRate)}`} />
+      {whole ? (
+        <PctBar value={next ? null : w.pctTarget} tone={tone} max={1} mark={w.target > 0 ? w.targetToDate / w.target : 0} label={`Đợt ${w.label}: đạt ${pct(w.pctTarget)} target cả đợt, kỳ vọng tới nay ${pct(w.target > 0 ? w.targetToDate / w.target : null)}`} />
+      ) : (
+        <PctBar value={next ? null : w.runRate} tone={tone} label={`Run-rate đợt ${w.label}: ${pct(w.runRate)}`} />
+      )}
       <dl className="grid grid-cols-3 gap-2 text-xs">
-        <div><dt className="text-[var(--text-faint)]">Đạt</dt><dd className={`font-bold text-[var(--text)] ${tabular}`}>{w.status === "next" ? "—" : money(w.actual)}</dd></div>
-        <div><dt className="text-[var(--text-faint)]">Kỳ vọng tới nay</dt><dd className={`font-bold text-[var(--text-muted)] ${tabular}`}>{w.status === "next" ? "—" : money(w.targetToDate)}</dd></div>
+        <div><dt className="text-[var(--text-faint)]">Đạt</dt><dd className={`font-bold text-[var(--text)] ${tabular}`}>{next ? "—" : money(w.actual)}</dd></div>
+        {whole ? (
+          <div><dt className="text-[var(--text-faint)]">Còn thiếu</dt><dd className={`font-bold ${tabular} ${w.gap > 0 || next ? "text-[var(--text)]" : "text-emerald-400"}`}>{next ? "—" : w.gap > 0 ? money(w.gap) : "đủ"}</dd></div>
+        ) : (
+          <div><dt className="text-[var(--text-faint)]">Kỳ vọng tới nay</dt><dd className={`font-bold text-[var(--text-muted)] ${tabular}`}>{next ? "—" : money(w.targetToDate)}</dd></div>
+        )}
         <div><dt className="text-[var(--text-faint)]">Target đợt</dt><dd className={`font-bold text-[var(--text-muted)] ${tabular}`}>{money(w.target)}</dd></div>
       </dl>
-      <div className="flex items-center justify-between gap-2 text-xs text-[var(--text-faint)]">
-        <span>{w.shiftsDone}/{w.shifts} ca có số{w.status !== "next" && w.pctTarget != null ? ` · ${pct(w.pctTarget)} target cả đợt` : ""}</span>
+      <div className="text-xs text-[var(--text-faint)]">
+        {whole ? (
+          next ? (
+            <span>{w.shifts} ca kế hoạch · chưa bắt đầu</span>
+          ) : w.gap <= 0 ? (
+            <span>Đã về đủ target đợt · run-rate {pct(w.runRate)}</span>
+          ) : w.daysLeft === 0 || w.needRate == null ? (
+            <span>Đợt đã hết ngày · hụt {money(w.gap)}</span>
+          ) : (
+            <span>
+              Còn {w.daysLeft} ngày phải chạy <b style={{ color: TONE_VAR[toneOfNeed(w.needRate)] }}>{pct(w.needRate)}</b> target các ngày đó
+            </span>
+          )
+        ) : (
+          <span>{w.shiftsDone}/{w.shifts} ca có số{!next && w.pctTarget != null ? ` · ${pct(w.pctTarget)} target cả đợt` : ""}</span>
+        )}
       </div>
       <div className="flex flex-wrap gap-2 mt-auto pt-1">
         <button type="button" onClick={() => onFocus({ lens: "day", wave: w.bucket })} className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1.5 rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] hover:border-[var(--accent)] min-h-[28px]">
@@ -101,18 +132,56 @@ const WaveCard: React.FC<{ w: RRWave; onFocus: (f: LensFocus) => void; active: b
   );
 };
 
-export const WaveLens: React.FC<{ r: AccountRunRate; waveFilter: CampDayBucket | null; onFocus: (f: LensFocus) => void }> = ({ r, waveFilter, onFocus }) => (
-  <div className="space-y-3">
-    <SectionTitle title="Từng đợt campaign" note="Mỗi đợt tính run-rate riêng: thực đạt ÷ target các ca của đợt tới ngày số tới" />
-    {r.waves.length === 0 ? (
-      <Card><p className="text-sm text-[var(--text-muted)]">Kế hoạch tháng này chưa có ca nào có target.</p></Card>
-    ) : (
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {r.waves.map((w) => <WaveCard key={w.bucket} w={w} onFocus={onFocus} active={waveFilter === w.bucket} />)}
+const WAVE_MODES: { id: WaveMode; label: string; note: string }[] = [
+  { id: "pace", label: "Tiến độ", note: "Run-rate: thực đạt ÷ target các ca của đợt tới ngày số tới" },
+  { id: "whole", label: "Cả đợt", note: "Thực đạt ÷ target cả đợt; vạch trên thanh là mức kỳ vọng tới nay" }
+];
+
+const WAVE_MODE_KEY = "runrate.waveMode";
+const readWaveMode = (): WaveMode => {
+  try {
+    return localStorage.getItem(WAVE_MODE_KEY) === "whole" ? "whole" : "pace";
+  } catch {
+    return "pace";
+  }
+};
+
+export const WaveLens: React.FC<{ r: AccountRunRate; waveFilter: CampDayBucket | null; onFocus: (f: LensFocus) => void }> = ({ r, waveFilter, onFocus }) => {
+  const [mode, setMode] = React.useState<WaveMode>(readWaveMode);
+  const pick = (m: WaveMode) => {
+    setMode(m);
+    try {
+      localStorage.setItem(WAVE_MODE_KEY, m);
+    } catch {
+      /* chỉ là tiện ích nhớ lựa chọn */
+    }
+  };
+  const cur = WAVE_MODES.find((m) => m.id === mode)!;
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-1">
+        <div className="min-w-0">
+          <h3 className="text-base sm:text-lg font-black text-[var(--text)]">Từng đợt campaign</h3>
+          <p className="text-xs text-[var(--text-faint)]">{cur.note}</p>
+        </div>
+        <div role="group" aria-label="Cách tính % của đợt" className="inline-flex items-center p-0.5 rounded-xl bg-[var(--surface-base)] border border-[var(--border)]">
+          {WAVE_MODES.map((m) => (
+            <button key={m.id} type="button" aria-pressed={mode === m.id} onClick={() => pick(m.id)} className={`px-3 py-1.5 rounded-[10px] text-xs font-bold min-h-[30px] transition-colors ${mode === m.id ? "bg-[var(--accent)] text-[var(--accent-contrast)]" : "text-[var(--text-muted)] hover:text-[var(--text)]"}`}>
+              {m.label}
+            </button>
+          ))}
+        </div>
       </div>
-    )}
-  </div>
-);
+      {r.waves.length === 0 ? (
+        <Card><p className="text-sm text-[var(--text-muted)]">Kế hoạch tháng này chưa có ca nào có target.</p></Card>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {r.waves.map((w) => <WaveCard key={w.bucket} w={w} mode={mode} onFocus={onFocus} active={waveFilter === w.bucket} />)}
+        </div>
+      )}
+    </div>
+  );
+};
 
 // ---------------------------------------------------------------------------
 // Ngày

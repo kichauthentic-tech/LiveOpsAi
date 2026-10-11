@@ -41,13 +41,14 @@ export const BucketChip: React.FC<{ bucket: CampDayBucket; label: string }> = ({
 
 export const toneOfPct = (v: number | null): RunRateTone => (v == null ? "none" : v >= RUN_RATE_WARN ? "good" : v >= RUN_RATE_BAD ? "warn" : "bad");
 
-/** Thanh tiến độ gọn: nền ba vùng đỏ/vàng/xanh nhạt, vạch 100%. Cùng thang với RunRateBar của Dashboard. */
-export const PctBar: React.FC<{ value: number | null; tone: RunRateTone; max?: number; height?: number; label?: string }> = ({ value, tone, max = 1.4, height = 8, label }) => {
+/** Thanh tiến độ gọn: nền ba vùng đỏ/vàng/xanh nhạt, vạch 100%. Cùng thang với RunRateBar của Dashboard.
+ *  `mark`: đặt vạch ở mốc khác 100% (vd mức kỳ vọng tới nay khi thanh là % target cả đợt). */
+export const PctBar: React.FC<{ value: number | null; tone: RunRateTone; max?: number; height?: number; label?: string; mark?: number }> = ({ value, tone, max = 1.4, height = 8, label, mark = 1 }) => {
   const w = (v: number) => `${(Math.min(v, max) / max) * 100}%`;
   return (
     <div className="relative rounded-full overflow-hidden bg-[var(--surface-base)] w-full" style={{ height }} role="img" aria-label={label ?? (value == null ? "chưa có số" : `${Math.round(value * 100)}%`)}>
       {value != null && <div className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-500" style={{ width: w(value), background: TONE_VAR[tone] }} />}
-      <div className="absolute inset-y-0 w-px bg-[var(--text)] opacity-60" style={{ left: w(1) }} />
+      <div className="absolute inset-y-0 w-px bg-[var(--text)] opacity-60" style={{ left: w(mark) }} />
     </div>
   );
 };

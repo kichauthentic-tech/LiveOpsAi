@@ -87,6 +87,18 @@ describe("buildAccountRunRate — cắt ở ngày số tới", () => {
     expect(r.waves.find((w) => w.bucket === "daily")!.status).toBe("live");
   });
 
+  test("đợt theo cả đợt: % target cả đợt, còn thiếu, và các ngày còn lại phải chạy bao nhiêu % target của chúng", () => {
+    const r = buildAccountRunRate(rrOf(), "2026-10-06");
+    for (const w of r.waves) {
+      expect(w.pctTarget).toBeCloseTo(w.actual / w.target);
+      expect(w.gap).toBe(Math.max(0, w.target - w.actual));
+      expect(w.daysLeft).toBe(w.days.filter((d) => d > "2026-10-06").length);
+      const left = w.target - w.targetToDate;
+      if (left > 0) expect(w.needRate! * left).toBeCloseTo(w.gap);
+      else expect(w.needRate).toBeNull();
+    }
+  });
+
   test("ca: giữ đủ ca kế hoạch theo thứ tự, ca huỷ có state cancelled, ca có số mang tên host + trợ", () => {
     const r = buildAccountRunRate(rrOf(), "2026-10-06");
     expect(r.shifts.map((s) => s.date)).toEqual(["2026-10-02", "2026-10-03", "2026-10-04", "2026-10-05", "2026-10-12"]);

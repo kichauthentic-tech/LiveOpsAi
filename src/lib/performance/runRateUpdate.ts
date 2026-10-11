@@ -63,6 +63,12 @@ export interface RRWave extends RRLine {
   shiftsDone: number;
   /** Thực đạt ÷ target CẢ đợt (khác run-rate: mẫu số là cả đợt, kể cả phần chưa tới). */
   pctTarget: number | null;
+  /** Số ngày của đợt chưa vào run-rate (sau ngày số tới). */
+  daysLeft: number;
+  /** Target đợt − thực đạt (≥ 0): phần còn phải làm để về target cả đợt. */
+  gap: number;
+  /** Các ngày còn lại phải chạy bao nhiêu % target của chính chúng để về đủ target đợt; null khi không còn ngày/target. */
+  needRate: number | null;
 }
 
 export interface RRWeek extends RRLine {
@@ -195,7 +201,10 @@ export function buildAccountRunRate(rr: PlanRunRate, asOf: string | null): Accou
         status: statusOf(b.days, asOf),
         shifts: inB.length,
         shiftsDone: inB.filter((t) => t.state === "done").length,
-        pctTarget: l.target > 0 ? l.actual / l.target : null
+        pctTarget: l.target > 0 ? l.actual / l.target : null,
+        daysLeft: b.days.filter((d) => !dayOf.get(d)!.counted).length,
+        gap: Math.max(0, l.target - l.actual),
+        needRate: l.target - l.targetToDate > 0 ? Math.max(0, l.target - l.actual) / (l.target - l.targetToDate) : null
       };
     })
     .filter((w) => w.target > 0 || w.actual > 0);
@@ -346,7 +355,7 @@ export function runRateExportSheets(accounts: ExportAccount[]): { name: string; 
   const waves: Row[] = withReport.flatMap((a) =>
     a.report.waves.map((w) => ({
       "Tài khoản": a.name, "Đợt": w.label, "Từ": w.from, "Đến": w.to, "Trạng thái": STATUS_LABEL[w.status],
-      "Target đợt": round(w.target), "Kỳ vọng tới ngày": round(w.targetToDate), "Thực đạt": round(w.actual), "Run-rate (%)": pctNum(w.runRate), "Số ca": w.shifts, "Ca có số": w.shiftsDone
+      "Target đợt": round(w.target), "Kỳ vọng tới ngày": round(w.targetToDate), "Thực đạt": round(w.actual), "Run-rate (%)": pctNum(w.runRate), "% target cả đợt": pctNum(w.pctTarget), "Còn thiếu": round(w.gap), "Ngày còn lại": w.daysLeft, "Cần đạt các ngày còn lại (% target)": pctNum(w.needRate), "Số ca": w.shifts, "Ca có số": w.shiftsDone
     }))
   );
   const days: Row[] = withReport.flatMap((a) =>
