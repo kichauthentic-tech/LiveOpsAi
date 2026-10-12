@@ -13,6 +13,18 @@ interface Msg {
   meta?: string;
   error?: boolean;
 }
+const MODELS: Record<Prefer, { id: string; label: string }[]> = {
+  claude: [
+    { id: "claude-opus-5-5", label: "Opus 5.5 (mạnh nhất)" },
+    { id: "claude-sonnet-5-5", label: "Sonnet 5.5 (cân bằng)" },
+    { id: "claude-haiku-5-5", label: "Haiku 5.5 (nhanh)" }
+  ],
+  gemini: [
+    { id: "gemini-flash-latest", label: "Flash" },
+    { id: "gemini-flash-lite-latest", label: "Flash-Lite (nhẹ, ít quá tải)" },
+    { id: "gemini-pro-latest", label: "Pro (mạnh nhất)" }
+  ]
+};
 const PREF_KEY = "control-room-ask-provider";
 const NAME: Record<Prefer, string> = { claude: "Claude", gemini: "Gemini" };
 const SUGGEST = [
@@ -23,21 +35,21 @@ const SUGGEST = [
   "Ai đang quá tải?"
 ];
 
-function readPref(): { prefer: Prefer; fallback: boolean } {
+function readPref(): { prefer: Prefer; fallback: boolean; models: Partial<Record<Prefer, string>> } {
   try {
     const v = JSON.parse(localStorage.getItem(PREF_KEY) ?? "null");
-    if (v && (v.prefer === "claude" || v.prefer === "gemini")) return { prefer: v.prefer, fallback: v.fallback !== false };
+    if (v && (v.prefer === "claude" || v.prefer === "gemini")) return { prefer: v.prefer, fallback: v.fallback !== false, models: v.models && typeof v.models === "object" ? v.models : {} };
   } catch {
     /* trình duyệt chặn bộ nhớ — dùng mặc định */
   }
-  return { prefer: "claude", fallback: true };
+  return { prefer: "claude", fallback: true, models: {} };
 }
 
 /** Lời giải thích đọc được từ một lần trả lời / lỗi của server (`switched` = các bên đã thử mà không trả lời được). */
-function metaOf(provider: Prefer | undefined, switched: { provider: Prefer; reason: string }[] | undefined): string {
+function metaOf(provider: Prefer | undefined, model: string | undefined, switched: { provider: Prefer; reason: string }[] | undefined): string {
   const tried = (switched ?? []).map((s) => `${NAME[s.provider]} ${s.reason}`).join("; ");
   if (!provider) return tried;
-  return `Trả lời bởi ${NAME[provider]}${tried ? ` (đã chuyển vì ${tried})` : ""}`;
+  return `Trả lời bởi ${NAME[provider]}${model ? ` · ${model}` : ""}${tried ? ` (đã chuyển vì ${tried})` : ""}`;
 }
 
 /** Hiện câu trả lời: **đậm** và dòng gạch đầu dòng ("* ", "- "). Dựng thành phần React (không chèn HTML) nên an toàn. */
@@ -82,6 +94,7 @@ export const AskPanel: React.FC<{ open: boolean; onClose: () => void; buildConte
     endRef.current?.scrollIntoView({ block: "end" });
   }, [msgs, busy]);
 
+  const curModel = MODELS[pref.prefer].some((m) => m.id === pref.models[pref.prefer]) ? pref.models[pref.prefer]! : MODELS[pref.prefer][0].id;
   const ask = async (question: string) => {
     const text = question.trim();
     if (!text || busy) return;
@@ -93,12 +106,12 @@ export const AskPanel: React.FC<{ open: boolean; onClose: () => void; buildConte
       const res = await authedFetch("/api/ai/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: text, history, context: buildContext(), prefer: pref.prefer, fallback: pref.fallback })
+        body: JSON.stringify({ question: text, history, context: buildContext(), prefer: pref.prefer, fallback: pref.fallback, model: curModel })
       });
       const body = await res.json().catch(() => ({}));
-      if (res.ok && body.success) setMsgs((m) => [...m, { role: "assistant", text: String(body.text), meta: metaOf(body.provider, body.switched) }]);
+      if (res.ok && body.success) setMsgs((m) => [...m, { role: "assistant", text: String(body.text), meta: metaOf(body.provider, body.model, body.switched) }]);
       else {
-        const why = body.code === "ai_not_configured" ? "Server chưa có khoá API của Claude lẫn Gemini." : body.switched ? `Chưa hỏi được: ${metaOf(undefined, body.switched)}.` : body.error || "Chưa hỏi được, thử lại sau ít phút.";
+        const why = body.code === "ai_not_configured" ? "Server chưa có khoá API của Claude lẫn Gemini." : body.switched ? `Chưa hỏi được: ${metaOf(undefined, undefined, body.switched)}.` : body.error || "Chưa hỏi được, thử lại sau ít phút.";
         setMsgs((m) => [...m, { role: "assistant", text: why, error: true }]);
       }
     } catch {
@@ -125,6 +138,9 @@ export const AskPanel: React.FC<{ open: boolean; onClose: () => void; buildConte
           {(["claude", "gemini"] as const).map((p) => (
             <button key={p} type="button" aria-pressed={pref.prefer === p} onClick={() => setPref((x) => ({ ...x, prefer: p }))} className={`px-2.5 py-1 rounded-full font-bold border min-h-[28px] ${pref.prefer === p ? "border-[var(--accent)] text-[var(--text)] bg-[var(--accent)]/15" : "border-[var(--border)] text-[var(--text-muted)]"}`}>{NAME[p]} trước</button>
           ))}
+          <select aria-label="Model" value={curModel} onChange={(e) => setPref((x) => ({ ...x, models: { ...x.models, [x.prefer]: e.target.value } }))} className="bg-[var(--surface-muted)] border border-[var(--border)] rounded-lg px-2 py-1 text-[var(--text)] min-h-[28px]">
+            {MODELS[pref.prefer].map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+          </select>
           <label className="flex items-center gap-1.5 text-[var(--text-muted)] ml-auto">
             <input type="checkbox" checked={pref.fallback} onChange={(e) => setPref((x) => ({ ...x, fallback: e.target.checked }))} className="accent-[var(--accent)]" />
             Hết lượt thì tự chuyển {NAME[pref.prefer === "claude" ? "gemini" : "claude"]}

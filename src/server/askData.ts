@@ -13,6 +13,11 @@ import { GoogleGenAI } from "@google/genai";
 export type AskProvider = "claude" | "gemini";
 export const ASK_CLAUDE_MODEL = "claude-opus-5-5";
 export const ASK_GEMINI_MODEL = "gemini-flash-latest";
+/** Model người dùng được chọn trong panel (danh sách cho phép — client gửi gì ngoài đây thì dùng mặc định). */
+export const ASK_MODELS: Record<AskProvider, readonly string[]> = {
+  claude: ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"],
+  gemini: ["gemini-flash-latest", "gemini-flash-lite-latest", "gemini-pro-latest"]
+};
 const PROVIDER_TIMEOUT_MS = 25_000;
 const MAX_CONTEXT_CHARS = 160_000;
 const MAX_QUESTION_CHARS = 2_000;
@@ -54,13 +59,13 @@ function reasonOf(e: unknown): string {
   return "lỗi tạm thời";
 }
 
-async function askClaude(apiKey: string, context: string, turns: AskTurn[]): Promise<string> {
+async function askClaude(apiKey: string, model: string, context: string, turns: AskTurn[]): Promise<string> {
   const client = new Anthropic({ apiKey, timeout: PROVIDER_TIMEOUT_MS, maxRetries: 0 });
   const res = await client.beta.messages.create({
-    model: ASK_CLAUDE_MODEL,
+    model,
     max_tokens: 4000,
     // Hỏi đáp ngắn trên số có sẵn: effort thấp cho nhanh (giới hạn 60 giây của Vercel).
-    output_config: { effort: "low" },
+    ...(model.includes("haiku") ? {} : { output_config: { effort: "low" as const } }),
     // Bị bộ lọc an toàn từ chối thì máy chủ tự chạy lại bằng model dự phòng.
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
@@ -77,10 +82,10 @@ async function askClaude(apiKey: string, context: string, turns: AskTurn[]): Pro
   return text;
 }
 
-async function askGemini(apiKey: string, context: string, turns: AskTurn[]): Promise<string> {
+async function askGemini(apiKey: string, model: string, context: string, turns: AskTurn[]): Promise<string> {
   const ai = new GoogleGenAI({ apiKey });
   const call = ai.models.generateContent({
-    model: ASK_GEMINI_MODEL,
+    model,
     contents: turns.map((t) => ({ role: t.role === "assistant" ? "model" : "user", parts: [{ text: t.text }] })),
     config: { systemInstruction: `${RULES}\n\nDỮ LIỆU (số đủ tới ngày ghi trong phần đầu):\n${context}` }
   });
@@ -126,6 +131,9 @@ export function registerAskRoute(app: express.Express, requireRoleCaller: Caller
 
     const prefer: AskProvider = body.prefer === "gemini" ? "gemini" : "claude";
     const order: AskProvider[] = body.fallback === false ? [prefer] : [prefer, prefer === "claude" ? "gemini" : "claude"];
+    // Model chỉ áp cho bên được chọn trước; bên dự phòng luôn dùng model mặc định của nó.
+    const chosen = typeof body.model === "string" && ASK_MODELS[prefer].includes(body.model) ? body.model : undefined;
+    const modelOf = (p: AskProvider) => (p === prefer && chosen ? chosen : p === "claude" ? ASK_CLAUDE_MODEL : ASK_GEMINI_MODEL);
     const keys: Record<AskProvider, string | undefined> = { claude: process.env.ANTHROPIC_API_KEY, gemini: process.env.GEMINI_API_KEY };
     const tried: Attempt[] = [];
     for (const p of order) {
@@ -135,8 +143,9 @@ export function registerAskRoute(app: express.Express, requireRoleCaller: Caller
         continue;
       }
       try {
-        const text = await withOneRetry(() => (p === "claude" ? askClaude(key, context, turns) : askGemini(key, context, turns)));
-        return res.json({ success: true, text, provider: p, model: p === "claude" ? ASK_CLAUDE_MODEL : ASK_GEMINI_MODEL, switched: tried });
+        const model = modelOf(p);
+        const text = await withOneRetry(() => (p === "claude" ? askClaude(key, model, context, turns) : askGemini(key, model, context, turns)));
+        return res.json({ success: true, text, provider: p, model, switched: tried });
       } catch (e) {
         console.error(`Hỏi số liệu — ${p} lỗi:`, e);
         tried.push({ provider: p, reason: reasonOf(e) });
