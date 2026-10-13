@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { Upload, FileSpreadsheet, Trash2, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Upload, FileSpreadsheet, Trash2, AlertTriangle, CheckCircle2, Pencil } from "lucide-react";
 import { LiveSession } from "../types";
 import {
   SessionSnapshot,
   applySessionLiveSnapshot,
   deleteSessionLiveSnapshot,
-  fetchSessionSnapshot
+  fetchSessionSnapshot,
+  setSessionSnapshotGmv
 } from "../lib/db/sessionLiveSnapshots";
 import { parseSnapshotFile, type ParsedSnapshotFile } from "../lib/liveSnapshot/extractRooms";
 import { preloadSpreadsheetReader } from "../lib/dataraw/parseDataRawExcel";
@@ -18,10 +19,21 @@ import { fmtVndFull } from "../lib/format";
 import { profileOf } from "../lib/platforms/profiles";
 import { platformOf } from "../lib/reportPlatform";
 import { dataSourceTier } from "../lib/dataSource";
+import { GmvEditor } from "./GmvEditor";
 
 interface SessionLiveSnapshotUploadProps {
   session: LiveSession;
   onApplied: (session: LiveSession) => void;
+}
+
+function fmtClock(iso: string): string {
+  return new Date(iso).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+}
+
+// Room còn live sau giờ hết ca (dung sai 5 phút) ⇒ số cộng dồn trong file có thể lẫn phần của ca sau (0174).
+function runsPastBoundary(snap: SessionSnapshot): boolean {
+  const limit = Date.parse(snap.boundaryAt) + 5 * 60_000;
+  return snap.rooms.some((r) => !r.endedAt || Date.parse(r.endedAt) > limit);
 }
 
 function fmtTime(iso?: string): string {
@@ -44,6 +56,8 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
   const fileRef = useRef<HTMLInputElement>(null);
   // File đã đọc, đang chờ trợ tick đúng phòng của ca (file tải về là cả ngày nhiều phòng).
   const [pending, setPending] = useState<{ fileName: string; parsed: ParsedSnapshotFile } | null>(null);
+  // Đang gõ GMV đúng của ca (0174) — tự mở ngay sau khi up nếu room còn live sau giờ hết ca.
+  const [editingGmv, setEditingGmv] = useState(false);
 
   useEffect(() => { preloadSpreadsheetReader(); }, []);
   useEffect(() => {
@@ -87,8 +101,25 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
         onApplied(updated);
       }
       fetchSnapshotParts(session.id).then((p) => setPartCount(p.length)).catch(() => undefined);
-      setSnapshot(await fetchSessionSnapshot(session.id));
+      const snap = await fetchSessionSnapshot(session.id);
+      setSnapshot(snap);
       setPending(null);
+      setEditingGmv(!!snap && runsPastBoundary(snap));
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Gõ GMV đúng (null = bỏ số gõ, về số file). DB quy room còn live về giờ hết ca, đơn/lượt xem theo % GMV, phần dư sang ca sau.
+  async function saveGmv(gmv: number | null) {
+    setBusy(true);
+    setError(null);
+    try {
+      onApplied(await setSessionSnapshotGmv(session.id, gmv));
+      setSnapshot(await fetchSessionSnapshot(session.id));
+      setEditingGmv(false);
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -178,6 +209,41 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
               <p className="text-xs font-bold text-[var(--text)]">{(session.totalViews ?? 0).toLocaleString("vi-VN")}</p>
             </div>
           </div>
+
+          {editingGmv ? (
+            <div className="space-y-1">
+              <p className="text-[11px] text-[var(--text-muted)]">
+                {runsPastBoundary(snapshot)
+                  ? `Room vẫn live sau giờ hết ca ${fmtClock(snapshot.boundaryAt)} khi tải file — số trên có thể lẫn phần của ca sau. Gõ GMV đúng của ca (số trên dashboard lúc giao ca):`
+                  : "Gõ GMV đúng của ca:"}
+              </p>
+              <GmvEditor initial={snapshot.typedGmv ?? session.actualGmv} busy={busy} onSave={(v) => void saveGmv(v)} onCancel={() => setEditingGmv(false)} />
+              <p className="text-[11px] text-[var(--text-faint)]">Đơn, lượt xem… tự chia theo % GMV; phần dư tự sang ca sau.</p>
+            </div>
+          ) : snapshot.typedGmv != null ? (
+            <p className="text-[11px] text-violet-300 flex items-center gap-1.5 flex-wrap">
+              <Pencil className="w-3.5 h-3.5 shrink-0" />
+              GMV gõ tay {fmtVndFull(snapshot.typedGmv)} — đơn, lượt xem theo % GMV, phần dư đã sang ca sau.
+              <button onClick={() => setEditingGmv(true)} disabled={busy} className="underline hover:text-violet-200 disabled:opacity-40">Sửa</button>
+              <button onClick={() => void saveGmv(null)} disabled={busy} className="underline text-[var(--text-faint)] hover:text-[var(--text)] disabled:opacity-40">Bỏ, dùng số file</button>
+            </p>
+          ) : (
+            <div className="flex items-start gap-2 flex-wrap">
+              {runsPastBoundary(snapshot) && (
+                <p className="text-[11px] text-amber-300 flex items-start gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
+                  Room vẫn live sau giờ hết ca {fmtClock(snapshot.boundaryAt)} khi tải file — GMV trên có thể lẫn phần của ca sau.
+                </p>
+              )}
+              <button
+                onClick={() => setEditingGmv(true)}
+                disabled={busy}
+                className="inline-flex items-center gap-1 text-[11px] font-bold text-violet-300 hover:text-violet-200 disabled:opacity-40"
+              >
+                <Pencil className="w-3 h-3" /> Sửa GMV đúng của ca
+              </button>
+            </div>
+          )}
 
           {(session.liveRoomIds?.length ?? 0) > 0 && (
             <p className="text-[11px] text-[var(--text-faint)]">

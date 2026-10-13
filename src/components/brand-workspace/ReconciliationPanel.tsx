@@ -9,6 +9,7 @@ import {
   deleteReconciliationBatch,
   fetchReconciliationBatches,
   fetchReconciliationPreview,
+  setReconGmvOverride,
   fetchReconciliationRows,
   mergeReconciliationRows,
   setReconciliationBucket,
@@ -20,6 +21,7 @@ import { useConfirm } from "../../hooks/useConfirm";
 import { fmtPeriodLabel, fmtVndFull, fmtVndShort } from "../../lib/format";
 import { LiveSession } from "../../types";
 import { suggestMergeGroups } from "../../lib/reconciliation/mergeRestarts";
+import { GmvEditor } from "../GmvEditor";
 
 // Đối soát số liệu của MỘT brand + MỘT sàn, nằm ngay trong Dữ Liệu Gốc (gộp 07/10 — trước đây là màn riêng
 // "Đối Soát Số Liệu" bắt up file lần hai). Lô đối soát được tạo từ chính lần up ở Dữ Liệu Gốc (hoặc từ một lần tải đã lưu);
@@ -65,7 +67,8 @@ const ORDER: ReconciliationBucket[] = ["agency", "review", "unassigned", "inhous
 const METHOD_TITLE: Record<ReconShare["method"], string> = {
   whole: "Cả phiên thuộc ca này",
   snapshot: "Theo snapshot lúc giao ca",
-  time: "Có phần ước lượng theo giờ — thiếu snapshot hoặc up trễ"
+  time: "Có phần ước lượng theo giờ — thiếu snapshot hoặc up trễ",
+  manual: "GMV gõ tay — phần còn lại của phiên chia cho các ca kia"
 };
 
 function fmtTime(iso?: string): string {
@@ -90,6 +93,9 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
   const [mergeOff, setMergeOff] = useState<Set<string>>(new Set());
   // Bản chia Áp dụng sẽ ghi (0171), theo dòng. null = DB chưa có 0171 ⇒ màn như cũ.
   const [preview, setPreview] = useState<Map<string, ReconShare[]> | null>(null);
+  // Ô ca đang gõ GMV tay (0174) + bộ đếm để nạp lại bản chia sau khi lưu.
+  const [editing, setEditing] = useState<{ rowId: string; sessionId: string } | null>(null);
+  const [previewKey, setPreviewKey] = useState(0);
 
   const reloadBatches = useCallback(async (selectId?: string) => {
     const list = await fetchReconciliationBatches(brandId, platform);
@@ -129,7 +135,7 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
       })
       .catch((e) => alive && setError(errorMessage(e)));
     return () => { alive = false; };
-  }, [activeId, rows.length, appliedAt]);
+  }, [activeId, rows.length, appliedAt, previewKey]);
 
   async function run(fn: () => Promise<void>) {
     setBusy(true);
@@ -142,6 +148,16 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
     } finally {
       setBusy(false);
     }
+  }
+
+  // Gõ / bỏ GMV tay của một ca trong phiên khớp nhiều ca; lưu xong nạp lại bản chia.
+  async function saveOverride(rowId: string, sessionId: string, gmv: number | null) {
+    await run(async () => {
+      await setReconGmvOverride(rowId, sessionId, gmv);
+      setEditing(null);
+      setPreviewKey((k) => k + 1);
+      setNote(gmv == null ? "Đã bỏ số gõ tay — ca quay về cách chia tự động." : "Đã lưu GMV gõ tay. Lô đã áp dụng thì bấm Áp Dụng Lại để ghi vào ca.");
+    });
   }
 
   // Chọn / bỏ chọn phiên: cập nhật ngay trên màn rồi mới ghi DB; ghi lỗi thì nạp lại để màn khớp DB.
@@ -205,7 +221,7 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
         <h4 className="font-bold text-[var(--text)] text-xs">Đối soát số liệu — {brandName}</h4>
         <p className="text-[11px] text-[var(--text-muted)] mt-1 max-w-3xl">
           Mỗi lần up file ở dưới tự tạo một lần đối soát: app khớp từng phiên live với ca CÓ SẴN của brand theo giờ, bạn xem rổ rồi bấm Áp dụng để thay số tạm bằng số cuối của sàn.
-          Phiên chạy xuyên nhiều ca: chia theo các mốc snapshot (tính theo giờ up thật), chỉ phần không có mốc mới chia theo giờ (≈) — tổng luôn đúng bằng file.
+          Phiên chạy xuyên nhiều ca: chia theo các mốc snapshot (tính theo giờ up thật), chỉ phần không có mốc mới chia theo giờ (≈) — tổng luôn đúng bằng file. Biết số đúng của một ca thì bấm vào ô ca để gõ (✎): phần còn lại tự chia cho các ca kia, đơn/lượt xem theo % GMV.
         </p>
 
         {batches.length > 0 && (
@@ -403,17 +419,46 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
                                 {r.matchedSessionIds.map((id) => {
                                   const sh = preview?.get(r.id)?.find((x) => x.sessionId === id);
                                   const est = sh?.method === "time";
+                                  const typed = sh?.method === "manual";
+                                  // Gõ tay chỉ có nghĩa khi phiên chia cho ≥ 2 ca (1 ca thì nhận trọn số file).
+                                  const editable = !!sh && APPLIED_BUCKETS.includes(r.bucket) && (preview?.get(r.id)?.length ?? 0) > 1;
+                                  if (editing?.rowId === r.id && editing.sessionId === id) {
+                                    return (
+                                      <span key={id} className="inline-flex items-center gap-1 whitespace-nowrap">
+                                        <span className="text-sky-300 font-bold">{sessionLabel(id)}</span>
+                                        <GmvEditor
+                                          initial={sh?.gmv}
+                                          busy={busy}
+                                          onSave={(v) => void saveOverride(r.id, id, v)}
+                                          onCancel={() => setEditing(null)}
+                                        />
+                                        {typed && (
+                                          <button
+                                            onClick={() => void saveOverride(r.id, id, null)}
+                                            disabled={busy}
+                                            className="text-[11px] text-[var(--text-faint)] hover:text-[var(--text)] underline disabled:opacity-40"
+                                          >
+                                            Bỏ số gõ
+                                          </button>
+                                        )}
+                                      </span>
+                                    );
+                                  }
+                                  const Tag = editable ? "button" : "span";
                                   return (
-                                    <span
+                                    <Tag
                                       key={id}
-                                      title={sh ? `${METHOD_TITLE[sh.method]} · ${fmtVndFull(sh.gmv)}` : undefined}
+                                      onClick={editable ? () => setEditing({ rowId: r.id, sessionId: id }) : undefined}
+                                      disabled={editable ? busy : undefined}
+                                      title={sh ? `${METHOD_TITLE[sh.method]} · ${fmtVndFull(sh.gmv)}${editable ? " · bấm để gõ GMV đúng của ca" : ""}` : undefined}
                                       className={`inline-flex items-center px-1.5 py-0.5 rounded border font-bold whitespace-nowrap ${
-                                        est ? "border-dashed border-amber-600 text-amber-300" : "border-sky-800 text-sky-300"
-                                      }`}
+                                        typed ? "border-violet-500 text-violet-300"
+                                          : est ? "border-dashed border-amber-600 text-amber-300" : "border-sky-800 text-sky-300"
+                                      } ${editable ? "hover:bg-[var(--surface-hover)] cursor-pointer" : ""}`}
                                     >
                                       {sessionLabel(id)}
-                                      {sh && <span className="ml-1 font-normal">· {est ? "≈" : ""}{fmtVndShort(sh.gmv)}</span>}
-                                    </span>
+                                      {sh && <span className="ml-1 font-normal">· {typed ? "✎ " : est ? "≈" : ""}{fmtVndShort(sh.gmv)}</span>}
+                                    </Tag>
                                   );
                                 })}
                               </span>

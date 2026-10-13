@@ -184,8 +184,9 @@ export async function mergeReconciliationRows(batchId: string, groups: string[][
   return (data as number) ?? 0;
 }
 
-/** Cách một phiên được chia cho một ca (0171): trọn phiên / theo mốc snapshot (ranh giới ca có mốc ±15 phút) / có phần ước lượng theo giờ. */
-export type ReconShareMethod = "whole" | "snapshot" | "time";
+/** Cách một phiên được chia cho một ca (0171): trọn phiên / theo mốc snapshot (ranh giới ca có mốc ±15 phút) / có phần ước lượng
+ *  theo giờ / OPS gõ tay (0174). */
+export type ReconShareMethod = "whole" | "snapshot" | "time" | "manual";
 
 export interface ReconShare {
   rowId: string;
@@ -214,6 +215,16 @@ export async function fetchReconciliationPreview(batchId: string): Promise<Recon
     currentGmv: Number(r.current_gmv) || 0,
     currentSource: r.current_source ?? undefined
   }));
+}
+
+/** Gõ GMV đúng của MỘT ca trong phiên khớp nhiều ca (0174); phần còn lại chia cho các ca kia, chỉ số khác theo % GMV.
+ *  Lưu theo (ca, room) nên lô file mới hơn của cùng room giữ số. `null` = bỏ số gõ. */
+export async function setReconGmvOverride(rowId: string, sessionId: string, gmv: number | null): Promise<void> {
+  const { error } = await supabase.rpc("set_recon_gmv_override", { p_row_id: rowId, p_session_id: sessionId, p_gmv: gmv });
+  if (error) {
+    if (error.code === "PGRST202") throw new Error("Chưa chạy migration 0174 nên chưa sửa được GMV ở đối soát.");
+    throw error;
+  }
 }
 
 export async function applyReconciliation(batchId: string): Promise<number> {

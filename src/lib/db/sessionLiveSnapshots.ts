@@ -25,6 +25,10 @@ export interface SessionSnapshot {
   rowCount: number;
   /** 0153: snapshot do OPS chia ước lượng theo thời gian (ca nối mà ca trước quên up file), không phải file thật. */
   isEstimated: boolean;
+  /** Mốc ranh giới = giờ hết ca. */
+  boundaryAt: string;
+  /** 0174: GMV đúng của ca do trợ/OPS gõ (file tải trễ lẫn phần ca sau). Vắng = dùng số file. */
+  typedGmv?: number;
   rooms: SessionSnapshotRoom[];
 }
 
@@ -36,6 +40,8 @@ interface DbSnapshot {
   captured_at: string;
   row_count: number;
   is_estimated: boolean | null;
+  boundary_at: string;
+  typed_gmv?: number | null;
 }
 
 interface DbSnapshotRow {
@@ -75,6 +81,8 @@ export async function fetchSessionSnapshot(sessionId: string): Promise<SessionSn
     capturedAt: snap.captured_at,
     rowCount: snap.row_count,
     isEstimated: snap.is_estimated === true,
+    boundaryAt: snap.boundary_at,
+    typedGmv: snap.typed_gmv == null ? undefined : Number(snap.typed_gmv),
     rooms: ((rowData ?? []) as DbSnapshotRow[]).map((r) => ({
       roomId: r.room_id,
       roomTitle: r.room_title ?? undefined,
@@ -106,5 +114,18 @@ export async function applySessionLiveSnapshot(sessionId: string, fileName: stri
 export async function deleteSessionLiveSnapshot(sessionId: string): Promise<LiveSession> {
   const { error } = await supabase.rpc("delete_session_live_snapshot", { p_session_id: sessionId });
   if (error) throw error;
+  return fetchSessionById(sessionId);
+}
+
+/**
+ * GMV ĐÚNG của ca (0174): file tải trễ thì số cộng dồn lẫn phần của ca sau — trợ gõ số đúng, DB quy số room còn live về giờ hết ca
+ * (mọi chỉ số đếm được theo % GMV), ca sau tự nhận phần dư. `null` = bỏ số gõ, về số file.
+ */
+export async function setSessionSnapshotGmv(sessionId: string, gmv: number | null): Promise<LiveSession> {
+  const { error } = await supabase.rpc("set_session_snapshot_gmv", { p_session_id: sessionId, p_gmv: gmv });
+  if (error) {
+    if (error.code === "PGRST202") throw new Error("Chưa chạy migration 0174 nên chưa sửa được GMV của ca.");
+    throw error;
+  }
   return fetchSessionById(sessionId);
 }
