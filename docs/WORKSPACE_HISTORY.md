@@ -5490,5 +5490,5 @@ trainer xếp người + dời giờ + thêm ca; trainer thấy rate VÀ Finance
 
 Bản thử "giảm chi phí" không giới hạn đổi 111 người một tuần ⇒ bỏ, thay bằng best-first ≤ N lần đổi, rẻ hơn ≥ 15%, mỗi người +≤ 9 giờ, ưu tiên gỡ lỗi.
 Harness đã dùng (đã xoá): `roster-harness.html` + `src/__harness/roster.tsx` mount RosterBoard với dữ liệu thật đọc bằng khoá service (JSON tạm ở gốc
-worktree) và `window.fetch` giả cho bảng/RPC 0175; server dev riêng chạy bằng mục tạm `trainer-worktree-dev` trong `.claude/launch.json` của thư mục
+worktree) và `window.fetch` giả cho bảng/RPC 0176; server dev riêng chạy bằng mục tạm `trainer-worktree-dev` trong `.claude/launch.json` của thư mục
 chính (`npm --prefix <worktree> run dev`) — preview_start đọc launch.json của thư mục chính, không của worktree.

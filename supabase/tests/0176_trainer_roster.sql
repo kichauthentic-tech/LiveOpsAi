@@ -1,5 +1,5 @@
--- Kiểm migration 0174 + 0175 (role trainer, Bàn Trainer). Chạy trên bản REPLAY cả chuỗi (README.md) SAU khi nạp 0174 rồi 0175.
--- Mỗi mục in "OK ..."; ERROR là hỏng. Replay chỉ tới 0173 thì đỏ ngay ở phần dựng dữ liệu (role 'trainer' không tồn tại).
+-- Kiểm migration 0175 + 0176 (role trainer, Bàn Trainer). Chạy trên bản REPLAY cả chuỗi (README.md) SAU khi nạp 0175 rồi 0176.
+-- Mỗi mục in "OK ..."; ERROR là hỏng. Replay chỉ tới 0174 thì đỏ ngay ở phần dựng dữ liệu (role 'trainer' không tồn tại).
 \set ON_ERROR_STOP on
 set client_min_messages = notice;
 

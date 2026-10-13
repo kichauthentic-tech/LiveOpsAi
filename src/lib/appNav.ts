@@ -129,7 +129,7 @@ export function agencyNavGroups(currentRole: UserRole): NavGroup[] {
             ]
           },
           {
-            // Bàn Trainer (0175, 13/10): người quản lý nhân sự live xếp lịch TUẦN — hạn đăng ký, nháp người cho ca mở, kiểm luật
+            // Bàn Trainer (0176, 13/10): người quản lý nhân sự live xếp lịch TUẦN — hạn đăng ký, nháp người cho ca mở, kiểm luật
             // giờ làm, công bố tuần (mỗi người một tin), đổi người/dời ca sau công bố có lý do. Role trainer mở vào đây.
             label: "Nhân Sự Live",
             items: [{ id: "roster", label: "Bàn Trainer", icon: ClipboardList, perm: "manage_roster" as PermissionKey }]

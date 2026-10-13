@@ -267,7 +267,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
         manage_roster: true
       };
     } else if (role === "trainer") {
-      // Trainer (0175): Bàn Trainer + Lịch & Studio/Bảng Vận Hành + Talent Pool. Finance mở cứng theo role (appNav), không qua Ma Trận.
+      // Trainer (0176): Bàn Trainer + Lịch & Studio/Bảng Vận Hành + Talent Pool. Finance mở cứng theo role (appNav), không qua Ma Trận.
       preset = {
         manage_sessions: false,
         manage_calendar: true,

@@ -5,7 +5,7 @@ import { hasSessionData } from "../sessionStatus";
 import { sessionDurationHours } from "../pnl";
 
 // Bàn Trainer — luật lịch tuần. Hàm thuần: nhận ca thật + ca mở (kèm người nháp) của một khoảng ngày, trả lỗi/cảnh báo theo ca.
-// Ngưỡng ở bảng roster_rules (0175); DB chỉ CHẶN quá max_week_hours (lúc công bố/đổi người) và trùng người (0143) — mọi luật còn
+// Ngưỡng ở bảng roster_rules (0176); DB chỉ CHẶN quá max_week_hours (lúc công bố/đổi người) và trùng người (0143) — mọi luật còn
 // lại là cảnh báo để trainer tự quyết (user chốt 13/10).
 
 export interface RosterRules {

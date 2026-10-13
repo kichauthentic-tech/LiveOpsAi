@@ -128,7 +128,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
   // Giao ca (0144): trợ live của ca, ca không trợ thì OPS (user chốt 06/10). Host xem được ai phải giao.
   const showHandover = !isBrandView && !s.isBackfill && s.status !== "Cancelled" && !!onSessionsUpdated;
   const canHandover = showHandover && (isOps || isHandoverPerson(s, viewer.myTalentId));
-  // Trainer (0175) xếp/dời/huỷ ca như ops, nhưng không giao ca / up số / đối soát (các RPC đó vẫn ceo/admin/ops).
+  // Trainer (0176) xếp/dời/huỷ ca như ops, nhưng không giao ca / up số / đối soát (các RPC đó vẫn ceo/admin/ops).
   const isScheduler = isOps || viewer.role === "trainer";
   const canEdit = isScheduler && !!onUpdateSession && !!studios && !!talents;
   // 0133: DB không cho dời ngày/giờ ca đã có số (ranh giới snapshot/đối soát tính theo giờ ca).
