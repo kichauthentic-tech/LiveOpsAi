@@ -4,7 +4,7 @@ import { fetchSessionById } from "./sessions";
 import type { LiveSession } from "../../types";
 import { DEFAULT_ROSTER_RULES, type RosterRules } from "../roster/rules";
 
-// Bàn Trainer (migration 0174): tuần xếp lịch (hạn đăng ký, đã công bố), nháp người cho ca mở, ngưỡng luật, nhật ký đổi lịch sau
+// Bàn Trainer (migration 0175): tuần xếp lịch (hạn đăng ký, đã công bố), nháp người cho ca mở, ngưỡng luật, nhật ký đổi lịch sau
 // công bố. Đặt hạn / công bố / đổi người / dời giờ chỉ qua RPC (guard + thông báo ở DB); nháp và ngưỡng ghi thẳng bằng RLS.
 
 export interface RosterWeek {
@@ -29,7 +29,7 @@ export interface RosterChange {
   changedAt: string;
 }
 
-/** Migration 0174 chưa chạy: bảng/hàm chưa có ⇒ màn báo "chưa chạy migration 0174" thay vì lỗi lạ. */
+/** Migration 0175 chưa chạy: bảng/hàm chưa có ⇒ màn báo "chưa chạy migration 0175" thay vì lỗi lạ. */
 export function isRosterBackendMissing(e: unknown): boolean {
   const code = (e as { code?: string } | null)?.code;
   return code === "PGRST202" || code === "PGRST205" || code === "42883" || code === "42P01";

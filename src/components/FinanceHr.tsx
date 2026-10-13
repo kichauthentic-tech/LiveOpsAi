@@ -40,7 +40,7 @@ interface FinanceHrProps {
     patch: Partial<Pick<SessionFinance, "studioCost" | "notes">>
   ) => Promise<void>;
   onSetFinanceApproval: (sessionId: string, status: SessionFinance["approvalStatus"]) => Promise<void>;
-  /** Trainer (0174) xem Finance để xếp người theo chi phí — chỉ đọc; ghi session_finance vẫn ceo/admin ở RLS. */
+  /** Trainer (0175) xem Finance để xếp người theo chi phí — chỉ đọc; ghi session_finance vẫn ceo/admin ở RLS. */
   readOnly?: boolean;
 }
 

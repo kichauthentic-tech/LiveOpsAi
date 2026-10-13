@@ -5449,3 +5449,46 @@ Số đo trên số thật (đọc DB 11/10, script ở scratchpad, walk-forward
 - Cầu CROCS T9 so T8: giờ +860M, cơ cấu ca −234M, năng suất nền −1.286M (lượt xem/giờ −17%, đơn/lượt xem −10%). File sản phẩm CROCS: 5 mẫu giảm mạnh nhất = 325M / 787M live giảm (T9 quy 31 ngày); 40 mẫu bán chạy nhất có trung vị 75% GMV từ live.
 - Đã thử và BỎ: cảnh báo sớm CUSUM (bắt 7/9 tháng giảm ≥ 15%, luật đơn giản 85% bắt 8/9); khung chiều 13–17h (+21% nhưng ~90 ca, không đưa vào gợi ý — app vẫn có khung 14h nhưng tính hệ số của engine).
 - Dữ liệu lệch phát hiện: Franklin TikTok cam kết tháng ghi GMV 650M, Kế Hoạch Tháng chốt 750M.
+
+
+## §1 các đợt 10/10 bố cục + 0162 (chuyển khỏi WORKSPACE 13/10)
+
+Nguyên văn các mục §1 của WORKSPACE_DESIGN.md, chuyển sang đây 13/10 để giữ file sống gần giới hạn ~500 dòng.
+
+- **10/10: SẮP LẠI BỐ CỤC CẢ APP (đã gộp vào main 10/10, làm trong worktree riêng rồi xoá; chỉ JSX/CSS, không đổi logic, không migration; tsc/eslint 0 lỗi, audit:dead sạch, vitest còn 2 đỏ có sẵn của parser Shopee).**
+  Đi từng trang Agency + Brand ở 1440px và 375px. Đã sửa: Bảng Vận Hành (Việc cần làm thành cột phải dính, prop `aside` của `OpsBoard`), Lịch & Studio (chế độ xem/ngày/lọc vào `PageHeader`; điện thoại gập 3 ô lọc sau nút "Lọc"), Sổ Ca, Hiệu Suất Host (hàng "Mọi host" thay thẻ theo thứ), Talent Pool, Studios (ca hôm nay trong thẻ phòng), CRM, Finance (1 khối cảnh báo, 1 nhãn thiếu rate/ca), Phân Quyền, Tài Khoản, Report Tháng (mục lục z-20), Hợp Đồng brand (tháng đang chạy trước giá), SKU, Affiliate, Dữ Liệu Gốc. KHÔNG động: 2 Dashboard (phiên khác đang làm lại), Kế Hoạch Tháng (user vừa chốt). Chi tiết: lịch sử `## Sắp lại bố cục cả app (2026-10-10)`.
+
+- **10/10: SẮP LẠI BỐ CỤC KẾ HOẠCH THÁNG + SỬA "DỰNG LƯỚI TỪ CA ĐÃ NHẬP" (không migration; bố cục CHƯA commit, sửa lỗi dựng lưới đã commit `4f6af13`; tsc/eslint 0 lỗi, vitest còn đúng 3 đỏ có sẵn).**
+  Lỗi: kế hoạch ĐÃ CHỐT + ca cũ đã có target ⇒ nhánh `fileTarget > 0` của `loadFromSessions` bỏ qua `withForecast`, ca thêm mới giữ target 0 (VERA Shopee T10: 17 ca) — nay `locked ? withForecast(next) : next` (ca mới nhận target = dự báo, ca cũ giữ). Bố cục (`MonthPlan.tsx`, chỉ JSX, logic không đổi): user thử bản gập/menu "Thêm ▾" rồi bảo trả lại giao diện cũ và chỉ chỉnh bố cục — nên giữ NGUYÊN các thẻ và thanh nút hiện đủ như trước (không menu, không dải 4 ô, không thanh dính). Chỉnh: ba thẻ cân chiều cao (Tham số lịch | Mục tiêu & cam kết | Lưới hiện tại + tiến độ giờ + khối "Số tham chiếu" gồm GMV hợp đồng · Ads · KPI Total GMV), mỗi ô số có một dòng giải thích; thanh nút tách nhóm trái (dựng/gợi ý/chia) và nhóm phải (Lưu nháp · Chốt · Xoá kế hoạch), thông báo xuống dòng riêng; nhãn "GMV cam kết" → "GMV hợp đồng", "KPI GMV" → "KPI Total GMV" (bảng thuật ngữ `metricGlossary` cấm "GMV cả shop"/"GMV thật"). Đã xem trên app thật (JOCKEY Shopee T10 chưa lập, VERA Shopee T10 đã chốt) ở 1500px; CHƯA xem ở 375px.
+  **Chia lại target CẢ LƯỚI sau chốt, kể cả ca đã qua — migration `0162` ĐÃ CHẠY 10/10 (phần giao diện/menu "Thêm ▾" mô tả dưới đã được thay bằng nút "Chia lại theo lịch hiện có…" của 0164; bảng nhật ký + trigger vẫn dùng) (user xác nhận):** user đang thử tối ưu engine chia target nên cần chia lại nhiều vòng. `0162` thêm bảng `plan_target_audit` (batch, ca, target cũ → mới, ai, lúc nào, ghi chú; RLS chỉ đọc cho ceo/ops/admin) + RPC `retarget_month_plan(plan, [{id,target}], note)` (security definer; CHỈ ceo/admin; kế hoạch phải đã chốt; chỉ đổi target ca, `brand_month_plans.target_gmv` = Σ target ca; cả batch một transaction) + nới đúng một chỗ của trigger `guard_locked_plan_slot` (0133): ca ngày đã qua ĐƯỢC đổi target khi biến phiên `app.retarget_plan` = id kế hoạch (RPC đặt local theo transaction; dời giờ ca đã qua và thêm ca ngày đã qua vẫn bị chặn). Thử trên Postgres cục bộ 11 ca (đổi ca đã qua qua RPC OK; trực tiếp bị chặn; role ops bị chặn; kế hoạch Nháp bị chặn; id lạ/âm/trùng rollback cả batch; cờ của kế hoạch khác không mở khoá; chạy lại 2 lần sạch). Client: `lib/scheduling/retarget.ts` (`buildRetarget`, `summarizeRetargetBatches`), `retargetMonthPlan`/`fetchRetargetHistory` ở `lib/db/monthPlans.ts`, panel trong `MonthPlan.tsx` (menu Thêm ▾ → "Chia lại target cả lưới…": nhập Target mới + target theo nhóm ngày → Xem trước (bảng nhóm ngày cũ/mới, số ca đã qua đổi) → Áp dụng & ghi nhật ký; tham số engine `alloc*` + ghi chú tự ghi kèm vào nhật ký để so các vòng). Bộ chia = `allocationWeights` + `groupSpec` như lưới nháp, chạy trên MỌI ca; lịch sử của mô hình v2 chỉ gồm ca TRƯỚC tháng đang chia nên ca đã qua của tháng không bị "lộ" số thật vào trọng số (brand chưa đủ lịch sử rơi về dự báo engine — có dùng số T10 đã có). Test: `tests/retarget.test.ts` (8). Đã xem trên app thật (VERA Shopee T10: xem trước 1,1B giữ nguyên ⇒ 0 ca đổi; 1,2B ⇒ 78 ca đổi / 19 ca đã qua; Áp dụng khi DB chưa có 0162 ⇒ thông báo "chưa chạy migration 0162", không ghi gì). **Đã thử ghi thật trên DB thật sau khi chạy 0162 (10/10):** PATCH trực tiếp ca đã qua vẫn bị trigger chặn; RPC đổi 1 ca đã qua +1đ rồi hoàn lại OK (tổng kế hoạch +1 rồi về 1.100.000.000, nhật ký 2 dòng); luồng giao diện (xem trước → Áp dụng → app tải lại → lịch sử vòng hiện đủ) OK, đã trả VERA Shopee T10 về 1,1B / Σ 78 ca = 1,1B. Để lại 4 dòng `plan_target_audit` ghi chú "ZZZ test" (bảng không có quyền xoá cho app — vô hại, lọc theo ghi chú nếu cần). **Chưa thử bằng tài khoản ops** (phải bị chặn).
+
+
+## Bàn Trainer (2026-10-13)
+
+Yêu cầu user: module cho "trainer" — thực chất là người quản lý nhân sự live: lập kế hoạch live, lịch, sắp xếp nhân sự, mở ca đăng ký,
+chọn người cho từng ca/khung giờ, giữ lịch trơn tru và tối ưu hiệu quả + doanh thu agency. Đề xuất + demo (lịch thật 12/10→01/11,
+rate giả lập ở bản 2): https://claude.ai/artifact/FZG3a19r8r6KD9J9CdoAgS.
+
+Số đo trên DB thật 13/10 (1.525 ca T6→31/10; 1.197 ca có GMV, 1–8 giờ; mô hình nền log(GMV/giờ) = kênh×tháng + khung giờ×kênh + camp×kênh):
+- Host giải thích 0,8% phần lệch còn lại (sd ≈ 5%), host×kênh 2,1%, trợ 1,0%, cặp host–trợ 0,7%.
+- Xếp lại host trong từng kênh×tuần theo tay nghề ước từ các tháng trước (giữ số ca mỗi người, chấm bằng tay nghề ước từ chính tháng đó):
+  T8 +0,73%, T9 −0,34%, T10 +0,37% GMV; trần "biết trước" 1,19 / 0,98 / 1,57%. Tay nghề tháng trước vs tháng sau r = 0,23 / −0,09 / −0,13.
+- Cùng kênh cùng ngày: hệ số log(GMV/giờ) theo log(giờ ca) = 0,06 (KTC 95% −0,006…0,124) ⇒ GMV ~ tỷ lệ thuận giờ (co giãn 1,06).
+  Nhìn thô ca ≤ 2 giờ thấp hơn ~10% GMV/giờ nhưng chủ yếu do rơi vào ngày khác.
+- Khung giờ trong kênh (so mức kênh): Franklin TikTok 10–11h 148%, 21h+ 56%; VERA Shopee 10–11h 71%, 14–16h 125%; CROCS 19–20h 123%, 12–13h 79%.
+- Không đo được hiệu ứng: ca thứ k của host trên kênh (1, 2–3, 4–6, 7–10, 11+), số ca đã đi chung của cặp host–trợ, kinh nghiệm tổng của host mới.
+- Lịch T10: 18 chỗ trùng người, 83 lần nối ca ≤ 30' (18 đổi phòng), 3 lần tan 23:30 → 9:00, 8 người-ngày > 9 giờ, 3 chuỗi ≥ 7 ngày;
+  T.Toàn 51,5 giờ tuần 12/10. Giờ người-tuần p10/p50/p90 = 4 / 13 / 26,5. 369 ca T10 tạo một lần 05/10 (nhập sheet); `session_availability` 0 dòng;
+  1/370 `shift_slots` gắn kế hoạch. Ca sắp tới 28/237 thiếu trợ (tuần 26/10: 13/52), 4 thiếu host. Phút kế hoạch không live (ca không nạp bù T10): 4,6%.
+- Dự bị kênh (host ≥ 3 ca/90 ngày): CROCS 11, VERA Shopee 10, VERA TikTok 8, JOCKEY TikTok 7, Franklin TikTok 7, JOCKEY Shopee 6, Franklin Shopee 2.
+- Rate talent: 0/43 hồ sơ có rate (13/10) ⇒ chi phí ca chỉ có khi nhập rate.
+- Ngoài: Gap Stable Scheduling Study (lịch ổn định, công bố trước 2 tuần, đổi ca qua app ⇒ doanh số +7%, năng suất +5%); BLLĐ 2019 Điều 105/107
+  (≤ 48 giờ/tuần thường, làm thêm ≤ 40 giờ/tháng); đào tạo chéo theo chuỗi (Jordan & Graves 1995).
+
+Quyết định user 13/10 (theo thứ tự hỏi): có nháp → công bố tuần; có hạn đăng ký do trainer tự đặt; role trainer RIÊNG; 48 giờ chặn, còn lại cảnh báo;
+trainer xếp người + dời giờ + thêm ca; trainer thấy rate VÀ Finance; làm luôn ở nhánh riêng. Còn mở: trả theo giờ hay có người trả theo ca.
+
+Bản thử "giảm chi phí" không giới hạn đổi 111 người một tuần ⇒ bỏ, thay bằng best-first ≤ N lần đổi, rẻ hơn ≥ 15%, mỗi người +≤ 9 giờ, ưu tiên gỡ lỗi.
+Harness đã dùng (đã xoá): `roster-harness.html` + `src/__harness/roster.tsx` mount RosterBoard với dữ liệu thật đọc bằng khoá service (JSON tạm ở gốc
+worktree) và `window.fetch` giả cho bảng/RPC 0175; server dev riêng chạy bằng mục tạm `trainer-worktree-dev` trong `.claude/launch.json` của thư mục
+chính (`npm --prefix <worktree> run dev`) — preview_start đọc launch.json của thư mục chính, không của worktree.

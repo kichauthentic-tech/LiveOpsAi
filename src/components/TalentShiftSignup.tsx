@@ -42,7 +42,7 @@ export default function TalentShiftSignup({ brands, shiftSlots, shiftRegistratio
   const [brandFilter, setBrandFilter] = useState("all");
   const [part, setPart] = useState<DayPart | "all">("all");
   const brandById = useMemo(() => new Map(brands.map((b) => [b.id, b])), [brands]);
-  // Hạn báo rảnh theo tuần do trainer đặt (0174). Qua hạn thì DB chặn — màn khoá nút trước cho khỏi bấm vô ích. Chưa chạy 0174 ⇒ không có hạn.
+  // Hạn báo rảnh theo tuần do trainer đặt (0175). Qua hạn thì DB chặn — màn khoá nút trước cho khỏi bấm vô ích. Chưa chạy 0175 ⇒ không có hạn.
   const [weeks, setWeeks] = useState<RosterWeek[]>([]);
   useEffect(() => {
     let cancelled = false;

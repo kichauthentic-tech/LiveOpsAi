@@ -31,7 +31,7 @@ import { autofillWeek, buildFamiliarity, famOf, planCostCut, shiftCost, type Cos
 import { ShiftPanel, dayLabel } from "./roster/ShiftPanel";
 import { AbsencePanel, ChangeLogPanel, ChecksPanel, HoursCostPanel, MatrixPanel, RulesPanel, WeekGrid, type ChannelRow } from "./roster/panels";
 
-// Bàn Trainer (0173/0174, 13/10). Quy trình tuần user chốt: Kế Hoạch Tháng chốt ⇒ ca mở → trainer đặt HẠN ĐĂNG KÝ → host/trợ báo rảnh
+// Bàn Trainer (0174/0175, 13/10). Quy trình tuần user chốt: Kế Hoạch Tháng chốt ⇒ ca mở → trainer đặt HẠN ĐĂNG KÝ → host/trợ báo rảnh
 // (tab Đăng Ký Ca) → trainer xếp NHÁP ở đây (talent/brand không thấy) → "Công bố tuần": chốt cả tuần trong một transaction, mỗi người
 // một tin. Sau công bố, đổi người / dời giờ phải có lý do (nhật ký roster_changes). Quá 48 giờ/tuần là luật chặn; còn lại cảnh báo.
 
@@ -409,7 +409,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
           </>
         }
       >
-        {backendMissing && <p className="text-xs rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-300 px-3 py-2">Chưa chạy migration 0173 + 0174 trên DB: màn chỉ xem được lịch đã có, chưa đặt hạn / xếp nháp / công bố được.</p>}
+        {backendMissing && <p className="text-xs rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-300 px-3 py-2">Chưa chạy migration 0174 + 0175 trên DB: màn chỉ xem được lịch đã có, chưa đặt hạn / xếp nháp / công bố được.</p>}
         {loadError && <p className="text-xs rounded-lg border border-red-500/30 bg-red-500/10 text-red-300 px-3 py-2">Không tải được dữ liệu Bàn Trainer: {loadError}</p>}
         <div className="flex flex-wrap items-end gap-x-4 gap-y-2 text-xs">
           <span className={`px-2 py-1 rounded-full font-bold ${week?.publishedAt ? "bg-emerald-500/15 text-emerald-300" : "bg-sky-500/15 text-sky-300"}`}>

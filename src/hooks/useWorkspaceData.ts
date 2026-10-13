@@ -325,7 +325,7 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
   // Chỉ 3 màn đọc danh sách này — Phân Quyền & Role, CRM, Tài Chính — cả ba đều gate ở ops.
   const usersLoadedRef = useRef<string | null>(null);
   useEffect(() => {
-    // Trainer (0174) mở Finance (chỉ đọc) — cần tên người duyệt.
+    // Trainer (0175) mở Finance (chỉ đọc) — cần tên người duyệt.
     if (!authUserId || !(isOpsRole || (currentRole === "trainer" && activeTab === "finance"))) return;
     if (!TABS_NEED_USERS.has(activeTab)) return;
     if (usersLoadedRef.current === authUserId) return;

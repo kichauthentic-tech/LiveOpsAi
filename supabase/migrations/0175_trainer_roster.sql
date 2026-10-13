@@ -1,5 +1,5 @@
--- 0174 — Bàn Trainer: quyền của role trainer, hạn đăng ký theo tuần, xếp nháp, công bố tuần, đổi lịch có lý do.
--- Chạy SAU 0173 (giá trị enum 'trainer' phải được commit trước).
+-- 0175 — Bàn Trainer: quyền của role trainer, hạn đăng ký theo tuần, xếp nháp, công bố tuần, đổi lịch có lý do.
+-- Chạy SAU 0174 (giá trị enum 'trainer' phải được commit trước).
 --
 -- Quyết định của user (13/10):
 --   * trainer là role riêng; thấy rate host/trợ VÀ Finance (chỉ đọc — ghi Finance vẫn ceo/admin);
@@ -33,7 +33,7 @@ update public.role_permissions
    set permissions = permissions || jsonb_build_object('manage_roster', role in ('ceo', 'admin', 'operations', 'trainer'))
  where not (permissions ? 'manage_roster');
 
--- ===== Phần 2 — RLS, liệt kê tường minh (sinh từ pg_policies của bản replay 0001->0173, chỉ thêm 'trainer') =====
+-- ===== Phần 2 — RLS, liệt kê tường minh (sinh từ pg_policies của bản replay 0001->0174, chỉ thêm 'trainer') =====
 alter policy brand_channels_read on public.brand_channels using (((( SELECT current_user_role() AS current_user_role) = ANY (ARRAY['ceo'::user_role, 'operations'::user_role, 'trainer'::user_role, 'admin'::user_role])) OR ((( SELECT current_user_role() AS current_user_role) = 'brand'::user_role) AND (brand_id = ( SELECT current_user_brand_id() AS current_user_brand_id)))));
 alter policy brand_month_plan_slots_read_scoped on public.brand_month_plan_slots using (((( SELECT current_user_role() AS current_user_role) = ANY (ARRAY['ceo'::user_role, 'operations'::user_role, 'trainer'::user_role, 'admin'::user_role])) OR ((( SELECT current_user_role() AS current_user_role) = 'brand'::user_role) AND (private.month_plan_brand_id(plan_id) = ( SELECT current_user_brand_id() AS current_user_brand_id)))));
 alter policy brand_month_plans_read_scoped on public.brand_month_plans using (((( SELECT current_user_role() AS current_user_role) = ANY (ARRAY['ceo'::user_role, 'operations'::user_role, 'trainer'::user_role, 'admin'::user_role])) OR ((( SELECT current_user_role() AS current_user_role) = 'brand'::user_role) AND (brand_id = ( SELECT current_user_brand_id() AS current_user_brand_id)))));
@@ -102,13 +102,13 @@ begin
       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'public' and p.proname = fn;
     if def is null then
-      raise exception '0174: không thấy hàm %', fn;
+      raise exception '0175: không thấy hàm %', fn;
     end if;
     if position('''trainer''' in def) > 0 then
       continue; -- đã chạy rồi
     end if;
     if position(pat in def) = 0 then
-      raise exception '0174: guard của % không đúng dạng mong đợi — kiểm tay trước khi chạy', fn;
+      raise exception '0175: guard của % không đúng dạng mong đợi — kiểm tay trước khi chạy', fn;
     end if;
     execute replace(def, pat, 'not in (''ceo'', ''admin'', ''operations'', ''trainer'')');
   end loop;
@@ -251,7 +251,7 @@ begin
     return;
   end if;
   if (length(def) - length(replace(def, pat, ''))) / length(pat) <> 1 then
-    raise exception '0174: notify_session_changes không đúng dạng mong đợi — kiểm tay';
+    raise exception '0175: notify_session_changes không đúng dạng mong đợi — kiểm tay';
   end if;
   execute replace(def, pat,
     'if v_future and new.status <> ''Cancelled'' and coalesce(current_setting(''app.roster_publish'', true), '''') <> ''1'' then');
@@ -615,19 +615,19 @@ begin
                             'bulk_assign_session_hosts', 'generate_shift_slots'] loop
     if position('''trainer''' in (select pg_get_functiondef(p.oid) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                                     where n.nspname = 'public' and p.proname = fn)) = 0 then
-      raise exception '0174 tự kiểm: % chưa nhận trainer', fn;
+      raise exception '0175 tự kiểm: % chưa nhận trainer', fn;
     end if;
   end loop;
   if position('app.roster_publish' in pg_get_functiondef('public.notify_session_changes'::regproc)) = 0 then
-    raise exception '0174 tự kiểm: notify_session_changes chưa có cờ công bố';
+    raise exception '0175 tự kiểm: notify_session_changes chưa có cờ công bố';
   end if;
   if (select count(*) from pg_policies where schemaname = 'public' and (coalesce(qual, '') || coalesce(with_check, '')) like '%trainer%') < 16 then
-    raise exception '0174 tự kiểm: thiếu policy có trainer';
+    raise exception '0175 tự kiểm: thiếu policy có trainer';
   end if;
   if position('trainer' in pg_get_viewdef('public.talents_secure')) = 0 then
-    raise exception '0174 tự kiểm: talents_secure chưa cho trainer thấy rate';
+    raise exception '0175 tự kiểm: talents_secure chưa cho trainer thấy rate';
   end if;
   if not exists (select 1 from role_permissions where role = 'trainer') then
-    raise exception '0174 tự kiểm: thiếu dòng role_permissions của trainer';
+    raise exception '0175 tự kiểm: thiếu dòng role_permissions của trainer';
   end if;
 end $$;
