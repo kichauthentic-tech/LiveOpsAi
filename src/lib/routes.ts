@@ -19,6 +19,7 @@ const AGENCY_TAB_SLUGS: Record<string, string> = {
   sessions: "so-ca",
   run_rate: "run-rate",
   control_room: "phong-dieu-hanh",
+  roster: "ban-trainer",
   host_performance: "hieu-suat-host",
   brands_overview: "toan-canh-brand",
   report_publish_board: "phat-hanh-report",

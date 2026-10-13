@@ -20,6 +20,12 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
     description: "Mở Bảng Vận Hành: ca hôm nay/tuần, lịch theo phòng live, mở ca chờ đăng ký."
   },
   {
+    key: "manage_roster",
+    label: "Bàn Trainer",
+    category: "Nhân sự",
+    description: "Mở Bàn Trainer: đặt hạn đăng ký ca theo tuần, xếp nháp host/trợ cho ca, kiểm luật giờ làm, công bố lịch tuần, đổi người/dời ca có ghi lý do."
+  },
+  {
     key: "manage_talents",
     label: "Talent Pool",
     category: "Nhân sự",

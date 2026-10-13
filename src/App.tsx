@@ -22,7 +22,7 @@ import { updateAiAgentPrompt } from "./lib/db/aiAgentPrompts";
 import { upsertBrandPlatformCommissionRate, upsertBrandPlatformRate, upsertBrandPlatformReturnRate } from "./lib/db/brandPlatformRates";
 import { setBrandStudio } from "./lib/db/brandStudios";
 import { fetchShiftSlots, createShiftSlot, deleteShiftSlot } from "./lib/db/shiftSlots";
-import { registerForSlot, unregisterFromSlot } from "./lib/db/shiftRegistrations";
+import { fetchShiftRegistrations, registerForSlot, unregisterFromSlot } from "./lib/db/shiftRegistrations";
 import { createRecurringShiftTemplate, updateRecurringShiftTemplate, deleteRecurringShiftTemplate } from "./lib/db/recurringShiftTemplates";
 import { fetchTalentRateHistory } from "./lib/db/talentRateHistory";
 import { fetchBrandPlatformRateHistory } from "./lib/db/brandPlatformRateHistory";
@@ -112,6 +112,7 @@ const OpsSupportTab = lazyNamed(() => import("./components/OpsSupportTab"), "def
 const CeoBrief = lazyNamed(() => import("./components/CeoBrief"), "default");
 const RunRateBoard = lazyNamed(() => import("./components/RunRateBoard"), "RunRateBoard");
 const ControlRoom = lazyNamed(() => import("./components/ControlRoom"), "default");
+const RosterBoard = lazyNamed(() => import("./components/RosterBoard"), "RosterBoard");
 const AgencyChannelSummary = lazyNamed(() => import("./components/AgencyChannelSummary"), "AgencyChannelSummary");
 
 // Tab đã gộp (08/10: Hỗ Trợ Vận Hành → Bảng Vận Hành) — activeTab đã lưu ở localStorage không được rơi vào màn "Quyền Truy Cập Bị Hạn Chế".
@@ -125,6 +126,7 @@ const TAB_CHUNKS: Record<string, { preload: () => void }[]> = {
   sessions: [SessionLedger],
   run_rate: [RunRateBoard],
   control_room: [ControlRoom],
+  roster: [RosterBoard],
   my_shifts: [TalentToday],
   talent_calendar: [LiveCalendar],
   shift_scheduling: [TalentShiftSignup],
@@ -1394,8 +1396,9 @@ export default function App() {
   // Ca Của Tôi: gửi tới "Ca Của Tôi" thì talent mở ra thấy trống và không hiểu mình vừa bấm gì.
   const handleOpenNotification = (n: AppNotification) => {
     void notifications.markRead([n.id]);
-    if (n.kind === "shift_open") setActiveTab("shift_scheduling");
+    if (n.kind === "shift_open" || n.kind === "signup_open") setActiveTab("shift_scheduling");
     else if (currentRole === "talent") setActiveTab("my_shifts");
+    else if (currentRole === "trainer") setActiveTab("roster");
     else setActiveTab("calendar");
     if (n.sessionId) setNotifOpenSessionId(n.sessionId);
     setMobileMenuOpen(false);
@@ -1874,6 +1877,33 @@ export default function App() {
                       setSessions(s);
                       setShiftSlots(sl);
                     }}
+                  />
+                )}
+
+                {activeTab === "roster" && (
+                  <RosterBoard
+                    sessions={sessions}
+                    shiftSlots={shiftSlots}
+                    shiftRegistrations={shiftRegistrations}
+                    talents={talents}
+                    talentRateHistory={talentRateHistory}
+                    brandChannels={channels}
+                    brandStudios={brandStudios}
+                    studios={studios}
+                    brands={brands}
+                    currentRole={currentRole}
+                    currentUserId={activeUser.id}
+                    onCreateSlot={handleCreateShiftSlot}
+                    onDeleteSlot={handleDeleteShiftSlot}
+                    onCancelSession={handleCancelSession}
+                    onScheduleChanged={async () => {
+                      const [s, sl, regs] = await Promise.all([fetchSessions(), fetchShiftSlots(), fetchShiftRegistrations()]);
+                      setSessions(s);
+                      setShiftSlots(sl);
+                      setShiftRegistrations(regs);
+                    }}
+                    onSessionUpdated={(saved) => setSessions((prev) => prev.map((x) => (x.id === saved.id ? saved : x)))}
+                    onSlotUpdated={(saved) => setShiftSlots((prev) => prev.map((x) => (x.id === saved.id ? saved : x)))}
                   />
                 )}
 
@@ -2370,7 +2400,7 @@ export default function App() {
 
                 {/* Guard trùng với điều kiện tạo nav item ở nhóm "Tài Chính" — cố ý lặp lại
                     thay vì chỉ dựa vào isTabAllowed, cùng khuôn với ai_training bên dưới. */}
-                {activeTab === "finance" && (currentRole === "ceo" || currentRole === "admin") && (
+                {activeTab === "finance" && (currentRole === "ceo" || currentRole === "admin" || currentRole === "trainer") && (
                   <FinanceHr
                     // Audit workflow 2026-10-04 #6: ca "loại khỏi báo cáo" vẫn là ca đã làm — vào lương (pnl.ts tự
                     // bỏ phần theo GMV của nó). Mọi màn phân tích/brand vẫn đọc activeSessions như cũ.
@@ -2384,6 +2414,7 @@ export default function App() {
                     brandPlatformRateHistory={brandPlatformRateHistory}
                     onUpdateFinance={handleUpdateSessionFinance}
                     onSetFinanceApproval={handleSetSessionFinanceApproval}
+                    readOnly={currentRole === "trainer"}
                   />
                 )}
 

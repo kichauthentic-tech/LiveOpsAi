@@ -325,7 +325,8 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
   // Chỉ 3 màn đọc danh sách này — Phân Quyền & Role, CRM, Tài Chính — cả ba đều gate ở ops.
   const usersLoadedRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!authUserId || !isOpsRole) return;
+    // Trainer (0174) mở Finance (chỉ đọc) — cần tên người duyệt.
+    if (!authUserId || !(isOpsRole || (currentRole === "trainer" && activeTab === "finance"))) return;
     if (!TABS_NEED_USERS.has(activeTab)) return;
     if (usersLoadedRef.current === authUserId) return;
     usersLoadedRef.current = authUserId;
@@ -344,7 +345,7 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
     return () => {
       cancelled = true;
     };
-  }, [authUserId, isOpsRole, activeTab]);
+  }, [authUserId, isOpsRole, currentRole, activeTab]);
 
   // `audit_logs` khoá ở ceo/operations/admin (0105) — chỉ nạp khi mở Phân Quyền & Role.
   const auditLogsLoadedRef = useRef<string | null>(null);

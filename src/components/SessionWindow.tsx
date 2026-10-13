@@ -128,7 +128,9 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
   // Giao ca (0144): trợ live của ca, ca không trợ thì OPS (user chốt 06/10). Host xem được ai phải giao.
   const showHandover = !isBrandView && !s.isBackfill && s.status !== "Cancelled" && !!onSessionsUpdated;
   const canHandover = showHandover && (isOps || isHandoverPerson(s, viewer.myTalentId));
-  const canEdit = isOps && !!onUpdateSession && !!studios && !!talents;
+  // Trainer (0174) xếp/dời/huỷ ca như ops, nhưng không giao ca / up số / đối soát (các RPC đó vẫn ceo/admin/ops).
+  const isScheduler = isOps || viewer.role === "trainer";
+  const canEdit = isScheduler && !!onUpdateSession && !!studios && !!talents;
   // 0133: DB không cho dời ngày/giờ ca đã có số (ranh giới snapshot/đối soát tính theo giờ ca).
   // 0138: ca đã chia người theo đoạn giờ cũng khoá giờ (offset phút của đoạn sẽ lệch) — bỏ chia đoạn trước khi dời.
   const scheduleLocked = hasSessionData(s) || hasStaffSegments(s);
@@ -266,7 +268,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
   const canEnterActuals =
     isOps && !!onSessionsUpdated && s.status !== "Cancelled" && dataSourceTier(s) === "manual" && !hasHandover(s) && s.date <= today;
   const hasData = dataSourceTier(s) !== "manual" || (s.actualGmv ?? 0) > 0 || (s.totalOrders ?? 0) > 0;
-  const canCancel = isOps && !!onCancelSession && s.status !== "Cancelled" && !hasData;
+  const canCancel = isScheduler && !!onCancelSession && s.status !== "Cancelled" && !hasData;
   const doCancel = async (reopenSlot: boolean) => {
     if (!onCancelSession) return;
     setCancelling(true);
@@ -679,7 +681,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
             </div>
           )}
 
-          {isOps && (canCancel || canExclude || (onDeleteSession && !hasData)) && (
+          {isScheduler && (canCancel || canExclude || (isOps && onDeleteSession && !hasData)) && (
             <div className="pt-3 border-t border-[var(--border)] space-y-2">
               {canCancel && !cancelOpen && (
                 <button onClick={() => setCancelOpen(true)} className="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-300 hover:text-amber-200 transition-colors">
@@ -733,7 +735,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                   <RotateCcw className="w-3.5 h-3.5" /> {excluding ? "Đang đưa lại..." : "Đưa ca trở lại báo cáo"}
                 </button>
               )}
-              {onDeleteSession && !hasData && (
+              {isOps && onDeleteSession && !hasData && (
                 <div>
                   <button onClick={handleDelete} disabled={deleting} className="inline-flex items-center gap-1.5 text-[11px] text-[var(--text-faint)] hover:text-rose-400 disabled:opacity-40 transition-colors">
                     <Trash2 className="w-3.5 h-3.5" /> {deleting ? "Đang xoá..." : "Xoá hẳn ca này"}

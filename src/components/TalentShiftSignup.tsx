@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CalendarClock, UserCheck, UserX } from "lucide-react";
 import type { Brand, LiveSession, ShiftRegistration, ShiftSlot } from "../types";
-import { getTodayDate } from "../lib/dateUtils";
+import { getTodayDate, isoWeekStart } from "../lib/dateUtils";
+import { fetchRosterWeeks, type RosterWeek } from "../lib/db/roster";
 import { fmtDateVn, fmtFixed } from "../lib/format";
 import { getBrandTheme } from "../lib/brandTheme";
 import { DAY_PART_LABEL, dayPartOf, openSlotsFrom, slotClashWithMine, slotHours, type DayPart } from "../lib/talent/myShifts";
@@ -26,6 +27,10 @@ interface Props {
 const WEEKDAY = ["CN", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"];
 const dayLabel = (date: string) => `${WEEKDAY[new Date(`${date}T00:00:00`).getDay()]} ${fmtDateVn(date, false)}`;
 const PARTS: (DayPart | "all")[] = ["all", "morning", "afternoon", "evening"];
+const fmtDeadline = (iso: string) => {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")} ${d.getDate()}/${d.getMonth() + 1}`;
+};
 const chip = (on: boolean) =>
   `shrink-0 px-3 py-1.5 min-h-8 rounded-full text-xs font-bold border transition-colors ${
     on ? "bg-[var(--accent)] border-[var(--accent)] text-white" : "bg-[var(--surface)] border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]"
@@ -37,6 +42,22 @@ export default function TalentShiftSignup({ brands, shiftSlots, shiftRegistratio
   const [brandFilter, setBrandFilter] = useState("all");
   const [part, setPart] = useState<DayPart | "all">("all");
   const brandById = useMemo(() => new Map(brands.map((b) => [b.id, b])), [brands]);
+  // Hạn báo rảnh theo tuần do trainer đặt (0174). Qua hạn thì DB chặn — màn khoá nút trước cho khỏi bấm vô ích. Chưa chạy 0174 ⇒ không có hạn.
+  const [weeks, setWeeks] = useState<RosterWeek[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    fetchRosterWeeks(isoWeekStart(today))
+      .then((w) => !cancelled && setWeeks(w))
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [today]);
+  const deadlineOf = (date: string) => weeks.find((w) => w.weekStart === isoWeekStart(date))?.signupDeadline;
+  const closed = (date: string) => {
+    const d = deadlineOf(date);
+    return !!d && new Date(d) <= new Date();
+  };
 
   const mineBySlot = useMemo(
     () => new Set(shiftRegistrations.filter((r) => !!myTalentId && r.talentId === myTalentId).map((r) => r.slotId)),
@@ -55,7 +76,7 @@ export default function TalentShiftSignup({ brands, shiftSlots, shiftRegistratio
     return [...m.entries()];
   }, [visible]);
   const registered = openSlots.filter((s) => mineBySlot.has(s.id));
-  const bulkTargets = visible.filter((s) => !mineBySlot.has(s.id) && !clashOf.get(s.id));
+  const bulkTargets = visible.filter((s) => !mineBySlot.has(s.id) && !clashOf.get(s.id) && !closed(s.date));
 
   const toggle = async (slot: ShiftSlot) => {
     if (!myTalentId) return;
@@ -124,6 +145,11 @@ export default function TalentShiftSignup({ brands, shiftSlots, shiftRegistratio
             <section key={date} className="space-y-2" aria-label={dayLabel(date)}>
               <p className={`text-[11px] font-black uppercase tracking-wide ${date === today ? "text-[var(--accent-text)]" : "text-[var(--text-faint)]"}`}>
                 {dayLabel(date)}{date === today ? " · hôm nay" : ""} · {slots.filter((s) => mineBySlot.has(s.id)).length}/{slots.length} đã đăng ký
+                {deadlineOf(date) && (
+                  <span className={closed(date) ? "text-amber-300" : "text-emerald-300"}>
+                    {" "}· {closed(date) ? "đã đóng đăng ký" : `hạn báo rảnh ${fmtDeadline(deadlineOf(date)!)}`}
+                  </span>
+                )}
               </p>
               <div className="grid gap-2 sm:grid-cols-2">
                 {slots.map((slot) => {
@@ -143,7 +169,9 @@ export default function TalentShiftSignup({ brands, shiftSlots, shiftRegistratio
                         pending
                       />
                       {myTalentId && (
-                        clash && !mine ? (
+                        closed(slot.date) ? (
+                          <p className="text-[11px] text-amber-300 px-1">{mine ? "Bạn đã báo rảnh · đã" : "Đã"} đóng đăng ký tuần này — trainer đang xếp lịch.</p>
+                        ) : clash && !mine ? (
                           <p className="text-[11px] text-rose-300 px-1">Trùng ca bạn đã có: {clash.brandName} {clash.startTime}–{clash.endTime}</p>
                         ) : (
                           <button

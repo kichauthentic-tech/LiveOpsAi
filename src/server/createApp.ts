@@ -110,7 +110,7 @@ export function createApp() {
 
   // Role cấp được qua route tạo tài khoản. Admin chỉ do Admin cấp (user chốt 23/09: admin > CEO) — cùng luật
   // với trigger `guard_profile_update` (0136) ở DB; route này đi bằng service_role nên trigger không chặn hộ.
-  const ASSIGNABLE_ROLES = ["admin", "ceo", "operations", "brand", "talent"];
+  const ASSIGNABLE_ROLES = ["admin", "ceo", "operations", "trainer", "brand", "talent"];
 
   // ceo hoặc admin (Admin là tập cha của CEO) — quản lý tài khoản, kết nối TikTok Shop.
   const requireCeoCaller = (req: express.Request) => requireRoleCaller(req, ["ceo", "admin"]);

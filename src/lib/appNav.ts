@@ -1,5 +1,5 @@
 import React from "react";
-import { BookOpen, BrainCircuit, Briefcase, Building2, CalendarCheck2, CalendarDays, Clapperboard, CalendarClock, Crosshair, Calendar as CalendarIcon, CalendarRange, Database, DollarSign, FileSignature, FileText, Gauge, LayoutDashboard, LayoutGrid, Link2, Megaphone, Package, Send, ShieldCheck, Sun, TrendingUp, User, Users } from "lucide-react";
+import { BookOpen, BrainCircuit, ClipboardList, Briefcase, Building2, CalendarCheck2, CalendarDays, Clapperboard, CalendarClock, Crosshair, Calendar as CalendarIcon, CalendarRange, Database, DollarSign, FileSignature, FileText, Gauge, LayoutDashboard, LayoutGrid, Link2, Megaphone, Package, Send, ShieldCheck, Sun, TrendingUp, User, Users } from "lucide-react";
 import { PermissionKey, UserRole } from "../types";
 
 // Cấu hình sidebar + vài hằng số điều hướng, tách khỏi App.tsx 2026-10-01 (App.tsx 2.867 dòng).
@@ -48,7 +48,7 @@ export interface NavGroup {
 // Các tab mà nội dung chính là lưới lịch — bỏ giới hạn max-w-7xl để lấy hết chiều ngang
 // (lưới 7 cột / ma trận 5 khung giờ cần ~150px mỗi ô). Không còn tự thu
 // gọn sidebar theo tab — xem `autoCollapse`.
-export const CALENDAR_TABS = new Set(["calendar", "studio_calendar", "brand_calendar", "talent_calendar"]);
+export const CALENDAR_TABS = new Set(["calendar", "studio_calendar", "brand_calendar", "talent_calendar", "roster"]);
 
 // Tab không đọc ca / talent / report tháng — không phải chờ đợt nạp đầu (coreDataReady). Mọi tab khác
 // hiện khung chờ tới khi nạp xong, thay vì vẽ "0 ca" / "Chưa có…" giả (audit UX 2026-09-29).
@@ -81,6 +81,7 @@ export const TABS_WITHOUT_NAV_ITEM = new Set(["account_settings"]);
 export function getDefaultTabForRole(role: UserRole): string {
   if (role === "brand") return "brand_calendar";
   if (role === "talent") return "my_shifts";
+  if (role === "trainer") return "roster";
   return "calendar";
 }
 
@@ -126,6 +127,12 @@ export function agencyNavGroups(currentRole: UserRole): NavGroup[] {
               // ở Bảng Vận Hành (bấm dòng ca chưa có người), việc lập kế hoạch tồn đọng nằm ở khối cuối Bảng Vận Hành.
               { id: "month_plan", label: "Kế Hoạch Tháng", icon: CalendarRange, perm: "manage_sessions" as PermissionKey }
             ]
+          },
+          {
+            // Bàn Trainer (0174, 13/10): người quản lý nhân sự live xếp lịch TUẦN — hạn đăng ký, nháp người cho ca mở, kiểm luật
+            // giờ làm, công bố tuần (mỗi người một tin), đổi người/dời ca sau công bố có lý do. Role trainer mở vào đây.
+            label: "Nhân Sự Live",
+            items: [{ id: "roster", label: "Bàn Trainer", icon: ClipboardList, perm: "manage_roster" as PermissionKey }]
           },
           {
             label: "Vận Hành Hằng Ngày",
@@ -178,7 +185,8 @@ export function agencyNavGroups(currentRole: UserRole): NavGroup[] {
         // Khoá cứng ceo/admin — không qua Ma Trận Phân Quyền (trước đây gate bằng permission
         // `view_financials` togglable, ceo có thể lỡ bật cho operations qua Ma Trận). Toàn bộ
         // dữ liệu Finance & HR (lương/hoa hồng/chi phí) giờ chỉ ceo/admin biết được.
-        ...(currentRole === "ceo" || currentRole === "admin"
+        // Trainer (user chốt 13/10) xem Finance để xếp người theo chi phí — chỉ đọc (ghi session_finance vẫn ceo/admin ở RLS).
+        ...(currentRole === "ceo" || currentRole === "admin" || currentRole === "trainer"
           ? [{ id: "finance", label: "Finance & P&L", icon: DollarSign, perm: undefined }]
           : []),
       ],

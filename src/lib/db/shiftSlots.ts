@@ -99,3 +99,18 @@ export async function deleteShiftSlot(id: string): Promise<void> {
   if (error) throw error;
   assertAffected(data, "xoá ca chờ đăng ký");
 }
+
+/** Dời ngày/giờ một ca CÒN MỞ (chưa chốt người) — Bàn Trainer. Ca đã chốt thì dời qua RPC roster_move_session (có lý do). */
+export async function updateOpenSlotTime(id: string, v: { date: string; startTime: string; endTime: string }): Promise<ShiftSlot> {
+  const { data, error } = await supabase
+    .from("shift_slots")
+    .update({ date: v.date, start_time: v.startTime, end_time: v.endTime })
+    .eq("id", id)
+    .eq("status", "open")
+    .is("session_id", null)
+    .select();
+  if (isDuplicateSlotError(error)) throw new Error(`Brand này đã có ca ${v.startTime}-${v.endTime} ngày ${v.date} rồi (chưa huỷ).`);
+  if (error) throw error;
+  assertAffected(data, "dời giờ ca chờ đăng ký");
+  return fromDb((data as DbShiftSlot[])[0]);
+}

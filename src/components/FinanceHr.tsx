@@ -40,6 +40,8 @@ interface FinanceHrProps {
     patch: Partial<Pick<SessionFinance, "studioCost" | "notes">>
   ) => Promise<void>;
   onSetFinanceApproval: (sessionId: string, status: SessionFinance["approvalStatus"]) => Promise<void>;
+  /** Trainer (0174) xem Finance để xếp người theo chi phí — chỉ đọc; ghi session_finance vẫn ceo/admin ở RLS. */
+  readOnly?: boolean;
 }
 
 const money = (n: number) => Math.round(n).toLocaleString("vi-VN");
@@ -63,7 +65,8 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
   talentRateHistory,
   brandPlatformRateHistory,
   onUpdateFinance,
-  onSetFinanceApproval
+  onSetFinanceApproval,
+  readOnly = false
 }) => {
   const { showToast } = useToast();
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -391,7 +394,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                       <input
                         type="number"
                         defaultValue={finance.studioCost}
-                        disabled={savingId === s.id}
+                        disabled={readOnly || savingId === s.id}
                         onBlur={(e) => handleFieldChange(s.id, "studioCost", Number(e.target.value))}
                         className="w-24 p-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface-base)] text-[var(--text)] font-bold disabled:opacity-40"
                       />
@@ -440,7 +443,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                       {finance.approvalStatus === "approved" ? (
                         <button
                           onClick={() => handleApprove(s.id, "pending")}
-                          disabled={savingId === s.id}
+                          disabled={readOnly || savingId === s.id}
                           className="flex items-center gap-1 text-emerald-400 font-bold hover:underline disabled:opacity-40"
                           title={finance.approvedByUserId ? `Duyệt bởi ${userNameById[finance.approvedByUserId] ?? finance.approvedByUserId}` : undefined}
                         >
@@ -449,7 +452,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                       ) : finance.approvalStatus === "rejected" ? (
                         <button
                           onClick={() => handleApprove(s.id, "pending")}
-                          disabled={savingId === s.id}
+                          disabled={readOnly || savingId === s.id}
                           className="flex items-center gap-1 text-red-400 font-bold hover:underline disabled:opacity-40"
                         >
                           <XCircle className="w-3.5 h-3.5" /> Từ chối
@@ -458,7 +461,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => handleApprove(s.id, "approved")}
-                            disabled={savingId === s.id}
+                            disabled={readOnly || savingId === s.id}
                             className="text-emerald-400 hover:bg-emerald-950/80 p-1 rounded-lg disabled:opacity-40"
                             title="Duyệt bảng lương"
                           >
@@ -466,7 +469,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                           </button>
                           <button
                             onClick={() => handleApprove(s.id, "rejected")}
-                            disabled={savingId === s.id}
+                            disabled={readOnly || savingId === s.id}
                             className="text-red-400 hover:bg-red-950/80 p-1 rounded-lg disabled:opacity-40"
                             title="Từ chối"
                           >

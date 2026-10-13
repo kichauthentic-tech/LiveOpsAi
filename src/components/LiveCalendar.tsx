@@ -145,7 +145,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
   // Modal State
   const [selectedSessionDetail, setSelectedSessionDetail] = useState<LiveSession | null>(null);
   const [selectedSlotDetail, setSelectedSlotDetail] = useState<ShiftSlot | null>(null);
-  const canManageSlots = currentRole === "ceo" || currentRole === "admin" || currentRole === "operations";
+  const canManageSlots = currentRole === "ceo" || currentRole === "admin" || currentRole === "operations" || currentRole === "trainer";
   // Kéo-thả ghi thẳng vào ca — chỉ khi có quyền VÀ có đường ghi. Trước 11/10 thiếu `onUpdateSession` thì thả vẫn báo "Đã chuyển".
   const canEdit = canManageSlots && !!onUpdateSession;
   // Q2: form duy nhất là "Mở ca chờ đăng ký" (OpenSlotModal); prefill ngày/phòng/giờ từ ô được bấm.

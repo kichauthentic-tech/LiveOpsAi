@@ -62,7 +62,7 @@ const AUDIT_CATEGORY_LABEL: Record<string, string> = {
   "Security Alert": "Cảnh báo"
 };
 
-const MATRIX_ROLES: UserRole[] = ["admin", "ceo", "operations", "brand", "talent"];
+const MATRIX_ROLES: UserRole[] = ["admin", "ceo", "operations", "trainer", "brand", "talent"];
 
 // Group permissions by category. Không còn filter nào ở đây: từ 2026-09-22 mọi PermissionKey
 // đều gate đúng một nav item thật (xem bất biến ở types.ts), nên lưới Ma Trận hiện đúng bằng
@@ -241,7 +241,8 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
         manage_studios_gear: true,
         manage_crm_projects: true,
         manage_tiktok_api: true,
-        manage_users_permissions: true
+        manage_users_permissions: true,
+        manage_roster: true
       };
     } else if (role === "ceo") {
       preset = {
@@ -251,7 +252,8 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
         manage_studios_gear: true,
         manage_crm_projects: true,
         manage_tiktok_api: true,
-        manage_users_permissions: true
+        manage_users_permissions: true,
+        manage_roster: true
       };
     } else if (role === "operations") {
       preset = {
@@ -261,7 +263,20 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
         manage_studios_gear: true,
         manage_crm_projects: true,
         manage_tiktok_api: true,
-        manage_users_permissions: false
+        manage_users_permissions: false,
+        manage_roster: true
+      };
+    } else if (role === "trainer") {
+      // Trainer (0174): Bàn Trainer + Lịch & Studio/Bảng Vận Hành + Talent Pool. Finance mở cứng theo role (appNav), không qua Ma Trận.
+      preset = {
+        manage_sessions: false,
+        manage_calendar: true,
+        manage_talents: true,
+        manage_studios_gear: false,
+        manage_crm_projects: false,
+        manage_tiktok_api: false,
+        manage_users_permissions: false,
+        manage_roster: true
       };
     } else if (role === "brand") {
       preset = {
@@ -271,7 +286,8 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
         manage_studios_gear: false,
         manage_crm_projects: false,
         manage_tiktok_api: false,
-        manage_users_permissions: false
+        manage_users_permissions: false,
+        manage_roster: false
       };
     } else {
       // talent — hẹp nhất: 3 tab của chính mình (Ca Của Tôi / Đăng Ký Ca / Hồ Sơ) đều không gate
@@ -283,7 +299,8 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
         manage_studios_gear: false,
         manage_crm_projects: false,
         manage_tiktok_api: false,
-        manage_users_permissions: false
+        manage_users_permissions: false,
+        manage_roster: false
       };
     }
 
@@ -381,6 +398,8 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
         return "bg-emerald-500/20 text-emerald-300 border-emerald-500/40";
       case "talent":
         return "bg-amber-500/20 text-amber-300 border-amber-500/40";
+      case "trainer":
+        return "bg-cyan-500/20 text-cyan-300 border-cyan-500/40";
     }
   };
 
@@ -396,6 +415,8 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
         return "Đại diện brand";
       case "talent":
         return "Host / Trợ live";
+      case "trainer":
+        return "Trainer";
     }
   };
 
@@ -507,6 +528,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                       {roleKey === "admin" && "Quản trị hệ thống"}
                       {roleKey === "ceo" && "CEO"}
                       {roleKey === "operations" && "Vận hành"}
+                      {roleKey === "trainer" && "Trainer (nhân sự live)"}
                       {roleKey === "brand" && "Brand (khách hàng)"}
                       {roleKey === "talent" && "Host / Trợ live"}
                     </h3>
@@ -514,6 +536,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                       {roleKey === "admin" && "Mọi thứ CEO làm được, thêm AI Training Center (chỉ admin)."}
                       {roleKey === "ceo" && "Toàn bộ màn agency, Finance & P&L, CRM và phân quyền."}
                       {roleKey === "operations" && "Lập kế hoạch tháng, xếp và chốt người cho ca, up số liệu, đối soát, làm report. Không thấy Finance."}
+                      {roleKey === "trainer" && "Xếp lịch tuần: hạn đăng ký, chọn host/trợ cho ca, dời/thêm ca, công bố lịch. Thấy rate và Finance (chỉ đọc)."}
                       {roleKey === "brand" && "Chỉ thấy workspace của brand mình: lịch, sổ ca, report tháng đã phát hành, cam kết, kế hoạch tháng sau."}
                       {roleKey === "talent" && "Ca của mình, đăng ký ca, nộp report ca và hồ sơ cá nhân."}
                     </p>
@@ -640,6 +663,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                 <option value="admin">Admin</option>
                 <option value="ceo">CEO</option>
                 <option value="operations">Vận hành</option>
+                <option value="trainer">Trainer</option>
                 <option value="brand">Brand</option>
                 <option value="talent">Host / Trợ live</option>
               </select>
@@ -935,6 +959,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                     {(currentRole === "admin" || formData.role === "admin") && <option value="admin">Quản trị hệ thống</option>}
                     <option value="ceo">CEO</option>
                     <option value="operations">Vận hành</option>
+                    <option value="trainer">Trainer (nhân sự live)</option>
                     <option value="brand">Brand (khách hàng)</option>
                     <option value="talent">Host / Trợ live</option>
                   </select>

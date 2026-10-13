@@ -5,7 +5,8 @@
 // thật đang dùng đường này). Giá trị 'moderator' vẫn còn trong enum `user_role` của Postgres —
 // Postgres không xoá được value khỏi enum một cách an toàn — nhưng không role nào dùng nó và
 // migration 0103 đã chặn không cho gán lại.
-export type UserRole = "ceo" | "operations" | "brand" | "talent" | "admin";
+// "trainer" (0173, 13/10): người quản lý nhân sự live — xếp lịch tuần, chọn người cho ca, công bố lịch; thấy rate + Finance.
+export type UserRole = "ceo" | "operations" | "brand" | "talent" | "admin" | "trainer";
 
 // BẤT BIẾN (chốt 2026-09-22, audit role × workspace): mỗi PermissionKey phải gate ĐÚNG MỘT nav
 // item trong AGENCY_NAV_GROUPS. Thêm key mà không gắn vào nav item nào là tạo một công tắc giả
@@ -27,7 +28,9 @@ export type PermissionKey =
   | "manage_studios_gear"
   | "manage_crm_projects"
   | "manage_tiktok_api"
-  | "manage_users_permissions";
+  | "manage_users_permissions"
+  // Bàn Trainer (0174): xếp nháp người cho ca, hạn đăng ký, công bố tuần.
+  | "manage_roster";
 
 export interface PermissionDefinition {
   key: PermissionKey;
@@ -689,7 +692,9 @@ export type AppNotificationKind =
   | "report_reconciled"
   | "shift_open"              // 0116/Đ9 — có ca đang mở chờ đăng ký (ca phát sinh, hoặc tổng cả tháng)
   | "shift_dropout_request"   // 0116/Đ7 — talent báo không đi được ca đã chốt; gửi cho OPS
-  | "handover_due";           // 0144 — hết ca 15 phút chưa giao ca (gửi trợ live, ca không trợ thì OPS)
+  | "handover_due"            // 0144 — hết ca 15 phút chưa giao ca (gửi trợ live, ca không trợ thì OPS)
+  | "roster_published"        // 0174 — trainer công bố lịch tuần: một tin tóm tắt ca của người nhận
+  | "signup_open";            // 0174 — trainer mở đăng ký tuần, kèm hạn chót
 
 export interface AppNotification {
   id: string;
