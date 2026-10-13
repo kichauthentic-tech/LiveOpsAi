@@ -17,6 +17,7 @@ import { useConfirm } from "../hooks/useConfirm";
 import { fmtVndFull } from "../lib/format";
 import { profileOf } from "../lib/platforms/profiles";
 import { platformOf } from "../lib/reportPlatform";
+import { dataSourceTier } from "../lib/dataSource";
 
 interface SessionLiveSnapshotUploadProps {
   session: LiveSession;
@@ -207,6 +208,13 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
             {busy ? "Đang xử lý..." : "Chọn File Số Liệu"}
           </button>
         </div>
+      )}
+
+      {dataSourceTier(session) === "reconciled" && (
+        <p className="text-[11px] text-sky-300 flex items-start gap-1.5">
+          <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-px" />
+          Ca đã đối soát bằng file sàn: up hay xoá file ở đây không đổi số của ca, chỉ dùng làm mốc khi bấm Áp dụng lại ở Đối soát.
+        </p>
       )}
 
       {links.prev && !links.prev.hasSnapshot && (
