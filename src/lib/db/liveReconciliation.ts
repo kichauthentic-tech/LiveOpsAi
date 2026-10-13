@@ -184,6 +184,38 @@ export async function mergeReconciliationRows(batchId: string, groups: string[][
   return (data as number) ?? 0;
 }
 
+/** Cách một phiên được chia cho một ca (0171): trọn phiên / theo mốc snapshot (ranh giới ca có mốc ±15 phút) / có phần ước lượng theo giờ. */
+export type ReconShareMethod = "whole" | "snapshot" | "time";
+
+export interface ReconShare {
+  rowId: string;
+  sessionId: string;
+  method: ReconShareMethod;
+  gmv: number;
+  orders: number;
+  /** Số đang ghi trên ca + nguồn số — để báo ca đã đối soát nhưng lệch bản chia mới (có snapshot mới sau lần Áp dụng). */
+  currentGmv: number;
+  currentSource?: string;
+}
+
+/** Bản chia mà Áp dụng sẽ ghi (cùng hàm private.recon_shares). DB chưa có 0171 ⇒ null (màn hiện như cũ, không số chia). */
+export async function fetchReconciliationPreview(batchId: string): Promise<ReconShare[] | null> {
+  const { data, error } = await supabase.rpc("preview_live_reconciliation", { p_batch_id: batchId });
+  if (error) {
+    if (error.code === "PGRST202") return null;
+    throw error;
+  }
+  return ((data ?? []) as Array<{ row_id: string; session_id: string; method: ReconShareMethod; gmv: number; orders: number; current_gmv: number | null; current_source: string | null }>).map((r) => ({
+    rowId: r.row_id,
+    sessionId: r.session_id,
+    method: r.method,
+    gmv: Number(r.gmv) || 0,
+    orders: Number(r.orders) || 0,
+    currentGmv: Number(r.current_gmv) || 0,
+    currentSource: r.current_source ?? undefined
+  }));
+}
+
 export async function applyReconciliation(batchId: string): Promise<number> {
   const { data, error } = await supabase.rpc("apply_live_reconciliation", { p_batch_id: batchId });
   if (error) throw error;

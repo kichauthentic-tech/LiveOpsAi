@@ -4,9 +4,11 @@ import {
   ReconciliationBatch,
   ReconciliationBucket,
   ReconciliationRow,
+  ReconShare,
   applyReconciliation,
   deleteReconciliationBatch,
   fetchReconciliationBatches,
+  fetchReconciliationPreview,
   fetchReconciliationRows,
   mergeReconciliationRows,
   setReconciliationBucket,
@@ -15,7 +17,7 @@ import {
 import { type ReportPlatform } from "../../lib/reportPlatform";
 import { errorMessage } from "../../lib/errorMessage";
 import { useConfirm } from "../../hooks/useConfirm";
-import { fmtPeriodLabel, fmtVndFull } from "../../lib/format";
+import { fmtPeriodLabel, fmtVndFull, fmtVndShort } from "../../lib/format";
 import { LiveSession } from "../../types";
 import { suggestMergeGroups } from "../../lib/reconciliation/mergeRestarts";
 
@@ -42,8 +44,8 @@ const BUCKET_LABEL: Record<ReconciliationBucket, string> = {
 };
 
 const BUCKET_HINT: Record<ReconciliationBucket, string> = {
-  agency: "Chia chính xác theo ranh giới snapshot mà trợ live đã up lúc giao ca.",
-  review: "Có ca trong chuỗi ca nối chưa up snapshot nên mất ranh giới — chỉ chia ước lượng theo thời gian trùng nhau. Nên nhắc trợ up đúng lúc giao ca.",
+  agency: "Chia đúng theo snapshot trợ live up lúc giao ca; ca cuối không up thì nhận phần sau mốc cuối.",
+  review: "Có ca chưa up snapshot hoặc up trễ — phần không có mốc chia theo giờ (ô ≈), phần có mốc vẫn chia đúng. Nên nhắc trợ up đúng lúc giao ca.",
   unassigned: "Không nằm trong khung giờ ca nào của agency. Không ảnh hưởng số liệu ca, chỉ cần gán nhãn để còn so hiệu suất agency với inhouse.",
   inhouse: "Đã xác nhận là brand tự live, không tính vào ca nào của agency."
 };
@@ -59,6 +61,12 @@ const BUCKET_TONE: Record<ReconciliationBucket, string> = {
 const APPLIED_BUCKETS: ReconciliationBucket[] = ["agency", "review"];
 
 const ORDER: ReconciliationBucket[] = ["agency", "review", "unassigned", "inhouse"];
+
+const METHOD_TITLE: Record<ReconShare["method"], string> = {
+  whole: "Cả phiên thuộc ca này",
+  snapshot: "Theo snapshot lúc giao ca",
+  time: "Có phần ước lượng theo giờ — thiếu snapshot hoặc up trễ"
+};
 
 function fmtTime(iso?: string): string {
   return iso ? new Date(iso).toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—";
@@ -80,6 +88,8 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
   const [note, setNote] = useState<string | null>(null);
   // Nhóm gộp restart đang bị bỏ tick (mặc định gợi ý nào cũng được tick); khoá theo id dòng đầu của nhóm.
   const [mergeOff, setMergeOff] = useState<Set<string>>(new Set());
+  // Bản chia Áp dụng sẽ ghi (0171), theo dòng. null = DB chưa có 0171 ⇒ màn như cũ.
+  const [preview, setPreview] = useState<Map<string, ReconShare[]> | null>(null);
 
   const reloadBatches = useCallback(async (selectId?: string) => {
     const list = await fetchReconciliationBatches(brandId, platform);
@@ -103,6 +113,23 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
       .finally(() => alive && setBusy(false));
     return () => { alive = false; };
   }, [reloadBatches, reloadKey]);
+
+  // Gộp dòng / Áp dụng / đổi lô đều nạp lại rows ⇒ tính lại bản chia (snapshot up sau cũng hiện ra ở đây).
+  const appliedAt = batches.find((b) => b.id === activeId)?.appliedAt;
+  useEffect(() => {
+    if (!activeId) return;
+    let alive = true;
+    fetchReconciliationPreview(activeId)
+      .then((list) => {
+        if (!alive) return;
+        if (!list) { setPreview(null); return; }
+        const byRow = new Map<string, ReconShare[]>();
+        for (const sh of list) byRow.set(sh.rowId, [...(byRow.get(sh.rowId) ?? []), sh]);
+        setPreview(byRow);
+      })
+      .catch((e) => alive && setError(errorMessage(e)));
+    return () => { alive = false; };
+  }, [activeId, rows.length, appliedAt]);
 
   async function run(fn: () => Promise<void>) {
     setBusy(true);
@@ -137,10 +164,40 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
   const mergePicked = mergeGroups.filter((g) => !mergeOff.has(g.ids[0]));
   const applicable = rows.filter((r) => APPLIED_BUCKETS.includes(r.bucket));
   const selectedCount = applicable.filter((r) => !r.excluded).length;
+  // Rổ hiển thị của dòng agency/review theo bản chia thật (có ô ước lượng hay không) — snapshot up sau lúc nạp lô đổi được rổ.
+  const shownBucket = (r: ReconciliationRow): ReconciliationBucket => {
+    const shares = preview?.get(r.id);
+    if (!APPLIED_BUCKETS.includes(r.bucket) || !shares?.length) return r.bucket;
+    return shares.some((sh) => sh.method === "time") ? "review" : "agency";
+  };
   const grouped = ORDER.map((bucket) => ({
     bucket,
-    items: rows.filter((r) => r.bucket === bucket)
+    items: rows.filter((r) => shownBucket(r) === bucket)
   })).filter((g) => g.items.length > 0);
+  // Lô đã Áp dụng mà ca đã đối soát đang khác bản chia mới (snapshot up/xoá sau lần Áp dụng) ⇒ nhắc Áp dụng lại.
+  // Chỉ tính ca mà lần đối soát GẦN NHẤT là lô này: ca đã được lô mới hơn ghi đè (file tải sau, số mới hơn) mà nhắc Áp dụng
+  // lại lô cũ thì sẽ đè số mới bằng số cũ (đo 13/10: CROCS 01–09/10 báo 13 ca "lệch" chỉ vì lô 01–10/10 đã ghi sau).
+  const staleSessions = useMemo(() => {
+    if (!preview || !appliedAt) return 0;
+    const appliedMs = Date.parse(appliedAt);
+    const lastByThisBatch = (id: string) => {
+      const at = sessionById.get(id)?.reconciledAt;
+      return !!at && Date.parse(at) <= appliedMs + 60_000;
+    };
+    const want = new Map<string, { gmv: number; current: number; source?: string }>();
+    for (const r of rows) {
+      if (r.excluded) continue;
+      for (const sh of preview.get(r.id) ?? []) {
+        if (!lastByThisBatch(sh.sessionId)) continue;
+        const w = want.get(sh.sessionId) ?? { gmv: 0, current: sh.currentGmv, source: sh.currentSource };
+        w.gmv += sh.gmv;
+        want.set(sh.sessionId, w);
+      }
+    }
+    // Lệch dưới 1% = hai cách ước lượng theo giờ khác nhau chút ít (vd ca nạp bù tách theo giờ ca, 0171 theo giờ live thật —
+    // CROCS T9 13/10: 27 ca lệch ≤ 0,6%) ⇒ không nhắc; chênh do mốc snapshot mới thì lớn hơn nhiều (VERA Shopee 09/10: 3,6–6%).
+    return [...want.values()].filter((w) => w.source === "tiktok_reconciled" && Math.abs(w.gmv - w.current) > Math.max(1, Math.abs(w.current) * 0.01)).length;
+  }, [preview, rows, appliedAt, sessionById]);
 
   return (
     <div className="space-y-3">
@@ -148,7 +205,7 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
         <h4 className="font-bold text-[var(--text)] text-xs">Đối soát số liệu — {brandName}</h4>
         <p className="text-[11px] text-[var(--text-muted)] mt-1 max-w-3xl">
           Mỗi lần up file ở dưới tự tạo một lần đối soát: app khớp từng phiên live với ca CÓ SẴN của brand theo giờ, bạn xem rổ rồi bấm Áp dụng để thay số tạm bằng số cuối của sàn.
-          Phiên dài chạy xuyên 2 ca (chưa có số lúc giao ca) vẫn chia được cho cả hai ca — chia ước lượng theo thời gian, tổng đúng bằng file.
+          Phiên chạy xuyên nhiều ca: chia theo các mốc snapshot (tính theo giờ up thật), chỉ phần không có mốc mới chia theo giờ (≈) — tổng luôn đúng bằng file.
         </p>
 
         {batches.length > 0 && (
@@ -173,6 +230,11 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
         {error && (
           <p className="text-xs text-rose-400 flex items-start gap-1.5 mt-3">
             <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" /> {error}
+          </p>
+        )}
+        {staleSessions > 0 && (
+          <p className="text-xs text-amber-300 flex items-start gap-1.5 mt-3">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" /> {staleSessions} ca đang khác bản chia mới (lệch quá 1%) — bấm Áp Dụng Lại để cập nhật.
           </p>
         )}
         {note && (
@@ -338,11 +400,22 @@ export function ReconciliationPanel({ brandId, brandName, platform, sessions, re
                           <td className="py-1.5 text-right text-[var(--text-muted)]">
                             {r.matchedSessionIds.length === 0 ? "—" : (
                               <span className="inline-flex gap-1 justify-end flex-wrap">
-                                {r.matchedSessionIds.map((id) => (
-                                  <span key={id} className="inline-flex items-center px-1.5 py-0.5 rounded border border-sky-800 text-sky-300 font-bold whitespace-nowrap">
-                                    {sessionLabel(id)}
-                                  </span>
-                                ))}
+                                {r.matchedSessionIds.map((id) => {
+                                  const sh = preview?.get(r.id)?.find((x) => x.sessionId === id);
+                                  const est = sh?.method === "time";
+                                  return (
+                                    <span
+                                      key={id}
+                                      title={sh ? `${METHOD_TITLE[sh.method]} · ${fmtVndFull(sh.gmv)}` : undefined}
+                                      className={`inline-flex items-center px-1.5 py-0.5 rounded border font-bold whitespace-nowrap ${
+                                        est ? "border-dashed border-amber-600 text-amber-300" : "border-sky-800 text-sky-300"
+                                      }`}
+                                    >
+                                      {sessionLabel(id)}
+                                      {sh && <span className="ml-1 font-normal">· {est ? "≈" : ""}{fmtVndShort(sh.gmv)}</span>}
+                                    </span>
+                                  );
+                                })}
                               </span>
                             )}
                           </td>
