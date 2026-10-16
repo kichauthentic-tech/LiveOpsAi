@@ -1,5 +1,5 @@
 import React from "react";
-import { BookOpen, BrainCircuit, ClipboardList, Briefcase, Building2, CalendarCheck2, CalendarDays, Clapperboard, CalendarClock, Crosshair, Calendar as CalendarIcon, CalendarRange, Database, DollarSign, FileSignature, FileText, Gauge, LayoutDashboard, LayoutGrid, Link2, Megaphone, Package, Send, ShieldCheck, Sun, TrendingUp, User, Users } from "lucide-react";
+import { BookOpen, BrainCircuit, ClipboardList, Briefcase, Building2, CalendarCheck, CalendarCheck2, CalendarDays, Clapperboard, CalendarClock, Crosshair, Calendar as CalendarIcon, CalendarRange, Database, DollarSign, FileSignature, FileText, Gauge, LayoutDashboard, LayoutGrid, Link2, Megaphone, Package, Send, ShieldCheck, TrendingUp, User, Users } from "lucide-react";
 import { PermissionKey, UserRole } from "../types";
 
 // Cấu hình sidebar + vài hằng số điều hướng, tách khỏi App.tsx 2026-10-01 (App.tsx 2.867 dòng).
@@ -94,17 +94,17 @@ export function agencyNavGroups(currentRole: UserRole): NavGroup[] {
   // Brand Workspace (Giai đoạn A, docs/WORKSPACE_HISTORY.md).
   const AGENCY_NAV_GROUPS: NavGroup[] = [
     // Tái cấu trúc 2026-09-21: tách LẬP KẾ HOẠCH (trước tháng) khỏi VẬN HÀNH (hằng ngày).
-    // App talent T1 (11/10): 4 tab — Hôm Nay (id cũ `my_shifts`: thông báo + localStorage trỏ vào), Lịch (LiveCalendar cách nhìn
-    // talent), Đăng Ký Ca, Hồ Sơ. Điện thoại: thanh tab dưới đáy (TalentTabBar); máy tính phòng live: sidebar.
+    // App talent bản 2 (16/10): 4 tab — Ca Của Tôi (id cũ `my_shifts`: thông báo + localStorage trỏ vào), Cả Agency (theo ngày +
+    // LiveCalendar cách nhìn talent), Đăng Ký Ca (user chốt giữ tab riêng), Tôi. Điện thoại: thanh tab dưới đáy (TalentTabBar).
     ...(currentRole === "talent"
       ? [
           {
             label: "Của Tôi",
             items: [
-              { id: "my_shifts", label: "Hôm Nay", icon: Sun, perm: undefined },
-              { id: "talent_calendar", label: "Lịch", icon: CalendarDays, perm: undefined },
+              { id: "my_shifts", label: "Ca Của Tôi", icon: CalendarCheck, perm: undefined },
+              { id: "talent_calendar", label: "Cả Agency", icon: CalendarDays, perm: undefined },
               { id: "shift_scheduling", label: "Đăng Ký Ca", icon: CalendarClock, perm: undefined },
-              { id: "my_talent_profile", label: "Hồ Sơ Của Tôi", icon: User, perm: undefined }
+              { id: "my_talent_profile", label: "Tôi", icon: User, perm: undefined }
             ]
           }
         ]

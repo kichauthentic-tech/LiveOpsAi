@@ -158,7 +158,7 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
             }`}
           >
             {iAmRegistered ? <UserX className="w-3.5 h-3.5" /> : <UserCheck className="w-3.5 h-3.5" />}
-            {iAmRegistered ? "Đã đăng ký · Huỷ" : "Tôi rảnh ca này"}
+            {iAmRegistered ? "Đã đăng ký · Huỷ" : "Đăng ký ca này"}
           </button>
         )}
 

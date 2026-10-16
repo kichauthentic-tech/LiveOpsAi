@@ -42,7 +42,8 @@ import {
 } from "lucide-react";
 import { AppSidebar } from "./components/AppSidebar";
 import { TalentTabBar } from "./components/talent/TalentTabBar";
-import { handoverDue, mySessions } from "./lib/talent/myShifts";
+import { myClashes, mySessions, openSlotsFrom } from "./lib/talent/myShifts";
+import { myBadgeCount } from "./lib/talent/agenda";
 import { myPendingAcks } from "./lib/talent/acks";
 import { useShiftAcks } from "./hooks/useShiftAcks";
 import { getTodayDate } from "./lib/dateUtils";
@@ -106,6 +107,7 @@ const BrandsOverview = lazyNamed(() => import("./components/BrandsOverview"), "B
 const ReportPublishBoard = lazyNamed(() => import("./components/ReportPublishBoard"), "ReportPublishBoard");
 const TalentShiftSignup = lazyNamed(() => import("./components/TalentShiftSignup"), "default");
 const TalentToday = lazyNamed(() => import("./components/talent/TalentToday"), "TalentToday");
+const TalentAgency = lazyNamed(() => import("./components/talent/TalentAgency"), "TalentAgency");
 const OpsPlanningTodo = lazyNamed(() => import("./components/OpsPlanningTodo"), "default");
 const MonthPlan = lazyNamed(() => import("./components/MonthPlan"), "default");
 const OpsSupportTab = lazyNamed(() => import("./components/OpsSupportTab"), "default");
@@ -128,7 +130,7 @@ const TAB_CHUNKS: Record<string, { preload: () => void }[]> = {
   control_room: [ControlRoom],
   roster: [RosterBoard],
   my_shifts: [TalentToday],
-  talent_calendar: [LiveCalendar],
+  talent_calendar: [TalentAgency, LiveCalendar],
   shift_scheduling: [TalentShiftSignup],
   month_plan: [MonthPlan],
   agency_overview: [CeoBrief, AgencyChannelSummary],
@@ -590,11 +592,18 @@ export default function App() {
         status: "Active",
       };
 
-  // App talent (T1, 11/10): ca của chính người này (Đăng Ký Ca chặn ca mở trùng giờ) + số ca phải giao (chấm đỏ trên thanh tab).
+  // App talent (bản 2, 16/10): ca của chính người này (Đăng Ký Ca chỉ hiện "Bạn đã có", không chặn trùng giờ). Chấm đỏ "Ca của tôi" chỉ đếm việc làm
+  // được trên điện thoại — có lịch mới cần xem (1) + chỗ bị xếp trùng giờ; KHÔNG đếm ca "cần giao" (admin giao trên máy phòng
+  // live, user chốt 16/10). Chấm của "Đăng ký" = ca đang mở mình chưa đăng ký.
   const myTalentIdForApp = currentRole === "talent" ? activeUser.assignedTalentId : undefined;
   const talentMyShifts = useMemo(() => mySessions(activeSessions, myTalentIdForApp), [activeSessions, myTalentIdForApp]);
-  const talentDueCount = useMemo(() => handoverDue(activeSessions, myTalentIdForApp, getTodayDate()).length, [activeSessions, myTalentIdForApp]);
-  // T2 (0169): ca mới xếp / đổi giờ chưa bấm "Đã nhận" — cộng vào chấm đỏ của tab Hôm nay.
+  const talentClashCount = useMemo(() => myClashes(activeSessions, myTalentIdForApp, getTodayDate()).length, [activeSessions, myTalentIdForApp]);
+  const talentOpenCount = useMemo(() => {
+    if (!myTalentIdForApp) return 0;
+    const mine = new Set(shiftRegistrations.filter((r) => r.talentId === myTalentIdForApp).map((r) => r.slotId));
+    return openSlotsFrom(shiftSlots, getTodayDate()).filter((sl) => !mine.has(sl.id)).length;
+  }, [shiftSlots, shiftRegistrations, myTalentIdForApp]);
+  // T2 (0169): ca mới xếp / đổi giờ chưa bấm "Đã nhận".
   const { acks: talentAcks, loadedAt: talentAcksAt, ack: handleAckShifts } = useShiftAcks(!!myTalentIdForApp);
   const talentAckCount = useMemo(
     () => (talentAcks ? myPendingAcks(activeSessions, myTalentIdForApp, talentAcks, talentAcksAt).length : 0),
@@ -2043,22 +2052,34 @@ export default function App() {
                 )}
 
                 {activeTab === "talent_calendar" && currentRole === "talent" && (
-                  <LiveCalendar
-                    channels={channels}
+                  <TalentAgency
                     sessions={activeSessions}
                     shiftSlots={shiftSlots}
-                    shiftRegistrations={shiftRegistrations}
-                    studios={activeStudios}
-                    talents={activeTalents}
                     brands={brands}
-                    onRegisterSlot={handleRegisterSlot}
-                    onUnregisterSlot={handleUnregisterSlot}
-                    myTalentId={activeUser.assignedTalentId}
-                    currentUserId={activeUser.id}
+                    talents={activeTalents}
                     currentRole={currentRole}
-                    schemes={promoSchemes}
+                    myTalentId={activeUser.assignedTalentId}
                     onSessionsUpdated={handleSessionsUpdated}
                     onRequestDropout={handleRequestDropout}
+                    fullCalendar={() => (
+                      <LiveCalendar
+                        channels={channels}
+                        sessions={activeSessions}
+                        shiftSlots={shiftSlots}
+                        shiftRegistrations={shiftRegistrations}
+                        studios={activeStudios}
+                        talents={activeTalents}
+                        brands={brands}
+                        onRegisterSlot={handleRegisterSlot}
+                        onUnregisterSlot={handleUnregisterSlot}
+                        myTalentId={activeUser.assignedTalentId}
+                        currentUserId={activeUser.id}
+                        currentRole={currentRole}
+                        schemes={promoSchemes}
+                        onSessionsUpdated={handleSessionsUpdated}
+                        onRequestDropout={handleRequestDropout}
+                      />
+                    )}
                   />
                 )}
 
@@ -2483,7 +2504,7 @@ export default function App() {
               setActiveTab(tab);
               setMobileMenuOpen(false);
             }}
-            badges={{ my_shifts: talentDueCount + talentAckCount }}
+            badges={{ my_shifts: myBadgeCount(talentAckCount, talentClashCount), shift_scheduling: talentOpenCount }}
           />
         )}
       </div>

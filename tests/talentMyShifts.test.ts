@@ -77,14 +77,6 @@ describe("heroShift", () => {
   });
 });
 
-describe("handoverDue", () => {
-  test("chỉ ca mình là TRỢ, đã chạy, chưa giao; host không phải giao", () => {
-    const done = { status: "Completed" as const, date: "2026-10-10" };
-    const xs = [ca("tro", done), ca("host", { ...done, hostId: GIANG, coHostId: "duy" }), ca("future"), ca("giao", { ...done, report: { handoverAt: "2026-10-10T08:00:00Z", submittedAt: "2026-10-10T08:00:00Z" } as LiveSession["report"], dataSource: "live_snapshot" } as Partial<LiveSession>)];
-    expect(M.handoverDue(xs, GIANG, "2026-10-11").map((s) => s.id)).toEqual(["tro"]);
-  });
-});
-
 describe("myClashes", () => {
   test("15/10 Franklin Shopee 19:30–21:30 trùng VERA 21:00–00:00 của chính mình", () => {
     const xs = [
@@ -131,10 +123,7 @@ describe("đăng ký ca", () => {
     const got = M.openSlotsFrom([slot("b", { startTime: "21:00" }), slot("a"), slot("qua", { date: "2026-10-01" }), slot("chot", { status: "finalized" })], "2026-10-11");
     expect(got.map((s) => s.id)).toEqual(["a", "b"]);
   });
-  test("ca mở trùng giờ ca đã chốt của mình ⇒ trả về ca đó", () => {
-    const mine = [ca("c", { date: "2026-10-20", startTime: "20:00", endTime: "23:00" })];
-    expect(M.slotClashWithMine(slot("a"), mine, GIANG)?.id).toBe("c");
-    expect(M.slotClashWithMine(slot("a", { startTime: "10:00", endTime: "13:00" }), mine, GIANG)).toBeNull();
+  test("giờ của ca mở, kể cả ca qua nửa đêm", () => {
     expect(M.slotHours(slot("a", { startTime: "22:00", endTime: "00:30" }))).toBe(2.5);
   });
 });

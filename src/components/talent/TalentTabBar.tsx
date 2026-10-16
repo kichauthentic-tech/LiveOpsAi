@@ -1,9 +1,9 @@
 import React from "react";
 import type { NavItem } from "../../lib/appNav";
 
-// Thanh 4 tab dưới đáy của app talent trên điện thoại (T1, 11/10). Host/trợ mở app bằng điện thoại riêng: menu ẩn sau nút ☰ là
-// một lần bấm thừa cho 4 màn. Máy tính (phòng live) vẫn dùng sidebar — thanh này `md:hidden`.
-const SHORT: Record<string, string> = { my_shifts: "Hôm nay", talent_calendar: "Lịch", shift_scheduling: "Đăng ký", my_talent_profile: "Hồ sơ" };
+// Thanh 4 tab dưới đáy của app talent trên điện thoại (T1 11/10, bản 2 16/10). Host/trợ mở app bằng điện thoại riêng: menu ẩn sau
+// nút ☰ là một lần bấm thừa cho 4 màn. Máy tính (phòng live) vẫn dùng sidebar — thanh này `md:hidden`.
+const SHORT: Record<string, string> = { my_shifts: "Ca của tôi", talent_calendar: "Cả agency", shift_scheduling: "Đăng ký", my_talent_profile: "Tôi" };
 
 export const TalentTabBar: React.FC<{ items: NavItem[]; activeTab: string; onSelect: (tab: string) => void; badges?: Record<string, number> }> = ({
   items,

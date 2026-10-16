@@ -1,12 +1,10 @@
 import type { LiveSession, ShiftSlot } from "../../types";
-import { addDays } from "../dateUtils";
-import { isHandoverPerson } from "../handover";
-import { missingSteps } from "../sessionLedger";
 import { sessionWindowMs } from "../sessionStatus";
-import { findPersonClashes, personClash, type PersonClash } from "../scheduling/conflicts";
+import { findPersonClashes, type PersonClash } from "../scheduling/conflicts";
 import { personRoleMinutes, sessionMinutes, hasStaffSegments } from "../staffSegments";
 
-// Logic thuần của app talent (T1, 11/10): tab Hôm nay, Đăng ký, Tôi. Mọi phép "ca của tôi" đi qua đây để ba tab nói
+// Logic thuần của app talent (T1 11/10, bản 2 16/10): tab Ca của tôi, Đăng ký, Tôi. Giao ca không còn ở app talent (admin giao
+// trên máy phòng live, user chốt 16/10). Mọi phép "ca của tôi" đi qua đây để ba tab nói
 // cùng một số về cùng một người. Giờ theo người đọc từ staffSegments (đổi người giữa ca, 0138) — không đọc hostId/coHostId
 // thô cho số liệu (WORKSPACE §5.5).
 
@@ -76,15 +74,6 @@ export function heroShift(mine: LiveSession[], nowMs: number, withinDays = 7): H
   return next ? { session: next, live: false, minutesLeft: Math.ceil((sessionWindowMs(next)[0] - nowMs) / 60000) } : null;
 }
 
-/** Ca tôi phải giao mà chưa giao: tôi là trợ live (ca không trợ thì OPS giao — user chốt 06/10), ca đã chạy, còn thiếu file
- *  hoặc phần giao ca (đối soát là việc của ops). Mới nhất trước. */
-export function handoverDue(sessions: LiveSession[], talentId: string | undefined, today: string): LiveSession[] {
-  if (!talentId) return [];
-  return sessions
-    .filter((s) => isHandoverPerson(s, talentId) && s.date <= today && missingSteps(s, today).some((m) => m !== "reconcile"))
-    .sort((a, b) => byStart(b, a));
-}
-
 /** Chỗ tôi bị xếp hai ca cùng lúc, từ hôm nay (cùng luật quét lịch của ops — findPersonClashes). */
 export function myClashes(sessions: LiveSession[], talentId: string | undefined, today: string): PersonClash[] {
   if (!talentId) return [];
@@ -107,10 +96,6 @@ export function loadBetween(mine: LiveSession[], talentId: string, from: string,
   const xs = mine.filter((s) => s.status !== "Cancelled" && s.date >= from && s.date <= to);
   return { count: xs.length, hours: xs.reduce((a, s) => a + hoursOf(s, talentId), 0) };
 }
-
-/** 7 ngày tới, không gồm hôm nay. */
-export const nextWeekLoad = (mine: LiveSession[], talentId: string, today: string): LoadSummary =>
-  loadBetween(mine, talentId, addDays(today, 1), addDays(today, 7));
 
 export interface MonthSummary {
   done: { count: number; hostCount: number; coCount: number; hostHours: number; coHours: number };
@@ -153,11 +138,6 @@ export function openSlotsFrom(slots: ShiftSlot[], today: string): ShiftSlot[] {
   return slots
     .filter((s) => s.status === "open" && s.date >= today)
     .sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
-}
-
-/** Ca đã chốt của tôi trùng giờ ca mở này (đăng ký thì OP cũng không chốt được — DB 0143 chặn trùng người). */
-export function slotClashWithMine(slot: ShiftSlot, sessions: LiveSession[], talentId: string | undefined): LiveSession | null {
-  return personClash(sessions, { date: slot.date, startTime: slot.startTime, endTime: slot.endTime }, talentId);
 }
 
 /** Giờ của một ca mở theo lịch. */

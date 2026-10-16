@@ -5,6 +5,7 @@ import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 import { isAliasEmail, isLoginName, loginLabel } from "../lib/loginName.js";
 import { registerAskRoute } from "./askData.js";
+import { registerCalendarFeedRoutes } from "./calendarFeed.js";
 import * as Sentry from "@sentry/node";
 
 dotenv.config();
@@ -509,6 +510,9 @@ export function createApp() {
     bucket.count += 1;
     next();
   };
+
+  // Link lịch riêng của host/trợ (.ics, migration 0177) — xem calendarFeed.ts.
+  registerCalendarFeedRoutes(app, { supabaseAdmin, authUserOf, rateLimit });
 
   // API Route: returns a one-time-use TikTok authorization URL. The client redirects the
   // browser to it (window.location = url); TikTok then redirects the seller back to

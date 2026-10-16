@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, ClipboardList, Send, Wand2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, ClipboardList, MessageSquareText, Send, Wand2 } from "lucide-react";
 import type { Brand, BrandChannel, BrandStudio, LiveSession, ShiftRegistration, ShiftSlot, Studio, Talent, TalentRateHistoryEntry, UserRole } from "../types";
 import { PageHeader } from "./common/PageHeader";
 import { useToast } from "../hooks/useToast";
@@ -8,6 +8,7 @@ import { errorMessage } from "../lib/errorMessage";
 import { fmtVndShort } from "../lib/format";
 import { talentShortName } from "../lib/talentName";
 import { addDays, getTodayDate, isoWeekStart } from "../lib/dateUtils";
+import { weekScheduleMessage } from "../lib/talent/agenda";
 import { updateOpenSlotTime } from "../lib/db/shiftSlots";
 import {
   fetchRosterChanges,
@@ -350,6 +351,18 @@ export const RosterBoard: React.FC<Props> = (p) => {
       showToast(`Đã công bố ${r.published} ca, gửi ${r.notified} tin cho host/trợ`);
     });
 
+  // Tin Zalo cho nhóm host/trợ (app talent bản 2, 16/10): ca ĐÃ CHỐT của tuần đang xem theo từng người + link vào thẳng "Ca của
+  // tôi" để bấm "Đã xem". Không cần đã công bố qua Bàn Trainer — lịch xếp từ Google Sheet (ca thật) cũng chép được.
+  const copyZalo = async () => {
+    const text = weekScheduleMessage(p.sessions, weekStart, weekEnd, p.talents, `${window.location.origin}/ca-cua-toi`);
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast("Đã chép tin lịch tuần — dán vào nhóm Zalo");
+    } catch {
+      showToast("Trình duyệt chặn chép — thử lại bằng Chrome/Safari bản mới");
+    }
+  };
+
   const saveRules = (r: RosterRules) =>
     run(async () => {
       await updateRosterRules(r, p.currentUserId);
@@ -402,6 +415,9 @@ export const RosterBoard: React.FC<Props> = (p) => {
             </div>
             <button type="button" disabled={readOnly || busy || openShifts.length === 0} onClick={doAutofill} className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[var(--border)] text-xs font-bold text-[var(--text)] disabled:opacity-40">
               <Wand2 className="w-4 h-4" /> Tự lấp chỗ trống
+            </button>
+            <button type="button" onClick={copyZalo} title="Chép lịch đã chốt của tuần này theo từng người, kèm link vào app" className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[var(--border)] text-xs font-bold text-[var(--text)]">
+              <MessageSquareText className="w-4 h-4" /> Chép tin Zalo
             </button>
             <button type="button" disabled={readOnly || busy || blocks.length > 0 || draftedCount === 0} onClick={publish} title={blocks.length > 0 ? "Còn lỗi chặn — xem tab Kiểm lịch" : draftedCount === 0 ? "Chưa có ca nháp nào" : undefined} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--accent)] text-white text-xs font-black disabled:opacity-40">
               <Send className="w-4 h-4" /> Công bố tuần

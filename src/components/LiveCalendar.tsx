@@ -493,7 +493,10 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
       if (!matchTitle && !matchBrand && !matchHost && !matchStudio) return false;
     }
     return true;
-  });
+  })
+    // Theo giờ bắt đầu cho MỌI cách xem (tháng/tuần/ngày): `sessions` đọc DB mới nhất trước ⇒ trước 16/10 Lịch Tuần hiện 20:00
+    // trước 11:00 trong cùng một ngày.
+    .sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
 
   // Ca đang mở chờ đăng ký (chưa có host) — vẽ song song với session đã chốt
   // trên mọi view, cùng bộ filter studio/brand (host filter không áp dụng vì

@@ -423,25 +423,27 @@ test("Talent: không màn nào in số 0 từ cột nhập tay talents.total_gmv
   }
 });
 
-test("Hồ Sơ Của Tôi: số đứng trước form, và ô trống nói lý do thay vì in 0", () => {
+test("Hồ Sơ Của Tôi (tab Tôi): số đứng trước form, và ô trống nói lý do thay vì in 0", () => {
   const src = readFileSync(join(SRC, "components/MyTalentProfile.tsx"), "utf8");
-  // Thứ tự khối: Hiệu Suất → Thu Nhập → Thông Tin Liên Hệ → Đổi Email. Trước đây hai form ghi chiếm
-  // trọn màn đầu 812px ở 375px, đẩy hiệu suất và lương ra ngoài màn.
-  const order = ["Hiệu suất & thông tin chỉ xem", "Thu nhập tháng", "Thông tin tự sửa", "Đổi email đăng nhập"]
-    .map((c) => src.indexOf(`{/* ${c}`));
+  // Thứ tự khối (bản 2, 16/10): giờ + thu nhập tháng → bảng công → hiệu suất → thông tin tự sửa → đổi email. Trước 30/09 hai form
+  // ghi chiếm trọn màn đầu 812px ở 375px, đẩy hiệu suất và lương ra ngoài màn.
+  const order = ["Tháng này", "Thu nhập tháng", "Bảng công", "Hiệu suất", "Thông tin tự sửa", "Đổi email đăng nhập"].map((c) => src.indexOf(`{/* ${c}`));
   expect(order.every((i) => i >= 0), `thiếu comment mốc khối: ${order}`).toBe(true);
   expect(order, `thứ tự khối sai: ${order}`).toEqual([...order].sort((a, b) => a - b));
+  // Form ghi gập sẵn (<details>) — không chiếm màn đầu.
+  expect(src.slice(src.indexOf("{/* Thông tin tự sửa")).trimStart()).toMatch(/^\{\/\* Thông tin tự sửa \*\/\}\s*<details/);
   // Rate chưa nhập phải nói "ops chưa nhập", không in "0/live". Không có ô hoa hồng theo GMV (user chốt 06/10: talent
   // chỉ ăn rate giờ/phiên) — hiện lại "Hoa hồng ops chưa nhập" là hứa một khoản không tồn tại.
   expect(src).toContain("ops chưa nhập");
   expect(src).toMatch(/\(myTalent\.ratePerSession \|\| 0\) > 0/);
   expect(src).not.toMatch(/commissionRate/);
-  // Không có dòng lương nào thì không in ô "Tổng thu nhập tạm tính: 0".
-  // Neo vào ĐÚNG chuỗi JSX, không vào nhãn trần: nhãn ấy còn nằm trong comment giải thích ngay
-  // phía trên nhánh rào, nên indexOf() thường sẽ bắt vào comment và luôn báo sai thứ tự.
-  const zeroTile = src.indexOf(">Tổng thu nhập tạm tính</div>");
-  const guard = src.indexOf("{income.rows.length === 0 ? (");
-  expect(guard >= 0 && guard < zeroTile, "ô tổng thu nhập phải nằm trong nhánh rows.length > 0").toBe(true);
+  // Không có dòng lương nào thì không in tổng thu nhập (số 0 to ở màn lương của chính mình đọc như "không được trả đồng nào").
+  const total = src.indexOf("{money(income.total)}");
+  const guard = src.indexOf("income.rows.length === 0 ? (");
+  expect(guard >= 0 && guard < total, "tổng thu nhập phải nằm sau nhánh rows.length === 0").toBe(true);
+  // Hiệu suất: không in khoảng tin cậy ở mặt chính (chỉ trong "Cách tính"), chỉ dòng có kết luận.
+  expect(src).toMatch(/standing\.clear\.map/);
+  expect(src.indexOf("reliabilityText(r)")).toBeGreaterThan(src.indexOf("Cách tính · xem từng kênh"));
 });
 
 test("App talent: có lịch sử ca đã chạy, và không nói 'không còn ca nào' với người chưa có ca", () => {
@@ -452,6 +454,8 @@ test("App talent: có lịch sử ca đã chạy, và không nói 'không còn c
   expect(profile).toMatch(/\{monthDone\.length > 0 && \(/);
   const today = readFileSync(join(SRC, "components/talent/TalentToday.tsx"), "utf8");
   expect(today).toContain('mine.length === 0 ? "Bạn chưa có ca nào trên lịch."');
+  // Bản 2 (16/10): giao ca không còn ở app talent (admin giao trên máy phòng live), không có khối liệt kê ca chờ nhận riêng.
+  expect(today).not.toMatch(/handoverDue|Cần giao ca|AckBlock/);
   const board = readFileSync(join(SRC, "components/OpsBoard.tsx"), "utf8");
   expect(board).not.toMatch(/mode === "mine"/);
 });
