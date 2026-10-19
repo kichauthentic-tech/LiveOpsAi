@@ -13,7 +13,7 @@
 
 ## 1. Giai đoạn hiện tại (cập nhật 2026-10-19)
 
-- **18–19/10: SẮP LẠI BỐ CỤC CHO BỚT RỐI (chưa commit, không migration)** — user: "quá rối mắt, không đẹp"; số đo + cách đo: 3 mục bố cục 18–19/10 ở §8.
+- **18–19/10: SẮP LẠI BỐ CỤC CHO BỚT RỐI (đã commit + push `9426932` 19/10, không migration)** — user: "quá rối mắt, không đẹp"; số đo + cách đo: 3 mục bố cục 18–19/10 ở §8.
   Đợt 1 (18/10): đầu trang hết là thẻ hộp; "Sàn" lên thanh trên cùng; "Tất cả kênh" một tiêu đề; tab đang chọn hết vàng đặc; sidebar 9 → 6 nhóm
   (brand 1 → 3); Bảng Vận Hành thẳng cột; Sổ Ca mở vào hôm nay; Finance bỏ 215 nhãn đỏ lặp; tuần bắt đầu Thứ 2. Đợt 2 (19/10): ô KPI = `StatTile`
   nhãn chữ thường; "Số đủ tới" một chỗ; Report Tháng 137 → 0 chữ viết hoa, hộp lồng 44 → 1; AI Training 159 → 70 dòng giải thích. Đợt 2b (19/10):
@@ -21,7 +21,7 @@
   Lịch brand 9.546 → 3.363px (bỏ danh sách ca lặp dưới lưới, ô ngày không viền); Bàn Trainer hộp lồng 92 → 1; Cửa sổ ca 27 hộp chỉ số → 1 khung;
   cửa sổ chốt người lấy ngày giờ làm tiêu đề. Verify: tsc/eslint 0 lỗi, vitest 966/966 (cả CI), audit:dead, build OK; app thật 1440 + 375 (0 tràn).
 
-- **17/10: AUDIT TOÀN APP THEO SIDEBAR + SỬA (chưa commit; migration `0178` CHƯA CHẠY).** ~25 lỗi phi logic/gãy vận hành đã sửa — nguyên
+- **17/10: AUDIT TOÀN APP THEO SIDEBAR + SỬA (đã commit + push `9426932` 19/10; migration `0178` CHƯA CHẠY).** ~25 lỗi phi logic/gãy vận hành đã sửa — nguyên
   văn: lịch sử `## §1 mục 17/10 (chuyển khỏi WORKSPACE 19/10)`, chi tiết từng module: `## Audit toàn app theo sidebar (2026-10-17)`. Chính:
   sửa ca ghi theo TRƯỜNG đã đổi (`update_session_fields` 0178 + `updateSession(next, base)`); đóng ca quá giờ không vấp cặp trùng người cũ;
   người đứng ca theo đoạn được up file/báo bận; app tự nạp lại danh sách ca (≥ 2 phút / 5 phút); brand không đếm ca chờ xác nhận thành giờ
@@ -64,7 +64,7 @@
 - **0178 (17/10):** chạy `0178_ops_flow_integrity.sql` — trước hay sau deploy đều được (client chưa có hàm ⇒ quay về `update_session_with_children`;
   view chưa có cột ⇒ đọc lại không có `live_evidence`, mỗi lần mở app tốn 2 request 400 tới khi chạy). Sau khi chạy: Bảng Vận Hành / Sổ Ca
   thấy ca quá giờ tự "Đã xong" lại (trước đó `complete_past_sessions` lỗi cả lô vì cặp trùng người). Nên bật pg_cron (Database → Extensions)
-  để ca được đóng cả khi không ai mở app. Rồi commit + deploy (thay đổi đang nằm trong working tree, gồm cả phần run-rate theo ca 11/10 và bố cục 18/10).
+  để ca được đóng cả khi không ai mở app. Code đã push `9426932` (19/10, gồm run-rate theo ca 11/10 + bố cục 18–19/10) — Vercel tự deploy từ main.
 - **Bàn Trainer (13/10, đã gộp main, chưa push):** chạy `0175_trainer_role.sql` RỒI MỚI chạy `0176_trainer_roster.sql` (hai lần chạy riêng; 0176 cần giá trị enum đã commit) → deploy. Tạo tài khoản role Trainer ở Phân Quyền rồi đăng nhập thử. Nhập rate ở Talent Pool để có chi phí ca. Muốn dùng quy trình tuần thì Kế Hoạch Tháng 11 phải chốt để có ca mở (lịch T10 nhập từ sheet nên tuần T10 chỉ có ca đã lên lịch). Còn mở: host/trợ trả theo giờ hay có người trả theo ca.
 - **Đối soát / GMV ca (13/10):** 0174 ĐÃ CHẠY. Còn: deploy client; Áp dụng lô CROCS T10 01–13/10, Áp Dụng Lại lô VERA Shopee 08–10/10 (Claude bị chặn bấm — user bấm); ca CROCS 11/10 09–12 (file tải 13:35) nên gõ GMV đúng ở form Giao ca trước khi Áp dụng.
 - **Phòng Điều Hành (11/10):** chạy `0170_control_room.sql` (trước hay sau deploy đều được — client tự báo "chưa chạy 0170" ở khối ca nháp; thẻ brand ẩn khi chưa có RPC); đặt `ANTHROPIC_API_KEY` trên Vercel nếu muốn hỏi bằng Claude (thiếu thì chỉ Gemini). Role brand chỉ thấy điểm của ngày sổ dự báo đã ghi (Dashboard / Phòng Điều Hành được mở ngày đó).
