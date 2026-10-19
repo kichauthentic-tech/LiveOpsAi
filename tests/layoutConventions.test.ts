@@ -64,7 +64,8 @@ test("tiêu đề trang (h2 đầu tiên của mỗi component màn) cùng cỡ 
 test("Report Tháng: mục lục dính được (khung ngoài không overflow-hidden) và có đánh dấu phần đang đọc", () => {
   const src = readFileSync(join(SRC, "components/brand-workspace/MonthlyReportTabs.tsx"), "utf8");
   // Khung ngoài của report (nền PAL.bg) — overflow-hidden làm `sticky` của mục lục vô tác dụng (đo 2026-09-29).
-  const outer = src.split("\n").find((l) => /<div className="rounded-2xl[^"]*" style=\{\{ background: PAL\.bg, border:/.test(l)) ?? "";
+  // 18/10 đợt 2: khung ngoài bỏ viền (tests/layoutCalm.test.ts) — vẫn là div nền PAL.bg.
+  const outer = src.split("\n").find((l) => /<div className="rounded-2xl[^"]*" style=\{\{ background: PAL\.bg[,} ]/.test(l)) ?? "";
   expect(outer).not.toBe("");
   expect(outer).not.toMatch(/overflow-hidden/);
   expect(src).toMatch(/sticky -top-3 sm:-top-6/);
@@ -521,9 +522,11 @@ test("Sổ Ca của brand: tháng chưa phát hành thì ô tổng nói lý do, 
   const src = readFileSync(join(SRC, "components/SessionLedger.tsx"), "utf8");
   expect(src).toMatch(/const allHidden = rows\.length > 0 && hiddenCount === rows\.length;/);
   for (const label of ["GMV", "Orders", "GMV/giờ"]) {
-    const tile = src.slice(src.indexOf(`<Stat label="${label}"`));
-    expect(tile.slice(0, 200), `ô "${label}" phải xét allHidden`).toMatch(/allHidden \? LOCKED/);
+    const at = src.indexOf(`<StatTile frame="card" label="${label}"`);
+    expect(at, `ô "${label}"`).toBeGreaterThan(-1);
+    expect(src.slice(at, at + 200), `ô "${label}" phải xét allHidden`).toMatch(/allHidden \? lockedValue/);
   }
+  expect(src).toMatch(/const lockedValue = <span[^>]*>\{LOCKED\}<\/span>;/);
   // Che MỘT PHẦN thì vẫn hiện số thật của phần đã phát hành — băng-rôn đã giải thích.
   expect(src).toMatch(/hiddenCount > 0 && \(/);
 });

@@ -211,7 +211,7 @@ export const TalentLoadTimeline: React.FC<Props> = ({ date, sessions, talents, t
         <div className="overflow-x-auto rounded-xl border border-[var(--border)]/80 scrollbar-thin">
           <div style={{ minWidth: 208 + timelineMinWidth }}>
             <div className="flex border-b border-[var(--border)] bg-[var(--surface-base)] text-[11px] font-mono text-[var(--text-muted)]">
-              <div className="w-52 shrink-0 p-2 font-bold uppercase tracking-wider border-r border-[var(--border)] sticky left-0 bg-[var(--surface-base)] z-10">Talent</div>
+              <div className="w-52 shrink-0 p-2 font-semibold border-r border-[var(--border)] sticky left-0 bg-[var(--surface-base)] z-10">Talent</div>
               <div className="relative flex-1 h-8" style={{ minWidth: timelineMinWidth }}>
                 {hours.map((m) => (
                   <span key={m} className="absolute top-2 -translate-x-1/2" style={{ left: pct(m) }}>{fmtHour(m)}</span>
@@ -220,7 +220,7 @@ export const TalentLoadTimeline: React.FC<Props> = ({ date, sessions, talents, t
             </div>
             {groups.filter((g) => g.rows.length > 0).map((g) => (
               <React.Fragment key={g.role}>
-                <div className="border-b border-[var(--border)] bg-[var(--surface-base)] text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                <div className="border-b border-[var(--border)] bg-[var(--surface-base)] text-[11px] font-semibold text-[var(--text-muted)]">
                   <span className="sticky left-0 inline-block px-3 py-1.5">
                     {g.role === "host" ? "Host" : "Trợ live"} · {g.rows.length} người
                   </span>
@@ -314,7 +314,7 @@ export const TalentLoadTimeline: React.FC<Props> = ({ date, sessions, talents, t
                 if (list.length === 0) return null;
                 return (
                   <div key={role} className="flex flex-wrap items-center gap-1.5">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-faint)] w-16 shrink-0">
+                    <span className="text-[11px] font-semibold text-[var(--text-faint)] w-16 shrink-0">
                       {role === "host" ? "Host" : "Trợ live"} · {list.length}
                     </span>
                     {list.map((t) => (

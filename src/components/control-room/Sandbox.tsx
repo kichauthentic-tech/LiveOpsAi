@@ -44,7 +44,7 @@ export const Sandbox: React.FC<{
         </label>
         <div className="flex gap-1 rounded-xl border border-[var(--border)] p-1" role="group" aria-label="Mục tiêu tự xếp">
           {([["probability", "Tối đa xác suất về đích"], ["gmv", "Tối đa GMV"]] as const).map(([k, l]) => (
-            <button key={k} type="button" aria-pressed={objective === k} onClick={() => onObjective(k)} className={`px-2.5 py-1 rounded-lg text-xs font-bold min-h-[28px] ${objective === k ? "bg-[var(--accent)] text-[var(--accent-contrast)]" : "text-[var(--text-muted)]"}`}>{l}</button>
+            <button key={k} type="button" aria-pressed={objective === k} onClick={() => onObjective(k)} className={`px-2.5 py-1 rounded-lg text-xs font-bold min-h-[28px] ${objective === k ? "seg-on" : "text-[var(--text-muted)]"}`}>{l}</button>
           ))}
         </div>
         <button type="button" onClick={onAuto} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-bold bg-[var(--accent)] text-[var(--accent-contrast)] min-h-[34px]"><Wand2 className="w-4 h-4" />Tự xếp</button>

@@ -9,8 +9,8 @@ import type { AccountVM } from "./types";
 
 const tabular = "tabular-nums";
 
-/** Số tới sau ngày đủ số, hoặc kênh chưa có ngày nào đủ số ⇒ tạm tính. */
-export const isTentative = (a: AccountVM) => !!a.report?.asOf && (a.completeThrough == null || a.report.asOf > a.completeThrough);
+// Có ca đã vào run-rate nằm sau ngày đủ số (tính theo từng ca) — số có thể còn đổi khi ca được đối soát.
+export const isTentative = (a: AccountVM) => (a.report?.tail.shifts ?? 0) > 0;
 
 export const AccountCard: React.FC<{ vm: AccountVM; selected: boolean; onSelect: () => void; onOpenMonthPlan: (brandId: string, platform: AccountVM["platform"]) => void }> = ({ vm, selected, onSelect, onOpenMonthPlan }) => {
   const r = vm.report;
@@ -63,7 +63,7 @@ export const AccountCard: React.FC<{ vm: AccountVM; selected: boolean; onSelect:
       {accent}
       <div className="flex items-start justify-between gap-2">
         {head}
-        {tentative && <span className="text-[11px] font-bold text-amber-300 bg-amber-500/15 border border-amber-500/30 rounded-full px-1.5 py-0.5 whitespace-nowrap" title="Số tới ngày sau ngày đủ số — còn ca chưa có số">Tạm tính</span>}
+        {tentative && <span className="text-[11px] font-bold text-amber-300 bg-amber-500/15 border border-amber-500/30 rounded-full px-1.5 py-0.5 whitespace-nowrap" title={`Gồm ${r.tail.shifts} ca sau ngày đủ số${r.tail.unreconciled > 0 ? `, ${r.tail.unreconciled} chưa đối soát` : ""} — số còn đổi khi đối soát`}>Gồm ca mới</span>}
       </div>
       <div className="flex items-end justify-between gap-2">
         <div>

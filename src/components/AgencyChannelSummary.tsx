@@ -12,6 +12,7 @@ import { defaultViewMonth } from "../lib/defaultMonth";
 import { getTodayDate } from "../lib/dateUtils";
 import { fmtMonth, fmtVndShort } from "../lib/format";
 import { MonthPicker } from "./common/MonthPicker";
+import { StatTile } from "./common/StatTile";
 import { PlatformChip } from "./common/PlatformChip";
 
 // Toàn agency một tháng (Bước 3 lộ trình đa sàn, 07/10) — đầu Dashboard khi chọn "Tất cả kênh". Luật user chốt 07/10:
@@ -92,12 +93,12 @@ export function AgencyChannelSummary({ platforms, channels, brands, sessions, fi
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Tile label="Ca trong tháng" value={totalSessions.toLocaleString("vi-VN")} sub={`gồm ca sắp tới · ${rows.filter((r) => r.sessions > 0).length} kênh có ca`} />
-        <Tile label="Giờ live (ca có số)" value={hrs(totalHours)} />
+        <StatTile label="Ca trong tháng" value={totalSessions.toLocaleString("vi-VN")} hint={`gồm ca sắp tới · ${rows.filter((r) => r.sessions > 0).length} kênh có ca`} />
+        <StatTile label="Giờ live (ca có số)" value={hrs(totalHours)} />
         {canSeeMoney && money && (
           <>
-            <Tile label="Doanh thu agency" value={money.priced ? fmtVndShort(money.revenue) : "Chưa tính được"} sub={money.sessions ? `${money.priced}/${money.sessions} ca đủ dữ liệu tiền` : undefined} />
-            <Tile label="Lãi gộp" value={money.priced ? fmtVndShort(money.profit) : "Chưa tính được"} sub={money.margin != null ? `biên ${Math.round(money.margin * 100)}%` : "nhập giá ở CRM, rate ở Talent Pool"} />
+            <StatTile label="Doanh thu agency" value={money.priced ? fmtVndShort(money.revenue) : "Chưa tính được"} hint={money.sessions ? `${money.priced}/${money.sessions} ca đủ dữ liệu tiền` : undefined} />
+            <StatTile label="Lãi gộp" value={money.priced ? fmtVndShort(money.profit) : "Chưa tính được"} hint={money.margin != null ? `biên ${Math.round(money.margin * 100)}%` : "nhập giá ở CRM, rate ở Talent Pool"} />
           </>
         )}
       </div>
@@ -105,7 +106,7 @@ export function AgencyChannelSummary({ platforms, channels, brands, sessions, fi
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
-            <tr className="text-left text-[11px] uppercase tracking-wider text-[var(--text-faint)] border-b border-[var(--border)]">
+            <tr className="text-left text-[11px] font-semibold text-[var(--text-faint)] border-b border-[var(--border)]">
               <th className="py-2 pr-3">Kênh</th>
               <th className="py-2 pr-3 text-right">Ca</th>
               <th className="py-2 pr-3 text-right">Giờ live</th>
@@ -146,15 +147,5 @@ export function AgencyChannelSummary({ platforms, channels, brands, sessions, fi
         </table>
       </div>
     </section>
-  );
-}
-
-function Tile({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return (
-    <div className="bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-3">
-      <p className="text-[11px] uppercase tracking-wider text-[var(--text-faint)]">{label}</p>
-      <p className="text-lg font-black text-[var(--text)] mt-0.5">{value}</p>
-      {sub && <p className="text-[11px] text-[var(--text-faint)] mt-0.5">{sub}</p>}
-    </div>
   );
 }

@@ -10,8 +10,8 @@ import { fetchMonthlyReportSnapshot, saveMonthlyReportSnapshot } from "../lib/db
 import { fetchDataRawImportStamps } from "../lib/db/brandDataRaw";
 import { type MonthlyReportSnapshot } from "../lib/report/monthlySnapshot";
 import { REPORT_ENGINES, type AnySnapshot } from "../lib/report/reportEngines";
-import { brandMonthKey, type ReportPlatform } from "../lib/reportPlatform";
-import { PageIntro } from "./common/PageIntro";
+import { brandMonthKey, platformOf, type ReportPlatform } from "../lib/reportPlatform";
+import { PageHeader } from "./common/PageHeader";
 import { dataSourceTier } from "../lib/dataSource";
 
 // Bảng điều phối phát hành report (còn lại của Đợt C, Audit Role × Workspace — xem
@@ -83,7 +83,8 @@ export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ platform
   // dòng (CROCS T6–T9) có ca thật; 20 dòng còn lại bấm vào là gửi cho brand một report rỗng.
   const sessionCountFor = (brandId: string, month: string) => {
     const { start, end } = monthRange(month);
-    return sessions.filter((s) => s.brandId === brandId && s.platform === platform && s.date >= start && s.date <= end).length;
+    // Ca huỷ không có gì để báo cáo — không đếm (CROCS T10 từng hiện 90 trong khi Dashboard/Toàn Cảnh Brand ghi 86).
+    return sessions.filter((s) => s.brandId === brandId && platformOf(s) === platform && s.status !== "Cancelled" && s.date >= start && s.date <= end).length;
   };
 
   const unreconciledCountFor = (brandId: string, month: string) => {
@@ -91,7 +92,7 @@ export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ platform
     return sessions.filter(
       (s) =>
         s.brandId === brandId &&
-        s.platform === platform &&
+        platformOf(s) === platform &&
         s.date >= start &&
         s.date <= end &&
         s.status === "Completed" &&
@@ -174,22 +175,23 @@ export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ platform
 
   return (
     <div className="space-y-4">
-      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5 space-y-2">
-        <h2 className="text-lg font-black text-[var(--text)] flex items-center gap-2">
-          <Send className="w-5 h-5 text-[var(--accent-text)]" /> Điều Phối Phát Hành Report
-        </h2>
-        <PageIntro>
-          Trạng thái phát hành Report Tháng của mọi brand, {MONTHS_BACK} tháng gần nhất — phát hành/thu hồi thẳng từ đây
-          thay vì mở lần lượt từng Brand Workspace. Workspace này chỉ có report của sàn {platform}; TikTok và Shopee phát hành và đóng sổ riêng. Report Tuần đọc theo Report Tháng (không publish riêng); Cam Kết Hợp
-          Đồng và Affiliate không có trạng thái phát hành nên không hiện ở đây.
-        </PageIntro>
-      </div>
+      <PageHeader
+        icon={Send}
+        title="Điều Phối Phát Hành Report"
+        description={
+          <>
+            Trạng thái phát hành Report Tháng của mọi brand, {MONTHS_BACK} tháng gần nhất — phát hành/thu hồi thẳng từ đây
+            thay vì mở lần lượt từng Brand Workspace. Workspace này chỉ có report của sàn {platform}; TikTok và Shopee phát hành và đóng sổ riêng. Report Tuần đọc theo Report Tháng (không publish riêng); Cam Kết Hợp
+            Đồng và Affiliate không có trạng thái phát hành nên không hiện ở đây.
+          </>
+        }
+      />
 
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-xl">
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)] uppercase text-[11px] tracking-wider">
+              <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)] text-[11px] font-semibold">
                 <th className="py-2.5 px-4">Brand</th>
                 <th className="py-2.5 px-2 text-right">Ca trong tháng</th>
                 <th className="py-2.5 px-2">Trạng thái</th>
@@ -295,7 +297,8 @@ export const ReportPublishBoard: React.FC<ReportPublishBoardProps> = ({ platform
                           <button
                             onClick={() => handlePublish(b.id, month, report)}
                             disabled={busy}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-60 text-white font-bold text-[11px] rounded-lg shadow transition-all"
+                            // Bố cục 18/10: nút viền thay vì nền vàng đặc — bảng 6 tháng × 4 brand từng có 21 nút vàng đặc thành một cột chói.
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-[var(--accent)]/60 text-[var(--accent-text)] hover:bg-[var(--accent)]/15 disabled:opacity-60 font-bold text-[11px] rounded-lg transition-all"
                           >
                             {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />} Phát hành
                           </button>

@@ -10,12 +10,13 @@ import { sessionHours } from "../lib/performance/hostPerformance";
 import { downloadRowsAsXlsx } from "../lib/exportXlsx";
 import { useToast } from "../hooks/useToast";
 import { errorMessage } from "../lib/errorMessage";
-import { LedgerFilter, MissingStep, brandTrustLabel, filterLedger, groupByDate, hasReport, hasSnapshot, isReconciled, needsClosing, metricsHiddenFor, ledgerHosts, ledgerMonths, linkedSessions, missingSteps, sessionIncidents, summarize } from "../lib/sessionLedger";
+import { LedgerFilter, MissingStep, brandTrustLabel, filterLedger, groupByDate, hasReport, hasSnapshot, isReconciled, needsClosing, metricsHiddenFor, ledgerHosts, ledgerMonths, linkedSessions, sessionIncidents, summarize } from "../lib/sessionLedger";
 
 import { BrandLogo } from "./ui/BrandLogo";
 import { PlatformChip } from "./common/PlatformChip";
 import { SessionWindow } from "./SessionWindow";
-import { PageIntro } from "./common/PageIntro";
+import { PageHeader } from "./common/PageHeader";
+import { StatTile } from "./common/StatTile";
 
 // Sổ Ca — một component, hai biến thể (cùng cách SessionEventCard dùng chung cho 2 lịch):
 //  - agency: mọi brand, thấy target/studio/trợ live, 3 ô tiến trình dữ liệu, mọi sự cố, hành động.
@@ -59,7 +60,7 @@ const STATUS_CLS = SESSION_STATUS_CLS;
 const SUB_COL = "hidden sm:table-cell py-2.5 px-2";
 
 const MISSING_LABEL: Record<MissingStep, string> = {
-  snapshot: "Chưa up file (TikTok)",
+  snapshot: "Chưa up file số liệu",
   report: "Chưa giao ca",
   reconcile: "Chưa đối soát"
 };
@@ -95,13 +96,12 @@ const inputCls =
 // Ô số bị khoá vì tháng chưa phát hành. Cố ý KHÔNG dùng dấu "—" như ô rỗng: brand phải phân biệt
 // được "ca này chưa có số" với "có số rồi nhưng chưa tới lượt bạn xem".
 const LOCKED = "chưa phát hành";
+const LOCKED_TITLE = "Số liệu tháng này sẽ hiện sau khi Report Tháng được phát hành.";
+const lockedValue = <span className="text-xs font-normal italic text-[var(--text-faint)]">{LOCKED}</span>;
 
 const LockedCell: React.FC = () => (
-  <span
-    title="Số liệu tháng này sẽ hiện sau khi Report Tháng được phát hành."
-    className="text-[11px] text-[var(--text-faint)] font-normal italic"
-  >
-    chưa phát hành
+  <span title={LOCKED_TITLE} className="text-[11px] text-[var(--text-faint)] font-normal italic">
+    {LOCKED}
   </span>
 );
 
@@ -152,6 +152,12 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
 
   const rows = useMemo(() => filterLedger(scoped, filter, today), [scoped, filter, today]);
   const days = useMemo(() => groupByDate(rows), [rows]);
+  // Ngày sau hôm nay gập lại khi trong bộ lọc còn ngày đã/đang chạy; cả bộ lọc toàn ca tương lai (tháng sau) thì hiện hết.
+  const [showUpcoming, setShowUpcoming] = useState(false);
+  const pastDays = days.filter((d) => d.date <= today);
+  const upcomingDays = pastDays.length > 0 ? days.filter((d) => d.date > today) : [];
+  const upcomingCount = upcomingDays.reduce((n, d) => n + d.sessions.length, 0);
+  const shownDays = upcomingDays.length === 0 || showUpcoming ? days : pastDays;
   // Tổng hiệu suất tính RIÊNG từng sàn (user chốt 07/10: không cộng GMV/đơn hai sàn); số vận hành (ca, giờ, bước còn thiếu,
   // nguồn số) thì cộng được.
   const perPlatform = useMemo(
@@ -260,25 +266,16 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
   return (
     <div className="space-y-4">
       {/* Tiêu đề + bộ lọc */}
-      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5 space-y-4 shadow-xl">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-black text-[var(--text)] flex items-center gap-2">
-              <BookOpen className="w-5 h-5 text-[var(--accent-text)]" /> Sổ Ca
-            </h2>
-            <PageIntro>
-              {isBrandView
-                ? "Từng ca live đã chạy cho brand: giờ live thật, GMV, đơn, lượt xem. Số “Tạm tính” còn chờ sàn cập nhật, “Đã chốt” là số đối soát cuối kỳ."
-                : "Từng ca đã/đang chạy: số thật của ca, số đó tin được tới đâu, và còn thiếu bước nào (TikTok: up file → giao ca; Shopee: giao ca; rồi đối soát) để chốt tháng."}
-            </PageIntro>
-            {hiddenCount > 0 && (
-              <p className="text-[11px] text-amber-300 mt-1.5 max-w-2xl">
-                {hiddenCount}/{rows.length} ca thuộc tháng chưa phát hành Report Tháng — số liệu của các ca đó chưa hiển thị,
-                và <b>chưa được tính</b> vào các ô tổng bên dưới.
-              </p>
-            )}
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
+      <PageHeader
+        icon={BookOpen}
+        title="Sổ Ca"
+        description={
+          isBrandView
+            ? "Từng ca live đã chạy cho brand: giờ live thật, GMV, đơn, lượt xem. Số “Tạm tính” còn chờ sàn cập nhật, “Đã chốt” là số đối soát cuối kỳ."
+            : "Từng ca đã/đang chạy: số thật của ca, số đó tin được tới đâu, và còn thiếu bước nào (TikTok: up file → giao ca; Shopee: giao ca; rồi đối soát) để chốt tháng."
+        }
+        actions={
+          <>
             <select value={filter.month} onChange={(e) => patch({ month: e.target.value })} className={inputCls}>
               <option value="">Mọi tháng</option>
               {months.map((m) => (
@@ -325,8 +322,15 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
             >
               <Download className="w-3.5 h-3.5" /> Xuất Excel
             </button>
-          </div>
-        </div>
+          </>
+        }
+      >
+        {hiddenCount > 0 && (
+          <p className="text-[11px] text-amber-300 max-w-2xl">
+            {hiddenCount}/{rows.length} ca thuộc tháng chưa phát hành Report Tháng — số liệu của các ca đó chưa hiển thị,
+            và <b>chưa được tính</b> vào các ô tổng bên dưới.
+          </p>
+        )}
 
         {/* Bộ lọc "còn thiếu" — thứ biến sổ thành việc phải làm. Brand không cần thấy quy trình nội bộ.
             M4: cả 3 bước đều 0 thì hàng nút không còn việc gì để bấm — nói thẳng một câu, ngắn hơn và rõ
@@ -362,13 +366,12 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
 
         {/* Dải tổng hợp theo bộ lọc */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-          <Stat label="Số ca" value={String(summary.total)} sub={summary.countable < summary.total ? `${summary.countable} ca có số` : undefined} />
-          <Stat label="Giờ live" value={fmtHours(summary.hours)} sub="giờ thật, thiếu thì lấy giờ kế hoạch" />
-          <Stat label="GMV" value={allHidden ? LOCKED : perfValue((x) => fmtVndShort(x.gmv))} accent={!allHidden} muted={allHidden} />
-          <Stat label="Orders" value={allHidden ? LOCKED : perfValue((x) => fmtInt(x.orders))} muted={allHidden} />
-          <Stat label="GMV/giờ" value={allHidden ? LOCKED : perfValue((x) => fmtVndShort(x.gmvPerHour))} muted={allHidden} />
-          <div className="bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-2.5">
-            <p className="text-[11px] uppercase tracking-wider text-[var(--text-faint)]">Nguồn số liệu</p>
+          <StatTile frame="card" label="Số ca" value={String(summary.total)} hint={summary.countable < summary.total ? `${summary.countable} ca có số` : undefined} />
+          <StatTile frame="card" label="Giờ live" value={fmtHours(summary.hours)} hint="giờ thật, thiếu thì lấy giờ kế hoạch" />
+          <StatTile frame="card" label="GMV" value={allHidden ? lockedValue : perfValue((x) => fmtVndShort(x.gmv))} tone={allHidden ? undefined : "text-[var(--success)]"} valueTitle={allHidden ? LOCKED_TITLE : undefined} />
+          <StatTile frame="card" label="Orders" value={allHidden ? lockedValue : perfValue((x) => fmtInt(x.orders))} valueTitle={allHidden ? LOCKED_TITLE : undefined} />
+          <StatTile frame="card" label="GMV/giờ" value={allHidden ? lockedValue : perfValue((x) => fmtVndShort(x.gmvPerHour))} valueTitle={allHidden ? LOCKED_TITLE : undefined} />
+          <StatTile frame="card" label="Nguồn số liệu" title="">
             {summary.countable === 0 ? (
               <p className="text-xs text-[var(--text-faint)] mt-1">—</p>
             ) : isBrandView ? (
@@ -385,16 +388,16 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
                 </span>
               </p>
             )}
-          </div>
+          </StatTile>
         </div>
-      </div>
+      </PageHeader>
 
       {/* Bảng gom theo ngày */}
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-xl">
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)] uppercase text-[11px] tracking-wider whitespace-nowrap">
+              <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)] text-[11px] font-semibold whitespace-nowrap">
                 <th className="py-2.5 px-4">Giờ</th>
                 {!isBrandView && <th className="py-2.5 px-2">Brand</th>}
                 <th className="py-2.5 px-2">Host</th>
@@ -413,7 +416,27 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
               </tr>
             </thead>
             <tbody>
-              {days.map((day) => (
+              {/* Ca của những ngày SAU hôm nay gập thành một dòng (bố cục 18/10): sổ xếp ngày mới nhất lên đầu nên trước đây
+                  màn mở ra là 31/10, 30/10… toàn ca "Sắp tới" chưa có số (đo CROCS T10: 3 màn đầu không một ô số nào). */}
+              {upcomingDays.length > 0 && (
+                <tr className="border-b border-[var(--border-muted)]">
+                  <td colSpan={colCount} className="p-0">
+                    <button
+                      type="button"
+                      onClick={() => setShowUpcoming((v) => !v)}
+                      aria-expanded={showUpcoming}
+                      className="w-full flex items-center gap-2 py-2 px-4 text-left text-[11px] font-bold text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]/40"
+                    >
+                      <ChevronRight className={`w-3.5 h-3.5 transition-transform ${showUpcoming ? "rotate-90" : ""}`} />
+                      {upcomingCount} ca sắp tới
+                      <span className="font-normal text-[var(--text-faint)]">
+                        · {fmtDate(upcomingDays[upcomingDays.length - 1].date)} – {fmtDate(upcomingDays[0].date)} · {showUpcoming ? "Ẩn" : "Hiện"}
+                      </span>
+                    </button>
+                  </td>
+                </tr>
+              )}
+              {shownDays.map((day) => (
                 <React.Fragment key={day.date}>
                   <tr className="bg-[var(--surface-elevated)]/50">
                     <td colSpan={colCount} className="py-1.5 px-4 text-[11px] font-bold text-[var(--text-muted)]">
@@ -427,7 +450,6 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
                     // Brand + tháng chưa phát hành: số đã bị view che, ô phải nói rõ LÝ DO.
                     const hideMetrics = metricsHiddenFor(s, currentRole);
                     const incidents = sessionIncidents(s).filter((i) => !isBrandView || !i.internal);
-                    const missing = isBrandView ? [] : missingSteps(s, today);
                     const isOpen = openId === s.id;
                     return (
                       <tr
@@ -509,9 +531,6 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
                             )
                           ) : (
                             <PipelineDots session={s} today={today} />
-                          )}
-                          {!isBrandView && missing.length > 0 && (
-                            <span className="block text-[11px] text-amber-300 mt-0.5">{missing.map((m) => MISSING_LABEL[m]).join(" · ")}</span>
                           )}
                         </td>
                         <td className={SUB_COL}>
@@ -605,23 +624,6 @@ export const SessionLedger: React.FC<SessionLedgerProps> = ({
   );
 };
 
-const Stat: React.FC<{ label: string; value: string; sub?: string; accent?: boolean; muted?: boolean }> = ({ label, value, sub, accent, muted }) => (
-  <div className="bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-2.5">
-    <p className="text-[11px] uppercase tracking-wider text-[var(--text-faint)]">{label}</p>
-    <p
-      title={muted ? "Số liệu tháng này sẽ hiện sau khi Report Tháng được phát hành." : undefined}
-      className={
-        muted
-          ? "text-xs font-normal italic mt-0.5 text-[var(--text-faint)]"
-          : `text-base font-black mt-0.5 ${accent ? "text-[var(--success)]" : "text-[var(--text)]"}`
-      }
-    >
-      {value}
-    </p>
-    {sub && <p className="text-[11px] text-[var(--text-faint)]">{sub}</p>}
-  </div>
-);
-
 const TrustBadge: React.FC<{ session: LiveSession }> = ({ session }) => {
   const label = brandTrustLabel(session);
   const done = label === "Đã chốt";
@@ -651,17 +653,15 @@ const PipelineDots: React.FC<{ session: LiveSession; today: string }> = ({ sessi
     { label: "Giao ca", done: hasReport(session) },
     { label: "Đối soát", done: isReconciled(session) }
   ];
+  // Bố cục 18/10: bước còn thiếu tô vàng ngay trên ô (trước: 3 ô viền xám/xanh xuống dòng trong cột hẹp + thêm một dòng chữ vàng
+  // "Chưa up file số liệu · Chưa giao ca · Chưa đối soát" lặp đúng các ô xám ⇒ mỗi ca cao 3–4 dòng).
   return (
-    <div className={`flex items-center gap-1 ${relevant ? "" : "opacity-40"}`} title={steps.map((s) => `${s.label}: ${s.done ? "✓" : "—"}`).join(" · ")}>
+    <div className="flex items-center gap-1 whitespace-nowrap" title={steps.map((s) => `${s.label}: ${s.done ? "✓" : "chưa"}`).join(" · ")}>
       {steps.map((s) => (
         <span
           key={s.label}
-          className={`inline-flex items-center gap-0.5 text-[11px] font-bold px-1.5 py-0.5 rounded border ${
-            s.done
-              ? "bg-emerald-950 text-emerald-300 border-emerald-800"
-              : relevant
-                ? "bg-[var(--surface-base)] text-[var(--text-faint)] border-[var(--border)]"
-                : "bg-transparent text-[var(--text-faint)] border-[var(--border-muted)]"
+          className={`inline-flex items-center gap-0.5 text-[11px] font-bold px-1.5 py-0.5 rounded ${
+            s.done ? "text-emerald-400" : "bg-amber-500/10 text-amber-300"
           }`}
         >
           {s.done ? <CheckCircle2 className="w-3 h-3" /> : <Circle className="w-3 h-3" />}

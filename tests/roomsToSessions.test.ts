@@ -4,7 +4,10 @@
 //
 // Chỗ dễ sai nhất và là lỗi tìm được đợt này: `buildHostGrid` xếp thứ tự ca trong ngày bằng
 // `(actualStartAt ?? startTime)` — trộn ISO timestamp với chuỗi "HH:MM" trong cùng một phép so sánh.
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
+
+// CI chạy không có .env: backfillRooms.ts import supabaseClient (ném lỗi khi thiếu URL/key) — vi.mock được vitest đưa lên đầu file.
+vi.mock("../src/lib/supabaseClient", () => ({ supabase: {} }));
 import {
   LONG_ROOM_MINUTES,
   buildHostGrid,

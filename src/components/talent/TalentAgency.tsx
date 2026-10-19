@@ -136,7 +136,7 @@ export const TalentAgency: React.FC<Props> = ({ sessions, shiftSlots, brands, ta
           if (xs.length === 0) return null;
           return (
             <section key={p} className="space-y-1.5" aria-label={DAY_PART_LABEL[p]}>
-              <p className="text-[11px] font-black uppercase tracking-wide text-[var(--text-faint)] px-1">{DAY_PART_LABEL[p]} · {xs.length} ca</p>
+              <p className="text-xs font-bold text-[var(--text-faint)] px-1">{DAY_PART_LABEL[p]} · {xs.length} ca</p>
               <div className={`grid gap-1.5 ${wide ? "" : "sm:grid-cols-2"}`}>
                 {xs.map((s) => (
                   <TalentSessionCard key={s.id} session={s} brand={brandById.get(s.brandId)} talents={talents} meId={myTalentId} onOpen={setOpenId} />

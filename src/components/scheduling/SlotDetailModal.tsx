@@ -4,9 +4,12 @@ import { X, Users, UserCheck, UserX, Check, AlertTriangle, Trash2 } from "lucide
 import { dateTimeRangesOverlap, getTodayDate } from "../../lib/dateUtils";
 import { personClash } from "../../lib/scheduling/conflicts";
 import { useToast } from "../../hooks/useToast";
+import { useConfirm } from "../../hooks/useConfirm";
 import { FATIGUE_WEEK_HOURS, suggestHosts, suggestionLabel } from "../../lib/performance/hostSuggestion";
 import { talentShortName } from "../../lib/talentName";
 import { platformOf } from "../../lib/reportPlatform";
+import { fmtDateVn } from "../../lib/format";
+import { PlatformChip } from "../common/PlatformChip";
 
 interface SlotDetailModalProps {
   slot: ShiftSlot;
@@ -27,6 +30,8 @@ interface SlotDetailModalProps {
 // Panel đăng ký/chốt lịch cho 1 Ca — mở từ bất kỳ lịch nào (Agency/Brand) và từ dòng ca chưa có người ở Bảng Vận Hành.
 // Từ 08/10 đây là NƠI DUY NHẤT ops chốt Host + Trợ live (màn "Nhân sự ca" đã bỏ): người đã đăng ký được xếp theo
 // GMV/giờ 90 ngày gần nhất cùng sàn (suggestHosts), kèm cảnh báo mệt.
+const WEEKDAY_VN = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
+
 export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
   slot,
   onClose,
@@ -43,6 +48,7 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
   fatigueWeekHours = FATIGUE_WEEK_HOURS
 }) => {
   const { showToast } = useToast();
+  const confirm = useConfirm();
   const [hostId, setHostId] = useState("");
   const [coHostId, setCoHostId] = useState("");
   const [busy, setBusy] = useState(false);
@@ -107,6 +113,8 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
 
   const handleDelete = async () => {
     if (!onDeleteSlot) return;
+    // Xoá ca chờ đăng ký mất luôn các lượt đăng ký rảnh của talent — một cú bấm nhầm icon thùng rác không được đi thẳng.
+    if (!(await confirm(`Xoá ca chờ đăng ký ${slot.brandName} ${slot.date} ${slot.startTime}–${slot.endTime}?${regs.length > 0 ? ` ${regs.length} lượt đăng ký rảnh của talent sẽ mất theo.` : ""} Không hoàn tác được.`, { danger: true }))) return;
     setBusy(true);
     await onDeleteSlot(slot.id);
     setBusy(false);
@@ -116,29 +124,29 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 bg-[var(--surface-base)]/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl max-w-lg w-full p-4 sm:p-6 space-y-4 shadow-2xl">
-        <div className="flex justify-between items-start border-b border-[var(--border)] pb-3">
-          <div>
-            <span className="text-[11px] font-bold text-amber-400 uppercase font-mono">{slot.brandName}</span>
-            <h3 className="font-bold text-[var(--text)] text-base sm:text-lg">Ca Chờ Đăng Ký</h3>
+        {/* Bố cục 19/10: ngày + giờ là tiêu đề (trước tiêu đề chung "Ca Chờ Đăng Ký", ngày giờ nằm trong một hộp phụ dạng
+            2026-10-19 bên dưới). */}
+        <div className="flex justify-between items-start gap-3 border-b border-[var(--border)] pb-3">
+          <div className="min-w-0">
+            <p className="flex items-center gap-1.5 text-xs font-bold text-[var(--text-muted)]">
+              {slot.brandName} <PlatformChip platform={slot.platform} />
+              <span className="font-normal text-[var(--text-faint)]">· ca chờ đăng ký</span>
+            </p>
+            <h3 className="font-black text-[var(--text)] text-base sm:text-lg mt-0.5">
+              {WEEKDAY_VN[new Date(`${slot.date}T00:00:00`).getDay()]} {fmtDateVn(slot.date, false)} · {slot.startTime.slice(0, 5)}–{slot.endTime.slice(0, 5)}
+            </h3>
+            <p className="text-xs text-[var(--text-muted)] mt-0.5">Phòng {slot.studioName || "chưa đặt"}{slot.notes ? ` · ${slot.notes}` : ""}</p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1 shrink-0">
             {canManage && onDeleteSlot && (
-              <button onClick={handleDelete} disabled={busy} className="text-[var(--text-faint)] hover:text-rose-400 p-1 rounded-lg" title="Xoá ca">
+              <button onClick={handleDelete} disabled={busy} className="text-[var(--text-faint)] hover:text-rose-400 p-1.5 rounded-lg" title="Xoá ca" aria-label="Xoá ca">
                 <Trash2 className="w-4 h-4" />
               </button>
             )}
-            <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text)] p-1 rounded-lg">
+            <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text)] p-1.5 rounded-lg" aria-label="Đóng">
               <X className="w-5 h-5" />
             </button>
           </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 text-xs bg-[var(--surface-base)] p-3 rounded-xl border border-[var(--border)]">
-          <div>Ngày: <strong className="text-[var(--text)] block font-mono">{slot.date}</strong></div>
-          <div>Khung giờ: <strong className="text-[var(--text)] block font-mono">{slot.startTime} - {slot.endTime}</strong></div>
-          <div>Phòng Studio: <strong className="text-[var(--text)] block">{slot.studioName || "—"}</strong></div>
-          <div>Nền tảng: <strong className="text-[var(--text)] block">{slot.platform}</strong></div>
-          {slot.notes && <div className="col-span-2">Ghi chú: <strong className="text-[var(--text)] block">{slot.notes}</strong></div>}
         </div>
 
         {studioConflicts.length > 0 && (
@@ -180,12 +188,14 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
             )}
 
             <div className="grid grid-cols-2 gap-2 pt-1">
+              <label className="block min-w-0">
+              <span className="block mb-1 text-[11px] font-bold text-[var(--text-muted)]">Host</span>
               <select
                 value={hostId}
                 onChange={(e) => setHostId(e.target.value)}
-                className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-2 text-xs text-[var(--text)] focus:outline-none focus:border-blue-500"
+                className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-2 text-xs text-[var(--text)] focus:outline-none focus:border-blue-500"
               >
-                <option value="">Host…</option>
+                <option value="">Chọn host…</option>
                 {suggestions.length > 0 && (
                   <optgroup label="Đã đăng ký rảnh (xếp theo hiệu suất)">
                     {suggestions.map((s) => (
@@ -199,12 +209,15 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
                   </optgroup>
                 )}
               </select>
+              </label>
+              <label className="block min-w-0">
+              <span className="block mb-1 text-[11px] font-bold text-[var(--text-muted)]">Trợ live <span className="font-normal text-[var(--text-faint)]">(tuỳ chọn)</span></span>
               <select
                 value={coHostId}
                 onChange={(e) => setCoHostId(e.target.value)}
-                className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-2 text-xs text-[var(--text)] focus:outline-none focus:border-blue-500"
+                className="w-full bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-2 text-xs text-[var(--text)] focus:outline-none focus:border-blue-500"
               >
-                <option value="">Trợ live (tuỳ chọn)…</option>
+                <option value="">Không có trợ live</option>
                 {regs.some((r) => r.talentId !== hostId) && (
                   <optgroup label="Đã đăng ký rảnh">
                     {regs.filter((r) => r.talentId !== hostId).map((r) => (
@@ -218,6 +231,7 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
                   </optgroup>
                 )}
               </select>
+              </label>
             </div>
             {((hostId && !regIds.has(hostId)) || (coHostId && !regIds.has(coHostId))) && (
               <p className="text-[11px] text-amber-400 flex items-center gap-1">
@@ -236,6 +250,11 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
               </p>
             )}
 
+            {!!coHostId && coHostId === hostId && (
+              <p className="text-[11px] text-rose-400 flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3 shrink-0" /> Host và Trợ live đang là cùng một người — chọn lại Trợ live.
+              </p>
+            )}
             {onFinalizeSlot && (
               <button
                 onClick={handleFinalize}
@@ -253,11 +272,6 @@ export const SlotDetailModal: React.FC<SlotDetailModalProps> = ({
           <p className="text-xs text-[var(--text-faint)] text-center py-2">Chỉ operations mới xem được danh sách đăng ký.</p>
         )}
 
-        <div className="pt-2 border-t border-[var(--border)] flex justify-end">
-          <button onClick={onClose} className="px-4 py-2 bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--text-muted)] font-bold rounded-xl text-xs">
-            Đóng
-          </button>
-        </div>
       </div>
     </div>
   );

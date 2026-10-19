@@ -1,12 +1,12 @@
 import { useMemo, useState } from "react";
 import { AlertTriangle, ChevronLeft, ChevronRight, Download, TrendingUp, Trophy } from "lucide-react";
 import { Brand, LiveSession } from "../types";
-import { WEEKDAY_LABELS, byWeekday, dataQuality, filterSessions, hostWeekdayGrid } from "../lib/performance/hostPerformance";
+import { WEEKDAY_LABELS, byWeekday, dataQuality, filterSessions, hostWeekdayGrid, isCountable } from "../lib/performance/hostPerformance";
 import { addDays, getTodayDate, isoWeekNumber, isoWeekStart } from "../lib/dateUtils";
 import { downloadSheetsAsXlsx } from "../lib/exportXlsx";
 import { useToast } from "../hooks/useToast";
 import { errorMessage } from "../lib/errorMessage";
-import { PageIntro } from "./common/PageIntro";
+import { PageHeader } from "./common/PageHeader";
 
 import { fmtDateVn, fmtFixed, fmtVndShort } from "../lib/format";
 import { METRIC, metricHint } from "../lib/metricGlossary";
@@ -81,7 +81,15 @@ export function HostPerformance({ platform, sessions, brands }: HostPerformanceP
   const today = getTodayDate();
   // Không cho tiến qua kỳ chứa hôm nay — chưa có ca nào để xếp hạng.
   const canNext = mode !== "range" && periodBounds(mode, anchor).to < today;
-  const [brandId, setBrandId] = useState("");
+  const [pickedBrandId, setBrandId] = useState("");
+  // Xếp hạng chỉ trong MỘT brand (luật Dashboard 10/10: brand giải thích 81% chênh lệch GMV/giờ) — "Tất cả brand" từng xếp host
+  // CROCS (~15M/giờ) trên host VERA (~2M/giờ) chỉ vì brand khác nhau. Mặc định brand có nhiều ca có số nhất của sàn trong kỳ.
+  const platformBrands = useMemo(() => {
+    const n = new Map<string, number>();
+    for (const s of sessions) if (inPlatformScope(s, platform) && s.brandId && s.date >= from && s.date <= to && isCountable(s)) n.set(s.brandId, (n.get(s.brandId) ?? 0) + 1);
+    return brands.filter((b) => n.has(b.id)).sort((a, b) => (n.get(b.id) ?? 0) - (n.get(a.id) ?? 0));
+  }, [sessions, platform, brands, from, to]);
+  const brandId = pickedBrandId && platformBrands.some((b) => b.id === pickedBrandId) ? pickedBrandId : platformBrands[0]?.id ?? "";
   // Xếp hạng theo TỪNG SÀN (06/10): GMV/giờ hai sàn khác hẳn nhau (VERA Shopee ~1,6x TikTok T6–T9) — gộp lại thì host
   // đứng nhiều ca Shopee tự nhiên lên top. Mặc định TikTok; "cả 2 sàn" vẫn chọn được nhưng ghi rõ là không nên so.
 
@@ -142,25 +150,24 @@ export function HostPerformance({ platform, sessions, brands }: HostPerformanceP
 
   return (
     <div className="space-y-4">
-      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-black text-[var(--text)] flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-[var(--accent-text)] shrink-0" /> Hiệu Suất Host
-            </h2>
-            <PageIntro>
-              Đọc từ số liệu ca đã có, để trả lời câu hỏi khi sắp lịch: host nào hiệu quả nhất với brand nào, và mạnh nhất vào thứ mấy.
-              Đây là số liệu tham khảo cho ops tự quyết, app không tự xếp lịch.
-            </PageIntro>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
+      <PageHeader
+        icon={TrendingUp}
+        title="Hiệu Suất Host"
+        description={
+          <>
+            Đọc từ số liệu ca đã có, để trả lời câu hỏi khi sắp lịch: trong MỘT brand, host nào hiệu quả nhất và mạnh nhất vào thứ mấy
+            (GMV/giờ giữa các brand khác nhau chủ yếu do brand, nên không xếp chung). Đây là số liệu tham khảo cho ops tự quyết, app không tự xếp lịch.
+          </>
+        }
+        actions={
+          <>
             <div className="flex rounded-lg border border-[var(--border)] overflow-hidden" role="group" aria-label="Kỳ xem">
               {(Object.keys(PERIOD_LABEL) as PeriodMode[]).map((m) => (
                 <button
                   key={m}
                   onClick={() => setMode(m)}
                   aria-pressed={mode === m}
-                  className={`px-2.5 py-1.5 text-xs font-bold ${mode === m ? "bg-[var(--accent)] text-white" : "bg-[var(--surface-base)] text-[var(--text-muted)] hover:text-[var(--text)]"}`}
+                  className={`px-2.5 py-1.5 text-xs font-bold ${mode === m ? "seg-on" : "bg-[var(--surface-base)] text-[var(--text-muted)] hover:text-[var(--text)]"}`}
                 >
                   {PERIOD_LABEL[m]}
                 </button>
@@ -189,9 +196,9 @@ export function HostPerformance({ platform, sessions, brands }: HostPerformanceP
                 </button>
               </div>
             )}
-            <select value={brandId} onChange={(e) => setBrandId(e.target.value)} className={inputCls}>
-              <option value="">Tất cả brand</option>
-              {brands.map((b) => (
+            <select value={brandId} onChange={(e) => setBrandId(e.target.value)} className={inputCls} aria-label="Brand">
+              {platformBrands.length === 0 && <option value="">Chưa brand nào có số</option>}
+              {platformBrands.map((b) => (
                 <option key={b.id} value={b.id}>{b.name}</option>
               ))}
             </select>
@@ -203,15 +210,15 @@ export function HostPerformance({ platform, sessions, brands }: HostPerformanceP
             >
               <Download className="w-3.5 h-3.5" /> Xuất Excel
             </button>
-          </div>
-        </div>
-
+          </>
+        }
+      >
         {quality.total === 0 ? (
-          <p className="text-xs text-[var(--text-faint)] mt-4">
+          <p className="text-xs text-[var(--text-faint)]">
             Chưa có ca nào có số liệu trong khoảng này. Số liệu sinh ra khi trợ live up file vào ca (mở ca ở Bảng Vận Hành).
           </p>
         ) : (
-          <p className="text-[11px] text-[var(--text-muted)] mt-4 flex items-start gap-1.5">
+          <p className="text-[11px] text-[var(--text-muted)] flex items-start gap-1.5">
             {quality.manual > 0 && <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px text-amber-400" />}
             <span>
               {/* Ghi kỳ ngay cạnh con số (audit người mới 2026-10-04): Talent Pool cộng MỌI tháng nên cùng một host
@@ -231,7 +238,7 @@ export function HostPerformance({ platform, sessions, brands }: HostPerformanceP
             </span>
           </p>
         )}
-      </div>
+      </PageHeader>
 
       {quality.total > 0 && (
         <>

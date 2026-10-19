@@ -293,7 +293,7 @@ export const BrandConfigPanel: React.FC<Props> = ({
             disabled={!canEdit}
             aria-pressed={brand.billingModel === m}
             onClick={() => brand.billingModel !== m && onUpdateBrand({ ...brand, billingModel: m })}
-            className={`min-h-6 px-3 py-1.5 rounded-lg text-xs font-bold border transition ${brand.billingModel === m ? "bg-[var(--accent)] text-white border-[var(--accent)]" : "border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]"}`}
+            className={`min-h-6 px-3 py-1.5 rounded-lg text-xs font-bold border transition ${brand.billingModel === m ? "seg-on" : "border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]"}`}
           >
             {m === "hourly" ? "Theo giờ live" : "Theo % doanh số"}
           </button>
@@ -305,7 +305,7 @@ export const BrandConfigPanel: React.FC<Props> = ({
               key={p}
               onClick={() => onPlatformChange(p)}
               aria-pressed={platform === p}
-              className={`min-h-6 px-3 py-1.5 rounded-lg text-xs font-bold ${platform === p ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)] hover:bg-[var(--surface-elevated)]"}`}
+              className={`min-h-6 px-3 py-1.5 rounded-lg text-xs font-bold ${platform === p ? "seg-on" : "text-[var(--text-muted)] hover:bg-[var(--surface-elevated)]"}`}
             >
               {p}
             </button>

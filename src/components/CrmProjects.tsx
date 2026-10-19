@@ -11,7 +11,7 @@ import type { TabPrefetchCtx } from "../lib/db/prefetch";
 import { findBrandStudioId } from "../lib/db/brandStudios";
 import { brandPriceLabel } from "../lib/brandPricing";
 import { contractCovering, monthKeyOf, todayVn } from "../lib/performance/brandCommitment";
-import { REPORT_PLATFORMS, type ReportPlatform } from "../lib/reportPlatform";
+import { platformOf, REPORT_PLATFORMS, type ReportPlatform } from "../lib/reportPlatform";
 import { findChannel, platformsOfBrand } from "../lib/channels";
 import { takeCrmFocus } from "../lib/crmFocus";
 import { errorMessage } from "../lib/errorMessage";
@@ -284,6 +284,9 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
               <div className="space-y-1.5">
                 {platformsOf(b.id).map((p) => {
                   const contract = contractCovering(contracts, b.id, p, thisMonth);
+                  // Giờ cam kết của tháng có thể gõ thẳng ở Kế Hoạch Tháng (không hợp đồng) — vẫn là cam kết thật mà Bảng Vận Hành /
+                  // Toàn Cảnh Brand đang đo; ghi "chưa có" ở đây là nói ngược với các màn đó.
+                  const monthCommit = commitments.find((c) => c.brandId === b.id && platformOf(c) === p && c.periodMonth.startsWith(thisMonth.slice(0, 7)));
                   const price = brandPriceLabel(b, brandPlatformRates, p);
                   const studio = studios.find((x) => x.id === findBrandStudioId(brandStudios, b.id, p));
                   const open = focus?.brandId === b.id && focus.platform === p;
@@ -302,7 +305,7 @@ export const CrmProjects: React.FC<CrmProjectsProps> = ({
                         <span className="ml-auto font-normal text-[var(--accent-text)]">{open ? "Đóng" : canEdit ? "Sửa" : "Xem"}</span>
                       </span>
                       <span className="block text-[var(--text-muted)] mt-0.5">
-                        Cam kết {fmtMonth(thisMonth.slice(0, 7))}: {contract ? <b className="text-[var(--text)]">{contract.monthlyHours.toLocaleString("vi-VN")}h/tháng</b> : missing}
+                        Cam kết {fmtMonth(thisMonth.slice(0, 7))}: {monthCommit && monthCommit.committedHours > 0 ? <b className="text-[var(--text)]">{monthCommit.committedHours.toLocaleString("vi-VN")}h{contract ? "" : " (nhập ở Kế Hoạch Tháng, chưa có hợp đồng)"}</b> : contract ? <b className="text-[var(--text)]">{contract.monthlyHours.toLocaleString("vi-VN")}h/tháng</b> : missing}
                         {" · "}Giá ({b.billingModel === "hourly" ? "theo giờ" : "theo %"}): {price ? <b className="text-[var(--text)]">{price}</b> : missing}
                         {" · "}Phòng: {studio ? <b className="text-[var(--text)]">{studio.name}</b> : missing}
                       </span>

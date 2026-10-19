@@ -136,7 +136,7 @@ export function HostChangeReports({ session: s, canSubmit, onSaved }: Props) {
   return (
     <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface-base)]/60 p-3 space-y-2.5">
       <div className="flex items-center justify-between gap-2">
-        <h4 className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-bold flex items-center gap-1.5">
+        <h4 className="text-xs font-bold text-[var(--text-muted)] flex items-center gap-1.5">
           <ArrowRightLeft className="w-3.5 h-3.5" /> Report lúc đổi host
         </h4>
         <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${pending === 0 ? "bg-emerald-950 text-emerald-300 border-emerald-800" : "bg-amber-950 text-amber-300 border-amber-800"}`}>

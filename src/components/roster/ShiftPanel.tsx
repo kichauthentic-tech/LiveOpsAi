@@ -86,7 +86,7 @@ export const ShiftPanel: React.FC<Props> = ({ shift, analysis, ctx, talents, his
     <aside className="fixed inset-y-0 right-0 z-40 w-full sm:w-[440px] bg-[var(--surface)] border-l border-[var(--border)] shadow-2xl flex flex-col" aria-label="Chi tiết ca">
       <div className="p-4 border-b border-[var(--border)] flex items-start justify-between gap-3">
         <div className="min-w-0 space-y-1">
-          <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--accent-text)]">
+          <p className="text-[11px] font-semibold text-[var(--accent-text)]">
             {dayLabel(shift.date)} · {shift.kind === "open" ? (shift.drafted ? "Ca mở · đang nháp" : "Ca mở · chưa xếp") : "Đã lên lịch"}
           </p>
           <h3 className="text-lg font-black text-[var(--text)] flex flex-wrap items-center gap-2">

@@ -123,7 +123,7 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ activeUser, on
 
         <form onSubmit={handleSaveName} className="space-y-3">
           <div>
-            <label className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">Tên hiển thị</label>
+            <label className="text-xs font-semibold text-[var(--text-muted)]">Tên hiển thị</label>
             <input
               type="text"
               required
@@ -166,7 +166,7 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ activeUser, on
 
         <form onSubmit={handleChangePassword} className="space-y-3">
           <div>
-            <label className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">
+            <label className="text-xs font-semibold text-[var(--text-muted)]">
               Mật khẩu hiện tại
             </label>
             <input
@@ -179,7 +179,7 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ activeUser, on
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">
+              <label className="text-xs font-semibold text-[var(--text-muted)]">
                 Mật khẩu mới
               </label>
               <input
@@ -192,7 +192,7 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ activeUser, on
               />
             </div>
             <div>
-              <label className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">
+              <label className="text-xs font-semibold text-[var(--text-muted)]">
                 Nhập lại mật khẩu mới
               </label>
               <input

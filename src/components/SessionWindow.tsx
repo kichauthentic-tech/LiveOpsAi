@@ -65,7 +65,8 @@ export interface SessionWindowProps {
   onClose: () => void;
   /** Giao ca xong: các ca đã đổi số (ca nối phía sau cũng tính lại) — App thay trong state. */
   onSessionsUpdated?: (sessions: LiveSession[]) => void;
-  onUpdateSession?: (session: LiveSession) => Promise<boolean>;
+  /** `base` = bản ca lúc bấm "Sửa ca" — chỉ trường khác base được ghi (0178). */
+  onUpdateSession?: (session: LiveSession, base?: LiveSession) => Promise<boolean>;
   onDeleteSession?: (id: string) => Promise<void>;
   // 0097: huỷ ca (ops) — ca chưa có số liệu; slot đã chốt về 'cancelled', talent được báo.
   onCancelSession?: (id: string, reason: string, reopenSlot: boolean) => Promise<boolean>;
@@ -153,8 +154,17 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
   const [dropoutSending, setDropoutSending] = useState(false);
   const [dropoutSent, setDropoutSent] = useState(false);
   const [edit, setEdit] = useState({ date: s.date, startTime: s.startTime, endTime: s.endTime, studioId: s.studioId, hostId: s.hostId, coHostId: s.coHostId ?? "" });
+  // Bản ca lúc bấm "Sửa ca". Form phải lấy lại từ ca HIỆN TẠI mỗi lần mở: trước đây form chỉ nạp lại khi đổi sang ca khác,
+  // nên sau "Đổi người giữa ca" (ca đã đổi trợ) lưu form là ghi trợ cũ đè lên (14/10 CROCS 12–15).
+  const [editBase, setEditBase] = useState<LiveSession>(s);
+  const startEdit = () => {
+    setEdit({ date: s.date, startTime: s.startTime, endTime: s.endTime, studioId: s.studioId, hostId: s.hostId, coHostId: s.coHostId ?? "" });
+    setEditBase(s);
+    setChangeReason("");
+    setEditing(true);
+  };
   const [changeReason, setChangeReason] = useState("");
-  const peopleChanged = edit.hostId !== s.hostId || (edit.coHostId || "") !== (s.coHostId ?? "");
+  const peopleChanged = edit.hostId !== editBase.hostId || (edit.coHostId || "") !== (editBase.coHostId ?? "");
   useEffect(() => {
     setEditingHandover(false);
     setEditing(false);
@@ -212,10 +222,10 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
     () => (isBrandView ? [] : findPersonClashes(allSessions).filter((c) => c.session.id === s.id || c.other?.id === s.id)),
     [isBrandView, allSessions, s.id]
   );
-  const scheduleChanged = edit.date !== s.date || edit.startTime !== s.startTime || edit.endTime !== s.endTime;
+  const scheduleChanged = edit.date !== editBase.date || edit.startTime !== editBase.startTime || edit.endTime !== editBase.endTime;
   const personBlocked =
-    (!!conflicts.host && (scheduleChanged || edit.hostId !== s.hostId)) ||
-    (!!conflicts.coHost && (scheduleChanged || (edit.coHostId || "") !== (s.coHostId ?? "")));
+    (!!conflicts.host && (scheduleChanged || edit.hostId !== editBase.hostId)) ||
+    (!!conflicts.coHost && (scheduleChanged || (edit.coHostId || "") !== (editBase.coHostId ?? "")));
 
   const saveEdit = async () => {
     if (!onUpdateSession) return;
@@ -237,11 +247,11 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
       coHostName: coObj?.name || ""
     };
     setSaving(true);
-    const ok = await onUpdateSession(updated);
+    const ok = await onUpdateSession(updated, editBase);
     if (ok && peopleChanged && onLogAudit) {
       const parts: string[] = [];
-      if (edit.hostId !== s.hostId) parts.push(`Host: ${s.hostName || "—"} → ${hostObj?.name ?? "—"}`);
-      if ((edit.coHostId || "") !== (s.coHostId ?? "")) parts.push(`Trợ live: ${s.coHostName || "—"} → ${coObj?.name ?? "—"}`);
+      if (edit.hostId !== editBase.hostId) parts.push(`Host: ${editBase.hostName || "—"} → ${hostObj?.name ?? "—"}`);
+      if ((edit.coHostId || "") !== (editBase.coHostId ?? "")) parts.push(`Trợ live: ${editBase.coHostName || "—"} → ${coObj?.name ?? "—"}`);
       await onLogAudit({
         action: "Thay người trên ca",
         details: `Ca ${s.date} ${s.startTime}-${s.endTime} (${s.brandName}): ${parts.join("; ")}. Lý do: ${changeReason.trim() || "Không ghi lý do"}.`,
@@ -351,7 +361,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
           </div>
           <div className="flex items-center gap-1 shrink-0">
             {canEdit && !editing && (
-              <button onClick={() => setEditing(true)} className="text-[11px] font-bold text-[var(--accent-text)] px-2.5 py-1.5 rounded-lg border border-[var(--accent)]/40 flex items-center gap-1"><Pencil className="w-3 h-3" /> Sửa ca · thay người</button>
+              <button onClick={startEdit} className="text-[11px] font-bold text-[var(--accent-text)] px-2.5 py-1.5 rounded-lg border border-[var(--accent)]/40 flex items-center gap-1"><Pencil className="w-3 h-3" /> Sửa ca · thay người</button>
             )}
             <button onClick={onClose} className="text-[var(--text-faint)] hover:text-[var(--text)] p-1" aria-label="Đóng"><X className="w-5 h-5" /></button>
           </div>
@@ -500,7 +510,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
           {showHandover && (
             <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface-base)]/60 p-3 space-y-3">
               <div className="flex items-center justify-between gap-2">
-                <h4 className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-bold">Giao ca</h4>
+                <h4 className="text-xs font-bold text-[var(--text-muted)]">Giao ca</h4>
                 <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${handoverDone ? "bg-emerald-950 text-emerald-300 border-emerald-800" : "bg-amber-950 text-amber-300 border-amber-800"}`}>
                   {handoverDone ? `đã giao ${new Date(s.report!.handoverAt!).toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" })}` : "chưa giao ca"}
                 </span>
@@ -542,7 +552,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
           {/* Report đã nộp (mọi vai đọc được) */}
           {!editingHandover && (s.report || incidents.length > 0) && (
             <section>
-              <h4 className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-bold mb-2">Report ca</h4>
+              <h4 className="text-xs font-bold text-[var(--text-muted)] mb-2">Report ca</h4>
               {s.report ? (
                 <div className="space-y-2">
                   <div className="flex flex-wrap gap-1">
@@ -570,15 +580,15 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
 
           {/* Số liệu ca */}
           <section>
-            <h4 className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-bold mb-2">Số liệu ca</h4>
+            <h4 className="text-xs font-bold text-[var(--text-muted)] mb-2">Số liệu ca</h4>
             {counters ? (
               <>
                 {/* Key Metrics đủ 18 chỉ số + AOV, cùng hàm/thứ tự với mọi report (lib/report/keyMetrics.ts). */}
-                <div className="grid grid-cols-3 gap-2">
+                <div className={KV_GRID}>
                   {prof.metrics.defs.map((d) => <KV key={d.key} label={d.label} value={prof.metrics.fmt(d, prof.metrics.value(metricTotals, d.key))} />)}
                 </div>
-                <p className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-bold mt-3 mb-2">Số khác</p>
-                <div className="grid grid-cols-3 gap-2">
+                <p className="text-xs font-bold text-[var(--text-muted)] mt-3 mb-2">Số khác</p>
+                <div className={KV_GRID}>
                   {/* Shopee chỉ có Comments ở mức ca (file Live List); SKU orders/followers/shares/likes/PCU/Show GPM là số TikTok. */}
                   {prof.showsTikTokCounters && <KV label="SKU orders" value={fmtInt(counters.skuOrders)} />}
                   {prof.showsTikTokCounters && <KV label="New followers" value={fmtInt(counters.newFollowers)} />}
@@ -597,7 +607,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
               </>
             ) : s.actualGmv || s.totalOrders || s.totalViews ? (
               <>
-                <div className="grid grid-cols-3 gap-2">
+                <div className={KV_GRID}>
                   <KV label="Orders" value={fmtInt(s.totalOrders)} />
                   <KV label={prof.viewsLabel} value={fmtInt(s.totalViews)} />
                   {prof.showsTikTokCounters && <KV label="PCU" value={fmtInt(s.peakViewers)} />}
@@ -628,7 +638,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
             events.sort((a, b) => a.at.localeCompare(b.at));
             return (
               <section>
-                <h4 className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-bold mb-2">Lịch sử</h4>
+                <h4 className="text-xs font-bold text-[var(--text-muted)] mb-2">Lịch sử</h4>
                 <ul className="space-y-1">
                   {events.map((e, i) => (
                     <li key={i} className="text-xs flex items-start gap-2">
@@ -644,7 +654,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
           {/* Phiên TikTok / ca nối */}
           {!isBrandView && ((s.liveRoomIds?.length ?? 0) > 0 || linkedLabel.length > 0) && (
             <section>
-              <h4 className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-bold mb-2">Phiên {prof.label}</h4>
+              <h4 className="text-xs font-bold text-[var(--text-muted)] mb-2">Phiên {prof.label}</h4>
               {(s.liveRoomIds?.length ?? 0) > 0 && <p className="text-xs text-[var(--text-muted)] font-mono break-all">Room: {s.liveRoomIds!.join(", ")}</p>}
               {linkedLabel.length > 0 && (
                 <p className="text-xs text-sky-300 mt-1 flex items-start gap-1"><Link2 className="w-3.5 h-3.5 shrink-0 mt-0.5" /><span>Ca nối, chung room với: {linkedLabel.join("; ")}</span></p>
@@ -762,8 +772,11 @@ const TrustBadge: React.FC<{ session: LiveSession }> = ({ session }) => {
   );
 };
 
+// Bố cục 19/10: chỉ số nằm trong MỘT khung (`KV_GRID`), mỗi chỉ số chỉ là nhãn + số — trước 27 hộp bo góc cách nhau
+// (19 chỉ số + 8 "Số khác"), cửa sổ ca lốm đốm khung.
+const KV_GRID = "grid grid-cols-3 gap-x-4 gap-y-3 rounded-xl border border-[var(--border)] bg-[var(--surface-base)] p-3";
 const KV: React.FC<{ label: string; value: string; muted?: boolean; accent?: boolean }> = ({ label, value, muted, accent }) => (
-  <div className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2.5 py-2">
+  <div className="min-w-0">
     <p className="text-[11px] text-[var(--text-faint)]" title={metricHint(label)}>{label}</p>
     <p className={`text-xs font-bold ${accent ? "text-[var(--success)]" : muted ? "text-[var(--text-faint)] font-normal italic" : "text-[var(--text)]"}`}>{value}</p>
   </div>

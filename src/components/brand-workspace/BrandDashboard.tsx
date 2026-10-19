@@ -8,8 +8,8 @@ import { CAMP_DAY_BUCKET_LABEL, CampDayBucket, effectiveCamp, resolveCampBucketT
 import { todayVn } from "../../lib/performance/brandCommitment";
 import { prefetchable, type TabPrefetchCtx } from "../../lib/db/prefetch";
 import { lastDataDate, monthEndOf, monthOutlook, prevMonthOf, nextMonthOf, RUN_RATE_BAD, RUN_RATE_WARN } from "../../lib/performance/ceoBrief";
-import { planRunRate, PlanRunRateSlot, projectMonthEnd, PROJECTION_METHOD_LABEL } from "../../lib/performance/planRunRate";
-import { dataCoverage, gmvTree, LEVER_OWNER, likeForLike, MAX_MONTH_HOURS, runRateByWave, runRateThrough } from "../../lib/performance/channelHealth";
+import { noDataSplit, planRunRate, PlanRunRateSlot, projectMonthEnd, PROJECTION_METHOD_LABEL, runRateLive } from "../../lib/performance/planRunRate";
+import { dataCoverage, gmvTree, LEVER_OWNER, likeForLike, MAX_MONTH_HOURS, runRateByWave } from "../../lib/performance/channelHealth";
 import { landingOf } from "../../lib/performance/forecastCone";
 import { computeCommitmentProgress } from "../../lib/performance/brandCommitment";
 import { commitmentProgressRead, type BrandCommitmentRow } from "../../lib/db/brandContracts";
@@ -21,6 +21,7 @@ import { buildChannelRoom } from "../../lib/performance/controlRoom";
 import {
   SLOT_BLOCKS,
   SLOT_BLOCK_LABEL,
+  type SlotBlock,
   campPositions,
   campRuleReliable,
   campWindows,
@@ -41,6 +42,7 @@ import { sessionDurationHours } from "../../lib/pnl";
 import { fmtMonth, fmtVndShort } from "../../lib/format";
 import { METRIC, metricHint } from "../../lib/metricGlossary";
 import { PageHeader } from "../common/PageHeader";
+import { StatTile } from "../common/StatTile";
 import OpsSupport, { prefetchOpsSupport } from "../OpsSupport";
 import { MonthPicker } from "../common/MonthPicker";
 import { channelTitle, platformOf, type ReportPlatform } from "../../lib/reportPlatform";
@@ -95,15 +97,7 @@ const Card: React.FC<{ title: string; icon: React.ReactNode; sub?: React.ReactNo
   </section>
 );
 
-// size: "lg" = 5 ô kết quả đọc trước (20px), mặc định 18px, "sm" = ô trong 3 nhóm phễu (14px).
-// Giữ trong 6 cỡ chữ đã chuẩn hoá ở M1 (11/12/14/16/18/20) — không thêm cỡ mới.
-const Stat: React.FC<{ label: string; value: string; hint?: React.ReactNode; tone?: string; size?: "lg" | "sm" }> = ({ label, value, hint, tone, size }) => (
-  <div className={`bg-[var(--surface-base)] border border-[var(--border)] rounded-xl min-w-0 ${size === "sm" ? "p-2.5" : "p-3"}`}>
-    <p className="text-[11px] uppercase tracking-wider font-bold text-[var(--text-faint)]" title={metricHint(label)}>{label}</p>
-    <p className={`font-black mt-0.5 font-mono ${size === "lg" ? "text-xl" : size === "sm" ? "text-sm" : "text-lg"} ${tone ?? "text-[var(--text)]"}`}>{value}</p>
-    {hint && <div className="text-[11px] text-[var(--text-faint)] mt-0.5 leading-snug">{hint}</div>}
-  </div>
-);
+// Ô số: StatTile (common/StatTile.tsx) — size "lg" = 5 ô kết quả đọc trước (20px), mặc định 18px, "sm" = ô trong 3 nhóm phễu (14px).
 
 
 // Lượt đọc riêng của màn — nạp trước trong lúc chờ đợt nạp chung (lib/db/prefetch.ts). Chỉ ops (hoặc role chưa
@@ -207,8 +201,13 @@ function BrandDashboardOne({ brandId, brandName, platform, platforms, sessions: 
     const open = shiftSlots.filter((sl) => sl.brandId === brandId && platformOf(sl) === platform && sl.status === "open" && !sl.sessionId);
     return buildChannelRoom({ sessions: chSessions, month, today, target: rr.total.target, bucketOf, params: engineParams, openSlots: open });
   }, [isOps, rr, month, today, brandSessions, platform, shiftSlots, brandId, bucketOf, engineParams]);
-  const rrCut = outlook ? runRateThrough(outlook, through) : null;
-  const waveRows = outlook ? runRateByWave(outlook, through).filter((w) => w.key !== "month") : [];
+  // Run-rate "tới ca mới nhất có số": tới ngày đủ số = target cả ngày; sau đó từng ca có số so với target đúng ca (planRunRate.runRateLive).
+  // KPI so cùng loại ngày / tỷ trọng live vẫn cắt ở ngày đủ số (`through`) — một ca lẻ không so được với cả ngày tháng trước.
+  const live = useMemo(() => (rr ? runRateLive(rr, coverage.completeThrough) : null), [rr, coverage.completeThrough]);
+  const rrCut = live && outlook?.target ? { actual: live.actual, expected: live.expected, runRate: live.runRate } : null;
+  const liveThrough = live?.lastDate ?? through;
+  const waveRows = outlook && live ? runRateByWave(outlook, liveThrough, { expectedByDate: live.expectedByDate, completeThrough: coverage.completeThrough }).filter((w) => w.key !== "month") : [];
+  const liveLabel = live?.lastShift ? `ca ${live.lastShift.startTime}–${live.lastShift.endTime} ${dm(live.lastShift.date)}` : liveThrough ? dm(liveThrough) : "—";
   // GMV/giờ cần cho phần còn lại = (target − đã có) ÷ giờ các ca còn trong lịch (gồm ca đã chạy chờ số) — thay "cần mỗi ngày":
   // chia đều theo ngày coi ngày thường như ngày D-Day.
   const remainingHours = outlook ? outlook.pending.reduce((a, p) => a + p.hours, 0) : 0;
@@ -298,13 +297,22 @@ function BrandDashboardOne({ brandId, brandName, platform, platforms, sessions: 
   const hosts = useMemo(() => (isOps ? hostReliability(monthSessions.filter((s) => s.date <= win.curEnd), bucketOf) : []), [isOps, monthSessions, win, bucketOf]);
 
   // Giờ mỗi ngày thường ở khung yếu / mạnh: tháng này vs tháng trước
-  const hoursPerDailyDay = (xs: LiveSession[], k: "B" | "D") => {
+  const hoursPerDailyDay = (xs: LiveSession[], k: SlotBlock) => {
     const d = xs.filter((s) => isCountable(s) && bucketOf(s.date) === "daily");
     const days = new Set(d.map((s) => s.date)).size;
     return days ? d.filter((s) => slotBlock(s.startTime) === k).reduce((a, s) => a + sessionHours(s), 0) / days : null;
   };
   const curRange = brandSessions.filter((s) => s.date >= win.curStart && s.date <= win.curEnd);
   const prevRange = brandSessions.filter((s) => s.date >= win.prevStart && s.date <= win.prevEnd);
+  // Cặp khung để dời giờ: TỪ khung yếu chắc chắn (cả dải < 1) mà kỳ này còn chạy giờ, SANG khung mạnh nhất. Trước đây cố định
+  // 11–13h → 19–20h (bài học của CROCS) nên VERA 17/10 được khuyên dời giờ khỏi khung kỳ này chạy 0h, khung đó cũng không yếu chắc
+  // chắn (0,43–1,25), và mức tăng in ra "+-463K".
+  const slotMove = (() => {
+    const rows = SLOT_BLOCKS.flatMap((k) => (sIdx[k] ? [{ k, r: sIdx[k]! }] : []));
+    const from = rows.filter(({ k, r }) => r.hi < 1 && (hoursPerDailyDay(curRange, k) ?? 0) > 0).sort((a, b) => a.r.idx - b.r.idx)[0];
+    const to = rows.filter(({ r }) => r.lo > (from?.r.hi ?? 1)).sort((a, b) => b.r.idx - a.r.idx)[0];
+    return from && to ? { from: from.k, to: to.k, lo: to.r.lo - from.r.hi, hi: to.r.hi - from.r.lo } : null;
+  })();
   const recent28 = useMemo(() => {
     if (!through) return null;
     const from = new Date(`${through}T00:00:00`);
@@ -362,7 +370,7 @@ function BrandDashboardOne({ brandId, brandName, platform, platforms, sessions: 
     const a = prof.metrics.value(mPrev, d.key), b = prof.metrics.value(mCur, d.key);
     const ch = a && b != null ? b / a - 1 : null;
     const tone = ch == null || d.goodWhenUp == null || Math.abs(ch) < 0.02 ? "" : ch > 0 === d.goodWhenUp ? "text-emerald-400" : "text-rose-400";
-    return <Stat key={d.key} size={size} label={d.label} value={prof.metrics.fmt(d, prof.metrics.value(mShown, d.key))} hint={<span className={tone}>{signed(ch)} <span className="text-[var(--text-faint)]">({prof.metrics.fmt(d, a)})</span></span>} />;
+    return <StatTile key={d.key} size={size} label={d.label} value={prof.metrics.fmt(d, prof.metrics.value(mShown, d.key))} hint={<span className={tone}>{signed(ch)} <span className="text-[var(--text-faint)]">({prof.metrics.fmt(d, a)})</span></span>} />;
   };
 
   return (
@@ -371,16 +379,7 @@ function BrandDashboardOne({ brandId, brandName, platform, platforms, sessions: 
         icon={LayoutDashboard}
         title={`Dashboard · ${titleName}`}
         description={`Tháng này tới đâu so với target plan, vì sao, và ${isOps ? "tuần tới / tháng sau nên sửa gì. Đề xuất chỉ dùng những quy tắc đã thử lại trên các tháng cũ của chính brand và đoán đúng hơn." : "nhịp theo tuần. Số của tháng hiện ra khi ops phát hành Report Tháng."}`}
-        actions={
-          <>
-            {through && (
-              <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${lagDays > 3 ? "bg-rose-500/15 text-rose-400" : "bg-emerald-500/15 text-emerald-400"}`} title="Ngày cuối mà ít nhất 90% giờ ca đã chạy có số. Trễ = số ngày sau mốc đó tới hôm qua.">
-                Số đủ tới {dm(through)}{lagDays > 1 ? ` · trễ ${lagDays - 1} ngày` : ""}
-              </span>
-            )}
-            <MonthPicker value={month} onChange={setPickedMonth} ariaLabel="Tháng" />
-          </>
-        }
+        actions={<MonthPicker value={month} onChange={setPickedMonth} ariaLabel="Tháng" />}
       >
         {/* 01 · Độ tươi dữ liệu (ops) — hàng phụ của đầu trang, không còn là khối rời */}
         {isOps && (
@@ -415,26 +414,27 @@ function BrandDashboardOne({ brandId, brandName, platform, platforms, sessions: 
               CHƯA có plan đã chốt thì KHÔNG dựng cả thẻ: đo 29/09 thấy thẻ rỗng vẫn chiếm 192px và đẩy số thật
               xuống dưới, trong khi hiện chưa brand/tháng nào có plan chốt ⇒ đó là trạng thái thường ngày, không
               phải ngoại lệ. Thay bằng 1 dòng, vì đầu trang đã có chip "Kế hoạch T9: chưa có" bấm được rồi. */}
+          {/* Mốc "số đủ tới" nói MỘT chỗ — dòng phụ của thẻ này (18/10: bỏ viên "Số đủ tới" ở đầu trang lặp đúng ngày đó). */}
           {/* 00 · Lớp khách (10/10): bốn câu brand hỏi — kết quả so target, live chiếm bao nhiêu trong shop, agency đã giao đủ giờ
               chưa, năng suất mỗi giờ so tháng trước (cùng loại ngày). Ops thấy đúng khối brand thấy. */}
-          <Card title={isOps ? "Tóm tắt brand đang thấy" : `Tóm tắt tháng ${Number(month.slice(5))}`} icon={<Gauge className="w-4 h-4 text-[var(--accent-text)]" />} sub={through ? `Tới ${dm(through)} — ngày cuối mà ít nhất 90% giờ ca đã có số.` : "Tháng này chưa có ca nào có số."}>
+          <Card title={`Tóm tắt tháng ${Number(month.slice(5))}`} icon={<Gauge className="w-4 h-4 text-[var(--accent-text)]" />} sub={through ? <>Tới {dm(through)} — ngày cuối mà ít nhất 90% giờ ca đã có số.{lagDays > 1 && <span className={lagDays > 3 ? "font-bold text-rose-400" : ""} title="Số ngày sau mốc đó tới hôm qua"> Trễ {lagDays - 1} ngày.</span>}</> : "Tháng này chưa có ca nào có số."}>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <Stat
+              <StatTile
                 label={rr ? "Kết quả so target" : METRIC.gmv}
                 value={rr ? pct(rr.total.pctTarget, 1) : fmtVndShort(mShown.gmv)}
                 hint={rr ? <>{fmtVndShort(rr.total.actual)} / {fmtVndShort(rr.total.target)}{landing ? <> · <LandingChip keyName={landing.key} />{landing.pHit != null ? ` ${pct(landing.pHit)}` : ""}</> : ""}</> : "tháng này chưa có Kế Hoạch Tháng đã chốt nên chưa có target"}
               />
-              <Stat
+              <StatTile
                 label="Live trong Total GMV"
                 value={liveShare ? pct(liveShare.share, 1) : "—"}
                 hint={liveShare ? `GMV ca agency ÷ Total GMV của shop · file shop tới ${dm(liveShare.last)}` : prof.hasShopAnalytics ? (isOps ? "chưa có file Shop Analytics của tháng ở Dữ Liệu Gốc" : "hiện khi Report Tháng có số Shop Analytics") : `${prof.label} không có file Total GMV theo ngày`}
               />
-              <Stat
+              <StatTile
                 label="Giờ đã giao / cam kết"
                 value={!commitment ? "—" : commitment.committedHours > MAX_MONTH_HOURS ? "—" : `${num(commitment.deliveredHours, 0)}/${num(commitment.committedHours, 0)}h`}
                 hint={!commitment ? "chưa có cam kết giờ cho tháng này" : commitment.committedHours > MAX_MONTH_HOURS ? (isOps ? `cam kết đang ghi ${num(commitment.committedHours, 0)} giờ — sửa ở Kế Hoạch Tháng` : "đang cập nhật") : `+ ${num(commitment.scheduledHours, 0)}h còn trong lịch${commitment.gapHours > 0 ? ` · thiếu ${num(commitment.gapHours, 0)}h` : ""}`}
               />
-              <Stat
+              <StatTile
                 label="GMV/giờ ngày thường"
                 value={tree?.gmvPerHour.cur != null ? fmtVndShort(tree.gmvPerHour.cur) : "—"}
                 tone={tree?.gmvPerHour.change == null || Math.abs(tree.gmvPerHour.change) < 0.03 ? undefined : tree.gmvPerHour.change > 0 ? "text-emerald-400" : "text-rose-400"}
@@ -460,31 +460,40 @@ function BrandDashboardOne({ brandId, brandName, platform, platforms, sessions: 
               title="Run-rate so với target plan"
               icon={<Gauge className="w-4 h-4 text-[var(--accent-text)]" />}
               right={landing ? <span className="inline-flex items-center gap-1.5"><LandingChip keyName={landing.key} />{landing.pHit != null && <span className="text-xs text-[var(--text-faint)]">khả năng đạt {pct(landing.pHit)}</span>}</span> : undefined}
-              sub="Target = tổng target các ca của Kế Hoạch Tháng đã chốt. Run-rate = thực đạt ÷ target các ca có ngày ≤ ngày đủ số (≥ 90% giờ ca có số). Ca huỷ vẫn giữ target; ca mở thêm ngoài plan được cộng thực đạt, target = 0. Nhãn = khả năng đạt target theo dự phóng."
+              sub="Target = tổng target các ca của Kế Hoạch Tháng đã chốt. Run-rate = thực đạt ÷ target: tới ngày đủ số (≥ 90% giờ ca có số) tính target cả ngày, sau đó mỗi ca có số so với target đúng ca đó — nhập tới ca nào cập nhật tới ca đó. Ca huỷ ở ngày đã đủ số vẫn giữ target; ca mở thêm ngoài plan được cộng thực đạt, target = 0. Nhãn = khả năng đạt target theo dự phóng."
             >
               <>
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                  <Stat label={METRIC.runRate} value={pct(rrCut?.runRate, 1)} tone={rrTone(rrCut?.runRate)} hint={`đạt ${fmtVndShort(rrCut?.actual ?? 0)} / target tới ${through ? dm(through) : "—"} ${fmtVndShort(rrCut?.expected ?? 0)}`} />
-                  <Stat label={METRIC.pctTarget} value={pct(rr.total.pctTarget, 1)} hint={`${fmtVndShort(rr.total.actual)} / ${fmtVndShort(rr.total.target)} · ${rr.slots.length} ca kế hoạch`} />
-                  <Stat label="Dự kiến cuối tháng" value={projection.value != null ? fmtVndShort(projection.value) : "—"} tone={projection.value == null ? undefined : projection.value >= rr.total.target ? "text-emerald-400" : "text-rose-400"} hint={`${signed(projection.value != null ? projection.value / rr.total.target - 1 : null)} so với target · ${PROJECTION_METHOD_LABEL[projection.method]}`} />
-                  <Stat
+                  <StatTile label={METRIC.runRate} value={pct(rrCut?.runRate, 1)} tone={rrTone(rrCut?.runRate)} hint={`đạt ${fmtVndShort(rrCut?.actual ?? 0)} / target tới ${liveLabel} ${fmtVndShort(rrCut?.expected ?? 0)}${live && live.tailShifts > 0 ? ` · gồm ${live.tailShifts} ca sau ngày đủ số${live.tailUnreconciled > 0 ? `, ${live.tailUnreconciled} chưa đối soát` : ""}` : ""}`} />
+                  <StatTile label={METRIC.pctTarget} value={pct(rr.total.pctTarget, 1)} hint={`${fmtVndShort(rr.total.actual)} / ${fmtVndShort(rr.total.target)} · ${rr.slots.length} ca kế hoạch`} />
+                  <StatTile label="Dự kiến cuối tháng" value={projection.value != null ? fmtVndShort(projection.value) : "—"} tone={projection.value == null ? undefined : projection.value >= rr.total.target ? "text-emerald-400" : "text-rose-400"} hint={`${signed(projection.value != null ? projection.value / rr.total.target - 1 : null)} so với target · ${PROJECTION_METHOD_LABEL[projection.method]}`} />
+                  <StatTile
                     label="GMV/giờ cần"
                     value={needPerHour != null ? fmtVndShort(needPerHour) : "—"}
                     tone={needPerHour != null && trailingPerHour != null ? (needPerHour <= trailingPerHour ? "text-emerald-400" : needPerHour > trailingPerHour * 1.3 ? "text-rose-400" : "text-amber-300") : undefined}
                     hint={needPerHour != null ? `cho ${num(remainingHours, 0)} giờ còn trong lịch${trailingPerHour != null ? ` · 28 ngày qua ${fmtVndShort(trailingPerHour)}/giờ` : ""}` : "không còn ca nào trong lịch"}
                   />
                 </div>
-                <CumulativeChart month={month} targetByDate={rr.targetByDate} actualByDate={rr.actualByDate} through={through} runRate={rrCut?.runRate ?? null} bucketOf={bucketOf} />
+                <CumulativeChart month={month} targetByDate={rr.targetByDate} actualByDate={rr.actualByDate} expectedByDate={live?.expectedByDate} through={liveThrough} runRate={rrCut?.runRate ?? null} bucketOf={bucketOf} />
                 {(rr.cancelledCount > 0 || rr.offPlan.length > 0 || rr.noDataCount > 0) && (
                   <p className="text-xs text-[var(--text-muted)]">
                     {rr.cancelledCount > 0 && <>{rr.cancelledCount} ca kế hoạch huỷ — target vẫn giữ trong mẫu số{rr.cancelledTargetToDate > 0 ? ` (${fmtVndShort(rr.cancelledTargetToDate)} tới nay)` : ""}. </>}
                     {rr.offPlan.length > 0 && <>{rr.offPlan.length} ca ngoài kế hoạch đã cộng {fmtVndShort(rr.offPlanActual)} vào thực đạt. </>}
-                    {rr.noDataCount > 0 && <span className="text-amber-300">{rr.noDataCount} ca kế hoạch đã qua mà chưa có số — run-rate chỉ tính tới ngày đủ số{through ? ` (${dm(through)})` : ""}, dự phóng đang tạm tính các ca này.</span>}
+                    {rr.noDataCount > 0 && (() => {
+                      const nd = noDataSplit(rr, coverage.completeThrough);
+                      return (
+                        <span className="text-amber-300">
+                          {nd.inDenominator > 0 && <>{nd.inDenominator} ca kế hoạch tới ngày đủ số{coverage.completeThrough ? ` (${dm(coverage.completeThrough)})` : ""} chưa có số — vẫn trong mẫu số run-rate. </>}
+                          {nd.waiting > 0 && <>{nd.waiting} ca sau ngày đủ số chưa có số — chưa vào mẫu số, có số là tự vào. </>}
+                          Dự phóng đang tạm tính các ca này.
+                        </span>
+                      );
+                    })()}
                   </p>
                 )}
 
                 <div>
-                  <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2">Theo loại ngày campaign</p>
+                  <p className="text-xs font-bold text-[var(--text-muted)] mb-2">Theo loại ngày campaign</p>
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs min-w-[640px]">
                       <thead>
@@ -502,15 +511,15 @@ function BrandDashboardOne({ brandId, brandName, platform, platforms, sessions: 
                         {/* Cắt ở ngày đủ số (runRateByWave — cùng target với planRunRate); số ca lấy từ planRunRate. */}
                         {waveRows.map((w) => {
                           const b = w.key === "month" ? undefined : rr.buckets.find((x) => x.bucket === w.key);
-                          const passed = w.days.filter((d) => through != null && d <= through).length;
+                          const passed = w.days.filter((d) => coverage.completeThrough != null && d <= coverage.completeThrough).length;
                           return (
                             <tr key={w.key} className="border-t border-[var(--border)]/60">
                               <td className="py-1.5 pr-3 font-bold text-[var(--text)]">{w.key === "month" ? w.label : CAMP_DAY_BUCKET_LABEL[w.key]}</td>
                               <td className="py-1.5 pr-3 font-mono text-[var(--text-muted)]">{w.key === "daily" ? `${w.days.length} ngày` : w.days.map(dm).join(", ")}</td>
-                              <td className="py-1.5 pr-3 text-[var(--text-muted)]">{w.state === "done" ? "Đã xong" : w.state === "live" ? `Đang chạy (${passed}/${w.days.length})` : "Sắp tới"}</td>
+                              <td className="py-1.5 pr-3 text-[var(--text-muted)]">{w.state === "done" ? "Đã xong" : w.state === "live" ? `${w.calendarDone ? "Còn ca chờ số" : "Đang chạy"} (${passed}/${w.days.length})` : w.state === "waiting" ? "Chờ số" : "Sắp tới"}</td>
                               <td className="py-1.5 pr-3 text-right font-mono">{fmtVndShort(w.target)} {b && <span className="text-[var(--text-faint)]">{b.slotCount} ca</span>}</td>
                               <td className="py-1.5 pr-3 text-right font-mono">{w.targetToDate > 0 ? fmtVndShort(w.targetToDate) : "—"}</td>
-                              <td className="py-1.5 pr-3 text-right font-mono">{passed ? fmtVndShort(w.actual) : "—"}</td>
+                              <td className="py-1.5 pr-3 text-right font-mono">{w.targetToDate > 0 ? fmtVndShort(w.actual) : "—"}</td>
                               <td className="py-1.5 text-right">{w.targetToDate > 0 ? <span className={`px-2 py-0.5 rounded-full font-bold ${rrPill(w.runRate)}`}>{pct(w.runRate)}</span> : <span className="text-[var(--text-faint)]">chưa tới</span>}</td>
                             </tr>
                           );
@@ -524,7 +533,7 @@ function BrandDashboardOne({ brandId, brandName, platform, platforms, sessions: 
                     Ba con số đếm nằm ngay trên dòng mở/đóng nên không phải mở mới biết có ca nào tụt. */}
                 <details className="group">
                   <summary className="cursor-pointer list-none flex items-center justify-between gap-2 flex-wrap min-h-[28px]">
-                    <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">
+                    <p className="text-xs font-bold text-[var(--text-muted)]">
                       Theo từng ca · {caRows.filter((r) => r.pctTarget != null && r.pctTarget >= RUN_RATE_WARN).length} ca ≥ 95% · {caRows.filter((r) => r.pctTarget != null && r.pctTarget >= RUN_RATE_BAD && r.pctTarget < RUN_RATE_WARN).length} ca 85–95% ·{" "}
                       {caRows.filter((r) => r.pctTarget != null && r.pctTarget < RUN_RATE_BAD).length} ca dưới 85%
                     </p>
@@ -589,7 +598,7 @@ function BrandDashboardOne({ brandId, brandName, platform, platforms, sessions: 
             </div>
             {prof.metrics.groups.filter((g) => g.group !== "result").map((g) => (
               <div key={g.group}>
-                <p className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2" title={g.hint}>{g.label}</p>
+                <p className="text-xs font-bold text-[var(--text-muted)] mb-2" title={g.hint}>{g.label}</p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
                   {prof.metrics.defs.filter((d) => d.group === g.group).map((d) => metricCell(d, "sm"))}
                 </div>
@@ -677,17 +686,17 @@ function BrandDashboardOne({ brandId, brandName, platform, platforms, sessions: 
                   </tbody>
                 </table>
               </div>}
-              {slotOk && sIdx.B && sIdx.D && recent28?.daily != null && (
+              {slotOk && slotMove && recent28?.daily != null && (
                 <p className="text-[var(--text-muted)]">
-                  Dời 1 giờ ngày thường từ khung 11–13h sang 19–20h ≈ <b className="text-[var(--text)]">+{fmtVndShort((sIdx.D.lo - sIdx.B.hi) * recent28.daily)} – {fmtVndShort((sIdx.D.hi - sIdx.B.lo) * recent28.daily)}</b> theo {METRIC.gmvPerHour} ngày thường 28 ngày gần nhất.
+                  Dời 1 giờ ngày thường từ khung {SLOT_BLOCK_LABEL[slotMove.from].replace("Bắt đầu ", "")} sang {SLOT_BLOCK_LABEL[slotMove.to].replace("Bắt đầu ", "")} ≈ <b className="text-[var(--text)]">+{fmtVndShort(slotMove.lo * recent28.daily)} – {fmtVndShort(slotMove.hi * recent28.daily)}</b> theo {METRIC.gmvPerHour} ngày thường 28 ngày gần nhất.
                   {(() => {
-                    const hB = hoursPerDailyDay(curRange, "B"), hD = hoursPerDailyDay(curRange, "D"), hDp = hoursPerDailyDay(prevRange, "D");
-                    if (hD == null) return null;
-                    return <> Kỳ này mỗi ngày thường chạy {num(hD, 1)}h ở khung 19–20h (cùng kỳ tháng trước {num(hDp, 1)}h) và {num(hB, 1)}h ở khung 11–13h.{hDp != null && hD < hDp * 0.85 && <b className="text-rose-300"> Giờ ở khung mạnh nhất đang bị cắt bớt.</b>}</>;
+                    const hF = hoursPerDailyDay(curRange, slotMove.from), hT = hoursPerDailyDay(curRange, slotMove.to), hTp = hoursPerDailyDay(prevRange, slotMove.to);
+                    if (hT == null) return null;
+                    return <> Kỳ này mỗi ngày thường chạy {num(hT, 1)}h ở khung {SLOT_BLOCK_LABEL[slotMove.to].replace("Bắt đầu ", "")} (cùng kỳ tháng trước {num(hTp, 1)}h) và {num(hF, 1)}h ở khung {SLOT_BLOCK_LABEL[slotMove.from].replace("Bắt đầu ", "")}.{hTp != null && hT < hTp * 0.85 && <b className="text-rose-300"> Giờ ở khung mạnh nhất đang bị cắt bớt.</b>}</>;
                   })()}
                 </p>
               )}
-              <p className="text-[var(--text-faint)]">Thử lại trên tháng cũ: dùng chỉ số khung của các tháng trước {wfSlot.gain == null ? "chưa đủ tháng để thử" : `${wfSlot.gain > 0 ? "giảm" : "tăng"} sai số dự đoán ${pct(Math.abs(wfSlot.gain))}`} ({wfSlot.months} tháng).</p>
+              <p className="text-[var(--text-faint)]">Thử lại trên tháng cũ: dùng chỉ số khung của các tháng trước {wfSlot.gain == null ? "chưa đủ tháng để thử" : Math.abs(wfSlot.gain) < 0.005 ? "gần như không đổi sai số dự đoán" : `${wfSlot.gain > 0 ? "giảm" : "tăng"} sai số dự đoán ${pct(Math.abs(wfSlot.gain))}`} ({wfSlot.months} tháng).</p>
             </div>
 
             <div className={`border-l-2 pl-3 space-y-1.5 ${campOk ? "border-emerald-500" : "border-[var(--border)] opacity-80"}`}>
@@ -731,10 +740,10 @@ function BrandDashboardOne({ brandId, brandName, platform, platforms, sessions: 
           ) : (
             <div className="space-y-3 text-xs">
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <Stat label="Target / giờ" value={`${fmtVndShort(check.target)} / ${num(check.hours, 0)}h`} hint={`cần ${fmtVndShort(check.needPerHour)}/giờ · ${nextPlan?.plan.status === "locked" ? "đã chốt" : "nháp"}`} />
-                <Stat label="Đang đạt (28 ngày)" value={`${fmtVndShort(check.recentPerHour)}/giờ`} tone={check.recentPerHour != null && check.needPerHour != null && check.recentPerHour < check.needPerHour ? "text-rose-400" : "text-emerald-400"} hint={check.recentPerHour && check.needPerHour ? `${signed(check.recentPerHour / check.needPerHour - 1)} so với mức cần` : undefined} />
-                <Stat label="Dự kiến theo năng suất 28 ngày" value={fmtVndShort(check.expectedAtRecent)} tone={check.expectedAtRecent != null && check.expectedAtRecent >= check.target ? "text-emerald-400" : "text-rose-400"} hint={check.expectedAtRecent != null && check.target > 0 ? `${signed(check.expectedAtRecent / check.target - 1)} so với target` : "chưa đủ lịch sử"} />
-                <Stat label="Giờ ngày thường 11–13h / 19–20h" value={`${num(check.weakHours, 0)}h / ${num(check.strongHours, 0)}h`} hint="khung yếu / khung mạnh" />
+                <StatTile label="Target / giờ" value={`${fmtVndShort(check.target)} / ${num(check.hours, 0)}h`} hint={`cần ${fmtVndShort(check.needPerHour)}/giờ · ${nextPlan?.plan.status === "locked" ? "đã chốt" : "nháp"}`} />
+                <StatTile label="Đang đạt (28 ngày)" value={`${fmtVndShort(check.recentPerHour)}/giờ`} tone={check.recentPerHour != null && check.needPerHour != null && check.recentPerHour < check.needPerHour ? "text-rose-400" : "text-emerald-400"} hint={check.recentPerHour && check.needPerHour ? `${signed(check.recentPerHour / check.needPerHour - 1)} so với mức cần` : undefined} />
+                <StatTile label="Dự kiến theo năng suất 28 ngày" value={fmtVndShort(check.expectedAtRecent)} tone={check.expectedAtRecent != null && check.expectedAtRecent >= check.target ? "text-emerald-400" : "text-rose-400"} hint={check.expectedAtRecent != null && check.target > 0 ? `${signed(check.expectedAtRecent / check.target - 1)} so với target` : "chưa đủ lịch sử"} />
+                <StatTile label="Giờ ngày thường 11–13h / 19–20h" value={`${num(check.weakHours, 0)}h / ${num(check.strongHours, 0)}h`} hint="khung yếu / khung mạnh" />
               </div>
               <ul className="space-y-1 text-[var(--text-muted)]">
                 {check.invertedCamps.map((c) => (
@@ -814,19 +823,21 @@ function BrandDashboardOne({ brandId, brandName, platform, platforms, sessions: 
 // Biểu đồ
 // ---------------------------------------------------------------------------
 
-function CumulativeChart({ month, targetByDate, actualByDate, through, runRate, bucketOf }: { month: string; targetByDate: Map<string, number>; actualByDate: Map<string, number>; through: string | null; runRate: number | null; bucketOf: (d: string) => CampDayBucket }) {
+function CumulativeChart({ month, targetByDate, actualByDate, expectedByDate, through, runRate, bucketOf }: { month: string; targetByDate: Map<string, number>; expectedByDate?: Map<string, number>; actualByDate: Map<string, number>; through: string | null; runRate: number | null; bucketOf: (d: string) => CampDayBucket }) {
   const days = [...targetByDate.keys()].sort();
   if (days.length === 0) return null;
   let t = 0, a = 0;
   const cumT: number[] = [], cumA: number[] = [], cumP: [number, number][] = [];
-  let p = 0;
+  let p = 0, leftover = 0;
   days.forEach((d, i) => {
     t += targetByDate.get(d) ?? 0;
     cumT.push(t);
     if (through && d <= through) {
       a += actualByDate.get(d) ?? 0;
       cumA.push(a);
-      p = a;
+      // Ca của ngày đã tới nhưng chưa có số (ngày sau mốc đủ số) chưa vào mẫu số — nét đứt vẫn cộng phần target đó theo run-rate.
+      leftover += Math.max(0, (targetByDate.get(d) ?? 0) - (expectedByDate ? expectedByDate.get(d) ?? 0 : targetByDate.get(d) ?? 0));
+      p = a + leftover * (runRate ?? 1);
     } else {
       p += (targetByDate.get(d) ?? 0) * (runRate ?? 1);
       cumP.push([i, p]);
@@ -888,8 +899,8 @@ function DriverBars({ parts, total }: { parts: { label: string; change: number }
           <span className="text-[var(--text-muted)]" title={metricHint(p.label)}>{p.label}</span>
           <div className="relative h-5">
             <div className="absolute inset-y-0 left-1/2 w-px bg-[var(--border)]" />
-            <div className={`absolute inset-y-0.5 rounded ${p.change >= 0 ? "bg-emerald-500/70" : "bg-rose-500/70"}`} style={p.change >= 0 ? { left: "50%", width: `${(Math.abs(p.change) / mx) * 45}%` } : { right: "50%", width: `${(Math.abs(p.change) / mx) * 45}%` }} />
-            <span className={`absolute top-0.5 font-mono text-[11px] ${p.change >= 0 ? "text-emerald-400" : "text-rose-400"}`} style={p.change >= 0 ? { left: `calc(50% + ${(Math.abs(p.change) / mx) * 45}% + 4px)` } : { right: `calc(50% + ${(Math.abs(p.change) / mx) * 45}% + 4px)` }}>
+            <div className={`absolute inset-y-0.5 rounded ${p.change >= 0 ? "bg-emerald-500/70" : "bg-rose-500/70"}`} style={p.change >= 0 ? { left: "50%", width: `${(Math.abs(p.change) / mx) * 32}%` } : { right: "50%", width: `${(Math.abs(p.change) / mx) * 32}%` }} />
+            <span className={`absolute top-0.5 font-mono text-[11px] ${p.change >= 0 ? "text-emerald-400" : "text-rose-400"}`} style={p.change >= 0 ? { left: `calc(50% + ${(Math.abs(p.change) / mx) * 32}% + 4px)` } : { right: `calc(50% + ${(Math.abs(p.change) / mx) * 32}% + 4px)` }}>
               {signed(p.change)}
             </span>
           </div>

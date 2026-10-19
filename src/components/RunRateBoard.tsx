@@ -118,8 +118,9 @@ export function RunRateBoard({ sessions, brands, brandChannels, shiftSlots, onNa
       const slots = slotData!.slots.get(a.key) ?? [];
       if (slots.length === 0) return { ...base, report: null, loading: false };
       const rr = planRunRate(month, slots, shiftSlots.filter((sl) => sl.brandId === a.brand.id), chSessions, today, effectiveCamp(plan.campRanges));
-      const asOf = resolveAsOf(month, rr.through, asOfPick, coverage.completeThrough ?? rr.through);
-      return { ...base, report: buildAccountRunRate(rr, asOf), loading: false };
+      // Mặc định = ngày cuối có số: tới ngày đủ số tính target cả ngày, sau đó từng ca có số so với target đúng ca (nhập tới đâu cập nhật tới đó).
+      const asOf = resolveAsOf(month, rr.through, asOfPick, rr.through);
+      return { ...base, report: buildAccountRunRate(rr, asOf, coverage.completeThrough), loading: false };
     });
   }, [accounts, plans, slotsReady, slotData, sessions, shiftSlots, month, today, asOfPick]);
 
@@ -160,7 +161,7 @@ export function RunRateBoard({ sessions, brands, brandChannels, shiftSlots, onNa
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-[var(--text-muted)]">Số tới ngày</span>
             <div role="group" aria-label="Chọn ngày số tới" className="inline-flex items-center p-0.5 rounded-xl bg-[var(--surface-base)] border border-[var(--border)]">
-              <button type="button" aria-pressed={asOfPick == null} onClick={() => setAsOfPick(null)} className={`px-3 py-1.5 rounded-[10px] text-xs font-bold min-h-[30px] transition-colors ${asOfPick == null ? "bg-[var(--accent)] text-[var(--accent-contrast)]" : "text-[var(--text-muted)] hover:text-[var(--text)]"}`}>Ngày đủ số</button>
+              <button type="button" aria-pressed={asOfPick == null} onClick={() => setAsOfPick(null)} className={`px-3 py-1.5 rounded-[10px] text-xs font-bold min-h-[30px] transition-colors ${asOfPick == null ? "seg-on" : "text-[var(--text-muted)] hover:text-[var(--text)]"}`}>Ca mới nhất</button>
               <label className={`inline-flex items-center px-1 rounded-[10px] ${asOfPick != null ? "bg-[var(--accent)]/15" : ""}`}>
                 <span className="sr-only">Chọn một ngày cụ thể</span>
                 <input
@@ -176,7 +177,7 @@ export function RunRateBoard({ sessions, brands, brandChannels, shiftSlots, onNa
           </div>
           <p className="flex items-start gap-1.5 text-xs text-[var(--text-faint)] max-w-2xl leading-snug">
             <Info className="w-3.5 h-3.5 shrink-0 mt-px" />
-            <span>“Ngày đủ số” = ngày cuối mà ít nhất 90% giờ ca đã chạy có số, tính riêng từng tài khoản. Chọn ngày cụ thể để chốt cùng một mốc cho mọi tài khoản (ngày chưa có số tự lùi về ngày cuối có số).</span>
+            <span>Mặc định tính tới ca mới nhất có số: tới “ngày đủ số” (ngày cuối mà ít nhất 90% giờ ca đã chạy có số, tính riêng từng tài khoản) lấy target cả ngày, sau đó mỗi ca có số so với target đúng ca đó. Chọn ngày cụ thể để chốt cùng một mốc cho mọi tài khoản (ngày chưa có số tự lùi về ngày cuối có số).</span>
           </p>
         </div>
       </PageHeader>

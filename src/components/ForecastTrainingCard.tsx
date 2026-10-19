@@ -8,6 +8,8 @@ import { REPORT_PLATFORMS, platformOf, type ReportPlatform } from "../lib/report
 import { fetchForecastSnapshots, type ForecastSnapshot } from "../lib/db/forecastSnapshots";
 import { fetchChannelAdsBudgets } from "../lib/db/monthPlans";
 import { fmtFixed, fmtVndShort } from "../lib/format";
+import { Explain } from "./common/Explain";
+import { StatTile } from "./common/StatTile";
 
 // AI Training Center — thẻ "Dự báo GMV tháng (engine target v3)". Phần tính ở lib/performance/monthForecast.ts; thẻ chỉ hiển thị:
 // engine đang nghĩ gì về tháng tới, 4 chỉ số theo dõi (backtest walk-forward tính ngay khi vặn tham số), sổ dự báo đã ghi (0163) và
@@ -97,14 +99,14 @@ export const ForecastTrainingCard: React.FC<Props> = ({ brandId, sessions, param
         {platforms.length > 1 && (
           <div className="flex gap-1">
             {platforms.map((p) => (
-              <button key={p} onClick={() => setPicked({ brandId, platform: p })} className={`px-2.5 min-h-6 rounded-lg text-xs font-bold border ${p === platform ? "bg-[var(--accent)] text-white border-transparent" : "border-[var(--border)] text-[var(--text)]"}`}>{p}</button>
+              <button key={p} onClick={() => setPicked({ brandId, platform: p })} className={`px-2.5 min-h-6 rounded-lg text-xs font-bold border ${p === platform ? "seg-on" : "border-[var(--border)] text-[var(--text)]"}`}>{p}</button>
             ))}
           </div>
         )}
       </div>
-      <p className="text-[11px] text-[var(--text-muted)] leading-snug">
-        Dự báo ca = mức × (giờ × loại ngày × khung giờ × vị trí ngày) — cùng mô hình với bộ chia target. Mức = trung bình nhân của {params.fcRecentDays} ngày gần nhất và 3 tháng gần nhất. Trong tháng, mức cập nhật bằng GMV đã có ÷ kỳ vọng của chính các ca đã có số. Dùng ở Kế Hoạch Tháng (dự báo lưới), Dashboard, run-rate, Hỗ Trợ Vận Hành.
-      </p>
+      <Explain summary="Engine dự báo thế nào">
+        <p>Dự báo ca = mức × (giờ × loại ngày × khung giờ × vị trí ngày) — cùng mô hình với bộ chia target. Mức = trung bình nhân của {params.fcRecentDays} ngày gần nhất và 3 tháng gần nhất. Trong tháng, mức cập nhật bằng GMV đã có ÷ kỳ vọng của chính các ca đã có số. Dùng ở Kế Hoạch Tháng (dự báo lưới), Dashboard, run-rate, Hỗ Trợ Vận Hành.</p>
+      </Explain>
 
       {!platform || channel.length === 0 ? (
         <p className="text-xs text-[var(--text-muted)]">Brand chưa có ca nào có số — chưa có gì để dự báo.</p>
@@ -112,11 +114,7 @@ export const ForecastTrainingCard: React.FC<Props> = ({ brandId, sessions, param
         <>
           <div className="grid grid-cols-2 gap-2">
             {kpis.map((k) => (
-              <div key={k.label} className="rounded-xl border border-[var(--border)] bg-[var(--surface-base)] p-2.5">
-                <p className="text-[11px] text-[var(--text-faint)] leading-tight">{k.label} <span className="text-[var(--text-faint)]">· mục tiêu {k.goal}</span></p>
-                <p className={`text-sm font-black mt-0.5 ${k.good ? "text-emerald-400" : "text-[var(--text)]"}`}>{k.value}</p>
-                <p className="text-[11px] text-[var(--text-faint)]">{k.sub}</p>
-              </div>
+              <StatTile key={k.label} size="sm" label={k.label} value={k.value} tone={k.good ? "text-emerald-400" : undefined} hint={<>mục tiêu {k.goal} · {k.sub}</>} />
             ))}
           </div>
 
@@ -168,7 +166,9 @@ export const ForecastTrainingCard: React.FC<Props> = ({ brandId, sessions, param
                     ))}
                   </tbody>
                 </table>
-                <p className="mt-1 text-[11px] text-[var(--text-faint)] leading-snug">Số = dự báo ÷ GMV cuối tháng − 1 (xanh: trong ±5% với cột ngày, ±10% với lúc lập). ⚠ = rơi ngoài dải ~80%. Backtest dùng lịch đã chạy làm lịch kế hoạch nên lạc quan hơn đời thật — sổ bên dưới là số đã nói thật.</p>
+                <Explain summary="Cách đọc bảng" className="mt-1">
+                  <p>Số = dự báo ÷ GMV cuối tháng − 1 (xanh: trong ±5% với cột ngày, ±10% với lúc lập). ⚠ = rơi ngoài dải ~80%. Backtest dùng lịch đã chạy làm lịch kế hoạch nên lạc quan hơn đời thật — sổ bên dưới là số đã nói thật.</p>
+                </Explain>
               </div>
             )}
           </div>
@@ -210,8 +210,7 @@ export const ForecastTrainingCard: React.FC<Props> = ({ brandId, sessions, param
             )}
           </div>
 
-          <div className="text-xs space-y-1">
-            <p className="font-bold text-[var(--text-muted)]">Tín hiệu dẫn — có kéo sai số lúc lập xuống không</p>
+          <Explain summary="Tín hiệu dẫn — có kéo sai số lúc lập xuống không">
             {leading.map((c) => (
               <p key={c.signal} className="text-[11px] text-[var(--text-muted)] leading-snug">
                 <b className="text-[var(--text)]">{c.signal === "ads" ? "Ngân sách Ads (Kế Hoạch Tháng)" : "Scheme khuyến mãi"}</b>:{" "}
@@ -220,17 +219,16 @@ export const ForecastTrainingCard: React.FC<Props> = ({ brandId, sessions, param
                   : <>sai lúc lập {pct(c.mapeBefore)} → <b className={c.helps ? "text-emerald-400" : "text-[var(--text)]"}>{pct(c.mapeAfter)}</b> nếu dùng (kiểm bỏ-một-tháng). {c.helps ? "Có lợi — đủ điều kiện đưa vào mức dự báo (cần sửa code, ghi vào WORKSPACE)." : "Chưa có lợi rõ (cần giảm ≥ 2 điểm %) — chưa dùng."}</>}
               </p>
             ))}
-          </div>
+          </Explain>
 
-          <details className="text-[11px] text-[var(--text-muted)]">
-            <summary className="cursor-pointer font-bold text-[var(--text)] min-h-6">Đọc các con số này thế nào / muốn nâng cấp thì làm gì</summary>
-            <ul className="list-disc pl-4 mt-1 space-y-0.5 leading-snug">
+          <Explain summary="Đọc các con số này thế nào / muốn nâng cấp thì làm gì">
+            <ul className="list-disc pl-4 space-y-0.5">
               <li>Lúc lập không thể ≤ 5%: mức GMV/giờ của brand tự lên xuống 5–30% mỗi tháng (Ads, voucher, hàng). Chỉ số đáng giữ là lệch hệ thống và dải 80%.</li>
               <li>≤ 5% đạt được ở dự báo trong tháng từ khoảng ngày 15–18 và ở kết quả cuối tháng nếu làm đủ 3 mốc bù giờ (tab Action của Dashboard).</li>
               <li>Ca đơn lẻ không bao giờ ≤ 5% (sàn ~18% kể cả khi biết trước) — đánh giá ca bằng dải, không bằng 100%.</li>
               <li>Sửa logic ở <code>src/lib/performance/monthForecast.ts</code>; mở bảng này cho cả hai sàn, chỉ nâng khi tốt hơn ≥ 2 tháng; chạy <code>npx vitest run tests/monthForecast.test.ts</code>. Đã thử và có hại: tự hiệu chỉnh lệch (CROCS T9 lệch 14% → 26%) — để tắt.</li>
             </ul>
-          </details>
+          </Explain>
         </>
       )}
     </div>

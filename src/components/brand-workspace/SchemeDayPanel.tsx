@@ -115,7 +115,7 @@ export const SchemeDayPanel: React.FC<SchemeDayPanelProps> = ({ brandId, date, s
                     onChange={(e) => setDraft((d) => ({ ...d, category: e.target.value }))}
                     list="scheme-categories-day"
                     placeholder="Hạng mục"
-                    className={`w-full bg-[var(--surface-elevated)] rounded px-1.5 py-1 text-[11px] font-black uppercase tracking-wide ${color.text} focus:outline-none focus:ring-1 focus:ring-amber-500`}
+                    className={`w-full bg-[var(--surface-elevated)] rounded px-1.5 py-1 text-[11px] font-bold ${color.text} focus:outline-none focus:ring-1 focus:ring-amber-500`}
                   />
                   <textarea
                     autoFocus
@@ -156,7 +156,7 @@ export const SchemeDayPanel: React.FC<SchemeDayPanelProps> = ({ brandId, date, s
                 </div>
               ) : (
                 <>
-                  <p className={`flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wide ${color.text} opacity-80`}>
+                  <p className={`flex items-center gap-1.5 text-[11px] font-bold ${color.text} opacity-80`}>
                     <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${color.dot}`} />
                     {scheme.category}
                   </p>

@@ -21,7 +21,7 @@ import { useToast } from "../hooks/useToast";
 import { PageIntro } from "./common/PageIntro";
 import { isUnconfirmedPast } from "../lib/sessionStatus";
 
-import { fmtMonth, fmtFixed } from "../lib/format";
+import { fmtDateVn, fmtMonth, fmtFixed } from "../lib/format";
 import { MonthPicker } from "./common/MonthPicker";
 import { PageHeader } from "./common/PageHeader";
 import { PlatformChip } from "./common/PlatformChip";
@@ -130,9 +130,22 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
     );
   }, [completedSessions, financeBySessionId, talentById, brandById, brandPlatformRates, talentRateHistory, brandPlatformRateHistory]);
 
+  // Luật tiền (WORKSPACE §4.5): chỉ CỘNG ca đủ dữ liệu (missingInputs rỗng) và luôn ghi "tính được X/Y ca". Trước đây tổng
+  // cộng cả ca đang tính bằng rate 0 / % hoa hồng mặc định 15% trong code ⇒ 17/10 hiện "576.190.636 (100,0%)" trong khi
+  // Dashboard ghi "Chưa tính được · 0/164 ca đủ dữ liệu tiền". Từng ca bên dưới vẫn hiện số tạm kèm nhãn "Thiếu …".
+  const completeRows = useMemo(() => rows.filter((r) => r.missingInputs.length === 0), [rows]);
+  // Bố cục 18/10: mọi ca cùng thiếu đúng một bộ (đo T10: 215/215 ca "Thiếu rate host · rate trợ live · % commission") thì nhãn
+  // từng dòng chỉ lặp lại khối cảnh báo phía trên 215 lần — ẩn đi; ca thiếu khác nhau thì ghi chữ vàng trên dòng (không còn
+  // viên đỏ đặc).
+  const uniformMissing = useMemo(() => {
+    if (rows.length === 0 || rows.some((r) => r.missingInputs.length === 0)) return false;
+    const key = (r: (typeof rows)[number]) => [...r.missingInputs].sort().join("|");
+    const first = key(rows[0]);
+    return rows.every((r) => key(r) === first);
+  }, [rows]);
   const totals = useMemo(
     () =>
-      rows.reduce(
+      completeRows.reduce(
         (acc, r) => ({
           grossAgencyRev: acc.grossAgencyRev + r.grossAgencyRev,
           hostPayout: acc.hostPayout + r.hostPayout + r.coHostPayout,
@@ -141,16 +154,19 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
         // Chỉ cộng TIỀN (cộng được qua sàn). Không có tổng GMV: user chốt 07/10 không cộng GMV TikTok với Shopee.
         { grossAgencyRev: 0, hostPayout: 0, netProfit: 0 }
       ),
-    [rows]
+    [completeRows]
   );
   // Lãi/lỗ THEO KÊNH (Bước 4 đa sàn, 07/10): tiền của agency cộng được qua mọi kênh (user chốt) — một bảng toàn agency, mỗi dòng
   // một kênh brand × sàn. Không có cột GMV: GMV hai sàn không cộng.
   const byChannel = useMemo(() => {
-    const m = new Map<string, { brandName: string; platform: ReportPlatform; n: number; rev: number; pay: number; profit: number }>();
+    const m = new Map<string, { brandName: string; platform: ReportPlatform; n: number; nAll: number; rev: number; pay: number; profit: number }>();
     for (const r of rows) {
       const p = platformOf(r.session);
       const k = `${r.session.brandId}|${p}`;
-      const e = m.get(k) ?? { brandName: r.session.brandName, platform: p, n: 0, rev: 0, pay: 0, profit: 0 };
+      const e = m.get(k) ?? { brandName: r.session.brandName, platform: p, n: 0, nAll: 0, rev: 0, pay: 0, profit: 0 };
+      e.nAll += 1;
+      m.set(k, e);
+      if (r.missingInputs.length > 0) continue;
       e.n += 1;
       e.rev += r.grossAgencyRev;
       e.pay += r.hostPayout + r.coHostPayout;
@@ -229,9 +245,13 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                 <span className="text-amber-300 font-bold"> · {rows.length - missingSummary.rowsAffected}/{rows.length} ca đủ rate</span>
               )}
             </div>
-            <div className={`text-lg font-black ${totals.netProfit >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-              {money(totals.netProfit)} <span className="text-xs font-bold text-[var(--text-muted)]">({totalMargin}%)</span>
-            </div>
+            {completeRows.length > 0 ? (
+              <div className={`text-lg font-black ${totals.netProfit >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                {money(totals.netProfit)} <span className="text-xs font-bold text-[var(--text-muted)]">({totalMargin}% · tính được {completeRows.length}/{rows.length} ca)</span>
+              </div>
+            ) : (
+              <div className="text-lg font-black text-[var(--text-faint)]">Chưa tính được</div>
+            )}
           </div>
         </div>
 
@@ -242,14 +262,14 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
             mỗi lý do một dòng có chấm màu — trước đó 3 hộp màu chồng nhau đẩy bảng xuống ~230px. */}
         {(missingSummary.rowsAffected > 0 || unconfirmed.length > 0 || (rows.length > 0 && quality.reconciled < quality.total)) && (
           <div className="text-[11px] rounded-xl border border-[var(--border)] bg-[var(--surface-base)] divide-y divide-[var(--border-muted)]">
-            <p className="px-3 py-1.5 font-bold text-[var(--text-muted)] uppercase tracking-wider">Số trên trang này chưa chắc chắn vì</p>
+            <p className="px-3 py-1.5 font-semibold text-[var(--text-muted)]">Số trên trang này chưa chắc chắn vì</p>
             {missingSummary.rowsAffected > 0 && (
               <div className="px-3 py-2 flex gap-2">
                 <span className="mt-1 w-2 h-2 rounded-full bg-rose-500 shrink-0" aria-hidden />
                 <div className="space-y-0.5 min-w-0">
                   <p className="text-rose-200">
-                    <b>{missingSummary.rowsAffected}/{rows.length} ca đang tính bằng rate chưa nhập</b> — Lãi/lỗ ở trên KHÔNG phải số thật,
-                    nó đang coi phần chưa nhập là 0 (hoặc dùng % mặc định trong code).
+                    <b>{missingSummary.rowsAffected}/{rows.length} ca thiếu rate/giá</b> — không cộng vào tổng ở trên. Số từng ca bên dưới
+                    đang coi phần chưa nhập là 0 (hoặc dùng % mặc định trong code) nên chỉ để tham khảo.
                   </p>
                   <p className="text-[var(--text-muted)]">
                     {missingSummary.byKind.map(([kind, n], i) => (
@@ -296,7 +316,7 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="text-left text-[11px] uppercase tracking-wider text-[var(--text-faint)] border-b border-[var(--border)]">
+                <tr className="text-left text-[11px] font-semibold text-[var(--text-faint)] border-b border-[var(--border)]">
                   <th className="py-2 pr-3">Kênh</th>
                   <th className="py-2 pr-3 text-right">Ca</th>
                   <th className="py-2 pr-3 text-right">Doanh thu agency</th>
@@ -309,20 +329,20 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                 {byChannel.map((c) => (
                   <tr key={`${c.brandName}|${c.platform}`} className="border-b border-[var(--border-muted)]">
                     <td className="py-2 pr-3 font-bold text-[var(--text)] whitespace-nowrap">{c.brandName} <PlatformChip platform={c.platform} /></td>
-                    <td className="py-2 pr-3 text-right font-mono">{c.n}</td>
-                    <td className="py-2 pr-3 text-right font-mono">{money(c.rev)}</td>
-                    <td className="py-2 pr-3 text-right font-mono">{money(c.pay)}</td>
-                    <td className={`py-2 pr-3 text-right font-mono font-bold ${c.profit >= 0 ? "text-emerald-400" : "text-red-400"}`}>{money(c.profit)}</td>
-                    <td className="py-2 pr-3 text-right font-mono">{c.rev > 0 ? `${fmtFixed((c.profit / c.rev) * 100, 1)}%` : "—"}</td>
+                    <td className="py-2 pr-3 text-right font-mono">{c.n < c.nAll ? <span title="ca đủ dữ liệu / tổng ca">{c.n}/{c.nAll}</span> : c.nAll}</td>
+                    <td className="py-2 pr-3 text-right font-mono">{c.n > 0 ? money(c.rev) : "—"}</td>
+                    <td className="py-2 pr-3 text-right font-mono">{c.n > 0 ? money(c.pay) : "—"}</td>
+                    <td className={`py-2 pr-3 text-right font-mono font-bold ${c.profit >= 0 ? "text-emerald-400" : "text-red-400"}`}>{c.n > 0 ? money(c.profit) : "—"}</td>
+                    <td className="py-2 pr-3 text-right font-mono">{c.n > 0 && c.rev > 0 ? `${fmtFixed((c.profit / c.rev) * 100, 1)}%` : "—"}</td>
                   </tr>
                 ))}
                 <tr className="bg-[var(--surface-elevated)]/40 font-bold">
                   <td className="py-2 pr-3 text-[var(--text)]">Toàn agency</td>
-                  <td className="py-2 pr-3 text-right font-mono">{rows.length}</td>
-                  <td className="py-2 pr-3 text-right font-mono">{money(totals.grossAgencyRev)}</td>
-                  <td className="py-2 pr-3 text-right font-mono">{money(totals.hostPayout)}</td>
-                  <td className={`py-2 pr-3 text-right font-mono ${totals.netProfit >= 0 ? "text-emerald-400" : "text-red-400"}`}>{money(totals.netProfit)}</td>
-                  <td className="py-2 pr-3 text-right font-mono">{totalMargin}%</td>
+                  <td className="py-2 pr-3 text-right font-mono">{completeRows.length < rows.length ? `${completeRows.length}/${rows.length}` : rows.length}</td>
+                  <td className="py-2 pr-3 text-right font-mono">{completeRows.length > 0 ? money(totals.grossAgencyRev) : "—"}</td>
+                  <td className="py-2 pr-3 text-right font-mono">{completeRows.length > 0 ? money(totals.hostPayout) : "—"}</td>
+                  <td className={`py-2 pr-3 text-right font-mono ${totals.netProfit >= 0 ? "text-emerald-400" : "text-red-400"}`}>{completeRows.length > 0 ? money(totals.netProfit) : "—"}</td>
+                  <td className="py-2 pr-3 text-right font-mono">{completeRows.length > 0 ? `${totalMargin}%` : "—"}</td>
                 </tr>
               </tbody>
             </table>
@@ -362,13 +382,13 @@ export const FinanceHr: React.FC<FinanceHrProps> = ({
                             Đã loại khỏi báo cáo — chỉ tính công, không tính GMV/doanh thu
                           </span>
                         )}
-                        {missingInputs.length > 0 && (
-                          <span className="text-[11px] font-bold bg-rose-950 text-rose-300 border border-rose-800 px-1.5 py-0.5 rounded-full" title={missingInputs.map((m) => PNL_MISSING_LABEL[m]).join("\n")}>
+                        {missingInputs.length > 0 && !uniformMissing && (
+                          <span className="text-[11px] font-semibold text-amber-300" title={missingInputs.map((m) => PNL_MISSING_LABEL[m]).join("\n")}>
                             Thiếu {missingInputs.map((m) => MISSING_SHORT[m]).join(" · ")}
                           </span>
                         )}
                       </div>
-                      <div className="text-[var(--text-muted)]">{s.brandName} · {s.date} · Host {talent?.name ?? s.hostName}</div>
+                      <div className="text-[var(--text-muted)]">{s.brandName} · {fmtDateVn(s.date, false)} · Host {talent?.name ?? s.hostName}</div>
                     </td>
                     <td className="py-2 pr-3">
                       <div className={`font-bold text-[var(--text-muted)] ${excluded ? "line-through" : ""}`}>{money(s.actualGmv)}</div>

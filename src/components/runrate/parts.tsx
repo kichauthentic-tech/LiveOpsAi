@@ -119,7 +119,7 @@ const dayTip = (d: RRDay) =>
   `${ddmm(d.date)} (${WEEKDAY[weekdayIdx(d.date)]})\nTarget: ${money(d.target)}\n` +
   (d.state === "future" || d.state === "empty"
     ? d.shifts > 0 ? `${d.shifts} ca chưa tới` : "Không có ca"
-    : `Đạt: ${money(d.actual)}${d.pctTarget != null ? ` (${pct(d.pctTarget)} target)` : ""}\n${d.withData}/${d.shifts} ca có số${d.state === "partial" ? "\nTạm tính — chưa vào run-rate" : d.state === "missing" ? "\nCòn ca chưa có số" : ""}`);
+    : `Đạt: ${money(d.actual)}${d.pctTarget != null ? ` (${pct(d.pctTarget)} target)` : ""}\n${d.withData}/${d.shifts} ca có số${d.state === "partial" ? (d.counted ? "\nTạm tính — ca đã có số đã vào run-rate theo target đúng ca, ca chờ số thì chưa" : "\nTạm tính — chưa vào run-rate") : d.state === "missing" ? "\nCòn ca chưa có số" : ""}`);
 
 export const CumulativeChart: React.FC<{ r: AccountRunRate; color: string }> = ({ r, color }) => {
   const { W, H, L, T, B } = FRAME;

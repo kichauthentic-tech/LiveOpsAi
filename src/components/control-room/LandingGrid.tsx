@@ -14,7 +14,8 @@ export const LandingGrid: React.FC<{ month: string; channels: RoomChannel[]; add
       const r = c.room;
       const mine = adds.filter((a) => a.channelKey === c.key);
       const whatIf = r && mine.length ? pWithAdds(r, mine).pHit : null;
-      const st = STATE_OF(r?.now.pHit ?? null);
+      // Kênh có target nhưng chưa đủ lịch sử để chiếu (Franklin Shopee T10): nhãn không được nói "Chưa có target".
+      const st = !r && c.target ? { ...STATE_OF(null), label: "Chưa đủ lịch sử" } : STATE_OF(r?.now.pHit ?? null);
       return (
         <button key={c.key} type="button" onClick={() => onPick?.(c.key)} className="text-left rounded-xl border border-[var(--border)] bg-[var(--surface-muted)]/40 hover:border-[var(--accent)] p-3 min-w-0 space-y-1">
           <div className="flex items-center justify-between gap-2">
@@ -22,7 +23,7 @@ export const LandingGrid: React.FC<{ month: string; channels: RoomChannel[]; add
             <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${st.cls}`}>{st.label}</span>
           </div>
           {!r ? (
-            <p className="text-xs text-[var(--text-faint)]">Kênh chưa đủ lịch sử (dưới 15 ca có số) để chiếu cuối tháng.</p>
+            <p className="text-xs text-[var(--text-faint)]">{c.target ? <>Target {money(c.target)} · </> : null}Kênh chưa đủ lịch sử (dưới 15 ca có số) để chiếu cuối tháng.</p>
           ) : (
             <>
               <p className="text-xs text-[var(--text-muted)]">

@@ -169,7 +169,8 @@ describe("theo ngày, sản phẩm, overview (tổng hợp)", () => {
 const DL = join(homedir(), "Downloads");
 const pick = (prefix: string, ext: string) => (existsSync(DL) ? readdirSync(DL).find((f) => f.startsWith(prefix) && f.endsWith(ext)) : undefined);
 const FILES = {
-  live: pick("supply-sellercenter-export-sc_live_stream_list_export_vn_13347498", ".xlsx"),
+  live: // Đúng bản export T9 (06/10, cùng lượt với file Sản phẩm) — Downloads còn nhiều Live List T10 cùng tiền tố, đứng trước theo thứ tự tên.
+  pick("supply-sellercenter-export-sc_live_stream_list_export_vn_13347498_46c31043c0d63b80afad5e9a28a0d993_14926871", ".xlsx"),
   product: pick("supply-sellercenter-export-sc_live_product_list_export_vn_13347498", ".xlsx"),
   daily: pick("export-sc__1m_2026-09-30", ".csv"),
   overview: pick("overview-v2_1m_2026-09-30", ".csv")

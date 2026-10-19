@@ -84,6 +84,19 @@
 .theme-yfb .text-white[class~="bg-[var(--accent)]"] { color: var(--accent-contrast); }
 
 /*
+  Nút tab / bộ chọn đang chọn (bố cục 18/10). Trước đây tô nền accent ĐẶC — cùng kiểu với nút hành động chính, nên một màn có
+  2–3 khối vàng tranh nhau (Dashboard: "Tháng" + "Tháng này"; Lịch & Studio: "Phòng theo giờ" + "Mở ca chờ đăng ký"). Nay:
+  accent đặc chỉ cho nút hành động chính; ô đang chọn là nền accent pha loãng + chữ đậm màu chữ chính. Ngoài @layer nên thắng
+  utility nền/chữ của Tailwind.
+*/
+.seg-on {
+  background-color: color-mix(in srgb, var(--accent) 18%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  color: var(--text);
+  font-weight: 700;
+}
+
+/*
   Ô nhập chữ < 16px làm iOS Safari tự phóng to cả trang khi chạm vào (252/252 ô nhập của app,
   audit UX 2026-09-26). Chỉ áp ở màn hẹp — desktop giữ cỡ chữ dày đặc như cũ. Ngoài @layer nên
   thắng text-xs/text-sm của Tailwind mà không cần !important.

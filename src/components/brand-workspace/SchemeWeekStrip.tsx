@@ -152,9 +152,15 @@ export const SchemeWeekStrip: React.FC<SchemeWeekStripProps> = ({ brandId, weekD
 
   return (
     <div className="col-span-7 -mt-1 mb-1.5">
+      {/* Bố cục 19/10: tuần CHƯA có khuyến mãi chỉ là một dòng chữ mờ (trước: dải vàng viền đậm lặp 5 lần/tháng như cảnh báo).
+          Tuần có khuyến mãi giữ dải vàng — đó là thông tin thật cần nhìn thấy. */}
       <button
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center gap-2 px-3 py-1.5 rounded-xl rounded-t-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 border-t-2 border-t-amber-400 dark:border-t-amber-600 text-amber-700 dark:text-amber-400 text-[11px] font-bold hover:bg-amber-100 dark:hover:bg-amber-950/50 transition-colors"
+        className={
+          weekSchemes.length > 0
+            ? "w-full flex items-center gap-2 px-3 py-1.5 rounded-xl rounded-t-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 border-t-2 border-t-amber-400 dark:border-t-amber-600 text-amber-700 dark:text-amber-400 text-[11px] font-bold hover:bg-amber-100 dark:hover:bg-amber-950/50 transition-colors"
+            : "w-full min-h-6 flex items-center gap-2 px-3 py-1 rounded-lg text-[var(--text-faint)] text-[11px] font-semibold hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]/60 transition-colors"
+        }
       >
         <Tag className="w-3.5 h-3.5 shrink-0" />
         <span>
@@ -195,7 +201,7 @@ export const SchemeWeekStrip: React.FC<SchemeWeekStripProps> = ({ brandId, weekD
                         onChange={(e) => setDraft((d) => ({ ...d, category: e.target.value }))}
                         list="scheme-categories"
                         placeholder="Hạng mục"
-                        className={`w-full bg-[var(--surface-elevated)] rounded px-1 py-0.5 text-[11px] font-black uppercase tracking-wide ${color.text} focus:outline-none focus:ring-1 focus:ring-amber-500`}
+                        className={`w-full bg-[var(--surface-elevated)] rounded px-1 py-0.5 text-[11px] font-bold ${color.text} focus:outline-none focus:ring-1 focus:ring-amber-500`}
                       />
                       <textarea
                         autoFocus
@@ -236,7 +242,7 @@ export const SchemeWeekStrip: React.FC<SchemeWeekStripProps> = ({ brandId, weekD
                     </div>
                   ) : (
                     <>
-                      <p className={`flex items-center gap-1 text-[11px] font-black uppercase tracking-wide ${color.text} opacity-80`}>
+                      <p className={`flex items-center gap-1 text-[11px] font-bold ${color.text} opacity-80`}>
                         <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${color.dot}`} />
                         {seg.scheme.category}
                       </p>

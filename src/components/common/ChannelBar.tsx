@@ -19,8 +19,8 @@ export function ChannelBar({
   const options: ChannelScope[] = allowAll ? ["all", ...platforms] : platforms;
   return (
     <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Sàn">
-      <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-faint)]">Sàn</span>
-      <div className="inline-flex items-center gap-1 bg-[var(--surface)] border border-[var(--border)] rounded-xl p-1">
+      <span className="text-xs font-bold text-[var(--text-faint)]">Sàn</span>
+      <div className="inline-flex items-center gap-0.5 bg-[var(--surface-elevated)]/60 border border-[var(--border)] rounded-full p-0.5">
         {options.map((o) => {
           const on = o === value;
           return (
@@ -28,8 +28,8 @@ export function ChannelBar({
               key={o}
               onClick={() => onChange(o)}
               aria-pressed={on}
-              className={`min-h-6 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                on ? (o === "all" ? "bg-[var(--accent)] text-white" : `border ${profileOf(o).chipClass}`) : "text-[var(--text-muted)] hover:bg-[var(--surface-elevated)]"
+              className={`min-h-6 px-3 py-1 rounded-full text-xs font-bold transition-colors ${
+                on ? (o === "all" ? "seg-on" : `border ${profileOf(o).chipClass}`) : "text-[var(--text-muted)] hover:bg-[var(--surface-elevated)]"
               }`}
             >
               {o === "all" ? "Tất cả kênh" : profileOf(o).label}

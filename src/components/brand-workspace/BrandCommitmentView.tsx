@@ -15,6 +15,7 @@ import { metricsHiddenFor } from "../../lib/sessionLedger";
 import { downloadRowsAsXlsx } from "../../lib/exportXlsx";
 import { useToast } from "../../hooks/useToast";
 import { PageHeader } from "../common/PageHeader";
+import { StatTile } from "../common/StatTile";
 import { channelTitle, platformOf, type ReportPlatform } from "../../lib/reportPlatform";
 import { BrandRateCard } from "../BrandRateCard";
 
@@ -90,13 +91,9 @@ const Bar: React.FC<{ done: number; scheduled: number; committed: number }> = ({
   );
 };
 
+// Ô số không khung (nằm trong thẻ tháng đang chạy) — StatTile chung; "strong" = số chính.
 const KV: React.FC<{ label: string; value: React.ReactNode; strong?: boolean }> = ({ label, value, strong }) => (
-  <div>
-    <div className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-bold">{label}</div>
-    <div className={`mt-0.5 ${strong ? "text-base font-black text-[var(--text)]" : "text-sm font-bold text-[var(--text-muted)]"}`}>
-      {value}
-    </div>
-  </div>
+  <StatTile frame="plain" label={label} value={value} size={strong ? "md" : "sm"} tone={strong ? undefined : "text-[var(--text-muted)]"} />
 );
 
 // Lượt đọc lúc mở màn — nạp trước trong lúc chờ đợt nạp chung (lib/db/prefetch.ts).
@@ -294,7 +291,7 @@ export const BrandCommitmentView: React.FC<BrandCommitmentViewProps> = ({
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)] uppercase text-[11px] tracking-wider">
+                <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)] text-[11px] font-semibold">
                   <th className="py-2.5 px-4">Tháng</th>
                   <th className="py-2.5 px-2 text-right">Cam kết</th>
                   <th className="py-2.5 px-2 text-right">Đã chạy</th>

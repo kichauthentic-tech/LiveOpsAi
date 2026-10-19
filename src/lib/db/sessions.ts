@@ -93,6 +93,8 @@ interface DbLiveSession {
   // brand chưa. Các đường trả về row thô từ RPC (cancel_session, submit_live_session_report…)
   // không có cột này — đó đều là đường của ops, và ops thì luôn thấy số, nên mặc định `true`.
   month_published?: boolean | null;
+  // 0178 — cờ "ca có bằng chứng diễn ra" (chỉ view có). Vắng ở row thô của RPC.
+  live_evidence?: boolean | null;
   // 0114 — cờ "đã loại khỏi báo cáo". Có ở cả bảng gốc và view, nhưng row thô do RPC cũ trả về
   // (update_session_with_children, submit_live_session_report…) có sẵn vì chúng `returning *`.
   excluded_from_reports?: boolean | null;
@@ -228,7 +230,8 @@ function sessionFromDb(row: DbLiveSession): Omit<LiveSession, "report"> {
     likesCount: row.likes_count ?? undefined,
     liveRoomIds: row.live_room_ids ?? undefined,
     isBackfill: row.is_backfill ?? false,
-    monthPublished: row.month_published ?? true
+    monthPublished: row.month_published ?? true,
+    ...(row.live_evidence != null ? { liveEvidence: row.live_evidence } : {})
   };
 }
 
@@ -442,8 +445,13 @@ export const SESSION_READ_COLUMNS = [
   "data_source", "reconciled_at", "cancel_reason", "cancelled_at", "tiktok_room_id",
   "actual_start_at", "actual_end_at", "live_duration_minutes", "attributed_items_sold", "attributed_sku_orders",
   "impressions", "product_impressions", "product_clicks", "new_followers", "comments_count", "shares_count", "likes_count",
-  "live_room_ids", "is_backfill", "month_published", "excluded_from_reports", "excluded_reason", "excluded_at"
+  "live_room_ids", "is_backfill", "month_published", "excluded_from_reports", "excluded_reason", "excluded_at", "live_evidence"
 ].join(",");
+// DB chưa chạy 0178 ⇒ view chưa có `live_evidence` (Postgres 42703) — đọc lại không có cột đó thay vì làm hỏng cả danh sách ca.
+const SESSION_READ_COLUMNS_PRE_0178 = SESSION_READ_COLUMNS.replace(",live_evidence", "");
+const UNDEFINED_COLUMN = "42703";
+// Nhớ cho cả phiên: đã biết view thiếu cột thì các lượt nạp lại nền (mỗi 5 phút) không bắn lại request lỗi.
+let readColumns = SESSION_READ_COLUMNS;
 
 async function fetchAllSessionRows(): Promise<DbLiveSession[]> {
   const out: DbLiveSession[] = [];
@@ -456,7 +464,7 @@ async function fetchAllSessionRows(): Promise<DbLiveSession[]> {
           const start = from + i * PAGE;
           return supabase
             .from(source)
-            .select(source === READ_VIEW ? SESSION_READ_COLUMNS : "*")
+            .select(source === READ_VIEW ? readColumns : "*")
             .order("date", { ascending: false })
             .order("start_time", { ascending: false })
             .order("id", { ascending: true })
@@ -464,6 +472,10 @@ async function fetchAllSessionRows(): Promise<DbLiveSession[]> {
         })
       );
     let results = await wave();
+    if (source === READ_VIEW && readColumns === SESSION_READ_COLUMNS && results.some((r) => r.error?.code === UNDEFINED_COLUMN)) {
+      readColumns = SESSION_READ_COLUMNS_PRE_0178;
+      results = await wave();
+    }
     if (source === READ_VIEW && results.some((r) => r.error?.code === VIEW_MISSING)) {
       warnViewMissing();
       source = "live_sessions";
@@ -502,17 +514,47 @@ export async function finalizeShiftSlot(slotId: string, hostId: string, coHostId
   return { ...sessionFromDb(data as DbLiveSession), report: undefined };
 }
 
-export async function updateSession(session: LiveSession): Promise<LiveSession> {
-  // RPC thay vì `.update()` thẳng: hàm tự raise khi RLS lọc còn 0 dòng (PostgREST thì im lặng trả 204).
-  // Từ 0133 hàm CHỈ ghi cột lịch + người (ngày/giờ/phòng/host/trợ) — các cột số liệu trong payload bị bỏ qua,
-  // vì bản client có thể cũ hơn số trợ live vừa up (không có realtime). Trạng thái do DB tự suy; ca đã có số
-  // thì DB không cho dời ngày/giờ. Tên còn chữ "children" là di sản (3 bảng con đã bỏ ở 0132).
-  const { data, error } = await supabase.rpc("update_session_with_children", {
-    p_session_id: session.id,
-    p_session: sessionToDb(session)
-  });
-  if (error) throw error;
-  const row = data as DbLiveSession;
+// Cột lịch + người mà ops sửa được trên ca (khớp phần `update_session_fields` ghi, 0178).
+const SCHEDULE_FIELDS = ["date", "start_time", "end_time", "studio_id", "studio_name", "host_id", "host_name", "co_host_id", "co_host_name"] as const;
+
+/** Khoá lịch/người khác nhau giữa bản sửa và bản gốc lúc bắt đầu sửa — chỉ những khoá này được ghi (0178). */
+export function sessionSchedulePatch(next: LiveSession, base: LiveSession): Record<string, unknown> {
+  const a = sessionToDb(next) as Record<string, unknown>, b = sessionToDb(base) as Record<string, unknown>;
+  const patch: Record<string, unknown> = {};
+  for (const k of SCHEDULE_FIELDS) if ((a[k] ?? null) !== (b[k] ?? null)) patch[k] = a[k];
+  // Tên đi kèm id: đổi người/phòng thì ghi cả tên (tên có thể đã lệch trong bản gốc).
+  if ("studio_id" in patch) patch.studio_name = a.studio_name;
+  if ("host_id" in patch) patch.host_name = a.host_name;
+  if ("co_host_id" in patch) patch.co_host_name = a.co_host_name;
+  return patch;
+}
+
+/**
+ * Sửa lịch/người của ca. `base` = bản ca lúc người dùng bắt đầu sửa: chỉ ghi các trường KHÁC base (0178
+ * `update_session_fields`), nên bản client cũ không ghi đè người/phòng mà máy khác — hoặc "Đổi người giữa ca" — vừa đổi
+ * (14/10 CROCS 12–15: lưu form Sửa ca sau khi đổi người giữa ca đã trả trợ về người cũ). DB chưa chạy 0178 ⇒ quay về
+ * `update_session_with_children` (ghi cả bộ cột lịch/người như trước).
+ */
+export async function updateSession(session: LiveSession, base?: LiveSession): Promise<LiveSession> {
+  let row: DbLiveSession | null = null;
+  if (base) {
+    const patch = sessionSchedulePatch(session, base);
+    if (Object.keys(patch).length === 0) return session;
+    const { data, error } = await supabase.rpc("update_session_fields", { p_session_id: session.id, p_patch: patch });
+    if (!error) row = data as DbLiveSession;
+    else if (!(error.code === "PGRST202" || error.code === "42883")) throw error;
+  }
+  if (!row) {
+    // RPC thay vì `.update()` thẳng: hàm tự raise khi RLS lọc còn 0 dòng (PostgREST thì im lặng trả 204).
+    // Từ 0133 hàm CHỈ ghi cột lịch + người (ngày/giờ/phòng/host/trợ) — các cột số liệu trong payload bị bỏ qua.
+    // Trạng thái do DB tự suy; ca đã có số thì DB không cho dời ngày/giờ.
+    const { data, error } = await supabase.rpc("update_session_with_children", {
+      p_session_id: session.id,
+      p_session: sessionToDb(session)
+    });
+    if (error) throw error;
+    row = data as DbLiveSession;
+  }
   const { reports, segments, checkpoints } = await fetchChildRowsForSessions([row.id]);
   return assembleSessions([row], reports, segments, checkpoints)[0];
 }

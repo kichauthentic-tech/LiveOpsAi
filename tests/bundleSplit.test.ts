@@ -32,7 +32,7 @@ const APP_STATIC_COMPONENTS = [
   "./components/ResetPasswordScreen",
   "./components/common/TabErrorFallback",
   "./components/common/ChannelBar", // thanh chọn sàn đầu nội dung (Bước 3 đa sàn, 07/10) — vài dòng nút, hiện trên mọi màn theo sàn
-  "./components/common/PlatformChip", // nhãn sàn ở đầu khối từng sàn của màn "mọi kênh"
+  "./components/common/PageHeader", // tiêu đề trang vẽ MỘT lần + ngữ cảnh khối sàn của màn "mọi kênh" (bố cục 18/10) — vài dòng, màn nào cũng dùng
   "./components/talent/TalentTabBar" // khung app của talent trên điện thoại (thanh 4 tab dưới đáy, 11/10) — vài nút, luôn hiện
 ];
 

@@ -68,7 +68,9 @@ export const WeekGrid: React.FC<{
                           key={s.key}
                           type="button"
                           onClick={() => onSelect(s.key)}
-                          className={`block w-full text-left rounded-lg border border-[var(--border)] border-l-[3px] px-1.5 py-1 text-[11px] leading-snug hover:border-[var(--accent)] ${CARD_BORDER[sev]} ${selectedKey === s.key ? "ring-2 ring-[var(--accent)]" : ""} ${s.kind === "open" ? "border-dashed" : ""}`}
+                          // Bố cục 19/10: thẻ ca chỉ còn vạch màu bên trái (đỏ/vàng/xanh) + nền nhạt — trước mỗi thẻ thêm viền đủ 4 cạnh
+                          // trong ô lưới cũng có viền (~90 hộp lồng một tuần). Ca mở vẫn viền đứt để khác ca đã có người.
+                          className={`block w-full text-left rounded-md border-l-[3px] px-1.5 py-1 text-[11px] leading-snug hover:bg-[var(--surface-hover)] ${sev === "ok" ? "bg-[var(--surface-elevated)]/50" : ""} ${CARD_BORDER[sev]} ${selectedKey === s.key ? "ring-2 ring-[var(--accent)]" : ""} ${s.kind === "open" ? "border border-dashed border-[var(--border)]" : ""}`}
                         >
                           <span className="font-mono font-bold text-[var(--text)]">
                             {s.startTime}–{s.endTime}
@@ -81,7 +83,7 @@ export const WeekGrid: React.FC<{
                       );
                     })}
                     {canAdd && (
-                      <button type="button" onClick={() => onAdd(ch, d)} className="w-full flex items-center justify-center gap-1 rounded-lg border border-dashed border-[var(--border)] py-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--text)] hover:border-[var(--accent)]" aria-label={`Thêm ca ${ch.brandName} ${dayLabel(d)}`}>
+                      <button type="button" onClick={() => onAdd(ch, d)} className="w-full min-h-6 flex items-center justify-center gap-1 rounded-md py-1 text-[11px] text-[var(--text-faint)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]/60" aria-label={`Thêm ca ${ch.brandName} ${dayLabel(d)}`}>
                         <Plus className="w-3 h-3" /> ca
                       </button>
                     )}
@@ -123,7 +125,8 @@ export const ChecksPanel: React.FC<{ analysis: RosterAnalysis; shifts: RosterShi
       <p className="text-xs text-[var(--text-muted)]">Chạy lại sau mỗi lần đổi người. Lỗi đỏ chặn "Công bố tuần"; ca thiếu host không chặn (ca vẫn mở sau công bố); mục vàng là cảnh báo, trainer tự quyết. Luật nghỉ / ngày liền tính cả tuần trước.</p>
       {RULE_ORDER.map(([code, label]) => {
         const items = analysis.issues.filter((i) => i.code === code);
-        const sev = ISSUE_SEVERITY[code];
+        // Màu theo mục thật sự có (trùng người giữa hai ca đã lên lịch chỉ là cảnh báo), không theo mức mặc định của luật.
+        const sev = items.length > 0 ? worstSeverity(items) ?? ISSUE_SEVERITY[code] : ISSUE_SEVERITY[code];
         return (
           <details key={code} open={items.length > 0 && sev === "block"} className="rounded-xl border border-[var(--border)]">
             <summary className="flex items-center justify-between gap-3 px-3 py-2 cursor-pointer text-sm">

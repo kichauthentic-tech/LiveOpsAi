@@ -3,6 +3,7 @@ import { Brand, BrandPlatformRate, BrandPlatformRateHistoryEntry } from "../type
 import { History, Tag } from "lucide-react";
 import { fmtDateVn, fmtVndFull } from "../lib/format";
 import { rateOf } from "../lib/brandPricing";
+import { StatTile } from "./common/StatTile";
 import type { ReportPlatform } from "../lib/reportPlatform";
 
 // Giá của brand × sàn — CHỈ ĐỌC, nằm trong tab "Hợp Đồng" của Brand Workspace (gộp với cam kết 06/10: hai nửa của
@@ -24,11 +25,7 @@ export const BrandRateCard: React.FC<Props> = ({ brand, platform, rates, rateHis
     [rateHistory, brand.id, platform]
   );
   const cell = (label: string, value: string | null, note: string) => (
-    <div className="bg-[var(--surface-base)]/60 border border-[var(--border)] rounded-xl p-3">
-      <div className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-bold">{label}</div>
-      <div className={`mt-0.5 text-base font-black ${value ? "text-[var(--text)]" : "text-[var(--text-faint)]"}`}>{value ?? "chưa đặt"}</div>
-      <p className="text-[11px] text-[var(--text-faint)] mt-0.5">{note}</p>
-    </div>
+    <StatTile label={label} value={value ?? "chưa đặt"} tone={value ? undefined : "text-[var(--text-faint)]"} hint={note} />
   );
 
   return (

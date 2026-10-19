@@ -538,7 +538,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
     <div className="space-y-4 sm:space-y-6">
       <PageHeader
         icon={CalendarIcon}
-        title={talentView ? "Lịch" : "Lịch Vận Hành"}
+        title={talentView ? "Lịch" : "Lịch & Studio"}
         description={
           talentView
             ? "Lịch ca đã chốt của bạn và của toàn agency, theo tháng, tuần, phòng. Bấm một ca để xem chi tiết; ca của bạn có chip \"Bạn\"."
@@ -553,7 +553,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                   type="button"
                   aria-pressed={onlyMine === v}
                   onClick={() => setOnlyMine(v)}
-                  className={`px-3 py-2 min-h-8 rounded-lg transition-all ${onlyMine === v ? "bg-[var(--accent)] text-white shadow-sm font-black" : "text-[var(--text-muted)] hover:text-[var(--text)]"}`}
+                  className={`px-3 py-2 min-h-8 rounded-lg transition-all ${onlyMine === v ? "seg-on font-black" : "text-[var(--text-muted)] hover:text-[var(--text)]"}`}
                 >
                   {label}
                 </button>
@@ -578,7 +578,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                 onClick={() => setViewMode("month")}
                 className={`px-3 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
                   viewMode === "month"
-                    ? "bg-[var(--accent)] text-white shadow-sm font-black"
+                    ? "seg-on font-black"
                     : "text-[var(--text-muted)] hover:text-[var(--text)]"
                 }`}
               >
@@ -588,7 +588,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                 onClick={() => setViewMode("week")}
                 className={`px-3 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
                   viewMode === "week"
-                    ? "bg-[var(--accent)] text-white shadow-sm font-black"
+                    ? "seg-on font-black"
                     : "text-[var(--text-muted)] hover:text-[var(--text)]"
                 }`}
               >
@@ -598,7 +598,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                 onClick={() => setViewMode("day")}
                 className={`px-3 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
                   viewMode === "day"
-                    ? "bg-[var(--accent)] text-white shadow-sm font-black"
+                    ? "seg-on font-black"
                     : "text-[var(--text-muted)] hover:text-[var(--text)]"
                 }`}
               >
@@ -608,7 +608,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                 onClick={() => setViewMode("talent_workload")}
                 className={`px-3 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
                   viewMode === "talent_workload"
-                    ? "bg-[var(--accent)] text-white shadow-sm font-black"
+                    ? "seg-on font-black"
                     : "text-[var(--text-muted)] hover:text-[var(--text)]"
                 }`}
               >
@@ -808,7 +808,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
             {["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ Nhật"].map((d, idx) => (
               <div
                 key={idx}
-                className={`p-1 sm:p-2 text-center font-black text-xs uppercase rounded-xl ${
+                className={`p-1 sm:p-2 text-center font-bold text-xs rounded-xl ${
                   idx >= 5
                     ? "bg-rose-100 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400"
                     : "bg-[var(--surface-elevated)] text-[var(--text-muted)]"
@@ -1034,7 +1034,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
                     className="flex justify-between items-center border-b border-[var(--border-muted)] pb-2 cursor-pointer"
                   >
                     <div>
-                      <span className="text-[11px] font-bold text-[var(--text-muted)] uppercase flex items-center gap-1">
+                      <span className="text-[11px] font-bold text-[var(--text-muted)] flex items-center gap-1">
                         {wDay.dayName}
                         {daySchemes.length > 0 && (
                           <span title={daySchemes.map((s) => `${s.title}${s.description ? ` — ${s.description}` : ""}`).join("\n")}>
@@ -1235,7 +1235,7 @@ export const LiveCalendar: React.FC<LiveCalendarProps> = ({
             <div style={{ minWidth: 176 + timelineMinWidth }}>
               {/* Trục giờ */}
               <div className="flex border-b border-[var(--border)] bg-[var(--surface-base)] text-[11px] font-mono text-[var(--text-muted)]">
-                <div className="w-44 shrink-0 p-2 font-bold uppercase tracking-wider border-r border-[var(--border)] sticky left-0 bg-[var(--surface-base)] z-10">Phòng</div>
+                <div className="w-44 shrink-0 p-2 font-semibold border-r border-[var(--border)] sticky left-0 bg-[var(--surface-base)] z-10">Phòng</div>
                 <div className="relative flex-1 h-8" style={{ minWidth: timelineMinWidth }}>
                   {/* Nhãn đầu/cuối trục căn vào trong (trước: cùng -50% nên "08:00" bị cắt còn ":00", "23:00" còn "23:"). */}
                   {hours.map((m, i) => (

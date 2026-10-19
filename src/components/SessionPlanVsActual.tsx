@@ -77,7 +77,7 @@ export function SessionPlanVsActual({ session: s, planHours, liveHours, hideMetr
   return (
     <section>
       <div className="flex items-center justify-between gap-2 mb-2">
-        <h4 className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-bold">Kế hoạch vs thực tế</h4>
+        <h4 className="text-xs font-bold text-[var(--text-muted)]">Kế hoạch vs thực tế</h4>
         {canEnter && !editing && !hideMetrics && (
           <button type="button" onClick={open} className="text-[11px] font-bold text-[var(--accent-text)] px-2 py-1 rounded-lg border border-[var(--accent)]/40 flex items-center gap-1">
             <Pencil className="w-3 h-3" /> Nhập tay thực tế
@@ -86,7 +86,7 @@ export function SessionPlanVsActual({ session: s, planHours, liveHours, hideMetr
       </div>
 
       <div className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg overflow-hidden">
-        <div className="grid grid-cols-[84px_1fr_1fr] bg-[var(--surface-elevated)] text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+        <div className="grid grid-cols-[84px_1fr_1fr] bg-[var(--surface-elevated)] text-[11px] font-semibold text-[var(--text-muted)]">
           <span className="px-2.5 py-1.5" />
           <span className="px-2.5 py-1.5">Kế hoạch</span>
           <span className="px-2.5 py-1.5">Thực tế</span>

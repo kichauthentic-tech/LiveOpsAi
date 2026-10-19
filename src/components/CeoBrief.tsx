@@ -32,7 +32,8 @@ import {
   nextMonthOf,
   periodFor,
   prevMonthOf,
-  totalsOf
+  totalsOf,
+  type Issue
 } from "../lib/performance/ceoBrief";
 import { todayVn } from "../lib/performance/brandCommitment";
 import { computeSessionPnl } from "../lib/pnl";
@@ -49,12 +50,12 @@ import { isCountable, sessionHours } from "../lib/performance/hostPerformance";
 import { handlingPlan, type HandlingPlan } from "../lib/performance/handlingPlan";
 import { planRunRate, type PlanRunRate } from "../lib/performance/planRunRate";
 import { profileOf } from "../lib/platforms/profiles";
-import { PageIntro } from "./common/PageIntro";
+import { PageHeader } from "./common/PageHeader";
 import { MonthPicker } from "./common/MonthPicker";
 import type { TabPrefetchCtx } from "../lib/db/prefetch";
 import { channelTitle, platformOf, brandMonthKey, brandPlatformKey, inPlatformScope, PLATFORM_SCOPE_LABEL, type ReportPlatform } from "../lib/reportPlatform";
 import { platformsOfBrand } from "../lib/channels";
-import { Card, Kpi, ddmm, hrs, money, num, pct, useTooltip } from "./dashboard/shared";
+import { Kpi, ddmm, hrs, money, num, pct, useTooltip } from "./dashboard/shared";
 import { ThisMonth } from "./dashboard/ThisMonth";
 import { Health } from "./dashboard/Health";
 import { AgencyHealth } from "./dashboard/AgencyHealth";
@@ -89,6 +90,8 @@ interface CeoBriefProps {
   talentRateHistory: TalentRateHistoryEntry[];
   currentRole: UserRole;
   onNavigate: (tab: string) => void;
+  /** Nút của cảnh báo một kênh (brand × sàn): mở đúng Kế Hoạch Tháng / Dữ Liệu Gốc của kênh đó. */
+  onOpenIssue?: (issue: Issue) => void;
   /** Tham số engine (AI Training Center) — dự báo tháng v3 đọc nhóm `fc*`/`alloc*`. Thiếu = mặc định. */
   engineParams?: EngineParams;
 }
@@ -106,7 +109,7 @@ export function prefetchCeoBrief(_ctx: TabPrefetchCtx): void {
 }
 
 export default function CeoBrief(props: CeoBriefProps) {
-  const { platform, sessions, brands, brandChannels, talents, shiftSlots, planSlotTargets, planMonthTotals, financeRecords, brandPlatformRates, brandPlatformRateHistory, talentRateHistory, currentRole, onNavigate } = props;
+  const { platform, sessions, brands, brandChannels, talents, shiftSlots, planSlotTargets, planMonthTotals, financeRecords, brandPlatformRates, brandPlatformRateHistory, talentRateHistory, currentRole, onNavigate, onOpenIssue } = props;
   const engineParams = props.engineParams ?? DEFAULT_ENGINE_PARAMS;
   const today = todayVn();
   const canSeeMoney = currentRole === "ceo" || currentRole === "admin";
@@ -343,7 +346,6 @@ export default function CeoBrief(props: CeoBriefProps) {
   const compareLabel = grain === "day" ? `so với cùng thứ tuần trước (${ddmm(period.prevStart)})` : grain === "month" ? "so cùng loại ngày tháng trước (ngày thường ↔ ngày thường, đợt camp cùng vị trí)" : `so với ${ddmm(period.prevStart)}–${ddmm(period.prevEnd)}`;
   const canNext = grain === "custom" ? false : grain === "day" ? anchor < today : period.calendarEnd < today;
   const inputCls = "bg-[var(--surface-base)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-[var(--text)] focus:outline-none focus:border-[var(--accent)]";
-  const stale = completeEnd != null && completeEnd < addDays(today, -1);
   // ---------- run-rate theo kế hoạch đã chốt + phương án xử lý (từng kênh) ----------
   const planRR = useMemo(() => {
     const out = new Map<string, PlanRunRate>();
@@ -450,23 +452,12 @@ export default function CeoBrief(props: CeoBriefProps) {
       {tooltip.node}
 
       {/* Đầu trang + bộ lọc */}
-      <Card className="!p-4 sm:!p-6 space-y-4">
-        <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-black text-[var(--text)] flex items-center gap-2">
-              <LayoutDashboard className="w-5 h-5 text-[var(--accent-text)]" /> Dashboard
-            </h2>
-            <PageIntro>
-              Mỗi kênh về đâu cuối tháng và vì sao, việc gì cần làm, rồi sức khoẻ agency: người, khách, dữ liệu{canSeeMoney ? ", tiền" : ""}. Mọi so sánh cắt ở ngày đủ số và so cùng loại ngày.
-            </PageIntro>
-          </div>
-          <span
-            className={`self-start shrink-0 text-xs font-bold px-3 py-1.5 rounded-full ${stale ? "bg-amber-500/15 text-amber-300" : "bg-emerald-500/15 text-emerald-300"}`}
-            title="Ngày cuối mà ít nhất 90% giờ ca đã chạy có số, trong phạm vi brand đang xem"
-          >
-            {completeEnd ? `● Số đủ tới ${ddmm(completeEnd)}${stale ? " — còn ca chờ số" : ""}` : "Chưa có số liệu"}
-          </span>
-        </div>
+      <PageHeader
+        icon={LayoutDashboard}
+        title="Dashboard"
+        description={<>Mỗi kênh về đâu cuối tháng và vì sao, việc gì cần làm, rồi sức khoẻ agency: người, khách, dữ liệu{canSeeMoney ? ", tiền" : ""}. Mọi so sánh cắt ở ngày đủ số và so cùng loại ngày.</>}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <div className="inline-flex bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-1" role="group" aria-label="Kỳ xem">
             {(["day", "week", "month", "custom"] as Grain[]).map((g) => (
@@ -474,7 +465,7 @@ export default function CeoBrief(props: CeoBriefProps) {
                 key={g}
                 onClick={() => pickGrain(g)}
                 aria-pressed={grain === g}
-                className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-colors ${grain === g ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)] hover:text-[var(--text)]"}`}
+                className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-colors ${grain === g ? "seg-on" : "text-[var(--text-muted)] hover:text-[var(--text)]"}`}
               >
                 {{ day: "Ngày", week: "Tuần", month: "Tháng", custom: "Tuỳ chọn" }[g]}
               </button>
@@ -500,24 +491,26 @@ export default function CeoBrief(props: CeoBriefProps) {
             {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
         </div>
-        <p className="text-sm text-[var(--text-muted)]">
+        {/* Hai phần của Dashboard cùng hàng với bộ lọc (bố cục 18/10) — trước là một hàng riêng có kẻ ngang bên dưới câu "Đang xem". */}
+        <div className="flex gap-1 rounded-xl border border-[var(--border)] p-1" role="tablist" aria-label="Phần của Dashboard">
+          {(Object.keys(TAB_LABEL) as DashTab[]).map((t) => (
+            <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
+              className={`px-3.5 py-1.5 rounded-lg text-sm font-bold transition-colors ${tab === t ? "seg-on" : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-hover)]/40"}`}>
+              {TAB_LABEL[t]}
+            </button>
+          ))}
+        </div>
+        </div>
+        <p className="text-xs text-[var(--text-muted)]">
           Đang xem <b className="text-[var(--text)]">{periodLabel}</b>
           {" · "}<b className="text-[var(--text)]">{PLATFORM_SCOPE_LABEL[platform]}</b>
           {hasPeriod && <> · mũi tên {compareLabel} · nét đứt trên biểu đồ nhỏ = kỳ so sánh</>}
           {period.cutByData && <span className="text-amber-300"> · kỳ cắt tới {ddmm(period.end)} vì sau ngày đó chưa đủ 90% giờ ca có số</span>}
         </p>
-        <div className="flex flex-wrap gap-1 border-t border-[var(--border)] pt-3" role="tablist" aria-label="Phần của Dashboard">
-          {(Object.keys(TAB_LABEL) as DashTab[]).map((t) => (
-            <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
-              className={`px-3.5 py-1.5 rounded-lg text-sm font-bold transition-colors ${tab === t ? "bg-[var(--accent)] text-[var(--accent-contrast)]" : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-hover)]/40"}`}>
-              {TAB_LABEL[t]}
-            </button>
-          ))}
-        </div>
-      </Card>
+      </PageHeader>
 
       {tab === "month" && (
-        <ThisMonth m={model} kpi={kpi} selected={channelPick} onSelect={setChannelPick} onNavigate={onNavigate} canReadShop={["ceo", "operations", "admin"].includes(currentRole)} />
+        <ThisMonth m={model} kpi={kpi} selected={channelPick} onSelect={setChannelPick} onNavigate={onNavigate} onOpenIssue={onOpenIssue} canReadShop={["ceo", "operations", "admin"].includes(currentRole)} />
       )}
       {tab === "health" && (
         <Health

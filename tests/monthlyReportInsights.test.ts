@@ -157,6 +157,14 @@ test("kết luận trước: kết quả, nguyên nhân quy ra tiền, thị tr�
   // Không có cơ hội ngày thường ⇒ chọn thừa số tụt nhiều tiền nhất.
   const alt = autoSummary({ ...input, dailyGap: null, controlLine: null, giftLine: null }).join("\n");
   expect(alt).toMatch(/Cơ hội lớn nhất: đưa Views\/giờ về mức kỳ trước \(3\.427, nay 2\.792\)/);
+
+  // Ca có số tới 30/09 nhưng file shop chỉ tới 22/09 (CROCS T9 17/10): không được ghi "live = 100,2% tổng shop" — tỷ trọng
+  // tính trên LIVE GMV cắt cùng ngày với file shop, và câu nói rõ file shop mới tới đâu.
+  const fullWindow = compareWindow("2026-09", "2026-09-30");
+  const short = autoSummary({ ...input, window: fullWindow, liveCur: { ...t9, gmv: 5_220_000_000 }, liveForShare: 3_515_000_000 })[0];
+  expect(short).toContain("File shop mới tới 22/09");
+  expect(short).toContain("67,5% cùng kỳ");
+  expect(short).not.toContain("100,");
 });
 
 test("so camp với camp tháng trước: mỗi tháng dùng khoảng camp của chính nó", () => {

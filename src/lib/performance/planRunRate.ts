@@ -1,6 +1,7 @@
 import { BrandMonthPlanSlot, LiveSession, ShiftSlot } from "../../types";
 import { addDays, eachDay } from "../dateUtils";
 import { CampDayBucket, CampOverrides, CAMP_DAY_BUCKET_ORDER, resolveCampBucketType } from "../campaignDays";
+import { dataSourceTier } from "../dataSource";
 import { isCountable } from "./hostPerformance";
 import { lastDataDate, monthEndOf, MonthOutlook } from "./ceoBrief";
 
@@ -113,7 +114,8 @@ export function planRunRate(
     let state: PlanSlotState;
     if (s?.status === "Cancelled" || (!s && sl?.status === "cancelled")) state = "cancelled";
     else if (s && isCountable(s)) state = "done";
-    else if (upTo(ps.date) || s?.status === "Completed") state = "no_data";
+    // Ca của HÔM NAY chưa Completed là ca chưa tới/đang chạy, không phải "đã qua mà chưa có số" (hôm nay vốn không tính vào ngày đủ số).
+    else if ((upTo(ps.date) && ps.date < today) || s?.status === "Completed") state = "no_data";
     else state = "pending";
     const actual = state === "done" ? s?.actualGmv ?? 0 : 0;
     const target = Math.max(0, ps.targetGmv || 0);
@@ -166,6 +168,79 @@ export function planRunRate(
     targetByDate,
     actualByDate
   };
+}
+
+// ---------------------------------------------------------------------------
+// Run-rate "tới ca mới nhất có số" (11/10/2026, user chọn: nhập tới đâu cập nhật tới đó)
+// ---------------------------------------------------------------------------
+//   - Ngày ≤ ngày đủ số (≥ 90% giờ ca có số): luật cũ — target CẢ NGÀY, ca chưa có số vẫn nằm trong mẫu số.
+//   - Ngày > ngày đủ số: mỗi ca có số được so với target ĐÚNG CA đó (ca sáng 78M ⇒ chia target ca sáng, không chia target cả
+//     ngày). Ca chưa có số / ca huỷ của những ngày này chưa vào mẫu số — chúng đang chờ, không phải kéo run-rate xuống.
+//   - Ca mở thêm ngoài plan: cộng thực đạt, target 0 (như mọi nơi).
+// Hàm thuần của (rr, completeThrough): sửa report của ca, đối soát (đổi số / đổi bậc nguồn), loại ca khỏi report, gộp ca restart
+// đều đổi `brandSessions` ⇒ planRunRate dựng lại ⇒ ca vào / ra / đổi số tự nhiên, không có bản lưu nào để lệch.
+
+export interface LiveRunRate {
+  /** Ngày đủ số đang dùng làm mốc (null = chưa ngày nào đủ ⇒ mọi ca có số đều tính theo ca). */
+  completeThrough: string | null;
+  /** Ngày cuối có số (kể cả hôm nay) — null = tháng chưa có số. */
+  lastDate: string | null;
+  /** Ca có số muộn nhất (ngày + giờ kết thúc) — nhãn "tới ca …". */
+  lastShift: { date: string; startTime: string; endTime: string } | null;
+  actual: number;
+  expected: number;
+  runRate: number | null;
+  /** Target dùng làm mẫu số theo từng ngày: ≤ ngày đủ số = target cả ngày; sau đó = target các ca đã có số. */
+  expectedByDate: Map<string, number>;
+  /** Số ca có số nằm SAU ngày đủ số (đã vào run-rate theo ca) và trong đó bao nhiêu ca chưa đối soát. */
+  tailShifts: number;
+  tailUnreconciled: number;
+}
+
+export function runRateLive(rr: PlanRunRate, completeThrough: string | null): LiveRunRate {
+  const cut = completeThrough;
+  const afterCut = (d: string) => cut == null || d > cut;
+  const expectedByDate = new Map<string, number>();
+  for (const [d, v] of rr.targetByDate) if (!afterCut(d)) expectedByDate.set(d, v);
+  let lastShift: LiveRunRate["lastShift"] = null;
+  const seen = (date: string, startTime: string, endTime: string) => {
+    if (!lastShift || date + hhmm(endTime) > lastShift.date + hhmm(lastShift.endTime)) lastShift = { date, startTime: hhmm(startTime), endTime: hhmm(endTime) };
+  };
+  let tailShifts = 0, tailUnreconciled = 0;
+  for (const t of rr.slots) {
+    if (t.state !== "done" || !t.session) continue;
+    seen(t.planSlot.date, t.planSlot.startTime, t.planSlot.endTime);
+    if (afterCut(t.planSlot.date)) {
+      expectedByDate.set(t.planSlot.date, (expectedByDate.get(t.planSlot.date) ?? 0) + t.target);
+      tailShifts++;
+      if (dataSourceTier(t.session) !== "reconciled") tailUnreconciled++;
+    }
+  }
+  for (const x of rr.offPlan) {
+    seen(x.session.date, x.session.startTime, x.session.endTime);
+    if (afterCut(x.session.date)) {
+      tailShifts++;
+      if (dataSourceTier(x.session) !== "reconciled") tailUnreconciled++;
+    }
+  }
+  let actual = 0, expected = 0;
+  for (const v of rr.actualByDate.values()) actual += v;
+  for (const v of expectedByDate.values()) expected += v;
+  return { completeThrough: cut, lastDate: rr.through, lastShift, actual, expected, runRate: expected > 0 ? actual / expected : null, expectedByDate, tailShifts, tailUnreconciled };
+}
+
+/**
+ * Ca kế hoạch đã qua mà chưa có số, tách theo mốc ngày đủ số: ngày ≤ mốc = VẪN trong mẫu số (target cả ngày) nên kéo run-rate
+ * xuống; ngày sau mốc = đang chờ số, CHƯA vào mẫu số (runRateLive). `completeThrough` undefined = luật cũ (mọi ca đều trong mẫu số).
+ */
+export function noDataSplit(rr: Pick<PlanRunRate, "slots">, completeThrough: string | null | undefined): { inDenominator: number; waiting: number } {
+  let inDenominator = 0, waiting = 0;
+  for (const t of rr.slots) {
+    if (t.state !== "no_data") continue;
+    if (completeThrough === undefined || (completeThrough != null && t.planSlot.date <= completeThrough)) inDenominator++;
+    else waiting++;
+  }
+  return { inDenominator, waiting };
 }
 
 export interface MonthEndProjection {

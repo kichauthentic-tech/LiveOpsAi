@@ -223,7 +223,7 @@ export const OpenSlotModal: React.FC<OpenSlotModalProps> = ({
                   const on = p.start === start && p.end === end;
                   return (
                     <button key={`${p.start}${p.end}`} type="button" onClick={() => { setStart(p.start); setEnd(p.end); }}
-                      className={`px-2.5 py-1.5 rounded-lg border font-mono font-bold text-[11px] ${on ? "bg-[var(--accent)] text-white border-[var(--accent)]" : "bg-[var(--surface-base)] text-[var(--text-muted)] border-[var(--border)] hover:border-[var(--accent)]/60"}`}>
+                      className={`px-2.5 py-1.5 rounded-lg border font-mono font-bold text-[11px] ${on ? "seg-on" : "bg-[var(--surface-base)] text-[var(--text-muted)] border-[var(--border)] hover:border-[var(--accent)]/60"}`}>
                       {p.start}–{p.end}
                     </button>
                   );

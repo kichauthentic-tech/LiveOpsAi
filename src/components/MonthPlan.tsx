@@ -43,7 +43,7 @@ import { recordForecastSnapshots } from "../lib/db/forecastSnapshots";
 import { EngineParams } from "../lib/scheduling/engineParams";
 import { findBrandStudioId } from "../lib/db/brandStudios";
 import { useConfirm } from "../hooks/useConfirm";
-import { PageIntro } from "./common/PageIntro";
+import { PageHeader } from "./common/PageHeader";
 
 import { fmtMonth, fmtFixed, fmtVndShort, fmtVndFull } from "../lib/format";
 import { MonthPicker } from "./common/MonthPicker";
@@ -77,7 +77,8 @@ interface MonthPlanProps {
   talents: Talent[];
 }
 
-const WEEKDAY_LABELS = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
+// Lưới bắt đầu Thứ 2 như Lịch & Studio / Bàn Trainer (bố cục 18/10).
+const WEEKDAY_LABELS = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
 const fmtH = (n: number) => n.toLocaleString("vi-VN", { maximumFractionDigits: 1 });
 const DEFAULT_SETTINGS: PlanSettings = { defaultSlotHours: 3, liveWindowStart: "09:00", liveWindowEnd: "23:00", maxSlotsPerDay: 3, notes: "", blackoutDates: [], targetGmv: 0, campRanges: {}, groupTargets: {}, shopTargetGmv: 0, adsBudget: 0 };
 const CAMP_RANGE_LABEL: Record<keyof PlanCampRanges, string> = { dday: "D-Day", midmonth: "Mid-Month", payday: "Pay Day" };
@@ -142,6 +143,14 @@ export default function MonthPlan({
   const [settings, setSettings] = useState<PlanSettings>(DEFAULT_SETTINGS);
   const [drafts, setDrafts] = useState<PlanDraftSlot[]>([]);
   const [dirty, setDirty] = useState(false);
+  // Đổi brand/tháng (hoặc tải lại trang) khi lưới có sửa chưa lưu thì mất sạch, trước đây không một câu hỏi.
+  const leaveDirty = async () => !dirty || (await confirm("Lưới đang có sửa CHƯA LƯU. Đổi sang kế hoạch khác thì các sửa đó mất. Bỏ các sửa đó?", { danger: true }));
+  useEffect(() => {
+    if (!dirty) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [dirty]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -471,7 +480,7 @@ export default function MonthPlan({
   };
 
   const days = useMemo(() => daysOfMonth(month), [month]);
-  const leading = new Date(`${days[0]}T00:00:00`).getDay();
+  const leading = (new Date(`${days[0]}T00:00:00`).getDay() + 6) % 7;
   const cells: (string | null)[] = [...Array(leading).fill(null), ...days];
   while (cells.length % 7 !== 0) cells.push(null);
   const draftsByDay = useMemo(() => {
@@ -864,7 +873,7 @@ export default function MonthPlan({
   // không có đường nào xoá dòng đó, kể cả khi lập nhầm brand/nhầm tháng.
   const removePlan = async () => {
     if (!plan) return;
-    const openFromPlan = shiftSlots.filter((sl) => sl.status === "open" && sl.brandId === brandId && sl.date.slice(0, 7) === month).length;
+    const openFromPlan = shiftSlots.filter((sl) => sl.status === "open" && sl.brandId === brandId && platformOf(sl) === platform && sl.date.slice(0, 7) === month).length;
     if (
       !(await confirm(
         `XOÁ HẲN kế hoạch ${brandLabel(brand?.name)} tháng ${fmtMonth(month)}?
@@ -920,30 +929,26 @@ export default function MonthPlan({
 
   return (
     <div className="space-y-6">
-      <div className="bg-[var(--surface)] border border-[var(--border)] p-4 sm:p-6 rounded-2xl shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-black text-[var(--text)] flex items-center gap-2">
-            <CalendarRange className="w-5 h-5 text-blue-400" />
-            Kế Hoạch Tháng
-          </h2>
-          <PageIntro>
-            Lập lưới ca cho brand trước khi mở đăng ký: giờ cam kết và target của tháng đặt ngay tại đây (mặc định lấy từ hợp đồng ở CRM), chốt là ca đổ xuống Bảng Vận Hành chờ talent đăng ký.
-          </PageIntro>
-        </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <select value={brandId} onChange={(e) => { userPicked.current = true; setBrandId(e.target.value); }} className="bg-[var(--surface-base)] border border-[var(--border)] rounded-xl px-3 py-2 text-[var(--text)] text-sm font-bold">
-            {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-          </select>
-          <MonthPicker value={month} onChange={(m) => { userPicked.current = true; setMonth(m); }} />
-        </div>
-      </div>
+      <PageHeader
+        icon={CalendarRange}
+        title="Kế Hoạch Tháng"
+        description="Lập lưới ca cho brand trước khi mở đăng ký: giờ cam kết và target của tháng đặt ngay tại đây (mặc định lấy từ hợp đồng ở CRM), chốt là ca đổ xuống Bảng Vận Hành chờ talent đăng ký."
+        actions={
+          <>
+            <select value={brandId} onChange={async (e) => { const v = e.target.value; if (!(await leaveDirty())) return; userPicked.current = true; setBrandId(v); }} className="bg-[var(--surface-base)] border border-[var(--border)] rounded-xl px-3 py-2 text-[var(--text)] text-sm font-bold">
+              {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+            <MonthPicker value={month} onChange={async (m) => { if (!(await leaveDirty())) return; userPicked.current = true; setMonth(m); }} />
+          </>
+        }
+      />
 
       {curMonthDrafts.length > 0 && !(month === today.slice(0, 7) && curMonthDrafts.some((b) => b.id === brandId)) && (
         <div className="bg-amber-950/40 border border-amber-900 rounded-xl px-4 py-2.5 text-xs text-amber-200 flex flex-wrap items-center gap-2">
           <AlertTriangle className="w-4 h-4 shrink-0" />
           <span>Kế hoạch <b>tháng này</b> ({fmtMonth(today.slice(0, 7))}) còn là nháp, chưa chốt: <b>{curMonthDrafts.map((b) => b.name).join(", ")}</b> — chưa chốt thì chưa có ca để talent đăng ký và Dashboard chưa có target.</span>
           <button
-            onClick={() => { userPicked.current = true; setBrandId(curMonthDrafts[0].id); setMonth(today.slice(0, 7)); }}
+            onClick={async () => { if (!(await leaveDirty())) return; userPicked.current = true; setBrandId(curMonthDrafts[0].id); setMonth(today.slice(0, 7)); }}
             className="ml-auto px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 font-bold text-amber-100 hover:bg-amber-500/30"
           >
             Mở kế hoạch {curMonthDrafts[0].name} tháng {fmtMonth(today.slice(0, 7))}
@@ -1417,7 +1422,7 @@ export default function MonthPlan({
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 overflow-x-auto">
         <div className="grid grid-cols-7 gap-1.5 min-w-[1100px]">
           {WEEKDAY_LABELS.map((w, i) => (
-            <div key={w} className={`text-center text-[11px] font-black uppercase tracking-wide py-1 rounded-lg ${i === 0 || i === 6 ? "text-rose-300 bg-rose-950/30" : "text-[var(--text-faint)] bg-[var(--surface-base)]"}`}>{w}</div>
+            <div key={w} className={`text-center text-[11px] font-bold py-1 rounded-lg ${i >= 5 ? "text-rose-300 bg-rose-950/30" : "text-[var(--text-faint)] bg-[var(--surface-base)]"}`}>{w}</div>
           ))}
           {cells.map((day, idx) => {
             if (!day) return <div key={`e${idx}`} className="min-h-[96px] rounded-xl bg-[var(--surface-base)]/40" />;
@@ -1536,7 +1541,7 @@ function SuggestionPanel({ history: h, result: r, committedHours, targetTotal, c
       {compare && (
         <div className="overflow-x-auto">
           <table className="w-full text-[11px]">
-            <thead><tr className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]"><th className="text-left py-1 pr-3">Phương án</th><th className="text-right py-1 pr-3">Ca</th><th className="text-right py-1 pr-3">Ngày</th><th className="text-right py-1 pr-3">Giờ</th><th className="text-right py-1 pr-3">Dự báo</th><th className="py-1"></th></tr></thead>
+            <thead><tr className="text-[11px] font-semibold text-[var(--text-faint)]"><th className="text-left py-1 pr-3">Phương án</th><th className="text-right py-1 pr-3">Ca</th><th className="text-right py-1 pr-3">Ngày</th><th className="text-right py-1 pr-3">Giờ</th><th className="text-right py-1 pr-3">Dự báo</th><th className="py-1"></th></tr></thead>
             <tbody>
               {(Object.keys(STRATEGY_LABEL) as SuggestStrategy[]).map((k) => {
                 const x = compare[k];

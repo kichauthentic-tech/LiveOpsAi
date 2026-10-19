@@ -3,7 +3,8 @@ import { CLIENT_CONCENTRATION_WARN, PERSON_CONCENTRATION_WARN, UNASSIGNED, hostK
 import { expandHostPortions, isCountable, sessionHours } from "../../lib/performance/hostPerformance";
 import type { LiveSession } from "../../types";
 import type { DashModel } from "./model";
-import { Card, SectionTitle, hrs, money, num, pct } from "./shared";
+import { SectionTitle, hrs, money, num, pct } from "./shared";
+import { StatTile } from "../common/StatTile";
 
 // Sức khoẻ agency (09/10/2026): rủi ro tập trung khách và người, lịch chưa đủ người, số chưa về. Chỉ số vận hành và tỷ trọng
 // trong MỘT sàn — không cộng GMV giữa TikTok và Shopee (mỗi sàn một khối Dashboard).
@@ -12,12 +13,9 @@ type Tone = "good" | "warn" | "bad";
 const TONE: Record<Tone, string> = { good: "text-emerald-400", warn: "text-amber-300", bad: "text-rose-400" };
 
 const Tile: React.FC<{ label: string; value: string; tone: Tone; sub: React.ReactNode; action?: { label: string; tab: string }; onNavigate: (tab: string) => void }> = ({ label, value, tone, sub, action, onNavigate }) => (
-  <Card className="!p-4 space-y-1 min-w-0">
-    <p className="text-[11px] uppercase tracking-wider font-bold text-[var(--text-faint)]">{label}</p>
-    <p className={`text-2xl font-black ${TONE[tone]}`}>{value}</p>
-    <p className="text-xs text-[var(--text-faint)] leading-snug">{sub}</p>
+  <StatTile frame="card" size="lg" label={label} value={value} tone={TONE[tone]} hint={<span className="text-xs">{sub}</span>}>
     {action && <button onClick={() => onNavigate(action.tab)} className="min-h-6 -mx-1 px-1 rounded inline-flex items-center text-xs font-bold text-[var(--accent-text)] hover:underline">{action.label} →</button>}
-  </Card>
+  </StatTile>
 );
 
 export const AgencyHealth: React.FC<{ m: DashModel; curSessions: LiveSession[]; onNavigate: (tab: string) => void }> = ({ m, curSessions, onNavigate }) => {

@@ -258,9 +258,9 @@ export function analyzeRoster(
   const weekEnd = addDays(weekStart, 6);
   const inWeek = (sh: RosterShift) => sh.date >= weekStart && sh.date <= weekEnd;
   const issues: RosterIssue[] = [];
-  const add = (code: IssueCode, sh: RosterShift, text: string, talentId?: string) => {
+  const add = (code: IssueCode, sh: RosterShift, text: string, talentId?: string, severity: IssueSeverity = ISSUE_SEVERITY[code]) => {
     if (!inWeek(sh)) return;
-    issues.push({ code, severity: ISSUE_SEVERITY[code], shiftKey: sh.key, talentId, text });
+    issues.push({ code, severity, shiftKey: sh.key, talentId, text });
   };
   const entries = personEntries(shifts);
   const weekHours = new Map<string, number>();
@@ -273,7 +273,10 @@ export function analyzeRoster(
       if (prev.shift.key === cur.shift.key) continue;
       const overlap = prev.ranges.some((a) => cur.ranges.some((b) => dateTimeRangesOverlap(a, b)));
       if (overlap) {
-        add("clash", cur.shift, `${name} trùng giờ với ca ${prev.shift.brandName} ${prev.shift.startTime}–${prev.shift.endTime} (${ddmm(prev.shift.date)})`, tid);
+        // Chỉ CHẶN công bố khi một trong hai ca là ca mở (nháp sắp chốt) — đúng chỗ DB (0143) sẽ từ chối. Trùng giữa hai ca đã lên
+        // lịch (giữ có chủ đích bằng cờ 0160, lịch nhập từ sheet) không ảnh hưởng lần công bố: báo vàng để trainer gỡ, không khoá nút.
+        const draftInvolved = cur.shift.kind === "open" || prev.shift.kind === "open";
+        add("clash", cur.shift, `${name} trùng giờ với ca ${prev.shift.brandName} ${prev.shift.startTime}–${prev.shift.endTime} (${ddmm(prev.shift.date)})${draftInvolved ? "" : " — ca đã lên lịch từ trước, không chặn công bố"}`, tid, draftInvolved ? "block" : "warn");
         continue;
       }
       const gap = cur.start - prev.end;

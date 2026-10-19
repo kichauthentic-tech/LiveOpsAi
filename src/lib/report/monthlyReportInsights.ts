@@ -418,6 +418,9 @@ export interface NarrativeInput {
   giftLine?: string | null;
   /** Việc cần làm của khung Insight phần 2–6 đã bỏ trùng (sectionInsights.sectionNextSteps). */
   sectionSteps?: string[];
+  /** File shop ngắn hơn số ca (Shop Analytics tới 22/09, ca tới 30/09): LIVE GMV cắt tới ngày cuối của file shop, để tỷ trọng
+   *  live/tổng shop so cùng ngày — không thì live 30 ngày ÷ shop 22 ngày ra "100,2% tổng shop". */
+  liveForShare?: number;
 }
 
 const money = (v: number) => fmtVndShort(v);
@@ -451,10 +454,14 @@ export const FACTOR_ACTION: Record<RateFactor, string> = {
 export function autoSummary(i: NarrativeInput): string[] {
   const out: string[] = [];
   const through = i.window.curEnd;
-  const liveShare = i.shopCur && i.shopCur.gmv > 0 ? (i.liveCur.gmv / i.shopCur.gmv) * 100 : null;
+  const liveShare = i.shopCur && i.shopCur.gmv > 0 ? ((i.liveForShare ?? i.liveCur.gmv) / i.shopCur.gmv) * 100 : null;
+  const shopThrough = i.shopCur?.through ?? null;
+  const shopShort = shopThrough != null && shopThrough < through;
 
   const head = i.shopCur
-    ? `Tới ${dayMonth(through)}, shop đạt ${money(i.shopCur.gmv)} GMV; live do agency vận hành mang về ${money(i.liveCur.gmv)}${liveShare != null ? ` (${pctTxt(liveShare)} tổng shop)` : ""}.`
+    ? shopShort
+      ? `Tới ${dayMonth(through)}, live do agency vận hành mang về ${money(i.liveCur.gmv)}. File shop mới tới ${dayMonth(shopThrough!)}: shop đạt ${money(i.shopCur.gmv)} GMV${liveShare != null ? `, live agency chiếm ${pctTxt(liveShare)} cùng kỳ` : ""}.`
+      : `Tới ${dayMonth(through)}, shop đạt ${money(i.shopCur.gmv)} GMV; live do agency vận hành mang về ${money(i.liveCur.gmv)}${liveShare != null ? ` (${pctTxt(liveShare)} tổng shop)` : ""}.`
     : `Tới ${dayMonth(through)}, live do agency vận hành đạt ${money(i.liveCur.gmv)} GMV qua ${i.liveCur.sessions} ca.`;
   const target = i.targetGmv && i.targetGmv > 0 ? ` Đạt ${pctTxt((i.liveCur.gmv / i.targetGmv) * 100, 0)} target tháng (${money(i.targetGmv)}).` : "";
   const k = i.shopKpi;

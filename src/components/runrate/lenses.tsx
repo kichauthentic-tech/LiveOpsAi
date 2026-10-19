@@ -166,7 +166,7 @@ export const WaveLens: React.FC<{ r: AccountRunRate; waveFilter: CampDayBucket |
         </div>
         <div role="group" aria-label="Cách tính % của đợt" className="inline-flex items-center p-0.5 rounded-xl bg-[var(--surface-base)] border border-[var(--border)]">
           {WAVE_MODES.map((m) => (
-            <button key={m.id} type="button" aria-pressed={mode === m.id} onClick={() => pick(m.id)} className={`px-3 py-1.5 rounded-[10px] text-xs font-bold min-h-[30px] transition-colors ${mode === m.id ? "bg-[var(--accent)] text-[var(--accent-contrast)]" : "text-[var(--text-muted)] hover:text-[var(--text)]"}`}>
+            <button key={m.id} type="button" aria-pressed={mode === m.id} onClick={() => pick(m.id)} className={`px-3 py-1.5 rounded-[10px] text-xs font-bold min-h-[30px] transition-colors ${mode === m.id ? "seg-on" : "text-[var(--text-muted)] hover:text-[var(--text)]"}`}>
               {m.label}
             </button>
           ))}

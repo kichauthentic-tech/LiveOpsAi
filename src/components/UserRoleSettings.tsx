@@ -433,7 +433,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
             onClick={() => setActiveTab("roles")}
             className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 ${
               activeTab === "roles"
-                ? "bg-[var(--accent)] text-white shadow-lg shadow-[var(--accent)]/30 font-black"
+                ? "seg-on font-black"
                 : "text-[var(--text-muted)] hover:text-[var(--text)]"
             }`}
           >
@@ -445,7 +445,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
             onClick={() => setActiveTab("users")}
             className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 ${
               activeTab === "users"
-                ? "bg-[var(--accent)] text-white shadow-lg shadow-[var(--accent)]/30 font-black"
+                ? "seg-on font-black"
                 : "text-[var(--text-muted)] hover:text-[var(--text)]"
             }`}
           >
@@ -457,7 +457,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
             onClick={() => setActiveTab("audit")}
             className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 ${
               activeTab === "audit"
-                ? "bg-[var(--accent)] text-white shadow-lg shadow-[var(--accent)]/30 font-black"
+                ? "seg-on font-black"
                 : "text-[var(--text-muted)] hover:text-[var(--text)]"
             }`}
           >
@@ -470,7 +470,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
               onClick={() => setActiveTab("usage")}
               className={`px-3.5 py-2 rounded-lg transition-all flex items-center gap-2 ${
                 activeTab === "usage"
-                  ? "bg-[var(--accent)] text-white shadow-lg shadow-[var(--accent)]/30 font-black"
+                  ? "seg-on font-black"
                   : "text-[var(--text-muted)] hover:text-[var(--text)]"
               }`}
             >
@@ -538,7 +538,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                       {roleKey === "operations" && "Lập kế hoạch tháng, xếp và chốt người cho ca, up số liệu, đối soát, làm report. Không thấy Finance."}
                       {roleKey === "trainer" && "Xếp lịch tuần: hạn đăng ký, chọn host/trợ cho ca, dời/thêm ca, công bố lịch. Thấy rate và Finance (chỉ đọc)."}
                       {roleKey === "brand" && "Chỉ thấy workspace của brand mình: lịch, sổ ca, report tháng đã phát hành, cam kết, kế hoạch tháng sau."}
-                      {roleKey === "talent" && "Ca của mình, đăng ký ca, nộp report ca và hồ sơ cá nhân."}
+                      {roleKey === "talent" && "Ca của mình, lịch cả agency, đăng ký ca và hồ sơ cá nhân (giao ca do OP làm trên máy phòng live)."}
                     </p>
                   </div>
 
@@ -604,7 +604,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
                           }`}
                         >
                           <div className="space-y-1 min-w-0">
-                            <p className="text-[11px] font-black uppercase tracking-wider text-[var(--text-faint)]">{category}</p>
+                            <p className="text-[11px] font-semibold text-[var(--text-faint)]">{category}</p>
                             <div className="flex items-center gap-2">
                               {isAllowed ? (
                                 <Lock className="w-3.5 h-3.5 text-emerald-400" />
@@ -686,7 +686,7 @@ export const UserRoleSettings: React.FC<UserRoleSettingsProps> = ({
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-xl text-[var(--text)]">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-[var(--surface-base)]/80 text-[var(--text-muted)] font-extrabold uppercase border-b border-[var(--border)] text-[11px]">
+                <thead className="bg-[var(--surface-base)]/80 text-[var(--text-muted)] font-semibold border-b border-[var(--border)] text-[11px]">
                   <tr>
                     <th className="p-4">Người dùng</th>
                     <th className="p-4">Vai trò</th>

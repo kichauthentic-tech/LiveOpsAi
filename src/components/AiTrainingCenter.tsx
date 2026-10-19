@@ -65,12 +65,12 @@ export const AiTrainingCenter: React.FC<AiTrainingCenterProps> = ({ prompts, loa
         title="AI Training Center"
         description="Cấu hình system prompt riêng cho từng AI Agent thật đang chạy trong hệ thống. Chỉ tài khoản Admin thấy và sửa được tab này."
         actions={
-          <div className="bg-rose-950/85 border border-rose-500/40 rounded-xl px-3.5 py-2 text-right">
-            <div className="flex items-center justify-end gap-2 text-xs font-bold text-rose-300">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <div className="text-right">
+            <div className="flex items-center justify-end gap-2 text-xs font-bold text-[var(--text)]">
+              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
               <span>{prompts.length} Agent</span>
             </div>
-            <p className="text-[11px] text-rose-400">Thay đổi có hiệu lực ngay ở lần gọi AI tiếp theo</p>
+            <p className="text-[11px] text-[var(--text-faint)]">Thay đổi có hiệu lực ngay ở lần gọi AI tiếp theo</p>
           </div>
         }
       />
@@ -104,7 +104,7 @@ export const AiTrainingCenter: React.FC<AiTrainingCenterProps> = ({ prompts, loa
         !error &&
         Object.entries(groupedByCategory).map(([category, agents]: [string, AiAgentPrompt[]]) => (
           <div key={category} className="space-y-3">
-            <h3 className="font-bold text-[var(--text)] text-sm uppercase tracking-wider border-b border-[var(--border)] pb-2">
+            <h3 className="font-bold text-[var(--text)] text-sm border-b border-[var(--border)] pb-2">
               {category}
             </h3>
             <div className="grid lg:grid-cols-2 gap-4">

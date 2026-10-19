@@ -220,27 +220,27 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
         icon={Building2}
         title="Studios & Gear"
         description="Phòng live và thiết bị của agency: trạng thái phòng, sức chứa, giờ hoạt động và thiết bị đang gắn vào từng phòng."
-      />
-
-      {/* Sub Tabs */}
-      <div className="flex space-x-2 text-xs font-bold border-b border-[var(--border)] pb-2">
+      >
+      {/* Sub Tabs — trong đầu trang (bố cục 18/10), không còn là dải rời có kẻ ngang dưới tiêu đề. */}
+      <div className="inline-flex gap-1 text-xs font-bold rounded-xl border border-[var(--border)] bg-[var(--surface-base)] p-1">
         <button
           onClick={() => setActiveSubTab("studios")}
-          className={`px-4 py-2 rounded-xl transition-all ${
-            activeSubTab === "studios" ? "bg-[var(--accent)] text-white shadow" : "bg-[var(--surface-elevated)] text-[var(--text-muted)] hover:bg-[var(--surface-hover)]"
+          className={`px-3.5 py-1.5 rounded-lg transition-all ${
+            activeSubTab === "studios" ? "seg-on" : "text-[var(--text-muted)] hover:text-[var(--text)]"
           }`}
         >
           <span className="inline-flex items-center gap-1.5"><Building2 className="w-3.5 h-3.5" /> Phòng live ({studios.length})</span>
         </button>
         <button
           onClick={() => setActiveSubTab("equipment")}
-          className={`px-4 py-2 rounded-xl transition-all ${
-            activeSubTab === "equipment" ? "bg-[var(--accent)] text-white shadow" : "bg-[var(--surface-elevated)] text-[var(--text-muted)] hover:bg-[var(--surface-hover)]"
+          className={`px-3.5 py-1.5 rounded-lg transition-all ${
+            activeSubTab === "equipment" ? "seg-on" : "text-[var(--text-muted)] hover:text-[var(--text)]"
           }`}
         >
           <span className="inline-flex items-center gap-1.5"><Camera className="w-3.5 h-3.5" /> Thiết bị ({equipments.length})</span>
         </button>
       </div>
+      </PageHeader>
 
       {/* Studio View — sắp lại 10/10: ca hôm nay nằm ngay trong thẻ từng phòng (trước là danh sách 24 dòng riêng dưới lưới phòng,
           phải dò tên phòng trong ngoặc vuông để biết phòng nào bận). */}
@@ -267,7 +267,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
                   {todaysBookings.length} ca hôm nay
                 </span>
               </h3>
-              <p className="text-xs text-[var(--text-muted)]">Mỗi brand gắn với một phòng ở Kế Hoạch Tháng; ca chốt ra sẽ dùng phòng đó. Dưới mỗi phòng là các ca hôm nay.</p>
+              <p className="text-xs text-[var(--text-muted)]">Phòng mặc định của từng kênh brand đặt ở CRM → "Hợp đồng & giá"; ca chốt ra sẽ dùng phòng đó. Dưới mỗi phòng là các ca hôm nay.</p>
             </div>
             <button
               onClick={openAddStudioModal}
@@ -315,7 +315,7 @@ export const StudioEquipment: React.FC<StudioEquipmentProps> = ({
                   </div>
 
                   <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] p-3 flex-1">
-                    <p className="text-[11px] font-bold text-[var(--text-faint)] uppercase tracking-wider mb-1.5">Ca hôm nay · {today.length}</p>
+                    <p className="text-[11px] font-semibold text-[var(--text-faint)] mb-1.5">Ca hôm nay · {today.length}</p>
                     {today.length === 0 ? (
                       <p className="text-xs text-[var(--text-faint)] italic">Trống cả ngày.</p>
                     ) : (

@@ -67,10 +67,20 @@ describe("analyzeRoster", () => {
     const codes = (k: string) => (an.byShift.get(k) ?? []).map((i) => i.code);
     expect(codes("s:b")).toContain("rest");
     expect(codes("s:d")).toContain("clash");
-    expect(R.worstSeverity(an.byShift.get("s:d"))).toBe("block");
+    // Hai ca đã lên lịch trùng người (lịch nhập từ sheet, cờ 0160): DB không chặn công bố ⇒ chỉ cảnh báo.
+    expect(R.worstSeverity(an.byShift.get("s:d"))).toBe("warn");
     expect(codes("s:f")).toContain("room");
     expect(an.issues.some((i) => i.code === "day" && i.talentId === "toan")).toBe(true);
     expect(an.weekHours.get("toan")).toBeCloseTo(3 + 3 + 3 + 2 + 4 + 5.75);
+  });
+
+  test("trùng người do ca NHÁP sắp chốt thì chặn công bố (đúng chỗ DB 0143 từ chối)", () => {
+    const sessions = [ca("x", { date: "2026-10-14", startTime: "19:00", endTime: "22:00" })];
+    const shifts = R.buildRosterShifts(sessions, [slot("o1", { date: "2026-10-14", startTime: "20:00", endTime: "23:00", brandId: "jockey", brandName: "JOCKEY", studioId: "r-jockey" })], [{ slotId: "o1", hostId: "toan" }], [], "2026-10-05", "2026-10-18");
+    const an = R.analyzeRoster(shifts, rules, WEEK, name);
+    const clash = an.issues.filter((i) => i.code === "clash");
+    expect(clash.length).toBeGreaterThan(0);
+    expect(clash.every((i) => i.severity === "block")).toBe(true);
   });
 
   test("quá 48 giờ/tuần là lỗi chặn; 40–48 chỉ cảnh báo; tuần trước không cộng vào", () => {

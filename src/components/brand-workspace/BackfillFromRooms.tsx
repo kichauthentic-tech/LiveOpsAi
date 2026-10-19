@@ -357,7 +357,7 @@ export const BackfillFromRooms: React.FC<Props> = ({ platform, brandId, brandNam
                       <span className="w-28 text-right font-bold text-[var(--text)]">{fmtMoney(p.gmv)}</span>
                       <span className="w-12 text-right text-[var(--text-muted)]">{p.orders} đơn</span>
                       <span className="ml-auto flex rounded-md overflow-hidden border border-[var(--border)] font-bold">
-                        <button type="button" onClick={() => toggleInhouse([p.room_id], false)} className={`px-2 py-0.5 ${!on ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)]"}`}>Agency</button>
+                        <button type="button" onClick={() => toggleInhouse([p.room_id], false)} className={`px-2 py-0.5 ${!on ? "seg-on" : "text-[var(--text-muted)]"}`}>Agency</button>
                         <button type="button" onClick={() => toggleInhouse([p.room_id], true)} className={`px-2 py-0.5 ${on ? "bg-sky-600 text-white" : "text-[var(--text-muted)]"}`}>Inhouse</button>
                       </span>
                     </div>
@@ -414,7 +414,7 @@ export const BackfillFromRooms: React.FC<Props> = ({ platform, brandId, brandNam
                       key={wd}
                       type="button"
                       onClick={() => setToolWeekdays((prev) => { const n = new Set(prev); if (n.has(wd)) n.delete(wd); else n.add(wd); return n; })}
-                      className={`px-1.5 py-0.5 rounded font-bold border ${toolWeekdays.has(wd) ? "bg-[var(--accent)] text-white border-[var(--accent)]" : "border-[var(--border)] text-[var(--text-muted)]"}`}
+                      className={`px-1.5 py-0.5 rounded font-bold border ${toolWeekdays.has(wd) ? "seg-on" : "border-[var(--border)] text-[var(--text-muted)]"}`}
                     >
                       {WEEKDAY_SHORT[wd]}
                     </button>

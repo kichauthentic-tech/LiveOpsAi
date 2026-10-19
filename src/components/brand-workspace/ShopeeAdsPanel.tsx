@@ -8,7 +8,8 @@ import { createOrReplaceDataRawImport, deleteDataRawImport, fetchDataRawImports,
 import { useConfirm } from "../../hooks/useConfirm";
 import { errorMessage } from "../../lib/errorMessage";
 import { fmtFixed, fmtMonth, fmtVndFull, fmtVndShort } from "../../lib/format";
-import { METRIC, metricHint } from "../../lib/metricGlossary";
+import { METRIC } from "../../lib/metricGlossary";
+import { StatTile } from "../common/StatTile";
 
 // Nhập Ads — sàn Shopee (06/10, user chốt: chi phí Shopee có file riêng). Tải file "Shopee Live Ads Report" (một dòng /
 // chiến dịch cho cả tháng) vào kho Dữ Liệu Gốc loại shopee_ads (migration 0142), 1 file / brand / tháng; Report Shopee đọc
@@ -32,25 +33,12 @@ const monthEnd = (month: string) => {
 };
 
 function StatsGrid({ s }: { s: ShopeeAdsStats }) {
-  const box = "bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl p-3";
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-      <div className={box}>
-        <div className="text-[11px] text-[var(--text-faint)]" title={metricHint(METRIC.expense)}>{METRIC.expense}</div>
-        <div className="text-base font-black text-[var(--text)]">{fmtVndShort(s.expense)}</div>
-      </div>
-      <div className={box}>
-        <div className="text-[11px] text-[var(--text-faint)]" title={metricHint(METRIC.roas)}>{METRIC.roas}</div>
-        <div className="text-base font-black text-[var(--text)]">{s.roas != null ? `${fmtFixed(s.roas, 1)}x` : "—"}</div>
-      </div>
-      <div className={box}>
-        <div className="text-[11px] text-[var(--text-faint)]">{METRIC.expense}/{METRIC.orders} ({fmtVndFull(s.orders)} {METRIC.orders})</div>
-        <div className="text-base font-black text-[var(--text)]">{s.costPerOrder != null ? fmtVndFull(s.costPerOrder) : "—"}</div>
-      </div>
-      <div className={box}>
-        <div className="text-[11px] text-[var(--text-faint)]">{METRIC.gmv} (file Ads)</div>
-        <div className="text-base font-black text-[var(--text)]">{fmtVndShort(s.gmv)}</div>
-      </div>
+      <StatTile label={METRIC.expense} value={fmtVndShort(s.expense)} />
+      <StatTile label={METRIC.roas} value={s.roas != null ? `${fmtFixed(s.roas, 1)}x` : "—"} />
+      <StatTile label={`${METRIC.expense}/${METRIC.orders} (${fmtVndFull(s.orders)} ${METRIC.orders})`} title="" value={s.costPerOrder != null ? fmtVndFull(s.costPerOrder) : "—"} />
+      <StatTile label={`${METRIC.gmv} (file Ads)`} title="" value={fmtVndShort(s.gmv)} />
     </div>
   );
 }

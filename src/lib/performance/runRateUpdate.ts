@@ -5,7 +5,8 @@ import { assertOnePlatform } from "../platforms/perf";
 import { monthEndOf, RUN_RATE_BAD, RUN_RATE_WARN } from "./ceoBrief";
 import { runRateTone, WAVE_NAME, type RunRateTone } from "./channelHealth";
 import { isCountable } from "./hostPerformance";
-import type { PlanRunRate, PlanSlotState } from "./planRunRate";
+import { noDataSplit, runRateLive, type PlanRunRate, type PlanSlotState } from "./planRunRate";
+import { dataSourceTier } from "../dataSource";
 
 // "Cập nhật run-rate" cho sếp + brand (module Run-rate, 11/10/2026). KHÔNG có luật số mới: mọi con số đi qua `planRunRate`
 // (target = Σ target ca của Kế Hoạch Tháng đã chốt, ca huỷ giữ target, ca ngoài plan target 0). File này chỉ
@@ -25,7 +26,7 @@ export interface RRLine {
 export type DayState =
   /** Ngày ≤ số tới, mọi ca đã có số. */
   | "counted"
-  /** Ngày sau "số tới" nhưng đã có một phần số — tạm tính, chưa vào run-rate. */
+  /** Tạm tính: ngày sau "số tới" đã có một phần số (chưa vào run-rate), hoặc ngày sau ngày đủ số đã vào run-rate theo từng ca nhưng còn ca chờ số. */
   | "partial"
   /** Ngày ≤ số tới có ca kế hoạch chưa có số. */
   | "missing"
@@ -46,7 +47,9 @@ export interface RRDay {
   state: DayState;
   /** Ngày nằm trong run-rate (≤ số tới). */
   counted: boolean;
-  /** Thực đạt ÷ target của riêng ngày — chỉ khi ngày có target và đã vào run-rate. */
+  /** Mẫu số của ngày trong run-rate: ≤ ngày đủ số = target cả ngày; sau đó = target các ca đã có số (bằng `target` khi không truyền ngày đủ số). */
+  expected: number;
+  /** Thực đạt ÷ mẫu số của riêng ngày — chỉ khi ngày đã vào run-rate và có mẫu số. */
   pctTarget: number | null;
 }
 
@@ -121,6 +124,8 @@ export interface AccountRunRate {
     /** Muốn kịp target tháng thì mỗi ngày còn lại phải đạt. */
     needPerRemainingDay: number | null;
   };
+  /** Ca có số nằm sau ngày đủ số và ≤ số tới (đã vào run-rate theo từng ca); `unreconciled` = trong đó chưa đối soát. 0 khi không truyền ngày đủ số. */
+  tail: { shifts: number; unreconciled: number; lastShift: { date: string; startTime: string; endTime: string } | null };
   waves: RRWave[];
   weeks: RRWeek[];
   days: RRDay[];
@@ -129,6 +134,8 @@ export interface AccountRunRate {
   offPlanActual: number;
   cancelledCount: number;
   noDataCount: number;
+  /** Trong `noDataCount`: ca sau ngày đủ số — chờ số, CHƯA vào mẫu số (chế độ theo ca). */
+  noDataWaiting: number;
   cumulative: RRCumulativePoint[];
 }
 
@@ -141,9 +148,15 @@ export function resolveAsOf(month: string, through: string | null, requested: st
   return clampDate(want, `${month}-01`, through < `${month}-01` ? `${month}-01` : through);
 }
 
-const statusOf = (days: string[], asOf: string | null): WaveStatus => (asOf && days[days.length - 1] <= asOf ? "done" : !asOf || days[0] > asOf ? "next" : "live");
+// `doneRef` = mốc để tính "đã xong": mặc định chính ngày số tới; chế độ theo ca dùng ngày đủ số (hôm nay mới có vài ca thì đợt vẫn đang chạy).
+const statusOf = (days: string[], asOf: string | null, doneRef: string | null = asOf): WaveStatus =>
+  doneRef && days[days.length - 1] <= doneRef ? "done" : !asOf || days[0] > asOf ? "next" : "live";
 
-export function buildAccountRunRate(rr: PlanRunRate, asOf: string | null): AccountRunRate {
+/**
+ * `completeThrough` (ngày đủ số — channelHealth.dataCoverage): truyền vào thì ngày SAU mốc đó chỉ lấy target các ca đã có số
+ * (planRunRate.runRateLive) — nhập tới ca nào cập nhật tới ca đó; bỏ qua thì mọi ngày ≤ `asOf` dùng target cả ngày (luật cũ).
+ */
+export function buildAccountRunRate(rr: PlanRunRate, asOf: string | null, completeThrough?: string | null): AccountRunRate {
   const month = rr.month;
   const mStart = `${month}-01`, mEnd = monthEndOf(mStart);
   const monthDays = eachDay(mStart, mEnd);
@@ -151,6 +164,10 @@ export function buildAccountRunRate(rr: PlanRunRate, asOf: string | null): Accou
   const bucketOf = new Map<string, CampDayBucket>();
   for (const b of rr.buckets) for (const d of b.days) bucketOf.set(d, b.bucket);
 
+  const perShift = completeThrough !== undefined;
+  const liveRR = perShift ? runRateLive(rr, completeThrough) : null;
+  const afterCut = (d: string) => perShift && (completeThrough == null || d > completeThrough);
+  const doneRef = perShift ? (completeThrough != null && asOf != null && completeThrough < asOf ? completeThrough : asOf != null && completeThrough == null ? null : asOf) : asOf;
   const slotsByDate = new Map<string, typeof rr.slots>();
   for (const t of rr.slots) slotsByDate.set(t.planSlot.date, [...(slotsByDate.get(t.planSlot.date) ?? []), t]);
 
@@ -161,10 +178,11 @@ export function buildAccountRunRate(rr: PlanRunRate, asOf: string | null): Accou
     const withData = planned.filter((t) => t.state === "done").length;
     const counted = upTo(date);
     let state: DayState;
-    if (counted) state = planned.some((t) => t.state === "no_data") ? "missing" : planned.length === 0 && actual <= 0 ? "empty" : "counted";
+    const expected = counted ? (liveRR ? liveRR.expectedByDate.get(date) ?? 0 : target) : 0;
+    if (counted) state = planned.some((t) => t.state === "no_data") ? (afterCut(date) ? "partial" : "missing") : planned.length === 0 && actual <= 0 ? "empty" : "counted";
     else if (rr.through && date <= rr.through && actual > 0) state = "partial";
     else state = planned.length === 0 && actual <= 0 ? "empty" : "future";
-    return { date, bucket: bucketOf.get(date) ?? "daily", target, actual, shifts: planned.length, withData, state, counted, pctTarget: counted && target > 0 ? actual / target : null };
+    return { date, bucket: bucketOf.get(date) ?? "daily", target, actual, shifts: planned.length, withData, state, counted, expected, pctTarget: counted && expected > 0 ? actual / expected : null };
   });
 
   const dayOf = new Map(days.map((d) => [d.date, d]));
@@ -174,7 +192,7 @@ export function buildAccountRunRate(rr: PlanRunRate, asOf: string | null): Accou
       const x = dayOf.get(d)!;
       target += x.target;
       if (x.counted) {
-        targetToDate += x.target;
+        targetToDate += x.expected;
         actual += x.actual;
       }
     }
@@ -198,7 +216,7 @@ export function buildAccountRunRate(rr: PlanRunRate, asOf: string | null): Accou
         days: b.days,
         from: b.days[0],
         to: b.days[b.days.length - 1],
-        status: statusOf(b.days, asOf),
+        status: statusOf(b.days, asOf, doneRef),
         shifts: inB.length,
         shiftsDone: inB.filter((t) => t.state === "done").length,
         pctTarget: l.target > 0 ? l.actual / l.target : null,
@@ -219,7 +237,7 @@ export function buildAccountRunRate(rr: PlanRunRate, asOf: string | null): Accou
     index: i + 1,
     label: `Tuần ${i + 1} · ${list[0].slice(8)}–${list[list.length - 1].slice(8)}/${month.slice(5)}`,
     days: list,
-    status: statusOf(list, asOf)
+    status: statusOf(list, asOf, doneRef)
   }));
 
   const shifts: RRShift[] = rr.slots
@@ -239,18 +257,20 @@ export function buildAccountRunRate(rr: PlanRunRate, asOf: string | null): Accou
     }))
     .sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
 
-  let cumT = 0, cumA = 0, cumAtAsOf = 0, cumTAtAsOf = 0;
+  // Mốc nét đứt = thực đạt + mẫu số ĐÃ tính (không phải target cả ngày) ⇒ phần target của ca chưa có số vẫn được chiếu theo run-rate.
+  let cumT = 0, cumA = 0, cumE = 0, cumAtAsOf = 0, cumEAtAsOf = 0;
   const cumulative: RRCumulativePoint[] = days.map((d) => {
     cumT += d.target;
     if (d.counted) {
       cumA += d.actual;
+      cumE += d.expected;
       cumAtAsOf = cumA;
-      cumTAtAsOf = cumT;
+      cumEAtAsOf = cumE;
     }
     return { date: d.date, target: cumT, actual: d.counted ? cumA : null, projected: null };
   });
   if (asOf && all.runRate != null) {
-    for (const p of cumulative) if (p.date >= asOf) p.projected = cumAtAsOf + (p.target - cumTAtAsOf) * all.runRate;
+    for (const p of cumulative) if (p.date >= asOf) p.projected = cumAtAsOf + (p.target - cumEAtAsOf) * all.runRate;
   }
 
   return {
@@ -268,6 +288,7 @@ export function buildAccountRunRate(rr: PlanRunRate, asOf: string | null): Accou
       perDayNow: elapsedDays > 0 ? all.actual / elapsedDays : null,
       needPerRemainingDay: all.target > 0 && remainingDays > 0 ? Math.max(0, all.target - all.actual) / remainingDays : null
     },
+    tail: tailOf(rr, asOf, completeThrough),
     waves,
     weeks,
     days,
@@ -276,8 +297,25 @@ export function buildAccountRunRate(rr: PlanRunRate, asOf: string | null): Accou
     offPlanActual: rr.offPlanActual,
     cancelledCount: rr.cancelledCount,
     noDataCount: rr.noDataCount,
+    noDataWaiting: noDataSplit(rr, completeThrough).waiting,
     cumulative
   };
+}
+
+function tailOf(rr: PlanRunRate, asOf: string | null, completeThrough: string | null | undefined): AccountRunRate["tail"] {
+  const none = { shifts: 0, unreconciled: 0, lastShift: null };
+  if (completeThrough === undefined || !asOf) return none;
+  let shifts = 0, unreconciled = 0;
+  let lastShift: AccountRunRate["tail"]["lastShift"] = null;
+  const take = (date: string, startTime: string, endTime: string, tier: ReturnType<typeof dataSourceTier>) => {
+    if (date > asOf || (completeThrough != null && date <= completeThrough)) return;
+    shifts++;
+    if (tier !== "reconciled") unreconciled++;
+    if (!lastShift || date + endTime.slice(0, 5) > lastShift.date + lastShift.endTime) lastShift = { date, startTime: startTime.slice(0, 5), endTime: endTime.slice(0, 5) };
+  };
+  for (const t of rr.slots) if (t.state === "done" && t.session) take(t.planSlot.date, t.planSlot.startTime, t.planSlot.endTime, dataSourceTier(t.session));
+  for (const x of rr.offPlan) take(x.session.date, x.session.startTime, x.session.endTime, dataSourceTier(x.session));
+  return { shifts, unreconciled, lastShift };
 }
 
 /** Tài khoản chưa có kế hoạch chốt: chỉ có số đã đạt trong tháng (không có target ⇒ không có run-rate). */

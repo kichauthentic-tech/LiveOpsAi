@@ -218,7 +218,10 @@ export default function ControlRoom(props: ControlRoomProps) {
 
   // ---------- nhịp agency ----------
   const pulse = useMemo(() => {
-    const gmvOf = (p: ReportPlatform) => channels.filter((c) => c.platform === p).reduce((a, c) => a + (c.room?.now.actual ?? 0), 0);
+    // GMV đã có của MỌI kênh trên sàn, kể cả kênh chưa đủ lịch sử để chiếu (room null) — trước đây thiếu Franklin Shopee
+    // nên "GMV Shopee tháng này" nhỏ hơn số Dashboard.
+    const gmvOf = (p: ReportPlatform) =>
+      channels.filter((c) => c.platform === p).reduce((a, c) => a + (c.room ? c.room.now.actual : c.sessions.filter((s) => s.date >= mStart && s.date <= mEnd && s.date <= today && s.status !== "Cancelled" && isCountable(s)).reduce((x, s) => x + (s.actualGmv ?? 0), 0)), 0);
     const ratioOf = (p: ReportPlatform) => {
       let a = 0, e = 0;
       for (const c of channels) if (c.platform === p && c.room) for (const s of c.room.sessions) if (s.actual != null) { a += s.actual; e += s.expected; }
@@ -326,7 +329,7 @@ export default function ControlRoom(props: ControlRoomProps) {
       >
         <div className="flex gap-1 rounded-xl border border-[var(--border)] p-1 w-fit" role="tablist" aria-label="Lớp">
           {([["boss", "Toàn cảnh"], ["ops", "Sa bàn & người"]] as const).map(([k, l]) => (
-            <button key={k} type="button" role="tab" aria-selected={layer === k} onClick={() => setLayer(k)} className={`px-3 py-1.5 rounded-lg text-sm font-bold min-h-[32px] ${layer === k ? "bg-[var(--accent)] text-[var(--accent-contrast)]" : "text-[var(--text-muted)]"}`}>{l}</button>
+            <button key={k} type="button" role="tab" aria-selected={layer === k} onClick={() => setLayer(k)} className={`px-3 py-1.5 rounded-lg text-sm font-bold min-h-[32px] ${layer === k ? "seg-on" : "text-[var(--text-muted)]"}`}>{l}</button>
           ))}
         </div>
       </PageHeader>

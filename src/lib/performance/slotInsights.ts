@@ -132,7 +132,9 @@ export function walkForward(sessions: LiveSession[], bucketOf: BucketOf, keyOf: 
 
 /** Khung giờ đủ tin để đề xuất: ≥ 2 tháng, walk-forward có ích, và có ít nhất một khung mà CI không chạm 1. */
 export function slotRuleReliable(idx: Partial<Record<SlotBlock, SlotIndexRow>>, wf: WalkForward): boolean {
-  return wf.months >= 2 && (wf.gain ?? 0) > 0 && SLOT_BLOCKS.some((k) => idx[k] && (idx[k]!.hi < 1 || idx[k]!.lo > 1));
+  // Giảm sai số dưới 1 điểm % là nhiễu (backtest chia target: "chênh dưới ~1 điểm % chưa đủ để kết luận") — VERA 17/10 hiện
+  // "Đủ tin cậy" kèm "giảm sai số 0%".
+  return wf.months >= 2 && (wf.gain ?? 0) >= 0.01 && SLOT_BLOCKS.some((k) => idx[k] && (idx[k]!.hi < 1 || idx[k]!.lo > 1));
 }
 
 // ---------------------------------------------------------------------------

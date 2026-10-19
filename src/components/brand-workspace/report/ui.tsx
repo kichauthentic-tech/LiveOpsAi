@@ -9,6 +9,7 @@ import { errorMessage } from "../../../lib/errorMessage";
 import { fmtFixed, fmtVndShort } from "../../../lib/format";
 import { LINK_BTN, PAL, DRIVER_SHORT, chartTooltipStyle } from "./theme";
 import { chartNum } from "./format";
+import { STAT_LABEL_SHAPE } from "../../common/StatTile";
 
 // Bộ component trình bày của Report Tháng — khung panel, bảng, thẻ KPI, hộp Insight, biểu đồ thác,
 // ô sửa nhận xét. Tách khỏi MonthlyReportTabs.tsx 2026-10-01: toàn bộ chỗ này đã tự chứa sẵn (không
@@ -64,7 +65,7 @@ export const ReportTable: React.FC<{ head: string[]; children: React.ReactNode }
           {head.map((h, i) => (
             <th
               key={i}
-              className={`py-2 px-3 text-left text-[11px] uppercase tracking-wider ${i > 0 ? "text-right" : ""}`}
+              className={`py-2 px-3 text-left text-[11px] font-semibold ${i > 0 ? "text-right" : ""}`}
               style={{ color: PAL.muted }}
               title={metricHint(h)}
             >
@@ -197,7 +198,7 @@ export const InsightBox: React.FC<{
   };
   return (
     <div className="rounded-xl p-4 space-y-2" style={{ background: "#1f1b10", border: `1px solid ${PAL.gold}44` }}>
-      <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider" style={{ color: PAL.gold }}>
+      <div className="flex items-center gap-2 text-xs font-bold" style={{ color: PAL.gold }}>
         <Lightbulb className="w-3.5 h-3.5" /> Insight
       </div>
       {editing ? (
@@ -274,12 +275,14 @@ export const InsightBox: React.FC<{
   );
 };
 
-export const KpiTile: React.FC<{ label: string; value: string; change?: number | null; note?: string }> = ({ label, value, change, note }) => (
-  <div className="rounded-xl p-4" style={{ background: PAL.panel2, border: `1px solid ${PAL.line}` }}>
-    <div className="text-[11px] uppercase tracking-wider" style={{ color: PAL.muted }} title={metricHint(label)}>
+// Cùng dáng với StatTile của app (common/StatTile.tsx: nhãn chữ thường 12px, số đậm, dòng phụ 11px) nhưng giữ skin đen-vàng
+// cố định của report. frame "plain" = ô nằm trong một Panel — không vẽ thêm khung (trước 18/10 report lồng hộp 4 tầng).
+export const KpiTile: React.FC<{ label: string; value: string; change?: number | null; note?: string; frame?: "box" | "plain" }> = ({ label, value, change, note, frame = "box" }) => (
+  <div className={`min-w-0 ${frame === "box" ? "rounded-xl p-4" : ""}`} style={frame === "box" ? { background: PAL.panel2, border: `1px solid ${PAL.line}` } : undefined}>
+    <div className={STAT_LABEL_SHAPE} style={{ color: PAL.muted }} title={metricHint(label)}>
       {label}
     </div>
-    <div className="font-mono text-xl font-bold mt-1.5" style={{ color: PAL.cream }}>
+    <div className="font-mono text-xl font-bold mt-1" style={{ color: PAL.cream }}>
       {value}
     </div>
     {change != null && (
@@ -293,6 +296,15 @@ export const KpiTile: React.FC<{ label: string; value: string; change?: number |
       </div>
     )}
   </div>
+);
+
+// Giải thích cách tính dài của một khối — gập sau dòng "Cách tính" (bố cục 18/10 đợt 2). Số, kết luận và chú thích màu
+// vẫn hiện; chỉ phần nói phương pháp mới gập.
+export const MethodNote: React.FC<{ children: React.ReactNode; label?: string; className?: string }> = ({ children, label = "Cách tính", className = "mt-2" }) => (
+  <details className={`text-[11px] ${className}`} style={{ color: PAL.muted }}>
+    <summary className="cursor-pointer min-h-6 py-1 font-bold w-fit">{label}</summary>
+    <div className="leading-relaxed">{children}</div>
+  </details>
 );
 
 export const ChartLegend: React.FC<{ items: [string, string][] }> = ({ items }) => (
@@ -318,7 +330,7 @@ export const NarrativeEditor: React.FC<{
 }> = ({ summaryDraft, nextDraft, onSummary, onNext, saving, error, onSave, onCancel }) => (
   <div className="space-y-3">
     <label className="block space-y-1">
-      <span className="text-[11px] uppercase tracking-wider" style={{ color: PAL.muted }}>
+      <span className="text-xs font-medium" style={{ color: PAL.muted }}>
         Kết luận (phần 1) — mỗi dòng một ý
       </span>
       <textarea
@@ -331,7 +343,7 @@ export const NarrativeEditor: React.FC<{
       />
     </label>
     <label className="block space-y-1">
-      <span className="text-[11px] uppercase tracking-wider" style={{ color: PAL.muted }}>
+      <span className="text-xs font-medium" style={{ color: PAL.muted }}>
         Việc tháng sau (phần 7) — mỗi dòng một việc
       </span>
       <textarea

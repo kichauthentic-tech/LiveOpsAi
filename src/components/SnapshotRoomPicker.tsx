@@ -43,7 +43,9 @@ export function SnapshotRoomPicker({ session: s, rows, fileName, untilMin, previ
   const noun = prof.liveFileRowNoun; // "phòng" (TikTok) / "phiên" (Shopee)
   const viewsWord = prof.viewsLabel.toLowerCase();
   const win = useMemo(() => sessionWindow(s, untilMin), [s, untilMin]);
-  const choices = useMemo(() => classifyRooms(rows, win, Date.now(), prevBaseline?.roomIds), [rows, win, prevBaseline?.roomIds]);
+  // Mốc "bây giờ" chốt một lần khi mở picker (phòng nào đang live tính theo lúc up file) — không đổi theo mỗi lần vẽ lại.
+  const [openedAt] = useState(() => Date.now());
+  const choices = useMemo(() => classifyRooms(rows, win, openedAt, prevBaseline?.roomIds), [rows, win, openedAt, prevBaseline?.roomIds]);
   const [picked, setPicked] = useState<Set<string>>(() => {
     const prev = new Set(previouslySelected ?? []);
     const fromPrev = choices.filter((c) => prev.has(c.row.roomId));

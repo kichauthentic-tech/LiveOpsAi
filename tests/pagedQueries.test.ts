@@ -7,9 +7,13 @@
 // qua `fetchAllPages`. Bảng bị chặn có chủ ý (nhật ký) thì phải khai `.limit(` rõ ràng.
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { describe, expect, test } from "vitest";
-import { PAGE_SIZE, fetchAllPages } from "../src/lib/db/fetchAllPages";
-import { SESSION_READ_COLUMNS } from "../src/lib/db/sessions";
+import { describe, expect, test, vi } from "vitest";
+
+// CI chạy không có .env: sessions.ts import supabaseClient (ném lỗi khi thiếu URL/key) — WORKSPACE §5.1.
+vi.mock("../src/lib/supabaseClient", () => ({ supabase: {} }));
+
+const { PAGE_SIZE, fetchAllPages } = await import("../src/lib/db/fetchAllPages");
+const { SESSION_READ_COLUMNS } = await import("../src/lib/db/sessions");
 
 const SRC = join(__dirname, "..", "src");
 const DB = join(SRC, "lib/db");

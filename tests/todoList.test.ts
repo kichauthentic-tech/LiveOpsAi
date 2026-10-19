@@ -12,7 +12,8 @@ const base = (over: Partial<TodoInput> = {}): TodoInput => ({
   today: "2026-10-04",
   brands: [brand("crocs", "CROCS"), brand("franklin", "Franklin")],
   channels: [{ id: "c1", brandId: "crocs", platform: "TikTok", shopName: "", shopRef: "", status: "active", note: "" } as BrandChannel],
-  sessions: [ca("a", "2026-09-22"), ca("b", "2026-09-21", { hostId: "" })],
+  // ca02: ca đã chạy sau ngày có số cuối mà chưa có số (đúng hiện trạng 04/10) ⇒ việc "Số liệu … mới tới 22/09".
+  sessions: [ca("a", "2026-09-22"), ca("b", "2026-09-21", { hostId: "" }), ca("ca02", "2026-10-02", { actualGmv: 0, dataSource: "manual", isBackfill: false })],
   shiftSlots: [],
   plansThisMonth: new Map([["crocs", { status: "draft" } as BrandMonthPlan]]),
   plansNextMonth: new Map(),
@@ -27,7 +28,7 @@ const ids = (input: TodoInput) => buildTodos(input).map((t) => t.id);
 
 describe("buildTodos", () => {
   test("tình huống 04/10: đủ các việc của CROCS, Franklin gộp một dòng", () => {
-    expect(ids(base()).sort()).toEqual(["commit-crocs", "idle", "no-host", "plan-draft-crocs", "rate-crocs", "report-crocs", "stale-crocs"].sort());
+    expect(ids(base()).sort()).toEqual(["commit-crocs", "idle", "no-host", "plan-draft-crocs", "rate-crocs", "report-crocs", "stale-crocs", "unconfirmed"].sort());
   });
   test("việc đỏ đứng trước", () => {
     const t = buildTodos(base());
@@ -41,6 +42,9 @@ describe("buildTodos", () => {
     }));
     expect(got).not.toContain("stale-crocs");
     expect(got).not.toContain("report-crocs");
+  });
+  test("kênh tạm nghỉ (không ca nào sau ngày có số cuối) thì không nhắc số liệu cũ", () => {
+    expect(ids(base({ sessions: [ca("a", "2026-09-22"), ca("b", "2026-09-21", { hostId: "" })] }))).not.toContain("stale-crocs");
   });
   test("ca nạp bù chưa gán host của một brand ⇒ mở lưới nạp bù của brand đó", () => {
     const t = buildTodos(base()).find((x) => x.id === "no-host")!;

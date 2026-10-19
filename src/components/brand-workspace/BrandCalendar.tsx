@@ -8,7 +8,8 @@ import { schemesForDate } from "../../lib/schemeUtils";
 import { CAMPAIGN_DAY_STYLES, getCampaignDayInfo } from "../../lib/campaignDays";
 import { OpenSlotModal } from "../scheduling/OpenSlotModal";
 import { SlotDetailModal } from "../scheduling/SlotDetailModal";
-import { PosterCalendarHeader, PosterCalendarGrid, PosterDayCell } from "../ui/PosterCalendarGrid";
+import { PosterCalendarGrid, PosterDayCell } from "../ui/PosterCalendarGrid";
+import { PageHeader } from "../common/PageHeader";
 import { CampaignDayRibbon, CampaignDayBanner } from "../ui/CampaignDayRibbon";
 import { SchemeWeekStrip } from "./SchemeWeekStrip";
 import { SchemeDayPanel } from "./SchemeDayPanel";
@@ -61,7 +62,9 @@ interface BrandCalendarProps {
   onLogAudit?: (entry: { action: string; details: string; category: AuditLogEntry["category"] }) => Promise<void>;
 }
 
-const WEEKDAY_LABELS = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
+// Tuần bắt đầu Thứ 2 như Lịch & Studio / Bàn Trainer / app talent (bố cục 18/10 — trước lịch brand là lịch duy nhất bắt đầu Chủ Nhật).
+const WEEKDAY_LABELS = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
+const WEEKEND_COLUMNS = [5, 6];
 
 // Ngày hôm nay theo giờ local, format YYYY-MM-DD — cùng pattern LiveCalendar.tsx/ShiftScheduling.tsx.
 const getTodayDateString = () => {
@@ -168,7 +171,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
   const [y, m] = month.split("-").map(Number);
   const firstDay = new Date(y, m - 1, 1);
   const daysInMonth = new Date(y, m, 0).getDate();
-  const leadingBlanks = firstDay.getDay();
+  const leadingBlanks = (firstDay.getDay() + 6) % 7;
 
   const sessionsByDate = useMemo(() => {
     const map = new Map<string, LiveSession[]>();
@@ -196,11 +199,11 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
     return map;
   }, [brandOpenSlots, month]);
 
-  // 7 ngày Chủ Nhật→Thứ 7 chứa `selectedDate` — dùng cho view Tuần (SchemeWeekStrip vốn đã
+  // 7 ngày Thứ 2→Chủ Nhật chứa `selectedDate` — dùng cho view Tuần (SchemeWeekStrip vốn đã
   // nhận thẳng mảng weekDates, tái dùng nguyên component/UI đã làm cho lưới tháng).
   const weekDates = useMemo(() => {
-    const sunday = shiftDay(selectedDate, -new Date(selectedDate).getDay());
-    return Array.from({ length: 7 }, (_, i) => shiftDay(sunday, i));
+    const monday = shiftDay(selectedDate, -((new Date(selectedDate).getDay() + 6) % 7));
+    return Array.from({ length: 7 }, (_, i) => shiftDay(monday, i));
   }, [selectedDate]);
 
   // Render 1 ô ngày (PosterDayCell + card phiên/ca bên trong) — dùng chung cho cả lưới Tháng (7
@@ -219,12 +222,11 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
   ) => {
     const daySchemes = schemesForDate(brandSchemes, dateStr);
     const campaignDay = getCampaignDayInfo(dateStr);
-    const eventCount = daySessions.length + daySlots.length + daySchemes.length;
     return (
       <PosterDayCell
         day={day}
         isToday={dateStr === getTodayDateString()}
-        isWeekend={columnIndex === 0 || columnIndex === 6}
+        isWeekend={WEEKEND_COLUMNS.includes(columnIndex)}
         title={campaignDay?.label}
         onClick={canManage ? () => setModalState({ open: true, session: null, initialDate: dateStr }) : undefined}
         minHeight={minHeight}
@@ -238,7 +240,6 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
             variant="poster"
           />
         }
-        footer={eventCount > 0 ? `${eventCount} sự kiện` : undefined}
         badge={
           daySchemes.length > 0 ? (
             <span
@@ -300,27 +301,19 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
 
   return (
     <div className="space-y-5">
-      <PosterCalendarHeader
+      {/* Bố cục 19/10: đầu trang chung PageHeader (trước là thẻ PosterCalendarHeader nền gradient — trang duy nhất còn thẻ tiêu đề
+          kiểu cũ), chú giải màu nằm trong đầu trang thay vì một dải rời giữa tiêu đề và lưới. */}
+      <PageHeader
         icon={CalendarIcon}
         title="Lịch Vận Hành"
-        subtitle="Chỉ hiện phiên live của riêng brand này."
+        description="Chỉ hiện phiên live của riêng brand này."
         actions={
-          canManage && (
-            <button
-              onClick={() => setModalState({ open: true, session: null, initialDate: undefined })}
-              className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-lg transition-all active:scale-95"
-            >
-              <Plus className="w-4 h-4" /> Mở ca chờ đăng ký
-            </button>
-          )
-        }
-        nav={
           <>
             <div className="flex items-center gap-0.5 p-0.5 rounded-xl bg-[var(--surface-base)]/60 border border-[var(--border)]">
               <button
                 onClick={() => setViewMode("month")}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                  viewMode === "month" ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)] hover:text-[var(--text)]"
+                  viewMode === "month" ? "seg-on" : "text-[var(--text-muted)] hover:text-[var(--text)]"
                 }`}
               >
                 Tháng
@@ -328,7 +321,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
               <button
                 onClick={() => setViewMode("week")}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                  viewMode === "week" ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)] hover:text-[var(--text)]"
+                  viewMode === "week" ? "seg-on" : "text-[var(--text-muted)] hover:text-[var(--text)]"
                 }`}
               >
                 Tuần
@@ -336,7 +329,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
               <button
                 onClick={() => setViewMode("day")}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                  viewMode === "day" ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)] hover:text-[var(--text)]"
+                  viewMode === "day" ? "seg-on" : "text-[var(--text-muted)] hover:text-[var(--text)]"
                 }`}
               >
                 Ngày
@@ -368,14 +361,23 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
                 </button>
               </>
             )}
+            {canManage && (
+              <button
+                onClick={() => setModalState({ open: true, session: null, initialDate: undefined })}
+                className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-lg transition-all active:scale-95"
+              >
+                <Plus className="w-4 h-4" /> Mở ca chờ đăng ký
+              </button>
+            )}
           </>
         }
-      />
+      >
+        <SessionCardLegend showCancelled showTiming={!brandViewer} />
+      </PageHeader>
 
-      <SessionCardLegend showCancelled showTiming={!brandViewer} className="px-1" />
 
       {viewMode === "month" && (
-      <PosterCalendarGrid weekdayLabels={WEEKDAY_LABELS} minWidthClassName="min-w-[1080px] xl:min-w-0">
+      <PosterCalendarGrid weekdayLabels={WEEKDAY_LABELS} weekendIndices={WEEKEND_COLUMNS} minWidthClassName="min-w-[1080px] xl:min-w-0">
         {cells.map((day, idx) => {
           const rowStart = idx - (idx % 7);
           const isRowEnd = idx % 7 === 6 || idx === cells.length - 1;
@@ -416,7 +418,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
                 daysInMonth - day + 1,
                 daySessions,
                 daySlots,
-                "min-h-[160px] sm:min-h-[240px]"
+                "min-h-[110px] sm:min-h-[150px]"
               )}
               {weekStrip}
             </React.Fragment>
@@ -426,7 +428,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
       )}
 
       {viewMode === "week" && (
-        <PosterCalendarGrid weekdayLabels={WEEKDAY_LABELS} minWidthClassName="min-w-[1080px] xl:min-w-0">
+        <PosterCalendarGrid weekdayLabels={WEEKDAY_LABELS} weekendIndices={WEEKEND_COLUMNS} minWidthClassName="min-w-[1080px] xl:min-w-0">
           {weekDates.map((dateStr, idx) => (
             <React.Fragment key={dateStr}>
               {renderDayCell(
@@ -437,7 +439,7 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
                 7 - idx,
                 brandSessions.filter((s) => s.date === dateStr),
                 brandOpenSlots.filter((sl) => sl.date === dateStr),
-                "min-h-[200px] sm:min-h-[280px]"
+                "min-h-[160px] sm:min-h-[220px]"
               )}
             </React.Fragment>
           ))}
@@ -453,16 +455,24 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
         </PosterCalendarGrid>
       )}
 
-      {viewMode === "month" && (
-      <div className="space-y-2">
-        {(sessionsByDate.size === 0 || Array.from(sessionsByDate.values()).flat().length === 0) && (
-          <p className="text-sm text-[var(--text-faint)] text-center py-6">Không có phiên live nào trong tháng {fmtMonth(month)}.</p>
-        )}
+      {/* Bố cục 19/10: danh sách ca theo ngày dưới lưới tháng lặp lại đúng các ca đã có trên lưới (CROCS T10: 90 ca hai lần, trang
+          8.300px) — gập lại, mở khi cần xem GMV từng ca theo hàng dài. */}
+      {viewMode === "month" && (sessionsByDate.size === 0 || Array.from(sessionsByDate.values()).flat().length === 0) && (
+        <p className="text-sm text-[var(--text-faint)] text-center py-6">Không có phiên live nào trong tháng {fmtMonth(month)}.</p>
+      )}
+      {viewMode === "month" && Array.from(sessionsByDate.values()).flat().length > 0 && (
+      <details className="group bg-[var(--surface)] border border-[var(--border)] rounded-2xl">
+        <summary className="list-none cursor-pointer px-4 py-3 flex items-center gap-2 text-sm font-bold text-[var(--text)]">
+          <ChevronRight className="w-4 h-4 text-[var(--text-faint)] transition-transform group-open:rotate-90" />
+          Danh sách ca theo ngày
+          <span className="text-xs font-normal text-[var(--text-faint)]">{Array.from(sessionsByDate.values()).flat().length} ca · {fmtMonth(month)}</span>
+        </summary>
+        <div className="divide-y divide-[var(--border-muted)] border-t border-[var(--border)]">
         {Array.from(sessionsByDate.entries())
           .sort(([a], [b]) => a.localeCompare(b))
           .map(([date, list]) => (
-            <div key={date} className="bg-[var(--surface)] border border-[var(--border)] rounded-xl px-4 py-3 space-y-1.5 shadow-sm">
-              <p className="text-xs font-bold text-[var(--text-muted)] font-mono">{date}</p>
+            <div key={date} className="px-4 py-3 space-y-1.5">
+              <p className="text-xs font-bold text-[var(--text-muted)]">{getDayOfWeekName(date)}, {fmtDateVn(date)}</p>
               {list.map((s) => {
                 // Cùng thẻ với lưới tháng/tuần (tầng "rộng" một hàng) — trước đây là dòng chữ + nhãn trạng thái riêng.
                 const studioLabel = studioById[s.studioId]?.name ?? s.studioName;
@@ -496,7 +506,8 @@ export const BrandCalendar: React.FC<BrandCalendarProps> = ({
               })}
             </div>
           ))}
-      </div>
+        </div>
+      </details>
       )}
 
       {viewMode === "day" && (

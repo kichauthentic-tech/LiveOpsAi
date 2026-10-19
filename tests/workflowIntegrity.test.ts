@@ -76,6 +76,16 @@ describe("#5/#6 tiền", () => {
     expect(isPnlSession(ca("x", { status: "Completed" }), { includeBackfill: true })).toBe(false);
   });
 
+  test("brand, tháng chưa phát hành (số bị che): dựa vào cờ live_evidence của view (0178)", () => {
+    const hidden = (over: Partial<LiveSession>) => ca("x", { status: "Completed", monthPublished: false, ...over });
+    // Brand Franklin 16/10: Hợp Đồng ghi 81h·29 ca vì ca chờ xác nhận bị tính là đã chạy.
+    expect(isUnconfirmedPast(hidden({ liveEvidence: false }))).toBe(true);
+    expect(isUnconfirmedPast(hidden({ liveEvidence: true }))).toBe(false);
+    expect(hasLiveEvidence(hidden({ liveEvidence: true }))).toBe(true);
+    // DB chưa chạy 0178 (không có cờ): giữ hành vi cũ — không gọi là chờ xác nhận.
+    expect(isUnconfirmedPast(hidden({}))).toBe(false);
+  });
+
   test("ca loại khỏi báo cáo: vẫn trả công theo giờ, bỏ doanh thu + hoa hồng theo GMV", () => {
     const host = { id: "h1", name: "Host", ratePerHour: 200_000, commissionRate: 1 } as Talent;
     const s = ca("x", { status: "Completed", dataSource: "tiktok_reconciled", actualGmv: 100_000_000, excludedFromReports: true });

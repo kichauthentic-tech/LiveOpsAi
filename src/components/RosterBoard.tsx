@@ -408,7 +408,7 @@ export const RosterBoard: React.FC<Props> = (p) => {
                   ["cost", "Chi phí thấp"]
                 ] as const
               ).map(([k, l]) => (
-                <button key={k} type="button" aria-pressed={mode === k} onClick={() => changeMode(k)} className={`px-3 py-1.5 rounded-lg ${mode === k ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)]"}`}>
+                <button key={k} type="button" aria-pressed={mode === k} onClick={() => changeMode(k)} className={`px-3 py-1.5 rounded-lg ${mode === k ? "seg-on" : "text-[var(--text-muted)]"}`}>
                   {l}
                 </button>
               ))}

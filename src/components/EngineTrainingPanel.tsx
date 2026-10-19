@@ -10,6 +10,7 @@ import { useDefaultBrand } from "../hooks/useDefaultBrand";
 import { errorMessage } from "../lib/errorMessage";
 import { AllocationTrainingCard } from "./AllocationTrainingCard";
 import { ForecastTrainingCard } from "./ForecastTrainingCard";
+import { Explain } from "./common/Explain";
 import { LEGACY_PLATFORM, REPORT_PLATFORMS, platformOf, type ReportPlatform } from "../lib/reportPlatform";
 
 import { fmtDateVn, fmtFixed, fmtVndShort } from "../lib/format";
@@ -39,6 +40,7 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [showHelp, setShowHelp] = useState(false);
   const [events, setEvents] = useState<CalendarEventRow[]>([]);
   const [lockedSlots, setLockedSlots] = useState<BrandMonthPlanSlot[]>([]);
   const today = todayVn();
@@ -101,17 +103,21 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
 
   return (
     <div className="space-y-6">
-      <div className="bg-[var(--surface)] text-[var(--text)] p-6 rounded-2xl border border-[var(--border)] shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <span className="text-sky-400 font-semibold text-xs uppercase tracking-wider flex items-center gap-1.5"><Sparkles className="w-4 h-4" /> Không phải LLM — thuật toán thuần</span>
-          <h2 className="text-lg font-black">Engine Kế Hoạch Tháng</h2>
-          <p className="text-xs text-[var(--text-muted)] mt-1 max-w-2xl">
-            Engine gợi ý lịch học từ ca đã đối soát rồi xếp ca theo tham số bên dưới. Không có prompt để sửa: "huấn luyện" = xem engine học được gì theo brand, vặn tham số, thấy kết quả đổi ngay, rồi lưu. Kết quả lặp lại được và giải thích được — cần thế khi chốt lịch cho host.
-          </p>
+      {/* Đầu mục không khung (bố cục 18/10 đợt 2) — trước là một thẻ tiêu đề nữa ngay dưới đầu trang, kèm 3 dòng giải thích. */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-3 border-t border-[var(--border)] pt-6">
+        <div className="min-w-0">
+          <h2 className="text-lg font-black text-[var(--text)] flex flex-wrap items-center gap-x-2">
+            Engine Kế Hoạch Tháng
+            <span className="text-xs font-semibold text-sky-400 inline-flex items-center gap-1"><Sparkles className="w-3.5 h-3.5" /> không phải LLM — thuật toán thuần</span>
+          </h2>
+          <p className="text-xs text-[var(--text-muted)] mt-0.5">Engine gợi ý lịch học từ ca đã đối soát rồi xếp ca theo tham số bên dưới.</p>
+          <Explain summary="Vì sao không có prompt để sửa" className="mt-0.5 max-w-2xl">
+            <p>"Huấn luyện" = xem engine học được gì theo brand, vặn tham số, thấy kết quả đổi ngay, rồi lưu. Kết quả lặp lại được và giải thích được — cần thế khi chốt lịch cho host.</p>
+          </Explain>
         </div>
-        <div className="flex-shrink-0 bg-sky-950/60 border border-sky-500/40 rounded-xl px-3.5 py-2 text-right">
-          <div className="text-xs font-bold text-sky-300">{changed} tham số khác mặc định</div>
-          <p className="text-[11px] text-sky-400">{updatedAt ? `Lưu lần cuối ${new Date(updatedAt).toLocaleString("vi-VN")}` : "Đang dùng mặc định"}</p>
+        <div className="shrink-0 text-xs md:text-right">
+          <b className="text-sky-300">{changed} tham số khác mặc định</b>
+          <p className="text-[11px] text-[var(--text-faint)]">{updatedAt ? `Lưu lần cuối ${new Date(updatedAt).toLocaleString("vi-VN")}` : "Đang dùng mặc định"}</p>
         </div>
       </div>
 
@@ -203,13 +209,17 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
         <div className="xl:col-span-3 bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 space-y-4">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-sm font-bold text-[var(--text)] flex-1">Tham số</h3>
+            {/* Mô tả 38 tham số chiếm ~70 dòng — ẩn mặc định, rê chuột lên tên tham số vẫn đọc được từng dòng. */}
+            <button onClick={() => setShowHelp((v) => !v)} aria-pressed={showHelp} className={`px-3 py-1.5 rounded-lg border text-xs font-bold ${showHelp ? "seg-on" : "border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]"}`}>
+              {showHelp ? "Ẩn giải thích" : "Hiện giải thích"}
+            </button>
             <span className="text-[11px] text-[var(--text-muted)]">{loading ? "Đang tải…" : msg ?? (dirty ? "Chưa lưu — nửa trái đang tính theo giá trị đang sửa." : "")}</span>
             <button onClick={resetAll} className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-xs font-bold text-[var(--text)] flex items-center gap-1.5"><RotateCcw className="w-3.5 h-3.5" /> Về mặc định tất cả</button>
             <button onClick={save} disabled={saving || !dirty} className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-bold disabled:opacity-40 flex items-center gap-1.5"><Save className="w-3.5 h-3.5" /> {saving ? "Đang lưu…" : "Lưu tham số"}</button>
           </div>
           {GROUPS.map((g) => (
             <div key={g}>
-              <p className="text-[11px] font-black uppercase tracking-wider text-[var(--text-faint)] mb-1.5">{ENGINE_GROUP_LABEL[g]}</p>
+              <p className="text-xs font-bold text-[var(--text-muted)] mb-1.5">{ENGINE_GROUP_LABEL[g]}</p>
               <div className="divide-y divide-[var(--border)] border border-[var(--border)] rounded-xl overflow-hidden">
                 {ENGINE_PARAM_META.filter((m) => m.group === g).map((m) => {
                   const v = draft[m.key];
@@ -218,8 +228,8 @@ export const EngineTrainingPanel: React.FC<Props> = ({ brands, sessions, shiftSl
                   return (
                     <div key={m.key} className={`flex items-center gap-3 px-3 py-2 text-xs ${isDef ? "" : "bg-sky-950/20"}`}>
                       <div className="flex-1 min-w-0">
-                        <div className="font-bold text-[var(--text)]">{m.label}</div>
-                        {m.help && <div className="text-[11px] text-[var(--text-muted)] leading-snug">{m.help}</div>}
+                        <div className="font-bold text-[var(--text)]" title={m.help}>{m.label}</div>
+                        {showHelp && m.help && <div className="text-[11px] text-[var(--text-muted)] leading-snug">{m.help}</div>}
                       </div>
                       {m.kind === "boolean" ? (
                         <label className="flex items-center gap-1.5 text-[var(--text)]">

@@ -66,7 +66,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
     </div>
 
     <nav
-      className={`flex-1 py-3 space-y-3 overflow-y-auto scrollbar-thin ${
+      className={`flex-1 py-3 space-y-4 overflow-y-auto scrollbar-thin ${
         sidebarCollapsed ? "px-3 md:px-2" : "px-3"
       }`}
     >
@@ -91,7 +91,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
           <div key={group.label} className="space-y-0.5">
             {group.label && (
               <p
-                className={`px-3 text-[11px] font-bold uppercase tracking-widest text-[var(--text-faint)] ${
+                className={`px-3 pb-0.5 text-[11px] font-semibold text-[var(--text-faint)] ${
                   sidebarCollapsed ? "md:hidden" : ""
                 }`}
               >
@@ -109,12 +109,12 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                   key={item.id}
                   onClick={() => onSelectTab(item.id)}
                   title={item.label}
-                  className={`w-full flex items-center justify-between gap-2 py-2 rounded-xl transition-colors text-xs font-medium ${
+                  className={`w-full flex items-center justify-between gap-2 py-[7px] rounded-lg transition-colors text-[13px] ${
                     sidebarCollapsed ? "px-3 md:px-0 md:justify-center" : "px-3"
                   } ${
                     isActive
-                      ? "bg-[var(--accent)]/10 text-[var(--accent-text)] border border-[var(--accent)]/20 font-bold"
-                      : "text-[var(--text-muted)] hover:bg-[var(--surface-elevated)]/80 hover:text-[var(--text)]"
+                      ? "bg-[var(--accent)]/12 text-[var(--text)] font-bold shadow-[inset_2px_0_0_var(--accent)]"
+                      : "text-[var(--text-muted)] font-medium hover:bg-[var(--surface-elevated)]/80 hover:text-[var(--text)]"
                   }`}
                 >
                   <div className={`flex items-center gap-3 min-w-0 ${sidebarCollapsed ? "md:gap-0" : ""}`}>
@@ -132,9 +132,8 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
 
                   <div className={`flex items-center gap-1.5 shrink-0 ${sidebarCollapsed ? "md:hidden" : ""}`}>
                     {item.badge && (
-                      <span className="bg-rose-600/20 text-rose-400 border border-rose-500/30 text-[11px] font-bold px-1.5 py-0.5 rounded uppercase">
-                        {item.badge}
-                      </span>
+                      // Bố cục 18/10: nhãn đỏ viết hoa "CHƯA DÙNG" là chỗ chói nhất sidebar cho một mục không ai dùng — chữ mờ là đủ báo.
+                      <span className="text-[11px] font-medium text-[var(--text-faint)]">{item.badge}</span>
                     )}
                   </div>
                 </button>
@@ -172,8 +171,8 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
           <p className="font-bold text-[var(--text)] truncate">{activeUser.name}</p>
           {/* Chức danh đã chứa role ("Quản Trị Viên Hệ Thống (Admin)") — in thêm role phía trước là
               lặp "ADMIN • ... (ADMIN)". Chỉ rơi về tên role khi chưa đặt chức danh. */}
-          <p className="text-[var(--accent-text)] text-[11px] uppercase font-extrabold truncate">
-            {activeUser.customRoleTitle || currentRole}
+          <p className="text-[var(--accent-text)] text-[11px] font-bold truncate">
+            {activeUser.customRoleTitle || currentRole.toUpperCase()}
           </p>
         </div>
         <UserCog

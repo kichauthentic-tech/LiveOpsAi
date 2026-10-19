@@ -93,7 +93,7 @@ export const FinanceSection: React.FC<{ fin: FinanceTotals; finPrev: FinanceTota
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="border-b border-[var(--border)]">
-                <tr>{["Brand", "Doanh thu", "Chi phí", "Lãi gộp", "Tỷ trọng lãi", "Phiên lãi", "Ngày lãi"].map((h, i) => <th key={h} className={`px-2 py-1.5 text-[11px] uppercase tracking-wider font-bold text-[var(--text-faint)] whitespace-nowrap ${i ? "text-right" : "text-left"}`}>{h}</th>)}</tr>
+                <tr>{["Brand", "Doanh thu", "Chi phí", "Lãi gộp", "Tỷ trọng lãi", "Phiên lãi", "Ngày lãi"].map((h, i) => <th key={h} className={`px-2 py-1.5 text-[11px] font-bold text-[var(--text-faint)] whitespace-nowrap ${i ? "text-right" : "text-left"}`}>{h}</th>)}</tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
                 {byBrand.length === 0 && <tr><td colSpan={7} className="px-2 py-3 text-[var(--text-faint)]">Không có ca nào trong kỳ.</td></tr>}

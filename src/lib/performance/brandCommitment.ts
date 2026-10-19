@@ -90,7 +90,7 @@ export function daysInMonth(periodMonth: string): number {
 // hiệu suất, còn ở đây ca lên sóng mà GMV = 0 VẪN giao đủ giờ cho brand nên vẫn phải đếm.
 //
 // Ca Completed chỉ là "đã giao" khi có bằng chứng diễn ra (`isUnconfirmedPast` = không có). Role brand ở tháng
-// chưa phát hành không thấy số (view che) nên với họ mọi ca Completed vẫn tính như cũ — xem isUnconfirmedPast.
+// chưa phát hành không thấy số (view che) ⇒ dựa vào cờ `liveEvidence` của view (0178) — xem isUnconfirmedPast.
 export function isDelivered(s: LiveSession): boolean {
   return s.status === "Live Now" || (s.status === "Completed" && !isUnconfirmedPast(s));
 }

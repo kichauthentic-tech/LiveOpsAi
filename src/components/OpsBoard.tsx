@@ -12,7 +12,11 @@ import { REPORT_PLATFORMS } from "../lib/reportPlatform";
 import { clashedSessionIds, findPersonClashes } from "../lib/scheduling/conflicts";
 import { SessionWindow } from "./SessionWindow";
 import { PageHeader } from "./common/PageHeader";
+import { StatTile } from "./common/StatTile";
 import { SlotDetailModal } from "./scheduling/SlotDetailModal";
+
+const WARN = "text-amber-300";
+const OK = "text-emerald-300";
 
 // Bảng Vận Hành — màn của NHỊP HẰNG NGÀY (tái cấu trúc 2026-09-21): hôm nay / ngày / tuần này có
 // ca nào, ai trực, phòng nào, và mỗi ca còn thiếu gì (chưa có người · chưa up file · chưa report ·
@@ -155,52 +159,59 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
 
   const openSession = openId ? sessions.find((s) => s.id === openId) ?? null : null;
 
+  // Bố cục 18/10: dòng ca là một hàng trong danh sách kẻ vạch (trước: mỗi ca một hộp viền nằm trong hộp lớn, 13 hộp/ngày), cột
+  // cố định giờ · brand · người · việc thiếu · trạng thái để mắt dò theo cột. Việc thiếu gộp MỘT cụm chữ vàng thay vì 2–3 nhãn
+  // viền ("chưa up file", "chưa giao ca"), trạng thái luôn ở mép phải.
+  // md trở lên: lưới cột cố định (giờ · brand · người · việc thiếu · trạng thái) — cụm việc thiếu dài tự xuống dòng TRONG ô của nó
+  // thay vì đẩy nhãn trạng thái rớt xuống đầu hàng sau. Màn hẹp: flex-wrap như cũ.
+  const ROW_CLS =
+    "w-full text-left rounded-lg px-2 sm:px-3 py-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 transition-colors md:grid md:grid-cols-[104px_168px_minmax(0,1fr)_minmax(0,auto)_76px]";
   const SessionRow = ({ s }: { s: LiveSession }) => {
     const missing = missingSteps(s, today);
     const actionable = missing.filter((m) => m !== "reconcile");
+    const noRoom = !s.studioId && s.status !== "Cancelled" && s.date >= today;
     return (
-      <button onClick={() => setOpenId(s.id)} className="w-full text-left bg-[var(--surface-base)] border border-[var(--border)] hover:border-[var(--accent)] rounded-xl p-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 transition-colors">
+      <button onClick={() => setOpenId(s.id)} className={`${ROW_CLS} hover:bg-[var(--surface-elevated)]/70`}>
         <span className="font-mono text-sm font-black text-[var(--text)] w-[104px] shrink-0">{s.startTime}–{s.endTime}</span>
-        <span className="flex items-center gap-1.5 min-w-0">
+        <span className="flex items-center gap-1.5 min-w-0 sm:w-[168px] shrink-0">
           <BrandLogo brand={brandById.get(s.brandId) ?? { name: s.brandName, logo: "" }} size="xs" />
           <span className="text-sm font-bold text-[var(--text)] truncate">{s.brandName}</span>
           <PlatformChip platform={s.platform} />
         </span>
-        <span className="flex-1 basis-40 min-w-0 text-xs text-[var(--text-muted)] truncate" title={[s.hostName ? `Host ${s.hostName}` : "chưa gán host", s.coHostName ? `Trợ ${s.coHostName}` : "", s.studioName ?? ""].filter(Boolean).join(" · ")}>
-          {s.hostName ? `Host ${s.hostName}` : <span className="text-rose-300 font-bold">chưa gán host</span>}
-          {s.coHostName ? ` · Trợ ${s.coHostName}` : ""}
-          {s.studioName ? ` · ${s.studioName}` : ""}
+        <span className="order-4 md:order-none flex-1 basis-40 min-w-0 text-xs text-[var(--text-muted)] truncate md:basis-auto" title={[s.hostName ? `Host ${s.hostName}` : "chưa gán host", s.coHostName ? `Trợ ${s.coHostName}` : "", s.studioName ?? ""].filter(Boolean).join(" · ")}>
+          {s.hostName ? <span className="text-[var(--text)]">{s.hostName}</span> : <span className="text-rose-300 font-bold">chưa gán host</span>}
+          {s.coHostName ? <span className="text-[var(--text-faint)]"> · Trợ {s.coHostName}</span> : ""}
+          {s.studioName ? <span className="text-[var(--text-faint)]"> · {s.studioName}</span> : ""}
         </span>
-        <span className="ml-auto flex flex-wrap items-center gap-1">
+        <span className="order-5 md:order-none ml-auto md:ml-0 flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-[11px] font-bold">
           {clashBySession.has(s.id) && (
-            <span className="text-[11px] font-bold px-1.5 py-0.5 rounded border bg-rose-950 text-rose-300 border-rose-800" title="Người này có ca khác cùng giờ">
+            <span className="px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-300" title="Người này có ca khác cùng giờ">
               trùng người: {clashBySession.get(s.id)!.join(", ")}
             </span>
           )}
-          {!s.studioId && s.status !== "Cancelled" && s.date >= today && (
-            <span className="text-[11px] font-bold px-1.5 py-0.5 rounded border bg-amber-950/60 text-amber-300 border-amber-800">chưa có phòng</span>
+          {(noRoom || actionable.length > 0) && (
+            <span className="text-amber-300">{[noRoom ? "chưa có phòng" : "", ...actionable.map((m) => MISSING_LABEL[m])].filter(Boolean).join(" · ")}</span>
           )}
-          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${STATUS_CLS[s.status]}`}>{STATUS_LABEL[s.status]}</span>
-          {s.actualGmv ? <span className="text-[11px] font-bold text-emerald-300">{fmtVndShort(s.actualGmv)}</span> : null}
-          {actionable.map((m) => (
-            <span key={m} className="text-[11px] font-bold px-1.5 py-0.5 rounded border bg-amber-950/60 text-amber-300 border-amber-800">{MISSING_LABEL[m]}</span>
-          ))}
-          {missing.length === 0 && s.status === "Completed" && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />}
+          {s.actualGmv ? <span className="text-emerald-300">{fmtVndShort(s.actualGmv)}</span> : null}
+          {missing.length === 0 && s.status === "Completed" && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" aria-label="Đủ bước" />}
         </span>
+        {/* Điện thoại: trạng thái lên cùng hàng giờ + brand (order), người + việc thiếu xuống hàng dưới. */}
+        <span className={`order-3 md:order-none ml-auto md:ml-0 shrink-0 min-w-[68px] text-center text-[11px] font-bold px-2 py-0.5 rounded-full border ${STATUS_CLS[s.status]}`}>{STATUS_LABEL[s.status]}</span>
       </button>
     );
   };
 
   const SlotRow = ({ r }: { r: Extract<Row, { kind: "slot" }> }) => (
-    <button onClick={() => setOpenSlotId(r.slot.id)} className="w-full text-left bg-[var(--surface-base)] border border-dashed border-rose-800/70 hover:border-rose-500 rounded-xl p-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 transition-colors" title="Mở để chốt Host + Trợ live">
+    <button onClick={() => setOpenSlotId(r.slot.id)} className={`${ROW_CLS} bg-rose-500/[0.06] hover:bg-rose-500/10`} title="Mở để chốt Host + Trợ live">
       <span className="font-mono text-sm font-black text-[var(--text)] w-[104px] shrink-0">{r.startTime.slice(0, 5)}–{r.endTime.slice(0, 5)}</span>
-      <span className="flex items-center gap-1.5 min-w-0">
+      <span className="flex items-center gap-1.5 min-w-0 sm:w-[168px] shrink-0">
         <BrandLogo brand={r.slot.brandId ? brandById.get(r.slot.brandId) : undefined} size="xs" />
         <span className="text-sm font-bold text-[var(--text)] truncate">{r.slot.brandName}</span>
         <PlatformChip platform={r.slot.platform} />
       </span>
-      <span className="flex-1 basis-40 min-w-0 text-xs text-rose-300 font-bold flex items-center gap-1"><UserX className="w-3.5 h-3.5" /> chưa có người · {r.registered} đăng ký</span>
-      <span className="ml-auto text-[11px] text-[var(--text-faint)] flex items-center gap-1"><CalendarClock className="w-3.5 h-3.5" /> chốt người</span>
+      <span className="order-4 md:order-none flex-1 basis-40 min-w-0 md:basis-auto text-xs text-rose-300 font-bold flex items-center gap-1"><UserX className="w-3.5 h-3.5" /> chưa có người · {r.registered} đăng ký</span>
+      <span className="hidden md:block" />
+      <span className="order-3 md:order-none ml-auto md:ml-0 text-[11px] font-bold text-[var(--accent-text)] flex items-center justify-center gap-1"><CalendarClock className="w-3.5 h-3.5" /> Chốt người</span>
     </button>
   );
 
@@ -219,7 +230,7 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
         actions={
           <>
             {(["today", "tomorrow", "week", "day"] as Range[]).map((r) => (
-              <button key={r} onClick={() => { setRange(r); if (r === "today") setAnchor(today); }} className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${range === r ? "bg-[var(--accent)] text-white border-[var(--accent)]" : "border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]"}`}>
+              <button key={r} onClick={() => { setRange(r); if (r === "today") setAnchor(today); }} className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${range === r ? "seg-on" : "border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]"}`}>
                 {r === "today" ? "Hôm nay" : r === "tomorrow" ? "Ngày mai" : r === "week" ? "Tuần" : "Ngày…"}
               </button>
             ))}
@@ -242,10 +253,11 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
               Run-rate ở Dashboard brand M2). */}
           {rows.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <Stat label={range === "week" ? "Ca trong tuần" : "Ca trong ngày"} value={String(summary.total)} />
-              <Stat label="Chưa có người" value={String(summary.noHost)} tone={summary.noHost > 0 ? "warn" : "ok"} />
-              <Stat label="Chưa giao ca" value={String(summary.pending)} tone={summary.pending > 0 ? "warn" : "ok"} />
-              <Stat
+              <StatTile frame="card" label={range === "week" ? "Ca trong tuần" : "Ca trong ngày"} value={String(summary.total)} />
+              <StatTile frame="card" label="Chưa có người" value={String(summary.noHost)} tone={summary.noHost > 0 ? WARN : OK} />
+              <StatTile frame="card" label="Chưa giao ca" value={String(summary.pending)} tone={summary.pending > 0 ? WARN : OK} />
+              <StatTile
+                frame="card"
                 label="GMV đã ghi nhận"
                 value={REPORT_PLATFORMS.some((p) => summary.gmv[p] > 0) ? REPORT_PLATFORMS.filter((p) => summary.gmv[p] > 0).map((p) => `${p} ${fmtVndShort(summary.gmv[p])}`).join(" · ") : "—"}
               />
@@ -281,16 +293,18 @@ export const OpsBoard: React.FC<OpsBoardProps> = ({
               </ul>
             </details>
           )}
-          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 sm:p-4 space-y-4">
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-2 sm:p-3 space-y-4">
             {rows.length === 0 && (
               <p className="text-sm text-[var(--text-faint)] italic py-6 text-center">
                 Không có ca nào {range === "today" ? "hôm nay" : range === "tomorrow" ? "ngày mai" : "trong khoảng này"}. Ca được mở từ Kế Hoạch Tháng hoặc nút "Mở ca chờ đăng ký" ở Lịch & Studio.
               </p>
             )}
             {groupedByDay(rows).map(([day, list]) => (
-              <div key={day} className="space-y-1.5">
-                {range !== "today" && range !== "tomorrow" && <p className={`text-[11px] font-black uppercase tracking-wide ${day === today ? "text-[var(--accent-text)]" : "text-[var(--text-faint)]"}`}>{fmtDay(day)}{day === today ? " · hôm nay" : ""}</p>}
-                {list.map((r) => (r.kind === "session" ? <SessionRow key={r.session.id} s={r.session} /> : <SlotRow key={r.slot.id} r={r} />))}
+              <div key={day}>
+                {range !== "today" && range !== "tomorrow" && <p className={`px-2 sm:px-3 pb-1 text-xs font-black ${day === today ? "text-[var(--accent-text)]" : "text-[var(--text-faint)]"}`}>{fmtDay(day)}{day === today ? " · hôm nay" : ""}</p>}
+                <div className="divide-y divide-[var(--border-muted)]">
+                  {list.map((r) => (r.kind === "session" ? <SessionRow key={r.session.id} s={r.session} /> : <SlotRow key={r.slot.id} r={r} />))}
+                </div>
               </div>
             ))}
           </div>
@@ -347,9 +361,3 @@ const ClashLink: React.FC<{ s: LiveSession; onOpen: (id: string) => void }> = ({
   </button>
 );
 
-const Stat: React.FC<{ label: string; value: string; tone?: "ok" | "warn" }> = ({ label, value, tone }) => (
-  <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3">
-    <p className="text-[11px] uppercase tracking-wider text-[var(--text-faint)]">{label}</p>
-    <p className={`text-lg font-black mt-0.5 ${tone === "warn" ? "text-amber-300" : tone === "ok" ? "text-emerald-300" : "text-[var(--text)]"}`}>{value}</p>
-  </div>
-);

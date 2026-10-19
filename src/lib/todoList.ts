@@ -2,7 +2,7 @@ import { BoostSlot, Brand, BrandChannel, BrandMonthPlan, BrandMonthPlanSlot, Bra
 import { isUnconfirmedPast } from "./sessionStatus";
 import { isCountable } from "./performance/hostPerformance";
 import { fmtDateVn, fmtMonth } from "./format";
-import { platformOf, brandMonthKey, brandPlatformKey, LEGACY_PLATFORM, platformIdSuffix, sessionBrandMonthKey } from "./reportPlatform";
+import { platformOf, brandMonthKey, brandPlatformKey, platformIdSuffix, sessionBrandMonthKey } from "./reportPlatform";
 import { profileOf } from "./platforms/profiles";
 import { platformsOfBrand } from "./channels";
 import { brandPriceSet } from "./brandPricing";
@@ -113,22 +113,6 @@ export function buildTodos(input: TodoInput): Todo[] {
   for (const b of activeBrands) {
     const own = sessions.filter((s) => s.brandId === b.id);
 
-    // 1. Số liệu cũ: ngày gần nhất có ca có số trước hôm qua.
-    let last: string | null = null;
-    for (const s of own) if (isCountable(s) && s.date <= today && (!last || s.date > last)) last = s.date;
-    if (last && last < addDays(today, -1)) {
-      const gap = daysBetween(last, today);
-      out.push({
-        id: `stale-${b.id}`,
-        level: gap > 3 ? "high" : "medium",
-        title: `Số liệu ${b.name} mới tới ${fmtDateVn(last, false)} (${gap} ngày trước)`,
-        detail: [...new Set(platformsOfBrand(input.channels, b.id).map((p) => profileOf(p).staleDataHint))].join(" ") || profileOf(LEGACY_PLATFORM).staleDataHint,
-        tab: "brand_dataraw",
-        brandId: b.id,
-        action: "Up file"
-      });
-    }
-
     // 2–4 và 8 theo TỪNG SÀN của brand (0139/0140: kế hoạch, target, report riêng từng sàn).
     // Kênh đang chạy của brand (0149) — kênh tạm dừng không bị nhắc kế hoạch/cam kết/giá.
     const platforms = platformsOfBrand(input.channels, b.id, false);
@@ -139,6 +123,25 @@ export function buildTodos(input: TodoInput): Todo[] {
       const name = platforms.length > 1 ? `${b.name} ${p}` : b.name;
       const sfx = platformIdSuffix(p);
       const ownP = own.filter((s) => platformOf(s) === p);
+
+      // 1. Số liệu cũ, theo TỪNG SÀN: ngày gần nhất có ca có số trước hôm qua. Gộp cả brand thì sàn mới nhất che sàn cũ
+      // (17/10: "Số liệu Franklin mới tới 15/10" nhờ Shopee, trong khi TikTok chỉ đủ tới 12/10).
+      let last: string | null = null;
+      for (const s of ownP) if (isCountable(s) && s.date <= today && (!last || s.date > last)) last = s.date;
+      // Chỉ nhắc khi SAU ngày có số cuối còn ca đã chạy mà chưa có số — kênh tạm nghỉ (JOCKEY Shopee T10: không ca nào) thì số "cũ" là đúng.
+      const ranSince = last != null && ownP.some((s) => s.date > last! && s.date < today && s.status !== "Cancelled" && !s.isBackfill && !isCountable(s));
+      if (last && last < addDays(today, -1) && ranSince) {
+        const gap = daysBetween(last, today);
+        out.push({
+          id: `stale-${b.id}${sfx}`,
+          level: gap > 3 ? "high" : "medium",
+          title: `Số liệu ${name} mới tới ${fmtDateVn(last, false)} (${gap} ngày trước)`,
+          detail: profileOf(p).staleDataHint,
+          tab: "brand_dataraw",
+          brandId: b.id,
+          action: "Up file"
+        });
+      }
       // 2–3. Kế hoạch tháng này.
       const cur = input.plansThisMonth.get(brandPlatformKey(b.id, p));
       if (cur?.status === "draft") {
@@ -304,7 +307,7 @@ export function buildTodos(input: TodoInput): Todo[] {
         id: "unacked-shifts",
         level: people.some((p) => p.firstStartMs - now <= 12 * 3600_000) ? "high" : "medium",
         title: `${people.length} người chưa nhận lịch ${shifts} ca trong 48 giờ tới`,
-        detail: `${people.slice(0, 4).map((p) => `${p.name} (${p.sessions.length} ca, sớm nhất ${first(p)})`).join(", ")}${people.length > 4 ? ` và ${people.length - 4} người khác` : ""}. Talent bấm "Đã nhận" ở tab Hôm nay của app; chưa nhận thì nhắn/gọi nhắc.`,
+        detail: `${people.slice(0, 4).map((p) => `${p.name} (${p.sessions.length} ca, sớm nhất ${first(p)})`).join(", ")}${people.length > 4 ? ` và ${people.length - 4} người khác` : ""}. Talent bấm "Đã xem" ở tab Ca của tôi của app; chưa xem thì nhắn/gọi nhắc.`,
         tab: "calendar",
         action: "Mở Bảng Vận Hành"
       });

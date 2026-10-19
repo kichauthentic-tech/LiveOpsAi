@@ -5,6 +5,7 @@ import type { IssueAction } from "../../lib/performance/ceoBrief";
 import { metricHint } from "../../lib/metricGlossary";
 import { getBrandTheme } from "../../lib/brandTheme";
 import { fmtVndShort } from "../../lib/format";
+import { StatTile } from "../common/StatTile";
 import type { CampDayBucket } from "../../lib/campaignDays";
 
 // Phần dùng chung của các khối Dashboard (tách từ CeoBrief.tsx 09/10/2026). Chỉ trình bày, không có luật số.
@@ -81,20 +82,24 @@ export const Sparkline: React.FC<{ values: number[]; prev?: (number | null)[] }>
   );
 };
 
+// Ô KPI của Dashboard = StatTile chung (common/StatTile.tsx) + mũi tên so kỳ + biểu đồ nhỏ.
 export const Kpi: React.FC<{ label: string; value: string; cur: number | null; prev: number | null; goodWhenUp?: boolean; extra?: string; series?: number[]; prevSeries?: (number | null)[]; locked?: boolean; empty?: boolean }> = ({ label, value, cur, prev, goodWhenUp, extra, series, prevSeries, locked, empty }) => (
-  <Card className="!p-3.5 flex flex-col gap-0.5 min-w-0">
-    <span className="text-[11px] font-bold text-[var(--text-faint)] flex items-center gap-1" title={metricHint(label)}>
-      {label}
-      {locked && <Lock className="w-3 h-3" aria-label="Chỉ CEO/admin" />}
-    </span>
-    <span className="text-xl font-black text-[var(--text)] truncate">{value}</span>
-    <span className="text-[11px] text-[var(--text-faint)] flex flex-wrap gap-x-1.5">
-      {/* Kỳ chưa có ca nào: không so (trước đây ra "↓100%" đỏ cho tháng chưa bắt đầu). */}
-      {empty ? <span className="text-[11px] text-[var(--text-faint)]">kỳ này chưa có ca</span> : <Delta cur={cur} prev={prev} goodWhenUp={goodWhenUp} />}
-      {extra && <span>· {extra}</span>}
-    </span>
+  <StatTile
+    frame="card"
+    size="lg"
+    title={metricHint(label)}
+    label={<>{label}{locked && <Lock className="w-3 h-3" aria-label="Chỉ CEO/admin" />}</>}
+    value={<span className="block truncate">{value}</span>}
+    hint={
+      <span className="flex flex-wrap gap-x-1.5">
+        {/* Kỳ chưa có ca nào: không so (trước đây ra "↓100%" đỏ cho tháng chưa bắt đầu). */}
+        {empty ? <span>kỳ này chưa có ca</span> : <Delta cur={cur} prev={prev} goodWhenUp={goodWhenUp} />}
+        {extra && <span>· {extra}</span>}
+      </span>
+    }
+  >
     {series && <Sparkline values={series} prev={prevSeries} />}
-  </Card>
+  </StatTile>
 );
 
 // Tooltip nổi cho mọi phần tử có data-tip (biểu đồ SVG + ô lịch). Một listener cho cả màn.

@@ -327,7 +327,7 @@ const HeroCard: React.FC<{
       style={{ "--b": theme.accent } as React.CSSProperties}
       className={`rounded-2xl p-4 space-y-3 border-[1.5px] bg-[color-mix(in_srgb,var(--b)_16%,var(--surface))] ${hero.live ? "border-rose-500" : "border-[color-mix(in_srgb,var(--b)_60%,var(--surface))]"}`}
     >
-      <p className="text-[11px] font-black uppercase tracking-wide text-[var(--text-muted)] flex flex-wrap items-center gap-1.5">
+      <p className="text-xs font-bold text-[var(--text-muted)] flex flex-wrap items-center gap-1.5">
         {hero.live ? (
           <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-rose-600 text-white"><span className="w-1.5 h-1.5 rounded-full bg-white" />LIVE</span>
         ) : (

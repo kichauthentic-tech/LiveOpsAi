@@ -33,11 +33,11 @@ export function GmvEditor({ initial, busy, onSave, onCancel }: GmvEditorProps) {
         onClick={save}
         disabled={busy || !Number.isFinite(value)}
         title="Lưu GMV này"
-        className="p-1 rounded-md bg-violet-600 hover:bg-violet-500 text-white disabled:opacity-40"
+        className="p-1.5 rounded-md bg-violet-600 hover:bg-violet-500 text-white disabled:opacity-40"
       >
         <Check className="w-3.5 h-3.5" />
       </button>
-      <button onClick={onCancel} disabled={busy} title="Huỷ" className="p-1 rounded-md text-[var(--text-faint)] hover:text-[var(--text)] disabled:opacity-40">
+      <button onClick={onCancel} disabled={busy} title="Huỷ" className="p-1.5 rounded-md text-[var(--text-faint)] hover:text-[var(--text)] disabled:opacity-40">
         <X className="w-3.5 h-3.5" />
       </button>
     </span>

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { UserRole, Brand, AppNotification } from "../types";
+import { Brand, AppNotification } from "../types";
 import { NotificationBell } from "./NotificationBell";
 import { LogOut, Building2, ChevronDown, Check, Palette, HelpCircle } from "lucide-react";
 import { useTheme, THEME_OPTIONS } from "../hooks/useTheme";
@@ -11,9 +11,6 @@ import { type ReportPlatform } from "../lib/reportPlatform";
 export type WorkspaceContext = { type: "agency" } | { type: "brand"; brandId: string };
 
 interface HeaderProps {
-  currentRole: UserRole;
-  activeUserName?: string;
-  activeUserTitle?: string;
   onSignOut?: () => void;
   // Switcher chỉ hiện cho role có quyền nhìn xuyên brand (ceo/admin/operations) —
   // role "brand" tự khoá vào workspace của họ ở App.tsx, không truyền props này xuống.
@@ -24,6 +21,9 @@ interface HeaderProps {
   brands?: Brand[];
   /** Mở "Từ điển và cách dùng" (GlossaryDialog). */
   onOpenHelp?: () => void;
+  /** Thanh chọn sàn của màn đang mở (bố cục 18/10) — đứng cạnh bộ chọn workspace vì cả hai là PHẠM VI của màn, không phải
+   *  nội dung. Trước đây là một dải riêng trên đầu trang, đè lên tiêu đề. Chỉ hiện từ lg; màn hẹp App vẽ ở đầu nội dung. */
+  scopeControl?: React.ReactNode;
   // Chuông thông báo (migration 0083). App giữ state qua useNotifications và quyết định bấm vào
   // thì nhảy tab nào — Header chỉ vẽ. Không truyền là không hiện chuông (màn chưa đăng nhập).
   notifications?: {
@@ -76,7 +76,7 @@ const WorkspaceSwitcher: React.FC<{
               {workspace.type === "agency" && <Check className="w-3.5 h-3.5 text-blue-400" />}
             </button>
             <div className="border-t border-[var(--border)] my-1.5" />
-            <p className="px-3 pb-1 text-[11px] font-bold uppercase tracking-widest text-[var(--text-faint)]">Brand</p>
+            <p className="px-3 pb-1 text-[11px] font-semibold text-[var(--text-faint)]">Brand</p>
             {brands.length === 0 && <p className="px-3 py-2 text-[11px] text-[var(--text-faint)]">Chưa có Brand nào.</p>}
             {brands.map((b) => {
               const plats = brandPlatforms?.[b.id] ?? [];
@@ -152,35 +152,28 @@ const ThemeSwitcher: React.FC = () => {
 };
 
 export const Header: React.FC<HeaderProps> = ({
-  currentRole,
-  activeUserName,
-  activeUserTitle,
   onSignOut,
   workspace,
   onWorkspaceChange,
   brandPlatforms,
   brands = [],
   notifications,
-  onOpenHelp
+  onOpenHelp,
+  scopeControl
 }) => {
   return (
     <header className="h-16 border-b border-[var(--border)]/80 px-2 sm:px-6 flex items-center justify-between bg-[var(--surface)]/40 backdrop-blur-md sticky top-0 z-40 text-[var(--text)] gap-4">
       {/* Active Region & Live Status */}
-      <div className="flex items-center gap-6 min-w-0">
+      <div className="flex items-center gap-4 min-w-0">
         {workspace && onWorkspaceChange && (
           <WorkspaceSwitcher workspace={workspace} brands={brands} onChange={onWorkspaceChange} brandPlatforms={brandPlatforms} />
         )}
+        {scopeControl && <div className="hidden lg:flex items-center min-w-0">{scopeControl}</div>}
       </div>
 
-      {/* Role Switcher, Settings & User Profile */}
-      <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
-        {/* Logged-in user identity (real auth — role comes from the account, not a switcher) */}
-        <div className="hidden md:flex flex-col items-end leading-tight px-2">
-          <span className="text-xs font-bold text-[var(--text)]">{activeUserName}</span>
-          <span className="text-[11px] text-[var(--accent-text)] font-semibold uppercase">
-            {activeUserTitle || currentRole}
-          </span>
-        </div>
+      {/* Tên + vai trò người đăng nhập không lặp ở đây nữa (bố cục 18/10): thẻ người dùng cuối sidebar đã ghi, sidebar luôn
+          hiện từ md — còn dưới md khối này vốn đã ẩn. */}
+      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
 
         {onOpenHelp && (
           <button

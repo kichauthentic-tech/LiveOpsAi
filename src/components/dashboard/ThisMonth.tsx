@@ -16,6 +16,7 @@ import { ChannelPlan } from "./ActionPlan";
 import { DrillDown } from "./DrillDown";
 import { ConeChart, LandingChip, RunRateBar } from "./RunRate";
 import { ACTION_TAB, Card, Delta, SectionTitle, ddmm, hrs, money, pct } from "./shared";
+import { STAT_LABEL } from "../common/StatTile";
 
 // Tab "Tháng này" (10/10/2026, đề xuất https://claude.ai/artifact/DKuM9K9dLJy1nTvFPPtYNX — gộp Overview + Deepdive + Action cũ).
 // Thứ tự đúng bốn câu CEO hỏi: số tin tới đâu → mỗi kênh về đâu và VÌ SAO (một nhãn + nguyên nhân gốc) → việc gì → chi tiết một kênh.
@@ -32,9 +33,11 @@ export const ThisMonth: React.FC<{
   selected: string | null;
   onSelect: (brandId: string) => void;
   onNavigate: (tab: string) => void;
+  /** Mở đúng kênh của một cảnh báo (Kế Hoạch Tháng / Dữ Liệu Gốc của brand × sàn đó). */
+  onOpenIssue?: (issue: Issue) => void;
   /** Đọc được Dữ Liệu Gốc (ceo/ops/admin) — khối "Thị trường hay mình" cần file Shop Analytics. */
   canReadShop: boolean;
-}> = ({ m, kpi, selected, onSelect, onNavigate, canReadShop }) => {
+}> = ({ m, kpi, selected, onSelect, onNavigate, onOpenIssue, canReadShop }) => {
   const rows: Row[] = m.brands
     .filter((b) => m.scopeIds.includes(b.id))
     .map((b) => ({ b, o: m.outlooks.get(b.id)!, h: m.health.get(b.id)! }))
@@ -54,7 +57,7 @@ export const ThisMonth: React.FC<{
         {idle.length > 0 && <p className="text-xs text-[var(--text-faint)] px-1">Không chạy tháng {Number(m.month.slice(5))} (không có ca, không có lịch): {idle.map((b) => m.channelName(b)).join(", ")}.</p>}
       </section>
 
-      <Todo issues={m.issues} onNavigate={onNavigate} />
+      <Todo issues={m.issues} onNavigate={onNavigate} onOpenIssue={onOpenIssue} />
 
       {current && <ChannelDetail key={current.b.id} m={m} row={current} canReadShop={canReadShop} onNavigate={onNavigate} />}
 
@@ -97,11 +100,10 @@ const Summary: React.FC<{ m: DashModel; rows: Row[] }> = ({ m, rows }) => {
   const sched = same.reduce((a, w) => a + w.scheduledHours, 0);
   const usual = same.every((w) => w.usualHours != null) ? same.reduce((a, w) => a + (w.usualHours ?? 0), 0) : null;
   const thin = rows.filter((r) => r.h.wave && same.includes(r.h.wave) && r.h.wave.ratio != null && r.h.wave.ratio < 0.8).map((r) => m.channelName(r.b));
-  const label = "text-[11px] uppercase tracking-wider font-bold text-[var(--text-faint)]";
   return (
     <section className="grid grid-cols-1 md:grid-cols-3 gap-3">
       <Card className="!p-4 space-y-1">
-        <p className={label}>Cuối tháng về đâu</p>
+        <p className={STAT_LABEL}>Cuối tháng về đâu</p>
         {withForecast.length === 0 ? <p className="text-sm text-[var(--text-faint)] pt-1">Chưa có số hay lịch để chiếu.</p> : (
           <>
             <p className="text-2xl font-black text-[var(--text)]">{money(cone.projected)}</p>
@@ -116,13 +118,13 @@ const Summary: React.FC<{ m: DashModel; rows: Row[] }> = ({ m, rows }) => {
         )}
       </Card>
       <Card className="!p-4 space-y-1">
-        <p className={label}>Tới {m.coverage.completeThrough ? ddmm(m.coverage.completeThrough) : "ngày có số"}</p>
+        <p className={STAT_LABEL}>Tới {m.coverage.completeThrough ? ddmm(m.coverage.completeThrough) : "ngày có số"}</p>
         <p className="text-2xl font-black text-[var(--text)]">{money(m.cur.gmv)}</p>
         <p className="text-xs text-[var(--text-faint)] flex flex-wrap items-center gap-x-1.5">LIVE GMV <Delta cur={m.cmp.cur.gmv} prev={m.cmp.prev.gmv} /> · GMV/giờ {money(m.cur.gmvPerHour)} <Delta cur={m.cmp.cur.gmvPerHour} prev={m.cmp.prev.gmvPerHour} /></p>
         <p className="text-[11px] text-[var(--text-faint)] leading-snug">so cùng loại ngày tháng trước (không so ngày lịch)</p>
       </Card>
       <Card className="!p-4 space-y-1">
-        <p className={label}>Đợt kế tiếp</p>
+        <p className={STAT_LABEL}>Đợt kế tiếp</p>
         {!first ? <p className="text-sm text-[var(--text-faint)] pt-1">Tháng này không còn đợt camp nào.</p> : (
           <>
             <p className="text-2xl font-black text-[var(--text)]">{WAVE_NAME[first.bucket]} <span className="text-base font-bold text-[var(--text-muted)]">{ddmm(first.days[0])}–{ddmm(first.days[first.days.length - 1])}</span></p>
@@ -136,7 +138,7 @@ const Summary: React.FC<{ m: DashModel; rows: Row[] }> = ({ m, rows }) => {
 };
 
 const Board: React.FC<{ m: DashModel; rows: Row[]; current: string | null; onSelect: (id: string) => void }> = ({ m, rows, current, onSelect }) => {
-  const th = "px-3 py-2 text-[11px] uppercase tracking-wider font-bold text-[var(--text-faint)] whitespace-nowrap";
+  const th = "px-3 py-2 text-[11px] font-semibold text-[var(--text-faint)] whitespace-nowrap";
   if (rows.length === 0) return <Card><p className="text-sm text-[var(--text-faint)]">Chưa có kênh nào có số hay lịch trong tháng này.</p></Card>;
   const anyTarget = rows.some((r) => r.o.target);
   return (
@@ -200,19 +202,19 @@ const Board: React.FC<{ m: DashModel; rows: Row[]; current: string | null; onSel
   );
 };
 
-const Todo: React.FC<{ issues: Issue[]; onNavigate: (tab: string) => void }> = ({ issues, onNavigate }) => {
+const Todo: React.FC<{ issues: Issue[]; onNavigate: (tab: string) => void; onOpenIssue?: (issue: Issue) => void }> = ({ issues, onNavigate, onOpenIssue }) => {
   // Việc đã thành dòng của bảng kết luận (chậm tiến độ, dự phóng thiếu, hết lịch) không lặp lại; việc dữ liệu tách nhóm riêng.
   const business = issues.filter((i) => !i.code || (!DATA_ISSUES.has(i.code) && !BOARD_ISSUES.has(i.code))).slice(0, 5);
   const data = issues.filter((i) => i.code && DATA_ISSUES.has(i.code));
   return (
     <section className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-      <IssueCard title="Việc kinh doanh" note="tối đa 5 · đỏ trước" issues={business} empty="Không có việc kinh doanh nào nổi lên ngoài bảng trên." onNavigate={onNavigate} />
-      <IssueCard title="Việc dữ liệu" note="ops up file / gán host — số trên màn sẽ đủ hơn" issues={data} empty="Mọi ca đã chạy đều có số và có host." onNavigate={onNavigate} />
+      <IssueCard title="Việc kinh doanh" note="tối đa 5 · đỏ trước" issues={business} empty="Không có việc kinh doanh nào nổi lên ngoài bảng trên." onNavigate={onNavigate} onOpenIssue={onOpenIssue} />
+      <IssueCard title="Việc dữ liệu" note="ops up file / gán host — số trên màn sẽ đủ hơn" issues={data} empty="Mọi ca đã chạy đều có số và có host." onNavigate={onNavigate} onOpenIssue={onOpenIssue} />
     </section>
   );
 };
 
-const IssueCard: React.FC<{ title: string; note: string; issues: Issue[]; empty: string; onNavigate: (tab: string) => void }> = ({ title, note, issues, empty, onNavigate }) => (
+const IssueCard: React.FC<{ title: string; note: string; issues: Issue[]; empty: string; onNavigate: (tab: string) => void; onOpenIssue?: (issue: Issue) => void }> = ({ title, note, issues, empty, onNavigate, onOpenIssue }) => (
   <Card>
     <div className="flex items-baseline justify-between gap-2 mb-2 flex-wrap">
       <h4 className="font-black text-[var(--text)]">{title}</h4>
@@ -229,7 +231,12 @@ const IssueCard: React.FC<{ title: string; note: string; issues: Issue[]; empty:
               <div className="min-w-0">
                 <p className="text-sm font-bold text-[var(--text)]">{it.title}</p>
                 <p className="text-xs text-[var(--text-faint)] leading-snug">{it.detail}</p>
-                {it.action && <button onClick={() => onNavigate(ACTION_TAB[it.action!].tab)} className="min-h-6 -mx-1 px-1 rounded inline-flex items-center text-xs font-bold text-[var(--accent-text)] hover:underline mt-0.5">{ACTION_TAB[it.action].label} →</button>}
+                {it.action && (() => {
+                  // Cảnh báo của MỘT kênh: mở thẳng kế hoạch / Dữ Liệu Gốc của kênh đó (trước đây mở màn chung với brand đang nhớ).
+                  const direct = !!onOpenIssue && !!it.brandId && (it.action === "month_plan" || it.action === "reconcile");
+                  const label = direct && it.action === "reconcile" ? "Mở Dữ Liệu Gốc" : ACTION_TAB[it.action!].label;
+                  return <button onClick={() => (direct ? onOpenIssue!(it) : onNavigate(ACTION_TAB[it.action!].tab))} className="min-h-6 -mx-1 px-1 rounded inline-flex items-center text-xs font-bold text-[var(--accent-text)] hover:underline mt-0.5">{label} →</button>;
+                })()}
               </div>
             </li>
           );
@@ -313,8 +320,8 @@ const TreeCard: React.FC<{ m: DashModel; h: ChannelHealth }> = ({ m, h }) => {
                   <span className={worst ? "font-bold text-[var(--text)]" : "text-[var(--text-muted)]"}>{p.label}</span>
                   <div className="relative h-5">
                     <div className="absolute inset-y-0 left-1/2 w-px bg-[var(--border)]" />
-                    <div className={`absolute inset-y-0.5 rounded ${p.change >= 0 ? "bg-emerald-500/70" : "bg-rose-500/70"}`} style={p.change >= 0 ? { left: "50%", width: `${(Math.abs(p.change) / mx) * 45}%` } : { right: "50%", width: `${(Math.abs(p.change) / mx) * 45}%` }} />
-                    <span className={`absolute top-0.5 font-mono text-[11px] ${p.change >= 0 ? "text-emerald-400" : "text-rose-400"}`} style={p.change >= 0 ? { left: `calc(50% + ${(Math.abs(p.change) / mx) * 45}% + 4px)` } : { right: `calc(50% + ${(Math.abs(p.change) / mx) * 45}% + 4px)` }}>{sign(p.change)}</span>
+                    <div className={`absolute inset-y-0.5 rounded ${p.change >= 0 ? "bg-emerald-500/70" : "bg-rose-500/70"}`} style={p.change >= 0 ? { left: "50%", width: `${(Math.abs(p.change) / mx) * 32}%` } : { right: "50%", width: `${(Math.abs(p.change) / mx) * 32}%` }} />
+                    <span className={`absolute top-0.5 font-mono text-[11px] ${p.change >= 0 ? "text-emerald-400" : "text-rose-400"}`} style={p.change >= 0 ? { left: `calc(50% + ${(Math.abs(p.change) / mx) * 32}% + 4px)` } : { right: `calc(50% + ${(Math.abs(p.change) / mx) * 32}% + 4px)` }}>{sign(p.change)}</span>
                   </div>
                 </div>
               );
@@ -394,14 +401,15 @@ const WaveCard: React.FC<{ rows: WaveRunRate[]; through: string | null }> = ({ r
           <React.Fragment key={r.key}>
             <div className={`min-w-0 ${r.key === "month" ? "" : "pl-3 border-l border-[var(--border)]"}`}>
               <p className="font-bold text-sm text-[var(--text)] truncate">{r.label}</p>
-              <p className="text-[11px] text-[var(--text-faint)]">{r.key === "month" || r.key === "daily" ? `${r.days.length} ngày` : `${ddmm(r.days[0])}–${ddmm(r.days[r.days.length - 1])}`} · {{ done: "đã qua", live: "đang chạy", next: "sắp tới" }[r.state]}</p>
+              <p className="text-[11px] text-[var(--text-faint)]">{r.key === "month" || r.key === "daily" ? `${r.days.length} ngày` : `${ddmm(r.days[0])}–${ddmm(r.days[r.days.length - 1])}`} · {r.state === "live" && r.calendarDone ? "đã qua · còn ca chờ số" : { done: "đã qua", live: "đang chạy", next: "sắp tới", waiting: "chờ số" }[r.state]}</p>
             </div>
-            {r.state === "next" ? (
-              <p className="text-xs text-[var(--text-muted)] col-span-2">Target {money(r.target)}{r.forecast != null ? ` · lịch hiện chiếu ${money(r.forecast)} (${pct(r.forecast / r.target)})` : ""}</p>
+            {r.state === "next" || r.state === "waiting" ? (
+              <p className="text-xs text-[var(--text-muted)] col-span-2">Target {money(r.target)}{r.forecast != null ? ` · ${r.state === "waiting" ? "tạm tính" : "lịch hiện chiếu"} ${money(r.forecast)} (${pct(r.forecast / r.target)})` : ""}</p>
             ) : (
               <>
                 <RunRateBar value={r.runRate} />
-                <p className="text-xs text-right whitespace-nowrap"><b className="text-[var(--text)]">{pct(r.runRate)}</b> <span className="text-[var(--text-faint)]">{money(r.actual)} / {money(r.targetToDate)}</span></p>
+                {/* 375px: số tiền xuống dòng dưới % (trước một dòng nowrap đẩy cả trang tràn ngang 26px). */}
+                <p className="text-xs text-right"><b className="text-[var(--text)]">{pct(r.runRate)}</b> <span className="block sm:inline whitespace-nowrap text-[var(--text-faint)]">{money(r.actual)} / {money(r.targetToDate)}</span></p>
               </>
             )}
           </React.Fragment>

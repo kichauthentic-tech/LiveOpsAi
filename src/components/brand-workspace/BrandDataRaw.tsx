@@ -307,7 +307,7 @@ export const BrandDataRaw: React.FC<BrandDataRawProps> = ({ platform, brandId, b
               key={t.id}
               onClick={() => setActiveType(t.id)}
               className={`text-xs font-bold px-3 py-1.5 rounded-xl border ${
-                activeType === t.id ? "bg-[var(--accent)] text-[var(--accent-text)] border-[var(--accent)]" : "bg-[var(--surface-elevated)] text-[var(--text-muted)] border-[var(--border)] hover:bg-[var(--surface-hover)]"
+                activeType === t.id ? "seg-on" : "bg-[var(--surface-elevated)] text-[var(--text-muted)] border-[var(--border)] hover:bg-[var(--surface-hover)]"
               }`}
             >
               {t.label}

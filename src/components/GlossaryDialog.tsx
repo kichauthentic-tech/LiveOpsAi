@@ -16,7 +16,7 @@ const OPS_STEPS: { step: string; where: string; why: string }[] = [
   { step: "Một lần cho mỗi brand × sàn: cách thu phí, giá (đơn giá/giờ hoặc % hoa hồng, tỷ lệ hoàn huỷ), hợp đồng + giờ cam kết mỗi tháng, phòng live mặc định", where: "CRM → \"Hợp đồng & giá\" trên thẻ brand", why: "Chỗ nhập duy nhất. Lưu hợp đồng là app tự đổ giờ cam kết ra từng tháng; thiếu giá thì Finance và Dashboard không tính được doanh thu, lãi." },
   { step: "Lập Kế Hoạch Tháng: giờ cam kết của tháng (mặc định theo hợp đồng), lưới ca, target từng ca, khung ngày camp — rồi bấm Chốt", where: "Kế Hoạch Tháng", why: "Chốt xong mới có ca để talent đăng ký; target tháng = tổng target các ca. Tháng brand mua thêm/bớt giờ thì sửa giờ cam kết ngay ở đây." },
   { step: "Talent đăng ký rảnh, ops chốt Host + Trợ live cho từng ca", where: "Bảng Vận Hành (bấm dòng ca chưa có người; talent đăng ký ở Đăng Ký Ca)", why: "Ca chốt người xong mới thành ca thật trên lịch." },
-  { step: "Trong ca: trợ live up file lúc giao ca (snapshot), host nộp report ca", where: "Bảng Vận Hành → bấm vào ca (Cửa sổ Ca Live)", why: "Giữ ranh giới số giữa 2 ca chung một phòng live." },
+  { step: "Cuối ca: giao ca — up file số liệu của sàn (TikTok Creator-Live-Performance / Shopee Live List) trên máy phòng live", where: "Bảng Vận Hành → bấm vào ca (Cửa sổ Ca Live) → Giao ca", why: "Giữ ranh giới số giữa 2 ca chung một phòng live." },
   { step: "Hằng tuần/cuối tháng: tải file từ TikTok Shop, up ở Dữ Liệu Gốc (một lần up là tự đối soát ca)", where: "Dữ Liệu Gốc (trong từng brand) → Creator Live Performance / Live List", why: "TikTok còn cập nhật GMV nhiều giờ sau khi tắt live; số đối soát là số cuối." },
   { step: "Hết tháng (brand có chạy Ads): tải file \"Campaign overview data\" theo ngày từ TikTok Ads", where: "Nhập Ads (trong từng brand)", why: "Report Tháng phần 6 lấy chi phí Ads, ROI, ROI theo loại ngày từ file này." },
   { step: "Hết tháng: tạo Report Tháng, kiểm số, rồi Phát hành cho brand", where: "Report Tháng (trong từng brand) · Điều Phối Phát Hành", why: "Phát hành = đóng sổ tháng: số của tháng không đổi nữa." },
@@ -24,9 +24,10 @@ const OPS_STEPS: { step: string; where: string; why: string }[] = [
 ];
 
 const TALENT_STEPS: { step: string; where: string; why: string }[] = [
-  { step: "Đăng ký những ca bạn rảnh", where: "Đăng Ký Ca", why: "Ops chốt người từ danh sách đăng ký." },
-  { step: "Xem ca đã được chốt cho bạn", where: "Ca Của Tôi", why: "" },
-  { step: "Sau ca: nộp report ca (số liệu, ghi chú)", where: "Ca Của Tôi → bấm vào ca", why: "Số bạn nộp là số tạm; số đối soát từ TikTok sẽ thay sau." }
+  { step: "Đăng ký những ca bạn rảnh", where: "Đăng ký ca", why: "Ops chốt người từ danh sách đăng ký." },
+  { step: "Xem ca đã được chốt cho bạn", where: "Ca của tôi", why: "" },
+  { step: "Có ca mới / ca đổi giờ: bấm \"Đã xem\" để báo đã nhận lịch", where: "Ca Của Tôi (thanh trên cùng)", why: "Chưa bấm thì OP sẽ nhắn/gọi nhắc trước giờ ca." },
+  { step: "Không đi được ca: bấm vào ca → báo bận (ghi lý do)", where: "Ca Của Tôi → bấm vào ca", why: "OP nhận thông báo để thay người; ca chưa đổi gì cho tới khi OP xử lý." }
 ];
 
 const TERMS: { term: string; meaning: string }[] = [

@@ -58,16 +58,21 @@ export function hasSessionData(s: Pick<LiveSession, "dataSource" | "actualGmv" |
  * report nếu ca có diễn ra, hoặc huỷ ca nếu không.
  */
 export function hasLiveEvidence(s: LiveSession): boolean {
+  // Role brand, tháng chưa phát hành: số bị che ⇒ tin cờ của DB (0178), đừng suy từ số rỗng.
+  if (s.monthPublished === false && s.liveEvidence !== undefined) return s.liveEvidence;
   return hasSessionData(s) || !!s.report || (s.liveDurationMinutes ?? 0) > 0 || !!s.isBackfill;
 }
 
 /**
  * Ca đã qua giờ (Completed), chưa huỷ, chưa có bằng chứng diễn ra — xem `hasLiveEvidence`. Role brand ở tháng
- * chưa phát hành bị view che số (`monthPublished === false`) nên không phân biệt được — không bao giờ coi là
- * "chờ xác nhận" ở phía đó.
+ * chưa phát hành bị view che số (`monthPublished === false`) nên client không tự suy được — dùng cờ `liveEvidence`
+ * của view (0178); DB chưa có cờ thì coi là đã chạy như trước.
  */
 export function isUnconfirmedPast(s: LiveSession): boolean {
-  return s.status === "Completed" && s.monthPublished !== false && !hasLiveEvidence(s);
+  if (s.status !== "Completed") return false;
+  // Tháng chưa phát hành với brand: chỉ biết khi DB gửi cờ bằng chứng (0178). Thiếu cờ (DB cũ) thì như trước — coi là đã chạy.
+  if (s.monthPublished === false) return s.liveEvidence === false;
+  return !hasLiveEvidence(s);
 }
 
 // OT / off sớm theo THỜI LƯỢNG LIVE: `liveDurationMinutes` (tổng thời lượng các room đã TRỪ mốc ca trước, 0078/0153) − thời

@@ -50,7 +50,7 @@ const h1 = (h: number) => `${fmtFixed(h, h % 1 ? 1 : 0)}h`;
 const CARD = "bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 space-y-3";
 const SECTION_TITLE = "text-sm font-black text-[var(--text)]";
 const INPUT = "mt-1 w-full px-3 py-2.5 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl text-sm outline-none focus:border-[var(--accent)] text-[var(--text)]";
-const LABEL = "text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide flex items-center gap-1";
+const LABEL = "text-xs font-semibold text-[var(--text-muted)] flex items-center gap-1";
 const SETTING_ROW = "cursor-pointer list-none flex items-center justify-between gap-2 px-4 py-3 min-h-11 text-sm font-bold text-[var(--text)]";
 
 // Ô trống phải nói VÌ SAO trống, không in số 0. Số 0 ở màn hồ sơ của chính mình đọc như "lương của bạn bằng 0" — ops CHƯA NHẬP

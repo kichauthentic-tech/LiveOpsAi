@@ -5,6 +5,7 @@ import { ALLOC_BAND_LABEL, ALLOC_METHODS, ALLOC_METHOD_LABEL, AllocMethod, Alloc
 import { nextMonthOf } from "../lib/performance/ceoBrief";
 import { REPORT_PLATFORMS, platformOf, type ReportPlatform } from "../lib/reportPlatform";
 import { fmtFixed } from "../lib/format";
+import { Explain } from "./common/Explain";
 
 // AI Training Center — thẻ "Chia target ca (engine v2)". Cùng tinh thần với EngineTrainingPanel: engine là thuật toán thuần, "huấn
 // luyện" = xem nó học được gì từ ca đã đối soát + vặn tham số + nhìn sai số backtest đổi ngay (chưa cần lưu). Phần tính nằm ở
@@ -44,14 +45,14 @@ export const AllocationTrainingCard: React.FC<Props> = ({ brandId, sessions, par
         {platforms.length > 1 && (
           <div className="flex gap-1">
             {platforms.map((p) => (
-              <button key={p} onClick={() => setPicked({ brandId, platform: p })} className={`px-2.5 min-h-6 rounded-lg text-xs font-bold border ${p === platform ? "bg-[var(--accent)] text-white border-transparent" : "border-[var(--border)] text-[var(--text)]"}`}>{p}</button>
+              <button key={p} onClick={() => setPicked({ brandId, platform: p })} className={`px-2.5 min-h-6 rounded-lg text-xs font-bold border ${p === platform ? "seg-on" : "border-[var(--border)] text-[var(--text)]"}`}>{p}</button>
             ))}
           </div>
         )}
       </div>
-      <p className="text-[11px] text-[var(--text-muted)] leading-snug">
-        Target ca = Target tháng × (giờ ca × hệ số loại ngày × hệ số khung giờ bắt đầu × hệ số vị trí ngày trong đợt) ÷ tổng. Ba nhóm hệ số học đồng thời từ ca đã đối soát của riêng kênh này, rồi trộn với cách cũ. Mỗi nút ở cột Tham số (nhóm Target) vặn ngay ở đây.
-      </p>
+      <Explain summary="Engine chia target thế nào">
+        <p>Target ca = Target tháng × (giờ ca × hệ số loại ngày × hệ số khung giờ bắt đầu × hệ số vị trí ngày trong đợt) ÷ tổng. Ba nhóm hệ số học đồng thời từ ca đã đối soát của riêng kênh này, rồi trộn với cách cũ. Mỗi nút ở cột Tham số (nhóm Target) vặn ngay ở đây.</p>
+      </Explain>
 
       {!platform || channel.length === 0 ? (
         <p className="text-xs text-[var(--text-muted)]">Brand chưa có ca đối soát nào — chưa có gì để học.</p>
@@ -118,23 +119,22 @@ export const AllocationTrainingCard: React.FC<Props> = ({ brandId, sessions, par
                     </tbody>
                   </table>
                 </div>
-                <p className="mt-1 text-[11px] text-[var(--text-faint)] leading-snug">
-                  Mỗi tháng engine chỉ được xem các tháng TRƯỚC nó, rồi chia đúng tổng GMV đã đối soát của tháng đó xuống ca; sai số = Σ|target ca − GMV ca đã đối soát| ÷ Σ GMV đã đối soát (thấp hơn là tốt). Bảng chỉ đo việc CHIA, không đo việc đặt tổng target. Gộp theo ngày: {ALLOC_METHODS.filter((k) => result.pooled[k]).map((k) => `${{ hours: "theo giờ", old: "cũ", glm: "v2 riêng", v2: "v2 trộn" }[k]} ${pct(result.pooled[k]!.day)}`).join(" · ")}. {result.folds.some((f) => f.partial) ? "* = tháng chưa trọn, chỉ để tham khảo. " : ""}Sai số quanh 22% là mức nhiễu từng ca — hệ số đúng mấy cũng không xuống dưới ~18%; chênh dưới ~1 điểm % giữa hai cách chưa đủ để kết luận.
-                </p>
+                <Explain summary="Cách đọc bảng" className="mt-1">
+                  <p>Mỗi tháng engine chỉ được xem các tháng TRƯỚC nó, rồi chia đúng tổng GMV đã đối soát của tháng đó xuống ca; sai số = Σ|target ca − GMV ca đã đối soát| ÷ Σ GMV đã đối soát (thấp hơn là tốt). Bảng chỉ đo việc CHIA, không đo việc đặt tổng target. Gộp theo ngày: {ALLOC_METHODS.filter((k) => result.pooled[k]).map((k) => `${{ hours: "theo giờ", old: "cũ", glm: "v2 riêng", v2: "v2 trộn" }[k]} ${pct(result.pooled[k]!.day)}`).join(" · ")}. {result.folds.some((f) => f.partial) ? "* = tháng chưa trọn, chỉ để tham khảo. " : ""}Sai số quanh 22% là mức nhiễu từng ca — hệ số đúng mấy cũng không xuống dưới ~18%; chênh dưới ~1 điểm % giữa hai cách chưa đủ để kết luận.</p>
+                </Explain>
               </>
             )}
           </div>
 
-          <details className="text-[11px] text-[var(--text-muted)]">
-            <summary className="cursor-pointer font-bold text-[var(--text)] min-h-6">Muốn nâng cấp logic chia target thì làm gì</summary>
-            <ol className="list-decimal pl-4 mt-1 space-y-0.5 leading-snug">
+          <Explain summary="Muốn nâng cấp logic chia target thì làm gì">
+            <ol className="list-decimal pl-4 space-y-0.5">
               <li>Sửa <code>src/lib/performance/allocationModel.ts</code> (mô hình + trộn + backtest cùng một file; thêm hệ số mới = thêm cột trong <code>fitAllocationModel</code> và một dòng trong <code>glmWeights</code>).</li>
               <li>Thêm tham số tương ứng vào <code>EngineParams</code> (<code>engineParams.ts</code>, nhóm Target) — nó tự hiện ở cột Tham số.</li>
               <li>Mở lại bảng này cho CẢ HAI sàn và các brand: chỉ nâng khi sai số gộp thấp hơn ở ≥ 2 tháng và không tệ đi ở brand khác.</li>
               <li>Chạy <code>npx vitest run tests/allocationModel.test.ts</code>, rồi ghi số đo vào <code>docs/WORKSPACE_HISTORY.md</code>.</li>
               <li>Đã thử và KHÔNG giúp (khỏi thử lại): thứ trong tuần, tuần trong tháng, tương tác loại ngày × khung, ô trực tiếp n ≥ 5, vị trí ngày trong D-Day, trọng số tháng gần, cắt ngoại lệ, học chung nhiều brand. Còn thiếu dữ liệu để thử: Ads theo ca, nội dung/gift của ca.</li>
             </ol>
-          </details>
+          </Explain>
         </>
       )}
     </div>

@@ -1,34 +1,9 @@
 import React from "react";
-import { LucideIcon } from "lucide-react";
 
 // Poster Calendar Design System — khung lưới dùng chung cho LiveCalendar / BrandCalendar /
 // GmvCalendar. Chỉ chứa phần trình bày (header banner + lưới 7 cột + khung cell); logic
 // nghiệp vụ (tính ngày, drag-drop, click mở modal...) vẫn nằm nguyên ở từng calendar,
 // truyền vào qua props/children.
-
-interface PosterCalendarHeaderProps {
-  icon?: LucideIcon;
-  title: string;
-  subtitle?: string;
-  nav?: React.ReactNode;
-  actions?: React.ReactNode;
-}
-
-export const PosterCalendarHeader: React.FC<PosterCalendarHeaderProps> = ({ icon: Icon, title, subtitle, nav, actions }) => (
-  <div className="rounded-2xl bg-gradient-to-r from-[var(--surface-elevated)] via-[var(--surface)] to-[var(--surface-elevated)] border border-[var(--border)] px-5 py-4 flex flex-wrap items-center justify-between gap-3 shadow-lg">
-    <div className="flex items-center gap-2.5">
-      {Icon && <Icon className="w-5 h-5 text-[var(--accent-text)] shrink-0" />}
-      <div>
-        <h2 className="text-lg font-black text-[var(--text)] tracking-tight">{title}</h2>
-        {subtitle && <p className="text-xs text-[var(--text-muted)] mt-0.5">{subtitle}</p>}
-      </div>
-    </div>
-    <div className="flex items-center gap-1.5 flex-wrap">
-      {actions}
-      {nav}
-    </div>
-  </div>
-);
 
 const WEEKEND_TINT = "bg-rose-50/80 dark:bg-rose-950/20";
 
@@ -51,15 +26,12 @@ export const PosterCalendarGrid: React.FC<PosterCalendarGridProps> = ({
   <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 sm:p-5 shadow-xl">
     <div className="overflow-x-auto -mx-1 px-1 pb-1">
       <div className={minWidthClassName}>
-        <div className="grid grid-cols-7 gap-2 text-[11px] sm:text-xs font-black uppercase tracking-wide mb-3">
+        {/* Bố cục 19/10: tên thứ là chữ trơn (trước mỗi thứ một viên nền, thêm một hàng hộp trên lưới vốn đã toàn hộp). */}
+        <div className="grid grid-cols-7 gap-2 text-xs font-bold mb-1.5">
           {weekdayLabels.map((w, i) => (
             <div
               key={w}
-              className={`text-center py-2 rounded-xl ${
-                weekendIndices.includes(i)
-                  ? "bg-rose-100 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400"
-                  : "bg-[var(--surface-elevated)] text-[var(--text-muted)]"
-              }`}
+              className={`text-center py-1 ${weekendIndices.includes(i) ? "text-rose-600 dark:text-rose-400" : "text-[var(--text-faint)]"}`}
             >
               {w}
             </div>
@@ -107,17 +79,17 @@ export const PosterDayCell: React.FC<PosterDayCellProps> = ({
     <div
       onClick={onClick}
       title={title}
-      className={`${minHeight} relative rounded-2xl p-1.5 sm:p-2.5 flex flex-col gap-1 border overflow-visible ${
+      className={`${minHeight} relative rounded-xl p-1.5 sm:p-2 flex flex-col gap-1 border overflow-visible ${
         isToday
           ? "bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-700/60 ring-2 ring-amber-400 shadow-md"
-          : toneClassName ?? `bg-[var(--surface)] border-[var(--border)] ${isWeekend ? WEEKEND_TINT : ""}`
+          : toneClassName ?? `bg-[var(--surface-base)]/60 border-transparent ${isWeekend ? WEEKEND_TINT : ""}`
       } ${onClick ? "cursor-pointer hover:border-[var(--accent)]/60 transition-colors" : ""}`}
     >
       {isToday && (
         // z-30 > z-20 của CampaignDayRibbon — ngày "hôm nay" rơi vào dải camp (D-Day/Mid-Month/
-        // Pay Day) vẫn phải đọc được chữ "HÔM NAY", không bị dải banner đè lên.
-        <span className="absolute -top-2 right-1.5 shrink-0 text-[11px] sm:text-[11px] font-black px-2 py-0.5 rounded-full bg-orange-500 text-white leading-none shadow-md z-30 tracking-wide">
-          HÔM NAY
+        // Pay Day) vẫn phải đọc được chữ "Hôm nay", không bị dải banner đè lên.
+        <span className="absolute -top-2 right-1.5 shrink-0 text-[11px] font-black px-2 py-0.5 rounded-full bg-orange-500 text-white leading-none shadow-md z-30">
+          Hôm nay
         </span>
       )}
       {ribbon}
@@ -127,7 +99,6 @@ export const PosterDayCell: React.FC<PosterDayCellProps> = ({
         </span>
         {badge && <span className="shrink-0">{badge}</span>}
       </div>
-      <div className="border-t border-[var(--border-muted)]" />
       {/* Ô cao ra theo số thẻ (07/10): không cuộn trong ô nữa — thẻ nằm dưới bị che là mất thông tin. */}
       <div className="flex-1 flex flex-col gap-1">
         {children}

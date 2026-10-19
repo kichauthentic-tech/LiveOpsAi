@@ -3,6 +3,7 @@ import { AlertTriangle, BarChart3, CalendarDays, Clapperboard, Megaphone } from 
 import type { CampDayBucket } from "../../lib/campaignDays";
 import { runRateVerdict } from "../../lib/performance/runRateUpdate";
 import { PlatformChip } from "../common/PlatformChip";
+import { StatTile } from "../common/StatTile";
 import { BrandLogo } from "../ui/BrandLogo";
 import { Card, chartColor, ddmm, money, pct } from "../dashboard/shared";
 import { isTentative } from "./AccountCard";
@@ -10,7 +11,6 @@ import { DayLens, MonthLens, ShiftLens, WaveLens, type Lens, type LensFocus } fr
 import { RunRateGauge, TONE_VAR, TonePill } from "./parts";
 import type { AccountVM } from "./types";
 
-const tabular = "tabular-nums";
 
 const LENSES: { id: Lens; label: string; icon: React.ReactNode }[] = [
   { id: "month", label: "Tháng", icon: <CalendarDays className="w-4 h-4" /> },
@@ -19,13 +19,6 @@ const LENSES: { id: Lens; label: string; icon: React.ReactNode }[] = [
   { id: "shift", label: "Ca", icon: <Clapperboard className="w-4 h-4" /> }
 ];
 
-const Stat: React.FC<{ label: string; value: string; hint?: string; tone?: string }> = ({ label, value, hint, tone }) => (
-  <div className="min-w-0 rounded-xl bg-[var(--surface-base)]/60 border border-[var(--border-muted)] px-3 py-2.5">
-    <div className="text-[11px] font-bold text-[var(--text-faint)] truncate">{label}</div>
-    <div className={`text-lg font-black leading-tight truncate ${tabular}`} style={{ color: tone ?? "var(--text)" }}>{value}</div>
-    {hint && <div className="text-[11px] text-[var(--text-faint)] truncate">{hint}</div>}
-  </div>
-);
 
 export const AccountDetail: React.FC<{ vm: AccountVM; lens: Lens; onLens: (l: Lens) => void; onNavigate: (tab: string) => void }> = ({ vm, lens, onLens, onNavigate }) => {
   const r = vm.report;
@@ -78,17 +71,21 @@ export const AccountDetail: React.FC<{ vm: AccountVM; lens: Lens; onLens: (l: Le
               </div>
             )}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              <Stat label="Target tháng" value={money(t.target)} hint={t.pctTarget != null ? `đã đạt ${pct(t.pctTarget)}` : undefined} />
-              <Stat label="Đã đạt" value={money(t.actual)} hint={`${t.elapsedDays} ngày đã tính`} />
-              <Stat label="Kỳ vọng tới nay" value={money(t.targetToDate)} hint="target các ca tới ngày số tới" />
-              <Stat label={ahead ? "Vượt tiến độ" : "Thiếu so tiến độ"} value={t.gap == null ? "—" : `${ahead ? "+" : "−"}${money(Math.abs(t.gap))}`} tone={t.gap == null ? undefined : TONE_VAR[ahead ? "good" : v.tone]} hint={r.offPlan.length > 0 ? `${r.offPlan.length} ca ngoài kế hoạch: ${money(r.offPlanActual)}` : undefined} />
+              <StatTile label="Target tháng" value={money(t.target)} hint={t.pctTarget != null ? `đã đạt ${pct(t.pctTarget)}` : undefined} />
+              <StatTile label="Đã đạt" value={money(t.actual)} hint={`${t.elapsedDays} ngày đã tính`} />
+              <StatTile label="Kỳ vọng tới nay" value={money(t.targetToDate)} hint="target các ca tới ngày số tới" />
+              <StatTile
+                label={ahead ? "Vượt tiến độ" : "Thiếu so tiến độ"}
+                value={t.gap == null ? "—" : <span style={{ color: TONE_VAR[ahead ? "good" : v.tone] }}>{`${ahead ? "+" : "−"}${money(Math.abs(t.gap))}`}</span>}
+                hint={r.offPlan.length > 0 ? `${r.offPlan.length} ca ngoài kế hoạch: ${money(r.offPlanActual)}` : undefined}
+              />
             </div>
             {(tentative || vm.missingSessions > 0) && (
               <div className="flex flex-wrap items-start gap-x-3 gap-y-1 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200 leading-snug">
                 <AlertTriangle className="w-4 h-4 shrink-0 mt-px text-amber-300" />
                 <div className="flex-1 min-w-0 space-y-0.5">
-                  {tentative && <p>Số tới {r.asOf ? ddmm(r.asOf) : "—"} nằm sau ngày đủ số{vm.completeThrough ? ` (${ddmm(vm.completeThrough)})` : ""} — run-rate là số tạm tính.</p>}
-                  {vm.missingSessions > 0 && <p>{vm.missingSessions} ca đã chạy chưa có số{vm.oldestMissing ? `, cũ nhất ${ddmm(vm.oldestMissing)}` : ""}: run-rate có thể thấp hơn thực tế.</p>}
+                  {tentative && <p>Run-rate gồm {r.tail.shifts} ca sau ngày đủ số{vm.completeThrough ? ` (${ddmm(vm.completeThrough)})` : ""}{r.tail.lastShift ? `, tới ca ${r.tail.lastShift.startTime}–${r.tail.lastShift.endTime} ${ddmm(r.tail.lastShift.date)}` : ""}, mỗi ca so với target đúng ca đó{r.tail.unreconciled > 0 ? `; ${r.tail.unreconciled} ca chưa đối soát nên còn đổi` : ""}.</p>}
+                  {vm.missingSessions > 0 && <p>{vm.missingSessions} ca đã chạy chưa có số{vm.oldestMissing ? `, cũ nhất ${ddmm(vm.oldestMissing)}` : ""}{r.noDataCount - r.noDataWaiting > 0 ? ": run-rate có thể thấp hơn thực tế." : " — chưa vào run-rate, có số là tự cập nhật."}</p>}
                 </div>
                 {vm.missingSessions > 0 && <button type="button" onClick={() => onNavigate("sessions")} className="font-bold underline underline-offset-2 hover:text-amber-100 min-h-[24px]">Mở Sổ Ca</button>}
               </div>
@@ -100,7 +97,7 @@ export const AccountDetail: React.FC<{ vm: AccountVM; lens: Lens; onLens: (l: Le
       <div role="tablist" aria-label="Xem theo" className="flex gap-1 p-1 rounded-2xl bg-[var(--surface)] border border-[var(--border)] overflow-x-auto">
         {LENSES.map((l) => (
           <button key={l.id} type="button" role="tab" aria-selected={lens === l.id} onClick={() => onLens(l.id)}
-            className={`flex-1 min-w-[88px] inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap min-h-[44px] transition-colors ${lens === l.id ? "bg-[var(--accent)] text-[var(--accent-contrast)] shadow" : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-hover)]/40"}`}>
+            className={`flex-1 min-w-[88px] inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap min-h-[44px] transition-colors ${lens === l.id ? "seg-on" : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-hover)]/40"}`}>
             {l.icon}{l.label}
           </button>
         ))}
@@ -111,7 +108,13 @@ export const AccountDetail: React.FC<{ vm: AccountVM; lens: Lens; onLens: (l: Le
       {lens === "day" && <DayLens r={r} color={color} waveFilter={waveFilter} pickDay={pickDay} onFocus={focus} onClearWave={() => setWaveFilter(null)} />}
       {lens === "shift" && <ShiftLens r={r} waveFilter={waveFilter} pickDay={pickDay} onFocus={focus} onClearWave={() => setWaveFilter(null)} />}
       {r.noDataCount > 0 && lens !== "shift" && (
-        <Card className="!py-3"><p className="text-xs text-[var(--text-muted)]">{r.noDataCount} ca kế hoạch đã qua nhưng chưa có số — vẫn nằm trong mẫu số (target) của run-rate. Xem ở mục “Ca”.</p></Card>
+        <Card className="!py-3">
+          <p className="text-xs text-[var(--text-muted)]">
+            {r.noDataCount - r.noDataWaiting > 0 && <>{r.noDataCount - r.noDataWaiting} ca kế hoạch đã qua nhưng chưa có số — vẫn nằm trong mẫu số (target) của run-rate. </>}
+            {r.noDataWaiting > 0 && <>{r.noDataWaiting} ca sau ngày đủ số chưa có số — chưa vào mẫu số, có số là tự vào. </>}
+            Xem ở mục “Ca”.
+          </p>
+        </Card>
       )}
     </div>
   );

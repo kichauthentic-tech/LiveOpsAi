@@ -58,7 +58,7 @@ export function credentialMessage(name: string, email: string, password: string,
     login,
     `• Mật khẩu tạm: ${password}`,
     kind === "new"
-      ? `Lần đầu đăng nhập app sẽ bắt đổi mật khẩu. Vào "Ca Của Tôi" để xem lịch; hết ca thì mở ca → Giao ca.`
+      ? `Lần đầu đăng nhập app sẽ bắt đổi mật khẩu. Vào "Ca của tôi" để xem lịch; hết ca thì mở ca → Giao ca.`
       : `Đăng nhập xong app sẽ bắt đổi mật khẩu mới.`
   ].join("\n");
 }

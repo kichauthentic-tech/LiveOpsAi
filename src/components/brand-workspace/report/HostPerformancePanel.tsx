@@ -9,7 +9,7 @@ import { CampDayBucket } from "../../../lib/campaignDays";
 import { fmtFixed } from "../../../lib/format";
 import { DAY_TYPE_SHORT, PAL } from "./theme";
 import { fmtHours } from "./format";
-import { Panel, ReportTable } from "./ui";
+import { MethodNote, Panel, ReportTable } from "./ui";
 
 // Bảng Host PFM của Report Tháng (phần 5). Tách riêng vì một mình nó đã 183 dòng và có state cục bộ
 // của chính nó (tab loại ngày), khác hẳn các component trình bày thuần ở ./ui.tsx.
@@ -129,29 +129,33 @@ export const HostPerformancePanel: React.FC<{
           );
         })}
       </div>
-      {/* Chú thích màu đặt ngay trên bảng — để ở phụ đề thì người đọc không biết xanh/đỏ so với cái gì. */}
-      <p className="text-[11px] mb-2" style={{ color: PAL.muted }}>
-        {isAll ? (
-          <>
+      {/* Chú thích màu đặt ngay trên bảng — để ở phụ đề thì người đọc không biết xanh/đỏ so với cái gì. Tab Cả tháng: một dòng
+          nghĩa của màu hiện luôn, cách tính "mặt bằng" dài 3 dòng gập vào "Cách tính" (bố cục 18/10 đợt 2). */}
+      {isAll ? (
+        <div className="mb-2">
+          <p className="text-[11px]" style={{ color: PAL.muted }}>
+            <span style={{ color: PAL.green }}>Xanh</span> / <span style={{ color: PAL.red }}>đỏ</span> = trên / dưới mặt bằng của nhóm chắc chắn (gộp {relMonths} tháng, khoảng tin cậy 95%; rê chuột để xem khoảng).
+          </p>
+          <MethodNote className="mt-0.5">
             So mặt bằng = GMV/giờ của host so với cả nhóm ở cùng tháng × loại ngày × buổi (ngày/tối) của từng ca. Chỉ tô{" "}
             <span style={{ color: PAL.green }}>xanh</span> / <span style={{ color: PAL.red }}>đỏ</span> khi gộp {relMonths} tháng mà khoảng tin cậy 95% vẫn
             nằm hẳn trên / dưới mặt bằng (rê chuột để xem khoảng). Số của riêng tháng này để tham khảo: một tháng vài ca thì chênh
             15–25% vẫn có thể là ngẫu nhiên.
-          </>
-        ) : (
-          <>
-            <span style={{ color: PAL.green }}>▲ xanh</span> / <span style={{ color: PAL.red }}>▼ đỏ</span> = cao / thấp hơn cột Cả team từ {DAY_TYPE_DIFF_THRESHOLD}% trở lên (cùng loại ngày). Host
-            chỉ có 1 ca không so. Dùng để hiểu thừa số nào kéo GMV/giờ, không dùng để xếp hạng host (xếp hạng xem tab Cả tháng).
-          </>
-        )}
-      </p>
+          </MethodNote>
+        </div>
+      ) : (
+        <p className="text-[11px] mb-2" style={{ color: PAL.muted }}>
+          <span style={{ color: PAL.green }}>▲ xanh</span> / <span style={{ color: PAL.red }}>▼ đỏ</span> = cao / thấp hơn cột Cả team từ {DAY_TYPE_DIFF_THRESHOLD}% trở lên (cùng loại ngày). Host
+          chỉ có 1 ca không so. Dùng để hiểu thừa số nào kéo GMV/giờ, không dùng để xếp hạng host (xếp hạng xem tab Cả tháng).
+        </p>
+      )}
       <ReportTable
         head={[
           "Chỉ số",
           // Cả team đứng ngay sau tên chỉ số: là mốc so sánh nên phải luôn thấy, không bị đẩy khuất khi bảng cuộn ngang.
           "Cả team",
           // Host dưới ngưỡng ca ghi thẳng trên tiêu đề (không làm mờ cột — user thấy cột đậm/nhạt khó hiểu).
-          ...hosts.map((h) => `${shortName(h.name).toUpperCase()}${!isAll && h.m.sessions < MIN_SESSIONS_TO_COMPARE ? ` · ${h.m.sessions} ca` : ""}`)
+          ...hosts.map((h) => `${shortName(h.name)}${!isAll && h.m.sessions < MIN_SESSIONS_TO_COMPARE ? ` · ${h.m.sessions} ca` : ""}`)
         ]}
       >
         {shownRows.map((r, idx) => (

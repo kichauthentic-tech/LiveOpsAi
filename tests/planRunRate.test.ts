@@ -1,7 +1,8 @@
 // Run-rate theo plan ban đầu — luật user chốt 2026-09-28 (lib/performance/planRunRate.ts).
 // Chạy: npx vitest run tests/planRunRate.test.ts
 import { describe, expect, test } from "vitest";
-import { planRunRate } from "../src/lib/performance/planRunRate";
+import { planRunRate, runRateLive } from "../src/lib/performance/planRunRate";
+import { buildAccountRunRate } from "../src/lib/performance/runRateUpdate";
 import { monthOutlook, monthTargetOf } from "../src/lib/performance/ceoBrief";
 import { BrandMonthPlanSlot, LiveSession, ShiftSlot } from "../src/types";
 
@@ -97,5 +98,85 @@ describe("planRunRate — luật plan ban đầu", () => {
     const tgt = monthTargetOf("2026-10", 400e6, plan.map((p) => ({ date: p.date, target: p.targetGmv })));
     const o = monthOutlook("2026-10", "2026-10-07", sessions, [], tgt, undefined);
     expect(o.runRate).toBeCloseTo(r.total.runRate!);
+  });
+});
+
+// Run-rate "tới ca mới nhất có số" (11/10/2026): ngày ≤ ngày đủ số = target cả ngày, ngày sau đó = từng ca có số ÷ target đúng ca.
+describe("runRateLive — nhập tới đâu cập nhật tới đó, kể cả sửa report / đối soát / loại ca", () => {
+  // Ngày 08 đủ số (2 ca × 100M, mỗi ca 90M). Ngày 09 (= "hôm nay" 10/10 trừ 1) có 3 ca × 100M, mới 1 ca có số.
+  const at = (id: string, date: string, start: string, end: string, target: number, slotId: string) => ({ ...planSlot(id, date, target, slotId), startTime: start, endTime: end });
+  const sl = (id: string, date: string, start: string, end: string, sessionId?: string) => ({ ...shift(id, date, sessionId), startTime: start, endTime: end });
+  function build(over: { s9a?: Partial<LiveSession>; s9bGmv?: number; s9b?: Partial<LiveSession> } = {}) {
+    const d8a = ca("2026-10-08", 90e6, { startTime: "09:00", endTime: "12:00" }), d8b = ca("2026-10-08", 90e6, { startTime: "20:00", endTime: "23:00" });
+    const d9a = ca("2026-10-09", 110e6, { startTime: "09:00", endTime: "12:00", dataSource: "live_snapshot", ...over.s9a });
+    const d9b = ca("2026-10-09", over.s9bGmv ?? 0, { startTime: "12:00", endTime: "15:00", status: "Upcoming", ...over.s9b });
+    const shifts = [sl("a", "2026-10-08", "09:00", "12:00", d8a.id), sl("b", "2026-10-08", "20:00", "23:00", d8b.id), sl("c", "2026-10-09", "09:00", "12:00", d9a.id), sl("d", "2026-10-09", "12:00", "15:00", d9b.id), sl("e", "2026-10-09", "20:00", "23:00")];
+    const plan = [at("p1", "2026-10-08", "09:00", "12:00", 100e6, "a"), at("p2", "2026-10-08", "20:00", "23:00", 100e6, "b"), at("p3", "2026-10-09", "09:00", "12:00", 100e6, "c"), at("p4", "2026-10-09", "12:00", "15:00", 100e6, "d"), at("p5", "2026-10-09", "20:00", "23:00", 100e6, "e")];
+    return { sessions: [d8a, d8b, d9a, d9b], shifts, plan };
+  }
+  const rrOf = (b = build()) => planRunRate("2026-10", b.plan, b.shifts, b.sessions, "2026-10-10");
+
+  test("ca đã có số của ngày chưa đủ số vào run-rate theo target đúng ca (không chia cho target cả ngày)", () => {
+    const r = runRateLive(rrOf(), "2026-10-08");
+    expect(r.actual).toBe(290e6);
+    expect(r.expected).toBe(300e6); // 200M ngày 08 + 100M ca sáng ngày 09 — ca 12h/20h chưa có số thì chưa vào mẫu số
+    expect(r.runRate).toBeCloseTo(290 / 300, 5);
+    expect(r.tailShifts).toBe(1);
+    expect(r.tailUnreconciled).toBe(1); // live_snapshot chưa đối soát
+    expect(r.lastShift).toEqual({ date: "2026-10-09", startTime: "09:00", endTime: "12:00" });
+    // Luật cũ (cắt cả ngày) sẽ ra 290 ÷ 500 = 58% — đúng cái bẫy mà ngày đủ số sinh ra để tránh.
+    expect(rrOf().total.runRate).toBeCloseTo(290 / 500, 5);
+  });
+
+  test("nhập thêm ca 12h ⇒ ca đó vào ngay, mẫu số + 100M", () => {
+    const r = runRateLive(rrOf(build({ s9b: { status: "Completed", dataSource: "live_snapshot" }, s9bGmv: 70e6 })), "2026-10-08");
+    expect(r.actual).toBe(360e6);
+    expect(r.expected).toBe(400e6);
+    expect(r.tailShifts).toBe(2);
+  });
+
+  test("sửa report của ca (đổi GMV) ⇒ run-rate đổi theo; đối soát ⇒ hết 'chưa đối soát' và số mới thay số tạm", () => {
+    const edited = runRateLive(rrOf(build({ s9a: { actualGmv: 60e6 } })), "2026-10-08");
+    expect(edited.actual).toBe(240e6);
+    expect(edited.runRate).toBeCloseTo(240 / 300, 5);
+    const reconciled = runRateLive(rrOf(build({ s9a: { actualGmv: 120e6, dataSource: "tiktok_reconciled" } })), "2026-10-08");
+    expect(reconciled.actual).toBe(300e6);
+    expect(reconciled.tailUnreconciled).toBe(0);
+  });
+
+  test("ca bị loại khỏi report (không còn trong danh sách ca) ⇒ ra khỏi cả tử lẫn mẫu số của ngày sau mốc", () => {
+    const b = build();
+    const without = planRunRate("2026-10", b.plan, b.shifts, b.sessions.filter((s) => s.startTime !== "09:00" || s.date !== "2026-10-09"), "2026-10-10");
+    const r = runRateLive(without, "2026-10-08");
+    expect(r.actual).toBe(180e6);
+    expect(r.expected).toBe(200e6);
+    expect(r.tailShifts).toBe(0);
+  });
+
+  test("ca của ngày ĐÃ đủ số vẫn giữ luật cũ: thiếu số / huỷ giữ target, ca ngoài plan target 0", () => {
+    const b = build();
+    b.sessions[1] = { ...b.sessions[1], status: "Cancelled", actualGmv: 0, totalViews: 0 } as LiveSession; // ca 20h ngày 08 huỷ
+    const off = ca("2026-10-09", 40e6, { startTime: "16:00", endTime: "18:00" });
+    const r = runRateLive(planRunRate("2026-10", b.plan, b.shifts, [...b.sessions, off], "2026-10-10"), "2026-10-08");
+    expect(r.expected).toBe(300e6); // 08: 100 + 100 (ca huỷ giữ target); 09: ca sáng 100; ca 16–18h ngoài plan target 0
+    expect(r.actual).toBe(90e6 + 110e6 + 40e6);
+  });
+
+  test("chưa ngày nào đủ số ⇒ mọi ca có số tính theo ca", () => {
+    const r = runRateLive(rrOf(), null);
+    expect(r.expected).toBe(300e6 + 0);
+    expect(r.actual).toBe(290e6);
+  });
+
+  test("module Run-rate: buildAccountRunRate(rr, asOf, đủ số) khớp runRateLive; không truyền đủ số = luật cũ", () => {
+    const rr = rrOf();
+    const live = buildAccountRunRate(rr, "2026-10-09", "2026-10-08");
+    expect(live.total.targetToDate).toBe(300e6);
+    expect(live.total.runRate).toBeCloseTo(290 / 300, 5);
+    expect(live.tail).toMatchObject({ shifts: 1, unreconciled: 1 });
+    const day9 = live.days.find((d) => d.date === "2026-10-09")!;
+    expect(day9.state).toBe("partial");
+    expect(day9.pctTarget).toBeCloseTo(1.1, 5);
+    expect(buildAccountRunRate(rr, "2026-10-09").total.runRate).toBeCloseTo(290 / 500, 5);
   });
 });

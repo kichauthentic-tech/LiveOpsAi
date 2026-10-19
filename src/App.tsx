@@ -4,7 +4,7 @@ import { requestCrmFocus } from "./lib/crmFocus";
 import { todayVn } from "./lib/performance/brandCommitment";
 import { UserRole, LiveSession, PermissionKey, RolePermissionsMap, SystemUser, AuditLogEntry, Talent, Studio, Equipment, Brand, SessionFinance, ShiftSlot, RecurringShiftTemplate, BrandSku, PromoScheme, AppNotification, BrandChannel } from "./types";
 import { ChannelBar } from "./components/common/ChannelBar";
-import { PlatformChip } from "./components/common/PlatformChip";
+import { PageHeader, PlatformBlockContext } from "./components/common/PageHeader";
 import { TabErrorFallback } from "./components/common/TabErrorFallback";
 import { ErrorBoundary } from "./lib/errorReporting";
 import { fetchTalents, updateTalent, updateMyTalentProfile, deleteTalent } from "./lib/db/talents";
@@ -684,6 +684,34 @@ export default function App() {
     setBrandChoice((m) => ({ ...m, [brandId]: scope }));
     if (scope !== "all") setBrandSingle((m) => ({ ...m, [brandId]: scope }));
   };
+  // Thanh chọn sàn (Bước 3 đa sàn): chỉ ở màn theo sàn và khi có hơn một sàn để chọn. Từ lg nằm trên thanh đầu (Header
+  // `scopeControl`), màn hẹp vẽ ở đầu nội dung kèm câu ghi chú (`withNote`). "Mỗi sàn một khối…" đã là mô tả của tiêu đề trang
+  // ở chế độ Tất cả kênh (perPlatformBlocks) nên không lặp ở đây.
+  const channelBar = (withNote: boolean): React.ReactNode => {
+    if (!tabScope) return null;
+    if (effectiveWorkspace.type === "brand") {
+      if (brandPlatformsForTab.length < 2) return null;
+      return (
+        <ChannelBar
+          platforms={brandPlatformsForTab}
+          value={brandScope}
+          allowAll={tabScope === "all"}
+          onChange={(v) => pickBrandScope(currentBrandId!, v)}
+          note={withNote && tabScope === "one" ? "Màn này làm trên một kênh" : undefined}
+        />
+      );
+    }
+    if (agencyPlatforms.length < 2) return null;
+    return (
+      <ChannelBar
+        platforms={agencyPlatforms}
+        value={agencyScope}
+        allowAll={tabScope === "all"}
+        onChange={pickAgencyScope}
+        note={withNote && tabScope === "one" ? "Màn này làm trên một kênh" : undefined}
+      />
+    );
+  };
   // Kênh brand × sàn cho bộ chọn workspace ở Header (07/10): brand hai sàn hiện thành mục riêng từng sàn + Tổng.
   const brandPlatformsMap = useMemo(
     () => Object.fromEntries(brands.map((b) => [b.id, platformsOfBrand(channels, b.id)])) as Record<string, ReportPlatform[]>,
@@ -1076,9 +1104,11 @@ export default function App() {
   // Handlers for Live Sessions — persisted to Supabase. Return a success boolean so callers that
   // manage their own UI state (e.g. the calendars' session modal) know whether to close/reset — only
   // dismiss on caught errors below, not on an unconditional "we sent the request" assumption.
-  const handleUpdateSession = async (updatedSession: LiveSession): Promise<boolean> => {
+  // `base` = bản ca lúc bắt đầu sửa (SessionWindow giữ lúc bấm "Sửa ca"); vắng thì lấy bản đang có trong state — kéo thẻ
+  // đổi phòng/ngày dựng bản sửa từ đúng bản đó. Chỉ trường khác base được ghi (0178).
+  const handleUpdateSession = async (updatedSession: LiveSession, base?: LiveSession): Promise<boolean> => {
     try {
-      const saved = await updateSession(updatedSession);
+      const saved = await updateSession(updatedSession, base ?? sessions.find((x) => x.id === updatedSession.id));
       setSessions(prev => prev.map(s => s.id === saved.id ? saved : s));
       return true;
     } catch (e) {
@@ -1357,6 +1387,10 @@ export default function App() {
       return true;
     } catch (e) {
       showToast(`Không thể chốt lịch: ${errorMessage(e)}`);
+      // Thường do máy khác vừa chốt/huỷ ca này (RPC từ chối slot không còn mở) — nạp lại để màn khớp DB thay vì bảo người dùng tự tải lại trang.
+      Promise.all([fetchShiftSlots(), fetchSessions()])
+        .then(([sl, ss]) => { setShiftSlots(sl); setSessions(ss); })
+        .catch(() => {});
       return false;
     }
   };
@@ -1374,20 +1408,29 @@ export default function App() {
   // Brand có kênh trên một sàn — danh sách brand của màn số liệu agency theo sàn đó.
   const brandsOn = (p: ReportPlatform) => brands.filter((b) => (brandPlatformsMap[b.id] ?? []).includes(p));
   // Màn "mọi kênh" của agency khi đang "Tất cả": mỗi sàn một khối (đầu khối có nhãn sàn), số hiệu suất không cộng giữa hai sàn.
-  const perPlatformBlocks = (render: (p: ReportPlatform) => React.ReactNode) =>
+  // Bố cục 18/10: tiêu đề trang vẽ MỘT lần ở đây; trong từng khối, PageHeader của component thành đầu khối "Các kênh X" với
+  // nút/bộ lọc của khối (PlatformBlockContext) — trước đó mỗi sàn lặp nguyên thẻ tiêu đề + mô tả + bộ chọn tháng. `lead` = khối
+  // chung đứng giữa tiêu đề và các khối sàn (Dashboard: số toàn agency).
+  const perPlatformBlocks = (render: (p: ReportPlatform) => React.ReactNode, lead?: React.ReactNode) =>
     agencyScope === "all" ? (
-      <div className="space-y-10">
-        {agencyPlatforms.map((p) => (
-          <section key={p} className="space-y-3" aria-label={`Kênh ${p}`}>
-            <h2 className="flex items-center gap-2 text-sm font-black text-[var(--text)] border-b border-[var(--border)] pb-2">
-              <PlatformChip platform={p} /> Các kênh {p}
-            </h2>
-            {render(p)}
-          </section>
-        ))}
-      </div>
+      <>
+        {currentTabNavItem && (
+          <PageHeader icon={currentTabNavItem.icon} title={currentTabNavItem.label} description="Mỗi sàn một khối — số hiệu suất của TikTok và Shopee không cộng với nhau." />
+        )}
+        {lead}
+        <div className="space-y-12">
+          {agencyPlatforms.map((p, i) => (
+            <section key={p} className="space-y-4" aria-label={`Kênh ${p}`}>
+              <PlatformBlockContext.Provider value={{ platform: p, first: i === 0 }}>{render(p)}</PlatformBlockContext.Provider>
+            </section>
+          ))}
+        </div>
+      </>
     ) : (
-      render(agencyPlatformState)
+      <>
+        {lead}
+        {render(agencyPlatformState)}
+      </>
     );
   const agencyBrands = brandsOn(agencyPlatformState);
   const navItems = navGroups.flatMap((g) => g.items);
@@ -1428,9 +1471,12 @@ export default function App() {
   );
 
   // Mở một màn từ nút "việc cần làm" của màn khác: brandId có ⇒ vào Brand Workspace của brand đó.
-  const navigateTo = (tab: string, brandId?: string) => {
+  // `platform` = sàn của khối đã bấm (màn "Tất cả kênh" xếp khối TikTok | Shopee) — mở đúng sàn đó ở màn đích.
+  const navigateTo = (tab: string, brandId?: string, platform?: ReportPlatform) => {
+    if (platform && !brandId && TAB_CHANNEL_SCOPE[tab]) pickAgencyScope(platform);
+    if (brandId && platform) pickBrandScope(brandId, platform);
     // Từ màn agency đang lọc một sàn sang Brand workspace: giữ đúng sàn đó.
-    if (brandId && effectiveWorkspace.type === "agency" && agencyScope !== "all" && tabScope) pickBrandScope(brandId, agencyScope);
+    else if (brandId && effectiveWorkspace.type === "agency" && agencyScope !== "all" && tabScope) pickBrandScope(brandId, agencyScope);
     setWorkspace(brandId ? { type: "brand", brandId } : { type: "agency" });
     setActiveTab(tab);
     setMobileMenuOpen(false);
@@ -1648,10 +1694,8 @@ export default function App() {
             )}
             <Header
               onOpenHelp={() => setHelpOpen(true)}
-              currentRole={currentRole}
-              activeUserName={activeUser.name}
-              activeUserTitle={activeUser.customRoleTitle}
               onSignOut={signOut}
+              scopeControl={channelBar(false)}
               // Switcher chỉ hiện cho role được phép nhìn xuyên brand — role "brand" đã bị ép
               // cứng vào effectiveWorkspace của họ (không truyền props này xuống thì Header
               // tự ẩn switcher, xem Header.tsx).
@@ -1679,7 +1723,7 @@ export default function App() {
                 <ShieldAlert className="w-4 h-4" />
               </span>
               <div>
-                <strong className="text-red-300 font-extrabold uppercase block mb-1">
+                <strong className="text-red-300 font-extrabold block mb-1">
                   Lỗi Tải Dữ Liệu Từ Supabase:
                 </strong>
                 <ul className="list-disc list-inside space-y-0.5">
@@ -1768,7 +1812,7 @@ export default function App() {
                 </div>
 
                 <div className="p-4 bg-[var(--surface-base)] border border-[var(--border)] rounded-xl text-left text-xs font-mono space-y-1 text-[var(--text-muted)]">
-                  <div className="text-[var(--text-faint)] font-sans text-[11px] uppercase font-bold">Chi tiết yêu cầu an ninh:</div>
+                  <div className="text-[var(--text-faint)] font-sans text-[11px] font-bold">Chi tiết yêu cầu an ninh:</div>
                   {/* Tab không có nav item cho role này thì không có perm key nào để in — nói thẳng là do role,
                       thay vì in "undefined". */}
                   <div>• Permission Required: <span className="text-blue-400">{currentTabNavItem?.perm ?? "không khả dụng cho role này"}</span></div>
@@ -1822,28 +1866,8 @@ export default function App() {
                   <TabLoading />
                 ) : (
                 <>
-                {/* Thanh chọn sàn (Bước 3 đa sàn): chỉ ở màn theo sàn và khi có hơn một sàn để chọn. */}
-                {tabScope && (effectiveWorkspace.type === "brand" ? brandPlatformsForTab : agencyPlatforms).length > 1 && (
-                  <div className="mb-4">
-                    {effectiveWorkspace.type === "brand" ? (
-                      <ChannelBar
-                        platforms={brandPlatformsForTab}
-                        value={brandScope}
-                        allowAll={tabScope === "all"}
-                        onChange={(v) => pickBrandScope(currentBrandId!, v)}
-                        note={tabScope === "one" ? "Màn này làm trên một kênh" : undefined}
-                      />
-                    ) : (
-                      <ChannelBar
-                        platforms={agencyPlatforms}
-                        value={agencyScope}
-                        allowAll={tabScope === "all"}
-                        onChange={pickAgencyScope}
-                        note={tabScope === "all" && agencyScope === "all" ? "Mỗi sàn một khối — số hiệu suất không cộng giữa hai sàn" : tabScope === "one" ? "Màn này làm trên một kênh" : undefined}
-                      />
-                    )}
-                  </div>
-                )}
+                {/* Thanh chọn sàn ở màn hẹp — từ lg nó nằm trên thanh đầu cạnh bộ chọn workspace (Header `scopeControl`). */}
+                {channelBar(true) && <div className="lg:hidden">{channelBar(true)}</div>}
                 {activeTab === "sessions" && (
                   <SessionLedger
                     variant="agency"
@@ -2118,22 +2142,8 @@ export default function App() {
                 )}
 
                 {activeTab === "agency_overview" && (
-                  <>
-                    {agencyScope === "all" && (
-                      <AgencyChannelSummary
-                        platforms={agencyPlatforms}
-                        channels={channels}
-                        brands={brands}
-                        sessions={activeSessions}
-                        financeRecords={financeRecords}
-                        brandPlatformRates={brandPlatformRates}
-                        brandPlatformRateHistory={brandPlatformRateHistory}
-                        talents={talents}
-                        talentRateHistory={talentRateHistory}
-                        canSeeMoney={currentRole === "ceo" || currentRole === "admin"}
-                      />
-                    )}
-                    {perPlatformBlocks((p) => (
+                  perPlatformBlocks(
+                    (p) => (
                       <CeoBrief
                       key={p}
                       platform={p}
@@ -2151,9 +2161,28 @@ export default function App() {
                       talentRateHistory={talentRateHistory}
                       currentRole={currentRole}
                       onNavigate={setActiveTab}
+                      onOpenIssue={(i) => {
+                        if (!i.brandId) return;
+                        if (i.action === "month_plan") openMonthPlanFor(i.brandId, i.platform ?? LEGACY_PLATFORM);
+                        else if (i.action === "reconcile") navigateTo("brand_dataraw", i.brandId, i.platform ?? LEGACY_PLATFORM);
+                      }}
                     />
-                    ))}
-                  </>
+                    ),
+                    agencyScope === "all" ? (
+                      <AgencyChannelSummary
+                        platforms={agencyPlatforms}
+                        channels={channels}
+                        brands={brands}
+                        sessions={activeSessions}
+                        financeRecords={financeRecords}
+                        brandPlatformRates={brandPlatformRates}
+                        brandPlatformRateHistory={brandPlatformRateHistory}
+                        talents={talents}
+                        talentRateHistory={talentRateHistory}
+                        canSeeMoney={currentRole === "ceo" || currentRole === "admin"}
+                      />
+                    ) : null
+                  )
                 )}
 
                 {activeTab === "host_performance" && (

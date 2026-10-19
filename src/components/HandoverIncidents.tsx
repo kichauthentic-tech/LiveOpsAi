@@ -47,7 +47,7 @@ export function HandoverIncidents({ value, onChange, label }: { value: IncidentS
           type="button"
           aria-pressed={value.on.length === 0}
           onClick={() => onChange({ ...value, on: [] })}
-          className={`min-h-9 px-3 rounded-full text-xs font-bold border ${value.on.length === 0 ? "bg-[var(--accent)] text-white border-[var(--accent)]" : "border-[var(--border)] text-[var(--text-muted)]"}`}
+          className={`min-h-9 px-3 rounded-full text-xs font-bold border ${value.on.length === 0 ? "seg-on" : "border-[var(--border)] text-[var(--text-muted)]"}`}
         >
           Đúng giờ, không sự cố
         </button>
@@ -70,7 +70,7 @@ export function HandoverIncidents({ value, onChange, label }: { value: IncidentS
           <div key={k} className="flex flex-wrap items-center gap-1.5 text-xs">
             <span className="font-bold text-[var(--text-muted)] w-14">{INCIDENT_LABEL[k]}</span>
             {MINUTE_PRESETS.map((m) => (
-              <button key={m} type="button" onClick={() => onChange({ ...value, [field]: m })} className={`min-h-8 px-2.5 rounded-lg border font-bold ${val === m ? "bg-[var(--accent)] text-white border-[var(--accent)]" : "border-[var(--border)] text-[var(--text-muted)]"}`}>
+              <button key={m} type="button" onClick={() => onChange({ ...value, [field]: m })} className={`min-h-8 px-2.5 rounded-lg border font-bold ${val === m ? "seg-on" : "border-[var(--border)] text-[var(--text-muted)]"}`}>
                 {m}p
               </button>
             ))}

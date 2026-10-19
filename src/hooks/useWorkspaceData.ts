@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import {
   AiAgentPrompt,
@@ -127,7 +127,13 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
   const [phase1Error, setPhase1Error] = useState<string | null>(null);
 
   // Live Sessions — real data from Supabase (Phase 2), no mock fallback
-  const [rawSessions, setSessions] = useState<LiveSession[]>([]);
+  const [rawSessions, setSessionsRaw] = useState<LiveSession[]>([]);
+  // Mọi lần ghi ca từ màn (lưu, huỷ, giao ca…) đi qua đây để lượt nạp lại nền biết có bản mới hơn nó (xem effect nạp lại).
+  const lastLocalSessionWrite = useRef(0);
+  const setSessions = useCallback<React.Dispatch<React.SetStateAction<LiveSession[]>>>((v) => {
+    lastLocalSessionWrite.current = Date.now();
+    setSessionsRaw(v);
+  }, []);
   // Target GMV từng ca phân bổ TỪ TRÊN XUỐNG theo kế hoạch tháng của brand (user chốt 2026-09-18,
   // xem lib/performance/targetAllocation.ts) — ghi đè `targetGmv` lưu trong DB (vốn là GMV trung
   // bình của host, sai bản chất) ở đúng MỘT chỗ này, mọi màn hình bên dưới nhận `sessions` đã
@@ -280,13 +286,17 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
     // suy "Đã xong" theo giờ. RPC có đóng ca nào (n > 0) thì nạp lại để khớp DB. `seq` chặn lượt nạp
     // cũ về sau ghi đè lượt mới.
     let latestApplied = 0;
-    const load = (seq: number) =>
-      fetchSessions().then((s) => {
+    const load = (seq: number) => {
+      const startedAt = Date.now();
+      return fetchSessions().then((s) => {
         if (cancelled || seq < latestApplied) return;
+        // Một màn vừa ghi ca SAU lúc lượt nạp này bắt đầu ⇒ bản trong tay mới hơn, bỏ lượt này (lượt sau sẽ khớp).
+        if (seq > 2 && lastLocalSessionWrite.current > startedAt) return;
         latestApplied = seq;
-        setSessions(s);
+        setSessionsRaw(s);
         setSessionsError(null);
       });
+    };
     load(1)
       .catch((err) => {
         if (cancelled) return;
@@ -296,8 +306,28 @@ export function useWorkspaceData({ session, currentRole, isOpsRole, activeTab }:
     completePastSessions()
       .then((n) => (n > 0 && !cancelled ? load(2) : undefined))
       .catch(() => {});
+    // Nạp lại nền (audit 15/10 B4): trước đây danh sách ca chỉ nạp lúc đăng nhập ⇒ máy để mở cả ngày không thấy ca/người máy
+    // khác vừa đổi, ca đã qua giờ không tự "Đã xong". Nạp lại khi quay lại tab (cách lần trước ≥ 2 phút) và mỗi 5 phút khi
+    // tab đang mở; tab ẩn thì không nạp.
+    let seq = 2;
+    let lastRefresh = Date.now();
+    const refresh = () => {
+      if (cancelled || document.visibilityState !== "visible" || Date.now() - lastRefresh < 2 * 60_000) return;
+      lastRefresh = Date.now();
+      const mySeq = ++seq;
+      completePastSessions()
+        .catch(() => 0)
+        .then(() => load(mySeq))
+        .catch(() => {});
+    };
+    const timer = window.setInterval(refresh, 5 * 60_000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
     return () => {
       cancelled = true;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
     };
   }, [authUserId]);
 

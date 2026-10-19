@@ -340,7 +340,7 @@ export const BrandMonthlyReport: React.FC<BrandMonthlyReportProps> = ({ brandId,
           key={m}
           onClick={() => setViewMode(m)}
           className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
-            viewMode === m ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)] hover:bg-[var(--surface-elevated)]"
+            viewMode === m ? "seg-on" : "text-[var(--text-muted)] hover:bg-[var(--surface-elevated)]"
           }`}
         >
           {m === "month" ? <FileText className="w-3.5 h-3.5" /> : <CalendarRange className="w-3.5 h-3.5" />}

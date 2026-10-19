@@ -96,7 +96,7 @@ export const TabUsagePanel: React.FC = () => {
                 type="button"
                 onClick={() => setDays(d)}
                 className={`px-3 py-1.5 rounded-lg transition-all ${
-                  days === d ? "bg-[var(--accent)] text-white font-black" : "text-[var(--text-muted)] hover:text-[var(--text)]"
+                  days === d ? "seg-on font-black" : "text-[var(--text-muted)] hover:text-[var(--text)]"
                 }`}
               >
                 {d} ngày
@@ -117,7 +117,7 @@ export const TabUsagePanel: React.FC = () => {
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="text-left text-[11px] uppercase tracking-wide text-[var(--text-faint)] border-b border-[var(--border)]">
+                <tr className="text-left text-[11px] font-semibold text-[var(--text-faint)] border-b border-[var(--border)]">
                   <th className="py-2 pr-3 font-bold">Tab</th>
                   <th className="py-2 pr-3 font-bold text-right">Lượt mở</th>
                   <th className="py-2 pr-3 font-bold text-right">Người</th>

@@ -43,6 +43,8 @@ interface Props {
   /** Các ca đã nạp — để vẽ dải chuỗi ca liền kề trong ngày và tìm ca trước. */
   allSessions?: LiveSession[];
   onSessionsUpdated: (sessions: LiveSession[]) => void;
+  /** Nằm trong form Giao ca (đã có tiêu đề bước + khung) — không vẽ khung/tiêu đề riêng. */
+  embedded?: boolean;
 }
 
 const dismissKey = (id: string) => `liveops:no-room-link:${id}`;
@@ -61,7 +63,7 @@ const linkedLabel = (x: { date: string; startTime: string; endTime: string; host
 const chipBase = "text-[11px] font-bold px-2 py-0.5 rounded-full border";
 const btnGhost = "inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--text)] disabled:opacity-40 transition-colors";
 
-export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSessionsUpdated }: Props) {
+export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSessionsUpdated, embedded = false }: Props) {
   const confirm = useConfirm();
   // TikTok gọi là room, Shopee gọi là phiên (một dòng trong file Live List) — cùng cơ chế snapshot nên cùng màn.
   const prof = profileOf(s);
@@ -212,12 +214,17 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
   };
 
   if (unavailable) return null;
-  const shell = (body: React.ReactNode) => (
-    <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface-base)]/60 p-3 space-y-2">
-      <h4 className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-bold">Lượt live & ca nối</h4>
-      {body}
-    </section>
-  );
+  // Bố cục 19/10: trong form Giao ca (bước "2 · Lượt live & ca nối") khối này không vẽ khung + tiêu đề riêng — trước đó tiêu đề
+  // lặp hai lần và thêm một tầng hộp trong hộp Giao ca.
+  const shell = (body: React.ReactNode) =>
+    embedded ? (
+      <div className="space-y-2">{body}</div>
+    ) : (
+      <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface-base)]/60 p-3 space-y-2">
+        <h4 className="text-xs font-bold text-[var(--text-muted)]">Lượt live & ca nối</h4>
+        {body}
+      </section>
+    );
   if (loading) return shell(<p className="text-[11px] text-[var(--text-faint)]">Đang tải thông tin {unit}...</p>);
 
   const rooms = snapshot?.rooms ?? [];
@@ -440,7 +447,7 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
       {/* Dải chuỗi ca liền kề trong ngày */}
       {chain.length > 1 && (
         <div className="rounded-xl border border-[var(--border)] p-2.5 space-y-1.5">
-          <p className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-bold">Chuỗi ca liền kề trong ngày</p>
+          <p className="text-xs font-bold text-[var(--text-muted)]">Chuỗi ca liền kề trong ngày</p>
           <div className="flex flex-wrap items-center gap-1 text-[11px]">
             {chain.map((c, i) => {
               const bd = i > 0 ? boundaries[i - 1] : undefined;

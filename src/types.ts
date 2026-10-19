@@ -206,6 +206,9 @@ export interface LiveSession {
    *  UI hiện số cho brand PHẢI xét cờ này trước: các cột số bị che về 0, hiện thẳng sẽ đọc
    *  thành "bán được 0 đồng" thay vì "chưa phát hành". */
   monthPublished: boolean;
+  /** Ca có bằng chứng đã diễn ra (0178, view `live_sessions_secure`): có số / report / giờ live / nạp bù. Chỉ cần cho role brand
+   *  ở tháng chưa phát hành (số bị che nên client không tự suy được); vắng = DB chưa chạy 0178 hoặc row thô từ RPC. */
+  liveEvidence?: boolean;
   actualGmv: number;
   totalOrders: number;
   avgWatchTimeSeconds: number;

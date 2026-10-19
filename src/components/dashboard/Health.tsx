@@ -47,7 +47,7 @@ const TrendTable: React.FC<{ m: DashModel }> = ({ m }) => {
   const months = [prevMonthOf(prevMonthOf(prevMonthOf(m.month))), prevMonthOf(prevMonthOf(m.month)), prevMonthOf(m.month), m.month];
   const brands = m.brands.filter((b) => m.scopeIds.includes(b.id));
   const through = m.coverage.completeThrough;
-  const th = "px-2.5 py-2 text-[11px] uppercase tracking-wider font-bold text-[var(--text-faint)] whitespace-nowrap text-right";
+  const th = "px-2.5 py-2 text-[11px] font-bold text-[var(--text-faint)] whitespace-nowrap text-right";
   const rows = brands
     .map((b) => {
       const bs = m.platformSessions.filter((s) => s.brandId === b.id && isCountable(s));
@@ -200,7 +200,7 @@ const StaffIndexCard: React.FC<{ m: DashModel }> = ({ m }) => {
 const ContractAndData: React.FC<{ m: DashModel }> = ({ m }) => {
   const brands = m.brands.filter((b) => m.scopeIds.includes(b.id) && m.health.get(b.id));
   if (brands.length === 0) return null;
-  const th = "px-3 py-2 text-[11px] uppercase tracking-wider font-bold text-[var(--text-faint)] whitespace-nowrap";
+  const th = "px-3 py-2 text-[11px] font-bold text-[var(--text-faint)] whitespace-nowrap";
   return (
     <section className="space-y-3">
       <SectionTitle title="Cam kết giờ và kỷ luật dữ liệu" note={`Tháng ${Number(m.month.slice(5))} · mỗi kênh một dòng`} />

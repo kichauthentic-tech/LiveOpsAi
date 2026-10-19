@@ -50,7 +50,7 @@ const ShiftTable: React.FC<{ date: string; today: string; rr: PlanRunRate | null
   const offPlan = rr?.offPlan.filter((x) => x.session.date === date) ?? [];
   const plain = rr ? [] : sessions.filter((s) => s.date === date && s.status !== "Cancelled").sort((a, z) => a.startTime.localeCompare(z.startTime));
   const state = { done: "có số", no_data: "chờ số", pending: "chưa diễn ra", cancelled: "đã huỷ" } as const;
-  const thBase = "px-3 py-2 text-[11px] uppercase tracking-wider font-bold text-[var(--text-faint)] whitespace-nowrap";
+  const thBase = "px-3 py-2 text-[11px] font-bold text-[var(--text-faint)] whitespace-nowrap";
   const th = `${thBase} text-right`, thL = `${thBase} text-left`;
   if (inPlan.length === 0 && offPlan.length === 0 && plain.length === 0) return <p className="text-sm text-[var(--text-faint)]">Ngày này không có ca nào.</p>;
   return (
@@ -129,7 +129,7 @@ export const DrillDown: React.FC<{ m: DashModel; onNavigate: (tab: string) => vo
       <div className="flex flex-wrap items-center gap-2">
         {!channelId && <div className="inline-flex flex-wrap bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-1" role="group" aria-label="Chọn kênh">
           {choices.map((c) => (
-            <button key={c.id} onClick={() => setBrandId(c.id)} aria-pressed={brandId === c.id} className={`px-3 py-1.5 rounded-lg text-sm font-bold inline-flex items-center gap-2 transition-colors ${brandId === c.id ? "bg-[var(--accent)] text-[var(--accent-contrast)]" : "text-[var(--text-muted)] hover:text-[var(--text)]"}`}>
+            <button key={c.id} onClick={() => setBrandId(c.id)} aria-pressed={brandId === c.id} className={`px-3 py-1.5 rounded-lg text-sm font-bold inline-flex items-center gap-2 transition-colors ${brandId === c.id ? "seg-on" : "text-[var(--text-muted)] hover:text-[var(--text)]"}`}>
               <BrandLogo brand={c} size="xs" /> {m.channelName(c)}
             </button>
           ))}

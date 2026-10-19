@@ -18,7 +18,7 @@ export const DataSourceBadge: React.FC<DataSourceBadgeProps> = ({ dataSource, pl
   if (tier === "reconciled") {
     return (
       <span
-        className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border bg-emerald-950 text-emerald-300 border-emerald-800 ${className}`}
+        className={`inline-flex items-center gap-1 whitespace-nowrap text-[11px] font-bold px-2 py-0.5 rounded-full border bg-emerald-950 text-emerald-300 border-emerald-800 ${className}`}
         title={`Số liệu đã được đối soát với báo cáo chính thức từ ${shop}`}
       >
         <CheckCircle2 className="w-3 h-3" /> Đã Đối Soát
@@ -33,7 +33,7 @@ export const DataSourceBadge: React.FC<DataSourceBadgeProps> = ({ dataSource, pl
   if (tier === "handover") {
     return (
       <span
-        className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border bg-sky-950 text-sky-300 border-sky-800 ${className}`}
+        className={`inline-flex items-center gap-1 whitespace-nowrap text-[11px] font-bold px-2 py-0.5 rounded-full border bg-sky-950 text-sky-300 border-sky-800 ${className}`}
         title={
           dataSource === "live_snapshot"
             ? `Số đọc từ file ${prof.reconciliationFile} trợ live up lúc giao ca — chờ đối soát cuối kỳ`
@@ -47,7 +47,7 @@ export const DataSourceBadge: React.FC<DataSourceBadgeProps> = ({ dataSource, pl
 
   return (
     <span
-      className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border bg-amber-950 text-amber-300 border-amber-800 ${className}`}
+      className={`inline-flex items-center gap-1 whitespace-nowrap text-[11px] font-bold px-2 py-0.5 rounded-full border bg-amber-950 text-amber-300 border-amber-800 ${className}`}
       title={`Số nạp từ bảng tính vận hành hoặc tự khai — chưa có số lúc giao ca, chờ đối soát với báo cáo chính thức từ ${shop}`}
     >
       <Clock className="w-3 h-3" /> Tạm Tính

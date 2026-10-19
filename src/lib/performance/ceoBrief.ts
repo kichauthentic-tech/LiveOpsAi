@@ -561,6 +561,9 @@ export interface Issue {
   detail: string;
   action?: IssueAction;
   code?: IssueCode;
+  /** Kênh của cảnh báo (brand × sàn) — nút hành động mở đúng kế hoạch / Dữ Liệu Gốc của kênh đó, không phải brand đang nhớ. */
+  brandId?: string;
+  platform?: ReportPlatform;
 }
 
 export interface BrandSnapshot {
@@ -599,14 +602,14 @@ export function buildIssues(x: IssueInput): Issue[] {
     const missing = b.outlook.pending.filter((p) => p.kind === "session" && p.date < x.today);
     if (missing.length === 0) continue;
     const oldest = missing.map((p) => p.date).sort()[0];
-    out.push({ level: "bad", title: `${b.name}: ${missing.length} ca đã chạy chưa có số`, detail: `Từ ${oldest.slice(8, 10)}/${oldest.slice(5, 7)} — chưa up file giao ca hoặc chưa đối soát. Dự phóng đang tạm tính phần này theo doanh số/giờ gần đây.`, action: "reconcile", code: "missing_data" });
+    out.push({ level: "bad", title: `${b.name}: ${missing.length} ca đã chạy chưa có số`, detail: `Từ ${oldest.slice(8, 10)}/${oldest.slice(5, 7)} — chưa up file giao ca hoặc chưa đối soát. Dự phóng đang tạm tính phần này theo doanh số/giờ gần đây.`, action: "reconcile", code: "missing_data", brandId: b.brandId, platform: b.platform });
   }
 
   for (const b of x.brands) {
     const o = b.outlook;
     if (!o.actual && !o.pending.length) continue;
     if (o.runRate != null && o.runRate < RUN_RATE_WARN) {
-      out.push({ level: o.runRate < RUN_RATE_BAD ? "bad" : "warn", title: `${b.name} chậm tiến độ: đạt ${pct(o.runRate)} kỳ vọng`, detail: `Đã có ${x.fmt(o.actual)}, kỳ vọng tới ngày có số là ${x.fmt(o.expectedToDate ?? 0)} (theo target từng ngày).`, action: "month_plan", code: "behind" });
+      out.push({ level: o.runRate < RUN_RATE_BAD ? "bad" : "warn", title: `${b.name} chậm tiến độ: đạt ${pct(o.runRate)} kỳ vọng`, detail: `Đã có ${x.fmt(o.actual)}, kỳ vọng tới ngày có số là ${x.fmt(o.expectedToDate ?? 0)} (theo target từng ngày).`, action: "month_plan", code: "behind", brandId: b.brandId, platform: b.platform });
     }
     if (o.target && o.gap != null && o.gap < 0) {
       // Mức báo theo khả năng đạt target (forecastCone.landingOf), không theo số tuyệt đối: thiếu 1,7% mà dải còn bao target ≠ thiếu 30%.
@@ -617,15 +620,19 @@ export function buildIssues(x: IssueInput): Issue[] {
         title: `${b.name} dự phóng thiếu ${x.fmt(-o.gap)} so với target${l.pHit != null ? ` (khả năng đạt ≈ ${pct(l.pHit)})` : ""}`,
         detail: `Dự phóng cuối tháng ${x.fmt(o.projected)} (${o.projectionMethod === "run_rate" ? "theo run-rate — chưa có GMV/giờ 28 ngày" : `dải ~80%: ${x.fmt(o.projected - half)} – ${x.fmt(o.projected + half)}`}) với lịch đang có. Xem tab Action để biết cần thêm bao nhiêu giờ.`,
         action: "month_plan",
-        code: "short"
+        code: "short",
+        brandId: b.brandId,
+        platform: b.platform
       });
     }
     if (o.remainingDays > 0 && o.pending.filter((p) => p.date >= x.today).length === 0 && o.actual > 0) {
-      out.push({ level: "bad", title: `${b.name}: chưa có ca nào trong lịch cho ${o.remainingDays} ngày còn lại`, detail: "Dự phóng chỉ bằng số đã có. Kiểm tra lịch và Kế Hoạch Tháng.", action: "month_plan", code: "no_schedule" });
+      out.push({ level: "bad", title: `${b.name}: chưa có ca nào trong lịch cho ${o.remainingDays} ngày còn lại`, detail: "Dự phóng chỉ bằng số đã có. Kiểm tra lịch và Kế Hoạch Tháng.", action: "month_plan", code: "no_schedule", brandId: b.brandId, platform: b.platform });
     }
-    const lastCamp = o.buckets.filter((c) => c.bucket !== "daily" && c.status === "done" && c.perDay != null && c.prevPerDay != null).pop();
+    // Đợt đã qua theo lịch nhưng còn ca chưa có số (pendingCount) thì GMV/ngày mới là một phần — so với cả đợt tháng trước
+    // ra "−72%" giả (Franklin TikTok 17/10: Mid-Month 13–15/10 chỉ có số ngày 13). Chỉ so đợt đã đủ số.
+    const lastCamp = o.buckets.filter((c) => c.bucket !== "daily" && c.status === "done" && c.pendingCount === 0 && c.perDay != null && c.prevPerDay != null).pop();
     if (lastCamp && lastCamp.perDay! < lastCamp.prevPerDay! * 0.85) {
-      out.push({ level: "warn", title: `${b.name}: đợt camp vừa rồi yếu hơn tháng trước`, detail: `${x.fmt(lastCamp.perDay!)}/ngày so với ${x.fmt(lastCamp.prevPerDay!)}/ngày tháng trước (${pct(lastCamp.perDay! / lastCamp.prevPerDay! - 1)}).`, code: "camp_weak" });
+      out.push({ level: "warn", title: `${b.name}: đợt camp vừa rồi yếu hơn tháng trước`, detail: `${x.fmt(lastCamp.perDay!)}/ngày so với ${x.fmt(lastCamp.prevPerDay!)}/ngày tháng trước (${pct(lastCamp.perDay! / lastCamp.prevPerDay! - 1)}).`, code: "camp_weak", brandId: b.brandId, platform: b.platform });
     }
   }
 

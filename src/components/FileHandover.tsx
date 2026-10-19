@@ -70,7 +70,7 @@ export function FileHandover({ session: s, isOps = false, allSessions, onSaved, 
       </div>
       <div className="space-y-1.5">
         <p className="block text-xs font-bold text-[var(--text-muted)]">2 · Lượt live & ca nối</p>
-        <SessionRoomCase key={s.id} session={s} canEdit isOps={isOps} allSessions={allSessions} onSessionsUpdated={onSaved} />
+        <SessionRoomCase key={s.id} session={s} canEdit isOps={isOps} allSessions={allSessions} onSessionsUpdated={onSaved} embedded />
       </div>
       <HandoverIncidents label="3 · Ca này có gì?" value={incidents} onChange={setIncidents} />
       {error && <p className="text-xs text-rose-300 bg-rose-950/50 border border-rose-800 rounded-xl px-3 py-2">{error}</p>}

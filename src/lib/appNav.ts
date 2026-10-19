@@ -99,11 +99,11 @@ export function agencyNavGroups(currentRole: UserRole): NavGroup[] {
     ...(currentRole === "talent"
       ? [
           {
-            label: "Của Tôi",
+            label: "Của tôi",
             items: [
-              { id: "my_shifts", label: "Ca Của Tôi", icon: CalendarCheck, perm: undefined },
-              { id: "talent_calendar", label: "Cả Agency", icon: CalendarDays, perm: undefined },
-              { id: "shift_scheduling", label: "Đăng Ký Ca", icon: CalendarClock, perm: undefined },
+              { id: "my_shifts", label: "Ca của tôi", icon: CalendarCheck, perm: undefined },
+              { id: "talent_calendar", label: "Cả agency", icon: CalendarDays, perm: undefined },
+              { id: "shift_scheduling", label: "Đăng ký ca", icon: CalendarClock, perm: undefined },
               { id: "my_talent_profile", label: "Tôi", icon: User, perm: undefined }
             ]
           }
@@ -120,22 +120,21 @@ export function agencyNavGroups(currentRole: UserRole): NavGroup[] {
             ]
           },
           {
-            label: "Lập Kế Hoạch",
+            // Bố cục 18/10: "Lập Kế Hoạch" và "Nhân Sự Live" mỗi nhóm chỉ một mục — gộp thành một nhóm theo việc trước khi live
+            // (lưới tháng → xếp người tuần). 9 nhóm cho 19 mục làm sidebar dài và nhiều tiêu đề hơn cả mục.
+            label: "Kế hoạch",
             items: [
               // Kế Hoạch Tháng (0090) — lập lưới ca + target trước khi mở đăng ký; chốt là ca đổ xuống Bảng Vận Hành
               // (ca chờ đăng ký). Chỉ ops (manage_sessions = ceo/admin/operations). Màn "Nhân sự ca" đã bỏ 08/10: chốt Host + Trợ live
               // ở Bảng Vận Hành (bấm dòng ca chưa có người), việc lập kế hoạch tồn đọng nằm ở khối cuối Bảng Vận Hành.
-              { id: "month_plan", label: "Kế Hoạch Tháng", icon: CalendarRange, perm: "manage_sessions" as PermissionKey }
+              { id: "month_plan", label: "Kế Hoạch Tháng", icon: CalendarRange, perm: "manage_sessions" as PermissionKey },
+              // Bàn Trainer (0176, 13/10): người quản lý nhân sự live xếp lịch TUẦN — hạn đăng ký, nháp người cho ca mở, kiểm luật
+              // giờ làm, công bố tuần (mỗi người một tin), đổi người/dời ca sau công bố có lý do. Role trainer mở vào đây.
+              { id: "roster", label: "Bàn Trainer", icon: ClipboardList, perm: "manage_roster" as PermissionKey }
             ]
           },
           {
-            // Bàn Trainer (0176, 13/10): người quản lý nhân sự live xếp lịch TUẦN — hạn đăng ký, nháp người cho ca mở, kiểm luật
-            // giờ làm, công bố tuần (mỗi người một tin), đổi người/dời ca sau công bố có lý do. Role trainer mở vào đây.
-            label: "Nhân Sự Live",
-            items: [{ id: "roster", label: "Bàn Trainer", icon: ClipboardList, perm: "manage_roster" as PermissionKey }]
-          },
-          {
-            label: "Vận Hành Hằng Ngày",
+            label: "Vận hành hằng ngày",
             items: [
               // "calendar" giữ id cũ (quyền manage_calendar, localStorage) — nội dung là Bảng Vận Hành (việc cần làm,
               // hôm nay/tuần). Lịch & Studio (LiveCalendar cũ) từng là tab con ở đây, tách thành mục riêng 07/10.
@@ -149,7 +148,7 @@ export function agencyNavGroups(currentRole: UserRole): NavGroup[] {
             ]
           },
           {
-            label: "Phân Tích",
+            label: "Phân tích",
             items: [
               { id: "host_performance", label: "Hiệu Suất Host", icon: TrendingUp, perm: "manage_sessions" as PermissionKey },
               // Toàn Cảnh Brand (Đợt C/6, 2026-09-23): bảng trạng thái 4 brand cho 1 tháng — kế
@@ -163,15 +162,11 @@ export function agencyNavGroups(currentRole: UserRole): NavGroup[] {
           }
         ]),
     {
-      label: "Tài Nguyên Chung",
+      // Bố cục 18/10: "Tài Nguyên Chung" (2 mục) + "Kinh Doanh" (2 mục) gộp — đều là danh mục ít đổi (người, phòng, khách).
+      label: "Nguồn lực & khách hàng",
       items: [
         { id: "talents", label: "Talent Pool", icon: Users, perm: "manage_talents" as PermissionKey },
         { id: "studios", label: "Studios & Gear", icon: Building2, perm: "manage_studios_gear" as PermissionKey },
-      ],
-    },
-    {
-      label: "Kinh Doanh",
-      items: [
         { id: "crm", label: "CRM", icon: Briefcase, perm: "manage_crm_projects" as PermissionKey },
         // "Cam Kết Hợp Đồng" riêng đã gộp (06/10, user: nhập một chỗ): điều khoản hợp đồng + giá + phòng live ở CRM →
         // "Hợp đồng & giá"; giờ cam kết của một tháng ở Kế Hoạch Tháng; tiến độ giao giờ ở Toàn Cảnh Brand / Nhân sự ca.
@@ -180,7 +175,8 @@ export function agencyNavGroups(currentRole: UserRole): NavGroup[] {
       ],
     },
     {
-      label: "Tài Chính",
+      // Bố cục 18/10: "Tài Chính" (1 mục) + "Hệ Thống" gộp — màn chỉ ceo/admin (trainer xem Finance chỉ đọc).
+      label: "Quản trị",
       items: [
         // Khoá cứng ceo/admin — không qua Ma Trận Phân Quyền (trước đây gate bằng permission
         // `view_financials` togglable, ceo có thể lỡ bật cho operations qua Ma Trận). Toàn bộ
@@ -189,11 +185,6 @@ export function agencyNavGroups(currentRole: UserRole): NavGroup[] {
         ...(currentRole === "ceo" || currentRole === "admin" || currentRole === "trainer"
           ? [{ id: "finance", label: "Finance & P&L", icon: DollarSign, perm: undefined }]
           : []),
-      ],
-    },
-    {
-      label: "Hệ Thống",
-      items: [
         { id: "user_settings", label: "Phân Quyền & Role", icon: ShieldCheck, perm: "manage_users_permissions" as PermissionKey },
         // Tài khoản cá nhân đã dời vào User Card cuối sidebar (bấm vào card để mở), không
         // còn là 1 mục nav riêng — tránh trùng lặp lối vào.
@@ -228,37 +219,48 @@ export function brandNavGroups(currentRole: UserRole): NavGroup[] {
   // "Report Tuần" không còn là tab riêng (2026-08-23) — đã gộp làm chế độ xem "Tuần" bên trong
   // Report Tháng (BrandMonthlyReport.tsx tự toggle Tháng/Tuần, CAN_VIEW_ROLES trong
   // BrandWeeklyReport.tsx vẫn chặn brand xem như trước).
+  // Bố cục 18/10: 10 mục trong MỘT nhóm "Brand Workspace" → 3 nhóm theo việc: theo dõi hằng ngày · kế hoạch, báo cáo,
+  // hợp đồng · nhập số liệu (chỉ ops).
   const BRAND_NAV_GROUPS: NavGroup[] = [
     {
-      label: "Brand Workspace",
+      label: "",
       items: [
         // Dashboard brand (2026-09-28): trong tháng — run-rate theo plan, vì sao, đề xuất, soát kế hoạch, phương
         // án bù + benchmark (gộp Hỗ Trợ Vận Hành). Role brand thấy bản rút gọn (component tự ẩn phần ops).
         { id: "brand_dashboard", label: "Dashboard", icon: LayoutDashboard, perm: undefined },
         { id: "brand_calendar", label: "Lịch Vận Hành", icon: CalendarIcon, perm: undefined },
-        { id: "brand_sessions", label: "Sổ Ca", icon: BookOpen, perm: undefined },
-        { id: "brand_skus", label: "Sản phẩm lên live", icon: Package, perm: undefined },
-        { id: "brand_monthly_report", label: "Report Tháng", icon: FileText, perm: undefined },
-        // Hợp Đồng bản CHỈ ĐỌC cho khách (Đợt C/1, migration 0108): giờ cam kết + tiến độ + giá theo sàn. Gộp 06/10 hai tab
-        // "Cam Kết Hợp Đồng" + "Rate Card" (hai nửa của một hợp đồng). Brand đọc cam kết qua view `brand_commitment_progress`
-        // (đã bỏ cột note nội bộ), giá qua RLS 0105; chỗ sửa là CRM bên Agency.
-        { id: "brand_commitment_view", label: "Hợp Đồng", icon: FileSignature, perm: undefined },
+        { id: "brand_sessions", label: "Sổ Ca", icon: BookOpen, perm: undefined }
+      ]
+    },
+    {
+      label: "Kế hoạch & báo cáo",
+      items: [
         // Kế hoạch tháng sau, chỉ đọc + nút xác nhận (Đợt C/2, migration 0110). Đường đọc đã mở từ
         // 0105 (brand_month_plans_read_scoped); xác nhận đi qua RPC confirm_month_plan riêng.
         { id: "brand_next_month_plan", label: "Kế Hoạch Tháng Sau", icon: CalendarCheck2, perm: undefined },
+        { id: "brand_skus", label: "Sản phẩm lên live", icon: Package, perm: undefined },
+        { id: "brand_monthly_report", label: "Report Tháng", icon: FileText, perm: undefined },
         // Trang Affiliate (2026-09-22) — bảng phân tích theo TỪNG PHIÊN của creator affiliate,
         // tách hẳn khỏi form Report Tháng (yêu cầu ops). Brand xem được (migration 0102 nới RLS
         // đọc), chỉ ops mới sửa được — khác "Nhập Ads"/"Dữ Liệu Gốc" vốn ẩn với brand.
         { id: "brand_affiliate", label: "Affiliate", icon: Users, perm: undefined },
-        // "Nhập Ads" (2026-09-21): phần nhập tay tách khỏi Report Tháng, ops-only như Dữ Liệu Gốc.
-        ...(currentRole === "brand"
+        // Hợp Đồng bản CHỈ ĐỌC cho khách (Đợt C/1, migration 0108): giờ cam kết + tiến độ + giá theo sàn. Gộp 06/10 hai tab
+        // "Cam Kết Hợp Đồng" + "Rate Card" (hai nửa của một hợp đồng). Brand đọc cam kết qua view `brand_commitment_progress`
+        // (đã bỏ cột note nội bộ), giá qua RLS 0105; chỗ sửa là CRM bên Agency.
+        { id: "brand_commitment_view", label: "Hợp Đồng", icon: FileSignature, perm: undefined }
+      ]
+    },
+    // "Nhập Ads" (2026-09-21): phần nhập tay tách khỏi Report Tháng, ops-only như Dữ Liệu Gốc.
+    {
+      label: "Nhập số liệu",
+      items:
+        currentRole === "brand"
           ? []
           : [
               { id: "brand_ads_report", label: "Nhập Ads", icon: Megaphone, perm: undefined },
               { id: "brand_dataraw", label: "Dữ Liệu Gốc", icon: Database, perm: undefined }
-            ]),
-      ],
-    },
+            ]
+    }
   ];
   return BRAND_NAV_GROUPS;
 }

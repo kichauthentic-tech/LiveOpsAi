@@ -16,7 +16,7 @@ import { downloadRowsAsXlsx } from "../lib/exportXlsx";
 import { useToast } from "../hooks/useToast";
 import { errorMessage } from "../lib/errorMessage";
 import { BrandLogo } from "./ui/BrandLogo";
-import { PageIntro } from "./common/PageIntro";
+import { PageHeader } from "./common/PageHeader";
 import { MonthPicker } from "./common/MonthPicker";
 
 // Màn toàn cảnh 4 brand cho agency (Đợt C/6, 2026-09-23) — BẢNG trạng thái từng brand cho MỘT
@@ -38,7 +38,7 @@ interface BrandsOverviewProps {
   brandPlatformRates: BrandPlatformRate[];
   monthlyReports: Map<string, BrandMonthlyReport>;
   /** Mở một màn (brandId có ⇒ mở trong Brand Workspace của brand đó). */
-  onNavigate?: (tab: string, brandId?: string) => void;
+  onNavigate?: (tab: string, brandId?: string, platform?: ReportPlatform) => void;
 }
 
 // Ô trạng thái "chưa có" là một NÚT tới đúng chỗ phải nhập (audit người mới 2026-10-04: bảng toàn chữ
@@ -186,12 +186,12 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ platform, brands
 
   return (
     <div className="space-y-4">
-      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-5 space-y-2">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-black text-[var(--text)] flex items-center gap-2">
-            <LayoutGrid className="w-5 h-5 text-[var(--accent-text)]" /> Toàn Cảnh Brand
-          </h2>
-          <div className="flex items-center gap-2">
+      <PageHeader
+        icon={LayoutGrid}
+        title="Toàn Cảnh Brand"
+        description="Mỗi brand trong tháng đang xem: đã lập kế hoạch, nhập hợp đồng, làm report, nhập giá chưa — và số thật đã chạy. Ô nào còn thiếu có nút dẫn tới chỗ nhập."
+        actions={
+          <>
             <MonthPicker value={month} onChange={setMonth} />
             <button
               onClick={exportXlsx}
@@ -201,13 +201,9 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ platform, brands
             >
               <Download className="w-3.5 h-3.5" /> Xuất Excel
             </button>
-          </div>
-        </div>
-        <PageIntro>
-          Mỗi brand trong tháng đang xem: đã lập kế hoạch, nhập hợp đồng, làm report, nhập giá chưa — và số thật đã
-          chạy. Ô nào còn thiếu có nút dẫn tới chỗ nhập.
-        </PageIntro>
-      </div>
+          </>
+        }
+      />
 
       {errorMsg && (
         <div className="p-3 bg-red-950/80 border border-red-800/50 rounded-xl text-red-300 text-xs font-semibold">{errorMsg}</div>
@@ -217,7 +213,7 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ platform, brands
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)] uppercase text-[11px] tracking-wider">
+              <tr className="text-left text-[var(--text-faint)] border-b border-[var(--border)] text-[11px] font-semibold">
                 <th className="py-2.5 px-4">Brand</th>
                 <th className="py-2.5 px-2">Kế hoạch tháng</th>
                 <th className="py-2.5 px-2">Cam kết</th>
@@ -241,7 +237,7 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ platform, brands
                         {PLAN_STATUS_LABEL[planStatus]}
                       </span>
                       {planStatus !== "locked" && (
-                        <GoLink label={planStatus === "none" ? "Lập kế hoạch" : "Chốt kế hoạch"} onClick={onNavigate && (() => { rememberBrandId(b.id); onNavigate("month_plan"); })} />
+                        <GoLink label={planStatus === "none" ? "Lập kế hoạch" : "Chốt kế hoạch"} onClick={onNavigate && (() => { rememberBrandId(b.id); onNavigate("month_plan", undefined, platform); })} />
                       )}
                       {plan?.brandConfirmedAt && (
                         <span className="block text-[11px] text-emerald-400 mt-1">✓ brand đã xác nhận</span>
@@ -257,11 +253,11 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ platform, brands
                         {COMMIT_STATUS_LABEL[commitStatus]}
                       </span>
                       {commitStatus === "no_commitment" && (
-                        <GoLink label="Đặt cam kết tháng" onClick={onNavigate && (() => { rememberBrandId(b.id); onNavigate("month_plan"); })} />
+                        <GoLink label="Đặt cam kết tháng" onClick={onNavigate && (() => { rememberBrandId(b.id); onNavigate("month_plan", undefined, platform); })} />
                       )}
                       {progress && (
                         <span className="block text-[11px] text-[var(--text-faint)] mt-1">
-                          {fmtHours(progress.plannedTotalHours)}/{fmtHours(progress.committedHours)}
+                          {progress.committedHours > 0 ? `${fmtHours(progress.plannedTotalHours)}/${fmtHours(progress.committedHours)}` : `${fmtHours(progress.plannedTotalHours)} trong lịch`}
                           {progress.gapHours > 0 && <span className="text-amber-300"> · thiếu {fmtHours(progress.gapHours)}</span>}
                         </span>
                       )}
@@ -283,7 +279,7 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ platform, brands
                         {REPORT_STATUS_LABEL[reportStatus]}
                       </span>
                       {reportStatus !== "published" && month < today.slice(0, 7) && s.happened > 0 && (
-                        <GoLink label={reportStatus === "none" ? "Tạo report" : "Mở report"} onClick={onNavigate && (() => onNavigate("brand_monthly_report", b.id))} />
+                        <GoLink label={reportStatus === "none" ? "Tạo report" : "Mở report"} onClick={onNavigate && (() => onNavigate("brand_monthly_report", b.id, platform))} />
                       )}
                     </td>
                     <td className="py-2.5 px-2">
