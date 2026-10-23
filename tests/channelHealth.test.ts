@@ -5,24 +5,21 @@ import {
   channelVerdict,
   COMPLETE_DAY_SHARE,
   dataCoverage,
-  dataDiscipline,
   gmvTree,
   likeForLike,
   matchedPrevDays,
   nextWaveReadiness,
   peopleLoad,
-  runRateByWave,
   runRateThrough,
   runRateTone,
   targetFeasibility,
   TARGET_HIGH_RATIO
 } from "../src/lib/performance/channelHealth";
 import { monthOutlook, monthTargetOf } from "../src/lib/performance/ceoBrief";
-import { planRunRate } from "../src/lib/performance/planRunRate";
 import { resolveCampBucketType } from "../src/lib/campaignDays";
 import { profileOf } from "../src/lib/platforms/profiles";
 import { METRIC } from "../src/lib/metricGlossary";
-import type { BrandMonthPlanSlot, LiveSession } from "../src/types";
+import type { LiveSession } from "../src/types";
 
 let seq = 0;
 function ca(date: string, extra: Partial<LiveSession> = {}): LiveSession {
@@ -77,7 +74,6 @@ describe("dataCoverage — ngày đủ số (≥ 90% giờ ca có số)", () => 
     const xs = [ca("2026-10-04"), noData("2026-10-09")];
     const c = dataCoverage(xs, "2026-10-10");
     expect(c.completeThrough).toBe("2026-10-08");
-    expect(dataDiscipline({ coverage: c, today: "2026-10-10", monthSessions: xs }).lagDays).toBe(1);
   });
 });
 
@@ -198,55 +194,7 @@ describe("channelVerdict — một kết luận + nguyên nhân gốc theo thứ
   });
 });
 
-describe("dataDiscipline", () => {
-  test("cam kết giờ = 550.000.000 (gõ GMV vào ô giờ) bị bắt; target tháng ≠ tổng ca bị bắt", () => {
-    const r = dataDiscipline({ coverage: dataCoverage([ca("2026-10-08")], "2026-10-10"), today: "2026-10-10", monthSessions: [ca("2026-10-08"), ca("2026-10-08", { dataSource: "manual" })], commitmentHours: 550_000_000, planTarget: 100_000_000, planSlotSum: 90_000_000 });
-    expect(r.errors).toHaveLength(2);
-    expect(r.errors[0]).toMatch(/550\.000\.000 giờ/);
-    expect(r.lagDays).toBe(0);
-    expect(r.manualShare).toBe(0.5);
-  });
-});
-
-describe("runRateByWave — tháng + từng đợt, cắt ở ngày đủ số, cùng luật planRunRate", () => {
-  // Chuyển từ tests/runRateLadder.test.ts (thang cũ đã bỏ 10/10): 8–10/10 là D-Day theo lịch cố định.
-  const targets: Record<string, number> = { "2026-10-06": 40_000_000, "2026-10-07": 40_000_000, "2026-10-08": 40_000_000, "2026-10-09": 60_000_000, "2026-10-10": 60_000_000, "2026-10-13": 50_000_000 };
-  const gmvOf: Record<string, number> = { "2026-10-06": 40_000_000, "2026-10-07": 50_000_000, "2026-10-08": 20_000_000 };
-  const build = () => {
-    const sessions = Object.keys(gmvOf).map((d) => ca(d, { actualGmv: gmvOf[d] }));
-    sessions.push(ca("2026-10-09", { status: "Upcoming", actualGmv: 0, totalViews: 0, totalOrders: 0, dataSource: "manual" }));
-    const slotTargets = Object.entries(targets).map(([date, target]) => ({ date, target }));
-    const target = monthTargetOf("2026-10", Object.values(targets).reduce((a, b) => a + b, 0), slotTargets);
-    return { o: monthOutlook("2026-10", "2026-10-09", sessions, [], target, undefined), sessions, slotTargets };
-  };
-  const planSlot = (date: string, targetGmv: number) => ({ id: `ps-${date}`, planId: "p1", date, startTime: "20:00", endTime: "23:00", targetGmv, expectedGmv: 0, note: "" }) as BrandMonthPlanSlot;
-
-  test("không target ⇒ rỗng", () => {
-    expect(runRateByWave(monthOutlook("2026-10", "2026-10-09", [ca("2026-10-06")], [], null, undefined), "2026-10-06")).toEqual([]);
-  });
-  test("hàng tháng cắt ở ngày cuối có số = planRunRate", () => {
-    const { o, sessions, slotTargets } = build();
-    const [month] = runRateByWave(o, "2026-10-08");
-    expect(month.actual).toBe(110_000_000);
-    expect(month.targetToDate).toBe(120_000_000);
-    const rr = planRunRate("2026-10", slotTargets.map((t) => planSlot(t.date, t.target)), [], sessions, "2026-10-09");
-    expect(rr.total.runRate).toBeCloseTo(month.runRate!, 9);
-    expect(rr.total.targetToDate).toBe(month.targetToDate);
-  });
-  test("đợt: D-Day đang chạy 1/3 ngày, Mid-Month sắp tới chỉ có target", () => {
-    const { o } = build();
-    const rows = runRateByWave(o, "2026-10-08");
-    const dd = rows.find((r) => r.key === "dday")!;
-    expect([dd.state, dd.actual, dd.targetToDate]).toEqual(["live", 20_000_000, 40_000_000]);
-    const mid = rows.find((r) => r.key === "midmonth")!;
-    expect([mid.state, mid.target]).toEqual(["next", 50_000_000]);
-    expect(rows.find((r) => r.key === "daily")!.actual).toBe(90_000_000);
-  });
-  test("ngày đủ số lùi về 07/10 thì 08/10 chưa vào mẫu số lẫn tử số", () => {
-    const { o } = build();
-    const [month] = runRateByWave(o, "2026-10-07");
-    expect([month.actual, month.targetToDate]).toEqual([90_000_000, 80_000_000]);
-  });
+describe("runRateTone", () => {
   test("runRateTone: ngưỡng 85% / 95%", () => {
     expect([runRateTone(null), runRateTone(0.84), runRateTone(0.85), runRateTone(0.949), runRateTone(0.95)]).toEqual(["none", "bad", "warn", "warn", "good"]);
   });

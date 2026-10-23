@@ -84,11 +84,14 @@ const SUM_RE = new RegExp(`reduce\\s*[<(]|\\+=|\\+\\s*\\(?\\s*[\\w!?.]+\\.(${PER
  * Thêm file vào đây phải kèm lý do đó. Không chắc thì dùng sumByPlatform/sumGmvByPlatform của lib/platforms/perf.ts.
  */
 const SINGLE_PLATFORM_FILES: Record<string, string> = {
+  "lib/performance/periodCompare.ts": "Dashboard so cùng kỳ: aggregate gọi assertOnePlatform; channelGph/indexBy chia theo TỪNG kênh brand × sàn",
+  "components/dashboard/period/PlatformTab.tsx": "tab Toàn sàn nhận ca của MỘT sàn (AgencyDashboard lọc platformOf trước khi truyền)",
+  "lib/performance/channelCard.ts": "buildChannelCard có assertOnePlatform; monthlyTrend / GMV tháng cộng ca của MỘT kênh brand × sàn",
   "lib/performance/controlRoom.ts": "Phòng Điều Hành: mọi hàm nhận ca của MỘT kênh brand × sàn và gọi assertOnePlatform trước khi cộng",
   "components/ControlRoom.tsx": "lịch sử tháng cộng trên `c.sessions` — ca của một kênh brand × sàn (lọc platformOf ở chỗ dựng kênh)",
   "lib/affiliate/plan.ts": "kế hoạch Affiliate chỉ có ở TikTok (hồ sơ Shopee ẩn tab brand_affiliate), tổng theo một brand × tháng",
   "components/ForecastTrainingCard.tsx": "thẻ lọc ca theo brand + sàn đã chọn (`channel`) trước khi cộng",
-  "components/brand-workspace/BrandDashboard.tsx": "workspace brand đã lọc ca theo sàn (platformSessions ở App)",
+  "components/dashboard/period/brandExtras.tsx": "tab Brand: ca của MỘT kênh brand × sàn (AgencyDashboard lọc platformOf + brand) — GMV/giờ 28 ngày cho đề xuất",
   "components/brand-workspace/BrandWeeklyReport.tsx": "nhận `platform`, lọc ca theo sàn",
   "components/brand-workspace/MonthlyReportTabs.tsx": "report TikTok, chỉ ca TikTok",
   "lib/dataraw/productListAgg.ts": "file product_list của một sàn",
@@ -100,7 +103,6 @@ const SINGLE_PLATFORM_FILES: Record<string, string> = {
   "lib/performance/hostSuggestion.ts": "lọc platformOf(s) === slot.platform trước khi cộng",
   "lib/performance/monthForecast.ts": "buildMonthForecaster có assertOnePlatform; dự báo của một kênh brand × sàn",
   "lib/performance/planRunRate.ts": "run-rate của một kế hoạch (brand × tháng × sàn)",
-  "lib/performance/runRateUpdate.ts": "monthActualOf có assertOnePlatform; mọi hàm khác chỉ chia lại số của MỘT tài khoản brand × sàn từ planRunRate",
   "lib/scheduling/rebase.ts": "cộng target các ca của MỘT kế hoạch (brand × tháng × sàn) đang mở trong Kế Hoạch Tháng",
   "lib/scheduling/boost.ts": "cộng target đề xuất các ca tăng cường của MỘT kế hoạch (brand × tháng × sàn) — chỉ danh sách của kế hoạch đang mở",
   "lib/performance/slotInsights.ts": "Dashboard brand / Kế Hoạch Tháng truyền ca một kênh",

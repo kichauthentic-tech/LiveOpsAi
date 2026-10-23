@@ -1,53 +1,22 @@
 import React from "react";
 import { RUN_RATE_BAD, RUN_RATE_WARN } from "../../lib/performance/ceoBrief";
 import type { RunRateTone } from "../../lib/performance/channelHealth";
-import type { AccountRunRate, DayState, RRDay, WaveStatus } from "../../lib/performance/runRateUpdate";
+import type { AccountRunRate, RRDay } from "../../lib/performance/runRateUpdate";
 import { BUCKET_COLOR, WEEKDAY, ddmm, money, niceMax, pct, weekdayIdx } from "../dashboard/shared";
 import type { CampDayBucket } from "../../lib/campaignDays";
 
 // Phần trình bày của module Run-rate: không có luật số (xem lib/performance/runRateUpdate.ts).
 
 export const TONE_VAR: Record<RunRateTone, string> = { good: "var(--success)", warn: "var(--warning)", bad: "var(--danger)", none: "var(--text-faint)" };
-export const TONE_PILL: Record<RunRateTone, string> = {
-  good: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
-  warn: "bg-amber-500/15 text-amber-300 border-amber-500/30",
-  bad: "bg-rose-500/15 text-rose-400 border-rose-500/30",
-  none: "bg-[var(--surface-elevated)] text-[var(--text-faint)] border-[var(--border)]"
-};
-
-export const TonePill: React.FC<{ tone: RunRateTone; children: React.ReactNode; className?: string }> = ({ tone, children, className = "" }) => (
-  <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${TONE_PILL[tone]} ${className}`}>{children}</span>
-);
-
-export const WAVE_STATUS_LABEL: Record<WaveStatus, string> = { done: "Đã xong", live: "Đang chạy", next: "Sắp tới" };
-export const WAVE_STATUS_PILL: Record<WaveStatus, string> = {
-  done: "bg-[var(--surface-elevated)] text-[var(--text-muted)] border-[var(--border)]",
-  live: "bg-sky-500/15 text-sky-300 border-sky-500/30",
-  next: "bg-[var(--surface-base)] text-[var(--text-faint)] border-[var(--border)] border-dashed"
-};
-export const WaveStatusPill: React.FC<{ status: WaveStatus }> = ({ status }) => (
-  <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${WAVE_STATUS_PILL[status]}`}>
-    {status === "live" && <span className="relative flex w-1.5 h-1.5"><span className="absolute inline-flex w-full h-full rounded-full bg-sky-400 opacity-60 animate-ping" /><span className="relative inline-flex w-1.5 h-1.5 rounded-full bg-sky-400" /></span>}
-    {WAVE_STATUS_LABEL[status]}
-  </span>
-);
-
-export const BucketChip: React.FC<{ bucket: CampDayBucket; label: string }> = ({ bucket, label }) => (
-  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[var(--text-muted)] whitespace-nowrap">
-    <i className="w-2 h-2 rounded-full inline-block" style={{ background: BUCKET_COLOR[bucket] }} />
-    {label}
-  </span>
-);
-
 export const toneOfPct = (v: number | null): RunRateTone => (v == null ? "none" : v >= RUN_RATE_WARN ? "good" : v >= RUN_RATE_BAD ? "warn" : "bad");
 
 /** Thanh tiến độ gọn: nền ba vùng đỏ/vàng/xanh nhạt, vạch 100%. Cùng thang với RunRateBar của Dashboard.
  *  `mark`: đặt vạch ở mốc khác 100% (vd mức kỳ vọng tới nay khi thanh là % target cả đợt). */
-export const PctBar: React.FC<{ value: number | null; tone: RunRateTone; max?: number; height?: number; label?: string; mark?: number }> = ({ value, tone, max = 1.4, height = 8, label, mark = 1 }) => {
+export const PctBar: React.FC<{ value: number | null; tone: RunRateTone; max?: number; height?: number; label?: string; mark?: number; color?: string }> = ({ value, tone, max = 1.4, height = 8, label, mark = 1, color }) => {
   const w = (v: number) => `${(Math.min(v, max) / max) * 100}%`;
   return (
     <div className="relative rounded-full overflow-hidden bg-[var(--surface-base)] w-full" style={{ height }} role="img" aria-label={label ?? (value == null ? "chưa có số" : `${Math.round(value * 100)}%`)}>
-      {value != null && <div className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-500" style={{ width: w(value), background: TONE_VAR[tone] }} />}
+      {value != null && <div className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-500" style={{ width: w(value), background: color ?? TONE_VAR[tone] }} />}
       <div className="absolute inset-y-0 w-px bg-[var(--text)] opacity-60" style={{ left: w(mark) }} />
     </div>
   );
@@ -68,16 +37,23 @@ function arc(cx: number, cy: number, r: number, a0: number, a1: number): string 
   return `M${n2(x0)},${n2(y0)} A${r},${r} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${n2(x1)},${n2(y1)}`;
 }
 
-export const RunRateGauge: React.FC<{ value: number | null; tone: RunRateTone; size?: number; caption?: string }> = ({ value, tone, size = 168, caption = "run-rate" }) => {
+/** `color` (Dashboard): tô theo nhãn khả năng đạt và bỏ ba vùng đỏ/vàng/xanh của ngưỡng run-rate — vùng đó là một kết luận thứ hai. */
+export const RunRateGauge: React.FC<{ value: number | null; tone: RunRateTone; size?: number; caption?: string; color?: string }> = ({ value, tone, size = 168, caption = "run-rate", color }) => {
   const c = 70, r = 56;
   const [tx0, ty0] = polar(c, c, r - 9, angleOf(1));
   const [tx1, ty1] = polar(c, c, r + 9, angleOf(1));
   return (
     <svg viewBox="0 0 140 140" width={size} height={size} role="img" aria-label={value == null ? "Chưa có run-rate" : `Run-rate ${Math.round(value * 100)}%`} className="shrink-0">
-      <path d={arc(c, c, r, angleOf(0), angleOf(RUN_RATE_BAD))} style={{ stroke: "var(--danger)", opacity: 0.22 }} fill="none" strokeWidth={10} />
-      <path d={arc(c, c, r, angleOf(RUN_RATE_BAD), angleOf(RUN_RATE_WARN))} style={{ stroke: "var(--warning)", opacity: 0.28 }} fill="none" strokeWidth={10} />
-      <path d={arc(c, c, r, angleOf(RUN_RATE_WARN), angleOf(GAUGE_MAX))} style={{ stroke: "var(--success)", opacity: 0.22 }} fill="none" strokeWidth={10} />
-      {value != null && value > 0 && <path d={arc(c, c, r, angleOf(0), angleOf(value))} style={{ stroke: TONE_VAR[tone] }} fill="none" strokeWidth={10} strokeLinecap="round" className="transition-all duration-700" />}
+      {color ? (
+        <path d={arc(c, c, r, angleOf(0), angleOf(GAUGE_MAX))} style={{ stroke: "var(--surface-base)" }} fill="none" strokeWidth={10} />
+      ) : (
+        <>
+          <path d={arc(c, c, r, angleOf(0), angleOf(RUN_RATE_BAD))} style={{ stroke: "var(--danger)", opacity: 0.22 }} fill="none" strokeWidth={10} />
+          <path d={arc(c, c, r, angleOf(RUN_RATE_BAD), angleOf(RUN_RATE_WARN))} style={{ stroke: "var(--warning)", opacity: 0.28 }} fill="none" strokeWidth={10} />
+          <path d={arc(c, c, r, angleOf(RUN_RATE_WARN), angleOf(GAUGE_MAX))} style={{ stroke: "var(--success)", opacity: 0.22 }} fill="none" strokeWidth={10} />
+        </>
+      )}
+      {value != null && value > 0 && <path d={arc(c, c, r, angleOf(0), angleOf(value))} style={{ stroke: color ?? TONE_VAR[tone] }} fill="none" strokeWidth={10} strokeLinecap="round" className="transition-all duration-700" />}
       <line x1={tx0} y1={ty0} x2={tx1} y2={ty1} style={{ stroke: "var(--text)" }} strokeWidth={2} strokeLinecap="round" />
       <text x={c} y={c + 6} textAnchor="middle" style={{ fill: "var(--text)", fontSize: 30, fontWeight: 900 }}>
         {value == null ? "—" : Math.round(value * 100)}
@@ -121,13 +97,14 @@ const dayTip = (d: RRDay) =>
     ? d.shifts > 0 ? `${d.shifts} ca chưa tới` : "Không có ca"
     : `Đạt: ${money(d.actual)}${d.pctTarget != null ? ` (${pct(d.pctTarget)} target)` : ""}\n${d.withData}/${d.shifts} ca có số${d.state === "partial" ? (d.counted ? "\nTạm tính — ca đã có số đã vào run-rate theo target đúng ca, ca chờ số thì chưa" : "\nTạm tính — chưa vào run-rate") : d.state === "missing" ? "\nCòn ca chưa có số" : ""}`);
 
-export const CumulativeChart: React.FC<{ r: AccountRunRate; color: string }> = ({ r, color }) => {
+/** `showPace` = vẽ đường "giữ nhịp" (module Run-rate). Chi tiết kênh tắt nó — dự báo cuối tháng ở đó là của thẻ kênh (engine), một số duy nhất. */
+export const CumulativeChart: React.FC<{ r: AccountRunRate; color: string; showPace?: boolean }> = ({ r, color, showPace = true }) => {
   const { W, H, L, T, B } = FRAME;
   const R = 100; // chừa lề phải cho nhãn cuối đường
   const pts = r.cumulative;
   const n = pts.length;
   const last = pts[n - 1];
-  const maxV = niceMax(Math.max(last?.target ?? 0, ...pts.map((p) => p.projected ?? 0), ...pts.map((p) => p.actual ?? 0), 1));
+  const maxV = niceMax(Math.max(last?.target ?? 0, ...pts.map((p) => (showPace ? p.projected ?? 0 : 0)), ...pts.map((p) => p.actual ?? 0), 1));
   const x = (i: number) => L + (i / Math.max(1, n - 1)) * (W - L - R);
   const y = (v: number) => T + (H - T - B) * (1 - v / maxV);
   const colW = (W - L - R) / Math.max(1, n - 1);
@@ -141,7 +118,7 @@ export const CumulativeChart: React.FC<{ r: AccountRunRate; color: string }> = (
   // Nhãn cuối đường: target và "giữ nhịp" thường nằm sát nhau ⇒ tách ra tối thiểu 15px.
   const endLabels: { text: string; y: number; fill: string }[] = [];
   if (last && last.target > 0) endLabels.push({ text: `Target ${money(last.target)}`, y: y(last.target), fill: "var(--text-muted)" });
-  if (r.total.keepPace != null && last?.projected != null) endLabels.push({ text: `Nhịp ${money(last.projected)}`, y: y(last.projected), fill: color });
+  if (showPace && r.total.keepPace != null && last?.projected != null) endLabels.push({ text: `Nhịp ${money(last.projected)}`, y: y(last.projected), fill: color });
   if (endLabels.length === 2 && Math.abs(endLabels[0].y - endLabels[1].y) < 15) {
     const up = endLabels[0].y <= endLabels[1].y ? 0 : 1;
     endLabels[up].y -= 8;
@@ -167,7 +144,7 @@ export const CumulativeChart: React.FC<{ r: AccountRunRate; color: string }> = (
       ))}
       {areaPath && <path d={areaPath} fill={`url(#${gid})`} />}
       <path d={line((p) => p.target)} fill="none" style={{ stroke: "var(--text-faint)" }} strokeWidth={2} strokeDasharray="2 5" strokeLinecap="round" />
-      <path d={line((p) => p.projected)} fill="none" stroke={color} strokeWidth={2} strokeDasharray="6 5" opacity={0.85} />
+      {showPace && <path d={line((p) => p.projected)} fill="none" stroke={color} strokeWidth={2} strokeDasharray="6 5" opacity={0.85} />}
       {actualPath && <path d={actualPath} fill="none" stroke={color} strokeWidth={3} strokeLinejoin="round" strokeLinecap="round" />}
       {asOfIdx >= 0 && pts[asOfIdx].actual != null && (
         <>
@@ -178,16 +155,16 @@ export const CumulativeChart: React.FC<{ r: AccountRunRate; color: string }> = (
       {endLabels.map((l) => <text key={l.text} x={W - R + 8} y={l.y} dominantBaseline="middle" style={{ fill: l.fill, fontSize: 11, fontWeight: 800 }}>{l.text}</text>)}
       {r.days.map((d, i) => (
         <rect key={d.date} x={x(i) - colW / 2} y={T} width={colW} height={H - T - B} fill="transparent"
-          data-tip={`${dayTip(d)}\n\nCộng dồn target: ${money(pts[i].target)}${pts[i].actual != null ? `\nCộng dồn đạt: ${money(pts[i].actual)}` : pts[i].projected != null ? `\nDự phóng giữ nhịp: ${money(pts[i].projected)}` : ""}`} />
+          data-tip={`${dayTip(d)}\n\nCộng dồn target: ${money(pts[i].target)}${pts[i].actual != null ? `\nCộng dồn đạt: ${money(pts[i].actual)}` : showPace && pts[i].projected != null ? `\nDự phóng giữ nhịp: ${money(pts[i].projected)}` : ""}`} />
       ))}
     </svg>
   );
 };
 
-export const CumulativeLegend: React.FC<{ color: string }> = ({ color }) => (
+export const CumulativeLegend: React.FC<{ color: string; showPace?: boolean }> = ({ color, showPace = true }) => (
   <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-[var(--text-muted)]">
     <span className="inline-flex items-center gap-1.5"><i className="w-4 h-[3px] rounded inline-block" style={{ background: color }} />Đã đạt (cộng dồn)</span>
-    <span className="inline-flex items-center gap-1.5"><i className="w-4 h-[3px] rounded inline-block" style={{ background: `repeating-linear-gradient(90deg,${color} 0 5px,transparent 5px 8px)` }} />Nếu giữ nhịp hiện tại</span>
+    {showPace && <span className="inline-flex items-center gap-1.5"><i className="w-4 h-[3px] rounded inline-block" style={{ background: `repeating-linear-gradient(90deg,${color} 0 5px,transparent 5px 8px)` }} />Nếu giữ nhịp hiện tại</span>}
     <span className="inline-flex items-center gap-1.5"><i className="w-4 h-[3px] rounded inline-block" style={{ background: "repeating-linear-gradient(90deg,var(--text-faint) 0 3px,transparent 3px 6px)" }} />Target cộng dồn</span>
     <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: "var(--accent)", opacity: 0.35 }} />Ngày camp</span>
   </div>
@@ -245,4 +222,3 @@ export const DayBarsLegend: React.FC = () => (
   </div>
 );
 
-export const DAY_STATE_LABEL: Record<DayState, string> = { counted: "Đã có số", partial: "Tạm tính", missing: "Thiếu số", future: "Chưa tới", empty: "Không có ca" };

@@ -261,9 +261,3 @@ export function projectMonthEnd(rr: PlanRunRate | null, outlook: Pick<MonthOutlo
   if (rr?.total.keepPace != null) return { value: rr.total.keepPace, method: "run_rate" };
   return { value: null, method: "none" };
 }
-
-export const PROJECTION_METHOD_LABEL: Record<MonthEndProjection["method"], string> = {
-  gmv_per_hour: "giờ các ca còn trong lịch × GMV/giờ 28 ngày gần nhất (cùng cách Dashboard agency)",
-  run_rate: "chưa có GMV/giờ 28 ngày ⇒ phần target còn lại × run-rate hiện tại",
-  none: "chưa có số để chiếu"
-};

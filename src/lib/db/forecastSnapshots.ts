@@ -93,32 +93,3 @@ export async function fetchForecastSnapshots(brandId: string, platform: ReportPl
     }))
   };
 }
-
-export interface LandingPoint {
-  asOf: string;
-  platform: ReportPlatform;
-  pHit: number;
-  target: number;
-}
-
-/**
- * Chuỗi khả năng về đích theo ngày của MỘT brand trong tháng (RPC brand_landing_series, 0170) — CHỈ xác suất + target, không có
- * GMV: role brand không được thấy số của tháng chưa phát hành, nhưng được thấy khả năng về đích (user chốt 11/10). Tính từ sổ
- * dự báo 0163 nên chỉ có những ngày sổ đã ghi (Dashboard / Phòng Điều Hành được mở). `missing` = DB chưa chạy 0170.
- */
-export async function fetchBrandLandingSeries(brandId: string, month: string): Promise<{ points: LandingPoint[]; missing: boolean }> {
-  const { data, error } = await supabase.rpc("brand_landing_series", { p_brand_id: brandId, p_month: `${month}-01` });
-  if (error) {
-    if (MISSING.has(error.code ?? "")) return { points: [], missing: true };
-    throw error;
-  }
-  return {
-    missing: false,
-    points: ((data as Record<string, unknown>[]) ?? []).map((r) => ({
-      asOf: String(r.as_of),
-      platform: r.platform as ReportPlatform,
-      pHit: Number(r.p_hit),
-      target: Number(r.target)
-    }))
-  };
-}

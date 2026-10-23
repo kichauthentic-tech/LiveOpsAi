@@ -111,14 +111,13 @@ const TalentAgency = lazyNamed(() => import("./components/talent/TalentAgency"),
 const OpsPlanningTodo = lazyNamed(() => import("./components/OpsPlanningTodo"), "default");
 const MonthPlan = lazyNamed(() => import("./components/MonthPlan"), "default");
 const OpsSupportTab = lazyNamed(() => import("./components/OpsSupportTab"), "default");
-const CeoBrief = lazyNamed(() => import("./components/CeoBrief"), "default");
-const RunRateBoard = lazyNamed(() => import("./components/RunRateBoard"), "RunRateBoard");
 const ControlRoom = lazyNamed(() => import("./components/ControlRoom"), "default");
 const RosterBoard = lazyNamed(() => import("./components/RosterBoard"), "RosterBoard");
-const AgencyChannelSummary = lazyNamed(() => import("./components/AgencyChannelSummary"), "AgencyChannelSummary");
+const AgencyDashboard = lazyNamed(() => import("./components/AgencyDashboard"), "AgencyDashboard");
 
 // Tab đã gộp (08/10: Hỗ Trợ Vận Hành → Bảng Vận Hành) — activeTab đã lưu ở localStorage không được rơi vào màn "Quyền Truy Cập Bị Hạn Chế".
-const renamedTab = (t: string) => (t === "ops_support" ? "calendar" : t);
+// Tab đã gộp: Hỗ Trợ Vận Hành → Bảng Vận Hành; Run-rate → Dashboard (22/10, tab "Tháng này").
+const renamedTab = (t: string) => (t === "ops_support" ? "calendar" : t === "run_rate" ? "agency_overview" : t);
 
 // Chunk của từng tab — để tải SONG SONG với đợt nạp dữ liệu (xem `preload` ở lib/lazyNamed.ts). Phải
 // khớp với khối render tab bên dưới; thiếu một tab thì tab đó chỉ chậm như trước, không hỏng.
@@ -126,14 +125,13 @@ const TAB_CHUNKS: Record<string, { preload: () => void }[]> = {
   calendar: [OpsBoard, TodoPanel, OpsPlanningTodo, OpsSupportTab],
   studio_calendar: [LiveCalendar],
   sessions: [SessionLedger],
-  run_rate: [RunRateBoard],
   control_room: [ControlRoom],
   roster: [RosterBoard],
   my_shifts: [TalentToday],
   talent_calendar: [TalentAgency, LiveCalendar],
   shift_scheduling: [TalentShiftSignup],
   month_plan: [MonthPlan],
-  agency_overview: [CeoBrief, AgencyChannelSummary],
+  agency_overview: [AgencyDashboard],
   host_performance: [HostPerformance],
   brands_overview: [BrandsOverview],
   report_publish_board: [ReportPublishBoard],
@@ -162,7 +160,7 @@ const TAB_CHUNKS: Record<string, { preload: () => void }[]> = {
 // lúc đợt nạp chung còn chạy (src/lib/db/prefetch.ts). import() trùng với chunk ở TAB_CHUNKS, không tải hai lần.
 
 const TAB_DATA_PREFETCH: Record<string, (ctx: TabPrefetchCtx) => Promise<void>> = {
-  agency_overview: (ctx) => import("./components/CeoBrief").then((m) => m.prefetchCeoBrief(ctx)),
+  agency_overview: (ctx) => import("./components/AgencyDashboard").then((m) => m.prefetchAgencyDashboard(ctx)),
   brand_dashboard: (ctx) => import("./components/brand-workspace/BrandDashboard").then((m) => m.prefetchBrandDashboard(ctx)),
   brand_monthly_report: (ctx) => import("./components/brand-workspace/BrandMonthlyReport").then((m) => m.prefetchBrandMonthlyReport(ctx)),
   brand_ads_report: (ctx) => import("./components/brand-workspace/BrandAdsReport").then((m) => m.prefetchBrandAdsReport(ctx)),
@@ -1411,10 +1409,10 @@ export default function App() {
   // Bố cục 18/10: tiêu đề trang vẽ MỘT lần ở đây; trong từng khối, PageHeader của component thành đầu khối "Các kênh X" với
   // nút/bộ lọc của khối (PlatformBlockContext) — trước đó mỗi sàn lặp nguyên thẻ tiêu đề + mô tả + bộ chọn tháng. `lead` = khối
   // chung đứng giữa tiêu đề và các khối sàn (Dashboard: số toàn agency).
-  const perPlatformBlocks = (render: (p: ReportPlatform) => React.ReactNode, lead?: React.ReactNode) =>
+  const perPlatformBlocks = (render: (p: ReportPlatform) => React.ReactNode, lead?: React.ReactNode, opts?: { header?: boolean }) =>
     agencyScope === "all" ? (
       <>
-        {currentTabNavItem && (
+        {currentTabNavItem && opts?.header !== false && (
           <PageHeader icon={currentTabNavItem.icon} title={currentTabNavItem.label} description="Mỗi sàn một khối — số hiệu suất của TikTok và Shopee không cộng với nhau." />
         )}
         {lead}
@@ -1901,10 +1899,7 @@ export default function App() {
                     brandStudios={brandStudios}
                     planSlotTargets={planSlotTargets}
                     planMonthTotals={planMonthTotals}
-                    brandPlatformRates={brandPlatformRates}
                     engineParams={engineParams}
-                    currentRole={currentRole}
-                    onOpenMonthPlan={(brandId, platform) => openMonthPlanFor(brandId, platform)}
                     onSessionsChanged={async () => {
                       const [s, sl] = await Promise.all([fetchSessions(), fetchShiftSlots()]);
                       setSessions(s);
@@ -1937,17 +1932,6 @@ export default function App() {
                     }}
                     onSessionUpdated={(saved) => setSessions((prev) => prev.map((x) => (x.id === saved.id ? saved : x)))}
                     onSlotUpdated={(saved) => setShiftSlots((prev) => prev.map((x) => (x.id === saved.id ? saved : x)))}
-                  />
-                )}
-
-                {activeTab === "run_rate" && (
-                  <RunRateBoard
-                    sessions={activeSessions}
-                    brands={brands}
-                    brandChannels={channels}
-                    shiftSlots={shiftSlots}
-                    onNavigate={setActiveTab}
-                    onOpenMonthPlan={(brandId, platform) => openMonthPlanFor(brandId, platform)}
                   />
                 )}
 
@@ -2021,7 +2005,6 @@ export default function App() {
                         promoSchemes={promoSchemes}
                         engineParams={engineParams}
                         onOpenSession={(id) => setNotifOpenSessionId(id)}
-                        onOpenMonthPlan={(brandId, platform) => openMonthPlanFor(brandId, platform)}
                       />
                     )}
                   </div>
@@ -2142,47 +2125,24 @@ export default function App() {
                 )}
 
                 {activeTab === "agency_overview" && (
-                  perPlatformBlocks(
-                    (p) => (
-                      <CeoBrief
-                      key={p}
-                      platform={p}
-                      engineParams={engineParams}
-                      sessions={activeSessions}
-                      brands={brandsOn(p)}
-                      brandChannels={channels}
-                      talents={talents}
-                      shiftSlots={shiftSlots}
-                      planSlotTargets={planSlotTargets}
-                      planMonthTotals={planMonthTotals}
-                      financeRecords={financeRecords}
-                      brandPlatformRates={brandPlatformRates}
-                      brandPlatformRateHistory={brandPlatformRateHistory}
-                      talentRateHistory={talentRateHistory}
-                      currentRole={currentRole}
-                      onNavigate={setActiveTab}
-                      onOpenIssue={(i) => {
-                        if (!i.brandId) return;
-                        if (i.action === "month_plan") openMonthPlanFor(i.brandId, i.platform ?? LEGACY_PLATFORM);
-                        else if (i.action === "reconcile") navigateTo("brand_dataraw", i.brandId, i.platform ?? LEGACY_PLATFORM);
-                      }}
-                    />
-                    ),
-                    agencyScope === "all" ? (
-                      <AgencyChannelSummary
-                        platforms={agencyPlatforms}
-                        channels={channels}
-                        brands={brands}
-                        sessions={activeSessions}
-                        financeRecords={financeRecords}
-                        brandPlatformRates={brandPlatformRates}
-                        brandPlatformRateHistory={brandPlatformRateHistory}
-                        talents={talents}
-                        talentRateHistory={talentRateHistory}
-                        canSeeMoney={currentRole === "ceo" || currentRole === "admin"}
-                      />
-                    ) : null
-                  )
+                  <AgencyDashboard
+                    key={agencyPlatformState}
+                    platform={agencyPlatformState}
+                    today={todayVn()}
+                    brands={agencyBrands}
+                    brandChannels={channels}
+                    sessions={activeSessions}
+                    shiftSlots={shiftSlots}
+                    engineParams={engineParams}
+                    currentRole={currentRole}
+                    onNavigate={setActiveTab}
+                    onOpenMonthPlan={(brandId, platform) => openMonthPlanFor(brandId, platform)}
+                    talents={talents}
+                    financeRecords={financeRecords}
+                    brandPlatformRates={brandPlatformRates}
+                    brandPlatformRateHistory={brandPlatformRateHistory}
+                    talentRateHistory={talentRateHistory}
+                  />
                 )}
 
                 {activeTab === "host_performance" && (
@@ -2224,18 +2184,22 @@ export default function App() {
 
                 {activeTab === "brand_dashboard" && effectiveWorkspace.type === "brand" && (
                   <BrandDashboard
-                    brandId={currentBrandId!}
-                    brandName={currentBrandName}
+                    brand={brands.find((b) => b.id === currentBrandId) ?? ({ id: currentBrandId!, name: currentBrandName, logo: "" } as Brand)}
                     platform={platformScope}
                     platforms={currentBrandPlatforms}
                     sessions={platformSessions}
                     shiftSlots={platformSlots}
-                    promoSchemes={promoSchemes}
                     engineParams={engineParams}
                     currentRole={currentRole}
-                    onOpenMonthPlan={() => openMonthPlanFor(currentBrandId!, singlePlatform)}
-                    onOpenSession={(id) => { setWorkspace({ type: "agency" }); setActiveTab("calendar"); setNotifOpenSessionId(id); }}
-                    onOpenSessions={() => setActiveTab("brand_sessions")}
+                    brandChannels={channels}
+                    talents={talents}
+                    financeRecords={financeRecords}
+                    brandPlatformRates={brandPlatformRates}
+                    brandPlatformRateHistory={brandPlatformRateHistory}
+                    talentRateHistory={talentRateHistory}
+                    onOpenMonthPlan={(brandId, platform) => openMonthPlanFor(brandId, platform)}
+                    onNavigate={(tab) => { setWorkspace({ type: "agency" }); setActiveTab(tab); }}
+                    onOpenReport={() => setActiveTab("brand_monthly_report")}
                   />
                 )}
 

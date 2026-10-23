@@ -5939,3 +5939,135 @@ Nguyên văn mục §1 "AUDIT TOÀN APP THEO SIDEBAR + SỬA" trước khi rút 
   hỏi. Lỗi có sẵn cũng sửa: 3 test đỏ (file thật trong Downloads, nút 22px), lint purity, 2 test vỡ khi CI không `.env`.
   **Verify:** tsc/eslint 0 lỗi; vitest 947/947 (cả chế độ CI); audit:dead sạch; replay 0001→0178 sạch, 0178 chạy 2 lần sạch,
   `supabase/tests/0178_ops_flow_integrity.sql` 10/10 OK và đỏ khi thiếu 0178; từng màn đã sửa xem lại trên app thật sau build.
+
+## §1 mục 16–17/10 brand workspace (chuyển khỏi WORKSPACE 21/10)
+
+- **16–17/10: ĐỀ XUẤT LÀM LẠI BRAND WORKSPACE (chỉ đo + đề xuất, CHƯA code).** https://claude.ai/artifact/KmNUv95A2FswDJ1S9u1R3N. 17/10 nghiên cứu lại, bỏ mọi số lượt mở (app chưa vận hành thật, `ui_tab_views` chỉ là user + Claude thử). Mới 17/10: (a) brand đã có GMV từng phiên real-time ở Seller Center (Data Compass) ⇒ cổng chỉ làm thứ chỉ agency có: giờ đã chạy (cơ sở tính tiền: `pnl.ts` hourly = giờ ca × `ratePerHour`, còn lại % × NMV), lịch/ai lên ca, nhịp run-rate, kế hoạch + báo cáo; (b) **LỘ DỮ LIỆU nếu mở tài khoản brand** (replay 0001→0178 trên Postgres tạm, đăng nhập vai brand A): `profiles` đọc hết (email mọi tài khoản, cả brand khác — policy 0001), `talents_secure` trả SĐT/ngày sinh/tổng GMV/`brands_worked_with` của mọi host; brand còn quyền GHI cũ vào `recurring_shift_templates` + `promo_schemes` (0035/0037/0038); bảng ca/kế hoạch/report/giá + 5 RPC theo brand đều kín ⇒ "Bước 0" = 1 migration đóng 3 chỗ trước khi cấp tài khoản brand (link bản tin không đăng nhập thì tránh cả loại lỗi). Đo cũ còn giữ: brand Franklin mở 8 tab chỉ 2 có nội dung (Lịch, Hợp Đồng — Hợp Đồng ghi 81h·29 ca vì số bị che nên ca chờ xác nhận tính là đã chạy, ops thấy 68h·24 ca); Dashboard brand tháng chưa phát hành chỉ còn "Khả năng về đích" (Franklin TT 0% "Đã ngã ngũ" trong khi run-rate user gửi 72%; rơi 66%→9% đêm 11/10 khi target 650→750M; VERA cả 2 kênh 0%); 1/22 tháng-kênh T6–T9 đã phát hành Report; 0 SKU, 0/6 kế hoạch được brand xác nhận; nhãn ops "Tóm tắt brand đang thấy" sai (brand không thấy khối đó); một vòng tháng của ops cho 1 brand nằm xen kẽ 2 khu (Kế Hoạch Tháng, Xếp lịch, Run-rate ở Agency; Nhập số, Report, KH tháng sau ở Brand). Đề xuất: cổng brand 4 màn (Bản tin = bản run-rate ops bấm "Gửi brand" ở module Run-rate, Lịch, Báo cáo, Hợp đồng & kế hoạch) + bàn brand của ops theo việc (có Kế Hoạch Tháng, "Xem như brand"); 3 bước (B1 không migration, B2 bảng bản tin + cờ bằng chứng ca cho brand). Chờ user chốt 4 điểm: brand thấy số trong tháng qua bản tin; link riêng không đăng nhập hay tài khoản; bỏ xác suất ở màn brand; bỏ tab Sản phẩm/Affiliate/Sổ Ca khỏi cổng. Cách giả lập role brand có che số: iframe cùng origin + vá `fetch` trước khi app chạy (profiles → role brand; `live_sessions_secure` → `month_published` false + null số tháng chưa phát hành), chặn ghi.
+
+## Dashboard "một thẻ kênh" (2026-10-21)
+
+User: "Giúp tôi thiết kế lại dashboard agency + brand", chọn cả 4 vấn đề (nhiều màn trả lời khác nhau · rối · thiếu thứ sếp cần · brand chưa có gì
+xem) và "đề xuất + demo số thật". Đề xuất + demo: https://claude.ai/artifact/8tca7KBXNqqdyMAqzTWcTG. User: "Đồng ý cả 4, làm đi".
+
+**Số đo 21/10 (bản build production localhost:62131, DB thật):**
+- Franklin TikTok cùng lúc: Dashboard "Sẽ hụt 0% · 514,1M · số đủ tới 18/10 · cần 7,9M/giờ cho 52h"; Run-rate "Chậm tiến độ 65% · giữ nhịp ~490,3M";
+  PĐH "Đã ngã ngũ 0%"; Dashboard brand (ops) ghi CẢ "Sẽ hụt" lẫn "Đã ngã ngũ", "số đủ tới 19/10", "cần 7,4M/giờ cho 58h", "Giờ live −12,3%" (khối Vì sao,
+  ngày thường) cạnh ô KPI "+14,5%" (mọi ngày). CROCS: Run-rate "Đúng tiến độ 100% · ~5,16B" vs Dashboard "Khó đạt 37% · 5,05B" vs PĐH "Đang giằng co".
+  JOCKEY TT 18%: Dashboard "Sẽ hụt", PĐH "Khó đạt". Franklin Shopee: Dashboard "Sẽ hụt · 67,1M" vs PĐH "Chưa đủ lịch sử". Tiền: Dashboard "0/219 ca"
+  vs PĐH "183,4M dự kiến" (giá ở CRM, 2/7 kênh). Ngưỡng tải: 24h/tuần (Sức khoẻ) / 40h (PĐH) / 30% giờ (Rủi ro).
+- Hai thang nhãn: `forecastCone.landingOf` 80/50/20% (Chắc đạt/Có thể đạt/Khó đạt/Sẽ hụt) vs `control-room/types.ts STATE_OF` 80/20/5%
+  (Gần như chắc/Đang giằng co/Khó đạt/Đã ngã ngũ).
+- Độ dài (iframe 1440): Dashboard "Tất cả kênh" 7.254px · 528 số · 3.146 chữ; Dashboard TikTok 3.482px; Dashboard brand Franklin 4.421px · 353 số,
+  CROCS 4.087px; Run-rate 2.350px; PĐH 2.077px.
+- GMV/giờ (giờ live) T6→T10: CROCS 20,1/24,3/25,8/19,9/19,8M; VERA TT 3,03/2,75/2,67/2,27/1,76M (−42%); VERA Shopee 4,97/4,74/4,45/3,83/4,29M;
+  JOCKEY TT 1,70/1,75/1,24/0,97/1,61M; Franklin TT T8–T10 2,88/5,36/3,67M (1.525 ca, đọc `live_sessions_secure`).
+- `forecast_snapshots` 49 dòng 10–21/10 (chỉ ngày có người mở Dashboard/PĐH): VERA TT p50 386→368M (target 650M), VERA Shopee 769→810M (1B),
+  CROCS 5,39→5,09B, Franklin TT 702→514M (target 650→750M ngày 11/10). Số "actual" đứng yên 18→21/10 ⇒ số trễ 3 ngày (TikTok đủ tới 18/10, Shopee 17/10).
+- 1/22 tháng-kênh đã hết (T6–T9) được phát hành Report (CROCS T7). `profiles` có 1 tài khoản role brand (Franklin, tạo 27/07).
+
+**Đã làm (chưa commit):** xem WORKSPACE §1 21/10. Bản tin brand đặt ở Chi tiết kênh thay vì module Run-rate (đề xuất ghi "Run-rate") vì số dự kiến
+cuối tháng của bản tin là số của thẻ kênh (engine); module Run-rate giữ nguyên theo quyết định 14/10.
+
+**0179 (chưa chạy):** profiles_read_all ⇒ `profiles_read_scoped` (ceo/admin/operations/trainer/talent đọc hết; còn lại chỉ dòng của mình — phiên
+không có dòng profiles cũng chỉ thấy mình); `talents_secure` che avg_gmv/total_gmv/ctr/cvr/score/brands_worked_with/phone/date_of_birth/profile_id
+với role ngoài danh sách đó (so `::text` để chạy cả khi DB chưa có enum 'trainer'; 0176 sửa cùng định nghĩa); bỏ 4 policy ghi cũ của brand
+(0037/0038); bảng `brand_bulletins` (append-only, đọc: ops + brand của mình) + RPC `publish_brand_bulletin`. Bộ kiểm
+`supabase/tests/0179_brand_portal.sql` 10/10 trên replay 0001→0179 (chạy bằng bash, không zsh); replay bỏ 0179 ⇒ 1a/1c/3 đỏ.
+
+**Chưa verify trên app thật:** 21/10 máy dev bị từ chối kết nối TCP tới `*.supabase.co` và `supabase.com` (curl exit 7 trong 4ms) trong khi
+`www.cloudflare.com`, `api.supabase.com` vẫn 200 — chặn theo tên miền ở mạng/ISP, không phải lỗi app. Thay tạm bằng test SSR `tests/channelCardRender.test.ts`.
+
+## §2 việc treo 04–08/10 (chuyển khỏi WORKSPACE 21/10)
+
+000000000. **Đợt 3 tài khoản XONG 06/10:** user cấp 27 tài khoản đăng nhập bằng tên (Thái Toàn + 26 người có ca), app đếm 37 tài khoản, khối vàng còn 5 hồ sơ chưa có ca sắp tới; 27 tài khoản gắn đúng hồ sơ cùng tên. Còn: thêm email thật khi có (nút "Thêm email"); 6 tài khoản talent cũ mang email thử (hhhhh@ / test@ / hostesttt@…) — nếu là người thật thì Đặt lại MK + gửi lại. Chưa đo: một lần giao ca THẬT đầu-cuối.
+00000000. **0143 ĐÃ CHẠY 06/10** (user xác nhận). Sửa 27 chỗ trùng người T10 (Bảng Vận Hành → khối đỏ "chỗ trùng người", hoặc Việc cần làm) — 0143 KHÔNG chặn ca trùng sẵn,
+   chỉ chặn lần ghi đưa người vào ca/dời giờ; 32 ca Franklin Shopee T10 chưa có phòng (đặt phòng mặc định ở CRM → Hợp đồng & giá, ca đã tạo thì Sửa ca).
+   **Lịch + giao ca 2 sàn — đề xuất** https://claude.ai/artifact/J4Kk16eZYeTtrkKDYvQWpY: Đợt 1 + Đợt 2 XONG, Đợt 3 có màn cấp tài khoản (§1). Còn: **Đợt 3** user cấp tài khoản cho host/trợ — user chốt 06/10 **CHUYỂN THẲNG sang app, KHÔNG chạy song song Google Sheet**
+   (nên Đợt 2 phải xong + verify kỹ trước khi phát tài khoản; GMV mất thì lấy lại từ đối soát, OT/sự cố thì không) · **Đợt 4** checklist cuối tháng
+   7 kênh ở Điều Phối Phát Hành, chia ca nối theo số giao ca, ước tính số chốt (sau backtest). User chốt 06/10: ca không có trợ ⇒ **OP giao ca**;
+   host/trợ dùng điện thoại riêng được. Số đo nền: lịch sử `## Lịch 2 sàn — khảo sát + Đợt 1 (2026-10-06)`.
+0000000. **0139–0142 đã chạy 06/10.** Việc còn lại của user: lập Kế Hoạch Tháng + target cho từng sàn (VERA/JOCKEY/Franklin Shopee);
+   nhập hợp đồng ở CRM → "Hợp đồng & giá" (chọn sàn); up file Ads Shopee các tháng/brand khác ở Nhập Ads (chọn Shopee — VERA T9 đã có). Phần 0139: Sau đó: up 4 file Shopee mỗi tháng/brand ở Dữ Liệu Gốc → chọn Shopee (VERA/JOCKEY T6–T9; Franklin Shopee từ T10); đối soát ca Shopee bằng Live List ở Đối Soát (chọn brand + sàn Shopee); tạo + phát hành Report Shopee ở Report Tháng (nút Shopee). Chưa có file Shopee tháng 6, 7, 8 nào; JOCKEY chưa gửi file. Shopee không có Ads/khuyến mãi/GMV trực tiếp–gián tiếp (ghi trong "cách tính" của report).
+000000. 29 ca chưa host (user tự rà và gán sau): CROCS 21 (8 ca T6–T9 chờ user gửi, 11 ca 01–04/10, 21–22/10 11–14), VERA 7 (25/09, 26/09, 06/10, 18/10, 24/10, 25/10, 30/10), Franklin 26/09.
+00000. CROCS T10: user tự gán host cho các ca (gồm 11 ca 01–04/10 và 21/10, 22/10 11–14); tên thật của Mia/Su/Đạt; hồ sơ talent Hoàng Dung. Sửa target tạm 5,5 tỷ của Kế Hoạch Tháng nháp trước khi chốt (user bảo để yên tạm thời).
+0000. Up file Ads (TikTok Ads → "Campaign overview data", xem theo ngày, mỗi file một tháng) cho các tháng/brand khác
+   có chạy Ads ở Nhập Ads — Franklin T8 để report T9 có cột so tháng trước. Muốn có "% ngân sách Ads" như deck
+   Franklin thì chốt chỗ nhập ngân sách (đề xuất: Kế Hoạch Tháng).
+000. Muốn bỏ 3 phiên "cần xem lại" của CROCS T9 (lô cũ khớp theo luật trước 0136): up lại file Creator Live
+   Performance T9 ở Dữ Liệu Gốc (CROCS) rồi bấm "Đối soát" ở lần tải đó và Áp dụng.
+00. **Chọn KAM thật + nhập SĐT người đại diện cho 4 brand ở CRM** — 0134/0135 (đã chạy 05/10) xoá hết liên hệ/KAM mẫu,
+   nay cả 4 brand "KAM: Chưa chọn", đại diện chỉ còn tên (Stan, Tuấn, Mai, Khanh).
+0b. **Sentry chưa cấu hình** (`/api/health` → `sentryConfigured: false`): lỗi phía người dùng không ai thấy. Muốn có thì
+   tạo project Sentry, đặt `SENTRY_DSN` trên Vercel.
+1. **Nạp lịch sử T6–T9 cho 4 brand — user chốt 05/10:** JOCKEY/VERA/Franklin CÓ live T6–T9 và có sheet vận hành ⇒ nạp bù
+   như CROCS; Report T6–T9 mọi brand PHÁT HÀNH (đóng sổ) sau khi đủ số + gán host xong (**CROCS T7 đã phát hành 05/10**);
+   ca T10 (kể cả 01–05/10) tạo thành ca THẬT, user tự nhập — KHÔNG nạp bù T10 (ca `is_backfill` không vào Finance).
+   User 05/10: chốt TRỌN CROCS trước, 3 brand kia user tự up sau. **CROCS T9 đã đủ 01→30/09 (05/10):** up file Creator
+   Live Performance tháng 9 (export 05/10, 65 room) vào ô tháng 9 + Sinh 18 ca + Đối Soát lô CROCS ⇒ 65 ca, GMV
+   5.217,1M = tổng file (số 01–22/09 lên +159M vì export mới hơn). Lô full cũ 01/06→22/09 vẫn ở ô tháng 6 ⇒ 2 lô chồng
+   tháng 9 — an toàn nhờ `dedupeRoomsAcrossBatches` (creatorLivePerfSlice.ts: trùng Room ID giữa các lô thì lấy lô up
+   sau). **Còn thiếu để phát hành CROCS T6/T8/T9:** host cho 8 ca (06/10 đã tách + gán nốt từ Working File, xem mục 1) — 27/06 19:59–23:59, 11/08 19:57–20:07,
+   16/08 11:00–14:00, 23/08 13:10–15:01, 18/09 22:15–23:05, 22/09 11:01–14:01, 23/09 09:00–13:10 và 13:11–00:31 (file
+   không có dòng ca hoặc chỉ phủ một phần) — user gửi; 5 file shop T9 (Khuyến Mãi, Sản Phẩm, Shop Analytics, Live
+   Performance, Live Analysis) mới tới 21–22/09. Cách Claude up file: chạy `liveops-prod` (localhost:3100, đã đăng nhập
+   admin, nối DB thật), chép file vào `dist/__upload/` rồi `fetch` cùng origin + gán vào `input[type=file]` — xoá file
+   sau khi up.
+   Franklin T9 đủ bộ có sẵn ở `~/Downloads` (export 03/10: Creator Live Performance 47 room 01→30/09, Khuyến Mãi,
+   product_list_20260901, Core Stats, Shop Analytics_20261003) — chưa up.
+   JOCKEY/VERA/Franklin: đã có ca T6→05/10 từ file Working File (05/10 tối, nhãn Tạm tính) — còn chờ file đối soát + tạo talent Mia/Su/Đạt/Dung/Trúc Như/Diễm Phương rồi gán host.
+2. **Nhập giá + lương**: giá brand (đơn giá/giờ hoặc % hoa hồng, tỷ lệ hoàn huỷ) + hợp đồng ở CRM → "Hợp đồng & giá"; rate talent ở
+   Talent Pool — đo 06/10: 0 hợp đồng, 1 dòng giá (JOCKEY = 0), talent rate = 0. Khối tiền của Dashboard CEO và Finance mới có số.
+3. Gán host cho ca nạp bù CROCS còn thiếu: 8/263 ca (xem mục 1). Trợ live lưu ở `co_host_id`.
+
+## §1 mục 21–22/10 Dashboard (chuyển khỏi WORKSPACE 23/10)
+
+Nguyên văn hai mục §1 trước khi Dashboard làm lại theo demo "so cùng kỳ" (23/10). `AgencyRunRate.tsx`, `AccountDetail` (component), `CeoBrief.tsx`,
+`dashboard/{Health,AgencyHealth,FinanceSection,model}` nhắc dưới đây ĐÃ GỠ 23/10.
+
+- **22/10: MODULE RUN-RATE GỘP VÀO DASHBOARD (BUILT, chưa commit, không migration)** — sau khi bác 4 bản màn sếp + 3 prototype (console, Sổ khách
+  hàng…), user: "mở rộng từ run-rate vào dashboard", chọn "Run-rate thành Dashboard". Tab **Tháng này** = `dashboard/AgencyRunRate.tsx`: chọn tháng ·
+  "Tới ca mới nhất | ngày" · Tải Excel · dòng "Số đủ tới · N ca chờ số"; mỗi sàn một hàng thẻ `runrate/AccountCard` (run-rate % to, thanh, Đạt / Kỳ vọng
+  tới nay, Target tháng, **Dự kiến cuối tháng = `card.forecast.p50`**, viên nhãn `CardPill`); ≤4 việc (`agencyTodos`); bấm thẻ ⇒ `AccountDetail` bên dưới
+  (đồng hồ, câu đạt/thiếu + dự báo + GMV/giờ cần của thẻ kênh, 4 nhịp Tháng·Đợt·Ngày·Ca, nút "Chi tiết kênh" → Dashboard brand). Số từ `useChannelCards`
+  (một lần tính); chọn ngày thì cắt lại `buildAccountRunRate(card.rr, …)`. Màu số/thanh/đồng hồ = màu viên nhãn khả năng đạt (`TONE_FILL`), không theo
+  ngưỡng run-rate; bỏ hẳn "Giữ nhịp"/"Đúng tiến độ" khỏi UI và Excel (cột "Dự kiến cuối tháng" + "Ghi chú" = nhãn · %). Gỡ: menu Run-rate
+  (`run_rate` → `agency_overview` ở `renamedTab`, link `/run-rate` → Dashboard), `RunRateBoard.tsx`, `dashboard/AgencyBoss.tsx`, `monthActualOf`.
+  Verify: tsc/eslint 0 lỗi, vitest 971/971 (CI), audit:dead sạch, build OK; SSR test thẻ/chi tiết (`channelCardRender`), test link cũ (`routes`).
+  App thật 22/10 (dev, DB thật): 6 thẻ + JOCKEY Shopee "Chưa lập"; Franklin TT 64% · ~497,9M · cần 8,4M/giờ cho 49h (trùng Chi tiết kênh 21/10);
+  chọn thẻ / nhịp Ca / chọn ngày 15/10 (cả 6 cắt cùng mốc) chạy; 375px 0 tràn; sidebar hết Run-rate; /run-rate → /dashboard. Còn mở: chọn ngày
+  cũ thì viên nhãn + dự báo vẫn là của hôm nay (không cắt theo ngày).
+
+- **21/10: DASHBOARD AGENCY + BRAND LÀM LẠI "MỘT THẺ KÊNH" (BUILT, chưa commit; `0179` ĐÃ CHẠY 21/10 — verify: RPC `publish_brand_bulletin` trả 42501 với anon, hàm bịa trả PGRST202)** — đề xuất + demo
+  https://claude.ai/artifact/8tca7KBXNqqdyMAqzTWcTG, user "Đồng ý cả 4, làm đi". Đo trước khi làm: 9 mâu thuẫn giữa 4 màn (Franklin TT 4 nhãn,
+  514,1M vs ~490,3M, số đủ tới 18/10 vs 19/10; "Khó đạt" = 20–50% ở Dashboard nhưng 5–20% ở PĐH; tiền 0/219 ca vs "183,4M"), Dashboard
+  "Tất cả kênh" 7.254px · 528 số. Đã làm: `lib/performance/channelCard.ts` (`buildChannelCard` — MỘT lần tính/kênh; "tới nay" = đúng số
+  module Run-rate) + hook `dashboard/useChannelCards.ts` (nạp kế hoạch/ca kế hoạch/cam kết/sổ dự báo, ghi sổ dự báo — CeoBrief/PĐH thôi ghi);
+  Dashboard agency = `AgencyDashboard` 3 tab: **Tháng này** (`dashboard/AgencyBoss.tsx` — dòng số đủ tới, thẻ TikTok | Shopee, xu hướng 5 tháng,
+  ≤5 việc `agencyTodos`, người & tiền), **Theo kỳ** + **Sức khoẻ** (CeoBrief cũ, `view` prop). Bấm thẻ ⇒ **Chi tiết kênh** = Dashboard brand của
+  ops (thẻ cỡ lớn + gửi bản tin, nhịp tháng/đợt/ngày/ca = `RunRateLenses` của module Run-rate với `showPace=false`, cây GMV/giờ `TreeCard`,
+  Key Metrics, nhịp tuần, **một** phương án `ChannelPlan` (handlingPlan) + nút Sa bàn, đề xuất đã backtest, soát kế hoạch tháng sau, host).
+  PĐH chỉ còn Sa bàn & người + Hỏi số liệu. Role brand ⇒ `BrandPortal` (bản tin, giờ so cam kết, lịch 7 ngày, báo cáo). Gỡ: ThisMonth, DrillDown,
+  RunRate.tsx, AgencyChannelSummary, LandingGrid/MonthMap/BrandLanding/LandingCurve, khối "phương án bù A/B" của OpsSupport (+ `suggestFill`),
+  `buildIssues`, `runRateByWave`, `coneOf`, `forecastFlags`, `landingOfMany`, `combineCones`, `fetchBrandLandingSeries`. Verify: tsc/eslint 0 lỗi,
+  vitest 970/970 (CI env), audit:dead sạch, build OK; replay 0001→0179 sạch + `supabase/tests/0179_brand_portal.sql` 10/10 (bỏ 0179 ⇒ 1a/1c/3 đỏ);
+  App thật 21/10 (build production, DB thật): "nhịp" + "đã đạt" 6 kênh trùng module Run-rate (64/95/55/99/29/82%); màn sếp 7.254 → 1.262px, 0 tràn
+  ở 375; Chi tiết kênh Franklin TT một bộ số (497,9M · 8,4M/giờ cho 49h ở thẻ = Phương án = Thử kịch bản); PĐH không còn nhãn cũ. CHƯA thử: bấm
+  "Gửi bản tin" thật + xem cổng bằng tài khoản brand (cần user cho phép ghi + mật khẩu brand). Lưu ý: 21/10 máy dev có lúc bị chặn `*.supabase.co`.
+  22/10 màn sếp một dòng/kênh (`AgencyBoss`) bị bác ("vẫn rối") rồi thay bằng thẻ run-rate (mục 22/10 trên).
+
+
+## Dashboard so cùng kỳ (2026-10-23)
+
+Demo duyệt 22/10 (https://claude.ai/artifact/CKfzXEuDtZyFQp3k37E1Y5, bản 23) → app 23/10.
+- **Luật lấy từ audit demo 22/10:** (1) hai mốc cắt — khối run-rate (đồng hồ, 4 nút, Key Metrics dưới nút) cắt ở ca mới nhất có số (`r.asOf`), GMV ở Key
+  Metrics = "Đã đạt"; mọi phần theo bộ chọn kỳ cắt ở ngày đủ số của sàn; (2) chỉ số theo khung giờ / độ dài ca / người = Σ(GMV ca ÷ GMV/giờ của CHÍNH kênh)
+  ÷ Σ giờ — chia cho trung bình sàn thì cơ cấu brand giả ra 25 vs 144 (CROCS ~20M/giờ ca dài vs VERA ~1,7M/giờ); (3) lệch giờ lên sóng > 180 phút là giờ xếp
+  ghi sai (VERA Shopee có 4 ca "trễ" 659–695 phút) ⇒ bỏ khỏi %, đếm riêng; (4) tuần/đợt cộng lại = dòng cả tháng: ca kế hoạch cộng lại thấp hơn target
+  tháng (CROCS T10 5,11B vs 5,15B) ⇒ chia phần chưa xếp theo tỷ lệ (`scaledDays`); (5) host vs trợ: trước đó Phương Thảo (VERA Shopee, 18/18 ca là trợ)
+  đứng đầu bảng "host" với chỉ số 144.
+- **Đo trên app thật (dev, DB thật, 23/10):** TikTok tháng này: GMV 01–20/10 4,08B ▼2,5% vs 01–20/09; run-rate sàn 90% (4,12B/4,56B), dự kiến ~5,96B = 90%
+  target 6,65B; CROCS 99% "Khó đạt · khả năng chạm target 29%", tuần 568,8M+1,31B+1,3B+1,42B+556,9M = 5,15B (khớp target). 30 tổ hợp sàn × kỳ × tab × brand
+  ở 1440 + 10 màn ở 375: 0 lỗi, 0 NaN, 0 tràn. "Lãi gộp mỗi giờ" ẩn vì chưa ca nào đủ rate để tính tiền.
+- **Bỏ so với 3 tab cũ (theo demo):** bảng xu hướng chỉ số 4 tháng, tải người/ngày-tuần, cam kết giờ + kỷ luật dữ liệu (`dataDiscipline` — bắt lỗi kiểu "cam
+  kết 550.000.000 giờ"), 6 ô tiền + biểu đồ lãi theo ngày, chọn ngày "số tới" của module Run-rate, Excel từng tài khoản khi xem kỳ khác (nay 1 sheet so cùng kỳ).
+

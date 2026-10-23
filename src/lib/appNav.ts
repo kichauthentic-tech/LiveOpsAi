@@ -1,5 +1,5 @@
 import React from "react";
-import { BookOpen, BrainCircuit, ClipboardList, Briefcase, Building2, CalendarCheck, CalendarCheck2, CalendarDays, Clapperboard, CalendarClock, Crosshair, Calendar as CalendarIcon, CalendarRange, Database, DollarSign, FileSignature, FileText, Gauge, LayoutDashboard, LayoutGrid, Link2, Megaphone, Package, Send, ShieldCheck, TrendingUp, User, Users } from "lucide-react";
+import { BookOpen, BrainCircuit, ClipboardList, Briefcase, Building2, CalendarCheck, CalendarCheck2, CalendarDays, Clapperboard, CalendarClock, Crosshair, Calendar as CalendarIcon, CalendarRange, Database, DollarSign, FileSignature, FileText, LayoutDashboard, LayoutGrid, Link2, Megaphone, Package, Send, ShieldCheck, TrendingUp, User, Users } from "lucide-react";
 import { PermissionKey, UserRole } from "../types";
 
 // Cấu hình sidebar + vài hằng số điều hướng, tách khỏi App.tsx 2026-10-01 (App.tsx 2.867 dòng).
@@ -22,7 +22,7 @@ export interface NavItem {
  * Màn không có ở đây (lịch toàn agency, nhân sự ca, talent, studio, CRM, finance, hệ thống) đã nhìn mọi kênh sẵn.
  */
 export const TAB_CHANNEL_SCOPE: Record<string, "all" | "one"> = {
-  agency_overview: "all",
+  agency_overview: "one",
   sessions: "all",
   host_performance: "all",
   brands_overview: "all",
@@ -142,9 +142,8 @@ export function agencyNavGroups(currentRole: UserRole): NavGroup[] {
               { id: "studio_calendar", label: "Lịch & Studio", icon: Clapperboard, perm: "manage_calendar" as PermissionKey },
               // Hỗ Trợ Vận Hành (benchmark ca sắp live): 28/09 gộp vào Dashboard brand, 07/10 tách thành tab riêng, 08/10 gộp vào
               // Bảng Vận Hành (khối thu gọn cuối trang) vì hai màn cùng trả lời "ca sắp tới thế nào".
-              { id: "sessions", label: "Sổ Ca", icon: BookOpen, perm: "manage_sessions" as PermissionKey },
-              // Run-rate (11/10): cập nhật kết quả đạt được cho sếp + brand theo tháng / đợt campaign / ngày / ca; soạn bản tin gửi đi.
-              { id: "run_rate", label: "Run-rate", icon: Gauge, perm: "manage_sessions" as PermissionKey }
+              { id: "sessions", label: "Sổ Ca", icon: BookOpen, perm: "manage_sessions" as PermissionKey }
+              // Run-rate (11/10) đã gộp vào Dashboard 22/10 — tab "Tháng này" chính là màn đó (id "run_rate" cũ → agency_overview ở App).
             ]
           },
           {

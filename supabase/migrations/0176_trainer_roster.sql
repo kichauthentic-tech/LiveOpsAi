@@ -52,42 +52,34 @@ alter policy shift_slots_write_ceo_ops on public.shift_slots using ((( SELECT cu
 alter policy talent_rate_history_read_ceo_admin_self on public.talent_rate_history using (((( SELECT current_user_role() AS current_user_role) = ANY (ARRAY['ceo'::user_role, 'admin'::user_role, 'trainer'::user_role])) OR (talent_id = ( SELECT current_user_talent_id() AS current_user_talent_id))));
 
 -- ===== Phần 3 — talents_secure: rate hiện cho ceo/admin/trainer + chính chủ (giữ nguyên mọi vế khác) =====
-create or replace view public.talents_secure as  SELECT id,
-    name,
-    avatar,
-    role,
-    gender,
-    niches,
-    avg_gmv_per_session,
-    total_gmv,
-    ctr_avg,
-    cvr_avg,
-        CASE
-            WHEN ((( SELECT current_user_role() AS current_user_role) = ANY (ARRAY['ceo'::user_role, 'admin'::user_role, 'trainer'::user_role])) OR (profile_id = ( SELECT auth.uid() AS uid)) OR (id = ( SELECT current_user_talent_id() AS current_user_talent_id))) THEN rate_per_session
-            ELSE NULL::numeric
-        END AS rate_per_session,
-        CASE
-            WHEN ((( SELECT current_user_role() AS current_user_role) = ANY (ARRAY['ceo'::user_role, 'admin'::user_role, 'trainer'::user_role])) OR (profile_id = ( SELECT auth.uid() AS uid)) OR (id = ( SELECT current_user_talent_id() AS current_user_talent_id))) THEN commission_rate
-            ELSE NULL::numeric
-        END AS commission_rate,
-    overall_score,
-    availability_status,
-    brands_worked_with,
-    phone,
-    date_of_birth,
-    profile_id,
-    created_at,
-    updated_at,
-        CASE
-            WHEN ((( SELECT current_user_role() AS current_user_role) = ANY (ARRAY['ceo'::user_role, 'admin'::user_role, 'trainer'::user_role])) OR (profile_id = ( SELECT auth.uid() AS uid)) OR (id = ( SELECT current_user_talent_id() AS current_user_talent_id))) THEN rate_per_hour
-            ELSE NULL::numeric
-        END AS rate_per_hour,
-    nickname,
-        CASE
-            WHEN ((( SELECT current_user_role() AS current_user_role) = ANY (ARRAY['ceo'::user_role, 'admin'::user_role, 'trainer'::user_role])) OR (profile_id = ( SELECT auth.uid() AS uid)) OR (id = ( SELECT current_user_talent_id() AS current_user_talent_id))) THEN assistant_rate_per_hour
-            ELSE NULL::numeric
-        END AS assistant_rate_per_hour
-   FROM talents;
+-- 21/10: cùng định nghĩa với 0179 (che SĐT/ngày sinh/GMV/brands_worked_with với role brand; so role bằng ::text) — chạy 0176 trước
+-- hay sau 0179 đều ra một view.
+create or replace view public.talents_secure as
+select
+  id,
+  name,
+  avatar,
+  role,
+  gender,
+  niches,
+  case when coalesce((select current_user_role())::text, '') in ('ceo', 'admin', 'operations', 'trainer', 'talent') or profile_id = (select auth.uid()) then avg_gmv_per_session end as avg_gmv_per_session,
+  case when coalesce((select current_user_role())::text, '') in ('ceo', 'admin', 'operations', 'trainer', 'talent') or profile_id = (select auth.uid()) then total_gmv end as total_gmv,
+  case when coalesce((select current_user_role())::text, '') in ('ceo', 'admin', 'operations', 'trainer', 'talent') or profile_id = (select auth.uid()) then ctr_avg end as ctr_avg,
+  case when coalesce((select current_user_role())::text, '') in ('ceo', 'admin', 'operations', 'trainer', 'talent') or profile_id = (select auth.uid()) then cvr_avg end as cvr_avg,
+  case when coalesce((select current_user_role())::text, '') in ('ceo', 'admin', 'trainer') or profile_id = (select auth.uid()) or id = (select current_user_talent_id()) then rate_per_session end as rate_per_session,
+  case when coalesce((select current_user_role())::text, '') in ('ceo', 'admin', 'trainer') or profile_id = (select auth.uid()) or id = (select current_user_talent_id()) then commission_rate end as commission_rate,
+  case when coalesce((select current_user_role())::text, '') in ('ceo', 'admin', 'operations', 'trainer', 'talent') or profile_id = (select auth.uid()) then overall_score end as overall_score,
+  availability_status,
+  case when coalesce((select current_user_role())::text, '') in ('ceo', 'admin', 'operations', 'trainer', 'talent') or profile_id = (select auth.uid()) then brands_worked_with end as brands_worked_with,
+  case when coalesce((select current_user_role())::text, '') in ('ceo', 'admin', 'operations', 'trainer', 'talent') or profile_id = (select auth.uid()) then phone end as phone,
+  case when coalesce((select current_user_role())::text, '') in ('ceo', 'admin', 'operations', 'trainer', 'talent') or profile_id = (select auth.uid()) then date_of_birth end as date_of_birth,
+  case when coalesce((select current_user_role())::text, '') in ('ceo', 'admin', 'operations', 'trainer', 'talent') or profile_id = (select auth.uid()) then profile_id end as profile_id,
+  created_at,
+  updated_at,
+  case when coalesce((select current_user_role())::text, '') in ('ceo', 'admin', 'trainer') or profile_id = (select auth.uid()) or id = (select current_user_talent_id()) then rate_per_hour end as rate_per_hour,
+  nickname,
+  case when coalesce((select current_user_role())::text, '') in ('ceo', 'admin', 'trainer') or profile_id = (select auth.uid()) or id = (select current_user_talent_id()) then assistant_rate_per_hour end as assistant_rate_per_hour
+from talents;
 
 -- ===== Phần 4 — RPC có sẵn nhận trainer (sửa đúng chuỗi guard, thân hàm còn lại giữ nguyên) =====
 do $$

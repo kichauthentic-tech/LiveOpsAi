@@ -27,12 +27,11 @@ interface Props {
   promoSchemes: PromoScheme[];
   engineParams: EngineParams;
   onOpenSession: (sessionId: string) => void;
-  onOpenMonthPlan: (brandId: string, platform: ReportPlatform) => void;
 }
 
 const selectCls = "bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs text-[var(--text)] focus:outline-none focus:border-[var(--accent)]";
 
-export default function OpsSupportTab({ platform: defaultPlatform, brandsOn, sessions, shiftSlots, promoSchemes, engineParams, onOpenSession, onOpenMonthPlan }: Props) {
+export default function OpsSupportTab({ platform: defaultPlatform, brandsOn, sessions, shiftSlots, promoSchemes, engineParams, onOpenSession }: Props) {
   const today = todayVn();
   const month = today.slice(0, 7);
   const [open, setOpen] = useState(false);
@@ -98,21 +97,17 @@ export default function OpsSupportTab({ platform: defaultPlatform, brandsOn, ses
           </div>
       {brand && (
         <OpsSupport
-          show="benchmark"
           rr={rr}
           projection={projection}
           brandId={brandId}
           brandName={`${brand.name} · ${platform}`}
           platform={platform}
           month={month}
-          plan={plan}
           camp={camp}
-          planLoading={planLoading}
           sessions={sess}
           shiftSlots={slots}
           promoSchemes={promoSchemes}
           engineParams={engineParams}
-          onOpenMonthPlan={() => onOpenMonthPlan(brandId, platform)}
           onOpenSession={onOpenSession}
         />
       )}

@@ -1,6 +1,7 @@
 import type { Brand } from "../../types";
 import type { ReportPlatform } from "../../lib/reportPlatform";
 import type { AccountRunRate } from "../../lib/performance/runRateUpdate";
+import type { ChannelCard } from "../../lib/performance/channelCard";
 
 /** Một tài khoản = một kênh brand × sàn. Không có trường nào cộng với tài khoản khác. */
 export interface AccountVM {
@@ -20,4 +21,7 @@ export interface AccountVM {
   oldestMissing: string | null;
   /** Đang đọc ca kế hoạch của kênh. */
   loading: boolean;
+  /** Dashboard (22/10): thẻ kênh của cùng kênh — có thì số cuối tháng = dự báo `card.forecast` + nhãn khả năng đạt (một luật với
+   *  Chi tiết kênh), màu theo nhãn đó, không in "Giữ nhịp"/"Đúng tiến độ" (luật 21/10: run-rate trên thẻ chỉ là số). */
+  card?: ChannelCard;
 }

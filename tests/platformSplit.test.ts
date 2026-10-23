@@ -128,27 +128,6 @@ describe("Việc cần làm theo sàn", () => {
   });
 });
 
-describe("Bản Tin CEO: tập trung khách tính riêng từng sàn (07/10: không cộng GMV hai sàn)", () => {
-  test("TikTok: Franklin 30 + VERA 35 ⇒ VERA 54% GMV TikTok; Shopee chỉ một khách ⇒ không báo", async () => {
-    const { buildIssues } = await import("../src/lib/performance/ceoBrief");
-    const o = (actual: number) => ({ actual, pending: [], runRate: null, target: null, gap: null, buckets: [], projectionMethod: "none", remainingDays: 20, projected: actual, expectedToDate: null }) as never;
-    const issues = buildIssues({
-      today: "2026-10-10",
-      brands: [
-        { brandId: "f", name: "Franklin", clientName: "Franklin", platform: "TikTok", outlook: o(30), lastData: "2026-10-09", nextPlan: "locked" },
-        { brandId: "v", name: "VERA · TikTok", clientName: "VERA", platform: "TikTok", outlook: o(35), lastData: "2026-10-09", nextPlan: "locked" },
-        { brandId: "v", name: "VERA · Shopee", clientName: "VERA", platform: "Shopee", outlook: o(35), lastData: "2026-10-09", nextPlan: "locked" }
-      ],
-      periodSessions: [],
-      finance: null,
-      agencyScope: true,
-      fmt: String
-    });
-    const t = issues.map((i) => i.title).filter((x) => /một khách/.test(x));
-    expect(t).toEqual(["54% GMV TikTok tháng đến từ một khách: VERA"]);
-  });
-});
-
 describe("phạm vi kênh của màn (Bước 3)", () => {
   test("màn mọi kênh giữ 'Tất cả' khi có hơn một sàn; màn một kênh quy về sàn đơn gần nhất", async () => {
     const { resolveChannelScope } = await import("../src/lib/reportPlatform");

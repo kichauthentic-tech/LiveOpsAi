@@ -1,5 +1,5 @@
 import { BrandMonthPlanSlot, LiveSession } from "../../types";
-import { addDays, isoWeekStart } from "../dateUtils";
+import { addDays } from "../dateUtils";
 import { sessionDurationHours } from "../pnl";
 import { CampDayBucket } from "../campaignDays";
 import { isCountable, sessionHours } from "./hostPerformance";
@@ -209,52 +209,6 @@ export function campRuleReliable(p: CampPosition[] | null): boolean {
 // Nhịp theo tuần
 // ---------------------------------------------------------------------------
 
-export interface WeekPoint {
-  weekStart: string;
-  gmv: number;
-  hours: number;
-  gmvPerHour: number | null;
-  /** Tuần đã trọn 7 ngày tính tới ngày cuối có số. */
-  full: boolean;
-  /** Trung vị GMV/giờ của tối đa 8 tuần trọn trước đó (cần ≥ 4). */
-  median8: number | null;
-  alert: boolean;
-}
-
-/** Cảnh báo khi tuần trọn thấp hơn trung vị 8 tuần trước ≥ 15%, hoặc thấp nhất kể từ khi có ≥ 8 tuần số. */
-export const WEEK_ALERT_DROP = 0.15;
-
-export function weeklySeries(sessions: LiveSession[], through: string | null, count = 16): WeekPoint[] {
-  if (!through) return [];
-  const acc = new Map<string, { g: number; h: number }>();
-  for (const s of sessions) {
-    if (!isCountable(s) || s.date > through) continue;
-    const k = isoWeekStart(s.date);
-    const a = acc.get(k) ?? { g: 0, h: 0 };
-    a.g += s.actualGmv ?? 0;
-    a.h += sessionHours(s);
-    acc.set(k, a);
-  }
-  const all = [...acc.keys()].sort();
-  const pts: WeekPoint[] = all.map((k) => {
-    const a = acc.get(k)!;
-    return { weekStart: k, gmv: a.g, hours: a.h, gmvPerHour: a.h > 0 ? a.g / a.h : null, full: addDays(k, 6) <= through, median8: null, alert: false };
-  });
-  pts.forEach((p, i) => {
-    const prior = pts.slice(Math.max(0, i - 8), i).filter((x) => x.full && x.gmvPerHour != null).map((x) => x.gmvPerHour!).sort((a, b) => a - b);
-    p.median8 = prior.length >= 4 ? prior[Math.floor(prior.length / 2)] : null;
-    // "Thấp nhất từ trước tới nay" chỉ có nghĩa khi đã có ≥ 8 tuần trọn phía trước.
-    const before = pts.slice(0, i).filter((x) => x.full && x.gmvPerHour != null).map((x) => x.gmvPerHour!);
-    const everMin = before.length >= 8 ? Math.min(...before) : -Infinity;
-    p.alert = p.full && p.gmvPerHour != null && ((p.median8 != null && p.gmvPerHour < p.median8 * (1 - WEEK_ALERT_DROP)) || p.gmvPerHour < everMin);
-  });
-  return pts.slice(-count);
-}
-
-// ---------------------------------------------------------------------------
-// Chia target ca trong Kế Hoạch Tháng theo chỉ số khung (user chốt 2026-09-28)
-// ---------------------------------------------------------------------------
-
 type SlotLike = Pick<BrandMonthPlanSlot, "date" | "startTime" | "endTime">;
 
 export interface TargetWeightModel {
@@ -310,63 +264,3 @@ export function targetWeights(slots: SlotLike[], model: TargetWeightModel, bucke
 // ---------------------------------------------------------------------------
 // Soát kế hoạch tháng sau (chỉ cảnh báo, không ghi)
 // ---------------------------------------------------------------------------
-
-export interface PlanCheck {
-  target: number;
-  hours: number;
-  slots: number;
-  needPerHour: number | null;
-  /** GMV/giờ 28 ngày gần nhất tới ngày cuối có số. */
-  recentPerHour: number | null;
-  /** GMV dự kiến nếu năng suất như 28 ngày gần nhất (theo loại ngày × chỉ số khung/vị trí ngày). */
-  expectedAtRecent: number | null;
-  /** Đợt MM/Pay Day có target ngày 1 thấp hơn ngày 3 — ngược lịch sử. */
-  invertedCamps: { bucket: "midmonth" | "payday"; day1: number; day3: number }[];
-  weakHours: number; // giờ ngày thường ở khung 11–13h
-  strongHours: number; // giờ ngày thường ở khung 19–20h
-}
-
-export function planCheck(plan: Pick<BrandMonthPlanSlot, "date" | "startTime" | "endTime" | "targetGmv">[], sessions: LiveSession[], through: string | null, bucketOf: BucketOf, model: TargetWeightModel | null): PlanCheck | null {
-  if (plan.length === 0) return null;
-  const hours = plan.reduce((a, s) => a + sessionDurationHours(s.startTime, s.endTime), 0);
-  const target = plan.reduce((a, s) => a + (s.targetGmv || 0), 0);
-  let recentPerHour: number | null = null;
-  let expectedAtRecent: number | null = null;
-  if (through) {
-    const from = addDays(through, -27);
-    const recent = sessions.filter((s) => valid(s) && s.date >= from && s.date <= through);
-    // GMV trên GIỜ KẾ HOẠCH — vì nó được nhân với giờ kế hoạch của lưới tháng sau (audit 2026-09-28 mục 7). Chia cho
-    // giờ live thật rồi nhân giờ kế hoạch là trộn hai đơn vị: ca live ngắn hơn lịch ⇒ dự kiến bị thổi lên.
-    // Cùng cách với dự phóng Bản Tin CEO (projectionRates).
-    const h = recent.reduce((a, s) => a + sessionDurationHours(s.startTime, s.endTime), 0);
-    recentPerHour = h > 0 ? recent.reduce((a, s) => a + s.actualGmv, 0) / h : null;
-    if (model && recentPerHour) {
-      const rate = (camp: boolean) => {
-        const xs = recent.filter((s) => (bucketOf(s.date) === "daily") !== camp);
-        const hh = xs.reduce((a, s) => a + sessionDurationHours(s.startTime, s.endTime), 0);
-        return hh > 0 ? xs.reduce((a, s) => a + s.actualGmv, 0) / hh : recentPerHour!;
-      };
-      const m = { ...model, bucketRate: { daily: rate(false), dday: rate(true), midmonth: rate(true), payday: rate(true) } };
-      expectedAtRecent = targetWeights(plan, m, bucketOf).reduce((a, w) => a + w, 0);
-    }
-  }
-  const invertedCamps: PlanCheck["invertedCamps"] = [];
-  for (const b of ["midmonth", "payday"] as const) {
-    const ds = [...new Set(plan.filter((s) => bucketOf(s.date) === b).map((s) => s.date))].sort();
-    if (ds.length < 3) continue;
-    const t = (d: string) => plan.filter((s) => s.date === d).reduce((a, s) => a + (s.targetGmv || 0), 0);
-    if (t(ds[0]) < t(ds[2])) invertedCamps.push({ bucket: b, day1: t(ds[0]), day3: t(ds[2]) });
-  }
-  const dailyHours = (k: SlotBlock) => plan.filter((s) => bucketOf(s.date) === "daily" && slotBlock(s.startTime) === k).reduce((a, s) => a + sessionDurationHours(s.startTime, s.endTime), 0);
-  return {
-    target,
-    hours,
-    slots: plan.length,
-    needPerHour: hours > 0 && target > 0 ? target / hours : null,
-    recentPerHour,
-    expectedAtRecent,
-    invertedCamps,
-    weakHours: dailyHours("B"),
-    strongHours: dailyHours("D")
-  };
-}

@@ -133,42 +133,39 @@ test("Key Metrics: đủ 19 chỉ số (18 + AOV), chỉ số nào cũng có nh�
   expect(KEY_METRICS.filter((d) => d.group === "result")).toHaveLength(5);
 });
 
-test("Dashboard brand: Run-rate so target đứng TRƯỚC lưới Key Metrics", () => {
-  const src = readFileSync(join(SRC, "components/brand-workspace/BrandDashboard.tsx"), "utf8");
-  const runRate = src.indexOf('title="Run-rate so với target plan"');
-  // Bước 2 đa sàn: lưới đọc bộ chỉ số của sàn qua hồ sơ sàn (prof.metrics.defs).
-  const keyMetrics = src.indexOf('prof.metrics.defs.filter((d) => d.group === "result")');
-  expect(runRate).toBeGreaterThan(-1);
-  expect(keyMetrics).toBeGreaterThan(-1);
-  expect(runRate).toBeLessThan(keyMetrics);
-  // Không quay lại lưới phẳng 19 ô cùng cỡ.
+test("Dashboard brand: đầu tab là run-rate + 4 nút, Key Metrics đi sau và theo nút; workspace brand (ops) mở chính tab Brand", () => {
+  const src = readFileSync(join(SRC, "components/dashboard/period/BrandTab.tsx"), "utf8");
+  const head = src.indexOf("<RunRateHead "), lenses = src.indexOf('aria-label="Xem theo"'), km = src.indexOf("<KeyMetrics ");
+  expect(head).toBeGreaterThan(-1);
+  expect(head).toBeLessThan(lenses);
+  expect(lenses).toBeLessThan(km);
+  // Lưới đọc bộ chỉ số của sàn qua hồ sơ sàn, phân tầng — không lưới phẳng 19 ô cùng cỡ.
+  expect(src).toMatch(/prof\.metrics\.defs\.filter\(\(d\) => d\.group === "result"\)/);
   expect(src).not.toMatch(/\{(KEY_METRICS|prof\.metrics\.defs)\.map\(/);
+  // Gộp 23/10: không còn màn Chi tiết kênh riêng.
+  expect(readFileSync(join(SRC, "components/brand-workspace/BrandDashboard.tsx"), "utf8")).toMatch(/<AgencyDashboard[\s\S]*lockBrandId=\{p\.brand\.id\}/);
 });
 
 test("Dashboard agency: khối không tính được thì không chiếm chỗ ngang bằng ô có số", () => {
-  const board = readFileSync(join(SRC, "components/dashboard/ThisMonth.tsx"), "utf8");
-  // Bảng kết luận từng kênh: cột Target / Thiếu-dư / Run-rate chỉ dựng khi có kênh có target, và nói rõ khi nào hiện.
-  expect(board).toMatch(/\{anyTarget && <th/);
-  expect(board).toMatch(/Cột Target, Thiếu\/dư và Run-rate hiện khi OP chốt Kế Hoạch Tháng/);
-  // Kênh chưa chốt kế hoạch: một dòng "chờ chốt kế hoạch", không vẽ thanh run-rate rỗng.
-  expect(board).toMatch(/chờ chốt kế hoạch/);
-  // Ô tiền ở đầu màn chỉ dựng khi đã tính được ít nhất một ca (10/10 — trước đó 2 ô "Chưa tính được" chiếm chỗ).
-  const shell = readFileSync(join(SRC, "components/CeoBrief.tsx"), "utf8");
-  expect(shell).toMatch(/const showMoney = canSeeMoney && !!fin && fin\.priced > 0/);
-  // Tài chính: chưa tính được ca nào thì không dựng 6 ô KPI + 2 biểu đồ/bảng rỗng.
-  const fin = readFileSync(join(SRC, "components/dashboard/FinanceSection.tsx"), "utf8");
-  expect(fin).toMatch(/\{fin\.priced === 0 \? \(/);
+  // Viên nhãn (21/10): chưa chốt kế hoạch / kênh mới thì viên nói rõ, không vẽ dự báo rỗng.
+  const card = readFileSync(join(SRC, "components/dashboard/ChannelCardView.tsx"), "utf8");
+  expect(card).toMatch(/Chưa có target/);
+  expect(card).toMatch(/c\.newChannel \? "Chưa dự báo"/);
+  // Lãi gộp mỗi giờ (22/10): chưa tính được tiền ca nào thì không dựng khối (không ô "Chưa tính được" chiếm chỗ).
+  const ops = readFileSync(join(SRC, "components/dashboard/period/opsBlocks.tsx"), "utf8");
+  expect(ops).toMatch(/if \(!c \|\| c\.priced === 0\) return null;/);
 });
 
-test("Dashboard agency: mỗi kênh MỘT kết luận, không còn hàng Hôm qua/Hôm nay và bảng xếp host thô qua brand", () => {
-  const board = readFileSync(join(SRC, "components/dashboard/ThisMonth.tsx"), "utf8");
-  expect(board).toMatch(/<LandingChip keyName=\{v\.landing\.key\} \/>/);
-  expect(board).not.toMatch(/Dự phóng ÷ target/);
-  const health = readFileSync(join(SRC, "components/dashboard/Health.tsx"), "utf8");
-  // Host/trợ so mặt bằng trong CÙNG kênh (hostReliability), không xếp GMV/giờ thô qua brand.
-  expect(health).toMatch(/hostReliability\(xs, h\.bucketOf, "host"\)/);
-  expect(health).toMatch(/hostReliability\(xs, h\.bucketOf, "assistant"\)/);
-  for (const f of ["components/dashboard/ThisMonth.tsx", "components/dashboard/Health.tsx", "components/CeoBrief.tsx"]) {
+test("Dashboard agency: mỗi kênh MỘT kết luận (một thang nhãn kèm %), không còn hàng Hôm qua/Hôm nay và bảng xếp host thô qua brand", () => {
+  const card = readFileSync(join(SRC, "components/dashboard/ChannelCardView.tsx"), "utf8");
+  // 22/10: viên nói rõ con số là gì ("99% run-rate mà Khó đạt" đọc không hiểu) — vẫn MỘT thang nhãn kèm %.
+  expect(card).toMatch(/\$\{LANDING_LABEL\[c\.landing\.key\]\} · khả năng chạm target \$\{pct\(c\.landing\.pHit\)\}/);
+  expect(card).not.toMatch(/Dự phóng ÷ target|tiến độ/);
+  // Đội live tách vai (22/10): host xếp bằng chỉ số so với CHÍNH kênh (GMV/giờ kênh), trợ live chỉ ca + giờ — không xếp GMV/giờ thô qua brand.
+  const pc = readFileSync(join(SRC, "lib/performance/periodCompare.ts"), "utf8");
+  expect(pc).toMatch(/flatMap\(hostPortions\)/);
+  expect(pc).toMatch(/segmentsOfRole\(s, "co_host"\)/);
+  for (const f of ["components/AgencyDashboard.tsx", "components/dashboard/period/PlatformTab.tsx", "components/dashboard/period/BrandTab.tsx"]) {
     expect(readFileSync(join(SRC, f), "utf8"), f).not.toMatch(/"Hôm qua"|"Hôm nay"/);
   }
 });

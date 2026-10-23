@@ -24,7 +24,7 @@ test("đầu trang (PageHeader) không còn là một thẻ có viền/nền/bó
 });
 
 test("6 màn từng tự vẽ thẻ tiêu đề nay dùng PageHeader (để chế độ Tất cả kênh không lặp tiêu đề mỗi sàn)", () => {
-  for (const f of ["CeoBrief", "SessionLedger", "HostPerformance", "BrandsOverview", "ReportPublishBoard", "MonthPlan"]) {
+  for (const f of ["AgencyDashboard", "SessionLedger", "HostPerformance", "BrandsOverview", "ReportPublishBoard", "MonthPlan"]) {
     expect(read(`components/${f}.tsx`), f).toMatch(/<PageHeader\b/);
   }
 });
@@ -98,30 +98,28 @@ test("ô KPI: một component chung StatTile, nhãn chữ thường (trước: ~
   const OLD: [string, RegExp][] = [
     ["components/SessionLedger.tsx", /const Stat: React\.FC/],
     ["components/OpsBoard.tsx", /const Stat: React\.FC/],
-    ["components/brand-workspace/BrandDashboard.tsx", /const Stat: React\.FC/],
-    ["components/runrate/AccountDetail.tsx", /const Stat: React\.FC/],
-    ["components/AgencyChannelSummary.tsx", /function Tile\(/]
+    ["components/dashboard/period/brandBelow.tsx", /const Stat: React\.FC/]
   ];
   for (const [f, re] of OLD) {
     const src = read(f);
     expect(src, f).not.toMatch(re);
     expect(src, f).toMatch(/<StatTile\b/);
   }
-  for (const f of ["components/dashboard/shared.tsx", "components/dashboard/AgencyHealth.tsx", "components/brand-workspace/BrandWeeklyReport.tsx", "components/BrandRateCard.tsx", "components/brand-workspace/BrandCommitmentView.tsx", "components/brand-workspace/ShopeeAdsPanel.tsx", "components/ForecastTrainingCard.tsx"]) {
+  for (const f of ["components/dashboard/period/PlatformTab.tsx", "components/dashboard/period/brandBelow.tsx", "components/brand-workspace/BrandWeeklyReport.tsx", "components/BrandRateCard.tsx", "components/brand-workspace/BrandCommitmentView.tsx", "components/brand-workspace/ShopeeAdsPanel.tsx", "components/ForecastTrainingCard.tsx"]) {
     expect(read(f), f).toMatch(/<StatTile\b/);
   }
 });
 
 test("không còn chữ viết hoa bằng CSS ở các màn có ô KPI, Dashboard, Report Tháng và AI Training", () => {
   const FILES = [
-    "components/SessionLedger.tsx", "components/OpsBoard.tsx", "components/OpsSupport.tsx", "components/CeoBrief.tsx",
-    "components/AgencyChannelSummary.tsx", "components/BrandRateCard.tsx", "components/runrate/AccountDetail.tsx",
+    "components/SessionLedger.tsx", "components/OpsBoard.tsx", "components/OpsSupport.tsx",
+    "components/AgencyDashboard.tsx", "components/BrandRateCard.tsx", "components/dashboard/period/BrandTab.tsx", "components/dashboard/period/brandExtras.tsx",
     "components/brand-workspace/BrandDashboard.tsx", "components/brand-workspace/BrandWeeklyReport.tsx",
     "components/brand-workspace/BrandCommitmentView.tsx", "components/brand-workspace/ShopeeAdsPanel.tsx",
     "components/brand-workspace/MonthlyReportTabs.tsx", "components/brand-workspace/report/ui.tsx",
     "components/brand-workspace/report/HostPerformancePanel.tsx",
     "components/AiTrainingCenter.tsx", "components/EngineTrainingPanel.tsx", "components/ForecastTrainingCard.tsx", "components/AllocationTrainingCard.tsx",
-    ...readdirSync(join(SRC, "components/dashboard")).map((f) => `components/dashboard/${f}`)
+    ...["components/dashboard", "components/dashboard/period"].flatMap((d) => readdirSync(join(SRC, d), { withFileTypes: true }).filter((f) => f.isFile()).map((f) => `${d}/${f.name}`))
   ];
   const hits = FILES.filter((f) => /\buppercase\b|toUpperCase\(\)/.test(read(f)));
   expect(hits).toEqual([]);
@@ -157,14 +155,11 @@ test("chữ viết hoa bằng CSS toàn app: chỉ còn chỗ nhận diện cố
 });
 
 test("Dashboard: mốc \"Số đủ tới\" nói MỘT chỗ (bỏ viên ở đầu trang lặp đúng dải/dòng ngay dưới)", () => {
-  // Agency: dải TrustStrip của phần Tháng này; Sức khoẻ có cột "Số đủ tới" theo từng kênh.
-  expect(read("components/CeoBrief.tsx")).not.toMatch(/Số đủ tới/);
-  expect(read("components/dashboard/ThisMonth.tsx")).toMatch(/`Số đủ tới \$\{ddmm\(c\.completeThrough\)\}`/);
-  // Brand: dòng phụ của thẻ "Tóm tắt tháng" (kèm "Trễ N ngày"), đầu trang chỉ còn bộ chọn tháng.
-  const bd = read("components/brand-workspace/BrandDashboard.tsx");
-  expect(bd).not.toMatch(/Số đủ tới \{/);
-  expect(bd).toMatch(/actions=\{<MonthPicker value=\{month\} onChange=\{setPickedMonth\} ariaLabel="Tháng" \/>\}/);
-  expect(bd).toMatch(/ngày cuối mà ít nhất 90% giờ ca đã có số\.\{lagDays > 1 &&/);
+  // Agency (22/10): dòng trạng thái dưới thanh chọn kỳ — hai tab không lặp lại.
+  expect(read("components/AgencyDashboard.tsx").match(/Số đủ tới/g)).toHaveLength(1);
+  for (const f of ["PlatformTab", "BrandTab", "brandBelow", "opsBlocks"]) expect(read(`components/dashboard/period/${f}.tsx`), f).not.toMatch(/Số đủ tới/);
+  // Workspace brand (ops) = chính tab Brand (23/10) — không có dòng riêng.
+  expect(read("components/brand-workspace/BrandDashboard.tsx")).not.toMatch(/Số đủ tới/);
 });
 
 test("Report Tháng: khung ngoài không viền, ô số trong Panel không khung, khối gập không bọc hộp", () => {

@@ -1,6 +1,5 @@
 import { BrandMonthPlan, BrandMonthPlanSlot, LiveSession, ShiftSlot } from "../types";
-import { EngineParams } from "./scheduling/engineParams";
-import { CalendarEvent, DateRange, HistorySummary, SuggestResult, SuggestedSlot, cellsForWindow, estimateSlots, suggestMonthPlan } from "./scheduling/suggestEngine";
+import { CalendarEvent, DateRange, HistorySummary, cellsForWindow, estimateSlots } from "./scheduling/suggestEngine";
 import { sessionHours } from "./performance/hostPerformance";
 import { sessionDurationHours } from "./pnl";
 import type { PlanRunRate } from "./performance/planRunRate";
@@ -125,55 +124,6 @@ export function trackMonth(rr: PlanRunRate, history: HistorySummary, ctx: Estima
     avgActualDone: done.length > 0 ? actualDone / done.length : 0,
     upliftPct: pending.length > 0 && forecastPending > 0 ? (remainingToTarget - forecastPending) / forecastPending : null
   };
-}
-
-export interface FillPlan {
-  result: SuggestResult;
-  extraSlots: SuggestedSlot[];
-  extraHours: number;
-  coversGap: boolean;
-}
-
-// Phương án bù giờ: engine chế độ target với TOÀN BỘ ca kế hoạch là ca cố định, target = dự báo engine
-// của lưới + phần thiếu (quy về thang engine bằng k) → ca xếp thêm chính là ca cần bù. Chỉ xếp từ hôm
-// nay trở đi (engine tự lọc).
-export function suggestFill(
-  tracking: MonthTracking,
-  history: HistorySummary,
-  plan: BrandMonthPlan,
-  month: string,
-  today: string,
-  ctx: EstimateCtx,
-  params: EngineParams
-): FillPlan | null {
-  if (tracking.gap <= 0 || history.brandGmvPerHour <= 0) return null;
-  const k = tracking.realityFactor ?? 1;
-  const fixed = tracking.slots.filter((t) => t.state !== "cancelled").map((t) => ({ date: t.planSlot.date, startTime: t.planSlot.startTime, endTime: t.planSlot.endTime }));
-  const forecastFixed = tracking.slots.filter((t) => t.state !== "cancelled").reduce((a, t) => a + t.forecast, 0);
-  const result = suggestMonthPlan(history, {
-    month,
-    today,
-    params,
-    committedHours: 0,
-    targetGmv: forecastFixed + tracking.gap / (k > 0 ? k : 1),
-    mode: "target",
-    // Khung camp hiệu lực do caller tính (effectiveCamp) — không đọc thẳng plan.campRanges (audit workflow #8).
-    camp: ctx.camp ?? plan.campRanges,
-    liveWindowStart: plan.liveWindowStart,
-    liveWindowEnd: plan.liveWindowEnd,
-    defaultSlotHours: plan.defaultSlotHours,
-    maxSlotsPerDay: plan.maxSlotsPerDay,
-    blackoutDates: plan.blackoutDates,
-    fixedSlots: fixed,
-    events: ctx.events,
-    schemes: ctx.schemes,
-    calibration: ctx.calibration,
-    strategy: "max"
-  });
-  const fixedKeys = new Set(fixed.map((f) => `${f.date}|${f.startTime}|${f.endTime}`));
-  const extraSlots = result.slots.filter((sl) => !fixedKeys.has(`${sl.date}|${sl.startTime}|${sl.endTime}`));
-  if (extraSlots.length === 0) return null;
-  return { result, extraSlots, extraHours: extraSlots.reduce((a, sl) => a + sl.hours, 0), coversGap: result.hoursToHitTarget !== null };
 }
 
 // ============ Benchmark cho ca sắp live ============

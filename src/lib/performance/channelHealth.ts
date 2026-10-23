@@ -6,7 +6,6 @@ import { METRIC } from "../metricGlossary";
 import { fmtVndShort } from "../format";
 import type { MetricTotals, PlatformMetricSet } from "../platforms/profiles";
 import { assertOnePlatform } from "../platforms/perf";
-import { dataSourceTier } from "../dataSource";
 import { effectiveSegments } from "../staffSegments";
 import { isCountable, sessionHours } from "./hostPerformance";
 import { landingOf, LANDING_LABEL, type Landing } from "./forecastCone";
@@ -177,24 +176,6 @@ export function likeForLike(
     cur: sessions.filter((s) => pairs.has(s.date) && isCountable(s)),
     prev: sessions.filter((s) => prevSet.has(s.date) && isCountable(s))
   };
-}
-
-/** Nhiều kênh cùng sàn: ghép ngày theo khung camp của TỪNG kênh rồi gộp ca (chỉ để cộng số vận hành/GMV trong một sàn). */
-export function likeForLikeMany(
-  channels: { sessions: LiveSession[]; bucketCur: (d: string) => CampDayBucket }[],
-  month: string,
-  through: string | null
-): { cur: LiveSession[]; prev: LiveSession[]; prevByCurDay: Map<string, LiveSession[]> } {
-  const cur: LiveSession[] = [], prev: LiveSession[] = [];
-  // Ngày tháng này → ca của ngày cùng loại tháng trước (mỗi kênh ghép theo khung của nó) — đường so sánh của biểu đồ nhỏ.
-  const prevByCurDay = new Map<string, LiveSession[]>();
-  for (const c of channels) {
-    const l = likeForLike(c.sessions, month, through, c.bucketCur);
-    cur.push(...l.cur);
-    prev.push(...l.prev);
-    for (const [cd, pd] of l.pairs) prevByCurDay.set(cd, [...(prevByCurDay.get(cd) ?? []), ...l.prev.filter((s) => s.date === pd)]);
-  }
-  return { cur, prev, prevByCurDay };
 }
 
 export interface TreePart {
@@ -404,41 +385,6 @@ export function channelVerdict(x: {
 // 6. Kỷ luật dữ liệu
 // ---------------------------------------------------------------------------
 
-/** Giờ tối đa có thể có trong một tháng (31 × 24) — cam kết vượt mức này chắc chắn là gõ nhầm ô. */
-export const MAX_MONTH_HOURS = 744;
-
-export interface DataDisciplineRow {
-  /** Ca chờ số lâu nhất đã chờ bao nhiêu ngày (hôm nay − ngày của ca). 0 = không có ca nào chờ. */
-  lagDays: number;
-  missingSessions: number;
-  /** Phần ca có số mà số còn là khai tay (bậc "manual" — "Tạm tính"), chưa qua file giao ca hay đối soát. */
-  manualShare: number | null;
-  errors: string[];
-}
-
-export function dataDiscipline(x: {
-  coverage: DataCoverage;
-  today: string;
-  monthSessions: LiveSession[];
-  commitmentHours?: number | null;
-  planTarget?: number | null;
-  planSlotSum?: number | null;
-}): DataDisciplineRow {
-  const lagDays = x.coverage.oldestMissing ? Math.max(0, Math.round((Date.parse(`${x.today}T00:00:00Z`) - Date.parse(`${x.coverage.oldestMissing}T00:00:00Z`)) / 86400000)) : 0;
-  const withData = x.monthSessions.filter((s) => isCountable(s) && !s.isBackfill);
-  const manual = withData.filter((s) => dataSourceTier(s) === "manual").length;
-  const errors: string[] = [];
-  if (x.commitmentHours != null && x.commitmentHours > MAX_MONTH_HOURS)
-    errors.push(`Cam kết giờ = ${Math.round(x.commitmentHours).toLocaleString("vi-VN")} giờ (một tháng tối đa ${MAX_MONTH_HOURS}) — có thể đã gõ số GMV vào ô giờ`);
-  if (x.planTarget != null && x.planSlotSum != null && x.planTarget > 0 && Math.abs(x.planTarget - x.planSlotSum) > Math.max(1000, x.planTarget * 0.001))
-    errors.push(`Target tháng ${fmtVndShort(x.planTarget)} khác tổng target ca ${fmtVndShort(x.planSlotSum)}`);
-  return { lagDays, missingSessions: x.coverage.missingSessions, manualShare: withData.length ? manual / withData.length : null, errors };
-}
-
-// ---------------------------------------------------------------------------
-// 7. Tải người (số vận hành — cộng được qua hai sàn: một người là một người)
-// ---------------------------------------------------------------------------
-
 export interface PersonLoad {
   talentId: string;
   name: string;
@@ -497,64 +443,3 @@ export function peopleLoad(sessions: LiveSession[], from: string, to: string, ch
 export type RunRateTone = "good" | "warn" | "bad" | "none";
 /** Màu của một run-rate theo ngưỡng chung của app (85% / 95%). */
 export const runRateTone = (v: number | null): RunRateTone => (v == null ? "none" : v >= RUN_RATE_WARN ? "good" : v >= RUN_RATE_BAD ? "warn" : "bad");
-
-export interface WaveRunRate {
-  key: "month" | CampDayBucket;
-  label: string;
-  days: string[];
-  target: number;
-  targetToDate: number;
-  actual: number;
-  runRate: number | null;
-  /** "waiting" = theo lịch đợt đã bắt đầu/đã qua nhưng chưa có ngày nào đủ số (trước đây bị gọi "sắp tới" — Mid-Month
-   *  13–15/10 vẫn hiện "sắp tới" ngày 17/10 vì số chỉ đủ tới 12/10). */
-  state: "done" | "live" | "next" | "waiting";
-  /** Đợt chưa tới / chờ số: GMV dự phóng của các ca trong lịch. */
-  forecast: number | null;
-  /** Theo LỊCH đợt đã hết (mọi ngày < hôm nay) — "live" mà lịch đã hết nghĩa là còn ca chờ số, không phải đang chạy. */
-  calendarDone?: boolean;
-}
-
-/** Cùng luật planRunRate (target theo ca kế hoạch đã chốt, ca huỷ giữ target) — chỉ đổi mốc cắt sang ngày đủ số. */
-export function runRateByWave(
-  o: Pick<MonthOutlook, "month" | "target" | "actualByDate" | "buckets">,
-  through: string | null,
-  /**
-   * Chế độ "tới ca mới nhất" (planRunRate.runRateLive): `expectedByDate` = mẫu số theo ngày thay cho target cả ngày;
-   * `completeThrough` = mốc đủ số — đợt chỉ "xong" khi ngày cuối ≤ mốc này (ngày hôm nay mới có vài ca thì đợt vẫn đang chạy).
-   */
-  live?: { expectedByDate: Map<string, number>; completeThrough: string | null }
-): WaveRunRate[] {
-  const expectedByDate = live?.expectedByDate;
-  const doneAt = (lastDay: string) => (live ? live.completeThrough != null && lastDay <= live.completeThrough : through != null && lastDay <= through);
-  if (!o.target) return [];
-  const t = o.target;
-  const line = (days: string[]) => {
-    let target = 0, targetToDate = 0, actual = 0;
-    for (const d of days) {
-      const v = t.byDate.get(d) ?? 0;
-      target += v;
-      if (through && d <= through) {
-        targetToDate += expectedByDate ? expectedByDate.get(d) ?? 0 : v;
-        actual += o.actualByDate.get(d) ?? 0;
-      }
-    }
-    return { target, targetToDate, actual, runRate: targetToDate > 0 ? actual / targetToDate : null };
-  };
-  const all = eachDay(`${o.month}-01`, monthEndOf(`${o.month}-01`));
-  const month: WaveRunRate = { key: "month", label: `Cả tháng ${Number(o.month.slice(5))}`, days: all, ...line(all), state: doneAt(all[all.length - 1]) ? "done" : "live", forecast: null };
-  const waves = o.buckets
-    .filter((b) => b.days.length > 0 && b.target != null && b.target > 0)
-    .map((b): WaveRunRate => {
-      const l = line(b.days);
-      const state: WaveRunRate["state"] = doneAt(b.days[b.days.length - 1])
-        ? "done"
-        : through && b.days[0] <= through
-          ? "live"
-          : b.status === "next"
-            ? "next"
-            : "waiting";
-      return { key: b.bucket, label: WAVE_NAME[b.bucket], days: b.days, ...l, state, forecast: state === "next" || state === "waiting" ? b.forecast : null, calendarDone: b.status === "done" };
-    });
-  return [month, ...waves];
-}

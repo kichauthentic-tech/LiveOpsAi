@@ -1,10 +1,8 @@
 import type { LiveSession } from "../../types";
 import { eachDay, isoWeekStart } from "../dateUtils";
 import type { CampDayBucket } from "../campaignDays";
-import { assertOnePlatform } from "../platforms/perf";
 import { monthEndOf, RUN_RATE_BAD, RUN_RATE_WARN } from "./ceoBrief";
 import { runRateTone, WAVE_NAME, type RunRateTone } from "./channelHealth";
-import { isCountable } from "./hostPerformance";
 import { noDataSplit, runRateLive, type PlanRunRate, type PlanSlotState } from "./planRunRate";
 import { dataSourceTier } from "../dataSource";
 
@@ -318,12 +316,6 @@ function tailOf(rr: PlanRunRate, asOf: string | null, completeThrough: string | 
   return { shifts, unreconciled, lastShift };
 }
 
-/** Tài khoản chưa có kế hoạch chốt: chỉ có số đã đạt trong tháng (không có target ⇒ không có run-rate). */
-export function monthActualOf(channelSessions: LiveSession[], month: string, upTo: string): number {
-  assertOnePlatform(channelSessions, "monthActualOf");
-  return channelSessions.filter((s) => s.date.startsWith(month) && s.date <= upTo && isCountable(s)).reduce((a, s) => a + (s.actualGmv ?? 0), 0);
-}
-
 // ---------------------------------------------------------------------------
 // Nhãn kết luận — cùng ngưỡng 85% / 95% với mọi màn (RUN_RATE_BAD / RUN_RATE_WARN)
 // ---------------------------------------------------------------------------
@@ -356,6 +348,10 @@ export interface ExportAccount {
   missing?: "no_plan" | "no_data";
   /** Số đã đạt trong tháng khi chưa có target. */
   actualOnly?: number;
+  /** Dự báo cuối tháng của thẻ kênh — cùng số với màn hình (Dashboard 22/10: cuối tháng chỉ có MỘT số, không xuất "giữ nhịp"). */
+  forecast?: number | null;
+  /** Nhãn khả năng đạt kèm %, vd "Có thể đạt · 62%". */
+  landing?: string | null;
 }
 
 const STATUS_LABEL: Record<WaveStatus, string> = { done: "đã xong", live: "đang chạy", next: "sắp tới" };
@@ -385,9 +381,9 @@ export function runRateExportSheets(accounts: ExportAccount[]): { name: string; 
       "Thực đạt": round(r?.total.actual ?? a.actualOnly ?? null),
       "Run-rate (%)": pctNum(r?.total.runRate ?? null),
       "% target tháng": pctNum(r?.total.pctTarget ?? null),
-      "Giữ nhịp → cuối tháng": round(r?.total.keepPace ?? null),
+      "Dự kiến cuối tháng": round(a.forecast ?? null),
       "Cần mỗi ngày còn lại": round(r?.total.needPerRemainingDay ?? null),
-      "Ghi chú": r ? runRateVerdict(r.total.runRate).label : a.missing === "no_plan" ? "Chưa chốt Kế Hoạch Tháng" : "Tháng này chưa có số"
+      "Ghi chú": r ? a.landing ?? "" : a.missing === "no_plan" ? "Chưa chốt Kế Hoạch Tháng" : "Tháng này chưa có số"
     };
   });
   const waves: Row[] = withReport.flatMap((a) =>

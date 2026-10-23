@@ -29,7 +29,6 @@ export function resolveChannelScope(choice: ChannelScope, single: ReportPlatform
 
 export const inChannelScope = (s: { platform?: string | null }, scope: ChannelScope) => scope === "all" || platformOf(s) === scope;
 
-export const PLATFORM_SCOPE_LABEL: Record<PlatformScope, string> = { TikTok: "TikTok", Shopee: "Shopee" };
 
 /** Sàn của một dòng (ca, ca mở, kế hoạch…). Dòng cũ thiếu cột sàn = TikTok. */
 export const platformOf = (x: { platform?: string | null }): ReportPlatform =>

@@ -3,19 +3,27 @@ import { AlertTriangle, CalendarRange, Target } from "lucide-react";
 import { runRateVerdict } from "../../lib/performance/runRateUpdate";
 import { BrandLogo } from "../ui/BrandLogo";
 import { PlatformChip } from "../common/PlatformChip";
+import { CardPill, TONE_FILL } from "../dashboard/ChannelCardView";
 import { chartColor, ddmm, money, pct } from "../dashboard/shared";
-import { PctBar, TONE_VAR, TonePill } from "./parts";
+import { PctBar, TONE_VAR } from "./parts";
 import type { AccountVM } from "./types";
 
 const tabular = "tabular-nums";
 
+/** Màu của số run-rate. Dashboard (có thẻ kênh): đúng màu viên nhãn khả năng đạt — backtest 14/10 run-rate ≥ 95% mà khả năng < 50%
+ *  chỉ 17% đạt target, nên tô xanh theo run-rate sẽ nói ngược viên nhãn ngay cạnh; kênh chưa có dự báo thì trung tính. */
+export const colorOfAccount = (vm: AccountVM): string | undefined =>
+  vm.card ? (vm.card.landing ? TONE_FILL[vm.card.landing.key] : "var(--text-faint)") : undefined;
+
 // Có ca đã vào run-rate nằm sau ngày đủ số (tính theo từng ca) — số có thể còn đổi khi ca được đối soát.
 export const isTentative = (a: AccountVM) => (a.report?.tail.shifts ?? 0) > 0;
 
-export const AccountCard: React.FC<{ vm: AccountVM; selected: boolean; onSelect: () => void; onOpenMonthPlan: (brandId: string, platform: AccountVM["platform"]) => void }> = ({ vm, selected, onSelect, onOpenMonthPlan }) => {
+export const AccountCard: React.FC<{ vm: AccountVM; selected: boolean; onSelect: () => void; onOpenMonthPlan: (brandId: string, platform: AccountVM["platform"]) => void; compare?: React.ReactNode }> = ({ vm, selected, onSelect, onOpenMonthPlan, compare }) => {
   const r = vm.report;
   const color = chartColor(vm.brand.name);
   const v = runRateVerdict(r?.total.runRate ?? null);
+  const fill = colorOfAccount(vm);
+  const card = vm.card;
   const base = `group relative text-left rounded-2xl border bg-[var(--surface)] p-4 flex flex-col gap-3 min-w-0 transition-all overflow-hidden ${selected ? "border-[var(--accent)] ring-1 ring-[var(--accent)] shadow-lg" : "border-[var(--border)] hover:border-[var(--text-faint)]"}`;
   const head = (
     <div className="flex items-center gap-2.5 min-w-0">
@@ -67,25 +75,25 @@ export const AccountCard: React.FC<{ vm: AccountVM; selected: boolean; onSelect:
       </div>
       <div className="flex items-end justify-between gap-2">
         <div>
-          <div className={`text-4xl font-black leading-none ${tabular}`} style={{ color: TONE_VAR[v.tone] }}>{t.runRate == null ? "—" : Math.round(t.runRate * 100)}<span className="text-lg text-[var(--text-muted)] font-extrabold">{t.runRate == null ? "" : "%"}</span></div>
-          <div className="text-[11px] text-[var(--text-faint)] mt-1">run-rate{r.asOf ? ` · số tới ${ddmm(r.asOf)}` : ""}</div>
+          <div className={`text-4xl font-black leading-none ${tabular}`} style={{ color: vm.card && !vm.card.landing ? "var(--text)" : fill ?? TONE_VAR[v.tone] }}>{t.runRate == null ? "—" : Math.round(t.runRate * 100)}<span className="text-lg text-[var(--text-muted)] font-extrabold">{t.runRate == null ? "" : "%"}</span></div>
+          <div className="text-[11px] text-[var(--text-faint)] mt-1">run-rate theo kế hoạch{r.asOf ? ` · số tới ${ddmm(r.asOf)}` : ""}</div>
         </div>
-        <TonePill tone={v.tone}>{v.label}</TonePill>
+        {card && <CardPill card={card} />}
       </div>
-      <PctBar value={t.runRate} tone={v.tone} label={`Run-rate ${vm.name}: ${pct(t.runRate)}`} />
+      <PctBar value={t.runRate} tone={v.tone} color={fill} label={`Run-rate ${vm.name}: ${pct(t.runRate)}`} />
       <dl className="grid grid-cols-2 gap-x-3 text-xs">
-        <div><dt className="text-[var(--text-faint)]">Đạt</dt><dd className={`font-bold text-[var(--text)] ${tabular}`}>{money(t.actual)}</dd></div>
-        <div><dt className="text-[var(--text-faint)]">Kỳ vọng tới nay</dt><dd className={`font-bold text-[var(--text-muted)] ${tabular}`}>{money(t.targetToDate)}</dd></div>
+        <div><dt className="text-[var(--text-faint)]">Đã đạt</dt><dd className={`font-bold text-[var(--text)] ${tabular}`}>{money(t.actual)}{t.target ? <span className="font-normal text-[var(--text-faint)]"> · {pct(t.actual / t.target)} target tháng</span> : null}</dd></div>
+        <div><dt className="text-[var(--text-faint)]">Kế hoạch tới nay</dt><dd className={`font-bold text-[var(--text-muted)] ${tabular}`}>{money(t.targetToDate)}{t.target ? <span className="font-normal text-[var(--text-faint)]"> · {pct(t.targetToDate / t.target)}</span> : null}</dd></div>
       </dl>
       <div className="border-t border-[var(--border-muted)] pt-2.5 space-y-1 text-xs text-[var(--text-muted)]">
         <div className="flex items-center justify-between gap-2">
           <span className="inline-flex items-center gap-1.5"><Target className="w-3.5 h-3.5 text-[var(--text-faint)] shrink-0" />Target tháng</span>
           <b className={`text-[var(--text)] ${tabular}`}>{money(t.target)}</b>
         </div>
-        {t.keepPace != null && (
+        {card && (
           <div className="flex items-center justify-between gap-2">
-            <span className="pl-5">Giữ nhịp → cuối tháng</span>
-            <b className={`text-[var(--text)] ${tabular}`}>~{money(t.keepPace)}</b>
+            <span className="pl-5">Dự kiến cuối tháng</span>
+            {card.forecast ? <b className={`text-[var(--text)] ${tabular}`}>~{money(card.forecast.p50)}{t.target ? <span className="font-normal text-[var(--text-faint)]"> · {pct(card.forecast.p50 / t.target)}</span> : null}</b> : <span className="text-[var(--text-faint)]">{card.newChannel ? "kênh mới, chưa dự báo" : "chưa chiếu được"}</span>}
           </div>
         )}
       </div>
@@ -95,6 +103,7 @@ export const AccountCard: React.FC<{ vm: AccountVM; selected: boolean; onSelect:
           <span>{vm.missingSessions} ca đã chạy chưa có số{vm.oldestMissing ? ` (cũ nhất ${ddmm(vm.oldestMissing)})` : ""}</span>
         </div>
       )}
+      {compare && <div className="border-t border-[var(--border-muted)] pt-2 text-[11px] text-[var(--text-faint)] leading-snug">{compare}</div>}
     </button>
   );
 };

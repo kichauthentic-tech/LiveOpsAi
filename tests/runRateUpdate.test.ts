@@ -2,7 +2,7 @@
 // Chạy: npx vitest run tests/runRateUpdate.test.ts
 import { describe, expect, test } from "vitest";
 import { planRunRate } from "../src/lib/performance/planRunRate";
-import { buildAccountRunRate, monthActualOf, resolveAsOf, runRateExportSheets, runRateVerdict } from "../src/lib/performance/runRateUpdate";
+import { buildAccountRunRate, resolveAsOf, runRateExportSheets, runRateVerdict } from "../src/lib/performance/runRateUpdate";
 import type { BrandMonthPlanSlot, LiveSession, ShiftSlot } from "../src/types";
 
 let seq = 0;
@@ -147,26 +147,20 @@ describe("runRateVerdict — ngưỡng 85% / 95% dùng chung", () => {
   });
 });
 
-describe("monthActualOf", () => {
-  test("cộng ca có số của MỘT kênh tới ngày chỉ định; từ chối mảng lẫn hai sàn", () => {
-    const { sessions } = example();
-    expect(monthActualOf(sessions, "2026-10", "2026-10-05")).toBe(270e6);
-    expect(() => monthActualOf([...sessions, ca("2026-10-02", 1, { platform: "Shopee" })], "2026-10", "2026-10-05")).toThrow();
-  });
-});
-
 describe("runRateExportSheets", () => {
   const report = buildAccountRunRate(rrOf(), "2026-10-06");
 
   test("4 sheet, mỗi dòng thuộc một tài khoản, không dòng tổng gộp", () => {
     const sheets = runRateExportSheets([
-      { name: "CROCS", platform: "TikTok", report },
+      { name: "CROCS", platform: "TikTok", report, forecast: 480e6, landing: "Có thể đạt · 62%" },
       { name: "JOCKEY · Shopee", platform: "Shopee", report: null, missing: "no_plan", actualOnly: 120e6 }
     ]);
     expect(sheets.map((s) => s.name)).toEqual(["Tổng quan", "Theo đợt", "Theo ngày", "Theo ca"]);
     const [overview, , , shifts] = sheets;
     expect(overview.rows).toHaveLength(2);
-    expect(overview.rows[0]).toMatchObject({ "Tài khoản": "CROCS", "Số tới ngày": "2026-10-06", "Target tháng": 500e6, "Thực đạt": 350e6, "Run-rate (%)": 87.5 });
+    expect(overview.rows[0]).toMatchObject({ "Tài khoản": "CROCS", "Số tới ngày": "2026-10-06", "Target tháng": 500e6, "Thực đạt": 350e6, "Run-rate (%)": 87.5, "Dự kiến cuối tháng": 480e6, "Ghi chú": "Có thể đạt · 62%" });
+    // Cuối tháng một số (dự báo thẻ kênh) — không còn cột "giữ nhịp" ra số thứ hai.
+    expect(Object.keys(overview.rows[0]).some((k) => /Giữ nhịp/.test(k))).toBe(false);
     expect(overview.rows[1]).toMatchObject({ "Tài khoản": "JOCKEY · Shopee", "Thực đạt": 120e6, "Run-rate (%)": "", "Ghi chú": "Chưa chốt Kế Hoạch Tháng" });
     expect(shifts.rows).toHaveLength(5);
     expect(shifts.rows.every((r) => r["Tài khoản"] === "CROCS")).toBe(true);

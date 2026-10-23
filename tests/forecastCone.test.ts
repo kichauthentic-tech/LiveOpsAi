@@ -1,7 +1,7 @@
 // Dải tin cậy dự phóng + khả năng đạt target + phương án xử lý (lib/performance/forecastCone.ts, handlingPlan.ts).
 // Chạy: npx vitest run tests/forecastCone.test.ts
 import { describe, expect, test } from "vitest";
-import { combineCones, coneOf, coneHalf, forecastFlags, landingOf, normalCdf, CONE_COEF } from "../src/lib/performance/forecastCone";
+import { coneHalf, landingOf, normalCdf } from "../src/lib/performance/forecastCone";
 import { dayElasticity, handlingPlan } from "../src/lib/performance/handlingPlan";
 import { monthOutlook, monthTargetOf } from "../src/lib/performance/ceoBrief";
 import { addDays } from "../src/lib/dateUtils";
@@ -44,26 +44,6 @@ describe("normalCdf", () => {
   });
 });
 
-describe("coneOf — dải rộng dần theo phần còn lại", () => {
-  test("cuối dải = 35% phần dự phóng còn lại; ngày cuối có số dải bằng 0", () => {
-    const { o } = scenario();
-    const c = coneOf(o);
-    const first = c.points[0], last = c.points[c.points.length - 1];
-    expect(first.hi - first.lo).toBe(0);
-    expect(last.mid).toBeCloseTo(o.projected, 0);
-    expect(CONE_COEF).toBe(0.35); // user chốt 09/10 — đổi hệ số = chạy lại backtest 13 kênh-tháng
-    expect(last.hi - last.mid).toBeCloseTo(0.35 * (o.projected - o.actual), 0);
-    expect(c.hi - c.lo).toBeCloseTo(2 * coneHalf(o.actual, o.projected), 0);
-    // đơn điệu: càng xa càng rộng
-    const widths = c.points.map((p) => p.hi - p.lo);
-    for (let i = 1; i < widths.length; i++) expect(widths[i]).toBeGreaterThanOrEqual(widths[i - 1] - 1e-6);
-  });
-  test("không chiếu theo giờ (không còn ca) ⇒ không có dải", () => {
-    const { o } = scenario({ futureDays: 0 });
-    expect(coneOf(o).points).toEqual([]);
-  });
-});
-
 describe("landingOf — khả năng đạt target", () => {
   test("dự phóng đúng bằng target ⇒ ~50%", () => {
     const { o } = scenario();
@@ -93,31 +73,6 @@ describe("landingOf — khả năng đạt target", () => {
     const done = { actual: 100, projected: 100, projectionMethod: "gmv_per_hour" as const };
     expect(landingOf({ ...done, target: { total: 90, byDate: new Map() } }).pHit).toBe(1);
     expect(landingOf({ ...done, target: { total: 110, byDate: new Map() } }).pHit).toBe(0);
-  });
-});
-
-describe("combineCones — các kênh độc lập cộng theo căn bậc hai", () => {
-  test("hai kênh bằng nhau ⇒ nửa dải = √2 × một kênh, nhỏ hơn cộng thẳng", () => {
-    const a = { actual: 100, projected: 300 };
-    const c = combineCones([a, a]);
-    expect(c.projected).toBe(600);
-    expect(c.half).toBeCloseTo(Math.SQRT2 * coneHalf(100, 300), 6);
-    expect(c.half).toBeLessThan(2 * coneHalf(100, 300));
-  });
-});
-
-describe("forecastFlags", () => {
-  test("ca mở chiếm ≥ 10% phần còn lại và ca đã chạy chưa có số đều được gắn cờ", () => {
-    const { o } = scenario({ extraOpen: 5 });
-    const past = { ...o, pending: [...o.pending, { date: "2026-09-08", hours: 3, forecast: 30_000_000, kind: "session" as const, bucket: "daily" as const }] };
-    const flags = forecastFlags(past, "2026-09-10");
-    expect(flags.some((f) => /chưa có số/.test(f.text))).toBe(true);
-    expect(flags.some((f) => /ca mở chưa có người/.test(f.text))).toBe(true);
-  });
-  test("không chiếu được ⇒ cờ cảnh báo duy nhất", () => {
-    const flags = forecastFlags({ pending: [], rates: null, projectionMethod: "none", actual: 0, projected: 0 }, "2026-09-10");
-    expect(flags).toHaveLength(1);
-    expect(flags[0].level).toBe("warn");
   });
 });
 

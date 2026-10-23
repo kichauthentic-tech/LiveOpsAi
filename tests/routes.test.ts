@@ -15,6 +15,11 @@ test("agency: tab ↔ link hai chiều", () => {
   expect(parsePath("/ke-hoach-thang/")).toEqual({ type: "agency", tab: "month_plan" });
 });
 
+test("link /run-rate cũ mở Dashboard (module Run-rate gộp vào tab Tháng này, 22/10)", () => {
+  expect(parsePath("/run-rate")).toEqual({ type: "agency", tab: "agency_overview" });
+  expect(routeToPath({ type: "agency" }, "agency_overview", brands)).toBe("/dashboard");
+});
+
 test("brand: link theo tên brand, tab của brand workspace", () => {
   expect(routeToPath({ type: "brand", brandId: "b-crocs" }, "brand_monthly_report", brands)).toBe("/brand/crocs/report-thang");
   expect(parsePath("/brand/crocs/report-thang")).toEqual({ type: "brand", brandSlug: "crocs", tab: "brand_monthly_report" });

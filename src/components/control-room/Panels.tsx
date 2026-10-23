@@ -20,41 +20,6 @@ export const ChannelChips: React.FC<{ channels: RoomChannel[]; value: string; on
 );
 
 // ---------- Cầu GMV ----------
-export const BridgeChart: React.FC<{ channel: RoomChannel }> = ({ channel }) => {
-  const b = channel.bridge;
-  if (!b) return <p className="text-sm text-[var(--text-faint)]">Kênh chưa đủ 2 tháng có số để tách.</p>;
-  const steps: [string, number, boolean][] = [[`Tháng ${Number(b.monthA.slice(5))}`, b.gmvA, true], ["Giờ live", b.hours, false], ["Cơ cấu ca", b.mix, false], ["Năng suất nền", b.level, false], [`Tháng ${Number(b.monthB.slice(5))}`, b.gmvB, true]];
-  let run = 0;
-  const peaks = steps.map(([, v, base]) => (base ? (run = v) : (run += v)));
-  const mx = Math.max(...peaks, b.gmvA, b.gmvB) * 1.12;
-  const W = 520, H = 200, T = 18, B = 36, bw = W / steps.length;
-  const y = (v: number) => T + (1 - v / mx) * (H - T - B);
-  run = 0;
-  return (
-    <div className="space-y-2">
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label={`Cầu GMV ${channel.name}`}>
-        {steps.map(([lab, v, base], i) => {
-          const x = i * bw + bw * 0.2, w = bw * 0.6;
-          let y1: number, y2: number, fill: string;
-          if (base) { y1 = y(v); y2 = y(0); fill = "var(--text-faint)"; run = v; }
-          else { const a = run, z = run + v; y1 = y(Math.max(a, z)); y2 = y(Math.min(a, z)); fill = v >= 0 ? "#2fb57f" : "#e5484d"; run = z; }
-          return (
-            <g key={lab}>
-              <rect x={x} y={y1} width={w} height={Math.max(2, y2 - y1)} rx={3} style={{ fill }} />
-              <text x={x + w / 2} y={y1 - 5} textAnchor="middle" fontSize={11.5} style={{ fill: "var(--text)", fontWeight: 700 }}>{base ? money(v) : `${v >= 0 ? "+" : "−"}${money(Math.abs(v))}`}</text>
-              <text x={x + w / 2} y={H - 20} textAnchor="middle" fontSize={11} style={{ fill: "var(--text-muted)" }}>{lab}</text>
-              {i < steps.length - 1 && <line x1={x + w} x2={(i + 1) * bw + bw * 0.2} y1={y(run)} y2={y(run)} style={{ stroke: "var(--text-faint)", strokeDasharray: "2 2" }} />}
-            </g>
-          );
-        })}
-        <text x={0} y={H - 4} fontSize={11} style={{ fill: "var(--text-faint)" }}>Giờ {Math.round(b.hoursA)} → {Math.round(b.hoursB)}</text>
-      </svg>
-      <p className="text-xs text-[var(--text-faint)]"><b className="text-[var(--text-muted)]">Giờ live</b>: thêm/bớt giờ ở năng suất cũ. <b className="text-[var(--text-muted)]">Cơ cấu ca</b>: tỷ lệ ca camp, khung giờ, vị trí trong camp, độ dài ca. <b className="text-[var(--text-muted)]">Năng suất nền</b>: phần còn lại — thị trường và đội live.</p>
-    </div>
-  );
-};
-
-// ---------- Tay nghề host ----------
 export const HostSkillTable: React.FC<{ channel: RoomChannel }> = ({ channel }) => {
   const rows = channel.hosts;
   if (rows.length === 0) return <p className="text-sm text-[var(--text-faint)]">Chưa host nào đủ 8 ca trong kênh ở 3 tháng gần nhất.</p>;
@@ -117,7 +82,7 @@ export const SwingList: React.FC<{ channel: RoomChannel }> = ({ channel }) => {
           ? "Mỗi ca được chấm bằng số điểm xác suất về đích nó làm thay đổi so với việc ca đó chỉ đạt đúng kỳ vọng."
           : r.target == null
             ? "Kênh chưa có target: xếp theo GMV vượt/hụt kỳ vọng của chính ca đó."
-            : `Tháng đã ngã ngũ (${pct(r.now.pHit)}) — một ca không còn đổi được cục diện, nên đo bằng GMV vượt/hụt kỳ vọng.`}
+            : `Khả năng đạt đã rõ (${pct(r.now.pHit)}) — một ca không còn đổi được kết quả tháng, nên đo bằng GMV vượt/hụt kỳ vọng.`}
       </p>
       {rows.map(({ s, v }) => (
         <div key={s.id} className="grid items-center gap-2 text-xs" style={{ gridTemplateColumns: "minmax(0,1fr) minmax(80px,180px) 76px" }}>

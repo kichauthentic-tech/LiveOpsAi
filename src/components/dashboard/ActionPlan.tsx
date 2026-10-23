@@ -1,15 +1,11 @@
 import React, { useState } from "react";
-import { BrandLogo } from "../ui/BrandLogo";
 import { coneHalf, LANDING_LABEL } from "../../lib/performance/forecastCone";
 import { applyWhatIf, type HandlingPlan, type Lever, type PlanMode } from "../../lib/performance/handlingPlan";
 import { CHECKPOINT_LABEL } from "../../lib/performance/monthForecast";
-import type { Brand } from "../../types";
 import type { MonthOutlook } from "../../lib/performance/ceoBrief";
-import { LandingChip } from "./RunRate";
 import { Card, hrs, money, pct } from "./shared";
 
-// Phương án của MỘT kênh (đòn bẩy, mốc điều chỉnh giờ, thử kịch bản) — 10/10 nằm trong phần chi tiết kênh của "Tháng này"
-// (tab Action riêng đã gộp vào). Mọi đòn bẩy ra số từ dữ liệu của chính kênh (lib/performance/handlingPlan.ts), căn cứ ghi ngay bên dưới.
+// Phương án của MỘT kênh (đòn bẩy, mốc điều chỉnh giờ, thử kịch bản) — 21/10 nằm ở Chi tiết kênh (Dashboard brand của ops), dưới thẻ kênh. Mọi đòn bẩy ra số từ dữ liệu của chính kênh (lib/performance/handlingPlan.ts), căn cứ ghi ngay bên dưới.
 
 const MODE_TEXT: Record<PlanMode, (o: MonthOutlook, p: HandlingPlan) => string> = {
   no_target: () => "Chưa có target nên chưa biết hụt hay dư. Dưới đây là các việc làm cho số liệu và lịch đáng tin hơn.",
@@ -86,24 +82,12 @@ const CheckpointStrip: React.FC<{ o: MonthOutlook; p: HandlingPlan; today: strin
   );
 };
 
-export const ChannelPlan: React.FC<{ b: Brand; o: MonthOutlook; p: HandlingPlan; name: string; today: string }> = ({ b, o, p, name, today }) => (
+/** Phương án của một kênh. Đầu khối không lặp nhãn / dự phóng / GMV/giờ cần — thẻ kênh ngay trên đã nói (21/10: một số một chỗ). */
+export const ChannelPlan: React.FC<{ o: MonthOutlook; p: HandlingPlan; today: string; extra?: React.ReactNode }> = ({ o, p, today, extra }) => (
   <Card className="space-y-3">
     <div className="flex flex-wrap items-center justify-between gap-2">
-      <h4 className="font-black text-[var(--text)] flex items-center gap-2"><BrandLogo brand={b} size="xs" /> {name}</h4>
-      <LandingChip keyName={p.landing} />
-    </div>
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-      {[
-        ["Dự phóng", o.projectionMethod === "none" ? "—" : money(o.projected)],
-        ["Target", o.target ? money(o.target.total) : "chưa có"],
-        ["Giờ còn trong lịch", hrs(p.remainingHours)],
-        ["GMV/giờ cần", p.needRate != null ? money(p.needRate) : "—"]
-      ].map(([k, v]) => (
-        <div key={k} className="bg-[var(--surface-base)] border border-[var(--border)] rounded-xl p-2.5">
-          <p className="text-[11px] text-[var(--text-faint)]">{k}</p>
-          <p className="font-black text-[var(--text)] text-sm mt-0.5">{v}</p>
-        </div>
-      ))}
+      <h4 className="font-black text-[var(--text)]">Phương án</h4>
+      {extra}
     </div>
     <p className="text-sm text-[var(--text-muted)] leading-snug">{MODE_TEXT[p.mode](o, p)}</p>
     {p.levers.length === 0 ? (

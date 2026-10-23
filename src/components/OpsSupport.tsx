@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { CalendarRange, Radio, TrendingDown } from "lucide-react";
-import { BrandMonthPlan, BrandMonthPlanSlot, CalendarEventRow, LiveSession, PromoScheme, ShiftSlot } from "../types";
+import { Radio } from "lucide-react";
+import { BrandMonthPlanSlot, CalendarEventRow, LiveSession, PromoScheme, ShiftSlot } from "../types";
 import { EngineParams } from "../lib/scheduling/engineParams";
 import { buildHistory } from "../lib/scheduling/suggestEngine";
 import { buildCalibration, evaluatePlan } from "../lib/scheduling/planEvaluation";
 import { calendarEventsRead, lockedPlanSlotsRead } from "../lib/db/monthPlans";
-import { EstimateCtx, MonthTracking, benchmarkForWindow, suggestFill, trackMonth } from "../lib/opsSupport";
-import { MonthEndProjection, PlanRunRate, PROJECTION_METHOD_LABEL } from "../lib/performance/planRunRate";
+import { EstimateCtx, MonthTracking, benchmarkForWindow, trackMonth } from "../lib/opsSupport";
+import { MonthEndProjection, PlanRunRate } from "../lib/performance/planRunRate";
 import { todayVn } from "../lib/performance/brandCommitment";
 import { fmtVndShort } from "../lib/format";
 import type { CampOverrides } from "../lib/campaignDays";
@@ -14,10 +14,8 @@ import { SESSION_STATUS_CLS, SESSION_STATUS_LABEL_VI } from "../lib/sessionStatu
 import type { ReportPlatform } from "../lib/reportPlatform";
 import { profileOf } from "../lib/platforms/profiles";
 
-// Hỗ Trợ Vận Hành (user chốt 2026-09-21) — từ 2026-09-28 là MỘT PHẦN của Dashboard brand (user chốt gộp,
-// bỏ tab agency `ops_support`). Không đụng target cam kết, không ghi DB. Còn lại hai việc riêng của nó:
-// (1) phương án bù khi dự kiến thiếu target (A · thêm giờ theo engine, B · nâng hiệu suất); (2) benchmark
-// ca sắp live — ops so bằng mắt với dashboard TikTok trong phiên: view thấp → đẩy traffic, CTR/CVR thấp
+// Hỗ Trợ Vận Hành — khối cuối Bảng Vận Hành (OpsSupportTab). Không đụng target cam kết, không ghi DB. Chỉ còn MỘT việc:
+// benchmark ca sắp live (21/10 bỏ "phương án bù A/B" — phương án của một kênh nay chỉ ở Chi tiết kênh, engine handlingPlan) — — ops so bằng mắt với dashboard TikTok trong phiên: view thấp → đẩy traffic, CTR/CVR thấp
 // → tối ưu, ads đốt mạnh → hãm. Run-rate, % Target, bảng từng ca kế hoạch và ca ngoài plan nay nằm ở
 // Dashboard (planRunRate — luật plan ban đầu), không lặp ở đây.
 
@@ -30,47 +28,31 @@ interface OpsSupportProps {
   /** Sàn đang xem — Dashboard đã lọc `sessions`/`shiftSlots` của brand theo sàn này; kế hoạch đã chốt đọc theo sàn. */
   platform: ReportPlatform;
   month: string; // "YYYY-MM"
-  /** Kế hoạch của `month` — Dashboard đã nạp (trước 2026-10-03 panel tự nạp lại đúng truy vấn đó). */
-  plan: { plan: BrandMonthPlan; slots: BrandMonthPlanSlot[] } | null;
   /** Khung camp hiệu lực Dashboard đã tính (effectiveCamp) — không đọc thẳng plan.campRanges. */
   camp: CampOverrides;
-  planLoading: boolean;
   sessions: LiveSession[];
   shiftSlots: ShiftSlot[];
   promoSchemes: PromoScheme[];
   engineParams: EngineParams;
-  onOpenMonthPlan: () => void;
   onOpenSession: (sessionId: string) => void;
-  /** Khối nào hiện: Dashboard brand chỉ hiện "fill" (phương án bù); tab Hỗ Trợ Vận Hành của agency chỉ hiện "benchmark" (07/10). */
-  show?: "fill" | "benchmark" | "both";
 }
 
 const WEEKDAY = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
 const fmtDate = (d: string) => `${WEEKDAY[new Date(`${d}T00:00:00`).getDay()]} ${d.slice(8, 10)}/${d.slice(5, 7)}`;
 const fmtPct = (x: number, digits = 0) => `${(x * 100).toLocaleString("vi-VN", { maximumFractionDigits: digits })}%`;
 const fmtN = (x: number) => Math.round(x).toLocaleString("vi-VN");
-const fmtH = (n: number) => n.toLocaleString("vi-VN", { maximumFractionDigits: 1 });
 const addDays = (d: string, n: number) => {
   const x = new Date(`${d}T00:00:00`);
   x.setDate(x.getDate() + n);
   return `${x.getFullYear()}-${`${x.getMonth() + 1}`.padStart(2, "0")}-${`${x.getDate()}`.padStart(2, "0")}`;
 };
 
-// Nạp trước cùng Dashboard brand (lib/db/prefetch.ts) — panel chỉ hiện với ops ở tháng hiện tại.
-export function prefetchOpsSupport(brandId: string, platform: ReportPlatform = "TikTok"): void {
-  calendarEventsRead.prefetch();
-  lockedPlanSlotsRead.prefetch(brandId, platform);
-}
-
-export default function OpsSupport({ rr, projection, brandId, brandName, platform, month, plan, camp, planLoading, sessions, shiftSlots, promoSchemes, engineParams, onOpenMonthPlan, onOpenSession, show = "both" }: OpsSupportProps) {
+export default function OpsSupport({ rr, projection, brandId, brandName, platform, month, camp, sessions, shiftSlots, promoSchemes, engineParams, onOpenSession }: OpsSupportProps) {
   const today = todayVn();
   const [lockedSlots, setLockedSlots] = useState<BrandMonthPlanSlot[]>([]);
   const [events, setEvents] = useState<CalendarEventRow[]>([]);
-  // Khoá brand của lần nạp ca-đã-chốt gần nhất — khác brand đang xem nghĩa là đang tải.
-  const [lockedFor, setLockedFor] = useState<string | null>(null);
   const funnel = profileOf(platform).funnel;
   const viewsLabel = profileOf(platform).viewsLabel;
-  const loading = planLoading || lockedFor !== `${brandId}|${platform}`;
 
   useEffect(() => {
     calendarEventsRead.take().then(setEvents).catch(() => setEvents([]));
@@ -81,8 +63,7 @@ export default function OpsSupport({ rr, projection, brandId, brandName, platfor
     lockedPlanSlotsRead
       .take(brandId, platform)
       .then((ls) => alive && setLockedSlots(ls))
-      .catch(() => alive && setLockedSlots([]))
-      .finally(() => alive && setLockedFor(`${brandId}|${platform}`));
+      .catch(() => alive && setLockedSlots([]));
     return () => {
       alive = false;
     };
@@ -124,11 +105,6 @@ export default function OpsSupport({ rr, projection, brandId, brandName, platfor
       upliftPct: pendingCount > 0 && futureForecast > 0 ? (remaining - futureForecast) / futureForecast : null
     };
   }, [engineTracking, projection]);
-  const fill = useMemo(
-    () => (tracking && plan && tracking.gapPct > engineParams.targetGapWarnPct ? suggestFill(tracking, history, plan.plan, month, today, ctx, engineParams) : null),
-    [tracking, plan, history, month, today, ctx, engineParams]
-  );
-
   // Benchmark: ca sắp live 7 ngày tới (đã chốt) + ca mở chưa có người (vẫn cần biết kỳ vọng để chọn host).
   const upcoming = useMemo(() => {
     const to = addDays(today, 7);
@@ -141,72 +117,9 @@ export default function OpsSupport({ rr, projection, brandId, brandName, platfor
     return [...ss, ...sl].sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
   }, [brandSessions, shiftSlots, brandId, today]);
 
-  const remainingCount = tracking ? tracking.pendingCount + tracking.noDataCount : 0;
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* 1. Phương án bù — chỉ khi kế hoạch đã chốt và dự kiến thiếu quá ngưỡng */}
-      {show === "benchmark" || loading ? null : tracking && tracking.gap > 0 && tracking.gapPct > engineParams.targetGapWarnPct ? (
-        <section className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-6 shadow-xl space-y-3">
-          <h3 className="font-bold text-[var(--text)] flex items-center gap-2">
-            <TrendingDown className="w-4 h-4 text-amber-300" /> Dự kiến thiếu {fmtVndShort(tracking.gap)} ({fmtPct(tracking.gapPct, 1)} target) — phương án bù
-          </h3>
-          <p className="text-xs text-[var(--text-muted)]">
-            Dự kiến cuối tháng {fmtVndShort(tracking.projected)} = đã có + {PROJECTION_METHOD_LABEL[projection.method]}.
-            {remainingCount > 0 && <> Về đích cần <b className="text-[var(--text)]">{fmtVndShort(tracking.requiredPerPending)}/ca</b> cho {remainingCount} ca kế hoạch còn lại.</>}
-          </p>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 text-xs">
-            <div className="bg-[var(--surface-base)]/70 border border-[var(--border)] rounded-xl p-3 space-y-2">
-              <p className="font-bold text-[var(--text)]">A · Thêm giờ live</p>
-              {fill ? (
-                <>
-                  <p className="text-[var(--text-muted)]">
-                    Thêm <b className="text-[var(--text)]">{fmtH(fill.extraHours)}h ({fill.extraSlots.length} ca)</b> vào các khung mạnh còn trống{fill.coversGap ? "" : " — vẫn chưa đủ trong khung giờ/ngày của kế hoạch"}:
-                  </p>
-                  <ul className="space-y-1 max-h-40 overflow-y-auto">
-                    {fill.extraSlots.map((sl) => (
-                      <li key={`${sl.date}${sl.startTime}`} className="flex justify-between gap-2">
-                        <span className="font-mono text-[var(--text)]">{fmtDate(sl.date)} {sl.startTime}–{sl.endTime}</span>
-                        <span className="text-[var(--text-faint)]">≈ {fmtVndShort(sl.expectedGmv * (tracking.realityFactor ?? 1))}{sl.dayLabel ? ` · ${sl.dayLabel}` : ""}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <button onClick={onOpenMonthPlan} className="mt-1 inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white">
-                    <CalendarRange className="w-3.5 h-3.5" /> Thêm ca ở Kế Hoạch Tháng
-                  </button>
-                  <p className="text-[11px] text-[var(--text-faint)]">Ca thêm ngoài plan được cộng vào thực đạt nhưng không mang target (luật run-rate plan ban đầu); target các ca đã chốt không đổi.</p>
-                </>
-              ) : (
-                <p className="text-[var(--text-muted)]">Không còn chỗ trong khung giờ/ngày của kế hoạch (hoặc chưa đủ lịch sử để engine xếp) — cân nhắc nới khung live hoặc phương án B.</p>
-              )}
-            </div>
-            <div className="bg-[var(--surface-base)]/70 border border-[var(--border)] rounded-xl p-3 space-y-2">
-              <p className="font-bold text-[var(--text)]">B · Nâng hiệu suất ca còn lại</p>
-              {remainingCount === 0 ? (
-                <p className="text-[var(--text-muted)]">Không còn ca kế hoạch nào phía trước — chỉ còn cách thêm giờ (A).</p>
-              ) : tracking.upliftPct !== null && tracking.upliftPct > 0 ? (
-                <>
-                  <p className="text-[var(--text-muted)]">Mỗi ca còn lại phải cao hơn dự kiến <b className="text-[var(--text)]">{fmtPct(tracking.upliftPct)}</b>. {funnel.formula}, nên tương đương một trong:</p>
-                  <ul className="list-disc pl-4 text-[var(--text-muted)] space-y-0.5">
-                    <li>{funnel.traffic} (traffic/ads) <b className="text-[var(--text)]">+{fmtPct(tracking.upliftPct)}</b> cùng {funnel.conversion} và {funnel.value}</li>
-                    <li>{funnel.conversion} <b className="text-[var(--text)]">+{fmtPct(tracking.upliftPct)}</b> ({funnel.conversionLever})</li>
-                    <li>{funnel.value} <b className="text-[var(--text)]">+{fmtPct(tracking.upliftPct)}</b> (combo, upsell)</li>
-                    <li>hoặc kết hợp: mỗi thứ +{fmtPct(Math.pow(1 + tracking.upliftPct, 1 / 3) - 1)}</li>
-                  </ul>
-                </>
-              ) : (
-                // Lỗi E2E 28/09 (#4): brand chưa có GMV/giờ 28 ngày ⇒ không có dự báo cho ca còn lại — trước đây
-                // rơi vào câu "không còn ca nào" ngay dưới dòng "cần X/ca cho N ca còn lại".
-                <p className="text-[var(--text-muted)]">
-                  Chưa có GMV/giờ 28 ngày gần nhất để dự báo {remainingCount} ca còn lại — mỗi ca cần đạt khoảng <b className="text-[var(--text)]">{fmtVndShort(tracking.requiredPerPending)}</b> để về đích.
-                </p>
-              )}
-            </div>
-          </div>
-        </section>
-      ) : null}
-
       {/* 2. Benchmark ca sắp live — nằm ở tab Hỗ Trợ Vận Hành của agency, không hiện ở Dashboard brand */}
-      {show !== "fill" && (
       <section className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-6 shadow-xl space-y-3">
         <div>
           <h3 className="font-bold text-[var(--text)] flex items-center gap-2"><Radio className="w-4 h-4 text-[var(--accent-text)]" /> Benchmark ca sắp live (7 ngày) — {brandName}</h3>
@@ -271,7 +184,6 @@ export default function OpsSupport({ rr, projection, brandId, brandName, platfor
           </div>
         )}
       </section>
-      )}
     </div>
   );
 }

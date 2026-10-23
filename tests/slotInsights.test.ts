@@ -1,18 +1,16 @@
-// Phân tích khung giờ / vị trí ngày camp / nhịp tuần / soát kế hoạch — lib/performance/slotInsights.ts.
+// Phân tích khung giờ / vị trí ngày camp / chia target theo chỉ số khung — lib/performance/slotInsights.ts.
 // Chạy: npx vitest run tests/slotInsights.test.ts
 import { describe, expect, test } from "vitest";
 import {
   campPositions,
   campRuleReliable,
   campWindows,
-  planCheck,
   slotBlock,
   slotIndex,
   slotRuleReliable,
   targetWeightModel,
   targetWeights,
-  walkForward,
-  weeklySeries
+  walkForward
 } from "../src/lib/performance/slotInsights";
 import { resolveCampBucketType } from "../src/lib/campaignDays";
 import { eachDay } from "../src/lib/dateUtils";
@@ -91,21 +89,6 @@ describe("vị trí ngày trong đợt camp", () => {
   });
 });
 
-describe("nhịp tuần", () => {
-  test("tuần tụt > 15% so với trung vị 8 tuần trước ⇒ cảnh báo; tuần chưa trọn không cảnh báo", () => {
-    const xs: LiveSession[] = [];
-    for (const d of eachDay("2026-06-01", "2026-08-16")) xs.push(ca(d, "20:00", 3, d >= "2026-08-10" ? 14e6 : 20e6));
-    const w = weeklySeries(xs, "2026-08-16");
-    expect(w.at(-1)!.weekStart).toBe("2026-08-10");
-    expect(w.at(-1)!.alert).toBe(true);
-    expect(w.at(-2)!.alert).toBe(false);
-    expect(w.filter((x) => x.alert).map((x) => x.weekStart)).toEqual(["2026-08-10"]); // tuần đầu (chưa đủ số so) không bị tô đỏ
-    const partial = weeklySeries(xs, "2026-08-12");
-    expect(partial.at(-1)!.full).toBe(false);
-    expect(partial.at(-1)!.alert).toBe(false);
-  });
-});
-
 describe("chia target ca theo chỉ số khung", () => {
   test("ca 20h nhận nhiều target hơn ca 11h cùng số giờ; ngày 1 Mid-Month nhiều hơn ngày 3", () => {
     const model = targetWeightModel(history(), "2026-10", bucketOf)!;
@@ -139,24 +122,5 @@ describe("chia target ca theo chỉ số khung", () => {
   });
   test("chưa đủ 2 tháng lịch sử ⇒ null (Kế Hoạch Tháng dùng dự báo engine như cũ)", () => {
     expect(targetWeightModel(history().filter((s) => s.date < "2026-07-01"), "2026-10", bucketOf)).toBeNull();
-  });
-});
-
-describe("soát kế hoạch", () => {
-  test("bắt target ngày 1 < ngày 3 và giờ dồn vào khung yếu", () => {
-    const plan = [
-      { date: "2026-10-13", startTime: "20:00", endTime: "23:00", targetGmv: 60e6 },
-      { date: "2026-10-14", startTime: "20:00", endTime: "23:00", targetGmv: 70e6 },
-      { date: "2026-10-15", startTime: "20:00", endTime: "23:00", targetGmv: 80e6 },
-      { date: "2026-10-02", startTime: "11:00", endTime: "14:00", targetGmv: 70e6 },
-      { date: "2026-10-02", startTime: "20:00", endTime: "23:00", targetGmv: 70e6 }
-    ];
-    const h = history();
-    const c = planCheck(plan, h, "2026-08-28", bucketOf, targetWeightModel(h, "2026-10", bucketOf))!;
-    expect(c.invertedCamps.map((x) => x.bucket)).toEqual(["midmonth"]);
-    expect(c.weakHours).toBe(3);
-    expect(c.strongHours).toBe(3);
-    expect(c.needPerHour).toBeCloseTo(350e6 / 15);
-    expect(c.expectedAtRecent!).toBeGreaterThan(0);
   });
 });
