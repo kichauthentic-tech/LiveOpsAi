@@ -1,6 +1,7 @@
 import { Brand } from "../types";
 import crocsLogo from "../assets/brands/crocs.png";
 import franklinLogo from "../assets/brands/franklin.png";
+import fujiwaLogo from "../assets/brands/fujiwa.png";
 import jockeyLogo from "../assets/brands/jockey.png";
 import veraLogo from "../assets/brands/vera.jpg";
 
@@ -23,7 +24,8 @@ const BRAND_LOGOS: Array<{ keyword: string; asset: BrandLogoAsset }> = [
   { keyword: "franklin", asset: { src: franklinLogo, alt: "Franklin", needsLightChip: true } },
   { keyword: "crocs", asset: { src: crocsLogo, alt: "Crocs", needsLightChip: false } },
   { keyword: "jockey", asset: { src: jockeyLogo, alt: "Jockey", needsLightChip: true } },
-  { keyword: "vera", asset: { src: veraLogo, alt: "Vera", needsLightChip: false } }
+  { keyword: "vera", asset: { src: veraLogo, alt: "Vera", needsLightChip: false } },
+  { keyword: "fujiwa", asset: { src: fujiwaLogo, alt: "Fujiwa", needsLightChip: false } }
 ];
 
 // Bỏ dấu tiếng Việt + hạ chữ thường để "Vera Fashion", "VERA", "Công ty Verá" đều khớp keyword.

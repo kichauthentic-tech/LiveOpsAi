@@ -47,6 +47,8 @@ const BRAND_THEMES: BrandThemeSeed[] = [
   { keyword: "crocs", primary: "#80C141", secondary: "#4F9427", ink: "#2D6212", inkDark: "#9AD65C" },
   // Sample từ vera.jpg — nền hồng magenta thương hiệu.
   { keyword: "vera", primary: "#EE008A", secondary: "#A80063", ink: "#8A0052", inkDark: "#F27AC0" },
+  // Sample từ fujiwa.png — chữ Fujiwa xanh navy (mặt trời đỏ #EE1C25 chỉ là điểm nhấn nhỏ nên không làm màu chủ đạo).
+  { keyword: "fujiwa", primary: "#2E3192", secondary: "#1E2066", ink: "#2E3192", inkDark: "#A9ACEB" },
   // Jockey + Franklin đều là wordmark ĐEN trên nền trong suốt (không có màu thương hiệu thứ 2 trên
   // file logo). Giữ primary đen cho đúng logo, nhưng cho 2 brand điểm cuối gradient khác nhau
   // (Jockey trung tính, Franklin ngả xanh than) để vẫn phân biệt được khi 2 brand nằm cạnh nhau
