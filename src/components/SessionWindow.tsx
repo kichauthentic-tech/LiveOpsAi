@@ -24,6 +24,7 @@ import { DataSourceBadge } from "./common/DataSourceBadge";
 import { BrandLogo } from "./ui/BrandLogo";
 import { SessionPlanVsActual } from "./SessionPlanVsActual";
 import { FileHandover } from "./FileHandover";
+import { sessionWindow } from "../lib/liveSnapshot/roomSelection";
 import { SessionRoomCase } from "./SessionRoomCase";
 import { handoverOwnerLabel, hasHandover, isHandoverPerson } from "../lib/handover";
 import { useToast } from "../hooks/useToast";
@@ -140,6 +141,8 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
   const hideMetrics = metricsHiddenFor(s, viewer.role);
 
   const [editingHandover, setEditingHandover] = useState(false);
+  // Bố cục 23/10: ca chưa tới giờ bắt đầu thì Giao ca chỉ là một dòng (file số liệu chỉ có sau khi live) — mở form sớm khi cần.
+  const [earlyHandover, setEarlyHandover] = useState(false);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -264,7 +267,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
 
   const handleDelete = async () => {
     if (!onDeleteSession) return;
-    if (!(await confirm(`Xoá ca ${fmtDate(s.date)} ${s.startTime}–${s.endTime} (${s.brandName})? Không hoàn tác được.`, { danger: true }))) return;
+    if (!(await confirm(`Xoá ca ${fmtDate(s.date)} ${s.startTime}–${s.endTime} (${s.brandName})? Không hoàn tác được. Ca mở đang gắn sẽ về "mở" để chốt người khác.`, { danger: true }))) return;
     setDeleting(true);
     try {
       await onDeleteSession(s.id);
@@ -310,6 +313,8 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
 
   const snapshotDone = hasSnapshot(s);
   const handoverDone = hasHandover(s);
+  const notStarted = Date.now() < sessionWindow(s).startMs;
+  const handoverCollapsed = notStarted && !handoverDone && !earlyHandover;
 
   return (
     <>
@@ -511,10 +516,20 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
             <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface-base)]/60 p-3 space-y-3">
               <div className="flex items-center justify-between gap-2">
                 <h4 className="text-xs font-bold text-[var(--text-muted)]">Giao ca</h4>
-                <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${handoverDone ? "bg-emerald-950 text-emerald-300 border-emerald-800" : "bg-amber-950 text-amber-300 border-amber-800"}`}>
-                  {handoverDone ? `đã giao ${new Date(s.report!.handoverAt!).toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" })}` : "chưa giao ca"}
+                <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${handoverDone ? "bg-emerald-950 text-emerald-300 border-emerald-800" : notStarted ? "bg-[var(--surface-elevated)] text-[var(--text-muted)] border-[var(--border)]" : "bg-amber-950 text-amber-300 border-amber-800"}`}>
+                  {handoverDone ? `đã giao ${new Date(s.report!.handoverAt!).toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" })}` : notStarted ? "chưa tới giờ" : "chưa giao ca"}
                 </span>
               </div>
+              {handoverCollapsed && (
+                <p className="text-xs text-[var(--text-muted)] flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span>Hết ca lúc {s.endTime.slice(0, 5)} thì up file {prof.reconciliationFile} và giao ca ở đây.</span>
+                  {canHandover && (
+                    <button onClick={() => setEarlyHandover(true)} className="text-[11px] font-bold text-[var(--accent-text)] hover:underline">
+                      Mở giao ca ngay
+                    </button>
+                  )}
+                </p>
+              )}
               {handoverDone && !editingHandover && (
                 <div className="space-y-1.5 text-xs">
                   <p className="text-[var(--text-muted)]">{snapshotDone ? `Đã up file ${prof.reconciliationFile} — số của ca ở "Số liệu ca" bên dưới.` : "Chưa có file số liệu."}</p>
@@ -525,7 +540,7 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                   )}
                 </div>
               )}
-              {(!handoverDone || editingHandover) &&
+              {!handoverCollapsed && (!handoverDone || editingHandover) &&
                 (canHandover ? (
                   <FileHandover
                     session={s}
@@ -578,8 +593,8 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
             </section>
           )}
 
-          {/* Số liệu ca */}
-          <section>
+          {/* Số liệu ca — ca chưa có số thì bỏ hẳn mục (23/10): cột Thực tế ở "Kế hoạch vs thực tế" đã nói "chưa có". */}
+          {(counters || s.actualGmv || s.totalOrders || s.totalViews) ? <section>
             <h4 className="text-xs font-bold text-[var(--text-muted)] mb-2">Số liệu ca</h4>
             {counters ? (
               <>
@@ -614,10 +629,8 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                 </div>
                 <p className="text-[11px] text-amber-300 mt-2">Số tự khai tay — chưa có file nên không tính được tỷ lệ.</p>
               </>
-            ) : (
-              <p className="text-xs text-[var(--text-faint)] italic">Chưa có số liệu.</p>
-            )}
-          </section>
+            ) : null}
+          </section> : null}
 
           {/* Lịch sử — mốc có trong dữ liệu ca (U6). Audit log chi tiết xem ở Nhật ký hệ thống. */}
           {!isBrandView && (() => {
@@ -746,12 +759,14 @@ export const SessionWindow: React.FC<SessionWindowProps> = ({
                 </button>
               )}
               {isOps && onDeleteSession && !hasData && (
-                <div>
-                  <button onClick={handleDelete} disabled={deleting} className="inline-flex items-center gap-1.5 text-[11px] text-[var(--text-faint)] hover:text-rose-400 disabled:opacity-40 transition-colors">
-                    <Trash2 className="w-3.5 h-3.5" /> {deleting ? "Đang xoá..." : "Xoá hẳn ca này"}
-                  </button>
-                  <span className="text-[11px] text-[var(--text-faint)] ml-2">— ca mở đang gắn sẽ về "mở" để chốt người khác; ca đã có số liệu không xoá được.</span>
-                </div>
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  title={'Ca mở đang gắn sẽ về "mở" để chốt người khác; ca đã có số liệu không xoá được.'}
+                  className="block text-[11px] text-[var(--text-faint)] hover:text-rose-400 disabled:opacity-40 transition-colors"
+                >
+                  <span className="inline-flex items-center gap-1.5"><Trash2 className="w-3.5 h-3.5" /> {deleting ? "Đang xoá..." : "Xoá hẳn ca này"}</span>
+                </button>
               )}
             </div>
           )}

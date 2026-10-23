@@ -58,6 +58,7 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
   const [pending, setPending] = useState<{ fileName: string; parsed: ParsedSnapshotFile } | null>(null);
   // Đang gõ GMV đúng của ca (0174) — tự mở ngay sau khi up nếu room còn live sau giờ hết ca.
   const [editingGmv, setEditingGmv] = useState(false);
+  const [dragging, setDragging] = useState(false);
 
   useEffect(() => { preloadSpreadsheetReader(); }, []);
   useEffect(() => {
@@ -260,18 +261,30 @@ export function SessionLiveSnapshotUpload({ session, onApplied }: SessionLiveSna
           )}
         </div>
       ) : (
-        <div className="rounded-xl border border-dashed border-[var(--border)] p-3 text-center">
-          <FileSpreadsheet className="w-5 h-5 text-[var(--text-faint)] mx-auto mb-1.5" />
-          <p className="text-[11px] text-[var(--text-muted)] mb-2">
-            Tải file <span className="font-bold">{prof.reconciliationFile}</span> từ {prof.liveFileWhere} rồi up vào ngay khi hết ca.
+        // Bố cục 23/10: ô up nằm ngang (icon · chỗ tải · nút) và nhận kéo-thả — trước là một khối giữa trang cao gấp đôi.
+        <div
+          onDragOver={(e) => { e.preventDefault(); if (!busy) setDragging(true); }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragging(false);
+            const f = e.dataTransfer.files?.[0];
+            if (f && !busy) void handleFile(f);
+          }}
+          className={`rounded-xl border border-dashed p-3 flex flex-wrap items-center gap-3 transition-colors ${dragging ? "border-[var(--accent)] bg-[var(--surface-hover)]" : "border-[var(--border)]"}`}
+        >
+          <FileSpreadsheet className="w-5 h-5 text-[var(--text-faint)] shrink-0" />
+          <p className="flex-1 min-w-[12rem] text-xs text-[var(--text-muted)]">
+            Tải <span className="font-bold text-[var(--text)]">{prof.reconciliationFile}</span> từ {prof.liveFileWhere} ngay khi hết ca.
+            <span className="hidden sm:block text-[11px] text-[var(--text-faint)]">Kéo thả file .xlsx vào đây hoặc bấm chọn.</span>
           </p>
           <button
             onClick={() => fileRef.current?.click()}
             disabled={busy}
-            className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--text)] disabled:opacity-40 transition-colors"
+            className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white disabled:opacity-40 transition-colors shrink-0"
           >
             <Upload className="w-3.5 h-3.5" />
-            {busy ? "Đang xử lý..." : "Chọn File Số Liệu"}
+            {busy ? "Đang xử lý..." : "Chọn file"}
           </button>
         </div>
       )}

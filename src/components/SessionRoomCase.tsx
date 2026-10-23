@@ -45,6 +45,8 @@ interface Props {
   onSessionsUpdated: (sessions: LiveSession[]) => void;
   /** Nằm trong form Giao ca (đã có tiêu đề bước + khung) — không vẽ khung/tiêu đề riêng. */
   embedded?: boolean;
+  /** Trong Giao ca: trợ đã chọn sự cố "Restart" ở bước 3 ⇒ hiện nút thêm lượt restart + chỉ đường dù chưa up file. */
+  restartFlagged?: boolean;
 }
 
 const dismissKey = (id: string) => `liveops:no-room-link:${id}`;
@@ -63,7 +65,7 @@ const linkedLabel = (x: { date: string; startTime: string; endTime: string; host
 const chipBase = "text-[11px] font-bold px-2 py-0.5 rounded-full border";
 const btnGhost = "inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-[var(--surface-elevated)] hover:bg-[var(--surface-hover)] text-[var(--text)] disabled:opacity-40 transition-colors";
 
-export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSessionsUpdated, embedded = false }: Props) {
+export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSessionsUpdated, embedded = false, restartFlagged = false }: Props) {
   const confirm = useConfirm();
   // TikTok gọi là room, Shopee gọi là phiên (một dòng trong file Live List) — cùng cơ chế snapshot nên cùng màn.
   const prof = profileOf(s);
@@ -269,16 +271,17 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
 
   return shell(
     <div className="space-y-3">
-      {/* Trạng thái hiện tại */}
-      <div className="flex flex-wrap items-center gap-1.5">
+      {/* Trạng thái hiện tại — trong Giao ca (23/10) ca bình thường không vẽ viên "Bình thường — 1 room riêng": tiêu đề bước đã nói
+          "chỉ khi có restart / chạy sang ca sau", viên đó chỉ là thêm một dòng. */}
+      {(prev || next || multiRoom || !embedded || (s.liveRoomIds?.length ?? 0) > 1) && <div className="flex flex-wrap items-center gap-1.5">
         {!prev && !next && !multiRoom && (s.liveRoomIds?.length ?? 0) > 1 && (
           <span className={`${chipBase} bg-amber-950 text-amber-300 border-amber-800`}>{s.liveRoomIds!.length} {unit} theo số đã nạp — chưa có file giao ca để ghi lý do từng lượt</span>
         )}
-        {!prev && !next && !multiRoom && (s.liveRoomIds?.length ?? 0) <= 1 && <span className={`${chipBase} bg-[var(--surface-elevated)] text-[var(--text-muted)] border-[var(--border)]`}>Bình thường — 1 {unit} riêng</span>}
+        {!embedded && !prev && !next && !multiRoom && (s.liveRoomIds?.length ?? 0) <= 1 && <span className={`${chipBase} bg-[var(--surface-elevated)] text-[var(--text-muted)] border-[var(--border)]`}>Bình thường — 1 {unit} riêng</span>}
         {prev && <span className={`${chipBase} bg-sky-950 text-sky-300 border-sky-800`}>Nối từ ca {prev.startTime}–{prev.endTime}</span>}
         {next && <span className={`${chipBase} bg-sky-950 text-sky-300 border-sky-800`}>Nối sang ca {next.startTime}–{next.endTime}</span>}
         {multiRoom && <span className={`${chipBase} bg-amber-950 text-amber-300 border-amber-800`}>{rooms.length} {unit}{parts.length > 0 ? ` · bị ngắt ×${Math.max(parts.length, rooms.length - 1)}` : ""}</span>}
-      </div>
+      </div>}
 
       {/* Ca này nối TỪ ca trước */}
       {prev && (
@@ -513,17 +516,27 @@ export function SessionRoomCase({ session: s, canEdit, isOps, allSessions, onSes
               <Link2 className="w-3.5 h-3.5" /> Ca nối: {unit} chạy tiếp sang ca sau
             </button>
           )}
-          <button
-            onClick={() => setPartForm({ reason: "network", note: "" })}
-            disabled={busy || !snapshot}
-            title={snapshot ? undefined : "Up file của lượt đầu trước, rồi mới thêm lượt restart"}
-            className={btnGhost}
-          >
-            <Plus className="w-3.5 h-3.5" /> Thêm lượt restart (up file riêng)
-          </button>
+          {/* Trong Giao ca: chưa up file thì chưa có lượt đầu ⇒ ẩn hẳn nút restart thay vì một nút xám + một dòng giải thích. */}
+          {(snapshot || !embedded || restartFlagged) && (
+            <button
+              onClick={() => setPartForm({ reason: "network", note: "" })}
+              disabled={busy || !snapshot}
+              title={snapshot ? "Mỗi lượt restart có một lần up file riêng" : "Up file của lượt đầu trước, rồi mới thêm lượt restart"}
+              className={btnGhost}
+            >
+              <Plus className="w-3.5 h-3.5" /> Thêm lượt restart (up file riêng)
+            </button>
+          )}
         </div>
       )}
-      {canEdit && !snapshot && !chooser && !partForm && <p className="text-[11px] text-[var(--text-faint)]">Restart giữa ca: up file lượt đầu trước, rồi bấm "Thêm lượt restart" — mỗi lượt có một lần up file riêng.</p>}
+      {canEdit && embedded && restartFlagged && !chooser && !partForm && (
+        <p className="text-[11px] text-amber-300/90">
+          {snapshot
+            ? `Lượt restart chưa có trong file vừa up thì bấm "Thêm lượt restart" — mỗi lượt một file riêng.`
+            : `Có restart: file ở bước 1 thường có đủ các lượt — tick hết ${prof.liveFileRowNoun} của ca ở đó, app hỏi lý do từng lượt. Lượt nào không có trong file thì up file riêng bằng "Thêm lượt restart" sau khi xong bước 1.`}
+        </p>
+      )}
+      {canEdit && !embedded && !snapshot && !chooser && !partForm && <p className="text-[11px] text-[var(--text-faint)]">Restart giữa ca: up file lượt đầu trước, rồi bấm "Thêm lượt restart" — mỗi lượt có một lần up file riêng.</p>}
 
       {error && <ErrorLine text={error} />}
       <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleFile(f); }} />

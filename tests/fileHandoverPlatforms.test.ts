@@ -25,13 +25,22 @@ describe("FileHandover — một luồng, tên file theo sàn", () => {
     ["Shopee", "Live List"]
   ] as const)("%s: bước 1 là up file %s, giao ca khoá tới khi có file", (platform, file) => {
     const html = renderToStaticMarkup(React.createElement(ConfirmProvider, null, React.createElement(FileHandover, { session: ses(platform), onSaved: () => {} })));
-    expect(html).toContain(`1 · Up file ${file}`);
-    expect(html).toContain("Up file ở bước 1 trước");
-    expect(html).toContain("2 · Lượt live &amp; ca nối");
-    expect(html).toContain("3 · Ca này có gì?");
+    // Dải bước dọc (23/10): số bước nằm trong chấm tròn, chữ "1 · " chỉ còn cho trình đọc màn hình.
+    expect(html).toMatch(new RegExp(`1 · </span>Up file ${file}`));
+    expect(html).toContain("Up file ở bước 1 trước để giao ca");
+    expect(html).toContain("2 · </span>Lượt live &amp; ca nối");
+    expect(html).toContain("3 · </span>Ca này có gì?");
     expect(html).not.toMatch(/Link dashboard|link dashboard|gõ số/);
     noBad(html);
   });
+});
+
+test("Đã có file: bước 1 đánh dấu xong (✓ + \"đã có\"), nút Giao ca mở khoá", () => {
+  const html = renderToStaticMarkup(React.createElement(ConfirmProvider, null, React.createElement(FileHandover, { session: ses("TikTok", { dataSource: "live_snapshot" }), onSaved: () => {} })));
+  expect(html).toContain("đã có");
+  expect(html).toMatch(/>Giao ca<\/button>/);
+  expect(html).not.toContain("Up file ở bước 1 trước");
+  noBad(html);
 });
 
 describe("HostChangeReports — số lúc đổi host chỉ qua file", () => {

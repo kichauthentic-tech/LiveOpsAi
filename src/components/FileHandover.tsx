@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
+import { Check } from "lucide-react";
 import { LiveSession } from "../types";
 import { submitFileHandover } from "../lib/db/handovers";
 import { errorMessage } from "../lib/errorMessage";
@@ -60,37 +61,70 @@ export function FileHandover({ session: s, isOps = false, allSessions, onSaved, 
     }
   };
 
+  const stepState = (done: boolean, active: boolean): StepState => (done ? "done" : active ? "active" : "todo");
   return (
-    <div className="space-y-3">
-      <div className="space-y-1.5">
-        <p className="block text-xs font-bold text-[var(--text-muted)]">
-          1 · Up file {prof.reconciliationFile} {fileDone && <span className="text-emerald-400 font-normal">— đã có</span>}
-        </p>
-        <SessionLiveSnapshotUpload session={s} onApplied={(u) => onSaved([u])} />
-      </div>
-      <div className="space-y-1.5">
-        <p className="block text-xs font-bold text-[var(--text-muted)]">2 · Lượt live & ca nối</p>
-        <SessionRoomCase key={s.id} session={s} canEdit isOps={isOps} allSessions={allSessions} onSessionsUpdated={onSaved} embedded />
-      </div>
-      <HandoverIncidents label="3 · Ca này có gì?" value={incidents} onChange={setIncidents} />
+    <div className="space-y-4">
+      <ol>
+        <Step no={1} state={stepState(fileDone, !fileDone)} title={`Up file ${prof.reconciliationFile}`}>
+          <SessionLiveSnapshotUpload session={s} onApplied={(u) => onSaved([u])} />
+        </Step>
+        <Step no={2} state={stepState(false, fileDone)} title="Lượt live & ca nối" hint="chỉ khi có restart / chạy sang ca sau">
+          <SessionRoomCase key={s.id} session={s} canEdit isOps={isOps} allSessions={allSessions} onSessionsUpdated={onSaved} embedded restartFlagged={incidents.on.includes("restart")} />
+        </Step>
+        <Step no={3} state={stepState(false, fileDone)} title="Ca này có gì?" last>
+          <HandoverIncidents value={incidents} onChange={setIncidents} />
+        </Step>
+      </ol>
       {error && <p className="text-xs text-rose-300 bg-rose-950/50 border border-rose-800 rounded-xl px-3 py-2">{error}</p>}
       <div className="flex gap-2">
         {onCancel && (
-          <button type="button" onClick={onCancel} className="min-h-12 px-4 rounded-xl bg-[var(--surface-elevated)] text-[var(--text-muted)] font-bold text-sm">
+          <button type="button" onClick={onCancel} className="min-h-11 px-4 rounded-xl bg-[var(--surface-elevated)] text-[var(--text-muted)] font-bold text-sm">
             Thôi
           </button>
         )}
+        {/* Chưa có file: nút nói luôn lý do khoá (trước là nút xanh mờ + một dòng chú thích riêng bên dưới). */}
         <button
           type="button"
           onClick={submit}
           disabled={!fileDone || saving}
-          title={fileDone ? undefined : "Up file ở bước 1 trước"}
-          className="flex-1 min-h-12 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black text-sm"
+          className={`flex-1 min-h-11 rounded-xl font-black text-sm transition-colors ${
+            fileDone ? "bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white" : "bg-[var(--surface-elevated)] text-[var(--text-faint)] font-bold cursor-not-allowed"
+          }`}
         >
-          {saving ? "Đang giao ca..." : s.report?.handoverAt ? "Cập nhật giao ca" : "Giao ca"}
+          {!fileDone ? "Up file ở bước 1 trước để giao ca" : saving ? "Đang giao ca..." : s.report?.handoverAt ? "Cập nhật giao ca" : "Giao ca"}
         </button>
       </div>
-      {!fileDone && <p className="text-[11px] text-[var(--text-faint)]">Up file ở bước 1 trước, rồi mới giao ca được.</p>}
     </div>
+  );
+}
+
+// Bố cục 23/10: ba bước thành dải bước dọc (số tròn + vạch nối) — trước là ba tiêu đề chữ "1 · / 2 · / 3 ·" cùng cỡ với nội dung,
+// không thấy bước nào xong, bước nào đang tới lượt.
+type StepState = "done" | "active" | "todo";
+const STEP_DOT: Record<StepState, string> = {
+  done: "bg-emerald-600 border-emerald-600 text-white",
+  active: "seg-on",
+  todo: "border-[var(--border)] text-[var(--text-faint)]"
+};
+
+function Step({ no, state, title, hint, last = false, children }: { no: number; state: StepState; title: string; hint?: string; last?: boolean; children: React.ReactNode }) {
+  return (
+    <li className="relative flex gap-3">
+      {!last && <span aria-hidden className="absolute left-[13px] top-8 bottom-1 w-px bg-[var(--border)]" />}
+      <span className={`relative z-[1] w-7 h-7 shrink-0 rounded-full border flex items-center justify-center text-xs font-black ${STEP_DOT[state]}`}>
+        {state === "done" ? <Check className="w-4 h-4" /> : no}
+      </span>
+      <div className={`min-w-0 flex-1 space-y-2 ${last ? "" : "pb-5"}`}>
+        <p className="min-h-7 flex flex-wrap items-baseline gap-x-2 pt-1 text-sm font-bold text-[var(--text)]">
+          <span>
+            <span className="sr-only">{no} · </span>
+            {title}
+          </span>
+          {state === "done" && <span className="text-xs font-semibold text-emerald-400">đã có</span>}
+          {hint && <span className="text-[11px] font-normal text-[var(--text-faint)]">{hint}</span>}
+        </p>
+        {children}
+      </div>
+    </li>
   );
 }

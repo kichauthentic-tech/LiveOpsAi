@@ -37,11 +37,11 @@ export function incidentValues(v: IncidentState) {
 
 const smallInput = "w-16 min-h-8 px-2 rounded-lg border border-[var(--border)] bg-[var(--surface-base)] text-[var(--text)] font-mono";
 
-export function HandoverIncidents({ value, onChange, label }: { value: IncidentState; onChange: (v: IncidentState) => void; label: string }) {
+export function HandoverIncidents({ value, onChange, label }: { value: IncidentState; onChange: (v: IncidentState) => void; label?: string }) {
   const toggle = (k: Incident) => onChange({ ...value, on: value.on.includes(k) ? value.on.filter((x) => x !== k) : [...value.on, k] });
   return (
     <div className="space-y-2">
-      <p className="block text-xs font-bold text-[var(--text-muted)] mb-1">{label}</p>
+      {label && <p className="block text-xs font-bold text-[var(--text-muted)] mb-1">{label}</p>}
       <div className="flex flex-wrap gap-1.5">
         <button
           type="button"
@@ -90,7 +90,7 @@ export function HandoverIncidents({ value, onChange, label }: { value: IncidentS
         value={value.note}
         onChange={(e) => onChange({ ...value, note: e.target.value })}
         placeholder="Ghi chú (không bắt buộc)"
-        className="w-full min-h-11 px-3 py-2.5 border border-[var(--border)] rounded-xl text-sm font-semibold text-[var(--text)] bg-[var(--surface-base)] placeholder:text-[var(--text-faint)]"
+        className="w-full min-h-10 px-3 py-2 border border-[var(--border)] rounded-xl text-sm text-[var(--text)] bg-[var(--surface-base)] placeholder:text-[var(--text-faint)] placeholder:font-normal"
       />
     </div>
   );

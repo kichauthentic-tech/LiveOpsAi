@@ -219,7 +219,7 @@ test("Cửa sổ ca: chỉ số trong MỘT khung (không hộp từng ô); Lư�
   const kv = sw.slice(sw.indexOf("const KV: React.FC"));
   expect(kv.slice(0, 300)).not.toMatch(/border|rounded/);
   expect((sw.match(/className=\{KV_GRID\}/g) ?? []).length).toBe(3);
-  expect(read("components/FileHandover.tsx")).toMatch(/<SessionRoomCase [^>]*\bembedded \/>/);
+  expect(read("components/FileHandover.tsx")).toMatch(/<SessionRoomCase [^>]*\bembedded\b/);
   expect(read("components/SessionRoomCase.tsx")).toMatch(/embedded \? \(\s*<div className="space-y-2">\{body\}<\/div>/);
 });
 
