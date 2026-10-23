@@ -91,6 +91,13 @@
   thấy ca quá giờ tự "Đã xong" lại (trước đó `complete_past_sessions` lỗi cả lô vì cặp trùng người). Nên bật pg_cron (Database → Extensions)
   để ca được đóng cả khi không ai mở app. Code đã push `9426932` (19/10, gồm run-rate theo ca 11/10 + bố cục 18–19/10) — Vercel tự deploy từ main.
 - **Bàn Trainer (13/10, đã gộp main, chưa push):** chạy `0175_trainer_role.sql` RỒI MỚI chạy `0176_trainer_roster.sql` (hai lần chạy riêng; 0176 cần giá trị enum đã commit) → deploy. Tạo tài khoản role Trainer ở Phân Quyền rồi đăng nhập thử. Nhập rate ở Talent Pool để có chi phí ca. Muốn dùng quy trình tuần thì Kế Hoạch Tháng 11 phải chốt để có ca mở (lịch T10 nhập từ sheet nên tuần T10 chỉ có ca đã lên lịch). Còn mở: host/trợ trả theo giờ hay có người trả theo ca.
+- **Sửa GMV/host theo Working File (23/10, dữ liệu, không code):** đối chiếu "YFB _ Working File 2026 - NEW (1).xlsx" ↔ app 01/06–22/10, rồi
+  user duyệt sửa: tách 37 ca CROCS nạp bù T6/T8/T9 gộp nhiều host (`split_backfill_session` + `bulk_assign_session_hosts`, GMV chia theo tỷ lệ
+  file); chia lại GMV ca nối theo tỷ lệ file — ca nạp bù không có lô sửa thẳng `live_sessions`, ca có lô dùng 47 dòng `recon_gmv_overrides`
+  rồi Áp Dụng Lại 6 lô (lô cũ trước, lô mới nhất sau); đổi host/trợ 25 ca. Tổng GMV brand×sàn×tháng không đổi; ca ngoài kế hoạch không đổi.
+  Sao lưu + nhật ký: ~/Downloads "Nhat ky sua GMV ca (23-10-2026).xlsx". **Còn tay:** CROCS T7 (report đã phát hành — thu hồi mới sửa);
+  7 ca VERA nằm sai ngày (chép lỗi gõ ngày của file) + 5 ca trùng giờ; 7 ca host/trợ đổi chéo bị chặn trùng người; 15 phiên không host
+  (xác nhận agency hay inhouse). Áp Dụng Lại lô cũ sau này phải áp lại lô mới nhất của kênh đó ngay sau.
 - **Đối soát / GMV ca (13/10):** 0174 ĐÃ CHẠY. Còn: deploy client; Áp dụng lô CROCS T10 01–13/10, Áp Dụng Lại lô VERA Shopee 08–10/10 (Claude bị chặn bấm — user bấm); ca CROCS 11/10 09–12 (file tải 13:35) nên gõ GMV đúng ở form Giao ca trước khi Áp dụng.
 - **Phòng Điều Hành (11/10):** chạy `0170_control_room.sql` (trước hay sau deploy đều được — client tự báo "chưa chạy 0170" ở khối ca nháp; thẻ brand ẩn khi chưa có RPC); đặt `ANTHROPIC_API_KEY` trên Vercel nếu muốn hỏi bằng Claude (thiếu thì chỉ Gemini). Role brand chỉ thấy điểm của ngày sổ dự báo đã ghi (Dashboard / Phòng Điều Hành được mở ngày đó).
 - **0168 ĐÃ CHẠY 11/10.** Còn lại: deploy client rồi thử up Live List giữa phiên ở một ca nối Shopee thật.
