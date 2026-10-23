@@ -37,19 +37,13 @@ describe("resolvePeriod", () => {
     const p = resolvePeriod({ key: "month", mode: "auto", completeEnd: "2026-10-18", today: "2026-10-22" });
     expect(p).toMatchObject({ start: "2026-10-01", end: "2026-10-18", prevStart: "2026-09-01", prevEnd: "2026-09-18", mode: "mom", isCurrentMonth: true });
   });
-  test("Tháng trước: cả tháng, so cả tháng trước nữa", () => {
-    const p = resolvePeriod({ key: "prev", mode: "auto", completeEnd: "2026-10-18", today: "2026-10-22" });
-    expect(p).toMatchObject({ start: "2026-09-01", end: "2026-09-30", prevStart: "2026-08-01", prevEnd: "2026-08-31", isCurrentMonth: false });
-  });
   test("7 ngày: so khoảng 7 ngày ngay trước", () => {
     const p = resolvePeriod({ key: "7d", mode: "auto", completeEnd: "2026-10-18", today: "2026-10-22" });
     expect(p).toMatchObject({ start: "2026-10-12", end: "2026-10-18", prevStart: "2026-10-05", prevEnd: "2026-10-11", mode: "prev" });
   });
-  test("Tự chọn vượt ngày đủ số ⇒ cắt, đánh dấu cut; kỳ so sánh trước ngày đầu có dữ liệu ⇒ noBase", () => {
-    const p = resolvePeriod({ key: "custom", mode: "auto", completeEnd: "2026-10-18", today: "2026-10-22", custom: { start: "2026-10-10", end: "2026-10-30" }, first: "2026-06-01" });
-    expect([p.start, p.end, p.cut]).toEqual(["2026-10-10", "2026-10-18", true]);
-    const q = resolvePeriod({ key: "custom", mode: "auto", completeEnd: "2026-10-18", today: "2026-10-22", custom: { start: "2026-06-01", end: "2026-06-20" }, first: "2026-06-01" });
-    expect(q.noBase).toBe(true);
+  test("kỳ so sánh trước ngày đầu có dữ liệu ⇒ noBase", () => {
+    const p = resolvePeriod({ key: "month", mode: "auto", completeEnd: "2026-06-18", today: "2026-06-20", first: "2026-06-01" });
+    expect(p.noBase).toBe(true);
   });
   test("ép so tháng trước cho 7 ngày", () => {
     const p = resolvePeriod({ key: "7d", mode: "mom", completeEnd: "2026-10-18", today: "2026-10-22" });

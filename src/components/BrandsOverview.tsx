@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { rememberBrandId } from "../lib/defaultBrand";
 import { requestCrmFocus } from "../lib/crmFocus";
 import { brandPriceLabel } from "../lib/brandPricing";
-import { Download, LayoutGrid, Loader2 } from "lucide-react";
+import { Ban, Clock, Download, LayoutGrid, Loader2, RotateCcw, Send } from "lucide-react";
 import { Brand, BrandChannel, BrandMonthlyReport, BrandMonthPlan, BrandPlatformRate, LiveSession } from "../types";
 import { planStatusesRead } from "../lib/db/monthPlans";
 import { channelTitle, platformOf, brandMonthKey, brandPlatformKey, type ReportPlatform } from "../lib/reportPlatform";
@@ -18,6 +18,7 @@ import { errorMessage } from "../lib/errorMessage";
 import { BrandLogo } from "./ui/BrandLogo";
 import { PageHeader } from "./common/PageHeader";
 import { MonthPicker } from "./common/MonthPicker";
+import { useReportPublish } from "../hooks/useReportPublish";
 
 // Màn toàn cảnh 4 brand cho agency (Đợt C/6, 2026-09-23) — BẢNG trạng thái từng brand cho MỘT
 // tháng đang xem, không phải widget KPI kiểu Dashboard cũ (xoá 2026-09-13 vì số tính live/dự phóng
@@ -27,6 +28,16 @@ import { MonthPicker } from "./common/MonthPicker";
 //
 // Câu hỏi màn này trả lời: "tháng này/tháng sau, brand nào đang ổn, brand nào cần tôi để ý ngay" —
 // thay vì ops phải mở lần lượt 4 Brand Workspace để tự ghép câu trả lời đó trong đầu.
+//
+// 23/10 (audit trùng màn): gộp màn "Điều Phối Phát Hành" vào đây — cột Report Tháng có nút Phát hành / Thu hồi (hooks/useReportPublish),
+// dòng đầu bảng nhắc tháng đã hết còn report chưa phát hành (thay cho lưới 6 tháng × brand của màn cũ).
+
+const MONTHS_BACK = 6;
+const shiftMonthKey = (month: string, delta: number) => {
+  const [y, m] = month.split("-").map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, "0")}`;
+};
 
 interface BrandsOverviewProps {
   /** Sàn của workspace agency (07/10): mỗi brand một dòng của ĐÚNG sàn này. */
@@ -37,6 +48,10 @@ interface BrandsOverviewProps {
   sessions: LiveSession[];
   brandPlatformRates: BrandPlatformRate[];
   monthlyReports: Map<string, BrandMonthlyReport>;
+  /** Để tự tạo bản chụp số liệu (0119) khi phát hành tháng chưa có — không có bản chụp thì brand mở report ra trống. */
+  planMonthTotals?: Map<string, number>;
+  /** Nạp lại Map report trung tâm sau khi phát hành/thu hồi. */
+  onReportsChanged: () => void;
   /** Mở một màn (brandId có ⇒ mở trong Brand Workspace của brand đó). */
   onNavigate?: (tab: string, brandId?: string, platform?: ReportPlatform) => void;
 }
@@ -97,7 +112,7 @@ export function prefetchBrandsOverview(_ctx: TabPrefetchCtx): void {
   commitmentsRead.prefetch();
 }
 
-export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ platform, brands, brandChannels, sessions, brandPlatformRates, monthlyReports, onNavigate }) => {
+export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ platform, brands, brandChannels, sessions, brandPlatformRates, monthlyReports, planMonthTotals, onReportsChanged, onNavigate }) => {
   const { showToast } = useToast();
   const today = todayVn();
   const [month, setMonth] = useState(today.slice(0, 7));
@@ -105,6 +120,7 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ platform, brands
   const [commitments, setCommitments] = useState<Awaited<ReturnType<typeof fetchBrandMonthlyCommitments>>>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const pub = useReportPublish({ platform, brands, sessions, brandPlatformRates, planMonthTotals, onReportsChanged });
 
   useEffect(() => {
     let cancelled = false;
@@ -162,6 +178,24 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ platform, brands
       });
   }, [platform, brands, brandChannels, planStatuses, progressByBrand, sessions, month, today, monthlyReports, brandPlatformRates]);
 
+  // Tháng đã hết (6 tháng gần nhất) có ca mà report chưa phát hành — bấm tháng để mở bảng của tháng đó.
+  const unpublished = useMemo(() => {
+    const cur = today.slice(0, 7);
+    const out: { month: string; names: string[] }[] = [];
+    for (let i = 1; i <= MONTHS_BACK; i++) {
+      const m = shiftMonthKey(cur, -i);
+      const names = brands
+        .filter((b) => platformsOfBrand(brandChannels, b.id).includes(platform))
+        .filter((b) => monthlyReports.get(brandMonthKey(b.id, m, platform))?.status !== "published" && pub.sessionCountFor(b.id, m) > 0)
+        .map((b) => b.name)
+        .sort();
+      if (names.length) out.push({ month: m, names });
+    }
+    return out;
+    // pub.sessionCountFor đọc `sessions` + `platform` — đã có trong deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [today, brands, brandChannels, platform, monthlyReports, sessions]);
+
   const exportXlsx = () => {
     const out = rows.map((r) => ({
       Brand: r.label,
@@ -189,7 +223,7 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ platform, brands
       <PageHeader
         icon={LayoutGrid}
         title="Toàn Cảnh Brand"
-        description="Mỗi brand trong tháng đang xem: đã lập kế hoạch, nhập hợp đồng, làm report, nhập giá chưa — và số thật đã chạy. Ô nào còn thiếu có nút dẫn tới chỗ nhập."
+        description="Mỗi brand trong tháng đang xem: đã lập kế hoạch, nhập hợp đồng, nhập giá chưa, số thật đã chạy — và phát hành / thu hồi Report Tháng ngay ở cột Report. Ô nào còn thiếu có nút dẫn tới chỗ nhập."
         actions={
           <>
             <MonthPicker value={month} onChange={setMonth} />
@@ -204,6 +238,18 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ platform, brands
           </>
         }
       />
+
+      {unpublished.length > 0 && (
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-amber-300">
+          <Clock className="w-3.5 h-3.5 shrink-0" />
+          <span>Report {platform} tháng đã hết chưa phát hành:</span>
+          {unpublished.map((u) => (
+            <button key={u.month} type="button" onClick={() => setMonth(u.month)} className={`min-h-6 px-2 rounded-lg border font-bold ${u.month === month ? "border-amber-500 text-amber-200" : "border-amber-800 hover:border-amber-500"}`}>
+              T{Number(u.month.slice(5))}/{u.month.slice(2, 4)} · {u.names.join(", ")}
+            </button>
+          ))}
+        </p>
+      )}
 
       {errorMsg && (
         <div className="p-3 bg-red-950/80 border border-red-800/50 rounded-xl text-red-300 text-xs font-semibold">{errorMsg}</div>
@@ -236,7 +282,8 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ platform, brands
                       <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${PLAN_STATUS_CLS[planStatus]}`}>
                         {PLAN_STATUS_LABEL[planStatus]}
                       </span>
-                      {planStatus !== "locked" && (
+                      {/* Tháng đã hết không lập kế hoạch / đặt cam kết được nữa — không mời bấm (23/10). */}
+                      {planStatus !== "locked" && month >= today.slice(0, 7) && (
                         <GoLink label={planStatus === "none" ? "Lập kế hoạch" : "Chốt kế hoạch"} onClick={onNavigate && (() => { rememberBrandId(b.id); onNavigate("month_plan", undefined, platform); })} />
                       )}
                       {plan?.brandConfirmedAt && (
@@ -252,7 +299,7 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ platform, brands
                       <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${COMMIT_STATUS_CLS[commitStatus]}`}>
                         {COMMIT_STATUS_LABEL[commitStatus]}
                       </span>
-                      {commitStatus === "no_commitment" && (
+                      {commitStatus === "no_commitment" && month >= today.slice(0, 7) && (
                         <GoLink label="Đặt cam kết tháng" onClick={onNavigate && (() => { rememberBrandId(b.id); onNavigate("month_plan", undefined, platform); })} />
                       )}
                       {progress && (
@@ -275,12 +322,19 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ platform, brands
                       {s.gmv > 0 ? fmtVndShort(s.gmv) : <span className="text-[var(--text-faint)] font-normal">—</span>}
                     </td>
                     <td className="py-2.5 px-2">
-                      <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${REPORT_STATUS_CLS[reportStatus]}`}>
-                        {REPORT_STATUS_LABEL[reportStatus]}
-                      </span>
-                      {reportStatus !== "published" && month < today.slice(0, 7) && s.happened > 0 && (
-                        <GoLink label={reportStatus === "none" ? "Tạo report" : "Mở report"} onClick={onNavigate && (() => onNavigate("brand_monthly_report", b.id, platform))} />
-                      )}
+                      <ReportCell
+                        status={reportStatus}
+                        report={monthlyReports.get(pub.reportKey(b.id, month))}
+                        month={month}
+                        currentMonth={today.slice(0, 7)}
+                        sessionCount={pub.sessionCountFor(b.id, month)}
+                        unreconciled={pub.unreconciledCountFor(b.id, month)}
+                        busy={pub.busyKey === pub.reportKey(b.id, month)}
+                        error={pub.rowError[pub.reportKey(b.id, month)]}
+                        onPublish={(r) => pub.handlePublish(b.id, month, r)}
+                        onUnpublish={(id) => pub.handleUnpublish(b.id, month, id)}
+                        onOpen={onNavigate && (() => onNavigate("brand_monthly_report", b.id, platform))}
+                      />
                     </td>
                     <td className="py-2.5 px-2">
                       {price ? (
@@ -312,6 +366,58 @@ export const BrandsOverview: React.FC<BrandsOverviewProps> = ({ platform, brands
           <Loader2 className="w-3 h-3 animate-spin" /> Đang tải…
         </p>
       )}
+    </div>
+  );
+};
+
+// Cột Report Tháng: trạng thái + Phát hành / Thu hồi (gộp từ Điều Phối Phát Hành 23/10). Phát hành = đóng sổ (0133) nên chỉ tháng đã hết;
+// tháng không có ca và chưa ai tạo dòng report thì không mời gửi một report rỗng.
+const ReportCell: React.FC<{
+  status: BrandMonthlyReport["status"] | "none";
+  report: BrandMonthlyReport | undefined;
+  month: string;
+  currentMonth: string;
+  sessionCount: number;
+  unreconciled: number;
+  busy: boolean;
+  error?: string;
+  onPublish: (existing: BrandMonthlyReport | undefined) => void;
+  onUnpublish: (reportId: string) => void;
+  onOpen?: () => void;
+}> = ({ status, report, month, currentMonth, sessionCount, unreconciled, busy, error, onPublish, onUnpublish, onOpen }) => {
+  const isPublished = status === "published" && !!report;
+  const nothingToPublish = sessionCount === 0 && !report;
+  const btn = "inline-flex items-center gap-1.5 mt-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold min-h-6 disabled:opacity-60";
+  return (
+    <div>
+      <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${REPORT_STATUS_CLS[status]}`}>
+        {REPORT_STATUS_LABEL[status]}
+      </span>
+      {isPublished && report?.publishedAt && (
+        <span className="block text-[11px] text-[var(--text-faint)] mt-1">{new Date(report.publishedAt).toLocaleDateString("vi-VN")}</span>
+      )}
+      {!isPublished && month < currentMonth && unreconciled > 0 && (
+        <span className="block text-[11px] text-amber-300 mt-1">{unreconciled} ca chưa đối soát</span>
+      )}
+      {isPublished ? (
+        <button type="button" onClick={() => onUnpublish(report!.id)} disabled={busy} className={`${btn} text-[var(--text-muted)] hover:bg-[var(--surface-elevated)]`}>
+          {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />} Thu hồi
+        </button>
+      ) : month >= currentMonth ? (
+        <span className="block text-[11px] text-[var(--text-faint)] mt-1" title="Phát hành là đóng sổ số của tháng — chỉ làm sau khi hết tháng.">Chờ hết tháng</span>
+      ) : nothingToPublish ? (
+        <span className="flex items-center gap-1 text-[11px] text-[var(--text-faint)] mt-1" title="Tháng này brand chưa có ca nào và cũng chưa ai tạo dòng report — không có số gì để gửi.">
+          <Ban className="w-3 h-3 shrink-0" /> Không có gì để phát hành
+        </span>
+      ) : (
+        <div className="flex flex-wrap items-center gap-x-2">
+          <button type="button" onClick={() => onPublish(report)} disabled={busy} className={`${btn} border border-[var(--accent)]/60 text-[var(--accent-text)] hover:bg-[var(--accent)]/15`}>
+            {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />} Phát hành
+          </button>
+          <GoLink label="Xem report" onClick={onOpen} />
+        </div>
+      )}
+      {error && <div className="text-[11px] text-red-300 font-semibold mt-1 max-w-[220px] whitespace-normal">{error}</div>}
     </div>
   );
 };

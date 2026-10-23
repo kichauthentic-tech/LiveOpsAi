@@ -13,6 +13,10 @@
 
 ## 1. Giai đoạn hiện tại (cập nhật 2026-10-23)
 
+- **23/10 tối: AUDIT TRÙNG MÀN + "mỗi loại số một màn" (đã commit + push 23/10, không migration)** — User chốt: OP VẪN chốt người + mở/huỷ/dời ca
+  như trainer (không gom về Bàn Trainer, giữ Phòng Điều Hành). Đã làm: Dashboard chỉ xem trong tháng (kỳ `"month" | "7d"`); Điều Phối Phát Hành gộp
+  vào Toàn Cảnh Brand (`hooks/useReportPublish.ts`, id/link cũ → `brands_overview`); "Việc cần làm" Dashboard chỉ còn "Báo sớm brand" + dẫn sang Bảng
+  Vận Hành; Toàn Cảnh Brand tháng đã hết không còn nút "Lập kế hoạch"/"Đặt cam kết tháng". Số đo audit, cách verify, việc còn mở: lịch sử `## Audit trùng màn (2026-10-23)`.
 - **23/10: TAB KẾ TOÁN K1 (BUILT, chưa commit, không migration)** — user: kế toán trên app CHỈ tính từ dữ liệu app (không thuế/hoá đơn/thu tiền/khấu hao/chi phí khác/kê khai).
   Menu Quản trị → "Kế Toán" (`accounting`, ceo/admin, URL `/ke-toan`): `Accounting.tsx` + logic thuần `lib/accounting/monthClose.ts` (`buildMonthClose`, test
   `tests/accountingMonthClose.test.ts`). Bốn số: doanh thu theo HỢP ĐỒNG (brand × sàn × `contractCovering`; không có hợp đồng hiệu lực ⇒ dòng riêng), công talent theo người,
@@ -23,7 +27,7 @@
   chỉ hiện khi nhập xong. **Còn mở:** K2 (bản chụp "Chốt tháng": báo lệch hay khoá — chờ user), role kế toán riêng, kiểm cột Hoàn tiền tính theo ngày đặt hay ngày hoàn.
 - **23/10: DASHBOARD LÀM LẠI THEO DEMO "SO CÙNG KỲ" (BUILT, chưa commit, không migration)** — user duyệt demo 22/10 rồi "bắt đầu build vào app".
   Dashboard agency = `AgencyDashboard.tsx`: MỘT sàn (thanh Sàn, `TAB_CHANNEL_SCOPE.agency_overview = "one"`), thanh trên = 2 tab **Toàn sàn | Brand** +
-  kỳ (Tháng này · 7 ngày · Tháng trước · Tự chọn) + "So với" + Tải Excel + dòng "Đang xem … · Số đủ tới · N ca chờ số". Số so kỳ: `lib/performance/periodCompare.ts`
+  kỳ (Tháng này · 7 ngày; 23/10 tối bỏ Tháng trước · Tự chọn) + "So với" + Tải Excel + dòng "Đang xem … · Số đủ tới · N ca chờ số". Số so kỳ: `lib/performance/periodCompare.ts`
   (`resolvePeriod`, `aggregate`, `indexBy`/`channelGph`, `hostRows`/`coRows`); 4 nút của tab Brand: `lib/performance/brandLens.ts` (`weekRows`/`waveRows` +
   dòng "Cả tháng tới nay", `lensScope`). UI ở `components/dashboard/period/` (`PlatformTab`, `BrandTab`, `brandBelow`, `opsBlocks`, `useBrandFiles`, `ui`).
   Toàn sàn: 2 hàng ô (vận hành, rồi GMV · run-rate theo kế hoạch · dự kiến cuối tháng · GMV/giờ · Orders·CVR · AOV), thẻ run-rate từng brand + dòng so cùng
@@ -144,7 +148,7 @@
 - **Workspace (Bước 3 đa sàn, 07/10):** switcher trên Header = **Agency** (ceo/admin/operations, mọi brand, mọi kênh) + **một mục mỗi
   brand** (CROCS, JOCKEY, VERA, Franklin; kênh của brand ghi cạnh tên). Role `brand` khoá vào brand của mình qua `assigned_brand_id`, không
   có switcher. **Sàn KHÔNG phải workspace:** sidebar không đổi khi đổi sàn; màn theo sàn có thanh **"Sàn"** đầu nội dung (`ChannelBar`),
-  phạm vi khai ở `TAB_CHANNEL_SCOPE` (appNav): `"all"` = Sổ Ca, Hiệu Suất Host, Toàn Cảnh Brand, Điều Phối Phát Hành, Lịch +
+  phạm vi khai ở `TAB_CHANNEL_SCOPE` (appNav): `"all"` = Sổ Ca, Hiệu Suất Host, Toàn Cảnh Brand, Lịch +
   Sổ Ca brand — thêm "Tất cả kênh" (agency: `perPlatformBlocks` xếp khối riêng từng sàn; Sổ Ca: số vận hành cộng, GMV/đơn/GMV giờ ghi
   từng sàn); `"one"` = Dashboard agency (23/10: không có "Tất cả" — hiệu suất hai sàn không cộng), Kế Hoạch
   Tháng, Hỗ Trợ Vận Hành và các tab brand còn lại (Dữ Liệu Gốc gồm cả đối soát). State: `agencyChoice/agencySingle`, `brandChoice/brandSingle` →
@@ -153,8 +157,8 @@
   Có URL route (`src/lib/routes.ts`): `/so-ca`, `/brand/crocs/report-thang`…
 - **Nguồn sự thật của menu:** `agencyNavGroups()`/`brandNavGroups()` ở [src/lib/appNav.ts](src/lib/appNav.ts). Ảnh chụp (nhóm gộp 18/10):
   - Agency: Dashboard · Phòng Điều Hành — **Kế hoạch:** Kế Hoạch Tháng · Bàn Trainer — **Vận hành hằng ngày:** Bảng Vận Hành (id `calendar`, khối
-    Hỗ Trợ Vận Hành cuối trang) · Lịch & Studio (`studio_calendar`) · Sổ Ca (Run-rate gộp vào Dashboard 22/10) — **Phân tích:** Hiệu Suất Host · Toàn Cảnh Brand · Điều Phối
-    Phát Hành — **Nguồn lực & khách hàng:** Talent Pool · Studios & Gear · CRM ("Hợp đồng & giá") · TikTok API — **Quản trị:** Kế Toán (ceo/admin, 23/10) · Finance & P&L (ceo/admin,
+    Hỗ Trợ Vận Hành cuối trang) · Lịch & Studio (`studio_calendar`) · Sổ Ca (Run-rate gộp vào Dashboard 22/10) — **Phân tích:** Hiệu Suất Host · Toàn Cảnh Brand (gồm phát hành Report
+    Tháng, 23/10) — **Nguồn lực & khách hàng:** Talent Pool · Studios & Gear · CRM ("Hợp đồng & giá") · TikTok API — **Quản trị:** Kế Toán (ceo/admin, 23/10) · Finance & P&L (ceo/admin,
     trainer chỉ đọc) · Phân Quyền & Role · AI Training Center (admin). Talent: Ca Của Tôi · Cả Agency · Đăng Ký Ca · Tôi (điện thoại: thanh tab dưới đáy).
   - Brand: Dashboard · Lịch Vận Hành · Sổ Ca — **Kế hoạch & báo cáo:** Kế Hoạch Tháng Sau · Sản phẩm lên live · Report Tháng · Affiliate · Hợp Đồng
     (chỉ đọc) — **Nhập số liệu** (ẩn với role brand): Nhập Ads · Dữ Liệu Gốc.
@@ -167,7 +171,7 @@
 - **Đã gỡ khỏi app (đừng dựng lại bản cũ):** Dashboard KPI dự phóng cũ, Toàn Cảnh Agency, Live Sessions Hub, Module
   Campaign, Price List, Co-Funded Voucher, Hoá Đơn & Công Nợ, AI Script Gen, Simulator, Hội Đồng AI, Workflow Automation
   Rules, Report Tháng Chuyên Sâu riêng (đã gộp), Hỗ Trợ Vận Hành riêng (đã gộp vào Dashboard brand), 3 bảng con của ca, tab Theo kỳ / Sức khoẻ
-  của Dashboard (23/10 — thay bằng bộ chọn kỳ + so cùng kỳ).
+  của Dashboard (23/10 — thay bằng bộ chọn kỳ + so cùng kỳ), kỳ "Tháng trước"/"Tự chọn" của Dashboard + màn Điều Phối Phát Hành riêng (23/10 tối).
 
 ## 4. Luồng dữ liệu
 
@@ -193,7 +197,7 @@
    cho brand qua RPC; brand chỉ thấy số của tháng đã phát hành (view `live_sessions_secure`, 0107). **Phát hành = đóng
    sổ** (0133): chỉ phát hành tháng đã hết; tháng đã phát hành thì mọi ghi số/lịch/người/loại/huỷ/thêm/xoá ca của
    brand-tháng đó bị trigger `trg_guard_published_month_sessions` chặn (trừ vòng đời Upcoming→Completed) — muốn sửa thì
-   thu hồi report. Điều Phối Phát Hành kiểm độ mới bản chụp trước khi phát hành (cũ ⇒ hỏi cập nhật rồi mới phát hành).
+   thu hồi report. Phát hành ở Toàn Cảnh Brand (`useReportPublish`) kiểm độ mới bản chụp trước khi phát hành (cũ ⇒ hỏi cập nhật rồi mới phát hành).
    **Đối soát** (0133): mỗi lô gắn MỘT brand (chọn trước khi up), chỉ khớp ca của brand đó; dòng thiếu giờ không khớp ca
    nào; lô cũ không gắn brand ⇒ `apply_live_reconciliation` từ chối. **Chia số (0171):** chỉ qua `private.recon_shares` —
    mốc snapshot theo GIỜ TẢI FILE, không theo giờ hết ca; ca đã đối soát không bị snapshot đè (chỉ Áp Dụng Lại đổi số).
@@ -458,6 +462,7 @@ target khung camp ở Nhập Ads bỏ 06/10 — tháng không có kế hoạch c
 
 | Mục trong file lịch sử | Tóm tắt |
 |---|---|
+| `## Audit trùng màn (2026-10-23)` | đếm cửa trùng (chốt người 6, mở ca 5, tải người 4, host 6, việc cần làm 5, cam kết 4), quyết định user, 3 sửa đợt 3 + cách verify, việc còn mở |
 | `## Dashboard so cùng kỳ (2026-10-23)` + `## §1 mục 21–22/10 Dashboard (chuyển khỏi WORKSPACE 23/10)` | luật lấy từ audit demo (2 mốc cắt, chỉ số so chính kênh, trễ > 3 tiếng, chia target chưa xếp, host/trợ), số đo app thật 23/10, những gì bỏ so với 3 tab cũ; nguyên văn §1 21–22/10 |
 | `## Dashboard "một thẻ kênh" (2026-10-21)` | 9 mâu thuẫn đo trên app thật, độ dài từng màn, xu hướng 5 tháng, sổ dự báo, 4 quyết định, vá quyền brand (0179) + bộ kiểm |
 | `## §1 mục 16–17/10 brand workspace (chuyển khỏi WORKSPACE 21/10)` | nguyên văn: số đo brand workspace, lỗ quyền role brand, cách giả lập role brand có che số |

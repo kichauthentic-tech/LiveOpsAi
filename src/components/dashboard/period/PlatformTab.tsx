@@ -32,7 +32,6 @@ export interface PlatformTabProps {
   cards: ChannelCard[];
   vms: AccountVM[];
   cardsLoading: boolean;
-  nextPlanLocked: (c: ChannelCard) => boolean;
   today: string;
   onOpenBrand: (brandId: string) => void;
   onOpenMonthPlan: (brandId: string, platform: ReportPlatform) => void;
@@ -49,7 +48,7 @@ export const PlatformTab: React.FC<PlatformTabProps> = (p) => {
   const scope: Scope = { cur, prev, label, prevLabel };
   const c = aggregate(cur), b = prev ? aggregate(prev) : null, weak = isWeak(c, b);
   const live = cards.filter((x) => x.state !== "off");
-  const todos = useMemo(() => (P.isCurrentMonth ? agencyTodos(cards, { today, max: 4, nextPlanLocked: p.nextPlanLocked }) : []), [P.isCurrentMonth, cards, today, p.nextPlanLocked]);
+  const todos = useMemo(() => agencyTodos(cards), [cards]);
 
   // Run-rate theo kế hoạch của cả sàn = Σ đã đạt ÷ Σ kế hoạch tới nay của các thẻ (mỗi thẻ tới ca mới nhất có số của nó).
   const rrAct = live.reduce((a, x) => a + (x.pace?.actual ?? 0), 0), rrExp = live.reduce((a, x) => a + (x.pace?.targetToDate ?? 0), 0);
@@ -110,7 +109,7 @@ export const PlatformTab: React.FC<PlatformTabProps> = (p) => {
 
       <CumChart sessions={sessions} P={P} cards={P.isCurrentMonth ? live : []} title={`GMV luỹ kế · các brand ${profileOf(platform).label}`} />
 
-      {todos.length > 0 && <Todos todos={todos} cards={cards} onOpenBrand={onOpenBrand} onOpenMonthPlan={onOpenMonthPlan} onNavigate={onNavigate} />}
+      {P.isCurrentMonth && <Todos todos={todos} onNavigate={onNavigate} />}
 
       <CampTable sessions={sessions} P={P} />
 
@@ -238,23 +237,24 @@ export const CumChart: React.FC<{ sessions: LiveSession[]; P: ResolvedPeriod; ca
 
 // ---------------------------------------------------------------------------
 
-const Todos: React.FC<{ todos: AgencyTodo[]; cards: ChannelCard[]; onOpenBrand: (brandId: string) => void; onOpenMonthPlan: (brandId: string, platform: ReportPlatform) => void; onNavigate: (tab: string) => void }> = ({ todos, cards, onOpenBrand, onOpenMonthPlan, onNavigate }) => (
+// 23/10: chỉ việc từ dự báo; việc vận hành (up số, chốt kế hoạch tháng sau, giờ cam kết) có một chỗ là Bảng Vận Hành — ở đây chỉ dẫn sang.
+const Todos: React.FC<{ todos: AgencyTodo[]; onNavigate: (tab: string) => void }> = ({ todos, onNavigate }) => (
   <Card>
     <BlockHead title="Việc cần làm" />
     <ul className="space-y-2">
-      {todos.map((t, i) => {
-        const card = t.action?.cardKey ? cards.find((c) => c.key === t.action!.cardKey) : undefined;
-        const go = !t.action ? null : t.action.kind === "sessions" ? () => onNavigate("sessions") : card ? (t.action.kind === "month_plan" ? () => onOpenMonthPlan(card.brandId, card.platform) : () => onOpenBrand(card.brandId)) : null;
-        return (
-          <li key={i} className="flex gap-2.5 text-sm">
-            <i className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${t.tone === "bad" ? "bg-rose-400" : t.tone === "warn" ? "bg-amber-300" : "bg-[var(--text-faint)]"}`} aria-hidden="true" />
-            <span className="min-w-0 text-[var(--text-muted)] leading-snug">
-              {t.text}
-              {go && <button type="button" onClick={go} className="ml-1.5 min-h-[24px] text-xs font-bold text-[var(--accent-text)] hover:underline">Mở →</button>}
-            </span>
-          </li>
-        );
-      })}
+      {todos.map((t, i) => (
+        <li key={i} className="flex gap-2.5 text-sm">
+          <i className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${t.tone === "bad" ? "bg-rose-400" : t.tone === "warn" ? "bg-amber-300" : "bg-[var(--text-faint)]"}`} aria-hidden="true" />
+          <span className="min-w-0 text-[var(--text-muted)] leading-snug">{t.text}</span>
+        </li>
+      ))}
+      <li className="flex gap-2.5 text-sm">
+        <i className="mt-1.5 w-2 h-2 rounded-full shrink-0 bg-[var(--text-faint)]" aria-hidden="true" />
+        <span className="min-w-0 text-[var(--text-muted)] leading-snug">
+          Up số ca, chốt kế hoạch tháng sau, giờ cam kết còn thiếu: ở Bảng Vận Hành
+          <button type="button" onClick={() => onNavigate("calendar")} className="ml-1.5 min-h-[24px] text-xs font-bold text-[var(--accent-text)] hover:underline">Mở →</button>
+        </span>
+      </li>
     </ul>
   </Card>
 );

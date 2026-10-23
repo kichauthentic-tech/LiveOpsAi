@@ -297,17 +297,15 @@ test("Talent Pool: trình AI khớp nối gập lại và xếp sau danh sách",
 
 // ---- M7 nhóm màn còn lại (2026-09-30) ----
 
-test("Điều Phối Phát Hành: không mời phát hành tháng không có gì để gửi", () => {
-  const src = readFileSync(join(SRC, "components/ReportPublishBoard.tsx"), "utf8");
-  // Số ca trong tháng là thứ quyết định report có gì để gửi — phải hiện trên bảng.
-  expect(src).toMatch(/const sessionCountFor = /);
-  expect(src).toMatch(/Ca trong tháng/);
+test("Phát hành report (Toàn Cảnh Brand, gộp 23/10): không mời phát hành tháng không có gì để gửi", () => {
+  const hook = readFileSync(join(SRC, "hooks/useReportPublish.ts"), "utf8");
+  const src = readFileSync(join(SRC, "components/BrandsOverview.tsx"), "utf8");
+  // Số ca trong tháng là thứ quyết định report có gì để gửi.
+  expect(hook).toMatch(/const sessionCountFor = /);
+  expect(src).toMatch(/sessionCount=\{pub\.sessionCountFor\(/);
   // Tháng không có ca và chưa ai tạo dòng report ⇒ không có nút xanh.
   expect(src).toMatch(/const nothingToPublish = sessionCount === 0 && !report/);
   expect(src).toMatch(/Không có gì để phát hành/);
-  // colSpan đếm được, không gõ số.
-  expect(src).toMatch(/colSpan=\{COL_COUNT\}/);
-  expect(src).not.toMatch(/colSpan=\{\d+\}/);
 });
 
 test("PageIntro: nút Chi tiết đạt sàn 24px (dùng chung 11 màn)", () => {
@@ -488,10 +486,10 @@ test("ca sinh từ Kế Hoạch Tháng giữ plan_id khi đọc/ghi DB", () => {
   expect(readFileSync(join(SRC, "types.ts"), "utf8")).toMatch(/planId\?: string;/);
 });
 
-test("Điều Phối Phát Hành: phát hành LUÔN hỏi, không chỉ khi còn ca chưa đối soát", () => {
+test("Phát hành report: LUÔN hỏi, không chỉ khi còn ca chưa đối soát", () => {
   // Phát hành là hành động hướng ra ngoài (brand nhìn thấy report) và không rút lại được trong mắt
   // người nhận; "Thu hồi" thì chỉ nội bộ và hoàn tác được. Trước đây chỉ phát hành mới KHÔNG hỏi.
-  const src = readFileSync(join(SRC, "components/ReportPublishBoard.tsx"), "utf8");
+  const src = readFileSync(join(SRC, "hooks/useReportPublish.ts"), "utf8");
   const body = src.slice(src.indexOf("const handlePublish"), src.indexOf("const handleUnpublish"));
   expect(body, "handlePublish phải await confirm").toMatch(/await confirm\(/);
   // Lời hỏi không được nằm trong nhánh `if (unreconciled > 0)`.

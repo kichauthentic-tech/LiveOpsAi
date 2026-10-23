@@ -1,5 +1,5 @@
 import React from "react";
-import { BookOpen, BrainCircuit, Calculator, ClipboardList, Briefcase, Building2, CalendarCheck, CalendarCheck2, CalendarDays, Clapperboard, CalendarClock, Crosshair, Calendar as CalendarIcon, CalendarRange, Database, DollarSign, FileSignature, FileText, LayoutDashboard, LayoutGrid, Link2, Megaphone, Package, Send, ShieldCheck, TrendingUp, User, Users } from "lucide-react";
+import { BookOpen, BrainCircuit, Calculator, ClipboardList, Briefcase, Building2, CalendarCheck, CalendarCheck2, CalendarDays, Clapperboard, CalendarClock, Crosshair, Calendar as CalendarIcon, CalendarRange, Database, DollarSign, FileSignature, FileText, LayoutDashboard, LayoutGrid, Link2, Megaphone, Package, ShieldCheck, TrendingUp, User, Users } from "lucide-react";
 import { PermissionKey, UserRole } from "../types";
 
 // Cấu hình sidebar + vài hằng số điều hướng, tách khỏi App.tsx 2026-10-01 (App.tsx 2.867 dòng).
@@ -26,7 +26,6 @@ export const TAB_CHANNEL_SCOPE: Record<string, "all" | "one"> = {
   sessions: "all",
   host_performance: "all",
   brands_overview: "all",
-  report_publish_board: "all",
   month_plan: "one",
   brand_dashboard: "one",
   brand_calendar: "all",
@@ -153,10 +152,8 @@ export function agencyNavGroups(currentRole: UserRole): NavGroup[] {
               // Toàn Cảnh Brand (Đợt C/6, 2026-09-23): bảng trạng thái 4 brand cho 1 tháng — kế
               // hoạch/cam kết/report/rate đọc thẳng từ DB, không phải widget KPI dự phóng kiểu
               // Dashboard cũ (đã xoá 2026-09-13).
-              { id: "brands_overview", label: "Toàn Cảnh Brand", icon: LayoutGrid, perm: "manage_sessions" as PermissionKey },
-              // Điều Phối Phát Hành Report (còn lại của Đợt C, Audit Role × Workspace) — bảng
-              // brand × tháng để phát hành/thu hồi Report Tháng thẳng từ đây.
-              { id: "report_publish_board", label: "Điều Phối Phát Hành", icon: Send, perm: "manage_sessions" as PermissionKey }
+              // 23/10: "Điều Phối Phát Hành" gộp vào đây (cột Report Tháng có nút Phát hành / Thu hồi); id cũ → brands_overview ở App.
+              { id: "brands_overview", label: "Toàn Cảnh Brand", icon: LayoutGrid, perm: "manage_sessions" as PermissionKey }
             ]
           }
         ]),

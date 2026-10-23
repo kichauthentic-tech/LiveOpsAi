@@ -26,6 +26,19 @@
         "NODE_ENV": "production"
       },
       "autoPort": true
+    },
+    {
+      "name": "liveops-prod-62131",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "tsx",
+        "server.ts"
+      ],
+      "port": 62131,
+      "env": {
+        "NODE_ENV": "production",
+        "PORT": "62131"
+      }
     }
   ]
 }

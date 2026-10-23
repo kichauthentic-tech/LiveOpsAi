@@ -105,7 +105,6 @@ const TodoPanel = lazyNamed(() => import("./components/TodoPanel"), "TodoPanel")
 const GlossaryDialog = lazyNamed(() => import("./components/GlossaryDialog"), "GlossaryDialog");
 const HostPerformance = lazyNamed(() => import("./components/HostPerformance"), "HostPerformance");
 const BrandsOverview = lazyNamed(() => import("./components/BrandsOverview"), "BrandsOverview");
-const ReportPublishBoard = lazyNamed(() => import("./components/ReportPublishBoard"), "ReportPublishBoard");
 const TalentShiftSignup = lazyNamed(() => import("./components/TalentShiftSignup"), "default");
 const TalentToday = lazyNamed(() => import("./components/talent/TalentToday"), "TalentToday");
 const TalentAgency = lazyNamed(() => import("./components/talent/TalentAgency"), "TalentAgency");
@@ -117,8 +116,9 @@ const RosterBoard = lazyNamed(() => import("./components/RosterBoard"), "RosterB
 const AgencyDashboard = lazyNamed(() => import("./components/AgencyDashboard"), "AgencyDashboard");
 
 // Tab đã gộp (08/10: Hỗ Trợ Vận Hành → Bảng Vận Hành) — activeTab đã lưu ở localStorage không được rơi vào màn "Quyền Truy Cập Bị Hạn Chế".
-// Tab đã gộp: Hỗ Trợ Vận Hành → Bảng Vận Hành; Run-rate → Dashboard (22/10, tab "Tháng này").
-const renamedTab = (t: string) => (t === "ops_support" ? "calendar" : t === "run_rate" ? "agency_overview" : t);
+// Tab đã gộp: Hỗ Trợ Vận Hành → Bảng Vận Hành; Run-rate → Dashboard (22/10, tab "Tháng này"); Điều Phối Phát Hành → Toàn Cảnh Brand (23/10).
+const RENAMED_TABS: Record<string, string> = { ops_support: "calendar", run_rate: "agency_overview", report_publish_board: "brands_overview" };
+const renamedTab = (t: string) => RENAMED_TABS[t] ?? t;
 
 // Chunk của từng tab — để tải SONG SONG với đợt nạp dữ liệu (xem `preload` ở lib/lazyNamed.ts). Phải
 // khớp với khối render tab bên dưới; thiếu một tab thì tab đó chỉ chậm như trước, không hỏng.
@@ -135,7 +135,6 @@ const TAB_CHUNKS: Record<string, { preload: () => void }[]> = {
   agency_overview: [AgencyDashboard],
   host_performance: [HostPerformance],
   brands_overview: [BrandsOverview],
-  report_publish_board: [ReportPublishBoard],
   brand_dashboard: [BrandDashboard],
   brand_calendar: [BrandCalendar],
   brand_sessions: [SessionLedger],
@@ -2160,25 +2159,13 @@ export default function App() {
                     sessions={activeSessions}
                     brandPlatformRates={brandPlatformRates}
                     monthlyReports={monthlyReports}
-                    onNavigate={navigateTo}
-                  />)
-                )}
-
-                {activeTab === "report_publish_board" && (
-                  perPlatformBlocks((p) => <ReportPublishBoard
-                    key={p}
-                    platform={p}
-                    brands={brandsOn(p)}
-                    sessions={activeSessions}
-                    brandPlatformRates={brandPlatformRates}
                     planMonthTotals={planMonthTotals}
-                    monthlyReports={monthlyReports}
                     onReportsChanged={() => {
                       fetchAllMonthlyReports().then(setMonthlyReports).catch(() => {});
                     }}
+                    onNavigate={navigateTo}
                   />)
                 )}
-
 
                 {/* Brand Workspace (Giai đoạn A) — mọi tab dưới đây chỉ render khi effectiveWorkspace
                     đang scope theo đúng 1 brand; component con nhận thẳng brandId + data đã lọc sẵn

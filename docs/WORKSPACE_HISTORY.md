@@ -6071,3 +6071,31 @@ Demo duyệt 22/10 (https://claude.ai/artifact/CKfzXEuDtZyFQp3k37E1Y5, bản 23)
 - **Bỏ so với 3 tab cũ (theo demo):** bảng xu hướng chỉ số 4 tháng, tải người/ngày-tuần, cam kết giờ + kỷ luật dữ liệu (`dataDiscipline` — bắt lỗi kiểu "cam
   kết 550.000.000 giờ"), 6 ô tiền + biểu đồ lãi theo ngày, chọn ngày "số tới" của module Run-rate, Excel từng tài khoản khi xem kỳ khác (nay 1 sheet so cùng kỳ).
 
+
+
+## Audit trùng màn (2026-10-23)
+
+User: "audit toàn bộ app xem có chỗ nào trùng feature, trùng màn, hoặc chức năng nằm sai nhóm (vận hành nằm ở trainer…)". Audit bằng đọc code
+(appNav.ts, khối render tab ở App.tsx, từng màn), không đo trên app.
+
+Đếm cửa trùng: chốt người vào ca 6 (Bàn Trainer công bố tuần · Bảng Vận Hành bấm ca chưa người · "Chốt lịch hàng loạt" · Lịch & Studio · Lịch Vận
+Hành brand · Phòng Điều Hành xác nhận ca nháp); mở ca 5 (Kế Hoạch Tháng · Lịch & Studio · Lịch Vận Hành brand · lưới Bàn Trainer · sa bàn Phòng Điều
+Hành); tải người 4; host giỏi 6 (Hiệu Suất Host · Dashboard Toàn sàn Host/Trợ/Cặp · Dashboard Brand Đội live · Phòng Điều Hành tay nghề · Bàn Trainer
+ma trận · Talent Pool AI); việc cần làm 5; tiến độ cam kết 4; số sau-tháng 3 (Report Tháng · Report Tuần · Dashboard kỳ Tháng trước/Tự chọn — trái
+luật §5.6); tạo talent + tài khoản 2 (Talent Pool · Phân Quyền); khuyến mãi (lịch brand `promo_schemes`) vs khung camp (Kế Hoạch Tháng) cùng nuôi dự báo.
+
+Quyết định user 23/10: (1) chốt người — OP cũng đổi được, không chỉ trainer; (2) mở/huỷ/dời ca — OP cũng cần ⇒ KHÔNG gom về một vai, không gỡ cửa nào
+ở hai mục này; (3) "mỗi loại số một màn" — đồng ý.
+
+Đã làm (đợt 3): Dashboard bỏ kỳ "Tháng trước"/"Tự chọn" (`resolvePeriod` chỉ month/7d, bỏ `cut`, `MAX_CUSTOM_DAYS`); Điều Phối Phát Hành gộp vào
+Toàn Cảnh Brand (cột Report Tháng = trạng thái + Phát hành/Thu hồi + "N ca chưa đối soát"; dòng nhắc tháng đã hết chưa phát hành trong 6 tháng);
+`agencyTodos(cards)` chỉ còn "Báo sớm brand", khối Việc cần làm thêm một dòng "Mở →" sang Bảng Vận Hành; bỏ `nextPlans` khỏi `useChannelCards`.
+Verify: tsc 0, `VITE_SUPABASE_URL= VITE_SUPABASE_ANON_KEY= npx vitest run` 986/986, audit:dead sạch, build OK, lint chỉ lỗi `Date.now` cũ ở
+SessionWindow.tsx. App thật (liveops-prod): `/phat-hanh-report` → `/toan-canh-brand`; menu không còn mục cũ; T10 dòng nhắc T9/T8/T7/T6 chưa phát
+hành; T9: CROCS/Franklin/VERA "Phát hành", JOCKEY "1 ca chưa đối soát · Phát hành", FUJIWA "Không có gì để phát hành"; bấm Phát hành CROCS → hộp
+"Bản chụp … đã cũ … 95 ca" → Huỷ, ô không đổi; Dashboard kỳ = [Tháng này, 7 ngày], 7 ngày không có Việc cần làm, "Mở →" tới /bang-van-hanh.
+Console: chỉ 2 request 400 `live_sessions_secure` đã biết (0178 chưa chạy).
+
+Còn mở (chưa làm, cần user): khối Shop/SKU/Ads/Khuyến mãi của Dashboard Brand rơi về file tháng trước khi tháng này chưa có file (là số
+sau-tháng); 6 nơi phân tích host (quyết định "bỏ bảng xếp host" từ 14/10 còn treo); tạo talent ở 2 chỗ; khuyến mãi vs khung camp; Nhập Ads tách khỏi
+Dữ Liệu Gốc; TikTok API "Chưa dùng" vẫn ở menu; trainer xem cả Finance.

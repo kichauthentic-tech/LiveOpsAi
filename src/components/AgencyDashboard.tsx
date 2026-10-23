@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Download, LayoutDashboard } from "lucide-react";
 import type { Brand, BrandChannel, BrandPlatformRate, BrandPlatformRateHistoryEntry, LiveSession, SessionFinance, ShiftSlot, Talent, TalentRateHistoryEntry, UserRole } from "../types";
 import { computeSessionPnl } from "../lib/pnl";
@@ -13,7 +13,6 @@ import { downloadSheetsAsXlsx } from "../lib/exportXlsx";
 import { errorMessage } from "../lib/errorMessage";
 import { planStatusesRead } from "../lib/db/monthPlans";
 import { commitmentsRead, contractsRead } from "../lib/db/brandContracts";
-import { nextMonthOf } from "../lib/performance/ceoBrief";
 import { todayVn } from "../lib/performance/brandCommitment";
 import type { TabPrefetchCtx } from "../lib/db/prefetch";
 import { useToast } from "../hooks/useToast";
@@ -26,16 +25,14 @@ import { rangeLabel } from "./dashboard/period/ui";
 import type { AccountVM } from "./runrate/types";
 
 // Dashboard agency (demo duyệt 22/10/2026 — thay 3 tab Tháng này / Theo kỳ / Sức khoẻ): MỘT sàn (thanh "Sàn"), kỳ chọn ở thanh trên
-// (Tháng này · 7 ngày · Tháng trước · Tự chọn + "So với"), mọi con số tự so kỳ so sánh (lib/performance/periodCompare.ts). Hai tab:
+// (Tháng này · 7 ngày + "So với"; 23/10 bỏ "Tháng trước"/"Tự chọn" — Dashboard chỉ xem trong tháng, tháng đã hết xem ở Report Tháng), mọi con số tự so kỳ so sánh (lib/performance/periodCompare.ts). Hai tab:
 // "Toàn sàn" (mọi brand của sàn) và "Brand" (một brand: run-rate + 4 nút xem + Key Metrics + shop/ads/đội live đi theo nút).
 // Run-rate, dự báo, 4 nút xem chỉ có ở "Tháng này" — số đi qua MỘT lần tính (useChannelCards → buildChannelCard).
 
 type View = "platform" | "brand";
 const PERIODS: { id: PeriodKey; label: string }[] = [
   { id: "month", label: "Tháng này" },
-  { id: "7d", label: "7 ngày" },
-  { id: "prev", label: "Tháng trước" },
-  { id: "custom", label: "Tự chọn" }
+  { id: "7d", label: "7 ngày" }
 ];
 const MODES: { id: CompareMode; label: string }[] = [
   { id: "auto", label: "Tự động" },
@@ -66,11 +63,10 @@ export interface AgencyDashboardProps {
   talentRateHistory: TalentRateHistoryEntry[];
 }
 
-// Trạng thái kế hoạch tháng này + tháng sau, cam kết, hợp đồng (useChannelCards) — nạp trước trong lúc chờ đợt nạp chung.
+// Trạng thái kế hoạch tháng này, cam kết, hợp đồng (useChannelCards) — nạp trước trong lúc chờ đợt nạp chung.
 export function prefetchAgencyDashboard(_ctx: TabPrefetchCtx): void {
   const month = todayVn().slice(0, 7);
   planStatusesRead.prefetch(month);
-  planStatusesRead.prefetch(nextMonthOf(month));
   commitmentsRead.prefetch();
   contractsRead.prefetch();
 }
@@ -95,19 +91,18 @@ export const AgencyDashboard: React.FC<AgencyDashboardProps> = (props) => {
   const brandId = lockBrandId ?? brandPick;
   const [periodKey, setPeriodKey] = useState<PeriodKey>("month");
   const [mode, setMode] = useState<CompareMode>("auto");
-  const [custom, setCustom] = useState({ start: `${today.slice(0, 7)}-01`, end: today });
 
   const platSessions = useMemo(() => sessions.filter((s) => platformOf(s) === platform && brands.some((b) => b.id === s.brandId)), [sessions, platform, brands]);
   const coverage = useMemo(() => dataCoverage(platSessions, today), [platSessions, today]);
   const period = useMemo(
-    () => resolvePeriod({ key: periodKey, mode, completeEnd: coverage.completeThrough, today, custom, first: FIRST_DATA }),
-    [periodKey, mode, coverage.completeThrough, today, custom]
+    () => resolvePeriod({ key: periodKey, mode, completeEnd: coverage.completeThrough, today, first: FIRST_DATA }),
+    [periodKey, mode, coverage.completeThrough, today]
   );
 
   // Thẻ kênh tháng đang chạy — MỘT lần tính cho cả hai tab.
   const month = today.slice(0, 7);
   const refs = useMemo(() => channelRefs(brands, brandChannels, [platform]), [brands, brandChannels, platform]);
-  const { cards, loading, nextPlans, ledger } = useChannelCards({ month, today, refs, brandChannels, sessions, shiftSlots, engineParams, role: currentRole });
+  const { cards, loading, ledger } = useChannelCards({ month, today, refs, brandChannels, sessions, shiftSlots, engineParams, role: currentRole });
   const brandOf = useMemo(() => new Map(brands.map((b) => [b.id, b])), [brands]);
   const vms: AccountVM[] = useMemo(() => {
     if (loading || cards.length === 0)
@@ -121,7 +116,6 @@ export const AgencyDashboard: React.FC<AgencyDashboardProps> = (props) => {
       oldestMissing: c.coverage.oldestMissing, loading: false, card: c
     }));
   }, [loading, cards, refs, brandOf]);
-  const nextPlanLocked = useCallback((c: { brandId: string; platform: ReportPlatform }) => nextPlans.get(brandPlatformKey(c.brandId, c.platform))?.status === "locked", [nextPlans]);
 
   const { talents, financeRecords, brandPlatformRates, brandPlatformRateHistory, talentRateHistory } = props;
   const canSeeMoney = currentRole === "ceo" || currentRole === "admin";
@@ -170,15 +164,6 @@ export const AgencyDashboard: React.FC<AgencyDashboardProps> = (props) => {
           <div className="flex gap-1 rounded-xl border border-[var(--border)] p-1 overflow-x-auto" role="group" aria-label="Kỳ xem">
             {PERIODS.map((x) => <button key={x.id} type="button" aria-pressed={periodKey === x.id} onClick={() => setPeriodKey(x.id)} className={seg(periodKey === x.id)}>{x.label}</button>)}
           </div>
-          {periodKey === "custom" && (
-            <div className="inline-flex items-center gap-1.5 text-xs">
-              <label className="sr-only" htmlFor="dash-from">Từ ngày</label>
-              <input id="dash-from" type="date" value={custom.start} min={FIRST_DATA} max={today} onChange={(e) => e.target.value && setCustom((c) => ({ ...c, start: e.target.value }))} className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1 min-h-[30px] text-[var(--text)]" />
-              <span className="text-[var(--text-faint)]">→</span>
-              <label className="sr-only" htmlFor="dash-to">Tới ngày</label>
-              <input id="dash-to" type="date" value={custom.end} min={custom.start} max={today} onChange={(e) => e.target.value && setCustom((c) => ({ ...c, end: e.target.value }))} className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1 min-h-[30px] text-[var(--text)]" />
-            </div>
-          )}
           <label className="inline-flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
             So với
             <select value={mode} onChange={(e) => setMode(e.target.value as CompareMode)} className="bg-[var(--surface-base)] border border-[var(--border)] rounded-lg px-2 py-1 min-h-[30px] text-[var(--text)] text-xs font-bold">
@@ -191,7 +176,7 @@ export const AgencyDashboard: React.FC<AgencyDashboardProps> = (props) => {
         </div>
         <p role="status" className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[var(--text-faint)] mt-2">
           <span>Đang xem <b className="text-[var(--text-muted)]">{label}</b> · {spanDays(period.start, period.end)} ngày · so với <b className="text-[var(--text-muted)]">{prevLabel}</b>{period.mode === "mom" ? " cùng ngày tháng trước" : " ngay trước, cùng độ dài"}</span>
-          <span>· Số đủ tới {coverage.completeThrough ? ddmm(coverage.completeThrough) : "—"}{period.cut ? " (kỳ cắt ở đây)" : ""}</span>
+          <span>· Số đủ tới {coverage.completeThrough ? ddmm(coverage.completeThrough) : "—"}</span>
           {waiting > 0 && <button type="button" onClick={() => onNavigate("sessions")} className="min-h-[24px] font-bold text-amber-300 hover:underline">· {waiting} ca chờ số →</button>}
           <span className="sm:ml-auto">Chỉ số trong {platform} · dưới 5 ca thì không tô màu</span>
         </p>
@@ -208,7 +193,6 @@ export const AgencyDashboard: React.FC<AgencyDashboardProps> = (props) => {
           cards={cards}
           vms={vms}
           cardsLoading={loading}
-          nextPlanLocked={nextPlanLocked}
           today={today}
           onOpenBrand={openBrand}
           onOpenMonthPlan={onOpenMonthPlan}

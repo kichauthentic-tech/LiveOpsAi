@@ -79,7 +79,7 @@ const TABS_MAY_CHANGE_REPORTS = new Set([
   "brand_monthly_report",
   "brand_next_month_plan",
   "month_plan",
-  "report_publish_board"
+  "brands_overview"
 ]);
 
 export interface WorkspaceDataInput {

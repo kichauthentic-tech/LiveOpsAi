@@ -23,8 +23,8 @@ test("đầu trang (PageHeader) không còn là một thẻ có viền/nền/bó
   expect(body).not.toMatch(/rounded-2xl|shadow-xl|bg-\[var\(--surface\)\]/);
 });
 
-test("6 màn từng tự vẽ thẻ tiêu đề nay dùng PageHeader (để chế độ Tất cả kênh không lặp tiêu đề mỗi sàn)", () => {
-  for (const f of ["AgencyDashboard", "SessionLedger", "HostPerformance", "BrandsOverview", "ReportPublishBoard", "MonthPlan"]) {
+test("5 màn từng tự vẽ thẻ tiêu đề nay dùng PageHeader (để chế độ Tất cả kênh không lặp tiêu đề mỗi sàn)", () => {
+  for (const f of ["AgencyDashboard", "SessionLedger", "HostPerformance", "BrandsOverview", "MonthPlan"]) {
     expect(read(`components/${f}.tsx`), f).toMatch(/<PageHeader\b/);
   }
 });
@@ -145,7 +145,7 @@ test("chữ viết hoa bằng CSS toàn app: chỉ còn chỗ nhận diện cố
   expect(found).toEqual(Object.fromEntries(Object.entries(KEEP).map(([f, [n]]) => [f, n])));
   // Màn đã dọn 19/10 cũng không còn chữ giãn rộng đi kèm kiểu viết hoa cũ (viên chữ có sẵn như "HÔM NAY" giữ `tracking-wide`).
   const CLEANED = [
-    "SessionWindow", "SessionRoomCase", "HostChangeReports", "SessionPlanVsActual", "BrandsOverview", "ReportPublishBoard",
+    "SessionWindow", "SessionRoomCase", "HostChangeReports", "SessionPlanVsActual", "BrandsOverview",
     "FinanceHr", "TabUsagePanel", "MonthPlan", "brand-workspace/BrandNextMonthPlan", "scheduling/TalentLoadTimeline",
     "scheduling/SlotDetailModal", "ui/PosterCalendarGrid", "StudioEquipment", "brand-workspace/SchemeWeekStrip",
     "brand-workspace/SchemeDayPanel", "roster/ShiftPanel", "AccountSettings", "MyTalentProfile", "Header", "ResetPasswordScreen",

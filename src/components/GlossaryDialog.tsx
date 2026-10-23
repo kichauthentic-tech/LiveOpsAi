@@ -19,7 +19,7 @@ const OPS_STEPS: { step: string; where: string; why: string }[] = [
   { step: "Cuối ca: giao ca — up file số liệu của sàn (TikTok Creator-Live-Performance / Shopee Live List) trên máy phòng live", where: "Bảng Vận Hành → bấm vào ca (Cửa sổ Ca Live) → Giao ca", why: "Giữ ranh giới số giữa 2 ca chung một phòng live." },
   { step: "Hằng tuần/cuối tháng: tải file từ TikTok Shop, up ở Dữ Liệu Gốc (một lần up là tự đối soát ca)", where: "Dữ Liệu Gốc (trong từng brand) → Creator Live Performance / Live List", why: "TikTok còn cập nhật GMV nhiều giờ sau khi tắt live; số đối soát là số cuối." },
   { step: "Hết tháng (brand có chạy Ads): tải file \"Campaign overview data\" theo ngày từ TikTok Ads", where: "Nhập Ads (trong từng brand)", why: "Report Tháng phần 6 lấy chi phí Ads, ROI, ROI theo loại ngày từ file này." },
-  { step: "Hết tháng: tạo Report Tháng, kiểm số, rồi Phát hành cho brand", where: "Report Tháng (trong từng brand) · Điều Phối Phát Hành", why: "Phát hành = đóng sổ tháng: số của tháng không đổi nữa." },
+  { step: "Hết tháng: tạo Report Tháng, kiểm số, rồi Phát hành cho brand", where: "Report Tháng (trong từng brand) · Toàn Cảnh Brand", why: "Phát hành = đóng sổ tháng: số của tháng không đổi nữa." },
   { step: "Theo dõi: tiến độ tháng, host nào bán tốt, lãi lỗ", where: "Dashboard · Hiệu Suất Host · Finance & P&L", why: "" }
 ];
 

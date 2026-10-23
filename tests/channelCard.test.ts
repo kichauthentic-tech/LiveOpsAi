@@ -134,22 +134,17 @@ describe("monthlyTrend — GMV/giờ 5 tháng", () => {
   });
 });
 
-describe("agencyTodos — tối đa 5, đỏ trước", () => {
+describe("agencyTodos — chỉ việc từ dự báo (23/10)", () => {
   const base = (over: Partial<ChannelCard>): ChannelCard =>
     ({ key: "k", brandId: "b", brandName: "B", platform: "TikTok", name: "B", month: "2026-10", state: "live", target: 100e6, forecast: { p50: 80e6, lo: 70e6, hi: 90e6 }, landing: { key: "short", pHit: 0 }, coverage: { missingSessions: 0, oldestMissing: null }, commitment: null, ...over }) as unknown as ChannelCard;
-  test("số chờ, báo hụt, chốt tháng sau, kênh không chạy", () => {
+  test("báo hụt có; up số / kế hoạch tháng sau / kênh không chạy không lặp lại Bảng Vận Hành", () => {
     const cards = [
       base({ key: "a", name: "Franklin", coverage: { missingSessions: 2, oldestMissing: "2026-10-19" } as never }),
       base({ key: "b", name: "VERA", landing: { key: "safe", pHit: 0.9 } }),
       base({ key: "c", name: "JOCKEY Shopee", state: "off", landing: null, forecast: null, target: null })
     ];
-    const todos = agencyTodos(cards, { today: "2026-10-21", nextPlanLocked: () => false });
-    expect(todos[0].tone).toBe("bad");
-    expect(todos.map((t) => t.text).join(" | ")).toMatch(/Báo sớm brand: 1 kênh dự kiến hụt target/);
-    expect(todos.some((t) => /Up số 2 ca/.test(t.text))).toBe(true);
-    expect(todos.some((t) => /Chốt Kế Hoạch tháng sau cho 2 kênh — còn 10 ngày/.test(t.text))).toBe(true);
-    expect(todos.some((t) => /JOCKEY Shopee: không có ca tháng 10/.test(t.text))).toBe(true);
-    expect(todos.length).toBeLessThanOrEqual(5);
+    expect(agencyTodos(cards)).toEqual([{ tone: "bad", text: "Báo sớm brand: 1 kênh dự kiến hụt target" }]);
+    expect(agencyTodos([cards[1]])).toEqual([]);
   });
 });
 

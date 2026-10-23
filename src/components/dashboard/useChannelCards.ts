@@ -5,7 +5,7 @@ import { platformsOfBrand } from "../../lib/channels";
 import { monthPlanRead, planStatusesRead } from "../../lib/db/monthPlans";
 import { commitmentsRead, contractsRead } from "../../lib/db/brandContracts";
 import { fetchForecastSnapshots, recordForecastSnapshots, type ForecastSnapshot } from "../../lib/db/forecastSnapshots";
-import { monthEndOf, nextMonthOf } from "../../lib/performance/ceoBrief";
+import { monthEndOf } from "../../lib/performance/ceoBrief";
 import { computeCommitmentProgress, monthCommitmentOf } from "../../lib/performance/brandCommitment";
 import { buildChannelCard, type ChannelCard } from "../../lib/performance/channelCard";
 import { brandPlatformKey, channelTitle, platformOf, type ReportPlatform } from "../../lib/reportPlatform";
@@ -35,11 +35,10 @@ export function useChannelCards(opts: {
   shiftSlots: ShiftSlot[];
   engineParams: EngineParams;
   role: UserRole;
-}): { cards: ChannelCard[]; loading: boolean; nextPlans: Map<string, BrandMonthPlan>; ledger: Map<string, ForecastSnapshot[]> } {
+}): { cards: ChannelCard[]; loading: boolean; ledger: Map<string, ForecastSnapshot[]> } {
   const { month, today, refs, brandChannels, sessions, shiftSlots, engineParams, role } = opts;
   const isOps = OPS.includes(role);
   const [plans, setPlans] = useState<{ month: string; map: Map<string, BrandMonthPlan> } | null>(null);
-  const [nextPlans, setNextPlans] = useState<Map<string, BrandMonthPlan>>(new Map());
   const [slots, setSlots] = useState<{ key: string; map: Map<string, BrandMonthPlanSlot[]> } | null>(null);
   const [commitments, setCommitments] = useState<BrandMonthlyCommitment[]>([]);
   const [contracts, setContracts] = useState<BrandContract[]>([]);
@@ -49,7 +48,6 @@ export function useChannelCards(opts: {
   useEffect(() => {
     let alive = true;
     planStatusesRead.take(month).then((m) => alive && setPlans({ month, map: m })).catch(() => alive && setPlans({ month, map: new Map() }));
-    planStatusesRead.take(nextMonthOf(month)).then((m) => alive && setNextPlans(m)).catch(() => alive && setNextPlans(new Map()));
     return () => { alive = false; };
   }, [month]);
 
@@ -140,5 +138,5 @@ export function useChannelCards(opts: {
     recordForecastSnapshots(rows).catch((e) => console.warn("Ghi sổ dự báo không được:", e));
   }, [cards, isOps, loading, month, today]);
 
-  return { cards, loading, nextPlans, ledger };
+  return { cards, loading, ledger };
 }

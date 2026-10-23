@@ -149,7 +149,6 @@ export interface ChannelCardInput {
   ledger?: { month: string; asOf: string; kind: string; p50: number }[];
 }
 
-const ddmm = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
 
 /** Ngày hiện ở "số đủ tới" = ngày đủ số, nhưng không vượt ngày cuối có số (ngày sau đó không có ca). */
 export function shownThroughOf(coverage: DataCoverage, sessions: LiveSession[]): string | null {
@@ -284,41 +283,18 @@ export function buildChannelCard(x: ChannelCardInput): ChannelCard {
 }
 
 // ---------------------------------------------------------------------------
-// Việc của màn sếp (tối đa 5) — dựng từ các thẻ, không có luật số riêng.
+// Việc của màn sếp — dựng từ các thẻ, không có luật số riêng. 23/10 (audit trùng màn): chỉ giữ việc mà CHỈ dự báo biết (báo sớm brand
+// kênh sẽ hụt). Up số ca, chốt kế hoạch tháng sau, giờ cam kết chưa xếp, kênh chưa có kế hoạch đã có ở Bảng Vận Hành (Việc cần làm +
+// Việc lập kế hoạch ca) và ô "Ca chưa có số" ngay trên — Dashboard chỉ dẫn sang đó, không liệt kê lại.
 // ---------------------------------------------------------------------------
 
 export interface AgencyTodo {
   tone: "bad" | "warn" | "info";
   text: string;
-  action?: { kind: "sessions" | "month_plan" | "detail"; cardKey?: string };
 }
 
-export function agencyTodos(cards: ChannelCard[], opts: { today: string; nextPlanLocked: (card: ChannelCard) => boolean; max?: number }): AgencyTodo[] {
-  const out: AgencyTodo[] = [];
-  const waiting = cards.filter((c) => c.coverage.missingSessions > 0);
-  const nWaiting = waiting.reduce((a, c) => a + c.coverage.missingSessions, 0);
-  if (nWaiting > 0) {
-    const oldest = waiting.map((c) => c.coverage.oldestMissing).filter((d): d is string => !!d).sort()[0];
-    out.push({ tone: "warn", text: `Up số ${nWaiting} ca đã chạy${oldest ? ` (cũ nhất ${ddmm(oldest)})` : ""} — dự báo đang tạm tính phần này`, action: { kind: "sessions" } });
-  }
+export function agencyTodos(cards: ChannelCard[]): AgencyTodo[] {
   const short = cards.filter((c) => c.landing && (c.landing.key === "short" || c.landing.key === "unlikely") && c.forecast && c.target);
-  if (short.length > 0)
-    out.push({
-      tone: "bad",
-      // Tên kênh đã nằm ngay trên ở biểu đồ màn sếp (dòng đỏ/vàng) — không liệt kê lại (22/10).
-      text: `Báo sớm brand: ${short.length} kênh dự kiến hụt target`
-    });
-  const mEnd = monthEndOf(`${opts.today.slice(0, 7)}-01`);
-  const daysLeft = Math.round((new Date(`${mEnd}T00:00:00`).getTime() - new Date(`${opts.today}T00:00:00`).getTime()) / 86400000);
-  const unplanned = cards.filter((c) => c.state !== "off" && !opts.nextPlanLocked(c));
-  if (unplanned.length > 0 && daysLeft <= 15)
-    out.push({ tone: daysLeft <= 10 ? "bad" : "warn", text: `Chốt Kế Hoạch tháng sau cho ${unplanned.length} kênh — còn ${daysLeft} ngày`, action: { kind: "month_plan", cardKey: unplanned[0].key } });
-  for (const c of cards) {
-    if (c.commitment && c.commitment.gapHours > 0.5)
-      out.push({ tone: "warn", text: `${c.name}: còn thiếu ${Math.round(c.commitment.gapHours)} giờ cam kết chưa xếp lịch`, action: { kind: "month_plan", cardKey: c.key } });
-  }
-  for (const c of cards.filter((x) => x.state === "off"))
-    out.push({ tone: "info", text: `${c.name}: không có ca tháng ${Number(c.month.slice(5))}, chưa có kế hoạch`, action: { kind: "month_plan", cardKey: c.key } });
-  const rank = { bad: 0, warn: 1, info: 2 } as const;
-  return out.map((t, i) => ({ t, i })).sort((a, b) => rank[a.t.tone] - rank[b.t.tone] || a.i - b.i).map((x) => x.t).slice(0, opts.max ?? 5);
+  // Tên kênh đã nằm ngay trên ở thẻ run-rate (dòng đỏ/vàng) — không liệt kê lại (22/10).
+  return short.length > 0 ? [{ tone: "bad", text: `Báo sớm brand: ${short.length} kênh dự kiến hụt target` }] : [];
 }

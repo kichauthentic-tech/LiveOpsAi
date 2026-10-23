@@ -4,28 +4,25 @@ import { sessionWindowMs } from "../sessionStatus";
 import { segmentsOfRole } from "../staffSegments";
 import { brandPlatformKey, platformOf } from "../reportPlatform";
 import { hostPortions, isCountable, sessionHours } from "./hostPerformance";
-import { monthEndOf } from "./ceoBrief";
 import { assertOnePlatform } from "../platforms/perf";
 
 // So cùng kỳ cho Dashboard (demo duyệt 22/10/2026): MỘT bộ chọn kỳ trên thanh trên cùng, mọi con số tự so với kỳ so sánh.
 // File thuần, không đụng Supabase. Luật đã chốt qua audit demo 22/10:
 //   - Kỳ nào cũng cắt ở NGÀY ĐỦ SỐ của sàn (channelHealth.dataCoverage) — không ở hôm nay, không ở ngày cuối có số bất kỳ.
-//   - "Tháng này"/"Tháng trước" so cùng các ngày của tháng trước; "7 ngày"/"Tự chọn" so khoảng ngay trước, cùng độ dài.
+//   - "Tháng này" so cùng các ngày của tháng trước; "7 ngày" so khoảng ngay trước, cùng độ dài.
+//   - 23/10 (audit trùng màn): Dashboard chỉ xem TRONG tháng — bỏ kỳ "Tháng trước" + "Tự chọn"; số một tháng đã hết chỉ ở Report Tháng.
 //   - Một bên dưới WEAK_SESSIONS ca ⇒ mũi tên xám (chưa kết luận).
 //   - Chỉ số của người / khung giờ / độ dài ca = Σ(GMV ca ÷ GMV/giờ của CHÍNH kênh đó) ÷ Σ giờ × 100. Chia cho trung bình sàn thì
 //     cơ cấu brand giả ra chênh lệch (CROCS ~20M/giờ, VERA ~1,7M/giờ: ca dài toàn rơi vào CROCS ⇒ 25 vs 144).
 //   - Lên sóng lệch quá LATE_MAX_MIN phút gần như luôn là giờ xếp ghi sai ⇒ không tính vào % trễ, đếm riêng.
 //   - Host tính GMV chỉ ở ca người đó làm HOST; trợ live chỉ tính ca và giờ (không chịu trách nhiệm GMV).
 
-export type PeriodKey = "month" | "7d" | "prev" | "custom";
+export type PeriodKey = "month" | "7d";
 export type CompareMode = "auto" | "mom" | "prev";
 
 export const WEAK_SESSIONS = 5;
 export const LATE_MIN = 5;
 export const LATE_MAX_MIN = 180;
-/** Khoảng tự chọn dài nhất (ngày) — dài hơn thì cắt bớt đầu. */
-export const MAX_CUSTOM_DAYS = 92;
-
 export interface ResolvedPeriod {
   key: PeriodKey;
   start: string;
@@ -34,8 +31,6 @@ export interface ResolvedPeriod {
   prevEnd: string;
   /** Cách so đã áp dụng (auto đã giải). */
   mode: "mom" | "prev";
-  /** Kỳ bị cắt vì số chưa đủ tới cuối kỳ theo lịch. */
-  cut: boolean;
   /** Kỳ so sánh rơi trước ngày có dữ liệu đầu tiên ⇒ không so. */
   noBase: boolean;
   /** Tháng đang chạy — chỉ kỳ này có run-rate, dự báo, 4 nút xem. */
@@ -57,28 +52,17 @@ export function shiftMonth(d: string, k: number): string {
  * `completeEnd` = ngày đủ số của sàn (null = chưa có ngày nào đủ ⇒ dùng `today`). `first` = ngày đầu có dữ liệu của app
  * (kỳ so sánh trước mốc này thì không so).
  */
-export function resolvePeriod(x: { key: PeriodKey; mode: CompareMode; completeEnd: string | null; today: string; custom?: { start: string; end: string }; first?: string }): ResolvedPeriod {
+export function resolvePeriod(x: { key: PeriodKey; mode: CompareMode; completeEnd: string | null; today: string; first?: string }): ResolvedPeriod {
   const E = x.completeEnd ?? x.today;
-  let a: string, b: string, whole = false;
-  if (x.key === "month") { a = `${E.slice(0, 7)}-01`; b = E; }
-  else if (x.key === "7d") { b = E; a = addDays(E, -6); }
-  else if (x.key === "prev") { a = shiftMonth(`${E.slice(0, 7)}-01`, -1); b = monthEndOf(a); whole = true; }
-  else {
-    a = x.custom?.start ?? `${E.slice(0, 7)}-01`;
-    b = x.custom?.end && x.custom.end >= a ? x.custom.end : a;
-    if (x.first && a < x.first) a = x.first;
-    if (spanDays(a, b) > MAX_CUSTOM_DAYS) a = addDays(b, -(MAX_CUSTOM_DAYS - 1));
-  }
-  let cut = false;
-  if (b > E) { b = E; cut = true; }
-  if (a > b) a = b;
-  const mode = x.mode === "auto" ? (x.key === "month" || x.key === "prev" ? "mom" : "prev") : x.mode;
+  const b = E;
+  const a = x.key === "month" ? `${E.slice(0, 7)}-01` : addDays(E, -6);
+  const mode = x.mode === "auto" ? (x.key === "month" ? "mom" : "prev") : x.mode;
   let ca: string, cb: string;
-  if (mode === "mom") { ca = shiftMonth(a, -1); cb = whole ? monthEndOf(ca) : shiftMonth(b, -1); }
+  if (mode === "mom") { ca = shiftMonth(a, -1); cb = shiftMonth(b, -1); }
   else { cb = addDays(a, -1); ca = addDays(cb, -(spanDays(a, b) - 1)); }
   const noBase = !!x.first && cb < x.first;
   if (x.first && ca < x.first) ca = x.first;
-  return { key: x.key, start: a, end: b, prevStart: ca, prevEnd: cb, mode, cut, noBase, isCurrentMonth: x.key === "month" };
+  return { key: x.key, start: a, end: b, prevStart: ca, prevEnd: cb, mode, noBase, isCurrentMonth: x.key === "month" };
 }
 
 // ---------------------------------------------------------------------------
