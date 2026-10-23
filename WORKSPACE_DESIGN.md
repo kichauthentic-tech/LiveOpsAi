@@ -13,6 +13,14 @@
 
 ## 1. Giai đoạn hiện tại (cập nhật 2026-10-23)
 
+- **23/10: TAB KẾ TOÁN K1 (BUILT, chưa commit, không migration)** — user: kế toán trên app CHỈ tính từ dữ liệu app (không thuế/hoá đơn/thu tiền/khấu hao/chi phí khác/kê khai).
+  Menu Quản trị → "Kế Toán" (`accounting`, ceo/admin, URL `/ke-toan`): `Accounting.tsx` + logic thuần `lib/accounting/monthClose.ts` (`buildMonthClose`, test
+  `tests/accountingMonthClose.test.ts`). Bốn số: doanh thu theo HỢP ĐỒNG (brand × sàn × `contractCovering`; không có hợp đồng hiệu lực ⇒ dòng riêng), công talent theo người,
+  chi phí ca (studio + Ads), lãi gộp; **Đối chiếu giờ theo brand × sàn** (Σ giờ tính lương các ca = Σ giờ host mọi người, `HourCheckRow`; trợ chỉ hiện phần chênh = giờ không có trợ); công tách 2 bảng **Host / Trợ live** (ai có làm host thì vai chính là host, giờ trợ của họ ở cột riêng; bấm dòng ra giờ từ brand nào); Tải Excel (5 sheet). Mọi tiền qua `computeSessionPnl` (không công thức thứ hai), chỉ cộng ca đủ dữ liệu + "tính được X/Y ca".
+  **Hợp đồng % NMV:** trước `monthEnd + 15` ngày = "ước tính" (% hoàn dự kiến CRM); sau đó, nếu file Shop Analytics phủ hết tháng, NMV = GMV × (1 − Σ Hoàn tiền ÷ Σ GMV CẢ SHOP)
+  — xấp xỉ (user chấp nhận), chỉ sàn có `shop_analytics` trong `profileOf().dataRawTypes` (Shopee luôn ước tính). Kế hoạch + câu chốt: `docs/ACCOUNTING_MODULE_PLAN.md`.
+  Đo app thật T10: 0/237 ca đủ dữ liệu (rate host/trợ chưa nhập, % commission chưa đặt, % hoàn dự kiến 0, không brand nào có hợp đồng "hiệu lực") — tab nói đúng vậy, số
+  chỉ hiện khi nhập xong. **Còn mở:** K2 (bản chụp "Chốt tháng": báo lệch hay khoá — chờ user), role kế toán riêng, kiểm cột Hoàn tiền tính theo ngày đặt hay ngày hoàn.
 - **23/10: DASHBOARD LÀM LẠI THEO DEMO "SO CÙNG KỲ" (BUILT, chưa commit, không migration)** — user duyệt demo 22/10 rồi "bắt đầu build vào app".
   Dashboard agency = `AgencyDashboard.tsx`: MỘT sàn (thanh Sàn, `TAB_CHANNEL_SCOPE.agency_overview = "one"`), thanh trên = 2 tab **Toàn sàn | Brand** +
   kỳ (Tháng này · 7 ngày · Tháng trước · Tự chọn) + "So với" + Tải Excel + dòng "Đang xem … · Số đủ tới · N ca chờ số". Số so kỳ: `lib/performance/periodCompare.ts`
@@ -146,7 +154,7 @@
 - **Nguồn sự thật của menu:** `agencyNavGroups()`/`brandNavGroups()` ở [src/lib/appNav.ts](src/lib/appNav.ts). Ảnh chụp (nhóm gộp 18/10):
   - Agency: Dashboard · Phòng Điều Hành — **Kế hoạch:** Kế Hoạch Tháng · Bàn Trainer — **Vận hành hằng ngày:** Bảng Vận Hành (id `calendar`, khối
     Hỗ Trợ Vận Hành cuối trang) · Lịch & Studio (`studio_calendar`) · Sổ Ca (Run-rate gộp vào Dashboard 22/10) — **Phân tích:** Hiệu Suất Host · Toàn Cảnh Brand · Điều Phối
-    Phát Hành — **Nguồn lực & khách hàng:** Talent Pool · Studios & Gear · CRM ("Hợp đồng & giá") · TikTok API — **Quản trị:** Finance & P&L (ceo/admin,
+    Phát Hành — **Nguồn lực & khách hàng:** Talent Pool · Studios & Gear · CRM ("Hợp đồng & giá") · TikTok API — **Quản trị:** Kế Toán (ceo/admin, 23/10) · Finance & P&L (ceo/admin,
     trainer chỉ đọc) · Phân Quyền & Role · AI Training Center (admin). Talent: Ca Của Tôi · Cả Agency · Đăng Ký Ca · Tôi (điện thoại: thanh tab dưới đáy).
   - Brand: Dashboard · Lịch Vận Hành · Sổ Ca — **Kế hoạch & báo cáo:** Kế Hoạch Tháng Sau · Sản phẩm lên live · Report Tháng · Affiliate · Hợp Đồng
     (chỉ đọc) — **Nhập số liệu** (ẩn với role brand): Nhập Ads · Dữ Liệu Gốc.

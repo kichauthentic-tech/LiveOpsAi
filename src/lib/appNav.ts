@@ -1,5 +1,5 @@
 import React from "react";
-import { BookOpen, BrainCircuit, ClipboardList, Briefcase, Building2, CalendarCheck, CalendarCheck2, CalendarDays, Clapperboard, CalendarClock, Crosshair, Calendar as CalendarIcon, CalendarRange, Database, DollarSign, FileSignature, FileText, LayoutDashboard, LayoutGrid, Link2, Megaphone, Package, Send, ShieldCheck, TrendingUp, User, Users } from "lucide-react";
+import { BookOpen, BrainCircuit, Calculator, ClipboardList, Briefcase, Building2, CalendarCheck, CalendarCheck2, CalendarDays, Clapperboard, CalendarClock, Crosshair, Calendar as CalendarIcon, CalendarRange, Database, DollarSign, FileSignature, FileText, LayoutDashboard, LayoutGrid, Link2, Megaphone, Package, Send, ShieldCheck, TrendingUp, User, Users } from "lucide-react";
 import { PermissionKey, UserRole } from "../types";
 
 // Cấu hình sidebar + vài hằng số điều hướng, tách khỏi App.tsx 2026-10-01 (App.tsx 2.867 dòng).
@@ -183,6 +183,10 @@ export function agencyNavGroups(currentRole: UserRole): NavGroup[] {
         // Trainer (user chốt 13/10) xem Finance để xếp người theo chi phí — chỉ đọc (ghi session_finance vẫn ceo/admin ở RLS).
         ...(currentRole === "ceo" || currentRole === "admin" || currentRole === "trainer"
           ? [{ id: "finance", label: "Finance & P&L", icon: DollarSign, perm: undefined }]
+          : []),
+        // Kế Toán (23/10, K1): số tháng để đối chiếu sổ sách — chỉ ceo/admin (tiền lương/doanh thu), role kế toán riêng để K2.
+        ...(currentRole === "ceo" || currentRole === "admin"
+          ? [{ id: "accounting", label: "Kế Toán", icon: Calculator, perm: undefined }]
           : []),
         { id: "user_settings", label: "Phân Quyền & Role", icon: ShieldCheck, perm: "manage_users_permissions" as PermissionKey },
         // Tài khoản cá nhân đã dời vào User Card cuối sidebar (bấm vào card để mở), không

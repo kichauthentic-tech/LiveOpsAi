@@ -27,6 +27,7 @@ const AGENCY_TAB_SLUGS: Record<string, string> = {
   crm: "crm",
   tiktok_api: "tiktok-api",
   finance: "finance",
+  accounting: "ke-toan",
   user_settings: "phan-quyen",
   ai_training: "ai-training",
   account_settings: "tai-khoan",

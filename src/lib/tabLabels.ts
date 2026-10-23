@@ -22,6 +22,7 @@ export const AGENCY_TAB_LABELS: Record<string, string> = {
   brand_commitment: "Cam Kết Hợp Đồng", // tab đã gộp vào CRM + Kế Hoạch Tháng (06/10) — giữ tên để "Lượt Mở Tab" đọc được lượt cũ
   tiktok_api: "TikTok API",
   finance: "Finance & P&L",
+  accounting: "Kế Toán",
   user_settings: "Phân Quyền & Role",
   ai_training: "AI Training Center",
   account_settings: "Tài Khoản Của Tôi",

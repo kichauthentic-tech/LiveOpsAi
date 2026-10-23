@@ -96,6 +96,7 @@ const StudioEquipment = lazyNamed(() => import("./components/StudioEquipment"), 
 const CrmProjects = lazyNamed(() => import("./components/CrmProjects"), "CrmProjects");
 const TikTokApiAutomation = lazyNamed(() => import("./components/TikTokApiAutomation"), "TikTokApiAutomation");
 const FinanceHr = lazyNamed(() => import("./components/FinanceHr"), "FinanceHr");
+const Accounting = lazyNamed(() => import("./components/Accounting"), "Accounting");
 const UserRoleSettings = lazyNamed(() => import("./components/UserRoleSettings"), "UserRoleSettings");
 const AiTrainingCenter = lazyNamed(() => import("./components/AiTrainingCenter"), "AiTrainingCenter");
 const EngineTrainingPanel = lazyNamed(() => import("./components/EngineTrainingPanel"), "EngineTrainingPanel");
@@ -151,6 +152,7 @@ const TAB_CHUNKS: Record<string, { preload: () => void }[]> = {
   crm: [CrmProjects],
   tiktok_api: [TikTokApiAutomation],
   finance: [FinanceHr],
+  accounting: [Accounting],
   ai_training: [AiTrainingCenter, EngineTrainingPanel],
   user_settings: [UserRoleSettings],
   account_settings: [AccountSettings]
@@ -2432,6 +2434,18 @@ export default function App() {
                   />
                 )}
 
+
+                {activeTab === "accounting" && (currentRole === "ceo" || currentRole === "admin") && (
+                  <Accounting
+                    sessions={sessions}
+                    talents={talents}
+                    brands={brands}
+                    financeRecords={financeRecords}
+                    brandPlatformRates={brandPlatformRates}
+                    talentRateHistory={talentRateHistory}
+                    brandPlatformRateHistory={brandPlatformRateHistory}
+                  />
+                )}
 
                 {activeTab === "ai_training" && currentRole === "admin" && (
                   <div className="space-y-8">
