@@ -62,23 +62,24 @@ export const PlatformTab: React.FC<PlatformTabProps> = (p) => {
     return sessions.filter((s) => s.status !== "Cancelled" && s.status !== "Completed" && s.date >= from && s.date <= to).reduce((a, s) => a + sessionHours(s), 0);
   }, [P.isCurrentMonth, sessions, today]);
 
-  const tile = (labelText: string, value: string, hint: React.ReactNode) => <StatTile frame="card" size="lg" label={labelText} value={value} hint={hint} />;
+  // Hai hàng KPI cùng một khung cột (6 khi tháng này, 4 khi kỳ khác) để ô thẳng hàng; ô cao bằng nhau (h-full).
+  const kpiGrid = `grid grid-cols-2 gap-2.5 ${P.isCurrentMonth ? "md:grid-cols-3 xl:grid-cols-6" : "xl:grid-cols-4"}`;
+  const tile = (labelText: string, value: string, hint: React.ReactNode) => <StatTile frame="card" size="lg" label={labelText} value={value} hint={hint} className="h-full" />;
   const vs = (x: number | null | undefined, f: (v: number) => string) => (x == null ? null : <span className="text-[var(--text-faint)]"> vs {f(x)}</span>);
   const nf = (v: number, d = 0) => v.toLocaleString("vi-VN", { maximumFractionDigits: d });
 
   return (
     <div className="space-y-5">
       {/* Vận hành trước (giờ, ca, người) — số hiệu suất sau. */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-2.5">
+      <div className={kpiGrid}>
         {tile(`Giờ live · ${profileOf(platform).label}`, `${nf(c.hours)} giờ`, <><Chg cur={c.hours} prev={b?.hours} weak />{vs(b?.hours, (v) => `${nf(v)} giờ`)}</>)}
         {tile("Sessions", nf(c.n), <><Chg cur={c.n} prev={b?.n} weak />{vs(b?.n, (v) => nf(v))}</>)}
         {tile("Người có ca (host + trợ)", nf(c.people), <><Chg cur={c.people} prev={b?.people} weak />{vs(b?.people, (v) => nf(v))}</>)}
         {tile("Giờ live/ca", c.hoursPerShift == null ? "—" : `${nf(c.hoursPerShift, 1)} giờ`, <><Chg cur={c.hoursPerShift} prev={b?.hoursPerShift} weak />{vs(b?.hoursPerShift, (v) => `${nf(v, 1)} giờ`)}</>)}
-        {P.isCurrentMonth
-          ? tile(`Giờ đã xếp ${rangeLabel(today, monthEndOf(`${today.slice(0, 7)}-01`))}`, `${nf(scheduledLeft ?? 0)} giờ`, `${live.length}/${cards.length} kênh đang chạy`)
-          : tile("Ca chưa có số", nf(c.noData), c.noData > 0 ? <button type="button" onClick={() => onNavigate("sessions")} className="font-bold text-amber-300 hover:underline min-h-[24px]">Mở Sổ Ca →</button> : "đủ số")}
+        {P.isCurrentMonth && tile(`Giờ đã xếp ${rangeLabel(today, monthEndOf(`${today.slice(0, 7)}-01`))}`, `${nf(scheduledLeft ?? 0)} giờ`, `${live.length}/${cards.length} kênh đang chạy`)}
+        {P.isCurrentMonth && tile("Ca chưa có số", nf(c.noData), c.noData > 0 ? <button type="button" onClick={() => onNavigate("sessions")} className="font-bold text-amber-300 hover:underline min-h-[24px]">Mở Sổ Ca →</button> : "đủ số")}
       </div>
-      <div className={`grid grid-cols-2 gap-2.5 ${P.isCurrentMonth ? "lg:grid-cols-6" : "lg:grid-cols-4"}`}>
+      <div className={kpiGrid}>
         {tile(`GMV ${label}`, money(c.gmv), <><Chg cur={c.gmv} prev={b?.gmv} weak={weak} />{vs(b?.gmv, money)}</>)}
         {P.isCurrentMonth && tile(`Run-rate theo kế hoạch · ${profileOf(platform).label}`, rrExp > 0 ? pct(rrAct / rrExp) : "—", rrExp > 0 ? `${money(rrAct)} / ${money(rrExp)} kế hoạch tới nay${tgt ? ` · đã đạt ${pct(rrAct / tgt)} target tháng` : ""}` : "chưa có kế hoạch chốt")}
         {P.isCurrentMonth && tile("Dự kiến cuối tháng", tgt ? `~${money(fc)}` : "—", tgt ? `${pct(fc / tgt)} của target ${money(tgt)}` : "chưa có target")}

@@ -362,7 +362,7 @@ const KeyMetrics: React.FC<{ platform: ReportPlatform; scope: LensScope }> = ({ 
     const ch = bn && cn != null ? cn / bn - 1 : null;
     const cls = ch == null || d.goodWhenUp == null || Math.abs(ch) < 0.02 || weak ? "text-[var(--text-faint)]" : ch > 0 === d.goodWhenUp ? "text-emerald-400" : "text-rose-400";
     return (
-      <div key={d.key} className={`min-w-0 ${big ? "rounded-xl border border-[var(--border)] bg-[var(--surface-base)] p-3" : "py-1.5"}`}>
+      <div key={d.key} className={`min-w-0 ${big ? "h-full rounded-xl border border-[var(--border)] bg-[var(--surface-base)] p-3" : "py-1.5"}`}>
         <p className="text-xs text-[var(--text-muted)] truncate">{d.label}</p>
         <p className={`${big ? "text-lg" : "text-sm"} font-black tabular-nums text-[var(--text)] leading-tight`}>{prof.metrics.fmt(d, cv)}</p>
         <p className="text-[11px] truncate">{ch == null ? <span className="text-[var(--text-faint)]">{baseGot.length ? "—" : "kỳ so sánh chưa có số"}</span> : <><span className={`font-bold ${cls}`}>{ch >= 0 ? "+" : "−"}{(Math.abs(ch) * 100).toLocaleString("vi-VN", { maximumFractionDigits: Math.abs(ch) < 0.1 ? 1 : 0 })}%</span> <span className="text-[var(--text-faint)]">({prof.metrics.fmt(d, bn)}{vol && norm ? `/${scope.unit}` : ""})</span></>}</p>
@@ -376,11 +376,11 @@ const KeyMetrics: React.FC<{ platform: ReportPlatform; scope: LensScope }> = ({ 
         <p className="text-sm text-[var(--text-muted)]">Không có ca có số trong {scope.label}. Chọn ngày, đợt hoặc ca khác.</p>
       ) : (
         <div className="space-y-3">
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">{prof.metrics.defs.filter((d) => d.group === "result").map((d) => cell(d, true))}</div>
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-2">{prof.metrics.defs.filter((d) => d.group === "result").map((d) => cell(d, true))}</div>
           {prof.metrics.groups.filter((g) => g.group !== "result").map((g) => (
             <div key={g.group}>
               <p className="text-xs font-bold text-[var(--text-muted)]" title={g.hint}>{g.label}</p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-x-4">{prof.metrics.defs.filter((d) => d.group === g.group).map((d) => cell(d, false))}</div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-x-4">{prof.metrics.defs.filter((d) => d.group === g.group).map((d) => cell(d, false))}</div>
             </div>
           ))}
           {weak && baseGot.length > 0 && <p className="text-xs text-[var(--text-faint)]">Dưới 5 ca ở một bên: % đổi để xám, chưa kết luận.</p>}
